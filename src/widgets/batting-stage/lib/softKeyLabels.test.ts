@@ -7,6 +7,7 @@ import {
   TIME_LABEL_POSITION,
   isTimeLabelState,
   showsTimeLabel,
+  softKeyLabelFramesOf,
 } from '@/widgets/batting-stage/lib/softKeyLabels'
 
 const origins = JSON.parse(readFileSync('public/sprites/game_ui/frames/origins.json', 'utf8')) as Record<
@@ -44,5 +45,13 @@ describe('소프트키 글자 — 0x4c8e0~0x4c9fc', () => {
     expect(showsTimeLabel(state, 3)).toBe(true)
     expect(showsTimeLabel(state, 0)).toBe(false)
     expect(showsTimeLabel(state, null)).toBe(false)
+  })
+
+  it('교체 창(상태 0xb) 뒤 배경에는 "*MENU" · "#TIME" 둘 다 없다 — 4c8e0 의 상태 문턱 0xd ~ 0x15 밖 (r212)', () => {
+    const state = { kind: '대기', tick: 0, isPaused: true } as const
+    expect(softKeyLabelFramesOf(state, 3)).toEqual([MENU_LABEL_FRAME, TIME_LABEL_FRAME])
+    expect(softKeyLabelFramesOf(state, 0)).toEqual([MENU_LABEL_FRAME])
+    expect(softKeyLabelFramesOf(state, 3, true)).toEqual([])
+    expect(softKeyLabelFramesOf({ kind: '결과', tick: 0, isPaused: false, isInPlay: true }, 3)).toEqual([])
   })
 })

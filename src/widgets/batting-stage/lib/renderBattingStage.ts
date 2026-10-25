@@ -270,6 +270,10 @@ export interface StageScene {
    * 없거나 null 이면 "#TIME" 을 안 그린다 (`softKeyLabels`).
    */
   readonly timeKeyCount?: number | null
+  /**
+   * 교체 창(경기 상태 0xb) 뒤 배경인가 — 0x4c8e0 의 상태 문턱(0xd ~ 0x15) 밖이라 "*MENU" · "#TIME" 을 안 그린다 (`softKeyLabels`)
+   */
+  readonly isSubstitutionState?: boolean
   /** 필살 남은 횟수 0xaea30(공격 팀) — 0x38a30 이 타자 옆에 "0:SP×n" 을 그린다 (`specialSwingBadge`). 없거나 null 이면 안 그린다 */
   readonly specialSwingRemaining?: number | null
   /** 경기 스킬 표시 판(0x4b5b4) 이 그림의 모습 — 상태 0xf ~ 0x11 이고 수명이 남았을 때만 (`skillPanel`) */
@@ -462,8 +466,10 @@ export function renderBattingStage(
   // 4c528 — 상태 0xf 이고 사람 수비면 존 대신 구질 목록(빛 지도 · 고리 · 칸)
   if (pitchInput?.kind === '구질') drawPitchMenu(context, pitchInput, side)
   else if (showsStrikeZone(scene.stagePhase)) drawStrikeZone(context, side)
-  // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`)
-  if (scene.stagePhase !== undefined) drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null)
+  // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`). 교체 창(0xb)은 상태 문턱 밖이라 둘 다 없다
+  if (scene.stagePhase !== undefined) {
+    drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null, scene.isSubstitutionState === true)
+  }
   // 0x4c4bc 의 0x4c9fc — 상태 0x12 의 "Km" 판 · 표시 구속 [+0x19a0] (`pitchSpeedReadout`)
   if (scene.stagePhase !== undefined) drawPitchSpeedReadout(context, scene.stagePhase, scene.pitch?.displaySpeedKmh)
   // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)

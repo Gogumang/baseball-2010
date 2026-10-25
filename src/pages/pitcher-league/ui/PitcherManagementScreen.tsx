@@ -353,10 +353,12 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
       */}
       <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
         footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false}
-        // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸
+        // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸.
+        // 칭호 목록(129)이 떠 있으면 '0' 칸은 걷는다 — 129 키 0x11f78 은 '0' 을 목록에 넘기고 목록이 버린다(타자편 `ManagementScreen`
+        // 같은 자리 주석, r212). '*' 칸은 129 에서도 119 로 돌아가는 키라 둔다
         footerPresses={{
           [FOOTER_BITS.nickname]: { label: '* 칭호', onPress: () => pressKey('*') },
-          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') },
+          ...(menu.isTitleWindowOpen ? {} : { [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') } }),
         }} />
 
       {/*

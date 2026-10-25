@@ -1,4 +1,5 @@
 import { style } from '@vanilla-extract/css'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 /**
  * 타석 캔버스(240×320) 자리 — 상태 0xe 의 소개 판(`MatchupCards`, 원본 좌표)을 놓는다.
@@ -36,4 +37,11 @@ export const popupLayer = style({
   position: 'absolute',
   inset: 0,
   zIndex: 5,
+  selectors: {
+    /**
+     * 메뉴가 띄운 질문 · 알림 상자(`MessageBox`)가 서 있는 동안은 층째 상자 겹(`POPUP_WINDOW`)으로 — 소프트키 판(6)이 상자 위로
+     * 새지 않게 (`stageScreen.css` 의 `menuLayer` 와 같은 일, r212)
+     */
+    '&:has(> [role="dialog"])': { zIndex: SCREEN_LAYERS.POPUP_WINDOW },
+  },
 })

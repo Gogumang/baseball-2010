@@ -969,6 +969,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         // 0x4c4bc 의 상태 갈래 재료 — 웹 단계 · 그 단계에 든 뒤 틱 · 쉬는 중(0xd · 0xe 대기 따위)
         stagePhase: stagePhaseNow(sceneTick),
         timeKeyCount: latestRef.current.timeKeyCount ?? null,
+        isSubstitutionState: latestRef.current.isSubstitutionWindowOpen === true,
         specialSwingRemaining: latestRef.current.specialSwingRemaining ?? null,
         // 0x4cad4 → 0x4b5b4 — 경기 스킬 표시 판 (결과 창 뒤 배경에는 안 그린다)
         skillPanel: isBackdrop ? null : stepSkillPanelNow(nowTick),
