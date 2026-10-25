@@ -8,9 +8,7 @@ import type { Screen } from '@/app/model/screen'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useCareerSession } from '@/app/model/useCareerSession'
 import { useMissionSession } from '@/app/model/useMissionSession'
-import { CareerRoutes } from '@/app/ui/CareerRoutes'
 import { EntryRoutes } from '@/app/ui/EntryRoutes'
-import { MissionRoutes, PitcherAceMatchRoute } from '@/app/ui/MissionRoutes'
 import { bootSeed, createSeededRandom } from '@/shared/api/random/seededRandom'
 import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGame'
 import { createLocalStorageMissionRecord } from '@/shared/api/save/localStorageMissionRecord'
@@ -42,10 +40,9 @@ import {
 } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
 import { useScreenSpritePreload } from '@/app/model/screenSpritePreload'
-import { SeasonRoute } from '@/app/ui/SeasonRoute'
 import { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
-import { PitcherLeagueRoute } from '@/app/ui/PitcherLeagueRoute'
-import { GeneralModeScreen, aceOpenPriceOf, generalGameOfSave, useAceOpen } from '@/pages/general-mode'
+import { generalGameOfSave } from '@/pages/general-mode/lib/generalModeResume'
+import { useAceOpen } from '@/pages/general-mode/model/useAceOpen'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { useModeSave } from '@/entities/mode-save/model/useModeSave'
 import { NEW_SAVE_LAST_PLAYED_MODE } from '@/entities/mode-save/model/modeSave'
@@ -62,10 +59,22 @@ import type { RegularSeasonOtherModes } from '@/entities/career/model/postseason
 import { useEditedNames } from '@/entities/player-name/model/useEditedNames'
 import { aceCellOfUnlock, recordUnlockIdOf } from '@/entities/collection/model/recordUnlock'
 import { recordUnlockNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
-import { isAceCellOpen } from '@/pages/general-mode/lib/aceOpenState'
+import { aceOpenPriceOf, isAceCellOpen } from '@/pages/general-mode/lib/aceOpenState'
 import { leaveGameSceneObject } from '@/widgets/game-scene/model/gameSceneObject'
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import { devBootSeed, publishSceneHandles } from '@/app/dev/sceneShortcut'
+import { lazyScreen, preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreen'
+
+/*
+ * 모드 화면은 따로 받는다(`lazyScreen` — 첫 화면 덩이를 줄인다, r224). 켤 때 길에서 `preloadLazyScreens` 가 미리 받아 두므로
+ * 메뉴에서 들어갈 때는 이미 와 있다. 뒤 숫자가 받는 차례다 — 메뉴 커서가 처음 서는 [최근게임] · 나만의리그 타자편 · 일반모드가 먼저.
+ */
+const CareerRoutes = lazyScreen(() => import('@/app/ui/CareerRoutes').then((module) => module.CareerRoutes), 10)
+const GeneralModeScreen = lazyScreen(() => import('@/pages/general-mode/ui/GeneralModeScreen').then((module) => module.GeneralModeScreen), 10)
+const PitcherLeagueRoute = lazyScreen(() => import('@/app/ui/PitcherLeagueRoute').then((module) => module.PitcherLeagueRoute), 30)
+const SeasonRoute = lazyScreen(() => import('@/app/ui/SeasonRoute').then((module) => module.SeasonRoute), 30)
+const MissionRoutes = lazyScreen(() => import('@/app/ui/MissionRoutes').then((module) => module.MissionRoutes), 30)
+const PitcherAceMatchRoute = lazyScreen(() => import('@/app/ui/MissionRoutes').then((module) => module.PitcherAceMatchRoute), 30)
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -131,8 +140,16 @@ const ALL_ACES_HIDDEN_TEAM_ID = 12
 const MISSION_PITCHER_MODE = 5
 const MISSION_BATTER_MODE = 6
 
+interface AppProps {
+  /**
+   * 켤 때 첫 화면 — 없으면 이용안내. 배포 빌드는 `main.tsx` 의 부팅 껍데기가 이 덩이를 받는 동안 이용안내를 먼저 그린다.
+   * 그새 키를 받았으면 다음 화면인 로고부터 선다(r224).
+   */
+  readonly bootScreen?: Screen
+}
+
 /** 화면 분기만 한다. 상태와 규칙은 model의 훅 세 개가 나눠 갖는다. */
-export function App() {
+export function App({ bootScreen }: AppProps = {}) {
   const saveGame = useMemo(() => createLocalStorageSaveGame(), [])
   const missionRecord = useMemo(() => createLocalStorageMissionRecord(), [])
   const settingsStore = useMemo(() => createLocalStorageJsonStore(SETTINGS_KEY), [])
@@ -178,7 +195,14 @@ export function App() {
   // 개발 · e2e 장면 바로가기 픽스처가 씨앗을 정했으면 그 값 (`app/dev` — 배포 빌드에서는 빠진다)
   const random = useMemo(() => createSeededRandom((import.meta.env.DEV || import.meta.env.MODE === 'e2e' ? devBootSeed() : null) ?? bootSeed()), [])
   // 켤 때는 장면 0x103 생성자의 [0x140006c] = −1 갈래 — 하위 0x2a <이용안내> 부터 (→ 2 로고 → 3 타이틀)
-  const [screen, setScreen] = useState<Screen>({ kind: '이용안내' })
+  const [screen, setScreen] = useState<Screen>(() => bootScreen ?? { kind: '이용안내' })
+  // 모드 화면 덩이(`lazyScreen`)는 로고가 끝난 뒤(타이틀부터) 받아 둔다 — 타이틀 · 메인 메뉴에 머무는 동안 다 온다.
+  // 이용안내 · 로고 동안 받으면 스크립트가 로고 그림보다 앞서 줄을 차지해 느린 4G 에서 로고가 2초 가까이 비었다(r224 측정).
+  // 한 덩이씩 받아 화면 그림과 덜 다툰다
+  const isPastLogo = screen.kind !== '이용안내' && screen.kind !== '로고'
+  useEffect(() => {
+    if (isPastLogo) void preloadLazyScreens()
+  }, [isPastLogo])
   /** 게임시작 목록 커서 전역 [0x1552d24] — 장면 0x103 이 내려가도 남는다(관리 메뉴 취소로 하위 5 에 바로 서면 그 칸) */
   const gameStartCursor = useRef(createGameStartCursor()).current
   /** 일반모드 진입 창 [13] 에서 빠른실행을 골랐는가 (원본 메인 메뉴 this+0x14c) */
