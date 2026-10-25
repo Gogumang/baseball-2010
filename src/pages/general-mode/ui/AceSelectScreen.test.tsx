@@ -61,7 +61,7 @@ describe('격자', () => {
 })
 
 describe('마투수 단계', () => {
-  it('윗줄만 고를 수 있다', () => {
+  it('윗줄만 누를 수 있다 — 상태 21 은 ↑ ↓ 를 격자에 안 넘겨 커서가 아랫줄로 못 간다', () => {
     띄우기()
     const cells = 칸들()
 
@@ -69,27 +69,41 @@ describe('마투수 단계', () => {
     expect(cells[5].disabled).toBe(true)
   })
 
-  it('고르면 격자 칸 번호를 넘긴다', () => {
+  it('칸 탭은 커서를 옮기고, 커서 칸을 다시 누르면 OK — 고른 격자 칸 번호를 넘긴다', () => {
     const onSelect = vi.fn()
     띄우기({ onSelect })
 
     fireEvent.click(칸들()[2])
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(screen.getByTestId('마선수-이름').textContent).toContain(acePlayerOfCell(2)?.name ?? '?')
 
+    fireEvent.click(칸들()[2])
     expect(onSelect).toHaveBeenCalledWith(2)
   })
 
-  it('안 열린 마선수는 고를 수 없고 LOCK 으로 나온다', () => {
-    띄우기({ openedAcePitcherIds: [0] })
+  /**
+   * 원본 격자는 막힌 칸 표를 다 1 로 채우고(0x263f4 의 vt+0x1c) 지우지 않는다 — 잠긴 칸에도 커서가 가고, 그 칸의 OK(0x29fbe)가
+   * 오픈 힌트를 띄운다. 그래서 잠긴 칸도 누를 수 있다 — 고르지는 못하고 힌트 · G 구매 팝업이 뜬다.
+   */
+  it('안 열린 마선수는 LOCK 이고, 커서는 가되 OK 는 고르기 대신 오픈 힌트 팝업이다', () => {
+    const onSelect = vi.fn()
+    const { container } = 띄우기({ openedAcePitcherIds: [0], onSelect })
     const cells = 칸들()
 
     expect(cells[0].disabled).toBe(false)
-    expect(cells[1].disabled).toBe(true)
+    expect(cells[1].disabled).toBe(false)
     expect(screen.getAllByRole('button', { name: 'LOCK' }).length).toBeGreaterThan(0)
+
+    fireEvent.click(cells[1])
+    expect(screen.getByTestId('마선수-이름').textContent).toBe('LOCK')
+    fireEvent.click(cells[1])
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('6000 G포인트')
   })
 })
 
 describe('마타자 단계', () => {
-  it('아랫줄만 고를 수 있다', () => {
+  it('아랫줄만 누를 수 있다', () => {
     띄우기({ phase: ACE_PHASE.마타자 })
     const cells = 칸들()
 
@@ -100,42 +114,57 @@ describe('마타자 단계', () => {
 
 describe('prop 을 안 넘기면(App.tsx 연결 누락 재현) 10칸이 전부 LOCK 이다', () => {
   it('openedAcePitcherIds·openedAceBatterIds 를 아예 안 주면 무엇도 못 고른다', () => {
-    render(<AceSelectScreen phase={ACE_PHASE.마투수} onSelect={vi.fn()} onCancel={vi.fn()} />)
-    const cells = 칸들()
+    const onSelect = vi.fn()
+    render(<AceSelectScreen phase={ACE_PHASE.마투수} onSelect={onSelect} onCancel={vi.fn()} />)
 
-    expect(cells.every((cell) => cell.disabled)).toBe(true)
     expect(screen.getAllByRole('button', { name: 'LOCK' })).toHaveLength(10)
+    for (const cell of 칸들()) {
+      fireEvent.click(cell)
+      fireEvent.click(cell)
+    }
+    expect(onSelect).not.toHaveBeenCalled()
   })
 })
 
 describe('App.tsx 기본 개방(DEFAULT_OPENED_ACE_*)을 넘기면', () => {
+  /** 칸마다 두 번(커서 옮기고 OK) 누르고 매번 팝업을 닫는다 — 고른 칸 번호만 모은다 */
+  const 다눌러보기 = (cellsToTry: readonly number[]) => {
+    const onSelect = vi.fn()
+    return { onSelect, run: () => {
+      for (const index of cellsToTry) {
+        fireEvent.click(칸들()[index])
+        fireEvent.click(칸들()[index])
+        const 닫기 = screen.queryByRole('button', { name: '아니오' }) ?? screen.queryByRole('button', { name: 'OK' })
+        if (닫기 !== null) fireEvent.click(닫기)
+      }
+    } }
+  }
+
   it('마투수 로컬 0(싸이커)만 고를 수 있다', () => {
+    const { onSelect, run } = 다눌러보기([0, 1, 2, 3, 4])
     띄우기({
+      onSelect,
       openedAcePitcherIds: DEFAULT_OPENED_ACE_PITCHER_IDS,
       openedAceBatterIds: DEFAULT_OPENED_ACE_BATTER_IDS,
     })
-    const cells = 칸들()
+    run()
 
-    expect(cells[0].disabled).toBe(false)
-    expect(cells[1].disabled).toBe(true)
-    expect(cells[2].disabled).toBe(true)
-    expect(cells[3].disabled).toBe(true)
-    expect(cells[4].disabled).toBe(true)
+    expect(onSelect).toHaveBeenCalled()
+    expect(onSelect.mock.calls.every(([cell]) => cell === 0)).toBe(true)
   })
 
   it('마타자 로컬 0(메디카)만 고를 수 있다', () => {
+    const { onSelect, run } = 다눌러보기([5, 6, 7, 8, 9])
     띄우기({
+      onSelect,
       phase: ACE_PHASE.마타자,
       openedAcePitcherIds: DEFAULT_OPENED_ACE_PITCHER_IDS,
       openedAceBatterIds: DEFAULT_OPENED_ACE_BATTER_IDS,
     })
-    const cells = 칸들()
+    run()
 
-    expect(cells[5].disabled).toBe(false)
-    expect(cells[6].disabled).toBe(true)
-    expect(cells[7].disabled).toBe(true)
-    expect(cells[8].disabled).toBe(true)
-    expect(cells[9].disabled).toBe(true)
+    expect(onSelect).toHaveBeenCalled()
+    expect(onSelect.mock.calls.every(([cell]) => cell === 5)).toBe(true)
   })
 })
 
@@ -376,6 +405,8 @@ describe('레벨업 — 상태 21 의 0 키 · 상태 28 의 OK (0x29efc · 0x2b
     const onLevelUp = vi.fn()
     띄우기({ mode: '레벨업', onSelect, onLevelUp, gamePoint: 99999, levels: { 7: 2 } })
 
+    // 첫 탭은 커서, 커서 칸 탭이 OK — 창의 "예" 는 Enter
+    fireEvent.click(칸들()[7])
     fireEvent.click(칸들()[7])
     fireEvent.keyDown(window, { key: 'Enter' })
 
@@ -386,6 +417,7 @@ describe('레벨업 — 상태 21 의 0 키 · 상태 28 의 OK (0x29efc · 0x2b
   it('상태 28: 잠긴 칸은 오픈 힌트 팝업이다', () => {
     const { container } = 띄우기({ mode: '레벨업', onLevelUp: vi.fn(), openedAceBatterIds: [] })
 
+    fireEvent.click(칸들()[7])
     fireEvent.click(칸들()[7])
 
     expect(container.textContent).toContain('마선수 오픈 힌트')

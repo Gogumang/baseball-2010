@@ -135,7 +135,7 @@ import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
-import { STEAL_KEY_OF_BASE, stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
+import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
@@ -1338,7 +1338,6 @@ function TeamGameScene({
           <PressLayer testId="도루 누름 칸">
             {isStealable.map((base) => (
               <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)}
-              touchKey={{ key: STEAL_KEY_OF_BASE[base], label: `도루 ${base}루` }}
                 onPress={() => {
                   pushSceneKey(() => {
                     if (flightProbeRef.current?.() === true) actions.steal(base)
@@ -1371,12 +1370,10 @@ function TeamGameScene({
         */}
         {overlay !== '조작방법' && (
           <PressLayer testId="소프트키 누름 칸" isOnTop>
-            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'}
-              touchKey={{ key: '*', label: isMenuOpen ? '닫기' : '메뉴' }} onPress={menu.pressStar}
+            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar}
               isDisabled={changeWindow !== null && !isMenuOpen} />
             {acceptsChangeKey && (
               <PressArea rect={TIME_PRESS_RECT} label={session.canChangePitcher ? '# 교체' : '# 대타'}
-                touchKey={{ key: '#', label: session.canChangePitcher ? '교체' : '대타' }}
                 onPress={() => setChangeWindow(session.canChangePitcher ? '투수' : '대타')} />
             )}
           </PressLayer>

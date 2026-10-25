@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
-import { FrameSprite } from '@/shared/ui'
-import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
-import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { FrameSprite, PressArea } from '@/shared/ui'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
@@ -63,8 +62,8 @@ interface EventDialogueBoxProps {
 /** 그리기 한 번(0x7fbc4)을 거친 상자 — 명령이 돌거나 상자를 내린 틀에도 그 틀의 그리기가 높이를 올리고 글을 찍는다 */
 const drawnState = (state: DialogueState, layout: DialogueLayout | null) => tickDialogue(state, layout)
 
-/** say 대사 건너뛰기 — CLR(Escape) */
-const DIALOGUE_SKIP_OFFER: TouchKeyOffer = { key: 'Escape', label: '건너뛰기' }
+/** 장식 mode_ui 프레임 21("CLR:SKIP" 글자, 44×7)이 서는 자리 — 띠 오른쪽 끝(W − 44 ~ W). 손가락 칸이라 사방 2px 넓힌다 */
+const SKIP_LABEL_WIDTH = 44
 
 /**
  * **이벤트 재생기 대사 상자** — 0x7fbc4 · 0x7fad0 · 키 0x8b804 (배치 · 찍기는 `pages/story/lib/eventDialogue`).
@@ -126,9 +125,9 @@ export function EventDialogueBox({
   onChoiceConfirmRef.current = onChoiceConfirm
   const onCancelRef = useRef(onCancel)
   onCancelRef.current = onCancel
-  // 터치 기기 — say 갈래의 CLR(0x8b7b0 건너뛰기)은 상자 탭(한 장씩 넘김)과 뜻이 달라 '건너뛰기' 상황 버튼으로 낸다(r186 — 늘 있던
-  // 뒤로 버튼을 걷었다. 원본 상자에 그 글자 자리는 없다). 버튼은 Escape 키 사건이라 아래 듣는 곳과 같은 길이다
-  useTouchKeyOffer(isActive && raw !== '' && choices === null && onCancel !== undefined ? DIALOGUE_SKIP_OFFER : null)
+  // 터치 기기 — say 갈래의 CLR(0x8b7b0 건너뛰기)은 상자 탭(한 장씩 넘김)과 뜻이 달라 따로 낸다. 원본 띠 오른쪽 장식(mode_ui 21)에
+  // "CLR:SKIP" 글자가 그려져 있어 그 자리 투명 누름 칸이 Escape 키 한 번을 낸다(r192 — r186 의 '건너뛰기' 상황 버튼을 걷었다, 필요한 버튼만)
+  const offersSkip = isActive && raw !== '' && choices === null && onCancel !== undefined
   const press = () => {
     const list = choicesRef.current
     if (list !== null) return onChoiceConfirmRef.current?.(list.selected)
@@ -217,6 +216,10 @@ export function EventDialogueBox({
       <FrameSprite folder={MODE_UI} frame={EVENT_DIALOGUE.ornamentFrame} origins={origins} x={SCREEN_WIDTH} y={boxTop} />
       <button type="button" className={styles.hit} aria-label="대사 넘기기"
         style={{ height: height + EVENT_DIALOGUE.bandHeight }} onClick={isActive ? press : undefined} />
+      {offersSkip && (
+        <PressArea label="CLR 건너뛰기" onPress={() => tapKey('Escape')}
+          rect={{ x: SCREEN_WIDTH - SKIP_LABEL_WIDTH - 2, y: bandTop - 2, width: SKIP_LABEL_WIDTH + 2, height: EVENT_DIALOGUE.bandHeight + 4 }} />
+      )}
       {placed.map(({ key, line, top, choice }) => (
         <div key={key} className={styles.textLine} data-part="글줄"
           role={choice === null ? undefined : 'option'}

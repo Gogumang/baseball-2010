@@ -406,8 +406,7 @@ export function HomeRunDerbyScreen({
         {!isMenuOpen && (acceptsConfirm || isPlayRunning) && (
           <PressArea label={acceptsConfirm ? '확인' : '건너뛰기'} onPress={acceptsConfirm ? pressConfirm : pressSkip} />
         )}
-        {!isResultShown && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT}
-          touchKey={{ key: '*', label: isMenuOpen ? '닫기' : '메뉴' }} onPress={menu.toggle} />}
+        {!isResultShown && <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.toggle} />}
 
         {isMenuOpen && !isResultShown && (
           <div className={stageScreen.menuLayer}>

@@ -36,7 +36,12 @@ const 띄우기 = (state: SeasonState, 열린투수 = 다열림, 열린타자 = 
   return onHire
 }
 
-const 줄고르기 = (이름: string) => fireEvent.click(screen.getByRole('button', { name: new RegExp(이름) }))
+/** 마선수 격자 칸 탭 — 첫 탭은 커서, 커서 칸 탭이 OK (`AceSelectScreen` 의 `tapCell`) */
+const 칸누르기 = (칸: HTMLElement) => {
+  fireEvent.click(칸)
+  fireEvent.click(칸)
+}
+const 줄고르기 = (이름: string) => 칸누르기(screen.getByRole('button', { name: new RegExp(이름) }))
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
 describe('코치 칸 = 마선수 격자 (0xd7 this+0x11c = 2 — 그림은 공용 목록 k 2)', () => {
@@ -58,7 +63,7 @@ describe('오픈 검사 (0xa734~0xa8fe)', () => {
     const onHire = 띄우기(상태({ money: 9999, popularity: 9999 }), [0], [], onOpenAce)
 
     // 칸 1(마투수 둘째)은 잠겨 있다 — 줄을 가리지 않고 힌트가 뜬다
-    fireEvent.click(screen.getAllByRole('button', { name: 'LOCK' })[0])
+    칸누르기(screen.getAllByRole('button', { name: 'LOCK' })[0])
     expect(screen.getByRole('button', { name: '예' })).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
@@ -70,7 +75,7 @@ describe('오픈 검사 (0xa734~0xa8fe)', () => {
     const onOpenAce = vi.fn()
     띄우기(상태({ money: 9999, popularity: 9999 }), [0, 1, 2, 3], [0, 1, 2, 3], onOpenAce)
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'LOCK' })[0])
+    칸누르기(screen.getAllByRole('button', { name: 'LOCK' })[0])
 
     expect(screen.queryByRole('button', { name: '예' })).toBeNull()
     expect(screen.getByRole('button', { name: 'OK' })).toBeDefined()

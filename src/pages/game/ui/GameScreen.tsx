@@ -48,7 +48,7 @@ import {
   runnerRunAbilitiesOf,
   stealableBasesOf,
 } from '@/features/play-game/model/gameFlow'
-import { STEAL_KEY_OF_BASE, stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
+import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import { RUTHLESS_SKILL_ID } from '@/entities/batting/model/specialSwing'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
@@ -480,11 +480,9 @@ export function GameScreen({
         )}
         {!sceneConfirm.isAwaiting && !isMenuOpen &&
           stealableBases.map((base) => (
-            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)}
-              touchKey={{ key: STEAL_KEY_OF_BASE[base], label: `도루 ${base}루` }} onPress={() => stealIfFlying(base)} />
+            <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={() => stealIfFlying(base)} />
           ))}
-        <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT}
-          touchKey={{ key: '*', label: isMenuOpen ? '닫기' : '메뉴' }} onPress={menu.pressStar} />
+        <PressArea label={isMenuOpen ? '닫기' : '메뉴'} rect={MENU_PRESS_RECT} onPress={menu.pressStar} />
 
         {isMenuOpen ? (
           <div className={stageScreen.menuLayer}>

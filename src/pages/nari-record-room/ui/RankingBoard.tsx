@@ -3,7 +3,7 @@ import { skinBlinkCounterValue } from '@/shared/lib/skinBlink/skinBlink'
 import { useSkinStepCounterValue } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { CommonPanel, PressArea, useImgTextPalette3 } from '@/shared/ui'
-import { PAGE_NEXT_OFFER, PAGE_PREVIOUS_OFFER, tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import { yearLabelOffsetOf, yearNumberGlyphsOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import {
@@ -73,13 +73,13 @@ export function RankingBoard({
         <img alt="다음 쪽" src={imageOf(SLT_FRAME, RANKING_BOARD.sideArrowImage)}
           style={{ ...pixel, left: rankingSideArrowXOf('right', counters), top: arrowTop, transform: 'scaleX(-1)' }} />
       )}
-      {/* 웹 덧붙임 — 쪽 화살(5×8, 깜박이며 2px 까딱) 위 투명 칸: 원본 ← · → 키 한 번. ◀ · ▶ 상황 버튼도 띄운다(부르는 화면이 키를 받는다) */}
+      {/* 웹 덧붙임 — 쪽 화살(5×8, 깜박이며 2px 까딱) 위 투명 칸: 원본 ← · → 키 한 번. 같은 키를 상황 버튼으로 또 내지 않는다(필요한 버튼만, 부르는 화면이 키를 받는다) */}
       {hasPreviousPage && (
-        <PressArea label="앞 쪽" touchKey={PAGE_PREVIOUS_OFFER} onPress={() => tapKey('ArrowLeft')}
+        <PressArea label="앞 쪽" onPress={() => tapKey('ArrowLeft')}
           rect={{ x: rankingSideArrowXOf('left', RANKING_BLINK_AT_REST) - 4, y: arrowTop - 3, width: 13, height: 14 }} />
       )}
       {hasNextPage && (
-        <PressArea label="다음 쪽" touchKey={PAGE_NEXT_OFFER} onPress={() => tapKey('ArrowRight')}
+        <PressArea label="다음 쪽" onPress={() => tapKey('ArrowRight')}
           rect={{ x: rankingSideArrowXOf('right', RANKING_BLINK_AT_REST) - 4, y: arrowTop - 3, width: 13, height: 14 }} />
       )}
       {Array.from({ length: RANKING_BOARD.rowCount }, (_unused, row) => {

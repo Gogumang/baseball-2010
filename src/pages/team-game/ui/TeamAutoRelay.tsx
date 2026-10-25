@@ -255,12 +255,12 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
               style={imageStyle(SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) + 3, ARROW_Y)} />
           </>
         )}
-        {/* 웹 덧붙임 — 속도 화살(5×8, 깜박임) 위 투명 칸: 원본 ← · → 키 한 번(속도 −1 · +1). 상황 버튼도 띄운다 */}
+        {/* 웹 덧붙임 — 속도 화살(5×8, 깜박임) 위 투명 칸: 원본 ← · → 키 한 번(속도 −1 · +1). 같은 키를 상황 버튼으로 또 내지 않는다(필요한 버튼만) */}
         {!isAsking && (
           <>
-            <PressArea label="속도 느리게" touchKey={{ key: 'ArrowLeft', label: '◀ 느리게' }} onPress={() => tapKey('ArrowLeft')}
+            <PressArea label="속도 느리게" onPress={() => tapKey('ArrowLeft')}
               rect={{ x: SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 13, y: ARROW_Y - 4, width: 14, height: 16 }} />
-            <PressArea label="속도 빠르게" touchKey={{ key: 'ArrowRight', label: '빠르게 ▶' }} onPress={() => tapKey('ArrowRight')}
+            <PressArea label="속도 빠르게" onPress={() => tapKey('ArrowRight')}
               rect={{ x: SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) - 1, y: ARROW_Y - 4, width: 14, height: 16 }} />
             {/* "CLR 중단" 글자(game_ui 92, 위 안내 그림) 자리 — 원본 CLR 키 한 번(중단 질문). r186 — 늘 있던 뒤로 버튼을 걷었다 */}
             {guide !== undefined && (

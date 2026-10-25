@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -178,6 +178,41 @@ export function NationalCupScreen({
     if (finish.reward.messageId === 0) return onFinish(finish, resolved)
     setStep('보상')
   }
+
+  /**
+   * **키 길** (직접 떴다) — 대진 키 0xf3 `0xe6f8` · 134 `0x19fdc` 와 순위 키 135 `0x10680` 은 [this+0x40] 이 OK(−5) 또는 '5'(0x35)
+   * 일 때만 움직이고, 시즌 순위 0xf4 `0x4a18` 만 그 밖에 CLR(−16) → 0xf3(대진)이 있다. 그 밖의 키는 아무 일이 없다.
+   * 팝업(히든 팀 · 칭호 · 결과 · 보상)이 떠 있는 동안은 창이 키를 먹는다(0x754f9) — 대진판 확인도 팝업이 다 닫힌 뒤다.
+   * 화면 탭(대진판 · 순위표의 투명 누름 칸)은 OK 와 같다.
+   */
+  const keyRef = useRef<(key: string) => boolean>(() => false)
+  keyRef.current = (key) => {
+    const isOk = key === 'Enter' || key === '5'
+    if (step === '대진' && entryPopup === null) {
+      if (!isOk) return false
+      confirmBracket()
+      return true
+    }
+    if (step === '순위' && matchup !== null) {
+      if (isOk) {
+        onStartGame(matchup, cup)
+        return true
+      }
+      if (key === 'Escape' && mode === '시즌모드') {
+        setStep('대진')
+        return true
+      }
+    }
+    return false
+  }
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      if (keyRef.current(event.key)) event.preventDefault()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   return (
     <RawScreen>

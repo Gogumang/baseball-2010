@@ -285,6 +285,24 @@ describe('엔딩 흐름', () => {
     expect(onFinish).toHaveBeenCalledWith(false)
   })
 
+  it('키 0x1220c 는 키 값을 안 본다 — 어느 키든 화면 탭과 같다 (나리 장면 0x1cdec 표 0xcc7e0[141 − 0x66] = 0x1d12c)', () => {
+    띄우기({ endingIndex: 0, bonusGamePoint: 0, isContinuable: true })
+
+    fireEvent.keyDown(window, { key: '7' })
+
+    expect(screen.getByText(/이어하시겠습니까/)).toBeTruthy()
+  })
+
+  it('은퇴 엔딩도 아무 키나 제작진으로 넘긴다 — 되풀이(누르고 있기)는 누름이 아니다', () => {
+    const { container } = 띄우기()
+    fireEvent.keyDown(window, { key: 'Enter', repeat: true })
+    틀(ENDING_STAGE.effectorFrames + 1)
+    const 앞 = container.textContent
+    fireEvent.keyDown(window, { key: 'Escape' })
+    틀(ENDING_STAGE.effectorFrames + 1)
+    expect(container.textContent).not.toBe(앞)
+  })
+
   it('부상·방출 엔딩은 제작진 없이 이어하기를 묻는다', () => {
     const onContinue = vi.fn(() => true)
     띄우기({ endingIndex: 0, bonusGamePoint: 0, isContinuable: true, onContinue })

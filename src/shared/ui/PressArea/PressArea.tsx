@@ -1,5 +1,3 @@
-import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
-import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import * as styles from '@/shared/ui/PressArea/PressArea.css'
 
 export interface PressRect {
@@ -23,11 +21,6 @@ interface PressAreaProps {
   readonly option?: { readonly isSelected: boolean }
   /** 시험이 칸을 찾는 이름 (`data-testid`) */
   readonly testId?: string
-  /**
-   * 터치 기기 상황 버튼으로도 띄울 원본 키 — 칸이 서 있고 막히지 않은 동안 그 키를 알린다(`touchKeyOffer`).
-   * 버튼은 이 칸의 `onPress` 가 아니라 **그 키 사건**을 쏜다(키보드와 같은 길). 작은 칸('*MENU' · 루 그림)을 손가락으로 대신한다
-   */
-  readonly touchKey?: TouchKeyOffer
 }
 
 /**
@@ -43,9 +36,9 @@ const WHOLE_SCREEN: PressRect = { x: 0, y: 0, width: 240, height: 320 }
 /**
  * **투명한 누름 칸** — 원본 화면에는 없는 웹 단추를 걷어 내되, 마우스 · 터치로 조작할 길은 남긴다.
  * 원본 그림 자리(소프트키 글자 "*MENU" 따위) 위에 투명하게 얹는다. 눌림이 아래 캔버스(스윙)로 내려가지 않게 막는다.
+ * 같은 키를 터치 상황 버튼으로 또 내지 않는다 — 원본 글자 자리로 되는 키는 버튼을 걷었다(r192, 사용자 요청 "필요한 버튼만").
  */
-export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = false, option, testId, touchKey }: PressAreaProps) {
-  useTouchKeyOffer(isDisabled ? null : touchKey ?? null)
+export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = false, option, testId }: PressAreaProps) {
   return (
     <button
       type="button"

@@ -153,6 +153,13 @@ describe('일반모드 진입 창 [13] — 하위 12 0x296f0', () => {
     expect(그림('이어하기')).toContain('popup/frames/009.png')
   })
 
+  it('터치: 창에 CLR 버튼이 없어 바닥띠 되돌아가기 표시 자리 투명 칸이 CLR 을 낸다 — 창이 닫힌다 (답 −1)', () => {
+    const onSelectMode = 일반모드창()
+    fireEvent.click(screen.getByRole('button', { name: '되돌아가기 칸' }))
+    expect(screen.queryByText('진행하시겠습니까?', { exact: false })).toBeNull()
+    expect(onSelectMode).not.toHaveBeenCalled()
+  })
+
   it('새로하기는 일반모드, 빠른실행은 빠른실행으로 들어간다', () => {
     const onSelectMode = 일반모드창()
     fireEvent.click(screen.getByRole('button', { name: '빠른실행' }))
