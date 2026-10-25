@@ -70,7 +70,7 @@
       "id": "hidden-team-korea",
       "kind": "hiddenTeam",
       "name": "대한민국",
-      "condition": "국가대항전 순위 화면 134 에 들어가면 열린다 — 전역 해금 k 8",
+      "condition": "국가대항전 대진판 134(나리 0x19f30) · 시즌모드 상태 243(0xe684) 에 들어가면 열린다 — 전역 해금 k 8",
       "source": "0x19f30 · 0xe684",
       "unlocked": null
     },
@@ -158,7 +158,7 @@
       "id": "hidden-item-19",
       "kind": "pitcherEquipment",
       "name": "토끼 머리띠",
-      "condition": "타자편 이벤트 r_event 306 보상 종류 7 — 전역 해금 k 19",
+      "condition": "나리 이벤트(두 편 공통 — audience 1, 0x8c60e 보상 7 갈래는 모드를 안 본다) r_event 306 보상 종류 7 — 전역 해금 k 19",
       "source": "0x8c626",
       "unlocked": null
     },
@@ -238,7 +238,7 @@
       "id": "hidden-item-29",
       "kind": "pitcherEquipment",
       "name": "사신의 눈",
-      "condition": "타자편 이벤트 r_event 307 보상 종류 7 — 전역 해금 k 29",
+      "condition": "나리 이벤트(두 편 공통 — audience 1, 0x8c60e 보상 7 갈래는 모드를 안 본다) r_event 307 보상 종류 7 — 전역 해금 k 29",
       "source": "0x8c626",
       "unlocked": null
     },
@@ -254,7 +254,7 @@
       "id": "hidden-item-31",
       "kind": "pitcherEquipment",
       "name": "토끼털 신발",
-      "condition": "나만의리그 투수편 플레이 시간 10시간 초과 — 전역 해금 k 31",
+      "condition": "나만의리그 투수편 플레이 시간 10시간 이상(⌊ms ÷ 3600000⌋ > 9, 4e94e~4e95c) — 전역 해금 k 31",
       "source": "0x4e8b0",
       "unlocked": null
     },
@@ -286,7 +286,7 @@
       "id": "hidden-item-35",
       "kind": "batterEquipment",
       "name": "바이커 스컬",
-      "condition": "타자편 이벤트 r_event 305 보상 종류 7 — 전역 해금 k 35",
+      "condition": "나리 이벤트(두 편 공통 — audience 1, 0x8c60e 보상 7 갈래는 모드를 안 본다) r_event 305 보상 종류 7 — 전역 해금 k 35",
       "source": "0x8c626",
       "unlocked": null
     },
@@ -350,7 +350,7 @@
       "id": "hidden-item-43",
       "kind": "batterEquipment",
       "name": "바이커 밴드",
-      "condition": "타자편 이벤트 r_event 304 보상 종류 7 — 전역 해금 k 43",
+      "condition": "나리 이벤트(두 편 공통 — audience 1, 0x8c60e 보상 7 갈래는 모드를 안 본다) r_event 304 보상 종류 7 — 전역 해금 k 43",
       "source": "0x8c626",
       "unlocked": null
     },
@@ -382,7 +382,7 @@
       "id": "hidden-item-47",
       "kind": "batterEquipment",
       "name": "바이커 부츠",
-      "condition": "나만의리그 타자편 플레이 시간 10시간 초과 — 전역 해금 k 47",
+      "condition": "나만의리그 타자편 플레이 시간 10시간 이상(⌊ms ÷ 3600000⌋ > 9, 4e94e~4e95c) — 전역 해금 k 47",
       "source": "0x4e8b0",
       "unlocked": null
     },
