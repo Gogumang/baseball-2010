@@ -1,3 +1,4 @@
+import { recordStageEntryPoints } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
 import { ballFrameIndexAt, ballPixelAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
@@ -381,7 +382,9 @@ export function renderBattingStage(
   const aceEffect = acePitcherEffectInputOf(scene)
   // 마투수 effect_pitcher(+0x1044) — 0x38d1c 꼬리 39258 이 깊이 24499 로 넣는다. 같은 깊이의 루상 주자(0x35b94)보다 먼저 넣어 그 밑이다
   drawEffectPitcher(context, aceEffect, side)
-  // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499(투수판 z − 1)로 들어가 투수·타자보다 먼저(뒤에) 그려진다 (유력)
+  // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499([0xcfa8c+8] − 1, 35bfe~35c08)로 들어가 투수보다 먼저(뒤에) 그려진다 (확정 r205:
+  // 넣기 0xbe810 은 깊이 오름차순(be864 `cmp 새, 칸 / bge`) · 비우기 0xbe6a0 은 칸 0 부터 그린다 · 투수 그림 0x79525 깊이 [0xd3cf8+8] = 24500
+  // — 곧 주자는 투수 밑이다, U-122)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
     // 주자 시계를 안 넘기는 옛 길(`tick`)도 창 첫 그림(0x35b94 35c62 한 칸)을 센다 — 시계를 넘기면 부르는 쪽이 이미 셌다
     drawBaseRunners(context, scene.hud, side, scene.tick + redrawsSoFar, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
@@ -397,6 +400,8 @@ export function renderBattingStage(
   )
   // 0x38dc6 바람 줄(애니 11) — 투수와 같은 깊이 24500 이지만 먼저 넣어 투수 밑에 그려진다
   drawPitchWind(context, scene, side, pitcherAnimation)
+  // 0x38d1c(38dc2) · 0x49e64(49f76)가 0x38b64 에 넘기는 그림 자리 — 교체 등판 파티클이 쓴다(`substitutionEntryParticle`)
+  recordStageEntryPoints(side, scene.pitcherHand ?? 0, scene.shift)
   drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0, pitcherOutfitOf(scene))
   // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) · 홈런 갈래(0x3908a) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
   drawPitcherMistakeMark(context, scene, side)

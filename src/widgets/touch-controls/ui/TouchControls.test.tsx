@@ -120,19 +120,14 @@ describe('상황 버튼 — 화면이 알린 키만, 같은 키 사건으로', (
     expect(names).toEqual(['필살타', '도루 1루', '교체', '메뉴'])
   })
 
-  it('PressArea 의 touchKey — 칸이 서 있고 막히지 않은 동안만 알린다', () => {
-    const Screen = ({ isDisabled, isShown }: { isDisabled: boolean; isShown: boolean }) => (
+  it('원본 글자 자리 투명 칸(PressArea)은 상황 버튼을 따로 띄우지 않는다 — 같은 키를 두 길로 내지 않는다 (r192, 필요한 버튼만)', () => {
+    render(
       <>
         <TouchControls layout="below" />
-        {isShown && <PressArea label="메뉴" onPress={() => {}} isDisabled={isDisabled} touchKey={{ key: '*', label: '메뉴' }} />}
-      </>
+        <PressArea label="메뉴" onPress={() => {}} />
+      </>,
     )
-    const { rerender } = render(<Screen isDisabled={false} isShown />)
-    expect(document.querySelector('[data-touch-key="*"]')?.textContent).toBe('메뉴')
-    rerender(<Screen isDisabled isShown />)
-    expect(document.querySelector('[data-touch-key="*"]')).toBeNull()
-    rerender(<Screen isDisabled={false} isShown={false} />)
-    expect(document.querySelector('[data-touch-key="*"]')).toBeNull()
+    expect(document.querySelector('[data-touch-key]')).toBeNull()
   })
 
   it('useTouchKeyOffer(null) 은 아무것도 알리지 않는다', () => {

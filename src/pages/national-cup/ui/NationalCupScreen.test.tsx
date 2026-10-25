@@ -292,3 +292,39 @@ describe('나리 142 취소로 돌아왔을 때 (0x13c72 의 S+0x12c 갈래 → 
     expect(onStartGame).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('키 길 (대진 0xe6f8 · 0x19fdc · 순위 0x4a18 · 0x10680 — 직접 떴다)', () => {
+  const 키 = (key: string) => fireEvent.keyDown(window, { key })
+
+  it('OK(Enter) · \'5\' 가 대진판 → 순위표 → 경기로 넘긴다 — 그 밖의 키는 아무 일이 없다', () => {
+    const onStartGame = vi.fn()
+    띄우기(createNationalCup(), { onStartGame })
+
+    키('1')
+    키('Escape')
+    expect(screen.getByRole('group', { name: '국가대항전 대진' })).toBeTruthy()
+    키('Enter')
+    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+    키('5')
+    expect(onStartGame).toHaveBeenCalledTimes(1)
+  })
+
+  it('시즌 0xf4 순위표만 CLR(−16) 로 0xf3 대진판에 돌아간다 (0x4a18)', () => {
+    띄우기(createNationalCup())
+    키('Enter')
+    키('Escape')
+    expect(screen.getByRole('group', { name: '국가대항전 대진' })).toBeTruthy()
+  })
+
+  it('나리 135 순위표는 CLR 을 안 받는다 (0x10680 은 OK · \'5\' 만)', () => {
+    const onStartGame = vi.fn()
+    render(
+      <NationalCupScreen mode="나만의리그" cup={createNationalCup()} yearIndex={2} random={고정난수(0)}
+        onStartGame={onStartGame} onFinish={vi.fn()} initialStep="순위" />,
+    )
+    키('Escape')
+    expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
+    키('5')
+    expect(onStartGame).toHaveBeenCalledTimes(1)
+  })
+})

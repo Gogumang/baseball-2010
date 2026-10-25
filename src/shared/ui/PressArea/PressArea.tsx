@@ -25,7 +25,8 @@ interface PressAreaProps {
   readonly testId?: string
   /**
    * 터치 기기 상황 버튼으로도 띄울 원본 키 — 칸이 서 있고 막히지 않은 동안 그 키를 알린다(`touchKeyOffer`).
-   * 버튼은 이 칸의 `onPress` 가 아니라 **그 키 사건**을 쏜다(키보드와 같은 길). 작은 칸('*MENU' · 루 그림)을 손가락으로 대신한다
+   * **원본 그림에 그 키의 글자 자리가 없는 칸에만** 준다(외출 지도 · 조준 · 교체 창의 CLR, r194). 글자 자리 위 칸("*MENU" · "#TIME" ·
+   * 루 그림 · 화살)은 그 칸이 곧 터치 길이라 버튼을 또 내지 않는다(r192, 사용자 요청 "필요한 버튼만")
    */
   readonly touchKey?: TouchKeyOffer
 }

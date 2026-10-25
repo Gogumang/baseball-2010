@@ -29,7 +29,7 @@ describe('순위 판 0x5796c 그리기', () => {
     expect(container.querySelector('img[alt="앞 쪽"]')).toBeNull()
   })
 
-  it('터치 — 쪽 화살 자리 투명 칸은 원본 → 키 한 번(keydown · keyup)을 내고, 있는 쪽만 ◀ · ▶ 상황 버튼을 띄운다', () => {
+  it('터치 — 쪽 화살 자리 투명 칸은 원본 → 키 한 번(keydown · keyup)을 내고, 있는 쪽만 선다 — 같은 키를 상황 버튼으로 또 내지 않는다(필요한 버튼만)', () => {
     const seen: string[] = []
     const record = (event: KeyboardEvent) => seen.push(`${event.type}:${event.key}`)
     window.addEventListener('keydown', record)
@@ -39,7 +39,7 @@ describe('순위 판 0x5796c 그리기', () => {
         hasPreviousPage={false} hasNextPage testIdPrefix="기록순위" />,
     )
     expect(screen.queryByRole('button', { name: '앞 쪽' })).toBeNull()
-    expect(touchKeyOffersNow().map((offer) => offer.key)).toEqual(['ArrowRight'])
+    expect(touchKeyOffersNow()).toEqual([])
     fireEvent.click(screen.getByRole('button', { name: '다음 쪽' }))
     expect(seen).toEqual(['keydown:ArrowRight', 'keyup:ArrowRight'])
     window.removeEventListener('keydown', record)

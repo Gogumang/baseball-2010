@@ -2123,6 +2123,8 @@ function selectPitchAfterClear(
     const incomingIsAce = moundAcePitcherOf(changed, false) !== undefined
     const scene: SubstitutionScene = {
       serial: (current.substitutionScene?.serial ?? 0) + 1,
+      // 투수 예약 갈래 — 0xe 첫 그림의 0x38b64 투수 가지(ptc/004)
+      entryKind: '투수',
       incomingIsAce,
       // 0x473f0 컷인 번호 — 0xb63a1(마투수) (투수라 +5 없음)
       ...(incomingIsAce && changed.aces !== undefined

@@ -234,6 +234,26 @@ export function AceSelectScreen({
   }
 
   /**
+   * **커서가 갈 수 있는 칸** — 격자 [메뉴+0x74] 는 진입(0x263f4 · 0x262c8)의 vt+0x1c 가 막힌 칸 표 [+0x28] 을 모두 1 로 채우고
+   * 지우는 곳이 없어(직접 떴다) **잠긴 칸에도 커서가 간다** — 그 칸의 OK(0x29fbe~)가 `mgr[0x30 + 칸] == 0` 을 보고 오픈 힌트를 띄운다.
+   * 상태 21 은 ↑ ↓ 를 격자에 안 넘겨(0x29e74~0x29e80) 단계의 줄 안에서만 다닌다. 상태 28 · 코치채용은 두 줄 모두.
+   */
+  const isCellReachable = (cell: number) => isLevelUpMode || isCoachMode || aceRoleOfCell(cell) === phase
+
+  /**
+   * **칸 탭** (웹 터치 길 — 원본은 키패드뿐): 커서가 아닌 칸이면 커서만 그 칸으로 옮기고(이름 막대 · ABILITY 판 · '0레벨업' 이
+   * 그 칸을 본다), 커서 칸을 다시 누르면 OK 한 번이다 — 열린 칸은 고르고, 잠긴 칸은 오픈 힌트 · G 구매 팝업이 뜬다.
+   */
+  const tapCell = (cell: number) => {
+    if (keyLock.current || !isCellReachable(cell)) return
+    // 팝업 · 창이 떠 있으면 격자는 키를 받지 않는다 — 키 길(아래)과 같다
+    if (hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null) return
+    if (overlay !== undefined && overlay !== null && overlay !== false) return
+    if (cell !== cursor) return setCursor(cell)
+    pressCell(cell)
+  }
+
+  /**
    * 오픈 힌트 팝업의 답 (0xa390~0xa46e). 첫 버튼(0)이 "예" 다.
    *
    * G가 모자라면(`G < 가격`, 0xa3dc `blt`) **사지 않고** 부족 팝업으로 넘어간다 — G도 안 깎인다.
@@ -411,13 +431,13 @@ export function AceSelectScreen({
             type="button"
             aria-label={open && player !== undefined ? player.name : LOCK_LABEL}
             aria-pressed={cell === cursor}
-            disabled={!isCoachMode && !isCellSelectable(cell)}
+            disabled={!isCellReachable(cell)}
             className={styles.cell}
             data-dimmed={isDimmed}
             style={{ left: x, top: y, width: ACE_LAYOUT.grid.cell, height: ACE_LAYOUT.grid.cell }}
             // 원본 격자(상태 21 진입 0x263f4 · 28 진입 0x262c8 의 vt+0x1c)는 키패드로만 커서를 옮긴다 — 올려 두기로 커서를 옮기던 onMouseEnter 는 걷었다(멈춘
-            // 포인터가 키 커서를 빼앗는다, 메인 메뉴 r27 과 같은 종류). 누름만 남긴다
-            onClick={() => (isLevelUpMode ? requestLevelUp(cell) : isCoachMode ? pressCell(cell) : onSelect(cell))}
+            // 포인터가 키 커서를 빼앗는다, 메인 메뉴 r27 과 같은 종류). 누름만 남긴다 — 첫 누름은 커서, 커서 칸 누름은 OK (`tapCell`)
+            onClick={() => tapCell(cell)}
           >
             <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cellImage)} style={{ left: 0, top: 0 }} />
             {open && player !== undefined

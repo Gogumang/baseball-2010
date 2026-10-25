@@ -8,7 +8,8 @@ import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import { createKeyHold, HOLD_STAGE_MASK, type KeyHold } from '@/shared/lib/sceneKeyLatch/keyHold'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
-import { useInPlayTouchKeys } from '@/features/defense-play/model/inPlayTouchKeys'
+import { offenseOffersFor, useInPlayTouchKeys } from '@/features/defense-play/model/inPlayTouchKeys'
+import type { InPlayRunnerSituation } from '@/features/defense-play/model/inPlayTouchKeys'
 import { PressArea } from '@/shared/ui/PressArea/PressArea'
 import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import {
@@ -655,8 +656,6 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   if (stepperRef.current === null || stepperRef.current.play !== play) {
     stepperRef.current = { play, stepper: startLiveRunnerPlay(play), startedAt: update }
   }
-  // 터치 기기 — 사람이 잡은 쪽(판의 side, 안 주면 수비)의 송구 · 주루 상황 버튼
-  useInPlayTouchKeys(play.side ?? '수비')
   const pressesRef = useRef<DefenseKeyPress[]>([])
   /** 줄의 키마다 받은 장면 틱 (`takePressFor`) */
   const pressTicksRef = useRef<number[]>([])
@@ -768,6 +767,9 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   }, [isFinished, onDone, stepper])
 
   const tickState = ticks[Math.min(Math.max(0, seen), lastIndex)]
+  // 터치 기기 — 사람이 잡은 쪽(판의 side, 안 주면 수비)의 송구 · 주루 상황 버튼. 공격 쪽 도루 · 폭투 판은 판을 연 주자 목록으로
+  // 그 판에 먹는 키만(`offenseOffersFor` — 주자 판에는 타구가 없어 +0x111 이 서지 않는다). 견제 판은 주자 목록을 따로 안 들어 아홉 다
+  useInPlayTouchKeys(play.side ?? '수비', play.kind === 'arrival' ? { runners: play.opened.engineInput.runners } : null)
   if (tickState === undefined) return null
   // 판이 닫힌 뒤 갱신 — 0x3f060 의 G1(3f0b8)이 닫혀 카메라가 선다
   const state = stepper.finished && seen > lastIndex ? frozenCamera(tickState) : tickState
@@ -788,6 +790,9 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     </DefenseScreen>
   )
 }
+
+/** 판을 연 첫 그림 전 — 주루 버튼 없음 */
+const NO_RUNNER_SITUATION: InPlayRunnerSituation = { runners: [] }
 
 interface LivePlaybackProps {
   readonly input: DefensePlayInput
@@ -818,8 +823,6 @@ function LivePlayback({
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(true, updateStartTickRef)
-  // 터치 기기 — 사람이 잡은 쪽의 송구 · 주루 상황 버튼 (자동 판은 없음)
-  useInPlayTouchKeys(side)
   const stateRef = useRef<DefensePlayState | null>(null)
   const builtFromRef = useRef<DefensePlayInput | null>(null)
   const builtSideRef = useRef<ControlSide | undefined>(undefined)
@@ -844,6 +847,13 @@ function LivePlayback({
   /** +0x1094 — 관문이 닫힌 뒤 지난 갱신 수 (판 시작 0) */
   const closedCountRef = useRef(0)
   const [view, setView] = useState<DefenseViewState | null>(null)
+  /**
+   * 터치 기기 — 사람이 잡은 쪽의 송구 · 주루 상황 버튼 (자동 판은 없음). 공격 쪽은 진행기의 지금 주자 형편(주자 +0x8c · 플레이 +0x111)으로
+   * 그 순간 먹는 키만(`offenseOffersFor`). 남는 키 묶음이 바뀔 때만 다시 그린다 — 판을 연 첫 그림 전에는 주루 버튼이 없다
+   */
+  const [runnerSituation, setRunnerSituation] = useState<InPlayRunnerSituation>(NO_RUNNER_SITUATION)
+  const runnerSituationKeyRef = useRef('')
+  useInPlayTouchKeys(side, runnerSituation)
   /** 판이 닫힌 뒤 갱신(+0x1094 셈)에 들었고 0x3f060 의 G1(3f0b8)이 닫혔다 — 카메라가 선다 */
   const [closed, setClosed] = useState(false)
   /**
@@ -1042,6 +1052,16 @@ function LivePlayback({
       seenTickCountRef.current = running.ticks.length
     }
     stateRef.current = running
+    if (side === '공격') {
+      const situation: InPlayRunnerSituation = {
+        runners: running.runners.map((runner) => runner.state), homeRunFlag: running.homeRunFlag,
+      }
+      const situationKey = offenseOffersFor(situation).map((offer) => offer.key).join(',')
+      if (situationKey !== runnerSituationKeyRef.current) {
+        runnerSituationKeyRef.current = situationKey
+        setRunnerSituation(situation)
+      }
+    }
     // 건너뛰기가 이 그림 안에서 여러 틱을 돌고 판 끝 전에 풀리면(카메라 3f17e) 다음 그림부터는 다시 한 그림에 한 틱이다 — 앞서 돈 틱만큼
     // 시작 갱신을 당겨 갱신 계수가 진행기 틱을 따라잡을 때까지 멈춰 있지 않게 한다
     if (running.tick > wanted) startedAtRef.current -= running.tick - wanted

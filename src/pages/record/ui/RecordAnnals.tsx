@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, InsetBox, PressArea, RawScreen, useImgTextPalette3 } from '@/shared/ui'
-import { PAGE_NEXT_OFFER, PAGE_PREVIOUS_OFFER, tapKey, useTouchKeyOffer, useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { tapKey, useTouchKeyOffer, useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -239,7 +239,7 @@ export function RecordAnnals({
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
-  // 터치 기기 — 본문에 초점이 있으면 ▲ · ▼ 상황 버튼(↑ · ↓ — 보이는 행 밖 칸 · 닉네임 글 스크롤). ◀ · ▶ 는 아래 쪽 화살 칸이 띄운다
+  // 터치 기기 — 본문에 초점이 있으면 ▲ · ▼ 상황 버튼(↑ · ↓ — 보이는 행 밖 칸 · 닉네임 글 스크롤). ◀ · ▶ 는 아래 쪽 화살 칸이 받는다
   useTouchScrollKeys(isPanelOpen && !isTabFocused)
   // 탭 막대 초점의 OK(본문으로)는 칸 그림이 없는 탭(0 · 3 · 4)에서 누를 자리가 없어 '본문 보기' 상황 버튼으로 낸다(r186 — 늘 있던
   // 확인 버튼을 걷었다). Enter 키 사건이라 위 듣는 곳과 같은 길이다
@@ -297,13 +297,13 @@ export function RecordAnnals({
           <div className={styles.pagerText} style={{ left: PAGER.numberX, top: PAGER.y }}>
             {page + 1}/{pageCount}
           </div>
-          {/* 웹 덧붙임 — 쪽 화살 그림(5×8) 위 투명 칸: 원본 ← · → 키 한 번. 본문 초점이면 ◀ · ▶ 상황 버튼도 띄운다 */}
+          {/* 웹 덧붙임 — 쪽 화살 그림(5×8) 위 투명 칸: 원본 ← · → 키 한 번. 같은 키를 상황 버튼으로 또 내지 않는다(r192, 필요한 버튼만) */}
           {isPanelOpen && (
             <>
               <PressArea label="앞 쪽" rect={{ x: PAGER.leftArrow.x - 3, y: PAGER.leftArrow.y - 3, width: 11, height: 14 }}
-                onPress={() => tapKey('ArrowLeft')} {...(isTabFocused ? {} : { touchKey: PAGE_PREVIOUS_OFFER })} />
+                onPress={() => tapKey('ArrowLeft')} />
               <PressArea label="뒤 쪽" rect={{ x: PAGER.rightArrow.x - 3, y: PAGER.rightArrow.y - 3, width: 11, height: 14 }}
-                onPress={() => tapKey('ArrowRight')} {...(isTabFocused ? {} : { touchKey: PAGE_NEXT_OFFER })} />
+                onPress={() => tapKey('ArrowRight')} />
             </>
           )}
         </>

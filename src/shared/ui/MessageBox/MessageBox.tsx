@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { MarkupText } from '@/shared/ui'
+import { PressArea } from '@/shared/ui/PressArea/PressArea'
+import type { PressRect } from '@/shared/ui/PressArea/PressArea'
 import { useMarksCommonWindowShown, useSceneClosesWithoutShrink } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
 
@@ -46,6 +48,11 @@ interface MessageBoxProps {
    * 예: 일반모드 [13] 은 −1(0x29760~0x2977c). 안 주면 지금까지처럼 마지막 칸이다.
    */
   readonly cancelAnswer?: number
+  /**
+   * CLR 을 터치로 낼 원본 글자 자리(240×320 좌표) — 창에 취소 단추가 없는데(`cancelAnswer` 가 단추 밖) 창 뒤 바닥띠의 되돌아가기 표시가
+   * 보일 때 준다. 그 자리 투명 누름 칸이 CLR 과 같은 답을 낸다. 칸은 상자 겹 안에 서서 어둡게 덮개에 먹히지 않는다 (r192)
+   */
+  readonly cancelPressRect?: PressRect
   /**
    * 뒤 어둡게의 검정 몫 (0x746cc 의 0x74704~0x7474a — 창이 떠 있는 그리기마다 [0x15605d0](0, 0, W, H, 검정, 단계 5) =
    * 검정 (5 + 1)/16, 장면이 세운 [창+0x24f] → [창+0x24e] 가 0 일 때). 안 주면 지금까지의 공용 근사다.
@@ -168,7 +175,7 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 }
 
 export function MessageBox({
-  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, dimOpacity, closesWithoutShrink: closesWithoutShrinkProp,
+  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, cancelPressRect, dimOpacity, closesWithoutShrink: closesWithoutShrinkProp,
   opensOneStepIn = false, onAnswer, onAnswerKey,
 }: MessageBoxProps) {
   // 창을 띄울 때 [창+0x24f] 를 [창+0x24e] 로 옮긴다(0x7503c) — 띄운 자리가 정하지 않았으면 지금 장면의 값
@@ -390,6 +397,9 @@ export function MessageBox({
           })}
         </div>
       </div>
+      {cancelPressRect !== undefined && (
+        <PressArea label="되돌아가기 칸" rect={cancelPressRect} onPress={() => answer(cancelAnswer ?? buttons.length - 1)} />
+      )}
     </div>
   )
 }
