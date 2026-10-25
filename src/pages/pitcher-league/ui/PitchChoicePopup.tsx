@@ -138,7 +138,7 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
         {/* 0x746cc — 뒤 어둡게(단계 5) 뒤 판 0x744c4 (0, (H − 높이) >> 1, 240, 높이) */}
         <div style={{ ...pixel, left: 0, top: 0, width: 240, height: 320, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
         <div className={boxStyles.box} data-testid="구질고르기-판" ref={boxRef}
-          style={{ ...box, top: recordPickPopupTopOf(box.height), transform: 'none', padding: 0 }} />
+          style={{ ...box, top: recordPickPopupTopOf(box.height), bottom: 'auto', padding: 0 }} />
         {/* 펼치는 동안은 판만 긋는다(0x7479c) — 줄이는 동안은 그리기 0x190f8 이 그대로 돈다 */}
         {motion.openingHeight === null && (<>
           {/* 0xba269 넷째 인자 −1(폭) = **글 폭을 재서 쓴다**(직접 떴다): 0xba268 이 폭을 0x6ef4c 의 다섯째 인자로 넘기고, 6efb0 이
