@@ -357,7 +357,7 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     ],
   },
   'general-relay': {
-    description: "일반모드 자동진행 중계 0x21 — 첫 타석에서 경기 중 메뉴 '*' [자동진행] 예 (씨앗 2)",
+    description: "일반모드 자동진행 중계 0x21 — 첫 타석에서 경기 중 메뉴 '*' [자동진행] 예 (general-bat 픽스처 씨앗 1)",
     fixture: 'general-bat',
     steps: [
       ...TO_GENERAL_GAME,
