@@ -14,6 +14,8 @@
  * (P6-screens 2d 확정), 처음 메뉴 쪽 0~5 는 프레임 그림을 눈으로 확인해 붙였다
  * (000 게임시작 · 001 스페셜 · 002 도움말 · 003 환경설정 · 004 랭킹 · 005 게임문의).
  */
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+
 export interface MainMenuEntry {
   readonly id: string
   readonly labelFrame: number
@@ -22,41 +24,40 @@ export interface MainMenuEntry {
 }
 
 export const TOP_MENU: readonly MainMenuEntry[] = [
-  { id: '게임시작', labelFrame: 0, isAvailable: true, description: '원하는 게임모드를 선택하여!N플레이 할 수 있습니다' }, // [0]
-  { id: '스페셜', labelFrame: 1, isAvailable: true, description: 'G포인트 구매 및 각종 유용한!N기능을 사용할 수 있습니다' }, // [1]
-  { id: '도움말', labelFrame: 2, isAvailable: true, description: '게임에 대한 각종 도움말을!N살펴볼 수 있습니다' }, // [2]
-  { id: '환경설정', labelFrame: 3, isAvailable: true, description: '게임 환경 및 조작 범위!N데이터를 관리할 수 있습니다' }, // [3]
-  { id: '랭킹', labelFrame: 4, isAvailable: false, description: '게임모드 별 랭킹과 자신의!N현재 랭킹을 확인합니다' }, // [4]
-  { id: '게임문의', labelFrame: 5, isAvailable: false, description: '게임문의처 및 주의사항!N을 확인할 수 있습니다' }, // [209]
+  { id: '게임시작', labelFrame: 0, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[0] ?? '' }, // [0]
+  { id: '스페셜', labelFrame: 1, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[1] ?? '' }, // [1]
+  { id: '도움말', labelFrame: 2, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[2] ?? '' }, // [2]
+  { id: '환경설정', labelFrame: 3, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[3] ?? '' }, // [3]
+  { id: '랭킹', labelFrame: 4, isAvailable: false, description: ORIGINAL_MAIN_MENU_TEXT[4] ?? '' }, // [4]
+  { id: '게임문의', labelFrame: 5, isAvailable: false, description: ORIGINAL_MAIN_MENU_TEXT[209] ?? '' }, // [209]
 ]
 
 export const GAME_START_MENU: readonly MainMenuEntry[] = [
-  { id: '최근게임', labelFrame: 6, isAvailable: true, description: '마지막으로 진행한 게임!N모드를 재시작합니다' }, // [6]
-  { id: '일반모드', labelFrame: 7, isAvailable: true, description: '원하는 팀을 선택해 자유롭게!N플레이하는 모드입니다' }, // [7]
-  { id: '나만의리그', labelFrame: 8, isAvailable: true, description: '나만의 선수를 자유롭게 육성!N할 수 있는 모드입니다' }, // [8]
-  { id: '시즌모드', labelFrame: 9, isAvailable: true, description: '우승을 목표로 1개 팀을 직접!N관리할 수 있는 모드입니다' }, // [9]
-  { id: '대전모드', labelFrame: 10, isAvailable: false, description: '다른 유저의 시즌모드 팀과!N경쟁할 수 있는 모드입니다' }, // [10]
-  { id: '홈런더비', labelFrame: 13, isAvailable: true, description: '홈런더비를 통해 타격감을!N향상 시킬 수 있는 모드입니다' }, // [11]
-  { id: '미션모드', labelFrame: 12, isAvailable: true, description: '상황에 따라 주어진 목표를!N달성하는 모드입니다' }, // [12]
+  { id: '최근게임', labelFrame: 6, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[6] ?? '' }, // [6]
+  { id: '일반모드', labelFrame: 7, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[7] ?? '' }, // [7]
+  { id: '나만의리그', labelFrame: 8, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[8] ?? '' }, // [8]
+  { id: '시즌모드', labelFrame: 9, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[9] ?? '' }, // [9]
+  { id: '대전모드', labelFrame: 10, isAvailable: false, description: ORIGINAL_MAIN_MENU_TEXT[10] ?? '' }, // [10]
+  { id: '홈런더비', labelFrame: 13, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[11] ?? '' }, // [11]
+  { id: '미션모드', labelFrame: 12, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[12] ?? '' }, // [12]
 ]
 
 /** [14] 나만의리그 편 고르기 창 질문 (하위 상태 13 진입 0x25d78, 종류 0x10 — 타자편·투수편 두 칸) */
-export const NARI_EDITION_PROMPT = '!C어떤 선수로!N플레이 하시겠습니까?'
+export const NARI_EDITION_PROMPT = ORIGINAL_MAIN_MENU_TEXT[14] ?? ''
 
 /**
  * [13] 일반모드 진입 창 질문 (하위 상태 12 0x296f0, 종류 0x10 — 이어하기·새로하기·빠른실행 세 칸).
  */
-export const GENERAL_MODE_PROMPT = '!C일반 모드를!N진행하시겠습니까?'
+export const GENERAL_MODE_PROMPT = ORIGINAL_MAIN_MENU_TEXT[13] ?? ''
 
 /**
  * [15] 일반모드 새로하기 확인 (0x296f0 단계 1 → 종류 0x82). 원본에서 [15] 를 쓰는 곳은 0x296f0 둘뿐이다
  * (0x2989e · 0x2993c `0x702b5(표, 0xf)`) — 나만의리그 진입은 이 창을 띄우지 않는다. 원문 그대로 (`StrMAINMENU.json`).
  */
-export const NEW_GAME_CONFIRM =
-  '!C새로하시겠습니까?!N기존 데이터는 사라집니다.!N(!cFFFF00진행 중인 시합에서 획득한!NG포인트도 사라집니다!cFFFFFF)'
+export const NEW_GAME_CONFIRM = ORIGINAL_MAIN_MENU_TEXT[15] ?? ''
 
 /**
  * [115] 대전모드를 고를 때 시즌 커리어(전역기록 +0x42)가 없으면 뜨는 확인 팝업 문구.
  * 원본 갱신 0x28cb0 → 0x28dcc 가 StrMAINMENU[0x73 = 115] 로 띄운다 (R11-special-leftovers 4-1 확정).
  */
-export const SEASON_FIRST_NOTICE = '!C!cFFFFFF시즌모드를!N먼저 시작해주세요'
+export const SEASON_FIRST_NOTICE = ORIGINAL_MAIN_MENU_TEXT[115] ?? ''

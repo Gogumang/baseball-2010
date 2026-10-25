@@ -29,6 +29,7 @@ import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 const SLT_IMAGE = './sprites/slt_frame'
 const IMG_TEXT = './sprites/img_text/frames'
@@ -44,7 +45,7 @@ const BIG_LOGO_HALF = 38
  * StrMAINMENU[108] 원문 (`base/extracted/StrMAINMENU.json`). 팝업 그리기 0x32b7d 는 [109](아이디 입력)를 기본으로 잡고
  * this+0x181 == 1(에디트가 세운 깃발)이면 [108] 로 바꾼다 (0x32ba4~0x32bc8).
  */
-const NAME_PROMPT = '!C!cFFFFFF이름을 입력해 주세요!N(!cFFFF00한글 4글자, 영문 8글자!cFFFFFF)'
+const NAME_PROMPT = ORIGINAL_MAIN_MENU_TEXT[108] ?? ''
 
 interface SpecialEditScreenProps {
   /** 머리띠 0x54d95 는 제목이 있으면 전역 G(mgr+0x64)를 같이 그린다 */

@@ -128,14 +128,14 @@ const MODE_TEXT_ILLNESS_CURED = 206
  * 효과 한 줄 (0x15382~0x1541a 와 같은 꼴 네 번) — **굴린 값(보정 전)이 0 이면 줄이 없다**.
  *   이름 StrMODE[n] + " " + |굴림+보정| + (보정 ≠ 0 이면 "(" + 부호 + |보정| + ")") + ([83] 상승 | [84] 하락) + "!N"
  * 상승·하락은 **굴림+보정 ≥ 0** 으로 고른다 (0x153fa). 원본 [83]·[84] 는 앞에 빈칸이 붙은 글(" !c00CC00상승…")이라
- * 숫자 뒤에 빈칸 하나가 들어간다 — 생성기가 깎은 그 빈칸을 되붙인다 (r216).
+ * 숫자 뒤에 빈칸 하나가 들어간다 — 생성 표가 원문 앞 빈칸을 그대로 둔다(r223).
  */
 function effectLineOf(nameId: number, rolled: number, bonus: number): string {
   if (rolled === 0) return ''
   const total = rolled + bonus
   const bonusText = bonus === 0 ? '' : `(${bonus > 0 ? '+' : '-'}${Math.abs(bonus)})`
   const verb = ORIGINAL_MODE_TEXT[total >= 0 ? MODE_TEXT_RISE : MODE_TEXT_FALL]
-  return `${ORIGINAL_MODE_TEXT[nameId]} ${Math.abs(total)}${bonusText} ${verb}!N`
+  return `${ORIGINAL_MODE_TEXT[nameId]} ${Math.abs(total)}${bonusText}${verb}!N`
 }
 
 /**

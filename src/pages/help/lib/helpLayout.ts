@@ -1,4 +1,5 @@
 import { FOOTER, HEADBAND, SCREEN } from '@/pages/special/lib/specialLayout'
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 /**
  * 도움말 배치 — **큰 정정** (S12 2절).
@@ -40,24 +41,24 @@ export interface RankingMenuItem {
 export const RANKING_MENU_ITEMS: readonly RankingMenuItem[] = [
   {
     id: '일반모드', labelFrame: 7, labelWidth: 97, labelHeight: 27,
-    description: '일반모드의!N순위를 확인합니다', // StrMAINMENU[24]
+    description: ORIGINAL_MAIN_MENU_TEXT[24] ?? '', // StrMAINMENU[24]
   },
   {
     id: '나만의리그', labelFrame: 8, labelWidth: 115, labelHeight: 27,
-    description: '나만의 리그의!N순위를 확인합니다', // [25]
+    description: ORIGINAL_MAIN_MENU_TEXT[25] ?? '', // [25]
   },
   {
     id: '시즌모드', labelFrame: 9, labelWidth: 98, labelHeight: 27,
-    description: '시즌모드의!N순위를 확인합니다', // [26]
+    description: ORIGINAL_MAIN_MENU_TEXT[26] ?? '', // [26]
   },
   {
     id: '대전모드', labelFrame: 10, labelWidth: 96, labelHeight: 27,
-    description: '대전모드의!N순위를 확인합니다', // [27]
+    description: ORIGINAL_MAIN_MENU_TEXT[27] ?? '', // [27]
   },
   {
     id: '홈런더비', labelFrame: 13, labelWidth: 95, labelHeight: 27,
     // 원본 글은 "훈련모드의…" 다 (칸은 홈런더비인데 글이 어긋난 것 — 원본 그대로 옮긴다)
-    description: '훈련모드의!N순위를 확인합니다', // [28]
+    description: ORIGINAL_MAIN_MENU_TEXT[28] ?? '', // [28]
   },
 ]
 

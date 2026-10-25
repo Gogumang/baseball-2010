@@ -377,8 +377,6 @@ const ABILITY_NAMES = ['히트', '파워', '수비', '주루', '모든능력치'
  */
 const ABILITY_NOTICE_NUMBERS = [6, 6, 6, 6, 8]
 const modeText = (index: number): string => ORIGINAL_MODE_TEXT[index] ?? ''
-/** 원본 [83] · [116] 은 앞에 빈칸이 있는 글이다 — 생성기가 깎은 빈칸을 되붙인다 (`modeTextWithLeadingSpace`) */
-const spacedModeText = (index: number): string => ` ${modeText(index)}`
 /** StrMODE[83] " 상승하였습니다"(색 마크업) · [116] " 당첨!!!N[" · [117] "] 획득!" · [126] "%d게임 동안 상대 투구…" */
 const RISE_TEXT = 83
 const LOTTERY_HEAD_TEXT = 116
@@ -421,7 +419,7 @@ const LOTTERY_LINE_BREAK = '!N'
  */
 function lotteryPrizeEffectNoticeOf(texts: GpNoticeTexts, prizeItemId: number): string {
   if (prizeItemId <= ALL_ABILITY_ITEM) {
-    return `${texts.abilityNames[prizeItemId] ?? ''} ${LOTTERY_ABILITY_NOTICE_NUMBER} ${spacedModeText(RISE_TEXT)}`
+    return `${texts.abilityNames[prizeItemId] ?? ''} ${LOTTERY_ABILITY_NOTICE_NUMBER} ${modeText(RISE_TEXT)}`
   }
   return STATIC_NOTICES[prizeItemId] ?? ''
 }
@@ -441,13 +439,13 @@ export function gpItemNoticeWith(
 ): string {
   // 실제 상승은 +10 이지만 글에는 6·8 이 찍힌다 (원본 그대로).
   // 0xa455c~0xa45fe: StrMODE[35+k](투수 40+k · 모든능력치 39) + " "(0xd80bc) + 0xbc73d(6 · 8) + " "(0xd80bc) + StrMODE[83]
-  if (id < texts.abilityNames.length) return `${texts.abilityNames[id]} ${ABILITY_NOTICE_NUMBERS[id]} ${spacedModeText(RISE_TEXT)}`
+  if (id < texts.abilityNames.length) return `${texts.abilityNames[id]} ${ABILITY_NOTICE_NUMBERS[id]} ${modeText(RISE_TEXT)}`
   if (id === LOTTERY_ITEM && prize !== null) {
     // 돈 상: sprintf("%d등 "(0xd7e08), 등수) + StrMODE[116] + 금액 + StrMODE[117] (0xa4658~0xa46c0)
     // 아이템 상: StrMODE[0x70 + 칸](118 엄마상 …) + [116] + StrITEM[0x62 + n] + [117] + "!N"(0xd80a4) (0xa46f8~0xa474a)
     //          뒤에 그 아이템의 효과 알림을 잇는다 (0xa474e~0xa48ee — `lotteryPrizeEffectNoticeOf`)
     const title = typeof prize === 'number' ? `${prize}등 ` : prize
-    const head = `${title}${spacedModeText(LOTTERY_HEAD_TEXT)}${prizeLabelOf(prize, prizeItemId)}${modeText(LOTTERY_TAIL_TEXT)}`
+    const head = `${title}${modeText(LOTTERY_HEAD_TEXT)}${prizeLabelOf(prize, prizeItemId)}${modeText(LOTTERY_TAIL_TEXT)}`
     if (typeof prize === 'number') return head
     return `${head}${LOTTERY_LINE_BREAK}${lotteryPrizeEffectNoticeOf(texts, prizeItemId ?? LOTTERY_EFFECT_OF[prize])}`
   }

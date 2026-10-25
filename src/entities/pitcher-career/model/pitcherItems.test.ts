@@ -45,7 +45,7 @@ describe('투수 서브 아이템 (창 종류 1 — 0x1364e · 0x14c8c 모드 �
 describe('투수 GP 아이템 (창 종류 2)', () => {
   it('가격은 0xcc41b 앞 10칸(타자 블록과 같은 값), 칸 9 만 십전대보탕이다 (StrITEM[107] · [171])', () => {
     expect(PITCHER_GP_ITEMS.map((item) => item.price)).toEqual(BATTER_GP_ITEMS.map((item) => item.price))
-    expect(PITCHER_GP_ITEMS[9]).toMatchObject({ name: '십전대보탕', effectText: '스태미나 100% 회복', price: 500 })
+    expect(PITCHER_GP_ITEMS[9]).toMatchObject({ name: '십전대보탕', effectText: '스태미나 100% 회복 ', price: 500 })
     expect(PITCHER_GP_ITEMS[0].effectText).toBe('제구 능력치 + 10')
     expect(PITCHER_GP_ITEMS[4].effectText).toBe('모든 능력치 + 10')
     // 아이콘 표 0xd4676 — 칸 9 만 20 (타자 이글아이는 19)
@@ -130,6 +130,6 @@ describe('투수 GP 알림 (0xa4488)', () => {
   })
 
   it('십전대보탕은 StrMODE[125]', () => {
-    expect(pitcherGpItemNoticeOf(9, null)).toBe('!C!cFFFF00스태미나가 100%!cFFFFFF!N회복되었습니다')
+    expect(pitcherGpItemNoticeOf(9, null)).toBe('!C!cFFFF00스태미나가 100%!cFFFFFF!N회복되었습니다 ') // [125] 끝 빈칸 원문
   })
 })

@@ -21,7 +21,11 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
  */
 const NAME_COUNT = ORIGINAL_TITLES.length / 2
 
-export const TITLE_NAMES: readonly string[] = ORIGINAL_TITLES.slice(0, NAME_COUNT)
+/**
+ * 칭호 이름 — 저장(`titleIds` · 수집 `titles`)이 이 글을 **열쇠**로 들고 있어 앞뒤 빈칸을 뗀 꼴로 둔다.
+ * 원문 [1] "떠오르는 샛별 " · [2] "최고의 루키 " 는 끝에 빈칸이 있다(생성 표 `ORIGINAL_TITLES` 는 원문 그대로, r223).
+ */
+export const TITLE_NAMES: readonly string[] = ORIGINAL_TITLES.slice(0, NAME_COUNT).map((name) => name.trim())
 
 /** 칭호는 모두 64개 — 기록연감 칸도 공통 32 + 타자 16 + 투수 16 = 64 다 (P3 10-2) */
 export const TITLE_COUNT = NAME_COUNT

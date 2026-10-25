@@ -192,7 +192,7 @@ describe('그림 · 키 — 0x803d4 탭 0 · 창 키 0x80268', () => {
     expect(figures.getAttribute('data-cost')).toBe('700')
     expect(figures.getAttribute('data-progress')).toBe('2/5')
     expect(screen.getByTestId('필살타법-이름').textContent).toBe('플레임 스윙')
-    expect(screen.getByTestId('필살타법-설명').textContent).toBe('조건: 인기도500 / 파워 스윙사용 횟수:3')
+    expect(screen.getByTestId('필살타법-설명').textContent).toBe('조건: 인기도500 / 파워 스윙사용 횟수: 3')
     expect([0, 1, 2, 3].map((slot) => screen.getByTestId(`필살칸-${slot}`).getAttribute('data-locked'))).toEqual(['false', 'true', 'true', 'true'])
   })
 })

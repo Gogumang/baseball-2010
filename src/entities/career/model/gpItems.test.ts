@@ -34,11 +34,11 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
     // 0xa455c: 이름 + " " + 6 + " " + StrMODE[83](앞 빈칸 포함 " !c00CC00상승…") — 빈칸이 둘이다
     expect(gpItemNoticeOf(1, null)).toBe('파워 6  !c00CC00상승!cFFFFFF하였습니다')
     expect(gpItemNoticeOf(4, null)).toBe('모든능력치 8  !c00CC00상승!cFFFFFF하였습니다')
-    expect(gpItemNoticeOf(6, null)).toBe('!C!cFFFF00사기 +40!cFFFFFF 회복되었습니다') // StrMODE[122] 원문
+    expect(gpItemNoticeOf(6, null)).toBe('!C!cFFFF00사기 +40!cFFFFFF 회복되었습니다 ') // StrMODE[122] 원문(끝 빈칸까지)
     // 돈 상: "%d등 "(0xd7e08) + " 당첨!!!N[!cFFFF00" + 금액 + "!cFFFFFF] 획득!"
     expect(gpItemNoticeOf(5, 1)).toBe('1등  당첨!!!N[!cFFFF001억!cFFFFFF] 획득!')
     // 아이템 상: … + [117] + "!N" + 그 아이템의 효과 알림 (0xa474e~0xa48ee) — 능력치 상의 숫자는 10 이다(일반 갈래 6·8 과 다르다)
-    expect(stripGameMarkup(gpItemNoticeOf(5, '우정상'))).toBe('우정상 당첨!!\n[영지버섯] 획득!\n사기 +40 회복되었습니다')
+    expect(stripGameMarkup(gpItemNoticeOf(5, '우정상'))).toBe('우정상 당첨!!\n[영지버섯] 획득!\n사기 +40 회복되었습니다 ')
     expect(stripGameMarkup(gpItemNoticeOf(5, '아차상', 2))).toBe('아차상 당첨!!\n[빌리언XZ] 획득!\n수비 10  상승하였습니다')
     expect(stripGameMarkup(gpItemNoticeOf(5, '엄마상'))).toBe('엄마상 당첨!!\n[엄마의도시락] 획득!\n모든능력치 10  상승하였습니다')
     expect(stripGameMarkup(gpItemNoticeOf(5, '메디카상'))).toBe('메디카상 당첨!!\n[종합건강진단] 획득!\n부상 및 질병이\n모두 치료 되었습니다')

@@ -8,6 +8,8 @@
  * ```
  * 그림은 모두 `ui/slt_frame.pzx`(this+0x9c)와 `ui/num.pzx`, 전역 `img_text` 다.
  */
+import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+
 const SCREEN_WIDTH = 240
 
 export const PANEL = { x: 24, y: 54, width: 192, height: 212 } as const
@@ -158,9 +160,9 @@ export const TOTAL_ROW = {
  * ```
  */
 export const ENDING_CELL_NAMES = [
-  '부상', '방출', '관중', '코치', '단장', '결번', '명예', '감독', '총장', '전설', // StrMAINMENU[189~198]
-  '솔로', '연인', '양다리', '승리자', '정복자', // [199~203]
-  '비인기', '지역구', '국내', '세계', '최강', // [204~208]
+  ORIGINAL_MAIN_MENU_TEXT[189] ?? '', ORIGINAL_MAIN_MENU_TEXT[190] ?? '', ORIGINAL_MAIN_MENU_TEXT[191] ?? '', ORIGINAL_MAIN_MENU_TEXT[192] ?? '', ORIGINAL_MAIN_MENU_TEXT[193] ?? '', ORIGINAL_MAIN_MENU_TEXT[194] ?? '', ORIGINAL_MAIN_MENU_TEXT[195] ?? '', ORIGINAL_MAIN_MENU_TEXT[196] ?? '', ORIGINAL_MAIN_MENU_TEXT[197] ?? '', ORIGINAL_MAIN_MENU_TEXT[198] ?? '', // StrMAINMENU[189~198]
+  ORIGINAL_MAIN_MENU_TEXT[199] ?? '', ORIGINAL_MAIN_MENU_TEXT[200] ?? '', ORIGINAL_MAIN_MENU_TEXT[201] ?? '', ORIGINAL_MAIN_MENU_TEXT[202] ?? '', ORIGINAL_MAIN_MENU_TEXT[203] ?? '', // [199~203]
+  ORIGINAL_MAIN_MENU_TEXT[204] ?? '', ORIGINAL_MAIN_MENU_TEXT[205] ?? '', ORIGINAL_MAIN_MENU_TEXT[206] ?? '', ORIGINAL_MAIN_MENU_TEXT[207] ?? '', ORIGINAL_MAIN_MENU_TEXT[208] ?? '', // [204~208]
 ] as const
 /** 칸 0~14 = 나리 엔딩(전역기록 +0xa8 + i) — 그 뒤 15~19 = 시즌 엔딩(+0xa0 + (i − 15)) */
 export const NARI_ENDING_CELL_COUNT = 15
