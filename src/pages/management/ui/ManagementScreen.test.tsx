@@ -311,6 +311,24 @@ describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 �
     expect(container.querySelector('[data-testid="basic-info-card"]'), '기본정보 카드로 돌아오지 않았다').not.toBeNull()
   })
 
+  it("칭호 목록(129)이 떠 있으면 바닥 '0 상세정보' 칸을 걷는다 — 129 키 0x11f78 이 '0' 을 목록에 넘기고 목록이 버린다 (r212)", () => {
+    render(<ManagementScreen {...propsWith({
+      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] },
+      onEquipTitle: vi.fn(),
+    })} />)
+    기본정보열기()
+    expect(screen.queryByRole('button', { name: '0 상세정보' })).not.toBeNull()
+
+    fireEvent.keyDown(window, { key: '*' })
+
+    expect(칭호창()).not.toBeNull()
+    expect(screen.queryByRole('button', { name: '0 상세정보' }), "칭호 창 위로 '0' 칸이 남았다").toBeNull()
+    // '*' 칸은 129 에서도 119 로 돌아가는 키(0x11f9a)라 남는다
+    fireEvent.click(screen.getByRole('button', { name: '* 칭호' }))
+    expect(칭호창()).toBeNull()
+    expect(screen.queryByRole('button', { name: '0 상세정보' })).not.toBeNull()
+  })
+
   it('onEquipTitle 을 안 넘기면 창이 열리지 않는다', () => {
     render(<ManagementScreen {...propsWith({ career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] } })} />)
     기본정보열기()

@@ -137,6 +137,8 @@ interface PitcherSideStageProps {
    * 상태 0xe(쉬는 대기) · 0xf(구질 목록이 실린 동안)에만 그린다
    */
   readonly timeKeyCount?: number | null
+  /** 교체 창(상태 0xb)이 떠 있는가 — 소프트키 글자 "*MENU" · "#TIME" 을 안 그린다 (`BattingStage` 의 같은 이름 props 주석 참고) */
+  readonly isSubstitutionWindowOpen?: boolean
   /**
    * **경기 스킬 표시 판** (장면 +0x19b0, 0xd 진입 48fa4 · 0xf 진입 3dd78 · 그리기 0x4b5b4) — CPU 타자 · 사람 투수가 장착한 스킬 중
    * 지금 걸리는 이름을 20 그림 동안 보이고, 그 CPU 타자가 전국구 · 먹튀면 함성 29 를 낸다. 공용 HUD 0x4c4bc 꼬리라 누가 던지든 같다.
@@ -655,6 +657,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         stagePhase: isSceneD ? { ...stage.phase, isSceneD } : stage.phase,
         pitchInput,
         timeKeyCount: isTimeState ? (current.timeKeyCount ?? null) : null,
+        isSubstitutionState: current.isSubstitutionWindowOpen === true,
         // 필살 남은 횟수 0x38a30 은 38a42 에서 0x33fe4(수비 조작 사람)면 바로 끝 — 사람이 던지는 장면엔 없다
         specialSwingRemaining: null,
         // 0x4cad4 → 0x4b5b4 — 경기 스킬 표시 판

@@ -320,6 +320,11 @@ interface BattingStageProps {
    */
   readonly timeKeyCount?: number
   /**
+   * **교체 창(경기 상태 0xb)이 떠 있는가** — 0xb 그리기 0x4db68 도 배경으로 공용 그리기 0x4c4bc 를 부르지만, 소프트키 글자 꼬리
+   * 0x4c8e0 은 상태 0xd ~ 0x15 만 받아(`subs #0xd; cmp #8; bhi`) "*MENU" · "#TIME" 둘 다 안 그린다. 참이면 두 글자를 그리지 않는다
+   */
+  readonly isSubstitutionWindowOpen?: boolean
+  /**
    * **경기 스킬 표시 판** (장면 +0x19b0, 0xd 진입 48fa4 · 0xf 진입 3dd78 · 그리기 0x4b5b4) — 타자 · 투수가 장착한 스킬 중 지금 걸리는
    * 이름을 20 그림 동안 화면 가장자리에 보이고, 전국구 · 먹튀 타자면 함성 29(0x4c39a)를 낸다(`lib/skillPanel`). 안 넘기면 안 그린다
    */

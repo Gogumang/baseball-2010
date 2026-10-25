@@ -200,6 +200,8 @@ export interface StageLatest {
   readonly onPickoff?: (base: 1 | 2 | 3) => void
   /** "#TIME" 의 벤치 수 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly timeKeyCount?: number
+  /** 교체 창(상태 0xb)이 떠 있는가 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly isSubstitutionWindowOpen?: boolean
   /** 지금 타자의 남은 필살 횟수 0xaea30 — `BattingStage` 의 같은 이름 props 주석 참고. 없으면 표시(0x38a30)를 안 그린다 */
   readonly specialSwingRemaining?: number
   /** 경기 스킬 표시 판(0x4b5b4) 재료 — `BattingStage` 의 같은 이름 props 주석 참고. 없으면 판을 안 그린다 */

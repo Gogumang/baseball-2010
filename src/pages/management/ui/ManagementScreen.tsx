@@ -203,10 +203,13 @@ export function ManagementScreen(props: ManagementScreenProps) {
           표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. 120 은 0x16928 "그 밖"이라 5, 그 밖 상태도 5 */}
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back}
         footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false}
-        // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸
+        // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸.
+        // 칭호 목록(129)이 떠 있으면 '0' 칸은 걷는다 — 129 키 0x11f78 은 −5 · '5'(장착) · −16 · '*'(→ 119) 밖의 키를 목록
+        // vt+0x18(0x6c298 → 0x6c520 → 0x6c030)에 넘기고, 숫자키 꼴 1 목록은 '0' 을 방향 없는 한 걸음(0x6be70 — dx = dy = 0)으로
+        // 버린다. 칸이 남으면 칭호 창 덮개(4)보다 위(7)라 누름만 먹는다(r212). '*' 칸은 129 에서도 119 로 돌아가는 키라 둔다
         footerPresses={{
           [FOOTER_BITS.nickname]: { label: '* 칭호', onPress: () => pressKey('*') },
-          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') },
+          ...(menu.overlay === '칭호' ? {} : { [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') } }),
         }} />
       {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
       {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (

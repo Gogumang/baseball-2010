@@ -85,10 +85,26 @@ export function drawSoftKeyLabels(
   context: CanvasRenderingContext2D,
   phase: StagePhaseSnapshot,
   benchCount: number | null,
+  isSubstitutionState = false,
 ): void {
-  if (phase.kind === '결과' && phase.isInPlay === true) return
-  drawLabel(context, MENU_LABEL_FRAME, MENU_LABEL_POSITION)
-  if (showsTimeLabel(phase, benchCount)) drawLabel(context, TIME_LABEL_FRAME, TIME_LABEL_POSITION)
+  for (const frame of softKeyLabelFramesOf(phase, benchCount, isSubstitutionState)) {
+    drawLabel(context, frame, frame === MENU_LABEL_FRAME ? MENU_LABEL_POSITION : TIME_LABEL_POSITION)
+  }
+}
+
+/**
+ * 이 그림에 서는 소프트키 글자 프레임(90 "*MENU" · 91 "#TIME") — `drawSoftKeyLabels` 의 고르기.
+ * 교체 창(경기 상태 0xb, `isSubstitutionState`)은 그리기 0x4db68 이 배경으로 0x4c4bc 를 부르지만 4c8e0 의 상태 문턱
+ * (`subs #0xd; cmp #8; bhi` — 0xd ~ 0x15) 밖이라 둘 다 없다. 웹 단계는 그동안에도 쉬는 '대기'(0xe)라 따로 받는다(r212)
+ */
+export function softKeyLabelFramesOf(
+  phase: StagePhaseSnapshot,
+  benchCount: number | null,
+  isSubstitutionState = false,
+): readonly number[] {
+  if (isSubstitutionState) return []
+  if (phase.kind === '결과' && phase.isInPlay === true) return []
+  return showsTimeLabel(phase, benchCount) ? [MENU_LABEL_FRAME, TIME_LABEL_FRAME] : [MENU_LABEL_FRAME]
 }
 
 function drawLabel(context: CanvasRenderingContext2D, index: number, at: { readonly x: number; readonly y: number }): void {
