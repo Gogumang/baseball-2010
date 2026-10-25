@@ -18,6 +18,11 @@
  * 내렸다 다시 띄우기와 경기 중간 저장(`saveGameProgress`) → 다시 띄워 `resumeSavedGame` → 30G 자동진행으로 끝내기.
  * 소지금 · G 수지, 장비 니블, 트레이드 뒤 열 팀 명단 크기 · 중복 · 맞바뀐 칸 · 니블 지움, 엔트리 편집 뒤 명단 · 선발 · 경기 옵션을
  * 더 본다. 긴 판: `SOAK=1 SOAK_SEEDS=1,2,3 yarn vitest run src/app/model/soak/seasonSoak.test.tsx -t "r235" --maxWorkers=2`
+ *
+ * **r245** — 국가대항전 경기정보(0xf4 → 0xdd)에서도 엔트리 편집 0xe0(대표팀 슬롯 +0x918 `cupRoster` — 대회 내내 남는다),
+ * 구단관리 → 선수영입(0xe2 → 0xdf 목적 3 — `PlayerRecruitScreen` 의 `recruitPlayer`)으로 명예의 전당 투수 · 타자와 나리 투수 · 타자를
+ * 데려와 장착아이템(0xdf 목적 1 → 0xdc — `SeasonRoute` 처럼 명예 선수는 명전 기록 니블에서 시작해 산 니블을 명전 기록에도 0x2328c)을
+ * 산다. **G 전체 장부**(처음 G + 기록연감 G획득 − G사용 + 리그 1위 G(0x6a56 — 통계 없이 지갑만) = 지갑)를 걸음마다 본다.
  * (`SOAK_MAX_GAMES=n` 이면 정규 n 경기에서 멈춘다)
  *
  * 길어서 기본은 짧은 판(첫 해 앞 몇 경기)만 돈다 — 긴 판은 `SOAK=1` 로 켠다:
@@ -69,6 +74,23 @@ import {
   SEASON_EQUIPMENT_LEVEL_COUNT, SEASON_EQUIPMENT_PART_COUNT, SEASON_FIRST_HIDDEN_LEVEL, applySeasonEquipment, checkSeasonEquipment,
 } from '@/entities/season-mode/model/seasonEquipment'
 import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlayerRecord'
+import {
+  hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, nariRecruitPlayerOf, recruitPlayer, slotOf,
+} from '@/entities/season-mode/model/playerRecruit'
+import { recruitEntriesOf } from '@/widgets/season/lib/recruitList'
+import type { RecruitCandidate } from '@/widgets/season/lib/recruitList'
+import {
+  EMPTY_COLLECTION, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS, hallOfFameEquipmentNibblesOf, hallOfFameRecordIdOf,
+  registerHallOfFame, registerHallOfFamePitcher, syncHallOfFameEquipment, withHallOfFameRecordSlot,
+} from '@/entities/collection/model/collection'
+import type { Collection, HallOfFameSide } from '@/entities/collection/model/collection'
+import { createCareer } from '@/entities/career/model/playerCareer'
+import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { seasonNariBatterRecordOf, seasonNariPitcherRecordOf } from '@/app/model/seasonHallOfFameRecords'
+import { KOREA_TEAM_ID } from '@/entities/national-cup/model/nationalCup'
+import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
+import { GAME_POINT_LIMIT } from '@/entities/wallet/model/gamePointWallet'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import { autoProgressCostOf, canAutoProgress, resumeTeamGame, runAutoProgress } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
@@ -103,6 +125,8 @@ interface SeasonSoakResult {
   readonly stoppedAt: string | null
   /** 새 길을 실제로 밟은 횟수 (r235) */
   readonly extraLog: Readonly<Record<string, number>>
+  /** G 장부 — 출처별 합 (r245) */
+  readonly ledger: Readonly<Record<string, number>>
 }
 
 interface SeasonSoakOptions {
@@ -129,8 +153,13 @@ interface SeasonSoakExtras {
   readonly trade?: boolean
   /** 아이템 → 서브아이템 · GP 아이템(십전대보탕은 0xe8) · 장착아이템(0xdf 목적 1 → 0xdc 종류 3) */
   readonly shop?: boolean
-  /** 경기정보 0xdd → 엔트리 편집 0xe0 (투수 두 줄 · 타순 두 줄 맞바꾸기) */
+  /** 경기정보 0xdd → 엔트리 편집 0xe0 (투수 두 줄 · 타순 두 줄 맞바꾸기) — 국가대항전 0xf4 → 0xdd 도 (r245) */
   readonly entryEdit?: boolean
+  /**
+   * 구단관리 → 선수영입 0xe2 → 자리 0xdf(목적 3)로 명예의 전당 투수 · 타자, 나리 투수 · 타자를 데려온다 — 기록연감에 명예 선수
+   * 한 명씩 · 나리 두 편 저장이 선 꼴로 시작한다. 장착아이템은 데려온 선수에게 먼저 산다 (r245)
+   */
+  readonly recruit?: boolean
   /** G 지갑(`useGamePointWallet`)을 세워 세션에 넘긴다 — 시작 잔고 */
   readonly startGamePoints?: number
   /** 관리 메뉴에서 이만큼 정규 경기마다 훅을 내리고 같은 저장으로 다시 띄운다(장면 0x105 새로 — `constructScene`) */
@@ -192,6 +221,37 @@ function battersOfTeams(stats: LeaguePlayerStats, teams: readonly number[], isOn
   return out
 }
 
+/**
+ * 기록연감에 명예 선수 한 명씩(타자 칸 0 · 투수 칸 0) 등록된 꼴 — 등록 0x1f680 · 0x1f654 그대로(`registerHallOfFame*`).
+ * 타자는 장비 니블을 조금 든 채 등록해 시즌 장비 창이 명전 기록 니블에서 시작하는지 본다
+ */
+function hallOfFameSeedOf(): Collection {
+  const batter = {
+    ...createCareer('명예타자'), endingIndex: 3, season: 13, equipmentLevels: { hit: 2, power: 0, defense: 1, run: 0 },
+  }
+  const first = registerHallOfFame(EMPTY_COLLECTION, batter, 99_999, 0)
+  const withBatter = first.kind === '등록' ? first.collection : EMPTY_COLLECTION
+  const second = registerHallOfFamePitcher(withBatter, { ...createPitcherCareer('명예투수'), endingIndex: 3, season: 13 }, 99_999, 0)
+  return second.kind === '등록' ? second.collection : withBatter
+}
+
+/** 영입 목록의 명예의 전당 칸 — `SeasonRoute.hallOfFameRecruitsOf` 그대로(0x1f654 투수 +0xa = 0 · 0x1f680 타자 +0xa = 0x20) */
+function hallOfFameRecruitsOf(hallOfFame: Collection) {
+  const pitchers = Array.from({ length: HALL_OF_FAME_MAX_PITCHERS }, (_, slot): RecruitCandidate | null => {
+    const famer = hallOfFame.hallOfFamePitchers.find((candidate) => candidate.slot === slot)
+    return famer === undefined ? null : {
+      name: famer.name, player: { id: hallOfFameRecordIdOf('투수', slot), kindByte: 0x00, fieldPosition: 0, stamina: 0 },
+    }
+  })
+  const batters = Array.from({ length: HALL_OF_FAME_MAX_BATTERS }, (_, slot): RecruitCandidate | null => {
+    const famer = hallOfFame.hallOfFame.find((candidate, index) => (candidate.slot ?? index) === slot)
+    return famer === undefined ? null : {
+      name: famer.name, player: { id: hallOfFameRecordIdOf('타자', slot), kindByte: 0x20, fieldPosition: 0, stamina: 0 },
+    }
+  })
+  return { hallOfFamePitchers: pitchers, hallOfFameBatters: batters }
+}
+
 function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
   const { seed, teamId, maxRegularGames, roundTripEvery = 5, policy = '사람', extras } = options
   const store = memoryStore()
@@ -200,9 +260,33 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
   const walletStore = memoryStore()
   const useWallet = extras?.startGamePoints !== undefined
   if (extras?.startGamePoints !== undefined) walletStore.save({ gamePoint: extras.startGamePoints })
+  /* ── G 전체 장부 — 처음 G + 기록연감 G획득 − G사용 + 리그 1위 G (한 줄마다 0..99999 로 자른다) ── */
+  const ledgerSums: Record<string, number> = {}
+  const ledger = {
+    balance: null as number | null,
+    add(source: string, delta: number) {
+      ledgerSums[source] = (ledgerSums[source] ?? 0) + delta
+      if (ledger.balance !== null) ledger.balance = Math.min(GAME_POINT_LIMIT, Math.max(0, ledger.balance + delta))
+    },
+  }
+  const recordStat = (event: AnnalsStatEvent) => {
+    if (event.kind === 'G획득') ledger.add('G획득', event.amount)
+    else if (event.kind === 'G사용') ledger.add('G사용', -event.amount)
+  }
+  /** 기록연감 — 영입 후보 명예 선수 · 장비 니블 동기(0x2328c) · 영입 자리(0xb6605). 새 길(`recruit`)이면 한 명씩 등록된 꼴로 시작 */
+  let collection: Collection = extras?.recruit === true ? hallOfFameSeedOf() : EMPTY_COLLECTION
+  const nariRecords = extras?.recruit === true
+    ? { 투수: seasonNariPitcherRecordOf(createPitcherCareer('나리투수')), 타자: seasonNariBatterRecordOf(createCareer('나리타자')) }
+    : null
   const mount = () => renderHook(() => {
     const wallet = useGamePointWallet(walletStore)
-    return { session: useSeasonSession(store, random, useWallet ? wallet : null), wallet }
+    return {
+      session: useSeasonSession(
+        store, random, useWallet ? wallet : null, undefined, recordStat, undefined, undefined,
+        extras?.recruit === true ? () => collection : undefined,
+      ),
+      wallet,
+    }
   })
   let rendered = mount()
   const result: Rendered = { get current() { return rendered.result.current.session } }
@@ -223,6 +307,7 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
   const startYear = { value: 0 }
   // 장면 0x105 를 세운다 — 라우트가 들어올 때 한 번 (`SeasonRoute` 의 useLayoutEffect)
   act(() => result.current.actions.constructScene())
+  ledger.balance = result.current.gamePoints
 
   const where = () => {
     const record = result.current.state?.record
@@ -230,8 +315,18 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
       + ` · 장면 0x${result.current.scene.toString(16)} · 걸음 ${steps}`
   }
 
+  /** G 장부 = 지갑 — 어긋나면 그 걸음을 적고 장부를 지갑에 맞춘다 */
+  const checkLedger = () => {
+    const balance = result.current.gamePoints
+    if (ledger.balance !== null && ledger.balance !== balance) {
+      problems.add(where(), [`G 장부 ${ledger.balance} ≠ 지갑 ${balance} (차이 ${balance - ledger.balance})`])
+      ledger.balance = balance
+    }
+  }
+
   /** 걸음마다 보는 값 — 불가능한 값 · 리그 전적 · 순위 */
   const checkState = () => {
+    checkLedger()
     const session = result.current
     const state = session.state
     if (state === null) return
@@ -614,7 +709,9 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
     const isPitcher = Math.floor(turn / 3) % 2 === 0
     const listed = isPitcher ? result.current.tradeRoster.pitchers : result.current.tradeRoster.batters
     const start = (turn * 7) % Math.max(1, listed.length)
-    const cursor = listed.map((_, offset) => (start + offset) % listed.length)
+    // 데려온 선수(명예 · 나리 — 레코드 id ≥ 0xb4)가 있으면 그 선수부터 (r245)
+    const recruitedCursor = extras?.recruit === true ? listed.findIndex((player) => player.id >= 0xb4) : -1
+    const cursor = recruitedCursor >= 0 ? recruitedCursor : listed.map((_, offset) => (start + offset) % listed.length)
       .find((index) => !isHallOfFameRecord(listed[index]!) && listed[index]!.id < 0xb4)
     if (cursor === undefined) {
       back()
@@ -623,7 +720,12 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
     const player = listed[cursor]!
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.아이템상점))
     const recordNow = result.current.state?.record ?? record
-    const equipment = seasonPlayerEquipmentOf(player, record.teamId, isPitcher)
+    // 명예 선수 — 영입 0xc554 가 옮긴 명전 기록의 니블이 처음 값이다(`SeasonRoute` 장비 창 그대로 지금 명전 칸을 읽는다)
+    const side: HallOfFameSide = isPitcher ? '투수' : '타자'
+    const isHallOfFamer = isHallOfFameRecord(player)
+    const equipment = player.equipment === undefined && isHallOfFamer
+      ? hallOfFameEquipmentNibblesOf(collection, side, player.id) ?? seasonPlayerEquipmentOf(player, record.teamId, isPitcher)
+      : seasonPlayerEquipmentOf(player, record.teamId, isPitcher)
     const isBatter = !isPitcher
     const opened = result.current.openedHiddenIds
     const part = turn % SEASON_EQUIPMENT_PART_COUNT
@@ -635,12 +737,18 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
       const bought = applySeasonEquipment(recordNow.money, { isBatter, equipment }, part, level)
       const others = listed.filter((_, index) => index !== cursor).map((other) => seasonPlayerEquipmentOf(other, record.teamId, isPitcher).join(','))
       act(() => result.current.actions.equipSeasonPlayer({ isPitcher, recordIndex: cursor, money: bought.money, equipment: bought.equipment }))
+      // 0x7ef4~0x7f12 — 명예 선수면 0x2328c 로 명전 기록에도 (`collection.syncSeasonHallOfFameEquipment`)
+      if (isHallOfFamer) {
+        collection = syncHallOfFameEquipment(collection, side, player.id, bought.equipment)
+        const synced = hallOfFameEquipmentNibblesOf(collection, side, player.id)
+        if (synced?.join(',') !== bought.equipment.join(',')) problems.add(at(), [`명예 ${side} 장비를 샀는데 명전 기록 니블 ${synced?.join(',')} ≠ ${bought.equipment.join(',')}`])
+      }
       const now = (isPitcher ? result.current.tradeRoster.pitchers : result.current.tradeRoster.batters)
       const target = now[cursor]
       if (target === undefined || playerKeyOf(target, record.teamId, isPitcher) !== playerKeyOf(player, record.teamId, isPitcher)) {
         problems.add(at(), [`장비를 산 칸 ${cursor} 의 선수가 바뀌었다`])
       } else {
-        const got = seasonPlayerEquipmentOf(target, record.teamId, isPitcher)
+        const got = target.equipment ?? seasonPlayerEquipmentOf(target, record.teamId, isPitcher)
         if (got.join(',') !== bought.equipment.join(',')) problems.add(at(), [`장비 니블 ${got.join(',')} ≠ 산 값 ${bought.equipment.join(',')}`])
         if (got[part] !== level + 1) problems.add(at(), [`장비 부위 ${part} 레벨 ${got[part]} ≠ ${level + 1}`])
       }
@@ -650,7 +758,7 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
       if (money !== bought.money || bought.money !== recordNow.money - checked.price * 10) {
         problems.add(at(), [`장비 소지금 ${recordNow.money} − ${checked.price}×10 → ${money} (계산 ${bought.money})`])
       }
-      logExtra(`장비${isPitcher ? '투수' : '타자'}`)
+      logExtra(`장비${player.id >= 0xb4 ? (isHallOfFamer ? '명예' : '나리') : ''}${isPitcher ? '투수' : '타자'}`)
     } else if (checked !== null && !checked.ok) {
       logExtra(`장비거절${checked.reason}`)
     }
@@ -660,7 +768,66 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
     return true
   }
 
+  let recruitTurn = 0
+  /**
+   * 구단관리 → 선수영입 0xe2 — 목록(`recruitEntriesOf`: 칸 0 나리 투수 · 1~4 명예 투수 · 5 나리 타자 · 6~ 명예 타자)에서 아직 안 데려온
+   * 후보를 차례로 하나 골라(중복이면 StrMODE[181] — 키 0xe340) 자리 0xdf(목적 3)의 칸 k 에 넣는다(`PlayerRecruitScreen.selectSlot` 그대로:
+   * 투수 칸 k 는 레코드 차례 → 명단 첨자 `pitcherRecordOrder`). 명예 칸이면 명전 기록 +0xa 아랫 5비트도 그 자리로(c578 0xb6605).
+   * 새 검사: 명단에 그 선수가 들어 한 명 늘었다 · 다른 팀 명단은 그대로 · 같은 선수 둘 없음 · 나리 · 명예 중복 거절
+   */
+  const recruitOnce = (): boolean => {
+    if (nariRecords === null) return false
+    const session = result.current
+    const roster = session.roster
+    const list = {
+      careerPitcher: { name: nariRecords.투수.name, player: nariRecruitPlayerOf(nariRecords.투수, true) },
+      careerBatter: { name: nariRecords.타자.name, player: nariRecruitPlayerOf(nariRecords.타자, false) },
+      ...hallOfFameRecruitsOf(collection),
+    }
+    const entries = recruitEntriesOf(list, roster).filter((entry) => entry.candidate !== null)
+    const open = entries.filter((entry) => entry.refusal === null)
+    recruitTurn += 1
+    const chosen = open[recruitTurn % Math.max(1, open.length)]
+    if (chosen === undefined || chosen.candidate === null) return false
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.구단관리))
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.선수영입))
+    const at = () => `${where()} · 선수영입 ${chosen.source}`
+    const players = chosen.isPitcher ? roster.pitchers : roster.batters
+    // 키 0xe340 의 중복 검사 — 나리는 0xb5054(+0xa 부호 비트), 명예는 0xb50ac(같은 번호)
+    const duplicated = chosen.source === '나리투수' || chosen.source === '나리타자'
+      ? hasRecruitedCareerPlayer(players)
+      : hasRecruitedHallOfFamePlayer(players, chosen.candidate.player.id)
+    if (duplicated) problems.add(at(), ['목록이 거절 안 한 후보를 키 0xe340 이 중복으로 거절한다'])
+    const sizes = rosterSizesOf(rosterOfTeam)
+    const slot = (recruitTurn * 3) % Math.max(1, players.length)
+    const rosterIndex = chosen.isPitcher ? session.pitcherRecordOrder[slot] ?? slot : slot
+    const recruited = recruitPlayer(roster, chosen.candidate.player, chosen.isPitcher, slot, rosterIndex)
+    act(() => result.current.actions.updateRoster(recruited.roster))
+    if (isHallOfFameRecord(recruited.source)) {
+      collection = withHallOfFameRecordSlot(collection, chosen.isPitcher ? '투수' : '타자', recruited.source.id, slotOf(recruited.source))
+    }
+    const after = result.current.roster
+    const afterPlayers = chosen.isPitcher ? after.pitchers : after.batters
+    if (afterPlayers.length !== players.length + 1) problems.add(at(), [`영입 뒤 명단 ${players.length} → ${afterPlayers.length}`])
+    if (!afterPlayers.some((player) => player.id === recruited.source.id && player.kindByte === recruited.source.kindByte)) {
+      problems.add(at(), ['영입한 선수가 명단에 없다'])
+    }
+    // 다른 팀 명단 크기 그대로 · 같은 선수 둘 없음
+    const myTeam = session.state?.record.teamId ?? 0
+    const othersSizes = new Map([...sizes].filter(([team]) => team !== myTeam))
+    problems.add(at(), leagueRosterProblemsOf(rosterOfTeam, othersSizes))
+    // 다시 고르면 거절 — 같은 후보가 목록에서 중복으로 뜬다 (StrMODE[181])
+    const again = recruitEntriesOf(list, result.current.roster).find((entry) => entry.cursor === chosen.cursor)
+    if (again?.refusal !== '이미영입') problems.add(at(), [`영입한 후보가 목록에서 거절되지 않는다 (${again?.refusal})`])
+    logExtra(`영입${chosen.source}`)
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.구단관리))
+    act(() => result.current.actions.goto(SEASON_SCENE_STATE.관리메뉴))
+    return true
+  }
+
   let entryTurn = 0
+  /** 국가대항전에서 고친 대표팀 명단 — 다음 대회 경기의 0xdd 가 그대로 받아야 한다(대회 내내 남는다) */
+  const cupEdited: { current: { readonly day: number; readonly roster: SeasonTeamRoster } | null } = { current: null }
   /**
    * 경기정보 0xdd '4' → 0xe0(유저 팀) — 투수 탭 0 · 1 줄, '*' 로 타자 탭 타순 0 · 2 줄을 맞바꾸고 CLR(끝 코드 1)로 0xdd.
    * 새 검사: 명단 크기 · 같은 선수 그대로(차례만) · 중복 없음, 경기정보 선발 이름 · 경기 옵션 `ourEntryOrder` 가 바뀐다
@@ -669,13 +836,18 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
     const session = result.current
     const pending = session.pendingGame
     entryTurn += 1
-    if (pending === null || pending.kind === '국가대항전' || entryTurn % 2 === 0) return
-    const at = () => `${where()} · 엔트리편집`
-    const roster = session.roster
+    // 국가대항전(r245)은 경기마다 — 대표팀 명단은 저장의 대표팀 슬롯 +0x918(`cupRoster`, 없으면 팀 10 표)이다
+    const isCup = pending?.kind === '국가대항전'
+    if (pending === null || (!isCup && entryTurn % 2 === 0)) return
+    const at = () => `${where()} · 엔트리편집${isCup ? '(국가대항전)' : ''}`
+    const cupRosterNow = () => (store.held() as { cupRoster?: SeasonTeamRoster | null } | null)?.cupRoster ?? tableRosterOf(KOREA_TEAM_ID)
+    const ownerTeam = isCup ? KOREA_TEAM_ID : session.state?.record.teamId ?? 0
+    const roster = isCup ? cupRosterNow() : session.roster
     const keysOf = (r: SeasonTeamRoster) => [
-      ...r.pitchers.map((p) => playerKeyOf(p, session.state?.record.teamId ?? 0, true)),
-      ...r.batters.map((p) => playerKeyOf(p, session.state?.record.teamId ?? 0, false)),
+      ...r.pitchers.map((p) => playerKeyOf(p, ownerTeam, true)),
+      ...r.batters.map((p) => playerKeyOf(p, ownerTeam, false)),
     ].sort().join(',')
+    const seasonRosterBefore = session.roster
     const starterBefore = session.matchInfoStarterName
     const orderBefore = pending.options.ourEntryOrder
     act(() => result.current.actions.openEntryEdit(true))
@@ -713,10 +885,13 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
       return
     }
     const after = result.current
-    if (after.roster.pitchers.length !== roster.pitchers.length || after.roster.batters.length !== roster.batters.length) {
-      problems.add(at(), [`엔트리 편집 뒤 명단 크기 ${roster.pitchers.length}/${roster.batters.length} → ${after.roster.pitchers.length}/${after.roster.batters.length}`])
+    const afterRoster = isCup ? cupRosterNow() : after.roster
+    if (afterRoster.pitchers.length !== roster.pitchers.length || afterRoster.batters.length !== roster.batters.length) {
+      problems.add(at(), [`엔트리 편집 뒤 명단 크기 ${roster.pitchers.length}/${roster.batters.length} → ${afterRoster.pitchers.length}/${afterRoster.batters.length}`])
     }
-    if (keysOf(after.roster) !== keysOf(roster)) problems.add(at(), ['엔트리 편집이 명단의 선수를 바꿨다(차례만 바뀌어야)'])
+    if (keysOf(afterRoster) !== keysOf(roster)) problems.add(at(), ['엔트리 편집이 명단의 선수를 바꿨다(차례만 바뀌어야)'])
+    // 대회 편집은 대표팀 슬롯만 — 시즌 내 팀 명단은 그대로다 (0x1f570 이 대회 중 팀 10 을 +0x918 로 돌린다)
+    if (isCup && firstDiffOf(seasonRosterBefore, after.roster) !== null) problems.add(at(), ['국가대항전 엔트리 편집이 시즌 명단을 바꿨다'])
     problems.add(at(), leagueRosterProblemsOf(rosterOfTeam))
     if (swapsPitchers && after.matchInfoStarterName === starterBefore) {
       problems.add(at(), [`투수 0 · 1 줄을 바꿨는데 경기정보 선발이 그대로 ${starterBefore}`])
@@ -724,7 +899,8 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
     act(() => result.current.actions.startPendingGame())
     const orderAfter = result.current.gameOptions?.ourEntryOrder
     if (firstDiffOf(orderBefore, orderAfter) === null) problems.add(at(), ['엔트리 편집 뒤 경기 옵션 ourEntryOrder 가 그대로'])
-    logExtra('엔트리편집')
+    if (isCup) cupEdited.current = { day: session.cup?.day ?? -1, roster: afterRoster }
+    logExtra(isCup ? '국가대항전엔트리편집' : '엔트리편집')
   }
 
   /** 경기 한 판 — `TeamGameScreen` 대신 */
@@ -886,10 +1062,12 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
             if (lastExtraDay !== dayKey) {
               lastExtraDay = dayKey
               extraTurn += 1
-              const order = extraTurn % 2 === 0 ? ['trade', 'shop'] as const : ['shop', 'trade'] as const
+              const order = extraTurn % 2 === 0 ? ['recruit', 'trade', 'shop'] as const : ['recruit', 'shop', 'trade'] as const
               let didExtra = false
               for (const which of order) {
                 if (didExtra) break
+                // 영입은 여섯째 날마다 (후보가 다 들면 거절만 남는다) — 행동을 안 쓰므로 같은 날 트레이드 · 상점도 한다
+                if (which === 'recruit' && extras.recruit === true && extraTurn % 6 === 1) recruitOnce()
                 if (which === 'trade' && extras.trade === true) didExtra = ownTrade()
                 if (which === 'shop' && extras.shop === true) didExtra = shopOnce()
               }
@@ -934,6 +1112,15 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
           if (session.isMatchSettingsOpen) act(() => actions.applyMatchSettings(ALL_AUTO_SETTINGS))
           if (result.current.isMatchSettingsOpen) act(() => result.current.actions.toggleMatchSettings())
           if (extras?.entryEdit === true) {
+            // 앞 대회 경기에서 고친 대표팀 차례가 다음 날 0xdd 에 그대로 남았나 (하루 끝 0xb818c 는 스태미나만 다시 채운다)
+            const cupDay = session.cup?.day
+            const edited = cupEdited.current
+            if (session.pendingGame?.kind === '국가대항전' && edited !== null && cupDay !== undefined && cupDay > edited.day) {
+              const held = (store.held() as { cupRoster?: SeasonTeamRoster | null } | null)?.cupRoster ?? null
+              const order = (r: SeasonTeamRoster | null) => r === null ? '' : [...r.pitchers, ...r.batters].map((p) => p.id).join(',')
+              if (order(held) !== order(edited.roster)) problems.add(where(), ['고친 대표팀 차례가 다음 대회 경기에 안 남았다'])
+              cupEdited.current = null
+            }
             editEntry()
             if (result.current.scene !== SEASON_SCENE_STATE.경기정보) break
           }
@@ -957,7 +1144,11 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
               yearLog.push(`${state.record.yearIndex + 1}년차 ${session.series.qualifiers.indexOf(state.record.teamId) + 1}시드 (${session.league.wins[state.record.teamId]}승)`)
             }
             const award = nextLeagueFirstAward(state.record, session.leagueFirstAwardedBits)
-            if (award !== null) act(() => actions.awardLeagueFirst(award))
+            if (award !== null) {
+              act(() => actions.awardLeagueFirst(award))
+              // 0x6a56 — G 만 더하고 통계는 달성 표시(0x22dd5)뿐이다(G획득 0x22c7d 없음) — 장부에 따로 적는다
+              ledger.add('리그1위', award.gamePoint)
+            }
             break
           }
           const series = session.series
@@ -1007,18 +1198,19 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
     rendered.unmount()
   }
   const years = (result.current.state?.record.yearIndex ?? 0) - startYear.value + 1
-  return { problems, steps, games, years, reachedEnding, stoppedAt, yearLog, extraLog }
+  return { problems, steps, games, years, reachedEnding, stoppedAt, yearLog, extraLog, ledger: ledgerSums }
 }
 
 /** r235 새 길 전부 — G 는 넉넉히(트레이드 비용 칸 1·2 · GP 아이템 · 자동진행을 실제로 밟게) */
 const NEW_PATHS: SeasonSoakExtras = {
-  trade: true, shop: true, entryEdit: true, startGamePoints: 20_000, reopenEvery: 3, midGameResumeEvery: 4,
+  trade: true, shop: true, entryEdit: true, recruit: true, startGamePoints: 20_000, reopenEvery: 3, midGameResumeEvery: 4,
 }
 
 function report(result: SeasonSoakResult): string {
   return `걸음 ${result.steps} · 경기 정규 ${result.games.정규} · PS ${result.games.포스트시즌} · 대회 ${result.games.국가대항전}`
     + ` · 연차 ${result.years} · 엔딩 ${result.reachedEnding} · [${result.yearLog.join(' / ')}]`
     + `${Object.keys(result.extraLog).length === 0 ? '' : ` · 새 길 ${JSON.stringify(result.extraLog)}`}`
+    + ` · G 장부 ${JSON.stringify(result.ledger)}`
     + `${result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`}`
     + (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
 }
@@ -1036,18 +1228,23 @@ describe('시즌모드 장기 진행 점검 (soak)', () => {
     expect(result.stoppedAt, report(result)).toBeNull()
     expect(result.problems.size, report(result)).toBe(0)
     expect(result.games.정규).toBe(24)
-    for (const name of ['엔트리편집', '관리메뉴이어하기', '경기중이어하기', '십전대보탕', '장비투수', '요청수락']) expect(result.extraLog[name] ?? 0, `${name} — ${report(result)}`).toBeGreaterThan(0)
+    for (const name of ['엔트리편집', '관리메뉴이어하기', '경기중이어하기', '십전대보탕', '요청수락']) expect(result.extraLog[name] ?? 0, `${name} — ${report(result)}`).toBeGreaterThan(0)
+    // 명예 · 나리 선수를 데려와 장비를 샀다 (r245)
+    expect(Object.keys(result.extraLog).filter((name) => name.startsWith('영입')).length, report(result)).toBeGreaterThanOrEqual(2)
+    expect(Object.keys(result.extraLog).some((name) => /^장비(명예|나리)/.test(name)), report(result)).toBe(true)
     expect((result.extraLog.트레이드성공 ?? 0) + (result.extraLog.트레이드실패 ?? 0), report(result)).toBeGreaterThan(0)
   }, 60_000)
 
   for (const seed of soakSeeds([1, 2, 3])) {
-    it.runIf(isSoakEnabled())(`긴 판 (r235 새 길) — 씨앗 ${seed}: 트레이드 · 상점 · 엔트리 편집 · 이어하기로 10년차 엔딩까지`, () => {
+    it.runIf(isSoakEnabled())(`긴 판 (r235 새 길) — 씨앗 ${seed}: 트레이드 · 상점 · 엔트리 편집 · 이어하기로 10년차 엔딩까지`, async () => {
       const started = Date.now()
       const result = runSeasonSoak({
         seed, teamId: (seed + 2) % 10, extras: NEW_PATHS, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
         ...(soakNumber('SOAK_MAX_GAMES', 0) > 0 ? { maxRegularGames: soakNumber('SOAK_MAX_GAMES', 0) } : {}),
       })
-      console.info(`[시즌 soak 새 길] 씨앗 ${seed} · ${(Date.now() - started) / 1000}s · ${report(result)}`)
+      const line = `[시즌 soak 새 길] 씨앗 ${seed} · ${(Date.now() - started) / 1000}s · ${report(result)}`
+      console.info(line)
+      if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
       expect(result.stoppedAt, report(result)).toBeNull()
       if (soakNumber('SOAK_MAX_GAMES', 0) === 0) expect(result.reachedEnding, report(result)).toBe(true)
       expect(result.problems.size, report(result)).toBe(0)
@@ -1061,10 +1258,12 @@ describe('시즌모드 장기 진행 점검 (soak)', () => {
       expect(result.reachedEnding, report(result)).toBe(true)
       expect(result.problems.size, report(result)).toBe(0)
     }, 3_600_000)
-    it.runIf(isSoakEnabled())(`긴 판 — 씨앗 ${seed}: 팀 고르기부터 10년차 엔딩까지`, () => {
+    it.runIf(isSoakEnabled())(`긴 판 — 씨앗 ${seed}: 팀 고르기부터 10년차 엔딩까지`, async () => {
       const started = Date.now()
       const result = runSeasonSoak({ seed, teamId: seed % 10, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10) })
-      console.info(`[시즌 soak] 씨앗 ${seed} · ${(Date.now() - started) / 1000}s · ${report(result)}`)
+      const line = `[시즌 soak] 씨앗 ${seed} · ${(Date.now() - started) / 1000}s · ${report(result)}`
+      console.info(line)
+      if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
       expect(result.stoppedAt, report(result)).toBeNull()
       expect(result.reachedEnding, report(result)).toBe(true)
       expect(result.years, report(result)).toBe(FINAL_YEAR_INDEX + 1)

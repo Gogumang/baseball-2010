@@ -3,77 +3,61 @@
  * **나리 타자편 장기 진행 점검 (soak)** — 화면 없이 `useCareerSession` 을 새 선수 등록부터 여러 해, 은퇴 · 엔딩까지 돌린다.
  *
  * 앱처럼 세운다 (`App`): 커리어 세션 옆에 G 지갑(`useGamePointWallet`) · 모드 저장(`useModeSave` — 경기 중간 저장 +0x4c ·
- * 마선수 대결 대기) · 기록연감(`useCollection` — 명예의 전당) · 미션 세션(`useMissionSession` — 이벤트 마선수 대결)을 같은
- * 난수 · 같은 화면 상태로 함께 띄운다. 저장소는 모두 메모리다.
+ * 마선수 대결 대기) · 기록연감(`useCollection` — 명예의 전당) · 미션 세션(`useMissionSession` — 이벤트 마선수 대결) · 환경설정
+ * (`useGameSettings`)을 같은 난수 · 같은 화면 상태로 함께 띄운다. 저장소는 모두 메모리다.
  *
- * 사람 입력은 단순한 정책으로 대신한다 (`CareerRoutes` · `GameRoute` 가 화면 대신 부르는 액션을 그대로 부른다):
+ * **경기 · 결과 · 이벤트 · 마선수 대결은 앱의 그 화면을 그대로 띄워 키로 친다 (r245)** — 경기(`GameRoute` → `GameScreen` →
+ * `BattingStage`), 경기 결과(`GameResultScreen` — 결과 그림 0x4a384 의 정산 효과), 이벤트(`StoryScreen` — 보상 명령마다
+ * `giveEventReward`), 마선수 대결(`MissionRoutes` → `MissionPlayScreen`)을 `CareerRoutes` · `MissionRoutes` 로 띄우고, 그림 틀을
+ * 한 틱씩(`millisecondsPerFrame()`) 돌리며 사람처럼 키만 누른다:
+ * - 공이 나는 동안(상태 0x11 — `sceneStateEntryAt`) 정책 난수로 휘두를지 · 몇 틱 뒤에 '5' 를 누를지 고른다. 타구 판정(패턴 덱
+ *   0x51490 · 발사 패턴 굴림) · 파티클 틱(마구 공 · 판정 글자 · 홈런 효과) · CPU 투구 · 견제 · 도루 출발은 화면이 앱 차례 그대로 굴린다.
+ * - 새 길(`extras`)이면 공이 나는 동안 가끔 도루 키('3' · '2' · '1' — 앞 루가 빈 가장 앞 주자).
+ * - 0xe 확인 · 판 · 결과 판 · 대사창은 사람이 몇 틱 뒤에 OK(Enter) 를 누른 것으로 넘긴다(그동안 도는 효과 틱도 앱 차례다).
+ * - 로딩 판(`LoadingTip`)은 그리자마자 끝낸다(굴림 없음 — 팁은 세션이 굴렸다). 그림 붓은 아무 일도 안 하는 붓이고, 파티클 설정은
+ *   앱이 받아 둔 `particles.json` 을 그대로 싣는다(받기 전 null 이면 파티클이 안 나 굴림이 빠진다).
+ *
+ * 그 밖의 화면은 그 화면이 부르는 액션을 그대로 부른다 (`CareerRoutes` 가 화면 대신):
  * - 관리(105): 이번 주기에 아직 안 했으면 사기 < 60 이면 휴식, 아니면 트레이닝 칸 히트 · 파워 · 수비 · 주루 차례(막힌 칸은 건너뜀).
- *   했으면 [다음경기] → 109 순위 확인 → 142 경기 준비 확인 → 로딩 끝.
- * - 타석(경기): **CPU 투구 굴림은 타석 화면과 같은 차례로 세션 난수에서** 굴린다(`useStageAnimation` — 구질 0x344dc ×9 →
- *   목표 0x345fc(종류 4 면 견제 루 0x34848 → `cpuPickoff`) → 놓기 0x4dc78). 공 결과는 정책 난수(세션 난수와 따로)로 볼 ·
- *   스트라이크 · 헛스윙 · 파울 · 페어 타구(원본 타구 패턴 표에서 페어 각 하나)를 골라 굴린 구질 번호와 함께 `handlePitchResolved`
- *   에 넣는다. 붙든 판(타구 판 · 주자 판 · 벤치 클리어링 · 돌발 결과)은 화면이 하던 끝 액션으로 푼다.
- *   타석 끝 배너 시계(`pauseWithBanner`)는 가짜 시계를 앞으로 돌려 넘긴다.
- * - 이벤트(114)는 지나온 보상 명령을 모아 끝에 한 번에 준다(첫 종류 21 이면 그 자리에서 엔딩).
+ *   했으면 [다음경기] → 109 순위 확인 → 142 경기 준비 확인.
  * - 포스트시즌(128)은 팝업을 닫고 [확인], 국가대항전(134)은 화면의 판정(`confirmNationalCupStandings` · `finishNationalCup`)을 그대로 부른다.
- * - 엔딩(141)은 보너스를 받고 등록 없이 끝낸다.
+ * - 엔딩(141)은 보너스를 받고, 이어할 수 있는 엔딩(부상 · 방출)이면 5000 G 로 이어하고(새 길이면 한 번, `continueEndings` 면 늘),
+ *   새 길이면 명예의 전당에 등록(`collection.register` → `eraseSaveForHallOfFame` → `finishEnding(true)`).
  *
- * **새 길 (`extras`, r235)** — 위 정책이 안 밟던 곳:
- * - 도루: 주자가 있으면 가끔 공이 나는 동안(0x11, 놓기 굴림 뒤) `stealBase` (원본은 0x11 에만 키를 받는다 — `startSteal` 머리말).
- * - 상점(111 · 121): 장비 사기(부위마다 살 수 있는 가장 낮은 레벨) · 산 장비 바꿔 끼기 · 서브 아이템 · GP 아이템(칸 차례 —
- *   칸 5 복권 · 칸 9 이글아이 포함). 막힌 칸은 화면처럼 `purchaseQuestionOf` 가 null 이라 묻지 않는다.
- * - 외출(112 · 113 · 126): 아프면 병원, 사기 < 70 이면 외식, [!] 장소가 있으면 들어가기(장소 이벤트 → 마선수 대결), 그 밖은 막히지 않은
- *   첫 기능. 결과 창을 닫는다.
- * - 마선수 대결: 이벤트 match 를 앱 길(`App.startAceMatch` → `holdAceMatch` → 미션 `beginAceMatch`)로 실제로 치르고
- *   (`MissionRoutes` 의 타석 — 같은 투구 굴림 차례), `finishAceMatch` 가 띄운 결과 이벤트(140)를 이어 간다.
- * - 엔딩: 이어할 수 있는 엔딩(부상 · 방출)이면 한 번은 5000 G 로 이어하고, 아니면 명예의 전당에 등록(`collection.register` →
- *   `eraseSaveForHallOfFame` → `finishEnding(true)`).
- * - 이어하기(`resumeEvery`): 몇 걸음마다 훅을 내리고 같은 저장소로 새로 띄워 메인 메뉴의 길로 들어간다 — 경기 중간 저장(+0x4c)이
- *   서 있으면 `resumeInterruptedGame`, 아니면 `continueSaved`.
+ * **새 길 (`extras`, r235)** — 도루 · 상점(장비 · 끼기 · 서브 · GP — 칸 5 복권 · 칸 9 이글아이) · 외출(병원 · 외식 · [!] 장소 →
+ * 장소 이벤트 → 마선수 대결) · 엔딩 이어하기 · 명전 등록 · 이어하기(`resumeEvery` — 훅을 내리고 같은 저장소로 새로 띄워 메인 메뉴의
+ * 길: 경기 중간 저장(+0x4c)이면 `resumeInterruptedGame`, 아니면 `continueSaved`).
  *
  * 걸음마다 불가능한 값, 리그 전적 합 · 순위 차례, 경기 요약 → 시즌 누계, 경기 수(일정표 하루씩), 저장 JSON 왕복과 새 세션으로 다시
- * 띄운 상태, 멈춤을 본다. 새 길에는 돈 · G 수지(구매 · 외출 · 복권 · GP 아이템 · 명전 등록 앞뒤 차이), 장비(낀 장비는 가진 장비 ·
- * 장비 능력치 = 능력치 + 레벨 보너스), 도루 · 견제 뒤 아웃 · 주자, 명전 기록 줄, 이어하기 앞뒤 커리어 값을 더 본다.
+ * 띄운 상태, 멈춤, **G 전체 장부**(처음 G + 기록연감 G획득 · G사용 · GP 아이템 + 미션 보상 − 명전 등록 = 지갑, r245)를 본다. 새 길에는
+ * 돈 · G 수지(구매 · 외출 · 복권 · GP 아이템 · 명전 등록 앞뒤 차이), 장비, 명전 기록 줄, 이어하기 앞뒤 커리어를 더 본다.
+ * MVP 사슬(375 · 376/377)은 (시즌 · 포스트시즌 자리)마다 두 번 끝나면 문제다(r243 — 시리즈가 끝난 경기마다 다시 뜨는 것은 원본).
  * 긴 판은 `SOAK=1` 로 켠다:
  * `SOAK=1 SOAK_SEEDS=1,2,3 yarn vitest run src/app/model/soak/careerSoak.test.tsx --maxWorkers=2`
  * (`SOAK_RESUME_EVERY` 끊는 간격 · `SOAK_REPORT=파일` 통과한 판 요약을 파일에 덧붙인다)
  *
- * ⚠️ 타석 화면과 아직 다른 난수 차례(남김 — 화면 없는 하네스): 휘두른 공의 타구 판정(`BattingStage` → `resolvePitch` 의 패턴 덱 ·
- * 발사 패턴 굴림)은 정책 결과로 갈음하고, 파티클 틱(마구 공 · 삼진 판정 글자 · 홈런 효과)과 결과 판 정산 효과(0x4a384)의 경기 난수
- * 굴림은 돌지 않는다. CPU 투구 · 견제 · 도루 출발(0xafa60)은 앱 차례 그대로다.
+ * ⚠️ 앱과 다른 것(남김 — 화면 없는 자리): 관리 · 외출 · 상점 · 포스트시즌 · 국가대항전 · 엔딩 화면은 띄우지 않고 액션을 부른다
+ * (그 화면들은 굴림이 없거나 세션이 굴린다). 이어하기는 같은 난수 객체로 잇는다(앱은 새로 켜면 새 난수다).
  */
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, renderHook } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook } from '@testing-library/react'
 import { useCareerSession } from '@/app/model/useCareerSession'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
-import {
-  missionCpuMagicStateOf, missionMoundPitcherAbility, missionStageBatterOf, useMissionSession,
-} from '@/app/model/useMissionSession'
-import { useCollection } from '@/app/model/useCollection'
+import { useMissionSession } from '@/app/model/useMissionSession'
+import { nariBatterOf, useCollection } from '@/app/model/useCollection'
+import { useGameSettings } from '@/app/model/useGameSettings'
 import { modeBatterOf } from '@/app/model/modeBatter'
+import { CareerRoutes } from '@/app/ui/CareerRoutes'
+import { MissionRoutes } from '@/app/ui/MissionRoutes'
 import type { Screen } from '@/app/model/screen'
 import { DEFAULT_ROOKIE_PROFILE, GAMES_PER_SEASON, nextOpponentOf } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
-import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
-import type { EventReward } from '@/entities/story/model/eventReward'
-import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { confirmNationalCupStandings, finishNationalCup } from '@/entities/national-cup/model/nationalCupFlow'
 import { nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
 import { rankingOf } from '@/entities/league/model/league'
-import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
-import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
-import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
-import { provisionalOutcomeOf, registerContact } from '@/entities/batting/model/battedContact'
-import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
-import {
-  opponentCpuMagicStateOf, opponentStaminaPercentAfterPitchOf, stageOpponentPitcherAbilityOf,
-} from '@/features/play-game/model/gameFlow'
-import { CPU_PITCH_TYPE_TICKS, cpuPitchAimOf, cpuPitchTypeTickOf, releaseCpuPitch } from '@/entities/pitching/model/selectPitch'
-import type { CpuPitchArgs } from '@/entities/pitching/model/selectPitch'
-import { pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
-import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { purchaseQuestionOf, shopItemId } from '@/features/shop/model/shopSelection'
 import {
   EQUIPMENT_LEVEL_COUNT, EQUIPMENT_PARTS, equipmentBlockReasonOf, equipmentBonusOf, equipmentItemOf, ownsEquipment,
@@ -83,30 +67,69 @@ import { SUB_ITEMS, subItemBlockReasonOf } from '@/entities/career/model/subItem
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { outingBlockReasonOf } from '@/entities/career/model/outing'
-import { isContinuableEnding } from '@/entities/career/model/seasonFlow'
+import { CONTINUE_COST_GAME_POINT, endingBonusOf, isContinuableEnding } from '@/entities/career/model/seasonFlow'
 import { batterRecordLineOf } from '@/entities/career/model/seasonStats'
 import { HALL_OF_FAME_COST } from '@/entities/collection/model/collection'
+import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { MatchCommand } from '@/pages/story/model/useEventPlayback'
+import type { StoryContext } from '@/app/model/useStorySchedule'
 import { nariGameMatchOfSave } from '@/pages/management/lib/nariMatchPrepare'
 import type { NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
 import { myBatterIndexOf, nariTeamRecordOf, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
+import { GAME_POINT_LIMIT } from '@/entities/wallet/model/gamePointWallet'
 import { useModeSave } from '@/entities/mode-save/model/useModeSave'
+import { STEAL_KEY_OF_BASE } from '@/features/defense-play/model/pitchArrivalPlay'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
-import { drawnReplayFieldingErrorsOf } from '@/features/defense-play/model/fieldingErrors'
 import { ACE_BATTER_ROSTER_SLOT } from '@/entities/league/model/leagueDay'
-import { resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { gameSceneTickNow, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
+import { SCENE_STATE, resetSceneStateEntries, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
+import { resetSceneParticlesForTest } from '@/widgets/particles/model/sceneParticles'
+import { resetSceneResultCode } from '@/widgets/batting-stage/model/sceneResultCodeStore'
+import { resetSceneCloudClock } from '@/widgets/batting-stage/model/sceneCloudClock'
+import { resetSceneBallPath, sceneBallPathPitch } from '@/widgets/batting-stage/model/sceneBallPath'
 import {
   SoakProblems, batterLineProblemsOf, firstDiffOf, isSoakEnabled, jsonRoundTripDiffOf, leagueTallyProblemsOf,
   outOfRangeOf, rankingOrderProblemsOf, soakNumber, soakSeeds, unserializablePathsOf,
 } from '@/app/model/soak/soakInvariants'
+
+// 그림 붓 — 타석 · 결과 그림은 아무 일도 안 한다(굴림 · 상태는 그대로 돈다)
+vi.mock('@/widgets/batting-stage/lib/renderBattingStage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/batting-stage/lib/renderBattingStage')>()
+  return { ...actual, renderBattingStage: () => {}, renderSettlementLayer: () => {} }
+})
+// 파티클 설정 — 앱은 첫 그림 무렵 받아 둔다. 받은 꼴 그대로 싣는다(없으면 파티클이 안 나 그 틱 굴림이 빠진다)
+vi.mock('@/widgets/particles/lib/particleCatalog', async () => {
+  const { readFileSync } = await import('node:fs')
+  const catalog = JSON.parse(readFileSync('public/sprites/ptcimg/particles.json', 'utf8')) as {
+    emitters: { callId: number; callable: boolean }[]
+  }
+  return {
+    particleConfigOf: (callId: number) => catalog.emitters.find((entry) => entry.callId === callId && entry.callable) ?? null,
+  }
+})
+// 로딩 판 — 그리자마자 끝낸다(팁은 세션이 굴렸고 판 자체는 굴림이 없다. 그림 적재를 기다리면 jsdom 에선 안 끝난다)
+vi.mock('@/widgets/loading-tip/ui/LoadingTip', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/widgets/loading-tip/ui/LoadingTip')>()
+  const { useEffect } = await import('react')
+  return {
+    ...actual,
+    LoadingTip: ({ onDone }: { readonly onDone: () => void }) => {
+      useEffect(() => {
+        onDone()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [])
+      return null
+    },
+  }
+})
 
 setActiveSound(createSilentSound())
 
@@ -115,8 +138,43 @@ const MVP_EVENT_IDS = [375, 376, 377]
 
 /** 나리 타자편 모드 번호 (`App` 의 NARI_BATTER_MODE) */
 const NARI_BATTER_MODE = 4
-/** 타석 화면의 압도 스킬 번호 (`GameRoute` 의 INTIMIDATE_SKILL_ID) */
-const INTIMIDATE_SKILL_ID = 22
+
+/** 휘두르는 비율 · 누르는 틱 흔들림(맞는 틱에서 앞으로 `SWING_TICK_EARLY` · 폭 `SWING_TICK_SPAN`) (정책) */
+const SWING_RATE = 0.55
+const SWING_TICK_SPAN = 5
+const SWING_TICK_EARLY = 3
+
+/* ── 그림 틀 — 앱처럼 requestAnimationFrame · performance.now · setTimeout 을 한 틀씩 돌린다 ─────────────── */
+
+let frameCallbacks = new Map<number, FrameRequestCallback>()
+let nextFrameHandle = 1
+let clock = 1_000
+let originals: { now: () => number; raf: typeof window.requestAnimationFrame; caf: typeof window.cancelAnimationFrame } | null = null
+
+function resetStageStores() {
+  resetSceneParticlesForTest()
+  resetSceneResultCode()
+  resetCommonWindowShownForTest()
+  resetSceneCloudClock()
+  resetSceneBallPath()
+  resetSceneStateEntries()
+}
+
+/** 한 틀 — 시계를 틀 길이만큼 · 미룬 일 · 그림 콜백 */
+function frame() {
+  act(() => {
+    clock += millisecondsPerFrame()
+    vi.advanceTimersByTime(millisecondsPerFrame())
+    const pending = [...frameCallbacks.values()]
+    frameCallbacks = new Map()
+    for (const callback of pending) callback(clock)
+  })
+}
+
+function pressKey(key: string) {
+  fireEvent.keyDown(window, { key })
+  fireEvent.keyUp(window, { key })
+}
 
 function memorySave(): SaveGamePort & { readonly held: () => PlayerCareer | null } {
   let saved: PlayerCareer | null = null
@@ -153,10 +211,6 @@ function memoryMissionRecord(): MissionRecordPort {
   }
 }
 
-/** 원본 타구 패턴 표의 페어 각 패턴 — (결과 코드, 패턴) */
-const FAIR_CONTACTS: readonly { readonly resultCode: number; readonly pattern: BattedBallPattern }[] = Object.entries(BATTED_BALL_PATTERNS)
-  .flatMap(([code, patterns]) => patterns.filter((pattern) => isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })))
-
 /** 정책 난수 — 세션 난수와 따로 굴린다(사람 손가락 자리) */
 function policyRandom(seed: number) {
   let state = (seed * 2654435761) >>> 0
@@ -166,80 +220,8 @@ function policyRandom(seed: number) {
   }
 }
 
-/** 공 하나 — 사람이 친 결과를 흉내 낸다. 구질 번호는 타석 화면이 굴린 CPU 구질(놓기 0x4dc78 의 결과)을 싣는다 */
-function pitchDetailOf(roll: number, pick: number, batterHand: number, pitchTypeNumber: number): PitchOutcomeDetail {
-  const base = { hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null, pitchTypeNumber } as const
-  if (roll < 0.33) return { ...base, resolution: { kind: '볼' } }
-  if (roll < 0.53) return { ...base, resolution: { kind: '스트라이크', isSwinging: false } }
-  if (roll < 0.66) return { ...base, hasSwung: true, resolution: { kind: '스트라이크', isSwinging: true } }
-  if (roll < 0.76) return { ...base, hasSwung: true, resolution: { kind: '파울' } }
-  if (roll < 0.765) return { ...base, resolution: { kind: '사구' } }
-  const contact = FAIR_CONTACTS[Math.floor(pick * FAIR_CONTACTS.length)]!
-  return {
-    ...base,
-    hasSwung: true,
-    resultCode: contact.resultCode,
-    pattern: contact.pattern,
-    batterHand,
-    resolution: {
-      kind: '타구',
-      outcome: registerContact(provisionalOutcomeOf(contact.pattern), { pattern: contact.pattern, resultCode: contact.resultCode, batterHand }),
-    },
-  }
-}
-
-/** 타석 화면 HUD 의 그 틱 값 — `pitchSituationOf` 가 읽는 칸만 */
-interface StageHud {
-  readonly balls: number
-  readonly strikes: number
-  readonly outs: number
-  readonly bases: { readonly first: boolean; readonly second: boolean; readonly third: boolean }
-}
-
-/**
- * 타석 화면(`useStageAnimation.cpuPitchArgsNow`)이 그 틱에 넘기는 CPU 투구 재료 — 마구 상태는 부르는 쪽이 든 값의 사본
- * (`magicStateOf` 의 `held` 갈래), 견제는 받아 줄 쪽(`onPickoff`)이 있어 늘 켠다
- */
-function stageCpuPitchArgsOf(input: {
-  readonly pitcher: CpuPitchArgs['pitcher']
-  /** 없으면(CPU 가 던지는 반이 아님 — `missionCpuMagicStateOf` 의 null 갈래) 남은 횟수 0 */
-  readonly cpuMagic: { readonly remaining: number; readonly ballMagicNumber: number } | undefined
-  readonly hud: StageHud
-  readonly batterForm: number
-  readonly batterHand?: number
-  readonly batterSkillIds: readonly number[]
-}): CpuPitchArgs {
-  const { hud } = input
-  const situationHud = hud as unknown as Parameters<typeof pitchSituationOf>[0]
-  return {
-    pitcher: input.pitcher,
-    situation: pitchSituationOf(situationHud, input.batterForm, input.batterHand),
-    difficulty: 'hard',
-    magic: { remaining: input.cpuMagic?.remaining ?? 0, ballMagicNumber: input.cpuMagic?.ballMagicNumber ?? 0 },
-    cpuPickoff: {
-      hasRunnerOnBase: (base) => (base === 1 ? hud.bases.first : base === 2 ? hud.bases.second : base === 3 ? hud.bases.third : false),
-    },
-    batterIntimidates: input.batterSkillIds.includes(INTIMIDATE_SKILL_ID),
-    derbyPitchType: undefined,
-  }
-}
-
-/**
- * CPU 공 하나의 굴림을 타석 화면 차례대로 — 상태 0xf 틱 0~8 구질 0x344dc(틱마다) → 0x10 틱 6 목표 0x345fc(또는 견제) →
- * 0x11 틱 10 놓기 0x4dc78. 재료는 틱마다 다시 읽는다(`cpuPitchArgsNow`). 견제면 그 루, 공이면 구질 번호
- */
-function rollStagePitch(argsNow: () => CpuPitchArgs, random: RandomPort):
-  { readonly kind: '견제'; readonly base: 1 | 2 | 3 } | { readonly kind: '투구'; readonly pitchTypeNumber: number } {
-  let typeNumber = 0
-  for (let tick = 0; tick < CPU_PITCH_TYPE_TICKS; tick += 1) typeNumber = cpuPitchTypeTickOf(argsNow(), random)
-  const aim = cpuPitchAimOf(argsNow(), random)
-  if (aim.kind === '견제') return { kind: '견제', base: aim.base }
-  const released = releaseCpuPitch(argsNow(), typeNumber, aim.target, random)
-  return { kind: '투구', pitchTypeNumber: released.pitchTypeNumber }
-}
-
 /** 도루할 루 — 앞 루가 빈 가장 앞 주자 (없으면 null) */
-function stealBaseOf(bases: StageHud['bases']): 1 | 2 | 3 | null {
+function stealBaseOf(bases: { readonly first: boolean; readonly second: boolean; readonly third: boolean }): 1 | 2 | 3 | null {
   if (bases.third) return null
   if (bases.second) return 2
   if (bases.first) return 1
@@ -249,6 +231,8 @@ function stealBaseOf(bases: StageHud['bases']): 1 | 2 | 3 | null {
 interface CareerSoakResult {
   readonly problems: SoakProblems
   readonly steps: number
+  /** 돌린 그림 틀 수 */
+  readonly frames: number
   readonly games: { 정규: number; 포스트시즌: number; 국가대항전: number; 대결: number }
   readonly seasons: number
   readonly endingIndex: number | null
@@ -256,7 +240,9 @@ interface CareerSoakResult {
   readonly log: readonly string[]
   /** 새 길을 실제로 밟은 횟수 */
   readonly paths: Readonly<Record<string, number>>
-  /** 재생한 이벤트 번호마다 거친 횟수(선택지로 이어 본 것 포함) — 한 번도 안 걸리는 이벤트 찾기 (r253) */
+  /** G 장부 — 출처별 합 */
+  readonly ledger: Readonly<Record<string, number>>
+  /** 재생한 이벤트 번호마다 거친 횟수(선택지로 이어 본 것 포함) — 한 번도 안 걸리는 이벤트 찾기 (r253 — `StoryScreen` 이 알린 본 이벤트로 센다) */
   readonly eventsViewed: Readonly<Record<number, number>>
 }
 
@@ -266,70 +252,21 @@ interface CareerSoakOptions {
   readonly maxRegularGames?: number
   /** 저장 왕복을 몇 번째 관리 화면마다 볼지 */
   readonly roundTripEvery?: number
-  /** 새 길 정책(도루 · 상점 · 장비 · GP · 복권 · 외출 · 마선수 대결 · 엔딩 이어하기 · 명전 등록) */
+  /** 새 길 정책(도루 · 상점 · 장비 · GP · 복권 · 외출 · 엔딩 이어하기 · 명전 등록) */
   readonly extras?: boolean
   /** 이 걸음 수마다 훅을 내리고 같은 저장으로 새로 띄워 이어 간다 — 없거나 0 이면 안 한다 */
   readonly resumeEvery?: number
   /** 지갑 첫 G */
   readonly startGamePoint?: number
-}
-
-/** 이벤트 재생 결과 — match 에 닿았으면 그 명령과 모은 것 */
-interface EventWalk {
-  readonly rewards: readonly EventReward[]
-  readonly viewed: readonly number[]
-  readonly endingEventId: number | null
-  readonly match: MatchCommand | null
-}
-
-/**
- * 이벤트 재생을 흉내 낸다 (`useEventPlayback`) — 지나온 보상 명령을 모으고, 선택지는 첫 칸 · 예아니오(창 있는 sub 0)는 "예"로
- * 건너간다(떠나온 이벤트는 `onChoice` 로 알린다). 첫 종류 21(엔딩 진입)을 만나면 거기서 멈추고 그 이벤트를 엔딩으로 넘긴다(0x8d4ce).
- * match 명령(마선수 대결)에서 멈추고 그 명령을 돌려준다 — 치를지는 부르는 쪽이 정한다.
- */
-function eventPlaybackOf(
-  events: readonly OriginalEvent[],
-  firstEventId: number,
-  onChoice: (eventId: number, leftEventIds: readonly number[]) => void,
-): EventWalk {
-  const rewards: EventReward[] = []
-  const viewed: number[] = []
-  let endingEventId: number | null = null
-  let match: MatchCommand | null = null
-  let eventId = firstEventId
-  for (let hop = 0; hop < 20; hop += 1) {
-    const event = events.find((candidate) => candidate.id === eventId)
-    if (!viewed.includes(eventId)) viewed.push(eventId)
-    let jumpTo: number | null = null
-    let stopped = false
-    for (const command of event?.commands ?? []) {
-      if (command.op === 'match') {
-        match = command
-        stopped = true
-        break
-      }
-      if (command.op === 'reward') {
-        if (command.items[0]?.kind === EVENT_REWARD_KIND.엔딩진입) {
-          endingEventId = eventId
-          stopped = true
-          break
-        }
-        rewards.push(...(command.items as readonly EventReward[]))
-      }
-      if (command.op === 'choice' && command.choices[0] !== undefined) {
-        jumpTo = command.choices[0].gotoEvent
-        break
-      }
-      if (command.op === 'yesno' && command.sub === 0) {
-        jumpTo = command.yesEvent
-        break
-      }
-    }
-    if (stopped || jumpTo === null || jumpTo <= 0) break
-    onChoice(eventId, [eventId])
-    eventId = jumpTo
-  }
-  return { rewards, viewed, endingEventId, match }
+  /**
+   * 첫 커리어를 이 값으로 고친 저장에서 [이어하기]로 시작한다(원본에 있는 꼴 — 그 연차 첫날 · 범위 안 인기도 · 부상 경기 수).
+   * 짧은 판이 엔딩 이어하기 길(부상 0 · 방출 1)을 몇 초 안에 밟게 한다
+   */
+  readonly startPatch?: Partial<Pick<PlayerCareer, 'season' | 'popularity' | 'injuredGamesPlayed' | 'isInjured' | 'injuryRemaining'>>
+  /** 이어할 수 있는 엔딩을 만날 때마다 이어한다(5000 G 가 있으면) — 없으면 새 길에서 한 번만 */
+  readonly continueEndings?: boolean
+  /** 이만큼 엔딩을 이어하면 멈춘다 */
+  readonly stopAfterContinues?: number
 }
 
 /** 끊어 볼 화면 — 차례로 돈다. 엔딩 · 메인 메뉴 · 마선수 대결(미션 장면 — 나가면 결과 이벤트가 105 진입에서 뜬다)은 뺀다 */
@@ -337,34 +274,173 @@ const RESUMABLE_SCREENS: readonly Screen['kind'][] = [
   '관리', '경기', '이벤트', '경기결과', '다음경기순위', '경기준비', '외출', '포스트시즌', '국가대항전', '연차표지', '대회경기결과',
 ]
 
+/** 앱의 화면을 띄워 그림 틀 · 키로 치는 화면 */
+const FRAME_SCREENS: ReadonlySet<Screen['kind']> = new Set(['경기', '경기결과', '대회경기결과', '이벤트', '마선수대결'])
+
 /** 이어하기 앞뒤로 같아야 하는 커리어 칸 — 이어하기 진입(장면 셋업 · 116 재진입)이 고치는 칸(본 이벤트 · 외출 수 · 카운터)은 뺀다 */
 const RESUME_STABLE_KEYS = [
   'season', 'gamesPlayed', 'money', 'salary', 'ability', 'equipmentLevels', 'ownedEquipment', 'subItemIds', 'stats', 'careerStats',
   'league', 'leaguePlayerStats', 'titleIds', 'teamId', 'postseason', 'nationalCup', 'endingIndex',
 ] as const
 
+/** 한 틀 안에 변화가 없으면 OK 를 누르기까지 기다리는 틀 · 멈춤으로 보는 틀 */
+const IDLE_OK_FRAMES = 24
+const STUCK_FRAMES = 6_000
+
 async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResult> {
-  const { seed, maxRegularGames, roundTripEvery = 5, extras = false, resumeEvery = 0, startGamePoint } = options
+  const {
+    seed, maxRegularGames, roundTripEvery = 5, extras = false, resumeEvery = 0, startGamePoint, startPatch, continueEndings = false,
+    stopAfterContinues,
+  } = options
   const saveGame = memorySave()
   const walletStore = memoryJson(startGamePoint === undefined ? null : { gamePoint: startGamePoint })
   const modeStore = memoryJson()
   const collectionStore = memoryJson()
+  const settingsStore = memoryJson()
   const missionRecord = memoryMissionRecord()
   const random = createSeededRandom(seed)
   const policy = policyRandom(seed)
 
-  /** 앱(`App`)처럼 세션들을 한 훅에 — 같은 화면 상태 · 같은 난수 · 같은 타석 진행기 */
-  const mount = () => renderHook(() => {
+  /* ── G 전체 장부 — 처음 G + 기록연감 G획득 − G사용 − GP 아이템 + 미션 보상 − 명전 등록 (한 줄마다 0..99999 로 자른다) ── */
+  const ledgerSums: Record<string, number> = {}
+  const ledger = {
+    balance: null as number | null,
+    add(source: string, delta: number) {
+      ledgerSums[source] = (ledgerSums[source] ?? 0) + delta
+      if (ledger.balance !== null) ledger.balance = Math.min(GAME_POINT_LIMIT, Math.max(0, ledger.balance + delta))
+    },
+  }
+  const recordStat = (event: AnnalsStatEvent) => {
+    if (event.kind === 'G획득') ledger.add('G획득', event.amount)
+    else if (event.kind === 'G사용') ledger.add('G사용', -event.amount)
+    else if (event.kind === 'GP아이템구매') ledger.add('GP아이템', -event.price)
+  }
+
+  /** 지금 띄운 훅 · 화면 묶음 (그림마다 새로 적는다) */
+  const holder: { current: HarnessBundle | null } = { current: null }
+  /** 이벤트 마선수 대결 시작 — 화면(`StoryScreen.onMatch`)이 부른다. 앱 `startAceMatch` 그대로 */
+  const startAceMatchRef: { current: (command: MatchCommand, carried: StoryCarry, context: StoryContext) => void } = {
+    current: () => {},
+  }
+  /** 이벤트 재생 끝 — 본 이벤트를 MVP 검사에 넘긴다 */
+  const sceneDoneRef: { current: (viewed: readonly number[]) => void } = { current: () => {} }
+  /** 공 결과 갈래 수 — 타석 화면이 낸 판정(휘두른 공의 패턴 덱까지) */
+  const pitchOutcomes: Record<string, number> = {}
+  const heldPlays = { 타구판: 0, 주자판: 0, 벤치클리어링: 0, 돌발결과: 0, 공: 0, 견제: 0, 도루: 0, 보상명령: 0 }
+
+  type Session = ReturnType<typeof useCareerSession>
+  interface HarnessBundle {
+    readonly screen: Screen
+    readonly setScreen: (screen: Screen) => void
+    readonly runner: ReturnType<typeof useAtBatRunner>
+    readonly wallet: ReturnType<typeof useGamePointWallet>
+    readonly modeSave: ReturnType<typeof useModeSave>
+    readonly session: Session
+    readonly collection: ReturnType<typeof useCollection>
+    readonly mission: ReturnType<typeof useMissionSession>
+    readonly gameSettings: ReturnType<typeof useGameSettings>
+  }
+
+  /** 화면에 넘기는 세션 — 액션을 감싸 판 · 보상 명령을 센다(부르는 길은 그대로) */
+  const observedSession = (session: Session): Session => ({
+    ...session,
+    handlePitchResolved: (...args: Parameters<Session['handlePitchResolved']>) => {
+      heldPlays.공 += 1
+      const [detail] = args
+      const kind = detail.resolution.kind === '스트라이크' && detail.resolution.isSwinging ? '헛스윙' : detail.resolution.kind
+      pitchOutcomes[kind] = (pitchOutcomes[kind] ?? 0) + 1
+      return session.handlePitchResolved(...args)
+    },
+    actions: {
+      ...session.actions,
+      finishDefensePlay: (...args: Parameters<Session['actions']['finishDefensePlay']>) => {
+        heldPlays.타구판 += 1
+        return session.actions.finishDefensePlay(...args)
+      },
+      finishRunnerPlay: (...args: Parameters<Session['actions']['finishRunnerPlay']>) => {
+        heldPlays.주자판 += 1
+        return session.actions.finishRunnerPlay(...args)
+      },
+      finishBenchClearing: (...args: Parameters<Session['actions']['finishBenchClearing']>) => {
+        heldPlays.벤치클리어링 += 1
+        return session.actions.finishBenchClearing(...args)
+      },
+      closeBurstResult: (...args: Parameters<Session['actions']['closeBurstResult']>) => {
+        heldPlays.돌발결과 += 1
+        return session.actions.closeBurstResult(...args)
+      },
+      cpuPickoff: (...args: Parameters<Session['actions']['cpuPickoff']>) => {
+        heldPlays.견제 += 1
+        return session.actions.cpuPickoff(...args)
+      },
+      stealBase: (...args: Parameters<Session['actions']['stealBase']>) => {
+        heldPlays.도루 += 1
+        return session.actions.stealBase(...args)
+      },
+      giveEventReward: (...args: Parameters<Session['actions']['giveEventReward']>) => {
+        heldPlays.보상명령 += 1
+        return session.actions.giveEventReward(...args)
+      },
+      completeScene: (...args: Parameters<Session['actions']['completeScene']>) => {
+        sceneDoneRef.current(args[1] ?? [])
+        return session.actions.completeScene(...args)
+      },
+    },
+  })
+
+  function HarnessScreens({ bundle }: { readonly bundle: HarnessBundle }): ReactNode {
+    const { screen, setScreen, runner, session, collection, mission, gameSettings, wallet } = bundle
+    const career = session.career
+    if (screen.kind === '마선수대결') {
+      const missionBatter = session.career ?? session.savedCareer
+      return (
+        <MissionRoutes
+          screen={screen}
+          setScreen={setScreen}
+          session={mission}
+          runner={runner}
+          random={random}
+          batter={modeBatterOf(missionBatter)}
+          hallOfFame={collection.collection}
+          nari={{ 투수: null, 타자: nariBatterOf(missionBatter) }}
+          pitchControl={gameSettings.settings.pitchControl}
+          gameSettings={gameSettings}
+          gamePoint={wallet.balance}
+        />
+      )
+    }
+    if (!FRAME_SCREENS.has(screen.kind) || career === null) return null
+    // 경기 진행이 아직 없으면(로딩 전) 관리 화면을 그리는 갈래라 띄우지 않는다
+    if (screen.kind === '경기' && session.progress === null) return null
+    return (
+      <CareerRoutes
+        screen={screen}
+        setScreen={setScreen}
+        session={observedSession(session)}
+        runner={runner}
+        random={random}
+        career={career}
+        hallOfFame={{ collection: collection.collection, nariPitcher: null, register: () => '취소' as never, gamePoint: wallet.balance }}
+        onAceMatch={(command, carried, context) => startAceMatchRef.current(command, carried, context)}
+        gameSettings={gameSettings}
+      />
+    )
+  }
+
+  /** 앱(`App`)처럼 세션들을 한 그림에 — 같은 화면 상태 · 같은 난수 · 같은 타석 진행기 */
+  function Harness(): ReactNode {
     const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
     const runner = useAtBatRunner()
     const wallet = useGamePointWallet(walletStore)
     const modeSave = useModeSave(modeStore)
+    const gameSettings = useGameSettings(settingsStore)
     const nariGameSave: NariGameSavePort = {
       start: (match) => modeSave.startNariGame(NARI_BATTER_MODE, match),
       clear: () => modeSave.clearNariGame(NARI_BATTER_MODE),
     }
     const session = useCareerSession({
-      runner, random, saveGame, screen, setScreen, wallet, nariGameSave,
+      runner, random, saveGame, screen, setScreen, wallet, nariGameSave, recordStat,
+      runningModeManual: gameSettings.settings.runningMode === '수동',
       aceMatchPending: modeSave.aceMatchPendingPorts[NARI_BATTER_MODE],
     })
     const collection = useCollection(collectionStore, session.career)
@@ -374,7 +450,14 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       : myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(missionBatterCareer), missionBatterCareer.teamId))
     const mission = useMissionSession({
       runner, random, missionRecord, screen, setScreen,
-      onGamePointReward: session.actions.gainGamePoint,
+      onGamePointReward: (amount: number) => {
+        ledger.add('미션보상', amount)
+        session.actions.gainGamePoint(amount)
+      },
+      recordStat,
+      throwModeManual: gameSettings.settings.throwMode === '수동',
+      runningModeManual: gameSettings.settings.runningMode === '수동',
+      isVibrationOn: gameSettings.settings.isVibrationOn,
       batterRunAbility: modeBatterOf(missionBatterCareer).ability.run,
       ...(missionBatterCareer === null ? {} : { batterSkillIds: missionBatterCareer.equippedSkillIds }),
       nariTeamIds: missionBatterCareer === null ? {} : { batter: missionBatterCareer.teamId },
@@ -384,11 +467,15 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         if (session.savedCareer !== null) session.actions.continueSaved()
       },
     })
-    return { screen, setScreen, runner, wallet, modeSave, session, collection, mission }
-  })
-  let rendered = mount()
+    const bundle: HarnessBundle = { screen, setScreen, runner, wallet, modeSave, session, collection, mission, gameSettings }
+    holder.current = bundle
+    return <HarnessScreens bundle={bundle} />
+  }
+
+  let rendered = render(<Harness />)
   /** 지금 띄운 훅 — 이어하기가 훅을 새로 띄워도 같은 이름으로 읽는다 */
-  const result = { get current() { return rendered.result.current } }
+  const result = { get current(): HarnessBundle { return holder.current! } }
+  ledger.balance = result.current.wallet.balance
   const problems = new SoakProblems()
   const games = { 정규: 0, 포스트시즌: 0, 국가대항전: 0, 대결: 0 }
   const paths: Record<string, number> = {}
@@ -404,6 +491,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
    */
   const mvpScenes = new Map<string, number>()
   let steps = 0
+  let frames = 0
   let trainingSlot = 0
   let managementVisits = 0
   let gpSlot = 0
@@ -411,17 +499,30 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   let started = false
   let endingIndex: number | null = null
   let firstSeason = 1
-  let continuedAfterEnding = false
+  let continuedAfterEnding = 0
   let lastCutStep = 0
   let resumeTarget = 0
   let lastSeenSeason = 1
   /** 이 경기를 시작할 때의 커리어 — 결과 화면에서 누계 증가분을 본다 */
   let beforeGame: { career: PlayerCareer; kind: '정규' | '포스트시즌' | '국가대항전' } | null = null
   let checkedSummary: unknown = null
-  /** 이 경기에서 재생 화면 대신 그린 판이 올린 실책(마타자 칸 뺌 — 요약과 같은 거르기) — 정산 요약의 실책과 같아야 한다 (r248) */
+  /**
+   * 이 경기에서 화면(수비 판 · 재생 판 — `DefensePlayback` 의 0x43278 +0x2e)이 그려 올린 실책(마타자 칸 뺌 — 요약과 같은 거르기). 정산 요약의
+   * 실책과 같아야 한다 (r248 — 경기를 끝낸 재생 판의 실책도 정산 앞에 든다). 진행의 실책 칸이 늘어난 만큼을 틀마다 모은다
+   */
   let drawnErrorsThisGame: unknown[] = []
-  /** 붙든 판을 푼 횟수 — 정책이 경기 갈래를 실제로 밟았는지 본다 */
-  const heldPlays = { 타구판: 0, 주자판: 0, 벤치클리어링: 0, 돌발결과: 0, 공: 0, 견제: 0, 도루: 0 }
+  let seenErrors: { progress: unknown; count: number } = { progress: null, count: 0 }
+  const collectDrawnErrors = () => {
+    const progress = result.current.session.progress
+    if (progress === null) return
+    const errors = progress.leagueErrors ?? []
+    if (seenErrors.progress === null || errors.length < seenErrors.count) seenErrors = { progress, count: 0 }
+    const added = errors.slice(seenErrors.count)
+    drawnErrorsThisGame.push(...added.filter((error) => error.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT))
+    seenErrors = { progress, count: errors.length }
+  }
+  /** 끝난 대결 — 같은 판을 두 번 안 센다 */
+  let countedAceRun: unknown = null
 
   const where = () => {
     const career = result.current.session.career
@@ -429,9 +530,48 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       + ` · 화면 ${result.current.screen.kind} · 걸음 ${steps}`
   }
 
+  /** 이벤트 화면이 알린 본 이벤트를 센다 — 이어 온(대결 결과) 이벤트가 들고 온 앞 이벤트는 이미 셌으므로 뺀다 */
+  const countViewed = (viewedIds: readonly number[]) => {
+    const screen = result.current.screen
+    const carried = screen.kind === '이벤트' ? screen.carried?.viewedEventIds ?? [] : []
+    const ids = new Set(viewedIds)
+    if (screen.kind === '이벤트') ids.add(screen.eventId)
+    for (const id of ids) if (!carried.includes(id)) eventsViewed[id] = (eventsViewed[id] ?? 0) + 1
+  }
+  sceneDoneRef.current = (viewedIds) => {
+    countViewed(viewedIds)
+    const career = result.current.session.career
+    for (const id of viewedIds.filter((viewedId) => MVP_EVENT_IDS.includes(viewedId))) {
+      const series = career?.postseason
+      const spot = series === null || series === undefined ? '정규' : `${series.round}:${series.teams.join(',')}:${series.wins.join(',')}`
+      const mvpKey = `${career?.season}:${spot}:${id}`
+      const count = (mvpScenes.get(mvpKey) ?? 0) + 1
+      mvpScenes.set(mvpKey, count)
+      if (count > 1) problems.add(where(), [`${career?.season}년차 ${spot} 자리에서 MVP 이벤트 ${id} 를 ${count}번째 끝냈다`])
+      if (id === 375) log.push(`${career?.season}년차 MVP 발표(${spot})`)
+    }
+  }
+
+  /** 앱 `startAceMatch` 그대로 — 화면 콜백 안에서 불리므로 act 를 따로 걸지 않는다 */
+  startAceMatchRef.current = (command, carried, context) => {
+    const { session, mission, setScreen } = result.current
+    countViewed(carried.viewedEventIds)
+    walked('마선수대결')
+    if (context === '장소') session.actions.settlePlaceForAceMatch()
+    const target = aceMatchMissionOf(command.team)
+    if (target === null) {
+      setScreen({ kind: '이벤트', eventId: matchResultEventOf(command.resultEvents, false), context: '대결결과', carried })
+      return
+    }
+    session.actions.holdAceMatch(command.resultEvents, carried.viewedEventIds)
+    mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried })
+  }
+
+  let lastCheckedCareer: PlayerCareer | null = null
   const checkCareer = () => {
     const career = result.current.session.career
-    if (career === null) return
+    if (career === null || career === lastCheckedCareer) return
+    lastCheckedCareer = career
     const at = where()
     problems.add(at, unserializablePathsOf(career, 'career').slice(0, 5))
     problems.add(at, outOfRangeOf('career', {
@@ -485,17 +625,28 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     if (new Set(career.subItemIds).size !== career.subItemIds.length) problems.add(at, ['서브 아이템이 겹친다'])
   }
 
+  /** G 장부 = 지갑 — 어긋나면 그 걸음을 적고 장부를 지갑에 맞춘다(같은 어긋남이 걸음마다 쌓이지 않게) */
+  const checkLedger = () => {
+    const balance = result.current.wallet.balance
+    if (ledger.balance !== null && ledger.balance !== balance) {
+      problems.add(where(), [`G 장부 ${ledger.balance} ≠ 지갑 ${balance} (차이 ${balance - ledger.balance})`])
+      ledger.balance = balance
+    }
+  }
+
   /** 경기 진행 값 — 도루 · 견제 뒤 아웃 · 루 · 점수 */
-  const checkProgress = (label: string) => {
+  let lastCheckedProgress: unknown = null
+  const checkProgress = () => {
     const progress = result.current.session.progress
-    if (progress === null) return
+    if (progress === null || progress === lastCheckedProgress) return
+    lastCheckedProgress = progress
     const { game } = progress
-    problems.add(where(), outOfRangeOf(`${label}.game`, { outs: game.outs, ourScore: game.ourScore, opponentScore: game.opponentScore }, 0))
+    problems.add(where(), outOfRangeOf('progress.game', { outs: game.outs, ourScore: game.ourScore, opponentScore: game.opponentScore }, 0))
     // 아웃은 3 까지 — 다만 9회 이후 말 공격 내 타석 앞의 끝내기 판 0xc22b4 는 `아웃 + 주자 = t` 를 n = rand(d, t + 1) 로 다시 나눠
     // st[6] = max(0, t − n) 을 그대로 쓴다(0xc2318~0xc232e, 직접 떴다 — 위 넘침 검사 없음). 2아웃 주자 둘 · 동점에서 n = 0 이면 아웃 4,
     // 만루면 5 다 — 원본 버그 그대로(`withAutoStopLateInningSetup`). 그 판에서만 5 까지 둔다
     const lateInningSetupOuts = game.inning >= 9 && game.half === '말' ? 5 : 3
-    if (game.outs > lateInningSetupOuts) problems.add(where(), [`${label}: 아웃 ${game.outs} > ${lateInningSetupOuts}`])
+    if (game.outs > lateInningSetupOuts) problems.add(where(), [`progress: 아웃 ${game.outs} > ${lateInningSetupOuts}`])
   }
 
   /** 저장 왕복 — 저장이 JSON 을 지나도 같고, 그 저장으로 새로 띄운 세션의 커리어가 지금과 같다 */
@@ -526,6 +677,13 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     }
   }
 
+  /** 앱을 다시 켠 꼴 — 그림을 내리고 장면 칸(모듈 상태)을 비운 뒤 같은 저장소로 새로 띄운다 */
+  const remount = () => {
+    rendered.unmount()
+    resetStageStores()
+    rendered = render(<Harness />)
+  }
+
   /**
    * **끊고 이어 가기** — 훅을 내리고(앱을 끈다) 같은 저장소로 새로 띄워, 메인 메뉴의 길로 들어간다: 경기 중간 저장(+0x4c)이
    * 서 있으면 [14] 곧장 경기(`resumeInterruptedGame`), 아니면 [이어하기](`continueSaved`). 이어하기 앞뒤 커리어의 안 바뀌어야 할
@@ -535,9 +693,10 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     const before = saveGame.held()
     if (before === null) return
     const fromScreen = result.current.screen.kind
-    rendered.unmount()
-    rendered = mount()
+    const balance = result.current.wallet.balance
+    remount()
     const { session, modeSave } = result.current
+    if (result.current.wallet.balance !== balance) problems.add(where(), [`다시 띄운 G ${result.current.wallet.balance} ≠ 내리기 전 ${balance}`])
     const inProgress = modeSave.save.nariGames[NARI_BATTER_MODE].isInProgress
     if (inProgress) {
       walked('이어하기:경기')
@@ -556,184 +715,143 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     if (d !== null) problems.add(where(), [d])
   }
 
-  /** 타석 화면 대신 — 나리 경기의 CPU 투구 재료(`GameRoute` → `GameScreen` → `BattingStage`) */
-  const careerPitchArgsNow = (): CpuPitchArgs => {
-    const { session, runner } = result.current
-    const progress = session.progress!
-    const career = session.career!
-    const moundPitcher = stageOpponentPitcherAbilityOf(progress, undefined)
-    return stageCpuPitchArgsOf({
-      pitcher: {
-        ...moundPitcher,
-        staminaPercentAfterPitch: opponentStaminaPercentAfterPitchOf(progress, {
-          batterIntimidates: career.equippedSkillIds.includes(INTIMIDATE_SKILL_ID),
-        }),
-      },
-      cpuMagic: opponentCpuMagicStateOf(progress, moundPitcher, undefined),
-      hud: { balls: runner.atBat.balls, strikes: runner.atBat.strikes, outs: progress.game.outs, bases: progress.game.bases },
-      batterForm: career.battingTypeIndex * 2 + career.battingSide,
-      batterSkillIds: career.equippedSkillIds,
-    })
-  }
+  /* ── 그림 틀 화면 — 사람 손가락 ─────────────────────────────────────────────────────────────────── */
 
-  /**
-   * 재생 화면(`GameRoute`) 대신 (r244) — 경기 화면 동안 세션에 붙어(`attachReplayHost`) 재생 칸의 새 판을 다 그린 것으로 알린다
-   * (`finishReplay`). 재생 판으로 끝난 경기는 세션이 정산을 그 알림 뒤로 미루므로 이 길이 멈추지 않는지도 함께 본다
-   */
-  let replayHosted: typeof rendered | null = null
-  let replayedPlay: unknown = null
-  const replayStep = () => {
-    if (replayHosted !== rendered) {
-      replayHosted = rendered
-      act(() => {
-        result.current.session.actions.attachReplayHost()
-      })
-    }
-    const play = result.current.session.progress?.lastDefensePlay ?? null
-    if (play === null || play.ticks.length === 0 || play === replayedPlay) return
-    replayedPlay = play
-    // 재생 화면처럼 판 틱을 다 그린 실책(0x43278 +0x2e)을 판 끝(onDone 앞)에 얹는다 (r248)
-    const drawn = drawnReplayFieldingErrorsOf(play.ticks)
-    if (drawn.length > 0) {
-      const before = result.current.session.progress?.leagueErrors?.length ?? 0
-      act(() => result.current.session.actions.recordFieldingErrors(drawn))
-      const added = result.current.session.progress?.leagueErrors?.slice(before) ?? []
-      drawnErrorsThisGame.push(...added.filter((error) => error.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT))
-    }
-    act(() => result.current.session.actions.finishReplay(play))
-  }
+  /** 지금 공이 나기 시작한 틱(상태 0x11 진입) — 같은 공에 한 번만 고른다 */
+  let flightSeenAt = -1
+  /** 마지막으로 본 놓은 공 — 새 공이면 휘두를지 고른다 */
+  let releasedPitch: unknown = null
+  let swingAtTick = -1
+  let stealAt: { readonly tick: number; readonly key: string } | null = null
+  let confirmSeenAt = -1
+  let okAtFrame = -1
+  let idleFrames = 0
+  let lastSignature = ''
 
-  /** 경기 한 걸음 — 붙든 판을 풀거나 공 하나 */
-  const gameStep = () => {
-    const { session, runner } = result.current
+  /** 그림 틀 화면의 겉보기 — 바뀌지 않으면 사람이 OK 를 누른다 */
+  const signatureOf = (tickEntry: ReturnType<typeof sceneStateEntryAt>) => {
+    const { screen, session, runner, mission } = result.current
     const progress = session.progress
-    if (session.loadingTip !== null) {
-      act(() => session.actions.finishLoading())
-      return
-    }
-    if (progress === null) {
-      stoppedAt = `경기 화면인데 진행이 없다: ${where()}`
-      return
-    }
-    if (progress.pendingDefensePlay !== null) {
-      heldPlays.타구판 += 1
-      act(() => session.actions.finishDefensePlay())
-    } else if (progress.pendingRunnerPlay != null) {
-      heldPlays.주자판 += 1
-      act(() => session.actions.finishRunnerPlay())
-      checkProgress('주자판 뒤')
-    } else if (progress.pendingBenchClearing !== null) {
-      heldPlays.벤치클리어링 += 1
-      act(() => session.actions.finishBenchClearing(false))
-    } else if (progress.lastBurstResolution != null) {
-      heldPlays.돌발결과 += 1
-      act(() => session.actions.closeBurstResult())
-    } else if (!runner.isPaused && !progress.game.isFinished) {
-      const career = session.career
-      // 타석 화면의 CPU 공 굴림 — 견제면 공을 안 던지고 견제 판(0x17)이 선다
-      const thrown = rollStagePitch(careerPitchArgsNow, random)
-      if (thrown.kind === '견제') {
-        heldPlays.견제 += 1
-        act(() => result.current.session.actions.cpuPickoff(thrown.base))
-        checkProgress('견제 뒤')
-      } else {
-        // 공이 나는 동안(0x11) 도루 키 — 앞 루가 빈 주자
-        const stealFrom = extras ? stealBaseOf(progress.game.bases) : null
-        if (stealFrom !== null && policy() < 0.2) {
-          heldPlays.도루 += 1
-          act(() => result.current.session.actions.stealBase(stealFrom))
-        }
-        heldPlays.공 += 1
-        const detail = pitchDetailOf(policy(), policy(), career?.battingSide ?? 0, thrown.pitchTypeNumber)
-        act(() => {
-          result.current.session.handlePitchResolved(detail)
-        })
-        checkProgress('공 뒤')
-      }
-    }
-    // 타석 끝 배너(`pauseWithBanner`) · 판 끝 대기 — 장면 시계를 돌린다
-    act(() => {
-      vi.advanceTimersByTime(2000)
-    })
-  }
-
-  /** 마선수 대결(미션 장면 모드 6) 한 걸음 — `MissionRoutes` 의 타석 화면 대신 */
-  const aceMatchStep = () => {
-    const { mission, runner } = result.current
     const run = mission.missionRun
-    if (mission.loadingTip !== null) return act(() => mission.actions.finishLoading())
-    if (run === null) {
-      stoppedAt = `마선수 대결인데 미션 판이 없다: ${where()}`
-      return
-    }
-    if (mission.halfInningBoard !== null) return act(() => mission.actions.confirmHalfInningBoard())
-    if (mission.substitutionScene !== null) {
-      act(() => mission.finishSubstitutionScene())
-      act(() => {
-        vi.advanceTimersByTime(2000)
-      })
-      return
-    }
-    if (mission.pendingDefensePlay !== null) return act(() => mission.actions.finishDefensePlay())
-    if (mission.pendingRunnerPlay !== null) return act(() => mission.actions.finishRunnerPlay())
-    if (mission.pendingBenchClearing !== null) return act(() => mission.actions.finishBenchClearing(true))
-    if (mission.pickoffReplay !== null) return act(() => mission.actions.finishPickoffReplay())
-    if (run.status !== '진행중') {
-      games.대결 += 1
-      log.push(`대결 ${run.mission.id} ${run.status}`)
-      return act(() => mission.actions.finishAceMatch())
-    }
-    // 상태 0xe — 새 타석 OK (0xf 진입이 CPU 교체를 묻는다)
-    if (mission.sceneConfirm !== null) act(() => result.current.mission.confirmScene())
-    if (!runner.isPaused) {
-      const argsNow = (): CpuPitchArgs => {
-        const now = result.current.mission
-        const current = now.missionRun!
-        const career = result.current.session.career ?? result.current.session.savedCareer
-        const stageBatter = missionStageBatterOf(current, modeBatterOf(career))
-        const form = stageBatter.look?.form ?? 0
-        return stageCpuPitchArgsOf({
-          pitcher: {
-            ...missionMoundPitcherAbility(current, now.aceLevels, now.opponentStaminaPercent),
-            staminaPercentAfterPitch: (pitchTypeNumber: number) => now.opponentStaminaPercentAfterPitch(current, pitchTypeNumber),
-          },
-          cpuMagic: missionCpuMagicStateOf(current, now.aceLevels),
-          hud: { balls: result.current.runner.atBat.balls, strikes: result.current.runner.atBat.strikes, outs: current.outs, bases: current.bases },
-          batterForm: form,
-          batterHand: batterSideOfForm(form),
-          batterSkillIds: stageBatter.skillIds,
-        })
-      }
-      const thrown = rollStagePitch(argsNow, random)
-      if (thrown.kind === '견제') {
-        act(() => result.current.mission.actions.cpuPickoff(thrown.base))
-      } else {
-        const stealable = result.current.mission.stealableBases
-        if (stealable.length > 0 && policy() < 0.2) act(() => result.current.mission.actions.steal(stealable[0]!))
-        const form = missionStageBatterOf(run, modeBatterOf(result.current.session.career)).look?.form ?? 0
-        const detail = pitchDetailOf(policy(), policy(), batterSideOfForm(form), thrown.pitchTypeNumber)
-        act(() => {
-          result.current.mission.handleMissionPitch(detail)
-        })
-      }
-    }
-    act(() => {
-      vi.advanceTimersByTime(2000)
-    })
+    return `${screen.kind}:${screen.kind === '이벤트' ? screen.eventId : ''}:${progress?.game.inning}:${progress?.game.half}:${progress?.game.outs}`
+      + `:${progress?.game.ourScore}:${progress?.game.opponentScore}:${runner.atBat.balls}:${runner.atBat.strikes}:${runner.isPaused}`
+      + `:${progress?.pendingDefensePlay === null}:${progress?.pendingRunnerPlay == null}:${progress?.lastDefensePlay === null}`
+      + `:${tickEntry?.state}:${tickEntry?.tick}:${run?.status}:${run?.outs}:${run?.game.inning}:${mission.halfInningBoard === null}`
+      + `:${mission.loadingTip === null}:${session.loadingTip === null}:${session.career?.gamePoint}`
   }
 
-  /** 이벤트 match → 앱 `startAceMatch` 그대로 */
-  const startAceMatch = (command: MatchCommand, carried: StoryCarry, context: string) => {
-    const { session, mission } = result.current
-    walked('마선수대결')
-    if (context === '장소') act(() => session.actions.settlePlaceForAceMatch())
-    const target = aceMatchMissionOf(command.team)
-    if (target === null) {
-      act(() => result.current.setScreen({ kind: '이벤트', eventId: matchResultEventOf(command.resultEvents, false), context: '대결결과', carried }))
-      return
+  /** 그림 틀 한 걸음 — 틀을 돌리고, 지금 보이는 자리에 맞춰 키를 누른다 */
+  const frameStep = () => {
+    frame()
+    frames += 1
+    const { screen, session, mission } = result.current
+    const isPlaying = screen.kind === '경기' || screen.kind === '마선수대결'
+    const tick = gameSceneTickNow()
+    const entry = isPlaying ? sceneStateEntryAt(tick) : null
+    if (isPlaying && entry !== null) {
+      // 공이 손을 떠났다(놓기 0x4dc78 — 경로 칸이 새 공) — 사람이 보는 공 길이(frameCount)를 보고 휘두를지 · 언제 누를지 고른다.
+      // 판정 틱의 공 프레임이 frameCount − 2 에 가까울수록 맞는다(`timingOf`) — 키 틱 = 보이는 프레임 + 1 이라 frameCount − 3 언저리
+      const released = sceneBallPathPitch()
+      if (entry.state === SCENE_STATE.투구 && released !== null && released !== releasedPitch) {
+        releasedPitch = released
+        swingAtTick = policy() < SWING_RATE
+          ? tick + Math.max(0, released.frameCount - 3 + Math.floor(policy() * SWING_TICK_SPAN) - SWING_TICK_EARLY)
+          : -1
+      }
+      // 공이 나기 시작했다(0x11) — 새 길이면 도루 키
+      if (entry.state === SCENE_STATE.투구 && entry.tick !== flightSeenAt) {
+        flightSeenAt = entry.tick
+        stealAt = null
+        if (extras) {
+          const bases = screen.kind === '경기' ? session.progress?.game.bases : mission.missionRun?.bases
+          const from = bases === undefined ? null : stealBaseOf(bases)
+          if (from !== null && policy() < 0.2) stealAt = { tick: entry.tick + 1 + Math.floor(policy() * 3), key: STEAL_KEY_OF_BASE[from] }
+        }
+      }
+      if (stealAt !== null && tick >= stealAt.tick) {
+        const { key } = stealAt
+        stealAt = null
+        pressKey(key)
+      }
+      if (swingAtTick >= 0 && tick >= swingAtTick) {
+        swingAtTick = -1
+        pressKey('5')
+      }
+      // 0xe 확인 대기 — 몇 틱 뒤 OK
+      if (entry.state === SCENE_STATE.확인 && entry.tick !== confirmSeenAt) {
+        confirmSeenAt = entry.tick
+        okAtFrame = frames + 2 + Math.floor(policy() * 8)
+      }
     }
-    act(() => result.current.session.actions.holdAceMatch(command.resultEvents, carried.viewedEventIds))
-    act(() => mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried }))
+    const signature = signatureOf(entry)
+    if (signature === lastSignature) idleFrames += 1
+    else {
+      idleFrames = 0
+      lastSignature = signature
+    }
+    // 판 · 창 · 대사 — 겉보기가 한참 그대로면 OK (공이 나는 동안은 누르지 않는다 — OK 는 스윙 키다)
+    const isFlying = entry?.state === SCENE_STATE.투구
+    if (okAtFrame < 0 && idleFrames >= (isPlaying ? IDLE_OK_FRAMES : 4 + Math.floor(policy() * 8)) && !isFlying) {
+      okAtFrame = frames
+    }
+    if (okAtFrame >= 0 && frames >= okAtFrame && !isFlying) {
+      okAtFrame = -1
+      idleFrames = 0
+      pressKey('Enter')
+    }
+    if (screen.kind === '경기') collectDrawnErrors()
+    if (idleFrames > STUCK_FRAMES) stoppedAt = `멈춤(그림 ${STUCK_FRAMES}틀 그대로): ${where()} · ${signature}`
+    checkProgress()
+  }
+
+  /** 경기 결과 화면에 처음 들어선 틀 — 요약 → 누계 검사 */
+  const checkGameResult = () => {
+    const { screen, session } = result.current
+    const career = session.career
+    if (screen.kind !== '경기결과' && screen.kind !== '대회경기결과') return
+    const summary = screen.summary
+    if (checkedSummary === summary || beforeGame === null || career === null) return
+    checkedSummary = summary
+    games[beforeGame.kind] += 1
+    const s = summary.stats
+    problems.add(where(), batterLineProblemsOf('summary.stats', s))
+    if (s.plateAppearances < s.atBats) problems.add(where(), [`경기 타석 ${s.plateAppearances} < 타수 ${s.atBats}`])
+    problems.add(where(), outOfRangeOf('summary', { ourScore: summary.ourScore, opponentScore: summary.opponentScore }, 0))
+    // 정산 실책 = 화면이 그린 실책 합 (r248)
+    collectDrawnErrors()
+    const settledErrors = JSON.stringify(summary.leagueErrors ?? [])
+    if (settledErrors !== JSON.stringify(drawnErrorsThisGame)) {
+      problems.add(where(), [`정산 실책 ${settledErrors} ≠ 그린 실책 ${JSON.stringify(drawnErrorsThisGame)}`])
+    }
+    drawnErrorsThisGame = []
+    seenErrors = { progress: null, count: 0 }
+    if (beforeGame.kind === '정규') {
+      // 일정표 0xd89cb 대로 — 정규 경기 상대는 그날(g) 일정표 상대다
+      const expected = nextOpponentOf(beforeGame.career)
+      if (summary.opponentTeamId !== expected) problems.add(where(), [`g${beforeGame.career.gamesPlayed} 상대 ${summary.opponentTeamId} ≠ 일정표 ${expected}`])
+      // 경기 요약 → 시즌 · 통산 누계 (0xa8024 — 정규시즌만)
+      for (const field of ['atBats', 'hits', 'homeRuns', 'runsBattedIn', 'plateAppearances'] as const) {
+        const delta = career.stats[field] - beforeGame.career.stats[field]
+        const careerDelta = career.careerStats[field] - beforeGame.career.careerStats[field]
+        if (delta !== s[field] && career.season === beforeGame.career.season) {
+          problems.add(where(), [`시즌 누계 ${field} 증가 ${delta} ≠ 경기 ${s[field]}`])
+        }
+        if (careerDelta !== s[field]) problems.add(where(), [`통산 누계 ${field} 증가 ${careerDelta} ≠ 경기 ${s[field]}`])
+      }
+      if (career.gamesPlayed !== beforeGame.career.gamesPlayed + 1 && career.postseason === null) {
+        problems.add(where(), [`정규 경기 뒤 경기 수 ${beforeGame.career.gamesPlayed} → ${career.gamesPlayed}`])
+      }
+    }
+    beforeGame = null
+  }
+
+  /** 마선수 대결이 끝난 틀 — 한 번 센다 */
+  const countAceMatch = () => {
+    const run = result.current.mission.missionRun
+    if (run === null || run.status === '진행중' || countedAceRun === run.mission) return
+    countedAceRun = run.mission
+    games.대결 += 1
+    log.push(`대결 ${run.mission.id} ${run.status}`)
   }
 
   /** 상점 한 바퀴 — 장비 · 끼기 · 서브 · GP (막힌 칸은 화면처럼 묻지 않는다). 사면 돈 · G 차이를 본다 */
@@ -805,12 +923,13 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         })
       }
     }
-    // GP 아이템 — 칸 차례로 한 번에 하나 (5 복권 · 9 이글아이)
+    // GP 아이템 — 칸 차례로 한 번에 하나 (5 복권 · 9 이글아이). 명전 등록 G 는 남긴다
     act(() => result.current.session.actions.openShop('GP'))
     for (let tries = 0; tries < BATTER_GP_ITEMS.length; tries += 1) {
       const index = gpSlot % BATTER_GP_ITEMS.length
       gpSlot += 1
       const price = BATTER_GP_ITEMS[index]!.price
+      if (result.current.wallet.balance - price < HALL_OF_FAME_COST + CONTINUE_COST_GAME_POINT) continue
       const bought = purchase(index === 5 ? '복권' : `GP${index}`, shopItemId('GP', index), (before, after, gBefore, gAfter) => {
         const out: string[] = []
         if (gBefore - gAfter !== price) out.push(`G ${gBefore} → ${gAfter} (값 ${price})`)
@@ -872,33 +991,93 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     act(() => session.actions.runOutingFunction(fallback.id))
   }
 
-  const maxSteps = soakNumber('SOAK_MAX_STEPS', 400000)
+  /** 엔딩 141 — 보너스 · 이어하기(부상 0 · 방출 1) · 명전 등록 */
+  const endingStep = (screen: Extract<Screen, { kind: '엔딩' }>) => {
+    log.push(`${result.current.session.career?.season}년차 엔딩 ${screen.endingIndex}`)
+    const gBeforeBonus = result.current.wallet.balance
+    const bonusReceived = result.current.session.career?.endingBonusReceived === true
+    act(() => result.current.session.actions.receiveEndingBonus())
+    if (!bonusReceived) {
+      const expected = Math.min(GAME_POINT_LIMIT, gBeforeBonus + endingBonusOf(screen.endingIndex))
+      if (result.current.wallet.balance !== expected) problems.add(where(), [`엔딩 ${screen.endingIndex} 보너스 G ${gBeforeBonus} → ${result.current.wallet.balance} ≠ ${expected}`])
+    }
+    const ended = result.current.session.career
+    // 이어할 수 있는 엔딩(부상 · 방출)이면 5000 G 로 이어한다 (팝업 0x32 예 → 0x1bd36)
+    const wantsContinue = continueEndings || (extras && continuedAfterEnding === 0)
+    if (wantsContinue && ended !== null && isContinuableEnding(screen.endingIndex)) {
+      const gBefore = result.current.wallet.balance
+      const seasonBefore = ended.season
+      let continued = false
+      act(() => {
+        continued = result.current.session.actions.continueAfterEnding()
+      })
+      if (continued) {
+        continuedAfterEnding += 1
+        walked(`엔딩이어하기${screen.endingIndex}`)
+        if (gBefore - result.current.wallet.balance !== CONTINUE_COST_GAME_POINT) problems.add(where(), [`엔딩 이어하기 G ${gBefore} → ${result.current.wallet.balance}`])
+        const after = result.current.session.career
+        if (after === null || after.endingIndex !== null) problems.add(where(), [`엔딩 이어하기 뒤 엔딩 칸 ${after?.endingIndex}`])
+        // 부상 엔딩은 부상만 풀고 같은 시즌, 방출 엔딩은 새 시즌(0x1bddc · 0x1b768)
+        if (after !== null && screen.endingIndex === 0 && (after.isInjured || after.injuredGamesPlayed !== 0 || after.season !== seasonBefore)) {
+          problems.add(where(), [`부상 엔딩 이어하기 뒤 부상 ${after.isInjured} · 부상 경기 ${after.injuredGamesPlayed} · ${seasonBefore} → ${after.season}년차`])
+        }
+        if (after !== null && screen.endingIndex === 1 && after.season !== seasonBefore + 1) {
+          problems.add(where(), [`방출 엔딩 이어하기 뒤 연차 ${seasonBefore} → ${after.season}`])
+        }
+        // 105 로 간다 — 그 진입이 곧바로 연 이벤트(연초 115 · 관리 훑기)면 이벤트다
+        if (result.current.screen.kind !== '관리' && result.current.screen.kind !== '이벤트') {
+          problems.add(where(), [`엔딩 이어하기 뒤 화면 ${result.current.screen.kind}`])
+        }
+        return
+      }
+      if (result.current.wallet.balance >= CONTINUE_COST_GAME_POINT) problems.add(where(), [`G ${result.current.wallet.balance} 인데 엔딩 ${screen.endingIndex} 을 이어하지 못했다`])
+    }
+    endingIndex = screen.endingIndex
+    if (extras && ended !== null) {
+      // 명예의 전당 등록 (145 목록 → 0x62cea): G −20000 · 칸 · 모드 저장 지우기 · 메인 메뉴
+      const gBefore = result.current.wallet.balance
+      const famersBefore = result.current.collection.collection.hallOfFame.length
+      let outcome = ''
+      act(() => {
+        outcome = result.current.collection.register(ended, result.current.wallet, null)
+        if (outcome === '등록') result.current.session.actions.eraseSaveForHallOfFame()
+      })
+      log.push(`명전 ${outcome}`)
+      if (outcome === '등록') {
+        ledger.add('명전등록', -HALL_OF_FAME_COST)
+        walked('명전등록')
+        const famers = result.current.collection.collection.hallOfFame
+        const famer = famers[famers.length - 1]
+        if (famers.length !== famersBefore + 1 || famer === undefined) problems.add(where(), ['명전 칸이 하나 늘지 않았다'])
+        else {
+          const d = firstDiffOf(
+            { name: famer.name, endingIndex: famer.endingIndex, season: famer.season, ability: famer.ability, recordLine: famer.recordLine, equipmentLevels: famer.equipmentLevels },
+            { name: ended.name, endingIndex: screen.endingIndex, season: ended.season, ability: ended.ability, recordLine: batterRecordLineOf(ended.stats), equipmentLevels: ended.equipmentLevels },
+            '명전 기록',
+          )
+          if (d !== null) problems.add(where(), [d])
+        }
+        if (gBefore - result.current.wallet.balance !== HALL_OF_FAME_COST) problems.add(where(), [`명전 등록 G ${gBefore} → ${result.current.wallet.balance}`])
+        if (saveGame.held() !== null) problems.add(where(), ['명전 등록 뒤 커리어 저장이 남았다'])
+        act(() => result.current.session.actions.finishEnding(true))
+        return
+      }
+    }
+    act(() => result.current.session.actions.finishEnding(false))
+  }
+
+  const maxSteps = soakNumber('SOAK_MAX_STEPS', 4_000_000)
   let lastKey = ''
   let sameKeySteps = 0
   try {
     // 이벤트 본문(535KB)은 커리어가 선 뒤 따로 받는다 — 먼저 받아 두고 세션이 싣게 한다
     await import('@/shared/config/original/events')
     for (; steps < maxSteps; steps += 1) {
-      const { screen, session, mission } = result.current
+      const { screen, session } = result.current
       const { actions } = session
       const career = session.career
-      const run = mission.missionRun
-      const key = `${screen.kind}:${career?.season}:${career?.gamesPlayed}:${session.progress?.game.inning}:${session.progress?.game.half}`
-        + `:${session.progress?.game.outs}:${result.current.runner.atBat.balls}:${result.current.runner.atBat.strikes}`
-        + `:${career?.postseason?.wins.join(',')}:${screen.kind === '국가대항전' ? screen.cup.day : ''}`
-        + `:${screen.kind === '이벤트' ? screen.eventId : ''}:${session.managementNotice}:${session.managementDetail === null}`
-        + `:${career?.hasActedThisCycle}:${session.pendingTitle}:${screen.kind === '포스트시즌' ? screen.popup?.kind : ''}`
-        + `:${session.outingPresentation?.functionId}:${session.outingResult === null}:${session.outingNotice}`
-        + `:${run?.status}:${run?.outs}:${run?.game.inning}:${run?.game.offenseSide}:${mission.loadingTip}`
-      if (key === lastKey) sameKeySteps += 1
-      else sameKeySteps = 0
-      lastKey = key
-      if (process.env.SOAK_TRACE !== undefined && steps >= Number(process.env.SOAK_TRACE) && steps < Number(process.env.SOAK_TRACE) + 60 && screen.kind !== '경기') console.info(`[흐름] ${steps} ${JSON.stringify(screen).slice(0, 120)} 끝상태 ${career?.seasonEndState} PS ${career?.postseason?.round}`)
-      if (sameKeySteps > 30) {
-        stoppedAt = `멈춤: ${where()}`
-        break
-      }
       if (maxRegularGames !== undefined && games.정규 >= maxRegularGames && screen.kind === '관리') break
+      if (stopAfterContinues !== undefined && continuedAfterEnding >= stopAfterContinues && screen.kind === '관리' && games.정규 > 0) break
 
       // 이벤트 본문이 아직이면(첫 커리어 직후 · 이어하기 직후) 한 틈 쉰다
       if (career !== null && session.storyEvents === null) {
@@ -918,6 +1097,29 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         continue
       }
       if (career !== null) lastSeenSeason = Math.max(lastSeenSeason, career.season)
+
+      if (FRAME_SCREENS.has(screen.kind) && career !== null) {
+        if (screen.kind === '경기결과' || screen.kind === '대회경기결과') checkGameResult()
+        frameStep()
+        if (result.current.screen.kind === '마선수대결') countAceMatch()
+        if (stoppedAt !== null) break
+        checkCareer()
+        checkLedger()
+        continue
+      }
+
+      // 액션 화면 — 같은 자리를 30 걸음 넘게 돌면 멈춤
+      const key = `${screen.kind}:${career?.season}:${career?.gamesPlayed}:${career?.postseason?.wins.join(',')}`
+        + `:${screen.kind === '국가대항전' ? screen.cup.day : ''}:${session.managementNotice}:${session.managementDetail === null}`
+        + `:${career?.hasActedThisCycle}:${session.pendingTitle}:${screen.kind === '포스트시즌' ? screen.popup?.kind : ''}`
+        + `:${session.outingPresentation?.functionId}:${session.outingResult === null}:${session.outingNotice}`
+      if (key === lastKey) sameKeySteps += 1
+      else sameKeySteps = 0
+      lastKey = key
+      if (sameKeySteps > 30) {
+        stoppedAt = `멈춤: ${where()}`
+        break
+      }
 
       if (session.managementNotice !== '') {
         act(() => actions.dismissManagementNotice())
@@ -941,6 +1143,13 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           }
           started = true
           act(() => actions.startNewCareer('소크', { ...DEFAULT_ROOKIE_PROFILE, teamId: seed % 10 }))
+          if (startPatch !== undefined) {
+            // 고친 저장으로 메인 메뉴 [이어하기] — 앱을 다시 켠 꼴
+            const created = saveGame.held()
+            if (created !== null) saveGame.save({ ...created, ...startPatch })
+            remount()
+            act(() => result.current.session.actions.continueSaved())
+          }
           firstSeason = result.current.session.career?.season ?? 1
           break
         case '관리': {
@@ -988,6 +1197,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         case '경기준비':
           if (career !== null) {
             drawnErrorsThisGame = []
+            seenErrors = { progress: null, count: 0 }
             beforeGame = {
               career,
               kind: screen.cup !== undefined ? '국가대항전' : career.postseason !== null ? '포스트시즌' : '정규',
@@ -995,85 +1205,6 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           }
           act(() => actions.confirmMatchPrepare())
           break
-        case '경기':
-          replayStep()
-          gameStep()
-          break
-        case '마선수대결':
-          aceMatchStep()
-          break
-        case '경기결과':
-        case '대회경기결과': {
-          const summary = screen.summary
-          if (checkedSummary !== summary && beforeGame !== null && career !== null) {
-            checkedSummary = summary
-            games[beforeGame.kind] += 1
-            if (process.env.SOAK_DEBUG === '1' && beforeGame.kind !== '정규' && games[beforeGame.kind] < 25) console.info(`[PS] ${where()} ${summary.ourTeamId}:${summary.opponentTeamId} ${summary.ourScore}-${summary.opponentScore} ${summary.result} 앞 ${JSON.stringify(beforeGame.career.postseason)} 뒤 ${JSON.stringify(career.postseason)}`)
-            const s = summary.stats
-            problems.add(where(), batterLineProblemsOf('summary.stats', s))
-            if (s.plateAppearances < s.atBats) problems.add(where(), [`경기 타석 ${s.plateAppearances} < 타수 ${s.atBats}`])
-            problems.add(where(), outOfRangeOf('summary', { ourScore: summary.ourScore, opponentScore: summary.opponentScore }, 0))
-            // 정산 실책 = 그린 실책 합 — 경기를 끝낸 재생 판의 실책도 정산 앞에 든다(r244 · r248). soak 의 타구 판은 화면 없이 돌아 실책을 안 그린다
-            const settledErrors = JSON.stringify(summary.leagueErrors ?? [])
-            if (settledErrors !== JSON.stringify(drawnErrorsThisGame)) {
-              problems.add(where(), [`정산 실책 ${settledErrors} ≠ 그린 실책 ${JSON.stringify(drawnErrorsThisGame)}`])
-            }
-            drawnErrorsThisGame = []
-            if (beforeGame.kind === '정규') {
-              // 일정표 0xd89cb 대로 — 정규 경기 상대는 그날(g) 일정표 상대다
-              const expected = nextOpponentOf(beforeGame.career)
-              if (summary.opponentTeamId !== expected) problems.add(where(), [`g${beforeGame.career.gamesPlayed} 상대 ${summary.opponentTeamId} ≠ 일정표 ${expected}`])
-              // 경기 요약 → 시즌 · 통산 누계 (0xa8024 — 정규시즌만)
-              for (const field of ['atBats', 'hits', 'homeRuns', 'runsBattedIn', 'plateAppearances'] as const) {
-                const delta = career.stats[field] - beforeGame.career.stats[field]
-                const careerDelta = career.careerStats[field] - beforeGame.career.careerStats[field]
-                if (delta !== s[field] && career.season === beforeGame.career.season) {
-                  problems.add(where(), [`시즌 누계 ${field} 증가 ${delta} ≠ 경기 ${s[field]}`])
-                }
-                if (careerDelta !== s[field]) problems.add(where(), [`통산 누계 ${field} 증가 ${careerDelta} ≠ 경기 ${s[field]}`])
-              }
-              if (career.gamesPlayed !== beforeGame.career.gamesPlayed + 1 && career.postseason === null) {
-                problems.add(where(), [`정규 경기 뒤 경기 수 ${beforeGame.career.gamesPlayed} → ${career.gamesPlayed}`])
-              }
-            }
-            beforeGame = null
-          }
-          if (screen.kind === '대회경기결과') {
-            act(() => actions.confirmCupGameResult())
-            break
-          }
-          const title = screen.newTitles[0]
-          if (title !== undefined && career !== null && !career.titleIds.includes(title)) {
-            act(() => actions.confirmGameResultTitle())
-          }
-          act(() => result.current.session.actions.confirmGameResult())
-          break
-        }
-        case '이벤트': {
-          const carried = screen.carried
-          const context = screen.context
-          const playback = eventPlaybackOf(session.storyEvents ?? [], screen.eventId, (eventId, left) => {
-            act(() => result.current.session.actions.confirmEventChoice(eventId, left))
-          })
-          const rewards = [...(carried?.rewards ?? []), ...playback.rewards]
-          const viewed = [...(carried?.viewedEventIds ?? []), ...playback.viewed.filter((id) => !(carried?.viewedEventIds ?? []).includes(id))]
-          for (const id of new Set([screen.eventId, ...playback.viewed])) eventsViewed[id] = (eventsViewed[id] ?? 0) + 1
-          if (playback.match !== null && extras) {
-            startAceMatch(playback.match, { rewards, viewedEventIds: viewed }, context)
-            break
-          }
-          for (const id of playback.viewed.filter((viewedId) => MVP_EVENT_IDS.includes(viewedId))) {
-            const series = career?.postseason
-            const spot = series === null || series === undefined ? '정규' : `${series.round}:${series.teams.join(',')}:${series.wins.join(',')}`
-            const mvpKey = `${career?.season}:${spot}:${id}`
-            const count = (mvpScenes.get(mvpKey) ?? 0) + 1
-            mvpScenes.set(mvpKey, count)
-            if (count > 1) problems.add(where(), [`${career?.season}년차 ${spot} 자리에서 MVP 이벤트 ${id} 를 ${count}번째 끝냈다`])
-            if (id === 375) log.push(`${career?.season}년차 MVP 발표(${spot})`)
-          }
-          act(() => result.current.session.actions.completeScene(rewards, viewed, playback.endingEventId))
-          break
-        }
         case '연차표지':
           log.push(`${career?.season}년차 표지(통산 ${career?.careerStats.atBats}타수 ${career?.careerStats.hits}안타 ${career?.careerStats.homeRuns}홈런)`)
           act(() => result.current.setScreen({ kind: '관리' }))
@@ -1100,102 +1231,88 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           }
           break
         }
-        case '엔딩': {
-          log.push(`${career?.season}년차 엔딩 ${screen.endingIndex}`)
-          act(() => actions.receiveEndingBonus())
-          const ended = result.current.session.career
-          // 이어할 수 있는 엔딩(부상 · 방출)이면 한 번은 5000 G 로 이어한다 (팝업 0x32 예 → 0x1bd36)
-          if (extras && !continuedAfterEnding && ended !== null && isContinuableEnding(screen.endingIndex)) {
-            const gBefore = result.current.wallet.balance
-            let continued = false
-            act(() => {
-              continued = result.current.session.actions.continueAfterEnding()
-            })
-            if (continued) {
-              continuedAfterEnding = true
-              walked('엔딩이어하기')
-              if (gBefore - result.current.wallet.balance !== 5000) problems.add(where(), [`엔딩 이어하기 G ${gBefore} → ${result.current.wallet.balance}`])
-              break
-            }
-          }
-          endingIndex = screen.endingIndex
-          if (extras && ended !== null) {
-            // 명예의 전당 등록 (145 목록 → 0x62cea): G −20000 · 칸 · 모드 저장 지우기 · 메인 메뉴
-            const gBefore = result.current.wallet.balance
-            const famersBefore = result.current.collection.collection.hallOfFame.length
-            let outcome = ''
-            act(() => {
-              outcome = result.current.collection.register(ended, result.current.wallet, null)
-              if (outcome === '등록') result.current.session.actions.eraseSaveForHallOfFame()
-            })
-            log.push(`명전 ${outcome}`)
-            if (outcome === '등록') {
-              walked('명전등록')
-              const famers = result.current.collection.collection.hallOfFame
-              const famer = famers[famers.length - 1]
-              if (famers.length !== famersBefore + 1 || famer === undefined) problems.add(where(), ['명전 칸이 하나 늘지 않았다'])
-              else {
-                const d = firstDiffOf(
-                  { name: famer.name, endingIndex: famer.endingIndex, season: famer.season, ability: famer.ability, recordLine: famer.recordLine, equipmentLevels: famer.equipmentLevels },
-                  { name: ended.name, endingIndex: screen.endingIndex, season: ended.season, ability: ended.ability, recordLine: batterRecordLineOf(ended.stats), equipmentLevels: ended.equipmentLevels },
-                  '명전 기록',
-                )
-                if (d !== null) problems.add(where(), [d])
-              }
-              if (gBefore - result.current.wallet.balance !== HALL_OF_FAME_COST) problems.add(where(), [`명전 등록 G ${gBefore} → ${result.current.wallet.balance}`])
-              if (saveGame.held() !== null) problems.add(where(), ['명전 등록 뒤 커리어 저장이 남았다'])
-              act(() => result.current.session.actions.finishEnding(true))
-              break
-            }
-          }
-          act(() => result.current.session.actions.finishEnding(false))
+        case '엔딩':
+          endingStep(screen)
           break
-        }
         default:
           stoppedAt = `다룰 줄 모르는 화면: ${where()}`
       }
       if (stoppedAt !== null) break
       checkCareer()
+      checkLedger()
     }
     if (steps === maxSteps && !started) stoppedAt = `걸음 한도 ${maxSteps}: ${where()}`
-    if (steps >= maxSteps && endingIndex === null && maxRegularGames === undefined) stoppedAt ??= `걸음 한도 ${maxSteps}: ${where()}`
+    if (steps >= maxSteps && endingIndex === null && maxRegularGames === undefined && stopAfterContinues === undefined) {
+      stoppedAt ??= `걸음 한도 ${maxSteps}: ${where()}`
+    }
   } catch (error) {
     stoppedAt = `예외: ${where()} — ${error instanceof Error ? `${error.message}\n${error.stack?.split('\n').slice(0, 6).join('\n')}` : String(error)}`
   } finally {
     rendered.unmount()
   }
   const lastSeason = Math.max(lastSeenSeason, saveGame.held()?.season ?? result.current.session.career?.season ?? firstSeason)
-  log.push(`판 ${JSON.stringify(heldPlays)}`)
-  return { problems, steps, games, seasons: lastSeason - firstSeason + 1, endingIndex, stoppedAt, log, paths, eventsViewed }
+  log.push(`판 ${JSON.stringify(heldPlays)} · 공 ${JSON.stringify(pitchOutcomes)}`)
+  return {
+    problems, steps, frames, games, seasons: lastSeason - firstSeason + 1, endingIndex, stoppedAt, log, paths, ledger: ledgerSums, eventsViewed,
+  }
 }
 
 function report(result: CareerSoakResult): string {
-  return `걸음 ${result.steps} · 경기 정규 ${result.games.정규} · PS ${result.games.포스트시즌} · 대회 ${result.games.국가대항전} · 대결 ${result.games.대결}`
-    + ` · 시즌 ${result.seasons} · 엔딩 ${result.endingIndex} · [${result.log.join(' / ')}] · 길 ${JSON.stringify(result.paths)}`
-    + ` · 이벤트 ${JSON.stringify(result.eventsViewed)}`
+  return `걸음 ${result.steps} · 틀 ${result.frames} · 경기 정규 ${result.games.정규} · PS ${result.games.포스트시즌} · 대회 ${result.games.국가대항전}`
+    + ` · 대결 ${result.games.대결} · 시즌 ${result.seasons} · 엔딩 ${result.endingIndex} · [${result.log.join(' / ')}]`
+    + ` · 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)} · 이벤트 ${JSON.stringify(result.eventsViewed)}`
     + `${result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`}`
     + (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
 }
 
 describe('나리 타자편 장기 진행 점검 (soak)', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] })
-    resetCommonWindowShownForTest()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    // 손으로 갈아 끼운다 — `vi.spyOn` 은 부른 기록을 다 들고 있어 긴 판(수백만 틀)에서 메모리가 넘친다
+    originals = { now: performance.now, raf: window.requestAnimationFrame, caf: window.cancelAnimationFrame }
+    performance.now = () => clock
+    window.requestAnimationFrame = (callback) => {
+      const handle = nextFrameHandle
+      nextFrameHandle += 1
+      frameCallbacks.set(handle, callback)
+      return handle
+    }
+    window.cancelAnimationFrame = (handle) => void frameCallbacks.delete(handle)
+    // 아무 일도 안 하는 붓 — 그라디언트 같은 돌려받는 붓 객체도
+    const noopBrush = (target: object): object => new Proxy(target, {
+      get: (held, key) => (key in held ? (held as Record<string | symbol, unknown>)[key] : () => noopBrush({})),
+      set: () => true,
+    })
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
+      return noopBrush({ canvas: this }) as never
+    })
+    resetStageStores()
   })
   afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+    if (originals !== null) {
+      performance.now = originals.now
+      window.requestAnimationFrame = originals.raf
+      window.cancelAnimationFrame = originals.caf
+      originals = null
+    }
     vi.useRealTimers()
+    frameCallbacks = new Map()
   })
 
-  it('짧은 판 — 새 선수로 6경기를 정책대로 치러도 값이 맞고 저장 왕복이 같다', async () => {
+  it('짧은 판 — 새 선수로 6경기를 타석 화면 그대로 쳐도 값이 맞고 저장 왕복 · G 장부가 같다', async () => {
     const result = await runCareerSoak({ seed: 2010, maxRegularGames: 6, roundTripEvery: 1 })
     expect(result.stoppedAt, report(result)).toBeNull()
     expect(result.problems.size, report(result)).toBe(0)
     expect(result.games.정규, report(result)).toBe(6)
+    // 공을 실제로 쳤다(타석 화면의 판정 — 휘두른 공의 패턴 덱)
+    expect(result.log.some((line) => line.includes('"공":0')), report(result)).toBe(false)
   }, 120_000)
 
   it('짧은 판(새 길) — 도루 · 상점 · 장비 · GP · 복권 · 외출 · 이어하기를 섞어 8경기를 치러도 값 · 수지가 맞는다', async () => {
     const result = await runCareerSoak({
-      seed: 2011, maxRegularGames: 8, roundTripEvery: 2, extras: true, resumeEvery: 97, startGamePoint: 60_000,
+      seed: 2011, maxRegularGames: 8, roundTripEvery: 2, extras: true, resumeEvery: 997, startGamePoint: 60_000,
     })
     expect(result.stoppedAt, report(result)).toBeNull()
     expect(result.problems.size, report(result)).toBe(0)
@@ -1203,7 +1320,29 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
     // 새 길을 실제로 밟았다
     for (const path of ['장비', '외출']) expect(result.paths[path] ?? 0, `${path} — ${report(result)}`).toBeGreaterThan(0)
     expect(Object.keys(result.paths).some((path) => path.startsWith('이어하기')), report(result)).toBe(true)
-  }, 120_000)
+  }, 180_000)
+
+  it('짧은 판(엔딩 이어하기) — 부상 엔딩(0)을 5000 G 로 이어하고 같은 시즌 경기를 이어 친다 (0x1bd36 → 0x1bddc)', async () => {
+    // 부상 경기 수 20 (0xa3a84 첫 줄) — 105 진입 판정 0 → 부상 엔딩 500
+    const result = await runCareerSoak({
+      seed: 2012, maxRegularGames: 3, roundTripEvery: 3, startGamePoint: 30_000, continueEndings: true,
+      startPatch: { injuredGamesPlayed: 20, isInjured: true, injuryRemaining: 5 },
+    })
+    expect(result.stoppedAt, report(result)).toBeNull()
+    expect(result.problems.size, report(result)).toBe(0)
+    expect(result.paths.엔딩이어하기0 ?? 0, report(result)).toBe(1)
+    expect(result.games.정규, report(result)).toBeGreaterThanOrEqual(3)
+  }, 180_000)
+
+  it.runIf(isSoakEnabled())('긴 판(엔딩 이어하기) — 7년차 인기도 ≤ 499 방출 엔딩(1)을 5000 G 로 이어해 8년차로 간다 (0x1b768)', async () => {
+    const result = await runCareerSoak({
+      seed: 2013, roundTripEvery: 10, startGamePoint: 30_000, continueEndings: true, stopAfterContinues: 1,
+      startPatch: { season: 7, popularity: 100 },
+    })
+    expect(result.stoppedAt, report(result)).toBeNull()
+    expect(result.problems.size, report(result)).toBe(0)
+    expect(result.paths.엔딩이어하기1 ?? 0, report(result)).toBe(1)
+  }, 3_600_000)
 
   for (const seed of soakSeeds([1, 2, 3])) {
     it.runIf(isSoakEnabled())(`긴 판 — 씨앗 ${seed}: 새 선수 등록부터 은퇴 · 엔딩까지`, async () => {
@@ -1219,7 +1358,7 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
     it.runIf(isSoakEnabled())(`긴 판(새 길) — 씨앗 ${seed}: 상점 · 외출 · 도루 · 마선수 대결 · 이어하기를 섞어 엔딩 · 명전 등록까지`, async () => {
       const startedAt = Date.now()
       const result = await runCareerSoak({
-        seed, extras: true, startGamePoint: 60_000, resumeEvery: soakNumber('SOAK_RESUME_EVERY', 307),
+        seed, extras: true, startGamePoint: 60_000, resumeEvery: soakNumber('SOAK_RESUME_EVERY', 30_011),
         roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
       })
       const line = `[타자편 soak 새 길] 씨앗 ${seed} · ${(Date.now() - startedAt) / 1000}s · ${report(result)}`
