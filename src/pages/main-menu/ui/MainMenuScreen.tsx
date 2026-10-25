@@ -5,7 +5,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { GENERAL_MODE_PROMPT, NARI_EDITION_PROMPT, NEW_GAME_CONFIRM } from '@/shared/config/original/mainMenu'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
-import { PressArea } from '@/shared/ui/PressArea/PressArea'
+import { FOOTER_BACK_PRESS_RECT, PressArea } from '@/shared/ui/PressArea/PressArea'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { entriesOf, isEntryDimmed, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, MainMenuOpenTier, NariGameReady } from '@/pages/main-menu/model/mainMenu'
@@ -481,6 +481,7 @@ export function MainMenuScreen({
           buttonFrames={NARI_EDITION_BUTTON_FRAMES}
           grid={NARI_EDITION_GRID}
           cancelAnswer={NARI_EDITION_CANCEL}
+          cancelPressRect={FOOTER_BACK_PRESS_RECT}
           onAnswer={(answer) => dispatch({ type: '창답', answer })}
         />
       )}
@@ -493,6 +494,8 @@ export function MainMenuScreen({
           buttonFrames={GENERAL_MODE_BUTTON_FRAMES}
           grid={GENERAL_MODE_GRID}
           cancelAnswer={GENERAL_MODE_CANCEL}
+          // CLR(−1)을 내는 단추가 창에 없다 — 창 뒤 바닥띠 되돌아가기 표시(아랫단 바닥 5) 자리 투명 칸이 CLR 을 낸다 (r192 터치 점검)
+          cancelPressRect={FOOTER_BACK_PRESS_RECT}
           initialSelected={state.generalModeWindow.initialSelected}
           onAnswer={(answer) => dispatch({ type: '창답', answer })}
         />

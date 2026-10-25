@@ -59,6 +59,21 @@ describe('엔딩 보너스 StrMODE[214] — 키 0x6b3c 는 SR+0x7b 만 본다', 
     expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
   })
 
+  it('키 0x6b3c 는 키 값을 안 본다 — 어느 키든 화면 탭과 같다 (시즌 장면 0xe9ac 표 0xcbf6c[0xf5 − 0xc8] = 0xed60)', () => {
+    vi.useFakeTimers()
+    try {
+      render(<SeasonEndingScreen endingIndex={2} onFinish={vi.fn()} />)
+      // 진입 효과기(종류 2)가 도는 동안은 삼킨다
+      act(() => {
+        vi.advanceTimersByTime(12 * millisecondsPerFrame())
+      })
+      fireEvent.keyDown(window, { key: '3' })
+      expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('6000 G포인트')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('SR+0x7b 가 서 있으면(판정 0 은 진입 0x6be8 이 세운다) 알림 없이 넘긴다 — 효과기 종류 1 아홉 틀이 끝난 틀에 (6b52~6b6e · 8ccc~8d2c)', () => {
     vi.useFakeTimers()
     try {

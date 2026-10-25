@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
@@ -87,6 +87,30 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
   const irisX = ENDING_IRIS.centerX + stage.dx
   const irisY = ENDING_IRIS.centerY + stage.dy
 
+  /** 키 0x6b3c — SR+0x7b 만 본다(보너스 값도 단계도 안 본다). 서 있으면 단계 + 1 · 종류 1 — 끝은 아래 효과기가 알린다 */
+  const press = () => {
+    if (isBonusReceived) setLeaveStage((stage) => stage + 1)
+    else setPhase('보너스')
+  }
+  const pressRef = useRef(press)
+  pressRef.current = press
+  /**
+   * **키 길** — 시즌 장면 0xe9ac 의 키 갈래(ec6a~ec9a)는 공용 창 0x754f9 가 키를 안 먹고 이 틀에 누름([this+0x34])이 있으면
+   * 상태 표 0xcbf6c[상태 − 0xc8] 로 간다. [0x2d](0xf5) = 0xed60 → `bl 0x6b3c` 이고, 0x6b3c 는 키 값([this+0x40])을 읽지 않는다 —
+   * **어느 키든** 같다(직접 떴다). 보너스 팝업(0x2b)이 떠 있는 동안은 창이 키를 먹는다(`MessageBox`). 효과기가 도는 동안의 키는
+   * `SeasonScreenFade` 가 잡기 단계에서 삼킨다. 되풀이(+0x38)는 누름이 아니라 거른다
+   */
+  useEffect(() => {
+    if (phase !== '엔딩') return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      event.preventDefault()
+      pressRef.current()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [phase])
+
   const bonus = (ENDING_BONUS_GAME_POINTS[endingIndex] ?? 0) * GAME_POINT_UNIT
   const text = ORIGINAL_ENDINGS[seasonEndingTextIndexOf(endingIndex)] ?? ''
 
@@ -136,12 +160,8 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
           type="button"
           className={styles.pressArea}
           aria-label="확인"
-          // 키 0x6b3c — SR+0x7b 만 본다(보너스 값도 단계도 안 본다). 서 있으면 단계 + 1 · 종류 1 — 끝은 아래 효과기가 알린다.
-          // 효과기가 도는 동안의 키는 `SeasonScreenFade` 가 삼켜 여기까지 안 온다
-          onClick={() => {
-            if (isBonusReceived) setLeaveStage((stage) => stage + 1)
-            else setPhase('보너스')
-          }}
+          // 화면 탭 = 키 하나 (0x6b3c). 효과기가 도는 동안은 덮개(`SeasonScreenFade`)가 누름을 받아 여기까지 안 온다
+          onClick={press}
         />
       )}
 

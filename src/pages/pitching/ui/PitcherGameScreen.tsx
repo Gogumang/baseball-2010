@@ -1091,9 +1091,8 @@ function PitcherGameScene({
         */}
         {acceptsMenuKey && (
           <PressLayer testId="소프트키 누름 칸" isOnTop>
-            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'}
-              touchKey={{ key: '*', label: isMenuOpen ? '닫기' : '메뉴' }} onPress={menu.pressStar} />
-            {acceptsGiveUpKey && <PressArea rect={TIME_PRESS_RECT} label="# 강판" onPress={pressGiveUp} touchKey={{ key: '#', label: '강판' }} />}
+            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar} />
+            {acceptsGiveUpKey && <PressArea rect={TIME_PRESS_RECT} label="# 강판" onPress={pressGiveUp} />}
           </PressLayer>
         )}
 

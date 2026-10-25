@@ -1,6 +1,8 @@
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
+import { canReturnRunner, runnerIndexOnBase } from '@/entities/fielding/model/baserunningKey'
+import type { RunnerState } from '@/entities/fielding/model/fieldingState'
 
 /**
  * **수비 인플레이(상태 0x17) 터치 상황 버튼** (웹 껍데기) — 원본 키 표(`entities/defense-controls/model/defenseKeys`)를 그대로 쏜다.
@@ -32,16 +34,61 @@ export const OFFENSE_RUNNER_OFFERS: readonly TouchKeyOffer[] = [
   { key: 'Escape', label: '전원 귀루', order: 8, isHold: true },
 ]
 
-/** 사람이 잡은 쪽의 상황 버튼 — 자동(`side` 없음)이면 없다 */
-export function inPlayTouchOffersOf(side: ControlSide | undefined): readonly TouchKeyOffer[] {
+/** 지금 그림의 주자 형편 — 공격 쪽 버튼을 그 순간 먹는 키만 남기는 데 쓴다 */
+export interface InPlayRunnerSituation {
+  /** 주자 목록(원본 목록 순서) — +0x8c(마지막으로 닿은 루) = `startBase` */
+  readonly runners: readonly RunnerState[]
+  /** 플레이 +0x111(홈런 사건 8) — 서면 0x5209e · 0x5222a 가 아무것도 안 한다 */
+  readonly homeRunFlag?: boolean
+}
+
+/** 진루 키 → 인자 루 · 귀루 키 → 인자 루 (`defenseKeys` 의 ADVANCE · RETURN 표와 같다) */
+const ADVANCE_BASE_OF_KEY: Readonly<Record<string, 1 | 2 | 3>> = { '2': 1, '4': 2, '8': 3 }
+const RETURN_BASE_OF_KEY: Readonly<Record<string, 1 | 2 | 3>> = { '3': 1, '1': 2, '7': 3 }
+
+/**
+ * **공격 쪽에서 그 순간 먹는 키만** (사용자 요청 "필요한 버튼만") — 메시지 0x582 · 0x584 의 0xa9b04 가 하는 그대로 고른다:
+ * - 플레이 +0x111(홈런)이 서면 진루 · 귀루 모두 아무 일이 없다 — 숨긴다.
+ * - '2' · '4' · '8' 진루와 '3' · '1' · '7' 귀루는 +0x8c 가 그 루인 산 주자(0xa97a0)가 없으면 아무 일이 없다 — 숨긴다.
+ *   귀루는 그 주자가 귀루 검사 0xa99a8(`canReturnRunner` — 1루로 가는 주자 · 뒤 주자가 닿은 루)를 지날 때만.
+ * - '0' 전원 진루 · CLR 전원 귀루는 인자 −1 이라 3 · 2 · 1 루 주자만 돈다(a9b1e) — 타자 주자(+0x8c = 0)뿐이면 숨긴다.
+ * - OK 슬라이딩(0x585)은 산 주자가 있으면 남긴다.
+ */
+export function offenseOffersFor(situation: InPlayRunnerSituation): readonly TouchKeyOffer[] {
+  const { runners } = situation
+  const isHomeRun = situation.homeRunFlag === true
+  const indexOn = (base: 1 | 2 | 3) => runnerIndexOnBase(runners, base)
+  const canAdvance = (base: 1 | 2 | 3) => !isHomeRun && indexOn(base) >= 0
+  const canReturn = (base: 1 | 2 | 3) => !isHomeRun && indexOn(base) >= 0 && canReturnRunner(runners, indexOn(base))
+  const bases = [1, 2, 3] as const
+  const isAlive = (runner: RunnerState) => !runner.isOut && !runner.scored
+  return OFFENSE_RUNNER_OFFERS.filter((offer) => {
+    const advanceBase = ADVANCE_BASE_OF_KEY[offer.key]
+    if (advanceBase !== undefined) return canAdvance(advanceBase)
+    const returnBase = RETURN_BASE_OF_KEY[offer.key]
+    if (returnBase !== undefined) return canReturn(returnBase)
+    if (offer.key === '0') return bases.some(canAdvance)
+    if (offer.key === 'Escape') return bases.some(canReturn)
+    return runners.some(isAlive)
+  })
+}
+
+/**
+ * 사람이 잡은 쪽의 상황 버튼 — 자동(`side` 없음)이면 없다. 공격 쪽은 주자 형편(`situation`)을 주면 그 순간 먹는 키만 남긴다
+ * (안 주면 아홉 다). 수비 송구는 네 루 모두 늘 먹는다(0x588)
+ */
+export function inPlayTouchOffersOf(
+  side: ControlSide | undefined,
+  situation?: InPlayRunnerSituation | null,
+): readonly TouchKeyOffer[] {
   if (side === '수비') return DEFENSE_THROW_OFFERS
-  if (side === '공격') return OFFENSE_RUNNER_OFFERS
+  if (side === '공격') return situation === undefined || situation === null ? OFFENSE_RUNNER_OFFERS : offenseOffersFor(situation)
   return []
 }
 
 /** 판이 서 있는 동안 사람이 잡은 쪽의 송구 · 주루 버튼을 알린다 (훅 수는 늘 아홉 — 빈 자리는 null) */
-export function useInPlayTouchKeys(side: ControlSide | undefined): void {
-  const offers = inPlayTouchOffersOf(side)
+export function useInPlayTouchKeys(side: ControlSide | undefined, situation?: InPlayRunnerSituation | null): void {
+  const offers = inPlayTouchOffersOf(side, situation)
   useTouchKeyOffer(offers[0] ?? null)
   useTouchKeyOffer(offers[1] ?? null)
   useTouchKeyOffer(offers[2] ?? null)
