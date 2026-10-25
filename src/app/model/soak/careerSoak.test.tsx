@@ -256,6 +256,8 @@ interface CareerSoakResult {
   readonly log: readonly string[]
   /** 새 길을 실제로 밟은 횟수 */
   readonly paths: Readonly<Record<string, number>>
+  /** 재생한 이벤트 번호마다 거친 횟수(선택지로 이어 본 것 포함) — 한 번도 안 걸리는 이벤트 찾기 (r253) */
+  readonly eventsViewed: Readonly<Record<number, number>>
 }
 
 interface CareerSoakOptions {
@@ -390,6 +392,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   const problems = new SoakProblems()
   const games = { 정규: 0, 포스트시즌: 0, 국가대항전: 0, 대결: 0 }
   const paths: Record<string, number> = {}
+  const eventsViewed: Record<number, number> = {}
   const walked = (path: string) => {
     paths[path] = (paths[path] ?? 0) + 1
   }
@@ -1054,6 +1057,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           })
           const rewards = [...(carried?.rewards ?? []), ...playback.rewards]
           const viewed = [...(carried?.viewedEventIds ?? []), ...playback.viewed.filter((id) => !(carried?.viewedEventIds ?? []).includes(id))]
+          for (const id of new Set([screen.eventId, ...playback.viewed])) eventsViewed[id] = (eventsViewed[id] ?? 0) + 1
           if (playback.match !== null && extras) {
             startAceMatch(playback.match, { rewards, viewedEventIds: viewed }, context)
             break
@@ -1162,12 +1166,13 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   }
   const lastSeason = Math.max(lastSeenSeason, saveGame.held()?.season ?? result.current.session.career?.season ?? firstSeason)
   log.push(`판 ${JSON.stringify(heldPlays)}`)
-  return { problems, steps, games, seasons: lastSeason - firstSeason + 1, endingIndex, stoppedAt, log, paths }
+  return { problems, steps, games, seasons: lastSeason - firstSeason + 1, endingIndex, stoppedAt, log, paths, eventsViewed }
 }
 
 function report(result: CareerSoakResult): string {
   return `걸음 ${result.steps} · 경기 정규 ${result.games.정규} · PS ${result.games.포스트시즌} · 대회 ${result.games.국가대항전} · 대결 ${result.games.대결}`
     + ` · 시즌 ${result.seasons} · 엔딩 ${result.endingIndex} · [${result.log.join(' / ')}] · 길 ${JSON.stringify(result.paths)}`
+    + ` · 이벤트 ${JSON.stringify(result.eventsViewed)}`
     + `${result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`}`
     + (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
 }

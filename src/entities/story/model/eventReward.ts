@@ -25,7 +25,9 @@ import { applyGpItem } from '@/entities/career/model/gpItems'
  *   20     연봉 변동 (0x8cac0) → seasonFlow.applySalaryChange
  *   7      히든 오픈 — |값| = 오픈 id (0x8c60e, 누락 탐색 7차)
  *   13~16  능력치 인덱스 0~3(히트·파워·수비·주루)에 더하고 999, 이어서 타입 한계치로 자른다 (0x8c758)
- * 그 밖의 종류(6 마구, 21 엔딩)는 아직 적용하지 않는다 (21 은 세션이 엔딩 화면으로 넘긴다).
+ *   9      GP 아이템 v−1 효과 (0xa4488) · 17 모든 능력치 (0x8c8e8)
+ * 5 · 8 · 12 는 점프표 칸이 곧 끝(0x8cb94)이라 효과가 없고, 6 마구는 투수편(0x7b985)만 준다(타자편은 효과 없음 — 0x8c5da).
+ * 21 엔딩은 0x8c460 이 종류 ≤ 20 만 받아 무시하고(0x8c480), 명령 0x8d4c4 가 첫 종류로 보고 세션이 엔딩 화면으로 넘긴다.
  */
 export interface EventReward {
   readonly kind: number
@@ -120,7 +122,10 @@ function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPo
       // GP 아이템 v−1 의 효과만 준다 (0xa4488) — 값을 치르지 않는다. 이벤트 36 v=10 → 아이템 9
       return random === undefined ? career : applyGpItem(career, reward.value - 1, random).career
     case EVENT_REWARD_KIND.질병:
-      if (reward.value < 0) return { ...career, isSick: false, illnessName: null, illnessCooldown: ILLNESS_COOLDOWN }
+      // 값 ≤ 0 갈래 0x8c73e~0x8c752: +5 = 0 · +6 = 표 0xd4d98[0](0) · +0x7c = 20
+      if (reward.value < 0) {
+        return { ...career, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: ILLNESS_COOLDOWN }
+      }
       return {
         ...career,
         illnessCooldown: ILLNESS_COOLDOWN,
