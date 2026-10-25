@@ -46,15 +46,21 @@ function uniform(random: RandomPort, count: number): number {
 
 /**
  * `0x9f5a0(저장)` — 팀 0..9 에 열린 히든 팀을 이어 붙인 목록에서 **균등**하게 하나.
+ *
+ * ```
+ * 9f5b8: sp[0..9] = 0..9                       ; 기본 팀 열 개
+ * 9f5c8: r0 = 저장+0x7a · k = 0..4              ; 히든 팀 다섯 바이트만 (전역 해금 k 8~12 칸)
+ * 9f5cc: ldrb [저장+0x7a+k] != 0 → sp[n++] = k+10
+ * 9f5e6: bfa55(0, n) → sp[i]
+ * ```
+ *
+ * 그래서 후보는 **팀 10~14 다섯 칸만** 본다 — 전역 해금표의 다른 번호(구장 · 장비 등)는 후보가 될 수 없다.
  * 목록은 번호 오름차순으로 쌓인다.
  */
 export function quickStartTeamCandidates(openedHiddenTeamIds: readonly number[] = []): readonly number[] {
-  // 해금 표(`unlocks.json`)가 푼 히든 팀도 열린 팀으로 얹는다 (표가 원본 그대로면 같은 목록)
-  const unlocked = Array.from({ length: HIDDEN_TEAM_COUNT }, (_unused, index) => HIDDEN_TEAM_FIRST_ID + index)
+  // 해금 표(`unlocks.json`)가 푼 히든 팀도 열린 팀으로 본다 (표가 원본 그대로면 저장 칸 그대로)
+  const hidden = Array.from({ length: HIDDEN_TEAM_COUNT }, (_unused, index) => HIDDEN_TEAM_FIRST_ID + index)
     .filter((id) => isTeamOpened(id, openedHiddenTeamIds))
-  const hidden = [...new Set([...openedHiddenTeamIds, ...unlocked])]
-    .filter((id) => id >= HIDDEN_TEAM_FIRST_ID)
-    .sort((left, right) => left - right)
   return [...Array.from({ length: OPEN_TEAM_COUNT }, (_unused, index) => index), ...hidden]
 }
 

@@ -34,6 +34,8 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
 | `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 5 로 첫 경기 이른 타석 앞에 제안이 뜨고 공을 그냥 보내 결과까지 (약 45초) | `nari-y1` + 씨앗 5 |
 
+G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/devOptions.ts` — vitest 밖에서는 켜짐) 때문에 늘 99999 로 보이고 써도 줄지 않는다. 실제로 깎이는 것을 볼 때는 주소에 `&real-gp`(또는 `&원본G`)를 붙인다.
+
 장면 표의 `seed` 나 주소의 `&seed=<수>` 는 픽스처의 부팅 씨앗 대신 쓴다(난수로만 닿는 장면 · 씨앗 찾기). 키를 누르는 시각이 아니라
 난수 차례로만 가므로 chromium · webkit · 세로 · 가로 모두 같은 자리에 닿는다.
 
