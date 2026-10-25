@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { gameSceneTickSeenAt, inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { GAUGE_LAST_CELL } from '@/entities/pitcher-career/model/pitchGauge'
 import {
   gaugePressedCellOf,
@@ -112,8 +113,17 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   )
   const onReleaseRef = useRef(onRelease)
   onReleaseRef.current = onRelease
-  /** 받은 키 칸 — 메시지 9(OK · '5' → 0x50e08)는 받은 다음 틀의 키 0x498d4(52d9e)가 0x11 갱신보다 먼저 처리한다(`sceneKeyLatch`) */
-  const [keyLatch] = useState(createSceneKeyLatch)
+  /**
+   * 받은 키 칸 — 메시지 9(OK · '5' → 0x50e08)는 받은 다음 틀의 키 0x498d4(52d9e)가 0x11 갱신보다 먼저 처리한다(`sceneKeyLatch`).
+   * 받은 틱은 키 사건이 난 때 장면 화면에 있던 그림의 틱이다(`gameSceneTickSeenAt` — 투수편 장면이 적는다, r217)
+   */
+  const [keyLatch] = useState(() => createSceneKeyLatch(gameSceneTickNow, gameSceneTickSeenAt))
+  /**
+   * 그린 커서 기록 — 그림마다 (장면 틱, 그 그림의 커서 `+0x17bc`). 원본은 키를 받은 틀 = 마지막으로 그린 틀이라 누른 칸은 **사람이 본
+   * 그림의 커서**다(다음 틀 머리의 0x50e08 이 그 틀 그리기 0x4d708 보다 먼저 읽는다). 웹은 커서를 틱 시계로 올리고 장면이 rAF 로 그리므로
+   * 그리기가 밀리면 시각 틱 · 지금 커서가 본 그림보다 한두 칸 앞이다 — 본 틱의 커서로 정한다 (r217)
+   */
+  const drawnCursorsRef = useRef<{ readonly tick: number; readonly cursor: number }[]>([])
   useEffect(() => openSceneKeyLatch(keyLatch), [keyLatch])
 
   useEffect(() => {
@@ -145,20 +155,54 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       } else {
         cursorRef.current += 1
         setCursor(cursorRef.current)
+        const drawn = drawnCursorsRef.current
+        drawn.push({ tick: gameSceneTickNow(), cursor: cursorRef.current })
+        if (drawn.length > 32) drawn.splice(0, drawn.length - 32)
       }
     })
     return () => handle()
   }, [isPaused, keyLatch])
 
-  const press = () => {
+  /**
+   * 0x50e08 — `seenTick` 은 키를 받은 틱(그때 화면에 있던 그림의 틱). 그 그림의 커서로 칸을 정한다. 그 뒤 그림이 커서를 더 올렸으면
+   * (그리기 · 키 손잡이가 밀려 늦게 꺼냄) 원본은 그 그림들에서 이미 커서가 서고 결과 원 틱이 올랐다 — 그만큼 되돌려 맞춘다
+   */
+  const press = (seenTick: number) => {
     if (releasedRef.current || isPaused || !showsGauge) return
-    pressedRef.current = gaugePressedCellOf(pressedRef.current, cursorRef.current)
+    const drawn = drawnCursorsRef.current
+    let seenIndex = -1
+    for (let index = drawn.length - 1; index >= 0; index -= 1) {
+      if ((drawn[index]?.tick ?? Number.POSITIVE_INFINITY) <= seenTick) {
+        seenIndex = index
+        break
+      }
+    }
+    const seenCursor = seenIndex < 0 ? (drawn.length === 0 ? cursorRef.current : 0) : drawn[seenIndex]?.cursor ?? cursorRef.current
+    const wasDecided = isDecidedCell(pressedRef.current)
+    pressedRef.current = gaugePressedCellOf(pressedRef.current, seenCursor)
     setPressed(pressedRef.current)
+    if (wasDecided || !isDecidedCell(pressedRef.current)) return
+    // 본 그림 뒤에 그린 그림 수 — 원본은 그 그림들이 커서 대신 결과 원 틱 +0x17c4 를 올렸다 (0x4d700 · 0x4d708)
+    const laterDraws = drawn.length - 1 - seenIndex
+    if (laterDraws > 0) {
+      cursorRef.current = seenCursor
+      setCursor(seenCursor)
+      setResultTick(laterDraws)
+    }
   }
   const pressRef = useRef(press)
   pressRef.current = press
   const isPausedRef = useRef(isPaused)
   isPausedRef.current = isPaused
+
+  /** 키 · 누름 하나를 칸에 넣는다 — 받은 틱은 사건이 난 때 화면에 있던 그림의 틱(누름 칸은 사건이 없어 지금 시각에 화면에 있던 그림) */
+  const pushPress = (event: Event | undefined) => {
+    const inputTime = inputTimeOf(event)
+    const seenTick = keyLatch.tickAt(inputTime)
+    keyLatch.push(() => pressRef.current(seenTick), 'press', inputTime)
+  }
+  const pushPressRef = useRef(pushPress)
+  pushPressRef.current = pushPress
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -167,7 +211,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       // 메시지 9 의 0x50dfa — OK(−5) · '5' 만 0x50e08 로 간다
       if (code !== KEY_OK && code !== 0x35) return
       event.preventDefault()
-      keyLatch.push(() => pressRef.current())
+      pushPressRef.current(event)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -182,7 +226,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       <PressArea
         {...(overlay === undefined ? {} : { rect: gaugeTapRectOf(overlay.aim, overlay.aimSide) })}
         label={`투구 게이지 ${isDecided ? pressed : cursor}칸`}
-        onPress={() => keyLatch.push(() => pressRef.current())}
+        onPress={() => pushPress(undefined)}
       />
     </PressLayer>
   )

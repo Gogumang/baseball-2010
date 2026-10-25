@@ -222,3 +222,19 @@ describe('사람 투구 장면의 0x11 · 0x13 연출 (타자편과 같은 부�
     장면내림()
   })
 })
+
+describe('투수편 장면은 그린 그림의 틱을 적는다 — 게이지 · 조준 키가 본 그림으로 센다 (r217, `gameSceneShownTicks`)', () => {
+  it('그림마다 (시각, 장면 틱)을 적고 · 내려가면 비운다', async () => {
+    const { gameSceneShownTicks } = await import('@/shared/lib/sceneKeyLatch/shownSceneTicks')
+    const { gameSceneTickOf, gameSceneTimeOf } = await import('@/shared/lib/commonWindow/commonWindow')
+    gameSceneShownTicks.clear()
+    const { unmount } = render(<PitcherSideStage {...기본} pitch={null} resolution={null} />)
+    for (let index = 0; index < 8; index += 1) 그림()
+    const 그린때 = clock
+    const 그린틱 = gameSceneTickOf(gameSceneTimeOf(그린때))
+    // 그 뒤 그림이 한참 안 와도 그 시각에 화면에 있던 것은 마지막 그림이다
+    expect(gameSceneShownTicks.tickSeenAt(그린때 + millisecondsPerFrame() * 2, 그린틱 + 2)).toBe(그린틱)
+    unmount()
+    expect(gameSceneShownTicks.tickSeenAt(그린때 + millisecondsPerFrame() * 2, 그린틱 + 2)).toBe(그린틱 + 2)
+  })
+})

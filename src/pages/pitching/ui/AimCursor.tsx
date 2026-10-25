@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, isRunningSceneKeys, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { gameSceneTickSeenAt, inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import {
   AIM_STILL,
@@ -86,8 +87,18 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
   const tickRef = useRef(tick)
   tickRef.current = tick
 
-  /** 받은 키 칸 — 메시지 8 은 받은 다음 틀의 키 0x498d4(52d9e)가 0x10 갱신 0x39c5c(52e14~)보다 먼저 처리한다(`sceneKeyLatch`) */
-  const [keyLatch] = useState(createSceneKeyLatch)
+  /**
+   * 받은 키 칸 — 메시지 8 은 받은 다음 틀의 키 0x498d4(52d9e)가 0x10 갱신 0x39c5c(52e14~)보다 먼저 처리한다(`sceneKeyLatch`).
+   * 받은 틱은 키 사건이 난 때 장면 화면에 있던 그림의 틱이다(`gameSceneTickSeenAt` — 투수편 장면이 적는다, r217)
+   */
+  const [keyLatch] = useState(() => createSceneKeyLatch(gameSceneTickNow, gameSceneTickSeenAt))
+  /**
+   * 갱신마다 (장면 틱, 그 틱 0x39c5c 뒤 조준점) 기록 — OK 확정은 **누를 때 본 그림의 조준점**에서 한 번 더 지나 넘긴다(r217). 원본은 키를 받은
+   * 틀 = 마지막으로 그린 틀이라 다음 틀 머리의 0x50e9c 가 그 그림의 조준점을 본다. 웹은 그리기 · 키 손잡이가 밀리면 그 사이 갱신이 조준점을
+   * 더 흘렸다 — 본 그림의 조준점으로 되돌린다. 처음 자리는 `startAimRef`
+   */
+  const aimHistoryRef = useRef<{ readonly tick: number; readonly aim: WorldPoint }[]>([])
+  const startAimRef = useRef(aim)
   useEffect(() => openSceneKeyLatch(keyLatch), [keyLatch])
 
   useEffect(() => {
@@ -104,22 +115,34 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
         keyLatch.clear()
       } else {
         // 키(메시지 8 — 방향 · OK · CLR)가 먼저다. OK · CLR 은 그 안에서 이 틀의 0x39c5c 를 지운 방향으로 한 번 지나고 끝난다
-        runSceneKeys(keyLatch, gameSceneTickNow())
+        const headTick = gameSceneTickNow()
+        runSceneKeys(keyLatch, headTick)
         if (isDoneRef.current) return
         tickRef.current()
+        const history = aimHistoryRef.current
+        history.push({ tick: headTick, aim: aimRef.current })
+        if (history.length > 32) history.splice(0, history.length - 32)
       }
       if (drawGate.allowsDraw()) setDrawTick((previous) => previous + 1)
     })
     return () => handle()
   }, [isPaused, keyLatch])
 
-  const apply = (action: AimKeyAction) => {
+  /** `seenTick` 은 키를 받은 틱(그때 화면에 있던 그림의 틱) */
+  const apply = (action: AimKeyAction, seenTick: number) => {
     if (isDoneRef.current || propsRef.current.isPaused) return
     // 메시지 8 머리 — 어느 키든 방향을 먼저 지운다
     directionRef.current = action.kind === 'move' ? action.direction : AIM_STILL
     if (action.kind === 'move') return
     if (action.kind === 'cancel' && propsRef.current.onCancel === undefined) return
     isDoneRef.current = true
+    // 본 그림 뒤에 갱신이 조준점을 더 흘렸으면(늦게 꺼냄) 본 그림의 조준점으로 되돌린다 — ⚠️ 미션 흔들림 난수는 그 갱신들이 이미 썼다(근사)
+    const history = aimHistoryRef.current
+    if (history.length > 0 && (history.at(-1)?.tick ?? seenTick) > seenTick) {
+      let seenAim = startAimRef.current
+      for (const entry of history) if (entry.tick <= seenTick) seenAim = entry.aim
+      aimRef.current = seenAim
+    }
     tickRef.current()
     if (action.kind === 'confirm') propsRef.current.onConfirm(aimRef.current)
     else propsRef.current.onCancel?.()
@@ -140,6 +163,15 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     [],
   )
 
+  /** 키 · 누름 하나를 칸에 넣는다 — 받은 틱은 사건이 난 때 화면에 있던 그림의 틱(누름 칸은 지금 시각에 화면에 있던 그림) */
+  const pushAction = (action: AimKeyAction, event: Event | undefined) => {
+    const inputTime = inputTimeOf(event)
+    const seenTick = keyLatch.tickAt(inputTime)
+    keyLatch.push(() => applyRef.current(action, seenTick), 'press', inputTime)
+  }
+  const pushActionRef = useRef(pushAction)
+  pushActionRef.current = pushAction
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // 누르고 있는 반복 · 뗌은 0x10 에 안 온다 (0x536bc 의 [+0x1c] == 0 만)
@@ -147,7 +179,7 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
       const action = aimKeyActionOf(event.key)
       if (action === null) return
       event.preventDefault()
-      keyLatch.push(() => applyRef.current(action))
+      pushActionRef.current(action, event)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -155,7 +187,7 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
 
   const pressKey = (key: string) => {
     const action = aimKeyActionOf(key)
-    if (action !== null) keyLatch.push(() => applyRef.current(action))
+    if (action !== null) pushAction(action, undefined)
   }
   const rects = aimTapRectsOf(side)
 

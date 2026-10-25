@@ -6,6 +6,7 @@ import {
 } from '@/shared/lib/commonWindow/commonWindow'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import { createKeyHold, HOLD_STAGE_MASK, type KeyHold } from '@/shared/lib/sceneKeyLatch/keyHold'
+import { useShownSceneTicks } from '@/shared/lib/sceneKeyLatch/useShownSceneTicks'
 import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import { offenseOffersFor, useInPlayTouchKeys } from '@/features/defense-play/model/inPlayTouchKeys'
@@ -647,6 +648,11 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(true, updateStartTickRef)
+  /**
+   * 키를 받은 틱 = 키 사건이 난 때 화면에 있던 그림의 틱(r217 — 원본은 키를 받은 틀 = 마지막으로 그린 틀). 이 갈래는 그림(갱신 u)마다 그 장면
+   * 틱까지 진행기를 돌려 그린다 — 그리기가 밀려 갱신이 늦게 오면 지금 틱은 앞서도 진행기는 본 그림에 서 있다
+   */
+  const tickSeenOf = useShownSceneTicks(updateStartTickRef.current === null ? null : updateStartTickRef.current + update)
   /** 창이 선 첫 그림([창+0x250])의 수 — 다시 그린 수는 판마다 센다 */
   const redraws = useGameSceneRedrawCount()
   const redrawnRef = useRef<{ readonly play: LiveRunnerPlay; count: number } | null>(null)
@@ -689,11 +695,11 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
       // 누른 채 되풀이는 0xbca05 가 센다(`keyHold`) — 브라우저 되풀이는 버린다
       if (event.repeat) return
       pressesRef.current.push({ key: event.key })
-      pressTicksRef.current.push(gameSceneTickNow())
+      pressTicksRef.current.push(tickSeenOf(event))
     }
     const onKeyUp = (event: KeyboardEvent) => {
       if (originalKeyOf(event.key) === null || isGameSceneFrozen()) return
-      holdRef.current.releaseTicks.push(gameSceneTickNow())
+      holdRef.current.releaseTicks.push(tickSeenOf(event))
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -701,7 +707,7 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [])
+  }, [tickSeenOf])
 
   const { stepper, startedAt } = stepperRef.current
   // 한 갱신 = 한 틱. 프레임을 건너뛴 만큼은 따라잡는다 (`LivePlayback` 과 같은 상한은 진행기의 판 끝이 정한다)
@@ -848,6 +854,12 @@ function LivePlayback({
   const closedCountRef = useRef(0)
   const [view, setView] = useState<DefenseViewState | null>(null)
   /**
+   * 화면에 낸 판 그림(`view`)의 장면 틱 — 키를 받은 틱은 키 사건이 난 때 화면에 있던 그림의 틱이다(r217, `useShownSceneTicks` — 원본은 키를
+   * 받은 틀 = 마지막으로 그린 틀). 그리기가 밀려 갱신이 늦게 오면 지금 틱은 앞서도 진행기는 본 그림에 서 있다
+   */
+  const viewTickRef = useRef<number | null>(null)
+  const tickSeenOf = useShownSceneTicks(view === null ? null : viewTickRef.current)
+  /**
    * 터치 기기 — 사람이 잡은 쪽의 송구 · 주루 상황 버튼 (자동 판은 없음). 공격 쪽은 진행기의 지금 주자 형편(주자 +0x8c · 플레이 +0x111)으로
    * 그 순간 먹는 키만(`offenseOffersFor`). 남는 키 묶음이 바뀔 때만 다시 그린다 — 판을 연 첫 그림 전에는 주루 버튼이 없다
    */
@@ -902,11 +914,11 @@ function LivePlayback({
       // 이 틀 누름 [장면+0x40] 이 있어야 한다)
       if (event.repeat) return
       pressesRef.current.push({ key: event.key })
-      pressTicksRef.current.push(gameSceneTickNow())
+      pressTicksRef.current.push(tickSeenOf(event))
     }
     const onKeyUp = (event: KeyboardEvent) => {
       if (originalKeyOf(event.key) === null || isGameSceneFrozen()) return
-      holdRef.current.releaseTicks.push(gameSceneTickNow())
+      holdRef.current.releaseTicks.push(tickSeenOf(event))
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -914,7 +926,7 @@ function LivePlayback({
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [])
+  }, [tickSeenOf])
 
   useEffect(() => {
     if (builtFromRef.current !== input || builtSideRef.current !== side) {
@@ -1128,6 +1140,7 @@ function LivePlayback({
       const last = running.ticks[running.ticks.length - 1] ?? null
       const shown = last?.closingListFrame === true ? (running.ticks[running.ticks.length - 2] ?? null) : last
       if (last?.closingListFrame === true) closingFrameRef.current = last
+      viewTickRef.current = updateStartTickNow === null ? null : updateStartTickNow + update
       setView(shown)
       // 건너뛰는 동안(+0xfe7)은 그림이 없다 — 창 첫 그림도 다시 그릴 판 그림이 없다
       lastPictureRef.current = shown === null || running.fastForward ? null : { view: shown, isPlay: true, drawsText: lastDrawsText }

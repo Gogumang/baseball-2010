@@ -32,6 +32,7 @@ import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { strikeoutJudgeParticlesOf } from '@/widgets/batting-stage/lib/judgeParticles'
 import { createSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { gameSceneShownTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { KEY_OK, originalKeyCodeOf } from '@/features/play-pitcher-game/model/pitchAim'
@@ -687,11 +688,15 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         if (drawMemo.needsDraw(canvasRef.current, stageScene)) renderBattingStage(context, stageScene)
         lastStageScene = stageScene
       }
+      // 이 틱의 그림이 화면에 섰다 — 이 뒤에 난 게이지 · 조준 키는 이 틱 그림을 보고 누른 것이다(`gameSceneShownTicks`, r217 —
+      // 원본은 키를 받은 틀 = 마지막으로 그린 틀. 타자편 `useStageAnimation` 의 `shownTicks` 와 같은 셈)
+      gameSceneShownTicks.mark(sceneTick, performance.now())
       handle = requestAnimationFrame(frame)
     }
     handle = requestAnimationFrame(frame)
     return () => {
       cancelAnimationFrame(handle)
+      gameSceneShownTicks.clear()
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [])
