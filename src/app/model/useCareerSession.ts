@@ -1311,12 +1311,16 @@ export function useCareerSession({
    * 웹은 훈련 결과 따위를 관리 화면 위 알림으로 보이므로 "105 에 있고 진입 이벤트 검사가 끝났으면" 늘 판정한 값으로 둔다.
    */
   const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? nextTitleOf(career) : null
-  // 장면이 새로 서면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60, `setUpNariScene`) — 이벤트 본문이 도착한 뒤에
+  // 장면이 새로 서면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60, `setUpNariScene`) — 이벤트 본문이 도착한 뒤에.
+  // ⚠️ 내보인 `career` 가 아니라 **지금 칸**(`current`)에서 지운다 (r245): 경기 끝(`finishGame`)은 셋업과 같은 그림에 기록 달성 G
+  // (0x4ea0c)를 커리어 칸에 얹는데, 그 그림의 내보인 커리어는 아직 지갑 값(얹기 전 G)이라 그것으로 갈아 끼우면 지갑 다리가
+  // "커리어 G 가 줄었다" 로 읽어 지갑까지 되돌렸다 — 경기마다 기록 달성 G 가 사라졌다
+  const events = story.events
   useEffect(() => {
-    if (!shouldForgetRepeatable || career === null || story.events === null) return
+    if (!shouldForgetRepeatable || career === null || events === null) return
     setShouldForgetRepeatable(false)
-    setCareer(forgetRepeatableEvents(career, story.events))
-  }, [shouldForgetRepeatable, career, story.events])
+    setCareer((current) => (current === null ? current : forgetRepeatableEvents(current, events)))
+  }, [shouldForgetRepeatable, career, events])
   useEffect(() => {
     if (!isManagementEntry || !managementEntryRef.current.isPending || career === null || story.events === null) return
     // 셋업의 반복 이벤트 지우기가 아직이면 그 뒤에 훑는다 — 원본은 셋업 0xf684 가 105 진입보다 먼저다
@@ -1352,7 +1356,10 @@ export function useCareerSession({
      * 1b8807f 앞의 옛 저장은 이 칸이 늘 거짓이라 불러온 뒤 한 번 더 115 를 본다 — 원본과의 차이 판단은 `hasSeenYearGoalWindow` 주석.
      */
     if (!career.hasSeenYearGoalWindow) {
-      if (career.removedMinusSkillIds.length > 0) setCareer({ ...career, removedMinusSkillIds: [] })
+      // 지금 칸에서 지운다 — 같은 그림에 커리어 쪽 G 가 움직였으면 내보인 커리어는 아직 지갑 값이다(위 반복 이벤트 지움과 같다)
+      if (career.removedMinusSkillIds.length > 0) {
+        setCareer((current) => (current === null ? current : { ...current, removedMinusSkillIds: [] }))
+      }
       return setScreen({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' })
     }
     /*

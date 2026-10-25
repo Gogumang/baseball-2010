@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { INJURY_FOLLOW_UP_NOTICE } from '@/entities/career/model/condition'
 import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { NARI_YEAR_START_EVENT_ID } from '@/entities/story/model/storyScene'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
@@ -691,6 +691,45 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
     // 지갑 500 + 우승 보상 1000
     expect(rendered.result.current.wallet.balance).toBe(1500)
     expect(rendered.result.current.session.career?.gamePoint).toBe(1500)
+  })
+
+  it('경기 끝 기록 달성 G(0x4ea0c)가 지갑에 남는다 — 같은 그림의 장면 셋업(반복 이벤트 지움)이 얹기 전 G 로 덮지 않는다 (r245)', async () => {
+    const rendered = 지갑띄우기(createCareer('기록G'), { gamePoint: 1000 })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    // 반복 이벤트 지움(0xacf60)은 이벤트 본문이 온 뒤에 돈다 — 그 효과가 경기 끝 그림에 같이 서야 이 길을 밟는다
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+      act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+      act(() => rendered.result.current.session.actions.confirmMatchPrepare())
+      act(() => rendered.result.current.session.actions.finishLoading())
+      const 헛스윙: PitchOutcomeDetail = {
+        resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+      }
+      for (let step = 0; step < 3000 && rendered.result.current.screen.kind === '경기'; step += 1) {
+        const { session } = rendered.result.current
+        const progress = session.progress
+        if (progress === null) break
+        if (progress.pendingDefensePlay !== null) act(() => session.actions.finishDefensePlay())
+        else if (progress.pendingRunnerPlay != null) act(() => session.actions.finishRunnerPlay())
+        else if (progress.pendingBenchClearing !== null) act(() => session.actions.finishBenchClearing(false))
+        else if (progress.lastBurstResolution != null) act(() => session.actions.closeBurstResult())
+        else act(() => session.handlePitchResolved(헛스윙))
+        act(() => {
+          vi.advanceTimersByTime(2000)
+        })
+      }
+      const screen = rendered.result.current.screen
+      expect(screen.kind).toBe('경기결과')
+      const reward = screen.kind === '경기결과' ? screen.gamePointReward : 0
+      expect(reward).toBeGreaterThan(0)
+      expect(rendered.result.current.wallet.balance).toBe(1000 + reward)
+      expect(rendered.result.current.session.career?.gamePoint).toBe(1000 + reward)
+    } finally {
+      vi.useRealTimers()
+      act(() => rendered.unmount())
+    }
   })
 })
 
