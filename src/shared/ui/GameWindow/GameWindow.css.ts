@@ -1,5 +1,6 @@
 import { style } from '@vanilla-extract/css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 /** 관리 화면 위에 뜨는 창들이 함께 쓰는 스타일 (순위표 0x7f070 · 필살타법 0x803d4) */
 
@@ -9,6 +10,16 @@ export const overlay = style({
   inset: 0,
   zIndex: 4,
   cursor: 'pointer',
+})
+
+/**
+ * 창 안에 공용 상자 0x74ef4(`MessageBox`)가 떠 있는 동안의 덮개 겹 — 덮개(4)가 겹 묶음을 만들어 상자의 `POPUP_WINDOW`(9)가
+ * 덮개 안에 갇히면, 화면의 누름 칸(7 — 기본정보 바닥 '*' · '0' 따위)이 상자 위로 새어 나와 누름을 먹는다. 떠 있으면 키는 상자
+ * 것이라(0x754f9) 그동안만 덮개째 상자 겹으로 올린다(r207). 늘 올리지는 않는다 — 시즌 다음 경기(`NextGameScreen`)처럼 창 위에
+ * 일부러 둔 누름 칸(되돌아가기, r186)이 덮인다
+ */
+export const overlayWithPopup = style({
+  zIndex: SCREEN_LAYERS.POPUP_WINDOW,
 })
 
 /** 원작 좌표에 그대로 놓는 그림 한 장 */

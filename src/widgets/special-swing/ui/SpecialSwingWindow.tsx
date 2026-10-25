@@ -138,7 +138,7 @@ export function SpecialSwingWindow({
   })
 
   return (
-    <div className={styles.overlay} role="dialog" aria-label="필살타법" onClick={onClose}>
+    <div className={notice !== null || question !== null ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay} role="dialog" aria-label="필살타법" onClick={onClose}>
       <SpecialTrainingFigure side="타자" state={mode} cursor={cursor} learnedCount={level} sessions={sessions}
         inUseNumber={inUseNumber} typeIndex={battingTypeIndex}
         onPressSlot={(slot) => { setCursor(slot); confirm(slot) }} />
