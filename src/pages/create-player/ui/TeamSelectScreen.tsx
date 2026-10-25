@@ -10,7 +10,7 @@ import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
   ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
-  TEAM_COUNT, TEAM_GRID_SHAPE, abilityAxisMaximumLengthOf, cellPositionOf, isTeamOpen, teamGridOpenShapeOf,
+  OPEN_TEAM_COUNT, TEAM_COUNT, TEAM_GRID_SHAPE, abilityAxisMaximumLengthOf, cellPositionOf, isTeamOpen, teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
@@ -80,6 +80,11 @@ interface TeamSelectScreenProps {
    * 잠긴 칸에서도 확인 키로 힌트 팝업을 띄우는 화면이 넘긴다.
    */
   readonly onSelectLocked?: (teamId: number) => void
+  /**
+   * 열린 히든 팀(10~14)도 고를 수 있는가 — 안 넘기면 참. **나만의리그 101(0x14114)은 거짓**이다: 격자 줄 [+0x10] == 2 면
+   * 열렸든 잠겼든 등록 0x66 으로 안 가고 힌트 팝업을 띄운다(14164~1416a) — 그때는 `onSelectLocked` 로 넘긴다.
+   */
+  readonly hiddenTeamsSelectable?: boolean
   readonly onCancel: () => void
   /** 화면 위에 얹을 팝업 — 같은 무대(RawScreen) 맨 위에 그린다 */
   readonly overlay?: ReactNode
@@ -109,8 +114,10 @@ const TEAM_COVER_STEP = 7
  */
 export function TeamSelectScreen({
   openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape = TEAM_GRID_SHAPE, onSelect, onSelectLocked, onCancel, overlay,
-  coveredTeamId = -1,
+  coveredTeamId = -1, hiddenTeamsSelectable = true,
 }: TeamSelectScreenProps) {
+  /** 확인으로 등록에 넘어가는 칸 — 열린 칸, 나만의리그면 히든 줄 밖 (0x14114) */
+  const isSelectable = (teamId: number) => isTeamOpen(teamId, openedHiddenIds) && (hiddenTeamsSelectable || teamId < OPEN_TEAM_COUNT)
   const [cursor, setCursor] = useState(0)
 
   const team = TEAMS[cursor] ?? TEAMS[0]
@@ -141,7 +148,7 @@ export function TeamSelectScreen({
         return setCursor(next)
       }
       const isOk = event.key === 'Enter' || event.key === '5'
-      if (isOk && isTeamOpen(cursor, openedHiddenIds)) {
+      if (isOk && isSelectable(cursor)) {
         event.preventDefault()
         onSelect(cursor)
       } else if (isOk && onSelectLocked !== undefined) {
@@ -155,7 +162,7 @@ export function TeamSelectScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cursor, openedHiddenIds, gridShape, onSelect, onSelectLocked, onCancel, bounce.start])
+  }, [cursor, openedHiddenIds, hiddenTeamsSelectable, gridShape, onSelect, onSelectLocked, onCancel, bounce.start])
 
   return (
     <RawScreen>
@@ -233,7 +240,7 @@ export function TeamSelectScreen({
             className={styles.cell}
             style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
             onClick={() => {
-              if (open) return onSelect(index)
+              if (isSelectable(index)) return onSelect(index)
               setCursor(index)
               onSelectLocked?.(index)
             }}

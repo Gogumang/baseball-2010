@@ -32,7 +32,6 @@ import { LogoScreen } from '@/pages/title/ui/LogoScreen'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
 import { createGameStartCursor } from '@/pages/main-menu/model/mainMenu'
 import type { GameStartCursor, NariGameReady } from '@/pages/main-menu/model/mainMenu'
-import { MY_LEAGUE_TEAM_GRID_SHAPE } from '@/pages/create-player/lib/teamSelectLayout'
 import { INITIAL_SECRET_CODE_STATE } from '@/pages/record/lib/statCells'
 import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
@@ -45,7 +44,7 @@ import { lazyScreen } from '@/shared/lib/lazyScreen/lazyScreen'
  */
 const HelpScreen = lazyScreen(() => import('@/pages/help/ui/HelpScreen').then((module) => module.HelpScreen), 60)
 const SettingsScreen = lazyScreen(() => import('@/pages/settings/ui/SettingsScreen').then((module) => module.SettingsScreen), 60)
-const TeamSelectScreen = lazyScreen(() => import('@/pages/create-player/ui/TeamSelectScreen').then((module) => module.TeamSelectScreen), 20)
+const MyLeagueTeamSelectScreen = lazyScreen(() => import('@/pages/create-player/ui/MyLeagueTeamSelectScreen').then((module) => module.MyLeagueTeamSelectScreen), 20)
 const CreatePlayerScreen = lazyScreen(() => import('@/pages/create-player/ui/CreatePlayerScreen').then((module) => module.CreatePlayerScreen), 20)
 const SpecialScreen = lazyScreen(() => import('@/pages/special/ui/SpecialScreen').then((module) => module.SpecialScreen), 50)
 const HallOfFameScreen = lazyScreen(() => import('@/pages/special/ui/SpecialScreen').then((module) => module.HallOfFameScreen), 40)
@@ -283,13 +282,14 @@ export function EntryRoutes({
   // 원본 흐름은 0x65 팀 고르기 → 0x66 등록 → 0x67 확인이다 (C-6)
   if (screen.kind === '팀선택') {
     return (
-      <TeamSelectScreen
+      // 히든 줄은 열렸어도 못 고르고 힌트 팝업만 뜬다 (0x14114 — `MyLeagueTeamSelectScreen`)
+      <MyLeagueTeamSelectScreen
+        side="타자편"
         title="나만의리그타자편"
         // 머리띠 G — 전역 G(+0x64). 안 넘기면 0 으로 찍혔다
         gamePoint={wallet.balance}
         // 히든 팀 열림은 커리어가 아니라 전역 기록 +0x70 + idx 다 — 투수편(App 의 PitcherCreateFlow)과 같은 출처
         openedHiddenIds={collection.openedHiddenIds}
-        gridShape={MY_LEAGUE_TEAM_GRID_SHAPE}
         onSelect={(teamId) => setScreen({ kind: '선수등록', teamId })}
         // 101 취소 0x14114 1424c~14264: 0x375d · 장면 0x103 · [0x140006c] = 5(게임시작 목록으로 바로) · [0x1552d14] = 1(전역 모드를
         // 일반으로 — 메인 메뉴 생성자 0x237fa 가 [0x1552d10] 에 옮긴다. 다음 모드 진입 0x327b8 이 다시 적으니 웹은 들 칸이 없다)

@@ -60,13 +60,12 @@ export function canSelectTeam(
  * 두 자리에서 서로 다르게 이어 붙인다:
  *   - **일반모드 팀 고르기**(상태 18·19, R4 3a): 잠겼으면 `sprintf(0xcc1ec "%s!N%s!N!N%s", [225], [216+팀], [0])`
  *     → 팝업 0x74ef5(…, 1, 0, 0, 0) (18: 0x29d38~0x29d8a · 19: 0x29bb8~0x29c14, 직접 떴다)
- *   - **그 밖의 팀 고르기**(0x14114): 열렸으면 `[225] + [226+k] + [1]`,
- *     잠겼으면 `[225] + [226+k] + [0] + [1]`
+ *   - **나만의리그 팀 고르기 101**(0x14114, 직접 떴다 r237): 격자 [+0x10](줄) == 2 — 히든 줄 — 면 **열렸든 잠겼든** 못 고른다.
+ *     k = [+0xc](열) · 열림 = 전역 기록 +0x7a + k(141a6~1418c). 열렸으면 `sprintf(0xcc1ec "%s!N%s!N!N%s", [225], [226+k], [1])`,
+ *     잠겼으면 `sprintf(0xcc1fc "%s!N%s!N!N%s!N%s", [225], [226+k], [0], [1])` → 팝업 0x74ef5(…, 1, 0, 0, 0) (14236)
  *
  * 고를 수 있는 경우(일반모드 + 열린 팀, 또는 히든이 아닌 팀)에는 `null` 이다.
- *
- * ⚠️ "그 밖의 팀 고르기" 갈래는 형식 문자열을 아직 안 떴다 — 그쪽은 그냥 이어 붙인다(시즌 0xca · 트레이드 0xe4 는
- * `pages/season` 의 `hiddenTeamHintOf` 가 따로 옮겼다).
+ * 시즌 0xca · 트레이드 0xe4 는 `pages/season` 의 `hiddenTeamHintOf` 가 따로 옮겼다.
  */
 export function hiddenTeamHintMessage(
   teamId: number,
@@ -81,8 +80,9 @@ export function hiddenTeamHintMessage(
     return `${ORIGINAL_MODE_TEXT[HIDDEN_HINT_TITLE]}!N${ORIGINAL_MODE_TEXT[HIDDEN_HINT_BASE + teamId]}!N!N${ORIGINAL_MODE_TEXT[TEAM_LOCKED_TEXT]}`
   }
 
+  // 0x14114 — 열림 0xcc1ec · 잠김 0xcc1fc (끝은 늘 [1])
   const parts = [ORIGINAL_MODE_TEXT[HIDDEN_HINT_TITLE], ORIGINAL_MODE_TEXT[HIDDEN_HINT_BASE + teamId]]
-  if (!isOpened) parts.push(ORIGINAL_MODE_TEXT[TEAM_LOCKED_TEXT])
-  if (!isGeneralMode) parts.push(ORIGINAL_MODE_TEXT[GENERAL_MODE_ONLY_TEXT])
-  return parts.join('')
+  return isOpened
+    ? `${parts[0]}!N${parts[1]}!N!N${ORIGINAL_MODE_TEXT[GENERAL_MODE_ONLY_TEXT]}`
+    : `${parts[0]}!N${parts[1]}!N!N${ORIGINAL_MODE_TEXT[TEAM_LOCKED_TEXT]}!N${ORIGINAL_MODE_TEXT[GENERAL_MODE_ONLY_TEXT]}`
 }
