@@ -26,10 +26,13 @@ export const BELOW_DENSE_FROM = 5
  * 누르면(pointerdown) keydown, 떼면(pointerup · pointercancel) keyup 을 **키보드와 같은 이름으로** 쏜다(`keyDispatch`) — 화면은
  * 키보드와 버튼을 가리지 않는다. 마우스 hover 로는 아무 일도 하지 않는다. 누르는 동안 초점을 빼앗지 않는다(`preventDefault`) —
  * 이름 입력칸에 초점이 있으면 키 사건도 그 칸으로 간다(키보드와 같다).
+ * pointer 사건 없이 click 만 온 탭은 키를 한 번 누르고 뗀다(대체 길 — 같은 탭의 pointer 누름 뒤 click 은 버린다).
  */
 export function TouchControls({ layout }: { readonly layout: TouchControlsLayout }) {
   const offers = useTouchKeyOffers()
   const pressesRef = useRef(new Map<number, KeyPressHandle>())
+  /** pointer 로 이미 누른 버튼의 키 — 그 탭 뒤에 따라오는 click 하나를 버린다 */
+  const pointerPressedKeysRef = useRef(new Set<string>())
 
   useEffect(() => {
     const presses = pressesRef.current
@@ -62,7 +65,14 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
           // 잡기를 못 해도(시험 환경 따위) 누름은 그대로다
         }
         event.currentTarget.dataset.pressed = ''
+        pointerPressedKeysRef.current.add(touchKey.key)
         pressesRef.current.set(event.pointerId, startTouchKeyPress(touchKey))
+      },
+      // pointer 사건이 안 오고 click 만 오는 탭(iOS Safari 가 사건 추적 영역 밖이라 여긴 손가락 따위, r208)도 키 한 번이다.
+      // pointer 로 이미 누른 탭 뒤의 click 은 버린다 — 키가 두 번 가지 않는다
+      onClick: () => {
+        if (pointerPressedKeysRef.current.delete(touchKey.key)) return
+        startTouchKeyPress(touchKey).release()
       },
       onPointerUp: release,
       onPointerCancel: release,
@@ -95,13 +105,13 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
 
   if (layout === 'sides') {
     return (
-      <div className={styles.panel} style={{ gridArea: 'padL' }} role="group" aria-label="상황 버튼">
+      <div className={styles.panel} role="group" aria-label="상황 버튼">
         {optionButtons.length > 0 && <div className={sidesOptionClass} data-option-layout={optionButtons.length > SIDES_COLUMN_MAX ? 'grid' : 'column'}>{optionButtons}</div>}
       </div>
     )
   }
   return (
-    <div className={styles.panel} style={{ gridArea: 'pad' }} role="group" aria-label="터치 조작">
+    <div className={styles.panel} role="group" aria-label="터치 조작">
       {optionButtons.length > 0 && (
         <div className={isDense ? `${styles.optionGrid} ${styles.optionGridFour}` : styles.optionRow}
           data-option-layout={isDense ? 'grid' : 'row'}>

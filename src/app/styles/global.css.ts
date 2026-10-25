@@ -123,9 +123,32 @@ globalStyle('body[data-layout="sides"]', {
   gridTemplateColumns: 'minmax(0, 1fr) var(--game-track) minmax(0, 1fr)',
 })
 
-/** 터치 버튼 자리는 감싸개 없이 덩이를 격자 칸에 바로 세운다 */
+/**
+ * 터치 버튼 자리(`#keypad-root`)는 **제 상자를 가진 격자 칸**으로 세운다 — `display: contents` 로 두면 안 된다.
+ *
+ * ⚠️ 버튼의 누름은 React 가 포털 그릇(`#keypad-root`)에 단 듣는 곳으로 받는다. iOS Safari(WebKit)는 터치 · pointer 듣는 곳이
+ * 달린 요소의 **상자**로 사건 추적 영역을 만들고, 그 영역 밖의 손가락은 페이지에 pointerdown · touchstart 로 보내지 않는다
+ * (탭 뒤 click 만 온다). `display: contents` 는 상자가 없어 영역이 비고, 아이폰에서 아래 버튼이 "아예 안 눌렸다"(r208).
+ * 데스크톱 · 안드로이드 크롬 · macOS WebKit 은 이 영역을 쓰지 않아 멀쩡했다.
+ *
+ * 안은 한 칸 격자라 덩이(`TouchControls.panel`)의 칸 안 가운데 맞춤 · 최대 폭은 예전과 같다. 버튼이 없는 `plain` 배치에서는 숨긴다.
+ */
 globalStyle('#keypad-root', {
-  display: 'contents',
+  display: 'none',
+  minWidth: 0,
+  minHeight: 0,
+  gridTemplateRows: 'minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+})
+
+globalStyle('body[data-layout="below"] #keypad-root', {
+  display: 'grid',
+  gridArea: 'pad',
+})
+
+globalStyle('body[data-layout="sides"] #keypad-root', {
+  display: 'grid',
+  gridArea: 'padL',
 })
 
 /**
