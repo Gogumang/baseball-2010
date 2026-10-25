@@ -52,6 +52,7 @@ import {
   teamBatters,
   teamPitchers,
   quickPitcherOf,
+  skillIdsOfBits,
 } from '@/entities/team/model/teamRoster'
 import {
   changePitcherIfNeeded,
@@ -87,6 +88,7 @@ import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import {
   defenseAbilitiesOf,
+  defenseSkillIdsOf,
   defenseFielderPlatesOf,
   isBattedBallInPlay,
   recordedOutcomeOf,
@@ -131,6 +133,7 @@ import {
   openPitchArrivalPlay,
   pitchJudgementOf,
   rollCpuStealStart,
+  stealStartSceneOf,
   runOpenedPitchArrivalPlay,
   type PitchArrivalPlay,
 } from '@/features/defense-play/model/pitchArrivalPlay'
@@ -1275,6 +1278,19 @@ export function startPitch(
     },
     random,
   )
+  // 같은 메시지 0x583 의 52222 — CPU 송구 결정 0xafa60 한 번(앞 판이 끝난 그대로의 우리 수비). 11번째 틱 CPU 타자 결정보다 먼저다
+  // (`stealStartSceneOf`, r214 — 예전 웹은 공 도착 판 맨 앞에서 굴렸다). 수비 · 주자 칸은 공 도착 판(`arrivePitcherPitch`)과 같다
+  const stealScene = stealStartSceneOf(
+    {
+      scene: progress.defenseScene,
+      bases: progress.game.bases,
+      outs: progress.game.outs,
+      defenseAbilities: myDefenseAbilitiesOf(progress),
+      runAbilities: runAbilitiesOnBaseOf(progress),
+    },
+    stealingFrom,
+    random,
+  )
   const thrown = pitchAgainstBatterDetailed(
     pitch,
     batter,
@@ -1346,6 +1362,7 @@ export function startPitch(
     stealingFrom,
     // 0xa9bd4 가 세운 st[0x14 + 루] 는 화면 표시 칸이기도 하다 — 출발이 없으면 앞 0xf 진입이 이미 지웠다
     stealDisplay: stealingFrom.length === 0 ? null : { bases: stealingFrom, selectionEntered: false },
+    ...(stealScene === progress.defenseScene ? {} : { defenseScene: stealScene }),
   }
 
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다(맞은 공은 모두 메시지 0x11 → 0x13 → 0x17). 공 도착 판(0x3dfac)은 못 맞힌 공만이다.
@@ -1529,6 +1546,7 @@ function arrivePitcherPitch(
       defenseAbilities: myDefenseAbilitiesOf(progress),
       // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
       fielderPlates: myFielderPlatesOf(progress),
+      fielderSkillIds: myFielderSkillIdsOf(progress),
       // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
       defenseTeamIndex: progress.options.ourTeamId,
       offenseTeamIndex: progress.options.opponentTeamId,
@@ -1762,6 +1780,16 @@ function myDefenseAbilitiesOf(progress: PitcherGameProgress): readonly number[] 
   )
 }
 
+/** 수비 아홉 칸의 스킬 번호 — `myDefenseAbilitiesOf` 와 같은 칸 고르기(레이저 0x66a8c · 필살수비의 초감각 21, `defenseSkillIdsOf`) */
+function myFielderSkillIdsOf(progress: PitcherGameProgress): (readonly number[])[] {
+  return defenseSkillIdsOf(
+    teamBatters(progress.options.ourTeamId).map((player) => ({
+      position: player.position,
+      skillIds: skillIdsOfBits(player.skillBits, false),
+    })),
+  )
+}
+
 /**
  * 루별 주자 주루 — 0 은 지금 타자(낫아웃 타자주자). 루의 주자는 신원(`GameState.runners`, 원본 주자 목록 — 상대 타순 칸)대로
  * 그 칸에 지금 선 로스터 선수다. 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(상대 타순을 거꾸로 센다)로 본다.
@@ -1959,6 +1987,7 @@ export function pickoff(
     // 수비 아홉 칸은 우리 팀 — 칸 0(나)은 진행기가 선수 없는 칸으로 둔다(0xb0fb4 b1032)
     defenseAbilities: myDefenseAbilitiesOf(progress),
     fielderPlates: myFielderPlatesOf(progress),
+    fielderSkillIds: myFielderSkillIdsOf(progress),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.options.ourTeamId,
     offenseTeamIndex: progress.options.opponentTeamId,
@@ -2254,6 +2283,7 @@ function defensePlayInputOf(
     defenseAbilities: myDefenseAbilitiesOf(progress),
     // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
     fielderPlates: myFielderPlatesOf(progress),
+    fielderSkillIds: myFielderSkillIdsOf(progress),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.options.ourTeamId,
     offenseTeamIndex: progress.options.opponentTeamId,

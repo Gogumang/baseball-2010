@@ -1614,12 +1614,13 @@ export function useCareerSession({
 
     /**
      * 도루 출발 (원본 키 '3' 1루 · '2' 2루 · '1' 3루 주자 → `0x53610` → 0x583 → `0xa9bd4`).
-     * 주자를 출발만 시킨다 — 판정은 공이 도착할 때 도루 판(종류 5)이 한다 (`arrivePitch`). 난수·소리 없음.
+     * 주자를 출발시키고 같은 메시지의 CPU 송구 결정 0xafa60 을 한 번 돌린다(앞 판 수비가 공을 쥐었을 때만 굴림 — `startSteal`).
+     * 판정은 공이 도착할 때 도루 판(종류 5)이 한다 (`arrivePitch`). 소리 없음.
      */
     stealBase: (base: StealBase) => {
       const current = progressRef.current
       if (current === null) return
-      const next = startSteal(current, base)
+      const next = startSteal(current, base, random)
       if (next === current) return
       progressRef.current = next
       setProgress(next)

@@ -154,6 +154,51 @@ export function stealBaseOfKey(key: string): StealBase | null {
   return null
 }
 
+/** 도루 출발 한 번의 수비 쪽 — 메시지 0x583 의 52222 `0xafa60` 이 보는 것 (공 도착 판과 같은 칸을 넘긴다) */
+export interface StealStartDefenseInput {
+  /** 앞 판이 남긴 수비 장면 — `playEnd` 가 없으면 굴림도 없다 */
+  readonly scene: DefenseScene | undefined
+  /** 투구 때 루 상황 */
+  readonly bases: BaseState
+  /** state[6] — 지금 아웃 수 (0xafb24 가 본다) */
+  readonly outs: number
+  readonly defenseAbilities?: readonly number[]
+  /** 루별 주자 주루 (0 은 안 본다) */
+  readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
+  readonly runAbility?: number
+  readonly runnerTeamGrade?: number
+}
+
+/**
+ * **도루 출발 메시지 0x583 한 번의 수비 쪽** — 0x520de 가 0xa9bd4 로 주자를 출발시킨 바로 뒤 52222 의 `0xafa60`(CPU 송구 결정) 한 번
+ * (`stealPlay.stealStartThrowDecision`). 바뀐 장면을 돌려준다 — 부르는 쪽은 경기 장면 칸(`defenseScene`)에 곧바로 적는다.
+ * `stealingFrom` 은 지금까지 출발한 주자의 루를 **출발한 차례대로**(마지막이 이번 키) 준다.
+ *
+ * 굴림 자리 (r214 — 예전 웹은 공 도착 판 맨 앞에서 몰아 굴렸다):
+ * - 사람 공격: 키 '3'·'2'·'1' 을 받은 그 자리(상태 0x11) — 그 뒤의 스윙 굴림보다 먼저.
+ * - CPU 공격: 상태 0x11 의 10번째 틱 `0x537dc` → 0x583 — `rollCpuStealStart` 바로 뒤, 11번째 틱 CPU 타자 결정 `0x34334` 보다 먼저.
+ * 판이 안 열리는 공(2아웃 삼진 · 맞힌 공)도 0xafa60 은 이미 돌았다 — 그 +0x128 = 0 · 던진 야수가 놓은 공이 장면에 남는다.
+ */
+export function stealStartSceneOf(
+  input: StealStartDefenseInput,
+  stealingFrom: readonly StealBase[],
+  random: RandomPort,
+): DefenseScene | undefined {
+  if (stealingFrom.length === 0) return input.scene
+  const runAbilities = input.runAbilities
+  return stealStartThrowDecision({
+    scene: input.scene,
+    bases: input.bases,
+    stealingFrom,
+    outs: input.outs,
+    defenseAbilities: input.defenseAbilities,
+    runAbilities: runAbilities === undefined ? undefined : { 1: runAbilities[1], 2: runAbilities[2], 3: runAbilities[3] },
+    runAbility: input.runAbility,
+    runnerTeamGrade: input.runnerTeamGrade,
+    random,
+  }).scene
+}
+
 /**
  * CPU 공격의 도루 출발 — `0x520de`(rollCpuSteal) → `0xa9bd4`(canStartSteal).
  * 부르는 자리는 CPU 타자 결정 `0x34334` 굴림 **바로 앞**. 후보가 없으면 굴리지 않는다.
@@ -192,6 +237,8 @@ export interface PitchArrivalPlayInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   /** 수비 칸별 이름 판 선수 (0x43cb0 — `DefensePlayInput.fielderPlates`) */
   readonly fielderPlates?: readonly (HolderPlate | null | undefined)[]
+  /** 수비 칸별 스킬 번호 — 레이저 굴림 0x66a8c 의 초감각(21) +3%p (`DefensePlayInput.fielderSkillIds`, `defenseSkillIdsOf`) */
+  readonly fielderSkillIds?: readonly (readonly number[])[]
   /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
   readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
@@ -285,26 +332,8 @@ export type OpenedPitchArrivalPlay =
 
 /** 공 도착 판을 판 시작까지 연다 — 판이 안 열리면 null (굴림: `runPitchArrivalPlay` 의 앞부분) */
 export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: RandomPort): OpenedPitchArrivalPlay | null {
-  // 도루 키 0x583 마다 52222 의 0xafa60 한 번 — 앞 판이 끝난 그대로의 플레이 · 야수로, 출발한 차례대로(`stealStartThrowDecision`, r201).
-  // ⚠️ 원본은 키를 받은 투구 틱에 굴린다 — CPU 공격 도루는 그 뒤 CPU 타자 결정 0x34334 굴림이 먼저 돌았다(stealPlay 머리말)
-  let scene = arrival.scene
-  for (let count = 1; count <= arrival.stealingFrom.length; count += 1) {
-    scene = stealStartThrowDecision({
-      scene,
-      bases: arrival.bases,
-      stealingFrom: arrival.stealingFrom.slice(0, count),
-      outs: arrival.outs,
-      defenseAbilities: arrival.defenseAbilities,
-      runAbilities:
-        arrival.runAbilities === undefined
-          ? undefined
-          : { 1: arrival.runAbilities[1], 2: arrival.runAbilities[2], 3: arrival.runAbilities[3] },
-      runAbility: arrival.runAbility,
-      runnerTeamGrade: arrival.runnerTeamGrade,
-      random,
-    }).scene
-  }
-  const input: PitchArrivalPlayInput = scene === arrival.scene ? arrival : { ...arrival, scene }
+  // 도루 키 0x583 의 0xafa60 은 여기서 안 돈다 — 출발한 그 자리(`stealStartSceneOf`)에서 굴려 `scene` 에 이미 들어 있다(r214)
+  const input = arrival
   const passedBall = rollPassedBall(input.gameMode, random)
   const kind = pitchPlayKindOf({
     passedBall,
@@ -362,6 +391,7 @@ export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: Ran
     defenseTeamIndex: input.defenseTeamIndex,
     offenseTeamIndex: input.offenseTeamIndex,
     fielderPlates: input.fielderPlates,
+    fielderSkillIds: input.fielderSkillIds,
     runnerAces: input.runnerAces,
     scene: input.scene,
     sceneResultCode: input.sceneResultCode,

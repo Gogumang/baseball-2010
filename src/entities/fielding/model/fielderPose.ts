@@ -1,5 +1,5 @@
 import { FIELDER_START_POSITIONS, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
-import { AI_STATE, type FielderState } from '@/entities/fielding/model/fieldingState'
+import type { FielderState } from '@/entities/fielding/model/fieldingState'
 
 /**
  * **야수 동작 번호 +0xa8 · 동작 프레임 +0xac · 자세 워드 +0xb0** (야수 vtable 0xd7934 — 전부 직접 뜬 것, r171).
@@ -125,15 +125,15 @@ export function withThrowMotion<F extends PoseFields>(fielder: F): F {
 
 /**
  * vt10 `0xa124c` — a1252 0xbf2b0(목표 +0x2c = 위치 +0x20 · +0x3a = 1) · +0xa8 = 0 · 워드 0 · +0xb4 = 0 (+0xac 는 그대로) (r176).
- * 웹 AI 0xb(`PICK_UP`)는 목표 칸에 +0x90 을 담아 두므로 그 칸은 안 바꾼다 — 원본도 같은 틱 AI 고리 b4b5c 가 vt14(+0x90)로
- * 곧바로 되돌린다(vt14 0xa14c8 관문 +0xb4 ≤ 0 · vtc8 은 vt10 뒤라 열려 있다).
+ * AI 0xb 도 목표를 위치로 덮는다 — 담장 앞 점은 +0x90(`FielderState.pickUpPoint`)에 따로 있어 다음 AI 고리 b4b5c 가 vt14 로 다시 적는다
+ * (r214 — 예전 웹은 목표 칸에 +0x90 을 담아 두어 여기서 AI 0xb 를 건너뛰었다).
  */
 export function withPoseCleared<
   F extends PoseFields & Pick<FielderState, 'actionLockTicks' | 'position' | 'target' | 'aiState'>,
 >(fielder: F): F {
   return {
     ...fielder,
-    target: fielder.aiState === AI_STATE.PICK_UP ? fielder.target : fielder.position,
+    target: fielder.position,
     action: FIELDER_ACTION.NONE,
     pose: 0,
     actionLockTicks: 0,

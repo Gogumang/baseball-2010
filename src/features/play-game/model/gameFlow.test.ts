@@ -34,6 +34,7 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -810,7 +811,44 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     expect(gamePointRewardOf(summary)).toBeGreaterThanOrEqual(20)
   })
 
-  it('8 도루 성공 — 키는 출발만 시키고(난수 없음) 공이 도착하면 도루 판(종류 5)이 연다, 살면 기록 8', () => {
+  it('도루 키는 그 자리에서 0x583 의 0xafa60 을 한 번 굴려 장면에 남긴다 — 2아웃 삼진으로 판이 안 열려도 +0x128 = 0 이 남는다 (r214)', () => {
+    const random = createSeededRandom(1)
+    const 시작 = startGame(random)
+    // 앞 판 — 포수가 공을 쥔 채 끝나 +0x128 = 1 (`DefenseScene.playEnd`)
+    const pattern: BattedBallPattern = [160, 101, 752, 0]
+    const 앞판 = runDefensePlay({
+      outcome: { kind: '아웃', detail: '땅볼아웃' },
+      trajectory: battedBallTrajectory(pattern),
+      bases: EMPTY_BASES,
+      outs: 0,
+      random: createSeededRandom(1),
+    }).scene
+    expect(앞판.playEnd?.play.wantsThrow).toBe(true)
+    const 주자있음: GameProgress = {
+      ...시작,
+      defenseScene: 앞판,
+      game: { ...시작.game, outs: 2, bases: { first: true, second: false, third: false } },
+    }
+    let rolls = 0
+    const 세는 = createFractionRandom(() => {
+      rolls += 1
+      return 0.99
+    })
+    const 출발 = startSteal(주자있음, 1, 세는)
+    // 점수식 0xafb24 → 0xb2c90 → 0xb2e38 — 악송구 굴림 0xa1828 이 돈다(굴림이 있었다)
+    expect(rolls).toBeGreaterThan(0)
+    expect(출발.defenseScene?.playEnd?.play.wantsThrow).toBe(false)
+    // 2아웃 삼진 — 0x3e0e4 의 !(아웃 > 1 && v == 5) 라 도루 판이 안 열린다. 장면의 +0x128 = 0 은 그대로다
+    const { progress: 뒤, play } = arrivePitch(
+      출발,
+      { resolution: { kind: '스트라이크', isSwinging: false }, outcomeAfter: { kind: '삼진' } },
+      createFractionRandom(() => 0.99),
+    )
+    expect(play).toBeNull()
+    expect(뒤.defenseScene?.playEnd?.play.wantsThrow).toBe(false)
+  })
+
+  it('8 도루 성공 — 키는 출발시키고(앞 판이 없으면 난수 없음) 공이 도착하면 도루 판(종류 5)이 연다, 살면 기록 8', () => {
     for (let seed = 1; seed <= 20; seed += 1) {
       const random = createSeededRandom(seed)
       const 시작 = startGame(random)
@@ -820,10 +858,10 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
         game: { ...시작.game, bases: { first: true, second: false, third: false } },
       }
       const n = 주자있음.recordIds.length
-      const 출발 = startSteal(주자있음, 1)
+      const 출발 = startSteal(주자있음, 1, createSeededRandom(0))
       expect(출발.stealingFrom).toEqual([1])
       expect(출발.game).toBe(주자있음.game)
-      expect(startSteal(출발, 1)).toBe(출발)
+      expect(startSteal(출발, 1, createSeededRandom(0))).toBe(출발)
       const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
       expect(뒤.stealingFrom).toEqual([])
       if (play?.kind !== 5) continue // 0.1% 폭투·포일이 먼저 섰다
@@ -838,7 +876,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
   it('도루 출발 표시 st[0x15 + i] 는 판정 때가 아니라 0xf 진입(3d966~3d976)에서 지운다 — 같은 타석 다음 공이면 그 걸음에 지워진다', () => {
     const random = createSeededRandom(1)
     const 시작 = startGame(random)
-    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1, createSeededRandom(0))
     expect(hiddenStealBasesOf(출발, 0)).toEqual([1])
     // 볼 — 판정(0x3dfac) 뒤 같은 타석 다음 공 0xf 진입이 지운다
     const { progress: 뒤 } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
@@ -849,7 +887,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
   it('타석이 끝난 공의 출발 표시는 새 타석 0xe 의 첫 OK(→ 0xf 진입)까지 남는다 — 판정 입력만 판정 때 거둔다', () => {
     const random = createSeededRandom(4)
     const 시작 = startGame(random)
-    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1, createSeededRandom(0))
     // 볼넷 + 도루 — 밀어내기 판(종류 2)은 표시를 안 지운다(0x3d7b8 은 종류 1 만)
     const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, random)
     expect(뒤.stealingFrom).toEqual([])
@@ -865,7 +903,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
   it('타구 판(종류 1) 시작 리드 0x3d7b8 은 도루 주자의 출발 표시를 지운다 (3d8c6~3d8d2)', () => {
     const random = createSeededRandom(4)
     const 시작 = startGame(random)
-    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+    const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1, createSeededRandom(0))
     const 진행중 = startPlayerOutcome(출발, { kind: '아웃', detail: '땅볼아웃' }, random)
     expect(진행중.pendingDefensePlay?.stealingFrom).toEqual([1])
     expect(hiddenStealBasesOf(진행중, 0)).toEqual([])
@@ -894,7 +932,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     ] as const) {
       const random = createSeededRandom(4)
       const 시작 = startGame(random)
-      const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1)
+      const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1, createSeededRandom(0))
       const { progress: 뒤, play, interrupted } = arrivePitch(출발, { resolution, outcomeAfter }, random)
       // 밀어내기 판(종류 2) — 주자 판으로 먹이지 않는다(진루는 타석 결과의 보통 길이 낸다)
       expect(play?.kind).toBe(2)
