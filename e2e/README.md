@@ -24,6 +24,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `nari-management` · `nari-outing` | 나리 타자편 관리 105 · 외출 지도 | `nari-y1` |
 | `pitcher-management` | 나리 투수편 관리 | `pitcher-y1` |
 | `season-management` · `season-outing` | 시즌 관리 메뉴 0xc9 · 외출 지도 0xd1 | `season-y1` |
+| `season-postseason` · `season-cup` | 시즌모드 포스트시즌 시작 이벤트 · 국가대항전 0xf3 예선 1경기 앞 (1년차 45경기를 실제로 친 저장 — `e2e/season-play.mjs`) | `season-postseason` · `season-cup` |
 | `general-quick` | 일반모드 빠른실행 경기정보 (경기설정 창) | `general-bat` |
 | `general-bat` · `general-pitch` · `general-defense` | 일반모드 1회 타석 · 구질 고르기 · 타구 수비 (약 5~10초) | `general-bat` · `general-pitch` |
 | `pitcher-pitch` · `pitcher-defense` | 나리 투수편 첫 경기 — 첫 수비 타석 구질 고르기 · 던진 공이 맞은 내 수비 판 (관리 [다음경기] → 경기시작, 약 5~7초) | `pitcher-y1` |
@@ -44,7 +45,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
-yarn node e2e/smoke.mjs                  # 장면 23개 × chromium · webkit 아이폰 (약 3분, 실패면 끝 코드 1)
+yarn node e2e/smoke.mjs                  # 장면 25개 × chromium · webkit 아이폰 (약 3분, 실패면 끝 코드 1)
 yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 ```
@@ -79,7 +80,7 @@ jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
 화면에 보이는 단추 · 창 위를 다른 누름 칸(꺼진 칸 포함)이 덮어 클릭 · 탭이 엉뚱한 곳에 먹히는 일(r195 · r203 · r207 · r212)을 훑는다.
 
 ```sh
-yarn e2e:hits                                   # 장면 23개 × 기기 넷, 약 6분 (서버가 없으면 띄우고 끝에 끈다)
+yarn e2e:hits                                   # 장면 25개 × 기기 넷, 약 6분 (서버가 없으면 띄우고 끝에 끈다)
 yarn e2e:hits general-bat derby-start           # 장면만 골라
 E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits    # 기기만 골라 (쉼표로 여럿)
 E2E_HITS_JOBS=1 yarn e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)

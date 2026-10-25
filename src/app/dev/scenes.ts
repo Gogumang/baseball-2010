@@ -153,6 +153,15 @@ const toMission = (side: '타자' | '투수', id: number): readonly SceneStep[] 
   screenIs(side === '투수' ? '투수미션' : '미션진행'),
 ]
 
+/** 시즌모드 들어가기 — 진입 분기 0xcb 가 저장의 phase · 국가대항전 칸을 보고 고른 상태까지 (`enterSeasonScene`) */
+const toSeasonState = (state: number, label: string): readonly SceneStep[] => [
+  call('시즌모드 들어가기 (onSelectMode 시즌모드)', (h) => {
+    h.setLastPlayedMode(MODE.시즌)
+    h.setScreen({ kind: '시즌모드' })
+  }),
+  until(label, (h) => h.screen.kind === '시즌모드' && h.season.scene === state),
+]
+
 /** 게임시작 목록 [홈런더비] 답 — 선수 고르기(하위 16). 커서는 나리 타자 칸 */
 const TO_DERBY_PICK: readonly SceneStep[] = [
   call('홈런더비 (onSelectMode 홈런더비)', (h) => h.setScreen({ kind: '홈런더비' })),
@@ -279,6 +288,24 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
       until('시즌 외출 지도 0xd1', (h) => h.season.scene === 0xd1),
       wait(600),
     ],
+  },
+  'season-postseason': {
+    description: '시즌모드 포스트시즌 시작 0xee — 정규시즌 45경기를 마친 저장(phase 0xb)으로 들어가 시작 이벤트(0xd3)가 선 자리',
+    fixture: 'season-postseason',
+    steps: [
+      call('시즌모드 들어가기 (onSelectMode 시즌모드)', (h) => {
+        h.setLastPlayedMode(MODE.시즌)
+        h.setScreen({ kind: '시즌모드' })
+      }),
+      // 진입 분기 0xcb 가 0xee 로 보내고, 0xee 는 곧바로 이벤트 재생 0xd3 을 연다
+      until('포스트시즌 시작 0xee → 이벤트 0xd3', (h) => h.screen.kind === '시즌모드' && h.season.scene === 0xd3),
+      wait(1500),
+    ],
+  },
+  'season-cup': {
+    description: '시즌모드 국가대항전 0xf3 — 1년차 정규시즌 45경기 · 결산 뒤 예선 1경기 앞 (진입 분기 0xcb 의 국가대항전 칸 갈래)',
+    fixture: 'season-cup',
+    steps: [...toSeasonState(0xf3, '국가대항전 0xf3'), wait(900)],
   },
   'general-quick': {
     description: '일반모드 빠른실행 — 경기정보(상태 22)에 경기설정 창이 저절로 뜬 자리 (진입 창 [13] 빠른실행 답)',
