@@ -2862,9 +2862,12 @@ export function stepDefensePlay(
     // ```
     // 중계맨은 쥐기(0xb2710)가 넣은 준비 틱(내야 3)이 끝난 틱에 던진다 — 0xb2e38 머리의 vtC4 가 그때까지 0 을 돌려준다.
     // 0xb2c90 을 거치지 않으므로 들고 뛰기·직접 밟기 관문도, 던진 뒤 AI 0 도 없다.
-    if (vt4cOpen && !play.finished && !uncatchable && play.held) {
+    // 지우기(b4638)는 쥠과 상관없다(r225 — 예전 웹은 쥠 갈래 안에 두었다). +0x130 은 고르기 0xb3b38 이 송구 때 받을 야수로
+    // 옮기므로, 최종 받는 야수에게 공이 날아가는 중(안 쥔 틱)에 이미 계획이 지워진다. vt5c 가 거짓(준비 전)이면 b4624 → b4660
+    // 이라 지우지 않는다 — [4] ≠ +0x130 이라 어차피 지울 일이 없다.
+    if (vt4cOpen && !play.finished && !uncatchable) {
       const holderSlot = play.ballHolderSlot
-      if (relayFinalSlot !== NONE && relayFinalSlot !== holderSlot) {
+      if (play.held && relayFinalSlot !== NONE && relayFinalSlot !== holderSlot) {
         throwBall(holderSlot, relayFinalSlot, relayBase, '중계', false)
       } else if (relayFinalSlot === holderSlot) {
         relayFinalSlot = NONE

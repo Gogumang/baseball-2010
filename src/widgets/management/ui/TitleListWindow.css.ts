@@ -12,7 +12,8 @@ export const row = style({
   font: 'inherit',
   fontSize: '11px',
   lineHeight: '13px',
-  whiteSpace: 'nowrap',
+  // 'pre' — 끝 빈칸도 가운데 맞춤 폭에 든다(원문 칭호 "떠오르는 샛별 ", 0x9c52c, r225)
+  whiteSpace: 'pre',
   overflow: 'hidden',
   cursor: 'pointer',
 })

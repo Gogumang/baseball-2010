@@ -17,7 +17,7 @@ import {
   TITLE_ROWS_PER_PAGE,
   TITLE_NAMES,
   titleListOf,
-  titleNumberOf, gameResultTitleOf } from '@/entities/career/model/titles'
+  titleNumberOf, gameResultTitleOf, titleDisplayNameOf } from '@/entities/career/model/titles'
 import { createCareer, GAMES_PER_SEASON, startNextSeason, withNariSceneSetupOutings } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -208,8 +208,22 @@ describe('equipTitle — 칭호 목록(상태 129) 확인 키 0x11f78', () => {
     expect(equipTitle(career, '없는칭호')).toBe(career)
   })
 
-  it('팝업 글은 이름 + StrMODE[138] 이다 (0x11fe2)', () => {
-    expect(equipTitleNoticeOf('안타제조기')).toBe('안타제조기!N닉네임이 적용되었습니다')
+  it('팝업 글은 "!C" + 이름 + StrMODE[138] 이다 (0x11fd8)', () => {
+    expect(equipTitleNoticeOf('안타제조기')).toBe('!C안타제조기!N닉네임이 적용되었습니다')
+  })
+
+  it('이름은 원문 StrNICKNAME 그대로 — [1] "떠오르는 샛별 " 은 끝 빈칸까지 (0x12000, r225)', () => {
+    expect(equipTitleNoticeOf('떠오르는 샛별')).toBe('!C떠오르는 샛별 !N닉네임이 적용되었습니다')
+  })
+})
+
+describe('titleDisplayNameOf — 화면에만 원문 빈칸 (r225)', () => {
+  it('저장 열쇠는 뗀 꼴, 그리는 이름은 원문 그대로', () => {
+    expect(TITLE_NAMES[1]).toBe('떠오르는 샛별')
+    expect(titleDisplayNameOf(TITLE_NAMES[1])).toBe('떠오르는 샛별 ')
+    expect(titleDisplayNameOf(TITLE_NAMES[2])).toBe('최고의 루키 ')
+    expect(titleDisplayNameOf('안타제조기')).toBe('안타제조기')
+    expect(titleDisplayNameOf('없는 칭호')).toBe('없는 칭호')
   })
 })
 
