@@ -5,7 +5,7 @@ import {
 import { FULL_STAMINA, staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
-import { TITLE_NAMES } from '@/entities/career/model/titles'
+import { TITLE_NAMES, titleDisplayNameOf } from '@/entities/career/model/titles'
 import { NAME_BAND, STATUS_BOXES, nameBandSplitOf } from '@/pages/management/lib/managementLayout'
 import { StatusBoardBase } from '@/pages/management/ui/ManagementBoard'
 import { NariStatusValues } from '@/pages/management/ui/StatusValues'
@@ -97,7 +97,7 @@ export function PitcherStatusBoard({ career, hour, isPreviousGame = false }: Pit
         nameContent={(
           <>
             <div className={styles.nameText} style={{ left: band.nameBox.x, top: band.top, width: band.nameBox.width }}>{career.name}</div>
-            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>{pitcherTitleNameOf(career)}</div>
+            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>{titleDisplayNameOf(pitcherTitleNameOf(career))}</div>
           </>
         )} />
       <svg className={styles.board} viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid="스태미나막대">

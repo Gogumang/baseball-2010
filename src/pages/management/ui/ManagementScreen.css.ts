@@ -18,7 +18,8 @@ export const nameText = style([
     fontSize: '11px',
     lineHeight: '20px',
     textAlign: 'center',
-    whiteSpace: 'nowrap',
+    // 'pre' — 줄을 안 접고 끝 빈칸도 가운데 맞춤 폭에 든다(원본 폭 재기 0x9c52c 처럼 — 칭호 "떠오르는 샛별 ", r225)
+    whiteSpace: 'pre',
     overflow: 'hidden',
   },
 ])

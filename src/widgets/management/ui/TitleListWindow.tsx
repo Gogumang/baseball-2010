@@ -4,7 +4,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import {
-  currentTitleOf, equipTitleNoticeOf, titleListOf, TITLE_ROWS_PER_PAGE,
+  currentTitleOf, equipTitleNoticeOf, titleDisplayNameOf, titleListOf, TITLE_ROWS_PER_PAGE,
 } from '@/entities/career/model/titles'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
@@ -169,7 +169,7 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
                 color: isEquipped ? TITLE_LIST_COLORS.equippedText : TITLE_LIST_COLORS.text,
               }}
               onClick={(event) => { event.stopPropagation(); setCursor(index); confirm(index) }}>
-              {title}
+              {titleDisplayNameOf(title)}
             </button>
             {index === cursor && isBlinkOn && (
               <svg className={local.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"

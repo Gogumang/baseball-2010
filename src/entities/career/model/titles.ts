@@ -27,6 +27,16 @@ const NAME_COUNT = ORIGINAL_TITLES.length / 2
  */
 export const TITLE_NAMES: readonly string[] = ORIGINAL_TITLES.slice(0, NAME_COUNT).map((name) => name.trim())
 
+/**
+ * 화면에 그릴 칭호 이름 — 원문 StrNICKNAME[번호] 그대로(끝 빈칸 포함, r225). 원본은 이름을 늘 표에서 바로 읽어 그린다
+ * (칭호 팝업 0x1b102 · 장착 알림 0x12000 · 상태판 0x7d5cc). 가운데 맞춤 폭(0x9c52c)이 끝 빈칸까지 세므로 "떠오르는 샛별 " 은
+ * 빈칸 반 칸만큼 왼쪽에 놓인다. 저장 열쇠(`TITLE_NAMES`)는 그대로 뗀 꼴이다. 모르는 이름이면 받은 글 그대로.
+ */
+export function titleDisplayNameOf(title: string): string {
+  const index = TITLE_NAMES.indexOf(title)
+  return index < 0 ? title : (ORIGINAL_TITLES[index] ?? title)
+}
+
 /** 칭호는 모두 64개 — 기록연감 칸도 공통 32 + 타자 16 + 투수 16 = 64 다 (P3 10-2) */
 export const TITLE_COUNT = NAME_COUNT
 /** 공통 칭호(어느 편에서 얻어도 한 칸)는 0~31 이다 */
@@ -356,11 +366,12 @@ export function equipTitle(career: PlayerCareer, title: string): PlayerCareer {
 }
 
 /**
- * 장착 확인 팝업 글 (0x11fe2~0x12040) — **이름 + StrMODE[138]** 을 그냥 이어 붙인다.
- * [138] 이 `!N` 으로 시작해서 이름 다음 줄에 "닉네임이 적용되었습니다" 가 온다.
+ * 장착 확인 팝업 글 (0x11fd8~0x12040) — **"!C"(0xcc210) + 이름 + StrMODE[138]** 을 그냥 이어 붙인다(strcpy 0xbc75d · strcat 0xbc965).
+ * [138] 이 `!N` 으로 시작해서 이름 다음 줄에 "닉네임이 적용되었습니다" 가 온다. 두 줄 다 가운데다.
+ * 이름은 원문 StrNICKNAME 그대로(끝 빈칸 포함) — r225 가 앞의 "!C" 와 함께 바로잡았다(예전 웹은 왼쪽 맞춤 · 빈칸 뗀 이름).
  */
 export function equipTitleNoticeOf(title: string): string {
-  return `${title}${ORIGINAL_MODE_TEXT[EQUIPPED_TITLE_TEXT] ?? ''}`
+  return `!C${titleDisplayNameOf(title)}${ORIGINAL_MODE_TEXT[EQUIPPED_TITLE_TEXT] ?? ''}`
 }
 
 /** 조건을 만족했지만 아직 얻지 않은 칭호 (원본 번호 순) */

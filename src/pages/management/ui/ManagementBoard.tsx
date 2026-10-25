@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
+import { titleDisplayNameOf } from '@/entities/career/model/titles'
 import {
   BOARD_COLOR, BOARD_POLYGON, MORALE_GAUGE_BACKGROUND, MORALE_LABEL_FRAME, NAME_BAND, STADIUM_BAND,
   STATUS_BOXES, moraleGaugeColumnsOf, moraleGaugeFrameOf, nameBandSplitOf,
@@ -112,7 +113,7 @@ export function ManagementBoard({ career, titleName, hour, isPreviousGame = fals
         nameContent={(
           <>
             <div className={styles.nameText} style={{ left: band.nameBox.x, top: band.top, width: band.nameBox.width }}>{career.name}</div>
-            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>{titleName}</div>
+            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>{titleDisplayNameOf(titleName)}</div>
           </>
         )} />
       <StatusValues career={career} isPreviousGame={isPreviousGame} />
