@@ -27,6 +27,10 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `general-quick` | 일반모드 빠른실행 경기정보 (경기설정 창) | `general-bat` |
 | `general-bat` · `general-pitch` · `general-defense` | 일반모드 1회 타석 · 구질 고르기 · 타구 수비 (약 5~10초) | `general-bat` · `general-pitch` |
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
+| `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 17 로 넷째 타석 앞에 제안이 뜨고 공을 그냥 보내 결과까지 (약 110초) | `nari-y1` + 씨앗 17 |
+
+장면 표의 `seed` 나 주소의 `&seed=<수>` 는 픽스처의 부팅 씨앗 대신 쓴다(난수로만 닿는 장면 · 씨앗 찾기). 키를 누르는 시각이 아니라
+난수 차례로만 가므로 chromium · webkit · 세로 · 가로 모두 같은 자리에 닿는다.
 
 경기 장면은 버튼 글자가 아니라 화면이 알리는 자리(`src/shared/lib/scenePeek` — 사람 타석 0xe · 구질 고르기 · 수비 판 · 더비 OK 대기)를 기다린다.
 진행기가 단계를 밟는 동안만 경기 로딩 판을 기다리지 않고, 인트로는 원본처럼 OK 로 넘긴다(난수 차례는 그대로).
@@ -66,8 +70,36 @@ jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
 설정은 `vitest.browser.config.ts` 에 있다. 앱과 같은 vite 플러그인을 써서 vanilla-extract CSS 가 실린다.
 진짜 손가락 탭은 `commands.touchTap(x, y)` 로 한다.
 
+## 5. 누름 칸 맞음 검사 (`yarn e2e:hits`)
+
+화면에 보이는 단추 · 창 위를 다른 누름 칸(꺼진 칸 포함)이 덮어 클릭 · 탭이 엉뚱한 곳에 먹히는 일(r195 · r203 · r207 · r212)을 훑는다.
+
+```sh
+yarn e2e:hits                                   # 장면 17개 × 기기 넷, 약 4분 (서버가 없으면 띄우고 끝에 끈다)
+yarn e2e:hits general-bat derby-start           # 장면만 골라
+E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits    # 기기만 골라 (쉼표로 여럿)
+E2E_HITS_JOBS=1 yarn e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)
+E2E_HITS_VERBOSE=1 yarn e2e:hits                # 동작 뒤 장면을 다시 열 때 알린다
+```
+
+- 기기: `chromium-desktop`(1000×800 가로 · 마우스) · `chromium-iphone`(아이폰 13 세로 · 터치) · `webkit-iphone`(Safari 엔진 세로) ·
+  `webkit-iphone-land`(가로).
+- 요소: `button`(PressArea 포함) · `[role=button]` · `[role=option]` · `[role=menuitem]` · 터치 상황 버튼(`[data-touch-key]`).
+  꺼진 것 · 안 보이는 것 · 조상 overflow 에 잘린 몫은 뺀다. 미끄러져 들어오는 연출은 자리가 멈출 때까지 기다린다.
+- 점: 가운데 + 네 모서리 안쪽(최대 8px 안). `elementFromPoint` 가 그 요소나 그 자손이 아니면 덮인 것이다.
+  웹킷은 CSS `zoom` 안 요소의 `getBoundingClientRect` 를 zoom 뺀 좌표로 내서 조상 zoom 곱을 곱해 화면 좌표로 옮긴다.
+- 창 아래: 덮은 것이 열린 창(`[role=dialog]`) 안이고 덮인 것은 그 창 밖이면 실패가 아니다(원본도 창이 키를 가져간다). 수만 센다.
+- 연 상태: `e2e/hits.mjs` 의 `ACTIONS` — 메뉴 '*' · 교체 '#' · 질문 · 알림 상자 · 칭호 창 · 기록실 · 외출 말풍선. 걸음은
+  키 이름 · `@이름`(그 이름의 단추를 실제로 탭/클릭) · `w밀리초`이고, `expect` 가 안 서면 동작 실패로 친다.
+- 허용 목록: `e2e/lib/hits.mjs` 의 `ALLOWED_OVERLAPS` — 의도된 겹침을 `why` 와 함께 둔다(외출 건물 모서리 · 외출 말풍선 아래 건물 ·
+  판 전체 확인 칸 위 소프트키 · 시즌 다음경기 되돌아가기 r186).
+- 결과: 화면에 기기별 요약 · 허용된 겹침 · 실패 줄(장면 · 상태 · 덮인 것 z ← 덮은 것 z · 못 맞은 점). 전부는 `e2e/.run/hits-report.json`.
+  실패가 있으면 끝 코드 1.
+
+겹침을 고칠 때는 `SCREEN_LAYERS`(`src/shared/config/screenLayers.ts`)의 층을 쓴다.
+
 ## 배포 빌드에 안 들어가는지
 
 ```sh
-yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|PTEST' dist || echo clean
+yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST' dist || echo clean
 ```

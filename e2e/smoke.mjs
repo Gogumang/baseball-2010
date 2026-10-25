@@ -41,7 +41,8 @@ async function runBrowser({ browserName, device }, names) {
       const started = Date.now()
       let error = null
       try {
-        await openScene(page, scene, { timeout: 60000 })
+        // nari-burst-result 는 씨앗대로 넷째 타석까지 공을 보내 약 110초 걸린다
+        await openScene(page, scene, { timeout: scene === 'nari-burst-result' ? 240000 : 60000 })
       } catch (caught) {
         error = String(caught).slice(0, 300)
       }

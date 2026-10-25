@@ -1,5 +1,6 @@
 import type { SceneHandles } from '@/app/dev/sceneShortcut'
 import { scenePeeksNow } from '@/shared/lib/scenePeek/scenePeek'
+import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TeamGamePeek } from '@/shared/lib/scenePeek/scenePeek'
 
 /**
@@ -23,12 +24,16 @@ export type SceneStep =
       readonly test: (handles: SceneHandles) => boolean
       readonly everyMs: number
       readonly timeoutMs: number
+      /** 참인 동안은 누르지 않고 기다린다 — 타석(OK 가 곧 스윙)에서 공을 그냥 보내 난수 차례만으로 타석이 끝나게 */
+      readonly holdWhen?: (handles: SceneHandles) => boolean
     }
 
 export interface SceneDefinition {
   readonly description: string
   /** `?fixture=` 를 안 주면 깔 픽스처 (`e2e/fixtures/<이름>.json`). 'none' 이면 저장을 안 건드린다 */
   readonly fixture: string
+  /** 픽스처의 부팅 씨앗 대신 쓸 씨앗 — 난수로만 닿는 장면(돌발미션)을 정하려고. `&seed=` 가 오면 그것이 먼저다 */
+  readonly seed?: number
   readonly steps: readonly SceneStep[]
 }
 
@@ -40,8 +45,27 @@ const until = (label: string, test: (handles: SceneHandles) => boolean, timeoutM
   timeoutMs === undefined ? { kind: 'until', label, test } : { kind: 'until', label, test, timeoutMs }
 const key = (name: string, times?: number): SceneStep => (times === undefined ? { kind: 'key', key: name } : { kind: 'key', key: name, times })
 const wait = (ms: number): SceneStep => ({ kind: 'wait', ms })
-const keyUntil = (name: string, label: string, test: (handles: SceneHandles) => boolean, everyMs: number, timeoutMs: number): SceneStep =>
-  ({ kind: 'keyUntil', key: name, label, test, everyMs, timeoutMs })
+const keyUntil = (
+  name: string,
+  label: string,
+  test: (handles: SceneHandles) => boolean,
+  everyMs: number,
+  timeoutMs: number,
+  holdWhen?: (handles: SceneHandles) => boolean,
+): SceneStep =>
+  holdWhen === undefined
+    ? { kind: 'keyUntil', key: name, label, test, everyMs, timeoutMs }
+    : { kind: 'keyUntil', key: name, label, test, everyMs, timeoutMs, holdWhen }
+/** 그 순간 화면이 알리는 터치 상황 버튼 — 나리 타석(번트 '8')을 가른다(돌발미션 장면이 타석에서 OK 를 안 누르게) */
+const offersHave = (label: string) => () => touchKeyOffersNow().some((offer) => offer.label.includes(label))
+/**
+ * 돌발미션 창(`BurstMissionWindow`, role dialog '돌발미션') — 진행기에 판정(`lastBurstResolution`)이 있으면 결과 창, 없으면 타석 앞 제안 창.
+ * 창이 없으면 null
+ */
+const burstWindowOf = (handles: SceneHandles): '제안' | '결과' | null => {
+  if (document.querySelector('[role="dialog"][aria-label="돌발미션"]') === null) return null
+  return handles.career.progress?.lastBurstResolution == null ? '제안' : '결과'
+}
 /**
  * 팀 경기 화면이 알리는 지금 자리(`shared/lib/scenePeek` — 버튼 글자 · 화면 구조에 기대지 않는다). r192 가 '*' · '#' 상황 버튼을
  * 걷고 "*MENU" · "#TIME" 글자 자리 누름 칸으로 바꾼 뒤 예전 표('대타' · '교체' 버튼 기다림)는 시간 초과로 끝났다(r222).
@@ -225,6 +249,22 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
       // 구질 · 코스 · 게이지 모두 OK — 공을 칠 때까지 던진다
       keyUntil('Enter', '수비 판 0x17', teamGameIs((peek) => peek.defensePlaySide === '수비'), 500, 60000),
       wait(300),
+    ],
+  },
+  'nari-burst-result': {
+    description: '나리 타자편 돌발미션 결과 창 — 다음 타석 OK 대기의 꺼진 화면 전체 확인 칸 위 (r195). 씨앗 17: 넷째 타석 앞 제안',
+    fixture: 'nari-y1',
+    seed: 17,
+    steps: [
+      ...TO_NARI_MANAGEMENT,
+      call('관리 [다음경기]', (h) => h.career.actions.runCommand('다음경기')),
+      // 순위 · 경기준비 · 타석 앞 OK 는 Enter, 타석(번트 '8' 이 뜸)에서는 누르지 않고 공을 보낸다 — 난수 차례만으로 간다
+      keyUntil('Enter', '돌발미션 제안 창', (h) => burstWindowOf(h) === '제안', 250, 150000, offersHave('번트')),
+      // 제안 창만 Enter 로 닫고 그 뒤로는 누르지 않는다 — 타석이 끝나면 결과 창이 다음 타석 OK 대기와 함께 저절로 선다
+      keyUntil('Enter', '돌발미션 결과 창', (h) => burstWindowOf(h) === '결과', 250, 60000, (h) => burstWindowOf(h) !== '제안'),
+      // 판이 오르고 글이 다 나올 때까지 — 결과 창이 선 직후 한 그림쯤 경기 화면이 다시 서며 창이 잠깐 빠지는 틈이 있어 넉넉히
+      wait(3000),
+      until('돌발미션 결과 창 그대로', (h) => burstWindowOf(h) === '결과', 3000),
     ],
   },
   'derby-pick': {
