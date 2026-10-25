@@ -226,6 +226,27 @@ export function spliceTrajectory(
   }
 }
 
+/**
+ * 공+0x68(재생 틱)이 **한 판 틱 동안 안 오른** 궤적 — 진행기는 판 틱으로 점을 읽으므로 `atTick` 의 점을 `atTick − 1` 의 점으로 하나
+ * 끼워 넣고 그 뒤 점 · 사건 틱(aa0 · aa4 · aa8 · ab0)을 한 칸씩 민다. 공+0x68 을 올리는 곳은 그리기 뒤 0x3f378(3f3c6 → 0xa2594) 하나라
+ * (리터럴 0xa2595 는 0x3f4c4 하나) 그리기가 없는 키 건너뛰기(+0xfe7) 되풀이 52b26~52b40 동안은 공이 서 있다.
+ */
+export function holdTrajectoryAt<T extends BattedBallTrajectory>(base: T, atTick: number): T {
+  const shift = (tick: number) => (tick < 0 || tick < atTick ? tick : tick + 1)
+  const from = (tick: number) => (tick < atTick ? tick : tick - 1)
+  return {
+    ...base,
+    length: base.length + 1,
+    pointAt: (tick: number) => base.pointAt(from(tick)),
+    ...(base.pointDetailAt === undefined ? {} : { pointDetailAt: (tick: number) => base.pointDetailAt!(from(tick)) }),
+    ...(base.isStoppedAt === undefined ? {} : { isStoppedAt: (tick: number) => base.isStoppedAt!(from(tick)) }),
+    landingTick: shift(base.landingTick),
+    fenceTick: shift(base.fenceTick),
+    poleTick: shift(base.poleTick),
+    ...(base.wallTick === undefined ? {} : { wallTick: shift(base.wallTick) }),
+  }
+}
+
 /** 궤적이 담장(또는 파울 관중석) 위로 넘었는가 — 공 +0xaa4 */
 export function clearedFence(trajectory: BattedBallTrajectory): boolean {
   return trajectory.fenceTick >= 0

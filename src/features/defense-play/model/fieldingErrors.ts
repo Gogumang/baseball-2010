@@ -64,8 +64,11 @@ export function drawnFumbleCheerOf(fielders: readonly DrawnFielderCounters[]): b
  * - 칸 0(투수): 판 시작은 건너뛰고(b1032 `cmp r4, #0 ; beq`) 공수 교대 판 0x3fac4 3fe1a~3fe4c 가 같은 식으로 넣은 값 —
  *   니블 1 = **지명타자**다. 투수의 펌블 · 악송구는 지명타자 기록에 붙는다(원본 그대로).
  *
- * ⚠️ 미확인: 0x3fac4 는 공수 교대 판이 서서 OK 를 기다릴 때만 불려(R10) 판이 안 선 반 이닝 뒤의 칸 0 은 앞 판의 값이 남는다 —
- * 웹은 늘 지금 수비 팀의 지명타자로 본다. 못 찾은 칸도 앞 값 대신 null(안 쌓음)이다.
+ * ⚠️ 근사(남김 — 웹 구조: 기록 흐름은 순수 함수라 화면이 따라가는 +0xec 를 못 받는다): 0x3fac4 는 공수 교대 판이 서서 OK 를 기다릴 때만
+ * 불려(4fb20 — 가드 3fad0 [장면+0x1104] · 3fade [장면+0x1784] == 0 · 3fae8 0xb68fd, R10) 판이 안 선 반 이닝 뒤의 칸 0 은 앞 판의 값이
+ * 남는다(장면 new 직후는 0 — 4383a 가 +0x2e 를 안 올린다). 그 값은 화면의 `widgets/field-walk/lib/useWalkerLineSeats` 가 따라가지만
+ * 웹은 늘 지금 수비 팀의 지명타자로 본다. 못 찾은 칸도 앞 값 대신 null(안 쌓음)이다. 같은 칸을 보는 펌블 · 레이저 굴림
+ * (`entities/fielding/model/fieldingState` `UNSEARCHED_FIELDER_SLOT` 머리)과 함께 옮길 몫이다.
  */
 export function fielderRecordIndexOf(
   lineup: readonly { readonly position?: number }[],
