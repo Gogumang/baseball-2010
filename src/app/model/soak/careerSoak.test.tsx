@@ -100,6 +100,8 @@ import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
+import { drawnReplayFieldingErrorsOf } from '@/features/defense-play/model/fieldingErrors'
+import { ACE_BATTER_ROSTER_SLOT } from '@/entities/league/model/leagueDay'
 import { resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 import {
   SoakProblems, batterLineProblemsOf, firstDiffOf, isSoakEnabled, jsonRoundTripDiffOf, leagueTallyProblemsOf,
@@ -413,6 +415,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   /** 이 경기를 시작할 때의 커리어 — 결과 화면에서 누계 증가분을 본다 */
   let beforeGame: { career: PlayerCareer; kind: '정규' | '포스트시즌' | '국가대항전' } | null = null
   let checkedSummary: unknown = null
+  /** 이 경기에서 재생 화면 대신 그린 판이 올린 실책(마타자 칸 뺌 — 요약과 같은 거르기) — 정산 요약의 실책과 같아야 한다 (r248) */
+  let drawnErrorsThisGame: unknown[] = []
   /** 붙든 판을 푼 횟수 — 정책이 경기 갈래를 실제로 밟았는지 본다 */
   const heldPlays = { 타구판: 0, 주자판: 0, 벤치클리어링: 0, 돌발결과: 0, 공: 0, 견제: 0, 도루: 0 }
 
@@ -585,6 +589,14 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     const play = result.current.session.progress?.lastDefensePlay ?? null
     if (play === null || play.ticks.length === 0 || play === replayedPlay) return
     replayedPlay = play
+    // 재생 화면처럼 판 틱을 다 그린 실책(0x43278 +0x2e)을 판 끝(onDone 앞)에 얹는다 (r248)
+    const drawn = drawnReplayFieldingErrorsOf(play.ticks)
+    if (drawn.length > 0) {
+      const before = result.current.session.progress?.leagueErrors?.length ?? 0
+      act(() => result.current.session.actions.recordFieldingErrors(drawn))
+      const added = result.current.session.progress?.leagueErrors?.slice(before) ?? []
+      drawnErrorsThisGame.push(...added.filter((error) => error.battingOrderIndex !== ACE_BATTER_ROSTER_SLOT))
+    }
     act(() => result.current.session.actions.finishReplay(play))
   }
 
@@ -972,6 +984,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           break
         case '경기준비':
           if (career !== null) {
+            drawnErrorsThisGame = []
             beforeGame = {
               career,
               kind: screen.cup !== undefined ? '국가대항전' : career.postseason !== null ? '포스트시즌' : '정규',
@@ -997,6 +1010,12 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
             problems.add(where(), batterLineProblemsOf('summary.stats', s))
             if (s.plateAppearances < s.atBats) problems.add(where(), [`경기 타석 ${s.plateAppearances} < 타수 ${s.atBats}`])
             problems.add(where(), outOfRangeOf('summary', { ourScore: summary.ourScore, opponentScore: summary.opponentScore }, 0))
+            // 정산 실책 = 그린 실책 합 — 경기를 끝낸 재생 판의 실책도 정산 앞에 든다(r244 · r248). soak 의 타구 판은 화면 없이 돌아 실책을 안 그린다
+            const settledErrors = JSON.stringify(summary.leagueErrors ?? [])
+            if (settledErrors !== JSON.stringify(drawnErrorsThisGame)) {
+              problems.add(where(), [`정산 실책 ${settledErrors} ≠ 그린 실책 ${JSON.stringify(drawnErrorsThisGame)}`])
+            }
+            drawnErrorsThisGame = []
             if (beforeGame.kind === '정규') {
               // 일정표 0xd89cb 대로 — 정규 경기 상대는 그날(g) 일정표 상대다
               const expected = nextOpponentOf(beforeGame.career)

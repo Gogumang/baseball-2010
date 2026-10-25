@@ -2177,8 +2177,22 @@ export function recordDrawnTeamFieldingErrors(
     }
     return { teamId: player.tableTeamId ?? teamId, battingOrderIndex: rosterSlot }
   })
-  if (errors.length === 0) return progress
-  return { ...progress, leagueErrors: [...(progress.leagueErrors ?? []), ...errors] }
+  /*
+   * 펌블 갈래는 +0x2e 뒤 0xa755d(ctx, 3) — 시즌 평판 코드 3(수비실수, 43854~43862). [+0xec] != 0 일 때만이라 레코드를 찾은 야수만
+   * (마선수도 레코드가 있어 센다 — 기록표 칸이 없을 뿐). 게이트 0xa755c 는 코드 ≤ 5 를 공격측이 CPU 일 때만 적으므로 우리 팀 수비 그림만 남는다
+   */
+  const fumbleCodes = drawn
+    .filter((error) => error.isFumble === true && error.teamIndex === progress.options.ourTeamId)
+    .filter((error) => fielderRecordIndexOf(entryBattersOf(progress, progress.options.ourTeamId), error.slot) >= 0)
+    .map(() => SEASON_RECORD_CODE.수비실수)
+  // 시즌(모드 2)이 아니면 `withSeasonRecord` 가 칸을 그대로 돌려준다
+  const gameRecord = fumbleCodes.length === 0 ? progress.gameRecord : withSeasonRecord(progress, '수비', fumbleCodes)
+  if (errors.length === 0 && gameRecord === progress.gameRecord) return progress
+  return {
+    ...progress,
+    ...(errors.length === 0 ? {} : { leagueErrors: [...(progress.leagueErrors ?? []), ...errors] }),
+    gameRecord,
+  }
 }
 
 /** 간이 타석 도루의 리그 기록을 진행에 얹을 칸 — 없으면 빈 것 */
