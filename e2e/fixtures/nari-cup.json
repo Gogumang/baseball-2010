@@ -1,5 +1,5 @@
 {
-  "note": "나리 타자편 1년차 52경기 국가대항전 134 바로 앞 — 대표 선발 이벤트 461(114)가 선 순간의 저장. 이어하기(continueSaved)가 그 이벤트를 다시 틀고 OK 로 넘기면 134 대진판(칭호 8 팝업)이 선다. 134 에 선 뒤의 저장은 타자편 이어하기가 392(연말 사슬)로 가서 쓰지 않았다(resumePointOf 가 S+0x12c 보다 S+0xb4 를 먼저 본다 — 투수편과 다르다). r236 soak(src/app/model/soak/soakFixtures.test.tsx, 씨앗 1 · careerSoak 의 정책)이 실제 저장 모듈(createLocalStorageSaveGame)이 쓴 칸을 떴다",
+  "note": "나리 타자편 1년차 52경기 국가대항전 134 진입 — 463 끝 저장(S+0x50 = 3 · S+0x12c = 1 · 대회 칸)이라 이어하기(continueSaved)의 그 밖 갈래가 S+0x12c 를 S+0xb4 보다 먼저 봐(0x1c154 1c346~1c364) 134 대진판(히든 팀 · 칭호 8 팝업)으로 돌아온다. r236 soak(src/app/model/soak/soakFixtures.test.tsx, 씨앗 1 · careerSoak 의 정책)이 134 가 처음 선 순간 실제 저장 모듈(createLocalStorageSaveGame)이 쓴 칸을 떴다 (r241 다시 뜸)",
   "localStorage": {
     "compus-baseball/career": {
       "version": 2,
@@ -69,7 +69,9 @@
           "377",
           "380",
           "381",
-          "385"
+          "385",
+          "461",
+          "463"
         ],
         "storySceneIndex": 0,
         "teamId": 1,
@@ -92,7 +94,7 @@
         "badBodyTrainings": 0,
         "fragileTrainings": 0,
         "popularity": 194,
-        "reputation": 525,
+        "reputation": 535,
         "morale": 67,
         "money": 14100,
         "removedMinusSkillIds": [],
@@ -2190,7 +2192,7 @@
         },
         "regularSeasonFirstCount": 1,
         "regularSeasonRewardTaken": true,
-        "seasonEndState": 132,
+        "seasonEndState": null,
         "postseason": {
           "baseOrders": {
             "0": [
@@ -3032,6 +3034,186 @@
             "moraleChange": -6,
             "commentIndex": 62
           }
+        },
+        "nationalCup": {
+          "teams": [
+            10,
+            11,
+            12,
+            13
+          ],
+          "wins": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "losses": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "matches": [
+            [
+              10,
+              11,
+              12,
+              13
+            ],
+            [
+              10,
+              12,
+              11,
+              13
+            ],
+            [
+              10,
+              13,
+              11,
+              12
+            ]
+          ],
+          "stage": 4,
+          "finalists": [
+            15,
+            15
+          ],
+          "champion": 15,
+          "day": 0
+        },
+        "nariCupTeams": {
+          "korea": {
+            "batters": [
+              {
+                "slot": 0,
+                "position": 9
+              },
+              {
+                "slot": 1,
+                "position": 7
+              },
+              {
+                "slot": 2,
+                "position": 8
+              },
+              {
+                "slot": 3,
+                "position": 3
+              },
+              {
+                "slot": 4,
+                "position": 1
+              },
+              {
+                "slot": 5,
+                "position": 5
+              },
+              {
+                "slot": -1,
+                "position": 4
+              },
+              {
+                "slot": 7,
+                "position": 2
+              },
+              {
+                "slot": 8,
+                "position": 6
+              },
+              {
+                "slot": 9,
+                "position": 0
+              },
+              {
+                "slot": 10,
+                "position": 0
+              },
+              {
+                "slot": 11,
+                "position": 0
+              },
+              {
+                "slot": 6,
+                "position": 0
+              }
+            ],
+            "acePitcher": -1,
+            "pitchers": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          "opponent": {
+            "batters": [
+              {
+                "slot": 0,
+                "position": 7
+              },
+              {
+                "slot": 1,
+                "position": 6
+              },
+              {
+                "slot": 2,
+                "position": 9
+              },
+              {
+                "slot": 3,
+                "position": 1
+              },
+              {
+                "slot": 4,
+                "position": 5
+              },
+              {
+                "slot": 5,
+                "position": 8
+              },
+              {
+                "slot": 6,
+                "position": 3
+              },
+              {
+                "slot": 7,
+                "position": 2
+              },
+              {
+                "slot": 8,
+                "position": 4
+              },
+              {
+                "slot": 9,
+                "position": 0
+              },
+              {
+                "slot": 10,
+                "position": 0
+              },
+              {
+                "slot": 11,
+                "position": 0
+              }
+            ],
+            "acePitcher": -1,
+            "pitchers": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          "opponentTeamId": 11
         }
       }
     }

@@ -101,6 +101,10 @@ const ACTIONS = {
     // 134 진입 팝업 — 히든 팀 열림(StrCOMMON[138]) 다음에 칭호 8 "국가 대표" 창
     { name: '히든 팀 팝업 닫기 → 칭호 창', steps: ['@확인', 'w700'], expect: '칭호' },
   ],
+  'nari-cup-result': [
+    // 대회가 끝난 대진판 확인(0x19fdc) → 결과 팝업 0x25
+    { name: '대진판 확인 → 결과 팝업', steps: ['Enter', 'w700'], expect: '알림' },
+  ],
   'pitcher-cup': [
     { name: '히든 팀 팝업 닫기 → 대진판', steps: ['@확인', 'w700'], expect: '국가대항전 대진' },
   ],
@@ -133,7 +137,7 @@ const SCENE_NAMES = [
   'title', 'main-menu', 'nari-new', 'pitcher-new', 'season-new', 'nari-management', 'nari-outing', 'pitcher-management',
   'season-management', 'season-outing', 'general-quick', 'general-bat', 'general-pitch', 'general-defense', 'derby-pick', 'derby-start',
   'nari-burst-result', 'pitcher-pitch', 'pitcher-defense', 'general-relay', 'mission-bat', 'mission-pitch', 'mission-result', 'season-postseason', 'season-cup',
-  'season-ending', 'nari-postseason', 'nari-cup', 'nari-ending', 'nari-hall-of-fame', 'pitcher-postseason', 'pitcher-cup', 'pitcher-cup-result',
+  'season-ending', 'nari-postseason', 'nari-cup', 'nari-cup-result', 'nari-ending', 'nari-hall-of-fame', 'pitcher-postseason', 'pitcher-cup', 'pitcher-cup-result',
   'pitcher-ending', 'pitcher-hall-of-fame',
 ]
 

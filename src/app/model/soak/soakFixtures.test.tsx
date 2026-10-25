@@ -369,7 +369,6 @@ async function captureNari(seed: number): Promise<Capture[]> {
   let trainingSlot = 0
   let done = false
   /** 마지막으로 이벤트(114)가 선 순간의 저장 — 134 로 곧장 이어하는 저장이 웹에 없어 그 앞 이벤트 저장을 쓴다(아래 '국가대항전') */
-  let lastEventStorage: { readonly storage: Record<string, unknown>; readonly eventId: number; readonly at: string } | null = null
   try {
     await import('@/shared/config/original/events')
     for (let steps = 0; steps < 600_000 && !done; steps += 1) {
@@ -461,7 +460,6 @@ async function captureNari(seed: number): Promise<Capture[]> {
           break
         }
         case '이벤트': {
-          lastEventStorage = { storage: snapshotStorage(), eventId: screen.eventId, at: where() }
           const playback = careerEventPlaybackOf(session.storyEvents ?? [], screen.eventId, (eventId, left) => {
             act(() => result.current.session.actions.confirmEventChoice(eventId, left))
           })
@@ -485,17 +483,24 @@ async function captureNari(seed: number): Promise<Capture[]> {
           else act(() => actions.pressPostseason())
           break
         case '국가대항전': {
-          // ⚠️ 134 에 선 순간의 저장은 이어하기가 134 로 안 간다 — 타자편 `resumePointOf` 가 S+0x12c(대회 칸)보다 S+0xb4(끝난 포스트시즌 ·
-          // g == 0 → 392)를 먼저 봐 연말 사슬을 다시 튼다(투수편 `pitcherResumePointOf` 는 S+0x12c 를 먼저 본다 — r236 이 찾음, 고치지 않음).
-          // 그래서 134 바로 앞 이벤트(대표 선발 461~463)가 선 순간의 저장을 뜬다 — 이어하기가 그 이벤트를 다시 틀고, 넘기면 134 가 선다
-          if (!has('nari-cup') && lastEventStorage !== null) {
+          // 134 에 선 순간 — 463 끝 0x8cd44 저장(S+0x50 = 3 · S+0x12c = 1 · 대회 칸). 이어하기 0x1c154 의 그 밖 갈래는 S+0x12c 를
+          // S+0xb4(끝난 포스트시즌)보다 먼저 봐 134 로 돌아온다(1c346~1c364 — r241 이 고침, 전엔 392 로 갔다)
+          if (!has('nari-cup')) {
             captures.push({
               name: 'nari-cup',
-              note: `나리 타자편 ${lastEventStorage.at} 국가대항전 134 바로 앞 — 대표 선발 이벤트 ${lastEventStorage.eventId}(114)가 선 순간의 저장.`
-                + ' 이어하기(continueSaved)가 그 이벤트를 다시 틀고 OK 로 넘기면 134 대진판(칭호 8 팝업)이 선다.'
-                + ' 134 에 선 뒤의 저장은 타자편 이어하기가 392(연말 사슬)로 가서 쓰지 않았다(resumePointOf 가 S+0x12c 보다 S+0xb4 를 먼저 본다 — 투수편과 다르다).'
-                + ` r236 soak(src/app/model/soak/soakFixtures.test.tsx, 씨앗 ${seed} · careerSoak 의 정책)이 실제 저장 모듈(createLocalStorageSaveGame)이 쓴 칸을 떴다`,
-              storage: lastEventStorage.storage,
+              note: `나리 타자편 ${where()} 국가대항전 134 진입 — 463 끝 저장(S+0x50 = 3 · S+0x12c = 1 · 대회 칸)이라 이어하기(continueSaved)의`
+                + ' 그 밖 갈래가 S+0x12c 를 S+0xb4 보다 먼저 봐(0x1c154 1c346~1c364) 134 대진판(히든 팀 · 칭호 8 팝업)으로 돌아온다.'
+                + ` r236 soak(src/app/model/soak/soakFixtures.test.tsx, 씨앗 ${seed} · careerSoak 의 정책)이 134 가 처음 선 순간 실제 저장 모듈(createLocalStorageSaveGame)이 쓴 칸을 떴다 (r241 다시 뜸)`,
+              storage: snapshotStorage(),
+            })
+          }
+          if (!has('nari-cup-result') && isCupDecided(screen.cup)) {
+            captures.push({
+              name: 'nari-cup-result',
+              note: `나리 타자편 ${where()} 국가대항전 134 — 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 이어하기가 134 대진판에 돌아와`
+                + ` 대진판 확인(OK)이 결과 팝업 0x25 를 띄운다 (한국 ${screen.cup.champion === KOREA_TEAM_ID ? '우승' : '탈락'}).`
+                + ` r241 soak(soakFixtures.test.tsx, 씨앗 ${seed})이 실제 저장 모듈이 쓴 칸을 떴다`,
+              storage: snapshotStorage(),
             })
           }
           act(() => actions.confirmCupTitle())
@@ -823,6 +828,7 @@ async function resumedPlaceOf(capture: Capture): Promise<string> {
       await Promise.resolve()
     })
     const { screen } = rendered.result.current
+    if (screen.kind === '국가대항전') return `타자편 국가대항전${isCupDecided(screen.cup) ? ' 끝남' : ''}`
     return `타자편 ${screen.kind}${screen.kind === '이벤트' ? ` ${screen.eventId}` : ''}`
   } finally {
     rendered.unmount()
@@ -833,7 +839,8 @@ async function resumedPlaceOf(capture: Capture): Promise<string> {
 const EXPECTED_RESUME: Readonly<Record<string, string | RegExp>> = {
   'season-ending': `시즌 0x${SEASON_SCENE_STATE.엔딩.toString(16)}`,
   'nari-postseason': '타자편 포스트시즌',
-  'nari-cup': /^타자편 이벤트 \d+$/,
+  'nari-cup': '타자편 국가대항전',
+  'nari-cup-result': '타자편 국가대항전 끝남',
   'nari-ending': /^타자편 이벤트 \d+$/,
   'nari-hall-of-fame': '타자편 엔딩',
   'pitcher-postseason': '투수편 포스트시즌',
@@ -875,11 +882,11 @@ describe.runIf(isEnabled)('soak 로 e2e 픽스처 뜨기 (SOAK_FIXTURE=1)', () =
     await checkAndWrite([capture])
   }, 600_000)
 
-  it('나리 타자편 포스트시즌 128 · 국가대항전 134 앞 · 엔딩 141 · 명예의 전당 등록 앞', async () => {
+  it('나리 타자편 포스트시즌 128 · 국가대항전 134(진입 · 끝난 대진판) · 엔딩 141 · 명예의 전당 등록 앞', async () => {
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] })
     const captures = await captureNari(NARI_SEED)
     vi.useRealTimers()
-    expect(captures.map((capture) => capture.name).sort()).toEqual(['nari-cup', 'nari-ending', 'nari-hall-of-fame', 'nari-postseason'])
+    expect(captures.map((capture) => capture.name).sort()).toEqual(['nari-cup', 'nari-cup-result', 'nari-ending', 'nari-hall-of-fame', 'nari-postseason'])
     await checkAndWrite(captures)
   }, 1_200_000)
 
