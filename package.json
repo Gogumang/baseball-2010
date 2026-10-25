@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "verify": "yarn typecheck && yarn test && yarn build",
-    "test:browser": "vitest run --config vitest.browser.config.ts"
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "e2e:hits": "node e2e/hits.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

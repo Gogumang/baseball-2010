@@ -97,6 +97,9 @@ export async function bootSceneShortcut(): Promise<void> {
       throw new Error(`장면이 없다: ${scene} (있는 것: ${Object.keys(SCENES).join(', ')})`)
     }
     if (fixture !== null && fixture !== 'none') await applyFixture(fixture)
+    // `&seed=<수>` · 장면 표의 `seed` — 픽스처의 부팅 씨앗 대신(난수로만 닿는 장면 · 씨앗 찾기). 난수 차례는 그대로다
+    const seed = params.get('seed') ?? (scene === null ? undefined : SCENES[scene]?.seed?.toString())
+    if (seed !== null && seed !== undefined && Number.isFinite(Number(seed))) setDevBootSeed(Number(seed))
     if (scene === null) report({ status: 'ready' })
   } catch (error) {
     report({ status: 'error', error: String(error) })
@@ -140,6 +143,10 @@ async function runStep(step: SceneStep): Promise<void> {
     for (let waited = 0; waited < step.timeoutMs; waited += step.everyMs) {
       const handles = sceneHandlesNow()
       if (handles !== null && step.test(handles)) return
+      if (handles !== null && step.holdWhen?.(handles) === true) {
+        await sleep(step.everyMs)
+        continue
+      }
       await pressKey(step.key)
       await sleep(Math.max(0, step.everyMs - 120))
     }
