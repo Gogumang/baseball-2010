@@ -116,6 +116,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     phaseEntryRef,
     hitSkipKeyTickRef,
     keyLatch,
+    shownTicks,
     resultTextRef,
     homeRunStartTickRef,
     swingStartTickRef,
@@ -1013,6 +1014,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         const particleContext = effectContextOf(layers.particles.current)
         if (particleContext !== null) renderSettlementLayer(particleContext, { particles: isParticleGated ? null : particlesRef.current })
       }
+      // 이 틱의 그림이 화면에 섰다(입력이 같아 건너뛴 그림도 캔버스에 남은 그림이 이 틱 그림이다) — 이 뒤에 난 키는 이 틱을 보고 누른 것이다
+      // (`shownSceneTicks` — 원본은 키를 받은 틀 = 마지막으로 그린 틀)
+      shownTicks.mark(sceneTick, performance.now())
 
       animationHandle = requestAnimationFrame(frame)
     }
@@ -1021,6 +1025,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     animationHandle = requestAnimationFrame(frame)
     return () => {
       cancelAnimationFrame(animationHandle)
+      shownTicks.clear()
       // 부품이 내려가면 미리 적은 0x10 · 0x11 예약은 서지 않는다(지난 칸과 이미 정한 0x12 · 0x13 · 0x17 은 남는다 — 판정이 낸 것)
       if (phaseRef.current === '대기') cancelSceneStateEntriesAfter(gameSceneTickNow(), PRE_PITCH_STATES)
       releaseKeyOwner()
@@ -1039,6 +1044,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       phaseStartTickRef.current = gameSceneTickNow()
       phaseEntryRef.current = null
       keyLatch.clear()
+      shownTicks.clear()
       hitSkipKeyTickRef.current = null
       pitchRef.current = null
       buntRef.current = null

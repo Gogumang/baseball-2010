@@ -1,15 +1,16 @@
 import { useEffect } from 'react'
 import type { PointerEvent } from 'react'
 import type { SceneKeyKind } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
-import { gameSceneNow, gameSceneTickNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 화면 좌우 이 비율 안쪽을 누르면 타자를 옮긴다 (모바일용, 웹판 추가) */
 const SHIFT_EDGE_RATIO = 0.25
 
 export interface StageActions {
-  /** 스윙 키 — `tick` 은 키를 받은 경기 장면 틱(`gameSceneTickNow`) */
+  /** 스윙 키 — `tick` 은 키를 받은 경기 장면 틱 — 키 사건이 난 때 화면에 있던 그림의 틱(`shownSceneTicks`) */
   readonly swing: (tick: number) => void
   /** 번트 키 누름 — 0x6a7 (`BattingStage` 의 `pressBunt`) */
   readonly pressBunt: (kind: number, tick: number) => void
@@ -50,10 +51,13 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
    * 키는 받은 그 자리에서 처리하지 않고 키 칸(`keyLatch`)에 든다 — 원본은 키 콜백이 [+0x20] 에 적기만 하고 다음 틀의 0xbca05 →
    * 키 0x498d4(52d9e)가 진입(52cdc) 뒤 · 갱신(52e14) 앞에서 처리한다. 루프(`useStageAnimation`)가 그 자리에서 꺼낸다.
    * 각 동작은 받은 장면 틱 `tick` 을 받는다 — 스윙 예약의 공 틱(`keyTickOf` = 보이던 공 틱 + 1)은 그 틱으로 센다.
+   * 받은 틱은 **키 사건이 난 시각에 화면에 있던 그림의 틱**이다(`keyLatch.tickAt` — 원본은 키를 받은 틀 = 마지막으로 그린 틀). 손잡이가
+   * 돈 때의 시각 틱으로 세면 그리기 · 주 스레드가 밀린 만큼(한두 틱) 늦게 누른 것이 된다 (r211)
    */
-  const latch = (apply: (tick: number) => void, kind: SceneKeyKind = 'press') => {
-    const tick = gameSceneTickNow()
-    keyLatch.push(() => apply(tick), kind)
+  const latch = (event: Event, apply: (tick: number) => void, kind: SceneKeyKind = 'press') => {
+    const inputTime = inputTimeOf(event)
+    const tick = keyLatch.tickAt(inputTime)
+    keyLatch.push(() => apply(tick), kind, inputTime)
   }
 
   useEffect(() => {
@@ -64,23 +68,23 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       if (isGameSceneFrozen()) return
       if (SWING_KEYS.has(event.key)) {
         event.preventDefault()
-        latch((tick) => actions.swing(tick))
+        latch(event, (tick) => actions.swing(tick))
       } else if (event.key === SPECIAL_SWING_KEY) {
         // 필살타법 — 화면이 손잡이를 안 넘겼으면 원본 키만 받아 두고 아무 일도 하지 않는다
         if (actions.specialSwing === undefined) return
         event.preventDefault()
         const { specialSwing } = actions
-        latch((tick) => specialSwing(tick))
+        latch(event, (tick) => specialSwing(tick))
       } else if (LEFT_KEYS.has(event.key)) {
         event.preventDefault()
         // 좌우 이동 0x53470 → 0x6a4 → 0x50f86 은 키 처리 안에서 +0xfe4 를 바로 고친다 — 다음 틀의 키 자리에서 바뀌고 그 틀부터 그린다
-        latch(() => actions.moveBatter(-1))
+        latch(event, () => actions.moveBatter(-1))
       } else if (RIGHT_KEYS.has(event.key)) {
         event.preventDefault()
-        latch(() => actions.moveBatter(1))
+        latch(event, () => actions.moveBatter(1))
       } else if (BUNT_KEYS[event.key] !== undefined && latestRef.current.canBunt) {
         const kind = BUNT_KEYS[event.key]
-        latch((tick) => actions.pressBunt(kind, tick))
+        latch(event, (tick) => actions.pressBunt(kind, tick))
       }
     }
     // 0x5364c — 뗀 키가 '7'~'9' 면 0x6a8 (종류를 가리지 않는다).
@@ -92,7 +96,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
     const onKeyUp = (event: KeyboardEvent) => {
       if (BUNT_KEYS[event.key] === undefined || isGameSceneFrozen()) return
       // 뗌 [+0x24] 도 다음 틀의 0xbca05(bcaf0~) → 0x5364c 가 읽는다 — 뗌 칸도 하나라 한 틀의 마지막 뗌만, 누름 뒤에 처리된다
-      latch((tick) => actions.releaseBunt(tick), 'release')
+      latch(event, (tick) => actions.releaseBunt(tick), 'release')
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -118,9 +122,9 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       if (isGameSceneFrozen()) return
       const bounds = event.currentTarget.getBoundingClientRect()
       const x = ((event.clientX - bounds.left) / bounds.width) * STAGE_WIDTH
-      if (x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return latch(() => actions.moveBatter(-1))
-      if (x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)) return latch(() => actions.moveBatter(1))
-      latch((tick) => actions.swing(tick))
+      if (x < STAGE_WIDTH * SHIFT_EDGE_RATIO) return latch(event.nativeEvent, () => actions.moveBatter(-1))
+      if (x > STAGE_WIDTH * (1 - SHIFT_EDGE_RATIO)) return latch(event.nativeEvent, () => actions.moveBatter(1))
+      latch(event.nativeEvent, (tick) => actions.swing(tick))
     },
   }
 }

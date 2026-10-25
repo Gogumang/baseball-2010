@@ -22,6 +22,9 @@ import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { createSceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { createShownSceneTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
+import type { ShownSceneTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
+import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -326,6 +329,11 @@ export interface StageRefs {
    * 갱신 앞(52d9e 키 0x498d4 자리)에서 꺼내 처리한다. 화면이 받은 도루 키도 이 칸에 든다(`pushSceneKey`)
    */
   readonly keyLatch: SceneKeyLatch
+  /**
+   * 루프가 그린 그림의 (시각, 장면 틱) 기록 — 키는 사건이 난 시각에 화면에 있던 그림의 틱으로 받는다(`keyLatch` 의 `tickAt`).
+   * 원본은 키를 받은 틀이 마지막으로 그린 틀이다 — 웹은 그리기가 밀려도 사람이 본 그림으로 센다 (r211)
+   */
+  readonly shownTicks: ShownSceneTicks
   readonly latestRef: MutableRefObject<StageLatest>
 }
 
@@ -363,7 +371,11 @@ export function useStageRefs(latest: StageLatest): StageRefs {
     particlesRef: useRef<ParticleScene>(sceneParticleScene()),
     inPlayEnteredTickRef: useRef<number | null>(null),
     pointerDownAtRef: useRef(0),
-    keyLatch: useState(() => createSceneKeyLatch())[0],
+    ...useState(() => {
+      const shownTicks = createShownSceneTicks()
+      const keyLatch = createSceneKeyLatch(gameSceneTickNow, (inputTime) => shownTicks.tickSeenAt(inputTime, gameSceneTickNow()))
+      return { keyLatch, shownTicks }
+    })[0],
     latestRef,
   }
 }

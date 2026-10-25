@@ -124,3 +124,76 @@ describe('타자편 스윙 키 틱 — F = 보이던 공 틱 + 1 (0x52c50 차례
     장면내림()
   })
 })
+
+/**
+ * **그리기 · 키 손잡이가 밀려도 F = 누를 때 보이던 공 틱 + 1** (r211 — 웹판 전용 지연).
+ *
+ * 원본은 키를 받은 틀이 마지막으로 그린 틀이다. 웹의 장면 틱은 실제 시각에서 세므로, 그리기가 밀리면(느린 기기 · 30Hz 절전) 시각으로는
+ * 다음 틱인데 화면은 앞 그림이고, 주 스레드가 바쁘면 키 손잡이가 새 그림 뒤에 돈다. 손잡이 때의 시각 틱으로 세면 한두 틱 늦게 누른 것이
+ * 된다(headless 측정: 그리기 50ms 막힘에서 60% 가 두 틱 늦음). 키는 사건 시각 앞에 마지막으로 그린 그림의 틱으로 센다(`shownSceneTicks`).
+ */
+describe('타자편 스윙 키 틱 — 그리기가 밀려도 사람이 본 그림으로 센다 (r211)', () => {
+  const 띄우기 = (seed: number) =>
+    render(
+      <BattingStage
+        batterAbility={ROOKIE_BATTER_ABILITY}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        isEagleEyeEnabled={false}
+        hud={null}
+        acePitcher={null}
+        isPaused={false}
+        skyRow={2}
+        random={createSeededRandom(seed)}
+        onPitchResolved={vi.fn()}
+      />,
+    )
+  /** 키 사건 — 사건 시각(`timeStamp`)을 `pressedAt` 으로 */
+  const 키 = (pressedAt: number) => {
+    const event = new KeyboardEvent('keydown', { key: ' ' })
+    Object.defineProperty(event, 'timeStamp', { value: pressedAt })
+    act(() => void window.dispatchEvent(event))
+  }
+  /** 공 끝 `back` 틱 앞 그림이 설 때까지 틀을 그린다 — 그 그림을 그린 시각을 돌려준다 */
+  const 그때까지 = (back: number, 틀간격: number) => {
+    for (let index = 1; index < 2000; index += 1) {
+      const at = index * 틀간격
+      그림(at)
+      const last = drawn.at(-1)
+      if (last?.pitch && last.frame >= 0 && last.frame === last.pitch.frameCount - back) return { at, frame: last.frame }
+    }
+    throw new Error('공이 안 섰다')
+  }
+  const 틱 = millisecondsPerFrame()
+
+  it('그림이 밀려 시각으로는 한두 틱 뒤에 눌러도 — F 는 화면에 있던 공 틱 + 1', () => {
+    const 장면내림 = markGameSceneUp()
+    띄우기(20101025 + 3)
+    const 틀간격 = 틱 / 4 + 0.37
+    const 본 = 그때까지(3, 틀간격)
+    // 다음 그림이 1.6 틱 동안 안 온다(그리기 밀림) — 그 사이 누른다. 손잡이 때의 시각 틱은 본 틱보다 1 뒤다
+    clock = 본.at + 틱 * 1.6
+    키(clock)
+    for (let index = 1; index < 200 && judged.length === 0; index += 1) 그림(clock + index * 틀간격)
+    expect(judged).toHaveLength(1)
+    expect(judged[0].frame).toBe(본.frame + 1)
+    장면내림()
+  })
+
+  it('누른 뒤 손잡이가 새 그림보다 늦게 돌아도(주 스레드 막힘) — 누를 때 보이던 그림의 틱으로 센다', () => {
+    const 장면내림 = markGameSceneUp()
+    띄우기(20101025 + 2)
+    // 30Hz 쯤 — 한 틀이 틱 반
+    const 틀간격 = 틱 / 2 + 0.37
+    const 본 = 그때까지(3, 틀간격)
+    const 누른때 = 본.at + 1
+    // 키 사건이 줄에 선 사이 다음 그림(본 틱 + 1)이 먼저 섰다
+    그림(본.at + 틱 + 0.5)
+    expect(drawn.at(-1)?.frame).toBe(본.frame + 1)
+    clock = 본.at + 틱 + 3
+    키(누른때)
+    for (let index = 1; index < 200 && judged.length === 0; index += 1) 그림(clock + index * 틀간격)
+    expect(judged).toHaveLength(1)
+    expect(judged[0].frame).toBe(본.frame + 1)
+    장면내림()
+  })
+})

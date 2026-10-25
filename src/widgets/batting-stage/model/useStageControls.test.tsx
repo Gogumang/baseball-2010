@@ -247,3 +247,35 @@ describe('화면 탭 (웹판 추가) — 손가락이 닿는 순간 키 하나',
     expect(손잡이.swing).not.toHaveBeenCalled()
   })
 })
+
+describe('받은 틱 — 키 사건이 난 때 화면에 있던 그림의 틱 (r211)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    resetCommonWindowShownForTest()
+  })
+
+  it('키 · 화면 탭 모두 사건 시각(timeStamp)을 칸의 셈(`tickAt`)에 넘긴다', () => {
+    vi.spyOn(performance, 'now').mockReturnValue(1000)
+    const 손잡이: StageActions = { swing: vi.fn(), pressBunt: vi.fn(), releaseBunt: vi.fn(), moveBatter: vi.fn() }
+    const 받은시각: number[] = []
+    칸 = createSceneKeyLatch(() => 16, (time) => {
+      받은시각.push(time)
+      return 14
+    })
+    const { result } = renderHook(() => useStageControls(가짜refs(true), 손잡이))
+    const event = new KeyboardEvent('keydown', { key: '5' })
+    Object.defineProperty(event, 'timeStamp', { value: 930 })
+    window.dispatchEvent(event)
+    runSceneKeys(칸, 15)
+    expect(손잡이.swing).toHaveBeenCalledWith(14)
+    expect(받은시각).toContain(930)
+    const canvas = document.createElement('canvas')
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 240, height: 320 }) as DOMRect
+    result.current.onPointerDown({
+      preventDefault: () => {}, button: 0, clientX: 120, currentTarget: canvas, nativeEvent: { timeStamp: 960 },
+    } as never)
+    runSceneKeys(칸, 15)
+    expect(손잡이.swing).toHaveBeenCalledTimes(2)
+    expect(받은시각).toContain(960)
+  })
+})
