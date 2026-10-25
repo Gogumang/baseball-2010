@@ -26,6 +26,7 @@ import {
 } from '@/shared/config/original/aceOpen'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
+import { aceCellUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
 
 /** 저장 칸 10개 — `mgr[0x30]`~`mgr[0x39]` (윗줄 0~4 마투수 · 아랫줄 5~9 마타자) */
 export const ACE_OPEN_CELL_COUNT = ACE_PER_ROLE * 2
@@ -60,9 +61,19 @@ export function normalizeAceOpenSave(raw: unknown): AceOpenSave {
 /** 새 저장 — 기본 개방 둘만 켜져 있다 */
 export const INITIAL_ACE_OPEN_SAVE: AceOpenSave = normalizeAceOpenSave(null)
 
-/** 이 칸이 열려 있나 */
+/** 이 칸이 저장에서 열려 있나 (원본 판정 `mgr[0x30 + 칸] != 0`) — 해금 기록 쪽(새로 열렸나)은 이것을 본다 */
 export function isAceCellOpen(save: AceOpenSave, cell: number): boolean {
   return save.cells[cell] === true
+}
+
+/**
+ * 화면 · 고르기가 보는 열림 — 해금 표(`unlocks.json`)가 풀면 열린 칸이다. 저장은 바꾸지 않는다.
+ * 칸 0 싸이커 · 5 메디카는 표에 없다(기본 개방 — 저장 값 그대로 늘 참).
+ */
+export function isAceCellUnlocked(save: AceOpenSave, cell: number): boolean {
+  const unlockId = aceCellUnlockIdOf(cell)
+  const original = () => isAceCellOpen(save, cell)
+  return unlockId === null ? original() : isUnlocked(unlockId, original)
 }
 
 /** 열린 마투수 — 화면이 받는 로컬 번호 0~4 (저장 +0x30..0x34) */
@@ -77,7 +88,7 @@ export function aceBatterIdsOf(save: AceOpenSave): readonly number[] {
 
 function openedIdsOf(save: AceOpenSave, phase: AcePhase): readonly number[] {
   return save.cells
-    .map((open, cell) => (open && aceRoleOfCell(cell) === phase ? aceIndexOfCell(cell) : null))
+    .map((_open, cell) => (isAceCellUnlocked(save, cell) && aceRoleOfCell(cell) === phase ? aceIndexOfCell(cell) : null))
     .filter((index): index is number => index !== null)
 }
 
@@ -96,7 +107,7 @@ export function aceOpenPriceOf(cell: number): number {
 export type AceOpenAnswer = '오픈' | 'G부족' | '못여는칸' | '이미열림'
 
 export function aceOpenAnswerOf(save: AceOpenSave, cell: number, gamePoint: number): AceOpenAnswer {
-  if (isAceCellOpen(save, cell)) return '이미열림'
+  if (isAceCellUnlocked(save, cell)) return '이미열림'
   if (!aceOpensWithGamePoint(cell)) return '못여는칸'
   return gamePoint < aceOpenPriceOf(cell) ? 'G부족' : '오픈'
 }

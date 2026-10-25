@@ -3,6 +3,7 @@ import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbil
 import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import { EQUIPMENT_LEVEL_COUNT, FIRST_HIDDEN_LEVEL } from '@/entities/career/model/equipment'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
+import { isHiddenUnlocked } from '@/shared/config/unlocks'
 
 /**
  * 나만의리그 **투수편(모드 3) 장비** — 타자편 `entities/career/model/equipment.ts` 와 **같은 코드**가
@@ -118,7 +119,9 @@ const isCollector = (career: PitcherCareer, part: number) =>
  */
 export function isPitcherHiddenOpen(career: PitcherCareer, part: number, level: number): boolean {
   if (level < FIRST_HIDDEN_LEVEL) return true
-  return career.openedHiddenIds.includes(pitcherHiddenOpenIdOf(part, level))
+  const id = pitcherHiddenOpenIdOf(part, level)
+  // 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다 — 저장의 전역 해금표는 그대로다
+  return isHiddenUnlocked(id, () => career.openedHiddenIds.includes(id))
 }
 
 export type PitcherEquipmentBlockReason = '미오픈' | '이미보유' | '인기도부족' | '소지금부족'

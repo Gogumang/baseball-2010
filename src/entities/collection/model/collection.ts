@@ -12,6 +12,7 @@ import { FIRST_HIDDEN_LEVEL, hiddenOpenIdOf, ownsEquipment } from '@/entities/ca
 import { ownsPitcherEquipment, pitcherHiddenOpenIdOf } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { EMPTY_ANNALS_STATS, normalizeAnnalsStats } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
+import { hallOfFameSlotUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
 
 /**
  * 스페셜 메뉴의 기록연감·명예의 전당 (StrHOWTO[28]). 선수 한 명이 아니라 게임 전체에 쌓인다.
@@ -258,16 +259,23 @@ export type HallOfFameSide = '투수' | '타자'
  * 투수 칸 1~4 → 번호 0~3, 타자 칸 6~9·11~14 → 0~7. 열림은 기본 개방(투수 2 · 타자 4)뿐이다.
  */
 export function firstEmptyHallOfFameSlot(collection: Collection, side: HallOfFameSide): number | null {
-  const open = side === '투수' ? HALL_OF_FAME_OPEN_PITCHERS : HALL_OF_FAME_OPEN_BATTERS
-  for (let slot = 0; slot < open; slot += 1) {
+  const max = side === '투수' ? HALL_OF_FAME_MAX_PITCHERS : HALL_OF_FAME_MAX_BATTERS
+  for (let slot = 0; slot < max; slot += 1) {
+    if (!isHallOfFameSlotOpen(side, slot)) continue
     const taken = side === '투수' ? hallOfFamePitcherAt(collection, slot) : hallOfFameBatterAt(collection, slot)
     if (taken === null) return slot
   }
   return null
 }
 
+/**
+ * 칸이 열려 있나 — 원본은 기본 개방(투수 2 · 타자 4)뿐이다. 해금 표(`unlocks.json`)가 풀면 나머지 칸(현금 슬롯 🌐)도 연다.
+ * 열림 깃발(g+0x80 · g+0x88)을 저장에 쓰지 않고 판정할 때만 푼다.
+ */
 export function isHallOfFameSlotOpen(side: HallOfFameSide, slot: number): boolean {
-  return slot >= 0 && slot < (side === '투수' ? HALL_OF_FAME_OPEN_PITCHERS : HALL_OF_FAME_OPEN_BATTERS)
+  const original = () => slot >= 0 && slot < (side === '투수' ? HALL_OF_FAME_OPEN_PITCHERS : HALL_OF_FAME_OPEN_BATTERS)
+  const unlockId = hallOfFameSlotUnlockIdOf(side, slot)
+  return unlockId === null ? original() : isUnlocked(unlockId, original)
 }
 
 /**

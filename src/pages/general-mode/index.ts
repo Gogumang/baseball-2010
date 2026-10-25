@@ -48,7 +48,7 @@ export type { AceOpenSession } from '@/pages/general-mode/model/useAceOpen'
 export {
   ACE_OPEN_CELL_COUNT, ACE_OPEN_SHORTAGE_POPUP, INITIAL_ACE_OPEN_SAVE,
   aceBatterIdsOf, aceOpenAnswerOf, aceOpenPriceOf, acePitcherIdsOf,
-  isAceCellOpen, normalizeAceOpenSave, openAceCell,
+  isAceCellOpen, isAceCellUnlocked, normalizeAceOpenSave, openAceCell,
 } from '@/pages/general-mode/lib/aceOpenState'
 export type { AceOpenAnswer, AceOpenSave } from '@/pages/general-mode/lib/aceOpenState'
 

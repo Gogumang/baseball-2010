@@ -1,0 +1,710 @@
+{
+  "$comment": "해금 관리 표 — unlockAll 이 참이면 모두 풀린다. 항목 unlocked: true = 늘 풀림 · false = 원본 조건대로 · null = unlockAll 을 따른다(거짓이면 원본 조건). 저장에는 쓰지 않고 판정할 때만 푼다.",
+  "unlockAll": true,
+  "entries": [
+    {
+      "id": "ace-leony",
+      "kind": "acePlayer",
+      "name": "레오니",
+      "condition": "기록 '삼진 콤보 x3' 누계 14 · 또는 6000 G 로 오픈 — 전역 해금 k 0",
+      "source": "0x62234 · 0xa3f6",
+      "unlocked": null
+    },
+    {
+      "id": "ace-bbmachine",
+      "kind": "acePlayer",
+      "name": "붕붕머신",
+      "condition": "기록 '풀카운트 삼진' 누계 54 · 또는 9000 G 로 오픈 — 전역 해금 k 1",
+      "source": "0x62234 · 0xa3f6",
+      "unlocked": null
+    },
+    {
+      "id": "ace-ballantine",
+      "kind": "acePlayer",
+      "name": "발렌타인",
+      "condition": "기록 '퍼펙트게임' 누계 3 · 또는 12000 G 로 오픈 — 전역 해금 k 2",
+      "source": "0x62234 · 0xa3f6",
+      "unlocked": null
+    },
+    {
+      "id": "ace-dragona",
+      "kind": "acePlayer",
+      "name": "드래고나",
+      "condition": "온라인 선물함 \"히든 오픈\" 64비트 마스크 비트 3 (🌐 웹 이벤트 — G 오픈 불가 0xa68e · 기록 해금 표에 없음, U-05) — 전역 해금 k 3",
+      "source": "0x2bb48",
+      "unlocked": null
+    },
+    {
+      "id": "ace-kao",
+      "kind": "acePlayer",
+      "name": "어거지죠",
+      "condition": "기록 '도루 성공' 누계 54 · 또는 6000 G 로 오픈 — 전역 해금 k 4",
+      "source": "0x62234 · 0xa3f6",
+      "unlocked": null
+    },
+    {
+      "id": "ace-roze",
+      "kind": "acePlayer",
+      "name": "로제",
+      "condition": "기록 '솔로 홈런' 누계 54 · 또는 9000 G 로 오픈 — 전역 해금 k 5",
+      "source": "0x62234 · 0xa3f6",
+      "unlocked": null
+    },
+    {
+      "id": "ace-death",
+      "kind": "acePlayer",
+      "name": "크라이져",
+      "condition": "기록 '사이클링 히트' 누계 2 · 또는 12000 G 로 오픈 — 전역 해금 k 6",
+      "source": "0x62234 · 0xa3f6",
+      "unlocked": null
+    },
+    {
+      "id": "ace-tiger",
+      "kind": "acePlayer",
+      "name": "킹타이거",
+      "condition": "기록 '만루 홈런' 누계 54 (G 오픈 불가 0xa68e) — 전역 해금 k 7",
+      "source": "0x62234",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-team-korea",
+      "kind": "hiddenTeam",
+      "name": "대한민국",
+      "condition": "국가대항전 순위 화면 134 에 들어가면 열린다 — 전역 해금 k 8",
+      "source": "0x19f30 · 0xe684",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-team-japan",
+      "kind": "hiddenTeam",
+      "name": "일본",
+      "condition": "국가대항전에서 대한민국이 결승에서 일본을 이기고 우승 — 전역 해금 k 9",
+      "source": "0x19f30 · 0xe684",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-team-cuba",
+      "kind": "hiddenTeam",
+      "name": "쿠바",
+      "condition": "국가대항전에서 대한민국이 결승에서 쿠바를 이기고 우승 — 전역 해금 k 10",
+      "source": "0x19f30 · 0xe684",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-team-usa",
+      "kind": "hiddenTeam",
+      "name": "미국",
+      "condition": "국가대항전에서 대한민국이 결승에서 미국을 이기고 우승 — 전역 해금 k 11",
+      "source": "0x19f30 · 0xe684",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-team-outsiders",
+      "kind": "hiddenTeam",
+      "name": "외인구단",
+      "condition": "마선수 열 칸(전역 +0x30~+0x39)이 모두 열린 채 마선수 고르기 격자를 그린다 — 전역 해금 k 12",
+      "source": "0x7b408",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-13",
+      "kind": "stadiumItem",
+      "name": "트로피컬",
+      "condition": "시즌모드 관중석 기본 네 칸을 모두 보유(컬렉터, 0xa38c5) — 전역 해금 k 13",
+      "source": "0x81d0",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-14",
+      "kind": "stadiumItem",
+      "name": "콜로세움",
+      "condition": "명예의 전당 선수 선물 서버 요청이 성공 (🌐) — 전역 해금 k 14",
+      "source": "0x62b8e",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-15",
+      "kind": "stadiumItem",
+      "name": "스페이스",
+      "condition": "온라인 선물함이 받은 \"히든 오픈\" 64비트 마스크의 비트 15 (메인 메뉴 하위 31, 🌐 웹 이벤트 — 로컬 조건 없음) — 전역 해금 k 15",
+      "source": "0x2bd06",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-16",
+      "kind": "stadiumItem",
+      "name": "내추럴전광판",
+      "condition": "시즌모드 전광판 기본 네 칸을 모두 보유(컬렉터, 0xa38c5) — 전역 해금 k 16",
+      "source": "0x81d0",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-17",
+      "kind": "stadiumItem",
+      "name": "고대의전광판",
+      "condition": "나만의리그 명예의 전당 등록 — 전역 해금 k 17",
+      "source": "0x1ca4c",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-18",
+      "kind": "stadiumItem",
+      "name": "싸이키전광판",
+      "condition": "온라인 선물함이 받은 \"히든 오픈\" 64비트 마스크의 비트 18 (메인 메뉴 하위 31, 🌐 웹 이벤트 — 로컬 조건 없음) — 전역 해금 k 18",
+      "source": "0x2bd06",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-19",
+      "kind": "pitcherEquipment",
+      "name": "토끼 머리띠",
+      "condition": "타자편 이벤트 r_event 306 보상 종류 7 — 전역 해금 k 19",
+      "source": "0x8c626",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-20",
+      "kind": "pitcherEquipment",
+      "name": "해적 선장모",
+      "condition": "투수 장비 모자 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 20",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-21",
+      "kind": "pitcherEquipment",
+      "name": "사신의 두건",
+      "condition": "투수 미션 편별 올클리어 (0xa5184) — 전역 해금 k 21",
+      "source": "0x4ef86",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-22",
+      "kind": "pitcherEquipment",
+      "name": "로얄 크라운",
+      "condition": "온라인 선물함이 받은 \"히든 오픈\" 64비트 마스크의 비트 22 (메인 메뉴 하위 31, 🌐 웹 이벤트 — 로컬 조건 없음) — 전역 해금 k 22",
+      "source": "0x2bd06",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-23",
+      "kind": "pitcherEquipment",
+      "name": "청옥의글러브",
+      "condition": "기록 '삼구 삼진' 누계 100 이상에서 다시 달성 (기록달성 해금 표 0xd1ca8 k 16) — 전역 해금 k 23",
+      "source": "0x62234",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-24",
+      "kind": "pitcherEquipment",
+      "name": "해적의글러브",
+      "condition": "투수 장비 글러브 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 24",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-25",
+      "kind": "pitcherEquipment",
+      "name": "사신의글러브",
+      "condition": "대전모드 승리 수 > 49 (통신 받기, 🌐) — 전역 해금 k 25",
+      "source": "0x72802",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-26",
+      "kind": "pitcherEquipment",
+      "name": "황금의글러브",
+      "condition": "온라인 선물함이 받은 \"히든 오픈\" 64비트 마스크의 비트 26 (메인 메뉴 하위 31, 🌐 웹 이벤트 — 로컬 조건 없음) — 전역 해금 k 26",
+      "source": "0x2bd06",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-27",
+      "kind": "pitcherEquipment",
+      "name": "선글라스",
+      "condition": "온라인 선물함이 받은 \"히든 오픈\" 64비트 마스크의 비트 27 (메인 메뉴 하위 31, 🌐 웹 이벤트 — 로컬 조건 없음) — 전역 해금 k 27",
+      "source": "0x2bd06",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-28",
+      "kind": "pitcherEquipment",
+      "name": "스카우터",
+      "condition": "투수 장비 아대 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 28",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-29",
+      "kind": "pitcherEquipment",
+      "name": "사신의 눈",
+      "condition": "타자편 이벤트 r_event 307 보상 종류 7 — 전역 해금 k 29",
+      "source": "0x8c626",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-30",
+      "kind": "pitcherEquipment",
+      "name": "오페라마스크",
+      "condition": "기록 '트리플플레이' 누계 2 이상에서 다시 달성 (기록달성 해금 표 0xd1ca8 k 27) — 전역 해금 k 30",
+      "source": "0x62234",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-31",
+      "kind": "pitcherEquipment",
+      "name": "토끼털 신발",
+      "condition": "나만의리그 투수편 플레이 시간 10시간 초과 — 전역 해금 k 31",
+      "source": "0x4e8b0",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-32",
+      "kind": "pitcherEquipment",
+      "name": "선장의 신발",
+      "condition": "투수 장비 신발 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 32",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-33",
+      "kind": "pitcherEquipment",
+      "name": "사신의 신발",
+      "condition": "통계의 획득 GP 일곱 칸 합 > 99998 — 전역 해금 k 33",
+      "source": "0x4ecd8",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-34",
+      "kind": "pitcherEquipment",
+      "name": "황제의 신발",
+      "condition": "타자편 정규시즌 우승 팝업 닫힘 — 정규시즌 1위 횟수 S+0x7a > 4 — 전역 해금 k 34",
+      "source": "0x15c76",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-35",
+      "kind": "batterEquipment",
+      "name": "바이커 스컬",
+      "condition": "타자편 이벤트 r_event 305 보상 종류 7 — 전역 해금 k 35",
+      "source": "0x8c626",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-36",
+      "kind": "batterEquipment",
+      "name": "검투사 투구",
+      "condition": "타자 장비 헬멧 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 36",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-37",
+      "kind": "batterEquipment",
+      "name": "프라임 헬멧",
+      "condition": "타자 미션 편별 올클리어 (0xa5184) — 전역 해금 k 37",
+      "source": "0x4ef86",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-38",
+      "kind": "batterEquipment",
+      "name": "천상의 헬름",
+      "condition": "온라인 선물함이 받은 \"히든 오픈\" 64비트 마스크의 비트 38 (메인 메뉴 하위 31, 🌐 웹 이벤트 — 로컬 조건 없음) — 전역 해금 k 38",
+      "source": "0x2bd06",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-39",
+      "kind": "batterEquipment",
+      "name": "폭주의 배트",
+      "condition": "홈런더비 누적 비거리 > 1999 — 전역 해금 k 39",
+      "source": "0x52a14",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-40",
+      "kind": "batterEquipment",
+      "name": "글라디우스",
+      "condition": "타자 장비 배트 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 40",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-41",
+      "kind": "batterEquipment",
+      "name": "오토봇 배트",
+      "condition": "시즌모드·나리 투수편·나리 타자편 세 곳 모두 정규시즌 1위 한 번 이상 (오토봇 배트) — 전역 해금 k 41",
+      "source": "0x6900 · 0x15c4e",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-42",
+      "kind": "batterEquipment",
+      "name": "광휘의 배트",
+      "condition": "온라인 선물함이 받은 \"히든 오픈\" 64비트 마스크의 비트 42 (메인 메뉴 하위 31, 🌐 웹 이벤트 — 로컬 조건 없음) — 전역 해금 k 42",
+      "source": "0x2bd06",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-43",
+      "kind": "batterEquipment",
+      "name": "바이커 밴드",
+      "condition": "타자편 이벤트 r_event 304 보상 종류 7 — 전역 해금 k 43",
+      "source": "0x8c626",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-44",
+      "kind": "batterEquipment",
+      "name": "검투사 밴드",
+      "condition": "타자 장비 밴드 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 44",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-45",
+      "kind": "batterEquipment",
+      "name": "프라임 밴드",
+      "condition": "정규시즌 승리 수 +0xbf > 99 — 전역 해금 k 45",
+      "source": "0x4f210",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-46",
+      "kind": "batterEquipment",
+      "name": "천상의 밴드",
+      "condition": "기록 '백투백투백 홈런' 누계 2 이상에서 다시 달성 (기록달성 해금 표 0xd1ca8 k 7) — 전역 해금 k 46",
+      "source": "0x62234",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-47",
+      "kind": "batterEquipment",
+      "name": "바이커 부츠",
+      "condition": "나만의리그 타자편 플레이 시간 10시간 초과 — 전역 해금 k 47",
+      "source": "0x4e8b0",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-48",
+      "kind": "batterEquipment",
+      "name": "플레이트부츠",
+      "condition": "타자 장비 슈즈 레벨 0~6 을 모두 보유(컬렉터, 0xa5020) — 전역 해금 k 48",
+      "source": "0x14a74",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-49",
+      "kind": "batterEquipment",
+      "name": "트랜스폼부츠",
+      "condition": "G 선물 보내기 누계 > 29999 (통신, 🌐) — 전역 해금 k 49",
+      "source": "0x2a80a",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-item-50",
+      "kind": "batterEquipment",
+      "name": "이카로스슈즈",
+      "condition": "투수편 정규시즌 우승 팝업 닫힘 — 정규시즌 1위 횟수 S+0x7a > 4 — 전역 해금 k 50",
+      "source": "0x15c76",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-pitch-gyro",
+      "kind": "hiddenPitch",
+      "name": "자이로볼 (GYRO)",
+      "condition": "투수편 이벤트 33 (8년차 9경기~13년차 45경기 · 제구 400 · 구속 700 · 변화 400) 보상 종류 6 이 구질 훈련 표 0행 열 4 를 연다",
+      "source": "0x17912 · 0x8c460",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-pitch-power-sinker",
+      "kind": "hiddenPitch",
+      "name": "파워싱커 (P.SINKER)",
+      "condition": "투수편 이벤트 30 (5년차 9경기~13년차 45경기 · 제구 200 · 구속 250 · 변화 300) 보상 종류 6 이 구질 훈련 표 1행 열 4 를 연다",
+      "source": "0x17912 · 0x8c460",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-pitch-power-slider",
+      "kind": "hiddenPitch",
+      "name": "파워슬라이더 (P.SLIDER)",
+      "condition": "투수편 이벤트 31 (6년차 9경기~13년차 45경기 · 제구 250 · 구속 350 · 변화 250) 보상 종류 6 이 구질 훈련 표 2행 열 4 를 연다",
+      "source": "0x17912 · 0x8c460",
+      "unlocked": null
+    },
+    {
+      "id": "hidden-pitch-knuckle",
+      "kind": "hiddenPitch",
+      "name": "너클볼 (KNUCKLE)",
+      "condition": "투수편 이벤트 32 (7년차 9경기~13년차 45경기 · 제구 300 · 구속 400 · 변화 600) 보상 종류 6 이 구질 훈련 표 3행 열 4 를 연다",
+      "source": "0x17912 · 0x8c460",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-2",
+      "kind": "mission",
+      "name": "타자 미션 2",
+      "condition": "바로 앞 미션 1 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-3",
+      "kind": "mission",
+      "name": "타자 미션 3",
+      "condition": "바로 앞 미션 2 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-4",
+      "kind": "mission",
+      "name": "타자 미션 4",
+      "condition": "바로 앞 미션 3 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-5",
+      "kind": "mission",
+      "name": "타자 미션 5",
+      "condition": "바로 앞 미션 4 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-6",
+      "kind": "mission",
+      "name": "타자 미션 6",
+      "condition": "바로 앞 미션 5 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-7",
+      "kind": "mission",
+      "name": "타자 미션 7",
+      "condition": "바로 앞 미션 6 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-8",
+      "kind": "mission",
+      "name": "타자 미션 8",
+      "condition": "바로 앞 미션 7 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-9",
+      "kind": "mission",
+      "name": "타자 미션 9",
+      "condition": "바로 앞 미션 8 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-10",
+      "kind": "mission",
+      "name": "타자 미션 10",
+      "condition": "바로 앞 미션 9 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-11",
+      "kind": "mission",
+      "name": "타자 미션 11",
+      "condition": "바로 앞 미션 10 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-12",
+      "kind": "mission",
+      "name": "타자 미션 12",
+      "condition": "바로 앞 미션 11 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-13",
+      "kind": "mission",
+      "name": "타자 미션 13",
+      "condition": "바로 앞 미션 12 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-batter-14",
+      "kind": "mission",
+      "name": "타자 미션 14",
+      "condition": "바로 앞 미션 13 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-2",
+      "kind": "mission",
+      "name": "투수 미션 2",
+      "condition": "바로 앞 미션 1 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-3",
+      "kind": "mission",
+      "name": "투수 미션 3",
+      "condition": "바로 앞 미션 2 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-4",
+      "kind": "mission",
+      "name": "투수 미션 4",
+      "condition": "바로 앞 미션 3 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-5",
+      "kind": "mission",
+      "name": "투수 미션 5",
+      "condition": "바로 앞 미션 4 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-6",
+      "kind": "mission",
+      "name": "투수 미션 6",
+      "condition": "바로 앞 미션 5 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-7",
+      "kind": "mission",
+      "name": "투수 미션 7",
+      "condition": "바로 앞 미션 6 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-8",
+      "kind": "mission",
+      "name": "투수 미션 8",
+      "condition": "바로 앞 미션 7 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-9",
+      "kind": "mission",
+      "name": "투수 미션 9",
+      "condition": "바로 앞 미션 8 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-10",
+      "kind": "mission",
+      "name": "투수 미션 10",
+      "condition": "바로 앞 미션 9 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-11",
+      "kind": "mission",
+      "name": "투수 미션 11",
+      "condition": "바로 앞 미션 10 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-12",
+      "kind": "mission",
+      "name": "투수 미션 12",
+      "condition": "바로 앞 미션 11 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-13",
+      "kind": "mission",
+      "name": "투수 미션 13",
+      "condition": "바로 앞 미션 12 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "mission-pitcher-14",
+      "kind": "mission",
+      "name": "투수 미션 14",
+      "condition": "바로 앞 미션 13 을 처음 클리어 (0xa540c 가 다음 칸을 연다 · 판정 0xa520d 전역 +0x150/+0x160 ≥ 0)",
+      "source": "0x1db26",
+      "unlocked": null
+    },
+    {
+      "id": "hall-of-fame-pitcher-slot-3",
+      "kind": "hallOfFameSlot",
+      "name": "명예의 전당 투수 칸 3",
+      "condition": "현금 슬롯 구매 (StrCOMMON 44/45, 🌐) — 기본 개방은 투수 2 · 타자 4 칸",
+      "source": "0x62772 · 0x6282c",
+      "unlocked": null
+    },
+    {
+      "id": "hall-of-fame-pitcher-slot-4",
+      "kind": "hallOfFameSlot",
+      "name": "명예의 전당 투수 칸 4",
+      "condition": "현금 슬롯 구매 (StrCOMMON 44/45, 🌐) — 기본 개방은 투수 2 · 타자 4 칸",
+      "source": "0x62772 · 0x6282c",
+      "unlocked": null
+    },
+    {
+      "id": "hall-of-fame-batter-slot-5",
+      "kind": "hallOfFameSlot",
+      "name": "명예의 전당 타자 칸 5",
+      "condition": "현금 슬롯 구매 (StrCOMMON 53/54, 🌐) — 기본 개방은 투수 2 · 타자 4 칸",
+      "source": "0x62772 · 0x6282c",
+      "unlocked": null
+    },
+    {
+      "id": "hall-of-fame-batter-slot-6",
+      "kind": "hallOfFameSlot",
+      "name": "명예의 전당 타자 칸 6",
+      "condition": "현금 슬롯 구매 (StrCOMMON 53/54, 🌐) — 기본 개방은 투수 2 · 타자 4 칸",
+      "source": "0x62772 · 0x6282c",
+      "unlocked": null
+    },
+    {
+      "id": "hall-of-fame-batter-slot-7",
+      "kind": "hallOfFameSlot",
+      "name": "명예의 전당 타자 칸 7",
+      "condition": "현금 슬롯 구매 (StrCOMMON 53/54, 🌐) — 기본 개방은 투수 2 · 타자 4 칸",
+      "source": "0x62772 · 0x6282c",
+      "unlocked": null
+    },
+    {
+      "id": "hall-of-fame-batter-slot-8",
+      "kind": "hallOfFameSlot",
+      "name": "명예의 전당 타자 칸 8",
+      "condition": "현금 슬롯 구매 (StrCOMMON 53/54, 🌐) — 기본 개방은 투수 2 · 타자 4 칸",
+      "source": "0x62772 · 0x6282c",
+      "unlocked": null
+    },
+    {
+      "id": "annals-secret-pages",
+      "kind": "annalsPage",
+      "name": "기록연감 통계 숨은 쪽 (3~8쪽)",
+      "condition": "기록연감에서 비밀 번호 1212123 을 친다 (틀리면 메뉴를 다시 만들기 전까지 못 연다)",
+      "source": "0x2b7a0",
+      "unlocked": null
+    }
+  ]
+}

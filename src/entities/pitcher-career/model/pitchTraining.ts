@@ -2,6 +2,7 @@ import { BALANCE } from '@/shared/config/original/balance'
 import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { HIDDEN_PITCH_EVENTS } from '@/entities/pitcher-career/model/pitcherAbility'
+import { hiddenPitchUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
 
 /**
  * **구질 훈련** — 투수편 관리 화면에만 있는 칸이다 (J 3-2 확정).
@@ -120,7 +121,10 @@ export function meetsPitchTrainingPrerequisite(career: PitcherCareer, row: numbe
 }
 
 export function isHiddenPitchRowOpen(career: PitcherCareer, row: number): boolean {
-  return career.hiddenPitchRows[row] === true
+  // 해금 표(`unlocks.json`)가 풀면 열린 계열로 본다 — 이벤트가 여는 저장 칸(`hiddenPitchRows`)은 그대로다
+  const unlockId = hiddenPitchUnlockIdOf(row)
+  const original = () => career.hiddenPitchRows[row] === true
+  return unlockId === null ? original() : isUnlocked(unlockId, original)
 }
 
 /**

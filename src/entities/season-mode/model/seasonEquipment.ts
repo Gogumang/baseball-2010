@@ -1,5 +1,6 @@
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
+import { isHiddenUnlocked } from '@/shared/config/unlocks'
 
 /**
  * **시즌 장비 창 — 장면 0x105 상태 0xdc, 창 종류 3** (아이템 0xd0 → 장착아이템 → 선수 고르기 0xdf 목적 1 → 확인).
@@ -101,7 +102,9 @@ export function checkSeasonEquipment(
   level: number,
   isHiddenOpen: (id: number) => boolean,
 ): SeasonEquipmentCheck {
-  if (level >= SEASON_FIRST_HIDDEN_LEVEL && !isHiddenOpen(seasonEquipmentHiddenIdOf(target.isBatter, part, level))) {
+  // 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다 — 원본 판정 `isHiddenOpen` 은 그대로 감싼다
+  const hiddenId = seasonEquipmentHiddenIdOf(target.isBatter, part, level)
+  if (level >= SEASON_FIRST_HIDDEN_LEVEL && !isHiddenUnlocked(hiddenId, () => isHiddenOpen(hiddenId))) {
     return { ok: false, reason: '미오픈' }
   }
   if ((target.equipment[part] ?? 0) - 1 === level) return { ok: false, reason: '이미보유' }

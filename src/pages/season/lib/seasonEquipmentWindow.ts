@@ -3,6 +3,7 @@ import {
   SEASON_EQUIPMENT_LEVEL_COUNT, SEASON_FIRST_HIDDEN_LEVEL, seasonEquipmentHiddenIdOf, seasonEquipmentNameOf,
   seasonEquipmentPriceOf, seasonEquipmentRequiredPopularityOf,
 } from '@/entities/season-mode/model/seasonEquipment'
+import { isHiddenUnlocked } from '@/shared/config/unlocks'
 
 /**
  * **시즌 장비 창 0xdc · 창 종류 3** 의 그림 — 그리기 0xb1f8 b296~b346 (직접 떴다, 0x83378 은 에뮬레이터로 그리기 호출을 맞춰 봤다):
@@ -242,8 +243,12 @@ export function scrollThumbRectsOf(top: number, count: number = SEASON_EQUIPMENT
 /** 잠긴 히든 칸 이름 (0xd4c18) */
 export const LOCKED_ITEM_NAME = '????'
 
-const isLockedLevel = (isBatter: boolean, part: number, level: number, isHiddenOpen: (id: number) => boolean) =>
-  level >= SEASON_FIRST_HIDDEN_LEVEL && !isHiddenOpen(seasonEquipmentHiddenIdOf(isBatter, part, level))
+/** 잠긴 히든 칸 — 해금 표(`unlocks.json`)가 풀면 열린 칸으로 그린다 */
+const isLockedLevel = (isBatter: boolean, part: number, level: number, isHiddenOpen: (id: number) => boolean) => {
+  if (level < SEASON_FIRST_HIDDEN_LEVEL) return false
+  const hiddenId = seasonEquipmentHiddenIdOf(isBatter, part, level)
+  return !isHiddenUnlocked(hiddenId, () => isHiddenOpen(hiddenId))
+}
 
 /** 칸 이름 — 잠긴 히든 칸은 "????" */
 export function equipmentItemNameOf(isBatter: boolean, part: number, level: number, isHiddenOpen: (id: number) => boolean): string {
