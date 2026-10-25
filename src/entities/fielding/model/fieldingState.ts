@@ -296,7 +296,7 @@ export function runnerTeamGradeOf(mode: number, teamGrit: number): number {
 }
 
 /**
- * 플레이 시작 때의 야수 9명 (0xb0fb4 + 0xb0f88).
+ * 플레이 시작 때의 야수 9명 (판 시작 vt20 0xb0fb4 — 0xb0f88 은 부르는 BL · 리터럴이 없는 죽은 함수다, r190 · 감사 r220).
  * 능력치는 송구 속도·악송구·펌블·필살수비 확률에만 쓰이고 **이동 속도에는 전혀 안 들어간다** (P2 1c).
  * `teamBonus` 는 `defenseTeamBonusOf` — 아홉 칸(칸 0 포함) 모두의 송구 속도에 더한다(등급 · 악송구 보정은 그대로).
  */
