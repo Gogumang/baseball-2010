@@ -231,7 +231,7 @@ describe('나리 134 진입 — 히든 팀 오픈(0x19f30 → 0x65de4) · 칭호
       const 창 = screen.getByTestId('칭호-창')
       expect(창.querySelector('img')?.getAttribute('src')).toBe('./sprites/img_text/frames/369.png')
       act(() => { vi.advanceTimersByTime(1000) })
-      expect(창.querySelector('[data-part="조건"]')?.textContent).toBe('국가대표 첫 선발')
+      expect(창.querySelector('[data-part="조건"]')?.textContent).toBe('국가대표 첫 선발 ') // 원문 StrNICKNAME[72] 끝 빈칸(r223 생성기가 보존)
       expect(창.querySelector('[data-part="이름"]')?.textContent).toBe('"국가 대표"')
       expect(onConfirmEntryTitle).not.toHaveBeenCalled()
 
