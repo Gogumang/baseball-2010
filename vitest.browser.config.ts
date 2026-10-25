@@ -43,6 +43,7 @@ export default defineConfig({
   ...viteConfig,
   test: {
     include: ['src/**/*.browser.test.tsx'],
+    setupFiles: ['src/shared/lib/lazyScreen/preloadForTests.ts'],
     browser: {
       enabled: true,
       headless: true,
