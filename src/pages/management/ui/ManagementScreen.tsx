@@ -162,7 +162,6 @@ export function ManagementScreen(props: ManagementScreenProps) {
       {menu.playingMenuId !== null && (
         <div className={styles.trainingPopup}>
           <TrainingScene presentation={TRAINING_PRESENTATION_OF[menu.playingMenuId] ?? null}
-            caption={`${menu.playingMenuId}훈련`}
             // 장타형은 동작표가 따로다 (0xd4a18·0xd4a6c — F-6). 0 만 타격형이고 그 밖은 장타형이다
             battingTypeIndex={career.battingTypeIndex}
             // 손은 넘기지 않는다 — 0x10810 이 +0x3c 에 넣은 손을 진입 0x11744 가 1 로 덮어써 안 뒤집는다(11802~1181e)
