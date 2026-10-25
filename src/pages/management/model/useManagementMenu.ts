@@ -1,3 +1,4 @@
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
@@ -176,7 +177,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
       if (SUB_MENU_KINDS.includes(id)) return open(id as SubMenuKind, COMMAND_SLOTS.find((slot) => slot.id === id) ?? null)
       if (id === '휴식' && !props.isRestBlocked()) {
         // 팝업 0x2a "예" → 127 진입 0x190e4(연출 0x85230). 굴림 · 결과 창 · 저장(0x18e3c)은 연출이 끝난 틀이다(`finishRest`)
-        return ask('!C[!cFFFF00휴식!cFFFFFF]을 취하시겠습니까?', () => setRestPhase('playing'))
+        // StrMODE[90] — 0x1261c 12682~126bc 가 0x702b5([장면+0x144], 0x5a)로 꺼내는 글(투수편과 같다)
+        return ask(ORIGINAL_MODE_TEXT[90] ?? '', () => setRestPhase('playing'))
       }
       return props.onSelect(id as ManagementCommand)
     }

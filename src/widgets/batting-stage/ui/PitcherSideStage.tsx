@@ -65,6 +65,11 @@ interface PitcherSideStageProps {
   readonly cpuSwing?: CpuSwingPose | null
   /** 0x12 대기 틱 (0x4e6d4 — `resultWaitTicksOf`) */
   readonly resultTicks: number
+  /**
+   * 그 공의 0x12 진입 0x3dfac 가 판정 칸 [장면+0x10ac] 를 지웠나 — 낫아웃 갈래 3e0aa (`clearsPitchJudgement`). 서 있으면 0x12 틱 0 의
+   * 판정 글자 '삼진'과 그 양끝 파티클(39498)이 없다(`judgeTextOf`). 진행기가 공을 정할 때 공 도착까지 돌려 실어 준다. 안 넘기면 거짓
+   */
+  readonly isJudgementCleared?: boolean
   readonly hud: HudState | null
   /**
    * 마운드 투수 체력 % — 34 이하면 투수 자리에 체력 그림(player_effect 애니 9 · 10, 0x38d1c)을 그린다. 안 넘기면 안 그린다
@@ -521,7 +526,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       // 0x12 틱 0 의 그림 — 판정 글자 0x393b4 가 삼진이면 양끝 파티클(394b2 · 394d2). 틀이 틱 0 을 건너뛰었으면 그 뒤 첫 그림에서 한 번
       if (isResult && resolution !== null && !strikeoutShot) {
         strikeoutShot = true
-        for (const shot of strikeoutJudgeParticlesOf(judgeTextOf(resolution, endsAtBatOf(current.resultTicks)), side)) {
+        for (const shot of strikeoutJudgeParticlesOf(judgeTextOf(resolution, endsAtBatOf(current.resultTicks), current.isJudgementCleared === true), side)) {
           emitParticles(sceneParticleScene(), particleConfigOf(shot.id), shot.x, shot.y, shot.img)
         }
       }
@@ -583,7 +588,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         tick: nowTick,
         redrawTicks,
         resultTick: isResult ? stage.phase.tick : 0,
-        resultText: isResult && resolution !== null ? judgeTextOf(resolution, endsAtBatOf(current.resultTicks)) : '',
+        resultText: isResult && resolution !== null ? judgeTextOf(resolution, endsAtBatOf(current.resultTicks), current.isJudgementCleared === true) : '',
         // CPU 홈런도 판정 v = 8 · 12 → 0x51cd8 이 +0x1960 을 켜 HOMERUN 글자(0x40b18)가 나간다 — 판정 글자는 없다 (타자편 `BattingStage` 와 같은 길).
         // ⚠️ 맞은 공은 0x12 를 안 지나(`passesHeldResult`) 이 장면에서는 '결과' 가 서지 않는다 — 원본도 0x13 → 0x17(수비 판)이라
         //    글자는 수비 판 그리기 0x46c88 이 띄운다(`pages/defense` 의 `DefenseHomeRunText`). 여기서는 같은 판정이 '결과' 로 들어올 때만 탄다

@@ -121,7 +121,8 @@ export interface TeamGameSession {
      * 타석 화면이 판정한 공 하나. `isUncatchable` 은 필살타법이 성공한 타구(0x517e6 → 0x51800)인가 —
      * 수비 화면의 야수가 쥐지 못한다.
      */
-    readonly resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean, buntKind?: number) => void
+    /** 먹인 뒤의 진행 — 타석 화면이 공 도착의 판정 칸(`lastPitchJudgementCleared`)을 같은 틀에 읽는다 */
+    readonly resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean, buntKind?: number) => TeamGameProgress
     /**
      * 사람 타석의 필살 스윙이 나갔다 (0x4e136) — `BattingStage` 의 `onSpecialSwingUsed` 를 그대로 잇는다.
      * 인자는 줄인 뒤 남은 횟수다.

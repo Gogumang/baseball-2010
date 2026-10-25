@@ -1197,7 +1197,9 @@ function TeamGameScene({
                   // 판정 틀에 싣고(진행기에 넘기기 전) 대기 틱은 이 공으로 끝난 타석 결과로 정한다 (`GameRoute` 와 같다)
                   const outcomeAfter = applyPitchResolution(progress.atBat, detail.resolution).outcome
                   notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
-                  actions.resolvePitch(detail, isUncatchable, buntKind)
+                  const after = actions.resolvePitch(detail, isUncatchable, buntKind)
+                  // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
+                  return { judgementCleared: after.lastPitchJudgementCleared === true }
                 }}
                 flightProbeRef={flightProbeRef}
                 // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
@@ -1226,6 +1228,8 @@ function TeamGameScene({
             pitch={progress.lastPitch}
             resolution={progress.lastResolution}
             resultTicks={heldResultTicks}
+            // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
+            isJudgementCleared={progress.lastPitchJudgementCleared === true}
             cpuSwing={progress.lastCpuSwing ?? null}
             // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다
             hitScene={teamHitScene.hitScene}

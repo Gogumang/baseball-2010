@@ -23,4 +23,12 @@ describe('삼진 양끝 파티클 0x393b4 (394b2 · 394d2)', () => {
     expect(judgeTextOf({ kind: '사구' }, true)).toBe('몸에 맞는 공')
     expect(strikeoutJudgeParticlesOf(judgeTextOf({ kind: '스트라이크', isSwinging: false }, true), 0)).toHaveLength(2)
   })
+
+  it('낫아웃(0x3dfac 3e0aa 가 v 를 지움)이면 판정 글자도 양끝 파티클도 없다 — 지운 칸은 삼진 공에만 선다 (r213)', () => {
+    expect(judgeTextOf({ kind: '스트라이크', isSwinging: true }, true, true)).toBe('')
+    expect(strikeoutJudgeParticlesOf(judgeTextOf({ kind: '스트라이크', isSwinging: false }, true, true), 0)).toEqual([])
+    // 맞힌 공 · 볼 따위에 남은 앞 공의 값은 글자를 안 바꾼다
+    expect(judgeTextOf({ kind: '볼' }, true, true)).toBe('볼넷')
+    expect(judgeTextOf({ kind: '스트라이크', isSwinging: true }, false, true)).toBe('헛스윙')
+  })
 })

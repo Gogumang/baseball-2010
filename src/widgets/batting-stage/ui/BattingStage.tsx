@@ -35,6 +35,7 @@ import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBat
 import type { StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { describeResolution, isHomeRunResolution, judgeTextOf, situationOf } from '@/widgets/batting-stage/lib/stageText'
+import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameOf, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
@@ -280,7 +281,7 @@ interface BattingStageProps {
    * 도루 안 한 주자에게 +3 틱을 더하고(`DefensePlayInput.buntKind`) 공 도착 판도 본다. 사람 키만 쓴다(`sceneBuntKind` 주석) —
    * 이 공에 키가 없었으면 0 이다(0x11 진입의 memset — `sceneBuntKind` 주석).
    */
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => void
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => PitchResolvedReply | void
   /**
    * **상태 0x11 인가** 를 밖에서 물을 수 있게 이 칸에 묻는 함수를 넣어 준다. 원본 도루 키(0x53610 → 메시지 0x583)는
    * 0x11 의 키 함수 0x53670 이 부른다 — 0x11 은 투수 와인드업부터(공 틱 0 인 동안도) 맞은 공 판정 · 공 끝(틱 N + 1)까지다.
@@ -531,7 +532,11 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
       // 타석을 끝낸 공(문턱 0x1f)이면 판정 A 가 0xd(밀어내기면 0x17 판) — 아니면 같은 타석 다음 공 0xf
       { tick: tick + 1 + resultTicksRef.current, state: resultTicksRef.current > RESULT_PHASE_TICKS ? SCENE_STATE.준비 : SCENE_STATE.선택 },
     )
-    latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
+    const reply = latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
+    // 0x3dfac 낫아웃 갈래가 판정 칸을 지웠으면(3e0aa) 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다 — 진입이 그 그림보다 먼저다
+    if (reply != null && reply.judgementCleared === true) {
+      resultTextRef.current = judgeTextOf(detail.resolution, resultTicksRef.current > RESULT_PHASE_TICKS, true)
+    }
   }
 
   /**

@@ -238,7 +238,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       const outcomeAfter = applyPitchResolution(runner.atBat, detail.resolution).outcome
       pitchEnd.notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
       sceneBuntKindRef.current = buntKind ?? 0
-      resolvePitchInSession(detail, pitch, isUncatchable, buntKind)
+      // 0x3dfac 의 답(낫아웃이면 판정 칸을 지웠다) — 타석 화면이 0x12 틱 0 그림에 쓴다
+      return resolvePitchInSession(detail, pitch, isUncatchable, buntKind)
     },
     [pitchEnd.notePitchResolved, resolvePitchInSession, runner.atBat],
   )

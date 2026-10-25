@@ -61,6 +61,14 @@ describe('낫아웃(state[0x1a]) 정산 — 삼진 사건 5 가 [sp+0x30] 에 �
     if (pending?.kind !== 'arrival') return
     expect(pending.opened.kind).toBe(9)
     expect(붙듦.atBat.outcome?.kind).toBe('삼진')
+    // 3e0aa — 판정 칸을 지웠다: 사람이 던지는 타석(`PitcherSideStage.isJudgementCleared`)의 0x12 틱 0 에 '삼진' 글자 · 파티클이 없다 (r213)
+    expect(붙듦.lastPitchJudgementCleared).toBe(true)
+  })
+
+  it('같은 공이 안 빠지면 판정 칸이 남는다 — 보통 삼진 글자 (r213)', () => {
+    const { 주자 } = 붙든낫아웃판()
+    const 보통 = startPitch(주자, { typeNumber: 1, gaugeCell: 0 }, createSeededRandom(23), true)
+    expect(보통.lastPitchJudgementCleared === true).toBe(false)
   })
 
   it('타자주자와 2루 주자를 함께 잡으면 [sp+0x30] 3 — 병살 26 이 아니라 삼중살 27 (a8e58 은 3 을 막지 않는다)', () => {

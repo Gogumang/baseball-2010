@@ -5,6 +5,7 @@ import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import {
   arrivalApplicationOf,
   arrivesUnhit,
+  clearsPitchJudgement,
   PITCH_JUDGEMENT,
   pitchJudgementOf,
   rollCpuStealStart,
@@ -147,6 +148,19 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     expect(play?.strikeout).toBe('batterRuns')
     expect(play?.recordIds).toEqual([])
     expect(play !== null && arrivalApplicationOf(play)).toBe('batterRuns')
+    // 3e0aa — 판정 칸 [장면+0x10ac] 를 지운다(0x12 틱 0 판정 글자 · 삼진 파티클 없음)
+    expect(clearsPitchJudgement(play)).toBe(true)
+  })
+
+  it('판정 칸을 지우는 것은 낫아웃 갈래뿐 — 1루 주자 · 1아웃 이하 삼진(3e0cc 되돌림) · 볼 · 판 없음은 남긴다 (r213)', () => {
+    const 판 = (pitchJudgement: number, bases: typeof EMPTY_BASES, outs: number) =>
+      runPitchArrivalPlay({ gameMode: 4, pitchJudgement, stealingFrom: [], bases, outs }, 세는난수(0))
+    const 그대로 = 판(PITCH_JUDGEMENT.STRIKEOUT, 일루, 1)
+    expect(그대로?.strikeout).toBe('strikeoutStands')
+    expect(clearsPitchJudgement(그대로)).toBe(false)
+    expect(clearsPitchJudgement(판(PITCH_JUDGEMENT.STRIKEOUT, 일루, 2))).toBe(true)
+    expect(clearsPitchJudgement(판(PITCH_JUDGEMENT.BALL, EMPTY_BASES, 0))).toBe(false)
+    expect(clearsPitchJudgement(null)).toBe(false)
   })
 
   it('도루 기록 — 잡힌 주자가 있으면 24 한 번뿐', () => {

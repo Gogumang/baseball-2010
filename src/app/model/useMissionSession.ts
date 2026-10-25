@@ -1,3 +1,4 @@
+import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react'
 import type { Screen } from '@/app/model/screen'
@@ -52,6 +53,7 @@ import type { StealBase } from '@/entities/fielding/model/stealStart'
 import {
   arrivalApplicationOf,
   arrivesUnhit,
+  clearsPitchJudgement,
   finishPitchArrivalPlay,
   openPitchArrivalPlay,
   pitchJudgementOf,
@@ -637,6 +639,8 @@ export function useMissionSession({
     readonly resultTicks: number
     /** CPU 타자가 휘둘렀으면 스윙 프레임 · 번트 종류 — 장면의 타자 자세 */
     readonly cpuSwing: CpuSwingPose | null
+    /** 공 도착 0x3dfac 의 낫아웃 갈래(3e0aa)가 판정 칸을 지웠나 (`clearsPitchJudgement`) */
+    readonly judgementCleared: boolean
   } | null>(null)
   /**
    * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
@@ -1152,7 +1156,7 @@ export function useMissionSession({
       isUncatchable = false,
       /** 이 공의 번트 종류 장면 +0xfdc (`BattingStage` 의 넷째 인자) — 타구 판 리드(0x3d7b8)가 본다 */
       buntKind = 0,
-    ) => {
+    ): PitchResolvedReply | undefined => {
       const pitchingRun = missionRunRef.current
       // 경기 +0xfd4 — 이 공의 0x11 진입이 지우고 휘두른 공이면 스윙 판정이 덮는다
       sceneResultCodeRef.current = sceneResultCodeAfterPitch(detail.resolution, detail.resultCode)
@@ -1243,6 +1247,8 @@ export function useMissionSession({
               random,
             )
           : null
+      // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠나 — 타석 화면이 0x12 틱 0 의 판정 글자 · 삼진 파티클을 고른다
+      const reply: PitchResolvedReply = { judgementCleared: clearsPitchJudgement(opened) }
       if (current !== null && opened !== null && opened.kind !== 2) {
         // 판정 콜(도루 17 · 62/20, 폭투 17)과 그 뒤 아웃 콜은 판 끝(`finishRunnerPlay`)에서 낸다 — 원본은 판 안의 그 틱
         playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, nextAtBat)])
@@ -1250,7 +1256,7 @@ export function useMissionSession({
         setPendingRunnerPlay({ kind: 'arrival', opened, side: '공격' })
         // 판이 도는 동안(상태 0x17) 다음 공은 없다
         runner.setIsPaused(true)
-        return
+        return reply
       }
       const play = opened === null ? null : runOpenedPitchArrivalPlay(opened)
       // 판이 남긴 수비 장면 칸은 다음 판으로
@@ -1272,9 +1278,9 @@ export function useMissionSession({
       if (context !== null ? continueMissionArrival(play, context) : outcome === null) {
         // 판이 없는 판(`current` 없음)의 같은 타석 다음 공 — 아래 `continueMissionArrival` 과 같은 길
         if (context === null) signalPitchSelection('same')
-        return
+        return reply
       }
-      if (outcome === null) return
+      if (outcome === null) return reply
 
       if (runsDefense && current !== null) {
         // 스윙 수만 먼저 줄이고 **루·아웃·목표는 한 톨도 건드리지 않는다** — 수비 화면이
@@ -1301,10 +1307,11 @@ export function useMissionSession({
           runnersOnBase,
         })
         runner.setIsPaused(true)
-        return
+        return reply
       }
 
       finishMissionArrivalAtBat(play, { hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase })
+      return reply
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [aceLevels, audio, batterRunningMode, batterSkillIds, random, runner],
@@ -1637,7 +1644,6 @@ export function useMissionSession({
     runner.setBannerText('')
     const outcome = isAtBatFinished(nextAtBat) ? nextAtBat.outcome : null
     const runsDefense = outcome !== null && isMissionPlayOutcome(outcome)
-    setLastPitcherThrow({ pitch, resolution, resultTicks: resultWaitTicksOf(outcome), cpuSwing: cpuSwingPoseOf(thrown) })
     // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다. 판 시작까지만 연다 —
     // 상태 0x17 키 0x53420 은 조작 [+0xc] ≠ 0(사람 수비)이면 판 종류 · 모드를 안 보고 송구 0x533c8 → 메시지 0x588 → 0x51890 →
     // 플레이 vt60 0xb3118 → +0x160 을 적고, 슬롯 2 의 52602 가 종류 ∉ 0x58c {2, 3, 7, 8, 10} 이면 vt4c 0xb45dc(b4660 사람 목표)를
@@ -1670,6 +1676,14 @@ export function useMissionSession({
           random,
         )
       : null
+    setLastPitcherThrow({
+      pitch,
+      resolution,
+      resultTicks: resultWaitTicksOf(outcome),
+      cpuSwing: cpuSwingPoseOf(thrown),
+      // 3e0aa — 낫아웃 갈래가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
+      judgementCleared: clearsPitchJudgement(opened),
+    })
     // 밀어내기(종류 2)는 vt4c 가 안 돌아 키가 +0x160 만 적고 쓰이지 않는다 — 미리 돌려 재생한다. 도루 · 폭투 판은 붙든다
     const held = opened !== null && opened.kind !== 2 ? opened : null
     const play = opened !== null && held === null ? runOpenedPitchArrivalPlay(opened) : null
