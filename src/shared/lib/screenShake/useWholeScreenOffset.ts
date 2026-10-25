@@ -1,10 +1,16 @@
 import { useLayoutEffect } from 'react'
+import { screenRectOf } from '@/shared/lib/viewportFit/zoomedRect'
 
 /** 앱이 그리는 뿌리 — 모든 화면 · 덮개가 이 안에 있다 (`app/main.tsx`) */
 const ROOT_ID = 'root'
 /** 원작 240×320 화면 버퍼 자리 (`RawScreen` 의 판) */
 const SCREEN_SELECTOR = '[data-original-screen]'
 const SCREEN_WIDTH = 240
+
+/** 화면 좌표 사각형 + 오른쪽 · 아래 끝 */
+function boxOf(rect: { readonly left: number; readonly top: number; readonly width: number; readonly height: number }) {
+  return { ...rect, right: rect.left + rect.width, bottom: rect.top + rect.height }
+}
 
 /**
  * **그린 화면 통째로 옮기기** 0xba888(화면, dx, dy) — 화면 버퍼의 픽셀을 (dx, dy) 만큼 옮기고(0xb95b0) 비운 줄 · 칸을 0(검정)으로
@@ -23,10 +29,13 @@ export function useWholeScreenOffset(offset: { readonly x: number; readonly y: n
     const root = document.getElementById(ROOT_ID)
     if (root === null || (x === 0 && y === 0)) return undefined
     const screen = root.querySelector<HTMLElement>(SCREEN_SELECTOR)
-    // 옮기기 전에 잰다 — 앞 효과의 정리가 이미 되돌려 두었다
-    const rootBox = root.getBoundingClientRect()
-    const screenBox = screen?.getBoundingClientRect() ?? null
-    const frameBox = screen?.parentElement?.getBoundingClientRect() ?? null
+    // 옮기기 전에 잰다 — 앞 효과의 정리가 이미 되돌려 두었다.
+    // 판 · 바깥 틀은 CSS zoom 안이라 웹킷(아이폰 Safari)은 사각형을 zoom 뺀 값으로 낸다 — 화면 좌표로 옮겨 잰다(`screenRectOf`).
+    // 안 옮기면 배율이 1 로 읽혀 자르는 사각형이 판의 1/배율 크기로 왼쪽 위에 잡혀, 흔드는 동안 판 오른쪽 · 아래가 잘려 검게 보였다 (r255)
+    const rootBox = boxOf(screenRectOf(root))
+    const screenBox = screen === null ? null : boxOf(screenRectOf(screen))
+    const frame = screen?.parentElement ?? null
+    const frameBox = frame === null ? null : boxOf(screenRectOf(frame))
     const previous = { transform: root.style.transform, clipPath: root.style.clipPath }
     root.style.transform = `translate(calc(${x}px * var(--zoom, 1)), calc(${y}px * var(--zoom, 1)))`
 
