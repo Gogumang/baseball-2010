@@ -59,7 +59,57 @@ export interface HomeRunDerbyPeek {
   readonly isResultShown: boolean
 }
 
+/**
+ * **타석 장면 시각 재기** (r242 — 타이밍 측정용). e2e 가 공이 어느 그림에 있는지 · 틱 격자를 읽어 "최적 틱에 탭" 을 노리고,
+ * 스윙 키 · 판정 기록(`battingLog`)으로 탭 → 키 틱 → 판정을 잰다. 상태를 바꾸지 않는다.
+ */
+export interface BattingStagePeek {
+  /** 지금 상태 — 단계 · 0x11 시작 장면 틱 · 공 틱 수 N · 릴리스 앞 틱(마투수) · 지금 장면 틱 · 그 틱 머리의 performance 시각 · 틱 길이 */
+  readonly probe: () => {
+    readonly phase: string
+    readonly phaseStartTick: number
+    readonly frameCount: number | null
+    readonly releaseTicks: number
+    readonly tickNow: number
+    readonly tickStartTimeOf: (tick: number) => number
+    readonly msPerTick: number
+  }
+}
+
+/** 타석 스윙 · 판정 기록 한 줄 */
+export type BattingLogEntry =
+  | {
+      readonly kind: '스윙'
+      /** 사건 시각(performance) · 받은 틱(본 그림) · 처리 때 지금 틱 · 키 틱 F · N */
+      readonly tick: number
+      readonly tickNow: number
+      readonly keyTick: number
+      readonly frameCount: number
+      readonly at: number
+    }
+  | {
+      readonly kind: '판정'
+      readonly tick: number
+      readonly keyTick: number | null
+      readonly frameCount: number
+      readonly result: string
+      readonly at: number
+    }
+
+const battingLog: BattingLogEntry[] = []
+
+/** 타석 기록에 한 줄 — 부르는 곳은 DEV · e2e 안에서만 */
+export function pushBattingLog(entry: BattingLogEntry): void {
+  battingLog.push(entry)
+  if (battingLog.length > 2000) battingLog.splice(0, battingLog.length - 2000)
+}
+
+export function battingLogNow(): readonly BattingLogEntry[] {
+  return battingLog
+}
+
 export interface ScenePeeks {
+  readonly battingStage?: BattingStagePeek
   readonly teamGame?: TeamGamePeek
   readonly homeRunDerby?: HomeRunDerbyPeek
   readonly pitcherGame?: PitcherGamePeek
