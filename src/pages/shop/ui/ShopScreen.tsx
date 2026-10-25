@@ -201,6 +201,8 @@ export function ShopScreenView({
           onSelect={select}
           money={money}
           isKeyEnabled={isKeyEnabled}
+          // CLR → 110 (0x13460 13b1e) — 장비 창은 `onExit` 가 같은 일을 한다
+          onCancel={onBack}
         />
       ) : (
         <>
