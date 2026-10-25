@@ -10,6 +10,7 @@ import { selectShopItem, shopItemId } from '@/features/shop/model/shopSelection'
 import { selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
 import { batterGpDetailViewOf, pitcherGpDetailViewOf } from '@/pages/shop/lib/gpDetailView'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { moraleGaugeColumnsOf } from '@/pages/management/lib/managementLayout'
 
 /** 상점 GP 결과 창 — 0x14a74 의 창 갈래 (0x14e8e~0x15180) */
 
@@ -70,5 +71,28 @@ describe('투수편 GP 결과 창', () => {
   it('칸 9(십전대보탕)는 창 없이 알림', () => {
     const bought = selectPitcherShopItem(투수(), shopItemId('GP', 9), 난수)
     expect(bought.detail ?? null).toBeNull()
+  })
+})
+
+/**
+ * r239 사용자 보고 "영지버섯을 먹었는데 창에는 사기 80 언저리, 게이지는 100% 꽉 참" — **원본 그대로다** (디스어셈 확정):
+ *   0x14a74 창 갈래가 사기 칸 현재값을 0x14f92 `0xa3a25` 로 **효과 0xa4489(0x14fde) 전에** 읽어 [sp+0xcc] 에 두고,
+ *   효과 뒤 0x1504a 다시 읽기는 능력치 칸 0~3(r5 ≤ 3)만 돈다. 상태판 게이지 0x7d794 는 그리는 때 `0xa3a25` 를 읽어
+ *   열 수 = 사기 × (폭 − 1) / 100 (0x7d7ac~0x7d7b8) 이라 효과 뒤 값(100)으로 꽉 찬다.
+ */
+describe('영지버섯 창 사기 칸 = 효과 전 · 상태판 게이지 = 효과 뒤 (원본 그대로, r239)', () => {
+  it.each([50, 70, 80, 90])('타자편 사기 %i 에서 사면 창은 그 값, 게이지는 자른 뒤 값', (start) => {
+    const bought = selectShopItem(선수({ morale: start }), shopItemId('GP', 6), 난수)
+    const after = Math.min(100, start + 40)
+    expect(bought.career.morale).toBe(after)
+    expect(사기(batterGpDetailViewOf(bought.detail!)!.rows)).toMatchObject({ current: start, maximum: 100, change: 40 })
+    expect(moraleGaugeColumnsOf(bought.career.morale)).toBe(Math.trunc((after * 40) / 100))
+  })
+
+  it('투수편도 같은 창 갈래(0x14a74 두 모드 공용) — 사기 80 이면 창 80, 커리어 100', () => {
+    const bought = selectPitcherShopItem(투수({ morale: 80 }), shopItemId('GP', 6), 난수)
+    expect(bought.career.morale).toBe(100)
+    expect(사기(pitcherGpDetailViewOf(bought.detail!)!.rows)).toMatchObject({ current: 80, maximum: 100, change: 40 })
+    expect(moraleGaugeColumnsOf(bought.career.morale)).toBe(40)
   })
 })
