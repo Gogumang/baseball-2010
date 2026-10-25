@@ -10,7 +10,7 @@ import { layerRecolorRequestsOf, pitcherLayersOf } from '@/widgets/batting-stage
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
-  SEASON_TRAINING_BATTER_FORM, SEASON_TRAINING_PRESENTATIONS, SEASON_TRAINING_SKIN, isSeasonTrainingSkipKey,
+  SEASON_TRAINING_BATTER_FORM, SEASON_TRAINING_BATTER_MIRROR_FLAG, SEASON_TRAINING_PRESENTATIONS, SEASON_TRAINING_SKIN, isSeasonTrainingSkipKey,
 } from '@/pages/season/lib/seasonTrainingPopup'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
@@ -108,7 +108,7 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
         )}
         {figure !== null && step !== null && figure.kind === '타자' && (
           <TrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} warmPoses={figure.poses} skinIndex={SEASON_TRAINING_SKIN} teamIndex={teamIndex}
-            form={SEASON_TRAINING_BATTER_FORM} x={ANCHOR.x + figure.dx} y={ANCHOR.y + figure.dy} />
+            form={SEASON_TRAINING_BATTER_FORM} mirrorFlag={SEASON_TRAINING_BATTER_MIRROR_FLAG} x={ANCHOR.x + figure.dx} y={ANCHOR.y + figure.dy} />
         )}
         {figure !== null && step !== null && figure.kind === '투수' && (
           <PitcherTrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} poses={figure.poses} teamIndex={teamIndex}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SEASON_TRAINING_BATTER_FORM, SEASON_TRAINING_PRESENTATIONS, isSeasonTrainingSkipKey,
+  SEASON_TRAINING_BATTER_FORM, SEASON_TRAINING_BATTER_MIRROR_FLAG, SEASON_TRAINING_PRESENTATIONS, isSeasonTrainingSkipKey,
 } from '@/pages/season/lib/seasonTrainingPopup'
 
 describe('시즌 0xde 훈련 팝업 — 0x84664 시즌 갈래 · 0x848d0 시즌 캐릭터', () => {
@@ -21,6 +21,10 @@ describe('시즌 0xde 훈련 팝업 — 0x84664 시즌 갈래 · 0x848d0 시즌 
 
   it('타자 그림은 balancer · 안 뒤집음(+0x3c = 1) — 폼 1', () => {
     expect(SEASON_TRAINING_BATTER_FORM).toBe(1)
+  })
+
+  it('+0x3c 는 0x5198 이 손수 쓴다(0x11744 안 거침) — 타자 1(0x78cfc 안 뒤집음)', () => {
+    expect(SEASON_TRAINING_BATTER_MIRROR_FLAG).toBe(1)
   })
 
   it('확인(−5 · 5)만 건너뛴다 — 취소는 없다', () => {

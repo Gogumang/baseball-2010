@@ -11,7 +11,7 @@ import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { bodyTypeOf, NO_EQUIPMENT, NO_PITCHER_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
-import { describePitchResolution } from '@/widgets/batting-stage/lib/stageText'
+import { judgeTextOf } from '@/widgets/batting-stage/lib/stageText'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import {
   cpuSwingTickOf, hitEndTickOf, HUMAN_PITCH_RELEASE_STATE_TICK, passesHeldResult, pitcherHitContactOf, pitcherSideStageFrameOf,
@@ -171,6 +171,10 @@ interface PitcherSideStageProps {
  * CPU 타자는 `cpuSwing` 의 스윙 프레임에 닿은 틱부터 스윙(번트면 번트) 자세다.
  */
 /** 큰 타구 건너뛰기 상황 버튼 — OK(Enter) */
+/** 0x12 문턱이 0x1f(타석을 끝낸 공 — `resultWaitTicksOf`)인가 — 판정 글자 삼진 · 볼넷(`judgeTextOf`)을 가른다 */
+const AT_BAT_END_RESULT_WAIT_TICKS = 0x1f
+const endsAtBatOf = (resultTicks: number): boolean => resultTicks >= AT_BAT_END_RESULT_WAIT_TICKS
+
 const HIT_SKIP_OFFER: TouchKeyOffer = { key: 'Enter', label: '넘기기' }
 
 export function PitcherSideStage(props: PitcherSideStageProps) {
@@ -515,7 +519,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       // 0x12 틱 0 의 그림 — 판정 글자 0x393b4 가 삼진이면 양끝 파티클(394b2 · 394d2). 틀이 틱 0 을 건너뛰었으면 그 뒤 첫 그림에서 한 번
       if (isResult && resolution !== null && !strikeoutShot) {
         strikeoutShot = true
-        for (const shot of strikeoutJudgeParticlesOf(describePitchResolution(resolution), side)) {
+        for (const shot of strikeoutJudgeParticlesOf(judgeTextOf(resolution, endsAtBatOf(current.resultTicks)), side)) {
           emitParticles(sceneParticleScene(), particleConfigOf(shot.id), shot.x, shot.y, shot.img)
         }
       }
@@ -577,7 +581,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         tick: nowTick,
         redrawTicks,
         resultTick: isResult ? stage.phase.tick : 0,
-        resultText: isResult && resolution !== null ? describePitchResolution(resolution) : '',
+        resultText: isResult && resolution !== null ? judgeTextOf(resolution, endsAtBatOf(current.resultTicks)) : '',
         // CPU 홈런도 판정 v = 8 · 12 → 0x51cd8 이 +0x1960 을 켜 HOMERUN 글자(0x40b18)가 나간다 — 판정 글자는 없다 (타자편 `BattingStage` 와 같은 길).
         // ⚠️ 맞은 공은 0x12 를 안 지나(`passesHeldResult`) 이 장면에서는 '결과' 가 서지 않는다 — 원본도 0x13 → 0x17(수비 판)이라
         //    글자는 수비 판 그리기 0x46c88 이 띄운다(`pages/defense` 의 `DefenseHomeRunText`). 여기서는 같은 판정이 '결과' 로 들어올 때만 탄다

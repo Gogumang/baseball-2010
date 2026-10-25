@@ -26,6 +26,19 @@ export function describeResolution(detail: PitchOutcomeDetail): string {
   return describePitchResolution(detail.resolution)
 }
 
+/**
+ * **판정 글자** — 0x39504 가 [장면+0x10ac] 의 판정 v(0x9d57c: 1 스트라이크 · 2 볼 · 3 볼넷 · 4 사구 · 5 삼진)로 game_judge 애니를 고른다
+ * (표 0xcfe90: v 3 → 애니 6 · v 5 → 애니 9). 0x9d57c 는 스윙했거나 존이면 `스트라이크 수 > 1` 일 때 5, 볼이면 `볼 수 > 2` 일 때 3 을 낸다
+ * (9d598~9d5b4) — 곧 타석을 끝낸 공(결과 문턱 0x1f, `resultPhaseTicksOf`)의 스트라이크는 삼진 · 볼은 볼넷 글자다(r204).
+ * 이 글자가 있어야 삼진 양끝 파티클(`strikeoutJudgeParticlesOf`, 39498 애니 9)도 선다.
+ * ⚠️ 남김: 0.1% 낫아웃은 0x3dfac 가 v 를 지워(3e0aa) 글자가 없다 — 웹은 이 자리에서 낫아웃을 몰라 삼진 글자로 둔다.
+ */
+export function judgeTextOf(resolution: PitchOutcomeDetail['resolution'], endsAtBat: boolean): string {
+  if (endsAtBat && resolution.kind === '스트라이크') return '삼진'
+  if (endsAtBat && resolution.kind === '볼') return '볼넷'
+  return describePitchResolution(resolution)
+}
+
 /** 판정 하나의 문구 — 공 판정만 아는 화면(사람이 던지는 타석 `PitcherSideStage`)이 쓴다 */
 export function describePitchResolution(resolution: PitchOutcomeDetail['resolution']): string {
 

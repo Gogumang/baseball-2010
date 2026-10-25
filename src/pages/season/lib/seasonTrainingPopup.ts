@@ -51,6 +51,13 @@ export const SEASON_TRAINING_PRESENTATIONS: readonly SeasonTrainingPresentation[
 
 /** 타자 그림 폼 — 타입 0(balancer) · +0x3c = 1(안 뒤집음) → `2 × 0 + 1` */
 export const SEASON_TRAINING_BATTER_FORM = 1
+/**
+ * 그림 +0x3c — 시즌 훈련 진입은 나리 0x11744 를 **안 거친다**. 시즌 상태 진입 점프(0xe9ac → 0xea80)가 부르는 0x5198 이
+ * 캐릭터를 만든 뒤 손수 `+0x3c = (t == 1 ? 1 : 0)` 을 쓴다(5232~524e). 타자 그리기 0x78cfc 는 +0x3c == 0 일 때만,
+ * 투수 그리기 0x79525 는 +0x3c != 0 일 때만 뒤집으므로(79544~7954e) 칸 0 투수 · 칸 1 타자 **둘 다 안 뒤집힌다**.
+ * 폼의 손 비트에 기대지 않게 타자 그림에 이 값을 그대로 넘긴다(`TrainingFigure.mirrorFlag`).
+ */
+export const SEASON_TRAINING_BATTER_MIRROR_FLAG = 1
 /** 피부 — vt+8 의 셋째 인자 0 (팔레트 = 피부 × 15 + 팀) */
 export const SEASON_TRAINING_SKIN = 0
 

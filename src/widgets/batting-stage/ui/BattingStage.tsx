@@ -34,7 +34,7 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
-import { describeResolution, isHomeRunResolution, situationOf } from '@/widgets/batting-stage/lib/stageText'
+import { describeResolution, isHomeRunResolution, judgeTextOf, situationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameOf, useStageRefs } from '@/widgets/batting-stage/model/stageRefs'
 import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
@@ -511,10 +511,11 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     const latest = latestRef.current
     buntRef.current = null
     const isHomeRun = isHomeRunResolution(detail)
-    resultTextRef.current = describeResolution(detail)
     // 공 끝 0x4e24e 가 이 틀에 0x12 를 예약한다(4e26c → 0xbcb49) — 0x12 는 다음 틀이 틱 0 이다(`phaseEntryRef`)
     homeRunStartTickRef.current = isHomeRun ? tick + 1 : null
     resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
+    // 판정 v — 타석을 끝낸 스트라이크 · 볼은 삼진(애니 9) · 볼넷(애니 6) 글자다 (`judgeTextOf`)
+    resultTextRef.current = judgeTextOf(detail.resolution, resultTicksRef.current > RESULT_PHASE_TICKS)
     isInPlayResultRef.current = false
     // 사구(st[0x12]) — 0x12 틱 0~7 에 타자 머리 위 표시(4a0ce, `batterOverlayMarks`)
     isHitByPitchResultRef.current = detail.resolution.kind === '사구'

@@ -21,7 +21,6 @@ const WINDOW_OFFSET_Y = 52 - 66
 interface TrainingSceneProps {
   /** null 이면 연출 없이 창만 보인다 */
   readonly presentation: TrainingPresentation | null
-  readonly caption?: string
   /**
    * 타자 타입 (0 타격형 · 그 밖 장타형) — 동작표를 가른다 (F-6 · 5-3 확정).
    * 안 넘기면 타격형으로 본다.
@@ -50,8 +49,11 @@ const BATTER_TRAINING_FIGURE_FLAG = 1
 /** 키 0x105a4 — 확인(−5) · '5' 면 [팝업+0x1d0] = [팝업+0x1d8](게이지 끝). 그 밖 키 없음(취소도 안 받는다) */
 export const isTrainingSkipKey = (key: string): boolean => key === 'Enter' || key === '5' || key === ' '
 
-/** 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다. */
-export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equipmentLevels, skinIndex, teamIndex, onFinished }: TrainingSceneProps) {
+/**
+ * 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다.
+ * 훈련 이름 글은 없다 — 0x848d0 은 창 · 연출 · 캐릭터 · 게이지만 그리고 글자 그리기(0x9c068)를 안 부른다(투수편 · 시즌 팝업과 같다, r204).
+ */
+export function TrainingScene({ presentation, battingTypeIndex = 0, equipmentLevels, skinIndex, teamIndex, onFinished }: TrainingSceneProps) {
   const folder = animationFolderOf(presentation?.file ?? 'raise_traning_ani')
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
@@ -144,7 +146,6 @@ export function TrainingScene({ presentation, caption, battingTypeIndex = 0, equ
         )}
       </div>
       {presentation !== null && update >= 0 && <TrainingGauge filled={update} />}
-      {caption !== undefined && <span className={styles.caption}>{caption}</span>}
     </div>
   )
 }

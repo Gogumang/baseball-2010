@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { strikeoutJudgeParticlesOf } from '@/widgets/batting-stage/lib/judgeParticles'
+import { judgeTextOf } from '@/widgets/batting-stage/lib/stageText'
 
 describe('삼진 양끝 파티클 0x393b4 (394b2 · 394d2)', () => {
   it('삼진(애니 9)만 ptc 008 · img 11 을 왼끝, ptc 009 · img 12 를 오른끝(폭 240)에 판정 글자 y 로', () => {
@@ -11,5 +12,15 @@ describe('삼진 양끝 파티클 0x393b4 (394b2 · 394d2)', () => {
 
   it('다른 판정 글자는 안 쏜다', () => {
     for (const text of ['스트라이크', '볼', '볼넷', '아웃', '파울', '']) expect(strikeoutJudgeParticlesOf(text, 0)).toEqual([])
+  })
+
+  it('판정 v 0x9d57c — 타석을 끝낸 스트라이크는 삼진(v 5) · 볼은 볼넷(v 3) 글자라 실제 삼진 공에서 쏜다 (r204)', () => {
+    expect(judgeTextOf({ kind: '스트라이크', isSwinging: true }, true)).toBe('삼진')
+    expect(judgeTextOf({ kind: '스트라이크', isSwinging: false }, true)).toBe('삼진')
+    expect(judgeTextOf({ kind: '볼' }, true)).toBe('볼넷')
+    expect(judgeTextOf({ kind: '스트라이크', isSwinging: true }, false)).toBe('헛스윙')
+    expect(judgeTextOf({ kind: '볼' }, false)).toBe('볼')
+    expect(judgeTextOf({ kind: '사구' }, true)).toBe('몸에 맞는 공')
+    expect(strikeoutJudgeParticlesOf(judgeTextOf({ kind: '스트라이크', isSwinging: false }, true), 0)).toHaveLength(2)
   })
 })
