@@ -4,7 +4,7 @@ import { MENU_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
-import { useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
+import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
@@ -201,6 +201,8 @@ export function HomeRunDerbyScreen({
   // 창 키 자리(52cc6 0x754f9 → 0x3c158)에서 닫는다(`pressStar` — 앱 키 문이 다음 앱 틱에 넘긴다). 0x463ac(463e6 0x741a1)는 키가
   // 아니라 장면 vtable 0xcfa0c [6] 멈춤 콜백(0xcfa24)이 같은 메뉴를 여는 자리다
   const { pressStar } = menu
+  // 단말 일시정지 0x463ac — 같은 메뉴를 연다('*' 가 받는 때 · 하위 창 없음)
+  useInGameMenuOpenOnHide(menu, acceptsMenuKey && overlay === null)
   useEffect(() => {
     if (!acceptsMenuKey) return
     const onKeyDown = (event: KeyboardEvent) => {

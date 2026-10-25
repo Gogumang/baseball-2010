@@ -271,6 +271,11 @@ export interface PitcherHitScene extends PitcherHitClock {
    * 0x13 에 부르는 0x49aec 의 재료(`specialSwingEffect` · `hitParticles.specialSwingParticlesOf`). 공격 측을 안 가린다. 아니면 null
    */
   readonly specialSwing: { readonly number: number; readonly isAceBatter: boolean } | null
+  /**
+   * 번트로 맞은 공인가 — CPU 번트도 0x34334 가 예약 +0xfe0 · 종류 +0xfdc = rand(1, 4)(3445e)를 세워 4e0ce 의 0xb93a8 로 번트 자세
+   * S+8 = 종류를 선다. 스윙 그리기 49faa 는 S+8 ≠ 0 이면 보통 불꽃 · ptc 를 건너뛴다(직접 뜸, r215). 없으면 거짓
+   */
+  readonly isBuntStance?: boolean
 }
 
 /**
@@ -321,6 +326,7 @@ export function pitcherHitSceneOf(
     particleId: hitParticleIdOf(hitParticleInputOf(pattern, resultCode, watchesBigHit)),
     resultCode,
     specialSwing: contact.specialSwing ?? null,
+    isBuntStance: isBunt,
   }
 }
 
@@ -338,7 +344,7 @@ export interface PitcherHitParticle {
  * 의 판정과 같은 갈래다. `aceBatterOrder` 는 0xb63a0(마타자 순번, 없으면 null), `side` 는 0xb63c1(타자 손).
  */
 export function pitcherHitContactOf(
-  hit: Pick<PitcherHitScene, 'particleId' | 'specialSwing'>,
+  hit: Pick<PitcherHitScene, 'particleId' | 'specialSwing' | 'isBuntStance'>,
   batterForm: number,
   aceBatterOrder: number | null,
   side: number,
@@ -349,5 +355,7 @@ export function pitcherHitContactOf(
   if (special !== null && effect !== null) {
     return { effect, particles: specialSwingParticlesOf(special.number, batterForm, aceIndex) }
   }
+  // 49faa — 번트 자세(S+8 ≠ 0)면 보통 불꽃 · ptc 가 없다
+  if (hit.isBuntStance === true) return { effect: null, particles: [] }
   return { effect: null, particles: hit.particleId === null ? [] : [{ id: hit.particleId, img: HIT_PARTICLE_IMAGE, offsetY: 0 }] }
 }
