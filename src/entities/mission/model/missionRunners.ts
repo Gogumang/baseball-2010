@@ -163,6 +163,13 @@ const DEFENSE_SLOT = 2
 export interface MissionDefenseSituation {
   readonly mission: Pick<OriginalMission, 'side'>
   readonly game: Pick<MissionGame, 'humanBatting' | 'cpuAutoBatting'>
+  /**
+   * **야수 칸 0 의 +0xec** — 미션 시작 첫 0x18 판의 0x3fac4 가 적은 수비 팀 레코드(`records` 칸, 그때 자리 니블 1 = 지명타자 —
+   * `missionBoardFielderZeroOf`). 첫 반 이닝이 사람 몫이 아니라 판이 안 섰으면 null(+0xec = 0). 미션은 3아웃 뒤 0x18 이 늘 0x21 이라
+   * 판이 다시 안 서므로 미션 내내 이 레코드다 — 자동진행 반 이닝의 대타(0xc1ba4 → 0xaebe4)가 지명 자리를 다른 레코드로 옮겨도 그대로다.
+   * 안 주면(옛 입구) 지금 지명타자로 본다
+   */
+  readonly fielderZeroRecord?: number | null
 }
 
 /**
@@ -184,12 +191,14 @@ export interface MissionDefenseSituation {
  * 대타는 명단(`lineup`)만 바꾸므로 명단에서 그대로 읽는다.
  *
  * **칸 0(투수)**: 판 시작은 선수를 찾지 않아 g = 2 · 악송구 보정 8 고정이다(송구 쪽은 이 칸을 안 읽는다 — `fielderAbilityOf`).
- * 공수 교대 판 0x3fac4 가 칸 0 의 +0xec 에 니블 1(지명타자)을 넣어 펌블 · 레이저가 그 수비를 보므로 칸 0 에는 지명타자 값을
- * 넣는다(`recordPlayerAbilityOf`, 모든 모드가 같다 — `defenseAbilitiesOf`).
+ * 공수 교대 판 0x3fac4 가 칸 0 의 +0xec 에 니블 1(지명타자)을 넣어 펌블 · 레이저가 그 수비를 보므로 칸 0 에는 **첫 0x18 판이 적은**
+ * 지명타자 레코드(`fielderZeroRecord`) 값을, 판이 안 섰으면 null 을 넣는다(`recordPlayerAbilityOf` · `entities/fielding/model/fielderRecords`).
  * ⚠️ 찾는 레코드가 미션 타자 · 마타자 표지면(수비 팀에는 안 생긴다) 진행기 기본값이다.
  */
-export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): number[] {
-  const abilities = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_RUN_ABILITY)
+export function missionDefenseAbilitiesOf(run: MissionDefenseSituation): (number | null)[] {
+  const abilities: (number | null)[] = Array.from({ length: FIELDER_COUNT }, () => DEFAULT_RUN_ABILITY)
+  // 칸 0 의 +0xec 가 0(판이 안 섰다) — 펌블 표 대신 0 · 레이저 굴림 없음 (`recordPlayerAbilityOf`)
+  if (run.fielderZeroRecord === null) abilities[0] = null
   for (const { slot, player } of missionDefenseFieldersOf(run, true)) {
     if (player !== undefined) abilities[slot] = masterGameAbilityOf(player, false, DEFENSE_SLOT)
   }
@@ -226,19 +235,39 @@ function missionDefenseFieldersOf(
   for (let order = 0; order < QUICK_LINEUP_SLOTS; order += 1) {
     positions.set(rosterSlotAt(defense.lineup, order), positionOfRow(rowOf(order)))
   }
-  // 칸 0 은 판 시작이 안 찾지만 공수 교대 판 0x3fac4 는 니블 1(지명타자)을 칸 0 의 +0xec 에 넣는다 — 능력치(펌블 · 레이저)만 본다
-  const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0 && !withDesignated)
+  // 칸 0 은 판 시작이 안 찾지만 공수 교대 판 0x3fac4 는 니블 1(지명타자)을 칸 0 의 +0xec 에 넣는다 — 능력치(펌블 · 레이저)만 본다.
+  // 그 판이 적은 레코드(`fielderZeroRecord`)를 알면 그것이다(그 뒤 대타로 지명 자리가 옮겨도 +0xec 는 그대로)
+  const seatedZero = withDesignated ? run.fielderZeroRecord : null
+  const filled = Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slot === 0 && (!withDesignated || seatedZero !== undefined))
   const fielders: { slot: number; positionCode: number; player: RosterPlayer | undefined }[] = []
+  if (seatedZero != null) fielders.push({ slot: 0, positionCode: 1, player: playerOfRow(rowOf(seatedZero)) })
   for (let record = 0; record < defense.records.length; record += 1) {
     const positionCode = positions.get(record) ?? 0
     const slot = positionCode - 1
     if (slot < 0 || slot >= FIELDER_COUNT || filled[slot]) continue
     filled[slot] = true
-    const row = rowOf(record)
-    const player = row === MISSION_NARI_RECORD || row === MISSION_ACE_ROSTER_SLOT ? undefined : roster[row]
-    fielders.push({ slot, positionCode, player })
+    fielders.push({ slot, positionCode, player: playerOfRow(rowOf(record)) })
   }
   return fielders
+
+  function playerOfRow(row: number): RosterPlayer | undefined {
+    return row === MISSION_NARI_RECORD || row === MISSION_ACE_ROSTER_SLOT ? undefined : roster[row]
+  }
+}
+
+/**
+ * 미션 시작 첫 0x18 판의 0x3fac4 3fe0a~3fe4c 가 칸 0 의 +0xec 에 적는 레코드 — 수비 팀 레코드 차례에서 그때 자리 니블이 1(지명)인
+ * 첫 레코드(`missionDefenseFieldersOf` 와 같은 니블 셈). 없으면 null(안 덮어 장면 직후 값 0 이 남는다)
+ */
+export function missionBoardFielderZeroOf(run: MissionDefenseSituation): number | null {
+  const defense = run.mission.side === '타자' ? run.game.cpuAutoBatting : run.game.humanBatting
+  if (defense === null) return null
+  const roster = teamBatters(defense.teamId)
+  const rowOf = (record: number) => defense.records[record] ?? record
+  for (let order = 0; order < QUICK_LINEUP_SLOTS; order += 1) {
+    if (((roster[rowOf(order)]?.position ?? 0) & 0xf) === 1) return rosterSlotAt(defense.lineup, order)
+  }
+  return null
 }
 
 /** 타순 아홉 칸 */
@@ -246,7 +275,7 @@ const QUICK_LINEUP_SLOTS = 9
 
 /** 미션 수비 판에 먹이는 능력치 — 아홉 칸 수비와 루별 주루(0 = 타자주자), 그리고 그림 전용 이름 판 · 마선수 주자 */
 export interface MissionPlayAbilities {
-  readonly defenseAbilities: readonly number[]
+  readonly defenseAbilities: readonly (number | null)[]
   readonly runAbilities: Partial<Record<0 | 1 | 2 | 3, number>>
   /** 수비 칸별 스킬 번호 — 레이저 0x66a8c · 필살수비의 초감각(21) (`missionFielderSkillIdsOf`) */
   readonly fielderSkillIds?: readonly (readonly number[])[]

@@ -34,7 +34,12 @@ import { lineupSlotOf, recordLineupPlay } from '@/entities/game/model/quickLineu
 import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
-import { missionRunnersAfterPlay, missionRunnersOf, missionStartRunnersOf } from '@/entities/mission/model/missionRunners'
+import {
+  missionBoardFielderZeroOf,
+  missionRunnersAfterPlay,
+  missionRunnersOf,
+  missionStartRunnersOf,
+} from '@/entities/mission/model/missionRunners'
 import type { MissionPlayAbilities } from '@/entities/mission/model/missionRunners'
 
 /**
@@ -73,6 +78,16 @@ export interface MissionRun {
   readonly cpu: MissionCpuTeam
   /** 경기의 이닝 · 공수 · 점수판과 자동진행 반 이닝이 쓰는 팀 (`missionGame`) */
   readonly game: MissionGame
+  /**
+   * 야수 칸 0 의 +0xec — 첫 0x18 판의 0x3fac4 가 적은 수비 팀 레코드(판이 안 섰으면 null). 미션 한 판에 판은 그 하나뿐이다
+   * (`missionRunners.MissionDefenseSituation.fielderZeroRecord`)
+   */
+  readonly fielderZeroRecord?: number | null
+}
+
+/** 첫 0x18 판이 서면(`missionFirstHalfIsHuman`) 0x3fac4 가 칸 0 의 +0xec 에 적는 레코드, 안 서면 null (`missionBoardFielderZeroOf`) */
+export function missionStartFielderZeroOf(run: Pick<MissionRun, 'mission' | 'game'>): number | null {
+  return missionFirstHalfIsHuman(run) ? missionBoardFielderZeroOf(run) : null
 }
 
 const OUTS_PER_INNING = 3
@@ -99,6 +114,7 @@ export function startMission(mission: OriginalMission, setup: MissionGameSetup =
     outs: mission.start.outs,
     cpu,
     game,
+    fielderZeroRecord: missionStartFielderZeroOf({ mission, game }),
   }
 }
 

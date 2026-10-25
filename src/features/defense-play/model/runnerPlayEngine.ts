@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import { judgeCallSoundIdOf } from '@/features/defense-play/model/judgeCall'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -190,7 +191,7 @@ export interface RunnerPlayEngineInput {
   readonly play: PlayView
   /** 시작 주자 — 원본 목록 순서 */
   readonly runners: readonly RunnerState[]
-  readonly abilities: readonly number[]
+  readonly abilities: readonly (number | null)[]
   readonly outs: number
   /** state[0x1e] 시작 값 — 공이 땅에 닿았거나 잡혔음 */
   readonly ballOnGround: boolean
@@ -225,6 +226,8 @@ export interface RunnerPlayEngineInput {
   readonly maximumTicks?: number
   readonly aceIndexes?: readonly (number | null | undefined)[]
   readonly defenseTeamIndex?: number
+  /** 야수 +0xec — 칸별 선수 레코드(판 시작 뒤 값, `entities/fielding/model/fielderRecords`). 그림이 야수마다 싣는다. 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) — 이 판들(밀어내기 · 도루 · 폭투)은 투구 뒤라 +0x1997 · 애니가 되감겨 있다 */
   readonly scene?: DefenseScene
@@ -1315,6 +1318,7 @@ function* runnerPlaySteps(
         sceneResultCode: input.sceneResultCode ?? null,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
+        fielderRecords: input.fielderRecords,
         offenseTeamIndex: input.offenseTeamIndex,
       })
     // 이 판 틱에 낸 소리(차례대로)를 그림에 싣는다 — 미리 돌린 판을 재생만 하는 화면(`DefensePlayback` 의 재생 갈래)이 그 틱에 낸다

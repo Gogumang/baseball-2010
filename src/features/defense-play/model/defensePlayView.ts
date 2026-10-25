@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
 import {
   basePosition,
@@ -88,6 +89,8 @@ export interface ViewStateInput {
   readonly laserShiningSlot?: number | null
   /** 수비 팀 번호 0~14 — 야수 그림 팔레트 (C-1) */
   readonly defenseTeamIndex?: number | null
+  /** 야수 +0xec — 칸별 선수 레코드(`entities/fielding/model/fielderRecords`). 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
   readonly offenseTeamIndex?: number | null
   /** 공 가진 야수 고리 (0x43cb0) — 진행기가 `holderMarkOf` 로 고른다. 안 주면 없다 */
@@ -135,6 +138,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       actionTick: tickSince(input.previousActions, `f${fielder.slot}`, action, input.tick),
       aceIndex: aceIndexOf(input.aceIndexes, fielder.slot),
       teamIndex: input.defenseTeamIndex ?? null,
+      ...(input.fielderRecords === undefined ? {} : { record: input.fielderRecords[fielder.slot] ?? null }),
       // +0xb0 — 세우는 곳이 가슴 높이(7) · 점프(0xe) 포구 세터뿐이고 동작이 끝나면 지운다 (근사: 지금 동작이 그 둘이면 선 것으로 본다)
       catchFlag: action === FIELDER_ACTION.catchChest || action === FIELDER_ACTION.jumpCatch,
       lockTicks: fielder.actionLockTicks,

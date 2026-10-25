@@ -165,6 +165,11 @@ import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-te
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
+import {
+  type FielderRecordSeat,
+  fielderRecordsAfterBoard,
+  fielderRecordsAtPlayStart,
+} from '@/entities/fielding/model/fielderRecords'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { EMPTY_DECISION_STATE, gameEndDecisionOf } from '@/entities/game/model/winLossSave'
 import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
@@ -597,6 +602,12 @@ export interface TeamGameProgress {
     /** 판 틱 0 의 0x3fac4 굴림 36 개 — 운동장 전경 0x4fb8c 가 18명을 걷게 한다 (`rollHalfInningFielders`) */
     readonly fielderRolls?: readonly HalfInningFielderRoll[]
   } | null
+  /**
+   * **수비 줄 야수 +0xec** — 장면이 사는 동안 칸별로 남는 선수 레코드 (`entities/fielding/model/fielderRecords`). 교대 판
+   * 0x3fac4(`withHalfInningBoard`)가 칸 0..8 을 그 판 수비 팀으로 적고, 판 시작 0xb0fb4 가 칸 1..8 을 다시 훑는다(`fielderRecordsFor`).
+   * 판 없이 지난 반 이닝(자동진행 뒤 · 모드 1 첫 반 이닝)은 칸 0 이 앞 판 값(상대 팀 지명타자일 수 있다) 또는 0 이다. 없으면 장면 직후(0)
+   */
+  readonly fielderRecords?: readonly (TeamFielderSeat | null)[]
   /** 마지막으로 사람이 잡은 타석의 반 이닝 — 반 이닝이 바뀐 뒤 첫 사람 타석인지 가린다 */
   readonly lastHumanHalf: { readonly inning: number; readonly half: GameState['half'] } | null
   /** 그 뒤로 자동(간이 엔진, 상태 0x21) 타석이 지났는가 — 지났으면 0x18 이 판 없이 넘어간다 (4fab6) */
@@ -1052,6 +1063,8 @@ export function resumeTeamGame(
     ...saved,
     // 장면 쪽 — 상태 0x18 판·자동진행 표시(+0x1784)·벤치 클리어링·수비 재생·교체 연출·공 도착 판
     halfInningBoard: null,
+    // 장면을 새로 세우니 야수 객체도 새것 — +0xec 아홉 칸 0 (new 의 memset)
+    fielderRecords: undefined,
     lastHumanHalf: null,
     autoSinceHuman: false,
     pendingBenchClearing: null,
@@ -2157,16 +2170,20 @@ function quickLeagueStolenBasesOf(
 
 /**
  * 수비 그림이 올린 실책(+0x2e, `features/defense-play/model/fieldingErrors`)을 리그 기록 재료에 얹는다 — 화면이 판 끝에 넘긴다.
- * 그림의 수비 팀(`teamIndex` = 판 입력 `defenseTeamIndex`)의 명단 차례에서 자리 니블이 칸 + 1 인 첫 타자(이름 판 `fielderPlatesFor`
- * 와 같은 표 — 칸 0 은 니블 1 = 지명타자)가 야수 +0xec 다. 열쇠는 도루와 같다 — 표 밖 선수는 원본 id, 마타자는 웹 기록표에 칸이 없다.
+ * 야수 +0xec 는 그림이 실은 레코드(판 입력 `fielderRecords` — `fielderRecordsFor`)다: 칸 1..8 은 그 판 수비 팀 명단에서 자리 니블이
+ * 칸 + 1 인 첫 타자, 칸 0 은 마지막 교대 판의 수비 팀 지명타자(판 없이 지난 반 이닝이면 상대 팀 지명타자에게 붙는다 — 원본 그대로).
+ * 열쇠는 도루와 같다 — 표 밖 선수는 원본 id, 마타자는 웹 기록표에 칸이 없다.
  */
 export function recordDrawnTeamFieldingErrors(
   progress: TeamGameProgress,
   drawn: readonly DrawnFieldingError[],
 ): TeamGameProgress {
-  const errors = fieldingErrorRecordsOf(drawn, (error) => {
+  const gameDrawn = drawn.filter(
+    (error) => error.teamIndex === progress.options.ourTeamId || error.teamIndex === progress.options.opponentTeamId,
+  )
+  const errors = fieldingErrorRecordsOf(gameDrawn, (error) => {
     const teamId = error.teamIndex
-    if (teamId !== progress.options.ourTeamId && teamId !== progress.options.opponentTeamId) return null
+    if (teamId === null) return null
     const entry = entryBattersOf(progress, teamId)
     const index = fielderRecordIndexOf(entry, error.slot)
     const player = entry[index]
@@ -2183,7 +2200,12 @@ export function recordDrawnTeamFieldingErrors(
    */
   const fumbleCodes = drawn
     .filter((error) => error.isFumble === true && error.teamIndex === progress.options.ourTeamId)
-    .filter((error) => fielderRecordIndexOf(entryBattersOf(progress, progress.options.ourTeamId), error.slot) >= 0)
+    // 그림이 레코드를 실었으면 이미 [+0xec] != 0 인 것만 왔다(`drawnFieldingErrorsOf`) — 옛 입구만 명단으로 찾는다
+    .filter(
+      (error) =>
+        error.record !== undefined ||
+        fielderRecordIndexOf(entryBattersOf(progress, progress.options.ourTeamId), error.slot) >= 0,
+    )
     .map(() => SEASON_RECORD_CODE.수비실수)
   // 시즌(모드 2)이 아니면 `withSeasonRecord` 가 칸을 그대로 돌려준다
   const gameRecord = fumbleCodes.length === 0 ? progress.gameRecord : withSeasonRecord(progress, '수비', fumbleCodes)
@@ -2429,13 +2451,52 @@ export function substitutionStaminaOf(progress: TeamGameProgress, index: number)
  * 먹인 값, J-4)를 로스터의 수비 자리 코드로 칸에 꽂는다.
  * 칸 0(투수)은 판 시작 0xb0fb4 가 선수를 찾지 않아(b1032) 진행기가 고정값으로 둔다 — 마운드 투수를 넣지 않는다.
  */
-function defenseAbilitiesFor(progress: TeamGameProgress, teamId: number): readonly number[] {
+function defenseAbilitiesFor(progress: TeamGameProgress, teamId: number): readonly (number | null)[] {
   const context = abilityContextOf(progress.options)
-  return defenseAbilitiesOf(
+  const abilities: (number | null)[] = defenseAbilitiesOf(
     entryBattersOf(progress, teamId).map((player, slot) => ({
       position: player.position,
       defense: entryBatterGameAbilities(context, teamId, player, slot)[2],
     })),
+  )
+  // 칸 0 은 +0xec(마지막 교대 판의 지명타자 — 상대 팀일 수 있다). b41ec 가 팀 레코드는 **지금 수비 팀**으로 넘기므로(0xb8681(팀[st[0xa]]))
+  // 팀 능력치 · 시즌 보정은 수비 팀 것으로 센다. 그 레코드는 니블 1(지명)이라 보직 불일치(0xb5844)가 없어 명단 칸을 안 넘긴다. 비었으면 null
+  const seat = fielderRecordsFor(progress, teamId)[0]
+  abilities[0] = seat == null ? null : entryBatterGameAbilities(context, teamId, seat.player, NO_LINEUP_SLOT)[2]
+  return abilities
+}
+
+/** 보직 불일치 판정에 넘길 명단 칸이 없음 — `entryBatterGameAbilities` 의 `context.lineup[칸]` 이 비어 벌점이 없다 */
+const NO_LINEUP_SLOT = -1
+
+/** 팀 경기의 야수 +0xec 한 칸 — 레코드(명단 줄)를 함께 든다(대타로 명단에서 빠져도 +0xec 는 그 레코드를 가리킨 채다) */
+interface TeamFielderSeat extends FielderRecordSeat {
+  readonly player: TeamEntryBatter
+}
+
+/**
+ * `teamId` 명단 차례 칸 `index` 의 +0xec 자리 — 실책 열쇠는 도루와 같다(표 밖 선수는 원본 id, 마타자는 웹 기록표에 칸이 없어 null).
+ */
+function teamFielderSeatOf(progress: TeamGameProgress, teamId: number, index: number): TeamFielderSeat {
+  const player = entryBattersOf(progress, teamId)[index]!
+  const errorKey =
+    player.aceIndex >= 0
+      ? null
+      : player.rosterSlot === NO_ROSTER_SLOT
+        ? player.recordId === undefined
+          ? null
+          : { teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId: player.recordId }
+        : { teamId: player.tableTeamId ?? teamId, battingOrderIndex: player.rosterSlot }
+  return { teamId, index, errorKey, player }
+}
+
+/**
+ * 판 시작 0xb0fb4 뒤의 야수 +0xec 아홉 칸 — 칸 1..8 은 그 판 수비 팀(`teamId`) 명단으로 다시 훑고 칸 0 은 진행기가 든 값
+ * (`fielderRecords` — 마지막 교대 판 0x3fac4 가 적은 것, `entities/fielding/model/fielderRecords`).
+ */
+function fielderRecordsFor(progress: TeamGameProgress, teamId: number): readonly (TeamFielderSeat | null)[] {
+  return fielderRecordsAtPlayStart(progress.fielderRecords, entryBattersOf(progress, teamId), (index) =>
+    teamFielderSeatOf(progress, teamId, index),
   )
 }
 
@@ -2444,9 +2505,13 @@ function defenseAbilitiesFor(progress: TeamGameProgress, teamId: number): readon
  * `0xb62b4(선수, 0x15)`(초감각)를 묻는다 — 명단 줄 레코드 +0x14(`entryBatterSkillIdsOf`, 마타자는 제 행) (`defenseSkillIdsOf`)
  */
 function fielderSkillIdsFor(progress: TeamGameProgress, teamId: number): (readonly number[])[] {
-  return defenseSkillIdsOf(
+  const skills = defenseSkillIdsOf(
     entryBattersOf(progress, teamId).map((player) => ({ position: player.position, skillIds: entryBatterSkillIdsOf(player) })),
   )
+  // 칸 0 — 66ad4 0xb62b4(+0xec, 0x15) 도 +0xec 레코드에 묻는다
+  const seat = fielderRecordsFor(progress, teamId)[0]
+  skills[0] = seat == null ? [] : entryBatterSkillIdsOf(seat.player)
+  return skills
 }
 
 /**
@@ -2861,6 +2926,7 @@ function batterDefenseInputOf(
     fielderSkillIds: fielderSkillIdsFor(progress, progress.options.opponentTeamId),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.options.opponentTeamId,
+    fielderRecords: fielderRecordsFor(progress, progress.options.opponentTeamId),
     offenseTeamIndex: progress.options.ourTeamId,
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, before.battingOrderIndex),
@@ -3589,6 +3655,7 @@ function defensiveDefenseInputOf(
     fielderSkillIds: fielderSkillIdsFor(progress, progress.options.ourTeamId),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.options.ourTeamId,
+    fielderRecords: fielderRecordsFor(progress, progress.options.ourTeamId),
     offenseTeamIndex: progress.options.opponentTeamId,
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
@@ -3876,6 +3943,7 @@ export function pickoff(
     fielderSkillIds: fielderSkillIdsFor(progress, progress.options.ourTeamId),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.options.ourTeamId,
+    fielderRecords: fielderRecordsFor(progress, progress.options.ourTeamId),
     offenseTeamIndex: progress.options.opponentTeamId,
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
@@ -3931,6 +3999,7 @@ export function cpuPickoff(
     fielderSkillIds: fielderSkillIdsFor(progress, progress.options.opponentTeamId),
     // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
     defenseTeamIndex: progress.options.opponentTeamId,
+    fielderRecords: fielderRecordsFor(progress, progress.options.opponentTeamId),
     offenseTeamIndex: progress.options.ourTeamId,
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
@@ -4219,6 +4288,7 @@ function arriveTeamPitch(
             fielderSkillIds: fielderSkillIdsFor(progress, options.opponentTeamId),
             // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
             defenseTeamIndex: options.opponentTeamId,
+            fielderRecords: fielderRecordsFor(progress, options.opponentTeamId),
             offenseTeamIndex: options.ourTeamId,
             defenseIsCpu: true,
             offenseIsCpu: false,
@@ -4232,6 +4302,7 @@ function arriveTeamPitch(
             fielderSkillIds: fielderSkillIdsFor(progress, options.ourTeamId),
             // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
             defenseTeamIndex: options.ourTeamId,
+            fielderRecords: fielderRecordsFor(progress, options.ourTeamId),
             offenseTeamIndex: options.opponentTeamId,
             defenseIsCpu: false,
             offenseIsCpu: true,
@@ -5861,6 +5932,8 @@ function withHalfInningBoard(progress: TeamGameProgress, random: RandomPort): Te
   if (last !== null && last.inning === game.inning && last.half === game.half) return progress
   if (last === null && introSkipsFirstBoard(progress.options.mode, settingsOf(progress))) return progress
   const fielderRolls = rollHalfInningFielders(random)
+  // 같은 틱의 0x3fac4 3fe0a~3fe4c — 판의 수비 팀 레코드 차례로 야수 아홉의 +0xec 를 적는다(칸 0 은 그 팀 지명타자)
+  const defenseTeamId = isOurOffense(progress) ? progress.options.opponentTeamId : progress.options.ourTeamId
   return {
     ...progress,
     halfInningBoard: {
@@ -5869,6 +5942,9 @@ function withHalfInningBoard(progress: TeamGameProgress, random: RandomPort): Te
       inning: game.inning,
       half: game.half,
     },
+    fielderRecords: fielderRecordsAfterBoard(progress.fielderRecords, entryBattersOf(progress, defenseTeamId), (index) =>
+      teamFielderSeatOf(progress, defenseTeamId, index),
+    ),
   }
 }
 

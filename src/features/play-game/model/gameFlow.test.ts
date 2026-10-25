@@ -26,6 +26,7 @@ import {
   opponentMoundOf,
   withGameTeamMorale,
   recordDrawnFieldingErrors,
+  opponentFielderRecordsOf,
 } from '@/features/play-game/model/gameFlow'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
@@ -2046,5 +2047,46 @@ describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee
       ...(포수 < 0 ? [] : [{ teamId: progress.opponentTeamId, battingOrderIndex: 포수 }]),
     ])
     expect(recordDrawnFieldingErrors(progress, [])).toBe(progress)
+  })
+})
+
+describe('야수 +0xec 칸 0 — 1회초 판 0x3fac4 만 적는다 (모드 4, `entities/fielding/model/fielderRecords`)', () => {
+  const 지명칸 = (teamId: number) => teamBatters(teamId).findIndex((player) => ((player.position ?? 0) & 0xf) === 1)
+
+  it('1회초 판이 안 선 경기는 칸 0 이 0 이다 — 상대 투수 칸 펌블 0 · 레이저 굴림 없음 · 실책 안 쌓임', () => {
+    const progress = startGame(createSeededRandom(3), 0, 1)
+    expect(progress.halfInningBoard).toBeNull()
+    const 자리 = opponentFielderRecordsOf(progress)
+    expect(자리[0]).toBeNull()
+    // 칸 1..8 은 판마다 상대 명단으로 다시 찾는다(0xb0fb4)
+    const 포수 = teamBatters(progress.opponentTeamId).findIndex((player) => ((player.position ?? 0) & 0xf) === 2)
+    expect(자리[1]).toEqual({ teamId: progress.opponentTeamId, index: 포수, errorKey: { teamId: progress.opponentTeamId, battingOrderIndex: 포수 } })
+  })
+
+  it('선공 · 1번이라 판이 서면 칸 0 은 상대 지명타자 — 판 입력 · 그림 · 실책이 그 레코드를 쓴다', () => {
+    const progress = startGame(createSeededRandom(3), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+    const 지명 = 지명칸(progress.opponentTeamId)
+    expect(지명).toBeGreaterThanOrEqual(0)
+    const 칸0 = { teamId: progress.opponentTeamId, index: 지명, errorKey: { teamId: progress.opponentTeamId, battingOrderIndex: 지명 } }
+    expect(progress.fielderRecords?.[0]).toEqual(칸0)
+    expect(opponentFielderRecordsOf(progress)[0]).toEqual(칸0)
+    // 그림이 실은 레코드로 쌓는다
+    const 끝 = recordDrawnFieldingErrors(progress, [{ slot: 0, teamIndex: progress.opponentTeamId, record: 칸0 }])
+    expect(끝.leagueErrors).toEqual([{ teamId: progress.opponentTeamId, battingOrderIndex: 지명 }])
+  })
+
+  it('타구 판 입력의 칸 0 능력치 — 판이 없으면 null, 서면 상대 지명타자의 수비', () => {
+    const 판입력 = (progress: GameProgress) => {
+      const 끝 = startPlayerOutcome(progress, { kind: '아웃', detail: '땅볼아웃' }, createSeededRandom(5))
+      return 끝.pendingDefensePlay
+    }
+    const 판없음 = 판입력(startGame(createSeededRandom(3), 0, 1))
+    const 판있음진행 = startGame(createSeededRandom(3), 0, 1, undefined, PLAYER_SIDE_FIRST_BAT)
+    const 판있음 = 판입력(판있음진행)
+    expect(판없음?.defenseAbilities?.[0]).toBeNull()
+    expect(판없음?.fielderRecords?.[0]).toBeNull()
+    const 지명 = teamBatters(판있음진행.opponentTeamId)[지명칸(판있음진행.opponentTeamId)]!
+    expect(판있음?.defenseAbilities?.[0]).toBe(지명.ability[2])
+    expect(판있음?.fielderRecords?.[0]?.index).toBe(지명칸(판있음진행.opponentTeamId))
   })
 })

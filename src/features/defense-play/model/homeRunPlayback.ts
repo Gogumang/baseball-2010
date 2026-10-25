@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { BaseState } from '@/entities/game/model/baseState'
@@ -33,7 +34,7 @@ export interface HomeRunPlaybackInput {
   /** 원본 패턴. 안 주면 결과에 맞는 원본 패턴을 고른다 (`fixturePatternFor`) */
   readonly pattern?: BattedBallPattern
   /** 수비 9명의 수비 능력치 (칸 순서). 기본 500 */
-  readonly defenseAbilities?: readonly number[]
+  readonly defenseAbilities?: readonly (number | null)[]
 
   // ── 아래 셋은 **그림에만 쓰인다** (`runDefensePlay` 와 같은 칸들) ──
 
@@ -45,6 +46,8 @@ export interface HomeRunPlaybackInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   /** 수비 팀 번호 0~14 — 야수 그림 팔레트 `defender.mpl` (C-1, 15색) */
   readonly defenseTeamIndex?: number
+  /** 야수 +0xec — 칸별 선수 레코드(판 시작 뒤 값, `entities/fielding/model/fielderRecords`). 그림이 야수마다 싣는다. 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
   readonly offenseTeamIndex?: number
 }
@@ -64,6 +67,7 @@ export function homeRunPlaybackOf(input: HomeRunPlaybackInput): DefensePlayResul
     defenseIsCpu: true,
     aceIndexes: aceIndexesWithOriginalBug(input.aceIndexes),
     defenseTeamIndex: input.defenseTeamIndex,
+    fielderRecords: input.fielderRecords,
     offenseTeamIndex: input.offenseTeamIndex,
   })
 }
