@@ -5,6 +5,7 @@
  * 화면은 **한 틱치 스냅샷**만 받는다. 모델이 붙으면 그 쪽에서 이 모양으로 넘겨 주면 된다.
  */
 
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import type { WorldPoint } from '@/pages/defense/lib/defenseCamera'
 import { TEAM_COUNT } from '@/shared/lib/sprite/paletteSwap'
 
@@ -274,6 +275,8 @@ export interface DefenseFielder {
   readonly aceIndex?: number | null
   /** 수비 팀 번호 0~14 — 그림 색을 갈아 끼우는 데 쓴다. 안 주면 구운 색 그대로다 (C-1) */
   readonly teamIndex?: number | null
+  /** 야수 +0xec 선수 레코드 — 실책 그림 0x43278 이 [+0xec]+0x2e 를 올리는 대상(`entities/fielding/model/fielderRecords`). null = 0(안 올린다), 안 주면 모른다 */
+  readonly record?: FielderRecordSeat | null
 
   // ── player_effect 부착 효과 칸 (0x43278 이 본다 — `playerEffectMarksOf`). 안 주면 아무것도 안 붙는다 ──
 

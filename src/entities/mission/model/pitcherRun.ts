@@ -10,7 +10,7 @@ import {
 } from '@/entities/mission/model/missionGoal'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
-import { limitOrNull, missionPlay } from '@/entities/mission/model/missionRun'
+import { limitOrNull, missionPlay, missionStartFielderZeroOf } from '@/entities/mission/model/missionRun'
 import type { MissionRun, MissionStatus } from '@/entities/mission/model/missionRun'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { baserunnerAllowedOfFates, chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
@@ -89,6 +89,7 @@ export function startPitcherMission(mission: OriginalMission, setup: MissionGame
     allowed: { runs: 0, hits: 0, walks: 0, baserunner: 0 },
     cpu,
     game,
+    fielderZeroRecord: missionStartFielderZeroOf({ mission, game }),
   }
 }
 

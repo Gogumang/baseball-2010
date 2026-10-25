@@ -66,3 +66,20 @@ describe('야수 +0xec — 자리 니블이 칸 + 1 인 첫 선수 (0xb0fb4 · 0
     expect(기록).toEqual([{ teamId: 2, battingOrderIndex: 4 }])
   })
 })
+
+describe('그림이 실은 +0xec 레코드 (`DefenseFielder.record` — `entities/fielding/model/fielderRecords`)', () => {
+  const 상대지명 = { teamId: 7, index: 0, errorKey: { teamId: 7, battingOrderIndex: 0 } }
+
+  it('[+0xec] == 0 이면 +0x2e 도 0xa755d 도 건너뛴다 (4383a · 438ea) — 펌블 함성은 따로 늘 난다', () => {
+    expect(drawnFieldingErrorsOf([{ slot: 0, fumbleTicks: 6, teamIndex: 3, record: null }])).toEqual([])
+    expect(drawnFieldingErrorsOf([{ slot: 0, throwErrorTicks: 4, teamIndex: 3, record: null }])).toEqual([])
+  })
+
+  it('레코드가 있으면 그 레코드에 붙는다 — 칸 0 이 앞 판의 상대 팀 지명타자여도 (지금 수비 팀 명단으로 찾지 않는다)', () => {
+    const 그림 = drawnFieldingErrorsOf([{ slot: 0, throwErrorTicks: 4, teamIndex: 3, record: 상대지명 }])
+    expect(그림).toEqual([{ slot: 0, teamIndex: 3, record: 상대지명 }])
+    expect(fieldingErrorRecordsOf(그림, () => ({ teamId: 3, battingOrderIndex: 2 }))).toEqual([{ teamId: 7, battingOrderIndex: 0 }])
+    // 기록표 칸이 없는 레코드(마타자 등)는 버린다
+    expect(fieldingErrorRecordsOf([{ slot: 0, teamIndex: 3, record: { ...상대지명, errorKey: null } }], () => null)).toEqual([])
+  })
+})

@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
@@ -162,7 +163,7 @@ export interface StealStartDefenseInput {
   readonly bases: BaseState
   /** state[6] — 지금 아웃 수 (0xafb24 가 본다) */
   readonly outs: number
-  readonly defenseAbilities?: readonly number[]
+  readonly defenseAbilities?: readonly (number | null)[]
   /** 루별 주자 주루 (0 은 안 본다) */
   readonly runAbilities?: Partial<Record<0 | 1 | 2 | 3, number>>
   readonly runAbility?: number
@@ -220,7 +221,7 @@ export interface PitchArrivalPlayInput {
   readonly bases: BaseState
   /** 이 투구 전의 아웃 수 (state[6]) — 판 종류 고르기(0x3e0ee)가 읽는다. 판은 삼진이 서면 + 1 로 연다(`playOutsOf`) */
   readonly outs: number
-  readonly defenseAbilities?: readonly number[]
+  readonly defenseAbilities?: readonly (number | null)[]
   /**
    * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
    * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
@@ -242,6 +243,8 @@ export interface PitchArrivalPlayInput {
   /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
   readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
+  /** 야수 +0xec — 칸별 선수 레코드(판 시작 뒤 값, `entities/fielding/model/fielderRecords`). 그림이 야수마다 싣는다. 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   readonly offenseTeamIndex?: number
   /**
    * 장면 +0xfdc — 공이 도착할 때의 번트 종류(0 = 없음). 판 시작 리드 `0x3d7b8`(3d8e0 이 장면 +0xfdc 를 바로 읽는다)이
@@ -358,6 +361,7 @@ export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: Ran
         runnerTeamGrade: input.runnerTeamGrade,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
+        fielderRecords: input.fielderRecords,
         offenseTeamIndex: input.offenseTeamIndex,
         fielderPlates: input.fielderPlates,
         runnerAces: input.runnerAces,
@@ -389,6 +393,7 @@ export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: Ran
     runningMode: input.runningMode,
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
+    fielderRecords: input.fielderRecords,
     offenseTeamIndex: input.offenseTeamIndex,
     fielderPlates: input.fielderPlates,
     fielderSkillIds: input.fielderSkillIds,

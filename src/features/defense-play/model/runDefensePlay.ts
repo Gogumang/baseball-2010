@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
 import { judgeCallSoundIdOf } from '@/features/defense-play/model/judgeCall'
 import {
@@ -251,7 +252,7 @@ export interface DefensePlayInput {
   /** 투구 때의 아웃 수 */
   readonly outs: number
   /** 수비 9명의 수비 능력치 (칸 순서). 기본 500 */
-  readonly defenseAbilities?: readonly number[]
+  readonly defenseAbilities?: readonly (number | null)[]
   /**
    * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
    * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
@@ -421,6 +422,8 @@ export interface DefensePlayInput {
   readonly aceIndexes?: readonly (number | null | undefined)[]
   /** 수비 팀 번호 0~14 — 야수 그림 팔레트 `defender.mpl` (C-1, 15색) */
   readonly defenseTeamIndex?: number
+  /** 야수 +0xec — 칸별 선수 레코드(판 시작 뒤 값, `entities/fielding/model/fielderRecords`). 그림이 야수마다 싣는다. 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   /** 공격 팀 번호 0~14 — 주자 그림 팔레트 */
   readonly offenseTeamIndex?: number
   /**
@@ -467,7 +470,8 @@ export interface DefenseLineupPlayer {
  *
  * 칸 0(투수)은 판 시작 0xb0fb4 가 **선수를 찾지 않는다**(b1032 — `fielderAbilityOf` 주석). 그래서 송구 속도 g = 2 ·
  * 악송구 보정 8 로 고정이고 송구 쪽은 이 칸의 값을 읽지 않는다. 대신 공수 교대 판 0x3fac4 가 칸 0 의 +0xec 에 **지명타자**
- * (니블 1)를 넣어 펌블 · 레이저 굴림이 그 수비를 본다 — 칸 0 에는 지명타자의 수비를 넣는다(`recordPlayerAbilityOf`).
+ * (니블 1)를 넣어 펌블 · 레이저 굴림이 그 수비를 본다 — 칸 0 에는 지명타자의 수비를 넣는다(`recordPlayerAbilityOf`). 진행기는 이 값을
+ * 장면이 든 +0xec(마지막 교대 판의 레코드, 판이 없었으면 null — `entities/fielding/model/fielderRecords`)로 덮어 넘긴다.
  * (예전 웹은 마운드 투수의 능력치 칸 2(투수 레코드에서는 변화)를 넣었다 — 원본에 없는 길이라 걷었다.)
  *
  * 자리 코드가 없거나 겹치는 칸은 원본 평균대(등급 3 = 500)로 둔다.
@@ -844,7 +848,7 @@ export interface DefensePlayState {
   // ── 시작할 때 정해지는 것 ──
   readonly input: DefensePlayInput
   trajectory: BattedBallTrajectory
-  readonly abilities: readonly number[]
+  readonly abilities: readonly (number | null)[]
   readonly maximumTicks: number
   /** 아무도 잡지 못하는 타구인가 (필살타법 0x51800) */
   uncatchable: boolean
@@ -3196,6 +3200,7 @@ export function stepDefensePlay(
         previousTargetOf: (index) => runners.find((runner) => runner.state.index === index)?.previousTarget ?? NONE,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
+        fielderRecords: input.fielderRecords,
         offenseTeamIndex: input.offenseTeamIndex,
       })
     ticks.push(snapshotAt(tick, fielders, pausedAtHead))

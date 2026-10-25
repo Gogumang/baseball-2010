@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { runnerSpeedOf, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
 import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
@@ -71,7 +72,7 @@ export interface WalkPlayInput {
   /** 이번 투구에 출발한 주자들의 루 (state[0x14 + 루]) */
   readonly stealingFrom?: readonly StealBase[]
   /** 수비 9명 능력치 (칸 순서) — 야수 송구 속도에만 쓰인다 */
-  readonly defenseAbilities?: readonly number[]
+  readonly defenseAbilities?: readonly (number | null)[]
   /**
    * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
    * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
@@ -88,6 +89,8 @@ export interface WalkPlayInput {
   /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
   readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
+  /** 야수 +0xec — 칸별 선수 레코드(판 시작 뒤 값, `entities/fielding/model/fielderRecords`). 그림이 야수마다 싣는다. 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   readonly offenseTeamIndex?: number
   /** 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`) */
   /**
@@ -192,6 +195,7 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
     restingBall: WALK_BALL_POINT,
     aceIndexes: input.aceIndexes,
     defenseTeamIndex: input.defenseTeamIndex,
+    fielderRecords: input.fielderRecords,
     offenseTeamIndex: input.offenseTeamIndex,
     fielderPlates: input.fielderPlates,
     runnerAceIndexes: runnerAceIndexesOf(input.runnerAces, input.bases),

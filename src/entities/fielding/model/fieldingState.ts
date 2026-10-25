@@ -222,9 +222,10 @@ export function throwErrorBiasOf(defenseGrade: number): number {
  * 그러나 야수+0xec 는 이 함수가 칸 0 에 쓰지 않을 뿐 비우지도 않는다 — **공수 교대 판 0x3fac4** 가 3fe0a~3fe4c 에서 야수 아홉
  * ([장면+0x111c+4i])마다 수비 팀(팀[st[0xa]], 3fd3c~3fd4e) 레코드 차례로 자리 니블 == i + 1 인 첫 선수를 +0xec 에 넣는다 —
  * 칸 0 은 니블 1 = **지명타자**다. +0xec 를 읽는 펌블(b41e4 → 표 0xd87d4[등급]) · 레이저(66a94 → 66aba 등급) 굴림은 그래서
- * 투수 칸이면 지명타자의 수비로 돈다(`recordPlayerAbilityOf`).
- * ⚠️ 근사(남김 — 수비 묶음 몫): 0x3fac4 는 공수 교대 판이 서서 OK 를 기다릴 때만 불려(R10) 판이 안 선 반 이닝 뒤에는 앞 판의 값이 남고, 장면을 만든
- *    뒤 첫 판 앞에는 0(new 의 memset)이다 — 웹은 늘 지금 수비 팀의 지명타자로 본다(`fieldingErrors.fielderRecordIndexOf` 와 같은 다리).
+ * 투수 칸이면 그 지명타자의 수비로 돈다(`recordPlayerAbilityOf`).
+ * 0x3fac4 는 공수 교대 판이 서서 OK 를 기다릴 때만 불려(4fb20 — 가드 3fad0 · 3fade · 3fae8) 판이 안 선 반 이닝 뒤에는 앞 판의 값이 남고,
+ * 장면을 만든 뒤 첫 판 앞에는 0(new 의 memset)이다 — 진행기가 그 칸을 장면 동안 들고(`entities/fielding/model/fielderRecords`)
+ * 능력치 배열의 칸 0 에 그 레코드의 수비를, 비었으면 null 을 넣는다.
  */
 export const UNSEARCHED_FIELDER_SLOT = 0
 
@@ -240,7 +241,7 @@ export const NO_PLAYER_THROW_ERROR_BIAS = 8
  * 펌블 · 레이저는 +0xec 를 보므로 `recordPlayerAbilityOf` 를 쓴다.
  */
 export function fielderAbilityOf(
-  defenseAbilities: readonly number[],
+  defenseAbilities: readonly (number | null)[],
   slot: number,
   fallback: number,
 ): number | null {
@@ -250,10 +251,16 @@ export function fielderAbilityOf(
 
 /**
  * 야수 **+0xec 선수**의 수비 능력치 — 펌블(b41e4) · 레이저(66a94)가 읽는 칸. 칸 1~8 은 판 시작 b1184 가, 칸 0 은 공수 교대 판
- * 0x3fac4 가 넣은 지명타자다(`UNSEARCHED_FIELDER_SLOT` 머리말). 능력치 배열의 칸 0 은 그 지명타자 값이다(`defenseAbilitiesOf`).
+ * 0x3fac4 가 넣은 지명타자다(`UNSEARCHED_FIELDER_SLOT` 머리말). 능력치 배열의 칸 0 은 진행기가 든 그 레코드의 값이고
+ * **null 은 +0xec 가 0** 인 칸이다 — 펌블은 표 대신 0(b41e4 beq b4224), 레이저는 굴리지 않는다(66aa6). 칸이 아예 없으면 `fallback`.
  */
-export function recordPlayerAbilityOf(defenseAbilities: readonly number[], slot: number, fallback: number): number {
-  return defenseAbilities[slot] ?? fallback
+export function recordPlayerAbilityOf(
+  defenseAbilities: readonly (number | null)[],
+  slot: number,
+  fallback: number,
+): number | null {
+  const ability = defenseAbilities[slot]
+  return ability === undefined ? fallback : ability
 }
 
 /**
@@ -300,7 +307,7 @@ export function runnerTeamGradeOf(mode: number, teamGrit: number): number {
  * 능력치는 송구 속도·악송구·펌블·필살수비 확률에만 쓰이고 **이동 속도에는 전혀 안 들어간다** (P2 1c).
  * `teamBonus` 는 `defenseTeamBonusOf` — 아홉 칸(칸 0 포함) 모두의 송구 속도에 더한다(등급 · 악송구 보정은 그대로).
  */
-export function createFielders(defenseAbilities: readonly number[], teamBonus = 0): readonly FielderState[] {
+export function createFielders(defenseAbilities: readonly (number | null)[], teamBonus = 0): readonly FielderState[] {
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
     // 칸 0(투수)은 b1032 가 선수를 찾지 않아 g = 2 고정 — 등급으로는 g − 1 = 1 (입력 능력치를 안 읽는다)
     const grade =

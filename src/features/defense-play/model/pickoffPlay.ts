@@ -1,3 +1,4 @@
+import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
@@ -177,7 +178,7 @@ export interface PickoffPlayInput {
   readonly bases: BaseState
   readonly outs: number
   /** 수비 9명 능력치 (칸 순서). 칸 0(투수)은 원본 그대로 레코드 칸 2 를 읽는다(`defenseAbilitiesOf`) */
-  readonly defenseAbilities?: readonly number[]
+  readonly defenseAbilities?: readonly (number | null)[]
   /**
    * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
    * 아홉 칸(칸 0 포함) 송구 속도에 더한다. 안 주면 0(모드 3~7 과 같다)
@@ -213,6 +214,8 @@ export interface PickoffPlayInput {
   /** 공격 팀 타자 · 루 위 주자의 마선수 번호 (`DefensePlayInput.runnerAces`) */
   readonly runnerAces?: RunnerAces
   readonly defenseTeamIndex?: number
+  /** 야수 +0xec — 칸별 선수 레코드(판 시작 뒤 값, `entities/fielding/model/fielderRecords`). 그림이 야수마다 싣는다. 안 주면 싣지 않는다 */
+  readonly fielderRecords?: readonly (FielderRecordSeat | null)[]
   readonly offenseTeamIndex?: number
   /**
    * 앞 판에서 넘어온 수비 장면 연출 칸 (`DefensePlayInput.scene`). 견제는 투구(0x10 · 0x11)를 안 지나 +0x1997 · 판정 애니를
@@ -1154,6 +1157,7 @@ function* pickoffPlaySteps(
         sceneResultCode: input.sceneResultCode ?? null,
         aceIndexes: input.aceIndexes,
         defenseTeamIndex: input.defenseTeamIndex,
+        fielderRecords: input.fielderRecords,
         offenseTeamIndex: input.offenseTeamIndex,
       })
     // 이 판 틱에 낸 소리(차례대로)를 그림에 싣는다 — 미리 돌린 판을 재생만 하는 화면(`DefensePlayback` 의 재생 갈래)이 그 틱에 낸다
