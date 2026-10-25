@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AIM_TAP_MIN_CELL, aimTapRectsOf, gaugeTapRectOf, slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
+import { AIM_TAP_MIN_CELL, aimTapRectsOf, gaugeTapRectOf, okBadgeTapRectOf, slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
 import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 
@@ -13,6 +13,18 @@ describe('투구 입력 누름 칸', () => {
     expect(slotTapRectOf(1, 1)).toEqual({ x: 63, y: 118, width: 64, height: 20 })
     expect(slotTapRectOf(1, 0)).toEqual({ x: 136, y: 118, width: 64, height: 20 })
     expect(slotTapRectOf(6, 1)).toBeNull()
+  })
+
+  it('칸 0 의 "OK" 글자(고리 프레임 25 의 왼쪽 위 귀)도 누름 칸이다 — 좌타 (37, 134) · 다른 칸과 겹치지 않는다', () => {
+    const badge = okBadgeTapRectOf(1)
+    expect(badge).toEqual({ x: 37, y: 134, width: 24, height: 15 })
+    const overlaps = (a: typeof badge, b: typeof badge) =>
+      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    for (const slot of [1, 2, 3, 4, 5]) {
+      const rect = slotTapRectOf(slot, 1)
+      expect(rect).not.toBeNull()
+      if (rect !== null) expect(overlaps(badge, rect)).toBe(false)
+    }
   })
 
   it('조준 칸은 자르기 상자의 투영을 3 × 3 으로 — 가운데 칸이 존 중심의 투영을 품는다', () => {
