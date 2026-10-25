@@ -15,7 +15,7 @@ const noTouchGestures = {
 } as const
 
 /**
- * 버튼 덩이 하나. `body` 격자의 칸(`pad` · `padL` · `padR`)에 바로 선다 — 감싸개(`#keypad-root`)는 `display: contents`.
+ * 버튼 덩이 하나. `body` 격자의 칸(`pad` · `padL`)에 선 감싸개(`#keypad-root` — 한 칸 격자, 전역 CSS)를 꽉 채운다.
  * 상황 버튼 줄(있을 때만). 칸이 남으면 가운데에 모인다.
  */
 export const panel = style({

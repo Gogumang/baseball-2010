@@ -223,3 +223,29 @@ describe('넘기기 · 차례 · 누름 칸 키', () => {
   })
 })
 
+
+describe('TouchControls — pointer 사건이 안 오는 기기(iOS Safari 사건 추적 영역 밖)에서도 탭이 닿는다 (r208)', () => {
+  it('pointerdown 없이 click 만 오면 키를 한 번 누르고 뗀다', () => {
+    render(<TouchControls layout="below" />)
+    act(() => {
+      offerTouchKey({ key: '*', label: '메뉴' })
+    })
+    fireEvent.click(screen.getByRole('button', { name: '메뉴' }))
+    expect(keys()).toEqual(['keydown:*', 'keyup:*'])
+  })
+
+  it('pointer 로 이미 누른 탭 뒤의 click 은 버린다 — 키가 두 번 가지 않는다', () => {
+    render(<TouchControls layout="sides" />)
+    act(() => {
+      offerTouchKey({ key: '0', label: '필살타' })
+    })
+    const button = screen.getByRole('button', { name: '필살타' })
+    press(button)
+    lift(button)
+    fireEvent.click(button)
+    expect(keys()).toEqual(['keydown:0', 'keyup:0'])
+    // 다음 탭이 click 만 와도 다시 닿는다
+    fireEvent.click(button)
+    expect(keys()).toEqual(['keydown:0', 'keyup:0', 'keydown:0', 'keyup:0'])
+  })
+})
