@@ -34,6 +34,8 @@ import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEvent
 import { PRE_GAME_ACE_PHASE } from '@/entities/season-mode/model/preGameFlow'
 import { koreanSeriesRewardOf, nextLeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import { confirmNationalCupStandings, finishNationalCup } from '@/entities/national-cup/model/nationalCupFlow'
+import { isMyTurn } from '@/entities/league/model/seasonEnd'
+import type { PostseasonSeries } from '@/entities/league/model/league'
 import { KOREA_TEAM_ID, isKoreaInFinal, isNationalCupFinalDay, isNationalCupOver, nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import { FULL_PLAY_SETTINGS, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
@@ -368,6 +370,8 @@ async function captureNari(seed: number): Promise<Capture[]> {
   let started = false
   let trainingSlot = 0
   let done = false
+  /** 내 포스트시즌 경기를 치른 라운드 — 128 에 돌아와 라운드가 바뀌었으면 내 시리즈가 끝난 것 (r254) */
+  const myPostseason = { round: null as string | null }
   /** 마지막으로 이벤트(114)가 선 순간의 저장 — 134 로 곧장 이어하는 저장이 웹에 없어 그 앞 이벤트 저장을 쓴다(아래 '국가대항전') */
   try {
     await import('@/shared/config/original/events')
@@ -423,6 +427,7 @@ async function captureNari(seed: number): Promise<Capture[]> {
           act(() => actions.confirmNextGameStandings())
           break
         case '경기준비':
+          noteMyPostseasonGame(myPostseason, career?.postseason ?? null, career?.teamId ?? -1, career?.season ?? 0)
           act(() => actions.confirmMatchPrepare())
           break
         case '경기': {
@@ -479,6 +484,19 @@ async function captureNari(seed: number): Promise<Capture[]> {
               storage: snapshotStorage(),
             })
           }
+          if (screen.popup === null && career !== null && career.postseason !== null) {
+            for (const kind of postseasonSpotsOf(myPostseason, career.postseason, career.teamId, career.season)) {
+              const name = `nari-postseason-${kind}`
+              if (has(name)) continue
+              captures.push({
+                name,
+                note: `나리 타자편 ${where()} 포스트시즌 128 — ${POSTSEASON_SPOT_NOTE[kind]} (시리즈 ${seriesLineOf(career.postseason, career.teamId)}).`
+                  + ' 저장 S+0x50 = 128 이라 이어하기(continueSaved)가 128 진입 0x120a4 를 다시 밟는다.'
+                  + ` r254 soak(src/app/model/soak/soakFixtures.test.tsx, 씨앗 ${seed} · careerSoak 의 정책)이 그 자리의 실제 저장 모듈(createLocalStorageSaveGame)이 쓴 칸을 떴다`,
+                storage: snapshotStorage(),
+              })
+            }
+          }
           if (screen.popup !== null) act(() => actions.closePostseasonPopup())
           else act(() => actions.pressPostseason())
           break
@@ -500,6 +518,15 @@ async function captureNari(seed: number): Promise<Capture[]> {
               note: `나리 타자편 ${where()} 국가대항전 134 — 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 이어하기가 134 대진판에 돌아와`
                 + ` 대진판 확인(OK)이 결과 팝업 0x25 를 띄운다 (한국 ${screen.cup.champion === KOREA_TEAM_ID ? '우승' : '탈락'}).`
                 + ` r241 soak(soakFixtures.test.tsx, 씨앗 ${seed})이 실제 저장 모듈이 쓴 칸을 떴다`,
+              storage: snapshotStorage(),
+            })
+          }
+          if (!has('nari-cup-win') && isCupDecided(screen.cup) && screen.cup.champion === KOREA_TEAM_ID) {
+            captures.push({
+              name: 'nari-cup-win',
+              note: `나리 타자편 ${where()} 국가대항전 134 — 한국이 우승한 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 이어하기가 134 대진판에`
+                + ' 돌아와 대진판 확인(OK)이 결과 팝업 0x25(한국 우승)를 띄운다.'
+                + ` r254 soak(soakFixtures.test.tsx, 씨앗 ${seed})이 실제 저장 모듈이 쓴 칸을 떴다`,
               storage: snapshotStorage(),
             })
           }
@@ -541,6 +568,36 @@ async function captureNari(seed: number): Promise<Capture[]> {
   }
   if (!done) throw new Error(`나리 타자편 엔딩에 못 닿았다 (${where()})`)
   return captures
+}
+
+/* ─────────────── 내 팀 포스트시즌 시리즈 (r254) ─────────────── */
+
+/** 128 에서 뜰 자리 — 내 시리즈 경기 앞 · 내 시리즈가 끝나고 다음 라운드에 선 대진 · 내 팀이 한국시리즈를 이겨 끝난 대진 */
+type PostseasonSpot = 'game' | 'next' | 'champion'
+
+const POSTSEASON_SPOT_NOTE: Readonly<Record<PostseasonSpot, string>> = {
+  game: '내 팀 시리즈 차례(대진 [다음]이 142 경기 준비로 간다)인 대진판, 그해 내 포스트시즌 경기를 아직 안 친 자리',
+  next: '내 시리즈를 이겨 다음 라운드 대진에 선 자리(내 경기를 치르고 116 → 114 → 128 로 돌아온 대진판, [다음]이 다음 라운드 142)',
+  champion: '내 팀이 한국시리즈를 이겨 포스트시즌이 끝난 대진판([다음]이 StrMODE[137] 우승 팀 발표 팝업 7, 닫으면 StrMODE[190] 팝업 8)',
+}
+
+/** 142 에 선 순간 — 그것이 내 포스트시즌 경기면 라운드를 적는다 */
+function noteMyPostseasonGame(mine: { round: string | null }, series: PostseasonSeries | null, myTeamId: number, season: number): void {
+  if (series !== null && isMyTurn(series, myTeamId)) mine.round = `${season}/${series.round}`
+}
+
+/** 팝업 없는 128 이 어느 자리인가 */
+function postseasonSpotsOf(mine: { round: string | null }, series: PostseasonSeries, myTeamId: number, season: number): readonly PostseasonSpot[] {
+  if (series.round === '종료') return series.champion === myTeamId ? ['champion'] : []
+  if (!isMyTurn(series, myTeamId)) return []
+  // 그해 내 경기를 아직 안 쳤다 — 시리즈 경기 앞
+  if (mine.round === null || !mine.round.startsWith(`${season}/`)) return ['game']
+  return mine.round !== `${season}/${series.round}` ? ['next'] : []
+}
+
+function seriesLineOf(series: PostseasonSeries, myTeamId: number): string {
+  if (series.round === '종료') return `종료 · 우승 팀 ${series.champion}${series.champion === myTeamId ? '(내 팀)' : ''}`
+  return `${series.round} ${series.teams.join(' 대 ')} ${series.wins.join(':')} · 내 팀 ${myTeamId}`
 }
 
 /** 대진판 확인이 결과 팝업으로 가는 대회 (`confirmNationalCupStandings` 의 두 '결과' 갈래 — 난수를 안 쓰고 본다) */
@@ -619,6 +676,7 @@ async function captureNariPitcher(seed: number, role: number, boostAbility: bool
   let aceMatches = 0
   let cupEntry: object | null = null
   let done = false
+  const myPostseason = { round: null as string | null }
   try {
     await waitFor(() => expect(result.current.career).toBeNull())
     act(() => result.current.actions.create('SOAK', {
@@ -682,6 +740,7 @@ async function captureNariPitcher(seed: number, role: number, boostAbility: bool
           act(() => actions.confirmNextGameStandings())
           break
         case '경기준비':
+          noteMyPostseasonGame(myPostseason, career.postseason, career.teamId, career.season)
           act(() => actions.confirmMatchPrepare())
           break
         case '경기': {
@@ -725,6 +784,18 @@ async function captureNariPitcher(seed: number, role: number, boostAbility: bool
               storage: snapshotStorage(),
             })
           }
+          if (session.postseasonPopup === null && career.postseason !== null) {
+            for (const kind of postseasonSpotsOf(myPostseason, career.postseason, career.teamId, career.season)) {
+              const name = `pitcher-postseason-${kind}`
+              if (has(name)) continue
+              captures.push({
+                name,
+                note: `나리 투수편 ${where()} 포스트시즌 128 — ${POSTSEASON_SPOT_NOTE[kind]} (시리즈 ${seriesLineOf(career.postseason, career.teamId)}).`
+                  + ` 저장의 이어할 자리가 포스트시즌이라 투수편에 들어서면 128 진입 0x120a4 를 다시 밟는다. ${how.replace('r236', 'r254')}이 그 자리의 실제 저장 모듈이 쓴 칸을 떴다`,
+                storage: snapshotStorage(),
+              })
+            }
+          }
           if (session.postseasonPopup !== null) act(() => actions.closePostseasonPopup())
           else act(() => actions.pressPostseason())
           break
@@ -743,6 +814,14 @@ async function captureNariPitcher(seed: number, role: number, boostAbility: bool
               name: 'pitcher-cup-result',
               note: `나리 투수편 ${where()} 국가대항전 134 — 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 투수편에 들어서면 134 대진판부터라`
                 + ` 대진판 확인(OK)이 결과 팝업 0x25 를 띄운다 (한국 ${entry.cup.champion === KOREA_TEAM_ID ? '우승' : '탈락'}). ${how}이 실제 저장 모듈이 쓴 칸을 떴다`,
+              storage: snapshotStorage(),
+            })
+          }
+          if (!has('pitcher-cup-win') && !entry.atStandings && isCupDecided(entry.cup) && entry.cup.champion === KOREA_TEAM_ID) {
+            captures.push({
+              name: 'pitcher-cup-win',
+              note: `나리 투수편 ${where()} 국가대항전 134 — 한국이 우승한 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 투수편에 들어서면 134 대진판부터라`
+                + ` 대진판 확인(OK)이 결과 팝업 0x25(한국 우승)를 띄운다. ${how.replace('r236', 'r254')}이 실제 저장 모듈이 쓴 칸을 떴다`,
               storage: snapshotStorage(),
             })
           }
@@ -848,6 +927,14 @@ const EXPECTED_RESUME: Readonly<Record<string, string | RegExp>> = {
   'pitcher-cup-result': '투수편 국가대항전',
   'pitcher-ending': '투수편 이벤트',
   'pitcher-hall-of-fame': '투수편 엔딩',
+  'nari-postseason-game': '타자편 포스트시즌',
+  'nari-postseason-next': '타자편 포스트시즌',
+  'nari-postseason-champion': '타자편 포스트시즌',
+  'nari-cup-win': '타자편 국가대항전 끝남',
+  'pitcher-postseason-game': '투수편 포스트시즌',
+  'pitcher-postseason-next': '투수편 포스트시즌',
+  'pitcher-postseason-champion': '투수편 포스트시즌',
+  'pitcher-cup-win': '투수편 국가대항전',
 }
 
 async function checkAndWrite(captures: readonly Capture[]): Promise<void> {
@@ -864,6 +951,11 @@ async function checkAndWrite(captures: readonly Capture[]): Promise<void> {
 /** 씨앗 — 포스트시즌(정규시즌 1위 진입 팝업) · 국가대항전을 둘 다 지나 보너스 엔딩(4)까지 가는 판. r249 에 엔진 변경(r244 정산 따위)으로 씨앗 1 이 4년차 부상 엔딩 0 · 1위 아님으로 갈라져 4 로 옮겼다 (`SOAK_FIXTURE_NARI_SEED` · `SOAK_FIXTURE_PITCHER_SEED` 로 바꿔 찾는다) */
 const NARI_SEED = Number(process.env.SOAK_FIXTURE_NARI_SEED ?? 4)
 const PITCHER_SEED = Number(process.env.SOAK_FIXTURE_PITCHER_SEED ?? 2)
+/**
+ * 타자편 `nari-cup-win` 만 뜨는 씨앗 (r254) — 씨앗 4 는 13년 내내 국가대항전에서 한국이 못 이겨, 한국 우승 대진판은 따로 돌려 뜬다.
+ * r254 에 1 · 2 · 3 · 5 · 6 · 7 을 훑어 2 · 3 · 5 에서 닿았다 (`SOAK_FIXTURE_NARI_CUP_WIN_SEED` 로 바꾼다)
+ */
+const NARI_CUP_WIN_SEED = Number(process.env.SOAK_FIXTURE_NARI_CUP_WIN_SEED ?? 5)
 
 describe.runIf(isEnabled)('soak 로 e2e 픽스처 뜨기 (SOAK_FIXTURE=1)', () => {
   beforeEach(() => {
@@ -886,13 +978,29 @@ describe.runIf(isEnabled)('soak 로 e2e 픽스처 뜨기 (SOAK_FIXTURE=1)', () =
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] })
     const captures = await captureNari(NARI_SEED)
     vi.useRealTimers()
-    expect(captures.map((capture) => capture.name).sort()).toEqual(['nari-cup', 'nari-cup-result', 'nari-ending', 'nari-hall-of-fame', 'nari-postseason'])
+    process.stdout.write(`[soak 픽스처] 타자편 뜬 것: ${captures.map((capture) => capture.name).join(' ')}\n`)
+    expect(captures.map((capture) => capture.name).sort()).toEqual([
+      'nari-cup', 'nari-cup-result', 'nari-ending', 'nari-hall-of-fame', 'nari-postseason',
+      'nari-postseason-champion', 'nari-postseason-game', 'nari-postseason-next',
+    ])
+    await checkAndWrite(captures)
+  }, 1_200_000)
+
+  it('나리 타자편 국가대항전 한국 우승 대진판 (씨앗 따로 — 기본 씨앗은 13년 동안 한국이 못 이긴다)', async () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] })
+    const captures = (await captureNari(NARI_CUP_WIN_SEED)).filter((capture) => capture.name === 'nari-cup-win')
+    vi.useRealTimers()
+    expect(captures.map((capture) => capture.name)).toEqual(['nari-cup-win'])
     await checkAndWrite(captures)
   }, 1_200_000)
 
   it('나리 투수편 포스트시즌 · 국가대항전(진입 · 끝난 대진판) · 엔딩 · 명예의 전당 등록 앞', async () => {
     const captures = await captureNariPitcher(PITCHER_SEED, PITCHER_ROLE.starter, true)
-    expect(captures.map((capture) => capture.name)).toEqual(expect.arrayContaining(['pitcher-postseason', 'pitcher-cup', 'pitcher-cup-result', 'pitcher-ending', 'pitcher-hall-of-fame']))
+    process.stdout.write(`[soak 픽스처] 투수편 뜬 것: ${captures.map((capture) => capture.name).join(' ')}\n`)
+    expect(captures.map((capture) => capture.name)).toEqual(expect.arrayContaining([
+      'pitcher-postseason', 'pitcher-cup', 'pitcher-cup-result', 'pitcher-ending', 'pitcher-hall-of-fame',
+      'pitcher-postseason-game', 'pitcher-postseason-next', 'pitcher-postseason-champion', 'pitcher-cup-win',
+    ]))
     await checkAndWrite(captures)
   }, 1_200_000)
 })

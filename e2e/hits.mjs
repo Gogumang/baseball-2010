@@ -126,6 +126,28 @@ const ACTIONS = {
   'pitcher-hall-of-fame': [
     { name: '등록 질문 예 → 등록 목록', steps: ['@예', 'w800'], expect: '1번 슬롯' },
   ],
+  // r254 — 사람 팀 포스트시즌 시리즈 · 한국시리즈 우승 팝업 · 국가대항전 한국 우승
+  'nari-postseason-game': [
+    { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
+  ],
+  'pitcher-postseason-game': [
+    { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
+    { name: "강판 물음 '#'", steps: ['@# 강판'], expect: '예', undo: ['@아니오'] },
+  ],
+  'nari-postseason-next': [
+    // 키 0x13da0 — 다음 라운드 대진에 내 팀이 있어 142 경기 준비
+    { name: '대진판 다음 → 다음 라운드 142 경기 준비', steps: ['@다음', 'w1500'], expect: '경기 시작' },
+  ],
+  'pitcher-postseason-next': [
+    { name: '대진판 다음 → 다음 라운드 142 경기 준비', steps: ['@다음', 'w1500'], expect: '경기 시작' },
+  ],
+  'nari-postseason-champion': [
+    // 팝업 7 StrMODE[137] 닫힘 — 우승 팀이 내 팀이라 팝업 8 StrMODE[190] (0x15984)
+    { name: '우승 팀 발표 OK → 한국시리즈 우승 팝업', steps: ['@OK', 'w700'], expect: '알림' },
+  ],
+  'pitcher-postseason-champion': [
+    { name: '우승 팀 발표 OK → 한국시리즈 우승 팝업', steps: ['@OK', 'w700'], expect: '알림' },
+  ],
 }
 
 /** 기본 상태에서 서 있어야 할 것 — 안 서면 자리가 멈춘 뒤 한 번 더 본다 */
@@ -138,7 +160,8 @@ const SCENE_NAMES = [
   'season-management', 'season-outing', 'general-quick', 'general-bat', 'general-pitch', 'general-defense', 'derby-pick', 'derby-start',
   'nari-burst-result', 'pitcher-pitch', 'pitcher-defense', 'general-relay', 'mission-bat', 'mission-pitch', 'mission-result', 'season-postseason', 'season-cup',
   'season-ending', 'nari-postseason', 'nari-cup', 'nari-cup-result', 'nari-ending', 'nari-hall-of-fame', 'pitcher-postseason', 'pitcher-cup', 'pitcher-cup-result',
-  'pitcher-ending', 'pitcher-hall-of-fame',
+  'pitcher-ending', 'pitcher-hall-of-fame', 'nari-postseason-game', 'nari-postseason-next', 'nari-postseason-champion', 'nari-korean-series',
+  'nari-cup-win', 'pitcher-postseason-game', 'pitcher-postseason-next', 'pitcher-postseason-champion', 'pitcher-korean-series', 'pitcher-cup-win',
 ]
 
 const argScenes = process.argv.slice(2)
