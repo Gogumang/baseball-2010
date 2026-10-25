@@ -80,7 +80,10 @@ function applyReward(career: PitcherCareer, reward: EventReward, random: RandomP
     case EVENT_REWARD_KIND.G포인트:
       return { ...career, gamePoint: clamp(career.gamePoint + reward.value, 0, MAXIMUM_GAME_POINT) }
     case EVENT_REWARD_KIND.질병:
-      if (reward.value < 0) return { ...career, isSick: false, illnessName: null, illnessCooldown: ILLNESS_COOLDOWN }
+      // 값 < 0 치료 갈래 0x8c73e~0x8c752 (모드 갈림 없음): +5 = 0 · +6 = 표 0xd4d98[0](0) · +0x7c = 20 — 남은 기간도 0 (r257)
+      if (reward.value < 0) {
+        return { ...career, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: ILLNESS_COOLDOWN }
+      }
       // 값 ≥ 0 은 알림 글 만들기(0x8c14e)가 bfa55(0,4)+1 로 다시 써 질병 종류가 된다 — 타자편과 같은 굴림
       return {
         ...career,
