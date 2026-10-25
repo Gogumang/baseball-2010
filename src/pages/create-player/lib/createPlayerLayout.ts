@@ -1,7 +1,7 @@
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
-  BATTING_TYPE_NAMES, INFO_BOARD, INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP,
+  BATTING_TYPE_NAMES, INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP,
   POSITION_NAMES, SIDE_NAMES, SKIN_NAMES,
 } from '@/pages/management/lib/basicInfoLayout'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
@@ -172,16 +172,6 @@ export function arrowTopLeftOf(box: { readonly x: number; readonly y: number; re
 
 /** 선수 미리보기 자세 — 대기 애니 첫 칸 (batterLayersOf 의 프레임 0) */
 export const FIGURE_POSE_FRAME = 0
-
-/**
- * 안내 문구 줄. 원본이 StrMODE 안내를 어디에 그리는지는 아직 미해독이라
- * 정보 판(21,176,196,83) 바로 아래에 둔다 — **배치 근사**.
- */
-export const HINT_BOX = {
-  x: INFO_BOARD.x,
-  y: INFO_BOARD.y + INFO_BOARD.height + 5,
-  width: INFO_BOARD.width,
-} as const
 
 /**
  * 등록 화면의 타순 칸 = **8** — 등록 화면에 타순 선택은 없고(C-4 확정), 생성 0x17360 이 타자면 레코드 +0xa 에

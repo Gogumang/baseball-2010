@@ -94,12 +94,14 @@ describe('아이템 창 박스 (mode_ui 프레임 33)', () => {
     expect(panel.style.height).toBe(`${WINDOW_BOX.height}px`)
   })
 
-  it('설명 칸은 박스 4 자리에서 효과 줄(0x82400)을 보여 준다', () => {
+  it('설명 칸은 박스 4 를 3 씩 줄인 자리에서 설명 · 효과 줄(0x82400)을 보여 준다 (0x82b72~0x82bce)', () => {
     띄우기('GP')
 
     const description = screen.getByTestId('shop-description')
-    expect(description.style.left).toBe(`${DESCRIPTION_BOX.x + 4}px`)
-    expect(description.style.top).toBe(`${DESCRIPTION_BOX.y + 4}px`)
+    expect(description.style.left).toBe(`${DESCRIPTION_BOX.x + 3}px`)
+    expect(description.style.top).toBe(`${DESCRIPTION_BOX.y + 3}px`)
+    // 첫 줄은 설명 StrITEM[0xad] 의 "!N" 앞 조각
+    expect(within(description).getByText('입안에서 살살 녹는 이 맛!')).toBeTruthy()
     expect(within(description).getByText(/효과 :/)).toBeTruthy()
     expect(within(description).getByText(BATTER_GP_ITEMS[0].effectText)).toBeTruthy()
   })

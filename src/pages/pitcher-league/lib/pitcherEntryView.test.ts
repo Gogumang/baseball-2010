@@ -7,7 +7,7 @@ import { pitcherNariEntryViewOf } from '@/pages/pitcher-league/lib/pitcherEntryV
 import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
 import { createNariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
-import { teamPitchers } from '@/entities/team/model/teamRoster'
+import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 
 const capacityOf = (view: NariEntryView, slot: number) => view.lists.pitchers[slot]?.stamina?.capacity
 const staminaOf = (view: NariEntryView, slot: number) => view.lists.pitchers[slot]?.ability[3] ?? 0
@@ -69,5 +69,21 @@ describe('투수편 143 국가대항전 — 대회 칸 기록 열 (0x20648 마�
     expect(row.pitcherLine?.outs).toBeGreaterThan(0)
     expect(row.stamina).toEqual({ capacity: staminaCapacityOf(player.ability[3], 55, false), percent: 100 })
     expect(view.lists.batters.every((batter) => batter.batterLine !== undefined)).toBe(true)
+  })
+
+  it('대표팀 칸 — 사기는 대회 경기가 남긴 +2, 붙박이 실책은 쌓인 수, 내 줄은 사사구 더하기 · 둘째 날부터 체력 100% (r221)', () => {
+    const base = { ...createPitcherCareer('보기'), stamina: 4300 }
+    const options = { ...pitcherGameOptionsOf(base), ourTeamId: 10, opponentTeamId: 12 }
+    const cup = { ...createNariCupTeams(0, 12), koreaMorale: 33, koreaErrors: { 2: 4 }, myCupWalks: 5 }
+    const day0 = pitcherNariEntryViewOf({ ...base, nariCupTeams: cup }, options, true, cup)
+    expect(day0.lists.batters.find((row) => row.name === teamBatters(10)[2]?.name)?.batterLine?.errors).toBe(4)
+    expect(day0.lists.batters.find((row) => row.name === teamBatters(10)[3]?.name)?.batterLine?.errors).toBe(0)
+    const mine = day0.lists.pitchers.find((row) => row.name === '보기')!
+    expect(mine.pitcherLine?.walks).toBe(5)
+    expect(mine.stamina?.percent).toBe(43)
+    expect(mine.stamina?.capacity).toBe(staminaCapacityOf(mine.ability[3] ?? 0, 33, false))
+    const nationalCup = { day: 1 } as unknown as NonNullable<typeof base.nationalCup>
+    const day1 = pitcherNariEntryViewOf({ ...base, nariCupTeams: cup, nationalCup }, options, true, cup)
+    expect(day1.lists.pitchers.find((row) => row.name === '보기')?.stamina?.percent).toBe(100)
   })
 })

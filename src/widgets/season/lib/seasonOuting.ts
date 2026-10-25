@@ -97,13 +97,19 @@ export interface SeasonOutingSubItemBonus {
   readonly text: string
 }
 
-export const SEASON_OUTING_SUB_ITEMS: readonly SeasonOutingSubItemBonus[] = [
-  { money: 5, text: '경기장 [친선경기] 시 소지금 +500만' },
-  { morale: 4, text: '번화가 [회식] 시 사기회복 +4' },
-  { money: 5, morale: 1, text: '병원 [입원] 시 소지금 감소없음 / 사기회복 +1' },
-  { popularity: 1, reputation: 1, text: '학교 [야구교실] 시 인기도 +1 / 평판 +1' },
-  { popularity: 2, text: '방송국 [구단CF] 시 인기도 +2' },
+/** StrITEM[220 + p] — 시즌 서브 아이템 칸 5~9 의 효과 글 (상점 설명 0x82b20 `StrITEM[0xd7 + k]`, 원문 `!N` · 들여쓰기 그대로) */
+const SEASON_OUTING_EFFECT_TEXT_BASE = 220
+const SEASON_OUTING_BONUSES: readonly Omit<SeasonOutingSubItemBonus, 'text'>[] = [
+  { money: 5 },
+  { morale: 4 },
+  { money: 5, morale: 1 },
+  { popularity: 1, reputation: 1 },
+  { popularity: 2 },
 ]
+export const SEASON_OUTING_SUB_ITEMS: readonly SeasonOutingSubItemBonus[] = SEASON_OUTING_BONUSES.map((bonus, place) => ({
+  ...bonus,
+  text: ORIGINAL_ITEMS[SEASON_OUTING_EFFECT_TEXT_BASE + place] ?? '',
+}))
 
 /** 가드가 거절하는 까닭 — 옆 번호가 원본 StrMODE id 다 */
 export type SeasonOutingRefusal =

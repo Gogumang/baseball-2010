@@ -10,8 +10,6 @@ import {
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import { restResultTextOf } from '@/entities/career/model/trainingText'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
-import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import {
   MAGIC_MAXIMUM_LEVEL,
   MAGIC_REQUIRED_POPULARITY,
@@ -20,7 +18,7 @@ import {
   magicTrainingCellCostOf,
   magicTrainingCursorOf,
   magicTrainingLinesOf,
-  PITCHER_TYPE_NAMES,
+  pitcherAbilityTrainingLinesOf,
   pitcherTrainingBlockReasonOf,
   pitchTypeTrainingLinesOf,
   runPitchTypeTraining,
@@ -57,7 +55,6 @@ import {
   abilityAtLimitTextOf,
   popularityShortageTextOf,
   trainingQuestionOf,
-  trainingResultOf,
   useQuestionOf,
 } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import type { PitcherManagementCommand } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
@@ -299,20 +296,18 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
 
   /** 능력치 훈련 한 칸 (107 칸 0~3 → 연출 뒤 105) */
   const runAbilityTraining = useCallback(
-    (menu: PitcherTrainingMenu, ability: keyof PitcherAbility) => {
+    (menu: PitcherTrainingMenu) => {
       const outcome = runPitcherTraining(career, menu, random)
-      const slot = PITCHER_ABILITY_ORDER.indexOf(ability)
       onSave(outcome.career)
       // 125 — 결과 창이 닫힐 때까지 105 가 아니다
       setIsResultWindowOpen(true)
-      const result = trainingResultOf(PITCHER_ABILITY_NAMES[slot] ?? menu.name, outcome.gains[ability] ?? 0)
-      // 타입 보너스 줄 — "!cFFFFFF[!cFFFF00"(0xcc0f0) + 타입 이름(0x1400080 [2+타입]) + "!cFFFFFF]"(0xcc104) + " " + StrMODE[194] (0x187a8~0x187f2)
-      const typeLine = outcome.typeBonus > 0 ? [`!cFFFFFF[!cFFFF00${PITCHER_TYPE_NAMES[career.typeIndex] ?? ''}!cFFFFFF] ${ORIGINAL_MODE_TEXT[194] ?? ''}`] : []
+      // 결과 창 글 — 0x17f5c 186c4~18a58 의 보정 줄만(타입 · 서브 아이템 · 자동안마기 · 병아리 · 몹쓸몸). 상승 수치 줄은 원본에 없다
+      const lines = pitcherAbilityTrainingLinesOf(outcome, career.typeIndex)
       const rows = pitcherTrainingDetailRowsOf(outcome)
       if (rows === null) {
         // 알림 창이 닫히면 125 → 105
         noticeThenRef.current = leaveTrainingResult
-        return setNotice([result, ...typeLine].join('!N'))
+        return setNotice(lines.join('!N'))
       }
       /*
        * 칸 0~3 은 타자편과 같은 상세 결과 창(0x872a1)을 띄운다 — 0x17f5c 가 모드 공용이다.
@@ -320,7 +315,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        */
       return setDetail({
         rows,
-        messages: [result, ...typeLine],
+        messages: lines,
         afterClose: () => {
           const injury = rollTrainingInjury(outcome.career, false, random)
           if (injury.career !== outcome.career) onSave(injury.career)
@@ -358,7 +353,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        */
       setIsResultWindowOpen(true)
       noticeThenRef.current = leaveTrainingResult
-      setNotice(magicTrainingLinesOf(magic, outcome.moraleLoss).join('!N'))
+      setNotice(magicTrainingLinesOf(magic, outcome).join('!N'))
     },
     [career, leaveTrainingResult, onSave, random],
   )
@@ -525,11 +520,10 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       const slot = PITCHER_TRAINING_MENUS.indexOf(menu)
       const reason = pitcherTrainingBlockReasonOf(career, menu)
       if (reason !== null) return setNotice(blockNoticeOf(reason, slot))
-      const ability = menu.ability
       // [85] 예 → 125 — 연출(칸 = 107 커서) 뒤에 훈련 0x17f5c 를 굴린다
       return setQuestion({
         text: trainingQuestionOf(slot),
-        onYes: () => startTraining(slot, () => runAbilityTraining(menu, ability)),
+        onYes: () => startTraining(slot, () => runAbilityTraining(menu)),
       })
     },
     [blockNoticeOf, career, openPitchWindow, runAbilityTraining, startTraining],

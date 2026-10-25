@@ -143,8 +143,3 @@ export function useQuestionOf(name: string): string {
 export function trainingQuestionOf(slot: number): string {
   return modeText(85).replace('%s', pitcherAbilityTextOf(slot))
 }
-
-/** 훈련 결과 글 — StrMODE[40+칸](투수 능력치 이름) + " " + 수치 + " " + StrMODE[83] (G 2절) */
-export function trainingResultOf(abilityName: string, gain: number): string {
-  return `${abilityName} ${gain} 상승하였습니다`
-}

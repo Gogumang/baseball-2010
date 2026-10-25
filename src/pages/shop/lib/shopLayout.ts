@@ -18,6 +18,7 @@
  *   프레임 38(92×13 노란 꺾쇠) · 52(61×15 파란 막대) 는 문서 크기와 같다.
  */
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { FONT_SPACING, LINE_HEIGHT } from '@/shared/lib/font/layout'
 
 export const SCREEN = { width: 240, height: 320 } as const
 
@@ -182,17 +183,18 @@ export function valueBarPositionOf(
 }
 
 /**
- * 박스 **안쪽** 좌표는 문서에 없어서 근사했다 (P6 3절이 박스 자리까지만 확정했다):
- *   이름 딱지 글 — 박스 3 가운데(0x22), 검정 그림자 (+1,+1) 뒤 흰 글 → 세로는 글 높이로 가운데 맞춤
- *   설명 — 박스 4 왼쪽 위(0x11) 에서 4px 안쪽, 줄 간격 13 (0xb9d35 의 줄 y 74/81 차가 7~8 이지만
- *          웹 글꼴이 더 커서 11px 글자에 맞는 13px 로 둔다)
- * *   격자 아이콘 — 33×33 칸 가운데
+ * 박스 **안쪽** 좌표:
+ *   이름 딱지 글 — 박스 3 가운데(0x22), 검정 그림자 (+1,+1) 뒤 흰 글 → 세로는 글 높이로 가운데 맞춤 (근사)
+ *   설명 — 0x82b72~0x82bce (직접 떴다): 박스 4 를 (x+3, y+3, w−6, h−6) 으로 줄여 `0xba411(칸, 글, 정렬 0x11, 0, 0)`.
+ *          0xba2e4 는 정렬 0x1 · 0x10 을 안 보므로 줄인 칸 왼쪽 위 그대로, 줄 간격은 앱 전역 글꼴(줄 11 + 줄간 3)이다
+ *          (시즌 장비 창 `SeasonEquipmentScreen` 의 같은 그리기와 같은 값). 서브 아이템 칸 5~9 는 설명 2줄 + 효과 2줄 = 4줄.
+ *   격자 아이콘 — 33×33 칸 가운데
  */
 export const INNER = {
   nameTextLeft: 5,
   nameShadow: 1,
-  descriptionPadding: 4,
-  descriptionLineHeight: 13,
+  descriptionPadding: 3,
+  descriptionLineHeight: LINE_HEIGHT + FONT_SPACING.app.lineGap,
 } as const
 
 /** 커서는 칸을 1px 둘러싸고 깜박인다 */

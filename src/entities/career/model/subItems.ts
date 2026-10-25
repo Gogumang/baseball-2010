@@ -1,11 +1,12 @@
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import type { RolledOutingEffect } from '@/shared/config/outingPlaces'
 
 /**
  * 서브 아이템 10종 (누락 탐색 5차).
- *   이름   StrITEM[88~97] · 효과 문구 StrITEM[148~154]
+ *   이름   StrITEM[88~97] · 설명 StrITEM[155~164] · 효과 문구 StrITEM[148~154] (`subItemEffectTextOf`)
  *   가격   표 0xcc430 × 10 (100만원 단위) — 웹판 소지금은 만원이라 × 1000
  *   보유   선수 +0x58+k 플래그, 영구 (0x14d12)
  *   효과   k 0~4 는 훈련 0x17f5c, k 5~9 는 외출 효과 0x15234 (`기록[0x5d + 장소]`, 점프표 0xcc6c4) — 둘 다 확정
@@ -15,30 +16,46 @@ export interface SubItem {
   readonly name: string
   /** 만원 */
   readonly price: number
+  /** 설명 첫 줄 — StrITEM[0x9b + k] (원문 `!N` 그대로) */
+  readonly descriptionText: string
+  /** 효과 글 — 칸 0~3 sprintf(StrITEM[0x94], 능력치 이름) · 칸 4~9 StrITEM[0x91 + k] (원문 `!N` · 들여쓰기 그대로) */
   readonly effectText: string
 }
 
 const PRICE_TABLE = [15, 20, 15, 15, 10, 25, 20, 10, 20, 20]
 const PRICE_UNIT = 1000
-const NAMES = ['표적판', '1톤 바벨', '모래주머니', '하드타이어', '자동안마기', '화보집', '외식회원증', '보험증서', '야구교본', '명품정장']
-const EFFECT_TEXTS = [
-  '히트 훈련 시 +2',
-  '파워 훈련 시 +2',
-  '수비 훈련 시 +2',
-  '주루 훈련 시 +2',
-  '훈련 시 사기 감소량 -1',
-  '경기장 [팬미팅] 시 인기도 +2',
-  '번화가 [외식] 시 사기회복 +4',
-  '병원 [입원] 시 소지금 감소없음 / 사기회복+1',
-  '학교 [야구교실] 시 인기도 +1 / 평판 +1',
-  '방송국 [CF촬영] 시 소지금 +400만',
-]
+const NAME_BASE = 88
+const DESCRIPTION_BASE = 0x9b
+const TRAINING_EFFECT_FORMAT = 0x94
+const OTHER_EFFECT_BASE = 0x91
+const TRAINING_SLOTS = 4
+/** 타자 능력치 이름 StrMODE[0x23 + k] — 투수는 [0x28 + k] (`pitcherItems.ts`) */
+const BATTER_ABILITY_NAME_BASE = 0x23
 
-export const SUB_ITEMS: readonly SubItem[] = NAMES.map((name, id) => ({
+/**
+ * 아이템 창 0x81dc0 의 설명 조립(나만의리그 갈래, 직접 떴다 — 0x82890~0x82b6e):
+ * ```
+ * 82890  "!cFFFFFF"(0xcc260)
+ * 82a66  + StrITEM[0x9b + k]                          ; 설명 (서브 · 창 종류 ≠ 2)
+ * 82a7c  + "!N효과 : !cFFFF00"(0xcc9f0)
+ * 82a86  k ≤ 3: + sprintf(StrITEM[0x94], StrMODE[0x23 + k])   ; 투수(0x7b984)면 [0x28 + k], 시즌이면 [0x2c + k]
+ * 82b60  k > 3: + StrITEM[0x91 + k]
+ * 82bb0  0xba411(박스 4 를 3 씩 줄인 칸, 글, 정렬 0x11, 0, 0)
+ * ```
+ */
+export function subItemEffectTextOf(id: number, abilityNameBase = BATTER_ABILITY_NAME_BASE): string {
+  if (id < TRAINING_SLOTS) {
+    return (ORIGINAL_ITEMS[TRAINING_EFFECT_FORMAT] ?? '').replace('%s', ORIGINAL_MODE_TEXT[abilityNameBase + id] ?? '')
+  }
+  return ORIGINAL_ITEMS[OTHER_EFFECT_BASE + id] ?? ''
+}
+
+export const SUB_ITEMS: readonly SubItem[] = PRICE_TABLE.map((price, id) => ({
   id,
-  name,
-  price: PRICE_TABLE[id] * PRICE_UNIT,
-  effectText: EFFECT_TEXTS[id],
+  name: ORIGINAL_ITEMS[NAME_BASE + id] ?? '',
+  price: price * PRICE_UNIT,
+  descriptionText: ORIGINAL_ITEMS[DESCRIPTION_BASE + id] ?? '',
+  effectText: subItemEffectTextOf(id),
 }))
 
 /** 원문 알림 — StrMODE[77] · [78] */

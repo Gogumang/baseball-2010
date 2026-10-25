@@ -3,8 +3,11 @@ import {
   createNariCupTeams,
   nariCupBattingOrderOf,
   nariCupRecordOf,
+  myCupPitcherStaminaOf,
+  myCupPitcherWalksOf,
   nextNariCupDayTeams,
   prepareNariCupMatch,
+  recordNariCupGame,
 } from '@/entities/career/model/nariCupTeams'
 import { MY_RECORD_SLOT, nariQuickLineupOf } from '@/entities/career/model/nariTeamRecord'
 
@@ -41,5 +44,35 @@ describe('국가대항전 대회 레코드 두 칸 — +0xbc4 대표팀 · +0xbe
     expect(nariCupRecordOf(day2, 13)).toBe(day2.opponent)
     expect(nariCupRecordOf(day2, 10)).toBe(day2.korea)
     expect(nextNariCupDayTeams(day2, null)).toBe(day2)
+  })
+})
+
+describe('대표팀 칸에 대회 경기가 남기는 것 — 게이트 0xa56dc 밖 (r221)', () => {
+  it('사기 +2(3a31e · b5762) · 대표팀 실책 +0x2e(0x43278) · 내 투수 사사구 +0x2a(a8b04) 를 쌓고, 하루 끝 새 복사에도 남는다', () => {
+    const teams = { ...createNariCupTeams(0, 11), opponentMorale: 70 }
+    const played = recordNariCupGame(teams, {
+      morale: 70,
+      errors: [
+        { teamId: 10, battingOrderIndex: 3 },
+        { teamId: 10, battingOrderIndex: 3 },
+        { teamId: 11, battingOrderIndex: 5 },
+      ],
+      myWalks: 2,
+    })
+    expect(played.koreaMorale).toBe(70)
+    expect(played.koreaErrors).toEqual({ 3: 2 })
+    expect(played.myCupWalks).toBe(2)
+    const nextDay = nextNariCupDayTeams(recordNariCupGame(played, { myWalks: 1 }), 12)
+    expect(nextDay.koreaMorale).toBe(70)
+    expect(nextDay.koreaErrors).toEqual({ 3: 2 })
+    expect(nextDay.myCupWalks).toBe(3)
+    // 상대국 칸 +2 는 새 복사로 지워진다
+    expect(nextDay.opponentMorale).toBeUndefined()
+    expect(myCupPitcherWalksOf(nextDay, 9998)).toBe(9999)
+  })
+
+  it('내 투수 사본 +0x2c — 첫날은 베낀 내 스태미나, 하루 끝 b81e0 0xb6190 뒤로는 10000', () => {
+    expect(myCupPitcherStaminaOf(0, 4300)).toBe(4300)
+    expect(myCupPitcherStaminaOf(1, 4300)).toBe(10000)
   })
 })

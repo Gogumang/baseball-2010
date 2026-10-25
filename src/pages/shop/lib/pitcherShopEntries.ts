@@ -17,7 +17,7 @@ function pitcherItemEntriesOf(career: PitcherCareer, tab: '서브' | 'GP'): read
   return items.map((item, index) => ({
     id: shopItemId(tab, index),
     name: item.name,
-    description: itemDescriptionOf(item.effectText),
+    description: itemDescriptionOf(item.descriptionText, item.effectText),
     price: item.price,
     iconFrame: tab === '서브' ? itemIconFrameOf('서브', index) : PITCHER_GP_ICON_FRAMES[index],
     isOwned: tab === '서브' && hasSubItem(career, index),

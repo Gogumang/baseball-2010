@@ -88,7 +88,7 @@ import {
 } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
-import { nariCupRecordOf, nextNariCupDayTeams } from '@/entities/career/model/nariCupTeams'
+import { nariCupRecordOf, nextNariCupDayTeams, recordNariCupGame } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
 import { liveGameInningIndex, resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
@@ -1321,7 +1321,19 @@ export function usePitcherLeagueSession(
         nationalCup: next,
         ...(current.nariCupTeams === undefined
           ? {}
-          : { nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) }),
+          : {
+            // 대표팀 칸(+0xbc4)에 남는 것 먼저 (r221): +2 사기 — 0xb570c b5762 가 마지막으로 덮은 나리 사기(대회 중이라 상대국 칸 값,
+            // 상대 칸 덮기와 같은 공), +0x2e 실책 — 사람 수비 그림 0x43278 이 대표팀 야수에 올린 것, +0x2a 사사구 — 내 투수 사본
+            // (a8b04~a8bee). 그 뒤 하루 끝 b8216 이 상대국 칸만 새로 복사한다
+            nariCupTeams: nextNariCupDayTeams(
+              recordNariCupGame(current.nariCupTeams, {
+                morale: summary.opponentRecordMorale ?? nariMoraleAfterBurst(options.teamMorale, burstDeltas),
+                errors: summary.leagueErrors,
+                myWalks: summary.seasonDelta.walks,
+              }),
+              nationalCupMatchupOf(next)?.opponent ?? null,
+            ),
+          }),
       }))
       setGameOptions(null)
       setCupMatch(null)

@@ -75,6 +75,15 @@ describe('미션 선택 격자', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  it('잠긴 칸도 설명칸에는 그 미션 설명이 나온다 — 설명 그리기 1e5e8~1e624 는 잠김 0xa520d 를 안 본다([60] 은 OK 팝업만)', () => {
+    const { container } = 띄우기()
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    const text = container.textContent ?? ''
+    expect(text).not.toContain('오픈 되지 않은 미션입니다')
+    expect(text).toContain(BATTER_MISSIONS[1].briefing.replace(/!c[0-9A-Fa-f]{6}|!C/g, '').split('!N')[0])
+  })
+
   it('열린 칸 OK 는 StrMAINMENU[61] "[이름] 미션에 도전하시겠습니까?" — 예면 그 미션, 아니오면 목록 (0x1db34 · 하위 1 0x1dbaa)', () => {
     const onSelect = vi.fn()
     띄우기({ onSelect })

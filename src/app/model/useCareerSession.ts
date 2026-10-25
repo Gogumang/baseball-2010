@@ -174,6 +174,7 @@ import {
   nariCupRecordOf,
   nextNariCupDayTeams,
   prepareNariCupMatch,
+  recordNariCupGame,
 } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
@@ -1002,7 +1003,17 @@ export function useCareerSession({
           nationalCup: next,
           ...(current.nariCupTeams === undefined
             ? {}
-            : { nariCupTeams: nextNariCupDayTeams(current.nariCupTeams, nationalCupMatchupOf(next)?.opponent ?? null) }),
+            : {
+              // 대표팀 칸(+0xbc4)에 남는 것 먼저 — +2 사기는 0xb570c b5762 가 마지막으로 덮은 나리 사기(대회 중이라 상대국 칸 값, 상대 칸
+              // 덮기와 같은 공이라 `opponentRecordMorale` 과 같은 때). 실책 +0x2e 는 타자편 수비 그림이 상대 야수뿐이라 대표팀 몫이 없다
+              nariCupTeams: nextNariCupDayTeams(
+                recordNariCupGame(current.nariCupTeams, {
+                  morale: finished.opponentRecordMorale ?? finished.teamMorale,
+                  errors: summary.leagueErrors,
+                }),
+                nationalCupMatchupOf(next)?.opponent ?? null,
+              ),
+            }),
         })
       // 0x4ec82 `0x22c7d(G, 모드 4)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointReward })

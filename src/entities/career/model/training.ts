@@ -6,6 +6,8 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { subItemMoraleRelief, subItemTrainingBonus } from '@/entities/career/model/subItems'
 import { abilityLimitOf } from '@/entities/career/model/abilityLimit'
 import { BATTER_BURSTS } from '@/shared/config/original/bursts'
+import { trainingMoraleAdjustmentOf } from '@/entities/career/model/trainingText'
+import type { TrainingModifiers } from '@/entities/career/model/trainingText'
 
 /**
  * 타자 훈련 (binary.mod 0x17f5c — 누락 탐색 4·5차).
@@ -24,7 +26,6 @@ import { BATTER_BURSTS } from '@/shared/config/original/bursts'
 export interface TrainingMenu {
   readonly id: string
   readonly name: string
-  readonly description: string
   /** 올리는 능력치. 비어 있으면 필살타법 칸 */
   readonly abilities: readonly (keyof BatterAbility)[]
 }
@@ -61,6 +62,10 @@ export interface TrainingOutcome {
    */
   readonly rolledGain: number
   readonly rolledMoraleLoss: number
+  /** 사기 보정을 낸 것 — 결과 글의 "(±n)" 괄호와 보정 줄 (0x17f5c [sp+0xf8] · [sp+0x28]) */
+  readonly modifiers: TrainingModifiers
+  /** 훈련 칸 k 의 서브 아이템(+2)을 가졌는가 — 결과 창 보정 줄 (0x187f6) */
+  readonly hasSubItemBonus: boolean
   readonly specialSwing: SpecialSwingProgress | null
   readonly career: PlayerCareer
 }
@@ -169,6 +174,15 @@ export function runTraining(career: PlayerCareer, menu: TrainingMenu, random: Ra
   return { ...outcome, career: countTraining(outcome.career, menu.id) }
 }
 
+/** 병아리(장착 0) · 몹쓸몸(장착 3) · 자동안마기(서브 4) — 0x17f5c 의 사기 보정 셋 */
+function trainingModifiersOf(career: PlayerCareer): TrainingModifiers {
+  return {
+    rookie: isSkillEquipped(career, ROOKIE_SKILL),
+    weakBody: isSkillEquipped(career, WEAK_BODY_SKILL),
+    massage: subItemMoraleRelief(career) > 0,
+  }
+}
+
 function runAbilityTraining(career: PlayerCareer, menu: TrainingMenu, random: RandomPort): TrainingOutcome {
   const [ability] = menu.abilities
   // 굴리는 차례: 사기 bfa55(5,8) → [sp+0x38] (0x186c4) 이 **먼저**, 상승 bfa55 → [sp+0x34] (0x18704) 가 다음
@@ -176,15 +190,14 @@ function runAbilityTraining(career: PlayerCareer, menu: TrainingMenu, random: Ra
   const rolled = roll(random, LEG_ABILITIES.has(ability) ? LEG_GAIN_RANGE : GAIN_RANGE)
   const typeBonus = TYPE_BONUS_ABILITY[career.battingTypeIndex] === ability ? TYPE_BONUS : 0
   const skillGain = (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
-  const gains = { [ability]: rolled + typeBonus + skillGain + subItemTrainingBonus(career, ability) }
-  const moraleLoss =
-    rolledMoraleLoss -
-    (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
-    (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
-    subItemMoraleRelief(career)
+  const subItemGain = subItemTrainingBonus(career, ability)
+  const gains = { [ability]: rolled + typeBonus + skillGain + subItemGain }
+  const modifiers = trainingModifiersOf(career)
+  const moraleLoss = rolledMoraleLoss + trainingMoraleAdjustmentOf(modifiers)
   const spent = spendCycleAction(gainMorale(career, -moraleLoss))
   return {
     menuId: menu.id, gains, typeBonus, moraleLoss, rolledGain: rolled, rolledMoraleLoss,
+    modifiers, hasSubItemBonus: subItemGain > 0,
     specialSwing: null, career: gainAbility(spent, gains),
   }
 }
@@ -195,11 +208,8 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
   const sessions = career.specialSwingSessions + 1
   const isLevelUp = sessions >= required
   const rolledMoraleLoss = roll(random, SPECIAL_SWING_MORALE_RANGE)
-  const moraleLoss =
-    rolledMoraleLoss -
-    (isSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) +
-    (isSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0) -
-    subItemMoraleRelief(career)
+  const modifiers = trainingModifiersOf(career)
+  const moraleLoss = rolledMoraleLoss + trainingMoraleAdjustmentOf(modifiers)
   const spent = spendCycleAction(gainMorale(career, -moraleLoss))
   const trained: PlayerCareer = {
     ...spent,
@@ -218,6 +228,8 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
     moraleLoss,
     rolledGain: 0,
     rolledMoraleLoss,
+    modifiers,
+    hasSubItemBonus: false,
     specialSwing: {
       sessions, required, isLevelUp,
       name: BATTER_BURSTS[number - 1 + (number === 4 ? career.battingTypeIndex : 0)] ?? '',

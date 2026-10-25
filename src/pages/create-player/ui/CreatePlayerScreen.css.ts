@@ -51,13 +51,3 @@ export const arrowButton = style({
   imageRendering: 'pixelated',
 })
 
-export const hint = style([
-  layer,
-  {
-    color: ORIGINAL_COLORS.text,
-    fontSize: '11px',
-    lineHeight: '13px',
-    textAlign: 'center',
-  },
-])
-

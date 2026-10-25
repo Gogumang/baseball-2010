@@ -51,7 +51,6 @@ export interface RolledOutingEffect {
 export interface OutingFunction {
   readonly id: string
   readonly name: string
-  readonly description: string
   /** 이 인기도 이상이어야 할 수 있다 — 모자라면 StrMODE[62] */
   readonly requiredPopularity: number
   readonly effect: OutingEffect
@@ -105,7 +104,6 @@ export const OUTING_PLACES: readonly OutingPlace[] = [
       {
         id: '팬미팅',
         name: '팬미팅',
-        description: '높은 인기도 상승과 소량의 사기 회복. 소지금을 소모한다',
         requiredPopularity: 600,
         effect: { moneyCost: 500, popularity: [4, 7], reputation: [0, 1], morale: [2, 4], healsInjury: false },
       },
@@ -126,7 +124,6 @@ export const OUTING_PLACES: readonly OutingPlace[] = [
       {
         id: '외식',
         name: '외식',
-        description: '사기를 대폭 회복한다. 소지금을 소모한다',
         requiredPopularity: 0,
         effect: { moneyCost: 100, popularity: [0, 1], reputation: [0, 1], morale: [25, 31], healsInjury: false },
       },
@@ -147,7 +144,6 @@ export const OUTING_PLACES: readonly OutingPlace[] = [
       {
         id: '입원',
         name: '입원',
-        description: '부상과 질병을 회복시키고 소량의 사기를 회복한다',
         requiredPopularity: 0,
         effect: { moneyCost: 200, popularity: [0, 1], reputation: [0, 1], morale: [3, 6], healsInjury: true },
       },
@@ -168,7 +164,6 @@ export const OUTING_PLACES: readonly OutingPlace[] = [
       {
         id: '야구교실',
         name: '야구교실',
-        description: '인기도와 평판이 상승한다',
         requiredPopularity: 200,
         effect: { moneyCost: 0, popularity: [1, 4], reputation: [3, 6], morale: [-8, -11], healsInjury: false },
       },
@@ -189,7 +184,6 @@ export const OUTING_PLACES: readonly OutingPlace[] = [
       {
         id: 'CF촬영',
         name: 'CF촬영',
-        description: '소량의 인기도 상승과 소지금을 획득한다. 단, 평판이 하락한다',
         requiredPopularity: 400,
         effect: { moneyCost: -800, popularity: [2, 5], reputation: [8, 11], morale: [-16, -21], healsInjury: false },
       },
