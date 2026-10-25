@@ -143,6 +143,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
    */
   const resumeTickRef = useRef<number | null>(null)
   const pausedAtCommitRef = useRef(latestRef.current.isPaused)
+  /**
+   * 아래 루프가 굴린 대체 하늘 줄 — 그 루프를 세운 고리 값(효과 의존)과 함께 둔다. 개발 StrictMode 는 같은 효과를 붙였다 떼고 다시
+   * 붙이는데, 그때 또 굴리면 배포보다 난수가 한 차례 더 나간다(r231 — 홈런더비 첫 타석). 의존이 바뀌어 루프를 새로 세우면 예전대로 새로 굴린다
+   */
+  const fallbackSkyRowRef = useRef<{ readonly loop: readonly unknown[]; readonly row: number } | null>(null)
   useLayoutEffect(() => {
     const isPaused = latestRef.current.isPaused
     if (pausedAtCommitRef.current && !isPaused) resumeTickRef.current = gameSceneTickNow()
@@ -212,9 +217,17 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     // (미션 · 홈런더비도 세션이 장면마다 한 번 굴린 rand(0, 6) 을 넘긴다 — 홈런더비는 결과 진입 0x4f574 에서 한 번 더).
     // 그리는 그림마다 넘겨받은 줄을 읽는다. ⚠️ 안 넘기는 화면만 예전대로 그림을 세울 때 여기서 굴린다(장면당 한 번이 아니다) —
     // r112 확인: 타석 화면을 세우는 일곱 곳(팀 경기 · 나리 타자편 · 미션 · 투수 미션 · 투수편 · 홈런더비 · 결과 배경)이 모두 넘기고,
-    // 결과 배경(CareerRoutes)만 정산 기록에 하늘 줄이 없을 때 안 넘긴다
-    const fallbackSkyRow =
-      latestRef.current.skyRow === undefined ? latestRef.current.random.rand(0, SKY_ROW_COUNT) : 0
+    // 결과 배경(CareerRoutes)만 정산 기록에 하늘 줄이 없을 때 안 넘긴다.
+    // ⚠️ 원본과의 차이(남김, r231 확인): 홈런더비 첫 장면은 이 효과(자식)가 세션의 장면 시작 굴림 효과(부모)보다 먼저 돌아 하늘 줄이 아직
+    // 없다 — 여기서 rand(0, 6) 을 한 번 굴리고 로딩 팁이 그 뒤다. 배포 빌드에도 있는 웹 전용 굴림이다
+    const loop = [handlers.judgePitch, handlers.commitHit] as const
+    const heldSkyRow = fallbackSkyRowRef.current
+    const fallbackSkyRow = latestRef.current.skyRow !== undefined
+      ? 0
+      : heldSkyRow !== null && heldSkyRow.loop.every((value, index) => value === loop[index])
+        ? heldSkyRow.row
+        : latestRef.current.random.rand(0, SKY_ROW_COUNT)
+    if (latestRef.current.skyRow === undefined) fallbackSkyRowRef.current = { loop, row: fallbackSkyRow }
     const skyRowNow = () => latestRef.current.skyRow ?? fallbackSkyRow
 
     /** 이번 0xf~0x10 의 CPU 투구 굴림 — 대기에 든 장면 틱이 바뀌면(새 공 · 견제 뒤 · 쉼) 새로 센다 */

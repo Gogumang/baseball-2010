@@ -265,9 +265,8 @@ for (const { browserName, device } of BROWSERS) {
     const boot = await measureBoot(browser, browserName, device)
     const nari = await measureNariByKeys(browser, browserName, device)
     const management = await measureScene(browser, browserName, device, 'nari-management')
-    // ⚠️ 빌드 산출물(StrictMode 이중 실행이 없다)에서는 씨앗 1 이 사람 선공이다 — 개발 서버에서 뜬 픽스처와 선공이 뒤집혀 있어
-    // general-bat 장면에 general-pitch 픽스처(씨앗 1)를 준다
-    const bat = await measureScene(browser, browserName, device, 'general-bat', process.env.PERF_BAT_FIXTURE ?? 'general-pitch')
+    // 장면의 기본 픽스처(general-bat) — 개발 · 빌드가 같은 씨앗에서 같은 선공이다(r231). PERF_BAT_FIXTURE 로 바꿀 수 있다
+    const bat = await measureScene(browser, browserName, device, 'general-bat', process.env.PERF_BAT_FIXTURE)
     const errors = [...boot.errors, ...nari.errors, ...management.errors, ...bat.errors]
     if (errors.length > 0) console.log(`  ! ${browserName} 실행 ${index + 1}: ${errors.slice(0, 3).join(' / ')}`)
     runs.push({ ...boot, ...nari, ...management, ...bat })
