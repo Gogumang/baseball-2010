@@ -1,0 +1,815 @@
+{
+  "note": "시즌모드 1년차 1/45경기 관리 메뉴 0xc9 — 빈 저장에서 시즌모드 팀 고르기(서울드래곤즈) · 단장 이름 STEST · 결정 예 직후. r210 이 chromium 으로 떴다",
+  "localStorage": {
+    "compus-baseball/ace-level": {
+      "levels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "compus-baseball/ace-open": {
+      "cells": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ]
+    },
+    "compus-baseball/collection": {
+      "titles": [],
+      "endings": [],
+      "seasonEndings": [],
+      "hallOfFame": [],
+      "hallOfFamePitchers": [],
+      "openedHiddenIds": [],
+      "stats": {
+        "recordCounts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "itemPurchaseCounts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gamePointUsage": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "gamePointEarned": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "batterEquippedSkillBits": 0,
+        "pitcherEquippedSkillBits": 0,
+        "achievementMarks": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "playTimes": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "compus-baseball/collection-rewards": {
+      "awardedBits": 0
+    },
+    "compus-baseball/mode-save": {
+      "lastPlayedMode": 2,
+      "isGeneralGameInProgress": false,
+      "generalGame": null,
+      "nariGames": {
+        "3": {
+          "isInProgress": false,
+          "match": null
+        },
+        "4": {
+          "isInProgress": false,
+          "match": null
+        }
+      },
+      "aceMatchPending": {
+        "3": null,
+        "4": null
+      },
+      "aceMatchWon": {
+        "3": false,
+        "4": false
+      },
+      "aceMatchMode": 0,
+      "generalMatchSettings": {
+        "kind": 1,
+        "value": 0,
+        "battingOrderBits": 0,
+        "pitchingInningBits": 0,
+        "offenseRunnerBits": 0,
+        "defenseRunnerBits": 0
+      },
+      "matchSettingsSeen": false
+    },
+    "compus-baseball/season": {
+      "state": {
+        "record": {
+          "teamId": 0,
+          "name": "STEST",
+          "money": 50,
+          "acted": false,
+          "illness": 0,
+          "illnessSlack": 0,
+          "seenEvents": [
+            400,
+            1,
+            2
+          ],
+          "lastMoraleChange": 0,
+          "popularity": 0,
+          "lastPopularityChange": 0,
+          "phase": 3,
+          "aimVisionGames": 0,
+          "storeGames": 0,
+          "tradeUsed": 0,
+          "coach": -1,
+          "trainingSubItems": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "outingSubItems": [
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "massager": false,
+          "reputation": 0,
+          "lastReputationGrade": 0,
+          "crowdLevel": 0,
+          "lastIncome": 0,
+          "popularityAtSeasonStart": 0,
+          "regularSeasonFirsts": 0,
+          "illnessCooldown": 0,
+          "games": 0,
+          "yearIndex": 0,
+          "inPostseason": false,
+          "postseasonRound": -1,
+          "postseasonChampion": 15,
+          "nationalCup": false,
+          "nationalCupChampion": 15,
+          "gameRecord": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "yearGoalShown": true,
+          "lastAttendance": 0,
+          "lastGameScore": 0,
+          "lastGameConceded": 0,
+          "dayBoard": {
+            "teamsA": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "teamsB": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "scoresA": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "scoresB": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "tradeRequestCount": 0,
+          "stadiumOwned": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "stadiumEquipped": [
+            0,
+            0,
+            0
+          ],
+          "endingSeen": false,
+          "endingBonusReceived": false
+        },
+        "teamMorale": 100,
+        "teamAbilities": [
+          [
+            365,
+            440,
+            430,
+            365
+          ],
+          [
+            400,
+            430,
+            460,
+            340
+          ],
+          [
+            470,
+            460,
+            320,
+            390
+          ],
+          [
+            350,
+            500,
+            435,
+            310
+          ],
+          [
+            380,
+            395,
+            490,
+            355
+          ],
+          [
+            480,
+            470,
+            360,
+            340
+          ],
+          [
+            410,
+            450,
+            380,
+            370
+          ],
+          [
+            345,
+            420,
+            410,
+            430
+          ],
+          [
+            330,
+            340,
+            370,
+            555
+          ],
+          [
+            340,
+            380,
+            500,
+            370
+          ]
+        ]
+      },
+      "league": {
+        "wins": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "losses": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "streak": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "bestStreak": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "losingStreak": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "headToHead": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "roster": {
+        "pitchers": [
+          {
+            "id": 0,
+            "kindByte": 0,
+            "fieldPosition": 0,
+            "stamina": 10000
+          },
+          {
+            "id": 1,
+            "kindByte": 1,
+            "fieldPosition": 0,
+            "stamina": 10000
+          },
+          {
+            "id": 2,
+            "kindByte": 2,
+            "fieldPosition": 0,
+            "stamina": 10000
+          },
+          {
+            "id": 3,
+            "kindByte": 3,
+            "fieldPosition": 0,
+            "stamina": 10000
+          },
+          {
+            "id": 4,
+            "kindByte": 4,
+            "fieldPosition": 0,
+            "stamina": 10000
+          },
+          {
+            "id": 5,
+            "kindByte": 5,
+            "fieldPosition": 0,
+            "stamina": 10000
+          },
+          {
+            "id": 6,
+            "kindByte": 6,
+            "fieldPosition": 0,
+            "stamina": 10000
+          },
+          {
+            "id": 7,
+            "kindByte": 7,
+            "fieldPosition": 0,
+            "stamina": 10000
+          }
+        ],
+        "batters": [
+          {
+            "id": 0,
+            "kindByte": 0,
+            "fieldPosition": 8,
+            "stamina": 0
+          },
+          {
+            "id": 1,
+            "kindByte": 1,
+            "fieldPosition": 9,
+            "stamina": 0
+          },
+          {
+            "id": 2,
+            "kindByte": 2,
+            "fieldPosition": 5,
+            "stamina": 0
+          },
+          {
+            "id": 3,
+            "kindByte": 3,
+            "fieldPosition": 1,
+            "stamina": 0
+          },
+          {
+            "id": 4,
+            "kindByte": 4,
+            "fieldPosition": 7,
+            "stamina": 0
+          },
+          {
+            "id": 5,
+            "kindByte": 5,
+            "fieldPosition": 3,
+            "stamina": 0
+          },
+          {
+            "id": 6,
+            "kindByte": 6,
+            "fieldPosition": 4,
+            "stamina": 0
+          },
+          {
+            "id": 7,
+            "kindByte": 7,
+            "fieldPosition": 2,
+            "stamina": 0
+          },
+          {
+            "id": 8,
+            "kindByte": 8,
+            "fieldPosition": 6,
+            "stamina": 0
+          },
+          {
+            "id": 9,
+            "kindByte": 9,
+            "fieldPosition": 0,
+            "stamina": 0
+          },
+          {
+            "id": 10,
+            "kindByte": 10,
+            "fieldPosition": 0,
+            "stamina": 0
+          },
+          {
+            "id": 11,
+            "kindByte": 11,
+            "fieldPosition": 0,
+            "stamina": 0
+          }
+        ]
+      },
+      "playerStats": {
+        "batters": {}
+      },
+      "series": null,
+      "ranking": [],
+      "cup": null,
+      "cpuPitcherStaminas": {
+        "1": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "2": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "3": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "4": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "5": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "6": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "7": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "8": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ],
+        "9": [
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000,
+          10000
+        ]
+      },
+      "openedStadiumIds": [],
+      "event100Awarded": false
+    },
+    "compus-baseball/settings": {
+      "speedLevel": 2,
+      "pitchControl": "기본",
+      "soundLevel": 2,
+      "isVibrationOn": true,
+      "runningMode": "자동",
+      "throwMode": "수동",
+      "isScoreboardOn": true
+    },
+    "compus-baseball/wallet": {
+      "gamePoint": 0
+    }
+  }
+}

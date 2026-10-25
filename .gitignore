@@ -27,3 +27,4 @@ base/extracted/
 
 # 웹폰트를 굽는 파이썬 venv (tools/build_webfont.py 머리 주석대로 다시 만든다)
 tools/.venv/
+e2e/.run/

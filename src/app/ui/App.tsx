@@ -65,6 +65,7 @@ import { recordUnlockNoticeTextOf } from '@/entities/collection/model/hiddenOpen
 import { isAceCellOpen } from '@/pages/general-mode/lib/aceOpenState'
 import { leaveGameSceneObject } from '@/widgets/game-scene/model/gameSceneObject'
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
+import { devBootSeed, publishSceneHandles } from '@/app/dev/sceneShortcut'
 
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
@@ -174,7 +175,8 @@ export function App() {
   })
   useSoundPauseOnHide(sound)
   // 부팅 씨앗 — 원본 0x2ed8 은 밀리초 시계의 아래 32비트 (저장 · 읽기 때 다시 세우기는 옮기지 않았다 — seededRandom 머리 주석)
-  const random = useMemo(() => createSeededRandom(bootSeed()), [])
+  // 개발 · e2e 장면 바로가기 픽스처가 씨앗을 정했으면 그 값 (`app/dev` — 배포 빌드에서는 빠진다)
+  const random = useMemo(() => createSeededRandom((import.meta.env.DEV || import.meta.env.MODE === 'e2e' ? devBootSeed() : null) ?? bootSeed()), [])
   // 켤 때는 장면 0x103 생성자의 [0x140006c] = −1 갈래 — 하위 0x2a <이용안내> 부터 (→ 2 로고 → 3 타이틀)
   const [screen, setScreen] = useState<Screen>({ kind: '이용안내' })
   /** 게임시작 목록 커서 전역 [0x1552d24] — 장면 0x103 이 내려가도 남는다(관리 메뉴 취소로 하위 5 에 바로 서면 그 칸) */
@@ -554,6 +556,21 @@ export function App() {
     </RecordAchievedContext.Provider>
   )
 
+  /** 메인 메뉴 일반모드 진입 창 [13] 의 답 — 빠른실행이면 경기정보(상태 22)부터 (0x299f8 this+0x14c = 1) */
+  const startGeneralMode = (isQuickStart: boolean) => {
+    setGeneralQuickStart(isQuickStart)
+    setGeneralResume(null)
+    setScreen({ kind: '일반모드' })
+  }
+
+  // 개발 · e2e 장면 바로가기(`app/dev/sceneShortcut`)에 진입 손잡이를 내놓는다 — 배포 빌드에서는 빠진다
+  if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+    publishSceneHandles({
+      screen, setScreen, career: careerSession, pitcher: pitcherSession, season: seasonSession, mission,
+      startGeneralMode, setLastPlayedMode,
+    })
+  }
+
   // 미션 모드는 메인 메뉴에서 들어가 선수 고르기(하위 17)부터 띄운다 — 육성·명예 선수가 다 없으면 원본대로
   // 고르기 창에서 막힌다(StrCOMMON[38]·[39]). 고른 선수의 편이 투수(모드 5)/타자(모드 6) 미션을 정한다.
   if (MISSION_SCREENS.includes(screen.kind)) {
@@ -768,11 +785,7 @@ export function App() {
         // 시즌모드 초기화 0x224ec(mgr, 2) — 시즌 저장(+0x42)·+0x4e
         onResetSeason={seasonSession.actions.resetSeason}
         // 일반모드 진입 창 [13] — 빠른실행이면 경기정보(상태 22)부터 (0x299f8 this+0x14c = 1)
-        onStartGeneralMode={(isQuickStart) => {
-          setGeneralQuickStart(isQuickStart)
-          setGeneralResume(null)
-          setScreen({ kind: '일반모드' })
-        }}
+        onStartGeneralMode={startGeneralMode}
         // 전역기록 +0x4d · +0x3c — 메인 메뉴 [13] 처음 커서·[15] 확인·이어하기, [최근게임] 갈래가 본다
         isGeneralGameInProgress={modeSave.save.isGeneralGameInProgress}
         lastPlayedMode={modeSave.save.lastPlayedMode}
