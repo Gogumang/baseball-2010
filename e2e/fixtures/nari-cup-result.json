@@ -1,5 +1,5 @@
 {
-  "note": "나리 타자편 1년차 49경기 국가대항전 134 — 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 이어하기가 134 대진판에 돌아와 대진판 확인(OK)이 결과 팝업 0x25 를 띄운다 (한국 탈락). r241 soak(soakFixtures.test.tsx, 씨앗 4)이 실제 저장 모듈이 쓴 칸을 떴다",
+  "note": "나리 타자편 1년차 49경기 국가대항전 134 — 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 이어하기가 134 대진판에 돌아와 대진판 확인(OK)이 결과 팝업 0x25 를 띄운다 (한국 우승). r241 soak(soakFixtures.test.tsx, 씨앗 4)이 실제 저장 모듈이 쓴 칸을 떴다",
   "localStorage": {
     "compus-baseball/career": {
       "version": 2,
@@ -11,7 +11,7 @@
           "run": 135,
           "defense": 164
         },
-        "gamePoint": 2017,
+        "gamePoint": 2052,
         "season": 1,
         "gamesPlayed": 49,
         "stats": {
@@ -2928,7 +2928,7 @@
             9992,
             8265,
             10000,
-            4366,
+            4204,
             5414,
             9520,
             10000,
@@ -2940,8 +2940,8 @@
             10000,
             5992,
             10000,
-            8480,
-            9195,
+            8000,
+            10000,
             10000
           ]
         },
@@ -2975,22 +2975,21 @@
           },
           "summary": {
             "result": "승",
-            "ourScore": 9,
-            "opponentScore": 5,
+            "ourScore": 8,
+            "opponentScore": 3,
             "stats": {
               "games": 0,
               "plateAppearances": 4,
               "atBats": 4,
-              "hits": 3,
+              "hits": 2,
               "doubles": 0,
               "triples": 0,
               "homeRuns": 0,
               "runsBattedIn": 0,
               "walks": 0,
-              "strikeouts": 0,
-              "stolenBases": 1
+              "strikeouts": 0
             },
-            "popularityPoints": 3,
+            "popularityPoints": 2,
             "doublePlays": 0,
             "scoringPositionOuts": 0,
             "reputationCounts": {
@@ -3011,10 +3010,11 @@
               16,
               4,
               9,
-              16,
               9,
-              0,
               16,
+              16,
+              2,
+              12,
               16
             ],
             "pitchersOfRecord": {
@@ -3039,16 +3039,16 @@
             13
           ],
           "wins": [
-            3,
-            3,
+            4,
             1,
-            0
+            1,
+            1
           ],
           "losses": [
-            1,
-            1,
+            0,
+            3,
             2,
-            3
+            2
           ],
           "matches": [
             [
@@ -3075,7 +3075,7 @@
             10,
             11
           ],
-          "champion": 11,
+          "champion": 10,
           "day": 4
         },
         "nariCupTeams": {

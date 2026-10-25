@@ -11,7 +11,7 @@
           "run": 135,
           "defense": 164
         },
-        "gamePoint": 1906,
+        "gamePoint": 1911,
         "season": 1,
         "gamesPlayed": 49,
         "stats": {
@@ -2922,7 +2922,7 @@
             9992,
             8265,
             10000,
-            4366,
+            4204,
             5414,
             9520,
             10000,
@@ -2934,8 +2934,8 @@
             10000,
             5992,
             10000,
-            8480,
-            9195,
+            8000,
+            10000,
             10000
           ]
         },
@@ -2969,22 +2969,21 @@
           },
           "summary": {
             "result": "승",
-            "ourScore": 9,
-            "opponentScore": 5,
+            "ourScore": 8,
+            "opponentScore": 3,
             "stats": {
               "games": 0,
               "plateAppearances": 4,
               "atBats": 4,
-              "hits": 3,
+              "hits": 2,
               "doubles": 0,
               "triples": 0,
               "homeRuns": 0,
               "runsBattedIn": 0,
               "walks": 0,
-              "strikeouts": 0,
-              "stolenBases": 1
+              "strikeouts": 0
             },
-            "popularityPoints": 3,
+            "popularityPoints": 2,
             "doublePlays": 0,
             "scoringPositionOuts": 0,
             "reputationCounts": {
@@ -3005,10 +3004,11 @@
               16,
               4,
               9,
-              16,
               9,
-              0,
               16,
+              16,
+              2,
+              12,
               16
             ],
             "pitchersOfRecord": {

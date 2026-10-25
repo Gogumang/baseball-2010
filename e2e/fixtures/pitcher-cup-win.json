@@ -1,5 +1,5 @@
 {
-  "note": "나리 투수편 3년차 50경기 국가대항전 134 — 한국이 우승한 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 투수편에 들어서면 134 대진판부터라 대진판 확인(OK)이 결과 팝업 0x25(한국 우승)를 띄운다. r254 soak(src/app/model/soak/soakFixtures.test.tsx, 씨앗 2 · 보직 0 · 능력 보직 상한으로 시작 · pitcherLeagueSoak 의 정책)이 실제 저장 모듈이 쓴 칸을 떴다",
+  "note": "나리 투수편 1년차 49경기 국가대항전 134 — 한국이 우승한 대회가 끝난 대진판(마지막 경기 뒤 재진입). 저장의 대회 칸으로 투수편에 들어서면 134 대진판부터라 대진판 확인(OK)이 결과 팝업 0x25(한국 우승)를 띄운다. r254 soak(src/app/model/soak/soakFixtures.test.tsx, 씨앗 1 · 보직 0 · 능력 보직 상한으로 시작 · pitcherLeagueSoak 의 정책)이 실제 저장 모듈이 쓴 칸을 떴다",
   "localStorage": {
     "compus-baseball/pitcher-league": {
       "name": "SOAK",
@@ -10,10 +10,10 @@
         "stamina": 800
       },
       "role": 0,
-      "positionCode": 0,
-      "typeIndex": 2,
-      "handIndex": 0,
-      "skinIndex": 2,
+      "positionCode": 2,
+      "typeIndex": 1,
+      "handIndex": 1,
+      "skinIndex": 1,
       "pitchMask": 7,
       "magicLevel": 0,
       "selectedMagicNumber": 0,
@@ -34,49 +34,47 @@
         false,
         false
       ],
-      "stamina": 8002,
-      "gamePoint": 9286,
-      "season": 3,
-      "gamesPlayed": 50,
+      "stamina": 10000,
+      "gamePoint": 3238,
+      "season": 1,
+      "gamesPlayed": 49,
       "stats": {
-        "games": 26,
-        "outs": 648,
-        "runsAllowed": 10,
+        "games": 25,
+        "outs": 619,
+        "runsAllowed": 23,
         "saves": 0,
-        "strikeouts": 326,
-        "pitches": 2333,
-        "wins": 19,
-        "losses": 2,
-        "walks": 0
+        "strikeouts": 335,
+        "pitches": 2173,
+        "wins": 20,
+        "losses": 1,
+        "walks": 1
       },
       "careerStats": {
-        "games": 79,
-        "outs": 1917,
-        "runsAllowed": 43,
+        "games": 25,
+        "outs": 619,
+        "runsAllowed": 23,
         "saves": 0,
-        "strikeouts": 1002,
-        "pitches": 7037,
-        "wins": 53,
-        "losses": 7,
-        "walks": 9
+        "strikeouts": 335,
+        "pitches": 2173,
+        "wins": 20,
+        "losses": 1,
+        "walks": 1
       },
-      "teamId": 2,
-      "popularity": 1239,
-      "reputation": 997,
-      "morale": 98,
-      "money": 77800,
-      "salary": 357,
+      "teamId": 1,
+      "popularity": 391,
+      "reputation": 991,
+      "morale": 96,
+      "money": 16400,
+      "salary": 147,
       "skillIds": [
-        15,
-        11,
-        16,
-        10
+        0,
+        8,
+        15
       ],
       "equippedSkillIds": [
-        15,
-        11,
-        16,
-        10
+        0,
+        8,
+        15
       ],
       "skillSlotLevel": 0,
       "removedMinusSkillIds": [],
@@ -84,16 +82,9 @@
         "이름 없는 신인",
         "떠오르는 샛별",
         "바른생활 사나이",
-        "성스러운 영혼",
-        "철완 28호",
-        "국가 대표",
-        "최고의 루키",
-        "은둔형 외톨이",
-        "닥터 K",
-        "괴물 투수",
-        "떠오르는 에이스"
+        "국가 대표"
       ],
-      "equippedTitle": 56,
+      "equippedTitle": 8,
       "subItemIds": [],
       "equipmentLevels": {
         "control": 0,
@@ -125,15 +116,7 @@
         "380",
         "383",
         "461",
-        "463",
-        "400",
-        "17",
-        "21",
-        "424",
-        "411",
-        "18",
-        "427",
-        "423"
+        "463"
       ],
       "storySceneIndex": 0,
       "trainingCounts": {},
@@ -158,198 +141,198 @@
       "illnessName": null,
       "illnessRemaining": 0,
       "illnessCooldown": 0,
-      "mvpSeasonBits": 7,
+      "mvpSeasonBits": 1,
       "lotteryPurchases": 0,
       "lotteryFirstPrizes": 0,
       "completeGameCounts": {
         "perfect": 0,
         "noHitter": 0,
-        "shutout": 44,
-        "completeGame": 18
+        "shutout": 11,
+        "completeGame": 9
       },
-      "seasonPopularityGain": 300,
-      "popularityAtSeasonStart": 833,
+      "seasonPopularityGain": 286,
+      "popularityAtSeasonStart": 0,
       "hasSeenYearGoalWindow": true,
       "yearGoalEventDone": false,
       "endingIndex": null,
       "league": {
         "wins": [
-          21,
-          20,
-          29,
-          15,
-          25,
+          17,
+          31,
           23,
-          24,
-          26,
+          23,
+          22,
           21,
+          24,
+          23,
+          20,
           21
         ],
         "losses": [
-          24,
-          25,
-          16,
-          30,
-          20,
+          28,
+          14,
           22,
-          21,
-          19,
+          22,
+          23,
           24,
+          21,
+          22,
+          25,
           24
         ],
         "streak": [
-          4,
-          3,
+          0,
+          1,
           1,
           0,
           0,
           0,
-          2,
-          1,
           0,
-          0
+          6,
+          1,
+          2
         ],
         "bestStreak": [
+          3,
           5,
-          3,
-          7,
-          2,
-          3,
-          6,
-          7,
-          9,
+          8,
           4,
-          4
+          4,
+          3,
+          7,
+          6,
+          6,
+          3
         ],
         "losingStreak": [
+          1,
           0,
           0,
-          0,
+          1,
+          4,
           6,
           1,
-          1,
           0,
           0,
-          4,
-          3
+          0
         ],
         "headToHead": [
           [
             0,
-            0,
+            1,
+            1,
             1,
             2,
-            4,
-            3,
-            4,
-            3,
             1,
+            4,
+            2,
+            2,
             3
           ],
           [
+            4,
+            0,
             5,
-            0,
-            2,
-            2,
-            2,
-            1,
-            1,
-            2,
-            3,
-            2
-          ],
-          [
-            4,
-            3,
-            0,
-            4,
-            3,
-            3,
-            2,
-            4,
-            3,
-            3
-          ],
-          [
-            3,
-            3,
-            1,
-            0,
-            0,
-            3,
-            0,
-            1,
-            1,
-            3
-          ],
-          [
-            1,
-            3,
-            2,
-            5,
-            0,
             3,
             4,
-            2,
-            3,
-            2
-          ],
-          [
-            2,
             4,
-            2,
-            2,
-            2,
-            0,
             3,
             2,
             3,
             3
           ],
           [
-            1,
             4,
+            0,
+            0,
+            2,
             3,
-            5,
+            3,
+            2,
+            2,
+            4,
+            3
+          ],
+          [
+            4,
+            2,
+            3,
+            0,
+            3,
+            2,
+            3,
+            3,
+            2,
+            1
+          ],
+          [
+            3,
             1,
             2,
+            2,
             0,
-            0,
-            4,
+            3,
+            2,
+            2,
+            3,
             4
           ],
           [
+            4,
+            1,
             2,
             3,
+            2,
+            0,
             1,
+            2,
+            3,
+            3
+          ],
+          [
+            1,
+            2,
+            3,
+            2,
+            3,
             4,
+            0,
+            4,
+            2,
+            3
+          ],
+          [
             3,
             3,
-            5,
+            3,
+            2,
+            3,
+            3,
+            1,
             0,
             2,
             3
           ],
           [
-            4,
-            2,
-            2,
-            4,
-            2,
+            3,
             2,
             1,
+            3,
+            2,
+            2,
+            3,
             3,
             0,
             1
           ],
           [
             2,
-            3,
             2,
             2,
-            3,
-            2,
+            4,
             1,
+            2,
+            2,
             2,
             4,
             0
@@ -357,30 +340,20 @@
         ],
         "pitcherOrders": {
           "0": [
+            0,
             1,
             2,
             3,
-            0,
-            4,
-            5,
-            6,
-            7
-          ],
-          "1": [
-            2,
-            3,
-            0,
-            1,
             4,
             5,
             6,
             7
           ],
           "2": [
-            2,
-            3,
             0,
             1,
+            2,
+            3,
             4,
             5,
             6,
@@ -397,20 +370,20 @@
             7
           ],
           "4": [
-            3,
             0,
             1,
             2,
+            3,
             4,
             5,
             6,
             7
           ],
           "5": [
-            3,
             0,
             1,
             2,
+            3,
             4,
             5,
             6,
@@ -427,20 +400,20 @@
             7
           ],
           "7": [
-            2,
-            3,
             0,
             1,
+            2,
+            3,
             4,
             5,
             6,
             7
           ],
           "8": [
-            3,
             0,
             1,
             2,
+            3,
             4,
             5,
             6,
@@ -463,13 +436,7 @@
           "batters": [
             {
               "slot": 0,
-              "position": 8,
-              "equipment": [
-                2,
-                0,
-                0,
-                0
-              ]
+              "position": 8
             },
             {
               "slot": 1,
@@ -481,13 +448,7 @@
             },
             {
               "slot": 3,
-              "position": 1,
-              "equipment": [
-                0,
-                2,
-                0,
-                0
-              ]
+              "position": 1
             },
             {
               "slot": 4,
@@ -512,7 +473,7 @@
             {
               "slot": 12,
               "position": 0,
-              "ace": 3
+              "ace": 4
             },
             {
               "slot": 10,
@@ -527,39 +488,13 @@
               "position": 0
             }
           ],
-          "acePitcher": 1,
-          "pitcherEquipment": {
-            "0": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "3": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              1,
-              0,
-              0
-            ]
-          }
+          "acePitcher": 1
         },
         {
           "batters": [
             {
               "slot": 0,
-              "position": 9,
-              "equipment": [
-                2,
-                0,
-                0,
-                0
-              ]
+              "position": 9
             },
             {
               "slot": 1,
@@ -571,111 +506,27 @@
             },
             {
               "slot": 3,
-              "position": 5,
-              "equipment": [
-                0,
-                2,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 4,
-              "position": 1
-            },
-            {
-              "slot": 5,
-              "position": 6
-            },
-            {
-              "slot": 6,
-              "position": 3
-            },
-            {
-              "slot": 7,
-              "position": 2
-            },
-            {
-              "slot": 8,
-              "position": 7
-            },
-            {
-              "slot": 12,
-              "position": 0,
-              "ace": 1
-            },
-            {
-              "slot": 10,
-              "position": 0
-            },
-            {
-              "slot": 11,
-              "position": 0
-            },
-            {
-              "slot": 9,
-              "position": 0
-            }
-          ],
-          "acePitcher": 4,
-          "pitcherEquipment": {
-            "0": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "3": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              1,
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "batters": [
-            {
-              "slot": 0,
-              "position": 4
-            },
-            {
-              "slot": 1,
-              "position": 8
-            },
-            {
-              "slot": 2,
-              "position": 1
-            },
-            {
-              "slot": 3,
-              "position": 3
-            },
-            {
-              "slot": 4,
-              "position": 7
-            },
-            {
-              "slot": 5,
               "position": 5
             },
             {
-              "slot": 6,
-              "position": 2
+              "slot": 4,
+              "position": 1
             },
             {
-              "slot": 7,
+              "slot": 5,
               "position": 6
             },
             {
+              "slot": 6,
+              "position": 3
+            },
+            {
+              "slot": 7,
+              "position": 2
+            },
+            {
               "slot": 8,
-              "position": 9
+              "position": 7
             },
             {
               "slot": 12,
@@ -697,9 +548,9 @@
           ],
           "acePitcher": 0,
           "pitchers": [
-            -1,
-            1,
             2,
+            1,
+            -1,
             3,
             4,
             5,
@@ -712,13 +563,65 @@
           "batters": [
             {
               "slot": 0,
-              "position": 9,
-              "equipment": [
-                2,
-                0,
-                0,
-                0
-              ]
+              "position": 4
+            },
+            {
+              "slot": 1,
+              "position": 8
+            },
+            {
+              "slot": 2,
+              "position": 1
+            },
+            {
+              "slot": 3,
+              "position": 3
+            },
+            {
+              "slot": 4,
+              "position": 7
+            },
+            {
+              "slot": 5,
+              "position": 5
+            },
+            {
+              "slot": 6,
+              "position": 2
+            },
+            {
+              "slot": 7,
+              "position": 6
+            },
+            {
+              "slot": 8,
+              "position": 9
+            },
+            {
+              "slot": 12,
+              "position": 0,
+              "ace": 3
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            },
+            {
+              "slot": 9,
+              "position": 0
+            }
+          ],
+          "acePitcher": 2
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 9
             },
             {
               "slot": 1,
@@ -730,13 +633,7 @@
             },
             {
               "slot": 3,
-              "position": 3,
-              "equipment": [
-                0,
-                2,
-                0,
-                0
-              ]
+              "position": 3
             },
             {
               "slot": 4,
@@ -745,6 +642,238 @@
             {
               "slot": 5,
               "position": 1
+            },
+            {
+              "slot": 6,
+              "position": 6
+            },
+            {
+              "slot": 7,
+              "position": 2
+            },
+            {
+              "slot": 8,
+              "position": 4
+            },
+            {
+              "slot": 12,
+              "position": 0,
+              "ace": 3
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            },
+            {
+              "slot": 9,
+              "position": 0
+            }
+          ],
+          "acePitcher": 4
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 4
+            },
+            {
+              "slot": 1,
+              "position": 9
+            },
+            {
+              "slot": 2,
+              "position": 7
+            },
+            {
+              "slot": 3,
+              "position": 1
+            },
+            {
+              "slot": 4,
+              "position": 5
+            },
+            {
+              "slot": 5,
+              "position": 6
+            },
+            {
+              "slot": 6,
+              "position": 3
+            },
+            {
+              "slot": 7,
+              "position": 8
+            },
+            {
+              "slot": 8,
+              "position": 2
+            },
+            {
+              "slot": 12,
+              "position": 0,
+              "ace": 1
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            },
+            {
+              "slot": 9,
+              "position": 0
+            }
+          ],
+          "acePitcher": 3
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 9
+            },
+            {
+              "slot": 1,
+              "position": 7
+            },
+            {
+              "slot": 2,
+              "position": 1
+            },
+            {
+              "slot": 3,
+              "position": 3
+            },
+            {
+              "slot": 4,
+              "position": 5
+            },
+            {
+              "slot": 5,
+              "position": 2
+            },
+            {
+              "slot": 6,
+              "position": 8
+            },
+            {
+              "slot": 7,
+              "position": 6
+            },
+            {
+              "slot": 8,
+              "position": 4
+            },
+            {
+              "slot": 12,
+              "position": 0,
+              "ace": 1
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            },
+            {
+              "slot": 9,
+              "position": 0
+            }
+          ],
+          "acePitcher": 4
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 3
+            },
+            {
+              "slot": 1,
+              "position": 9
+            },
+            {
+              "slot": 2,
+              "position": 4
+            },
+            {
+              "slot": 3,
+              "position": 5
+            },
+            {
+              "slot": 4,
+              "position": 1
+            },
+            {
+              "slot": 5,
+              "position": 7
+            },
+            {
+              "slot": 6,
+              "position": 2
+            },
+            {
+              "slot": 7,
+              "position": 8
+            },
+            {
+              "slot": 8,
+              "position": 6
+            },
+            {
+              "slot": 12,
+              "position": 0,
+              "ace": 1
+            },
+            {
+              "slot": 10,
+              "position": 0
+            },
+            {
+              "slot": 11,
+              "position": 0
+            },
+            {
+              "slot": 9,
+              "position": 0
+            }
+          ],
+          "acePitcher": 3
+        },
+        {
+          "batters": [
+            {
+              "slot": 0,
+              "position": 8
+            },
+            {
+              "slot": 1,
+              "position": 5
+            },
+            {
+              "slot": 2,
+              "position": 9
+            },
+            {
+              "slot": 3,
+              "position": 1
+            },
+            {
+              "slot": 4,
+              "position": 3
+            },
+            {
+              "slot": 5,
+              "position": 7
             },
             {
               "slot": 6,
@@ -776,417 +905,25 @@
               "position": 0
             }
           ],
-          "acePitcher": 1,
-          "pitcherEquipment": {
-            "2": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "3": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              1,
-              0,
-              0
-            ]
-          }
+          "acePitcher": 3
         },
         {
           "batters": [
             {
               "slot": 0,
-              "position": 4,
-              "equipment": [
-                2,
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 1,
-              "position": 9
-            },
-            {
-              "slot": 2,
               "position": 7
             },
             {
-              "slot": 3,
-              "position": 1,
-              "equipment": [
-                0,
-                2,
-                0,
-                0
-              ]
+              "slot": 1,
+              "position": 8
             },
             {
-              "slot": 4,
+              "slot": 2,
+              "position": 4
+            },
+            {
+              "slot": 3,
               "position": 5
-            },
-            {
-              "slot": 5,
-              "position": 6
-            },
-            {
-              "slot": 6,
-              "position": 3
-            },
-            {
-              "slot": 7,
-              "position": 8
-            },
-            {
-              "slot": 8,
-              "position": 2
-            },
-            {
-              "slot": 12,
-              "position": 0,
-              "ace": 4
-            },
-            {
-              "slot": 10,
-              "position": 0
-            },
-            {
-              "slot": 11,
-              "position": 0
-            },
-            {
-              "slot": 9,
-              "position": 0
-            }
-          ],
-          "acePitcher": 2,
-          "pitcherEquipment": {
-            "1": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "2": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              1,
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "batters": [
-            {
-              "slot": 0,
-              "position": 9,
-              "equipment": [
-                2,
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 1,
-              "position": 7
-            },
-            {
-              "slot": 2,
-              "position": 1
-            },
-            {
-              "slot": 3,
-              "position": 3,
-              "equipment": [
-                0,
-                2,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 4,
-              "position": 5
-            },
-            {
-              "slot": 5,
-              "position": 2
-            },
-            {
-              "slot": 6,
-              "position": 8
-            },
-            {
-              "slot": 7,
-              "position": 6
-            },
-            {
-              "slot": 8,
-              "position": 4
-            },
-            {
-              "slot": 12,
-              "position": 0,
-              "ace": 4
-            },
-            {
-              "slot": 10,
-              "position": 0
-            },
-            {
-              "slot": 11,
-              "position": 0
-            },
-            {
-              "slot": 9,
-              "position": 0
-            }
-          ],
-          "acePitcher": 4,
-          "pitcherEquipment": {
-            "1": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "3": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              1,
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "batters": [
-            {
-              "slot": 0,
-              "position": 3,
-              "equipment": [
-                1,
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 1,
-              "position": 9
-            },
-            {
-              "slot": 2,
-              "position": 4
-            },
-            {
-              "slot": 3,
-              "position": 5,
-              "equipment": [
-                0,
-                2,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 4,
-              "position": 1
-            },
-            {
-              "slot": 5,
-              "position": 7
-            },
-            {
-              "slot": 6,
-              "position": 2
-            },
-            {
-              "slot": 7,
-              "position": 8
-            },
-            {
-              "slot": 8,
-              "position": 6
-            },
-            {
-              "slot": 12,
-              "position": 0,
-              "ace": 4
-            },
-            {
-              "slot": 10,
-              "position": 0
-            },
-            {
-              "slot": 11,
-              "position": 0
-            },
-            {
-              "slot": 9,
-              "position": 0
-            }
-          ],
-          "acePitcher": 4,
-          "pitcherEquipment": {
-            "2": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "3": [
-              2,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              1,
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "batters": [
-            {
-              "slot": 0,
-              "position": 8,
-              "equipment": [
-                1,
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 1,
-              "position": 5
-            },
-            {
-              "slot": 2,
-              "position": 9
-            },
-            {
-              "slot": 3,
-              "position": 1,
-              "equipment": [
-                0,
-                1,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 4,
-              "position": 3
-            },
-            {
-              "slot": 5,
-              "position": 7
-            },
-            {
-              "slot": 6,
-              "position": 6
-            },
-            {
-              "slot": 7,
-              "position": 2
-            },
-            {
-              "slot": 8,
-              "position": 4
-            },
-            {
-              "slot": 12,
-              "position": 0,
-              "ace": 3
-            },
-            {
-              "slot": 10,
-              "position": 0
-            },
-            {
-              "slot": 11,
-              "position": 0
-            },
-            {
-              "slot": 9,
-              "position": 0
-            }
-          ],
-          "acePitcher": 2,
-          "pitcherEquipment": {
-            "0": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "1": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              1,
-              0,
-              0
-            ]
-          }
-        },
-        {
-          "batters": [
-            {
-              "slot": 0,
-              "position": 7,
-              "equipment": [
-                2,
-                0,
-                0,
-                0
-              ]
-            },
-            {
-              "slot": 1,
-              "position": 8
-            },
-            {
-              "slot": 2,
-              "position": 4
-            },
-            {
-              "slot": 3,
-              "position": 5,
-              "equipment": [
-                0,
-                2,
-                0,
-                0
-              ]
             },
             {
               "slot": 4,
@@ -1226,39 +963,13 @@
               "position": 0
             }
           ],
-          "acePitcher": 2,
-          "pitcherEquipment": {
-            "1": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "3": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              2,
-              0,
-              0
-            ]
-          }
+          "acePitcher": 4
         },
         {
           "batters": [
             {
               "slot": 0,
-              "position": 8,
-              "equipment": [
-                2,
-                0,
-                0,
-                0
-              ]
+              "position": 8
             },
             {
               "slot": 1,
@@ -1270,13 +981,7 @@
             },
             {
               "slot": 3,
-              "position": 3,
-              "equipment": [
-                0,
-                1,
-                0,
-                0
-              ]
+              "position": 3
             },
             {
               "slot": 4,
@@ -1301,7 +1006,7 @@
             {
               "slot": 12,
               "position": 0,
-              "ace": 4
+              "ace": 2
             },
             {
               "slot": 10,
@@ -1316,1804 +1021,1788 @@
               "position": 0
             }
           ],
-          "acePitcher": 1,
-          "pitcherEquipment": {
-            "2": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "3": [
-              1,
-              0,
-              0,
-              0
-            ],
-            "7": [
-              0,
-              2,
-              0,
-              0
-            ]
-          }
+          "acePitcher": 4
         }
       ],
       "leaguePlayerStats": {
         "batters": {
           "0": {
-            "atBats": 186,
-            "hits": 67,
-            "homeRuns": 3,
-            "runsBattedIn": 12,
+            "atBats": 187,
+            "hits": 58,
+            "homeRuns": 2,
+            "runsBattedIn": 13,
             "steals": 18,
-            "doubles": 13,
-            "triples": 3
+            "doubles": 20,
+            "triples": 2
           },
           "1": {
-            "atBats": 183,
-            "hits": 53,
-            "homeRuns": 5,
-            "runsBattedIn": 18,
-            "steals": 8,
-            "doubles": 21
-          },
-          "2": {
-            "atBats": 184,
-            "hits": 53,
-            "homeRuns": 4,
-            "runsBattedIn": 22,
-            "steals": 7,
-            "doubles": 12,
-            "triples": 6
-          },
-          "3": {
-            "atBats": 178,
-            "hits": 57,
-            "homeRuns": 7,
-            "runsBattedIn": 29,
-            "steals": 13,
-            "doubles": 14,
-            "triples": 1
-          },
-          "4": {
-            "atBats": 168,
-            "hits": 58,
-            "homeRuns": 1,
-            "runsBattedIn": 15,
-            "steals": 13,
-            "doubles": 17,
-            "triples": 1
-          },
-          "5": {
-            "atBats": 157,
-            "hits": 47,
-            "homeRuns": 4,
-            "runsBattedIn": 25,
-            "steals": 5,
-            "doubles": 17,
-            "triples": 2
-          },
-          "6": {
-            "atBats": 163,
+            "atBats": 172,
             "hits": 49,
             "homeRuns": 7,
-            "runsBattedIn": 23,
-            "steals": 4,
-            "doubles": 12,
+            "runsBattedIn": 25,
+            "steals": 11,
+            "doubles": 16,
+            "triples": 4
+          },
+          "2": {
+            "atBats": 188,
+            "hits": 64,
+            "homeRuns": 8,
+            "runsBattedIn": 22,
+            "steals": 10,
+            "doubles": 15,
             "triples": 1
           },
-          "7": {
-            "atBats": 158,
-            "hits": 44,
+          "3": {
+            "atBats": 176,
+            "hits": 45,
             "homeRuns": 5,
-            "runsBattedIn": 20,
-            "steals": 12,
-            "doubles": 7,
+            "runsBattedIn": 18,
+            "steals": 7,
+            "doubles": 13,
             "triples": 2
           },
-          "8": {
-            "atBats": 162,
-            "hits": 46,
+          "4": {
+            "atBats": 179,
+            "hits": 55,
+            "homeRuns": 5,
+            "runsBattedIn": 14,
+            "steals": 8,
+            "doubles": 15,
+            "triples": 2
+          },
+          "5": {
+            "atBats": 170,
+            "hits": 48,
+            "homeRuns": 6,
+            "runsBattedIn": 25,
+            "steals": 9,
+            "doubles": 7,
+            "triples": 5
+          },
+          "6": {
+            "atBats": 167,
+            "hits": 43,
             "homeRuns": 3,
-            "runsBattedIn": 15,
-            "steals": 7,
-            "doubles": 12,
+            "runsBattedIn": 9,
+            "steals": 10,
+            "doubles": 15
+          },
+          "7": {
+            "atBats": 161,
+            "hits": 47,
+            "homeRuns": 3,
+            "runsBattedIn": 20,
+            "steals": 17,
+            "doubles": 13,
             "triples": 1
           },
+          "8": {
+            "atBats": 155,
+            "hits": 42,
+            "homeRuns": 1,
+            "runsBattedIn": 11,
+            "steals": 11,
+            "doubles": 14
+          },
           "9": {
-            "atBats": 48,
-            "hits": 16,
-            "homeRuns": 2,
-            "runsBattedIn": 9,
-            "steals": 1,
-            "doubles": 8
+            "atBats": 35,
+            "hits": 10,
+            "homeRuns": 0,
+            "runsBattedIn": 2,
+            "steals": 3,
+            "doubles": 1,
+            "triples": 1
           },
           "10": {
-            "atBats": 41,
-            "hits": 18,
-            "homeRuns": 1,
-            "runsBattedIn": 8,
-            "steals": 2,
-            "doubles": 4
+            "atBats": 45,
+            "hits": 12,
+            "homeRuns": 5,
+            "runsBattedIn": 13,
+            "steals": 1,
+            "doubles": 1,
+            "triples": 1
           },
           "11": {
-            "atBats": 47,
-            "hits": 16,
-            "homeRuns": 0,
+            "atBats": 28,
+            "hits": 9,
+            "homeRuns": 1,
             "runsBattedIn": 3,
-            "steals": 2,
-            "doubles": 7
+            "steals": 1,
+            "doubles": 2
           },
           "12": {
-            "atBats": 185,
-            "hits": 52,
+            "atBats": 183,
+            "hits": 54,
             "homeRuns": 4,
-            "runsBattedIn": 9,
-            "steals": 16,
-            "doubles": 15,
+            "runsBattedIn": 14,
+            "steals": 21,
+            "doubles": 18,
             "triples": 2
           },
           "13": {
             "atBats": 176,
-            "hits": 41,
-            "homeRuns": 0,
-            "runsBattedIn": 10,
-            "steals": 16,
-            "doubles": 15,
-            "triples": 2
-          },
-          "14": {
-            "atBats": 180,
-            "hits": 60,
-            "homeRuns": 9,
-            "runsBattedIn": 23,
-            "steals": 7,
-            "doubles": 16
-          },
-          "15": {
-            "atBats": 182,
-            "hits": 69,
-            "homeRuns": 10,
-            "runsBattedIn": 32,
+            "hits": 48,
+            "homeRuns": 5,
+            "runsBattedIn": 20,
             "steals": 11,
-            "doubles": 16,
+            "doubles": 15,
             "triples": 3
           },
+          "14": {
+            "atBats": 177,
+            "hits": 56,
+            "homeRuns": 9,
+            "runsBattedIn": 28,
+            "steals": 6,
+            "doubles": 13,
+            "triples": 5
+          },
+          "15": {
+            "atBats": 190,
+            "hits": 63,
+            "homeRuns": 6,
+            "runsBattedIn": 31,
+            "steals": 5,
+            "doubles": 18,
+            "triples": 4
+          },
           "16": {
-            "atBats": 162,
-            "hits": 36,
-            "homeRuns": 5,
-            "runsBattedIn": 14,
-            "steals": 8,
+            "atBats": 169,
+            "hits": 64,
+            "homeRuns": 4,
+            "runsBattedIn": 13,
+            "steals": 9,
+            "doubles": 21
+          },
+          "17": {
+            "atBats": 169,
+            "hits": 53,
+            "homeRuns": 4,
+            "runsBattedIn": 15,
+            "steals": 11,
             "doubles": 8,
             "triples": 1
           },
-          "17": {
-            "atBats": 170,
-            "hits": 41,
-            "homeRuns": 4,
-            "runsBattedIn": 17,
-            "steals": 9,
-            "doubles": 10
-          },
           "18": {
-            "atBats": 164,
-            "hits": 42,
-            "homeRuns": 2,
-            "runsBattedIn": 10,
-            "steals": 6,
-            "doubles": 11,
-            "triples": 5
+            "atBats": 177,
+            "hits": 61,
+            "homeRuns": 7,
+            "runsBattedIn": 22,
+            "steals": 12,
+            "doubles": 20
           },
           "19": {
-            "atBats": 152,
+            "atBats": 158,
             "hits": 43,
-            "homeRuns": 3,
-            "runsBattedIn": 9,
-            "steals": 17,
-            "doubles": 10
+            "homeRuns": 1,
+            "runsBattedIn": 19,
+            "steals": 11,
+            "doubles": 15,
+            "triples": 3
           },
           "20": {
-            "atBats": 148,
-            "hits": 34,
-            "homeRuns": 3,
-            "runsBattedIn": 10,
-            "steals": 8,
-            "doubles": 10
+            "atBats": 145,
+            "hits": 35,
+            "homeRuns": 0,
+            "runsBattedIn": 14,
+            "steals": 13,
+            "doubles": 17,
+            "triples": 1
           },
           "21": {
-            "atBats": 36,
-            "hits": 8,
+            "atBats": 44,
+            "hits": 16,
             "homeRuns": 1,
-            "runsBattedIn": 3,
-            "doubles": 1
+            "runsBattedIn": 5,
+            "steals": 1,
+            "doubles": 4
           },
           "22": {
             "atBats": 37,
-            "hits": 9,
-            "homeRuns": 3,
-            "runsBattedIn": 8,
-            "doubles": 2
+            "hits": 11,
+            "homeRuns": 1,
+            "runsBattedIn": 6,
+            "steals": 1,
+            "doubles": 4
           },
           "23": {
-            "atBats": 33,
-            "hits": 16,
-            "homeRuns": 2,
-            "runsBattedIn": 8,
-            "steals": 2,
-            "doubles": 8
+            "atBats": 39,
+            "hits": 9,
+            "homeRuns": 0,
+            "runsBattedIn": 1,
+            "steals": 3,
+            "doubles": 4
           },
           "24": {
-            "atBats": 193,
-            "hits": 48,
-            "homeRuns": 2,
-            "runsBattedIn": 10,
-            "steals": 10,
-            "doubles": 16,
+            "atBats": 187,
+            "hits": 60,
+            "homeRuns": 7,
+            "runsBattedIn": 20,
+            "steals": 15,
+            "doubles": 18,
             "triples": 2
           },
           "25": {
-            "atBats": 189,
-            "hits": 59,
-            "homeRuns": 4,
-            "runsBattedIn": 21,
+            "atBats": 191,
+            "hits": 62,
+            "homeRuns": 9,
+            "runsBattedIn": 26,
             "steals": 14,
-            "doubles": 20
+            "doubles": 15
           },
           "26": {
-            "atBats": 182,
-            "hits": 61,
+            "atBats": 175,
+            "hits": 52,
             "homeRuns": 7,
-            "runsBattedIn": 21,
-            "steals": 8,
-            "doubles": 14,
-            "triples": 1
+            "runsBattedIn": 25,
+            "steals": 10,
+            "doubles": 13,
+            "triples": 2
           },
           "27": {
-            "atBats": 183,
-            "hits": 51,
-            "homeRuns": 3,
-            "runsBattedIn": 18,
-            "steals": 6,
-            "doubles": 17,
-            "triples": 3
+            "atBats": 173,
+            "hits": 52,
+            "homeRuns": 5,
+            "runsBattedIn": 13,
+            "steals": 11,
+            "doubles": 13,
+            "triples": 2
           },
           "28": {
-            "atBats": 175,
-            "hits": 67,
-            "homeRuns": 6,
-            "runsBattedIn": 26,
-            "steals": 9,
-            "doubles": 14
-          },
-          "29": {
-            "atBats": 170,
-            "hits": 44,
-            "homeRuns": 2,
-            "runsBattedIn": 13,
-            "steals": 7,
-            "doubles": 11,
-            "triples": 1
-          },
-          "30": {
-            "atBats": 163,
-            "hits": 40,
+            "atBats": 178,
+            "hits": 66,
             "homeRuns": 5,
             "runsBattedIn": 17,
-            "steals": 10,
-            "doubles": 7,
+            "steals": 19,
+            "doubles": 18,
             "triples": 3
           },
+          "29": {
+            "atBats": 164,
+            "hits": 39,
+            "homeRuns": 3,
+            "runsBattedIn": 20,
+            "steals": 5,
+            "doubles": 16,
+            "triples": 4
+          },
+          "30": {
+            "atBats": 175,
+            "hits": 44,
+            "homeRuns": 8,
+            "runsBattedIn": 21,
+            "steals": 6,
+            "doubles": 12,
+            "triples": 2
+          },
           "31": {
-            "atBats": 158,
-            "hits": 48,
-            "homeRuns": 5,
-            "runsBattedIn": 14,
-            "steals": 12,
-            "doubles": 19,
-            "triples": 1
+            "atBats": 162,
+            "hits": 51,
+            "homeRuns": 2,
+            "runsBattedIn": 11,
+            "steals": 18,
+            "doubles": 16
           },
           "32": {
             "atBats": 162,
-            "hits": 45,
-            "homeRuns": 6,
-            "runsBattedIn": 18,
-            "steals": 10,
-            "doubles": 11,
-            "triples": 4
+            "hits": 36,
+            "homeRuns": 3,
+            "runsBattedIn": 13,
+            "steals": 6,
+            "doubles": 7,
+            "triples": 1
           },
           "33": {
-            "atBats": 40,
-            "hits": 14,
-            "homeRuns": 1,
-            "runsBattedIn": 4,
-            "steals": 1,
-            "doubles": 1
-          },
-          "34": {
-            "atBats": 31,
-            "hits": 6,
-            "homeRuns": 0,
-            "runsBattedIn": 0,
-            "doubles": 2,
-            "steals": 1
-          },
-          "35": {
-            "atBats": 26,
-            "hits": 8,
-            "homeRuns": 1,
-            "runsBattedIn": 5,
+            "atBats": 41,
+            "hits": 13,
+            "homeRuns": 2,
+            "runsBattedIn": 6,
+            "steals": 4,
             "doubles": 2
           },
-          "36": {
-            "atBats": 183,
-            "hits": 55,
-            "homeRuns": 4,
-            "runsBattedIn": 22,
-            "steals": 12,
-            "doubles": 20,
-            "triples": 2
+          "34": {
+            "atBats": 44,
+            "hits": 14,
+            "homeRuns": 1,
+            "runsBattedIn": 5,
+            "steals": 2,
+            "doubles": 5
           },
-          "37": {
-            "atBats": 174,
-            "hits": 40,
-            "homeRuns": 4,
+          "35": {
+            "atBats": 27,
+            "hits": 6,
+            "homeRuns": 0,
             "runsBattedIn": 6,
-            "steals": 9,
+            "steals": 3
+          },
+          "36": {
+            "atBats": 180,
+            "hits": 44,
+            "homeRuns": 4,
+            "runsBattedIn": 10,
+            "steals": 12,
             "doubles": 16,
             "triples": 1
           },
+          "37": {
+            "atBats": 178,
+            "hits": 40,
+            "homeRuns": 3,
+            "runsBattedIn": 11,
+            "steals": 8,
+            "doubles": 9
+          },
           "38": {
-            "atBats": 179,
-            "hits": 58,
-            "homeRuns": 6,
-            "runsBattedIn": 22,
-            "steals": 12,
-            "doubles": 11,
-            "triples": 3
+            "atBats": 174,
+            "hits": 54,
+            "homeRuns": 5,
+            "runsBattedIn": 16,
+            "steals": 16,
+            "doubles": 14
           },
           "39": {
-            "atBats": 174,
-            "hits": 52,
-            "homeRuns": 6,
-            "runsBattedIn": 21,
-            "steals": 10,
-            "doubles": 10,
+            "atBats": 175,
+            "hits": 41,
+            "homeRuns": 4,
+            "runsBattedIn": 15,
+            "steals": 9,
+            "doubles": 12,
             "triples": 1
           },
           "40": {
-            "atBats": 174,
-            "hits": 44,
-            "homeRuns": 6,
-            "runsBattedIn": 11,
-            "steals": 16,
-            "doubles": 10,
+            "atBats": 171,
+            "hits": 43,
+            "homeRuns": 2,
+            "runsBattedIn": 8,
+            "steals": 12,
+            "doubles": 9,
             "triples": 2
           },
           "41": {
-            "atBats": 165,
-            "hits": 37,
-            "homeRuns": 0,
-            "runsBattedIn": 7,
-            "steals": 8,
-            "doubles": 12,
+            "atBats": 166,
+            "hits": 56,
+            "homeRuns": 3,
+            "runsBattedIn": 10,
+            "steals": 9,
+            "doubles": 19,
             "triples": 2
           },
           "42": {
-            "atBats": 158,
-            "hits": 42,
-            "homeRuns": 2,
-            "runsBattedIn": 11,
-            "steals": 7,
-            "doubles": 9,
-            "triples": 1
-          },
-          "43": {
-            "atBats": 164,
+            "atBats": 162,
             "hits": 51,
             "homeRuns": 4,
-            "runsBattedIn": 17,
-            "steals": 7,
-            "doubles": 16,
-            "triples": 1
+            "runsBattedIn": 20,
+            "steals": 8,
+            "doubles": 18,
+            "triples": 3
+          },
+          "43": {
+            "atBats": 162,
+            "hits": 39,
+            "homeRuns": 3,
+            "runsBattedIn": 21,
+            "steals": 5,
+            "doubles": 8,
+            "triples": 2
           },
           "44": {
-            "atBats": 162,
-            "hits": 42,
-            "homeRuns": 5,
+            "atBats": 153,
+            "hits": 47,
+            "homeRuns": 8,
             "runsBattedIn": 18,
-            "steals": 6,
-            "doubles": 15,
+            "steals": 7,
+            "doubles": 13,
             "triples": 1
           },
           "45": {
-            "atBats": 30,
-            "hits": 7,
+            "atBats": 35,
+            "hits": 11,
             "homeRuns": 1,
-            "runsBattedIn": 3,
-            "doubles": 2
+            "runsBattedIn": 5,
+            "steals": 4,
+            "doubles": 3,
+            "triples": 1
           },
           "46": {
+            "atBats": 32,
+            "hits": 11,
+            "homeRuns": 3,
+            "runsBattedIn": 8,
+            "steals": 3,
+            "doubles": 3
+          },
+          "47": {
             "atBats": 33,
             "hits": 7,
             "homeRuns": 0,
-            "runsBattedIn": 1,
-            "steals": 2,
+            "runsBattedIn": 6,
             "doubles": 2
           },
-          "47": {
-            "atBats": 37,
-            "hits": 10,
-            "homeRuns": 2,
-            "runsBattedIn": 4,
-            "doubles": 2,
-            "steals": 1
-          },
           "48": {
-            "atBats": 183,
-            "hits": 39,
+            "atBats": 188,
+            "hits": 52,
+            "homeRuns": 2,
+            "runsBattedIn": 16,
+            "steals": 14,
+            "doubles": 20
+          },
+          "49": {
+            "atBats": 195,
+            "hits": 64,
+            "homeRuns": 4,
+            "runsBattedIn": 22,
+            "steals": 11,
+            "doubles": 25,
+            "triples": 1
+          },
+          "50": {
+            "atBats": 185,
+            "hits": 50,
             "homeRuns": 4,
             "runsBattedIn": 15,
             "steals": 11,
-            "doubles": 14
-          },
-          "49": {
-            "atBats": 179,
-            "hits": 49,
-            "homeRuns": 6,
-            "runsBattedIn": 17,
-            "steals": 12,
-            "doubles": 19,
-            "triples": 4
-          },
-          "50": {
-            "atBats": 187,
-            "hits": 57,
-            "homeRuns": 6,
-            "runsBattedIn": 20,
-            "steals": 11,
-            "doubles": 16,
+            "doubles": 18,
             "triples": 1
           },
           "51": {
-            "atBats": 179,
-            "hits": 61,
-            "homeRuns": 7,
-            "runsBattedIn": 23,
+            "atBats": 182,
+            "hits": 68,
+            "homeRuns": 10,
+            "runsBattedIn": 32,
             "steals": 13,
-            "doubles": 23,
-            "triples": 1
+            "doubles": 11,
+            "triples": 4
           },
           "52": {
-            "atBats": 173,
-            "hits": 47,
-            "homeRuns": 9,
-            "runsBattedIn": 22,
-            "steals": 5,
-            "doubles": 11
-          },
-          "53": {
-            "atBats": 169,
-            "hits": 49,
-            "homeRuns": 2,
-            "runsBattedIn": 7,
-            "steals": 9,
-            "doubles": 10,
+            "atBats": 172,
+            "hits": 51,
+            "homeRuns": 7,
+            "runsBattedIn": 25,
+            "steals": 10,
+            "doubles": 14,
             "triples": 1
           },
-          "54": {
-            "atBats": 156,
-            "hits": 47,
+          "53": {
+            "atBats": 178,
+            "hits": 50,
             "homeRuns": 2,
-            "runsBattedIn": 11,
-            "steals": 10,
-            "doubles": 13,
+            "runsBattedIn": 14,
+            "steals": 7,
+            "doubles": 19,
+            "triples": 5
+          },
+          "54": {
+            "atBats": 169,
+            "hits": 56,
+            "homeRuns": 6,
+            "runsBattedIn": 25,
+            "steals": 14,
+            "doubles": 14,
             "triples": 3
           },
           "55": {
-            "atBats": 164,
-            "hits": 45,
-            "homeRuns": 5,
-            "runsBattedIn": 22,
-            "steals": 8,
-            "doubles": 17,
-            "triples": 1
+            "atBats": 162,
+            "hits": 51,
+            "homeRuns": 4,
+            "runsBattedIn": 21,
+            "steals": 13,
+            "doubles": 14,
+            "triples": 4
           },
           "56": {
-            "atBats": 152,
-            "hits": 53,
-            "homeRuns": 4,
-            "runsBattedIn": 18,
-            "steals": 9,
+            "atBats": 171,
+            "hits": 61,
+            "homeRuns": 5,
+            "runsBattedIn": 28,
+            "steals": 12,
             "doubles": 16
           },
           "57": {
-            "atBats": 32,
-            "hits": 8,
-            "homeRuns": 1,
-            "runsBattedIn": 2,
-            "steals": 4,
-            "doubles": 2
-          },
-          "58": {
-            "atBats": 36,
-            "hits": 7,
-            "homeRuns": 1,
-            "runsBattedIn": 4,
-            "doubles": 1
-          },
-          "59": {
-            "atBats": 25,
-            "hits": 7,
-            "homeRuns": 0,
-            "runsBattedIn": 2,
-            "doubles": 1
-          },
-          "60": {
-            "atBats": 183,
-            "hits": 52,
-            "homeRuns": 0,
-            "runsBattedIn": 8,
-            "steals": 13,
-            "doubles": 22,
-            "triples": 1
-          },
-          "61": {
-            "atBats": 179,
-            "hits": 42,
-            "homeRuns": 2,
-            "runsBattedIn": 11,
-            "steals": 10,
-            "doubles": 10
-          },
-          "62": {
-            "atBats": 183,
-            "hits": 58,
-            "homeRuns": 4,
-            "runsBattedIn": 19,
-            "steals": 7,
-            "doubles": 17,
-            "triples": 3
-          },
-          "63": {
-            "atBats": 173,
-            "hits": 49,
-            "homeRuns": 7,
-            "runsBattedIn": 19,
-            "steals": 7,
-            "doubles": 16,
-            "triples": 5
-          },
-          "64": {
-            "atBats": 169,
-            "hits": 54,
-            "homeRuns": 7,
-            "runsBattedIn": 23,
-            "steals": 12,
-            "doubles": 9,
-            "triples": 2
-          },
-          "65": {
-            "atBats": 153,
-            "hits": 47,
-            "homeRuns": 1,
-            "runsBattedIn": 9,
-            "steals": 12,
-            "doubles": 16
-          },
-          "66": {
-            "atBats": 162,
-            "hits": 43,
-            "homeRuns": 3,
-            "runsBattedIn": 21,
-            "steals": 8,
-            "doubles": 12,
-            "triples": 1
-          },
-          "67": {
-            "atBats": 150,
-            "hits": 40,
-            "homeRuns": 4,
-            "runsBattedIn": 11,
-            "steals": 9,
-            "doubles": 10,
-            "triples": 1
-          },
-          "68": {
-            "atBats": 157,
-            "hits": 37,
-            "homeRuns": 5,
-            "runsBattedIn": 18,
-            "steals": 6,
-            "doubles": 9,
-            "triples": 3
-          },
-          "69": {
-            "atBats": 25,
-            "hits": 5,
+            "atBats": 35,
+            "hits": 11,
             "homeRuns": 1,
             "runsBattedIn": 3,
-            "steals": 1,
-            "triples": 1
-          },
-          "70": {
-            "atBats": 42,
-            "hits": 16,
-            "homeRuns": 2,
-            "runsBattedIn": 10,
-            "steals": 1,
-            "doubles": 4
-          },
-          "71": {
-            "atBats": 37,
-            "hits": 5,
-            "homeRuns": 0,
-            "runsBattedIn": 1,
-            "steals": 1,
-            "doubles": 2
-          },
-          "72": {
-            "atBats": 188,
-            "hits": 58,
-            "homeRuns": 5,
-            "runsBattedIn": 11,
-            "steals": 13,
-            "doubles": 21,
-            "triples": 1
-          },
-          "73": {
-            "atBats": 190,
-            "hits": 59,
-            "homeRuns": 7,
-            "runsBattedIn": 19,
-            "steals": 7,
-            "doubles": 15,
-            "triples": 1
-          },
-          "74": {
-            "atBats": 183,
-            "hits": 55,
-            "homeRuns": 5,
-            "runsBattedIn": 21,
-            "steals": 11,
-            "doubles": 17,
-            "triples": 4
-          },
-          "75": {
-            "atBats": 184,
-            "hits": 67,
-            "homeRuns": 7,
-            "runsBattedIn": 36,
-            "steals": 13,
-            "doubles": 15,
-            "triples": 7
-          },
-          "76": {
-            "atBats": 177,
-            "hits": 61,
-            "homeRuns": 4,
-            "runsBattedIn": 20,
-            "steals": 14,
-            "doubles": 18,
-            "triples": 1
-          },
-          "77": {
-            "atBats": 167,
-            "hits": 43,
-            "homeRuns": 6,
-            "runsBattedIn": 18,
-            "steals": 6,
-            "doubles": 8,
-            "triples": 3
-          },
-          "78": {
-            "atBats": 163,
-            "hits": 47,
-            "homeRuns": 5,
-            "runsBattedIn": 18,
-            "steals": 12,
-            "doubles": 14,
-            "triples": 1
-          },
-          "79": {
-            "atBats": 159,
-            "hits": 46,
-            "homeRuns": 2,
-            "runsBattedIn": 15,
-            "steals": 5,
-            "doubles": 15
-          },
-          "80": {
-            "atBats": 146,
-            "hits": 30,
-            "homeRuns": 3,
-            "runsBattedIn": 11,
-            "steals": 4,
-            "doubles": 5
-          },
-          "81": {
-            "atBats": 38,
-            "hits": 11,
-            "homeRuns": 2,
-            "runsBattedIn": 7,
-            "steals": 1,
-            "doubles": 4
-          },
-          "82": {
-            "atBats": 27,
-            "hits": 6,
-            "homeRuns": 2,
-            "runsBattedIn": 4,
-            "steals": 1,
+            "steals": 2,
             "doubles": 1
           },
-          "83": {
-            "atBats": 41,
-            "hits": 14,
-            "homeRuns": 1,
-            "runsBattedIn": 6,
-            "steals": 1,
-            "doubles": 2,
-            "triples": 1
-          },
-          "84": {
-            "atBats": 190,
-            "hits": 57,
-            "homeRuns": 4,
-            "runsBattedIn": 22,
-            "steals": 13,
-            "doubles": 23,
-            "triples": 1
-          },
-          "85": {
-            "atBats": 189,
-            "hits": 66,
-            "homeRuns": 2,
-            "runsBattedIn": 17,
-            "steals": 9,
-            "doubles": 18,
-            "triples": 2
-          },
-          "86": {
-            "atBats": 183,
-            "hits": 46,
-            "homeRuns": 4,
-            "runsBattedIn": 22,
-            "steals": 13,
-            "doubles": 18,
-            "triples": 1
-          },
-          "87": {
-            "atBats": 172,
-            "hits": 56,
-            "homeRuns": 4,
-            "runsBattedIn": 21,
-            "steals": 9,
-            "doubles": 18,
-            "triples": 2
-          },
-          "88": {
-            "atBats": 171,
-            "hits": 58,
-            "homeRuns": 2,
-            "runsBattedIn": 16,
-            "steals": 16,
-            "doubles": 20,
-            "triples": 2
-          },
-          "89": {
-            "atBats": 171,
-            "hits": 46,
-            "homeRuns": 5,
-            "runsBattedIn": 18,
-            "steals": 8,
-            "doubles": 11
-          },
-          "90": {
-            "atBats": 161,
-            "hits": 46,
-            "homeRuns": 1,
-            "runsBattedIn": 11,
-            "steals": 6,
-            "doubles": 15,
-            "triples": 1
-          },
-          "91": {
-            "atBats": 162,
-            "hits": 48,
-            "homeRuns": 2,
-            "runsBattedIn": 17,
-            "steals": 5,
-            "doubles": 17
-          },
-          "92": {
-            "atBats": 156,
-            "hits": 44,
-            "homeRuns": 2,
-            "runsBattedIn": 12,
-            "steals": 8,
-            "doubles": 17
-          },
-          "93": {
-            "atBats": 35,
-            "hits": 15,
+          "58": {
+            "atBats": 39,
+            "hits": 12,
             "homeRuns": 0,
-            "runsBattedIn": 6,
-            "steals": 3,
-            "doubles": 3,
-            "triples": 1
-          },
-          "94": {
-            "atBats": 40,
-            "hits": 9,
-            "homeRuns": 2,
-            "runsBattedIn": 9,
+            "runsBattedIn": 4,
             "steals": 1,
-            "doubles": 4
+            "doubles": 5
           },
-          "95": {
-            "atBats": 24,
-            "hits": 9,
-            "homeRuns": 2,
-            "runsBattedIn": 8,
+          "59": {
+            "atBats": 30,
+            "hits": 7,
+            "homeRuns": 1,
+            "runsBattedIn": 4,
             "steals": 1,
             "doubles": 3
           },
-          "96": {
-            "atBats": 191,
-            "hits": 52,
-            "homeRuns": 1,
-            "runsBattedIn": 9,
-            "steals": 12,
-            "doubles": 17,
-            "triples": 2
+          "60": {
+            "atBats": 183,
+            "hits": 63,
+            "homeRuns": 3,
+            "runsBattedIn": 20,
+            "steals": 15,
+            "doubles": 26
           },
-          "97": {
-            "atBats": 192,
-            "hits": 51,
-            "homeRuns": 1,
-            "runsBattedIn": 13,
-            "steals": 7,
-            "doubles": 16,
-            "triples": 2
-          },
-          "98": {
-            "atBats": 171,
-            "hits": 47,
-            "homeRuns": 4,
-            "runsBattedIn": 21,
-            "steals": 7,
-            "doubles": 15,
-            "triples": 3
-          },
-          "99": {
-            "atBats": 176,
-            "hits": 55,
-            "homeRuns": 6,
-            "runsBattedIn": 19,
-            "steals": 12,
-            "doubles": 12,
-            "triples": 1
-          },
-          "100": {
-            "atBats": 167,
-            "hits": 44,
+          "61": {
+            "atBats": 179,
+            "hits": 48,
             "homeRuns": 1,
             "runsBattedIn": 11,
             "steals": 10,
+            "doubles": 17,
+            "triples": 1
+          },
+          "62": {
+            "atBats": 191,
+            "hits": 46,
+            "homeRuns": 3,
+            "runsBattedIn": 11,
+            "steals": 6,
             "doubles": 12
           },
-          "101": {
+          "63": {
+            "atBats": 172,
+            "hits": 63,
+            "homeRuns": 7,
+            "runsBattedIn": 26,
+            "steals": 12,
+            "doubles": 22,
+            "triples": 2
+          },
+          "64": {
+            "atBats": 169,
+            "hits": 57,
+            "homeRuns": 9,
+            "runsBattedIn": 21,
+            "steals": 11,
+            "doubles": 16,
+            "triples": 1
+          },
+          "65": {
             "atBats": 161,
-            "hits": 45,
+            "hits": 49,
+            "homeRuns": 3,
+            "runsBattedIn": 18,
+            "steals": 7,
+            "doubles": 14,
+            "triples": 3
+          },
+          "66": {
+            "atBats": 161,
+            "hits": 54,
+            "homeRuns": 2,
+            "runsBattedIn": 23,
+            "steals": 11,
+            "doubles": 18
+          },
+          "67": {
+            "atBats": 158,
+            "hits": 46,
+            "homeRuns": 2,
+            "runsBattedIn": 11,
+            "steals": 13,
+            "doubles": 9
+          },
+          "68": {
+            "atBats": 157,
+            "hits": 39,
+            "homeRuns": 4,
+            "runsBattedIn": 18,
+            "steals": 5,
+            "doubles": 9
+          },
+          "69": {
+            "atBats": 28,
+            "hits": 3,
             "homeRuns": 0,
-            "runsBattedIn": 6,
+            "runsBattedIn": 0,
+            "steals": 2,
+            "doubles": 1
+          },
+          "70": {
+            "atBats": 55,
+            "hits": 13,
+            "homeRuns": 3,
+            "runsBattedIn": 12,
+            "steals": 1,
+            "doubles": 3
+          },
+          "71": {
+            "atBats": 35,
+            "hits": 9,
+            "homeRuns": 2,
+            "runsBattedIn": 7,
+            "steals": 2,
+            "doubles": 4
+          },
+          "72": {
+            "atBats": 203,
+            "hits": 73,
+            "homeRuns": 4,
+            "runsBattedIn": 19,
+            "steals": 16,
+            "doubles": 29,
+            "triples": 2
+          },
+          "73": {
+            "atBats": 176,
+            "hits": 47,
+            "homeRuns": 7,
+            "runsBattedIn": 17,
+            "steals": 9,
+            "doubles": 14,
+            "triples": 1
+          },
+          "74": {
+            "atBats": 173,
+            "hits": 44,
+            "homeRuns": 3,
+            "runsBattedIn": 11,
+            "steals": 9,
+            "doubles": 20
+          },
+          "75": {
+            "atBats": 170,
+            "hits": 48,
+            "homeRuns": 4,
+            "runsBattedIn": 20,
+            "steals": 5,
+            "doubles": 11,
+            "triples": 1
+          },
+          "76": {
+            "atBats": 175,
+            "hits": 73,
+            "homeRuns": 4,
+            "runsBattedIn": 21,
+            "steals": 10,
+            "doubles": 20,
+            "triples": 2
+          },
+          "77": {
+            "atBats": 170,
+            "hits": 53,
+            "homeRuns": 10,
+            "runsBattedIn": 29,
+            "steals": 6,
+            "doubles": 15,
+            "triples": 2
+          },
+          "78": {
+            "atBats": 166,
+            "hits": 45,
+            "homeRuns": 7,
+            "runsBattedIn": 20,
+            "steals": 9,
+            "doubles": 6,
+            "triples": 2
+          },
+          "79": {
+            "atBats": 164,
+            "hits": 52,
+            "homeRuns": 3,
+            "runsBattedIn": 17,
             "steals": 9,
             "doubles": 16,
             "triples": 1
           },
-          "102": {
-            "atBats": 160,
-            "hits": 46,
-            "homeRuns": 3,
-            "runsBattedIn": 15,
-            "steals": 11,
-            "doubles": 12
+          "80": {
+            "atBats": 164,
+            "hits": 43,
+            "homeRuns": 5,
+            "runsBattedIn": 18,
+            "steals": 5,
+            "doubles": 13,
+            "triples": 2
           },
-          "103": {
-            "atBats": 162,
-            "hits": 47,
-            "homeRuns": 4,
-            "runsBattedIn": 17,
-            "steals": 11,
-            "doubles": 10,
-            "triples": 1
-          },
-          "104": {
-            "atBats": 158,
-            "hits": 39,
-            "homeRuns": 3,
-            "runsBattedIn": 10,
-            "steals": 10,
-            "doubles": 11
-          },
-          "105": {
-            "atBats": 32,
-            "hits": 12,
-            "homeRuns": 0,
-            "runsBattedIn": 6,
-            "steals": 3,
-            "doubles": 4
-          },
-          "106": {
-            "atBats": 34,
-            "hits": 7,
-            "homeRuns": 0,
-            "runsBattedIn": 2,
-            "doubles": 1
-          },
-          "107": {
+          "81": {
             "atBats": 45,
-            "hits": 12,
+            "hits": 15,
+            "homeRuns": 2,
+            "runsBattedIn": 10,
+            "steals": 4,
+            "doubles": 6
+          },
+          "82": {
+            "atBats": 32,
+            "hits": 9,
             "homeRuns": 1,
             "runsBattedIn": 5,
-            "steals": 3,
+            "steals": 2,
             "doubles": 3,
             "triples": 1
           },
-          "108": {
-            "atBats": 191,
-            "hits": 66,
-            "homeRuns": 3,
-            "runsBattedIn": 18,
-            "steals": 10,
-            "doubles": 21
-          },
-          "109": {
-            "atBats": 179,
-            "hits": 52,
+          "83": {
+            "atBats": 56,
+            "hits": 13,
             "homeRuns": 1,
-            "runsBattedIn": 13,
-            "steals": 11,
-            "doubles": 22,
+            "runsBattedIn": 9,
+            "steals": 1,
+            "doubles": 3,
             "triples": 1
           },
-          "110": {
-            "atBats": 196,
-            "hits": 57,
-            "homeRuns": 7,
-            "runsBattedIn": 30,
-            "steals": 7,
-            "doubles": 18,
-            "triples": 5
+          "84": {
+            "atBats": 189,
+            "hits": 47,
+            "homeRuns": 1,
+            "runsBattedIn": 11,
+            "steals": 16,
+            "doubles": 14,
+            "triples": 3
           },
-          "111": {
-            "atBats": 176,
-            "hits": 67,
-            "homeRuns": 7,
-            "runsBattedIn": 27,
-            "steals": 11,
-            "doubles": 23,
-            "triples": 2
-          },
-          "112": {
-            "atBats": 164,
-            "hits": 48,
-            "homeRuns": 8,
-            "runsBattedIn": 21,
-            "steals": 9,
+          "85": {
+            "atBats": 180,
+            "hits": 55,
+            "homeRuns": 5,
+            "runsBattedIn": 13,
+            "steals": 12,
             "doubles": 14,
             "triples": 2
           },
-          "113": {
-            "atBats": 165,
-            "hits": 38,
-            "homeRuns": 4,
-            "runsBattedIn": 17,
-            "steals": 6,
-            "doubles": 9,
-            "triples": 1
-          },
-          "114": {
-            "atBats": 171,
-            "hits": 51,
-            "homeRuns": 6,
+          "86": {
+            "atBats": 187,
+            "hits": 63,
+            "homeRuns": 2,
             "runsBattedIn": 20,
-            "steals": 6,
-            "doubles": 10,
-            "triples": 1
+            "steals": 19,
+            "doubles": 19,
+            "triples": 2
           },
-          "115": {
-            "atBats": 166,
-            "hits": 54,
-            "homeRuns": 3,
-            "runsBattedIn": 18,
-            "steals": 11,
+          "87": {
+            "atBats": 169,
+            "hits": 42,
+            "homeRuns": 7,
+            "runsBattedIn": 19,
+            "steals": 5,
             "doubles": 15
           },
-          "116": {
-            "atBats": 161,
-            "hits": 50,
+          "88": {
+            "atBats": 169,
+            "hits": 56,
+            "homeRuns": 4,
+            "runsBattedIn": 19,
+            "steals": 10,
+            "doubles": 12,
+            "triples": 1
+          },
+          "89": {
+            "atBats": 173,
+            "hits": 60,
             "homeRuns": 3,
-            "runsBattedIn": 13,
-            "steals": 4,
-            "doubles": 18
-          },
-          "117": {
-            "atBats": 52,
-            "hits": 17,
-            "homeRuns": 0,
-            "runsBattedIn": 3,
+            "runsBattedIn": 23,
             "steals": 7,
-            "doubles": 6
+            "doubles": 21,
+            "triples": 1
           },
-          "118": {
+          "90": {
+            "atBats": 160,
+            "hits": 38,
+            "homeRuns": 4,
+            "runsBattedIn": 21,
+            "steals": 6,
+            "doubles": 11,
+            "triples": 2
+          },
+          "91": {
+            "atBats": 159,
+            "hits": 45,
+            "homeRuns": 3,
+            "runsBattedIn": 17,
+            "steals": 7,
+            "doubles": 11
+          },
+          "92": {
+            "atBats": 163,
+            "hits": 39,
+            "homeRuns": 2,
+            "runsBattedIn": 9,
+            "steals": 8,
+            "doubles": 9
+          },
+          "93": {
             "atBats": 34,
-            "hits": 12,
+            "hits": 10,
+            "homeRuns": 0,
+            "runsBattedIn": 2,
+            "steals": 4,
+            "doubles": 3
+          },
+          "94": {
+            "atBats": 33,
+            "hits": 10,
             "homeRuns": 1,
             "runsBattedIn": 8,
             "steals": 1,
+            "doubles": 3,
+            "triples": 1
+          },
+          "95": {
+            "atBats": 39,
+            "hits": 13,
+            "homeRuns": 0,
+            "runsBattedIn": 3,
+            "steals": 1,
+            "doubles": 4
+          },
+          "96": {
+            "atBats": 187,
+            "hits": 47,
+            "homeRuns": 2,
+            "runsBattedIn": 11,
+            "steals": 8,
+            "doubles": 18,
+            "triples": 2
+          },
+          "97": {
+            "atBats": 184,
+            "hits": 57,
+            "homeRuns": 6,
+            "runsBattedIn": 18,
+            "steals": 14,
+            "doubles": 13,
+            "triples": 1
+          },
+          "98": {
+            "atBats": 182,
+            "hits": 54,
+            "homeRuns": 4,
+            "runsBattedIn": 13,
+            "steals": 14,
+            "doubles": 14,
+            "triples": 1
+          },
+          "99": {
+            "atBats": 180,
+            "hits": 59,
+            "homeRuns": 6,
+            "runsBattedIn": 24,
+            "steals": 9,
+            "doubles": 13
+          },
+          "100": {
+            "atBats": 173,
+            "hits": 46,
+            "homeRuns": 5,
+            "runsBattedIn": 26,
+            "steals": 12,
+            "doubles": 15
+          },
+          "101": {
+            "atBats": 157,
+            "hits": 45,
+            "homeRuns": 0,
+            "runsBattedIn": 13,
+            "steals": 11,
+            "doubles": 14,
+            "triples": 1
+          },
+          "102": {
+            "atBats": 167,
+            "hits": 46,
+            "homeRuns": 7,
+            "runsBattedIn": 20,
+            "steals": 12,
+            "doubles": 7,
+            "triples": 1
+          },
+          "103": {
+            "atBats": 156,
+            "hits": 32,
+            "homeRuns": 3,
+            "runsBattedIn": 16,
+            "steals": 10,
+            "doubles": 9,
+            "triples": 2
+          },
+          "104": {
+            "atBats": 156,
+            "hits": 35,
+            "homeRuns": 1,
+            "runsBattedIn": 12,
+            "steals": 7,
+            "doubles": 10,
+            "triples": 1
+          },
+          "105": {
+            "atBats": 39,
+            "hits": 13,
+            "homeRuns": 0,
+            "runsBattedIn": 4,
+            "doubles": 3,
+            "triples": 1
+          },
+          "106": {
+            "atBats": 29,
+            "hits": 6,
+            "homeRuns": 0,
+            "runsBattedIn": 3,
             "doubles": 2
           },
-          "119": {
-            "atBats": 37,
-            "hits": 8,
+          "107": {
+            "atBats": 30,
+            "hits": 12,
             "homeRuns": 1,
             "runsBattedIn": 4,
+            "doubles": 5
+          },
+          "108": {
+            "atBats": 183,
+            "hits": 47,
+            "homeRuns": 1,
+            "runsBattedIn": 8,
+            "steals": 18,
+            "doubles": 19
+          },
+          "109": {
+            "atBats": 178,
+            "hits": 42,
+            "homeRuns": 1,
+            "runsBattedIn": 13,
+            "steals": 11,
+            "doubles": 15,
+            "triples": 1
+          },
+          "110": {
+            "atBats": 187,
+            "hits": 60,
+            "homeRuns": 7,
+            "runsBattedIn": 23,
+            "steals": 8,
+            "doubles": 15,
+            "triples": 2
+          },
+          "111": {
+            "atBats": 176,
+            "hits": 49,
+            "homeRuns": 6,
+            "runsBattedIn": 18,
+            "steals": 9,
+            "doubles": 8
+          },
+          "112": {
+            "atBats": 174,
+            "hits": 51,
+            "homeRuns": 4,
+            "runsBattedIn": 18,
+            "steals": 8,
+            "doubles": 16,
+            "triples": 2
+          },
+          "113": {
+            "atBats": 175,
+            "hits": 54,
+            "homeRuns": 6,
+            "runsBattedIn": 15,
+            "steals": 8,
+            "doubles": 18,
+            "triples": 1
+          },
+          "114": {
+            "atBats": 162,
+            "hits": 52,
+            "homeRuns": 6,
+            "runsBattedIn": 17,
+            "steals": 6,
+            "doubles": 13,
+            "triples": 1
+          },
+          "115": {
+            "atBats": 163,
+            "hits": 54,
+            "homeRuns": 5,
+            "runsBattedIn": 27,
+            "steals": 10,
+            "doubles": 16,
+            "triples": 1
+          },
+          "116": {
+            "atBats": 159,
+            "hits": 42,
+            "homeRuns": 4,
+            "runsBattedIn": 13,
+            "steals": 9,
+            "doubles": 17,
+            "triples": 1
+          },
+          "117": {
+            "atBats": 29,
+            "hits": 7,
+            "homeRuns": 0,
+            "runsBattedIn": 7,
+            "doubles": 1,
+            "triples": 1
+          },
+          "118": {
+            "atBats": 35,
+            "hits": 14,
+            "homeRuns": 3,
+            "runsBattedIn": 9,
             "steals": 1,
-            "doubles": 1
+            "doubles": 4
+          },
+          "119": {
+            "atBats": 32,
+            "hits": 12,
+            "homeRuns": 0,
+            "runsBattedIn": 5,
+            "doubles": 7
           }
         },
         "pitchers": {
           "0": {
-            "outs": 235,
-            "runsAllowed": 21,
+            "outs": 295,
+            "runsAllowed": 31,
             "saves": 0,
-            "strikeouts": 61,
-            "pitches": 836,
-            "wins": 7,
-            "losses": 1
-          },
-          "1": {
-            "outs": 238,
-            "runsAllowed": 51,
-            "saves": 0,
-            "strikeouts": 55,
-            "pitches": 891,
-            "wins": 3,
-            "losses": 6
-          },
-          "2": {
-            "outs": 191,
-            "runsAllowed": 38,
-            "saves": 0,
-            "strikeouts": 53,
-            "pitches": 720,
-            "wins": 2,
+            "strikeouts": 80,
+            "pitches": 1058,
+            "wins": 4,
             "losses": 7
           },
-          "3": {
-            "outs": 232,
-            "runsAllowed": 34,
+          "1": {
+            "outs": 187,
+            "runsAllowed": 43,
             "saves": 0,
-            "strikeouts": 62,
-            "pitches": 869,
+            "strikeouts": 47,
+            "pitches": 705,
+            "wins": 1,
+            "losses": 7
+          },
+          "2": {
+            "outs": 204,
+            "runsAllowed": 40,
+            "saves": 0,
+            "strikeouts": 58,
+            "pitches": 767,
+            "wins": 2,
+            "losses": 8
+          },
+          "3": {
+            "outs": 236,
+            "runsAllowed": 37,
+            "saves": 0,
+            "strikeouts": 72,
+            "pitches": 895,
             "wins": 5,
             "losses": 3
           },
           "4": {
-            "outs": 107,
-            "runsAllowed": 16,
+            "outs": 105,
+            "runsAllowed": 25,
             "saves": 0,
-            "strikeouts": 32,
-            "pitches": 416,
+            "strikeouts": 21,
+            "pitches": 408,
+            "wins": 2,
+            "losses": 1
+          },
+          "5": {
+            "outs": 81,
+            "runsAllowed": 11,
+            "saves": 0,
+            "strikeouts": 24,
+            "pitches": 294,
             "wins": 2,
             "losses": 2
           },
-          "5": {
-            "outs": 80,
-            "runsAllowed": 10,
-            "saves": 0,
-            "strikeouts": 23,
-            "pitches": 296,
-            "wins": 1,
-            "losses": 1
-          },
           "6": {
-            "outs": 38,
-            "runsAllowed": 4,
+            "outs": 34,
+            "runsAllowed": 11,
             "saves": 0,
-            "strikeouts": 11,
-            "pitches": 124,
+            "strikeouts": 6,
+            "pitches": 121,
             "wins": 0,
             "losses": 0
           },
           "7": {
-            "outs": 46,
-            "runsAllowed": 11,
+            "outs": 33,
+            "runsAllowed": 5,
             "saves": 0,
-            "strikeouts": 17,
-            "pitches": 175,
-            "wins": 0,
-            "losses": 4
+            "strikeouts": 10,
+            "pitches": 144,
+            "wins": 1,
+            "losses": 0
           },
           "8": {
-            "outs": 258,
-            "runsAllowed": 30,
+            "outs": 34,
+            "runsAllowed": 2,
             "saves": 0,
-            "strikeouts": 74,
-            "pitches": 900,
-            "wins": 4,
-            "losses": 4
+            "strikeouts": 8,
+            "pitches": 111,
+            "wins": 0,
+            "losses": 0
           },
           "9": {
-            "outs": 172,
-            "runsAllowed": 36,
+            "outs": 149,
+            "runsAllowed": 21,
             "saves": 0,
-            "strikeouts": 46,
-            "pitches": 676,
+            "strikeouts": 43,
+            "pitches": 561,
             "wins": 1,
-            "losses": 7
+            "losses": 5
           },
           "10": {
-            "outs": 183,
-            "runsAllowed": 40,
-            "saves": 0,
-            "strikeouts": 58,
-            "pitches": 718,
-            "wins": 2,
-            "losses": 7
-          },
-          "11": {
-            "outs": 212,
-            "runsAllowed": 27,
-            "saves": 0,
-            "strikeouts": 52,
-            "pitches": 725,
-            "wins": 4,
-            "losses": 3
-          },
-          "12": {
-            "outs": 102,
+            "outs": 159,
             "runsAllowed": 19,
             "saves": 0,
-            "strikeouts": 26,
-            "pitches": 407,
-            "wins": 3,
-            "losses": 1
+            "strikeouts": 53,
+            "pitches": 574,
+            "wins": 5,
+            "losses": 2
+          },
+          "11": {
+            "outs": 136,
+            "runsAllowed": 31,
+            "saves": 0,
+            "strikeouts": 33,
+            "pitches": 532,
+            "wins": 1,
+            "losses": 5
+          },
+          "12": {
+            "outs": 59,
+            "runsAllowed": 6,
+            "saves": 0,
+            "strikeouts": 18,
+            "pitches": 211,
+            "wins": 1,
+            "losses": 0
           },
           "13": {
-            "outs": 122,
-            "runsAllowed": 17,
+            "outs": 16,
+            "runsAllowed": 3,
             "saves": 0,
-            "strikeouts": 40,
-            "pitches": 427,
-            "wins": 0,
+            "strikeouts": 5,
+            "pitches": 61,
+            "wins": 1,
             "losses": 0
           },
           "14": {
-            "outs": 82,
-            "runsAllowed": 12,
+            "outs": 3,
+            "runsAllowed": 2,
             "saves": 0,
-            "strikeouts": 18,
-            "pitches": 278,
-            "wins": 4,
-            "losses": 1
-          },
-          "15": {
-            "outs": 44,
-            "runsAllowed": 10,
-            "saves": 0,
-            "strikeouts": 17,
-            "pitches": 171,
-            "wins": 0,
-            "losses": 2
-          },
-          "16": {
-            "outs": 38,
-            "runsAllowed": 6,
-            "saves": 0,
-            "strikeouts": 11,
-            "pitches": 146,
-            "wins": 0,
-            "losses": 1
-          },
-          "17": {
-            "outs": 174,
-            "runsAllowed": 29,
-            "saves": 0,
-            "strikeouts": 55,
-            "pitches": 656,
-            "wins": 3,
-            "losses": 4
-          },
-          "18": {
-            "outs": 145,
-            "runsAllowed": 22,
-            "saves": 0,
-            "strikeouts": 47,
-            "pitches": 564,
-            "wins": 1,
-            "losses": 3
-          },
-          "19": {
-            "outs": 145,
-            "runsAllowed": 17,
-            "saves": 0,
-            "strikeouts": 43,
-            "pitches": 490,
-            "wins": 3,
-            "losses": 4
-          },
-          "20": {
-            "outs": 33,
-            "runsAllowed": 6,
-            "saves": 0,
-            "strikeouts": 9,
-            "pitches": 107,
-            "wins": 0,
-            "losses": 2
-          },
-          "21": {
-            "outs": 8,
-            "runsAllowed": 4,
-            "saves": 0,
-            "strikeouts": 1,
-            "pitches": 31,
+            "strikeouts": 2,
+            "pitches": 18,
             "wins": 0,
             "losses": 0
           },
-          "23": {
-            "outs": 10,
-            "runsAllowed": 3,
+          "15": {
+            "outs": 39,
+            "runsAllowed": 8,
             "saves": 0,
-            "strikeouts": 1,
-            "pitches": 36,
+            "strikeouts": 11,
+            "pitches": 151,
+            "wins": 0,
+            "losses": 1
+          },
+          "16": {
+            "outs": 253,
+            "runsAllowed": 31,
+            "saves": 0,
+            "strikeouts": 87,
+            "pitches": 924,
+            "wins": 4,
+            "losses": 5
+          },
+          "17": {
+            "outs": 235,
+            "runsAllowed": 33,
+            "saves": 0,
+            "strikeouts": 62,
+            "pitches": 835,
+            "wins": 6,
+            "losses": 3
+          },
+          "18": {
+            "outs": 193,
+            "runsAllowed": 30,
+            "saves": 0,
+            "strikeouts": 59,
+            "pitches": 715,
+            "wins": 4,
+            "losses": 2
+          },
+          "19": {
+            "outs": 203,
+            "runsAllowed": 34,
+            "saves": 0,
+            "strikeouts": 49,
+            "pitches": 774,
+            "wins": 4,
+            "losses": 6
+          },
+          "20": {
+            "outs": 122,
+            "runsAllowed": 19,
+            "saves": 0,
+            "strikeouts": 29,
+            "pitches": 416,
+            "wins": 1,
+            "losses": 5
+          },
+          "21": {
+            "outs": 85,
+            "runsAllowed": 15,
+            "saves": 0,
+            "strikeouts": 23,
+            "pitches": 306,
+            "wins": 1,
+            "losses": 0
+          },
+          "22": {
+            "outs": 39,
+            "runsAllowed": 13,
+            "saves": 0,
+            "strikeouts": 12,
+            "pitches": 158,
+            "wins": 0,
+            "losses": 1
+          },
+          "23": {
+            "outs": 60,
+            "runsAllowed": 6,
+            "saves": 0,
+            "strikeouts": 14,
+            "pitches": 199,
             "wins": 1,
             "losses": 0
           },
           "24": {
-            "outs": 270,
-            "runsAllowed": 31,
+            "outs": 228,
+            "runsAllowed": 32,
             "saves": 0,
-            "strikeouts": 87,
-            "pitches": 978,
-            "wins": 3,
+            "strikeouts": 74,
+            "pitches": 889,
+            "wins": 2,
             "losses": 7
           },
           "25": {
-            "outs": 184,
-            "runsAllowed": 39,
+            "outs": 245,
+            "runsAllowed": 31,
             "saves": 0,
-            "strikeouts": 50,
-            "pitches": 722,
+            "strikeouts": 71,
+            "pitches": 900,
             "wins": 3,
-            "losses": 4
+            "losses": 5
           },
           "26": {
-            "outs": 183,
-            "runsAllowed": 37,
+            "outs": 196,
+            "runsAllowed": 34,
             "saves": 0,
-            "strikeouts": 47,
-            "pitches": 679,
-            "wins": 1,
-            "losses": 7
+            "strikeouts": 51,
+            "pitches": 735,
+            "wins": 3,
+            "losses": 3
           },
           "27": {
-            "outs": 231,
-            "runsAllowed": 32,
+            "outs": 208,
+            "runsAllowed": 40,
             "saves": 0,
             "strikeouts": 56,
-            "pitches": 819,
-            "wins": 3,
-            "losses": 7
+            "pitches": 750,
+            "wins": 5,
+            "losses": 3
           },
           "28": {
-            "outs": 120,
-            "runsAllowed": 14,
+            "outs": 94,
+            "runsAllowed": 13,
             "saves": 0,
-            "strikeouts": 46,
-            "pitches": 448,
+            "strikeouts": 32,
+            "pitches": 344,
+            "wins": 2,
+            "losses": 0
+          },
+          "29": {
+            "outs": 89,
+            "runsAllowed": 5,
+            "saves": 0,
+            "strikeouts": 22,
+            "pitches": 303,
             "wins": 2,
             "losses": 1
           },
-          "29": {
-            "outs": 86,
-            "runsAllowed": 8,
-            "saves": 0,
-            "strikeouts": 25,
-            "pitches": 283,
-            "wins": 0,
-            "losses": 0
-          },
           "30": {
-            "outs": 84,
-            "runsAllowed": 9,
+            "outs": 76,
+            "runsAllowed": 10,
             "saves": 0,
-            "strikeouts": 19,
-            "pitches": 298,
-            "wins": 0,
-            "losses": 2
+            "strikeouts": 17,
+            "pitches": 285,
+            "wins": 3,
+            "losses": 1
           },
           "31": {
-            "outs": 40,
-            "runsAllowed": 6,
+            "outs": 60,
+            "runsAllowed": 11,
             "saves": 0,
-            "strikeouts": 15,
-            "pitches": 151,
-            "wins": 1,
+            "strikeouts": 22,
+            "pitches": 213,
+            "wins": 3,
             "losses": 2
           },
           "32": {
-            "outs": 210,
-            "runsAllowed": 32,
+            "outs": 239,
+            "runsAllowed": 40,
             "saves": 0,
-            "strikeouts": 69,
-            "pitches": 757,
-            "wins": 5,
-            "losses": 1
+            "strikeouts": 68,
+            "pitches": 883,
+            "wins": 4,
+            "losses": 6
           },
           "33": {
-            "outs": 228,
-            "runsAllowed": 27,
+            "outs": 204,
+            "runsAllowed": 38,
             "saves": 0,
-            "strikeouts": 62,
-            "pitches": 775,
+            "strikeouts": 69,
+            "pitches": 788,
             "wins": 5,
-            "losses": 4
+            "losses": 3
           },
           "34": {
-            "outs": 186,
-            "runsAllowed": 23,
+            "outs": 161,
+            "runsAllowed": 35,
             "saves": 0,
-            "strikeouts": 45,
-            "pitches": 643,
-            "wins": 5,
+            "strikeouts": 56,
+            "pitches": 617,
+            "wins": 3,
             "losses": 4
           },
           "35": {
-            "outs": 266,
-            "runsAllowed": 47,
+            "outs": 224,
+            "runsAllowed": 37,
             "saves": 0,
             "strikeouts": 68,
-            "pitches": 1028,
-            "wins": 3,
-            "losses": 6
+            "pitches": 799,
+            "wins": 4,
+            "losses": 4
           },
           "36": {
-            "outs": 96,
-            "runsAllowed": 10,
-            "saves": 0,
-            "strikeouts": 27,
-            "pitches": 308,
-            "wins": 2,
-            "losses": 1
-          },
-          "37": {
-            "outs": 91,
+            "outs": 123,
             "runsAllowed": 21,
             "saves": 0,
-            "strikeouts": 28,
-            "pitches": 353,
+            "strikeouts": 50,
+            "pitches": 500,
+            "wins": 2,
+            "losses": 2
+          },
+          "37": {
+            "outs": 105,
+            "runsAllowed": 18,
+            "saves": 0,
+            "strikeouts": 26,
+            "pitches": 426,
             "wins": 1,
             "losses": 2
           },
           "38": {
-            "outs": 53,
-            "runsAllowed": 7,
+            "outs": 84,
+            "runsAllowed": 14,
             "saves": 0,
-            "strikeouts": 13,
-            "pitches": 204,
-            "wins": 1,
-            "losses": 0
+            "strikeouts": 25,
+            "pitches": 299,
+            "wins": 0,
+            "losses": 1
           },
           "39": {
-            "outs": 58,
-            "runsAllowed": 8,
+            "outs": 39,
+            "runsAllowed": 2,
             "saves": 0,
-            "strikeouts": 20,
-            "pitches": 217,
-            "wins": 0,
-            "losses": 2
+            "strikeouts": 10,
+            "pitches": 135,
+            "wins": 1,
+            "losses": 1
           },
           "40": {
-            "outs": 232,
-            "runsAllowed": 32,
+            "outs": 260,
+            "runsAllowed": 30,
             "saves": 0,
             "strikeouts": 65,
-            "pitches": 874,
-            "wins": 6,
-            "losses": 4
+            "pitches": 913,
+            "wins": 3,
+            "losses": 6
           },
           "41": {
-            "outs": 224,
-            "runsAllowed": 31,
-            "saves": 0,
-            "strikeouts": 73,
-            "pitches": 845,
-            "wins": 4,
-            "losses": 5
-          },
-          "42": {
-            "outs": 223,
-            "runsAllowed": 25,
-            "saves": 0,
-            "strikeouts": 59,
-            "pitches": 807,
-            "wins": 4,
-            "losses": 4
-          },
-          "43": {
-            "outs": 243,
+            "outs": 250,
             "runsAllowed": 24,
             "saves": 0,
-            "strikeouts": 67,
-            "pitches": 840,
+            "strikeouts": 71,
+            "pitches": 864,
             "wins": 5,
+            "losses": 3
+          },
+          "42": {
+            "outs": 206,
+            "runsAllowed": 33,
+            "saves": 0,
+            "strikeouts": 60,
+            "pitches": 733,
+            "wins": 5,
+            "losses": 2
+          },
+          "43": {
+            "outs": 226,
+            "runsAllowed": 42,
+            "saves": 0,
+            "strikeouts": 63,
+            "pitches": 831,
+            "wins": 3,
             "losses": 5
           },
           "44": {
-            "outs": 93,
-            "runsAllowed": 11,
+            "outs": 89,
+            "runsAllowed": 20,
             "saves": 0,
-            "strikeouts": 29,
-            "pitches": 325,
+            "strikeouts": 30,
+            "pitches": 339,
             "wins": 2,
             "losses": 1
           },
           "45": {
-            "outs": 71,
-            "runsAllowed": 16,
+            "outs": 74,
+            "runsAllowed": 18,
             "saves": 0,
-            "strikeouts": 22,
-            "pitches": 255,
-            "wins": 0,
-            "losses": 1
+            "strikeouts": 15,
+            "pitches": 286,
+            "wins": 1,
+            "losses": 3
           },
           "46": {
-            "outs": 25,
-            "runsAllowed": 5,
+            "outs": 34,
+            "runsAllowed": 3,
             "saves": 0,
-            "strikeouts": 3,
-            "pitches": 98,
-            "wins": 0,
+            "strikeouts": 13,
+            "pitches": 110,
+            "wins": 2,
             "losses": 0
           },
           "47": {
-            "outs": 64,
-            "runsAllowed": 5,
+            "outs": 46,
+            "runsAllowed": 10,
             "saves": 0,
-            "strikeouts": 21,
-            "pitches": 228,
+            "strikeouts": 8,
+            "pitches": 192,
             "wins": 0,
-            "losses": 2
+            "losses": 3
           },
           "48": {
-            "outs": 236,
-            "runsAllowed": 37,
+            "outs": 248,
+            "runsAllowed": 32,
             "saves": 0,
-            "strikeouts": 63,
-            "pitches": 821,
-            "wins": 4,
+            "strikeouts": 64,
+            "pitches": 923,
+            "wins": 3,
             "losses": 4
           },
           "49": {
-            "outs": 190,
-            "runsAllowed": 34,
+            "outs": 195,
+            "runsAllowed": 35,
             "saves": 0,
-            "strikeouts": 52,
-            "pitches": 730,
-            "wins": 3,
-            "losses": 5
+            "strikeouts": 54,
+            "pitches": 706,
+            "wins": 4,
+            "losses": 4
           },
           "50": {
-            "outs": 233,
-            "runsAllowed": 34,
+            "outs": 220,
+            "runsAllowed": 41,
             "saves": 0,
-            "strikeouts": 68,
-            "pitches": 882,
-            "wins": 5,
-            "losses": 5
+            "strikeouts": 59,
+            "pitches": 832,
+            "wins": 4,
+            "losses": 4
           },
           "51": {
-            "outs": 239,
-            "runsAllowed": 30,
+            "outs": 216,
+            "runsAllowed": 36,
             "saves": 0,
-            "strikeouts": 81,
-            "pitches": 885,
-            "wins": 6,
-            "losses": 3
+            "strikeouts": 59,
+            "pitches": 812,
+            "wins": 4,
+            "losses": 4
           },
           "52": {
-            "outs": 116,
+            "outs": 108,
             "runsAllowed": 22,
             "saves": 0,
-            "strikeouts": 22,
-            "pitches": 430,
-            "wins": 1,
+            "strikeouts": 32,
+            "pitches": 410,
+            "wins": 4,
             "losses": 0
           },
           "53": {
-            "outs": 84,
-            "runsAllowed": 4,
+            "outs": 78,
+            "runsAllowed": 15,
             "saves": 0,
-            "strikeouts": 21,
-            "pitches": 287,
-            "wins": 2,
+            "strikeouts": 23,
+            "pitches": 309,
+            "wins": 1,
             "losses": 1
           },
           "54": {
-            "outs": 45,
-            "runsAllowed": 1,
-            "saves": 0,
-            "strikeouts": 5,
-            "pitches": 145,
-            "wins": 2,
-            "losses": 0
-          },
-          "55": {
-            "outs": 51,
-            "runsAllowed": 8,
+            "outs": 61,
+            "runsAllowed": 18,
             "saves": 0,
             "strikeouts": 18,
-            "pitches": 218,
-            "wins": 0,
+            "pitches": 256,
+            "wins": 1,
             "losses": 3
           },
-          "56": {
-            "outs": 163,
-            "runsAllowed": 32,
+          "55": {
+            "outs": 71,
+            "runsAllowed": 11,
             "saves": 0,
-            "strikeouts": 42,
-            "pitches": 587,
-            "wins": 4,
-            "losses": 3
-          },
-          "57": {
-            "outs": 244,
-            "runsAllowed": 37,
-            "saves": 0,
-            "strikeouts": 65,
-            "pitches": 879,
-            "wins": 3,
-            "losses": 4
-          },
-          "58": {
-            "outs": 244,
-            "runsAllowed": 31,
-            "saves": 0,
-            "strikeouts": 68,
-            "pitches": 893,
-            "wins": 6,
-            "losses": 4
-          },
-          "59": {
-            "outs": 194,
-            "runsAllowed": 39,
-            "saves": 0,
-            "strikeouts": 53,
-            "pitches": 702,
-            "wins": 3,
-            "losses": 5
-          },
-          "60": {
-            "outs": 122,
-            "runsAllowed": 21,
-            "saves": 0,
-            "strikeouts": 32,
-            "pitches": 449,
+            "strikeouts": 26,
+            "pitches": 251,
             "wins": 2,
             "losses": 1
           },
+          "56": {
+            "outs": 286,
+            "runsAllowed": 40,
+            "saves": 0,
+            "strikeouts": 81,
+            "pitches": 1059,
+            "wins": 3,
+            "losses": 4
+          },
+          "57": {
+            "outs": 237,
+            "runsAllowed": 27,
+            "saves": 0,
+            "strikeouts": 56,
+            "pitches": 810,
+            "wins": 3,
+            "losses": 3
+          },
+          "58": {
+            "outs": 192,
+            "runsAllowed": 30,
+            "saves": 0,
+            "strikeouts": 67,
+            "pitches": 721,
+            "wins": 4,
+            "losses": 5
+          },
+          "59": {
+            "outs": 194,
+            "runsAllowed": 38,
+            "saves": 0,
+            "strikeouts": 65,
+            "pitches": 731,
+            "wins": 3,
+            "losses": 6
+          },
+          "60": {
+            "outs": 111,
+            "runsAllowed": 11,
+            "saves": 0,
+            "strikeouts": 32,
+            "pitches": 417,
+            "wins": 4,
+            "losses": 0
+          },
           "61": {
-            "outs": 81,
+            "outs": 74,
             "runsAllowed": 16,
             "saves": 0,
-            "strikeouts": 28,
-            "pitches": 341,
+            "strikeouts": 25,
+            "pitches": 280,
             "wins": 2,
             "losses": 1
           },
           "62": {
-            "outs": 59,
-            "runsAllowed": 10,
+            "outs": 54,
+            "runsAllowed": 8,
             "saves": 0,
-            "strikeouts": 15,
-            "pitches": 214,
-            "wins": 1,
+            "strikeouts": 18,
+            "pitches": 206,
+            "wins": 2,
             "losses": 1
           },
           "63": {
-            "outs": 53,
-            "runsAllowed": 0,
-            "saves": 0,
-            "strikeouts": 17,
-            "pitches": 179,
-            "wins": 1,
-            "losses": 0
-          },
-          "64": {
-            "outs": 230,
-            "runsAllowed": 28,
-            "saves": 0,
-            "strikeouts": 63,
-            "pitches": 814,
-            "wins": 4,
-            "losses": 5
-          },
-          "65": {
-            "outs": 244,
-            "runsAllowed": 32,
-            "saves": 0,
-            "strikeouts": 81,
-            "pitches": 891,
-            "wins": 4,
-            "losses": 4
-          },
-          "66": {
-            "outs": 234,
-            "runsAllowed": 29,
-            "saves": 0,
-            "strikeouts": 58,
-            "pitches": 800,
-            "wins": 5,
-            "losses": 3
-          },
-          "67": {
-            "outs": 227,
-            "runsAllowed": 42,
-            "saves": 0,
-            "strikeouts": 67,
-            "pitches": 869,
-            "wins": 2,
-            "losses": 8
-          },
-          "68": {
-            "outs": 109,
-            "runsAllowed": 13,
-            "saves": 0,
-            "strikeouts": 20,
-            "pitches": 365,
-            "wins": 1,
-            "losses": 2
-          },
-          "69": {
-            "outs": 66,
-            "runsAllowed": 16,
-            "saves": 0,
-            "strikeouts": 22,
-            "pitches": 238,
-            "wins": 3,
-            "losses": 1
-          },
-          "70": {
-            "outs": 45,
-            "runsAllowed": 9,
-            "saves": 0,
-            "strikeouts": 9,
-            "pitches": 178,
-            "wins": 1,
-            "losses": 1
-          },
-          "71": {
-            "outs": 38,
+            "outs": 47,
             "runsAllowed": 5,
             "saves": 0,
             "strikeouts": 14,
-            "pitches": 124,
+            "pitches": 168,
+            "wins": 0,
+            "losses": 2
+          },
+          "64": {
+            "outs": 297,
+            "runsAllowed": 25,
+            "saves": 0,
+            "strikeouts": 86,
+            "pitches": 1052,
+            "wins": 7,
+            "losses": 2
+          },
+          "65": {
+            "outs": 225,
+            "runsAllowed": 30,
+            "saves": 0,
+            "strikeouts": 55,
+            "pitches": 806,
+            "wins": 4,
+            "losses": 5
+          },
+          "66": {
+            "outs": 165,
+            "runsAllowed": 45,
+            "saves": 0,
+            "strikeouts": 38,
+            "pitches": 605,
+            "wins": 1,
+            "losses": 6
+          },
+          "67": {
+            "outs": 181,
+            "runsAllowed": 38,
+            "saves": 0,
+            "strikeouts": 49,
+            "pitches": 670,
+            "wins": 3,
+            "losses": 5
+          },
+          "68": {
+            "outs": 103,
+            "runsAllowed": 18,
+            "saves": 0,
+            "strikeouts": 25,
+            "pitches": 393,
+            "wins": 0,
+            "losses": 2
+          },
+          "69": {
+            "outs": 115,
+            "runsAllowed": 23,
+            "saves": 0,
+            "strikeouts": 26,
+            "pitches": 432,
+            "wins": 2,
+            "losses": 2
+          },
+          "70": {
+            "outs": 46,
+            "runsAllowed": 14,
+            "saves": 0,
+            "strikeouts": 8,
+            "pitches": 189,
+            "wins": 0,
+            "losses": 1
+          },
+          "71": {
+            "outs": 63,
+            "runsAllowed": 9,
+            "saves": 0,
+            "strikeouts": 17,
+            "pitches": 226,
+            "wins": 1,
+            "losses": 2
+          },
+          "72": {
+            "outs": 198,
+            "runsAllowed": 36,
+            "saves": 0,
+            "strikeouts": 45,
+            "pitches": 733,
+            "wins": 4,
+            "losses": 6
+          },
+          "73": {
+            "outs": 245,
+            "runsAllowed": 27,
+            "saves": 0,
+            "strikeouts": 66,
+            "pitches": 866,
+            "wins": 5,
+            "losses": 3
+          },
+          "74": {
+            "outs": 208,
+            "runsAllowed": 33,
+            "saves": 0,
+            "strikeouts": 59,
+            "pitches": 738,
+            "wins": 3,
+            "losses": 7
+          },
+          "75": {
+            "outs": 190,
+            "runsAllowed": 22,
+            "saves": 0,
+            "strikeouts": 47,
+            "pitches": 659,
+            "wins": 5,
+            "losses": 2
+          },
+          "76": {
+            "outs": 96,
+            "runsAllowed": 12,
+            "saves": 0,
+            "strikeouts": 30,
+            "pitches": 378,
             "wins": 0,
             "losses": 0
           },
-          "72": {
-            "outs": 222,
-            "runsAllowed": 37,
-            "saves": 0,
-            "strikeouts": 64,
-            "pitches": 841,
-            "wins": 3,
-            "losses": 4
-          },
-          "73": {
-            "outs": 207,
-            "runsAllowed": 38,
-            "saves": 0,
-            "strikeouts": 64,
-            "pitches": 829,
-            "wins": 3,
-            "losses": 4
-          },
-          "74": {
-            "outs": 211,
-            "runsAllowed": 32,
-            "saves": 0,
-            "strikeouts": 64,
-            "pitches": 746,
-            "wins": 3,
-            "losses": 4
-          },
-          "75": {
-            "outs": 209,
-            "runsAllowed": 35,
-            "saves": 0,
-            "strikeouts": 55,
-            "pitches": 766,
-            "wins": 3,
-            "losses": 6
-          },
-          "76": {
-            "outs": 131,
-            "runsAllowed": 29,
-            "saves": 0,
-            "strikeouts": 37,
-            "pitches": 496,
-            "wins": 2,
-            "losses": 5
-          },
           "77": {
-            "outs": 91,
-            "runsAllowed": 16,
+            "outs": 111,
+            "runsAllowed": 21,
             "saves": 0,
             "strikeouts": 25,
-            "pitches": 351,
-            "wins": 2,
-            "losses": 1
+            "pitches": 363,
+            "wins": 0,
+            "losses": 3
           },
           "78": {
-            "outs": 82,
-            "runsAllowed": 17,
+            "outs": 81,
+            "runsAllowed": 5,
             "saves": 0,
-            "strikeouts": 26,
-            "pitches": 311,
-            "wins": 2,
+            "strikeouts": 22,
+            "pitches": 298,
+            "wins": 1,
             "losses": 0
           },
           "79": {
-            "outs": 33,
-            "runsAllowed": 2,
+            "outs": 59,
+            "runsAllowed": 17,
             "saves": 0,
-            "strikeouts": 7,
-            "pitches": 108,
+            "strikeouts": 20,
+            "pitches": 226,
             "wins": 1,
-            "losses": 0
+            "losses": 3
           }
         }
       },
-      "regularSeasonFirstCount": 3,
+      "regularSeasonFirstCount": 1,
       "regularSeasonRewardTaken": true,
       "seasonEndState": null,
       "streaks": {
-        "win": 6,
+        "win": 10,
         "strikeout": 23,
         "loss": 0
       },
       "postseason": {
         "baseOrders": {
           "0": [
+            0,
             1,
             2,
             3,
-            0,
-            4,
-            5,
-            6,
-            7
-          ],
-          "1": [
-            2,
-            3,
-            0,
-            1,
             4,
             5,
             6,
             7
           ],
           "2": [
-            2,
-            3,
             0,
             1,
+            2,
+            3,
             4,
             5,
             6,
@@ -3130,20 +2819,20 @@
             7
           ],
           "4": [
-            3,
             0,
             1,
             2,
+            3,
             4,
             5,
             6,
             7
           ],
           "5": [
-            3,
             0,
             1,
             2,
+            3,
             4,
             5,
             6,
@@ -3160,20 +2849,20 @@
             7
           ],
           "7": [
-            2,
-            3,
             0,
             1,
+            2,
+            3,
             4,
             5,
             6,
             7
           ],
           "8": [
-            3,
             0,
             1,
             2,
+            3,
             4,
             5,
             6,
@@ -3192,92 +2881,137 @@
         },
         "round": "종료",
         "qualifiers": [
-          2,
-          7,
-          4,
-          6
+          1,
+          6,
+          3,
+          2
         ],
         "teams": [
-          2,
-          6
+          1,
+          3
         ],
         "wins": [
           4,
-          1
+          0
         ],
         "winsNeeded": 4,
-        "champion": 2,
+        "champion": 1,
         "rotations": {
-          "2": 4,
-          "4": 2,
-          "6": 8,
-          "7": 2
+          "1": 3,
+          "2": 3,
+          "3": 8,
+          "6": 2
         },
-        "semiPlayoffWinner": 6
+        "semiPlayoffWinner": 3
       },
       "lastMidSeasonGoalCount": 5,
       "reputationZeroGames": 0,
       "midSeasonEvaluatedYears": [
-        0,
-        1,
-        2
+        0
       ],
-      "wins": 33,
+      "wins": 35,
       "draws": 0,
-      "losses": 17,
+      "losses": 14,
       "leaguePitcherStaminas": {
-        "2": [
+        "1": [
+          3644,
           10000,
-          10000,
-          6860,
+          7750,
           10000,
           10000,
           10000,
           10000,
           10000
         ],
-        "6": [
-          4180,
+        "3": [
+          7620,
           10000,
           10000,
-          9044,
+          6944,
           10000,
-          10000,
+          9465,
           10000,
           10000
         ]
       },
       "teamRecordMorales": {
-        "0": 98,
-        "1": 98,
-        "2": 100,
-        "3": 98,
-        "4": 98,
-        "5": 98,
-        "6": 98,
-        "7": 98,
-        "8": 98,
-        "9": 98
+        "0": 96,
+        "1": 100,
+        "2": 96,
+        "3": 96,
+        "4": 96,
+        "5": 91,
+        "6": 96,
+        "7": 96,
+        "8": 96,
+        "9": 96
       },
       "lastEvaluation": {
         "popularityChange": 12,
-        "reputationChange": 19,
+        "reputationChange": 17,
         "moraleChange": 5
       },
       "lastGame": {
         "decisionCode": 1,
         "outs": 27,
-        "runs": 1,
-        "strikeouts": 15,
+        "runs": 0,
+        "strikeouts": 18,
         "walksAndHitByPitch": 0,
-        "hitsAllowed": 3,
-        "pitches": 85,
+        "hitsAllowed": 7,
+        "pitches": 92,
         "managerCommentIndex": 37
       },
       "highMoraleStreak": 0,
       "moneyGrubberGames": 0,
       "moneyGrubberPopularityGain": 0,
-      "salaryRecordGrade": 35,
+      "salaryRecordGrade": 14,
+      "nationalCup": {
+        "teams": [
+          10,
+          11,
+          12,
+          13
+        ],
+        "wins": [
+          4,
+          0,
+          2,
+          1
+        ],
+        "losses": [
+          0,
+          3,
+          2,
+          2
+        ],
+        "matches": [
+          [
+            10,
+            11,
+            12,
+            13
+          ],
+          [
+            10,
+            12,
+            11,
+            13
+          ],
+          [
+            10,
+            13,
+            11,
+            12
+          ]
+        ],
+        "stage": 0,
+        "finalists": [
+          10,
+          12
+        ],
+        "champion": 10,
+        "day": 4
+      },
       "nariCupTeams": {
         "korea": {
           "batters": [
@@ -3334,52 +3068,52 @@
           "pitchers": [
             -1,
             1,
-            2,
+            0,
             3,
             4,
             5,
             6,
             7,
-            0
+            2
           ]
         },
         "opponent": {
           "batters": [
             {
               "slot": 0,
-              "position": 3
-            },
-            {
-              "slot": 1,
               "position": 9
             },
             {
-              "slot": 2,
-              "position": 4
-            },
-            {
-              "slot": 3,
-              "position": 5
-            },
-            {
-              "slot": 4,
-              "position": 1
-            },
-            {
-              "slot": 5,
+              "slot": 1,
               "position": 7
             },
             {
-              "slot": 6,
+              "slot": 2,
+              "position": 1
+            },
+            {
+              "slot": 3,
+              "position": 3
+            },
+            {
+              "slot": 4,
+              "position": 5
+            },
+            {
+              "slot": 5,
               "position": 2
             },
             {
-              "slot": 7,
+              "slot": 6,
               "position": 8
             },
             {
-              "slot": 8,
+              "slot": 7,
               "position": 6
+            },
+            {
+              "slot": 8,
+              "position": 4
             },
             {
               "slot": 9,
@@ -3406,79 +3140,9 @@
             7
           ]
         },
-        "opponentTeamId": 13,
-        "koreaMorale": 100
-      },
-      "yearlyStats": [
-        {
-          "games": 26,
-          "outs": 630,
-          "runsAllowed": 20,
-          "saves": 0,
-          "strikeouts": 353,
-          "pitches": 2282,
-          "wins": 19,
-          "losses": 2,
-          "walks": 5
-        },
-        {
-          "games": 27,
-          "outs": 639,
-          "runsAllowed": 13,
-          "saves": 0,
-          "strikeouts": 323,
-          "pitches": 2422,
-          "wins": 15,
-          "losses": 3,
-          "walks": 4
-        }
-      ],
-      "nationalCup": {
-        "teams": [
-          10,
-          11,
-          12,
-          13
-        ],
-        "wins": [
-          4,
-          0,
-          1,
-          2
-        ],
-        "losses": [
-          0,
-          3,
-          2,
-          2
-        ],
-        "matches": [
-          [
-            10,
-            11,
-            12,
-            13
-          ],
-          [
-            10,
-            12,
-            11,
-            13
-          ],
-          [
-            10,
-            13,
-            11,
-            12
-          ]
-        ],
-        "stage": 0,
-        "finalists": [
-          10,
-          13
-        ],
-        "champion": 10,
-        "day": 4
+        "opponentTeamId": 12,
+        "koreaMorale": 100,
+        "myCupWalks": 1
       }
     }
   }
