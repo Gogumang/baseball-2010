@@ -70,6 +70,21 @@ const ACTIONS = {
   'derby-start': [
     { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
   ],
+  'general-relay': [
+    // CLR 중단 질문 StrGAME[6] — [아니오]면 중계가 그대로 이어진다
+    { name: '자동진행 중단 질문 상자', steps: ['@CLR 중단'], expect: '예', undo: ['@아니오'] },
+  ],
+  'pitcher-pitch': [
+    { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
+    // 모드 3 의 '#' 는 교체 창이 아니라 강판 물음 StrGAME[104]
+    { name: "강판 물음 '#'", steps: ['@# 강판'], expect: '예', undo: ['@아니오'] },
+  ],
+  'mission-bat': [
+    { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
+  ],
+  'mission-pitch': [
+    { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
+  ],
 }
 
 /** 기본 상태에서 서 있어야 할 것 — 안 서면 자리가 멈춘 뒤 한 번 더 본다 */
@@ -80,7 +95,7 @@ const SCENE_EXPECT = {
 const SCENE_NAMES = [
   'title', 'main-menu', 'nari-new', 'pitcher-new', 'season-new', 'nari-management', 'nari-outing', 'pitcher-management',
   'season-management', 'season-outing', 'general-quick', 'general-bat', 'general-pitch', 'general-defense', 'derby-pick', 'derby-start',
-  'nari-burst-result',
+  'nari-burst-result', 'pitcher-pitch', 'pitcher-defense', 'general-relay', 'mission-bat', 'mission-pitch', 'mission-result', 'season-postseason', 'season-cup',
 ]
 
 const argScenes = process.argv.slice(2)

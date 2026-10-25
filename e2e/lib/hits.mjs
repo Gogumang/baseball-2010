@@ -188,6 +188,10 @@ export const ALLOWED_OVERLAPS = [
     match: (scene, row) => scene === 'season-management' && row.label === 'button "되돌아가기"' && row.by === 'button "되돌아가기 칸"',
     why: '시즌 다음경기 0xd8 — 바닥띠 되돌아가기 그림 단추를 같은 자리 같은 일(onCancel)의 누름 칸이 덮는다. 판 전체 확인 칸(7) 위로 올리려고 둔 것(r186)',
   },
+  {
+    match: (_scene, row) => CORNERS_ONLY(row) && row.by === row.label.replace(/"$/, ' (OK 글자)"'),
+    why: '구질 고리 칸 0 과 고리 귀의 "OK" 글자 칸(r219) — 같은 칸 0 의 같은 onPress 라 모서리가 겹쳐도 같은 구질이 골린다',
+  },
 ]
 
 export function isAllowed(scene, row) {

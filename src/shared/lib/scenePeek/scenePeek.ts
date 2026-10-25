@@ -19,6 +19,34 @@ export interface TeamGamePeek {
   readonly isPitchSlotPickerShown: boolean
   /** 수비 판(상태 0x17)이 떠 있다 — 그 판을 사람이 받는 쪽 */
   readonly defensePlaySide: '수비' | '공격' | null
+  /** 자동진행 중계(상태 0x21 — `TeamAutoRelay`)가 돌고 있다 */
+  readonly isAutoRelay: boolean
+}
+
+/** 나리 투수편 경기 (경기 장면 모드 3 — `PitcherGameScreen`) */
+export interface PitcherGamePeek {
+  readonly isIntroDone: boolean
+  /** 내 투수가 마운드에 선 수비 타석 */
+  readonly canPitch: boolean
+  /** 0xe — OK 를 기다리는 중(투수 · 타자 소개 판) */
+  readonly isAwaitingConfirm: boolean
+  /** 구질 고르기(0xf) 누름 칸이 서 있다 */
+  readonly isPitchSlotPickerShown: boolean
+  /** '#' 강판 물음이 먹는 자리 — 0xe · 0xf */
+  readonly acceptsGiveUpKey: boolean
+  /** 내 수비 판(상태 0x17)이 떠 있다 */
+  readonly isDefensePlayShown: boolean
+}
+
+/** 미션 경기 (경기 장면 모드 5 투수 `PitchingScreen` · 6 타자 `MissionPlayScreen`) */
+export interface MissionPeek {
+  readonly side: '타자' | '투수'
+  /** 0xe — OK 를 기다리는 중 */
+  readonly isAwaitingConfirm: boolean
+  /** 구질 고르기(0xf) 누름 칸이 서 있다 — 투수 미션만 */
+  readonly isPitchSlotPickerShown: boolean
+  /** 결과 판(0x19 — `MissionResultBoard`)이 떠 있다 */
+  readonly isResultShown: boolean
 }
 
 /** 홈런더비 타석 (경기 장면 모드 7) */
@@ -34,6 +62,8 @@ export interface HomeRunDerbyPeek {
 export interface ScenePeeks {
   readonly teamGame?: TeamGamePeek
   readonly homeRunDerby?: HomeRunDerbyPeek
+  readonly pitcherGame?: PitcherGamePeek
+  readonly mission?: MissionPeek
 }
 
 let peeks: ScenePeeks = {}
