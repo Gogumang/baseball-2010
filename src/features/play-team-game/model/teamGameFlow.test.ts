@@ -2984,4 +2984,19 @@ describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee
     ])
     expect(summaryOf(끝).leagueErrors).toEqual(끝.leagueErrors)
   })
+
+  it('펌블 갈래는 시즌 평판 코드 3(수비실수) — 우리 팀 수비 그림 · 레코드를 찾은 칸만, 악송구 · 상대 수비 · 시즌 밖은 없다 (43854 0xa755d, r248)', () => {
+    const { progress } = 시작()
+    const 앞 = progress.gameRecord[3] ?? 0
+    const 끝 = recordDrawnTeamFieldingErrors(progress, [
+      { slot: 5, teamIndex: 0, isFumble: true },
+      { slot: 5, teamIndex: 0 },
+      { slot: 5, teamIndex: 1, isFumble: true },
+    ])
+    // 칸 3 = 코드 3 (점프표 0xd7d7c 는 4 · 5 만 뒤집혔다)
+    expect(끝.gameRecord[3]).toBe(앞 + 1)
+    expect(summaryOf(끝).gameRecord).toEqual(끝.gameRecord)
+    const 일반 = 시작({ mode: 1 }).progress
+    expect(recordDrawnTeamFieldingErrors(일반, [{ slot: 5, teamIndex: 0, isFumble: true }]).gameRecord).toBe(일반.gameRecord)
+  })
 })

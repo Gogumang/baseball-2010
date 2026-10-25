@@ -71,8 +71,10 @@ import { pitcherRestBlockReasonOf, recoverAfterPitcherRest, runPitcherRest } fro
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import {
   closeBurstWindow, closeManagerHookWindow, confirmScene, isPitchTurn, pitchSlotsFor, resolveBenchClearing, resolveDefensePlay,
-  resolveRunnerPlay, startPitch, startPitcherGame, startsToday, summaryOf,
+  recordDrawnPitcherFieldingErrors, resolveRunnerPlay, startPitch, startPitcherGame, startsToday, summaryOf,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { drawnReplayFieldingErrorsOf } from '@/features/defense-play/model/fieldingErrors'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
@@ -119,6 +121,8 @@ interface HeadlessPitcherGame {
   readonly magicCount: number
   readonly magicRemaining: number
   readonly magicProblems: readonly string[]
+  /** 정산 실책 ≠ 그린 실책 합 (r248) */
+  readonly errorProblems: readonly string[]
 }
 
 /**
@@ -132,10 +136,32 @@ function playPitcherGameHeadless(options: PitcherGameOptions, random: RandomPort
   let pitches = 0
   let magicThrown = 0
   const magicProblems: string[] = []
-  const done = (): HeadlessPitcherGame => ({
-    summary: summaryOf(progress), pitches, magicThrown, magicCount: options.magicCount, magicRemaining: progress.magicRemaining, magicProblems,
-  })
+  /**
+   * 재생 화면(`PitcherGameScreen` 재생 갈래) 대신 — 재생 칸에 새로 든 판을 다 그린 실책(0x43278 +0x2e)을 얹는다. 경기를 끝낸 재생 판도
+   * 정산 앞에 그린다(`useShownReplay`, r248). 타구 · 주자 판은 화면 없이 돌아 실책을 안 그린다
+   */
+  let drawnPlay: DefensePlayResult | null = null
+  const drawnErrors: unknown[] = []
+  const drawReplay = () => {
+    const play = progress.lastDefensePlay
+    if (play === drawnPlay) return
+    drawnPlay = play
+    if (play === null || play.ticks.length === 0) return
+    const before = progress.leagueErrors?.length ?? 0
+    progress = recordDrawnPitcherFieldingErrors(progress, drawnReplayFieldingErrorsOf(play.ticks))
+    drawnErrors.push(...(progress.leagueErrors ?? []).slice(before))
+  }
+  const done = (): HeadlessPitcherGame => {
+    const summary = summaryOf(progress)
+    // 정산 실책 = 그린 실책 합
+    const settled = JSON.stringify(summary.leagueErrors)
+    const errorProblems = settled === JSON.stringify(drawnErrors) ? [] : [`정산 실책 ${settled} ≠ 그린 실책 ${JSON.stringify(drawnErrors)}`]
+    return {
+      summary, pitches, magicThrown, magicCount: options.magicCount, magicRemaining: progress.magicRemaining, magicProblems, errorProblems,
+    }
+  }
   for (let step = 0; step < 20_000; step += 1) {
+    drawReplay()
     if (progress.magicRemaining < 0 || progress.magicRemaining > options.magicCount) {
       magicProblems.push(`마구 남은 횟수 ${progress.magicRemaining} 가 0..${options.magicCount} 밖`)
     }
@@ -483,6 +509,7 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     const { summary } = played
     if (extras) {
       problems.add(where(), played.magicProblems)
+      problems.add(where(), played.errorProblems)
       paths.마구공 += played.magicThrown
       // 남은 횟수 = 경기 처음 횟수 − 던진 마구 (사람 차례에서만 깎는다)
       if (played.magicCount - played.magicRemaining !== played.magicThrown) {

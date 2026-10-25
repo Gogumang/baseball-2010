@@ -18,6 +18,11 @@ export interface DrawnFieldingError {
   readonly slot: number
   /** 그 그림의 수비 팀 번호 (`DefenseFielder.teamIndex` = 판 입력 `defenseTeamIndex`). 모르면 null */
   readonly teamIndex: number | null
+  /**
+   * 펌블 갈래(4381a `+0xb8 == 6`)에서 올랐나 — 이 갈래만 +0x2e 뒤 43854~43862 `0xa755d([ctx], 3)`(시즌 평판 코드 3 수비실수,
+   * 게이트 0xa755c — 모드 2 · 코드 ≤ 5 라 공격측이 CPU 일 때만)을 부른다. 악송구 갈래(438c4)는 +0x2e 만 (r248)
+   */
+  readonly isFumble?: true
 }
 
 /** 그림 하나의 야수 칸 — 0x43278 이 보는 세 카운터 */
@@ -44,9 +49,21 @@ export function drawnFieldingErrorsOf(fielders: readonly DrawnFielderCounters[])
     if ((fielder.lockTicks ?? 0) > 0) continue
     const fumble = fielder.fumbleTicks ?? 0
     const hit = fumble > 0 ? fumble === FUMBLE_RECORD_TICKS : (fielder.throwErrorTicks ?? 0) === THROW_ERROR_RECORD_TICKS
-    if (hit) errors.push({ slot: fielder.slot, teamIndex: fielder.teamIndex ?? null })
+    if (!hit) continue
+    const error: DrawnFieldingError = { slot: fielder.slot, teamIndex: fielder.teamIndex ?? null }
+    errors.push(fumble > 0 ? { ...error, isFumble: true } : error)
   }
   return errors
+}
+
+/**
+ * 재생 판(`lastDefensePlay`) 하나를 건너뛰기 없이 끝까지 그렸을 때 올라가는 실책 — 판 틱마다 그림 한 번(`DefensePlayback` 재생 갈래의
+ * 셈과 같다: 틱 0..끝을 한 번씩 그리고 닫힌 갱신의 다시 그리기는 안 센다). 화면 없는 하네스(soak)가 재생 화면 대신 쓴다
+ */
+export function drawnReplayFieldingErrorsOf(
+  views: readonly { readonly fielders: readonly DrawnFielderCounters[] }[],
+): DrawnFieldingError[] {
+  return views.flatMap((view) => drawnFieldingErrorsOf(view.fielders))
 }
 
 /**

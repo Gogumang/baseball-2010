@@ -24,7 +24,7 @@ import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunn
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindow'
@@ -102,18 +102,14 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   }, [gameCast])
   // 경기 뒤 관리 화면의 이야기 이벤트 · 평가 감독 초상 — 이벤트 데이터에서 계산해 유휴로 (안 기다린다, r134)
   useAfterGameEventPreload(career)
-  /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않으려고 기억해 둔다 */
-  const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const play = progress.lastDefensePlay
   // 세션 액션은 그릴 때마다 새 함수라 붙이기는 처음 한 번 — 떼기 · 알리기는 세션 ref 로 늘 지금 것을 부른다
   const sessionActionsRef = useRef(session.actions)
   sessionActionsRef.current = session.actions
   // 재생 판으로 경기가 끝나면 세션이 정산을 재생 뒤로 미룬다 — 이 화면이 붙어 있는 동안만 (`attachReplayHost`)
   useEffect(() => sessionActionsRef.current.attachReplayHost(), [])
-  const finishPlayback = useCallback(() => {
-    setShownPlay(play)
-    sessionActionsRef.current.finishReplay(play)
-  }, [play])
+  /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않는다. 다 그리면 세션에 알린다(팀 경기 · 투수편과 같은 `useShownReplay`) */
+  const { shownPlay, finishPlayback } = useShownReplay(play, (shown) => sessionActionsRef.current.finishReplay(shown))
   /**
    * 경기 장면 0x104 하나 — 경기를 세울 때(`startGame` → 적재 상태 8, 웹은 로딩 팁) 새로 만든다. 로딩 팁이 새로 설 때마다 하나 오른다.
    * 그 장면이 사는 동안 아래 칸들이 판 · 타석 · 이닝을 건너 남는다(`useSceneScopedRef`)

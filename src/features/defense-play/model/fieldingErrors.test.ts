@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   drawnFieldingErrorsOf,
+  drawnReplayFieldingErrorsOf,
   fielderRecordIndexOf,
   fieldingErrorRecordsOf,
 } from '@/features/defense-play/model/fieldingErrors'
 
 describe('야수 그리기 0x43278 의 실책 +0x2e (4381a~43904)', () => {
   it('펌블 +0xb8 == 6 · 악송구 +0xc0 == 4 인 그림만 센다', () => {
-    expect(drawnFieldingErrorsOf([{ slot: 5, fumbleTicks: 6, teamIndex: 3 }])).toEqual([{ slot: 5, teamIndex: 3 }])
+    expect(drawnFieldingErrorsOf([{ slot: 5, fumbleTicks: 6, teamIndex: 3 }])).toEqual([{ slot: 5, teamIndex: 3, isFumble: true }])
     expect(drawnFieldingErrorsOf([{ slot: 5, fumbleTicks: 5 }])).toEqual([])
     expect(drawnFieldingErrorsOf([{ slot: 2, throwErrorTicks: 4 }])).toEqual([{ slot: 2, teamIndex: null }])
     expect(drawnFieldingErrorsOf([{ slot: 2, throwErrorTicks: 3 }])).toEqual([])
@@ -15,7 +16,19 @@ describe('야수 그리기 0x43278 의 실책 +0x2e (4381a~43904)', () => {
 
   it('+0xb8 > 0 이면 악송구 칸은 안 본다 (438c4 는 그 밖 갈래)', () => {
     expect(drawnFieldingErrorsOf([{ slot: 4, fumbleTicks: 2, throwErrorTicks: 4 }])).toEqual([])
-    expect(drawnFieldingErrorsOf([{ slot: 4, fumbleTicks: 6, throwErrorTicks: 4 }])).toEqual([{ slot: 4, teamIndex: null }])
+    expect(drawnFieldingErrorsOf([{ slot: 4, fumbleTicks: 6, throwErrorTicks: 4 }])).toEqual([{ slot: 4, teamIndex: null, isFumble: true }])
+  })
+
+  it('펌블 갈래만 시즌 평판 0xa755d(ctx, 3) 표시를 단다 — 악송구 갈래(438c4)는 +0x2e 만 (r248)', () => {
+    expect(drawnFieldingErrorsOf([{ slot: 5, fumbleTicks: 6 }, { slot: 2, throwErrorTicks: 4 }]).map((error) => error.isFumble === true))
+      .toEqual([true, false])
+  })
+
+  it('재생 판을 끝까지 그린 실책 — 판 틱마다 그림 한 번 (재생 갈래와 같은 셈)', () => {
+    expect(drawnReplayFieldingErrorsOf([
+      { fielders: [{ slot: 5, fumbleTicks: 6 }] },
+      { fielders: [{ slot: 5, fumbleTicks: 5 }, { slot: 2, throwErrorTicks: 4 }] },
+    ])).toEqual([{ slot: 5, teamIndex: null, isFumble: true }, { slot: 2, teamIndex: null }])
   })
 
   it('동작 잠금 +0xb4 > 0 인 야수는 건너뛴다 (437a4)', () => {

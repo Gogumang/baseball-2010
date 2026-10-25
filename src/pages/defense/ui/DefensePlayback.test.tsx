@@ -259,7 +259,7 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       const 기대 = 결.ticks.flatMap((view) =>
         view.fielders
           .filter((fielder) => (fielder.lockTicks ?? 0) <= 0 && fielder.fumbleTicks === 6)
-          .map((fielder) => ({ slot: fielder.slot, teamIndex: 3 })),
+          .map((fielder) => ({ slot: fielder.slot, teamIndex: 3, isFumble: true })),
       )
       expect(기대.length).toBeGreaterThan(0)
       expect(onFieldingErrors).toHaveBeenCalledTimes(1)

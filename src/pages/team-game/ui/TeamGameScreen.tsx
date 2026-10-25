@@ -138,6 +138,7 @@ import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { summaryAfterReplay, useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
 import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
@@ -278,7 +279,14 @@ function TeamGameScene({
   matchupRecords,
   session,
 }: TeamGameScreenProps & { readonly session: TeamGameSession }) {
-  const { progress, canBat, canPitch, summary, actions } = session
+  const { progress, canBat, canPitch, summary: progressSummary, actions } = session
+  /**
+   * 재생 칸의 판 — 경기를 끝낸 재생 판도 0x17 로 다 그린 뒤에야 0xd → 경기 끝 판 0x18 · 정산 0x19 다(판정 B 0xae3e8). 그 그리기
+   * 0x43278 의 실책 +0x2e 가 요약에 들도록 재생이 남은 동안은 요약을 안 낸다(`useShownReplay`, r248)
+   */
+  const play = progress.lastDefensePlay
+  const { shownPlay, finishPlayback, isReplayPending } = useShownReplay(play)
+  const summary = summaryAfterReplay(progressSummary, isReplayPending)
   // 이어하기 저장 0x4f928 — 진행기가 새 저장 진행을 담을 때마다 한 번씩 넘긴다
   const halfInningSave = progress.halfInningSave ?? null
   const onHalfInningSaveRef = useRef(onHalfInningSave)
@@ -357,10 +365,6 @@ function TeamGameScene({
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
   /** 인트로·교대 판·벤치 클리어링이 화면을 덮고 있는가 — 경기 키(0x498d4)가 안 먹는다 */
   const isSceneCovering = !isIntroDone || isHalfInningBoardOpen || progress.pendingBenchClearing !== null
-  /** 이미 다 보여 준 수비 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
-  const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
-  const play = progress.lastDefensePlay
-  const finishPlayback = useCallback(() => setShownPlay(play), [play])
   /**
    * 장면 +0x111c 수비 줄 자리 · 카메라 +0x1e8 — 경기 내내 같은 객체라 교대 판 0x3fac4 가 앞 장면이 남긴 그대로 읽는다(`lib/fieldCarry`).
    * 수비 화면 0x17 이 끝난 판 · 교대 판이 닫힌 틱 · 벤치 클리어링 · 자동진행 중계(카메라만)가 차례로 덮는다.
