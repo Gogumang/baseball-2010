@@ -129,6 +129,9 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     expect(알림글()).toContain('[투구] 능력치가 최대입니다')
     expect(알림글()).toContain('[타격] 능력치가 최대입니다')
     expect(알림글()).toContain('[지옥훈련]을 하시겠습니까?')
+    // 922e strcat(buf, "!N") — 목록과 [141] 사이에 빈 줄 하나 (r260)
+    const 줄글 = Array.from(screen.getByRole('dialog', { name: '알림' }).querySelectorAll('p')).map((p) => p.textContent ?? '')
+    expect(줄글.slice(0, 4)).toEqual(['[투구] 능력치가 최대입니다', '[타격] 능력치가 최대입니다', '\u00a0', '[지옥훈련]을 하시겠습니까?'])
 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     fireEvent.keyDown(window, { key: '5' })

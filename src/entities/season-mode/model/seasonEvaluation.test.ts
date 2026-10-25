@@ -60,10 +60,11 @@ describe('완투 판정 — ⚠️ 인기도와 평판이 서로 다른 칸을 �
     expect(reputationCompleteGameOf(33, 8, { ...무실점, allowedRun: true })).toBeNull()
   })
 
-  it('인기도의 퍼펙트는 아웃 27 이하일 때만이다', () => {
+  it('퍼펙트는 인기도 · 평판 모두 아웃 27 이하일 때만이다 (a67d0 · a703a `cmp #0x1b ; bhi`)', () => {
     expect(popularityCompleteGameOf(33, 10, 무실점)).toBe('노히트')
-    // 평판식에는 그 제한이 없다
-    expect(reputationCompleteGameOf(33, 10, 무실점)).toBe('퍼펙트')
+    // 평판식도 같은 비교를 한다 (r260 다시 뜸) — 정규 마지막 이닝이 8 이면 27 이라 닿지 않는다
+    expect(reputationCompleteGameOf(33, 10, 무실점)).toBe('노히트')
+    expect(reputationCompleteGameOf(27, 8, 무실점)).toBe('퍼펙트')
   })
 
   it('아웃 수가 안 맞으면 완투가 아니다', () => {
