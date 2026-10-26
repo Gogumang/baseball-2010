@@ -87,6 +87,8 @@ export interface PitchOutcomeDetail {
    * 여기서 정해 실어 보내는 이유: 번호를 고르는 데 **방금 뽑은 타구 패턴**(각·세기·높이)이
    * 필요한데 그 패턴을 밖으로 내보내지 않기 때문이다. 심판 콜은 볼카운트를 알아야 해서
    * 받는 쪽(`app/model`)이 `pitchCallSoundIdOf` 로 따로 고른다.
+   * 타석 화면(`BattingStage`)은 이 소리를 **판정 틀에 스스로 내고**(원본 0x51408 의 타구 순간 0x515de~ 가 판정 메시지를 받은 그 틀이다)
+   * 받는 쪽에는 null 로 비워 넘긴다 — 받는 쪽은 맞은 공을 0x13 이 끝난 틀에, 못 맞힌 공을 0x12 를 예약한 틀에 받기 때문이다.
    */
   readonly contactSoundId?: number | null
   /** 맞은 공이면 친 타자의 손 0xb63c1 (`situation.batterSide`) — [경기+0xf2c] 공의 수평각 d (`BattedContact.batterHand`) */

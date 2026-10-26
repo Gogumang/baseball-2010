@@ -394,7 +394,7 @@ export function HomeRunDerbyScreen({
             isFieldPlay={isPlayShown && session.result === null}
             fieldPlayShotsAt={fieldPlayShotsAt}
             random={random}
-            onPitchResolved={(detail) => session.onPitchResolved(detail)}
+            onPitchResolved={(detail, _pitch, _isUncatchable, _buntKind, sceneTick) => session.onPitchResolved(detail, sceneTick)}
           />
         </div>
 

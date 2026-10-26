@@ -206,6 +206,14 @@ export function pitchResultEntryDelayTicksOf(frameCount: number, aceOrder?: numb
 }
 
 /**
+ * 공을 놓은 틱에서 같은 타석 다음 공의 0xf 진입 틱까지 — 0x12 틱 0(`pitchResultEntryDelayTicksOf`)에서 문턱 갱신(상태 틱 `resultTicks`,
+ * 0x4e6d4)이 0xf 를 예약하고 다음 틀이 진입 0x3d954 다(`pitcherSideStateEntriesOf` 의 `resultEntry + resultTicks + 1`)
+ */
+export function pitchSelectionEntryDelayTicksOf(frameCount: number, resultTicks: number, aceOrder?: number | null): number {
+  return pitchResultEntryDelayTicksOf(frameCount, aceOrder) + resultTicks + 1
+}
+
+/**
  * 0x12 를 지나는 판정인가 — 맞히지 못한 공(볼 · 스트라이크 · 헛스윙 · 사구)만. 맞은 공(파울 포함)은 0x13 → 0x17 로 간다.
  */
 export function passesHeldResult(resolution: PitchResolution): boolean {

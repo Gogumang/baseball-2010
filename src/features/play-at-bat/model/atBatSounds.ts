@@ -11,11 +11,11 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
  *   2. **판정 스위치** (0x51a94, 점프표 0xd0488, v = 1~13) — 심판 콜. 플레이가 끝나고 난다.
  * 그래서 여기서도 `contactSoundIdOf`(1) 와 `pitchCallSoundIdOf`·`inPlayCallSoundIdOf`(2) 로 나눴다.
  *
- * ⚠️ **웹은 두 자리의 시각이 거의 붙어 있다.** 타석 화면은 맞은 공을 상태 0x13 만큼 붙잡아 둔 뒤
- * `onPitchResolved` 를 한 번 부르므로, 타구음과 판정음이 같은 순간에 도착한다. 소리 통로가 하나뿐이라
- * (`shared/api/audio/soundPort` 머리 주석) 뒤에 튼 판정음이 타구음을 끊는다 — 원본도 두 소리가
- * 붙으면 같은 일이 벌어지지만, 원본은 사이가 벌어져 있어 둘 다 들린다. **이 어긋남은 근사다.**
- * (인플레이 타구는 수비 화면이 끝난 뒤에야 아웃 콜이 나므로 타구음이 온전히 들린다.)
+ * **두 자리는 틀이 다르다.** 1 은 판정 메시지를 받은 그 틀(사람 타석은 타석 화면 `BattingStage` 가 판정 틀에 스스로 낸다),
+ * 2 의 공 판정 콜은 다음 틀 0x12 진입 0x3dfac 가 메시지 0xbba 를 곧바로 보내(3e1e2~3e1e8) 난다 — 받는 쪽이 장면 틱으로 미뤄 낸다
+ * (`features/play-game/model/sceneTickSounds`). 사람이 던진 공은 놓는 틀에 투구 순간 소리(0x3f378), 0x12 진입 틀에 콜이다
+ * (`PitchStepSoundTiming`). 소리 통로가 하나뿐이라(`shared/api/audio/soundPort` 머리 주석) 같은 틀의 소리는 뒤가 앞을 끊고,
+ * 다른 틀이면 그 사이만큼 들린다. 수비 판의 콜은 판 안의 그 틱이다(`runDefensePlay` 의 `tickSounds`).
  *
  * 근거: docs/re/L-sound-effects.md 1-F·1-G · docs/re/R2-game-effects.md 8절.
  */
@@ -151,7 +151,7 @@ export function contactSoundIdOf(input: ContactSoundInput): number | null {
  * **파울 콜 25 는 수비 판 안의 소리다**: 맞은 공은 파울 각이라도 판(상태 0x17)을 돌고, 낙구 · 담장선 틱 b44f6 의 0x9d5bc 가
  * 7 을 내면 b457c 메시지 0xbba(7) → 화면 51a56 이 state[0xb] = 7 로 표 0xd0488[6] = **51c5c** 에 가서 `0x6ea6d(소리, 0x19)`
  * (25 "Foul!") · 0xa7dbc(연속 파울)를 부른다 — 모드 검사가 없다. 공 판정 0x9d57c 는 7 을 내지 않는다. 그래서 공 판정 자리의
- * '파울' 은 콜이 없고, 판이 파울로 닫힌 자리에서 낸다(⚠️ 원본은 판이 닫히는 때가 아니라 7 이 난 그 틱 — 함성 60 과 같은 근사).
+ * '파울' 은 콜이 없고, 판 안의 7 이 난 그 틱에 화면이 낸다(`tickSounds`) — 그 틱에 판이 닫힌다. 화면이 결과를 못 넘긴 판만 판 끝에 낸다.
  * 낙구 전에 잡힌 파울 각 공(뜬공 아웃 13)은 7 이 안 나 25 도 없고, 아웃 콜(62)이 난다.
  *
  * **39 의 조건 `[sp+0xa4]+4 == 2` 는 올린 뒤의 스트라이크 수다 (확정, 2026-10 r87 직접 뜸)**:

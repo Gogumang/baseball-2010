@@ -74,7 +74,9 @@ import {
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
-import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
+import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks, type PitchStepSoundTiming } from '@/features/play-game/model/sceneTickSounds'
 import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import { teamPitcherSideStageOf } from '@/pages/team-game/lib/teamMatchupCards'
 
@@ -241,25 +243,34 @@ export function useTeamGame(
   const isVibrationOnRef = useRef(isVibrationOn)
   isVibrationOnRef.current = isVibrationOn
 
-  /** 진행 한 걸음을 먹이고, 그 사이에 원본이 내는 소리를 울린다 */
+  /**
+   * 진행 한 걸음을 먹이고, 그 사이에 원본이 내는 소리를 울린다.
+   * `timingOf` 를 주면(사람이 던진 공) 걸음이 여러 틀 몫이다 — 놓는 틀의 소리(`releaseSoundId`)만 지금 내고, 걸음의 소리는 0x12 진입 틀
+   * (`resultEntryTicks` 뒤), 0xf 진입 0x3d954 의 교체 소리는 그 0xf 틀(`pitchSelectionTicks` 뒤)에 낸다(`playSoundIdsAfterSceneTicks`)
+   */
   const step = useMemo(() => {
     return (
       next: (current: TeamGameProgress) => TeamGameProgress,
       soundsOf?: (before: TeamGameProgress, after: TeamGameProgress) => readonly (number | null)[],
+      timingOf?: (before: TeamGameProgress, after: TeamGameProgress) => PitchStepSoundTiming,
     ) => {
       const current = progressRef.current
       const after = next(current)
       if (after === current) return current
       progressRef.current = after
       setProgress(after)
-      playSoundIds(audio, [
+      const timing = timingOf?.(current, after) ?? null
+      if (timing !== null) playSoundIds(audio, [timing.releaseSoundId])
+      playSoundIdsAfterSceneTicks(audio, [
         ...(soundsOf === undefined ? [] : soundsOf(current, after)),
         ...stepSoundIdsOf(current, after),
+      ], timing?.resultEntryTicks ?? 0)
+      playSoundIdsAfterSceneTicks(audio, [
         // 대타 교체 연출(상태 0x16)을 지났으면 — CPU 대타는 다음 타석 준비(0xf 진입)에서 서므로 걸음 끝에 둔다
         ...pinchHitSoundIdsOf(current, after),
         // 사람 장면 CPU 투수 교체(0x3d954 → 0xac428)도 같은 0x16 연출 — 22 뒤 올라온 투수 등판음
         ...scenePitcherChangeSoundIdsOf(current, after),
-      ])
+      ], timing?.pitchSelectionTicks ?? 0)
       return after
     }
   }, [audio])
@@ -283,14 +294,14 @@ export function useTeamGame(
               isUncatchable: isUncatchable === true,
               buntKind: buntKind ?? 0,
             }),
-          // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다.
+          // 타구음(0x515de~)은 판정 틀 — 타석 화면이 이미 냈다(`contactSoundId` 는 비어 온다). 심판 콜(0x51a94)은 다음 틀 0x12 진입
+          // 0x3dfac → 0xbba 다(`timingOf` — `BATTER_PITCH_RESULT_ENTRY_TICKS`).
           // 인플레이 타구면 아웃 콜은 여기서 안 난다 — 수비 화면이 끝난 뒤(`finishDefensePlay`)다
           (before, after) => {
             // 진행기가 타석이 끝나면 볼카운트를 바로 새 타석으로 되돌리므로(`finishBatterOutcome`),
             // 심판 콜이 보는 "이 공을 먹인 뒤" 의 카운트는 여기서 따로 만든다
             const nextAtBat = applyPitchResolution(before.atBat, detail.resolution)
             return [
-              detail.contactSoundId ?? null,
               pitchCallSoundIdOf(detail.resolution, nextAtBat),
               // 공 도착 0x3dfac 가 연 도루·폭투 판의 판정 콜(도루 17 · 62/20, 폭투 17) — 원본은 판 안의 그 틱에 낸다.
               // 재생할 판은 재생 화면이 기록된 틱에, 재생하지 않는 판만 판을 연 이 자리에서 낸다 (`arrivalCallSoundIdOf`)
@@ -300,6 +311,15 @@ export function useTeamGame(
                 : inPlayCallSoundIdOf(nextAtBat.outcome),
             ]
           },
+          // 같은 타석 다음 공이면 진행기가 이 걸음에 0xf 진입 0x3d954(CPU 투수 교체 22)까지 돈다 — 원본은 0x12 틱 0 에서
+          // 문턱 갱신 0x4e6d4 가 예약한 다음 틀이다(사람이 던진 공의 `pitchSelectionEntryDelayTicksOf` 와 같은 셈)
+          (before) => ({
+            releaseSoundId: detail.contactSoundId ?? null,
+            resultEntryTicks: BATTER_PITCH_RESULT_ENTRY_TICKS,
+            pitchSelectionTicks:
+              BATTER_PITCH_RESULT_ENTRY_TICKS +
+              resultWaitTicksOf(applyPitchResolution(before.atBat, detail.resolution).outcome) + 1,
+          }),
         ),
       applyOutcome: (outcome: AtBatOutcome) =>
         step(
@@ -309,18 +329,11 @@ export function useTeamGame(
       throwPitch: (input: TeamPitchInput) =>
         step(
           (current) => startThrowPitch(current, input, random),
-          // 투구 순간 소리 12 / 마구 28 (0x3f378) — 구질 22, 또는 마투수(rec+0xa 비트6)의 공+0x10 ≠ 0.
-          // 공+0x10 은 안 지워져(H2 3-4) 마투수는 첫 마구 뒤로 모든 공이 28 이다 (원본 그대로).
-          // ⚠️ **근사**: 웹은 던지는 순간에 판정까지 다 나와 투구음과 심판 콜이 붙는다 (통로가 하나라
-          //    뒤 소리가 앞 소리를 끊는다). 원본은 공이 날아가는 동안이 사이에 있다
+          // 심판 콜(0x51a94) — 0x12 진입 0x3dfac 가 판정 0x9d57c 를 메시지 0xbba 로 곧바로(0xbfbac, 3e1e2~3e1e8) 보내 그 틀에 난다.
+          // 투구 순간 소리는 아래 `timingOf` 가 놓는 틀에 낸다
           (before, after) => {
-            const releaseSound = pitchReleaseSoundIdOf({
-              typeNumber: input.typeNumber,
-              pitcherMagicNumber: after.lastPitch?.pitcherMagicNumber ?? 0,
-              ballMagicNumber: after.lastPitch?.magicNumber ?? 0,
-            })
             const resolution = after.lastResolution
-            if (resolution === null) return [releaseSound]
+            if (resolution === null) return []
             // 삼진 진동 100ms — 사람이 던진 공도 상태 0x12 그리기 0x4ce9c 를 지난다 (0x4d0d6, `strikeoutVibration`). 0x12 틱 0 의
             // 그림(놓은 틱에서 `pitchResultEntryDelayTicksOf` 뒤 — 마투수면 릴리스 단계가 길다)에 울린다.
             // 우리 공격 반쪽의 삼진은 `BattingStage` 가 울린다
@@ -334,7 +347,6 @@ export function useTeamGame(
             }
             const nextAtBat = applyPitchResolution(before.atBat, resolution)
             return [
-              releaseSound,
               pitchCallSoundIdOf(resolution, nextAtBat),
               // CPU 가 건 도루·폭투 판의 판정 콜 — 재생할 판은 재생 화면이 그 틱에, 아니면 판을 연 이 자리에서 (`arrivalCallSoundIdOf`)
               arrivalCallSoundIdOf(before, after),
@@ -347,6 +359,25 @@ export function useTeamGame(
                 ? null
                 : inPlayCallSoundIdOf(nextAtBat.outcome),
             ]
+          },
+          // 투구 순간 소리 12 / 마구 28 (0x3f378 — 놓는 틀) — 구질 22, 또는 마투수(rec+0xa 비트6)의 공+0x10 ≠ 0.
+          // 공+0x10 은 안 지워져(H2 3-4) 마투수는 첫 마구 뒤로 모든 공이 28 이다 (원본 그대로).
+          // 심판 콜은 0x12 진입 틀(놓은 틀에서 `pitchResultEntryDelayTicksOf` 뒤 — 마투수면 릴리스 단계가 길다), 0xf 진입 CPU 교체 22 는
+          // 0x12 문턱 뒤 0xf 틀이다(`PitchStepSoundTiming`). 원본은 그 사이 공이 날아가 두 소리가 다 들린다
+          (before, after) => {
+            const frameCount = after.lastPitch?.frameCount ?? 0
+            const aceOrder = teamPitcherSideStageOf(before).acePitcher?.order
+            const resolution = after.lastResolution
+            const outcome = resolution === null ? null : applyPitchResolution(before.atBat, resolution).outcome
+            return {
+              releaseSoundId: pitchReleaseSoundIdOf({
+                typeNumber: input.typeNumber,
+                pitcherMagicNumber: after.lastPitch?.pitcherMagicNumber ?? 0,
+                ballMagicNumber: after.lastPitch?.magicNumber ?? 0,
+              }),
+              resultEntryTicks: pitchResultEntryDelayTicksOf(frameCount, aceOrder),
+              pitchSelectionTicks: pitchSelectionEntryDelayTicksOf(frameCount, resultWaitTicksOf(outcome), aceOrder),
+            }
           },
         ),
       // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36). 원본은 결과 코드가 선 **틱**에 낸다 —

@@ -45,6 +45,7 @@ import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } f
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageCastPreload } from '@/widgets/batting-stage/model/useStageCastPreload'
 import { gameSceneNow, gameSceneTickNow, gameSceneTickStartTime, useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
+import { activeSound } from '@/shared/api/audio/soundPort'
 import { publishScenePeek, pushBattingLog } from '@/shared/lib/scenePeek/scenePeek'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
@@ -302,8 +303,12 @@ interface BattingStageProps {
    * 네 번째 인자는 이 공이 판정될 때의 **장면 +0xfdc**(0 스윙 · 1~3 번트 키 '8'·'7'·'9') — 타구 판 시작 리드(0x3d7b8)가
    * 도루 안 한 주자에게 +3 틱을 더하고(`DefensePlayInput.buntKind`) 공 도착 판도 본다. 사람 키만 쓴다(`sceneBuntKind` 주석) —
    * 이 공에 키가 없었으면 0 이다(0x11 진입의 memset — `sceneBuntKind` 주석).
+   * 다섯 번째 인자는 **넘긴 틀의 장면 틱** — 못 맞힌 공은 0x12 를 예약한 틀(다음 틀이 0x12 틱 0), 맞은 공은 0x13 을 끝내고 0x17 을
+   * 예약한 틀이다. 받는 쪽이 판 안의 때를 이 틱에 맞춘다(`gameSceneTickNow()` 를 다시 읽으면 틀 머리가 지난 뒤일 수 있다).
    */
-  readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => PitchResolvedReply | void
+  readonly onPitchResolved: (
+    detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number, sceneTick?: number,
+  ) => PitchResolvedReply | void
   /**
    * **상태 0x11 인가** 를 밖에서 물을 수 있게 이 칸에 묻는 함수를 넣어 준다. 원본 도루 키(0x53610 → 메시지 0x583)는
    * 0x11 의 키 함수 0x53670 이 부른다 — 0x11 은 투수 와인드업부터(공 틱 0 인 동안도) 맞은 공 판정 · 공 끝(틱 N + 1)까지다.
@@ -417,6 +422,11 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     return memory.kind
   }
 
+  /** 타구 순간 소리 — 판정 틀에 곧바로 낸다(소리 통로 `activeSound`, 투구 순간 소리 `useStageAnimation` 과 같은 통로) */
+  const playContactSoundNow = (soundId: number | null | undefined) => {
+    if (soundId !== null && soundId !== undefined) activeSound().play(soundId)
+  }
+
   const finishPitch = useCallback((swing: BattingSwing | null, tick: number) => {
     const pitch = pitchRef.current
     if (pitch === null) return
@@ -471,10 +481,15 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch, latest.hud?.strikes ?? null),
         latest.isVibrationOn !== false,
       )
+    // 타구 순간 소리(배트 · 헛스윙 바람 — 0x515de~0x5164a)는 판정 메시지를 받은 0x51408 이 **이 판정 틀**에 낸다. 심판 콜(0x12 진입 ·
+    // 수비 판)은 뒤 틀이라 받는 쪽이 낸다 — 그래서 받는 쪽에는 이미 낸 소리를 비워 넘긴다(`contactSoundId: null`)
+    playContactSoundNow(resolved.detail.contactSoundId)
     // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
     const pitchTypeNumber = pitchTypeNumberRef.current
-    const result =
-      pitchTypeNumber === null ? resolved : { ...resolved, detail: { ...resolved.detail, pitchTypeNumber } }
+    const result = {
+      ...resolved,
+      detail: { ...resolved.detail, contactSoundId: null, ...(pitchTypeNumber === null ? {} : { pitchTypeNumber }) },
+    }
     // 필살 성공(0x34c74 → 0x517e6)은 판정이 방향·패턴 뒤에 굴려 실어 준다 — 헛스윙이면 굴리지 않는다
     const isUncatchable = resolved.isUncatchable
     if (scene !== undefined) scene.deck = result.deck
@@ -579,7 +594,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
       // 타석을 끝낸 공(문턱 0x1f)이면 판정 A 가 0xd(밀어내기면 0x17 판) — 아니면 같은 타석 다음 공 0xf
       { tick: tick + 1 + resultTicksRef.current, state: resultTicksRef.current > RESULT_PHASE_TICKS ? SCENE_STATE.준비 : SCENE_STATE.선택 },
     )
-    const reply = latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch())
+    const reply = latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch(), tick)
     // 0x3dfac 낫아웃 갈래가 판정 칸을 지웠으면(3e0aa) 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다 — 진입이 그 그림보다 먼저다
     if (reply != null && reply.judgementCleared === true) {
       resultTextRef.current = judgeTextOf(detail.resolution, resultTicksRef.current > RESULT_PHASE_TICKS, true)
@@ -605,10 +620,10 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
           pushBattingLog({ kind: '판정', tick, keyTick: swing.frame, frameCount: pitch.frameCount, at: performance.now(), result: '판정없음' })
         }
-        // 판정 없는 헛스윙은 판정 틱에 0x4e21c 가 8/27 을 냈다 — 웹은 결과와 함께 싣는다(소리 때는 근사)
-        const soundId = swing.isUnjudgedWhiff ? unjudgedWhiffSoundIdOf(aceBatterIndex >= 0) : null
+        // 판정 없는 헛스윙은 이 틀(공 끝 0x4e060 의 4e21c — 0x12 예약 4e24e 와 같은 갱신)에 8/27 을 낸다. 심판 콜은 다음 틀 0x12 진입이다
+        playContactSoundNow(swing.isUnjudgedWhiff ? unjudgedWhiffSoundIdOf(aceBatterIndex >= 0) : null)
         const pitchTypeNumber = pitchTypeNumberRef.current
-        const detail = unjudgedSwingDetailOf(soundId)
+        const detail = unjudgedSwingDetailOf(null)
         const latest = latestRef.current
         const withType = pitchTypeNumber === null ? detail : { ...detail, pitchTypeNumber }
         vibrate(
@@ -653,7 +668,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     isHitByPitchResultRef.current = false
     phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
     markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.인플레이 })
-    latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind)
+    latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind, tick)
   }, [])
 
   const actions = useMemo(() => {

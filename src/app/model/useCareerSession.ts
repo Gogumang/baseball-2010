@@ -18,6 +18,7 @@ import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingE
 import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
+import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
@@ -1224,8 +1225,10 @@ export function useCareerSession({
       // 공마다 연속 파울(ctx+0x15f)을 센다 — 32·33 은 타석 결과와 함께 gameFlow 로 넘긴다 (0xa7dbc)
       const tally = tallyPitch(pitchTallyRef.current, detail.resolution)
       pitchTallyRef.current = tally
-      // 타구음(0x515de~) → 심판 콜(0x51a94) 순서. 통로가 하나라 뒤 소리가 앞 소리를 끊는다
-      playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, nextAtBat)])
+      // 타구음(0x515de~)은 판정 틀 — 타석 화면이 이미 냈다(`contactSoundId` 는 비어 온다). 심판 콜(0x51a94)은 다음 틀 0x12 진입
+      // 0x3dfac 가 메시지 0xbba 를 곧바로 보내 낸다(3e1e2~3e1e8) — 타석 화면은 0x12 를 예약한 틀에 이 자리를 부른다(`showResult`)
+      playSoundIds(audio, [detail.contactSoundId])
+      playSoundIdsAfterSceneTicks(audio, [pitchCallSoundIdOf(detail.resolution, nextAtBat)], BATTER_PITCH_RESULT_ENTRY_TICKS)
       // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 출발한 도루(종류 5) 판을 연다 (`arrivePitch`)
       const beforeArrival = progressRef.current
       const arrival =
@@ -1586,7 +1589,8 @@ export function useCareerSession({
       setProgress(resolved)
       if (played.foulEnded === true) {
         // 파울로 닫힌 판 — 0xae3e8 ae568 → 0xf(같은 타석 다음 공) · 0x35108 → 0xb6b58(스트라이크 ≤ 1 이면 +1).
-        // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)과 파울 콜 25 가 이 판의 것이다(⚠️ 근사(때 · 남김 — 웹 구조): 원본은 7 이 난 틱 — 판 끝에 낸다)
+        // 결과 코드 7 메시지 51c5c 의 연속 파울(0xa7dbc)과 파울 콜 25 가 이 판의 것이다 — 7 이 난 틱 b4562 가 0xbba 로 화면까지 가고
+        // 같은 틱 0x35108 이 판을 닫는다(파울 판의 끝 틱이 곧 7 의 틱이다)
         runner.applyPitch({ kind: '파울' })
         pitchTallyRef.current = tallyPitch(pitchTallyRef.current, { kind: '파울' })
         // 파울 콜 25 는 결과 코드 7 메시지(51c5c)가 낸다 — 화면이 돌린 판이면 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
