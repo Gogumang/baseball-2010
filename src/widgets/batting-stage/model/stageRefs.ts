@@ -112,6 +112,8 @@ export interface PendingHit {
   readonly hitPath?: HitBallPath | null
   /** 0x13 꼬리선 0x3b188 을 긋는가 — 0x35988(강한 타구) || 0x357e0(결과 코드 24~26) (3b440~3b45c) */
   readonly showsHitTrail?: boolean
+  /** 판정 각 s16 [+0xfcc] — 0x13 카메라 따라가기(0x3f060 3f23e, `hitCamera`)가 본다. 패턴을 모르면 null */
+  readonly hitAngle?: number | null
 }
 
 /** 매 프레임 최신 값을 읽어야 하는 props 묶음. */

@@ -81,7 +81,10 @@ export function hitBallPointAt(path: HitBallPath, ballTick: number): WorldPoint 
   return path.points[clampTick(ballTick, path.points.length)]
 }
 
-/** 0x35854 — 경로 점의 화면 자리 (카메라 흔들림 +0xff4 · +0xff8 은 웹 타석이 안 얹는다 — `bigHitScreen` 머리말) */
+/**
+ * 0x35854 — 경로 점의 화면 자리. 가운데 카메라(−120, −70)로 놓는다 — 0x13 카메라가 옮긴 몫(+0xff4 · +0xff8)은 그리기가 캔버스를 옮겨
+ * 더한다(`hitCamera`, `StageScene.camera`)
+ */
 export function hitBallPixelAt(path: HitBallPath, ballTick: number, side: number): { readonly x: number; readonly y: number } | null {
   const point = hitBallPointAt(path, ballTick)
   return point === null ? null : projectToScreen(point, side)

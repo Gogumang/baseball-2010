@@ -8,6 +8,7 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { earlyHitPauseTickOf, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit } from '@/widgets/batting-stage/lib/hitPause'
 import { hitBallPathOf, type HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
+import { hitCameraAngleOf } from '@/widgets/batting-stage/lib/hitCamera'
 import { bigHitEndTickOf, bigHitReleaseTickOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import type { HitPauseInput } from '@/widgets/batting-stage/lib/hitPause'
 import { HIT_PARTICLE_IMAGE, hitParticleIdOf, hitParticleInputOf, isHomeRunHitResult, isStrongHit, specialSwingParticlesOf } from '@/widgets/batting-stage/lib/hitParticles'
@@ -286,6 +287,8 @@ export interface PitcherHitScene extends PitcherHitClock {
   readonly isBuntStance?: boolean
   /** 0x13 의 타구 공 경로 — 0x33e34 가 [경기+0xf2c] 공으로 다시 채운 +0x1140 (`hitBallPath`, 타자편 `BattingStage` 와 같다) */
   readonly hitPath?: HitBallPath | null
+  /** 판정 각 s16 [+0xfcc] — 0x13 카메라 따라가기(0x3f060 3f23e, `hitCamera`) */
+  readonly hitAngle?: number
   /** 0x13 꼬리선 0x3b188 — 0x35988(강한 타구, 번트 자세 아님) || 0x357e0(결과 24~26) */
   readonly showsHitTrail?: boolean
 }
@@ -343,6 +346,7 @@ export function pitcherHitSceneOf(
     isBuntStance: isBunt,
     // 0x13 진입 0x33e34 — 같은 [경기+0xf2c] 공의 점으로 타석 공 경로를 다시 채운다 (+0x17e1 = 친 타자의 손)
     hitPath: hitBallPathOf(earlyPassTrajectory, hitSide),
+    hitAngle: hitCameraAngleOf(pattern[0]),
     showsHitTrail:
       isHomeRunHitResult(resultCode) || (!isBunt && isStrongHit(hitParticleInputOf(pattern, resultCode, watchesBigHit))),
   }

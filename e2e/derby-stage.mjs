@@ -28,7 +28,7 @@ const skipsAt = (stage) => SKIP || stage < SKIP_UNTIL_STAGE
 const SWEEP_SHIFTS = [-9, -6, -3, 0, 3, 6, 9]
 /**
  * 맞은 공 몇 개까지 0x13(타구 공 · 그림자 — r274)과 판 0x17 필드 화면(A-01)을 찍나 — 그림: derby-<브라우저>-hit<n>-<자리>.png
- * (`hit<n>-13` 0x13 넷째 그림쯤 · `hit<n>-field` 판 0.5초 · `hit<n>-field2` 판 1.5초). 이벤트 존이 선 판은 공마다 `pitch<n>-zone`
+ * (`hit<n>-13` 0x13 넷째 그림쯤 · `hit<n>-13b` 0.45초 뒤 아직 0x13 이면(카메라가 공을 따라간 자리, r292) · `hit<n>-field` 판 0.5초 · `hit<n>-field2` 판 1.5초). 이벤트 존이 선 판은 공마다 `pitch<n>-zone`
  */
 const HIT_SHOTS = Number(process.env.E2E_DERBY_HIT_SHOTS ?? '3')
 const OUT = 'e2e/.run'
@@ -149,6 +149,11 @@ async function run(browserName, shiftOf) {
           await page.waitForTimeout(250)
           await screenShot(`hit${hitShots + 1}-13`)
           shotHit = true
+          // 0x13 카메라(0x3f060 3f1f2~ — r292)가 공을 따라 옮긴 뒤 — 아직 0x13 이면 한 장 더
+          await page.waitForTimeout(450)
+          if ((await page.evaluate(() => window.__batting?.().probe?.phase ?? null)) === '타격') {
+            await screenShot(`hit${hitShots + 1}-13b`)
+          }
         }
         if (p.isPlayRunning) {
           fieldStartedAt ??= Date.now()
