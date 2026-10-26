@@ -47,11 +47,9 @@ export const ORIGINAL_BUG_IDS: readonly string[] = Array.from(
 
 /** 고친 길이 코드에 들어간 id — `bugfixes.json` 의 `implemented: true` 와 1:1 이어야 한다 (시험이 본다) */
 export const IMPLEMENTED_BUGFIX_IDS: readonly string[] = [
-export const IMPLEMENTED_BUGFIX_IDS: readonly string[] = [
   'B-01', 'B-02', 'B-03', 'B-04', 'B-05', 'B-06', 'B-07', 'B-08', 'B-09', 'B-10', 'B-11', 'B-13', 'B-14', 'B-15', 'B-16', 'B-17',
   'B-18', 'B-19', 'B-20', 'B-21', 'B-22', 'B-23', 'B-24', 'B-25', 'B-26', 'B-27', 'B-28', 'B-29', 'B-30', 'B-31', 'B-32', 'B-33',
   'B-34',
-]
 ]
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
