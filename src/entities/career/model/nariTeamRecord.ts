@@ -244,8 +244,10 @@ export function nariRecordFieldersOf(record: NariTeamRecord, teamId: number, myN
  * ```
  * 레코드 배열은 경기를 세울 때 명단 칸 k = 레코드 k(0xb891c `team[0xe + i] = i`)이고 웹 `QuickLineup` 은 빠진 선수를 지운 명단이라,
  * 지금 타순 칸 s 에 선 레코드 r ≠ s 마다 r 은 칸 s 시작 레코드의 니블을, 시작 레코드 s 는 r 의 니블을 받는다.
- * ⚠️ 근사(남김 — 결과 같음): 한 칸에 대타가 둘 이상 들어오면 중간에 빠진 대타는 다음 대타의 니블을 받는데 웹은 제 니블을 둔다 — 벤치 니블은 붙박이 표에서
- * 모두 0 이라(XlsBATTER_DATA 행 바이트 28) 결과가 같다. 명단 칸 값으로 레코드 줄을 찾지 못하면 그 칸은 건너뛴다.
+ * ⚠️ 근사(남김 — 결과 같음, 시험으로 못 박음): 한 칸에 대타가 둘 이상 들어오면 중간에 빠진 대타는 다음 대타의 니블을 받는데 웹은 제 니블을
+ * 둔다 — 벤치 니블은 붙박이 표에서 모두 0 이라(XlsBATTER_DATA 행 바이트 28, `nariTeamRecord.test` 의 표 시험) 결과가 같다. 원본 꼴(대타마다
+ * 맞바꿈)로 옮기려면 대타 차례 이력이 있어야 하는데 웹 명단(`QuickLineup`)은 마지막 명단만 든다(빠진 칸은 0xb95b0 처럼 지운다).
+ * 명단 칸 값으로 레코드 줄을 찾지 못하면 그 칸은 건너뛴다.
  */
 export function nariFieldersAfterPinchHits(
   fielders: readonly NariRecordFielder[],

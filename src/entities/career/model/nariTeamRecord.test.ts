@@ -118,3 +118,15 @@ describe('타순 보상 19 — 0xb5d09 (셋이 돈다)', () => {
     expect(applyBattingOrderRewards({ teamId: 팀, battingOrder: 8 }, [])).toBeNull()
   })
 })
+
+describe('대타 니블 — 중간에 빠진 대타 (0xaebe4 aece6, r276)', () => {
+  it('붙박이 표의 벤치 줄(9~11)은 자리 니블이 모두 0 이다 — 중간에 빠진 대타가 다음 대타의 니블(0)을 받든 제 니블(0)을 두든 같다', () => {
+    let teams = 0
+    for (let teamId = 0; teamBatters(teamId).length > 0; teamId += 1) {
+      teams += 1
+      const bench = teamBatters(teamId).slice(9)
+      expect(bench.map((player) => (player.position ?? 0) & 0xf)).toEqual(bench.map(() => 0))
+    }
+    expect(teams).toBeGreaterThan(0)
+  })
+})

@@ -24,7 +24,7 @@ describe('내 타석의 2스트라이크 번트 파울도 판을 돈다 — 판 
       expect(pending.strikes).toBe(2)
       expect(pending.buntKind).toBe(1)
       const result = runDefensePlay(pending)
-      const 끝 = resolveDefensePlay(붙듦, result, random)
+      const 끝 = resolveDefensePlay(붙듦, result, random, { countAfterFoul: { strikes: 1, balls: 0 } })
       expect(result.foulEnded).toBeUndefined()
       expect(끝.pendingDefensePlay).toBeNull()
       // 타석이 끝났다 — 판이 타자 아웃 하나를 내고(판 앞 자리로 안 돌아감) 경기 상태가 움직인다(동료 타석까지 이어 돈다)
