@@ -9,6 +9,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
+import { devDerbyStartNow, setDevDerbyStart } from '@/shared/lib/devDerbyStart/devDerbyStart'
 import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model/battedBallOutcome'
 
 /** 홈런 결과 코드 하나 — `outcomeOfPattern` 의 마지막 갈래 */
@@ -284,6 +285,26 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.pitcher.ace).toBeNull()
     // 단계 0 은 구질 1 만 던진다
     expect(rendered.result.current.pitcher.pitchType).toBe(1)
+  })
+})
+
+describe('장면 바로가기 `derby-stage<N>` (웹 개발 도구 — A-07)', () => {
+  afterEach(() => setDevDerbyStart(null))
+
+  it('적어 둔 단계 시작 상태로 첫 판을 열고 그 단계 마투수가 선다 — 칸은 첫 그림 뒤 지워 다시하기는 0 단계부터', () => {
+    setDevDerbyStart({ stage: 2, totalDistance: 1200, remainingPitches: 7 })
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
+    expect(rendered.result.current.run).toMatchObject({ stage: 2, totalDistance: 1200, remainingPitches: 7, pitchesThrown: 3 })
+    expect(rendered.result.current.pitcher.ace).not.toBeNull()
+    expect(devDerbyStartNow()).toBeNull()
+    act(() => rendered.result.current.restart())
+    expect(rendered.result.current.run).toMatchObject({ stage: 0, totalDistance: 0, remainingPitches: 10 })
+  })
+
+  it('칸이 비었으면 게임 길 그대로 — 단계 0', () => {
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
+    expect(rendered.result.current.run).toMatchObject({ stage: 0, totalDistance: 0, remainingPitches: 10 })
+    expect(rendered.result.current.pitcher.ace).toBeNull()
   })
 })
 
