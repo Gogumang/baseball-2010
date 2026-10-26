@@ -7,7 +7,7 @@ import {
   rollCpuGamePrep,
   simulateLeagueGame,
 } from '@/entities/league/model/leagueDay'
-import type { LeagueAbilityContext, LeagueTeamRecord } from '@/entities/league/model/leagueDay'
+import type { LeagueAbilityContext, LeagueGameAces, LeagueTeamRecord } from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isBugFixed } from '@/shared/config/bugfixes'
@@ -57,6 +57,11 @@ export interface CpuPostseasonResult {
   readonly pitcherStaminas: PitcherStaminaTable
   /** 넘긴 `abilityContext.staleRecordMorales` 에 이 경기들을 치른 팀의 레코드 +2(= 나리 사기)를 먹인 것. 안 넘겼으면 없다 */
   readonly staleRecordMorales?: Readonly<Record<number, number>>
+  /**
+   * 팀 번호 → 이 경기들의 준비 `0xc239c` 가 그 팀 레코드에 넣은 마선수(팀마다 마지막 경기 것) — `LeagueDayResult.recordAces` 와 같다.
+   * 나리는 레코드에 남긴다(`withCpuGameRecordAces`, A-05). 한 경기도 안 치렀으면 없다
+   */
+  readonly recordAces?: Readonly<Record<number, LeagueGameAces>>
 }
 
 /**
@@ -93,13 +98,14 @@ export function playCpuSeriesGameWithStamina(
   rollSimulatorInit(random)
   // 경기 준비의 굴림 다섯 (c2464~c24ea) — 팀 A = 칸 sX(초)의 객체 = 윗 시드 명단
   const rolls = rollCpuGamePrep(random)
+  const aces = cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME)
   const score = simulateLeagueGame(
     sides,
     random,
     starters,
     { away: pitcherStaminas[sides.away], home: pitcherStaminas[sides.home] },
     {
-      aces: cpuGameAcesOf(rolls, 1 - LEAGUE_SIDE_HOME),
+      aces,
       aceLevels,
       pitcherOrders: orders,
       abilityContext,
@@ -121,6 +127,11 @@ export function playCpuSeriesGameWithStamina(
       ...pitcherStaminas,
       [away]: score.pitcherStaminas.away,
       [home]: score.pitcherStaminas.home,
+    },
+    // 명단 쪽 마선수 — 그 명단 팀의 레코드에 들어간다(0xb8680 은 팀 객체 +0x25 = 명단 팀으로 레코드를 고른다, `playLeagueDay` 와 같다)
+    recordAces: {
+      ...(aces.away === undefined ? {} : { [away]: aces.away }),
+      ...(aces.home === undefined ? {} : { [home]: aces.home }),
     },
   }
 }
@@ -153,9 +164,10 @@ export function runCpuPostseasonWithStamina(
   for (let game = 0; game < MAXIMUM_GAMES; game += 1) {
     if (current.series.round === '종료' || isMyTurn(current.series, myTeamId)) return withMorales(current)
     const teams = current.series.teams
-    current = playCpuSeriesGameWithStamina(
+    const played = playCpuSeriesGameWithStamina(
       current.series, random, current.pitcherStaminas, aceLevels, context, recordOf,
     )
+    current = { ...played, recordAces: { ...current.recordAces, ...played.recordAces } }
     // 한 경기를 치른 두 팀 레코드 +2 는 0xb570c(b5768)가 나리 사기로 덮었다 — 다음 경기 첫 공의 앞 값이 그 값이다
     const morale = context?.nariMorale
     if (context?.staleRecordMorales !== undefined && morale !== undefined) {

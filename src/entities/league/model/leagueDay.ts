@@ -718,9 +718,10 @@ export function decisionsAfterHalfInning(
  * `0xd88aa` 을 먹는다(`extras.aceLevels`). 국가대항전 준비 `0xc2c4c` 에는 이 굴림이 없다(`state+0x30 = 0xff`).
  * 마투수 스태미나는 저장의 마투수 레코드(`0x1f824`) +0x2c 를 통째로 복사한 값(늘 10000, `ACE_PITCHER_RECORD_STAMINA`)
  * 에서 시작하고, 끝 값은 팀 레코드 8번 칸에 남는다(`acePitcherStaminas`).
- * ⚠️ 남은 차이:
- *   - 원본은 마선수를 팀 **저장 레코드**에 넣는다(0xb53f0·0xb521c 가 0xb8680 의 레코드를 늘리고 덮는다) — 첫 경기 뒤로
- *     팀 레코드에 마선수 칸이 남아 사람 경기의 명단·기록표에도 비친다. 웹은 경기마다 붙박이 표에서 새로 세운다.
+ * 원본은 마선수를 팀 **저장 레코드**에 넣는다(0xb53f0 0x40 · 0xb521c 0x60 갈래가 0xb8680 의 레코드를 늘리거나, 8 · 9번이 이미
+ * 마선수면 덮는다). 덮기와 새로 늘리기는 같은 배열 꼴(투수 [0..7, 마투수, 옛 8] · 타자 [0..8, 마타자, 10, 11, 옛 9])이고 경기마다
+ * 두 팀에 늘 넣으므로, 이 경기의 명단은 레코드에 남은 지난 마선수와 상관없이 같다 — 여기서는 붙박이 표 위에 새로 세운다.
+ * 남는 쪽은 부르는 쪽이 저장에 든다: 시즌 `SeasonSave.recordAces`(U-105) · 나리 `withCpuGameRecordAces`(A-05, `nariTeams`).
  */
 export function simulateLeagueGame(
   matchup: LeagueMatchup,

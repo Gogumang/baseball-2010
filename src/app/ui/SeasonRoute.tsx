@@ -799,8 +799,9 @@ function SeasonScreens({
         // 뒤에 머리띠 0x7f4ec. 머리띠는 공통 앞그림 0xb810 이 0xe2 에서 기본 갈래 0x7f53c(hdr, 10, 5, 0) 로 세운 "시즌모드"
         // (+ G포인트 · 되돌아가기)라 미션(제목 11)·스페셜과 다르다.
         // 바탕은 공통 앞그림 0xb810 의 공 무늬 0x5fd61 이다(미션 하위 17 은 메뉴 바탕 0x58371) — backdrop="공무늬".
-        // ⚠️ 미해결: 상태 0xe2 덧그림 0x669c0 → 0x65e80(목록 +0x298 객체를 54×75 버퍼에 그린다 — 캐릭터 그림으로 보임)은
-        //    내부를 안 읽어 명예의 전당 화면 그대로 둔다.
+        // 상태 0xe2 덧그림 0xe9ac(ef9a~efa6) 0x669c0 → 0x65e80 은 명전 하위 17 · 27(0x32dd8 32e16) · 나리 145(0x16a34)와 같은 함수다 —
+        // 목록 +0x298 투수 그림을 54×75 이미지 [0x1552ae0] 로 떠 두는 몸 그림이라 `HallOfFameScreen` 의 `useHallOfFameFigure`
+        // (capturesImage 참, listOwner 시즌)가 이미 그린다 (f5aee7bd, `pages/special/lib/hallOfFameFigure`). A-12 정정
         renderCandidates={({ choose, back }) => (
           <HallOfFameScreen
             frame={{ title: '시즌모드', gamePoint: session.gamePoints }}

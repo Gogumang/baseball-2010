@@ -1,4 +1,6 @@
 import { BALANCE } from '@/shared/config/original/balance'
+import { isLiveGameFightingSpiritSituation } from '@/shared/lib/liveGameState/liveGameState'
+import { nariRecordTeamIdOf } from '@/entities/career/model/nariMorale'
 import {
   effectivePitcherAbilityOf, equippedPitcherAbilityOf, isPitcherSkillEquipped, pitcherAbilityLimitsOf,
 } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -25,6 +27,25 @@ const POWERLESS_SKILL = 5
 const LEGEND_SKILL = 7
 
 const abilitySlotsOf = (ability: PitcherAbility): readonly number[] => PITCHER_ABILITY_ORDER.map((key) => ability[key])
+
+/** 0xb62b5(선수, 0xe) — 투수 비트 14 투지 (skills.json 30) */
+const FIGHTING_SPIRIT_SKILL_BIT = 14
+/** 0xb5b06 — 맨 끝 자르기 */
+const ABILITY_MAXIMUM = 999
+
+/** 0xb5a28~0xb5a72 스킬 14 갈래 → 0xb5b06 자르기 (칸 ≠ 3 · 0 쪽 버림) */
+function withFightingSpirit(career: PitcherCareer, ability: PitcherAbility): PitcherAbility {
+  if (!isPitcherSkillEquipped(career, FIGHTING_SPIRIT_SKILL_BIT)) return ability
+  if (!isLiveGameFightingSpiritSituation(nariRecordTeamIdOf(career))) return ability
+  const raised = { ...ability }
+  PITCHER_ABILITY_ORDER.forEach((key, slot) => {
+    if (slot === FIGHTING_SPIRIT_EXCLUDED_SLOT) return
+    raised[key] = Math.min(ABILITY_MAXIMUM, Math.max(0, ability[key] + Math.trunc(ability[key] / 10)))
+  })
+  return raised
+}
+/** 스킬 14 에서 빠지는 칸 — 체력 3 (b5a48 `cmp r7, #3`) */
+const FIGHTING_SPIRIT_EXCLUDED_SLOT = 3
 
 function rowsOf(after: PitcherCareer, change: DetailSlots, bonus?: DetailSlots): DetailRow[] {
   return detailRowsFromSlots(
@@ -65,13 +86,15 @@ export function pitcherRestDetailRowsOf(after: PitcherCareer, moraleGain: number
 /**
  * 투수편 능력치 상세 창(120) — 0x88fe8 의 모드 3 갈래: 장비 이름 StrITEM 44 칸부터 · 능력치 이름 StrMODE[40..43] ·
  * 이름표 340~343. 최대값은 0x5e865 모드 3 갈래(보직 0xb6705) = `pitcherAbilityLimitsOf`.
- * 실효값은 피로 없는 0xb570c = `effectivePitcherAbilityOf`.
- * ⚠️ 미해결: 0xb570c 의 코치 갈래(0xb5a28~0xb5a72 — 투수 · 스킬 14 장착 · 칸 ≠ 3 · 경기 객체 [+0x6b] > 4 ·
- * 0xb6a4d(경기) == 팀이면 +v/10)는 관리 화면에서 **지난 경기 객체**를 읽는다. 웹에는 그 값이 없어 넣지 않았다.
+ * 실효값은 피로 없는 0xb570c = `effectivePitcherAbilityOf` 에 **스킬 14(투지) 갈래**(0xb5a28~0xb5a72, A-11)를 얹은 것:
+ * 투수 · 장착 14(0xb62b5(rec, 0xe)) · 칸 ≠ 3(체력) · 전역 경기 상태 [0x1552d0c] +0x6b > 4 · 0xb6a4d(상태) == 0xb6be9(상태, 팀)
+ * 이면 `v += v/10` — 관리 화면이라 **마지막으로 돈 사람 경기**(모드 불문)의 이닝 · 측별 팀 · 점수를 본다
+ * (`isLiveGameFightingSpiritSituation`). 팀은 0x1f989(저장, S[1]) 레코드 +0 (`nariRecordTeamIdOf` — 대회 중이면 상대국 칸).
+ * 모드 3 은 팀 정액(0xb592c)도 코치(0xb5a74)도 없어 이 값 뒤로는 0..999 자르기(0xb5b06)뿐이다.
  */
 export function pitcherAbilityDetailViewOf(career: PitcherCareer): DetailView {
   const limits = pitcherAbilityLimitsOf(career)
-  const effective = effectivePitcherAbilityOf(career)
+  const effective = withFightingSpirit(career, effectivePitcherAbilityOf(career))
   return abilityDetailViewOf(
     {
       isBatter: false,

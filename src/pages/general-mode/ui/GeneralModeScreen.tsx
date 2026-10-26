@@ -20,7 +20,7 @@ import { EntryEditorScreen } from '@/widgets/entry-editor'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { TEAMS } from '@/shared/config/original/teams'
-import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { liveGameSidesOf, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 
 export interface GeneralModeScreenProps {
   readonly random: RandomPort
@@ -131,16 +131,24 @@ export function GeneralModeScreen(props: GeneralModeScreenProps) {
  * 그 뒤라 저장이 오는 때의 이닝이 곧 이 칸이고, 경기 중 나가기(0x40140)는 이 칸을 안 지워 나간 그 이닝이 남는다.
  * 경기 끝(정산 진입 · 결과 확인)은 끝 이닝. 0 으로 두는 자리는 상태 22 의 0x30f20(`useGeneralMode`)이다.
  */
+/** 경기 끝 측별 팀 +0x28 · 점수 +0x7e (`setLiveGameSides`) — 요약에 측이 없으면(손으로 만든 요약) 건드리지 않는다 */
+function setSummarySides(summary: TeamGameSummary): void {
+  const playerSide = summary.playerSide
+  if (playerSide !== undefined) setLiveGameSides(liveGameSidesOf(summary, { ...summary, playerSide }))
+}
+
 function withLiveGameInning(props: GeneralModeScreenProps): GeneralModeScreenProps {
   const { onGameStart, onGameSave, onSettlementEnter, onFinish } = props
   return {
     ...props,
     onGameStart: (save) => {
       setLiveGameInningIndex(save.game.inning - 1)
+      setLiveGameSides(liveGameSidesOf(save.options, save.game))
       onGameStart?.(save)
     },
     onGameSave: (save) => {
       setLiveGameInningIndex(save.game.inning - 1)
+      setLiveGameSides(liveGameSidesOf(save.options, save.game))
       onGameSave?.(save)
     },
     ...(onSettlementEnter === undefined
@@ -148,11 +156,13 @@ function withLiveGameInning(props: GeneralModeScreenProps): GeneralModeScreenPro
       : {
           onSettlementEnter: (summary: TeamGameSummary) => {
             setLiveGameInningIndex(summary.inningsPlayed - 1)
+            setSummarySides(summary)
             onSettlementEnter(summary)
           },
         }),
     onFinish: (summary) => {
       setLiveGameInningIndex(summary.inningsPlayed - 1)
+      setSummarySides(summary)
       onFinish(summary)
     },
   }

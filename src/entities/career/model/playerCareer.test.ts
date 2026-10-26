@@ -6,6 +6,7 @@ import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZer
 import type { NariLastGame, PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
+import { NO_RECORD_ACE } from '@/entities/career/model/nariTeamRecord'
 import type { GameSummary } from '@/entities/game/model/gameSummary'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { EMPTY_LEAGUE_PLAYER_STATS, leagueBatterIdOf } from '@/entities/league/model/leaguePlayerStats'
@@ -426,6 +427,29 @@ describe('리그 투수 레코드 — 차례와 스태미나 (0x1c46c · 4f2e8 �
     const 표 = 결과.leaguePitcherStaminas ?? {}
     expect(Object.keys(표).length).toBe(8)
     expect(표[0]).toBeUndefined()
+  })
+
+  it('CPU 경기 준비 0xc239c 가 넣은 마선수는 나리 레코드에 남는다 — 9번 마타자 · 8번 마투수 (A-05)', () => {
+    const career = { ...createCareer('선수'), teamId: 0, gamesPlayed: 1 }
+    const 결과 = applyLeagueDay(career, 0, createSeededRandom(1))
+    const 팀들 = 결과.nariTeams ?? []
+    const 상대 = opponentOf(0, 0)
+    for (let team = 0; team < 10; team += 1) {
+      const 레코드 = 팀들[team]
+      if (team === 0 || team === 상대) {
+        // 사람 경기 두 팀은 CPU 경기를 안 치렀다 — 내 팀 레코드는 등록 꼴 그대로
+        expect(레코드?.acePitcher).toBe(NO_RECORD_ACE)
+        continue
+      }
+      expect(레코드?.acePitcher).toBeGreaterThanOrEqual(0)
+      expect(레코드?.batters[9]?.ace).toBeGreaterThanOrEqual(0)
+      // 옛 9번은 맨 끝으로 — 타자 배열이 한 칸 늘었다
+      expect(레코드?.batters.length).toBe(13)
+    }
+    // 이튿날 다시 넣으면 그 칸을 덮는다 — 배열이 더 늘지 않는다
+    const 이튿날 = applyLeagueDay({ ...결과, gamesPlayed: 2 }, 0, createSeededRandom(2))
+    const 다시 = (이튿날.nariTeams ?? []).find((record, team) => team !== 0 && record.batters.length > 13)
+    expect(다시).toBeUndefined()
   })
 
   it('포스트시즌 경기 끝은 CPU 리그 경기를 건너뛴다 (4f268) — 순위표가 그대로고 회복만 돈다', () => {

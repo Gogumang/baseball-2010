@@ -94,7 +94,9 @@ import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCup
 import { nariCupRecordOf, nextNariCupDayTeams, recordNariCupGame } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
-import { liveGameInningIndex, resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import {
+  liveGameInningIndex, liveGameSidesOf, resetLiveGameState, setLiveGameInningIndex, setLiveGameSides,
+} from '@/shared/lib/liveGameState/liveGameState'
 import {
   createPitcherCupTeams,
   pitcherCupPositionCodeOf,
@@ -1299,8 +1301,9 @@ export function usePitcherLeagueSession(
       setUpPitcherScene()
       // 정산 진입 0x4ea0c 의 0x4f3d6 — 모드를 가리지 않고 +0x4c + 모드 = 0
       nariGameSaveRef.current?.clear()
-      // 전역 경기 상태 +0x6b 는 대회 경기도 남긴다
+      // 전역 경기 상태 +0x6b 는 대회 경기도 남긴다 — 측별 팀 +0x28 · 점수 +0x7e 도 (`setLiveGameSides`)
       setLiveGameInningIndex(summary.endedInningIndex ?? 0)
+      setLiveGameSides(liveGameSidesOf(options, { ...summary, playerSide: options.playerSide }))
       // 0x4ea0c 4f072~4f136 — 후공(측 1) 점수가 더 많을 때만 후공 승, 동점이면 선공(측 0) 승 (`nariCupGameResultOf`, 타자편과 같다)
       const { winner, loser } = nariCupGameResultOf({
         mySide: options.playerSide,
@@ -1495,8 +1498,10 @@ export function usePitcherLeagueSession(
           strikeouts: summary.record.strikeouts,
         })
         : withEvaluation.streaks
-      // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다 (이어하기 116 의 감독 글 38 판정이 본다)
+      // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다 (이어하기 116 의 감독 글 38 판정이 본다) — 측별 팀 +0x28 · 점수 +0x7e 도
+      // 남아 120 상세 창의 스킬 14 갈래(0xb5a28~)가 본다 (`isLiveGameFightingSpiritSituation`)
       setLiveGameInningIndex(summary.endedInningIndex ?? 0)
+      setLiveGameSides(liveGameSidesOf(gameOptions, { ...summary, playerSide: gameOptions.playerSide }))
       setGameOptions(null)
       // S+0x50 = 2 · 저장 → 평가 창 → 경기 뒤 카운터 → 저장, 평가 징글 (`enterPitcherGameEvaluation`)
       commit(enterPitcherGameEvaluation({ ...withEvaluation, lastGame, streaks }))

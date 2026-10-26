@@ -30,7 +30,7 @@ import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { HelpScreen } from '@/pages/help/ui/HelpScreen'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
-import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { liveGameSidesOf, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import { BattingStage } from '@/widgets/batting-stage/ui/BattingStage'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
@@ -388,6 +388,19 @@ export function PitchingScreen({
   usePickoffTouchKeys(acceptsPickoff, run.bases)
 
   const teamIds = missionTeamIdsOf(run)
+  // 경기[0x28 + 칸] 팀(0xaa57c aa72a 의 0xb6bd4) · 점수 st[0x7e + 칸](0xb69b0) — 미션 경기도 전역 상태라 관리 화면 상세 창의
+  // 스킬 14 갈래(0xb5a28~)가 마지막 미션 판의 값을 본다 (`setLiveGameSides`)
+  const sideHumanTeam = teamIds.human
+  const sideCpuTeam = teamIds.cpu
+  const sideHumanScore = run.game.scores[humanSideOf(run.mission)]
+  const sideCpuScore = run.game.scores[cpuSideOf(run.mission)]
+  const sideOfHuman = humanSideOf(run.mission)
+  useEffect(() => {
+    setLiveGameSides(liveGameSidesOf(
+      { ourTeamId: sideHumanTeam, opponentTeamId: sideCpuTeam },
+      { ourScore: sideHumanScore ?? 0, opponentScore: sideCpuScore ?? 0, playerSide: sideOfHuman },
+    ))
+  }, [sideHumanTeam, sideCpuTeam, sideHumanScore, sideCpuScore, sideOfHuman])
 
   // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
   const peekPitchSlotPicker = isRunning && !isPopupOpen && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy

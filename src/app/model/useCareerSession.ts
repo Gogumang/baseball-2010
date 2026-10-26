@@ -182,7 +182,7 @@ import {
 } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
-import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { liveGameSidesOf, resetLiveGameState, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import { UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
@@ -900,6 +900,8 @@ export function useCareerSession({
       nariGameSaveRef.current?.clear()
       // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다(0xb6b6c) — 투수편 이어하기 116 의 감독 글 38 이 본다 (`liveGameState`)
       setLiveGameInningIndex(finished.game.inning - 1)
+      // 측별 팀 +0x28 · 점수 +0x7e 도 남는다 — 관리 화면 상세 창의 스킬 14 갈래(0xb5a28~)가 본다 (`isLiveGameFightingSpiritSituation`)
+      setLiveGameSides(liveGameSidesOf(finished, finished.game))
       const summary = summaryOf(finished)
       // 경기 후 평가 — 인기도 → 평판 → 사기 (0xa719c), 이어서 연속 기록 (0x8a6fc)
       const thisEvaluation = evaluateGame(currentCareer, summary)
@@ -1011,8 +1013,9 @@ export function useCareerSession({
       setUpNariScene()
       // 대회 경기도 정산 진입 0x4ea0c 를 지난다 — 0x4f3d6 은 모드를 가리지 않고 +0x4c + 모드 = 0
       nariGameSaveRef.current?.clear()
-      // 전역 경기 상태 +0x6b — 대회 경기도 끝 이닝을 남긴다
+      // 전역 경기 상태 +0x6b — 대회 경기도 끝 이닝을 남긴다 (측별 팀 · 점수도)
       setLiveGameInningIndex(finished.game.inning - 1)
+      setLiveGameSides(liveGameSidesOf(finished, finished.game))
       // 같은 날 CPU 경기 두 나라는 상대국 슬롯 레코드(base+0x934) 하나를 쓴다 — 사람 경기가 깎아 둔 그 레코드의
       // 투수 +0x2c 에서 선다 (701a7a9). 사람 경기 끝 상대 투수 칸별 값을 넘긴다
       // 그 CPU 경기(0xc2dac)의 간이 엔진도 0xb570c b5768 로 두 나라 레코드 +2 에 나리 사기를 쓴다 — 대회 중이라 상대국 칸 +2, 곧 사람
@@ -2539,7 +2542,10 @@ export function useCareerSession({
     /** 경기 중 [메뉴] → 나가기. StrGAME[0] "현재 이닝의 기록과 획득한 G포인트가 사라집니다" */
     quitGame: () => {
       // 상태 0x22 → 장면 0x103 은 전역 경기 상태를 안 지운다 — 나간 그 이닝이 +0x6b 에 남는다
-      if (progressRef.current !== null) setLiveGameInningIndex(progressRef.current.game.inning - 1)
+      if (progressRef.current !== null) {
+        setLiveGameInningIndex(progressRef.current.game.inning - 1)
+        setLiveGameSides(liveGameSidesOf(progressRef.current, progressRef.current.game))
+      }
       progressRef.current = null
       setProgress(null)
       runner.resetAtBat()

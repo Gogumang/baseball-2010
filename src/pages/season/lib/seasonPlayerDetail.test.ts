@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { resetLiveGameState, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import { seasonCardAbilitiesOf, seasonCardInfoOf, seasonPlayerDetailViewOf } from '@/pages/season/lib/seasonPlayerDetail'
 import type { SeasonPlayerDetailContext } from '@/pages/season/lib/seasonPlayerDetail'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
@@ -17,7 +18,7 @@ const 타자 = (patch: Partial<SeasonPlayerRecordView> = {}): SeasonPlayerRecord
 const 투수 = (patch: Partial<SeasonPlayerRecordView> = {}) => 타자({ name: '시험투수', isPitcher: true, fieldPosition: 0, ...patch })
 
 const 건강 = (patch: Partial<SeasonPlayerDetailContext['record']> = {}, teamMorale = 100): SeasonPlayerDetailContext => ({
-  record: { illness: 0, illnessSlack: 0, coach: -1, ...patch }, teamMorale,
+  record: { illness: 0, illnessSlack: 0, coach: -1, teamId: 0, ...patch }, teamMorale,
 })
 
 describe('표 다섯 줄 (0x872a0)', () => {
@@ -146,5 +147,59 @@ describe('정보 칸 0x7c450 시즌 · 0xd9 갈래 — seasonCardInfoOf', () => 
     }, true)
     const view = seasonPlayerRecordOf(0, player, true, 0)
     expect(seasonCardInfoOf(view, 'T', player.kindByte).values).toEqual(['T', '철완', '오버핸드', '웨이브 볼', '구원', '우완', '황인'])
+  })
+})
+
+describe('스킬 14 투지 갈래 0xb5a16~0xb5a72 (A-11) — 마지막 사람 경기의 전역 상태를 본다', () => {
+  afterEach(() => {
+    resetLiveGameState()
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 0, ourScore: 0, opponentScore: 0, playerSide: 0 })
+  })
+  /** 장착 비트 14 */
+  const 투지투수 = 투수({ skillBits: 1 << 14 })
+
+  it('6회 이후(+0x6b > 4)이고 내 팀이 지는 측이면 제구·구속·변화 += v/10, 체력(칸 3)은 빠진다', () => {
+    setLiveGameInningIndex(5)
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 3, ourScore: 1, opponentScore: 4, playerSide: 1 })
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows.map((row) => row.change)).toEqual([50, 50, 50, 0, 0])
+    expect(seasonCardAbilitiesOf(투지투수, 건강()).map((ability) => ability.shown)).toEqual([550, 550, 550, 500])
+  })
+
+  it('5회(+0x6b = 4) · 이기는 측 · 장착 안 함 · 타자면 없다', () => {
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 3, ourScore: 1, opponentScore: 4, playerSide: 0 })
+    setLiveGameInningIndex(4)
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows[0]?.change).toBe(0)
+    setLiveGameInningIndex(8)
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows[0]?.change).toBe(50)
+    expect(seasonPlayerDetailViewOf(투수(), 건강()).rows[0]?.change).toBe(0)
+    expect(seasonPlayerDetailViewOf(타자({ skillBits: 1 << 14 }), 건강()).rows[0]?.change).toBe(0)
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 3, ourScore: 5, opponentScore: 4, playerSide: 0 })
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows[0]?.change).toBe(0)
+  })
+
+  it('동점이면 측 0(0xb6a4c 가 0) · 두 측 어디에도 없는 팀은 측 1(0xb6be8) 로 본다', () => {
+    setLiveGameInningIndex(8)
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 3, ourScore: 2, opponentScore: 2, playerSide: 0 })
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows[0]?.change).toBe(50)
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 3, ourScore: 2, opponentScore: 2, playerSide: 1 })
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows[0]?.change).toBe(0)
+    // 다른 팀끼리의 경기(측 0 = 5)가 남았고 측 1 이 지면 — 내 팀(0)은 측 1 로 보아 붙는다
+    setLiveGameSides({ ourTeamId: 5, opponentTeamId: 6, ourScore: 3, opponentScore: 1, playerSide: 0 })
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows[0]?.change).toBe(50)
+  })
+
+  it('0xb6814(경기 준비)가 이닝 · 점수를 지우면 없다', () => {
+    setLiveGameInningIndex(8)
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 3, ourScore: 0, opponentScore: 2, playerSide: 0 })
+    resetLiveGameState()
+    expect(seasonPlayerDetailViewOf(투지투수, 건강()).rows[0]?.change).toBe(0)
+  })
+
+  it('팀 정액 뒤 · 코치 앞 — 투수 코치 +값은 10% 에 안 들어간다', () => {
+    setLiveGameInningIndex(8)
+    setLiveGameSides({ ourTeamId: 0, opponentTeamId: 3, ourScore: 0, opponentScore: 2, playerSide: 0 })
+    const 코치 = seasonPlayerDetailViewOf(투지투수, 건강({ coach: 4 })).rows.map((row) => row.change)
+    const 코치없음 = seasonPlayerDetailViewOf(투지투수, 건강()).rows.map((row) => row.change)
+    expect(코치[0]! - 코치없음[0]!).toBe(코치[3]!)
   })
 })

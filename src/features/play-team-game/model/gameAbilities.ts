@@ -192,6 +192,13 @@ export interface GameAbilityInput {
   readonly season?: SeasonTeamCondition
   /** 타자 수비 칸(보직 불일치) 판정 입력. 없으면 벌점 없음 */
   readonly assignment?: FieldingAssignment
+  /**
+   * **스킬 14(투수 비트 14 — 투지) 갈래가 서는가** (0xb5a28~0xb5a72) — 장착 비트 `0xb62b5(선수, 0xe)` 이고 전역 경기 상태가 6회 이후 · 이 팀이
+   * 지는 측(`isLiveGameFightingSpiritSituation`)이면 부르는 쪽이 참을 넘긴다. 투수(0xb6279) · 칸 ≠ 3(체력) 검사는 여기서 한다.
+   * 피로 · 팀 능력치 정액 **뒤**, 코치 **앞**에 `v += v/10`(0 쪽 버림, 0xca7b5). 안 넘기면 없음.
+   * ⚠️ 피로를 따로 먹이는 `gameAbilityPartsOf`(경기 중 투수) 길은 이 값을 안 싣는다 — 경기 안 투지는 아직 옮기지 않았다(A-11 남김).
+   */
+  readonly fightingSpirit?: boolean
 }
 
 /**
@@ -206,7 +213,19 @@ export interface GameAbilityParts {
   readonly bonusAfterFatigue: number
 }
 
+/** `gameAbilityPartsOf` 의 정액을 팀 능력치(0xb592c)와 코치(0xb5a74)로 나눈 것 — 스킬 14(b5a16~b5a72)가 그 사이에 선다 */
+interface GameAbilitySteps {
+  readonly beforeFatigue: number
+  readonly teamBonus: number
+  readonly coachBonus: number
+}
+
 export function gameAbilityPartsOf(input: GameAbilityInput): GameAbilityParts {
+  const steps = gameAbilityStepsOf(input)
+  return { beforeFatigue: steps.beforeFatigue, bonusAfterFatigue: steps.teamBonus + steps.coachBonus }
+}
+
+function gameAbilityStepsOf(input: GameAbilityInput): GameAbilitySteps {
   const { mode, isPitcher, slot } = input
   let value = input.base
   const isSeason = mode === TEAM_GAME_MODE.시즌
@@ -228,21 +247,36 @@ export function gameAbilityPartsOf(input: GameAbilityInput): GameAbilityParts {
   }
 
   // (0xb58e6 체력% 피로 — 이 자리. 부르는 쪽이 체력%를 들고 `pitcherGameStatOf` 로 먹인다)
-  let bonus = 0
+  let teamBonus = 0
 
   // ── 팀 능력치 (모드 1·2·8·9) ──
   const teamAbilities = input.teamAbilities
   if (teamAbilities !== undefined && isTeamAbilityMode(mode)) {
-    bonus += teamAbilityBonusOf(teamAbilities[teamAbilitySlotFor(isPitcher, slot)] ?? 0)
+    teamBonus += teamAbilityBonusOf(teamAbilities[teamAbilitySlotFor(isPitcher, slot)] ?? 0)
   }
+
+  // (0xb5a16~0xb5a72 스킬 14 — 이 자리. `gameAbilityOf` 가 `fightingSpirit` 으로 먹인다)
+  let coachBonus = 0
 
   // ── 코치 보너스 (모드 2). 팀 검사가 없다 (0xb5a74~0xb5b04) — 원본 버그 B-21.
   // 고침(`bugfixes.json` B-21, 기본 켬): 내 팀(시즌 팀 [시즌+1]) 선수에게만 — 질병·사기 갈래(0xb5804)와 같은 팀 검사. 굴림 없음
   if (isSeason && season !== undefined && season.coach >= 0 && (input.isMyTeam || !isBugFixed('B-21'))) {
-    bonus += coachBonusOf(season.coach, isPitcher, slot)
+    coachBonus += coachBonusOf(season.coach, isPitcher, slot)
   }
 
-  return { beforeFatigue: value, bonusAfterFatigue: bonus }
+  return { beforeFatigue: value, teamBonus, coachBonus }
+}
+
+/** 스킬 14 의 칸 — 체력(3)은 빠진다 (b5a48 `cmp r7, #3 ; beq`) */
+const FIGHTING_SPIRIT_EXCLUDED_SLOT = PITCHER_SLOT.체력
+
+/**
+ * 스킬 14 갈래 (0xb5a28~0xb5a72): 투수(0xb6279) ∧ 장착 14(0xb62b5) ∧ 칸 ≠ 3 ∧ 전역 경기 상태 +0x6b > 4 ∧ 0xb6a4d(상태) == 0xb6be9(상태, 팀)
+ * 이면 `v += v / 10` (0xca7b5 — 0 쪽 버림). 장착 · 경기 상태는 `fightingSpirit` 이 든다.
+ */
+export function fightingSpiritValueOf(value: number, input: Pick<GameAbilityInput, 'isPitcher' | 'slot' | 'fightingSpirit'>): number {
+  if (input.fightingSpirit !== true || !input.isPitcher || input.slot === FIGHTING_SPIRIT_EXCLUDED_SLOT) return value
+  return value + Math.trunc(value / 10)
 }
 
 /**
@@ -252,8 +286,8 @@ export function gameAbilityPartsOf(input: GameAbilityInput): GameAbilityParts {
  * 값을 `base` 로 넘긴다. 팀 경기에는 육성 선수가 (영입하지 않는 한) 없어서 지금은 밑값 그대로다.
  */
 export function gameAbilityOf(input: GameAbilityInput): number {
-  const parts = gameAbilityPartsOf(input)
-  const value = parts.beforeFatigue + parts.bonusAfterFatigue
+  const steps = gameAbilityStepsOf(input)
+  const value = fightingSpiritValueOf(steps.beforeFatigue + steps.teamBonus, input) + steps.coachBonus
   if (value < 0) return 0
   return value > ABILITY_LIMIT ? ABILITY_LIMIT : value
 }

@@ -157,7 +157,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { lapPlayClock } from '@/entities/collection/model/playClock'
-import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { liveGameSidesOf, resetLiveGameState, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** 시즌모드 = 원본 모드 2 (0x22c7d 의 획득 GP 칸 3) */
@@ -2427,6 +2427,9 @@ export function useSeasonSession(
       if (latest === null) return null
       // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다(0xb6b6c — 정규·포스트시즌·국가대항전 모두) (`liveGameState`)
       setLiveGameInningIndex(summary.inningsPlayed - 1)
+      // 측별 팀 +0x28(0x6548 의 0xb6bd4) · 점수 +0x7e 도 남는다 — 0xd9 상세의 스킬 14 갈래(0xb5a28~)가 본다
+      const playerSide = summary.playerSide ?? gameOptions?.playerSide
+      if (playerSide !== undefined) setLiveGameSides(liveGameSidesOf(summary, { ...summary, playerSide }))
       // 0x4f3d6 — 같은 진입이 +0x4c+모드(+0x4e)를 0 으로 쓰고 0x1fded · 0x22755 · 0x1f1b9 로 저장한다. 정산과 한 커밋이다
       const savedBefore: SeasonSave = { ...latest, isGameInProgress: false, gameSave: null }
       // 돌발미션 보상·페널티 (0x8e34c 모드 2) — 원본은 판정이 난 경기 중에 SR·팀 사기에 바로 더하므로 평가보다 앞이다.
@@ -3217,6 +3220,7 @@ export function useSeasonSession(
       // 반 이닝 저장(0x4f928)은 이닝 넘김 0xb6b6c 뒤다 — 전역 경기 상태 +0x6b 가 지금 이닝이다. 경기 중 나가기(0x40140)는
       // 이 칸을 안 지우므로 나간 그 이닝이 남는다 (`liveGameState`). 이어하기 첫 진행은 블록에서 되복사한 st 의 이닝이다
       setLiveGameInningIndex(progress.game.inning - 1)
+      setLiveGameSides(liveGameSidesOf(progress.options, progress.game))
       // 0x4f928 의 0x4fa9e `0x4e8b0` — 반 이닝 저장마다 지난 시간을 칸 3(시즌) 플레이 시간에
       recordStat?.({ kind: '플레이시간', mode: SEASON_STAT_MODE, elapsed: lapPlayClock() })
       commit({ ...current, isGameInProgress: true, gameSave: { progress, kind: gameKind, ownRotationShift } })
