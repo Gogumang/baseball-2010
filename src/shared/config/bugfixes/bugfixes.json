@@ -851,7 +851,7 @@
     {
       "id": "B-95",
       "name": "시즌 엔딩 아이리스",
-      "symptom": "정정(r282) — 원본 버그가 아니다: 0x887dc~0x88846 은 k · p 를 사인 0x6c6a9 로 거쳐(r = D·sin(min(16t,110))/100 + D − D·sin(t==0 ? 90 : 110)/100) 원이 t = 0 부터 커지고 t = 6 에 살짝 넘쳤다 돌아온다. 사인을 빠뜨린 것은 웹 seasonEndingLayout 의 옮김 실수다(TODO)",
+      "symptom": "정정(r282 · r288) — 원본 버그가 아니다: 시즌 엔딩 그리기 0x87a1c 의 0x87a44~0x87bae 는 k · p 를 사인 0x6c6a9(리터럴 0x87c48)로 거쳐 r = D − D·sin(t==0 ? 90 : 110)/100 + D·sin(min(8t,110))/100 (D = 240 − 100), 지름 = W − r 로 원을 240 에서 100 으로 줄인다(t = 11·12 에 살짝 넘쳤다 돌아온다). 사인을 빠뜨리고 반지름으로 그린 것은 웹 seasonEndingLayout 의 옮김 실수였다 — A-19(r288)에서 그대로 다시 옮겼다",
       "source": "seasonEndingLayout 식(t=1 이 t=0 보다 작음)",
       "impact": "거의 없음",
       "implemented": false,
