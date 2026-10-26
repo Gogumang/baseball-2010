@@ -23,14 +23,3 @@ export const placeButton = style({
     '&:focus-visible': { filter: 'brightness(1.3)', outline: 'none' },
   },
 })
-
-/** 밤 덮개 — 화면 전체 [0x15605d4] 단계 9 (0x7eba2). 누름은 아래 건물로 지나간다 */
-export const nightCover = style({
-  position: 'absolute',
-  left: 0,
-  top: 0,
-  width: '240px',
-  height: '320px',
-  background: '#000000',
-  pointerEvents: 'none',
-})

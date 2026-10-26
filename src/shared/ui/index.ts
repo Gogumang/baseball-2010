@@ -28,6 +28,7 @@ export {
 export { FrameSprite } from '@/shared/ui/FrameSprite/FrameSprite'
 export { LayeredFrameSprite } from '@/shared/ui/LayeredFrameSprite/LayeredFrameSprite'
 export { SolidStamp } from '@/shared/ui/SolidStamp/SolidStamp'
+export { ComposedScreen } from '@/shared/ui/ComposedScreen/ComposedScreen'
 export { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 export { FOOTER_BACK_PRESS_RECT, PressArea } from '@/shared/ui/PressArea/PressArea'
 export type { PressRect } from '@/shared/ui/PressArea/PressArea'

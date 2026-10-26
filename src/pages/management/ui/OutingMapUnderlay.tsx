@@ -1,11 +1,9 @@
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { FrameSprite } from '@/shared/ui'
-import {
-  EVENT_MARKER_ANIMATION, MAP_FRAME, MAP_FRAMES, NIGHT_WINDOW_FRAME, OUTING_PLACES,
-} from '@/shared/config/outingPlaces'
-import { outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
+import { ComposedScreen, FrameSprite } from '@/shared/ui'
+import { EVENT_MARKER_ANIMATION, MAP_FRAMES } from '@/shared/config/outingPlaces'
+import { mapLabelSrc, outingMapComposeOps, outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 
 export interface OutingMapUnderlayProps {
@@ -46,20 +44,10 @@ export function OutingMapUnderlay({ eventPlaceIds, hour }: OutingMapUnderlayProp
   const markerStep = animationStepAt(animations?.[EVENT_MARKER_ANIMATION] ?? [], update)
   return (
     <div data-testid="외출지도-밑그림" style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320, background: '#000', overflow: 'hidden', pointerEvents: 'none' }}>
-      <FrameSprite folder={MAP_FRAMES} frame={MAP_FRAME} origins={origins} x={layout.mapX} y={layout.mapY} />
-      {OUTING_PLACES.map((place) => (
-        <FrameSprite key={place.id} folder={MAP_FRAMES} frame={place.frame} origins={origins} x={layout.mapX} y={layout.mapY} />
-      ))}
-      {layout.labels.map((label) => (
-        <img key={label.frame} alt="" src={`./sprites/management/map_label_${label.frame}.png`}
-          style={{ position: 'absolute', left: label.left, top: label.top, imageRendering: 'pixelated' }} />
-      ))}
-      {layout.isNight && (
-        <>
-          <div data-testid="외출지도-밤" style={{ position: 'absolute', inset: 0, background: `rgba(0, 0, 0, ${layout.nightDim})` }} />
-          <FrameSprite folder={MAP_FRAMES} frame={NIGHT_WINDOW_FRAME} origins={origins} x={layout.mapX} y={layout.mapY} />
-        </>
-      )}
+      <ComposedScreen testId="외출지도-합성" ops={outingMapComposeOps({
+        origins, mapX: layout.mapX, mapY: layout.mapY, selected: -1, isNight: layout.isNight,
+        labelOf: (index) => [{ kind: 'image', src: mapLabelSrc(layout.labels[index].frame), x: layout.labels[index].left, y: layout.labels[index].top }],
+      })} />
       {markerStep !== null && layout.markers
         .filter((marker) => eventPlaceIds.has(marker.placeId))
         .map((marker) => (
