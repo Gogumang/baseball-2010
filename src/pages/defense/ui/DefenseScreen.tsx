@@ -96,6 +96,20 @@ interface DefenseScreenProps {
   readonly drawRedraws?: number
   /** 화면 위에 얹을 것 — 조작 버튼·점수판 같은 것 */
   readonly children?: ReactNode
+  /**
+   * 부르는 쪽이 정한 이 그림의 **필드 카메라**(+0x1e8 현재 자리). 주면 화면이 따라가기를 굴리지 않고 이 자리로 그린다 — 홈런더비 판처럼
+   * 카메라를 미리 셈해 두는 화면(이벤트 존 조건이 카메라 오프셋을 본다, `pages/home-run-derby/lib/derbyField`)
+   */
+  readonly camera?: CameraState
+  /**
+   * 바탕(0x41230 → 0x411e0 의 구장 0x78931) 바로 위 · 공 그림자 아래에 깔 것 — 같은 0x411e0 이 구장 다음에 부르는 0x41098(이벤트 존 ·
+   * 200G)의 자리다. 줌 층 안이다
+   */
+  readonly overBackground?: ReactNode
+  /** 작은 지도 0x395f4 를 안 그린다 — 0x46844 가 판 종류([[+0x200]+0x118]) 8(홈런더비 판)이면 건너뛴다 */
+  readonly hidesFieldMap?: boolean
+  /** `RawScreen` 을 따로 세우지 않는다 — 이미 원본 화면 판(`RawScreen`) 안에 겹쳐 놓을 때 */
+  readonly isEmbedded?: boolean
 }
 
 /**
@@ -206,6 +220,10 @@ export function DefenseScreen({
   cameraOffsetRef,
   drawRedraws = 0,
   children,
+  camera: fixedCamera,
+  overBackground,
+  hidesFieldMap = false,
+  isEmbedded = false,
 }: DefenseScreenProps) {
   // 카메라 0x3f060 은 경기 장면 갱신이다 — 공용 창이 서 있으면 52cc6 이 건너뛰어 카메라도 선다(`useGameSceneUpdateCounter`)
   const update = useGameSceneUpdateCounter(isRunning)
@@ -237,7 +255,7 @@ export function DefenseScreen({
     for (let i = 0; i < ticks; i += 1) moved = stepCamera(bounds, moved, target, followPercent)
     cameraRef.current = { update, state: moved }
   }
-  const camera = cameraRef.current.state
+  const camera = fixedCamera ?? cameraRef.current.state
   const offset = screenOffsetOf(camera)
   if (cameraOffsetRef !== undefined) cameraOffsetRef.current = offset
 
@@ -344,8 +362,8 @@ export function DefenseScreen({
       : []),
   ].sort((a, b) => a.key - b.key)
 
-  return (
-    <RawScreen>
+  const field = (
+    <>
       <div className={styles.field} data-testid="defense-field">
         <div className={styles.zoomLayer} style={zoomStyle} data-testid="defense-zoom" data-zoom={zoom?.percent ?? 100}>
         <img
@@ -367,6 +385,9 @@ export function DefenseScreen({
           alt=""
           data-testid="defense-background-right"
         />
+
+        {/* 0x411e0 의 구장 다음 0x41098 — 이벤트 존 · 200G (홈런더비 판). 공 그림자(0x46c88 의 0x36dfc)보다 먼저다 */}
+        {overBackground}
 
         {/*
           공 그림자 0x356f8 — 0x36dfc(37268)가 땅점 (x, z) 자리에 검정 (s+1)² 칸 + 회색 테두리 넷을 **곧바로** 칠한다
@@ -447,7 +468,7 @@ export function DefenseScreen({
         )}
 
         {/* 작은 지도 0x395f4(장면, 0x1e, 0x1e) — 0x46c88 의 0x46e02, 결과 판(0x46844) 뒤 · 번쩍임(0x4403c~) 앞 */}
-        <DefenseFieldMap runners={state.runners} />
+        {!hidesFieldMap && <DefenseFieldMap runners={state.runners} />}
 
         {/* 필살 포구 연출 B 0x441c4 · C 0x44398(그리기 46e0e · 46e14 — 결과 판 뒤) — 공 가진 야수 자리에서 B 는 y − 50, C 는 방향대로 ±10 */}
         {state.flash != null && (
@@ -465,8 +486,9 @@ export function DefenseScreen({
         </div>
       </div>
       {children}
-    </RawScreen>
+    </>
   )
+  return isEmbedded ? field : <RawScreen>{field}</RawScreen>
 }
 
 function Fielder({

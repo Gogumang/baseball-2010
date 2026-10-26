@@ -10,7 +10,7 @@ import { DERBY_DISTANCE_LIMIT, derbyDistanceOf } from '@/entities/home-run-derby
 import { battedBallTrajectory, isBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { isBigFlyPattern, isEventZoneHit, isEventZoneTranslucentAt } from '@/entities/home-run-derby/model/eventZone'
+import { isBigFlyPattern, isEventZoneTranslucentAt } from '@/entities/home-run-derby/model/eventZone'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 
@@ -89,18 +89,10 @@ describe('홈런더비 판(종류 8) 하나 — 슬롯 2 모드 7 갈래 0x526ca
 })
 
 describe('이벤트 존 — 플레이 +0x127 = 패턴 플래그 & 2 (0xb07c8)', () => {
-  it('플래그 비트1 이 선 패턴만 존을 얻는다 — 높이와 상관없다', () => {
-    expect(isEventZoneHit({ pattern: [118, 961, 1367, 2] })).toBe(true)
-    expect(isEventZoneHit({ pattern: [90, 815, 1592, 0] })).toBe(false)
-    expect(isEventZoneHit({ pattern: [10, 900, 600, 3] })).toBe(true)
-  })
-
-  it('맞은 공이 아니면 안 뜬다', () => {
-    expect(isEventZoneHit({ pattern: null })).toBe(false)
-  })
-
-  it('한 공에 한 번만 놓인다', () => {
-    expect(isEventZoneHit({ pattern: [118, 961, 1367, 2], isZonePlaced: true })).toBe(false)
+  it('플래그 비트1 이 선 패턴만 플레이 +0x127 을 세운다 — 높이와 상관없다 (존의 화면 · 결과 코드 조건은 `derbyField`)', () => {
+    expect(isBigFlyPattern([118, 961, 1367, 2])).toBe(true)
+    expect(isBigFlyPattern([90, 815, 1592, 0])).toBe(false)
+    expect(isBigFlyPattern([10, 900, 600, 3])).toBe(true)
   })
 
   it('비트1 이 선 패턴은 원본 표에서 결과 18~20 에 몰려 있다 (P7 H1)', () => {

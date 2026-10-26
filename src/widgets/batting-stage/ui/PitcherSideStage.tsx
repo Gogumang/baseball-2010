@@ -21,7 +21,9 @@ import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import type { PitcherHitClock, PitcherHitScene } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { hitByPitchMarkDrawCallOf, hitFlameAnimationOf } from '@/widgets/batting-stage/lib/batterOverlayMarks'
 import { canSkipHitPause } from '@/widgets/batting-stage/lib/hitPause'
-import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
+import { BIG_HIT_PARTICLE, HIT_GROUND_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
+import { hitBallPointAt, hitBallTickOf } from '@/widgets/batting-stage/lib/hitBallPath'
+import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
@@ -259,6 +261,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let hitSparkShot = false
     let hitStopShot = false
     let hitEndNotified = false
+    /** 0x13 땅 파티클(3b472)을 마지막으로 셈한 0x13 틱 — 공마다 처음부터 */
+    let hitGroundEmittedTick: number | null = null
     /** '넘기기' 상황 버튼을 알린 상태 — 바뀔 때만 React 에 알린다 */
     let hitSkipOffered = false
     /** 판정 틀에 고른 0x49aec 그림 갈래(필살 스윙)와 타격점 — 맞은 틀 · 0x13 그림마다 그린다. 없으면 null */
@@ -353,6 +357,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         hitSparkShot = false
         hitStopShot = false
         hitEndNotified = false
+        hitGroundEmittedTick = null
         hitSpecialEffect = null
         magicEmittedTick = null
         strikeoutShot = false
@@ -428,6 +433,22 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           hitStopShot = true
           const contact = platePixelOf(pitch)
           emitParticles(sceneParticleScene(), particleConfigOf(BIG_HIT_PARTICLE.id), contact.x, contact.y, BIG_HIT_PARTICLE.img)
+        }
+        // 0x13 공 그리기 0x3b2f4 3b472 — 지금 경로 점(0x33e34 가 채운 `hitPath`)의 높이가 0 인 그림마다 공 자리에 0xbbc85(…, 0, 8)
+        // (타자편 `useStageAnimation` 의 `emitHitGroundParticleAt` 과 같다). 016 은 공 틱 0(타격점, 높이 > 0)의 그림이라 겹치지 않는다
+        const hitPath = hitBase.hitPath ?? null
+        if (hitPath !== null) {
+          const side = current.batterSide ?? batterSideOfForm(current.batterForm)
+          for (let tick = (hitGroundEmittedTick ?? -1) + 1; tick <= Math.min(hitTickRaw, endTick); tick += 1) {
+            const ballTick = hitBallTickOf(
+              tick, hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < tick)) : null,
+            )
+            const point = hitBallPointAt(hitPath, ballTick)
+            if (point === null || point.y !== 0) continue
+            const at = projectToScreen(point, side)
+            emitParticles(sceneParticleScene(), particleConfigOf(HIT_GROUND_PARTICLE.id), at.x, at.y, HIT_GROUND_PARTICLE.img)
+          }
+          hitGroundEmittedTick = Math.max(hitGroundEmittedTick ?? -1, Math.min(hitTickRaw, endTick))
         }
         // 0x13 틱 endTick 의 갱신 0x406e8 이 0x17 을 예약 — 다음 틀(0x17 틱 0)에 부르는 화면이 수비 판으로 넘긴다
         if (hitTickRaw > endTick && !hitEndNotified) {
@@ -617,6 +638,18 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
             ? bigHitScreenOf(
                 hitBase.watchesBigHit, stage.phase.tick, current.batterSide ?? batterSideOfForm(current.batterForm), contactPoint, hitFrozenDraws,
               )
+            : null,
+        // 0x13 의 타구 공 — 0x33e34 가 채운 경로를 공 틱 [+0x1098] 로 (`hitBallPath` — 타자편과 같다)
+        hitBall:
+          isHitState && hitBase !== null && (hitBase.hitPath ?? null) !== null
+            ? {
+                path: hitBase.hitPath!,
+                ballTick: hitBallTickOf(
+                  stage.phase.tick,
+                  hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < stage.phase.tick)) : null,
+                ),
+                showsTrail: hitBase.showsHitTrail === true,
+              }
             : null,
         // 필살 스윙 연출 그림 0x49aec — 판정 틀 J(0x11)에 첫 부름, 이어 0x13 틱 d 의 그림이 d + 2 번째 부름 (`specialSwingEffect`)
         // 보통 타격 불꽃 0x49e64 49faa~4a0a2 — 필살 그림 갈래가 아니고 큰 타구가 아닌 맞은 공. 필살 그림과 같은 부름 차례 (`batterOverlayMarks`)

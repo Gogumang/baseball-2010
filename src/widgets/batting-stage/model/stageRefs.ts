@@ -21,6 +21,8 @@ import { RESULT_PHASE_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
+import type { HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
+import type { StageParticleShot } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { createSceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { createShownSceneTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
@@ -104,6 +106,12 @@ export interface PendingHit {
    * 보통 타격 불꽃(0x49e64 49faa~4a0a2) — game_effect 애니 2 · 3 을 타격점에 (`batterOverlayMarks`). 필살 그림 갈래 · 큰 타구면 null
    */
   readonly hitFlame?: { readonly animation: number; readonly x: number; readonly y: number } | null
+  /**
+   * 0x13 의 타구 공 경로 — 0x13 진입이 0x33e34 로 [경기+0xf2c] 공의 점을 옮겨 채운 +0x1140 (`hitBallPath`). 패턴을 모르면 null
+   */
+  readonly hitPath?: HitBallPath | null
+  /** 0x13 꼬리선 0x3b188 을 긋는가 — 0x35988(강한 타구) || 0x357e0(결과 코드 24~26) (3b440~3b45c) */
+  readonly showsHitTrail?: boolean
 }
 
 /** 매 프레임 최신 값을 읽어야 하는 props 묶음. */
@@ -189,6 +197,10 @@ export interface StageLatest {
   readonly homeRunText?: HomeRunTextWindow | null
   /** 효과를 치운 시각 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly effectsClearedAt?: number | null
+  /** 홈런더비 판(0x17)의 필드 화면이 밑에 깔렸다 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly isFieldPlay?: boolean
+  /** 필드 화면 그리기(0x46c88)가 그 장면 틱에 쏘는 파티클 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly fieldPlayShotsAt?: (sceneTick: number) => readonly StageParticleShot[]
   /** 경기 정산 효과 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly settlement?: SettlementEffectSource
   /** 결과 창 뒤 배경의 틱별 +0x17e2 — `BattingStage` 의 같은 이름 props 주석 참고 */

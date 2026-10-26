@@ -257,7 +257,7 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.isAwaitingConfirm).toBe(true)
   })
 
-  it('이벤트 존은 친 공의 패턴 플래그 & 2 로만 정해진다 (플레이 +0x127, 0xb07c8)', () => {
+  it('이벤트 존은 판의 필드 화면이 정한다 — 결과 24~26 · 패턴 플래그 & 2 · 공이 화면 위쪽에 낮게 든 그림 (0x36dfc 3726c, U-93)', () => {
     const rendered = 띄우기()
     const 존홈런: PitchOutcomeDetail = { ...홈런, pattern: [118, 961, 1367, 2] }
     act(() => rendered.result.current.onPitchResolved(존홈런))
@@ -270,6 +270,12 @@ describe('홈런더비 한 판', () => {
     expect(rendered.result.current.run.bonusGamePoint).toBe(200)
     // 플래그 0 패턴(같은 홈런)은 존이 없다
     act(() => rendered.result.current.onPitchResolved(홈런))
+    expect(rendered.result.current.isEventZoneShown).toBe(false)
+    act(() => {
+      vi.advanceTimersByTime(resultHoldMillisecondsOf(홈런) + 1)
+    })
+    // 같은 플래그 패턴이라도 결과 코드가 18(24~26 밖 — 0x357e0)이면 존이 없다
+    act(() => rendered.result.current.onPitchResolved({ ...존홈런, resultCode: 18 }))
     expect(rendered.result.current.isEventZoneShown).toBe(false)
   })
 

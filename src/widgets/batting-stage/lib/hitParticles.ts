@@ -27,6 +27,9 @@ export const HIT_PARTICLE_IMAGE = 10
 /** 큰 타구 멈춤 셈 [+0x10a8] 이 풀리는 0x13 그림(틱 7)이 쏘는 파티클 — id 15 → `016.ptc`, 프레임 10 (0x4cd14, `hitPause.HIT_STOP_TICKS`) */
 export const BIG_HIT_PARTICLE = { id: 15, img: HIT_PARTICLE_IMAGE } as const
 
+/** 0x13 타구 공이 땅 높이(경로 점 y == 0)에 있는 그림마다 쏘는 파티클 — 0x3b2f4 3b48e `movs r3, #8` · r2 = 높이 0 → id 0 (`001.ptc`), 프레임 8 */
+export const HIT_GROUND_PARTICLE = { id: 0, img: 8 } as const
+
 /** id 5 → `006.ptc` (홈런성·강한 타구) */
 export const STRONG_HIT_PARTICLE_ID = 5
 /** id 6 → `007.ptc` (보통 타구) */
@@ -46,6 +49,11 @@ export interface HitParticleInput {
   readonly height: number
   /** 감상 플래그 `+0x199a` (0x392ac). 켜졌으면 타격 순간엔 안 쏜다 */
   readonly isBigHit: boolean
+}
+
+/** 0x357e0 — 결과 코드 [+0xfd4] 가 홈런성(24~26)인가 */
+export function isHomeRunHitResult(resultCode: number | null): boolean {
+  return resultCode !== null && BIG_HIT_CODES.has(resultCode)
 }
 
 /** 웹 패턴에서 원본 `+0xfcc` 를 만든다 — 원본은 각을 음수로 뒤집어 넣는다 */

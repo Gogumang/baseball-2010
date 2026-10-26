@@ -5,12 +5,12 @@ import { SCENE_STATE } from '@/shared/lib/commonWindow/sceneStateEntries'
 import type { SceneStateEntry } from '@/shared/lib/commonWindow/sceneStateEntries'
 import type { BattedContact } from '@/entities/batting/model/battedContact'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
-import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
-import { earlyHitPauseTickOf, hitPauseTicksOf, isBigHit } from '@/widgets/batting-stage/lib/hitPause'
+import { earlyHitPauseTickOf, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit } from '@/widgets/batting-stage/lib/hitPause'
+import { hitBallPathOf, type HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
 import { bigHitEndTickOf, bigHitReleaseTickOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import type { HitPauseInput } from '@/widgets/batting-stage/lib/hitPause'
-import { HIT_PARTICLE_IMAGE, hitParticleIdOf, hitParticleInputOf, specialSwingParticlesOf } from '@/widgets/batting-stage/lib/hitParticles'
+import { HIT_PARTICLE_IMAGE, hitParticleIdOf, hitParticleInputOf, isHomeRunHitResult, isStrongHit, specialSwingParticlesOf } from '@/widgets/batting-stage/lib/hitParticles'
 import { specialSwingStageEffectOf } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 
@@ -276,6 +276,10 @@ export interface PitcherHitScene extends PitcherHitClock {
    * S+8 = 종류를 선다. 스윙 그리기 49faa 는 S+8 ≠ 0 이면 보통 불꽃 · ptc 를 건너뛴다(직접 뜸, r215). 없으면 거짓
    */
   readonly isBuntStance?: boolean
+  /** 0x13 의 타구 공 경로 — 0x33e34 가 [경기+0xf2c] 공으로 다시 채운 +0x1140 (`hitBallPath`, 타자편 `BattingStage` 와 같다) */
+  readonly hitPath?: HitBallPath | null
+  /** 0x13 꼬리선 0x3b188 — 0x35988(강한 타구, 번트 자세 아님) || 0x357e0(결과 24~26) */
+  readonly showsHitTrail?: boolean
 }
 
 /**
@@ -306,6 +310,8 @@ export function pitcherHitSceneOf(
 ): PitcherHitScene {
   const { pattern, resultCode } = contact
   const trajectory = battedBallTrajectory(pattern)
+  const hitSide = contact.batterHand ?? batterHand
+  const earlyPassTrajectory = hitBallTrajectoryOf(pattern, hitSide)
   const pauseInput: HitPauseInput = {
     resultCode,
     angle: pattern[0],
@@ -313,7 +319,7 @@ export function pitcherHitSceneOf(
     poleTick: trajectory.poleTick,
     carryScale: trajectory.carryScale,
     // 이른 넘김은 [경기+0xf2c] 공 — 판 공과 수평각이 d 다른 공 (0x5174c, `hitPause.pauseInputOf` 와 같다)
-    earlyTick: earlyHitPauseTickOf(resultCode, battedBallTrajectory(earlyPassPatternOf(pattern, contact.batterHand ?? batterHand))),
+    earlyTick: earlyHitPauseTickOf(resultCode, earlyPassTrajectory),
   }
   const watchesBigHit = isBigHit(pauseInput)
   const isBunt = cpuSwing !== null && cpuSwing.buntKind !== 0
@@ -327,6 +333,10 @@ export function pitcherHitSceneOf(
     resultCode,
     specialSwing: contact.specialSwing ?? null,
     isBuntStance: isBunt,
+    // 0x13 진입 0x33e34 — 같은 [경기+0xf2c] 공의 점으로 타석 공 경로를 다시 채운다 (+0x17e1 = 친 타자의 손)
+    hitPath: hitBallPathOf(earlyPassTrajectory, hitSide),
+    showsHitTrail:
+      isHomeRunHitResult(resultCode) || (!isBunt && isStrongHit(hitParticleInputOf(pattern, resultCode, watchesBigHit))),
   }
 }
 

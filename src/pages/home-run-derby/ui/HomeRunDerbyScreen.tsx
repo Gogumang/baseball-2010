@@ -20,6 +20,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
 import { derbyDisplayDistanceAt } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { DerbyHud } from '@/pages/home-run-derby/ui/DerbyHud'
+import { DerbyFieldPlay } from '@/pages/home-run-derby/ui/DerbyFieldPlay'
+import { derbyFieldShotsAt } from '@/pages/home-run-derby/lib/derbyField'
 import { DerbyResultWindow } from '@/pages/home-run-derby/ui/DerbyResultWindow'
 import { derbyMasterBatterOf } from '@/entities/home-run-derby/model/derbyLineup'
 import { MatchupCards } from '@/widgets/matchup-cards/ui/MatchupCards'
@@ -312,10 +314,33 @@ export function HomeRunDerbyScreen({
         }
   // 판(0x17) 그리기 0x46c88 은 0x4c4bc(타석 화면 · HUD 0x45a54)를 안 부른다 — 판 동안은 HUD 가 없다
   const isPlayShown = session.distanceBoard !== null
+  const board = session.distanceBoard
+  // 판 틱 — 0x17 진입 그림이 0 (판 시각은 그 틱의 머리)
+  const playTick = board === null ? 0 : gameSceneTickNow() - gameSceneTickOf(board.startedAt)
+  /** 필드 화면의 공 그리기 0x36dfc 가 장면 틱 그림에 쏘는 파티클 — 타석 캔버스 루프가 그 틱 프레임에 쏜다(`BattingStage.fieldPlayShotsAt`) */
+  const fieldPlayShotsAt = (sceneTick: number) =>
+    board === null ? [] : derbyFieldShotsAt(board.field.input, board.field.timeline, sceneTick - gameSceneTickOf(board.startedAt))
 
   return (
     <>
       <RawScreen>
+        {/*
+          판(0x17)의 필드 화면(A-01) — 틀 그리기 0x41230(구장 · 이벤트 존) → 0x46c88(비거리 판 · 야수 · 공). 타석 캔버스는 이 위에서
+          비우고 HOMERUN 글자 · 파티클만 그린다(`isFieldPlay`)
+        */}
+        {board !== null && session.result === null && (
+          <DerbyFieldPlay
+            field={board.field}
+            tick={playTick}
+            look={{
+              defenseTeamIndex: session.opponentTeamId ?? null,
+              // 칸 0 은 0xae83d(지금 투수) 가 마투수(0xb633d)면 투수 마선수 그림 — 단계 ≥ 1 의 난입 마투수
+              acePitcherOrder: ace === null ? null : acePitcherFramesOf(ace).order,
+            }}
+            distanceValue={derbyDisplayDistanceAt(board.batted, playTick, board.previous)}
+            rewardX={session.eventZoneRewardX}
+          />
+        )}
         {/* 타석 캔버스 — RawScreen 판 (0, 0) 에 맞춘다(`stageScreen.css`) */}
         <div className={stageScreen.canvasSlot}>
           <BattingStage
@@ -365,6 +390,9 @@ export function HomeRunDerbyScreen({
             homeRunText={session.homeRunText}
             // 키 건너뛰기 0x519cc · 판 끝 0x35108 이 파티클을 치운다 — 홈런 효과 굴림은 타석 화면이 글자 창대로 돈다
             effectsClearedAt={session.effectsClearedAt}
+            // 판(0x17) 동안은 밑의 필드 화면이 비치게 캔버스를 비운다 — 0x46c88 은 타석 그림 0x4c4bc 를 안 부른다
+            isFieldPlay={isPlayShown && session.result === null}
+            fieldPlayShotsAt={fieldPlayShotsAt}
             random={random}
             onPitchResolved={(detail) => session.onPitchResolved(detail)}
           />
@@ -386,19 +414,8 @@ export function HomeRunDerbyScreen({
               isPlayShown={isPlayShown}
               run={run}
               bestDistance={bestDistance}
-              isEventZoneShown={session.isEventZoneShown}
-              eventZoneRewardX={session.eventZoneRewardX}
               tick={tick}
               shownCombo={session.shownCombo}
-              distanceBoardValue={
-                session.distanceBoard === null
-                  ? null
-                  : derbyDisplayDistanceAt(
-                      session.distanceBoard.batted,
-                      gameSceneTickNow() - gameSceneTickOf(session.distanceBoard.startedAt),
-                      session.distanceBoard.previous,
-                    )
-              }
               // 0x4585c 가 0xb63c1(지금 타자)로 콤보 표시 쪽을 가른다 — 타석 그림과 같은 폼(안 넘기면 0 = 우타)
               batterSide={batterSideOfForm(stageBatter.form ?? 0)}
             />

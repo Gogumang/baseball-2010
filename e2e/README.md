@@ -73,8 +73,11 @@ E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 yarn node e2e/swing-timing.mjs webkit   # �
 ```
 
 홈런더비 단계 상승 · 난입 마투수는 `e2e/derby-stage.mjs` 로 실제로 쳐서 닿는다(r261). `derby-start` 에서 공마다 판정 오차(`probe.plateError`)에
-맞춰 좌우 이동하고 최적 틱에 친다. 씨앗 10 · `nari-ending` 선수(파워 380)면 9구째 누적 803M 로 단계 1(마투수 레오니) → 14구 982M 결과 창까지
-chromium 데스크톱 · webkit 아이폰 같은 판이다(약 90초). `nari-y1`(파워 100)은 열 구에 500M 안팎이라 닿지 않는다.
+맞춰 좌우 이동하고 최적 틱에 친다. 씨앗 10 · `nari-ending` 선수(파워 380)면 9구째 누적 826M 로 단계 1(마투수 레오니) → 14구 1112M · 보너스 게임 →
+결과 창까지 chromium 데스크톱 · webkit 아이폰 같은 판이다(약 90초). `nari-y1`(파워 100)은 열 구에 500M 안팎이라 닿지 않는다.
+(r274 — 판(0x17)의 필드 화면이 공 그리기 0x36dfc 의 큰 타구 · 튐 파티클을, 0x13 이 땅 파티클을 원본 차례로 쏘아 관리자 틱의 난수 굴림이 늘었다.
+그 앞(r261~r271)은 9구 803M → 14구 982M 였다.) 맞은 공 셋(`E2E_DERBY_HIT_SHOTS`, 기본 3)은 0x13(타구 공 · 그림자 · 꼬리선)과 필드 화면을
+`hit<n>-13` · `hit<n>-field` · `hit<n>-field2` 로 찍고, 이벤트 존이 선 판은 `pitch<n>-zone` 으로 찍는다.
 
 ```sh
 E2E_PORT=5710 E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=10 yarn node e2e/derby-stage.mjs   # 그림: e2e/.run/derby-<브라우저>-stage1.png · result.png

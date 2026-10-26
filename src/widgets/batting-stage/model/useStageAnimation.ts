@@ -13,7 +13,8 @@ import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import type { PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
-import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
+import { ZONE_CENTERS, projectToScreen } from '@/entities/pitching/model/pitchCurve'
+import { hitBallPointAt, hitBallTickOf } from '@/widgets/batting-stage/lib/hitBallPath'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -26,7 +27,7 @@ import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { batterFrameNow, pitchSituationOf } from '@/widgets/batting-stage/lib/stageText'
 import { ballFrameOf, ballFrameStartTick } from '@/widgets/batting-stage/model/stageRefs'
 import { clearParticles, emitParticles } from '@/entities/particle/model/particleScene'
-import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
+import { BIG_HIT_PARTICLE, HIT_GROUND_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
 import { bigHitEndTickOf, bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import { strikeoutJudgeParticlesOf } from '@/widgets/batting-stage/lib/judgeParticles'
@@ -282,6 +283,32 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       if (!pending.watchesBigHit || held < bigHitReleaseTickOf(frozenDraws) || hitStopReleased === pending) return
       hitStopReleased = pending
       emitHitStopParticle(pending)
+    }
+    /**
+     * 0x13 공 그리기 0x3b2f4 의 3b472~3b492 — 상태 0x13 이고 지금 경로 점(0x35820, `hitBallPath`)의 높이가 0 이면 공 화면 점 [sp+0x4c]
+     * 에 0xbbc85(x, y, 0, 8) — 튐 파티클(001.ptc · ptcimg 8)과 같은 것이다. 장면 틱 `tick` 의 그림 몫(그 틀 끝 관리자 틱 앞).
+     * 같은 그림 꼬리 4cd14 의 016(`drawHitStop`)과 한 그림에 겹치지 않는다 — 016 은 공 틱 0(타격점, 높이 > 0)의 그림이다
+     */
+    const emitHitGroundParticleAt = (tick: number) => {
+      const hit = hitInStage
+      if (hit === null || tick < hit.startTick || (hit.endTick !== null && tick >= hit.endTick)) return
+      const path = hit.pending.hitPath ?? null
+      if (path === null) return
+      const held = tick - hit.startTick
+      const ballTick = hitBallTickOf(held, hit.pending.watchesBigHit ? bigHitReleaseTickOf(hit.frozenDraws.filter((at) => at < held)) : null)
+      const point = hitBallPointAt(path, ballTick)
+      if (point === null || point.y !== 0) return
+      const side = latestRef.current.batterHand ?? batterSideOfForm(latestRef.current.batterForm)
+      const at = projectToScreen(point, side)
+      emitParticles(particlesRef.current, particleConfigOf(HIT_GROUND_PARTICLE.id), at.x, at.y, HIT_GROUND_PARTICLE.img)
+    }
+    /** 0x13 그림의 타구 공 — 공 틱은 큰 타구면 막음이 풀린 그림(`bigHitReleaseTickOf`, 그 앞 창 첫 그림까지 센다)부터 오른다 */
+    const hitBallNow = (hit: NonNullable<typeof hitInStage>, sceneTick: number): StageScene['hitBall'] => {
+      const path = hit.pending.hitPath ?? null
+      if (path === null) return null
+      const stateTick = sceneTick - hit.startTick
+      const releaseTick = hit.pending.watchesBigHit ? bigHitReleaseTickOf(hit.frozenDraws.filter((at) => at < stateTick)) : null
+      return { path, ballTick: hitBallTickOf(stateTick, releaseTick), showsTrail: hit.pending.showsHitTrail === true }
     }
     const emitHitStopParticle = (pending: PendingHit) => {
       if (pending.bigHitAt === null) return
@@ -829,6 +856,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         }
         // 이 틱의 0x11 그림이 쏘는 마구 공 파티클 — 그 틀 끝 관리자 틱(아래 `stepStageFrame` 의 0x6de84) 앞
         emitMagicBallParticlesAt(steppedTick)
+        // 이 틱의 0x13 그림이 땅에 닿은 타구 공 자리에 쏘는 파티클(3b472)
+        emitHitGroundParticleAt(steppedTick)
         // 0x12 틱 0 의 그림 — 판정 글자 0x393b4 가 삼진이면 양끝 파티클을 쏜다(`strikeoutJudgeParticlesOf`). 맞은 공(0x13 · 0x17)은 0x12 가 아니다
         if (phaseRef.current === '결과' && steppedTick === phaseStartTickRef.current && !isInPlayResultRef.current) {
           for (const shot of strikeoutJudgeParticlesOf(resultTextRef.current, side)) {
@@ -840,6 +869,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           millisecondsPerTick: tickLength,
           window: latestRef.current.homeRunText ?? null,
           effectsClearedAt: latestRef.current.effectsClearedAt ?? null,
+          // 홈런더비 판(0x17)의 필드 공 그리기 0x36dfc 파티클 — 필드 층이 그 틱 그림 몫을 낸다
+          drawShots: latestRef.current.fieldPlayShotsAt?.(steppedTick) ?? [],
           particles: particlesRef.current,
           random: latestRef.current.random,
           configOf: particleConfigOf,
@@ -918,6 +949,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           hitNow === null || isBackdrop
             ? null
             : bigHitScreenOf(hitNow.pending.watchesBigHit, sceneTick - hitNow.startTick, side, hitNow.pending.bigHitAt, hitNow.frozenDraws),
+        // 0x13 의 타구 공 — 0x33e34 가 채운 경로를 공 틱 [+0x1098] 로 (`hitBallPath`). 큰 타구는 막음이 풀린 그림부터 공 틱이 오른다
+        hitBall: hitNow === null || isBackdrop || (hitNow.pending.hitPath ?? null) === null ? null : hitBallNow(hitNow, sceneTick),
+        isFieldPlay: latestRef.current.isFieldPlay === true,
         bodyType,
         ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),
         batterSkinIndex: latestRef.current.batterSkinIndex,
