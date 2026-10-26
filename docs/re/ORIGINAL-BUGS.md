@@ -9,9 +9,9 @@
 - 영향: **큼** = 승패·돈·보상이 크게 바뀌거나 공짜로 얻는 길이 생김 · **중** = 자주 겪거나 진행·기록이 눈에 띄게 달라짐 · **작음** = 드물거나 글·기록만 조금 틀림 · **거의 없음** = 그림 몇 px·안 드러나는 길.
 - 사용자 결정으로 이미 고친 것, 웹이 원본과 다를 수밖에 없는 것은 아래 2절에 따로 적었다. 예전에 "원본 버그"로 적었다가 버그가 아니었던 것은 3절에 있다.
 
-개수: 큼 7 · 중 27 · 작음 49 · 거의 없음 17 = **100건** (그 밖에 고침·웹 다름 5건, 정정 11건 — B-12 는 r272 에 정정으로 옮겼고 id 는 남겨 둔다)
+개수: 큼 7 · 중 27 · 작음 49 · 거의 없음 17 = **100건** (그 밖에 고침·웹 다름 5건, 정정 16건 — B-12 는 r272 에, B-48 · B-49 · B-50 · B-51 · B-58 은 r277 에 정정으로 옮겼고 id 는 남겨 둔다)
 
-**고치기(사용자 결정 2026-10-26)**: 웹 `src/shared/config/bugfixes/bugfixes.json` 이 100건을 모두 들고 `isBugFixed('B-xx')` 로 갈래를 고른다(기본 `fixAll: true` · 항목 `fixed` 로 덮음 · 고친 길이 없는 항목은 `implemented: false` 라 원본대로). 시험은 원본(모두 끔)으로 돈다. 고친 항목은 증상 칸 끝에 **고침(bugfixes.json, 기본 켬)** 으로 적는다 — r270: B-01 · B-02 · B-08 · B-09 · B-10 · B-14 · B-15 · r273(시즌): B-04 · B-06 · B-07 · B-16 · B-18 · B-19 · B-20 · B-21 · B-22 · B-23 · B-29 · B-34 · r275(나리 · 그 밖): B-03 · B-05 · B-17 · B-24 · B-25 · B-26 · B-27 · B-28 · B-30 · B-31 · B-32(고친 길만 — 웹에 공 화면 자리가 없어 아직 원본대로) · B-33.
+**고치기(사용자 결정 2026-10-26)**: 웹 `src/shared/config/bugfixes/bugfixes.json` 이 100건을 모두 들고 `isBugFixed('B-xx')` 로 갈래를 고른다(기본 `fixAll: true` · 항목 `fixed` 로 덮음 · 고친 길이 없는 항목은 `implemented: false` 라 원본대로). 시험은 원본(모두 끔)으로 돈다. 고친 항목은 증상 칸 끝에 **고침(bugfixes.json, 기본 켬)** 으로 적는다 — r270: B-01 · B-02 · B-08 · B-09 · B-10 · B-14 · B-15 · r273(시즌): B-04 · B-06 · B-07 · B-16 · B-18 · B-19 · B-20 · B-21 · B-22 · B-23 · B-29 · B-34 · r275(나리 · 그 밖): B-03 · B-05 · B-17 · B-24 · B-25 · B-26 · B-27 · B-28 · B-30 · B-31 · B-32(고친 길만 — 웹에 공 화면 자리가 없어 아직 원본대로) · B-33 · r277(작음 1): B-35 · B-36 · B-37 · B-38 · B-39 · B-40 · B-41 · B-42 · B-43 · B-44 · B-45 · B-46 · B-47 · B-52 · B-53 · B-54 · B-55 · B-56 · B-57 · B-59.
 
 ## 1. 남아 있는 원본 버그
 
@@ -51,31 +51,31 @@
 | B-32 | 홈런더비 | 이벤트 존은 공이 실제로 닿았는지 안 보고 200G 를 준다 · **고침(bugfixes.json, 기본 켬) — **고친 길만** — 공 자리가 존 그림 두 칸(필드 오프셋 기준 (51,16) · (499,16) 각 70×66, event_zone 프레임 0 알파로 잼) 안이어야 적중(`isBallInEventZone`). 이식판 더비는 아직 공 화면 자리가 없어(A-01) 부르는 쪽이 `ballFieldPoint` 를 넘기기 전까지 원본대로 돈다 (r275)** | 0x514e6 이 놓으면서 적중(+0x3f)까지 세움 | 중 | `src/entities/home-run-derby/model/eventZone.ts` |
 | B-33 | 나리 이벤트(발렌타인) | 2차 대결 재도전 이벤트 228·229 의 선행 번호가 1차 패배(219)라, 1차를 이기고 2차에서 진 사람에게는 재도전이 안 나온다 · **고침(bugfixes.json, 기본 켬) — 데이터는 그대로 두고 읽을 때 228 · 229 의 선행 번호를 227(2차 패배)로 덮는다(`requiredEventIdOf`, 타자편 · 투수편 훑기). 굴림 없음 — 훑기 결과가 바뀌는 자리만 갈린다 (r275)** | 이벤트 표 228·229 `requiresEvent = 219`(2차 패배는 227) | 중 | `src/shared/config/original/data/events.json` |
 | B-34 | 시즌 10년차 엔딩 | 엔딩 화면에서 특정 한 틀에 키를 누르면 영영 넘어가지 않는다 · **고침(bugfixes.json, 기본 켬) — 단계를 1 에서 멈춰(그 뒤 키는 버림) 도는 효과기의 끝이 넘긴다. 굴림 없음 (r273)** | 키 0x6b3c(단계 +1) · 그리기 0x8bd8 `단계 == 1` | 중 | `src/pages/season/ui/SeasonEndingScreen.tsx` |
-| B-35 | 경기 기록 | 승리 투수는 6회 이후 득점·정규 9이닝 경기에서만 정해져, 승리 투수 없는 경기가 생긴다 | 0xa5c34 a5cf6~a5dea(S1) | 작음 | `src/entities/game/model/winLossSave.ts` |
-| B-36 | 시즌·나리 순위표 | 승패가 같을 때 상대전적 비교가 엉뚱한 팀끼리 이뤄진다 | 0xb79d8(배열 위치로 팀 번호 표를 찾음) | 작음 | `src/entities/league/model/league.ts` |
-| B-37 | 팀 경기 퍼펙트 | 야수선택으로 타자주자만 살면 퍼펙트가 안 깨진다 | 0xa8c6a(`movs r5,#0` 가 루프 안) | 작음 | `src/entities/pitcher-career/model/pitcherGameRecord.ts` |
-| B-38 | 시즌 경기 평가 | 연장 완투는 인기도 보너스만 받고 평판 보너스는 못 받는다 | 인기도 st+0x6b · 평판 st+0x69 | 작음 | `src/entities/season-mode/model/seasonEvaluation.ts` · `src/features/play-team-game/model/teamGameFlow.ts` |
-| B-39 | 투수편 경기 평가 | 선발 인기도의 실점 감점이 음수 비교라 한 번도 안 걸린다 | 0xa6c92(`adds r3,#6 ; bgt`) | 작음 | `src/features/play-pitcher-game/model/pitcherGameEvaluation.ts` |
-| B-40 | 시즌 경기 평가·사기 | 동점 경기를 먼저 공격한 팀이 이긴 것으로 본다 | 0xb69c8 | 작음 | `src/entities/season-mode/model/seasonEvaluation.ts` · `src/entities/game/model/gameRecords.ts` |
-| B-41 | 국가대항전 | 대한민국이 결승에 못 가면 우승국을 동전던지기로 정하고, CPU 경기 동점이면 선공 팀이 이긴다 | 0xb858c · 4f09a | 작음 | `src/entities/national-cup/model/nationalCup.ts` · `src/entities/career/model/nariCupGame.ts` |
-| B-42 | 국가대항전 결과 | 결승에서 져도 "대표팀 탈락!!" 이 뜬다(준우승이라는 말이 없다) | StrMODE[143] · 0x85e6c | 작음 | `src/entities/national-cup/model/nationalCupFlow.ts` |
-| B-43 | 시즌 국가대항전 보상 | 준우승 글은 "+2500만" 인데 실제로는 +2000만 | 0x8a2e(글) vs 0x8b76 `adds #0x14` | 작음 | `src/entities/season-mode/model/seasonRewards.ts` |
-| B-44 | 나리 국가대항전 보상 | 나만의리그에는 준우승 보상이 없다 | StrMODE[200] 은 시즌 0x896c 에서만 | 작음 | `src/entities/national-cup/model/nationalCupFlow.ts` |
-| B-45 | 나리 GP 아이템 | 능력치는 +10 오르는데 알림은 "6 상승"(모든능력치는 "8") | 0xa455c~0xa45fe(인자 6·8) | 작음 | `src/entities/career/model/gpItems.ts` |
-| B-46 | 나리 상점 상세 창 | 영지버섯 사기 "현재" 칸이 먹기 전 값으로 보인다 | 0x14f92 에서 읽고 0x14fde 효과, 다시 안 읽음 | 작음 | `src/pages/management/lib/detailPopup.ts` · `src/pages/shop/lib/gpDetailView.ts` |
-| B-47 | 시즌 트레이드 | 자리 벌점을 마스터 표에서 id 아래 비트로 찾아 대부분 선수는 벌점 0 이다 | 0xb6561 b6574 · b65b0 · b65ca | 작음 | `src/entities/season-mode/model/playerTrade.ts` |
-| B-48 | 시즌 구장 아이템 | 구장 아이템을 사도 인기도가 안 깎이고, 잔디는 1~3억을 받으면서 아무 효과가 없다 | S3 5-1 · 8절 | 작음 | `src/pages/season/ui/StadiumShopScreen.tsx` · `src/entities/season-mode/model/stadiumItems.ts` |
-| B-49 | 투수편 트레이닝 | 사기 0 이면 마구·구질 창도 안 열린다 | 키 0x12d48(사기 0 검사가 맨 앞) | 작음 | `src/pages/pitcher-league/model/usePitcherManagementMenu.ts` · `src/entities/pitcher-career/model/pitcherManagement.ts` |
-| B-50 | 시즌 트레이닝 | 지옥훈련은 넷 다 최대일 때만 거절(일부 최대 칸은 헛돎) · 998 칸은 막히지 않고 999 가 된다 | 가드 0x9108(`> 998`) | 작음 | `src/widgets/season/lib/seasonTraining.ts` |
-| B-51 | 경기(마구) | 마구 횟수가 구질을 고를 때가 아니라 코스 확정(OK)에서 준다 | 0x50e9c | 작음 | `src/entities/pitcher-career/model/magicPitch.ts` · `src/features/play-pitcher-game/model/pitchAim.ts` |
-| B-52 | 돌발미션 | 단타로 3아웃째가 되면 "안타" 실패 · 끝내기 승리로 끝나면 삼진도 성공 · 고의사구 목표는 아무 볼넷이나 성공 | 결과비트 B5 · 0x801 | 작음 | `src/entities/burst-mission/model/burstMissionJudge.ts` · `src/entities/burst-mission/model/burstResultBits.ts` |
-| B-53 | 홈런더비 | 마지막 공은 던진 공 수에도, 단계 상승 문턱에도 안 든다 | 0xae3e8 ae4b6(기회가 남을 때만) | 작음 | `src/entities/home-run-derby/model/derbyRun.ts` |
-| B-54 | 홈런더비 | 볼 카운트가 공 사이에 안 지워져 넷째 볼부터 "볼넷" 콜이 난다 | 0x3e156 st[5]++ 에 모드 검사 없음 | 작음 | `src/pages/home-run-derby/lib/derbyPitchCall.ts` |
-| B-55 | 홈런더비 | 볼넷·사구 뒤 다음 단계부터 내 타자 대신 마스터 팀 타순의 다른 타자가 친다 | 0x48d50 48ddc → 0xaebe4 | 작음 | `src/entities/home-run-derby/model/derbyLineup.ts` |
-| B-56 | 수비 화면 | 수비 그림 창 첫 그림에서 펌블·악송구 실책을 두 번 센다(함성도 다시) | 0x43278 4381a~43904 | 작음 | `src/pages/defense/ui/DefensePlayback.tsx` |
-| B-57 | 수비 | 홈 송구에는 자동 슬라이딩이 안 걸린다 | 0xb030c(+0x7c 홈 4 ≠ 목표 0) | 작음 | `src/entities/defense-controls/model/sliding.ts` |
-| B-58 | 수비 견제 | 견제 커버 야수가 "루 번호 + 1" 로 고정이라 2루 견제도 늘 같은 야수가 들어간다 | 0xb28be~0xb2948 | 작음 | `src/entities/defense-controls/model/pickoff.ts` |
-| B-59 | 수비 AI | 외야 백업 위치가 음수 쪽 큰 차이를 무시한다(dx·dz 양수 쪽만 봄) | 0xb4bae | 작음 | `src/entities/fielding/model/catchPrediction.ts` |
+| B-35 | 경기 기록 | 승리 투수는 6회 이후 득점·정규 9이닝 경기에서만 정해져, 승리 투수 없는 경기가 생긴다 · **고침(bugfixes.json, 기본 켬) — 승리 투수도 패전 투수처럼 모든 득점마다 본다(이닝 · 경기 종류 문을 걷음) — 이긴 팀이 마지막으로 리드를 잡은 순간의 마운드 투수. "선발 5이닝" 은 원본에 없어 안 넣었다. 굴림 없음 (r277)** | 0xa5c34 a5cf6~a5dea(S1) | 작음 | `src/entities/game/model/winLossSave.ts` |
+| B-36 | 시즌·나리 순위표 | 승패가 같을 때 상대전적 비교가 엉뚱한 팀끼리 이뤄진다 · **고침(bugfixes.json, 기본 켬) — 상대전적은 그 자리의 팀 번호(order[j] · order[best])로 읽는다. 굴림 없음 — 승패 같은 팀의 순위 · PS 진출이 바뀔 수 있다 (r277)** | 0xb79d8(배열 위치로 팀 번호 표를 찾음) | 작음 | `src/entities/league/model/league.ts` |
+| B-37 | 팀 경기 퍼펙트 | 야수선택으로 타자주자만 살면 퍼펙트가 안 깨진다 · **고침(bugfixes.json, 기본 켬) — 출루 허용은 목록에 안 끝난 주자가 하나라도 있으면(`movs r5,#0` 을 루프 밖으로) — 야수선택 출루도 퍼펙트를 깬다. 간이 엔진 타석은 홈런 말고 타자가 나간 결과면 선다. 굴림 없음 (r277)** | 0xa8c6a(`movs r5,#0` 가 루프 안) | 작음 | `src/entities/pitcher-career/model/pitcherGameRecord.ts` |
+| B-38 | 시즌 경기 평가 | 연장 완투는 인기도 보너스만 받고 평판 보너스는 못 받는다 · **고침(bugfixes.json, 기본 켬) — 평판 완투도 인기도처럼 지금 이닝(st+0x6b)을 본다 — 9이닝은 같고 연장 완투만 보너스. 굴림 없음 (r277)** | 인기도 st+0x6b · 평판 st+0x69 | 작음 | `src/entities/season-mode/model/seasonEvaluation.ts` · `src/features/play-team-game/model/teamGameFlow.ts` |
+| B-39 | 투수편 경기 평가 | 선발 인기도의 실점 감점이 음수 비교라 한 번도 안 걸린다 · **고침(bugfixes.json, 기본 켬) — 문턱 −6 · −5 · −3 을 실점 6 · 5 · 3 으로 읽는다(부호만 뒤집힘으로 봄, 감점 −4 · −2 · −1 그대로) — 인기도가 내려가 평판 · 사기도 따라 바뀐다. 굴림 없음 (r277)** | 0xa6c92(`adds r3,#6 ; bgt`) | 작음 | `src/features/play-pitcher-game/model/pitcherGameEvaluation.ts` |
+| B-40 | 시즌 경기 평가·사기 | 동점 경기를 먼저 공격한 팀이 이긴 것으로 본다 · **고침(bugfixes.json, 기본 켬) — 동점은 아무도 이기지 않는다(`seasonHumanWonOf` · 경기 끝 기록의 이긴 경기). 웹 · 원본 모두 연장 상한이 없어 동점이 안 나는 방어다. 굴림 없음 (r277)** | 0xb69c8 | 작음 | `src/entities/season-mode/model/seasonEvaluation.ts` · `src/entities/game/model/gameRecords.ts` |
+| B-41 | 국가대항전 | 대한민국이 결승에 못 가면 우승국을 동전던지기로 정하고, CPU 경기 동점이면 선공 팀이 이긴다 · **고침(bugfixes.json, 기본 켬) — 결승이 없는 해는 풀리그 1위가 우승(동전은 그대로 굴려 값만 버린다 — 난수 차례 같음). CPU 결승을 돌리는 길은 두 나라가 같은 명단으로 서는 준비(0xc2c4c)라 동전과 다를 바 없어 안 골랐다. CPU 경기 동점 선공 승은 연장 상한이 없어 동점이 안 나므로 그대로 (r277)** | 0xb858c · 4f09a | 작음 | `src/entities/national-cup/model/nationalCup.ts` · `src/entities/career/model/nariCupGame.ts` |
+| B-42 | 국가대항전 결과 | 결승에서 져도 "대표팀 탈락!!" 이 뜬다(준우승이라는 말이 없다) · **고침(bugfixes.json, 기본 켬) — 결승에서 진 해는 [143] 의 "탈락" 만 "준우승" 으로 바꾼다(원본에 준우승 결과 글이 없어 웹이 넣은 한 낱말). 굴림 없음 (r277)** | StrMODE[143] · 0x85e6c | 작음 | `src/entities/national-cup/model/nationalCupFlow.ts` |
+| B-43 | 시즌 국가대항전 보상 | 준우승 글은 "+2500만" 인데 실제로는 +2000만 · **고침(bugfixes.json, 기본 켬) — 글대로 +25(2500만)를 더한다. 굴림 없음 (r277)** | 0x8a2e(글) vs 0x8b76 `adds #0x14` | 작음 | `src/entities/season-mode/model/seasonRewards.ts` |
+| B-44 | 나리 국가대항전 보상 | 나만의리그에는 준우승 보상이 없다 · **고침(bugfixes.json, 기본 켬) — 나리도 결승에서 지면 준우승 보상 — 원본 값이 없어 나리 우승의 절반(인기도 +10 · 평판 +15 · 1000만 · G 0), 글 StrMODE[200]. 보상 칸 0 · 1 · 3 은 굴림 없음 (r277)** | StrMODE[200] 은 시즌 0x896c 에서만 | 작음 | `src/entities/national-cup/model/nationalCupFlow.ts` |
+| B-45 | 나리 GP 아이템 | 능력치는 +10 오르는데 알림은 "6 상승"(모든능력치는 "8") · **고침(bugfixes.json, 기본 켬) — 알림 숫자를 실제 상승 10 으로(복권 상 갈래 0xa4868 · 상점 설명 StrITEM[165] 과 같음). 굴림 없음 (r277)** | 0xa455c~0xa45fe(인자 6·8) | 작음 | `src/entities/career/model/gpItems.ts` |
+| B-46 | 나리 상점 상세 창 | 영지버섯 사기 "현재" 칸이 먹기 전 값으로 보인다 · **고침(bugfixes.json, 기본 켬) — 사기 칸 현재값도 효과 뒤 값(`after.morale`) — 변화량 40 그대로. 표시만 (r277)** | 0x14f92 에서 읽고 0x14fde 효과, 다시 안 읽음 | 작음 | `src/pages/management/lib/detailPopup.ts` · `src/pages/shop/lib/gpDetailView.ts` |
+| B-47 | 시즌 트레이드 | 자리 벌점을 마스터 표에서 id 아래 비트로 찾아 대부분 선수는 벌점 0 이다 · **고침(bugfixes.json, 기본 켬) — 마스터 팀을 id 몫(투수 /8 · 타자 /12)으로 고르고 줄을 끝까지 훑는다 → 리그 선수는 늘 제 +0xa 칸으로 벌점이 붙어 트레이드 성공률이 내려간다(명전 · 나리는 그대로 −1). 굴림 없음 (r277)** | 0xb6561 b6574 · b65b0 · b65ca | 작음 | `src/entities/season-mode/model/playerTrade.ts` |
+| B-48 | 시즌 구장 아이템 | ~~구장 아이템을 사도 인기도가 안 깎이고, 잔디는 1~3억을 받으면서 아무 효과가 없다~~ · **정정(r277) — 원본 버그가 아니다(3절)**: 인기도는 StrMODE[62] "필요한 인기도 : %d" 대로 조건이지 값이 아니고, 잔디는 설명(StrITEM[144~147] "조금은 거친 인조잔디" …)이 겉모습(타석 바닥 팔레트 0x786c8)만 말한다. 고칠 것 없음(`implemented: false` 로 둔다) | S3 5-1 · 8절 | 작음 | `src/pages/season/ui/StadiumShopScreen.tsx` · `src/entities/season-mode/model/stadiumItems.ts` |
+| B-49 | 투수편 트레이닝 | ~~사기 0 이면 마구·구질 창도 안 열린다~~ · **정정(r277) — 원본 버그가 아니다(3절)**: 마구 · 구질 훈련도 사기를 깎는 훈련이라(마구 사기 굴림 · `runPitchTypeTraining`) 사기 0 에서 막는 것은 다른 훈련 칸과 같은 규칙이다. 보기만 하는 구질 창은 선수정보 [구질]에서 사기와 상관없이 열린다. 고칠 것 없음(`implemented: false` 로 둔다) | 키 0x12d48(사기 0 검사가 맨 앞) | 작음 | `src/pages/pitcher-league/model/usePitcherManagementMenu.ts` · `src/entities/pitcher-career/model/pitcherManagement.ts` |
+| B-50 | 시즌 트레이닝 | ~~지옥훈련은 넷 다 최대일 때만 거절(일부 최대 칸은 헛돎) · 998 칸은 막히지 않고 999 가 된다~~ · **정정(r277) — 원본 버그가 아니다(3절)**: 상한이 999 라 가드 `> 998` 은 곧 "최대(999)" 이고 998 이 999 로 오르는 것이 맞다. 지옥훈련은 최대가 아닌 칸이 오르므로 일부 최대에도 진행하는 것이 맞고, 최대 칸이 999 에 머무는 것은 상한이다. 고칠 것 없음(`implemented: false` 로 둔다) | 가드 0x9108(`> 998`) | 작음 | `src/widgets/season/lib/seasonTraining.ts` |
+| B-51 | 경기(마구) | ~~마구 횟수가 구질을 고를 때가 아니라 코스 확정(OK)에서 준다~~ · **정정(r277) — 원본 버그가 아니다(3절)**: 구질 고르기(0x50db8)는 남은 횟수 > 0 만 보고 실제로 던지는 코스 확정(OK, 0x50e9c)에서 1 줄인다 — 고른 뒤 CLR 로 물리면 횟수가 남는 것이 맞다. 한 공에 한 번만 준다. 고칠 것 없음(`implemented: false` 로 둔다) | 0x50e9c | 작음 | `src/entities/pitcher-career/model/magicPitch.ts` · `src/features/play-pitcher-game/model/pitchAim.ts` |
+| B-52 | 돌발미션 | 단타로 3아웃째가 되면 "안타" 실패 · 끝내기 승리로 끝나면 삼진도 성공 · 고의사구 목표는 아무 볼넷이나 성공 · **고침(bugfixes.json, 기본 켬) — "안타" 성공 비트에 B3(단타) — 3아웃째 단타도 성공 · 끝내기 덧비트 0x801 을 안 켠다(실제 결과로만 가림). **고의사구 목표의 "아무 볼넷" 은 고치지 않는다** — 원본에 고의사구 명령이 없어 볼 넷으로 내보내는 것이 목표의 뜻이다. 굴림 없음 (r277)** | 결과비트 B5 · 0x801 | 작음 | `src/entities/burst-mission/model/burstMissionJudge.ts` · `src/entities/burst-mission/model/burstResultBits.ts` |
+| B-53 | 홈런더비 | 마지막 공은 던진 공 수에도, 단계 상승 문턱에도 안 든다 · **고침(bugfixes.json, 기본 켬) — 끝 공(보너스 열기 · 판 끝)도 단계 문턱을 보고, 판 끝 공도 던진 공에 센다 — 단계가 G 셈에 들어가 결과 G 가 늘 수 있다. 굴림 없음 (r277)** | 0xae3e8 ae4b6(기회가 남을 때만) | 작음 | `src/entities/home-run-derby/model/derbyRun.ts` |
+| B-54 | 홈런더비 | 볼 카운트가 공 사이에 안 지워져 넷째 볼부터 "볼넷" 콜이 난다 · **고침(bugfixes.json, 기본 켬) — 더비 볼은 스트라이크처럼 st[5]++ 를 건너뛴다 — 늘 판정 2 · 콜 16 · 대기 15(볼넷 콜 24 · 볼넷 타순 넘김 없음). 굴림 없음 (r277)** | 0x3e156 st[5]++ 에 모드 검사 없음 | 작음 | `src/pages/home-run-derby/lib/derbyPitchCall.ts` |
+| B-55 | 홈런더비 | 볼넷·사구 뒤 다음 단계부터 내 타자 대신 마스터 팀 타순의 다른 타자가 친다 · **고침(bugfixes.json, 기본 켬) — 볼넷 · 사구가 다음 타순을 예약하지 않는다 — 내 타자가 끝까지 친다. 굴림 없음 (r277)** | 0x48d50 48ddc → 0xaebe4 | 작음 | `src/entities/home-run-derby/model/derbyLineup.ts` |
+| B-56 | 수비 화면 | 수비 그림 창 첫 그림에서 펌블·악송구 실책을 두 번 센다(함성도 다시) · **고침(bugfixes.json, 기본 켬) — 창 첫 그림(다시 그리기 52efe)은 실책 +0x2e · 함성 29 를 다시 내지 않는다(`redrawnFieldingErrorsOf`) — 연출 · 파티클 · 점수판 타이머는 원본대로 한 칸 더라 굴림 차례 같음. 시즌 수비 실수 · 실책 기록이 줄어든다 (r277)** | 0x43278 4381a~43904 | 작음 | `src/pages/defense/ui/DefensePlayback.tsx` |
+| B-57 | 수비 | 홈 송구에는 자동 슬라이딩이 안 걸린다 · **고침(bugfixes.json, 기본 켬) — 주자 목표 4(홈)를 송구 목표 0 으로 읽어 견준다 — 홈 승부에도 자동 슬라이딩. 굴림 없음(도착 틱 · 태그 결과는 바뀔 수 있다) (r277)** | 0xb030c(+0x7c 홈 4 ≠ 목표 0) | 작음 | `src/entities/defense-controls/model/sliding.ts` |
+| B-58 | 수비 견제 | ~~견제 커버 야수가 "루 번호 + 1" 로 고정이라 2루 견제도 늘 같은 야수가 들어간다~~ · **정정(r277) — 원본 버그가 아니다(3절)**: 커버 표 [1,2,3,4] 는 홈 포수 · 1루 1루수 · 2루 2루수 · 3루 3루수 — 야수 칸 번호가 곧 루 번호 + 1 인 의도된 배정이다. 견제에는 타구 방향이 없어 2루 커버 규칙(0xb1c90)을 쓸 까닭이 없다. 고칠 것 없음(`implemented: false` 로 둔다) | 0xb28be~0xb2948 | 작음 | `src/entities/defense-controls/model/pickoff.ts` |
+| B-59 | 수비 AI | 외야 백업 위치가 음수 쪽 큰 차이를 무시한다(dx·dz 양수 쪽만 봄) · **고침(bugfixes.json, 기본 켬) — dx · dz 의 절댓값이 2000 을 넘으면 백업 점을 낸다(점을 내는 식이 이미 부호를 쓴다). 굴림 없음(외야수 위치가 바뀌어 뒤 판이 갈릴 수 있다) (r277)** | 0xb4bae | 작음 | `src/entities/fielding/model/catchPrediction.ts` |
 | B-60 | 수비 AI | 중계가 낀 외야 재송구 시간을 실제보다 짧게 본다 | 0xb3444 res[5](1구간 틱, S7) | 작음 | `src/entities/fielding/model/throwPlan.ts` |
 | B-61 | 경기 기록 | 마타자 타석의 도루는 누구 기록에도 안 쌓인다 | 0xa56dc(지금 타자로 게이트) | 작음 | `src/features/play-pitcher-game/model/pitcherGameFlow.ts` · `src/features/play-game/model/gameFlow.ts` |
 | B-62 | 설정 모드 초기화 | 투수편 나리 초기화를 막을 때 [212] 대신 [213] 글이 뜬다 | 0x2c950 `movs r1,#0xd5` | 작음 | `src/entities/settings/model/modeReset.ts` |
@@ -143,5 +143,10 @@
 | 오토봇 배트가 열리는 해에는 리그 1위 G 를 못 받는다 | 해금 알림을 닫으면 0x87d2~0x87fc 가 G 를 준다 | a3cfe3a · 5a45956 → P4 4b |
 | 크라이져 해금이 힌트("사이클링 트리플")와 달리 2번째 사이클링에 열린다 | 문턱은 지난 경기까지 누계를 본다 — 3번째에 열린다 | 웹 r29 → K 3-1 |
 | 레이저 송구 창이 카운터가 호출마다 올라 19틱이 아니라 7~9틱(B-12) | 0x523bc 는 굴림 뒤(+0x19af ≠ 0, 523d6) 0xb2648 을 안 부른다 — 굴림 틱 뒤로는 0x4e858 하나만 세어 19틱 그대로 | S12 3-3 → r272 |
+| 구장 아이템을 사도 인기도가 안 깎이고 잔디는 효과가 없다(B-48) | 인기도는 "필요한 인기도"(StrMODE[62]) 조건이고, 잔디 설명은 겉모습만 말한다(바닥 팔레트 0x786c8) | S3 5-1 · 8절 → r277 |
+| 투수편 사기 0 이면 마구·구질 창도 안 열린다(B-49) | 두 훈련 모두 사기를 깎는다 — 다른 훈련 칸과 같은 사기 0 규칙. 보기 창은 선수정보에서 열린다 | 키 0x12d48 → r277 |
+| 시즌 트레이닝 `> 998` 가드 · 지옥훈련 일부 최대(B-50) | 상한 999 라 `> 998` = 최대. 지옥훈련은 남은 칸이 오른다 | 가드 0x9108 → r277 |
+| 마구 횟수가 코스 확정(OK)에서 준다(B-51) | 던지는 순간 깎는 것이 맞다 — 고르기는 남은 횟수 > 0 만 본다 | 0x50db8 · 0x50e9c → r277 |
+| 견제 커버가 루 번호 + 1 고정(B-58) | 홈 포수 · 1루수 · 2루수 · 3루수 — 의도된 배정 | 0xb28be~0xb2948 → r277 |
 
 웹 코드 주석 중 `src/entities/career/model/equipment.ts`(오토봇 배트 G 건너뜀)는 위 정정보다 앞선 문구라 낡았다. `playerCareer.ts` 의 "옮길 코드가 없다" 문구는 r275 에서 B-27 고친 길과 함께 고쳐 적었다.
