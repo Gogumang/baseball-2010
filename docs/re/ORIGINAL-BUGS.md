@@ -11,25 +11,27 @@
 
 개수: 큼 7 · 중 27 · 작음 49 · 거의 없음 17 = **100건** (그 밖에 고침·웹 다름 5건, 정정 10건)
 
+**고치기(사용자 결정 2026-10-26)**: 웹 `src/shared/config/bugfixes/bugfixes.json` 이 100건을 모두 들고 `isBugFixed('B-xx')` 로 갈래를 고른다(기본 `fixAll: true` · 항목 `fixed` 로 덮음 · 고친 길이 없는 항목은 `implemented: false` 라 원본대로). 시험은 원본(모두 끔)으로 돈다. 고친 항목은 증상 칸 끝에 **고침(bugfixes.json, 기본 켬)** 으로 적는다 — r270: B-01 · B-02 · B-08 · B-09 · B-10 · B-14 · B-15.
+
 ## 1. 남아 있는 원본 버그
 
 | id | 모드/화면 | 증상 | 원본 근거 주소 | 플레이 영향 | 웹 위치 |
 |---|---|---|---|---|---|
-| B-01 | 경기(투수편·팀 경기·미션) | 마구를 한 번 던지면 그 경기 끝까지 직구·변화구에도 마구 보정이 계속 붙는다(투수가 바뀌어도 남음) | 공+0x10 을 지우는 코드 없음 — 싣기 0x3de10, 읽는 26곳 전수(H2 3-4) | 큼 | `src/entities/pitcher-career/model/magicPitch.ts` · `src/entities/pitching/model/magicPitchGame.ts` |
-| B-02 | 경기(마구) | 마구의 "잘 맞을 확률·홈런 확률" 보정이 타자 쪽을 올린다 — 마구가 오히려 장타를 돕는다 | 보정 0x34d6c out+0xa/+0xb → 타격 판정 0xab214(부호 양수, H2 2절) | 큼 | `src/entities/pitcher-career/model/magicPitch.ts` · `src/entities/batting/model/swingBoost.ts` |
+| B-01 | 경기(투수편·팀 경기·미션) | 마구를 한 번 던지면 그 경기 끝까지 직구·변화구에도 마구 보정이 계속 붙는다(투수가 바뀌어도 남음) · **고침(bugfixes.json, 기본 켬) — 마구 보정은 마구로 던진 그 공에만(마지막 한 개 포함), 다른 공·바뀐 투수는 0 (`ballMagicNumberOfPitch`)** | 공+0x10 을 지우는 코드 없음 — 싣기 0x3de10, 읽는 26곳 전수(H2 3-4) | 큼 | `src/entities/pitcher-career/model/magicPitch.ts` · `src/entities/pitching/model/magicPitchGame.ts` |
+| B-02 | 경기(마구) | 마구의 "잘 맞을 확률·홈런 확률" 보정이 타자 쪽을 올린다 — 마구가 오히려 장타를 돕는다 · **고침(bugfixes.json, 기본 켬) — 투수 쪽이 채운 B·C % 의 부호를 뒤집어 깎는다(크기·덮어쓰기 차례는 원본)** | 보정 0x34d6c out+0xa/+0xb → 타격 판정 0xab214(부호 양수, H2 2절) | 큼 | `src/entities/pitcher-career/model/magicPitch.ts` · `src/entities/batting/model/swingBoost.ts` |
 | B-03 | 일반·대전·빠른실행 | 사람이 마선수를 "없음"으로 골라도 CPU 팀은 늘 마투수·마타자를 하나씩 받는다 | 0x31054 가 고른 번호를 `ldrb` 로 읽음(−1 → 0xff, S13 1-4) | 큼 | `src/entities/game/model/aceOpponent.ts` |
 | B-04 | 시즌·나리 포스트시즌(CPU 끼리) | CPU 끼리 포스트시즌 경기는 점수를 **덜 낸** 팀이 이긴다 | 0xc2760 c28e2~c290a + 준비 0xc239c 명단 엇갈림(R1 정정) | 큼 | `src/entities/league/model/postseasonPlay.ts` · `src/entities/league/model/leagueDay.ts` |
 | B-05 | 나리 타자편·투수편 연말 | 포스트시즌 시리즈가 끝날 때마다 올해의 목표·타이틀·MVP 발표가 보상째 다시 나온다 | 136 진입 0x10bb0 → 0x8bdc9(392), 본 표시를 안 봄(0x8bdc8 → 0xae170) · 0x19774 | 큼 | `src/app/model/useCareerSession.ts` · `src/app/model/usePitcherLeagueSession.ts` |
 | B-06 | 시즌 구장관리 | 구장관리 교체에 검사가 없어 사지 않은 구장 아이템도 끼울 수 있다 | 구장관리 교체(S3 6절, 구장 아이템 0x9a84) | 큼 | `src/pages/season/ui/StadiumShopScreen.tsx` · `src/entities/season-mode/model/stadiumItems.ts` |
 | B-07 | 시즌 경기 | 경기를 이어할 때마다 관중 수입이 소지금에 한 번 더 들어간다(끄고 이어하면 돈이 는다) | 경기 장면 셋업 0x39fdc 모드 2 → 0xa34b8(0x3a3e4) | 큼 | `src/entities/season-mode/model/seasonAttendance.ts` · `src/app/model/useSeasonSession.ts` |
-| B-08 | 경기(마구) | 그 경기 첫 마구는 횟수가 안 줄어 한 경기에 표보다 1개 더 던진다 | 소모 0x345fc 조건이 `공+0x10 != 0` | 중 | `src/entities/pitching/model/magicPitchGame.ts` · `src/entities/pitcher-career/model/magicPitch.ts` |
-| B-09 | 경기 전반 | 스태미나 0 인 투수가 한 개 더 던지면 1% 로 되살아난다 | 0xaeb08 else 가지 s' = 100 | 중 | `src/entities/pitcher-career/model/pitcherStamina.ts` |
-| B-10 | 경기 기록(모든 모드) | 세이브가 거의 안 붙는다 — CPU 리그 세이브는 늘 0 | state+0x64 를 0 으로 되돌리는 코드 없음 · 경기 끝 검사 0xa7eaa(S1) | 중 | `src/entities/game/model/winLossSave.ts` · `src/entities/league/model/leaguePlayerStats.ts` |
+| B-08 | 경기(마구) | 그 경기 첫 마구는 횟수가 안 줄어 한 경기에 표보다 1개 더 던진다 · **고침(bugfixes.json, 기본 켬) — 첫 마구도 횟수를 깎아 표 값만큼만 던진다(홈런더비는 원본도 소모 없음)** | 소모 0x345fc 조건이 `공+0x10 != 0` | 중 | `src/entities/pitching/model/magicPitchGame.ts` · `src/entities/pitcher-career/model/magicPitch.ts` |
+| B-09 | 경기 전반 | 스태미나 0 인 투수가 한 개 더 던지면 1% 로 되살아난다 · **고침(bugfixes.json, 기본 켬) — 0 에서 더 던지면 0 에 머문다** | 0xaeb08 else 가지 s' = 100 | 중 | `src/entities/pitcher-career/model/pitcherStamina.ts` |
+| B-10 | 경기 기록(모든 모드) | 세이브가 거의 안 붙는다 — CPU 리그 세이브는 늘 0 · **고침(bugfixes.json, 기본 켬) — 경기 끝에 코드(잡아야 할 아웃 수)를 안 보고, 세이브 상황 아닌 같은 측 교체면 후보를 지운다** | state+0x64 를 0 으로 되돌리는 코드 없음 · 경기 끝 검사 0xa7eaa(S1) | 중 | `src/entities/game/model/winLossSave.ts` · `src/entities/league/model/leaguePlayerStats.ts` |
 | B-11 | 수비(사람) | 사람이 수비하면 협살이 절대 안 일어난다 | 협살 시작 조건 `state[0x31+수비측] == 1`(CPU, S8 1-4) | 중 | `src/entities/fielding/model/rundown.ts` · `src/features/defense-play/model/runDefensePlay.ts` |
 | B-12 | 수비(사람) 레이저 송구 | 레이저 송구 입력 창이 19틱이 아니라 실제 7~9틱뿐이다 | 카운터가 틱이 아니라 0xb2648 호출마다 오름(0x524c0 틱당 2~3번) | 중 | `src/entities/defense-controls/model/laserThrow.ts` · `src/features/defense-play/model/laserTick.ts` |
 | B-13 | 나리 타자편 9회 이후 | 자동진행이 멈춘 끝내기 판에서 아웃 수가 3을 넘어(4~5) 설 수 있다 | 0xc22b4 c2318~c232e(`st[6] = t − rand(d, t+1)`) | 중 | `src/features/play-game/model/gameFlow.ts` |
-| B-14 | CPU 끼리 경기·간이 타석 | 볼넷이 밀어내기가 아니라 모든 주자 한 루씩 — 3루 주자 혼자여도 득점 | 0xc1818 c1918~c194a → 0xc0fb4(sim, 1) | 중 | `src/entities/game/model/baseState.ts` |
-| B-15 | 사람 경기의 CPU 도루 | CPU 도루 확률이 주루와 상관없이 1.1% / 0.5% / 0.3% 고정 | 0x520de · 표 0xd047c(속도칸이 늘 1) | 중 | `src/entities/fielding/model/cpuSteal.ts` |
+| B-14 | CPU 끼리 경기·간이 타석 | 볼넷이 밀어내기가 아니라 모든 주자 한 루씩 — 3루 주자 혼자여도 득점 · **고침(bugfixes.json, 기본 켬) — 사람 경기와 같은 밀어내기(만루에서만 1점). 루가 달라져 뒤 굴림 차례가 바뀐다** | 0xc1818 c1918~c194a → 0xc0fb4(sim, 1) | 중 | `src/entities/game/model/baseState.ts` |
+| B-15 | 사람 경기의 CPU 도루 | CPU 도루 확률이 주루와 상관없이 1.1% / 0.5% / 0.3% 고정 · **고침(bugfixes.json, 기본 켬) — 표 칸 = min(주루 능력치 ÷ 250, 3). 굴림 수는 같다** | 0x520de · 표 0xd047c(속도칸이 늘 1) | 중 | `src/entities/fielding/model/cpuSteal.ts` |
 | B-16 | 시즌 평판 | 병살을 잡으면 평판이 깎이고 탈삼진이 평판을 올린다 | 점프표 0xd7d7c 의 코드 4·5 뒤집힘(S4 2b) | 중 | `src/entities/season-mode/model/seasonReputation.ts` |
 | B-17 | 국가대항전 중(나리·시즌) | 대회 동안 내 팀 사기를 읽고 쓰는 칸이 그날 상대국 칸이다 — 사기 변화·돌발 사기가 하루 끝에 사라지고 경기 사기는 상대국 표값으로 선다 | 0x1f940/0x1f8f8 1f95e~1f97a · 0x1f570 1f58a~1f5a4 · 0xa3a24/0xa3a44 · 하루 끝 b8216 | 중 | `src/entities/career/model/nariMorale.ts` · `src/entities/team/model/teamMorale.ts` · `src/entities/career/model/nariCupTeams.ts` · `src/entities/season-mode/model/seasonRewards.ts` |
 | B-18 | 시즌 새 해 | 국가대항전을 치른 해에는 새 해 팀 사기가 100 으로 안 돌아간다 | 0x6e0c 6ea0~6ea8 이 `[this+0xa4]`(상대국 슬롯)에 씀 | 중 | `src/entities/season-mode/model/seasonRecord.ts` |
