@@ -8,6 +8,7 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { AceSelectScreen } from '@/pages/general-mode'
 import { ACE_PHASE } from '@/pages/general-mode/lib/generalModeSetup'
+import { CoachInfoBox } from '@/pages/season/ui/CoachInfoBox'
 
 /** StrMODE — 코치채용 문구 (J 4-3 가드 순서와 같은 번호) */
 const ALREADY_HIRED = ORIGINAL_MODE_TEXT[147] // "현재 채용중인 마선수입니다"
@@ -48,6 +49,13 @@ export interface CoachHireScreenProps {
  * 계약금 1억~3.5억 · 필요 인기도 0~1000 · 가드 순서는 `entities/season-mode/model/seasonCoach.ts`.
  * **코치는 한 명뿐이고 바꾸면 계약금을 새로 낸다(환불 없음).**
  * 머리띠는 0xaa24 끝이 `[this+0x11c] == 2` 면 `0x54d95(skin, 4 "마선수선택", 5)` 다(0xad94~0xada0).
+ *
+ * 그림 0xaa24 (r263 직접 뜸): 공용 목록 0x63b15 를 **k 10** 으로(0xaa44~0xaa4e — A · B 딱지 · ABILITY 판 없음) 그린 뒤
+ * 오른쪽 위 정보 상자(`CoachInfoBox`, 0xaa6c~0xad78) → 머리띠. 0x5f395(레벨업 창)는 코치채용이면 안 부른다(0xad7e).
+ * 키 0xa248 의 코치 갈래(r263 다시 뜸): 팝업이 떠 있으면([0x140005c]+9) 팝업 결과만 본다 — 0x15 "예" 면 채용(0xa27a~0xa35a:
+ * 소지금 −= 표×10 · SR+0x185 = 칸 · ⚠️ SR+0x1bb = 0x2d — 이 칸을 읽는 곳은 리터럴 · 즉치로 못 찾아 웹은 옮기지 않았다 ·
+ * [148] 팝업 (1, 1) · 저장 0x22755). 그 밖에는 모든 키를 격자 [this+0x8c] vt+0x18(숫자키 꼴 1 — '2' '4' '6' '8' 방향 · '5' → −5)에
+ * 넘기고(0xa578~0xa586) 돌려받은 키로: −5 → OK(0xa734) · −16 → 0xce(0xa974) · '0' → 버림(0xa656) · 그 밖('*' '#' 따위) 없음.
  */
 export function CoachHireScreen({
   state, gamePoints = 0, openedAcePitcherIds, openedAceBatterIds, levels, onOpenAce, onHire, onBack,
@@ -98,6 +106,8 @@ export function CoachHireScreen({
       onCancel={onBack}
       // 공통 앞그림 0xb810 — 0xd7 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다
       underlay={<SkinBackdrop kind="공무늬" />}
+      // 0xaa24 의 코치채용 갈래(0xaa6c~0xad78) — 오른쪽 위 정보 상자: 커서 칸 코치의 효과 · 계약금 · 필요 인기도
+      panel={(cursor) => <CoachInfoBox slot={cursor} />}
       overlay={question !== null ? (
         <MessageBox
           text={question.text}

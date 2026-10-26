@@ -33,8 +33,13 @@ describe('시즌 GP 상점 0xdc 종류 2 — 가드 0x98ba~0x9a00 · 효과 0xa3
 
   it('값 0xcbbe3 × 100 — G 부족 [65] 이 가장 먼저, 칸 7 이상은 아무것도 안 한다', () => {
     expect([0, 1, 2, 3, 4, 5, 6].map(seasonGpItemPriceOf)).toEqual([300, 300, 500, 500, 1000, 2000, 2000])
-    expect(checkSeasonGpItem(입력(레코드(), 299), 0)).toEqual({ ok: false, notice: expect.stringContaining('G포인트가 부족') })
+    expect(checkSeasonGpItem(입력(레코드(), 299), 0)).toEqual({ ok: false, notice: expect.stringContaining('G포인트가 부족'), asks: true })
     expect(checkSeasonGpItem(입력(레코드()), 7)).toBeNull()
+  })
+
+  it('G 부족 [65] 만 예/아니오 (0x98fe 0xbbef9(2, 2)) — 나머지 가드는 한 단추 (0x96be (1, 1))', () => {
+    expect(checkSeasonGpItem(입력(레코드(), 299), 0)).toMatchObject({ asks: true })
+    expect(checkSeasonGpItem(입력(레코드({ illness: 0 })), 2)).not.toHaveProperty('asks')
   })
 
   it('칸별 가드 — 5 트레이드 미사용 [176] · 1 사기 100 [91] · 4 이글아이 > 98 [210] · 2 건강 [208] · 6 매점 [217]', () => {

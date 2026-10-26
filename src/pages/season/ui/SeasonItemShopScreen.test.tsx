@@ -34,3 +34,17 @@ describe('GP 창 격자', () => {
     expect(props.onBuyGpItem).not.toHaveBeenCalled()
   })
 })
+
+describe('G 부족 [65] 팝업 — 0x98fe 0xbbef9(this, 2, 2, 1)', () => {
+  it('예/아니오 두 단추로 뜨고, 웹에는 G 충전 0xfa 가 없어 어느 답이든 닫기만 한다', () => {
+    const props = { onBuySubItem: vi.fn(() => ''), onBuyGpItem: vi.fn(() => ''), onBack: vi.fn() }
+    render(<SeasonItemShopScreen kind={2} record={startNewSeason(0, '테스터').record} teamMorale={50} gamePoint={0} {...props} />)
+    fireEvent.keyDown(window, { key: '5' })
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toContain('G포인트가 부족합니다')
+    expect(screen.getByRole('button', { name: '예' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(props.onBuyGpItem).not.toHaveBeenCalled()
+  })
+})

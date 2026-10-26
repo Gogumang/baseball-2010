@@ -111,6 +111,11 @@ export interface AceSelectScreenProps {
   readonly underlay?: ReactNode
   /** 화면 맨 위에 얹을 팝업 — 코치채용의 가드·확인 팝업 */
   readonly overlay?: ReactNode
+  /**
+   * 목록 뒤 · 머리띠 앞에 그릴 것 (커서 칸을 받는다) — 코치채용 정보 상자. 0xaa24 가 공용 목록 0x63b15 뒤 · 머리띠 0x54d95 앞
+   * (0xaa6c~0xad78)에 그리고, 머리띠가 미끄러지는 동안(목록이 아무것도 안 그릴 때)에도 그린다
+   */
+  readonly panel?: (cursor: number) => ReactNode
 }
 
 /**
@@ -152,7 +157,7 @@ const ACE_GRID_SHAPES: Readonly<Record<'고르기' | '레벨업', AnnalsGridShap
  */
 export function AceSelectScreen({
   phase, openedAcePitcherIds = [], openedAceBatterIds = [], levels, mode = '고르기', gamePoint = 0, chosenPitcherCell = null,
-  onOpenAce, onLevelUp, onSelect, onCancel, underlay, overlay, onAllAcesOpen,
+  onOpenAce, onLevelUp, onSelect, onCancel, underlay, overlay, onAllAcesOpen, panel,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
@@ -169,9 +174,18 @@ export function AceSelectScreen({
   const isLevelUpMode = mode === '레벨업'
   const isCoachMode = mode === '코치'
 
+  /**
+   * 단계가 바뀌면 커서를 옮긴다. 마투수 OK 는 (0, 1) = 칸 5 로 내린다(시즌 0xa78e~0xa798).
+   * 마타자 단계의 CLR 은 커서를 **고른 마투수 칸**(rec+0xe)으로 되돌린다 — +0xc = 칸 % 열 · +0x10 = 칸 / 열
+   * (시즌 0xa91c~0xa94a · 일반모드 상태 21 0x2a0bc~0x2a0e2, 0xca911 나머지 · 0xca7b5 몫). 0 칸이 아니다.
+   */
+  const previousPhaseRef = useRef(phase)
   useEffect(() => {
-    setCursor(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
-  }, [phase])
+    if (previousPhaseRef.current === phase) return
+    previousPhaseRef.current = phase
+    const isChosen = chosenPitcherCell !== null && chosenPitcherCell >= 0 && chosenPitcherCell < ACE_PER_ROLE
+    setCursor(phase === ACE_PHASE.마투수 ? (isChosen ? chosenPitcherCell : 0) : ACE_PER_ROLE)
+  }, [phase, chosenPitcherCell])
 
   // 0x7b408~0x7b42e — for i in 0..9: 전역 +0x30 + i == 0 이면 그만, 다 켜졌으면 0x62368(ui, 12, 0)
   const isEveryAceOpen = Array.from({ length: ACE_PER_ROLE }, (_unused, index) => index)
@@ -331,11 +345,16 @@ export function AceSelectScreen({
          즉 A 딱지가 그려지는 k 는 **0·1·3·4·5 뿐**이다. 직접 디스어셈해 전수 확인했다.)
         어느 단계인지는 아래 안내 줄이 알려 준다. B 딱지(ABILITY)는 원본도 그린다.
       */}
-      {/* B 딱지 — 파란 막대(117) 에 ABILITY, k 2 는 기본값 43 위다 */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.blueBar)}
-        style={{ left: anchorB.x + TAG.dx, top: anchorB.y + TAG.bDyDefault }} />
-      <FrameSprite folder={IMG_TEXT_FRAME} frame={ACE_LAYOUT.tagFrames.ability} origins={imgTextOrigins} centerX
-        x={anchorB.x} y={anchorB.y + TAG.bDyDefault + TAG.textDdy} />
+      {/*
+        B 딱지 — 파란 막대(117) 에 ABILITY, k 2 는 기본값 43 위다. 코치채용(k 10)은 그리지 않는다: 0x63cdc 가 B 글 [sp+0xc0] 을 −1 로
+        두고 k 10 갈래 0x63daa~0x63dc0 는 그 칸을 안 고쳐(k 2 갈래 0x63d64 만 0x9f) 0x657e0~0x657e4 가 B 딱지를 통째로 건너뛴다(r263 직접 뜸)
+      */}
+      {!isCoachMode && (<>
+        <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.blueBar)}
+          style={{ left: anchorB.x + TAG.dx, top: anchorB.y + TAG.bDyDefault }} />
+        <FrameSprite folder={IMG_TEXT_FRAME} frame={ACE_LAYOUT.tagFrames.ability} origins={imgTextOrigins} centerX
+          x={anchorB.x} y={anchorB.y + TAG.bDyDefault + TAG.textDdy} />
+      </>)}
 
       {/*
         ABILITY 판 — k 2(고르기) · k 11(레벨업)만 0x64b6e~0x64bac 에서 0x5aefc(skin, 레이더 [skin+0xd4], B.x, B.y + 8,
@@ -457,6 +476,8 @@ export function AceSelectScreen({
       )}
 
       </>)}
+
+      {panel?.(cursor)}
 
       {/* 원본에 없던 웹 키 안내 글("…를 고르세요 — 방향키 이동 · Enter 결정")은 걷었다 */}
 

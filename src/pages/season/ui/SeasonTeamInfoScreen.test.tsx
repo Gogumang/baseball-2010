@@ -32,6 +32,29 @@ describe('구단정보 0xd5 img_text 팔레트 (0x7c450)', () => {
   })
 })
 
+describe('구단정보 0xd5 숫자 값 칸 — numBox 0xba51c (0x7c8ea · 0x7cdc2 · 0x7ceae)', () => {
+  it('좌석 5000 은 시스템 글꼴이 아니라 주황 num 그림 20 + 숫자를 칸(60, 218, 81, 15) 가운데에 — 가로 60 + (81 − 4 × 7) >> 1 = 86', () => {
+    render(<SeasonTeamInfoScreen teamId={0} teamAbilities={[50, 50, 50, 50]} rows={ROWS} onBack={() => {}} />)
+    const cell = screen.getByTestId('구단정보-값-2')
+    expect(cell.textContent).toBe('')
+    const digits = [...cell.querySelectorAll('img')].filter((image) => image.getAttribute('src')?.startsWith('./sprites/num/'))
+    expect(digits.map((image) => image.getAttribute('src'))).toEqual(
+      ['./sprites/num/025.png', './sprites/num/020.png', './sprites/num/020.png', './sprites/num/020.png'],
+    )
+    expect(digits[0].style.left).toBe('86px')
+    // 세로 ceil((15 − 10) / 2) = 3 — 줄 2 의 칸 y = 184 + 2 × 17
+    expect(digits[0].style.top).toBe('221px')
+  })
+
+  it('순위 3 도 num 그림 — 오른쪽 열 칸(176, 218, 32, 15) 가운데 176 + (32 − 7) >> 1 = 188', () => {
+    render(<SeasonTeamInfoScreen teamId={0} teamAbilities={[50, 50, 50, 50]} rows={ROWS} onBack={() => {}} />)
+    const cell = screen.getByTestId('구단정보-값-6')
+    const digit = cell.querySelector('img') as HTMLImageElement
+    expect(digit.getAttribute('src')).toBe('./sprites/num/023.png')
+    expect(digit.style.left).toBe('188px')
+  })
+})
+
 /** 구단정보 0xd5 — 카드 0x7ba44 의 0xd5 갈래 */
 
 const 띄우기 = (hasCardBadge?: boolean) => render(

@@ -172,6 +172,10 @@ export function SeasonEquipmentScreen({
         <EquipmentWindow record={record} isBatter={isBatter} equipment={equipment} part={part} level={level} top={top}
           isItemFocus={isItemFocus} tick={tick} isHiddenOpen={isHiddenOpen}
           onPickPart={(slot) => {
+            if (notice !== null || question !== null) return
+            // ⚠️ 웹 전용 길(원본은 칸 목록에서 부위로 가려면 취소 0x81a9a 를 거친다) — 칸 목록에서 다른 부위를 누르면
+            // 먼저 지금 부위를 진짜 니블로 되돌린다. 안 그러면 앞 부위에 끼워 본 장비가 카드 사본에 남았다(r263)
+            if (isItemFocus) leaveItems()
             setPart(slot)
             enterItems(slot)
           }}

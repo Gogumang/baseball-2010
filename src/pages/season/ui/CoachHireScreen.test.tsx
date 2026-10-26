@@ -57,6 +57,31 @@ describe('코치 칸 = 마선수 격자 (0xd7 this+0x11c = 2 — 그림은 공�
   })
 })
 
+describe('정보 상자 0xaa6c~0xad78 (r263)', () => {
+  const 정보글 = () => screen.getByTestId('코치-정보글').textContent ?? ''
+
+  it('커서 칸 코치의 효과 [149 + 칸] · 계약금 [159] · 필요 인기도 [160] — 처음 칸 0', () => {
+    띄우기(상태())
+    expect(정보글()).toBe('팀 투수 변화 +8계약금 : 1억필요 인기도 : 0')
+  })
+
+  it('커서를 옮기면 그 칸 글 — 잠긴 칸이어도 그린다 (가드 없음)', () => {
+    띄우기(상태(), [0], [0])
+    fireEvent.keyDown(window, { key: '6' })
+    expect(정보글()).toBe('팀 투수 구속 +9계약금 : 1억5000필요 인기도 : 100')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(정보글()).toBe('팀 타자 주력/수비 +5계약금 : 1억5000필요 인기도 : 100')
+  })
+
+  it('B 딱지(ABILITY 파란 막대 117)는 안 그린다 — k 10 은 [sp+0xc0] = −1 (0x657e0)', () => {
+    const { container } = render(
+      <CoachHireScreen state={상태()} openedAcePitcherIds={다열림} openedAceBatterIds={다열림} onHire={vi.fn()} onBack={vi.fn()} />,
+    )
+    expect(container.querySelector('img[src$="slt_frame/117.png"]')).toBeNull()
+    expect(screen.getByTestId('코치-정보상자')).toBeDefined()
+  })
+})
+
 describe('오픈 검사 (0xa734~0xa8fe)', () => {
   it('안 열린 칸은 가드 대신 [43] G 오픈 팝업 — 예면 그 칸을 연다', () => {
     const onOpenAce = vi.fn()

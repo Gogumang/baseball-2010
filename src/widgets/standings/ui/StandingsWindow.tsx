@@ -21,7 +21,7 @@ const frameImage = (folder: string, frame: number) => `${folder}/${String(frame)
 
 interface StandingsWindowProps {
   readonly league: League
-  /** 포스트시즌이면 진출 4팀만 (0x7f070 의 [+0xac] 플래그) */
+  /** 줄 수 — 0x7f070 은 리그 [+0xac](국가대항전 플래그)가 서면 i ≥ 4 줄을 건너뛴다(0x7f1d0~0x7f1e0). 포스트시즌 플래그가 아니다 — 대회 4개국 표는 `NationalCupStandings` */
   readonly rowCount?: number
   readonly onClose: () => void
 }
