@@ -147,14 +147,69 @@ let loadingScenesUp = 0
 /** 멈추기 시작한 횟수 중 로딩 판(상태 7 · 8 · 9)이 아닐 때 선 것 — 그 첫 그림만 배경 0x41230 을 다시 그린다(52f26~52f36) */
 let backdropFreezeSerial = 0
 
-function syncGameSceneFreeze(now: number = performance.now()): void {
-  const isFrozen = gameScenesUp > 0 && shownCommonWindows > 0
-  if (isFrozen && frozenSince === null) {
-    frozenSince = now
-    frozenSinceAppTick = appTickOf(now)
+/**
+ * **갱신 뒤에 연 창 — 다음 앱 틱 머리부터 멈춘다**. 경기 장면 프레임 0x52c50 은 창 게이트 0x754f9 를 틀 머리 52cc6 에서 **한 번만**
+ * 본다. 그 뒤 키 0x498d4(52d9e — '*' 49918 → 0x741a0 · 0x3c02c) · 진입 표 0xd04bc · 갱신 표 0xd0530(52e14~ — 히든 오픈 알림
+ * 0x62368 → 0x74ef5 · 돌발 창 따위)이 창을 세우면 그 틀은 갱신을 끝까지 돌고, 52efe 는 [창+0x250] = 1(창을 띄운 0x74ef4 · 0x741a0)이라
+ * 장면을 그대로 그린 뒤 같은 틀 끝 0x746cc 가 [+0x250] 을 지운다. 다음 틀부터 52cc6 이 갱신을, 52efe 가 장면 그리기를 건너뛴다 —
+ * **그 틀은 보통 틀이고 창만 얹힌 첫 그림이 따로 없다**. 웹은 그런 창(`noteCommonWindowOpensInSceneUpdate`)을 그 앱 틱이 끝날 때까지
+ * 멈추지 않고(그 틱 머리에 걸린 시계 · 틱 고리 · 타석 루프가 마저 돈다) 다음 앱 틱 머리에서 멈추며, 창이 선 첫 그림 셈(`freezeSerial`)을
+ * 올리지 않는다. 틀 머리 앞(창 갱신 0x754f8 이 대기 칸 창을 이어 띄움 · 단말 일시정지 0x463ac)에 선 창은 지금처럼 곧바로 멈추고 그 첫
+ * 그림이 장면을 한 번 더 그린다. 파티클 게이트 53048 은 같은 틀 뒤쪽이라 둘 다 창이 선 때부터다(`isCommonWindowShown`).
+ */
+let pendingFreeze: { readonly appTick: number; bumpsFirstDraw: boolean; handle: ReturnType<typeof setTimeout> | null } | null = null
+/** 이 앱 틱에 경기 장면 갱신(키 · 진입 · 갱신) 안에서 창을 연다고 적어 둔 틱 — 그 틱 안에 서는 창의 멈춤을 늦춘다 */
+let inSceneUpdateOpenAppTick: number | null = null
+
+/**
+ * 지금 여는 창은 경기 장면 틀의 갱신 안(키 0x498d4 · 진입 · 갱신 — 게이트 52cc6 뒤)에서 연다 — 같은 앱 틱 안에 서는 공용 창은 그 틱이
+ * 끝난 뒤(다음 앱 틱 머리)부터 장면을 멈추고, 창이 선 첫 그림([창+0x250] 의 다시 그리기)을 따로 세지 않는다(`pendingFreeze` 머리말)
+ */
+export function noteCommonWindowOpensInSceneUpdate(now: number = performance.now()): void {
+  inSceneUpdateOpenAppTick = appTickOf(now)
+}
+
+function beginFreeze(at: number, appTick: number, bumpsFirstDraw: boolean): void {
+  frozenSince = at
+  frozenSinceAppTick = appTick
+  if (bumpsFirstDraw) {
     freezeSerial += 1
     if (loadingScenesUp === 0) backdropFreezeSerial += 1
-    for (const timer of sceneTimers.values()) pauseSceneTimer(timer, now)
+  }
+  for (const timer of sceneTimers.values()) pauseSceneTimer(timer, at)
+}
+
+/** 늦춘 멈춤의 앱 틱 머리가 지났으면 그 머리에서 멈춘다 — 시계를 읽는 곳마다 먼저 부른다 */
+function settlePendingFreeze(now: number = performance.now()): void {
+  const pending = pendingFreeze
+  if (pending === null || appTickOf(now) < pending.appTick) return
+  pendingFreeze = null
+  if (pending.handle !== null) clearTimeout(pending.handle)
+  // 장면 틱은 갱신을 다 돈 앞 틱에 선다 — 장면 시각은 멈춘 틱 머리에서 선다
+  beginFreeze(appTickStartTime(pending.appTick), pending.appTick - 1, pending.bumpsFirstDraw)
+}
+
+function syncGameSceneFreeze(now: number = performance.now()): void {
+  settlePendingFreeze(now)
+  const isFrozen = gameScenesUp > 0 && shownCommonWindows > 0
+  if (isFrozen && frozenSince === null && pendingFreeze === null) {
+    const appTick = appTickOf(now)
+    const opensInUpdate = inSceneUpdateOpenAppTick === appTick
+    inSceneUpdateOpenAppTick = null
+    if (!opensInUpdate) {
+      beginFreeze(now, appTick, true)
+      return
+    }
+    const pending = { appTick: appTick + 1, bumpsFirstDraw: false, handle: null as ReturnType<typeof setTimeout> | null }
+    pendingFreeze = pending
+    pending.handle = setTimeout(() => {
+      pending.handle = null
+      settlePendingFreeze()
+    }, Math.max(0, appTickStartTime(appTick + 1) - now))
+  } else if (!isFrozen && pendingFreeze !== null) {
+    // 창이 그 틱 안에 다시 내려갔다 — 멈추지 않는다
+    if (pendingFreeze.handle !== null) clearTimeout(pendingFreeze.handle)
+    pendingFreeze = null
   } else if (!isFrozen && frozenSince !== null) {
     frozenTotal += Math.max(0, now - frozenSince)
     // 창이 선 틀부터 닫힌 틀까지 앱 틱 수 — 닫힌 틀이 든 앱 틱은 멈춘 장면 틱 그대로이고 다음 앱 틱 머리에서 하나 오른다
@@ -189,9 +244,17 @@ function runSceneTimer(id: number, timer: SceneTimer, now: number): void {
   timer.startedAt = now
   // 틱 시계는 남은 ms 가 아니라 울릴 장면 틱의 머리(= 앱 틱 머리)까지 잰다 — 창이 닫힌 뒤에도 틱 머리에 선다
   const delay = timer.dueTick === null ? timer.remaining : Math.max(0, appTickStartTime(timer.dueTick + frozenTicks) - now)
+  const dueAt = now + delay
   timer.handle = setTimeout(() => {
-    sceneTimers.delete(id)
     timer.handle = null
+    // 늦춘 멈춤(갱신 뒤에 연 창)의 머리가 이 시계보다 먼저면 이 시계는 창 아래에서 선다
+    settlePendingFreeze()
+    if (frozenSince !== null && dueAt >= frozenSince) {
+      if (timer.dueTick === null) timer.remaining = Math.max(0, dueAt - frozenSince)
+      timer.startedAt = null
+      return
+    }
+    sceneTimers.delete(id)
     timer.callback()
   }, delay)
 }
@@ -200,7 +263,7 @@ function pauseSceneTimer(timer: SceneTimer, now: number): void {
   if (timer.handle === null) return
   clearTimeout(timer.handle)
   timer.handle = null
-  if (timer.dueTick === null) timer.remaining = Math.max(0, timer.remaining - (now - (timer.startedAt ?? now)))
+  if (timer.dueTick === null) timer.remaining = Math.max(0, timer.remaining - Math.max(0, now - (timer.startedAt ?? now)))
   timer.startedAt = null
 }
 
@@ -209,6 +272,7 @@ function addSceneTimer(callback: () => void, remaining: number, dueTick: number 
   nextSceneTimerId += 1
   const timer: SceneTimer = { callback, remaining: Math.max(0, remaining), dueTick, startedAt: null, handle: null }
   sceneTimers.set(id, timer)
+  settlePendingFreeze()
   if (frozenSince === null) runSceneTimer(id, timer, performance.now())
   return id
 }
@@ -239,15 +303,17 @@ export function clearGameSceneTimeout(id: number | null | undefined): void {
  * 대기 칸 창이 이어 설 때도 같다 — 창 갱신 0x754f8 이 75552 · 755d4 에서 0x75440 을 불러 0x74ef4 · 0x741a0 으로 다음 창을 띄우므로
  * [+0x250] 이 다시 선다(웹은 앞 창이 내려가고 같은 때 다음 창이 서서 멈춤이 새로 센다).
  *
- * ⚠️ 근사(때 · 남김 — 웹 구조): 원본은 창을 연 자리가 갱신(52cc6) 앞(대기 칸 창이 0x754f9 안에서 서는 때 · 폰 인터럽트 0x463ac)이면 그 그림이 갱신 없이
- * 그리기만 하고, 갱신 뒤(키 0x498d4 의 '*' 메뉴 · 진입 · 갱신의 히든 오픈 알림)면 그 그림은 갱신 · 그리기를 다 한다. 웹은 창이 서는
- * 커밋에서 곧장 멈추고 그리기 셈만 한 번 더 올린다 — 뒤 경우의 갱신 한 틱은 웹에 없다.
+ * 창을 연 자리로 갈린다(r300): 게이트(52cc6) **앞**(대기 칸 창이 0x754f9 안에서 서는 때 · 단말 일시정지 0x463ac)이면 다음 그림이 갱신 없이
+ * 그리기만 하고 — 이 첫 그림을 센다. 게이트 **뒤**(키 0x498d4 의 '*' 메뉴 · 진입 · 갱신의 히든 오픈 알림 따위)면 그 틀이 갱신 · 그리기를
+ * 다 하는 보통 틀이고 다음 틀부터 둘 다 건너뛴다 — 웹은 여는 쪽이 `noteCommonWindowOpensInSceneUpdate` 로 알리고, 멈춤을 다음 앱 틱
+ * 머리로 늦추며 첫 그림을 안 센다(`pendingFreeze` 머리말).
  */
 /**
  * 경기 장면이 멈추기 시작한 횟수 — 곧 창이 선 첫 그림([창+0x250], 52efe)의 수다. 그 그림은 배경 0x41230 을 한 번 더 그리므로
  * 배경이 스스로 올리는 칸(전광판 글자 자리 [구장+0x8c] — `sceneCloudClock.sceneScoreboardTickOf`)이 이 수를 더 센다
  */
 export function gameSceneFreezeSerialNow(): number {
+  settlePendingFreeze()
   return freezeSerial
 }
 
@@ -257,6 +323,7 @@ export function gameSceneFreezeSerialNow(): number {
  * (`sceneCloudClock.sceneScoreboardTickOf`)
  */
 export function gameSceneBackdropFreezeSerialNow(): number {
+  settlePendingFreeze()
   return backdropFreezeSerial
 }
 
@@ -287,6 +354,12 @@ export function markGameSceneLoading(): () => void {
  * [+9] 를 먼저 봐 아무 일 없다. 웹은 멈춤 셈을 한 번 더 올린다(`createGameSceneDrawGate` · `gameSceneFreezeSerialNow`).
  */
 export function rearmGameSceneFirstDraw(): void {
+  settlePendingFreeze()
+  // 갱신 뒤에 연 창이 아직 다음 틀 머리 전이면 — 그 틀(52cc6 이 창을 보는 첫 틀)이 장면을 한 번 더 그린다
+  if (pendingFreeze !== null) {
+    pendingFreeze.bumpsFirstDraw = true
+    return
+  }
   if (frozenSince === null) return
   freezeSerial += 1
   if (loadingScenesUp === 0) backdropFreezeSerial += 1
@@ -297,10 +370,16 @@ export interface GameSceneDrawGate {
 }
 
 export function createGameSceneDrawGate(): GameSceneDrawGate {
-  let seenSerial = frozenSince === null ? -1 : freezeSerial
+  settlePendingFreeze()
+  // 흐르는 중에 만든 부품도 지금까지의 멈춤은 지난 것으로 본다 — 다음에 세는 첫 그림부터 그린다
+  let seenSerial = freezeSerial
   return {
     allowsDraw: () => {
-      if (frozenSince === null) return true
+      settlePendingFreeze()
+      if (frozenSince === null) {
+        seenSerial = freezeSerial
+        return true
+      }
       if (seenSerial === freezeSerial) return false
       seenSerial = freezeSerial
       return true
@@ -333,6 +412,7 @@ export function isGameSceneUp(): boolean {
 
 /** 경기 장면 0x52c50 이 52cc6 · 52efe · 53048 에서 이 그림을 건너뛰는가 (`gameScenesUp` 머리말) */
 export function isGameSceneFrozen(): boolean {
+  settlePendingFreeze()
   return frozenSince !== null
 }
 
@@ -342,6 +422,7 @@ export function isGameSceneFrozen(): boolean {
  * 경기 장면 부품이 쓰는 시각(단계 시작 · 키를 받은 시각 · 그림 시각)은 모두 이 시계로 재야 서로 맞는다.
  */
 export function gameSceneTimeOf(raw: number): number {
+  settlePendingFreeze()
   return (frozenSince === null ? raw : Math.min(raw, frozenSince)) - frozenTotal
 }
 
@@ -367,6 +448,7 @@ export function gameSceneNow(): number {
  * 끝 틱을 본 그 틀(= 원본의 예약 다음 틀)에 새 단계를 세우므로 그 틀의 장면 틱이 새 단계의 시작 틱이다.
  */
 export function gameSceneTickOf(sceneTime: number): number {
+  settlePendingFreeze()
   const appTick = appTickOf(sceneTime + frozenTotal)
   // 서 있는 동안은 창이 선 앱 틱에 머문다(그 뒤 시각을 받아도 오르지 않는다)
   return (frozenSinceAppTick === null ? appTick : Math.min(appTick, frozenSinceAppTick)) - frozenTicks
@@ -379,11 +461,13 @@ export function gameSceneTickNow(): number {
 
 /** 장면 틱 `tick` 이 시작하는 경기 장면 시각(ms) — 그 틱의 앱 틱 머리를 장면 시계로 옮긴 값 */
 export function gameSceneTickStartTime(tick: number): number {
+  settlePendingFreeze()
   return appTickStartTime(tick + frozenTicks) - frozenTotal
 }
 
 /** 장면 틱 `tick` 이 든 앱 틱 — 앱 전역 셈(파티클 관리자 틱 표지 따위)을 장면 부품이 같은 틀로 맞출 때 */
 export function appTickOfGameSceneTick(tick: number): number {
+  settlePendingFreeze()
   return tick + frozenTicks
 }
 
@@ -416,6 +500,7 @@ export function resetCommonWindowShownForTest(): void {
   shownCommonWindows = 0
   gameScenesUp = 0
   loadingScenesUp = 0
+  inSceneUpdateOpenAppTick = null
   // 붙잡혀 있던 시계는 다시 흘린다
   syncGameSceneFreeze()
   frozenSince = null
