@@ -104,7 +104,7 @@ function entryStateOf(
   return { openedTeams, popups: queuedPopupsOf([...hiddenPopups, ...titlePopups]) }
 }
 
-type Step = '대진' | '순위' | '결과' | '보상'
+type Step = '대진' | '순위' | '결과' | '보상' | '끝'
 
 /**
  * 국가대항전 화면 한 벌 — 대진 → 순위 → (경기) → … → 결과 → 보상.
@@ -173,9 +173,18 @@ export function NationalCupScreen({
     setStep('결과')
   }
 
+  /**
+   * 대회 끝 — 팝업이 닫힌 틀에 (나리는) 새 시즌 0x1b768(1bb28)을 부른다. 나리 134 는 그 뒤에도 대진판을 그리며
+   * 효과기 끝을 기다린다(1bb2c~1bb64) — 팝업 없이 대진판만 남긴다(`YearCoverHoldLayer`)
+   */
+  const finishCup = () => {
+    setStep('끝')
+    onFinish(finish, resolved)
+  }
+
   const closeResult = () => {
     // 보상이 없으면(탈락·나리 준우승) 보상 팝업 없이 곧장 끝난다 — 원본도 그렇다
-    if (finish.reward.messageId === 0) return onFinish(finish, resolved)
+    if (finish.reward.messageId === 0) return finishCup()
     setStep('보상')
   }
 
@@ -252,7 +261,7 @@ export function NationalCupScreen({
         <MessageBox
           text={nationalCupRewardText(finish.reward)}
           buttons={['확인']}
-          onAnswer={() => onFinish(finish, resolved)}
+          onAnswer={finishCup}
         />
       )}
     </RawScreen>

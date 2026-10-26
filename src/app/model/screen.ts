@@ -8,6 +8,16 @@ import type { GameEvaluation, StreakNotice } from '@/entities/career/model/gameE
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { PostseasonPopup } from '@/entities/career/model/postseasonFlow'
 
+/** 116 경기 뒤 평가의 재료 — 경기 결과 화면이 들고 있다가 116 에 넘긴다 */
+export interface GameEvaluationScreenData {
+  /** 116 진입 0x1278c 가 직접 거는 칭호(39 다이너마이트 배트 — 1299e~129c8). 주는 것은 칭호 팝업 키 0x1b1e4 */
+  readonly newTitles: readonly string[]
+  readonly evaluation: GameEvaluation
+  readonly streakNotices: readonly StreakNotice[]
+  /** 0x8a6fc 가 쌓은 보상 명령(종류 7) — 평판 합 · 슬럼프 ±18. 114 가 명령마다 창을 띄운다 (`streakEventOf().rewards`) */
+  readonly streakRewards?: readonly EventReward[]
+}
+
 /** 지금 떠 있는 화면 하나. 화면마다 필요한 값을 같이 들고 다닌다. */
 export type Screen =
   /** 켤 때 첫 화면 `<이용안내>` — 장면 0x103 하위 0x2a (생성자 0x234d4 의 `[0x140006c]` = −1 갈래). 아무 키나 → 로고 */
@@ -51,25 +61,31 @@ export type Screen =
   | { readonly kind: '일반모드' }
   | { readonly kind: '선수등록'; readonly teamId?: number }
   | { readonly kind: '경기' }
-  | {
+  /**
+   * 나리 타자편 정규 경기 결과 — **경기 장면 0x104** 의 경기 끝 판(상태 0x18 · 0x4fe9c)과 정산(0x19 · 진입 0x4ea0c · 그림 0x4a384).
+   * 정산 판을 나가면(키 0x407f0 40980~4098c `0xbfbac(+0x70, 0x3f3)`) 나리 장면 0x106 이 새로 서고 상태 100 `0x1c154` 가
+   * S+0x50 == 2 로 116 을 띄운다(1c26a) — 웹은 `leaveGameSettlement` 가 '경기평가' 로 넘긴다. 평가 재료는 그때 넘겨줄 몫으로 든다.
+   */
+  | ({
       readonly kind: '경기결과'
       readonly summary: GameSummary
       readonly gamePointReward: number
-      readonly newTitles: readonly string[]
-      readonly evaluation: GameEvaluation
-      readonly streakNotices: readonly StreakNotice[]
-      /** 0x8a6fc 가 쌓은 보상 명령(종류 7) — 평판 합 · 슬럼프 ±18. 114 가 명령마다 창을 띄운다 (`streakEventOf().rewards`) */
-      readonly streakRewards?: readonly EventReward[]
       /**
-       * 경기 정산 0x4ea0c 를 막 지났으면 경기 끝 이닝(1 부터) — 결과 그림 0x4a384 의 배경 · 정산 효과(밤 승리 불꽃 · 패배 비)가 쓴다.
-       * 이어하기가 116 을 다시 띄울 때(정산을 다시 안 돈다)는 없다.
+       * 경기 정산 0x4ea0c 를 지난 경기 끝 이닝(1 부터) — 결과 그림 0x4a384 의 배경 · 정산 효과(밤 승리 불꽃 · 패배 비)가 쓴다.
+       * (시험 길처럼 없으면 경기 끝 판 없이 정산 판만)
        */
       readonly settlementInning?: number
-      /** 사람 팀의 측(0 = 선공) — 경기 끝 판 0x4fe9c · 정산 판 0x4a948 의 점수 · 점수판 틀 두 측 차례. 정산을 지났을 때만 */
+      /** 사람 팀의 측(0 = 선공) — 경기 끝 판 0x4fe9c · 정산 판 0x4a948 의 점수 · 점수판 틀 두 측 차례 */
       readonly settlementPlayerSide?: PlayerSide
-      /** 그 경기 구장의 하늘 줄 +0x10(0x783b0) — 정산 결과 그림 배경이 경기 중 줄 그대로 쓴다. 정산을 지났을 때만 */
+      /** 그 경기 구장의 하늘 줄 +0x10(0x783b0) — 정산 결과 그림 배경이 경기 중 줄 그대로 쓴다 */
       readonly settlementSkyRow?: number
-    }
+    } & GameEvaluationScreenData)
+  /**
+   * 나리 타자편 **116 경기 뒤 평가** — 나리 장면 0x106 의 상태 116(진입 0x1278c · 그림 0x11e0c) → 114 내장 이벤트 0x8a6fc.
+   * 경기 뒤(정산 판을 나간 메시지 0x3f3 → 장면 0x106 → 100 → 116)와 이어하기(S+0x50 == 2 — 1c26a, 정산을 다시 안 돈다) 두 길로
+   * 온다. 진입이 평가 징글 36~38(12c96~12cc6)을 낸다. [확인](114 끝) → 105 · 109 · 128 · 136 (`confirmGameResult`)
+   */
+  | ({ readonly kind: '경기평가' } & GameEvaluationScreenData)
   /**
    * 나리 국가대항전 사람 경기 결과 — 경기 끝 판(상태 0x18) · 정산 그림(0x19 · 0x4a384)을 정규 경기 결과 화면 한 장으로 보인다.
    * 116 평가는 없다(대회는 S+0x50 = 2 를 안 쓴다). [확인] → 134 대진판(0x1c154 의 S+0x12c 갈래). `cup` 은 하루를 넘긴 대회.
@@ -98,6 +114,11 @@ export type Screen =
        * 137 을 띄운다(`nariYearCover` 의 이어하기 길). 앞 화면은 100 · 1 · 105 · 115 · 114 이고, 100 진입 1c15e 가 배경음을 끊는다
        */
       readonly fromResume?: true
+      /**
+       * 134 대진판 · 141 엔딩에서 왔다 — 앞 화면 아홉 틀(0x1b768 뒤 그 상태가 그리기를 돌며 효과기 끝을 기다린다)은 앞 화면이 그대로
+       * 선 채 앱이 효과기를 칠했고(`YearCoverHoldLayer`), 표지는 137 예약 다음 틀(효과기 종류 2 의 칠하기 1)부터 선다
+       */
+      readonly afterHold?: true
     }
   /**
    * 나만의리그 다음경기 앞 순위표 (원본 상태 109). 관리 [다음경기]에서 오거나(이전 105), 경기 뒤 관리 주기가 아니면

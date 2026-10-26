@@ -111,7 +111,7 @@ describe('B-28 116 이어하기가 경기 뒤 카운터를 다시 씀 (0x1c154 1
   it('고침: 평가 창만 다시 띄우고 카운터는 그대로 — 연속 기록 보상은 [확인] 한 번', () => {
     setBugfixConfigForTests(bugfixConfigWith(['B-28']))
     const rendered = 띄우기(평가중())
-    expect(rendered.result.current.screen.kind).toBe('경기결과')
+    expect(rendered.result.current.screen.kind).toBe('경기평가')
     expect(rendered.result.current.session.career?.seasonPopularityGain).toBe(10)
     act(() => rendered.result.current.session.actions.confirmGameResult())
     expect(rendered.result.current.session.career?.reputation).toBe(310)

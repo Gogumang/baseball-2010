@@ -247,16 +247,22 @@ export function canContinueAfterEnding(career: PlayerCareer, endingIndex: number
   return isContinuableEnding(endingIndex) && career.gamePoint >= CONTINUE_COST_GAME_POINT
 }
 
-const INJURY_ENDING = 0
+/** 부상 엔딩 — 141 팝업 0x32 예(1bdd2)의 판정 0xa3a85(S) == 0 갈래 */
+export const INJURY_ENDING_INDEX = 0
+
+/** 이어하기 값 5000 G포인트를 치르고 엔딩 칸을 비운 선수 (팝업 0x32 예 → 0x1bdc6) — 새 시즌 처리는 부르는 쪽 몫 */
+export function continueAfterEndingPayment(career: PlayerCareer): PlayerCareer {
+  return { ...career, gamePoint: career.gamePoint - CONTINUE_COST_GAME_POINT, endingIndex: null }
+}
 
 /**
  * "현재 상태에서 이어하기" (0x1bd36, 점검 9차) — 5000 G포인트를 쓰고
  * 부상 엔딩은 부상만 풀고 같은 시즌 관리 화면으로, 방출 엔딩은 새 시즌 전환(0x1b768)으로 간다.
  */
 export function continueAfterEnding(career: PlayerCareer, random: RandomPort): PlayerCareer {
-  const paid: PlayerCareer = { ...career, gamePoint: career.gamePoint - CONTINUE_COST_GAME_POINT, endingIndex: null }
+  const paid = continueAfterEndingPayment(career)
   // 0x1bddc~0x1bdfa: 부상 기간 +0x1b5 · +0x1ce · 부상 경기 수 +0x1b6 을 0 으로 (원본 부상 판정은 +0x1b5 > 0)
-  if (career.endingIndex === INJURY_ENDING) return { ...paid, isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0 }
+  if (career.endingIndex === INJURY_ENDING_INDEX) return { ...paid, isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0 }
   return startNextSeason(paid, random)
 }
 

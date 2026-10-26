@@ -8,7 +8,7 @@ import type { Screen } from '@/app/model/screen'
  *   - 장면 0x103(메인 메뉴): 이용안내 0x2a · 로고 2 · 타이틀 3 · 메뉴 4/5 · 도움말 7 · 환경설정 8 · 스페셜 6 · 홈런더비 선수 고르기 16 ·
  *     일반모드 준비 18~22 · 미션 선수 고르기 17
  *   - 장면 0x107(미션 목록 0x1d784) — 미션선택에서 선수를 고른 뒤
- *   - 장면 0x106(나리 0xf684) — 팀선택 0x65 · 선수등록 0x66 · 투수편 · 관리 · 이벤트 · 경기결과 116 · … 경기 밖 나리 화면 모두
+ *   - 장면 0x106(나리 0xf684) — 팀선택 0x65 · 선수등록 0x66 · 투수편 · 관리 · 이벤트 · 경기평가 116 · … 경기 밖 나리 화면 모두
  *   - 장면 0x105(시즌 0x3b14) — 시즌모드 안 경기 밖 화면
  */
 export function sceneClosesWithoutShrinkOf(kind: Screen['kind'], isMissionPlayerPicked: boolean): boolean {

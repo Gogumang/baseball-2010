@@ -122,13 +122,18 @@ interface StoryScreenProps {
    * 고른 이벤트로 넘어가기(0x8be20) 앞이다. 안 넘기면 아무 일도 없다(끝 · 보상 자리에서 같은 값이 된다).
    */
   readonly onChoiceConfirm?: EventChoiceConfirmHandler
+  /**
+   * 키 · 누르기를 안 받는다 — 효과기가 도는 동안 나리 장면 키 문 0x10758 · 0x10774 가 키를 버리는 틀(이어하기 길 137 앞의 연초 114
+   * — `resumeCoverUnderlayAt` 의 '대화'). 재생기는 그대로 돈다
+   */
+  readonly isInputLocked?: boolean
 }
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
   events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
   systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
-  rewardNoticeContext, onSystemWindowConfirm, onReward, onChoiceConfirm,
+  rewardNoticeContext, onSystemWindowConfirm, onReward, onChoiceConfirm, isInputLocked = false,
 }: StoryScreenProps) {
   // 대본이 적어 둔 표정 전부 — 주인공 초상화의 표정 애니를 미리 칠한다(`eventPortraitCastOf`)
   const upcomingPortraits = useMemo(() => eventPortraitCastOf(events, event), [events, event])
@@ -286,7 +291,7 @@ export function StoryScreen({
         <EventDialogueBox raw={isBoxCleared ? '' : (box.slots[0] ?? '')} replacements={box.replacements}
           choices={box.isChoice ? { lines: box.slots, selected: selectedChoice } : null}
           textKey={box.key} lowerKey={lowerCount} slideIn
-          onAdvance={next} isActive={isBoxActive}
+          onAdvance={next} isActive={isBoxActive && !isInputLocked}
           // 0x8b7b0 — say 중 취소는 다음 보상 · system · 선택지 · 예아니오 · 4 · 경기 명령까지 say · 효과 · 소리를 건너뛴다
           onCancel={command?.op === 'say' ? skip : undefined}
           onChoiceMove={setSelectedChoice}

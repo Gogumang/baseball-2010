@@ -796,7 +796,14 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       reward: { messageId: 199, popularity: 20, reputation: 30, money: 20, gamePoint: 1000 },
       openedTeams: [10],
     } as never))
+    // 134 는 0x1b768 뒤에도 대진판을 그리며 효과기 끝을 기다린다(1bb2c~1bb64) — 장면 · 대진은 그대로, 아홉 틀 뒤 137
+    expect(result.current.scene).toBe('국가대항전')
+    expect(result.current.cup).not.toBeNull()
+    expect(result.current.isYearCoverHeld).toBe(true)
+    act(() => result.current.actions.enterHeldYearCover())
     expect(result.current.scene).toBe('연차표지')
+    expect(result.current.yearCoverAfterHold).toBe(true)
+    expect(result.current.cup).toBeNull()
     expect(result.current.career?.season).toBe(2)
     // 대회 끝은 히든 팀을 열지 않는다 — 134 진입 0x19f30 이 화면에서 연다(`openCupHiddenTeams`)
     expect(result.current.career?.openedHiddenIds).not.toContain(10)

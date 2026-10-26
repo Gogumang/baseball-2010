@@ -3,6 +3,7 @@ import { scenePeeksNow } from '@/shared/lib/scenePeek/scenePeek'
 import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { MissionPeek, PitcherGamePeek, TeamGamePeek } from '@/shared/lib/scenePeek/scenePeek'
 import { MISSIONS } from '@/shared/config/original/missions'
+import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 
 /**
  * **장면 바로가기 표** (개발 · e2e 전용). 단계는 화면 상태를 꽂지 않고 메인 메뉴 · 관리 메뉴가 부르는 **그 진입 함수**를 부른다
@@ -325,6 +326,31 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     fixture: 'nari-y1',
     steps: [...TO_NARI_MANAGEMENT, wait(900)],
   },
+  'nari-evaluation': {
+    description: '나리 타자편 116 경기 뒤 평가 — 경기 결과(정산 판, 경기 장면 0x19)를 세우고 OK 로 나가면(0x3f3) 나리 장면 116 → 114 평가 대사 (r287)',
+    fixture: 'nari-y1',
+    steps: [
+      ...TO_NARI_MANAGEMENT,
+      call('경기 결과 0x19 를 세운다(정산 효과 없이 정산 판만)', (h) => h.setScreen({
+        kind: '경기결과',
+        summary: {
+          result: '승', ourScore: 5, opponentScore: 3, stats: EMPTY_SEASON_STATS, popularityPoints: 0, doublePlays: 0,
+          scoringPositionOuts: 0,
+          reputationCounts: { grandSlams: 0, walkOffs: 0, buntHits: 0, walks: 0, goAheadRuns: 0, tyingRuns: 0 },
+          ourTeamId: h.career.career?.teamId ?? 0, opponentTeamId: 1, recordIds: [],
+        },
+        gamePointReward: 0,
+        newTitles: [],
+        evaluation: { popularityChange: 2, reputationChange: 3, moraleChange: 1, commentIndex: 40 },
+        streakNotices: [],
+      })),
+      screenIs('경기결과'),
+      wait(600),
+      key('Enter'),
+      screenIs('경기평가'),
+      wait(900),
+    ],
+  },
   'nari-bat': {
     description: '나리 타자편 경기 — 1년차 첫 경기 내 첫 타석 0xe (관리 [다음경기] → 순위표 · 경기 준비 OK → 경기). 타이밍 재기 r242',
     fixture: 'nari-y1',
@@ -615,6 +641,16 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     fixture: 'nari-cup-win',
     seed: 1,
     steps: [...toNariResume('국가대항전'), ...CUP_RESULT_POPUP],
+  },
+  'nari-cup-cover': {
+    description: '나리 타자편 국가대항전 끝 → 새 시즌 — 결과 · 보상 팝업을 닫으면 134 대진판이 선 채 아홉 틀 어두워지고 137 "N년차" 표지 (r287)',
+    fixture: 'nari-cup-win',
+    seed: 1,
+    steps: [
+      ...toNariResume('국가대항전'),
+      ...CUP_RESULT_POPUP,
+      keyUntil('Enter', '137 표지', (h) => h.screen.kind === '연차표지', 700, 15000),
+    ],
   },
   'pitcher-postseason-game': {
     description: '나리 투수편 포스트시즌 내 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기 첫 구질 고르기 0xf (soak 픽스처)',
