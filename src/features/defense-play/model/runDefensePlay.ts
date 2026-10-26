@@ -132,7 +132,7 @@ import {
   throwTicksTo,
   throwTicksToFielder,
 } from '@/entities/fielding/model/throwPlan'
-import { chooseThrowTargetBase, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
+import { chooseThrowTargetBase, isForcedRunner, isSpecialThrow } from '@/entities/fielding/model/throwTargetBase'
 import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import { stealTargetBaseOf } from '@/entities/fielding/model/stealStart'
 import { EMPTY_BASES, type AdvanceResult, type BaseState } from '@/entities/game/model/baseState'
@@ -166,6 +166,7 @@ import { rollSpecialSwing } from '@/entities/batting/model/specialSwing'
 import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
 import { isSacrificeOf, settledBatterOutcomeOf, type PlayOutcomeInput } from '@/features/defense-play/model/playOutcome'
 import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import {
   holderMarkOf,
   viewStateOf,
@@ -316,7 +317,8 @@ export interface DefensePlayInput {
   readonly gameMode?: number
   /**
    * **수비를 CPU 가 맡았는가** — 협살(AI 상태 8)은 `state[0x31 + 수비측] == 1` 일 때만 시작한다
-   * (S8 1-4, 확정). 사람이 수비하면 원본에서도 협살이 절대 안 일어난다.
+   * (S8 1-4, 확정). 사람이 수비하면 원본에서도 협살이 절대 안 일어난다 — 원본 버그 B-11. 고친 길(`isBugFixed('B-11')`)은
+   * 이 값과 상관없이 협살을 건다(사람 수비면 포스로 밀려 가는 주자 0xb1b54 는 빼고).
    *
    * 안 주면 **안 도는 쪽**으로 둔다. 원본은 경기 상태가 늘 답을 알지만 이 진행기는 부르는 쪽이
    * 말해 줘야 알 수 있어서, 모르면 시작하지 않는 쪽이 안전하다.
@@ -2493,7 +2495,11 @@ export function stepDefensePlay(
     const arrivalBranch =
       runners.some((runner) => !runner.state.isOut && runner.arrivedThisListTick) ||
       fielderArrivals[play.ballHolderSlot] === true
-    if (defenseIsCpu && !play.finished && play.everHeld) {
+    // **B-11 고침(bugfixes.json)**: 사람 수비에서도 협살을 건다 — 원본의 `state[0x31 + 수비측] == 1` 관문(0xb4358)을 걷고,
+    // 포스로 밀려 가는 주자는 빼낸다(아래 `humanForceSkip`). 사람 수비면 공격은 CPU 라 주자가 되돌지 않아(자동 주루 0xaf918 은 앞으로만)
+    // 공 쥔 야수가 늘 주자가 달려오는 루의 커버(`coversBack`)다 — 짝에게 던질 일이 없어 수동 송구 원칙(키 없이 공이 안 나감)과 안 부딪친다.
+    const rundownEnabled = defenseIsCpu || isBugFixed('B-11')
+    if (rundownEnabled && !play.finished && play.everHeld) {
       // 협살 중 짝에게 던진 공이 닿았다 — 공 쥔 쪽이 바뀐다. 협살이 그사이 풀렸어도 날아간 공은 짝이 받는다
       // (원본 공은 실제 송구공이라 받는 야수의 포구 틱 갈래 b42c8 쥐기 0xb2710 으로 들어간다). 예전에는 풀리는 순간
       // 날아가던 공을 지워 아무도 공을 안 쥔 채 판이 끝났다 — 판 진행 관문의 +0x12c(쥠)를 보게 되며 드러났다.
@@ -2516,7 +2522,11 @@ export function stepDefensePlay(
         const target = chooseRundownRunner(context.runners)
         // 원본처럼 타자주자(0번)도 협살 대상이다 — 고르기(0xb398c)가 **뒤 주자부터** 보므로 0번은 다른 주자가 없을 때만
         // 뽑힌다. (예전 웹은 타자주자의 운명을 결과 코드가 정한다며 0번을 뺐다 — 결과를 먼저 정한 웹 다리라 걷었다)
-        if (target !== NONE && canStartRundown(context, true)) {
+        // B-11 고친 길의 사람 수비는 **포스로 밀려 가는 주자(0xb1b54 — 타자주자 · 앞 주자가 내 루로 오는 주자)를 협살하지 않는다**.
+        // 그 주자는 루만 밟으면 잡히는데, 협살 AI 가 루로 가던 공 가진 야수를 주자 쪽으로 돌려 세워 포스 아웃을 놓친다
+        // (원본 CPU 수비도 같은 길이 있지만 그쪽은 원본 그대로 둔다)
+        const humanForceSkip = !defenseIsCpu && target !== NONE && isForcedRunner(context.play, context.runners, target)
+        if (target !== NONE && !humanForceSkip && canStartRundown(context, true)) {
           rundown = buildRundownPlan(context, target)
           rundowns += 1
           // 0xb3a94 b3aec~b3b28 (직접 뜬 것, r176): 두 야수(+0x1ec · +0x1ed)마다 +0xb4(동작 잠금) ≤ 0 일 때만 b3b0c vt10

@@ -98,13 +98,13 @@
       "symptom": "사람이 수비하면 협살이 절대 안 일어난다",
       "source": "협살 시작 조건 `state[0x31+수비측] == 1`(CPU, S8 1-4)",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-12",
       "name": "수비(사람) 레이저 송구",
-      "symptom": "레이저 송구 입력 창이 19틱이 아니라 실제 7~9틱뿐이다",
+      "symptom": "정정(r272) — 원본 버그가 아니다: 0x523bc 는 굴림(+0x19af) 뒤 0xb2648 을 안 불러 창은 19틱 그대로다(고칠 것 없음)",
       "source": "카운터가 틱이 아니라 0xb2648 호출마다 오름(0x524c0 틱당 2~3번)",
       "impact": "중",
       "implemented": false,
@@ -116,7 +116,7 @@
       "symptom": "자동진행이 멈춘 끝내기 판에서 아웃 수가 3을 넘어(4~5) 설 수 있다",
       "source": "0xc22b4 c2318~c232e(`st[6] = t − rand(d, t+1)`)",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
