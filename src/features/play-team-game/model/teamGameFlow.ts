@@ -208,6 +208,7 @@ import type {
   TeamGameAbilityContext,
 } from '@/features/play-team-game/model/teamGameRoster'
 import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import {
   backToBackRecordOf,
@@ -1145,6 +1146,9 @@ function startingPitcherSlotsOf(
   return { opponent, ours: rollStartingPitcherIndex(random) }
 }
 
+/** AI 팀 마선수 없음 — 시즌 국가대항전 · 굴리지 않는 길과 같은 값 */
+const NO_OPPONENT_ACE = -1
+
 /**
  * **AI 팀 마선수 번호 둘**을 굴린다 — 마투수 `0x66968` → 마타자 `0x66994` 차례 (난수 2).
  * 인자는 사람이 고른 마선수(준비 기록 `+0xe`·`+0xd`)다 — 겹치지 않는 번호가 나온다(`rollOpponentAceIndex`).
@@ -1161,7 +1165,13 @@ export function rollOpponentAces(
 ): { readonly pitcher: number; readonly batter: number } {
   const pitcher = rollOpponentAceIndex(acePitcherId, random)
   const batter = rollOpponentAceIndex(aceBatterId, random)
-  return { pitcher, batter }
+  // B-03 — 원본은 사람이 "없음"(−1)을 골라도 AI 가 늘 하나씩 받는다(`rollOpponentAceIndex` 의 ldrb). 고친 길(기본)은 사람이 안 고른
+  // 역할은 AI 도 없음(−1)으로 둔다. 굴림 둘은 그대로 먹어 뒤의 선발 굴림 차례가 원본과 같다
+  if (!isBugFixed('B-03')) return { pitcher, batter }
+  return {
+    pitcher: acePitcherId < 0 ? NO_OPPONENT_ACE : pitcher,
+    batter: aceBatterId < 0 ? NO_OPPONENT_ACE : batter,
+  }
 }
 
 /** 일반모드 `0x30f20` 이 굴리는 넷 — 상대 마선수 둘과 선발 둘 */

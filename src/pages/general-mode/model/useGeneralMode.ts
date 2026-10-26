@@ -35,6 +35,7 @@ import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { readSetupRecord, writeSetupRecord } from '@/pages/general-mode/model/setupRecord'
 import { mountOnce } from '@/shared/lib/strictMount/strictMount'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 export interface UseGeneralModeOptions extends QuickStartOpenState {
   readonly random: RandomPort
@@ -67,7 +68,7 @@ export interface UseGeneralModeOptions extends QuickStartOpenState {
    * - 상태 23 엔트리 편집 나감 `0x2a370` — 2a3d6 두 팀 `0xb8769` → 2a428~2a456 같은 칸 0x32 · 0x33 → 2a45a `0x22755(저장, 1)`
    *
    * +0x4d 를 0 으로 쓰는 곳은 정산 진입(0x4f3d6) 하나라, 이어하기가 살아 있던 채로 새로하기 → 22 → OK 없이 나가면
-   * [최근게임]·[13] 이어하기가 방금 세운 1회초 0:0 경기를 연다(원본 버그 그대로).
+   * [최근게임]·[13] 이어하기가 방금 세운 1회초 0:0 경기를 연다(원본 버그 B-30 — 고친 길(기본)은 OK 전에는 부르지 않는다).
    */
   readonly onMatchBlockWrite?: (block: TeamGameProgress) => void
 }
@@ -443,6 +444,10 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   blockWriteRef.current = { gameOptions, onMatchBlockWrite, random }
   useEffect(() => {
     if (blockWriteSerial === 0) return
+    // B-30 — 원본은 경기정보 OK 앞에서도 모드 1 블록을 새 경기로 덮어(+0x4d 는 그대로) 이어하기가 있던 채 새로하기 → OK 없이 나가면
+    // [최근게임]이 옛 경기 대신 새 1회초 0:0 을 연다. 고친 길(기본)은 OK(0x3136e — `onGameStart`) 전에는 블록을 안 쓴다.
+    // 블록 쓰기는 굴림이 없어 난수 차례는 같다(플레이 시간 칸은 다음 쓰기 때 몰아 적힌다)
+    if (isBugFixed('B-30')) return
     const { gameOptions: options, onMatchBlockWrite: write, random: port } = blockWriteRef.current
     if (write === undefined || options.opponentAces === undefined || options.startingPitcherSlots === undefined) return
     write(teamGameStartPointOf(options, port))

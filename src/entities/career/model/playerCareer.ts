@@ -3,6 +3,7 @@ import type { GameSummary } from '@/entities/game/model/gameSummary'
 import type { GameEvaluation } from '@/entities/career/model/gameEvaluation'
 import type { League } from '@/entities/league/model/league'
 import { BALANCE } from '@/shared/config/original/balance'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import {
@@ -259,7 +260,8 @@ export interface PlayerCareer {
   readonly cycleHitGames: number
   /**
    * 경기 뒤 누적 카운터 S+0x1f0 u16[7] — 평가 0xa719c(정규시즌만) 안 0xa690c 가 경기마다 더한다(`withGameSkillCounters`).
-   * 새 시즌 0xa39a8 이 지우려다 +0x1e0 을 두 번 지워(원본 버그) **이 벌은 영영 안 지워진다**. 스킬 획득 조건 10 · 11 · 16 이 읽는다.
+   * 새 시즌 0xa39a8 이 지우려다 +0x1e0 을 두 번 지워(원본 버그 B-27) **원본은 이 벌을 영영 안 지운다** — 고친 길(기본)은 새 시즌에 지운다.
+   * 스킬 획득 조건 10 · 11 · 16 이 읽는다.
    * 옛 저장에는 없다(0 으로 본다).
    */
   readonly gameSkillCounters?: readonly number[]
@@ -1145,11 +1147,12 @@ export function isSeasonFinished(career: PlayerCareer): boolean {
  * 시즌을 넘긴다 (0x1b768 · 안쪽 `0xa39a8`, S13 2절 전수 확정).
  * 시즌 성적은 초기화되고 통산 성적은 남는다.
  *
- * ⚠️ **원본 버그 그대로** — `0xa39bc`·`0xa39c6` 이 **둘 다 `S+0x1e0`** 을 16바이트 지운다.
+ * ⚠️ **원본 버그(B-27)** — `0xa39bc`·`0xa39c6` 이 **둘 다 `S+0x1e0`** 을 16바이트 지운다.
  * 경기 뒤 누적 카운터는 `+0x1e0`·`+0x1f0` **두 벌**이고 `0xa690c` 가 같은 값을 양쪽에 더하는데,
  * 둘째 줄이 `r6`(= `S + 0x1e0`)을 그대로 다시 써서 **`+0x1f0` 벌은 영영 안 지워진다**
- * → 나리 누적 카운터 한 벌이 해를 넘겨 계속 쌓인다.
- * 웹판에는 그 두 벌짜리 누적 카운터 자체가 없어 **옮길 코드가 없다** — 사실만 적어 둔다.
+ * → 스킬 획득 조건 10 · 11 · 16 이 읽는 `gameSkillCounters`(+0x1f0)가 해를 넘겨 계속 쌓인다.
+ * 원본 그대로면 웹은 그 칸을 지우지 않는다. **고친 길(기본)은 새 시즌에 +0x1f0 도 지운다**(`startNextSeasonRecords`) — 굴림 없음.
+ * 투수편 +0x1f0(`completeGameCounts` — 칭호 60 · 63)은 같은 함수가 남기지만 B-27 은 타자편 스킬 조건만 다룬다(그대로 둔다).
  */
 /**
  * 국가대항전 플래그를 내린다 — 원본 `S+0x12c = 0`(대회 끝 0x1b9ea · 0x1bae6 · 새 시즌 0x1b768 의 1b774). 대회 칸(L+0xa8~)은
@@ -1228,6 +1231,8 @@ function startNextSeasonRecords(career: PlayerCareer): PlayerCareer {
     seasonEndState: null,
     // 0x1b882 `memset(S+0x1bc, 0, 4)` — 나리 S 의 +0x1bc 는 연속 기록 세 칸이다(0xa4ce0 · 0x8a6fc)
     streaks: { multiHit: 0, homeRun: 0, hitless: 0 },
+    // 0xa39c6 — 원본은 +0x1e0 을 한 번 더 지워 +0x1f0(경기 뒤 누적 카운터)이 남는다(B-27). 고친 길은 이 벌도 지운다
+    ...(isBugFixed('B-27') ? { gameSkillCounters: undefined } : {}),
     wins: 0,
     draws: 0,
     losses: 0,

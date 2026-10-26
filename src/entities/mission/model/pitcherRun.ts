@@ -35,6 +35,7 @@ import {
 } from '@/entities/mission/model/missionGame'
 import { drainMissionAutoTicks } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 투수편 미션 진행.
@@ -123,11 +124,11 @@ export function recordPitch(run: PitcherRun, wasPerfectGauge: boolean): PitcherR
  * (`0xaa940`: 한도 > 0 이고 칸 ≥ 한도면 실패 2):
  *   +0xa1 아래 ↔ R+0x128(실점) · +0xa2 위 ↔ **R+0x144(볼넷)** · +0xa2 아래 ↔ R+0x12c(피안타) · +0xa3 ↔ R+0x130(출루 허용, u8)
  * "무사사구" 한도가 보는 R+0x144 는 **볼넷만**이다 — 코드 0x1c 는 볼 카운트 state[5] > 3 일 때뿐(0xa8e04~0xa8e0e)이고
- * 사구는 R+0x148(코드 0x1d, 0xa8e2a)로 따로 간다. 그래서 사구는 이 한도를 채우지 않는다 (이름과 달리 — 원본 그대로).
+ * 사구는 R+0x148(코드 0x1d, 0xa8e2a)로 따로 간다. 그래서 사구는 이 한도를 채우지 않는다 (이름과 달리 — 원본 버그 B-31, 고친 길은 센다).
  *
  * 넷째 한도 +0xa3(s8, `0xaacca ldrsb`) ↔ R+0x130 (`0xaacc6 ldrb [r6,#0xc]`, r6 = R+0x124) — `0xaaccc bl 0xaa940` — 투수 13·14 번만 1 이다.
  *   R+0x130 은 `baserunnerAllowedOfFates`(주자 운명 목록) 로 센다 — 아래 주석. 볼넷·사구 타자도 주자 목록에 들므로 **노히트노런(13번)도
- *   볼넷·사구 하나로 실패**다 — 원본 그대로.
+ *   볼넷·사구 하나로 실패**다 — 원본 버그 B-31 (고친 길은 사사구 플레이를 출루 허용으로 안 친다, `isWalkBaserunnerExempt`).
  *
  * 첫 한도 +0xa1 아래 ↔ R+0x128(실점)은 **원본에서도 걸린다** (전수 확인). P1 5-1 의 "쓰는 곳 없음" 은 사건 함수
  * 0xa57f8 의 코드 0x15 만 본 것이다 — 0xa57f8 로 가는 BL 34곳의 r1 은 모두 상수이고 0x15 는 없지만(맞다),
@@ -151,6 +152,22 @@ export function recordPitch(run: PitcherRun, wasPerfectGauge: boolean): PitcherR
  * 죽었으면 그 플레이 득점을 하나도 안 센다" — 점수판 득점과 다를 수 있는 갈래다. 진행기 결과의 `runnerFates`
  * (보류 무효 주자도 `scored`)로 그대로 옮겼다.
  */
+/**
+ * **B-31 고침** (기본) — 원본은 노히트노런(13번)의 "무출루" 한도(R+0x130)가 볼넷 · 사구 타자에도 서서 볼넷 하나로 실패하고,
+ * "무사사구" 한도(R+0x144)는 이름과 달리 볼넷만 센다. 고친 길은
+ *   - 볼넷 · 사구로 끝난 플레이는 출루 허용(R+0x130)으로 치지 않고 — 노히트노런은 사사구를 허용한다(실점 · 피안타 한도는 그대로),
+ *   - "무사사구" 한도는 볼넷과 사구를 함께 센다 — 퍼펙트(14번) · 마선수 공략 같은 무사사구 한도 미션은 사구로도 깨진다.
+ * 굴림 없는 집계라 난수 차례는 같다
+ */
+function countsTowardWalkLimit(kind: AtBatOutcome['kind']): boolean {
+  if (kind === '볼넷') return true
+  return kind === '사구' && isBugFixed('B-31')
+}
+
+function isWalkBaserunnerExempt(kind: AtBatOutcome['kind']): boolean {
+  return (kind === '볼넷' || kind === '사구') && isBugFixed('B-31')
+}
+
 function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allowed']): string[] {
   const limits = mission.failLimits
   const reached = (count: number, limit: number) => limit > 0 && count >= limit
@@ -233,10 +250,12 @@ export function applyPitcherOutcome(
     // R+0x128 = +0x95 주자 수, 3아웃이고 목록 0번이 끝났으면 0 (0xa8ea4~0xa8f56)
     runs: run.allowed.runs + chargedRunsOfFates(defense.runnerFates, defense.outsAtSettlement),
     hits: run.allowed.hits + (isHit(settled) ? 1 : 0),
-    // R+0x144 = 볼넷만 (사구는 R+0x148 — `brokenConditionsOf` 머리글)
-    walks: run.allowed.walks + (settled.kind === '볼넷' ? 1 : 0),
-    // R+0x130 = 이번 플레이 하나의 값 (덮어쓴다) — 목록 마지막 원소의 +0x96 이 꺼져 있나
-    baserunner: baserunnerAllowedOfFates(options.settledRunnerFates ?? defense.runnerFates) ? 1 : 0,
+    // R+0x144 = 볼넷만 (사구는 R+0x148 — `brokenConditionsOf` 머리글). B-31 고침이면 "무사사구" 한도가 사구도 센다
+    walks: run.allowed.walks + (countsTowardWalkLimit(settled.kind) ? 1 : 0),
+    // R+0x130 = 이번 플레이 하나의 값 (덮어쓴다) — 목록 마지막 원소의 +0x96 이 꺼져 있나.
+    // B-31 고침이면 볼넷 · 사구 플레이는 출루 허용으로 안 친다(사사구는 위 "무사사구" 한도의 몫)
+    baserunner: !isWalkBaserunnerExempt(settled.kind)
+      && baserunnerAllowedOfFates(options.settledRunnerFates ?? defense.runnerFates) ? 1 : 0,
   }
   const progress = recordPitcherOutcome(
     run.progress,

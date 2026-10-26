@@ -3,6 +3,7 @@ import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissi
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { DEFAULT_TEAM_MORALE, teamRecordMoraleAfterBurst, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { BALANCE } from '@/shared/config/original/balance'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
 
 /**
@@ -14,7 +15,8 @@ import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
  * 0x1f940 / 0x1f8f8(g, 팀)   [g+0xb8] / [g+0xbc] 블록. 0x1f8d4(g, 편) +0x12c(국가대항전, S+0x12c) ≠ 0 이면
  *                 1f964~1f970: 팀 == 10 → +0xbc4(대표팀) · **그 밖 → +0xbe0(상대국)** · 아니면 +4 + 0x1c·팀
  * ```
- * R[1] 은 늘 내 **리그 팀**(0~9)이라 대회 중(S+0x12c ≠ 0)에는 두 함수가 **상대국 칸 +0xbe0 의 +2** 를 읽고 쓴다 — ⚠️ 원본 버그 그대로 옮긴다.
+ * R[1] 은 늘 내 **리그 팀**(0~9)이라 대회 중(S+0x12c ≠ 0)에는 두 함수가 **상대국 칸 +0xbe0 의 +2** 를 읽고 쓴다 — ⚠️ 원본 버그(B-17).
+ * 원본 길은 그대로 옮겨 두고, 고친 길(기본)은 대회 중에도 커리어 사기를 쓴다(`moraleSlotIsOpponentDuringCup`).
  * 그 칸은 대회 초기화 0xb7bf0(b7ca4) · 하루 끝 0xb818c(b8216)의 `0x20648` 이 마스터 팀 레코드를 통째(0x1fe5c) 새로 복사하므로
  * 날마다 그 상대국 표값(전 팀 100)으로 돌아가고, 리그 칸의 사기는 대회 동안 그대로 남는다(새 시즌 0x1b768 은 S+0x12c = 0 (1b774)
  * 뒤에 1b790 `0xa3a44(R, 100)` 으로 리그 칸을 100 으로 놓는다).
@@ -38,9 +40,19 @@ export interface NariMoraleCareer {
 
 const MAXIMUM_MORALE = BALANCE.limits.morale
 
-/** 0xa3a24 — 지금 나리 사기. 대회 중이면 상대국 칸 +2 (없으면 마스터 복사 표값) */
+/**
+ * 대회 중 나리 사기 읽기 · 쓰기가 상대국 칸을 가리키는가 — 원본(0x1f988 → 0x1f8f8/0x1f940 1f964~1f970)은 그렇다 (B-17).
+ * **고친 길**: 대회 중에도 내 리그 팀 칸(커리어 사기)을 읽고 쓴다 — 사기 변화 · 돌발 사기가 하루 끝에 사라지지 않고, 경기 사기도
+ * 내 사기로 선다. 상대국 칸 +2 는 아무도 안 써서 그 팀 표값(마스터 복사)으로 남는다. 굴림 없음. 시즌 쪽 칸(`teamMorale` ·
+ * `seasonRewards`)은 이 갈림을 보지 않는다(나리 쪽만)
+ */
+function moraleSlotIsOpponentDuringCup(): boolean {
+  return !isBugFixed('B-17')
+}
+
+/** 0xa3a24 — 지금 나리 사기. 대회 중이면 상대국 칸 +2 (없으면 마스터 복사 표값) — B-17 고침이면 늘 커리어 사기 */
 export function nariMoraleOf(career: NariMoraleCareer): number {
-  if (career.nationalCup === undefined) return career.morale
+  if (career.nationalCup === undefined || !moraleSlotIsOpponentDuringCup()) return career.morale
   const teams = career.nariCupTeams
   if (teams === undefined) return DEFAULT_TEAM_MORALE
   return teams.opponentMorale ?? teamRecordMoraleOf(teams.opponentTeamId)
@@ -49,7 +61,9 @@ export function nariMoraleOf(career: NariMoraleCareer): number {
 /** 0xa3a44 — 나리 사기를 v 로(0..100 으로 자른다). 대회 중이면 상대국 칸 +2 에 쓰고 커리어 사기는 그대로다 */
 export function withNariMorale<T extends NariMoraleCareer>(career: T, value: number): T {
   const clamped = Math.min(MAXIMUM_MORALE, Math.max(0, value))
-  if (career.nationalCup === undefined) return career.morale === clamped ? career : { ...career, morale: clamped }
+  if (career.nationalCup === undefined || !moraleSlotIsOpponentDuringCup()) {
+    return career.morale === clamped ? career : { ...career, morale: clamped }
+  }
   const teams = career.nariCupTeams
   // 대회 칸은 142 준비(`prepareNariCupMatch`)가 경기 전에 세운다 — 칸이 없으면 쓸 자리가 없다
   if (teams === undefined) return career

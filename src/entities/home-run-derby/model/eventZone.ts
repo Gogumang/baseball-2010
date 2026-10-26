@@ -1,5 +1,6 @@
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 이벤트 존 (H-2 · P7 H1).
@@ -13,9 +14,10 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
  * +0x127 (확정, P7 H1): 타구 시작 0x51408 이 0 으로 비우고(0x51470), 덱에서 꺼낸 패턴이 `0xb07c8(덱, 결과, 패턴)` == 1
  * — **패턴 플래그 & 2** — 이면 1 로 세운다(0x514e6). 곧 존은 **플래그 비트1 이 선 패턴**(주로 결과 18~20 의 큰 뜬공)에서만 생긴다.
  *
- * ⚠️ **원본 그대로**: 존을 "놓는" 코드가 곧바로 "적중" 칸까지 세운다 — 곧 조건만 맞으면
- * 공이 실제로 존에 닿았는지 따로 보지 않고 200 G 가 붙는다. 버그로 보이지만 고치지 않는다
- * (`docs/re/DECISIONS.md` — 원본 버그는 그대로 옮긴다).
+ * ⚠️ **원본 버그(B-32)**: 존을 "놓는" 코드(0x372d4~0x372f6 — 존 좌표 = 그때 공 화면 자리)가 곧바로 "적중" 칸 +0x3f 까지 세운다 —
+ * 곧 조건만 맞으면 공이 관중석의 존 그림(event_zone 프레임 0 의 두 칸)에 실제로 닿았는지 따로 보지 않고 200 G 가 붙는다.
+ * 고친 길(기본)은 공 자리가 두 칸 안일 때만 적중으로 친다(`isBallInEventZone`). 다만 이식판 더비는 아직 공 화면 자리가 없어(아래 미해결 ·
+ * A-01) 부르는 쪽이 `ballFieldPoint` 를 넘기지 않으면 판단할 수 없어 원본대로 둔다 — 필드 화면이 서면 그 자리를 넘기면 된다.
  *
  * ⚠️ 미해결: "공 화면 y < 화면 높이/3" 고리. 이식판 홈런더비는 타구 비행을 화면에 그리지 않아(타석 화면만 쓴다)
  * 공의 화면 y 가 없다 — 이 고리는 **보지 않는다**(늘 참으로 둔다). 예전에 이 자리를 메우던 "궤적 최고 높이 ≥ 5000" 은
@@ -39,18 +41,49 @@ export function isBigFlyPattern(pattern: BattedBallPattern): boolean {
   return (pattern[3] & BIG_FLY_PATTERN_FLAG) !== 0
 }
 
+/** 필드 화면 좌표(필드 오프셋 +0xfec · +0xff0 기준)의 한 점 */
+export interface EventZonePoint {
+  readonly x: number
+  readonly y: number
+}
+
 export interface EventZoneCondition {
   /** 이번 타구가 뽑은 패턴 (맞은 공이 아니면 null — 비행 상태 24~26 에 들지 않는다) */
   readonly pattern: BattedBallPattern | null
   /** 이미 이번 공에서 존이 놓였는가 (0x3de10 이 공마다 −1 로 비운다) */
   readonly isZonePlaced?: boolean
+  /**
+   * 존이 놓이는 틀의 공 자리 — 0x372d4~0x372e4 가 존 좌표로 적는 공 화면 자리에서 필드 오프셋을 뺀 값. B-32 고친 길만 본다.
+   * 이식판 더비는 아직 이 자리가 없다(A-01) — 안 넘기면 판단하지 않는다(원본대로)
+   */
+  readonly ballFieldPoint?: EventZonePoint
 }
 
-/** 이번 공에 이벤트 존이 뜨는가(= 적중하는가). 위 ⚠️ 대로 둘이 같은 판정이다 */
-export function isEventZoneHit({ pattern, isZonePlaced = false }: EventZoneCondition): boolean {
+/**
+ * 존 그림 — `stadium/event_zone.pzx` 프레임 0(원점 (51, 16) · 518×66)의 **부품 두 장**(각 70×66, 합성 그림 x 0~69 · 448~517).
+ * 필드 화면 오프셋 기준 사각형이다(그림 알파로 잰 값)
+ */
+export const EVENT_ZONE_RECTS: readonly { readonly x: number; readonly y: number; readonly width: number; readonly height: number }[] = [
+  { x: 51, y: 16, width: 70, height: 66 },
+  { x: 51 + 448, y: 16, width: 70, height: 66 },
+]
+
+/** 공 자리가 존 그림 두 칸 중 하나 안에 드는가 (B-32 고친 길의 적중 판정) */
+export function isBallInEventZone(point: EventZonePoint): boolean {
+  return EVENT_ZONE_RECTS.some((rect) =>
+    point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height)
+}
+
+/**
+ * 이번 공에 이벤트 존이 뜨는가(= 적중하는가). 원본은 둘이 같은 판정이다(위 ⚠️).
+ * B-32 고침이면 공 자리(`ballFieldPoint`)를 받았을 때 존 칸 안이어야 적중이다 — 굴림 없는 판정이라 난수 차례는 같다
+ */
+export function isEventZoneHit({ pattern, isZonePlaced = false, ballFieldPoint }: EventZoneCondition): boolean {
   if (isZonePlaced) return false
   if (pattern === null) return false
-  return isBigFlyPattern(pattern)
+  if (!isBigFlyPattern(pattern)) return false
+  if (ballFieldPoint === undefined || !isBugFixed('B-32')) return true
+  return isBallInEventZone(ballFieldPoint)
 }
 
 /** 존이 선 동안 반투명으로 그리는 효과 1 의 단계 — 0x41098 410ec `movs r2, #5` → [sp+8] (그림 5/16 + 화면 11/16) */

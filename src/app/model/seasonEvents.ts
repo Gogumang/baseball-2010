@@ -28,6 +28,7 @@ import {
   TITLE_INTRO_EVENT_ID,
   titleResultEventId,
 } from '@/entities/awards/model/seasonAwards'
+import { entersYearEndChainInPostseason } from '@/entities/career/model/postseasonFlow'
 
 /** 시즌 이벤트 하나를 마친 뒤 할 일 */
 export type SeasonStep =
@@ -191,7 +192,10 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
   }
   if (career.seasonEndState === 128) return { kind: '포스트시즌' }
   // 경기 뒤(S+0x50 == 2 → 116) — 116 의 끝(12b74~12b94)처럼 g == 0 이면 [114 → 136](392 를 트는 136 진입으로 곧장), 아니면 128
-  return leagueDayCounterOf(career) === 0 ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID } : { kind: '포스트시즌' }
+  // B-05 고침이면 대진이 막 열린 때만 사슬로 (`entersYearEndChainInPostseason`)
+  return leagueDayCounterOf(career) === 0 && entersYearEndChainInPostseason(career.postseason)
+    ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
+    : { kind: '포스트시즌' }
 }
 
 /** 0x1c154 의 S+0x50 == 0xa 갈래(1c2a2~1c344) — 연차idx(S+0xb3)는 끝난 해의 것(`season − 1`)이다 */

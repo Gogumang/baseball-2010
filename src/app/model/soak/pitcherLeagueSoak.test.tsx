@@ -126,6 +126,7 @@ import {
   SoakProblems, batterLineProblemsOf, firstDiffOf, isSoakEnabled, jsonRoundTripDiffOf, leagueTallyProblemsOf, outOfRangeOf,
   rankingOrderProblemsOf, soakNumber, soakSeeds, unserializablePathsOf,
 } from '@/app/model/soak/soakInvariants'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 // 그림 붓 — 타석 · 결과 그림은 아무 일도 안 한다(굴림 · 상태는 그대로 돈다)
 vi.mock('@/widgets/batting-stage/lib/renderBattingStage', async (importOriginal) => {
@@ -763,7 +764,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       const now = result.current.career
       // 116(경기결과)에서 끊고 이어하면 진입 0x1278c 가 다시 돌아 경기 뒤 카운터(12bc2~12c3c: 이번 시즌 인기도 합 +0x1c2 · 평판 0 연속 +0x184 ·
       // 무력감 · 먹튀)가 한 번 더 쌓인다 — 원본 그대로(`enterPitcherGameEvaluation` 머리말). 같은 재진입을 얹어 견준다
-      const reentered = now !== null && result.current.scene === '경기결과' && now.seasonEndState === 116 ? enterPitcherGameEvaluation(now) : now
+      // B-28 고친 길(`BUGFIXES=json`)이면 다시 쓰지 않는다 — 저장 그대로
+      const reentered = now !== null && result.current.scene === '경기결과' && now.seasonEndState === 116 && !isBugFixed('B-28')
+        ? enterPitcherGameEvaluation(now)
+        : now
       // 다시 띄우면 나리 장면 0x106 이 새로 서며 셋업 0xf684 → 0x8ce94 → 0xacf60 이 반복 이벤트(452~454 · 490 …) 본 표시를 지운다 —
       // 메모리에서만 지우는 원본 그대로라(저장에는 다음 저장 때 같이 간다) 같은 지움을 얹어 견준다
       const events = result.current.storyEvents
