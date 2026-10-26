@@ -4,6 +4,7 @@ import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatS
 import { clearGameSceneTimeout, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import { RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { opensArrivalPlayAtOnce, type ArrivalPlayLike } from '@/features/play-game/model/benchClearingScene'
 
 /**
  * **타석이 끝난 뒤 새 타석 0xd 까지 남은 그림 수** — 원본에는 따로 띄우는 "결과 띠" 상태가 없다. 타석을 끝내는 길은 둘뿐이다(R10 8절):
@@ -17,13 +18,13 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 export const AT_BAT_END_AFTER_RESULT_WAIT_FRAMES = RESULT_WAIT_TICKS_AT_BAT_END + 1
 
 /**
- * 0x12 진입에서 타석을 끝낸 공의 남은 그림 수 — 삼진 · 볼넷 · 사구(st[0xb] ∈ {3, 4, 5})이고 공 도착 판이 없거나 밀어내기(종류 2)면
- * 0x12 대기 32 그림, 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 0 그림(판 끝에서 0xd). 그 밖 결과(홈런 등 — 원본은
- * 0x13 → 0x17 판)도 0 그림이다. 판 끝에서 부르는 쪽은 `arrivalKind` 와 무관하게 0 이라 이 함수를 안 쓴다.
+ * 0x12 진입에서 타석을 끝낸 공의 남은 그림 수 — 삼진 · 볼넷 · 사구(st[0xb] ∈ {3, 4, 5})이고 공 도착 판이 없거나 0x12 대기를 탄
+ * 밀어내기(종류 2)면 0x12 대기 32 그림, 도루 · 폭투 판(종류 5 · 9)이 열렸거나 도루 출발 중 볼넷 · 사구의 밀어내기 판(A-24 —
+ * 3e0e4 → 3e114)이면 곧장 0x17 이라 0 그림(판 끝에서 0xd, `opensArrivalPlayAtOnce`). 그 밖 결과(홈런 등 — 원본은 0x13 → 0x17 판)도
+ * 0 그림이다. 판 끝에서 부르는 쪽은 판과 무관하게 0 이라 이 함수를 안 쓴다.
  */
-export function atBatEndFramesOf(outcome: AtBatOutcome, arrivalKind: number | null): number {
-  const waitsAtResult =
-    resultWaitTicksOf(outcome) === RESULT_WAIT_TICKS_AT_BAT_END && (arrivalKind === null || arrivalKind === 2)
+export function atBatEndFramesOf(outcome: AtBatOutcome, arrivalPlay: ArrivalPlayLike | null | undefined): number {
+  const waitsAtResult = resultWaitTicksOf(outcome) === RESULT_WAIT_TICKS_AT_BAT_END && !opensArrivalPlayAtOnce(arrivalPlay)
   return waitsAtResult ? AT_BAT_END_AFTER_RESULT_WAIT_FRAMES : 0
 }
 

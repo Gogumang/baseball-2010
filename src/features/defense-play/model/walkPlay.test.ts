@@ -3,7 +3,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { advanceRunners, EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { arrivalApplicationOf, runPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
-import { acceptsWalkPlaySkipKey, isWalkPlayResult, runWalkPlay } from '@/features/defense-play/model/walkPlay'
+import { acceptsWalkPlaySkipKey, isWalkPlayResult, opensWalkPlayAtArrival, runWalkPlay } from '@/features/defense-play/model/walkPlay'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 
 function 세는난수(): RandomPort & { readonly count: () => number } {
@@ -36,6 +36,19 @@ describe('볼넷 · 사구 밀어내기 판 — 종류 2 (0xb288c · 0x46418 · 
         }
       }
     }
+  })
+
+  it('도루 출발 중이면 공 도착에서 곧장 연 판이다 — 3e0e4 → 3e114 0x17 (A-24), 아니면 0x12 대기 뒤 판', () => {
+    const 도루 = runWalkPlay({ bases: 루(true, false, false), outs: 0, pitchJudgement: 4, stealingFrom: [1] })
+    const 보통 = runWalkPlay({ bases: 루(true, false, false), outs: 0, pitchJudgement: 4 })
+    expect(opensWalkPlayAtArrival(도루)).toBe(true)
+    expect(opensWalkPlayAtArrival(보통)).toBe(false)
+    expect('opensAtArrival' in 보통).toBe(false)
+    // 진루는 같다 — 판이 서는 때만 다르다
+    expect(도루.advance).toEqual(보통.advance)
+    const 판 = runPitchArrivalPlay({ gameMode: 4, pitchJudgement: 3, stealingFrom: [1], bases: 루(true, false, false), outs: 2 }, 세는난수())
+    expect(판?.kind).toBe(2)
+    expect(판 !== null && opensWalkPlayAtArrival(판.result)).toBe(true)
   })
 
   it('판 안에서 난수를 하나도 안 쓴다 — 종류 2 의 도루 주자 리드는 틱 0(rand(0,9) 없음) · 포수가 손에 안 쥐어 CPU 송구가 없다', () => {
