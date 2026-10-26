@@ -162,7 +162,7 @@ import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
-import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_PREPARE_FRAMES, confirmedCountOf, noteSceneDEntryTick } from '@/features/play-game/model/useSceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   enterMissionPitchSelection,
@@ -178,7 +178,7 @@ import {
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
-import { isGameSceneFrozen, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -1048,13 +1048,17 @@ export function useMissionSession({
 
   /**
    * 화면이 교체 연출 0x16 을 다 그렸다(끝 비트 → 메시지 0xd). 0xd 두 그림 뒤 0xe 그리기(0x38d1c 38dc2 · 0x49e64 49f76 → 0x38b64)가
-   * 들어온 선수 자리에 파티클을 쏘고 등판음을 낸다.
-   * ⚠️ 근사(남김 — 웹 구조): 웹은 0xd 두 그림을 타이머로 센다(화면의 0xe 대기는 같은 때부터 0xd 두 그림을 센다).
+   * 들어온 선수 자리에 파티클을 쏘고 등판음을 낸다. 이 틀이 0xd 틱 0 이라 화면에 내놓는 대기의 0xd 진입 틱으로 적는다
+   * (`noteSceneDEntryTick` — 화면의 0xe 대기가 이 틱부터 0xd 두 그림을 센다, `useSubstitutionScene` 과 같다).
    */
   const finishSubstitutionScene = () => {
     const scene = substitutionScene
     if (scene === null) return
     setSubstitutionScene(null)
+    if (sceneConfirm !== null) {
+      const shown = freshAtBatWaits.has(sceneConfirm) ? announcedWaitOf(sceneConfirm) : sceneConfirm
+      noteSceneDEntryTick(shown, confirmedCountOf(shown), gameSceneTickNow())
+    }
     // 경기 장면 틱으로 센다 — 공용 창이 서 있으면 0xd 의 장면 틱(52cc6) · 0xe 그리기(52efe)가 서기 때문이다
     // 0x38b64 — 들어온 선수 자리에 파티클(투수 ptc/004 · 타자 ptc/003)을 먼저 쏘고 등판음
     setGameSceneTickTimeout(() => {

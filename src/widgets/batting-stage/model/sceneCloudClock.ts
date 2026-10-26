@@ -1,4 +1,5 @@
 import { gameSceneBackdropFreezeSerialNow, gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
+import { SCENE_STATE, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { LOADING_CLOUD_CALLS } from '@/widgets/batting-stage/lib/stageScenery'
 
 /**
@@ -16,7 +17,10 @@ import { LOADING_CLOUD_CALLS } from '@/widgets/batting-stage/lib/stageScenery'
  * - ⚠️ 근사: 구름을 안 그리는 웹 화면(이닝 판 · 돌발 · 교체 판 따위)에 머문 그림은 세지 않는다(남김 — 아래). 원본은 그중 야외 화면 상태(0x16 · 0x18 …)가
  *   아닌 상태(0xb · 0x1b · 0x1d · 0x1f · 0x22 · 0x23 따위)에서도 갱신마다 센다(남김 — 웹 화면 묶음: 그 상태들은 이 장면 시계를 안 도는 다른
  *   화면 · 페이지라 어느 그림이 세는 상태였는지 셀 고리가 없다. 구름 자리만 달라지고 난수 · 기록과는 무관).
- * - ⚠️ 근사: 웹 단계가 바뀐 그림의 경계는 루프가 본 그림 단위다(한 그림 안에서 '대기' → '투구중' 이 바뀌면 그 그림은 바뀐 뒤 단계로 센다)(남김 — 웹 루프 구조: 단계는 그림 단위로만 본다).
+ * - 세는 상태가 바뀐 고리 칸은 그 경계를 장면 틱으로 가른다 — 루프는 그림마다 지금 단계만 보므로, 그림이 틱을 건너뛰어(느린 rAF) 한 번에
+ *   여러 틱을 셀 때 단계가 그 사이에 바뀌었으면 상태 경계(`sceneStateEntries` — 타석 장면 · 확인 대기가 적은 0xd~0x13 · 0x17 의 선 틱)로
+ *   경계 앞 틱은 앞 그림의 단계, 경계부터는 지금 단계로 센다. 지금 틱의 칸이 그 사이에 섰고 지금 단계와 맞을 때만 쓴다 — 아니면(칸이
+ *   없는 결과 창 · 웹만의 덮개) 예전처럼 사이 틱을 모두 지금 단계로 센다.
  */
 let calls = LOADING_CLOUD_CALLS
 let lastFrame: number | null = null
@@ -41,13 +45,31 @@ export function sceneScoreboardTickOf(sceneTick: number): number {
   return Math.max(0, sceneTick - scoreboardOrigin) + (gameSceneBackdropFreezeSerialNow() - scoreboardOriginFreezes)
 }
 
-/** 그림 고리마다 하나 — 그 고리가 마지막으로 본 그림 번호 */
+/** 그림 고리마다 하나 — 그 고리가 마지막으로 본 그림 번호와 그때 세는 상태였는가 */
 export interface CloudFrameCursor {
   frame: number | null
+  counts: boolean | null
 }
 
 export function createCloudFrameCursor(): CloudFrameCursor {
-  return { frame: null }
+  return { frame: null, counts: null }
+}
+
+/** 0x3f060 이 구름을 세는 경기 장면 상태 — 0xd~0x10 ('대기') */
+const CLOUD_STATES: ReadonlySet<number> = new Set([SCENE_STATE.준비, SCENE_STATE.확인, SCENE_STATE.선택, SCENE_STATE.조준])
+
+/**
+ * 앞 그림(`from`, 세는 상태 `fromCounts`) 뒤부터 이 그림(`to`, `counts`)까지 센 틱 수. 단계가 바뀌었으면 지금 틱에 선 상태 칸의
+ * 틱을 경계로 가른다(머리말)
+ */
+function countedTicksBetween(from: number, fromCounts: boolean, to: number, counts: boolean): number {
+  const elapsed = to - from
+  if (fromCounts === counts) return counts ? elapsed : 0
+  const entry = sceneStateEntryAt(to)
+  const boundary =
+    entry !== null && entry.tick > from && entry.tick <= to && CLOUD_STATES.has(entry.state) === counts ? entry.tick : from + 1
+  // 경계 앞(from + 1 ~ boundary − 1)은 앞 단계, 경계부터 지금(boundary ~ to)은 지금 단계
+  return counts ? to - boundary + 1 : boundary - from - 1
 }
 
 /** requestAnimationFrame 시각 → 경기 장면 그림 번호 (경기 장면 시계 기준 — 공용 창이 떠 있는 동안은 안 오른다) */
@@ -65,14 +87,14 @@ export function sceneCloudCallsNow(): number {
  * (0x3f060 이 그리기 앞이라 이 그림의 부름까지 든다).
  */
 export function observeSceneCloudFrame(frame: number, counts: boolean, cursor: CloudFrameCursor): number {
-  const elapsed =
-    cursor.frame !== null
-      ? frame - cursor.frame
-      : lastFrame === null
-        ? 1
-        : Math.min(1, frame - lastFrame)
-  if (counts && elapsed > 0) calls += elapsed
+  if (cursor.frame !== null) {
+    if (frame > cursor.frame) calls += countedTicksBetween(cursor.frame, cursor.counts ?? counts, frame, counts)
+  } else {
+    const elapsed = lastFrame === null ? 1 : Math.min(1, frame - lastFrame)
+    if (counts && elapsed > 0) calls += elapsed
+  }
   cursor.frame = frame
+  cursor.counts = counts
   lastFrame = frame
   return calls
 }

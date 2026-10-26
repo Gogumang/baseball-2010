@@ -8,10 +8,12 @@ import {
   sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
 import { markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
+import { SCENE_STATE, markSceneStateEntries, resetSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 
 afterEach(() => {
   resetSceneCloudClock()
   resetCommonWindowShownForTest()
+  resetSceneStateEntries()
 })
 
 describe('경기 장면 구름 셈 — 구장 +0x1c~+0x28 (0x78448)', () => {
@@ -36,6 +38,25 @@ describe('경기 장면 구름 셈 — 구장 +0x1c~+0x28 (0x78448)', () => {
     expect(observeSceneCloudFrame(10, true, again)).toBe(LOADING_CLOUD_CALLS + 1)
     const later = createCloudFrameCursor()
     expect(observeSceneCloudFrame(50, true, later)).toBe(LOADING_CLOUD_CALLS + 2)
+  })
+
+  it('그림이 틱을 건너뛴 사이에 단계가 바뀌면 상태 경계(장면 틱)로 가른다 — 0xf 틱 0 부터 · 0x11 틱 0 앞까지만 센다', () => {
+    const cursor = createCloudFrameCursor()
+    // 0x12 (세지 않음) — 그림 10 을 보고, 다음 그림 14 에서 '대기'. 0x12 끝 문턱 다음 틀 12 가 0xf 틱 0
+    markSceneStateEntries({ tick: 5, state: SCENE_STATE.결과 }, { tick: 12, state: SCENE_STATE.선택 })
+    const before = observeSceneCloudFrame(10, false, cursor)
+    // 12 · 13 · 14 셋 (11 은 아직 0x12)
+    expect(observeSceneCloudFrame(14, true, cursor)).toBe(before + 3)
+    // 0x11 틱 0 이 30 — 그림 28 을 보고 다음 그림 32 에서 '투구중'. 29 만 더 센다
+    markSceneStateEntries({ tick: 30, state: SCENE_STATE.투구 })
+    const idle = observeSceneCloudFrame(28, true, cursor)
+    expect(observeSceneCloudFrame(32, false, cursor)).toBe(idle + 1)
+  })
+
+  it('경계 칸이 없거나(결과 창 · 웹만의 덮개) 지금 단계와 안 맞으면 사이 틱을 모두 지금 단계로 센다', () => {
+    const cursor = createCloudFrameCursor()
+    const before = observeSceneCloudFrame(10, false, cursor)
+    expect(observeSceneCloudFrame(14, true, cursor)).toBe(before + 4)
   })
 
   it('장면을 나가면 로딩 판 자리로 되돌린다', () => {
