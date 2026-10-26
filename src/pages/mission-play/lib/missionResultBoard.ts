@@ -118,7 +118,7 @@ export type MissionResultExit = '다시' | '목록' | '대결끝'
 
 /**
  * 키 하나의 결과 — 마선수 대결은 `aceFlags` 의 g[0x11f] · g[0x176] 를 그대로 본다(OK 는 둘 다 서 있어야 대결 끝 길,
- * CLR 은 하나만 서도 대결 끝 길 — 원본 그대로). 커서를 뒤집으면 `toggle`, 나가면 `exit`.
+ * CLR 은 하나만 서도 대결 끝 길 — 원본 버그 B-106 그대로, 0x407f0 408ce~408f2 · 4087c~408a0). 커서를 뒤집으면 `toggle`, 나가면 `exit`.
  */
 export function missionResultStepOf(
   action: MissionResultKeyAction,
@@ -140,7 +140,7 @@ export function missionResultStepOf(
  * 0x4b100 이 읽는다. 다만 0x4b100 의 모드 5·6 갈래(4b31e~4b376, 직접 떴다)는 g[0x11f] || g[0x176] 이면 **0x140006c 를 안 읽고**
  * 전역 모드 = g[0xf6] · 장면 g[0xf6] == 2 ? 0x105 : 0x106 으로 간다(대기가 없을 때만 4b378 → 0x107 이 0x140006c 를 본다).
  *
- * 그래서 마선수 대결에서 칸이 하나만 서 OK 가 '다시'(0x140006c = 3 — `missionResultStepOf` 의 원본 버그 그대로)가 되어도 같은 대결을
+ * 그래서 마선수 대결에서 칸이 하나만 서 OK 가 '다시'(0x140006c = 3 — `missionResultStepOf` 의 원본 버그 그대로, ORIGINAL-BUGS B-106)가 되어도 같은 대결을
  * 다시 세우지 않고 대결 끝과 같은 원래 모드 장면으로 떠난다. 남은 3 은 나리 장면이 메인 메뉴로 갈 때 5 로 덮는다(0x1bfd4 · 0x1ca92).
  * ⚠️ g[0xf6] 이 3 · 4 가 아닐 때(한 편 140 이 g[0xf6] 을 지운 뒤 남은 다른 편 대기)는 CLR(대결 끝 0x4090e)은 판에 갇히지만 OK 는
  * 0x4b100 이 전역 모드 g[0xf6] 그대로 0x106 을 세운다 — 웹은 그 장면(모드 0 의 0x106)을 몰라 두 키 모두 판에 갇힌다(`leaveMissionResult`).

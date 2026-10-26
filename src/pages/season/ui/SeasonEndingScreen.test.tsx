@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
+import type React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { SeasonEndingScreen } from '@/pages/season/ui/SeasonEndingScreen'
 import {
-  ENDING_IRIS_STAGES, SEASON_ENDING_TEXT, endingIrisRadiusOf, seasonEndingTextIndexOf,
+  SEASON_ENDING_TEXT, isSeasonEndingTextShown, seasonEndingIrisOf, seasonEndingTextIndexOf,
 } from '@/widgets/season/lib/seasonEndingLayout'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 
@@ -17,16 +18,29 @@ afterEach(cleanup)
 
 const 글 = () => document.body.textContent ?? ''
 
+/** 글은 상태 틱 n > 15 부터 그린다 (0x87bdc~0x87be0) — 가짜 시계로 16 틀을 보낸다 */
+function 글까지그리기(ui: React.ReactElement) {
+  vi.useFakeTimers()
+  try {
+    render(ui)
+    act(() => {
+      vi.advanceTimersByTime(16 * millisecondsPerFrame())
+    })
+  } finally {
+    vi.useRealTimers()
+  }
+}
+
 describe('엔딩 글 StrENDING[15 + 결과]', () => {
   it('결과 0 은 [15] 비 인기 구단이다', () => {
-    render(<SeasonEndingScreen endingIndex={0} onFinish={vi.fn()} />)
+    글까지그리기(<SeasonEndingScreen endingIndex={0} onFinish={vi.fn()} />)
 
     expect(seasonEndingTextIndexOf(0)).toBe(15)
     expect(글()).toContain('비 인기 구단')
   })
 
   it('결과 4 는 [19] 역사상 최고의 구단이다', () => {
-    render(<SeasonEndingScreen endingIndex={4} onFinish={vi.fn()} />)
+    글까지그리기(<SeasonEndingScreen endingIndex={4} onFinish={vi.fn()} />)
 
     expect(seasonEndingTextIndexOf(4)).toBe(19)
     expect(글()).toContain('역사상 최고의 구단')
@@ -164,19 +178,29 @@ describe('연출', () => {
     expect(container.querySelectorAll('img[src*="map_label_"]').length).toBe(0)
   })
 
-  it('원형 전환을 그린다 (0x87a1c 는 나리와 같은 식을 쓴다)', () => {
+  it('원형 전환 판은 늘 있고, 상태 틱 n ≤ 10 에는 원을 안 그린다 (0x87a3c~0x87a42 `cmp #0xa; bgt`)', () => {
     render(<SeasonEndingScreen endingIndex={1} onFinish={vi.fn()} />)
 
-    expect(screen.getByLabelText('원형 전환')).toBeDefined()
+    expect(screen.getByLabelText('원형 전환').querySelector('path')).toBeNull()
+    expect(seasonEndingIrisOf(10)).toBeNull()
   })
 
-  it('⚠️ 원본 버그 그대로 — 아이리스 반지름이 t=1 에서 t=0 보다 작아진다', () => {
-    const D = ENDING_IRIS_STAGES.open.diameter // 140
-    expect(endingIrisRadiusOf(0, D)).toBe(14) // 0.10·D
-    expect(endingIrisRadiusOf(1, D)).toBe(8) // 0.06·D — 한 번 줄었다 다시 커진다
-    expect(endingIrisRadiusOf(2, D)).toBeGreaterThan(endingIrisRadiusOf(1, D))
-    // t ≥ 7 이면 p 가 110 에 걸려 r = D
-    expect(endingIrisRadiusOf(7, D)).toBe(D)
-    expect(endingIrisRadiusOf(20, D)).toBe(D)
+  it('원은 0x87a1c 식 그대로 — D = 240 − 100, r = D − D·sin(k)/100 + D·sin(min(8t, 110))/100, 지름 W − r, 왼쪽 위 −(지름 − s) (A-19)', () => {
+    // n = 11 → t = 0: k = sin 90 = 100, p = sin 0 = 0 → r = 0 → 지름 240, 왼쪽 위 (120 − 58 − 140, 160 − 55 − 140)
+    expect(seasonEndingIrisOf(11)).toEqual({ x: -78, y: -35, diameter: 240 })
+    // t ≥ 14 → 8t ≥ 110 이라 p = k → r = D → 지름 = s = 100, 왼쪽 위 (62, 105)
+    expect(seasonEndingIrisOf(25)).toEqual({ x: 62, y: 105, diameter: 100 })
+    expect(seasonEndingIrisOf(60)).toEqual({ x: 62, y: 105, diameter: 100 })
+    // 옛 웹(사인 빠뜨림)처럼 한 번 줄었다 커지지 않는다 — t = 0 부터 줄어든다
+    const 지름 = Array.from({ length: 15 }, (_, t) => seasonEndingIrisOf(11 + t)?.diameter ?? 0)
+    expect(지름[1]).toBeLessThan(지름[0])
+    expect(Math.min(...지름)).toBeLessThan(100) // t = 11·12 에 사인 99 로 조금 더 작아졌다 100 으로 돌아온다 — 원본 그대로
+  })
+
+  it('글은 상태 틱 n > 15 부터 (0x87bdc~0x87be0 `cmp #0xf; ble`)', () => {
+    expect(isSeasonEndingTextShown(15)).toBe(false)
+    expect(isSeasonEndingTextShown(16)).toBe(true)
+    render(<SeasonEndingScreen endingIndex={1} onFinish={vi.fn()} />)
+    expect(글()).not.toContain('지역 인기 구단')
   })
 })

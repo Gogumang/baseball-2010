@@ -38,12 +38,17 @@ export interface BugfixConfig {
   readonly entries: readonly BugfixEntry[]
 }
 
-/** `ORIGINAL-BUGS.md` 1절의 id 전부 — B-01 ~ B-100 */
-export const ORIGINAL_BUG_COUNT = 100
-export const ORIGINAL_BUG_IDS: readonly string[] = Array.from(
-  { length: ORIGINAL_BUG_COUNT },
-  (_, index) => `B-${String(index + 1).padStart(2, '0')}`,
-)
+/**
+ * `ORIGINAL-BUGS.md` 1절의 id 전부 — B-01 ~ B-100 과 그 뒤에 새로 찾은 것(B-106~).
+ * B-101 ~ B-105 는 2절(고침 · 웹 다름)의 id 라 1절에 없다.
+ */
+const NUMBERED_BUG_COUNT = 100
+const LATER_BUG_IDS: readonly string[] = ['B-106']
+export const ORIGINAL_BUG_IDS: readonly string[] = [
+  ...Array.from({ length: NUMBERED_BUG_COUNT }, (_, index) => `B-${String(index + 1).padStart(2, '0')}`),
+  ...LATER_BUG_IDS,
+]
+export const ORIGINAL_BUG_COUNT = ORIGINAL_BUG_IDS.length
 
 /** 고친 길이 코드에 들어간 id — `bugfixes.json` 의 `implemented: true` 와 1:1 이어야 한다 (시험이 본다) */
 export const IMPLEMENTED_BUGFIX_IDS: readonly string[] = [

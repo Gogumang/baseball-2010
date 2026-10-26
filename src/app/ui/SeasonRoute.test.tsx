@@ -108,6 +108,10 @@ describe('엔딩 0xf5 배선', () => {
   const 효과기넘기기 = () => act(() => {
     vi.advanceTimersByTime(12 * millisecondsPerFrame())
   })
+  /** 엔딩 글은 상태 틱 n > 15 부터 그린다 (0x87a1c 87bdc~87be0) */
+  const 글까지 = () => act(() => {
+    vi.advanceTimersByTime(16 * millisecondsPerFrame())
+  })
   afterEach(() => {
     vi.useRealTimers()
   })
@@ -119,7 +123,9 @@ describe('엔딩 0xf5 배선', () => {
       seenEvents: [400, 1, 5, 100],
     })))
 
+    vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={vi.fn()} />)
+    글까지()
 
     // 인기도 900 · 1위 0회 → 판정 1 = StrENDING[16] 지역 인기 구단 (0xa3084)
     expect(document.body.textContent).toContain('지역 인기 구단')
@@ -144,6 +150,7 @@ describe('엔딩 0xf5 배선', () => {
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
     // 받은 표시(SR+0x7b)와 G 는 저장에 — 엔딩 본 표시(SR+0x1bc)는 아직이다
     expect(store.load()).toMatchObject({ state: { record: { endingBonusReceived: true, endingSeen: false } } })
+    글까지()
     expect(document.body.textContent).toContain('지역 인기 구단')
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
@@ -178,9 +185,9 @@ describe('엔딩 0xf5 배선', () => {
 
     vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={vi.fn()} />)
+    글까지()
 
     expect(document.body.textContent).toContain('지역 인기 구단')
-    효과기넘기기()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
     효과기넘기기()

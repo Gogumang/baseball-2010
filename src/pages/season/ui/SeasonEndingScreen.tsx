@@ -4,8 +4,8 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import { ENDING_BONUS_GAME_POINTS } from '@/entities/season-mode/model/seasonRewards'
 import {
-  ENDING_BACKDROP_COLOR, ENDING_IRIS, ENDING_IRIS_STAGES, ENDING_SCREEN,
-  SEASON_ENDING_TEXT, endingIrisRadiusOf, seasonEndingTextIndexOf,
+  ENDING_BACKDROP_COLOR, ENDING_IRIS, ENDING_SCREEN,
+  SEASON_ENDING_TEXT, isSeasonEndingTextShown, seasonEndingIrisOf, seasonEndingTextIndexOf,
 } from '@/widgets/season/lib/seasonEndingLayout'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
@@ -48,7 +48,7 @@ type Phase = '엔딩' | '보너스'
  * `저장+0xa0+e = 1`(본 엔딩) · `phase = 6` 을 세우고 이벤트 **500**(10년 종료)을 튼 뒤 여기로 온다.
  *
  * 화면 (P6 4b 마지막 항목 확정):
- *   화면 검정 → **외출 지도 `0x7ea65(…, 1)`** 를 배경으로 → 같은 **원형 전환**(S9 8-2 식) →
+ *   화면 검정 → **외출 지도 `0x7ea65(…, 1)`** 를 배경으로 → **원형 전환**(n > 10, `seasonEndingIrisOf`) → (n > 15)
  *   `StrENDING[15 + 결과]` 흰 글을 **(0, H/2 + 55, 폭 W)** 가운데.
  * 이어서 **엔딩 보너스 StrMODE[214]** (표 0xcbc2e × 1000 G) 를 알린다.
  *
@@ -80,13 +80,12 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
    */
   const [leaveStage, setLeaveStage] = useState(0)
 
-  /** 원이 화면을 다 덮으면(t ≥ 7) 연출이 끝난다 — 그 뒤로는 움직이는 것이 없다 */
-  const tick = Math.min(useUpdateCounter(), ENDING_IRIS.fullTick)
-  const isOpening = tick < ENDING_IRIS.fullTick
-  const stage = isOpening ? ENDING_IRIS_STAGES.open : ENDING_IRIS_STAGES.reveal
-  const radius = isOpening ? endingIrisRadiusOf(tick, stage.diameter) : stage.diameter
-  const irisX = ENDING_IRIS.centerX + stage.dx
-  const irisY = ENDING_IRIS.centerY + stage.dy
+  /**
+   * 상태 틱 `[장면+0x2c]`(0xb7e0 이 0x87a1c 에 넘긴다) — n ≤ 10 은 지도만 · n > 10 부터 원 · n > 15 부터 글.
+   * 원은 t ≥ 14 에 지름 100 으로 서므로 그 뒤로는 움직이는 것이 없다(틱을 거기서 세운다 — 글 문턱 15 보다 크다).
+   */
+  const tick = Math.min(useUpdateCounter(), ENDING_IRIS.firstTickAfter + 1 + 14)
+  const circle = seasonEndingIrisOf(tick)
 
   /** 키 0x6b3c — SR+0x7b 만 본다(보너스 값도 단계도 안 본다). 서 있으면 단계 + 1 · 종류 1 — 끝은 아래 효과기가 알린다 */
   const press = () => {
@@ -133,7 +132,7 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
       {/* 배경 = 외출 지도 0x7ea64(gfx, −1, 1) — 건물 다섯 보통 · 이름 숨김 · 밤이면 어둡게 */}
       <SeasonOutingMap selected={-1} hidesNames />
 
-      {/* 원형 전환 — 검정 판에 원을 뚫어 덮는다 (S9 8-2). evenodd 라 원 안쪽이 구멍이 된다 */}
+      {/* 원형 전환 — 검정 판에 원을 뚫어 덮는다 (0x87a1c). evenodd 라 원 안쪽이 구멍이 된다. n ≤ 10 은 판도 없다 */}
       <svg
         className={styles.overlay}
         aria-label="원형 전환"
@@ -141,22 +140,26 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
         width={ENDING_SCREEN.width}
         height={ENDING_SCREEN.height}
       >
-        <path
-          fillRule="evenodd"
-          fill={ENDING_IRIS.cover}
-          d={`M0,0H${ENDING_SCREEN.width}V${ENDING_SCREEN.height}H0Z`
-            + `M${irisX - radius},${irisY}`
-            + `a${radius},${radius} 0 1,0 ${radius * 2},0`
-            + `a${radius},${radius} 0 1,0 ${-radius * 2},0`}
-        />
+        {circle !== null && (
+          <path
+            fillRule="evenodd"
+            fill={ENDING_IRIS.cover}
+            d={`M0,0H${ENDING_SCREEN.width}V${ENDING_SCREEN.height}H0Z`
+              + `M${circle.x},${circle.y + circle.diameter / 2}`
+              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0`
+              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`}
+          />
+        )}
       </svg>
 
-      <div
-        className={styles.endingText}
-        style={{ left: SEASON_ENDING_TEXT.x, top: SEASON_ENDING_TEXT.y, width: SEASON_ENDING_TEXT.width }}
-      >
-        <MarkupText raw={text} />
-      </div>
+      {isSeasonEndingTextShown(tick) && (
+        <div
+          className={styles.endingText}
+          style={{ left: SEASON_ENDING_TEXT.x, top: SEASON_ENDING_TEXT.y, width: SEASON_ENDING_TEXT.width }}
+        >
+          <MarkupText raw={text} />
+        </div>
+      )}
 
       {phase === '엔딩' && (
         <button
