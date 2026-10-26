@@ -20,6 +20,7 @@ import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import type { MatchupBatterCard, MatchupPitcherCard } from '@/widgets/matchup-cards/ui/MatchupCards'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
+import { missionResultLeaveOf } from '@/pages/mission-play/lib/missionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
@@ -450,7 +451,7 @@ export function PitchingScreen({
             {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
             {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}
             onExit={(exit) => {
-              if (resultBoard?.aceMatch === undefined && exit === '다시' && onRetry !== undefined) onRetry()
+              if (missionResultLeaveOf(exit, resultBoard?.aceMatch !== undefined) === '다시하기' && onRetry !== undefined) onRetry()
               else onFinish()
             }}
           />

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MISSION_POINT_BOX, MISSION_POINT_ROWS, MISSION_RESULT_TITLE, MISSION_RESULT_WINDOW, MISSION_RETRY_BOX,
   MISSION_RETRY_BUTTONS, MISSION_RETRY_TEXT, missionResultEarnedOf, missionResultHeldOf, missionResultKeyActionOf,
-  missionResultStepOf,
+  missionResultLeaveOf, missionResultStepOf,
 } from '@/pages/mission-play/lib/missionResultBoard'
 
 const 보통 = { flag11f: false, flag176: false }
@@ -50,5 +50,14 @@ describe('미션 결과 판 0x4a384 (모드 5·6 갈래)', () => {
     expect(missionResultStepOf('취소', true, 타자대결).exit).toBe('대결끝')
     expect(missionResultStepOf('확인', true, 타자대결).exit).toBe('다시')
     expect(missionResultStepOf('확인', true, { flag11f: true, flag176: true }).exit).toBe('대결끝')
+  })
+
+  it('판을 나간 뒤 — 0x4b100 4b31e 는 대기가 서면 0x140006c 를 안 읽어, 대결 OK 의 다시(한 칸만 선 원본 버그)도 원래 모드로 떠난다', () => {
+    expect(missionResultLeaveOf('다시', false)).toBe('다시하기')
+    expect(missionResultLeaveOf('목록', false)).toBe('떠나기')
+    // 타자편 대결(g[0x11f] 만) — OK 는 '다시'(0x140006c = 3)지만 0x4b100 이 g[0xf6] 장면 0x106 으로
+    const 타자대결 = { flag11f: true, flag176: false }
+    expect(missionResultLeaveOf(missionResultStepOf('확인', true, 타자대결).exit ?? '목록', true)).toBe('떠나기')
+    expect(missionResultLeaveOf(missionResultStepOf('취소', true, 타자대결).exit ?? '목록', true)).toBe('떠나기')
   })
 })

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { registerContact } from '@/entities/batting/model/battedContact'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, judgedGoalsOf, missionKeyOf } from '@/entities/mission/model/missionGoal'
-import { MISSION_CPU_START } from '@/entities/mission/model/missionCpuTeam'
+import { MISSION_ACE_ROSTER_SLOT, MISSION_CPU_START, missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
+import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
+import { missionOpponentOf } from '@/entities/game/model/aceOpponent'
+import { aceMatchMissionOf } from '@/entities/story/model/aceMatch'
 import { MISSION_HUMAN_START_ORDER, cpuSideOf, humanSideOf } from '@/entities/mission/model/missionGame'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import {
@@ -26,6 +29,7 @@ import {
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { MISSIONS } from '@/shared/config/original/missions'
 import type { OriginalMission } from '@/shared/config/original/missions'
 
 /**
@@ -576,5 +580,156 @@ describe('투수편 칸마다 — 성공 길과 실패 길 (판정 0xaaa6c 모�
     expect(pitch(startPitcherMission(mission), HIT_BY_PITCH, random()).status).toBe('실패')
     expect(pitch(startPitcherMission(mission), SINGLE, random()).status).toBe('실패')
     expect(tick(startPitcherMission(mission), 299).status).toBe('실패')
+  })
+})
+
+// ── 마선수 공략 레코드 16~20 (대결 전용) ─────────────────────────────────────
+
+/**
+ * **마선수 공략 레코드 — 타자편 · 투수편 미션 16~20** (목록에 없는 대결 전용 레코드, 이벤트 SYS 8 의 team 16~20).
+ *
+ * - 파일 줄 차례: XlsBATTER/PITCHER_MISSION.zt1 은 19 줄(1~14 · 16~20) — 이벤트 칸 15 는 파일에 없다.
+ *   레코드 게터 0xa5268(타자) · 0xa5294(투수): `idx ≤ 13 → 줄 idx · idx == 14 → 그대로(이벤트 칸) · idx > 14 → 줄 idx − 1`.
+ *   SYS 8(0x8d764) 은 `+0xbd = team − 1` 이라 team 16~20 → idx 15~19 → 파일 줄 14~18 = 레코드 번호 바이트 16~20.
+ * - 판정 · 시작 · 보상은 위 28칸과 같은 함수(0xaaa6c · 0xaae7c · 0xa52b0)라 같은 풀이를 쓴다. 보상 등급 d = 0 → 0 G
+ *   (대결은 어차피 정산 0x4ef3e 가 G 를 건너뛴다).
+ * - 클리어 칸: 0xa5368(obj, 1) 은 `+0xbd ≤ 15` 일 때만 — team 16 만 그 편 15번 칸, 첫 승리 −1 → 0, 99 상한(a53f4 `cmp #0x63`).
+ *   다음 칸 열기는 `idx ≤ 12`(a5410) 라 대결은 안 탄다.
+ */
+const RAW_ACE: readonly (readonly ['타자' | '투수', string, string, string, string])[] = [
+  ['타자', '1000ae0000000033100001000000', '0000000000000100', '000000000000000000000000000000000000', '싸이커'],
+  ['타자', '1100ae0000000033200001000000', '0000000000000100', '000000000000000000000000000000000000', '레오니'],
+  ['타자', '1200ae0000000033300001000000', '0000000000000100', '000000000000000000000000000000000000', '붕붕머신'],
+  ['타자', '1300ae0000000033400001000000', '0000000000000100', '000000000000000000000000000000000000', '발렌타인'],
+  ['타자', '1400ae0000000033500001000000', '0000000000000100', '000000000000000000000000000000000000', '드래고나'],
+  ['투수', '1000ae0000000033100501000000', '0001110001', '000001000000000000000000000000000000', '메디카'],
+  ['투수', '1100ae0000000033500501000000', '0001110001', '000001000000000000000000000000000000', '킹타이거'],
+  ['투수', '1200ae0000000033300501000000', '0001110001', '000001000000000000000000000000000000', '로제'],
+  ['투수', '1300ae0000000033400501000000', '0001110001', '000001000000000000000000000000000000', '크라이져'],
+  ['투수', '1400ae0000000033200501000000', '0001110001', '000001000000000000000000000000000000', '어거지죠'],
+]
+
+const DECODED_ACE = RAW_ACE.map(([side, head, goalRow, board, name]) => ({ ...decode([side, head, goalRow, board]), name }))
+
+/** 0xa5268 / 0xa5294 — 레코드 번호 idx 를 파일 줄로 (14 는 파일에 없는 이벤트 칸) */
+function fileRowOfRecordIndex(idx: number): number | null {
+  if (idx <= 13) return idx
+  if (idx === 14) return null
+  return idx - 1
+}
+
+const findAnyMission = (side: '타자' | '투수', id: number): OriginalMission => {
+  const mission = MISSIONS.find((candidate) => candidate.side === side && candidate.id === id)
+  if (mission === undefined) throw new Error(`레코드 없음: ${side} ${id}`)
+  return mission
+}
+
+describe('마선수 공략 레코드 10칸 — 원본 바이트 · 레코드 게터 · 상대 · 보상 · 클리어 칸', () => {
+  it.each(['타자', '투수'] as const)('%s편 — SYS 8 의 team 16~20 → idx team − 1 → 0xa5268/0xa5294 파일 줄 14~18 → 레코드 번호 바이트가 곧 team', (side) => {
+    const rows = [...DECODED.filter((row) => row.side === side), ...DECODED_ACE.filter((row) => row.side === side)]
+    expect(rows).toHaveLength(19)
+    for (const team of [16, 17, 18, 19, 20]) {
+      const fileRow = fileRowOfRecordIndex(team - 1)
+      expect(fileRow).toBe(team - 2)
+      expect(rows[fileRow ?? -1]?.id).toBe(team)
+      expect(aceMatchMissionOf(team, side)?.id).toBe(team)
+    }
+    // 목록(미션 1~14)에는 없다 — 고르기 화면에 안 나온다
+    const listed = side === '타자' ? BATTER_MISSIONS : PITCHER_MISSIONS
+    expect(listed.some((mission) => mission.id >= 16)).toBe(false)
+  })
+
+  it.each(DECODED_ACE.map((row) => [row.side, row.id, row] as const))('%s %i — 레코드 · 판정 목표 · 한도 · CPU 표 · 상대 · 보상', (side, id, row) => {
+    const mission = findAnyMission(side, id)
+    const key = missionKeyOf(mission)
+    expect(mission).toMatchObject({
+      name: row.name,
+      briefing: `${row.name} 공략`,
+      stage: row.tier,
+      humanSide: row.humanSide,
+      sideTeams: row.sideTeams,
+      start: row.start,
+      opponentAce: row.opponentAce,
+      plateAppearanceLimit: row.plateAppearanceLimit,
+      swingLimit: row.swingLimit,
+      pitchLimit: row.pitchLimit,
+      timeLimitSeconds: row.timeLimitSeconds,
+      conditionCode: row.aimShake,
+      failLimits: row.failLimits,
+    })
+    expect(mission.goalCounts).toEqual(row.goals)
+    expect(MISSION_CPU_START[key]).toEqual({ pitcherSlot: row.cpuPitcherSlot, battingOrder: row.cpuBattingOrder })
+    expect(MISSION_HUMAN_START_ORDER[key]).toBe(row.humanBattingOrder)
+    // 상대 마선수 — 레코드 +8 윗 4비트 순번, 레코드 이름 칸과 같은 마선수
+    const opponent = missionOpponentOf(side === '타자' ? '투수' : '타자', row.opponentAce)
+    expect(opponent?.name).toBe(row.name)
+    // 보상 0xa52b0 — d = 0 이라 처음이든 몇 번째든 0
+    for (const clears of [0, 1, 5]) expect(missionRewardOf(mission.stage, clears)).toBe(0)
+    // 클리어 칸 0xa5368 — +0xbd = id − 1 ≤ 15 인 team 16 만
+    expect(aceMatchClearKeyOf(mission)).toBe(id === 16 ? key : null)
+  })
+
+  it.each(DECODED_ACE.map((row) => [row.side, row.id, row] as const))('%s %i 의 시작 판 — 1회 무사 빈 루 · 사람 칸 0(선공) · 상대 마선수가 첫 타석에 선다', (side, id, row) => {
+    const mission = findAnyMission(side, id)
+    const human = humanSideOf(mission)
+    const cpu = cpuSideOf(mission)
+    if (side === '타자') {
+      const run = startMission(mission)
+      expect(run.status).toBe('진행중')
+      expect(run.game.offenseSide).toBe(human)
+      expect(run.remainingPlateAppearances).toBe(1)
+      expect(run.remainingSwings).toBeNull()
+      // 마투수는 명부 8번에 베낀 뒤 0 ↔ 8 (aafca~ab06e) — 선발 칸이 마투수다
+      expect(run.cpu.pitching?.roster[0]).toBe(MISSION_ACE_ROSTER_SLOT)
+      expect(run.game.scores).toEqual([0, 0])
+    } else {
+      const run = startPitcherMission(mission)
+      expect(run.status).toBe('진행중')
+      expect(run.game.offenseSide).toBe(cpu)
+      expect(run.remainingPlateAppearances).toBe(1)
+      expect(run.remainingPitches).toBe(5)
+      // 마타자는 지금 타순(레코드 +7 아래 4비트 = 3) 레코드에 끼운다 (ab078~ab0f4)
+      expect(missionCpuBatterOf(run.cpu)).toMatchObject({ order: row.cpuBattingOrder, isAce: true })
+      // 점수판 +0x8e 앞 9칸(측 0 = 사람 칸)의 합 1 — 1:0 으로 앞선 채 수비
+      expect(run.game.scores[human]).toBe(1)
+      expect(run.game.scores[cpu]).toBe(0)
+    }
+    expect(row.start).toMatchObject({ inning: 1, outs: 0, balls: 0, strikes: 0 })
+    expect(human).toBe(0)
+  })
+})
+
+describe('마선수 공략 레코드 — 성공 길과 실패 길 (같은 판정 0xaaa6c)', () => {
+  const random = () => createSeededRandom(7)
+  const ACE_RECORD_IDS = [16, 17, 18, 19, 20]
+
+  it.each(ACE_RECORD_IDS)('타자 %i — 안타 1 · 1타석: 단타 · 홈런이면 성공, 삼진 · 뜬공 · 볼넷이면 그 타석에서 실패', (id) => {
+    const mission = findAnyMission('타자', id)
+    expect(bat(startMission(mission), SINGLE, random()).status).toBe('성공')
+    expect(bat(startMission(mission), HOME_RUN, random()).status).toBe('성공')
+    expect(bat(startMission(mission), STRIKEOUT, random()).status).toBe('실패')
+    expect(bat(startMission(mission), FLY_OUT, random()).status).toBe('실패')
+    // 볼넷도 타석 하나 — 남은 0 타석으로 안타 1 을 못 채운다(0xaa958)
+    expect(bat(startMission(mission), WALK, random()).status).toBe('실패')
+  })
+
+  it.each(ACE_RECORD_IDS)('투수 %i — 아웃 1 · 1타석 · 투구 5: 삼진 · 뜬공이면 성공, 볼넷 · 사구 · 안타 · 홈런 · 다섯째 공이면 실패', (id) => {
+    const mission = findAnyMission('투수', id)
+    expect(pitch(startPitcherMission(mission), STRIKEOUT, random(), { pitches: 3 }).status).toBe('성공')
+    expect(pitch(startPitcherMission(mission), FLY_OUT, random()).status).toBe('성공')
+    for (const outcome of [WALK, HIT_BY_PITCH, SINGLE, HOME_RUN]) {
+      expect(pitch(startPitcherMission(mission), outcome, random()).status).toBe('실패')
+    }
+    let run = startPitcherMission(mission)
+    for (let thrown = 0; thrown < 4; thrown += 1) run = checkPitchExhausted(recordPitch(run, false))
+    expect(run.status).toBe('진행중')
+    expect(checkPitchExhausted(recordPitch(run, false)).status).toBe('실패')
+  })
+
+  it('클리어 칸 — team 16 을 이기면 −1(새 저장 memset 0xff) → 0 → 1 …, 99 에서 멈춘다 (a53c4~a540a)', () => {
+    expect(aceMatchClearCountAfterWin(undefined)).toBe(0)
+    expect(aceMatchClearCountAfterWin(0)).toBe(1)
+    expect(aceMatchClearCountAfterWin(98)).toBe(99)
+    expect(aceMatchClearCountAfterWin(99)).toBe(99)
   })
 })

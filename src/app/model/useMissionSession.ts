@@ -1923,6 +1923,9 @@ export function useMissionSession({
    * g[0x176])가 없으면 미션 목록, 서 있으면 결과 판 키 0x407f0 4090c 대로 g[0xf6] ∈ {3, 4} 의 나리 장면(`onReturnToNari`).
    * **g[0xf6] 이 3 · 4 가 아니면(한 편 140 이 다른 편 대기를 남긴 채 g[0xf6] 을 0 으로 지웠을 때) 그 키가 아무 일도 안 해 판에
    * 갇힌다 — 원본 그대로** 판을 안 닫고 거짓을 돌려준다.
+   * ⚠️ 원본에서 갇히는 것은 CLR(과 두 칸이 다 선 OK — 0x4090e) 뿐이다. 칸이 하나만 선 OK 는 '다시'(0x140006c = 3)로 전환을 걸고
+   * 0x4b100 4b344 가 전역 모드 = g[0xf6](0) 으로 장면 0x106 을 세운다 — 모드 0 의 0x106 은 안 읽어 웹은 그 키도 판에 둔다
+   * (`missionResultLeaveOf` 머리말, r264).
    */
   const leaveMissionResult = (): boolean => {
     const held = aceMatchHold?.read() ?? NO_ACE_MATCH_HOLD

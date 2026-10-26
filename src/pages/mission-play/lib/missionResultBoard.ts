@@ -134,3 +134,17 @@ export function missionResultStepOf(
   if (action === '취소') return { answer, exit: isAce ? '대결끝' : '목록' }
   return { answer, exit: null }
 }
+
+/**
+ * **판을 나간 뒤의 길** — 키 0x407f0 이 0x140006c 에 적은 값(3 같은 미션 다시 · 1 목록 · 0x69 대결 끝)은 화면 전환이 끝난 틀의
+ * 0x4b100 이 읽는다. 다만 0x4b100 의 모드 5·6 갈래(4b31e~4b376, 직접 떴다)는 g[0x11f] || g[0x176] 이면 **0x140006c 를 안 읽고**
+ * 전역 모드 = g[0xf6] · 장면 g[0xf6] == 2 ? 0x105 : 0x106 으로 간다(대기가 없을 때만 4b378 → 0x107 이 0x140006c 를 본다).
+ *
+ * 그래서 마선수 대결에서 칸이 하나만 서 OK 가 '다시'(0x140006c = 3 — `missionResultStepOf` 의 원본 버그 그대로)가 되어도 같은 대결을
+ * 다시 세우지 않고 대결 끝과 같은 원래 모드 장면으로 떠난다. 남은 3 은 나리 장면이 메인 메뉴로 갈 때 5 로 덮는다(0x1bfd4 · 0x1ca92).
+ * ⚠️ g[0xf6] 이 3 · 4 가 아닐 때(한 편 140 이 g[0xf6] 을 지운 뒤 남은 다른 편 대기)는 CLR(대결 끝 0x4090e)은 판에 갇히지만 OK 는
+ * 0x4b100 이 전역 모드 g[0xf6] 그대로 0x106 을 세운다 — 웹은 그 장면(모드 0 의 0x106)을 몰라 두 키 모두 판에 갇힌다(`leaveMissionResult`).
+ */
+export function missionResultLeaveOf(exit: MissionResultExit, isAceFlagged: boolean): '다시하기' | '떠나기' {
+  return exit === '다시' && !isAceFlagged ? '다시하기' : '떠나기'
+}

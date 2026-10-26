@@ -358,8 +358,9 @@ export function withAceMatchHeld(save: ModeSave, mode: NariLeagueMode, resultEve
 
 /**
  * **140 진입 0x10df8** — 결과 이벤트를 틀며 대기 칸을 지우고 전역기록을 저장한다(10f72). 타자편 갈래 10ec6~10f0c 는
- * g[0xec] · g[0xee] · g[0x11f] · g[0x144] · **g[0xf6]** · g[0xf7], 투수편 갈래 10f0e~ 는 g[0x170] · g[0x172] · g[0x176] · g[0x177] ·
- * **g[0xf6]**(10f56) · g[0x175] 를 0 으로 — g[0xf6] 은 다른 편 대기가 남아 있어도 지운다(원본 그대로).
+ * g[0xec] · g[0xee] · g[0x11f] · g[0x144] · **g[0xf6]** 을 0, g[0xf7] 을 −1(10f66 `movs #1; rsbs`) 로, 투수편 갈래 10f0e~ 는
+ * g[0x170] · g[0x172] · g[0x176] · g[0x177] · **g[0xf6]**(10f56) 을 0, g[0x175] 를 −1 로 — g[0xf6] 은 다른 편 대기가 남아 있어도
+ * 지운다(원본 그대로). 팀 칸(g[0xf7] · g[0x175])은 웹 저장에 없다(미션 세션이 대결 미션으로 든다).
  */
 export function withAceMatchCleared(save: ModeSave, mode: NariLeagueMode): ModeSave {
   if (save.aceMatchPending[mode] === null) return save
