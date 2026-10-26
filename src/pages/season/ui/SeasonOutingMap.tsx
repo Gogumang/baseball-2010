@@ -1,16 +1,10 @@
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { FrameSprite, SolidStamp } from '@/shared/ui'
-import {
-  CURSOR_ANIMATION, MAP_FRAME, MAP_FRAMES, NIGHT_WINDOW_FRAME, OUTING_PLACES, PLACE_LABEL_FRAMES,
-} from '@/shared/config/outingPlaces'
-import { outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
+import { ComposedScreen, FrameSprite, SolidStamp } from '@/shared/ui'
+import { CURSOR_ANIMATION, MAP_FRAMES, OUTING_PLACES, PLACE_LABEL_FRAMES } from '@/shared/config/outingPlaces'
+import { mapLabelSrc, outingMapComposeOps, outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
-import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
-
-/** 효과 1 · 인자 7 — 고르지 않은 건물은 7/16 (R6 3a · ⚠️ 근사(남김 — 웹 DOM 한계): 섞기는 공용 `translucentOpacityOf` 머리의 불투명도) */
-const UNSELECTED_OPACITY = translucentOpacityOf(7)
 /** 0x7ec04 · 0x7e300 의 단색 찍기 자리 — 건물은 네 방향, 글자 테두리는 여덟 방향(표 0xd48c8 · 0xd48e8) */
 const FOUR_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
 const EIGHT_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1], [-1, -1], [1, -1], [1, 1], [-1, 1]]
@@ -30,6 +24,7 @@ export interface SeasonOutingMapProps {
  * 시즌 엔딩 0x87a1c 는 같은 장면 gfx([this+0xc0], 0xb7ec)로 `0x7ea64(gfx, −1, 1)`(0x87a30~0x87a38)을 부른다 —
  * sel = −1 이라 건물 다섯이 효과 0(보통)이고(0x7eb0a) 흰 테두리 · 화살표가 없으며(0x7ec04 → 0x7ed58), 이름숨김 1 이라
  * 0x7eb66 의 이름을 건너뛴다(셋째 인자는 거기서만 본다). 밤 갈래(0x7eba2)는 sel 과 상관없이 탄다.
+ * 지도 · 고르지 않은 건물(효과 1 · 7) · 이름 · 밤 덮개는 원본 식 그대로 한 캔버스로 합성한다(`outingMapComposeOps`).
  */
 export function SeasonOutingMap({ selected, hidesNames = false, hour }: SeasonOutingMapProps) {
   const origins = useFrameOrigins(MAP_FRAMES)
@@ -45,21 +40,12 @@ export function SeasonOutingMap({ selected, hidesNames = false, hour }: SeasonOu
   return (
     <div data-testid="시즌-외출지도" data-selected={selected}
       style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320, background: '#000', overflow: 'hidden', pointerEvents: 'none' }}>
-      <FrameSprite folder={MAP_FRAMES} frame={MAP_FRAME} origins={origins} x={layout.mapX} y={layout.mapY} />
-      {OUTING_PLACES.map((place, index) => index === selected ? null : (
-        <FrameSprite key={place.id} folder={MAP_FRAMES} frame={place.frame} origins={origins} x={layout.mapX} y={layout.mapY}
-          style={selected === -1 ? undefined : { opacity: UNSELECTED_OPACITY }} />
-      ))}
-      {!hidesNames && layout.labels.map((label, index) => index === selected ? null : (
-        <img key={label.frame} alt="" src={`./sprites/management/map_label_${label.frame}.png`}
-          style={{ position: 'absolute', left: label.left, top: label.top, imageRendering: 'pixelated' }} />
-      ))}
-      {layout.isNight && (
-        <>
-          <div style={{ position: 'absolute', inset: 0, background: `rgba(0, 0, 0, ${layout.nightDim})` }} />
-          <FrameSprite folder={MAP_FRAMES} frame={NIGHT_WINDOW_FRAME} origins={origins} x={layout.mapX} y={layout.mapY} />
-        </>
-      )}
+      <ComposedScreen testId="시즌-외출지도-합성" ops={outingMapComposeOps({
+        origins, mapX: layout.mapX, mapY: layout.mapY, selected, isNight: layout.isNight,
+        labelOf: (index) => (hidesNames
+          ? []
+          : [{ kind: 'image', src: mapLabelSrc(layout.labels[index].frame), x: layout.labels[index].left, y: layout.labels[index].top }]),
+      })} />
       {selectedPlace !== undefined && (
         <>
           {FOUR_WAYS.map(([dx, dy]) => (

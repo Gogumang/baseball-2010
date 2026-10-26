@@ -2,9 +2,7 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import {
   CURSOR_ANIMATION,
   EVENT_MARKER_ANIMATION,
-  MAP_FRAME,
   MAP_FRAMES,
-  NIGHT_WINDOW_FRAME,
   OUTING_PLACES,
   PLACE_LABEL_FRAMES,
 } from '@/shared/config/outingPlaces'
@@ -14,14 +12,13 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { Fragment } from 'react'
 import type { ReactNode } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { FrameSprite, PressArea, SolidStamp } from '@/shared/ui'
+import { ComposedScreen, FrameSprite, PressArea, SolidStamp } from '@/shared/ui'
 import * as styles from '@/pages/outing-map/ui/OutingMapScreen.css'
 import { placeLabelTopLeftOf } from '@/pages/outing-map/lib/placeLabelPosition'
 import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
-import { NIGHT_DIM_STEP } from '@/pages/management/lib/outingMapUnderlay'
-import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
+import { outingMapComposeOps } from '@/pages/management/lib/outingMapUnderlay'
+import { frameComposeOps } from '@/shared/lib/pixelEffect/screenCompose'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
-import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /**
  * [!] 표시 기준점 (0x7ed6c, F-2 2-6 확정) — `mapX + bx + (bw >> 1)`, `mapY + by`.
@@ -38,8 +35,6 @@ const cursorAnchorOf = (box: MapBox) => ({ x: box.x + Math.trunc(box.width / 2),
 /** ⚠️ 웹 자리: 취소 — 오른쪽 소프트키 글자 자리 (W − 41 − 1, H − 12 − 1), 타석 "#TIME" 과 같은 자리 */
 const OUTING_CANCEL_PRESS_RECT = { x: 198, y: 307, width: 41, height: 12 } as const
 
-/** 효과 1·인자 7 — 그림 무게가 7/16 이다 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리) */
-const UNSELECTED_OPACITY = translucentOpacityOf(7)
 /** 고른 건물 테두리 0x7ec44~0x7ecb0 — 찍는 차례 (x−1, y) · (x, y−1) · (x+1, y) · (x, y+1) 과 색 RGB(255,255,255) */
 const SELECTED_OUTLINE_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
 const SELECTED_OUTLINE_COLOR = '#FFFFFF'
@@ -68,6 +63,17 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, chil
   const update = useUpdateCounter()
   const sceneHour = useSceneHour()
   const isNight = backgroundFrameOf(hour ?? sceneHour) === NIGHT_TIME_SLOT
+  const selectedIndex = OUTING_PLACES.findIndex((place) => place.id === selectedPlaceId)
+  const composeOps = outingMapComposeOps({
+    origins, mapX: 0, mapY: styles.MAP_TOP, selected: selectedIndex, isNight,
+    labelOf: (index) => {
+      const place = OUTING_PLACES[index]
+      const label = labelOrigins?.[String(place.labelFrame).padStart(3, '0')]
+      if (label === undefined) return []
+      const at = placeLabelTopLeftOf(place.nameBox, label.width, label.height)
+      return frameComposeOps(PLACE_LABEL_FRAMES, place.labelFrame, labelOrigins, at.x, at.y)
+    },
+  })
 
   const animated = (animation: number, anchor: { x: number; y: number }, key: string) => {
     const step = animationStepAt(animations?.[animation] ?? [], update)
@@ -80,24 +86,15 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, chil
 
   return (
     <RawScreen>
-      <FrameSprite folder={MAP_FRAMES} frame={MAP_FRAME} origins={origins} x={0} y={styles.MAP_TOP} />
-
-      {/* 0x7eb0a~0x7eba0 — 고르지 않은 건물(효과 1·인자 7 = 7/16 반투명 겹치기, R6 3a 확정)과 그 이름. 고른 건물은 밤 덮개 뒤에 그린다 */}
+      {/*
+        0x7ea7e~0x7ec00 — 지도 · 고르지 않은 건물(효과 1·인자 7 반투명 겹치기 0x9a449, R6 3a 확정)과 그 이름 · 밤 덮개를 원본 식 그대로
+        한 캔버스로 합성한다(`outingMapComposeOps`). 밤: 시간대 [gfx+0x1c] == 2 이면 화면 전체를 [0x15605d4] 단계 9 로 덮고(검정 몸통
+        0x9aac4 — 9/16 남김) 프레임 6(창문 불빛)을 지도 원점에 얹는다 (F-2 2-3 확정). 고른 건물은 밤 덮개 뒤에 그린다
+      */}
+      <ComposedScreen testId="외출지도-합성" ops={composeOps} />
       {OUTING_PLACES.filter((place) => place.id !== selectedPlaceId).map((place) => (
         <PlaceArt key={place.id} place={place} origins={origins} labelOrigins={labelOrigins} isSelected={false} onOpen={onOpen} />
       ))}
-
-      {/*
-        0x7eba2~0x7ec00 밤: 시간대 [gfx+0x1c] == 2 이면 화면 전체를 [0x15605d4] 단계 9 로 덮고(검정 몫 7/16)
-        프레임 6(창문 불빛)을 지도 원점에 얹는다 (F-2 2-3 확정). 그 밖 시간대에는 둘 다 없다.
-      */}
-      {isNight && (
-        <>
-          <div className={styles.nightCover} data-testid="외출지도-밤덮개"
-            style={{ opacity: blackStepCoverOpacityOf(NIGHT_DIM_STEP) }} />
-          <FrameSprite folder={MAP_FRAMES} frame={NIGHT_WINDOW_FRAME} origins={origins} x={0} y={styles.MAP_TOP} />
-        </>
-      )}
 
       {/*
         0x7ec04~0x7ecf8 — 고른 건물 · 이름은 덮개 뒤에 그려 밝게 남는다. 건물은 프레임 sel+1 을 효과 0xb(단색) · RGB(255,255,255) 로
@@ -130,7 +127,10 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, chil
   )
 }
 
-/** 건물 한 채와 그 이름 — 고르지 않은 건물은 7/16 반투명. 이름은 박스에 mapY 를 안 더한다 (F-2 2-4 확정) */
+/**
+ * 건물 한 채의 누름 칸과(고른 건물이면) 그림 · 이름 — 고르지 않은 건물 · 이름은 합성 캔버스(`outingMapComposeOps`)가 그리고
+ * 여기는 투명 누름 칸만 둔다. 이름은 박스에 mapY 를 안 더한다 (F-2 2-4 확정)
+ */
 function PlaceArt({ place, origins, labelOrigins, isSelected, onOpen }: {
   readonly place: OutingPlace
   readonly origins: ReturnType<typeof useFrameOrigins>
@@ -146,12 +146,13 @@ function PlaceArt({ place, origins, labelOrigins, isSelected, onOpen }: {
         <button type="button" className={styles.placeButton} aria-label={place.name}
           style={{ left: frameOrigin.x, top: frameOrigin.y + styles.MAP_TOP, width: frameOrigin.width, height: frameOrigin.height }}
           onClick={() => onOpen(place)}>
-          <img className={styles.sprite}
-            style={{ left: 0, top: 0, opacity: isSelected ? 1 : UNSELECTED_OPACITY }}
-            src={`${MAP_FRAMES}/${String(place.frame).padStart(3, '0')}.png`} alt="" />
+          {isSelected && (
+            <img className={styles.sprite} style={{ left: 0, top: 0 }}
+              src={`${MAP_FRAMES}/${String(place.frame).padStart(3, '0')}.png`} alt="" />
+          )}
         </button>
       )}
-      {label !== undefined && (
+      {isSelected && label !== undefined && (
         <FrameSprite folder={PLACE_LABEL_FRAMES} frame={place.labelFrame} origins={labelOrigins}
           {...placeLabelTopLeftOf(place.nameBox, label.width, label.height)} />
       )}
