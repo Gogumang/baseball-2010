@@ -1,5 +1,6 @@
 import { placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 경기 HUD — binary.mod 0x373d0 (position-re 2차, 바이트 확인).
@@ -92,7 +93,7 @@ export function lampCountOf(lamp: { readonly max: number }, count: number): numb
  * ```
  * 그래서 새 램프가 5·4·3·2·1 배로 다섯 그림 동안 줄어든다. 확대 자리는 **상자** w·h 로 `(x − ((z−1)·w >> 1), y − ((z−1)·h >> 1))`.
  * 타석 시작 0xd 진입(0x48f08)은 **타이머만** 0 으로 지운다 — 지난 칸 수는 경기 적재 0x48658(48cc2~48cf2)이 한 번 채울 뿐이다.
- * 원본 버그 그대로: 칸이 0 으로 내려갔다 같은 수로 다시 켜지면(지난 1 → 0 → 1) 확대가 없다.
+ * 원본 버그(B-87): 칸이 0 으로 내려갔다 같은 수로 다시 켜지면(지난 1 → 0 → 1) 확대가 없다 — 고친 길은 0 에서 지난 칸 수를 지운다.
  * 정수 배 확대라는 것은 R6 3b 확정 (프레임 그리기 0x944b5 의 e == 0x10, b > 0 → 좌표·크기 ×b).
  */
 const LAMP_ZOOM_TIMER = 5
@@ -119,7 +120,8 @@ export function stepLampZoom(memory: LampZoomMemory, count: number, tick: number
   if (tick === memory.tick) return memory
   let { last, timer } = memory
   if (tick < memory.tick) timer = 0
-  if (count <= 0) return { last, timer, tick, zoom: 0 }
+  // B-87 고친 길 — 꺼진 칸은 지난 칸 수를 0 으로 둬, 같은 수로 다시 켜져도(1 → 0 → 1) 확대가 선다. 굴림 없음
+  if (count <= 0) return isBugFixed('B-87') ? { last: 0, timer: 0, tick, zoom: 0 } : { last, timer, tick, zoom: 0 }
   if (last !== count) {
     timer = LAMP_ZOOM_TIMER
     last = count

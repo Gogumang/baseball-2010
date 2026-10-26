@@ -30,7 +30,7 @@
  *   화면[자리] = 0x1400748(R >> 밀기, G >> 밀기, B >> 밀기)                       ; 색 만들기 — 565 로 묶는다(유력)
  * 줄 0 = 줄 1 · 줄 H−1 = 줄 H−2 (0x1400408 복사) → 줄마다 칸 0 = 칸 1 · 칸 W−1 = 칸 W−2
  * ```
- * 제자리라 왼쪽·위 이웃은 이미 흐려진 값이다 — 오른쪽 아래로 끌리는 흐림(원본 그대로).
+ * 제자리라 왼쪽·위 이웃은 이미 흐려진 값이다 — 오른쪽 아래로 끌리는 흐림(원본 그대로, B-91 고친 길은 사본에서 읽는다).
  *
  * ### 1-2. [0x15605d0] = 0x9b3f4 — 단계 덮기 (직접 떴다, 0x2ed8 의 0x3118 `0x987f9(1, 0x9a52d, 0x9b3f5)` 가 건다)
  * 0x9b3f4(x, y, w, h, 색, 단계 ≤ 15) 가 자르기 칸과 화면 안으로 줄인 뒤 16비트면 [0x15605e0] = **0x9a52c** 를 부른다.
@@ -59,11 +59,14 @@
  * c < w + 15 ? c + 1 : 1 → [skin+0x414]
  * ```
  * → 공 아이콘(애니 0 = 프레임 0~5 지연 3)이 38px 간격 엇갈린 격자로 깔려 **틱마다 오른쪽 아래로 2px** 흐른다.
- * c 는 1 → 38 을 돌아 시작이 −44 → 30 을 오가는데, 38 에서 1 로 돌 때 74px 만 되돌아가(무늬 한 주기는 76px)
- * 한 바퀴마다 2px 튄다 — **원본 그대로**.
+ * c 는 1 → 38 을 돌아 시작이 −44 → 30 을 오간다. 38 에서 1 로 돌 때 74px 되돌아가는 것은 무늬 주기(가로 38 · 세로 두 줄 76)로
+ * 보면 +2px 이라 흐름은 끊기지 않는다(r282 다시 셈 — 예전 "2px 튄다" 는 틀렸다). 다만 시작이 15 를 넘는 c = 31 … 38(시작 18 … 30)
+ * 에서는 시작 앞 칸(시작 − 38)을 안 그려 **왼쪽 · 위 가장자리에 공 한 줄이 비었다가** 1 로 돌 때 다시 나타난다(B-91, 원본 그대로).
+ * 고친 길은 시작이 0 을 넘으면 한 주기(76)를 빼 그 칸을 채운다 — 무늬는 76 옮겨도 같으므로 나머지 그림은 그대로다.
  * [skin+0x414] 를 0 으로 놓는 곳은 스킨을 만들 때 0x5390c(0x53a1e) 하나뿐이라 화면을 건너 이어진다.
  */
 
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { finishSkinBackdrop565 } from '@/shared/lib/screen565/screen565'
 
 export const SKIN_SCREEN = { width: 240, height: 320 } as const
@@ -129,8 +132,10 @@ export function ballPatternCounterAfter(draws: number): number {
 
 /** c 일 때 공 칸들의 왼쪽 위 — 줄마다 홀수 줄은 반 칸 왼쪽 */
 export function ballPatternTilesOf(counter: number): readonly { readonly x: number; readonly y: number }[] {
-  const start = 2 * (counter - tileWidth)
   const stepX = tileWidth + gap
+  const rawStart = 2 * (counter - tileWidth)
+  // B-91 고친 길 — 무늬 주기 2 · (w + 15) 만큼 당겨 왼쪽 · 위 가장자리 빈 줄을 채운다. 굴림 없음
+  const start = isBugFixed('B-91') && rawStart > 0 ? rawStart - 2 * stepX : rawStart
   // 줄 간격도 높이가 아니라 **폭** + 15 다 (0x5fe74 `adds r3, r2, r7` — r7 = 폭). gpoint 12 는 23×23 이라 같다
   const stepY = tileWidth + gap
   const tiles: { x: number; y: number }[] = []

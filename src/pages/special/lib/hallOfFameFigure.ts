@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { pitcherPoseOf as stagePitcherPoseOf, pitcherStepRuleOf } from '@/widgets/batting-stage/lib/stageScenery'
 
 /**
@@ -29,7 +30,7 @@ import { pitcherPoseOf as stagePitcherPoseOf, pitcherStepRuleOf } from '@/widget
  * ```
  * - **투수 그림은 한 그림 늦다**: 이미지는 목록 그리기 **앞**에 뜨므로 그 그림의 생김새·자세는 앞 그림 끝의 값이다.
  *   커서를 타자 칸에서 투수 칸으로 옮긴 첫 그림은 앞서 실었던 투수(이번 진입에 실은 적이 없으면 빈 그림)를
- *   **타자 자세 번호**로 그린다 — [목록+0x204] 하나를 둘이 같이 쓰기 때문이다(원본 그대로).
+ *   **타자 자세 번호**로 그린다 — [목록+0x204] 하나를 둘이 같이 쓰기 때문이다(원본 그대로 — B-97, 고친 길은 그 그림의 투수 · 자세로).
  *   반면 x 를 가르는 손 [투수그림+0x3c] 는 그리는 그 순간(이번 그림에 실은 뒤)의 값이다.
  * - 손 0xb63c0: 등록 선수(rec[0xa] bit6 = 0 — 명전 등록이 +0xa 를 0/0x20 으로 둔다)는 `폼 & 1`. 투수 그림은 손 ≠ 0(좌완)이면
  *   뒤집고(0x79544, 효과 0x11) 타자 그림은 손 = 0(우타)이면 뒤집는다(0x78d0c).
@@ -289,10 +290,14 @@ export function drawListFigure(memory: FigureListMemory, entry: FigureEntryState
   }
   if (!input.isBatterSlot && nextEntry.pitcherAnimation !== null && nextEntry.pitcher !== null) {
     const stepped = stepPitcher(nextMemory, nextEntry.pitcherAnimation)
+    // B-97 고친 길 — 이번 그림에 실은 투수와 이번 걸음의 자세로 뜬다(한 그림 늦음 · 타자 자세 번호를 걷는다). 굴림 없음
+    const drawnImage = isBugFixed('B-97')
+      ? (input.capturesImage ? { look: nextEntry.pitcher, pose: stepped.memory.pose } : null)
+      : image
     return {
       memory: stepped.memory,
       entry: { ...nextEntry, pitcherAnimation: stepped.animation },
-      drawing: { kind: '투수', image, hand: figureHandOf(nextEntry.pitcher) },
+      drawing: { kind: '투수', image: drawnImage, hand: figureHandOf(nextEntry.pitcher) },
     }
   }
   return { memory: nextMemory, entry: nextEntry, drawing: { kind: '없음' } }

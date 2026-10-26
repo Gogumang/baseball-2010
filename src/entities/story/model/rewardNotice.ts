@@ -8,6 +8,7 @@ import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { hiddenOpenNoticeTextOf as hiddenOpenWindowTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * **보상 명령 7 의 알림** — 실행 0x8d4c4 · 글 0x8beb8 · 기다림 0x8daa0 (직접 떴다).
@@ -126,7 +127,8 @@ function originalMoneyText(amount: number): string {
   if (amount < hundredMillion) return String(amount)
   const head = Math.trunc(amount / hundredMillion)
   const rest = amount % hundredMillion
-  return rest === 0 ? `${head}억` : `${head}억${String(rest).padStart(3, '0')}`
+  // B-99 고친 길 — 나머지는 만 단위 네 자리라 "%04d" 로 채운다(1억 50만 → "1억0050", 원본 "1억050"). 굴림 없음
+  return rest === 0 ? `${head}억` : `${head}억${String(rest).padStart(isBugFixed('B-99') ? 4 : 3, '0')}`
 }
 
 /** 0x8457c — 스킬 s ≤ 7 이면 StrCOMMON[55 + s], 그 밖 모드 4 면 55 + s · 아니면 71 + s */

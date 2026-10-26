@@ -6,6 +6,7 @@ import type { EquipmentBlockReason } from '@/entities/career/model/equipment'
 import { purchaseSubItem, SUB_ITEM_BLOCK_TEXT, SUB_ITEMS, subItemBlockReasonOf } from '@/entities/career/model/subItems'
 import { BATTER_GP_ITEMS, EAGLE_EYE_ITEM_ID, EAGLE_EYE_NOTICE, gpItemBlockReasonOf, gpItemNoticeOf, purchaseGpItem } from '@/entities/career/model/gpItems'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /** 상점 탭 (0x14a74 의 화면+0x1a4 — 3 장착 · 1 서브 · 2 GP) · 선수정보 장비착용(0x17b66) */
@@ -116,7 +117,8 @@ export function formatOriginalMoney(amount: number): string {
   if (amount < HUNDRED_MILLION) return String(amount)
   const hundredMillions = Math.trunc(amount / HUNDRED_MILLION)
   const rest = amount % HUNDRED_MILLION
-  return rest === 0 ? `${hundredMillions}억` : `${hundredMillions}억${String(rest).padStart(3, '0')}`
+  // B-99 고친 길 — "%04d" (1억 50만 → "1억0050", 원본 "1억050"). 굴림 없음
+  return rest === 0 ? `${hundredMillions}억` : `${hundredMillions}억${String(rest).padStart(isBugFixed('B-99') ? 4 : 3, '0')}`
 }
 
 const moneyQuestion = (amount: number) =>

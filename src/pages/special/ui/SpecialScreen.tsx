@@ -64,6 +64,7 @@ import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 const MAIN_UI = './sprites/main_ui'
 const MAIN_UI_FRAMES = `${MAIN_UI}/frames`
@@ -1121,7 +1122,7 @@ function hallOfFameIconOf(slot: number, state: HallOfFameSlotState) {
  *   0xf810~0xf85a: (5, 3, 1, 0x10) · 막힘 [2·열] = 칸 10 — 진입 0x1c8ec 는 [목록+0x134] 에 넣고 커서 vt+0x14(0, 0) 만 (0x1ca06~0x1ca2a)
  * 시즌 0xe2 선수영입 [장면+0x9c] — 시즌 장면 생성자 0x3b14 가 한 번 짓는다
  *   0x3d60~0x3d94: (5, 3, 1, 0x10) · 막힌 칸 없음 — 진입 0xe1dc 는 [목록+0x134] 에 넣고 커서 vt+0x14(0, 0) 만 (0xe302~0xe320)
- *   곧 영입 목록은 안 쓰는 칸 10 에도 커서가 선다 (원본 그대로)
+ *   곧 영입 목록은 안 쓰는 칸 10 에도 커서가 선다 (원본 그대로 — B-98, 고친 길은 칸 10 을 막는다)
  * ```
  * 꼴 0x10 이라 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다. 옮기기 0x6c445 는 막힌 칸을 같은 방향으로 건너뛴다.
  */
@@ -1129,7 +1130,8 @@ function hallOfFameGridOf(mode: HallOfFameMode, owner: HallOfFameListOwner): Ann
   const base = { columns: HALL_OF_FAME_GRID.columns, rows: HALL_OF_FAME_GRID.rows, wrapsColumns: true, wrapsRows: false } as const
   if (mode.kind === '보기') return { ...base, blockedCells: [0, 5, 10] }
   if (mode.kind === '선수고르기' && mode.purpose === '홈런더비') return { ...base, rows: 2, blockedCells: [5] }
-  if (owner === '시즌') return base
+  // B-98 고친 길 — 시즌 영입 목록도 나리 145 · 미션처럼 안 쓰는 칸 10 을 막는다. 굴림 없음
+  if (owner === '시즌' && !isBugFixed('B-98')) return base
   return { ...base, blockedCells: [10] }
 }
 

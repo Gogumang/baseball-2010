@@ -92,7 +92,8 @@ export interface SlideKeyResult {
  *   플레이 종류 2·3 → 끝 / **파울 타구(0xb68dc)** → 끝 / 걸어 나가는 주자가 하나라도 있으면 → 끝
  *   → 0xa96ec 로 **여기서 실제 슬라이딩이 걸리고**
  *   → 그 뒤에야 소리 재생 중·+0x31c 잠금을 본다.
- * 즉 **두 번째 누름에서도 슬라이딩은 또 걸리고 효과음만 한 번**이다 — 버그로 보여도 원본 그대로 옮긴다.
+ * 즉 **두 번째 누름에서도 슬라이딩은 또 걸리고 효과음만 한 번**이다. 다시 거는 것은 동작 설정 0xa0164 가 같은 동작(6)이면
+ * 아무것도 안 해(a0170 `cmp [+0xb0], r1 ; beq`) 효과가 없고, 효과음 한 번은 +0x31c 잠금의 몫이라 버그가 아니다(B-85 정정 r282).
  */
 export function slideOnKey(input: SlideKeyInput): SlideKeyResult {
   const 없음: SlideKeyResult = { slidRunnerIndexes: [], playsSound: false }

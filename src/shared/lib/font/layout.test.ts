@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   ASCII_WIDTH,
   FONT_SPACING,
@@ -79,5 +80,16 @@ describe('글자 배치', () => {
     expect(measurePixelTextWidth('가나', { letterGap: 1 })).toBe(19)
     expect(measurePixelTextWidth('가뷁나', { letterGap: 1 })).toBe(20)
     expect(layoutPixelText('가뷁나', { letterGap: 1 }).width).toBe(19)
+  })
+})
+
+describe('B-92 고친 길 — 못 그리는 글자는 폭 재기에서도 0px', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('그런 글자가 든 줄의 잰 폭이 자간만큼 줄어든다', () => {
+    const 원본 = measurePixelTextWidth('가똠나', { letterGap: 2 })
+    expect(원본).toBe(measurePixelTextWidth('가나', { letterGap: 2 }) + 2)
+    setBugfixConfigForTests(bugfixConfigWith(['B-92']))
+    expect(measurePixelTextWidth('가똠나', { letterGap: 2 })).toBe(measurePixelTextWidth('가나', { letterGap: 2 }))
   })
 })

@@ -251,7 +251,7 @@ export interface PlayerCareer {
    * 원본은 칸을 하나(+0x6a)만 두고 **새 시즌 첫 경기 전**에 그 값을 본다(0x1a590·0x1a5d0, P3 9절). 쓰는 곳은 외출 +1(1c05e~1c066 ·
    * 0x156e4~0x156ec)과 **나리 장면 셋업 0xf684 의 fb92~fba8 — `s8 S+0xb2(경기 수) == 2` 면 +0x6a = 0** 뿐이다(시즌 전환 0x1b768 은
    * 안 지운다, U-31). 그래서 원본 칸 값 = `outingsLastSeason + outingsThisSeason` 이다 — 새 시즌 g == 0 창의 외출은 지난해 값에 더해져
-   * 칭호 25 · 26 에 들고, 2경기 뒤 셋업(`withNariSceneSetupOutings`)이 둘 다 지운다(g == 2 창에서 외출한 뒤 이어하면 또 지운다 — 원본 그대로)
+   * 칭호 25 · 26 에 들고, 2경기 뒤 셋업(`withNariSceneSetupOutings`)이 둘 다 지운다(g == 2 창에서 외출한 뒤 이어하면 또 지운다 — 원본 그대로, B-84 고친 길은 2경기째가 막 끝난 셋업에서만)
    */
   readonly outingsLastSeason: number
   /** 한 경기 최다 홈런 — 칭호 "한 경기 홈런 4회 달성" */
@@ -1170,8 +1170,12 @@ export const NARI_OUTING_RESET_GAMES = 2
 
 export function withNariSceneSetupOutings<T extends Pick<PlayerCareer, 'gamesPlayed' | 'outingsThisSeason' | 'outingsLastSeason'>>(
   career: T,
+  previousGames?: number | null,
 ): T {
   if (career.gamesPlayed !== NARI_OUTING_RESET_GAMES) return career
+  // B-84 고친 길 — 원본은 g == 2 인 셋업마다(이어하기 · 마선수 대결 뒤도) 지워 g == 2 창에서 한 외출이 사라진다. 2경기째가 막 끝난
+  // 셋업(앞서 본 경기 수 1)에서만 지운다. 굴림 없음
+  if (isBugFixed('B-84') && previousGames !== NARI_OUTING_RESET_GAMES - 1) return career
   if (career.outingsThisSeason === 0 && career.outingsLastSeason === 0) return career
   return { ...career, outingsThisSeason: 0, outingsLastSeason: 0 }
 }

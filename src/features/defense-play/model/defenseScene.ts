@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { FielderState, PlayView } from '@/entities/fielding/model/fieldingState'
 import { listTickFielder } from '@/entities/fielding/model/fielderPose'
@@ -27,7 +28,7 @@ import {
  * - +0x1998 · +0x1999 를 지우는 곳은 결과 판의 보통 갈래와 큰 OUT 끝뿐이다 — 판 끝에 남으면 다음 판까지 간다.
  * - deadly_effect(게임+0x1024) 애니 0 은 **아무도 되감지 않는다**(xval 0x1024: 적재 0x48a48 · 해제 0x33854 · 0x4403c · 0x441c4 ·
  *   0x44398 뿐). 연출 단계 0 의 0x93cfd(애니, 0) 은 칸을 0 으로 돌리지 않고 돌리기 비트만 켠다 — 그래서 한 경기의 **첫** 필살
- *   포구만 0 · 1 · 2 · 3 칸을 다 그리고, 그 뒤로는 끝 칸 3 을 한 그림 그리고 곧바로 끝난다(93df2 넘김이 곧 감김 → 끝 비트).
+ *   포구만 0 · 1 · 2 · 3 칸을 다 그리고, 그 뒤로는 끝 칸 3 을 한 그림 그리고 곧바로 끝난다(93df2 넘김이 곧 감김 → 끝 비트). B-86 고친 길은 시작마다 칸 0 으로 되감는다.
  * 웹은 판마다 진행기를 새로 세우므로 이 칸들을 `DefenseScene` 으로 묶어 경기 흐름이 판에서 판으로 넘긴다.
  *
  * ⚠️ 미해결(근사): 3아웃 뒤 상태 0x18 도 수비 화면 0x46c88 을 그려 결과 판 · 연출이 그동안 이어 돈다 — 웹은 0x18 그림이 없어
@@ -179,8 +180,12 @@ export interface SceneDraw {
   readonly flashEnded: boolean
 }
 
-/** 0x93cfd(애니, 0) — 돌고 있지 않으면 비트 0 · 4 를 지우고 돌리기 비트를 켠다. 칸 · 끝 비트는 그대로다 */
+/**
+ * 0x93cfd(애니, 0) — 돌고 있지 않으면 비트 0 · 4 를 지우고 돌리기 비트를 켠다. 칸 · 끝 비트는 그대로다.
+ * B-86 고친 길 — 칸 0 으로 되감아(끝 비트도 내려) 필살 포구마다 0 · 1 · 2 · 3 칸을 다 그린다. 굴림 없음
+ */
 function startDeadlyAnim(anim: DeadlyAnimState): DeadlyAnimState {
+  if (isBugFixed('B-86')) return { frameIndex: 0, playing: true, ended: false }
   return anim.playing ? anim : { ...anim, playing: true }
 }
 

@@ -1,5 +1,6 @@
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   ALL_TITLES_REWARD_GAME_POINT,
   awardTitles,
@@ -391,5 +392,20 @@ describe('칭호 표·목록·완성 보상 (P3 10절)', () => {
     expect(isAllTitlesCollected(TITLE_NAMES.slice(0, 63))).toBe(false)
     expect(isAllTitlesCollected(TITLE_NAMES)).toBe(true)
     expect(ALL_TITLES_REWARD_GAME_POINT).toBe(60_000)
+  })
+})
+
+describe('B-84 고친 길 — 외출 칸은 2경기째가 막 끝난 셋업에서만 지운다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('앞서 본 경기 수가 1 이면 지우고, g == 2 창에서 외출한 뒤 이어하기(앞서 본 수 없음) · 다시 선 셋업(앞서 본 2)은 안 지운다', () => {
+    const 외출뒤 = 선수({ outingsLastSeason: 0, outingsThisSeason: 1, gamesPlayed: 2 })
+    // 원본은 g == 2 셋업마다 지운다 (fb92~fba8)
+    expect(withNariSceneSetupOutings(외출뒤, null)).toMatchObject({ outingsThisSeason: 0 })
+    setBugfixConfigForTests(bugfixConfigWith(['B-84']))
+    const 둘째경기뒤 = 선수({ outingsLastSeason: 19, outingsThisSeason: 1, gamesPlayed: 2 })
+    expect(withNariSceneSetupOutings(둘째경기뒤, 1)).toMatchObject({ outingsLastSeason: 0, outingsThisSeason: 0 })
+    expect(withNariSceneSetupOutings(외출뒤, null)).toBe(외출뒤)
+    expect(withNariSceneSetupOutings(외출뒤, 2)).toBe(외출뒤)
   })
 })

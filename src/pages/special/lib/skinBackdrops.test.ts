@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   BALL_PATTERN_COLUMNS, BALL_PATTERN_PERIOD, BALL_PATTERN_ROWS, MAIN_TITLE_BACKDROP, ballPatternCounterAfter,
   ballPatternTilesOf, blurScreen565, mainTitleLineYs, nextBallPatternCounter, rgbOf565, rgbTo565, whitenStep3Of565,
@@ -71,5 +72,44 @@ describe('공 무늬 바탕 0x5fd61', () => {
     const animations = JSON.parse(readFileSync('public/sprites/gpoint/frames/animations.json', 'utf8')) as
       readonly (readonly { frame: number; delay: number }[])[]
     expect(GPOINT_ANIMATION).toEqual(animations[0].map(({ frame, delay }) => ({ frame, delay })))
+  })
+})
+
+describe('B-91 고친 길 — 흐리기는 사본에서 읽고, 공 무늬 왼쪽 · 위 가장자리를 채운다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('흐리기 — 왼쪽 이웃이 이미 흐린 값이 아니라 처음 값이다', () => {
+    const white = rgbTo565(255, 255, 255)
+    const 화면 = () => Uint16Array.from([0, 0, 0, 0, 0, white, 0, 0, 0, 0, 0, 0])
+    const 원본 = 화면()
+    blurScreen565(원본, 4, 3, 1)
+    setBugfixConfigForTests(bugfixConfigWith(['B-91']))
+    const 고침 = 화면()
+    blurScreen565(고침, 4, 3, 1)
+    // (2, 1) 의 왼쪽 이웃 (1, 1) 은 흰색 — 원본은 흐린 뒤 검정이 된 (1, 1) 을 읽는다
+    expect(원본[6]).toBe(0)
+    expect(rgbOf565(고침[6])[0]).toBeGreaterThan(0)
+  })
+
+  it('공 무늬 — 화면에 걸치는 공이 끝없는 무늬와 같다 (원본은 c = 31 … 38 에서 왼쪽 · 위 줄이 빈다)', () => {
+    const key = (tile: { readonly x: number; readonly y: number }) => `${tile.x},${tile.y}`
+    const 보이나 = (tile: { readonly x: number; readonly y: number }) => tile.x + 23 > 0 && tile.x < 240 && tile.y + 23 > 0 && tile.y < 320
+    /** 시작 2(c − 23) 에서 사방으로 끝없이 깐 무늬 가운데 화면에 걸치는 것 */
+    const 끝없는 = (counter: number) => {
+      const start = 2 * (counter - 23)
+      const tiles: string[] = []
+      for (let row = -4; row < 20; row += 1) {
+        for (let column = -4; column < 20; column += 1) {
+          const tile = { x: start + 38 * column - (Math.abs(row) % 2 === 1 ? 19 : 0), y: start + 38 * row }
+          if (보이나(tile)) tiles.push(key(tile))
+        }
+      }
+      return tiles.sort()
+    }
+    const 그린 = (counter: number) => ballPatternTilesOf(counter).filter(보이나).map(key).sort()
+    const 모든c = Array.from({ length: BALL_PATTERN_PERIOD }, (_, index) => index + 1)
+    expect(모든c.filter((counter) => 그린(counter).join() !== 끝없는(counter).join())).toEqual([31, 32, 33, 34, 35, 36, 37, 38])
+    setBugfixConfigForTests(bugfixConfigWith(['B-91']))
+    expect(모든c.filter((counter) => 그린(counter).join() !== 끝없는(counter).join())).toEqual([])
   })
 })

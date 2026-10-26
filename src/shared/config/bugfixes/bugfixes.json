@@ -755,13 +755,13 @@
       "symptom": "2경기째 창에서 외출한 뒤 이어하면 외출 카운트가 또 지워진다",
       "source": "0xf684 fb92~fba8",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-85",
       "name": "수비",
-      "symptom": "슬라이딩 키를 두 번 누르면 또 걸리고 효과음만 한 번",
+      "symptom": "정정(r282) — 원본 버그가 아니다: 두 번째 누름이 이미 미끄러지는 주자에 다시 거는 것은 동작 설정 0xa0164 가 같은 동작(6)이면 아무것도 안 해 효과가 없고, 효과음을 한 판에 한 번만 내는 것은 +0x31c 잠금의 몫이다(고칠 것 없음)",
       "source": "0x518da",
       "impact": "거의 없음",
       "implemented": false,
@@ -773,7 +773,7 @@
       "symptom": "필살 포구 번쩍임이 한 경기 첫 번에만 네 칸 다 나온다",
       "source": "0x93cfd(되감는 곳 없음)",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -782,7 +782,7 @@
       "symptom": "칸이 0 으로 내려갔다 같은 수로 다시 켜지면 확대 연출이 없다",
       "source": "0x37736 · 0x37744",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -791,7 +791,7 @@
       "symptom": "HOMERUN 글자가 살짝 오른쪽으로 치우친다",
       "source": "0x40b18(7글자 폭 합 / 2)",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -800,7 +800,7 @@
       "symptom": "아래 칸 빗변이 박스 X 만큼 더 밀린다",
       "source": "0x7c2f0(`adds r4, r7, r6`)",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -809,7 +809,7 @@
       "symptom": "바퀴가 도는 도중 270° 를 지날 때 칸이 20px 툭 튄다",
       "source": "0x24e8a~0x24eba",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -818,7 +818,7 @@
       "symptom": "공 무늬가 한 바퀴마다 2px 튀고, 흐리기 바탕은 오른쪽 아래로 끌린다",
       "source": "0x5fd61 · 제자리 평균",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -827,7 +827,7 @@
       "symptom": "못 그리는 글자가 든 줄은 잰 폭이 글자당 자간만큼 넓다",
       "source": "0x9c63a~0x9c654",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -836,13 +836,13 @@
       "symptom": "베지어 차수 0 가중치가 10000 이 아니라 1",
       "source": "0xbcb84",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-94",
       "name": "목록 격자",
-      "symptom": "칸 x 가 `colW[(i−1) mod 열수]` 를 읽어 열 너비가 다르면 어긋난다 — 원본 화면은 모두 같은 너비라 안 드러남",
+      "symptom": "칸 x 가 `colW[(i−1) mod 열수]` 를 읽어 열 너비가 다르면 어긋난다 — 원본 화면은 모두 같은 너비라 안 드러남 · 웹에는 이 식(열 너비가 다른 격자)이 없어 고칠 곳이 없다(r282)",
       "source": "0x7a73e(S9)",
       "impact": "거의 없음",
       "implemented": false,
@@ -851,7 +851,7 @@
     {
       "id": "B-95",
       "name": "시즌 엔딩 아이리스",
-      "symptom": "원이 한 번 줄었다가 커진다",
+      "symptom": "정정(r282) — 원본 버그가 아니다: 0x887dc~0x88846 은 k · p 를 사인 0x6c6a9 로 거쳐(r = D·sin(min(16t,110))/100 + D − D·sin(t==0 ? 90 : 110)/100) 원이 t = 0 부터 커지고 t = 6 에 살짝 넘쳤다 돌아온다. 사인을 빠뜨린 것은 웹 seasonEndingLayout 의 옮김 실수다(TODO)",
       "source": "seasonEndingLayout 식(t=1 이 t=0 보다 작음)",
       "impact": "거의 없음",
       "implemented": false,
@@ -860,7 +860,7 @@
     {
       "id": "B-96",
       "name": "스토리 화면 효과",
-      "symptom": "'검정에서밝아짐' 은 어두워지고 '검게어두워짐' 은 밝아진다(이름과 모습이 반대)",
+      "symptom": "정정(r282) — 원본 버그가 아니다: 이름은 우리 RE 노트가 붙인 꼬리표다. 시즌 엔딩 진입 0x6be8 은 종류 2 를 밝아짐으로, 키 0x6b3c 는 종류 1 을 어두워짐으로 쓴다 — 검정 덮기(단계/16 남김)의 실제 모습이 원본이 바란 모습이다(고칠 것 없음)",
       "source": "L 1-E2(색 몫 (단계+1)/16)",
       "impact": "거의 없음",
       "implemented": false,
@@ -872,7 +872,7 @@
       "symptom": "A 자리 투수 몸 그림이 한 그림 늦고, 타자 칸에서 넘어온 첫 그림은 타자 자세 번호로 그린다",
       "source": "[목록+0x204] 공유(P6 7-4)",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -881,7 +881,7 @@
       "symptom": "안 쓰는 칸 10 에도 커서가 선다",
       "source": "0x26156~0x26180",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -890,7 +890,7 @@
       "symptom": "1억 50만이 \"1억050\" 으로 찍힌다",
       "source": "0x55cf4 `\"%d억%03d\"`",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -899,7 +899,7 @@
       "symptom": "'*' 재굴림은 구장을 안 바꾸고, 빠른실행 뒤 새로하기면 구장 커서가 목록 밖에서 시작한다",
       "source": "31262 · 31272 → 31280 · rec+0xc",
       "impact": "거의 없음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     }
   ]

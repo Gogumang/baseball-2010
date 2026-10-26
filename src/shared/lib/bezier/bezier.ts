@@ -1,14 +1,17 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
+
 /** 원본 곡선의 t 눈금 — 0 ~ 10000 */
 const T_SCALE = 10_000
 
 /**
  * 번스타인 가중치 (binary.mod 0xbcb84, 정수 나눗셈은 0쪽으로 자름).
- * 차수 0 이면 원본 그대로 [1] 이다 — 10000 이 아닌 것은 원본 버그다.
+ * 차수 0 이면 원본 그대로 [1] 이다 — 10000 이 아닌 것은 원본 버그다(B-93 — 제어점 하나면 점이 거의 0 으로 떨어진다).
+ * 고친 길은 [10000] 으로 제어점 그 자리를 낸다. 굴림 없음
  */
 export function bernsteinWeights(degree: number, t: number): number[] {
   const weights = new Array<number>(degree + 1).fill(0)
   if (degree === 0) {
-    weights[0] = 1
+    weights[0] = isBugFixed('B-93') ? T_SCALE : 1
     return weights
   }
   weights[0] = T_SCALE - t

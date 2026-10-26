@@ -19,6 +19,7 @@ import {
   INITIAL_SETUP,
   aceIndexOfCell,
   aceRoleOfCell,
+  stadiumCursorOnEntry,
 } from '@/pages/general-mode/lib/generalModeSetup'
 import type {
   AcePhase,
@@ -76,7 +77,8 @@ export function chooseUserTeam(state: GeneralModeFlowState, teamId: number): Gen
 export function chooseAiTeam(state: GeneralModeFlowState, teamId: number): GeneralModeFlowState {
   return {
     ...state,
-    setup: { ...state.setup, aiTeamId: teamId },
+    // 20 진입 0x23f36 — 구장 커서는 rec+0xc (B-100 고친 길은 목록 밖이면 0)
+    setup: { ...state.setup, aiTeamId: teamId, stadiumId: stadiumCursorOnEntry(state.setup.stadiumId) },
     step: GENERAL_MODE_STEP.선공구장,
     firstBatPhase: FIRST_BAT_PHASE.선공,
     // 20 진입 0x23f50 — skin+0x74 = 0
@@ -168,6 +170,7 @@ export function stepBack(state: GeneralModeFlowState): GeneralModeFlowState | nu
       // 상태 20 진입 0x23ed0 이 단계를 0(선공)으로 · 선공 커서를 0 으로 되돌리고 구장 커서는 지난번 구장(rec+0xc)에서 시작한다
       return {
         ...state,
+        setup: { ...state.setup, stadiumId: stadiumCursorOnEntry(state.setup.stadiumId) },
         step: GENERAL_MODE_STEP.선공구장,
         firstBatPhase: FIRST_BAT_PHASE.선공,
         firstBatCursor: PLAYER_SIDE_FIRST_BAT,

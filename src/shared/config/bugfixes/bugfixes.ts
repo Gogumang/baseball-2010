@@ -51,6 +51,8 @@ export const IMPLEMENTED_BUGFIX_IDS: readonly string[] = [
   'B-18', 'B-19', 'B-20', 'B-21', 'B-22', 'B-23', 'B-24', 'B-25', 'B-26', 'B-27', 'B-28', 'B-29', 'B-30', 'B-31', 'B-32', 'B-33',
   'B-34', 'B-35', 'B-36', 'B-37', 'B-38', 'B-39', 'B-40', 'B-41', 'B-42', 'B-43', 'B-44', 'B-45', 'B-46', 'B-47', 'B-52', 'B-53',
   'B-54', 'B-55', 'B-56', 'B-57', 'B-59',
+  // r282 — 거의 없음 묶음
+  'B-84', 'B-86', 'B-87', 'B-88', 'B-89', 'B-90', 'B-91', 'B-92', 'B-93', 'B-97', 'B-98', 'B-99', 'B-100',
 ]
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null

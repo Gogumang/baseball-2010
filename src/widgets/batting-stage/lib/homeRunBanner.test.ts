@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   HOME_RUN_TEXT_SCENE_START,
   derbyHomeRunTextOn,
@@ -145,5 +146,23 @@ describe('0x40b18 그림 한 번씩 — 원본 칸(+0x1961 · +0x1963 · +0x1962
     const 다음 = homeRunTextAfterDraws(derbyHomeRunTextOn(앞), 9)
     const 반짝 = 다음.frame?.letters.findIndex((letter) => letter.brighten === 140)
     expect(반짝).toBe(2)
+  })
+})
+
+describe('B-88 고친 길 — HOMERUN 글자를 그린 폭으로 가운데에 둔다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  /** 그린 글자 띠의 가운데 x — 첫 글자 왼쪽부터 마지막 글자 오른쪽 끝까지 (날아 들어오기 끝 — 간격 3, 모두 1배) */
+  const 가운데 = () => {
+    const letters = homeRunLettersAt(HOME_RUN_FLY_IN_END_TICK - 1)
+    const first = letters[0]
+    const last = letters[letters.length - 1]
+    return (first.x + last.x + (HOME_RUN_LETTER_WIDTHS[last.index] ?? 0)) / 2
+  }
+
+  it('원본은 1.5px 오른쪽으로 치우치고, 고친 길은 화면 가운데(120)에서 반 px 안이다', () => {
+    expect(가운데() - 120).toBe(1.5)
+    setBugfixConfigForTests(bugfixConfigWith(['B-88']))
+    expect(Math.abs(가운데() - 120)).toBeLessThanOrEqual(0.5)
   })
 })

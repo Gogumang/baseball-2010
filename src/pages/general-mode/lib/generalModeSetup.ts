@@ -17,6 +17,7 @@
  * 여기서도 **한 덩어리를 통째로 갈아 끼우는** 모양으로 둔다.
  */
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
@@ -108,6 +109,15 @@ export const INITIAL_SETUP: GeneralModeSetup = {
   stadiumId: 0,
   aceBatterId: NO_ACE,
   acePitcherId: NO_ACE,
+}
+
+/**
+ * 상태 20 진입(0x23ed0 · 0x23f36)의 구장 커서 — 원본은 rec+0xc 그대로라 빠른실행의 히든 유저 팀(10~14)이면 목록 밖에서 시작한다.
+ * B-100 고친 길은 목록 밖이면 첫 칸(0)에서 시작한다. 굴림 없음
+ */
+export function stadiumCursorOnEntry(stadiumId: number): number {
+  if (!isBugFixed('B-100')) return stadiumId
+  return stadiumId >= 0 && stadiumId < STADIUM_COUNT ? stadiumId : 0
 }
 
 /**

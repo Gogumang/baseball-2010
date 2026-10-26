@@ -14,6 +14,7 @@
  * 여기는 좌표·단계 계산만 한다 — 그리기는 renderHomeRunBanner.ts.
  */
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** H O M E R U N — game_effect 이미지 번호 */
 export const HOME_RUN_LETTER_IMAGES: readonly number[] = [54, 55, 56, 57, 58, 59, 60]
@@ -74,11 +75,13 @@ const SLOT_SHAPES: readonly { readonly y: number; readonly scale: number; readon
 
 /**
  * 글자 x 자리. 시작 x = scrW/2 − Σ(w−간격)/2 이고 글자 사이가 w−간격 이다.
- * 원본이 7글자 모두의 (w−간격) 을 더해 반으로 나누므로(0x40b18) 마지막 글자 폭만큼 오른쪽으로 치우친다 — 그대로 둔다.
+ * 원본이 7글자 모두의 (w−간격) 을 더해 반으로 나누므로(0x40b18 40b46~40b88 — 프레임 0x36~0x3c 의 w − 3 합 >> 1) 그린 폭보다
+ * 간격만큼 좁게 재어 간격의 반(간격 3 이면 1.5px)만큼 오른쪽으로 치우친다(B-88). 고친 길은 그린 폭(마지막 글자는 w 그대로)으로 가운데를 잡는다. 굴림 없음
  */
 function letterXs(gap: number): readonly number[] {
   const span = HOME_RUN_LETTER_WIDTHS.reduce((sum, width) => sum + (width - gap), 0)
-  let x = Math.floor(STAGE_WIDTH / 2 - span / 2)
+  const drawnSpan = isBugFixed('B-88') ? span + gap : span
+  let x = Math.floor(STAGE_WIDTH / 2 - drawnSpan / 2)
   return HOME_RUN_LETTER_WIDTHS.map((width) => {
     const left = x
     x += width - gap

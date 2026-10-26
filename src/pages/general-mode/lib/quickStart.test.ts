@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
+import { finishQuickRespin } from '@/pages/general-mode/lib/quickStart'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -74,5 +76,19 @@ describe('빠른실행 굴림', () => {
 
     expect(setup.acePitcherId).toBe(NO_ACE)
     expect(setup.aceBatterId).toBe(NO_ACE)
+  })
+})
+
+describe('B-100 고친 길 — 재굴림은 구장도 새 유저 팀으로', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('굴림 차례는 같고 구장만 새 유저 팀이다', () => {
+    const previous = { ...rollQuickStart(정해진난수([0.95, 0.1, 0.9, 0, 0])), stadiumId: 9 }
+    const 원본 = finishQuickRespin(정해진난수([0.3, 0.6, 0.9, 0, 0]), previous)
+    expect(원본.stadiumId).toBe(9)
+    setBugfixConfigForTests(bugfixConfigWith(['B-100']))
+    const 고침 = finishQuickRespin(정해진난수([0.3, 0.6, 0.9, 0, 0]), previous)
+    expect({ ...고침, stadiumId: 원본.stadiumId }).toEqual(원본)
+    expect(고침.stadiumId).toBe(고침.userTeamId)
   })
 })
