@@ -160,8 +160,11 @@ export function HomeRunDerbyScreen({
   // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
   useEffect(() => {
     if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
-    publishScenePeek('homeRunDerby', { acceptsConfirm, isPlayRunning, isResultShown })
-  }, [acceptsConfirm, isPlayRunning, isResultShown])
+    const { remainingPitches, totalDistance, stage, isBonusGame } = session.run
+    publishScenePeek('homeRunDerby', {
+      acceptsConfirm, isPlayRunning, isResultShown, run: { remainingPitches, totalDistance, stage, isBonusGame },
+    })
+  }, [acceptsConfirm, isPlayRunning, isResultShown, session.run])
   useEffect(() => () => {
     if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('homeRunDerby', null)
   }, [])
@@ -354,6 +357,8 @@ export function HomeRunDerbyScreen({
             acePitcher={ace === null ? null : acePitcherFramesOf(ace)}
             // 조작방법 뷰어 동안은 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             isPaused={session.isPaused || overlay !== null}
+            // 좌우 이동은 0xd 진입(48f88)에서만 0 — 공 사이 0xf 에는 남는다
+            shiftResetSerial={session.sceneDSerial}
             // 결과 창(0x45c18)은 창 뒤에 구름·구장(+0x17e2 만큼 가라앉는다)만 그린다
             isResultBackdrop={isResultShown}
             // HOMERUN 글자는 판의 홈런 틱에 더비 칸(0x5279a — 단계만 0)으로 켠다. 타석 임시 결과로는 안 켠다

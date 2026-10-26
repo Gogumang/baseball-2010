@@ -4,7 +4,7 @@ import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
-import { resolvePitch, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
+import { plateErrorOf, resolvePitch, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
 import { unjudgedWhiffSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
@@ -198,6 +198,11 @@ interface BattingStageProps {
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
   /**
+   * 타석 준비 0xd 진입 번호 — 넘기면 좌우 이동(+0xfe4)을 이 값이 바뀔 때만 0 으로 되돌린다(0x48d50 48f88). 안 넘기면 쉬는 동안
+   * 되돌린다(`StageLatest.shiftResetSerial`)
+   */
+  readonly shiftResetSerial?: number
+  /**
    * **결과 창 뒤 배경** — 홈런더비 결과 창(상태 0x1a) 그리기 `0x45c18` 은 창보다 먼저 구름 `0x78448` 과
    * 구장 `0x78578(구장, +0x17e2, 1)` 만 그린다(선수·공·HUD 없음). +0x17e2 는 들어선 뒤 틱마다 5 씩 150 까지 올라
    * 구장·바닥이 아래로 가라앉는다(`resultBackdropOffsetAt`). 참인 동안은 공을 던지지 않는다. 파티클은 경기 장면 프레임 0x52c50 이
@@ -377,6 +382,10 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     isSceneFrozen: isCommonWindowOpen,
   })
   const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, phaseEntryRef, hitSkipKeyTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, isHitByPitchResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
+  // 0xd 진입 0x48d50 의 48f88 — 좌우 이동 +0xfe4 = 0 (번호를 받는 화면만. 안 받으면 쉬는 동안 되돌린다 — `useStageAnimation`)
+  useEffect(() => {
+    if (props.shiftResetSerial !== undefined) shiftRef.current = 0
+  }, [props.shiftResetSerial, shiftRef])
   /** 장면 +0xfdc — 사람 키가 쓰고(`sceneBuntKind` 주석) 판정된 공이 그 값을 넘긴다. 부르는 쪽이 들고 있으면 그 값을 따른다 */
   const sceneBuntKindRef = useRef(sceneBuntKind ?? 0)
   useEffect(() => {
@@ -765,6 +774,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         tickNow: gameSceneTickNow(),
         tickStartTimeOf: (tick: number) => gameSceneTickStartTime(tick) + (performance.now() - gameSceneNow()),
         msPerTick: millisecondsPerFrame(),
+        plateError: pitchRef.current === null ? null : plateErrorOf(pitchRef.current, 0),
       }),
     })
     return () => publishScenePeek('battingStage', null)

@@ -57,6 +57,13 @@ export interface HomeRunDerbyPeek {
   readonly isPlayRunning: boolean
   /** 결과 창(0x1a) */
   readonly isResultShown: boolean
+  /** 진행 칸(+0x33 기회 · +0x34 누적 · +0x38 단계 · +0x3e 보너스) — r261 단계 상승 · 난입 마투수 e2e 가 읽는다 */
+  readonly run?: {
+    readonly remainingPitches: number
+    readonly totalDistance: number
+    readonly stage: number
+    readonly isBonusGame: boolean
+  }
 }
 
 /**
@@ -73,6 +80,8 @@ export interface BattingStagePeek {
     readonly tickNow: number
     readonly tickStartTimeOf: (tick: number) => number
     readonly msPerTick: number
+    /** 지금 공의 판정 오차(좌우 이동 0 일 때, `plateErrorOf`) — r261 더비 e2e 가 조준(좌우 이동)을 고른다. 공이 없으면 null */
+    readonly plateError: { readonly horizontal: number; readonly vertical: number } | null
   }
 }
 

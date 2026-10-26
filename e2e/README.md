@@ -72,6 +72,14 @@ yarn node e2e/swing-timing.mjs                                  # webkit · chro
 E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 yarn node e2e/swing-timing.mjs webkit   # 탭 x = 화면 폭 비율
 ```
 
+홈런더비 단계 상승 · 난입 마투수는 `e2e/derby-stage.mjs` 로 실제로 쳐서 닿는다(r261). `derby-start` 에서 공마다 판정 오차(`probe.plateError`)에
+맞춰 좌우 이동하고 최적 틱에 친다. 씨앗 10 · `nari-ending` 선수(파워 380)면 9구째 누적 803M 로 단계 1(마투수 레오니) → 14구 982M 결과 창까지
+chromium 데스크톱 · webkit 아이폰 같은 판이다(약 90초). `nari-y1`(파워 100)은 열 구에 500M 안팎이라 닿지 않는다.
+
+```sh
+E2E_PORT=5710 E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=10 yarn node e2e/derby-stage.mjs   # 그림: e2e/.run/derby-<브라우저>-stage1.png · result.png
+```
+
 브라우저를 띄워 둔 채 여러 번 들여다볼 때는 `e2e/drive.mjs` 를 쓴다. 명령은 파일 머리에 적혀 있다.
 
 ```sh
