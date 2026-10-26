@@ -143,6 +143,12 @@ interface SeasonSoakOptions {
   readonly policy?: '사람' | '훈련만'
   /** 정책이 안 밟던 길 (r235) — 없으면 r233 정책 그대로(난수 차례도 같다) */
   readonly extras?: SeasonSoakExtras
+  /**
+   * 짧은 판을 `maxRegularGames` 에서 바로 끊지 않고 이 새 길(`extraLog` 이름)을 밟은 뒤 정규 한 경기를 더 치를 때까지 잇는다 —
+   * 한도는 정규 `limit` 경기 (r282). CPU 트레이드 요청은 경기 뒤 10% 굴림이고 짝수 경기 뒤에만 관리 메뉴 알림으로 떠서(홀수 뒤는
+   * 묻힌다, `tradeRequest.ts`) 24경기 안에 한 번도 안 뜨는 씨앗이 흔하다 — 고친 길(`BUGFIXES=json`)이 난수 차례를 바꾸면 갈린다.
+   */
+  readonly extendUntil?: { readonly extra: string; readonly limit: number }
 }
 
 /**
@@ -293,8 +299,11 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
   const result: Rendered = { get current() { return rendered.result.current.session } }
   const walletNow = (): GamePointWalletSession => rendered.result.current.wallet
   const extraLog: Record<string, number> = {}
+  /** 새 길을 처음 밟은 때의 정규 경기 수 — `extendUntil` 이 본다 */
+  const extraFirstGame: Record<string, number> = {}
   const logExtra = (name: string) => {
     extraLog[name] = (extraLog[name] ?? 0) + 1
+    extraFirstGame[name] ??= games.정규
   }
   const problems = new SoakProblems()
   const games = { 정규: 0, 포스트시즌: 0, 국가대항전: 0 }
@@ -1026,7 +1035,11 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
         startYear.value = result.current.state?.record.yearIndex ?? 0
         continue
       }
-      if (maxRegularGames !== undefined && games.정규 >= maxRegularGames) break
+      if (maxRegularGames !== undefined && games.정규 >= maxRegularGames) {
+        const until = options.extendUntil
+        const seenAt = until === undefined ? undefined : extraFirstGame[until.extra]
+        if (until === undefined || games.정규 >= until.limit || (seenAt !== undefined && games.정규 > seenAt)) break
+      }
 
       switch (scene) {
         case SEASON_SCENE_STATE.이벤트재생: {
@@ -1045,6 +1058,7 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
             // r235 — 새 길이면 요청을 번갈아 받는다(예 → 0xe5 요청 칸)
             const accept = extras?.trade === true && requestAnswers % 2 === 0
             requestAnswers += 1
+            logExtra('요청알림')
             if (accept) logExtra('요청수락')
             act(() => actions.answerTradeRequest(accept))
             break
@@ -1230,10 +1244,14 @@ describe('시즌모드 장기 진행 점검 (soak)', () => {
   }, 60_000)
 
   it('짧은 판 (r235 새 길) — 트레이드 · 상점 · 장비 · 엔트리 편집 · G 지갑 · 관리 메뉴/경기 중간 이어하기를 밟아도 값이 맞는다', () => {
-    const result = runSeasonSoak({ seed: 2010, teamId: 3, maxRegularGames: 24, roundTripEvery: 3, extras: NEW_PATHS })
+    const result = runSeasonSoak({
+      seed: 2010, teamId: 3, maxRegularGames: 24, roundTripEvery: 3, extras: NEW_PATHS,
+      // 요청 알림은 씨앗 운이라(짝수 경기 뒤 10%) 뜰 때까지 더 치른다 — 세 해(정규 135경기) 안에 안 뜰 확률은 0.2% 쯤 (r282)
+      extendUntil: { extra: '요청수락', limit: 135 },
+    })
     expect(result.stoppedAt, report(result)).toBeNull()
     expect(result.problems.size, report(result)).toBe(0)
-    expect(result.games.정규).toBe(24)
+    expect(result.games.정규).toBeGreaterThanOrEqual(24)
     for (const name of ['엔트리편집', '관리메뉴이어하기', '경기중이어하기', '십전대보탕', '요청수락']) expect(result.extraLog[name] ?? 0, `${name} — ${report(result)}`).toBeGreaterThan(0)
     // 명예 · 나리 선수를 데려와 장비를 샀다 (r245)
     expect(Object.keys(result.extraLog).filter((name) => name.startsWith('영입')).length, report(result)).toBeGreaterThanOrEqual(2)

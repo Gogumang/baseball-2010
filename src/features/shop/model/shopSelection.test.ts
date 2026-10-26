@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -99,5 +100,17 @@ describe('상점 선택 — 0x14a74', () => {
     const sick = selectShopItem(선수({ gamePoint: 500, isSick: true, illnessName: '감기', illnessRemaining: 3 }), shopItemId('GP', 7), 난수)
     expect(sick.detail ?? null).toBeNull()
     expect(sick.notice).toBe('!C부상 및 질병이!N!cFFFF00모두 치료!cFFFFFF 되었습니다')
+  })
+})
+
+describe('B-99 고친 길 — 1억 이상 나머지는 네 자리', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('1억 50만은 원본 "1억050" · 고친 길 "1억0050"', () => {
+    expect(formatOriginalMoney(10_050)).toBe('1억050')
+    setBugfixConfigForTests(bugfixConfigWith(['B-99']))
+    expect(formatOriginalMoney(10_050)).toBe('1억0050')
+    expect(formatOriginalMoney(15_000)).toBe('1억5000')
+    expect(formatOriginalMoney(20_000)).toBe('2억')
   })
 })

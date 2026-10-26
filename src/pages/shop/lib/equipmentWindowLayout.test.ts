@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   BOARD_COLORS, EQUIPMENT_BOXES, EQUIPMENT_COLORS, alignedPositionOf, boardRectsOf, descriptionPanelRectsOf, digitShiftOf,
   effectOffsetsOf, rowBoxOf, scrollBarRectsOf, tabCursorBoxOf, tabSeparatorRectsOf,
@@ -96,5 +97,17 @@ describe('효과 줄 자리', () => {
     const effect = rowBoxOf(EQUIPMENT_BOXES.value, 2)
     expect(alignedPositionOf(effect, 21, 10, 0x24, -26)).toEqual({ x: 64 + 63 - 21 - 26, y: 214 + 3 })
     expect(alignedPositionOf(effect, 6, 6, 0x24, -17, 1, true)).toEqual({ x: 64 + 57 - 17, y: 214 + 4 + 1 })
+  })
+})
+
+describe('B-89 고친 길 — 아래 칸 빗변은 X 를 한 번만 더한다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('오른쪽 아랫변이 X + trunc(W/2) − s + 2 에서 선다 (원본은 X 를 한 번 더 더한다)', () => {
+    const board = { x: 18, y: 100, width: 100, height: 40 }
+    const 아랫변 = () => boardRectsOf(board, false).find((rect) => rect.y === board.y + board.height + 1)
+    expect(아랫변()?.x).toBe(18 + 18 + 50 - 10 + 2)
+    setBugfixConfigForTests(bugfixConfigWith(['B-89']))
+    expect(아랫변()?.x).toBe(18 + 50 - 10 + 2)
   })
 })

@@ -20,6 +20,7 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import {
   ACE_PER_ROLE,
   NO_ACE,
@@ -136,7 +137,7 @@ export function rollQuickRespinTeams(
  *
  * ⚠️ **원본 그대로 — 구장(+0xc)은 안 바꾼다.** 진입 0x314b0 은 구장 = 유저 팀(3152e)이지만 여기는 +0xc 낱말을
  * 옛 값으로 되적고 +0xd · +0xe 바이트만 고친다(31262 · 31272 → 31280 `ldr [sp+0x2c]`). 재굴림 뒤 구장은
- * 처음 유저 팀의 구장으로 남는다.
+ * 처음 유저 팀의 구장으로 남는다(B-100 — 고친 길은 새 유저 팀의 구장).
  */
 export function finishQuickRespin(
   random: RandomPort,
@@ -147,5 +148,7 @@ export function finishQuickRespin(
   const playerSide = uniform(random, 2) !== 0 ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT
   const acePitcherId = rollAce(random, open.openedAcePitcherIds)
   const aceBatterId = rollAce(random, open.openedAceBatterIds)
-  return { ...previous, userTeamId, aiTeamId, playerSide, aceBatterId, acePitcherId }
+  // B-100 고친 길 — 진입 0x314b0(3152e)처럼 구장 = 새 유저 팀. 굴림 수 · 차례는 같다
+  const stadiumId = isBugFixed('B-100') ? userTeamId : previous.stadiumId
+  return { ...previous, userTeamId, aiTeamId, playerSide, stadiumId, aceBatterId, acePitcherId }
 }

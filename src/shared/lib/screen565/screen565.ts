@@ -2,6 +2,7 @@
  * **16비트(RGB565) 화면 연산** — 스킨 바탕 0x581dc · 0x58371 이 화면을 떠 두기 전에 하는 흐리기 · 3줄 선 · 흰 단계 3 덮기
  * (근거는 `pages/special/lib/skinBackdrops.ts` 머리 1-1 ~ 1-3). 메뉴 바탕과 경기정보 구장 미리보기(0x5fd04 → 0x581dc)가 같이 쓴다.
  */
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** 8비트 → 565 (에셋은 565 를 비트 복제로 늘린 값이라 위 비트만 남기면 원래 값이다) */
 export const rgbTo565 = (r: number, g: number, b: number) => ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
@@ -21,9 +22,13 @@ function neighborOffsetsOf(mode: number, width: number): { readonly offsets: rea
   return { offsets: [-width - 1, -width, 1 - width, -1, 1, width - 1, width, width + 1], shift: 3 }
 }
 
-/** 0xbdd65(모드) → 0xbdc2c — 제자리 이웃 평균 흐리기와 가장자리 채우기. `pixels` 를 고친다 */
+/**
+ * 0xbdd65(모드) → 0xbdc2c — 제자리 이웃 평균 흐리기와 가장자리 채우기. `pixels` 를 고친다.
+ * 원본은 제자리라 왼쪽 · 위 이웃이 이미 흐린 값이다(B-91 — 오른쪽 아래로 끌린다). 고친 길은 흐리기 전 화면 사본에서 이웃을 읽는다
+ */
 export function blurScreen565(pixels: Uint16Array, width: number, height: number, mode: number): void {
   const { offsets, shift } = neighborOffsetsOf(mode, width)
+  const source = isBugFixed('B-91') ? pixels.slice() : pixels
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
       const at = y * width + x
@@ -31,7 +36,7 @@ export function blurScreen565(pixels: Uint16Array, width: number, height: number
       let g = 0
       let b = 0
       for (const offset of offsets) {
-        const p = pixels[at + offset]
+        const p = source[at + offset]
         r += (p & 0xf800) >> 8
         g += (p & 0x7e0) >> 3
         b += (p & 0x1f) << 3

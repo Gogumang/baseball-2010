@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import { INITIAL_LAMP_ZOOM, alignedNumberGlyphsOf, hudRowsOf, inningGlyphsOf, lampCountOf, roundFillRectsOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
 
 const HUD: HudState = {
@@ -137,5 +138,24 @@ describe('inningGlyphsOf — HUD 이닝 0xba689 → 0xba51c', () => {
   it('글자는 아래 맞춤 — 키 다른 숫자는 최대 높이에 바닥을 맞춘다', () => {
     const tall = (index: number) => ({ width: 8, height: index === 1 ? 9 : 10 })
     expect(inningGlyphsOf(12, tall)).toEqual([{ index: 1, x: 9, y: 9 }, { index: 2, x: 17, y: 8 }])
+  })
+})
+
+describe('B-87 고친 길 — 꺼진 램프는 지난 칸 수를 지운다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  const 걸음 = (counts: readonly number[]) => {
+    let memory: LampZoomMemory = INITIAL_LAMP_ZOOM
+    counts.forEach((count, tick) => {
+      memory = stepLampZoom(memory, count, tick)
+    })
+    return memory
+  }
+
+  it('1 → 0 → 1 로 다시 켜지면 확대가 선다 (원본은 지난 1 이 남아 없다)', () => {
+    const counts = [1, 1, 1, 1, 1, 1, 0, 1]
+    expect(걸음(counts).zoom).toBe(0)
+    setBugfixConfigForTests(bugfixConfigWith(['B-87']))
+    expect(걸음(counts).zoom).toBe(5)
   })
 })

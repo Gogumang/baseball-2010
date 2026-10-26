@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
   ACE_PHASE, FIRST_BAT_PHASE, GENERAL_MODE_STEP, NO_ACE,
@@ -140,5 +141,18 @@ describe('처음 기록', () => {
   it('마선수는 고른 것이 없는 상태로 시작한다', () => {
     expect(처음().setup.acePitcherId).toBe(NO_ACE)
     expect(처음().setup.aceBatterId).toBe(NO_ACE)
+  })
+})
+
+describe('B-100 고친 길 — 상태 20 진입의 구장 커서는 목록 안에서 시작한다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('빠른실행이 남긴 히든 유저 팀 구장(12)이면 원본은 12, 고친 길은 0 에서 시작한다 (목록 안이면 그대로)', () => {
+    const 남은 = createFlowState({ setup: { ...createFlowState().setup, stadiumId: 12 } })
+    expect(chooseAiTeam(남은, 3).setup.stadiumId).toBe(12)
+    setBugfixConfigForTests(bugfixConfigWith(['B-100']))
+    expect(chooseAiTeam(남은, 3).setup.stadiumId).toBe(0)
+    const 보통 = createFlowState({ setup: { ...createFlowState().setup, stadiumId: 7 } })
+    expect(chooseAiTeam(보통, 3).setup.stadiumId).toBe(7)
   })
 })

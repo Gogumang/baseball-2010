@@ -542,10 +542,16 @@ export function useCareerSession({
    * 올린 뒤의 장면이다) 그 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`)
    */
   const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
+  /** B-84 고친 길 — 앞 셋업 때(이 세션에서 마지막으로 본) 경기 수. 2 로 막 오른 셋업만 지운다 */
+  const lastSeenGamesRef = useRef<number | null>(null)
   useEffect(() => {
     if (sceneSetUpCount === 0) return
-    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current)))
+    const previousGames = lastSeenGamesRef.current
+    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current, previousGames)))
   }, [sceneSetUpCount])
+  useEffect(() => {
+    lastSeenGamesRef.current = career?.gamesPlayed ?? null
+  }, [career?.gamesPlayed])
   /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
   nariGameSaveRef.current = nariGameSave

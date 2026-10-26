@@ -1,5 +1,6 @@
 import { ASCII_ATLAS, HANGUL_ATLAS } from '@/shared/lib/font/atlas'
 import { glyphOf } from '@/shared/lib/font/compose'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 원본 글자 그리기 0x9c068 의 배치 규칙 (R5 5절).
@@ -166,7 +167,7 @@ export function layoutPixelText(text: string, options: PixelTextOptions = {}): P
  *
  * ⚠️ **원본 버그를 그대로 옮긴다**: 못 그리는 글자(2350자 밖·기호)를 그리기 쪽은 0px 로 넘기는데
  * 폭 재기는 자간만큼 더한다(0x9c63a~0x9c654). 그래서 그런 글자가 든 줄은 잰 폭이 실제보다
- * 글자당 자간만큼 넓다. 원본 화면이 그만큼 어긋나게 맞추므로 고치지 않는다.
+ * 글자당 자간만큼 넓다(B-92). 고친 길은 그런 글자를 그리기처럼 0px(자간도 없이)로 잰다. 굴림 없음
  */
 export function measurePixelTextWidth(text: string, options: PixelTextOptions = {}): number {
   const letterGap = options.letterGap ?? FONT_SPACING.app.letterGap
@@ -174,7 +175,8 @@ export function measurePixelTextWidth(text: string, options: PixelTextOptions = 
   for (const character of [...text]) {
     const glyph = glyphOf(character)
     if (glyph.kind === 'newline') break
-    width += glyph.kind === 'skip' ? letterGap : glyph.advance + letterGap
+    if (glyph.kind === 'skip') width += isBugFixed('B-92') ? 0 : letterGap
+    else width += glyph.advance + letterGap
   }
   return Math.max(width - letterGap, 0)
 }

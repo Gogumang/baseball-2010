@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   INITIAL_FIGURE_ENTRY, INITIAL_FIGURE_LIST_MEMORY, advanceBatterAnimation, advancePitcherAnimation, batterPoseOf,
   drawListFigure, drawListFigureTimes, pitcherImageDxOf, pitcherPoseOf,
@@ -141,5 +142,22 @@ describe('투수 애니 표는 경기 장면(stageScenery)과 한 곳 — vtable
       expect(animation.state).toBe(stage.state)
       expect(pitcherPoseOf(animation)).toBe(stagePitcherPoseOf(stage, 0))
     }
+  })
+})
+
+describe('B-97 고친 길 — 투수 이미지는 그 그림의 투수 · 자세로 뜬다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('진입 첫 그림부터 실린 투수, 타자 칸에서 와도 투수 자세 번호', () => {
+    setBugfixConfigForTests(bugfixConfigWith(['B-97']))
+    const first = drawListFigure(INITIAL_FIGURE_LIST_MEMORY, INITIAL_FIGURE_ENTRY, 투수칸(1))
+    expect(first.drawing).toEqual({ kind: '투수', image: { look: 투수, pose: first.memory.pose }, hand: 1 })
+    let frame: FigureFrame = drawListFigureTimes(first.memory, first.entry, 타자칸(6), 40)
+    const back = drawListFigure(frame.memory, frame.entry, 투수칸(1))
+    expect(back.drawing).toEqual({ kind: '투수', image: { look: 투수, pose: back.memory.pose }, hand: 1 })
+    expect(back.memory.pose).toBe(pitcherPoseOf(back.entry.pitcherAnimation ?? { state: 0, step: 0, count: 0, form: 1 }))
+    // 홈런더비(이미지를 안 뜨는 화면)는 그대로 빈 이미지
+    frame = drawListFigure(INITIAL_FIGURE_LIST_MEMORY, INITIAL_FIGURE_ENTRY, { ...투수칸(1), capturesImage: false })
+    expect(frame.drawing).toEqual({ kind: '투수', image: null, hand: 1 })
   })
 })

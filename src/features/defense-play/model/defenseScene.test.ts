@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   DEFENSE_SCENE_START,
   drawDefenseScene,
@@ -97,5 +98,18 @@ describe('레이저 연출 0x4403c 와 판을 넘는 칸', () => {
     const 남음 = { ...DEFENSE_SCENE_START, popup: { ...DEFENSE_SCENE_START.popup, timer: 4, shown: false, bigOutDraws: 7 } }
     expect(enterDefenseScene(남음, false).popup).toMatchObject({ timer: -1, shown: false, bigOutDraws: 7 })
     expect(enterDefenseScene(남음, true).popup).toMatchObject({ timer: -1, shown: true, bigOutDraws: 0 })
+  })
+})
+
+describe('B-86 고친 길 — deadly_effect 애니를 시작마다 되감는다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('같은 경기 두 번째 필살 포구도 0 · 1 · 2 · 3 을 다 그린다', () => {
+    setBugfixConfigForTests(bugfixConfigWith(['B-86']))
+    const 첫번 = 그리기(turnOnDeadlyFlash(DEFENSE_SCENE_START, { jump: true, slide: false }), 12).scene
+    const 다음판 = enterDefenseScene(첫번, true)
+    const { rows } = 그리기(turnOnDeadlyFlash(다음판, { jump: true, slide: false }), 12)
+    expect(rows.map((row) => row.flash?.step ?? null)).toEqual([null, null, null, null, null, null, null, 0, 1, 2, 3, null])
+    expect(rows[10].flashEnded).toBe(true)
   })
 })

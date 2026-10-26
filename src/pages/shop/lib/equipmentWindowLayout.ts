@@ -40,6 +40,7 @@
  * ```
  */
 import type { ShopBox } from '@/pages/shop/lib/shopLayout'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 export type EquipmentEdition = '타자' | '투수'
 
@@ -151,7 +152,7 @@ export const BOARD_COLORS = {
  * 7c398  b' = b − 12: (X−1, Y+H+13)~(X+b'+1, …) · (X−1, Y+H+12)~(X+b'+2, …) #244CAE
  * 7c3fc  채우기 (X−2, Y−1, 2, H+14) · (X+W, Y−12, 2, H+13) #244CAE         ; 왼·오른 테
  * ```
- * ⚠️ X 를 두 번 더하는 것은 원본 버그로 보이나 그대로 옮긴다 — 박스 6(X = 18)이면 아래 칸 빗변이 18px 오른쪽으로 밀린다.
+ * ⚠️ X 를 두 번 더하는 것은 원본 버그(B-89)다 — 박스 6(X = 18)이면 아래 칸 빗변이 18px 오른쪽으로 밀린다. 고친 길은 X 를 한 번만 더한다.
  */
 export function boardRectsOf(board: ShopBox, isRaisedDark: boolean): readonly PixelRect[] {
   const { x, y, width, height } = board
@@ -171,7 +172,8 @@ export function boardRectsOf(board: ShopBox, isRaisedDark: boolean): readonly Pi
   rects.push(hLine(top + 13, x + width - 1, y - 12, BOARD_COLORS.light))
   rects.push(hLine(top + 13, x + width, y - 13, BOARD_COLORS.dark))
 
-  let bottom = x + half - step
+  // B-89 고친 길 — X 를 한 번만 더해 아래 칸 빗변이 위 칸처럼 X + trunc(W/2) − s 에서 선다. 굴림 없음
+  let bottom = isBugFixed('B-89') ? half - step : x + half - step
   rects.push(hLine(x + bottom + 2, x + width, y + height + 1, BOARD_COLORS.dark))
   rects.push(hLine(x + bottom + 2, x + width, y + height, BOARD_COLORS.dark))
   for (let i = 1; i <= 12; i += 1) {

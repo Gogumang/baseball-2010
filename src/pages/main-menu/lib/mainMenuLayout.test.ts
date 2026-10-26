@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
   MENU_DESCRIPTION_PANEL, MENU_DESCRIPTION_TEXT_BOX, MENU_LABEL_HEIGHT, MENU_REEL_ITEM_COUNT,
   MENU_REEL_ITEM_FRAMES, MENU_REEL_ROW_STEP, MENU_REEL_SCROLL_STEPS, MENU_REEL_SHADOW_COLOR,
@@ -350,5 +351,21 @@ describe('칸 밑판 — 0x24b1c 24eca~24f98 (main_ui 이미지 0 · 1 · 2)', (
 
   it('멈춘 바퀴의 칸은 늘 이미지 0 밑판이다', () => {
     expect(menuWheelRestingLabelsOf(1).every((label) => label.underlay.image === 0)).toBe(true)
+  })
+})
+
+describe('B-90 고친 길 — 바퀴 x 보정 20px 를 45~90 · 270~315 사이에서 고르게 옮긴다', () => {
+  afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
+
+  it('멈추는 자리는 같고 도는 도중에는 툭 튀지 않는다', () => {
+    const angles = [270, 279, 288, 297, 306, 315]
+    const 원본 = angles.map((angle) => menuWheelPointOf(angle).x)
+    setBugfixConfigForTests(bugfixConfigWith(['B-90']))
+    const 고침 = angles.map((angle) => menuWheelPointOf(angle).x)
+    expect(고침[0]).toBe(원본[0])
+    expect(고침[5]).toBe(원본[5])
+    // 원본은 279 에서 20 이 한꺼번에 붙는다 — 고친 길은 걸음마다 4 씩
+    expect(원본[1] - 원본[0]).toBeGreaterThan(20)
+    for (let index = 1; index < angles.length; index += 1) expect(Math.abs(고침[index] - 고침[index - 1])).toBeLessThan(20)
   })
 })

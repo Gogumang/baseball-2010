@@ -71,6 +71,8 @@
  * - 0x1637d4 바이트 바이너리 전체에 해상도 분기가 없다(한 벌로 모든 기종을 돈다).
  * **단, 아래 `menuReelTextTopLeftOf`·`MENU_DESCRIPTION_PANEL` 의 잘림은 높이와 무관하다** — 그 주석 참고.
  */
+import { isBugFixed } from '@/shared/config/bugfixes'
+
 export const SCREEN_WIDTH = 240
 export const SCREEN_HEIGHT = 320
 /** 화면 가운데 */
@@ -141,17 +143,26 @@ function scaled(value: number): number {
  * 각도 → 칸 기준점. `x = 120 + (cos a·93 >> 16) + (a 가 [90,270] 밖이면 20)`,
  * `y = 320 + (sin a·93 >> 16)` (0x24e8a~0x24eba, 확정).
  *
- * 20px 보정은 **각도로만** 갈리므로 도는 도중 270° 를 지날 때 x 가 20 만큼 툭 튄다.
- * 원본 식 그대로다 — 고치지 않는다.
+ * 20px 보정은 **각도로만** 갈리므로 도는 도중 270° 를 지날 때 x 가 20 만큼 툭 튄다(90° 로 들어서는 마지막 걸음도 같다).
+ * 원본 식 그대로다(B-90). 고친 길은 멈추는 자리(45 · 315 는 20, 90 · 180 · 270 은 0)는 같게 두고 45~90 · 270~315 사이를
+ * 각에 따라 고르게 옮긴다(`menuWheelSideShiftOf`). 굴림 없음
  */
 export function menuWheelPointOf(angle: number): MenuWheelPoint {
   const a = wrapDegrees(angle)
   const radians = (a * Math.PI) / 180
-  const sideShift = a < 90 || a > 270 ? 20 : 0
+  const sideShift = isBugFixed('B-90') ? menuWheelSideShiftOf(a) : a < 90 || a > 270 ? 20 : 0
   return {
     x: MENU_WHEEL_CENTER.x + scaled(Math.cos(radians)) + sideShift,
     y: MENU_WHEEL_CENTER.y + scaled(Math.sin(radians)),
   }
+}
+
+/** B-90 고친 길의 x 보정 — 45° 이하 · 315° 이상 20, 90~270 0, 그 사이는 각에 비례(정수로 자른다) */
+export function menuWheelSideShiftOf(a: number): number {
+  if (a <= 45 || a >= 315) return 20
+  if (a < 90) return Math.trunc((20 * (90 - a)) / 45)
+  if (a > 270) return Math.trunc((20 * (a - 270)) / 45)
+  return 0
 }
 
 /**

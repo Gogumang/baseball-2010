@@ -828,10 +828,16 @@ export function usePitcherLeagueSession(
   }, [])
   /** 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 경기 뒤 커리어 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`) */
   const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
+  /** B-84 고친 길 — 앞 셋업 때(이 세션에서 마지막으로 본) 경기 수. 2 로 막 오른 셋업만 지운다 */
+  const lastSeenGamesRef = useRef<number | null>(null)
   useEffect(() => {
     if (sceneSetUpCount === 0) return
-    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current)))
+    const previousGames = lastSeenGamesRef.current
+    setCareer((current) => (current === null ? current : withNariSceneSetupOutings(current, previousGames)))
   }, [sceneSetUpCount])
+  useEffect(() => {
+    lastSeenGamesRef.current = career?.gamesPlayed ?? null
+  }, [career?.gamesPlayed])
   // 메인 메뉴 따위에서 투수편 화면으로 들어선다 — 장면 0x106 이 새로 선다(떠나면 헐린다)
   const wasOnScreenRef = useRef(isOnScreen)
   if (wasOnScreenRef.current !== isOnScreen) {

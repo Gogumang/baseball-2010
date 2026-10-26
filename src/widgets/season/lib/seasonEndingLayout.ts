@@ -64,8 +64,10 @@ export const ENDING_IRIS = {
  * ```
  * t = 0 → 0.10·D · t = 1 → 0.06·D · t = 2 → 0.22·D · … · t ≥ 7 → D.
  *
- * ⚠️ **원본 버그 그대로**: t = 1 이 t = 0 보다 **작아진다**(0.06·D < 0.10·D) — 원이 한 번 줄었다
- * 다시 커진다. 고치지 않는다.
+ * ⚠️ **옮김 실수(r282 확인 — B-95 정정)**: 원본 0x887dc~0x88846 은 k · p 를 사인 0x6c6a9 로 거친다
+ * (`r = D·sin(min(16t, 110))/100 + D − D·sin(t == 0 ? 90 : 110)/100`, 리터럴 0x889a8 = 0x6c6a9 · 0xcaa04 = `bx r6`) — 타자편
+ * `pages/ending/lib/endingLayout.ts` 의 `irisCircleOf` 가 그 식이다. 여기는 사인을 빠뜨려 t = 1 이 t = 0 보다 작아진다(원본은 그렇지 않다).
+ * 지름 = W − r 로 그리는 것까지 함께 다시 옮겨야 한다 — TODO.
  */
 export function endingIrisRadiusOf(tick: number, diameter: number): number {
   const k = tick === 0 ? 90 : 110
