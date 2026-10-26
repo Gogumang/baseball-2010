@@ -743,8 +743,8 @@
     {
       "id": "B-83",
       "name": "홈런 재생",
-      "symptom": "타자 마선수 그림이 팀당 첫 한 명으로 뭉개진다",
-      "source": "0x3a680~0x3a716(R3 7-3)",
+      "symptom": "타자 마선수 그림이 팀당 첫 한 명으로 뭉개진다 — 홈런 재생 · 교대 판 · 벤치 클리어링 운동장(walkerAces, r288 묶음)",
+      "source": "0x3a680~0x3a716(R3 7-3) · 0x3fac4 3ff62~3ffe0",
       "impact": "작음",
       "implemented": true,
       "fixed": null

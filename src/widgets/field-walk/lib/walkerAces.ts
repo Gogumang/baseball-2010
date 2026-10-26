@@ -6,6 +6,7 @@ import {
   fielderActionFrameOf,
 } from '@/pages/defense/lib/defenseView'
 import type { FieldWalker } from '@/widgets/field-walk/lib/fieldWalker'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * **운동장 전경 · 벤치 클리어링의 마선수 그림** — 줄 그리기 0x43010(직접 뜸 2026-10-14)이 칸마다 0x79b48(그림, a, b, 프레임, …) 을 부른다:
@@ -17,7 +18,8 @@ import type { FieldWalker } from '@/widgets/field-walk/lib/fieldWalker'
  * ```
  * 그림 객체는 줄마다 하나이고(교대 판: 수비 줄 [+0x177c] · 공격 줄 [+0xf20], 벤치 클리어링은 거꾸로), 싣는 곳(0x3fac4 3ff38~3ffdc ·
  * 0x3a5f0 3a6c6~3a716)이 그 줄 팀의 지금 투수가 마선수면 +0x28 에 그 번호 그림을, 레코드 타자 배열에서 처음으로 +0xa & 0x40 인 선수
- * (0xb8a50)가 있으면 +0x1c 에 **그 첫 마타자 번호** 그림을 싣는다 — 한 줄의 타자 마선수는 누구든 그 팀 첫 마타자 그림으로 그려진다(원본 그대로).
+ * (0xb8a50)가 있으면 +0x1c 에 **그 첫 마타자 번호** 그림을 싣는다 — 한 줄의 타자 마선수는 누구든 그 팀 첫 마타자 그림으로 그려진다(원본 버그
+ * B-83 과 같은 뭉개기 — B-83 근거 0x3a680~0x3a716 이 바로 이 벤치 클리어링 적재다. 고친 길은 `walkAceSpritesOfRecords`).
  *
  * +0xec 는 교대 판 0x3fac4(3fe1a~3ff36)가 칸 i 마다 줄 팀 레코드 타자 배열을 차례로 훑어 자리 니블(+0x1c & 0xf)이 i + 1 인 **첫** 레코드로 적는다
  * — 칸 0(투수)에는 니블 1(지명)인 레코드가 든다. 그래서 칸 0 은 a 가 거짓이면 지명 레코드가 마타자일 때 타자 마선수 그림이 된다(원본 그대로).
@@ -128,6 +130,8 @@ export function walkAceSpritesOfRecords(
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
     if (slot === 0 && isAceIndex(pitcherAce)) return { kind: 'pitcher', index: pitcherAce }
     const record = seated[slot] ?? null
+    // 고침(`bugfixes.json` B-83, 기본 켬): 팀 첫 마타자 그림 하나로 뭉개지 않고 칸마다 제 마타자 그림 — 굴림 없음(그림만)
+    if (record !== null && isAceIndex(record.ace) && isBugFixed('B-83')) return { kind: 'batter', index: record.ace }
     // b — 그림 +0x1c 가 없으면(첫 마타자를 못 찾음) 0x79b48 이 아무것도 안 그린다 — 웹은 보통 그림으로 둔다
     if (record !== null && isAceIndex(record.ace) && isAceIndex(firstAce)) return { kind: 'batter', index: firstAce }
     return null
