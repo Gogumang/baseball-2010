@@ -59,8 +59,12 @@ export function RecordAlertPanel({ frame }: { readonly frame: RecordAlertFrame }
  * 화면 기둥 위에 얹는 알림 — 웹 투구 화면(팀경기 우리 수비 · 투수편)처럼 240×320 장면 캔버스가 없는 화면에서 쓴다.
  * 원본은 같은 프레임 0x52c50 이 타석·투구 구분 없이 화면 좌표 (0, 0) 기준으로 그리므로 화면 기둥 왼쪽 위가 기준이다.
  * 부르는 쪽은 `position: relative` 판(화면과 형제 자리)에 넣는다 — 240×320 판(RawScreen) **안**이면 `RecordAlertStageOverlay`.
- * ⚠️ 근사: 원본은 팝업(경기 중 메뉴 등)을 알림 **위에** 그린다(0x53066 다음 0x746cd) — 웹은 알림이 위에 온다(남김 —
- * 경기 중 메뉴는 각 화면 페이지가 제 본문 안에 그리고 이 알림은 화면 기둥에 얹혀, 겹 차례를 이 부품이 정할 수 없다).
+ *
+ * **겹 차례 (Q-04 ⑥, r297)** — 경기 프레임 0x52c50 은 상태 그리기 표 0xd05a0 → 53066 알림 0x4e35c → 0x746cd 팝업 차례로 그린다.
+ * 그래서 알림은 장면 창(돌발 0x1b~0x1d · 교체 0xb · 감독 강판 0x23 — 상태 그리기) **위**, 팝업(일시정지 창 0x741a0 · 0x74ef5 상자 ·
+ * 공용 창) **아래**다 — 겹 `SCREEN_LAYERS.RECORD_ALERT`(장면 창 8 < 9 < 팝업 상자 10). 경기 중 메뉴 층은 누름 칸 때문에 그보다 낮아
+ * 메뉴가 떠 있는 동안은 `isUnderMenu` 로 알림을 그 아래로 내린다. 이 기둥을 쓰는 화면(중계 0x21 · 공수 교대 판 · 경기 끝 판 · 정산 ·
+ * 벤치 클리어링)에는 경기 중 메뉴가 없다.
  */
 export function RecordAlertScreenOverlay({ frame }: { readonly frame: RecordAlertFrame }) {
   if (frame.panel === null) return null
@@ -77,10 +81,14 @@ export function RecordAlertScreenOverlay({ frame }: { readonly frame: RecordAler
  * 240×320 판(RawScreen) **안**에 얹는 알림 — 판이 이미 화면 배율을 먹었으므로 기둥(zoom)을 다시 씌우지 않는다.
  * 예전에는 판 안에서도 `RecordAlertScreenOverlay` 를 써서 배율 2 · 3 창에서 알림이 두 번 커졌다(배율 1 에서만 맞았다).
  */
-export function RecordAlertStageOverlay({ frame }: { readonly frame: RecordAlertFrame }) {
+export function RecordAlertStageOverlay({ frame, isUnderMenu = false }: {
+  readonly frame: RecordAlertFrame
+  /** 경기 중 메뉴(0x741a0)가 떠 있다 — 알림을 메뉴 층 아래로 (`styles.stageLayerUnderMenu`) */
+  readonly isUnderMenu?: boolean
+}) {
   if (frame.panel === null) return null
   return (
-    <div className={styles.stageLayer}>
+    <div className={isUnderMenu ? styles.stageLayerUnderMenu : styles.stageLayer} data-testid="기록달성-겹">
       <RecordAlertPanel frame={frame} />
     </div>
   )

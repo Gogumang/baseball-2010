@@ -26,7 +26,7 @@ import { benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFiel
 import type { SceneStadium } from '@/features/play-team-game/model/sceneStadium'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
-import { RecordAlertPanel } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { BurstBand } from '@/widgets/burst-mission/ui/BurstBand'
 import { burstBandRoleOf } from '@/widgets/burst-mission/lib/burstBandLayout'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
@@ -492,8 +492,9 @@ export function GameScreen({
         {substitution.isShown && (
           <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
         )}
-        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
-        {recordAlert !== undefined && <RecordAlertPanel frame={recordAlert} />}
+        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음(53066), 팝업 0x746cd 앞. 겹 `RECORD_ALERT` 라 돌발 창(장면 창)
+            위, 경기 중 메뉴가 떠 있으면 메뉴 층 아래 */}
+        {recordAlert !== undefined && <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />}
 
         {/*
           웹 제목줄 · 배지(G 누계 · 이글아이)는 걷었다 — 원본 240×320 장면 한 장뿐이다. G 누계는 기록 달성 알림 0x4e35c 가

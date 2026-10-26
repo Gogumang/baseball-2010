@@ -52,7 +52,7 @@ import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
 import { usePitcherHitScene } from '@/widgets/batting-stage/model/usePitcherHitScene'
 import { usePitchArrivalHold } from '@/widgets/batting-stage/model/usePitchArrivalHold'
-import { RecordAlertPanel, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
@@ -318,6 +318,8 @@ function TeamGameScene({
   useMarksGameScene()
   const isMenuOpen = menu.isOpen
   const [overlay, setOverlay] = useState<MenuOverlay | null>(null)
+  /** 자동진행 중계(0x21)의 CLR 중단 질문 창이 서 있다 — 기록 달성 알림이 멈춘다 (`TeamAutoRelay.onAskingChange`) */
+  const [isRelayAsking, setRelayAsking] = useState(false)
   // [조작방법] · [설정] 동안도 일시정지 창이 떠 있다(0x3c212 · 0x3c326 이 대기 칸으로 다시 띄운다 — I 4c-3) — 공용 창 [0x140005c]+9
   useMarksCommonWindowShown(overlay !== null)
   /** 구질 · 조준 · 게이지 그림 재료 — 사람 수비 타석 장면이 그 위에 그린다 (0x4c4bc · 0x4d780 · 0x4d2ac) */
@@ -819,7 +821,8 @@ function TeamGameScene({
   const recordAlert = useRecordAlert(progress.recordIds, {
     // 0x11 끝 · 0x13 을 그리는 동안은 아직 0x17 이 아니다
     isDrawing: isIntroDone && summary === null && (!isDefenseInPlay || isPitchSceneBeforePlay) && !isReplaying,
-    isFrozen: isMenuOpen || overlay === '조작방법',
+    // 중계 0x21 의 CLR 질문 창도 팝업이다(52cc6)
+    isFrozen: isMenuOpen || overlay === '조작방법' || isRelayAsking,
     isSettled: progress.game.isFinished,
     // 상태 틱 [+0x2c] 의 0 점 — 화면 갈래(판 · 타석/투구 입력 단계 · 확인 대기)가 바뀐 틱과, 원본 상태 경계(타석 장면이 적는
     // 0xf · 0x10 · 0x11 · 0x12 · 0x13, 사람 투구 장면이 적는 0x11 · 0x12 · 그 끝, 확인 대기가 적는 0xd · 0xe — `sceneStateEntries`)
@@ -1166,6 +1169,9 @@ function TeamGameScene({
         humanSide={options.playerSide}
         grassPalette={fieldPalette}
         entryLoadedRunnerAce={menuRelayLoadedRef.current}
+        // 0x21 에도 기록 달성 알림 0x4e35c 를 그린다(0x17 말고는 늘 — 53066). 질문 창 동안은 멈춘다
+        recordAlert={<RecordAlertStageOverlay frame={recordAlert} />}
+        onAskingChange={setRelayAsking}
       />
     )
   }
@@ -1333,8 +1339,9 @@ function TeamGameScene({
             {isMatchupShown && matchupCards}
             {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
             {substitutionOverlay}
-            {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음이라 맨 위 */}
-            <RecordAlertPanel frame={recordAlert} />
+            {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음(53066) · 팝업 0x746cd 앞. 교체 창(0xb) · 돌발 창 위,
+                경기 중 메뉴 아래 */}
+            <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />
           </>
         ) : canPitch || isPitchSceneBeforePlay ? (
           /*
@@ -1483,7 +1490,7 @@ function TeamGameScene({
           (예전 웹 안내 "자동 진행 중…" 은 원본에 없다)
         */}
 
-        {(canPitch || isPitchSceneBeforePlay) && !canBat && <RecordAlertStageOverlay frame={recordAlert} />}
+        {(canPitch || isPitchSceneBeforePlay) && !canBat && <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />}
 
         {/* 0xe — OK 하나만 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
         {isAwaitingConfirm && !isPopupOpen && changeWindow === null && (
