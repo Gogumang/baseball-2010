@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isBugFixed } from '@/shared/config/bugfixes'
-import { restartsManagementBgmFrom } from '@/app/model/screenBgm'
+import { playEndingContinueBgm, restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import { pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
@@ -1732,6 +1732,8 @@ export function usePitcherLeagueSession(
     recordStat({ kind: 'G사용', usage: leagueUsageOf(PITCHER_LEAGUE_MODE), amount: PITCHER_CONTINUE_COST_GAME_POINT })
     // 판정 0(부상)은 곧장 105(1bddc~1be1e), 방출은 새 시즌 0x1b768(1be26) 뒤 141 이 엔딩 판을 그리며 효과기 끝을 기다려 137(1beb4~1beea)
     if (career.endingIndex !== PITCHER_INJURY_ENDING) {
+      // 1be2a~1be40 — 두 갈래가 만나 소리를 끊고 4 를 튼다. 방출은 화면이 엔딩 그대로라 여기서 (`playEndingContinueBgm`)
+      playEndingContinueBgm(activeSound())
       setYearCoverFromResume(false)
       setYearCoverAfterHold(false)
       setHeldEndingIndex(career.endingIndex)

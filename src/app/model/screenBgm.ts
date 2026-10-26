@@ -8,8 +8,8 @@ import type { PitcherScene, PitcherStoryContext } from '@/app/model/usePitcherLe
  *
  * ```
  * 1  타이틀·메인메뉴   장면 0x103 상태 3~5 (`MENU_STATE_BGM` 의 표 0xcea84)
- * 3  모드 준비·설정    0x105 상태 202 · 0x106 상태 101 · 0x107 로비 · 0x103 상태 16(홈런더비 고르기, 이전 5)
- * 4  관리 화면         시즌(0x105)·나만의리그(0x106) 관리
+ * 3  모드 준비·설정    0x105 상태 202(0xca) · 0x106 상태 101 · 0x107 상태 0(돌아올 때만) · 0x103 상태 16·17(이전 5)
+ * 4  관리 화면         시즌 0xc9(이전 상태 목록) · 0xef · 0xf1, 나리 105(이전 상태 목록) · 109 · 128(이어하기) · 141 방출 이어하기
  * —  경기              0x104 — 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 소리를 끊고(0x6e418) 시작한다. 경기 안 배경음은
  *                      자동진행 중계 0x21 진입 0x3abf0 의 33(모드 {1,2,8,9} · 속도 ≠ 2 — `TeamAutoRelay`)과
  *                      벤치클리어링 44(한 번)뿐이다. 끊기는 장면을 세우는 쪽(`useTeamGame` · `usePitcherGame` ·
@@ -22,10 +22,11 @@ import type { PitcherScene, PitcherStoryContext } from '@/app/model/usePitcherLe
  * 원본도 배경음이 없는 상태로 넘어갈 때 따로 끄지 않는다 (통로는 하나뿐이라 다음 배경음이
  * 가져갈 때 자연히 바뀐다, 0x6e9d4).
  *
- * ⚠️ 근사(남김 — 웹 구조): 시즌·나만의리그·미션의 **안쪽 화면**은 최상위 `Screen` 한 칸(`시즌모드`·
- * `투수편` 등)으로 뭉쳐 있어 관리·준비를 여기서 가를 수 없다. 모드에 들어가는 순간은 원본도
- * 준비 화면(3)이므로 3 을 쓰고, 관리 화면(4)으로 갈라 주는 일은 그 라우트가 제 장면 번호를
- * 알게 되면 그때 넘긴다.
+ * **안쪽 상태별 배경음(r296 — 0x6ea6c · 0x6e498 · 0x6e418 · 0x6e438 · 0x6eaf0 호출지 전수)**: 시즌(0x105 갱신 0xe9ac)은
+ * 진입 스위치 0xcbea0 · 처리 0xcbf6c · 틀 나무 0xedb6, 나리(0x106 갱신 0x1cdec)는 진입 0xcc728 · 틀 나무 0x1d1b2, 미션 목록
+ * (0x107 0x1e99c)은 상태 0~4 표 0xcd6a0 으로 뜬다. 소리를 부르는 함수가 이들 밖에서 불리는 일은 없다(통신 화면의 resumeBgm 뿐).
+ * 최상위 '시즌모드' 는 배경음을 안 바꾸고(null) 상태 진입이 튼다(`useSeasonMenuBgm`) — 0xcb 진입 분기가 0xd8 · 0xf3 처럼 소리를
+ * 안 부르는 상태로 가면 메인 메뉴의 1 이 잇는다. 투수편은 '등록'(101 0x10790 의 3)만 3 이다. 표는 docs `L-sound-effects.md` 1-F3.
  *
  * **메인 메뉴(장면 0x103) 상태 표** — 상태가 바뀐 틀에 0x32fa0(32fc8~32fd6, +0x31 이 서면)이 0x24ab8 을 부르고,
  * 0x24ab8 은 `[this+0x1c] − 3` 으로 표 0xcea84 (20칸, r197 직접 다시 뜸)를 뛴다. 소리는 모두 `0x6ea6d(소리, n, −1, 1)` (반복 즉시):
@@ -46,11 +47,19 @@ export const SCREEN_BGM = {
   // 도움말 · 스페셜은 없다 — 모두 장면 0x103 안의 상태(7 · 13)라 진입이 상태 표
   // 0xcea84 의 아무것도 안 하는 칸이다. 메뉴의 1 이 이어진다. 환경설정(8)은 진입 0x259fc 가 소리를 끊는다(`stopsSoundOnEnter`) —
   // 그래서 돌아올 때 0x24a40 이 1 을 처음부터 다시 튼다(`useScreenBgm`)
+  // 101 진입 0x10790 이 조건 없이 `0x6ea6d(소리, 3, −1, 1)`(107a2). 102 등록(0x17360 · 키 0x16f28)은 소리를 안 건드려 3 이 잇고,
+  // 102 취소(171fa → 101)는 101 진입을 다시 지나 3 을 처음부터 튼다(`restartsTeamSelectBgm`)
   팀선택: 3,
   선수등록: 3,
-  시즌모드: 3,
+  // 시즌모드는 표에 없다(null) — 장면 0x105 는 첫 상태 0xcb(0x4b50)가 저장을 보고 갈라 가고, 3 은 0xca 팀 고르기 진입 0x50a8 만
+  // 튼다(50ba, 조건 없음). 0xc9 의 4 · 0xd3 의 40 · 0xef 의 4 · 0xf1 의 4 · 0xf5 의 46/52 · 0xe9 징글은 상태 진입이 낸다(`useSeasonMenuBgm` ·
+  // `useSeasonSession`). 0xd8 · 0xf3 처럼 아무것도 안 부르는 상태로 들어가면 메인 메뉴의 1 이 이어진다
   투수편: 3,
   일반모드: 3,
+  // 미션: 메인 메뉴 하위 17(선수 고르기) 진입은 이전 5 면 3(24af0). 장면 0x107 은 상태 0 갱신 0x1d9a4(1da1e~1da56)가
+  // [0x140006c] ≠ −1 일 때만 3 을 튼다 — 결과 판 '목록'(1) · '다시'(3, 곧바로 상태 3 진입 0x1e908 이 0x6e418 로 끊는다). 메인 메뉴에서
+  // 고르기를 지나 들어오면 0x103 생성자가 −1 로 지운 뒤라(23894) 안 틀고 17 의 3 이 잇는다. 목록에서 미션을 고르면 키 0x1daa4 가
+  // stopBgm(1dbd8 · 1dc32) — 웹은 곧 서는 경기 장면의 끊기(0x3e350)가 맡는다
   미션선택: 3,
   // 홈런더비는 표에 없다 — 고르기(하위 16)는 이전 상태가 5 일 때 3(24af0)이고 경기는 0x3e350 이 끊는다 (`screenBgmOf`)
   관리: 4,
@@ -106,6 +115,19 @@ export function endingBgmOf(endingIndex: number): number {
   return endingIndex <= 1 ? ENDING_SAD_BGM : SCREEN_BGM.엔딩
 }
 
+/** 엔딩 141 이어하기의 배경음 4 (1be38 `movs r1, #4`) */
+const ENDING_CONTINUE_BGM = 4
+/**
+ * 엔딩 141 의 이어하기(팝업 0x32 예) — 틀 0x1bbc4 는 부상(곧장 105, 1bddc~1be1e)과 방출(새 시즌 0x1b768, 1be26) 두 갈래가
+ * 1be2a 에서 만나 `0x6e419(소리)`(1be30 — 끊기) 뒤 `0x6ea6d(소리, 4, −1, 1)`(1be40)을 부른다. 모드 갈림이 없어 타자편 · 투수편 같다.
+ * 부상 갈래는 화면이 '관리' 로 바뀌어 화면 표가 4 를 틀지만, 방출 갈래는 141 이 효과기 끝을 기다린 뒤 137 → 105 로 그 4 를 잇는다
+ * (`carriesYearCoverBgm`) — 그래서 방출 갈래는 세션이 이 함수로 그 자리에서 튼다.
+ */
+export function playEndingContinueBgm(sound: SoundPort): void {
+  sound.stop()
+  sound.playBgm(ENDING_CONTINUE_BGM)
+}
+
 /**
  * 시즌모드(장면 0x105) 10년차 엔딩 상태 0xf5 의 배경음 — 진입 0x6be8 (직접 떴다):
  * ```
@@ -132,6 +154,15 @@ export function seasonEndingBgmOf(endingIndex: number | null): number {
 export function restartsMenuBgm(previousKind: Screen['kind'] | null, screen: Screen): boolean {
   if (screen.kind !== '메인메뉴' || previousKind === '메인메뉴') return false
   return previousKind === '환경설정' || screen.openTier === 5
+}
+
+/**
+ * 나리 등록(102)에서 팀 고르기(101)로 물러날 때 배경음 3 을 **처음부터** 다시 트는가 — 102 키 0x16f28 의 취소(171dc~17202)가
+ * `0xbcb49(0x65)` 로 101 에 다시 들어오고, 진입 0x10790 은 조건 없이 `0x6ea6d(소리, 3, −1, 1)`(107a2)라 울리던 3 을 끊고 새로 튼다.
+ * 투수편은 같은 두 상태가 '등록' 한 장면 안이라 `PitcherCreateFlow` 가 스스로 튼다.
+ */
+export function restartsTeamSelectBgm(previousKind: string | null, kind: string): boolean {
+  return kind === '팀선택' && previousKind === '선수등록'
 }
 
 /**
@@ -194,7 +225,7 @@ export function usePitcherLeagueBgmRestart(
 /**
  * **137 "N년차" 표지 뒤 이어지는 배경음** — 137 진입 0x1055c · 틀 0x12190 · 그리기 0x1cc4c 는 소리를 안 건드리고, 105 처리 0x1aec4 의
  * 첫 틀 배경음 4 는 이전 상태가 {0x64, 0x74, 0x84, 0x7d, 0x7e, 0x72, 0x86, 1, 0x70} 일 때만이라(1aece~1aef2, r148 직접 뜸) 0x89 는
- * 빠진다. 곧 137 → 105 는 앞의 배경음(연말 114 의 40 · 141 엔딩의 46/52 · 대회 경기 뒤 끊긴 채)을 그대로 잇고, 105 에서 들어가
+ * 빠진다. 곧 137 → 105 는 앞의 배경음(연말 114 의 40 · 141 방출 이어하기의 4 · 대회 경기 뒤 끊긴 채)을 그대로 잇고, 105 에서 들어가
  * 소리를 안 건드리는 109(이전 105) · 110/111 상점 · 112 외출 지도에서도 이어진다. 112 · 126 → 105(`restartsManagementBgm`),
  * 화면이 '관리' 인 채 125 → 105(`restartsManagementBgmFrom` — 훈련 결과 창 · 훈련 알림을 닫을 때) 나 그 밖 화면으로 가면 끝나고
  * 4 가 처음부터 운다. 127 휴식 → 105 · 하위 메뉴 취소는 목록 밖이라 잇는다.
@@ -231,7 +262,10 @@ export function useScreenBgm(
     setPreviousKind(screen.kind)
     setEnteredFrom(previousKind)
     setYearCoverCarry(carriesYearCoverBgm(isYearCoverCarry, previousKind, screen.kind))
-    if (restartsMenuBgm(previousKind, screen) || restartsManagementBgm(previousKind, screen.kind)) {
+    if (
+      restartsMenuBgm(previousKind, screen) || restartsManagementBgm(previousKind, screen.kind) ||
+      restartsTeamSelectBgm(previousKind, screen.kind)
+    ) {
       setRestartSerial((serial) => serial + 1)
     }
   }
@@ -271,7 +305,8 @@ export function screenBgmOf(screen: Screen, enteredFrom: Screen['kind'] | null =
  * 배경음을 안 건드려 그 4 가 이어진다(타자편 `SCREEN_BGM` 의 아이템·외출 4 와 같다).
  * 141 엔딩은 타자편과 같은 진입 0x12300(모드 갈림 없음) — `endingBgmOf`(e ≤ 1 이면 52, 그 밖 46).
  * 시즌 끝 사슬(136 · 130 · 131 · 132 · 133 — 웹은 이벤트 화면)과 국가대항전(134 · 135)은 배경음을 안 건드린다(null).
- * 그 밖 장면은 예전 근사 그대로 준비 화면 배경음(3)이다 (머리 주석 ⚠️).
+ * '등록'(101 팀 고르기 0x10790 의 3 · 102 · 103 은 안 건드림)만 3 이다. 마선수 대결은 SYS 8(0x8d734)이 곧장 경기 장면 0x104 를
+ * 세워 0x3e350 이 끊는다 — 화면 표는 안 바꾼다(null).
  */
 export function pitcherLeagueBgmOf(
   scene: PitcherScene,
@@ -305,7 +340,10 @@ export function pitcherLeagueBgmOf(
   if (scene === '국가대항전') return null
   // 137 "N년차" 표지(진입 0x1055c · 틀 0x12190 · 그리기 0x1cc4c)는 배경음을 안 건드린다 — 뒤 105 도 잇는다(`carriesYearCoverBgm`)
   if (scene === '연차표지') return null
-  return SCREEN_BGM.투수편
+  // 101 진입 0x10790 — 조건 없이 3(107a2). 102 · 103 은 안 건드려 이어진다
+  if (scene === '등록') return SCREEN_BGM.투수편
+  // 마선수 대결(경기 장면 0x104 — 0x3e350 이 끊는다) · 판정이 아직 없는 엔딩(141 진입 0x12300 이 판정과 함께 튼다)
+  return null
 }
 
 /**
@@ -353,9 +391,12 @@ export function usePitcherLeagueBgm(
 /** 시즌 트레이닝 0xcf · 그 연출 0xde (웹은 0xde 를 0xcf 화면 안 결과 팝업으로 갈음한다) */
 const SEASON_TRAINING = 0xcf
 const SEASON_TRAINING_EFFECT = 0xde
-/** 시즌 관리 메뉴 상태 0xc9 · 장면 생성 뒤 첫 상태(진입 분기) 0xcb */
+/** 시즌 관리 메뉴 상태 0xc9 · 장면 생성 뒤 첫 상태(진입 분기) 0xcb · 팀 고르기 0xca */
 const SEASON_MANAGEMENT_MENU = 0xc9
 const SEASON_ENTRY_BRANCH = 0xcb
+const SEASON_TEAM_SELECT = 0xca
+/** 팀 고르기 0xca 진입 0x50a8 의 배경음 — 50a8~50ba `0x6ea6d(소리, 3, −1, 1)` 조건 없이 (모드 준비 배경음) */
+const SEASON_TEAM_SELECT_BGM = 3
 /** 관리 메뉴 배경음 (`0x6ea6d(소리, 4, −1, 1)`) */
 const SEASON_MANAGEMENT_BGM = 4
 /**
@@ -387,8 +428,19 @@ export function seasonMenuBgmOf(previous: number | null): number | null {
 }
 
 /**
- * 시즌모드(장면 0x105) 관리 메뉴의 배경음 4 — 원본은 상태 0xc9 의 틀 0x73b8 이 이전 상태를 보고 **한 번** 튼다.
- * 최상위 화면 표(`SCREEN_BGM` 시즌모드 3)를 고른 **뒤에** 불러야 한다 — 같은 컴포넌트의 효과는 선언 차례로 돈다.
+ * 시즌 상태에 들어설 때 그 상태가 트는 배경음 — 0xc9 는 틀 0x73b8 이 이전 상태를 보고 4(`seasonMenuBgmOf`), 0xca 는 진입 0x50a8 이
+ * 조건 없이 3. 그 밖 상태의 소리(0xd3 40 · 0xe9 징글 · 0xef 4 · 0xf1 4 · 0xf5 46/52)는 세션이 그 자리에서 낸다. null 이면 안 바꾼다.
+ */
+export function seasonSceneBgmOf(previous: number | null, scene: number): number | null {
+  if (scene === SEASON_TEAM_SELECT) return SEASON_TEAM_SELECT_BGM
+  if (scene === SEASON_MANAGEMENT_MENU) return seasonMenuBgmOf(previous)
+  return null
+}
+
+/**
+ * 시즌모드(장면 0x105) 상태 진입의 배경음 — 관리 메뉴 0xc9 의 4(틀 0x73b8, 이전 상태를 보고 **한 번**) · 팀 고르기 0xca 의 3(진입 0x50a8).
+ * 최상위 화면 표는 '시즌모드' 에 배경음이 없다(null) — 장면에 들어선 첫 상태가 무엇이냐(0xcb 진입 분기 0x4b50)로 갈린다.
+ * 둘 다 0x6ea6c 라 같은 번호가 울려도 처음부터 다시 튼다(0xca 를 다시 지나면 3 이 다시 운다).
  */
 export function useSeasonMenuBgm(
   sound: SoundPort,
@@ -402,8 +454,8 @@ export function useSeasonMenuBgm(
   useEffect(() => {
     const previous = previousRef.current
     previousRef.current = !isActive ? null : scene === SEASON_TRAINING && trainingShown ? SEASON_TRAINING_EFFECT : scene
-    if (!isActive || scene !== SEASON_MANAGEMENT_MENU || previous === scene) return
-    const bgm = seasonMenuBgmOf(previous)
+    if (!isActive || previous === scene) return
+    const bgm = seasonSceneBgmOf(previous, scene)
     if (bgm !== null) sound.playBgm(bgm)
   }, [sound, isActive, scene, trainingShown])
 }
