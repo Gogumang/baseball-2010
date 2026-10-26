@@ -1,5 +1,6 @@
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
@@ -12,8 +13,8 @@ import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
  *   - 켜졌으면(큰 타구): 공 틱이 `0x406a4` 문턱을 넘을 때까지 기다린다. **OK(−5)·'5' 로 건너뛴다.**
  *   - 꺼졌으면: **틱 8** 에 넘어간다(키로 못 건너뛴다). 결과 코드 ≤ 2 인 땅에 닿는 타구는 그보다 이를 수 있다(`earlyHitPauseTickOf`).
  *
- * 그리기(0x4cb1c)의 공 그림은 타구 궤적 쪽이라 문서가 읽지 않았고, 웹 타석 화면에도 타구 그림이
- * 없다 — 여기서는 **화면을 붙잡아 두는 시간만** 옮긴다 (연출 내용은 빠져 있다).
+ * 여기서는 **화면을 붙잡아 두는 시간**을 옮긴다. 그 동안의 타구 공 그림(0x13 진입 0x33e34 가 다시 채운 경로를 공용 공 그리기
+ * 0x3b2f4 가 그린다)은 `hitBallPath` · `renderBattingStage` 의 `addHitBallDraws` 다 (r274).
  */
 
 /** 원본 `공+0xac0` 눈금의 상한 (E 2-1b) */
@@ -187,6 +188,16 @@ export function canSkipHitPause(watchesBigHit: boolean): boolean {
 }
 
 /**
+ * **[경기+0xf2c] 공의 궤적** — 0x51408(5174c · 517ce)이 판 공과 수평각만 d 다른 패턴(`earlyPassPatternOf`)으로 쏘는 공. 0x13 의
+ * 이른 넘김(0x406e8)과 0x13 공 경로(0x33e34 → `hitBallPath`)가 이 공을 본다. ⚠️ 근사(남김 — 굴림 차례): 그 공이 폴에 맞으면 원본은
+ * 판 시작에서 rand(−25, 25) 로 폴 뒤 점을 다시 깐다(0xa2c64) — 그 굴림은 판 쪽(`runDefensePlay` · `derbyBattedBallOf`)이 차례만 맞추고
+ * 타석은 굴림 없는 궤적을 쓴다. 폴 틱 앞 점은 같다
+ */
+export function hitBallTrajectoryOf(pattern: BattedBallPattern, batterHand: number) {
+  return battedBallTrajectory(earlyPassPatternOf(pattern, batterHand))
+}
+
+/**
  * 방금 친 공의 궤적에서 0x13 판정에 쓸 값을 꺼낸다.
  *
  * 원본은 타구 순간 공 객체에 깔아 둔 점 목록에서 `+0xaa0`(낙구 틱)·`+0xab0`(폴 틱)·`+0xac0`(거리)
@@ -205,6 +216,6 @@ export function pauseInputOf(resultCode: number, deck: PatternDeck, batterHand: 
     poleTick: trajectory.poleTick,
     carryScale: trajectory.carryScale,
     // 이른 넘김은 [경기+0xf2c] 공 — 판 공과 수평각이 d 다른 공을 따로 깐다 (0x5174c)
-    earlyTick: earlyHitPauseTickOf(resultCode, battedBallTrajectory(earlyPassPatternOf(pattern, batterHand))),
+    earlyTick: earlyHitPauseTickOf(resultCode, hitBallTrajectoryOf(pattern, batterHand)),
   }
 }

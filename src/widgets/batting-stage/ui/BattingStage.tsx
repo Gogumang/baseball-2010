@@ -13,11 +13,15 @@ import { emitParticles } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { useClaimSceneParticles } from '@/widgets/particles/model/useClaimSceneParticles'
 import { batterEquipmentOf, NO_EQUIPMENT, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
-import { canSkipHitPause, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
+import { canSkipHitPause, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
+import { hitBallPathOf } from '@/widgets/batting-stage/lib/hitBallPath'
+import type { StageParticleShot } from '@/widgets/batting-stage/lib/homeRunEffects'
 import {
   HIT_PARTICLE_IMAGE,
   hitParticleIdOf,
   hitParticleInputOf,
+  isHomeRunHitResult,
+  isStrongHit,
   specialSwingParticlesOf,
 } from '@/widgets/batting-stage/lib/hitParticles'
 import { hitFlameAnimationOf } from '@/widgets/batting-stage/lib/batterOverlayMarks'
@@ -235,6 +239,16 @@ interface BattingStageProps {
    * (`lib/homeRunEffects`). 값이 바뀔 때마다 한 번씩. 안 넘기면 치우지 않는다.
    */
   readonly effectsClearedAt?: number | null
+  /**
+   * **홈런더비 판(0x17)의 필드 화면이 이 캔버스 밑에 깔렸다** — 0x17 그리기 0x46c88 은 타석 그림 0x4c4bc 를 안 부른다. 캔버스를 비워
+   * (바탕색도 빼) HOMERUN 글자 0x40b18 과 프레임 끝 파티클만 그린다. 루프(갱신 · 효과 틱 · 파티클 틱)는 그대로 돈다
+   */
+  readonly isFieldPlay?: boolean
+  /**
+   * 필드 화면의 공 그리기 0x36dfc 가 장면 틱 그림에 쏘는 파티클(큰 타구 · 튐) — 이 캔버스의 루프가 그 틱 프레임에서 치우기 뒤 · HOMERUN
+   * 글자 효과 틱 앞에 쏜다(`lib/homeRunEffects` 의 `drawShots`). 파티클 관리자 · 굴림(경기 난수)이 하나라 차례가 원본과 같다
+   */
+  readonly fieldPlayShotsAt?: (sceneTick: number) => readonly StageParticleShot[]
   /**
    * **경기 정산 효과** (결과 창 뒤 배경 `isResultBackdrop` 에서만). 0x4ea0c 가 이기고 밤하늘이면 종류 2 불꽃 · 지면 비를 깔고
    * 결과 그림 0x4a384 가 그림마다 굴린다 — 그 굴림과 파티클 틱은 **`random`(경기 난수)** 로 돈다(배경 `random` 은 하늘 줄만).
@@ -503,7 +517,18 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         specialEffect !== null || isBuntStance || pattern === null || contact === null
           ? null
           : hitFlameAnimationOf(hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit)), watchesBigHit)
+      // 0x13 진입 0x33e34 — [경기+0xf2c] 공(수평각 d 다른 공)의 점을 옮겨 타석 공 경로를 다시 채운다(`hitBallPath`). 꼬리선은
+      // 강한 타구(0x35988) · 결과 코드 24~26(0x357e0)일 때만(3b440)
+      const hitSide = latest.batterHand ?? batterSideOfForm(latest.batterForm)
+      const hitPath = pattern === null ? null : hitBallPathOf(hitBallTrajectoryOf(pattern, hitSide), hitSide)
+      const showsHitTrail =
+        pattern !== null &&
+        (isHomeRunHitResult(result.detail.resultCode) ||
+          // 0x35988 머리 359a0 — 스윙 객체 [+0xf9c]+8(번트 자세)이 서 있으면 거짓
+          (!isBuntStance && isStrongHit(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))))
       pendingHitRef.current = {
+        hitPath,
+        showsHitTrail,
         ticks: hitPauseTicksOf(pauseInput),
         detail: result.detail,
         pitch,
@@ -803,6 +828,8 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     <canvas
       ref={refs.canvasRef}
       className={styles.stage}
+      // 홈런더비 판(0x17) — 밑에 깔린 필드 화면이 비치도록 바탕을 뺀다(`isFieldPlay`)
+      style={props.isFieldPlay === true ? { background: 'transparent' } : undefined}
       width={STAGE_WIDTH}
       height={STAGE_HEIGHT}
       {...pointerHandlers}

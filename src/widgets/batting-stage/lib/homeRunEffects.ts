@@ -25,8 +25,9 @@ import { homeRunTextAfterDraws, type HomeRunTextWindow } from '@/widgets/batting
  * 0x901a0 을 부른다(entities/batting `homeRunFireworks`). 그래서 한 틱은
  * 1. (키 건너뛰기 0x519cc · 0x17 끝 0x35108 이 그 틱에 돌았으면) 효과 객체 칸을 버리고(0x8fc70) 파티클을 치운다(0x6dee4)
  * 2. 홈런 갈래(더비 0x527be · 일반 0x51d1e)가 그 틱 갱신에서 돌았으면 효과 객체를 종류 2 로 다시 깐다(0x90191(…, 2, 1) — 굴림 없음)
- * 3. 글자를 그리고, 그 그림이 유지 단계면 효과 틱(칸 0..6 — 파티클을 쏘고 굴린다)
- * 4. 파티클 틱
+ * 3. (홈런더비 판이면) 필드 공 그리기 0x36dfc 의 파티클(`drawShots`) — 그리기 목록 차례라 글자보다 앞
+ * 4. 글자를 그리고, 그 그림이 유지 단계면 효과 틱(칸 0..6 — 파티클을 쏘고 굴린다)
+ * 5. 파티클 틱
  *
  * 글자 창(`HomeRunTextWindow`)은 그 판의 갱신을 아는 쪽이 넘긴다: 첫 그림 = 홈런 틱, 다시 켜는 그림(`restartDraws`) = 같은 판의 둘째 홈런
  * 갈래(그 틱에 효과 객체도 다시 깐다), 끝 = 관문이 닫힌 틱 · 키 건너뛰기.
@@ -58,6 +59,19 @@ export interface StageFrameInput {
   readonly configOf: (id: number) => ParticleConfig | null
   /** 이 틱 프레임이 든 앱 틱 — 앱 전역 관리자는 앱 틀당 한 번만 굴린다(`claimSceneParticleTick`). 없으면 늘 굴린다 */
   readonly appTick?: number
+  /**
+   * 이 틱 그림이 HOMERUN 글자 앞에 쏘는 파티클 — 홈런더비 판(0x17)의 공 그리기 0x36dfc(큰 타구 · 튐, 46cce)는 0x46c88 의 그리기 목록
+   * 차례라 글자 0x40b18(46e5c) · 효과 틱보다 앞이고 치우기(키 0x519cc · 0x35108 — 갱신 쪽)보다 뒤다. 없으면 없음
+   */
+  readonly drawShots?: readonly StageParticleShot[]
+}
+
+/** 0xbbc85(x, y, id, img, 0, −1, 0, 0) 한 번 */
+export interface StageParticleShot {
+  readonly id: number
+  readonly img: number
+  readonly x: number
+  readonly y: number
 }
 
 /** 효과 객체가 파티클 장면에 닿는 자리 — 이미터 자리는 블록 번호다 (`emitParticles` · `blockStateOf`) */
@@ -81,6 +95,9 @@ export function stepStageFrame(effects: StageEffects, input: StageFrameInput): S
     fireworks = null
     clearParticles(input.particles)
   }
+
+  // 그리기 목록 차례의 파티클(0x36dfc) — 치우기 뒤 · 글자 앞
+  for (const shot of input.drawShots ?? []) emitParticles(input.particles, input.configOf(shot.id), shot.x, shot.y, shot.img)
 
   // 첫 그림 시각이 다른 창이면 새 홈런 — 효과 객체는 그 창의 첫 그림에서 다시 깐다.
   // 같은 홈런의 창을 끝만 바꿔 다시 넘긴 것(키 건너뛰기)은 센 그림을 잇는다

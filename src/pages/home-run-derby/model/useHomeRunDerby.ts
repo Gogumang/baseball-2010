@@ -32,7 +32,9 @@ import {
   shouldShowComboAtNextPitch,
 } from '@/entities/home-run-derby/model/derbyRun'
 import type { DerbyResult, DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
-import { eventZoneRewardXOf, isEventZoneHit } from '@/entities/home-run-derby/model/eventZone'
+import { eventZoneRewardXOf, isBigFlyPattern } from '@/entities/home-run-derby/model/eventZone'
+import { isBigHitWatch } from '@/entities/batting/model/bigHitWatch'
+import { derbyFieldTimelineOf, type DerbyFieldInput, type DerbyFieldTimeline } from '@/pages/home-run-derby/lib/derbyField'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { FOUL_CALL_SOUND } from '@/features/play-at-bat/model/atBatSounds'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
@@ -135,6 +137,32 @@ export interface DerbyDistanceBoard {
   readonly batted: DerbyBattedBall
   /** 이 판이 다시 쓰기 전의 +0x36 */
   readonly previous: number
+  /** 이 판의 필드 화면 재료 — 카메라 · 공 틱 · 이벤트 존 (`lib/derbyField`, A-01) */
+  readonly field: DerbyFieldPlay
+}
+
+/** 판 하나의 필드 화면 — 재료와 미리 셈한 그림들 */
+export interface DerbyFieldPlay {
+  readonly input: DerbyFieldInput
+  readonly timeline: DerbyFieldTimeline
+}
+
+/**
+ * 판 하나의 필드 화면을 셈한다 — 이벤트 존(0x36dfc 3726c~)도 여기서 정해진다. 난수를 안 쓴다.
+ * 감상 플래그 +0x199a(0x392ac)는 판 공 [+0x204] 의 폴 틱 · 거리 눈금을 본다
+ */
+export function derbyFieldPlayOf(batted: DerbyBattedBall, detail: Pick<PitchOutcomeDetail, 'resultCode' | 'pattern'>): DerbyFieldPlay {
+  const input: DerbyFieldInput = {
+    batted,
+    resultCode: detail.resultCode,
+    isBigFlyPattern: detail.pattern != null && isBigFlyPattern(detail.pattern),
+    watchesBigHit: isBigHitWatch({
+      resultCode: detail.resultCode,
+      poleTick: batted.trajectory.poleTick,
+      carryScale: batted.trajectory.carryScale ?? 0,
+    }),
+  }
+  return { input, timeline: derbyFieldTimelineOf(input) }
 }
 
 export interface HomeRunDerbyOptions {
@@ -384,6 +412,7 @@ export function useHomeRunDerby({
     readonly runBefore: DerbyRun
     readonly isEventZoneHit: boolean
     readonly textSceneBefore: HomeRunTextState
+    readonly field: DerbyFieldPlay
   } | null>(null)
 
   // 캔버스 루프에서 불리는 콜백이라 최신 값은 전부 ref 로 읽는다 (StrictMode 가 업데이터를 두 번 돌린다).
@@ -628,23 +657,26 @@ export function useHomeRunDerby({
     // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때 · 남김 — 웹 구조): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
     clearPlaySoundTimers()
     const startedAt = gameSceneTickStartTime(gameSceneTickNow())
-    if (batted !== null) {
+    // 판의 필드 화면(A-01) — 카메라 · 공 틱 · 이벤트 존을 미리 셈한다(`lib/derbyField`). 존은 그 그림의 공 그리기 0x36dfc 가 놓는다:
+    // 공을 그리는 그림 · 높이 투영 ≤ 54 · 땅점 화면 y < 화면 높이/3 · 결과 코드 24~26 · 패턴 플래그 & 2 (U-93)
+    const field = batted === null ? null : derbyFieldPlayOf(batted, detail)
+    const zoneHit = field?.timeline.zone != null
+    if (batted !== null && field !== null) {
       schedulePlaySounds(batted, startedAt, 0)
       playRef.current = {
         startedAt,
         batted,
         runBefore: current,
-        isEventZoneHit: isEventZoneHit({ pattern: detail.pattern ?? null }),
+        isEventZoneHit: zoneHit,
         textSceneBefore: homeRunTextSceneRef.current,
+        field,
       }
-      showPlay(batted)
+      showPlay(batted, field)
     } else {
       playRef.current = null
       setHomeRunText(null)
       setDistanceBoard(null)
     }
-    // 이벤트 존은 "공이 날아가는 중" 조건이라 배트에 맞은 공에서만 본다 (0x36dfc) — 패턴 플래그 & 2 (+0x127)
-    const zoneHit = isEventZoneHit({ pattern: detail.pattern ?? null })
     applyPlayResult(current, batted, zoneHit)
     setIsEventZoneShown(zoneHit)
     // 존을 놓은 공의 "200G" 애니 자리 — 0x41098 4111c 가 +0xfcc(판정 수평각)로 가른다
@@ -676,13 +708,13 @@ export function useHomeRunDerby({
   }
 
   /** HOMERUN 글자 창 · 비거리 판을 이 판으로 — 글자 칸은 판 앞에 남은 칸에서 셈한다 */
-  const showPlay = (batted: DerbyBattedBall) => {
+  const showPlay = (batted: DerbyBattedBall, field: DerbyFieldPlay) => {
     const play = playRef.current
     if (play === null) return
     const text = derbyHomeRunTextOf(batted, play.startedAt, play.textSceneBefore, millisecondsPerFrame())
     homeRunTextSceneRef.current = text.after
     setHomeRunText(text.window)
-    setDistanceBoard({ startedAt: play.startedAt, batted, previous: play.runBefore.lastDistance })
+    setDistanceBoard({ startedAt: play.startedAt, batted, previous: play.runBefore.lastDistance, field })
   }
 
   /**
@@ -793,7 +825,11 @@ export function useHomeRunDerby({
     const keyTick = keySceneTick - startTick
     const skipped = skipDerbyBattedBall(play.batted, keyTick)
     if (skipped === play.batted) return
-    playRef.current = { ...play, batted: skipped }
+    // 공 틱이 끝으로 넘어가고 관문이 일찍 닫힌다 — 필드 화면(공 · 카메라)과 그 뒤 그림의 이벤트 존 셈도 다시 한다
+    const input = { ...play.field.input, batted: skipped }
+    const field: DerbyFieldPlay = { input, timeline: derbyFieldTimelineOf(input) }
+    const zoneHit = field.timeline.zone !== null
+    playRef.current = { ...play, batted: skipped, field, isEventZoneHit: zoneHit }
     // 0x519cc 의 0x519fe — 울리던 소리를 끊는다(0x6e418). 키 틱의 홈런 소리는 그 뒤에 난다
     audioRef.current.stop()
     // 0x519cc — 키 틱 프레임 머리에서 효과 객체 칸을 버리고(0x8fc70) 파티클을 치운다(0x6dee4)
@@ -801,10 +837,19 @@ export function useHomeRunDerby({
     // 키 틱의 홈런 갈래(폴 뒤 담장선)는 그대로 돌고, 그 뒤 틱의 소리는 없다
     clearPlaySoundTimers()
     schedulePlaySounds(skipped, play.startedAt, keyTick)
-    showPlay(skipped)
-    // 두 번 더할 갈래가 키 뒤였으면 비거리가 달라진다 — 판 앞 진행에서 다시 셈한다(원본도 0xae3e8 은 판 끝에서 돈다)
-    if (skipped.distance !== play.batted.distance || skipped.displayDistance !== play.batted.displayDistance) {
-      applyPlayResult(play.runBefore, skipped, play.isEventZoneHit)
+    showPlay(skipped, field)
+    // 두 번 더할 갈래가 키 뒤였으면 비거리가 달라진다 — 판 앞 진행에서 다시 셈한다(원본도 0xae3e8 은 판 끝에서 돈다).
+    // 이벤트 존(경기+0x3f — 0xae3e8 의 +200G)이 키 뒤 그림에서 놓일 차례였으면 그것도 빠진다
+    if (
+      skipped.distance !== play.batted.distance ||
+      skipped.displayDistance !== play.batted.displayDistance ||
+      zoneHit !== play.isEventZoneHit
+    ) {
+      applyPlayResult(play.runBefore, skipped, zoneHit)
+    }
+    if (zoneHit !== play.isEventZoneHit) {
+      setIsEventZoneShown(zoneHit)
+      if (!zoneHit) setEventZoneRewardX(null)
     }
     armPlayEnd(Math.max(0, skipped.endTicks - elapsedTicks))
   }, [])

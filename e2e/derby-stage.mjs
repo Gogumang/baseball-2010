@@ -11,7 +11,7 @@
 // 누적이 800 을 넘어 단계가 오르면(0xae3e8 → 0xd → 0xe) 그 0xe 를 찍고(난입 마투수 · 소개 판), OK 로 넘겨 마투수 공도 친다.
 // 결과 창(0x1a)도 찍는다. 그림은 e2e/.run/derby-<브라우저>-<자리>.png.
 // 판정 · 비거리는 쪽 안 기록(`window.__batting`)과 더비 들여다보기(`peeks.homeRunDerby.run`)로 표에 낸다.
-import { launch, openScene, toPagePoint } from './lib/scene.mjs'
+import { launch, openScene, shot as shotScreen, toPagePoint } from './lib/scene.mjs'
 
 const browsers = process.argv.slice(2).length > 0 ? process.argv.slice(2) : ['chromium', 'webkit']
 const FIXTURE = process.env.E2E_DERBY_FIXTURE ?? undefined
@@ -22,6 +22,11 @@ const SWEEP = process.env.E2E_DERBY_SWEEP === '1'
 /** 판(0x17) 동안 키를 눌러 홈런 연출을 건너뛴다(0x519cc — 홈런 틱 뒤에만 먹는다). 씨앗 찾기를 빠르게 */
 const SKIP = process.env.E2E_DERBY_SKIP === '1'
 const SWEEP_SHIFTS = [-9, -6, -3, 0, 3, 6, 9]
+/**
+ * 맞은 공 몇 개까지 0x13(타구 공 · 그림자 — r274)과 판 0x17 필드 화면(A-01)을 찍나 — 그림: derby-<브라우저>-hit<n>-<자리>.png
+ * (`hit<n>-13` 0x13 넷째 그림쯤 · `hit<n>-field` 판 0.5초 · `hit<n>-field2` 판 1.5초). 이벤트 존이 선 판은 공마다 `pitch<n>-zone`
+ */
+const HIT_SHOTS = Number(process.env.E2E_DERBY_HIT_SHOTS ?? '3')
 const OUT = 'e2e/.run'
 
 const derbyPeek = (page) => page.evaluate(() => window.__sceneProbe?.()?.peeks?.homeRunDerby ?? null)
@@ -73,6 +78,13 @@ async function run(browserName, shiftOf) {
     await page.screenshot({ path })
     shots.push(path)
   }
+  /** 원본 화면 판만 — 0x13 · 필드 화면 확인용 */
+  const screenShot = async (name) => {
+    const path = `${OUT}/derby-${browserName}-${name}.png`
+    await shotScreen(page, path)
+    shots.push(path)
+  }
+  let hitShots = 0
   while (Date.now() - started < 10 * 60_000) {
     const peek = await derbyPeek(page)
     if (peek === null) throw new Error('더비 화면이 아니다')
@@ -117,12 +129,50 @@ async function run(browserName, shiftOf) {
     lead = Math.max(0, Math.min(80, lead + (downAt - moment.target) * 0.3))
     pitchIndex += 1
     // 공 하나의 셈(판 끝 · 0x12 대기 끝)까지 — `SKIP` 이면 판 동안 키로 건너뛴다
+    const capturing = hitShots < HIT_SHOTS
+    let shotHit = false
+    let fieldStartedAt = null
+    let shotField = 0
+    let shotZone = false
     for (const until = Date.now() + 30000; Date.now() < until; ) {
       const p = await derbyPeek(page)
       if (p === null || p.isResultShown || p.acceptsConfirm || p.run.remainingPitches !== before.remainingPitches) break
+      if (capturing) {
+        const phase = await page.evaluate(() => window.__batting?.().probe?.phase ?? null)
+        if (!shotHit && phase === '타격') {
+          // 0x13 — 타구 공이 날기 시작한 그림(큰 타구는 멈춤 7 그림 뒤)
+          await page.waitForTimeout(250)
+          await screenShot(`hit${hitShots + 1}-13`)
+          shotHit = true
+        }
+        if (p.isPlayRunning) {
+          fieldStartedAt ??= Date.now()
+          const elapsed = Date.now() - fieldStartedAt
+          if (shotField === 0 && elapsed > 500) {
+            await screenShot(`hit${hitShots + 1}-field`)
+            shotField = 1
+          } else if (shotField === 1 && elapsed > 1500) {
+            await screenShot(`hit${hitShots + 1}-field2`)
+            shotField = 2
+          }
+        }
+      }
+      // 이벤트 존이 선 그림(0x36dfc 3726c — 결과 24~26 · 플래그 & 2 큰 뜬공이 관중석 쪽에 낮게) — 판마다 처음 한 번
+      if (p.isPlayRunning && !shotZone) {
+        const zone = await page.evaluate(() => document.querySelector('[data-testid="더비-이벤트존"]')?.getAttribute('data-placed') ?? null)
+        if (zone === 'true') {
+          await page.waitForTimeout(120)
+          await screenShot(`pitch${pitchIndex}-zone`)
+          // 존 보상 "200G"(trainning 애니 3 — 첫 칸 15 는 비었다)가 돈 뒤
+          await page.waitForTimeout(600)
+          await screenShot(`pitch${pitchIndex}-zone2`)
+          shotZone = true
+        }
+      }
       if (SKIP && p.isPlayRunning) await page.keyboard.press('Enter')
-      await page.waitForTimeout(SKIP ? 150 : 50)
+      await page.waitForTimeout(SKIP ? 150 : capturing ? 20 : 30)
     }
+    if (shotHit || fieldStartedAt !== null) hitShots += 1
     const after = await derbyPeek(page)
     const log = await page.evaluate((from) => window.__batting().log.slice(from), logLength)
     const swing = log.find((entry) => entry.kind === '스윙') ?? null

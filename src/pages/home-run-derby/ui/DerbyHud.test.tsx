@@ -9,10 +9,7 @@ afterEach(cleanup)
 
 const 헛스윙 = { isHomeRun: false, distance: 0, isEventZoneHit: false }
 
-const 띄우기 = (run: DerbyRun, bestDistance = 0, extra: { isEventZoneShown?: boolean } = {}) =>
-  render(
-    <DerbyHud run={run} bestDistance={bestDistance} isEventZoneShown={extra.isEventZoneShown ?? false} tick={0} />,
-  )
+const 띄우기 = (run: DerbyRun, bestDistance = 0) => render(<DerbyHud run={run} bestDistance={bestDistance} tick={0} />)
 
 const 그림들 = (testId: string) => screen.queryAllByTestId(testId).map((node) => node.getAttribute('src'))
 
@@ -66,25 +63,10 @@ describe('홈런더비 HUD (0x45a54)', () => {
     expect(screen.queryByText(/마투수/)).toBeNull()
   })
 
-  it('이벤트 존을 얻으면 존 그림을 띄운다', () => {
-    띄우기(createDerbyRun(), 0, { isEventZoneShown: true })
-    expect(screen.getByAltText('이벤트 존')).toBeTruthy()
-  })
-
-  it('존 그림은 한 장을 틱 % 8 < 4 면 5/16 반투명, 4~7 은 그대로 그린다 (0x41098 효과 1 단계 5)', () => {
-    const hud = (tick: number) => <DerbyHud run={createDerbyRun()} bestDistance={0} isEventZoneShown tick={tick} />
-    const { rerender } = render(hud(2))
-    const zone = () => screen.getByAltText('이벤트 존') as HTMLImageElement
-    expect(zone().style.opacity).toBe(String(5 / 16))
-    rerender(hud(6))
-    expect(zone().style.opacity).toBe('')
-    expect(zone().getAttribute('src')).toBe('./sprites/event_zone/000.png')
-  })
-
   it('콤보 표시는 trainning.pzx "Combo" 가 미끄러져 온 뒤 셋째 갱신부터 숫자를 붙인다 (0x4585c — combo.pzx 는 안 그린다)', () => {
     const run = createDerbyRun()
     const hud = (tick: number) => (
-      <DerbyHud run={run} bestDistance={0} isEventZoneShown={false} tick={tick} shownCombo={2} batterSide={1} />
+      <DerbyHud run={run} bestDistance={0} tick={tick} shownCombo={2} batterSide={1} />
     )
     const { rerender } = render(hud(10))
     expect(screen.getByAltText('Combo').getAttribute('src')).toBe('./sprites/trainning/frames/003.png')
@@ -94,13 +76,12 @@ describe('홈런더비 HUD (0x45a54)', () => {
     expect(screen.getAllByTestId('콤보숫자').map((node) => node.getAttribute('src'))).toEqual(['./sprites/num/072.png'])
   })
 
-  it('더비 판(0x17) 동안은 판 · 공 번호 · 최고 · 현재 칸을 안 그리고 비거리 판만 얹는다 (0x46c88 은 0x4c4bc 를 안 부른다)', () => {
-    render(
-      <DerbyHud run={createDerbyRun()} bestDistance={0} isEventZoneShown={false} tick={0} distanceBoardValue={37} isPlayShown />,
-    )
+  it('더비 판(0x17) 동안은 판 · 공 번호 · 최고 · 현재 칸을 안 그린다 — 비거리 판 · 이벤트 존은 필드 화면 몫이다 (0x46c88 은 0x4c4bc 를 안 부른다)', () => {
+    render(<DerbyHud run={createDerbyRun()} bestDistance={0} tick={0} isPlayShown />)
     expect(screen.queryByAltText('홈런더비 판')).toBeNull()
     expect(그림들('공번호')).toEqual([])
     expect(그림들('현재비거리')).toEqual([])
-    expect(screen.getByAltText('비거리 판')).toBeTruthy()
+    expect(screen.queryByAltText('비거리 판')).toBeNull()
+    expect(screen.queryByAltText('이벤트 존')).toBeNull()
   })
 })

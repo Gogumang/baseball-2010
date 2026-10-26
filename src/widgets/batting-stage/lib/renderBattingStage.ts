@@ -1,7 +1,9 @@
 import { recordStageEntryPoints } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import type { Pitch } from '@/entities/pitching/model/pitch'
-import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
-import { ballDepthAt, ballFrameIndexAt, ballPixelAt, ballShadowAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
+import { BALL_FRAMES_PER_KIND, projectToScreen } from '@/entities/pitching/model/pitchCurve'
+import { ballDepthAt, ballFrameIndexAt, ballPixelAt, ballShadowAt, ballShadowOfPoint, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
+import { hitBallPointAt, hitBallSizeOf, type HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
+import { HIT_BALL_TRAIL, PITCH_BALL_TRAIL, ballTrailLinesOf, trailsAt, type BallTrailLine } from '@/widgets/batting-stage/lib/ballTrail'
 import { ballShadowPiecesAt } from '@/shared/lib/ballShadow/ballShadowPieces'
 import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite, warmRecoloredFrames } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { RecolorFrame, StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
@@ -305,6 +307,17 @@ export interface StageScene {
    */
   readonly bigHitScreen?: BigHitScreen | null
   /**
+   * 상태 0x13 의 **타구 공** — 0x33e34 가 [경기+0xf2c] 공으로 다시 채운 경로(`hitBallPath`)와 이 그림의 공 틱 [+0x1098],
+   * 꼬리선(0x3b188 — 강한 타구 0x35988 · 결과 코드 24~26 일 때만)을 긋는가. 0x13('타격') 그림에만 부르는 쪽이 채운다.
+   * 없거나 null 이면 0x13 공을 안 그린다
+   */
+  readonly hitBall?: { readonly path: HitBallPath; readonly ballTick: number; readonly showsTrail: boolean } | null
+  /**
+   * 홈런더비 판(0x17)의 **필드 화면이 타석 캔버스 밑에 깔린 동안** — 0x17 그리기 0x46c88 은 타석 그림(0x4c4bc)을 안 부른다.
+   * 캔버스는 비우고 HOMERUN 글자(0x40b18)와 파티클(프레임 끝 0x6dd69)만 그린다 — 필드는 `pages/home-run-derby` 의 필드 층이 그린다
+   */
+  readonly isFieldPlay?: boolean
+  /**
    * 곧 타석 · 마운드에 설 수 있는 선수들(타순 다음 · 벤치 대타 · 교체 투수)의 그림 생김새 — 그림마다 그 칠하기를 미리 건다
    * (`warmStageCast`). 원본은 타석 교대 0x47cc8 이 적재(타자 0x78ab0 · 투수 0x793b0) 때 팔레트를 갈아 끼우므로 새 타자 · 투수의
    * 첫 그림부터 제 색이다. 웹은 칠하기가 비동기라 교대 직후 첫 그림에 구운 벌이 비치던 것을 막는다. 그림 · 차례 · 난수는 안 바꾼다
@@ -360,6 +373,10 @@ export function renderBattingStage(
 ): void {
   // 결과 배경만 그리는 때(타석 사이)도 건다 — 다음 타자가 서기 전이 미리 칠할 때다
   warmStageCast(scene.warmCast)
+  if (scene.isFieldPlay === true) {
+    renderFieldPlayOverlay(context, scene)
+    return
+  }
   const side = scene.side ?? STAGE_SIDE
   const backdropOffsetY = scene.resultBackdropOffsetY ?? null
   /** 이 그림까지 든 창 첫 그림 수 — 장면이 사는 동안 도는 그리기 쪽 애니(하늘 조명 0x78490 · 램프 그리기 0x373d0 의 확대 갈래 0x37828~0x37858)에 더한다 */
@@ -451,7 +468,10 @@ export function renderBattingStage(
   }
   // 0x4d780 · 0x4d2ac 의 그리기 목록 몫(애니 0 · 이름 · 게이지) — 깊이 29705(타자와 같다), 타자(0x49e64) 다음 · 공(0x3b2f4) 앞에 넣는다
   drawList.add(DRAW_DEPTH.타자, () => drawPitchInputSprites(context, pitchInput, side))
-  if (scene.pitch !== null) addBallDraws(context, drawList, scene)
+  // 0x13 은 같은 공 그리기 0x3b2f4 가 0x33e34 로 다시 채운 타구 경로를 그린다 — 투구 경로 · 마구 이펙트 · 강속구 불꽃은 없다
+  if (scene.stagePhase?.kind === '타격') {
+    if (scene.hitBall != null) addHitBallDraws(context, drawList, scene.hitBall, side)
+  } else if (scene.pitch !== null) addBallDraws(context, drawList, scene)
   drawList.flush()
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
@@ -492,6 +512,16 @@ export function renderBattingStage(
   if (scene.particles !== null && scene.particles !== undefined) {
     drawParticles(context, scene.particles)
   }
+}
+
+/**
+ * 홈런더비 판(0x17)의 필드 화면 위 — 0x46c88 은 타석 그림 0x4c4bc 를 안 부르고(필드 · 야수 · 공은 밑의 필드 층), 이 캔버스에는
+ * HOMERUN 글자 0x40b18(46e5c)과 프레임 끝 파티클 0x6dd69 만 남는다. 캔버스는 비워 밑의 필드가 비친다
+ */
+function renderFieldPlayOverlay(context: CanvasRenderingContext2D, scene: StageScene): void {
+  context.clearRect(0, 0, context.canvas.width, context.canvas.height)
+  if (scene.homeRunFrame !== undefined && scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)
+  if (scene.particles !== null && scene.particles !== undefined) drawParticles(context, scene.particles)
 }
 
 /** 공격 팀 번호 — 초(측 0) · 말(측 1) 중 공격 측이 사람 측(`playerSide`, 기본 1)이면 우리 팀 */
@@ -1121,8 +1151,16 @@ function addBallDraws(context: CanvasRenderingContext2D, drawList: StageDrawList
   const isPitchState = scene.stagePhase === undefined || scene.stagePhase.kind === '투구중'
   const depth = ballDepthAt(pitch, ballTick ?? scene.frame) ?? DRAW_DEPTH.타자
   if (ballTick !== null) {
-    // 3b388~3b422 공 그림자 — 상태 0x11 에서만(0x12 는 3b406 에서 빠진다). 0x13 의 타구 공은 웹에 아직 없다(`ballShadowAt`)
+    // 3b388~3b422 공 그림자 — 상태 0x11 에서만(0x12 는 3b406 에서 빠진다). 0x13 의 타구 공은 `addHitBallDraws`
     if (isPitchState) drawBallShadow(context, pitch, ballTick)
+    // 3b434~3b46e 꼬리선 0x3b188(장면, 5, 0xdf, 0) — 공 틱 ≤ N 이면 0x11 · 0x12 늘. 그림자 다음 · 그리기 목록 밖(곧바로)이다
+    const path = pitch.worldPath
+    if (path !== null && path.length > 0 && trailsAt(ballTick, path.length)) {
+      drawBallTrail(
+        context,
+        ballTrailLinesOf(PITCH_BALL_TRAIL, ballTick, path.length, (index) => projectToScreen(path[index], pitch.stageSide)),
+      )
+    }
     // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트 · 깊이 z + 1)
     if (isFlying || scene.stagePhase?.kind === '투구중') {
       drawList.add(depth + MAGIC_EFFECT_DEPTH_STEP, () => drawMagicBallEffect(context, pitch, ballTick))
@@ -1132,6 +1170,53 @@ function addBallDraws(context: CanvasRenderingContext2D, drawList: StageDrawList
   // 강속구 불꽃 0x3b6e4 — 같은 공 그리기 0x3b2f4 의 꼬리라 공 다음에 같은 깊이로 넣는다. 공이 다 온 틱(N)부터라
   // 0x12 에서도 마지막 점의 공 위에 돈다 (`fastballFlame`)
   drawList.add(depth, () => drawFastballFlame(context, pitch, scene.frame, scene.stagePhase))
+}
+
+/**
+ * 0x13 의 타구 공 — 0x3b2f4 를 0x33e34 가 다시 채운 경로(`hitBallPath`)로 돈다 (r274 직접 떴다):
+ * ```
+ * 3b310  P = 0x35820(공 틱)                 ; 경로 점 [clamp(틱, 0, N − 1)]
+ * 3b35c  크기 = 0x358fc(P)                  ; 0x13 갈래 — trunc((P.z − 24500) · 10 / 5205) 를 [2, 9] 로 (`hitBallSizeOf`)
+ * 3b388  공 틱 ≠ 0 이면 그림자 — 0x13 은 화면 아래 끝을 안 본다(3b406 → 3b40a)
+ * 3b434  공 틱 ≤ N 이고 0x35988 · 0x357e0 이면 꼬리선 0x3b188(장면, 3, 0x8f, 0)
+ * 3b472  0x13 이고 P.y == 0 이면 0xbbc85(공 화면 점, 0, 8) — 땅 파티클(웹은 타석 갱신이 쏜다 — `useStageAnimation`)
+ * 3b6ac  공 그림 크기 + 11 × [+0x1080](0x13 진입 3d78e 가 0) 을 깊이 P.z 로 그리기 목록에 (0x11 만 보는 마구 이펙트 · 강속구 불꽃은 없다)
+ * ```
+ */
+function addHitBallDraws(
+  context: CanvasRenderingContext2D,
+  drawList: StageDrawList,
+  hitBall: NonNullable<StageScene['hitBall']>,
+  side: number,
+): void {
+  const { path, ballTick, showsTrail } = hitBall
+  const point = hitBallPointAt(path, ballTick)
+  if (point === null) return
+  const size = hitBallSizeOf(point)
+  const shadow = ballShadowOfPoint(point, size, side, true, ballTick)
+  if (shadow !== null) {
+    for (const piece of ballShadowPiecesAt(shadow.x, shadow.y, shadow.size)) {
+      context.fillStyle = `rgb(${piece.color.r}, ${piece.color.g}, ${piece.color.b})`
+      context.fillRect(piece.x, piece.y, piece.width, piece.height)
+    }
+  }
+  const count = path.points.length
+  if (showsTrail && trailsAt(ballTick, count)) {
+    drawBallTrail(context, ballTrailLinesOf(HIT_BALL_TRAIL, ballTick, count, (index) => projectToScreen(path.points[index], side)))
+  }
+  const position = projectToScreen(point, side)
+  drawList.add(point.z, () => drawBallSprite(context, position, size))
+}
+
+/** 꼬리선 마디 — 0x6a905 선(양 끝 포함), 회색 a 를 알파 a/255 로 */
+function drawBallTrail(context: CanvasRenderingContext2D, lines: readonly BallTrailLine[]): void {
+  if (lines.length === 0) return
+  context.save()
+  for (const line of lines) {
+    context.fillStyle = `rgba(${line.shade}, ${line.shade}, ${line.shade}, ${line.shade / 255})`
+    for (const pixel of linePixels(line.from, line.to)) context.fillRect(pixel.x, pixel.y, 1, 1)
+  }
+  context.restore()
 }
 
 /** 공 그림자 0x356f8 — 자리 · 크기는 `ballShadowAt`, 조각은 `ballShadowPiecesAt` */
@@ -1149,8 +1234,11 @@ const BALL_FRAMES = './sprites/ball/frames'
 
 /** 공 그림 (3b6ac 0xbe8d5) — 그림자는 `drawBallShadow`(3b388~3b422) */
 function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number): void {
-  const position = ballPixelAt(pitch, frame)
-  const ballFrame = ballFrameIndexAt(pitch, frame)
+  drawBallSprite(context, ballPixelAt(pitch, frame), ballFrameIndexAt(pitch, frame))
+}
+
+/** ball.pzx 프레임 한 장을 화면 자리에 (원점 = 공 가운데) */
+function drawBallSprite(context: CanvasRenderingContext2D, position: { readonly x: number; readonly y: number }, ballFrame: number): void {
   const placed = placedFrame(BALL_FRAMES, ballFrame)
 
   if (placed === null) {

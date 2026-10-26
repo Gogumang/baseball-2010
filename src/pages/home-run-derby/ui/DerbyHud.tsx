@@ -1,12 +1,9 @@
 import { useState } from 'react'
 import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/model/derbyRun'
 import type { DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
-import { EVENT_ZONE_REWARD, EVENT_ZONE_TRANSLUCENT_LEVEL, eventZoneRewardFrameAt, isEventZoneTranslucentAt } from '@/entities/home-run-derby/model/eventZone'
-import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { LayeredFrameSprite } from '@/shared/ui/LayeredFrameSprite/LayeredFrameSprite'
 import {
-  COMBO_DISPLAY, DISTANCE_BOARD, EVENT_ZONE_SPOT, HUD_PANEL,
-  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, distanceBoardGlyphsOf, totalDistanceGlyphsOf,
+  COMBO_DISPLAY, HUD_PANEL,
+  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf,
 } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import type { HudGlyph } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyHud.css'
@@ -15,9 +12,7 @@ interface DerbyHudProps {
   readonly run: DerbyRun
   /** 저장된 최고 비거리 (저장 +0x5c) */
   readonly bestDistance: number
-  /** 이번 공이 이벤트 존을 얻었나 */
-  readonly isEventZoneShown: boolean
-  /** 깜빡임용 갱신 횟수 */
+  /** 갱신 횟수 — 콤보 표시 애니가 센다 */
   readonly tick: number
   /**
    * 콤보 표시(장면 +0x1b60)가 켜져 있으면 그 값(+0x84), 아니면 null — `useHomeRunDerby` 의 `shownCombo`.
@@ -27,20 +22,10 @@ interface DerbyHudProps {
   /** 치는 타자의 손 (0xb63c0 — 0 우타 · 1 좌타). 콤보 표시를 왼쪽(좌타)·오른쪽(우타) 어디에 그릴지 가른다 */
   readonly batterSide?: number
   /**
-   * 더비 판(0x17)이 도는 동안 비거리 판 0x36cd4 가 보이는 표시 비거리 +0x36 — 판이 없으면 null.
-   * 부르는 쪽이 판의 공 틱에 맞춰 `derbyDisplayDistanceAt` 으로 넘긴다.
-   */
-  readonly distanceBoardValue?: number | null
-  /**
    * 더비 판(0x17)이 도는 중인가 — 0x17 그리기 0x46c88 은 타석 화면 그리기 0x4c4bc(HUD 0x45a54 · 콤보 0x4585c 를 부르는 곳)를
-   * 안 부르고 비거리 판 0x36cd4 만 얹는다. 그래서 판 동안은 판 · 공 번호 · 최고 · 현재 칸과 콤보를 안 그린다.
+   * 안 불러 판 · 공 번호 · 최고 · 현재 칸과 콤보가 없다. 그 동안의 비거리 판 0x36cd4 · 이벤트 존은 필드 화면 몫이다(`DerbyFieldPlay`)
    */
   readonly isPlayShown?: boolean
-  /**
-   * 이벤트 존 보상 "200G"(trainning 애니 3)의 x(0x32 · 0x8c) — 존이 서 있는 동안만, 아니면 null (`EVENT_ZONE_REWARD` · 0x41098).
-   * 값이 선 갱신부터 첫 칸으로 반복 재생한다(0x93d31 · 0x93cfd(애니, 1) 뒤 그릴 때마다 0x93d91)
-   */
-  readonly eventZoneRewardX?: number | null
 }
 
 const spriteSrcOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
@@ -68,14 +53,8 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; read
  * 공 번호 = `(보너스 중 ? 최대 콤보 : 10) − 남은 기회 + 1`, 최고 칸은 누적이 넘으면 노란 글자로 바뀐다.
  */
 export function DerbyHud({
-  run, bestDistance, isEventZoneShown, tick, shownCombo = null, batterSide = 0, distanceBoardValue = null, isPlayShown = false,
-  eventZoneRewardX = null,
+  run, bestDistance, tick, shownCombo = null, batterSide = 0, isPlayShown = false,
 }: DerbyHudProps) {
-  // 존을 놓은 갱신 — 0x36dfc 가 그 자리에서 애니 3 을 첫 칸으로 돌려 반복 재생을 건다(0x3730e · 0x37328)
-  const [rewardShownAt, setRewardShownAt] = useState<{ value: number | null; tick: number }>({ value: eventZoneRewardX, tick })
-  if (rewardShownAt.value !== eventZoneRewardX) setRewardShownAt({ value: eventZoneRewardX, tick })
-  const rewardFrame = eventZoneRewardX === null ? null : eventZoneRewardFrameAt(tick - rewardShownAt.tick)
-  const trainningOrigins = useFrameOrigins(EVENT_ZONE_REWARD.folder)
   // 콤보 표시를 켠 갱신 — 상태 0xf 가 +0x19ec = 0 · 두 애니를 첫 칸으로 돌린다(0x3db92~0x3dc14)
   const [comboShownAt, setComboShownAt] = useState<{ value: number | null; tick: number }>({ value: shownCombo, tick })
   if (comboShownAt.value !== shownCombo) setComboShownAt({ value: shownCombo, tick })
@@ -125,49 +104,10 @@ export function DerbyHud({
         </>
       )}
 
-      {/* 비거리 판 (0x36cd4) — 더비 판(0x17) 동안 화면 위 가운데 "___M", 숫자는 표시 비거리 +0x36 */}
-      {distanceBoardValue !== null && (
-        <>
-          <img
-            className={styles.sprite}
-            style={{ left: DISTANCE_BOARD.x, top: DISTANCE_BOARD.y }}
-            src={spriteSrcOf(DISTANCE_BOARD.folder, DISTANCE_BOARD.frame)}
-            alt="비거리 판"
-          />
-          <Glyphs glyphs={distanceBoardGlyphsOf(distanceBoardValue)} testId="비거리판" />
-        </>
-      )}
-
-      {/* 이벤트 존 (0x41098) — 같은 그림을 상태 틱 % 8 < 4 면 효과 1 · 단계 5(그림 5/16 + 화면 11/16), 아니면 효과 0 으로 그린다 */}
-      {isEventZoneShown && (
-        <img
-          className={styles.sprite}
-          style={{
-            left: EVENT_ZONE_SPOT.x,
-            top: EVENT_ZONE_SPOT.y,
-            ...(isEventZoneTranslucentAt(tick) ? { opacity: EVENT_ZONE_TRANSLUCENT_LEVEL / 16 } : {}),
-          }}
-          src={EVENT_ZONE_SPOT.src}
-          alt="이벤트 존"
-        />
-      )}
-
       {/*
-        존 보상 "200G" — 0x41098 이 event_zone 다음에 trainning 애니 3 을 효과 0 으로 그린다(4115c 0x93c45). 21~23 의 0x67 겹은
-        화면에 더한다(layers.json — 캔버스 `drawFrameLayers` 와 같은 목록을 DOM 에서 plus-lighter 로).
-        ⚠️ 근사(자리 · 남김 — 웹 구조): 원본은 판(0x17)의 틀 그리기 0x41230 → 0x411e0(52f36 — 그리기 표 0x46c88 앞, 감사 2026-10-24 정정) 안, 구장 바로 위 · 공과 선수 아래다. 웹 더비는
-        판의 필드 화면이 없어 타석 캔버스 위 HUD 에 이벤트 존과 같이 얹는다(남김 — 필드 화면은 타구 비행 그리기가 있어야 서는데
-        그 투영 수식은 이 작업 범위 밖이다)
+        더비 판(0x17)의 비거리 판 0x36cd4 · 이벤트 존 · 200G(0x41098)는 필드 화면이 그린다(`DerbyFieldPlay` — A-01, r274). 0x46c88 은
+        이 HUD(0x45a54 — 타석 그림 0x4c4bc 안)를 안 부른다
       */}
-      {eventZoneRewardX !== null && rewardFrame !== null && (
-        <LayeredFrameSprite
-          folder={EVENT_ZONE_REWARD.folder}
-          frame={rewardFrame}
-          origins={trainningOrigins}
-          x={eventZoneRewardX}
-          y={EVENT_ZONE_REWARD.y}
-        />
-      )}
     </div>
   )
 }

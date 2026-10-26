@@ -1,6 +1,6 @@
 import { magicBallKindAtPath } from '@/entities/pitcher-career/model/magicPitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
-import { BALL_FRAMES_PER_KIND, ballFrameOf, projectToScreen } from '@/entities/pitching/model/pitchCurve'
+import { BALL_FRAMES_PER_KIND, ballFrameOf, projectToScreen, type WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { bezierPointAt } from '@/shared/lib/bezier/bezier'
 import { STAGE_HEIGHT, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -108,7 +108,7 @@ export function ballFrameIndexAt(pitch: Pitch, frame: number): number {
  * 깊이 0 이면 (0, 0), 아니면 (dx·(F + 10) / |깊이|, 가로질·F / |깊이|), F = [+0x14] (`pitchCurve.projectToPlate` 와 같다).
  * 0xb94b5 → 0xb9480 은 (x · [+0x10] / [+8], y · [+0x14] / [+0xc]) 비율 바꾸기다 — 웹 공 그리기(`projectToScreen`)가 이미 1:1 로 쓰는 것과 같다.
  * 그래서 그림자 = (공 화면 x, 땅점 화면 y + 2) 이다. 웹은 카메라 흔들림(+0xff4 · +0xff8)을 안 얹는다(`bigHitScreen` 머리말 — 공과 같다).
- * `isBigHitState` 는 상태 0x13 — 웹은 0x13 의 타구 공(0x33e34 가 공 물리 +0xf2c 에서 경로를 다시 채운다)을 아직 안 그린다.
+ * `isBigHitState` 는 상태 0x13 — 0x13 의 타구 공(0x33e34 가 공 물리 +0xf2c 에서 경로를 다시 채운다, `hitBallPath`)은 `ballShadowOfPoint` 로 같은 셈을 탄다(r274).
  * 곡선이 없는 대체 공(시험 · 와인드업 자리)은 월드 점이 없어 그림자도 없다.
  */
 export interface BallShadowPlacement {
@@ -126,10 +126,25 @@ const BALL_SHADOW_Y_OFFSET = 2
 export function ballShadowAt(pitch: Pitch, frame: number, isBigHitState = false): BallShadowPlacement | null {
   const path = pitch.worldPath
   if (frame === 0 || path === null || path.length === 0) return null
-  const point = path[clampFrame(frame, path.length)]
-  const ball = projectToScreen(point, pitch.stageSide)
-  const ground = projectToScreen({ x: point.x, y: 0, z: point.z }, pitch.stageSide)
-  const size = Math.max(ballFrameOf(path, clampFrame(frame, path.length), 0) - BALL_SHADOW_SIZE_DROP, BALL_SHADOW_SMALLEST)
+  const index = clampFrame(frame, path.length)
+  return ballShadowOfPoint(path[index], ballFrameOf(path, index, 0), pitch.stageSide, isBigHitState, frame)
+}
+
+/**
+ * 경로 점 하나의 그림자 (3b33a~3b422) — `ballSize` 는 0x358fc 의 공 크기 칸(2~9, 종류 빼고), `ballTick` 은 자르기 전 공 틱 [+0x1098].
+ * 0x13 의 타구 공(`hitBallPath`)도 이 셈이다 — 크기만 0x358fc 의 0x13 갈래(`hitBallSizeOf`)고 화면 아래 끝을 안 본다.
+ */
+export function ballShadowOfPoint(
+  point: WorldPoint,
+  ballSize: number,
+  side: number,
+  isBigHitState: boolean,
+  ballTick: number,
+): BallShadowPlacement | null {
+  if (ballTick === 0) return null
+  const ball = projectToScreen(point, side)
+  const ground = projectToScreen({ x: point.x, y: 0, z: point.z }, side)
+  const size = Math.max(ballSize - BALL_SHADOW_SIZE_DROP, BALL_SHADOW_SMALLEST)
   if (!isBigHitState && ground.y + size >= BALL_SHADOW_SCREEN_HEIGHT) return null
   return { x: ball.x, y: ground.y + BALL_SHADOW_Y_OFFSET, size }
 }
