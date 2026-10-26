@@ -1,7 +1,8 @@
 import { recordStageEntryPoints } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND } from '@/entities/pitching/model/pitchCurve'
-import { ballFrameIndexAt, ballPixelAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
+import { ballDepthAt, ballFrameIndexAt, ballPixelAt, ballShadowAt, eagleEyePixelOf } from '@/widgets/batting-stage/lib/trajectory'
+import { ballShadowPiecesAt } from '@/shared/lib/ballShadow/ballShadowPieces'
 import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite, warmRecoloredFrames } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { RecolorFrame, StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
@@ -384,14 +385,20 @@ export function renderBattingStage(
   // 0x4d780 이 바로 그리는 판 · 덮개 — 그리기 목록(선수)보다 먼저
   drawPitchInputUnderlay(context, pitchInput, side)
   const aceEffect = acePitcherEffectInputOf(scene)
+  // 그리기 목록 0xbe810 · 0xbe6a1 — 넣은 그림을 깊이 오름차순(같은 깊이는 넣은 차례, be864 `bge`)으로 한꺼번에 그린다.
+  // 아래 그림들은 원본이 넣는 차례 그대로 넣고, 공(깊이 = 경로 점의 월드 z, `ballDepthAt`)만 깊이에 따라 앞뒤가 갈린다(Q-02, r271)
+  const drawList = new StageDrawList()
   // 마투수 effect_pitcher(+0x1044) — 0x38d1c 꼬리 39258 이 깊이 24499 로 넣는다. 같은 깊이의 루상 주자(0x35b94)보다 먼저 넣어 그 밑이다
-  drawEffectPitcher(context, aceEffect, side)
+  drawList.add(DRAW_DEPTH.주자, () => drawEffectPitcher(context, aceEffect, side))
   // 루상 주자 0x35b94 — 그리기 목록에 깊이 24499([0xcfa8c+8] − 1, 35bfe~35c08)로 들어가 투수보다 먼저(뒤에) 그려진다 (확정 r205:
   // 넣기 0xbe810 은 깊이 오름차순(be864 `cmp 새, 칸 / bge`) · 비우기 0xbe6a0 은 칸 0 부터 그린다 · 투수 그림 0x79525 깊이 [0xd3cf8+8] = 24500
   // — 곧 주자는 투수 밑이다, U-122)
   if (scene.hud !== null && showsBaseRunners(scene.stagePhase)) {
+    const hud = scene.hud
     // 주자 시계를 안 넘기는 옛 길(`tick`)도 창 첫 그림(0x35b94 35c62 한 칸)을 센다 — 시계를 넘기면 부르는 쪽이 이미 셌다
-    drawBaseRunners(context, scene.hud, side, scene.tick + redrawsSoFar, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces)
+    drawList.add(DRAW_DEPTH.주자, () =>
+      drawBaseRunners(context, hud, side, scene.tick + redrawsSoFar, isRunPipState(scene.stagePhase), scene.runnerAnimationSteps, scene.runnerAces),
+    )
   }
   const pitcherAnimation = pitcherAnimationAt(
     {
@@ -403,58 +410,51 @@ export function renderBattingStage(
     scene.acePitcher?.order ?? null,
   )
   // 0x38dc6 바람 줄(애니 11) — 투수와 같은 깊이 24500 이지만 먼저 넣어 투수 밑에 그려진다
-  drawPitchWind(context, scene, side, pitcherAnimation)
+  drawList.add(DRAW_DEPTH.투수, () => drawPitchWind(context, scene, side, pitcherAnimation))
   // 0x38d1c(38dc2) · 0x49e64(49f76)가 0x38b64 에 넘기는 그림 자리 — 교체 등판 파티클이 쓴다(`substitutionEntryParticle`)
   recordStageEntryPoints(side, scene.pitcherHand ?? 0, scene.shift)
-  drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0, pitcherOutfitOf(scene))
+  drawList.add(DRAW_DEPTH.투수, () =>
+    drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0, pitcherOutfitOf(scene)),
+  )
   // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) · 홈런 갈래(0x3908a) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
-  drawPitcherMistakeMark(context, scene, side)
-  drawPitcherFatigue(context, scene, side, pitcherAnimation)
-  drawPitcherHomeRunMarks(context, scene, side, pitcherAnimation)
+  drawList.add(DRAW_DEPTH.투수, () => {
+    drawPitcherMistakeMark(context, scene, side)
+    drawPitcherFatigue(context, scene, side, pitcherAnimation)
+    drawPitcherHomeRunMarks(context, scene, side, pitcherAnimation)
+  })
   // 0x46fa8(장면, 0) 붕붕머신 · 발렌타인 — 깊이 24501 이라 투수 덧그림(24500)들 다음 · 타자(29705) 앞이다
-  drawAceMagicAnimation(context, aceEffect, side)
+  drawList.add(DRAW_DEPTH.마투수마법, () => drawAceMagicAnimation(context, aceEffect, side))
   const tickSpecial = scene.specialSwingEffect ?? null
   // 49d50 애니 0 은 그림마다 한 칸 — 부르는 쪽은 장면 틱으로 센 수를 넘기고 창 첫 그림은 여기서 더한다(`stageRedraws`)
   const special =
     tickSpecial === null ? null : { ...tickSpecial, drawCall: drawCallWithRedraws(tickSpecial.drawCall, scene.tick, scene.redrawTicks) }
   // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
-  if (special !== null && special.isBehindBatter) drawSpecialSwingPicture(context, special)
-  drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder)
+  if (special !== null && special.isBehindBatter) drawList.add(DRAW_DEPTH.타자 - 1, () => drawSpecialSwingPicture(context, special))
+  drawList.add(DRAW_DEPTH.타자, () =>
+    drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder),
+  )
   // 미라지(49c9c~49d40) — 같은 타자 그림을 반대쪽 타석 앵커(0xcfb34 / 0xcfb2c)에 반대 손 자세로, 좌우 이동(+0xfe4) 없이 한 장 더
   if (special !== null && special.showsMirage) {
-    drawBatter(context, scene.swingFrame, 0, scene.bodyType, side === BATTER_SIDE.우타 ? BATTER_SIDE.좌타 : BATTER_SIDE.우타, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment)
+    drawList.add(DRAW_DEPTH.타자, () =>
+      drawBatter(context, scene.swingFrame, 0, scene.bodyType, side === BATTER_SIDE.우타 ? BATTER_SIDE.좌타 : BATTER_SIDE.우타, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment),
+    )
   }
-  if (special !== null && !special.isBehindBatter) drawSpecialSwingPicture(context, special)
+  if (special !== null && !special.isBehindBatter) drawList.add(DRAW_DEPTH.타자, () => drawSpecialSwingPicture(context, special))
   // 0x49e64 꼬리 — 보통 타격 불꽃(깊이 타자 + 10) · 사구 표시(타자 깊이, 타자 뒤에 넣는다). 둘 다 그림마다 한 칸(4a0a0 · 4a12a 0x93d91)
   // — 창 첫 그림도 센다(`stageRedraws`)
-  drawHitFlame(context, scene)
-  drawHitByPitchMark(context, scene, side)
+  drawList.add(DRAW_DEPTH.타자 + HIT_FLAME_DEPTH_STEP, () => drawHitFlame(context, scene))
+  drawList.add(DRAW_DEPTH.타자, () => drawHitByPitchMark(context, scene, side))
+  // 0x4d2ac 4d3ee — 이글아이 프레임 0x23 은 깊이 [0xcfa8c + 0x14] = 29705
   if (scene.pitch !== null && scene.isEagleEyeEnabled) {
-    drawEagleEyeMarker(context, eagleEyePixelOf(scene.pitch))
+    const marker = eagleEyePixelOf(scene.pitch)
+    drawList.add(DRAW_DEPTH.타자, () => drawEagleEyeMarker(context, marker))
   }
-  if (scene.pitch !== null && scene.frame >= 0 && scene.frame < scene.pitch.frameCount) {
-    drawBall(context, scene.pitch, scene.frame)
-    // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트)
-    drawMagicBallEffect(context, scene.pitch, scene.frame)
-  } else if (scene.pitch !== null) {
-    // 0x12 그리기 0x4ce9c 도 0x3b2f4 를 불러 공을 마지막 점에 그대로 둔다 — 0x11 이 아니라 마구 이펙트는 없다 (`heldBall`).
-    // 0x11 의 공 틱 N · N + 1(0x12 를 예약한 틀) 도 공은 같다: 0x11 그리기 0x4d64c 는 4d72c 에서 보임 칸(0x9e039 — 0x11 진입이 세우고
-    // 0xf · 0xd 진입 · 0x18 진입만 지운다)이 서 있으면 4d73a 에서 0x3b2f4 를 부르고, 0x3b2f4 는 3b310 의 0x35820 으로 공 틱을 N − 1 에
-    // 자른다(35828~3582e). 그 두 틀은 아직 0x11 이라 마구 이펙트도 돈다(2026-10-24 직접 떴다): 3b496 상태 == 0x11 이면 3b546 갈래가
-    // 자르지 않은 공 틱 [sp+0x38] > 7 · 애니가 마지막 칸 전이면 그리고, 자리는 잘린 점 [sp+0x4c](0x35854)다 — 공과 같은 자리 · 같은 셈
-    const heldTick =
-      heldBallTickOf(scene.stagePhase, scene.pitch.frameCount) ??
-      (scene.stagePhase?.kind === '투구중' && scene.frame >= scene.pitch.frameCount ? scene.frame : null)
-    if (heldTick !== null) drawBall(context, scene.pitch, heldTick)
-    if (heldTick !== null && scene.stagePhase?.kind === '투구중') drawMagicBallEffect(context, scene.pitch, heldTick)
-  }
-  // 강속구 불꽃 0x3b6e4 — 같은 공 그리기 0x3b2f4 의 꼬리라 공 · 마구 이펙트 다음이다. 공이 다 온 틱(N)부터라
-  // 0x12 에서도 마지막 점의 공 위에 돈다 (`fastballFlame`)
-  if (scene.pitch !== null) drawFastballFlame(context, scene.pitch, scene.frame, scene.stagePhase)
+  // 0x4d780 · 0x4d2ac 의 그리기 목록 몫(애니 0 · 이름 · 게이지) — 깊이 29705(타자와 같다), 타자(0x49e64) 다음 · 공(0x3b2f4) 앞에 넣는다
+  drawList.add(DRAW_DEPTH.타자, () => drawPitchInputSprites(context, pitchInput, side))
+  if (scene.pitch !== null) addBallDraws(context, drawList, scene)
+  drawList.flush()
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
-  // 0x4d780 · 0x4d2ac 의 그리기 목록 몫(애니 0 · 이름 · 게이지) — 깊이 29705(타자와 같다) · ⚠️ 공과의 앞뒤는 근사(`pitchInputOverlay` 머리말)
-  drawPitchInputSprites(context, pitchInput, side)
   // 0x46fa8(장면, 1) 싸이커 · 드래고나 — 목록 비우기(0x4d744) 뒤 · HUD(0x4c4bc) 앞에 화면에 바로 섞어 그린다
   drawAceMagicScaled(context, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
   if (scene.hud !== null) {
@@ -1071,18 +1071,83 @@ function drawAceMagicScaled(context: CanvasRenderingContext2D, input: AcePitcher
   drawImageScaledBlend(context, image, origin.x, origin.y, draw.scale * 10, ACE_EFFECT_BLEND_WEIGHT)
 }
 
+/**
+ * 그리기 목록 깊이 — 원본이 0xbe8a5 · 0xbe8d5 로 넣는 깊이 (근거는 각 그림의 주석). 주자 24499 = [0xcfa8c+8] − 1 · 투수 24500 = [0xd3cf8+8] ·
+ * 마투수 마법 24501 · 타자 29705 = 0xd3a70[5] = [0xcfa8c+0x14]
+ */
+const DRAW_DEPTH = { 주자: 24499, 투수: 24500, 마투수마법: 24501, 타자: 29705 } as const
+/** 보통 타격 불꽃은 타자 깊이 + 10 (0x49e64 꼬리) */
+const HIT_FLAME_DEPTH_STEP = 10
+/** 마구 이펙트는 공 깊이 + 1 (3b59c `adds r3, #1`) */
+const MAGIC_EFFECT_DEPTH_STEP = 1
+
+/**
+ * 그리기 목록 0xbe810(넣기) · 0xbe6a0(비우기) — 깊이 오름차순, 같은 깊이는 넣은 차례(be864 `cmp 새, 칸 / bge` 로 같은 깊이 뒤에 넣는다).
+ * 비우기는 칸 0 부터 그린다. 넣을 때 그리지 않고 비울 때 차례대로 그린다.
+ */
+export class StageDrawList {
+  private readonly entries: { readonly depth: number; readonly order: number; readonly draw: () => void }[] = []
+
+  add(depth: number, draw: () => void): void {
+    this.entries.push({ depth, order: this.entries.length, draw })
+  }
+
+  flush(): void {
+    const sorted = [...this.entries].sort((left, right) => left.depth - right.depth || left.order - right.order)
+    this.entries.length = 0
+    for (const entry of sorted) entry.draw()
+  }
+}
+
+/**
+ * 타석 공 그리기 0x3b2f4 의 몫 — 그림자는 곧바로 화면에(목록 밖이라 선수 · 공 아래), 공 · 마구 이펙트 · 강속구 불꽃은 목록에 넣는다.
+ * 넣는 차례는 마구 이펙트(3b59e, 깊이 z + 1) → 공(3b6de, z) → 강속구 불꽃(3b7cc, z) 이라 비울 때 공 · 불꽃 · 이펙트 차례다.
+ * z 는 공 틱의 경로 점 월드 z(`ballDepthAt`) — 공이 타자 깊이 29705 에 못 미치면 타자 · 투구 UI 밑, 닿으면 그 위다.
+ */
+function addBallDraws(context: CanvasRenderingContext2D, drawList: StageDrawList, scene: StageScene): void {
+  const pitch = scene.pitch
+  if (pitch === null) return
+  const isFlying = scene.frame >= 0 && scene.frame < pitch.frameCount
+  // 0x12 그리기 0x4ce9c 도 0x3b2f4 를 불러 공을 마지막 점에 그대로 둔다 — 0x11 이 아니라 마구 이펙트는 없다 (`heldBall`).
+  // 0x11 의 공 틱 N · N + 1(0x12 를 예약한 틀) 도 공은 같다: 0x11 그리기 0x4d64c 는 4d72c 에서 보임 칸(0x9e039 — 0x11 진입이 세우고
+  // 0xf · 0xd 진입 · 0x18 진입만 지운다)이 서 있으면 4d73a 에서 0x3b2f4 를 부르고, 0x3b2f4 는 3b310 의 0x35820 으로 공 틱을 N − 1 에
+  // 자른다(35828~3582e). 그 두 틀은 아직 0x11 이라 마구 이펙트도 돈다(2026-10-24 직접 떴다): 3b496 상태 == 0x11 이면 3b546 갈래가
+  // 자르지 않은 공 틱 [sp+0x38] > 7 · 애니가 마지막 칸 전이면 그리고, 자리는 잘린 점 [sp+0x4c](0x35854)다 — 공과 같은 자리 · 같은 셈
+  const heldTick = isFlying
+    ? null
+    : (heldBallTickOf(scene.stagePhase, pitch.frameCount) ??
+      (scene.stagePhase?.kind === '투구중' && scene.frame >= pitch.frameCount ? scene.frame : null))
+  const ballTick = isFlying ? scene.frame : heldTick
+  const isPitchState = scene.stagePhase === undefined || scene.stagePhase.kind === '투구중'
+  const depth = ballDepthAt(pitch, ballTick ?? scene.frame) ?? DRAW_DEPTH.타자
+  if (ballTick !== null) {
+    // 3b388~3b422 공 그림자 — 상태 0x11 에서만(0x12 는 3b406 에서 빠진다). 0x13 의 타구 공은 웹에 아직 없다(`ballShadowAt`)
+    if (isPitchState) drawBallShadow(context, pitch, ballTick)
+    // 마구 이펙트는 원본에서도 공 **다음**에 그려 공 위에 얹힌다 (0x3b422 공 → 0x3b546 이펙트 · 깊이 z + 1)
+    if (isFlying || scene.stagePhase?.kind === '투구중') {
+      drawList.add(depth + MAGIC_EFFECT_DEPTH_STEP, () => drawMagicBallEffect(context, pitch, ballTick))
+    }
+    drawList.add(depth, () => drawBall(context, pitch, ballTick))
+  }
+  // 강속구 불꽃 0x3b6e4 — 같은 공 그리기 0x3b2f4 의 꼬리라 공 다음에 같은 깊이로 넣는다. 공이 다 온 틱(N)부터라
+  // 0x12 에서도 마지막 점의 공 위에 돈다 (`fastballFlame`)
+  drawList.add(depth, () => drawFastballFlame(context, pitch, scene.frame, scene.stagePhase))
+}
+
+/** 공 그림자 0x356f8 — 자리 · 크기는 `ballShadowAt`, 조각은 `ballShadowPiecesAt` */
+function drawBallShadow(context: CanvasRenderingContext2D, pitch: Pitch, ballTick: number): void {
+  const placement = ballShadowAt(pitch, ballTick)
+  if (placement === null) return
+  for (const piece of ballShadowPiecesAt(placement.x, placement.y, placement.size)) {
+    context.fillStyle = `rgb(${piece.color.r}, ${piece.color.g}, ${piece.color.b})`
+    context.fillRect(piece.x, piece.y, piece.width, piece.height)
+  }
+}
+
 /** ball.pzx 합성 프레임 — 원점이 공 가운데라 투영 좌표에 원점대로 놓는다 */
 const BALL_FRAMES = './sprites/ball/frames'
 
-/*
- * ⚠️ 미이식 — **공 그림자** (r256 에서 떴다, 웹에 없다). 타석 공 그리기 0x3b2f4 가 공 그림(3b6ac) 앞에서 그린다:
- *   3b388  공 틱 [+0x1098] ≠ 0 이고 공 그림 칸이 있을 때만
- *   3b33a · 3b350  공 점(0x35820)을 높이 0 으로 내린 점을 변환 → 3b3ca 0xb94b5 투영(표 0xcfb18[+0x17e1]) — 투영 수식이라 해석하지 않았다
- *   3b3ce  크기 s = max(공 크기 칸 0x358fc − 4, 2)          ; 공 크기 2~9 → 그림자 2~5
- *   3b3d8  상태 0x11 이면 아래 끝(0x14008c8)을 넘지 않을 때만, 0x13 이면 늘 — 자리 (카메라 +0xff4 + x, +0xff8 + y + 2)
- *   0x356f8  (x − s/2, y − s/2) 에 s + 1 덩이(0x14006e8) · s > 2 면 rgb(100,100,100)(0x1400748) 선 넷(0x14006c8) — 그리기 스텁 뜻은 유력
- * 공이 타자에 다가올수록 그림자가 공 밑으로 붙는 타이밍 단서다. 자리 셈이 공 궤적 투영이라(지침) 옮기지 않았다.
- */
+/** 공 그림 (3b6ac 0xbe8d5) — 그림자는 `drawBallShadow`(3b388~3b422) */
 function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number): void {
   const position = ballPixelAt(pitch, frame)
   const ballFrame = ballFrameIndexAt(pitch, frame)

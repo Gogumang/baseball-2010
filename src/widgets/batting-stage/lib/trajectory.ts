@@ -2,7 +2,7 @@ import { magicBallKindAtPath } from '@/entities/pitcher-career/model/magicPitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { BALL_FRAMES_PER_KIND, ballFrameOf, projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { bezierPointAt } from '@/shared/lib/bezier/bezier'
-import { toPixel } from '@/widgets/batting-stage/lib/stageLayout'
+import { STAGE_HEIGHT, toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 
 /**
  * 공 궤적 — 원본은 3D 곡선 N 점(0x4dc78)을 한 틱에 한 점씩 옮기고 투영한다(0xbe3d8, 0x35854).
@@ -88,4 +88,59 @@ export function ballFrameIndexAt(pitch: Pitch, frame: number): number {
   if (path !== null && path.length > 0) return ballFrameOf(path, clampFrame(frame, path.length), ballKind)
   const ratio = Math.max(0, Math.min(1, frame / Math.max(1, pitch.frameCount - 1)))
   return SMALLEST_BALL + Math.round(ratio * (LARGEST_BALL - SMALLEST_BALL)) + BALL_FRAMES_PER_KIND * ballKind
+}
+
+/**
+ * **타석 공 그림자** — 타석 공 그리기 0x3b2f4 가 공 그림(3b6de) 앞에서 0x356f8 로 그린다 (r271 직접 떴다 — 투영 해석 허가 10-26).
+ * ```
+ * 3b310  P = 0x35820(장면, 공 틱 [+0x1098])          ; 경로 [+0x1140 + 12 · clamp(틱, 0, N − 1)] — 월드 (x, y, z)
+ * 3b33a  (bx, by) = [+0x218] vt+8(P)                 ; 투영 0xbe3d8 — 공 그리기 0x35854 가 쓰는 것과 같은 함수 · 같은 값
+ * 3b350  (gx, gy) = 0xbe385([+0x218], P.x, 0, P.z)   ; 0xbe384 는 (x, y, z) 점을 세워 같은 vt+8 을 부르는 얇은 감쌈 — 높이 0 으로 내린 점
+ * 3b35a  gx = bx                                     ; ★ 가로는 공 점의 투영 그대로, 세로만 땅점의 투영
+ * 3b35c  크기 = 0x358fc(장면, P) — 공 그림 크기 칸(2~9, 종류 빼고)
+ * 3b388  공 틱 [+0x1098] == 0 이거나 공 그림 칸이 없으면 그림자 없음
+ * 3b39c  (sx, sy) = 0xb94b5([+0x1f4], 원점[+0x17e1].x + gx, 원점.y − gy)   ; 원점 표 0xcfb18 — 공 그리기 0x35854 와 같은 셈
+ * 3b3ce  s = max(크기 − 4, 2)
+ * 3b3d8  상태 0x11: 카메라 y(+0xff8) + sy + s ≥ 화면 높이(0x14008c8) 면 그리지 않음 · 0x13: 늘 · 그 밖(0x12 등): 그리지 않음
+ * 3b416  0x356f8(카메라 x(+0xff4) + sx, 카메라 y + sy + 2, s)
+ * ```
+ * 투영 vt+8 = 0xbe3d8: d = P − 카메라(+4 · +8 · +0xc), 가로질 = (dy·cos − dz·sin)/100 · 깊이 = (dy·sin + dz·cos)/100,
+ * 깊이 0 이면 (0, 0), 아니면 (dx·(F + 10) / |깊이|, 가로질·F / |깊이|), F = [+0x14] (`pitchCurve.projectToPlate` 와 같다).
+ * 0xb94b5 → 0xb9480 은 (x · [+0x10] / [+8], y · [+0x14] / [+0xc]) 비율 바꾸기다 — 웹 공 그리기(`projectToScreen`)가 이미 1:1 로 쓰는 것과 같다.
+ * 그래서 그림자 = (공 화면 x, 땅점 화면 y + 2) 이다. 웹은 카메라 흔들림(+0xff4 · +0xff8)을 안 얹는다(`bigHitScreen` 머리말 — 공과 같다).
+ * `isBigHitState` 는 상태 0x13 — 웹은 0x13 의 타구 공(0x33e34 가 공 물리 +0xf2c 에서 경로를 다시 채운다)을 아직 안 그린다.
+ * 곡선이 없는 대체 공(시험 · 와인드업 자리)은 월드 점이 없어 그림자도 없다.
+ */
+export interface BallShadowPlacement {
+  readonly x: number
+  readonly y: number
+  readonly size: number
+}
+
+/** 화면 높이 — 0x14008c8 이 돌려주는 값 (웹 타석 캔버스 높이) */
+const BALL_SHADOW_SCREEN_HEIGHT = STAGE_HEIGHT
+const BALL_SHADOW_SIZE_DROP = 4
+const BALL_SHADOW_SMALLEST = 2
+const BALL_SHADOW_Y_OFFSET = 2
+
+export function ballShadowAt(pitch: Pitch, frame: number, isBigHitState = false): BallShadowPlacement | null {
+  const path = pitch.worldPath
+  if (frame === 0 || path === null || path.length === 0) return null
+  const point = path[clampFrame(frame, path.length)]
+  const ball = projectToScreen(point, pitch.stageSide)
+  const ground = projectToScreen({ x: point.x, y: 0, z: point.z }, pitch.stageSide)
+  const size = Math.max(ballFrameOf(path, clampFrame(frame, path.length), 0) - BALL_SHADOW_SIZE_DROP, BALL_SHADOW_SMALLEST)
+  if (!isBigHitState && ground.y + size >= BALL_SHADOW_SCREEN_HEIGHT) return null
+  return { x: ball.x, y: ground.y + BALL_SHADOW_Y_OFFSET, size }
+}
+
+/**
+ * **공 그리기 목록 깊이** — 0x3b2f4 가 공 그림(3b6de 0xbe8d5) · 강속구 불꽃(3b7cc 0xbe8a5)을 [sp+0x88] 로, 마구 이펙트(3b59e 0xbe8a5)를
+ * [sp+0x88] + 1 로 넣는다. [sp+0x88] 은 0x35820 이 꺼낸 경로 점의 **월드 z**(투영 전 값)다.
+ * 목록 0xbe810 은 깊이 오름차순 · 같은 깊이는 넣은 차례(be864 `bge`)라 공은 z 이하 깊이의 그림(투수 24500 · 타자 29705 …) 다음이다.
+ */
+export function ballDepthAt(pitch: Pitch, frame: number): number | null {
+  const path = pitch.worldPath
+  if (path === null || path.length === 0) return null
+  return path[clampFrame(frame, path.length)].z
 }
