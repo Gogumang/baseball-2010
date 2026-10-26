@@ -106,7 +106,8 @@ const TEXT = {
 }
 const CONTINUE_COST = 5000
 
-type Phase = '엔딩' | '제작진' | '보너스' | '이어하기질문' | '등록질문' | '등록목록' | '안내'
+/** '이어하기' — 팝업 0x32 예를 받아 이어하기로 넘어갔다(창 없이 엔딩 판만 — 방출이면 141 이 새 시즌 효과기 끝을 기다리며 그린다) */
+type Phase = '엔딩' | '제작진' | '보너스' | '이어하기질문' | '이어하기' | '등록질문' | '등록목록' | '안내'
 type QuestionPhase = '이어하기질문' | '등록질문'
 
 interface Question {
@@ -161,7 +162,9 @@ export function EndingScreen(props: EndingScreenProps) {
     이어하기질문: {
       text: TEXT.continue,
       onYes: () => {
-        if (!onContinue()) inform(TEXT.shortage.replace('%d', String(CONTINUE_COST)))
+        if (!onContinue()) return inform(TEXT.shortage.replace('%d', String(CONTINUE_COST)))
+        // 창은 닫혔다 — 방출 이어하기(0x1b768, 1be26)는 141 이 엔딩 판을 그리며 효과기 끝을 기다린다(1beb4~1beea)
+        setPhase('이어하기')
       },
       onNo: onFinish,
     },

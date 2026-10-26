@@ -22,8 +22,8 @@ import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoSt
 import { pitcherCupMatchInfoOf, pitcherMatchInfoOf } from '@/pages/pitcher-league/lib/pitcherMatchInfo'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
-import { NariYearCoverScreen, YearCoverResumeLeftFrame } from '@/pages/management/ui/NariYearCoverScreen'
-import { resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
+import { NariYearCoverScreen, YearCoverHoldLayer, YearCoverResumeLeftFrame } from '@/pages/management/ui/NariYearCoverScreen'
+import { YEAR_COVER_ENTRY_FRAMES, resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { PitcherGameEvaluationScreen } from '@/pages/pitcher-league/ui/PitcherGameEvaluationScreen'
 import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
@@ -34,6 +34,7 @@ import { nariOutingPresentationOf } from '@/pages/season/lib/seasonOutingPopup'
 import { portraitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { PITCHER_YEAR_START_EVENT } from '@/entities/pitcher-career/model/pitcherStoryScene'
 import { rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import { PITCHER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
 import { awardWindowTextOf } from '@/pages/story/lib/awardWindows'
@@ -91,6 +92,11 @@ interface PitcherLeagueRouteProps {
  * 투수편 라우트 — 나리 장면 0x106 의 시간대 시각(상태 100 진입 0x1c154 끝 `0x7b934(gfx, 0xb8fbd())`)을 장면에 들어설 때 잡아
  * 안쪽 화면에 내려 준다(`SceneHourContext`). 경기(0x104) · 마선수 대결 경기 동안은 나리 장면이 내려가 있다.
  */
+/** 이어하기 길 137 앞의 연초 114 — 재생기에 싣는 이벤트는 내장 연초 이벤트 하나다(0x8a681, 타자편과 같다) */
+const PITCHER_YEAR_START_EVENTS = [PITCHER_YEAR_START_EVENT] as const
+/** 그 114 는 효과기 끝(9 틀째)에 끊긴다 — 재생이 끝나거나 경기를 거는 일은 없다 */
+const ignoreEventEnd = () => {}
+
 export function PitcherLeagueRoute(props: PitcherLeagueRouteProps) {
   const { scene, gameOptions } = props.session
   const isInNariScene = !(scene === '경기' && gameOptions !== null) && scene !== '마선수대결'
@@ -106,6 +112,8 @@ export function PitcherLeagueRoute(props: PitcherLeagueRouteProps) {
   return (
     <SceneHourContext.Provider value={hour}>
       <PitcherLeagueScreens {...props} />
+      {/* 새 시즌 0x1b768 을 부른 134 · 141 이 효과기 끝을 기다리는 아홉 틀 — 그 화면을 그대로 두고 효과기만 덮는다 */}
+      {props.session.isYearCoverHeld ? <YearCoverHoldLayer onDone={props.session.actions.enterHeldYearCover} /> : null}
     </SceneHourContext.Provider>
   )
 }
@@ -405,8 +413,10 @@ function PitcherLeagueScreens({
     )
   }
 
-  if (scene === '엔딩' && career.endingIndex !== null) {
-    const endingIndex = career.endingIndex
+  // 방출 이어하기 뒤 아홉 틀은 선수의 엔딩 칸이 이미 비었다 — 141 이 그리던 번호 그대로 (`heldEndingIndex`)
+  const shownEndingIndex = career.endingIndex ?? session.heldEndingIndex
+  if (scene === '엔딩' && shownEndingIndex !== null) {
+    const endingIndex = shownEndingIndex
     return (
       <EndingScreen
         playerName={career.name}
@@ -474,17 +484,30 @@ function PitcherLeagueScreens({
 
   if (scene === '연차표지') {
     // 앞 화면 아홉 틀은 앞 상태가 매 틀 그린다 — 114 끝은 0x19da4(상태판 · 머리띠, 새 시즌의 S), 이어하기 길은 `resumeCoverUnderlayAt`.
-    // ⚠️ 134 대진판 · 141 엔딩 판은 멈춘 판(`LeftFrame`) 그대로 — 타자편 `CareerRoutes` 와 같다
+    // 134 대진판 · 141 엔딩은 그 화면이 선 채 아홉 틀을 돌고(`YearCoverHoldLayer`) 표지는 그다음 틀부터 — 타자편 `CareerRoutes` 와 같다
     const statusBoard = <PitcherEventUnderlay career={career} />
     const previousScreenAt = session.yearCoverFromResume
       ? (frame: number) => {
         const underlay = resumeCoverUnderlayAt(frame)
         if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
-        return underlay === '관리' ? <PitcherResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} /> : statusBoard
+        if (underlay === '관리') return <PitcherResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} />
+        if (underlay === '상태판') return statusBoard
+        // 연초 114 — 0x19e64 밑그림 위에 대화창 0x8b5ac(내장 이벤트 0x8a681 의 첫 say). 키는 장면 키 문이 버린다
+        return (
+          <>
+            {statusBoard}
+            <StoryScreen events={PITCHER_YEAR_START_EVENTS} event={PITCHER_YEAR_START_EVENT} playerName={career.name}
+              teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name} skinIndex={career.skinIndex} battingTypeIndex={0}
+              isVibrationOn={gameSettings.settings.isVibrationOn} onComplete={ignoreEventEnd} onMatch={ignoreEventEnd} isInputLocked />
+          </>
+        )
       }
       : previousScene === '이벤트' ? () => statusBoard : undefined
     // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다 — 타자편과 같은 137
-    return <NariYearCoverScreen yearIndex={career.season - 1} onDone={() => actions.goto('관리')} previousScreenAt={previousScreenAt} />
+    return (
+      <NariYearCoverScreen yearIndex={career.season - 1} onDone={() => actions.goto('관리')} previousScreenAt={previousScreenAt}
+        {...(session.yearCoverAfterHold ? { startFrame: YEAR_COVER_ENTRY_FRAMES } : {})} />
+    )
   }
 
   return (

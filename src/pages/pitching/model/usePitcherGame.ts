@@ -12,6 +12,8 @@ import {
   giveUpPitching,
   isPitchTurn,
   pickoff,
+  enterBenchClearing,
+  judgeHitByPitch,
   resolveBenchClearing,
   resolveDefensePlay,
   recordDrawnPitcherFieldingErrors,
@@ -104,6 +106,10 @@ export interface PitcherGameSession {
     readonly confirmManagerHook: () => void
     /** 돌발 창 닫기 */
     readonly closeBurst: () => void
+    /** 사구의 0x12 대기 끝(틱 31 갱신 0x4e6d4) — 4e74c 판정 (`judgeHitByPitch`, 화면 `useHitByPitchWait` 가 부른다) */
+    readonly judgeHitByPitch: () => void
+    /** 판정이 0x1e 를 예약한 다음 틀 — 벤치 클리어링 진입 0x3a5f0 의 굴림 45 번 (`enterBenchClearing`) */
+    readonly enterBenchClearing: () => void
     /**
      * 벤치 클리어링 연출(상태 0x1e)이 끝났다 — 인자는 틱 10 의 갱신이 돌았는가.
      * 진행기 `resolveBenchClearing` 이 그 굴림 8 번을 내고 붙든 사구를 먹인다.
@@ -351,6 +357,8 @@ export function usePitcherGame(
       giveUp: () => step((current) => giveUpPitching(current, random)),
       confirmManagerHook: () => step((current) => closeManagerHookWindow(current, random)),
       closeBurst: () => step((current) => closeBurstWindow(current)),
+      judgeHitByPitch: () => step((current) => judgeHitByPitch(current, random)),
+      enterBenchClearing: () => step((current) => enterBenchClearing(current, random)),
       finishBenchClearing: (reachedTargetTick: boolean) =>
         step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
       enterSettlement: () => {

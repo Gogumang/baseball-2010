@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import {
+  enterBenchClearing,
   isHumanTurn,
+  judgeHitByPitch,
   resolveBenchClearing,
   startBatterOutcome,
   startTeamGame,
@@ -42,17 +44,28 @@ describe('팀 경기 벤치 클리어링 연출 (상태 0x1e) — 우리 타자�
   it('들어가면 굴림 1 + 진입 45 를 쓰고 연출에서 붙든다 — 그 동안 사람 차례가 아니다', () => {
     const progress = startTeamGame(옵션, createSeededRandom(5))
     const { random, counter } = 첫굴림(0, 9)
-    const 들어감 = startBatterOutcome(progress, { kind: '사구' }, random)
+    // 공 도착 — 굴림 없이 0x12 대기로 붙든다. 그 동안도 사람 차례가 아니다 (A-22)
+    const 붙듦 = startBatterOutcome(progress, { kind: '사구' }, random)
+    expect(counter.count).toBe(0)
+    expect(붙듦.pendingBenchClearing).toEqual({ phase: 'wait', side: '공격', outcome: { kind: '사구' } })
+    expect(isHumanTurn(붙듦)).toBe(false)
+    // 0x12 틱 31 의 4e74c 판정 → 다음 틀 진입 0x3a5f0
+    const 판정 = judgeHitByPitch(붙듦, random)
+    expect(counter.count).toBe(1)
+    expect(판정.pendingBenchClearing).toEqual({ phase: 'entry', side: '공격', outcome: { kind: '사구' } })
+    const 들어감 = enterBenchClearing(판정, random)
 
     expect(counter.count).toBe(46)
-    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
+    expect(들어감.pendingBenchClearing).toEqual({ phase: 'scene', side: '공격', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
     expect(들어감.game).toEqual(progress.game)
     expect(isHumanTurn(들어감)).toBe(false)
   })
 
   it('끝나면 사구를 보통 길로 먹인다 — 틱 10 을 지났으면 그 앞에 굴림 8 번', () => {
     const progress = startTeamGame(옵션, createSeededRandom(5))
-    const 들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0, 9).random)
+    const { random } = 첫굴림(0, 9)
+    const 들어감 = enterBenchClearing(judgeHitByPitch(startBatterOutcome(progress, { kind: '사구' }, random), random), random)
+    expect(들어감.pendingBenchClearing?.phase).toBe('scene')
 
     const 다봄 = resolveBenchClearing(들어감, { reachedTargetTick: true }, createSeededRandom(13))
     const 앞당김 = createSeededRandom(13)

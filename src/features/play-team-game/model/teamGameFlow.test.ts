@@ -42,6 +42,8 @@ import {
   resolveDefensePlay,
   returnToPitchSelection,
   runAutoProgress,
+  enterBenchClearing,
+  judgeHitByPitch,
   resolveBenchClearing,
   pitchersOfRecordOf,
   rollTeamSetup,
@@ -2024,10 +2026,16 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
       rand9d: (n: number) => rest.rand9d(n),
     }
   }
+  /** 공 도착에서 붙든 사구(0x12 대기)를 같은 난수로 틱 31 판정 · 들어갔으면 진입까지 (A-22) */
+  function 사구(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+    const 붙듦 = startBatterOutcome(progress, { kind: '사구' }, random)
+    expect(붙듦.pendingBenchClearing).toEqual({ phase: 'wait', side: '공격', outcome: { kind: '사구' } })
+    return enterBenchClearing(judgeHitByPitch(붙듦, random), random)
+  }
 
   it('사구는 붙들 것이 없어 곧장 끝나고 1루가 찬다', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
-    const 끝 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+    const 끝 = 사구(progress, 첫굴림(0.9, 3))
 
     expect(끝.pendingDefensePlay).toBeNull()
     expect(끝.game.bases.first).toBe(true)
@@ -2035,11 +2043,11 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
 
   it('들어가면 상대 투수 투구 수 +10 — 우리 공격이라 시즌 평판 S[1] 은 게이트에서 버려진다', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
-    const 들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0, 3))
-    const 안들어감 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+    const 들어감 = 사구(progress, 첫굴림(0, 3))
+    const 안들어감 = 사구(progress, 첫굴림(0.9, 3))
 
     // 들어가면 연출(상태 0x1e)에서 사구를 붙든다 — 밀어내기는 연출이 끝난 뒤 (`teamBenchClearing.test`)
-    expect(들어감.pendingBenchClearing).toEqual({ side: '공격', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
+    expect(들어감.pendingBenchClearing).toEqual({ phase: 'scene', side: '공격', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
     expect(들어감.game).toEqual(progress.game)
     expect(들어감.opponentPitcherCounters.pitches - 안들어감.opponentPitcherCounters.pitches).toBe(10)
     expect(들어감.gameRecord).toEqual(안들어감.gameRecord)
@@ -2050,7 +2058,7 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
 
   it('안 들어가면 굴림 한 번 말고는 볼넷과 같은 차례다', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
-    const 사구끝 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+    const 사구끝 = 사구(progress, 첫굴림(0.9, 3))
     const 볼넷끝 = startBatterOutcome(progress, { kind: '볼넷' }, createSeededRandom(3))
 
     expect(사구끝.game).toEqual(볼넷끝.game)
@@ -2068,7 +2076,9 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   function 맞히기(seed: number): { 전: TeamGameProgress; 후: TeamGameProgress } {
     const { progress } = 시작()
     const input = { typeNumber: 첫구질(progress), aim: aimAfterTicks(1, { dx: 1, dy: 1 }, 11), gaugeCell: 0 }
-    const 후 = startThrowPitch(progress, input, createSeededRandom(seed))
+    const random = createSeededRandom(seed)
+    // 공 도착에서 붙든 사구(0x12 대기)를 같은 난수로 틱 31 판정 · 들어갔으면 진입까지 (A-22)
+    const 후 = enterBenchClearing(judgeHitByPitch(startThrowPitch(progress, input, random), random), random)
     return { 전: progress, 후 }
   }
 
@@ -2090,7 +2100,7 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
     expect(벤치.gameRecord[1] - 보통.gameRecord[1]).toBe(1)
     // 연출(상태 0x1e)에서 붙든다 — 끝나면 보통 길(밀어내기 1루)
     // 이 사구 공이 연 밀어내기 판(종류 2)은 연출 뒤에 재생하려고 함께 붙든다
-    expect(벤치.pendingBenchClearing).toMatchObject({ side: '수비', outcome: { kind: '사구' }, arrivalPlay: { kind: 2 } })
+    expect(벤치.pendingBenchClearing).toMatchObject({ phase: 'scene', side: '수비', outcome: { kind: '사구' }, arrivalPlay: { kind: 2 } })
     expect(resolveBenchClearing(벤치, { reachedTargetTick: false }, createSeededRandom(1)).game.bases.first).toBe(true)
     // 수비가 사람이라 상대(공격) 투수 투구 수는 건드리지 않는다
     expect(벤치.opponentPitcherCounters).toEqual(보통.opponentPitcherCounters)
@@ -2100,7 +2110,8 @@ describe('사구 — 우리 수비에서 CPU 타자가 맞는다 (0x35a20 · 벤
   it('시즌이 아니면(모드 ≠ 2) S[1] 이 안 남는다', () => {
     const { progress } = 시작({ mode: 1 })
     const input = { typeNumber: 첫구질(progress), aim: aimAfterTicks(1, { dx: 1, dy: 1 }, 11), gaugeCell: 0 }
-    const 벤치 = startThrowPitch(progress, input, createSeededRandom(2544))
+    const random = createSeededRandom(2544)
+    const 벤치 = enterBenchClearing(judgeHitByPitch(startThrowPitch(progress, input, random), random), random)
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     expect(벤치.gameRecord).toEqual(progress.gameRecord)
@@ -3033,7 +3044,9 @@ describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee
     const 볼넷 = 끝.pitcherLines.filter((line) => line.teamId === 1).reduce((sum, line) => sum + (line.walks ?? 0), 0)
     expect(볼넷).toBe(1)
     // 사구(state[0x12], a8b88~a8bee)도 같은 칸 — 벤치 클리어링이 안 들어가는 굴림
-    const 사구끝 = startBatterOutcome(progress, { kind: '사구' }, 첫굴림(0.9, 3))
+    const 사구굴림 = 첫굴림(0.9, 3)
+    // 공 도착에서 붙든 사구를 0x12 틱 31 판정까지 (A-22)
+    const 사구끝 = judgeHitByPitch(startBatterOutcome(progress, { kind: '사구' }, 사구굴림), 사구굴림)
     expect(사구끝.pitcherLines.filter((line) => line.teamId === 1).reduce((sum, line) => sum + (line.walks ?? 0), 0)).toBe(1)
   })
 

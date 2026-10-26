@@ -23,6 +23,7 @@ import { useSceneScopedRef } from '@/pages/defense/model/useSceneScopedRef'
 import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { useHitByPitchWait } from '@/pages/defense/model/useHitByPitchWait'
 import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
 import { useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
@@ -41,7 +42,7 @@ import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboar
 import { useIsSceneConfirmAwaiting } from '@/features/play-game/model/useSceneConfirm'
 import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
-import { batterHumanRecordCountOf, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
+import { batterHumanRecordCountOf, RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import type { RecordAlertScene } from '@/pages/game/ui/GameScreen'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
@@ -182,7 +183,18 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     play !== null && play !== shownPlay ? play : null,
     progress.pendingBenchClearing !== null,
     alertSceneFrozenRef.current,
+    // 0x12 끝 돌발 판정의 결과 창(0x1d)을 닫은 뒤에야 판정 A 의 0x17
+    resolution !== null,
   )
+  // 사구 — 0x12 대기(판정 틀 T 다음 그림이 틱 0) 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
+  useHitByPitchWait({
+    hold: progress.pendingBenchClearing,
+    waitTicks: RESULT_WAIT_TICKS_AT_BAT_END,
+    isFrozen: alertSceneFrozenRef.current,
+    random,
+    onJudge: session.actions.judgeHitByPitch,
+    onEnter: session.actions.enterBenchClearing,
+  })
   /** 사람 주루 키를 받으며 실시간으로 도는 주자 판(도루 · 폭투 · CPU 견제) — `progress.pendingRunnerPlay` */
   const runnerPlay = progress.pendingRunnerPlay ?? null
   const isDefenseShown =
@@ -206,8 +218,9 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
             defense: (boardOursOffense ? fieldTeams.opponent : fieldTeams.ours).aces.records,
             offense: (boardOursOffense ? fieldTeams.ours : fieldTeams.opponent).aces.records,
           },
+    // 진입 0x3a5f0 — 0x12 대기 · 진입 앞 사구는 아직 아니다
     benchClearing:
-      progress.pendingBenchClearing === null
+      progress.pendingBenchClearing?.phase !== 'scene'
         ? null
         : { key: progress.pendingBenchClearing, offense: gameBenchOffenseOf(fieldTeams.ours, progress) },
   })

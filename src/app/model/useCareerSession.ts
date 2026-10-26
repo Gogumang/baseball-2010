@@ -4,18 +4,19 @@ import { clearsPitchJudgement } from '@/features/defense-play/model/pitchArrival
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Screen } from '@/app/model/screen'
+import type { GameEvaluationScreenData, Screen } from '@/app/model/screen'
 import { NARI_STATE, restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import { atBatEndFramesOf } from '@/app/model/useAtBatRunner'
+import { RESULT_WAIT_TICKS_AT_BAT_END } from '@/pages/game/lib/batterRecordAlert'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { applyPitchResolution, isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
-import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, enterBenchClearing, judgeHitByPitch, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
@@ -130,6 +131,8 @@ import {
   CONTINUE_COST_GAME_POINT,
   endingBonusOf,
   continueAfterEnding,
+  continueAfterEndingPayment,
+  INJURY_ENDING_INDEX,
   GOAL_INTRO_EVENT_ID,
   INJURY_ENDING_EVENT_ID,
   judgeEnding,
@@ -235,8 +238,8 @@ import type { PlayerSide } from '@/entities/game/model/gameState'
  * 레코드 `+0x4a` = **직전 경기 인기도 변화 p** 로 확정돼 있다 (A 0절 "+0x4a s8: 지난 경기
  * 인기도 변화 (0xa68ca 가 쓴다) 확정" · P1 5-2 정정). 웹 값은 `evaluation.popularityChange` 다.
  *
- * ⚠️ 근사(때 · 남김 — 웹 구조): **근사인 곳은 우는 자리뿐이다.** 원본은 결과 화면과 평가 창이 따로인데 웹은 한 화면이라
- * 승패 징글(31·32) 바로 뒤에 이어 낸다 — 통로가 하나라 앞 소리가 끊긴다.
+ * 우는 때는 116 진입이다 — 경기 결과(경기 장면 0x104 의 0x18 · 0x19)와 평가(나리 장면 0x106 의 116)가 따로 서는 원본처럼 웹도
+ * 두 화면이라(r287) 승패 징글 31 · 32 는 정산 0x19 진입, 평가 징글은 정산 판을 나가 116 이 선 그 틀에 낸다(`enterGameEvaluationScreen`).
  */
 const MY_LEAGUE_EVALUATION_THRESHOLD = 1
 function evaluationJingleIdOf(popularityChange: number): number {
@@ -483,6 +486,11 @@ export function useCareerSession({
   const [progress, setProgress] = useState<GameProgress | null>(null)
 
   const [shopNotice, setShopNotice] = useState('')
+  /**
+   * 새 시즌 0x1b768 을 부른 앞 상태(134 대진판 · 141 엔딩)가 아직 그리는 아홉 틀 — 화면은 그대로 두고 그 위에 효과기만 칠한다
+   * (`startNewSeason` 의 `holdsPrevious` · `YearCoverHoldLayer`). 끝나면 `enterHeldYearCover` 가 137 로 넘긴다
+   */
+  const [isYearCoverHeld, setYearCoverHeld] = useState(false)
   /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
   const [shopGpDetail, setShopGpDetail] = useState<GpDetailOf<PlayerCareer> | null>(null)
   const [outingNotice, setOutingNotice] = useState('')
@@ -914,7 +922,7 @@ export function useCareerSession({
         isEvaluated, thisEvaluation, currentCareer.lastGame, summary.stats,
       )
       // 승리 31 · 패배 32 징글은 정산 0x19 진입(경기 끝 판 0x18 의 OK 뒤), 평가 징글 36 · 37 · 38 은 116 진입이 낸다 —
-      // 결과 화면이 단계에 들어설 때 부른다(`enterGameSettlement` · `enterGameEvaluation`)
+      // 정산은 결과 화면이 그 단계에 들어설 때(`enterGameSettlement`), 평가는 116 을 띄우는 자리(`enterGameEvaluationScreen`)가 낸다
       // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다.
       // CPU 끼리의 포스트시즌 경기는 **여기서 돌리지 않는다** — 원본은 대진 화면 128 의 [확인](0x13da0)에서 돌린다
@@ -1171,7 +1179,8 @@ export function useCareerSession({
         runner.setIsPaused(true)
         return
       }
-      // 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 화면이 연출을 끝낼 때(`finishBenchClearing`)까지 붙든다
+      // 사구 — 0x12 대기(32 그림) 끝의 판정(`judgeHitByPitch`)까지, 들어갔으면 벤치 클리어링 연출(상태 0x1e)이 끝날 때
+      // (`finishBenchClearing`)까지 붙든다. 그동안 타석 화면은 0x12 를 그린다
       if (advanced.pendingBenchClearing !== null) {
         runner.setIsPaused(true)
         return
@@ -1467,11 +1476,23 @@ export function useCareerSession({
    * 예약하지 않지만, 100 → 1 → 100 → 1 → 105 → 115 → 114 로 가는 사이 남은 +0x289 를 연초 114 의 틀 0x1c014(1c0dc — 재생 중에도
    * 매 틀)가 효과기 끝(0x1b768 의 틀부터 9 틀째)에 받아 137 을 띄운다(r156 직접 뜸 — `nariYearCover` 의 이어하기 길).
    */
-  const startNewSeason = (finished: PlayerCareer, fromResume = false) => {
+  const startNewSeason = (finished: PlayerCareer, fromResume = false, holdsPrevious = false) => {
     // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
     const next = startNextSeason(finished, random)
     setCareer(next)
+    // 134(0x1b92c 1bb30~1bb64) · 141(0x1bbc4 1beb4~1beea)은 0x1b768 뒤에도 제 그리기를 돌며 효과기 끝을 기다린다 — 그 화면을 그대로 둔다
+    if (holdsPrevious) return setYearCoverHeld(true)
     setScreen(fromResume ? { kind: '연차표지', fromResume: true } : { kind: '연차표지' })
+  }
+
+  /**
+   * **116 경기 뒤 평가에 들어선다** — 진입 0x1278c 의 12c96~12cc6 이 +0x4a(평가 경기 인기도 변화)로 평가 징글 36 · 37 · 38 을
+   * 낸다(`evaluationJingleIdOf`). 경기 뒤(정산 판을 나간 0x3f3 → 장면 0x106 → 100 → 116)와 이어하기(1c26a) 두 길 모두.
+   * 승패 징글 31 · 32 는 경기 장면의 정산 0x19 진입이 따로 냈다 — 두 상태가 따로 서 소리도 따로다
+   */
+  const enterGameEvaluationScreen = (data: GameEvaluationScreenData) => {
+    playSoundIds(audio, [evaluationJingleIdOf(data.evaluation.popularityChange)])
+    setScreen({ kind: '경기평가', ...data })
   }
 
   /**
@@ -1637,6 +1658,35 @@ export function useCareerSession({
   )
 
   /**
+   * **사구의 0x12 대기 끝** (틱 31 갱신 0x4e6d4) — 화면이 대기를 센 뒤 부른다(`useHitByPitchWait`). 진행기 `judgeHitByPitch` 가
+   * 4e74c 를 굴려 들어갔으면 붙든 채 두고(진입 0x3a5f0 은 다음 틀 `enterBenchClearing`), 안 들어갔으면 판정 A 0xae24c 의 보통 길
+   * (밀어내기 판 · 정산) — 소리 · 타석 끝은 예전 공 도착 걸음의 볼넷 · 사구 그대로이고, 0xd 는 0x12 진입부터 32 그림 뒤라 남은 그림만 둔다.
+   */
+  const judgeHeldHitByPitch = useCallback(() => {
+    const current = progressRef.current
+    const pending = current?.pendingBenchClearing ?? null
+    if (current === null || pending === null || pending.phase !== 'wait') return
+    const { bases } = current.game
+    const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
+    const judged = judgeHitByPitch(current, random)
+    progressRef.current = judged
+    setProgress(judged)
+    if (judged.pendingBenchClearing !== null) return
+    playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome), ...gameStepSoundIdsOf(current, judged)])
+    const endFrames = atBatEndFramesOf(pending.outcome, pending.arrivalPlay?.kind ?? null) - RESULT_WAIT_TICKS_AT_BAT_END
+    finishAtBat(judged, pending.outcome, runnersOnBase, Math.max(0, endFrames))
+  }, [audio, finishAtBat, random])
+
+  /** **벤치 클리어링 진입** 0x3a5f0 — 판정이 0x1e 를 예약한 다음 틀에 화면이 부른다. 굴림 45 번 (`enterBenchClearing`) */
+  const enterHeldBenchClearing = useCallback(() => {
+    const current = progressRef.current
+    if (current === null || current.pendingBenchClearing?.phase !== 'entry') return
+    const entered = enterBenchClearing(current, random)
+    progressRef.current = entered
+    setProgress(entered)
+  }, [random])
+
+  /**
    * 벤치 클리어링 연출이 끝났다 (`BenchClearingScene` 의 `onDone`) — 출구 0xae24c 뒤 사구를 보통 길로 먹인다.
    * `reachedTargetTick` 이면 틱 10 의 굴림 8 번을 진행기가 먼저 낸다.
    */
@@ -1682,6 +1732,10 @@ export function useCareerSession({
 
   const actions = {
     syncOpenedHidden,
+    /** 사구의 0x12 대기 끝 — 4e74c 판정 (`judgeHitByPitch`) */
+    judgeHitByPitch: judgeHeldHitByPitch,
+    /** 벤치 클리어링 진입 0x3a5f0 (`enterBenchClearing`) */
+    enterBenchClearing: enterHeldBenchClearing,
     finishBenchClearing,
 
     /** 수비 화면이 끝났다 — 주자 처리를 이제 먹인다 */
@@ -1908,13 +1962,9 @@ export function useCareerSession({
           : countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
         // 1299e 도 다시 — 비트가 이미 섰으면 팝업을 안 건다. 주는 것은 키 0x1b1e4 (`confirmGameResultTitle`)
         const dynamite = gameResultTitleOf(counted.titleIds, (lastGame.recordLine ?? lastGame.summary.stats).homeRuns)
-        // 평가 징글(12c96)은 결과 화면이 116 에 들어설 때 낸다(`enterGameEvaluation`)
+        // 116 진입 — 평가 징글(12c96)까지. 경기 결과(경기 장면 0x18 · 0x19)는 다시 안 선다
         setCareer(counted)
-        return setScreen({
-          kind: '경기결과',
-          summary: lastGame.summary,
-          // 원본 116 은 G 를 보이지 않는다 — 결과 판 0x18 · 정산 0x4ea0c 의 몫이라 다시 주지도 않는다
-          gamePointReward: 0,
+        return enterGameEvaluationScreen({
           newTitles: dynamite === null ? [] : [dynamite],
           evaluation: lastGame.evaluation,
           streakNotices: streakEventOf(counted).notices,
@@ -2080,15 +2130,21 @@ export function useCareerSession({
       playSoundIds(audio, [gameResultSoundIdOf(screen.summary.result, screen.settlementPlayerSide)])
     },
 
-    /** 116 진입 0x1278c 의 12c96~12cc2 — +0x4a(평가 경기 인기도 변화)로 36 · 37 · 38 (`evaluationJingleIdOf`). 이어하기로 다시 선 116 도 */
-    enterGameEvaluation: () => {
+    /**
+     * 정산 판을 나갔다 — 키 0x407f0 의 40980~4098c `0xbfbac(+0x70, 0x3f3)`. 경기 장면 0x104 가 내려가고 나리 장면 0x106 이 서서
+     * 상태 100 `0x1c154` 가 S+0x50 == 2(정산 0x4ea0c 4f03a 가 쓴 값)로 116 을 띄운다(1c26a → 진입 0x1278c)
+     */
+    leaveGameSettlement: () => {
       if (screen.kind !== '경기결과') return
-      playSoundIds(audio, [evaluationJingleIdOf(screen.evaluation.popularityChange)])
+      const { newTitles, evaluation, streakNotices, streakRewards } = screen
+      enterGameEvaluationScreen(streakRewards === undefined
+        ? { newTitles, evaluation, streakNotices }
+        : { newTitles, evaluation, streakNotices, streakRewards })
     },
 
     /** 116 의 칭호 39 팝업 키 0x1b1e4 — 비트 · 곧바로 장착(+0x1c4) · 저장 (관리 화면 `confirmTitle` 과 같은 콜백) */
     confirmGameResultTitle: () => {
-      if (career === null || screen.kind !== '경기결과') return
+      if (career === null || screen.kind !== '경기평가') return
       const title = screen.newTitles[0]
       if (title === undefined || career.titleIds.includes(title)) return
       setCareer(awardTitles(career, [title]))
@@ -2659,7 +2715,8 @@ export function useCareerSession({
         recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: finish.reward.gamePoint })
       }
       // 히든 팀은 여기서 열지 않는다 — 134 에 들어올 때마다 진입 0x19f30 이 열었다(결승 승리 뒤 진입이 결승 상대까지)
-      startNewSeason(rewarded)
+      // 0x1bb28 0x1b768 뒤 134 는 대진판을 그리며 효과기 끝을 기다린다(1bb2c~1bb64) — 대진판 위에 아홉 틀 어두워진 뒤 137
+      startNewSeason(rewarded, false, true)
     },
 
     /** 134 첫 틀 `0x1b92c` 의 칭호 8 팝업 확인 `0x1b1e4` — 비트 · 곧바로 장착 · 저장 (관리 화면 `confirmTitle` 과 같은 콜백) */
@@ -2681,16 +2738,30 @@ export function useCareerSession({
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: endingBonusOf(endingIndex) })
     },
 
-    /** 부상·방출 엔딩 뒤 5000 G포인트로 이어한다 (StrMODE[221]). 모자라면 false */
+    /**
+     * 부상·방출 엔딩 뒤 5000 G포인트로 이어한다 (StrMODE[221]). 모자라면 false.
+     * 팝업 0x32 예(0x1bdc6~) — 판정 0xa3a85(S) 가 0(부상)이면 부상 칸을 비우고 S+0x50 = 3 · 0xbcb49(0x69) 로 곧장 105(1bddc~1be1e),
+     * 아니면(방출) 새 시즌 0x1b768(1be26) — 141 은 엔딩 판을 그리며 효과기 끝을 기다려(1beb4~1beea) 137 "N년차" 표지로 간다
+     */
     continueAfterEnding: () => {
       if (career === null || career.endingIndex === null) return false
       if (!canContinueAfterEnding(career, career.endingIndex)) return false
-      const continued = continueAfterEnding(career, random)
-      setCareer(continued)
       // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 4 → 1, 5000)`
       recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: CONTINUE_COST_GAME_POINT })
+      if (career.endingIndex !== INJURY_ENDING_INDEX) {
+        startNewSeason(continueAfterEndingPayment(career), false, true)
+        return true
+      }
+      setCareer(continueAfterEnding(career, random))
       setScreen({ kind: '관리' })
       return true
+    },
+
+    /** 앞 상태(134 · 141)가 효과기 끝을 본 틀 — `0xbcb49(0x89)` 로 137 을 예약하고 효과기 종류 2 를 건다(1bb46~1bb64 · 1becc~1beea) */
+    enterHeldYearCover: () => {
+      if (!isYearCoverHeld) return
+      setYearCoverHeld(false)
+      setScreen({ kind: '연차표지', afterHold: true })
     },
 
     /**
@@ -2728,6 +2799,8 @@ export function useCareerSession({
     career,
     progress,
     shopNotice,
+    /** 새 시즌 0x1b768 뒤 앞 상태(134 · 141)가 아직 그리는 아홉 틀 — 앱이 그 화면 위에 효과기를 칠한다 */
+    isYearCoverHeld,
     shopGpDetail,
     outingNotice,
     outingResult,

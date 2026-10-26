@@ -27,6 +27,8 @@ import {
   pickoff,
   pitchSlotsFor,
   pitchersOfRecordOf,
+  enterBenchClearing,
+  judgeHitByPitch,
   resolveBenchClearing,
   resolveDefensePlay,
   resolveRunnerPlay,
@@ -873,10 +875,17 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
    */
   const 사구씨앗 = 174
   const 벤치씨앗 = 2544
+  /** 공 도착에서 붙든 사구(0x12 대기)를 같은 난수로 틱 31 판정 · 들어갔으면 진입까지 (A-22) */
+  function 사구던짐(progress: PitcherGameProgress, seed: number): PitcherGameProgress {
+    const random = 씨앗(seed)
+    const 붙듦 = startPitch(progress, 바깥직구, random)
+    expect(붙듦.pendingBenchClearing).toMatchObject({ phase: 'wait', outcome: { kind: '사구' } })
+    return enterBenchClearing(judgeHitByPitch(붙듦, random), random)
+  }
 
   it('밀어내기 1루 · R+0x148 사구 칸 · 출루 허용(state[0x88]) · 삼자범퇴 칸이 깨진다 — R+0x144 볼넷은 그대로', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
-    const 끝 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
+    const 끝 = 사구던짐(progress, 사구씨앗)
 
     expect(끝.lastResolution).toEqual({ kind: '사구' })
     expect(끝.game.bases.first).toBe(true)
@@ -895,8 +904,8 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
 
   it('벤치 클리어링에 들어가면 수비(나)가 사람이라 내 스태미나 −1000 — 연출(0x1e)에서 사구를 붙든다', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
-    const 보통 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
-    const 벤치 = startPitch(progress, 바깥직구, 씨앗(벤치씨앗))
+    const 보통 = 사구던짐(progress, 사구씨앗)
+    const 벤치 = 사구던짐(progress, 벤치씨앗)
 
     expect(벤치.lastResolution).toEqual({ kind: '사구' })
     // 공 하나의 스태미나 소모는 구질만 보므로 두 씨앗이 같다 — 차이는 0xaeab0(팀, 1000) 하나다
@@ -904,7 +913,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
     expect(벤치.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(true)
     // 밀어내기 주루·정산은 연출이 끝나야 돈다 — 그 동안 다음 공이 안 나간다
     // 이 사구 공이 연 밀어내기 판(종류 2)은 연출 뒤에 재생하려고 함께 붙든다
-    expect(벤치.pendingBenchClearing).toMatchObject({ outcome: { kind: '사구' }, arrivalPlay: { kind: 2 } })
+    expect(벤치.pendingBenchClearing).toMatchObject({ phase: 'scene', outcome: { kind: '사구' }, arrivalPlay: { kind: 2 } })
     expect(벤치.game).toEqual(progress.game)
     expect(isPitchTurn(벤치)).toBe(false)
 
@@ -916,7 +925,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
 
   it('연출이 끝나면 사구를 보통 길로 먹인다 — 틱 10 을 지났으면 그 앞에 굴림 8 번이 끼어든다 (0x401d4)', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
-    const 벤치 = startPitch(progress, 바깥직구, 씨앗(벤치씨앗))
+    const 벤치 = 사구던짐(progress, 벤치씨앗)
     expect(벤치.pendingBenchClearing).not.toBeNull()
 
     const 다봄 = resolveBenchClearing(벤치, { reachedTargetTick: true }, 씨앗(11))
@@ -937,7 +946,7 @@ describe('사구 — 내가 맞힌 타석 (0x35a20 → 0xa8024 · 벤치 클리�
 
   it('퍼펙트(기록 31)가 사구로 깨진다 — 출루 허용 칸 state[0x88] 이 사구에도 선다', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(1))
-    const 끝 = startPitch(progress, 바깥직구, 씨앗(사구씨앗))
+    const 끝 = 사구던짐(progress, 사구씨앗)
     expect(
       completeGameRecordIdsOf({
         mode: 3,

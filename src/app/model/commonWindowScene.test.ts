@@ -14,7 +14,7 @@ describe('[창+0x24f] — 메인 메뉴 0x234d4 · 경기 0x3301c 는 1, 시즌 
   })
 
   it('나리 · 시즌 화면은 줄임으로 닫힌다', () => {
-    for (const kind of ['팀선택', '선수등록', '투수편', '시즌모드', '관리', '이벤트', '경기결과', '포스트시즌'] as const) {
+    for (const kind of ['팀선택', '선수등록', '투수편', '시즌모드', '관리', '이벤트', '경기결과', '경기평가', '포스트시즌'] as const) {
       expect(sceneClosesWithoutShrinkOf(kind, false)).toBe(false)
     }
   })

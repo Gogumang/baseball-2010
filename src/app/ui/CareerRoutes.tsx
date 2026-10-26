@@ -6,6 +6,7 @@ import type { useCareerSession } from '@/app/model/useCareerSession'
 import { GameRoute } from '@/app/ui/GameRoute'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import { GameResultScreen } from '@/pages/game-result/ui/GameResultScreen'
+import { GameEvaluationScreen } from '@/pages/game-result/ui/GameEvaluationScreen'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import { NextGameStandingsScreen } from '@/pages/management/ui/NextGameStandingsScreen'
 import { NariMatchInfoScreen } from '@/pages/management/ui/NariMatchInfoScreen'
@@ -19,13 +20,14 @@ import { portraitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
 import { ScreenOverlay } from '@/shared/ui'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
+import { NARI_YEAR_START_EVENT } from '@/entities/story/model/storyScene'
 import { rewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import { BATTER_LEAGUE_MODE } from '@/entities/collection/model/annalsStats'
 import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
 import { NationalCupScreen } from '@/pages/national-cup/ui/NationalCupScreen'
 import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
-import { NariYearCoverScreen, YearCoverResumeLeftFrame } from '@/pages/management/ui/NariYearCoverScreen'
-import { resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
+import { NariYearCoverScreen, YearCoverHoldLayer, YearCoverResumeLeftFrame } from '@/pages/management/ui/NariYearCoverScreen'
+import { YEAR_COVER_ENTRY_FRAMES, resumeCoverUnderlayAt } from '@/pages/management/lib/nariYearCover'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
@@ -82,12 +84,17 @@ interface CareerRoutesProps {
   readonly aceLevels?: Readonly<Record<number, number>>
 }
 
+/** 이어하기 길 137 앞의 연초 114 — 재생기에 싣는 이벤트는 내장 연초 이벤트 하나다(0x8a681) */
+const YEAR_START_EVENTS = [NARI_YEAR_START_EVENT] as const
+/** 그 114 는 효과기 끝(9 틀째)에 끊긴다 — 재생이 끝나거나 경기를 거는 일은 없다 */
+const ignoreEventEnd = () => {}
+
 export type AceMatchStarter = (command: MatchCommand, carried: StoryCarry, context: StoryContext) => void
 
 /**
  * 경기 장면 0x104 쪽 화면 — 나리 장면 0x106 이 내려가 있다. 여기서 다른 화면으로 오면 장면이 새로 서서 상태 100 진입 0x1c154 를 지난다.
- * ⚠️ 근사(남김 — 웹 구조): '경기결과' 는 정산 그림(경기 장면 0x19)과 평가 116(나리 장면)을 한 화면으로 보이므로 경기 장면 쪽으로 친다 —
- * 원본은 116 앞 상태 100 에서 시각을 잡으니 몇 초 이르다.
+ * '경기결과' 는 경기 끝 판 0x18 · 정산 0x19 뿐이고, 116 평가('경기평가')는 정산 판을 나간 0x3f3 뒤 새로 선 나리 장면의 100 → 116 이라
+ * 그 100 진입에서 시각을 잡는다(r287 — 예전엔 한 화면이라 정산부터 시각이 늦었다).
  */
 const NARI_OUTSIDE_SCREENS: ReadonlySet<Screen['kind']> = new Set(['경기', '경기결과', '대회경기결과', '마선수대결'])
 
@@ -100,6 +107,8 @@ export function CareerRoutes(props: CareerRoutesProps) {
   return (
     <SceneHourContext.Provider value={hour}>
       <CareerScreens {...props} />
+      {/* 새 시즌 0x1b768 을 부른 134 · 141 이 효과기 끝을 기다리는 아홉 틀 — 그 화면을 그대로 두고 효과기만 덮는다 */}
+      {props.session.isYearCoverHeld ? <YearCoverHoldLayer onDone={props.session.actions.enterHeldYearCover} /> : null}
     </SceneHourContext.Provider>
   )
 }
@@ -175,8 +184,8 @@ function CareerScreens({
       onExit={() => setScreen({ kind: '메인메뉴', openTier: 5 })}
       onReenter={actions.reenterManagement}
       onMainConfirm={actions.pressManagementConfirm}
-      // 114(이벤트) · 100(경기 뒤 재진입 — 경기결과) · 1(자원 적재 — 처음 선다)
-      centerSlidesIn={previousKind === null || previousKind === '이벤트' || previousKind === '경기결과'}
+      // 114(이벤트 · 경기 뒤 평가 116 → 114) · 1(자원 적재 — 처음 선다)
+      centerSlidesIn={previousKind === null || previousKind === '이벤트' || previousKind === '경기평가'}
       mainCursor={mainCursor}
     />
   )
@@ -215,28 +224,15 @@ function CareerScreens({
       )
 
     case '경기결과':
+      // 경기 장면 0x104 의 경기 끝 판 0x18 → 정산 0x19. 정산 판을 나가면(0x3f3) 나리 장면이 새로 서서 100 → 116 (`leaveGameSettlement`)
       return (
         <GameResultScreen
           summary={screen.summary}
           gamePointReward={screen.gamePointReward}
-          newTitles={screen.newTitles}
-          onConfirmTitle={actions.confirmGameResultTitle}
-          evaluation={screen.evaluation}
-          streakNotices={screen.streakNotices}
-          {...(screen.streakRewards === undefined ? {} : { streakRewards: screen.streakRewards })}
-          // 0x8c460 이 보상 창을 띄운 갱신에 평판을 준다 — 상태판이 그 창부터 새 값
-          rewardUnderlay={(rewarded) => <NariEventUnderlay career={rewarded} isPreviousGame />}
-          // 116 의 S+0x1d8 — 정산이 남긴 줄(포스트시즌 경기 뒤에는 앞 평가 경기 줄)
-          {...(career.lastGame === undefined ? {} : { recordLine: nariLastGameRecordLineOf(career.lastGame) })}
           career={career}
-          onContinue={actions.confirmGameResult}
+          onContinue={actions.leaveGameSettlement}
           onSettlementEnter={actions.enterGameSettlement}
-          onEvaluationEnter={actions.enterGameEvaluation}
-          // 116(0x11e0c) → 114 평가 대화 0x8b5ac: 공 무늬 · 상태판([이벤트+0xb] = 1 — 0x8a71e) · 머리띠
-          underlay={<NariEventUnderlay career={career} isPreviousGame />}
-          // 116 이 선 첫 틀 — 그림 0x11e0c(머리띠 · 상태판 0x7d34c(gfx, 0)). 114 는 다음 틀
-          entryUnderlay={<NariEventUnderlay career={career} />}
-          // 정산 0x4ea0c 를 막 지났을 때만 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
+          // 정산 0x4ea0c 를 지났을 때 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
           {...(screen.settlementInning === undefined
             ? {}
             : {
@@ -253,13 +249,34 @@ function CareerScreens({
         />
       )
 
+    case '경기평가':
+      // 나리 장면 0x106 의 116 경기 뒤 평가 → 114 내장 이벤트 0x8a6fc. 진입 징글은 세션이 띄울 때 냈다
+      return (
+        <GameEvaluationScreen
+          newTitles={screen.newTitles}
+          onConfirmTitle={actions.confirmGameResultTitle}
+          evaluation={screen.evaluation}
+          streakNotices={screen.streakNotices}
+          {...(screen.streakRewards === undefined ? {} : { streakRewards: screen.streakRewards })}
+          // 0x8c460 이 보상 창을 띄운 갱신에 평판을 준다 — 상태판이 그 창부터 새 값
+          rewardUnderlay={(rewarded) => <NariEventUnderlay career={rewarded} isPreviousGame />}
+          // 116 의 S+0x1d8 — 정산이 남긴 줄(포스트시즌 경기 뒤에는 앞 평가 경기 줄)
+          {...(career.lastGame === undefined ? {} : { recordLine: nariLastGameRecordLineOf(career.lastGame) })}
+          career={career}
+          onContinue={actions.confirmGameResult}
+          // 116(0x11e0c) → 114 평가 대화 0x8b5ac: 공 무늬 · 상태판([이벤트+0xb] = 1 — 0x8a71e) · 머리띠
+          underlay={<NariEventUnderlay career={career} isPreviousGame />}
+          // 116 이 선 첫 틀 — 그림 0x11e0c(머리띠 · 상태판 0x7d34c(gfx, 0)). 114 는 다음 틀
+          entryUnderlay={<NariEventUnderlay career={career} />}
+        />
+      )
+
     // 국가대항전 경기 결과 — 정규 경기와 같은 결과 판(0x18 · 0x4a384), 116 평가 없이 [확인] → 134 대진판
     case '대회경기결과':
       return (
         <GameResultScreen
           summary={screen.summary}
           gamePointReward={screen.gamePointReward}
-          newTitles={[]}
           career={career}
           onContinue={actions.confirmCupGameResult}
           onSettlementEnter={actions.enterGameSettlement}
@@ -314,7 +331,7 @@ function CareerScreens({
       if (session.storyEvents === null || event === undefined) return management
       // 114 그림 0x19e64 → 대화창 0x8b5ac: [gfx+0x174](0x7e84c 가 받은 마지막 상태)가 0x70·0x71 이면 외출 지도,
       // 그 밖(105 · 115 · 116 · 117 · 130~138 뒤)은 공 무늬 + 상태판(둘째 인자 [이벤트+0xb]) + 머리띠 (`NariEventUnderlay`).
-      // 웹이 트는 이벤트는 파일 이벤트라 [이벤트+0xb] 는 0 이다(경기 뒤 평가 내장 이벤트는 경기결과 화면이 맡는다).
+      // 웹이 트는 이벤트는 파일 이벤트라 [이벤트+0xb] 는 0 이다(경기 뒤 평가 내장 이벤트는 경기평가 화면이 맡는다).
       // 외출진입(112) · 장소(113) · 대결결과(140 — 진입 0x10df8 이 0x7e84c(gfx, 0x70))는 지도 0x7ea64(gfx, −1, 0) 만 (`OutingMapUnderlay`).
       // 같은 [gfx+0x174] 가 초상화 바닥 y 도 고른다(0x7fdee — 지도 252 · 그 밖 135).
       const isOverOutingMap = screen.context === '외출진입' || screen.context === '장소' || screen.context === '대결결과'
@@ -383,18 +400,31 @@ function CareerScreens({
        * 앞 화면 아홉 틀 — 원본은 앞 상태가 매 틀 그리기를 돈다(멈춘 판이 아니다). 114 끝(0x1c014 의 끝남 갈래가 0x1b768 을 부르고
        * 상태를 안 바꾼다)은 0x19e64 → 0x19da4 = 상태판 0x7d34c(gfx, 0) · 머리띠(커맨드 줄은 앞 상태가 105 가 아니라 칸 수 0)로,
        * 상태판은 새 시즌이 고친 S(소지금 S+2 · 연차)를 읽는다. 이어하기 길은 `resumeCoverUnderlayAt`.
-       * ⚠️ 134 대진판 · 141 엔딩 판은 화면 상태(대회 · 엔딩 단계)를 이 자리에서 다시 세울 수 없어 멈춘 판(`LeftFrame`) 그대로다
+       * 134 대진판 · 141 엔딩은 그 화면이 선 채 아홉 틀을 돌고(`YearCoverHoldLayer`) 표지는 그다음 틀부터 선다(`afterHold`)
        */
       const statusBoard = <NariEventUnderlay career={career} />
       const previousScreenAt = screen.fromResume === true
         ? (frame: number) => {
           const underlay = resumeCoverUnderlayAt(frame)
           if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
-          return underlay === '관리' ? <NariResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} /> : statusBoard
+          if (underlay === '관리') return <NariResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} />
+          if (underlay === '상태판') return statusBoard
+          // 연초 114 — 0x19e64 밑그림 위에 대화창 0x8b5ac(내장 이벤트 0x8a681 의 첫 say). 키는 장면 키 문이 버린다
+          return (
+            <>
+              {statusBoard}
+              <StoryScreen events={YEAR_START_EVENTS} event={NARI_YEAR_START_EVENT} playerName={career.name}
+                teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name} skinIndex={career.skinIndex} battingTypeIndex={career.battingTypeIndex}
+                isVibrationOn={gameSettings.settings.isVibrationOn} onComplete={ignoreEventEnd} onMatch={ignoreEventEnd} isInputLocked />
+            </>
+          )
         }
         : previousKind === '이벤트' ? () => statusBoard : undefined
       // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다
-      return <NariYearCoverScreen yearIndex={career.season - 1} onDone={backToManagement} previousScreenAt={previousScreenAt} />
+      return (
+        <NariYearCoverScreen yearIndex={career.season - 1} onDone={backToManagement} previousScreenAt={previousScreenAt}
+          {...(screen.afterHold === true ? { startFrame: YEAR_COVER_ENTRY_FRAMES } : {})} />
+      )
     }
 
     case '다음경기순위':
