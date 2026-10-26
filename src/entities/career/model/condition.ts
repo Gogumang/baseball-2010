@@ -4,6 +4,7 @@ import { isSkillEquipped, MAXIMUM_ABILITY } from '@/entities/career/model/player
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { balanceGrid, balanceNumber } from '@/shared/config/balance'
 
 /**
  * 선수 상태 — 부상·질병 (StrHOWTO[14]).
@@ -19,31 +20,23 @@ export const ILLNESS_NAMES: readonly string[] = ['감기', '몸살', '식중독'
 
 /** 부상 남은 기간 (0x1b4c4 가 +0x1b5 = 3) */
 const INJURY_DURATION = 3
-/** 부상·질병 감소율 (0xb570c) — 둘 다면 질병 먼저, 부상 다음으로 **차례로** 곱한다 */
-const ILLNESS_ABILITY_CUT = 30
-const INJURY_ABILITY_CUT = 60
+// 부상·질병 감소율 (0xb570c, 원본 30 · 60) — 둘 다면 질병 먼저, 부상 다음으로 **차례로** 곱한다.
+// 숨은 판정값 표 `ability.illnessCutPercent` · `ability.injuryCutPercent` 에서 읽는다.
 
 /** 실효 능력치 스킬 보정 (0xb6414, 누락 탐색 5차) — 스킬 20 은 수비(칸 2)만 (0xb652c `cmp #2`) */
 const POWERLESS_SKILL = 5
 const LEGEND_SKILL = 7
 const DEFENSE_PENALTY_SKILL = 20
-const SKILL_PENALTY = 100
-const LEGEND_BONUS = 50
+// 스킬 5 · 20 감점(원본 100) · 스킬 7 가점(원본 50)은 숨은 판정값 표 `ability.skillPenalty` · `ability.legendSkillBonus`
 
 const clampAbility = (value: number) => Math.min(MAXIMUM_ABILITY, Math.max(0, value))
 
 /**
- * 사기가 낮을 때의 능력치 감소 (0xb570c 뒷부분) — 나눗셈은 0 쪽 버림이다.
+ * `v += (−p·v)/100` 을 0 쪽 버림으로 (원본 나눗셈 0xca738).
+ * 사기가 낮을 때의 능력치 감소(0xb570c 뒷부분)도 이 식이다 — [사기 상한, 감소율 %] 표는 원본 [10,50] · [30,20] · [50,10]
+ * (사기 > 50 이면 그대로)이고 숨은 판정값 표 `ability.moraleCuts` 에서 읽는다.
  * 안내문은 StrMODE[213] "사기가 낮아 선수 능력치가 %d 감소하였습니다".
  */
-const MORALE_ABILITY_CUTS: readonly (readonly [number, number])[] = [
-  // [사기 상한, 감소율 %] — 사기 > 50 이면 그대로
-  [10, 50],
-  [30, 20],
-  [50, 10],
-]
-
-/** `v += (−p·v)/100` 을 0 쪽 버림으로 (원본 나눗셈 0xca738) */
 const reduceByPercent = (value: number, percent: number) =>
   value - Math.trunc((value * percent) / 100)
 
@@ -85,9 +78,11 @@ export function equippedAbilityOf(
 ): BatterAbility {
   const adjust = (key: keyof BatterAbility) => {
     let value = clampAbility(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
-    if (isSkillEquipped(career, POWERLESS_SKILL)) value = clampAbility(value - SKILL_PENALTY)
-    if (isSkillEquipped(career, LEGEND_SKILL)) value = clampAbility(value + LEGEND_BONUS)
-    if (key === 'defense' && isSkillEquipped(career, DEFENSE_PENALTY_SKILL)) value = clampAbility(value - SKILL_PENALTY)
+    if (isSkillEquipped(career, POWERLESS_SKILL)) value = clampAbility(value - balanceNumber('ability.skillPenalty'))
+    if (isSkillEquipped(career, LEGEND_SKILL)) value = clampAbility(value + balanceNumber('ability.legendSkillBonus'))
+    if (key === 'defense' && isSkillEquipped(career, DEFENSE_PENALTY_SKILL)) {
+      value = clampAbility(value - balanceNumber('ability.skillPenalty'))
+    }
     return value
   }
   return { hit: adjust('hit'), power: adjust('power'), run: adjust('run'), defense: adjust('defense') }
@@ -95,12 +90,14 @@ export function equippedAbilityOf(
 
 /** 피로 없는 0xb570c — 0xb6414 → 질병 → 부상 → 사기 → 맨 끝 0..999 자르기 (0xb5b06) */
 export function effectiveAbilityOf(career: PlayerCareer): BatterAbility {
-  const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => career.morale <= limit)?.[1] ?? 0
+  const moraleCut = balanceGrid('ability.moraleCuts').find(([limit]) => career.morale <= limit)?.[1] ?? 0
+  const illnessCut = balanceNumber('ability.illnessCutPercent')
+  const injuryCut = balanceNumber('ability.injuryCutPercent')
   const equipped = equippedAbilityOf(career)
   const adjust = (key: keyof BatterAbility) => {
     let value = equipped[key]
-    if (career.isSick) value = reduceByPercent(value, ILLNESS_ABILITY_CUT)
-    if (career.isInjured) value = reduceByPercent(value, INJURY_ABILITY_CUT)
+    if (career.isSick) value = reduceByPercent(value, illnessCut)
+    if (career.isInjured) value = reduceByPercent(value, injuryCut)
     if (moraleCut > 0) value = reduceByPercent(value, moraleCut)
     return clampAbility(value)
   }

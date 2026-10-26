@@ -1,3 +1,5 @@
+import { balanceNumber } from '@/shared/config/balance'
+
 /**
  * 스윙 타이밍 0~100 (binary.mod 0x34be0).
  * frame = 스윙 키를 누른 순간의 공 프레임 F, frameCount = 공이 나는 틱 수 N.
@@ -6,20 +8,17 @@
  * (위치 분석 3차 상수표 — 점검 10차가 물은 *DAT_00034c6c 가 이 설정 객체다).
  */
 const MINIMUM_FRAME_COUNT = 3
-const TIMING_WIDTH = 24
-const SPECIAL_TIMING_WIDTH = 22
-const SPECIAL_DIVISOR = 12
-/** d_level.dat D10 · D12 */
-const TIMING_FLOOR = 0
-const TIMING_SCALE = 100
 
+/**
+ * 폭 24 · 특수구 22 · 나눔 12 · 바닥(D10) · 배율(D12) 은 숨은 판정값 표(`balance.json` timing.*)에서 부를 때마다 읽는다.
+ */
 export function timingOf(frame: number, frameCount: number, isSpecialPitch: boolean): number {
   if (frameCount < MINIMUM_FRAME_COUNT) return 0
-  const width = isSpecialPitch ? SPECIAL_TIMING_WIDTH : TIMING_WIDTH
-  const divisor = isSpecialPitch ? SPECIAL_DIVISOR : frameCount - 1
+  const width = balanceNumber(isSpecialPitch ? 'timing.specialWidth' : 'timing.width')
+  const divisor = isSpecialPitch ? balanceNumber('timing.specialDivisor') : frameCount - 1
   const distance = Math.abs(frame - (frameCount - 2))
   const penalty = Math.trunc((distance * 100) / divisor)
-  return Math.max(TIMING_FLOOR, Math.trunc((TIMING_SCALE * (width - penalty)) / width))
+  return Math.max(balanceNumber('timing.floor'), Math.trunc((balanceNumber('timing.scale') * (width - penalty)) / width))
 }
 
 // 스윙 창(키를 받는 틱 · 판정 틱 · 공 끝)은 타이밍 값과 무관하다 — `widgets/batting-stage/lib/swingWindow` (0x4e060)

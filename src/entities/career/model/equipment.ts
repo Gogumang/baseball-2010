@@ -2,6 +2,7 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { isHiddenUnlocked } from '@/shared/config/unlocks'
+import { balanceList } from '@/shared/config/balance'
 
 /**
  * 장착 아이템 (타자편 — 누락 탐색 4·6차, 바이트 확인).
@@ -38,7 +39,6 @@ const PRICE_TABLE = [
 const PRICE_UNIT = 1000
 const REQUIRED_POPULARITY = [0, 50, 150, 300, 450, 600, 800, 0, 0, 0, 0]
 export const FIRST_HIDDEN_LEVEL = 7
-const LEVEL_BONUS = [30, 50, 70, 90, 110, 125, 140, 190, 210, 230, 250]
 /** 히든 오픈 힌트 — 타자 부위는 StrITEM[202] 부터 부위당 4줄 */
 const HIDDEN_HINT_START = 202
 const HIDDEN_HINTS_PER_PART = 4
@@ -179,5 +179,6 @@ export function equipOwned(career: PlayerCareer, part: number, level: number): P
 
 /** 니블 값(0 = 미장착, 1~11) → 능력치 보너스 */
 export function equipmentBonusOf(nibble: number): number {
-  return nibble <= 0 ? 0 : LEVEL_BONUS[nibble - 1]
+  // 레벨 보너스 표 0xd8890 = [30,50,70,90,110,125,140,190,210,230,250] — 숨은 판정값 표 `ability.equipmentBonus`
+  return nibble <= 0 ? 0 : balanceList('ability.equipmentBonus')[nibble - 1]
 }

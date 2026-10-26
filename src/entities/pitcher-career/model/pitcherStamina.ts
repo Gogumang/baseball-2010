@@ -1,3 +1,5 @@
+import { balanceList } from '@/shared/config/balance'
+
 /**
  * 투수 스태미나 (binary.mod 0xa5e14 투구 한 개 · 0x66ef0 기본 소모 · 0xaeb08 소모 적용 ·
  * 0x66e44 용량 · 0xb60e0 경기 사이 회복 · 0x66ed0 회복량 · 0xb58e6 체력%에 따른 능력치 감소 —
@@ -153,8 +155,12 @@ export function recoverStaminaAfterGameDay(stamina: number, input: StaminaRecove
  * (`entities/pitching/model/pitcherGameStats`).
  */
 export function abilityAfterFatigue(value: number, staminaPercent: number): number {
-  const reduction =
-    staminaPercent > 54 ? 0 : staminaPercent >= 35 ? 10 : staminaPercent >= 20 ? 30 : staminaPercent >= 1 ? 50 : 90
+  // 문턱 [55, 35, 20, 1] · 감소 % [0, 10, 30, 50, 90] — 숨은 판정값 표 `pitching.fatigueThresholds` · `pitching.fatigueCutPercents`
+  // (체력%는 정수라 "> 54" 와 "≥ 55" 가 같다)
+  const thresholds = balanceList('pitching.fatigueThresholds')
+  const cuts = balanceList('pitching.fatigueCutPercents')
+  const band = thresholds.findIndex((threshold) => staminaPercent >= threshold)
+  const reduction = cuts[band < 0 ? thresholds.length : band]
   return value - Math.trunc((value * reduction) / 100)
 }
 

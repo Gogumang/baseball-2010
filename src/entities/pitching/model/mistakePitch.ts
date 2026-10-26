@@ -1,5 +1,6 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
+import { balanceList, balanceNumber } from '@/shared/config/balance'
 
 /**
  * 실투 판정 — 원본 0x33cbc(scene). 투구 순간 0x4dc78 이 궤적 준비(0x9e669) **뒤**에
@@ -36,15 +37,9 @@ import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
  *    칸이 비어 있어 1~3루 주자 수와 같다고 보고 부르는 쪽이 그 값을 넘긴다.
  */
 
-/** 표 0xd2589 (s8) — 등급 t 별 능력치 배율 % (0x66d70) */
-const ABILITY_PERCENT_BY_GRADE: readonly number[] = [70, 80, 90, 100, 105, 110]
-/** 표 0xd257d (s8) — 등급 t 별 더하는 값 */
-const MISTAKE_BONUS_BY_GRADE: readonly number[] = [10, 5, 0, 0, -1, -2]
-/** 0x33d14 — 8 − 능력치 등급 */
-const MISTAKE_BASE = 8
+// 표 0xd2589 (s8) 등급 t 별 능력치 배율 % (0x66d70) · 표 0xd257d (s8) 등급 t 별 더하는 값 · 0x33d14 의 8(− 능력치 등급) ·
+// 0x33d3e 게이지를 안 누르면(t = 0) 20 — 숨은 판정값 표 `pitching.mistake*` · `pitching.unpressedMistakePercent`
 const MISTAKE_FLOOR = 1
-/** 0x33d3e — 게이지를 안 누르면(t = 0) 20 */
-const UNPRESSED_MISTAKE_PERCENT = 20
 const INTIMIDATE_BONUS = 5
 const STEADY_PENALTY = 5
 const TIMID_BONUS = 10
@@ -78,10 +73,12 @@ export interface MistakePitchInput {
 export function mistakePercentOf(input: Omit<MistakePitchInput, 'isMagicPitch'>): number {
   const t = input.grade
   const scaled =
-    t >= 0 && t <= 5 ? Math.trunc((input.effectiveVelocity * ABILITY_PERCENT_BY_GRADE[t]) / 100) : input.effectiveVelocity
-  const bonus = t >= 0 && t <= 5 ? MISTAKE_BONUS_BY_GRADE[t] : 0
-  let p = Math.max(MISTAKE_BASE - abilityGradeOf(scaled) + bonus, MISTAKE_FLOOR)
-  if (t === 0) p = UNPRESSED_MISTAKE_PERCENT
+    t >= 0 && t <= 5
+      ? Math.trunc((input.effectiveVelocity * balanceList('pitching.mistakeAbilityPercent')[t]) / 100)
+      : input.effectiveVelocity
+  const bonus = t >= 0 && t <= 5 ? balanceList('pitching.mistakeGradeBonus')[t] : 0
+  let p = Math.max(balanceNumber('pitching.mistakeBase') - abilityGradeOf(scaled) + bonus, MISTAKE_FLOOR)
+  if (t === 0) p = balanceNumber('pitching.unpressedMistakePercent')
   if (input.batterIntimidates) p += INTIMIDATE_BONUS
   if (input.runnerCount > 1 && input.pitcherIsSteady) p = Math.max(p - STEADY_PENALTY, 0)
   if (input.hasSecondBaseRunner && input.pitcherIsTimid) p += TIMID_BONUS

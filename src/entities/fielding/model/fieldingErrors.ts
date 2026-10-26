@@ -1,6 +1,7 @@
 import { abilityGradeOf } from '@/entities/fielding/model/fieldGeometry'
 import { NO_PLAYER_THROW_ERROR_BIAS, throwErrorBiasOf } from '@/entities/fielding/model/fieldingState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { balanceList, balanceNumber } from '@/shared/config/balance'
 
 /**
  * 수비 실수 세 가지 — 펌블(0xb401c 안 0xb41d0) · 악송구(0xa1828) · 필살수비 발동(0x66b30/0x66be4).
@@ -10,7 +11,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 
 const RANDOM_LIMIT = 10_000
 
-/** 펌블 확률표 0xd87d4 = [200,180,160,140,120,100,80,50] (÷10000) — 등급 0~7 */
+/** 펌블 확률표 0xd87d4 = [200,180,160,140,120,100,80,50] (÷10000) — 등급 0~7. 원본 값이고 굴림은 숨은 판정값 표 `fielding.fumblePermyriad` 를 읽는다 */
 export const FUMBLE_PERMYRIAD: readonly number[] = [200, 180, 160, 140, 120, 100, 80, 50]
 
 /**
@@ -19,7 +20,7 @@ export const FUMBLE_PERMYRIAD: readonly number[] = [200, 180, 160, 140, 120, 100
  */
 export function fumbleChanceOf(defenseAbility: number | null): number {
   if (defenseAbility === null) return 0
-  return FUMBLE_PERMYRIAD[abilityGradeOf(defenseAbility)]
+  return balanceList('fielding.fumblePermyriad')[abilityGradeOf(defenseAbility)]
 }
 
 /**
@@ -47,7 +48,8 @@ export function rollFumble(defenseAbility: number | null, ballIsMoving: boolean,
  */
 export function throwErrorChanceOf(defenseAbility: number | null, special = false): number {
   const bias = defenseAbility === null ? NO_PLAYER_THROW_ERROR_BIAS : throwErrorBiasOf(abilityGradeOf(defenseAbility))
-  return bias + (special ? 100 : 0) + 100
+  // 끝의 100 은 숨은 판정값 표 `fielding.throwErrorBase` (특수 송구의 +100 은 그대로)
+  return bias + (special ? 100 : 0) + balanceNumber('fielding.throwErrorBase')
 }
 
 export interface ThrowErrorResult {
@@ -86,7 +88,7 @@ export function rollThrowError(
 /** 송구 거리 상한 = 17000 × 120 / 100. 넘으면 원바운드가 된다 (0xa1620, I-controls 2b) */
 export const BOUNCE_THROW_DISTANCE = 20_400
 
-/** 필살수비 발동 확률표 0xd25b0 = [1,2,3,3,4,4,5,6] (퍼센트) */
+/** 필살수비 발동 확률표 0xd25b0 = [1,2,3,3,4,4,5,6] (퍼센트) — 원본 값. 굴림은 숨은 판정값 표 `fielding.specialDefensePercent` 를 읽는다 */
 export const SPECIAL_DEFENSE_PERCENT: readonly number[] = [1, 2, 3, 3, 4, 4, 5, 6]
 
 export interface SpecialDefenseOptions {
@@ -101,7 +103,7 @@ export function specialDefenseThresholdOf(
   defenseAbility: number,
   options: SpecialDefenseOptions = {},
 ): number {
-  const base = SPECIAL_DEFENSE_PERCENT[abilityGradeOf(defenseAbility)] + (options.hasSixthSense === true ? 3 : 0)
+  const base = balanceList('fielding.specialDefensePercent')[abilityGradeOf(defenseAbility)] + (options.hasSixthSense === true ? 3 : 0)
   const threshold = base * 10
   return options.isBatterCareerMode === true ? Math.trunc(threshold / 2) : threshold
 }

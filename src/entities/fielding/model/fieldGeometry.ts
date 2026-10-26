@@ -1,4 +1,5 @@
 import { integerSquareRoot } from '@/shared/lib/math/originalTrigonometry'
+import { balanceNumber } from '@/shared/config/balance'
 
 /**
  * 수비 좌표계와 이동 상수 (binary.mod).
@@ -72,10 +73,7 @@ export const BASE_SCORE: readonly number[] = [4000, 1000, 2000, 3000]
 
 /** 야수 달리기 속도 cfg+0x18 = 220/틱. **능력치와 무관하게 9명 전부 같다** (P2 1c, 확정) */
 export const FIELDER_SPEED = 220
-/** 주자 기본 속도 cfg+0x14 = 300 (R3 4절) */
-export const RUNNER_BASE_SPEED = 300
-/** 주루 능력치 계수 cfg+0x16 = 7 (÷100) */
-export const RUNNER_SPEED_NUMERATOR = 7
+// 주자 기본 속도 cfg+0x14 = 300 (R3 4절) · 주루 능력치 계수 cfg+0x16 = 7 (÷100) — 숨은 판정값 표 `running.baseSpeed` · `running.speedPerRun`
 /** 슬라이딩 동작(6) 중 추가 속도 (0xa0164, R3 3절) */
 export const SLIDING_SPEED_BONUS = 40
 /** 슬라이딩이 걸리는 진행률 구간 (0xa9690: 71 ≤ p ≤ 94) */
@@ -86,7 +84,7 @@ export const SLIDING_PROGRESS_RANGE = { minimum: 71, maximum: 94 } as const
  * 팀 등급은 전역 모드 1·2·8 에서만 더해진다(야수 보너스와 달리 9 가 빠진다).
  */
 export function runnerSpeedOf(runAbility: number, teamGrade = 0): number {
-  return RUNNER_BASE_SPEED + Math.trunc((runAbility * RUNNER_SPEED_NUMERATOR) / 100) + teamGrade
+  return balanceNumber('running.baseSpeed') + Math.trunc((runAbility * balanceNumber('running.speedPerRun')) / 100) + teamGrade
 }
 
 /** 능력치 → 등급 0~7 (0xbbe98). 투구 쪽 0x66c98 표와 같은 칸이다 */

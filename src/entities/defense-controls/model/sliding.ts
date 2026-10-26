@@ -1,3 +1,5 @@
+import { balanceNumber } from '@/shared/config/balance'
+
 /**
  * 슬라이딩 — 사람 키(OK) 와 자동 슬라이딩 (binary.mod 0x518da · 0xa96ec · 0xa9690 · 0xb030c).
  *
@@ -13,10 +15,8 @@ export const SLIDING_PROGRESS_MINIMUM = 71
 export const SLIDING_PROGRESS_MAXIMUM = 94
 /** 동작 바꾸기 0xa0164: 새 동작이 6(슬라이딩)이면 속도 = vt64() + 40 (`adds r1,#0x28`) */
 export const SLIDING_SPEED_BONUS = 40
-/** 주자 기본 속도의 상수항 cfg+0x14 = 300 (d_level.dat 파일 0x10 = `2c01`, 폴백 0xb6f3e) */
-export const RUNNER_BASE_SPEED = 300
-/** 주루 능력 배율 cfg+0x16 = 7 (÷100) — 0xa93ac */
-export const RUNNER_RUN_NUMERATOR = 7
+// 주자 기본 속도의 상수항 cfg+0x14 = 300 (d_level.dat 파일 0x10 = `2c01`, 폴백 0xb6f3e) · 주루 능력 배율 cfg+0x16 = 7 (÷100) — 0xa93ac.
+// 둘 다 숨은 판정값 표 `running.baseSpeed` · `running.speedPerRun` 에서 읽는다
 export const RUNNER_RUN_DENOMINATOR = 100
 /** 슬라이딩 동작 번호 (야수·주자 공용 동작표, R3 5절: 6 = 슬라이딩) */
 export const SLIDING_MOTION = 6
@@ -28,7 +28,7 @@ export const SLIDING_SOUND_EFFECT = 10
  * 팀 등급은 전역 모드 **1·2·8** 일 때만 붙는다(야수 보너스와 달리 9 가 빠진다 — 원본 그대로, 0xa93ac).
  */
 export function runnerSpeedOf(run: number, teamGrade = 0): number {
-  return RUNNER_BASE_SPEED + Math.trunc((run * RUNNER_RUN_NUMERATOR) / RUNNER_RUN_DENOMINATOR) + teamGrade
+  return balanceNumber('running.baseSpeed') + Math.trunc((run * balanceNumber('running.speedPerRun')) / RUNNER_RUN_DENOMINATOR) + teamGrade
 }
 
 /** 슬라이딩 중 속도 (0xa0164) */

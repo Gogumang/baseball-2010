@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { balanceNumber } from '@/shared/config/balance'
 
 /**
  * `state[0x19]` 0.1% 사건 — **포수 뒤로 빠진 공(폭투·포일)** (S8 5절).
@@ -15,6 +16,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 /**
  * cfg+0x2e 32비트 값 = 10 (파일 0x2a = 10, 0x2c = 0).
  * 원본 `T > rand(0, 10000)`(위끝 제외) — 10/10000 = 0.1% (0x35058).
+ * 원본 값이다 — 굴림은 숨은 판정값 표 `pitching.wildPitchPermyriad` 를 읽는다.
  */
 export const PASSED_BALL_THRESHOLD = 10
 const RANDOM_LIMIT = 10_000
@@ -24,7 +26,7 @@ export const HOME_RUN_DERBY_MODE = 7
 
 export function rollPassedBall(gameMode: number, random: RandomPort): boolean {
   if (gameMode === HOME_RUN_DERBY_MODE) return false
-  return PASSED_BALL_THRESHOLD > random.rand(0, RANDOM_LIMIT)
+  return balanceNumber('pitching.wildPitchPermyriad') > random.rand(0, RANDOM_LIMIT)
 }
 
 /** 굴림이 섰을 때 실제로 공이 튀는 값 (0x3507c) */
