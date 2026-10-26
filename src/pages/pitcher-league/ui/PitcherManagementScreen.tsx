@@ -66,13 +66,13 @@ export interface PitcherManagementScreenProps {
   readonly onSave: (career: PitcherCareer) => void
   /** [다음경기] — 세션의 `actions.beginGame` (원본 109 → 142 → 144 → 경기 장면 0x104) */
   readonly onNextGame: () => void
-  /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 — 그러면 칸이 알림만 띄운다 */
-  readonly onOuting?: () => void
+  /** [외출] 상태 112 */
+  readonly onOuting: () => void
   /**
    * 111 상점('장착'·'서브'·'GP', [아이템] → 110 하위 메뉴 칸 0·1·2) · 121 장비착용('착용', [선수정보] 칸 1).
-   * 안 넘기면 그 칸은 알림만 띄운다 ([아이템/스킬] 122 는 화면이 스킬 창을 띄운다)
+   * ([아이템/스킬] 122 는 화면이 스킬 창을 띄운다)
    */
-  readonly onOpenShop?: (tab: PitcherShopTab) => void
+  readonly onOpenShop: (tab: PitcherShopTab) => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
   /** 화면이 '관리' 인 채 105 에 다시 들어온다 — 세션의 `actions.reenterManagement` (`usePitcherManagementMenu` 의 `onReenter`) */
@@ -214,16 +214,14 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
     ...(returned === null ? {} : { initialKind: returned.kind }),
     // 110 확인 → 111(키 0x11478) · 106 칸 1 → 121(키 0x13010) — 그 취소는 하위 메뉴로 돌아온다(0x13460 의 13b1e → 110 ·
     // 0x17ad0 의 17aee → 106). 커서는 고른 칸 그대로
-    ...(onOpenShop === undefined ? {} : {
-      onOpenShop: (tab: PitcherShopTab) => {
-        if (tab === '착용') {
-          leaveNariSubMenu(mainCursor, '선수정보', PITCHER_COMMAND_BAR.선수정보.findIndex((slot) => slot.id === '장비착용'))
-        } else {
-          leaveNariSubMenu(mainCursor, '아이템', PITCHER_COMMAND_BAR.아이템.findIndex((slot) => slot.id === tab))
-        }
-        onOpenShop(tab)
-      },
-    }),
+    onOpenShop: (tab: PitcherShopTab) => {
+      if (tab === '착용') {
+        leaveNariSubMenu(mainCursor, '선수정보', PITCHER_COMMAND_BAR.선수정보.findIndex((slot) => slot.id === '장비착용'))
+      } else {
+        leaveNariSubMenu(mainCursor, '아이템', PITCHER_COMMAND_BAR.아이템.findIndex((slot) => slot.id === tab))
+      }
+      onOpenShop(tab)
+    },
   })
   /*
    * 화면 안 행동(훈련 125 · 휴식 127 — S+4 = 1)은 그 상태를 거쳐 105 로 다시 들어온다 — 그 진입이 행동함이라 커서를 첫 칸으로.

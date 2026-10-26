@@ -136,12 +136,18 @@ describe('가드에 걸린 칸 (0x13460)', () => {
     expect(onPurchase).not.toHaveBeenCalled()
   })
 
-  it('G 포인트가 모자라면 살 수 없다고 안내한다 (StrMODE[65])', () => {
+  it('G 포인트가 모자라면 StrMODE[65] 를 예/아니오로 묻고, 어느 답이든 닫기만 한다 (0x1378c~0x137a4 → 0xbbef9(글, 2, 2, 1))', () => {
     const onPurchase = 띄우기('GP', { ...createCareer('테스터'), gamePoint: 0 })
 
     칸고르기('장어구이')
 
-    expect(within(알림() as HTMLElement).getByText(/G포인트가 부족합니다/)).toBeTruthy()
+    const dialog = 알림() as HTMLElement
+    expect(within(dialog).getByText(/G포인트가 부족합니다/)).toBeTruthy()
+    expect(dialog.textContent).toContain('페이지로 이동하시겠습니까?')
+    expect(within(dialog).getByRole('button', { name: '아니오' })).toBeTruthy()
+    // 예 = 원본 G 충전 — 서버 기능 제외(10-24)라 웹은 닫기만 한다
+    fireEvent.click(within(dialog).getByRole('button', { name: '예' }))
+    expect(알림()).toBeNull()
     expect(onPurchase).not.toHaveBeenCalled()
   })
 

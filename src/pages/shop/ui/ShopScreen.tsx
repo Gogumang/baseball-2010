@@ -141,8 +141,11 @@ export function ShopScreenView({
   const [cursor, setCursor] = useState(0)
   const [equipmentState, setEquipmentState] = useState<EquipmentWindowState>(INITIAL_EQUIPMENT_WINDOW)
   const [pending, setPending] = useState<{ readonly itemId: string; readonly question: string } | null>(null)
-  /** 가드에 걸린 칸의 안내 — 원본 0x13460 은 여기서 1버튼 팝업만 띄우고 사지 않는다 */
-  const [blockNotice, setBlockNotice] = useState<string | null>(null)
+  /**
+   * 가드에 걸린 칸의 안내 — 원본 0x13460 은 여기서 팝업만 띄우고 사지 않는다.
+   * `asks` 는 G 부족 [65] 의 예/아니오 (2, 2) — 예(G 충전)는 서버 기능 제외라 두 답 모두 닫기만 한다.
+   */
+  const [blockNotice, setBlockNotice] = useState<{ readonly text: string; readonly asks: boolean } | null>(null)
   const [dismissedNotice, setDismissedNotice] = useState('')
 
   const entries = entriesOf()
@@ -174,7 +177,7 @@ export function ShopScreenView({
     if (entry === undefined) return
     // 서브·GP 는 막힘 문구가 entities 쪽에 그대로 있어 창이 바로 띄운다.
     if (entry.blockNotice !== null) {
-      setBlockNotice(entry.blockNotice)
+      setBlockNotice({ text: entry.blockNotice, asks: entry.blockAsks === true })
       return
     }
     askOrPurchase(entry.id)
@@ -233,7 +236,8 @@ export function ShopScreenView({
           }} />
       )}
       {pending === null && blockNotice !== null && (
-        <MessageBox text={`!C${blockNotice}`} buttons={['확인']} onAnswer={() => setBlockNotice(null)} />
+        <MessageBox text={centeredNoticeOf(blockNotice.text)} buttons={blockNotice.asks ? ['예', '아니오'] : ['확인']}
+          onAnswer={() => setBlockNotice(null)} />
       )}
       {detail !== null && (
         // 장비 구매 확정 0x14a74(0x15084) — 0x741a0(높이 0), 키 0x1d648 이 0x742a9 로 바로 치운다

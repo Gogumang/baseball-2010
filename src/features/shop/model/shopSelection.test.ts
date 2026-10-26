@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -89,7 +90,7 @@ describe('상점 선택 — 0x14a74', () => {
     expect(gp.detail?.itemIndex).toBe(6)
     expect(gp.detail?.before.morale).toBe(10)
     expect(gp.detail?.after).toBe(gp.career)
-    expect(selectShopItem(선수({ gamePoint: 0 }), shopItemId('GP', 6), 난수).notice).toBe('G포인트가 부족합니다')
+    expect(selectShopItem(선수({ gamePoint: 0 }), shopItemId('GP', 6), 난수).notice).toBe(ORIGINAL_MODE_TEXT[65]) // StrMODE[65] 원문
   })
 
   it('GP 결과 창은 칸 0~4·6 만 — 5·7·8·9 는 알림 그대로 (0x14f28 · 0x15030)', () => {

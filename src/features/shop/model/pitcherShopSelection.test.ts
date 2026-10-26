@@ -4,6 +4,7 @@ import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCare
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { pitcherPurchaseQuestionOf, selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
 import { shopItemId } from '@/features/shop/model/shopSelection'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /** 장비·서브는 난수를 안 쓴다 — 쓰면 터지게 둔다 */
@@ -96,7 +97,7 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
 
   it('GP: G 부족(65)이 가장 먼저다 — 스태미나가 최대여도 G 부족 글이 뜬다', () => {
     const 빈G = 투수({ gamePoint: 0 })
-    expect(selectPitcherShopItem(빈G, shopItemId('GP', 9), 무작위)).toEqual({ career: 빈G, notice: 'G포인트가 부족합니다' })
+    expect(selectPitcherShopItem(빈G, shopItemId('GP', 9), 무작위)).toEqual({ career: 빈G, notice: ORIGINAL_MODE_TEXT[65] })
     expect(selectPitcherShopItem(투수({ gamePoint: 1000 }), shopItemId('GP', 9), 무작위).notice)
       .toBe('!C스태미나가 최대입니다!N구매 할 수 없습니다')
   })

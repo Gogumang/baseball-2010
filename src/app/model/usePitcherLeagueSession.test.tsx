@@ -732,14 +732,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(본것.slice(-2)).toEqual([461, 464])
     expect(거절.current.career?.season).toBe(2)
     expect(본것).toContain(383)
-    expect(거절.current.storyNotice).toBe('')
 
     const 출전 = 판짜기(잘함)
     act(() => 출전.current.actions.beginYearEnd())
     연말끝까지(출전, { 380: [383], 461: [463] })
     expect(출전.current.scene).toBe('국가대항전')
     expect(출전.current.career?.season).toBe(1)
-    expect(출전.current.storyNotice).toBe('')
     // 0xb521d — 대표팀 투수 배열 칸 k(내 칸, 선발 0)에 내 투수 복사본, 옛 0번은 맨 끝
     expect(출전.current.career?.nariCupTeams?.korea.pitchers).toEqual([-1, 1, 2, 3, 4, 5, 6, 7, 0])
     // 134 첫 틀(0x1b92c)은 칭호 8 "국가 대표" 팝업만 띄운다 — 확인 0x1b1e4 가 주고 곧바로 장착. 거절은 못 받는다
@@ -1441,7 +1439,6 @@ describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
     act(() => result.current.actions.completeStory([{ kind: 7, value: 19 }, { kind: 7, value: 43 }], [result.current.story!.eventId]))
 
     expect(result.current.career?.openedHiddenIds).toEqual([19, 43])
-    expect(result.current.storyNotice).toBe('')
     expect(알림).toHaveBeenCalledWith([19, 43])
   })
 

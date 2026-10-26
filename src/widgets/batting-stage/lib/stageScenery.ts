@@ -200,7 +200,9 @@ export function skyLightFrameAt(
  * 0xd 진입이 상태 0 을 걸고 0xd 갱신 0x39e14 가 0xe 를 예약하므로, 0xd → 0xe 로 쉬는 동안 투수는 상태 0 이다(웹 쉬는 '대기').
  * 0xe 를 예약하는 곳은 0x39e2e(0xd 갱신)와 0x4984a(0xb 교체 화면의 # · CLR) 둘뿐이다(0xbcb48 부름 269곳의 `movs r1, #0xe`).
  * 0xb 는 0xe · 0xf 의 '#'(0x499f4)로 들고 갱신 칸이 비어 있어, 0xf 에서 대기 동작 중에 '#' 를 누르면 0xb → 0xe 동안 그 단계에
- * 굳어 있다가 다음 0xf 진입에 상태 0 이 된다. ⚠️ 웹은 이 길(0xf → 0xb → 0xe)의 굳음을 따로 옮기지 않았다.
+ * 굳어 있다가 다음 0xf 진입에 상태 0 이 된다. 웹(`PitcherSideStage`)은 0xb 동안 구질 목록 부품이 내려가 `idleEndTick` 이 서고(굳음),
+ * 0xb 에서 곧장 선 0xe 는 0xd 표지(`sceneDEntryMark`)를 안 바꿔 그대로 굳어 있다가, OK 뒤 0xf 진입(`entersStateF`)에 상태 0 이 된다
+ * (`PitcherSideStage.idle.test`).
  *
  * 한 그림 차례(0x52c50): 진입 표 → 키(0x498d4 → 조작 0x536bc → 0x534d8 → 0xbfbad 바로 보냄 → 0x509a0 메시지 7 → 0x50de8)
  * → 갱신 표 → 그리기. 그래서 0x11 진입 그림과 빈 칸 키 그림은 둘 다 **상태를 건 그 그림에 한 번 센 단계로 그린다**(틱 0).

@@ -2,6 +2,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { SUB_ITEMS, SUB_ITEM_BLOCK_TEXT, hasSubItem, subItemBlockReasonOf } from '@/entities/career/model/subItems'
 import { BATTER_GP_ITEMS, gpItemBlockReasonOf } from '@/entities/career/model/gpItems'
 import { shopItemId } from '@/features/shop/model/shopSelection'
+import { NOT_ENOUGH_GAME_POINT_TEXT } from '@/features/shop/model/pitcherShopSelection'
 import type { ShopTab } from '@/features/shop/model/shopSelection'
 import { itemIconFrameOf } from '@/pages/shop/lib/shopLayout'
 import type { ShopWindowKindName } from '@/pages/shop/lib/shopLayout'
@@ -25,6 +26,11 @@ export interface ShopEntry {
    * 가드에 걸린 칸이면 그 안내 문구. 원본은 0x13460 이 여기서 **1버튼 팝업만 띄우고 사지 않는다**.
    */
   readonly blockNotice: string | null
+  /**
+   * 막힘 팝업이 예/아니오(2, 2)인가 — GP 칸의 G 부족 [65] 만 그렇다(0x1378c~0x137a4 → 0x1371c → 0x13b0c 0xbbef9(글, 2, 2, 1)).
+   * 다른 가드는 (1, 1) 한 단추(0x139a0~0x139a8). 예는 원본에서 G 충전이지만 웹은 서버 기능을 빼 두어 두 답 모두 닫는다.
+   */
+  readonly blockAsks?: boolean
 }
 
 /**
@@ -52,8 +58,6 @@ function subEntriesOf(career: PlayerCareer): readonly ShopEntry[] {
   })
 }
 
-/** G 부족 StrMODE[65] — `selectShopItem` 이 내는 문구와 같은 글이어야 두 길의 팝업이 안 갈린다 */
-const NOT_ENOUGH_GAME_POINT = 'G포인트가 부족합니다'
 
 /** GP아이템 상점 — 창 종류 2 (R12 1b-다: G부족이 가장 먼저, 그 다음 아이템별 가드 여섯) */
 function gpEntriesOf(career: PlayerCareer): readonly ShopEntry[] {
@@ -64,7 +68,8 @@ function gpEntriesOf(career: PlayerCareer): readonly ShopEntry[] {
     price: item.price,
     iconFrame: itemIconFrameOf('GP', index),
     isOwned: false,
-    blockNotice: career.gamePoint < item.price ? NOT_ENOUGH_GAME_POINT : gpItemBlockReasonOf(career, index),
+    blockNotice: career.gamePoint < item.price ? NOT_ENOUGH_GAME_POINT_TEXT : gpItemBlockReasonOf(career, index),
+    blockAsks: career.gamePoint < item.price,
   }))
 }
 

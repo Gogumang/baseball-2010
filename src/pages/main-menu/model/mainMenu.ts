@@ -15,12 +15,9 @@ export type MainMenuTier = 4 | 5 | 9
 
 /**
  * 처음 메뉴 6칸. 순서는 StrMAINMENU [0]~[4]·[209] 그대로다.
- * 공용 설정(`shared/config/original/mainMenu`)은 [랭킹]·[게임문의] 를 아직 안 만든 칸(isAvailable false)으로 적어 두었다 —
- * 지금은 둘 다 들어간다: 랭킹 = 하위 9 모드 목록(오프라인, OK 부터 서버 🌐), 게임문의 = 하위 10 도움말 뷰어 장 6.
- * 공용 설정은 이 쪽에서 덮어 연다.
+ * 랭킹 = 하위 9 모드 목록(오프라인, OK 부터 서버 🌐), 게임문의 = 하위 10 도움말 뷰어 장 6.
  */
-export const TOP_ENTRIES: readonly MainMenuEntry[] = TOP_MENU.map((entry) =>
-  entry.id === '랭킹' || entry.id === '게임문의' ? { ...entry, isAvailable: true } : entry)
+export const TOP_ENTRIES: readonly MainMenuEntry[] = TOP_MENU
 
 /**
  * **랭킹 모드 목록**(하위 9) 다섯 칸 — 진입 0x23d98 이 항목 글자 표 0xcea00(img_text 9·12·15·18·20)을 `[0x1552d28]` 로,

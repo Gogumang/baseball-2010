@@ -509,6 +509,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         idleStartTick = null
         idleEndTick = null
       }
+      // 구질 목록 부품이 내려가면(0x10 조준 · 0xb 교체 창 · 공) 다음 0xf 의 부품은 누름 표지를 0 부터 다시 센다 — 본 표지도 0 으로.
+      // 안 그러면 0xf → 0xb('#') → 0xe → 0xf 길 뒤 첫 빈 칸 키가 앞 0xf 의 표지와 같은 수라 대기 동작(9dff8(…, 2))을 놓친다
+      if (current.inputOverlayRef?.current?.kind !== '구질') seenIdlePress = 0
       // 0x50de8 — 구질 목록(0xf)의 빈 칸 키. 누를 때마다 처음부터 한 바퀴(9dff8 이 단계 · 틱을 0 으로)
       const idlePress = pitchInput?.kind === '구질' ? (pitchInput.pitcherIdlePress ?? 0) : 0
       if (idlePress !== 0 && idlePress !== seenIdlePress) {

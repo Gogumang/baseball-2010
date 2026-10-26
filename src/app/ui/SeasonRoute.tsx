@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
-import type { ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 import {
   GameIncomeScreen, NextGameScreen, PlayerRecruitScreen,
   SeasonEndingScreen, SeasonInfoScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonChainFrameScreen,
@@ -204,16 +203,13 @@ export function SeasonRoute(props: SeasonRouteProps) {
  * 어느 화면 다음에 무엇이 오는지는 `entities/season-mode` 의 상태 기계가 정하고,
  * 여기서는 그 장면 번호에 맞는 화면을 고르기만 한다.
  *
- * **아직 화면이 없는 장면**(연초 목표 0xd4 등)은
- * 알림을 띄우고 관리 메뉴로 되돌린다 — 조용히 아무것도 안 하는 것보다 낫다.
+ * 시즌 상태는 모두 갈래가 있다 — 갈래가 기다리는 재료가 아직 없는 틀만 아무것도 안 그린다(맨 끝).
  */
 function SeasonScreens({
   session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords, onHallOfFameEquipment, onHallOfFameRecruit,
 }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
-  /** 아이템 메뉴에서 고른, 웹에 아직 없는 창 종류 (`[win+0x1a4]`) */
-  const [missingWindow, setMissingWindow] = useState<ItemWindowKind | null>(null)
   /** 아이템 상점 0xdc 의 창 종류 1 서브아이템 · 2 GP (0x5f3c 가 0xd0 의 칸으로 고른다). null 이면 구장·장비 갈래 */
   const [shopKind, setShopKind] = useState<1 | 2 | null>(null)
   /** 0xe8 에서 돌아오면 GP 창 커서를 칸 3 으로 (0x5f3c 이전 상태 0xe8 갈래) */
@@ -304,18 +300,6 @@ function SeasonScreens({
     // 들어올 때 한 번만 — 0x327b8 은 시즌모드에 들어오는 그 순간에만 돈다
   }, [])
   if (isEnteringGame) return null
-
-  if (missingWindow !== null) {
-    return (
-      <RawScreen>
-        <MessageBox
-          text={`이 화면은 아직 없습니다 (장면 0xdc 창 종류 ${missingWindow})`}
-          buttons={['OK']}
-          onAnswer={() => setMissingWindow(null)}
-        />
-      </RawScreen>
-    )
-  }
 
   if (notice !== '') {
     return (
@@ -918,7 +902,8 @@ function SeasonScreens({
             return actions.goto(target)
           }
           setShopKind(null)
-          return windowKind === ITEM_WINDOW_KIND.구장아이템 ? actions.goto(target) : setMissingWindow(windowKind)
+          // 남은 칸은 구장(종류 4)뿐이다 — 장비(3)는 위 0xdf 로 먼저 빠진다 (`SEASON_ITEM_MENU` 네 칸)
+          return actions.goto(target)
         }}
         onBack={backToManagement}
         gamePoint={session.gamePoints}
@@ -1160,14 +1145,8 @@ function SeasonScreens({
     )
   }
 
-  return (
-    <RawScreen>
-      <MessageBox
-        text={`이 화면은 아직 없습니다 (장면 0x${scene.toString(16)})`}
-        buttons={['OK']}
-        onAnswer={backToManagement}
-      />
-    </RawScreen>
-  )
+  // 0x105 그리기 표의 시즌 상태는 위 갈래가 모두 받는다 — 여기는 갈래가 기다리는 재료(이벤트 · 경기 · 고른 선수 따위)가 아직 없는
+  // 틀뿐이라, 빈 그리기 칸처럼 아무것도 안 그린다 (예전 웹 안내 "이 화면은 아직 없습니다" 는 원본에 없다)
+  return null
 }
 

@@ -164,7 +164,6 @@ import type { OutingPresentation, OutingResult } from '@/entities/career/model/o
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } from '@/pages/outing-map/lib/outingPlaceSlots'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
-import { PITCHER_MANAGEMENT_TEXT } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import { nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage } from '@/pages/management/lib/nariMatchPrepare'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import {
@@ -293,8 +292,6 @@ export interface PitcherLeagueSession {
   readonly postseasonPopup: PostseasonPopup | null
   /** 치르는 마선수 대결 (장면 '마선수대결'). 아니면 null */
   readonly aceMatch: PitcherAceMatch | null
-  /** 이벤트 재생 뒤 띄울 알림 — 히든 오픈(보상 7) 팝업 글 · 옮기지 않은 갈래. 없으면 '' */
-  readonly storyNotice: string
   /** 관리 화면에 띄울 칭호 팝업 하나 (0x1a1c0 → 0x1274c). 없으면 null */
   readonly pendingTitle: string | null
   /** 국가대항전 대회 (장면 '국가대항전') — `atStandings` 면 135(순위)부터 (142 취소). 대회 칸은 커리어 `nationalCup` 에도 저장된다 */
@@ -386,8 +383,6 @@ export interface PitcherLeagueSession {
      * 하위와 상관없이 모든 system 창이다.
      */
     readonly confirmEventSystemWindow: () => void
-    /** 이벤트가 경기 명령(마선수 대결)에 닿았다 — 대결 화면이 없을 때: 지나온 보상만 남기고 105 (근사) */
-    readonly abortStoryAtMatch: (carry: StoryCarry) => void
     /** 경기 명령 → 투수 미션 레코드 team−1 로 마선수 대결 (장면 '마선수대결') */
     readonly beginAceMatch: (command: MatchCommand, carry: StoryCarry) => void
     /** 대결이 끝났다 — 105 진입이 +0x176 을 보고 140 → 결과 이벤트 resultEvents[이김 ? 0 : 1] */
@@ -397,7 +392,6 @@ export interface PitcherLeagueSession {
      * 대기 칸(전역기록 — `aceMatchPending`)은 남아 다음 105 진입이 진 결과 이벤트를 띄운다.
      */
     readonly quitAceMatch: () => void
-    readonly dismissStoryNotice: () => void
     /** 128 [다음] — 키 0x13da0 (끝났으면 우승 발표 · 내 차례면 경기 · 아니면 CPU 끼리) */
     readonly pressPostseason: () => void
     /** 128 팝업 닫힘 — 틀 0x15984 */
@@ -765,7 +759,6 @@ export function usePitcherLeagueSession(
   const [endingFromResume, setEndingFromResume] = useState(() => resumePoint.kind === '엔딩')
   const [gameOptions, setGameOptions] = useState<PitcherGameOptions | null>(null)
   const [story, setStory] = useState<PitcherStory | null>(() => pitcherStoryOfResume(resumePoint))
-  const [storyNotice, setStoryNotice] = useState('')
   /** 128 로 넘어가며 접어 둔 연말 사슬의 본 번호 — 128 이 끝나면 여기서 132 로 잇는다 */
   const yearEndViewedRef = useRef<readonly number[]>([])
   const [postseasonPopup, setPostseasonPopup] = useState<PostseasonPopup | null>(() => postseasonPopupOfResume(career, resumePoint))
@@ -2113,24 +2106,6 @@ export function usePitcherLeagueSession(
   }, [career, commit])
 
   /**
-   * 경기 명령(r_event `match`) — 투수편 장소 이벤트 113·123·127·150·153·192·196·207·211·217·221·225·229 (대상 3).
-   *
-   * **대결 화면이 없을 때의 근사** (`abortStoryAtMatch`): 그때까지 지나온 보상·본 이벤트만 남기고 알림과 함께 105.
-   * 장소 끝 처리(행동·외출 수)는 match 가 끝남을 돌려주는 자리라 그대로 한다. 결과 이벤트는 열리지 않는다.
-   */
-  const abortStoryAtMatch = useCallback(
-    (carry: StoryCarry) => {
-      if (career === null || story === null) return
-      const rewarded = applyPitcherEventRewards(settlePlaceForAceMatch(career, story.context), carry.rewards, random, story.eventId)
-      commit(finishPitcherEvent(rewarded, carry.viewedEventIds))
-      setStory(null)
-      setStoryNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
-      setScene('관리')
-    },
-    [career, commit, random, story],
-  )
-
-  /**
    * **마선수 대결** — SYS 8(0x8d734 → 0x8d764)이 `g[0x175] = team − 1`(투수편 미션 레코드 번호)를 적고 미션 장면으로 나간다.
    * 그때까지 지나온 보상·본 이벤트는 재생기가 들고(`carry`) 결과 이벤트로 넘긴다 — 타자편과 같은 꼴.
    * 이벤트 데이터의 team 은 16~20 뿐이라 투수 미션 16~20 "메디카·킹타이거·로제·크라이져·어거지죠" (목표 아웃) 에 떨어진다.
@@ -2142,7 +2117,9 @@ export function usePitcherLeagueSession(
     (command: MatchCommand, carry: StoryCarry) => {
       if (career === null || story === null) return
       const mission = aceMatchMissionOf(command.team, '투수')
-      if (mission === null) return abortStoryAtMatch(carry)
+      // 원본은 범위 검사 없이 레코드 team − 1 을 연다 — 이벤트 데이터의 team 은 16~20 뿐이라 null 이 안 난다
+      // (경기 명령: 투수편 장소 이벤트 113·123·127·150·153·192·196·207·211·217·221·225·229 · 결과 이벤트)
+      if (mission === null) return
       /*
        * SYS 8 투수편 갈래(0x8d7d0~0x8d834): g[0x175] = team − 1 · g[0x170]/g[0x172] = 결과 이벤트 · g[0x176] = 1 · g[0x177] = 0 ·
        * g[0xf6] = 모드 → 전역기록 저장(8d84a) · 지금 이벤트 본 표시(8d85c) · 커리어 저장(8d870). match 가 끝남을 돌려 114 끝
@@ -2155,7 +2132,7 @@ export function usePitcherLeagueSession(
       setAceMatch({ mission, resultEvents: command.resultEvents, carried: carry })
       setScene('마선수대결')
     },
-    [abortStoryAtMatch, career, commit, story],
+    [career, commit, story],
   )
 
   /**
@@ -2188,7 +2165,6 @@ export function usePitcherLeagueSession(
     setAceMatch(null)
     quitGame()
   }, [quitGame])
-  const dismissStoryNotice = useCallback(() => setStoryNotice(''), [])
 
   /** 128 이 끝났다 (팝업 7 · 8 닫힘 → 132 연말) — 접어 둔 연말 사슬을 이어 연말 0x10c54 의 이벤트로 */
   const finishPostseason = useCallback(
@@ -2253,7 +2229,7 @@ export function usePitcherLeagueSession(
    * 훈련 · 휴식 결과 창은 원본에서 125 · 127 상태라(창이 닫혀야 105 로 돌아온다) 그동안은 판정하지 않는다(`isResultWindowOpen`).
    */
   const pendingTitle = career !== null && scene === '관리' && story === null && fileEvents !== null
-    && storyNotice === '' && outingRecoveryNotice === '' && !isResultWindowOpen
+    && outingRecoveryNotice === '' && !isResultWindowOpen
     ? nextPitcherTitleOf(career)
     : null
 
@@ -2279,7 +2255,6 @@ export function usePitcherLeagueSession(
     storyEvents,
     eventPlaceIds,
     storyReplacementsFor,
-    storyNotice,
     pendingTitle,
     aceMatch,
     postseasonPopup,
@@ -2481,11 +2456,9 @@ export function usePitcherLeagueSession(
       confirmStoryChoice,
       completeStory,
       confirmEventSystemWindow,
-      abortStoryAtMatch,
       beginAceMatch,
       finishAceMatch,
       quitAceMatch,
-      dismissStoryNotice,
       pressPostseason,
       closePostseasonPopup,
       reset,

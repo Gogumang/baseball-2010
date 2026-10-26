@@ -14,15 +14,20 @@ import { itemIconFrameOf } from '@/pages/shop/lib/shopLayout'
  */
 function pitcherItemEntriesOf(career: PitcherCareer, tab: '서브' | 'GP'): readonly ShopEntry[] {
   const items = tab === '서브' ? PITCHER_SUB_ITEMS : PITCHER_GP_ITEMS
-  return items.map((item, index) => ({
-    id: shopItemId(tab, index),
-    name: item.name,
-    description: itemDescriptionOf(item.descriptionText, item.effectText),
-    price: item.price,
-    iconFrame: tab === '서브' ? itemIconFrameOf('서브', index) : PITCHER_GP_ICON_FRAMES[index],
-    isOwned: tab === '서브' && hasSubItem(career, index),
-    blockNotice: pitcherItemBlockNoticeOf(career, tab, index),
-  }))
+  return items.map((item, index) => {
+    const blockNotice = pitcherItemBlockNoticeOf(career, tab, index)
+    return {
+      id: shopItemId(tab, index),
+      name: item.name,
+      description: itemDescriptionOf(item.descriptionText, item.effectText),
+      price: item.price,
+      iconFrame: tab === '서브' ? itemIconFrameOf('서브', index) : PITCHER_GP_ICON_FRAMES[index],
+      isOwned: tab === '서브' && hasSubItem(career, index),
+      blockNotice,
+      // G 부족 [65] 만 예/아니오 (2, 2) — 0x13460 kind 2 는 두 모드가 함께 쓴다
+      blockAsks: tab === 'GP' && career.gamePoint < item.price,
+    }
+  })
 }
 
 /** 투수편 서브·GP 상점 칸. 장비(창 종류 3)는 장비 창 0x83378 이라 `equipmentRows.pitcherEquipmentRowsOf` 가 줄을 만든다 */
