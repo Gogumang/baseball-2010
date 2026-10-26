@@ -25,6 +25,7 @@ import { BIG_HIT_PARTICLE, HIT_GROUND_PARTICLE } from '@/widgets/batting-stage/l
 import { hitBallPointAt, hitBallTickOf } from '@/widgets/batting-stage/lib/hitBallPath'
 import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
+import { hitCameraAt, stageCameraShiftOf } from '@/widgets/batting-stage/lib/hitCamera'
 import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
@@ -445,8 +446,20 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
             )
             const point = hitBallPointAt(hitPath, ballTick)
             if (point === null || point.y !== 0) continue
+            // [sp+0x4c] = 0x35854 — 투영 + (+0xff4, +0xff8): 그 그림의 0x13 카메라만큼 옮긴다(`hitCamera`)
             const at = projectToScreen(point, side)
-            emitParticles(sceneParticleScene(), particleConfigOf(HIT_GROUND_PARTICLE.id), at.x, at.y, HIT_GROUND_PARTICLE.img)
+            const shift = stageCameraShiftOf(
+              hitBase.hitAngle === undefined
+                ? null
+                : hitCameraAt(
+                  {
+                    path: hitPath, side, angle: hitBase.hitAngle,
+                    releaseTick: hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < tick)) : null,
+                  },
+                  tick,
+                ),
+            )
+            emitParticles(sceneParticleScene(), particleConfigOf(HIT_GROUND_PARTICLE.id), at.x + shift.dx, at.y + shift.dy, HIT_GROUND_PARTICLE.img)
           }
           hitGroundEmittedTick = Math.max(hitGroundEmittedTick ?? -1, Math.min(hitTickRaw, endTick))
         }
@@ -650,6 +663,19 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
                 ),
                 showsTrail: hitBase.showsHitTrail === true,
               }
+            : null,
+        // 0x13 타석 카메라 — 틀 머리 0x3f060 이 공을 따라 옮긴 [+0x1ec] (`hitCamera` — 타자편과 같다)
+        camera:
+          isHitState && hitBase !== null && (hitBase.hitPath ?? null) !== null && hitBase.hitAngle !== undefined
+            ? hitCameraAt(
+                {
+                  path: hitBase.hitPath!,
+                  side: current.batterSide ?? batterSideOfForm(current.batterForm),
+                  angle: hitBase.hitAngle,
+                  releaseTick: hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < stage.phase.tick)) : null,
+                },
+                stage.phase.tick,
+              )
             : null,
         // 필살 스윙 연출 그림 0x49aec — 판정 틀 J(0x11)에 첫 부름, 이어 0x13 틱 d 의 그림이 d + 2 번째 부름 (`specialSwingEffect`)
         // 보통 타격 불꽃 0x49e64 49faa~4a0a2 — 필살 그림 갈래가 아니고 큰 타구가 아닌 맞은 공. 필살 그림과 같은 부름 차례 (`batterOverlayMarks`)

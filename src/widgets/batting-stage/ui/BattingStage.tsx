@@ -15,6 +15,7 @@ import { useClaimSceneParticles } from '@/widgets/particles/model/useClaimSceneP
 import { batterEquipmentOf, NO_EQUIPMENT, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
 import { canSkipHitPause, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
 import { hitBallPathOf } from '@/widgets/batting-stage/lib/hitBallPath'
+import { hitCameraAngleOf } from '@/widgets/batting-stage/lib/hitCamera'
 import type { StageParticleShot } from '@/widgets/batting-stage/lib/homeRunEffects'
 import {
   HIT_PARTICLE_IMAGE,
@@ -544,6 +545,8 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
       pendingHitRef.current = {
         hitPath,
         showsHitTrail,
+        // 0x13 카메라(0x3f060 3f23e)가 보는 판정 각 [+0xfcc] — 판 패턴 각의 부호를 뒤집은 값
+        hitAngle: pattern === null ? null : hitCameraAngleOf(pattern[0]),
         ticks: hitPauseTicksOf(pauseInput),
         detail: result.detail,
         pitch,

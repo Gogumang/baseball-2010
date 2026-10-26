@@ -29,6 +29,7 @@ import { ballFrameOf, ballFrameStartTick } from '@/widgets/batting-stage/model/s
 import { clearParticles, emitParticles } from '@/entities/particle/model/particleScene'
 import { BIG_HIT_PARTICLE, HIT_GROUND_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
 import { bigHitEndTickOf, bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsOf } from '@/widgets/batting-stage/lib/bigHitScreen'
+import { hitCameraAt, stageCameraShiftOf, type StageCamera } from '@/widgets/batting-stage/lib/hitCamera'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import { strikeoutJudgeParticlesOf } from '@/widgets/batting-stage/lib/judgeParticles'
 import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
@@ -299,8 +300,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const point = hitBallPointAt(path, ballTick)
       if (point === null || point.y !== 0) return
       const side = latestRef.current.batterHand ?? batterSideOfForm(latestRef.current.batterForm)
+      // [sp+0x4c] = 0x35854 — 투영 + (+0xff4, +0xff8): 이 그림의 0x13 카메라만큼 옮긴다
       const at = projectToScreen(point, side)
-      emitParticles(particlesRef.current, particleConfigOf(HIT_GROUND_PARTICLE.id), at.x, at.y, HIT_GROUND_PARTICLE.img)
+      const shift = stageCameraShiftOf(hitCameraNow(hit, held))
+      emitParticles(particlesRef.current, particleConfigOf(HIT_GROUND_PARTICLE.id), at.x + shift.dx, at.y + shift.dy, HIT_GROUND_PARTICLE.img)
     }
     /** 0x13 그림의 타구 공 — 공 틱은 큰 타구면 막음이 풀린 그림(`bigHitReleaseTickOf`, 그 앞 창 첫 그림까지 센다)부터 오른다 */
     const hitBallNow = (hit: NonNullable<typeof hitInStage>, sceneTick: number): StageScene['hitBall'] => {
@@ -309,6 +312,18 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const stateTick = sceneTick - hit.startTick
       const releaseTick = hit.pending.watchesBigHit ? bigHitReleaseTickOf(hit.frozenDraws.filter((at) => at < stateTick)) : null
       return { path, ballTick: hitBallTickOf(stateTick, releaseTick), showsTrail: hit.pending.showsHitTrail === true }
+    }
+    /**
+     * 0x13 그림의 타석 카메라(0x3f060 3f1dc~3f2d8, `hitCamera`) — 막음이 풀린 다음 틀 머리부터 공을 따라간다. 창이 선 첫 그림은 틀 머리를
+     * 안 돌아 마지막 갱신 틱의 자리다
+     */
+    const hitCameraNow = (hit: NonNullable<typeof hitInStage>, stateTick: number): StageCamera | null => {
+      const path = hit.pending.hitPath ?? null
+      const angle = hit.pending.hitAngle ?? null
+      if (path === null || angle === null) return null
+      const releaseTick = hit.pending.watchesBigHit ? bigHitReleaseTickOf(hit.frozenDraws.filter((at) => at < stateTick)) : null
+      const side = latestRef.current.batterHand ?? batterSideOfForm(latestRef.current.batterForm)
+      return hitCameraAt({ path, side, angle, releaseTick }, stateTick)
     }
     const emitHitStopParticle = (pending: PendingHit) => {
       if (pending.bigHitAt === null) return
@@ -951,6 +966,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             : bigHitScreenOf(hitNow.pending.watchesBigHit, sceneTick - hitNow.startTick, side, hitNow.pending.bigHitAt, hitNow.frozenDraws),
         // 0x13 의 타구 공 — 0x33e34 가 채운 경로를 공 틱 [+0x1098] 로 (`hitBallPath`). 큰 타구는 막음이 풀린 그림부터 공 틱이 오른다
         hitBall: hitNow === null || isBackdrop || (hitNow.pending.hitPath ?? null) === null ? null : hitBallNow(hitNow, sceneTick),
+        // 0x13 타석 카메라 — 틀 머리 0x3f060 이 공을 따라 옮긴 [+0x1ec] (`hitCamera`)
+        camera: hitNow === null || isBackdrop ? null : hitCameraNow(hitNow, sceneTick - hitNow.startTick),
         isFieldPlay: latestRef.current.isFieldPlay === true,
         bodyType,
         ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),

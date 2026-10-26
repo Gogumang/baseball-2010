@@ -111,6 +111,7 @@ import {
   bigHitZoomPercentOf,
   type BigHitScreen,
 } from '@/widgets/batting-stage/lib/bigHitScreen'
+import { stageCameraShiftOf, type StageCamera } from '@/widgets/batting-stage/lib/hitCamera'
 
 export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -315,6 +316,12 @@ export interface StageScene {
    */
   readonly hitBall?: { readonly path: HitBallPath; readonly ballTick: number; readonly showsTrail: boolean } | null
   /**
+   * 상태 0x13 의 **타석 카메라** [경기+0x1ec] 지금 자리 — 틀 머리 0x3f060 3f1dc~3f2d8 이 공을 따라 옮긴다(`hitCamera`). 0x41230 이 이 값으로
+   * (+0xff4, +0xff8) 을 적어 구장 배경(+0xf10)과 그 카메라를 더하는 그림(투수 · 타자 · 주자 · 공 · 존 · 판정 글자 · 필살 표시 · 큰 타구
+   * 애니 3)이 함께 옮겨진다. 점수판 HUD · 하늘 조명 · 소프트키 · 확대 연출은 화면 자리라 그대로다. 없거나 null 이면 가운데(120, 70)
+   */
+  readonly camera?: StageCamera | null
+  /**
    * 홈런더비 판(0x17)의 **필드 화면이 타석 캔버스 밑에 깔린 동안** — 0x17 그리기 0x46c88 은 타석 그림(0x4c4bc)을 안 부른다.
    * 캔버스는 비우고 HOMERUN 글자(0x40b18)와 파티클(프레임 끝 0x6dd69)만 그린다 — 필드는 `pages/home-run-derby` 의 필드 층이 그린다
    */
@@ -381,6 +388,8 @@ export function renderBattingStage(
   }
   const side = scene.side ?? STAGE_SIDE
   const backdropOffsetY = scene.resultBackdropOffsetY ?? null
+  // 0x13 카메라(`hitCamera`) — 고정 오프셋(−120, −70) 그림에서 옮길 차이. 0x13 이 아니면 (0, 0)
+  const cameraShift = stageCameraShiftOf(scene.camera)
   /** 이 그림까지 든 창 첫 그림 수 — 장면이 사는 동안 도는 그리기 쪽 애니(하늘 조명 0x78490 · 램프 그리기 0x373d0 의 확대 갈래 0x37828~0x37858)에 더한다 */
   const redrawsSoFar = redrawsUpTo(scene.redrawTicks, scene.tick)
   drawScenery(context, {
@@ -393,6 +402,8 @@ export function renderBattingStage(
     ourTeamId: scene.hud?.ourTeamId ?? null,
     opponentTeamId: scene.hud?.opponentTeamId ?? null,
     offsetY: backdropOffsetY ?? 0,
+    // 0x41230 — 구장 +0xf10 자리 = (+0xff4, +0xff8). 0x13 카메라가 옮긴 만큼 하늘 · 구름 · 펜스 · 바닥이 따라간다
+    ...(cameraShift.dx === 0 && cameraShift.dy === 0 ? {} : { cameraShift }),
   })
   if (backdropOffsetY !== null) {
     // 결과 그림 0x4a384 — 배경 뒤 효과 틱 0x4a452 가 비를 그리고, 프레임 끝 0x6dd69 가 파티클(불꽃)을 그린다
@@ -401,6 +412,9 @@ export function renderBattingStage(
     return
   }
   const pitchInput = scene.pitchInput ?? null
+  // 카메라 (+0xff4, +0xff8) 을 더해 그리는 것들(그리기 목록 · 투구 판 · 투구 기계 · 마투수 덧그림)은 0x13 카메라만큼 옮긴다
+  context.save()
+  context.translate(cameraShift.dx, cameraShift.dy)
   // 0x4d780 이 바로 그리는 판 · 덮개 — 그리기 목록(선수)보다 먼저
   drawPitchInputUnderlay(context, pitchInput, side)
   const aceEffect = acePitcherEffectInputOf(scene)
@@ -481,6 +495,7 @@ export function renderBattingStage(
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
   // 0x46fa8(장면, 1) 싸이커 · 드래고나 — 목록 비우기(0x4d744) 뒤 · HUD(0x4c4bc) 앞에 화면에 바로 섞어 그린다
   drawAceMagicScaled(context, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
+  context.restore()
   if (scene.hud !== null) {
     // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x373d0 안 갈래 0x37828~0x37858)이 5틱 동안 배율을 줄인다
     // HUD 그리기 0x4c4bc 가 4c50c 에서 램프 그리기 함수 0x373d0(373d0~378f8)을 부르고, 확대는 그 안 갈래다 — 0x37828 을 부르는
@@ -490,7 +505,7 @@ export function renderBattingStage(
   // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
   // 4c528 — 상태 0xf 이고 사람 수비면 존 대신 구질 목록(빛 지도 · 고리 · 칸)
   if (pitchInput?.kind === '구질') drawPitchMenu(context, pitchInput, side)
-  else if (showsStrikeZone(scene.stagePhase)) drawStrikeZone(context, side)
+  else if (showsStrikeZone(scene.stagePhase)) withCameraShift(context, cameraShift, () => drawStrikeZone(context, side))
   // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`). 교체 창(0xb)은 상태 문턱 밖이라 둘 다 없다
   if (scene.stagePhase !== undefined) {
     drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null, scene.isSubstitutionState === true)
@@ -498,11 +513,15 @@ export function renderBattingStage(
   // 0x4c4bc 의 0x4c9fc — 상태 0x12 의 "Km" 판 · 표시 구속 [+0x19a0] (`pitchSpeedReadout`)
   if (scene.stagePhase !== undefined) drawPitchSpeedReadout(context, scene.stagePhase, scene.pitch?.displaySpeedKmh)
   // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)
-  if (scene.stagePhase !== undefined) drawSpecialSwingBadge(context, scene.stagePhase, scene.specialSwingRemaining ?? null, side)
+  // 0x38a30 — 자리는 [+0xff4] + 투영 (38ab4)이라 카메라를 탄다
+  if (scene.stagePhase !== undefined) {
+    const phase = scene.stagePhase
+    withCameraShift(context, cameraShift, () => drawSpecialSwingBadge(context, phase, scene.specialSwingRemaining ?? null, side))
+  }
   // 0x4c4bc 꼬리 0x4cad4 — 경기 스킬 표시 판 0x4b5b4 (`skillPanel`)
   if (scene.skillPanel !== undefined && scene.skillPanel !== null) drawSkillPanel(context, scene.skillPanel)
   // 0x4cb1c 꼬리 — 공용 그림 · HUD(0x4c4bc) 다 그린 화면을 확대 · 흐리기 · 번쩍임 · 테두리 (`bigHitScreen`). 파티클(53048)은 이 위다
-  if (scene.bigHitScreen !== undefined && scene.bigHitScreen !== null) drawBigHitScreen(context, scene.bigHitScreen)
+  if (scene.bigHitScreen !== undefined && scene.bigHitScreen !== null) drawBigHitScreen(context, scene.bigHitScreen, cameraShift)
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)
   if (scene.homeRunFrame !== undefined) {
     if (scene.homeRunFrame !== null) drawHomeRunTextFrame(context, scene.homeRunFrame)
@@ -1289,8 +1308,27 @@ function drawMagicBallEffect(context: CanvasRenderingContext2D, pitch: Pitch, fr
   context.drawImage(placed.image, Math.round(position.x) + placed.offsetX, Math.round(position.y) + placed.offsetY)
 }
 
-/** 큰 타구 0x13 의 화면 연출 — 차례와 근거는 `bigHitScreen` 머리말 */
-function drawBigHitScreen(context: CanvasRenderingContext2D, effect: BigHitScreen): void {
+/** 카메라 (+0xff4, +0xff8) 을 더해 그리는 한 그림을 0x13 카메라만큼 옮겨 그린다 */
+function withCameraShift(context: CanvasRenderingContext2D, shift: { readonly dx: number; readonly dy: number }, draw: () => void): void {
+  if (shift.dx === 0 && shift.dy === 0) {
+    draw()
+    return
+  }
+  context.save()
+  context.translate(shift.dx, shift.dy)
+  draw()
+  context.restore()
+}
+
+/**
+ * 큰 타구 0x13 의 화면 연출 — 차례와 근거는 `bigHitScreen` 머리말. 뒤 갈래의 애니 3 자리 = 타격점 투영 + (+0xff4, +0xff8)(4cb8c)이라
+ * 0x13 카메라만큼 옮긴다. 멈춤 갈래는 막음 동안이라 카메라가 가운데 그대로다(0x3f060 3f1ea)
+ */
+function drawBigHitScreen(
+  context: CanvasRenderingContext2D,
+  effect: BigHitScreen,
+  cameraShift: { readonly dx: number; readonly dy: number } = { dx: 0, dy: 0 },
+): void {
   const width = STAGE_WIDTH
   const height = STAGE_HEIGHT
   if (effect.kind === '뒤') {
@@ -1299,7 +1337,9 @@ function drawBigHitScreen(context: CanvasRenderingContext2D, effect: BigHitScree
     const entries = frameAnimations(GAME_EFFECT_FRAMES)?.[BIG_HIT_FOLLOW_ANIMATION]
     const frameIndex = entries === undefined ? null : judgeFrameAt(entries, effect.drawCall)
     if (frameIndex !== null && effect.point !== null) {
-      drawFrameAt(context, GAME_EFFECT_FRAMES, frameIndex, Math.round(effect.point.x), Math.round(effect.point.y))
+      drawFrameAt(
+        context, GAME_EFFECT_FRAMES, frameIndex, Math.round(effect.point.x) + cameraShift.dx, Math.round(effect.point.y) + cameraShift.dy,
+      )
     }
     return
   }

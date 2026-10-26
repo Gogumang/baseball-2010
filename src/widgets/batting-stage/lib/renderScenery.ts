@@ -133,6 +133,12 @@ export interface SceneryState {
    * 결과 창(상태 0x1a, `0x45c18`)이 장면 +0x17e2 를 넘긴다. 생략하면 0.
    */
   readonly offsetY?: number
+  /**
+   * **0x13 타석 카메라가 옮긴 만큼** (`hitCamera.stageCameraShiftOf`) — 0x41230 이 구장 +0xf10 자리(구장+4 · +8)에 (+0xff4, +0xff8) 을
+   * 적으므로 하늘 띠(0x77fe8 이 구장+8 에서) · 구름 · 펜스 묶음 · 바닥이 함께 옮겨진다. 하늘 조명 0x78490 은 화면 오른쪽 위(화면 폭에서
+   * 잰다)라 그대로다. 생략하면 (0, 0)
+   */
+  readonly cameraShift?: { readonly dx: number; readonly dy: number }
 }
 
 const CAMERA = { x: -120, y: -70 }
@@ -243,15 +249,28 @@ export function seasonTeamIconBoxesOf(board: number): readonly (readonly number[
 export function drawScenery(context: CanvasRenderingContext2D, state: SceneryState): void {
   context.fillStyle = ORIGINAL_COLORS.black
   context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
-  const colorIndex = drawSky(context, state)
+  const { dx, dy } = state.cameraShift ?? { dx: 0, dy: 0 }
+  const colorIndex = drawSky(context, state, dy)
   // 구장 8 은 하늘 0x77fe8 이 단색만 칠하고 구름 갈래까지 가지 않는다(78088 → 783a8)
   if (state.stadium !== FLAT_SKY_STADIUM && isCloudVisible(colorIndex)) {
-    drawClouds(context, state.cloudCalls ?? 0, cloudPaletteRowOf(colorIndex))
+    withShift(context, dx, dy, () => drawClouds(context, state.cloudCalls ?? 0, cloudPaletteRowOf(colorIndex)))
   }
   const offsetY = state.offsetY ?? 0
-  drawFence(context, state, offsetY)
-  drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY, (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타)
+  withShift(context, dx, 0, () => drawFence(context, state, offsetY + dy))
+  drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY + dy, (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타, dx)
   if (offsetY === 0) drawSkyLight(context, state, colorIndex)
+}
+
+/** 0x13 카메라가 옮긴 만큼 캔버스를 옮겨 그린다 — 옮김이 없으면 그대로 */
+function withShift(context: CanvasRenderingContext2D, dx: number, dy: number, draw: () => void): void {
+  if (dx === 0 && dy === 0) {
+    draw()
+    return
+  }
+  context.save()
+  context.translate(dx, dy)
+  draw()
+  context.restore()
 }
 
 /**
@@ -259,22 +278,25 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
  * (그라데이션 · 구름 없음). 그 밖은 표 0xd37a4 줄 · 칸의 두 색으로 위 단색 · 그라데이션 · 아래 단색.
  * 돌려주는 색 칸은 구름 · 하늘 조명이 쓴다(구장 8 은 둘 다 안 그린다).
  */
-function drawSky(context: CanvasRenderingContext2D, state: SceneryState): number {
+function drawSky(context: CanvasRenderingContext2D, state: SceneryState, dy = 0): number {
   const { top, bottom, colorIndex } = skyColorsOf(state.skyRow, state.skyColumn)
   if (state.stadium === FLAT_SKY_STADIUM) {
     context.fillStyle = FLAT_SKY_COLOR
     context.fillRect(0, 0, STAGE_WIDTH, STAGE_HEIGHT)
     return colorIndex
   }
+  // 띠는 구장+8 에서 잰다 — 0x13 카메라가 옮긴 dy 만큼 같이 내려간다(가로 480 이라 화면을 늘 덮는다)
+  const skyTop = SKY_GRADIENT.top + dy
+  const skyBottom = SKY_GRADIENT.bottom + dy
   context.fillStyle = top
-  context.fillRect(0, 0, STAGE_WIDTH, SKY_GRADIENT.top)
-  const gradient = context.createLinearGradient(0, SKY_GRADIENT.top, 0, SKY_GRADIENT.bottom)
+  context.fillRect(0, 0, STAGE_WIDTH, skyTop)
+  const gradient = context.createLinearGradient(0, skyTop, 0, skyBottom)
   gradient.addColorStop(0, top)
   gradient.addColorStop(1, bottom)
   context.fillStyle = gradient
-  context.fillRect(0, SKY_GRADIENT.top, STAGE_WIDTH, SKY_GRADIENT.bottom - SKY_GRADIENT.top)
+  context.fillRect(0, skyTop, STAGE_WIDTH, skyBottom - skyTop)
   context.fillStyle = bottom
-  context.fillRect(0, SKY_GRADIENT.bottom, STAGE_WIDTH, SKY_GRADIENT.end - SKY_GRADIENT.bottom)
+  context.fillRect(0, skyBottom, STAGE_WIDTH, SKY_GRADIENT.end - SKY_GRADIENT.bottom)
   return colorIndex
 }
 
@@ -516,16 +538,21 @@ function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, co
  * `grassPalette` 가 있으면 그 `.mpl` 줄로 칠한 그림을 쓴다 (잔디 = 팔레트, `0x786c8`).
  * 칠하는 동안에는 구운 그림이 나가므로 첫 몇 프레임은 기본색이 보인다.
  */
-function drawField(context: CanvasRenderingContext2D, grassPalette: number | null, offsetY: number, isMirrored = false): void {
+function drawField(context: CanvasRenderingContext2D, grassPalette: number | null, offsetY: number, isMirrored = false, shiftX = 0): void {
   const field = fieldBackground(grassPalette)
   if (field === null) return
   if (isMirrored) {
     // 0x772ca — 우타는 x = 구장+4 − 0x21 에 효과 0x11(제 상자 안 뒤집기). 폭 585 라 좌타 자리(−193)의 238 − x 거울과 같다
     context.save()
-    context.translate(RIGHT_HANDED_MIRROR_X, 0)
+    context.translate(RIGHT_HANDED_MIRROR_X + shiftX, 0)
     context.scale(-1, 1)
     context.drawImage(field, -STAGE_LAYOUT.fieldSourceX, STAGE_LAYOUT.fieldTopY + offsetY)
     context.restore()
+    return
+  }
+  if (shiftX !== 0) {
+    // 0x13 카메라가 옮긴 가로 — 화면 폭만 잘라 그리던 그림을 통째로 구장+4 자리에서 그린다
+    context.drawImage(field, -STAGE_LAYOUT.fieldSourceX + shiftX, STAGE_LAYOUT.fieldTopY + offsetY)
     return
   }
   context.drawImage(

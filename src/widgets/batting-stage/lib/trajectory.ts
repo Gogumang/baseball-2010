@@ -107,7 +107,8 @@ export function ballFrameIndexAt(pitch: Pitch, frame: number): number {
  * 투영 vt+8 = 0xbe3d8: d = P − 카메라(+4 · +8 · +0xc), 가로질 = (dy·cos − dz·sin)/100 · 깊이 = (dy·sin + dz·cos)/100,
  * 깊이 0 이면 (0, 0), 아니면 (dx·(F + 10) / |깊이|, 가로질·F / |깊이|), F = [+0x14] (`pitchCurve.projectToPlate` 와 같다).
  * 0xb94b5 → 0xb9480 은 (x · [+0x10] / [+8], y · [+0x14] / [+0xc]) 비율 바꾸기다 — 웹 공 그리기(`projectToScreen`)가 이미 1:1 로 쓰는 것과 같다.
- * 그래서 그림자 = (공 화면 x, 땅점 화면 y + 2) 이다. 웹은 카메라 흔들림(+0xff4 · +0xff8)을 안 얹는다(`bigHitScreen` 머리말 — 공과 같다).
+ * 그래서 그림자 = (공 화면 x, 땅점 화면 y + 2) 이다. 카메라(+0xff4 · +0xff8)는 가운데(−120, −70)로 놓고, 0x13 카메라가 옮긴 몫은 그리기가
+ * 캔버스를 옮겨 더한다(`hitCamera` — 공과 같다. 화면 높이 문턱은 0x13 이 아닐 때만 보므로 카메라에 안 걸린다).
  * `isBigHitState` 는 상태 0x13 — 0x13 의 타구 공(0x33e34 가 공 물리 +0xf2c 에서 경로를 다시 채운다, `hitBallPath`)은 `ballShadowOfPoint` 로 같은 셈을 탄다(r274).
  * 곡선이 없는 대체 공(시험 · 와인드업 자리)은 월드 점이 없어 그림자도 없다.
  */
