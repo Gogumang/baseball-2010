@@ -140,6 +140,19 @@ interface DefensePlaybackProps {
    */
   readonly freePassPlay?: boolean
   readonly children?: React.ReactNode
+  /**
+   * **돌발 결과 창 0x1c — 수비 화면 위에** (r284 직접 뜸). 0x17 끝 0x528b0 이 0x35108(52a66) 뒤 돌발 판정 0x8f414(52a8e)가 참이면
+   * 다음 상태를 0x1c 로 둔다(52aa2). 0x1c 그리기 0x46ee0(표 0xd05a0 칸 0x13 → 0x5300e)은 머리에서 **수비 화면 그리기 0x46c88 을 부른 뒤**
+   * (46ee6) 창 0x8f3c0 을 얹는다 — 갱신 0x3afd4 는 창 갱신 0x8e5b8 하나뿐이라 판(진행기 · 목록 틱)은 서고 카메라도 선 채, 그리기 쪽만
+   * 그림마다 돈다: 공 그리기 0x36dfc 의 파티클 → 프레임 끝 관리자 틱 0x6de85(53048 — 이 창은 공용 창이 아니라 게이트가 안 닫힌다,
+   * 경기 난수). 0x12 끝 판정(0x4e7ca)은 0x1d(그리기 0x4d1e0 — 타석 화면)로 가므로 이 길이 아니다.
+   *
+   * 주면 판이 끝난 뒤(0x35108 — `onDone`)에도 이 판을 내리지 않고 그 그림을 이어 그리며 위에 이 창(과 그 위 덧그림)을 얹는다.
+   * 부르는 쪽은 판을 띄운 그 자리에 **같은 요소**로 다시 그려 상태를 잇는다(`useDefenseUnderBurstWindow`). `onDone` 은 판마다 한 번이다.
+   * ⚠️ 연출 몫(결과 판 0x46844 · 레이저 · B · C — 굴림 없음)은 판이 닫힌 뒤 그림(+0x1094 셈)처럼 안 넘긴다 — 판 끝 칸 그대로 그린다
+   * (진행기가 판 끝에 넘긴 장면 칸이 다음 판으로 이어지므로 화면에서만 넘기면 어긋난다). 줌 펀치는 0x35108 의 0xbb428 이 내려 안 그린다.
+   */
+  readonly burstWindow?: React.ReactNode
 }
 
 /** 판이 닫힌 뒤 갱신(+0x1094 셈 · 그리기 · 파티클 틱) — 탭이 잠들었다 돌아와도 한 번에 이만큼만 따라잡는다 */
@@ -244,6 +257,7 @@ export function DefensePlayback({
   sceneMemory,
   freePassPlay = false,
   children,
+  burstWindow,
 }: DefensePlaybackProps) {
   // 수비 판(0x17)은 갱신마다 앱 전역 파티클 관리자를 직접 굴리고 그린다(그리기 0x46c88 → 프레임 끝 0x6de84 · 0x6dd69)
   useClaimSceneParticles()
@@ -261,6 +275,7 @@ export function DefensePlayback({
         grassPalette={grassPalette}
         runScoreBoard={runScoreBoard}
         sceneMemory={sceneMemory}
+        burstWindow={burstWindow}
       >
         {children}
       </LivePlayback>
@@ -274,6 +289,7 @@ export function DefensePlayback({
         onFieldingErrors={onFieldingErrors}
         grassPalette={grassPalette}
         runScoreBoard={runScoreBoard}
+        burstWindow={burstWindow}
       >
         {children}
       </LiveRunnerPlayback>
@@ -287,6 +303,7 @@ export function DefensePlayback({
       grassPalette={grassPalette}
       runScoreBoard={runScoreBoard}
       freePassPlay={freePassPlay}
+      burstWindow={burstWindow}
     >
       {children}
     </RecordedPlayback>
@@ -368,6 +385,54 @@ function clearBallParticles(run: BallParticleRun): void {
   run.version += 1
 }
 
+/** 돌발 창 0x1c 동안 이어 그리는 판 — 어느 판인가 · 마지막으로 그린 갱신 */
+interface BurstWindowHold<K> {
+  readonly key: K
+  lastUpdate: number
+}
+
+/**
+ * **0x1c 에 들었나** (`DefensePlaybackProps.burstWindow`) — 판이 끝났고(0x35108) 창을 받았으면 그 판의 첫 0x1c 그림에서 칸을 세운다.
+ * 0x35108 이 치운 파티클(`clearBallParticles`)은 그 뒤 그림의 공 그리기 0x36dfc 가 다시 쏘므로 쏘기를 다시 연다. 판이 바뀌거나 창이 없으면 null
+ */
+function burstWindowHoldOf<K>(
+  ref: { current: BurstWindowHold<K> | null },
+  key: K,
+  holds: boolean,
+  run: BallParticleRun,
+  update: number,
+): BurstWindowHold<K> | null {
+  if (!holds) return null
+  if (ref.current === null || ref.current.key !== key) {
+    // 0x35108 이 이미 치웠다(판이 끝난 그림) — 그 뒤 0x1c 그림부터 다시 쏜다
+    clearBallParticles(run)
+    run.cleared = false
+    ref.current = { key, lastUpdate: update }
+  }
+  return ref.current
+}
+
+/**
+ * 0x1c 그림들 — 갱신(0x3afd4 = 창 0x8e5b8)은 판을 안 건드리고, 그리기 0x46ee0 → 0x46c88 이 마지막 판 그림의 공을 다시 그려(0x36dfc) 파티클을
+ * 쏘고 프레임 끝 0x6de85 가 굴린다(경기 난수 — 창이 공용 창이 아니라 53048 이 안 닫힌다). 건너뛴 갱신은 닫힌 갱신과 같은 상한까지 따라잡는다
+ */
+function drawBurstWindowFrames(
+  hold: BurstWindowHold<unknown>,
+  run: BallParticleRun,
+  drawn: DefenseViewState | undefined,
+  cameraOffset: { readonly x: number; readonly y: number } | null,
+  random: RandomPort,
+  update: number,
+  updateStartTick: number | null,
+): void {
+  const frames = Math.min(update - hold.lastUpdate, MAX_CLOSED_CATCH_UP)
+  hold.lastUpdate = update
+  for (let frame = 0; frame < frames; frame += 1) {
+    const sceneTick = updateStartTick === null ? null : updateStartTick + update - (frames - 1 - frame)
+    drawBallParticles(run, drawn, cameraOffset, random, sceneTick)
+  }
+}
+
 /**
  * 미리 돌린 재생 갈래의 파티클 굴림 — ⚠️ 근사(남김 — 원본에 없는 길만): 원본은 경기 난수로 판 틱 굴림 사이사이에 굴리지만, 이 갈래의 판은
  * 이미 다 돌았고 경기 흐름도 그 뒤 굴림을 먼저 써 버렸다. 경기 난수를 건드리지 않게 그림 전용 난수로 굴린다.
@@ -387,6 +452,7 @@ interface RecordedPlaybackProps {
   readonly runScoreBoard?: RunScoreBoardSource
   readonly freePassPlay: boolean
   readonly children?: React.ReactNode
+  readonly burstWindow?: React.ReactNode
 }
 
 /** 홈 자리 — 주자가 여기 닿은 틱이 메시지 0x13(주자 하나 홈인)이다 */
@@ -517,7 +583,7 @@ function redrawPlaybackPicture(
  * "타자주자가 달리는 재생 = 홈런 비행" 으로 읽는다.
  */
 function RecordedPlayback({
-  ticks, onDone, onFieldingErrors, grassPalette, runScoreBoard, freePassPlay, children,
+  ticks, onDone, onFieldingErrors, grassPalette, runScoreBoard, freePassPlay, children, burstWindow,
 }: RecordedPlaybackProps) {
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
@@ -602,13 +668,22 @@ function RecordedPlayback({
   const recordedUpdateStart = updateStartTickRef.current
   const skipped = skipTick !== null && skipTick.ticks === ticks && recordedUpdateStart !== null && recordedUpdateStart + update > skipTick.at
   const isFinished = ticks.length === 0 || holder.tally.ended || skipped
-  if (isFinished) clearBallParticles(particles.run)
+  // 0x1c — 판이 끝난 뒤 돌발 창 아래 그림 (`burstWindowHoldOf`)
+  const burstHoldRef = useRef<BurstWindowHold<readonly DefenseViewState[]> | null>(null)
+  const burstHold = burstWindowHoldOf(burstHoldRef, ticks, isFinished && burstWindow != null, particles.run, update)
+  if (isFinished && burstHold === null) clearBallParticles(particles.run)
+  if (burstHold !== null) {
+    drawBurstWindowFrames(burstHold, particles.run, ticks[lastIndex], cameraOffsetRef.current, particles.random, update, updateStartTickRef.current)
+  }
 
   // 넘길 곳은 늘 최신 것 — 부르는 쪽이 그릴 때마다 새 함수를 줘도 끝(onDone)을 다시 부르지 않게 의존에서 뺀다
   const onFieldingErrorsRef = useRef(onFieldingErrors)
   onFieldingErrorsRef.current = onFieldingErrors
+  /** `onDone` 을 부른 재생 묶음 — 판이 끝난 뒤에도 남는 그림(0x1c)이 다시 그려져도 한 번만 부른다 */
+  const doneForRef = useRef<readonly DefenseViewState[] | null>(null)
   useEffect(() => {
-    if (!isFinished) return
+    if (!isFinished || doneForRef.current === ticks) return
+    doneForRef.current = ticks
     if (drawnErrors.length > 0) onFieldingErrorsRef.current?.(drawnErrors)
     onDone()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 실책 묶음은 재생 묶음(ticks)마다 하나다
@@ -635,8 +710,9 @@ function RecordedPlayback({
         밀어내기 판은 원본이 아는 키 아무것이나 받아 넘긴다(0x519cc) — 화면에 그 글자는 없어 판 전체를 OK 누름 칸으로(웹 전용,
         r186 — 늘 있던 확인 버튼을 걷었다). 키와 같은 길(keydown → 위 듣는 곳)로 들어간다
       */}
-      {freePassPlay && <PressArea label="넘기기" onPress={() => tapKey('Enter')} />}
+      {freePassPlay && burstHold === null && <PressArea label="넘기기" onPress={() => tapKey('Enter')} />}
       {children}
+      {burstHold !== null && burstWindow}
     </DefenseScreen>
   )
 }
@@ -648,6 +724,7 @@ interface LiveRunnerPlaybackProps {
   readonly grassPalette: number | null
   readonly runScoreBoard?: RunScoreBoardSource
   readonly children?: React.ReactNode
+  readonly burstWindow?: React.ReactNode
 }
 
 /**
@@ -656,7 +733,9 @@ interface LiveRunnerPlaybackProps {
  * 0x582 · 0x584 와 OK 슬라이딩 0x585 — 어느 쪽인지는 판의 `side`), 관문이 닫힌 뒤로는 재생 갈래와
  * 같은 닫힌 갱신(+0x1094 가 11 이 되는 갱신에 0x35108)과 득점 점수판 셈(`stepRecordedBoard`)을 지난다.
  */
-function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children }: LiveRunnerPlaybackProps) {
+function LiveRunnerPlayback({
+  play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children, burstWindow,
+}: LiveRunnerPlaybackProps) {
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(true, updateStartTickRef)
@@ -771,12 +850,21 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
     redrawPlaybackPicture(holder, ticks, (drawn) => isHomeRunHitCode(drawn.sceneResultCode), particles.run, cameraOffsetRef.current, random, drawnErrors)
   }
   const isFinished = stepper.finished && holder.tally.ended
-  if (isFinished) clearBallParticles(particles.run)
+  // 0x1c — 판이 끝난 뒤 돌발 창 아래 그림 (`burstWindowHoldOf`)
+  const burstHoldRef = useRef<BurstWindowHold<LiveRunnerPlay> | null>(null)
+  const burstHold = burstWindowHoldOf(burstHoldRef, play, isFinished && burstWindow != null, particles.run, update)
+  if (isFinished && burstHold === null) clearBallParticles(particles.run)
+  if (burstHold !== null && random !== undefined) {
+    drawBurstWindowFrames(burstHold, particles.run, ticks[lastIndex], cameraOffsetRef.current, random, update, updateStartTickRef.current)
+  }
 
   const onFieldingErrorsRef = useRef(onFieldingErrors)
   onFieldingErrorsRef.current = onFieldingErrors
+  /** `onDone` 을 부른 판 — 판이 끝난 뒤에도 남는 그림(0x1c)이 다시 그려져도 한 번만 부른다 */
+  const doneForRef = useRef<LiveRunnerStepper | null>(null)
   useEffect(() => {
-    if (!isFinished) return
+    if (!isFinished || doneForRef.current === stepper) return
+    doneForRef.current = stepper
     if (drawnErrors.length > 0) onFieldingErrorsRef.current?.(drawnErrors)
     // 판이 닫힌 뒤(+0x1094 셈) 온 키 · 판 끝까지 못 먹인 키도 키 처리 0x53420 을 지나 사람 수비면 송구 0x533c8 → 0x588 → vt60 이
     // +0x160 에 적지만, 다음 판 시작 vt18 0xb27ec 가 부르는 vt1c 0xb0edc(b0f66~b0f68)가 −1 로 지워 넘어가지 않는다
@@ -787,7 +875,11 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   const tickState = ticks[Math.min(Math.max(0, seen), lastIndex)]
   // 터치 기기 — 사람이 잡은 쪽(판의 side, 안 주면 수비)의 송구 · 주루 상황 버튼. 공격 쪽 도루 · 폭투 판은 판을 연 주자 목록으로
   // 그 판에 먹는 키만(`offenseOffersFor` — 주자 판에는 타구가 없어 +0x111 이 서지 않는다). 견제 판은 주자 목록을 따로 안 들어 아홉 다
-  useInPlayTouchKeys(play.side ?? '수비', play.kind === 'arrival' ? { runners: play.opened.engineInput.runners } : null)
+  // 0x1c 동안은 키가 창 갱신 0x8e5b8 몫이라 버튼이 없다
+  useInPlayTouchKeys(
+    burstHold !== null ? undefined : (play.side ?? '수비'),
+    play.kind === 'arrival' ? { runners: play.opened.engineInput.runners } : null,
+  )
   if (tickState === undefined) return null
   // 판이 닫힌 뒤 갱신 — 0x3f060 의 G1(3f0b8)이 닫혀 카메라가 선다
   const state = stepper.finished && seen > lastIndex ? frozenCamera(tickState) : tickState
@@ -805,6 +897,7 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
       {board !== null && runScoreBoard !== undefined && <RunScoreBoard sides={runScoreBoard.sides} scores={board} />}
       <DefenseParticles scene={particles.run.scene} version={particles.run.version} />
       {children}
+      {burstHold !== null && burstWindow}
     </DefenseScreen>
   )
 }
@@ -821,6 +914,7 @@ interface LivePlaybackProps {
   readonly runScoreBoard?: RunScoreBoardSource
   readonly sceneMemory?: { current: DefenseSceneMemory }
   readonly children?: React.ReactNode
+  readonly burstWindow?: React.ReactNode
 }
 
 /** 득점 점수판이 이번 그리기에 보이는 모습 */
@@ -836,7 +930,7 @@ interface RunScoreBoardView {
  * 키 → 뜻은 진행기 안에서 `inPlayCommandOf` 가 한다 — 표를 여기서 다시 만들지 않는다.
  */
 function LivePlayback({
-  input, side, onDone, onFieldingErrors, grassPalette, runScoreBoard, sceneMemory, children,
+  input, side, onDone, onFieldingErrors, grassPalette, runScoreBoard, sceneMemory, children, burstWindow,
 }: LivePlaybackProps) {
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
@@ -877,7 +971,12 @@ function LivePlayback({
    */
   const [runnerSituation, setRunnerSituation] = useState<InPlayRunnerSituation>(NO_RUNNER_SITUATION)
   const runnerSituationKeyRef = useRef('')
-  useInPlayTouchKeys(side, runnerSituation)
+  /** 0x1c — 판이 끝난 뒤 돌발 창 아래 그림 (`DefensePlaybackProps.burstWindow`). 어느 판인가 · 마지막으로 그린 갱신 */
+  const burstHoldRef = useRef<BurstWindowHold<DefensePlayInput> | null>(null)
+  const [ended, setEnded] = useState(false)
+  const holdsUnderBurst = ended && burstWindow != null
+  // 0x1c 동안은 키가 창 갱신 0x8e5b8 몫이라 버튼이 없다
+  useInPlayTouchKeys(holdsUnderBurst ? undefined : side, runnerSituation)
   /** 판이 닫힌 뒤 갱신(+0x1094 셈)에 들었고 0x3f060 의 G1(3f0b8)이 닫혔다 — 카메라가 선다 */
   const [closed, setClosed] = useState(false)
   /**
@@ -886,8 +985,7 @@ function LivePlayback({
    */
   const closingFrameRef = useRef<DefenseViewState | null>(null)
   const [runBoard, setRunBoard] = useState<RunScoreBoardView | null>(null)
-  /** 0x35108(0x17 끝)을 지났다 — 닫힌 뒤 11 번째 갱신, 홈런 점수판이 선 홈런 타구는 내려갈 때까지 더, 키 건너뛰기면 그 그림 */
-  const [ended, setEnded] = useState(false)
+  // `ended` — 0x35108(0x17 끝)을 지났다: 닫힌 뒤 11 번째 갱신, 홈런 점수판이 선 홈런 타구는 내려갈 때까지 더, 키 건너뛰기면 그 그림 (위)
   /**
    * 홈런 연출(HOMERUN 글자 · 홈런 효과 · 파티클 · 비거리 판 — `lib/defenseHomeRunEffects`). 원본 한 그림 = 진행기 한 틱이라 틱마다
    * 갱신(홈런 갈래) → 그리기(글자 · 유지 그림의 효과 틱) → 파티클 틱 차례로 돌고, 판이 닫힌 뒤 갱신에도 그리기 · 파티클 틱은 돈다.
@@ -1226,8 +1324,43 @@ function LivePlayback({
     }
   }, [redraws, ended, input, runScoreBoard, homeRunHit])
 
+  // 0x1c 그림들 — 갱신 0x3afd4(창 0x8e5b8)는 판을 안 건드리고 그리기 0x46ee0 → 0x46c88 만 돈다: 마지막 판 그림의 공 0x36dfc 가 파티클을
+  // 다시 쏘고 프레임 끝 0x6de85 가 굴린다(경기 난수 — 창은 공용 창이 아니라 53048 이 안 닫힌다). 글자 +0x1960 · 점수판 타이머는 0x35108 이
+  // 내려 아무것도 안 그린다. ⚠️ 결과 판 · 레이저 · B · C 는 닫힌 뒤 그림처럼 안 넘긴다(`burstWindow` 머리말)
   useEffect(() => {
-    if (!ended) return
+    const state = stateRef.current
+    if (!holdsUnderBurst || state === null) return
+    const hold = burstHoldRef.current
+    if (hold === null || hold.key !== input) {
+      burstHoldRef.current = { key: input, lastUpdate: update }
+      return
+    }
+    const frames = Math.min(update - hold.lastUpdate, MAX_CLOSED_CATCH_UP)
+    hold.lastUpdate = update
+    if (frames <= 0) return
+    const startTick = updateStartTickRef.current
+    for (let frame = 0; frame < frames; frame += 1) {
+      const sceneTick = startTick === null ? null : startTick + update - (frames - 1 - frame)
+      effectsRef.current = stepDefenseEffects(
+        effectsRef.current,
+        null,
+        {
+          particles: particlesRef.current,
+          random: isCommonWindowShown() ? undefined : input.random,
+          configOf: particleConfigOf,
+          ...(sceneTick === null ? {} : { appTick: appTickOfGameSceneTick(sceneTick) }),
+        },
+        ballShotsAt(state.ticks[state.ticks.length - 1], cameraOffsetRef.current),
+      ).effects
+    }
+    setEffectsView((previous) => ({ text: null, distanceBoard: null, version: previous.version + 1 }))
+  }, [update, holdsUnderBurst, input])
+
+  /** `onDone` 을 부른 판 — 판이 끝난 뒤에도 남는 그림(0x1c)이 다시 그려져도 한 번만 부른다 */
+  const doneForRef = useRef<DefensePlayState | null>(null)
+  useEffect(() => {
+    if (!ended || doneForRef.current === stateRef.current) return
+    doneForRef.current = stateRef.current
     // 0x17 끝 0x35108 — 글자를 끄고 파티클을 치운다. 장면에 남는 칸(글자 칸 · +0x36)은 부르는 쪽 ref 로 돌려준다
     effectsRef.current = endDefenseEffects(effectsRef.current, particlesRef.current)
     if (sceneMemory !== undefined) sceneMemory.current = sceneMemoryOf(effectsRef.current)
@@ -1243,10 +1376,10 @@ function LivePlayback({
 
   if (view === null) return null
   // 0x46c88 차례 — 비거리 판(0x46cb6, 선수 아래 · 줌 안) → 선수 · 공 → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62),
-  // 그 뒤 프레임 끝 파티클(0x6dd68)
+  // 그 뒤 프레임 끝 파티클(0x6dd68). 0x1c 는 판이 선 채(카메라도 선다) 그 위에 창 — 줌은 0x35108 의 0xbb428 이 내렸다
   return (
     <DefenseScreen
-      state={closed ? frozenCamera(view) : view}
+      state={holdsUnderBurst ? unzoomed(frozenCamera(view)) : closed ? frozenCamera(view) : view}
       grassPalette={grassPalette}
       cameraOffsetRef={cameraOffsetRef}
       drawRedraws={redraws}
@@ -1260,8 +1393,16 @@ function LivePlayback({
       )}
       <DefenseParticles scene={particlesRef.current} version={effectsView.version} />
       {children}
+      {holdsUnderBurst && burstWindow}
     </DefenseScreen>
   )
+}
+
+/** 0x35108 의 0xbb428 — 줌 펀치 전역을 내린다(0x1c 그림에 줌이 없다) */
+function unzoomed(state: DefenseViewState): DefenseViewState {
+  if (state.zoom == null) return state
+  const { zoom: _zoom, ...rest } = state
+  return rest
 }
 
 /**

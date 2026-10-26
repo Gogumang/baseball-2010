@@ -22,9 +22,12 @@ import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { irisHoleSpansOf } from '@/widgets/game-scene/lib/irisClose'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
-import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
+import {
+  claimSceneParticleTick, clearSceneParticles, holdSceneParticleTicks, sceneParticleScene,
+} from '@/entities/particle/model/sceneParticleManager'
+import { tickParticles } from '@/entities/particle/model/particleScene'
 import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
-import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { appTickOfGameSceneTick, gameSceneTickNow, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 interface BenchClearingSceneProps {
@@ -102,7 +105,18 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
       if (randomRef.current !== undefined) targetRollsRef.current = rollBenchClearingTargets(randomRef.current)
     }
     if (next >= BENCH_CLEARING_EXIT_TICK) finish()
+    // 같은 틀의 프레임 끝 관리자 틱 0x6de85(53048) — 갱신 표(52e14) 뒤다. 앞 상태가 쏜 이미터가 남았으면 이 틀에 굴린다
+    // (틱 10 이면 목표 굴림 8 번 뒤). 앱 층의 그림 시계(requestAnimationFrame)에 맡기면 같은 틀의 두 굴림 차례가 어느 시계가 먼저
+    // 울리느냐에 달려 장면 갱신 바로 뒤에서 돌린다(`holdSceneParticleTicks`, r284). 공용 창이 서 있는 틀은 갱신과 함께 건너뛴다(52cc6 · 53048)
+    const random = randomRef.current
+    const scene = sceneParticleScene()
+    if (random !== undefined && scene.emitters.length > 0 && claimSceneParticleTick(scene, appTickOfGameSceneTick(gameSceneTickNow()))) {
+      tickParticles(scene, random)
+    }
   }, true, false, keyLatch)
+  // 경기 난수를 받았으면 관리자 틱을 이 장면이 맡는다 — 그리기는 앱 층(`SceneParticleLayer`)이 그대로 한다
+  const holdsParticleTicks = random !== undefined
+  useEffect(() => (holdsParticleTicks ? holdSceneParticleTicks() : undefined), [holdsParticleTicks])
 
   // 진입 꼬리 0x3aba4 — 0x6e498(음, 0x2c, 0)
   useEffect(() => {

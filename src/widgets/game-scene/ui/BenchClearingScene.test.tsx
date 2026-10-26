@@ -5,6 +5,10 @@ import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
+import { emitParticles } from '@/entities/particle/model/particleScene'
+import {
+  isSceneParticleTickHeld, resetSceneParticleManagerForTest, sceneParticleScene,
+} from '@/entities/particle/model/sceneParticleManager'
 
 const 녹음 = { played: [] as number[], stopped: 0 }
 const 소리: SoundPort = {
@@ -101,5 +105,53 @@ describe('벤치 클리어링 연출 (상태 0x1e)', () => {
     fireEvent.keyDown(window, { key: '5' })
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onDone).toHaveBeenCalledWith(false)
+  })
+
+  it('앞 상태가 남긴 이미터는 이 장면이 제 갱신 바로 뒤에 굴린다 — 틱 10 이면 목표 굴림 8 번 다음 (52e14 → 53048, r284)', () => {
+    setActiveSound(소리)
+    vi.useFakeTimers()
+    resetSceneParticleManagerForTest()
+    const calls: string[] = []
+    const random = {
+      rand: (lo: number) => {
+        calls.push('목표')
+        return lo
+      },
+      rand9d: () => {
+        calls.push('입자')
+        return 0
+      },
+    }
+    // 오래 사는 이미터 하나 — 해마다 한 알씩 50 알, 알마다 40 틱
+    emitParticles(
+      sceneParticleScene(),
+      {
+        ang: 0, spread: 0, spd: 0, spdR: 0, emit: 1, emitR: 0, life: 40, lifeR: 0, a0: 0, a0R: 0, a1: 0, a1R: 0,
+        ax: 0, ay: 0, w: 0, h: 0, total: 50, mode: 2,
+      },
+      0, 0, 0,
+    )
+    const entryRolls = Array.from({ length: 9 }, () => ({ scatterX: 0, scatterZ: 100, speed: 200, targetX: 0, targetZ: 0 }))
+    render(
+      <BenchClearingScene
+        field={{ entryRolls, offenseSide: 1, isLeftBatter: true, occupiedBases: [true, false, false], defenseTeam: 2, offenseTeam: 3 }}
+        random={random}
+        onDone={() => {}}
+      />,
+    )
+    // 관리자 틱은 이 장면이 맡는다 — 앱 층은 그리기만
+    expect(isSceneParticleTickHeld()).toBe(true)
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
+    expect(calls.length).toBeGreaterThan(0)
+    expect(calls.every((call) => call === '입자')).toBe(true)
+    calls.length = 0
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
+    // 틱 10 의 틀 — 목표 굴림 8 번이 먼저, 그 뒤 같은 틀의 관리자 틱
+    expect(calls.slice(0, 8)).toEqual(Array.from({ length: 8 }, () => '목표'))
+    expect(calls.length).toBeGreaterThan(8)
+    expect(calls.slice(8).every((call) => call === '입자')).toBe(true)
+    cleanup()
+    expect(isSceneParticleTickHeld()).toBe(false)
+    resetSceneParticleManagerForTest()
   })
 })
