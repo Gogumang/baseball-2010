@@ -478,10 +478,14 @@ function SeasonScreens({
           teamMorale={state.teamMorale}
           view={{ ...view, equipment }}
           equipment={equipment}
+          ownedEquipment={player.ownedEquipment}
           isHiddenOpen={(id) => opened.includes(id)}
           gamePoint={session.gamePoints}
           onPurchase={(bought) => {
-            actions.equipSeasonPlayer({ isPitcher, recordIndex: pick.cursor, money: bought.money, equipment: bought.equipment })
+            actions.equipSeasonPlayer({
+              isPitcher, recordIndex: pick.cursor, money: bought.money, equipment: bought.equipment,
+              ...(bought.ownedEquipment === undefined ? {} : { ownedEquipment: bought.ownedEquipment }),
+            })
             // 0x7ef4~0x7f12 — 명예 선수면 0x2328c(저장, 줄, ed+0x33f) 로 명전 기록에도
             if (isHallOfFamer) onHallOfFameEquipment?.(side, player.id, bought.equipment)
           }}
@@ -821,7 +825,7 @@ function SeasonScreens({
           />
         )}
         onRecruit={(result, asPitcher) => {
-          // 원본은 밀려난 선수를 빼지 않고 **끼워넣는다** — 그 규칙은 recruitPlayer 안에 있다
+          // 원본은 밀려난 선수를 빼지 않고 **끼워넣는다**(B-22 — 고친 길은 교체) — 그 규칙은 recruitPlayer 안에 있다
           actions.updateRoster(result.roster)
           // c578 0xb6605 — 명전 칸 영입이면 명전 기록 +0xa 아랫 5비트도 고른 자리로 (나리 칸 기록은 저장 안 됨)
           if (isHallOfFameRecord(result.source)) {

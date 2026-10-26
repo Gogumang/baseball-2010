@@ -158,6 +158,7 @@ import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { lapPlayClock } from '@/entities/collection/model/playClock'
 import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** 시즌모드 = 원본 모드 2 (0x22c7d 의 획득 GP 칸 3) */
 const SEASON_STAT_MODE = 2
@@ -341,6 +342,8 @@ export interface SeasonEquipPurchase {
   readonly money: number
   /** 새 니블 네 칸 */
   readonly equipment: readonly number[]
+  /** B-23 고친 길 — 부위별 산 칸 비트 (`SeasonPlayer.ownedEquipment`) */
+  readonly ownedEquipment?: readonly number[]
 }
 
 /** 0xe9 의 평가 내장 이벤트 재료 (`seasonGameEvaluationLineOf` · `settleGameIncome`) */
@@ -947,7 +950,7 @@ function withSeasonFirstDayStamina(save: SeasonSave): SeasonSave {
  * `0xb570d(…, 3, …, 0x5a, 1)`(c152e) 로 읽어 팀 정액·코치를 먹는다 (`cpuBatterGameAbilityOf`, f3ba9d1).
  */
 function seasonAbilityContextOf(state: SeasonState): LeagueAbilityContext {
-  return { mode: SEASON_MODE, teamAbilities: state.teamAbilities, coach: state.record.coach }
+  return { mode: SEASON_MODE, teamAbilities: state.teamAbilities, coach: state.record.coach, coachTeamId: state.record.teamId }
 }
 
 /**
@@ -1553,9 +1556,16 @@ export function useSeasonSession(
     // 0xe9 갱신 0xdea0 — 기록 줄을 지어(구내매점 "(+200)" 은 줄이기 전 SR+0x55) 0x8a6fc 로 평가 이벤트를 쌓는다. 그 안에서
     // 구내매점 SR+0x55 가 하나 줄고(R13 10절) e120~e130 이 저장한다 — phase 는 경기 끝의 2 그대로라 이어하면 0xe9 를 다시 탄다
     if (scene === SEASON_SCENE_STATE.관중수입) {
+      // 고침(`bugfixes.json` B-29, 기본 켬): 이 경기 정산을 이미 했으면(끄고 이어함) 구내매점을 다시 줄이지 않고 만료 안내도 다시
+      // 안 붙인다 — 평가 글은 같은 레코드로 다시 보인다. 굴림 없음
+      if (isBugFixed('B-29') && record.incomeSettled === true) {
+        setIncomeEvaluation({ line: seasonGameEvaluationLineOf(record), storeExpired: false })
+        return
+      }
       const settlement = settleGameIncome(record)
       setIncomeEvaluation({ line: seasonGameEvaluationLineOf(record), storeExpired: settlement.storeExpired })
-      commit({ ...save, state: { ...save.state, record: settlement.record } })
+      const settledRecord = isBugFixed('B-29') ? { ...settlement.record, incomeSettled: true } : settlement.record
+      commit({ ...save, state: { ...save.state, record: settledRecord } })
       return
     }
 
@@ -1745,7 +1755,13 @@ export function useSeasonSession(
         : purchase.recordIndex
       const players = purchase.isPitcher ? current.roster.pitchers : current.roster.batters
       if (players[rosterIndex] === undefined) return
-      const replaced = players.map((player, index) => (index === rosterIndex ? { ...player, equipment: purchase.equipment } : player))
+      const replaced = players.map((player, index) => (index === rosterIndex
+        ? {
+          ...player,
+          equipment: purchase.equipment,
+          ...(purchase.ownedEquipment === undefined ? {} : { ownedEquipment: purchase.ownedEquipment }),
+        }
+        : player))
       commit({
         ...current,
         state: { ...current.state, record: { ...current.state.record, money: purchase.money } },
@@ -2460,6 +2476,8 @@ export function useSeasonSession(
             // 경기를 치르면 이번 주기의 트레이닝·외출 표시를 지운다 (0x4f158)
             acted: false,
             phase: SEASON_PHASE.경기끝,
+            // B-29 고친 길 — 새 경기의 0xe9 정산은 아직이다
+            ...(isBugFixed('B-29') ? { incomeSettled: false } : {}),
             // SR+0x1c0 — 0xc2a48 끝(c2be0)이 모드 2 · 국가대항전·포스트시즌 아님일 때만 오늘 점수표를 복사한다.
             // 이 갈래가 곧 그 조건이다(포스트시즌·국가대항전은 위에서 먼저 돌아갔다)
             dayBoard: day.board,
@@ -2529,8 +2547,13 @@ export function useSeasonSession(
       if (save === null) return
       // 0xe9 갱신 0xdea0 끝(e114~e130)은 다음 상태(0xee/0xef/0xf1 · 사이 0xd3)를 걸고 저장만 한다 — phase(SR+0x50)는
       // 경기 끝 0x4ea0c 가 쓴 2 그대로다. 0xf1 진입 0x953c 도 안 바꾼다. 그래서 0xe9·0xf1 에서 끄고 이어하면 진입 분기 0xcb 가
-      // 다시 0xe9 로 보내 평가 이벤트·구내매점 감소·트레이드 요청을 또 탄다 — 원본 그대로. phase 는 0xc9(3)·0xd8(4) 진입이 고친다
-      const settled: SeasonRecord = record
+      // 다시 0xe9 로 보내 평가 이벤트·구내매점 감소·트레이드 요청을 또 탄다 — 원본 버그 B-29. phase 는 0xc9(3)·0xd8(4) 진입이 고친다.
+      // 고침(`bugfixes.json` B-29, 기본 켬): 여기서 phase 를 0xe9 다음 자리로 옮겨 저장한다 — 정규시즌이 끝나는 경기면 시즌 끝 사슬의
+      // 첫 칸(0xb → 0xee), 그 밖은 기본(3 — 진입 분기 0xcb 가 경기 수 짝수면 0xc9 · 홀수면 0xd8, 곧 0xf1 확인 `afterGameNext` 와 같다).
+      // 0xf1(경기 뒤 마무리)에서 끄고 이어하면 그 판과 CPU 트레이드 요청은 건너뛴다(요청은 원래 저장에 안 남는 칸이다). 굴림 없음
+      const settled: SeasonRecord = isBugFixed('B-29')
+        ? { ...record, phase: record.games >= SEASON_GAME_COUNT ? SEASON_PHASE.포스트시즌시작 : SEASON_PHASE.기본 }
+        : record
       commit({ ...save, state: { ...save.state, record: settled } })
       if (settled.games >= SEASON_GAME_COUNT) {
         /*
@@ -3093,7 +3116,9 @@ export function useSeasonSession(
     }
     // 장면 0x104 셋업 0x39fdc 모드 2 갈래 — 정규시즌이면 관중·수입 0xa34b8 이 **다시** 돈다(원본 버그: 이어할 때마다
     // 수입이 소지금에 겹친다). 곧이어 +0x4e = 1 · 파일 쓰기(0x3a426 · 0x22755)
-    const withIncome = withSceneSetupIncome(current, saved.options.opponentTeamId)
+    // 고침(`bugfixes.json` B-07, 기본 켬): 이어하기는 수입을 다시 더하지 않는다 — 새 경기 0xdd OK 가 이미 더해 저장했다
+    // (이어하기는 `isGameInProgress` 가 선 뒤라 그 판의 수입이 늘 들어 있다). 난수 없음
+    const withIncome = isBugFixed('B-07') ? current : withSceneSetupIncome(current, saved.options.opponentTeamId)
     if (withIncome !== current) commit(withIncome)
     setGameKind(block.kind)
     setOwnRotationShift(block.ownRotationShift)

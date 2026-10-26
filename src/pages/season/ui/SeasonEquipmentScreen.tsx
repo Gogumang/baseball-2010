@@ -12,6 +12,7 @@ import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/season
 import {
   SEASON_EQUIPMENT_LEVEL_COUNT, SEASON_EQUIPMENT_TEXT, applySeasonEquipment, checkSeasonEquipment,
 } from '@/entities/season-mode/model/seasonEquipment'
+import type { SeasonEquipmentApplied } from '@/entities/season-mode/model/seasonEquipment'
 import { seasonCardAbilitiesOf } from '@/pages/season/lib/seasonPlayerDetail'
 import { seasonCardLookOf } from '@/pages/season/lib/seasonPlayerCard'
 import {
@@ -51,11 +52,13 @@ export interface SeasonEquipmentScreenProps {
   readonly view: SeasonPlayerRecordView
   /** 팀 레코드 진짜 줄의 니블 네 칸 (+0x19 · +0x1a) */
   readonly equipment: readonly number[]
+  /** B-23 고친 길 — 이 선수의 부위별 산 칸 비트 (`SeasonPlayer.ownedEquipment`) */
+  readonly ownedEquipment?: readonly number[]
   /** 전역 해금표 app+0xc0 의 칸이 열렸나 (`seasonEquipmentHiddenIdOf`) */
   readonly isHiddenOpen: (id: number) => boolean
   readonly gamePoint?: number
-  /** 0x7d90 결과 0x14 — 새 소지금(100만 원 단위)과 니블 네 칸 */
-  readonly onPurchase: (purchase: { readonly money: number; readonly equipment: readonly number[] }) => void
+  /** 0x7d90 결과 0x14 — 새 소지금(100만 원 단위)과 니블 네 칸 (B-23 고친 길이면 산 칸 비트도) */
+  readonly onPurchase: (purchase: SeasonEquipmentApplied) => void
   /** 0x957c — 부위 목록에서 취소(−16) → 0xdf */
   readonly onBack: () => void
 }
@@ -84,7 +87,7 @@ const withNibble = (nibbles: readonly number[], part: number, level: number) =>
  * 바꿔 받는다(직접 떴다) — 방향키와 같은 걸음이다.
  */
 export function SeasonEquipmentScreen({
-  record, teamMorale, view, equipment, isHiddenOpen, gamePoint = 0, onPurchase, onBack,
+  record, teamMorale, view, equipment, ownedEquipment, isHiddenOpen, gamePoint = 0, onPurchase, onBack,
 }: SeasonEquipmentScreenProps) {
   const isBatter = !view.isPitcher
   // 카드 사본의 니블 — 들어올 때 진짜 줄의 사본(0x5f3c), 끼워 보기 · 되돌리기가 바꾼다
@@ -98,18 +101,20 @@ export function SeasonEquipmentScreen({
   const tick = useUpdateCounter()
 
   const select = () => {
-    const checked = checkSeasonEquipment(record, { isBatter, equipment }, part, level, isHiddenOpen)
+    const checked = checkSeasonEquipment(record, { isBatter, equipment, ownedEquipment }, part, level, isHiddenOpen)
     if (!checked.ok) {
       const text = modeText(SEASON_EQUIPMENT_TEXT[checked.reason])
       setNotice(checked.reason === '인기도부족' ? fillModeText(text, checked.required ?? 0) : text)
       return
     }
+    // B-23 고친 길 — 산 적 있는 칸은 확인 창 없이 곧장 끼운다(StrMODE[142] 장착 완료)
+    if (checked.owned === true) return buy()
     setQuestion({ text: fillModeText(modeText(SEASON_EQUIPMENT_TEXT.구매확인), seasonMoneyTextOf(checked.price * 10)) })
   }
 
   const buy = () => {
     setQuestion(null)
-    onPurchase(applySeasonEquipment(record.money, { isBatter, equipment }, part, level))
+    onPurchase(applySeasonEquipment(record.money, { isBatter, equipment, ownedEquipment }, part, level))
     setNotice(modeText(SEASON_EQUIPMENT_TEXT.장착완료))
   }
 

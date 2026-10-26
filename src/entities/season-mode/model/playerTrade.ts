@@ -4,6 +4,7 @@ import {
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 시즌 트레이드 — 상태 **0xe4**(팀 고르기) → **0xe5**(영입할 선수) → **0xe6**(보상할 선수)
@@ -133,14 +134,17 @@ export interface TradeRateInput {
  * r = 40 − |d|·100/250 − pen(내) − pen(상대) ; r = max(r, 3)
  * r += [0, 50, 20][선택] ; r = min(r, 100)
  * ```
- * ⚠️ **차이를 절댓값으로 본다** — 내가 더 좋은 선수를 내줘도 확률이 떨어진다
- * (좋은 선수를 달라고 하면 음수 쪽이라 두 배로 떨어진다). 원본 그대로 옮겼다.
+ * ⚠️ **원본 버그(B-19) — 차이를 절댓값으로 본다** — 내가 더 좋은 선수를 내줘도 확률이 떨어진다
+ * (좋은 선수를 달라고 하면 음수 쪽이라 두 배로 떨어진다).
+ * **고침(`bugfixes.json` B-19, 기본 켬)**: 내가 더 좋은 선수를 달라고 할 때(d < 0)만 깎는다 — 내가 더 좋은 선수를 내주면(d > 0)
+ * 등급 차로는 안 깎는다(올려 주지도 않는다 — 바닥 40 · 자리 벌점 · 보강 칸은 원본 그대로). 굴림 없음
  */
 export function tradeSuccessRate(input: TradeRateInput): number {
   const difference = (input.myGrade - input.opponentGrade) * TRADE_GRADE_SCALE
   const weighted = difference < 0 ? difference * 2 : difference
+  const counted = isBugFixed('B-19') ? Math.min(weighted, 0) : weighted
   const raw = TRADE_RATE_BASE
-    - Math.trunc((Math.abs(weighted) * 100) / TRADE_GRADE_DIVISOR)
+    - Math.trunc((Math.abs(counted) * 100) / TRADE_GRADE_DIVISOR)
     - input.myPenalty
     - input.opponentPenalty
   const floored = Math.max(raw, TRADE_RATE_FLOOR)
@@ -149,14 +153,15 @@ export function tradeSuccessRate(input: TradeRateInput): number {
 
 /**
  * 성공 판정 — `bfa55(1, 101) < r` 또는 **강제 성공 플래그**(this+0x148, CPU 요청 수락).
- * 뽑기가 1..100 이라 실제 확률은 `(r − 1)%` 다 ⚠️ (원본 그대로).
+ * 뽑기가 1..100 이라 실제 확률은 `(r − 1)%` 다 ⚠️ (원본 버그 B-19 의 둘째 몫).
+ * **고침(B-19, 기본 켬)**: `뽑기 ≤ r` 로 견줘 표시한 r% 그대로 — 뽑기 수(하나)와 차례는 원본과 같다.
  *
  * 강제 성공이어도 **뽑기는 먼저 한다** (직접 떴다 — d160 `bfa55(1,101)` → d16c `< r` 이면 성공,
  * 아니면 d170 에서 this+0x148 을 본다). 난수 하나가 늘 나간다.
  */
 export function rollTradeSuccess(random: RandomPort, rate: number, isForced = false): boolean {
   const drawn = random.rand(1, 101)
-  return drawn < rate || isForced
+  return (isBugFixed('B-19') ? drawn <= rate : drawn < rate) || isForced
 }
 
 /**
@@ -205,7 +210,8 @@ export function canUseTradeCommand(record: SeasonRecord): boolean {
 /**
  * 트레이드 커맨드를 썼다고 표시한다 (SR+0x56).
  * ⚠️ 이 칸을 **0 으로 되돌리는 곳은 GP 아이템 칸 5(협회허가증, `rec[0x56] = 0` + StrMODE[127])
- * 하나뿐**이다 (P4 6절 표 · R12 3d). 주기마다 지우는 코드는 문서에 없어 넣지 않았다.
+ * 하나뿐**이다 (P4 6절 표 · R12 3d) — 원본 버그 B-20(시즌모드 내내 한 번).
+ * **고침(`bugfixes.json` B-20, 기본 켬)**: 새 해 `startNextYear` 가 0 으로 되돌린다 — 해마다 한 번(협회허가증은 그대로 한 번 더).
  */
 export function markTradeUsed(record: SeasonRecord): SeasonRecord {
   return { ...record, tradeUsed: 1 }

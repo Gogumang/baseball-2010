@@ -1,12 +1,15 @@
 import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord } from '@/entities/season-mode/model/seasonEntry'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 시즌 선수영입 (상태 0xe2 → 0xdf → 0xc554) — `docs/re/S6-season-cleanup.md` 4 절 **확정**,
  * 고르는 규칙은 `docs/re/R13-season-leftovers.md` 9 절, 가드는 `docs/re/P4-season-flow.md` 5 절.
  *
- * ⚠️ **영입은 교체가 아니라 끼워넣기다** (S6 4-3 확정, CORRECTIONS "R13 9절" 정정):
+ * ⚠️ **영입은 교체가 아니라 끼워넣기다** (S6 4-3 확정, CORRECTIONS "R13 9절" 정정 — 원본 버그 B-22):
  * 로스터가 매번 한 칸 늘고, 고른 자리에 있던 선수는 **맨 끝(벤치 마지막)으로 밀릴 뿐 빠지지 않는다.**
  * 정원 상한도 없다. 진짜 교체 함수 `0xb5648` 이 따로 있지만 영입은 그것을 쓰지 않는다.
+ * **고침(`bugfixes.json` B-22, 기본 켬)**: 고른 자리의 선수를 새 선수로 **바꾼다**(명단 길이 그대로, 밀려난 선수는 빠진다).
+ * 타자는 원본처럼 밀려난 선수의 수비 위치를 잇는다. 굴림은 없다.
  */
 
 /**
@@ -87,6 +90,11 @@ export interface SeasonPlayer {
    * 웹은 장비 창 0xdc 종류 3(`SeasonRoute` → `equipSeasonPlayer`)이 이 칸을 쓴다.
    */
   readonly equipment?: readonly number[]
+  /**
+   * **웹 전용 — 부위별 산 장비 칸 비트**(비트 i = 칸 i, 네 칸). 원본에는 없는 칸이다 — 원본 버그 B-23(산 기록이 없다)의 고친 길
+   * (`seasonEquipment.applySeasonEquipment`)만 쓴다. 없으면 산 기록 없음(옛 저장 · 원본 길)
+   */
+  readonly ownedEquipment?: readonly number[]
   /**
    * **이 선수의 붙박이 표 팀** — 원본 id(+0)는 Xls 행 번호 그대로라(투수 `팀 × 8 + 칸` · 타자 `팀 × 12 + 칸`,
    * `base/extracted/XlsPITCHER_DATA.json` 줄마다 바이트 0 이 줄 번호다) 팀이 id 안에 들어 있다. 웹 `id` 는 그 팀 안
@@ -183,7 +191,8 @@ export function insertPitcher(
   const next = [...pitchers]
   const pushed = next[slot]
   if (pushed === undefined) return next
-  next.push(pushed) // 옛 선수는 맨 끝으로 — 칸 번호는 고치지 않는다(원본 그대로)
+  // 고침(`bugfixes.json` B-22, 기본 켬): 진짜 교체 — 옛 선수는 빠지고 그 칸에 새 선수만(칸 번호도 겹치지 않는다)
+  if (!isBugFixed('B-22')) next.push(pushed) // 옛 선수는 맨 끝으로 — 칸 번호는 고치지 않는다(원본 버그 B-22)
   next[slot] = player
   return next
 }
@@ -209,7 +218,8 @@ export function insertBatter(
   if (pushed === undefined) return next
   const position = pushed.fieldPosition & 0xf
   const lastIndex = next.length // 한 칸 늘린 뒤의 마지막 첨자
-  next.push(withSlot({ ...pushed, fieldPosition: 0 }, lastIndex))
+  // 고침(B-22, 기본 켬): 밀려난 선수는 빠진다 — 새 선수가 그 칸 · 수비 위치를 그대로 잇는다
+  if (!isBugFixed('B-22')) next.push(withSlot({ ...pushed, fieldPosition: 0 }, lastIndex))
   next[slot] = { ...player, fieldPosition: position }
   return next
 }

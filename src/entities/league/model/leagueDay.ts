@@ -64,6 +64,7 @@ import type {
   LeagueStolenBase,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 하루치 리그 경기 (binary.mod 0xc2a48).
@@ -310,8 +311,13 @@ export interface LeagueAbilityContext {
   readonly mode: number
   /** 팀 번호 → 팀 능력치 네 칸 [투구, 타격, 집중, 근성] (시즌 기록). 안 넘기면 XlsTEAM_DATA 그대로 */
   readonly teamAbilities?: readonly (readonly number[])[]
-  /** 시즌 코치 `SR+0x185` (−1 없음, 0~9). 원본 코치 분기에 팀 검사가 없어 상대 팀에도 붙는다 (J 4-2 유력) */
+  /** 시즌 코치 `SR+0x185` (−1 없음, 0~9). 원본 코치 분기에 팀 검사가 없어 상대 팀에도 붙는다 (J 4-2 · 원본 버그 B-21) */
   readonly coach?: number
+  /**
+   * 코치를 채용한 팀(시즌 내 팀 SR[1]) — B-21 고친 길(기본 켬)은 이 팀 선수에게만 코치를 붙인다(`coachAppliesTo`).
+   * CPU 끼리 경기에는 내 팀이 없으므로 고친 길에서는 코치가 아무에게도 안 붙는다. 없으면 아무 팀도 아니다
+   */
+  readonly coachTeamId?: number
   /**
    * **나리(모드 3 · 4) 사기** 0xa3a24 — 간이 엔진의 0xb570c(0xc11f0 c1308 · c1320 은 두 팀 [r7+0x78] · [r7+0x74], 0xc1818 은 수비 팀)가
    * 모드 3 · 4 갈래 b5762~b5768 에서 넘겨 받은 팀 레코드 +2 에 이 값을 쓴다 → CPU 끼리 경기도 두 팀 용량(0x66e44 `V[+2]`)이 이 값이다
@@ -326,6 +332,11 @@ export interface LeagueAbilityContext {
    * 지난번 남은 값으로 용량을 센다(`HalfInningDefense.staleMorale`). 안 넘기면 늘 `nariMorale`
    */
   readonly staleRecordMorales?: Readonly<Record<number, number>>
+}
+
+/** 코치 정액이 이 팀 선수에게 붙는가 — 원본(B-21)은 팀을 안 본다, 고친 길은 `coachTeamId` 팀만 */
+function coachAppliesTo(teamId: number, context: LeagueAbilityContext | undefined): boolean {
+  return !isBugFixed('B-21') || context?.coachTeamId === teamId
 }
 
 /** 팀 능력치를 먹이는 모드 비트 0x306 = {1, 2, 8, 9} (0xb593a) */
@@ -364,7 +375,7 @@ export function cpuPitcherGameAbilityOf(
     if (teamAbility !== 0) value += Math.trunc((17 * teamAbility - 5100) / 100)
   }
   const coach = context?.coach ?? -1
-  if (mode === 2 && coach >= 0 && (COACH_PITCHER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
+  if (mode === 2 && coach >= 0 && coachAppliesTo(teamId, context) && (COACH_PITCHER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
   return Math.min(999, Math.max(0, value))
 }
 
@@ -397,7 +408,7 @@ export function cpuBatterGameAbilityOf(
     if (teamAbility !== 0) value += Math.trunc((17 * teamAbility - 5100) / 100)
   }
   const coach = context?.coach ?? -1
-  if (mode === 2 && coach >= 0 && (COACH_BATTER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
+  if (mode === 2 && coach >= 0 && coachAppliesTo(teamId, context) && (COACH_BATTER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
   return Math.min(999, Math.max(0, value))
 }
 

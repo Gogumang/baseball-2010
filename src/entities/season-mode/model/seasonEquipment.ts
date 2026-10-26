@@ -1,6 +1,7 @@
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { isHiddenUnlocked } from '@/shared/config/unlocks'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * **시즌 장비 창 — 장면 0x105 상태 0xdc, 창 종류 3** (아이템 0xd0 → 장착아이템 → 선수 고르기 0xdf 목적 1 → 확인).
@@ -26,8 +27,11 @@ import { isHiddenUnlocked } from '@/shared/config/unlocks'
  * 니블 자리: 바이트 +0x19 + t/2, 짝수 t 는 윗니블 · 홀수 t 는 아랫니블 (`SeasonPlayer.equipment[t]`).
  *
  * ⚠️ 원본 그대로 옮긴 것:
- *   - **산 기록이 없다** — 나리 장비(보유 플래그 +0x188)와 달리 시즌은 니블 하나뿐이라 바꿔 끼우면 앞의 것은 사라지고,
- *     예전에 샀던 것을 다시 끼우려면 다시 산다(되돌려 받는 돈도 없다). "이미 가지고 있는" 은 지금 낀 칸만이다.
+ *   - **산 기록이 없다**(원본 버그 B-23) — 나리 장비(보유 플래그 +0x188)와 달리 시즌은 니블 하나뿐이라 바꿔 끼우면 앞의 것은
+ *     사라지고, 예전에 샀던 것을 다시 끼우려면 다시 산다(되돌려 받는 돈도 없다). "이미 가지고 있는" 은 지금 낀 칸만이다.
+ *     **고침(`bugfixes.json` B-23, 기본 켬)**: 선수마다 부위별 산 칸 비트(`SeasonPlayer.ownedEquipment`, 웹 전용 칸)를 두고
+ *     산 칸 · 빼낸 칸을 적는다. 산 적 있는 칸은 돈 · 인기도 없이 확인 창도 없이 곧장 끼운다(`checkSeasonEquipment` 의 `owned`).
+ *     옛 저장은 칸이 없어 "산 기록 없음" 으로 읽힌다. 굴림 없음.
  *   - 소지금은 9999(= 99억 9900만) 위로 자른다 — 빼기만 하는 자리라 실제로 닿지 않는다.
  *   - 인기도는 깎지 않는다(조건일 뿐).
  * 0x2328d(명예 선수의 명전 기록 반영)는 `collection.syncHallOfFameEquipment` — 라우트가 앱의 기록연감에 넘긴다.
@@ -88,10 +92,18 @@ export interface SeasonEquipmentTarget {
   readonly isBatter: boolean
   /** 팀 레코드의 진짜 니블 네 칸 */
   readonly equipment: readonly number[]
+  /** B-23 고친 길 — 부위별 산 칸 비트(비트 i = 칸 i). 없으면 산 기록 없음 */
+  readonly ownedEquipment?: readonly number[]
+}
+
+/** B-23 고친 길 — 이 칸을 산 적이 있는가(지금 낀 칸은 `이미보유` 가 먼저 막는다) */
+export function ownsSeasonEquipment(target: SeasonEquipmentTarget, part: number, level: number): boolean {
+  return (((target.ownedEquipment?.[part] ?? 0) >> level) & 1) === 1
 }
 
 export type SeasonEquipmentCheck =
-  | { readonly ok: true; readonly price: number }
+  /** `owned` — B-23 고친 길에서 산 적 있는 칸이라 돈 없이 끼운다(`price` 0) */
+  | { readonly ok: true; readonly price: number; readonly owned?: true }
   | { readonly ok: false; readonly reason: SeasonEquipmentRefusal; readonly required?: number }
 
 /** 0x957c 가드 — 차례 그대로 */
@@ -108,6 +120,7 @@ export function checkSeasonEquipment(
     return { ok: false, reason: '미오픈' }
   }
   if ((target.equipment[part] ?? 0) - 1 === level) return { ok: false, reason: '이미보유' }
+  if (isBugFixed('B-23') && ownsSeasonEquipment(target, part, level)) return { ok: true, price: 0, owned: true }
   const required = seasonEquipmentRequiredPopularityOf(level)
   if (required > record.popularity) return { ok: false, reason: '인기도부족', required }
   const price = seasonEquipmentPriceOf(target.isBatter, part, level)
@@ -116,14 +129,31 @@ export function checkSeasonEquipment(
 }
 
 /** 0x7d90 결과 0x14 — 소지금(100만 원 단위)과 니블 */
+export interface SeasonEquipmentApplied {
+  readonly money: number
+  readonly equipment: readonly number[]
+  /** B-23 고친 길에서만 — 부위별 산 칸 비트(빼낸 칸 · 새 칸을 더한 것) */
+  readonly ownedEquipment?: readonly number[]
+}
+
 export function applySeasonEquipment(
   money: number,
   target: SeasonEquipmentTarget,
   part: number,
   level: number,
-): { readonly money: number; readonly equipment: readonly number[] } {
+): SeasonEquipmentApplied {
   const price = seasonEquipmentPriceOf(target.isBatter, part, level)
   const equipment = Array.from({ length: SEASON_EQUIPMENT_PART_COUNT }, (_unused, slot) =>
     slot === part ? level + 1 : target.equipment[slot] ?? 0)
-  return { money: Math.min(MONEY_LIMIT, Math.max(0, money - price * PRICE_SCALE)), equipment }
+  if (!isBugFixed('B-23')) return { money: Math.min(MONEY_LIMIT, Math.max(0, money - price * PRICE_SCALE)), equipment }
+  // 고친 길 — 산 적 있는 칸은 돈을 안 받고, 빼낸 칸(니블 − 1)과 새 칸을 산 칸 비트에 적는다
+  const owned = ownsSeasonEquipment(target, part, level)
+  const previous = (target.equipment[part] ?? 0) - 1
+  const ownedEquipment = Array.from({ length: SEASON_EQUIPMENT_PART_COUNT }, (_unused, slot) => {
+    const bits = target.ownedEquipment?.[slot] ?? 0
+    if (slot !== part) return bits
+    return bits | (1 << level) | (previous >= 0 ? 1 << previous : 0)
+  })
+  const spent = owned ? 0 : price * PRICE_SCALE
+  return { money: Math.min(MONEY_LIMIT, Math.max(0, money - spent)), equipment, ownedEquipment }
 }
