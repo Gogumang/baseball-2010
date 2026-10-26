@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { describeOutcome, isFreePass } from '@/entities/at-bat/model/atBatOutcome'
@@ -2036,6 +2037,8 @@ function advanceUntilPlayerTurn(
  */
 /** 경기 상태 초기화 0xb6814 가 `state+0x69`(마지막 정규 이닝, 0-기준)에 넣는 값 — 9회 */
 const LAST_REGULAR_INNING_INDEX = 8
+/** B-13 고친 길 — 내 타석이 오는 반 이닝의 아웃 상한(3아웃이면 이닝이 끝났다) */
+const MAXIMUM_OUTS_BEFORE_MY_AT_BAT = 2
 
 export function withAutoStopLateInningSetup(progress: GameProgress, random: RandomPort): GameProgress {
   const game = progress.game
@@ -2047,7 +2050,9 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
   const total = game.outs + runnerCountOf(game.bases)
   if (total < deficit) return progress
   let runners = random.rand(deficit, total + 1)
-  const outs = Math.max(0, total - runners)
+  // c232e st[6] = max(0, t − n) — t 가 5(2아웃 만루)까지라 n 이 작으면 아웃이 3~5 로 선다(원본 버그 B-13).
+  // 고친 길은 내 타석 앞 아웃의 상한 2 로 자른다 — 굴림 · 주자 세우기는 원본 그대로다
+  const outs = isBugFixed('B-13') ? Math.min(MAXIMUM_OUTS_BEFORE_MY_AT_BAT, Math.max(0, total - runners)) : Math.max(0, total - runners)
   const placed: boolean[] = []
   for (let base = 0; base <= 2; base += 1) {
     if (runners === 3 - base) {

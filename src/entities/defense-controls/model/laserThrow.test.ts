@@ -13,7 +13,6 @@ import {
   SPECIAL_DEFENSE_TABLE,
   LASER_WINDOW_FIRST_TICK,
   LASER_WINDOW_LAST_TICK,
-  LASER_WINDOW_REAL_TICKS,
   LASER_WINDOW_TICKS,
 } from '@/entities/defense-controls/model/laserThrow'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -145,10 +144,6 @@ describe('"반짝이는 순간" 창 — 0xb2648 (포구 −10 ~ +8틱)', () => {
     표.forEach(([ticksSinceCatch, expected]) => {
       expect(isLaserWindowOpen({ ...기본, ticksSinceCatch }), `${ticksSinceCatch}틱`).toBe(expected)
     })
-  })
-
-  it('원본 버그 — 카운터가 틱당 2~3번 올라 실제 창은 7~9틱이다 (그대로 옮긴다)', () => {
-    expect(LASER_WINDOW_REAL_TICKS).toEqual({ min: 7, max: 9 })
   })
 
   it('이미 목표를 고르고 공을 쥔 채 던질 준비가 끝났으면 창이 닫힌다', () => {

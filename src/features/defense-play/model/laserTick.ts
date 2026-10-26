@@ -31,7 +31,8 @@ import type { DefenseKeyPress } from '@/features/defense-play/model/runDefensePl
  * (+0x130 = −1 — 0xb0c7c 가 0) 원본은 관문을 건너뛴다(아래 ⚠️). 굴림의 능력치도 같은 공 가진 야수의 것이다.
  *
  * 창 0xb2648 의 카운터(+0x1e4 — 판 시작 vt1c b0f44 가 −1)는 0x4e858 이 매 틱 한 번씩 올리므로 웹은 포구 틱 기준 −10 ~ +8 틱으로 본다
- * (`isLaserWindowOpen` — 타구 진행기와 같은 근사. 0x523bc 가 외야 관문을 지나 한 번 더 부르는 틀에는 굴림이 곧바로 +0x19af 를 세운다).
+ * (`isLaserWindowOpen` — 타구 진행기와 같은 근사. 0x523bc 가 외야 관문을 지나 한 번 더 부르는 틀에는 굴림이 곧바로 +0x19af 를 세워
+ * 다음 틀부터 523d6 에서 끝난다 — 그래서 "틱당 2~3번 → 7~9틱"(B-12)은 원본 버그가 아니다. r272 정정, `laserThrow.ts` 창 주석).
  */
 export interface LaserFlags {
   /** 경기+0x19ad — 반짝임 (사람 수비) */
