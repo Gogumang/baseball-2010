@@ -5,6 +5,7 @@
  * 보정은 스킬마다 그때 값에 차례로 더한다 — B += trunc(B × % / 100) (점검 10차. 1%·2% 외의 나눗수는 추정).
  */
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { balanceGrid } from '@/shared/config/balance'
 
 export interface SwingSituation {
   /** 1부터 센 이닝 */
@@ -76,8 +77,6 @@ export interface SwingWeights {
 interface SkillRule {
   readonly id: number
   readonly isActive: (situation: SwingSituation) => boolean
-  readonly solid: number
-  readonly homeRun: number
   /** 주자 한 명마다 곱하는가 */
   readonly perRunner?: boolean
 }
@@ -85,46 +84,59 @@ interface SkillRule {
 const always = () => true
 const LATE_INNING = 6
 
+/**
+ * 켜지는 조건만 여기 둔다 — B · C % 는 숨은 판정값 표 `skill.batterSwingPercents` · `skill.pitcherSwingPercents` 의
+ * 같은 차례 칸에서 읽는다 (원본 값: 8 [1,1] · 9 [2,0] · 10 [3,3] · 12 [0,5] · 13 [2,0] · 14 [2,0] · 15 [3,0] · 16 [5,5] ·
+ * 17 [−10,−10] · 18 [−10,0] · 19 [1,−10] / 24 [−1,−1] · 25 [−2,0] · 27 [−3,0] · 28 [−2,0] · 29 [−2,0] · 31 [0,−10] ·
+ * 33 [−5,0] · 35 [5,0] · 37 [−2,−2]).
+ */
 const BATTER_RULES: readonly SkillRule[] = [
-  { id: 8, isActive: always, solid: 1, homeRun: 1 },
-  { id: 9, isActive: always, solid: 2, homeRun: 0 },
-  { id: 10, isActive: (s) => s.inning >= LATE_INNING && s.isLosing, solid: 3, homeRun: 3 },
-  { id: 12, isActive: (s) => s.runnerCount >= 2, solid: 0, homeRun: 5 },
-  { id: 13, isActive: (s) => s.pitcherSide !== 0, solid: 2, homeRun: 0 },
-  { id: 14, isActive: (s) => s.pitcherSide === 0, solid: 2, homeRun: 0 },
-  { id: 15, isActive: (s) => s.balls === 0 && s.strikes === 0, solid: 3, homeRun: 0 },
-  { id: 16, isActive: isHotStreak, solid: 5, homeRun: 5 },
-  { id: 17, isActive: isColdStreak, solid: -10, homeRun: -10 },
-  { id: 18, isActive: always, solid: -10, homeRun: 0 },
-  { id: 19, isActive: always, solid: 1, homeRun: -10 },
+  { id: 8, isActive: always },
+  { id: 9, isActive: always },
+  { id: 10, isActive: (s) => s.inning >= LATE_INNING && s.isLosing },
+  { id: 12, isActive: (s) => s.runnerCount >= 2 },
+  { id: 13, isActive: (s) => s.pitcherSide !== 0 },
+  { id: 14, isActive: (s) => s.pitcherSide === 0 },
+  { id: 15, isActive: (s) => s.balls === 0 && s.strikes === 0 },
+  { id: 16, isActive: isHotStreak },
+  { id: 17, isActive: isColdStreak },
+  { id: 18, isActive: always },
+  { id: 19, isActive: always },
 ]
 
 const PITCHER_RULES: readonly SkillRule[] = [
-  { id: 24, isActive: always, solid: -1, homeRun: -1 },
-  { id: 25, isActive: always, solid: -2, homeRun: 0 },
-  { id: 27, isActive: (s) => s.strikes === 2, solid: -3, homeRun: 0 },
-  { id: 28, isActive: (s) => s.batterSide !== 0, solid: -2, homeRun: 0 },
-  { id: 29, isActive: (s) => s.batterSide === 0, solid: -2, homeRun: 0 },
+  { id: 24, isActive: always },
+  { id: 25, isActive: always },
+  { id: 27, isActive: (s) => s.strikes === 2 },
+  { id: 28, isActive: (s) => s.batterSide !== 0 },
+  { id: 29, isActive: (s) => s.batterSide === 0 },
   // 0부터 센 타순 2·3·4 = 3~5번 클린업 (b6394 ∈ {2,3,4})
-  { id: 31, isActive: (s) => s.batterOrderIndex >= 2 && s.batterOrderIndex <= 4, solid: 0, homeRun: -10 },
-  { id: 33, isActive: (s) => s.hasSecondBaseRunner, solid: -5, homeRun: 0 },
-  { id: 35, isActive: always, solid: 5, homeRun: 0 },
-  { id: 37, isActive: always, solid: -2, homeRun: -2, perRunner: true },
+  { id: 31, isActive: (s) => s.batterOrderIndex >= 2 && s.batterOrderIndex <= 4 },
+  { id: 33, isActive: (s) => s.hasSecondBaseRunner },
+  { id: 35, isActive: always },
+  { id: 37, isActive: always, perRunner: true },
 ]
 
 const PERCENT = 100
 const stepOf = (value: number, percent: number) => value + Math.trunc((value * percent) / PERCENT)
 
-function applyRules(weights: SwingWeights, rules: readonly SkillRule[], owned: readonly number[], situation: SwingSituation): SwingWeights {
+function applyRules(
+  weights: SwingWeights,
+  rules: readonly SkillRule[],
+  percents: readonly (readonly number[])[],
+  owned: readonly number[],
+  situation: SwingSituation,
+): SwingWeights {
   let { solid, homeRun } = weights
-  for (const rule of rules) {
-    if (!owned.includes(rule.id) || !rule.isActive(situation)) continue
+  rules.forEach((rule, index) => {
+    if (!owned.includes(rule.id) || !rule.isActive(situation)) return
+    const [solidPercent, homeRunPercent] = percents[index]
     const times = rule.perRunner === true ? situation.runnerCount : 1
     for (let repeat = 0; repeat < times; repeat += 1) {
-      if (rule.solid !== 0) solid = stepOf(solid, rule.solid)
-      if (rule.homeRun !== 0) homeRun = stepOf(homeRun, rule.homeRun)
+      if (solidPercent !== 0) solid = stepOf(solid, solidPercent)
+      if (homeRunPercent !== 0) homeRun = stepOf(homeRun, homeRunPercent)
     }
-  }
+  })
   return { solid, homeRun }
 }
 
@@ -135,5 +147,6 @@ export function applySwingSkills(
   pitcherSkillIds: readonly number[],
   situation: SwingSituation,
 ): SwingWeights {
-  return applyRules(applyRules(weights, BATTER_RULES, batterSkillIds, situation), PITCHER_RULES, pitcherSkillIds, situation)
+  const batterApplied = applyRules(weights, BATTER_RULES, balanceGrid('skill.batterSwingPercents'), batterSkillIds, situation)
+  return applyRules(batterApplied, PITCHER_RULES, balanceGrid('skill.pitcherSwingPercents'), pitcherSkillIds, situation)
 }

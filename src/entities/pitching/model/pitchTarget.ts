@@ -3,6 +3,7 @@ import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonomet
 import { PLATE_DEPTH, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { MISSION_AIM_CLAMP, MISSION_AIM_SHAKES } from '@/shared/config/original/missions'
+import { balanceGrid, balanceList } from '@/shared/config/balance'
 
 /**
  * CPU 목표점 (0x345fc) 과 제구 오차 (0x4dc78) — 위치 분석 2·5차, 난수 순서까지 원본 그대로.
@@ -144,18 +145,8 @@ export function pitchTargetOf(kind: number, situation: TargetSituation, random: 
   }
 }
 
-/** 등급별 누적 % (표 0xcfd60) → 계수 칸 */
-const ERROR_ROWS: readonly (readonly number[])[] = [
-  [10, 35, 80, 100],
-  [40, 65, 90, 100],
-  [50, 73, 93, 100],
-  [60, 80, 95, 100],
-  [72, 87, 97, 100],
-  [84, 94, 99, 100],
-]
-const ERROR_COEFFICIENTS = [12, 20, 25, 30]
-/** slt_pitch 프레임 59~67 의 반폭 — 조준 칸 크기 */
-const AIM_HALF_WIDTHS = [21, 20, 18, 16, 14, 12, 10, 8, 6]
+// 등급별 누적 % (표 0xcfd60) → 계수 칸 [12, 20, 25, 30] · slt_pitch 프레임 59~67 의 반폭(조준 칸 크기) —
+// 숨은 판정값 표 `pitching.controlErrorRows` · `pitching.controlErrorCoefficients` · `pitching.aimHalfWidths`
 const COMPUTER_AIM_OFFSET = 3
 const SIXTEEN_BITS = 16
 
@@ -216,12 +207,15 @@ export interface ControlErrorInput {
  */
 export function applyControlError(target: WorldPoint, input: ControlErrorInput, random: RandomPort): WorldPoint {
   const aim = target
-  const row = ERROR_ROWS[Math.max(0, Math.min(input.tier, ERROR_ROWS.length - 1))]
+  const errorRows = balanceGrid('pitching.controlErrorRows')
+  const coefficients = balanceList('pitching.controlErrorCoefficients')
+  const halfWidths = balanceList('pitching.aimHalfWidths')
+  const row = errorRows[Math.max(0, Math.min(input.tier, errorRows.length - 1))]
   const aimIndex = input.isComputer ? input.tier + COMPUTER_AIM_OFFSET : (input.aimIndex ?? 0)
   const roll = random.rand(0, 100)
   const column = row.findIndex((percent) => roll < percent)
-  const coefficient = ERROR_COEFFICIENTS[column < 0 ? ERROR_COEFFICIENTS.length - 1 : column]
-  const half = input.tier === 0 ? AIM_HALF_WIDTHS[0] : AIM_HALF_WIDTHS[Math.min(aimIndex, AIM_HALF_WIDTHS.length - 1)]
+  const coefficient = coefficients[column < 0 ? coefficients.length - 1 : column]
+  const half = input.tier === 0 ? halfWidths[0] : halfWidths[Math.min(aimIndex, halfWidths.length - 1)]
   const angle = random.rand(0, 360) + 1
   const dx = Math.abs(coefficient * ((half + random.rand(-2, 3)) * sineSixteen(angle))) >> SIXTEEN_BITS
   const dy = Math.abs(coefficient * ((half + random.rand(-2, 3)) * cosineSixteen(angle))) >> SIXTEEN_BITS

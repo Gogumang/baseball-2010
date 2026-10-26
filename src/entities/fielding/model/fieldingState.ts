@@ -1,3 +1,4 @@
+import { balanceNumber } from '@/shared/config/balance'
 import {
   FIELDER_COUNT,
   FIELDER_SPEED,
@@ -195,9 +196,9 @@ export interface DefenseContext {
   readonly landingTick: number
 }
 
-/** 송구 공 속도 (0xa0fc4). g = 등급 + 1, 선수가 없으면 g = 2 */
+/** 송구 공 속도 (0xa0fc4). g = 등급 + 1, 선수가 없으면 g = 2. 940 · 8 은 숨은 판정값 표 `fielding.throwSpeedBase` · `fielding.throwSpeedPerGrade` */
 export function throwSpeedOf(defenseGrade: number, teamBonus = 0): number {
-  return 940 + 8 * (defenseGrade + 1) + teamBonus
+  return balanceNumber('fielding.throwSpeedBase') + balanceNumber('fielding.throwSpeedPerGrade') * (defenseGrade + 1) + teamBonus
 }
 
 /** 악송구 보정 +0xe4 = cfg+0x2c(2) − 등급 + 8 = 10 − 등급 (0xb0fb4) */

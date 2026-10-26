@@ -1,13 +1,7 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { balanceGrid, balanceNumber } from '@/shared/config/balance'
 
-/** 제구 250 단위 행 × 누적 % (표 0xd896c) */
-const TIER_ROWS: readonly (readonly number[])[] = [
-  [5, 15, 70, 97, 100],
-  [4, 12, 60, 95, 100],
-  [3, 9, 50, 93, 100],
-  [2, 5, 45, 91, 100],
-]
-const CONTROL_ROW_WIDTH = 250
+// 제구 250 단위 행 × 누적 % (표 0xd896c) — 숨은 판정값 표 `pitching.controlTierRows` · `pitching.controlRowWidth`
 const LAST_TIER = 3
 
 /**
@@ -15,7 +9,8 @@ const LAST_TIER = 3
  * control 은 컨디션을 반영한 제구(0~999). 지친 투수(0xaebb0 == 0)는 한 칸 내려간다.
  */
 export function controlTierOf(control: number, isNotExhausted: boolean, random: RandomPort): number {
-  const row = TIER_ROWS[Math.min(Math.trunc(control / CONTROL_ROW_WIDTH), TIER_ROWS.length - 1)]
+  const rows = balanceGrid('pitching.controlTierRows')
+  const row = rows[Math.min(Math.trunc(control / balanceNumber('pitching.controlRowWidth')), rows.length - 1)]
   const roll = random.rand(0, 10_000)
   const index = row.findIndex((percent) => roll < percent * 100)
   if (index < 0) return LAST_TIER

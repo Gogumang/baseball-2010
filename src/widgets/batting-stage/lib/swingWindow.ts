@@ -1,3 +1,4 @@
+import { balanceNumber } from '@/shared/config/balance'
 import type { SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 
 /**
@@ -50,11 +51,9 @@ export function isSwingJudgeable(keyTick: number, frameCount: number): boolean {
   return swingJudgeTickOf(keyTick) <= pitchEndTickOf(frameCount)
 }
 
-/** 4e1e4 의 깊이 문턱 0xbb8 */
-export const SWING_REACH_DEPTH = 3000
-
 /**
  * 0x4e1a6~0x4e1ea — `|표 0xcfbcc[side].z − 공 경로[min(틱, N − 1)].z| ≤ 3000` 이면 판정(0x6aa), 아니면 판정 없는 헛스윙.
+ * 깊이 문턱 3000(4e1e4 의 0xbb8)은 숨은 판정값 표 `timing.reachDepth` 에서 읽는다.
  * 경로가 없는 공(사용자 투구)은 웹 전용이라 늘 닿는 것으로 본다.
  */
 export function isBallInSwingReach(
@@ -65,7 +64,7 @@ export function isBallInSwingReach(
 ): boolean {
   if (path === null || path.length === 0) return true
   const index = Math.max(0, Math.min(tick, frameCount - 1, path.length - 1))
-  return Math.abs(zoneDepth - path[index].z) <= SWING_REACH_DEPTH
+  return Math.abs(zoneDepth - path[index].z) <= balanceNumber('timing.reachDepth')
 }
 
 /**

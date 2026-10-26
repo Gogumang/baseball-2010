@@ -1,0 +1,590 @@
+{
+  "$comment": "숨은 판정값 표 — 화면 능력치 밖에서 안타 · 삼진 · 홈런 · 실책 확률을 정하는 값. value 의 기본은 원본(binary.mod) 값이다. 표(배열)는 칸 수를 바꿀 수 없고 range 밖 값은 막힌다. 효과 측정은 docs/re/BALANCE.md.",
+  "entries": [
+    {
+      "id": "timing.width",
+      "category": "timing",
+      "name": "타이밍 폭",
+      "value": 24,
+      "source": "0x34c42 (movs #0x18) · 0x34be0",
+      "effect": "타이밍 = 100 × (폭 − 어긋남 벌점) ÷ 폭. 올리면 한두 틱 빗나가도 타이밍이 덜 깎여 헛스윙이 준다(정타 타이밍 100 은 그대로)",
+      "range": { "min": 1, "max": 200 }
+    },
+    {
+      "id": "timing.specialWidth",
+      "category": "timing",
+      "name": "마구 타이밍 폭",
+      "value": 22,
+      "source": "0x34c04~0x34c22 (구질 번호 0x16 을 그대로 폭으로 쓴다) · 0x34be0",
+      "effect": "마구(구질 22)를 칠 때의 타이밍 폭. 올리면 마구를 맞히기 쉬워진다",
+      "range": { "min": 1, "max": 200 }
+    },
+    {
+      "id": "timing.specialDivisor",
+      "category": "timing",
+      "name": "마구 타이밍 나눔",
+      "value": 12,
+      "source": "0x34c18 (movs #0xc, 보통 공은 N − 1) · 0x34be0",
+      "effect": "어긋남 벌점 = 틱 차이 × 100 ÷ 이 값. 올리면 마구에 한 틱 빗나갈 때 벌점이 줄어든다",
+      "range": { "min": 1, "max": 100 }
+    },
+    {
+      "id": "timing.floor",
+      "category": "timing",
+      "name": "타이밍 바닥",
+      "value": 0,
+      "source": "d_level.dat 0x0c (cfg+0x10) · 0x34be0",
+      "effect": "타이밍이 이 값 아래로 안 내려간다. 올리면 아주 늦거나 이른 스윙도 가끔 맞는다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "timing.scale",
+      "category": "timing",
+      "name": "타이밍 배율",
+      "value": 100,
+      "source": "d_level.dat 0x0e (cfg+0x12) · 0x34be0",
+      "effect": "정타 타이밍 값(기본 100). 올리면 모든 스윙의 맞힐 확률과 잘 맞을 확률이 함께 오른다",
+      "range": { "min": 0, "max": 200 }
+    },
+    {
+      "id": "timing.reachDepth",
+      "category": "timing",
+      "name": "스윙 판정 깊이",
+      "value": 3000,
+      "source": "0x4e1e4 (리터럴 0xbb8)",
+      "effect": "스윙 순간 공이 타석 앞 이 거리 안에 있어야 판정을 탄다. 줄이면 늦거나 이른 스윙이 판정 없는 헛스윙이 된다",
+      "range": { "min": 0, "max": 20000 }
+    },
+    {
+      "id": "swing.ownBatterBonusBase",
+      "category": "swing",
+      "name": "내 선수 타자 보너스(1년차)",
+      "value": 400,
+      "source": "d_level.dat 0x1d4 (cfg+0x1d8) · 0xab3f2",
+      "effect": "나만의리그에서 육성 타자의 히트·파워에 더하는 값(연차마다 깎임). 올리면 맞힐 확률·장타가 크게 오른다 — 신인 타율을 좌우하는 가장 큰 숨은 값",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "swing.ownBatterBonusPerYear",
+      "category": "swing",
+      "name": "내 선수 타자 보너스 연차당 감소",
+      "value": 35,
+      "source": "d_level.dat 0x1d6 (cfg+0x1da) · 0xab3f2",
+      "effect": "보너스 = 기본 − 이 값 × (연차 − 1), 0 아래는 0. 올리면 해가 갈수록 보너스가 빨리 사라진다",
+      "range": { "min": 0, "max": 400 }
+    },
+    {
+      "id": "swing.ownPitcherBonusBase",
+      "category": "swing",
+      "name": "내 선수 투수 보너스(1년차)",
+      "value": 400,
+      "source": "d_level.dat 0x1d8 (cfg+0x1dc) · 0xab494",
+      "effect": "나만의리그에서 육성 투수의 구속·제구에 더하는 값. 올리면 상대 타자의 안타가 준다(투수편)",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "swing.ownPitcherBonusPerYear",
+      "category": "swing",
+      "name": "내 선수 투수 보너스 연차당 감소",
+      "value": 40,
+      "source": "d_level.dat 0x1da (cfg+0x1de) · 0xab494",
+      "effect": "투수 보너스가 연차마다 줄어드는 폭",
+      "range": { "min": 0, "max": 400 }
+    },
+    {
+      "id": "swing.missionOwnPitcherBonus",
+      "category": "swing",
+      "name": "투수 미션 육성 투수 보너스",
+      "value": 100,
+      "source": "0xab440 (movs #0x64) · 0xab42a~0xab442",
+      "effect": "투수 미션에서 육성 투수에게 붙는 고정 보너스. 올리면 미션 상대 타자가 덜 친다",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "swing.contactBase",
+      "category": "swing",
+      "name": "맞힐 확률 기본값",
+      "value": 1200,
+      "source": "0xab65a (0x96<<3 = 1200, K·hit/1000 + 1200) · 홈런더비 0xab69a",
+      "effect": "맞힐 확률(만분율) = (이 값 + 능력 차 × 계수) × 코스 · 타이밍. 올리면 모든 타자의 헛스윙이 준다",
+      "range": { "min": 0, "max": 10000 }
+    },
+    {
+      "id": "swing.normalContactFactor",
+      "category": "swing",
+      "name": "맞힐 확률 능력 계수(일반)",
+      "value": 500,
+      "source": "d_level.dat 0x54 (normal contactFactor) · 0xab628~0xab648",
+      "effect": "일반 경기에서 (히트 − 투수 구속) 차이가 맞힐 확률에 먹히는 정도(÷1000). 올리면 능력치 차가 더 크게 갈린다",
+      "range": { "min": 0, "max": 3000 }
+    },
+    {
+      "id": "swing.aceContactFactor",
+      "category": "swing",
+      "name": "맞힐 확률 능력 계수(나리)",
+      "value": 1000,
+      "source": "d_level.dat 0x4a (ace contactFactor) · 0xab628~0xab648",
+      "effect": "나만의리그(육성 선수가 낀 타석)에서 능력치 차가 맞힐 확률에 먹히는 정도(÷1000)",
+      "range": { "min": 0, "max": 3000 }
+    },
+    {
+      "id": "swing.normalHitBase",
+      "category": "swing",
+      "name": "잘 맞을 확률 기본(일반)",
+      "value": 280,
+      "source": "d_level.dat 0x4c · 0xab214",
+      "effect": "일반 경기 잘 맞을 확률(B)의 바탕 ×10. 올리면 강한 타구(라이너·장타)가 는다",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.normalHitCoefficient",
+      "category": "swing",
+      "name": "잘 맞을 확률 히트 계수(일반)",
+      "value": 200,
+      "source": "d_level.dat 0x4e · 0xab214",
+      "effect": "B 에 히트 쪽 능력 차가 먹히는 정도(÷100)",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.normalExtraBase",
+      "category": "swing",
+      "name": "홈런성 기본(일반)",
+      "value": 50,
+      "source": "d_level.dat 0x50 · 0xab214",
+      "effect": "일반 경기 홈런성 확률(C)의 바탕 ×10. 올리면 홈런이 는다",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.normalExtraCoefficient",
+      "category": "swing",
+      "name": "파워 계수(일반)",
+      "value": 400,
+      "source": "d_level.dat 0x52 · 0xab214",
+      "effect": "B · C 에 파워 쪽 능력 차가 먹히는 정도(÷100). 올리면 파워 높은 타자의 홈런이 더 는다",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.aceHitBase",
+      "category": "swing",
+      "name": "잘 맞을 확률 기본(나리)",
+      "value": 250,
+      "source": "d_level.dat 0x42 · 0xab214",
+      "effect": "나리 경기의 B 바탕 ×10",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.aceHitCoefficient",
+      "category": "swing",
+      "name": "잘 맞을 확률 히트 계수(나리)",
+      "value": 400,
+      "source": "d_level.dat 0x44 · 0xab214",
+      "effect": "나리 경기에서 히트 쪽 능력 차가 B 에 먹히는 정도(÷100)",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.aceExtraBase",
+      "category": "swing",
+      "name": "홈런성 기본(나리)",
+      "value": 70,
+      "source": "d_level.dat 0x46 · 0xab214",
+      "effect": "나리 경기의 C(홈런성) 바탕 ×10. 올리면 홈런이 는다",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.aceExtraCoefficient",
+      "category": "swing",
+      "name": "파워 계수(나리)",
+      "value": 430,
+      "source": "d_level.dat 0x48 · 0xab214",
+      "effect": "나리 경기에서 파워 쪽 능력 차가 B · C 에 먹히는 정도(÷100)",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.hitWeight",
+      "category": "swing",
+      "name": "B 의 히트 가중",
+      "value": 3,
+      "source": "d_level.dat 0x56 · 0xab214",
+      "effect": "B = (히트쪽 × 이 값 + 파워쪽 × 파워 가중) ÷ (두 가중 합). 올리면 B 가 히트를 더 따른다",
+      "range": { "min": 1, "max": 10 }
+    },
+    {
+      "id": "swing.extraWeight",
+      "category": "swing",
+      "name": "B 의 파워 가중",
+      "value": 1,
+      "source": "d_level.dat 0x57 · 0xab214",
+      "effect": "B 계산에서 파워 쪽 비중",
+      "range": { "min": 1, "max": 10 }
+    },
+    {
+      "id": "swing.timingPivot",
+      "category": "swing",
+      "name": "타이밍 중심",
+      "value": 77,
+      "source": "d_level.dat 0x58 · 0xab214",
+      "effect": "B · C 배율 = (타이밍 − 이 값) × 2 + 100. 내리면 조금 빗나간 스윙도 강한 타구가 된다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "swing.foulPercent",
+      "category": "swing",
+      "name": "약한 타구 중 파울 %",
+      "value": 30,
+      "source": "d_level.dat 0x59 · 0xab214",
+      "effect": "잘 안 맞은 타구(B 실패) 가운데 파울(코드 9) 비율. 올리면 파울이 늘고 땅볼·빗맞음이 준다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "swing.outPercent",
+      "category": "swing",
+      "name": "약한 타구 중 땅볼 %",
+      "value": 35,
+      "source": "d_level.dat 0x5a · 0xab214",
+      "effect": "파울을 뺀 약한 타구 가운데 코드 0(땅볼) 비율, 나머지는 코드 3. 결과는 수비 판이 정한다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "swing.solidCap",
+      "category": "swing",
+      "name": "잘 맞을 확률 상한",
+      "value": 9000,
+      "source": "0xabebc (리터럴 0x2328)",
+      "effect": "B 의 상한(만분율). 내리면 아무리 강한 타자도 강한 타구 비율이 이 값에 막힌다",
+      "range": { "min": 0, "max": 10000 }
+    },
+    {
+      "id": "swing.homeRunCap",
+      "category": "swing",
+      "name": "홈런성 상한",
+      "value": 4500,
+      "source": "0xabec4 (리터럴 0x1194)",
+      "effect": "C 의 상한(만분율). 내리면 홈런이 최대 이 비율로 막힌다",
+      "range": { "min": 0, "max": 9800 }
+    },
+    {
+      "id": "swing.swingStrengthBonus",
+      "category": "swing",
+      "name": "스윙 세기 보너스",
+      "value": 500,
+      "source": "0xab812 · 0xab8fc (0xfa<<1 = 500 × param_15)",
+      "effect": "B · C 에 늘 더하는 값. 올리면 모든 타자의 강한 타구 · 홈런이 는다",
+      "range": { "min": 0, "max": 5000 }
+    },
+    {
+      "id": "swing.exhaustedBonus",
+      "category": "swing",
+      "name": "지친 투수 보너스",
+      "value": 2000,
+      "source": "0xab840 (0xfa<<3 = 2000)",
+      "effect": "투수 체력 0% 일 때 B · C 에 더하는 값. 올리면 지친 투수가 더 얻어맞는다",
+      "range": { "min": 0, "max": 10000 }
+    },
+    {
+      "id": "swing.lineDriveFactor",
+      "category": "swing",
+      "name": "라이너 문턱 계수",
+      "value": 120,
+      "source": "0xabefa (movs #0x78, C×120 ÷ ((10000−C)/100))",
+      "effect": "강한 타구 가운데 코드 18(장타성)이 될 확률 계수. 올리면 15(라이너)보다 18 이 는다",
+      "range": { "min": 0, "max": 1000 }
+    },
+    {
+      "id": "swing.teamHumanDefensePenalty",
+      "category": "swing",
+      "name": "사람 수비 팀 보정",
+      "value": 10,
+      "source": "0xab5d2 (subs #0xa)",
+      "effect": "나만의리그 밖에서 수비 팀이 사람일 때 타자 히트·파워에서 빼는 값",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "swing.batterMissionHumanBonus",
+      "category": "swing",
+      "name": "타자 미션 보정",
+      "value": 100,
+      "source": "0xab5f6 (adds #0x64)",
+      "effect": "타자 미션에서 사람 타자 히트·파워에 더하는 값. 올리면 미션 타격이 쉬워진다",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "swing.pitchGradeMultipliers",
+      "category": "swing",
+      "name": "제구 등급별 투수 능력 배율 %",
+      "value": [80, 90, 95, 100, 115, 130],
+      "source": "d_level.dat 0x1dc~0x1e6",
+      "effect": "투구 등급 0~5 마다 투수 능력에 곱하는 %. 맞힐 확률 코스 배율 (300 − 이 값)/200 에도 들어간다. 올리면 투수가 강해진다",
+      "range": { "min": 0, "max": 299 }
+    },
+    {
+      "id": "swing.centerFactors",
+      "category": "swing",
+      "name": "한가운데 공 시작값 [A, B, C]",
+      "value": [10000, 500, 350],
+      "source": "0xab214 존 시작값 (오차 ≤ 3)",
+      "effect": "코스 오차가 3 이하인 공의 맞힐(A) · 잘 맞을(B) · 홈런성(C) 시작값",
+      "range": { "min": -10000, "max": 10000 }
+    },
+    {
+      "id": "swing.buntSuccessPercent",
+      "category": "swing",
+      "name": "번트 성공 % (종류 0~3)",
+      "value": [0, 75, 50, 50],
+      "source": "0xabe0e~0xabe14 (50 · 종류 1 이면 75) · 0xab214 번트 갈래",
+      "effect": "번트 종류 1~3 의 성공률. 올리면 번트가 잘 된다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "swing.errorBands",
+      "category": "swing",
+      "name": "코스 오차 구간 [오차 한도, A, B, C]",
+      "value": [[22, 0, -1000, -2000], [19, 3000, -500, -1000], [15, 6000, -300, -400], [12, 8500, -125, -100], [9, 9000, -50, -50], [3, 9500, 0, 0]],
+      "source": "0xab214 존 시작값 표",
+      "effect": "공이 배트 중심에서 이 오차보다 멀면 그 줄의 A · B · C 로 시작한다. A 를 올리면 빗나간 코스도 맞는다",
+      "range": { "min": -10000, "max": 10000 }
+    },
+    {
+      "id": "skill.batterSwingPercents",
+      "category": "skill",
+      "name": "타자 스킬 B · C % (스킬 8·9·10·12·13·14·15·16·17·18·19 차례)",
+      "value": [[1, 1], [2, 0], [3, 3], [0, 5], [2, 0], [2, 0], [3, 0], [5, 5], [-10, -10], [-10, 0], [1, -10]],
+      "source": "0xab91c~ (위치 분석 3차 표 — 1%·2% 외 나눗수는 추정)",
+      "effect": "스킬이 켜졌을 때 B(잘 맞음) · C(홈런성)에 더하는 %. 올리면 그 스킬의 효과가 커진다",
+      "range": { "min": -100, "max": 100 }
+    },
+    {
+      "id": "skill.pitcherSwingPercents",
+      "category": "skill",
+      "name": "투수 스킬 B · C % (스킬 24·25·27·28·29·31·33·35·37 차례)",
+      "value": [[-1, -1], [-2, 0], [-3, 0], [-2, 0], [-2, 0], [0, -10], [-5, 0], [5, 0], [-2, -2]],
+      "source": "0xab91c~ (위치 분석 3차 표)",
+      "effect": "투수 스킬이 켜졌을 때 타자의 B · C 에 더하는 %. 음수가 클수록 투수에게 유리",
+      "range": { "min": -100, "max": 100 }
+    },
+    {
+      "id": "ability.moraleCuts",
+      "category": "ability",
+      "name": "사기 구간 능력치 감소 [사기 상한, 감소 %]",
+      "value": [[10, 50], [30, 20], [50, 10]],
+      "source": "0xb57c4~0xb5802",
+      "effect": "사기가 상한 이하면 경기 능력치를 그 % 깎는다(사기 51 이상은 그대로). 감소 %를 내리면 사기가 낮아도 덜 약해진다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "ability.illnessCutPercent",
+      "category": "ability",
+      "name": "질병 능력치 감소 %",
+      "value": 30,
+      "source": "0xb5784",
+      "effect": "질병일 때 경기 능력치 감소율",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "ability.injuryCutPercent",
+      "category": "ability",
+      "name": "부상 능력치 감소 %",
+      "value": 60,
+      "source": "0xb57b4",
+      "effect": "부상일 때 경기 능력치 감소율",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "ability.equipmentBonus",
+      "category": "ability",
+      "name": "장비 레벨별 능력치 보너스",
+      "value": [30, 50, 70, 90, 110, 125, 140, 190, 210, 230, 250],
+      "source": "표 0xd8890 · 0xb6494",
+      "effect": "장비 레벨 1~11 이 그 능력치에 더하는 값(가게 화면 숫자도 같이 바뀐다)",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "ability.skillPenalty",
+      "category": "ability",
+      "name": "무기력 · 수비 스킬 감점",
+      "value": 100,
+      "source": "0xb64b0 · 0xb6512",
+      "effect": "스킬 5(네 능력치) · 스킬 20(수비) 장착 때 빼는 값",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "ability.legendSkillBonus",
+      "category": "ability",
+      "name": "전설 스킬 보너스",
+      "value": 50,
+      "source": "0xb64ca",
+      "effect": "스킬 7 장착 때 네 능력치에 더하는 값",
+      "range": { "min": 0, "max": 999 }
+    },
+    {
+      "id": "pitching.controlTierRows",
+      "category": "pitching",
+      "name": "제구 등급 누적 % (제구 250 단위 줄)",
+      "value": [[5, 15, 70, 97, 100], [4, 12, 60, 95, 100], [3, 9, 50, 93, 100], [2, 5, 45, 91, 100]],
+      "source": "표 0xd896c · 0xb74bc",
+      "effect": "CPU 투구 등급(0~5)을 뽑는 누적 %. 앞 칸을 키우면 낮은 등급(약한 공)이 잦아 타자가 유리",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "pitching.controlRowWidth",
+      "category": "pitching",
+      "name": "제구 줄 폭",
+      "value": 250,
+      "source": "0xb74bc (÷250)",
+      "effect": "제구 능력치를 이 값으로 나눠 줄을 고른다",
+      "range": { "min": 1, "max": 999 }
+    },
+    {
+      "id": "pitching.controlErrorRows",
+      "category": "pitching",
+      "name": "제구 흩어짐 누적 % (등급별)",
+      "value": [[10, 35, 80, 100], [40, 65, 90, 100], [50, 73, 93, 100], [60, 80, 95, 100], [72, 87, 97, 100], [84, 94, 99, 100]],
+      "source": "표 0xcfd60 · 0x4dc78",
+      "effect": "등급마다 흩어짐 계수 칸을 고르는 누적 %. 앞 칸을 키우면 공이 조준점에 더 잘 간다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "pitching.controlErrorCoefficients",
+      "category": "pitching",
+      "name": "제구 흩어짐 계수",
+      "value": [12, 20, 25, 30],
+      "source": "0x4dc78",
+      "effect": "흩어짐 크기 계수. 올리면 공이 조준점에서 더 벗어난다(볼 · 한가운데 실투가 는다)",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "pitching.aimHalfWidths",
+      "category": "pitching",
+      "name": "조준 칸 반폭",
+      "value": [21, 20, 18, 16, 14, 12, 10, 8, 6],
+      "source": "slt_pitch 프레임 59~67 · 0x4dc78",
+      "effect": "흩어짐 반지름 바탕. 올리면 공이 더 흩어진다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "pitching.mistakeAbilityPercent",
+      "category": "pitching",
+      "name": "실투 판정 구속 배율 % (등급별)",
+      "value": [70, 80, 90, 100, 105, 110],
+      "source": "표 0xd2589 · 0x66d70",
+      "effect": "실투 판정에 쓰는 구속에 곱하는 %. 내리면 실투가 는다",
+      "range": { "min": 0, "max": 200 }
+    },
+    {
+      "id": "pitching.mistakeGradeBonus",
+      "category": "pitching",
+      "name": "실투 % 등급 보정",
+      "value": [10, 5, 0, 0, -1, -2],
+      "source": "표 0xd257d · 0x33cfc",
+      "effect": "등급마다 실투 %에 더하는 값. 올리면 실투(한가운데 공)가 는다",
+      "range": { "min": -100, "max": 100 }
+    },
+    {
+      "id": "pitching.mistakeBase",
+      "category": "pitching",
+      "name": "실투 % 기본",
+      "value": 8,
+      "source": "0x33d14 (8 − 능력 등급)",
+      "effect": "실투 % = 이 값 − 구속 등급 + 등급 보정. 올리면 실투가 는다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "pitching.unpressedMistakePercent",
+      "category": "pitching",
+      "name": "게이지 안 누른 실투 %",
+      "value": 20,
+      "source": "0x33d3e",
+      "effect": "게이지를 안 누르고 던진 공의 실투 %",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "pitching.fatigueThresholds",
+      "category": "pitching",
+      "name": "체력% 구간 문턱",
+      "value": [55, 35, 20, 1],
+      "source": "0xb58e6~0xb592a",
+      "effect": "체력%가 문턱 이상이면 그 칸의 감소 %를 쓴다(마지막 칸 아래는 맨 끝 감소 %)",
+      "range": { "min": 0, "max": 101 }
+    },
+    {
+      "id": "pitching.fatigueCutPercents",
+      "category": "pitching",
+      "name": "체력% 구간 능력치 감소 %",
+      "value": [0, 10, 30, 50, 90],
+      "source": "0xb58e6~0xb592a",
+      "effect": "지친 투수의 능력치 감소 %. 올리면 지친 투수가 더 얻어맞는다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "pitching.wildPitchPermyriad",
+      "category": "pitching",
+      "name": "폭투 · 포일 확률(만분율)",
+      "value": 10,
+      "source": "d_level.dat 0x2a · 0x35058",
+      "effect": "투구마다 공이 포수 뒤로 빠질 확률. 10 = 0.1%",
+      "range": { "min": 0, "max": 10000 }
+    },
+    {
+      "id": "fielding.fumblePermyriad",
+      "category": "fielding",
+      "name": "펌블 확률(만분율, 수비 등급 0~7)",
+      "value": [200, 180, 160, 140, 120, 100, 80, 50],
+      "source": "표 0xd87d4 · 0xb41d0",
+      "effect": "움직이는 공을 잡을 때 놓칠 확률. 올리면 실책 · 출루가 는다",
+      "range": { "min": 0, "max": 10000 }
+    },
+    {
+      "id": "fielding.throwErrorBase",
+      "category": "fielding",
+      "name": "악송구 기본(만분율)",
+      "value": 100,
+      "source": "0xa1828",
+      "effect": "악송구 확률 = 이 값 + (10 − 수비 등급). 올리면 악송구가 는다",
+      "range": { "min": 0, "max": 10000 }
+    },
+    {
+      "id": "fielding.specialDefensePercent",
+      "category": "fielding",
+      "name": "필살수비 발동 % (수비 등급 0~7)",
+      "value": [1, 2, 3, 3, 4, 4, 5, 6],
+      "source": "표 0xd25b0 · 0x66b30",
+      "effect": "점프 · 슬라이딩 수비 창이 열릴 확률. 올리면 어려운 타구를 더 잡는다",
+      "range": { "min": 0, "max": 100 }
+    },
+    {
+      "id": "fielding.throwSpeedBase",
+      "category": "fielding",
+      "name": "송구 속도 기본",
+      "value": 940,
+      "source": "d_level.dat 0x16 (cfg+0x1a) · 0xa0fc4",
+      "effect": "송구 속도 = 이 값 + 등급계수 × (등급+1). 올리면 도루 · 내야안타가 어려워진다",
+      "range": { "min": 0, "max": 5000 }
+    },
+    {
+      "id": "fielding.throwSpeedPerGrade",
+      "category": "fielding",
+      "name": "송구 속도 등급 계수",
+      "value": 8,
+      "source": "d_level.dat 0x26 (cfg+0x2a) · 0xa0fc4",
+      "effect": "수비 등급이 송구 속도에 더하는 정도",
+      "range": { "min": 0, "max": 200 }
+    },
+    {
+      "id": "running.baseSpeed",
+      "category": "running",
+      "name": "주자 기본 속도",
+      "value": 300,
+      "source": "d_level.dat 0x10 (cfg+0x14) · 0xa092c",
+      "effect": "주자 속도 = 이 값 + 주루 × 계수 ÷ 100. 올리면 도루 · 내야안타 · 추가 진루가 쉬워진다",
+      "range": { "min": 0, "max": 2000 }
+    },
+    {
+      "id": "running.speedPerRun",
+      "category": "running",
+      "name": "주루 능력 계수",
+      "value": 7,
+      "source": "d_level.dat 0x12 (cfg+0x16) · 0xa93ac",
+      "effect": "주루 능력치가 속도에 먹히는 정도(÷100). 올리면 발 빠른 주자가 더 빨라진다",
+      "range": { "min": 0, "max": 100 }
+    }
+  ]
+}

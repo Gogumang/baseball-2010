@@ -1,4 +1,5 @@
 import { BALANCE } from '@/shared/config/original/balance'
+import { balanceGrid, balanceNumber } from '@/shared/config/balance'
 import { skillIdsOfBits } from '@/entities/team/model/teamRoster'
 import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import {
@@ -741,8 +742,7 @@ export function pitcherAbilityLimitsOf(career: PitcherCareer): PitcherAbility {
 const POWERLESS_SKILL = 5
 const LEGEND_SKILL = 7
 const COOL_SKILL = 22
-const SKILL_PENALTY = 100
-const LEGEND_BONUS = 50
+// 5 의 −100 · 7 의 +50 은 숨은 판정값 표 `ability.skillPenalty` · `ability.legendSkillBonus`
 /** 냉정 22: `v += v / 10` (0xb6506~0xb6510, 나눗셈 0xca7b5 = 0 쪽 버림) */
 const COOL_CONTROL_DIVISOR = 10
 
@@ -760,8 +760,8 @@ export function equippedPitcherAbilityOf(
 ): PitcherAbility {
   const adjust = (key: keyof PitcherAbility) => {
     let value = Math.min(MAXIMUM_ABILITY, career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
-    if (isPitcherSkillEquipped(career, POWERLESS_SKILL)) value = Math.max(0, value - SKILL_PENALTY)
-    if (isPitcherSkillEquipped(career, LEGEND_SKILL)) value = Math.min(MAXIMUM_ABILITY, value + LEGEND_BONUS)
+    if (isPitcherSkillEquipped(career, POWERLESS_SKILL)) value = Math.max(0, value - balanceNumber('ability.skillPenalty'))
+    if (isPitcherSkillEquipped(career, LEGEND_SKILL)) value = Math.min(MAXIMUM_ABILITY, value + balanceNumber('ability.legendSkillBonus'))
     if (key === 'control' && isPitcherSkillEquipped(career, COOL_SKILL)) {
       value += Math.trunc(value / COOL_CONTROL_DIVISOR)
     }
@@ -780,13 +780,7 @@ export function equippedPitcherAbilityOf(
  * 모드 3·4 이고 내 선수(0xb6389)일 때의 갈래로, 타자편 `condition.ts` 와 같은 코드다:
  *   질병 `v += (−30·v)/100` (0xb5784) · 부상 `v += (−60·v)/100` (0xb57b4 `lsls #4; subs; lsls #2` = −60)
  */
-const ILLNESS_ABILITY_CUT = 30
-const INJURY_ABILITY_CUT = 60
-const MORALE_ABILITY_CUTS: readonly (readonly [number, number])[] = [
-  [10, 50],
-  [30, 20],
-  [50, 10],
-]
+// 감소율(질병 30 · 부상 60 · 사기 [10,50] · [30,20] · [50,10])은 타자편과 같은 숨은 판정값 표 `ability.*` 에서 읽는다
 
 /**
  * 0xb570c 를 체력% 피로(0xb58e6) **앞까지** 돌린 값 — 0..999 로 **아직 자르지 않았다**.
@@ -805,8 +799,8 @@ export function gamePitcherAbilityBeforeMoraleOf(career: PitcherCareer): Pitcher
   const equipped = equippedPitcherAbilityOf(career)
   const adjust = (key: keyof PitcherAbility) => {
     let value = equipped[key]
-    if (career.isSick) value = reduceByPercent(value, ILLNESS_ABILITY_CUT)
-    if (career.isInjured) value = reduceByPercent(value, INJURY_ABILITY_CUT)
+    if (career.isSick) value = reduceByPercent(value, balanceNumber('ability.illnessCutPercent'))
+    if (career.isInjured) value = reduceByPercent(value, balanceNumber('ability.injuryCutPercent'))
     return value
   }
   return {
@@ -822,7 +816,7 @@ export function gamePitcherAbilityBeforeMoraleOf(career: PitcherCareer): Pitcher
  * 0xa3a24 값이라 경기 중 돌발 보상으로 바뀌면 다음 계산부터 새 값이 먹는다(`pitcherGameFlow` 의 `withPitcherGameMorale`)
  */
 export function withMoraleAbilityCut(ability: PitcherAbility, morale: number): PitcherAbility {
-  const moraleCut = MORALE_ABILITY_CUTS.find(([limit]) => morale <= limit)?.[1] ?? 0
+  const moraleCut = balanceGrid('ability.moraleCuts').find(([limit]) => morale <= limit)?.[1] ?? 0
   if (moraleCut <= 0) return ability
   return {
     control: reduceByPercent(ability.control, moraleCut),
