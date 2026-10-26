@@ -8,4 +8,6 @@ import { ORIGINAL_BUGFIX_CONFIG, setBugfixConfigForTests } from '@/shared/config
  * 고친 길로 soak · 시드 측정을 돌릴 때만 `BUGFIXES=json` 을 준다 — 그때는 `bugfixes.json` 그대로 돈다
  * (예: `BUGFIXES=json SOAK_SEEDS=1,777 yarn vitest run src/app/model/soak/seasonSoak.test.tsx --maxWorkers=2`).
  */
-setBugfixConfigForTests(process.env.BUGFIXES === 'json' ? null : ORIGINAL_BUGFIX_CONFIG)
+// 브라우저 시험(`vitest.browser.config.ts`)에는 `process` 가 없다 — 그때는 늘 원본
+const useJson = typeof process !== 'undefined' && process.env.BUGFIXES === 'json'
+setBugfixConfigForTests(useJson ? null : ORIGINAL_BUGFIX_CONFIG)
