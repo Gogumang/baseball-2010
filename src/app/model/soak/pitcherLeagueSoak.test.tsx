@@ -116,6 +116,8 @@ import { confirmNationalCupStandings, finishNationalCup } from '@/entities/natio
 import { nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
 import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import { forgetRepeatableEvents } from '@/entities/story/model/storyScene'
+import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
+import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
@@ -490,6 +492,15 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   const storyDoneRef: { current: (viewed: readonly number[]) => void } = { current: () => {} }
   /** 마선수 대결 끝 — 이겼나 */
   const aceMatchDoneRef: { current: (isWin: boolean) => void } = { current: () => {} }
+  /**
+   * **마선수 대결 대조 (r264)** — SYS 8 투수편 갈래(0x8d7d0~0x8d834)에서 연 대결이 끝나면 140 진입 0x10df8 이 결과 바이트 g[0x177]
+   * (= [미션+0xbc], 0x4ea0c 4eff6)로 resultEvents[이김 ? 0 : 1] 을 틀고 대기 칸을 지운다. 0x4ef3e 는 g[0x176] 으로 G 를 건너뛰고,
+   * 0xa5368 은 +0xbd = team − 1 ≤ 15(team 16 메디카)일 때만 투수 15번 칸을 −1 에서 하나 올린다.
+   */
+  const aceWatch: {
+    opened: { readonly team: number; readonly resultEvents: readonly number[]; readonly gamePoint: number; readonly counts: Readonly<Record<string, number>> } | null
+    finished: { readonly isWin: boolean } | null
+  } = { opened: null, finished: null }
 
   /** 화면에 넘기는 세션 — 액션을 감싸 보상 명령 · 재생 끝 · 대결 끝을 센다(부르는 길은 그대로) */
   const observedSession = (session: PitcherLeagueSession): PitcherLeagueSession => ({
@@ -504,8 +515,15 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
         storyDoneRef.current(args[1])
         return session.actions.completeStory(...args)
       },
+      beginAceMatch: (...args: Parameters<PitcherLeagueSession['actions']['beginAceMatch']>) => {
+        const [command] = args
+        aceWatch.opened = { team: command.team, resultEvents: command.resultEvents, gamePoint: hooks().wallet.balance, counts: missionCounts }
+        aceWatch.finished = null
+        return session.actions.beginAceMatch(...args)
+      },
       finishAceMatch: (isWin: boolean) => {
         aceMatchDoneRef.current(isWin)
+        aceWatch.finished = { isWin }
         return session.actions.finishAceMatch(isWin)
       },
       finishGame: (summary: PitcherGameSummary) => {
@@ -613,6 +631,26 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     paths.대결 += 1
     games.대결 += 1
     if (isWin) paths.대결이김 += 1
+  }
+  const checkAceMatchResult = () => {
+    const { opened, finished } = aceWatch
+    if (opened === null || finished === null) return
+    const session = result.current
+    if (session.story === null || session.story.context !== '대결결과') return
+    aceWatch.opened = null
+    aceWatch.finished = null
+    const lines: string[] = []
+    const expectedEvent = matchResultEventOf(opened.resultEvents, finished.isWin)
+    if (session.story.eventId !== expectedEvent) lines.push(`결과 이벤트 ${session.story.eventId} ≠ ${expectedEvent}`)
+    if (aceMatchPending.read() !== null) lines.push('140 뒤에도 투수편 대기가 남았다')
+    if (hooks().wallet.balance !== opened.gamePoint) lines.push(`대결 G ${opened.gamePoint} → ${hooks().wallet.balance} (0x4ef3e 는 건너뛴다)`)
+    const target = aceMatchMissionOf(opened.team, '투수')
+    const key = target === null ? null : aceMatchClearKeyOf(target)
+    const expectedCounts = finished.isWin && key !== null ? { ...opened.counts, [key]: aceMatchClearCountAfterWin(opened.counts[key]) } : opened.counts
+    const firstDiff = firstDiffOf(expectedCounts, missionCounts)
+    if (firstDiff !== null) lines.push(`클리어 칸 ${firstDiff}`)
+    problems.add(where(), lines.map((line) => `마선수 대결 team ${opened.team}: ${line}`))
+    if (process.env.SOAK_DEBUG === '1') process.stderr.write(`[대결 대조] team ${opened.team} ${finished.isWin ? '이김' : '짐'} 문제 ${lines.length}\n`)
   }
 
   /** G 장부 = 지갑 — 어긋나면 그 걸음을 적고 장부를 지갑에 맞춘다(같은 어긋남이 걸음마다 쌓이지 않게) */
@@ -1235,6 +1273,7 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       }
       if (frameScenes.has(result.current.scene) && result.current.career !== null) {
         frameStep()
+        checkAceMatchResult()
         // 화면이 경기를 끝냈다(`finishGame`) — 정산이 든 뒤 요약 검사
         const finished = finishedGame.current
         if (finished !== null) {

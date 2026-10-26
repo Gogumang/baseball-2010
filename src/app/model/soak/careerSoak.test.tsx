@@ -72,6 +72,8 @@ import { batterRecordLineOf } from '@/entities/career/model/seasonStats'
 import { HALL_OF_FAME_COST } from '@/entities/collection/model/collection'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
+import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
+import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import type { MatchCommand } from '@/pages/story/model/useEventPlayback'
 import type { StoryContext } from '@/app/model/useStorySchedule'
@@ -262,7 +264,7 @@ interface CareerSoakOptions {
    * 첫 커리어를 이 값으로 고친 저장에서 [이어하기]로 시작한다(원본에 있는 꼴 — 그 연차 첫날 · 범위 안 인기도 · 부상 경기 수).
    * 짧은 판이 엔딩 이어하기 길(부상 0 · 방출 1)을 몇 초 안에 밟게 한다
    */
-  readonly startPatch?: Partial<Pick<PlayerCareer, 'season' | 'popularity' | 'injuredGamesPlayed' | 'isInjured' | 'injuryRemaining'>>
+  readonly startPatch?: Partial<Pick<PlayerCareer, 'season' | 'popularity' | 'injuredGamesPlayed' | 'isInjured' | 'injuryRemaining' | 'seenEventIds'>>
   /** 이어할 수 있는 엔딩을 만날 때마다 이어한다(5000 G 가 있으면) — 없으면 새 길에서 한 번만 */
   readonly continueEndings?: boolean
   /** 이만큼 엔딩을 이어하면 멈춘다 */
@@ -341,6 +343,27 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     readonly gameSettings: ReturnType<typeof useGameSettings>
   }
 
+  /**
+   * **마선수 대결 대조 (r264)** — SYS 8(0x8d782~0x8d7ce) 에서 연 대결이 결과 판을 닫으면(0x407f0 → 0x4b100 → 0x106 → 105 진입
+   * 0x11b46 → 140 0x10df8) 결과 이벤트 · 대기 칸 · G · 클리어 칸이 원본대로인지 본다.
+   */
+  const aceWatch: {
+    opened: { readonly team: number; readonly resultEvents: readonly number[]; readonly gamePoint: number; readonly counts: MissionClearCounts } | null
+    finished: { readonly isWin: boolean } | null
+  } = { opened: null, finished: null }
+  /** 대결 화면에 넘기는 미션 세션 — 결과 판을 닫는 `finishAceMatch` 때의 이겼나를 적는다 */
+  const observedMission = (mission: ReturnType<typeof useMissionSession>): ReturnType<typeof useMissionSession> => ({
+    ...mission,
+    actions: {
+      ...mission.actions,
+      finishAceMatch: () => {
+        const status = mission.missionRun?.status
+        if (status === '성공' || status === '실패') aceWatch.finished = { isWin: status === '성공' }
+        return mission.actions.finishAceMatch()
+      },
+    },
+  })
+
   /** 화면에 넘기는 세션 — 액션을 감싸 판 · 보상 명령을 센다(부르는 길은 그대로) */
   const observedSession = (session: Session): Session => ({
     ...session,
@@ -397,7 +420,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         <MissionRoutes
           screen={screen}
           setScreen={setScreen}
-          session={mission}
+          session={observedMission(mission)}
           runner={runner}
           random={random}
           batter={modeBatterOf(missionBatter)}
@@ -564,7 +587,39 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       return
     }
     session.actions.holdAceMatch(command.resultEvents, carried.viewedEventIds)
+    aceWatch.opened = { team: command.team, resultEvents: command.resultEvents, gamePoint: result.current.wallet.balance, counts: missionRecord.load() }
+    aceWatch.finished = null
     mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried })
+  }
+
+  /**
+   * 대결을 마친 뒤의 결과 이벤트 — 140 진입 0x10df8: 결과 바이트 g[0x144](= [미션+0xbc] 성공 여부, 0x4ea0c 4efc6)로
+   * resultEvents[이김 ? 0 : 1] 을 틀고 대기 칸(g[0x11f] …)을 지운다. 정산 0x4ef3e 는 g[0x11f] 로 G 를 건너뛰고, 0xa5368 은
+   * +0xbd = team − 1 ≤ 15(team 16)일 때만 타자 15번 칸을 −1 에서 하나 올린다.
+   */
+  const checkAceMatchResult = () => {
+    const { opened, finished } = aceWatch
+    if (opened === null || finished === null) return
+    const { screen, modeSave, wallet } = result.current
+    if (screen.kind !== '이벤트' || screen.context !== '대결결과') return
+    aceWatch.opened = null
+    aceWatch.finished = null
+    walked(finished.isWin ? '대결이김' : '대결짐')
+    const at = where()
+    const lines: string[] = []
+    const expectedEvent = matchResultEventOf(opened.resultEvents, finished.isWin)
+    if (screen.eventId !== expectedEvent) lines.push(`결과 이벤트 ${screen.eventId} ≠ ${expectedEvent}`)
+    if (modeSave.aceMatchPendingPorts[NARI_BATTER_MODE].read() !== null) lines.push('140 뒤에도 타자편 대기가 남았다')
+    if (wallet.balance !== opened.gamePoint) lines.push(`대결 G ${opened.gamePoint} → ${wallet.balance} (0x4ef3e 는 건너뛴다)`)
+    const target = aceMatchMissionOf(opened.team)
+    const key = target === null ? null : aceMatchClearKeyOf(target)
+    const expectedCounts = finished.isWin && key !== null
+      ? { ...opened.counts, [key]: aceMatchClearCountAfterWin(opened.counts[key]) }
+      : opened.counts
+    const firstDiff = firstDiffOf(expectedCounts, missionRecord.load())
+    if (firstDiff !== null) lines.push(`클리어 칸 ${firstDiff}`)
+    problems.add(at, lines.map((line) => `마선수 대결 team ${opened.team}: ${line}`))
+    if (process.env.SOAK_DEBUG === '1') process.stderr.write(`[대결 대조] team ${opened.team} ${finished.isWin ? '이김' : '짐'} 문제 ${lines.length}\n`)
   }
 
   let lastCheckedCareer: PlayerCareer | null = null
@@ -1102,6 +1157,7 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         if (screen.kind === '경기결과' || screen.kind === '대회경기결과') checkGameResult()
         frameStep()
         if (result.current.screen.kind === '마선수대결') countAceMatch()
+        checkAceMatchResult()
         if (stoppedAt !== null) break
         checkCareer()
         checkLedger()
@@ -1321,6 +1377,23 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
     for (const path of ['장비', '외출']) expect(result.paths[path] ?? 0, `${path} — ${report(result)}`).toBeGreaterThan(0)
     expect(Object.keys(result.paths).some((path) => path.startsWith('이어하기')), report(result)).toBe(true)
   }, 180_000)
+
+  it('짧은 판(마선수 대결) — 4년차 방송국 [!] 206(team 16 싸이커)을 앱 화면으로 치르면 결과 이벤트 · 대기 · G · 클리어 칸이 원본대로', async () => {
+    // 방송국(trigger 6) 앞 이벤트 200~205 와 다른 장소의 1회짜리 이벤트를 본 4년차 첫날 — 지도의 [!] 가 방송국 하나라
+    // g29 부터 타자 대결 206(team 16)이 서고, 지면 210 으로 다시 붙는다
+    const seenPlaceEvents = ORIGINAL_EVENTS
+      .filter((event) => event.trigger >= 1 && event.trigger !== 6 && !event.repeatable && (event.audience === 1 || event.audience === 2))
+      .map((event) => String(event.id))
+    const result = await runCareerSoak({
+      seed: 2015, maxRegularGames: 44, roundTripEvery: 4, extras: true, startGamePoint: 60_000,
+      startPatch: { season: 4, popularity: 1_600, seenEventIds: [...seenPlaceEvents, '200', '201', '202', '203', '204', '205'] },
+    })
+    if (process.env.SOAK_DEBUG === '1') process.stderr.write(`${report(result)}\n`)
+    expect(result.stoppedAt, report(result)).toBeNull()
+    expect(result.problems.size, report(result)).toBe(0)
+    // 대결을 실제로 치르고 결과 이벤트까지 대조했다 — 소크 손가락은 마투수 공을 못 맞혀 늘 진다(이긴 길은 `useMissionSession.test` 의 team 16 칸)
+    expect(result.paths.대결짐 ?? 0, report(result)).toBeGreaterThan(0)
+  }, 600_000)
 
   it('짧은 판(엔딩 이어하기) — 부상 엔딩(0)을 5000 G 로 이어하고 같은 시즌 경기를 이어 친다 (0x1bd36 → 0x1bddc)', async () => {
     // 부상 경기 수 20 (0xa3a84 첫 줄) — 105 진입 판정 0 → 부상 엔딩 500

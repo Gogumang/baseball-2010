@@ -35,6 +35,7 @@ import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
+import { missionResultLeaveOf } from '@/pages/mission-play/lib/missionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
@@ -514,7 +515,7 @@ export function MissionPlayScreen({
             {...(resultBoard?.heldGamePoint === undefined ? {} : { heldGamePoint: resultBoard.heldGamePoint })}
             {...(resultBoard?.aceMatch === undefined ? {} : { aceMatch: resultBoard.aceMatch })}
             onExit={(exit) => {
-              if (resultBoard?.aceMatch === undefined && exit === '다시' && onRetry !== undefined) onRetry()
+              if (missionResultLeaveOf(exit, resultBoard?.aceMatch !== undefined) === '다시하기' && onRetry !== undefined) onRetry()
               else onFinish()
             }}
           />
