@@ -18,6 +18,7 @@
  */
 
 import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** 투수 칸 — 레코드 +0xc 부터 s16 네 칸 */
 export const PITCHER_SLOT = { 제구: 0, 구속: 1, 변화: 2, 체력: 3 } as const
@@ -170,7 +171,7 @@ export interface SeasonTeamCondition {
    * SR+0x185 코치 (−1 없음, 0~9).
    * 원본 코치 분기에는 팀 검사가 없어 **상대 팀 선수에게도 붙는다** (J 4-2, 직접 떴다): 0xb5a74 `[sp+4] == 2`(모드) →
    *   SR+0x185 ≥ 0 → 점프표 0xd8858[코치] 가 칸(r7)·투수 여부(0xb6279)만 보고 b5b04 `r4 += 0xd884c[코치]` — 팀 비교가 없고,
-   *   b5a16 뒤로는 모든 갈래가 b5a74 로 모인다. 원본 동작이므로 그대로 옮긴다 — `applyToEveryTeam` 참고.
+   *   b5a16 뒤로는 모든 갈래가 b5a74 로 모인다 (원본 버그 B-21 — 고친 길은 `isMyTeam` 선수에게만, `gameAbilityPartsOf`).
    */
   readonly coach: number
 }
@@ -235,8 +236,9 @@ export function gameAbilityPartsOf(input: GameAbilityInput): GameAbilityParts {
     bonus += teamAbilityBonusOf(teamAbilities[teamAbilitySlotFor(isPitcher, slot)] ?? 0)
   }
 
-  // ── 코치 보너스 (모드 2). 팀 검사가 없다 (0xb5a74~0xb5b04) ──
-  if (isSeason && season !== undefined && season.coach >= 0) {
+  // ── 코치 보너스 (모드 2). 팀 검사가 없다 (0xb5a74~0xb5b04) — 원본 버그 B-21.
+  // 고침(`bugfixes.json` B-21, 기본 켬): 내 팀(시즌 팀 [시즌+1]) 선수에게만 — 질병·사기 갈래(0xb5804)와 같은 팀 검사. 굴림 없음
+  if (isSeason && season !== undefined && season.coach >= 0 && (input.isMyTeam || !isBugFixed('B-21'))) {
     bonus += coachBonusOf(season.coach, isPitcher, slot)
   }
 

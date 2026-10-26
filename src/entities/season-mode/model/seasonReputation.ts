@@ -1,4 +1,5 @@
 import { GAME_RECORD_SIZE } from '@/entities/season-mode/model/seasonRecord'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 시즌 평판 평가 16칸 (`SR+0x1a0..0x1af`) — `docs/re/S4-season-reputation.md` **확정**.
@@ -39,13 +40,26 @@ export type SeasonRecordCode = (typeof SEASON_RECORD_CODE)[keyof typeof SEASON_R
 /**
  * 점프표 `0xd7d7c` 가 만드는 **코드 → 칸** 대응.
  *
- * ⚠️ **원본 버그 그대로**: 코드 4·5 만 서로 뒤집혀 있다 (S4 2b 확정, DECISIONS 2026-09-20).
+ * ⚠️ **원본 버그(B-16)**: 코드 4·5 만 서로 뒤집혀 있다 (S4 2b 확정, DECISIONS 2026-09-20). 고친 길은 `FIXED_RECORD_CODE_TO_SLOT`.
  * 그래서 **탈삼진(코드 4)이 S[5] 로, 병살(코드 5)이 S[4] 로** 들어가고,
  * 평판식이 `+ S[5]/3`(탈삼진 가산) · `− 2×(S[4]/3)`(병살 감산)을 하므로
  * 결과적으로 **병살을 잡으면 평판이 깎이고 탈삼진이 평판을 올린다.**
  * 표를 뒤집지 않았다면 반대였겠지만 **실행되는 값은 표 그대로**이므로 그대로 옮긴다.
  */
 export const RECORD_CODE_TO_SLOT: readonly number[] = [0, 1, 2, 3, 5, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+/**
+ * **고친 대응(B-16)** — 코드 k 를 칸 k 에 그대로 넣는다(점프표의 4·5 뒤집힘만 걷는다).
+ * 평판식(0xa6f1c)은 손대지 않으므로 칸 4(이제 탈삼진)는 `− 2×(S[4]/3)`, 칸 5(이제 병살)는 `+ S[5]/3` 이 된다 —
+ * `ORIGINAL-BUGS.md` B-16 이 적은 증상("병살이 깎고 탈삼진이 올린다")을 뒤집는 가장 작은 고침이다.
+ * 의도가 둘 중 어느 쪽이었는지는 원본에서 알 수 없다(S4 4절) — 표를 뒤집은 쪽을 버그로 보는 판단이다.
+ */
+export const FIXED_RECORD_CODE_TO_SLOT: readonly number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+/** 지금 쓰는 코드 → 칸 대응 — `bugfixes.json` B-16 이 켜져 있으면(기본) 고친 대응. 굴림 없음 */
+export function recordCodeToSlotTable(): readonly number[] {
+  return isBugFixed('B-16') ? FIXED_RECORD_CODE_TO_SLOT : RECORD_CODE_TO_SLOT
+}
 
 /** 코드 상한 — `0xa3440` 은 `k > 14` 면 아무것도 하지 않는다 */
 export const MAXIMUM_RECORD_CODE = 14
@@ -80,7 +94,7 @@ export function recordSeasonGameEvent(slots: readonly number[], code: number, my
   const next = [...slots]
   if (code < 0 || code > MAXIMUM_RECORD_CODE) return next
   if (sideOfRecordCode(code) !== mySide) return next
-  const slot = RECORD_CODE_TO_SLOT[code]
+  const slot = recordCodeToSlotTable()[code]
   next[slot] = (next[slot] + 1) & 0xff
   return next
 }

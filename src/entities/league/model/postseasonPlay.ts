@@ -10,6 +10,7 @@ import {
 import type { LeagueAbilityContext, LeagueTeamRecord } from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * CPU 끼리의 포스트시즌 진행 (binary.mod 0xc2760 한 경기 · 0x13da0 자동 소화 루프).
@@ -106,8 +107,12 @@ export function playCpuSeriesGameWithStamina(
     },
   )
   // c28e2~c290a: `score(sX) > score(sY)` 면 X 승, 아니면(동점 포함) Y 승. 칸 sX(초)에서 친 것은 Y 의 선수라
-  // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그 그대로 (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다)
-  const winner = score.awayRuns > score.homeRuns ? x : y
+  // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그(B-04) (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다).
+  // 고침(`bugfixes.json` B-04, 기본 켬): 칸이 아니라 **명단**으로 견준다 — 칸 0(away)은 Y 의 명단, 칸 1(home)은 X 의 명단이라
+  // X 의 득점(homeRuns)이 더 많으면 X 승, 그 밖(동점 포함)은 원본처럼 Y(윗 시드) 승. 굴림 수는 같다(승자만 바뀐다)
+  const winner = isBugFixed('B-04')
+    ? (score.homeRuns > score.awayRuns ? x : y)
+    : (score.awayRuns > score.homeRuns ? x : y)
   const away = sides.away
   const home = sides.home
   return {

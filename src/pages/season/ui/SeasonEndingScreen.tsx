@@ -10,6 +10,7 @@ import {
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { SeasonOutingMap } from '@/pages/season/ui/SeasonOutingMap'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** 엔딩 보너스 안내 — StrMODE[214] 원문 그대로 (J 4-8) */
 const BONUS_TEXT = '!C엔딩 보너스 획득!N[!cFFFF00%d G포인트!cFFFFFF]'
@@ -75,7 +76,7 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
    * 효과기가 도는 동안(+0x10 == 0)은 키가 안 먹는다(`SeasonScreenFade` — 0x4b18 · 0x4b34). 그러나 종류 1 이 마지막 칠하기에 끝을
    * 세운 틀과 `0x8bd8` 이 그 끝을 보는 다음 틀 사이에는 키가 먹는다 — 그 키는 SR+0x7b 가 선 0x6b3c 라 **단계 2** · 종류 1 을 다시
    * 걸고, 그 틀의 `0x8bd8` 은 단계 ≠ 1 이라 넘기지 않는다. 그 뒤로도 키마다 단계만 오르고 효과기가 다시 돌 뿐 영영 넘어가지 않는다
-   * (원본 버그 그대로). 끝을 본 다음 틀에 효과기가 비워져(0xbd85e) 어두워진 화면은 걷힌다.
+   * (원본 버그 B-34 — 고친 길은 `press`). 끝을 본 다음 틀에 효과기가 비워져(0xbd85e) 어두워진 화면은 걷힌다.
    */
   const [leaveStage, setLeaveStage] = useState(0)
 
@@ -89,7 +90,9 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
 
   /** 키 0x6b3c — SR+0x7b 만 본다(보너스 값도 단계도 안 본다). 서 있으면 단계 + 1 · 종류 1 — 끝은 아래 효과기가 알린다 */
   const press = () => {
-    if (isBonusReceived) setLeaveStage((stage) => stage + 1)
+    // 고침(`bugfixes.json` B-34, 기본 켬): 단계는 1 에서 멈춘다 — 끝을 본 틀 사이의 키가 단계 2 로 넘겨 영영 안 넘어가던 길(원본 버그)을
+    // 막는다. 이미 단계 1 이면 키를 버리고 도는 효과기의 끝이 그대로 넘긴다. 굴림 없음
+    if (isBonusReceived) setLeaveStage((stage) => (isBugFixed('B-34') && stage >= 1 ? stage : stage + 1))
     else setPhase('보너스')
   }
   const pressRef = useRef(press)

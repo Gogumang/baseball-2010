@@ -1,4 +1,5 @@
 import { TEAMS } from '@/shared/config/original/teams'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 시즌모드(구단 운영, 장면 0x105)의 시즌 레코드 SR.
@@ -45,6 +46,11 @@ export interface SeasonRecord {
   readonly lastPopularityChange: number
   /** SR+0x50 — 진행 단계(phase). 값 뜻은 `seasonStateMachine.ts` 의 `SEASON_PHASE` */
   readonly phase: number
+  /**
+   * **웹 전용** — 이 경기의 관중수입 창(0xe9) 정산(구내매점 −1)을 이미 했는가. 원본 버그 B-29(0xe9 에서 끄고 이어하면 정산을 다시
+   * 탄다)의 고친 길만 쓴다: 0xe9 진입이 세우고 정규시즌 경기 끝(phase 2)이 내린다. 없으면 아직 안 한 것(옛 저장 · 원본 길)
+   */
+  readonly incomeSettled?: boolean
   /** SR+0x54 — 상대 투구 목표점 보기가 남은 경기 수 (99 상한, 경기마다 −1: 0x4f38c) */
   readonly aimVisionGames: number
   /** SR+0x55 — 구내매점이 남은 경기 수. 살 때 45, 경기마다 −1 (R13 10절) */
@@ -366,9 +372,12 @@ export function startNextYear(state: SeasonState): SeasonState {
       yearGoalShown: false,
       acted: false,
       popularityAtSeasonStart: record.popularity,
+      // SR+0x56 — 원본은 새 해에도 안 지운다(원본 버그 B-20: 트레이드가 시즌모드 내내 한 번). 고침(기본 켬): 해마다 한 번
+      ...(isBugFixed('B-20') ? { tradeUsed: 0 } : {}),
     },
-    // 6ea4 [this+0xa4]+2 = 100 — 대회를 치른 해는 그 포인터가 상대국 슬롯이라 리그 사기가 그대로 남는다(원본 버그)
-    teamMorale: record.nationalCup ? state.teamMorale : MORALE_LIMIT,
+    // 6ea4 [this+0xa4]+2 = 100 — 대회를 치른 해는 그 포인터가 상대국 슬롯이라 리그 사기가 그대로 남는다(원본 버그 B-18).
+    // 고침(`bugfixes.json` B-18, 기본 켬): 대회를 치른 해도 내 팀 사기를 100 으로. 굴림 없음
+    teamMorale: record.nationalCup && !isBugFixed('B-18') ? state.teamMorale : MORALE_LIMIT,
     teamAbilities: state.teamAbilities.map((abilities, team) =>
       team === record.teamId ? abilities : abilities.map((value) => Math.min(value + 30, TEAM_ABILITY_LIMIT)),
     ),

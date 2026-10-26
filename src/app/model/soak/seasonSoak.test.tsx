@@ -98,6 +98,7 @@ import {
   SoakProblems, batterLineProblemsOf, firstDiffOf, isSoakEnabled, jsonRoundTripDiffOf, leagueTallyProblemsOf,
   outOfRangeOf, rankingOrderProblemsOf, soakNumber, soakSeeds, unserializablePathsOf,
 } from '@/app/model/soak/soakInvariants'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 setActiveSound(createSilentSound())
 
@@ -400,7 +401,10 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
         // GP 아이템 칸 6 구내매점을 사야 SR+0x55 > 0 이라 r233 정책에선 안 보였다)
         ['state', now.state === null ? null : {
           ...now.state,
-          record: clearRepeatableSeen(now.scene === SEASON_SCENE_STATE.관중수입 ? settleGameIncome(now.state.record).record : now.state.record),
+          // B-29 고친 길(BUGFIXES=json)은 다시 띄워도 정산을 다시 안 한다
+          record: clearRepeatableSeen(now.scene === SEASON_SCENE_STATE.관중수입 && !isBugFixed('B-29')
+            ? settleGameIncome(now.state.record).record
+            : now.state.record),
         }, again.state], ['league', now.league, again.league], ['roster', now.roster, again.roster],
         ['playerStats', now.playerStats, again.playerStats], ['series', now.series, again.series], ['cup', now.cup, again.cup],
       ]
@@ -808,7 +812,9 @@ function runSeasonSoak(options: SeasonSoakOptions): SeasonSoakResult {
     }
     const after = result.current.roster
     const afterPlayers = chosen.isPitcher ? after.pitchers : after.batters
-    if (afterPlayers.length !== players.length + 1) problems.add(at(), [`영입 뒤 명단 ${players.length} → ${afterPlayers.length}`])
+    // B-22 고친 길(BUGFIXES=json)은 끼워넣기가 아니라 교체라 길이가 그대로다
+    const grown = isBugFixed('B-22') ? 0 : 1
+    if (afterPlayers.length !== players.length + grown) problems.add(at(), [`영입 뒤 명단 ${players.length} → ${afterPlayers.length}`])
     if (!afterPlayers.some((player) => player.id === recruited.source.id && player.kindByte === recruited.source.kindByte)) {
       problems.add(at(), ['영입한 선수가 명단에 없다'])
     }

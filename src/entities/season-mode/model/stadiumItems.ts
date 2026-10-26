@@ -1,6 +1,7 @@
 import { MONEY_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { isHiddenUnlocked } from '@/shared/config/unlocks'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 시즌 구장 아이템(관중석·전광판·잔디) — `docs/re/S3-stadium-items.md` **확정**.
@@ -157,11 +158,19 @@ export function buyStadiumItem(record: SeasonRecord, kind: StadiumKind, slot: nu
 /**
  * 교체 — 구단관리-구장관리 `0x7958`. `rec[0x1b8 + 종류] = 선택칸` **한 줄이 전부**다.
  *
- * ⚠️ **가드가 하나도 없다** (S3 6절 확정): 가격·인기도·보유 어느 것도 보지 않는다.
- * 목록에 보유분만 올린다는 뜻으로 읽히지만 목록을 채우는 코드는 안 읽었으므로,
- * 원본대로 여기서도 막지 않는다 — 안 산 칸도 그대로 끼워진다.
+ * ⚠️ **원본 버그(B-06) — 가드가 하나도 없다** (S3 6절 확정, r273 다시 뜸: 0x799c `0x8455d` 로 칸을 읽고 0x79b0 `strb` 로 곧장 쓴다):
+ * 가격·인기도·보유 어느 것도 보지 않아 안 산 칸도 그대로 끼워진다.
+ * **고침(`bugfixes.json` B-06, 기본 켬)**: 산 칸(보유 플래그 `0x188 + 7×종류 + 칸`)과 처음부터 있는 칸 0(가격 0)만 끼운다 —
+ * 그 밖은 레코드를 그대로 돌려준다(`canEquipStadiumItem`). 굴림은 없다.
  */
+export function canEquipStadiumItem(record: SeasonRecord, kind: StadiumKind, slot: number): boolean {
+  if (!isBugFixed('B-06')) return true
+  if (stadiumPriceOf(kind, slot) === null) return false
+  return slot === 0 || ownsStadiumItem(record, kind, slot)
+}
+
 export function equipStadiumItem(record: SeasonRecord, kind: StadiumKind, slot: number): SeasonRecord {
+  if (!canEquipStadiumItem(record, kind, slot)) return record
   return {
     ...record,
     stadiumEquipped: record.stadiumEquipped.map((current, position) =>

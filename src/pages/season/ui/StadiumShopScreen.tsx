@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
-  STADIUM_KINDS, buyStadiumItem, checkStadiumPurchase, equipStadiumItem, stadiumCollectorUnlocks, stadiumPreviewOf,
+  STADIUM_KINDS, buyStadiumItem, canEquipStadiumItem, checkStadiumPurchase, equipStadiumItem, stadiumCollectorUnlocks, stadiumPreviewOf,
 } from '@/entities/season-mode/model/stadiumItems'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { stepSeasonScoreboardX } from '@/widgets/batting-stage/lib/renderScenery'
@@ -143,6 +143,8 @@ export function StadiumShopScreen({
   const select = (nextKind: StadiumKind, nextSlot: number) => {
     // 구장관리(0x7958)는 `rec[0x1b8 + 종류] = 선택칸` 한 줄이 전부다 — ⚠️ 가드가 없다
     if (!isShop) {
+      // B-06 고침(기본 켬): 안 산 칸은 끼우지 않는다 — 알림도 없이 그대로 (원본 글에 맞는 줄이 없다)
+      if (!canEquipStadiumItem(record, nextKind, nextSlot)) return
       onChange(equipStadiumItem(record, nextKind, nextSlot))
       setNotice(EQUIPPED_TEXT(stadiumItemNameOf(nextKind, nextSlot)))
       return

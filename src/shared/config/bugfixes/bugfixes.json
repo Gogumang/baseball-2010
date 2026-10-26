@@ -35,7 +35,7 @@
       "symptom": "CPU 끼리 포스트시즌 경기는 점수를 **덜 낸** 팀이 이긴다",
       "source": "0xc2760 c28e2~c290a + 준비 0xc239c 명단 엇갈림(R1 정정)",
       "impact": "큼",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -53,7 +53,7 @@
       "symptom": "구장관리 교체에 검사가 없어 사지 않은 구장 아이템도 끼울 수 있다",
       "source": "구장관리 교체(S3 6절, 구장 아이템 0x9a84)",
       "impact": "큼",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -62,7 +62,7 @@
       "symptom": "경기를 이어할 때마다 관중 수입이 소지금에 한 번 더 들어간다(끄고 이어하면 돈이 는다)",
       "source": "경기 장면 셋업 0x39fdc 모드 2 → 0xa34b8(0x3a3e4)",
       "impact": "큼",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -143,7 +143,7 @@
       "symptom": "병살을 잡으면 평판이 깎이고 탈삼진이 평판을 올린다",
       "source": "점프표 0xd7d7c 의 코드 4·5 뒤집힘(S4 2b)",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -161,7 +161,7 @@
       "symptom": "국가대항전을 치른 해에는 새 해 팀 사기가 100 으로 안 돌아간다",
       "source": "0x6e0c 6ea0~6ea8 이 `[this+0xa4]`(상대국 슬롯)에 씀",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -170,7 +170,7 @@
       "symptom": "성공률이 등급 차의 절댓값이라 더 좋은 선수를 내줘도 확률이 떨어진다 · 실제 확률은 표시보다 1% 낮다",
       "source": "0xcf24(뽑기 1..100)",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -179,7 +179,7 @@
       "symptom": "트레이드는 시즌모드 내내 한 번뿐이다(GP 아이템으로만 다시 열림)",
       "source": "SR+0x56 을 되돌리는 코드 없음",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -188,7 +188,7 @@
       "symptom": "코치 보너스가 상대 팀 선수에게도 붙는다",
       "source": "0xb5a74 팀 검사 없음(J 4-2)",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -197,7 +197,7 @@
       "symptom": "영입이 교체가 아니라 끼워넣기 — 밀려난 선수가 안 빠지고, 투수 영입은 칸 번호가 새 투수와 겹친다",
       "source": "0xb521c · S6 4-4",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -206,7 +206,7 @@
       "symptom": "장비를 바꿔 끼우면 앞 장비가 사라져 다시 사야 한다(산 기록이 없다)",
       "source": "니블 하나뿐(P4 8-4)",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -260,7 +260,7 @@
       "symptom": "평가 화면에서 끄고 이어하면 평가·구내매점 감소·트레이드 요청을 다시 탄다",
       "source": "0xdea0 e114~e130(phase 2 그대로 저장)",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -305,7 +305,7 @@
       "symptom": "엔딩 화면에서 특정 한 틀에 키를 누르면 영영 넘어가지 않는다",
       "source": "키 0x6b3c(단계 +1) · 그리기 0x8bd8 `단계 == 1`",
       "impact": "중",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
