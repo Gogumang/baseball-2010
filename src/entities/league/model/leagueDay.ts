@@ -65,6 +65,8 @@ import type {
 } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isBugFixed } from '@/shared/config/bugfixes'
+import { hasFightingSpiritBit, withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
+import { isLiveGameFightingSpiritSituation } from '@/shared/lib/liveGameState/liveGameState'
 
 /**
  * 하루치 리그 경기 (binary.mod 0xc2a48).
@@ -366,6 +368,11 @@ export function cpuPitcherGameAbilityOf(
   slot: number,
   teamId: number,
   context: LeagueAbilityContext | undefined,
+  /**
+   * 스킬 14(투지) 갈래가 이 투수에게 서는가 — 장착 비트 14 ∧ 전역 경기 상태(`isLiveGameFightingSpiritSituation`). 팀 정액 뒤 · 코치 앞에
+   * 칸 ≠ 3 이면 `v += v/10` (b5a16~b5a72). 안 넘기면 거짓
+   */
+  fightingSpirit = false,
 ): number {
   let value = base
   const mode = context?.mode ?? -1
@@ -374,10 +381,14 @@ export function cpuPitcherGameAbilityOf(
     const teamAbility = abilities?.[TEAM_ABILITY_SLOT_OF_PITCHER[slot] ?? 0] ?? 0
     if (teamAbility !== 0) value += Math.trunc((17 * teamAbility - 5100) / 100)
   }
+  if (fightingSpirit && slot !== FIGHTING_SPIRIT_EXCLUDED_SLOT) value = withFightingSpirit(value)
   const coach = context?.coach ?? -1
   if (mode === 2 && coach >= 0 && coachAppliesTo(teamId, context) && (COACH_PITCHER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
   return Math.min(999, Math.max(0, value))
 }
+
+/** 스킬 14 갈래에서 빠지는 칸 — 체력 3 (b5a48 `cmp r7, #3`) */
+const FIGHTING_SPIRIT_EXCLUDED_SLOT = 3
 
 /** 타자 칸 → 팀 능력치 칸 — 히트·파워 → 타격(1), 수비 → 집중(2), 주루 → 근성(3) (0xb592c) */
 const TEAM_ABILITY_SLOT_OF_BATTER = [1, 1, 2, 3] as const
@@ -566,27 +577,37 @@ function defenseOf(
   /** 그 칸 투수의 밑값 간이 능력 (마투수는 레벨 배율을 먹은 레코드 값) */
   const quickAt = (slot: number): QuickAtBatPitcher =>
     slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.quick : recordQuickPitcherAt(record, teamId, slot)
+  /** 그 칸 레코드 +0x14 의 투지(비트 14) ∧ 이 순간 경기 상태 — 마투수는 XlsACE_PIT 행(붕붕머신 0x16000 은 섰다) */
+  const spiritAt = (slot: number, fightingSpirit: boolean | undefined) =>
+    fightingSpirit === true &&
+    hasFightingSpiritBit(slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.skillBits : rowAt(slot).skillBits)
   return {
     mound,
     // 마투수는 명단 8번 칸 = 벤치 맨 끝에 하나 더 (0xb88c8 → 0xb521c, 벤치 투수 수 team+0x33 +1)
     pitcherSlots: acePitcher === undefined ? order : [...order, ACE_PITCHER_SLOT],
     // 간이 타석의 투수 능력은 `0xb570c(…, 1, 90, 1)` — 밑값(0xb6414) 위에 팀 능력치 정액 · 코치를 먹인다
-    pitcherAt: (slot) => {
+    pitcherAt: (slot, fightingSpirit) => {
       const quick = quickAt(slot)
+      const spirit = spiritAt(slot, fightingSpirit)
       return {
         ...quick,
-        control: cpuPitcherGameAbilityOf(quick.control, 0, teamId, abilityContext),
-        velocity: cpuPitcherGameAbilityOf(quick.velocity, 1, teamId, abilityContext),
+        control: cpuPitcherGameAbilityOf(quick.control, 0, teamId, abilityContext, spirit),
+        velocity: cpuPitcherGameAbilityOf(quick.velocity, 1, teamId, abilityContext, spirit),
       }
     },
     // 체력%로 부른 `0xb570c` — 피로 0xb58e6 이 팀 정액 · 코치보다 먼저 먹는다 (simulateHalfInning `tiredPitcherAt`)
-    tiredPitcherAt: (slot, staminaPercent) => {
+    tiredPitcherAt: (slot, staminaPercent, fightingSpirit) => {
       const quick = quickAt(slot)
+      const spirit = spiritAt(slot, fightingSpirit)
       return {
-        control: cpuPitcherGameAbilityOf(abilityAfterFatigue(quick.control, staminaPercent), 0, teamId, abilityContext),
-        velocity: cpuPitcherGameAbilityOf(abilityAfterFatigue(quick.velocity, staminaPercent), 1, teamId, abilityContext),
+        control: cpuPitcherGameAbilityOf(abilityAfterFatigue(quick.control, staminaPercent), 0, teamId, abilityContext, spirit),
+        velocity: cpuPitcherGameAbilityOf(abilityAfterFatigue(quick.velocity, staminaPercent), 1, teamId, abilityContext, spirit),
       }
     },
+    // 0xb570c 스킬 14 갈래의 경기 상태 — CPU 끼리 경기(0xc239c · 0xc2a48 · 0xc2760 · 0xc2dac)는 0xc0dac 에 제 스택 상태를 넘겨
+    // 전역 [0x1552d0c] 를 안 건드리지만 0xb570c 는 늘 전역을 읽는다 → **마지막 사람 경기**의 이닝 · 측별 팀 · 점수가 그대로다.
+    // 팀은 넘겨 받은 팀 레코드 +0 = 이 팀 번호 — 그 경기 +0x28 팀이 아니면 측 1 이다 (A-23)
+    fightingSpiritAt: () => isLiveGameFightingSpiritSituation(teamId),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3) — 용량 0x66e44 는 `0xb6415(P, 3, 1)` 이라 장비 니블을 먹는다
     staminaAbilityAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
@@ -610,7 +631,7 @@ function defenseOf(
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.skillBits : rowAt(slot).skillBits,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 경기용 능력치(체력 인자 90) 네 칸 합. 마투수는 0xabfcc 가 거르므로
     // 그 칸 값은 쓰이지 않는다 — 레벨 배율 먹은 네 칸을 그대로 둔다
-    abilitySumAt: (slot) =>
+    abilitySumAt: (slot, fightingSpirit) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
         ? pitcherAbilitySumOf([
             acePitcher.quick.control,
@@ -620,7 +641,7 @@ function defenseOf(
           ])
         : pitcherAbilitySumOf(
             recordPitcherAbilityAt(record, teamId, slot).map((base, k) =>
-              cpuPitcherGameAbilityOf(base, k, teamId, abilityContext),
+              cpuPitcherGameAbilityOf(base, k, teamId, abilityContext, spiritAt(slot, fightingSpirit)),
             ),
           ),
   }

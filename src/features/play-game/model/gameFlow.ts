@@ -32,7 +32,10 @@ import {
   facingPitcherOf,
   simulateHalfInningTicks,
   startingMoundOf,
+  withQuickFightingSpirit,
 } from '@/entities/game/model/simulateHalfInning'
+import { hasFightingSpiritBit, withFightingSpirit, withPitcherFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
+import { inGameFightingSpiritStateOf, isFightingSpiritSituationOf } from '@/shared/lib/liveGameState/liveGameState'
 import type {
   HalfInningDefense,
   HalfInningMound,
@@ -910,7 +913,23 @@ export function stageOpponentPitcherAbilityOf(
 ): PitcherAbility {
   return progress.aceOpponent === null
     ? opponentPitcherAbilityOf(progress)
-    : pitcherAbilityOf(progress.aceOpponent, aceLevels, staminaPercentOf(progress.opponentMound.stamina))
+    : withPitcherFightingSpirit(
+        pitcherAbilityOf(progress.aceOpponent, aceLevels, staminaPercentOf(progress.opponentMound.stamina)),
+        gameFightingSpiritOf(progress, progress.opponentTeamId),
+      )
+}
+
+/**
+ * **스킬 14(투지) 갈래의 경기 상태** (0xb570c b5a4c~b5a66) — 경기 장면은 전역 상태 [0x1552d0c] 자체를 굴리므로 지금 판의 이닝(+0x6b) ·
+ * 측별 팀(+0x28, 셋업 0xb6bd4) · 점수(+0x7e, 득점 0xb6a9c)를 본다. `runsThisHalf` 는 자동진행 간이 엔진이 굴리는 중인 이번 반 이닝 득점
+ * (`offenseIsOurs` 쪽). 팀은 0xb570c 첫 인자 = `0xb8680(팀 객체)` 레코드 +0 이다 (A-23)
+ */
+function gameFightingSpiritOf(
+  progress: GameProgress,
+  teamId: number,
+  extraRuns?: { readonly runs: number; readonly offenseIsOurs: boolean },
+): boolean {
+  return isFightingSpiritSituationOf(inGameFightingSpiritStateOf(progress, progress.game, extraRuns), teamId)
 }
 
 /** 타석 화면에 넘길 CPU 마구 두 칸(`BattingStage.cpuMagic`) — 안 채웠으면 지금 마운드 투수로 채운 값(0xaebe4 aeea8) */
@@ -1561,14 +1580,19 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
   const slot = progress.opponentMound.pitcherSlot
   // 142 가 상대 명부 8번 칸에 넣은 마투수가 마운드에 서면 그 레코드가 던진다 — 레벨 배율(0xb6414)·체력%(0xaebb0)
   const ace = moundAcePitcherOf(progress, false)
+  // 0xb570c 스킬 14 갈래 — 상대 마운드 레코드 +0x14 비트 14 · 지금 판의 경기 상태 (`gameFightingSpiritOf`)
+  const situation = gameFightingSpiritOf(progress, progress.opponentTeamId)
   if (ace !== undefined) {
-    return pitcherAbilityOf(ace.player, progress.aces?.levels ?? {}, staminaPercentOf(progress.opponentMound.stamina))
+    return withPitcherFightingSpirit(
+      pitcherAbilityOf(ace.player, progress.aces?.levels ?? {}, staminaPercentOf(progress.opponentMound.stamina)),
+      situation,
+    )
   }
   const row = teamPitchers(progress.opponentTeamId)[slot]
   const repertoire = ROSTER_PITCHER_REPERTOIRES[progress.opponentTeamId * PITCHERS_PER_TEAM + slot]
   if (row === undefined) return DEFAULT_PITCHER_ABILITY
   const pitcher = withRecordEquipment(row, progress.opponentEquipment?.pitchers?.[slot], true)
-  return {
+  return withPitcherFightingSpirit({
     control: Math.round(pitcher.ability[0] / STAGE_PITCHER_DIVISOR),
     velocity: Math.round(pitcher.ability[1] / STAGE_PITCHER_DIVISOR),
     breaking: Math.round(pitcher.ability[2] / STAGE_PITCHER_DIVISOR),
@@ -1583,7 +1607,7 @@ export function opponentPitcherAbilityOf(progress: GameProgress): PitcherAbility
       : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
     // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (붙박이 줄 = Xls 행 그대로)
     skillBits: pitcher.skillBits,
-  }
+  }, situation)
 }
 
 /**
@@ -2253,6 +2277,10 @@ function playOpponentInning(progress: GameProgress, random: RandomPort, relay?: 
       progress.ourPitcherStaminas,
       teamAcePitcherOf(progress, true),
       progress.teamMorale,
+      undefined,
+      undefined,
+      // 상대가 공격 — 이 반 이닝 득점은 상대 쪽
+      (runs) => gameFightingSpiritOf(progress, progress.ourTeamId, { runs, offenseIsOurs: false }),
     ),
     // 상대 타자는 명단에서 고르고, 타석마다 CPU 대타(0xac228)를 먼저 본다
     {
@@ -2616,6 +2644,8 @@ function quickDefenseOf(
   staleMorale?: number,
   /** 그 팀 레코드 장비 니블 (`GameProgress.opponentEquipment`) — 상대 팀만. 없으면 Xls 행 */
   equipment?: TeamRecordEquipment,
+  /** 스킬 14(투지) 갈래의 경기 상태 — 이 반 이닝 득점을 받아 (`HalfInningDefense.fightingSpiritAt`, `gameFightingSpiritOf`) */
+  fightingSpiritAt?: (runsThisHalf: number) => boolean,
 ): HalfInningDefense {
   const roster = teamPitchers(teamId)
   const recordAt = (slot: number) => withRecordEquipment(roster[slot % roster.length], equipment?.pitchers?.[slot % roster.length], true)
@@ -2624,9 +2654,14 @@ function quickDefenseOf(
     mound,
     pitcherSlots: order,
     ...(staminas === undefined ? {} : { staminaAt: (slot: number) => staminas[slot] ?? FULL_STAMINA }),
-    pitcherAt: (slot) => (isAce(slot) && ace !== undefined
-      ? ace.quick
-      : quickPitcherOf(roster[slot % roster.length], equipment?.pitchers?.[slot % roster.length])),
+    // 0xb570c 스킬 14 갈래 — 모드 4 는 정액이 없어 밑값에 곧장 v/10 (`withQuickFightingSpirit`)
+    pitcherAt: (slot, fightingSpirit) => withQuickFightingSpirit(
+      isAce(slot) && ace !== undefined
+        ? ace.quick
+        : quickPitcherOf(roster[slot % roster.length], equipment?.pitchers?.[slot % roster.length]),
+      fightingSpirit,
+    ),
+    ...(fightingSpiritAt === undefined ? {} : { fightingSpiritAt }),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) =>
       isAce(slot) && ace !== undefined ? ace.staminaAbility : roster[slot % roster.length].ability[3],
@@ -2637,10 +2672,21 @@ function quickDefenseOf(
     roleAt: rosterPitcherRoleOf,
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 4 는 0xb574a 가지가 내 육성
     // 선수(0xb6388)에만 붙고 팀 능력치(0x306)·코치(모드 2) 정액이 없어 로스터 밑값을 0..999 로 자른 합이다
-    abilitySumAt: (slot) =>
+    // 스킬 14 갈래(b5a16~b5a72)는 칸 0~2 에 v/10 을 얹고 자른다 (칸 3 체력은 빠진다)
+    abilitySumAt: (slot, fightingSpirit) =>
       isAce(slot) && ace !== undefined
-        ? pitcherAbilitySumOf([ace.control, ace.velocity, ace.breaking, ace.staminaAbility].map(clampAbility))
-        : pitcherAbilitySumOf(recordAt(slot).ability.map(clampAbility)),
+        ? pitcherAbilitySumOf(
+            withSumFightingSpirit(
+              [ace.control, ace.velocity, ace.breaking, ace.staminaAbility],
+              fightingSpirit === true && hasFightingSpiritBit(ace.player.skillBits),
+            ).map(clampAbility),
+          )
+        : pitcherAbilitySumOf(
+            withSumFightingSpirit(
+              recordAt(slot).ability,
+              fightingSpirit === true && hasFightingSpiritBit(recordAt(slot).skillBits),
+            ).map(clampAbility),
+          ),
     // 마선수 0xb633c(+0xa 비트6) — 마투수 8번 칸. 마운드면 특수 문턱(ac4f2), 벤치에 있으면 0xb8a8d 가 참이라
     // 마무리 굴림 0xac360 을 지나고, 0xabfcc 는 고르지 않는다 (`leagueDay.defenseOf` 와 같다). 보직은 칸 8 이 표 밖이라 없다
     isSpecialPitcherAt: isAce,
@@ -2662,6 +2708,11 @@ function withRecordEquipment<T extends RosterPlayer>(row: T, equipment: readonly
 /** 0xb5b06 — 경기용 능력치를 0..999 로 자른다 */
 const clampAbility = (value: number) => Math.min(999, Math.max(0, value))
 
+/** 능력 합 0xb5b50 의 네 칸에 스킬 14 갈래 — 칸 0~2 만 `v += v/10` (b5a48 칸 ≠ 3) */
+function withSumFightingSpirit(ability: readonly number[], on: boolean): readonly number[] {
+  return on ? ability.map((value, slot) => (slot === 3 ? value : withFightingSpirit(value))) : ability
+}
+
 /** 우리가 공격 중일 때 상대 팀 수비 — 리드는 상대 점수 − 우리 점수 */
 function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
   return quickDefenseOf(
@@ -2676,6 +2727,8 @@ function opponentQuickDefenseOf(progress: GameProgress): HalfInningDefense {
     // 이 경기에서 아직 안 덮였을 때만 앞 값 (`GameProgress.opponentRecordMorale`)
     progress.opponentRecordMorale === undefined ? progress.opponentStaleMorale : undefined,
     progress.opponentEquipment,
+    // 우리가 공격 — 이 반 이닝 득점은 우리 쪽
+    (runs) => gameFightingSpiritOf(progress, progress.opponentTeamId, { runs, offenseIsOurs: true }),
   )
 }
 

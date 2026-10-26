@@ -22,6 +22,7 @@ import {
   staminaPercentOf,
 } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
 import {
   lineupSlotOf,
@@ -248,13 +249,27 @@ export interface HalfInningDefense {
   readonly mound: HalfInningMound
   /** 이 팀의 투수 칸 전부 (`team+0x0c` 8명) — 마운드와 이미 쓴 투수를 뺀 나머지가 벤치다 */
   readonly pitcherSlots: readonly number[]
-  /** 그 칸 투수의 간이 타석용 능력 — 체력 인자 90(피로 없음)으로 부른 `0xb570c` */
-  readonly pitcherAt: (pitcherSlot: number) => QuickAtBatPitcher
+  /**
+   * 그 칸 투수의 간이 타석용 능력 — 체력 인자 90(피로 없음)으로 부른 `0xb570c`. `fightingSpirit` 은 이 순간 스킬 14(투지) 갈래의
+   * **경기 상태**가 섰는가(`fightingSpiritAt`) — 참이고 그 투수가 비트 14 를 장착했으면 팀 정액 뒤 · 코치 앞에 v/10 을 얹는다(b5a16~b5a72)
+   */
+  readonly pitcherAt: (pitcherSlot: number, fightingSpirit?: boolean) => QuickAtBatPitcher
   /**
    * 그 칸 투수를 **체력%로 부른** `0xb570c` 의 제구·구속 (`QuickAtBatPitcher.tired`) — 피로 0xb58e6 이 팀 능력치 정액·코치보다
    * 먼저 먹으므로 밑값을 아는 부르는 쪽이 준다. 안 넘기면 `pitcherAt` 값에 피로(`abilityAfterFatigue`)만 먹인다.
    */
-  readonly tiredPitcherAt?: (pitcherSlot: number, staminaPercent: number) => { readonly control: number; readonly velocity: number }
+  readonly tiredPitcherAt?: (
+    pitcherSlot: number,
+    staminaPercent: number,
+    fightingSpirit?: boolean,
+  ) => { readonly control: number; readonly velocity: number }
+  /**
+   * **스킬 14(투지) 갈래의 경기 상태** (0xb570c b5a4c~b5a66) — 전역 경기 상태 [0x1552d0c] 의 +0x6b > 4 이고 이 수비 팀(팀레코드 +0)이
+   * 지는 측인가. `runsThisHalf` 는 이 반 이닝에 지금까지 들어온 점수다 — 사람 경기 장면 안 자동진행은 전역 상태 자체라 득점 0xb6a9c 가
+   * 그때그때 점수 칸을 올린다(`inGameFightingSpiritStateOf`). CPU 끼리 경기(0xc239c · 0xc2a48 …)는 제 스택 상태로 굴려 전역 칸을 안 건드리므로
+   * 마지막 사람 경기의 값이 그대로다(`isLiveGameFightingSpiritSituation`). 안 넘기면 늘 거짓
+   */
+  readonly fightingSpiritAt?: (runsThisHalf: number) => boolean
   /** 그 칸 투수의 **체력 실효 능력치(칸 3)** — 스태미나 용량 X 의 바탕 (0x66e44) */
   readonly staminaAbilityAt: (pitcherSlot: number) => number
   /**
@@ -302,7 +317,7 @@ export interface HalfInningDefense {
    * 새 투수 고르기 0xabfcc 의 마무리 갈래(ac0be)가 이 값 큰 순으로 줄 세운다. 안 넘기면 그 갈래는
    * 스태미나 순 근사로 고른다.
    */
-  readonly abilitySumAt?: (pitcherSlot: number) => number
+  readonly abilitySumAt?: (pitcherSlot: number, fightingSpirit?: boolean) => number
   /**
    * 그 칸이 마선수(0xb633c = 레코드 `+0xa` 비트6)인가. 마운드면 특수 문턱(ac4f2), 벤치에 하나라도 있으면
    * 0xb8a8d 가 참이라 마무리 굴림 0xac360 을 지난다. 0xabfcc 는 마선수를 고르지 않는다. 안 넘기면 아무도 아니다.
@@ -325,13 +340,49 @@ export interface HalfInningDefense {
  * 마운드 투수가 이 공에 보이는 능력 — 체력%(0xaebb0)와 그 체력%로 부른 제구·구속(`tired`, 0xb58e6).
  * 0xc11f0·0xc1818 이 0xb570c 를 체력%로 부르는 세 자리(구위 등급 · 스트라이크존 · 0xab214 투수 쪽)가 `tired` 를 본다.
  */
-export function facingPitcherOf(defense: HalfInningDefense, pitcherSlot: number, staminaPercent: number): QuickAtBatPitcher {
-  const fresh = defense.pitcherAt(pitcherSlot)
-  const tired = defense.tiredPitcherAt?.(pitcherSlot, staminaPercent) ?? {
-    control: abilityAfterFatigue(fresh.control, staminaPercent),
-    velocity: abilityAfterFatigue(fresh.velocity, staminaPercent),
-  }
+export function facingPitcherOf(
+  defense: HalfInningDefense,
+  pitcherSlot: number,
+  staminaPercent: number,
+  /** 이 반 이닝에 지금까지 들어온 점수 — 스킬 14 의 경기 상태(`fightingSpiritAt`)가 본다. 수비를 지금 판으로 지었으면 0 */
+  runsThisHalf = 0,
+): QuickAtBatPitcher {
+  const fightingSpirit = defense.fightingSpiritAt?.(runsThisHalf) === true
+  const fresh = defense.pitcherAt(pitcherSlot, fightingSpirit)
+  const tired = defense.tiredPitcherAt?.(pitcherSlot, staminaPercent, fightingSpirit) ?? tiredWithoutBonusOf(
+    fightingSpirit ? defense.pitcherAt(pitcherSlot, false) : fresh,
+    staminaPercent,
+    fightingSpirit,
+  )
   return { ...fresh, stamina: staminaPercent, tired }
+}
+
+/** 투수 스킬 번호 30 = 장착 비트 14 투지 (`skillIdsOfBits` — 투수 번호 = 비트 + 16) */
+const FIGHTING_SPIRIT_PITCHER_SKILL_ID = 30
+
+/**
+ * 정액(팀 능력치 · 코치)이 없는 모드(3 · 4 · 5)의 간이 투수에 **스킬 14 갈래**를 얹는다 — 0xb570c b5a16~b5a72 는 칸 ≠ 3 이라
+ * 제구 · 구속 둘 다 `v += v/10` (`withFightingSpirit`). 장착은 `skillIds` 의 30(비트 14)으로 본다. 정액이 있는 모드는 부르는 쪽이
+ * 팀 정액 뒤 · 코치 앞에 직접 넣는다(`leagueDay` 의 `cpuPitcherGameAbilityOf`)
+ */
+export function withQuickFightingSpirit(pitcher: QuickAtBatPitcher, fightingSpirit: boolean | undefined): QuickAtBatPitcher {
+  if (fightingSpirit !== true || !pitcher.skillIds.includes(FIGHTING_SPIRIT_PITCHER_SKILL_ID)) return pitcher
+  return { ...pitcher, control: withFightingSpirit(pitcher.control), velocity: withFightingSpirit(pitcher.velocity) }
+}
+
+/** `tiredPitcherAt` 이 없는 길 — 정액 없는 밑값(`pitcherAt(칸, 거짓)`)에 피로 0xb58e6 → 스킬 14 차례로 */
+function tiredWithoutBonusOf(
+  raw: QuickAtBatPitcher,
+  staminaPercent: number,
+  fightingSpirit: boolean,
+): { readonly control: number; readonly velocity: number } {
+  const fatigued = {
+    ...raw,
+    control: abilityAfterFatigue(raw.control, staminaPercent),
+    velocity: abilityAfterFatigue(raw.velocity, staminaPercent),
+  }
+  const raised = withQuickFightingSpirit(fatigued, fightingSpirit)
+  return { control: raised.control, velocity: raised.velocity }
 }
 
 /** `roleAt` 을 안 넘긴 길 — 보직을 모른다 */
@@ -598,7 +649,7 @@ export function* simulateHalfInningTicks(
      */
     const facing =
       defense !== undefined && mound !== undefined
-        ? facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(mound.stamina))
+        ? facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(mound.stamina), runs)
         : pitcher
     /** 이 타석 동안 공마다 깎이는 스태미나 — 0xc262c 는 공을 던지기 **앞에** 0xa5e14 로 깎는다(c26c8) */
     let pitchStamina = mound?.stamina
@@ -635,7 +686,7 @@ export function* simulateHalfInningTicks(
                   batterOn(order).skillIds.includes(INTIMIDATE_SKILL_ID),
                 )
                 thrownThisAtBat += 1
-                return facingPitcherOf(defense, current.pitcherSlot, staminaPercentOf(pitchStamina))
+                return facingPitcherOf(defense, current.pitcherSlot, staminaPercentOf(pitchStamina), runs)
               },
             }),
       },
@@ -876,7 +927,10 @@ export function changePitcherIfNeeded(
       // 0xabfcc 의 `[sp+4] && 0xb6388` 거르기 · ac626 되돌이가 보는 내 육성 선수
       ...(skipsOwn ? { isOwnPlayer: isOwn(slot) } : {}),
       // 0xb5b50 능력 합 — 마무리 갈래(ac0be)의 정렬 열쇠
-      ...(defense.abilitySumAt === undefined ? {} : { abilitySum: defense.abilitySumAt(slot) }),
+      // 스킬 14 의 경기 상태는 지금 리드로 — 반 이닝 시작 리드에서 빠진 만큼이 이 반 이닝 득점이다
+      ...(defense.abilitySumAt === undefined
+        ? {}
+        : { abilitySum: defense.abilitySumAt(slot, defense.fightingSpiritAt?.(defense.lead - situation.lead) === true) }),
       // 마선수(0xb633c) — 타자편·투수편 로스터에는 마선수가 없고, 리그의 마투수 8번 칸은 `isSpecialPitcherAt` 을
       // 넘겨야 선다. 마선수가 벤치에 없으면 0xb8a8d(team, 0) 이 거짓이라 마무리 굴림 0xac360 은 **돌지 않는다**.
     })),

@@ -12,11 +12,13 @@
  * 0xb58ac  팀 사기 정액 감소   ┘
  * 0xb58e6  (체력% 피로 — 투구 흐름이 `fatiguedStatsOf` 로 따로 먹인다)
  * 0xb592c  팀 능력치 → 선수 능력치   (모드 1·2·8·9)
+ * 0xb5a16  스킬 14 투지 v += v/10     (투수 · 장착 14 · 칸 ≠ 3 · 전역 경기 상태 — 모드 불문, `fightingSpirit`)
  * 0xb5a74  코치 보너스               (모드 2)
  * 0xb5b06  0..999 로 자름
  * ```
  */
 
+import { withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
 import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 import { isBugFixed } from '@/shared/config/bugfixes'
 
@@ -196,7 +198,8 @@ export interface GameAbilityInput {
    * **스킬 14(투수 비트 14 — 투지) 갈래가 서는가** (0xb5a28~0xb5a72) — 장착 비트 `0xb62b5(선수, 0xe)` 이고 전역 경기 상태가 6회 이후 · 이 팀이
    * 지는 측(`isLiveGameFightingSpiritSituation`)이면 부르는 쪽이 참을 넘긴다. 투수(0xb6279) · 칸 ≠ 3(체력) 검사는 여기서 한다.
    * 피로 · 팀 능력치 정액 **뒤**, 코치 **앞**에 `v += v/10`(0 쪽 버림, 0xca7b5). 안 넘기면 없음.
-   * ⚠️ 피로를 따로 먹이는 `gameAbilityPartsOf`(경기 중 투수) 길은 이 값을 안 싣는다 — 경기 안 투지는 아직 옮기지 않았다(A-11 남김).
+   * 피로를 따로 먹이는 `gameAbilityPartsOf`(경기 중 투수) 길은 `fightingSpirit` · `coachBonus` 로 넘겨 `pitcherGameStatOf` 가
+   * 피로 → 팀 정액 → 투지 → 코치 차례로 먹인다 (A-23).
    */
   readonly fightingSpirit?: boolean
 }
@@ -211,6 +214,10 @@ export interface GameAbilityParts {
   readonly beforeFatigue: number
   /** 0xb58e6 **뒤에** 더하는 정액 — 팀 능력치(모드 1·2·8·9) + 코치(모드 2) */
   readonly bonusAfterFatigue: number
+  /** `bonusAfterFatigue` 가운데 코치 몫 — 스킬 14(b5a16~b5a72)가 팀 정액과 코치 사이에 선다 */
+  readonly coachBonus: number
+  /** 스킬 14 갈래가 이 칸에 서는가 — `fightingSpirit` ∧ 투수 ∧ 칸 ≠ 3 */
+  readonly fightingSpirit: boolean
 }
 
 /** `gameAbilityPartsOf` 의 정액을 팀 능력치(0xb592c)와 코치(0xb5a74)로 나눈 것 — 스킬 14(b5a16~b5a72)가 그 사이에 선다 */
@@ -222,7 +229,12 @@ interface GameAbilitySteps {
 
 export function gameAbilityPartsOf(input: GameAbilityInput): GameAbilityParts {
   const steps = gameAbilityStepsOf(input)
-  return { beforeFatigue: steps.beforeFatigue, bonusAfterFatigue: steps.teamBonus + steps.coachBonus }
+  return {
+    beforeFatigue: steps.beforeFatigue,
+    bonusAfterFatigue: steps.teamBonus + steps.coachBonus,
+    coachBonus: steps.coachBonus,
+    fightingSpirit: isFightingSpiritSlot(input),
+  }
 }
 
 function gameAbilityStepsOf(input: GameAbilityInput): GameAbilitySteps {
@@ -275,9 +287,15 @@ const FIGHTING_SPIRIT_EXCLUDED_SLOT = PITCHER_SLOT.체력
  * 이면 `v += v / 10` (0xca7b5 — 0 쪽 버림). 장착 · 경기 상태는 `fightingSpirit` 이 든다.
  */
 export function fightingSpiritValueOf(value: number, input: Pick<GameAbilityInput, 'isPitcher' | 'slot' | 'fightingSpirit'>): number {
-  if (input.fightingSpirit !== true || !input.isPitcher || input.slot === FIGHTING_SPIRIT_EXCLUDED_SLOT) return value
-  return value + Math.trunc(value / 10)
+  return isFightingSpiritSlot(input) ? withFightingSpirit(value) : value
 }
+
+/** 스킬 14 갈래가 이 칸에 서는가 — `fightingSpirit`(장착 ∧ 경기 상태) ∧ 투수 레코드 ∧ 칸 ≠ 3 */
+function isFightingSpiritSlot(input: Pick<GameAbilityInput, 'isPitcher' | 'slot' | 'fightingSpirit'>): boolean {
+  return input.fightingSpirit === true && input.isPitcher && input.slot !== FIGHTING_SPIRIT_EXCLUDED_SLOT
+}
+
+export { FIGHTING_SPIRIT_SKILL_BIT, hasFightingSpiritBit } from '@/entities/pitching/model/pitcherGameStats'
 
 /**
  * 경기용 능력치 한 칸을 계산한다 — 피로가 없는 값(체력 인자 90: 타자·야수·능력 합 0xb5b50).
@@ -326,5 +344,12 @@ export function pitcherGameAbilityPartsOf(
       velocity: velocity.bonusAfterFatigue,
       breaking: breaking.bonusAfterFatigue,
     },
+    coachBonusAfterFatigue: {
+      control: control.coachBonus,
+      velocity: velocity.coachBonus,
+      breaking: breaking.coachBonus,
+    },
+    // 세 칸 모두 칸 ≠ 3 이라 투수 레코드면 함께 선다 (b5a48)
+    ...(control.fightingSpirit ? { fightingSpirit: true } : {}),
   }
 }
