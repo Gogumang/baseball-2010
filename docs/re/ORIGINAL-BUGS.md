@@ -9,9 +9,9 @@
 - 영향: **큼** = 승패·돈·보상이 크게 바뀌거나 공짜로 얻는 길이 생김 · **중** = 자주 겪거나 진행·기록이 눈에 띄게 달라짐 · **작음** = 드물거나 글·기록만 조금 틀림 · **거의 없음** = 그림 몇 px·안 드러나는 길.
 - 사용자 결정으로 이미 고친 것, 웹이 원본과 다를 수밖에 없는 것은 아래 2절에 따로 적었다. 예전에 "원본 버그"로 적었다가 버그가 아니었던 것은 3절에 있다.
 
-개수: 큼 7 · 중 27 · 작음 49 · 거의 없음 17 = **100건** (그 밖에 고침·웹 다름 5건, 정정 18건 — B-12 는 r272 에, B-48 · B-49 · B-50 · B-51 · B-58 은 r277 에, B-79 · B-81 은 r279 에 정정으로 옮겼고 id 는 남겨 둔다)
+개수: 큼 7 · 중 27 · 작음 49 · 거의 없음 17 = **100건** (그 밖에 고침·웹 다름 5건, 정정 21건 — B-12 는 r272 에, B-48 · B-49 · B-50 · B-51 · B-58 은 r277 에, B-79 · B-81 은 r279 에, B-85 · B-95 · B-96 은 r282 에 정정으로 옮겼고 id 는 남겨 둔다)
 
-**고치기(사용자 결정 2026-10-26)**: 웹 `src/shared/config/bugfixes/bugfixes.json` 이 100건을 모두 들고 `isBugFixed('B-xx')` 로 갈래를 고른다(기본 `fixAll: true` · 항목 `fixed` 로 덮음 · 고친 길이 없는 항목은 `implemented: false` 라 원본대로). 시험은 원본(모두 끔)으로 돈다. 고친 항목은 증상 칸 끝에 **고침(bugfixes.json, 기본 켬)** 으로 적는다 — r270: B-01 · B-02 · B-08 · B-09 · B-10 · B-14 · B-15 · r273(시즌): B-04 · B-06 · B-07 · B-16 · B-18 · B-19 · B-20 · B-21 · B-22 · B-23 · B-29 · B-34 · r275(나리 · 그 밖): B-03 · B-05 · B-17 · B-24 · B-25 · B-26 · B-27 · B-28 · B-30 · B-31 · B-32(고친 길만 — 웹에 공 화면 자리가 없어 아직 원본대로) · B-33 · r277(작음 1): B-35 · B-36 · B-37 · B-38 · B-39 · B-40 · B-41 · B-42 · B-43 · B-44 · B-45 · B-46 · B-47 · B-52 · B-53 · B-54 · B-55 · B-56 · B-57 · B-59 · r279(작음 2): B-60 · B-61 · B-62 · B-63 · B-64 · B-65 · B-66 · B-67 · B-68 · B-69 · B-70 · B-71 · B-72(시즌만) · B-73 · B-74 · B-75 · B-76 · B-77 · B-78 · B-80 · B-82 · B-83.
+**고치기(사용자 결정 2026-10-26)**: 웹 `src/shared/config/bugfixes/bugfixes.json` 이 100건을 모두 들고 `isBugFixed('B-xx')` 로 갈래를 고른다(기본 `fixAll: true` · 항목 `fixed` 로 덮음 · 고친 길이 없는 항목은 `implemented: false` 라 원본대로). 시험은 원본(모두 끔)으로 돈다. 고친 항목은 증상 칸 끝에 **고침(bugfixes.json, 기본 켬)** 으로 적는다 — r270: B-01 · B-02 · B-08 · B-09 · B-10 · B-14 · B-15 · r273(시즌): B-04 · B-06 · B-07 · B-16 · B-18 · B-19 · B-20 · B-21 · B-22 · B-23 · B-29 · B-34 · r275(나리 · 그 밖): B-03 · B-05 · B-17 · B-24 · B-25 · B-26 · B-27 · B-28 · B-30 · B-31 · B-32(고친 길만 — 웹에 공 화면 자리가 없어 아직 원본대로) · B-33 · r277(작음 1): B-35 · B-36 · B-37 · B-38 · B-39 · B-40 · B-41 · B-42 · B-43 · B-44 · B-45 · B-46 · B-47 · B-52 · B-53 · B-54 · B-55 · B-56 · B-57 · B-59 · r279(작음 2): B-60 · B-61 · B-62 · B-63 · B-64 · B-65 · B-66 · B-67 · B-68 · B-69 · B-70 · B-71 · B-72(시즌만) · B-73 · B-74 · B-75 · B-76 · B-77 · B-78 · B-80 · B-82 · B-83 · r282(거의 없음): B-84 · B-86 · B-87 · B-88 · B-89 · B-90 · B-91 · B-92 · B-93 · B-97 · B-98 · B-99 · B-100.
 
 ## 1. 남아 있는 원본 버그
 
@@ -100,23 +100,23 @@
 | B-81 | 표시 구속 | ~~너클볼은 rank 가 낮을수록 빠르게 표시된다~~ · **정정(r279) — 원본 버그가 아니다(3절)**: 0x66dc0 이 너클(66de4 `cmp #0x15`)만 일부러 거꾸로 세고, 실제 비행 프레임도 너클은 단계가 오를수록 느려진다(pitch.zt1 [26, 29, 32, 35]) — 변화가 좋을수록 느린 너클이라 표시와 실제가 같다. 고칠 것 없음(`implemented: false` 로 둔다) | 0x66dc0(66de4 `cmp #0x15` 갈래) · 0x66c98 식 F | 작음 | `src/entities/pitching/model/displaySpeed.ts` |
 | B-82 | 마투수 이펙트 | 레오니 마투수 이펙트가 화면에 안 나온다 · **고침(bugfixes.json, 기본 켬) — 0x4703a 가 넣는 그림(자세 4~14, 점프표 0xd00dc)을 목록 비우기 앞처럼 깊이대로 그린다(`leonyEffectDrawsOf`, 겹 그림 `public/sprites/leony_effect/frames/layers*`). 굴림 없음 (r279)** | 0xbe8d5 목록 넣기가 비우기 0x4d744 뒤 · 53032~53044 | 작음 | `src/widgets/batting-stage/lib/acePitcherEffect.ts` · `src/widgets/batting-stage/lib/renderBattingStage.ts` · `src/shared/lib/sprite/frameLayers.ts` |
 | B-83 | 홈런 재생 | 타자 마선수 그림이 팀당 첫 한 명으로 뭉개진다 · **고침(bugfixes.json, 기본 켬) — 칸마다 제 마선수 그림을 쓴다. 교대 판(`walkerAces.ts`)의 같은 뭉개기는 표에 없어 그대로. 굴림 없음 (r279)** | 0x3a680~0x3a716(R3 7-3) | 작음 | `src/features/defense-play/model/defensePlayView.ts` · `src/features/defense-play/model/homeRunPlayback.ts` |
-| B-84 | 나리 외출 칭호 | 2경기째 창에서 외출한 뒤 이어하면 외출 카운트가 또 지워진다 | 0xf684 fb92~fba8 | 거의 없음 | `src/entities/career/model/playerCareer.ts` |
-| B-85 | 수비 | 슬라이딩 키를 두 번 누르면 또 걸리고 효과음만 한 번 | 0x518da | 거의 없음 | `src/entities/defense-controls/model/sliding.ts` |
-| B-86 | 수비 필살 포구 | 필살 포구 번쩍임이 한 경기 첫 번에만 네 칸 다 나온다 | 0x93cfd(되감는 곳 없음) | 거의 없음 | `src/features/defense-play/model/defenseScene.ts` |
-| B-87 | 타석 HUD 램프 | 칸이 0 으로 내려갔다 같은 수로 다시 켜지면 확대 연출이 없다 | 0x37736 · 0x37744 | 거의 없음 | `src/widgets/batting-stage/lib/renderHud.ts` |
-| B-88 | 홈런 글자 | HOMERUN 글자가 살짝 오른쪽으로 치우친다 | 0x40b18(7글자 폭 합 / 2) | 거의 없음 | `src/widgets/batting-stage/lib/homeRunBanner.ts` |
-| B-89 | 장비 창 | 아래 칸 빗변이 박스 X 만큼 더 밀린다 | 0x7c2f0(`adds r4, r7, r6`) | 거의 없음 | `src/pages/shop/lib/equipmentWindowLayout.ts` |
-| B-90 | 메인 메뉴 | 바퀴가 도는 도중 270° 를 지날 때 칸이 20px 툭 튄다 | 0x24e8a~0x24eba | 거의 없음 | `src/pages/main-menu/lib/mainMenuLayout.ts` |
-| B-91 | 메뉴 바탕 | 공 무늬가 한 바퀴마다 2px 튀고, 흐리기 바탕은 오른쪽 아래로 끌린다 | 0x5fd61 · 제자리 평균 | 거의 없음 | `src/pages/special/lib/skinBackdrops.ts` |
-| B-92 | 글자 배치 | 못 그리는 글자가 든 줄은 잰 폭이 글자당 자간만큼 넓다 | 0x9c63a~0x9c654 | 거의 없음 | `src/shared/lib/font/layout.ts` |
-| B-93 | 곡선 연출 | 베지어 차수 0 가중치가 10000 이 아니라 1 | 0xbcb84 | 거의 없음 | `src/shared/lib/bezier/bezier.ts` |
-| B-94 | 목록 격자 | 칸 x 가 `colW[(i−1) mod 열수]` 를 읽어 열 너비가 다르면 어긋난다 — 원본 화면은 모두 같은 너비라 안 드러남 | 0x7a73e(S9) | 거의 없음 | — (드러나는 화면 없음) |
-| B-95 | 시즌 엔딩 아이리스 | 원이 한 번 줄었다가 커진다 | seasonEndingLayout 식(t=1 이 t=0 보다 작음) | 거의 없음 | `src/widgets/season/lib/seasonEndingLayout.ts` |
-| B-96 | 스토리 화면 효과 | '검정에서밝아짐' 은 어두워지고 '검게어두워짐' 은 밝아진다(이름과 모습이 반대) | L 1-E2(색 몫 (단계+1)/16) | 거의 없음 | `src/entities/story/model/screenEffect.ts` |
-| B-97 | 명예의 전당 | A 자리 투수 몸 그림이 한 그림 늦고, 타자 칸에서 넘어온 첫 그림은 타자 자세 번호로 그린다 | [목록+0x204] 공유(P6 7-4) | 거의 없음 | `src/pages/special/lib/hallOfFameFigure.ts` |
-| B-98 | 스페셜 영입 목록 | 안 쓰는 칸 10 에도 커서가 선다 | 0x26156~0x26180 | 거의 없음 | `src/pages/special/ui/SpecialScreen.tsx` |
-| B-99 | 금액 표시 | 1억 50만이 "1억050" 으로 찍힌다 | 0x55cf4 `"%d억%03d"` | 거의 없음 | `src/entities/story/model/rewardNotice.ts` · `src/features/shop/model/shopSelection.ts` |
-| B-100 | 일반모드 빠른실행 | '*' 재굴림은 구장을 안 바꾸고, 빠른실행 뒤 새로하기면 구장 커서가 목록 밖에서 시작한다 | 31262 · 31272 → 31280 · rec+0xc | 거의 없음 | `src/pages/general-mode/lib/quickStart.ts` · `src/pages/general-mode/model/useGeneralMode.ts` |
+| B-84 | 나리 외출 칭호 | 2경기째 창에서 외출한 뒤 이어하면 외출 카운트가 또 지워진다 · **고침(bugfixes.json, 기본 켬) — 2경기째가 막 끝난 셋업(앞서 본 경기 수 1)에서만 지운다 — g == 2 창 외출 뒤 이어하기 · 마선수 대결 뒤 셋업은 안 지운다. 굴림 없음 (r282)** | 0xf684 fb92~fba8 | 거의 없음 | `src/entities/career/model/playerCareer.ts` |
+| B-85 | 수비 | ~~슬라이딩 키를 두 번 누르면 또 걸리고 효과음만 한 번~~ · **정정(r282) — 원본 버그가 아니다(3절)**: 이미 미끄러지는 주자에 다시 거는 0xa04d0 → 동작 설정 0xa0164 는 같은 동작(6)이면 아무것도 안 한다(a0170 `beq`) — 속도도 vt64 + 40 그대로라 효과가 없다. 새로 창에 든 주자가 두 번째 누름에 걸리는 것은 맞고, 효과음 한 번은 +0x31c 잠금의 몫이다. 고칠 것 없음(`implemented: false`) | 0x518da | 거의 없음 | `src/entities/defense-controls/model/sliding.ts` |
+| B-86 | 수비 필살 포구 | 필살 포구 번쩍임이 한 경기 첫 번에만 네 칸 다 나온다 · **고침(bugfixes.json, 기본 켬) — 시작 0x93cfd 마다 칸 0 으로 되감아(끝 비트도 내림) 필살 포구마다 0 · 1 · 2 · 3 을 다 그린다. 굴림 없음 (r282)** | 0x93cfd(되감는 곳 없음) | 거의 없음 | `src/features/defense-play/model/defenseScene.ts` |
+| B-87 | 타석 HUD 램프 | 칸이 0 으로 내려갔다 같은 수로 다시 켜지면 확대 연출이 없다 · **고침(bugfixes.json, 기본 켬) — 칸이 0 이면 지난 칸 수를 0 으로 둬 같은 수로 다시 켜져도 확대가 선다. 굴림 없음 (r282)** | 0x37736 · 0x37744 | 거의 없음 | `src/widgets/batting-stage/lib/renderHud.ts` |
+| B-88 | 홈런 글자 | HOMERUN 글자가 살짝 오른쪽으로 치우친다 · **고침(bugfixes.json, 기본 켬) — 그린 폭(Σ(w − 간격) + 간격)으로 가운데를 잡는다. 다시 셈: 치우침은 간격의 반(간격 3 이면 1.5px, 40b46~40b88 프레임 0x36~0x3c 의 w − 3 합 >> 1)이다. 굴림 없음 (r282)** | 0x40b18(7글자 폭 합 / 2) | 거의 없음 | `src/widgets/batting-stage/lib/homeRunBanner.ts` |
+| B-89 | 장비 창 | 아래 칸 빗변이 박스 X 만큼 더 밀린다 · **고침(bugfixes.json, 기본 켬) — X 를 한 번만 더해 아래 칸 빗변이 X + trunc(W/2) − s 에서 선다. 굴림 없음 (r282)** | 0x7c2f0(`adds r4, r7, r6`) | 거의 없음 | `src/pages/shop/lib/equipmentWindowLayout.ts` |
+| B-90 | 메인 메뉴 | 바퀴가 도는 도중 270° 를 지날 때 칸이 20px 툭 튄다 · **고침(bugfixes.json, 기본 켬) — 멈추는 자리(45 · 315 는 20, 90 · 180 · 270 은 0)는 같게 두고 45~90 · 270~315 사이를 각에 비례해 옮긴다(90° 로 들어서는 걸음도 같이 튀었다). 굴림 없음 (r282)** | 0x24e8a~0x24eba | 거의 없음 | `src/pages/main-menu/lib/mainMenuLayout.ts` |
+| B-91 | 메뉴 바탕 | 공 무늬가 한 바퀴마다 2px 튀고, 흐리기 바탕은 오른쪽 아래로 끌린다 · **고침(bugfixes.json, 기본 켬) — 흐리기 0xbdc2c 는 흐리기 전 사본에서 이웃을 읽는다. 공 무늬는 다시 셈(r282): 38 → 1 의 74px 되돌림은 무늬 주기(가로 38 · 세로 두 줄 76)로 +2px 라 **튀지 않는다** — 실제 증상은 c = 31 … 38(시작 18 … 30)에서 시작 앞 칸을 안 그려 왼쪽 · 위 가장자리 공 한 줄이 빈 것. 고친 길은 시작이 0 을 넘으면 76 을 빼 채운다. 굴림 없음 (r282)** | 0x5fd61 · 제자리 평균 | 거의 없음 | `src/pages/special/lib/skinBackdrops.ts` |
+| B-92 | 글자 배치 | 못 그리는 글자가 든 줄은 잰 폭이 글자당 자간만큼 넓다 · **고침(bugfixes.json, 기본 켬) — 못 그리는 글자는 폭 재기에서도 그리기처럼 0px(자간 없이). 굴림 없음 (r282)** | 0x9c63a~0x9c654 | 거의 없음 | `src/shared/lib/font/layout.ts` |
+| B-93 | 곡선 연출 | 베지어 차수 0 가중치가 10000 이 아니라 1 · **고침(bugfixes.json, 기본 켬) — 차수 0 가중치를 10000 으로. 굴림 없음 (r282)** | 0xbcb84 | 거의 없음 | `src/shared/lib/bezier/bezier.ts` |
+| B-94 | 목록 격자 | 칸 x 가 `colW[(i−1) mod 열수]` 를 읽어 열 너비가 다르면 어긋난다 — 원본 화면은 모두 같은 너비라 안 드러남 · **고칠 곳 없음(r282)** — 웹에는 열 너비가 다른 격자도, 이 식을 옮긴 공용 격자도 없다(화면마다 같은 너비로 옮겼다). `implemented: false` 로 둔다 | 0x7a73e(S9) | 거의 없음 | — (드러나는 화면 없음) |
+| B-95 | 시즌 엔딩 아이리스 | ~~원이 한 번 줄었다가 커진다~~ · **정정(r282) — 원본 버그가 아니다(3절)**: 0x887dc~0x88846 은 k · p 를 사인 0x6c6a9(리터럴 0x889a8, `bl 0xcaa04` = `bx r6`)로 거친다 — r = D·sin(min(16t, 110))/100 + D − D·sin(t == 0 ? 90 : 110)/100 이라 t = 0 부터 커지고 t = 6 에 살짝 넘쳤다 돌아온다(타자편 `irisCircleOf` 가 이 식). 사인을 빠뜨린 것은 웹 `seasonEndingLayout` 의 옮김 실수 — 지름 = W − r 그리기와 함께 다시 옮길 일(WORKPLAN A-19) | seasonEndingLayout 식(t=1 이 t=0 보다 작음) | 거의 없음 | `src/widgets/season/lib/seasonEndingLayout.ts` |
+| B-96 | 스토리 화면 효과 | ~~'검정에서밝아짐' 은 어두워지고 '검게어두워짐' 은 밝아진다(이름과 모습이 반대)~~ · **정정(r282) — 원본 버그가 아니다(3절)**: 이름은 RE 노트(L 1-E2)가 붙인 꼬리표다. 원본은 실제 모습대로 쓴다 — 시즌 엔딩 진입 0x6be8 이 종류 2 로 검정에서 밝히고 키 0x6b3c 가 종류 1 로 어둡게 닫는다(웹 `SeasonEndingScreen`). 고칠 것 없음(`implemented: false`) | L 1-E2(색 몫 (단계+1)/16) | 거의 없음 | `src/entities/story/model/screenEffect.ts` |
+| B-97 | 명예의 전당 | A 자리 투수 몸 그림이 한 그림 늦고, 타자 칸에서 넘어온 첫 그림은 타자 자세 번호로 그린다 · **고침(bugfixes.json, 기본 켬) — 투수 이미지를 그 그림에 실은 투수와 이번 걸음의 투수 자세로 뜬다(한 그림 늦음 · 타자 자세 번호를 걷음). 이미지를 안 뜨는 홈런더비는 그대로. 굴림 없음 (r282)** | [목록+0x204] 공유(P6 7-4) | 거의 없음 | `src/pages/special/lib/hallOfFameFigure.ts` |
+| B-98 | 스페셜 영입 목록 | 안 쓰는 칸 10 에도 커서가 선다 · **고침(bugfixes.json, 기본 켬) — 시즌 영입 목록도 나리 145 · 미션처럼 칸 10 을 막는다. 굴림 없음 (r282)** | 0x26156~0x26180 | 거의 없음 | `src/pages/special/ui/SpecialScreen.tsx` |
+| B-99 | 금액 표시 | 1억 50만이 "1억050" 으로 찍힌다 · **고침(bugfixes.json, 기본 켬) — 나머지를 "%04d" 로(1억 50만 → "1억0050"). 굴림 없음 (r282)** | 0x55cf4 `"%d억%03d"` | 거의 없음 | `src/entities/story/model/rewardNotice.ts` · `src/features/shop/model/shopSelection.ts` |
+| B-100 | 일반모드 빠른실행 | '*' 재굴림은 구장을 안 바꾸고, 빠른실행 뒤 새로하기면 구장 커서가 목록 밖에서 시작한다 · **고침(bugfixes.json, 기본 켬) — 재굴림 20번째 틱도 구장 = 새 유저 팀(진입 3152e 처럼) · 상태 20 진입 구장 커서는 목록(0~9) 밖이면 0. 굴림 수 · 차례 같음 (r282)** | 31262 · 31272 → 31280 · rec+0xc | 거의 없음 | `src/pages/general-mode/lib/quickStart.ts` · `src/pages/general-mode/model/useGeneralMode.ts` |
 
 ## 2. 고친 것 · 웹이 원본과 다른 것
 
@@ -153,5 +153,9 @@
 | 경기진행 설정 찬스 좌우 뒤집기 · 9회 칸이 연장까지(B-65 일부) | 두 칸 감아 돌기와 같다 · 연장을 맡는 칸이 그것뿐인 설계 | 0x5ffcc · 0xc2162 → r279 |
 | 시즌 경기 평가 글의 안타에서 홈런이 빠진다(B-67 일부) | S[7] 은 홈런 포함 — 2·3루타 두 번 셈만 맞다. 동점 "경기패배!" 는 닿지 않는다 | S4 2절 · 0xb68fc → r279 |
 | 시즌 상세 글 사기 줄 정액(B-80 일부) | 실제 사기 감소도 정액 | `moralePenaltyOf` → r279 |
+| 슬라이딩 키 두 번이면 또 걸린다(B-85) | 다시 거는 동작 설정은 같은 동작이면 아무것도 안 한다 · 효과음 한 번은 잠금의 몫 | 0xa0164 a0170 · +0x31c → r282 |
+| 시즌 엔딩 아이리스가 한 번 줄었다 커진다(B-95) | 원본은 사인 0x6c6a9 를 거쳐 t = 0 부터 커진다 — 웹이 사인을 빠뜨렸다(옮김 실수, A-19) | 0x887dc~0x88846 · 리터럴 0x889a8 → r282 |
+| 스토리 화면 효과 이름과 모습이 반대(B-96) | 이름은 RE 꼬리표 — 원본은 실제 모습대로 쓴다(시즌 엔딩 0x6be8 밝힘 · 0x6b3c 닫음) | L 1-E2 · 0x6be8 6c32 · 0x6b3c → r282 |
+| 공 무늬가 한 바퀴마다 2px 튄다(B-91 일부) | 74px 되돌림은 무늬 주기 76 으로 +2px — 튀지 않는다. 남는 증상은 c = 31 … 38 의 가장자리 빈 줄(고침) | 0x5fd61 · P6 7-3 → r282 |
 
 웹 코드 주석 중 `src/entities/career/model/equipment.ts`(오토봇 배트 G 건너뜀)는 위 정정보다 앞선 문구라 낡았다. `playerCareer.ts` 의 "옮길 코드가 없다" 문구는 r275 에서 B-27 고친 길과 함께 고쳐 적었다.
