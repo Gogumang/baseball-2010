@@ -111,7 +111,7 @@ interface EntryRoutesProps {
   /** 기록연감 사건 — 홈런더비 결과의 획득 G 통계(0x22c7d)를 남긴다. 안 넘기면 안 남긴다 */
   readonly recordStat?: (event: AnnalsStatEvent) => void
   /** `0x62368(ui, k, 0)` 열기 + 공용 창 알림 — 홈런더비 누적 비거리 히든 39 */
-  readonly openHidden?: (id: number) => boolean
+  readonly openHidden?: (id: number, then?: (() => void) | null) => boolean
   /** 스페셜 명예의 전당 "슬롯에서 삭제" — 앱이 기록연감·시즌 명단 정리를 묶어 넘긴다 */
   readonly hallOfFameDeletion?: HallOfFameDeletion
   /**
@@ -376,7 +376,7 @@ export function EntryRoutes({
         // 보유 G 는 전역 기록 `mgr[+0x64]` 다 (0x461f2) — 선수 칸이 아니라 지갑을 본다
         gamePoint={wallet.balance}
         // 판 끝 0x52a00 — 누적 비거리 > 1999 면 히든 39 (0x62368)
-        {...(openHidden === undefined ? {} : { onOpenHidden: (id: number) => { openHidden(id) } })}
+        {...(openHidden === undefined ? {} : { onOpenHidden: (id: number, then: () => void) => openHidden(id, then) })}
         onFinish={(result) => {
           if (result.bestDistance > derbyBest) {
             setDerbyBest(result.bestDistance)

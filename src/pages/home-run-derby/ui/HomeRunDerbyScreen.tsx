@@ -73,7 +73,7 @@ interface HomeRunDerbyScreenProps {
   /** 한 판이 끝났을 때. 최고 기록 갱신과 G 지급은 부르는 쪽이 한다 */
   readonly onFinish?: (result: DerbyResult) => void
   /** 판 끝 누적 비거리 > 1999 의 히든 39 열기 (0x52a14 `0x62368`) — `useHomeRunDerby` 의 `onOpenHidden` */
-  readonly onOpenHidden?: (id: number) => void
+  readonly onOpenHidden?: (id: number, then: () => void) => boolean | void
   /** 결과 화면에서 "아니오" — 메인 메뉴로 (전역 0x140006c = 4) */
   readonly onExit: () => void
   /** 경기 중 메뉴 "설정" 칸이 열 환경설정. 안 넘기면 칸이 잠긴다 */
@@ -153,7 +153,9 @@ export function HomeRunDerbyScreen({
   // 상태 0xe — 사람 OK 를 기다린다 (0x532b0). 경기 중 메뉴·조작방법·설정이 떠 있으면 경기 키가 안 간다(일시정지 팝업 0x754f9)
   const acceptsConfirm = session.isAwaitingConfirm && session.result === null && !isMenuOpen && overlay === null
   // 판(0x17)이 도는 동안의 키 — 0x53420 이 키마다 0x587 을 보내 홈런 뒤면 건너뛴다(0x519cc). 경기 중 메뉴 · 조작방법 · 설정이 떠 있으면 안 간다
-  const isPlayRunning = session.distanceBoard !== null && session.result === null && !isMenuOpen && overlay === null
+  // 판이 끝나 히든 39 창 뒤에 필드 화면만 남긴 동안(`isPlayHeld`)은 판이 아니다
+  const isPlayRunning = session.distanceBoard !== null && !session.isPlayHeld && session.result === null && !isMenuOpen
+    && overlay === null
   /**
    * 0xe 의 OK · 판(0x17)의 건너뛰기 키는 받은 그 자리에서 처리하지 않고 장면 키 칸에 든다 — 원본은 키 콜백이 [+0x20] 에 적기만 하고
    * 다음 틀의 0xbca05 → 키 0x498d4(52d9e) → 0x536bc 가 그 틀의 상태로 가른다(0xe 0x532b0 · 0x17 0x53420 → 0x587 → 0x519cc).
