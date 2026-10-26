@@ -952,13 +952,18 @@ async function checkAndWrite(captures: readonly Capture[]): Promise<void> {
 
 /** 씨앗 — 포스트시즌(정규시즌 1위 진입 팝업) · 국가대항전을 둘 다 지나 보너스 엔딩(4)까지 가는 판. r249 에 엔진 변경(r244 정산 따위)으로 씨앗 1 이 4년차 부상 엔딩 0 · 1위 아님으로 갈라져 4 로 옮겼다 (`SOAK_FIXTURE_NARI_SEED` · `SOAK_FIXTURE_PITCHER_SEED` 로 바꿔 찾는다) */
 const NARI_SEED = Number(process.env.SOAK_FIXTURE_NARI_SEED ?? 4)
-/** 투수편 — r259 에 r257(투수편 이벤트 보상) 이후 씨앗 2 가 국가대항전 한국 우승에 못 닿아 1 로 옮겼다(1 · 4 · 5 · 6 · 7 은 아홉 자리 다 닿는다) */
-const PITCHER_SEED = Number(process.env.SOAK_FIXTURE_PITCHER_SEED ?? 1)
+/**
+ * 투수편 — r259 에 r257(투수편 이벤트 보상) 이후 씨앗 2 가 국가대항전 한국 우승에 못 닿아 1 로 옮겼다(1 · 4 · 5 · 6 · 7 은 아홉 자리 다 닿는다).
+ * r297 — r291(A-23 경기 안 투지)로 능력치가 갈려 씨앗 1 이 포스트시즌 다음 판(pitcher-postseason-next)에 못 닿아 5 로 옮겼다
+ * (2~7 을 훑어 4 · 5 · 7 이 아홉 자리 다 닿는다). 저장된 픽스처 파일은 그대로 둔다(smoke 통과)
+ */
+const PITCHER_SEED = Number(process.env.SOAK_FIXTURE_PITCHER_SEED ?? 5)
 /**
  * 타자편 `nari-cup-win` 만 뜨는 씨앗 (r254) — 씨앗 4 는 13년 내내 국가대항전에서 한국이 못 이겨, 한국 우승 대진판은 따로 돌려 뜬다.
- * r254 에 1 · 2 · 3 · 5 · 6 · 7 을 훑어 2 · 3 · 5 에서 닿았다 (`SOAK_FIXTURE_NARI_CUP_WIN_SEED` 로 바꾼다)
+ * r254 에 1 · 2 · 3 · 5 · 6 · 7 을 훑어 2 · 3 · 5 에서 닿았다 (`SOAK_FIXTURE_NARI_CUP_WIN_SEED` 로 바꾼다).
+ * r297 — r291(A-23) 뒤 5 가 못 닿아 1 로 옮겼다(1~9 가운데 1 · 9 가 닿는다)
  */
-const NARI_CUP_WIN_SEED = Number(process.env.SOAK_FIXTURE_NARI_CUP_WIN_SEED ?? 5)
+const NARI_CUP_WIN_SEED = Number(process.env.SOAK_FIXTURE_NARI_CUP_WIN_SEED ?? 1)
 
 describe.runIf(isEnabled)('soak 로 e2e 픽스처 뜨기 (SOAK_FIXTURE=1)', () => {
   beforeEach(() => {
