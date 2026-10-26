@@ -213,9 +213,9 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
       magicNumber: famer.selectedMagicNumber ?? 0,
     },
     { equippedSkillIds, ...(famer.equipmentLevels === undefined ? {} : { equipmentLevels: famer.equipmentLevels }) },
-    // ⚠️ 미구현(남김 — 웹 기록 꼴): 명전 기록 +0x2c 는 등록 0x1f654 가 그때 투수 레코드를 통째 베낀 값인데 웹 명전 기록(`HallOfFamePitcher`)이
-    //    그 칸을 안 남긴다 — 남길 때까지 10000 으로 둔다
-    MISSION_STAMINA,
+    // 명전 기록 +0x2c — 등록 0x1f654 가 그때 투수 레코드를 통째 베낀 값(시즌 영입이면 0xc554 가 10000 으로 고친 값).
+    // 옛 기록은 `normalizeCollection` 이 10000 으로 이사해 두지만, 이사를 안 거친 값(시험 등)도 같은 10000 으로 본다
+    famer.stamina ?? MISSION_STAMINA,
     // ⚠️ 보직을 안 남긴 옛 명전 기록은 보직이 없다(판 없음) — 원본 기록에는 늘 있는 칸이다
     famer.role === undefined ? { name: famer.name } : { name: famer.name, role: famer.role },
     famer.look.skinIndex,

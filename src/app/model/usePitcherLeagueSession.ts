@@ -26,6 +26,7 @@ import {
   startNextPitcherSeason,
   withPitcherGameLeagueRecords,
   withPitcherGameStaminas,
+  migratePitcherYearlyStats,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PitcherLastGame } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -431,7 +432,8 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
   const saved = raw as Partial<PitcherCareer>
   if (typeof saved.name !== 'string') return null
   const base = createPitcherCareer(saved.name)
-  return {
+  // 지난 해 연도별 칸(0x1fa78)이 연차만큼 없는 옛 저장은 앞에 채운다 (`migratePitcherYearlyStats`)
+  return migratePitcherYearlyStats({
     ...base,
     ...saved,
     stats: { ...base.stats, ...saved.stats },
@@ -456,7 +458,7 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
       ...base,
       ...saved,
     } as PitcherCareer)),
-  }
+  })
 }
 
 /** 해금 id 를 더한다 — 이미 있으면 그대로 */

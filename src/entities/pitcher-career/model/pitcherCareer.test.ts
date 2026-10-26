@@ -2,6 +2,7 @@ import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { opponentOf, rotateLeaguePitchers, startPostseason } from '@/entities/league/model/league'
 import { describe, expect, it } from 'vitest'
 import {
+  migratePitcherYearlyStats,
   equippedPitcherSkillIdsOf,
   GAMES_PER_SEASON,
   applyPitcherGameResult,
@@ -385,5 +386,25 @@ describe('equippedPitcherSkillIdsOf — 장착 비트(+0x14)를 0xab214 의 투�
   it('비트 번호마다 +16, 번호 순 · 겹침 없음', () => {
     expect(equippedPitcherSkillIdsOf({ equippedSkillIds: [22, 8, 15, 8] })).toEqual([24, 31, 38])
     expect(equippedPitcherSkillIdsOf({ equippedSkillIds: [] })).toEqual([])
+  })
+})
+
+describe('옛 저장 이사 — 지난 해 연도별 칸 0x1fa78 (r278)', () => {
+  const 줄 = (wins: number, saves: number) => ({ ...createPitcherCareer('x').stats, wins, saves, games: wins + saves })
+
+  it('한 칸 모자라면 통산 − 이번 해로 정확히 되살린다 · 칸이 차 있으면 같은 객체', () => {
+    const career = { ...createPitcherCareer('옛'), season: 2, stats: 줄(3, 1), careerStats: 줄(10, 4) }
+    const migrated = migratePitcherYearlyStats(career)
+    expect(migrated.yearlyStats).toEqual([줄(7, 3)])
+    expect(migratePitcherYearlyStats(migrated)).toBe(migrated)
+    // 저장 → 불러오기를 돌아도 같다
+    expect(migratePitcherYearlyStats(JSON.parse(JSON.stringify(migrated)) as typeof migrated)).toEqual(migrated)
+  })
+
+  it('여러 칸 모자라면 합을 가장 최근 빈 칸에 두고 앞 칸은 0 — 뒤에 붙은 새 칸은 제 해 자리로 밀린다', () => {
+    const 새칸 = 줄(5, 0)
+    const career = { ...createPitcherCareer('옛'), season: 4, stats: 줄(2, 0), careerStats: 줄(20, 6), yearlyStats: [새칸] }
+    const migrated = migratePitcherYearlyStats(career)
+    expect(migrated.yearlyStats).toEqual([줄(0, 0), 줄(13, 6), 새칸])
   })
 })

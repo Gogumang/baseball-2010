@@ -116,6 +116,16 @@ describe('명예 투수 — 0x1fbd0 의 +0xa5 ≥ 0 갈래 = 0x1f62c 명전 기�
     expect(modePitcherOfHallOfFame(famer)).toEqual(modePitcherOf(나리))
   })
 
+  it('명전 기록 +0x2c — 등록 때 베낀 스태미나로 선다 (r278 — 예전엔 늘 10000)', () => {
+    const 지친 = registerHallOfFamePitcher(EMPTY_COLLECTION, { ...나리, stamina: 3000 }, 99_999)
+    if (지친.kind !== '등록') throw new Error('등록 실패')
+    const pitcher = modePitcherOfHallOfFame(지친.collection.hallOfFamePitchers[0]!)
+    expect(pitcher.stamina).toBe(3000)
+    expect(pitcher).toEqual(modePitcherOf({ ...나리, stamina: 3000 }))
+    const { stamina: _stamina, ...옛 } = 지친.collection.hallOfFamePitchers[0]!
+    expect(modePitcherOfHallOfFame(옛).stamina).toBe(10000)
+  })
+
   it('기록 칸이 없는 옛 저장은 등록 때 남긴 0xb6415 값과 직구만·스킬 없음으로 던진다', () => {
     const { equipmentLevels: _e, equippedSkillIds: _s, pitchMask: _p, selectedMagicNumber: _m, ...옛기록 } = famer
     const pitcher = modePitcherOfHallOfFame(옛기록)

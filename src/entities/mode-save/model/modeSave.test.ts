@@ -13,6 +13,7 @@ import {
   withLastPlayedMode,
   withNariGameCleared,
   withNariGameStarted,
+  withSeasonMatchSettings,
   withGeneralMatchSettings,
   withMatchSettingsSeen,
   NEW_SAVE_MATCH_SETTINGS,
@@ -137,5 +138,19 @@ describe('일반모드 경기진행 설정(+0x12c+0 계열) · 설정 창 본 �
     const 옛것 = normalizeModeSave({ lastPlayedMode: 4, generalMatchSettings: { kind: '1' } })
     expect(옛것.generalMatchSettings).toEqual(NEW_SAVE_MATCH_SETTINGS)
     expect(옛것.matchSettingsSeen).toBe(false)
+  })
+})
+
+describe('시즌 경기진행 설정(+0x12c+1 계열) — 전역 칸 (r278)', () => {
+  it('옛 세이브(칸 없음)는 null(시즌 세션이 옛 시즌 저장 값을 옮겨 온다) · 되쓴 값은 저장 → 불러오기를 돌아 남는다', () => {
+    expect(EMPTY_MODE_SAVE.seasonMatchSettings).toBeNull()
+    expect(normalizeModeSave({ lastPlayedMode: 2 }).seasonMatchSettings).toBeNull()
+    const 설정 = { ...NEW_SAVE_MATCH_SETTINGS, kind: 0, value: 1 }
+    const 저장 = withSeasonMatchSettings(EMPTY_MODE_SAVE, 설정)
+    const 다시 = normalizeModeSave(JSON.parse(JSON.stringify(저장)))
+    expect(다시.seasonMatchSettings).toEqual(설정)
+    expect(normalizeModeSave(JSON.parse(JSON.stringify(다시)))).toEqual(다시)
+    // 일반모드 칸(m = 0)과 따로다
+    expect(다시.generalMatchSettings).toEqual(NEW_SAVE_MATCH_SETTINGS)
   })
 })
