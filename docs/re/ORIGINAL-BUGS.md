@@ -9,7 +9,7 @@
 - 영향: **큼** = 승패·돈·보상이 크게 바뀌거나 공짜로 얻는 길이 생김 · **중** = 자주 겪거나 진행·기록이 눈에 띄게 달라짐 · **작음** = 드물거나 글·기록만 조금 틀림 · **거의 없음** = 그림 몇 px·안 드러나는 길.
 - 사용자 결정으로 이미 고친 것, 웹이 원본과 다를 수밖에 없는 것은 아래 2절에 따로 적었다. 예전에 "원본 버그"로 적었다가 버그가 아니었던 것은 3절에 있다.
 
-개수: 큼 7 · 중 27 · 작음 49 · 거의 없음 17 = **100건** (그 밖에 고침·웹 다름 5건, 정정 10건)
+개수: 큼 7 · 중 27 · 작음 49 · 거의 없음 17 = **100건** (그 밖에 고침·웹 다름 5건, 정정 11건 — B-12 는 r272 에 정정으로 옮겼고 id 는 남겨 둔다)
 
 **고치기(사용자 결정 2026-10-26)**: 웹 `src/shared/config/bugfixes/bugfixes.json` 이 100건을 모두 들고 `isBugFixed('B-xx')` 로 갈래를 고른다(기본 `fixAll: true` · 항목 `fixed` 로 덮음 · 고친 길이 없는 항목은 `implemented: false` 라 원본대로). 시험은 원본(모두 끔)으로 돈다. 고친 항목은 증상 칸 끝에 **고침(bugfixes.json, 기본 켬)** 으로 적는다 — r270: B-01 · B-02 · B-08 · B-09 · B-10 · B-14 · B-15.
 
@@ -27,9 +27,9 @@
 | B-08 | 경기(마구) | 그 경기 첫 마구는 횟수가 안 줄어 한 경기에 표보다 1개 더 던진다 · **고침(bugfixes.json, 기본 켬) — 첫 마구도 횟수를 깎아 표 값만큼만 던진다(홈런더비는 원본도 소모 없음)** | 소모 0x345fc 조건이 `공+0x10 != 0` | 중 | `src/entities/pitching/model/magicPitchGame.ts` · `src/entities/pitcher-career/model/magicPitch.ts` |
 | B-09 | 경기 전반 | 스태미나 0 인 투수가 한 개 더 던지면 1% 로 되살아난다 · **고침(bugfixes.json, 기본 켬) — 0 에서 더 던지면 0 에 머문다** | 0xaeb08 else 가지 s' = 100 | 중 | `src/entities/pitcher-career/model/pitcherStamina.ts` |
 | B-10 | 경기 기록(모든 모드) | 세이브가 거의 안 붙는다 — CPU 리그 세이브는 늘 0 · **고침(bugfixes.json, 기본 켬) — 경기 끝에 코드(잡아야 할 아웃 수)를 안 보고, 세이브 상황 아닌 같은 측 교체면 후보를 지운다** | state+0x64 를 0 으로 되돌리는 코드 없음 · 경기 끝 검사 0xa7eaa(S1) | 중 | `src/entities/game/model/winLossSave.ts` · `src/entities/league/model/leaguePlayerStats.ts` |
-| B-11 | 수비(사람) | 사람이 수비하면 협살이 절대 안 일어난다 | 협살 시작 조건 `state[0x31+수비측] == 1`(CPU, S8 1-4) | 중 | `src/entities/fielding/model/rundown.ts` · `src/features/defense-play/model/runDefensePlay.ts` |
-| B-12 | 수비(사람) 레이저 송구 | 레이저 송구 입력 창이 19틱이 아니라 실제 7~9틱뿐이다 | 카운터가 틱이 아니라 0xb2648 호출마다 오름(0x524c0 틱당 2~3번) | 중 | `src/entities/defense-controls/model/laserThrow.ts` · `src/features/defense-play/model/laserTick.ts` |
-| B-13 | 나리 타자편 9회 이후 | 자동진행이 멈춘 끝내기 판에서 아웃 수가 3을 넘어(4~5) 설 수 있다 | 0xc22b4 c2318~c232e(`st[6] = t − rand(d, t+1)`) | 중 | `src/features/play-game/model/gameFlow.ts` |
+| B-11 | 수비(사람) | 사람이 수비하면 협살이 절대 안 일어난다 · **고침(bugfixes.json, 기본 켬) — 사람 수비에서도 협살을 건다. 다만 포스로 밀려 가는 주자(0xb1b54 — 타자주자 등)는 빼낸다: 관문만 걷으면 협살 AI 가 루로 가던 공 가진 야수를 주자 쪽으로 돌려 세워 포스 아웃을 놓친다(번트·땅볼 20400판 훑기에서 아웃 132번 잃음 → 빼낸 뒤 0번). CPU 공격 주자는 되돌지 않아 협살은 마주 쫓는 태그로 끝난다 (r272)** | 협살 시작 조건 `state[0x31+수비측] == 1`(CPU, S8 1-4) | 중 | `src/entities/fielding/model/rundown.ts` · `src/features/defense-play/model/runDefensePlay.ts` |
+| B-12 | 수비(사람) 레이저 송구 | ~~레이저 송구 입력 창이 19틱이 아니라 실제 7~9틱뿐이다~~ · **정정(r272) — 원본 버그가 아니다(3절)**: 0x523bc 는 523d6 에서 +0x19af(이 판 굴림 마침) ≠ 0 이면 0xb2648 을 부르기 전에 끝난다. 굴림은 창이 처음 열린 부름(포구 −10틱)에서 바로 일어나므로 그 뒤로는 0x4e858 하나만 틱당 한 번 센다 → 창은 19틱(포구 −10~+8) 그대로, 웹도 그렇게 돈다. 고칠 것 없음(`implemented: false` 로 둔다) | 카운터가 틱이 아니라 0xb2648 호출마다 오름(0x524c0 틱당 2~3번) | 중 | `src/entities/defense-controls/model/laserThrow.ts` · `src/features/defense-play/model/laserTick.ts` |
+| B-13 | 나리 타자편 9회 이후 | 자동진행이 멈춘 끝내기 판에서 아웃 수가 3을 넘어(4~5) 설 수 있다 · **고침(bugfixes.json, 기본 켬) — 아웃을 2(내 타석 앞 상한)에서 자른다. 굴림 rand(d, t+1) · 주자 세우기는 원본 그대로라 난수 차례가 같다 (r272)** | 0xc22b4 c2318~c232e(`st[6] = t − rand(d, t+1)`) | 중 | `src/features/play-game/model/gameFlow.ts` |
 | B-14 | CPU 끼리 경기·간이 타석 | 볼넷이 밀어내기가 아니라 모든 주자 한 루씩 — 3루 주자 혼자여도 득점 · **고침(bugfixes.json, 기본 켬) — 사람 경기와 같은 밀어내기(만루에서만 1점). 루가 달라져 뒤 굴림 차례가 바뀐다** | 0xc1818 c1918~c194a → 0xc0fb4(sim, 1) | 중 | `src/entities/game/model/baseState.ts` |
 | B-15 | 사람 경기의 CPU 도루 | CPU 도루 확률이 주루와 상관없이 1.1% / 0.5% / 0.3% 고정 · **고침(bugfixes.json, 기본 켬) — 표 칸 = min(주루 능력치 ÷ 250, 3). 굴림 수는 같다** | 0x520de · 표 0xd047c(속도칸이 늘 1) | 중 | `src/entities/fielding/model/cpuSteal.ts` |
 | B-16 | 시즌 평판 | 병살을 잡으면 평판이 깎이고 탈삼진이 평판을 올린다 | 점프표 0xd7d7c 의 코드 4·5 뒤집힘(S4 2b) | 중 | `src/entities/season-mode/model/seasonReputation.ts` |
@@ -142,5 +142,6 @@
 | 시즌 상태 0xf4 는 나가는 길이 없다 | 키 표 0xcbf6c 칸 0x4a18 — OK → 0xdd · CLR → 0xf3 | eefce6e → R13 |
 | 오토봇 배트가 열리는 해에는 리그 1위 G 를 못 받는다 | 해금 알림을 닫으면 0x87d2~0x87fc 가 G 를 준다 | a3cfe3a · 5a45956 → P4 4b |
 | 크라이져 해금이 힌트("사이클링 트리플")와 달리 2번째 사이클링에 열린다 | 문턱은 지난 경기까지 누계를 본다 — 3번째에 열린다 | 웹 r29 → K 3-1 |
+| 레이저 송구 창이 카운터가 호출마다 올라 19틱이 아니라 7~9틱(B-12) | 0x523bc 는 굴림 뒤(+0x19af ≠ 0, 523d6) 0xb2648 을 안 부른다 — 굴림 틱 뒤로는 0x4e858 하나만 세어 19틱 그대로 | S12 3-3 → r272 |
 
 웹 코드 주석 중 `src/entities/career/model/equipment.ts`(오토봇 배트 G 건너뜀)·`playerCareer.ts` 1148행("옮길 코드가 없다")은 위 정정·B-27 보다 앞선 문구라 낡았다.
