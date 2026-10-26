@@ -535,7 +535,7 @@ describe('홈런더비 장면 시작 굴림 차례 (`rollDerbySceneStart`)', () 
 describe('판 끝 누적 비거리 > 1999 → 히든 39 (0x52a00~0x52a16)', () => {
   it('맞은 공의 판이 끝날 때 누적이 1999 를 넘었으면 그때마다 부른다 (이미 열렸는지는 받는 쪽)', () => {
     const opened: number[] = []
-    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => opened.push(id) }))
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => { opened.push(id) } }))
     OK(rendered)
     const 존홈런: PitchOutcomeDetail = { ...홈런, pattern: [118, 961, 1367, 2] }
     let expected = 0
@@ -554,9 +554,47 @@ describe('판 끝 누적 비거리 > 1999 → 히든 39 (0x52a00~0x52a16)', () =
     expect(opened.length).toBeGreaterThan(0)
   })
 
+  it('창이 서면 판(0x17)의 필드 화면이 창 뒤에 남고, 창을 닫아야 다음 상태로 간다 (52a54 0xbcb48 · 52efe → 0x46c88)', () => {
+    let close: (() => void) | null = null
+    const rendered = renderHook(() => useHomeRunDerby({
+      bestDistance: 0,
+      onOpenHidden: (_id, then) => {
+        if (close !== null) return false
+        close = then
+        return true
+      },
+    }))
+    OK(rendered)
+    const 존홈런: PitchOutcomeDetail = { ...홈런, pattern: [118, 961, 1367, 2] }
+    for (let ball = 0; ball < 40 && close === null && rendered.result.current.result === null; ball += 1) {
+      act(() => rendered.result.current.onPitchResolved(존홈런))
+      act(() => {
+        vi.advanceTimersByTime(resultHoldMillisecondsOf(존홈런) + 500)
+      })
+      if (close === null && rendered.result.current.isAwaitingConfirm) OK(rendered)
+    }
+    expect(close).not.toBeNull()
+    const held = rendered.result.current
+    // 판의 필드 화면(비거리 판)은 남고 HOMERUN 글자는 꺼졌다(0x35108) — 화면 칸(run)은 아직 판 앞 값이다
+    expect(held.isPlayHeld).toBe(true)
+    expect(held.distanceBoard).not.toBeNull()
+    expect(held.homeRunText).toBeNull()
+    const runBefore = held.run
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
+    expect(rendered.result.current.run).toBe(runBefore)
+    expect(rendered.result.current.distanceBoard).not.toBeNull()
+    // 창을 닫으면 그 다음 틀 머리가 다음 상태로 옮긴다
+    act(() => close?.())
+    expect(rendered.result.current.isPlayHeld).toBe(false)
+    expect(rendered.result.current.distanceBoard).toBeNull()
+    expect(rendered.result.current.run).not.toBe(runBefore)
+  })
+
   it('맞지 않은 공(0x12)에서는 부르지 않는다', () => {
     const opened: number[] = []
-    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => opened.push(id) }))
+    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => { opened.push(id) } }))
     OK(rendered)
     한구(rendered, 헛스윙)
     expect(opened).toEqual([])

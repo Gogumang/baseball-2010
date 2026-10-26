@@ -196,9 +196,12 @@ export interface HomeRunDerbyOptions {
   /**
    * **히든 39 열기** `0x62368(ui, 0x27 = 39, 0)` — 0x17 갱신이 관문이 닫힌 뒤 11 번째 갱신(529f0 `+0x1094 > 10`)에
    * 0xae3e8 로 가기 **앞**(52a00~52a16)에서 누적 비거리 st+0x34(s16) > 1999 면 부른다. 이미 열렸는지는 받는 쪽이 본다.
-   * 그 검사는 모드를 안 가리지만 st+0x34 를 더하는 0xa600c 는 모드 7 갈래(0x52794 · 0x52828)만 불러 더비에서만 닿는다
+   * 그 검사는 모드를 안 가리지만 st+0x34 를 더하는 0xa600c 는 모드 7 갈래(0x52794 · 0x52828)만 불러 더비에서만 닿는다.
+   *
+   * 새로 열어 창이 섰으면 참을 돌려주고 창을 닫은 뒤 `then` 을 부른다 — 그동안 판(0x17)의 필드 화면이 창 뒤에 남는다
+   * (`isPlayHeld` — 창이 선 그림의 그리기 52efe 는 아직 0x17 이다). 참이 아니면 곧바로 다음 상태로 간다
    */
-  readonly onOpenHidden?: (id: number) => void
+  readonly onOpenHidden?: (id: number, then: () => void) => boolean | void
 }
 
 /** 52a08 `cmp r2, 0x7cf; ble` — 누적 비거리가 1999 를 넘으면 */
@@ -295,6 +298,11 @@ export interface HomeRunDerbySession {
   readonly confirm: () => void
   /** 이번 공이 이벤트 존을 얻었나 — 존 그림을 띄우는 동안만 참이다 */
   readonly isEventZoneShown: boolean
+  /**
+   * 판(0x17)이 끝났는데 히든 39 알림 창(0x52a14 `0x62368`)이 서서 판의 필드 화면을 창 뒤에 남겨 둔 동안 참 — 판은 끝나 키
+   * 건너뛰기(0x587)는 안 받는다. 창을 닫으면 거짓이 되고 다음 상태로 간다 (`onOpenHidden`)
+   */
+  readonly isPlayHeld: boolean
   /**
    * 이벤트 존 보상 "200G"(trainning 애니 3)의 x — 존이 서 있는 동안만 값, 아니면 null (`EVENT_ZONE_REWARD` · 0x41098)
    */
@@ -408,6 +416,7 @@ export function useHomeRunDerby({
   const [sceneDSerial, setSceneDSerial] = useState(0)
   const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(false)
   const [isEventZoneShown, setIsEventZoneShown] = useState(false)
+  const [isPlayHeld, setIsPlayHeld] = useState(false)
   const [eventZoneRewardX, setEventZoneRewardX] = useState<number | null>(null)
   const [shownCombo, setShownCombo] = useState<number | null>(null)
   const [result, setResult] = useState<DerbyResult | null>(null)
@@ -763,19 +772,42 @@ export function useHomeRunDerby({
       // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
       // 맞지 않은 공(0xae24c)은 이 갈래가 없다
       if (playRef.current?.batted.isHomeRun === true) audioRef.current.stop()
+      // 판(0x17) 그리기를 내리고 다음 상태로 — 0x17 끝 0xbcb48 은 다음 상태 칸 [장면+0x18+8] 만 적고, 다음 틀 머리 52cd8 0xbc9c8 이
+      // 지금 칸 [+0x1c] 로 옮긴다. 그래서 판이 끝난 그림의 그리기(52f3a 표 0xd05a0[0x17 − 9] = 0x46c88)까지는 0x17 이다
+      const leavePlay = () => {
+        setIsPlayHeld(false)
+        setIsEventZoneShown(false)
+        setEventZoneRewardX(null)
+        // 0x17 그리기(비거리 판 · 필드 화면)는 더는 안 돈다
+        setDistanceBoard(null)
+      }
       // 52a00~52a16 — 판(0x17) 끝, 0x35108 · 0xae3e8 앞에서 누적 비거리 st+0x34 > 1999 면 히든 39. 누적은 판 안 0xa600c 가
       // 이미 더했다(웹은 판 시작에 셈해 둔 `runRef`). 맞지 않은 공(0x12)은 이 갈래를 안 지난다
-      if (playRef.current !== null && runRef.current.totalDistance > DERBY_DISTANCE_HIDDEN_THRESHOLD) {
-        onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID)
-      }
+      const isHiddenShown = playRef.current !== null && runRef.current.totalDistance > DERBY_DISTANCE_HIDDEN_THRESHOLD
+        && onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID, () => {
+          leavePlay()
+          finishPitch()
+        }) === true
       // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
       if (playRef.current !== null) setEffectsClearedAt(gameSceneTickStartTime(gameSceneTickNow()))
       playRef.current = null
-      setIsEventZoneShown(false)
-      setEventZoneRewardX(null)
-      // 0x17 끝 0x35108 — HOMERUN 글자를 끄고(0x351d0) 0x17 그리기(비거리 판)도 더는 안 돈다
+      // 0x17 끝 0x35108 — HOMERUN 글자를 끈다(0x351d0 +0x1960 = 0 · 0x351d6 [0x1552d0c]+0x1d = 0)
       setHomeRunText(null)
-      setDistanceBoard(null)
+      /*
+       * **창이 선 그림의 그리기 — 판(0x17)의 필드 화면이 창 뒤에 남는다** (2026-10-26 직접 떴다, r299):
+       *   52a16  0x62368 → 0x74ef4 가 창을 세우고 [창+0x250] = 1
+       *   52a54  0xae3e8 이 다음 상태를 돌려주고 52ab2 0xbcb48(장면+0x18, 다음) — +8 = 다음 · +0x18 = 1 만 적는다(지금 +4 그대로)
+       *   52efe  [+0x250] = 1 이라 그리기를 건너뛰지 않는다 → 52f3a [장면+0x1c] = 아직 0x17 → 0x46c88(+ 앞의 0x41230 구장 · 이벤트 존)
+       *   다음 그림부터 52cc6 이 0xbc9c8(상태 옮기기) · 갱신을, 52efe 가 그리기를 건너뛰어 그 그림이 남는다
+       * 0x46c88 은 모드 7 이라 비거리 판 0x36cd4(판 종류 8 이면 늘) · 야수 · 공 · 존을 그리고, HOMERUN 0x40b18(46e2e~46e5c)은 관문
+       * 0xb0d28 이 닫혀(판 끝은 관문이 닫힌 뒤 11 번째 갱신) 안 그린다. 파티클은 53048 이 창 동안 건너뛴다. 타석 화면 0x4c4bc(HUD)는 없다.
+       * 창을 닫으면 그 다음 틀 머리가 다음 상태(0xf · 0xd · 0x1a)로 옮겨 진입 · 그리기를 한다 — 웹은 닫힘에서 `finishPitch`
+       */
+      if (isHiddenShown) {
+        setIsPlayHeld(true)
+        return
+      }
+      leavePlay()
       // 0x12 갱신 0x4e740~0x4e776 — 사구(st[0xb] == 4)면 플레이 종류 [+0x118] 은 v4 의 0xb0cb8(플레이, 2) 가 쓴 2 라
       // 8(더비 판) 검사에 안 걸린다 → 더비도 rand(0, 99) ≤ 19 면 벤치 클리어링(0x1e). 돌발 객체는 더비에 없다
       if (isHitByPitchRef.current) {
@@ -947,6 +979,7 @@ export function useHomeRunDerby({
     isAwaitingConfirm,
     confirm,
     isEventZoneShown,
+    isPlayHeld,
     eventZoneRewardX,
     shownCombo,
     result,

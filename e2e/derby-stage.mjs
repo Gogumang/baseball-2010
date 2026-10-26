@@ -98,19 +98,24 @@ async function run(browserName, shiftOf) {
   let hitShots = 0
   let noticeCount = 0
   const noticeTexts = []
+  /**
+   * 공용 창(히든 39 알림 — 판 끝 누적 > 1999, 0x52a14 `0x62368`)이 서면 키를 통째로 가져간다(0x754f9) — 찍고 OK 로 닫는다.
+   * 창 뒤에는 판(0x17)의 필드 화면이 남고 다음 상태(공 셈 · 0xf · 0xd)는 창을 닫아야 간다(r299) — 공 하나를 기다리는 동안에도 닫는다
+   */
+  const closeNotice = async () => {
+    const notice = await page.evaluate(() => document.querySelector('[role="dialog"][aria-label="알림"]')?.textContent ?? null)
+    if (notice === null) return false
+    await page.waitForTimeout(800)
+    await shot(`notice${++noticeCount}`)
+    noticeTexts.push(notice)
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(400)
+    return true
+  }
   while (Date.now() - started < 10 * 60_000) {
     const peek = await derbyPeek(page)
     if (peek === null) throw new Error('더비 화면이 아니다')
-    // 공용 창(히든 39 알림 — 판 끝 누적 > 1999, 0x52a14 `0x62368`)이 서면 키를 통째로 가져간다(0x754f9) — 찍고 OK 로 닫는다
-    const notice = await page.evaluate(() => document.querySelector('[role="dialog"][aria-label="알림"]')?.textContent ?? null)
-    if (notice !== null) {
-      await page.waitForTimeout(800)
-      await shot(`notice${++noticeCount}`)
-      noticeTexts.push(notice)
-      await page.keyboard.press('Enter')
-      await page.waitForTimeout(400)
-      continue
-    }
+    if (await closeNotice()) continue
     if (peek.isResultShown) {
       await page.waitForTimeout(1500)
       await shot('result')
@@ -165,6 +170,7 @@ async function run(browserName, shiftOf) {
     for (const until = Date.now() + 30000; Date.now() < until; ) {
       const p = await derbyPeek(page)
       if (p === null || p.isResultShown || p.acceptsConfirm || p.run.remainingPitches !== before.remainingPitches) break
+      if (await closeNotice()) continue
       if (capturing) {
         const phase = await page.evaluate(() => window.__batting?.().probe?.phase ?? null)
         if (!shotHit && phase === '타격') {
