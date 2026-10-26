@@ -379,7 +379,7 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     const 진행중 = startPlayerOutcome(시작, { kind: '안타', bases: 2 }, createSeededRandom(3))
     const 결과 = runDefensePlay(진행중.pendingDefensePlay!)
 
-    const 끝 = resolveDefensePlay(진행중, 결과, createSeededRandom(3))
+    const 끝 = resolveDefensePlay(진행중, 결과, createSeededRandom(3), { countAfterFoul: { strikes: 1, balls: 0 } })
 
     expect(끝.pendingDefensePlay).toBeNull()
     expect(끝.myStats.hits).toBe(1)
@@ -410,7 +410,7 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     const 쪼개서 = (() => {
       const random = createSeededRandom(3)
       const 진행중 = startPlayerOutcome(시작, 뜬공아웃, random)
-      return resolveDefensePlay(진행중, runDefensePlay(진행중.pendingDefensePlay!), random)
+      return resolveDefensePlay(진행중, runDefensePlay(진행중.pendingDefensePlay!), random, { countAfterFoul: { strikes: 1, balls: 0 } })
     })()
 
     expect(쪼개서.game).toEqual(한번에.game)
@@ -850,7 +850,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const { progress: 뒤, play } = arrivePitch(
       출발,
       { resolution: { kind: '스트라이크', isSwinging: false }, outcomeAfter: { kind: '삼진' } },
-      createFractionRandom(() => 0.99),
+      createFractionRandom(() => 0.99), { countAfter: { strikes: 1, balls: 0 } },
     )
     expect(play).toBeNull()
     expect(뒤.defenseScene?.playEnd?.play.wantsThrow).toBe(false)
@@ -876,7 +876,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
       expect(출발.stealingFrom).toEqual([1])
       expect(출발.game).toBe(주자있음.game)
       expect(startSteal(출발, 1, createSeededRandom(0))).toBe(출발)
-      const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+      const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random, { countAfter: { strikes: 0, balls: 1 } })
       expect(뒤.stealingFrom).toEqual([])
       if (play?.kind !== 5) continue // 0.1% 폭투·포일이 먼저 섰다
       // 빠른 주자라 CPU 수비가 잡을 루가 없다 — 도루 주자는 2루에 닿는다
@@ -893,7 +893,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1, createSeededRandom(0))
     expect(hiddenStealBasesOf(출발, 0)).toEqual([1])
     // 볼 — 판정(0x3dfac) 뒤 같은 타석 다음 공 0xf 진입이 지운다
-    const { progress: 뒤 } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    const { progress: 뒤 } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random, { countAfter: { strikes: 0, balls: 1 } })
     expect(뒤.stealingFrom).toEqual([])
     expect(hiddenStealBasesOf(뒤, 0)).toEqual([])
   })
@@ -903,7 +903,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const 시작 = startGame(random)
     const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1, createSeededRandom(0))
     // 볼넷 + 도루 — 밀어내기 판(종류 2)은 표시를 안 지운다(0x3d7b8 은 종류 1 만)
-    const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, random)
+    const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, random, { countAfter: { strikes: 0, balls: 1 } })
     expect(뒤.stealingFrom).toEqual([])
     expect(hiddenStealBasesOf(뒤, 0)).toEqual([1])
     const 끝 = startPlayerOutcome(뒤, { kind: '볼넷' }, random, { arrivalPlay: play })
@@ -931,11 +931,11 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
       rolls += 1
       return 0.5
     })
-    const 볼 = arrivePitch(시작, { resolution: { kind: '볼' }, outcomeAfter: null }, 세는)
+    const 볼 = arrivePitch(시작, { resolution: { kind: '볼' }, outcomeAfter: null }, 세는, { countAfter: { strikes: 0, balls: 1 } })
     expect(볼.play).toBeNull()
     expect(볼.progress).toBe(시작)
     expect(rolls).toBe(1)
-    arrivePitch(시작, { resolution: { kind: '파울' }, outcomeAfter: null }, 세는)
+    arrivePitch(시작, { resolution: { kind: '파울' }, outcomeAfter: null }, 세는, { countAfter: { strikes: 1, balls: 0 } })
     expect(rolls).toBe(1)
   })
 
@@ -947,7 +947,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
       const random = createSeededRandom(4)
       const 시작 = startGame(random)
       const 출발 = startSteal({ ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }, 1, createSeededRandom(0))
-      const { progress: 뒤, play, interrupted } = arrivePitch(출발, { resolution, outcomeAfter }, random)
+      const { progress: 뒤, play, interrupted } = arrivePitch(출발, { resolution, outcomeAfter }, random, { countAfter: { strikes: 0, balls: 0 } })
       // 밀어내기 판(종류 2) — 주자 판으로 먹이지 않는다(진루는 타석 결과의 보통 길이 낸다)
       expect(play?.kind).toBe(2)
       expect(play !== null && arrivalApplicationOf(play)).toBe('freePass')
@@ -964,14 +964,14 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const 시작 = startGame(createSeededRandom(4))
     const 놓음 = { ...시작, game: { ...시작.game, bases: { first: true, second: false, third: true } } }
     const 판있음 = createSeededRandom(11)
-    const { progress: 뒤, play } = arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판있음)
+    const { progress: 뒤, play } = arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판있음, { countAfter: { strikes: 0, balls: 1 } })
     const 끝 = startPlayerOutcome(뒤, { kind: '볼넷' }, 판있음, { arrivalPlay: play })
     expect(끝.lastDefensePlay).toBe(play?.result)
     // 판의 진루 = 보통 길의 밀어내기 (내 타석 뒤 동료 타석은 자동진행이 이어 돈다)
     expect(play?.result.advance).toEqual({ bases: { first: true, second: true, third: true }, runsScored: 0, outsAdded: 0 })
     // 판이 없던 예전 길과 굴림 수가 같다 — 다음 굴림이 같은 값
     const 판없음 = createSeededRandom(11)
-    arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판없음)
+    arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판없음, { countAfter: { strikes: 0, balls: 1 } })
     startPlayerOutcome(뒤, { kind: '볼넷' }, 판없음)
     expect(판있음.rand(0, 0x7fffffff)).toBe(판없음.rand(0, 0x7fffffff))
   })
@@ -1313,12 +1313,12 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     const progress = startGame(createSeededRandom(20100905))
     expect(isPlayerTurn(progress.game)).toBe(true)
     const 판 = 주자(progress, { first: true, second: false, third: false })
-    expect(cpuPickoff(판, 2, createSeededRandom(1))).toBe(판)
+    expect(cpuPickoff(판, 2, createSeededRandom(1), { count: { strikes: 0, balls: 0 } })).toBe(판)
     const 끝 = { ...판, game: { ...판.game, isFinished: true } }
-    expect(cpuPickoff(끝, 1, createSeededRandom(1))).toBe(끝)
+    expect(cpuPickoff(끝, 1, createSeededRandom(1), { count: { strikes: 0, balls: 0 } })).toBe(끝)
     // 타구 진행 중(상태 0x17)에는 투구가 안 나간다
     const 진행중 = startPlayerOutcome(판, { kind: '안타', bases: 1 }, createSeededRandom(1))
-    if (진행중.pendingDefensePlay !== null) expect(cpuPickoff(진행중, 1, createSeededRandom(1))).toBe(진행중)
+    if (진행중.pendingDefensePlay !== null) expect(cpuPickoff(진행중, 1, createSeededRandom(1), { count: { strikes: 0, balls: 0 } })).toBe(진행중)
   })
 
   it('경기 +0xfd4 — 공마다 0x11 이 지우고 휘두른 공만 덮는다. 견제 판은 앞 공의 값을 싣는다', () => {
@@ -1326,14 +1326,14 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     expect(progress.sceneResultCode).toBe(0)
     const 판 = 주자(progress, { first: true, second: false, third: false })
     // 맞은 공(타구 결과 코드 25) — arrivePitch 가 판 없이 넘겨도 칸은 적는다
-    const 맞음 = arrivePitch(판, { resolution: { kind: '파울' }, outcomeAfter: null, resultCode: 25 }, createSeededRandom(3))
+    const 맞음 = arrivePitch(판, { resolution: { kind: '파울' }, outcomeAfter: null, resultCode: 25 }, createSeededRandom(3), { countAfter: { strikes: 1, balls: 0 } })
     expect(맞음.progress.sceneResultCode).toBe(25)
-    const 견제 = cpuPickoff(맞음.progress, 1, createSeededRandom(7))
+    const 견제 = cpuPickoff(맞음.progress, 1, createSeededRandom(7), { count: { strikes: 0, balls: 0 } })
     const play = 견제.lastDefensePlay
     if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
     expect(play.ticks[0]?.sceneResultCode).toBe(25)
     // 다음 공이 볼이면 0 으로 돌아간다 — 바뀌지 않으면 같은 객체
-    const 볼 = arrivePitch(맞음.progress, { resolution: { kind: '볼' }, outcomeAfter: null, resultCode: null }, createSeededRandom(3))
+    const 볼 = arrivePitch(맞음.progress, { resolution: { kind: '볼' }, outcomeAfter: null, resultCode: null }, createSeededRandom(3), { countAfter: { strikes: 0, balls: 1 } })
     expect(볼.progress.sceneResultCode).toBe(0)
   })
 
@@ -1341,7 +1341,7 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     const progress = startGame(createSeededRandom(20100905))
     const 판 = 주자(progress, { first: true, second: false, third: true })
     const { random, counter } = 세는난수(7)
-    const after = cpuPickoff(판, 3, random)
+    const after = cpuPickoff(판, 3, random, { count: { strikes: 0, balls: 0 } })
     expect(after).not.toBe(판)
     const play = after.lastDefensePlay
     if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
@@ -1371,14 +1371,14 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
   it('견제 판 정산(종류 4)은 같은 투구 틈 앞 판의 사건까지 센다 — 상대 투수 +0x20 · 모드 4 의 0xa59c0 (인기도 · 병살 · 득점권 아웃)', () => {
     const progress = startGame(createSeededRandom(20100905))
     const 판 = 주자(progress, { first: false, second: true, third: false })
-    const 그냥 = cpuPickoff(판, 2, createSeededRandom(7))
+    const 그냥 = cpuPickoff(판, 2, createSeededRandom(7), { count: { strikes: 0, balls: 0 } })
     const play = 그냥.lastDefensePlay
     if (!isPickoffPlayResult(play)) throw new Error('견제 판이 아니다')
     // 이 씨앗의 견제는 세이프 — 판의 사건은 없고 주자는 2루에 남는다
     expect(play.advance).toMatchObject({ outsAdded: 0, runsScored: 0, bases: { second: true } })
     const 아웃합 = (p: GameProgress) => p.pitcherLines.reduce((sum, line) => sum + line.outs, 0)
     // 같은 틈에 앞 판이 아웃 2 를 남겼다 — [sp+0x30] == 2
-    const 남은 = cpuPickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 0 } }, 2, createSeededRandom(7))
+    const 남은 = cpuPickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 0 } }, 2, createSeededRandom(7), { count: { strikes: 0, balls: 0 } })
     expect(아웃합(남은)).toBe(아웃합(그냥) + 2)
     // 아웃 > 1 → −1 · 병살 G+0x118 · 아웃 > 0 이고 판 뒤 2루에 산 주자 → 득점권 아웃 G+0x11c
     expect(남은.popularityPoints).toBe(그냥.popularityPoints - 1)
@@ -1386,7 +1386,7 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     expect(남은.scoringPositionOuts).toBe(그냥.scoringPositionOuts + 1)
     expect(남은.pendingSettlementEvents).toEqual({ outs: 2, runs: 0 })
     // 0xa56dc(ctx, 타자, 1) 가 거짓(포스트시즌 · 국가대항전)이면 0xa59c0 은 아무것도 안 센다
-    const 포스트 = cpuPickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 0 } }, 2, createSeededRandom(7), {
+    const 포스트 = cpuPickoff({ ...판, pendingSettlementEvents: { outs: 2, runs: 0 } }, 2, createSeededRandom(7), { count: { strikes: 0, balls: 0 },
       isRecorded: false,
     })
     expect(포스트.doublePlays).toBe(그냥.doublePlays)
@@ -1397,7 +1397,7 @@ describe('CPU 견제 — 모드 4 도 0x345fc 종류 4 → 0x34848 → 메시지
     const progress = startGame(createSeededRandom(20100905))
     const 판 = 주자(progress, { first: true, second: false, third: false })
     const { random, counter } = 세는난수(5)
-    cpuPickoff(판, 1, random)
+    cpuPickoff(판, 1, random, { count: { strikes: 0, balls: 0 } })
     const 다시 = createSeededRandom(5)
     for (let index = 0; index < counter.draws; index += 1) 다시.rand(0, 10000)
     expect(random.rand(0, 10000)).toBe(다시.rand(0, 10000))
@@ -1628,7 +1628,7 @@ describe('0xf 진입 0x3d954 는 공마다 — 판정 A 0xae24c 의 볼 · 스�
 
   it('볼(타석이 이어짐)이 도착한 뒤 0xf 진입이 상대 투수를 바꾸고 · 새 0xe 대기 하나 · 연출(confirmsBefore 0)을 싣는다', () => {
     const { progress, random } = 지친투수(11)
-    const { progress: 뒤, play } = arrivePitch(progress, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    const { progress: 뒤, play } = arrivePitch(progress, { resolution: { kind: '볼' }, outcomeAfter: null }, random, { countAfter: { strikes: 0, balls: 1 } })
     if (play !== null) return // 0.1% 폭투·포일
     expect(뒤.opponentMound.pitcherSlot).not.toBe(progress.opponentMound.pitcherSlot)
     expect(뒤.sceneConfirm).not.toBe(progress.sceneConfirm)
@@ -1641,7 +1641,7 @@ describe('0xf 진입 0x3d954 는 공마다 — 판정 A 0xae24c 의 볼 · 스�
     const { progress: 뒤 } = arrivePitch(
       progress,
       { resolution: { kind: '스트라이크', isSwinging: true }, outcomeAfter: { kind: '삼진' } },
-      random,
+      random, { countAfter: { strikes: 1, balls: 0 } },
     )
     expect(뒤.opponentMound.pitcherSlot).toBe(progress.opponentMound.pitcherSlot)
   })
@@ -1654,7 +1654,7 @@ describe('0xf 진입 0x3d954 는 공마다 — 판정 A 0xae24c 의 볼 · 스�
     const 시작 = startGame(random)
     expect(시작.burst?.current).toBeTruthy()
     const 진행중: GameProgress = { ...시작, opponentMound: { ...시작.opponentMound, stamina: 0, justChanged: false } }
-    const { progress: 뒤, play } = arrivePitch(진행중, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
+    const { progress: 뒤, play } = arrivePitch(진행중, { resolution: { kind: '볼' }, outcomeAfter: null }, random, { countAfter: { strikes: 0, balls: 1 } })
     expect(play).toBeNull()
     expect(뒤.opponentMound.pitcherSlot).toBe(진행중.opponentMound.pitcherSlot)
   })
@@ -1713,7 +1713,7 @@ describe('0xf 진입 0x3d954 는 공마다 — 판정 A 0xae24c 의 볼 · 스�
   it('견제 판이 끝나 같은 타석이 이어지면 0xf 진입이 교체를 본다', () => {
     const { progress, random } = 지친투수(11)
     const 주자 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
-    const 뒤 = cpuPickoff(주자, 1, random)
+    const 뒤 = cpuPickoff(주자, 1, random, { count: { strikes: 0, balls: 0 } })
     if (!isPlayerTurn(뒤.game) || 뒤.game.outs !== 주자.game.outs) return // 견제사로 판이 바뀐 씨앗
     expect(뒤.opponentMound.pitcherSlot).not.toBe(주자.opponentMound.pitcherSlot)
   })
@@ -1748,7 +1748,7 @@ describe('내 타석의 파울 각 공도 수비 판을 돈다 — startPlayerFo
       const pending = 붙듦.pendingDefensePlay
       if (pending === null) throw new Error('판이 안 섰다')
       const result = runDefensePlay(pending)
-      const 끝 = resolveDefensePlay(붙듦, result, random, { foulRecordIds: [32] })
+      const 끝 = resolveDefensePlay(붙듦, result, random, { countAfterFoul: { strikes: 1, balls: 0 }, foulRecordIds: [32] })
       if (result.foulEnded === true) {
         파울 += 1
         expect(result.outcome).toBeUndefined()
@@ -1928,7 +1928,7 @@ describe('삼진 없이 경기 끝으로 정산되는 폭투·포일 판(종류 
       },
     }
     // 씨앗 8 — 3루 주자가 홈에 닿는 폭투다(r268: 주자 걸음이 맨해튼 거리라 씨앗 1 의 폭투로는 3루 주자가 안 들어온다)
-    const step = arrivePitch(끝내기판, { resolution: { kind: '볼' } as never, outcomeAfter: null }, 폭투난수(8, 0))
+    const step = arrivePitch(끝내기판, { resolution: { kind: '볼' } as never, outcomeAfter: null }, 폭투난수(8, 0), { countAfter: { strikes: 0, balls: 1 } })
     expect(step.play?.kind).toBe(9)
     expect(step.interrupted).toBe(true)
     const 끝 = step.progress

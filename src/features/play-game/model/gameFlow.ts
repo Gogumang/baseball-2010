@@ -1072,10 +1072,10 @@ export function resolveDefensePlay(
     readonly isRecorded?: boolean
     /**
      * 판이 파울로 닫혔을 때 0xf 진입의 볼카운트 — 같은 틱 0x35108 이 파울 스트라이크(0xb6b58)를 먹인 값 (`AtBatCount`).
-     * 교체 틱 굴림(0x344dc)이 본다
+     * 교체 틱 굴림(0x344dc)이 본다. 판이 파울로 안 닫혀도 늘 넘긴다 — 볼카운트 없는 입구(옛 시험)는 걷었다
      */
-    readonly countAfterFoul?: AtBatCount
-  } = {},
+    readonly countAfterFoul: AtBatCount
+  },
 ): GameProgress {
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
@@ -2140,8 +2140,8 @@ function prepareMyAtBat(progress: GameProgress, random: RandomPort): GameProgres
 function enterPitchSelection(
   progress: GameProgress,
   random: RandomPort,
-  /** 이 0xf 진입 때의 볼카운트 (`AtBatCount`) — 안 넘긴 입구(옛 시험)는 마구 투수의 교체 틱 굴림을 못 가린다 */
-  count: AtBatCount | undefined,
+  /** 이 0xf 진입 때의 볼카운트 (`AtBatCount`) — 교체 틱 굴림(0x344dc)이 본다 */
+  count: AtBatCount,
   afterConfirm = false,
 ): GameProgress {
   // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e)보다 앞이다.
@@ -2158,7 +2158,7 @@ function enterPitchSelection(
 function selectPitchAfterClear(
   progress: GameProgress,
   random: RandomPort,
-  count: AtBatCount | undefined,
+  count: AtBatCount,
   afterConfirm: boolean,
 ): GameProgress {
   let current = progress
@@ -2177,20 +2177,16 @@ function selectPitchAfterClear(
     // 볼카운트는 이 0xf 진입 때 값(`count`)이다. 마구 칸이 없으면 셋을 안 보고 rand(0,6) 한 번이다.
     const outgoingPitcher = opponentPitcherAbilityOf(current)
     const outgoing = outgoingPitcher.repertoire
-    const outgoingHasMagic = (outgoing?.magicId ?? 0) !== 0
-    // ⚠️ 근사(남김 — 시험 전용 입구, 앱 길엔 없다): 볼카운트를 안 넘긴 입구(옛 시험 호출)는 마구 투수일 때 굴림 여부를 못 가려 굴리지 않는다 — 앱 세션은 늘 넘긴다
-    if (!outgoingHasMagic || count !== undefined) {
-      rollCpuPitchTypeOnPitcherChangeTick(
-        {
-          repertoire: outgoing,
-          magicRemaining: opponentCpuMagicStateOf(current, outgoingPitcher, current.aces?.levels).remaining,
-          runnerCount: runnerCountOf(current.game.bases),
-          strikes: (count ?? NEW_AT_BAT_COUNT).strikes,
-          balls: (count ?? NEW_AT_BAT_COUNT).balls,
-        },
-        random,
-      )
-    }
+    rollCpuPitchTypeOnPitcherChangeTick(
+      {
+        repertoire: outgoing,
+        magicRemaining: opponentCpuMagicStateOf(current, outgoingPitcher, current.aces?.levels).remaining,
+        runnerCount: runnerCountOf(current.game.bases),
+        strikes: count.strikes,
+        balls: count.balls,
+      },
+      random,
+    )
     // 22(3da88) → 0x16(3da94) — 앞 0xe 의 OK 를 다 받은 뒤 선다. 0x16 진입 0x3d458 이 투수 예약을 보고 +0x195c 비트1(마선수면 6)
     const incomingIsAce = moundAcePitcherOf(changed, false) !== undefined
     const scene: SubstitutionScene = {
@@ -2963,17 +2959,20 @@ export interface PitchArrivalStep {
 }
 
 /** 타자편의 붙든 주자 판 — 판과, 판 뒤 `arrivePitch` · `cpuPickoff` 의 나머지가 쓰는 값 */
-export type GamePendingRunnerPlay = LiveRunnerPlay & {
-  /** 공 도착 판이면 — 이 공 뒤의 타석 결과(없으면 같은 타석 다음 공)와 타자 게이트 0xa56dc */
-  readonly arrival?: {
-    readonly outcomeAfter: AtBatOutcome | null
-    readonly isRecorded: boolean
-    /** 이 공을 먹인 뒤의 볼카운트 — 판이 도는 동안 안 바뀐다. 판 끝 0xf 진입의 교체 틱 굴림(0x344dc)이 본다 */
-    readonly countAfter?: AtBatCount
-  }
-  /** CPU 견제 판이면 — 타자 게이트 0xa56dc 와 지금 볼카운트(판 끝 0xf 진입의 교체 틱 굴림) */
-  readonly pickoff?: { readonly isRecorded: boolean; readonly count?: AtBatCount }
-}
+export type GamePendingRunnerPlay =
+  | (Extract<LiveRunnerPlay, { readonly kind: 'arrival' }> & {
+      /** 공 도착 판 — 이 공 뒤의 타석 결과(없으면 같은 타석 다음 공)와 타자 게이트 0xa56dc */
+      readonly arrival: {
+        readonly outcomeAfter: AtBatOutcome | null
+        readonly isRecorded: boolean
+        /** 이 공을 먹인 뒤의 볼카운트 — 판이 도는 동안 안 바뀐다. 판 끝 0xf 진입의 교체 틱 굴림(0x344dc)이 본다 */
+        readonly countAfter: AtBatCount
+      }
+    })
+  | (Extract<LiveRunnerPlay, { readonly kind: 'pickoff' }> & {
+      /** CPU 견제 판 — 타자 게이트 0xa56dc 와 지금 볼카운트(판 끝 0xf 진입의 교체 틱 굴림) */
+      readonly pickoff: { readonly isRecorded: boolean; readonly count: AtBatCount }
+    })
 
 /**
  * **공 도착** — 상태 0x12 진입 `0x3dfac` (`features/defense-play/model/pitchArrivalPlay`).
@@ -3007,13 +3006,13 @@ export function arrivePitch(
     /** 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓 (`resolveDefensePlay` 의 `isRecorded`). 안 넘기면 참 */
     readonly isRecorded?: boolean
     /** 이 공을 먹인 뒤의 볼카운트 — 타석이 이어져 0xf 에 다시 들 때 교체 틱 굴림(0x344dc)이 본다 (`AtBatCount`) */
-    readonly countAfter?: AtBatCount
+    readonly countAfter: AtBatCount
     /**
      * 화면이 판을 실시간으로 돌린다 — 도루 · 폭투 판(종류 5 · 9)을 붙들고(`pendingRunnerPlay`, 사람 공격) 끝나면 `resolveRunnerPlay`.
      * 판 시작 굴림(0.1% · 폭투 쏘기 · 도루 리드)은 여기서, 판 안의 굴림은 화면의 틱에서 — 그 사이 다른 굴림이 없어 차례가 같다
      */
     readonly live?: boolean
-  } = {},
+  },
 ): PitchArrivalStep {
   const before = progress.game
   if (before.isFinished || !isPlayerTurn(before) || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) {
@@ -3086,7 +3085,7 @@ export function arrivePitch(
           arrival: {
             outcomeAfter: pitch.outcomeAfter,
             isRecorded,
-            ...(options.countAfter === undefined ? {} : { countAfter: options.countAfter }),
+            countAfter: options.countAfter,
           },
         },
       },
@@ -3113,7 +3112,7 @@ function applyArrivalPlay(
   isRecorded: boolean,
   random: RandomPort,
   /** 이 공을 먹인 뒤의 볼카운트 — 같은 타석이 이어질 때 0xf 진입의 교체 틱 굴림(0x344dc)이 본다 (`AtBatCount`) */
-  countAfter: AtBatCount | undefined,
+  countAfter: AtBatCount,
 ): PitchArrivalStep {
   const before = progress.game
   const shownLive = play.shownLive === true
@@ -3170,9 +3169,9 @@ export function resolveRunnerPlay(progress: GameProgress, result: DefensePlayRes
   if (pending.kind === 'pickoff') {
     if (!isPickoffPlayResult(result)) return { progress: cleared, play: null, interrupted: false }
     const next = applyCpuPickoff(cleared, pending.input.targetBase as PickoffBase, result, random, {
-      isRecorded: pending.pickoff?.isRecorded !== false,
+      isRecorded: pending.pickoff.isRecorded,
       shownLive: true,
-      count: pending.pickoff?.count,
+      count: pending.pickoff.count,
     })
     const before = cleared.game
     const interrupted =
@@ -3180,7 +3179,7 @@ export function resolveRunnerPlay(progress: GameProgress, result: DefensePlayRes
     return { progress: next, play: null, interrupted }
   }
   const play = finishPitchArrivalPlay(pending.opened, result as RunnerPlayEngineResult, true)
-  const arrival = pending.arrival ?? { outcomeAfter: null, isRecorded: true }
+  const arrival = pending.arrival
   return applyArrivalPlay(cleared, cleared, play, arrival.outcomeAfter, arrival.isRecorded, random, arrival.countAfter)
 }
 
@@ -3485,7 +3484,8 @@ const OUT_RESULT_CODE = 5
  * 내 타석이 아니거나(경기 끝·수비 진행 중) 그 루가 비었으면 아무 일도 없다 — 같은 객체를 돌려준다
  * (`0x34848` 은 주자 있는 루가 나올 때까지 굴리므로 빈 루가 들어오면 부르는 쪽 잘못이다).
  *
- * ⚠️ 미확인(남김 — 0xae3e8 의 3아웃 갈래 타순 커서는 따로 안 떴다 · 판은 웹이 미리 돌린다) (`teamGameFlow.cpuPickoff` 와 같은 자리)
+ * 0xae3e8 의 3아웃 갈래(0xae554 → 0x18)는 정산 0xa8024 와 모드 5·6 의 0xaaa6c 만 부르고 타순 커서 예약 0xaf020 은 0x35108 이 종류 4 면
+ * 안 부른다(3513a~3515c, r276 직접 뜸) — 3아웃으로 끊겨도 타순은 그대로다. 판은 웹이 미리 돌린다 (`teamGameFlow.cpuPickoff` 와 같은 자리)
  * - 견제사·진루·득점은 루·아웃·점수·반 이닝 교대와 상대 투수 실점 A·B 에 먹이고, 0xa8024(종류 4)의 거르지 않는 칸은
  *   `withRunnerPlaySettlement`(상대 투수 +0x20 · 모드 4 의 0xa59c0 인기도 · 병살 · 득점권 아웃) — 같은 투구 틈 앞 판의 사건까지.
  *   돌발 판정 0x8f414 는 결과비트 0 이라 판정이 없다.
@@ -3501,13 +3501,13 @@ export function cpuPickoff(
     /** 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓 (`resolveDefensePlay` 의 `isRecorded`). 안 넘기면 참 */
     readonly isRecorded?: boolean
     /** 지금 볼카운트 — 견제는 카운트를 안 바꾼다. 판 끝 0xf 진입의 교체 틱 굴림(0x344dc)이 본다 (`AtBatCount`) */
-    readonly count?: AtBatCount
+    readonly count: AtBatCount
     /**
      * 화면이 판을 실시간으로 돌린다 — 판을 붙들고(`pendingRunnerPlay`, 사람 공격) 끝나면 `resolveRunnerPlay`. 견제 판(종류 4)은
      * 0xae794 마스크 0x232 안이라 사람 주루 키(0x5331c → 0x582 · 0x584 → 0xa9b04)와 OK 슬라이딩(0x585)을 받는다
      */
     readonly live?: boolean
-  } = {},
+  },
 ): GameProgress {
   const before = progress.game
   if (before.isFinished || !isPlayerTurn(before) || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) {
@@ -3550,7 +3550,7 @@ export function cpuPickoff(
         kind: 'pickoff',
         input,
         side: '공격',
-        pickoff: { isRecorded, ...(options.count === undefined ? {} : { count: options.count }) },
+        pickoff: { isRecorded, count: options.count },
       },
     }
   }
@@ -3567,7 +3567,7 @@ function applyCpuPickoff(
     readonly isRecorded: boolean
     readonly shownLive: boolean
     /** 지금 볼카운트 — 판 끝 0xf 진입의 교체 틱 굴림(0x344dc)이 본다 (`AtBatCount`) */
-    readonly count?: AtBatCount
+    readonly count: AtBatCount
   },
 ): GameProgress {
   const before = progress.game

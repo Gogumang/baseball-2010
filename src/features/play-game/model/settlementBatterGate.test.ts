@@ -41,8 +41,8 @@ const 내칸홈런 = (before: GameProgress, after: GameProgress) =>
 function 둘다(overrides: Partial<DefensePlayResult>, streak = 0) {
   const { progress, result } = 붙든판(overrides)
   const 시작 = { ...progress, homeRunStreak: streak }
-  const 정규 = resolveDefensePlay(시작, result, createSeededRandom(4), { isRecorded: true })
-  const 포스트 = resolveDefensePlay(시작, result, createSeededRandom(4), { isRecorded: false })
+  const 정규 = resolveDefensePlay(시작, result, createSeededRandom(4), { countAfterFoul: { strikes: 1, balls: 0 }, isRecorded: true })
+  const 포스트 = resolveDefensePlay(시작, result, createSeededRandom(4), { countAfterFoul: { strikes: 1, balls: 0 }, isRecorded: false })
   const count = (ids: readonly number[], id: number) => ids.filter((x) => x === id).length
   return { 시작, 정규, 포스트, count }
 }
@@ -76,28 +76,28 @@ describe('정산 0xa8024 의 타자 게이트 [sp+0x34] — 포스트시즌 장�
 describe('번트 안타 G+0xf4 — 정산 a8506 (안타 갈래 · 번트 타구 state[0x13] → 코드 10)', () => {
   it('번트 타구가 안타로 끝나면 경기 요약의 reputationCounts.buntHits 로 나간다', () => {
     const { progress, result } = 붙든판({ outcome: { kind: '안타', bases: 1 }, buntBall: true })
-    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { isRecorded: true })
+    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { countAfterFoul: { strikes: 1, balls: 0 }, isRecorded: true })
 
     expect(summaryOf(끝).reputationCounts.buntHits).toBe(1)
   })
 
   it('희생번트(아웃)는 안타 갈래를 안 지나 안 센다', () => {
     const { progress, result } = 붙든판({ outcome: { kind: '아웃', detail: '땅볼아웃' }, buntBall: true })
-    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { isRecorded: true })
+    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { countAfterFoul: { strikes: 1, balls: 0 }, isRecorded: true })
 
     expect(summaryOf(끝).reputationCounts.buntHits).toBe(0)
   })
 
   it('번트가 아닌 안타는 안 센다', () => {
     const { progress, result } = 붙든판({ outcome: { kind: '안타', bases: 1 } })
-    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { isRecorded: true })
+    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { countAfterFoul: { strikes: 1, balls: 0 }, isRecorded: true })
 
     expect(summaryOf(끝).reputationCounts.buntHits).toBe(0)
   })
 
   it('게이트 0xa56dc(R, 타자, 1) 가 거짓(포스트시즌 · 국가대항전)이면 안 센다', () => {
     const { progress, result } = 붙든판({ outcome: { kind: '안타', bases: 1 }, buntBall: true })
-    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { isRecorded: false })
+    const 끝 = resolveDefensePlay(progress, result, createSeededRandom(4), { countAfterFoul: { strikes: 1, balls: 0 }, isRecorded: false })
 
     expect(summaryOf(끝).reputationCounts.buntHits).toBe(0)
   })

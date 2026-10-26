@@ -116,7 +116,7 @@ export function playCareerGames(options: HitRateOptions): HitRateTally {
         if (recorded.kind === '안타' || recorded.kind === '홈런') tally.hits += 1
         if (recorded.kind === '홈런') tally.homeRuns += 1
       }
-      progress = resolveDefensePlay(started, result, random)
+      progress = resolveDefensePlay(started, result, random, { countAfterFoul: { strikes: 1, balls: 0 } })
     }
   }
   return tally

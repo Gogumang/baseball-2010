@@ -63,7 +63,7 @@ function 타구를친다(progress: GameProgress, pattern: BattedBallPattern, ran
   const started = startPlayerOutcome(progress, outcome, random, { pattern })
   expect(started.pendingDefensePlay).not.toBeNull()
   const played = runDefensePlay(started.pendingDefensePlay!)
-  return { played, finished: resolveDefensePlay(started, played, random) }
+  return { played, finished: resolveDefensePlay(started, played, random, { countAfterFoul: { strikes: 1, balls: 0 } }) }
 }
 
 const 차례난수 = (values: readonly number[]): RandomPort => {

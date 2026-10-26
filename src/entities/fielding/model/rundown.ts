@@ -46,10 +46,12 @@ const HOLDER_MARGIN_TICKS = 5
 const FREE_MARGIN_TICKS = 4
 
 /**
- * 협살 대상 주자 고르기 0xb398c — **뒤 주자부터** 보며 `남은 틱 / 전체 틱 > 35%` 인 첫 주자.
+ * 협살 대상 주자 고르기 0xb398c — **뒤 주자부터** 보며 `남은 틱 0xbefec × 100 / 0xbf01c > 35` 인 첫 주자.
  *
  * **P2 정정(S8 정정 3)**: "35% 넘게 **간** 주자" 가 아니라 "35% 넘게 **남은**" 주자다.
- * 즉 루에 35% 미만으로 붙은 주자는 협살하지 않는다.
+ * **r276 정정**: 주자의 0xbf01c 는 +0x14 에서 재는데 주자 +0x14 는 움직인 틱마다 위치로 다시 적힌다(`legTotalTicksOf`) — 두 값이 같아
+ * 비율은 늘 100 이다. 그래서 원본은 아웃 · 판정끝이 아니고 목표 루에 아직 안 닿은(0xbf01c ≠ 0, b39c8) 첫 주자를 고른다 —
+ * 루에 거의 다 온 주자도 대상이다(예전 웹은 구간 출발점으로 재서 35% 미만 남은 주자를 건너뛰었다).
  */
 export function chooseRundownRunner(runners: readonly RunnerState[]): number {
   for (let index = runners.length - 1; index >= 0; index -= 1) {

@@ -52,13 +52,29 @@ describe('협살 대상 고르기 0xb398c — 남은 비율 > 35%', () => {
     expect(RUNDOWN_REMAINING_PERCENT).toBe(35)
   })
 
-  it('**루에 35% 미만으로 붙은 주자는 협살하지 않는다** (P2 의 방향이 반대였다)', () => {
-    // 진행률 80% = 남은 20% → 대상 아님
-    expect(remainingPercentOf(사이주자(1, 80))).toBeLessThan(35)
-    expect(chooseRundownRunner([타자주자, 사이주자(1, 80)])).toBe(NONE)
-    // 진행률 30% = 남은 70% → 대상
-    expect(remainingPercentOf(사이주자(1, 30))).toBeGreaterThan(35)
-    expect(chooseRundownRunner([타자주자, 사이주자(1, 30)])).toBe(1)
+  it('주자 +0x14 는 움직인 틱마다 위치(0xbf240)라 남은 비율은 늘 100 — 루에 거의 다 온 주자도 대상이다 (r276)', () => {
+    // 진행률 80% 든 30% 든 0xbf01c(+0x14 = 위치) 와 0xbefec 가 같다 — 주력 500 의 속도로 걷는다
+    const 실주자 = (percent: number) =>
+      createRunner(1, 1, 주력500, {
+        targetBase: 2,
+        position: {
+          ...basePosition(1),
+          x: basePosition(1).x + Math.trunc(((basePosition(2).x - basePosition(1).x) * percent) / 100),
+          z: basePosition(1).z + Math.trunc(((basePosition(2).z - basePosition(1).z) * percent) / 100),
+        },
+        legStart: basePosition(1),
+      })
+    expect(remainingPercentOf(실주자(80))).toBe(100)
+    expect(chooseRundownRunner([타자주자, 실주자(80)])).toBe(1)
+    expect(remainingPercentOf(실주자(30))).toBe(100)
+    expect(chooseRundownRunner([타자주자, 실주자(30)])).toBe(1)
+    // 한 걸음 안에 든 주자는 0xbf01c 몫이 0 이라(b39c8) 건너뛴다
+    expect(chooseRundownRunner([사이주자(1, 80)])).toBe(NONE)
+  })
+
+  it('목표 루에 닿은 주자(0xbf01c == 0, b39c8)는 건너뛴다', () => {
+    const 닿음 = createRunner(1, 1, 주력500, { targetBase: 2, position: basePosition(2), legStart: basePosition(1) })
+    expect(chooseRundownRunner([닿음])).toBe(NONE)
   })
 
   it('뒤 주자부터 본다', () => {

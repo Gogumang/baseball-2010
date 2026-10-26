@@ -389,8 +389,11 @@ export interface MissionWalkTeam {
  *   **옛 그 칸 선수의 니블**이다(`missionRecordNibbleRowOf`).
  * - 타순 밖 레코드 = 그 레코드 칸의 니블(붙박이 벤치는 0, 마타자에게 밀려 9번으로 간 붙박이는 **0** — 같은 되쓰기).
  * 마타자 번호 = 미션 마선수 순번 − 1 (`missionRunnerAcesOf` 와 같다). 지금 투수 마투수 = CPU 팀 마운드가 마투수 칸일 때(타자 미션).
- * ⚠️ 미확인(남김 — 결과 같음): 미션 타자 레코드(`MISSION_NARI_RECORD`)의 니블은 0xb53f0 0x80 갈래가 "옛 [k] 선수 것"을 남기는데 웹은 마스터 줄 표를
- * 안 거쳐 0 으로 둔다 — 마선수가 아니라 그림은 같고 이름표(수비 줄)에는 안 선다.
+ * ⚠️ 근사(남김 — 결과 같음): 미션 타자 레코드(`MISSION_NARI_RECORD`)의 니블을 웹은 0 으로 둔다. 원본(r276 다시 뜸): 0xb53f0 의 0x80 갈래가
+ * 레코드 k 에 옛 [k] 줄 니블을 남기고(b54b6 · b5520), 이어 aa7e8 0xb8cb8(팀, 시작 타순 s, k) → 0xb5e98(r3 = 0)이 두 줄을 맞바꾼다 —
+ * 두 니블이 다 0 이 아니면 니블이 선수를 따라가고(b5f32~b5f4a), 한쪽이 0 이면 칸에 되쓴다(b5f1a~b5f30). 그래서 미션 타자의 니블은 k ≤ 8 이면
+ * 마스터 줄 k 의 것, k ≥ 9(벤치 · 끝 칸 12)면 마스터 줄 s 의 것이고, 그때 k 칸으로 밀린 마스터 줄 s 는 0 이다. 사람 칸 팀은 타자 미션에서
+ * 공격만 하므로 이 니블을 읽는 수비 줄 이름표에 서지 않아 그림 · 결과가 같다.
  */
 export function missionWalkTeamOf(run: MissionPlateSituation, isDefense: boolean): MissionWalkTeam | null {
   const team = isDefense
