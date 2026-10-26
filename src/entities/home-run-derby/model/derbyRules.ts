@@ -1,5 +1,6 @@
 import { BATTING_POINT } from '@/entities/batting/model/battedBallFlight'
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import { integerSquareRoot } from '@/shared/lib/math/originalTrigonometry'
 
 /**
  * 홈런더비(게임 모드 7)의 수치 — **규칙 전체가 확정이다**
@@ -33,12 +34,23 @@ export const DERBY_DISTANCE_LIMIT = 160
  * state[0x26] 은 결과 코드가 아니라 **판 종류**(홈런더비 판 = 8)라 더비에서는 늘 참이다. 홈런은 홈런 순간에 낙구 점으로,
  * 홈런 아닌 페어 공은 낙구 틱에 그 점으로 더한다(`derbyBattedBall` 머리말).
  *
- * `d = |착지점 − (20000, 1000, 30000)| / 265`, 160 을 넘으면 160.
- * 원본은 정수 나눗셈이라 버림이다.
+ * ```
+ * a6036  기준점 = 표 0xd81f8 (12 바이트 복사)
+ * a6054  d = 0xbf9f0(기준점.x, .y, .z, 점.x, [점.y, 점.z])   ; = isqrt(|기준.x − 점.x|² + |기준.z − 점.z|²) — 높이 y 는 안 본다
+ * a6062  d = d / 0x109(265)                                 ; 0xca7b4 정수 나눗셈(버림)
+ * a606a  d ≥ 0xa0(160) 이면 160
+ * a6074  +0x34(s16) += d
+ * ```
+ * 0xbf9f0(bf9fe~bfa1a): r0 − r3 = x 차, [sp+8] − [sp+0x18] = z 차, 두 제곱의 합을 0x6c64c(정수 제곱근)로 — `E-defense-rules` 의
+ * "거리 함수 0xbf9f0 = isqrt(dx² + dz²)". (r261 앞까지 웹은 높이까지 센 3차원 거리였다 — 담장을 넘는 홈런 순간처럼 공이 높으면 더 나왔다)
  */
 export function derbyDistanceOf(landing: WorldPoint, origin: WorldPoint = DERBY_DISTANCE_ORIGIN): number {
-  const length = Math.hypot(landing.x - origin.x, landing.y - origin.y, landing.z - origin.z)
-  const distance = Math.trunc(length / DERBY_DISTANCE_DIVISOR)
+  const dx = landing.x - origin.x
+  const dz = landing.z - origin.z
+  // muls · adds 는 32비트로 돈다(bfa10~bfa16) — 합을 부호 없는 32비트로 감아 0x6c64c 에 넘긴다. 0x6c64c 는 이 범위에서 floor(sqrt)
+  // 와 같다(합 < 0xfffe0001 — 땅 거리 65535 미만, 160M 상한의 42400 보다 훨씬 멀다)
+  const squared = (Math.imul(dx, dx) + Math.imul(dz, dz)) >>> 0
+  const distance = Math.trunc(integerSquareRoot(squared) / DERBY_DISTANCE_DIVISOR)
   return distance >= DERBY_DISTANCE_LIMIT ? DERBY_DISTANCE_LIMIT : distance
 }
 

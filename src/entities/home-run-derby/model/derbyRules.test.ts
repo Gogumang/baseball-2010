@@ -31,13 +31,15 @@ describe('비거리 — d = |착지점 − (20000,1000,30000)| / 265, 상한 160
     expect(derbyDistanceOf({ x: 20_000, y: 1_000, z: 30_000 - 265 })).toBe(1)
   })
 
-  it('3차원 거리다 — 높이도 센다', () => {
-    const 대각선 = derbyDistanceOf({ x: 20_000 + 3 * DERBY_DISTANCE_DIVISOR, y: 1_000 + 4 * DERBY_DISTANCE_DIVISOR, z: 30_000 })
-    expect(대각선).toBe(5)
+  it('평면 거리다 — 높이 y 는 안 센다 (0xbf9f0 = isqrt(dx² + dz²), r261)', () => {
+    expect(derbyDistanceOf({ x: 20_000 + 3 * DERBY_DISTANCE_DIVISOR, y: 1_000, z: 30_000 - 4 * DERBY_DISTANCE_DIVISOR })).toBe(5)
+    // 높이만 다른 점은 0 — 담장 위를 넘는 홈런 순간도 땅 위 거리로 센다
+    expect(derbyDistanceOf({ x: 20_000, y: 1_000 + 100 * DERBY_DISTANCE_DIVISOR, z: 30_000 })).toBe(0)
+    expect(derbyDistanceOf({ x: 20_000 + 3 * DERBY_DISTANCE_DIVISOR, y: 9_000, z: 30_000 - 4 * DERBY_DISTANCE_DIVISOR })).toBe(5)
   })
 
   it('한 타구 상한은 160 이다 (0xa606a)', () => {
-    const 아주멀리 = derbyDistanceOf({ x: 20_000, y: 1_000, z: 30_000 - 1_000 * DERBY_DISTANCE_DIVISOR })
+    const 아주멀리 = derbyDistanceOf({ x: 20_000, y: 1_000, z: 30_000 - 200 * DERBY_DISTANCE_DIVISOR })
     expect(아주멀리).toBe(DERBY_DISTANCE_LIMIT)
   })
 

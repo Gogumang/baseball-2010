@@ -332,12 +332,27 @@ describe('경기 시작 굴림 — 0x39fdc 모드 7 갈래 3a454 rand(0, 9) 뒤 
     const { random, calls } = 기록난수()
     const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, random }))
     OK(rendered)
-    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [45, 2000, 1500, 0] }
+    // 원본 코드 24 패턴 중 하나(낙구 땅 거리 154M) — 평면 거리 0xbf9f0 라 높이 없이도 다섯 개면 800 을 넘는다
+    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [55, 1520, 1154, 0] }
     for (let index = 0; index < 9 && rendered.result.current.run.stage === 0; index += 1) 한구(rendered, 큰홈런)
     expect(rendered.result.current.run.stage).toBe(1)
     calls.length = 0
     act(() => rendered.result.current.retryFromResult())
     expect(calls).toEqual([[1, 4], ...한장면])
+  })
+})
+
+describe('좌우 이동 +0xfe4 는 0xd 진입(48f88)에서만 지운다 — r261', () => {
+  it('공 사이(0xf)에는 0xd 번호가 그대로고, 단계가 올라 0xd 를 지나면 오른다', () => {
+    const rendered = 띄우기()
+    const 처음 = rendered.result.current.sceneDSerial
+    const 큰홈런: PitchOutcomeDetail = { ...홈런, pattern: [55, 1520, 1154, 0] }
+    한구(rendered, 큰홈런)
+    expect(rendered.result.current.run.stage).toBe(0)
+    expect(rendered.result.current.sceneDSerial).toBe(처음)
+    for (let index = 0; index < 8 && rendered.result.current.run.stage === 0; index += 1) 한구(rendered, 큰홈런)
+    expect(rendered.result.current.run.stage).toBe(1)
+    expect(rendered.result.current.sceneDSerial).toBe(처음 + 1)
   })
 })
 

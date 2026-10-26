@@ -248,6 +248,11 @@ export interface HomeRunDerbySession {
   /** 결과를 보여 주는 동안·상태 0xe 에서 OK 를 기다리는 동안은 새 공을 안 던진다 */
   readonly isPaused: boolean
   /**
+   * 상태 0xd 진입 번호 — 단계 상승 · 보너스 열기(0xae3e8 · 0xae24c → 0xd)마다 1 오른다. 타석 화면은 이때만 좌우 이동
+   * +0xfe4 를 0 으로 되돌린다(0x48d50 48f88) — 공 사이(0xf)에는 남는다
+   */
+  readonly sceneDSerial: number
+  /**
    * **상태 0xe — 사람 OK 를 기다리는 중**. 경기 첫 공 앞(적재 8 → 0xd, 0x3fa50)·단계가 올라 새 마투수가 설 때·보너스 게임을
    * 열 때(0xae3e8/0xae24c → 0xd) 0xd 를 지나 0xe 로 온다. 0xe 는 시간 제한·자동 진행이 없다 — 갱신 0x39bd4 는 모드 7 이면
    * 아무것도 안 하고(0x39bde `cmp r3,#7`), CPU 조작 객체 0x53874 는 0xf·0x10·0x11 만 본다.
@@ -360,6 +365,8 @@ export function useHomeRunDerby({
   }
   // 경기 시작: 적재 상태 8 끝이 모드 7 이면 미리 넣어 둔 0xd 로 간다(0x3fa4c~0x3fa50 · R10 0x48b20) → 0x39e14 → 0xe
   const [isPreparing, setIsPreparing] = useState(true)
+  /** 상태 0xd 진입 번호 — 타석 화면이 이때만 좌우 이동을 되돌린다(0x48d50 48f88) */
+  const [sceneDSerial, setSceneDSerial] = useState(0)
   const [isAwaitingConfirm, setIsAwaitingConfirm] = useState(false)
   const [isEventZoneShown, setIsEventZoneShown] = useState(false)
   const [eventZoneRewardX, setEventZoneRewardX] = useState<number | null>(null)
@@ -474,6 +481,8 @@ export function useHomeRunDerby({
    * 0x30 바이트 복사(48d8e~48dd4), 볼카운트 지우기 0x48e9c(`0xb6764`). 첫 공 앞의 0xd 도 같은 진입이다.
    */
   const enterSceneD = () => {
+    // 48f88 — 좌우 이동 +0xfe4 = 0. 공 사이(0xf)에서는 안 지운다 (`shiftResetSerial`)
+    setSceneDSerial((serial) => serial + 1)
     // 48ef8~48f04 — 이전 상태가 0x16 이 아니면 파티클 관리자를 비운다(0x6dee4). 더비의 0xd 는 0x16 을 안 거친다
     clearSceneParticles()
     setMoundStage(runRef.current.stage)
@@ -873,6 +882,7 @@ export function useHomeRunDerby({
     opponentTeamId,
     finishBenchClearing,
     isPaused: isPaused || isPreparing || isAwaitingConfirm || loadingTip !== null,
+    sceneDSerial,
     isAwaitingConfirm,
     confirm,
     isEventZoneShown,
