@@ -95,17 +95,45 @@ export type HitByPitchHoldPhase =
   | 'scene'
 
 /**
- * **0x12 대기 끝까지 붙드는 타석 결과인가** — 볼넷 · 사구 (r295).
+ * **0x12 대기 끝까지 붙드는 타석 결과인가** — 볼넷 · 사구 (r295) · 공 도착 판이 안 열린 삼진 (r298).
  *
  * 공 도착 0x3dfac 은 v = 3 · 4 면 판 종류를 2 로 두고(0x3e1b4 `0xb0cb8(플레이, 2)`) 0x12 만 예약한다. 0x12 갱신 0x4e6d4 가
  * 문턱(4e6de~4e6f0 — st[0xb] ∈ {3, 4, 5} 면 0x1f)에 닿은 틀(4e72c)에서 사구면 4e74c 벤치 클리어링 굴림, 그 밖은 판정 A 0xae24c
  * (4e78c — ae344~ae35c: st[0xb] ∈ {3, 4} → 0x17 밀어내기 판)로 간다. 볼넷도 사구와 같은 틀에 판정 A 를 지나므로 진행기는 둘 다
  * 굴림 없이 붙들고(`'wait'`) 화면이 0x12 대기를 센 뒤(`useHitByPitchWait`) 판정을 부른다. 볼넷은 4e744 st[0xb] == 4 가 거짓이라
  * 벤치 클리어링 굴림 없이 판정 A 의 보통 길(밀어내기 판 재생 · 정산)만 돈다(`rollsIntoBenchClearing` 의 `isHitByPitch`).
- * 삼진(st[0xb] = 5)도 같은 문턱이지만 판정 A 가 0xd · 정산 0xa8024 로 곧장 가는 다른 길이라 여기 넣지 않았다.
+ *
+ * 삼진(st[0xb] = 5)도 같은 문턱 · 같은 틀이다(r298 — 0x3dfac · 0x4e6d4 · 0xae24c 직접 뜸):
+ * ```
+ * 3e15e  v == 5 — 0xa5e01 · 0xb8ced · 0xaf021(…, 0) · 3e1a6 st[6]++ (아웃은 0x12 진입에서 오른다) — 0x17 예약 없음 → 0x12 대기
+ * 4e72c  [+0x2c] ≥ 0x1f → 4e744 st[0xb] ≠ 4 라 굴림 없이 4e78c 판정 A
+ * ae33c  st[6] > 2 → 0x18 · ae344 st[0xb] == 5 → 0xd — 둘 다 ae362 정산 0xa8024 · 4e796 칸 채우기 · 4e7ca 돌발 판정
+ * ```
+ * 그래서 공 도착 판이 안 열린 삼진은 볼넷처럼 붙들고 판정 때 정산한다(굴림 없음 — 정산 · 뒤 자동진행의 굴림이 0x12 32 그림의
+ * 관리자 틱 굴림 뒤로 간다). 판이 열린 삼진은 0x12 를 안 기다린다:
+ * - 낫아웃 · 삼진 그대로인 폭투·포일(종류 9) — 3e062 판이 서면 3e09a 가 곧장 0x17 을 예약하고 판 끝 판정 B 0xae3e8 이 정산한다
+ *   (3e0a2~3e0e0 이 낫아웃이면 v 를 0 으로 지우고 st[0x1a] = 1).
+ * - 삼진 + 도루(종류 5) — 3e0e4 도루 칸이 서고 아웃 ≤ 1(3e0f4) 이면 3e114 가 0x17 · 판정 B 가 종류 5 로 한 번 정산. 아웃이 2 면
+ *   (3e0fa v == 5) 판이 안 열려 위 보통 삼진 길이다 — 웹 `openPitchArrivalPlay` 도 같은 조건이라 판이 null 로 온다.
  */
-export function holdsUntilResultWaitEnd(outcome: AtBatOutcome): boolean {
-  return outcome.kind === '사구' || outcome.kind === '볼넷'
+export function holdsUntilResultWaitEnd(
+  outcome: AtBatOutcome,
+  /** 이 공의 0x3dfac 이 연 공 도착 판(밀어내기 종류 2 · 폭투 9 · 도루 5) — 없으면 null */
+  arrivalPlay: { readonly kind: number } | null | undefined,
+): boolean {
+  if (outcome.kind === '사구' || outcome.kind === '볼넷') return true
+  return outcome.kind === '삼진' && arrivalPlay == null
+}
+
+/**
+ * **0x12 대기 동안 HUD 에 그릴 아웃** — 붙든 삼진(`'wait'`)이면 진입 3e1a6 이 이미 올린 st[6] (`min(3, 아웃 + 1)`).
+ * 웹 진행기는 삼진을 판정(틱 31)에 정산하므로 그 전 그림은 이 값으로 그린다(r298). 볼넷 · 사구는 0x12 진입이 아웃을 안 건드린다.
+ */
+export function outsShownDuringResultWait(
+  outs: number,
+  hold: { readonly phase: HitByPitchHoldPhase; readonly outcome: AtBatOutcome } | null | undefined,
+): number {
+  return hold != null && hold.phase === 'wait' && hold.outcome.kind === '삼진' ? Math.min(3, outs + 1) : outs
 }
 
 /** 공격 쪽 선수 수 — 진입 루프 i = 8..0 */

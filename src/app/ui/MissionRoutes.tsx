@@ -25,6 +25,7 @@ import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart
 import { useHitByPitchWait } from '@/pages/defense/model/useHitByPitchWait'
 import { RESULT_WAIT_TICKS_AT_BAT_END } from '@/pages/game/lib/batterRecordAlert'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
+import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
@@ -211,6 +212,16 @@ export function MissionRoutes({
     session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
   )
   const pitchScene = useMissionPitchSceneBeforePlay(session, isPopupFrozen)
+  // 타자 미션 볼넷 · 사구 — 0x12 대기(판정 틀 T 다음 그림이 틱 0) 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0
+  // (r298 — 모드 6 도 0x4e6d4 를 탄다). 타자편 `GameRoute` 와 같은 셈이다
+  useHitByPitchWait({
+    hold: session.pendingBenchClearing?.side === '타자' ? session.pendingBenchClearing : null,
+    waitTicks: RESULT_WAIT_TICKS_AT_BAT_END,
+    isFrozen: isPopupFrozen,
+    random: session.random,
+    onJudge: actions.judgeHitByPitch,
+    onEnter: actions.enterBenchClearing,
+  })
   /**
    * 미션 경기 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 미션 시작 첫 0x18 판 0x3fac4 · 사람 반 이닝의 수비 판 시작 0xb0fb4 ·
    * 투수 미션 벤치 클리어링 0x3a5f0. 자동진행 0x21 이 돌아온 0x18 은 판 없이 지나가 0x3fac4 를 안 부른다(Q2)
@@ -240,6 +251,9 @@ export function MissionRoutes({
     missionPitcherNameOf(session, hallOfFame, nari.투수),
     walkerSeats,
     pitchScene,
+    session.pendingBenchClearing?.side === '타자'
+      ? batterSideOfForm(missionStageBatterOf(session.pendingBenchClearing.run, batter).look?.form ?? 0)
+      : undefined,
   )
   if (overlay !== null) return overlay
 
@@ -478,6 +492,8 @@ function missionOverlayOf(
   walkerSeats?: { readonly boardBefore: WalkerLineSeats; readonly benchDefense: readonly WalkerSeat[] },
   /** 투수 미션 판이 섰지만 아직 0x17 전(0x11 끝 · 0x13 · 공 도착 판의 0x12 틱 0) — 그동안은 투구 화면이 그린다 */
   pitchScene?: MissionPitchSceneBeforePlay,
+  /** 타자 미션 벤치 클리어링의 타자 손 — 사구를 맞은 사람 칸 타자 (`missionStageBatterOf` 의 폼) */
+  benchBatterHand?: number,
 ): ReactNode | null {
   const { pendingDefensePlay, actions } = session
   // 경기 장면 로딩 판 — 상태 7 진입 0x39f88(0x667f8 로딩 판 · 0x54120 진행 칸 끝 0x24 · 0x53dbc 팁 rand(0, 73)) 뒤 상태 7 · 9 · 8 의
@@ -539,7 +555,8 @@ function missionOverlayOf(
     )
   }
 
-  // 투수 미션 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 투수편 `PitcherGameScreen` 과 같은 위젯이다
+  // 미션 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 투수편 `PitcherGameScreen` 과 같은 위젯이다. 타자 미션(모드 6)도 0x4e6d4 를 타
+  // 같은 연출이 선다(r298) — 두 팀 · 루 · 공격 줄은 판의 사람 칸 · CPU 칸 그대로
   if (session.pendingBenchClearing?.phase === 'scene') {
     const benchRun = session.pendingBenchClearing.run
     const sideTeams = missionWithSideTeamsOf(benchRun.mission, benchRun.game.humanBatting.teamId).sideTeams
@@ -552,7 +569,11 @@ function missionOverlayOf(
           playerSide: 0,
           ourTeamId: sideTeams[0],
           opponentTeamId: sideTeams[1],
-          batterHand: missionCpuBatterHandOf(benchRun),
+          // 타자 미션이면 사구를 맞은 사람 칸 타자(타석 화면과 같은 손 — `missionStageBatterOf` 의 레코드 +0xb 폼)
+          batterHand:
+            session.pendingBenchClearing.side === '투수'
+              ? missionCpuBatterHandOf(session.pendingBenchClearing.run)
+              : (benchBatterHand ?? 0),
           bases: benchRun.bases,
           // 마선수 그림 0x79b48 — 수비 줄은 사람 칸 팀(미션 투수), 공격 줄은 CPU 타선(마타자 칸 포함)
           defenseAces: missionWalkTeamOf(benchRun, true),
@@ -858,10 +879,10 @@ function useMissionPitchSceneBeforePlay(
     // 일시정지 팝업(0x741a0)이 장면 틱을 세운다(0x52cc6) — 투구 화면이 알린다
     isFrozen: isPopupFrozen,
   })
-  // 투수 미션 사구 — 0x12 대기 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22). 세션은 못 맞힌 공의 공 도착을 0x12 진입
+  // 투수 미션 볼넷 · 사구 · 삼진 — 0x12 대기 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22). 세션은 못 맞힌 공의 공 도착을 0x12 진입
   // 틀에 돌려(r293) 붙든 칸이 0x12 틱 0 그림에 서므로 그 그림부터 0x1f − 1
   useHitByPitchWait({
-    hold: session.pendingBenchClearing,
+    hold: session.pendingBenchClearing?.side === '투수' ? session.pendingBenchClearing : null,
     waitTicks: RESULT_WAIT_TICKS_AT_BAT_END - 1,
     isFrozen: isPopupFrozen,
     random: session.random,
@@ -894,6 +915,8 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     lastThrow: session.lastPitcherThrow,
     // 3e0aa — 0x12 진입 틀에 공 도착이 적는다(`lastPitchJudgementCleared`)
     isJudgementCleared: session.lastPitchJudgementCleared,
+    // 붙든 삼진의 0x12 대기 — HUD 아웃은 진입 3e1a6 이 올린 값 (r298)
+    resultHold: session.pendingBenchClearing,
     pitcherForm: form,
     pitcherHand: pitcherHandOf(form, false),
     ...(equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOf(equipment) }),

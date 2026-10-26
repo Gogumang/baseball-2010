@@ -52,6 +52,11 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
       act(() => result.current.actions.finishDefensePlay())
       continue
     }
+    // 붙든 볼넷 · 사구 · 삼진(0x12 대기, r298) — 끼어들 사람 없는 끝내기로 판정 · 정산
+    if (result.current.progress.pendingBenchClearing !== null) {
+      act(() => result.current.actions.finishBenchClearing(true))
+      continue
+    }
     // 0xe 의 OK — 화면은 OK 전에 공을 안 낸다
     if (result.current.progress.sceneConfirmPending === true) {
       act(() => result.current.actions.confirmScene())

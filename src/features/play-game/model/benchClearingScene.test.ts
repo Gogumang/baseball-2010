@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
-import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import {
+  holdsUntilResultWaitEnd, outsShownDuringResultWait, rollBenchClearingEntry, rollBenchClearingTargets,
+} from '@/features/play-game/model/benchClearingScene'
 
 const 세는난수 = () => {
   const calls: number[] = []
@@ -23,5 +25,25 @@ describe('벤치 클리어링 연출의 전역 rand', () => {
     const { calls, random } = 세는난수()
     rollBenchClearingTargets(random)
     expect(calls.length).toBe(8)
+  })
+})
+
+describe('0x12 대기 끝까지 붙드는 타석 결과 — 0x4e6d4 문턱 0x1f (st[0xb] ∈ {3, 4, 5}) · 0x3dfac 의 0x17 직행 갈래 (r298)', () => {
+  it('볼넷 · 사구는 판(종류 2)과 함께 늘, 삼진은 공 도착 판이 안 열렸을 때만 붙든다', () => {
+    expect(holdsUntilResultWaitEnd({ kind: '볼넷' }, { kind: 2 })).toBe(true)
+    expect(holdsUntilResultWaitEnd({ kind: '사구' }, null)).toBe(true)
+    expect(holdsUntilResultWaitEnd({ kind: '삼진' }, null)).toBe(true)
+    expect(holdsUntilResultWaitEnd({ kind: '삼진' }, undefined)).toBe(true)
+    // 3e09a(폭투·포일 · 낫아웃) · 3e114(도루) — 곧장 0x17
+    expect(holdsUntilResultWaitEnd({ kind: '삼진' }, { kind: 9 })).toBe(false)
+    expect(holdsUntilResultWaitEnd({ kind: '삼진' }, { kind: 5 })).toBe(false)
+    expect(holdsUntilResultWaitEnd({ kind: '홈런' }, null)).toBe(false)
+  })
+
+  it('대기 중 HUD 아웃 — 붙든 삼진만 진입 3e1a6 의 st[6]++ 을 미리 그린다(3 에서 멈춤)', () => {
+    expect(outsShownDuringResultWait(1, { phase: 'wait', outcome: { kind: '삼진' } })).toBe(2)
+    expect(outsShownDuringResultWait(2, { phase: 'wait', outcome: { kind: '삼진' } })).toBe(3)
+    expect(outsShownDuringResultWait(1, { phase: 'wait', outcome: { kind: '볼넷' } })).toBe(1)
+    expect(outsShownDuringResultWait(1, null)).toBe(1)
   })
 })

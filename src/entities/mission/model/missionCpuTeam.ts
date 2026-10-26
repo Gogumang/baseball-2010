@@ -29,6 +29,7 @@ import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { equippedSeasonAbilityOf } from '@/entities/season-mode/model/seasonPlayerRecord'
+import { BENCH_CLEARING_PITCH_COUNT_GAIN } from '@/entities/game/model/benchClearing'
 
 /**
  * **미션 상대 CPU 팀** — 미션 경기 준비 `0xaa57c`(모드 5·6)가 세운 다른 칸 팀과, 그 팀의 CPU 교체가 보는 칸들.
@@ -525,6 +526,22 @@ export function missionCpuAfterRuns(team: MissionCpuTeam, runs: number, inningEn
       mound: { ...pitching.mound, runsAllowed: Math.min(MAXIMUM_COUNTER, pitching.mound.runsAllowed + runs) },
       inningRunsAllowed: inningEnded ? 0 : inningRuns,
       ourRuns: pitching.ourRuns + Math.max(0, runs),
+    },
+  }
+}
+
+/**
+ * **벤치 클리어링 진입의 꼬리** 0x3ab82 — 수비 팀이 CPU 면(타자 미션) 그 팀 +0x27c(이번 투수 투구 수) += 10 (상한 없음,
+ * `entities/game/model/benchClearing`). 투구 수 칸은 공 하나 셈(`missionCpuAfterPitch`)과 같은 칸이다. 투수진이 없으면 그대로
+ */
+export function missionCpuAfterBenchClearing(team: MissionCpuTeam): MissionCpuTeam {
+  const pitching = team.pitching
+  if (pitching === null) return team
+  return {
+    ...team,
+    pitching: {
+      ...pitching,
+      mound: { ...pitching.mound, pitches: pitching.mound.pitches + BENCH_CLEARING_PITCH_COUNT_GAIN },
     },
   }
 }

@@ -24,6 +24,7 @@ import { missionResultLeaveOf } from '@/pages/mission-play/lib/missionResultBoar
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
+import { outsShownDuringResultWait } from '@/features/play-game/model/benchClearingScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
@@ -73,6 +74,8 @@ export interface PitchingStageSource {
    * 공 도착을 0x12 진입 틀에 돌리므로 공(`lastThrow`)과 따로 그 틀에 선다
    */
   readonly isJudgementCleared?: boolean
+  /** 붙든 볼넷 · 사구 · 삼진(세션 `pendingBenchClearing`) — 0x12 대기 중 삼진이면 HUD 아웃을 진입 3e1a6 이 올린 값으로 그린다 (r298) */
+  readonly resultHold?: Parameters<typeof outsShownDuringResultWait>[1]
   readonly pitcherForm: number
   readonly pitcherHand: number
   /** 미션 투수 장비 겹 (0x10810 → 0x79790) — 없으면 맨몸 */
@@ -586,7 +589,7 @@ export function PitchingScreen({
                 opponentScore: run.game.scores[cpuSideOf(run.mission)],
                 balls: atBat.balls,
                 strikes: atBat.strikes,
-                outs: run.outs,
+                outs: outsShownDuringResultWait(run.outs, stage.resultHold),
                 bases: run.bases,
                 // 경기[0x28 + 칸] 팀의 작은 로고 (0x48658 48a38~48a74 → 장면+0x1054 · +0x1058) — 사람 칸 · CPU 칸 (`missionTeamIdsOf`)
                 ourLogoUrl: smallLogoUrlOf(teamIds.human),

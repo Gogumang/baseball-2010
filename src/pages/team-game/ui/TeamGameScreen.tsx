@@ -78,6 +78,7 @@ import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { HALF_INNING_JINGLE_TICK } from '@/features/play-game/model/halfInningBoard'
 import { HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
+import { outsShownDuringResultWait } from '@/features/play-game/model/benchClearingScene'
 import { useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { SettlementBoard } from '@/pages/team-game/ui/SettlementBoard'
@@ -1277,7 +1278,8 @@ function TeamGameScene({
                   opponentScore: game.opponentScore,
                   balls: progress.atBat.balls,
                   strikes: progress.atBat.strikes,
-                  outs: game.outs,
+                  // 붙든 삼진(0x12 대기)은 진입 3e1a6 이 이미 올린 아웃으로 그린다 (r298)
+                  outs: outsShownDuringResultWait(game.outs, progress.pendingBenchClearing),
                   bases: game.bases,
                   ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
                   opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
@@ -1369,7 +1371,7 @@ function TeamGameScene({
               opponentScore: game.opponentScore,
               balls: progress.atBat.balls,
               strikes: progress.atBat.strikes,
-              outs: game.outs,
+              outs: outsShownDuringResultWait(game.outs, progress.pendingBenchClearing),
               bases: game.bases,
               ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
               opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
