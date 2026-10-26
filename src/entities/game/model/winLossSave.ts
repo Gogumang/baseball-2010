@@ -71,6 +71,10 @@ export interface RunScoredInput {
  * 한 점도 안 나면 **승리 투수가 없는 경기**가 된다 (패전 투수는 이닝 조건이 없어 정상으로 남는다).
  * 원본에 "선발 5이닝 요건"·"구원 승 인계" 같은 진짜 규칙은 없다.
  *
+ * **고침(`bugfixes.json` B-35, 기본 켬)**: 이닝 · 경기 종류 문을 걷는다 — 승리 투수도 패전 투수처럼 **모든 득점마다** 다시 본다.
+ * 곧 이긴 팀이 마지막으로 리드를 잡은 순간 그 팀 마운드에 있던 투수가 승리 투수다(원본에 없는 "선발 5이닝" 은 넣지 않는다 —
+ * 원본 식 그대로 문만 연 가장 작은 고침). 굴림 없음. 6회 이후 득점이 있던 경기에서도 승리 투수가 앞 이닝의 리드 투수로 바뀔 수 있다.
+ *
  * 2026-10-15 r79 다시 확인: 플레이 점검(r77)의 일반모드 2:5 패배(이긴 팀 1회 5점 · 진 팀 4회 2점 · 6회 뒤 무득점)에서
  * 결과 판 승리투수 칸이 빈 것은 이 빈틈 그대로다 — 0xa5cf6~0xa5d12 가 이닝 index ≤ 4 · state+0x69 ≠ 8 이면 승리 토막을
  * 통째로 건너뛰고, 경기 끝 0xa7de8(0xa7dea~0xa7e0e)은 칸을 읽기만 해 측 2 면 넘어가며(채우는 대체 길 없음),
@@ -80,9 +84,11 @@ export function applyRunScored(state: DecisionState, input: RunScoredInput): Dec
   const { offenseSide, defenseSide, scoreOf, moundPitcherOf } = input
 
   let winner = state.winner
+  // 고침(B-35): 이닝 · 경기 종류 문을 걷어 패전 투수와 같은 셈으로 — 앞선 팀이 리드를 잡은 순간의 마운드 투수가 승리 투수다
   const canDecideWinner =
-    input.inningIndex >= WIN_PITCHER_FROM_INNING_INDEX &&
-    input.lastInningIndex === REGULATION_LAST_INNING_INDEX
+    isBugFixed('B-35') ||
+    (input.inningIndex >= WIN_PITCHER_FROM_INNING_INDEX &&
+      input.lastInningIndex === REGULATION_LAST_INNING_INDEX)
   if (canDecideWinner) {
     // 이미 정해져 있는데 그 팀이 더 이상 앞서지 않으면 지운다 (0xa5d2e)
     if (winner.side !== NO_SIDE && scoreOf(winner.side) <= scoreOf(1 - winner.side)) {

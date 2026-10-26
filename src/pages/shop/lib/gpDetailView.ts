@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { MAXIMUM_MORALE } from '@/entities/career/model/playerCareer'
@@ -29,7 +30,13 @@ import type { DetailView } from '@/pages/management/lib/detailPopup'
  *                · 칸 4 StrITEM[166] · 칸 6 StrITEM[168] — 상점 설명 줄 `effectText` 와 같은 글이다.
  *           창 글 칸은 색을 안 그리므로(훈련 창과 같이) 색 표시는 빼고 `!N` 에서 줄을 나눈다.
  * 이름 StrITEM[0x62+k] 은 모드 갈림이 없다 — 창이 뜨는 칸(0~4·6)은 두 모드 이름이 같다.
+ *
+ * **고침(`bugfixes.json` B-46, 기본 켬)**: 사기 칸 현재값도 능력치 칸처럼 효과 **뒤** 값(`after.morale`)을 보인다 — 영지버섯이면
+ * 오른 사기가 보인다. 변화량(40)은 그대로. 표시만이라 굴림 · 저장 영향 없음.
  */
+/** 사기 칸 현재값 — 원본은 효과 전(0x14f92), 고친 길(B-46)은 효과 뒤 */
+const shownMoraleOf = (before: { readonly morale: number }, after: { readonly morale: number }): number =>
+  isBugFixed('B-46') ? after.morale : before.morale
 
 const BATTER_ABILITY_KEYS: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']
 
@@ -46,7 +53,7 @@ export function batterGpDetailViewOf({ itemIndex, before, after }: GpDetailOf<Pl
   return {
     rows: detailRowsFromSlots(
       BATTER_DETAIL_LABEL_FRAMES,
-      { ability: BATTER_ABILITY_KEYS.map((key) => current[key]), morale: before.morale },
+      { ability: BATTER_ABILITY_KEYS.map((key) => current[key]), morale: shownMoraleOf(before, after) },
       { ability: limitSlots, morale: MAXIMUM_MORALE },
       change,
     ),
@@ -63,7 +70,7 @@ export function pitcherGpDetailViewOf({ itemIndex, before, after }: GpDetailOf<P
   return {
     rows: detailRowsFromSlots(
       PITCHER_DETAIL_LABEL_FRAMES,
-      { ability: PITCHER_ABILITY_ORDER.map((key) => current[key]), morale: before.morale },
+      { ability: PITCHER_ABILITY_ORDER.map((key) => current[key]), morale: shownMoraleOf(before, after) },
       { ability: limitSlots, morale: MAXIMUM_MORALE },
       change,
     ),

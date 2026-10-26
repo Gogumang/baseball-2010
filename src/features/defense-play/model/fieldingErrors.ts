@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import type { LeagueFieldingError } from '@/entities/league/model/leaguePlayerStats'
 
@@ -122,4 +123,16 @@ export function fieldingErrorRecordsOf(
     if (key !== null) records.push(key)
   }
   return records
+}
+
+/**
+ * **창 첫 그림(다시 그리기 52efe)이 내는 실책 · 펌블 함성** — 원본은 앞 그림과 같은 야수 칸을 다시 보아 실책 +0x2e 와 함성 29 를
+ * **한 번 더** 낸다(0x43278 4381a~43904, B-56). **고침(`bugfixes.json` B-56, 기본 켬)**: 다시 그리기는 아무것도 안 낸다. 굴림 없음.
+ */
+export function redrawnFieldingErrorsOf(fielders: readonly DrawnFielderCounters[]): DrawnFieldingError[] {
+  return isBugFixed('B-56') ? [] : drawnFieldingErrorsOf(fielders)
+}
+
+export function redrawnFumbleCheerOf(fielders: readonly DrawnFielderCounters[]): boolean {
+  return isBugFixed('B-56') ? false : drawnFumbleCheerOf(fielders)
 }

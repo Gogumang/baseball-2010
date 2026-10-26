@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { balanceNumber } from '@/shared/config/balance'
 
 /**
@@ -46,7 +47,7 @@ export interface SlidingRunner {
   readonly isLeavingField: boolean
   /** 주자+0xb8 — 이미 슬라이딩 중 */
   readonly isSliding: boolean
-  /** 주자+0x7c — 목표 루 (0 홈 · 1 1루 · 2 2루 · 3 3루) */
+  /** 주자+0x7c — 목표 루 (1 1루 · 2 2루 · 3 3루 · 4 홈 — 루 표 [4] 의 홈 사본. 송구 목표의 홈은 0 이다, B-57) */
   readonly targetBase: number
   /** 0xbefec(주자) — 목표 루 도착까지 남은 틱 */
   readonly ticksToArrive: number
@@ -112,6 +113,9 @@ export function slideOnKey(input: SlideKeyInput): SlideKeyResult {
 /** 0xb030c 의 창: |도착 틱 − 송구 도착 틱| ≤ 9 이고 도착까지 6틱 이하 */
 export const AUTO_SLIDING_TICK_TOLERANCE = 9
 export const AUTO_SLIDING_MAXIMUM_TICKS = 6
+/** 홈 — 주자 목표 루(+0x7c)는 4, 송구 목표(계획 +0xf)는 0 으로 적는다 (B-57) */
+const HOME_AS_RUNNER_TARGET = 4
+const HOME_AS_THROW_TARGET = 0
 
 export interface AutoSlideInput {
   /** 공.vt18() — 송구가 날아가는 중일 때만 돈다 */
@@ -127,6 +131,10 @@ export interface AutoSlideInput {
  * 자동 슬라이딩 — 제어기 vt 0x10 = 0xb030c, 매 틱 돈다 (사람/CPU 구분 없이).
  * 송구가 향하는 루로 6틱 안에 닿는 주자는 키 없이도 슬라이딩한다.
  * 사람 키 슬라이딩은 그 밖의 상황(송구가 안 오는 루, 7틱 이상 남음)에서 미리 당기는 용도다.
+ *
+ * ⚠️ 원본 버그(B-57): 주자 목표 루(+0x7c)는 홈을 **4** 로, 송구 목표(계획 +0xf)는 홈을 **0** 으로 적어 홈 송구에는 안 걸린다.
+ * **고침(`bugfixes.json` B-57, 기본 켬)**: 주자 목표 4 를 0 으로 읽어 견준다 — 홈으로 뛰는 주자도 송구가 오면 자동 슬라이딩. 굴림 없음
+ * (슬라이딩은 도착 틱 · 태그 판정을 바꾸므로 홈 승부의 결과가 바뀔 수 있다).
  */
 export function autoSlideRunnerIndexes(input: AutoSlideInput): readonly number[] {
   if (!input.isThrowInFlight) return []
@@ -134,7 +142,9 @@ export function autoSlideRunnerIndexes(input: AutoSlideInput): readonly number[]
 
   return input.runners
     .map((runner, index) => {
-      if (runner.targetBase !== input.throwTargetBase) return -1
+      // 고침(B-57): 주자의 홈(4)을 송구 표기의 홈(0)으로
+      const runnerTarget = isBugFixed('B-57') && runner.targetBase === HOME_AS_RUNNER_TARGET ? HOME_AS_THROW_TARGET : runner.targetBase
+      if (runnerTarget !== input.throwTargetBase) return -1
       if (runner.isSliding) return -1
       if (Math.abs(runner.ticksToArrive - input.throwArrivalTicks) > AUTO_SLIDING_TICK_TOLERANCE) return -1
       if (runner.ticksToArrive > AUTO_SLIDING_MAXIMUM_TICKS) return -1

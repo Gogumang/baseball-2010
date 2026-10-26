@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import {
   BEST_DISTANCE_LIMIT,
   COMBO_BONUS_UNIT,
@@ -109,6 +110,11 @@ export function createDerbyRun(): DerbyRun {
  * 최대 콤보(= 보너스 게임 수)와 보너스 G 를 올린다. 보너스 게임을 열 때는 "직전 공 홈런"(+0x3a)을 0 으로 지우고 던진 공도 센다.
  * ⚠️ **원본 버그 그대로**: 던진 공 수(+0x68)는 기회가 남았을 때와 보너스를 열 때만 올라 마지막 공은 안 센다.
  *    결과 화면이 "총 기회" 를 이 칸이 아니라 `10 + 보너스` 로 따로 세는 이유다(R14 1-3).
+ *    단계 문턱(누적 ≥ 표 0xd84dc[단계])도 기회가 남았을 때만 보아, 마지막 공(보너스 열기 · 끝)의 비거리로는 단계가 안 오른다.
+ *
+ * **고침(`bugfixes.json` B-53, 기본 켬)**: 끝 공도 다른 공처럼 — 끝(보너스 · 판 끝) 갈래에서도 던진 공을 세고(끝 갈래만, 보너스 열기는
+ * 원본도 셈) 단계 문턱을 본다. 단계는 G 셈(`derbyGamePointOf`)에 들어가 결과 G 가 늘 수 있다. 보너스 열기에서 단계가 오르면 보너스 공의
+ * 마투수 단계도 따라 오른다. 굴림 없음.
  */
 export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): DerbyRun {
   if (run.isFinished) return run
@@ -150,6 +156,9 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
     }
   }
 
+  // 고침(B-53): 마지막 공도 단계 문턱을 본다
+  const lastPitchStage = isBugFixed('B-53') ? nextAceStageOf(run.stage, totalDistance) : run.stage
+
   // 3. 보너스 게임 — 최대 콤보 수만큼, 한 번만. "직전 공 홈런" 은 지운다(ae502), 던진 공은 센다(ae51c)
   if (maxCombo > 0 && !run.isBonusGame) {
     return {
@@ -160,11 +169,20 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
       isBonusGame: true,
       remainingPitches: maxCombo,
       pitchesThrown: run.pitchesThrown + 1,
+      stage: lastPitchStage,
     }
   }
 
-  // 4. 끝
-  return { ...run, ...common, combo, wasPreviousHomeRun: outcome.isHomeRun, isFinished: true }
+  // 4. 끝 — 고침(B-53): 마지막 공도 던진 공에 센다
+  return {
+    ...run,
+    ...common,
+    combo,
+    wasPreviousHomeRun: outcome.isHomeRun,
+    isFinished: true,
+    stage: lastPitchStage,
+    pitchesThrown: isBugFixed('B-53') ? run.pitchesThrown + 1 : run.pitchesThrown,
+  }
 }
 
 /**

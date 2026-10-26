@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { KOREA_TEAM_ID } from '@/entities/season-mode/model/seasonRewards'
 
@@ -262,9 +263,14 @@ export function otherMatchOf(cup: NationalCup): readonly [number, number] | null
  * ⚠️ **원본 그대로 옮긴 동작** (`0xb858c`, DECISIONS 2026-09-20):
  * 대한민국이 풀리그 2위 안에 못 들면 **결승을 치르지 않고** `rand(0,2)` 동전 던지기로 우승국을 정한다.
  * `rand(0,2) == 0` 이면 `L+0xaf`(2위), 아니면 `L+0xae`(1위)가 우승이다.
+ *
+ * **고침(`bugfixes.json` B-41, 기본 켬)**: 결승을 안 치르는 갈래이니 **풀리그 1위(`L+0xae`)가 우승**한다 — 동전은 그대로 굴려
+ * (값은 버린다) 난수 차례가 원본과 같다. 결승 경기를 CPU 끼리 돌리는 길은 두 나라가 같은 명단으로 서는 원본 준비(0xc2c4c)라
+ * 동전과 다를 바 없어 고르지 않았다. 동점 CPU 경기의 "선공 승" 은 웹 · 간이 경기 모두 연장 상한이 없어 동점이 안 나므로 그대로 둔다.
  */
 export function coinFlipChampion(cup: NationalCup, random: RandomPort): NationalCup {
   // 0xb859c — 동전 0xbfaa0 = rand(0, 2)
   const roll = random.rand(0, 2)
+  if (isBugFixed('B-41')) return { ...cup, champion: cup.finalists[0] }
   return { ...cup, champion: roll === 0 ? cup.finalists[1] : cup.finalists[0] }
 }

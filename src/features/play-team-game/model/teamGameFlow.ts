@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
@@ -101,6 +102,7 @@ import {
 import {
   popularityCompleteGameOf,
   reputationCompleteGameOf,
+  reputationCompleteGameInningIndexOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import type { CompleteGameFlags } from '@/entities/season-mode/model/seasonEvaluation'
 import {
@@ -1722,8 +1724,10 @@ function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number[] {
   // 0x4ea0c 는 경기가 끝나야 부른다 — 도중의 요약에는 안 붙인다
   if (!progress.game.isFinished) return []
   const game = progress.game
+  // 고침(B-40): 동점은 이긴 경기가 아니다 (원본은 선공이면 이긴 경기 — `seasonHumanWonOf`)
   const won =
-    game.ourScore > game.opponentScore || (game.ourScore === game.opponentScore && ourHalfOf(game) === '초')
+    game.ourScore > game.opponentScore ||
+    (!isBugFixed('B-40') && game.ourScore === game.opponentScore && ourHalfOf(game) === '초')
   if (!won) return []
   return [
     ...gameEndRecordIdsOf(game.ourScore - game.opponentScore),
@@ -6542,7 +6546,12 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     // ⚠️ 원본 그대로 — 인기도는 `st+0x6b`(현재 이닝), 평판은 `st+0x69`(정규 마지막 이닝)를 본다.
     //    그래서 **연장 완투는 인기도만 보너스를 받는다** (P4 "원본 버그·이상" 3번)
     popularityCompleteGame: popularityCompleteGameOf(outs, game.inning - 1, flags),
-    reputationCompleteGame: reputationCompleteGameOf(outs, REGULATION_LAST_INNING_INDEX, flags),
+    //    고침(B-38): 평판도 지금 이닝으로 본다 (`reputationCompleteGameInningIndexOf`)
+    reputationCompleteGame: reputationCompleteGameOf(
+      outs,
+      reputationCompleteGameInningIndexOf(game.inning - 1, REGULATION_LAST_INNING_INDEX),
+      flags,
+    ),
     gameRecord: progress.gameRecord,
     recordIds,
     gamePoints: recordGamePointsOf(recordIds),

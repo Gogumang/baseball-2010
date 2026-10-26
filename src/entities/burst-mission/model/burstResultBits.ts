@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 
 /**
@@ -41,6 +42,9 @@ export const BURST_RESULT_BIT = {
  * (`0xb68fc`(경기 끝) && 앞선 쪽이 사람 조작 팀, P7 K1 확정).
  * 그 바람에 실제 타석이 무엇이었든 공격 목표(안타·장타·홈런·타점·고의사구)가 **성공으로 뒤집힌다**.
  * 뜻은 아직 미해결이지만 실행값이 이러하므로 그대로 옮긴다.
+ *
+ * **고침(`bugfixes.json` B-52, 기본 켬)**: 이 두 비트를 켜지 않는다 — 끝내기 판도 실제 타석 결과로만 가린다
+ * (끝내기 안타 · 볼넷은 제 비트로 그대로 성공). 굴림 없음.
  */
 export const HUMAN_WIN_END_BITS = BURST_RESULT_BIT.홈런 | BURST_RESULT_BIT.볼넷 // 0x801
 
@@ -137,7 +141,8 @@ export function burstResultBitsOf(input: BurstResultBitsInput): number {
   // B11 은 볼넷 갈래 0xa8b7a 와 사구 갈래 0xa8bf4 두 곳이 켠다
   if (isWalkOrHitByPitch) bits |= BURST_RESULT_BIT.볼넷
 
-  if (input.humanTeamWalkOff ?? false) bits |= HUMAN_WIN_END_BITS
+  // 고침(B-52): 끝내기 덧비트를 안 켠다
+  if ((input.humanTeamWalkOff ?? false) && !isBugFixed('B-52')) bits |= HUMAN_WIN_END_BITS
 
   return bits
 }

@@ -1,4 +1,5 @@
 import { advanceRotation } from '@/entities/pitcher-career/model/pitcherRotation'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 리그 순위표·일정·포스트시즌 (binary.mod 0xb7xxx — 누락 탐색 9차, 바이트 확인).
@@ -142,7 +143,16 @@ export function nextSeasonLeague(pitcherOrders: League['pitcherOrders']): League
  * **배열 위치**다. 표를 함께 섞지도 않는다 → swap 이 한 번이라도 일어나면 엉뚱한 팀끼리의
  * 전적을 비교한다. 상대전적까지 같으면 `best` 를 바꾸지 않으므로 마지막 기준은
  * "현재 배열 위치가 앞선 팀" 이고, 초기값 덕에 대체로 팀 번호 순으로 보이지만 엄밀히는 아니다.
+ *
+ * **고침(`bugfixes.json` B-36, 기본 켬)**: 상대전적은 그 자리의 **팀 번호**(`order[j]`·`order[best]`)로 읽는다 — 정렬 차례 ·
+ * 마지막 기준(배열 위치)은 그대로. 굴림 없음 · 저장 꼴 같음. 승패가 같은 팀의 순위(곧 포스트시즌 진출 · 대진)가 바뀔 수 있다.
  */
+/** 상대전적 비교 — 원본은 배열 위치 j·best 로 표를 읽는다(B-36), 고친 길은 그 위치의 팀 번호로 읽는다. 굴림 없음 */
+function headToHeadBeats(league: League, order: readonly number[], j: number, best: number): boolean {
+  const [a, b] = isBugFixed('B-36') ? [order[j], order[best]] : [j, best]
+  return league.headToHead[a][b] > league.headToHead[b][a]
+}
+
 export function rankingOf(league: League): number[] {
   const order = Array.from({ length: LEAGUE_TEAM_COUNT }, (_unused, team) => team)
   const wins = [...league.wins]
@@ -153,11 +163,12 @@ export function rankingOf(league: League): number[] {
     for (let j = i + 1; j < LEAGUE_TEAM_COUNT; j += 1) {
       if (wins[best] < wins[j]) best = j
       else if (wins[best] === wins[j] && losses[best] > losses[j]) best = j
-      // 색인 버그: j·best 는 배열 위치인데 headToHead 는 팀 번호 표다 (원본 그대로)
+      // 색인 버그(B-36): j·best 는 배열 위치인데 headToHead 는 팀 번호 표다 (원본 그대로).
+      // 고침: 그 자리에 앉은 팀 번호(order)로 표를 읽는다
       else if (
         wins[best] === wins[j] &&
         losses[best] === losses[j] &&
-        league.headToHead[j][best] > league.headToHead[best][j]
+        headToHeadBeats(league, order, j, best)
       ) best = j
     }
     ;[wins[i], wins[best]] = [wins[best], wins[i]]

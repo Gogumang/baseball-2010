@@ -1,3 +1,5 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
+
 /**
  * 투수편 경기 평가 객체 R 의 **투수 칸 다섯** (binary.mod 기록 함수 0xa57f8 · 점프표 0xd8218 —
  * S5 U-13 전부 확정).
@@ -63,7 +65,7 @@ export const EMPTY_PITCHER_GAME_RECORD: PitcherGameRecord = {
  * ⚠️ **원본 버그 그대로**: `movs r5,#0` 가 루프 **안**(0xa8c6a)에 있어서
  * r5 는 **주자 목록의 마지막 원소 하나**만 반영한다. 목록이 비면 0 이다.
  * 그래서 야수선택으로 타자주자가 살고 앞 주자가 죽으면 출루가 잡히지 않아
- * 그 경기가 퍼펙트로 계산될 수 있다 (S5 정정 1). 고치지 않는다.
+ * 그 경기가 퍼펙트로 계산될 수 있다 (S5 정정 1). **고침(`bugfixes.json` B-37)** 은 목록 전체를 본다.
  *
  * @param runnersOut 주자 목록의 "아웃 표시"(주자+0x96) 를 순서대로 담은 배열
  */
@@ -71,6 +73,8 @@ export function recordAllowedBaserunner(
   record: PitcherGameRecord,
   runnersOut: readonly boolean[],
 ): PitcherGameRecord {
+  // 고침(B-37): 목록 전체에서 안 끝난 주자가 하나라도 있으면 선다
+  if (isBugFixed('B-37')) return { ...record, allowedBaserunner: runnersOut.some((out) => !out) }
   const last = runnersOut.length === 0 ? undefined : runnersOut[runnersOut.length - 1]
   return { ...record, allowedBaserunner: last === false }
 }

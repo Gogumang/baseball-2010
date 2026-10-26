@@ -242,7 +242,7 @@ export function NationalCupScreen({
 
       {step === '결과' && (
         <MessageBox
-          text={nationalCupResultText(edition, finish.isKoreaChampion, championName)}
+          text={nationalCupResultText(edition, finish.isKoreaChampion, championName, finish.koreaInFinal)}
           buttons={['확인']}
           onAnswer={closeResult}
         />
