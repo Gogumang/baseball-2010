@@ -156,7 +156,8 @@ import type { AceMatchHold, AceMatchHoldPort } from '@/entities/mode-save/model/
 import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
-import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
@@ -748,11 +749,18 @@ export function useMissionSession({
    * 진행이 다 먹인 뒤의 판을 봐야 해서 아래 효과가 그린 뒤에 돈다.
    */
   const [pitchSelectionEntry, setPitchSelectionEntry] = useState<
-    { readonly serial: number; readonly kind: 'new' | 'same' } | null
+    { readonly serial: number; readonly kind: 'new' | 'same'; readonly delayTicks: number } | null
   >(null)
   const handledPitchSelectionRef = useRef(0)
-  const signalPitchSelection = (kind: 'new' | 'same') =>
-    setPitchSelectionEntry((previous) => ({ serial: (previous?.serial ?? 0) + 1, kind }))
+  /**
+   * `delayTicks` — 0xf 진입 틀까지 남은 장면 틱. 투수 미션은 공을 놓는 걸음에 판정까지 다 내므로(`handlePitcherThrow`) 같은 타석 다음 공의
+   * 0xf 는 0x12 를 다 선 뒤의 틀이다(`pitchSelectionEntryDelayTicksOf`). 타자 미션은 결과 띠가 걷히는 때를 아래 효과가 본다
+   */
+  const signalPitchSelection = (kind: 'new' | 'same', delayTicks = 0) =>
+    setPitchSelectionEntry((previous) => ({ serial: (previous?.serial ?? 0) + 1, kind, delayTicks }))
+  /** 0xf 진입 틀이 온 신호 번호 — `delayTicks` 를 장면 틱으로 다 센 신호(`setGameSceneTickTimeout`) */
+  const [pitchSelectionDueSerial, setPitchSelectionDueSerial] = useState(0)
+  const armedPitchSelectionRef = useRef(0)
   /**
    * 새 타석의 0xe 대기 — 이 대기가 OK 를 받으면(메시지 1 → 0xf 진입 0x3d954) CPU 교체를 묻는다(`confirmScene`).
    * 그 뒤 교체 연출이 다시 세운 대기는 0xf 재진입이 state[0xd] · state[0xe] 로 굴림 없이 지나므로 묻지 않는다.
@@ -930,8 +938,9 @@ export function useMissionSession({
    * **OK 를 한 번 더** 기다린 뒤 0xf 재진입 — 그때는 state[0xd](교체 직후) · state[0xe](대타 막음)가 서 있어 굴림 없이 지나므로
    * 다시 묻지 않는다.
    * - 새 타석: 0xe 의 OK(메시지 1 → 0x50c18 → 0xf)를 받는 화면 콜백(`confirmScene`)에서 묻는다 — 원본 차례 그대로 22 가 OK 뒤에 난다.
-   * - 같은 타석 다음 공: 공 결과를 먹인 바로 뒤에 묻는다(아래 효과).
-   *   ⚠️ 근사(때 · 남김 — 웹 구조): 원본은 결과 상태 0x12 가 끝난 뒤 0xf 로 들어서 22 가 그때 난다 — 웹은 심판 콜과 붙는다. 그 사이 굴림은 없다.
+   * - 같은 타석 다음 공: 원본은 결과 상태 0x12 가 끝난 뒤(문턱 갱신 0x4e6d4 가 예약한 다음 틀) 0xf 로 들어서 22 가 그때 난다.
+   *   타자 미션은 결과 띠가 걷힌 뒤(0x12 끝), 투수 미션은 놓은 틀에서 0x12 진입 · 문턱 + 1 틱 뒤(`pitchSelectionEntryDelayTicksOf`)에
+   *   묻는다(아래 효과). 그 사이 진행기 굴림은 없다 — 0x12 동안 도는 파티클 관리자 틱(경기 난수)과의 차례는 원본대로 그 뒤가 된다.
    */
   const askPitchSelection = (kind: 'new' | 'same') => {
     // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e · 3da70)보다 앞이다
@@ -1013,10 +1022,17 @@ export function useMissionSession({
     // 타자 미션은 결과 띠가 걷혀야(0x12 가 끝나야) 0xf 다
     const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
     if (!isPitcherSide && runner.bannerText !== '') return
+    // 투수 미션 — 0x12 를 다 선 0xf 진입 틀까지 장면 틱으로 센다(공용 창이 서면 함께 선다, 52cc6)
+    if (isPitcherSide && entry.delayTicks > 0 && pitchSelectionDueSerial !== entry.serial) {
+      if (armedPitchSelectionRef.current === entry.serial) return
+      armedPitchSelectionRef.current = entry.serial
+      setGameSceneTickTimeout(() => setPitchSelectionDueSerial(entry.serial), entry.delayTicks)
+      return
+    }
     handledPitchSelectionRef.current = entry.serial
     askPitchSelection(entry.kind)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pitchSelectionEntry, runner.bannerText])
+  }, [pitchSelectionEntry, pitchSelectionDueSerial, runner.bannerText])
 
   /**
    * 0xe 의 OK 하나 — 화면(`useSceneConfirm` 의 `onConfirm`)이 부른다. 새 타석 대기의 OK 면 0xf 진입 0x3d954 가 CPU 교체를 묻는다.
@@ -1259,8 +1275,10 @@ export function useMissionSession({
       // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠나 — 타석 화면이 0x12 틱 0 의 판정 글자 · 삼진 파티클을 고른다
       const reply: PitchResolvedReply = { judgementCleared: clearsPitchJudgement(opened) }
       if (current !== null && opened !== null && opened.kind !== 2) {
-        // 판정 콜(도루 17 · 62/20, 폭투 17)과 그 뒤 아웃 콜은 판 끝(`finishRunnerPlay`)에서 낸다 — 원본은 판 안의 그 틱
-        playSoundIds(audio, [detail.contactSoundId, pitchCallSoundIdOf(detail.resolution, nextAtBat)])
+        // 판정 콜(도루 17 · 62/20, 폭투 17)과 그 뒤 아웃 콜은 판 안의 그 틱이다(화면이 판을 실시간으로 돌린다).
+        // 심판 콜은 0x12 진입 틀(타구음은 판정 틀에 타석 화면이 냈다 — `contactSoundId` 는 비어 온다)
+        playSoundIds(audio, [detail.contactSoundId])
+        playSoundIdsAfterSceneTicks(audio, [pitchCallSoundIdOf(detail.resolution, nextAtBat)], BATTER_PITCH_RESULT_ENTRY_TICKS)
         missionArrivalContextRef.current = { current, hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase }
         setPendingRunnerPlay({ kind: 'arrival', opened, side: '공격' })
         // 판이 도는 동안(상태 0x17) 다음 공은 없다
@@ -1271,16 +1289,17 @@ export function useMissionSession({
       // 판이 남긴 수비 장면 칸은 다음 판으로
       if (play !== null) missionSceneRef.current = play.result.scene
 
-      // 타구음 → 심판 콜 순서 (경기 장면과 같은 0x51408 이다). 공 도착 판이 열렸으면 그 판정 콜(도루 17 · 62/20,
-      // 폭투 17)이 심판 콜 뒤다 — 원본은 판 안의 그 틱에 낸다. 재생 칸에 넣는 판(진루만 하는 판)은 재생 화면이 기록된 틱에 내고
+      // 타구음(판정 틀 — 타석 화면이 이미 냈다, `contactSoundId` 는 비어 온다) → 심판 콜(0x12 진입 틀 0x3dfac → 0xbba, 한 틀 뒤)
+      // 차례 (경기 장면과 같은 0x51408 이다). 공 도착 판이 열렸으면 그 판정 콜(도루 17 · 62/20, 폭투 17)이 심판 콜 뒤다 — 원본은
+      // 판 안의 그 틱에 낸다. 재생 칸에 넣는 판(진루만 하는 판)은 재생 화면이 기록된 틱에 내고
       // (`continueMissionArrival` → `setPickoffReplay`), 재생하지 않는 판만 연 자리에서 낸다(근사).
       // 삼진·볼넷·홈런은 수비가 개입할 것이 없어 아웃 콜도 여기서 같이 난다 (0xae24c 갈래)
-      playSoundIds(audio, [
-        detail.contactSoundId,
+      playSoundIds(audio, [detail.contactSoundId])
+      playSoundIdsAfterSceneTicks(audio, [
         pitchCallSoundIdOf(detail.resolution, nextAtBat),
         play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
         outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
-      ])
+      ], BATTER_PITCH_RESULT_ENTRY_TICKS)
 
       const context: MissionArrivalContext | null =
         current === null ? null : { current, hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase }
@@ -1369,6 +1388,8 @@ export function useMissionSession({
     run: PitcherRun,
     play: PitchArrivalPlay | null,
     context: PitcherArrivalContext,
+    /** 같은 타석 다음 공의 0xf 진입까지 남은 장면 틱 — 공을 놓은 걸음이면 0x12 를 다 선 뒤다(`signalPitchSelection`). 판 끝이면 0 */
+    pitchSelectionDelayTicks = 0,
   ) => {
     const { outcome, pitcherStamina } = context
     let nextRun = run
@@ -1424,7 +1445,7 @@ export function useMissionSession({
     } else {
       nextRun = checkPitchExhausted(nextRun)
       // 판정 A 의 "그 밖" — 같은 타석 다음 공(0xf)
-      signalPitchSelection('same')
+      signalPitchSelection('same', pitchSelectionDelayTicks)
     }
     setPitcherRun(settlePitcherRun(nextRun))
   }
@@ -1725,9 +1746,9 @@ export function useMissionSession({
             : play !== null && arrivalApplicationOf(play) === 'batterRuns',
         ),
     )
-    // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때). 이어서 심판 콜.
-    // ⚠️ 근사(때 · 남김 — 웹 구조, 투수편 `usePitcherGame` 과 같은 자리): 웹은 던지는 순간에 결과가 다 나오므로 투구음과 심판 콜이 붙어 버린다.
-    //    통로가 하나라 뒤 소리가 앞 소리를 끊는다 (원본은 공이 날아가는 동안이 사이에 있다).
+    // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때) — 이 틀(놓는 틀). 심판 콜은 0x12 진입 틀: 0x3dfac 가 판정
+    // 0x9d57c 를 메시지 0xbba 로 곧바로 보낸다(3e1e2~3e1e8) — 놓은 틀에서 `pitchResultEntryDelayTicksOf` 뒤, 삼진 진동과 같은 틀이다
+    // (투수편 `usePitcherGame` · 팀경기 `useTeamGame` 과 같은 셈 — `PitchStepSoundTiming`). 원본은 그 사이 공이 날아가 두 소리가 다 들린다.
     // 삼진 진동 100ms — 미션(모드 5)도 경기 장면 0x104 라 못 맞힌 공은 0x11 → 0x12 를 지나고, 그 그리기 0x4ce9c 는
     // 모드를 가리지 않는다(0x52fb6 표 0xd05a0[0x12]). 0x12 진입 3dfac 이 0x9d57c 로 state[0xc] = 5(삼진) 를 쓰면
     // 첫 그리기(경기+0x2c == 0)의 4d0ba → 4d0d6 0x3a44(100, 100) (`strikeoutVibration`). 난수 없음.
@@ -1741,12 +1762,14 @@ export function useMissionSession({
       // 0x3f378 3f46a — 구질 22 면 28. 미션 투수는 육성·명예 투수(비트7)라 0xb633d 가 거짓이어서
       // 공+0x10 갈래(3f488)는 안 탄다 → 투수 +0x18 을 0 으로 넘긴다 (b008959)
       pitchReleaseSoundIdOf({ typeNumber, pitcherMagicNumber: 0, ballMagicNumber: nextBallMagicNumber }),
+    ])
+    playSoundIdsAfterSceneTicks(audio, [
       pitchCallSoundIdOf(resolution, nextAtBat),
       // 공 도착 판의 판정 콜 — 붙든 도루 · 폭투 판은 화면이 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 낸다.
       // 여기 오는 것은 밀어내기(콜 없음)뿐이다. 재생 칸에 넣는 판이면 재생 화면이 기록된 틱에 낸다
       play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
       outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
-    ])
+    ], pitchResultEntryDelayTicksOf(pitch.frameCount))
 
     if (held !== null) {
       // 판이 도는 동안(상태 0x17) 다음 공은 없다 — 판 끝(`actions.finishRunnerPlay`)이 `finishPitcherMissionArrival` 로 잇는다
@@ -1824,7 +1847,9 @@ export function useMissionSession({
       setPitcherRun(nextRun)
       return
     }
-    finishPitcherMissionArrival(nextRun, play, { outcome, pitcherStamina })
+    // 같은 타석 다음 공이면 0xf 진입 0x3d954(CPU 대타 · "Time!" 22)는 0x12 문턱 갱신 0x4e6d4 가 예약한 다음 틀이다
+    finishPitcherMissionArrival(nextRun, play, { outcome, pitcherStamina },
+      pitchSelectionEntryDelayTicksOf(pitch.frameCount, resultWaitTicksOf(outcome)))
   }
 
   /**
@@ -1844,8 +1869,8 @@ export function useMissionSession({
       setPendingDefensePlay(null)
       if (pending.isFoulPlay === true && played.foulEnded === true) {
         // 파울로 닫힌 판 — 0xae3e8 ae568 이 정산 없이 0xf(같은 타석 다음 공) · 0x35108 이 0xa975c(주자를 판 앞 자리로) ·
-        // 0xb6b58(스트라이크 ≤ 1 이면 +1). 콜은 결과 코드 7 메시지 51c5c 의 25(⚠️ 근사(때 · 남김 — 웹 구조): 원본은 7 이 난 틱 — 판 끝에 낸다)
-        // 화면이 돌린 판이면 25 는 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
+        // 0xb6b58(스트라이크 ≤ 1 이면 +1). 콜은 결과 코드 7 메시지 51c5c 의 25 — 7 이 난 틱 b4562 가 0xbba 로
+        // 화면까지 가고 같은 틱에 판이 닫힌다. 화면이 돌린 판이면 25 는 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
         if (result === undefined) playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome, played)])
         runner.applyPitch({ kind: '파울' })
         if (pending.side === '투수') {
@@ -2314,8 +2339,9 @@ export function useMissionSession({
      * 수비 능력치·주루는 미션 타구와 같은 값이다(`missionPlayAbilitiesOf` — CPU 수비 팀 레코드 0xb0fb4 · 주자 신원의 주력), 사람 공격,
      * 주루는 환경설정 "주루"(설정 +0xbd)다 — 사람 공격이라 0xae690 첫 항이 거짓이어서 둘째 항(0x46418 이 넘기는 +0xbd)이 답이다.
      *
-     * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36).
-     * ⚠️ 근사(때 · 남김 — 웹 구조): 원본은 공이 잡히는 **틱**에 낸다. 웹은 판을 미리 다 돌려 재생하므로 판을 연 자리에서 낸다 (팀경기·나만의리그와 같다).
+     * 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36). 원본은 결과 코드가 선 플레이 **틱**(메시지 0xbba)에
+     * 낸다 — 판을 붙들어 화면이 실시간으로 돌리므로 그 틱에 화면이 낸다(`afterMissionCpuPickoff` 의 `callShown`). 화면이 결과를 못 넘긴
+     * 판만 판 끝에서 낸다.
      */
     cpuPickoff: (base: PickoffBase) => {
       const current = missionRunRef.current

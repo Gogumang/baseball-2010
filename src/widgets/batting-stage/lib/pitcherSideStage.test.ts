@@ -8,6 +8,8 @@ import {
   pitcherHitSceneOf,
   passesHeldResult,
   pitchSceneBusyTicksOf,
+  pitchResultEntryDelayTicksOf,
+  pitchSelectionEntryDelayTicksOf,
   pitcherSideStageFrameOf,
   pitcherSideStateEntriesOf,
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
@@ -205,5 +207,18 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
     expect(bunt.isBuntStance).toBe(true)
     expect(pitcherHitContactOf(bunt, 0, null, 0)).toEqual({ effect: null, particles: [] })
     expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).isBuntStance).toBe(false)
+  })
+})
+
+describe('사람이 던진 공의 틀 셈 (`PitchStepSoundTiming`)', () => {
+  it('0xf 진입 틀은 장면이 다시 대기로 돌아오는 틀과 같다 — 0x12 틱 0 에서 문턱 + 1 뒤 (0x4e6d4 → 0x3d954)', () => {
+    for (const frameCount of [20, 26, 31]) {
+      for (const resultTicks of [0xf, 0x1f]) {
+        expect(pitchSelectionEntryDelayTicksOf(frameCount, resultTicks)).toBe(pitchSceneBusyTicksOf(frameCount, resultTicks))
+        expect(pitchSelectionEntryDelayTicksOf(frameCount, resultTicks)).toBe(
+          pitchResultEntryDelayTicksOf(frameCount) + resultTicks + 1,
+        )
+      }
+    }
   })
 })

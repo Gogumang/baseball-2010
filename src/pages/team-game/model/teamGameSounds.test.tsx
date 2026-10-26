@@ -145,7 +145,8 @@ describe('팀 경기 화면의 소리 배선', () => {
     expect(녹음.played).not.toContain(GAME_INTRO_SOUND)
   })
 
-  it('사람 타석 — 타구음 뒤에 심판 콜이 붙는다 (0x515de~ → 0x51a94)', () => {
+  it('사람 타석 — 타구음 뒤 다음 틀(0x12 진입 0x3dfac)에 심판 콜 (0x515de~ → 0x51a94)', () => {
+    vi.useFakeTimers()
     const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
     녹음.played.length = 0
 
@@ -154,9 +155,13 @@ describe('팀 경기 화면의 소리 배선', () => {
         공({ resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, contactSoundId: 8 }),
       ),
     )
+    // 8 헛스윙 바람 소리 — 결과를 넘긴 틀(타석 화면은 판정 틀에 스스로 내고 비워 넘긴다. 이 시험은 실어 넘긴 옛 호출)
+    expect(녹음.played).toEqual([8])
 
-    // 8 헛스윙 바람 소리 → 18 "Strike!"
+    // → 다음 틀 18 "Strike!"
+    act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 2))
     expect(녹음.played).toEqual([8, 18])
+    vi.useRealTimers()
   })
 
   it('사람 대타를 확정하면 교체 연출 0x16 을 싣고 걸음 끝 소리는 없다 — 등판음 14 는 연출 뒤 0xe 에서 (0x38b64 타자 가지 38cd4)', () => {

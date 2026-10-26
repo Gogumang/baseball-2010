@@ -39,6 +39,7 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 import { FOUL_CALL_SOUND } from '@/features/play-at-bat/model/atBatSounds'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
+import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollDerbySceneStadium } from '@/features/play-team-game/model/sceneStadium'
@@ -328,7 +329,8 @@ export interface HomeRunDerbySession {
   /** 로딩 판을 다 그렸다 — 적재 8 끝이 모드 7 이면 0xd(0x3fa4c~0x3fa50) → 두 그림 뒤 0xe. 굴림 없음 */
   readonly finishLoading: () => void
 
-  readonly onPitchResolved: (detail: PitchOutcomeDetail) => void
+  /** 둘째 인자는 타석 화면이 넘긴 틀의 장면 틱(`BattingStage.onPitchResolved` 다섯째 인자) — 없으면 지금 틱 */
+  readonly onPitchResolved: (detail: PitchOutcomeDetail, sceneTick?: number) => void
   /** 경기 중 메뉴 [다시하기] 예 — 새 경기 장면 (0x3c98e 모드 7 갈래, `restart` 머리말) */
   readonly restart: () => void
   /** 결과 창 [예] — 단계 > 0 이면 rand(1, 4) 를 하나 더 굴린 뒤 `restart` 와 같다 (0x40a08) */
@@ -619,7 +621,8 @@ export function useHomeRunDerby({
     enterNextPitch()
   }, [])
 
-  const onPitchResolved = useCallback((detail: PitchOutcomeDetail) => {
+  const onPitchResolved = useCallback((detail: PitchOutcomeDetail, sceneTick?: number) => {
+    const passedTick = sceneTick ?? gameSceneTickNow()
     // 원본은 공 하나가 상태 0xf 에서 21 갱신 안에 끝날 수 없어 표시는 늘 그 전에 꺼진다 — 웹 타이머가 늦으면 여기서 먼저 끈다
     if (comboTimerRef.current !== null) endShownCombo()
     const current = runRef.current
@@ -638,7 +641,9 @@ export function useHomeRunDerby({
     ballsRef.current = call.balls
     // 볼넷 v3 → 사구 v4 0x3e1b4 `0xaf020(공격 팀, 0)` — 다음 타순 예약. 확정은 다음 0xd 진입(`enterSceneD`)
     if (call.judgment === 3 || call.judgment === 4) lineupRef.current = reserveDerbyNextBatter(lineupRef.current)
-    playSoundIds(audioRef.current, [detail.contactSoundId, call.soundId])
+    // 타구음은 판정 틀 — 타석 화면이 이미 냈다(`contactSoundId` 는 비어 온다). 심판 콜은 다음 틀 0x12 진입 0x3dfac → 0xbba
+    playSoundIds(audioRef.current, [detail.contactSoundId])
+    playSoundIdsAfterSceneTicks(audioRef.current, [call.soundId], passedTick + BATTER_PITCH_RESULT_ENTRY_TICKS - gameSceneTickNow())
 
     // **맞은 공은 홈런더비 판(종류 8)을 돈다** (2026-10-07 직접 뜸 — `derbyBattedBall` 머리말). 원본은 모드 7 도 맞은 공이면
     // 각과 무관하게(파울 · 번트 포함) 판(상태 0x17)을 돌고 그 끝 0x52a52 → 0xae3e8 모드 7 갈래로 간다(H-2). 판 시작은 폴 충돌
@@ -650,13 +655,13 @@ export function useHomeRunDerby({
     const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current, detail.batterHand)
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
     // 공 틱 0 = 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 틀)의 장면 틱 — 판 시각은 그 틱의 머리라 판 안의 틱(소리 · 글자 창 ·
-    // 키 틱 · 판 끝)이 모두 경기 장면 틱 격자에 선다. ⚠️ 근사(때 · 남김 — 웹 구조): 판을 넘긴 틀의 틱을 `gameSceneTickNow()` 로 다시 읽는다 —
-    // rAF 틀 머리와 이 자리 사이에 틱 머리가 지나면 한 틱 늦게 선다
+    // 키 틱 · 판 끝)이 모두 경기 장면 틱 격자에 선다. 판을 넘긴 틀의 틱은 타석 화면이 그 틀의 틱으로 넘긴다(`sceneTick`) — 이 자리에서
+    // `gameSceneTickNow()` 를 다시 읽으면 rAF 틀 머리와 이 자리 사이에 틱 머리가 지났을 때 한 틱 늦게 선다
     // HOMERUN 글자(0x5279a~0x527ac)는 판의 홈런 틱에 켜고(`derbyHomeRunTextOf`), 비거리 판(0x36cd4)은 판 내내 띄운다.
     // 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 글자 창의 첫 그림(홈런 틱)에 타석 화면이 깔고, 유지 단계 그림마다 굴린다
     // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때 · 남김 — 웹 구조): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
     clearPlaySoundTimers()
-    const startedAt = gameSceneTickStartTime(gameSceneTickNow())
+    const startedAt = gameSceneTickStartTime(passedTick)
     // 판의 필드 화면(A-01) — 카메라 · 공 틱 · 이벤트 존을 미리 셈한다(`lib/derbyField`). 존은 그 그림의 공 그리기 0x36dfc 가 놓는다:
     // 공을 그리는 그림 · 높이 투영 ≤ 54 · 땅점 화면 y < 화면 높이/3 · 결과 코드 24~26 · 패턴 플래그 & 2 (U-93)
     const field = batted === null ? null : derbyFieldPlayOf(batted, detail)

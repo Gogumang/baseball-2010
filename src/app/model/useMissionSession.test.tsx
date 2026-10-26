@@ -1760,6 +1760,11 @@ describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428
       expect(afterHomeRun.cpu.pitching).toMatchObject({ inningRunsAllowed: 3, ourRuns: 3, mound: { pitcherSlot: 0 } })
       // 결과 띠가 떠 있는 동안은 0xd 앞 — 아직 안 묻는다
       expect(played).not.toContain(22)
+      // 판정 콜(홈런 11)은 결과를 넘긴 다음 틀이다(`BATTER_PITCH_RESULT_ENTRY_TICKS`)
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 2)
+      })
+      expect(played).toContain(11)
 
       played.length = 0
       act(() => {

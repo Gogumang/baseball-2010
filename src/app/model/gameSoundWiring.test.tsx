@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useCareerSession } from '@/app/model/useCareerSession'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
@@ -15,6 +15,7 @@ import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPattern
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 /**
  * **소리가 실제로 통로까지 가는지** 본다 — 번호를 고르는 규칙은
@@ -75,7 +76,15 @@ const 공 = (overrides: Partial<PitchOutcomeDetail>): PitchOutcomeDetail => ({
 const 떼어낼것: (() => void)[] = []
 afterEach(() => {
   while (떼어낼것.length > 0) 떼어낼것.pop()?.()
+  vi.useRealTimers()
 })
+
+/**
+ * 심판 콜은 다음 틀 — 타석 화면은 0x12 를 예약한 틀에 결과를 넘기고 0x12 진입 0x3dfac 가 다음 틀에 콜을 낸다
+ * (`BATTER_PITCH_RESULT_ENTRY_TICKS`). 그 틀까지 장면 시계를 넘긴다(가짜 시계 — `시계켜기` 를 먼저)
+ */
+const 시계켜기 = () => vi.useFakeTimers()
+const 다음틀까지 = () => act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 2))
 
 const 경기시작 = () => {
   const 녹음 = 녹음포트()
@@ -110,52 +119,66 @@ describe('경기 소리 배선', () => {
     expect(played).toEqual([GAME_INTRO_SOUND])
   })
 
-  it('볼 판정마다 "Ball!" 16 이 난다', () => {
+  it('볼 판정마다 "Ball!" 16 이 난다 — 결과를 넘긴 틀이 아니라 다음 틀(0x12 진입 0x3dfac)에', () => {
+    시계켜기()
     const { rendered, played } = 경기시작()
     act(() => rendered.result.current.session.actions.finishLoading())
     played.length = 0
 
     act(() => rendered.result.current.session.handlePitchResolved(공({ resolution: { kind: '볼' } })))
+    expect(played).toEqual([])
+    다음틀까지()
 
     expect(played).toEqual([16])
   })
 
   it('헛스윙은 바람 소리 뒤에 스트라이크 콜 — 두 번째 스트라이크는 39 다', () => {
+    시계켜기()
     const { rendered, played } = 경기시작()
     act(() => rendered.result.current.session.actions.finishLoading())
     played.length = 0
 
+    // 바람 소리는 타석 화면이 판정 틀에 낸다 — 비우지 않고 넘긴 소리(옛 호출)는 받은 자리에서 곧바로 낸다
     const 헛스윙 = 공({ resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, contactSoundId: 8 })
     act(() => rendered.result.current.session.handlePitchResolved(헛스윙))
+    expect(played).toEqual([8])
+    다음틀까지()
     expect(played).toEqual([8, 18])
 
     act(() => rendered.result.current.session.handlePitchResolved(헛스윙))
+    다음틀까지()
     expect(played).toEqual([8, 18, 8, 39])
   })
 
   it('세 번째 스트라이크에서 "Strike out!" 21 이 난다', () => {
+    시계켜기()
     const { rendered, played } = 경기시작()
     act(() => rendered.result.current.session.actions.finishLoading())
     const 헛스윙 = 공({ resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, contactSoundId: 8 })
     act(() => rendered.result.current.session.handlePitchResolved(헛스윙))
     act(() => rendered.result.current.session.handlePitchResolved(헛스윙))
+    다음틀까지()
     played.length = 0
 
     act(() => rendered.result.current.session.handlePitchResolved(헛스윙))
+    다음틀까지()
 
     expect(played.slice(0, 2)).toEqual([8, 21])
   })
 
   it('네 번째 볼에서 "Base on balls!" 24 가 난다', () => {
+    시계켜기()
     const { rendered, played } = 경기시작()
     act(() => rendered.result.current.session.actions.finishLoading())
     const 볼 = 공({ resolution: { kind: '볼' } })
     for (let count = 0; count < 3; count += 1) {
       act(() => rendered.result.current.session.handlePitchResolved(볼))
     }
+    다음틀까지()
     played.length = 0
 
     act(() => rendered.result.current.session.handlePitchResolved(볼))
+    다음틀까지()
 
     expect(played.slice(0, 1)).toEqual([24])
   })

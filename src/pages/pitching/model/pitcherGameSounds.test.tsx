@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -20,6 +20,8 @@ import {
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 
 /** 무엇이 몇 번 울렸는지 적어 두는 포트 */
 function 녹음포트() {
@@ -85,8 +87,15 @@ describe('투수편 화면의 소리 배선', () => {
     expect(result.current.canPitch).toBe(true)
     녹음.played.length = 0
 
+    vi.useFakeTimers()
+    const 콜틀까지 = () => {
+      const delay = pitchResultEntryDelayTicksOf(result.current.progress.lastPitch?.frameCount ?? 0)
+      act(() => vi.advanceTimersByTime(millisecondsPerFrame() * (delay + 1)))
+    }
     act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
-    expect(녹음.played[0]).toBe(PITCH_RELEASE_SOUND)
+    // 놓는 틀에는 투구 순간 소리만 — 심판 콜은 0x12 진입 틀(놓은 틀에서 `pitchResultEntryDelayTicksOf` 뒤)이다
+    expect(녹음.played).toEqual([PITCH_RELEASE_SOUND])
+    콜틀까지()
 
     // 심판 콜은 난수가 정한다 — 몇 개 더 던져 볼·스트라이크 계열이 통로까지 가는지 본다
     // (16 "Ball!" · 18 "Strike!" · 39 "Strike two!" · 21 삼진 · 24 볼넷 · 25 파울 — 25 는 파울 판이 닫힐 때)
@@ -97,8 +106,12 @@ describe('투수편 화면의 소리 배선', () => {
       }
       if (!result.current.canPitch) break
       act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
+      콜틀까지()
     }
+    vi.useRealTimers()
     expect(녹음.played.some((id) => [16, 18, 39, 21, 24, 25].includes(id))).toBe(true)
+    // 콜은 늘 투구 순간 소리 뒤다
+    expect(녹음.played[0]).toBe(PITCH_RELEASE_SOUND)
   })
 
   it('마구(구질 22)를 던지면 투구 순간 소리가 28 이다 — 내 투수는 육성이라 그 뒤 직구는 다시 12 (0x3f378)', () => {
