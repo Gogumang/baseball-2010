@@ -6489,6 +6489,8 @@ export interface TeamGameSummary {
   readonly opponentScore: number
   readonly ourTeamId: number
   readonly opponentTeamId: number
+  /** 사람(우리) 측 — 전역 경기 상태 +0x28 · +0x7e 의 측 차례 (`setLiveGameSides`). 손으로 만든 요약에는 없다 */
+  readonly playerSide?: PlayerSide
   /** 치른 이닝 (1-기준) */
   readonly inningsPlayed: number
   readonly pitching: TeamPitchingLine
@@ -6583,6 +6585,7 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     opponentScore: game.opponentScore,
     ourTeamId: progress.options.ourTeamId,
     opponentTeamId: progress.options.opponentTeamId,
+    playerSide: game.playerSide,
     inningsPlayed: game.inning,
     pitching: progress.pitching,
     leaguePlateAppearances: progress.leaguePlateAppearances,

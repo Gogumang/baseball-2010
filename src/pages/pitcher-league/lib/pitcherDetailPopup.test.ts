@@ -1,11 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { PITCHER_TRAINING_MENUS, runPitcherTraining } from '@/entities/pitcher-career/model/pitcherManagement'
 import {
   createPitcherCareer, equippedPitcherAbilityOf, pitcherAbilityLimitsOf,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
-import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
+import { pitcherAbilityDetailViewOf, pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
+import { resetLiveGameState, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 
@@ -64,5 +65,27 @@ describe('투수 휴식 결과 창 (0x18ede~0x18fc2)', () => {
     expect(rest.career.morale).toBe(100)
     expect(rows.map((row) => row.change)).toEqual([0, 0, 0, 0, 15])
     expect(rows.every((row) => row.bonus === 0)).toBe(true)
+  })
+})
+
+describe('120 상세 창 스킬 14 투지 갈래 0xb5a28~0xb5a72 (A-11)', () => {
+  afterEach(() => resetLiveGameState())
+
+  it('마지막 사람 경기가 6회 이후 · 내 팀이 지는 측이면 변화 칸이 제구·구속·변화 v/10 만큼 오른다 (체력은 그대로)', () => {
+    const 장착 = 투수({ teamId: 2, equippedSkillIds: [14] })
+    const 안장착 = 투수({ teamId: 2 })
+    setLiveGameInningIndex(6)
+    setLiveGameSides({ ourTeamId: 2, opponentTeamId: 5, ourScore: 0, opponentScore: 3, playerSide: 0 })
+    const 붙음 = pitcherAbilityDetailViewOf(장착).rows
+    const 밑 = pitcherAbilityDetailViewOf(안장착).rows
+    const 효과 = [0, 1, 2, 3].map((slot) => (붙음[slot]?.change ?? 0) - (밑[slot]?.change ?? 0))
+    expect(효과[3]).toBe(0)
+    expect(효과.slice(0, 3).every((value) => value > 0)).toBe(true)
+    // 이기면 · 5회면 없다
+    setLiveGameSides({ ourTeamId: 2, opponentTeamId: 5, ourScore: 4, opponentScore: 3, playerSide: 0 })
+    expect(pitcherAbilityDetailViewOf(장착).rows.map((row) => row.change)).toEqual(밑.map((row) => row.change))
+    setLiveGameSides({ ourTeamId: 2, opponentTeamId: 5, ourScore: 0, opponentScore: 3, playerSide: 0 })
+    setLiveGameInningIndex(4)
+    expect(pitcherAbilityDetailViewOf(장착).rows.map((row) => row.change)).toEqual(밑.map((row) => row.change))
   })
 })

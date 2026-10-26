@@ -1,4 +1,5 @@
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
+import { isLiveGameFightingSpiritSituation } from '@/shared/lib/liveGameState/liveGameState'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { BATTER_BURSTS, PITCHER_BURSTS } from '@/shared/config/original/bursts'
@@ -59,11 +60,15 @@ import type { DetailView } from '@/pages/management/lib/detailPopup'
  *   - 사기 줄은 정액(−50/−100/−200)을 "감소" 로 적는다 — 나리 창(0x88fe8)의 % 줄과 글이 다르지만, 시즌의 실제 사기 감소
  *     (`moralePenaltyOf`)도 같은 정액이라 글과 실제는 맞다(버그 아님).
  *   - 나리 창에 있던 부상 줄(선수 +0x1b5)이 시즌판에는 없다.
- * ⚠️ 미해결(남김): 0xb570c 의 스킬 14 갈래(0xb5a16~0xb5a72, 직접 떴다)는 투수(0xb6279) · 스킬 14(0xb62b5(rec, 0xe)) · 종류 ≠ 3
- * 이고 전역 경기 상태 [0x1552d0c] 의 **+0x6b(이닝) > 4** 이며 0xb6a4d(상태)(0xb69b0 두 번 — 점수 비교) == 0xb6be9(상태, 팀)
- * (`+0x28 ^ 팀` 이 0 이 아님) 일 때 값 += 값/10 이다. 웹은 마지막 경기의 +0x6b 만 들고(`liveGameInningIndex`) +0x28 · 점수 칸은
- * 들지 않아 이 갈래를 빼 둔다 — 변화 칸에서 빠진다.
+ * **스킬 14(투수 비트 14 — 투지) 갈래** (0xb570c 0xb5a16~0xb5a72, 직접 떴다 — A-11): 투수(0xb6279) · 장착 14(0xb62b5(rec, 0xe)) ·
+ * 칸 r7 ≠ 3(체력)이고 전역 경기 상태 [0x1552d0c] 의 **+0x6b(이닝) > 4** 이며 0xb6a4d(상태)(+0x7f < +0x7e ? 1 : 0 — 지는 측, 동점이면 0)
+ * == 0xb6be9(상태, 팀레코드+0)(`+0x28 ^ 팀` 이 0 이 아니면 1) 일 때 팀 정액 뒤 · 코치 앞에서 값 += 값/10 이다.
+ * 관리 화면이라 **마지막으로 돈 사람 경기**(모드 불문)의 이닝 · 측별 팀 · 점수가 남은 것을 본다(`isLiveGameFightingSpiritSituation`).
+ * 팀은 0x897e8 · 0x7ba44 가 넘기는 내 팀 레코드 +0 = 시즌 팀 번호다.
  */
+
+/** 0xb62b5(선수, 0xe) — 투수 비트 14 투지 (skills.json 30) */
+const FIGHTING_SPIRIT_SKILL_BIT = 14
 
 /** StrITEM 은 부위마다 11칸 · 투수 장비는 44칸부터 */
 const ITEMS_PER_PART = 11
@@ -88,7 +93,7 @@ function moraleCutOf(morale: number): number {
 
 /** 0x897e8 · 0x7ba44 가 함께 읽는 시즌 쪽 값 */
 export interface SeasonPlayerDetailContext {
-  readonly record: Pick<SeasonRecord, 'illness' | 'illnessSlack' | 'coach'>
+  readonly record: Pick<SeasonRecord, 'illness' | 'illnessSlack' | 'coach' | 'teamId'>
   /** 팀 레코드 +2 — 내 팀 사기 */
   readonly teamMorale: number
 }
@@ -108,6 +113,8 @@ export function seasonDetailEffectiveOf(view: SeasonPlayerRecordView, slot: numb
     // −30% 는 질병 종류 SR+5 가 아니라 입원 여유 SR+6 을 본다 (0xb5824 — `illnessPenaltyFieldOf`)
     season: { illness: illnessPenaltyFieldOf(context.record), morale: context.teamMorale, coach: context.record.coach },
     ...(view.isPitcher ? {} : { assignment: assignmentOf(view) }),
+    // b5a28~b5a72 — 장착 14 이고 마지막 사람 경기가 6회 이후 · 내 팀(팀레코드 +0) 지는 측 (`isLiveGameFightingSpiritSituation`)
+    fightingSpirit: hasSeasonSkill(view, FIGHTING_SPIRIT_SKILL_BIT) && isLiveGameFightingSpiritSituation(context.record.teamId),
   })
 }
 

@@ -46,7 +46,7 @@ import {
   withoutRecordLine,
 } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
-import { ROOKIE_BATTER_SLOT, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
+import { ROOKIE_BATTER_SLOT, nariTeamsOf, withCpuGameRecordAces } from '@/entities/career/model/nariTeamRecord'
 import { nariLeagueTeamRecordOf, rollNariCpuEquipment } from '@/entities/career/model/nariCpuEquipment'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
@@ -1039,6 +1039,8 @@ export function applyLeagueDay(
     leaguePlayerStats: played.playerStats,
     // 하루 끝 4f2e8 — 열 팀 0xb617c (+20%)
     leaguePitcherStaminas: recoveredLeagueStaminas(played.pitcherStaminas, BATTER_EDITION_MODE),
+    // 0xc239c 가 0xb8680(모드 4 → 0x1f989)으로 받은 나리 레코드에 넣은 마선수는 경기 뒤에도 남는다 (A-05)
+    nariTeams: withCpuGameRecordAces(nariTeamsOf(career), played.recordAces),
   }
 }
 
@@ -1093,6 +1095,8 @@ export function applyPostseasonCpuGames(
     postseason: result.series,
     leaguePitcherStaminas: result.pitcherStaminas,
     ...(result.staleRecordMorales === undefined ? {} : { teamRecordMorales: result.staleRecordMorales }),
+    // 0xc2760 → 0xc239c 도 나리 레코드에 마선수를 넣고 남긴다 (A-05)
+    ...(result.recordAces === undefined ? {} : { nariTeams: withCpuGameRecordAces(nariTeamsOf(career), result.recordAces) }),
   }
 }
 

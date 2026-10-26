@@ -37,7 +37,7 @@ import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSc
 import { MissionResultBoard } from '@/pages/mission-play/ui/MissionResultBoard'
 import { missionResultLeaveOf } from '@/pages/mission-play/lib/missionResultBoard'
 import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionResultBoard'
-import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { liveGameSidesOf, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
@@ -250,6 +250,19 @@ export function MissionPlayScreen({
   }, [run.mission, missionInningIndex])
   /** 경기 점수판 0xb69b0(st[0x7e] · st[0x7f]) — 사람 칸 · CPU 칸. 타석 득점 · 자동진행 반 이닝 득점이 모두 든다(`run.game.scores`) */
   const teamIds = missionTeamIdsOf(run)
+  // 경기[0x28 + 칸] 팀(0xaa57c aa72a 의 0xb6bd4) · 점수 st[0x7e + 칸](0xb69b0) — 미션 경기도 전역 상태라 관리 화면 상세 창의
+  // 스킬 14 갈래(0xb5a28~)가 마지막 미션 판의 값을 본다 (`setLiveGameSides`)
+  const sideHumanTeam = teamIds.human
+  const sideCpuTeam = teamIds.cpu
+  const sideHumanScore = run.game.scores[humanSideOf(run.mission)]
+  const sideCpuScore = run.game.scores[cpuSideOf(run.mission)]
+  const sideOfHuman = humanSideOf(run.mission)
+  useEffect(() => {
+    setLiveGameSides(liveGameSidesOf(
+      { ourTeamId: sideHumanTeam, opponentTeamId: sideCpuTeam },
+      { ourScore: sideHumanScore ?? 0, opponentScore: sideCpuScore ?? 0, playerSide: sideOfHuman },
+    ))
+  }, [sideHumanTeam, sideCpuTeam, sideHumanScore, sideCpuScore, sideOfHuman])
   const humanScore = run.game.scores[humanSideOf(run.mission)]
   const cpuScore = run.game.scores[cpuSideOf(run.mission)]
 

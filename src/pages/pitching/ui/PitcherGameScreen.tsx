@@ -88,7 +88,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import { MAXIMUM_GAME_POINT, STARTING_ABILITY } from '@/entities/career/model/playerCareer'
-import { setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
+import { liveGameSidesOf, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
@@ -311,6 +311,12 @@ function PitcherGameScene({
   useEffect(() => {
     setLiveGameInningIndex(inningIndex)
   }, [inningIndex])
+  // 측별 팀 +0x28(셋업 0xb6bd4) · 점수 +0x7e(득점 0xb6a9c)도 경기 장면이 그때그때 쓴다 — 나간 그때의 값이 남는다
+  const { ourTeamId, opponentTeamId } = progress.options
+  const { ourScore, opponentScore, playerSide } = progress.game
+  useEffect(() => {
+    setLiveGameSides(liveGameSidesOf({ ourTeamId, opponentTeamId }, { ourScore, opponentScore, playerSide }))
+  }, [ourTeamId, opponentTeamId, ourScore, opponentScore, playerSide])
 
   // 타석·차례가 바뀌면 1단계로 되돌린다
   useEffect(() => {

@@ -58,6 +58,16 @@ export function nariMoraleOf(career: NariMoraleCareer): number {
   return teams.opponentMorale ?? teamRecordMoraleOf(teams.opponentTeamId)
 }
 
+/**
+ * `0x1f988(저장, S[1])` 이 돌려주는 레코드의 **+0 팀 번호** — 대회 중이면 상대국 칸 +0xbe0 의 팀(11~13, 1f964~1f970 — S[1] 이 10 이
+ * 아니라서), 아니면 내 리그 팀. 투수편 120 상세 창(0x88fe8 89020~89032)이 이 레코드를 0xb570c 의 팀으로 넘겨 스킬 14 갈래의
+ * `0xb6be9(상태, 팀)` 이 이 번호를 본다. B-17 고침이면 사기 칸처럼 늘 내 리그 팀이다. 대회 칸이 아직 없으면 내 리그 팀
+ */
+export function nariRecordTeamIdOf(career: NariMoraleCareer & { readonly teamId: number }): number {
+  if (career.nationalCup === undefined || !moraleSlotIsOpponentDuringCup()) return career.teamId
+  return career.nariCupTeams?.opponentTeamId ?? career.teamId
+}
+
 /** 0xa3a44 — 나리 사기를 v 로(0..100 으로 자른다). 대회 중이면 상대국 칸 +2 에 쓰고 커리어 사기는 그대로다 */
 export function withNariMorale<T extends NariMoraleCareer>(career: T, value: number): T {
   const clamped = Math.min(MAXIMUM_MORALE, Math.max(0, value))

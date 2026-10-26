@@ -187,6 +187,29 @@ export interface NariRecordAces {
 }
 
 /**
+ * **CPU 끼리 경기가 넣은 마선수를 레코드에 남긴다** (A-05) — 준비 `0xc239c`(c24aa `0xb8870(A, x)` · c24b6 `0xb88c8(A, y)` ·
+ * c24dc `0xb88c8(B, v)` · c24ee `0xb8870(B, w)`)의 팀 객체는 `0xb8680` 모드 3·4 → `0x1f989` 로 **나리 저장 레코드 자체**를 받는다
+ * (b86c6~b86d0, 포스트시즌 0xc2760 도 같은 준비). 그래서 `0xb53f0` 0x40 갈래 · `0xb521c` 0x60 갈래가 레코드를 늘려(또는 덮어)
+ * 9번 마타자 · 8번 마투수가 경기 뒤에도 남는다 — 레코드에서 빼는 `0xb512c` 는 시즌 0xdf · 0xe5 진입만 부른다(나리는 안 부른다).
+ * `aces` 는 팀 번호 → 그 팀이 마지막으로 치른 CPU 경기가 넣은 번호 (`LeagueDayResult.recordAces` · `CpuPostseasonResult.recordAces`).
+ * 같은 칸을 다음 CPU 경기 · 142 가 덮으므로(덮기 갈래와 새로 늘리기는 같은 배열 꼴) 간이 경기 결과와 굴림은 바뀌지 않는다 —
+ * 레코드 줄만 남는다.
+ */
+export function withCpuGameRecordAces(
+  records: NariTeamRecords,
+  aces: Readonly<Record<number, { readonly batter: number; readonly pitcher: number }>>,
+): NariTeamRecords {
+  let next = records
+  for (const [team, teamAces] of Object.entries(aces)) {
+    const teamId = Number(team)
+    if (teamId < 0 || teamId >= LEAGUE_TEAM_COUNT) continue
+    const record = seatAcePitcher(seatAceBatter(nariTeamRecordOf(next, teamId), teamAces.batter), teamAces.pitcher)
+    next = withNariTeamRecord(next, teamId, record)
+  }
+  return next
+}
+
+/**
  * 142 진입 0x1c46c 의 넣기 (1c62e~1c660) — `0xb88c8(내 팀, p)` · `0xb8870(내 팀, b)` · `0xb88c8(상대, …)` ·
  * `0xb8870(상대, …)`. 레코드에서 마선수를 빼는 코드가 없어 다음 장면의 142 가 같은 칸을 덮을 때까지 남는다.
  */

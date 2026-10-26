@@ -11,7 +11,7 @@ const 타자: SeasonPlayerRecordView = {
   equipment: [0, 0, 0, 0], fieldPosition: 3, isComplete: true,
 }
 /** 앓고 있는데(SR+5 = 1) 입원 여유 SR+6 이 0 */
-const 앓음여유0: SeasonPlayerDetailContext = { record: { illness: 1, illnessSlack: 0, coach: -1 }, teamMorale: 100 }
+const 앓음여유0: SeasonPlayerDetailContext = { record: { illness: 1, illnessSlack: 0, coach: -1, teamId: 0 }, teamMorale: 100 }
 
 describe('B-80 질병 줄은 SR+5, 실제 −30% 는 SR+6 을 본다', () => {
   it('원본: 줄은 뜨는데 변화 칸에 −30% 가 없다', () => {
@@ -23,7 +23,7 @@ describe('B-80 질병 줄은 SR+5, 실제 −30% 는 SR+6 을 본다', () => {
   it('고침: −30% 도 SR+5 를 봐 줄과 맞는다 — 안 앓으면 여유 칸이 남아도 안 깎인다', () => {
     setBugfixConfigForTests(bugfixConfigWith(['B-80']))
     expect(seasonPlayerDetailViewOf(타자, 앓음여유0).rows[0]?.change).toBe(-150)
-    const 건강 = seasonPlayerDetailViewOf(타자, { ...앓음여유0, record: { illness: 0, illnessSlack: 3, coach: -1 } })
+    const 건강 = seasonPlayerDetailViewOf(타자, { ...앓음여유0, record: { illness: 0, illnessSlack: 3, coach: -1, teamId: 0 } })
     expect(건강.messages).toEqual([])
     expect(건강.rows[0]?.change).toBe(0)
   })

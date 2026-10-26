@@ -79,7 +79,7 @@ import {
 } from '@/entities/pitcher-career/model/myPitcherRecord'
 import type { MyPitcherDay } from '@/entities/pitcher-career/model/myPitcherRecord'
 import { myPitcherRegistrationSlotOf, registeredMyPitcherOrderOf } from '@/entities/pitcher-career/model/myPitcherRecord'
-import { createNariTeamRecords, nariTeamsOf } from '@/entities/career/model/nariTeamRecord'
+import { createNariTeamRecords, nariTeamsOf, withCpuGameRecordAces } from '@/entities/career/model/nariTeamRecord'
 import { nariLeagueTeamRecordOf, rollNariCpuEquipment } from '@/entities/career/model/nariCpuEquipment'
 import {
   DEFAULT_PITCHER_ROOKIE_PROFILE,
@@ -988,6 +988,8 @@ export function applyPitcherLeagueDay(
     leaguePlayerStats: played.playerStats,
     // 하루 끝 4f304 — 열 팀 0xb617c (내 육성 선수가 아니면 +20%). 내 투수 회복은 `applyPitcherGameResult` 가 한다
     leaguePitcherStaminas: recoveredLeagueStaminas(played.pitcherStaminas, PITCHER_EDITION_MODE),
+    // 0xc239c 가 0xb8680(모드 3 → 0x1f989)으로 받은 나리 레코드에 넣은 마선수는 경기 뒤에도 남는다 (A-05)
+    nariTeams: withCpuGameRecordAces(nariTeamsOf(career), played.recordAces),
   }
 }
 
@@ -1151,6 +1153,8 @@ export function applyPitcherPostseasonProgress(
       postseason: result.series,
       leaguePitcherStaminas: result.pitcherStaminas,
       ...(result.staleRecordMorales === undefined ? {} : { teamRecordMorales: result.staleRecordMorales }),
+      // 0xc2760 → 0xc239c 도 나리 레코드에 마선수를 넣고 남긴다 (A-05)
+      ...(result.recordAces === undefined ? {} : { nariTeams: withCpuGameRecordAces(nariTeamsOf(career), result.recordAces) }),
     }
 }
 
