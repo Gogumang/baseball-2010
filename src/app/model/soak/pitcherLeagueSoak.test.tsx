@@ -1166,8 +1166,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     onScreen.value = false
     rendered = mount()
     await waitUntil(() => result.current.storyEvents !== null, '이벤트 본문')
-    // 116 재진입 0x1278c · 반복 이벤트 지움 — `checkRoundTrip` 과 같은 근거
-    const reentered = now !== null && scene === '경기결과' && now.seasonEndState === 116 ? enterPitcherGameEvaluation(now) : now
+    // 116 재진입 0x1278c · 반복 이벤트 지움 — `checkRoundTrip` 과 같은 근거. B-28 고친 길이면 재진입이 없다(저장 그대로)
+    const reentered = now !== null && scene === '경기결과' && now.seasonEndState === 116 && !isBugFixed('B-28')
+      ? enterPitcherGameEvaluation(now)
+      : now
     const expected = reentered === null || events === null ? reentered : forgetRepeatableEvents(reentered, events)
     const d = firstDiffOf(expected, result.current.career, 'career')
     if (d !== null) problems.add(at, [`이어하기(${scene}) 뒤 커리어가 다르다: ${d}`])
