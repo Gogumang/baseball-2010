@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 
 /**
@@ -12,10 +13,12 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
  *       "관중: " SR+0x1b4 "명" " / " "수입: " 0x55cf4(SR+0x66 × 100) (SR+0x55 > 0 이면 "(+200)") "만"
  * e0d4  0x8a6fc(evmgr, 모드, 글 번호 50000, 글, …, S+7 · 팀 사기 · S+0x4a · 인기도 · S+0x64 · 평판, 표정 8)
  * ```
- * S = SR+0x1a0 경기 평판 16칸(`gameRecord`). 원본 그대로의 어긋남 셋:
- * - 동점이면 "경기패배!" 다(`>` 비교). 원본 시즌 경기는 동점으로 끝나지 않지만 식은 그대로 둔다.
- * - 안타 = S[7] + S[8] + S[9] — 홈런 칸이 빠지고 2루타·3루타는 S[7] 과 함께 두 번 센다(`seasonReputation` 주석).
- * - 구내매점 "(+200)" 이 "만" **앞**에 붙는다 → "수입: 520(+200)만". "(+200)" 은 0x8a6fc 가 SR+0x55 를 줄이기 **전** 값으로 본다.
+ * S = SR+0x1a0 경기 평판 16칸(`gameRecord`). 원본의 어긋남 셋(B-67):
+ * - 동점이면 "경기패배!" 다(`>` 비교). 원본 시즌 경기는 동점으로 끝나지 않아(0xb68fc 연장 상한 없음) 닿지 않는다 — 고칠 것 없음(정정 r279).
+ * - 안타 = S[7] + S[8] + S[9] — S[7] 이 이미 홈런까지 든 안타 수(S4 2절 · 0xa8518)라 2루타·3루타를 두 번 센다.
+ *   (ORIGINAL-BUGS 의 "홈런이 빠진다" 는 틀렸다 — 홈런은 S[7] 에 들어 있다.)
+ * - 구내매점 "(+200)" 이 "만" **앞**에 붙는다(e052 "(+200)" → e058 "만") → "수입: 520(+200)만". "(+200)" 은 0x8a6fc 가 SR+0x55 를 줄이기 **전** 값으로 본다.
+ * **고침(bugfixes.json B-67, 기본 켬)**: 안타 = S[7] 하나 · "(+200)" 은 "만" 뒤("수입: 520만(+200)"). 굴림 없음.
  *
  * 0x8a6fc 시즌(모드 2) 갈래: 명령 1 say(글 번호 50000 — 0x8bab8 이 감독 글을 안 붙여 대사 = 기록 줄만) · 명령 2 system sub 2
  * (변화 창 0x86c90) · 인기도 막대 d = 12(0x8a816) · 연속 기록은 통째로 건너뛴다(0x8a834 → 0x8afaa) · 구내매점 SR+0x55 −1,
@@ -24,11 +27,13 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 export function seasonGameEvaluationLineOf(record: SeasonRecord): string {
   const s = record.gameRecord
   const result = record.lastGameScore > record.lastGameConceded ? '경기승리!' : '경기패배!'
-  const hits = (s[7] ?? 0) + (s[8] ?? 0) + (s[9] ?? 0)
+  const fixed = isBugFixed('B-67')
+  const hits = fixed ? (s[7] ?? 0) : (s[7] ?? 0) + (s[8] ?? 0) + (s[9] ?? 0)
   const store = record.storeGames > 0 ? '(+200)' : ''
+  const income = originalMoneyText(record.lastIncome * 100)
   return `득점: ${record.lastGameScore} / 실점: ${record.lastGameConceded} / ${result}!N` +
     `안타: ${hits} / 피안타: ${s[2] ?? 0} / 에러: ${s[3] ?? 0}!N` +
-    `관중: ${record.lastAttendance}명 / 수입: ${originalMoneyText(record.lastIncome * 100)}${store}만`
+    `관중: ${record.lastAttendance}명 / 수입: ${fixed ? `${income}만${store}` : `${income}${store}만`}`
 }
 
 /**

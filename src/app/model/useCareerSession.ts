@@ -399,6 +399,28 @@ export function isEvaluatedGame(careerBeforeGame: Pick<PlayerCareer, 'postseason
   return careerBeforeGame.postseason === null
 }
 
+/** 평가 변화 없음 — 포스트시즌 경기는 0xa719c 를 안 타 인기도 · 평판 · 사기가 그대로다 (B-73 고친 길의 116 숫자) */
+const NO_EVALUATION_CHANGE = { popularityChange: 0, reputationChange: 0, moraleChange: 0 } as const
+
+/**
+ * 116 이 보일 평가 숫자와 기록 줄 — S+0x4a · +0x64 · +7 · S+0x1d8 은 평가 0xa719c(정규시즌만 — 0x4f268 `ldrb L+0x34 ; bne 0x4f29a`)가 쓴다.
+ * ⚠️ 원본 버그(B-73): 포스트시즌 경기 뒤 116 은 **앞 정규 경기의** 평가 숫자 · 기록 줄(타수 안타 타점 홈런) · 칭호 39 판정을 다시 보인다.
+ * 옛 저장에 앞 값이 없으면 이 경기 값.
+ * **고침(`bugfixes.json` B-73, 기본 켬)**: 기록 줄은 이 경기 값, 평가 숫자는 실제로 안 바뀌었으므로 0 (감독 글은 부르는 곳이 0 으로 다시 고른다).
+ * 굴림 없음 — 다만 116 쪽 스킬 카운터(`countGameForSkills` +0x1c2 · 먹튀)가 0 을 세고 칭호 39 가 이 경기 홈런을 본다.
+ */
+export function shownGameEvaluationOf(
+  isEvaluated: boolean,
+  thisEvaluation: GameEvaluation,
+  previous: PlayerCareer['lastGame'],
+  stats: Parameters<typeof nariRecordLineOf>[0],
+): { readonly evaluation: GameEvaluation; readonly recordLine: ReturnType<typeof nariRecordLineOf> } {
+  if (isEvaluated) return { evaluation: thisEvaluation, recordLine: nariRecordLineOf(stats) }
+  if (isBugFixed('B-73')) return { evaluation: { ...thisEvaluation, ...NO_EVALUATION_CHANGE }, recordLine: nariRecordLineOf(stats) }
+  if (previous === undefined) return { evaluation: thisEvaluation, recordLine: nariRecordLineOf(stats) }
+  return { evaluation: previous.evaluation, recordLine: previous.recordLine ?? nariRecordLineOf(previous.summary.stats) }
+}
+
 /** 평가(인기도 → 평판 → 사기, 0xa719c)를 얹는다 — 평가하지 않는 경기면 그대로 */
 export function applyGameEvaluation(
   career: PlayerCareer,
@@ -879,11 +901,9 @@ export function useCareerSession({
        * 116 이 읽는 S+0x4a · +0x64 · +7 · S+0x1d8 은 평가 0xa719c(정규시즌만, 0x4f268)가 쓰는 칸이라 **포스트시즌 경기 뒤에는 앞 평가
        * 경기 값**이다 — 평가 창 숫자 · 감독 글 · 징글 · 경기 뒤 카운터(+0x1c2 · 먹튀) · 칭호 39 모두. 옛 저장에 앞 값이 없으면 이 경기 값.
        */
-      const previous = currentCareer.lastGame
-      const staleEvaluation = isEvaluated || previous === undefined ? thisEvaluation : previous.evaluation
-      const recordLine = isEvaluated || previous === undefined
-        ? nariRecordLineOf(summary.stats)
-        : previous.recordLine ?? nariRecordLineOf(previous.summary.stats)
+      const { evaluation: staleEvaluation, recordLine } = shownGameEvaluationOf(
+        isEvaluated, thisEvaluation, currentCareer.lastGame, summary.stats,
+      )
       // 승리 31 · 패배 32 징글은 정산 0x19 진입(경기 끝 판 0x18 의 OK 뒤), 평가 징글 36 · 37 · 38 은 116 진입이 낸다 —
       // 결과 화면이 단계에 들어설 때 부른다(`enterGameSettlement` · `enterGameEvaluation`)
       // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)

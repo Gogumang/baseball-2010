@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { equippedPitcherAbilityOf, GAMES_PER_SEASON, pitcherYearlyStatsOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
@@ -154,7 +155,10 @@ const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
 
 /** 칸 하나의 이번 시즌 훈련 수 — `u8 S+0x4b+s − s8 S+0x6b+s` (0xad87e~0xad88a, 깃털 0xad91a 도 같은 읽기) */
 const seasonTrainingByteCountOf = (career: PitcherCareer, menuId: string) =>
-  ((career.trainingCounts[menuId] ?? 0) & 0xff) - toInt8(career.seasonStartTrainingCounts[menuId] ?? 0)
+  isBugFixed('B-70')
+    ? // 고침(bugfixes.json B-70, 기본 켬): 참 값끼리 — 사본 128 이상에서 s8 로 음수가 되는 원본 버그를 걷는다
+      (career.trainingCounts[menuId] ?? 0) - (career.seasonStartTrainingCounts[menuId] ?? 0)
+    : ((career.trainingCounts[menuId] ?? 0) & 0xff) - toInt8(career.seasonStartTrainingCounts[menuId] ?? 0)
 
 /**
  * 투수 통산 `0x9da28` 의 +4(Σ +0x24 세이브) · +0xe(Σ s8 +0x2e 승) — 지난 해 0x1fa78(i)(i < 연차idx)와 이번 해 0x1fbd0 을 s32 로

@@ -8,6 +8,7 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import {
   BOARD_FRAME, BOARD_ROW_STEP, LOGO_INSET, RESULT_IMAGE, boardRowsOf, imageCenterOf, isWinA, isWinB,
+  showsResultMark,
   logoPanelRectsOf, rowPanelRectsOf, scoreRightOf, shifted,
 } from '@/pages/season/lib/dayResultBoard'
 import type { BoardBox, PanelRect } from '@/pages/season/lib/dayResultBoard'
@@ -123,8 +124,8 @@ export function DayResultBoardScreen({ board, onConfirm, gamePoint }: DayResultB
               aria-label={`${TEAMS[row.teamA]?.name ?? ''} ${row.scoreA} : ${row.scoreB} ${TEAMS[row.teamB]?.name ?? ''}`}>
               <TeamLogo cell={shifted(BOARD_FRAME.logoA, index)} teamId={row.teamA} />
               <TeamLogo cell={shifted(BOARD_FRAME.logoB, index)} teamId={row.teamB} />
-              <ResultMark cell={shifted(BOARD_FRAME.resultA, index)} isWin={isWinA(row)} />
-              <ResultMark cell={shifted(BOARD_FRAME.resultB, index)} isWin={isWinB(row)} />
+              {showsResultMark(row) && <ResultMark cell={shifted(BOARD_FRAME.resultA, index)} isWin={isWinA(row)} />}
+              {showsResultMark(row) && <ResultMark cell={shifted(BOARD_FRAME.resultB, index)} isWin={isWinB(row)} />}
               <SpriteNumber glyphs={numberGlyphsOf(row.scoreA)} right={scoreRightOf(scoreA, row.scoreA)}
                 boxTop={scoreA.y} boxHeight={scoreA.height} />
               <SpriteNumber glyphs={numberGlyphsOf(row.scoreB)} right={scoreRightOf(scoreB, row.scoreB)}

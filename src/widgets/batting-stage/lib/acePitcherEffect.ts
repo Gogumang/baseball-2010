@@ -1,4 +1,5 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 
 /**
@@ -47,7 +48,8 @@ import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoad
  * - **레오니**(6) 0x4703a: 둘째 인자 != 0 일 때 자세 4~14 로 leony_effect 프레임을 0xbe8d5 로 **목록**(+0x234)에 넣지만, 이 부름은
  *   목록 비우기 0x4d744 **뒤**다. 0x4d2ac 는 그 뒤 0x4c4bc 로 끝나고 0x4c4bc 안에는 비우기(0xbe6a1 — 부르는 곳 15곳 전수)가 없으며,
  *   장면 프레임 0x52c50 이 그리기 뒤 53032~53044 에서 목록 수가 0 보다 크면 **그리지 않고** 0xbe4a9(수 = 0)로 버린다.
- *   → **레오니 이펙트는 화면에 안 나온다(원본 그대로)**. 그래서 여기 없다.
+ *   → **레오니 이펙트는 화면에 안 나온다(원본 버그 B-82)**. 원본 길은 아무것도 안 그린다.
+ *   **고침(bugfixes.json B-82, 기본 켬)**: 넣은 그림을 목록 비우기 앞에 넣은 것처럼 깊이대로 그린다(`leonyEffectDrawsOf`). 굴림 없음.
  */
 
 /** effect_pitcher.pzx (+0x1044) */
@@ -63,6 +65,7 @@ const ACE_EFFECT_FOLDERS = [
 ] as const
 
 const PSYKER_NUMBER = 5
+const LEONY_NUMBER = 6
 const BBMACHINE_NUMBER = 7
 const BALLANTINE_NUMBER = 8
 const DRAGONA_NUMBER = 9
@@ -164,4 +167,61 @@ export function aceMagicScaledOriginOf(
   height: number,
 ): { readonly x: number; readonly y: number } {
   return { x: anchor.x - halfTowardZero(scale * width), y: anchor.y - halfTowardZero(scale * height) }
+}
+
+/** leony_effect 프레임 폴더 (0x67 겹이 있다 — `FRAME_LAYER_FOLDERS`) */
+export const LEONY_EFFECT_FRAMES = './sprites/leony_effect/frames'
+/** [0xcfa8c+8] — 투수 깊이 24500. 레오니 그림은 이것 −1(투수 뒤) · +1(투수 앞)로 넣는다 */
+const LEONY_BASE_DEPTH = 24500
+
+/** 0xbe8d5 로 넣는 한 장 — 투수 앵커에서 (dx, dy) 떨어진 자리에 프레임을 그 원점대로 */
+export interface LeonyEffectDraw {
+  readonly frame: number
+  readonly dx: number
+  readonly dy: number
+  readonly depth: number
+}
+
+/**
+ * **레오니(6) 0x4703a** — 투수 자세 p = 0x9e0b8(4~14, 점프표 0xd00dc)마다 leony_effect 프레임을 0xbe8d5(목록, x, y, 깊이, 그림, 프레임,
+ * 0, 0, 1, 0, −1)로 넣는다. 상자 (w, h) = 0xba815(그림, 프레임, 1)(합집합 상자 = origins 의 폭 · 높이):
+ * ```
+ * p 4 · 5      47066 · 47072  프레임 5 · 6 을 앵커에                         깊이 D − 1
+ * p 6 · 7      4707e · 470d2  프레임 7 · 8 을 앵커에, 그 뒤 프레임 2 · 3 을 (0, −h)   깊이 D − 1
+ * p 8          47142          프레임 4 를 (0, −h)                               깊이 D − 1
+ * p 9          47184          프레임 0 을 (−w/2, −h/2)                          깊이 D + 1
+ * p 10         471d6          프레임 1 을 (−w/2, −w/2) — y 도 폭으로 뺀다(원본 그대로)  깊이 D + 1
+ * p 11~14      47224          프레임 p − 2 를 앵커에                            깊이 D − 1
+ * ```
+ * D = [0xcfa8c+8] = 24500(투수), /2 는 0 쪽 자름. **원본은 이 부름이 목록 비우기 0x4d744 뒤라 아무것도 안 나온다(B-82)** — 원본 길은 빈 목록.
+ */
+export function leonyEffectDrawsOf(
+  input: AcePitcherEffectInput,
+  pose: number,
+  boxOf: (frame: number) => { readonly width: number; readonly height: number } | null,
+): readonly LeonyEffectDraw[] {
+  if (!isBugFixed('B-82')) return []
+  const branch = aceMagicBranchOf(input)
+  if (branch === null || branch.number !== LEONY_NUMBER) return []
+  const behind = LEONY_BASE_DEPTH - 1
+  const front = LEONY_BASE_DEPTH + 1
+  const at = (frame: number, dx = 0, dy = 0, depth = behind): LeonyEffectDraw => ({ frame, dx, dy, depth })
+  const above = (frame: number): LeonyEffectDraw | null => {
+    const box = boxOf(frame)
+    return box === null ? null : at(frame, 0, -box.height)
+  }
+  const drawn = (draws: readonly (LeonyEffectDraw | null)[]) => draws.filter((draw): draw is LeonyEffectDraw => draw !== null)
+  if (pose === 4 || pose === 5) return [at(pose + 1)]
+  if (pose === 6 || pose === 7) return drawn([at(pose + 1), above(pose - 4)])
+  if (pose === 8) return drawn([above(4)])
+  if (pose === 9) {
+    const box = boxOf(0)
+    return box === null ? [] : [at(0, -halfTowardZero(box.width), -halfTowardZero(box.height), front)]
+  }
+  if (pose === 10) {
+    const box = boxOf(1)
+    return box === null ? [] : [at(1, -halfTowardZero(box.width), -halfTowardZero(box.width), front)]
+  }
+  if (pose >= 11 && pose <= 14) return [at(pose - 2)]
+  return []
 }

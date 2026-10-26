@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { hasSkill, startNextSeason } from '@/entities/career/model/playerCareer'
 import { ROMANCE_EVENT_IDS, TITLE_NAMES } from '@/entities/career/model/titles'
@@ -173,8 +174,18 @@ export function judgeEnding(career: PlayerCareer): number | null {
   if (popularity > 1500) return 5
   if (popularity > 1000 && money > 199) return 4
   if (popularity > 1000) return 3
-  // 원본은 "999 이하" 만 은퇴식이라 정확히 1000 이면 판정이 없다 (−1)
-  return popularity <= 999 ? 2 : null
+  // 원본은 "999 이하" 만 은퇴식이라 정확히 1000 이면 판정이 없다 (−1, 0xa3b66 `0x3e7 ; bgt` — 3 은 0xa3b5e `> 1000`)
+  // 고침(bugfixes.json B-76, 기본 켬): 1000 도 은퇴식(2) — 판정 없음 엔딩(키가 안 먹는 141)에 갇히지 않는다
+  return popularity <= retirementPopularityLimit() ? 2 : null
+}
+
+/**
+ * 은퇴식(엔딩 2)의 인기도 상한 — 원본 0xa3b66 은 `≤ 999`, 3 은 `> 1000`(0xa3b5e) 이라 **정확히 1000 이 비어** 판정 −1 이 된다.
+ * −1 은 141 키 0x1220c 가 부호 없이(`cmp e,#1 ; bhi`, 12224) 보너스 갈래로 보낸 뒤 단계 > 2 에서 부호 있게(`ble`, 12274) 막아
+ * 키가 안 먹는 화면에 갇힌다 (B-76). 고침은 빈 칸 1000 을 은퇴식으로 메운다(굴림 없음) — 타자편 · 투수편 같은 식.
+ */
+function retirementPopularityLimit(): number {
+  return isBugFixed('B-76') ? 1000 : 999
 }
 
 /** 연애 엔딩은 StrENDING[9 + c] — c = 1(짝 없음) … 5(넷 모두) 라 10~14 다 */
@@ -302,7 +313,7 @@ export function salaryOfferOf(career: SalaryHolder): { readonly raise: number; r
 /**
  * 연봉 = base ± trunc(base × 변동률 / 100), base = max(1, trunc(인기도 상승/4)) + 이전 연봉 (0x8cac0).
  * 단위는 원본 그대로 100만원 한 칸이다 (관리 화면이 ×100 해서 만원으로 보여 준다).
- * 새 값은 0xa4fd8 `strh` 로 쓰여 u16 으로 감긴다(상한에 붙지 않는다 — 원본 그대로).
+ * 새 값은 0xa4fd8 `strh` 로 쓰여 u16 으로 감긴다(상한에 붙지 않는다 — 원본 버그 B-69, 고친 길은 65535 에 붙인다).
  */
 export function applySalaryChange<C extends SalaryHolder>(career: C, code: number): C {
   const base = salaryOfferOf(career).salary
@@ -310,7 +321,10 @@ export function applySalaryChange<C extends SalaryHolder>(career: C, code: numbe
   const change = Math.sign(rate) * Math.trunc((base * Math.abs(rate)) / 100)
   // 0x8cac0 의 v 는 32비트 정수(8cada · 8cb28)라 0xa4fd8 의 레코드 +0x1b 는 감기기 전 v 로 센다(a4ff6~a5006)
   const salary = base + change
-  return { ...career, salary: salary & SALARY_MASK, salaryRecordGrade: nariRecordSalaryGradeOf(salary) }
+  // ⚠️ 원본 버그(B-69): 0xa4fe2 `strh` 가 자르지 않아 65535 를 넘으면 아래 16비트만 남는다(큰 연봉이 작은 값으로 돈다).
+  // 고침(bugfixes.json B-69, 기본 켬): u16 상한 65535 에 붙인다. 레코드 +0x1b 는 어느 쪽이든 감기기 전 v 로 센다(0xff). 굴림 없음
+  const stored = isBugFixed('B-69') ? Math.min(salary, SALARY_MASK) : salary & SALARY_MASK
+  return { ...career, salary: stored, salaryRecordGrade: nariRecordSalaryGradeOf(salary) }
 }
 
 /** 레코드 +0x1b 는 바이트 — 0xa4ffe `movs r3, #0xff ; cmp r0, #0xff ; bge` */

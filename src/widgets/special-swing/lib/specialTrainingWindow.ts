@@ -26,6 +26,7 @@
  * 이름 · 설명의 갈래는 **탭이 아니라 모드**(0x7b970 `[gfx+0x20] == 4`)로 가른다 — 웹에서는 타자 = 탭 0, 투수 = 탭 1 이라 한 값으로 둔다.
  */
 import { BATTER_BURSTS, PITCHER_BURSTS } from '@/shared/config/original/bursts'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 
 /** 창의 두 쪽 — 타자 108 탭 0 · 123 (필살타법), 투수 108 탭 1 (마구) */
@@ -166,10 +167,11 @@ export const isSlotIconInUse = (slot: number, inUseNumber: number) => Math.min(i
 /**
  * 0xa43c4(저장, c) — `n = c + 1, n > 3 이면 n += 레코드 +0xb 위 3비트` 로 레코드 +0x18 과 견준다(H-4 원본 어긋남 그대로).
  * 아래 글 "사용중" · 0x17cec 의 [69] 가 쓴다.
+ * **고침(bugfixes.json B-77, 기본 켬)**: 저장(고르기 0x17c64 · 훈련 완료 0x1816c)이 1~4 라 타입을 안 더하고 `칸 + 1` 과 견준다. 굴림 없음.
  */
 export function isSlotInUse(slot: number, inUseNumber: number, typeIndex: number): boolean {
   const number = slot + 1
-  return inUseNumber === (number > 3 ? number + typeIndex : number)
+  return inUseNumber === (number > 3 && !isBugFixed('B-77') ? number + typeIndex : number)
 }
 
 /**

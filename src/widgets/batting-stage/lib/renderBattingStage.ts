@@ -26,6 +26,8 @@ import {
   EFFECT_PITCHER_FRAMES,
   aceMagicAnimationDrawOf,
   aceMagicScaledDrawOf,
+  leonyEffectDrawsOf,
+  LEONY_EFFECT_FRAMES,
   aceMagicScaledOriginOf,
   effectPitcherFrameAt,
   type AcePitcherEffectInput,
@@ -472,6 +474,8 @@ export function renderBattingStage(
   if (scene.stagePhase?.kind === '타격') {
     if (scene.hitBall != null) addHitBallDraws(context, drawList, scene.hitBall, side)
   } else if (scene.pitch !== null) addBallDraws(context, drawList, scene)
+  // 0x46fa8(장면, 1) 레오니 0x4703a — 원본은 목록 비우기 뒤에 넣어 버려진다(B-82). 고친 길만 목록에 든다(`leonyEffectDrawsOf`)
+  addLeonyEffectDraws(context, drawList, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
   drawList.flush()
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
   drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
@@ -1090,6 +1094,20 @@ function drawAceMagicAnimation(context: CanvasRenderingContext2D, input: AcePitc
   if (placed === null) return
   const anchor = stageLayoutOf(side).pitcherAnchor
   context.drawImage(placed.image, anchor.x + placed.offsetX, anchor.y + placed.offsetY)
+}
+
+/** 0x4703a 레오니 — 고친 길(B-82)의 0xbe8d5 몫을 투수 앵커 기준으로 목록에 넣는다 */
+function addLeonyEffectDraws(
+  context: CanvasRenderingContext2D, drawList: StageDrawList, input: AcePitcherEffectInput, side: number, pose: number,
+): void {
+  const boxOf = (frame: number) => {
+    const placed = placedFrame(LEONY_EFFECT_FRAMES, frame)
+    return placed === null ? null : { width: placed.image.width, height: placed.image.height }
+  }
+  const anchor = stageLayoutOf(side).pitcherAnchor
+  for (const draw of leonyEffectDrawsOf(input, pose, boxOf)) {
+    drawList.add(draw.depth, () => drawFrameAt(context, LEONY_EFFECT_FRAMES, draw.frame, anchor.x + draw.dx, anchor.y + draw.dy))
+  }
 }
 
 /** 0x472ba · 0x47368 — 그림 0번 이미지를 s 배로 키워 투수 앵커 가운데에 반반 섞기 (0xbb91d 종류 0x12) */

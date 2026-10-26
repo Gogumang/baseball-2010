@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { hasSkill, yearlyStatsOf } from '@/entities/career/model/playerCareer'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
@@ -53,10 +54,20 @@ const toInt16 = (value: number) => ((value & 0xffff) << 16) >> 16
 function seasonTrainingByteTotalOf(career: PlayerCareer): number {
   const menuIds = new Set([...Object.keys(career.trainingCounts), ...Object.keys(career.seasonStartTrainingCounts)])
   let total = 0
-  for (const menuId of menuIds) {
-    total += toUint8(career.trainingCounts[menuId] ?? 0) - toInt8(career.seasonStartTrainingCounts[menuId] ?? 0)
-  }
+  for (const menuId of menuIds) total += trainingDifferenceOf(career, menuId)
   return total
+}
+
+/**
+ * 칸 하나의 `통산 − 사본`.
+ * ⚠️ 원본 버그(B-70): 통산은 u8(ldrb) · 사본은 s8(ldrb → lsl/asr 24) 로 읽어 사본이 128 을 넘으면 음수가 되어 차이가 256 만큼 커진다.
+ * **고침(`bugfixes.json` B-70, 기본 켬)**: 웹이 든 참 값끼리 뺀다(`seasonTrainingCountOf` 와 같은 이번 시즌 훈련 수). 굴림 없음
+ * (조건 판정만 바뀐다 — 사본이 128 이상인 해에 몹쓸몸 · 유리몸 · 18 · 19 · 20 이 원본과 달리 맞을 수 있다).
+ */
+function trainingDifferenceOf(career: PlayerCareer, menuId: string): number {
+  const total = career.trainingCounts[menuId] ?? 0
+  const copy = career.seasonStartTrainingCounts[menuId] ?? 0
+  return isBugFixed('B-70') ? total - copy : toUint8(total) - toInt8(copy)
 }
 
 /** 0xa4d51 — +0x1ca 비트 0~12 가운데 켜진 수 (0xa4d40 을 i = 0..12 로) */
@@ -128,8 +139,7 @@ const isLeftHanded = (career: PlayerCareer) => career.battingSide === 1
  * 칸 하나의 이번 시즌 훈련 수 — 0xad87e~0xad88a: `u8 S+0x4b+s − s8 S+0x6b+s` (18 · 19 · 20 공용). 256 회째에 0 으로 돌고 사본이
  * 128 을 넘으면 음수로 읽힌다(원본 그대로 — 몹쓸몸 · 유리몸의 T 와 같은 읽기)
  */
-const seasonTrainingByteCountOf = (career: PlayerCareer, menuId: string) =>
-  toUint8(career.trainingCounts[menuId] ?? 0) - toInt8(career.seasonStartTrainingCounts[menuId] ?? 0)
+const seasonTrainingByteCountOf = (career: PlayerCareer, menuId: string) => trainingDifferenceOf(career, menuId)
 
 /** 조건표를 옮긴 스킬 — 나머지는 아직 판정하지 않는다 */
 const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: RandomPort | undefined) => boolean>> = {

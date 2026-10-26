@@ -1,5 +1,6 @@
 import type { EventReward } from '@/entities/story/model/eventReward'
 import { ILLNESS_NAMES } from '@/entities/career/model/condition'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { salaryOfferOf } from '@/entities/career/model/seasonFlow'
 import type { SalaryHolder } from '@/entities/career/model/seasonFlow'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
@@ -197,7 +198,10 @@ function buildRewardText(
         return
       }
     } else if (item.kind === MONEY_KIND) {
-      text += `${name}${value >= 0 ? ' +' : ''} ${originalMoneyText(Math.abs(value * 100))}만`
+      // 원본 0x8c2a4~0x8c2d2: 값 ≥ 0 이면 " +", 금액은 |값 × 100| 이라 **줄 때는 부호가 없다** (B-78).
+      // 고침(bugfixes.json B-78, 기본 켬): 줄 때 금액 앞에 "-" — 그 밖 종류의 `%d`(" -5")와 같은 꼴. 굴림 없음
+      const minus = value < 0 && isBugFixed('B-78') ? '-' : ''
+      text += `${name}${value >= 0 ? ' +' : ''} ${minus}${originalMoneyText(Math.abs(value * 100))}만`
     } else if (item.kind === SALARY_KIND) {
       text += `연봉 ${salaryAfter(ctx.salaryBase, value) * 100}만 결정!`
     } else {

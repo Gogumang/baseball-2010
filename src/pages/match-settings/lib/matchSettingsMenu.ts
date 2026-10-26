@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import {
   CHANCE_VALUE, INNING_VALUE, MATCH_SETTING_KIND, hasAnyDetailSelection,
 } from '@/features/play-team-game/model/matchSettings'
@@ -62,6 +63,8 @@ export interface MatchSettingsWindowState {
   readonly detailCell: number
   /** +0x314 — null 이면 확인창 없음 */
   readonly popup: MatchSettingsPopup | null
+  /** 창을 열 때의 저장 칸 — 원본에는 없다. 고친 길(B-65)이 종류 OK 에서 저장된 값을 되살릴 때만 읽는다 */
+  readonly opened?: MatchProgressSettings
 }
 
 /** 창이 받는 키 — 원본 키값(−3·−4·'2'·'8'·'4'·'6'·−5·'5'·−16)을 뜻으로 옮긴 것 */
@@ -86,6 +89,7 @@ export function openMatchSettings(saved: MatchProgressSettings): MatchSettingsWi
     detailRow: DETAIL_ROW.타자조작,
     detailCell: 0,
     popup: null,
+    opened: saved,
   }
 }
 
@@ -148,10 +152,11 @@ function pressKindKey(state: MatchSettingsWindowState, key: MatchSettingsKey): M
     return 유지({
       ...state,
       stage: SETTINGS_STAGE.값,
-      // **원본 그대로**(R4 4절 — 0x5ffcc 6003a~60044 `+0x2bd = 0`): 종류를 고르면 값(+0x2bd)이 무조건 0 이 된다.
+      // ⚠️ 원본 버그(B-65, R4 4절 — 0x5ffcc 6003a~60044 `+0x2bd = 0`): 종류를 고르면 값(+0x2bd)이 무조건 0 이 된다.
       //    저장에 "6이닝 자동진행"(값 2)이 들어 있어도 창을 다시 열어 종류에서 OK 를 누르는 순간
-      //    "자동진행 없음"(값 0)으로 되돌아간다. 버그로 보이지만 고치지 않는다.
-      settings: { ...state.settings, value: 0 },
+      //    "자동진행 없음"(값 0)으로 되돌아간다.
+      // 고침(bugfixes.json B-65, 기본 켬): 연 때 저장된 종류와 같은 종류를 고르면 저장된 값에서 시작한다(다른 종류면 0 — 값의 뜻이 다르다)
+      settings: { ...state.settings, value: valueOnKindChosen(state) },
       detailRow: DETAIL_ROW.타자조작,
       detailCell: 0,
     })
@@ -161,12 +166,19 @@ function pressKindKey(state: MatchSettingsWindowState, key: MatchSettingsKey): M
   return 유지(state)
 }
 
+/** 종류 OK 뒤 값 칸 (+0x2bd) — 원본은 늘 0 (B-65) */
+function valueOnKindChosen(state: MatchSettingsWindowState): number {
+  const opened = state.opened
+  if (!isBugFixed('B-65') || opened === undefined || opened.kind !== state.settings.kind) return 0
+  return opened.value
+}
+
 /** 단계 1 — 찬스·이닝 값 고르기 */
 function pressValueKey(state: MatchSettingsWindowState, key: MatchSettingsKey): MatchSettingsAction {
   const { kind } = state.settings
   if (kind === MATCH_SETTING_KIND.찬스 && (key === '왼쪽' || key === '오른쪽')) {
     // **원본 그대로**: 찬스는 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다 (R4 4절).
-    //    오른쪽 끝에서 오른쪽을 눌러도 되돌아온다 — 칸이 둘뿐이라 원본이 방향을 안 본다.
+    //    칸이 둘이라 감아 도는 좌·우 이동과 결과가 같다 — 버그가 아니다(B-65 정정 r279).
     const flipped = state.settings.value === CHANCE_VALUE.공격득점권
       ? CHANCE_VALUE.수비삼루
       : CHANCE_VALUE.공격득점권

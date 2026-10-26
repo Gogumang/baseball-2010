@@ -35,7 +35,8 @@ export type FrameLayerListing = Readonly<Record<string, readonly FrameLayerEntry
  * (`frameLayers.test` 가 파일과 맞춰 본다). 다른 폴더는 목록을 청하지 않는다(없는 파일을 404 로 청하지 않게).
  * main_title 은 타이틀 캔버스(`pages/title`)와 메뉴 바탕 0x58371(`SkinBackdrops`)이, game_judge 는 수비 화면 DOM 판정 글자도
  * (`shared/ui/LayeredFrameSprite` — plus-lighter) 쓴다.
- * 0x67 을 쓰지만 안 실은 것: leony_effect(원본도 화면에 안 나온다 — `acePitcherEffect`) · sky_effect_light1(그리는 자리 없음) ·
+ * leony_effect 는 원본에서 화면에 안 나오지만(B-82) 고친 길(`bugfixes.json` B-82)이 그린다 — `acePitcherEffect`.
+ * 0x67 을 쓰지만 안 실은 것: sky_effect_light1(그리는 자리 없음) ·
  * touch(원본 binary.mod 에 파일 이름조차 없다 — 안 쓰는 그림).
  * trainning 21~23(애니 3 "200G")은 더비 0x41098 이 효과 0 으로 그린다 — 웹은 DOM 더비 HUD(`DerbyHud` · `LayeredFrameSprite`).
  */
@@ -44,6 +45,7 @@ export const FRAME_LAYER_FOLDERS: ReadonlySet<string> = new Set([
   'game_effect',
   'game_judge',
   'game_ui',
+  'leony_effect',
   'main_title',
   'medica_effect',
   'pitcher_dragona',

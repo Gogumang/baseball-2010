@@ -537,18 +537,18 @@
       "id": "B-60",
       "name": "수비 AI",
       "symptom": "중계가 낀 외야 재송구 시간을 실제보다 짧게 본다",
-      "source": "0xb3444 res[5](1구간 틱, S7)",
+      "source": "0xb3444 res[5](1구간 틱, S7) · 읽는 곳 0xafe7e",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-61",
       "name": "경기 기록",
       "symptom": "마타자 타석의 도루는 누구 기록에도 안 쌓인다",
-      "source": "0xa56dc(지금 타자로 게이트)",
+      "source": "0xa56dc(지금 타자로 게이트 a8070 · a8362)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -557,7 +557,7 @@
       "symptom": "투수편 나리 초기화를 막을 때 [212] 대신 [213] 글이 뜬다",
       "source": "0x2c950 `movs r1,#0xd5`",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -566,7 +566,7 @@
       "symptom": "같은 팀끼리 경기가 나올 수 있다(AI 팀 고르기에도 검사 없음)",
       "source": "0x314b0 재추첨 없음(J 2절)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -575,16 +575,16 @@
       "symptom": "히든 팀(10~14)이 홈이면 구장 바닥색 표를 넘어 읽는다 · 구장 그림 빈칸",
       "source": "표 0xcfd0c 첨자 st+0x30",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-65",
       "name": "경기진행 설정",
-      "symptom": "종류에서 OK 를 누르면 값이 \"자동진행 없음\"으로 돌아간다 · 찬스는 좌우 상관없이 뒤집힌다 · 투수조작 9회 칸은 연장까지",
+      "symptom": "종류에서 OK 를 누르면 값이 \"자동진행 없음\"으로 돌아간다 (찬스 좌우 뒤집기는 두 칸 감아 돌기와 같고, 투수조작 9회 칸이 연장까지 덮는 것은 설계라 정정 r279)",
       "source": "0x5ffcc 6003a~60044",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -593,16 +593,16 @@
       "symptom": "6·7 쪽 합계가 늘 \"0G\"",
       "source": "0x58801(인자 4·5 만 더함)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-67",
       "name": "시즌 경기 평가 글(0xe9)",
-      "symptom": "동점이면 \"경기패배!\" · 안타 수에서 홈런이 빠지고 2·3루타는 두 번 셈 · \"(+200)\" 이 \"만\" 앞에 붙음",
+      "symptom": "동점이면 \"경기패배!\"(시즌 경기는 동점으로 안 끝나 닿지 않음) · 안타 수에서 2·3루타를 두 번 셈(S[7] 은 홈런 포함) · \"(+200)\" 이 \"만\" 앞에 붙음",
       "source": "0x8a6fc · 0xdea0",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -611,7 +611,7 @@
       "symptom": "동점 경기는 두 팀 모두 LOSE",
       "source": "그림 0xb400 b6c4",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -620,7 +620,7 @@
       "symptom": "연봉이 u16 으로 감겨 상한을 넘으면 작은 값으로 돈다",
       "source": "0xa4fd8 `strh`",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -629,7 +629,7 @@
       "symptom": "칸별 훈련 수가 u8−s8 이라 128 을 넘으면 음수 · 몹쓸몸/유리몸 T 도 같다",
       "source": "0x18b86 · A 4절",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -638,16 +638,16 @@
       "symptom": "두 선수가 아니라 세 선수가 돈다",
       "source": "0xb5d09(갈래 i == b · b == a)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-72",
       "name": "나리·시즌 마선수",
-      "symptom": "넣었던 마선수가 팀 레코드에 남아 그 뒤 목록(CPU 트레이드 요청·십전대보탕)에 보인다",
+      "symptom": "넣었던 마선수가 팀 레코드에 남아 그 뒤 목록(CPU 트레이드 요청·십전대보탕)에 보인다 (고친 길은 시즌만 — 나리는 이어하기가 레코드 마선수를 읽어 원본대로)",
       "source": "142(R9 10-1) · U-105",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -656,7 +656,7 @@
       "symptom": "포스트시즌 경기 뒤 평가(116)가 앞 정규 경기의 기록 줄을 다시 보인다",
       "source": "0x4f268(포스트시즌이면 0xa719c 안 돎)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -665,7 +665,7 @@
       "symptom": "메디카(team 16)를 이길 때만 클리어 칸이 오르고 첫 승은 −1 → 0",
       "source": "0xa5368",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -674,16 +674,16 @@
       "symptom": "대기 모드 값(g[0xf6])이 3·4 가 아니면 결과 판에서 못 나간다",
       "source": "0x407f0 408ce~40942",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-76",
       "name": "나리 엔딩",
       "symptom": "판정 없음(e = −1) 엔딩은 키가 안 먹는 화면에 갇힌다",
-      "source": "0x1220c 12222(`bhi`) · 단계 > 2 `ble`",
+      "source": "0xa3a84(0xa3b5e `> 1000` · 0xa3b66 `≤ 999`) · 0x1220c 12224(`bhi`) · 12274(`ble`)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -692,7 +692,7 @@
       "symptom": "장타형이 메테오 스윙을 골라도 \"사용 중\" 이 안 뜬다",
       "source": "0xa43c4(4+타입) vs 저장 0x17c64 · 0x1816c(1~4)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -701,14 +701,14 @@
       "symptom": "소지금이 줄 때도 부호 없이 \"N만\" 으로 보인다",
       "source": "0x8beb8 → 0x55cf4(\\|값×100\\|)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-79",
       "name": "시즌 선수 카드",
-      "symptom": "피부 칸 넷째 값이 \"우타\" 로 찍힌다",
-      "source": "표 0x140022c",
+      "symptom": "정정(r279) — 원본 버그가 아니다: 피부 칸 3 을 가진 선수가 없다(리그 표 300행 0~2 · 마선수 모두 0 · 등록은 세 칸만 돌림) — 표 0x140022c 넷째를 읽는 길이 닿지 않는다(고칠 것 없음)",
+      "source": "표 0x140022c(세 칸) · roster profile 비트2~3",
       "impact": "작음",
       "implemented": false,
       "fixed": null
@@ -716,17 +716,17 @@
     {
       "id": "B-80",
       "name": "시즌 능력치 상세 글",
-      "symptom": "질병 줄은 질병 종류를 보지만 실제 −30% 는 입원 여유 칸을 봐서 글과 실제가 어긋난다 · 사기 줄도 정액",
-      "source": "0x897e8 · 0xb5824(7264a07)",
+      "symptom": "질병 줄은 질병 종류(SR+5)를 보지만 실제 −30% 는 입원 여유 칸(SR+6)을 봐서 글과 실제가 어긋난다 (사기 줄 정액은 실제 감소도 정액이라 정정 r279)",
+      "source": "0x897e8(89df6 `[SR,#5]`) · 0xb5824(`[SR,#6]`)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-81",
       "name": "표시 구속",
-      "symptom": "너클볼은 rank 가 낮을수록 빠르게 표시된다",
-      "source": "0x66dc0",
+      "symptom": "정정(r279) — 원본 버그가 아니다: 0x66dc0 이 너클(0x15)만 일부러 거꾸로 세고, 실제 비행 프레임도 너클은 단계가 오를수록 느려진다(pitch.zt1 [26,29,32,35]) — 변화가 좋을수록 느린 너클로 표시와 실제가 같다(고칠 것 없음)",
+      "source": "0x66dc0(66de4 `cmp #0x15` 갈래) · 0x66c98 식 F",
       "impact": "작음",
       "implemented": false,
       "fixed": null
@@ -737,7 +737,7 @@
       "symptom": "레오니 마투수 이펙트가 화면에 안 나온다",
       "source": "0xbe8d5 목록 넣기가 비우기 0x4d744 뒤 · 53032~53044",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -746,7 +746,7 @@
       "symptom": "타자 마선수 그림이 팀당 첫 한 명으로 뭉개진다",
       "source": "0x3a680~0x3a716(R3 7-3)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
