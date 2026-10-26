@@ -1373,6 +1373,94 @@ describe('투수 미션 사구 뒤 벤치 클리어링 — 0x4e72c → 0x1e 는 
   })
 })
 
+/* ── 타자 미션 볼넷 · 사구의 0x12 대기 · 벤치 클리어링 (r298) ───────────────────────── */
+
+describe('타자 미션(모드 6)도 0x12 갱신 0x4e6d4 를 탄다 — 사구는 틱 31 에 4e74c 를 굴리고 들어가면 0x1e (r298)', () => {
+  const 사구 = { resolution: { kind: '사구' as const }, hasSwung: false, isBunt: false, resultCode: null }
+
+  it('사구는 공 도착에서 굴림 없이 붙들고 판정 1 · 진입 45 · 틱 10 의 8 — 들어가면 CPU 마운드 투구 수 +10(0x3ab82)', () => {
+    let 들어감 = false
+    let 안들어감 = false
+    for (let seed = 1; seed < 200 && !(들어감 && 안들어감); seed += 1) {
+      const counter = countedSeeded(seed)
+      const rendered = setUpBatterMission(1, counter.port)
+      const 공앞 = counter.drawn()
+      const 판앞 = rendered.result.current.session.missionRun!
+      act(() => {
+        rendered.result.current.session.handleMissionPitch(사구)
+      })
+      const 붙듦 = rendered.result.current.session.pendingBenchClearing
+      expect(붙듦?.side).toBe('타자')
+      expect(붙듦?.phase).toBe('wait')
+      // 공 도착 0x3dfac 의 0.1% 폭투 굴림 하나뿐 — 벤치 클리어링 굴림 · 정산은 대기 끝이다
+      expect(counter.drawn() - 공앞).toBe(1)
+      expect(rendered.result.current.session.missionRun?.bases).toEqual(판앞.bases)
+      // 0xf 가 아니다 — 도루 키가 안 열린다
+      expect(rendered.result.current.session.stealableBases).toEqual([])
+
+      const 판정앞 = counter.drawn()
+      act(() => rendered.result.current.session.actions.judgeHitByPitch())
+      expect(counter.drawn() - 판정앞).toBe(1)
+      const 판정뒤 = rendered.result.current.session.pendingBenchClearing
+      if (판정뒤 === null) {
+        // 안 들어갔다 — 판정 A 의 보통 길(사구 진루)
+        expect(rendered.result.current.session.missionRun?.bases.first).toBe(true)
+        안들어감 = true
+        rendered.unmount()
+        continue
+      }
+      expect(판정뒤.phase).toBe('entry')
+      const 투구수 = rendered.result.current.session.missionRun!.cpu.pitching!.mound.pitches
+      const 진입앞 = counter.drawn()
+      act(() => rendered.result.current.session.actions.enterBenchClearing())
+      expect(counter.drawn() - 진입앞).toBe(45)
+      expect(rendered.result.current.session.pendingBenchClearing?.phase).toBe('scene')
+      expect(rendered.result.current.session.missionRun!.cpu.pitching!.mound.pitches).toBe(투구수 + 10)
+      // 연출 중에도 사구는 아직 안 먹었다
+      expect(rendered.result.current.session.missionRun?.bases).toEqual(판앞.bases)
+      const 끝앞 = counter.drawn()
+      act(() => rendered.result.current.session.actions.finishBenchClearing(true))
+      expect(counter.drawn() - 끝앞).toBe(8)
+      expect(rendered.result.current.session.pendingBenchClearing).toBeNull()
+      expect(rendered.result.current.session.missionRun?.bases.first).toBe(true)
+      들어감 = true
+      rendered.unmount()
+    }
+    expect(들어감).toBe(true)
+    expect(안들어감).toBe(true)
+  })
+
+  it('볼넷도 붙들고 판정에서 굴림 없이 진루 — 삼진은 붙들지 않는다(정산 굴림이 없다)', () => {
+    const counter = countedSeeded(3)
+    const rendered = setUpBatterMission(1, counter.port, undefined)
+    const 볼 = { resolution: { kind: '볼' as const }, hasSwung: false, isBunt: false, resultCode: null }
+    for (let count = 0; count < 4; count += 1) {
+      act(() => {
+        rendered.result.current.session.handleMissionPitch(볼)
+      })
+    }
+    expect(rendered.result.current.session.pendingBenchClearing?.outcome.kind).toBe('볼넷')
+    const 판정앞 = counter.drawn()
+    act(() => rendered.result.current.session.actions.judgeHitByPitch())
+    expect(counter.drawn()).toBe(판정앞)
+    expect(rendered.result.current.session.pendingBenchClearing).toBeNull()
+    expect(rendered.result.current.session.missionRun?.bases.first).toBe(true)
+    rendered.unmount()
+
+    const 삼진판 = setUpBatterMission(1, createSeededRandom(3))
+    const 아웃앞 = 삼진판.result.current.session.missionRun!.outs
+    for (let count = 0; count < 3; count += 1) {
+      act(() => {
+        삼진판.result.current.session.handleMissionPitch({
+          resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null,
+        })
+      })
+    }
+    expect(삼진판.result.current.session.pendingBenchClearing).toBeNull()
+    expect(삼진판.result.current.session.missionRun?.outs).toBe(아웃앞 + 1)
+  })
+})
+
 /* ── 필살타법 남은 횟수 (0xaebe4 · 0x4e136) ─────────────────────────────────── */
 
 describe('미션의 필살 남은 칸 — 0xaebe4 가 채우고 0x4e136 이 줄인다', () => {

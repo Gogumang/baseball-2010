@@ -455,8 +455,9 @@ export interface GameProgress {
    */
   readonly decisions: DecisionState
   /**
-   * **붙든 볼넷 · 사구** — 0x12 대기(`'wait'`) · 벤치 클리어링 진입 앞(`'entry'`) · 연출 중(`'scene'`, 상태 0x1e)
-   * (`HitByPitchHoldPhase`, A-22). 볼넷은 `'wait'` 뿐이다 — 판정 때 벤치 클리어링 굴림 없이 판정 A 의 보통 길로 끝난다(r295).
+   * **붙든 볼넷 · 사구 · 삼진** — 0x12 대기(`'wait'`) · 벤치 클리어링 진입 앞(`'entry'`) · 연출 중(`'scene'`, 상태 0x1e)
+   * (`HitByPitchHoldPhase`, A-22). 볼넷 · 판 없는 삼진은 `'wait'` 뿐이다 — 판정 때 벤치 클리어링 굴림 없이 판정 A 의 보통 길로
+   * 끝난다(r295 · r298 — 삼진의 아웃은 0x12 진입이 올리므로 그동안 HUD 는 `outsShownDuringResultWait` 로 그린다).
    * 사구 공이 도착하면 굴림 없이 여기 붙들고, 화면이 0x12 틱 31 에 `judgeHitByPitch`(4e74c 의
    * 20/99 굴림)를, 들어갔으면 다음 틀에 `enterBenchClearing`(진입 0x3a5f0 의 굴림 45 번)을 부른다. 밀어내기 주루·정산·다음 타석은
    * 안 들어갔으면 판정 때, 들어갔으면 화면이 연출을 끝내고 `resolveBenchClearing` 을 부를 때 비로소 돈다
@@ -978,9 +979,9 @@ export function opponentStaminaPercentAfterPitchOf(
  * 이 칸의 뜻이다 (원본 상태 0x17 이 도는 동안 투구가 안 나가는 것과 같은 자리).
  * 주자 처리·기록·돌발 판정은 화면이 다 돌고 `resolveDefensePlay` 를 부를 때 한 번에 한다.
  *
- * 삼진·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
- * 볼넷 · 사구는 굴림 없이 붙든다 — 0x12 대기 끝(틱 31 의 0x4e6d4)에서 사구면 벤치 클리어링을 굴리고 판정 A 로 간다
- * (`judgeHitByPitch`, A-22 · r295).
+ * 홈런 · 공 도착 판이 열린 삼진(낫아웃 · 도루)은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
+ * 볼넷 · 사구 · 판 없는 삼진은 굴림 없이 붙든다 — 0x12 대기 끝(틱 31 의 0x4e6d4)에서 사구면 벤치 클리어링을 굴리고 판정 A 로 간다
+ * (`judgeHitByPitch`, A-22 · r295 · r298).
  */
 export function startPlayerOutcome(
   progress: GameProgress,
@@ -990,9 +991,10 @@ export function startPlayerOutcome(
 ): GameProgress {
   if (progress.game.isFinished) return progress
   progress = withFoulRecords(progress, options.foulRecordIds)
-  // 볼넷 · 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기 주루·정산은
-  // 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 — `holdsUntilResultWaitEnd`, r295)
-  if (holdsUntilResultWaitEnd(outcome)) {
+  // 볼넷 · 사구 · 판 없는 삼진 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기
+  // 주루 · 정산(삼진은 0xd · 0x18 과 0xa8024)은 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 —
+  // `holdsUntilResultWaitEnd`, r295 · r298)
+  if (holdsUntilResultWaitEnd(outcome, options.arrivalPlay)) {
     const arrivalPlay = options.arrivalPlay ?? null
     return {
       ...progress,
@@ -1124,8 +1126,9 @@ export function resolveDefensePlay(
 }
 
 /**
- * **볼넷 · 사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(`withBenchClearing` — 사구만,
- * 볼넷은 4e744 st[0xb] == 4 가 거짓이라 굴림 없이 4e78c 판정 A 로). 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀 `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의
+ * **볼넷 · 사구 · 삼진의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(`withBenchClearing` —
+ * 사구만, 볼넷 · 삼진은 4e744 st[0xb] == 4 가 거짓이라 굴림 없이 4e78c 판정 A 로 — 삼진은 0xd/0x18 · 정산 0xa8024, r298).
+ * 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀 `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의
  * 보통 길 — 밀어내기 판(종류 2)을 재생 칸에 넣고 정산한다(예전 공 도착 걸음에 하던 그대로). 대기 중인 사구가 없으면 그대로 돌려준다.
  */
 export function judgeHitByPitch(progress: GameProgress, random: RandomPort): GameProgress {

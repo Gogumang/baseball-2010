@@ -43,6 +43,7 @@ import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from 
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { opponentOf } from '@/entities/league/model/league'
 import { advanceRunners, EMPTY_BASES } from '@/entities/game/model/baseState'
+import { outsShownDuringResultWait } from '@/features/play-game/model/benchClearingScene'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -1002,6 +1003,45 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     expect(judgeHitByPitch(판정, 세는)).toBe(판정)
   })
 
+  it('판 없는 삼진도 공 도착에서 굴림 없이 붙들고 0x12 틱 31 의 판정 A(0xae24c → 0xd/0x18 · 정산 0xa8024)에서 정산한다 (r298)', () => {
+    for (const outs of [0, 2]) {
+      const 시작 = startGame(createSeededRandom(4))
+      const 놓음 = { ...시작, game: { ...시작.game, outs, bases: { first: true, second: false, third: false } } }
+      let 굴림 = 0
+      const 세는 = 세며(createSeededRandom(11), () => { 굴림 += 1 })
+      const 붙듦 = startPlayerOutcome(놓음, { kind: '삼진' }, 세는)
+      expect(굴림).toBe(0)
+      expect(붙듦.pendingBenchClearing).toEqual({ phase: 'wait', outcome: { kind: '삼진' } })
+      expect(붙듦.game).toEqual(놓음.game)
+      // 0x12 진입 3e1a6 이 이미 올린 아웃 — 대기 동안 HUD 는 이 값으로 그린다
+      expect(outsShownDuringResultWait(붙듦.game.outs, 붙듦.pendingBenchClearing)).toBe(outs + 1)
+      const 판정 = judgeHitByPitch(붙듦, 세는)
+      expect(판정.pendingBenchClearing).toBeNull()
+      expect(판정.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+      // 끼어들 사람 없는 껍데기(`applyPlayerOutcome`)와 같은 차례 · 결과 — 3아웃이면 뒤 자동진행까지
+      let 껍데기굴림 = 0
+      const 껍데기 = applyPlayerOutcome(놓음, { kind: '삼진' }, 세며(createSeededRandom(11), () => { 껍데기굴림 += 1 }))
+      expect(판정.game).toEqual(껍데기.game)
+      expect(판정.myStats).toEqual(껍데기.myStats)
+      expect(굴림).toBe(껍데기굴림)
+    }
+  })
+
+  it('공 도착 판이 열린 삼진(삼진 + 도루 · 낫아웃)은 0x12 를 안 기다린다 — 3e09a · 3e114 가 곧장 0x17 (r298)', () => {
+    const 판뒤 = startGame(createSeededRandom(4))
+    const 판 = (kind: 5 | 9) =>
+      ({
+        kind,
+        strikeout: kind === 9 ? 'batterRuns' : 'none',
+        recordIds: [],
+        result: { advance: { bases: EMPTY_BASES, runsScored: 0, outsAdded: kind === 5 ? 1 : 0 }, runnerFates: [] },
+      }) as unknown as NonNullable<Parameters<typeof startPlayerOutcome>[3]>['arrivalPlay']
+    for (const kind of [5, 9] as const) {
+      const 끝 = startPlayerOutcome(판뒤, { kind: '삼진' }, createSeededRandom(3), { arrivalPlay: 판(kind) })
+      expect(끝.pendingBenchClearing).toBeNull()
+    }
+  })
+
   it('삼진 + 도루면 판은 아웃 + 1 로 열린다 — 0x3e15e 가 판 앞에서 state[6]++', () => {
     const 삼루 = { first: false, second: false, third: true }
     for (let seed = 1; seed <= 10; seed += 1) {
@@ -1884,7 +1924,9 @@ describe('내 삼진 + 도루 판 · 낫아웃 판의 정산 0xa8024 — [sp+0x3
     const 판뒤 = { ...내타석(EMPTY_BASES, 1) }
     const 도루저지 = 판(5, 1, EMPTY_BASES, [{ fromBase: 1, scored: false, retired: true }])
     const 끝 = startPlayerOutcome(판뒤, { kind: '삼진' }, createSeededRandom(3), { arrivalPlay: 도루저지 })
-    const 보통 = startPlayerOutcome(판뒤, { kind: '삼진' }, createSeededRandom(3))
+    // 판 없는 삼진은 0x12 대기 끝(틱 31 의 판정 A)까지 붙든다 — 판정에서 정산 (r298)
+    const 보통난수 = createSeededRandom(3)
+    const 보통 = judgeHitByPitch(startPlayerOutcome(판뒤, { kind: '삼진' }, 보통난수), 보통난수)
 
     expect(끝.pendingDefensePlay).toBeNull()
     expect(보통.myStats.atBats).toBe(판뒤.myStats.atBats + 1)
@@ -1913,7 +1955,9 @@ describe('내 삼진 + 도루 판 · 낫아웃 판의 정산 0xa8024 — [sp+0x3
     const 시작 = 내타석(EMPTY_BASES, 0)
     const 낫아웃 = 판(9, 1, EMPTY_BASES, [{ fromBase: 0, scored: false, retired: true }])
     const 끝 = startPlayerOutcome(시작, { kind: '삼진' }, createSeededRandom(3), { arrivalPlay: 낫아웃 })
-    const 보통 = startPlayerOutcome(시작, { kind: '삼진' }, createSeededRandom(3))
+    // 판 없는 삼진은 0x12 대기 끝(틱 31 의 판정 A)까지 붙든다 — 판정에서 정산 (r298)
+    const 보통난수 = createSeededRandom(3)
+    const 보통 = judgeHitByPitch(startPlayerOutcome(시작, { kind: '삼진' }, 보통난수), 보통난수)
     expect(끝.doublePlays).toBe(시작.doublePlays + 1)
     expect(보통.doublePlays).toBe(시작.doublePlays)
     // 둘 다 1아웃 · 빈 루라 뒤 자동진행이 같다 — 차이는 a8cb0 의 삼진 사건 하나다

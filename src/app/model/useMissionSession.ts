@@ -159,7 +159,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
 import { missionRewardOf } from '@/entities/mission/model/missionReward'
 import { missionResultEarnedOf } from '@/pages/mission-play/lib/missionResultBoard'
-import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
+import { RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
 import { NO_ACE_MATCH_HOLD, isAceMatchHeld } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchHold, AceMatchHoldPort } from '@/entities/mode-save/model/modeSave'
@@ -178,6 +178,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import {
   enterMissionPitchSelection,
   isMissionCpuMoundAce,
+  missionCpuAfterBenchClearing,
   missionCpuAfterPitch,
   masterBatterAbilityOf,
   missionCpuBatterAbilityOf,
@@ -729,28 +730,21 @@ export function useMissionSession({
     setStealingFrom((previous) => (previous.length === 0 ? previous : []))
   }
   /**
-   * **붙든 사구** — 투수 미션 전용. 0x12 대기(`'wait'`) · 벤치 클리어링 진입 앞(`'entry'`) · 연출 중(`'scene'`, 상태 0x1e)
+   * **붙든 볼넷 · 사구 · 삼진** — 0x12 대기(`'wait'`) · 벤치 클리어링 진입 앞(`'entry'`) · 연출 중(`'scene'`, 상태 0x1e)
    * (`HitByPitchHoldPhase`, A-22).
-   * 원본 미션(모드 5)도 보통 경기 장면 0x104 라 상태 0x12 갱신 0x4e6d4 의 끝 0x4e72c~0x4e776 을 그대로 탄다:
-   * 거르는 것은 플레이 종류 8(홈런더비, 0x4e740)과 사구 아님(0x4e748)뿐이고 모드를 읽지 않는다.
-   * 진입 0x3a5f0 도 모드·미션 칸을 안 본다 → 연출과 그 전역 rand(진입 45 · 틱 10 의 8)가 미션에서도 돈다.
-   * 사구 공이 도착하면 굴림 없이 붙들고, 화면이 0x12 틱 31 에 `judgeHitByPitch`(4e74c 굴림 — 안 들어가면 판정 A 의 보통 길)를,
-   * 들어갔으면 다음 틀에 `enterBenchClearing`(굴림 45 번)을 부른다. 출구 0xae24c 뒤에야 사구가 보통 길(밀어내기·정산)을 간다
+   * 원본 미션(모드 5 · 6)도 보통 경기 장면 0x104 라 상태 0x12 갱신 0x4e6d4 의 끝 0x4e72c~0x4e776 을 그대로 탄다:
+   * 상태 갱신 표(0x52c50 52cee)는 상태 번호로만 고르고, 0x4e6d4 가 거르는 것은 플레이 종류 8(홈런더비, 0x4e740)과 사구 아님(0x4e748)뿐
+   * 모드를 읽지 않는다. 진입 0x3a5f0 도 모드·미션 칸을 안 본다 → 연출과 그 전역 rand(진입 45 · 틱 10 의 8)가 미션에서도 돈다.
+   * 공이 도착하면 굴림 없이 붙들고, 화면이 0x12 틱 31 에 `judgeHitByPitch`(4e74c 굴림 — 안 들어가면 판정 A 의 보통 길)를,
+   * 들어갔으면 다음 틀에 `enterBenchClearing`(굴림 45 번)을 부른다. 출구 0xae24c 뒤에야 보통 길(밀어내기·정산)을 간다
    * — `finishBenchClearing`.
+   * - `'투수'` — 투수 미션 · 투수편 마선수 대결: 볼넷 · 사구 · 판 없는 삼진(r289 · r295 · r298).
+   * - `'타자'` — 타자 미션 · 타자편 마선수 대결: 볼넷 · 사구(r298). 들어가면 수비가 CPU 라 0x3ab82 CPU 마운드 +0x27c += 10.
+   *   삼진은 정산 굴림이 없어 붙들지 않는다(타석 정산 `applyMissionOutcome` 은 난수를 안 쓴다).
    */
-  const [pendingBenchClearing, setPendingBenchClearing] = useState<
-    {
-      readonly phase: HitByPitchHoldPhase
-      readonly run: PitcherRun
-      /** 이 공을 놓은 뒤의 미션 투수 +0x2c — 들어가면 0x3ab7c 가 −1000 */
-      readonly pitcherStamina: number
-      readonly outcome: AtBatOutcome
-      /** 이 사구 공이 연 밀어내기 판(종류 2) — 연출 뒤 0x17 로 재생한다 */
-      readonly walkReplay?: DefensePlayResult | null
-      /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
-      readonly entryRolls?: readonly BenchClearingEntryRoll[]
-    } | null
-  >(null)
+  const [pendingBenchClearing, setPendingBenchClearing] = useState<MissionHeldResult | null>(null)
+  const pendingBenchClearingRef = useRef(pendingBenchClearing)
+  pendingBenchClearingRef.current = pendingBenchClearing
   /**
    * **필살 남은 칸** s8 팀[+0x29 + 타순] — 미션 한 판에 한 번 채우고(0xaebe4) 스윙 틱 0x4e136 이 줄인다. −1 = 안 채움.
    * 이 칸은 타자 미션의 내 타자 칸이다 — 투수 미션 상대 타자 칸은 타순마다 CPU 타선(`MissionCpuBatting.specialSwing`)이 든다.
@@ -1190,6 +1184,8 @@ export function useMissionSession({
   const finishMissionArrivalAtBat = (
     play: PitchArrivalPlay | null,
     context: Omit<MissionArrivalContext, 'current' | 'outcome'> & { readonly outcome: AtBatOutcome },
+    /** 붙든 볼넷 · 사구를 판정 · 연출 끝에서 먹일 때 — 0x12 진입부터 이미 지난 그림 수(0xd 까지 남은 그림만 둔다, r298) */
+    elapsedFrames = 0,
   ) => {
     const { hasSwung, outcome, isBunt, runnersOnBase } = context
     // 볼넷 · 사구 — 판정 A 0xae24c 가 밀어내기 판(종류 2, 0x17)으로 보낸다. 진루는 보통 길과 같아 판은 재생만 한다
@@ -1210,7 +1206,7 @@ export function useMissionSession({
     // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
     runner.pauseWithBanner(
       describeOutcomeBanner(outcome, runnersOnBase),
-      atBatEndFramesOf(outcome, play?.kind ?? null),
+      Math.max(0, atBatEndFramesOf(outcome, play?.kind ?? null) - elapsedFrames),
     )
   }
 
@@ -1385,6 +1381,23 @@ export function useMissionSession({
         return reply
       }
 
+      // 볼넷 · 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다(모드 6 도 상태 갱신 표 그대로 0x4e6d4). 틱 31 갱신의 4e74c 벤치
+      // 클리어링 굴림(사구만)·판정 A 의 밀어내기 · 정산은 0x12 의 32 그림 뒤라 그동안 붙든다 — 화면이 `judgeHitByPitch` 를 부른다(r298).
+      // 삼진은 정산 굴림이 없어 붙들지 않는다(판정 A 는 굴림 없이 0xd · 정산 — 웹 `applyMissionOutcome` 도 난수를 안 쓴다)
+      if (current !== null && (outcome.kind === '사구' || outcome.kind === '볼넷')) {
+        setPendingBenchClearing({
+          side: '타자',
+          phase: 'wait',
+          run: current,
+          outcome,
+          play,
+          hasSwung,
+          isBunt: detail.isBunt,
+          runnersOnBase,
+        })
+        runner.setIsPaused(true)
+        return reply
+      }
       finishMissionArrivalAtBat(play, { hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase })
       return reply
     },
@@ -1426,28 +1439,43 @@ export function useMissionSession({
         : undefined,
     )
 
-  type HeldHitByPitch = NonNullable<typeof pendingBenchClearing>
-  /** 붙든 볼넷 · 사구의 판정 A 0xae24c 보통 길 — 밀어내기 판(종류 2, 0x17)을 재생하고 정산한다. 진루는 보통 길과 같다 */
-  const finishHeldHitByPitch = (held: HeldHitByPitch) => {
+  /** 붙든 볼넷 · 사구 · 삼진의 판정 A 0xae24c 보통 길 — 밀어내기 판(종류 2, 0x17)을 재생하고 정산한다. 진루는 보통 길과 같다 */
+  const finishHeldResult = (held: MissionHeldResult, elapsedFrames: number) => {
+    if (held.side === '타자') {
+      // 타자 미션 — 공 도착 걸음의 보통 길(`finishMissionArrivalAtBat`) 그대로. 0xd 는 0x12 진입부터 32 그림 뒤라 지난 그림만큼 덜 둔다
+      finishMissionArrivalAtBat(held.play, held, elapsedFrames)
+      return
+    }
     if (held.walkReplay != null && held.walkReplay.ticks.length > 0) setPickoffReplay(held.walkReplay)
     setPitcherRun(settlePitcherRun(applyPitcherOutcome(held.run, held.outcome, { random })))
     resetAtBatWithConfirm()
   }
   /**
    * 0x12 틱 31 의 4e74c 판정 — 들어가면 0x1e 를 예약한 칸(`'entry'`)을 돌려주고, 안 들어가면 보통 길을 돌고 null.
-   * 들어가면 수비가 사람이라 0x3ab7c 0xaeab0(수비 팀, 1000) — 미션 투수 +0x2c −1000. S[1] 은 시즌(모드 2)만 적는다
+   * 투수 미션은 들어가면 수비가 사람이라 0x3ab7c 0xaeab0(수비 팀, 1000) — 미션 투수 +0x2c −1000(진입 꼬리지만 굴림 없는 칸이라 여기서).
+   * S[1] 은 시즌(모드 2)만 적는다. 타자 미션은 수비가 CPU 라 진입 꼬리 3ab82 가 CPU 마운드 +0x27c += 10 (`enterHeldBenchClearing`)
    */
-  const judgeHeldHitByPitch = (held: HeldHitByPitch): HeldHitByPitch | null => {
-    // 볼넷은 4e744 st[0xb] == 4 가 거짓이라 굴림 없이 4e78c 판정 A 의 보통 길이다(r295)
+  const judgeHeldResult = (held: MissionHeldResult): MissionHeldResult | null => {
+    // 볼넷 · 삼진은 4e744 st[0xb] == 4 가 거짓이라 굴림 없이 4e78c 판정 A 의 보통 길이다(r295 · r298)
     if (rollsIntoBenchClearing({ isHitByPitch: held.outcome.kind === '사구', isHomeRunDerby: false, burstInProgress: false }, random)) {
-      setPitcherStaminaStored(staminaAfterBenchClearing(held.pitcherStamina, benchClearingEffectOf(true).defenseStaminaLoss))
-      const entering: HeldHitByPitch = { ...held, phase: 'entry' }
+      if (held.side === '투수') {
+        setPitcherStaminaStored(staminaAfterBenchClearing(held.pitcherStamina, benchClearingEffectOf(true).defenseStaminaLoss))
+      }
+      const entering: MissionHeldResult = { ...held, phase: 'entry' }
       setPendingBenchClearing(entering)
       return entering
     }
     setPendingBenchClearing(null)
-    finishHeldHitByPitch(held)
+    finishHeldResult(held, RESULT_WAIT_TICKS_AT_BAT_END)
     return null
+  }
+  /** 벤치 클리어링 진입 0x3a5f0 — 굴림 45 번(`rollBenchClearingEntry`), 타자 미션이면 꼬리 3ab82 의 CPU 마운드 투구 수 +10 */
+  const enterHeldBenchClearing = (held: MissionHeldResult): MissionHeldResult => {
+    const entryRolls = rollBenchClearingEntry(random)
+    if (held.side === '타자') {
+      setMissionRun((previous) => (previous === null ? previous : { ...previous, cpu: missionCpuAfterBenchClearing(previous.cpu) }))
+    }
+    return { ...held, phase: 'scene', entryRolls }
   }
 
   /**
@@ -1477,10 +1505,12 @@ export function useMissionSession({
       }
     }
     if (outcome !== null) {
-      // 볼넷 · 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기·정산은 0x12 의
-      // 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 — 화면이 `judgeHitByPitch` 를 부른다, A-22 · r295)
-      if (holdsUntilResultWaitEnd(outcome)) {
+      // 볼넷 · 사구 · 판 없는 삼진 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의
+      // 밀어내기 · 정산(삼진은 0xd · 0x18 과 0xa8024 — 판정 0xaaa6c 도 그 뒤 ae384)은 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의
+      // 입자 굴림이 먼저 난다 — 화면이 `judgeHitByPitch` 를 부른다, A-22 · r295 · r298)
+      if (holdsUntilResultWaitEnd(outcome, play)) {
         setPendingBenchClearing({
+          side: '투수',
           phase: 'wait',
           run: nextRun,
           pitcherStamina,
@@ -2275,30 +2305,30 @@ export function useMissionSession({
       if (pending === null) return
       // 아직 0x12 대기 · 진입 앞(끼어들 사람이 없는 길)이면 남은 판정 · 진입을 먼저 — 안 들어갔으면 판정의 보통 길로 끝난다
       if (pending.phase === 'wait') {
-        pending = judgeHeldHitByPitch(pending)
+        pending = judgeHeldResult(pending)
         if (pending === null) return
       }
-      if (pending.phase === 'entry') rollBenchClearingEntry(random)
+      if (pending.phase === 'entry') pending = enterHeldBenchClearing(pending)
       setPendingBenchClearing(null)
       if (reachedTargetTick) rollBenchClearingTargets(random)
-      // 출구 0xae24c → 0x17 밀어내기 판
-      finishHeldHitByPitch(pending)
+      // 출구 0xae24c → 0x17 밀어내기 판 — 대기 없이 곧장(0xd 도 그 판 끝)
+      finishHeldResult(pending, Number.POSITIVE_INFINITY)
     },
 
     /**
-     * **사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4 의 4e74c 벤치 클리어링 굴림. 미션(모드 5)도 홈런더비가 아니라 늘 한 번 굴린다.
-     * 굴림이 돌발 검사보다 앞이라 돌발 유무와 무관하게 난수는 한 번 쓴다. 들어가면 0x1e 예약(진입은 다음 틀 `enterBenchClearing`),
-     * 안 들어가면 판정 A 0xae24c 의 보통 길(밀어내기 판 · 정산)이다. 화면이 대기를 센 뒤 부른다(`useHitByPitchWait`)
+     * **볼넷 · 사구 · 삼진의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4 의 4e74c 벤치 클리어링 굴림(사구만). 미션(모드 5 · 6)도 홈런더비가 아니라
+     * 사구면 늘 한 번 굴린다. 굴림이 돌발 검사보다 앞이라 돌발 유무와 무관하게 난수는 한 번 쓴다. 들어가면 0x1e 예약(진입은 다음 틀
+     * `enterBenchClearing`), 안 들어가면 판정 A 0xae24c 의 보통 길(밀어내기 판 · 정산)이다. 화면이 대기를 센 뒤 부른다(`useHitByPitchWait`)
      */
     judgeHitByPitch: () => {
       if (pendingBenchClearing?.phase !== 'wait') return
-      judgeHeldHitByPitch(pendingBenchClearing)
+      judgeHeldResult(pendingBenchClearing)
     },
 
     /** **벤치 클리어링 진입** 0x3a5f0 — 판정이 0x1e 를 예약한 다음 틀. 공격 9명 자리·목표 굴림 45 번 (`rollBenchClearingEntry`) */
     enterBenchClearing: () => {
       if (pendingBenchClearing?.phase !== 'entry') return
-      setPendingBenchClearing({ ...pendingBenchClearing, phase: 'scene', entryRolls: rollBenchClearingEntry(random) })
+      setPendingBenchClearing(enterHeldBenchClearing(pendingBenchClearing))
     },
 
     /**
@@ -2462,6 +2492,8 @@ export function useMissionSession({
       const current = missionRunRef.current
       if (current === null || current.status !== '진행중') return
       if (pendingDefensePlayRef.current !== null || pendingRunnerPlayRef.current !== null) return
+      // 붙든 볼넷 · 사구(0x12 대기 · 벤치 클리어링)도 0xf 가 아니다
+      if (pendingBenchClearingRef.current !== null) return
       if (!(base === 1 ? current.bases.first : base === 2 ? current.bases.second : current.bases.third)) return
       const input: PickoffPlayInput = {
         targetBase: base,
@@ -2610,6 +2642,7 @@ export function useMissionSession({
       const current = missionRunRef.current
       if (current === null || current.status !== '진행중') return
       if (pendingDefensePlayRef.current !== null || pendingRunnerPlayRef.current !== null) return
+      if (pendingBenchClearingRef.current !== null) return
       const next = startHumanSteal(current.bases, stealingFromRef.current, base)
       if (next === stealingFromRef.current) return
       // 수비 · 주자 칸은 공 도착 판(`playAbilitiesOf` — CPU 수비 팀 레코드 · 사람 칸 타순 주자)과 같다
@@ -2719,7 +2752,8 @@ export function useMissionSession({
 
   /** 타자 미션에서 지금 출발시킬 수 있는 루 — `canStartSteal`(0xa9924 앞길 검사). 이번 공에 이미 출발한 주자는 빠진다 */
   const stealableBases: readonly StealBase[] =
-    missionRun === null || missionRun.status !== '진행중' || pendingDefensePlay !== null || pendingRunnerPlay !== null
+    missionRun === null || missionRun.status !== '진행중' || pendingDefensePlay !== null || pendingRunnerPlay !== null ||
+    pendingBenchClearing !== null
       ? []
       : ([1, 2, 3] as const).filter((base) => startHumanSteal(missionRun.bases, stealingFrom, base) !== stealingFrom)
 
@@ -3203,6 +3237,40 @@ interface MissionArrivalContext {
   /** 공 앞 루상 주자 수 — 결과 띠 */
   readonly runnersOnBase: number
 }
+
+/** 투수 미션(모드 5)의 붙든 볼넷 · 사구 · 삼진 — `useMissionSession` 의 `pendingBenchClearing` */
+interface PitcherMissionHeldResult {
+  readonly side: '투수'
+  readonly phase: HitByPitchHoldPhase
+  readonly run: PitcherRun
+  /** 이 공을 놓은 뒤의 미션 투수 +0x2c — 들어가면 0x3ab7c 가 −1000 */
+  readonly pitcherStamina: number
+  readonly outcome: AtBatOutcome
+  /** 이 공이 연 밀어내기 판(종류 2) — 판정 A(또는 연출 뒤) 0x17 로 재생한다 */
+  readonly walkReplay?: DefensePlayResult | null
+  /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
+  readonly entryRolls?: readonly BenchClearingEntryRoll[]
+}
+
+/** 타자 미션(모드 6)의 붙든 볼넷 · 사구 (r298) — 판정 A 의 보통 길은 `finishMissionArrivalAtBat` 그대로다 */
+interface BatterMissionHeldResult {
+  readonly side: '타자'
+  readonly phase: HitByPitchHoldPhase
+  /** 공을 받을 때의 판 — 벤치 클리어링 그림(0x43228)의 루 · 두 팀 */
+  readonly run: MissionRun
+  readonly outcome: AtBatOutcome
+  /** 이 공의 0x3dfac 이 연 밀어내기 판(종류 2) */
+  readonly play: PitchArrivalPlay | null
+  readonly hasSwung: boolean
+  readonly isBunt: boolean
+  /** 공 앞 루상 주자 수 — 결과 띠 */
+  readonly runnersOnBase: number
+  /** 진입 0x3a5f0 의 굴림 45 번 */
+  readonly entryRolls?: readonly BenchClearingEntryRoll[]
+}
+
+/** 미션의 붙든 타석 결과 — 투수 미션 · 타자 미션 (`pendingBenchClearing`) */
+export type MissionHeldResult = PitcherMissionHeldResult | BatterMissionHeldResult
 
 /** 투수 미션의 붙든 공 도착 판이 끝난 뒤 그 공의 나머지가 쓰는 값 (`handleThrow` 가 공을 던질 때의 것) */
 interface PitcherArrivalContext {

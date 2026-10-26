@@ -2011,6 +2011,22 @@ describe('마타자 0xb633d — 번트 칸을 뽑아도 친다', () => {
   })
 })
 
+describe('우리 타석 판 없는 삼진 — 0x12 대기 끝(틱 31 의 판정 A 0xae24c)에서 정산 (r298)', () => {
+  it('공 도착에서 굴림 없이 붙들고 판정이 끼어들 사람 없는 껍데기(`applyBatterOutcome`)와 같은 결과 · 차례를 낸다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 붙든난수 = createSeededRandom(5)
+    const 붙듦 = startBatterOutcome(progress, { kind: '삼진' }, 붙든난수)
+    expect(붙듦.pendingBenchClearing).toEqual({ phase: 'wait', side: '공격', outcome: { kind: '삼진' } })
+    expect(붙듦.game).toEqual(progress.game)
+    const 판정 = judgeHitByPitch(붙듦, 붙든난수)
+    expect(판정.pendingBenchClearing).toBeNull()
+    const 껍데기난수 = createSeededRandom(5)
+    const 껍데기 = applyBatterOutcome(progress, { kind: '삼진' }, 껍데기난수)
+    expect(판정.game).toEqual(껍데기.game)
+    expect(붙든난수.rand(0, 0x7fffffff)).toBe(껍데기난수.rand(0, 0x7fffffff))
+  })
+})
+
 describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e, 20%)', () => {
   /** 첫 rand 만 정해 두고(비율 value) 나머지는 씨앗 난수에 맡긴다 */
   function 첫굴림(value: number, seed: number): RandomPort {
