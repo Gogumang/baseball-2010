@@ -4,6 +4,7 @@
 //   yarn node e2e/derby-stage.mjs webkit                  # 하나만
 //   E2E_DERBY_SHIFT=-9 E2E_DERBY_FIXTURE=nari-ending yarn node e2e/derby-stage.mjs chromium
 //   E2E_DERBY_SWEEP=1 yarn node e2e/derby-stage.mjs chromium   # 좌우 이동마다 몇 M 나는지 훑기
+//   E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=1 E2E_DERBY_SKIP_UNTIL_STAGE=2 yarn node e2e/derby-stage.mjs chromium   # 단계 2 까지 건너뛰고 그 뒤 판을 찍기(A-07)
 //
 // `derby-start`(첫 공 앞 0xe)에서 OK 로 시작해 공마다
 //   - 좌우 이동 '4'/'6'(+0xfe4, ±3 · [−9, 9])을 공의 판정 오차(`probe.plateError`)에 맞추고(`E2E_DERBY_SHIFT=<수>` 면 고정) — 0xd 진입(48f88)에서만 0 으로 돌아가고 공 사이에는 남는다
@@ -21,6 +22,9 @@ const SHIFT = process.env.E2E_DERBY_SHIFT ?? 'auto'
 const SWEEP = process.env.E2E_DERBY_SWEEP === '1'
 /** 판(0x17) 동안 키를 눌러 홈런 연출을 건너뛴다(0x519cc — 홈런 틱 뒤에만 먹는다). 씨앗 찾기를 빠르게 */
 const SKIP = process.env.E2E_DERBY_SKIP === '1'
+/** 이 단계에 닿을 때까지만 건너뛰고(빠르게 · 키 시각이 덜 밀린다) 그 뒤로는 판을 끝까지 보고 찍는다 — 단계 2 · 3 확인용(A-07, r288) */
+const SKIP_UNTIL_STAGE = Number(process.env.E2E_DERBY_SKIP_UNTIL_STAGE ?? '0')
+const skipsAt = (stage) => SKIP || stage < SKIP_UNTIL_STAGE
 const SWEEP_SHIFTS = [-9, -6, -3, 0, 3, 6, 9]
 /**
  * 맞은 공 몇 개까지 0x13(타구 공 · 그림자 — r274)과 판 0x17 필드 화면(A-01)을 찍나 — 그림: derby-<브라우저>-hit<n>-<자리>.png
@@ -106,7 +110,7 @@ async function run(browserName, shiftOf) {
       continue
     }
     const probe = await page.evaluate(() => window.__batting?.().probe ?? null)
-    if (SKIP && peek.isPlayRunning) {
+    if (skipsAt(peek.run.stage) && peek.isPlayRunning) {
       await page.keyboard.press('Enter')
       await page.waitForTimeout(200)
       continue
@@ -129,7 +133,8 @@ async function run(browserName, shiftOf) {
     lead = Math.max(0, Math.min(80, lead + (downAt - moment.target) * 0.3))
     pitchIndex += 1
     // 공 하나의 셈(판 끝 · 0x12 대기 끝)까지 — `SKIP` 이면 판 동안 키로 건너뛴다
-    const capturing = hitShots < HIT_SHOTS
+    const skipping = skipsAt(before.stage)
+    const capturing = hitShots < HIT_SHOTS && !skipping
     let shotHit = false
     let fieldStartedAt = null
     let shotField = 0
@@ -169,8 +174,8 @@ async function run(browserName, shiftOf) {
           shotZone = true
         }
       }
-      if (SKIP && p.isPlayRunning) await page.keyboard.press('Enter')
-      await page.waitForTimeout(SKIP ? 150 : capturing ? 20 : 30)
+      if (skipping && p.isPlayRunning) await page.keyboard.press('Enter')
+      await page.waitForTimeout(skipping ? 150 : capturing ? 20 : 30)
     }
     if (shotHit || fieldStartedAt !== null) hitShots += 1
     const after = await derbyPeek(page)
