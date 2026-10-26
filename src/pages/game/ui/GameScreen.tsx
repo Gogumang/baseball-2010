@@ -447,6 +447,8 @@ export function GameScreen({
             // 조작방법 뷰어 동안도 일시정지 팝업이 떠 있어 경기 갱신이 멈춘다 (0x52cc6 0x754f9)
             // 0xe(OK 대기)에서도 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다
             isPaused={isPaused || isMenuOpen || overlay !== null || sceneConfirm.isAwaiting}
+            // 좌우 이동 +0xfe4 는 0xd 진입 48f88 에서만 지운다 — 같은 타석의 다음 공(0xf)과 결과 연출 동안은 남는다(A-02)
+            shiftResetSerial={sceneConfirm.sceneDEntryMark}
             {...(skyRow === undefined ? {} : { skyRow })}
             // 구장 객체(0x39fdc 모드 4 — 홈 팀 · 대회 2/8) — 펜스 프레임 +0x70 · 바닥 팔레트 줄 +0xc
             {...(sceneStadium === null ? {} : { stadium: sceneStadium.stadium })}

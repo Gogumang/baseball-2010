@@ -57,9 +57,12 @@ describe('타구 판의 판 안 소리 (`DefensePlayState.tickSounds`)', () => {
   })
 
   it('쥐기 판정의 태그 아웃을 같은 틱 두 번째 판정이 지운 판은 그 틱에 20 이다 (state[0x87] 은 그 자리 값)', () => {
-    // 표 8 번 15째 땅볼 — 1루수(2)가 15틱에 쥐며 타자주자를 태그한다(r176: 쥐기는 야수를 옮기지 않아 예전 [50, 409, 355] 는 한 틱 뒤 태그다)
-    const { sounds } = 틱소리(판(땅볼아웃, { first: false, second: true, third: false }, [48, 427, 323, 1]))
-    expect(sounds).toContainEqual({ tick: 15, sound: { kind: 'sound', soundId: 20 } })
+    // 표 14 번 [10] 땅볼 — 1루수(2)가 21틱에 쥐며 타자주자를 태그한다(r176: 쥐기는 야수를 옮기지 않아 예전 [50, 409, 355] 는 한 틱 뒤 태그다.
+    // 예전 표 8 [48, 427, 323, 1] 은 걸음이 맨해튼 거리(0xbfa2c)로 나뉜 뒤 태그가 포구 틱에 안 겹친다)
+    const { sounds, log } = 틱소리(판(땅볼아웃, { first: false, second: true, third: false }, [45, 279, 324, 0]))
+    expect(log).toContain('21틱 2번 야수가 잡았다 (종류 0)')
+    expect(log).toContain('21틱 0번 주자 태그 아웃 (0xb36d0 결과 3)')
+    expect(sounds).toContainEqual({ tick: 21, sound: { kind: 'sound', soundId: 20 } })
     expect(번호들(sounds)).not.toContain(62)
   })
 

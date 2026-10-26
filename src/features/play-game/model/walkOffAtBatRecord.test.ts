@@ -71,8 +71,11 @@ const 차례난수 = (values: readonly number[]): RandomPort => {
   return createFractionRandom(() => values[Math.min(index++, values.length - 1)]!)
 }
 
-/** 2루수 땅볼 (runDefensePlay 시험의 `이루수땅볼`) — 펌블 · 아웃 굴림을 차례난수로 고른다 */
-const 이루수땅볼: BattedBallPattern = [70, 1000, 202, 0]
+/**
+ * 내야 땅볼 — 원본 코드 3 의 25번째. 펌블 · 아웃 굴림을 차례난수로 고른다.
+ * (r268: 주자 걸음이 맨해튼 거리라 예전 `이루수땅볼` [70, 1000, 202] 로는 이 끝내기 판들이 안 선다)
+ */
+const 이루수땅볼: BattedBallPattern = [109, 904, 360, 1]
 
 describe('끝내기 타석의 기록 — 정산 0xa8024 가 경기 끝(0x18) 앞에 돈다 (0xae3e8 ae55c → ae5b2)', () => {
   it('끝내기 홈런 — 타수 · 안타 · 홈런 · 타점(홈런 주자 모두)이 이 경기 줄에 든다', () => {
@@ -88,8 +91,8 @@ describe('끝내기 타석의 기록 — 정산 0xa8024 가 경기 끝(0x18) 앞
 
   it('끝내기 안타 — 2 · 3루 주자 둘이 들어온 2점 끝내기도 1타수 1안타 2타점이다', () => {
     const 판 = 끝내기판({ bases: { first: false, second: true, third: true }, outs: 1, ourScore: 2, opponentScore: 3 })
-    // 원본 패턴 덱 코드 9 의 46번째 — 이 판에서 2루타로 끝난다
-    const pattern = BATTED_BALL_PATTERNS[9]![45]!
+    // 원본 패턴 덱 코드 9 의 49번째 — 이 판에서 2루타로 끝난다 (r268: 주자 걸음이 맨해튼 거리라 46번째는 이제 2점 2루타가 아니다)
+    const pattern = BATTED_BALL_PATTERNS[9]![48]!
     const { played, finished } = 타구를친다(판, pattern, createSeededRandom(11), { kind: '안타', bases: 1 })
 
     expect(played.outcome).toEqual({ kind: '안타', bases: 2 })

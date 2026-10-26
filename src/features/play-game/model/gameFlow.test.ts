@@ -301,8 +301,10 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
     expect(play!.runnerFates.every((fate) => fate.scored)).toBe(true)
   })
 
-  it('깊은 뜬공은 3루 주자를 불러들이고, 얕은 뜬공은 못 불러들인다 (희생플라이 보장 제거)', () => {
-    const 깊은뜬공: BattedBallPattern = [92, 895, 1017, 0] // 원본 코드 0 — 중견수가 낙구 전 23틱에 잡는다
+  it('늦게 잡히는 높은 뜬공은 3루 주자를 불러들이고, 얕은 뜬공은 못 불러들인다 (희생플라이 보장 제거)', () => {
+    const 깊은뜬공: BattedBallPattern = [90, 810, 1592, 0] // 원본 코드 0 — 높이 뜬 공을 유격수가 58틱에 잡는다
+    // (r268: 주자 걸음 · 도착 틱이 맨해튼 거리(0xbfa2c)라 3루→홈이 35틱 남짓 — 외야수가 잡는 뜬공은 송구가 먼저라 태그업을 안 한다.
+    //  예전 [92, 895, 1017] 처럼 23틱에 잡히는 공으로는 3루 주자가 안 뛴다)
     const 얕은뜬공: BattedBallPattern = [90, 250, 700, 0]
     const 시작 = 내타석({ first: false, second: false, third: true }, 0)
     const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
@@ -324,12 +326,15 @@ describe('사람 타석은 수비 시뮬레이션을 돌린다 — CPU 간이 �
    * 3아웃이면 영영 안 풀린다(0xaa388). 타자주자가 살아 뛰던 때 바로 올린 득점은 남는다(원본 그대로).
    */
   it('2아웃 땅볼에 보류된 3루 주자 득점은 타자주자가 셋째 아웃이 되면 무효가 된다 (0xaa1c0 · 0xaa388)', () => {
+    // r268: 원본 코드 3 [124, 907, 330, 1] — 3루수가 13틱에 잡아 16틱에 CPU 송구로 1루에 던지고, 28틱 플레이 틱에서 타자주자가
+    // 1루 포스(0xb36d0 결과 2)로 셋째 아웃, 같은 틱 3루 주자 홈은 보류(0xaa1c0)다. (주자 걸음이 맨해튼 거리라 예전 [110, 711, 41, 1] 은
+    // 3루 주자가 홈에 닿기 전에 판이 닫힌다.) 아래는 그 전 씨앗의 내력이다.
     // 원본 코드 4 — 투수가 잡아 CPU 송구로 1루에 던지고, 18틱 그림의 플레이 틱에서 타자주자가 1루 포스(0xb36d0 결과 2)로 셋째
     // 아웃이 된다. 3루 주자는 그 그림의 목록 틱에 홈에 닿아, 플레이 틱 뒤의 득점 0xaa0a8 이 3아웃을 보고 보류한다(0xaa1c0) —
     // 3아웃이라 안 풀린다(0xaa388). (씨앗을 다시 골랐다 — [70, 1095, 100, 1] 은 득점을 아웃 판정 앞에 세던 옛 차례에 기댔고, 원본
     // 차례에서는 3아웃이 홈인 목록 틱보다 먼저라 관문이 닫혀 득점도 보류도 없다. 그 앞 [107, 787, 280, 1] 은 투수 칸 송구 속도
     // g = 2(0xb0fb4 b106a)로 타자주자가 살고, 손-패턴 [80, 800, 150] 은 투수가 뜬 채로 잡는 공이다)
-    const 땅볼: BattedBallPattern = [110, 711, 41, 1]
+    const 땅볼: BattedBallPattern = [124, 907, 330, 1]
     const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
     const 이사 = 내타석({ first: false, second: false, third: true }, 2)
     const play = applyPlayerOutcome(이사, 땅볼아웃, createSeededRandom(3), { pattern: 땅볼 }).lastDefensePlay!
@@ -420,7 +425,9 @@ describe('환경설정 "주루" 가 나만의리그 타자편에도 먹는다 (�
   //          = (경기[0x31 + 경기[9](공격측)] == 1) || (설정+0xbd != 0)
   //   그 값이 0 이면 52660 의 자동 진루 제어기(0xaf8c0 = vt8 = 0xaf918)를 통째로 안 돌린다.
   // 타자편은 사람이 늘 공격이라 앞 항이 늘 거짓 → 설정이 그대로 먹는다.
-  const 깊은뜬공: BattedBallPattern = [92, 895, 1017, 0] // 원본 코드 0 — 중견수가 낙구 전 23틱에 잡는다
+  const 깊은뜬공: BattedBallPattern = [90, 810, 1592, 0] // 원본 코드 0 — 높이 뜬 공을 유격수가 58틱에 잡는다
+  // (r268: 주자 걸음 · 도착 틱이 맨해튼 거리(0xbfa2c)라 3루→홈이 35틱 남짓 — 외야수가 잡는 뜬공은 송구가 먼저라 태그업을 안 한다.
+  //  예전 [92, 895, 1017] 처럼 23틱에 잡히는 공으로는 3루 주자가 안 뛴다)
   const 땅볼: BattedBallPattern = [45, 300, 200, 0]
   const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
 
@@ -853,10 +860,16 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     for (let seed = 1; seed <= 20; seed += 1) {
       const random = createSeededRandom(seed)
       const 시작 = startGame(random)
-      // 1루에 주자를 세우고(2루 빈칸) 도루를 건다
+      // 1루에 주자를 세우고(2루 빈칸) 도루를 건다. 주자는 발 빠른 나(주루 999) — 한 틱 이동 0xbf158 이 맨해튼 거리로 나눠
+      // 대각선 1루→2루가 평면 속도의 0.71 배라 보통 주자(주루 500 안팎)는 CPU 포수 송구에 잡힌다(r268)
       const 주자있음: GameProgress = {
         ...시작,
-        game: { ...시작.game, bases: { first: true, second: false, third: false } },
+        myRunAbility: 999,
+        game: {
+          ...시작.game,
+          bases: { first: true, second: false, third: false },
+          runners: { first: 시작.game.playerOrderIndex, second: null, third: null },
+        },
       }
       const n = 주자있음.recordIds.length
       const 출발 = startSteal(주자있음, 1, createSeededRandom(0))
@@ -866,7 +879,7 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
       const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, random)
       expect(뒤.stealingFrom).toEqual([])
       if (play?.kind !== 5) continue // 0.1% 폭투·포일이 먼저 섰다
-      // CPU 수비는 리드 뒤 잡을 루가 없어 던지지 않는다 — 도루 주자는 2루에 닿는다
+      // 빠른 주자라 CPU 수비가 잡을 루가 없다 — 도루 주자는 2루에 닿는다
       expect(뒤.game.bases).toEqual({ first: false, second: true, third: false })
       expect(뒤.recordIds.slice(n)).toEqual([8])
       expect(뒤.lastDefensePlay).toBe(play.result)
@@ -1914,7 +1927,8 @@ describe('삼진 없이 경기 끝으로 정산되는 폭투·포일 판(종류 
         runners: { first: null, second: null, third: 4 },
       },
     }
-    const step = arrivePitch(끝내기판, { resolution: { kind: '볼' } as never, outcomeAfter: null }, 폭투난수(1, 0))
+    // 씨앗 8 — 3루 주자가 홈에 닿는 폭투다(r268: 주자 걸음이 맨해튼 거리라 씨앗 1 의 폭투로는 3루 주자가 안 들어온다)
+    const step = arrivePitch(끝내기판, { resolution: { kind: '볼' } as never, outcomeAfter: null }, 폭투난수(8, 0))
     expect(step.play?.kind).toBe(9)
     expect(step.interrupted).toBe(true)
     const 끝 = step.progress

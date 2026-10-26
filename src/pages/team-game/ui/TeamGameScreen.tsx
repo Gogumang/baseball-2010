@@ -1255,6 +1255,8 @@ function TeamGameScene({
                 // 0xe 에서는 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다. 일시정지 팝업(0x52cc6) · 교체 창(상태 0xb, 0x4db68 은
                 // 장면을 그리기만 한다) 동안도 멈춘 채 선다 — 내렸다 다시 올리면 타석이 새로 서며 굴림이 샌다
                 isPaused={visibleBurstLines !== null || isAwaitingConfirm || isPopupOpen || changeWindow !== null}
+                // 좌우 이동 +0xfe4 는 0xd 진입 48f88 에서만 지운다 — 같은 타석의 다음 공(0xf)과 결과 연출 동안은 남는다(A-02)
+                shiftResetSerial={sceneConfirm.sceneDEntryMark}
                 // 구장 하늘 줄 — 경기 하나에 한 번(0x783b0). 수비 재생으로 화면이 다시 서도 같은 줄이다
                 {...(stadiumSkyRow === null ? {} : { skyRow: stadiumSkyRow })}
                 random={random}

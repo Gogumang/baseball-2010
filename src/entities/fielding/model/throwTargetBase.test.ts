@@ -101,16 +101,16 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (0아웃 = 점수식)
   const 결과 = describeThrowTarget(상황)
 
   it('후보표: 주자 도착 틱은 "그 주자가 달려가는 루(+0x7c)" 칸에 들어간다 (0xafbae)', () => {
-    // 타자주자 → 1루 칸, 홈으로 가는 3루 주자(+0x7c = 4) → 4 & 3 = 홈 칸
-    expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([23, 23, NONE, NONE])
-    // 수비 틱은 송구 틱 0xa1adc(포물선, throwPlan.throwTicksTo) 기준
-    expect(결과.candidates.map((candidate) => candidate.defTick)).toEqual([13, 10, 9, 7])
+    // 타자주자 → 1루 칸, 홈으로 가는 3루 주자(+0x7c = 4) → 4 & 3 = 홈 칸. 틱 = 맨해튼 11216 · 11215 ÷ 335 = 33 (0xbefec → vt20 0xbf3ec → 0xbfa2c)
+    expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([33, 33, NONE, NONE])
+    // 수비 틱은 송구 틱 0xa1adc(포물선, throwPlan.throwTicksTo) 기준 — 2·3루는 커버 도착 틱(맨해튼 ÷ 220)이 더 늦어 그것이다
+    expect(결과.candidates.map((candidate) => candidate.defTick)).toEqual([13, 10, 11, 9])
     // forced(vt0x80)도 +0x7c 칸에 — 타자주자(늘 1)의 1루만 선다
     expect(결과.candidates.map((candidate) => candidate.forced)).toEqual([false, true, false, false])
   })
 
   it('여유 = 주자 틱 − 수비 틱, 확실한 아웃 후보(포스 = 타자주자의 1루)에만 적힌다', () => {
-    expect(결과.margins).toEqual([NONE, 13, NONE, NONE])
+    expect(결과.margins).toEqual([NONE, 23, NONE, NONE])
   })
 
   it('루 기본 점수는 표 0xd85ac 대로 홈이 가장 크다', () => {
@@ -119,10 +119,10 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (0아웃 = 점수식)
 
   it('불확실한 홈 보너스 1000000 은 둘째 루 항에도 붙는다 — 1루로 잡고 홈까지 되던질 여유가 있으면 1루가 이긴다', () => {
     // 홈 = 4000 + 1000000(A) + 2×10000 + 500(B) = 1024500 — 둘째 루 항은 확실(effective)한 첫 루에만 붙는다
-    // 1루 = 1000 + (4000 + 1000000)(A: 둘째 루 홈 항) + 2×(100013 + 5001(밖·1루) + 10000(달리는 중))
-    //      + 10000(둘째 루 홈, 불확실) + 500(B) = 1245528 — 1루 → 홈 되던지기(0xa1adc)가 3루 주자보다 빠르다
+    // 1루 = 1000 + (4000 + 1000000)(A: 둘째 루 홈 항) + 2×(100023 + 5001(밖·1루) + 10000(달리는 중))
+    //      + 10000(둘째 루 홈, 불확실) + 500(B) = 1245548 — 1루 → 홈 되던지기(0xa1adc)가 3루 주자보다 빠르다
     // 후보가 없는 루도 바닥값 500 은 받는다 (`+500`)
-    expect(결과.topScores).toEqual([1_024_500, 1_245_528, 500, 500])
+    expect(결과.topScores).toEqual([1_024_500, 1_245_548, 500, 500])
     expect(결과.chosen).toBe(1)
   })
 
@@ -158,8 +158,9 @@ describe('도루 주자 — 떠난 루가 아니라 달려가는 루로 던진�
         { fielders: 포수보유, landingTick: 0, outs: 2 },
       ),
     )
-    expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([NONE, NONE, 23, NONE])
-    expect(결과.margins).toEqual([NONE, NONE, 11, NONE])
+    // 1루→2루 맨해튼 10951 ÷ 335 = 32
+    expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([NONE, NONE, 32, NONE])
+    expect(결과.margins).toEqual([NONE, NONE, 20, NONE])
     expect(결과.chosen).toBe(2)
   })
 })
@@ -173,6 +174,18 @@ describe('1루 커버가 없을 때의 예외 (2-6)', () => {
   it('1루선에서 499 이내에 있고 타자주자보다 빠르면 수비 틱 = 주자 틱 으로 적는다', () => {
     const 결과 = describeThrowTarget(
       입력({ ballHolderSlot: 3, catchFielderSlot: 3, everHeld: true, held: true }, [느린타자주자], {
+        fielders: 선위야수,
+      }),
+    )
+    expect(결과.candidates[1].defTick).toBe(결과.candidates[1].runTick)
+  })
+
+  it('견주는 값은 틱이 아니라 1루까지의 평면 거리다 (afda4 · afdc0 0xbed30) — 빠른 타자주자라도 더 멀면 예외', () => {
+    // 타자주자 홈→1루 7945 · 속도 600 → 맨해튼 11216 ÷ 600 = 18틱, 2루수 (22973, 26810)→1루 3973 · 220 → 5608 ÷ 220 = 25틱.
+    // 틱으로는 주자가 빠르지만 거리로는 주자가 멀어 예외가 걸린다
+    const 빠른타자주자 = createRunner(0, 0, 600, { targetBase: 1 })
+    const 결과 = describeThrowTarget(
+      입력({ ballHolderSlot: 3, catchFielderSlot: 3, everHeld: true, held: true }, [빠른타자주자], {
         fielders: 선위야수,
       }),
     )

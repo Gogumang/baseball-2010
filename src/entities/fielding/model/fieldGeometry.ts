@@ -95,11 +95,25 @@ export function abilityGradeOf(ability: number): number {
   return index < 0 ? ABILITY_GRADE_LIMITS.length : index
 }
 
-/** 평면 거리 isqrt(dx² + dz²) — 0xbfa2c. 높이는 보지 않는다 */
+/**
+ * 평면 거리 isqrt(dx² + dz²) — **0xbf9f0** (bf9fe~bfa1a: |dx|² + |dz|² → 제곱근 0x6c64c). 높이는 보지 않는다.
+ * 원본이 이것을 부르는 곳: 가장 가까운 야수(b3c30) · 송구 0xa1620 · 0xa1adc · 0xa1f16 · 중계 0xb3444 · 송구 문턱 0xb2c90 ·
+ * 중계 자리 0xb1edc · 2루 커버 0xb1c90 · 태그 0xb36d0(0xbece8) · 1루 예외 0xafb24(0xbed30) · 한 틱 이동 0xbf158 의 붙이기 검사 ·
+ * 타구 0xa29bc · 0xa2a88 · 0x406e8 · 더비 비거리 0xa600c
+ */
 export function horizontalDistance(from: WorldPoint, to: WorldPoint): number {
   const dx = to.x - from.x
   const dz = to.z - from.z
   return integerSquareRoot(dx * dx + dz * dz)
+}
+
+/**
+ * 맨해튼 거리 |dx| + |dz| — **0xbfa2c** (bfa3a~bfa4a). 높이는 보지 않는다.
+ * 원본이 이것을 부르는 곳: 도착 틱 0xbf01c · vt20 0xbf3ec · 한 틱 이동 0xbf158 의 나눗수(bf1c6) · 주자 진행률 0xa04e8 ·
+ * 한 루 더 가는 틱 0xa06ec · 포구 예보 거리 0xb12d0(b15b4) · 백업 야수 0xb3e18(b3f2a)
+ */
+export function manhattanDistance(from: WorldPoint, to: WorldPoint): number {
+  return Math.abs(to.x - from.x) + Math.abs(to.z - from.z)
 }
 
 /** 세 좌표가 **정확히** 같은가 — 0xbc0f4. 루 판정(0xa0ae4)이 이 완전일치를 쓴다 */
@@ -107,31 +121,40 @@ export function isSamePoint(left: WorldPoint, right: WorldPoint): boolean {
   return left.x === right.x && left.y === right.y && left.z === right.z
 }
 
-/** 목표까지 남은 틱 — 0xbf01c: 속도가 0 이면 1000 을 돌려준다 (원본 그대로) */
+/**
+ * 목표까지 남은 틱 — 0xbf01c · vt20 0xbf3ec: 속도가 0 이면 1000, 아니면 **맨해튼 거리**(0xbfa2c) ÷ 속도 (원본 그대로).
+ * 한 틱 이동(0xbf158)도 맨해튼 거리로 나눠 걸으니 대각선에서도 이 틱과 실제 걸음 수가 맞는다
+ */
 export const UNREACHABLE_TICKS = 1000
 
 export function ticksToReach(from: WorldPoint, to: WorldPoint, speed: number): number {
   if (speed === 0) return UNREACHABLE_TICKS
-  return Math.trunc(horizontalDistance(from, to) / speed)
+  return Math.trunc(manhattanDistance(from, to) / speed)
 }
 
 /**
  * 한 틱 이동 — 기반 캐릭터 vt 0x24 = 0xbf158.
- * 남은 거리가 속도 이하면 **목표에 정확히 붙인다**(그래서 루 위 캐릭터 좌표가 루 좌표와 비트까지 같다 — S8 6-2).
+ * 남은 **평면 거리(0xbf9f0, bf186)** 가 속도 이하면 **목표에 정확히 붙인다**(그래서 루 위 캐릭터 좌표가 루 좌표와 비트까지 같다 — S8 6-2).
+ * 아니면 x · z 를 (차 × 속도 ÷ **맨해튼 거리**(0xbfa2c, bf1c6)) 만큼 옮긴다 — 나눗수가 평면 거리가 아니라서 대각선으로는
+ * 한 틱에 속도보다 덜 간다(45° 면 약 0.71배). 원본 그대로다.
  */
 export function stepToward(position: WorldPoint, target: WorldPoint, speed: number): WorldPoint {
   const distance = horizontalDistance(position, target)
   if (distance <= speed) return { x: target.x, y: position.y, z: target.z }
+  const divisor = manhattanDistance(position, target)
   return {
-    x: position.x + Math.trunc(((target.x - position.x) * speed) / distance),
+    x: position.x + Math.trunc(((target.x - position.x) * speed) / divisor),
     y: position.y,
-    z: position.z + Math.trunc(((target.z - position.z) * speed) / distance),
+    z: position.z + Math.trunc(((target.z - position.z) * speed) / divisor),
   }
 }
 
-/** 진행률 % — 주자 vt90 = 0xa04e8: 출발 루에서 현재 위치까지 ÷ 출발 루에서 목표 루까지 × 100 */
+/**
+ * 진행률 % — 주자 vt90 = 0xa04e8 (a0616~a068a): **100 − ⌊맨해튼(목표 루, 현재 위치) × 100 ÷ 맨해튼(출발 루, 목표 루)⌋**.
+ * 거리는 둘 다 0xbfa2c 이고 남은 몫을 100 에서 뺀다(그래서 간 몫을 내림한 것보다 1 크게 나올 수 있다). 출발 루 = 목표 루면 0(a068e)
+ */
 export function progressPercent(legStart: WorldPoint, position: WorldPoint, target: WorldPoint): number {
-  const whole = horizontalDistance(legStart, target)
+  const whole = manhattanDistance(legStart, target)
   if (whole === 0) return 0
-  return Math.trunc((horizontalDistance(legStart, position) * 100) / whole)
+  return 100 - Math.trunc((manhattanDistance(target, position) * 100) / whole)
 }

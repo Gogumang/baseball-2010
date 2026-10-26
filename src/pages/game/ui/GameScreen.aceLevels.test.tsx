@@ -18,6 +18,7 @@ interface 받은칸 {
   readonly careerYearIndex?: number
   readonly canBunt?: boolean
   readonly sceneBuntKind?: number
+  readonly shiftResetSerial?: number
 }
 const 받은props: 받은칸[] = []
 vi.mock('@/widgets/batting-stage/ui/BattingStage', () => ({
@@ -138,5 +139,24 @@ describe('나만의리그 타자편 장면 +0xfdc — 사람 키가 쓰는 칸 (
       />,
     )
     expect(받은props.at(-1)?.sceneBuntKind).toBe(2)
+  })
+})
+
+describe('나만의리그 · 시즌 타석 → 좌우 이동은 0xd 진입 번호로만 지운다 (0x48d50 48f88, A-02)', () => {
+  it('BattingStage 에 0xd 진입 표지(`sceneDEntryMark`)를 shiftResetSerial 로 넘긴다 — 안 넘기면 쉬는 동안 지우던 옛 갈래가 없다', () => {
+    render(
+      <GameScreen
+        career={createCareer('테스트')}
+        progress={startGame(createSeededRandom(20100901))}
+        atBat={createAtBat()}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onQuit={vi.fn()}
+      />,
+    )
+    expect(typeof 받은props.at(-1)?.shiftResetSerial).toBe('number')
   })
 })

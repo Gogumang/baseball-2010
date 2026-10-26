@@ -52,6 +52,12 @@ describe('직선 근사 거리 — `정지면 d −= 속도 × n` (0xb12d0)', ()
     expect(catchKindsAt(창({ ball: 멀리, runTicks: 7, speed: 220 }))).toContain(CATCH_KIND.LOW)
   })
 
+  it('거리 d 는 맨해튼 |dx| + |dz| 다 (b15b4 → 0xbfa2c)', () => {
+    // 야수 (20000, 20000) — 공 (20300, 20400): 평면 500 이지만 맨해튼 700 이라 내야 반경 500 밖이다
+    expect(approachedDistanceOf(창({ ball: { x: 20_300, y: 800, z: 20_400 } }))).toBe(700)
+    expect(catchKindsAt(창({ ball: { x: 20_300, y: 800, z: 20_400 } }))).not.toContain(CATCH_KIND.LOW)
+  })
+
   it('빼기만 하고 0 으로 자르지 않는다 — 음수 거리도 원본 그대로다', () => {
     expect(approachedDistanceOf(창({ runTicks: 5, speed: 220 }))).toBe(-1100)
   })

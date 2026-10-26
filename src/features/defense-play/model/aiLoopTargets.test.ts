@@ -80,7 +80,8 @@ describe('추적야수 AI 1(b4aca)의 목표 고치기는 AI 고리 안 — 같�
       random: createSeededRandom(1),
       controls: { side: '수비', keyAt: () => ({ key: '6', isRepeat: false }) },
     })
-    expect(결과.log).toContain('45틱 1루로 송구 — 56틱 도착 (3번 야수 중계) (6번 야수)')
+    // 야수 걸음이 맨해튼 거리(0xbf158 → 0xbfa2c)로 나뉘어 외야수가 44틱에 잡고 50틱에 던진다
+    expect(결과.log).toContain('50틱 1루로 송구 — 61틱 도착 (3번 야수 중계) (6번 야수)')
   })
 })
 

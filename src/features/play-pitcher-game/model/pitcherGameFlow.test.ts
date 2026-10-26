@@ -1531,7 +1531,7 @@ describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac
 })
 
 describe('상태 0xe 의 OK 대기 — 내가 던지는 타석마다 (0x39e14 → 0x532b0)', () => {
-  it('첫 타석 앞에 대기가 서고, 다음 타자 타석은 새 대기다. 감독 강판(0x23)이면 대기를 안 바꾼다', () => {
+  it('첫 타석 앞에 대기가 서고, 다음 타자 타석은 새 대기다. 감독 강판(0x23)이면 OK 를 안 받는 지나감 대기로 선다', () => {
     const random = 씨앗(20100901)
     let progress = startPitcherGame(기본옵션, random)
     expect(isPitchTurn(progress)).toBe(true)
@@ -1540,7 +1540,10 @@ describe('상태 0xe 의 OK 대기 — 내가 던지는 타석마다 (0x39e14 �
       const before = progress
       progress = throwPitch(progress, { typeNumber: 1, gaugeCell: 0 }, random)
       if (progress.managerHookText !== null) {
-        expect(progress.sceneConfirm).toBe(before.sceneConfirm)
+        // 강판이어도 0xd 두 그림 · 0xe 한 그림을 지난 뒤 강판 창이 선다(`enterSceneHookPassage`, eee18139) — OK 는 안 받는다.
+        // (r268 전에는 이 씨앗에서 강판이 안 나 이 갈래가 돌지 않았다 — 옛 기대 "대기를 안 바꾼다" 는 eee18139 앞의 것이다)
+        expect(progress.sceneConfirm).not.toBe(before.sceneConfirm)
+        expect(progress.sceneConfirm?.hooksAtEntry).toBe(true)
         break
       }
       const 새타석 = progress.opponentOrderIndex !== before.opponentOrderIndex || progress.game.half !== before.game.half

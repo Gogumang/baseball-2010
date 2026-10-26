@@ -56,9 +56,16 @@ const isSamePointXZ = (a: { x: number; z: number }, b: { x: number; z: number })
 
 /** 외야 깊숙한 뜬공 — 송구가 늦어 태그업이 걸린다. 원본 코드 0 [92, 895, 1017] (중견수가 낙구 24 전 23틱에 잡는다) */
 const 깊은뜬공: BattedBallPattern = [92, 895, 1017, 0]
+/**
+ * 태그업이 걸리는 더 깊은 뜬공 — 원본 코드 0 [92, 781, 1313] (중견수가 30틱에 잡는다). 한 틱 이동 0xbf158 · 도착 틱 0xbf01c 가
+ * 맨해튼 거리라 3루 → 홈 주자 틱(11215 ÷ 335 = 33)이 길어져 [92, 895, 1017] 로는 송구가 이겨 안 뛴다
+ */
+const 태그업뜬공: BattedBallPattern = [92, 781, 1313, 0]
+/** 필살타법 타구가 중견수를 맞고 튕겨 백업 좌익수가 줍는 깊은 뜬공 — 원본 코드 0 [96, 646, 1374] (중견수 31틱 · 좌익수 61틱) */
+const 필살뜬공: BattedBallPattern = [96, 646, 1374, 0]
 /** 내야 뒤에 겨우 뜬 공 — 송구가 빨라 태그업이 안 걸린다 */
 const 얕은뜬공: BattedBallPattern = [90, 250, 700, 0]
-/** 2루수(칸 3)가 9틱에 줍는 땅볼 — 원본 코드 3 [70, 1000, 202, 0]. 대표 땅볼(투수가 줍는다)로는 펌블 · 레이저를 못 본다(투수 칸은 선수가 없다) */
+/** 2루수(칸 3)가 10틱에 줍는 땅볼 — 원본 코드 3 [70, 1000, 202, 0]. 대표 땅볼(투수가 줍는다)로는 펌블 · 레이저를 못 본다(투수 칸은 선수가 없다) */
 const 이루수땅볼: BattedBallPattern = [70, 1000, 202, 0]
 
 /**
@@ -97,10 +104,11 @@ function play2(
   outs: number,
   runningMode: '수동' | '자동',
   throwMode: '수동' | '자동' = '자동',
+  pattern: BattedBallPattern = fixturePatternFor(outcome),
 ): DefensePlayResult {
   return runDefensePlay({
     outcome,
-    trajectory: battedBallTrajectory(fixturePatternFor(outcome)),
+    trajectory: battedBallTrajectory(pattern),
     bases,
     outs,
     runAbility: 500,
@@ -128,11 +136,13 @@ describe('한 플레이 진행기 — 타자주자도 원본 수비 규칙으로
   })
 
   it('1루 주자가 있는 땅볼 — CPU 송구 결정이 2루 포스를 고르면 1루 주자가 죽고 타자주자는 1루에 산다 (야수 선택)', () => {
-    const 결과 = play(땅볼아웃, 주자1루, 0)
+    // 원본 코드 3 [55, 700, 200] — 대표 땅볼(투수가 줍는 [113, 500, 300])은 한 틱 이동 0xbf158 이 맨해튼 거리로 나눠 대각선
+    // 1루 걸음이 느려진 뒤로 병살(2루 → 1루)이 된다
+    const 결과 = play(땅볼아웃, 주자1루, 0, [55, 700, 200, 0])
 
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.advance.bases).toEqual({ first: true, second: false, third: false })
-    expect(결과.log).toContain('15틱 1번 주자 루 아웃 (0xb36d0 결과 2)')
+    expect(결과.log).toContain('19틱 1번 주자 루 아웃 (0xb36d0 결과 2)')
     // 정산 0xa8024 의 야수 선택 [sp+0x18] — 목록 1번 주자가 +0x7c == 2 로 죽었다 → 안타가 아니다(타수만 든다)
     expect(결과.outcome).toEqual({ kind: '아웃', detail: '땅볼아웃' })
   })
@@ -167,27 +177,29 @@ describe('한 플레이 진행기 — 타자주자도 원본 수비 규칙으로
     const 포스땅볼 = 이루송구([81, 897, 290, 1]) // 원본 코드 3
     expect(포스땅볼.tagOut).toBe(false)
     expect(포스땅볼.log.some((줄) => 줄.includes('루 아웃'))).toBe(true)
-    // 1루 선상의 땅볼을 1루수(2)가 잡는 그 틱에, 1루로 뛰던 타자주자와 닿으면 태그(3a)다 — 타자주자도 판정을 받는다.
-    // (예전 손-패턴 [73, 1200, 100] 은 결과를 먼저 정하던 다리 없이 돌리면 투수가 뜬 채로 잡는 공이다)
-    const 태그땅볼 = 이루송구([47, 500, 301, 1]) // 원본 코드 5
+    // 1루 선상의 땅볼을 1루수(2)가 잡고(17틱), 1루로 뛰던 타자주자와 닿으면 태그(3a)다 — 타자주자도 판정을 받는다.
+    // (예전 [47, 500, 301, 1] 은 맨해튼 걸음(0xbf158) 뒤로 타자주자가 1루수에 닿기 전에 판이 다른 길로 간다)
+    const 태그땅볼 = 이루송구([45, 435, 100, 1]) // 원본 코드 6
+    expect(태그땅볼.log).toContain('20틱 0번 주자 태그 아웃 (0xb36d0 결과 3)')
     expect(태그땅볼.tagOut).toBe(true)
     expect(태그땅볼.log.some((줄) => 줄.includes('태그 아웃'))).toBe(true)
   })
 
   it('쥐기 판정(0xb2758)이 낸 태그 아웃은 같은 플레이 틱의 두 번째 판정(b42f2 · b43de)이 state[0x87] 을 지워 콜 20 이다', () => {
-    // 2루 주자 땅볼(표 8 번 15째) — 1루수(2)가 공을 잡는 15틱의 쥐기 판정이 1루로 뛰던 타자주자를 태그(결과 3)한다. 쥐기가 +0xe0 을
+    // 2루 주자 땅볼(표 14 번 [42, 280, 420]) — 1루수(2)가 공을 잡는 20틱의 쥐기 판정이 1루로 뛰던 타자주자를 태그(결과 3)한다. 쥐기가 +0xe0 을
     // 세우므로 같은 플레이 틱 0xb401c 가 b42ce 뒤 vt90 을 한 번 더 부르고(머리 b36dc 에서 state[0x87] = 0), 그 판정은 아무도 안 죽여
     // 0 이다 — 결과 코드 13 을 b4540 이 읽을 때 칸은 0 (예전 웹은 쥐기 판정의 태그를 그대로 들고 가 62 였다)
-    const 결과 = play(땅볼아웃, { first: false, second: true, third: false }, 0, [48, 427, 323, 1])
+    // (예전 [48, 427, 323, 1] 은 맨해튼 걸음 뒤로 1루수가 17틱에 잡고 23틱 태그라 쥐기 판정이 아니다)
+    const 결과 = play(땅볼아웃, { first: false, second: true, third: false }, 0, [42, 280, 420, 0])
 
-    expect(결과.log).toContain('15틱 2번 야수가 잡았다 (종류 0)')
-    expect(결과.log).toContain('15틱 0번 주자 태그 아웃 (0xb36d0 결과 3)')
+    expect(결과.log).toContain('20틱 2번 야수가 잡았다 (종류 0)')
+    expect(결과.log).toContain('20틱 0번 주자 태그 아웃 (0xb36d0 결과 3)')
     expect(결과.tagOut).toBe(false)
-    // 쥐기 0xb2710 은 야수를 포구 지점으로 옮기지 않는다(r176) — 예전 이 시험의 [50, 409, 355] 는 13틱에 못 닿은 채 쥐고, 포구 지점으로
+    // 쥐기 0xb2710 은 야수를 포구 지점으로 옮기지 않는다(r176) — 손 패턴 [50, 320, 355] 는 19틱에 못 닿은 채 쥐고, 포구 지점으로
     // 마저 걷는 다음 틱에 태그한다(그 틱은 쥐기 판정이 아니라 b43da 판정이라 콜 62)
-    const 예전공 = play(땅볼아웃, { first: false, second: true, third: false }, 0, [50, 409, 355, 0])
-    expect(예전공.log).toContain('13틱 2번 야수가 잡았다 (종류 0)')
-    expect(예전공.log).toContain('14틱 0번 주자 태그 아웃 (0xb36d0 결과 3)')
+    const 예전공 = play(땅볼아웃, { first: false, second: true, third: false }, 0, [50, 320, 355, 0])
+    expect(예전공.log).toContain('19틱 2번 야수가 잡았다 (종류 0)')
+    expect(예전공.log).toContain('20틱 0번 주자 태그 아웃 (0xb36d0 결과 3)')
     expect(예전공.tagOut).toBe(true)
   })
 
@@ -227,7 +239,7 @@ describe('한 플레이 진행기 — 타자주자도 원본 수비 규칙으로
 
 describe('희생플라이는 "보장" 이 아니라 자동 진루 규칙(0xaf918)의 결과다', () => {
   it('외야 깊은 뜬공이면 3루 주자가 태그업해 들어온다', () => {
-    const 결과 = play(뜬공아웃, 주자3루, 0, 깊은뜬공)
+    const 결과 = play(뜬공아웃, 주자3루, 0, 태그업뜬공)
 
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.advance.runsScored).toBe(1)
@@ -249,10 +261,10 @@ describe('희생플라이는 "보장" 이 아니라 자동 진루 규칙(0xaf918
   })
 
   it('태그업은 포구 뒤에 시작한다 — 잡힐 뜬공이면 그 전에는 아무도 안 뛴다', () => {
-    const 결과 = play(뜬공아웃, 주자3루, 0, 깊은뜬공)
+    const 결과 = play(뜬공아웃, 주자3루, 0, 태그업뜬공)
     // 첫 포구 틱 — `catchTick` 은 뒤에 송구를 받은 틱으로 바뀐다
     const 첫포구 = Number.parseInt(결과.log.find((줄) => 줄.includes('잡았다'))!, 10)
-    expect(첫포구).toBe(23)
+    expect(첫포구).toBe(30)
     const 포구순간 = 결과.ticks[첫포구].runners.find((runner) => runner.index === 1)
 
     // 포구 순간까지 3루에 붙어 있다가, 잡히고 나서야 홈으로 뛴다
@@ -264,7 +276,7 @@ describe('희생플라이는 "보장" 이 아니라 자동 진루 규칙(0xaf918
 describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', () => {
   it('2아웃 뜬공 — 친 순간 뛴(0xa9e44) 3루 주자가 포구 전에 홈을 밟으면 공이 땅에 안 닿아 바로 득점(0xaa16e), 포구가 3아웃', () => {
     // 원본 그대로: 보류는 state[0x1e](공이 땅에 닿은 플레이)일 때만이라 뜬 공이 잡히기 전 득점은 남는다
-    const 결과 = play(뜬공아웃, 주자3루, 2, 깊은뜬공)
+    const 결과 = play(뜬공아웃, 주자3루, 2, 태그업뜬공)
 
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.advance.runsScored).toBe(1)
@@ -273,30 +285,34 @@ describe('2아웃 득점 보류 — state[0] (0xaa164 · 0xaa34c · 0xaa388)', (
   })
 
   it('2아웃 땅볼 — 타자주자가 죽은 틱에 홈을 밟은 주자는 보류(0xaa1c0)되고 3아웃이라 영영 안 풀린다(0xaa388)', () => {
-    // 투수가 잡아 CPU 송구로 1루에 던지고, 17틱 그림의 플레이 틱에서 타자주자가 1루 포스(0xb36d0 결과 2)로 죽는다. 3루 주자는
-    // 그 그림의 목록 틱(16틱 6 절 이동)에 홈에 닿아, 플레이 틱 뒤의 득점 0xaa0a8(525fc)이 3아웃을 보고 보류한다.
+    // 원본 코드 4 [122, 501, 333] — 27틱 그림의 플레이 틱에서 타자주자가 1루 포스(0xb36d0 결과 2)로 죽는다. 3루 주자는
+    // 그 그림의 목록 틱(26틱 6 절 이동)에 홈에 닿아, 플레이 틱 뒤의 득점 0xaa0a8(525fc)이 3아웃을 보고 보류한다.
+    // (맨해튼 걸음 0xbf158 로 3루 → 홈이 33틱 남짓이라 예전 [63, 704, 224, 1] 은 홈인 전에 판이 닫힌다)
     // (씨앗을 다시 골랐다 — 예전 [99, 898, 290, 1] 은 득점을 아웃 판정 앞에 세던 옛 차례에 기댔다. 그 판은 이제 3아웃이 홈인
     //  그림보다 먼저라 G1 이 닫혀 주자가 홈에 못 닿는다 — 원본 차례 그대로)
-    const 결과 = play(땅볼아웃, 주자3루, 2, [63, 704, 224, 1])
+    const 결과 = play(땅볼아웃, 주자3루, 2, [122, 501, 333, 0])
 
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.advance.runsScored).toBe(0)
     expect(결과.voidedRuns).toBe(1)
-    expect(결과.log).toContain('17틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
-    expect(결과.log).toContain('17틱 1번 주자 홈 — 보류 1 / 득점 0')
+    expect(결과.log).toContain('27틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
+    expect(결과.log).toContain('27틱 1번 주자 홈 — 보류 1 / 득점 0')
   })
 
   it('2아웃 땅볼 — 타자주자가 살아 뛰던 때 바로 올린 득점(0xaa1b0)은 뒤에 타자주자가 죽어 3아웃이 돼도 남는다', () => {
     // 원본 그대로: 바로 득점은 0xa5c34 가 점수판에 곧장 +1 하고, 팀+0x27c 칸을 되돌리는 코드는 없다.
     // 예전 웹은 S2 2-5 의 타석 단위 근사(3아웃 · 땅볼 · 타자주자 아웃 → 0)를 걸어 이 득점을 지웠다
-    const 결과 = play(땅볼아웃, 주자3루, 2, [266, 94, 785, 0])
+    // 원본 코드 4 [127, 551, 301, 1] — 3루 주자가 27틱에 홈을 밟고 타자주자는 28틱에 1루에서 죽는다(예전 [266, 94, 785] 는
+    // 맨해튼 걸음 뒤로 홈인보다 포수 포구가 먼저다)
+    const 결과 = play(땅볼아웃, 주자3루, 2, [127, 551, 301, 1])
 
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.runnerFates[0].retired).toBe(true)
     expect(결과.advance.runsScored).toBe(1)
     expect(결과.voidedRuns).toBe(0)
-    // 주자는 16틱 6 절 이동(그림 17 의 목록 틱)에 닿고 그림 17 의 슬롯 2 득점 0xaa0a8 이 센다
-    expect(결과.log).toContain('17틱 1번 주자 홈 — 보류 0 / 득점 1')
+    // 주자는 26틱 6 절 이동(그림 27 의 목록 틱)에 닿고 그림 27 의 슬롯 2 득점 0xaa0a8 이 센다
+    expect(결과.log).toContain('27틱 1번 주자 홈 — 보류 0 / 득점 1')
+    expect(결과.log).toContain('28틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
   })
 
   it('3아웃이 난 그림 뒤의 목록 틱에서야 홈에 닿을 주자는 득점도 보류도 없다 — 관문이 닫혀 0xaa0a8 이 안 돈다', () => {
@@ -417,15 +433,15 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
     const 보통 = 굴림포함(고정난수(0.9), { trajectory: battedBallTrajectory(이루수땅볼) })
 
     expect(결과.fumbled).toBe(true)
-    // 보통 판에서 2루수가 처음 쥐는 틱(9) — 그 틱에 펌블한다
-    expect(보통.log).toContain('9틱 3번 야수가 잡았다 (종류 0)')
-    expect(결과.log).toContain('9틱 3번 야수 펌블 (0xbc2)')
+    // 보통 판에서 2루수가 처음 쥐는 틱(10 — 맨해튼 걸음 0xbf158 로 한 틱 늦다) — 그 틱에 펌블한다
+    expect(보통.log).toContain('10틱 3번 야수가 잡았다 (종류 0)')
+    expect(결과.log).toContain('10틱 3번 야수 펌블 (0xbc2)')
     // 다시 쏜 공: 속도 max(지금 점 속도·60%, 300) · v0 min(30%, 100) · 각 + 16
     const 튕김 = 결과.log.find((line) => line.includes('공 튕김'))
     // 펌블은 동작 잠금(+0xb4)이 없다 — 2루수가 다시 줍는다
-    expect(튕김).toMatch(/^9틱 공 튕김 \(0xb3148\) — 속도 450 · v0 70 · 각 -54 · 3번 야수가 21틱에 줍는다$/)
-    expect(결과.catchTick).toBe(21)
-    expect(결과.log).toContain('21틱 3번 야수가 잡았다 (종류 0)')
+    expect(튕김).toMatch(/^10틱 공 튕김 \(0xb3148\) — 속도 450 · v0 70 · 각 -54 · 3번 야수가 28틱에 줍는다$/)
+    expect(결과.catchTick).toBe(28)
+    expect(결과.log).toContain('28틱 3번 야수가 잡았다 (종류 0)')
   })
 
   it('늘 0 인 난수면 줍는 족족 펌블한다 — 원본도 포구 틱마다 굴린다(0xb41d0)', () => {
@@ -437,12 +453,12 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
   })
 
   it('투수(칸 0)의 펌블은 +0xec = 지명타자의 수비로 굴린다 — 공수 교대 판 0x3fac4 가 넣는다 (b41e4)', () => {
-    // 대표 땅볼은 투수가 6틱에 줍는다. 판 시작 0xb0fb4 는 칸 0 의 선수를 안 찾지만(b1032 — 송구 g · 악송구 보정만)
+    // 대표 땅볼([113, 500, 300])은 투수가 11틱에 줍는다. 판 시작 0xb0fb4 는 칸 0 의 선수를 안 찾지만(b1032 — 송구 g · 악송구 보정만)
     // 펌블 표 b41e4 는 야수+0xec 를 본다 — 칸 0 의 +0xec 는 0x3fac4 가 넣은 지명타자다
     const 결과 = 굴림포함(고정난수(0))
 
     expect(결과.fumbled).toBe(true)
-    expect(결과.log).toContain('6틱 0번 야수 펌블 (0xbc2)')
+    expect(결과.log).toContain('11틱 0번 야수 펌블 (0xbc2)')
   })
 
   it('악송구가 나면 받을 야수가 아니라 예보 vt24(0)가 고른 야수가 줍는다 (0xa1828 · 0xb2e38 b2f8c 세계 · b307c)', () => {
@@ -465,8 +481,9 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
     expect(결과.errantThrow).toBe(true)
     // 흔들린 공(h' · w' · φ', 중력 70%)을 세계 0xbfed0 이 깔고, 던진 투수는 t ≤ 4 건너뜀 + +0xb1 첫 복제 틱으로 빠져
     // 홈 뒤의 포수가 4틱 뒤 가슴 높이로 줍는다 — 보통 포구 틱 갈래(펌블 굴림 · 쥐기)다
-    expect(결과.log).toContain('9틱 0루로 송구 — 13틱 도착 (악송구 — 1번 야수가 줍는다) (0번 야수)')
-    expect(결과.log).toContain('13틱 1번 야수가 잡았다 (종류 1)')
+    // (대표 땅볼 [113, 500, 300] 을 투수가 11틱에 쥐고 준비 3틱 뒤 14틱에 던진다)
+    expect(결과.log).toContain('14틱 0루로 송구 — 20틱 도착 (악송구 — 1번 야수가 줍는다) (0번 야수)')
+    expect(결과.log).toContain('20틱 1번 야수가 잡았다 (종류 1)')
     // 홈 송구가 빗나가 아무도 안 죽는다 — 사람 수동 송구는 키('8')대로만 던져 1루로는 아무도 안 던졌다
     expect(결과.advance.outsAdded).toBe(0)
     expect(결과.advance.bases).toEqual({ first: true, second: true, third: false })
@@ -484,15 +501,15 @@ describe('확률 굴림은 난수를 줘야 돈다 — 펌블 · 악송구 · �
       // 펌블(0.9) → 악송구(0) — 레이저는 외야수만 굴린다(0x523e6, r201)
       random: 차례난수([0.9, 0, 0.9]),
     })
-    expect(결과.log).toContain('9틱 0루로 송구 — 13틱 도착 (악송구 — 1번 야수가 줍는다) (0번 야수)')
+    expect(결과.log).toContain('14틱 0루로 송구 — 20틱 도착 (악송구 — 1번 야수가 줍는다) (0번 야수)')
     const 투수 = (tick: number) => {
       const fielder = 결과.ticks.find((view) => view.tick === tick)?.fielders.find((entry) => entry.slot === 0)
       return fielder === undefined ? null : { x: fielder.x, z: fielder.z }
     }
-    // 그림 틱 N 은 N − 1 의 이동 뒤 자리다 — 9틱 이동은 쉬고(10 == 9), 10틱 이동부터 걷는다(11 ≠ 10)
-    expect(투수(9)).not.toBeNull()
-    expect(투수(10)).toEqual(투수(9))
-    expect(투수(11)).not.toEqual(투수(10))
+    // 그림 틱 N 은 N − 1 의 이동 뒤 자리다 — 14틱 이동은 쉬고(15 == 14), 15틱 이동부터 걷는다(16 ≠ 15)
+    expect(투수(14)).not.toBeNull()
+    expect(투수(15)).toEqual(투수(14))
+    expect(투수(16)).not.toEqual(투수(15))
   })
 
   it('난수가 늘 1 에 가까우면 하나도 안 걸린다', () => {
@@ -608,7 +625,8 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
     expect(레이저.laserThrow).toBe(true)
     // 레이저 송구 자체는 악송구가 없다. (받은 유격수가 펌블해 튕긴 공을 투수가 주우면 — 투수는 선수가 없어 펌블하지 않는다 —
     // 투수가 보통 송구로 다시 던지고 그 송구는 악송구가 날 수 있어 판 전체의 `errantThrow` 로는 못 본다)
-    expect(레이저.log.find((line) => line.includes('레이저 송구'))).toBe('27틱 2루로 레이저 송구 — 31틱 도착 (6번 야수)')
+    // (외야수가 공에 닿는 틱이 맨해튼 걸음 0xbf158 로 한 틱 늦다)
+    expect(레이저.log.find((line) => line.includes('레이저 송구'))).toBe('28틱 2루로 레이저 송구 — 32틱 도착 (6번 야수)')
     expect(보통.laserThrow).toBe(false)
     expect(보통.errantThrow).toBe(true)
     // 같은 틱에 같은 루로 던져도 레이저(2000)가 먼저 닿는다
@@ -638,7 +656,7 @@ describe('사람 조작 — 상태 0x17 키 표 (I-controls 0·2b·2d·3b)', () 
     expect(틱마다.find((row) => row.tick === F + 3)).toMatchObject({ step: -1 })
     // 송구는 멈춤이 풀린 그림 F+2 의 플레이 틱(사람 목표 b4660)이 +0x1f4 로 던진다
     // (뒤에 투수가 튕긴 공을 주워 다시 던지므로 마지막 송구 틱 `throwReleaseTick` 이 아니라 기록으로 본다)
-    expect(state.log).toContain(`${F + 2}틱 2루로 레이저 송구 — 31틱 도착 (6번 야수)`)
+    expect(state.log).toContain(`${F + 2}틱 2루로 레이저 송구 — 32틱 도착 (6번 야수)`)
     expect(state.laserThrow).toBe(true)
     expect(state.laserArmed).toBe(false)
   })
@@ -694,7 +712,9 @@ describe('2루 커버가 아닌 키스톤 야수 자리 — 0xb1c90 의 0xb203a 
   it('중견 앞 2루타에 1루 주자 — 2루 커버는 2루수, 유격수는 AI 0xa 로 표 0xd8764 자리 (14500, 17600) 로 걷는다', () => {
     const state = startDefensePlay({
       outcome: 이루타,
-      trajectory: battedBallTrajectory([102, 866, 910, 0]), // 원본 코드 18
+      // 원본 코드 18 [100, 1300, 600, 2] — 예전 [102, 866, 910] 은 맨해튼 걸음(0xbf158) 뒤로 10틱의 유격수가 표 자리가 아니라
+      // 중계 갈래(b2144~b21b0)의 자리를 받는다
+      trajectory: battedBallTrajectory([100, 1300, 600, 2]),
       bases: 주자1루,
       outs: 0,
     })
@@ -719,17 +739,19 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     })
 
   it('첫 야수는 쥐지 못하고 0xbc3 · 사건만 난다 — 틱 끝 0xb3148 이 공을 그 야수에게서 튕겨 다시 쏜다', () => {
-    const 필살 = 필살타구(뜬공아웃, EMPTY_BASES, 0, 깊은뜬공)
+    // 원본 코드 0 [96, 646, 1374] — 예전 [92, 895, 1017] 은 백업 거리가 맨해튼(0xbfa2c, b3f2a)이 된 뒤로 좌익수가 백업으로
+    // 안 붙어 중견수가 61틱에 다시 줍는다
+    const 필살 = 필살타구(뜬공아웃, EMPTY_BASES, 0, 필살뜬공)
 
     expect(필살.isUncatchable).toBe(true)
-    // 뜬 채로는 아무도 못 잡는다 — 예보(자르지 않은 표)가 고른 중견수가 낙구(26) 전 23틱 포구점에 닿아 맞고 튕긴다
+    // 뜬 채로는 아무도 못 잡는다 — 예보(자르지 않은 표)가 고른 중견수가 낙구(34) 전 31틱 포구점에 닿아 맞고 튕긴다
     expect(필살.caughtOnTheFly).toBe(false)
-    expect(필살.log).toContain('23틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
+    expect(필살.log).toContain('31틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
     // 지금 점 속도 → 60% · v0 min(30%, 100) · 각 그대로(난수 없음).
     // 맞은 중견수는 b4588 vt74 → 0xa1e60 으로 +0xb4 = 15 — 새 예보의 복제가 그 잠금을 물려받아 t = 5(건너뛴 4틱 뒤) ~ 19 는 판정이 없다.
     // 좌익수(7)는 첫 고르기의 백업 갈래(b3f5c — 외야 추적야수 곁의 가장 가까운 외야수 AI 0xc)로 중견수 목표 2000 뒤(b4b78)까지 와
     // 있어 다시 쏜 공을 줍는다(r180 — 백업이 없던 예전 웹은 중견수가 61틱에 주웠다)
-    expect(필살.log).toContain('23틱 공 튕김 (0xb3148) — 속도 537 · v0 100 · 각 -92 · 7번 야수가 60틱에 줍는다')
+    expect(필살.log).toContain('31틱 공 튕김 (0xb3148) — 속도 387 · v0 100 · 각 -96 · 7번 야수가 61틱에 줍는다')
   })
 
   it('다시 쏜 공은 보통 공이다 — 속성 목록 +0x5c 를 0xa2610 이 비워 새 예보의 야수가 그대로 쥔다', () => {
@@ -739,26 +761,28 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
     const 잡음 = 필살.log.findIndex((line) => line.includes('잡았다'))
     expect(맞음).toBeGreaterThanOrEqual(0)
     expect(잡음).toBeGreaterThan(맞음)
-    // 맞은 투수는 15틱 잠금(+0xb4) — 예보에서 빠지고(가까운 야수 0xb3c4c 도 잠금이면 건너뜀) 2루수가 줍는다.
-    // 다시 쏘기(b45a0)는 그림 6 의 슬롯 2 라 예보가 그 그림의 야수 자리(6 절 이동 앞)로 고른다 — 예전 웹은 이동 뒤 자리로 골라 유격수였다
-    expect(필살.log[잡음]).toBe('23틱 3번 야수가 잡았다 (종류 0)')
+    // 맞은 투수는 15틱 잠금(+0xb4) — 예보에서 빠지고(가까운 야수 0xb3c4c 도 잠금이면 건너뜀) 3루수가 줍는다.
+    // 다시 쏘기(b45a0)는 그림 11 의 슬롯 2 라 예보가 그 그림의 야수 자리(6 절 이동 앞)로 고른다
+    // (대표 땅볼이 [113, 500, 300] — 투수 11틱 — 으로 바뀌어 줍는 야수 · 틱도 바뀌었다)
+    expect(필살.log[맞음]).toBe('11틱 0번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
+    expect(필살.log[잡음]).toBe('28틱 4번 야수가 잡았다 (종류 0)')
   })
 
   it('맞은 야수는 +0xb4 = 15 동안 제자리이고 잠금이 0 이 된 틱의 걸음부터 걷는다 (a12b4~a12d6 · a1376, r155)', () => {
     // 야수 틱 0xa1284: +0xb4 > 0 이면 −1 만 하고 끝(a12c6 · a12d6) — 이동 0xbf094(a1376)는 그 뒤라 잠금 틱엔 못 간다.
-    // 웹 6 절 걸음은 원본의 다음 야수 틱 몫이라 맞은 틱(23) 그 걸음부터 15번(23~37)을 쉬고 38 의 걸음부터 걷는다.
+    // 웹 6 절 걸음은 원본의 다음 야수 틱 몫이라 맞은 틱(31) 그 걸음부터 15번(31~45)을 쉬고 46 의 걸음부터 걷는다.
     // 그림 틱 N 은 N − 1 의 걸음 뒤 자리다
-    const 필살 = 필살타구(뜬공아웃, EMPTY_BASES, 0, 깊은뜬공)
-    expect(필살.log).toContain('23틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
+    const 필살 = 필살타구(뜬공아웃, EMPTY_BASES, 0, 필살뜬공)
+    expect(필살.log).toContain('31틱 8번 야수에게 필살타법 타구가 맞았다 (0xbc3)')
     const 중견수 = (tick: number) => {
       const fielder = 필살.ticks.find((view) => view.tick === tick)?.fielders.find((entry) => entry.slot === 8)
       return fielder === undefined ? null : { x: fielder.x, z: fielder.z }
     }
-    expect(중견수(23)).not.toBeNull()
-    for (let tick = 24; tick <= 38; tick += 1) expect(중견수(tick)).toEqual(중견수(23))
+    expect(중견수(31)).not.toBeNull()
+    for (let tick = 32; tick <= 46; tick += 1) expect(중견수(tick)).toEqual(중견수(31))
     // 잠금이 풀린 뒤에도 그 자리다(r180): 다시 쏜 공의 고르기가 좌익수를 고르고 중견수를 백업(AI 0xc)으로 둔다. 풀리는 a12c8 의 vt10 이
     // 목표 = 위치로 두고, b4b78 은 좌익수 목표와의 차가 `dx > 2000 || dz > 2000`(음수 쪽은 안 봄 — 원본 그대로)일 때만 vt14 라 안 움직인다
-    for (let tick = 39; tick <= 45; tick += 1) expect(중견수(tick)).toEqual(중견수(23))
+    for (let tick = 47; tick <= 53; tick += 1) expect(중견수(tick)).toEqual(중견수(31))
   })
 
   it('맞은 틱에만 효과음 53 칸이 선다 — 틱 끝 b4588 → 0xa1e60 a1e82 즉시 재생', () => {
@@ -779,7 +803,9 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
   })
 
   it('튕기는 동안에도 3루 주자는 홈을 밟는다', () => {
-    const 필살 = 필살타구(뜬공아웃, 주자3루, 2, 깊은뜬공)
+    // 원본 코드 1 [117, 1121, 900] — 좌익수가 맞고 튕긴 공을 중견수가 70틱에 줍는 사이 타자주자가 134틱에 홈까지 돈다
+    // (예전 [92, 895, 1017] 은 맨해튼 걸음 0xbf158 로 타자주자가 2루에서 멈춘다)
+    const 필살 = 필살타구(뜬공아웃, 주자3루, 2, [117, 1121, 900, 0])
 
     // 홈을 밟은 주자는 +0x96(죽음)이다(0xaa0a8 → aa1da 0xa9520) — 앞길 검사 0xa9924 의 앞 주자 0xa97d4 가 건너뛰어 타자주자도
     // 3루에서 막히지 않고 홈까지 돈다(예전 웹은 득점 주자를 산 주자로 보아 타자주자를 3루에 세웠다)
@@ -820,15 +846,16 @@ describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (
 
 describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
   // 시작 0xb3fa8 은 **주자가 달려가는 루(+0x7c)의 커버가 공을 쥐고** 공 가진 야수가 내야(≤ 5)일 때만이다.
-  // 원본 코드 5 [68, 808, 282, 1]: 투수가 잡아 1루로 던져 타자주자를 15틱에 포스로 잡고, 16틱 귀루 키('3')로 1루로 돌아오는
+  // 원본 코드 3 [86, 899, 400, 1]: 타자주자를 15틱에 1루 포스로 잡고, 18틱 귀루 키('3')로 1루로 돌아오는
   // 1번 주자(1→2루 출발)를 두고 공 쥔 1루 커버(2)와 유격수(5)가 협살을 세운다
+  // (예전 [68, 808, 282, 1] · 16틱은 한 틱 이동 0xbf158 이 맨해튼 거리로 나눠 대각선 주자가 느려진 뒤로 협살 대상 조건이 안 선다)
   // (예전 장면 [87, 1388, 222] 씨앗 26 은 **투수 펌블**로 튄 공에 기대 있었다 — 투수 칸은 판 시작 0xb0fb4 가 선수를 안 찾아(b1032)
   //  펌블 확률이 0 이라 원본엔 그 판이 없다)
-  const 협살판 = [68, 808, 282, 1] as const
-  const 협살상황 = (defenseIsCpu: boolean, keys: Record<number, string> = { 16: '3' }) =>
+  const 협살판 = [86, 899, 400, 1] as const
+  const 협살상황 = (defenseIsCpu: boolean, keys: Record<number, string> = { 18: '3' }) =>
     runDefensePlay({
       outcome: 단타,
-      trajectory: battedBallTrajectory([...협살판]), // 원본 코드 5
+      trajectory: battedBallTrajectory([...협살판]), // 원본 코드 3
       bases: 주자1루,
       outs: 0,
       runAbility: 500,
@@ -837,7 +864,7 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     })
 
   it('수비가 CPU 일 때만 걸린다 — 사람이 수비하면 원본에서도 안 일어난다 (state[0x31+수비측])', () => {
-    expect(협살상황(true).log).toContain('16틱 협살 시작 — 1번 주자 1↔2루 (야수 2·5)')
+    expect(협살상황(true).log).toContain('18틱 협살 시작 — 1번 주자 1↔2루 (야수 2·5)')
     expect(협살상황(false).log.some((line) => line.includes('협살 시작'))).toBe(false)
   })
 
@@ -854,20 +881,20 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
   })
 
   it('송구가 닿으면 공은 받은 야수의 손으로 옮겨 간다 — 받은 짝이 다시 던질 수 있다 (0xb2734)', () => {
-    // 같은 판에서 17틱 진루 키('2')로 주자가 다시 2루로 가면 1루수(1루 커버)가 짝(유격수 5)에게 던지고,
-    // 18틱 귀루 키로 또 돌아서면 받은 유격수가 공을 쥐어 다시 1루수에게 던진다
-    const 결과 = 협살상황(true, { 16: '3', 17: '2', 18: '3' })
+    // 같은 판에서 19틱 진루 키('2')로 주자가 다시 2루로 가면 1루수(1루 커버)가 짝(유격수 5)에게 던지고,
+    // 20틱 귀루 키로 또 돌아서면 받은 유격수가 공을 쥐어 다시 1루수에게 던진다
+    const 결과 = 협살상황(true, { 18: '3', 19: '2', 20: '3' })
 
     expect(결과.rundowns).toBe(1)
-    expect(결과.log).toContain('16틱 협살 시작 — 1번 주자 1↔2루 (야수 2·5)')
-    expect(결과.log).toContain('17틱 협살 송구 2→5 — 26틱 도착')
-    expect(결과.log).toContain('26틱 협살 송구 5→2 — 33틱 도착')
+    expect(결과.log).toContain('18틱 협살 시작 — 1번 주자 1↔2루 (야수 2·5)')
+    expect(결과.log).toContain('19틱 협살 송구 2→5 — 28틱 도착')
+    expect(결과.log).toContain('28틱 협살 송구 5→2 — 35틱 도착')
   })
 
   it('**주자가 안 되돌면 태그가 안 난다** — 원본에도 주자 쪽 협살 AI 가 없다', () => {
-    // 자동 주루(0xaf918)는 앞으로 가는 판정만 한다. 17틱 진루 키 뒤로 주자가 더 돌지 않으면 짝 송구가 닿기 전에 2루에 붙어
+    // 자동 주루(0xaf918)는 앞으로 가는 판정만 한다. 19틱 진루 키 뒤로 주자가 더 돌지 않으면 짝 송구가 닿기 전에 2루에 붙어
     // (주자 vt18) 태그가 안 되고, 루에 35% 미만으로 붙으면 고르기(0xb398c)가 −1 이 되어 협살이 풀린다.
-    const 결과 = 협살상황(true, { 16: '3', 17: '2' })
+    const 결과 = 협살상황(true, { 18: '3', 19: '2' })
 
     expect(결과.rundowns).toBe(1)
     expect(결과.rundownOuts).toBe(0)
@@ -878,14 +905,13 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
   it('사람이 귀루 키를 누르면 되돌아 뛰다가 협살 태그로 죽는다', () => {
     // 협살은 수비가 CPU 일 때만 걸리므로 공격은 늘 사람이다. 되돌아 뛰는 것은 귀루 키('3' = 1루 주자,
     // 메시지 0x584)이고, 아웃은 거리 ≤ 499 태그(0xb36d0 결과 3)다 — 협살 중이라 협살 아웃으로 센다.
-    // 16틱 귀루: 달려가는 루가 1루로 바뀐 주자를 공 쥔 1루수가 마주 쫓아 29틱에 태그한다
-    // (아웃 판정 · 낙구 요구 루가 이동 앞(같은 그림 슬롯 2)이 되어 예전 28틱보다 한 틱 뒤다)
+    // 18틱 귀루: 달려가는 루가 1루로 바뀐 주자를 공 쥔 1루수가 마주 쫓아 32틱에 태그한다
     const 결과 = 협살상황(true)
 
-    expect(결과.log).toContain('16틱 귀루 — 주자 1')
+    expect(결과.log).toContain('18틱 귀루 — 주자 1')
     expect(결과.rundowns).toBe(1)
     expect(결과.rundownOuts).toBe(1)
-    expect(결과.log).toContain('29틱 협살 태그 — 1번 주자 아웃')
+    expect(결과.log).toContain('32틱 협살 태그 — 1번 주자 아웃')
     // 타자주자 1루 포스(15틱) + 협살 태그
     expect(결과.advance.outsAdded).toBe(2)
   })
@@ -987,8 +1013,11 @@ describe('공 사라짐 판정 0x36dfc (36e2a~36e80)', () => {
 })
 
 describe('화면 스냅샷 배선 — 번쩍임 · 마선수 그림 · 팀 팔레트 (R2 2절 · C-16 · C-1)', () => {
-  /** 필살 슬라이딩 캐치가 골라지는 원본 패턴 (코드 15) — 창이 열려야 골라진다 */
-  const 슬라이딩캐치패턴: BattedBallPattern = [49, 802, 799, 0]
+  /**
+   * 필살 슬라이딩 캐치가 골라지는 원본 패턴 (코드 15) — 창이 열려야 골라진다. 포구 거리 d 가 맨해튼(0xbfa2c, b15b4)이라
+   * 예전 [49, 802, 799] 는 창 1999 < d ≤ 3000 에 안 든다
+   */
+  const 슬라이딩캐치패턴: BattedBallPattern = [55, 848, 620, 8]
   /** 필살 점프 캐치가 골라지는 원본 패턴 (코드 15) */
   const 점프캐치패턴: BattedBallPattern = [126, 674, 811, 0]
 
@@ -1220,7 +1249,7 @@ describe('주루 수동/자동 — 설정 +0xbd 와 0xae690 (직접 뜬 것)', (
   const 깊은뜬공주자3루 = (extra: Partial<DefensePlayInput> = {}) =>
     runDefensePlay({
       outcome: 뜬공아웃,
-      trajectory: battedBallTrajectory(깊은뜬공),
+      trajectory: battedBallTrajectory(태그업뜬공),
       bases: 주자3루,
       outs: 0,
       runAbility: 500,
@@ -1313,8 +1342,11 @@ describe('포스 사슬 — 머리는 늘 "타자주자 → 1루" (`createPlayRu
   // **한 루에 산 주자를 둘 놓지 않는다**("루 b 의 주자" 0xa97a0 · 주루 키의 앞길/뒷길 검사 0xa99a8 · 0xa9924, I 3b).
   // (예전 웹은 타석 결과 코드가 준 최소 루 M 을 사슬 머리로 썼다 — 결과를 먼저 정한 웹 다리라 걷었다.)
   const 진루 = (bases: BaseState) => [bases.first, bases.second, bases.third]
-  /** 원본 코드 18 [0] — 좌중간으로 빠지는 단타 */
-  const 외야단타 = battedBallTrajectory([69, 1000, 700, 0])
+  /**
+   * 원본 코드 18 [45, 750, 1100] — 좌익선상으로 빠지는 단타. (예전 [69, 1000, 700] 은 맨해튼 걸음 0xbf158 · 도착 틱 0xbf01c 로
+   * 1루 주자가 2루에서 3루까지 송구를 이기지 못해 자동 진루가 안 걸린다)
+   */
+  const 외야단타 = battedBallTrajectory([45, 750, 1100, 0])
   const 단타판 = (bases: BaseState, runningMode: '수동' | '자동') =>
     runDefensePlay({ outcome: 단타, trajectory: 외야단타, bases, outs: 0, runAbility: 500, runningMode, throwMode: '자동' })
 
@@ -1337,15 +1369,21 @@ describe('포스 사슬 — 머리는 늘 "타자주자 → 1루" (`createPlayRu
   })
 
   it('바운드로 담장을 넘은 공(결과 코드 10)은 종류 7 무조건 진루 — 수동이어도 투구 때 루 + 2 까지 가고 2루타로 적는다', () => {
-    const 한주자 = play2(이루타, 주자1루, 0, '수동')
+    // 원본 코드 18 [73, 876, 1213] — 바운드로 담장을 넘는다(결과 코드 10). 대표 2루타 패턴은 맨해튼 걸음 뒤로 담장을 안 넘는
+    // [109, 1200, 541] 로 바뀌어 패턴을 못 박는다
+    const 담장바운드: BattedBallPattern = [73, 876, 1213, 0]
+    expect(runDefensePlay({ outcome: 이루타, trajectory: battedBallTrajectory(담장바운드), bases: EMPTY_BASES, outs: 0 }).log).toContain(
+      '28틱 낙구 — 판 끝 결과 코드 10 (0x9d5bc)',
+    )
+    const 한주자 = play2(이루타, 주자1루, 0, '수동', '자동', 담장바운드)
     expect(한주자.advance.bases).toEqual({ first: false, second: true, third: true })
     expect(한주자.outcome).toEqual(이루타)
 
-    const 만루 = play2(이루타, { first: true, second: true, third: true }, 0, '수동')
+    const 만루 = play2(이루타, { first: true, second: true, third: true }, 0, '수동', '자동', 담장바운드)
     expect(만루.advance.bases).toEqual({ first: false, second: true, third: true })
     expect(만루.advance.runsScored).toBe(2)
 
-    const 삼루만 = play2(이루타, 주자3루, 0, '수동')
+    const 삼루만 = play2(이루타, 주자3루, 0, '수동', '자동', 담장바운드)
     expect(진루(삼루만.advance.bases)).toEqual([false, true, false])
     expect(삼루만.advance.runsScored).toBe(1)
   })
@@ -1403,7 +1441,8 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
   it('수동이면 키를 안 누른 사람 수비는 던지지 않는다 — 0xb1c90 자동 가지에는 송구 호출이 없다', () => {
     // 공을 내보내는 호출(플레이.vt58 0xb2c90 · vt5c 0xb2e38)은 0xafa60(CPU 결정) · b4660(+0x160 사람 목표) ·
     // 앞선 송구가 세운 중계/AI 상태 9 · 견제 · CPU 협살뿐이다. 0x509a0 앞머리는 빈 함수 0xae5f8 을 부른다.
-    const 단타궤적 = battedBallTrajectory([90, 900, 350, 1]) // 원본 코드 3 — 투수가 바운드 뒤 5틱에 줍는다
+    // 원본 코드 3 [113, 500, 300] — 투수가 11틱에 줍는다. (예전 [90, 900, 350, 1] 은 맨해튼 도착 틱(0xbf01c) 뒤로 점수식이 3루를 고른다)
+    const 단타궤적 = battedBallTrajectory([113, 500, 300, 0])
     const 수동 = 만루단타({ throwMode: '수동', trajectory: 단타궤적 })
     expect(수동.throwBase).toBe(-1)
     expect(송구줄(수동)).toBe('(송구 없음)')
@@ -1430,7 +1469,9 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     // 결과 코드 13 → 0x51d40 이 수비 조작이 사람이어도 `아웃 ≤ 2` 면 0xafa60 을 부른다 → 점수식이 1루를 고른다(병살)
     const 결과 = runDefensePlay({
       outcome: 이루타,
-      trajectory: battedBallTrajectory([114, 201, 125, 1]),
+      // 원본 코드 7 [100, 188, 125, 1] — 포수가 6틱에 잡는다. (예전 [114, 201, 125, 1] 은 맨해튼 걸음 0xbf158 뒤로 3루 주자가
+      // 포수 곁을 지날 때 거리가 안 맞아 태그가 안 난다)
+      trajectory: battedBallTrajectory([100, 188, 125, 1]),
       bases: 만루,
       outs: 1,
       runAbility: 500,
@@ -1439,16 +1480,15 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     const 태그 = 결과.log.find((line) => line.includes('태그 아웃'))
     expect(태그).toBeDefined()
     const 아웃틱 = 태그!.split('틱')[0]
-    // 3루 주자는 13틱 6 절 이동(그림 14 의 목록 틱)에 포수 옆으로 들어오고, 그림 14 의 플레이 틱 b43da 가 태그한다
-    // (예전 웹은 아웃 판정을 이동 뒤 같은 판 틱에 두어 13틱으로 적었다)
-    expect(아웃틱).toBe('14')
+    // 3루 주자는 22틱 6 절 이동(그림 23 의 목록 틱)에 포수 옆으로 들어오고, 그림 23 의 플레이 틱 b43da 가 태그한다
+    expect(아웃틱).toBe('23')
     expect(결과.log.some((line) => line.startsWith(`${아웃틱}틱 1루로 송구`) && line.includes('CPU 결정'))).toBe(true)
     expect(결과.throwBase).toBe(1)
     expect(결과.advance.outsAdded).toBe(2)
     // 2아웃째(이 판의 첫 아웃 + 1)라 `아웃 ≤ 2` — 3아웃이었다면 돌지 않는다
     const 셋째 = runDefensePlay({
       outcome: 이루타,
-      trajectory: battedBallTrajectory([114, 201, 125, 1]),
+      trajectory: battedBallTrajectory([100, 188, 125, 1]),
       bases: 만루,
       outs: 2,
       runAbility: 500,
@@ -1461,11 +1501,12 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
   describe('받은 야수의 이어 던지기 — 쥐기 0xb2710(+0x128 = 1) · 슬롯 2 의 0xafa60 · 결과 메시지 0xbba', () => {
     // 만루 땅볼 — 투수가 잡아 홈으로 던지고(포스), 받은 포수(1)가 준비 틱 3 이 지난 뒤 다시 고른다 — 1루로 던져 병살.
     // (r176: 쥐기 0xb2710 이 야수를 포구 지점으로 옮기지 않아, 예전 [90, 900, 350] 은 투수가 못 닿은 채 쥐어 홈 송구가 한 틱 늦고
-    // 포수가 준비될 때 타자주자가 이미 1루라 이어 던지지 않는다 — 표 15 번 53째 공으로 바꿨다)
+    // 포수가 준비될 때 타자주자가 이미 1루라 이어 던지지 않는다 — 표 15 번 53째 공으로 바꿨다. 다시 맨해튼 걸음 0xbf158 · 도착 틱
+    // 0xbf01c 로 그 공은 점수식이 3루를 골라 표 6 번 [87, 713, 300, 1] 로 바꿨다)
     const 이어던지기 = (extra: Partial<DefensePlayInput>) =>
       runDefensePlay({
         outcome: 이루타,
-        trajectory: battedBallTrajectory([98, 1328, 335, 1]), // 원본 코드 15
+        trajectory: battedBallTrajectory([87, 713, 300, 1]), // 원본 코드 6
         bases: 만루,
         outs: 0,
         runAbility: 500,
@@ -1477,12 +1518,12 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
       const 결과 = 이어던지기({ defenseIsCpu: true })
       const [첫, 둘] = 송구들(결과)
 
-      // 받는 점 (홈 목표 x, 1000, z) 를 점[T − 1] 에 끼워 넣어(b2f9c) 포수가 11틱에 받는다
-      expect(첫).toBe('7틱 0루로 송구 — 11틱 도착 (CPU 결정) (0번 야수)')
-      expect(결과.log).toContain('11틱 3번 주자 루 아웃 (0xb36d0 결과 2)')
-      // 11틱에 받아(+0xc8 = 3) 준비 틱이 지난 14틱에 0xafa60 이 1루를 고른다 — 포수(홈 커버)가 쥔 공으로는 1루로 뛰는 타자주자의
+      // 받는 점 (홈 목표 x, 1000, z) 를 점[T − 1] 에 끼워 넣어(b2f9c) 포수가 13틱에 받는다
+      expect(첫).toBe('10틱 0루로 송구 — 13틱 도착 (CPU 결정) (0번 야수)')
+      expect(결과.log).toContain('13틱 3번 주자 루 아웃 (0xb36d0 결과 2)')
+      // 13틱에 받아(+0xc8 = 3) 준비 틱이 지난 16틱에 0xafa60 이 1루를 고른다 — 포수(홈 커버)가 쥔 공으로는 1루로 뛰는 타자주자의
       // 협살이 안 선다(0xb3fa8 은 달려가는 루 1루의 커버가 쥐어야 한다)
-      expect(둘).toMatch(/^14틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
+      expect(둘).toMatch(/^16틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
       expect(결과.log.some((line) => line.includes('0번 주자 루 아웃'))).toBe(true)
       expect(결과.advance.outsAdded).toBe(2)
       // 결과의 송구 칸은 첫 송구다
@@ -1493,10 +1534,10 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
       // 씨앗 95 — 공을 바꾸며(r176) 7 로, 레이저 굴림을 외야수만 돌리며(0x523e6, r201 — 투수가 줍는 이 공은 이제 굴림이 없다) 다시 골랐다
       const 결과 = 이어던지기({ defenseIsCpu: true, random: createSeededRandom(95) })
 
-      expect(결과.log).toContain('7틱 0루로 송구 — 11틱 도착 (CPU 결정) (0번 야수)')
-      expect(결과.log).toContain('11틱 1번 야수 펌블 (0xbc2)')
-      expect(결과.log).toContain('11틱 공 튕김 (0xb3148) — 속도 567 · v0 47 · 각 91 · 1번 야수가 27틱에 줍는다')
-      expect(결과.log).toContain('27틱 1번 야수가 잡았다 (종류 0)')
+      expect(결과.log).toContain('10틱 0루로 송구 — 13틱 도착 (CPU 결정) (0번 야수)')
+      expect(결과.log).toContain('13틱 1번 야수 펌블 (0xbc2)')
+      expect(결과.log).toContain('13틱 공 튕김 (0xb3148) — 속도 568 · v0 37 · 각 104 · 1번 야수가 30틱에 줍는다')
+      expect(결과.log).toContain('30틱 1번 야수가 잡았다 (종류 0)')
       expect(결과.fumbled).toBe(true)
     })
 
@@ -1505,7 +1546,7 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
       const CPU = 송구들(이어던지기({ defenseIsCpu: true }))
       expect(사람[0]).toBe(CPU[0])
       // 둘째 송구도 같다 — 예전 웹은 포수가 쥔 공으로 타자주자 0↔1루 협살을 세워 CPU 수비만 한 틱 늦게(15틱) 던졌다
-      expect(사람[1]).toMatch(/^14틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
+      expect(사람[1]).toMatch(/^16틱 1루로 송구 — \d+틱 도착 \(CPU 결정\) \(1번 야수\)$/)
       expect(CPU[1]).toBe(사람[1])
     })
 
@@ -1524,19 +1565,19 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
     it('송구가 날아가는 동안은 아무도 공을 쥐지 않는다 — b2f80 야수+0xe0 = 0 · b3070 +0x12c = 0', () => {
       const state = startDefensePlay({
         outcome: 이루타,
-        trajectory: battedBallTrajectory([98, 1328, 335, 1]),
+        trajectory: battedBallTrajectory([87, 713, 300, 1]),
         bases: 만루,
         outs: 0,
         runAbility: 500,
         defenseIsCpu: true,
       })
-      while (state.tick <= 9) stepDefensePlay(state)
+      while (state.tick <= 11) stepDefensePlay(state)
 
       expect(state.play.held).toBe(false)
       expect(state.fielders.some((fielder) => fielder.holdingBall)).toBe(false)
       // 0xb3b38 의 "잡을 야수"(+0x170)·"받는 틱"(+0x174)은 받을 포수 · 송구공 예보의 포구 틱이다 (vt24(0) 다시 예보)
       expect(state.play.catchFielderSlot).toBe(1)
-      expect(state.play.catchTick).toBe(11)
+      expect(state.play.catchTick).toBe(13)
     })
   })
 
@@ -1578,7 +1619,8 @@ describe('CPU 홈 송구 20% 특수 송구 — 0xafa60 → 0xb2c90 → 0xb3444 �
   const 홈송구 = (value: number) =>
     runDefensePlay({
       outcome: 단타,
-      trajectory: battedBallTrajectory([90, 900, 350, 1]), // 원본 코드 3
+      // 원본 코드 3 [113, 500, 300] — 예전 [90, 900, 350, 1] 은 맨해튼 도착 틱(0xbf01c) 뒤로 점수식이 3루를 고른다
+      trajectory: battedBallTrajectory([113, 500, 300, 0]),
       bases: { first: true, second: true, third: true },
       outs: 0,
       runAbility: 500,
@@ -1760,7 +1802,8 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       expect(state.log.some((line) => line.includes('미룬다'))).toBe(true)
       // 판 진행 관문 0xb0d28 은 공을 쥔 채 주자가 다 선 틱을 51틱 더 돌린다 — 그사이 1루수가 닿아 b4838 이 놓아준다
       const 송구들 = state.log.filter((line) => line.includes('송구 —'))
-      expect(송구들).toEqual(['36틱 1루로 송구 — 43틱 도착 (AI 9 미룬 송구) (4번 야수)'])
+      // (1루수가 대각선을 맨해튼 걸음 0xbf158 로 걸어 한 틱 이르게(35) 놓아준다)
+      expect(송구들).toEqual(['35틱 1루로 송구 — 43틱 도착 (AI 9 미룬 송구) (4번 야수)'])
     })
   })
 
@@ -1781,37 +1824,38 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
 
     // 확정(+0x19ae)으로 0x400bc 가 쏘아 +0x1f4 를 세우고 경기를 멈춘다 — 연출 0x4403c 단계 0 이 +0x19ae 를 내린다.
     // 유격수(5)가 2루수(3)에게 던지므로 0xb2e38 이 +0x1f4 를 지워(b2ee6) 보통 송구(0xa1620 — 흔들림 굴림)로 나간다
-    expect(state.log).toContain('52틱 7번 야수 펌블 (0xbc2)')
-    expect(state.log.filter((line) => line.includes('레이저'))).toEqual(['75틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993'])
-    expect(state.log).toContain('77틱 2루로 송구 — 97틱 도착 (흔들린 긴 송구 — 3번 야수가 받는다) (5번 야수)')
+    // (좌익수 · 유격수 걸음이 맨해튼 0xbf158 이라 틱이 뒤로 밀렸다 — 펌블 57 · 줍기 83 · 발사 86 · 송구 88)
+    expect(state.log).toContain('57틱 7번 야수 펌블 (0xbc2)')
+    expect(state.log).toContain('83틱 5번 야수가 잡았다 (종류 0)')
+    expect(state.log.filter((line) => line.includes('레이저'))).toEqual(['86틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993'])
+    expect(state.log).toContain('88틱 2루로 송구 — 108틱 도착 (흔들린 긴 송구 — 3번 야수가 받는다) (5번 야수)')
     expect(state.laserConfirmed).toBe(false)
     expect(state.laserArmed).toBe(false)
     expect(state.laserThrow).toBe(false)
   })
 
   it('결과 코드 9 — 공 든 야수가 루에 막 닿았는데 주자가 서 있으면 0xbba 로 0xafa60 을 한 번 부른다 (b43ec~b444a)', () => {
-    // 무사 1루 — 원본 코드 15 [95, 980, 750]: 30틱 귀루 키에 1번 주자가 2↔3루 협살(2루수 3 · 3루수 4)에 걸리고, 34틱 진루 ·
-    // 37틱 귀루 키에 짝 송구가 3→4(35틱) · 4→3(43틱) 으로 오간다. 주루 키 인자는 +0x8c(마지막으로 닿은 루)로 찾으니(0xa97a0)
-    // 2루를 밟고 3루로 가는 1번 주자는 '1'(귀루 2) · '4'(진루 2)다 — 1루 타자주자는 '3'(귀루 1)이 먼저 집는다. 49틱에 받은 2루수가 2루로 가 닿고(50틱 6 절 이동 = 그림 51 의 목록 틱), 그림 51 의 플레이 틱 b4412 가 그 +0x3b 와 이미 2루에
-    // 선 1번 주자를 본다.
-    // (예전 장면 [94, 1359, 221] 씨앗 257 은 투수 펌블로 튄 공에 기댄 협살이었다 — 투수 칸은 선수가 없어(0xb0fb4 b1032) 펌블하지 않는다)
-    const keys: Record<number, string> = { 30: '1', 34: '4', 37: '1' }
+    // 무사 1루 — 원본 코드 9 [42, 529, 397, 1]: 1루수(2)가 17틱에 잡아 1루를 직접 밟으러 가는데(20틱) 타자주자가 0↔1루 협살
+    // (1루수 2 · 포수 1)에 걸린다. 공 든 1루수가 38틱에 1루에 닿았을 때(+0x3b) 1루에 마지막으로 닿은 타자주자가 서 있어 그 그림의
+    // 플레이 틱 b4412 가 결과 코드 9 를 낸다.
+    // (예전 장면 [95, 980, 750] · 30/34/37틱 주루 키의 2↔3루 협살은 맨해튼 걸음 0xbf158 뒤로 1번 주자가 35틱 2루 태그로 먼저 죽는다)
     const 결과 = runDefensePlay({
       outcome: 단타,
-      trajectory: battedBallTrajectory([95, 980, 750, 0]), // 원본 코드 15
+      trajectory: battedBallTrajectory([42, 529, 397, 1]), // 원본 코드 9
       bases: 주자1루,
       outs: 0,
       runAbility: 500,
       defenseIsCpu: true,
-      controls: { side: '공격', keyAt: (tick) => (keys[tick] === undefined ? null : { key: keys[tick] }) },
     })
 
-    expect(결과.log).toContain('43틱 협살 송구 4→3 — 49틱 도착')
-    expect(결과.log).toContain('51틱 결과 코드 9 — 3번 야수가 2루에 닿았지만 1번 주자가 서 있다')
+    expect(결과.log).toContain('20틱 2번 야수가 1루를 직접 밟으러 간다')
+    expect(결과.log).toContain('21틱 협살 시작 — 0번 주자 1↔0루 (야수 2·1)')
+    expect(결과.log).toContain('38틱 결과 코드 9 — 2번 야수가 1루에 닿았지만 0번 주자가 서 있다')
   })
 
   it('3아웃이면 그 틱 끝에서 판이 닫힌다 — 판 진행 관문 0xb0d28 의 state[6] > 2 (b0dbe)', () => {
-    // 2아웃 2루 3루 땅볼 — 3루수가 1루로 던져 타자주자가 1루 포스(0xb36d0 결과 2)로 셋째 아웃이 된다
+    // 2아웃 2루 땅볼 — 유격수가 1루로 던져 타자주자가 26틱에 1루 포스(0xb36d0 결과 2)로 셋째 아웃이 된다
+    // (맨해튼 걸음 0xbf158 로 예전 21틱보다 늦다)
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory([113, 1111, 100, 0]), // 원본 코드 3
@@ -1821,10 +1865,10 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       defenseIsCpu: true,
     })
 
-    expect(결과.log).toContain('21틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
+    expect(결과.log).toContain('26틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
     // 다음 틱부터는 아무것도 안 돈다
-    expect(결과.log.some((line) => line.startsWith('22틱'))).toBe(false)
-    expect(결과.ticks).toHaveLength(22)
+    expect(결과.log.some((line) => line.startsWith('27틱'))).toBe(false)
+    expect(결과.ticks).toHaveLength(27)
     expect(결과.advance.outsAdded).toBe(1)
     expect(결과.outcome).toEqual(땅볼아웃)
   })
@@ -2026,13 +2070,14 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
   })
 
   it('협살이 풀린 틱에 날아가던 짝 송구도 짝이 받는다 — 공을 아무도 안 쥔 채 240틱까지 가지 않는다', () => {
-    // 원본 코드 5 [68, 808, 282, 1] · 16틱 귀루 · 17틱 진루: 1루수가 17틱에 짝 유격수에게 던진 공이 날아가는 동안 주자가 2루에 붙어
+    // 원본 코드 3 [86, 899, 400, 1] · 18틱 귀루 · 19틱 진루: 1루수가 19틱에 짝 유격수에게 던진 공이 날아가는 동안 주자가 2루에 붙어
     // 고르기(0xb398c)가 −1 이 되며 협살이 풀린다
-    // (예전 장면 [87, 1388, 222] 씨앗 26 은 투수 펌블로 튄 공에 기댄 협살이었다 — 투수 칸은 선수가 없어 펌블하지 않는다)
-    const keys: Record<number, string> = { 16: '3', 17: '2' }
+    // (예전 [68, 808, 282, 1] · 16/17틱은 맨해튼 걸음 0xbf158 뒤로 협살이 안 선다. 그 전 장면 [87, 1388, 222] 씨앗 26 은 투수 펌블로
+    //  튄 공에 기댄 협살이었다 — 투수 칸은 선수가 없어 펌블하지 않는다)
+    const keys: Record<number, string> = { 18: '3', 19: '2' }
     const result = runDefensePlay({
       outcome: 단타,
-      trajectory: battedBallTrajectory([68, 808, 282, 1]),
+      trajectory: battedBallTrajectory([86, 899, 400, 1]),
       bases: 주자1루,
       outs: 0,
       runAbility: 500,
@@ -2040,7 +2085,7 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
       controls: { side: '공격', keyAt: (tick) => (keys[tick] === undefined ? null : { key: keys[tick] }) },
     })
     expect(result.rundowns).toBeGreaterThan(0)
-    expect(result.log).toContain('17틱 협살 송구 2→5 — 26틱 도착')
+    expect(result.log).toContain('19틱 협살 송구 2→5 — 28틱 도착')
     expect(result.ticks.length).toBeLessThan(240)
   })
 })
@@ -2085,20 +2130,23 @@ describe('AI 0xb 담장 갈래 — 고르기 0xb3b38 은 +0x90 만 적고 목표
 
 describe('포구 틱 b4292 — 발밑 루에 주자가 서 있는 포구는 결과 코드 9 (쥐기 b42c8 앞)', () => {
   it('2루 위에서 송구를 받는 틱에 2루에 마지막으로 닿은 주자가 서 있으면 9 — 타구 포구뿐 아니라 송구 받기에도 걸린다', () => {
-    // 원본 코드 0 [90, 810, 1592]: 중견수 뜬공 아웃 뒤 2루 위의 3번 야수가 (유격수 중계로) 송구를 받는다.
-    // r214: CPU 송구는 계획이 지워져 중계가 안 이어지므로(afb08 0xb0ea0) 사람 키 '2' 로 고른 송구로 바꿨다. 굴림을 빼 레이저가 안 선다
+    // 원본 코드 15 [130, 884, 618]: 좌중간에 떨어진 공을 7번 야수가 21틱에 줍고, 사람 키 '2'(22틱)로 2루에 던진 공을 2루 위의
+    // 3번 야수가 40틱에 받는다 — 그 사이 1번 주자는 2루에 닿아 서 있다. 굴림을 빼 레이저가 안 선다
+    // (r214: CPU 송구는 계획이 지워져 중계가 안 이어지므로(afb08 0xb0ea0) 사람 키로 고른 송구다. 예전 [90, 810, 1592] · 37틱 키는
+    //  맨해튼 걸음 0xbf158 뒤로 받는 틱에 1번 주자가 2루에 서 있지 않다)
     const result = runDefensePlay({
       outcome: 땅볼아웃,
-      trajectory: battedBallTrajectory([90, 810, 1592, 0]),
+      trajectory: battedBallTrajectory([130, 884, 618, 0]),
       bases: 주자1루,
       outs: 1,
       defenseIsCpu: false,
       throwMode: '수동',
-      controls: { side: '수비', keyAt: (tick) => (tick === 37 ? { key: '2' } : null) },
+      controls: { side: '수비', keyAt: (tick) => (tick === 22 ? { key: '2' } : null) },
     })
-    expect(result.log).toContain('64틱 결과 코드 9 — 3번 야수가 2루 위에서 잡았지만 1번 주자가 서 있다 (b4292)')
+    expect(result.log).toContain('27틱 2루로 송구 — 40틱 도착 (7번 야수)')
+    expect(result.log).toContain('40틱 결과 코드 9 — 3번 야수가 2루 위에서 잡았지만 1번 주자가 서 있다 (b4292)')
     // 9 를 내는 틱에도 쥐기는 그대로 돈다(b42c8)
-    expect(result.log).toContain('64틱 3번 야수가 잡았다 (종류 0)')
+    expect(result.log).toContain('40틱 3번 야수가 잡았다 (종류 0)')
   })
 })
 
@@ -2295,10 +2343,11 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
   const 야수 = (결과: DefensePlayResult, tick: number, slot: number) =>
     틱(결과, tick)?.fielders.find((fielder) => fielder.slot === slot)
 
-  it('쥐기 전에는 고리가 없고, 투수가 쥔 틱(6)부터 공 가진 야수 칸에 뜬다 — 사람 공격이면 애니 3', () => {
+  it('쥐기 전에는 고리가 없고, 투수가 쥔 틱(11)부터 공 가진 야수 칸에 뜬다 — 사람 공격이면 애니 3', () => {
+    // 대표 땅볼 [113, 500, 300] 은 투수가 11틱에 쥔다
     const 결과 = play(땅볼아웃, EMPTY_BASES, 0)
-    expect(틱(결과, 5)?.holderMark).toBeNull()
-    expect(틱(결과, 6)?.holderMark).toEqual({ slot: 0, anim: 3 })
+    expect(틱(결과, 10)?.holderMark).toBeNull()
+    expect(틱(결과, 11)?.holderMark).toEqual({ slot: 0, anim: 3 })
   })
 
   it('CPU 공격이면 애니 1, 이름 판 선수는 공 가진 칸의 것을 싣는다', () => {
@@ -2311,12 +2360,12 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
       offenseIsCpu: true,
       fielderPlates: [{ name: '선발', pitcherRole: 0 }],
     })
-    expect(틱(결과, 6)?.holderMark).toEqual({ slot: 0, anim: 1 })
-    expect(틱(결과, 6)?.holderPlate).toEqual({ name: '선발', pitcherRole: 0 })
+    expect(틱(결과, 11)?.holderMark).toEqual({ slot: 0, anim: 1 })
+    expect(틱(결과, 11)?.holderPlate).toEqual({ name: '선발', pitcherRole: 0 })
   })
 
   it('펌블한 틱의 그림이 +0xb8 = 6 을 보고, 다음 틱부터 야수 틱이 하나씩 줄인다 (b4280 · a12da)', () => {
-    // 2루수가 9틱에 펌블한다 (필살수비 A · B 실패 → 펌블 0) — 투수는 선수가 없어 펌블하지 않는다. 레이저는 외야수만(0x523e6, r201)
+    // 2루수가 10틱에 펌블한다 (필살수비 A · B 실패 → 펌블 0) — 투수는 선수가 없어 펌블하지 않는다. 레이저는 외야수만(0x523e6, r201)
     const 결과 = runDefensePlay({
       outcome: 땅볼아웃,
       trajectory: battedBallTrajectory(이루수땅볼),
@@ -2324,11 +2373,11 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
       outs: 0,
       random: 차례난수([0.9, 0.9, 0, 0.9]),
     })
-    expect(야수(결과, 8, 3)?.fumbleTicks).toBe(0)
-    expect(야수(결과, 9, 3)?.fumbleTicks).toBe(6)
-    expect(야수(결과, 10, 3)?.fumbleTicks).toBe(5)
-    expect(야수(결과, 14, 3)?.fumbleTicks).toBe(1)
-    expect(야수(결과, 15, 3)?.fumbleTicks).toBe(0)
+    expect(야수(결과, 9, 3)?.fumbleTicks).toBe(0)
+    expect(야수(결과, 10, 3)?.fumbleTicks).toBe(6)
+    expect(야수(결과, 11, 3)?.fumbleTicks).toBe(5)
+    expect(야수(결과, 15, 3)?.fumbleTicks).toBe(1)
+    expect(야수(결과, 16, 3)?.fumbleTicks).toBe(0)
   })
 
   it('악송구를 던진 야수는 +0xc0 = 4 (a1908)', () => {
@@ -2342,8 +2391,9 @@ describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) 
       random: 차례난수([0.9, 0, 0.9]),
     })
     expect(결과.errantThrow).toBe(true)
-    expect(야수(결과, 9, 0)?.throwErrorTicks).toBe(4)
-    expect(야수(결과, 10, 0)?.throwErrorTicks).toBe(3)
+    // 투수가 11틱에 쥐고 14틱에 던진다
+    expect(야수(결과, 14, 0)?.throwErrorTicks).toBe(4)
+    expect(야수(결과, 15, 0)?.throwErrorTicks).toBe(3)
   })
 
   it('부착 효과 칸을 더해도 진행 · 난수 차례는 그대로다 — 같은 판을 두 번 돌리면 로그가 같다', () => {

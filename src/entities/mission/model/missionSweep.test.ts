@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { registerContact } from '@/entities/batting/model/battedContact'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { BATTER_MISSIONS, PITCHER_MISSIONS, judgedGoalsOf, missionKeyOf } from '@/entities/mission/model/missionGoal'
 import { MISSION_ACE_ROSTER_SLOT, MISSION_CPU_START, missionCpuBatterOf } from '@/entities/mission/model/missionCpuTeam'
 import { aceMatchClearCountAfterWin, aceMatchClearKeyOf } from '@/entities/mission/model/aceMatchClear'
@@ -13,6 +14,7 @@ import {
   applySteal,
   checkSwingsExhausted,
   isMissionBatterUp,
+  missionDefensePlayInputOf,
   recordSwing,
   runBatterMissionAutoHalves,
   startMission,
@@ -227,8 +229,15 @@ const WALK: AtBatOutcome = { kind: '볼넷' }
 const HIT_BY_PITCH: AtBatOutcome = { kind: '사구' }
 /** 내야 뒤에 겨우 뜬 공 — 사람 수비가 키 없이도 뜬 채로 잡는다(주자는 태그업으로 못 들어온다, `pitcherRun.test` 와 같은 원본 코드 0 패턴) */
 const FLY_OUT = registerContact({ kind: '아웃', detail: '뜬공아웃' }, { pattern: [90, 250, 700, 0], resultCode: 0 })
-/** 원본 패턴 표 코드 20 칸 2 — 1사 빈 루에서 판 안 그라운드 홈런(state[0x25]) */
-const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { pattern: [67, 1150, 600, 2], resultCode: 20 })
+/**
+ * 원본 패턴 표 코드 14 칸 10 [45, 279, 324] — 1사 빈 루에서 **주루 999 타자**면 판 안 그라운드 홈런(state[0x25])이 난다.
+ * r268: 주자 걸음 · 도착 틱이 원본대로 맨해튼 거리(0xbf158 · 0xbf01c → 0xbfa2c)라 네 구간이 평면 속도의 0.71 배다 — 주루 500 으로는
+ * 1275 패턴 어느 것도 판 안에서 홈을 못 돈다(예전 [67, 1150, 600] 은 이제 3루타). 미션 타자는 나리 저장 선수라 빠른 선수면 깬다
+ */
+const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { pattern: [45, 279, 324, 0], resultCode: 14 })
+/** 그라운드 홈런 판은 주루 999 타자로 미리 돌려 넘긴다(`applyOutcome` 의 played — 화면이 판을 다 돌린 길) */
+const 빠른타자판 = (run: MissionRun, outcome: AtBatOutcome) =>
+  runDefensePlay({ ...missionDefensePlayInputOf(run.bases, run.outs, outcome), runAbilities: { 0: 999 } })
 const LOOP_GUARD = 3000
 
 // ── 타자편 ────────────────────────────────────────────────────────────────
@@ -247,7 +256,8 @@ function bat(run: MissionRun, outcome: AtBatOutcome, random: RandomPort, options
   let next = toMissionBatter(run, random)
   if (next.status !== '진행중') return next
   for (let swing = 0; swing < (options.swings ?? 1); swing += 1) next = recordSwing(next)
-  return runBatterMissionAutoHalves(applyOutcome(next, outcome, options.bunt === true), random)
+  const played = outcome === INSIDE_THE_PARK_HOME_RUN ? 빠른타자판(next, outcome) : undefined
+  return runBatterMissionAutoHalves(applyOutcome(next, outcome, options.bunt === true, undefined, played), random)
 }
 
 /** 미션 타자가 삼진만 당한다 — 타석 · 스윙 한도가 없으면 경기 끝(0xb68fc → aad20)까지 */

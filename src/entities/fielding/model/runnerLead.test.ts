@@ -77,14 +77,15 @@ describe('0x3d7b8 — 수비 판이 열릴 때 주자 리드 틱', () => {
     expect(moved.legStart).toEqual(basePosition(1))
     expect(moved.targetBase).toBe(2)
     expect(moved.startBase).toBe(1)
-    // 한 틱마다 좌표를 정수로 자르므로 18 × 335 보다 조금 짧다
-    expect(horizontalDistance(basePosition(1), moved.position)).toBe(6022)
-    expect(moved.position).toEqual({ x: 21_338, y: 0, z: 20_298 })
+    // 한 걸음은 차 × 335 ÷ 맨해튼 거리(0xbfa2c)라 대각선으로는 평면 335 보다 짧다 — 18 걸음에 평면 4266
+    expect(horizontalDistance(basePosition(1), moved.position)).toBe(4266)
+    expect(moved.position).toEqual({ x: 22_683, y: 0, z: 21_426 })
   })
 
   it('applyRunnerLead: 목표에 닿으면 루 좌표에 정확히 멈춘다(도착 처리는 판 첫 틱에)', () => {
     const fast = { ...createRunner(1, 1, runnerSpeedOf(999, 0)), targetBase: 2 }
-    const moved = applyRunnerLead(fast, { ticks: 23, leadTargetBase: 2, restoredTargetBase: 2 })
+    // 맨해튼 10951 ÷ 369 — 30 걸음째에 붙는다
+    const moved = applyRunnerLead(fast, { ticks: 30, leadTargetBase: 2, restoredTargetBase: 2 })
     expect(moved.position).toEqual(basePosition(2))
     expect(moved.settled).toBe(false)
   })
@@ -93,6 +94,6 @@ describe('0x3d7b8 — 수비 판이 열릴 때 주자 리드 틱', () => {
     const plain = createRunner(1, 2, 335)
     const moved = applyRunnerLead(plain, runnerLeadOf(plain, { playKind: 5, stealing: false }))
     expect(moved.targetBase).toBe(2)
-    expect(horizontalDistance(basePosition(2), moved.position)).toBe(4347)
+    expect(horizontalDistance(basePosition(2), moved.position)).toBe(3081)
   })
 })

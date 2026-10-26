@@ -29,9 +29,9 @@ const 문맥 = (play: Partial<PlayView>, overrides: Partial<DefenseContext> = {}
 })
 
 describe('0xaf284 — 커버가 없을 때는 "직접 뛰기 vs 루 담당 야수 도착" 중 빠른 쪽', () => {
-  it('2루수가 잡았고 1루에 커버가 없으면 1루수(칸 2)가 루에 닿는 5틱 이 이긴다', () => {
+  it('2루수가 잡았고 1루에 커버가 없으면 1루수(칸 2)가 루에 닿는 8틱 이 이긴다 (맨해튼 거리 ÷ 220, 0xbfa2c)', () => {
     const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3 })
-    expect(defenseArrivalTicks(문, 1)).toBe(5)
+    expect(defenseArrivalTicks(문, 1)).toBe(8)
   })
 
   it('루 담당 야수가 이미 그 루를 목표로 하고 있으면 더 뛰지 않는다', () => {
@@ -39,7 +39,7 @@ describe('0xaf284 — 커버가 없을 때는 "직접 뛰기 vs 루 담당 야�
       slot === 2 ? { ...fielder, targetBase: 1, target: basePosition(1) } : fielder,
     )
     const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3 }, { fielders: 야수 })
-    expect(defenseArrivalTicks(문, 1)).toBe(5)
+    expect(defenseArrivalTicks(문, 1)).toBe(8)
   })
 })
 
@@ -60,7 +60,8 @@ describe('0xaf284 — 커버가 있으면 "남은 틱 + max(송구 + 준비, 커
       { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, 2, NONE, NONE], catchTick: 10 },
       { fielders: 야수, currentTick: 4 },
     )
-    expect(defenseArrivalTicks(문, 1)).toBe(7) // 송구 5 + 동작 2
+    // 송구 5 + 동작 2 = 7 보다 커버(1루수)가 1루에 닿는 8틱(맨해튼 ÷ 220)이 늦다
+    expect(defenseArrivalTicks(문, 1)).toBe(8)
   })
 
   it('외야에서 17000 이상이면 중계가 끼고 준비 틱도 6 이 된다 — 중계 30 + 준비 6 = 36', () => {

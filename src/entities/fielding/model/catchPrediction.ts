@@ -1,6 +1,6 @@
 import {
-  horizontalDistance,
   isOutfieldSlot,
+  manhattanDistance,
   type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
 
@@ -132,11 +132,12 @@ export interface CatchWindowInput {
 }
 
 /**
- * 판정에 쓰는 거리 d — 0xb12d0 의 `d = isqrt(dx²+dz²)(복제 위치, P(t))`, 정지 근사면 `d −= 속도 × n`.
+ * 판정에 쓰는 거리 d — 0xb12d0 의 `d = |dx| + |dz|`(복제 위치, P(t)) — **맨해튼 0xbfa2c**(b15b4, 이 함수의 거리 호출은 이것 하나다),
+ * 정지 근사면 `d −= 속도 × n`.
  * 자르지 않는다(원본 그대로).
  */
 export function approachedDistanceOf(input: CatchWindowInput): number {
-  const distance = horizontalDistance(input.fielder, input.ball)
+  const distance = manhattanDistance(input.fielder, input.ball)
   const ran = (input.runTicks ?? 0) * (input.speed ?? 0)
   return distance - ran
 }

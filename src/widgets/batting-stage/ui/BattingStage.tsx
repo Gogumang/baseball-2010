@@ -198,8 +198,8 @@ interface BattingStageProps {
   /** 참이면 새 공을 던지지 않는다. 타석 결과 연출 중에 쓴다. */
   readonly isPaused: boolean
   /**
-   * 타석 준비 0xd 진입 번호 — 넘기면 좌우 이동(+0xfe4)을 이 값이 바뀔 때만 0 으로 되돌린다(0x48d50 48f88). 안 넘기면 쉬는 동안
-   * 되돌린다(`StageLatest.shiftResetSerial`)
+   * 타석 준비 0xd 진입 번호 — 좌우 이동(+0xfe4)을 이 값이 바뀔 때만 0 으로 되돌린다(0x48d50 48f88). 쉬는 동안(`isPaused`)은
+   * 안 지운다. 사람이 치는 화면은 `useSceneConfirm.sceneDEntryMark`(더비는 `sceneDSerial`)를 넘긴다(`StageLatest.shiftResetSerial`)
    */
   readonly shiftResetSerial?: number
   /**
@@ -382,7 +382,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     isSceneFrozen: isCommonWindowOpen,
   })
   const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, phaseEntryRef, hitSkipKeyTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, isHitByPitchResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
-  // 0xd 진입 0x48d50 의 48f88 — 좌우 이동 +0xfe4 = 0 (번호를 받는 화면만. 안 받으면 쉬는 동안 되돌린다 — `useStageAnimation`)
+  // 0xd 진입 0x48d50 의 48f88 — 좌우 이동 +0xfe4 = 0 (번호가 바뀔 때만. 쉬는 동안은 안 지운다)
   useEffect(() => {
     if (props.shiftResetSerial !== undefined) shiftRef.current = 0
   }, [props.shiftResetSerial, shiftRef])

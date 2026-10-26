@@ -256,3 +256,26 @@ describe('웹 테두리 걷기 — 원본 240×320 판 한 장 · 목표는 HUD 
     expect(onSteal).toHaveBeenCalledWith(1)
   })
 })
+
+describe('미션 타석 → 좌우 이동은 0xd 진입 번호로만 지운다 (0x48d50 48f88, A-02)', () => {
+  it('BattingStage 에 0xd 진입 표지(`sceneDEntryMark`)를 shiftResetSerial 로 넘긴다', () => {
+    const mission = MISSIONS.find((candidate) => candidate.side === '타자')!
+    render(
+      <MissionPlayScreen
+        run={startMission(mission)}
+        ability={ROOKIE_BATTER_ABILITY}
+        pitcherAbility={DEFAULT_PITCHER_ABILITY}
+        opponent={null}
+        atBat={createAtBat()}
+        isPaused={false}
+        bannerText=""
+        random={createSeededRandom(1)}
+        onPitchResolved={vi.fn()}
+        onGiveUp={vi.fn()}
+        onFinish={vi.fn()}
+        onSteal={vi.fn()}
+      />,
+    )
+    expect(typeof stageProps.last?.shiftResetSerial).toBe('number')
+  })
+})

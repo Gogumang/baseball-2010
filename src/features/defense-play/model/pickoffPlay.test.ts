@@ -86,10 +86,10 @@ describe('견제 한 판 — 종류 4 (0xb28be · 0xb47da · 0xb4292)', () => {
     // (굴림 수는 투수 칸이 선수 없는 칸 — 송구 g = 2 · 악송구 보정 8 · 펌블 0(0xb0fb4 b1032) — 이 되며 34 → 36,
     // r180: 외야 추적야수의 백업(AI 0xc) · AI 0 의 시작 자리 고치기를 AI 고리로 옮겨 줍는 외야수 차례가 바뀌며 36 → 34,
     // r201: 튕긴 공을 외야수(6번)가 쫓게 되면 슬롯 2 머리 0x523bc 가 레이저 굴림 0x66a8c 를 한 번 돌려(공 가진 야수가 외야수 — 523e6)
-    // 34 → 35)
+    // 34 → 35, r268: 야수 · 주자 걸음과 도착 틱이 맨해튼 거리(0xbfa2c)가 되며 튕김 · 다시 줍기가 줄어 35 → 27)
     const random = 세는난수(0)
     const result = runPickoffPlay({ targetBase: 1, bases: 일루, outs: 0, random })
-    expect(random.count()).toBe(35)
+    expect(random.count()).toBe(27)
     expect(result.errantThrow).toBe(true)
     expect(result.fumbled).toBe(true)
     expect(result.resultCode).toBeNull()
@@ -140,20 +140,20 @@ describe('견제를 받은 야수의 CPU 송구 결정 — 슬롯 2 의 0xafa60 
       defenseIsCpu: true,
     })
 
-    // 6틱에 1루수가 받아 +0xc8 = 3 → 9틱에 준비. 9틱 견제사(돌아오던 주자가 8틱 이동 = 그림 9 의 목록 틱에서 다가와 그림 9 의
-    // 플레이 틱 b43da 가 태그한다) 뒤 주자가 없고 1루수가 공을 쥐어 +0x120 이 9틱 끝부터 한 그림에 세 번(그리기 G3 · 0x3f060 G1 ·
-    // 52502 G2) 올라 52번째 호출(26틱 끝의 G3)에서 닫힌다 — 수비 CPU · 사람 모두 같다 (점수식이 던질 루를 못 찾는다).
-    // (예전 웹은 판정을 이동 뒤 같은 판 틱에 두어 8틱 견제사 · 26 그림이었다)
+    // 6틱에 1루수가 받아 +0xc8 = 3 → 9틱에 준비. 견제사 뒤 주자가 없고 1루수가 공을 쥐어 +0x120 이 그 틱 끝부터 한 그림에 세 번
+    // (그리기 G3 · 0x3f060 G1 · 52502 G2) 올라 52번째 호출에서 닫힌다 — 수비 CPU · 사람 모두 같다 (점수식이 던질 루를 못 찾는다).
+    // r268: 리드 걸음(0xbf158)이 맨해튼 나눗수라 리드가 짧아져 돌아오던 주자가 그림 8 의 플레이 틱 b43da 에서 태그된다 —
+    // 8틱 견제사 · 26 그림 (r267 까지는 9틱 · 27 그림)
     expect(사람.throwArrivalTick).toBe(6)
-    expect(사람.log).toContain('9틱 1번 주자 견제사 (0xb36d0 결과 3)')
-    expect(사람.ticks).toHaveLength(27)
-    expect(CPU.ticks).toHaveLength(27)
+    expect(사람.log).toContain('8틱 1번 주자 견제사 (0xb36d0 결과 3)')
+    expect(사람.ticks).toHaveLength(26)
+    expect(CPU.ticks).toHaveLength(26)
     expect(CPU.advance).toEqual(사람.advance)
     // 송구 설정이 자동이면 사람 수비도 같다
     expect(
       runPickoffPlay({ targetBase: 1, bases: { first: true, second: false, third: false }, outs: 0, throwMode: '자동' })
         .ticks,
-    ).toHaveLength(27)
+    ).toHaveLength(26)
   })
 
   it('표본 — CPU 갈래가 돌아도 견제 판의 결과·굴림은 그대로다 (점수식이 던질 루를 못 찾는다)', () => {

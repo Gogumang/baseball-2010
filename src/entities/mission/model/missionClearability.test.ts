@@ -14,6 +14,7 @@ import {
   canSteal,
   checkSwingsExhausted,
   isMissionBatterUp,
+  missionDefensePlayInputOf,
   recordSwing,
   runBatterMissionAutoHalves,
   startMission,
@@ -30,14 +31,22 @@ import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { MISSIONS } from '@/shared/config/original/missions'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { registerContact } from '@/entities/batting/model/battedContact'
+import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 
 const SINGLE: AtBatOutcome = { kind: '안타', bases: 1 }
 const DOUBLE: AtBatOutcome = { kind: '안타', bases: 2 }
 const TRIPLE: AtBatOutcome = { kind: '안타', bases: 3 }
 const HOME_RUN: AtBatOutcome = { kind: '홈런' }
 const STRIKEOUT: AtBatOutcome = { kind: '삼진' }
-/** 원본 패턴 표 코드 20 칸 2 — 굴림 없이 1사 빈 루에서 판 안 그라운드 홈런(state[0x25])이 난다 */
-const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { pattern: [67, 1150, 600, 2], resultCode: 20 })
+/**
+ * 원본 패턴 표 코드 14 칸 10 [45, 279, 324] — 1사 빈 루에서 **주루 999 타자**면 판 안 그라운드 홈런(state[0x25])이 난다.
+ * r268: 주자 걸음 · 도착 틱이 원본대로 맨해튼 거리(0xbf158 · 0xbf01c → 0xbfa2c)라 네 구간이 평면 속도의 0.71 배다 — 주루 500 으로는
+ * 1275 패턴 어느 것도 판 안에서 홈을 못 돈다(예전 [67, 1150, 600] 은 이제 3루타). 미션 타자는 나리 저장 선수라 빠른 선수면 깬다
+ */
+const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { pattern: [45, 279, 324, 0], resultCode: 14 })
+/** 그라운드 홈런 판은 주루 999 타자로 미리 돌려 넘긴다(`applyOutcome` 의 played — 화면이 판을 다 돌린 길) */
+const 빠른타자판 = (run: MissionRun, outcome: AtBatOutcome) =>
+  runDefensePlay({ ...missionDefensePlayInputOf(run.bases, run.outs, outcome), runAbilities: { 0: 999 } })
 const PITCHES_PER_STRIKEOUT = 3
 const MAXIMUM_PLATE_APPEARANCES = 30
 
@@ -50,7 +59,7 @@ const findMission = (side: '타자' | '투수', id: number): OriginalMission => 
 /** 미션마다 가장 이상적인 타석 결과 순서 */
 function idealBatterOutcomes(mission: OriginalMission): AtBatOutcome[] {
   if (mission.goals.includes('사이클링히트')) return [SINGLE, DOUBLE, TRIPLE, HOME_RUN]
-  // 그라운드홈런은 판 안 홈인만 센다 (0xaa1e2) — 원본 패턴 표 코드 20 의 [67, 1150, 600] 은 1사 빈 루에서 타자주자가 홈까지 돈다
+  // 그라운드홈런은 판 안 홈인만 센다 (0xaa1e2) — 원본 패턴 표 코드 14 의 [45, 279, 324] 를 빠른 타자가 치면 홈까지 돈다
   if (mission.goals.includes('그라운드홈런')) return [INSIDE_THE_PARK_HOME_RUN]
   if (mission.goals.includes('2루타')) return [DOUBLE, HOME_RUN]
   return Array.from({ length: MAXIMUM_PLATE_APPEARANCES }, () => HOME_RUN)
@@ -70,7 +79,8 @@ function playIdealBatter(mission: OriginalMission): MissionRun {
     if (run.status !== '진행중') break
     const played = isBunt ? SINGLE : outcome
     run = recordSwing(run)
-    run = runBatterMissionAutoHalves(applyOutcome(run, played, isBunt), random)
+    const result = played === INSIDE_THE_PARK_HOME_RUN ? 빠른타자판(run, played) : undefined
+    run = runBatterMissionAutoHalves(applyOutcome(run, played, isBunt, undefined, result), random)
   }
   return run
 }
@@ -186,7 +196,8 @@ describe('시작 상황 — 레코드 3·4·5번 바이트', () => {
     expect(fence.progress.counts['그라운드홈런'] ?? 0).toBe(0)
     expect(fence.status).toBe('진행중')
 
-    const inside = applyOutcome(startMission(findMission('타자', 11)), INSIDE_THE_PARK_HOME_RUN)
+    const 시작 = startMission(findMission('타자', 11))
+    const inside = applyOutcome(시작, INSIDE_THE_PARK_HOME_RUN, false, undefined, 빠른타자판(시작, INSIDE_THE_PARK_HOME_RUN))
     expect(inside.progress.counts['그라운드홈런']).toBe(1)
     expect(inside.status).toBe('성공')
   })

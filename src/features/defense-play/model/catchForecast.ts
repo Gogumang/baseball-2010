@@ -8,7 +8,7 @@ import {
   EMPTY_CATCH_TABLE,
   HEIGHT_WINDOW,
 } from '@/entities/fielding/model/catchPrediction'
-import { horizontalDistance, isOutfieldSlot, stepToward, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import { horizontalDistance, isOutfieldSlot, manhattanDistance, stepToward, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
 import { POSE, isFreezeOpen, shouldClearPose, withThrowMotion } from '@/entities/fielding/model/fielderPose'
 
@@ -84,7 +84,7 @@ export interface CatchForecast {
   /**
    * **고르기 0xb3b38 의 백업 갈래 b3ebe~b3f62** (직접 뜬 것, r180): 담장 갈래(`fenceChasePoint`)가 아니고 고른 야수가 외야(칸 6~8 —
    * 0xb8da8 `+0x88 − 6 ≤ 2`)면, 칸 5~8 중 외야이고 고른 야수가 아닌 야수 가운데 위치(+0x20)와 낮은 공 점 Q(sp+0x74 — `nearestSlotTo`
-   * 의 점) 거리(0xbfa2c)가 가장 짧은(처음 최소 400000, `<`) 야수 하나를 AI 0xc(백업)로. 없으면 −1. 목표는 안 바꾼다 —
+   * 의 점) 맨해튼 거리(0xbfa2c = |dx| + |dz|)가 가장 짧은(처음 최소 400000, `<`) 야수 하나를 AI 0xc(백업)로. 없으면 −1. 목표는 안 바꾼다 —
    * AI 고리 b4b78 이 매 틱 정한다(`backupPointOf`)
    */
   readonly backupSlot: number
@@ -318,8 +318,8 @@ function fenceChasePointOf(trajectory: BattedBallTrajectory, table: CatchTable):
 /** b3ece — 백업 거리의 처음 최소 0x61a80 */
 const BACKUP_DISTANCE_START = 400_000
 
-/** b3ebe~b3f62 — 백업 야수 (`CatchForecast.backupSlot`) */
-function backupSlotOf(fielders: readonly FielderState[], chaserSlot: number, lowPoint: WorldPoint): number {
+/** b3ebe~b3f62 — 백업 야수 (`CatchForecast.backupSlot`). 거리는 **맨해튼 0xbfa2c**(b3f2a)다 */
+export function backupSlotOf(fielders: readonly FielderState[], chaserSlot: number, lowPoint: WorldPoint): number {
   if (!isOutfieldSlot(chaserSlot)) return -1
   let best = -1
   let bestDistance = BACKUP_DISTANCE_START
@@ -327,7 +327,7 @@ function backupSlotOf(fielders: readonly FielderState[], chaserSlot: number, low
   for (let slot = 5; slot <= 8; slot += 1) {
     const fielder = fielders[slot]
     if (fielder === undefined || !isOutfieldSlot(fielder.slot) || fielder.slot === chaserSlot) continue
-    const distance = horizontalDistance(fielder.position, lowPoint)
+    const distance = manhattanDistance(fielder.position, lowPoint)
     if (distance < bestDistance) {
       bestDistance = distance
       best = fielder.slot

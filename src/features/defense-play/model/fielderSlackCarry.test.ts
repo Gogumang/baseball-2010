@@ -69,19 +69,27 @@ describe('야수 +0xcc 는 판 사이로 남는다 — 생성자 a0df0 · vt8c a
   })
 
   it('도루 판(1 · 3루, 1루 도루) — +0xcc 가 늦게 보이는 야수(vtc0)를 보고 3루 주자가 판 시작에 홈으로 뛰어 잡힌다', () => {
+    // 도착 틱 · 한 틱 이동이 맨해튼 거리(0xbfa2c)라 3루→홈 대각선이 멀다 — 판 시작 비교(주자 틱 + 1 < 수비 틱 − 1)를 넘으려면
+    // 가장 빠른 주자(주루 999 · 팀 등급 7 = 속도 376)에 번트 자세 리드 +3틱(장면 +0xfdc, 0x3d7b8)까지 있어야 한다
     const 도루 = (scene?: DefenseScene) =>
       runStealPlay({
         bases: { ...EMPTY_BASES, first: true, third: true },
         stealingFrom: [1],
         outs: 0,
-        runAbility: 200,
+        runAbility: 999,
+        runnerTeamGrade: 7,
+        buntKind: 1,
         random: createSeededRandom(1),
         defenseIsCpu: true,
         scene,
       })
-    expect(도루().resultCode).toBeNull()
+    // +0xcc 가 없으면 3루 주자는 판 시작에 안 뛰고, 포수는 리드한 3루 주자를 잡으러 3루로 던진다
+    const 그냥 = 도루()
+    expect(그냥.log).not.toContain('판 시작 2번 주자 자동 진루 → 4루')
+    expect(그냥.log).toContain('0틱 1번 야수가 3루로 송구 — 8틱 도착 (CPU 결정)')
     const 남은판 = 도루(남김(5))
     expect(남은판.log).toContain('판 시작 2번 주자 자동 진루 → 4루')
+    expect(남은판.log).toContain('19틱 2번 주자 아웃 (0xb36d0 결과 3)')
     expect(남은판.resultCode).toBe(RUNNER_PLAY_RESULT.OUT)
   })
 
@@ -95,8 +103,8 @@ describe('야수 +0xcc 는 판 사이로 남는다 — 생성자 a0df0 · vt8c a
         defenseIsCpu: true,
         scene,
       })
-    expect(폭투().log).toContain('18틱 1번 야수가 공을 쥐었다')
-    expect(폭투(남김(5)).log).toContain('24틱 1번 야수가 공을 쥐었다')
+    expect(폭투().log).toContain('21틱 1번 야수가 공을 쥐었다')
+    expect(폭투(남김(5)).log).toContain('27틱 1번 야수가 공을 쥐었다')
   })
 
   it('견제 · 밀어내기 판 — 결과는 같고, 목록 틱이 줄인 나머지를 다음 판으로 넘긴다', () => {

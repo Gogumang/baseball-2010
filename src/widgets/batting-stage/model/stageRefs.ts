@@ -111,9 +111,9 @@ export interface StageLatest {
   readonly batterAbility: BatterAbility
   /**
    * **타석 준비 0xd 진입 번호** — 좌우 이동 +0xfe4 를 0 으로 되돌리는 곳은 0xd 진입 0x48d50 의 48f88 하나다(쓰는 곳은 그것과 키 0x50f86 뿐,
-   * 리터럴 0xfe4 를 읽는 다섯 곳 3d504 · 48f7a · 49ef0 · 50f86 · 51250 전수). 넘기면 이 값이 바뀔 때만 이동을 되돌리고 쉬는 동안(`isPaused`)은
-   * 그대로 둔다 — 홈런더비는 공 하나가 끝나면 0xf 로 곧장 가므로(0xae3e8 ae4ea) 공 사이에 이동이 남는다. 안 넘기면 쉬는 동안 되돌린다
-   * (팀 경기 · 미션은 쉬는 동안이 곧 타석 사이다)
+   * 리터럴 0xfe4 를 읽는 다섯 곳 3d504 · 48f7a · 49ef0 · 50f86 · 51250 전수). 이 값이 바뀔 때만 이동을 되돌리고 쉬는 동안(`isPaused`)은
+   * 그대로 둔다 — 같은 타석의 다음 공은 0xae3e8 → 0xf 로 곧장 가므로(더비 ae4ea · 그 밖 ae568 · ae592) 공 사이에 이동이 남는다.
+   * 사람이 치는 화면(나만의리그 · 시즌 · 팀 · 미션)은 `sceneDEntryMark`, 더비는 `sceneDSerial` 을 넘긴다(A-02)
    */
   readonly shiftResetSerial?: number
   readonly pitcherAbility: PitcherAbility

@@ -25,9 +25,10 @@ const 일삼루 = { ...EMPTY_BASES, first: true, third: true }
 
 describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)', () => {
   it('판이 열릴 때 도루 주자는 이미 15+3 틱 달려 나가 있다(0x46418 → 0x3d7b8) — 사람이 2루로 던져도 세이프 9 · 콜 17', () => {
-    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 500, manualThrowBase: 2 })
-    // 속도 335 로 1루(25946, 24175)에서 2루 쪽으로 18 틱 — 그림 0틱은 움직이기 전이다
-    expect(result.ticks[0].runners[0]).toMatchObject({ x: 21338, z: 20298, base: 2 })
+    // 발 빠른 주자(주루 999 · 속도 369) — 한 틱 이동 0xbf158 이 맨해튼 거리로 나눠 대각선 1→2루가 느려 주루 500 은 잡힌다
+    const result = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 999, manualThrowBase: 2 })
+    // 속도 369 로 1루(25946, 24175)에서 2루 쪽으로 18 틱(걸음 = 차 × 369 ÷ 맨해튼) — 그림 0틱은 움직이기 전이다
+    expect(result.ticks[0].runners[0]).toMatchObject({ x: 22346, z: 21151, base: 2 })
     expect(result.throwBase).toBe(2)
     expect(result.resultCode).toBe(RUNNER_PLAY_RESULT.SAFE)
     expect(stealCallSoundIdOf(result)).toBe(17)
@@ -80,8 +81,9 @@ describe('도루 한 판 — 종류 5 (0xb2950 · 0xb1c90 · 0xb36d0 · 0xb4292)
     const wild = 세는난수(0)
     const errant = runStealPlay({ bases: 일루, stealingFrom: [1], outs: 0, runAbility: 0, random: wild, manualThrowBase: 2 })
     // 판은 안전망(240틱)까지 간다 — 튕김마다 두 굴림(펌블 · rand(−20, 20)). r162: 판 시작 · 매 틱 0xb1c90 의 0xb203a 가 2루 커버가
-    // 아닌 유격수를 기본 자리 0xd8764(14500, 17600)로 물려 11틱 튕김을 유격수(예전 21틱) 대신 2루수가 12~15틱에 거푸 줍는다 → 36 → 44
-    expect(wild.count()).toBe(44)
+    // 아닌 유격수를 기본 자리 0xd8764(14500, 17600)로 물려 11틱 튕김을 유격수(예전 21틱) 대신 2루수가 12~15틱에 거푸 줍는다 → 36 → 44.
+    // 야수 걸음이 맨해튼 거리(0xbf158 → 0xbfa2c)로 나뉜 뒤로는 튕긴 공에 닿는 틱이 늦어 튕김이 줄어 31
+    expect(wild.count()).toBe(31)
     expect(errant.errantThrow).toBe(true)
     expect(errant.fumbled).toBe(true)
     expect(errant.resultCode).toBeNull()
@@ -194,9 +196,11 @@ describe('중계 이어 던지기 b4616 — 주자 판에도 있다 (r214)', () 
 
   it('사람 목표(b4660 → 0xb2c90)로 던진 먼 송구는 중계맨이 쥔 뒤 준비 틱(내야 3)이 지난 틱에 최종 받는 야수에게 이어 던진다', () => {
     const 결과 = 판(false)
-    expect(결과.log).toContain('0틱 8번 야수가 0루로 송구 — 12틱 도착 (5번 야수 중계)')
-    expect(결과.log).toContain('12틱 5번 야수가 공을 쥐었다')
-    expect(결과.log.some((line) => line.startsWith('15틱 5번 야수가 0루로 송구') && line.endsWith('(중계 이어 던지기)'))).toBe(true)
+    // 맨해튼 걸음이라 유격수가 중계 자리에 늦어 0틱은 미루고(AI 9), 1틱에 2루수 중계로 던진다
+    expect(결과.log).toContain('0틱 8번 야수가 0루 송구를 미룬다 — 5번 야수가 늦다 (AI 9)')
+    expect(결과.log.some((line) => line.startsWith('1틱 8번 야수가 0루로 송구 — 13틱 도착 (3번 야수 중계)'))).toBe(true)
+    expect(결과.log).toContain('13틱 3번 야수가 공을 쥐었다')
+    expect(결과.log.some((line) => line.startsWith('16틱 3번 야수가 0루로 송구') && line.endsWith('(중계 이어 던지기)'))).toBe(true)
   })
 
   it('CPU 송구 결정 0xafa60 이 던진 공은 계획이 지워져(afb08 0xb0ea0) 이어 던지지 않는다', () => {
