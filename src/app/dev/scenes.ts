@@ -4,6 +4,8 @@ import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { MissionPeek, PitcherGamePeek, TeamGamePeek } from '@/shared/lib/scenePeek/scenePeek'
 import { MISSIONS } from '@/shared/config/original/missions'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
+import { ACE_STAGE_THRESHOLDS, DERBY_PITCH_COUNT } from '@/entities/home-run-derby/model/derbyRules'
+import { setDevDerbyStart } from '@/shared/lib/devDerbyStart/devDerbyStart'
 
 /**
  * **장면 바로가기 표** (개발 · e2e 전용). 단계는 화면 상태를 꽂지 않고 메인 메뉴 · 관리 메뉴가 부르는 **그 진입 함수**를 부른다
@@ -164,6 +166,34 @@ const toSeasonState = (state: number, label: string): readonly SceneStep[] => [
 ]
 
 /** 게임시작 목록 [홈런더비] 답 — 선수 고르기(하위 16). 커서는 나리 타자 칸 */
+/**
+ * **더비 단계 N 에서 시작** (A-07) — 더비 화면에 들어서기 전에 첫 판을 그 단계의 시작 상태로 적어 둔다(`shared/lib/devDerbyStart`):
+ * 단계 N · 누적 = 문턱 표 0xd84dc[N − 1](그 단계로 막 오른 값) · 남은 기회 10(`&derbyPitches=<1~10>` 으로 바꾼다). 첫 0xd 가 그 단계
+ * 마투수(0xcfce8[N − 1])를 세우고 0xe 소개 판에서 OK 를 기다린다. 게임 길(실제 단계 오름 0xae3e8 → 0xd)과 같은 판을 실제로 쳐서
+ * 닿지 않고 보려고 — 이 장면 밖에서는 칸을 안 쓴다
+ */
+function derbyStageScenes(stages: readonly number[]): Record<string, SceneDefinition> {
+  const entries = stages.map((stage): [string, SceneDefinition] => [
+    `derby-stage${stage}`,
+    {
+      description: `홈런더비 단계 ${stage} 에서 시작 — 누적 ${ACE_STAGE_THRESHOLDS[stage - 1]}M · 마투수 소개 0xe (\`&derbyPitches=\` 남은 기회, 기본 10)`,
+      fixture: 'nari-y1',
+      steps: [
+        call(`더비 단계 ${stage} 시작 상태`, () => {
+          const asked = Number(new URLSearchParams(window.location.search).get('derbyPitches') ?? DERBY_PITCH_COUNT)
+          const remainingPitches = Number.isInteger(asked) && asked >= 1 && asked <= DERBY_PITCH_COUNT ? asked : DERBY_PITCH_COUNT
+          setDevDerbyStart({ stage, totalDistance: ACE_STAGE_THRESHOLDS[stage - 1] ?? 0, remainingPitches })
+        }),
+        ...TO_DERBY_PICK,
+        key('Enter'),
+        until(`더비 단계 ${stage} 타석 0xe`, () => scenePeeksNow().homeRunDerby?.acceptsConfirm === true, 15000),
+        wait(500),
+      ],
+    },
+  ])
+  return Object.fromEntries(entries)
+}
+
 const TO_DERBY_PICK: readonly SceneStep[] = [
   call('홈런더비 (onSelectMode 홈런더비)', (h) => h.setScreen({ kind: '홈런더비' })),
   screenIs('홈런더비'),
@@ -533,6 +563,7 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     fixture: 'nari-y1',
     steps: [...TO_DERBY_PICK, key('Enter'), until('더비 타석 0xe (첫 공 앞)', () => scenePeeksNow().homeRunDerby?.acceptsConfirm === true, 15000), wait(500)],
   },
+  ...derbyStageScenes([2, 3, 4]),
   'season-ending': {
     description: '시즌모드 10년차 엔딩 0xf5 — 저장 phase 6(엔딩)이라 진입 분기 0xcb 가 곧장 엔딩으로 (soak 픽스처)',
     fixture: 'season-ending',

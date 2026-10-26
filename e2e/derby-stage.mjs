@@ -5,6 +5,8 @@
 //   E2E_DERBY_SHIFT=-9 E2E_DERBY_FIXTURE=nari-ending yarn node e2e/derby-stage.mjs chromium
 //   E2E_DERBY_SWEEP=1 yarn node e2e/derby-stage.mjs chromium   # 좌우 이동마다 몇 M 나는지 훑기
 //   E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=1 E2E_DERBY_SKIP_UNTIL_STAGE=2 yarn node e2e/derby-stage.mjs chromium   # 단계 2 까지 건너뛰고 그 뒤 판을 찍기(A-07)
+//   E2E_DERBY_START_STAGE=2 E2E_DERBY_FIXTURE=nari-ending yarn node e2e/derby-stage.mjs   # 장면 `derby-stage2`(단계 2 시작 상태 — 누적 800 · 기회 10)에서 (A-07, r294)
+//   E2E_DERBY_START_STAGE=3 E2E_DERBY_PITCHES=5 ...                                         # 남은 기회를 바꿔(`&derbyPitches=`)
 //
 // `derby-start`(첫 공 앞 0xe)에서 OK 로 시작해 공마다
 //   - 좌우 이동 '4'/'6'(+0xfe4, ±3 · [−9, 9])을 공의 판정 오차(`probe.plateError`)에 맞추고(`E2E_DERBY_SHIFT=<수>` 면 고정) — 0xd 진입(48f88)에서만 0 으로 돌아가고 공 사이에는 남는다
@@ -17,6 +19,10 @@ import { launch, openScene, shot as shotScreen, toPagePoint } from './lib/scene.
 const browsers = process.argv.slice(2).length > 0 ? process.argv.slice(2) : ['chromium', 'webkit']
 const FIXTURE = process.env.E2E_DERBY_FIXTURE ?? undefined
 const SEED = process.env.E2E_DERBY_SEED ?? '1'
+/** 이 단계의 시작 상태에서 연다(장면 `derby-stage<N>` — 2 · 3 · 4). 없으면 `derby-start`(단계 0) */
+const START_STAGE = Number(process.env.E2E_DERBY_START_STAGE ?? '0')
+const PITCHES = process.env.E2E_DERBY_PITCHES ?? undefined
+const SCENE = START_STAGE > 0 ? `derby-stage${START_STAGE}` : 'derby-start'
 /** 'auto' 면 공마다 판정 오차(`probe.plateError`)를 가장 줄이는 이동, 수면 그 값 고정 */
 const SHIFT = process.env.E2E_DERBY_SHIFT ?? 'auto'
 const SWEEP = process.env.E2E_DERBY_SWEEP === '1'
@@ -68,7 +74,8 @@ async function swingKey(page, point) {
 async function run(browserName, shiftOf) {
   const device = browserName === 'webkit' ? 'iphone' : 'desktop'
   const { browser, page, errors } = await launch(browserName, { device })
-  await openScene(page, 'derby-start', { timeout: 60000, query: `seed=${SEED}`, ...(FIXTURE === undefined ? {} : { fixture: FIXTURE }) })
+  const query = `seed=${SEED}${PITCHES === undefined ? '' : `&derbyPitches=${PITCHES}`}`
+  await openScene(page, SCENE, { timeout: 60000, query, ...(FIXTURE === undefined ? {} : { fixture: FIXTURE }) })
   // 아이폰은 판 가운데 탭(공이 나는 동안 판 전체가 스윙 — r256), 데스크톱은 OK 키
   const point = device === 'iphone' ? await toPagePoint(page, 120, 176) : null
   const rows = []
@@ -89,9 +96,21 @@ async function run(browserName, shiftOf) {
     shots.push(path)
   }
   let hitShots = 0
+  let noticeCount = 0
+  const noticeTexts = []
   while (Date.now() - started < 10 * 60_000) {
     const peek = await derbyPeek(page)
     if (peek === null) throw new Error('더비 화면이 아니다')
+    // 공용 창(히든 39 알림 — 판 끝 누적 > 1999, 0x52a14 `0x62368`)이 서면 키를 통째로 가져간다(0x754f9) — 찍고 OK 로 닫는다
+    const notice = await page.evaluate(() => document.querySelector('[role="dialog"][aria-label="알림"]')?.textContent ?? null)
+    if (notice !== null) {
+      await page.waitForTimeout(800)
+      await shot(`notice${++noticeCount}`)
+      noticeTexts.push(notice)
+      await page.keyboard.press('Enter')
+      await page.waitForTimeout(400)
+      continue
+    }
     if (peek.isResultShown) {
       await page.waitForTimeout(1500)
       await shot('result')
@@ -104,7 +123,11 @@ async function run(browserName, shiftOf) {
         await page.waitForTimeout(600)
         await shot(`stage${peek.run.stage}`)
       }
-      if (peek.run.isBonusGame && !shots.some((path) => path.endsWith('bonus.png'))) await shot('bonus')
+      if (peek.run.isBonusGame && !shots.some((path) => path.endsWith('bonus.png'))) {
+        // 보너스 0xd → 0xe — 단계 소개 판처럼 판이 다 선 뒤에 찍는다
+        await page.waitForTimeout(600)
+        await shot('bonus')
+      }
       await page.keyboard.press('Enter')
       await page.waitForTimeout(300)
       continue
@@ -197,7 +220,7 @@ async function run(browserName, shiftOf) {
     if (after !== null && after.run.stage > before.stage) await shot(`stage${after.run.stage}-play-end`)
   }
   await browser.close()
-  return { rows, shots, errors }
+  return { rows, shots, errors, noticeTexts }
 }
 
 if (SWEEP) {
@@ -216,7 +239,7 @@ if (SWEEP) {
 } else {
   let failed = false
   for (const browserName of browsers) {
-    const { rows, shots, errors } = await run(browserName, (_index, error) => {
+    const { rows, shots, errors, noticeTexts } = await run(browserName, (_index, error) => {
       if (SHIFT !== 'auto') return Number(SHIFT)
       // 오차 + 이동 이 0 에 가깝게 — 이동은 3 칸 · [−9, 9]
       const best = Math.round(-(error?.horizontal ?? 0) / 3) * 3
@@ -224,8 +247,8 @@ if (SWEEP) {
     })
     console.table(rows)
     const reached = Math.max(0, ...rows.map((row) => row.stageAfter ?? 0))
-    console.log(JSON.stringify({ browser: browserName, reachedStage: reached, shots, pageErrors: errors }))
-    if (reached < 1 || errors.length > 0) failed = true
+    console.log(JSON.stringify({ browser: browserName, reachedStage: reached, notices: noticeTexts, shots, pageErrors: errors }))
+    if (reached < Math.max(1, START_STAGE) || errors.length > 0) failed = true
   }
   process.exitCode = failed ? 1 : 0
 }

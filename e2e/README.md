@@ -33,6 +33,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `mission-bat` · `mission-pitch` | 타자 미션 1 첫 타석 0xe · 투수 미션 3 구질 고르기 (미션 선수 고르기 → 나리 선수 → [61] 예, 약 2초) | `nari-y1` · `pitcher-y1` |
 | `mission-result` | 투수 미션 3 결과 판 0x19 — 10구 제한까지 OK 만 되풀이 (약 55초) | `pitcher-y1` |
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
+| `derby-stage2` · `derby-stage3` · `derby-stage4` | 홈런더비 단계 N 시작 상태(누적 = 문턱 0xd84dc[N − 1] · 기회 10, `&derbyPitches=` 로 바꿈) — 마투수 소개 0xe (웹 개발 도구 `shared/lib/devDerbyStart`, r294) | `nari-y1` |
 | `season-ending` | 시즌모드 10년차 엔딩 0xf5 (저장 phase 6 → 진입 분기가 곧장 엔딩, 약 3초) | `season-ending` |
 | `nari-postseason` · `pitcher-postseason` | 나리 타자편 · 투수편 포스트시즌 128 시작 — 1년차 45경기 뒤 준플레이오프 대진, 진입 팝업이 뜬 자리 (약 2초) | `nari-postseason` · `pitcher-postseason` |
 | `nari-cup` · `nari-cup-result` | 나리 타자편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) — 134 에 선 저장의 이어하기가 134 로 돌아온다 | `nari-cup` · `nari-cup-result` |
@@ -85,7 +86,12 @@ E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 yarn node e2e/swing-timing.mjs webkit   # �
 
 ```sh
 E2E_PORT=5710 E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=10 yarn node e2e/derby-stage.mjs   # 그림: e2e/.run/derby-<브라우저>-stage1.png · result.png
+E2E_PORT=5710 E2E_DERBY_START_STAGE=2 E2E_DERBY_FIXTURE=nari-ending yarn node e2e/derby-stage.mjs   # 단계 2 시작(장면 derby-stage2)에서 — 단계 3 · 4 까지
 ```
+
+단계 2 이상은 `E2E_DERBY_START_STAGE=<2~4>` 로 장면 `derby-stage<N>` 에서 연다(r294 — 단계 0 부터 쳐서는 15구째에야 단계 2 에 닿았다).
+씨앗 1 · `nari-ending` 이면 단계 2 → 7구째 단계 3(마투수 발렌타인) → 보너스 → 결과, 단계 3 시작이면 7구째 2074M 로 단계 4(드래고나)다.
+누적이 1999 를 넘은 판 끝에는 히든 39 [폭주의 배트] 알림 창(0x52a14 `0x62368`)이 저장마다 한 번 서므로 스크립트가 찍고(`notice<n>`) OK 로 닫는다.
 
 브라우저를 띄워 둔 채 여러 번 들여다볼 때는 `e2e/drive.mjs` 를 쓴다. 명령은 파일 머리에 적혀 있다.
 
