@@ -21,8 +21,10 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
  * 그래서 여기서 정하는 것은 **각 하나로 갈리는 파울**(state[0x1c], 0x9d660)과 2스트라이크 번트 파울 아웃(판정 11)뿐이다.
  * 페어 각의 공은 `'타구'` 로 넘기고, 결과는 진행기의 판 끝 정산(`features/defense-play/model/playOutcome`)이 낸다.
  *
- * ⚠️ 남은 어긋남(웹): 파울 각의 공도 원본은 판을 돈다 — 낙구·담장선 틱에 0x9d5bc 가 7(파울)을 내기 **전에** 야수가 쥐면
- * 뜬공 아웃(13)이다. 웹은 파울 각을 여기서 곧장 파울로 끝내 **파울 뜬공 아웃이 없다**(타석 화면이 파울을 판 없이 넘기므로).
+ * 파울 각의 공도 원본은 판을 돈다 — 낙구·담장선 틱에 0x9d5bc 가 7(파울)을 내기 **전에** 야수가 쥐면 뜬공 아웃(13)이다.
+ * 웹도 같다: 여기서 낸 '파울' 은 판정 이름일 뿐이고, 경기 흐름이 그 공으로 파울 판을 세운다(`gameFlow.startPlayerFoulPlay` ·
+ * 팀경기 · 투수편 · 미션의 같은 갈래, 화면은 `useCareerSession` 의 `foulPlayRef` 따위) — 판이 쥐면 뜬공 아웃, 못 쥐면 파울로 닫힌다.
+ * 홈런더비만 판이 없어(`useHomeRunDerby`) 파울 뜬공 아웃이 없다 — 원본 더비도 판을 안 돈다.
  */
 export type BattedBallContact =
   | { readonly kind: '파울' }

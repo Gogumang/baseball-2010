@@ -31,6 +31,13 @@ describe('스페셜 에디트 화면', () => {
     expect(onBack).toHaveBeenCalledOnce()
   })
 
+  it('팀 고르기 — Backspace 도 CLR 이다 (다른 화면과 같이 Escape · Backspace)', () => {
+    const onBack = vi.fn()
+    render(<SpecialEditScreen gamePoint={0} onRename={vi.fn()} onBack={onBack} />)
+    key('Backspace')
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+
   it('팀 → 투수 명단 → OK 로 입력 창(StrMAINMENU[108]) → 이름 저장 뒤 명단으로', () => {
     const onRename = vi.fn()
     render(<SpecialEditScreen gamePoint={0} onRename={onRename} onBack={vi.fn()} />)

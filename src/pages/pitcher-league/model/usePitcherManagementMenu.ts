@@ -114,13 +114,13 @@ export interface UsePitcherManagementMenuInput {
   readonly onSave: (career: PitcherCareer) => void
   /** [다음경기] — 원본 109 → 142 → 144 → 경기 장면 0x104 */
   readonly onNextGame: () => void
-  /** [외출] 상태 112. 투수편 외출 지도가 아직 없으면 넘기지 않는다 */
-  readonly onOuting?: () => void
+  /** [외출] 상태 112 */
+  readonly onOuting: () => void
   /**
-   * 111 상점('장착' 장비 · '서브' · 'GP') · 121 장비착용('착용') 을 연다. 안 넘기면 그 칸은 "옮기지 않은 화면" 알림이다.
+   * 111 상점('장착' 장비 · '서브' · 'GP') · 121 장비착용('착용') 을 연다.
    * [아이템] 은 먼저 110 하위 메뉴를 띄우고, 거기서 고른 칸이 창 종류가 된다 (키 0x11478, 모드 갈림 없음).
    */
-  readonly onOpenShop?: (tab: PitcherShopTab) => void
+  readonly onOpenShop: (tab: PitcherShopTab) => void
   /** 105 취소 — 메인 메뉴 장면 0x103 */
   readonly onExit: () => void
   /**
@@ -288,12 +288,6 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     setChoice(next)
   }, [])
 
-  /** 아직 옮기지 않은 화면으로 가는 칸 — 원본에는 없는 웹판 알림이다 */
-  const openOrNotice = useCallback((open: (() => void) | undefined) => {
-    if (open === undefined) return setNotice(PITCHER_MANAGEMENT_TEXT.notPorted)
-    return open()
-  }, [])
-
   /** 능력치 훈련 한 칸 (107 칸 0~3 → 연출 뒤 105) */
   const runAbilityTraining = useCallback(
     (menu: PitcherTrainingMenu) => {
@@ -444,7 +438,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       if (id === '선수정보') return setKind('선수정보')
       if (id === '트레이닝') return setKind('트레이닝')
       if (id === '다음경기') return onNextGame()
-      if (id === '외출') return openOrNotice(onOuting)
+      if (id === '외출') return onOuting()
       if (id === '아이템') return setKind('아이템')
       // [휴식] — 가드(0x12682) 뒤 StrMODE[90] 확인 팝업 0x2a → 상태 127
       const reason = pitcherRestBlockReasonOf(career)
@@ -458,7 +452,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         },
       })
     },
-    [career, onNextGame, onOuting, openOrNotice],
+    [career, onNextGame, onOuting],
   )
 
   /** 127 틀 0x19080 — 0x84e58 이 참인 틀에 0x18e3c (굴림 rand · 결과 창 0x741a0 · S+4 = 1 · 저장 0x1fded/0x22755) */
@@ -490,7 +484,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const selectPlayerInfo = useCallback(
     (id: string) => {
       if (id === '기본정보') return setSubWindow('기본정보')
-      if (id === '장비착용') return openOrNotice(onOpenShop && (() => onOpenShop('착용')))
+      if (id === '장비착용') return onOpenShop('착용')
       /*
        * [아이템/스킬] 하위 상태 122 — 스킬 창. 메뉴 표 0xcc69c 와 확인 키 0x13140 · 대화 0x147b0 에
        * 모드 갈림이 없어 투수편도 타자편과 같은 창이다 (이름만 0x8457c 가 모드 3 이면 비트+16 칸을 읽는다).
@@ -503,7 +497,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        */
       return setSubWindow('기록실')
     },
-    [onOpenShop, openChoice, openPitchWindow, openOrNotice],
+    [onOpenShop, openChoice, openPitchWindow],
   )
 
   const selectTraining = useCallback(
@@ -533,9 +527,9 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const selectItemMenu = useCallback(
     (id: string) => {
       if (id !== '장착' && id !== '서브' && id !== 'GP') return undefined
-      return openOrNotice(onOpenShop && (() => onOpenShop(id)))
+      return onOpenShop(id)
     },
-    [onOpenShop, openOrNotice],
+    [onOpenShop],
   )
 
   const select = useCallback(

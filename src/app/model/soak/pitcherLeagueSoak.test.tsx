@@ -1250,7 +1250,7 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       const { career, scene, actions } = session
       const key = `${scene}:${career?.season}:${career?.gamesPlayed}:${session.story?.eventId}:${session.story?.context}`
         + `:${games.리그 + games.포스트시즌 + games.대회}:${career?.postseason?.wins.join(',')}:${career?.nationalCup?.day}`
-        + `:${session.postseasonPopup?.kind ?? ''}:${career?.hasActedThisCycle}:${session.pendingTitle}:${session.storyNotice}`
+        + `:${session.postseasonPopup?.kind ?? ''}:${career?.hasActedThisCycle}:${session.pendingTitle}`
       if (key === lastKey) sameKeySteps += 1
       else sameKeySteps = 0
       lastKey = key
@@ -1268,10 +1268,6 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
         case '관리': {
           if (session.outingRecoveryNotice !== '') {
             act(() => actions.dismissOutingRecoveryNotice())
-            break
-          }
-          if (session.storyNotice !== '') {
-            act(() => actions.dismissStoryNotice())
             break
           }
           if (session.pendingTitle !== null) {

@@ -50,8 +50,8 @@ const 화면 = (options: 화면옵션 = {}) =>
       random={난수}
       onSave={options.onSave ?? (() => {})}
       onNextGame={options.onNextGame ?? (() => {})}
-      onOuting={options.onOuting}
-      onOpenShop={options.onOpenShop}
+      onOuting={options.onOuting ?? (() => {})}
+      onOpenShop={options.onOpenShop ?? (() => {})}
       onExit={options.onExit ?? (() => {})}
     />,
   )
@@ -112,14 +112,8 @@ describe('커맨드 여섯 칸 (상태 105 · 점프표 0xcc540)', () => {
     expect(onExit).toHaveBeenCalledOnce()
   })
 
-  it('옮기지 않은 화면([외출])을 고르면 알림만 뜬다 — 핸들러를 주면 그쪽으로 간다', () => {
+  it('[외출] 은 상태 112 로 간다', () => {
     const onOuting = vi.fn()
-    const { unmount } = 화면()
-
-    누르기('외출')
-    expect(screen.getByText('아직 옮기지 않은 화면입니다')).toBeTruthy()
-    unmount()
-
     화면({ onOuting })
     누르기('외출')
     expect(onOuting).toHaveBeenCalledOnce()
@@ -173,7 +167,8 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
   it('125 는 가운데 판을 빼고(0x19da4 19dc6) 취소를 안 받는다(0x105a4) — 결과 창이 닫히면 105 로 돌아와 다시 깐다', () => {
     const onExit = vi.fn()
     render(
-      <PitcherManagementScreen career={투수()} random={난수} onSave={() => {}} onNextGame={() => {}} onExit={onExit} />,
+      <PitcherManagementScreen career={투수()} random={난수} onSave={() => {}} onNextGame={() => {}} onOuting={() => {}}
+        onOpenShop={() => {}} onExit={onExit} />,
     )
     누르기('트레이닝')
     누르기('제구')
@@ -667,7 +662,8 @@ describe('두 갈래 팝업의 키 (0x19398 · StrictMode)', () => {
           random={난수}
           onSave={options.onSave ?? (() => {})}
           onNextGame={options.onNextGame ?? (() => {})}
-          onOuting={options.onOuting}
+          onOuting={options.onOuting ?? (() => {})}
+          onOpenShop={options.onOpenShop ?? (() => {})}
           onExit={options.onExit ?? (() => {})}
           onReenter={options.onReenter}
           onResultWindowChange={options.onResultWindowChange}
@@ -837,7 +833,7 @@ describe('하위 메뉴로 돌아오기 — 111 → 110 · 121 → 106 · 하위
   const 다시띄우기 = (mainCursor: ReturnType<typeof createNariMainMenuCursor>, onOpenShop: (tab: PitcherShopTab) => void) =>
     render(
       <PitcherManagementScreen career={투수({ hasActedThisCycle: true })} random={난수} onSave={() => {}} onNextGame={() => {}}
-        onOpenShop={onOpenShop} onExit={() => {}} mainCursor={mainCursor} />,
+        onOuting={() => {}} onOpenShop={onOpenShop} onExit={() => {}} mainCursor={mainCursor} />,
     )
   const 커서칸 = () => [...document.querySelectorAll('[data-testid="command-bar"] button')]
     .find((button) => button.getAttribute('aria-current') === 'true')?.getAttribute('aria-label')

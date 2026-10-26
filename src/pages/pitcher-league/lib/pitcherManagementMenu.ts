@@ -110,8 +110,6 @@ export const PITCHER_MANAGEMENT_TEXT = {
   magicAllTrained: modeText(63),
   /** StrMODE[65] — G포인트가 모자란다 */
   gamePointShortage: modeText(65),
-  /** ⚠️ 웹판 문구 — 원본에는 없다. 아직 옮기지 않은 화면을 고른 자리 */
-  notPorted: '아직 옮기지 않은 화면입니다',
 } as const
 
 /** StrMODE[40+칸] — 투수 능력치 이름 (칸 0 제구 · 1 구속 · 2 변화 · 3 체력) */

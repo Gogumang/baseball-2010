@@ -50,7 +50,12 @@ describe('투수 장비 상점 화면', () => {
     const entries = pitcherShopEntriesOf(createPitcherCareer('투수'), 'GP')
     expect(entries[9]).toMatchObject({ name: '십전대보탕', iconFrame: 20 })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(screen.getByText('G포인트가 부족합니다')).toBeTruthy()
+    // G 부족 [65] 는 0x13460 kind 2 가 0xbbef9(글, 2, 2, 1) 예/아니오로 띄운다 — 예(G 충전)는 서버 제외라 닫기만 한다
+    const dialog = screen.getByRole('dialog', { name: '알림' })
+    expect(dialog.textContent).toContain('G포인트가 부족합니다.')
+    expect(dialog.textContent).toContain('페이지로 이동하시겠습니까?')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
     expect(onPurchase).not.toHaveBeenCalled()
   })
 

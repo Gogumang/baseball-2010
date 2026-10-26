@@ -2880,7 +2880,7 @@ export function useSeasonSession(
    * - 선택지로 다른 이벤트를 번호로 불렀으면 커서 +0x2c 가 마지막으로 부른 레코드 다음을 가리킨다.
    *
    * 재생 화면은 보상을 명령마다 그 자리에서 준다(`giveSeasonEventReward`, 알림 글 0x8beb8 와 함께) — 그때 여기 오는 `rewards` 는 비어 있다.
-   * ⚠️ 미구현(남김 — 웹 구조, 배경음은 장면 단위): 이벤트 배경음 40(0x5110 — 웹 배경음은 장면 단위다).
+   * 이벤트 배경음 40(0xd3 진입 0x5110 512c~5152)은 `app/model/screenBgm` 의 `STORY_BGM` 이 두 가드(S+0x50 · [관리자+0x39f])대로 튼다.
    */
   const finishSeasonEvent = useCallback(
     (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[], endingEventId: number | null = null) => {

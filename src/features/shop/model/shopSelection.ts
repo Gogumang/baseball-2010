@@ -166,7 +166,7 @@ export function selectShopItem(career: PlayerCareer, itemId: string, random: Ran
   const gpBlock = career.gamePoint < BATTER_GP_ITEMS[index].price ? null : gpItemBlockReasonOf(career, index)
   if (gpBlock !== null) return { career, notice: gpBlock }
   const purchase = purchaseGpItem(career, index, random)
-  if (purchase.kind === '거절') return { career, notice: 'G포인트가 부족합니다' }
+  if (purchase.kind === '거절') return { career, notice: ORIGINAL_MODE_TEXT[65] ?? '' } // StrMODE[65] 원문
   const { result } = purchase
   if (opensGpDetailWindow(index)) {
     return { career: result.career, notice: '', detail: { itemIndex: index, before: career, after: result.career } }

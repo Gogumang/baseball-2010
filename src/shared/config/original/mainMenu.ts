@@ -5,8 +5,6 @@
  * - 설명 문구: data/StrMAINMENU.zt1 — 대괄호 안 번호가 원본 인덱스다
  * - 순서: StrMAINMENU 의 설명 순서를 그대로 따른다
  *
- * isAvailable 은 원작 여부가 아니라 **이 웹판에서 아직 만들었는지**다.
- *
  * 두 단 = 원본 장면 0x103 의 하위 상태 **4(처음 메뉴 `TOP_MENU`)** 와 **5(게임시작 목록
  * `GAME_START_MENU`)** 다. 4 에서 [게임시작] 을 고르면 5 로 내려가고(진입 0x25b88), 5 에서 CLR 을
  * 누르면 4 로 돌아온다(갱신 0x28cb0 의 `0xbcb49(this+0x18, 4)`).
@@ -20,6 +18,7 @@ export interface MainMenuEntry {
   readonly id: string
   readonly labelFrame: number
   readonly description: string
+  /** 이 웹판에서 들어갈 수 있는 칸인가 — 지금 막힌 칸은 대전모드뿐이다(통신 대전, `lockedNoticeOf` 가 [115] 를 띄운다) */
   readonly isAvailable: boolean
 }
 
@@ -28,8 +27,8 @@ export const TOP_MENU: readonly MainMenuEntry[] = [
   { id: '스페셜', labelFrame: 1, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[1] ?? '' }, // [1]
   { id: '도움말', labelFrame: 2, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[2] ?? '' }, // [2]
   { id: '환경설정', labelFrame: 3, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[3] ?? '' }, // [3]
-  { id: '랭킹', labelFrame: 4, isAvailable: false, description: ORIGINAL_MAIN_MENU_TEXT[4] ?? '' }, // [4]
-  { id: '게임문의', labelFrame: 5, isAvailable: false, description: ORIGINAL_MAIN_MENU_TEXT[209] ?? '' }, // [209]
+  { id: '랭킹', labelFrame: 4, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[4] ?? '' }, // [4]
+  { id: '게임문의', labelFrame: 5, isAvailable: true, description: ORIGINAL_MAIN_MENU_TEXT[209] ?? '' }, // [209]
 ]
 
 export const GAME_START_MENU: readonly MainMenuEntry[] = [

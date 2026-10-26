@@ -697,10 +697,6 @@ async function captureNariPitcher(seed: number, role: number, boostAbility: bool
             act(() => actions.dismissOutingRecoveryNotice())
             break
           }
-          if (session.storyNotice !== '') {
-            act(() => actions.dismissStoryNotice())
-            break
-          }
           if (session.pendingTitle !== null) {
             act(() => actions.confirmTitle())
             break

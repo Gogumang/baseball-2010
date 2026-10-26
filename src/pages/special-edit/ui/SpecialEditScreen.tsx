@@ -191,7 +191,8 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
         event.preventDefault()
         return onChoose()
       }
-      if (event.key === 'Escape') {
+      // CLR(−16) — 웹은 다른 화면과 같이 Escape · Backspace 둘 다 CLR 로 받는다 (갱신 0x2b2e0 하위 0)
+      if (event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
         onBack()
       }

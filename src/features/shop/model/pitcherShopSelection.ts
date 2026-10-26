@@ -63,8 +63,12 @@ export function pitcherEquipmentBlockNoticeOf(career: PitcherCareer, part: numbe
 const moneyQuestion = (amount: number) =>
   `!C!cFFFF00소지금 ${formatOriginalMoney(amount)}!cFFFFFF이 소모됩니다!N구매하겠습니까?`
 
-/** G 부족 StrMODE[65] — 타자편 상점과 같은 글 (`shopEntries` 의 칸 막힘 글과 같아야 두 길의 팝업이 안 갈린다) */
-export const NOT_ENOUGH_GAME_POINT_TEXT = 'G포인트가 부족합니다'
+/**
+ * G 부족 StrMODE[65] 원문 — 타자편 상점과 같은 글 (`shopEntries` 의 칸 막힘 글과 같아야 두 길의 팝업이 안 갈린다).
+ * 0x13460 kind 2 의 0x1378c~0x137a4 가 [65] 를 꺼내 0x1371c → 0x13b0c 0xbbef9(글, **2, 2**, 1) 예/아니오로 띄운다
+ * (시즌 GP 상점 0x98fe 와 같은 꼴). 예는 원본에서 G 충전이지만 서버 기능 제외(10-24)라 웹은 두 답 모두 닫는다.
+ */
+export const NOT_ENOUGH_GAME_POINT_TEXT = ORIGINAL_MODE_TEXT[65] ?? ''
 
 /** 서브·GP 칸의 막힘 글 (0x13460 kind 1·2 차례 그대로) — 없으면 null */
 export function pitcherItemBlockNoticeOf(career: PitcherCareer, tab: '서브' | 'GP', index: number): string | null {

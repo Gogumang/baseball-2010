@@ -328,3 +328,10 @@ describe('일반모드 (모드 1) — 하위 12 진입 창 [13]·[15] (0x296f0)'
     expect(답(빠른.state, 1, true).effect).toBeNull()
   })
 })
+
+describe('들어갈 수 없는 칸 (`isAvailable`)', () => {
+  it('처음 메뉴 여섯 칸은 모두 들어가고, 막힌 칸은 게임시작 목록의 대전모드 하나다 — 공용 설정을 덮어 열던 낡은 값을 걷었다', () => {
+    expect(TOP_ENTRIES.filter((entry) => !isEntryEnabled(entry, false))).toEqual([])
+    expect(MODE_ENTRIES.filter((entry) => !isEntryEnabled(entry, false)).map((entry) => entry.id)).toEqual(['대전모드'])
+  })
+})

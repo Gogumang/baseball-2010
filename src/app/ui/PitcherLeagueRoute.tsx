@@ -83,9 +83,8 @@ interface PitcherLeagueRouteProps {
   }
   /**
    * 마선수 대결 화면 — 투수 미션 레코드(team − 1)를 사람이 던지는 미션 장면(모드 5). 끝나면 `onFinish(이겼나)`.
-   * 안 넘기면 대결을 열지 않고 예전처럼 지나온 보상만 남기고 105 로 돌아간다 (`abortStoryAtMatch`).
    */
-  readonly renderAceMatch?: (match: PitcherAceMatch, onFinish: (isWin: boolean) => void) => ReactNode
+  readonly renderAceMatch: (match: PitcherAceMatch, onFinish: (isWin: boolean) => void) => ReactNode
 }
 
 /**
@@ -339,9 +338,7 @@ function PitcherLeagueScreens({
             replacementsFor={session.storyReplacementsFor}
             onComplete={eventEnd.end}
             carried={story.carried}
-            onMatch={(command, carry) =>
-              renderAceMatch === undefined ? actions.abortStoryAtMatch(carry) : actions.beginAceMatch(command, carry)
-            }
+            onMatch={actions.beginAceMatch}
             // 370·375 의 system 3·4 — 타이틀(0x8b3bc, 투수 문구 79~81 · 마무리 82)·MVP(0x8b23c) 발표 창 (130·131 과 같은 판정)
             systemWindowTextOf={(command) =>
               awardWindowTextOf(command.sub, () => judgePitcherSeasonAwards(career))
@@ -363,7 +360,7 @@ function PitcherLeagueScreens({
     }
   }
 
-  if (scene === '마선수대결' && session.aceMatch !== null && renderAceMatch !== undefined) {
+  if (scene === '마선수대결' && session.aceMatch !== null) {
     return <>{renderAceMatch(session.aceMatch, actions.finishAceMatch)}</>
   }
 
@@ -496,15 +493,11 @@ function PitcherLeagueScreens({
       {scene === '관리' && previousScene === '연차표지' && <SeasonScreenFade kind="검게어두워짐" startFrame={1} />}
       {/* 관리 화면(RawScreen)의 형제라 240×320 기둥(ScreenOverlay)에 가둔다 — 안 가두면 창 판(left 0 · 폭 240)이 창 전체 왼쪽에 붙어 그려졌다.
           기둥은 누름을 받으므로 창이 있을 때만 세운다 */}
-      {(session.outingRecoveryNotice !== '' || session.storyNotice !== '' || session.pendingTitle !== null) && (
+      {(session.outingRecoveryNotice !== '' || session.pendingTitle !== null) && (
       <ScreenOverlay>
         {/* 126 → 105 뒤 남는 입원 회복 팝업 (0x1575c `0xbbef8(글, 1, 1, 1)`) */}
         {session.outingRecoveryNotice !== '' && (
           <MessageBox text={session.outingRecoveryNotice} buttons={['확인']} onAnswer={actions.dismissOutingRecoveryNotice} />
-        )}
-        {/* 이벤트 뒤 알림 — 히든 오픈(보상 7, 0x62368) · 옮기지 않은 갈래 */}
-        {session.storyNotice !== '' && session.outingRecoveryNotice === '' && (
-          <MessageBox text={session.storyNotice} buttons={['확인']} onAnswer={actions.dismissStoryNotice} />
         )}
         {/* 칭호 팝업 0x1274c — 그리기 0x1afe8(투수편 i > 31 이면 이름 [i+16] · 조건 [i+80]) · 키 0x1b1e4 (`TitleWindow`).
             키가 창을 그 자리에서 치우고 다음 갱신 0x1aec4 가 다음 칭호를 새 창으로 띄운다 — `key` 가 칭호마다 새 창을 세운다 */}
