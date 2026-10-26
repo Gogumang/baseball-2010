@@ -166,7 +166,7 @@ import {
 import type { PendingSettlementEvents } from '@/features/defense-play/model/settlementEvents'
 import { benchClearingEffectOf, rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
-import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll, HitByPitchHoldPhase } from '@/features/play-game/model/benchClearingScene'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import {
   FRESH_HELD_CPU_MAGIC, cpuMagicStateOf, heldCpuMagicAfterPitch, heldCpuMagicAfterPitcherChange,
@@ -452,12 +452,14 @@ export interface GameProgress {
    */
   readonly decisions: DecisionState
   /**
-   * **벤치 클리어링 연출 중**(상태 0x1e). 사구 타석이 20/99 굴림에 걸리면 진입(0x3a5f0)의 굴림 45 번까지 쓰고
-   * 여기 사구 결과를 붙든 채 멈춘다 — 밀어내기 주루·정산·다음 타석은 화면이 연출을 끝내고
-   * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
-   * `arrivalPlay` 는 이 사구 공이 연 밀어내기 판(종류 2) — 연출 뒤에 재생한다.
+   * **붙든 사구** — 0x12 대기(`'wait'`) · 벤치 클리어링 진입 앞(`'entry'`) · 연출 중(`'scene'`, 상태 0x1e)
+   * (`HitByPitchHoldPhase`, A-22). 사구 공이 도착하면 굴림 없이 여기 붙들고, 화면이 0x12 틱 31 에 `judgeHitByPitch`(4e74c 의
+   * 20/99 굴림)를, 들어갔으면 다음 틀에 `enterBenchClearing`(진입 0x3a5f0 의 굴림 45 번)을 부른다. 밀어내기 주루·정산·다음 타석은
+   * 안 들어갔으면 판정 때, 들어갔으면 화면이 연출을 끝내고 `resolveBenchClearing` 을 부를 때 비로소 돈다
+   * (원본도 출구 0xae24c 뒤에야 0x17 로 간다). `arrivalPlay` 는 이 사구 공이 연 밀어내기 판(종류 2) — 그 뒤에 재생한다.
    */
   readonly pendingBenchClearing: {
+    readonly phase: HitByPitchHoldPhase
     readonly outcome: AtBatOutcome
     readonly arrivalPlay?: PitchArrivalPlay | null
     /** 진입 0x3a5f0 의 굴림 45 번 — 그리기 0x43228 이 공격 9명을 세운다 (`rollBenchClearingEntry`) */
@@ -956,8 +958,8 @@ export function opponentStaminaPercentAfterPitchOf(
  * 이 칸의 뜻이다 (원본 상태 0x17 이 도는 동안 투구가 안 나가는 것과 같은 자리).
  * 주자 처리·기록·돌발 판정은 화면이 다 돌고 `resolveDefensePlay` 를 부를 때 한 번에 한다.
  *
- * 삼진·볼넷·사구·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
- * 사구는 그 앞에서 벤치 클리어링을 굴린다 (`withBenchClearing`).
+ * 삼진·볼넷·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다 (0xc11f0 과 같은 규칙).
+ * 사구는 굴림 없이 붙든다 — 0x12 대기 끝(틱 31 의 0x4e6d4)에서 벤치 클리어링을 굴리고 판정 A 로 간다 (`judgeHitByPitch`, A-22).
  */
 export function startPlayerOutcome(
   progress: GameProgress,
@@ -967,15 +969,13 @@ export function startPlayerOutcome(
 ): GameProgress {
   if (progress.game.isFinished) return progress
   progress = withFoulRecords(progress, options.foulRecordIds)
-  // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루·정산보다 앞이다
-  const cleared = withBenchClearing(progress, outcome, random)
-  if (cleared !== progress) {
-    // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
-    const entryRolls = rollBenchClearingEntry(random)
+  // 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c)·밀어내기 주루·정산은 0x12 의 32 그림 뒤라
+  // 그동안 사구를 붙든다(그 그림들의 입자 굴림이 먼저 난다)
+  if (outcome.kind === '사구') {
     const arrivalPlay = options.arrivalPlay ?? null
     return {
-      ...cleared,
-      pendingBenchClearing: arrivalPlay === null ? { outcome, entryRolls } : { outcome, arrivalPlay, entryRolls },
+      ...progress,
+      pendingBenchClearing: arrivalPlay === null ? { phase: 'wait', outcome } : { phase: 'wait', outcome, arrivalPlay },
     }
   }
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
@@ -1103,16 +1103,51 @@ export function resolveDefensePlay(
 }
 
 /**
+ * **사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(`withBenchClearing`).
+ * 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀 `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의
+ * 보통 길 — 밀어내기 판(종류 2)을 재생 칸에 넣고 정산한다(예전 공 도착 걸음에 하던 그대로). 대기 중인 사구가 없으면 그대로 돌려준다.
+ */
+export function judgeHitByPitch(progress: GameProgress, random: RandomPort): GameProgress {
+  const pending = progress.pendingBenchClearing
+  if (pending === null || pending.phase !== 'wait') return progress
+  const { outcome } = pending
+  const held: GameProgress = { ...progress, pendingBenchClearing: null }
+  const cleared = withBenchClearing(held, outcome, random)
+  if (cleared !== held) return { ...cleared, pendingBenchClearing: { ...pending, phase: 'entry' } }
+  // 실시간으로 이미 보여 준 판(`shownLive` — 사람 주루 키를 받은 판)은 재생 칸에 다시 안 넣는다
+  const arrival = pending.arrivalPlay ?? null
+  const arrivalPlayback = arrival === null || arrival.shownLive === true ? null : arrival.result
+  const playback = homeRunPlaybackOf({ outcome, bases: held.game.bases, outs: held.game.outs }) ?? arrivalPlayback
+  return finishPlayerOutcome(withoutSteal(held), outcome, random, null, playback)
+}
+
+/**
+ * **벤치 클리어링 진입** 0x3a5f0 — 판정이 0x1e 를 예약한 다음 틀. 공격 9명을 흩뿌리며 45 번 굴리고(`rollBenchClearingEntry`)
+ * 연출이 끝날 때까지 붙든다. 진입 앞인 사구가 없으면 그대로 돌려준다.
+ */
+export function enterBenchClearing(progress: GameProgress, random: RandomPort): GameProgress {
+  const pending = progress.pendingBenchClearing
+  if (pending === null || pending.phase !== 'entry') return progress
+  return { ...progress, pendingBenchClearing: { ...pending, phase: 'scene', entryRolls: rollBenchClearingEntry(random) } }
+}
+
+/**
  * **벤치 클리어링 연출이 끝났다** — 출구 0xae24c (100틱 뒤 화면 전환이 끝났거나 OK·'5' 로 건너뜀).
  *
  * `reachedTargetTick` = 틱 10 의 갱신이 돌았는가. 돌았으면 그때 수비 8명 목표를 굴린 8 번이 나갔다
  * (`benchClearingScene` 머리말) — 화면은 굴림을 직접 하지 않고 여기로 알린다. 그 뒤 사구는 보통 길 그대로다.
+ * 아직 0x12 대기 · 진입 앞인 사구(끼어들 사람이 없는 길)는 남은 판정 · 진입을 먼저 돈다 — 안 들어갔으면 판정의 보통 길로 끝난다.
  */
 export function resolveBenchClearing(
   progress: GameProgress,
   scene: { readonly reachedTargetTick: boolean },
   random: RandomPort,
 ): GameProgress {
+  if (progress.pendingBenchClearing?.phase === 'wait') {
+    progress = judgeHitByPitch(progress, random)
+    if (progress.pendingBenchClearing === null) return progress
+  }
+  progress = enterBenchClearing(progress, random)
   const pending = progress.pendingBenchClearing
   if (pending === null) return progress
   if (scene.reachedTargetTick) rollBenchClearingTargets(random)
@@ -1130,7 +1165,7 @@ export function resolveBenchClearing(
  * 내 타석이라 수비는 늘 CPU 다 → 들어가면 상대 투수 투구 수(`+0x27c`) +10 (0x3ab82).
  * 시즌 평판 S[1](코드 1)은 게이트상 내 팀이 수비일 때만 남아 여기서는 안 오른다 — 타자편은 S 칸도 안 든다.
  * 홈런더비가 아니므로 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
- * 들어가면 부르는 쪽이 연출(상태 0x1e)을 붙든다 — `startPlayerOutcome` · `resolveBenchClearing`.
+ * 0x12 대기 끝(`judgeHitByPitch`)이 부른다 — 들어가면 연출(상태 0x1e)을 붙든다(`enterBenchClearing` · `resolveBenchClearing`).
  */
 function withBenchClearing(progress: GameProgress, outcome: AtBatOutcome, random: RandomPort): GameProgress {
   const entered = rollsIntoBenchClearing(

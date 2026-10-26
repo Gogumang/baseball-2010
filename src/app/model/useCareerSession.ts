@@ -10,12 +10,13 @@ import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/ac
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import { atBatEndFramesOf } from '@/app/model/useAtBatRunner'
+import { RESULT_WAIT_TICKS_AT_BAT_END } from '@/pages/game/lib/batterRecordAlert'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import { applyPitchResolution, isAtBatFinished } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
-import { arrivePitch, cpuPickoff, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, cpuPickoff, enterBenchClearing, judgeHitByPitch, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
@@ -1178,7 +1179,8 @@ export function useCareerSession({
         runner.setIsPaused(true)
         return
       }
-      // 사구 뒤 벤치 클리어링 연출(상태 0x1e) — 화면이 연출을 끝낼 때(`finishBenchClearing`)까지 붙든다
+      // 사구 — 0x12 대기(32 그림) 끝의 판정(`judgeHitByPitch`)까지, 들어갔으면 벤치 클리어링 연출(상태 0x1e)이 끝날 때
+      // (`finishBenchClearing`)까지 붙든다. 그동안 타석 화면은 0x12 를 그린다
       if (advanced.pendingBenchClearing !== null) {
         runner.setIsPaused(true)
         return
@@ -1656,6 +1658,35 @@ export function useCareerSession({
   )
 
   /**
+   * **사구의 0x12 대기 끝** (틱 31 갱신 0x4e6d4) — 화면이 대기를 센 뒤 부른다(`useHitByPitchWait`). 진행기 `judgeHitByPitch` 가
+   * 4e74c 를 굴려 들어갔으면 붙든 채 두고(진입 0x3a5f0 은 다음 틀 `enterBenchClearing`), 안 들어갔으면 판정 A 0xae24c 의 보통 길
+   * (밀어내기 판 · 정산) — 소리 · 타석 끝은 예전 공 도착 걸음의 볼넷 · 사구 그대로이고, 0xd 는 0x12 진입부터 32 그림 뒤라 남은 그림만 둔다.
+   */
+  const judgeHeldHitByPitch = useCallback(() => {
+    const current = progressRef.current
+    const pending = current?.pendingBenchClearing ?? null
+    if (current === null || pending === null || pending.phase !== 'wait') return
+    const { bases } = current.game
+    const runnersOnBase = [bases.first, bases.second, bases.third].filter(Boolean).length
+    const judged = judgeHitByPitch(current, random)
+    progressRef.current = judged
+    setProgress(judged)
+    if (judged.pendingBenchClearing !== null) return
+    playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome), ...gameStepSoundIdsOf(current, judged)])
+    const endFrames = atBatEndFramesOf(pending.outcome, pending.arrivalPlay?.kind ?? null) - RESULT_WAIT_TICKS_AT_BAT_END
+    finishAtBat(judged, pending.outcome, runnersOnBase, Math.max(0, endFrames))
+  }, [audio, finishAtBat, random])
+
+  /** **벤치 클리어링 진입** 0x3a5f0 — 판정이 0x1e 를 예약한 다음 틀에 화면이 부른다. 굴림 45 번 (`enterBenchClearing`) */
+  const enterHeldBenchClearing = useCallback(() => {
+    const current = progressRef.current
+    if (current === null || current.pendingBenchClearing?.phase !== 'entry') return
+    const entered = enterBenchClearing(current, random)
+    progressRef.current = entered
+    setProgress(entered)
+  }, [random])
+
+  /**
    * 벤치 클리어링 연출이 끝났다 (`BenchClearingScene` 의 `onDone`) — 출구 0xae24c 뒤 사구를 보통 길로 먹인다.
    * `reachedTargetTick` 이면 틱 10 의 굴림 8 번을 진행기가 먼저 낸다.
    */
@@ -1701,6 +1732,10 @@ export function useCareerSession({
 
   const actions = {
     syncOpenedHidden,
+    /** 사구의 0x12 대기 끝 — 4e74c 판정 (`judgeHitByPitch`) */
+    judgeHitByPitch: judgeHeldHitByPitch,
+    /** 벤치 클리어링 진입 0x3a5f0 (`enterBenchClearing`) */
+    enterBenchClearing: enterHeldBenchClearing,
     finishBenchClearing,
 
     /** 수비 화면이 끝났다 — 주자 처리를 이제 먹인다 */

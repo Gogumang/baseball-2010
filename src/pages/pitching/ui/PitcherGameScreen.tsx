@@ -47,6 +47,7 @@ import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/sta
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { useHitByPitchWait } from '@/pages/defense/model/useHitByPitchWait'
 import { summaryAfterReplay, useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
@@ -93,7 +94,7 @@ import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commo
 import * as styles from '@/pages/pitching/ui/PitcherGameScreen.css'
 import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
-import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
+import { RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitcherAutoRelayStepsOf } from '@/pages/pitching/lib/pitcherAutoRelay'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
@@ -258,7 +259,7 @@ function PitcherGameScene({
           ours: nariFieldersAfterPinchHits(recordFieldLineups.ours, progress.ourLineup),
           opponent: nariFieldersAfterPinchHits(recordFieldLineups.opponent, progress.opponentLineup),
         }
-  const benchOffense = progress.pendingBenchClearing === null ? null : pitcherBenchOffenseOf(progress, options, fieldLineups)
+  const benchOffense = progress.pendingBenchClearing?.phase !== 'scene' ? null : pitcherBenchOffenseOf(progress, options, fieldLineups)
   const boardOurDefense = board !== null && (board.half === '초' ? 0 : 1) !== options.playerSide
   const ourFieldRecords = pitcherFieldAcesOf(progress, options, fieldLineups, true)?.records ?? null
   /**
@@ -277,9 +278,11 @@ function PitcherGameScene({
             defense: boardOurDefense ? fieldLineups.ours : fieldLineups.opponent,
             offense: boardOurDefense ? fieldLineups.opponent : fieldLineups.ours,
           },
-    benchClearing: progress.pendingBenchClearing === null ? null : { key: progress.pendingBenchClearing, offense: benchOffense },
+    // 진입 0x3a5f0 — 0x12 대기 · 진입 앞 사구는 아직 아니다
+    benchClearing: progress.pendingBenchClearing?.phase !== 'scene' ? null : { key: progress.pendingBenchClearing, offense: benchOffense },
   })
-  const isBenchClearing = progress.pendingBenchClearing !== null
+  // 벤치 클리어링 연출(상태 0x1e) — 붙든 사구가 0x12 대기 · 진입 앞이면 아직 투구 장면이 0x12 를 그린다(A-22)
+  const isBenchClearing = progress.pendingBenchClearing?.phase === 'scene'
   /** 공용 키 0x498d4 의 상태 범위(0xd~0x15) 밖 — 인트로 0xc · 판 0x18 · 벤치 클리어링 0x1e */
   const isSceneShowing = !isIntroDone || isHalfInningBoardOpen || isBenchClearing || summary !== null
 
@@ -365,6 +368,8 @@ function PitcherGameScene({
     play !== null && play !== shownPlay ? play : null,
     progress.pendingBenchClearing !== null,
     isPopupOpen,
+    // 0x12 끝 돌발 판정의 결과 창(0x1d)을 닫은 뒤에야 판정 A 의 0x17
+    resolution !== null,
   )
   const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady
   /**
@@ -437,6 +442,15 @@ function PitcherGameScene({
     setHeldResultTicks(waitTicks)
   }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay, progress.lastPitch, notePitchResolved])
   useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
+  // 사구 — 놓은 틱에서 0x12 틱 0 까지 + 0x12 대기 틱 31 의 4e74c 판정(공 끝 칸 채우기와 같은 셈), 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
+  useHitByPitchWait({
+    hold: progress.pendingBenchClearing,
+    waitTicks: pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0) - 1 + RESULT_WAIT_TICKS_AT_BAT_END,
+    isFrozen: isPopupOpen || asksGiveUp,
+    random,
+    onJudge: actions.judgeHitByPitch,
+    onEnter: actions.enterBenchClearing,
+  })
   /** 공이 날거나 0x12 인 동안 — 원본 상태 0x11 · 0x12 */
   const isPitchSceneBusy = pitchWaitTicks > 0
   /**
@@ -800,8 +814,8 @@ function PitcherGameScene({
     )
   }
 
-  // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 진입 굴림 45 번은 진행기가 이미 썼다
-  if (progress.pendingBenchClearing !== null) {
+  // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 진입 굴림 45 번은 진입 틀에 진행기가 이미 썼다
+  if (progress.pendingBenchClearing?.phase === 'scene') {
     return withRecordAlert(
       <BenchClearingScene
         // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명. 타자 손은 사구를 맞은 상대 타자(타석 소개 판과 같은 값)

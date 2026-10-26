@@ -105,7 +105,7 @@ import { stageWarmCastOf } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { passesHeldResult, pitchResultEntryDelayTicksOf, pitchSceneBusyTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
-import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
+import { RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
@@ -139,6 +139,7 @@ import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
+import { useHitByPitchWait } from '@/pages/defense/model/useHitByPitchWait'
 import { summaryAfterReplay, useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { DEFENSE_SCENE_START, type DefenseSceneMemory } from '@/pages/defense/lib/defenseHomeRunEffects'
@@ -365,7 +366,8 @@ function TeamGameScene({
   const board = progress.halfInningBoard
   const isHalfInningBoardOpen = board !== null && board.serial !== closedBoardSerial && summary === null
   /** 인트로·교대 판·벤치 클리어링이 화면을 덮고 있는가 — 경기 키(0x498d4)가 안 먹는다 */
-  const isSceneCovering = !isIntroDone || isHalfInningBoardOpen || progress.pendingBenchClearing !== null
+  // 붙든 사구가 0x12 대기 · 진입 앞이면 아직 타석 · 투구 장면이 0x12 를 그린다(A-22) — 연출 단계만 덮는다
+  const isSceneCovering = !isIntroDone || isHalfInningBoardOpen || progress.pendingBenchClearing?.phase === 'scene'
   /**
    * 장면 +0x111c 수비 줄 자리 · 카메라 +0x1e8 — 경기 내내 같은 객체라 교대 판 0x3fac4 가 앞 장면이 남긴 그대로 읽는다(`lib/fieldCarry`).
    * 수비 화면 0x17 이 끝난 판 · 교대 판이 닫힌 틱 · 벤치 클리어링 · 자동진행 중계(카메라만)가 차례로 덮는다.
@@ -423,7 +425,7 @@ function TeamGameScene({
    * 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 교대 판 0x3fac4 · 수비 판 시작 0xb0fb4 · 벤치 클리어링 0x3a5f0 이 차례로 적는다.
    * 수비 판은 실시간 갈래(`pendingDefensePlay` · `pendingRunnerPlay`)든 재생 갈래(`lastDefensePlay`)든 판 하나마다 그 판 앞 그림의 수비 팀으로 훑는다
    */
-  const benchOffense = progress.pendingBenchClearing === null ? null : benchClearingOffenseOf(progress)
+  const benchOffense = progress.pendingBenchClearing?.phase !== 'scene' ? null : benchClearingOffenseOf(progress)
   const walkerSeats = useWalkerLineSeats({
     sceneKey: options,
     playKey: session.pendingDefensePlay ?? progress.pendingRunnerPlay ?? play,
@@ -436,7 +438,8 @@ function TeamGameScene({
             defense: teamWalkAcesOf(progress, !isOurOffense(progress)).records,
             offense: teamWalkAcesOf(progress, isOurOffense(progress)).records,
           },
-    benchClearing: progress.pendingBenchClearing === null ? null : { key: progress.pendingBenchClearing, offense: benchOffense },
+    // 진입 0x3a5f0 — 0x12 대기 · 진입 앞 사구는 아직 아니다
+    benchClearing: progress.pendingBenchClearing?.phase !== 'scene' ? null : { key: progress.pendingBenchClearing, offense: benchOffense },
   })
   /** `#` 교체 화면(경기 상태 0xb)이 떠 있는가 — 수비 중이면 투수 교체, 공격 중이면 대타 */
   const [changeWindow, setChangeWindow] = useState<'투수' | '대타' | null>(null)
@@ -644,8 +647,26 @@ function TeamGameScene({
     progress.pendingBenchClearing !== null,
     // 경기 중 메뉴(0x741a0 팝업)가 떠 있으면 0x12 상태 틱이 멈춘다 (0x52cc6)
     isMenuOpen,
+    // 0x12 끝 돌발 판정의 결과 창(0x1d)을 닫은 뒤에야 판정 A 의 0x17
+    resolution !== null,
   )
   const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady
+  // 사구 — 0x12 대기 틱 31 의 4e74c 판정(공 끝 칸 채우기와 같은 셈: 타석 공은 판정 틀 다음 그림이 틱 0, 내 공은 놓은 틱에서
+  // 0x12 틱 0 까지를 더한다), 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
+  const heldHitByPitch = progress.pendingBenchClearing
+  useHitByPitchWait({
+    hold: heldHitByPitch,
+    waitTicks:
+      heldHitByPitch?.side === '수비'
+        ? pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order) -
+          1 +
+          RESULT_WAIT_TICKS_AT_BAT_END
+        : RESULT_WAIT_TICKS_AT_BAT_END,
+    isFrozen: isMenuOpen || overlay === '조작방법',
+    random,
+    onJudge: actions.judgeHitByPitch,
+    onEnter: actions.enterBenchClearing,
+  })
   /**
    * **상태 0xe — 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`). 새 타석·반 이닝 시작·교체 연출 뒤·교체 창
    * 취소 뒤마다 진행기가 대기를 싣는다. 공격이든 수비든 같다 — 0x532b0 은 조작 객체의 공수(+0xc)를 안 본다.
@@ -1052,7 +1073,7 @@ function TeamGameScene({
   if (heldDefense !== null) return heldDefense
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다 (진입 굴림 45 번은 진행기가 이미 썼다)
-  if (progress.pendingBenchClearing !== null) {
+  if (progress.pendingBenchClearing?.phase === 'scene') {
     return (
       <BenchClearingScene
         // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명. 타자 손은 사구를 맞은 지금 타자(타석 소개 판과 같은 값)

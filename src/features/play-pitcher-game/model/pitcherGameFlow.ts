@@ -231,7 +231,7 @@ import {
 } from '@/entities/fielding/model/fielderRecords'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
-import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
+import type { BenchClearingEntryRoll, HitByPitchHoldPhase } from '@/features/play-game/model/benchClearingScene'
 import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { enterSceneConfirm, enterSceneHookPassage } from '@/features/play-game/model/sceneConfirm'
@@ -652,11 +652,14 @@ export interface PitcherGameProgress {
    */
   readonly pendingDefensePlay: DefensePlayInput | null
   /**
-   * **벤치 클리어링 연출 중**(상태 0x1e). 내가 던진 공이 사구이고 20/99 굴림에 걸리면 진입(0x3a5f0)의 굴림 45 번까지
-   * 쓰고 여기 사구 결과를 붙든 채 멈춘다 — 밀어내기 주루·정산·다음 타석은 화면이 연출을 끝내고
-   * `resolveBenchClearing` 을 부를 때 비로소 돈다 (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
+   * **붙든 사구** — 0x12 대기(`'wait'`) · 벤치 클리어링 진입 앞(`'entry'`) · 연출 중(`'scene'`, 상태 0x1e)
+   * (`HitByPitchHoldPhase`, A-22). 내가 던진 공이 사구면 굴림 없이 여기 붙들고, 화면이 0x12 틱 31 에 `judgeHitByPitch`(4e74c 의
+   * 20/99 굴림)를, 들어갔으면 다음 틀에 `enterBenchClearing`(진입 0x3a5f0 의 굴림 45 번)을 부른다. 밀어내기 주루·정산·다음 타석은
+   * 안 들어갔으면 판정 때, 들어갔으면 화면이 연출을 끝내고 `resolveBenchClearing` 을 부를 때 비로소 돈다
+   * (원본도 출구 0xae24c 뒤에야 0x17 로 간다).
    */
   readonly pendingBenchClearing: {
+    readonly phase: HitByPitchHoldPhase
     readonly outcome: AtBatOutcome
     /** 이 사구 공이 연 밀어내기 판(종류 2, `arrivePitcherPitch`) — 연출 뒤 0x17 로 재생한다 */
     readonly arrivalPlay?: PitchArrivalPlay | null
@@ -1453,17 +1456,39 @@ function afterMyPitchArrival(
       random,
     )
   }
-  // 사구면 상태 0x12 끝(0x4e74c)에서 벤치 클리어링을 굴린다 — 밀어내기 주루(0x17)·정산 0xa8024 보다 앞이다
-  const settled = withPitcherBenchClearing(arrived, outcome, random)
-  if (settled !== arrived) {
-    // 들어갔다 — 진입 0x3a5f0 이 공격 9명을 흩뿌리며 45 번 굴리고, 연출이 끝날 때까지 붙든다
-    const entryRolls = rollBenchClearingEntry(random)
+  // 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c)·밀어내기 주루(0x17)·정산 0xa8024 는 0x12 의
+  // 32 그림 뒤라 그동안 사구를 붙든다(그 그림들의 입자 굴림이 먼저 난다 — `judgeHitByPitch`, A-22)
+  if (outcome.kind === '사구') {
     return {
-      ...settled,
-      pendingBenchClearing: play === null ? { outcome, entryRolls } : { outcome, arrivalPlay: play, entryRolls },
+      ...arrived,
+      pendingBenchClearing: play === null ? { phase: 'wait', outcome } : { phase: 'wait', outcome, arrivalPlay: play },
     }
   }
-  return finishNonPlayOutcome(settled, outcome, random, play)
+  return finishNonPlayOutcome(arrived, outcome, random, play)
+}
+
+/**
+ * **사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(`withPitcherBenchClearing`).
+ * 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀 `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의
+ * 보통 길(밀어내기 판 재생 · 정산 · 다음 사람 차례까지) — 예전 공 도착 걸음에 하던 그대로다. 대기 중인 사구가 없으면 그대로 돌려준다.
+ */
+export function judgeHitByPitch(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  const pending = progress.pendingBenchClearing
+  if (pending === null || pending.phase !== 'wait') return progress
+  const held: PitcherGameProgress = { ...progress, pendingBenchClearing: null }
+  const settled = withPitcherBenchClearing(held, pending.outcome, random)
+  if (settled !== held) return { ...settled, pendingBenchClearing: { ...pending, phase: 'entry' } }
+  return finishNonPlayOutcome(held, pending.outcome, random, pending.arrivalPlay ?? null)
+}
+
+/**
+ * **벤치 클리어링 진입** 0x3a5f0 — 판정이 0x1e 를 예약한 다음 틀. 공격 9명을 흩뿌리며 45 번 굴리고(`rollBenchClearingEntry`)
+ * 연출이 끝날 때까지 붙든다. 진입 앞인 사구가 없으면 그대로 돌려준다.
+ */
+export function enterBenchClearing(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  const pending = progress.pendingBenchClearing
+  if (pending === null || pending.phase !== 'entry') return progress
+  return { ...progress, pendingBenchClearing: { ...pending, phase: 'scene', entryRolls: rollBenchClearingEntry(random) } }
 }
 
 /**
@@ -1907,6 +1932,12 @@ export function resolveBenchClearing(
   scene: { readonly reachedTargetTick: boolean },
   random: RandomPort,
 ): PitcherGameProgress {
+  // 아직 0x12 대기 · 진입 앞인 사구(끼어들 사람이 없는 길)는 남은 판정 · 진입을 먼저 돈다 — 안 들어갔으면 판정의 보통 길로 끝난다
+  if (progress.pendingBenchClearing?.phase === 'wait') {
+    progress = judgeHitByPitch(progress, random)
+    if (progress.pendingBenchClearing === null) return progress
+  }
+  progress = enterBenchClearing(progress, random)
   const pending = progress.pendingBenchClearing
   if (pending === null) return progress
   if (scene.reachedTargetTick) rollBenchClearingTargets(random)
@@ -1918,7 +1949,7 @@ export function resolveBenchClearing(
  * 들어가면 0x3ab7c `0xaeab0(수비 팀, 1000)` — 지금 마운드의 내 스태미나(+0x2c) −1000, [0, 10000] 로 자른다.
  * 시즌 평판 S[1](0xa755c(ctx, 1), 0x3ab92)도 부르지만 그 게이트는 **모드 2(시즌)** 만 적으므로 투수편(모드 3)에서는
  * 아무것도 안 남는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
- * 들어가면 부르는 쪽이 연출(상태 0x1e)을 붙든다 — `startPitch` · `resolveBenchClearing`.
+ * 0x12 대기 끝(`judgeHitByPitch`)이 부른다 — 들어가면 연출(상태 0x1e)을 붙든다(`enterBenchClearing` · `resolveBenchClearing`).
  */
 function withPitcherBenchClearing(
   progress: PitcherGameProgress,

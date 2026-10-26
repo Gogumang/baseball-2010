@@ -104,7 +104,7 @@ interface GameScreenProps {
   readonly settings?: GameSettings
   readonly onSettingsChange?: (settings: GameSettings) => void
   /**
-   * 벤치 클리어링 연출(상태 0x1e)이 끝났다 — `progress.pendingBenchClearing` 이 차 있는 동안 타석 대신 연출을 띄운다.
+   * 벤치 클리어링 연출(상태 0x1e)이 끝났다 — `progress.pendingBenchClearing` 이 연출 단계(`'scene'`)인 동안 타석 대신 연출을 띄운다.
    * 인자는 틱 10 의 갱신이 돌았는가 (진행기 `resolveBenchClearing` 이 그 굴림 8 번을 낸다).
    */
   readonly onBenchClearingDone?: (reachedTargetTick: boolean) => void
@@ -217,7 +217,8 @@ export function GameScreen({
     }, 'press', event === undefined ? undefined : inputTimeOf(event))
   }
 
-  const isBenchClearing = progress.pendingBenchClearing !== null
+  // 벤치 클리어링 연출(상태 0x1e) — 붙든 사구가 0x12 대기 · 진입 앞이면 아직 타석 화면이 0x12 를 그린다(A-22)
+  const isBenchClearing = progress.pendingBenchClearing?.phase === 'scene'
   /** OK 로 1회초 판을 닫았는가 */
   const [isBoardClosed, setBoardClosed] = useState(false)
   const board = progress.halfInningBoard ?? null
@@ -286,7 +287,7 @@ export function GameScreen({
   }, [alertSceneKey, isAlertFrozen, onRecordAlertSceneChange])
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다. 공용 키 '*'·도루도 0x1e 에서는 안 열린다
-  if (progress.pendingBenchClearing !== null && onBenchClearingDone !== undefined) {
+  if (progress.pendingBenchClearing?.phase === 'scene' && onBenchClearingDone !== undefined) {
     return (
       <BenchClearingScene
         // 그리기 0x43228 — 진입 굴림 45 번으로 선 18명 (사구를 맞은 타자는 나다)

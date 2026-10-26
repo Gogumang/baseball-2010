@@ -72,6 +72,27 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * 그 뒤면 53 번**이다.
  */
 
+/**
+ * ## 사구가 0x1e 에 닿기까지 — 0x12 대기 (A-22, r289)
+ * ```
+ * 틀 T       0x3dfac 공 도착 — 판정 v = 4(사구) · 밀어내기 판(종류 2)을 열고 0x12 예약
+ * 틀 T+1..   0x12 그림 32 장(상태 틱 0~31, 그리기 0x4ce9c) — 틀마다 끝에 관리자 틱 0x6de85(입자 굴림, 경기 난수)
+ * 틱 31 갱신 0x4e6d4: 4e72c [+0x2c] ≥ 0x1f → 4e744 st[0xb] == 4 → 4e74c rand(0, 99) ≤ 19 · 돌발 0x8eb95 → 0x1e 예약
+ *            (안 들어가면 판정 A 0xae24c — 진루 0x17 · 정산 · 0x21) → 그 틀 끝 관리자 틱
+ * 다음 틀    0x1e 진입 0x3a5f0 — 굴림 45 번(`rollBenchClearingEntry`) → 그리기 0x43228(틱 0)
+ * ```
+ * 웹 진행기는 공 도착 걸음에 사구를 **붙들기만** 하고(단계 `'wait'`), 화면이 0x12 대기를 장면 틱으로 센 뒤 판정(`'entry'` 또는 보통 길)과
+ * 진입(`'scene'`)을 한 틀씩 부른다(`pages/defense/model/useHitByPitchWait`). 끼어들 사람이 없는 길(시험 · 자동)은 끝내기
+ * (`resolveBenchClearing`)가 남은 단계를 한꺼번에 돈다 — 굴림 차례(판정 → 진입 45 → 틱 10 의 8 → 사구 보통 길)는 같다.
+ */
+export type HitByPitchHoldPhase =
+  /** 0x12 대기 — 아직 판정(4e74c) 앞. 사구 결과 · 밀어내기 판 · 정산이 모두 붙들려 있다 */
+  | 'wait'
+  /** 틱 31 의 판정이 0x1e 를 예약했다 — 진입 0x3a5f0(굴림 45 번)은 다음 틀 */
+  | 'entry'
+  /** 진입 굴림 45 번을 냈다 — 연출(0x1e)이 돈다 */
+  | 'scene'
+
 /** 공격 쪽 선수 수 — 진입 루프 i = 8..0 */
 const OFFENSE_PLAYERS = 9
 

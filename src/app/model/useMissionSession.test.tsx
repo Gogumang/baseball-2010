@@ -1319,7 +1319,14 @@ function sessionInBenchClearing() {
       const before = counter.drawn()
       // 구석 칸들을 돌려 가며 게이지 없이 — 사구가 나올 만한 자리
       act(() => current.handleThrow(PITCH_TYPES[0], CORNER_AIMS[pitch % CORNER_AIMS.length], 0, false))
-      if (rendered.result.current.pendingBenchClearing !== null) {
+      // 사구는 공 도착에서 굴림 없이 붙든다(0x12 대기) — 화면 대신 틱 31 의 판정 · 다음 틀 진입을 부른다 (A-22)
+      if (rendered.result.current.pendingBenchClearing?.phase === 'wait') {
+        expect(counter.drawn() - before).toBeLessThan(45)
+        act(() => rendered.result.current.actions.judgeHitByPitch())
+      }
+      if (rendered.result.current.pendingBenchClearing?.phase === 'entry') {
+        act(() => rendered.result.current.actions.enterBenchClearing())
+        expect(rendered.result.current.pendingBenchClearing?.phase).toBe('scene')
         return { rendered, counter, drawnByThrow: counter.drawn() - before }
       }
     }
@@ -1352,7 +1359,7 @@ describe('투수 미션 사구 뒤 벤치 클리어링 — 0x4e72c → 0x1e 는 
     const beforeWatch = watched.counter.drawn()
     act(() => watched.rendered.result.current.actions.finishBenchClearing(true))
     expect(watched.counter.drawn() - beforeWatch).toBe(skipDraws + 8)
-    // 진입 0x3a5f0 의 45 번은 던지는 순간 이미 나갔다
+    // 판정 1 · 진입 0x3a5f0 의 45 번은 연출 앞(공 · 판정 · 진입)에 이미 나갔다
     expect(watched.drawnByThrow).toBeGreaterThanOrEqual(45 + 1)
   })
 })
