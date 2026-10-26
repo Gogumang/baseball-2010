@@ -21,7 +21,7 @@ import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 
 /** 무엇이 몇 번 울렸는지 적어 두는 포트 */
 function 녹음포트() {
@@ -69,6 +69,19 @@ afterEach(() => setActiveSound(null))
 
 const 띄우기 = (seed = 20100901) =>
   renderHook(() => usePitcherGame(기본옵션, createSeededRandom(seed)))
+
+/**
+ * 한 개 던지고 그 공의 0x12 진입(못 맞힌 공의 공 도착 `enterPitchResult`)과 같은 타석 다음 공의 0xf 진입 틀까지 장면 시계를 흘린다 —
+ * 가짜 시계(`vi.useFakeTimers`) 안에서 부른다
+ */
+const 던지고흘리기 = (
+  result: ReturnType<typeof 띄우기>['result'],
+  input: Parameters<ReturnType<typeof usePitcherGame>['actions']['throwPitch']>[0],
+) => {
+  act(() => result.current.actions.throwPitch(input))
+  const frameCount = result.current.progress.lastPitch?.frameCount ?? 0
+  act(() => vi.advanceTimersByTime(millisecondsPerFrame() * (pitchSelectionEntryDelayTicksOf(frameCount, 31) + 2)))
+}
 
 describe('투수편 화면의 소리 배선', () => {
   it('로딩 판(상태 7 · 9 · 8)이 끝나 인트로(0xc)로 갈 때 예약음 61 이 난다 (상태 0xc 진입 0x3b148) — 판 동안은 안 난다', () => {
@@ -143,6 +156,7 @@ describe('투수편 화면의 소리 배선', () => {
     // 1회초 판(0x18)의 걸음 굴림 36 개가 첫 타석 준비 앞에 끼면서 2 → 3 으로 옮겼다
     // 원본 난수 생성기(0xbfa54 · 0x9d468)로 바꾸며 3 → 2 로 옮겼다
     const { result } = 띄우기(2)
+    vi.useFakeTimers()
 
     // 인플레이 **안타**가 나올 때까지 던진다 — 무엇이 나올지는 난수가 정한다.
     // 아웃이 걸린 타구는 그대로 흘려보내고, 중간에 뜨는 창(감독 대사·돌발)은 닫아 가며 이어 던진다
@@ -162,8 +176,9 @@ describe('투수편 화면의 소리 배선', () => {
         continue
       }
       if (!result.current.canPitch) break
-      act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
+      던지고흘리기(result, { typeNumber: 1, gaugeCell: 0 })
     }
+    vi.useRealTimers()
     const pending = result.current.progress.pendingDefensePlay
     expect(pending?.outcome.kind).toBe('안타')
 
@@ -193,6 +208,7 @@ describe('투수편 화면의 소리 배선', () => {
    */
   it('내가 던지는 타석에 CPU 대타가 서면 걸음 끝에 22 — 등판음 14/15 는 교체 연출 0x16 에 실어 연출 뒤 0xe 에서, 대타 없는 걸음엔 22 가 없다', () => {
     let 대타소리 = 0
+    vi.useFakeTimers()
     for (let seed = 1; seed <= 10 && 대타소리 === 0; seed += 1) {
       const { result, unmount } = 띄우기(seed)
       for (let pitch = 0; pitch < 400; pitch += 1) {
@@ -204,7 +220,8 @@ describe('투수편 화면의 소리 배선', () => {
           // 0xe 의 OK — 그 뒤 0xf 진입 0x3d954 가 대타를 묻는다
           act(() => result.current.actions.confirmScene())
         } else if (result.current.canPitch) {
-          act(() => result.current.actions.throwPitch({ typeNumber: 1, gaugeCell: 0 }))
+          // 같은 타석 다음 공이면 0xf 진입 틀(놓은 틀에서 `pitchSelectionEntryDelayTicksOf` 뒤)에 22 가 난다 — 그 틀까지 흘린다
+          던지고흘리기(result, { typeNumber: 1, gaugeCell: 0 })
         } else {
           break
         }
@@ -225,6 +242,7 @@ describe('투수편 화면의 소리 배선', () => {
       }
       unmount()
     }
+    vi.useRealTimers()
     expect(대타소리).toBe(1)
   })
 })
@@ -244,6 +262,7 @@ describe('CPU 타자의 파울 각 공 판 — 콜은 판 안의 그 틱 (결과
   it('파울로 닫힌 판은 "Foul!" 25, 낙구 전에 잡힌 판(파울 뜬공 아웃)은 잡은 아웃 콜 62 — 공 판정 자리에서는 25 가 안 난다', () => {
     let 파울 = 0
     let 뜬공 = 0
+    vi.useFakeTimers()
     // 놓기 0x4dc78 의 표시 구속 굴림(0x34968 → 0x66dc0 rand)이 흩어짐 앞에 끼어 11~13 에서 파울 판이 안 나와 5~7 로 옮겼다
     // (1 부터 센 첫 파울 씨앗 5 부터 세 개)
     for (let seed = 5; seed <= 7 && 파울 < 3; seed += 1) {
@@ -291,11 +310,12 @@ describe('CPU 타자의 파울 각 공 판 — 콜은 판 안의 그 틱 (결과
         }
         if (!result.current.canPitch) break
         녹음.played.length = 0
-        act(() => result.current.actions.throwPitch({ typeNumber: 1, aim: aimAfterTicks(1, { dx: (pitch % 3) - 1, dy: 1 - Math.floor((pitch % 9) / 3) }, 11), gaugeCell: 0 }))
+        던지고흘리기(result, { typeNumber: 1, aim: aimAfterTicks(1, { dx: (pitch % 3) - 1, dy: 1 - Math.floor((pitch % 9) / 3) }, 11), gaugeCell: 0 })
         expect(녹음.played).not.toContain(25)
       }
       unmount()
     }
+    vi.useRealTimers()
     // 이 씨앗들은 파울 뜬공 아웃이 안 나온다(사람 수비 판을 키 없이 돌린다) — 파울 판만 꼭 본다. 뜬공 쪽 콜은 atBatSounds 시험
     expect(파울).toBeGreaterThan(0)
     expect(뜬공).toBeGreaterThanOrEqual(0)

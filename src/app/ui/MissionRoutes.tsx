@@ -836,8 +836,8 @@ interface MissionPitchSceneBeforePlay {
  * **투수 미션의 0x11 끝 · 0x13 · 0x12 틱 0 — 수비 판(0x17)을 그 뒤로 미룬다** (투수편 `PitcherGameScreen` 과 같은 길).
  * 세션은 공을 놓는 순간(0x11 틱 10) 판정과 함께 판을 세운다(`handleThrow`). 원본은 CPU 타자가 맞힌 공이면 판정 틀(스윙 F + 1 ·
  * 번트 N − 1)까지 0x11 · 이어 0x13(큰 타구면 문턱 + 7)을 지나 0x17 로 가고(`usePitcherHitScene`), 못 맞힌 공의 도루 · 폭투 판은
- * 0x12 진입 0x3dfac 이 열어 다음 그림이 0x17 이다(`usePitchArrivalHold`). 그동안 투구 화면(`PitchingScreen`)이 장면을 그린다.
- * 판 입력 · 판 시작 굴림은 세션이 이미 냈으니 미뤄도 그 굴림 차례는 그대로다.
+ * 0x12 진입 0x3dfac 이 열어 다음 그림이 0x17 이다(`usePitchArrivalHold` — 세션도 못 맞힌 공의 공 도착을 그 틀에 돌린다). 그동안 투구
+ * 화면(`PitchingScreen`)이 장면을 그린다. 맞은 공의 판 입력 · 판 시작 굴림은 세션이 이미 냈으니 미뤄도 그 굴림 차례는 그대로다.
  */
 function useMissionPitchSceneBeforePlay(
   session: ReturnType<typeof useMissionSession>,
@@ -858,7 +858,6 @@ function useMissionPitchSceneBeforePlay(
   const runnerPlay = session.pendingRunnerPlay
   const isArrivalHolding = usePitchArrivalHold({
     play: runnerPlay !== null && runnerPlay.kind === 'arrival' && runnerPlay.side === '수비' ? runnerPlay : null,
-    pitch: lastThrow?.pitch ?? null,
     isFrozen: isPopupFrozen,
   })
   return {
@@ -880,6 +879,8 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
   const equipment = session.pitcher.equipmentLevels
   return {
     lastThrow: session.lastPitcherThrow,
+    // 3e0aa — 0x12 진입 틀에 공 도착이 적는다(`lastPitchJudgementCleared`)
+    isJudgementCleared: session.lastPitchJudgementCleared,
     pitcherForm: form,
     pitcherHand: pitcherHandOf(form, false),
     ...(equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOf(equipment) }),

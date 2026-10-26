@@ -395,12 +395,12 @@ function PitcherGameScene({
   })
   const isHitSceneShowing = pitcherHitScene.isShowing
   /**
-   * **공 도착 판(도루 · 폭투)의 0x11 끝 · 0x12 틱 0** — 진행기는 놓는 순간 주자 판(`pendingRunnerPlay`)을 세우지만 원본은 0x12 진입
-   * 0x3dfac 이 판을 열어 0x17 을 예약한다 — 그 다음 그림까지 타석 장면을 두고 수비 화면을 띄운다 (`usePitchArrivalHold`)
+   * **공 도착 판(도루 · 폭투)의 0x12 틱 0** — 진행기는 붙든 공의 0x3dfac 을 0x12 진입 틀에 돌려(`enterPitchResult`) 그 틀에 주자 판
+   * (`pendingRunnerPlay`)을 세운다. 원본도 그 진입이 0x17 을 예약하므로 다음 그림까지 타석 장면을 두고 수비 화면을 띄운다 (`usePitchArrivalHold`)
    */
+  const arrivalPlay = progress.pendingRunnerPlay?.kind === 'arrival' ? progress.pendingRunnerPlay : null
   const isArrivalHolding = usePitchArrivalHold({
-    play: progress.pendingRunnerPlay?.kind === 'arrival' ? progress.pendingRunnerPlay : null,
-    pitch: progress.lastPitch,
+    play: arrivalPlay,
     isFrozen: isPopupOpen || asksGiveUp,
   })
   /**
@@ -412,7 +412,7 @@ function PitcherGameScene({
     isPlayShown: progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null || isReplaying,
     isFrozen: isPopupOpen || asksGiveUp,
   })
-  const { notePitchResolved } = pitchEnd
+  const { notePitchResolved, notePitchPlayOpened } = pitchEnd
   const [pitchWaitTicks, setPitchWaitTicks] = useState(0)
   /** 마지막 공의 0x12 길이 — 타석 장면(`PitcherSideStage`)이 공을 마지막 점에 두는 틱 수 */
   const [heldResultTicks, setHeldResultTicks] = useState(0)
@@ -436,6 +436,12 @@ function PitcherGameScene({
     setPitchWaitTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks))
     setHeldResultTicks(waitTicks)
   }, [lastResolution, progress.pendingDefensePlay, progress.pendingRunnerPlay, progress.lastPitch, notePitchResolved])
+  // 0x12 진입 틀에 공 도착 판이 섰다 — 공 끝 · 키 막음은 이제 판이 맡는다(놓는 그림은 판이 설지 몰라 대기 틱을 세웠다)
+  useEffect(() => {
+    if (arrivalPlay === null) return
+    setPitchWaitTicks(0)
+    notePitchPlayOpened()
+  }, [arrivalPlay, notePitchPlayOpened])
   useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
   /** 공이 날거나 0x12 인 동안 — 원본 상태 0x11 · 0x12 */
   const isPitchSceneBusy = pitchWaitTicks > 0

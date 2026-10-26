@@ -22,6 +22,11 @@ export interface BatterPitchEnd {
    * `isHit` = 맞은 공(0x13 → 0x17), `waitTicks` = 0x12 대기(`resultWaitTicksOf`).
    */
   readonly notePitchResolved: (pitch: { readonly isHit: boolean; readonly waitTicks: number }) => void
+  /**
+   * 0x12 대기를 세던 공의 0x12 진입이 공 도착 판(도루 · 폭투 — 0x17)을 열었다. 사람이 던진 공은 놓는 그림에 판정을 싣고 판은 0x12 진입
+   * 틀에 서므로(`enterPitchResult` 따위) 그때 부른다 — 0x3e096 · 0x3e114 가 곧장 0x17 로 가 대기를 안 타니 판이 끝날 때가 공 끝이다
+   */
+  readonly notePitchPlayOpened: () => void
 }
 
 /**
@@ -99,5 +104,11 @@ export function useBatterPitchEnd({ isPlayShown, isFrozen }: {
     setVersion((version) => version + 1)
   }, [])
 
-  return { serial: serialRef.current, isHolding: pending !== null || isPlayShown, notePitchResolved }
+  const notePitchPlayOpened = useCallback(() => {
+    if (pendingRef.current?.kind !== 'wait') return
+    pendingRef.current = { kind: 'play' }
+    setVersion((version) => version + 1)
+  }, [])
+
+  return { serial: serialRef.current, isHolding: pending !== null || isPlayShown, notePitchResolved, notePitchPlayOpened }
 }

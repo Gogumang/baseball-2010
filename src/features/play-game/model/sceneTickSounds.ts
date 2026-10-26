@@ -40,6 +40,18 @@ export interface PitchStepSoundTiming {
 }
 
 /**
+ * **0x12 진입 틀에 부르는 걸음의 소리 때** — 놓는 걸음이 공 도착 0x3dfac 을 그 틀까지 붙들면(`pendingPitchArrival` 따위) 걸음의 소리
+ * (`resultEntryTicks`)는 이제 그 틀(지금)이고, 0xf 진입의 교체 소리는 거기서 남은 틱 뒤다. 놓는 틀의 소리는 이미 났다
+ */
+export function resultEntryStepTimingOf(release: PitchStepSoundTiming): PitchStepSoundTiming {
+  return {
+    releaseSoundId: null,
+    resultEntryTicks: 0,
+    pitchSelectionTicks: Math.max(0, release.pitchSelectionTicks - release.resultEntryTicks),
+  }
+}
+
+/**
  * **사람 타석의 0x12 진입 틀까지** — 타석 화면은 못 맞힌 공의 결과를 0x12 를 예약한 틀(공 끝 0x4e24e → 0xbcb49)에 넘기고
  * (`BattingStage.showResult`), 0x12 는 다음 틀 머리 0xbc9c8 이 세워 진입 0x3dfac 가 그 틀에 심판 콜을 낸다 — 한 틀 뒤다
  */
