@@ -4,7 +4,7 @@ import {
   FIELDER_START_POSITIONS,
   abilityGradeOf,
   basePosition,
-  horizontalDistance,
+  manhattanDistance,
   ticksToReach,
   type WorldPoint,
 } from '@/entities/fielding/model/fieldGeometry'
@@ -408,11 +408,12 @@ export function runnerRemainingTicks(runner: RunnerState): number {
 /**
  * 주자 vt0xa0 = 0xa06ec = **한 루 더 갈 때의 총 틱**
  * = 거리(루[(목표루+1)%4], 루[목표루]) ÷ 속도 + 지금 목표까지 남은 틱 (S7 5절, 확정).
+ * 거리는 **맨해튼 0xbfa2c**(a0740)다.
  */
 export function runnerOneMoreBaseTicks(runner: RunnerState): number {
   const next = basePosition(runner.targetBase + 1)
   const current = basePosition(runner.targetBase)
-  const legs = runner.speed === 0 ? 0 : Math.trunc(horizontalDistance(next, current) / runner.speed)
+  const legs = runner.speed === 0 ? 0 : Math.trunc(manhattanDistance(next, current) / runner.speed)
   return legs + runnerRemainingTicks(runner)
 }
 

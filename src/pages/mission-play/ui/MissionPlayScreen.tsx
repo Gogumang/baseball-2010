@@ -429,6 +429,8 @@ export function MissionPlayScreen({
             // 0xe(OK 대기)에서도 공이 안 나간다
             // 교체 연출 0x16 에는 갱신이 없다(R10 표 — 진입 0x3d458 · 그리기 0x4da30 뿐)
             isPaused={isPaused || isOver || overlay !== null || isAwaitingConfirm || isSubstituting}
+            // 좌우 이동 +0xfe4 는 0xd 진입 48f88 에서만 지운다 — 같은 타석의 다음 공(0xf)과 결과 연출 동안은 남는다(A-02)
+            shiftResetSerial={sceneConfirm.sceneDEntryMark}
             random={random}
             /*
               경기 상태 0x19 — 결과 그림 0x4a384 는 모드를 안 가리고 구름 0x78448 · 배경 0x40ff0(+0x17e2)만 그린다(선수 · 공 · HUD 없음).

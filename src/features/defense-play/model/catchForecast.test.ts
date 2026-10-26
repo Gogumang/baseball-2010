@@ -3,7 +3,7 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
 import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
 import { createFielders } from '@/entities/fielding/model/fieldingState'
-import { forecastCatch, nearestSlotTo } from '@/features/defense-play/model/catchForecast'
+import { backupSlotOf, forecastCatch, nearestSlotTo } from '@/features/defense-play/model/catchForecast'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 
 const 야수들 = createFielders(Array.from({ length: 9 }, () => 500))
@@ -71,8 +71,9 @@ describe('포구 예보 — 가장 먼저 닿는 야수가 잡는다 (P2 2a)', (
  */
 describe('거리 d 가 실제로 계산된다 — 포구 반경과 필살 창이 살아 있다 (P2 2a)', () => {
   it('필살 슬라이딩 창을 열면 슬라이딩 캐치(종류 4)가 실제로 골라진다', () => {
-    // 원본 코드 3 [55, 700, 200] — 낮게 깔린 타구라 낙구(8) 전엔 보통 포구가 없고, 슬라이딩 창이 열리면 1루수가 6틱에 몸을 던진다
-    const 궤적 = battedBallTrajectory([55, 700, 200, 0])
+    // 원본 코드 3 [70, 1000, 202] — 낮게 깔린 타구라 낙구(8) 전엔 보통 포구가 없고, 슬라이딩 창이 열리면 1루수가 6틱에 몸을 던진다
+    // (포구 거리 d 가 맨해튼 0xbfa2c 라 예전 [55, 700, 200] 은 창 1999 < d ≤ 3000 에 안 든다)
+    const 궤적 = battedBallTrajectory([70, 1000, 202, 0])
     const 닫힘 = forecastCatch(궤적, 야수들, 뜬공구간(궤적.landingTick))
     const 열림 = forecastCatch(궤적, 야수들, 뜬공구간(궤적.landingTick), { slideUnlocked: true })
 
@@ -164,10 +165,11 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
       startedAtPlate: false,
     }
     const 잠긴 = 야수들.map((야수) => (야수.slot === 8 ? { ...야수, actionLockTicks: 4 } : 야수))
-    // 잠금 4틱(1~4)은 제자리 · 5~10틱 6걸음(1320)을 낙구 쪽으로 — 거리 isqrt(600² + 1320²) = 1449 · n 은 11틱에 1 → n = 6 인 16틱
+    // 잠금 4틱(1~4)은 제자리 · 5~10틱 6걸음(1320)을 낙구 쪽으로 — 거리 600 + 1320 = 1920(맨해튼 0xbfa2c) · n 은 11틱에 1 →
+    // 1920 − 220n ≤ 300 은 n = 8 인 18틱
     expect(
       forecastCatch(공, 잠긴, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low,
-    ).toEqual({ tick: 16, slot: 8 })
+    ).toEqual({ tick: 18, slot: 8 })
   })
 
   it('+0x127 이면 낙구 틱까지 복제가 낙구 지점으로 실제로 달리고(b1416 vt14) n 은 낙구 뒤부터 센다', () => {
@@ -183,10 +185,11 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
     }
     // 보통은 11틱에 n = 11 이라 곧바로 닿는다
     expect(forecastCatch(공, 야수들, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8 }).table.low).toEqual({ tick: 11, slot: 8 })
-    // +0x127: 10틱 동안 2200 을 낙구 지점 쪽으로 달려 거리 isqrt(600² + 2200²) = 2280 · n 은 11틱에 1 → 2280 − 220n ≤ 300 은 n = 9
+    // +0x127: 10틱 동안 2200 을 낙구 지점 쪽으로 달려 거리 600 + 2200 = 2800(맨해튼 0xbfa2c) · n 은 11틱에 1 →
+    // 2800 − 220n ≤ 300 은 n = 12
     expect(
       forecastCatch(공, 야수들, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low,
-    ).toEqual({ tick: 19, slot: 8 })
+    ).toEqual({ tick: 22, slot: 8 })
   })
 })
 
@@ -199,6 +202,18 @@ describe('고르기 0xb3b38 의 백업 갈래 b3ebe~b3f62 (r180)', () => {
     const 내야 = forecastCatch(battedBallTrajectory([70, 1000, 202, 0]), 야수, { from: 0, to: Number.POSITIVE_INFINITY })
     expect(내야.choice.slot).toBeLessThanOrEqual(5)
     expect(내야.backupSlot).toBe(-1)
+  })
+
+  it('백업 거리는 맨해튼 |dx| + |dz| 다 (b3f2a → 0xbfa2c)', () => {
+    // 낮은 공 (20000, 10000): 6번은 평면 4242 · 맨해튼 6000, 7번은 평면 5000 · 맨해튼 5000 — 맨해튼이라 7번
+    const 자리 = 야수.map((fielder) =>
+      fielder.slot === 6
+        ? { ...fielder, position: { x: 23_000, y: 0, z: 13_000 } }
+        : fielder.slot === 7
+          ? { ...fielder, position: { x: 25_000, y: 0, z: 10_000 } }
+          : fielder,
+    )
+    expect(backupSlotOf(자리, 8, { x: 20_000, y: 0, z: 10_000 })).toBe(7)
   })
 
   it('다이빙 후보 표 +0x178 — 공 첫 점이 표준 배팅 지점이 아니면 모두 1000', () => {

@@ -148,15 +148,20 @@ describe('판 안의 판정 콜 — 결과 메시지 0xbba(b4562) → 0x51a56 �
   })
 
   it('도루 판: 키 2 로 2루에 던져 세이프 — 받은 야수가 쥐는 틱(결과 9)에 17 (종류 5 는 0x51c14 51c22 에서 곧장 17)', () => {
+    // 발 빠른 주자(주루 999) — 한 틱 이동 0xbf158 이 맨해튼 거리로 나눠 대각선 1→2루가 느려 주루 500 은 2루 앞에서 잡힌다
     const opened = openPitchArrivalPlay(
-      { gameMode: 2, pitchJudgement: 2, stealingFrom: [1], bases: 일루, outs: 0, defenseIsCpu: false, offenseIsCpu: true },
+      { gameMode: 2, pitchJudgement: 2, stealingFrom: [1], bases: 일루, outs: 0, defenseIsCpu: false, offenseIsCpu: true, runAbility: 999 },
       createSeededRandom(1),
     )
     if (opened === null || opened.kind === 2) throw new Error('도루 판이 안 열렸다')
     const { sounds, result, lastTick } = 틱소리({ kind: 'arrival', opened }, { 4: '2' })
     const 세이프틱 = 틱of(result.log, /2루 세이프 \(결과 9\)/)
     expect((result as { readonly resultCode?: number | null }).resultCode).toBe(9)
-    expect(sounds).toEqual([{ tick: 세이프틱, id: 17 }])
+    // 빠른 주자는 4틱에 71% 를 넘어 CPU 주루의 슬라이딩(0xa9690)이 걸리고 효과음 10 이 먼저 난다
+    expect(sounds).toEqual([
+      { tick: 4, id: 10 },
+      { tick: 세이프틱, id: 17 },
+    ])
     expect(세이프틱).toBeLessThan(lastTick)
   })
 

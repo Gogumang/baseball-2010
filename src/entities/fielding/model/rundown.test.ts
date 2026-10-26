@@ -33,7 +33,8 @@ function 사이주자(index: number, percent: number): RunnerState {
   const from = basePosition(1)
   const to = basePosition(2)
   let position = from
-  const speed = Math.max(1, Math.trunc((7772 * percent) / 100))
+  // 한 틱 이동 0xbf158 은 맨해튼 거리(1루→2루 10951)로 나누므로 한 걸음 = 속도 ÷ 10951 몫이다
+  const speed = Math.max(1, Math.trunc((10_951 * percent) / 100))
   position = stepToward(from, to, speed)
   return createRunner(index, 1, 주력500, { targetBase: 2, position, legStart: from })
 }
@@ -164,9 +165,14 @@ describe('협살 한 틱 0xb48b6', () => {
       slot === 3 ? { ...fielder, position: basePosition(2) } : fielder,
     )
     expect(rundownAction(틱(3, 2, { fielders: 루위 })).kind).toBe('주자추적')
-    // 주자가 절반(50%)까지 왔으면 주자 11틱 > 송구 7틱 이지만 +4 를 못 넘겨 대기다
-    const 절반 = [타자주자, 사이주자(1, 50)]
-    expect(rundownAction(틱(3, 2, { fielders: 루위, runners: 절반 })).kind).toBe('대기')
+    // 주자가 45% 까지 왔고(남은 비율 53% > 35) 2루수가 2루 앞 (21785, 20672) 에 나와 있으면 주자 8틱 > 송구 5틱 이지만
+    // +4 를 못 넘겨 대기다. 한 틱 이동 · 도착 틱이 맨해튼 거리라(0xbfa2c) 2루수가 루에 붙은 채로는 이 틈이 안 생긴다
+    // (주자 틱 ≤ 11 이면 남은 비율이 35% 아래라 협살 대상이 아니다)
+    const 앞으로 = 야수들.map((fielder, slot) =>
+      slot === 3 ? { ...fielder, position: { x: 21_785, y: 0, z: 20_672 } } : fielder,
+    )
+    const 절반 = [타자주자, 사이주자(1, 45)]
+    expect(rundownAction(틱(3, 2, { fielders: 앞으로, runners: 절반 })).kind).toBe('대기')
   })
 
   it('주자가 코앞이면 내 루로 가서 밟는다', () => {

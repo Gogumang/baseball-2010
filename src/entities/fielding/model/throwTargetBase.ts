@@ -1,9 +1,9 @@
 import {
   BASE_POSITIONS,
   BASE_SCORE,
+  horizontalDistance,
   isOutfieldSlot,
   isSamePoint,
-  ticksToReach,
 } from '@/entities/fielding/model/fieldGeometry'
 import {
   isRunnerStopped,
@@ -156,8 +156,10 @@ function buildCandidates(input: ThrowTargetInput): BaseCandidate[] {
 
 /**
  * 1루에 커버가 없을 때의 예외 (S7 2-6).
- * 공 가진 야수가 1루선에서 499 이내에 있고 타자주자보다 먼저 1루에 닿으면
+ * 공 가진 야수가 1루선에서 499 이내에 있고 1루까지 타자주자보다 가까우면
  * **수비 틱 = 주자 틱** 으로 적어 "보낼 수 있는 루" 로 친다(= 직접 밟는다).
+ * 견주는 값은 틱이 아니라 **평면 거리**다 — afda4 · afdc0 이 둘 다 0xbed30(= 0xbf9f0) 으로 1루 좌표까지 재고 afdc4 에서 비교한다.
+ * 속도를 안 보니 빠른 타자주자라도 1루에서 더 멀면 예외가 걸린다(원본 그대로).
  */
 function applyFirstBaseException(input: ThrowTargetInput, candidate: BaseCandidate): void {
   const holder = input.fielders[input.play.ballHolderSlot]
@@ -171,9 +173,9 @@ function applyFirstBaseException(input: ThrowTargetInput, candidate: BaseCandida
 
   const batterRunner = input.runners[0]
   if (batterRunner === undefined) return
-  const runnerTicks = ticksToReach(batterRunner.position, first, batterRunner.speed)
-  const fielderTicks = ticksToReach(holder.position, first, holder.speed)
-  if (runnerTicks > fielderTicks) candidate.defTick = candidate.runTick
+  if (horizontalDistance(batterRunner.position, first) > horizontalDistance(holder.position, first)) {
+    candidate.defTick = candidate.runTick
+  }
 }
 
 /** 루 b 로 보낸 뒤 다시 루 r 로 보내는 틱 (S7 2-5) */

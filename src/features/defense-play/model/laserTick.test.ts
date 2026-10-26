@@ -115,16 +115,17 @@ describe('견제 · 주루 판의 레이저 송구 — 타구 진행기와 같�
     })
     // 내야수(2루수 3 · 유격수 5)가 쫓는 동안은 굴리지 않고, 좌익수가 쫓을 때 한 번
     expect(random.calls.filter((call) => call === '0,1000')).toHaveLength(1)
-    expect(result.log).toContain('57틱 7번 야수가 공을 쥐었다')
-    expect(result.log).toContain('63틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993')
+    // 야수 걸음 · 공 튕김 뒤 줍기가 맨해튼 걸음(0xbf158 → 0xbfa2c)이라 예전보다 7틱 늦게 쥔다
+    expect(result.log).toContain('64틱 7번 야수가 공을 쥐었다')
+    expect(result.log).toContain('70틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993')
     // 발사한 그림 F 의 슬롯 2 와 F+1 이 빠지고, F+2 의 플레이 틱(사람 목표 b4660)이 +0x1f4 로 던진다 — 2루수에게(외야 → 내야라 b2ee6 이 안 지운다)
-    expect(result.log).toContain('65틱 7번 야수가 2루로 레이저 송구 — 70틱 도착 (사람 송구 키)')
+    expect(result.log).toContain('72틱 7번 야수가 2루로 레이저 송구 — 76틱 도착 (사람 송구 키)')
     expect(result.laserThrow).toBe(true)
     // 반짝임은 쥔 좌익수에게 · 머리에서 멈춘 그림(F+1)은 카메라가 선다 · 잔상은 발사부터
-    expect(result.ticks.find((view) => view.tick === 60)?.laserShiningSlot).toBe(7)
-    expect(result.ticks.find((view) => view.tick === 64)?.cameraFrozen).toBe(true)
-    expect(result.ticks.find((view) => view.tick === 63)?.cameraFrozen).toBe(false)
-    expect(result.ticks.find((view) => view.tick === 63)?.laserTrailFrom).not.toBeNull()
+    expect(result.ticks.find((view) => view.tick === 67)?.laserShiningSlot).toBe(7)
+    expect(result.ticks.find((view) => view.tick === 71)?.cameraFrozen).toBe(true)
+    expect(result.ticks.find((view) => view.tick === 70)?.cameraFrozen).toBe(false)
+    expect(result.ticks.find((view) => view.tick === 70)?.laserTrailFrom).not.toBeNull()
   })
 })
 

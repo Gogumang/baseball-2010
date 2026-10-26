@@ -320,8 +320,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       if (phaseEntryRef.current !== null) return
       if (phaseRef.current === '대기') {
         if (latestRef.current.isPaused) {
-          // 타석이 끝나 쉬는 동안 — 다음 타석 준비(0x48d50)처럼 좌우 이동을 되돌린다. 0xd 번호를 받는 화면(더비)은 그 번호가 바뀔 때만
-          if (latestRef.current.shiftResetSerial === undefined) shiftRef.current = 0
+          // 쉬는 동안에도 좌우 이동(+0xfe4)은 그대로 둔다 — 지우는 곳은 0xd 진입 48f88 하나(`shiftResetSerial`, BattingStage).
+          // 같은 타석의 다음 공은 0xae3e8 → 0xf 로 가 0xd 를 안 지난다
           phaseStartTickRef.current = sceneTick
           // 쉬는 동안은 0xf · 0x10 · 0x11 이 안 선다 — 대기 셈이 미리 적어 둔 예약을 거둔다(지난 칸 · 확인 대기가 적은 0xd · 0xe 는 남는다)
           cancelSceneStateEntriesAfter(sceneTick, PRE_PITCH_STATES)

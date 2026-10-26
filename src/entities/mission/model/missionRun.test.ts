@@ -135,19 +135,21 @@ describe('applyOutcome', () => {
 describe('missionAdvance — 미션 주루도 수비 시뮬레이션이 정한다 (P2 7절 · U-02)', () => {
   const 주자 = (first: boolean, second: boolean, third: boolean) => ({ first, second, third })
 
-  it('1루타에 2루 주자는 홈까지 든다 — 고정표가 아니라 자동 진루 0xaf918 가 정한다(판 시작 force 1 한 번 · 매 틱 force 0)', () => {
-    // 판 시작 0x46766 의 `0xaf8c0(제어기, 1)` 이 리드 뒤 제 루로 돌아오던 2루 주자를 곧장 3루로 보내고(송구보다 2틱 넘게 먼저),
-    // 3루에 서면 매 틱 자동 진루(force 0)의 틱 비교가 홈까지 보낸다. (예전 웹은 판 시작 호출이 없어 2루로 돌아갔다가 3루에서 멈췄다.)
+  it('1루타에 2루 주자는 3루까지 간다 — 고정표가 아니라 자동 진루 0xaf918 가 정한다(판 시작 force 1 한 번 · 매 틱 force 0)', () => {
+    // 판 시작 0x46766 의 `0xaf8c0(제어기, 1)` 이 리드 뒤 제 루로 돌아오던 2루 주자를 곧장 3루로 보낸다.
+    // r268: 주자 걸음 · 도착 틱이 맨해튼 거리(0xbfa2c)라 3루→홈 틱이 송구보다 늦어 매 틱 자동 진루(force 0)가 홈까지는 안 보낸다
+    // (평면 거리였던 r267 까지는 홈까지 들었다)
     expect(missionAdvance(주자(false, true, false), 0, { kind: '안타', bases: 1 })).toEqual({
-      bases: 주자(true, false, false),
-      runsScored: 1,
+      bases: 주자(true, false, true),
+      runsScored: 0,
       outsAdded: 0,
     })
   })
 
-  it('1루타에 1루 주자가 3루까지 간다 (0xaf918 자동 추가 진루)', () => {
+  it('1루타에 1루 주자는 2루에 선다 — 2루→3루 틱 비교(0xaf918)가 송구에 진다', () => {
+    // r268: 맨해튼 걸음이라 1루 주자의 추가 진루(r267 까지는 3루)가 없다
     expect(missionAdvance(주자(true, false, false), 0, { kind: '안타', bases: 1 })).toEqual({
-      bases: 주자(true, false, true),
+      bases: 주자(true, true, false),
       runsScored: 0,
       outsAdded: 0,
     })
@@ -180,10 +182,10 @@ describe('missionAdvance — 미션 주루도 수비 시뮬레이션이 정한�
     })
   })
 
-  it('미션 진행에도 이어져 있다 — 1루 주자가 단타에 3루까지 간다', () => {
-    // 고정 진루표였다면 1루 주자는 2루까지만 갔다
+  it('미션 진행에도 이어져 있다 — 2루 주자가 단타에 3루까지 간다', () => {
+    // 수비 판(0xaf918)이 정한다 — r268 맨해튼 걸음 뒤로 1루 주자는 단타에 2루에 서므로 2루 주자 판으로 본다
     const 방망이 = MISSIONS.find((m) => m.name === '폭발하는 방망이')!
-    const run = applyOutcome(startMission(방망이), { kind: '안타', bases: 1 })
+    const run = applyOutcome({ ...startMission(방망이), bases: { first: false, second: true, third: false } }, { kind: '안타', bases: 1 })
 
     expect(run.bases).toEqual({ first: true, second: false, third: true })
   })
@@ -290,7 +292,8 @@ describe('타점은 3아웃으로 끝난 판의 득점도 든다 (0xae3e8 ae554 
     const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
     const played = runDefensePlay({
       outcome: 땅볼아웃,
-      trajectory: battedBallTrajectory([266, 94, 785, 0]),
+      // r268: 맨해튼 걸음 뒤로 예전 [266, 94, 785] 는 3루 주자가 늦다 — 원본 코드 3 [47, 1123, 100] 땅볼로 본다
+      trajectory: battedBallTrajectory([47, 1123, 100, 0]),
       bases: run.bases,
       outs: run.outs,
       runAbility: 500,

@@ -366,10 +366,12 @@ describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
         }
       }
       expect(shown.length).toBeGreaterThan(0)
-      expect(shown.slice(0, 5)).toEqual(['2:3', '2:3', '2:3', '2:3', '2:3'])
-      // 여섯째 갱신부터 새 점수 — 갱신 계수는 시계로 돌아 같은 그림(앞 점수)을 한 번 더 볼 수 있다(아래 21 과 같은 까닭)
+      // 여섯째 갱신부터 새 점수 — 갱신 계수는 시계로 돌아 그림 하나가 갱신 하나를 건너뛰거나 같은 그림을 한 번 더 볼 수 있다.
+      // 주자 걸음이 맨해튼 거리(0xbf158 → 0xbfa2c)가 된 뒤로는 홈인 틱의 위상이 바뀌어 첫 갱신이 첫 그림 앞에 떨어져
+      // 앞 점수 그림이 넷 보이고(갱신 다섯 중 첫째를 못 봄), 새 점수 그림이 그만큼 하나 더 보인다
+      expect(shown.slice(0, 4)).toEqual(['2:3', '2:3', '2:3', '2:3'])
       const firstNew = shown.indexOf('2:4')
-      expect(firstNew === 5 || (firstNew === 6 && shown[5] === '2:3')).toBe(true)
+      expect(firstNew).toBe(4)
       expect(shown.slice(firstNew).every((value) => value === '2:4')).toBe(true)
       // 20 번 그린다 — 갱신 계수는 시계로 돌아 한 진행에 갱신이 안 오르면 같은 그림을 한 번 더 볼 수 있다
       expect(shown.length).toBeLessThanOrEqual(21)
@@ -447,9 +449,13 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
       expect(shown[0]).toBe('0')
       expect(shown).toContain('1')
       expect(shown[shown.length - 1]).toBe('2')
-      // 20 + 21 + 19 번 — 두 주자가 같은 그림(판의 마지막 그림)에 홈인해 한 그림에 둘을 받는다(예전 시험은 타자주자만 한 그림
-      // 늦게 옮겨 붙여 21 + 20 + 20 이었다). 끝 틱(플레이 끝)은 그리지 않는다
-      expect(shown).toHaveLength(60)
+      // 21 + 19 + 21 번 — 두 주자가 같은 그림(판의 마지막 그림)에 홈인해 한 그림에 둘을 받는다(예전 시험은 타자주자만 한 그림
+      // 늦게 옮겨 붙여 21 + 20 + 20 이었다). 끝 틱(플레이 끝)은 그리지 않는다. 주자 걸음이 맨해튼 거리(0xbfa2c)가 된 뒤로 판 길이가
+      // 바뀌어 갱신 계수와 그림 시계의 위상이 달라졌다(예전 20 + 21 + 19)
+      expect(shown.filter((value) => value === '0')).toHaveLength(21)
+      expect(shown.filter((value) => value === '1')).toHaveLength(19)
+      expect(shown.filter((value) => value === '2')).toHaveLength(21)
+      expect(shown).toHaveLength(61)
     } finally {
       vi.useRealTimers()
     }
@@ -560,6 +566,8 @@ describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌�
         outs: 0,
         defenseIsCpu: false,
         offenseIsCpu: true,
+        // 발 빠른 주자 — 한 틱 이동 0xbf158 이 맨해튼 거리로 나눠 대각선 1→2루가 느려 주루 500 은 2루에서 잡힌다
+        runAbility: 999,
       },
       createSeededRandom(3),
     )
@@ -680,7 +688,8 @@ describe('판정 콜은 판 안의 그 틱 (결과 메시지 0xbba)', () => {
   it('재생 갈래 — 미리 돌린 도루 판은 그림에 실린 판정 콜을 그 틱에 낸다(판을 연 자리가 아니라)', () => {
     vi.useFakeTimers()
     // 판을 열 때 앞 판에서 남은 사람 송구 키 2(+0x160)가 있던 도루 판 — 포수가 2루로 던져 세이프(결과 9 → 17)
-    const result = runStealPlay({ bases: { first: true, second: false, third: false }, stealingFrom: [1], outs: 0, runAbility: 500, manualThrowBase: 2 })
+    // 발 빠른 주자(주루 999) — 맨해튼 걸음(0xbf158 → 0xbfa2c)이라 주루 500 은 2루에서 잡혀 콜이 62 다
+    const result = runStealPlay({ bases: { first: true, second: false, third: false }, stealingFrom: [1], outs: 0, runAbility: 999, manualThrowBase: 2 })
     const play = { result, callSoundId: stealCallSoundIdOf(result) }
     expect(play.callSoundId).toBe(17)
     const 콜틱 = play.result.ticks.findIndex((view) => (view.tickSoundIds ?? []).includes(play.callSoundId!))

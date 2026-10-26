@@ -108,14 +108,15 @@ function playCareerGames(offsets: readonly number[], games: number): Tally {
 }
 
 describe('나리 타자편 안타율 — 판정 길 회귀 (r209)', () => {
-  it('최적 타이밍(F = N − 2) 신인 타자는 헛스윙 약 30% · 맞힌 공 안타율 약 .27 · 타율 약 .25', () => {
+  // r268: 야수 · 주자 한 걸음과 도착 틱이 원본대로 맨해튼 거리(0xbfa2c)라 대각선으로 느려져 맞힌 공 안타율이 .27 → .37 로 올랐다
+  it('최적 타이밍(F = N − 2) 신인 타자는 헛스윙 약 30% · 맞힌 공 안타율 약 .37 · 타율 약 .3', () => {
     const tally = playCareerGames([0], 200)
     expect(tally.atBats).toBeGreaterThan(700)
     const whiffRate = tally.whiffs / tally.swings
     expect(whiffRate).toBeGreaterThan(0.24)
     expect(whiffRate).toBeLessThan(0.37)
-    expect(tally.hits / tally.fair).toBeGreaterThan(0.2)
-    expect(tally.hits / tally.fair).toBeLessThan(0.35)
+    expect(tally.hits / tally.fair).toBeGreaterThan(0.3)
+    expect(tally.hits / tally.fair).toBeLessThan(0.44)
     expect(tally.hits / tally.atBats).toBeGreaterThan(0.19)
   })
 

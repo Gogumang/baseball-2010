@@ -581,7 +581,11 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     expect(startSteal(progress, 2, createSeededRandom(0))).toBe(progress)
   })
 
-  it('공이 도착하면 도루 판(종류 5)이 열린다 — 1루 도루는 늘 세이프, 기록 8 · 타석은 이어진다', () => {
+  it('공이 도착하면 도루 판(종류 5)이 열린다 — 살면 기록 8, 잡히면 아웃 하나 · 어느 쪽이든 타석은 이어진다', () => {
+    // r268: 주자 걸음이 맨해튼 거리(0xbf158 → 0xbfa2c)라 대각선 1루→2루가 평면 속도의 0.71 배다 — 예전 웹처럼 "늘 세이프" 가 아니다.
+    // 이 씨앗들에서는 살고 잡히는 판이 섞여 나온다
+    let 산판 = 0
+    let 잡힌판 = 0
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const { progress } = 일루주자()
       const started = startSteal(progress, 1, createSeededRandom(0))
@@ -590,14 +594,22 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
       expect(next.stealingFrom).toEqual([])
       expect(next.lastArrivalPlay?.kind).toBe(5)
       expect(next.lastDefensePlay).toBe(next.lastArrivalPlay?.result)
-      expect(next.game.bases.second).toBe(true)
       expect(next.game.bases.first).toBe(false)
-      expect(next.game.outs).toBe(progress.game.outs)
       expect(next.game.battingOrderIndex).toBe(progress.game.battingOrderIndex)
-      // 8 도루 성공 (0xa8024 @a83c6) — 사람 공격이라 게이트를 지난다
-      expect(next.recordIds).toEqual([...progress.recordIds, 8])
       expect(next.atBat.balls).toBe(progress.atBat.balls + 1)
+      if (next.game.bases.second) {
+        산판 += 1
+        expect(next.game.outs).toBe(progress.game.outs)
+        // 8 도루 성공 (0xa8024 @a83c6) — 사람 공격이라 게이트를 지난다
+        expect(next.recordIds).toEqual([...progress.recordIds, 8])
+      } else {
+        잡힌판 += 1
+        expect(next.game.outs).toBe(progress.game.outs + 1)
+        expect(next.recordIds).not.toContain(8)
+      }
     }
+    expect(산판).toBeGreaterThan(0)
+    expect(잡힌판).toBeGreaterThan(0)
   })
 
   it('출발 표시 st[0x15 + i] 는 판정 때가 아니라 0xf 진입(3d966~3d976)에서 지운다 — 같은 타석 다음 공이면 그 걸음에 지워진다', () => {

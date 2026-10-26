@@ -10,6 +10,7 @@ import {
   horizontalDistance,
   isOutfieldSlot,
   isSamePoint,
+  manhattanDistance,
   progressPercent,
   runnerSpeedOf,
   SLIDING_SPEED_BONUS,
@@ -19,6 +20,7 @@ import {
   WORLD_DEPTH,
   WORLD_WIDTH,
 } from '@/entities/fielding/model/fieldGeometry'
+import { createRunner, runnerOneMoreBaseTicks } from '@/entities/fielding/model/fieldingState'
 
 describe('수비 좌표계 — 0xd856c · 0xd86ec · cfg', () => {
   it('월드는 40000 × 32500 이다 (R3 1절)', () => {
@@ -89,8 +91,9 @@ describe('거리·틱·한 틱 이동', () => {
     expect(horizontalDistance({ x: 0, y: 9999, z: 0 }, { x: 3, y: 0, z: 4 })).toBe(5)
   })
 
-  it('도착 틱은 거리 ÷ 속도 버림, 속도 0 이면 1000 (0xbf01c)', () => {
-    expect(ticksToReach(BASE_POSITIONS[0], BASE_POSITIONS[1], 335)).toBe(23)
+  it('도착 틱은 맨해튼 거리 ÷ 속도 버림, 속도 0 이면 1000 (0xbf01c → 0xbfa2c)', () => {
+    // 홈→1루 |5946| + |5270| = 11216 — 평면 거리 7945 가 아니다
+    expect(ticksToReach(BASE_POSITIONS[0], BASE_POSITIONS[1], 335)).toBe(33)
     expect(ticksToReach(BASE_POSITIONS[0], BASE_POSITIONS[1], 0)).toBe(UNREACHABLE_TICKS)
   })
 
@@ -102,6 +105,31 @@ describe('거리·틱·한 틱 이동', () => {
   it('멀면 속도만큼만 간다', () => {
     const 한틱 = stepToward({ x: 0, y: 0, z: 0 }, { x: 1000, y: 0, z: 0 }, 220)
     expect(한틱).toEqual({ x: 220, y: 0, z: 0 })
+  })
+
+  it('대각선 한 틱은 맨해튼 거리로 나눠 속도보다 덜 간다 (0xbf158 bf1c6 → 0xbfa2c)', () => {
+    // 평면 거리 1414 > 220 이라 붙이지 않고, 1000 × 220 ÷ 2000 = 110 씩 간다(평면 거리로 나누면 155)
+    expect(stepToward({ x: 0, y: 0, z: 0 }, { x: 1000, y: 0, z: 1000 }, 220)).toEqual({ x: 110, y: 0, z: 110 })
+  })
+
+  it('붙이기 검사는 평면 거리다 (0xbf158 bf186 → 0xbf9f0) — 맨해튼 300 이어도 평면 212 ≤ 220 이면 붙는다', () => {
+    expect(stepToward({ x: 0, y: 0, z: 0 }, { x: 150, y: 0, z: 150 }, 220)).toEqual({ x: 150, y: 0, z: 150 })
+  })
+
+  it('진행률은 100 − 남은 맨해튼 거리 몫이다 (0xa04e8 a0616~a068a)', () => {
+    // 남은 |25946 − 21000| + |24175 − 28559| = 9330, 전체 11216 → 100 − ⌊83.18⌋ = 17 (평면 거리 간 몫이면 16)
+    expect(progressPercent(BASE_POSITIONS[0], { x: 21_000, y: 0, z: 28_559 }, BASE_POSITIONS[1])).toBe(17)
+  })
+
+  it('두 거리 함수 — 0xbf9f0 은 isqrt(dx² + dz²), 0xbfa2c 는 |dx| + |dz| (둘 다 높이 y 를 안 본다)', () => {
+    expect(manhattanDistance(BASE_POSITIONS[0], BASE_POSITIONS[1])).toBe(11_216)
+    expect(manhattanDistance({ x: 0, y: 9999, z: 0 }, { x: -3, y: 0, z: 4 })).toBe(7)
+    expect(horizontalDistance({ x: 0, y: 9999, z: 0 }, { x: -3, y: 0, z: 4 })).toBe(5)
+  })
+
+  it('한 루 더 가는 틱도 맨해튼 거리다 (주자 vt0xa0 = 0xa06ec a0740 → 0xbfa2c)', () => {
+    // 1루에 선 주자 — 1루→2루 |5946| + |5005| = 10951 ÷ 300 = 36 (평면 7772 면 25)
+    expect(runnerOneMoreBaseTicks(createRunner(1, 1, 300))).toBe(36)
   })
 
   it('진행률은 출발 루 기준 퍼센트다 (주자 vt90 = 0xa04e8)', () => {
