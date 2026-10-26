@@ -16,6 +16,8 @@ import {
   arrivePitch,
   hiddenStealBasesOf,
   summaryOf,
+  enterBenchClearing,
+  judgeHitByPitch,
   resolveBenchClearing,
   throwOpponentPitch,
   opponentCpuMagicStateOf,
@@ -1130,10 +1132,14 @@ describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 
     const progress = startGame(createSeededRandom(20100901))
     return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
   }
+  /** 공 도착에서 붙든 사구를 0x12 틱 31 의 판정까지 (A-22) */
+  function 사구판정(progress: GameProgress, random: RandomPort): GameProgress {
+    return judgeHitByPitch(startPlayerOutcome(progress, { kind: '사구' }, random), random)
+  }
 
   it('수비가 돌지 않고 곧장 끝난다 — 타수에 안 들고 볼넷 수에도 안 든다', () => {
     const 시작 = 내타석(EMPTY_BASES, 0)
-    const 끝 = startPlayerOutcome(시작, { kind: '사구' }, createSeededRandom(3))
+    const 끝 = 사구판정(시작, createSeededRandom(3))
 
     expect(끝.pendingDefensePlay).toBeNull()
     expect(끝.myStats.atBats).toBe(시작.myStats.atBats)
@@ -1143,7 +1149,7 @@ describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 
   })
 
   it('타석 결과 링에는 9 가 들어간다 (0xa8b9c)', () => {
-    const 끝 = startPlayerOutcome(내타석(EMPTY_BASES, 0), { kind: '사구' }, createSeededRandom(3))
+    const 끝 = 사구판정(내타석(EMPTY_BASES, 0), createSeededRandom(3))
 
     expect(끝.recentAtBatCodes[끝.recentAtBatCodes.length - 1]).toBe(9)
   })
@@ -1151,7 +1157,7 @@ describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 
   it('만루 사구는 밀어내기 1타점이다', () => {
     const 만루 = { first: true, second: true, third: true }
     const 시작 = 내타석(만루, 0)
-    const 끝 = startPlayerOutcome(시작, { kind: '사구' }, createSeededRandom(3))
+    const 끝 = 사구판정(시작, createSeededRandom(3))
 
     expect(끝.myStats.runsBattedIn - 시작.myStats.runsBattedIn).toBe(1)
   })
@@ -1159,7 +1165,7 @@ describe('사구 — 사람 타석 결과 4 (0x35a20 → 0x9d57c) 를 경기에 
   it('사구는 2·3볼넷 기록(34·35)을 안 센다 — 0xa7a7c 를 부르지 않는다', () => {
     let progress = 내타석(EMPTY_BASES, 0)
     progress = { ...progress, myStats: { ...progress.myStats, walks: 1 } }
-    const 끝 = startPlayerOutcome(progress, { kind: '사구' }, createSeededRandom(3))
+    const 끝 = 사구판정(progress, createSeededRandom(3))
 
     expect(끝.recordIds.filter((id) => id === 34 || id === 35)).toEqual([])
   })
@@ -1169,6 +1175,10 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
   function 내타석(bases: BaseState, outs: number): GameProgress {
     const progress = startGame(createSeededRandom(20100901))
     return { ...progress, game: { ...progress.game, bases, outs, half: '말' } }
+  }
+  /** 공 도착에서 붙든 사구를 0x12 틱 31 의 판정까지 (A-22) */
+  function 사구판정(progress: GameProgress, random: RandomPort): GameProgress {
+    return judgeHitByPitch(startPlayerOutcome(progress, { kind: '사구' }, random), random)
   }
   /** 첫 굴림만 비율로 정해 두고 나머지는 씨앗 난수에 맡긴다 */
   function 첫굴림(value: number, seed: number): RandomPort {
@@ -1187,7 +1197,7 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
 
   it('사구는 맨 먼저 한 번 굴린다 — 안 들어가면 그 한 번 말고는 볼넷과 같은 차례다', () => {
     const 시작 = 내타석(EMPTY_BASES, 0)
-    const 사구끝 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0.9, 3))
+    const 사구끝 = 사구판정(시작, 첫굴림(0.9, 3))
     const 볼넷끝 = startPlayerOutcome(시작, { kind: '볼넷' }, createSeededRandom(3))
 
     expect(사구끝.game).toEqual(볼넷끝.game)
@@ -1200,11 +1210,20 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     let 굴림 = 0
     const 첫 = 첫굴림(0, 6)
     const 세는 = 세며(첫, () => { 굴림 += 1 })
-    const 들어감 = startPlayerOutcome(시작, { kind: '사구' }, 세는)
+    const 붙듦 = startPlayerOutcome(시작, { kind: '사구' }, 세는)
+    // 공 도착 — 굴림 없이 0x12 대기로 붙든다 (A-22)
+    expect(굴림).toBe(0)
+    expect(붙듦.pendingBenchClearing).toEqual({ phase: 'wait', outcome: { kind: '사구' } })
+    expect(붙듦.game).toEqual(시작.game)
+    // 0x12 틱 31 의 4e74c — 굴림 1, 0x1e 예약(진입은 다음 틀)
+    const 판정 = judgeHitByPitch(붙듦, 세는)
+    expect(굴림).toBe(1)
+    expect(판정.pendingBenchClearing).toEqual({ phase: 'entry', outcome: { kind: '사구' } })
+    const 들어감 = enterBenchClearing(판정, 세는)
 
     // 들어가기 굴림 1 + 진입 0x3a5f0 의 45 — 밀어내기 주루·다음 타석은 아직 안 돌았다
     expect(굴림).toBe(46)
-    expect(들어감.pendingBenchClearing).toEqual({ outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
+    expect(들어감.pendingBenchClearing).toEqual({ phase: 'scene', outcome: { kind: '사구' }, entryRolls: expect.any(Array) })
     // 진입 굴림 45 번은 그리기 0x43228 이 쓰도록 칸 9 개로 싣는다
     expect(들어감.pendingBenchClearing?.entryRolls).toHaveLength(9)
     expect(들어감.game).toEqual(시작.game)
@@ -1214,7 +1233,8 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
 
   it('연출이 끝나면(0xae24c) 사구를 보통 길로 먹인다 — 틱 10 을 지났으면 그 앞에 굴림 8 번이 끼어든다', () => {
     const 시작 = 내타석(EMPTY_BASES, 0)
-    const 들어감 = startPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0, 6))
+    const 첫 = 첫굴림(0, 6)
+    const 들어감 = enterBenchClearing(사구판정(시작, 첫), 첫)
 
     const 다봄 = resolveBenchClearing(들어감, { reachedTargetTick: true }, createSeededRandom(11))
     // 건너뛴 쪽에 같은 난수를 8 번 앞당겨 주면 둘이 똑같이 흘러가야 한다
@@ -1231,6 +1251,17 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
     const 시작 = 내타석(EMPTY_BASES, 0)
     const 끝 = applyPlayerOutcome(시작, { kind: '사구' }, 첫굴림(0, 6))
     expect(끝.pendingBenchClearing).toBeNull()
+  })
+
+  it('붙든 채(0x12 대기) 끝내기를 부르면 판정 · 진입 · 연출을 한꺼번에 돈다 — 굴림 차례는 한 틀씩 부른 것과 같다', () => {
+    const 시작 = 내타석(EMPTY_BASES, 0)
+    const 한꺼번 = createSeededRandom(6)
+    const 몰아 = resolveBenchClearing(startPlayerOutcome(시작, { kind: '사구' }, 한꺼번), { reachedTargetTick: true }, 한꺼번)
+    const 따로 = createSeededRandom(6)
+    const 진입 = enterBenchClearing(사구판정(시작, 따로), 따로)
+    const 나눠 = 진입.pendingBenchClearing === null ? 진입 : resolveBenchClearing(진입, { reachedTargetTick: true }, 따로)
+    expect(몰아.game).toEqual(나눠.game)
+    expect(한꺼번.rand(0, 1000)).toBe(따로.rand(0, 1000))
   })
 
   it('돌발이 진행 중이면 굴림은 쓰지만 들어가지 않는다 (0x8eb94)', () => {

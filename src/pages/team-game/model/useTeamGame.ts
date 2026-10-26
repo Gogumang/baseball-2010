@@ -22,6 +22,8 @@ import {
   cancelSubstitution,
   confirmScene,
   returnToPitchSelection,
+  enterBenchClearing,
+  judgeHitByPitch,
   resolveBenchClearing,
   resolveDefensePlay,
   recordDrawnTeamFieldingErrors,
@@ -184,6 +186,10 @@ export interface TeamGameSession {
      * 키 없이 끝까지 돌려서라도 붙든 상태를 푼다.
      */
     readonly finishRunnerPlay: (result?: DefensePlayResult) => void
+    /** 사구의 0x12 대기 끝(틱 31 갱신 0x4e6d4) — 4e74c 판정 (`judgeHitByPitch`, 화면 `useHitByPitchWait` 가 부른다) */
+    readonly judgeHitByPitch: () => void
+    /** 판정이 0x1e 를 예약한 다음 틀 — 벤치 클리어링 진입 0x3a5f0 의 굴림 45 번 (`enterBenchClearing`) */
+    readonly enterBenchClearing: () => void
     /**
      * 벤치 클리어링 연출(상태 0x1e)이 끝났다 (`BenchClearingScene` 의 `onDone`) — 출구 0xae24c 뒤 사구를 먹인다.
      * `reachedTargetTick` 이면 틱 10 의 굴림 8 번을 진행기가 먼저 낸다.
@@ -412,6 +418,8 @@ export function useTeamGame(
         const after = step((current) => stopAutoRelay(current))
         if (after.autoProgressFlag === 'stopped') autoRelayRecordPort().setStopped(autoRelayModeSlotOf(after.options.mode), true)
       },
+      judgeHitByPitch: () => step((current) => judgeHitByPitch(current, random)),
+      enterBenchClearing: () => step((current) => enterBenchClearing(current, random)),
       finishBenchClearing: (reachedTargetTick: boolean) =>
         step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
       finishRunnerPlay: (result?: DefensePlayResult) => {
