@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { mountOnce } from '@/shared/lib/strictMount/strictMount'
 import { startPlayClock } from '@/entities/collection/model/playClock'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
@@ -8,6 +8,7 @@ import {
   closeBurstWindow,
   closeManagerHookWindow,
   confirmScene,
+  enterPitchResult,
   giveUpPitching,
   isPitchTurn,
   pickoff,
@@ -47,7 +48,9 @@ import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
-import { playSoundIdsAfterSceneTicks, type PitchStepSoundTiming } from '@/features/play-game/model/sceneTickSounds'
+import {
+  playSoundIdsAfterSceneTicks, resultEntryStepTimingOf, scheduleSceneFrameUpdate, type PitchStepSoundTiming,
+} from '@/features/play-game/model/sceneTickSounds'
 import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import type {
   PitchInput,
@@ -166,7 +169,7 @@ export function usePitcherGame(
     ) => {
       const current = progressRef.current
       const after = next(current)
-      if (after === current) return
+      if (after === current) return current
       progressRef.current = after
       setProgress(after)
       const timing = timingOf?.(current, after) ?? null
@@ -180,8 +183,19 @@ export function usePitcherGame(
       // 투수편 사람 장면은 늘 우리 수비라 CPU 투수 교체(3da3e — 수비가 CPU 일 때)는 없고, 8회 구원 등판·강판 교체는
       // 0x21(간이 엔진) 쪽이라 0x16 을 안 지나 등판음도 없다
       playSoundIdsAfterSceneTicks(audio, pinchHitSoundIdsOf(current, after), timing?.pitchSelectionTicks ?? 0)
+      return after
     }
   }, [audio])
+
+  /**
+   * 붙든 공(`pendingPitchArrival`)의 0x12 진입 틀 시계 — 경기 화면이 내려가면 거둔다(원본도 그 틀에 닿지 않는다). 장면 시계라 공용 창이
+   * 서 있으면 함께 선다
+   */
+  const cancelResultEntryRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => {
+    cancelResultEntryRef.current?.()
+    cancelResultEntryRef.current = null
+  }, [])
 
   // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 모드 3 은 적재 상태 8 끝(48b20)에서 0xc 로 오므로 로딩 판이 끝나는 자리다
   const finishLoading = useCallback(() => {
@@ -191,10 +205,26 @@ export function usePitcherGame(
 
   const actions = useMemo(
     () => ({
-      throwPitch: (input: PitchInput) =>
-        step(
-          // 공 도착의 도루 · 폭투 판은 붙들어 수비 화면이 실시간으로 돌린다(송구 키 +0x160 — `live`)
-          (current) => startPitch(current, input, random, true),
+      throwPitch: (input: PitchInput) => {
+        const before = progressRef.current
+        const releaseTimingOf = (stepBefore: PitcherGameProgress, after: PitcherGameProgress): PitchStepSoundTiming => {
+          const frameCount = after.lastPitch?.frameCount ?? 0
+          const resolution = after.lastResolution
+          const outcome = resolution === null ? null : applyPitchResolution(stepBefore.atBat, resolution).outcome
+          return {
+            releaseSoundId: pitchReleaseSoundIdOf({
+              typeNumber: input.typeNumber,
+              pitcherMagicNumber: after.lastPitch?.pitcherMagicNumber ?? 0,
+              ballMagicNumber: after.lastPitch?.magicNumber ?? 0,
+            }),
+            resultEntryTicks: pitchResultEntryDelayTicksOf(frameCount),
+            pitchSelectionTicks: pitchSelectionEntryDelayTicksOf(frameCount, resultWaitTicksOf(outcome)),
+          }
+        }
+        const released = step(
+          // 공 도착의 도루 · 폭투 판은 붙들어 수비 화면이 실시간으로 돌린다(송구 키 +0x160 — `live`). 못 맞힌 공의 공 도착 0x3dfac 은
+          // 0x12 진입 틀까지 붙든다(`holdsArrival` — 아래 시계가 `enterPitchResult` 로 잇는다)
+          (current) => startPitch(current, input, random, true, true),
           // 심판 콜(0x51a94) — 0x12 진입 0x3dfac 가 판정 0x9d57c 를 메시지 0xbba 로 곧바로(0xbfbac, 3e1e2~3e1e8) 보내 그 틀에 난다.
           // 투구 순간 소리는 아래 `pitchStepSoundTimingOf` 가 놓는 틀에 낸다
           (before, after) => {
@@ -218,11 +248,7 @@ export function usePitcherGame(
               // 공 도착 0x3dfac 가 연 판의 판정 콜 — 도루 · 폭투 판은 붙들어(`live`) 화면이 판 안의 그 틱에 내므로 여기서는
               // `lastArrivalPlay` 가 밀어내기(콜 없음)일 때만 바뀐다. 미리 돌려 재생 칸에 넣은 판은 재생 화면이 기록된 틱에 내고
               // (`replayCallsOnScreen`), 재생하지 않는 판만 연 자리에서 낸다(근사)
-              after.lastArrivalPlay !== null &&
-              after.lastArrivalPlay !== before.lastArrivalPlay &&
-              !replayCallsOnScreen(before.lastDefensePlay, after.lastDefensePlay, after.lastArrivalPlay.result)
-                ? after.lastArrivalPlay.callSoundId
-                : null,
+              arrivalCallSoundIdOf(before, after),
               // 볼넷 뒤 관중 함성 29 (0x51afa~0x51b02) — 원본은 **공격 팀이 CPU 조작**
               // (`state[0x31 + state[9]] == 1`) 일 때만 예약한다. 투수편은 사람이 늘 수비라
               // 타석에 서는 쪽이 언제나 CPU 다 → 조건이 늘 참이다.
@@ -238,21 +264,22 @@ export function usePitcherGame(
           // 투구 순간 소리 12 / 마구 28 (0x3f378 — 놓는 틀). 내 투수는 육성(rec+0xa 비트7)이라 0xb633d 가 거짓 — 구질 22 일 때만 28.
           // 심판 콜은 0x12 진입 틀(놓은 틀에서 `pitchResultEntryDelayTicksOf` 뒤 — 삼진 진동과 같은 틀), 0xf 진입 CPU 대타 22 는
           // 0x12 문턱 뒤 0xf 틀이다(`PitchStepSoundTiming`). 원본은 그 사이 공이 날아가 두 소리가 다 들린다
-          (before, after) => {
-            const frameCount = after.lastPitch?.frameCount ?? 0
-            const resolution = after.lastResolution
-            const outcome = resolution === null ? null : applyPitchResolution(before.atBat, resolution).outcome
-            return {
-              releaseSoundId: pitchReleaseSoundIdOf({
-                typeNumber: input.typeNumber,
-                pitcherMagicNumber: after.lastPitch?.pitcherMagicNumber ?? 0,
-                ballMagicNumber: after.lastPitch?.magicNumber ?? 0,
-              }),
-              resultEntryTicks: pitchResultEntryDelayTicksOf(frameCount),
-              pitchSelectionTicks: pitchSelectionEntryDelayTicksOf(frameCount, resultWaitTicksOf(outcome)),
-            }
-          },
-        ),
+          releaseTimingOf,
+        )
+        if (released === before || released.pendingPitchArrival == null) return
+        // 0x12 진입 틀 — 0x3dfac 의 굴림(`rollPassedBall` · 판 시작)과 그 뒤 걸음. 공이 나는 동안의 관리자 틱 굴림(마구 공 파티클 따위)이
+        // 먼저 난다. 걸음의 소리는 그 틀(지금), 0xf 진입 교체 소리는 남은 틱 뒤(`resultEntryStepTimingOf`)
+        const releaseTiming = releaseTimingOf(before, released)
+        cancelResultEntryRef.current?.()
+        cancelResultEntryRef.current = scheduleSceneFrameUpdate(() => {
+          cancelResultEntryRef.current = null
+          step(
+            (current) => enterPitchResult(current, random),
+            (entryBefore, entryAfter) => [arrivalCallSoundIdOf(entryBefore, entryAfter)],
+            () => resultEntryStepTimingOf(releaseTiming),
+          )
+        }, releaseTiming.resultEntryTicks)
+      },
       /**
        * **여기서야** 진루·아웃·실점이 경기 상태가 된다 — 그 전까지는 타석 결과 코드만 정해져 있었다.
        *
@@ -352,6 +379,19 @@ export function usePitcherGame(
   )
 
   return { progress, loadingTip, finishLoading, canPitch: isPitchTurn(progress), summary, actions }
+}
+
+/**
+ * 공 도착 0x3dfac 가 연 판의 판정 콜 — 도루 · 폭투 판은 붙들어(`live`) 화면이 판 안의 그 틱에 내므로 여기서는 `lastArrivalPlay` 가
+ * 밀어내기(콜 없음)일 때만 바뀐다. 미리 돌려 재생 칸에 넣은 판은 재생 화면이 기록된 틱에 내고(`replayCallsOnScreen`), 재생하지 않는 판만
+ * 연 자리에서 낸다(근사)
+ */
+function arrivalCallSoundIdOf(before: PitcherGameProgress, after: PitcherGameProgress): number | null {
+  return after.lastArrivalPlay !== null &&
+    after.lastArrivalPlay !== before.lastArrivalPlay &&
+    !replayCallsOnScreen(before.lastDefensePlay, after.lastDefensePlay, after.lastArrivalPlay.result)
+    ? after.lastArrivalPlay.callSoundId
+    : null
 }
 
 /** 화면이 쓰는 타입을 한 번 더 내보낸다 — 앱이 진행기 경로를 몰라도 되게 한다 */

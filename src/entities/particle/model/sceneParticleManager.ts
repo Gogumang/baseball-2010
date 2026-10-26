@@ -66,12 +66,52 @@ export function isSceneParticleTickHeld(): boolean {
  */
 let lastTickedAppTick: number | null = null
 
+/** 그 틀의 관리자 틱 앞에 돌 장면 갱신 하나 — `runBeforeSceneParticleTick` */
+interface FrameUpdate {
+  readonly isDueAt: (appTick: number) => boolean
+  readonly run: () => void
+}
+const frameUpdates = new Set<FrameUpdate>()
+
+/**
+ * **그 틀의 관리자 틱 앞에 돌 장면 갱신을 건다** — 원본 한 틀은 갱신(52e14) → 프레임 끝 관리자 틱(0x6de85) 차례다. 웹은 장면 갱신을
+ * 장면 틱 시계(setTimeout)로, 관리자 틱을 그림 시계(requestAnimationFrame)로 돌려 같은 틀의 두 굴림 차례가 어느 쪽이 먼저 울리느냐에
+ * 달린다. 갱신을 시계와 여기 둘 다에 걸면, 관리자 틱이 먼저 그 틀을 잡으려 할 때(`claimSceneParticleTick`) 갱신이 먼저 돈다.
+ * `isDueAt(앱 틱)` 이 참인 첫 관리자 틱 앞에 한 번 돈다. 돌려준 함수로 거둔다(이미 돌았으면 아무 일 없다).
+ */
+export function runBeforeSceneParticleTick(isDueAt: (appTick: number) => boolean, run: () => void): () => void {
+  const update: FrameUpdate = { isDueAt, run }
+  frameUpdates.add(update)
+  return () => {
+    frameUpdates.delete(update)
+  }
+}
+
+/** 시험용 — 걸린 장면 갱신을 지금 다 돌린다(시계 · 관리자 틱을 기다리지 않는다). 공을 놓은 걸음과 0x12 진입을 한 번에 보는 시험이 쓴다 */
+export function runSceneFrameUpdatesForTest(): void {
+  for (const update of [...frameUpdates]) {
+    if (!frameUpdates.has(update)) continue
+    frameUpdates.delete(update)
+    update.run()
+  }
+}
+
+function flushFrameUpdates(appTick: number): void {
+  for (const update of [...frameUpdates]) {
+    if (!frameUpdates.has(update) || !update.isDueAt(appTick)) continue
+    frameUpdates.delete(update)
+    update.run()
+  }
+}
+
 /**
  * 앱 틱 `appTick` 의 틀에 관리자 틱을 돌려도 되는가 — 아직 안 돌았으면 참을 돌려주고 표지를 그 틀로 올린다. 앱 전역 관리자가 아닌
  * 장면(시험 따위)이거나 앱 틱을 모르면(`undefined`) 늘 참이다.
  */
 export function claimSceneParticleTick(target: ParticleScene, appTick: number | undefined): boolean {
   if (target !== scene || appTick === undefined) return true
+  // 그 틀의 장면 갱신이 아직이면 먼저 — 갱신 → 관리자 틱 차례(`runBeforeSceneParticleTick`)
+  flushFrameUpdates(appTick)
   if (lastTickedAppTick !== null && appTick <= lastTickedAppTick) return false
   lastTickedAppTick = appTick
   return true
@@ -83,4 +123,5 @@ export function resetSceneParticleManagerForTest(): void {
   claims = 0
   tickHolds = 0
   lastTickedAppTick = null
+  frameUpdates.clear()
 }

@@ -605,6 +605,13 @@ export interface PitcherGameProgress {
    */
   readonly pendingRunnerPlay?: PitcherPendingRunnerPlay | null
   /**
+   * **0x12 진입을 기다리는 못 맞힌 공** — 화면 갈래(`startPitch` 의 `holdsArrival`)는 공을 놓는 걸음(0x11 틱 10)에서 공 도착 0x3dfac 을
+   * 돌리지 않고 여기 붙든다. 원본은 공이 날아간 뒤 0x12 진입 틀에 0x3dfac 이 `rollPassedBall` · 판 시작 굴림을 내므로, 그 사이 프레임 끝
+   * 관리자 틱 0x6de85 (마구 공 파티클 따위 — 경기 난수)가 먼저 굴린다. 화면이 그 틀에 `enterPitchResult` 를 불러 나머지를 돌린다.
+   * 없으면(null · 옛 진행) 붙든 공이 없다
+   */
+  readonly pendingPitchArrival?: PitcherPendingPitchArrival | null
+  /**
    * **이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 투수편은 늘 CPU 공격이라 투구마다 CPU 타자 결정(0x34334)
    * 바로 앞에서 `0x520de` 를 굴려 넣는다(`rollCpuStealStart`). 공이 도착하면(0x3dfac) 도루 판(종류 5)을 열거나
    * 지워지고, 인플레이 타구면 타구 판의 리드(0x3d7b8)가 이 칸을 본다.
@@ -1190,8 +1197,13 @@ export function startPitch(
    * 안 주면 예전처럼 키 없이 미리 돌린다(`throwPitch` · 시험)
    */
   live = false,
+  /**
+   * 화면 갈래 — 못 맞힌 공의 공 도착 0x3dfac 을 0x12 진입 틀까지 붙든다(`pendingPitchArrival`). 부르는 쪽이 그 틀
+   * (놓은 틀에서 `pitchResultEntryDelayTicksOf` 뒤)에 `enterPitchResult` 를 부른다. 안 주면 예전처럼 놓는 걸음에 다 돌린다
+   */
+  holdsArrival = false,
 ): PitcherGameProgress {
-  if (!isPitchTurn(progress)) return progress
+  if (!isPitchTurn(progress) || progress.pendingPitchArrival != null) return progress
   const { options } = progress
   const isMagic = input.typeNumber === MAGIC_PITCH_TYPE_NUMBER
   if (isMagic && progress.magicRemaining <= 0) return progress
@@ -1403,15 +1415,52 @@ export function startPitch(
   }
 
   // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다
-  const resume = { buntKind: thrown.buntKind ?? 0 }
-  const arrival = arrivePitcherPitch(
-    afterPitch,
-    { resolution, outcomeAfter: afterPitch.atBat.outcome, buntKind: thrown.buntKind ?? 0, grade },
-    random,
-    live ? resume : undefined,
-  )
+  const arrivalPitch: PitcherPendingPitchArrival = {
+    resolution,
+    outcomeAfter: afterPitch.atBat.outcome,
+    buntKind: thrown.buntKind ?? 0,
+    grade,
+    live,
+  }
+  // 화면 갈래 — 0x3dfac 은 0x12 진입 틀이다. 공이 나는 동안의 관리자 틱 굴림이 먼저 나도록 그 틀까지 붙든다 (`enterPitchResult`)
+  if (holdsArrival && arrivesUnhit(resolution)) return { ...afterPitch, pendingPitchArrival: arrivalPitch }
+  return arrivePitcherPitchThenRest(afterPitch, arrivalPitch, random)
+}
+
+/**
+ * **0x12 진입 0x3dfac — 붙든 공의 공 도착** (`pendingPitchArrival`). 화면이 공을 놓은 틀에서 `pitchResultEntryDelayTicksOf` 뒤 틀 머리에
+ * 부른다 — 그 사이 공이 나는 틀들의 관리자 틱 0x6de85 굴림이 이 굴림(`rollPassedBall` 1번 → 판이 열리면 판 시작 굴림) 앞에 난다.
+ * 그 뒤는 `startPitch` 가 놓는 걸음에 돌리던 나머지 그대로다(0xf 진입 · 타석 결과 · 벤치 클리어링). 붙든 공이 없으면 그대로 돌려준다.
+ */
+export function enterPitchResult(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  const held = progress.pendingPitchArrival
+  if (held == null) return progress
+  return arrivePitcherPitchThenRest({ ...progress, pendingPitchArrival: null }, held, random)
+}
+
+/** 붙든(또는 막 놓은) 못 맞힌 공의 0x3dfac 과 그 뒤 — `startPitch` · `enterPitchResult` 의 꼬리 */
+function arrivePitcherPitchThenRest(
+  progress: PitcherGameProgress,
+  pitch: PitcherPendingPitchArrival,
+  random: RandomPort,
+): PitcherGameProgress {
+  const resume = { buntKind: pitch.buntKind }
+  const arrival = arrivePitcherPitch(progress, pitch, random, pitch.live ? resume : undefined)
   if (arrival.deferred === true) return arrival.progress
   return afterMyPitchArrival(arrival, resume, random)
+}
+
+/** 0x12 진입까지 붙든 공 — `pendingPitchArrival` */
+export interface PitcherPendingPitchArrival {
+  readonly resolution: PitchResolution
+  /** 이 공을 먹인 뒤의 타석 결과 (볼넷 · 삼진 · 사구, 아니면 null) */
+  readonly outcomeAfter: AtBatOutcome | null
+  /** 장면 +0xfdc — CPU 타자의 이 공 번트 종류 */
+  readonly buntKind: number
+  /** 이 공의 등급 t (scene+0x17c0) */
+  readonly grade: number
+  /** 도루 · 폭투 판을 화면이 실시간으로 돌리는 갈래인가 (`startPitch` 의 `live`) */
+  readonly live: boolean
 }
 
 /**
@@ -2045,7 +2094,8 @@ export function pickoff(
   /** 화면이 판을 실시간으로 돌린다 — 판을 붙들고(`pendingRunnerPlay`) 끝나면 `resolveRunnerPlay` (사람 송구 키 +0x160) */
   live = false,
 ): PitcherGameProgress {
-  if (!isPitchTurn(progress) || !progress.atBatPrepared) return progress
+  // 공이 날거나 0x12 인 동안(붙든 공)은 0xf 키가 없다
+  if (!isPitchTurn(progress) || !progress.atBatPrepared || progress.pendingPitchArrival != null) return progress
   const bases = progress.game.bases
   const play = pickoffPlayForKey(webKey, (base) =>
     base === 1 ? bases.first : base === 2 ? bases.second : bases.third,

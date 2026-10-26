@@ -67,9 +67,12 @@ export interface PitchingStageSource {
     readonly resultTicks: number
     /** CPU 타자의 스윙 프레임 · 번트 종류 (휘두르지 않았으면 null) */
     readonly cpuSwing?: CpuSwingPose | null
-    /** 공 도착 0x3dfac 의 낫아웃 갈래(3e0aa)가 판정 칸을 지웠나 — 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다 */
-    readonly judgementCleared?: boolean
   } | null
+  /**
+   * 마지막 공의 공 도착 0x3dfac 의 낫아웃 갈래(3e0aa)가 판정 칸을 지웠나 — 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다. 세션은 못 맞힌 공의
+   * 공 도착을 0x12 진입 틀에 돌리므로 공(`lastThrow`)과 따로 그 틀에 선다
+   */
+  readonly isJudgementCleared?: boolean
   readonly pitcherForm: number
   readonly pitcherHand: number
   /** 미션 투수 장비 겹 (0x10810 → 0x79790) — 없으면 맨몸 */
@@ -570,7 +573,7 @@ export function PitchingScreen({
               pitch={stage.lastThrow?.pitch ?? null}
               resolution={stage.lastThrow?.resolution ?? null}
               resultTicks={stage.lastThrow?.resultTicks ?? 0}
-              isJudgementCleared={stage.lastThrow?.judgementCleared === true}
+              isJudgementCleared={stage.isJudgementCleared === true}
               cpuSwing={stage.lastThrow?.cpuSwing ?? null}
               // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다 (투수편과 같다)
               hitScene={stage.hitScene ?? null}

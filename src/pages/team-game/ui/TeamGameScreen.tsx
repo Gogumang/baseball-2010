@@ -501,15 +501,13 @@ function TeamGameScene({
   })
   const isHitSceneShowing = teamHitScene.isShowing
   /**
-   * 사람이 던진 공의 공 도착 판(도루 · 폭투) — 원본은 0x12 진입 0x3dfac 이 판을 열고 0x17 을 예약한다. 그 다음 그림까지 사람 수비 타석
-   * 장면(0x11 끝 · 0x12 틱 0)을 두고 수비 화면을 띄운다 (`usePitchArrivalHold` — 투수편과 같다)
+   * 사람이 던진 공의 공 도착 판(도루 · 폭투) — 원본은 0x12 진입 0x3dfac 이 판을 열고 0x17 을 예약한다. 진행기도 붙든 공의 0x3dfac 을 그
+   * 틀에 돌린다(`enterPitchResult`). 그 다음 그림까지 사람 수비 타석 장면(0x12 틱 0)을 두고 수비 화면을 띄운다 (`usePitchArrivalHold` — 투수편과 같다)
    */
   const humanArrivalPlay =
     progress.pendingRunnerPlay?.kind === 'arrival' && progress.pendingRunnerPlay.side !== '공격' ? progress.pendingRunnerPlay : null
   const isArrivalHolding = usePitchArrivalHold({
     play: humanArrivalPlay,
-    pitch: progress.lastPitch,
-    aceOrder: humanDefenseStage.acePitcher?.order ?? null,
     isFrozen: isMenuOpen || overlay === '조작방법',
   })
   /** 사람 투구 장면이 아직 0x11 끝 · 0x12 · 0x13 을 그리는 동안(판은 섰지만 0x17 전) */
@@ -651,17 +649,13 @@ function TeamGameScene({
     resolution !== null,
   )
   const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady
-  // 사구 — 0x12 대기 틱 31 의 4e74c 판정(공 끝 칸 채우기와 같은 셈: 타석 공은 판정 틀 다음 그림이 틱 0, 내 공은 놓은 틱에서
-  // 0x12 틱 0 까지를 더한다), 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
+  // 사구 — 0x12 대기 틱 31 의 4e74c 판정(공 끝 칸 채우기와 같은 셈: 타석 공은 판정 틀 다음 그림이 틱 0, 내 공은 0x12 진입 틀
+  // (`enterPitchResult` — r293)에 붙든 칸이 서 그 그림이 틱 0 이라 하나 적다), 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
   const heldHitByPitch = progress.pendingBenchClearing
   useHitByPitchWait({
     hold: heldHitByPitch,
     waitTicks:
-      heldHitByPitch?.side === '수비'
-        ? pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order) -
-          1 +
-          RESULT_WAIT_TICKS_AT_BAT_END
-        : RESULT_WAIT_TICKS_AT_BAT_END,
+      heldHitByPitch?.side === '수비' ? RESULT_WAIT_TICKS_AT_BAT_END - 1 : RESULT_WAIT_TICKS_AT_BAT_END,
     isFrozen: isMenuOpen || overlay === '조작방법',
     random,
     onJudge: actions.judgeHitByPitch,
@@ -674,6 +668,13 @@ function TeamGameScene({
    * OK 뒤 굴림(돌발 0x8f158 · 0xf 진입 0x3d954)은 OK 를 받을 때 진행기가 돌린다 (`confirmScene`).
    */
   const pitchEnd = useBatterPitchEnd({ isPlayShown: isDefenseInPlay || isReplaying, isFrozen: isMenuOpen || overlay === '조작방법' })
+  // 0x12 진입 틀에 공 도착 판이 섰다 — 공 끝 · 키 막음은 이제 판이 맡는다(놓는 그림은 판이 설지 몰라 대기 틱을 세웠다)
+  const { notePitchPlayOpened } = pitchEnd
+  useEffect(() => {
+    if (humanArrivalPlay === null) return
+    setPitchBusyTicks(0)
+    notePitchPlayOpened()
+  }, [humanArrivalPlay, notePitchPlayOpened])
   /**
    * 사람 타석 공의 0x12 대기 — 갱신 0x4e6d4 가 상태 틱이 15(타석 끝 31: 삼진 · 볼넷 · 사구)에 닿아야 판정 A 0xae24c 가 다음 상태
    * (+0x1b6c → 0xd)를 정한다. 그 전에는 0xd · 0xe 가 아니라 다음 타자 소개 판 0x44944 도 OK 도 없다. 웹 진행기는 판정 틀에서 다음 타석
