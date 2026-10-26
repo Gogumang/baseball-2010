@@ -7,7 +7,9 @@ import { appTickOfGameSceneTick, gameSceneTickNow } from '@/shared/lib/commonWin
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 
 /**
- * **사구의 0x12 대기 → 판정 → 벤치 클리어링 진입** (A-22, `features/play-game/model/benchClearingScene` 머리말).
+ * **볼넷 · 사구의 0x12 대기 → 판정 → 벤치 클리어링 진입** (A-22, `features/play-game/model/benchClearingScene` 머리말).
+ * 볼넷도 같은 틀(틱 31 갱신 0x4e6d4 의 4e78c 판정 A 0xae24c)에서 밀어내기 판 · 정산으로 가므로 진행기가 같은 칸에 붙든다 — 볼넷은
+ * 판정에서 벤치 클리어링 굴림 없이 보통 길로 끝나 `'entry'` 에 닿지 않는다(r295, `holdsUntilResultWaitEnd`).
  *
  * 원본은 공 도착 틀 T 에 0x12 를 예약하고, 0x12 그림 32 장(상태 틱 0~31)을 그린 뒤 틱 31 갱신 0x4e6d4 가 4e74c 에서 벤치 클리어링을
  * 굴린다(들어가지 않으면 같은 갱신의 판정 A 0xae24c 가 진루 · 정산). 그 틀 끝에 관리자 틱 0x6de85(입자, 경기 난수)가 돌고, 들어갔으면
@@ -31,7 +33,7 @@ export function useHitByPitchWait({
   onJudge,
   onEnter,
 }: {
-  /** 붙든 사구 (`pendingBenchClearing`) — 없으면 null. 단계가 `'scene'` 이면 연출이 맡는다 */
+  /** 붙든 볼넷 · 사구 (`pendingBenchClearing`) — 없으면 null. 단계가 `'scene'` 이면 연출이 맡는다 */
   readonly hold: { readonly phase: HitByPitchHoldPhase } | null
   /** 붙든 칸이 처음 보인 그림에서 0x12 틱 31 갱신까지의 장면 틱 수 */
   readonly waitTicks: number

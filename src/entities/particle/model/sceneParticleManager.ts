@@ -96,6 +96,20 @@ export function runSceneFrameUpdatesForTest(): void {
   }
 }
 
+/**
+ * **앱 틱 `appTick` 의 틀에 아직 안 돈 장면 갱신이 있는가** — 그 틀을 그리는 부품(사람이 던지는 타석 `PitcherSideStage`)이 그리기 앞에서
+ * 본다. 원본 한 틀은 갱신 52e14 → 그리기 → 관리자 틱 53048 차례라, 갱신이 아직이면 그리기 앞에서 돌려야 그 그림이 갱신을 본다(r295).
+ */
+export function hasDueSceneFrameUpdate(appTick: number): boolean {
+  for (const update of frameUpdates) if (update.isDueAt(appTick)) return true
+  return false
+}
+
+/** 앱 틱 `appTick` 의 틀에 걸린 장면 갱신을 지금 돌린다(`hasDueSceneFrameUpdate` — 그리기 앞) */
+export function runDueSceneFrameUpdates(appTick: number): void {
+  flushFrameUpdates(appTick)
+}
+
 function flushFrameUpdates(appTick: number): void {
   for (const update of [...frameUpdates]) {
     if (!frameUpdates.has(update) || !update.isDueAt(appTick)) continue

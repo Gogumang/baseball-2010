@@ -908,7 +908,8 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const { progress: 뒤, play } = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, random, { countAfter: { strikes: 0, balls: 1 } })
     expect(뒤.stealingFrom).toEqual([])
     expect(hiddenStealBasesOf(뒤, 0)).toEqual([1])
-    const 끝 = startPlayerOutcome(뒤, { kind: '볼넷' }, random, { arrivalPlay: play })
+    // 볼넷도 0x12 대기 끝(틱 31 의 판정 A)까지 붙든다 — 판정에서 진루 · 정산 (r295)
+    const 끝 = judgeHitByPitch(startPlayerOutcome(뒤, { kind: '볼넷' }, random, { arrivalPlay: play }), random)
     // 다음 내 타석의 0xe 를 기다리는 동안은 1루(새로 선 주자)도 안 그린다 — 원본 그대로
     expect(isPlayerTurn(끝.game)).toBe(true)
     expect(끝.sceneConfirm).not.toBeNull()
@@ -967,15 +968,38 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     const 놓음 = { ...시작, game: { ...시작.game, bases: { first: true, second: false, third: true } } }
     const 판있음 = createSeededRandom(11)
     const { progress: 뒤, play } = arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판있음, { countAfter: { strikes: 0, balls: 1 } })
-    const 끝 = startPlayerOutcome(뒤, { kind: '볼넷' }, 판있음, { arrivalPlay: play })
+    const 끝 = judgeHitByPitch(startPlayerOutcome(뒤, { kind: '볼넷' }, 판있음, { arrivalPlay: play }), 판있음)
     expect(끝.lastDefensePlay).toBe(play?.result)
     // 판의 진루 = 보통 길의 밀어내기 (내 타석 뒤 동료 타석은 자동진행이 이어 돈다)
     expect(play?.result.advance).toEqual({ bases: { first: true, second: true, third: true }, runsScored: 0, outsAdded: 0 })
     // 판이 없던 예전 길과 굴림 수가 같다 — 다음 굴림이 같은 값
     const 판없음 = createSeededRandom(11)
     arrivePitch(놓음, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, 판없음, { countAfter: { strikes: 0, balls: 1 } })
-    startPlayerOutcome(뒤, { kind: '볼넷' }, 판없음)
+    judgeHitByPitch(startPlayerOutcome(뒤, { kind: '볼넷' }, 판없음), 판없음)
     expect(판있음.rand(0, 0x7fffffff)).toBe(판없음.rand(0, 0x7fffffff))
+  })
+
+  it('볼넷은 공 도착에서 굴림 없이 붙들고 0x12 틱 31 의 판정 A(0x4e6d4 4e78c)에서 진루 · 정산한다 — 벤치 클리어링 굴림은 없다 (r295)', () => {
+    const 시작 = startGame(createSeededRandom(4))
+    const 놓음 = { ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } } }
+    let 굴림 = 0
+    const 세는 = 세며(createSeededRandom(11), () => { 굴림 += 1 })
+    const 붙듦 = startPlayerOutcome(놓음, { kind: '볼넷' }, 세는)
+    expect(굴림).toBe(0)
+    expect(붙듦.pendingBenchClearing).toEqual({ phase: 'wait', outcome: { kind: '볼넷' } })
+    expect(붙듦.game).toEqual(놓음.game)
+    expect(붙듦.recordIds).toEqual(놓음.recordIds)
+    // 판정 — 4e744 st[0xb] == 4 가 거짓이라 벤치 클리어링 굴림 없이 판정 A 의 보통 길(밀어내기 진루 · 정산 · 뒤 자동진행)
+    const 판정 = judgeHitByPitch(붙듦, 세는)
+    expect(판정.pendingBenchClearing).toBeNull()
+    expect(판정.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+    // 끼어들 사람 없는 껍데기(`applyPlayerOutcome`)와 같은 차례 · 결과 — 판정 앞에 더한 굴림이 없다
+    let 껍데기굴림 = 0
+    const 껍데기 = applyPlayerOutcome(놓음, { kind: '볼넷' }, 세며(createSeededRandom(11), () => { 껍데기굴림 += 1 }))
+    expect(판정.game).toEqual(껍데기.game)
+    expect(굴림).toBe(껍데기굴림)
+    // 같은 판정을 두 번 불러도 한 번만 돈다
+    expect(judgeHitByPitch(판정, 세는)).toBe(판정)
   })
 
   it('삼진 + 도루면 판은 아웃 + 1 로 열린다 — 0x3e15e 가 판 앞에서 state[6]++', () => {
@@ -1198,7 +1222,8 @@ describe('사구 뒤 벤치 클리어링 (상태 0x1e, 20%) — 내 타석', () 
   it('사구는 맨 먼저 한 번 굴린다 — 안 들어가면 그 한 번 말고는 볼넷과 같은 차례다', () => {
     const 시작 = 내타석(EMPTY_BASES, 0)
     const 사구끝 = 사구판정(시작, 첫굴림(0.9, 3))
-    const 볼넷끝 = startPlayerOutcome(시작, { kind: '볼넷' }, createSeededRandom(3))
+    const 볼넷난수 = createSeededRandom(3)
+    const 볼넷끝 = judgeHitByPitch(startPlayerOutcome(시작, { kind: '볼넷' }, 볼넷난수), 볼넷난수)
 
     expect(사구끝.game).toEqual(볼넷끝.game)
     expect(사구끝.opponentMound).toEqual(볼넷끝.opponentMound)
@@ -2068,7 +2093,8 @@ describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee
   it('내 타석 볼넷 · 사구는 지금 상대 마운드 투수 줄에 walks +1 (사람 판정 3e1ae 가 볼을 넷째로 센다)', () => {
     const progress = startGame(createSeededRandom(20101016))
     const 투수 = progress.opponentMound.pitcherSlot
-    const 끝 = startPlayerOutcome(progress, { kind: '볼넷' }, createSeededRandom(3))
+    const 볼넷난수 = createSeededRandom(3)
+    const 끝 = judgeHitByPitch(startPlayerOutcome(progress, { kind: '볼넷' }, 볼넷난수), 볼넷난수)
     const 그줄 = 끝.pitcherLines.find((line) => line.teamId === 끝.opponentTeamId && line.pitcherSlot === 투수)
     expect(그줄?.walks).toBe(1)
     // 뒤 동료 타석(간이 엔진)의 포볼 c1918 은 볼을 3 에서 안 올려 안 센다 — 합도 1

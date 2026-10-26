@@ -2059,7 +2059,9 @@ describe('사구 — 우리 타석 결과 4 와 벤치 클리어링 (상태 0x1e
   it('안 들어가면 굴림 한 번 말고는 볼넷과 같은 차례다', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
     const 사구끝 = 사구(progress, 첫굴림(0.9, 3))
-    const 볼넷끝 = startBatterOutcome(progress, { kind: '볼넷' }, createSeededRandom(3))
+    // 볼넷도 0x12 대기 끝(틱 31 의 판정 A)까지 붙든다 (r295)
+    const 볼넷난수 = createSeededRandom(3)
+    const 볼넷끝 = judgeHitByPitch(startBatterOutcome(progress, { kind: '볼넷' }, 볼넷난수), 볼넷난수)
 
     expect(사구끝.game).toEqual(볼넷끝.game)
     expect(사구끝.opponentPitcherCounters).toEqual(볼넷끝.opponentPitcherCounters)
@@ -3040,7 +3042,8 @@ describe('사사구 +0x2a · 실책 +0x2e — 게이트 밖 두 칸 (a8b04~a8bee
 
   it('사람 타석의 볼넷은 지금 상대 마운드 투수 줄에 walks +1', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
-    const 끝 = startBatterOutcome(progress, { kind: '볼넷' }, createSeededRandom(3))
+    const 볼넷난수 = createSeededRandom(3)
+    const 끝 = judgeHitByPitch(startBatterOutcome(progress, { kind: '볼넷' }, 볼넷난수), 볼넷난수)
     const 볼넷 = 끝.pitcherLines.filter((line) => line.teamId === 1).reduce((sum, line) => sum + (line.walks ?? 0), 0)
     expect(볼넷).toBe(1)
     // 사구(state[0x12], a8b88~a8bee)도 같은 칸 — 벤치 클리어링이 안 들어가는 굴림

@@ -4,7 +4,10 @@ import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import {
   claimSceneParticles,
   clearSceneParticles,
+  hasDueSceneFrameUpdate,
   isSceneParticlesClaimed,
+  runBeforeSceneParticleTick,
+  runDueSceneFrameUpdates,
   resetSceneParticleManagerForTest,
   sceneParticleScene,
 } from '@/entities/particle/model/sceneParticleManager'
@@ -37,5 +40,22 @@ describe('앱 전역 파티클 관리자 [0x1400068]', () => {
     expect(isSceneParticlesClaimed()).toBe(true)
     b()
     expect(isSceneParticlesClaimed()).toBe(false)
+  })
+
+  it('그리기 앞 갱신 — 그 틀에 걸린 갱신만 보이고 한 번만 돈다 (r295)', () => {
+    const ran: number[] = []
+    const cancel = runBeforeSceneParticleTick((appTick) => appTick >= 5, () => ran.push(5))
+    runBeforeSceneParticleTick((appTick) => appTick >= 9, () => ran.push(9))
+    expect(hasDueSceneFrameUpdate(4)).toBe(false)
+    runDueSceneFrameUpdates(4)
+    expect(ran).toEqual([])
+    expect(hasDueSceneFrameUpdate(5)).toBe(true)
+    runDueSceneFrameUpdates(6)
+    expect(ran).toEqual([5])
+    expect(hasDueSceneFrameUpdate(6)).toBe(false)
+    // 이미 돈 갱신을 거둬도 아무 일 없다
+    cancel()
+    runDueSceneFrameUpdates(9)
+    expect(ran).toEqual([5, 9])
   })
 })

@@ -165,7 +165,7 @@ import {
 import type { PitchSlot, PitcherStats } from '@/features/play-pitcher-game/model/pitcherPitch'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
 import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
-import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import { holdsUntilResultWaitEnd, rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { BenchClearingEntryRoll, HitByPitchHoldPhase } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import {
@@ -2824,7 +2824,8 @@ export function applyBatterOutcome(
  * 다음 투구가 나가지 않는 것이 이 칸의 뜻이다 (원본 상태 0x17 이 도는 동안 0xf 로 안 돌아간다).
  *
  * 우리 공격 타석이므로 사람이 잡는 쪽은 **공격(주루 0x5331c)** 이다 (I 0절 상태 0x17 표).
- * 삼진·볼넷·사구·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다. 사구는 그 앞에서 벤치 클리어링을 굴린다.
+ * 삼진·홈런은 수비가 개입할 것이 없어 여기서 곧장 끝낸다. 볼넷 · 사구는 0x12 대기 끝까지 붙든다(`judgeHitByPitch` — 사구면
+ * 그때 벤치 클리어링을 굴린다).
  */
 export function startBatterOutcome(
   progress: TeamGameProgress,
@@ -2836,9 +2837,9 @@ export function startBatterOutcome(
   // 출발 칸은 이 공 하나의 것이다 — 타구 판 입력이 읽고 나면 비운다
   const stealing = progress
   progress = withoutSteal(progress)
-  // 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c)·밀어내기 주루·정산은 0x12 의 32 그림 뒤라
-  // 그동안 사구를 붙든다(그 그림들의 입자 굴림이 먼저 난다 — `judgeHitByPitch`, A-22)
-  if (outcome.kind === '사구') {
+  // 볼넷 · 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기 주루·정산은
+  // 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 — `judgeHitByPitch`, A-22 · r295)
+  if (holdsUntilResultWaitEnd(outcome)) {
     const arrivalPlay = options.arrivalPlay ?? null
     return {
       ...progress,
@@ -2897,7 +2898,7 @@ export function resolveBenchClearing(
 }
 
 /**
- * **사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(사람이 공격이면
+ * **볼넷 · 사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(사구만 — 사람이 공격이면
  * `withBatterBenchClearing`, 수비면 `withPitcherBenchClearing`). 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀
  * `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의 보통 길 — 예전 공 도착 걸음에 하던 그대로다.
  * 대기 중인 사구가 없으면 그대로 돌려준다.
@@ -2924,7 +2925,7 @@ export function enterBenchClearing(progress: TeamGameProgress, random: RandomPor
   return { ...progress, pendingBenchClearing: { ...pending, phase: 'scene', entryRolls: rollBenchClearingEntry(random) } }
 }
 
-/** 붙든 사구의 판정 A 0xae24c 보통 길 — 밀어내기 판(종류 2)을 재생 칸에 넣고 정산 · 다음 사람 차례까지 (`cleared` 는 칸을 비운 진행) */
+/** 붙든 볼넷 · 사구의 판정 A 0xae24c 보통 길 — 밀어내기 판(종류 2)을 재생 칸에 넣고 정산 · 다음 사람 차례까지 (`cleared` 는 칸을 비운 진행) */
 function finishHeldHitByPitch(
   cleared: TeamGameProgress,
   pending: NonNullable<TeamGameProgress['pendingBenchClearing']>,
@@ -2938,7 +2939,7 @@ function finishHeldHitByPitch(
       null
     return finishBatterOutcome(cleared, pending.outcome, random, null, playback)
   }
-  // 사구는 인플레이가 아니라 타구 판 없이 곧장 끝난다 — 밀어내기 판(종류 2)만 재생한다
+  // 볼넷 · 사구는 인플레이가 아니라 타구 판 없이 곧장 끝난다 — 밀어내기 판(종류 2)만 재생한다
   return advance(startDefensiveAtBat(cleared, pending.outcome, true, random, false, arrival), random)
 }
 
@@ -3558,9 +3559,9 @@ function afterOurPitchArrival(
   // 판정 A(0xae24c)의 "그 밖 → 0xf" — 같은 타석 다음 공. 0xf 진입 0x3d954 가 CPU 대타를 다시 묻는다
   if (outcome === null) return enterPitchSelection(arrived, random)
 
-  // 사구 — 0x12 의 32 그림 뒤 틱 31 갱신(4e74c)이 벤치 클리어링을 굴리고 밀어내기 주루(0x17)·정산 0xa8024 로 간다 — 그동안 붙든다
-  // (`judgeHitByPitch`, A-22). 끼어들 사람이 없는 갈래는 대기 · 연출을 끝까지 본 것으로
-  if (outcome.kind === '사구') {
+  // 볼넷 · 사구 — 0x12 의 32 그림 뒤 틱 31 갱신(4e74c)이 (사구면) 벤치 클리어링을 굴리고 판정 A 가 밀어내기 주루(0x17)·정산으로
+  // 보낸다 — 그동안 붙든다(`judgeHitByPitch`, A-22 · r295). 끼어들 사람이 없는 갈래는 대기 · 연출을 끝까지 본 것으로
+  if (holdsUntilResultWaitEnd(outcome)) {
     const held: TeamGameProgress = {
       ...arrived,
       pendingBenchClearing:

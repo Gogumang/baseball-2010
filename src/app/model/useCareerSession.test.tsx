@@ -1006,6 +1006,8 @@ describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판�
         const { bases } = rendered.result.current.session.progress!.game
         if (bases.first || bases.second || bases.third) break
         for (let pitch = 0; pitch < 4; pitch += 1) act(() => rendered.result.current.session.handlePitchResolved(볼))
+        // 볼넷은 0x12 대기 끝(틱 31 의 판정 A)까지 붙든다 — 화면(`useHitByPitchWait`) 대신 판정을 부른다 (r295)
+        act(() => rendered.result.current.session.actions.judgeHitByPitch())
         act(() => rendered.result.current.runner.resetAtBat())
       }
       const before = rendered.result.current.session.progress!

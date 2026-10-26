@@ -11,12 +11,13 @@ import { isWalkPlayResult, WALK_PLAY_WAIT_TICKS } from '@/features/defense-play/
  *
  * 웹 진행기는 공을 판정한 그 걸음에 판을 재생 칸에 넣으므로, 재생 화면을 세우기 전에 그 대기만큼 타석 화면을 둔다.
  * 팝업 등으로 0x12 틱이 멈추는 것(0x52cc6)은 `isFrozen` 으로 받는다.
- * 사구는 진행기가 공 도착에서 붙들고(`pendingBenchClearing` 의 `'wait'`) 화면이 0x12 대기를 센 뒤 판정하므로(`useHitByPitchWait`, A-22)
- * 판정 뒤에 들어온 사구 판도 벤치 클리어링 출구와 같이 더 기다리지 않는다(붙든 칸이 섰던 것을 `benchClearingPending` 으로 본다).
+ * 볼넷 · 사구는 진행기가 공 도착에서 붙들고(`pendingBenchClearing` 의 `'wait'`) 화면이 0x12 대기를 센 뒤 판정하므로(`useHitByPitchWait`,
+ * A-22 · r295) 판정 뒤에 들어온 판도 벤치 클리어링 출구와 같이 더 기다리지 않는다(붙든 칸이 섰던 것을 `benchClearingPending` 으로 본다).
+ * 여기서 대기를 세는 판은 붙들지 않는 길 — 타자 미션(공 도착 걸음에 판을 넣는다 — 판정 틀 T 의 다음 그림이 0x12 틱 0 이라 0x1f)뿐이다.
  * 0x12 끝(4e7ca)에서 돌발 판정이 나면 그 틀은 0x1d(타석 위 결과 창)로 가고 판정 A 의 0x17 은 창을 닫은 뒤다 — 결과 창이 떠 있는 동안
  * (`isResultWindowShown`)은 대기를 다 채웠어도 판을 세우지 않는다.
  *
- * `play` = 아직 안 보여 준 재생거리(없으면 null). `benchClearingPending` = 지금 사구를 붙들고 있나(0x12 대기 · 벤치 클리어링).
+ * `play` = 아직 안 보여 준 재생거리(없으면 null). `benchClearingPending` = 지금 볼넷 · 사구를 붙들고 있나(0x12 대기 · 벤치 클리어링).
  * 돌려주는 값이 참이면 재생 화면을 세워도 된다(밀어내기 판이 아니면 늘 참).
  */
 export function useFreePassPlayStart(
