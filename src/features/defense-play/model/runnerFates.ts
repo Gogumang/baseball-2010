@@ -4,6 +4,7 @@ import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { RunnerState } from '@/entities/fielding/model/fieldingState'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * **주자 목록 한 칸의 운명** — 플레이가 끝난 뒤 정산 `0xa8024` 가 주자 목록(`0xa9564(관리, i)`)을 돌며 읽는 두 바이트.
@@ -127,8 +128,13 @@ export function chargedFromBasesOfFates(fates: readonly RunnerFate[], outsAfterP
 /**
  * **R+0x130(출루 허용)** — 정산 `0xa8c5c~0xa8c86`: 목록을 돌며 `r5 = (주자+0x96 == 0)` 을 루프 안에서
  * **새로** 매기므로 **마지막 원소 하나만** 본다. 목록이 비면 r5 = 0 그대로다(0xa8c2e).
+ *
+ * **고침(`bugfixes.json` B-37, 기본 켬)**: `movs r5,#0` 을 루프 밖으로 — 목록에 **안 끝난 주자가 하나라도** 있으면 선다.
+ * 야수선택으로 타자주자만 살고 앞 주자가 죽은 판도 출루 허용이라 퍼펙트(state[0x88])가 깨진다. 굴림 없음.
  */
 export function baserunnerAllowedOfFates(fates: readonly RunnerFate[]): boolean {
+  // 고침(B-37): 목록 전체를 본다 — 산 주자가 하나라도 있으면 출루 허용 (야수선택으로 산 타자주자도)
+  if (isBugFixed('B-37')) return fates.some((fate) => !fate.retired)
   const last = fates[fates.length - 1]
   return last !== undefined && !last.retired
 }
@@ -217,7 +223,10 @@ export function baserunnerAllowedOfPlay(
     return baserunnerAllowedOfFates(runnerFatesWithoutPlay(bases, outcome))
   }
   if (quickAdvance !== undefined) {
-    if (isHit(outcome) || isFreePass(outcome)) return quickAdvance.runsScored === 0
+    // 고침(B-37): 목록 전체를 보면 타자주자가 늘 살아 있다 — 홈런(전원 +0x96 = 1)만 안 선다
+    if (isHit(outcome) || isFreePass(outcome)) {
+      return isBugFixed('B-37') ? outcome.kind !== '홈런' : quickAdvance.runsScored === 0
+    }
     return runnerCountOf(bases) > 0
   }
   // 판도 간이 엔진도 아닌 타석은 원본에 없다(정산 0xa8024 를 부르는 곳은 수비 판 · 사람 장면 · 간이 엔진 넷뿐 — 위 머리말).

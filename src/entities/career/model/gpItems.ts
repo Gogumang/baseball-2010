@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { applySkillReward, isMinusSkill, isSkillEquipped, MAXIMUM_MORALE, MINUS_SKILL_IDS } from '@/entities/career/model/playerCareer'
@@ -374,6 +375,9 @@ const ABILITY_NAMES = ['히트', '파워', '수비', '주루', '모든능력치'
  * ⚠️ **원본 버그를 그대로 옮긴다** (G 2절 확정 · DECISIONS 2026-09-20):
  * 능력치는 실제로 **+10** 오르는데, 알림 글에는 **칸별 아이템 6 · 엄마의도시락 8** 이라고 찍힌다.
  * 글 = StrMODE[35+k] + " " + 숫자 + " " + StrMODE[83] 이고, 그 숫자 인자가 6·8 로 박혀 있다.
+ *
+ * **고침(`bugfixes.json` B-45, 기본 켬)**: 글의 숫자를 실제 상승 **10** 으로 — 복권 상 갈래(0xa4868 `movs r1,#0xa`)와 상점 설명
+ * StrITEM[165] "능력치 + 10" 이 이미 10 이라 그쪽에 맞췄다. 능력치 · 굴림은 그대로.
  */
 const ABILITY_NOTICE_NUMBERS = [6, 6, 6, 6, 8]
 const modeText = (index: number): string => ORIGINAL_MODE_TEXT[index] ?? ''
@@ -439,7 +443,11 @@ export function gpItemNoticeWith(
 ): string {
   // 실제 상승은 +10 이지만 글에는 6·8 이 찍힌다 (원본 그대로).
   // 0xa455c~0xa45fe: StrMODE[35+k](투수 40+k · 모든능력치 39) + " "(0xd80bc) + 0xbc73d(6 · 8) + " "(0xd80bc) + StrMODE[83]
-  if (id < texts.abilityNames.length) return `${texts.abilityNames[id]} ${ABILITY_NOTICE_NUMBERS[id]} ${modeText(RISE_TEXT)}`
+  if (id < texts.abilityNames.length) {
+    // 고침(B-45): 실제 상승 10 을 쓴다
+    const number = isBugFixed('B-45') ? LOTTERY_ABILITY_NOTICE_NUMBER : ABILITY_NOTICE_NUMBERS[id]
+    return `${texts.abilityNames[id]} ${number} ${modeText(RISE_TEXT)}`
+  }
   if (id === LOTTERY_ITEM && prize !== null) {
     // 돈 상: sprintf("%d등 "(0xd7e08), 등수) + StrMODE[116] + 금액 + StrMODE[117] (0xa4658~0xa46c0)
     // 아이템 상: StrMODE[0x70 + 칸](118 엄마상 …) + [116] + StrITEM[0x62 + n] + [117] + "!N"(0xd80a4) (0xa46f8~0xa474a)

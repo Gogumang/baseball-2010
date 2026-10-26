@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 
@@ -20,6 +21,9 @@ import { pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
  * - 사구는 v4 → **23** (진동 200ms 는 타석 화면이 낸다 — `pitchVibration`).
  * 볼넷 뒤 함성 29 는 공격 팀이 CPU 일 때만이라(0x51adc) 사람이 치는 더비에선 없다.
  * 파울 · 맞은 공은 판(0x17)이 콜을 낸다 — 여기서는 null.
+ *
+ * **고침(`bugfixes.json` B-54, 기본 켬)**: 볼도 스트라이크처럼 모드 7 이면 st[5]++ 를 건너뛴다 — 더비의 볼은 늘 v2(콜 16)이고
+ * "Base on balls!"(24) · 볼넷 판정(v3)이 안 난다. 그래서 볼넷 뒤 타순 넘김(0xaf020, B-55)도 볼로는 안 걸린다. 대기 갱신은 볼과 같은 15. 굴림 없음.
  */
 export interface DerbyPitchCall {
   /** 이 공을 먹인 뒤의 볼 수 st[5] */
@@ -41,6 +45,10 @@ export function derbyPitchCallOf(resolution: PitchResolution, balls: number): De
       // 0x3e14a — 모드 7 은 st[4]++ 를 건너뛰어 스트라이크 수가 늘 0 이다
       return { balls, judgment: 1, soundId: pitchCallSoundIdOf(resolution, { balls, strikes: 1, outcome: null }) }
     case '볼': {
+      // 고침(B-54): 더비는 볼 수를 세지 않는다 — 늘 v2
+      if (isBugFixed('B-54')) {
+        return { balls, judgment: 2, soundId: pitchCallSoundIdOf(resolution, { balls: 0, strikes: 0, outcome: null }) }
+      }
       const isWalk = balls > WALK_BALLS_ABOVE
       const after = balls + 1
       return {

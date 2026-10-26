@@ -68,9 +68,15 @@ export const MASTER_SLOT_NOT_FOUND = -1
  * **탭**으로 가른다 — 웹 명단의 kindByte 는 종류 비트(타자 0x20)를 안 들고, 리그 선수는 투수 표 = 투수 레코드라 같다.
  * 영입한 나리·명전 선수(id ≥ 0xb4)는 −1 로 본다(투수는 원본도 못 찾는다 · 타자는 원본이 마스터 15팀 밖을 읽는다 —
  * 그 선수는 트레이드에서 거절되므로 닿지 않는다).
+ *
+ * **고침(`bugfixes.json` B-47, 기본 켬)**: 마스터 팀을 id 의 몫(투수 id/8 · 타자 id/12)으로 고르고 그 팀 줄을 끝까지(투수 8 · 타자 12)
+ * 훑는다 — 리그 선수는 모두 제 마스터 팀 줄에 있으므로 늘 찾고, 돌려주는 값은 원본과 같은 p 자신의 +0xa 하위 5비트다.
+ * 곧 자리 벌점이 대부분 선수에게 붙어 트레이드 성공률이 그만큼 내려간다. 명전 · 나리 선수(id ≥ 0xb4)는 그대로 −1. 굴림 없음.
  */
 export function masterRosterSlotOf(player: SeasonPlayer, ownerTeamId: number, tab: number): number {
   if (player.id >= HALL_OF_FAME_FIRST_ID) return MASTER_SLOT_NOT_FOUND
+  // 고침(B-47): 제 마스터 팀 줄 전부를 훑으면 리그 선수는 늘 찾는다
+  if (isBugFixed('B-47')) return player.kindByte & PLAYER_SLOT_MASK
   const team = tableTeamOf(player, ownerTeamId)
   const slotBits = player.kindByte & PLAYER_SLOT_MASK
   if (tab === TRADE_TAB.투수) {

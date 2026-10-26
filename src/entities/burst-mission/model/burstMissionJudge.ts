@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { BURST_RESULT_BIT, hasBit } from '@/entities/burst-mission/model/burstResultBits'
 
 /**
@@ -99,8 +100,9 @@ export function judgeBurstGoal(goal: number, bits: number): BurstJudgement | nul
     // 안타 — ⚠️ 성공 비트에 B3(단타)이 **없다**. 그래도 단타면 B5(출루·이닝 안 끝남)가 함께 켜져
     // 성공이다 (CORRECTIONS.md "K: 안타 목표에서 단타는 실패" 정정, P7 → K).
     // ⚠️ 원본 버그 그대로: 단타로 3아웃째가 나면 B5 가 안 켜져 **B3 만 남아 실패**로 떨어진다.
+    // 고침(B-52): 성공 비트에 B3(단타)을 넣는다 — 안타면 이닝이 끝나도 성공
     case BURST_GOAL.안타:
-      if (hasBit(bits, B.홈런 | B['2루타'] | B['3루타'] | B.타점 | B.출루)) return '성공'
+      if (hasBit(bits, B.홈런 | B['2루타'] | B['3루타'] | B.타점 | B.출루 | (isBugFixed('B-52') ? B.단타 : 0))) return '성공'
       if (hasBit(bits, B.번트진루)) return '무효'
       return '실패'
 
@@ -134,7 +136,9 @@ export function judgeBurstGoal(goal: number, bits: number): BurstJudgement | nul
       return judgeDefensiveGoal(B.삼진, bits)
     case BURST_GOAL.병살:
       return judgeDefensiveGoal(B.병살, bits)
-    // 고의사구 — ⚠️ 원본 그대로 **아무 볼넷이나** 성공이다 (B11 은 고의사구를 가리지 않는다)
+    // 고의사구 — ⚠️ 원본 그대로 **아무 볼넷이나** 성공이다 (B11 은 고의사구를 가리지 않는다).
+    // B-52 의 이 갈래는 고치지 않는다 — 원본에 고의사구 명령이 없어 "볼 넷을 던져 내보내라"(대사 "일단은 고의사구 작전이다")는
+    // 아무 볼넷으로만 따를 수 있다. 원본 버그가 아니라 목표의 뜻이 그렇다
     case BURST_GOAL.고의사구:
       return judgeDefensiveGoal(B.볼넷, bits)
 

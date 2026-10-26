@@ -3,6 +3,7 @@ import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { isStarterTypePosition } from '@/entities/pitcher-career/model/pitcherRole'
 import { NO_ENTRY_USER_EVENT_INDEX } from '@/entities/pitcher-career/model/pitcherRotation'
 import { PITCHER_DECISION_CODE } from '@/entities/game/model/winLossSave'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 투수편 **경기 뒤 평가** (binary.mod 인기도 0xa690c · 평판 0xa6218 · 사기 0xa73c4 ·
@@ -170,8 +171,18 @@ function starterOutPoints(outs: number): number {
  * ⚠️ **원본 버그 그대로**: 실점 항의 비교가 **음수**다 (`≤ −6 → −4 · ≤ −5 → −2 · ≤ −3 → −1`).
  * 0xa6c92: `ldr r3,[R+0x128] ; adds r3,#6 ; bgt` 처럼 **더해서** 0 과 견준다 — 실점은 0 이상이라
  * 이 항은 실점이 나도 한 번도 걸리지 않는다 (선발 인기도는 완봉/완투 갈래로만 실점을 본다).
+ *
+ * **고침(`bugfixes.json` B-39, 기본 켬)**: 문턱 −6 · −5 · −3 을 실점 6 · 5 · 3 으로 읽는다(`adds #6` 는 `cmp #−6` 의 꼴 —
+ * 부호만 뒤집힌 것으로 보고 크기 · 감점 값은 그대로). 실점 6↑ −4 · 5 −2 · 3~4 −1. 인기도가 내려가 평판 · 사기도 따라 바뀐다. 굴림 없음.
  */
 function starterRunPoints(runsAllowedField: number): number {
+  // 고침(B-39): 부호를 바로 — 실점 6 이상 −4 · 5 −2 · 3~4 −1
+  if (isBugFixed('B-39')) {
+    if (runsAllowedField >= 6) return -4
+    if (runsAllowedField >= 5) return -2
+    if (runsAllowedField >= 3) return -1
+    return 0
+  }
   if (runsAllowedField <= -6) return -4
   if (runsAllowedField <= -5) return -2
   if (runsAllowedField <= -3) return -1

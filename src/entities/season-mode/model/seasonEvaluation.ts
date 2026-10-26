@@ -6,6 +6,7 @@ import {
 } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { seasonReputationChangeOf } from '@/entities/season-mode/model/seasonReputation'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { CompleteGameKind, SeasonGameContext } from '@/entities/season-mode/model/seasonReputation'
 
 /**
@@ -90,6 +91,15 @@ export function popularityCompleteGameOf(
   const kind = kindOf(flags)
   if (kind === '퍼펙트' && outs > PERFECT_OUT_LIMIT) return '노히트'
   return kind
+}
+
+/**
+ * 평판용 완투 판정이 보는 이닝 — 원본은 `st+0x69`(정규 마지막 이닝 8)라 연장 완투를 못 알아본다(B-38).
+ * **고침(`bugfixes.json` B-38, 기본 켬)**: 인기도처럼 `st+0x6b`(지금 이닝)를 본다 — 9이닝 경기는 값이 같고(8) 연장 완투만
+ * 평판 완투 보너스를 받는다(퍼펙트는 아웃 27 상한이 그대로라 연장이면 노히트 칸). 굴림 없음.
+ */
+export function reputationCompleteGameInningIndexOf(currentInningIndex: number, lastRegularInningIndex: number): number {
+  return isBugFixed('B-38') ? currentInningIndex : lastRegularInningIndex
 }
 
 /** 평판용 완투 판정 (`아웃 == 정규 마지막 이닝×3+3`, 퍼펙트는 아웃 ≤ 27 도 — a7014 · a703a) */
@@ -195,8 +205,13 @@ export function moraleChangeOf(won: boolean, rival: boolean): number {
  * 예전 근거로 적었던 메시지 2 "경기 끝 요청"(0x50cb0, 모드 5·6 이 아니면 동점 요청 무시 — S1 6절)는 그 메시지를 상수로
  * 보내는 곳이 원본에 없어(3e04a0d) 시즌 경기의 끝을 정하지 않는다. 웹 경기도 이제 연장 상한이 없어(`gameState`) 동점으로
  * 끝나지 않지만, 정산 4f072 의 비교식 모양 그대로 판정한다.
+ *
+ * **고침(`bugfixes.json` B-40, 기본 켬)**: 동점이면 거짓(이기지 않음) — 선공 쪽이 이긴 것으로 보지 않는다. 동점이 나는 길이
+ * 지금 웹에 없어(연장 상한 없음) 드러나지 않는 방어다. 평판식의 −2 문(`tied ? won : !won`)도 이 값으로 −2 를 안 깎는다. 굴림 없음.
  */
 export function seasonHumanWonOf(myRuns: number, opponentRuns: number, mySide: 0 | 1): boolean {
+  // 고침(B-40): 동점은 아무도 이기지 않는다
+  if (isBugFixed('B-40') && myRuns === opponentRuns) return false
   const runsOf = (side: 0 | 1) => (side === mySide ? myRuns : opponentRuns)
   const winnerSide = runsOf(1) > runsOf(0) ? 1 : 0
   return winnerSide === mySide

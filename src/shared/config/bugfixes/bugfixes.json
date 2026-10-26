@@ -314,7 +314,7 @@
       "symptom": "승리 투수는 6회 이후 득점·정규 9이닝 경기에서만 정해져, 승리 투수 없는 경기가 생긴다",
       "source": "0xa5c34 a5cf6~a5dea(S1)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -323,7 +323,7 @@
       "symptom": "승패가 같을 때 상대전적 비교가 엉뚱한 팀끼리 이뤄진다",
       "source": "0xb79d8(배열 위치로 팀 번호 표를 찾음)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -332,7 +332,7 @@
       "symptom": "야수선택으로 타자주자만 살면 퍼펙트가 안 깨진다",
       "source": "0xa8c6a(`movs r5,#0` 가 루프 안)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -341,7 +341,7 @@
       "symptom": "연장 완투는 인기도 보너스만 받고 평판 보너스는 못 받는다",
       "source": "인기도 st+0x6b · 평판 st+0x69",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -350,7 +350,7 @@
       "symptom": "선발 인기도의 실점 감점이 음수 비교라 한 번도 안 걸린다",
       "source": "0xa6c92(`adds r3,#6 ; bgt`)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -359,7 +359,7 @@
       "symptom": "동점 경기를 먼저 공격한 팀이 이긴 것으로 본다",
       "source": "0xb69c8",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -368,7 +368,7 @@
       "symptom": "대한민국이 결승에 못 가면 우승국을 동전던지기로 정하고, CPU 경기 동점이면 선공 팀이 이긴다",
       "source": "0xb858c · 4f09a",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -377,7 +377,7 @@
       "symptom": "결승에서 져도 \"대표팀 탈락!!\" 이 뜬다(준우승이라는 말이 없다)",
       "source": "StrMODE[143] · 0x85e6c",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -386,7 +386,7 @@
       "symptom": "준우승 글은 \"+2500만\" 인데 실제로는 +2000만",
       "source": "0x8a2e(글) vs 0x8b76 `adds #0x14`",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -395,7 +395,7 @@
       "symptom": "나만의리그에는 준우승 보상이 없다",
       "source": "StrMODE[200] 은 시즌 0x896c 에서만",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -404,7 +404,7 @@
       "symptom": "능력치는 +10 오르는데 알림은 \"6 상승\"(모든능력치는 \"8\")",
       "source": "0xa455c~0xa45fe(인자 6·8)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -413,7 +413,7 @@
       "symptom": "영지버섯 사기 \"현재\" 칸이 먹기 전 값으로 보인다",
       "source": "0x14f92 에서 읽고 0x14fde 효과, 다시 안 읽음",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -422,13 +422,13 @@
       "symptom": "자리 벌점을 마스터 표에서 id 아래 비트로 찾아 대부분 선수는 벌점 0 이다",
       "source": "0xb6561 b6574 · b65b0 · b65ca",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-48",
       "name": "시즌 구장 아이템",
-      "symptom": "구장 아이템을 사도 인기도가 안 깎이고, 잔디는 1~3억을 받으면서 아무 효과가 없다",
+      "symptom": "정정(r277) — 원본 버그가 아니다: 인기도는 StrMODE[62] \"필요한 인기도\" 대로 조건일 뿐 값이 아니고, 잔디 설명(StrITEM[144~147])은 겉모습만 말한다(고칠 것 없음)",
       "source": "S3 5-1 · 8절",
       "impact": "작음",
       "implemented": false,
@@ -437,7 +437,7 @@
     {
       "id": "B-49",
       "name": "투수편 트레이닝",
-      "symptom": "사기 0 이면 마구·구질 창도 안 열린다",
+      "symptom": "정정(r277) — 원본 버그가 아니다: 마구·구질 훈련도 사기를 깎는 훈련(runPitchTypeTraining · 마구 사기 굴림)이라 사기 0 에서 막는 것은 다른 칸과 같은 규칙이고, 보기만 하는 [구질] 창은 선수정보에서 열린다(고칠 것 없음)",
       "source": "키 0x12d48(사기 0 검사가 맨 앞)",
       "impact": "작음",
       "implemented": false,
@@ -446,7 +446,7 @@
     {
       "id": "B-50",
       "name": "시즌 트레이닝",
-      "symptom": "지옥훈련은 넷 다 최대일 때만 거절(일부 최대 칸은 헛돎) · 998 칸은 막히지 않고 999 가 된다",
+      "symptom": "정정(r277) — 원본 버그가 아니다: 상한이 999 라 `> 998` 은 곧 \"최대\" 이고 998 이 999 로 오르는 것이 맞다. 지옥훈련은 남은 칸이 오르므로 일부 최대에도 진행이 맞다(고칠 것 없음)",
       "source": "가드 0x9108(`> 998`)",
       "impact": "작음",
       "implemented": false,
@@ -455,7 +455,7 @@
     {
       "id": "B-51",
       "name": "경기(마구)",
-      "symptom": "마구 횟수가 구질을 고를 때가 아니라 코스 확정(OK)에서 준다",
+      "symptom": "정정(r277) — 원본 버그가 아니다: 구질 고르기는 남은 횟수 > 0 만 보고, 실제로 던지는 코스 확정(OK)에서 1 줄인다 — 고른 뒤 취소(CLR)하면 횟수가 남는 것이 맞다(고칠 것 없음)",
       "source": "0x50e9c",
       "impact": "작음",
       "implemented": false,
@@ -467,7 +467,7 @@
       "symptom": "단타로 3아웃째가 되면 \"안타\" 실패 · 끝내기 승리로 끝나면 삼진도 성공 · 고의사구 목표는 아무 볼넷이나 성공",
       "source": "결과비트 B5 · 0x801",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -476,7 +476,7 @@
       "symptom": "마지막 공은 던진 공 수에도, 단계 상승 문턱에도 안 든다",
       "source": "0xae3e8 ae4b6(기회가 남을 때만)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -485,7 +485,7 @@
       "symptom": "볼 카운트가 공 사이에 안 지워져 넷째 볼부터 \"볼넷\" 콜이 난다",
       "source": "0x3e156 st[5]++ 에 모드 검사 없음",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -494,7 +494,7 @@
       "symptom": "볼넷·사구 뒤 다음 단계부터 내 타자 대신 마스터 팀 타순의 다른 타자가 친다",
       "source": "0x48d50 48ddc → 0xaebe4",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -503,7 +503,7 @@
       "symptom": "수비 그림 창 첫 그림에서 펌블·악송구 실책을 두 번 센다(함성도 다시)",
       "source": "0x43278 4381a~43904",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
@@ -512,13 +512,13 @@
       "symptom": "홈 송구에는 자동 슬라이딩이 안 걸린다",
       "source": "0xb030c(+0x7c 홈 4 ≠ 목표 0)",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {
       "id": "B-58",
       "name": "수비 견제",
-      "symptom": "견제 커버 야수가 \"루 번호 + 1\" 로 고정이라 2루 견제도 늘 같은 야수가 들어간다",
+      "symptom": "정정(r277) — 원본 버그가 아니다: 커버 표 [1,2,3,4] 는 홈 포수 · 1루 1루수 · 2루 2루수 · 3루 3루수로 칸 번호 = 루 번호 + 1 인 의도된 배정이다. 견제에는 타구 방향이 없어 유격수 갈래(0xb1c90)를 쓸 까닭이 없다(고칠 것 없음)",
       "source": "0xb28be~0xb2948",
       "impact": "작음",
       "implemented": false,
@@ -530,7 +530,7 @@
       "symptom": "외야 백업 위치가 음수 쪽 큰 차이를 무시한다(dx·dz 양수 쪽만 봄)",
       "source": "0xb4bae",
       "impact": "작음",
-      "implemented": false,
+      "implemented": true,
       "fixed": null
     },
     {

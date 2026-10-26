@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import {
   MONEY_LIMIT,
   MORALE_LIMIT,
@@ -49,6 +50,8 @@ export const KOREA_TEAM_ID = 10
  * ⚠️ **원본 버그 그대로**: 준우승 문구 StrMODE[200] 은 "소지금 +2500만" 이라 적혀 있는데
  * 실제로 더하는 값은 **+20 (= 2000만)** 이다 (`0x8a2e` 표시 vs `0x8b76 adds #0x14`).
  * 표시와 실제가 다른 채로 둔다.
+ *
+ * **고침(`bugfixes.json` B-43, 기본 켬)**: 글대로 **+25(2500만)** 를 더한다 — 사람이 보는 약속(글)에 실제를 맞췄다. 굴림 없음.
  */
 export const NATIONAL_CUP_RUNNER_UP_TEXT_MONEY = 25
 export function nationalCupRewardOf(champion: number, koreaInFinal: boolean): SeasonReward {
@@ -56,8 +59,9 @@ export function nationalCupRewardOf(champion: number, koreaInFinal: boolean): Se
     return { popularity: 30, reputation: 40, money: 50, gamePoint: 1000, messageId: 199 }
   }
   if (koreaInFinal) {
-    // 문구는 2500만이지만 코드는 20(=2000만)을 더한다 — 원본 그대로
-    return { popularity: 20, reputation: 20, money: 20, gamePoint: 0, messageId: 200 }
+    // 문구는 2500만이지만 코드는 20(=2000만)을 더한다 — 원본 그대로. 고친 길(B-43)은 글대로 25
+    const money = isBugFixed('B-43') ? NATIONAL_CUP_RUNNER_UP_TEXT_MONEY : 20
+    return { popularity: 20, reputation: 20, money, gamePoint: 0, messageId: 200 }
   }
   return NOTHING
 }

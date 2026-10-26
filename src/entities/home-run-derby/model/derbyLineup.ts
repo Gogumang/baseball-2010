@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { BATTERS_PER_TEAM, teamBatters } from '@/entities/team/model/teamRoster'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import type { BatterAbility } from '@/entities/batting/model/batter'
@@ -33,6 +34,9 @@ import { masterBatterAbilityOf } from '@/entities/mission/model/missionCpuTeam'
  * - 타석 교대 0x47cc8(0x48d50 의 48e90 — 0xaebe4 뒤)이 지금 타자 0xae89c 로 타자 그림(손 0xb63c0 · 장비 +0x19 …)을 다시 싣고,
  *   스윙 판정 0xab214 · 실투 0x33d52 도 지금 타자 기록을 본다 — 능력치 · 스킬 · 그림 모두 그 줄 것이다.
  * 다시하기 · 재도전은 장면을 새로 세워(0x39fdc) 다시 k 부터다.
+ *
+ * **고침(`bugfixes.json` B-55, 기본 켬)**: 더비는 내 타자 한 사람이 끝까지 친다 — 볼넷 · 사구가 다음 타순을 예약하지 않는다
+ * (`reserveDerbyNextBatter` 가 그대로 돌려준다). 굴림 없음.
  */
 export interface DerbyLineup {
   /** 팀 0 의 명부 팀 r7 (팀 객체 +0x25) — 마스터 명부 0x1f8c1 */
@@ -71,6 +75,8 @@ export function createDerbyLineup(teamId: number, modeBatterSlot: number): Derby
 
 /** `0xaf020(공격 팀, 0)` — 볼넷 · 사구. 예약이 이미 서 있으면 그대로 */
 export function reserveDerbyNextBatter(lineup: DerbyLineup): DerbyLineup {
+  // 고침(B-55): 타순을 넘기지 않는다
+  if (isBugFixed('B-55')) return lineup
   if (lineup.reservedOrder !== null) return lineup
   return { ...lineup, reservedOrder: (lineup.order + 1) % LINEUP_SIZE }
 }

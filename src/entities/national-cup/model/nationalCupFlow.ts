@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { NATIONAL_CUP_RUNNER_UP_TEXT_MONEY, nationalCupRewardOf } from '@/entities/season-mode/model/seasonRewards'
@@ -127,6 +128,9 @@ export function confirmNationalCupStandings(cup: NationalCup, random: RandomPort
  * - 그 밖: StrMODE[143] `"!C[!cFFFF00대한민국!cFFFFFF] 대표팀 탈락!!N!N[!cFFFF00%s!cFFFFFF] 대표팀 제%d회!N국가대항전 우승!!"` ← 우승국 이름 · 제 n 회
  *
  * ⚠️ **원본 버그 그대로**: 결승까지 올라가 **져도** 문구는 "대표팀 탈락!!" 이다. 준우승이라는 말이 없다.
+ *
+ * **고침(`bugfixes.json` B-42, 기본 켬)**: 대한민국이 결승에서 졌으면(`isKoreaRunnerUp`) [143] 의 "탈락" 만 "준우승" 으로 바꾼다
+ * (원본에 준우승 결과 글이 없어 웹이 만든 한 낱말 — 나머지 글 · 색 · 회차는 [143] 그대로). 굴림 없음.
  */
 export const NATIONAL_CUP_CHAMPION_MESSAGE_ID = 144
 export const NATIONAL_CUP_ELIMINATED_MESSAGE_ID = 143
@@ -135,12 +139,33 @@ export const NATIONAL_CUP_ELIMINATED_MESSAGE_ID = 143
 const sprintfModeText = (id: number, ...values: readonly (string | number)[]): string =>
   values.reduce<string>((text, value) => text.replace(/%[sd]/, String(value)), ORIGINAL_MODE_TEXT[id] ?? '')
 
-export function nationalCupResultText(edition: number, isKoreaChampion: boolean, championName: string): string {
+export function nationalCupResultText(
+  edition: number,
+  isKoreaChampion: boolean,
+  championName: string,
+  /** 대한민국이 결승 두 팀에 들었는가 — 우승이 아니면 준우승이다 (`NationalCupFinish.koreaInFinal`) */
+  isKoreaRunnerUp = false,
+): string {
   if (isKoreaChampion) return sprintfModeText(NATIONAL_CUP_CHAMPION_MESSAGE_ID, edition)
-  return sprintfModeText(NATIONAL_CUP_ELIMINATED_MESSAGE_ID, championName, edition)
+  const text = sprintfModeText(NATIONAL_CUP_ELIMINATED_MESSAGE_ID, championName, edition)
+  // 고침(B-42): 결승에서 진 해는 "탈락" 대신 "준우승"
+  return isBugFixed('B-42') && isKoreaRunnerUp ? text.replace(ELIMINATED_WORD, RUNNER_UP_WORD) : text
 }
 
+/** [143] 의 "탈락" · 고친 길(B-42)이 바꿔 넣는 "준우승" */
+const ELIMINATED_WORD = '탈락'
+const RUNNER_UP_WORD = '준우승'
+
 const NOTHING: SeasonReward = { popularity: 0, reputation: 0, money: 0, gamePoint: 0, messageId: 0 }
+
+/** 고친 길(B-44)의 나리 준우승 보상 — 나리 우승(20 · 30 · 20 · G 1000)의 절반, 글 StrMODE[200] */
+export const CAREER_NATIONAL_CUP_RUNNER_UP_REWARD: SeasonReward = {
+  popularity: 10,
+  reputation: 15,
+  money: 10,
+  gamePoint: 0,
+  messageId: 200,
+}
 
 /**
  * 나만의리그 보상 `0x1b92c` (팝업 `0x25` 결과 → `0x26` 보상).
@@ -153,13 +178,18 @@ const NOTHING: SeasonReward = { popularity: 0, reputation: 0, money: 0, gamePoin
  * ⚠️ **나만의리그엔 준우승 보상이 없다** — StrMODE[200] 을 쓰는 곳은 시즌모드 `0x896c` 하나뿐이라
  * 결승에서 져도 탈락과 똑같이 빈손이다 (원본 그대로).
  *
+ * **고침(`bugfixes.json` B-44, 기본 켬)**: 나리도 결승에서 지면 준우승 보상을 준다 — 원본에 나리 값이 없어 **나리 우승 값의 절반**
+ * (인기도 +10 · 평판 +15 · 소지금 +10 = 1000만 · G 0)으로 정했다. 시즌 준우승/우승 비(20·20·20 / 30·40·50)보다 작게 잡은 보수적인 값이다.
+ * 글은 시즌과 같은 StrMODE[200](G 줄 없음). 보상 칸 0·1·3 은 `applyEventRewards` 의 상한만 거쳐 굴림이 없다.
+ *
  * 시즌모드 쪽 보상은 `seasonRewards.ts` 의 `nationalCupRewardOf` 가 이미 갖고 있다 —
  * 여기서 다시 만들지 않고 `nationalCupRewardFor` 가 그것을 그대로 부른다.
  */
-export function careerNationalCupRewardOf(champion: number): SeasonReward {
+export function careerNationalCupRewardOf(champion: number, koreaInFinal = false): SeasonReward {
   if (champion === KOREA_TEAM_ID) {
     return { popularity: 20, reputation: 30, money: 20, gamePoint: 1000, messageId: 199 }
   }
+  if (isBugFixed('B-44') && koreaInFinal) return CAREER_NATIONAL_CUP_RUNNER_UP_REWARD
   return NOTHING
 }
 
@@ -180,7 +210,9 @@ export function careerNationalCupRewardOf(champion: number): SeasonReward {
 export function nationalCupRewardText(reward: SeasonReward): string {
   if (reward.messageId === 0) return ''
   if (reward.messageId === 200) {
-    return sprintfModeText(200, reward.popularity, reward.reputation, NATIONAL_CUP_RUNNER_UP_TEXT_MONEY * 100)
+    // 고친 길(B-43 시즌 · B-44 나리)은 실제로 더하는 값을 글에 쓴다 — 원본 시즌은 글 2500만 · 실제 2000만
+    const money = isBugFixed('B-43') || reward === CAREER_NATIONAL_CUP_RUNNER_UP_REWARD ? reward.money : NATIONAL_CUP_RUNNER_UP_TEXT_MONEY
+    return sprintfModeText(200, reward.popularity, reward.reputation, money * 100)
   }
   return sprintfModeText(reward.messageId, reward.popularity, reward.reputation, reward.money * 100, reward.gamePoint)
 }
@@ -206,7 +238,7 @@ export function careerNationalCupRewardItems(reward: SeasonReward): readonly Eve
 
 /** 모드에 맞는 대회 보상. 시즌모드는 `seasonRewards.nationalCupRewardOf` 를 그대로 쓴다 */
 export function nationalCupRewardFor(mode: NationalCupMode, cup: NationalCup): SeasonReward {
-  if (mode === '나만의리그') return careerNationalCupRewardOf(cup.champion)
+  if (mode === '나만의리그') return careerNationalCupRewardOf(cup.champion, isKoreaInFinal(cup))
   return nationalCupRewardOf(cup.champion, isKoreaInFinal(cup))
 }
 
