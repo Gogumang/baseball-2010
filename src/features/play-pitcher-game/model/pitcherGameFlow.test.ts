@@ -28,6 +28,7 @@ import {
   pitchSlotsFor,
   pitchersOfRecordOf,
   enterBenchClearing,
+  enterPitchResult,
   judgeHitByPitch,
   resolveBenchClearing,
   resolveDefensePlay,
@@ -1332,6 +1333,33 @@ describe('자동 타석(0x21)의 0xc1ba4 — 양 팀 마운드와 CPU 대타 (0x
 
 describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 공격', () => {
   const 가운데직구 = { typeNumber: 1, gaugeCell: 0 }
+
+  it('도루 출발 중 볼넷 · 사구는 0x12 를 안 기다린다 — 3e0e4 → 3e114 곧장 0x17, 4e74c 굴림 없음 (A-24, r302)', () => {
+    const progress = startPitcherGame(기본옵션, 씨앗(1))
+    const 놓음 = (kind: '볼넷' | '사구', stealing: boolean): PitcherGameProgress => ({
+      ...progress,
+      game: { ...progress.game, bases: { first: true, second: false, third: false } },
+      stealingFrom: stealing ? [1] : [],
+      atBat: { balls: kind === '볼넷' ? 4 : 0, strikes: 0, outcome: { kind } },
+      pendingPitchArrival: {
+        resolution: kind === '볼넷' ? { kind: '볼' } : { kind: '사구' },
+        outcomeAfter: { kind },
+        buntKind: 0,
+        grade: 0,
+        live: false,
+      },
+    })
+    for (const kind of ['볼넷', '사구'] as const) {
+      const 끝 = enterPitchResult(놓음(kind, true), 씨앗(3))
+      expect(끝.pendingBenchClearing).toBeNull()
+      expect(끝.lastArrivalPlay?.kind).toBe(2)
+      expect(끝.lastArrivalPlay?.kind === 2 && 끝.lastArrivalPlay.result.opensAtArrival).toBe(true)
+      expect(끝.lastDefensePlay).toBe(끝.lastArrivalPlay?.result)
+      expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+      // 도루가 없으면 그대로 붙든다
+      expect(enterPitchResult(놓음(kind, false), 씨앗(3)).pendingBenchClearing?.phase).toBe('wait')
+    }
+  })
 
   it('1루 주자가 있으면 타자 결정 앞에서 굴린다 — 못 맞힌 공이면 도루 판(종류 5)이 열리고, 1루 도루는 늘 세이프', () => {
     let opened = 0

@@ -1,4 +1,5 @@
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
+import { runWalkPlay } from '@/features/defense-play/model/walkPlay'
 import { describe, expect, it } from 'vitest'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
@@ -2008,6 +2009,24 @@ describe('마타자 0xb633d — 번트 칸을 뽑아도 친다', () => {
 
     expect(마번트).toEqual(마치기)
     expect(일반번트).not.toEqual(마번트)
+  })
+})
+
+describe('우리 타석 도루 출발 중 볼넷 · 사구 — 0x3dfac 3e0e4 → 3e114 곧장 0x17 (A-24, r302)', () => {
+  it('붙들지 않고 벤치 클리어링 굴림 없이 공 도착 걸음에 정산 · 밀어내기 판을 곧장 재생 칸에 넣는다', () => {
+    const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
+    const 놓음 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
+    for (const kind of ['볼넷', '사구'] as const) {
+      const result = runWalkPlay({ bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4, stealingFrom: [1] })
+      const arrivalPlay = { kind: 2, result, strikeout: 'none', callSoundId: null, recordIds: [] } as const
+      const 끝 = startBatterOutcome(놓음, { kind }, createSeededRandom(5), { arrivalPlay })
+      expect(끝.pendingBenchClearing).toBeNull()
+      expect(끝.game.bases.first).toBe(true)
+      expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+      // 도루가 없으면 0x12 대기로 붙든다
+      const 보통판 = { ...arrivalPlay, result: runWalkPlay({ bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4 }) }
+      expect(startBatterOutcome(놓음, { kind }, createSeededRandom(5), { arrivalPlay: 보통판 }).pendingBenchClearing?.phase).toBe('wait')
+    }
   })
 })
 

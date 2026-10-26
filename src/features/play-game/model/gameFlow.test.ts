@@ -39,6 +39,7 @@ import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/co
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
+import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { isPlayerTurn, PLAYER_BATTING_ORDER_INDEX, PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { opponentOf } from '@/entities/league/model/league'
@@ -1001,6 +1002,38 @@ describe('기록달성 남은 것 — 타자편 배선 (6·7 백투백 · 8·24 
     expect(굴림).toBe(껍데기굴림)
     // 같은 판정을 두 번 불러도 한 번만 돈다
     expect(judgeHitByPitch(판정, 세는)).toBe(판정)
+  })
+
+  it('도루 출발 중 볼넷 · 사구는 붙들지 않는다 — 3e0e4 → 3e114 가 곧장 0x17, 0x12 대기 · 4e74c 굴림이 없다 (A-24, r302)', () => {
+    const 시작 = startGame(createSeededRandom(4))
+    // 1루 주자가 도루 출발(st[0x24]) — 공 도착 0x3dfac 이 종류 5 → 0x17 예약 뒤 3e1ae/3e1b4 가 종류를 2 로 덮는다
+    const 놓음 = { ...시작, game: { ...시작.game, bases: { first: true, second: false, third: false } }, stealingFrom: [1] as const }
+    const 결과들: GameProgress[] = []
+    const 굴림수: number[] = []
+    for (const kind of ['볼넷', '사구'] as const) {
+      let 굴림 = 0
+      const 세는 = 세며(createSeededRandom(11), () => { 굴림 += 1 })
+      const resolution: PitchResolution = kind === '볼넷' ? { kind: '볼' } : { kind: '사구' }
+      const { progress: 뒤, play } = arrivePitch(놓음, { resolution, outcomeAfter: { kind } }, 세는, { countAfter: { strikes: 0, balls: 0 } })
+      expect(play?.kind).toBe(2)
+      expect(play?.kind === 2 && play.result.opensAtArrival).toBe(true)
+      const 끝 = startPlayerOutcome(뒤, { kind }, 세는, { arrivalPlay: play })
+      expect(끝.pendingBenchClearing).toBeNull()
+      expect(끝.lastDefensePlay).toBe(play?.result)
+      expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
+      결과들.push(끝)
+      굴림수.push(굴림)
+    }
+    // 사구도 볼넷과 같은 굴림 수 — 4e74c rand(0, 99) 가 없다
+    expect(굴림수[1]).toBe(굴림수[0])
+    expect(결과들[1].game.bases).toEqual(결과들[0].game.bases)
+    // 도루 없는 볼넷은 그대로 붙든다
+    const 보통 = arrivePitch({ ...놓음, stealingFrom: [] }, { resolution: { kind: '볼' }, outcomeAfter: { kind: '볼넷' } }, createSeededRandom(11), {
+      countAfter: { strikes: 0, balls: 0 },
+    })
+    expect(보통.play?.kind === 2 && 보통.play.result.opensAtArrival).toBeFalsy()
+    expect(startPlayerOutcome(보통.progress, { kind: '볼넷' }, createSeededRandom(11), { arrivalPlay: 보통.play }).pendingBenchClearing)
+      .toEqual({ phase: 'wait', outcome: { kind: '볼넷' }, arrivalPlay: 보통.play })
   })
 
   it('판 없는 삼진도 공 도착에서 굴림 없이 붙들고 0x12 틱 31 의 판정 A(0xae24c → 0xd/0x18 · 정산 0xa8024)에서 정산한다 (r298)', () => {

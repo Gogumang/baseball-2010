@@ -9,11 +9,17 @@ describe('타석 끝에서 0xd 까지 — 0x12 대기 0x4e6d4 · 판정 A/B', ()
     expect(AT_BAT_END_AFTER_RESULT_WAIT_FRAMES).toBe(32)
     expect(atBatEndFramesOf({ kind: '삼진' }, null)).toBe(32)
     expect(atBatEndFramesOf({ kind: '볼넷' }, null)).toBe(32)
-    expect(atBatEndFramesOf({ kind: '사구' }, 2)).toBe(32)
+    expect(atBatEndFramesOf({ kind: '사구' }, { kind: 2 })).toBe(32)
     // 0x12 진입 0x3e096 · 0x3e114 가 곧장 0x17 — 판 끝에서 0xd
-    expect(atBatEndFramesOf({ kind: '삼진' }, 5)).toBe(0)
-    expect(atBatEndFramesOf({ kind: '삼진' }, 9)).toBe(0)
+    expect(atBatEndFramesOf({ kind: '삼진' }, { kind: 5 })).toBe(0)
+    expect(atBatEndFramesOf({ kind: '삼진' }, { kind: 9 })).toBe(0)
     expect(atBatEndFramesOf({ kind: '홈런' }, null)).toBe(0)
+  })
+
+  it('도루 출발 중 볼넷 · 사구의 밀어내기 판은 3e0e4 → 3e114 가 곧장 0x17 — 0 그림 (A-24)', () => {
+    expect(atBatEndFramesOf({ kind: '볼넷' }, { kind: 2, result: { opensAtArrival: true } })).toBe(0)
+    expect(atBatEndFramesOf({ kind: '사구' }, { kind: 2, result: { opensAtArrival: true } })).toBe(0)
+    expect(atBatEndFramesOf({ kind: '사구' }, { kind: 2, result: {} })).toBe(32)
   })
 
   describe('pauseWithBanner', () => {

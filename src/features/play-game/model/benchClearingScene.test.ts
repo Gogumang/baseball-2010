@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import {
-  holdsUntilResultWaitEnd, outsShownDuringResultWait, rollBenchClearingEntry, rollBenchClearingTargets,
+  holdsUntilResultWaitEnd, opensArrivalPlayAtOnce, outsShownDuringResultWait, rollBenchClearingEntry, rollBenchClearingTargets,
 } from '@/features/play-game/model/benchClearingScene'
 
 const 세는난수 = () => {
@@ -38,6 +38,18 @@ describe('0x12 대기 끝까지 붙드는 타석 결과 — 0x4e6d4 문턱 0x1f 
     expect(holdsUntilResultWaitEnd({ kind: '삼진' }, { kind: 9 })).toBe(false)
     expect(holdsUntilResultWaitEnd({ kind: '삼진' }, { kind: 5 })).toBe(false)
     expect(holdsUntilResultWaitEnd({ kind: '홈런' }, null)).toBe(false)
+  })
+
+  it('도루 출발 중 볼넷 · 사구의 밀어내기 판은 붙들지 않는다 — 3e0e4 → 3e114 곧장 0x17 (A-24, r302)', () => {
+    const 도루밀어내기 = { kind: 2, result: { opensAtArrival: true } }
+    expect(holdsUntilResultWaitEnd({ kind: '볼넷' }, 도루밀어내기)).toBe(false)
+    expect(holdsUntilResultWaitEnd({ kind: '사구' }, 도루밀어내기)).toBe(false)
+    expect(holdsUntilResultWaitEnd({ kind: '사구' }, { kind: 2, result: {} })).toBe(true)
+    expect(opensArrivalPlayAtOnce(도루밀어내기)).toBe(true)
+    expect(opensArrivalPlayAtOnce({ kind: 5 })).toBe(true)
+    expect(opensArrivalPlayAtOnce({ kind: 9 })).toBe(true)
+    expect(opensArrivalPlayAtOnce({ kind: 2 })).toBe(false)
+    expect(opensArrivalPlayAtOnce(null)).toBe(false)
   })
 
   it('대기 중 HUD 아웃 — 붙든 삼진만 진입 3e1a6 의 st[6]++ 을 미리 그린다(3 에서 멈춤)', () => {

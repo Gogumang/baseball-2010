@@ -115,14 +115,44 @@ export type HitByPitchHoldPhase =
  *   (3e0a2~3e0e0 이 낫아웃이면 v 를 0 으로 지우고 st[0x1a] = 1).
  * - 삼진 + 도루(종류 5) — 3e0e4 도루 칸이 서고 아웃 ≤ 1(3e0f4) 이면 3e114 가 0x17 · 판정 B 가 종류 5 로 한 번 정산. 아웃이 2 면
  *   (3e0fa v == 5) 판이 안 열려 위 보통 삼진 길이다 — 웹 `openPitchArrivalPlay` 도 같은 조건이라 판이 null 로 온다.
+ *
+ * 볼넷 · 사구도 도루 칸 st[0x24] 가 서 있으면 붙들지 않는다(A-24, r302 — 0x3dfac 직접 뜸): 3e062 가 v ∈ {3, 4} 면 폭투 판을 건너
+ * 3e0e4 로 오고, 도루 칸이 서 있으면 아웃과 무관하게(3e0f4 · 3e0fa 는 v == 5 만 거름) 3e0fe 0xb0cb8(플레이, 5) · 3e114 0x17 예약 —
+ * 그 뒤 3e1ae/3e1b4 가 종류를 2 로 덮어 밀어내기 판이 곧장 선다. 0x12 대기 · 4e74c 굴림이 없어 도루 중 사구는 벤치 클리어링에 안 들고,
+ * 정산은 판 끝 판정 B 다(웹은 공 도착 걸음의 보통 길 — 판은 재생 칸으로 곧장, `opensArrivalPlayAtOnce`).
  */
 export function holdsUntilResultWaitEnd(
   outcome: AtBatOutcome,
   /** 이 공의 0x3dfac 이 연 공 도착 판(밀어내기 종류 2 · 폭투 9 · 도루 5) — 없으면 null */
-  arrivalPlay: { readonly kind: number } | null | undefined,
+  arrivalPlay: ArrivalPlayLike | null | undefined,
 ): boolean {
-  if (outcome.kind === '사구' || outcome.kind === '볼넷') return true
+  if (outcome.kind === '사구' || outcome.kind === '볼넷') return !opensArrivalPlayAtOnce(arrivalPlay)
   return outcome.kind === '삼진' && arrivalPlay == null
+}
+
+/** 공 도착 판의 모양 — 종류와(밀어내기면) 판 결과의 `opensAtArrival` 만 본다 */
+export interface ArrivalPlayLike {
+  readonly kind: number
+  /** 판 결과 — 밀어내기 판(`WalkPlayResult`)이면 `opensAtArrival` 을 본다 */
+  readonly result?: object
+}
+
+/**
+ * **공 도착 0x3dfac 이 0x12 대기 없이 곧장 0x17 을 예약한 판인가** — 폭투·포일(종류 9, 3e09a) · 도루(종류 5, 3e114), 그리고 도루 출발 중
+ * 볼넷 · 사구의 밀어내기 판(A-24, r302 — 3e0e4 → 3e114 가 0x17 을 예약한 뒤 3e1ae/3e1b4 가 종류를 2 로 덮는다, `opensAtArrival`).
+ * 이 판들은 0x12 갱신 0x4e6d4 를 안 지나 0x1f 대기 · 4e74c 벤치 클리어링 굴림 · 0x12 끝 돌발 판정이 없고, 판 끝 판정 B 0xae3e8 이
+ * 정산한다(0xd 까지 0 그림 — `atBatEndFramesOf`).
+ *
+ * 0x12 갱신 0x4e6d4 머리(4e6f2~4e728)에도 "아웃 ≤ 2 이고 플레이.vt88() 이 참이면 0xb0cb8(플레이, 5) · 0x17" 갈래가 있지만, 플레이 객체
+ * (경기 +0x200, new(0x1fc) + 생성자 0xb0b68 — 0x3e340 의 3e75a 한 곳)의 vtable 0xd8618 +0x88 = 0xb2644 는 `movs r0, #0; bx lr` 이라
+ * **늘 거짓**이다(0xd8618 을 쓰는 곳은 이 클래스의 생성 · 소멸 0xb0b34 · 0xb0b68 · 0xb0b9c · 0xb0bc0 · 0xb0be4 뿐, 0xb2645 를 담은 칸은
+ * 0xd86a0 하나 — 덮어쓰는 파생 클래스가 없다). 죽은 갈래라 웹에 옮길 것이 없다(r302).
+ */
+export function opensArrivalPlayAtOnce(arrivalPlay: ArrivalPlayLike | null | undefined): boolean {
+  if (arrivalPlay == null) return false
+  if (arrivalPlay.kind !== 2) return true
+  const result = arrivalPlay.result as { readonly opensAtArrival?: boolean } | undefined
+  return result?.opensAtArrival === true
 }
 
 /**
