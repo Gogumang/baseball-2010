@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
-import { confirmedCountOf, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { confirmedCountOf, noteSceneDEntryTick, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
 
 export interface SubstitutionScenePlayback {
   /** 지금 0x16 — "CHANGE" 애니(`SubstitutionSceneOverlay`)를 그리고 0xe 대기를 세지 않는다 */
@@ -24,8 +24,9 @@ export interface SubstitutionScenePlayback {
  * - 0xe 대기가 `confirmsBefore` 번 OK 를 받은 뒤(없으면 곧장), `canRun`(덮개 · 팝업 · 결과 띠가 없을 때)이면 선다.
  * - 선 첫 그림에 `timeSoundId`(CPU 교체의 "Time!" 22 — 진행기가 안 낸 경우)를 낸다.
  * - 다 그리면(`finish`) 0xd 두 그림 뒤 0xe 그리기 0x38d1c(38dc2) · 0x49e64(49f76) → 0x38b64 가 들어온 선수 자리에 파티클을 쏘고
- *   (`onEntryDraw` — 투수 ptc/004 · 타자 ptc/003) 등판음(26 · 15 · 14)을 낸다.
- *   ⚠️ 근사(남김 — 웹 구조): 0xd 두 그림을 타이머로 센다 — 화면의 0xe 대기도 같은 때부터 0xd 두 그림을 센다(`useSceneConfirm`).
+ *   (`onEntryDraw` — 투수 ptc/004 · 타자 ptc/003) 등판음(26 · 15 · 14)을 낸다. `finish` 는 끝 비트를 본 그림의 메시지 0xd 다음 틀
+ *   머리(= 0xd 틱 0)에 불리므로 그 장면 틱을 대기의 0xd 진입 틱으로 적는다(`noteSceneDEntryTick`) — 화면의 0xe 대기(`useSceneConfirm`)는
+ *   덮개가 걷혀 다시 그린 때가 아니라 이 틱부터 0xd 두 그림을 세고, 등판음도 같은 틱에서 센 0xe 틱 0 이다.
  * 한 번 다 본 번호는 다시 세우지 않는다(화면이 다시 서도 — 진행 상태가 같은 객체를 들고 있는 동안).
  */
 export function useSubstitutionScene(
@@ -53,16 +54,20 @@ export function useSubstitutionScene(
 
   const sceneRef = useRef(scene)
   sceneRef.current = scene
+  const waitRef = useRef(wait)
+  waitRef.current = wait
   const onEntryDrawRef = useRef(onEntryDraw)
   onEntryDrawRef.current = onEntryDraw
   const finish = useCallback(() => {
     const current = sceneRef.current
     if (current == null || seenSerials.has(current)) return
     seenSerials.add(current)
+    // 0x16 끝 메시지 0xd → 이 틀이 0xd 틱 0 — 대기는 OK 를 `confirmsBefore` 번 받은 뒤의 0xe 다
+    noteSceneDEntryTick(waitRef.current, confirmedCountOf(waitRef.current), gameSceneTickNow())
     setVersion((version) => version + 1)
     const entry = current.entrySoundId
     // 0xd 두 그림 뒤 0xe 그리기(0x38b64)의 등판음 — 0xd · 0xe 는 경기 장면 상태라 공용 창이 서 있으면 52cc6 이 장면 틱을, 52efe 가
-    // 그리기를 건너뛴다. 경기 장면 틱으로 센다(0xe 첫 그림 = 장면 틱 격자의 틱 머리)
+    // 그리기를 건너뛴다. 경기 장면 틱으로 센다(0xe 첫 그림 = 위에 적은 0xd 틱 0 에서 두 틱 뒤의 틱 머리)
     // 0x38b64 는 파티클(38bd0 · 38c6e)을 먼저 쏘고 등판음을 낸다
     setGameSceneTickTimeout(() => {
       onEntryDrawRef.current?.(current)

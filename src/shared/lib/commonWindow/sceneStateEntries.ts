@@ -75,6 +75,11 @@ export function sceneStateEntryAt(tick: number): SceneStateEntry | null {
   return null
 }
 
+/** 마지막으로 적힌 칸(가장 늦은 틱) — 앞날의 예약일 수 있다. 적힌 것이 없으면 null */
+export function lastSceneStateEntry(): SceneStateEntry | null {
+  return entries.at(-1) ?? null
+}
+
 /** 경기 장면 객체가 사라진다(0x332b8) — 다음 장면은 새 상태 객체로 선다 */
 export function resetSceneStateEntries(): void {
   entries = []

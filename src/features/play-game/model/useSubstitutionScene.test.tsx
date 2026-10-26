@@ -106,3 +106,23 @@ describe('교체 연출 0x16 을 경기 화면에 세운다 (3da88 · 0x4da30 ·
     expect(order).toEqual(['파티클 투수'])
   })
 })
+
+describe('0x16 끝의 0xd 진입 틱 (끝 비트 메시지 0xd → 다음 틀 0xd 틱 0)', () => {
+  it('다 그린 틀을 대기의 0xd 틱 0 으로 적는다 — 화면이 한 틱 늦게 받기 시작해도 등판음과 OK 잠금이 같은 0xd 에서 센다', () => {
+    const scene: SubstitutionScene = { serial: 1, entryKind: '투수', incomingIsAce: false, entrySoundId: 15 }
+    const wait = enterSceneConfirm()
+    const { result, rerender } = renderHook(({ cover }: { cover: boolean }) => {
+      const substitution = useSubstitutionScene(scene, wait, true)
+      const confirm = useSceneConfirm(wait, !substitution.isShown && !cover)
+      return { substitution, confirm }
+    }, { initialProps: { cover: true } })
+    act(() => result.current.substitution.finish())
+    프레임(1)
+    rerender({ cover: false })
+    프레임(SCENE_PREPARE_FRAMES - 1)
+    expect(played).toEqual([15])
+    프레임(SCENE_CONFIRM_READY_FRAMES - SCENE_PREPARE_FRAMES)
+    act(() => result.current.confirm.confirm())
+    expect(result.current.confirm.isAwaiting).toBe(false)
+  })
+})

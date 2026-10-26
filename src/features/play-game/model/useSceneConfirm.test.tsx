@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
+import {
+  SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, noteSceneDEntryTick, useSceneConfirm,
+} from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_STATE, markSceneStateEntries, resetSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import {
   chainSceneConfirm, enterSceneConfirm, enterSceneConfirmFromSubstitutionWindow, enterSceneHookPassage,
 } from '@/features/play-game/model/sceneConfirm'
@@ -12,7 +15,7 @@ import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import {
-  markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest,
+  gameSceneTickNow, markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest,
 } from '@/shared/lib/commonWindow/commonWindow'
 
 beforeEach(() => vi.useFakeTimers())
@@ -276,5 +279,64 @@ describe('0xe 진입의 감독 강판 지나감 (0x50674 506ea 0x504cc → 0x23)
     })
     expect(result.current.isAwaiting).toBe(false)
     expect(played).toEqual([14])
+  })
+})
+
+describe('0xd 진입 틱 — 원본은 0xd 를 예약한 다음 틀이 0xd 틱 0 (0xbcb48 → 0xbc9c8)', () => {
+  afterEach(() => {
+    setActiveSound(null)
+    resetSceneStateEntries()
+  })
+
+  /** 지금 틱에서 `ticks` 틱 뒤 머리로 */
+  const 틱 = (ticks: number) =>
+    act(() => {
+      vi.advanceTimersByTime(ticks * millisecondsPerFrame())
+    })
+
+  it('타석 장면이 앞날에 적은 0xd(0x12 문턱 다음 틀)가 있으면 덮개가 문턱 틀에 걷혀도 그 틱부터 센다 — 등장음도 그 틱', () => {
+    const played: number[] = []
+    setActiveSound({ ...createSilentSound(), play: (id: number) => { played.push(id) } })
+    // 0x12 문턱 갱신이 이 틀에 판정 A → 0xd 예약 — 0xd 틱 0 은 다음 틀 (`BattingStage.showResult` 가 적는 칸)
+    markSceneStateEntries({ tick: gameSceneTickNow() + 1, state: SCENE_STATE.준비 })
+    const wait = enterSceneConfirm(14)
+    const { result } = renderHook(() => useSceneConfirm(wait, true))
+    expect(played).toEqual([])
+    expect(result.current.sceneDEntryMark).toBe(0)
+    틱(1)
+    expect(played).toEqual([14])
+    expect(result.current.sceneDEntryMark).toBe(1)
+    // 0xd 틱 0 에서 다섯 틱(0xd 두 그림 + 0xe 잠금 셋) 뒤에야 OK
+    틱(SCENE_CONFIRM_READY_FRAMES - 1)
+    act(() => result.current.confirm())
+    expect(result.current.isAwaiting).toBe(true)
+    틱(1)
+    act(() => result.current.confirm())
+    expect(result.current.isAwaiting).toBe(false)
+  })
+
+  it('지난 0xd 칸(자동진행 중계 · 이닝 판 · 수비 판을 거친 뒤)은 쓰지 않는다 — 덮개가 걷힌 틱부터', () => {
+    markSceneStateEntries({ tick: gameSceneTickNow() - 30, state: SCENE_STATE.준비 })
+    const wait = enterSceneConfirm()
+    const { result } = renderHook(() => useSceneConfirm(wait, true))
+    틱(SCENE_CONFIRM_READY_FRAMES - 1)
+    act(() => result.current.confirm())
+    expect(result.current.isAwaiting).toBe(true)
+    틱(1)
+    act(() => result.current.confirm())
+    expect(result.current.isAwaiting).toBe(false)
+  })
+
+  it('교체 연출 끝이 적은 0xd 틱(`noteSceneDEntryTick`)을 쓴다 — 화면이 한 틱 늦게 받기 시작해도 그 틱부터', () => {
+    const wait = enterSceneConfirm()
+    noteSceneDEntryTick(wait, 0, gameSceneTickNow())
+    const { result, rerender } = renderHook(({ canAccept }: { canAccept: boolean }) => useSceneConfirm(wait, canAccept), {
+      initialProps: { canAccept: false },
+    })
+    틱(1)
+    rerender({ canAccept: true })
+    틱(SCENE_CONFIRM_READY_FRAMES - 1)
+    act(() => result.current.confirm())
+    expect(result.current.isAwaiting).toBe(false)
   })
 })
