@@ -46,6 +46,8 @@ export function SeasonItemShopScreen({
 }: SeasonItemShopScreenProps) {
   const [cursor, setCursor] = useState(initialCursor)
   const [notice, setNotice] = useState<string | null>(null)
+  /** G부족 [65] — 예/아니오 (2, 2). 웹은 G 충전 0xfa 가 없어 두 답 모두 닫기만 한다 */
+  const [lackNotice, setLackNotice] = useState<string | null>(null)
   const [question, setQuestion] = useState<{ readonly text: string; readonly slot: number } | null>(null)
 
   const entries: readonly ShopEntry[] = kind === 1
@@ -63,7 +65,7 @@ export function SeasonItemShopScreen({
       ? checkSeasonSubItem(record, slot)
       : checkSeasonGpItem({ record, teamMorale, gamePoint }, slot)
     if (checked === null) return
-    if (!checked.ok) return setNotice(checked.notice)
+    if (!checked.ok) return checked.asks === true ? setLackNotice(checked.notice) : setNotice(checked.notice)
     return setQuestion({ text: checked.question, slot })
   }
 
@@ -73,7 +75,7 @@ export function SeasonItemShopScreen({
     if (text !== null) setNotice(text)
   }
 
-  const isPopup = notice !== null || question !== null
+  const isPopup = notice !== null || question !== null || lackNotice !== null
   const latest = useRef({ isPopup, onBack })
   latest.current = { isPopup, onBack }
   useEffect(() => {
@@ -109,6 +111,9 @@ export function SeasonItemShopScreen({
       {question !== null && (
         <MessageBox text={question.text} buttons={['예', '아니오']}
           onAnswer={(index) => (index === 0 ? buy(question.slot) : setQuestion(null))} />
+      )}
+      {lackNotice !== null && (
+        <MessageBox text={lackNotice} buttons={['예', '아니오']} onAnswer={() => setLackNotice(null)} />
       )}
       {question === null && notice !== null && (
         <MessageBox text={notice} buttons={['OK']} onAnswer={() => setNotice(null)} />

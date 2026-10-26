@@ -119,6 +119,18 @@ describe('구장 아이템 상점 — 구매 확정 (0x812c)', () => {
     expect(바뀐.stadiumEquipped[0]).toBe(1)
   })
 
+  it('구매 완료 글은 StrMODE[184] 원문 — [구단관리]-[구장관리] 두 이름이 노랑 (0x81ba → 0xbbef9(1, 0xf))', () => {
+    띄우기(레코드({ popularity: 200, money: 400 }))
+
+    칸고르기('관중석 2단 관중석')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(알림글()).toContain('[구단관리]-[구장관리]')
+    const 노랑 = [...screen.getByRole('dialog', { name: '알림' }).querySelectorAll('span')]
+      .filter((node) => node.style.color === 'rgb(255, 255, 0)').map((node) => node.textContent)
+    expect(노랑).toEqual(expect.arrayContaining(['구단관리', '구장관리']))
+  })
+
   it('⚠️ 원본 버그: 사도 **인기도가 깎이지 않는다** (S3 5-1 — 차감 코드가 없다)', () => {
     const onChange = 띄우기(레코드({ popularity: 800, money: 9999 }))
 

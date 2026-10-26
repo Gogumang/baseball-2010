@@ -67,7 +67,12 @@ export function seasonGpItemPriceOf(slot: number): number {
 
 export type SeasonShopCheck =
   | { readonly ok: true; readonly question: string }
-  | { readonly ok: false; readonly notice: string }
+  /**
+   * `asks` — 예/아니오 팝업 (2, 2). G부족 [65] 만 그렇다: 0x98fe~0x9902 가 0xbbef9(this, **2, 2**, 1) 로 띄우고
+   * 결과 2 의 "예"(0x7d90 점프표 0xcbdf4[0] → 0x8214)는 G 충전 0xfa 로 간다 — 웹은 서버 기능을 빼 두어(10-24 결정) 예도 닫기만 한다.
+   * 다른 가드는 모두 (1, 1) 한 단추 팝업(0x96b8 → 0x96be~0x96c2)이다.
+   */
+  | { readonly ok: false; readonly notice: string; readonly asks?: boolean }
 
 const modeText = (id: number) => ORIGINAL_MODE_TEXT[id] ?? ''
 /** StrMODE 원문 */
@@ -120,7 +125,7 @@ export function checkSeasonGpItem(input: SeasonGpShopInput, slot: number): Seaso
   if (slot < 0 || slot >= SEASON_GP_ITEM_COUNT) return null
   const price = seasonGpItemPriceOf(slot)
   const refuse = (id: number): SeasonShopCheck => ({ ok: false, notice: modeText(id) })
-  if (price > input.gamePoint) return refuse(SEASON_SHOP_TEXT.G부족)
+  if (price > input.gamePoint) return { ok: false, notice: modeText(SEASON_SHOP_TEXT.G부족), asks: true }
   const { record } = input
   if (slot === 5 && record.tradeUsed !== 1) return refuse(SEASON_SHOP_TEXT.트레이드)
   if (slot === 1 && input.teamMorale === MORALE_LIMIT) return refuse(SEASON_SHOP_TEXT.사기최고)

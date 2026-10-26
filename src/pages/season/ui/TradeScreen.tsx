@@ -232,6 +232,7 @@ export function TradeScreen({
   /** 요청이면 단계에 들어갈 때마다 진입 알림 [204]/[205] 를 다시 띄운다 (0x5cd0·0x5b28 은 진입 함수다) */
   const enterStep = (next: TradeStep) => {
     setStep(next)
+    resetListCursor()
     // 0x5cd0 · 0x5b28 — 편집기를 this+0x154 탭으로 다시 세운다
     if (next.kind === '영입' || next.kind === '보상') setListTab(tradeTab)
     // 0x5cd0 · 0x5b28 진입이 늘 알림을 띄운다 — 요청이면 [204] · [205], 아니면 [163] · [164] (0x5cf0~0x5d18 · 0x5b2a~0x5b56)
@@ -254,6 +255,7 @@ export function TradeScreen({
     setTradeTab(TRADE_REQUEST_TAB.투수)
     setListTab(TRADE_REQUEST_TAB.투수)
     setStep({ kind: '영입', teamId })
+    resetListCursor()
     // 0x5cd0 — StrMODE[163] 알림
     setNotice(CHOOSE_ACQUIRED)
   }
@@ -267,7 +269,14 @@ export function TradeScreen({
     const entry = shownEntries[chosen]
     if (entry === undefined) return
     setTradeTab(nextTab)
+    // 0x71bc~0x723a — 요청이 아니면 탭 · 칸을 먼저 적고(this+0x154 · +0x150) 상대 선수 0xb5695(상대 팀, 탭, 칸)가 나리 선수(0xb6389)면
+    // [165] 알림 (1, 1, 1) 뒤 0xe5 에 남는다. 명전 검사(0xb6349 → [166])는 0xe6 키 0x727c 에만 있다 — 원본 그대로
+    if (forced === null && entry.refusal === '나리선수') {
+      setNotice(REFUSE_CAREER)
+      return
+    }
     setStep({ kind: '보상', teamId: step.teamId, acquired: chosen })
+    resetListCursor()
     setListTab(nextTab)
     // 0x5b28 — [164] (요청이면 [205]) 알림
     setNotice(forced === null ? CHOOSE_GIVEN : REQUEST_GIVEN)
@@ -288,6 +297,7 @@ export function TradeScreen({
       return
     }
     setStep({ kind: '확인', teamId: step.teamId, acquired: step.acquired, given: index })
+    resetListCursor()
   }
 
   const chooseBoost = (which: number) => {
@@ -374,9 +384,38 @@ export function TradeScreen({
     onCancel: () => backOneStep(),
     isEnabled: step.kind !== '팀' && !isBusy,
     ...(lockedCursor === null ? {} : { cursor: lockedCursor, onCursorChange: () => undefined }),
+    // 0xe7 비용 칸 [this+0x7c] 은 장면 생성자 0x3c60~0x3c88 이 0x6bd7d vt+0x10(1열, 3줄, 숫자키 꼴 1, 꼴 0x330) 으로 짓는다(r263 직접 뜸).
+    // 1열이라 ← → 는 0x6bead 의 0x10 갈래에서 끝을 넘고(0x6bdc4) 0x100 · 줄 > 1 로 세로 같은 부호 한 칸 — 곧 ← = ↑ · → = ↓,
+    // '2' '4' '6' '8' 도 격자 키 0x6c030 이 방향으로 바꾼다. 커맨드 줄과 같은 걸음이다
+    isCommandBar: step.kind === '확인',
   })
   const shownCursor = cursor
   const moveCursor = lockedCursor === null ? moveTo : () => undefined
+  /**
+   * 단계 진입마다 커서를 첫 칸으로 — 0xe5 · 0xe6 진입(0x5cd0 · 0x5b28)이 편집기 0x5561c 로 목록을 다시 세워 0x5574c vt+0x14(0, 0) 와
+   * 윗줄 [+0x2c] · [+0x30] = 0, 0xe7 진입 0xce78 이 비용 칸 [this+0x7c] vt+0x14(0, 0)(0xceb0~0xceba, r263 직접 뜸).
+   * 웹은 세 단계가 커서 하나를 같이 써서 앞 단계에서 고른 줄 번호가 남아 있었다(0xe7 이 칸 2 · +20% 로 열리는 따위). 요청이면 묶인 칸 그대로
+   */
+  function resetListCursor() {
+    moveTo(0)
+  }
+
+  /**
+   * 0xe5 · 0xe6 목록 [ed+0x41c] 은 0x55724 가 0x6c219 vt+0x1c(1열, n줄, 숫자키 꼴 **1**, 꼴 0x20) 으로 짓고(r263 직접 뜸),
+   * 편집기 키 0x55864 가 키를 그대로 넘긴다(0x5588e~0x5589a) — 격자 키 0x6c030 이 '2' '8' 을 ↑ ↓ 로 바꿔 커서를 감아 옮긴다.
+   * '4' '6' · ← → 는 1열 · 꼴 0x20(0x10 · 0x100 없음)이라 안 움직인다. 요청 중에는 0x7104 · 0x727c 가 '2' '8' 도 −3 으로 바꿔 막는다
+   */
+  useEffect(() => {
+    if (!(step.kind === '영입' || step.kind === '보상') || isBusy) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '2' && event.key !== '8') return
+      event.preventDefault()
+      const count = listRows.length
+      if (count > 0) moveCursor((shownCursor + (event.key === '2' ? -1 : 1) + count) % count)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
 
   /** '*' (편집기 559b2) — 목록 탭만 뒤집고 커서 0. 트레이드 탭(this+0x154)은 0xe5 OK 에서만 바뀐다 */
   function flipListTab() {

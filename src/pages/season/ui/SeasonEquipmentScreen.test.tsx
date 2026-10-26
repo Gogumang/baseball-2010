@@ -51,6 +51,16 @@ describe('장비 창 0xdc 종류 3 (0x83378 · 0x819ac)', () => {
     expect(screen.getByTestId('장비-칸-0')).toBeTruthy()
   })
 
+  it('칸 목록에서 다른 부위를 누르면 앞 부위의 끼워 보기를 진짜 니블로 되돌린다 (취소 0x81a9a 와 같게)', () => {
+    띄우기([2, 0, 0, 0])
+    fireEvent.click(screen.getByRole('button', { name: '부위 1' }))
+    키('ArrowDown')
+    키('ArrowDown')
+    expect(니블()).toBe('3,0,0,0')
+    fireEvent.click(screen.getByRole('button', { name: '부위 2' }))
+    expect(니블()).toBe('2,1,0,0')
+  })
+
   it('부위 목록에서 취소 → 0xdf', () => {
     const { onBack } = 띄우기()
     키('Escape')

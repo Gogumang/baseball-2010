@@ -110,6 +110,17 @@ describe('마타자 단계', () => {
     expect(cells[0].disabled).toBe(true)
     expect(cells[7].disabled).toBe(false)
   })
+
+  it('CLR 로 마투수 단계에 돌아오면 커서는 고른 마투수 칸이다 — 0 칸이 아니다 (시즌 0xa91c~0xa94a · 상태 21 0x2a0bc~0x2a0e2)', () => {
+    const onSelect = vi.fn()
+    const props = { openedAcePitcherIds: [0, 1, 2, 3, 4], openedAceBatterIds: [0, 1, 2, 3, 4], onSelect, onCancel: vi.fn() }
+    const { rerender } = render(<AceSelectScreen phase={ACE_PHASE.마투수} {...props} />)
+    rerender(<AceSelectScreen phase={ACE_PHASE.마타자} chosenPitcherCell={3} {...props} />)
+    rerender(<AceSelectScreen phase={ACE_PHASE.마투수} chosenPitcherCell={3} {...props} />)
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith(3)
+  })
 })
 
 describe('prop 을 안 넘기면(App.tsx 연결 누락 재현) 10칸이 전부 LOCK 이다', () => {

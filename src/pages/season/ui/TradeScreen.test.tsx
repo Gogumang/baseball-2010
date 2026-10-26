@@ -234,6 +234,75 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
   })
 })
 
+describe('r263 — 키 다시 뜸 (0x7104 · 0x727c · 0xc66c · 목록 0x55724 · 비용 칸 0x3c60)', () => {
+  const 커서줄 = () => screen.getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true')
+
+  it("0xe5 목록은 '8' · '2' 로도 위아래로 감아 옮긴다 — 0x55724 vt+0x1c(1, n, 숫자키 꼴 1, 0x20)", () => {
+    띄우기(상태())
+    상대팀고르기()
+
+    expect(커서줄()?.getAttribute('aria-label')).toContain(teamPitchers(OPPONENT)[0].name)
+    fireEvent.keyDown(window, { key: '8' })
+    expect(커서줄()?.getAttribute('aria-label')).toContain(teamPitchers(OPPONENT)[1].name)
+    fireEvent.keyDown(window, { key: '2' })
+    fireEvent.keyDown(window, { key: '2' })
+    expect(커서줄()?.getAttribute('aria-label')).toContain(teamPitchers(OPPONENT)[7].name)
+    // '4' '6' 은 1열 · 꼴 0x20 이라 안 움직인다
+    fireEvent.keyDown(window, { key: '6' })
+    expect(커서줄()?.getAttribute('aria-label')).toContain(teamPitchers(OPPONENT)[7].name)
+  })
+
+  it('0xe6 진입은 목록 커서를 첫 줄로 — 0x5b28 → 0x5561c 의 vt+0x14(0, 0) (0xe5 에서 고른 줄 번호가 남지 않는다)', () => {
+    띄우기(상태())
+    타자로()
+    영입고르기(teamBatters(OPPONENT)[6].name)
+
+    expect(커서줄()?.getAttribute('aria-label')).toContain(teamBatters(MY_TEAM)[0].name)
+  })
+
+  it("0xe5 에서 상대 팀의 나리 선수를 고르면 [165] 알림만 — 0x71bc~0x723a (0xb6389)", () => {
+    const 나리가낀상대 = 명단({
+      batters: [
+        { id: 0xfe, kindByte: PLAYER_OWN_BIT | 0, fieldPosition: 0, stamina: 0 },
+        ...명단().batters.slice(1),
+      ],
+    })
+    띄우기(상태(), { opponentRosterOf: () => 나리가낀상대 })
+    타자로()
+    누르기('타자 1번')
+
+    expect(알림글()).toContain('나만의 리그 선수는')
+    알림닫기()
+    // 0xe5 에 남는다 — 바닥 0x17 "*투수" 표시가 그대로
+    expect(screen.getByRole('button', { name: '* 투수' })).toBeDefined()
+  })
+
+  it("0xe7 비용 칸은 ← → · '4' '6' · '2' '8' 도 옮긴다 — [this+0x7c] 1×3 · 꼴 0x330 · 숫자키 꼴 1", () => {
+    띄우기(상태())
+    타자로()
+    영입고르기(teamBatters(OPPONENT)[6].name)
+    누르기(teamBatters(MY_TEAM)[6].name)
+
+    fireEvent.keyDown(window, { key: '6' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('dialog').textContent).toContain('2000')
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '아니오' }))
+    틀보내기()
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByRole('dialog').textContent).toContain('1000')
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '아니오' }))
+    틀보내기()
+
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: '2' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    // 칸 2 → 1 → 0 : 기본 진행 (비용 글 없음)
+    expect(screen.getByRole('dialog').textContent).not.toMatch(/\d000/)
+  })
+})
+
 describe('0xe7 확인·진행 (J 4-4)', () => {
   // 두 팀 타자 6번은 +0x1b 가 둘 다 9 라 d = 0 이다 (표 값)
   const 같은값칸 = 6
