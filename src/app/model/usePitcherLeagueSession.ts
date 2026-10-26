@@ -129,6 +129,7 @@ import {
   applyPitcherEndingBonus,
   canContinueAfterPitcherEnding,
   continueAfterPitcherEnding,
+  PITCHER_INJURY_ENDING,
   judgePitcherEnding,
   PITCHER_CONTINUE_COST_GAME_POINT,
   pitcherEndingBonusOf,
@@ -254,6 +255,15 @@ export interface PitcherLeagueSession {
    * 100 진입 1c15e 가 배경음을 끊는다(`pages/management/lib/nariYearCover` 의 이어하기 길). 타자편 `Screen` 의 `fromResume`
    */
   readonly yearCoverFromResume: boolean
+  /**
+   * 새 시즌 0x1b768 을 부른 134 대진판 · 141 엔딩이 아직 그리는 아홉 틀 — 장면은 그대로 두고 앱이 그 위에 효과기를 칠한다
+   * (`YearCoverHoldLayer`). 끝나면 `enterHeldYearCover` 가 137 로 넘긴다 (타자편 `isYearCoverHeld` 와 같다)
+   */
+  readonly isYearCoverHeld: boolean
+  /** 137 표지가 앞 화면 아홉 틀을 그 화면 위에서 이미 돌고 왔다 — 표지는 137 예약 다음 틀부터 (`Screen` 의 `afterHold`) */
+  readonly yearCoverAfterHold: boolean
+  /** 방출 엔딩 뒤 이어하기의 아홉 틀 동안 141 이 그리는 엔딩 번호 — 선수의 엔딩 칸은 이미 비었다 */
+  readonly heldEndingIndex: number | null
   /** 엔딩 141 이 이어하기 100 진입 1c24e(S+0x50 ∈ {6, 7})에서 왔다 — 단계 0 의 남은 판에 상태 1 의 덮기가 얹힌다 (`EndingScreen.isResumed`) */
   readonly endingFromResume: boolean
   /**
@@ -336,6 +346,8 @@ export interface PitcherLeagueSession {
     readonly beginYearEnd: () => void
     /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기. 모자라면 false */
     readonly continueAfterEnding: () => boolean
+    /** 앞 상태(134 · 141)가 효과기 끝을 본 틀 — `0xbcb49(0x89)` 로 137 (1bb46~1bb64 · 1becc~1beea) */
+    readonly enterHeldYearCover: () => void
     /** 엔딩 141 의 보너스 팝업 0x2b 를 닫았다 — 보너스 · S+0x7b = 1 · 저장 (1bbf4~1bc70) */
     readonly receiveEndingBonus: () => void
     /** 엔딩을 떠나 메인 메뉴로 — 명예의 전당에 등록했으면 선수 저장을 지운다(0x224ec), 아니면 저장이 남는다 */
@@ -1512,20 +1524,35 @@ export function usePitcherLeagueSession(
   )
 
 
+  /** 새 시즌 0x1b768 을 부른 134 · 141 이 효과기 끝을 기다리는 아홉 틀 (`PitcherLeagueSession.isYearCoverHeld`) */
+  const [isYearCoverHeld, setYearCoverHeld] = useState(false)
+  const [yearCoverAfterHold, setYearCoverAfterHold] = useState(false)
+  const [heldEndingIndex, setHeldEndingIndex] = useState<number | null>(null)
   /**
    * 새 시즌 처리 0x1b768 → 137 "N년차" 표지 → 105 관리 화면 (타자편 `startNewSeason` 과 같다 — `pages/management/lib/nariYearCover`).
    * 난수는 1b86c 의 CPU 장비 굴림 하나뿐이고 137 은 난수를 안 쓴다. `fromResume` 은 이어하기 100 진입 1c25e — 0x1b768 뒤 1c3be 로
    * 빠져도 남은 +0x289 를 연초 114 틀 0x1c014 가 9 틀째에 받아 137 을 띄운다(r156 직접 뜸 — `nariYearCover` 의 이어하기 길).
    */
   const startNewSeason = useCallback(
-    (finished: PitcherCareer, fromResume = false) => {
+    (finished: PitcherCareer, fromResume = false, holdsPrevious = false) => {
       // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
       commit(startNextPitcherSeason(finished, random))
       setYearCoverFromResume(fromResume)
+      setYearCoverAfterHold(false)
+      // 134(1bb2c~1bb64)는 0x1b768 뒤에도 대진판을 그리며 효과기 끝을 기다린다 — 그 장면을 그대로 둔다
+      if (holdsPrevious) return setYearCoverHeld(true)
       setScene('연차표지')
     },
     [commit, random],
   )
+  const enterHeldYearCover = useCallback(() => {
+    if (!isYearCoverHeld) return
+    setYearCoverHeld(false)
+    setYearCoverAfterHold(true)
+    setHeldEndingIndex(null)
+    setCupView(null)
+    setScene('연차표지')
+  }, [isYearCoverHeld])
 
   /**
    * 엔딩 141 로 — 진입 0x12300 은 S+0x50 = 6 을 메모리에만 쓰고 커리어를 저장하지 않는다(저장은 엔딩 칸을 비운 채 —
@@ -1703,6 +1730,14 @@ export function usePitcherLeagueSession(
     commit(continueAfterPitcherEnding(career, random))
     // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 3 → 2, 5000)`
     recordStat({ kind: 'G사용', usage: leagueUsageOf(PITCHER_LEAGUE_MODE), amount: PITCHER_CONTINUE_COST_GAME_POINT })
+    // 판정 0(부상)은 곧장 105(1bddc~1be1e), 방출은 새 시즌 0x1b768(1be26) 뒤 141 이 엔딩 판을 그리며 효과기 끝을 기다려 137(1beb4~1beea)
+    if (career.endingIndex !== PITCHER_INJURY_ENDING) {
+      setYearCoverFromResume(false)
+      setYearCoverAfterHold(false)
+      setHeldEndingIndex(career.endingIndex)
+      setYearCoverHeld(true)
+      return true
+    }
     setScene('관리')
     return true
   }, [career, commit, random, recordStat])
@@ -2269,6 +2304,9 @@ export function usePitcherLeagueSession(
     career: shown,
     scene,
     yearCoverFromResume,
+    isYearCoverHeld,
+    yearCoverAfterHold,
+    heldEndingIndex,
     endingFromResume,
     managementBgmRestart,
     nextGameFromManagement,
@@ -2445,8 +2483,8 @@ export function usePitcherLeagueSession(
         if (finish.reward.gamePoint > 0) {
           recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: finish.reward.gamePoint })
         }
-        setCupView(null)
-        startNewSeason(rewarded)
+        // 0x1bb28 0x1b768 뒤 134 는 대진판을 그리며 효과기 끝을 기다린다 — 대진 칸은 137 로 넘길 때 걷는다(`enterHeldYearCover`)
+        startNewSeason(rewarded, false, true)
       },
       /**
        * 134 진입 0x19f30 → 0x65de4 가 처음 연 히든 팀 — 전역 +0x7a+k = 1 · 전역 저장 0x1f1b9(커리어 저장은 아니다).
@@ -2468,6 +2506,7 @@ export function usePitcherLeagueSession(
       },
       beginYearEnd,
       continueAfterEnding,
+      enterHeldYearCover,
       receiveEndingBonus,
       finishEnding,
       eraseSaveForHallOfFame,

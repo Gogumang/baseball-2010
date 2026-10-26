@@ -557,7 +557,12 @@ describe('대회 끝 정산 (0x1b92c)', () => {
     expect(끝난뒤?.gamePoint).toBe(1000)
     expect(끝난뒤?.openedHiddenIds).toEqual([])
     expect(끝난뒤?.season).toBe(2)
-    expect(rendered.result.current.screen).toEqual({ kind: '연차표지' })
+    // 134 는 0x1b768 뒤에도 대진판을 그리며 효과기 끝을 기다린다(1bb2c~1bb64) — 화면은 그대로, 아홉 틀 뒤 137
+    expect(rendered.result.current.screen.kind).toBe('국가대항전')
+    expect(rendered.result.current.session.isYearCoverHeld).toBe(true)
+    act(() => rendered.result.current.session.actions.enterHeldYearCover())
+    expect(rendered.result.current.screen).toEqual({ kind: '연차표지', afterHold: true })
+    expect(rendered.result.current.session.isYearCoverHeld).toBe(false)
   })
 
   it('⚠️ 나만의리그는 준우승·탈락에 보상이 없다 — 빈손으로 새 시즌이다 (원본 그대로)', () => {
@@ -1899,9 +1904,8 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
   it('평가 창을 다시 띄우고 경기 뒤 카운터를 한 번 더 쓴다 — 정산(G · 평가 · 리그)은 다시 안 돈다', () => {
     const rendered = 띄우기(평가중())
     const screen = rendered.result.current.screen
-    expect(screen.kind).toBe('경기결과')
-    if (screen.kind !== '경기결과') return
-    expect(screen.gamePointReward).toBe(0)
+    expect(screen.kind).toBe('경기평가')
+    if (screen.kind !== '경기평가') return
     expect(screen.evaluation).toEqual(지난경기.evaluation)
     expect(screen.streakNotices.map((notice) => notice.reputationChange)).toEqual([10])
     const career = rendered.result.current.session.career!
@@ -1936,19 +1940,19 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     } as unknown as PlayerCareer
     const rendered = 띄우기(홈런넷)
     const screen = rendered.result.current.screen
-    expect(screen.kind === '경기결과' ? screen.newTitles : null).toEqual([TITLE_NAMES[39]])
+    expect(screen.kind === '경기평가' ? screen.newTitles : null).toEqual([TITLE_NAMES[39]])
     // 116 진입은 팝업만 건다 — 비트는 아직 없다
     expect(rendered.result.current.session.career?.titleIds).not.toContain(TITLE_NAMES[39])
     const 키전 = 띄우기(rendered.result.current.session.career!)
     const beforeKey = 키전.result.current.screen
-    expect(beforeKey.kind === '경기결과' ? beforeKey.newTitles : null).toEqual([TITLE_NAMES[39]])
+    expect(beforeKey.kind === '경기평가' ? beforeKey.newTitles : null).toEqual([TITLE_NAMES[39]])
     // 키 0x1b1e4 — 비트 · 곧바로 장착
     act(() => rendered.result.current.session.actions.confirmGameResultTitle())
     expect(rendered.result.current.session.career?.titleIds).toContain(TITLE_NAMES[39])
     expect(rendered.result.current.session.career?.equippedTitle).toBe(39)
     const 다시 = 띄우기(rendered.result.current.session.career!)
     const again = 다시.result.current.screen
-    expect(again.kind === '경기결과' ? again.newTitles : null).toEqual([])
+    expect(again.kind === '경기평가' ? again.newTitles : null).toEqual([])
   })
 
   it('칭호 39 는 S+0x1d8[3](recordLine) 을 본다 — 포스트시즌 경기 뒤에는 앞 평가 경기 줄이다', () => {
@@ -1957,12 +1961,64 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
       lastGame: { ...지난경기, recordLine: { atBats: 5, hits: 4, runsBattedIn: 6, homeRuns: 4 } },
     } as unknown as PlayerCareer
     const screen = 띄우기(앞줄).result.current.screen
-    expect(screen.kind === '경기결과' ? screen.newTitles : null).toEqual([TITLE_NAMES[39]])
+    expect(screen.kind === '경기평가' ? screen.newTitles : null).toEqual([TITLE_NAMES[39]])
+  })
+
+  it('116 진입이 평가 징글 36~38 을 낸다(12c96) — 이어하기 길도. 정산 판을 나간 길(0x3f3 → 100 → 116)은 경기 결과에서 평가로 넘긴다 (r287)', () => {
+    const played: number[] = []
+    const sound = { ...createSilentSound(), play: (id: number) => { played.push(id) } }
+    const saveGame = 메모리저장(평가중())
+    const random = createSeededRandom(20100901)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen, sound }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    expect(rendered.result.current.screen.kind).toBe('경기평가')
+    // +0x4a = 2 > 1 → 36 (12cc2)
+    expect(played).toEqual([36])
+
+    // 경기 장면의 결과 화면(0x18 · 0x19)이 들고 있던 평가 재료를 116 에 넘긴다 — 징글은 이때 한 번
+    played.length = 0
+    const 평가재료 = { newTitles: [], evaluation: { popularityChange: -1, reputationChange: 0, moraleChange: 0, commentIndex: 40 }, streakNotices: [] }
+    act(() => rendered.result.current.setScreen({
+      kind: '경기결과', summary: 지난경기.summary as unknown as Extract<Screen, { kind: '경기결과' }>['summary'], gamePointReward: 0, ...평가재료,
+    }))
+    expect(played).toEqual([])
+    act(() => rendered.result.current.session.actions.leaveGameSettlement())
+    expect(rendered.result.current.screen).toEqual({ kind: '경기평가', ...평가재료 })
+    expect(played).toEqual([38])
+    // 평가 화면에서는 다시 부르지 않는다
+    act(() => rendered.result.current.session.actions.leaveGameSettlement())
+    expect(played).toEqual([38])
   })
 
   it('지난 경기 재료가 없는 옛 저장은 예전처럼 116 의 끝으로 가른다', () => {
     const rendered = 띄우기({ ...평가중(), lastGame: undefined })
     expect(rendered.result.current.screen).toEqual({ kind: '다음경기순위', fromManagement: false })
+  })
+})
+
+describe('엔딩 141 의 5000 G 이어하기 (팝업 0x32 예 — 0x1bdc6~)', () => {
+  it('방출(판정 1)은 새 시즌 0x1b768 뒤 141 이 선 채 효과기 끝을 기다려 137(1beb4~1beea) — 부상(0)은 곧장 105', () => {
+    const 방출 = 띄우기({ ...createCareer('방출'), endingIndex: 1, gamePoint: 6000 })
+    expect(방출.result.current.screen.kind).toBe('엔딩')
+    let 이어함 = false
+    act(() => { 이어함 = 방출.result.current.session.actions.continueAfterEnding() })
+    expect(이어함).toBe(true)
+    expect(방출.result.current.session.career?.season).toBe(2)
+    expect(방출.result.current.session.career?.endingIndex).toBeNull()
+    expect(방출.result.current.screen.kind).toBe('엔딩')
+    expect(방출.result.current.session.isYearCoverHeld).toBe(true)
+    act(() => 방출.result.current.session.actions.enterHeldYearCover())
+    expect(방출.result.current.screen).toEqual({ kind: '연차표지', afterHold: true })
+
+    const 부상 = 띄우기({ ...createCareer('부상'), endingIndex: 0, gamePoint: 6000, isInjured: true, injuredGamesPlayed: 20 })
+    act(() => { 부상.result.current.session.actions.continueAfterEnding() })
+    expect(부상.result.current.screen).toEqual({ kind: '관리' })
+    expect(부상.result.current.session.isYearCoverHeld).toBe(false)
+    expect(부상.result.current.session.career?.season).toBe(1)
   })
 })
 

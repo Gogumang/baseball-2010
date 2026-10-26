@@ -284,7 +284,7 @@ describe('이벤트 재생 배경음 40 — 114 진입 0x11d00 · 0xd3 진입 0x
   })
 
   it('경기 뒤 116 → 114 → 128 은 S+0x50 == 2 라 40 이 없다 — 131 뒤는 40', () => {
-    expect(screenBgmOf({ kind: '포스트시즌', popup: null }, '경기결과')).toBeNull()
+    expect(screenBgmOf({ kind: '포스트시즌', popup: null }, '경기평가')).toBeNull()
     expect(screenBgmOf({ kind: '포스트시즌', popup: null }, '이벤트')).toBe(40)
     const { result, rerender } = renderHook(
       ({ scene }: { scene: PitcherScene }) => usePitcherLeagueBgm(true, scene),

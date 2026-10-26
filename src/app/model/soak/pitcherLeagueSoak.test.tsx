@@ -1430,6 +1430,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
             act(() => actions.startCupGame(matchup, entry.cup))
           } else {
             act(() => actions.finishCup(finishNationalCup('나만의리그', next.cup)))
+            // 134 가 대진판을 그리며 효과기 끝을 기다린 아홉 틀 뒤 137 (`YearCoverHoldLayer`)
+            if (result.current.isYearCoverHeld) act(() => result.current.actions.enterHeldYearCover())
           }
           break
         }
@@ -1467,6 +1469,12 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
                 problems.add(where(), [`부상 엔딩 이어하기 뒤 부상 ${after.isInjured} · 부상 경기 ${after.injuredGamesPlayed} · ${seasonBefore} → ${after.season}년차`])
               }
               if (after !== null && ended === 1 && after.season !== seasonBefore + 1) problems.add(where(), [`방출 엔딩 이어하기 뒤 연차 ${seasonBefore} → ${after.season}`])
+              // 방출(새 시즌 0x1b768)은 141 이 엔딩 판을 그리며 효과기 끝을 기다린 아홉 틀 뒤 137(1beb4~1beea)
+              if (ended !== 0) {
+                if (!result.current.isYearCoverHeld || result.current.scene !== '엔딩') problems.add(where(), [`방출 엔딩 이어하기 뒤 141 이 서 있지 않다 — ${result.current.scene}`])
+                act(() => result.current.actions.enterHeldYearCover())
+                if (result.current.scene !== '연차표지') problems.add(where(), [`방출 엔딩 이어하기 뒤 장면 ${result.current.scene}`])
+              }
               break
             }
           }

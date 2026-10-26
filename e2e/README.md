@@ -44,6 +44,8 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `nari-postseason-champion` · `pitcher-postseason-champion` | 내 팀이 한국시리즈를 이긴 끝난 대진 [다음] → 우승 팀 발표 StrMODE[137] 팝업 7 | `nari-postseason-champion` · `pitcher-postseason-champion` |
 | `nari-korean-series` · `pitcher-korean-series` | 팝업 7 을 OK 로 닫아 내 팀 한국시리즈 우승 StrMODE[190] 팝업 8 | `nari-postseason-champion` · `pitcher-postseason-champion` |
 | `nari-cup-win` · `pitcher-cup-win` | 국가대항전 한국 우승 — 끝난 대진판 확인 → 결과 팝업 0x25 "[대한민국] 대표팀 제n회 국가대항전 우승!!" | `nari-cup-win`(씨앗 5 판) · `pitcher-cup-win` |
+| `nari-evaluation` | 나리 타자편 116 경기 뒤 평가 — 경기 결과(정산 판 0x19)를 세우고 OK 로 나가면 나리 장면 116 → 114 평가 대사 (r287) | `nari-y1` |
+| `nari-cup-cover` | 나리 타자편 국가대항전 끝 → 134 대진판이 선 채 아홉 틀 어두워진 뒤 137 "N년차" 표지 (r287) | `nari-cup-win` |
 | `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 5 로 첫 경기 이른 타석 앞에 제안이 뜨고 공을 그냥 보내 결과까지 (약 45초) | `nari-y1` + 씨앗 5 |
 
 G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/devOptions.ts` — vitest 밖에서는 켜짐) 때문에 늘 99999 로 보이고 써도 줄지 않는다. 실제로 깎이는 것을 볼 때는 주소에 `&real-gp`(또는 `&원본G`)를 붙인다.
@@ -59,10 +61,12 @@ G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
-yarn node e2e/smoke.mjs                  # 장면 46개 × chromium · webkit 아이폰 (약 5분, 실패면 끝 코드 1)
+yarn node e2e/smoke.mjs                  # 장면 49개 × chromium · webkit 아이폰 (약 5분, 실패면 끝 코드 1)
 yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 ```
+
+경기 결과 → 116 평가 대사(키 · 탭) · 대회 끝 134 위 효과기 → 137 → 105 는 `e2e/year-cover-evaluation.mjs` 로 본다(r287, chromium 키 · webkit 아이폰 탭).
 
 타석 탭 타이밍은 `e2e/swing-timing.mjs` 로 잰다(r242). `nari-bat` 에서 공마다 최적 틱(보이는 공 그림 N − 3)에 `touchscreen.tap` 하고,
 쪽 안 기록(`window.__batting` — 공 그림 · 틱 격자와 스윙 · 판정 줄)으로 탭 → 받은 틱 → 키 틱 F → 판정을 표로 낸다.

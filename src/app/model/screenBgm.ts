@@ -247,7 +247,7 @@ export function screenBgmOf(screen: Screen, enteredFrom: Screen['kind'] | null =
   if (screen.kind === '포스트시즌') {
     if (screen.fromReentry === true) return POSTSEASON_REENTRY_BGM
     // 경기 뒤 116 → 114 는 S+0x50 == 2 라 40 을 안 튼다 (`STORY_BGM` 가드)
-    return enteredFrom === '경기결과' ? null : STORY_BGM
+    return enteredFrom === '경기평가' ? null : STORY_BGM
   }
   // 115 연초 이벤트는 0x8a680 이 만든 내장 이벤트([관리자+0x39f] = 1) — 40 을 안 튼다.
   // 대결결과(140 → 114)도 40 이다 (확정): 미션 장면 결과 0x4ea0c 가 S+0x50 을 쓰는 곳은 4eb3e(`[장면+0xf08]` 이 있으면 3) ·

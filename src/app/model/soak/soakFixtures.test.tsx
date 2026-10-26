@@ -454,11 +454,13 @@ async function captureNari(seed: number): Promise<Capture[]> {
           break
         }
         case '경기결과':
-        case '대회경기결과': {
-          if (screen.kind === '대회경기결과') {
-            act(() => actions.confirmCupGameResult())
-            break
-          }
+          // 정산 판을 나간다(0x3f3) — 나리 장면 100 → 116
+          act(() => actions.leaveGameSettlement())
+          break
+        case '대회경기결과':
+          act(() => actions.confirmCupGameResult())
+          break
+        case '경기평가': {
           const title = screen.newTitles[0]
           if (title !== undefined && career !== null && !career.titleIds.includes(title)) act(() => actions.confirmGameResultTitle())
           act(() => result.current.session.actions.confirmGameResult())
@@ -539,6 +541,8 @@ async function captureNari(seed: number): Promise<Capture[]> {
             act(() => result.current.session.actions.startCupGame(matchup, cup))
           } else {
             act(() => result.current.session.actions.finishCup(finishNationalCup('나만의리그', next.cup)))
+            // 134 가 대진판을 그리며 효과기 끝을 기다린 아홉 틀 뒤 137 (`YearCoverHoldLayer`)
+            if (result.current.session.isYearCoverHeld) act(() => result.current.session.actions.enterHeldYearCover())
           }
           break
         }
@@ -834,6 +838,8 @@ async function captureNariPitcher(seed: number, role: number, boostAbility: bool
             act(() => actions.startCupGame(matchup, entry.cup))
           } else {
             act(() => actions.finishCup(finishNationalCup('나만의리그', next.cup)))
+            // 134 가 대진판을 그리며 효과기 끝을 기다린 아홉 틀 뒤 137 (`YearCoverHoldLayer`)
+            if (result.current.isYearCoverHeld) act(() => result.current.actions.enterHeldYearCover())
           }
           break
         }

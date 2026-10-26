@@ -277,7 +277,7 @@ const RESUMABLE_SCREENS: readonly Screen['kind'][] = [
 ]
 
 /** 앱의 화면을 띄워 그림 틀 · 키로 치는 화면 */
-const FRAME_SCREENS: ReadonlySet<Screen['kind']> = new Set(['경기', '경기결과', '대회경기결과', '이벤트', '마선수대결'])
+const FRAME_SCREENS: ReadonlySet<Screen['kind']> = new Set(['경기', '경기결과', '경기평가', '대회경기결과', '이벤트', '마선수대결'])
 
 /** 이어하기 앞뒤로 같아야 하는 커리어 칸 — 이어하기 진입(장면 셋업 · 116 재진입)이 고치는 칸(본 이벤트 · 외출 수 · 카운터)은 뺀다 */
 const RESUME_STABLE_KEYS = [
@@ -1079,6 +1079,15 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         if (after !== null && screen.endingIndex === 1 && after.season !== seasonBefore + 1) {
           problems.add(where(), [`방출 엔딩 이어하기 뒤 연차 ${seasonBefore} → ${after.season}`])
         }
+        // 방출(새 시즌 0x1b768)은 141 이 엔딩 판을 그리며 효과기 끝을 기다린 아홉 틀 뒤 137(1beb4~1beea) — 표지 뒤 105
+        if (screen.endingIndex !== 0) {
+          if (!result.current.session.isYearCoverHeld || result.current.screen.kind !== '엔딩') {
+            problems.add(where(), [`방출 엔딩 이어하기 뒤 141 이 서 있지 않다 — ${result.current.screen.kind}`])
+          }
+          act(() => result.current.session.actions.enterHeldYearCover())
+          if (result.current.screen.kind !== '연차표지') problems.add(where(), [`방출 엔딩 이어하기 뒤 화면 ${result.current.screen.kind}`])
+          act(() => result.current.setScreen({ kind: '관리' }))
+        }
         // 105 로 간다 — 그 진입이 곧바로 연 이벤트(연초 115 · 관리 훑기)면 이벤트다
         if (result.current.screen.kind !== '관리' && result.current.screen.kind !== '이벤트') {
           problems.add(where(), [`엔딩 이어하기 뒤 화면 ${result.current.screen.kind}`])
@@ -1142,6 +1151,9 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         continue
       }
 
+      // 경기 결과 화면에 들어선 틀 — 끊기 전에 센다(경기 장면의 결과 판에서 끊으면 이어하기는 116 평가로 돌아와 요약이 없다, r287)
+      if (career !== null && (screen.kind === '경기결과' || screen.kind === '대회경기결과')) checkGameResult()
+
       // 이어하기 — 몇 걸음마다 앱을 끄고 다시 켠다(엔딩 · 메인 메뉴 · 대결 중은 빼고)
       // 끊는 화면을 차례로 바꾼다(관리 · 경기 중 · 이벤트 · 경기 결과 …) — 그 화면이 한참 안 오면 아무 데서나 끊는다
       if (resumeEvery > 0 && steps - lastCutStep >= resumeEvery && career !== null && RESUMABLE_SCREENS.includes(screen.kind)
@@ -1154,7 +1166,6 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       if (career !== null) lastSeenSeason = Math.max(lastSeenSeason, career.season)
 
       if (FRAME_SCREENS.has(screen.kind) && career !== null) {
-        if (screen.kind === '경기결과' || screen.kind === '대회경기결과') checkGameResult()
         frameStep()
         if (result.current.screen.kind === '마선수대결') countAceMatch()
         checkAceMatchResult()
@@ -1284,6 +1295,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           } else {
             log.push(`${career?.season}년차 국가대항전 우승 ${next.cup.champion}`)
             act(() => result.current.session.actions.finishCup(finishNationalCup('나만의리그', next.cup)))
+            // 134 가 대진판을 그리며 효과기 끝을 기다린 아홉 틀 뒤 137 (`YearCoverHoldLayer`)
+            if (result.current.session.isYearCoverHeld) act(() => result.current.session.actions.enterHeldYearCover())
           }
           break
         }
