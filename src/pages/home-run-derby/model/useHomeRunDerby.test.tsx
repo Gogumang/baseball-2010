@@ -420,6 +420,36 @@ describe('더비 판의 HOMERUN 글자 · 비거리 판 · 홈런 뒤 키 건너
     째깍.spy.mockRestore()
   })
 
+  it('판 끝은 넘긴 틀의 틱에서 센다 — 넘긴 뒤 틱 머리가 지났어도 지금 틱을 다시 읽지 않는다 (Q-04 ⑧)', () => {
+    const 째깍 = 시계()
+    const rendered = 띄우기()
+    const 판 = derbyBattedBallOf(홈런.pattern!)
+    const ms = millisecondsPerFrame()
+    const 넘긴틱 = Math.floor(째깍.now / ms)
+    // 타석 화면이 넘긴 틀은 한 틱 앞 — 이 자리에 닿기 전에 틱 머리가 지났다
+    act(() => rendered.result.current.onPitchResolved(홈런, 넘긴틱 - 1))
+    const 시작 = (넘긴틱 - 1) * ms
+    expect(rendered.result.current.distanceBoard?.startedAt).toBe(시작)
+    째깍.흘리기(시작 + 판.endTicks * ms - 째깍.now - 1)
+    expect(rendered.result.current.distanceBoard).not.toBeNull()
+    째깍.흘리기(2)
+    expect(rendered.result.current.distanceBoard).toBeNull()
+    째깍.spy.mockRestore()
+  })
+
+  it('맞지 않은 공의 0x12 대기 끝도 넘긴 틀 + 1(0x12 틱 0) + 15 틀 머리다', () => {
+    const 째깍 = 시계()
+    const rendered = 띄우기()
+    const ms = millisecondsPerFrame()
+    const 넘긴틱 = Math.floor(째깍.now / ms) - 1
+    act(() => rendered.result.current.onPitchResolved(헛스윙, 넘긴틱))
+    째깍.흘리기((넘긴틱 + 1 + 15) * ms - 째깍.now - 1)
+    expect(rendered.result.current.isPaused).toBe(true)
+    째깍.흘리기(2)
+    expect(rendered.result.current.isPaused).toBe(false)
+    째깍.spy.mockRestore()
+  })
+
   it('홈런 아닌 맞은 공도 비거리 판은 뜨고 글자는 없다', () => {
     const rendered = 띄우기()
     act(() => rendered.result.current.onPitchResolved(번트))

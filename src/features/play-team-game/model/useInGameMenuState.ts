@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { isCommonWindowShown, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
-import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { isCommonWindowShown, isGameSceneFrozen, noteCommonWindowOpensInSceneUpdate } from '@/shared/lib/commonWindow/commonWindow'
+import { isRunningSceneKeys, pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 /**
  * 일시정지 창이 어떻게 떴는가 — 창 [+0x290] 과 펼침이 이것으로 갈린다 (2026-10-14 직접 뜸):
@@ -127,6 +127,9 @@ export function useInGameMenuState(): InGameMenuState {
     if (isOpenRef.current) return close()
     // 그 그림의 키 뒤 갱신(52e14~) — 창은 이미 섰지만 게이트(52cc6)는 키 앞에서 지나갔다
     for (const listener of [...starOpenFrameListeners]) listener()
+    // 장면 키 칸이 그 틀의 키 자리에서 연 창이면 그 틀의 갱신 · 그리기가 마저 돌고 다음 틀부터 선다(`noteCommonWindowOpensInSceneUpdate`).
+    // 칸이 없어 받은 자리에서 곧바로 연 창은 위 고리가 그 한 틀을 돌렸으므로 곧바로 서고 첫 그림이 그것을 그린다
+    if (isRunningSceneKeys()) noteCommonWindowOpensInSceneUpdate()
     openAsStar()
   }, [close, openAsStar])
   const openFromPause = useCallback(() => {

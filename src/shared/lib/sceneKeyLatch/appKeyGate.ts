@@ -60,7 +60,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 /** 경기 장면 부품의 칸이 받는 때인가 — 장면이 서 있고(또는 장면 부품이 칸을 올려 두었고) 창이 없다 */
 function sceneLatchOwnsKeys(): boolean {
-  if (isGameSceneUp()) return !isGameSceneFrozen()
+  // 갱신 뒤에 연 창은 장면 시계를 다음 틀 머리에서 세운다 — 그 사이 받은 키도 다음 틀(창이 서 있는 틀)의 창 키 0x754f9 몫이다
+  if (isGameSceneUp()) return !isGameSceneFrozen() && !isCommonWindowShown()
   return hasOpenSceneKeyLatch() && !isCommonWindowShown()
 }
 

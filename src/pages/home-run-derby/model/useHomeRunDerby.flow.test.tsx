@@ -181,13 +181,13 @@ describe('볼넷 · 사구 뒤 다음 타자 — 0xaf020 예약 · 0xd 진입 0x
 })
 
 describe('맞지 않은 공의 대기 — 상태 0x12 0x4e6de~0x4e730', () => {
-  it('헛스윙 · 볼은 15틱, 사구는 31틱 뒤에 다음으로 간다', () => {
+  it('헛스윙 · 볼은 0x12 진입 틀(넘긴 틀 + 1)부터 15틱, 사구는 31틱 뒤에 다음으로 간다 — 넘긴 틀의 틱에서 센다', () => {
     const ms = millisecondsPerFrame()
     const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0 }))
     OK(rendered)
     act(() => rendered.result.current.onPitchResolved(헛스윙))
     act(() => {
-      vi.advanceTimersByTime(15 * ms - 1)
+      vi.advanceTimersByTime(16 * ms - 1)
     })
     expect(rendered.result.current.isPaused).toBe(true)
     act(() => {
@@ -197,7 +197,7 @@ describe('맞지 않은 공의 대기 — 상태 0x12 0x4e6de~0x4e730', () => {
 
     act(() => rendered.result.current.onPitchResolved(사구))
     act(() => {
-      vi.advanceTimersByTime(31 * ms - 1)
+      vi.advanceTimersByTime(32 * ms - 1)
     })
     expect(rendered.result.current.isPaused).toBe(true)
     act(() => {
@@ -217,7 +217,7 @@ describe('사구 뒤 벤치 클리어링 — 0x4e740 의 종류 8 검사는 사�
     calls.length = 0
     act(() => rendered.result.current.onPitchResolved(사구))
     act(() => {
-      vi.advanceTimersByTime(31 * millisecondsPerFrame())
+      vi.advanceTimersByTime(32 * millisecondsPerFrame())
     })
     expect(calls[0]).toEqual([0, 99])
     expect(calls).toHaveLength(1 + 45)
@@ -273,7 +273,7 @@ describe('화면 갱신 때 — 셈은 판 끝 0xae3e8 · 마투수는 0xd 진�
     OK(rendered)
     act(() => rendered.result.current.onPitchResolved(사구))
     act(() => {
-      vi.advanceTimersByTime(31 * millisecondsPerFrame())
+      vi.advanceTimersByTime(32 * millisecondsPerFrame())
     })
     expect(rendered.result.current.isBenchClearing).toBe(true)
     expect(rendered.result.current.run.remainingPitches).toBe(10)

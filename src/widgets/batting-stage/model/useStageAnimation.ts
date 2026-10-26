@@ -587,7 +587,9 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
     /**
      * 파티클은 **원본 틱**에 맞춰 굴린다 — rAF 가 60fps 라도 갱신은 틱마다 한 번이다.
-     * 탭이 쉬다 돌아오면 밀린 틱이 한꺼번에 쌓이므로 따라잡기는 몇 틱으로 끊는다. 이 루프의 첫 그림은 세지 않는다(null)
+     * 탭이 쉬다 돌아오면 밀린 틱이 한꺼번에 쌓이므로 따라잡기는 몇 틱으로 끊는다. 이 루프의 첫 그림은 세지 않는다(null).
+     * 원본은 단말이 부르는 틀마다 한 번 갱신하고 시간으로 따라잡지 않는다 — 따라잡기는 rAF 가 틱을 건너뛴 그림 몫이고, 탭이 쉬는 동안
+     * 틀이 안 도는 것은 단말 몫이다(일시정지 0x2da0 은 소리 · 장면 vt+0x18 · 0x74458 뿐 — TODO C-18)
      */
     let particleTick: number | null = null
     const PARTICLE_CATCH_UP_LIMIT = 4

@@ -66,13 +66,14 @@ import {
 
 /**
  * 결과 연출로 붙잡는 시간 — 맞은 공(패턴이 실려 온 공)은 원본 판 끝(공.vt18 멈춤 + 10틱, `derbyBattedBallOf` 의 endTicks)까지,
- * 안 맞은 공은 상태 0x12 의 대기(`derbyNoContactWaitFramesOf` — 15틱, 볼넷 · 사구면 31틱, 0x4e6de~0x4e730).
+ * 안 맞은 공은 0x12 진입 틀(넘긴 틀 + 1)부터 상태 0x12 의 대기(`derbyNoContactWaitFramesOf` — 15틱, 볼넷 · 사구면 31틱, 0x4e6de~0x4e730).
  * `balls` = 이 공 앞의 볼 수 st[5] (볼넷 판정에 쓴다). 난수를 안 쓰는 미리 보기다 — 폴에 맞는 공은 판 시작 굴림으로
  * 다시 깐 궤적의 끝을 쓴다(`onPitchResolved`).
  */
 export function resultHoldMillisecondsOf(detail: PitchOutcomeDetail, balls = 0): number {
   if (detail.pattern === undefined) {
-    return derbyNoContactWaitFramesOf(derbyPitchCallOf(detail.resolution, balls).judgment) * millisecondsPerFrame()
+    const waitTicks = derbyNoContactWaitFramesOf(derbyPitchCallOf(detail.resolution, balls).judgment)
+    return (BATTER_PITCH_RESULT_ENTRY_TICKS + waitTicks) * millisecondsPerFrame()
   }
   return derbyBattedBallOf(detail.pattern).endTicks * millisecondsPerFrame()
 }
@@ -670,7 +671,9 @@ export function useHomeRunDerby({
     // `gameSceneTickNow()` 를 다시 읽으면 rAF 틀 머리와 이 자리 사이에 틱 머리가 지났을 때 한 틱 늦게 선다
     // HOMERUN 글자(0x5279a~0x527ac)는 판의 홈런 틱에 켜고(`derbyHomeRunTextOf`), 비거리 판(0x36cd4)은 판 내내 띄운다.
     // 0x90191(…, 2, 1) 홈런 효과 객체(알갱이 7 · 난수)는 글자 창의 첫 그림(홈런 틱)에 타석 화면이 깔고, 유지 단계 그림마다 굴린다
-    // (widgets/batting-stage `homeRunEffects`). ⚠️ 근사(때 · 남김 — 웹 구조): 파티클 · 효과 틱은 타석 화면이 rAF 로 도는 틱이라 탭이 쉬면 밀린다
+    // (widgets/batting-stage `homeRunEffects`). 파티클 · 효과 틱은 타석 화면이 장면 틱마다 돌린다(rAF 가 건너뛴 틱은 4 틱까지 따라잡는다).
+    // 원본은 단말이 틀을 부를 때마다 한 번 갱신하고 밀린 시간을 따라잡는 셈이 없다 — 탭이 쉬는 동안 틀이 안 도는 것은 단말 몫이다
+    // (일시정지 0x2da0 은 소리 0x6e690 · 장면 vt+0x18 · 0x74458 뿐이고, 경기 장면 0x463ac 는 판 0x17 이면 메뉴를 안 연다 — TODO C-18)
     clearPlaySoundTimers()
     const startedAt = gameSceneTickStartTime(passedTick)
     // 판의 필드 화면(A-01) — 카메라 · 공 틱 · 이벤트 존을 미리 셈한다(`lib/derbyField`). 존은 그 그림의 공 그리기 0x36dfc 가 놓는다:
@@ -698,9 +701,16 @@ export function useHomeRunDerby({
     // 존을 놓은 공의 "200G" 애니 자리 — 0x41098 4111c 가 +0xfcc(판정 수평각)로 가른다
     setEventZoneRewardX(zoneHit && detail.pattern != null ? eventZoneRewardXOf(detail.pattern[0]) : null)
     setIsPaused(true)
-    // 맞지 않은 공은 상태 0x12 — 15틱(볼넷 · 사구면 31틱) 뒤 0x4e740: 사구(st[0xb] == 4)면 벤치 클리어링 굴림
+    // 맞지 않은 공은 상태 0x12 — 넘긴 틀이 0x12 를 예약했고(공 끝 0x4e24e) 다음 틀이 0x12 틱 0 이다. 갱신 0x4e6d4 는 상태 틱이
+    // 15(볼넷 · 사구면 31)에 닿은 틀(4e72c)에서 0x4e740(사구면 벤치 클리어링 굴림) · 판정 A 0xae24c 를 돈다 — 그 틀이 시계 끝이다.
+    // 맞은 공은 판 틱 0 = 넘긴 틀에서 `endTicks` 뒤. 둘 다 **넘긴 틀의 틱**에서 센다 — 지금 틱을 다시 읽으면 rAF 틀 머리와 이 자리
+    // 사이에 틱 머리가 지났을 때 한 틱 늦었다
     isHitByPitchRef.current = call.judgment === 4
-    armPlayEnd(batted === null ? derbyNoContactWaitFramesOf(call.judgment) : batted.endTicks)
+    armPlayEnd(
+      batted === null
+        ? passedTick + BATTER_PITCH_RESULT_ENTRY_TICKS + derbyNoContactWaitFramesOf(call.judgment)
+        : passedTick + batted.endTicks,
+    )
   }, [])
 
   /** 이번 공이 사구(판정 v4)였나 — 0x12 대기 끝의 벤치 클리어링 굴림 조건 */
@@ -755,9 +765,10 @@ export function useHomeRunDerby({
     runRef.current = next
   }
 
-  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 — 지금 장면 틱에서 `ticks` 틱 뒤 틀 머리 */
-  const armPlayEnd = (ticks: number) => {
+  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 — 장면 틱 `dueTick` 의 틀 머리(지났으면 다음 틀 머리) */
+  const armPlayEnd = (dueTick: number) => {
     clearTimer()
+    const ticks = dueTick - gameSceneTickNow()
     timerRef.current = setGameSceneTickTimeout(() => {
       timerRef.current = null
       // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
@@ -837,7 +848,6 @@ export function useHomeRunDerby({
     if (play === null) return
     // 키는 그 그림의 갱신(공 틱 +1)보다 먼저 돈다 — 받은 틱 다음 틱이 키를 처리하는 틱이다 (판 시각은 공 틱 0 의 머리)
     const startTick = gameSceneTickOf(play.startedAt)
-    const elapsedTicks = gameSceneTickNow() - startTick
     const keyTick = keySceneTick - startTick
     const skipped = skipDerbyBattedBall(play.batted, keyTick)
     if (skipped === play.batted) return
@@ -867,7 +877,7 @@ export function useHomeRunDerby({
       setIsEventZoneShown(zoneHit)
       if (!zoneHit) setEventZoneRewardX(null)
     }
-    armPlayEnd(Math.max(0, skipped.endTicks - elapsedTicks))
+    armPlayEnd(startTick + skipped.endTicks)
   }, [])
 
   /**
