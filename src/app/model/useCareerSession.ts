@@ -1,4 +1,5 @@
 import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { clearsPitchJudgement } from '@/features/defense-play/model/pitchArrivalPlay'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
@@ -64,6 +65,7 @@ import {
 import {
   applyKoreanSeriesReward,
   applyRegularSeasonReward,
+  entersYearEndChainInPostseason,
   popupAfterChampion,
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
@@ -82,6 +84,7 @@ import { blockReasonOf, runTraining, specialSwingCostOf } from '@/entities/caree
 import { restResultTextOf, trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
 import { BATTING_TYPE_NAMES } from '@/pages/management/lib/basicInfoLayout'
 import {
+  actedAfterOutingMapCancel,
   outingBlockReasonOf,
   outingBlockTextOf,
   performOuting,
@@ -460,6 +463,8 @@ export function useCareerSession({
   /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
   const [shopGpDetail, setShopGpDetail] = useState<GpDetailOf<PlayerCareer> | null>(null)
   const [outingNotice, setOutingNotice] = useState('')
+  /** 105 → 112 로 들어설 때의 행동함(S+4) — B-26 고친 길에서 지도 취소가 되돌릴 값. 지도 밖이면 null */
+  const outingEntryActedRef = useRef<boolean | null>(null)
   /** 상태 126 결과 팝업 두 장 — 효과 글(0x15234)과 입원 회복 글(0x1575c). 효과 팝업이 떠 있지 않으면 null */
   const [outingResult, setOutingResult] = useState<OutingResult | null>(null)
   /**
@@ -1842,7 +1847,8 @@ export function useCareerSession({
      * **S+0x50 == 2(1c26a) 면 116 을 다시 띄운다** (0x1278c 직접 떴다): 진입이 S+0x50 = 2 · 저장 뒤 S 의 칸(+7 · 사기 0xa3a25 ·
      * +0x4a 인기도 변화 · 인기도 0xb6e79 · +0x64 · +0x62 평판 · S+0x1d8 기록)으로 0x8a6fc(12b6e)를 불러 평가 내장 이벤트를 다시
      * 쌓고, 경기 뒤 카운터(12bc2~12c3c: +0x1c7 무력감 · +0x1c2 += +0x4a · 0xa4d09 · +0x1cd/+0x1c0 먹튀)를 **다시 쓴 뒤** 저장 →
-     * [114 → 105/109/136/128]. 114 가 그 이벤트를 틀면 연속 기록 보상 명령도 다시 먹는다 — 이어하기마다 겹쳐 쌓인다(원본 그대로).
+     * [114 → 105/109/136/128]. 114 가 그 이벤트를 틀면 연속 기록 보상 명령도 다시 먹는다 — 이어하기마다 겹쳐 쌓인다(원본 버그 B-28 —
+     * 고친 길은 카운터를 다시 쓰지 않는다. 웹의 보상 명령은 [확인] 한 번에만 먹으므로 겹치는 것은 카운터뿐이다).
      * 경기 정산(0x4ea0c — 승패 · G · 평가 0xa719c · 리그 하루)은 다시 안 돈다. 결과 판(상태 0x18)의 승패 징글도 없다.
      */
     continueSaved: () => {
@@ -1862,8 +1868,11 @@ export function useCareerSession({
       }
       const lastGame = savedCareer.lastGame
       if (savedCareer.seasonEndState === 116 && lastGame !== undefined) {
-        // 116 진입 0x1278c 다시 — 카운터를 한 번 더 쓰고(겹쳐 쌓임) 평가 창을 다시 띄운다
-        const counted = countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
+        // 116 진입 0x1278c 다시 — 원본은 카운터를 한 번 더 쓰고(겹쳐 쌓임, B-28) 평가 창을 다시 띄운다.
+        // 고친 길(기본)은 첫 진입이 이미 센 저장 그대로 창만 다시 띄운다(굴림 없음 — 난수 차례 같음)
+        const counted = isBugFixed('B-28')
+          ? savedCareer
+          : countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
         // 1299e 도 다시 — 비트가 이미 섰으면 팝업을 안 건다. 주는 것은 키 0x1b1e4 (`confirmGameResultTitle`)
         const dynamite = gameResultTitleOf(counted.titleIds, (lastGame.recordLine ?? lastGame.summary.stats).homeRuns)
         // 평가 징글(12c96)은 결과 화면이 116 에 들어설 때 낸다(`enterGameEvaluation`)
@@ -1957,6 +1966,8 @@ export function useCareerSession({
         })
       }
       if (command === '외출') {
+        // B-26 — 105 에서 지도로 들어설 때의 행동함을 떠 둔다(취소 `leaveOutingMap` 이 되돌린다)
+        outingEntryActedRef.current = career.hasActedThisCycle
         setOutingNotice('')
         setOutingResult(null)
         setOutingPresentation(null)
@@ -2064,11 +2075,12 @@ export function useCareerSession({
       //   - 시리즈가 끝난 내 경기: 0xb76dc 의 0xb7724 가 L+0x32 = −1(b777a), 곧이어 하루 끝 0xb818c(0x4f29c)가 +1 → 0 이라
       //     **136 부터 사슬을 다시 돈다.** 136 진입 0x10bb0 은 0x8bdc9(392) 를 그대로 부르고, 0x8bdc8 → 0xae170 은
       //     레코드를 번호로 찾아 틀 뿐 본 표시를 보지 않는다 — 392 → 130(370) → 131(375) 가 보상째 다시 나오고 128 로 온다.
-      //     원본 동작 그대로 옮긴다 (미션·대결 같은 반복 가드가 없는 자리다).
+      //     원본 버그(B-05, 미션·대결 같은 반복 가드가 없는 자리다) — 고친 길(기본)은 대진이 막 열린 때만 사슬로 간다.
       //   - 그 밖 포스트시즌 경기: 128.
       //   116 끝은 0xbcb49(0x88 = 136) · 0xbcb49(0x72 = 114) 를 바로 예약한다(12b8c~12bbe) — 사이에 시즌 요약 화면이 없다.
       if (career.postseason !== null) {
-        if (leagueDayCounterOf(career) === 0) return enterYearEndChain(career)
+        // B-05 고침이면 시리즈 끝(대진이 막 열린 때 말고)은 사슬을 다시 안 틀고 128 로 (`entersYearEndChainInPostseason`)
+        if (leagueDayCounterOf(career) === 0 && entersYearEndChainInPostseason(career.postseason)) return enterYearEndChain(career)
         return enterPostseason(career)
       }
       if (isSeasonFinished(career)) return enterYearEndChain(career)
@@ -2295,11 +2307,14 @@ export function useCareerSession({
 
     /**
      * 112 외출 지도 취소(CLR) → 105 — 키 0x13ba4 13bc0~13bca 가 **S+4(행동함) = 0** 으로 내린 뒤 0xbcb49(0x69) · 0x7ff21.
-     * 원본 그대로(버그로 보여도): 행동함 뒤 흑백 외출 칸으로 들어갔다 취소하면 트레이닝 · 휴식 · 외출 칸이 다시 켜진다.
+     * 원본 버그(B-26): 행동함 뒤 흑백 외출 칸으로 들어갔다 취소하면 트레이닝 · 휴식 · 외출 칸이 다시 켜진다 — 고친 길(기본)은 들어설 때 값으로.
      * 저장은 이 키가 아니라 이어지는 105 진입 0x11910(119a2)이 한다 — 웹은 커리어가 바뀌면 저장한다
      */
     leaveOutingMap: () => {
-      if (career !== null && career.hasActedThisCycle) setCareer({ ...career, hasActedThisCycle: false })
+      // B-26 고침이면 들어설 때의 값으로 되돌린다 (`actedAfterOutingMapCancel`)
+      const acted = career === null ? false : actedAfterOutingMapCancel(career.hasActedThisCycle, outingEntryActedRef.current)
+      outingEntryActedRef.current = null
+      if (career !== null && career.hasActedThisCycle !== acted) setCareer({ ...career, hasActedThisCycle: acted })
       setScreen({ kind: '관리' })
     },
 

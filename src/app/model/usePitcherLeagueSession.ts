@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
@@ -49,6 +50,7 @@ import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   applyKoreanSeriesReward,
   applyRegularSeasonReward,
+  entersYearEndChainInPostseason,
   popupAfterChampion,
   regularSeasonPopupOnEnter,
   REGULAR_SEASON_HIDDEN_ID,
@@ -159,7 +161,7 @@ import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { lapPlayClock } from '@/entities/collection/model/playClock'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
-import { outingBlockReasonOf, outingBlockTextOf, performOuting } from '@/entities/career/model/outing'
+import { actedAfterOutingMapCancel, outingBlockReasonOf, outingBlockTextOf, performOuting } from '@/entities/career/model/outing'
 import type { OutingPresentation, OutingResult } from '@/entities/career/model/outing'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } from '@/pages/outing-map/lib/outingPlaceSlots'
@@ -354,6 +356,11 @@ export interface PitcherLeagueSession {
     readonly closeShopGpDetail: () => void
     /** 105 커맨드 칸 3 [외출] → 상태 112 외출 지도 (0x126be — 모드 갈림 없음) */
     readonly openOuting: () => void
+    /**
+     * 112 취소(키 0x13ba4)가 남길 행동함 — 원본은 늘 거짓(13bc0~13bca), B-26 고침이면 105 에서 들어설 때 값 (`actedAfterOutingMapCancel`).
+     * 부르면 들어설 때 값을 비운다
+     */
+    readonly actedAfterOutingCancel: () => boolean
     /** 113 장소 기능 — 가드 0x16cf0 → 효과 0x15234 (→ 입원 회복 0x1575c). 모드 3·4 공용 (`outing.ts`) */
     readonly runOutingFunction: (functionId: string) => void
     /** 126 연출 끝(0x84e58) — 효과 0x15234 를 굴려 효과 팝업을 띄운다 */
@@ -610,8 +617,11 @@ function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
       // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137(연초 114 틀이 남은 +0x289 를 받는다 —
       // `nariYearCover` 의 이어하기 길)은 **투수편에 들어설 때** 돈다(`resumedNewSeasonRef` 고리) — 띄울 때는 저장 그대로다
       // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
-      // S+0x50 == 2 → 116 진입 0x1278c 다시 — 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임). 정산(0x4ea0c)은 다시 안 돈다
-      : saved !== null && point.kind === '경기결과' ? enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)) : saved,
+      // S+0x50 == 2 → 116 진입 0x1278c 다시 — 원본은 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임, B-28). 정산(0x4ea0c)은 다시 안 돈다.
+      // 고친 길(기본)은 첫 진입이 센 저장 그대로 — 감독 글(`resumedPitcherLastGameOf`)만 다시 고른다
+      : saved !== null && point.kind === '경기결과'
+        ? (isBugFixed('B-28') ? resumedPitcherLastGameOf(saved) : enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)))
+        : saved,
     point,
   }
 }
@@ -1624,7 +1634,8 @@ export function usePitcherLeagueSession(
        * 45번째 경기는 경기 전 대진이 없어 아래 갈래로 간다(그때도 L+0x32 = 0 → 136 이다).
        */
       if (counted.postseason !== null) {
-        if (leagueDayCounterOf(counted) === 0) {
+        // B-05 고침이면 시리즈 끝(대진이 막 열린 때 말고)은 사슬을 다시 안 틀고 128 로 (`entersYearEndChainInPostseason`)
+        if (leagueDayCounterOf(counted) === 0 && entersYearEndChainInPostseason(counted.postseason)) {
           // 114 진입 0x11d00 이 2 → 0xb(포스트시즌 g == 0) — 136 진입이 다시 쓴다. 116 끝은 [114 → 136] 을 곧장 예약한다
           // (0xbcb49(0x88) · 0xbcb49(0x72), 12b8c~12bbe) — 사이에 시즌 요약 화면이 없다(웹 전용 '시즌종료' 화면은 r71 에서 걷음)
           return continueYearEnd(counted, [])
@@ -1885,13 +1896,21 @@ export function usePitcherLeagueSession(
     cursorRef.current = 0
   }, [])
   enterOutingMapRef.current = enterOutingMap
+  /** 105 → 112 로 들어설 때의 행동함(S+4) — B-26 고친 길에서 지도 취소가 되돌릴 값. 지도 밖이면 null */
+  const outingEntryActedRef = useRef<boolean | null>(null)
   const openOuting = useCallback(() => {
+    outingEntryActedRef.current = career?.hasActedThisCycle ?? null
     setOutingNotice('')
     setOutingResult(null)
     setOutingPresentation(null)
     enterOutingMap()
     setScene('외출')
-  }, [enterOutingMap])
+  }, [career, enterOutingMap])
+  const actedAfterOutingCancel = useCallback(() => {
+    const acted = actedAfterOutingMapCancel(career?.hasActedThisCycle ?? false, outingEntryActedRef.current)
+    outingEntryActedRef.current = null
+    return acted
+  }, [career])
   const runOutingFunction = useCallback(
     (functionId: string) => {
       if (career === null) return
@@ -2446,6 +2465,7 @@ export function usePitcherLeagueSession(
       purchase,
       closeShopGpDetail,
       openOuting,
+      actedAfterOutingCancel,
       runOutingFunction,
       finishOutingPresentation,
       enterOutingPlace,

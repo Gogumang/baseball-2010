@@ -9,6 +9,7 @@ import {
   NARI_YEAR_START_EVENT_ID,
   OPENING_EVENT_ID,
   placeTriggerOf,
+  requiredEventIdOf,
 } from '@/entities/story/model/storyScene'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -94,7 +95,8 @@ export function isPitcherEventEligible(
     !isIllnessCooldownBlocked(event, career.illnessCooldown, isFreshScene) &&
     !hasSeen(career, event.id) &&
     event.trigger === trigger &&
-    (event.requiresEvent === 0 || hasSeen(career, event.requiresEvent)) &&
+    // B-33 고침이면 228 · 229 의 선행 번호를 227 로 (`requiredEventIdOf`)
+    (requiredEventIdOf(event) === 0 || hasSeen(career, requiredEventIdOf(event))) &&
     isInDateWindow(event, career) &&
     meetsConditions(event, career, random)
   )

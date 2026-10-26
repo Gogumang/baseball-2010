@@ -3,6 +3,7 @@ import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import { runCpuPostseason } from '@/entities/league/model/postseasonPlay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import { BALANCE } from '@/shared/config/original/balance'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
@@ -89,6 +90,19 @@ const MAXIMUM_REPUTATION: number = BALANCE.limits.reputation
 export function regularSeasonPopupOnEnter(career: PostseasonCareerFields): PostseasonPopup | null {
   if (career.regularSeasonRewardTaken) return null
   return rankingOf(career.league)[0] === career.teamId ? { kind: '정규시즌우승' } : null
+}
+
+/**
+ * **116 끝 g == 0 이 연말 사슬(136 → 130 → 131)을 다시 트는가** — 포스트시즌 중 경기 뒤(0x12b74~0x12b94).
+ *
+ * 원본은 45번째 경기(대진 0xb80a8 이 막 열림)뿐 아니라 **내 경기로 시리즈가 끝날 때마다** L+0x32 가 0 이 되어 136 부터 사슬을 다시 돈다 —
+ * 136 진입 0x10bb0 이 0x8bdc9(392) 를 본 표시 없이 틀고(0x8bdc8 → 0xae170), 392 → 130(370) → 131(375) 가 보상째 다시 나온다 (B-05).
+ * **고친 길**: 한 해에 한 번만 — 대진이 막 열린 때(준플레이오프 0승 0승)만 사슬로, 그 밖의 시리즈 끝은 128 대진으로 곧장 간다.
+ * 굴림 없는 갈림이지만 고친 길은 사슬의 이벤트 · 보상 굴림을 건너뛰므로 그 뒤 난수 차례가 달라진다. 타자편 · 투수편 공용
+ */
+export function entersYearEndChainInPostseason(series: PostseasonSeries): boolean {
+  if (!isBugFixed('B-05')) return true
+  return series.round === '준플레이오프' && series.wins[0] === 0 && series.wins[1] === 0
 }
 
 /** 128 키 0x13da0 한 번의 결과 */

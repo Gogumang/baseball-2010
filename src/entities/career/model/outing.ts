@@ -12,6 +12,7 @@ import type { RecoverableCareer } from '@/entities/career/model/recovery'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { applyOutingSubItems, outingSubItemIdOf, SUB_ITEMS } from '@/entities/career/model/subItems'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 외출 커맨드 — 2010판에서 신규 추가된 기능이다.
@@ -55,13 +56,32 @@ export function outingBlockReasonOf(
   // 행동함(S+4)은 보지 않는다 — 0x16cf0 은 아래 넷뿐이다
   // StrMODE[62] "인기도가 부족합니다. 필요한 인기도 : %d"
   if (career.popularity < outingFunction.requiredPopularity) return '인기도부족'
-  // StrMODE[77] — 보험증서(서브아이템 7)를 보지 않는다 (원본 그대로)
-  if (outingFunction.effect.moneyCost > 0 && career.money < outingFunction.effect.moneyCost) return '소지금부족'
+  // StrMODE[77] — 원본은 보험증서(서브아이템 7)를 보지 않는다 (B-25). 고친 길은 서브 아이템을 먹인 실제 비용으로 견준다
+  const moneyCost = outingMoneyCostOf(career, outingFunction)
+  if (moneyCost > 0 && career.money < moneyCost) return '소지금부족'
   // StrMODE[196] "건강한 상태입니다 입원할 필요가 없습니다"
   if (outingFunction.effect.healsInjury && !career.isInjured && !career.isSick) return '건강함'
   // 외식은 사기가 최고면 막힌다 (StrMODE[91])
   if (outingFunction.id === '외식' && career.morale >= MAXIMUM_MORALE) return '사기최고'
   return null
+}
+
+/**
+ * 소지금 검사가 보는 비용 — 원본(0x16d42)은 표 비용 그대로라 보험증서가 있어 실제로는 공짜인 입원도 소지금이 모자라면 막는다.
+ * **B-25 고침**: 효과 0x15234 가 실제로 빼는 값(서브 아이템 보정 뒤 `applyOutingSubItems` 의 비용 — 입원 + 보험증서면 0)으로 견준다.
+ * 굴림이 없는 판정이라 난수 차례는 같다
+ */
+function outingMoneyCostOf(career: OutingCareer, outingFunction: OutingFunction): number {
+  const cost = outingFunction.effect.moneyCost
+  if (!isBugFixed('B-25')) return cost
+  const applied = applyOutingSubItems(career, outingFunction.id, {
+    moneyCost: cost,
+    popularityGain: 0,
+    reputationGain: 0,
+    moraleGain: 0,
+    healsInjury: outingFunction.effect.healsInjury,
+  })
+  return applied.moneyCost
 }
 
 /** 막힘 알림 원문 — StrMODE[62] · [77] · [196] · [91] 을 원문 표에서 마크업째 읽는다(r216), 이미 행동함은 r_event_txt[176] */
@@ -222,7 +242,18 @@ const REST_MORALE_RANGE = { minimum: 10, maximumExclusive: 16 }
 export function restBlockReasonOf(career: PlayerCareer): '사기최고' | null {
   // 행동함(S+4)은 보지 않는다 — 105 키 0x1261c 휴식 칸(12682~126bc)은 사기만 본다
   // 0x1261c — 사기가 100 이면 아파도 StrMODE[91] 로 거절한다 (행동으로 치지 않음)
-  return career.morale >= MAXIMUM_MORALE ? '사기최고' : null
+  return isRestRefusedAtFullMorale(career) ? '사기최고' : null
+}
+
+/**
+ * 휴식 가드 0x12682~0x1269a — 원본은 `사기 == 100` 하나만 보아 **아프거나 다쳐도** StrMODE[91] 로 거절한다(회복 판정 0x1b308 을
+ * 굴릴 기회가 없다). **B-24 고침**: 질병·부상 중이면 사기가 100 이어도 휴식을 받는다(사기는 100 에서 잘리고 회복 판정은 그대로 돈다).
+ * 고친 길에서 새로 열리는 휴식은 원본에 없던 굴림(사기 bfa55 · 회복 bfa55)을 먹는다 — 그 자리만 난수 차례가 달라진다.
+ * 타자편 · 투수편 공용(`pitcherRestBlockReasonOf`)
+ */
+export function isRestRefusedAtFullMorale(career: Pick<RecoverableCareer, 'isInjured' | 'isSick'> & { readonly morale: number }): boolean {
+  if (career.morale < MAXIMUM_MORALE) return false
+  return !(isBugFixed('B-24') && (career.isInjured || career.isSick))
 }
 
 /** 휴식 결과 (0x18e3c) — 사기만 오른다. 회복 판정은 결과 창을 닫을 때 recoverAfterRest 로 한다 (0x1b308) */
@@ -236,4 +267,17 @@ export function runRest(career: PlayerCareer, random: RandomPort): { career: Pla
 
 export function recoverAfterRest(career: PlayerCareer, random: RandomPort) {
   return rollRecovery(career, REST_RECOVERY, random)
+}
+
+/**
+ * 112 외출 지도 취소(CLR → 105, 키 0x13ba4)가 남기는 행동함(S+4).
+ * 원본 13bc0~13bca 는 **늘 S+4 = 0** 으로 내린다 — 트레이닝 · 휴식 · 외출로 행동한 뒤 흑백 외출 칸에 들어갔다 취소하면 세 칸이 다시 켜져
+ * 한 주기에 두 번 행동한다 (B-26).
+ * **B-26 고침**: 105 에서 지도로 들어설 때의 값으로 되돌린다 — 들어설 때 행동하지 않았으면 원본처럼 내리고(지도 진입 이벤트가 켠
+ * 행동함을 취소가 되돌리는 원본 동작은 그대로), 이미 행동했으면 그대로 둔다. 들어설 때 값을 모르면(`null`) 지금 값을 둔다.
+ * 굴림이 없어 난수 차례는 같다
+ */
+export function actedAfterOutingMapCancel(actedNow: boolean, actedAtEntry: boolean | null): boolean {
+  if (!isBugFixed('B-26')) return false
+  return actedAtEntry ?? actedNow
 }

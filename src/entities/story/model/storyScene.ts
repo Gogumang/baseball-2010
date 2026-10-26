@@ -4,6 +4,7 @@ import { isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { meetsSkillAcquireCondition, meetsSkillReleaseCondition } from '@/entities/story/model/skillCondition'
 import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
@@ -181,11 +182,29 @@ function meetsConditions(event: OriginalEvent, career: PlayerCareer, random: Ran
   })
 }
 
+/**
+ * 발렌타인 2차 대결 재도전(228 타자편 · 229 투수편)의 선행 이벤트 — 원본 이벤트 표(r_event.zt1)는 **219(1차 패배)** 라,
+ * 1차를 이기고(218) 2차에서 진(227) 사람에게는 재도전이 안 나오고, 1차에 진 적만 있으면 2차를 치르기도 전에 나올 수 있다 (B-33).
+ * 1차 재도전 220 이 `requiresEvent = 219`(1차 패배) · 조건 "218 안 봄" 인 것과 같은 꼴로, 2차는 227(2차 패배) · "226 안 봄" 이어야 맞다.
+ */
+const SECOND_VALENTINE_RETRY_EVENT_IDS: ReadonlySet<number> = new Set([228, 229])
+const SECOND_VALENTINE_LOSS_EVENT_ID = 227
+
+/**
+ * 이벤트의 선행 번호(`requiresEvent`) — 데이터 버그 B-33 고침(기본)이면 228 · 229 를 227 로 덮어 읽는다. 타자편 · 투수편 공용.
+ * 굴림이 없는 판정이라 난수 차례는 훑기 결과가 바뀌는 자리만 달라진다
+ */
+export function requiredEventIdOf(event: Pick<OriginalEvent, 'id' | 'requiresEvent'>): number {
+  if (SECOND_VALENTINE_RETRY_EVENT_IDS.has(event.id) && isBugFixed('B-33')) return SECOND_VALENTINE_LOSS_EVENT_ID
+  return event.requiresEvent
+}
+
 function isEligible(event: OriginalEvent, career: PlayerCareer, trigger: number, random: RandomPort | undefined): boolean {
+  const requiredEventId = requiredEventIdOf(event)
   return (
     event.trigger === trigger &&
     BATTER_AUDIENCES.has(event.audience) &&
-    (event.requiresEvent === 0 || hasSeen(career, event.requiresEvent)) &&
+    (requiredEventId === 0 || hasSeen(career, requiredEventId)) &&
     isInDateWindow(event, career) &&
     meetsConditions(event, career, random)
   )

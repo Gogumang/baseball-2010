@@ -269,9 +269,10 @@ function PitcherLeagueScreens({
       noticeText={session.outingNotice}
       onCloseNotice={actions.closeOutingNotice}
       onRun={actions.runOutingFunction}
-      // 112 취소 → 105 (키 0x13ba4) — 13bc0~13bca 가 S+4(행동함) = 0 으로 내린다(원본 그대로 — 두 편 공용 키)
+      // 112 취소 → 105 (키 0x13ba4) — 원본 13bc0~13bca 는 S+4(행동함) = 0 으로 내린다(두 편 공용 키). B-26 고침이면 들어설 때 값으로
       onBack={() => {
-        if (career.hasActedThisCycle) actions.save({ ...career, hasActedThisCycle: false })
+        const acted = actions.actedAfterOutingCancel()
+        if (career.hasActedThisCycle !== acted) actions.save({ ...career, hasActedThisCycle: acted })
         actions.goto('관리')
       }}
       // 장소 이벤트 배정 0x8cdc0 — 장소마다 파일 순서 첫 이벤트(대상 1·3)

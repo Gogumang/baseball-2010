@@ -35,6 +35,7 @@ import {
 import { rewardsIn } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
+import { entersYearEndChainInPostseason } from '@/entities/career/model/postseasonFlow'
 
 /**
  * 나만의리그 **투수편**(모드 3) 연말 이벤트 사슬 — 시즌 끝 상태 기계 0x1cdec 의 136 → 130 → 131 → 132.
@@ -243,7 +244,10 @@ export function pitcherResumePointOf(career: PitcherCareer): PitcherResumePoint 
   }
   if (career.seasonEndState === 128) return { kind: '포스트시즌' }
   // 116 끝(12b74~12b94): g == 0 → [114 → 136] — 136 진입 0x10bb0 이 392 를 튼다(사이에 시즌 요약 화면 없음)
-  return leagueDayCounterOf(career) === 0 ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID } : { kind: '포스트시즌' }
+  // B-05 고침이면 대진이 막 열린 때만 사슬로 (`entersYearEndChainInPostseason`)
+  return leagueDayCounterOf(career) === 0 && entersYearEndChainInPostseason(career.postseason)
+    ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
+    : { kind: '포스트시즌' }
 }
 
 /** 13년차의 연차idx — 0x1c2c2 `cmp r5, #0xc` */

@@ -1,8 +1,8 @@
-import { BALANCE } from '@/shared/config/original/balance'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { REST_RECOVERY, rollRecovery } from '@/entities/career/model/recovery'
 import { gainPitcherMorale, spendPitcherCycleAction } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
+import { isRestRefusedAtFullMorale } from '@/entities/career/model/outing'
 
 /**
  * 투수편 [휴식] 커맨드 — 관리 화면 105 칸 2 → 팝업 0x2a → 상태 **127**(휴식 연출 0x85230) →
@@ -19,21 +19,21 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 
 /** 사기 회복 `bfa55(10, 16)` = 10~15 (0x18e3c) */
 const REST_MORALE_RANGE = { minimum: 10, maximumExclusive: 16 }
-const MAXIMUM_MORALE = BALANCE.limits.morale
 
 export type PitcherRestBlockReason = '사기최고'
 
 /**
  * 휴식 가드 (0x12682).
  *
- * ⚠️ **원본 그대로**: 사기가 최고면 **아프거나 다쳤어도** StrMODE[91] 로 거절한다 — 회복 판정을
- * 굴릴 기회 자체가 없다 (G 2절 "아파도 거절"). 고치지 않는다.
+ * ⚠️ 원본: 사기가 최고면 **아프거나 다쳤어도** StrMODE[91] 로 거절한다 — 회복 판정을
+ * 굴릴 기회 자체가 없다 (G 2절 "아파도 거절"). B-24 고침(기본)은 질병·부상 중이면 받는다.
  *
  * 행동함(S+4)은 보지 않는다 — 105 키 0x1261c 휴식 칸(12682~126bc)은 사기 최고만 본다. r_event_txt[176] "한 가지만" 은
  * 안내 글이고 원본 코드는 막지 않는다(타자편 `restBlockReasonOf` 와 같다).
  */
 export function pitcherRestBlockReasonOf(career: PitcherCareer): PitcherRestBlockReason | null {
-  return career.morale >= MAXIMUM_MORALE ? '사기최고' : null
+  // B-24 고침이면 아프거나 다쳤을 때는 받는다 (`isRestRefusedAtFullMorale`)
+  return isRestRefusedAtFullMorale(career) ? '사기최고' : null
 }
 
 export interface PitcherRestOutcome {

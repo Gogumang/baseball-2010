@@ -71,7 +71,8 @@ export const ACE_PER_ROLE = 5
  * ```
  * ⚠️ **원본 버그 그대로** (S13 1-4): 인자를 `ldrb`(부호 없음)로 받아 **사람이 "없음"(−1 = 0xff)을
  * 골라도 `v == 0xff` 가 성립하지 않는다** → 사람이 마선수를 안 써도 **AI 는 늘 마투수·마타자를
- * 하나씩 얻는다**. 고치지 말 것.
+ * 하나씩 얻는다** (B-03). 이 함수는 원본 그대로 두고, 고친 길은 일반모드 · 시즌이 부르는 `rollOpponentAces`(teamGameFlow)가 굴린 뒤
+ * 사람이 안 고른 역할을 없음으로 돌린다. 나리 142(`rollNariMatchAces`)는 사람이 고르지 않는 자리라 원본 그대로다.
  */
 export function rollOpponentAceIndex(playerAceIndex: number, random: RandomPort): number {
   const value = random.rand(0, ACE_PER_ROLE)
