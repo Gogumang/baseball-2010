@@ -13,6 +13,7 @@
  * 0xc26a2 → 0xa60c0)이 **같은 함수**를 부르므로 판정도 한 벌이다 — 그래서 `entities/game` 에 둔다.
  * (`features/play-pitcher-game/model/winLossSave` 는 옛 import 를 위한 다시 내보내기다.)
  */
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** 측 2 = 없음 (0xb6814) */
 export const NO_SIDE = 2
@@ -140,11 +141,18 @@ export function outsRemainingOf(input: {
 /**
  * 투수가 **올라오는 그 순간 한 번** 세이브 후보를 잡는다 (0xa60c0).
  * 요건은 실제 야구 규칙 그대로이고, 3번(동점 주자 대기)이 다른 둘을 **덮어쓴다**.
+ *
+ * **고침(B-10)**: 원본은 세이브 상황이 아닌 교체면 아무것도 안 해 **앞서 내려간 투수가 후보로 남는다**(원본은 어차피
+ * 세이브를 안 적어 드러나지 않았다). 고친 길은 경기 끝에 코드를 안 보므로, 같은 측 투수가 세이브 상황이 아닐 때 올라오면
+ * 후보를 지운다 — 세이브는 리드를 지키며 **경기를 끝낸** 투수에게만 간다.
  */
 export function applyPitcherChange(state: DecisionState, input: SaveChanceInput): DecisionState {
   const defense = input.scoreOf(input.defenseSide)
   const offense = input.scoreOf(input.offenseSide)
-  if (defense <= offense) return state
+  // 고침(B-10): 세이브 상황이 아닌데 후보 측이 투수를 바꾸면 앞 후보는 경기를 끝내지 못하므로 지운다
+  const noSaveChance = (): DecisionState =>
+    isBugFixed('B-10') && state.save.side === input.defenseSide ? { ...state, save: NO_PITCHER_OF_RECORD } : state
+  if (defense <= offense) return noSaveChance()
 
   const remaining = outsRemainingOf(input)
   const gap = defense - offense
@@ -160,7 +168,7 @@ export function applyPitcherChange(state: DecisionState, input: SaveChanceInput)
     qualifies = true
   }
   if (defense <= offense + input.runnerCount + 2 && remaining > 0) code = 1
-  if (!qualifies && code === 0) return state
+  if (!qualifies && code === 0) return noSaveChance()
 
   return {
     ...state,
@@ -178,10 +186,13 @@ export interface GameEndDecision {
 /**
  * 경기 끝에 실제로 기록되는 셋 (0xa7de8 의 0xa7e0e·0xa7e9a~0xa7ed8).
  *
- * **원본 버그 그대로 (r126 확정)**: `state+0x64` 를 0 으로 되돌리는 코드가 원본 어디에도 없다.
+ * **원본 버그(B-10, r126 확정)**: `state+0x64` 를 0 으로 되돌리는 코드가 원본 어디에도 없다.
  * 세이브 후보가 한 번이라도 잡히면 코드가 1·3·9 로 남고, 경기 끝의 `코드 > 0 이면 건너뜀` 에 걸려
- * **세이브가 한 번도 기록되지 않는다** (S1 4-1). 고치지 않는다 — 그래서 이 함수는
- * 후보가 있어도 거의 늘 `save: null` 을 돌려준다.
+ * **세이브가 한 번도 기록되지 않는다** (S1 4-1). 원본 길은 후보가 있어도 거의 늘 `save: null` 을 돌려준다.
+ *
+ * **고침(`bugfixes.json` B-10, 기본 켬)**: 코드 1·3·9 는 그 투수가 잡아야 할 아웃 수(동점 주자 대기 1 · 1이닝 3 · 3이닝 9)로
+ * 읽힌다 — 올라올 때 남은 아웃이 그 값 이상이어야 후보가 되므로, 후보가 리드를 지키며 경기를 끝내면 요건은 저절로 채워진다.
+ * 그래서 고친 길은 경기 끝에 코드를 보지 않는다(후보 · 승리 투수와 같은 번호 검사는 그대로). 굴림은 없다.
  * 근거(r126, S1 이 남긴 "memset 경유" 고리를 닫음): state 는 전역 `[0x1552d0c]` 하나로, 앱 시작 0x2ed8 의
  * 0x300a~0x301a 에서 **한 번만** 0xa4 바이트를 할당(0x1239 → 0x2ac4 가 memset 0x1400428 로 0 채움)하고
  * 생성자 0xb68a4 → 0xb6814 를 부른다. 0xb6814 는 +0x44·+0x50·+0x5c = 2 · +0x40 = 0 만 쓰고 +0x64 는 안 쓴다.
@@ -195,7 +206,7 @@ export function gameEndDecisionOf(state: DecisionState): GameEndDecision {
   const hasSave =
     state.save.side !== NO_SIDE &&
     !(winner !== null && winner.number === state.save.number) &&
-    state.saveCode <= 0
+    (isBugFixed('B-10') || state.saveCode <= 0)
   return { winner, loser, save: hasSave ? state.save : null }
 }
 

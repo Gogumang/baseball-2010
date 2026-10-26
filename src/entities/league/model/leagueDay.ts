@@ -941,7 +941,7 @@ export function simulateLeagueGame(
    *   - 승리 투수는 **6회(이닝 index ≥ 5) 이후의 득점 때만** 정해진다 — 5회까지만 점수가 나고 그 뒤로 한 점도
    *     안 나면 **승리 투수가 없다**(패전 투수는 이닝 조건이 없어 남는다). 선발 5이닝 요건 같은 진짜 규칙은 없다.
    *   - 세이브는 **한 번도 기록되지 않는다** — 후보는 교체 0xa60c0 이 잡지만 세이브 코드 `state+0x64` 를 0 으로
-   *     되돌리는 곳이 없어 0xa7eaa 에 늘 걸린다 (S1 4-1, CORRECTIONS 2-1).
+   *     되돌리는 곳이 없어 0xa7eaa 에 늘 걸린다 (S1 4-1, CORRECTIONS 2-1 — 원본 버그 B-10, 고친 길은 `gameEndDecisionOf`).
    * 판정은 경기 안의 **실제 점수**로 한다 — 순위표 쪽의 칸·명단 엇갈림(`playLeagueDay`)과는 따로다.
    */
   const ended = gameEndDecisionOf(decision)

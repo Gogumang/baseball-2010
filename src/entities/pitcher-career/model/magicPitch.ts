@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 마구 (binary.mod 0xb6d2c 구질 칸 · 0x50da8 사람 고르기 · 0x344dc CPU 고르기 · 0x3de10 공에 싣기 ·
@@ -143,9 +144,9 @@ export const NO_MAGIC_PITCH_CORRECTION: MagicPitchCorrection = {
 }
 
 /**
- * ⚠️ **원본 버그 그대로**: out+0xa/+0xb 는 **타자의** B·C 를 올린다(부호가 양수고 빼는 코드가 없다).
+ * ⚠️ **원본 버그(B-02)**: out+0xa/+0xb 는 **타자의** B·C 를 올린다(부호가 양수고 빼는 코드가 없다).
  * 마구의 실제 억제력은 out+4/+6(구속·제구 +150~220)뿐이다 — 의도는 감소였을 것으로 보이지만
- * 표 그대로가 실행값이므로 그대로 옮긴다 (H2 2절).
+ * 표 그대로가 실행값이므로 그대로 옮긴다 (H2 2절). 고친 길(기본)은 `entities/batting/model/swingBoost` 가 부호를 뒤집는다.
  */
 export function magicPitchCorrectionOf(input: {
   readonly number: number
@@ -316,8 +317,8 @@ export function magicBallKindAtPath(input: {
 }
 
 /**
- * ⚠️ **원본 버그 그대로**: 공 객체 +0x10(이번 공의 마구 번호)을
- * 0 으로 되돌리는 코드가 원본에 **없다**(H2 3-4). 그래서 한 번 마구를 던지고 나면
+ * ⚠️ **원본 버그(B-01) — 이 함수는 원본 길이다**: 공 객체 +0x10(이번 공의 마구 번호)을
+ * 0 으로 되돌리는 코드가 원본에 **없다**(H2 3-4). 고친 길은 아래 `ballMagicNumberOfPitch`. 그래서 한 번 마구를 던지고 나면
  * 직구·변화구에도 마구 보정이 계속 붙고, 투수가 바뀌어도 값이 남는다.
  * 같은 이유로 **CPU 가 그 경기 첫 마구를 던질 때는 횟수가 줄지 않는다**(소모 조건이 `공+0x10 != 0`).
  *
@@ -338,4 +339,30 @@ export function ballMagicNumberAfterPitch(
   if (pitchTypeNumber === MAGIC_PITCH_TYPE_NUMBER && remaining > 0) return pitcherMagicNumber
   // 원본에는 여기서 0 으로 되돌리는 줄이 없다 — 직전 값이 그대로 남는다
   return previousBallMagicNumber
+}
+
+/**
+ * **이번 공의 공+0x10** — 소모(남은 횟수 깎기) 앞뒤의 남은 횟수를 함께 받아 원본 길과 고친 길을 가른다.
+ *
+ * - 원본(B-01 끔): `ballMagicNumberAfterPitch(직전 값, 구질, 투수 번호, 소모 뒤 남은)` — 0x3de10 은 소모 **뒤**에 돌아
+ *   마지막 한 개(1 → 0)는 안 싣고, 0 으로 되돌리는 줄이 없어 앞 마구의 번호가 그 뒤 모든 공(투수가 바뀌어도)에 남는다.
+ * - **고침(B-01, `bugfixes.json`)**: 마구 보정은 **마구로 던진 그 공에만** 붙는다 — 이번 공이 마구(구질 22)이고
+ *   던지기 전에 남은 횟수가 있었으면 던진 투수의 번호, 아니면 0. 마지막 한 개도 실린다(고를 수 있었던 공이므로).
+ *   굴림을 안 쓰므로 이 함수만으로는 난수 차례가 안 바뀐다(보정값이 바뀌어 결과가 달라질 뿐이다).
+ */
+export function ballMagicNumberOfPitch(input: {
+  /** 직전 공+0x10 */
+  readonly previous: number
+  readonly pitchTypeNumber: number
+  /** 던진 투수 레코드 +0x18 */
+  readonly pitcherMagicNumber: number
+  /** 이 공을 고를 때(소모 전) 남은 횟수 */
+  readonly remainingBefore: number
+  /** 소모 뒤 남은 횟수 — 원본 0x3de10 이 보는 값 */
+  readonly remainingAfter: number
+}): number {
+  if (isBugFixed('B-01')) {
+    return input.pitchTypeNumber === MAGIC_PITCH_TYPE_NUMBER && input.remainingBefore > 0 ? input.pitcherMagicNumber : 0
+  }
+  return ballMagicNumberAfterPitch(input.previous, input.pitchTypeNumber, input.pitcherMagicNumber, input.remainingAfter)
 }

@@ -2,6 +2,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * **CPU 도루 판정 0x520de** — 사람이 수비(투구)할 때 CPU 공격이 도루를 거는가 (Q1 3a, 직접 다시 뜬 것).
@@ -35,7 +36,10 @@ import type { StealBase } from '@/entities/fielding/model/stealStart'
  * - **원본 그대로(버그 후보)**: 칸 = 주자 속도 ÷ 250 인데 주자 속도는 300 + 주루×7÷100 (+팀 등급 0~7)
  *   = 300~383 이라 **늘 1** 이다. 그래서 주루와 무관하게 1루 주자 11/1000 · 2루 단독 5/1000 · 1·2루 3/1000
  *   (`표 ≥ rand`, rand 는 이 저장소 관례대로 [0, 1000) → (값 + 1)/1000) = Q1 의 1.1% · 0.5% · 0.3%.
- *   표의 칸 0·2·3 은 죽은 칸이다 — 고치지 않는다.
+ *   표의 칸 0·2·3 은 죽은 칸이다 — 원본 버그(B-15).
+ * - **고침(`bugfixes.json` B-15, 기본 켬)**: 칸 = min(**주루 능력치** ÷ 250, 3). 능력치는 0~999 라 ÷250 이 네 칸(0~249 · 250~499 ·
+ *   500~749 · 750~)에 꼭 맞는다 — 표가 노린 "느림 → 빠름" 네 단계로 읽었다. 주자 속도(300 + 주루×7÷100)에서 300 을 빼고
+ *   ÷250 하면 늘 0 이 되어 또 한 칸에 갇히므로 능력치를 직접 쓴다. 굴림 수(후보가 있을 때 rand 한 번)는 원본과 같다.
  * - 투수·포수 능력, 볼카운트, 아웃, 점수, 이닝은 보지 않는다.
  * - 간이 엔진 도루(0xc1818 · 표 0xd9064, `entities/game/model/steal`)와는 완전히 다른 길이다.
  */
@@ -103,8 +107,10 @@ export function rollCpuSteal(input: CpuStealInput, random: RandomPort): StealBas
   if (!input.offenseIsCpu) return null
   const target = cpuStealTargetOf(input.bases)
   if (target === null) return null
-  const speed = runnerSpeedOf(input.runAbilityOf(target.base), input.runnerTeamGrade ?? 0)
-  const column = cpuStealSpeedColumnOf(speed)
+  const runAbility = input.runAbilityOf(target.base)
+  const column = isBugFixed('B-15')
+    ? cpuStealSpeedColumnOf(Math.max(0, runAbility))
+    : cpuStealSpeedColumnOf(runnerSpeedOf(runAbility, input.runnerTeamGrade ?? 0))
   const roll = random.rand(0, RANDOM_LIMIT)
   return CPU_STEAL_TABLE[target.row][column] >= roll ? target.base : null
 }

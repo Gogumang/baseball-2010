@@ -130,7 +130,7 @@ import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitch
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import {
   MAGIC_PITCH_TYPE_NUMBER,
-  ballMagicNumberAfterPitch,
+  ballMagicNumberOfPitch,
   magicPitchCountOf,
 } from '@/entities/pitcher-career/model/magicPitch'
 import {
@@ -3187,12 +3187,14 @@ function pitchOnce(
   // `구질 == 22 && 남은 > 0` 이면 공+0x10 = 투수+0x18 을 싣는다 — 마지막 한 개(1 → 0)는 안 싣는다 (H2 3-4).
   // 되돌리는 줄이 없어 마구 뒤의 공에도 남는다. CPU 타석 판정의 0x34d6c 투수 쪽이 이 칸을 본다
   const magicRemainingAfter = isMagic ? progress.magicRemaining - 1 : progress.magicRemaining
-  const ballMagicNumber = ballMagicNumberAfterPitch(
-    progress.ballMagicNumber,
-    input.typeNumber,
-    repertoire.magicId,
-    magicRemainingAfter,
-  )
+  // 고침(B-01)이면 마구로 던진 이 공에만 싣는다 — `ballMagicNumberOfPitch`
+  const ballMagicNumber = ballMagicNumberOfPitch({
+    previous: progress.ballMagicNumber,
+    pitchTypeNumber: input.typeNumber,
+    pitcherMagicNumber: repertoire.magicId,
+    remainingBefore: progress.magicRemaining,
+    remainingAfter: magicRemainingAfter,
+  })
   const aimedPitch: Pitch = { ...builtPitch, magicNumber: ballMagicNumber, pitcherMagicNumber: repertoire.magicId }
 
   // 실투 판정 0x33cbc — 투구 순간 0x4dc78 이 궤적 준비 0x9e669 **뒤**(0x4dea0)에 부른다.

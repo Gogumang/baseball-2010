@@ -96,7 +96,7 @@ import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchCle
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import { rollCpuPitchTypeOnPitcherChangeTick } from '@/entities/pitching/model/selectPitch'
-import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch } from '@/entities/pitcher-career/model/magicPitch'
+import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberOfPitch } from '@/entities/pitcher-career/model/magicPitch'
 import { countsTopGradePitch } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -1510,12 +1510,14 @@ export function useMissionSession({
     // `구질 == 22 && 남은 > 0` 이면 공+0x10 = 투수 +0x18 — 마지막 한 개(1 → 0)는 안 싣는다. 되돌리는 줄이 없다 (H2 3-4).
     // CPU 타석 판정의 보정 구조체 0x34d6c 투수 쪽이 이 칸을 본다 — 미션 투수는 비트7 이라 n = 공+0x10 − 1 칸
     const magicRemainingAfter = isMagic ? pitcherMagicRemaining - 1 : pitcherMagicRemaining
-    const nextBallMagicNumber = ballMagicNumberAfterPitch(
-      ballMagicNumber,
-      typeNumber,
-      pitcher.repertoire.magicNumber,
-      magicRemainingAfter,
-    )
+    // 고침(B-01)이면 마구로 던진 이 공에만 싣는다 — `ballMagicNumberOfPitch`
+    const nextBallMagicNumber = ballMagicNumberOfPitch({
+      previous: ballMagicNumber,
+      pitchTypeNumber: typeNumber,
+      pitcherMagicNumber: pitcher.repertoire.magicNumber,
+      remainingBefore: pitcherMagicRemaining,
+      remainingAfter: magicRemainingAfter,
+    })
     setPitcherMagicStored(magicRemainingAfter)
     setBallMagicNumber(nextBallMagicNumber)
     const aimedPitch = {

@@ -47,6 +47,7 @@ export default defineConfig({
       'src/shared/lib/lazyScreen/preloadForTests.ts',
       'src/shared/config/unlocks/originalUnlocksForTests.ts',
       'src/shared/config/balance/originalBalanceForTests.ts',
+      'src/shared/config/bugfixes/originalBugfixesForTests.ts',
     ],
     browser: {
       enabled: true,

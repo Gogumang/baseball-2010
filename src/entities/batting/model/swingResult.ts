@@ -262,7 +262,7 @@ function finishFactors(
   boost: SwingBoost,
 ): SwingFactors {
   const skilled = applySwingSkills({ solid, homeRun }, input.batterSkillIds, input.pitcherSkillIds, input.situation)
-  // 0xabd92~0xabe02 — 스킬 보정 뒤, 상한(0xabeba) 앞. 마구 % 도 부호가 양수라 타자 쪽을 올린다 (원본 그대로)
+  // 0xabd92~0xabe02 — 스킬 보정 뒤, 상한(0xabeba) 앞. 마구 % 도 부호가 양수라 타자 쪽을 올린다 (원본 버그 B-02 — 고친 길은 swingBoostOf 가 음수 % 를 준다)
   const boostedSolid = skilled.solid + trunc((skilled.solid * boost.solidPercent) / 100)
   const boostedHomeRun = skilled.homeRun + trunc((skilled.homeRun * boost.homeRunPercent) / 100)
   return { contact, solid: boostedSolid, homeRun: boostedHomeRun }
