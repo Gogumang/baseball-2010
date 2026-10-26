@@ -18,7 +18,7 @@ import type { PitcherAbility } from '@/entities/pitching/model/pitch'
  * b58e6  체력 구간 감소 — [sp+0x24](= 부르는 쪽 [sp]) 가
  *          > 54 그대로 · 35~54 v += v/(−10) · 20~34 v += (v−16v)·2/100 · 1~19 v −= v/2 · ≤ 0 v += −90v/100
  *          (나눗셈은 0xca7b5 = 0 쪽 버림. `abilityAfterFatigue` 와 같은 값이다)
- * b592c  팀 능력치 정액 (모드 1·2·8·9) → b5a74 코치 정액 (모드 2)
+ * b592c  팀 능력치 정액 (모드 1·2·8·9) → b5a16 스킬 14 투지 v += v/10 (`fightingSpirit`) → b5a74 코치 정액 (모드 2)
  * b5b06  0..999 로 한 번 자른다
  * ```
  * 곧 피로는 **팀·코치 정액보다 먼저** 먹는다 — 이미 정액을 더한 값에 피로를 먹이면 값이 달라진다.
@@ -57,23 +57,52 @@ export interface PitcherGameAbilityParts {
    * 코치(0xb5a74, 모드 2). 없으면 0 (모드 3~7 은 둘 다 없다).
    */
   readonly bonusAfterFatigue?: PitcherStatTriple
+  /**
+   * `bonusAfterFatigue` 가운데 **코치 몫**(0xb5a74, 모드 2) — 스킬 14 갈래(b5a16~b5a72)가 팀 정액 **뒤** · 코치 **앞**에 서서
+   * 둘을 갈라야 한다. 없으면 0
+   */
+  readonly coachBonusAfterFatigue?: PitcherStatTriple
+  /**
+   * **스킬 14(투수 비트 14 — 투지, skills.json 30) 갈래가 지금 서는가** (0xb5a28~0xb5a72) — 투수 레코드(0xb6279) · 장착 14
+   * (0xb62b5(rec, 0xe)) · 전역 경기 상태 [0x1552d0c] +0x6b > 4 · 0xb6a4d(상태) == 0xb6be9(상태, 팀레코드 +0). 참이면 제구 · 구속 · 변화
+   * (칸 ≠ 3)가 피로 · 팀 정액 뒤에 `v += v/10` (`withFightingSpirit`). 부르는 쪽이 장착과 그 순간의 경기 상태를 함께 본다. 없으면 거짓
+   */
+  readonly fightingSpirit?: boolean
 }
 
 const clamp = (value: number) => Math.min(ABILITY_LIMIT, Math.max(0, value))
 
-/** `0xb570c` 한 칸 — 피로 앞 값 · 체력% · 피로 뒤 정액 → 0..999 */
-export function pitcherGameStatOf(beforeFatigue: number, staminaPercent: number, bonusAfterFatigue = 0): number {
-  return clamp(abilityAfterFatigue(beforeFatigue, staminaPercent) + bonusAfterFatigue)
+/** 스킬 14 갈래 b5a68~b5a72 — `v += v / 10` (0xca7b5 = 0 쪽 버림). 칸 3(체력)은 부르는 쪽이 거른다 */
+export function withFightingSpirit(value: number): number {
+  return value + Math.trunc(value / 10)
+}
+
+/**
+ * `0xb570c` 한 칸 — 피로 앞 값 · 체력% · 피로 뒤 정액 → 0..999.
+ * 차례: 피로 0xb58e6 → 팀 정액 0xb592c → **스킬 14**(b5a16~b5a72, `fightingSpirit`) → 코치 0xb5a74(`coachBonus`, `bonusAfterFatigue` 안 몫) → 0xb5b06 자르기
+ */
+export function pitcherGameStatOf(
+  beforeFatigue: number,
+  staminaPercent: number,
+  bonusAfterFatigue = 0,
+  coachBonus = 0,
+  fightingSpirit = false,
+): number {
+  const beforeCoach = abilityAfterFatigue(beforeFatigue, staminaPercent) + bonusAfterFatigue - coachBonus
+  return clamp((fightingSpirit ? withFightingSpirit(beforeCoach) : beforeCoach) + coachBonus)
 }
 
 /** 세 칸을 한꺼번에 */
 export function pitcherGameStatsOf(parts: PitcherGameAbilityParts, staminaPercent: number): PitcherStatTriple {
-  const bonus = parts.bonusAfterFatigue
-  return {
-    control: pitcherGameStatOf(parts.beforeFatigue.control, staminaPercent, bonus?.control ?? 0),
-    velocity: pitcherGameStatOf(parts.beforeFatigue.velocity, staminaPercent, bonus?.velocity ?? 0),
-    breaking: pitcherGameStatOf(parts.beforeFatigue.breaking, staminaPercent, bonus?.breaking ?? 0),
-  }
+  const at = (key: keyof PitcherStatTriple) =>
+    pitcherGameStatOf(
+      parts.beforeFatigue[key],
+      staminaPercent,
+      parts.bonusAfterFatigue?.[key] ?? 0,
+      parts.coachBonusAfterFatigue?.[key] ?? 0,
+      parts.fightingSpirit === true,
+    )
+  return { control: at('control'), velocity: at('velocity'), breaking: at('breaking') }
 }
 
 /** CPU 투구 한 번이 쓰는 투수 값 */
@@ -110,7 +139,28 @@ export function cpuPitchStatsOf(pitcher: PitcherAbility): CpuPitchStats {
       parts.beforeFatigue.velocity,
       NO_FATIGUE_STAMINA_PERCENT,
       parts.bonusAfterFatigue?.velocity ?? 0,
+      parts.coachBonusAfterFatigue?.velocity ?? 0,
+      parts.fightingSpirit === true,
     ),
     isNotExhausted,
   }
+}
+
+/** 0xb62b5(선수, 0xe) — 투수 장착 비트 14 투지 (skills.json 30) · 레코드 +0x14 */
+export const FIGHTING_SPIRIT_SKILL_BIT = 14
+
+/** 레코드 +0x14 장착 비트에 투지(비트 14)가 섰나 — 투수 레코드인지(0xb6279)는 부르는 쪽 몫 */
+export function hasFightingSpiritBit(skillBits: number | undefined): boolean {
+  return (((skillBits ?? 0) >>> FIGHTING_SPIRIT_SKILL_BIT) & 1) === 1
+}
+
+/**
+ * 사람 타석의 CPU 투수(`PitcherAbility`)에 **스킬 14 갈래**를 싣는다 — 레코드 +0x14 비트 14(`skillBits`)가 서고 경기 상태(`situation`,
+ * 전역 [0x1552d0c] +0x6b > 4 ∧ 그 팀이 지는 측)가 맞으면 `gameAbility.fightingSpirit`. 0x34968 · 0x4dbac · 0x33cbc · 0xab214 가 모두
+ * 같은 0xb570c 라 `cpuPitchStatsOf` 한 곳이 먹인다. 원본 재료(`gameAbility`)가 없는 옛 길은 그대로 둔다
+ */
+export function withPitcherFightingSpirit(pitcher: PitcherAbility, situation: boolean): PitcherAbility {
+  if (!situation || pitcher.gameAbility === undefined) return pitcher
+  if (!hasFightingSpiritBit(pitcher.skillBits)) return pitcher
+  return { ...pitcher, gameAbility: { ...pitcher.gameAbility, fightingSpirit: true } }
 }

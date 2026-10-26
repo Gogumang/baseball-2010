@@ -81,9 +81,72 @@ export function setLiveGameSides(sides: LiveGameSides): void {
  * 어느 쪽에도 없는 팀도 측 1). 이닝 검사(+0x6b > 4)는 부르는 쪽 몫이다.
  */
 export function isLiveGameLosingTeam(teamId: number): boolean {
-  const losingSide = sideScores[1] < sideScores[0] ? 1 : 0
-  const sideOfTeam = sideTeamIds[0] !== teamId ? 1 : 0
+  return isLosingTeamOf({ inningIndex, sideTeamIds, sideScores }, teamId)
+}
+
+/** 전역 경기 상태 한 벌의 스킬 14 재료 — +0x6b · +0x28 · +0x29 · +0x7e · +0x7f */
+export interface FightingSpiritState {
+  readonly inningIndex: number
+  readonly sideTeamIds: readonly [number, number]
+  readonly sideScores: readonly [number, number]
+}
+
+/** `0xb6a4c(상태) == 0xb6be8(상태, 팀)` — 상태 한 벌로 (`isLiveGameLosingTeam` 머리말) */
+function isLosingTeamOf(state: FightingSpiritState, teamId: number): boolean {
+  const losingSide = state.sideScores[1] < state.sideScores[0] ? 1 : 0
+  const sideOfTeam = state.sideTeamIds[0] !== teamId ? 1 : 0
   return losingSide === sideOfTeam
+}
+
+/** 스킬 14 갈래(b5a4c~b5a66)의 경기 상태 조건 — 상태 한 벌로 (`isLiveGameFightingSpiritSituation` 머리말) */
+export function isFightingSpiritSituationOf(state: FightingSpiritState, teamId: number): boolean {
+  return state.inningIndex > FIGHTING_SPIRIT_AFTER_INNING_INDEX && isLosingTeamOf(state, teamId)
+}
+
+/** 사람 경기 판 하나 — 이닝(1 부터) · 점수 · 사람 측 */
+export interface InGameFightingSpiritGame {
+  readonly inning: number
+  readonly ourScore: number
+  readonly opponentScore: number
+  /** 사람(우리) 팀의 측 — 0 선공 · 1 후공 */
+  readonly playerSide: 0 | 1
+}
+
+/**
+ * **경기 중**의 전역 경기 상태 — 사람 경기 장면은 [0x1552d0c] 자체를 굴린다: +0x6b 는 이닝 넘김 0xb6b6c 가, +0x7e · +0x7f 는 득점
+ * 0xb6a9c 가(99 상한) 그때그때 바꾸고 +0x28 · +0x29 는 셋업 0xb6bd4 가 두 팀으로 적었다. 장면 안 자동진행(간이 엔진)도 같은 상태를 쓴다.
+ * 그래서 경기 안 0xb570c 의 스킬 14 갈래는 **지금 판**의 이닝 · 점수를 본다 — `isFightingSpiritSituationOf` 에 넣을 상태 한 벌.
+ * `extraRuns` 는 아직 판에 안 실린 이번 반 이닝 득점(간이 엔진이 굴리는 중) — `offenseIsOurs` 쪽 점수에 더한다.
+ */
+export function inGameFightingSpiritStateOf(
+  teams: { readonly ourTeamId: number; readonly opponentTeamId: number },
+  game: InGameFightingSpiritGame,
+  extraRuns?: { readonly runs: number; readonly offenseIsOurs: boolean },
+): FightingSpiritState {
+  const capped = (score: number) => Math.max(0, Math.min(SCORE_LIMIT, Math.trunc(score)))
+  const ourScore = capped(game.ourScore + (extraRuns !== undefined && extraRuns.offenseIsOurs ? extraRuns.runs : 0))
+  const opponentScore = capped(game.opponentScore + (extraRuns !== undefined && !extraRuns.offenseIsOurs ? extraRuns.runs : 0))
+  const ourSide = game.playerSide
+  return {
+    inningIndex: game.inning - 1,
+    sideTeamIds: ourSide === 0 ? [teams.ourTeamId, teams.opponentTeamId] : [teams.opponentTeamId, teams.ourTeamId],
+    sideScores: ourSide === 0 ? [ourScore, opponentScore] : [opponentScore, ourScore],
+  }
+}
+
+/** 측 차례로 든 이닝 인덱스 · 팀 · 점수에서 상태 한 벌 — 점수는 득점 0xb6a9c 처럼 0..99 로 자른다 */
+export function sideFightingSpiritStateOf(
+  inningIndexOfGame: number,
+  teams: readonly [number, number],
+  scores: readonly [number, number],
+): FightingSpiritState {
+  const capped = (score: number) => Math.max(0, Math.min(SCORE_LIMIT, Math.trunc(score)))
+  return { inningIndex: inningIndexOfGame, sideTeamIds: teams, sideScores: [capped(scores[0]), capped(scores[1])] }
+}
+
+/** 지금 전역 상태(마지막 사람 경기) 한 벌 — CPU 끼리 간이 엔진(0xc11f0 · 0xc1818)도 0xb570c 안에서 이 칸을 읽는다 */
+export function liveFightingSpiritState(): FightingSpiritState {
+  return { inningIndex, sideTeamIds, sideScores }
 }
 
 /** 경기 장면이 이닝을 넘길 때(0xb6b6c) · 미션 시작 이닝(0xaa698) — 웹은 경기 끝 · 나가기 때의 이닝 인덱스(0 부터) */
@@ -104,5 +167,5 @@ const FIGHTING_SPIRIT_AFTER_INNING_INDEX = 4
  * 관리 화면 상세 창은 경기 밖이라 **마지막으로 돈 사람 경기**(모드 불문)의 값이 남은 것을 본다.
  */
 export function isLiveGameFightingSpiritSituation(teamId: number): boolean {
-  return inningIndex > FIGHTING_SPIRIT_AFTER_INNING_INDEX && isLiveGameLosingTeam(teamId)
+  return isFightingSpiritSituationOf(liveFightingSpiritState(), teamId)
 }

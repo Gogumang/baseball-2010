@@ -19,7 +19,7 @@ import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import { gameAbilitiesOf, pitcherGameAbilityPartsOf, TEAM_ABILITY_SLOT } from '@/features/play-team-game/model/gameAbilities'
+import { gameAbilitiesOf, hasFightingSpiritBit, pitcherGameAbilityPartsOf, TEAM_ABILITY_SLOT } from '@/features/play-team-game/model/gameAbilities'
 import { defenseTeamBonusOf, runnerTeamGradeOf } from '@/entities/fielding/model/fieldingState'
 import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
@@ -76,6 +76,17 @@ export interface TeamGameAbilityContext {
    * 안 넘기면 모두 Lv1(0) = 60% 다 (새 저장 기본값 0x9f26c).
    */
   readonly aceLevels?: Readonly<Record<number, number>>
+  /**
+   * **스킬 14(투지) 갈래의 경기 상태 조건** — 0xb570c b5a4c~b5a66: 전역 경기 상태 [0x1552d0c] +0x6b > 4 이고 `팀`(팀레코드 +0)이
+   * 지는 측. 경기 장면은 지금 판의 이닝 · 점수를 본다(`inGameFightingSpiritStateOf`). 장착 비트 14 는 투수 레코드 +0x14 로
+   * 여기서 본다(`hasFightingSpiritBit`). 안 넘기면 늘 거짓
+   */
+  readonly fightingSpiritOf?: (teamId: number) => boolean
+}
+
+/** 투수 레코드 하나에 스킬 14 갈래가 지금 서는가 — 장착 비트 14(+0x14) ∧ 경기 상태(`fightingSpiritOf`) */
+function pitcherFightingSpiritOf(context: TeamGameAbilityContext, teamId: number, skillBits: number | undefined): boolean {
+  return hasFightingSpiritBit(skillBits) && context.fightingSpiritOf?.(teamId) === true
 }
 
 /**
@@ -170,6 +181,7 @@ export function pitcherGameAbilities(
     isMyTeam: context.seasonTeamId === teamId,
     teamAbilities: teamAbilitiesOf(context, teamId),
     season: context.season,
+    fightingSpirit: pitcherFightingSpiritOf(context, teamId, player?.skillBits),
   })
 }
 
@@ -227,6 +239,7 @@ export function pitcherGameAbilityParts(
     isMyTeam: context.seasonTeamId === teamId,
     teamAbilities: teamAbilitiesOf(context, teamId),
     season: context.season,
+    fightingSpirit: pitcherFightingSpiritOf(context, teamId, roster[slot]?.skillBits),
   })
 }
 
@@ -905,6 +918,8 @@ export function entryPitcherGameAbilityParts(
     isMyTeam: context.seasonTeamId === teamId,
     teamAbilities: teamAbilitiesOf(context, teamId),
     season: context.season,
+    // 레코드 +0x14 — 붙박이 줄은 Xls 행, 마투수는 XlsACE_PIT 행 (붕붕머신 0x16000 은 비트 14 가 섰다)
+    fightingSpirit: pitcherFightingSpiritOf(context, teamId, entry.skillBits),
   })
 }
 
@@ -920,5 +935,6 @@ export function entryPitcherGameAbilities(
     isMyTeam: context.seasonTeamId === teamId,
     teamAbilities: teamAbilitiesOf(context, teamId),
     season: context.season,
+    fightingSpirit: pitcherFightingSpiritOf(context, teamId, entry.skillBits),
   })
 }

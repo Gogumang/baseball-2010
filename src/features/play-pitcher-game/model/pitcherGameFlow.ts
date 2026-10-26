@@ -60,7 +60,10 @@ import {
   drainQuickPitcher,
   facingPitcherOf,
   startingMoundOf,
+  withQuickFightingSpirit,
 } from '@/entities/game/model/simulateHalfInning'
+import { hasFightingSpiritBit, withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
+import { inGameFightingSpiritStateOf, isFightingSpiritSituationOf } from '@/shared/lib/liveGameState/liveGameState'
 import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { advanceRunners, runnerCountOf } from '@/entities/game/model/baseState'
@@ -1228,7 +1231,9 @@ export function startPitch(
     pitcherEndures: options.pitcherEndures === true,
   })
   const staminaPercent = staminaPercentOf(stamina)
-  const fatigued = fatiguedStatsOf(options.stats, stamina)
+  // 0xb570c 스킬 14 갈래 — 내 투수 장착 비트 14 ∧ 지금 판의 경기 상태 (`myFightingSpiritOf`). 등급 · 피로 능력치 · CPU 스윙이 함께 본다
+  const myFightingSpirit = myFightingSpiritOf(progress)
+  const fatigued = fatiguedStatsOf(options.stats, stamina, myFightingSpirit)
   const grade = pitchGradeOf(
     {
       gaugeSettingOn: options.gaugeSettingOn,
@@ -1277,8 +1282,8 @@ export function startPitch(
       isMagicPitch: isMagic,
       grade,
       // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속, 체력 인자 90 이라 피로 감소가 없다.
-      // `options.stats` 가 곧 장비·스킬·컨디션을 먹인 실효값이다 (`fatiguedStatsOf` 주석)
-      effectiveVelocity: options.stats.velocity,
+      // `options.stats` 가 곧 장비·스킬·컨디션을 먹인 실효값이다 (`fatiguedStatsOf` 주석). 스킬 14 갈래는 피로 없는 값에도 선다
+      effectiveVelocity: myFightingSpirit ? withFightingSpirit(options.stats.velocity) : options.stats.velocity,
       runnerCount: runnerCountOf(progress.game.bases),
       hasSecondBaseRunner: progress.game.bases.second,
       // 지금 상대 타자의 압도 22 (+5) — drainStamina 와 같은 값
@@ -3895,6 +3900,7 @@ function quickDefenseOf(
   isOurs: boolean,
 ): HalfInningDefense {
   const { options } = progress
+  const teamId = isOurs ? options.ourTeamId : options.opponentTeamId
   const roster = teamPitchers(isOurs ? options.ourTeamId : options.opponentTeamId)
   // 상대 레코드 장비 니블 (나리 새 시즌 0x665e8) — 내 팀은 굴리지 않는다
   const equipmentAt = (slot: number) => (isOurs ? undefined : options.opponentEquipment?.pitchers?.[slot % roster.length])
@@ -3918,12 +3924,18 @@ function quickDefenseOf(
       isOurs && slot === MY_PITCHER_SLOT
         ? progress.stamina
         : (isOurs ? progress.ourPitcherStaminas : progress.opponentPitcherStaminas)[slot] ?? FULL_STAMINA,
-    pitcherAt: (slot) =>
-      isOurs && slot === MY_PITCHER_SLOT
-        ? myPitcher
-        : isAce(slot) && ace !== undefined
-          ? ace.quick
-          : quickPitcherOf(roster[slot % roster.length], equipmentAt(slot)),
+    // 0xb570c 스킬 14 갈래 — 모드 3 은 정액이 없어 밑값에 곧장 v/10 (`withQuickFightingSpirit`, 장착은 skillIds 30)
+    pitcherAt: (slot, fightingSpirit) =>
+      withQuickFightingSpirit(
+        isOurs && slot === MY_PITCHER_SLOT
+          ? myPitcher
+          : isAce(slot) && ace !== undefined
+            ? ace.quick
+            : quickPitcherOf(roster[slot % roster.length], equipmentAt(slot)),
+        fightingSpirit,
+      ),
+    // 경기 장면 안 자동진행은 전역 상태 자체 — 이 반 이닝 득점은 공격 쪽(우리가 수비면 상대)에 얹는다
+    fightingSpiritAt: (runs) => pitcherGameFightingSpiritOf(progress, teamId, { runs, offenseIsOurs: !isOurs }),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3)
     staminaAbilityAt: (slot) =>
       isOurs && slot === MY_PITCHER_SLOT
@@ -3958,18 +3970,57 @@ function quickDefenseOf(
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 0xb570c(팀, k, P, 1, 90, 1) 네 칸 합. 모드 3 은 팀 능력치(0x306)·코치
     // 정액이 없고 0xb574a 가지는 내 육성 선수(0xb6388)에만 붙는다 — 로스터 투수는 밑값을 0..999 로 자른 합.
     // 내 투수는 0xabfcc 가 모드 3 에서 거르므로(내선수거름) 그 칸 값은 쓰이지 않는다 — 실효 능력치 네 칸 합을 둔다
-    abilitySumAt: (slot) =>
+    // 스킬 14 갈래(b5a16~b5a72)는 칸 0~2 에 v/10 을 얹고 자른다
+    abilitySumAt: (slot, fightingSpirit) =>
       isOurs && slot === MY_PITCHER_SLOT
-        ? pitcherAbilitySumOf([
-            options.stats.control,
-            options.stats.velocity,
-            options.stats.breaking,
-            options.staminaAbility,
-          ])
+        ? pitcherAbilitySumOf(
+            withSumFightingSpirit(
+              [options.stats.control, options.stats.velocity, options.stats.breaking, options.staminaAbility],
+              fightingSpirit === true && myPitcher.skillIds.includes(FIGHTING_SPIRIT_PITCHER_SKILL_ID),
+            ),
+          )
         : isAce(slot) && ace !== undefined
-          ? pitcherAbilitySumOf([ace.control, ace.velocity, ace.breaking, ace.staminaAbility].map(clampAbility))
-          : pitcherAbilitySumOf(rosterPitcherAbilityOf(roster[slot % roster.length], equipmentAt(slot)).map(clampAbility)),
+          ? pitcherAbilitySumOf(
+              withSumFightingSpirit(
+                [ace.control, ace.velocity, ace.breaking, ace.staminaAbility],
+                fightingSpirit === true && hasFightingSpiritBit(ace.player.skillBits),
+              ).map(clampAbility),
+            )
+          : pitcherAbilitySumOf(
+              withSumFightingSpirit(
+                rosterPitcherAbilityOf(roster[slot % roster.length], equipmentAt(slot)),
+                fightingSpirit === true && hasFightingSpiritBit(roster[slot % roster.length].skillBits),
+              ).map(clampAbility),
+            ),
   }
+}
+
+/** 투수 스킬 번호 30 = 장착 비트 14 투지 (`skillIdsOfBits` — 비트 + 16) */
+const FIGHTING_SPIRIT_PITCHER_SKILL_ID = 30
+
+/** 능력 합 0xb5b50 의 네 칸에 스킬 14 갈래 — 칸 0~2 만 `v += v/10` (b5a48 칸 ≠ 3) */
+function withSumFightingSpirit(ability: readonly number[], on: boolean): readonly number[] {
+  return on ? ability.map((value, slot) => (slot === 3 ? value : withFightingSpirit(value))) : ability
+}
+
+/**
+ * **스킬 14(투지) 갈래의 경기 상태** (0xb570c b5a4c~b5a66) — 경기 장면은 전역 상태 [0x1552d0c] 자체를 굴려 지금 판의 이닝(+0x6b) ·
+ * 측별 팀(+0x28) · 점수(+0x7e)를 본다. `extraRuns` 는 자동진행 간이 엔진이 굴리는 중인 이번 반 이닝 득점 (A-23)
+ */
+function pitcherGameFightingSpiritOf(
+  progress: PitcherGameProgress,
+  teamId: number,
+  extraRuns?: { readonly runs: number; readonly offenseIsOurs: boolean },
+): boolean {
+  return isFightingSpiritSituationOf(inGameFightingSpiritStateOf(progress.options, progress.game, extraRuns), teamId)
+}
+
+/** 사람이 던지는 내 투수에 스킬 14 갈래가 지금 서는가 — 장착 비트 14(`pitcherSkillIds` 30) ∧ 경기 상태(내 팀 레코드 +0) */
+function myFightingSpiritOf(progress: PitcherGameProgress): boolean {
+  return (
+    (progress.options.pitcherSkillIds ?? []).includes(FIGHTING_SPIRIT_PITCHER_SKILL_ID) &&
+    pitcherGameFightingSpiritOf(progress, progress.options.ourTeamId)
+  )
 }
 
 /**

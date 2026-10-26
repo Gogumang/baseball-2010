@@ -27,6 +27,7 @@ import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { advanceRunners } from '@/entities/game/model/baseState'
 import type { AdvanceResult } from '@/entities/game/model/baseState'
 import { pitcherGameStatsOf } from '@/entities/pitching/model/pitcherGameStats'
+import { inGameFightingSpiritStateOf, isFightingSpiritSituationOf } from '@/shared/lib/liveGameState/liveGameState'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -1471,6 +1472,18 @@ function abilityContextOf(options: TeamGameOptions): TeamGameAbilityContext {
   }
 }
 
+/**
+ * 투수 능력치를 낼 때의 문맥 — `abilityContextOf` 에 **스킬 14(투지) 갈래의 경기 상태**(0xb570c b5a4c~b5a66)를 더한다.
+ * 경기 장면은 전역 상태 [0x1552d0c] 자체를 굴리므로 지금 판의 이닝(+0x6b) · 측별 팀(+0x28) · 점수(+0x7e)를 본다(A-23).
+ */
+function pitcherAbilityContextOf(progress: TeamGameProgress): TeamGameAbilityContext {
+  const state = inGameFightingSpiritStateOf(progress.options, progress.game)
+  return {
+    ...abilityContextOf(progress.options),
+    fightingSpiritOf: (teamId) => isFightingSpiritSituationOf(state, teamId),
+  }
+}
+
 /** 시즌 팀 번호 `[시즌+1]` — 안 넘기면 내 팀이 곧 시즌 팀이다 (정규·포스트시즌) */
 function seasonTeamIdOf(options: TeamGameOptions): number {
   return options.seasonTeamId ?? options.ourTeamId
@@ -2170,7 +2183,7 @@ function entryQuickTiredOf(
 ): { readonly control: number; readonly velocity: number } | undefined {
   const entry = pitcherEntryAt(progress, teamId, slot)
   if (entry === undefined) return undefined
-  const stats = pitcherGameStatsOf(entryPitcherGameAbilityParts(abilityContextOf(progress.options), teamId, entry), staminaPercent)
+  const stats = pitcherGameStatsOf(entryPitcherGameAbilityParts(pitcherAbilityContextOf(progress), teamId, entry), staminaPercent)
   return { control: stats.control, velocity: stats.velocity }
 }
 
@@ -2326,7 +2339,7 @@ function pitcherAbilitiesAt(
 ): readonly number[] {
   const entry = pitcherEntryAt(progress, teamId, slot)
   if (entry === undefined) return [0, 0, 0, 0]
-  return entryPitcherGameAbilities(abilityContextOf(progress.options), teamId, entry)
+  return entryPitcherGameAbilities(pitcherAbilityContextOf(progress), teamId, entry)
 }
 
 /** 투수 명단 한 칸의 구질 표 (폼·마구·보유 구질) */
@@ -2367,7 +2380,7 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
     breaking: Math.round(ability[2] / STAGE_PITCHER_DIVISOR),
     ...(entry === undefined
       ? {}
-      : { gameAbility: entryPitcherGameAbilityParts(abilityContextOf(progress.options), teamId, entry) }),
+      : { gameAbility: entryPitcherGameAbilityParts(pitcherAbilityContextOf(progress), teamId, entry) }),
     staminaPercent: staminaPercentOf(progress.opponentStamina),
     // 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 깎은 뒤 체력을 놓기 0x4dc78 · 스윙 0xab214 가 본다 — 깎는 셈은
     // 진행기(`throwOpponentPitch`)와 같은 것이고, 화면이 판정된 공을 넘기면 진행기가 같은 값으로 깎는다
@@ -3244,6 +3257,18 @@ function arriveOurPitchThenRest(
   return afterOurPitchArrival(arrival, resume, random, defer)
 }
 
+/**
+ * 우리(사람) 투수의 **체력%로 부른** 제구 · 구속 · 변화 — 등급 0x4dbac · 피로 능력치 0x34968 은 CPU 투수와 같은 `0xb570c(…, 체력%)` 라
+ * 시즌 내 팀 보정 → **피로 0xb58e6** → 팀 능력치 정액 → 스킬 14 투지 → 코치 차례다(`pitcherGameStatsOf`). 예전에는 정액까지 먹인
+ * 값(`ourPitcherStats`)에 피로를 먹였다 — 체력 54% 아래에서 팀 정액이 있으면 값이 달랐다(A-23 에서 원본 차례로). 명단 칸이 없으면 옛 길
+ */
+function ourFatiguedStatsOf(progress: TeamGameProgress, stats: PitcherStats, stamina: number): PitcherStats {
+  const entry = pitcherEntryAt(progress, progress.options.ourTeamId, progress.ourPitcherIndex)
+  if (entry === undefined) return fatiguedStatsOf(stats, stamina)
+  const parts = entryPitcherGameAbilityParts(pitcherAbilityContextOf(progress), progress.options.ourTeamId, entry)
+  return { ...pitcherGameStatsOf(parts, staminaPercentOf(stamina)), stamina: stats.stamina }
+}
+
 /** `defer` 가 참이면 인플레이 타구에서 멈춘다 — 그 밖은 예전처럼 타구까지 한 번에 돌린다 */
 function pitchOnce(
   progress: TeamGameProgress,
@@ -3273,7 +3298,7 @@ function pitchOnce(
     batterIntimidates: entryBatterIntimidatesAt(progress, options.opponentTeamId, progress.opponentOrderIndex),
     ...pitcherSkillFlagsAt(progress, options.ourTeamId, progress.ourPitcherIndex),
   })
-  const fatigued = fatiguedStatsOf(stats, stamina)
+  const fatigued = ourFatiguedStatsOf(progress, stats, stamina)
   const staminaPercent = staminaPercentOf(stamina)
   const repertoire = pitcherRepertoireAt(progress, options.ourTeamId, progress.ourPitcherIndex)
   const grade = pitchGradeOf(

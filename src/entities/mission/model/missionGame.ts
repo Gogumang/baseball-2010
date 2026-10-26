@@ -6,6 +6,7 @@ import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import { simulateHalfInningTicks } from '@/entities/game/model/simulateHalfInning'
+import { isFightingSpiritSituationOf, sideFightingSpiritStateOf } from '@/shared/lib/liveGameState/liveGameState'
 import type { HalfInningPlateAppearance, HalfInningTick } from '@/entities/game/model/simulateHalfInning'
 import { isGameOverAt } from '@/entities/game/model/gameState'
 import {
@@ -386,7 +387,20 @@ export function* simulateMissionAutoHalfTicks(
     const row = batting.records[record] ?? record
     return quickBatterOf(rows[Math.max(0, row) % rows.length])
   }
-  const defense = missionPitchingDefenseOf(pitching, game.scores[defenseSide] - game.scores[offenseSide], defenseOptions)
+  // 0xb570c 스킬 14 갈래의 경기 상태 — 미션 장면도 전역 상태 [0x1552d0c] 자체를 굴린다: +0x6b = st[0x6b] 이닝, +0x28 = 0xaa57c aa72a 의
+  // 0xb6bd4 가 적은 두 팀, +0x7e = 지금 점수 + 이 반 이닝 득점(간이 엔진 득점 0xb6a9d) (A-23)
+  const sideTeams: [number, number] = [0, 0]
+  sideTeams[defenseSide] = pitching.teamId
+  sideTeams[offenseSide] = batting.teamId
+  const fightingSpiritAt = (runs: number) => {
+    const scores: [number, number] = [game.scores[0], game.scores[1]]
+    scores[offenseSide] += runs
+    return isFightingSpiritSituationOf(sideFightingSpiritStateOf(game.inning, sideTeams, scores), pitching.teamId)
+  }
+  const defense = missionPitchingDefenseOf(pitching, game.scores[defenseSide] - game.scores[offenseSide], {
+    ...defenseOptions,
+    fightingSpiritAt,
+  })
   const ticks = simulateHalfInningTicks(
     batting.order,
     (cursor) => batterOf(rosterSlotAt(batting.lineup, cursor)),
@@ -523,6 +537,22 @@ export function simulateHumanTeamAutoHalf(
  * 경기 적재 0x48658 이 이 번호로 HUD 작은 로고(48a38~48a74 — `team_logo_ini` 그림[0xb6bdc(st, 0)] → 장면+0x1054,
  * [0xb6bdc(st, 1)] → +0x1058, 두 번호가 같으면 같은 그림)를 싣고, 타석 HUD 0x373d0 이 위 줄 = 측 0 · 아래 줄 = 측 1 로 그린다.
  */
+/**
+ * 미션 경기의 **스킬 14(투지) 갈래 경기 상태** (0xb570c b5a4c~b5a66) — 미션 장면도 전역 상태 [0x1552d0c] 를 굴린다: +0x6b = st[0x6b]
+ * (`game.inning`), +0x28 = 0xaa57c aa72a 의 0xb6bd4 가 적은 두 팀(`missionTeamIdsOf`), +0x7e = `game.scores`. 팀은 0xb570c 첫 인자
+ * 팀 레코드 +0 (A-23)
+ */
+export function missionFightingSpiritOf(
+  run: { readonly mission: OriginalMission; readonly game: Pick<MissionGame, 'humanBatting' | 'inning' | 'scores'> },
+  teamId: number,
+): boolean {
+  const ids = missionTeamIdsOf(run)
+  const sideTeams: [number, number] = [0, 0]
+  sideTeams[humanSideOf(run.mission)] = ids.human
+  sideTeams[cpuSideOf(run.mission)] = ids.cpu
+  return isFightingSpiritSituationOf(sideFightingSpiritStateOf(run.game.inning, sideTeams, run.game.scores), teamId)
+}
+
 export function missionTeamIdsOf(run: {
   readonly mission: OriginalMission
   readonly game: Pick<MissionGame, 'humanBatting'>

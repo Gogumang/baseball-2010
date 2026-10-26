@@ -42,7 +42,16 @@ import {
   startPitcherMission,
   withHalfEnd,
 } from '@/entities/mission/model/pitcherRun'
-import { battingRecordAt, cpuSideOf, humanSideOf, missionHumanRecordSlotOf, missionTeamIdsOf, withMissionScore } from '@/entities/mission/model/missionGame'
+import {
+  battingRecordAt,
+  cpuSideOf,
+  humanSideOf,
+  missionFightingSpiritOf,
+  missionHumanRecordSlotOf,
+  missionTeamIdsOf,
+  withMissionScore,
+} from '@/entities/mission/model/missionGame'
+import { withFightingSpirit, withPitcherFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import { skillIdsOfBits, teamBatters } from '@/entities/team/model/teamRoster'
@@ -433,9 +442,16 @@ export function missionMoundPitcherAbility(
   aceLevels?: Readonly<Record<number, number>>,
   staminaPercent?: number,
 ): PitcherAbility {
-  if (isMissionCpuMoundAce(run.cpu)) return missionPitcherAbility(run.mission, aceLevels, staminaPercent)
-  return missionCpuMoundPitcherAbilityOf(run.cpu) ?? DEFAULT_PITCHER_ABILITY
+  // 0xb570c 스킬 14 갈래 — 마운드 레코드 +0x14 비트 14 ∧ 지금 판의 경기 상태(CPU 팀 레코드 +0) (`withPitcherFightingSpirit`)
+  const situation = missionFightingSpiritOf(run, missionTeamIdsOf(run).cpu)
+  if (isMissionCpuMoundAce(run.cpu)) {
+    return withPitcherFightingSpirit(missionPitcherAbility(run.mission, aceLevels, staminaPercent), situation)
+  }
+  return withPitcherFightingSpirit(missionCpuMoundPitcherAbilityOf(run.cpu) ?? DEFAULT_PITCHER_ABILITY, situation)
 }
+
+/** 투수 스킬 번호 30 = 장착 비트 14 투지 (`skillIdsOfBits` — 비트 + 16) */
+const FIGHTING_SPIRIT_PITCHER_SKILL_ID = 30
 
 /** 타자 스킬 22 압도 — 0xa5e14 가 `0xb62b4(현재 타자, 22)` 면 투구 소모 ×2 (0xa5f0e) */
 const INTIMIDATE_SKILL_ID = 22
@@ -988,6 +1004,8 @@ export function useMissionSession({
         aceStamina: missionAceMoundStaminaOf(run),
         inningIndex: run.game.inning,
         lead: run.game.scores[cpuSideOf(run.mission)] - run.game.scores[humanSideOf(run.mission)],
+        // 마무리 정렬 열쇠 0xb5b50 의 스킬 14 갈래 — 지금 판의 경기 상태 (`missionFightingSpiritOf`)
+        fightingSpirit: missionFightingSpiritOf(run, missionTeamIdsOf(run).cpu),
       },
       random,
     )
@@ -1549,8 +1567,11 @@ export function useMissionSession({
     )
     setPitcherStaminaStored(pitcherStamina)
     const pitcherStaminaPercent = staminaPercentOf(pitcherStamina)
-    // 0xb570c(모드 5) — 0xb6414 에 곧장 피로 0xb58e6 → 0..999 (`modePitcher` 머리말)
-    const fatigued = fatiguedStatsOf(pitcher.ability, pitcherStamina)
+    // 0xb570c(모드 5) — 0xb6414 에 곧장 피로 0xb58e6 → 스킬 14 투지(장착 비트 14 ∧ 지금 판, 사람 칸 팀 레코드 +0) → 0..999
+    // (`modePitcher` 머리말 · A-23)
+    const pitcherFightingSpirit =
+      pitcher.skillIds.includes(FIGHTING_SPIRIT_PITCHER_SKILL_ID) && missionFightingSpiritOf(pitcherRun, missionTeamIdsOf(pitcherRun).human)
+    const fatigued = fatiguedStatsOf(pitcher.ability, pitcherStamina, pitcherFightingSpirit)
     // 게이지를 쓰면 칸에서 t = max(g−4, 1) 을, 안 쓰면 제구·체력 확률표 0xd896c 로 뽑는다 (0x4dbac)
     const grade = pitchGradeOf(
       {
@@ -1599,8 +1620,11 @@ export function useMissionSession({
       {
         isMagicPitch: typeNumber === MAGIC_PITCH_TYPE_NUMBER,
         grade,
-        // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속. 모드 5 는 0xb6414 를 0..999 로 자른 값 (`modePitcherOf`)
-        effectiveVelocity: pitcher.stats.velocity,
+        // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속. 모드 5 는 0xb6414 를 0..999 로 자른 값 (`modePitcherOf`).
+        // 스킬 14 갈래가 서면 자르기 앞 값에 v/10 을 얹고 자른다
+        effectiveVelocity: pitcherFightingSpirit
+          ? Math.min(999, Math.max(0, withFightingSpirit(pitcher.ability.velocity)))
+          : pitcher.stats.velocity,
         runnerCount: runnerCountOf(pitcherRun.bases),
         hasSecondBaseRunner: pitcherRun.bases.second,
         // 지금 CPU 타자의 압도 22 (+5) — 위 소모와 같은 값

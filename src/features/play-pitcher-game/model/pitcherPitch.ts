@@ -10,6 +10,7 @@ import { PITCH_TYPES } from '@/shared/config/original/pitchTypes'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
 import {
   GAUGE_LAST_CELL,
   MAGIC_PITCH_GRADE,
@@ -349,12 +350,24 @@ const clampFatigued = (value: number) => Math.min(MAXIMUM_PITCHER_ABILITY, Math.
  * 0xb570c 는 피로 **뒤** 맨 끝(0xb5b06)에서 0..999 로 자르므로 여기서 자른다 —
  * 냉정 22 로 999 를 넘은 제구가 피로로 깎일 때 먼저 자른 값과 달라진다.
  */
-export function fatiguedStatsOf(stats: PitcherStats, stamina: number): PitcherStats {
+export function fatiguedStatsOf(
+  stats: PitcherStats,
+  stamina: number,
+  /**
+   * 스킬 14(투지) 갈래가 지금 서는가 (0xb570c b5a16~b5a72 — 장착 비트 14 ∧ 경기 상태). 정액이 없는 모드(3 · 5)라 피로 **뒤** · 자르기 **앞**에
+   * 세 칸(칸 ≠ 3) `v += v/10`. 안 넘기면 거짓
+   */
+  fightingSpirit = false,
+): PitcherStats {
   const percent = staminaPercentOf(stamina)
+  const at = (value: number) => {
+    const fatigued = abilityAfterFatigue(value, percent)
+    return clampFatigued(fightingSpirit ? withFightingSpirit(fatigued) : fatigued)
+  }
   return {
-    control: clampFatigued(abilityAfterFatigue(stats.control, percent)),
-    velocity: clampFatigued(abilityAfterFatigue(stats.velocity, percent)),
-    breaking: clampFatigued(abilityAfterFatigue(stats.breaking, percent)),
+    control: at(stats.control),
+    velocity: at(stats.velocity),
+    breaking: at(stats.breaking),
     stamina: stats.stamina,
   }
 }

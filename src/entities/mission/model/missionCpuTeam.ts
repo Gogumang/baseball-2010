@@ -2,7 +2,8 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
 import { quickPitcherOf, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
-import { changePitcherIfNeeded, drainPitcherForPitch } from '@/entities/game/model/simulateHalfInning'
+import { changePitcherIfNeeded, drainPitcherForPitch, withQuickFightingSpirit } from '@/entities/game/model/simulateHalfInning'
+import { hasFightingSpiritBit, withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
 import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/simulateHalfInning'
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
@@ -453,7 +454,12 @@ export function isMissionPitcherChangeBlocked(mission: OriginalMission): boolean
 export function missionPitchingDefenseOf(
   pitching: MissionCpuPitching,
   lead: number,
-  options: { readonly ace?: MissionAcePitcher; readonly pitcherChangeBlocked?: boolean } = {},
+  options: {
+    readonly ace?: MissionAcePitcher
+    readonly pitcherChangeBlocked?: boolean
+    /** 스킬 14(투지) 갈래의 경기 상태 — 이 반 이닝 득점을 받아 (`HalfInningDefense.fightingSpiritAt`). 안 넘기면 늘 거짓 */
+    readonly fightingSpiritAt?: (runsThisHalf: number) => boolean
+  } = {},
 ): HalfInningDefense {
   const masters = teamPitchers(pitching.teamId)
   const isAce = (slot: number) => pitching.roster[slot] === MISSION_ACE_ROSTER_SLOT
@@ -461,7 +467,13 @@ export function missionPitchingDefenseOf(
   return {
     mound: pitching.mound,
     pitcherSlots: pitching.roster.map((_master, slot) => slot),
-    pitcherAt: (slot) => (isAce(slot) && options.ace !== undefined ? options.ace.quick : quickPitcherOf(masterAt(slot))),
+    // 0xb570c 스킬 14 갈래 — 모드 5 · 6 은 정액이 없어 밑값에 곧장 v/10 (`withQuickFightingSpirit`, 장착은 skillIds 30)
+    pitcherAt: (slot, fightingSpirit) =>
+      withQuickFightingSpirit(
+        isAce(slot) && options.ace !== undefined ? options.ace.quick : quickPitcherOf(masterAt(slot)),
+        fightingSpirit,
+      ),
+    ...(options.fightingSpiritAt === undefined ? {} : { fightingSpiritAt: options.fightingSpiritAt }),
     // 투수 능력치 칸 3 = 체력 — 소모(0x66e44 용량)에만 쓴다. 사람 타석의 마투수 소모는 세션이 든다(`ace` 를 안 넘긴다)
     staminaAbilityAt: (slot) =>
       isAce(slot) && options.ace !== undefined ? options.ace.staminaAbility : masterAt(slot).ability[3],
@@ -478,8 +490,15 @@ export function missionPitchingDefenseOf(
     bothTeamsAreCpu: false,
     // 보직은 줄째 따라간다 — 마스터 줄 +0xb & 3 (팀 안 차례 0,0,0,0,1,1,1,2). 마투수 칸은 표 밖이라 없다
     roleAt: (slot) => (isAce(slot) ? undefined : rosterPitcherRoleOf(pitching.roster[slot] ?? slot)),
-    abilitySumAt: (slot) =>
-      pitcherAbilitySumOf(masterAt(slot).ability.map((value) => Math.min(999, Math.max(0, value)))),
+    // 스킬 14 갈래(b5a16~b5a72)는 칸 0~2 에 v/10 을 얹고 자른다 (마스터 줄 +0x14 비트 14)
+    abilitySumAt: (slot, fightingSpirit) => {
+      const spirit = fightingSpirit === true && hasFightingSpiritBit(masterAt(slot).skillBits)
+      return pitcherAbilitySumOf(
+        masterAt(slot).ability.map((value, k) =>
+          Math.min(999, Math.max(0, spirit && k !== 3 ? withFightingSpirit(value) : value)),
+        ),
+      )
+    },
     isSpecialPitcherAt: isAce,
     // 소모 0xa5e14 의 비트 18 · 10 — 마스터 줄 +0x14 (Xls 행 사본). 마투수 소모는 세션이 든다
     skillBitsAt: (slot) =>
@@ -597,6 +616,8 @@ export interface MissionPitchSelectionSituation {
   readonly inningIndex?: number
   /** 리드 0xb69b0(수비 − 공격) = CPU 점수 − 사람 칸 점수 (`MissionRun.game.scores`). 안 주면 시작 점수 + 사람 득점으로 */
   readonly lead?: number
+  /** 스킬 14(투지) 갈래의 경기 상태가 CPU(수비) 팀에 섰나 — 마무리 정렬 열쇠 0xb5b50 이 본다 (`missionFightingSpiritOf`). 안 주면 거짓 */
+  readonly fightingSpirit?: boolean
 }
 
 /**
@@ -619,7 +640,11 @@ export function enterMissionPitchSelection(
     const isAceMound = pitching.roster[pitching.mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
     const mound = isAceMound ? { ...pitching.mound, stamina: situation.aceStamina } : pitching.mound
     const after = changePitcherIfNeeded(
-      missionPitchingDefenseOf({ ...pitching, mound }, lead),
+      missionPitchingDefenseOf(
+        { ...pitching, mound },
+        lead,
+        situation.fightingSpirit === true ? { fightingSpiritAt: () => true } : {},
+      ),
       mound,
       {
         // state[0x6b] — 0xaa57c 가 레코드 +3 아래 4비트로 적고 말이 끝날 때마다 0xb6b6c 가 올린다 (`MissionRun.game`)
