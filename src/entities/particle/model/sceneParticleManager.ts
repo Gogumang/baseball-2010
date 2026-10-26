@@ -35,6 +35,30 @@ export function isSceneParticlesClaimed(): boolean {
   return claims > 0
 }
 
+/** 관리자 **틱만** 맡은 경기 장면 부품 수 — 그리기는 앱 층이 그대로 한다 */
+let tickHolds = 0
+
+/**
+ * 경기 장면 부품이 관리자 틱 0x6de85 만 맡는다 — 돌려준 함수로 놓는다. 장면 갱신이 굴리는 상태(벤치 클리어링 0x1e 의 틱 10 목표 굴림 따위)는
+ * 한 틀 안에서 갱신(52e14) → 프레임 끝 관리자 틱(53048) 차례라, 장면 틱 시계(setTimeout)와 앱 층의 그림 시계(requestAnimationFrame)가
+ * 저마다 틀을 세면 같은 틀의 두 굴림 차례가 어느 쪽이 먼저 울리느냐에 달린다. 부품이 제 갱신 바로 뒤에 같은 틀의 관리자 틱을 돌리고
+ * 앱 층은 그리기만 한다(`claimSceneParticleTick` 표지로 틀당 한 번).
+ */
+export function holdSceneParticleTicks(): () => void {
+  tickHolds += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    tickHolds -= 1
+  }
+}
+
+/** 관리자 틱을 맡은 부품이 있는가 — 있으면 앱 층은 굴리지 않고 그리기만 한다 */
+export function isSceneParticleTickHeld(): boolean {
+  return tickHolds > 0
+}
+
 /**
  * 관리자 틱 0x6de85 가 마지막으로 돈 **앱 틱** — 원본은 앱 루프 한 틀에 장면 프레임 하나가 돌고 그 끝에서 관리자를 한 번 굴린다
  * (`sceneParticles` 머리 표 — 다섯 장면 프레임 모두 틀 끝 한 번). 웹은 굴리는 루프가 화면마다 따로라(앱 층 · 타석 · 수비 판) 화면이
@@ -57,5 +81,6 @@ export function claimSceneParticleTick(target: ParticleScene, appTick: number | 
 export function resetSceneParticleManagerForTest(): void {
   clearParticles(scene)
   claims = 0
+  tickHolds = 0
   lastTickedAppTick = null
 }

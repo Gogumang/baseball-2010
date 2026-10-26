@@ -45,6 +45,7 @@ import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { MENU_PRESS_RECT, TIME_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import { summaryAfterReplay, useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
@@ -338,6 +339,8 @@ function PitcherGameScene({
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
+  /** 판 끝에서 난 돌발 판정(상태 0x1c)이면 그 판을 창 아래에 이어 그린다 (`useDefenseUnderBurstWindow`) */
+  const defenseUnderBurst = useDefenseUnderBurstWindow(resolution)
   const proposal =
     burst !== null && burst.current !== null && burst.current !== shownProposal ? burst.current : null
   const burstRow = resolution?.row ?? proposal
@@ -702,10 +705,27 @@ function PitcherGameScene({
     )
   }
 
-  if (progress.pendingDefensePlay !== null && !isHitSceneShowing) {
-    return (
+  /** 장면 배치 — 타자 손(0xb63c0). 구질 목록 누름 칸이 투수 앵커 0xcfb18[이 값] 둘레에 선다 (`PitcherSideStage` 와 같은 값) */
+  const stageBatter = stageBatterOf(progress)
+  const stageSide = stageBatter.batterSide ?? (stageBatter.batterForm & 1)
+  const burstWindow = visibleBurstLines === null ? null : (
+    <BurstMissionWindow
+      lines={visibleBurstLines}
+      judgement={resolution?.judgement ?? null}
+      row={resolution?.row ?? null}
+      // 0xb63c0(지금 타자) — 타석 장면이 그리는 타자 손
+      isBatterLeftHanded={stageSide !== 0}
+      onClose={
+        resolution !== null ? actions.closeBurst : () => setShownProposal(proposal)
+      }
+    />
+  )
+
+  const pendingDefensePlay = progress.pendingDefensePlay
+  if (pendingDefensePlay !== null && !isHitSceneShowing) {
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
-        input={progress.pendingDefensePlay}
+        input={pendingDefensePlay}
         side="수비"
         grassPalette={grassPalette}
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
@@ -714,33 +734,48 @@ function PitcherGameScene({
         // 그림 0x43278 이 올린 실책 +0x2e — 판 끝 정산보다 먼저 얹는다
         onFieldingErrors={actions.recordFieldingErrors}
         onDone={actions.finishDefensePlay}
+        burstWindow={window}
       />
-    )
+    ))
   }
   // 내 수비의 주자 판(도루 · 폭투 · 견제) — 송구 키(+0x160)로 던지므로 실시간으로 한 틱씩 돌린다 (`liveRunnerPlay`)
-  if (progress.pendingRunnerPlay != null && !isArrivalHolding) {
-    return (
+  const pendingRunnerPlay = progress.pendingRunnerPlay
+  if (pendingRunnerPlay != null && !isArrivalHolding) {
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
-        runnerPlay={progress.pendingRunnerPlay}
+        runnerPlay={pendingRunnerPlay}
         grassPalette={grassPalette}
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         onFieldingErrors={actions.recordFieldingErrors}
         onDone={actions.finishRunnerPlay}
+        burstWindow={window}
       />
-    )
+    ))
   }
   // 홈런 비행처럼 조작할 것이 없는 장면만 예전대로 재생 갈래로 간다
   if (isReplaying) {
-    return (
+    const replayTicks = play.ticks
+    const replayIsWalk = isWalkPlayResult(play)
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
-        ticks={play.ticks}
+        ticks={replayTicks}
         onDone={finishPlayback}
         onFieldingErrors={actions.recordFieldingErrors}
-        freePassPlay={isWalkPlayResult(play)}
+        freePassPlay={replayIsWalk}
         grassPalette={grassPalette}
+        burstWindow={window}
       />
-    )
+    ))
   }
+  // 상태 0x1c — 판 끝(0x528b0)에서 난 돌발 판정의 창은 방금 판의 수비 화면 위에 선다(0x46ee0 → 0x46c88 — `useDefenseUnderBurstWindow`).
+  // 그 위 기록 달성 알림 0x4e35c 는 0x17 이 아니라 그린다(53064)
+  const heldDefense = defenseUnderBurst.held(
+    <>
+      {burstWindow}
+      <RecordAlertStageOverlay frame={recordAlert} />
+    </>,
+  )
+  if (heldDefense !== null) return heldDefense
   // 자동진행 중계(0x21) — 굴려 둔 틱을 매 틱 한 칸씩 (모드 3: 키 · 속도 · 배경음 없음)
   if (isRelaying && relay !== null) {
     return withRecordAlert(
@@ -935,9 +970,6 @@ function PitcherGameScene({
     )
   }
 
-  /** 장면 배치 — 타자 손(0xb63c0). 구질 목록 누름 칸이 투수 앵커 0xcfb18[이 값] 둘레에 선다 (`PitcherSideStage` 와 같은 값) */
-  const stageBatter = stageBatterOf(progress)
-  const stageSide = stageBatter.batterSide ?? (stageBatter.batterForm & 1)
   /** '*' 소프트키 — 공용 키 0x498d4 가 받는 동안(경기 장면 · 조작방법 뷰어가 아닐 때) */
   const acceptsMenuKey = !isSceneShowing && overlay !== '조작방법' && !asksGiveUp
 
@@ -1163,18 +1195,7 @@ function PitcherGameScene({
           />
         )}
 
-        {visibleBurstLines !== null && (
-          <BurstMissionWindow
-            lines={visibleBurstLines}
-            judgement={resolution?.judgement ?? null}
-            row={resolution?.row ?? null}
-            // 0xb63c0(지금 타자) — 타석 장면이 그리는 타자 손
-            isBatterLeftHanded={stageSide !== 0}
-            onClose={
-              resolution !== null ? actions.closeBurst : () => setShownProposal(proposal)
-            }
-          />
-        )}
+        {burstWindow}
 
         {/* 0x16 → 0xd → 0xe 진입 0x50674 의 감독 강판 — 연출 뒤다 */}
         {progress.managerHookText !== null && !substitution.isShown && !isHookPassing && (

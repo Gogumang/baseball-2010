@@ -46,7 +46,8 @@ import type { RecordAlertScene } from '@/pages/game/ui/GameScreen'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
-import { RecordAlertScreenOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { RecordAlertScreenOverlay, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
+import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import { gameAutoRelayStepsOf } from '@/pages/game/lib/gameAutoRelay'
 
 /** 나리 타자편 — 전역 모드 [0x1552d10] = 4 */
@@ -160,6 +161,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     : null
   const closeProposal = useCallback(() => setShownProposal(proposal), [proposal])
   const { closeBurstResult } = session.actions
+  /** 판 끝에서 난 돌발 판정(상태 0x1c)이면 그 판을 창 아래에 이어 그린다 (`useDefenseUnderBurstWindow`) */
+  const defenseUnderBurst = useDefenseUnderBurstWindow(resolution)
   /**
    * 경기 시작 인트로(상태 0xc) — 적재(상태 8, 웹은 로딩 팁) 끝에서 모드 1~4 만 온다. 타자편은 모드 4 라 선다.
    * 효과음 61 은 진입 예약음이라 세션이 로딩을 끝낼 때(`finishLoading`) 이미 낸다. 난수는 안 쓴다.
@@ -292,11 +295,27 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       />
     )
   }
+  // 결과가 먼저다 — 타석이 끝나며 난 판정을 보여 준 뒤에야 다음 타석 제안이 뜬다
+  const burstRow = resolution?.row ?? proposal
+  const burstLines =
+    burst === null || burstRow === null ? null : ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null
+  const burstWindow = burstLines === null ? null : (
+    <BurstMissionWindow
+      lines={burstLines}
+      judgement={resolution?.judgement ?? null}
+      row={resolution?.row ?? null}
+      // 0xb63c0(지금 타자) — 모드 4 의 돌발은 사람 장면(내 타석)에서만 뜨므로 내 선수 손으로 본다(⚠️ 유력: 결과 창은 타석이 끝난 뒤다)
+      isBatterLeftHanded={battingSide !== 0}
+      onClose={resolution !== null ? closeBurstResult : closeProposal}
+    />
+  )
+
   // 사람이 주루를 잡는 갈래가 먼저다 — 진행 중인 타구가 있으면 그것을 실시간으로 돌린다
-  if (progress.pendingDefensePlay !== null) {
-    return (
+  const pendingDefensePlay = progress.pendingDefensePlay
+  if (pendingDefensePlay !== null) {
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
-        input={progress.pendingDefensePlay}
+        input={pendingDefensePlay}
         side="공격"
         // 바탕 0x35218 — 수비 구장 +0xc 줄(0x39fdc 모드 4)
         grassPalette={grassPalette}
@@ -312,8 +331,9 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         // 그림 0x43278 이 올린 실책 +0x2e — 판 끝 정산보다 먼저 얹는다
         onFieldingErrors={session.actions.recordFieldingErrors}
         onDone={session.actions.finishDefensePlay}
+        burstWindow={window}
       />
-    )
+    ))
   }
   /**
    * 주자 판(도루 · 폭투 · CPU 견제) — 상태 0x17 키 0x53420 이 사람 공격이면 주루 0x5331c(0x582 진루 · 0x584 귀루 → 0xa9b04)와
@@ -321,7 +341,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
    * 다 돌면 `finishRunnerPlay` 가 결과를 먹이고 그 공(또는 견제)의 나머지를 잇는다
    */
   if (runnerPlay !== null) {
-    return (
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
         runnerPlay={runnerPlay}
         grassPalette={grassPalette}
@@ -334,21 +354,34 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         }}
         onFieldingErrors={session.actions.recordFieldingErrors}
         onDone={session.actions.finishRunnerPlay}
+        burstWindow={window}
       />
-    )
+    ))
   }
   if (play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady) {
-    return (
+    const replayTicks = play.ticks
+    const replayIsWalk = isWalkPlayResult(play)
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
-        ticks={play.ticks}
+        ticks={replayTicks}
         onDone={finishPlayback}
         // 재생 판(견제 · 도루 · 폭투 등)도 같은 0x17 그림이라 실책 +0x2e 가 오른다
         onFieldingErrors={session.actions.recordFieldingErrors}
-        freePassPlay={isWalkPlayResult(play)}
+        freePassPlay={replayIsWalk}
         grassPalette={grassPalette}
+        burstWindow={window}
       />
-    )
+    ))
   }
+  // 상태 0x1c — 판 끝(0x528b0)에서 난 돌발 판정의 창은 방금 판의 수비 화면 위에 선다(0x46ee0 → 0x46c88). 그 위 기록 달성 알림 0x4e35c 는
+  // 0x17 이 아니라 그린다(53064)
+  const heldDefense = defenseUnderBurst.held(
+    <>
+      {burstWindow}
+      <RecordAlertStageOverlay frame={recordAlert} />
+    </>,
+  )
+  if (heldDefense !== null) return heldDefense
   // 자동진행 중계(0x21) — 앞 판의 수비 재생 뒤 · 내 공의 0x12 대기(15/31 틱)가 끝난 뒤(판정 A 가 0x21 로 보낸다), 0x18 · 0xe ·
   // 다음 내 타석 앞. 기록 달성 알림 0x4e35c 는 0x17 말고는 늘 그리므로 중계 위에도 얹는다
   if (relay !== null && !pitchEnd.isHolding && !(shownRelay?.scene === relayScene && shownRelay.serial === relay.serial)) {
@@ -369,11 +402,6 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       </div>
     )
   }
-
-  // 결과가 먼저다 — 타석이 끝나며 난 판정을 보여 준 뒤에야 다음 타석 제안이 뜬다
-  const burstRow = resolution?.row ?? proposal
-  const burstLines =
-    burst === null || burstRow === null ? null : ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null
 
   /** 지금 마운드의 상대 투수 — 타석 화면과 마구 두 칸(`cpuMagic`)이 함께 본다 */
   const moundPitcher = stageOpponentPitcherAbilityOf(progress, aceLevels)
@@ -425,18 +453,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         burstRow={burst?.current ?? resolution?.row ?? null}
       />
       {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
-      {burstLines !== null && (
-        <ScreenOverlay>
-        <BurstMissionWindow
-          lines={burstLines}
-          judgement={resolution?.judgement ?? null}
-          row={resolution?.row ?? null}
-          // 0xb63c0(지금 타자) — 모드 4 의 돌발은 사람 장면(내 타석)에서만 뜨므로 내 선수 손으로 본다(⚠️ 유력: 결과 창은 타석이 끝난 뒤다)
-          isBatterLeftHanded={battingSide !== 0}
-          onClose={resolution !== null ? closeBurstResult : closeProposal}
-        />
-        </ScreenOverlay>
-      )}
+      {burstWindow !== null && <ScreenOverlay>{burstWindow}</ScreenOverlay>}
     </>
   )
 }

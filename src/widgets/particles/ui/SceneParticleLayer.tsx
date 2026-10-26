@@ -7,6 +7,7 @@ import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import { particleSignatureOf } from '@/widgets/particles/lib/particleSignature'
 import {
   claimSceneParticleTick,
+  isSceneParticleTickHeld,
   isSceneParticlesClaimed,
   preloadSceneParticles,
   sceneParticleScene,
@@ -60,7 +61,8 @@ export function SceneParticleLayer({ random, isGameScene = false }: SceneParticl
       // 53048 — 경기 장면에 공용 창이 서 있으면 이 그림의 틱도 그림도 없다(따라잡지 않는다 — 원본 틀이 관리자를 안 부른 것이다).
       // 장면은 창이 선 첫 그림([창+0x250])에만 다시 그려지고(52efe~52f24) 그 그림에 파티클이 없으므로 멈춘 화면에도 파티클이 안 남는다
       const isGated = isGameSceneRef.current && isCommonWindowShown()
-      if (scene.emitters.length === 0 || isClaimed || isGated) {
+      // 틱만 맡은 장면 부품(`holdSceneParticleTicks` — 벤치 클리어링)이 있으면 그 부품이 제 갱신 뒤에 굴린다 — 여기는 그리기만
+      if (scene.emitters.length === 0 || isClaimed || isGated || isSceneParticleTickHeld()) {
         steppedTick = tick
       } else {
         if (tick - steppedTick > CATCH_UP_LIMIT) steppedTick = tick - CATCH_UP_LIMIT

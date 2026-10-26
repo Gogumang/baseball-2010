@@ -137,6 +137,7 @@ import type { PitchSlotChoice } from '@/pages/pitching/ui/PitchSlotPicker'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
+import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import { summaryAfterReplay, useShownReplay } from '@/pages/defense/model/useShownReplay'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
@@ -619,6 +620,8 @@ function TeamGameScene({
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
+  /** 판 끝에서 난 돌발 판정(상태 0x1c)이면 그 판을 창 아래에 이어 그린다 (`useDefenseUnderBurstWindow`) */
+  const defenseUnderBurst = useDefenseUnderBurstWindow(resolution)
   const proposal =
     burst !== null && burst.current !== null && burst.current.index !== shownProposal
       ? burst.current
@@ -965,9 +968,23 @@ function TeamGameScene({
    * 팀 경기는 공수를 모두 사람이 맡으니 그 쪽이 이닝마다 갈린다 — 진행기가 붙들 때 적어 둔 값을 그대로 쓴다.
    * 다 돌면 `onDone` 이 그 결과를 경기 상태에 먹인다 — **주자 처리는 그때 처음 정해진다.**
    */
+  const burstWindow = visibleBurstLines === null ? null : (
+    <BurstMissionWindow
+      lines={visibleBurstLines}
+      judgement={resolution?.judgement ?? null}
+      row={resolution?.row ?? null}
+      // 0xb63c0(지금 타자) — 타석 소개 판과 같은 값
+      isBatterLeftHanded={matchup.batterHand !== 0}
+      onClose={
+        resolution !== null
+          ? actions.closeBurst
+          : () => setShownProposal(proposal?.index ?? null)
+      }
+    />
+  )
   const pending = session.pendingDefensePlay
   if (pending !== null && !isHitSceneShowing) {
-    return (
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
         input={pending.input}
         side={pending.side}
@@ -981,8 +998,9 @@ function TeamGameScene({
           carryLivePlay(result)
           actions.finishDefensePlay(result)
         }}
+        burstWindow={window}
       />
-    )
+    ))
   }
   /**
    * 사람 수비의 주자 판(도루 · 폭투 · 견제) — 상태 0x17 동안 송구 키(0x533c8 → +0x160)로 던지므로 **실시간으로 한 틱씩** 돌린다
@@ -990,7 +1008,7 @@ function TeamGameScene({
    */
   const runnerPlay = progress.pendingRunnerPlay
   if (runnerPlay != null && !isArrivalHolding) {
-    return (
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
         runnerPlay={runnerPlay}
         grassPalette={fieldPalette}
@@ -1000,25 +1018,38 @@ function TeamGameScene({
           carryLivePlay(result)
           actions.finishRunnerPlay(result)
         }}
+        burstWindow={window}
       />
-    )
+    ))
   }
   /**
    * 홈런 비행처럼 조작할 것이 없는 장면은 **미리 만들어 둔 틱을 재생만** 한다 (원본도 같은 0x17 이다).
    * 이게 없으면 배트에 맞은 공이 어디로 갔는지 화면에 아예 안 나온다.
    */
   if (isReplaying) {
-    return (
+    const replayTicks = play.ticks
+    const replayIsWalk = isWalkPlayResult(play)
+    return defenseUnderBurst.show((window) => (
       <DefensePlayback
-        ticks={play.ticks}
+        ticks={replayTicks}
         grassPalette={fieldPalette}
         onDone={finishPlayback}
         // 재생 판도 같은 0x17 그림이라 실책 +0x2e 가 오른다 (수비 팀은 그림의 팀 번호로 가린다)
         onFieldingErrors={actions.recordFieldingErrors}
-        freePassPlay={isWalkPlayResult(play)}
+        freePassPlay={replayIsWalk}
+        burstWindow={window}
       />
-    )
+    ))
   }
+  // 상태 0x1c — 판 끝(0x528b0)에서 난 돌발 판정의 창은 방금 판의 수비 화면 위에 선다(0x46ee0 → 0x46c88 — `useDefenseUnderBurstWindow`).
+  // 그 위 기록 달성 알림 0x4e35c 는 0x17 이 아니라 그린다(53064)
+  const heldDefense = defenseUnderBurst.held(
+    <>
+      {burstWindow}
+      <RecordAlertStageOverlay frame={recordAlert} />
+    </>,
+  )
+  if (heldDefense !== null) return heldDefense
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다 (진입 굴림 45 번은 진행기가 이미 썼다)
   if (progress.pendingBenchClearing !== null) {
@@ -1525,20 +1556,7 @@ function TeamGameScene({
           </div>
         )}
 
-        {visibleBurstLines !== null && (
-          <BurstMissionWindow
-            lines={visibleBurstLines}
-            judgement={resolution?.judgement ?? null}
-            row={resolution?.row ?? null}
-            // 0xb63c0(지금 타자) — 타석 소개 판과 같은 값
-            isBatterLeftHanded={matchup.batterHand !== 0}
-            onClose={
-              resolution !== null
-                ? actions.closeBurst
-                : () => setShownProposal(proposal?.index ?? null)
-            }
-          />
-        )}
+        {burstWindow}
       </RawScreen>
 
       {overlay === '조작방법' && (

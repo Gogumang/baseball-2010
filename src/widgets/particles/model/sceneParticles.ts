@@ -52,6 +52,8 @@ export {
   claimSceneParticleTick,
   claimSceneParticles,
   clearSceneParticles,
+  holdSceneParticleTicks,
+  isSceneParticleTickHeld,
   isSceneParticlesClaimed,
   sceneParticleScene,
 } from '@/entities/particle/model/sceneParticleManager'
