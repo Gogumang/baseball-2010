@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { ReactNode } from 'react'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -52,7 +53,10 @@ import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
-import { createGameSceneDrawGate, gameSceneTickOf, gameSceneTimeOf, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  appTickOfGameSceneTick, createGameSceneDrawGate, gameSceneTickOf, gameSceneTimeOf, isGameSceneFrozen,
+} from '@/shared/lib/commonWindow/commonWindow'
+import { hasDueSceneFrameUpdate, runDueSceneFrameUpdates } from '@/entities/particle/model/sceneParticleManager'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { stageCastSpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
@@ -290,6 +294,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     /** 키를 꺼내는 틀의 0x13 상태 틱 — 0x13 이 아니면 null */
     let keyHitTick: number | null = null
     window.addEventListener('keydown', onKeyDown)
+    /** 장면이 내려갔다 — 그리기 앞 갱신(`runDueSceneFrameUpdates`)이 그 자리에서 이 장면을 내릴 수 있다 */
+    let isDisposed = false
 
     const frame = (rawNow: number) => {
       // 경기 장면 0x52c50 — 공용 창 [0x140005c]+9 가 서 있으면 52cc6 이 갱신을, 52efe 가 상태 그리기를 건너뛴다 — 시계도 선다.
@@ -337,6 +343,16 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         return
       }
       const sceneTick = gameSceneTickOf(gameSceneTimeOf(rawNow))
+      // 이 틀의 갱신이 아직이면 그리기 앞에서 먼저 — 원본 틀 차례 갱신 52e14 → 그리기 52efe → 관리자 틱 53048. 사람이 던진 못 맞힌 공의
+      // 0x12 진입 0x3dfac(`scheduleSceneFrameUpdate` — 판정 칸 지움 3e0aa · 판 시작)은 장면 틱 시계에 걸려 그림 시계보다 늦게 울릴 수 있다.
+      // 그 갱신이 고친 진행이 이 그림의 재료(`latestRef`)에 들도록 React 를 곧바로 커밋한다 — 0x12 틱 0 의 판정 글자 · 삼진 양끝 파티클
+      // (0x393b4)이 판정 칸 지움을 본다(r295, r293 의 남은 근사)
+      const appTick = appTickOfGameSceneTick(sceneTick)
+      if (hasDueSceneFrameUpdate(appTick)) {
+        flushSync(() => runDueSceneFrameUpdates(appTick))
+        // 그 갱신이 이 장면을 내렸으면(수비 판 · 벤치 클리어링으로 넘어감) 이 루프도 끝난다
+        if (isDisposed) return
+      }
       const current = latestRef.current
       if (current.isFrozen === true) {
         if (frozenSinceTick === null) frozenSinceTick = sceneTick
@@ -757,6 +773,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     }
     handle = requestAnimationFrame(frame)
     return () => {
+      isDisposed = true
       cancelAnimationFrame(handle)
       gameSceneShownTicks.clear()
       window.removeEventListener('keydown', onKeyDown)

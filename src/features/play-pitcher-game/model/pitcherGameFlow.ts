@@ -233,7 +233,7 @@ import {
   fielderRecordsAtPlayStart,
 } from '@/entities/fielding/model/fielderRecords'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
-import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import { holdsUntilResultWaitEnd, rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { BenchClearingEntryRoll, HitByPitchHoldPhase } from '@/features/play-game/model/benchClearingScene'
 import { pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
@@ -1510,9 +1510,9 @@ function afterMyPitchArrival(
       random,
     )
   }
-  // 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c)·밀어내기 주루(0x17)·정산 0xa8024 는 0x12 의
-  // 32 그림 뒤라 그동안 사구를 붙든다(그 그림들의 입자 굴림이 먼저 난다 — `judgeHitByPitch`, A-22)
-  if (outcome.kind === '사구') {
+  // 볼넷 · 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기 주루(0x17)·정산은
+  // 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 — `judgeHitByPitch`, A-22 · r295)
+  if (holdsUntilResultWaitEnd(outcome)) {
     return {
       ...arrived,
       pendingBenchClearing: play === null ? { phase: 'wait', outcome } : { phase: 'wait', outcome, arrivalPlay: play },
@@ -1522,7 +1522,8 @@ function afterMyPitchArrival(
 }
 
 /**
- * **사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(`withPitcherBenchClearing`).
+ * **볼넷 · 사구의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(`withPitcherBenchClearing` —
+ * 사구만. 볼넷은 굴림 없이 4e78c 판정 A).
  * 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀 `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의
  * 보통 길(밀어내기 판 재생 · 정산 · 다음 사람 차례까지) — 예전 공 도착 걸음에 하던 그대로다. 대기 중인 사구가 없으면 그대로 돌려준다.
  */

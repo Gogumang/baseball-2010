@@ -101,7 +101,7 @@ import type { CpuSwingSkillSituation } from '@/entities/pitching/model/simulateB
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import { RUTHLESS_SKILL_ID, specialSwingCountOf } from '@/entities/batting/model/specialSwing'
 import { benchClearingEffectOf, rollsIntoBenchClearing, staminaAfterBenchClearing } from '@/entities/game/model/benchClearing'
-import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
+import { holdsUntilResultWaitEnd, rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { BenchClearingEntryRoll, HitByPitchHoldPhase } from '@/features/play-game/model/benchClearingScene'
 import { BATTER_SLOT, gameAbilityOf } from '@/features/play-team-game/model/gameAbilities'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
@@ -1427,7 +1427,7 @@ export function useMissionSession({
     )
 
   type HeldHitByPitch = NonNullable<typeof pendingBenchClearing>
-  /** 붙든 사구의 판정 A 0xae24c 보통 길 — 밀어내기 판(종류 2, 0x17)을 재생하고 정산한다. 진루는 보통 길과 같다 */
+  /** 붙든 볼넷 · 사구의 판정 A 0xae24c 보통 길 — 밀어내기 판(종류 2, 0x17)을 재생하고 정산한다. 진루는 보통 길과 같다 */
   const finishHeldHitByPitch = (held: HeldHitByPitch) => {
     if (held.walkReplay != null && held.walkReplay.ticks.length > 0) setPickoffReplay(held.walkReplay)
     setPitcherRun(settlePitcherRun(applyPitcherOutcome(held.run, held.outcome, { random })))
@@ -1438,7 +1438,8 @@ export function useMissionSession({
    * 들어가면 수비가 사람이라 0x3ab7c 0xaeab0(수비 팀, 1000) — 미션 투수 +0x2c −1000. S[1] 은 시즌(모드 2)만 적는다
    */
   const judgeHeldHitByPitch = (held: HeldHitByPitch): HeldHitByPitch | null => {
-    if (rollsIntoBenchClearing({ isHitByPitch: true, isHomeRunDerby: false, burstInProgress: false }, random)) {
+    // 볼넷은 4e744 st[0xb] == 4 가 거짓이라 굴림 없이 4e78c 판정 A 의 보통 길이다(r295)
+    if (rollsIntoBenchClearing({ isHitByPitch: held.outcome.kind === '사구', isHomeRunDerby: false, burstInProgress: false }, random)) {
       setPitcherStaminaStored(staminaAfterBenchClearing(held.pitcherStamina, benchClearingEffectOf(true).defenseStaminaLoss))
       const entering: HeldHitByPitch = { ...held, phase: 'entry' }
       setPendingBenchClearing(entering)
@@ -1476,9 +1477,9 @@ export function useMissionSession({
       }
     }
     if (outcome !== null) {
-      // 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c)·밀어내기·정산은 0x12 의 32 그림 뒤라
-      // 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 — 화면이 `judgeHitByPitch` 를 부른다, A-22)
-      if (outcome.kind === '사구') {
+      // 볼넷 · 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기·정산은 0x12 의
+      // 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 — 화면이 `judgeHitByPitch` 를 부른다, A-22 · r295)
+      if (holdsUntilResultWaitEnd(outcome)) {
         setPendingBenchClearing({
           phase: 'wait',
           run: nextRun,
@@ -1488,10 +1489,6 @@ export function useMissionSession({
         })
         setPitcherRun(nextRun)
         return
-      }
-      // 볼넷 · 사구 — 밀어내기 판(종류 2, 0x17)을 재생한다. 진루는 아래 보통 길과 같다
-      if (play !== null && arrivalApplicationOf(play) === 'freePass' && play.result.ticks.length > 0) {
-        setPickoffReplay(play.result)
       }
       nextRun =
         play !== null && arrivalApplicationOf(play) === 'batterRuns'

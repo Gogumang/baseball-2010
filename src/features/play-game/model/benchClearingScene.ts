@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 
 /**
  * **벤치 클리어링 연출** — 경기 장면 상태 0x1e 의 진입·갱신·키 (R10 6절, 디스어셈 대조 2026-10-05).
@@ -92,6 +93,20 @@ export type HitByPitchHoldPhase =
   | 'entry'
   /** 진입 굴림 45 번을 냈다 — 연출(0x1e)이 돈다 */
   | 'scene'
+
+/**
+ * **0x12 대기 끝까지 붙드는 타석 결과인가** — 볼넷 · 사구 (r295).
+ *
+ * 공 도착 0x3dfac 은 v = 3 · 4 면 판 종류를 2 로 두고(0x3e1b4 `0xb0cb8(플레이, 2)`) 0x12 만 예약한다. 0x12 갱신 0x4e6d4 가
+ * 문턱(4e6de~4e6f0 — st[0xb] ∈ {3, 4, 5} 면 0x1f)에 닿은 틀(4e72c)에서 사구면 4e74c 벤치 클리어링 굴림, 그 밖은 판정 A 0xae24c
+ * (4e78c — ae344~ae35c: st[0xb] ∈ {3, 4} → 0x17 밀어내기 판)로 간다. 볼넷도 사구와 같은 틀에 판정 A 를 지나므로 진행기는 둘 다
+ * 굴림 없이 붙들고(`'wait'`) 화면이 0x12 대기를 센 뒤(`useHitByPitchWait`) 판정을 부른다. 볼넷은 4e744 st[0xb] == 4 가 거짓이라
+ * 벤치 클리어링 굴림 없이 판정 A 의 보통 길(밀어내기 판 재생 · 정산)만 돈다(`rollsIntoBenchClearing` 의 `isHitByPitch`).
+ * 삼진(st[0xb] = 5)도 같은 문턱이지만 판정 A 가 0xd · 정산 0xa8024 로 곧장 가는 다른 길이라 여기 넣지 않았다.
+ */
+export function holdsUntilResultWaitEnd(outcome: AtBatOutcome): boolean {
+  return outcome.kind === '사구' || outcome.kind === '볼넷'
+}
 
 /** 공격 쪽 선수 수 — 진입 루프 i = 8..0 */
 const OFFENSE_PLAYERS = 9

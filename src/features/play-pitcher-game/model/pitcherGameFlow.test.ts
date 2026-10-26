@@ -691,7 +691,7 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(끝.lastDefensePlay).toBe(직전.lastDefensePlay)
   })
 
-  it('붙드는 것은 인플레이 타구뿐이다 — 삼진·볼넷은 곧장 끝난다', () => {
+  it('수비 판으로 붙드는 것은 인플레이 타구뿐이다 — 삼진은 곧장 끝나고 볼넷 · 사구는 0x12 대기 끝 판정까지 붙든다', () => {
     // 씨앗 3 은 게이지 끈 공의 흩어짐 반지름을 t + 3 칸으로 고친 뒤(0x4dce0) 300 개 안에 삼진·볼넷이 안 나와 1 로 옮겼다.
     // 1회초 판(0x18)의 걸음 굴림 36 개가 첫 타석 준비 앞에 끼면서 1 → 3 으로 다시 옮겼다.
     // r201: 레이저 굴림이 외야수만 돌고(0x523e6) 도루 키 0x583 의 0xafa60 이 굴림을 먹으며 씨앗 3 의 300 개 안에 홈런(붙드는 타구지만
@@ -700,9 +700,17 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     let current = startPitcherGame(기본옵션, random)
     const 붙든결과: string[] = []
     let 안붙든타석 = 0
+    const 대기결과: string[] = []
     for (let pitch = 0; pitch < 300 && isPitchTurn(current); pitch += 1) {
       const 직전 = current
       current = startPitch(current, 한가운데직구, random)
+      // 볼넷 · 사구 — 0x12 틱 31 의 판정 A 까지 붙든다(r295 · A-22). 끼어들 사람 없는 끝내기로 판정
+      if (current.pendingBenchClearing !== null) {
+        expect(current.log.length).toBe(직전.log.length)
+        대기결과.push(current.pendingBenchClearing.outcome.kind)
+        current = resolveBenchClearing(current, { reachedTargetTick: true }, random)
+        continue
+      }
       if (current.pendingDefensePlay !== null) {
         붙든결과.push(current.pendingDefensePlay.outcome.kind)
         current = resolveDefensePlay(current, runDefensePlay(current.pendingDefensePlay), random)
@@ -715,6 +723,7 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     expect(붙든결과.length).toBeGreaterThan(0)
     expect(붙든결과.every((kind) => kind === '안타' || kind === '아웃')).toBe(true)
     expect(안붙든타석).toBeGreaterThan(0)
+    expect(대기결과.every((kind) => kind === '볼넷' || kind === '사구')).toBe(true)
   })
 
   it('둘로 쪼갠 길과 한 번에 돌리는 길의 결과가 같다 — 난수 차례도 같다', () => {
