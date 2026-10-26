@@ -3,13 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import {
-  SEASON_DEFAULT_MATCH_SETTINGS, seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf,
+  SEASON_DEFAULT_MATCH_SETTINGS, seasonGameProgressOf, seasonGoalInputOf, withRecordSalaryGrades, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf,
   useSeasonSession,
 } from '@/app/model/useSeasonSession'
 import {
   EMPTY_LEAGUE, pitcherOrdersAfterPostseason, postseasonGameOf, postseasonRotationTurnsOf, postseasonStarterSlotOf,
 } from '@/entities/league/model/league'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
+import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
 import { SEASON_PHASE, SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import { SEASON_PLAYABLE_EVENTS } from '@/entities/season-mode/model/seasonEventFlow'
@@ -1771,8 +1772,16 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
     expect(result.current.scene).toBe(SEASON_SCENE_STATE.경기정보)
     expect(result.current.entryEdit).toBeNull()
     expect(result.current.isMatchSettingsOpen).toBe(false)
-    // 저장에도 남는다 — 다음 경기까지 이어진다
+    // 원본은 저장 객체만 고치고 파일 쓰기는 경기 시작(0x84a0 → 0x22754)이다 — 그 전에 끄면 날아간다 (r278)
+    expect((store.load() as { roster: { pitchers: { id: number }[] } }).roster.pitchers[0]?.id).toBe(0)
+    // 설정 창 확인은 전역 칸만 쓴다 — 고친 명단이 새지 않는다
+    act(() => result.current.actions.applyMatchSettings({ ...SEASON_DEFAULT_MATCH_SETTINGS, value: 2 }))
+    expect((store.load() as { roster: { pitchers: { id: number }[] } }).roster.pitchers[0]?.id).toBe(0)
+    expect((store.load() as { matchSettings?: MatchProgressSettings }).matchSettings?.value).toBe(2)
+    // 다음 시즌 파일 쓰기에 함께 쓰인다 — 다음 경기까지 이어진다
+    act(() => result.current.actions.updateRecord(result.current.state!.record))
     expect((store.load() as { roster: { pitchers: { id: number }[] } }).roster.pitchers[0]?.id).toBe(2)
+    expect(result.current.roster.pitchers[0]?.id).toBe(2)
   })
 
   it('경기는 고친 명단 차례로 선다 — 옵션 ourEntryOrder = 시즌 저장 레코드 차례 (0xb891c → 0xb8680)', () => {
@@ -2787,5 +2796,140 @@ describe('레코드에 남은 마선수 (0xb512c 는 0xdf · 0xe5 진입만)', (
 
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.선수고르기))
     expect(result.current.myRecordAces).toBeUndefined()
+  })
+})
+
+describe('r278 Q-05 — 기록 · 저장 꼴', () => {
+  /** 국가대항전 첫날 0xdd 까지 */
+  const 대회 = (store: JsonStorePort = 메모리저장()) => {
+    const rendered = 띄우기(store)
+    const { result } = rendered
+    시작(result, 3)
+    act(() => result.current.actions.confirmIncome({ ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1 }))
+    act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
+    act(() => result.current.actions.finishSeason())
+    return rendered
+  }
+
+  it('국가대항전 0xe0 의 대회 칸은 마스터 복사라 Xls 행 줄 그대로다 — 시즌 리그 기록표가 아니다 (0x205c0 · 0x20648)', () => {
+    const { result } = 대회()
+    act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.openEntryEdit(true))
+    const batter = result.current.entryEdit!.lists.batters[0]!
+    // 대표팀 명단은 대회 초기화가 표 그대로 세운 것이라 명단 칸 = 표 칸
+    const row = teamBatters(10)[batter.rosterIndex]
+    expect(row?.recordLine[0]).toBeGreaterThan(0)
+    expect(batter.batterLine?.atBats).toBe(row?.recordLine[0])
+    expect(batter.batterLine?.errors).toBe(0)
+  })
+
+  it('대회 사람 경기의 게이트 밖 두 칸(+0x2a 사사구 · +0x2e 실책)은 대표팀 슬롯에 쌓이고 다음 날 0xe0 에 보인다 — 상대국 몫은 없다', () => {
+    const store = 메모리저장()
+    const { result } = 대회(store)
+    expect((store.load() as { cupPlayerStats?: unknown }).cupPlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
+    act(() => result.current.actions.playCupGame(10, 11))
+    act(() => result.current.actions.toggleMatchSettings())
+    act(() => result.current.actions.startPendingGame())
+    act(() => result.current.actions.finishGame(요약({
+      ourTeamId: 10,
+      opponentTeamId: 11,
+      leaguePitchers: {
+        lines: [
+          { teamId: 10, pitcherSlot: 2, outs: 27, runsAllowed: 1, strikeouts: 9, pitches: 120, walks: 3 },
+          { teamId: 11, pitcherSlot: 0, outs: 24, runsAllowed: 5, strikeouts: 4, pitches: 130, walks: 4 },
+        ],
+        decision: { winner: null, loser: null, save: null },
+        sideTeams: [11, 10],
+      },
+      leagueErrors: [{ teamId: 10, battingOrderIndex: 4 }, { teamId: 10, battingOrderIndex: 4 }, { teamId: 11, battingOrderIndex: 1 }],
+    })))
+    const saved = store.load() as { cupPlayerStats: { pitchers: Record<number, { walks?: number }>; batters: Record<number, { errors?: number }> } }
+    expect(saved.cupPlayerStats.pitchers[10 * 8 + 2]?.walks).toBe(3)
+    expect(saved.cupPlayerStats.batters[10 * 12 + 4]?.errors).toBe(2)
+    expect(Object.keys(saved.cupPlayerStats.pitchers)).toEqual([String(10 * 8 + 2)])
+
+    act(() => result.current.actions.playCupGame(10, 12))
+    act(() => result.current.actions.openEntryEdit(true))
+    const lists = result.current.entryEdit!.lists
+    const pitcher = lists.pitchers.find((row) => row.name === teamPitchers(10)[2]?.name)
+    expect(pitcher?.pitcherLine?.walks).toBe((teamPitchers(10)[2]?.recordLine[5] ?? 0) + 3)
+    const fielder = lists.batters.find((row) => row.name === teamBatters(10)[4]?.name)
+    expect(fielder?.batterLine?.errors).toBe(2)
+  })
+
+  it('옛 저장 이사 — 대회 중 쌓임 칸 · 레코드 마선수 칸 · 영입 사본 +0x1b 를 채우고 저장 → 불러오기를 돌아도 같다', () => {
+    const store = 메모리저장()
+    const { result } = 대회(store)
+    act(() => result.current.actions.playCupGame(10, 11))
+    const raw = JSON.parse(JSON.stringify(store.load())) as Record<string, unknown> & { roster: { pitchers: Record<string, unknown>[] } }
+    delete raw.cupPlayerStats
+    delete raw.recordAces
+    const nari = { id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: {
+      name: '나리', ability: [500, 500, 500, 500], repertoire: { name: '나리', form: 0, magicId: 0, pitchMask: 1 },
+    } }
+    raw.roster = { ...raw.roster, pitchers: [...raw.roster.pitchers, nari] }
+    const oldStore = 메모리저장()
+    oldStore.save(raw)
+    const loaded = 띄우기(oldStore).result.current
+    expect(loaded.roster.pitchers.at(-1)?.record?.salaryGrade).toBe(0)
+    // 이사한 값은 다음 쓰기에서 저장되고, 다시 읽어도 같다
+    act(() => loaded.actions.updateRecord(loaded.state!.record))
+    const once = JSON.parse(JSON.stringify(oldStore.load())) as Record<string, unknown>
+    expect(once.cupPlayerStats).toEqual(EMPTY_LEAGUE_PLAYER_STATS)
+    expect(once.recordAces).toEqual({})
+    const again = 메모리저장()
+    again.save(once)
+    const reloaded = 띄우기(again).result.current
+    act(() => reloaded.actions.updateRecord(reloaded.state!.record))
+    expect(JSON.parse(JSON.stringify(again.load()))).toEqual(once)
+    expect(withRecordSalaryGrades(reloaded.roster)).toBe(reloaded.roster)
+  })
+
+  it('경기진행 설정(전역 m = 1)은 전역 칸 손잡이가 주인이다 — 옛 시즌 저장의 값을 처음 한 번 옮기고, 고친 값은 시즌 파일에 안 쓴다', () => {
+    const 옛설정 = { ...SEASON_DEFAULT_MATCH_SETTINGS, kind: MATCH_SETTING_KIND.찬스, value: 1 }
+    const store = 메모리저장()
+    const first = 띄우기(store)
+    시작(first.result, 0)
+    act(() => first.result.current.actions.applyMatchSettings(옛설정))
+    expect((store.load() as { matchSettings?: MatchProgressSettings }).matchSettings).toEqual(옛설정)
+
+    let 전역: MatchProgressSettings | null = null
+    const slot = {
+      read: () => true,
+      markSeen: vi.fn(),
+      readSeasonSettings: () => 전역,
+      writeSeasonSettings: vi.fn((settings: MatchProgressSettings) => { 전역 = settings }),
+    }
+    const 이사 = renderHook(() => useSeasonSession(
+      store, createSeededRandom(1), null, undefined, undefined, undefined, undefined, undefined, slot,
+    ))
+    expect(slot.writeSeasonSettings).toHaveBeenCalledWith(옛설정)
+    expect(이사.result.current.matchSettings).toEqual(옛설정)
+
+    const 새설정 = { ...SEASON_DEFAULT_MATCH_SETTINGS, value: 3 }
+    const before = JSON.stringify(store.load())
+    act(() => 이사.result.current.actions.applyMatchSettings(새설정))
+    expect(전역).toEqual(새설정)
+    expect(이사.result.current.matchSettings).toEqual(새설정)
+    // 시즌 파일은 안 쓴다 — 시즌 저장 칸을 지워도 설정은 전역 칸에 남는다
+    expect(JSON.stringify(store.load())).toBe(before)
+    const 빈시즌 = renderHook(() => useSeasonSession(
+      메모리저장(), createSeededRandom(1), null, undefined, undefined, undefined, undefined, undefined, slot,
+    ))
+    expect(빈시즌.result.current.matchSettings).toEqual(새설정)
+  })
+
+  it('이어하기 블록은 옛 꼴이면 이사한다 — 상대 마투수 탈삼진 칸 (seasonGameProgressOf)', () => {
+    const { result } = 띄우기()
+    시작(result, 0)
+    act(() => result.current.actions.openNextGame())
+    act(() => result.current.actions.confirmNextGame())
+    act(() => result.current.actions.choosePreGameAce(1))
+    act(() => result.current.actions.choosePreGameAce(8))
+    act(() => result.current.actions.startPendingGame())
+    const progress = startTeamGame(result.current.gameOptions!, createSeededRandom(7))
+    const { opponentAceStrikeouts: _dropped, ...옛 } = JSON.parse(JSON.stringify(progress)) as typeof progress
+    expect(seasonGameProgressOf(옛)?.opponentAceStrikeouts).toBe(0)
   })
 })

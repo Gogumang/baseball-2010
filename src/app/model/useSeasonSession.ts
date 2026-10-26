@@ -61,7 +61,7 @@ import { PITCHERS_PER_TEAM, teamBatters, teamPitchers } from '@/entities/team/mo
 import { DEFAULT_TEAM_MORALE, teamRecordMoraleAfterBurst, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { FULL_STAMINA, recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { TeamGameOptions, TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
-import { rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
+import { migrateTeamGameProgress, rollOpponentAces } from '@/features/play-team-game/model/teamGameFlow'
 import { INNING_VALUE, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
@@ -69,7 +69,7 @@ import {
 } from '@/entities/season-mode/model/preGameFlow'
 import type { PreGameAces, SquadPurpose } from '@/entities/season-mode/model/preGameFlow'
 import {
-  leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey,
+  entryBatterLineOfRecord, entryPitcherLineOfRecord, leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey,
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
@@ -560,11 +560,22 @@ interface SeasonSave {
    */
   readonly cupRoster?: SeasonTeamRoster | null
   /**
+   * **대표팀 슬롯 +0x918 에 대회 중 쌓인 게이트 밖 두 칸** — 투수 +0x2a 사사구(정산 꼬리 a8b04~a8bee) · 타자 +0x2e 실책(수비 그림
+   * 0x43278 4381a~43904). 대회 경기는 게이트 0xa56dc 가 거짓이라 타석 · 투구 줄은 안 쌓이고 이 둘만 그 경기 레코드에 오른다
+   * (`recordUngatedSeasonRecords`). 대회 중 팀 얻기 0x1f570 이 팀 10 을 +0x918 로 돌리므로 대표팀 레코드에 남고, 상대국 슬롯
+   * +0x934 몫은 하루 끝 b8216 이 마스터에서 새로 덮어 지워진다 — 그래서 대표팀(팀 10) 줄만 든다. 열쇠는 리그 기록표와 같은
+   * 붙박이 표 칸(`팀 × 12 + 칸` · `팀 × 8 + 칸`). 엔트리 목록 0xe0 의 대회 칸이 Xls 행 줄에 이 수를 얹어 읽는다(`seasonEntryCellSourceOf`).
+   * 대회 초기화가 빈 표로 세우고 대회 끝이 지운다. 2026-10-26 에 더했다 — 옛 저장(대회 중)은 빈 표로 이사한다(그동안 센 수는 없다)
+   */
+  readonly cupPlayerStats?: LeaguePlayerStats | null
+  /**
    * 경기진행 설정 시즌 칸 (전역 저장 +0x12c+m 계열, m = 1). 원본은 **전역 저장**이라 시즌을 새로 해도 남는다 —
    * 웹엔 그 전역 저장 객체가 없어 시즌 저장에 두되, 새 시즌(`chooseTeam`)이 앞 저장의 값을 그대로 넘겨받는다.
    * 모드 초기화 0x224ec(2) 는 이 칸을 안 지운다 — `resetSeason` 이 시즌 없는 덩어리에 남겨 둔다(`SeasonGlobalCarry`).
-   * ⚠️ 근사(남김 — 웹 저장 꼴): 시즌 저장 칸을 통째로 지우면(브라우저 저장 삭제) 함께 사라진다 — 그 점만 다르다.
    * 한 번도 고치지 않았으면 생성자 0x9f26c 의 기본값(`SEASON_DEFAULT_MATCH_SETTINGS` — 이닝 · 전체)이다.
+   * **전역 칸 손잡이(`matchSettingsSeenSlot.readSeasonSettings`)를 넘기면 그쪽(모드 저장 `seasonMatchSettings`)이 주인이다** —
+   * 이 칸은 옛 저장의 값을 거기로 옮기는 이사 재료로만 읽고(`useSeasonSession` 의 이사), 고친 값은 전역 칸에만 쓴다(r278 — 예전에는
+   * 시즌 저장 칸을 통째로 지우면 함께 사라졌다). 손잡이가 없으면(시험) 예전처럼 이 칸이 든다.
    */
   readonly matchSettings?: MatchProgressSettings
   /**
@@ -589,7 +600,8 @@ interface SeasonSave {
    * 0xdd 진입 0x6548 · CPU 끼리 0xc239c 가 모드 2 에서 시즌 레코드에 넣고, 빼는 `0xb512c` 는 0xdf 진입 0x5980 · 0xe5 진입 0x5cd0
    * 두 곳(열 팀 모두)만 부른다 — 그 사이 0xf1 트레이드 요청 0x93c8 · 0xe8 스태미나 목록 0x5870 이 마선수 줄을 본다.
    * 경기 끝 0x4ea0c 의 저장(0x22755)이 레코드째 쓰므로 이어하기에도 남는다. 웹 명단 배열(`roster` · `cpuRosters`)에는 넣지 않는다.
-   * 이 칸이 없는 옛 저장은 마선수가 빠진 레코드(0xb512c 뒤)로 본다 — ⚠️ 근사(남김 — 옛 웹 저장 호환): 옛 저장을 0xe9 · 0xf1 에서 이어 하면 그날 마선수 없이 굴린다.
+   * 이 칸이 없는 옛 저장은 `normalizeSeasonSave` 가 빈 표(마선수가 빠진 레코드 — 0xb512c 뒤)로 이사한다. 그날 경기들이 넣은 마선수
+   * (CPU 끼리 경기는 0x66968 굴림)는 옛 저장에 남아 있지 않아 되살릴 수 없다 — 옛 저장을 0xe9 · 0xf1 에서 이어 하면 그날만 마선수 없이 굴린다.
    */
   readonly recordAces?: Readonly<Record<number, SeasonRecordAces>>
   /**
@@ -789,13 +801,28 @@ function recordSeasonHumanGamePitchers(
 /**
  * 게이트 0xa56dc 밖에서 쌓이는 두 칸 — 투수 +0x2a 사사구(정산 0xa8024 꼬리 a8b04~a8bee, 볼넷 · 사구마다 지금 마운드 투수)와
  * 타자 +0x2e 실책(수비 그림 0x43278 4381a~43904). 정규시즌 · 포스트시즌 모두 부른다.
- * ⚠️ 미확인(남김 — 웹 기록 꼴): 국가대항전 사람 경기도 같은 두 칸을 그 경기 레코드(대표팀 · 상대국 슬롯)에 올리지만 웹 리그 기록표와 다른 레코드라 안 쌓는다
+ * 국가대항전 사람 경기도 같은 두 칸을 그 경기 레코드(대표팀 · 상대국 슬롯)에 올린다 — 리그 기록표가 아니라 대회 칸
+ * (`SeasonSave.cupPlayerStats`, `recordCupUngatedRecords`)에 쌓는다.
  */
 function recordUngatedSeasonRecords(
   stats: LeaguePlayerStats,
   summary: { readonly leaguePitchers?: GameLeaguePitchers; readonly leagueErrors?: readonly LeagueFieldingError[] },
 ): LeaguePlayerStats {
   return recordLeagueErrors(recordLeagueFreePasses(stats, summary.leaguePitchers?.lines ?? []), summary.leagueErrors ?? [])
+}
+
+/**
+ * **국가대항전 사람 경기의 게이트 밖 두 칸** — `recordUngatedSeasonRecords` 와 같은 두 칸을 대표팀 슬롯 +0x918 에 쌓는다.
+ * 상대국 슬롯 +0x934 몫은 하루 끝 b8216 0x20648 이 마스터에서 새로 덮어 지우므로 대표팀(팀 10) 줄만 남긴다
+ */
+function recordCupUngatedRecords(
+  stats: LeaguePlayerStats,
+  summary: { readonly leaguePitchers?: GameLeaguePitchers; readonly leagueErrors?: readonly LeagueFieldingError[] },
+): LeaguePlayerStats {
+  return recordLeagueErrors(
+    recordLeagueFreePasses(stats, (summary.leaguePitchers?.lines ?? []).filter((line) => line.teamId === KOREA_TEAM_ID)),
+    (summary.leagueErrors ?? []).filter((error) => error.teamId === KOREA_TEAM_ID),
+  )
 }
 
 /** CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것, 아니면 붙박이 표 명단 */
@@ -1130,20 +1157,22 @@ export function seasonGameProgressOf(raw: unknown): TeamGameProgress | null {
   if (typeof game.inning !== 'number' || (game.half !== '초' && game.half !== '말')) return null
   if (!Array.isArray(progress.ourEntry) || !Array.isArray(progress.opponentEntry)) return null
   if (!Array.isArray(progress.ourPitcherEntry) || !Array.isArray(progress.opponentPitcherEntry)) return null
-  return raw as TeamGameProgress
+  // 꼴이 넓어진 칸은 옛 블록 이사(`migrateTeamGameProgress`)가 채운다
+  return migrateTeamGameProgress(raw as TeamGameProgress)
 }
 
 /** 저장의 경기 블록을 고른다 — 꼴이 안 맞으면 null */
 function normalizeGameSave(raw: unknown): SeasonGameSaveBlock | null {
   if (raw === null || typeof raw !== 'object') return null
   const value = raw as Partial<Record<keyof SeasonGameSaveBlock, unknown>>
-  if (seasonGameProgressOf(value.progress) === null) return null
+  const progress = seasonGameProgressOf(value.progress)
+  if (progress === null) return null
   const kind = SEASON_GAME_KINDS.find((candidate) => candidate === value.kind)
   if (kind === undefined) return null
   const shift = typeof value.ownRotationShift === 'number' && Number.isInteger(value.ownRotationShift)
     ? value.ownRotationShift
     : 0
-  return { progress: value.progress, kind, ownRotationShift: shift }
+  return { progress, kind, ownRotationShift: shift }
 }
 
 /**
@@ -1168,18 +1197,41 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
   const staminaKnown = saved.cpuPitcherStaminas !== undefined
   // 옛 저장(칸 없음)은 경기 저장 없음 — 블록을 못 읽으면 +0x4e 도 내린다(웹 전용, 블록 없이 표시만 설 수는 없다)
   const gameSave = normalizeGameSave(saved.gameSave)
+  const cupActive = saved.cup !== undefined && saved.cup !== null
   return {
     ...saved,
     isGameInProgress: saved.isGameInProgress === true && gameSave !== null,
     gameSave,
     state,
     league: saved.league ?? EMPTY_LEAGUE,
-    roster: staminaKnown ? roster : withFullRosterStamina(roster),
+    roster: withRecordSalaryGrades(staminaKnown ? roster : withFullRosterStamina(roster)),
+    // 레코드 마선수 칸이 생기기 전 저장 — 마선수가 빠진 레코드(0xb512c 뒤)로 이사한다(그날 넣은 마선수는 남아 있지 않다)
+    recordAces: saved.recordAces ?? {},
+    // 대회 중 저장인데 대표팀 쌓임 칸이 없으면 빈 표로 이사 — 그 전 경기들이 쌓은 +0x2a · +0x2e 는 남아 있지 않다
+    ...(cupActive ? { cupPlayerStats: saved.cupPlayerStats ?? EMPTY_LEAGUE_PLAYER_STATS } : {}),
     playerStats: saved.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     cpuPitcherStaminas: saved.cpuPitcherStaminas ?? fullCpuPitcherStaminas(state.record.teamId),
     // 준PO 승자 칸(L+0x3b)이 생기기 전 시리즈 이사 — `withSemiPlayoffWinner`
     ...(saved.series === undefined || saved.series === null ? {} : { series: withSemiPlayoffWinner(saved.series) }),
   }
+}
+
+/**
+ * **영입 기록 사본의 +0x1b 이사** — 원본 영입 0xc554 는 기록 0x30 바이트를 통째로 옮겨 +0x1b(연봉 칸)가 늘 있다. 웹 사본
+ * (`SeasonPlayer.record`)이 `salaryGrade` 를 들기 전(2026-10-16) 영입한 선수는 칸이 비어 있고 영입 때 값은 남아 있지 않다 —
+ * 예전 웹이 비운 칸을 0 으로 찍던 대로(상세 창 0x5b798 연봉 0) 0 을 채운다. 바꿀 것이 없으면 같은 명단
+ */
+export function withRecordSalaryGrades(roster: SeasonTeamRoster): SeasonTeamRoster {
+  const fill = (players: readonly SeasonPlayer[]) =>
+    players.some((player) => player.record !== undefined && player.record.salaryGrade === undefined)
+      ? players.map((player) =>
+        player.record === undefined || player.record.salaryGrade !== undefined
+          ? player
+          : { ...player, record: { ...player.record, salaryGrade: 0 } })
+      : players
+  const pitchers = fill(roster.pitchers)
+  const batters = fill(roster.batters)
+  return pitchers === roster.pitchers && batters === roster.batters ? roster : { ...roster, pitchers, batters }
 }
 
 /**
@@ -1323,7 +1375,13 @@ export function useSeasonSession(
    * 전역기록 +0x11e 손잡이 — 0xdd 진입 0x6548 과 일반모드 22 진입 0x3163c~0x31688 이 **같은 칸**을 본다: 둘 중 먼저 들어간
    * 쪽에서 한 번만 설정 창이 저절로 뜬다. 넘기면 이 칸도 읽고 쓴다(시즌 저장 `matchSettingsSeen` 은 옛 저장 몫으로 계속 적는다).
    */
-  matchSettingsSeenSlot?: { readonly read: () => boolean; readonly markSeen: () => void },
+  matchSettingsSeenSlot?: {
+    readonly read: () => boolean
+    readonly markSeen: () => void
+    /** 전역 m = 1 칸(시즌 경기진행 설정) — 옛 저장이면 null. 넘기면 이 칸이 시즌 설정의 주인이다(`SeasonSave.matchSettings`) */
+    readonly readSeasonSettings?: () => MatchProgressSettings | null
+    readonly writeSeasonSettings?: (settings: MatchProgressSettings) => void
+  },
   /**
    * 정산 0x4ea0c 4f1e8~4f212 — 정규시즌 경기에서 사람 팀이 이기면 전역기록 +0xbf 를 올리고(0x9f6f0) 100 이면 히든 45.
    * 기록연감 훅이 든다(`recordSeasonRegularWin`). 안 넘기면 세지 않는다
@@ -1361,6 +1419,29 @@ export function useSeasonSession(
   if (carriedGlobals.current === null) carriedGlobals.current = seasonGlobalCarryOf(store.load())
 
   const [save, setSave] = useState<SeasonSave | null>(loaded.current)
+  /**
+   * 시즌 경기진행 설정(전역 m = 1) — 전역 칸 손잡이가 있으면 그 값, 없거나 옛 저장이면 시즌 저장(또는 남겨 둔 덩어리)의 값.
+   * 옛 저장 이사: 손잡이 칸이 비었고 시즌 저장에 값이 있으면 처음 한 번 전역 칸으로 옮긴다(아래 effect)
+   */
+  const legacyMatchSettings = (loaded.current ?? carriedGlobals.current)?.matchSettings
+  const [globalMatchSettings, setGlobalMatchSettings] = useState<MatchProgressSettings | null>(
+    () => matchSettingsSeenSlot?.readSeasonSettings?.() ?? null,
+  )
+  const seasonMatchSettings = matchSettingsSeenSlot?.readSeasonSettings === undefined
+    ? (save ?? carriedGlobals.current)?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS
+    : globalMatchSettings ?? legacyMatchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS
+  const seasonMatchSettingsRef = useRef(seasonMatchSettings)
+  seasonMatchSettingsRef.current = seasonMatchSettings
+  useEffect(() => {
+    const slot = matchSettingsSeenSlot
+    if (slot?.readSeasonSettings === undefined || slot.writeSeasonSettings === undefined) return
+    if (slot.readSeasonSettings() !== null || legacyMatchSettings === undefined) return
+    // 옛 저장 이사 — 시즌 저장이 들던 값을 전역 m = 1 칸으로 (원본 자리)
+    slot.writeSeasonSettings(legacyMatchSettings)
+    setGlobalMatchSettings(legacyMatchSettings)
+    // 처음 한 번만 — 손잡이 · 옛 값은 첫 렌더의 것으로 본다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [scene, setScene] = useState<SeasonSceneState>(() =>
     save === null
       ? SEASON_SCENE_STATE.팀고르기
@@ -1504,13 +1585,39 @@ export function useSeasonSession(
   /** 마지막으로 쓴 저장 — 경기 화면의 이어하기 저장(effect)이 렌더 사이에 잇달아 와도 앞 것을 덮지 않게 */
   const latestSave = useRef(save)
   latestSave.current = save
+  /**
+   * **마지막으로 파일(저장소)에 쓴 시즌** — 원본은 저장 객체(메모리)를 고치는 것과 시즌 파일 쓰기(0x22754)가 따로다. 웹 시즌 저장소
+   * 한 칸에 전역 칸 몇(`SeasonGlobalSlots` 등)이 같이 실려 있어, 전역 칸만 쓸 때는 메모리 시즌이 아니라 이 값 위에 얹어 쓴다 —
+   * 메모리에만 고친 것(`stageSave`)이 전역 저장 때문에 파일에 새지 않게
+   */
+  const persistedSave = useRef(save)
   const commit = useCallback(
     (next: SeasonSave) => {
       latestSave.current = next
+      persistedSave.current = next
       setSave(next)
       store.save({ ...next, ...globalsRef.current })
     },
     [store],
+  )
+  /** 저장 객체(메모리)만 고친다 — 파일 쓰기는 다음 `commit` 이 한다 (원본의 저장 객체 고치기와 0x22754 사이) */
+  const stageSave = useCallback((next: SeasonSave) => {
+    latestSave.current = next
+    setSave(next)
+  }, [])
+  /**
+   * 시즌 저장소에 같이 실린 전역 칸 하나를 고치고 곧바로 쓴다 — 메모리 시즌에도 얹되 파일에는 마지막으로 쓴 시즌 위에만 얹는다
+   * (`persistedSave`)
+   */
+  const writeGlobalField = useCallback(
+    (patch: Partial<SeasonSave>) => {
+      const current = latestSave.current
+      const persisted = persistedSave.current
+      if (current !== null) stageSave({ ...current, ...patch })
+      if (persisted !== null) persistedSave.current = { ...persisted, ...patch }
+      store.save({ ...(persisted ?? carriedGlobals.current), ...patch, ...globalsRef.current })
+    },
+    [stageSave, store],
   )
   /** 전역기록 칸(`SeasonGlobalSlots`)을 고치고 곧바로 저장한다 — 원본도 쓰는 그 자리에서 전역 저장 0x1f1b9 를 부른다 */
   const updateGlobals = useCallback(
@@ -1519,7 +1626,8 @@ export function useSeasonSession(
       if (next === globalsRef.current) return
       globalsRef.current = next
       setGlobals(next)
-      store.save({ ...(latestSave.current ?? carriedGlobals.current), ...next })
+      // 메모리에만 고친 시즌(`stageSave`)은 싣지 않는다 — 전역 저장 0x1f1b9 는 시즌 파일을 안 쓴다
+      store.save({ ...(persistedSave.current ?? carriedGlobals.current), ...next })
     },
     [store],
   )
@@ -1730,6 +1838,7 @@ export function useSeasonSession(
     const carry = seasonGlobalCarryOf(current ?? carriedGlobals.current)
     carriedGlobals.current = carry
     latestSave.current = null
+    persistedSave.current = null
     setSave(null)
     store.save({ ...carry, ...globalsRef.current })
     setGameOptions(null)
@@ -1873,7 +1982,7 @@ export function useSeasonSession(
         opponentTeamId: opponent,
         playerSide: side === LEAGUE_SIDE_HOME ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
         // 경기진행 설정 시즌 칸 — 0xdd 의 '0' 창이 고친 값. 한 번도 안 고쳤으면 원본 0 초기값(찬스 · 공격 득점권)
-        settings: save.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
+        settings: seasonMatchSettingsRef.current,
         // 코치는 SR+0x185 다 — 채용 화면(0xd7)이 채운 칸을 그대로 넘긴다 (−1 = 없음)
         // 질병 −30% 는 질병 종류 SR+5 가 아니라 **SR+6 > 0** 을 본다 (0xb5824 `ldrsb [SR,#6]`) — `illnessPenaltyFieldOf`
         season: { illness: illnessPenaltyFieldOf(record), morale: save.state.teamMorale, coach: record.coach },
@@ -2100,7 +2209,7 @@ export function useSeasonSession(
     // 0x6548 이 돌린 저장 레코드 차례로 명단을 세운다 — 0번 선발 · 나머지 벤치 차례 (`withOwnRecordRotation`)
     const prepared = withOwnRecordRotation({
       ...pendingGame.options,
-      settings: save.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
+      settings: seasonMatchSettingsRef.current,
       ourEntryOrder: entryOrderOf(roster),
       // 투수 스태미나 +0x2c — 시즌 내내 이어진 값으로 선다. 국가대항전은 두 팀 모두 10000(기본)이다
       ...(isCup ? {} : staminaOptionsOf(save, pendingGame.options.opponentTeamId)),
@@ -2125,13 +2234,24 @@ export function useSeasonSession(
   /** 0xdd '0' (0x857a) — `0x5fef4(메뉴, 열림 뒤집기)` */
   const toggleMatchSettings = useCallback(() => setIsMatchSettingsOpen((open) => !open), [])
 
+  /**
+   * 0xdd 설정 창 확인 — 전역 m = 1 칸을 되쓰고 0x1f1b9 로 **전역 저장만** 쓴다(시즌 파일은 안 쓴다 — 0xe0 에서 고친 명단은
+   * 아직 메모리에만 있다, `pressEntryKeyAction`). 전역 칸 손잡이가 없으면(시험) 시즌 저장 칸에 적되 마지막으로 파일에 쓴 시즌
+   * 위에 얹는다(`writeGlobalField`)
+   */
   const applyMatchSettings = useCallback(
     (settings: MatchProgressSettings) => {
       setIsMatchSettingsOpen(false)
-      if (save === null) return
-      commit({ ...save, matchSettings: settings })
+      const slot = matchSettingsSeenSlot
+      if (slot?.readSeasonSettings !== undefined && slot.writeSeasonSettings !== undefined) {
+        slot.writeSeasonSettings(settings)
+        setGlobalMatchSettings(settings)
+        return
+      }
+      if (latestSave.current === null) return
+      writeGlobalField({ matchSettings: settings })
     },
-    [commit, save],
+    [matchSettingsSeenSlot, writeGlobalField],
   )
 
   /**
@@ -2208,8 +2328,9 @@ export function useSeasonSession(
    * 1 → 0xdd · 2 → CPU 팀일 때만 0xdd · 3 → 유저 팀일 때만 0xdd. 0xdd 로 돌아오면 들어옴 0x6548 이
    * 이전 상태 0xe0 을 보고 아무것도 안 한다(설정 창 자동 열기·명단 다시 세우기 없음) — 그래서 장면만 바꾼다.
    *
-   * 유저 팀 명단이 바뀌면 곧장 시즌 세이브에 적는다. 원본은 저장 객체의 팀 레코드를 바로 고치고 파일 쓰기는
-   * 0xdd 의 경기 시작(0x22754)이 하므로, ⚠️ 근사(남김 — 웹 저장 꼴): 경기를 시작하지 않고 끄면 원본은 고친 것이 날아가지만 웹은 남는다.
+   * 유저 팀 명단이 바뀌면 시즌 저장 **객체(메모리)** 만 고친다(`stageSave`). 원본은 저장 객체의 팀 레코드를 바로 고치고 파일
+   * 쓰기는 0xdd 의 경기 시작(0x84a0 → 0x22754)이 하므로 경기를 시작하지 않고 끄면 고친 것이 날아간다 — 웹도 같다(r278). 그 사이
+   * 다른 시즌 파일 쓰기(`commit`)가 오면 원본처럼 함께 쓰인다.
    */
   const pressEntryKeyAction = useCallback(
     (key: EntryKey) => {
@@ -2220,7 +2341,7 @@ export function useSeasonSession(
         const source = userEntrySourceOf(save, pendingGame)
         const roster = seasonRosterOfEntry(source.roster, lists, source.dayCounter)
         // 국가대항전은 대표팀 슬롯 +0x918 — 대회 내내 남는다
-        commit(pendingGame.kind === '국가대항전' ? { ...save, cupRoster: roster } : { ...save, roster })
+        stageSave(pendingGame.kind === '국가대항전' ? { ...save, cupRoster: roster } : { ...save, roster })
         // 명단 첨자를 새 명단에 맞춰 다시 세운다 (줄 순서는 같다)
         lists = seasonEntryListsOf({ ...source, roster, aceLevels })
       }
@@ -2231,7 +2352,7 @@ export function useSeasonSession(
       }
       setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
     },
-    [aceLevels, commit, entryEdit, pendingGame, save, userEntrySourceOf],
+    [aceLevels, entryEdit, pendingGame, save, stageSave, userEntrySourceOf],
   )
 
   const pointEntryCursorAction = useCallback(
@@ -2396,6 +2517,8 @@ export function useSeasonSession(
               nariMorale: teamRecordMoraleAfterBurst(teamRecordMoraleOf(opponent), burstDeltas),
             },
           ),
+          // 게이트 밖 두 칸(+0x2a · +0x2e)은 그 경기 레코드 — 대표팀 슬롯 +0x918 에 남는다(상대국 슬롯 몫은 하루 끝에 덮인다)
+          cupPlayerStats: recordCupUngatedRecords(current.cupPlayerStats ?? EMPTY_LEAGUE_PLAYER_STATS, summary),
           state: { ...current.state, record: played },
         })
         return { next: SEASON_SCENE_STATE.국가대항전, jingle: null }
@@ -2757,6 +2880,7 @@ export function useSeasonSession(
         state: { ...save.state, record: { ...record, nationalCupChampion: finish.champion } },
         cup: null,
         cupRoster: null,
+        cupPlayerStats: null,
       }, random)
       commit(next.save)
       // 히든 팀은 여기서 열지 않는다 — 0xf3 갱신 0xe684 가 대진판에 있는 동안 열었다(`openCupHiddenTeams`)
@@ -2879,8 +3003,9 @@ export function useSeasonSession(
         ...rewarded,
         state: { ...rewarded.state, record: { ...record, nationalCup: true } },
         cup: createNationalCup(),
-        // b7c72 0x205c0 — 대표팀 슬롯 +0x918 을 마스터 팀 10 으로 새로 채운다
+        // b7c72 0x205c0 — 대표팀 슬롯 +0x918 을 마스터 팀 10 으로 새로 채운다 (마스터 행 +0x2a · +0x2e 는 그 표 값 — 쌓인 수 0)
         cupRoster: tableRosterOf(KOREA_TEAM_ID),
+        cupPlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
       })
       // 0xf2 진입 0xe5f8: SR+0x12c = 1 · 461 을 틀고 · 대회 초기화 · 저장 · [다음 0xf3] (e600~e64c)
       return startEvent(NATIONAL_CUP_INTRO_EVENT_ID, SEASON_SCENE_STATE.국가대항전)
@@ -3181,7 +3306,7 @@ export function useSeasonSession(
     pendingGame,
     isMatchSettingsOpen,
     matchInfoStage,
-    matchSettings: (save ?? carriedGlobals.current)?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS,
+    matchSettings: seasonMatchSettings,
     entryEdit,
     matchInfoStarterName,
     matchInfoOpponentStarterName,
@@ -3286,6 +3411,7 @@ export function seasonBatterLineOf(stats: LeaguePlayerStats, ownerTeamId: number
  * (`teamRecordMoraleOf` — 시즌 중 그 칸을 쓰는 곳이 없다).
  */
 export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUserTeam: boolean): SeasonEntryCellSource {
+  if (save.cup !== undefined && save.cup !== null && teamId >= KOREA_TEAM_ID) return seasonCupEntryCellSourceOf(save, teamId, isUserTeam)
   const stats = save.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS
   const cpuStaminas = save.cpuPitcherStaminas?.[teamId]
   return {
@@ -3311,6 +3437,37 @@ export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUser
     },
   }
 }
+
+/**
+ * **국가대항전 두 슬롯의 엔트리 칸 재료** — 대회 중 팀 얻기 0x1f570 이 팀 10 을 대표팀 슬롯 +0x918 로, 나머지 나라를 상대국 슬롯
+ * +0x934 로 돌린다. 두 슬롯은 마스터 팀(0x1f8c0 — 0x1ff98 이 Xls 행 0x30 바이트를 통째 베낀 것)을 깊은 복사한 것이라(대회 초기화
+ * b7c72 0x205c0 · 하루마다 b8216 0x20648) 붙박이 줄 +0x20~ 은 **Xls 행 줄 그대로**다 — 시즌 리그 기록표가 아니다(나리
+ * `nariCupEntryCellSourceOf` 와 같은 근거). 대표팀 슬롯에는 대회 사람 경기가 게이트 밖 두 칸(+0x2a 사사구 · +0x2e 실책)을 더 쌓는다
+ * (`SeasonSave.cupPlayerStats`). 사기 · 스태미나는 부르는 쪽 몫 그대로다(대표팀은 `userEntrySourceOf` 가 덮는다).
+ */
+function seasonCupEntryCellSourceOf(save: SeasonSave, teamId: number, isUserTeam: boolean): SeasonEntryCellSource {
+  const marks = teamId === KOREA_TEAM_ID ? save.cupPlayerStats ?? EMPTY_LEAGUE_PLAYER_STATS : EMPTY_LEAGUE_PLAYER_STATS
+  const isTablePlayer = (player: SeasonPlayer) => player.id < HALL_OF_FAME_FIRST_ID
+  return {
+    staminaMode: 2,
+    teamMorale: isUserTeam ? save.state.teamMorale : teamRecordMoraleOf(teamId),
+    ...(isUserTeam ? {} : { staminaOf: () => FULL_STAMINA }),
+    batterLineOf: (player) => {
+      const row = isTablePlayer(player) ? teamBatters(tableTeamOf(player, teamId))[player.id] : undefined
+      const line = entryBatterLineOfRecord(row?.recordLine ?? [])
+      const errors = leagueBatterLineOf(marks, leagueBatterIdOf(tableTeamOf(player, teamId), player.id)).errors ?? 0
+      return { ...line, errors: Math.min(CUP_RECORD_COUNTER_LIMIT, line.errors + errors) }
+    },
+    pitcherLineOf: (player) => {
+      const row = isTablePlayer(player) ? teamPitchers(tableTeamOf(player, teamId))[player.id] : undefined
+      const line = entryPitcherLineOfRecord(row?.recordLine ?? [])
+      const walks = leaguePitcherLineOf(marks, leaguePitcherIdOf(tableTeamOf(player, teamId), player.id)).walks ?? 0
+      return { ...line, walks: Math.min(CUP_RECORD_COUNTER_LIMIT, line.walks + walks) }
+    },
+  }
+}
+/** a8b5a · 0x43838 의 `0x270f` 상한 — 레코드 칸에 더할 때 자른다 */
+const CUP_RECORD_COUNTER_LIMIT = 9999
 
 /** 시즌 명단 선수의 이번 시즌 투수 줄 — `seasonBatterLineOf` 와 같은 열쇠 */
 export function seasonPitcherLineOf(stats: LeaguePlayerStats, ownerTeamId: number, player: SeasonPlayer): LeaguePitcherLine {
@@ -3531,13 +3688,13 @@ export function seasonTeamRankOf(source: Pick<SeasonGoalSource, 'state' | 'leagu
  * `recordSeasonHumanGamePitchers` 로 넣는다(원본 0xa8024 · 0xa7de8, 0xa56dc 모드 2 갈래라 정규시즌만). 그래서 ④ 는 내 팀 투수가
  * 실점하면 0 보다 커진다.
  *
- * ⚠️ 근사(남김 — 웹 기록 꼴) 한계 (지어내지 않고 남긴다):
+ * 선수 줄 열쇠:
  * - 트레이드로 옮겨 온 선수는 옛 팀 표 자리(`tableTeamId` · id), 영입한 명전·나리 선수(id ≥ 0xb4 · 0xfe)는 원본 id 의
  *   표 밖 줄(`recordBatters`·`recordPitchers` — 0xa56dc 모드 2 갈래가 마선수만 거른다)로 쌓였다 — 같은 열쇠로 읽는다.
- *   기록을 못 찾은 표 밖 선수(`recordOf` 를 안 넘긴 길)는 경기가 남은 표 칸으로 세우고(`tableSlotsOfOrder`) 그 칸으로
- *   쌓는다 — 여기도 같은 칸을 읽는다 (근사).
- * - 대진 칸의 플레이오프 아랫 시드(준PO 승자)는 한국시리즈가 시작된 뒤에는 시리즈 객체에 남지 않아 모른다 —
- *   목표 판정(392)은 포스트시즌 첫날에 돌아 닿지 않는다.
+ *   기록을 못 찾은 표 밖 선수(`recordOf` 를 안 넘긴 길 — 앱 길에서는 닿지 않는다, `tableSlotsOfOrder` 주석)는 경기가 남은 표
+ *   칸으로 세우고 그 칸으로 쌓으므로 여기도 같은 칸을 읽는다.
+ * - 대진 칸의 플레이오프 아랫 시드(L+0x3b 준PO 승자)는 시리즈의 `semiPlayoffWinner` 가 포스트시즌 끝까지 든다(옛 저장은
+ *   `withSemiPlayoffWinner` 가 이사) — `goalBracketOf` 가 읽는다.
  */
 export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
   const { record } = source.state

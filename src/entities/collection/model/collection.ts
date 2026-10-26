@@ -7,6 +7,7 @@ import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCaree
 import { PITCHER_ABILITY_ORDER } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
+import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { nariRecordSalaryGradeOfCareer, romanceEndingIndexOf } from '@/entities/career/model/seasonFlow'
 import { FIRST_HIDDEN_LEVEL, hiddenOpenIdOf, ownsEquipment } from '@/entities/career/model/equipment'
 import { ownsPitcherEquipment, pitcherHiddenOpenIdOf } from '@/entities/pitcher-career/model/pitcherEquipment'
@@ -73,6 +74,11 @@ interface HallOfFameRecordFields<Ability> {
   readonly recordSlot?: number
 }
 
+/** 명전 기록 시즌 줄 +0x20~+0x2b 여섯 칸이 모두 0 — 시즌 영입 0xc554 의 0xb6cc4 · 0xb8e28 이 지운 줄 */
+const CLEARED_RECORD_LINE: readonly number[] = [0, 0, 0, 0, 0, 0]
+const isClearedLine = (line: readonly number[] | undefined) =>
+  line !== undefined && line.length === CLEARED_RECORD_LINE.length && line.every((value) => value === 0)
+
 /** 명예의 전당 타자 (+0x940 칸) */
 export interface HallOfFamer extends HallOfFameRecordFields<BatterAbility> {
   readonly name: string
@@ -112,6 +118,13 @@ export interface HallOfFamePitcher extends HallOfFameRecordFields<PitcherAbility
    * CPU 투수 교체(0xabfcc · 0xac428)·등판 판정(0xa4f60) 등에서 읽는다. 옛 저장에는 없다(받는 쪽이 선발로 본다).
    */
   readonly role?: PitcherRole
+  /**
+   * 기록 **+0x2c 스태미나** — 등록 0x1f654 가 그때 투수 레코드 0x30 바이트를 통째로 베끼므로 그 순간의 `career.stamina` 다.
+   * 미션 투수(0x1fbd0 이 명전 기록을 준다)의 경기 스태미나가 이 칸이다. 시즌 영입 0xc554 가 c584~c588 `strh 0x2710, [기록, #0x2c]` ·
+   * 0xb6cc4 로 이 전역 기록 자체를 10000 으로 바꾸고 0x22755 → 0x1f1b8 이 game_o.sav 에 남긴다(`withHallOfFameRecordSlot`).
+   * 2026-10-26 에 더했다 — 옛 저장은 `normalizeCollection` 이 10000 으로 채운다(이사 — 등록 때 값이 남아 있지 않다)
+   */
+  readonly stamina?: number
 }
 
 export interface Collection {
@@ -368,6 +381,8 @@ export function registerHallOfFamePitcher(
     role: career.role,
     recordLine: pitcherRecordLineOf(career.stats),
     salaryGrade: nariRecordSalaryGradeOfCareer(career),
+    // +0x2c — 0x30 바이트 통째 사본이라 등록 순간의 스태미나
+    stamina: career.stamina,
   }
   return {
     kind: '등록',
@@ -453,7 +468,12 @@ export function hallOfFameRecordSlotOf(famer: HallOfFamer | HallOfFamePitcher): 
 
 /**
  * **시즌 영입 0xc554 의 원본 기록 칸 고치기** — c536~c550 이 명전 칸 `0x1f62d(투수) / 0x1f641(타자)(앱, [목록+0x130])` 을 받고
- * c578 `0xb6605(그 기록, j)` 가 +0xa 아랫 5비트를 고른 자리 j 로 (윗 3비트는 둔다). 그 뒤 0xc5dc `0x22755(앱, 1)` → 22bee
+ * c578 `0xb6605(그 기록, j)` 가 +0xa 아랫 5비트를 고른 자리 j 로 (윗 3비트는 둔다). 이어서 **같은 기록**(r4)에 (r278 직접 떴다):
+ * ```
+ * 투수 c584  strh 0x2710, [r4, #0x2c]  ; c58c 0xb6cc5(r4): +0x20~+0x2b · +0x2e · +0x2f = 0, +0x2c = 0x2710
+ * 타자 c5ae  0xb8e29(r4)                ; +0x20~+0x2f = 0
+ * ```
+ * 그래서 영입한 명전 기록의 시즌 줄(`recordLine`)은 0 이 되고 투수 +0x2c(`stamina`)는 10000 이다. 그 뒤 0xc5dc `0x22755(앱, 1)` → 22bee
  * `0x1f1b8` 이 전역 블록을 game_o.sav 에 쓴다 — 명전 기록은 그 블록 안이라 저장된다. 칸은 기록 번호(칸 + 0xb4 / + 0xc8)로 찾는다.
  * 나리 칸(0 · 5)은 `0x22169 / 0x220ed` 가 `0x213c0(앱, 3|4, 1)` 로 올린 나리 저장의 기록을 고치나, 0x22755 는 지금 모드
  * ([앱+0x40], 시즌) 파일과 전역 블록만 쓰고 0xc5fa~0xc608 `0x1f24d(앱, 4) · (앱, 3)` 가 그 저장을 쓰지 않고 풀어(0x1f3c6 ·
@@ -469,17 +489,21 @@ export function withHallOfFameRecordSlot(
   const value = recordSlot & RECORD_SLOT_MASK
   if (side === '투수') {
     const famer = slot < 0 || slot >= HALL_OF_FAME_MAX_PITCHERS ? null : hallOfFamePitcherAt(collection, slot)
-    if (famer === null || famer.recordSlot === value) return collection
+    if (famer === null || (famer.recordSlot === value && isClearedLine(famer.recordLine) && famer.stamina === FULL_STAMINA)) {
+      return collection
+    }
+    const recruited = { ...famer, recordSlot: value, recordLine: CLEARED_RECORD_LINE, stamina: FULL_STAMINA }
     return {
       ...collection,
-      hallOfFamePitchers: collection.hallOfFamePitchers.map((entry) => (entry.slot === slot ? { ...entry, recordSlot: value } : entry)),
+      hallOfFamePitchers: collection.hallOfFamePitchers.map((entry) => (entry.slot === slot ? recruited : entry)),
     }
   }
   const famer = slot < 0 || slot >= HALL_OF_FAME_MAX_BATTERS ? null : hallOfFameBatterAt(collection, slot)
-  if (famer === null || famer.recordSlot === value) return collection
+  if (famer === null || (famer.recordSlot === value && isClearedLine(famer.recordLine))) return collection
+  const recruited = { ...famer, recordSlot: value, recordLine: CLEARED_RECORD_LINE }
   return {
     ...collection,
-    hallOfFame: collection.hallOfFame.map((entry, index) => ((entry.slot ?? index) === slot ? { ...entry, recordSlot: value } : entry)),
+    hallOfFame: collection.hallOfFame.map((entry, index) => ((entry.slot ?? index) === slot ? recruited : entry)),
   }
 }
 
@@ -554,8 +578,24 @@ function isHallOfFamePitcher(value: unknown): value is HallOfFamePitcher {
     hasRecordFields(candidate, PITCHER_ABILITY_KEYS) &&
     isOptionalNumber(candidate.pitchMask) &&
     isOptionalNumber(candidate.selectedMagicNumber) &&
+    isOptionalNumber(candidate.stamina) &&
     (candidate.role === undefined || candidate.role === 0 || candidate.role === 1 || candidate.role === 2)
   )
+}
+
+/**
+ * **옛 명전 기록 이사** — 원본 기록은 0x30 바이트 통째 사본이라 늘 있는 칸인데 웹 기록이 나중에 든 칸을 채운다. 등록 때 값은
+ * 남아 있지 않아 예전 웹이 빈 칸을 읽던 값으로 채운다 — 이사 앞뒤 결과가 같다. 채울 것이 없으면 같은 객체
+ * - +0x1b `salaryGrade`(2026-10-16): 0 — 상세 창 0x5b798 이 빈 칸을 연봉 0 으로 찍었다
+ * - 투수 +0x2c `stamina`(2026-10-26): 10000 — 미션 투수 스태미나로 늘 10000 을 썼다
+ */
+export function migrateHallOfFamer(famer: HallOfFamer): HallOfFamer {
+  return famer.salaryGrade === undefined ? { ...famer, salaryGrade: 0 } : famer
+}
+
+export function migrateHallOfFamePitcher(famer: HallOfFamePitcher): HallOfFamePitcher {
+  if (famer.stamina !== undefined && famer.salaryGrade !== undefined) return famer
+  return { ...famer, stamina: famer.stamina ?? FULL_STAMINA, salaryGrade: famer.salaryGrade ?? 0 }
 }
 
 /** 저장소에서 읽은 값은 믿지 않는다 — 하나라도 형식이 틀리면 빈 기록연감으로 시작한다 */
@@ -567,10 +607,10 @@ export function normalizeCollection(raw: unknown): Collection {
   }
   // 옛 저장은 칸 번호 없이 앞에서부터 채웠다 — 목록 순서를 칸 번호로 굳혀 둔다
   const hallOfFame = Array.isArray(candidate.hallOfFame)
-    ? candidate.hallOfFame.filter(isHallOfFamer).map((famer, index) => ({ ...famer, slot: famer.slot ?? index }))
+    ? candidate.hallOfFame.filter(isHallOfFamer).map((famer, index) => migrateHallOfFamer({ ...famer, slot: famer.slot ?? index }))
     : []
   const hallOfFamePitchers = Array.isArray(candidate.hallOfFamePitchers)
-    ? candidate.hallOfFamePitchers.filter(isHallOfFamePitcher)
+    ? candidate.hallOfFamePitchers.filter(isHallOfFamePitcher).map(migrateHallOfFamePitcher)
     : []
   const openedHiddenIds = isNumberArray(candidate.openedHiddenIds) ? candidate.openedHiddenIds : []
   return {

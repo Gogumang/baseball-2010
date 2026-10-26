@@ -20,6 +20,7 @@ import {
   availablePinchHitters,
   availablePitchers,
   burstGameRecordOf,
+  migrateTeamGameProgress,
   canAutoProgress,
   canOpenPinchHit,
   canOpenPitcherChange,
@@ -2511,6 +2512,26 @@ describe('돌발 경기 기록 검사 0x8ec9c — 공격 팀 지금 타순 칸 +
     expect(기록.hitsInGame).toBe(2)
     expect(기록.homeRunsInGame).toBe(1)
     expect(기록.strikeoutsInGame).toBe(상대투수?.tableSlot === undefined ? 0 : 4)
+  })
+
+  it('상대 지금 투수가 마투수면 그 경기 탈삼진(R[0])을 따로 센 칸을 본다 — 표 칸이 없어 경기 줄에서 빠진다 (r278)', () => {
+    const { progress } = 시작()
+    const index = progress.opponentPitcherIndex
+    const opponentPitcherEntry = progress.opponentPitcherEntry.map((entry, at) => (at === index ? { ...entry, aceIndex: 1 } : entry))
+    const 마투수판 = { ...progress, opponentPitcherEntry, opponentAceStrikeouts: 3 }
+    expect(burstGameRecordOf(마투수판, true).strikeoutsInGame).toBe(3)
+    // 붙박이 투수면 이 칸이 아니라 그 투수의 경기 줄이다
+    expect(burstGameRecordOf({ ...progress, opponentAceStrikeouts: 3 }, true).strikeoutsInGame).toBe(0)
+  })
+
+  it('옛 이어하기 블록(상대 마투수 탈삼진 칸 없음)은 0 으로 이사하고 저장 → 불러오기를 돌아도 같다', () => {
+    const { progress } = 시작()
+    const { opponentAceStrikeouts: _dropped, ...옛 } = progress
+    const migrated = migrateTeamGameProgress(옛 as typeof progress)
+    expect(migrated.opponentAceStrikeouts).toBe(0)
+    expect(migrateTeamGameProgress(migrated)).toBe(migrated)
+    const roundTrip = migrateTeamGameProgress(JSON.parse(JSON.stringify(migrated)) as typeof progress)
+    expect(roundTrip).toEqual(JSON.parse(JSON.stringify(migrated)))
   })
 
   it('사람 수비면 상대 타순 칸 안타·홈런(+0x12·+0x13)과 우리 지금 투수의 탈삼진(R[0])을 본다', () => {

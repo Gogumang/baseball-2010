@@ -36,7 +36,8 @@
  * 일반모드 경기정보 22 의 설정 창은 열 때 0x5fef4 가 m = 0 칸에서 읽고, 확인 0x60376 이 되쓰고 0x1f1b9 가 파일에 남긴다 —
  * 그래서 다음 판 · 다음 실행에도 남는다. +0x11e 는 22 진입 0x3163c~0x31688 과 시즌 0xdd 진입 0x6548 이 **같은 칸**을 본다:
  * 0 이면 설정 창을 저절로 열고 1 을 쓴 뒤 저장한다 — 두 모드 중 먼저 들어간 쪽에서 한 번만 뜬다.
- * (시즌 칸 m = 1 은 웹에서 아직 시즌 저장 `matchSettings` 가 든다 — useSeasonSession 머리 참고.)
+ * 시즌 칸 m = 1 도 같은 전역기록이다(`seasonMatchSettings` — 시즌 0xdd 의 '0' 창 확인이 되쓰고 0x1f1b9 로 남긴다). 시즌 파일 지움
+ * 0x224ec(2) 이 안 건드려 시즌을 새로 해도 남는다.
  */
 export interface ModeSave {
   /** 전역기록 +0x3c — 마지막으로 시작한 모드 (새 저장은 1 — 생성자 0x9f26c) */
@@ -68,6 +69,12 @@ export interface ModeSave {
   readonly generalMatchSettings: ModeMatchSettings
   /** 전역기록 +0x11e — 경기진행 설정 창을 한 번 봤는가 (일반 22 · 시즌 0xdd 가 함께 본다) */
   readonly matchSettingsSeen: boolean
+  /**
+   * 전역기록 +0x12c+1 · +0x146+1 · +0x120+2 · +0x124+2 · +0x128+1 · +0x12a+1 — **시즌모드 경기진행 설정** (m = 1).
+   * null 은 웹이 이 칸을 이곳에 두기 전(2026-10-26) 저장이다 — 그때는 시즌 저장 `matchSettings` 가 들었다. 시즌 세션이 그 값을
+   * 이리로 옮긴다(`useSeasonSession` 의 이사). 둘 다 없으면 새 저장 값(이닝 · 전체)이다
+   */
+  readonly seasonMatchSettings: ModeMatchSettings | null
 }
 
 /**
@@ -192,6 +199,8 @@ export const EMPTY_MODE_SAVE: ModeSave = {
   generalMatchSettings: NEW_SAVE_MATCH_SETTINGS,
   // 생성자 0x9f26c 가 +0x11e 를 건드리지 않고 앞서 0xe44 바이트를 0 으로 민다 — 0
   matchSettingsSeen: false,
+  // 생성자는 m = 1 에도 새 저장 값을 넣지만, 웹은 옛 시즌 저장의 값을 옮겨 올 자리로 비워 둔다(읽는 쪽이 새 저장 값으로 본다)
+  seasonMatchSettings: null,
 }
 
 /** 원본 모드 번호 범위 — 0x327b8 의 점프표 0xcf048 은 1~9 */
@@ -237,6 +246,10 @@ export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = NEW_SAVE_
     // 옛 세이브(칸 없음)는 새 저장 값 — 일반모드 설정은 예전 웹이 저장하지 않았다
     generalMatchSettings: normalizeModeMatchSettings(value.generalMatchSettings),
     matchSettingsSeen: value.matchSettingsSeen === true,
+    // 옛 세이브(칸 없음)는 null — 시즌 세션이 시즌 저장의 값을 옮겨 온다
+    seasonMatchSettings: value.seasonMatchSettings === null || value.seasonMatchSettings === undefined
+      ? null
+      : normalizeModeMatchSettings(value.seasonMatchSettings),
   }
 }
 
@@ -262,6 +275,11 @@ function normalizeModeMatchSettings(raw: unknown): ModeMatchSettings {
 /** 일반모드 설정 창 확인 0x60376 — m = 0 칸을 되쓴다(0x1f1b9 로 파일까지) */
 export function withGeneralMatchSettings(save: ModeSave, settings: ModeMatchSettings): ModeSave {
   return { ...save, generalMatchSettings: settings }
+}
+
+/** 시즌 0xdd 설정 창 확인 — m = 1 칸을 되쓴다(0x1f1b9 로 파일까지) */
+export function withSeasonMatchSettings(save: ModeSave, settings: ModeMatchSettings): ModeSave {
+  return { ...save, seasonMatchSettings: settings }
 }
 
 /** +0x11e = 1 — 일반 22 진입 0x31682 · 시즌 0xdd 진입 0x6548 이 설정 창을 저절로 열며 쓰고 저장한다 */

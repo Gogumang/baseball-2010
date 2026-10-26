@@ -15,6 +15,7 @@ import {
   withAceMatchResultWritten,
   withGeneralMatchSettings,
   withMatchSettingsSeen,
+  withSeasonMatchSettings,
   aceMatchHoldOf,
 } from '@/entities/mode-save/model/modeSave'
 import type {
@@ -26,6 +27,10 @@ export interface MatchSettingsSeenPort {
   readonly read: () => boolean
   /** +0x11e = 1 · 저장 (0x31682 · 0x6548) */
   readonly markSeen: () => void
+  /** 전역 m = 1 칸(시즌 경기진행 설정) — 없으면(옛 저장) null (`ModeSave.seasonMatchSettings`) */
+  readonly readSeasonSettings: () => ModeMatchSettings | null
+  /** 시즌 0xdd 설정 창 확인 — m = 1 칸에 되쓰고 저장 */
+  readonly writeSeasonSettings: (settings: ModeMatchSettings) => void
 }
 
 export interface ModeSaveSession {
@@ -106,6 +111,8 @@ export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = NEW_SAV
   const matchSettingsSeenPort = useMemo<MatchSettingsSeenPort>(() => ({
     read: () => saveRef.current.matchSettingsSeen,
     markSeen: () => update(withMatchSettingsSeen),
+    readSeasonSettings: () => saveRef.current.seasonMatchSettings,
+    writeSeasonSettings: (settings) => update((current) => withSeasonMatchSettings(current, settings)),
   }), [update])
 
   return useMemo(

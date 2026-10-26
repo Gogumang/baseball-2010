@@ -169,7 +169,11 @@ function pitcherSavesPlusWinsOf(career: PitcherCareer): number {
 /** 0xb63c0(내 투수 레코드 0x1fbd0) — 마투수가 아니면 폼(2×타입 + 손) & 1 = 손(1 좌완) (b63c0~b640e) */
 const isLeftHandedPitcher = (career: PitcherCareer) => (career.handIndex & 1) === 1
 
-/** 지난 해 i(0부터)의 연도 기록 0x1fa78(i) — 없으면(옛 저장) 0 으로 본다 (⚠️ 근사(남김 — 웹 기록 꼴)) */
+/**
+ * 지난 해 i(0부터)의 연도 기록 0x1fa78(i). 옛 저장의 모자란 칸은 불러올 때 `migratePitcherYearlyStats` 가 앞에 채운다 — 하나만
+ * 모자라면 통산 − 이번 해로 되살리고, 둘 이상이면 해마다 나눈 값이 남아 있지 않아 합을 가장 최근 칸에 두고 앞 칸은 0 이다.
+ * 이사를 안 거친 값(시험)에서 칸이 없으면 0 으로 본다
+ */
 function pitcherYearOf(career: PitcherCareer, yearIndex: number) {
   const row = pitcherYearlyStatsOf(career)[yearIndex]
   return { wins: row === undefined ? 0 : toInt8(row.wins), saves: row === undefined ? 0 : toInt16(row.saves) }

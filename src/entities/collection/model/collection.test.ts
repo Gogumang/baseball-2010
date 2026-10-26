@@ -49,7 +49,8 @@ describe('기록연감 — 모은 닉네임·스킬·엔딩 (StrHOWTO[28])', () 
     const famer = { name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [] }
     const raw = { titles: [], skills: [], endings: [], hallOfFame: [famer, { name: 3 }, null] }
 
-    expect(normalizeCollection(raw).hallOfFame).toEqual([{ ...famer, slot: 0 }])
+    // +0x1b 가 없던 옛 기록은 0 으로 이사한다 (`migrateHallOfFamer`)
+    expect(normalizeCollection(raw).hallOfFame).toEqual([{ ...famer, slot: 0, salaryGrade: 0 }])
   })
 
   it('옛 저장의 skills(보유 합집합)는 버리고 나머지는 그대로 읽는다 — 새 저장엔 skills 가 없어도 된다 (r138)', () => {
@@ -180,7 +181,7 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
     const loaded = normalizeCollection({
       titles: [], skills: [], endings: [], hallOfFame: [famer, { ...famer, equippedSkillIds: 'x' }, { ...famer, specialSwingNumber: '1' }],
     })
-    expect(loaded.hallOfFame).toEqual([{ ...famer, slot: 0 }])
+    expect(loaded.hallOfFame).toEqual([{ ...famer, slot: 0, salaryGrade: 0 }])
   })
 
   it('엔딩을 보지 않은 선수는 등록할 수 없다', () => {
@@ -296,5 +297,48 @@ describe('정산 0x4ea0c 시즌 정규시즌 승리 수 +0xbf (0x9f6f0)', () => 
   it('저장에서 읽을 때 0~100 만 믿는다', () => {
     expect(normalizeCollection({ ...EMPTY_COLLECTION, seasonRegularWinCount: 7 }).seasonRegularWinCount).toBe(7)
     expect(normalizeCollection({ ...EMPTY_COLLECTION, seasonRegularWinCount: 101 }).seasonRegularWinCount).toBeUndefined()
+  })
+})
+
+describe('r278 Q-05 — 명전 기록 +0x2c 와 시즌 영입이 지우는 줄 (0x1f654 · 0xc554 c584 · 0xb6cc4 · 0xb8e28)', () => {
+  const 넉넉 = 99999
+
+  it('등록은 그 순간 투수 레코드 +0x2c(스태미나)를 통째로 베낀다', () => {
+    const 지친 = { ...createPitcherCareer('지친'), endingIndex: 5, stamina: 4321 }
+    const result = registerHallOfFamePitcher(EMPTY_COLLECTION, 지친, 넉넉)
+    if (result.kind !== '등록') throw new Error('등록 실패')
+    expect(result.collection.hallOfFamePitchers[0]?.stamina).toBe(4321)
+  })
+
+  it('시즌 영입은 명전 기록 자체의 줄을 0 으로 · 투수 +0x2c 를 10000 으로 고친다 — 다시 불러도 같은 객체', () => {
+    const 지친 = { ...createPitcherCareer('지친'), endingIndex: 5, stamina: 4321 }
+    const result = registerHallOfFamePitcher(EMPTY_COLLECTION, 지친, 넉넉)
+    if (result.kind !== '등록') throw new Error('등록 실패')
+    const withLine = {
+      ...result.collection,
+      hallOfFamePitchers: result.collection.hallOfFamePitchers.map((famer) => ({ ...famer, recordLine: [27, 3, 1, 9, 120, 2] })),
+    }
+    const recruited = withHallOfFameRecordSlot(withLine, '투수', 0xb4, 6)
+    expect(recruited.hallOfFamePitchers[0]).toMatchObject({ recordSlot: 6, recordLine: [0, 0, 0, 0, 0, 0], stamina: 10000 })
+    expect(withHallOfFameRecordSlot(recruited, '투수', 0xb4, 6)).toBe(recruited)
+    const batter = { ...EMPTY_COLLECTION, hallOfFame: [{
+      name: '타', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot: 0,
+      recordLine: [100, 30, 5, 1, 7, 20],
+    }] }
+    expect(withHallOfFameRecordSlot(batter, '타자', 0xc8, 2).hallOfFame[0]).toMatchObject({ recordSlot: 2, recordLine: [0, 0, 0, 0, 0, 0] })
+  })
+
+  it('옛 저장 이사 — +0x2c 가 없던 투수는 10000, +0x1b 가 없던 기록은 0 으로 채우고 저장 → 불러오기를 돌아도 같다', () => {
+    const result = registerHallOfFamePitcher(EMPTY_COLLECTION, { ...createPitcherCareer('옛'), endingIndex: 5 }, 넉넉)
+    if (result.kind !== '등록') throw new Error('등록 실패')
+    const saved = JSON.parse(JSON.stringify(result.collection)) as { hallOfFamePitchers: Record<string, unknown>[] }
+    const 옛 = { ...saved.hallOfFamePitchers[0] }
+    delete 옛.stamina
+    delete 옛.salaryGrade
+    const migrated = normalizeCollection({ ...saved, hallOfFamePitchers: [옛] })
+    expect(migrated.hallOfFamePitchers[0]).toMatchObject({ stamina: 10000, salaryGrade: 0 })
+    const roundTrip = normalizeCollection(JSON.parse(JSON.stringify(migrated)))
+    expect(roundTrip).toEqual(migrated)
+    expect(normalizeCollection({ ...saved, hallOfFamePitchers: [{ ...옛, stamina: 'x' }] }).hallOfFamePitchers).toEqual([])
   })
 })

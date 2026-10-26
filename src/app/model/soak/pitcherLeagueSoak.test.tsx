@@ -68,7 +68,7 @@ import type { NariGameMatch, NariGameSavePort } from '@/pages/management/lib/nar
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   MAXIMUM_ABILITY, enterPitcherGameEvaluation, equippedPitcherAbilityOf, isPitcherSkillEquipped, pitcherAbilityLimitsOf,
-  pitcherRecordLineOf,
+  migratePitcherYearlyStats, pitcherRecordLineOf,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import { magicTrainingCellBlockOf, magicTrainingCellCostOf } from '@/entities/pitcher-career/model/pitcherManagement'
@@ -1258,7 +1258,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     }
     if (options.startPatch !== undefined && result.current.career !== null) {
       const created = result.current.career
-      act(() => result.current.actions.save({ ...created, ...options.startPatch }))
+      // 연차를 건너뛴 저장은 지난 해 칸(0x1fa78)이 모자란 옛 꼴이다 — 불러오기 이사(`migratePitcherYearlyStats`)를 먼저 거친 꼴로 둔다
+      act(() => result.current.actions.save(migratePitcherYearlyStats({ ...created, ...options.startPatch })))
     }
     for (; steps < maxSteps; steps += 1) {
       // '이벤트' 는 연말 사슬(이어하기 100 진입 0x1c154 가 그 이벤트로 다시 서는 자리)에서만 끊는다 — 장소 · 관리 이벤트에서 끊으면

@@ -665,6 +665,14 @@ export interface TeamGameProgress {
    */
   readonly pitcherLines: readonly GamePitcherLine[]
   /**
+   * **상대 마투수의 경기 탈삼진** — 마운드 투수 경기 기록 `0xb8cec` = `team + 0x244 + 4·team[0]` 의 R[0] 중 상대 마투수 몫.
+   * 마투수는 리그 붙박이 표 칸이 없어 `pitcherLines` 에서 빠지므로(`chargeEntryLine`) 정산 0xa8024 가 그 R[0] 을 올리는 자리
+   * (상대 마운드 삼진 — 사람 타석 · 간이 타석)에서 따로 센다. 돌발 b6 == 3(0x8ed14)이 읽는다(`burstGameRecordOf`).
+   * 마투수는 팀에 하나이고 내려가면 다시 못 오른다 — 교체 때 0 으로 둔다. 2026-10-26 에 더했다 — 옛 이어하기 블록은
+   * `migrateTeamGameProgress` 가 0 으로 채운다
+   */
+  readonly opponentAceStrikeouts: number
+  /**
    * 우리 팀 **명단** — 원본 `team+0xe` 의 "칸 → 선수" 목록이다.
    * 칸 0~8 이 타순, 9 부터가 벤치다. 대타(`pinchHit`)가 두 칸을 맞바꾸고 빠진 선수를 지운다.
    */
@@ -1308,6 +1316,7 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
     ourPitcherCounters: EMPTY_MOUND_COUNTERS,
     opponentPitcherCounters: EMPTY_MOUND_COUNTERS,
     pitcherLines: [],
+    opponentAceStrikeouts: 0,
     pitcherJustChanged: false,
     atBatPrepared: false,
     sceneConfirm: null,
@@ -3000,6 +3009,7 @@ function finishBatterOutcome(
     game,
     // 득점 처리 0xa5c34 — 한 점씩 승·패·세 칸을 고친다
     decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
+    opponentAceStrikeouts: opponentAceStrikeoutsAfter(progress, outcome.kind === '삼진'),
     // 정산 0xa8024 — 상대 마운드 투수 레코드에 아웃(결과 코드 5·0xd)·실점·탈삼진
     // 실점은 들어온 주자의 책임 투수(주자+0x30)에게 (a8ee4)
     ...chargeRunsToResponsible(
@@ -4777,8 +4787,8 @@ function readyAtBat(progress: TeamGameProgress, random: RandomPort): TeamGamePro
  * 웹 칸: 안타·홈런 = 타순 칸 기록 `+0x12`·`+0x13`(`*EntryRecords[칸].hits`·`.homeRuns` — 양 팀 같은 칸),
  * 우리 투수 탈삼진 = `recordTally.moundStrikeouts`(교체 때 0), 상대 투수 탈삼진 = 그 투수의 경기 줄(`pitcherLines`).
  *
- * ⚠️ 미구현(남김 — 웹 기록 꼴 · 지금 표로는 결과 같음): **상대 마투수의 탈삼진**은 웹이 들고 있지 않아 0 이다(마투수는 리그 붙박이 표 칸이 없어 경기 줄이 없다).
- *    시즌 표(XlsSEASON_BURST 56행)에는 b6 ≠ 0 인 행이 하나도 없어 지금 경기 결과는 같다 (b6 은 타자·투수편 표만 쓴다).
+ * **상대 마투수의 탈삼진**은 마투수가 붙박이 표 칸이 없어 경기 줄에서 빠지므로 `opponentAceStrikeouts` 로 따로 센다(r278).
+ * 시즌 표(XlsSEASON_BURST 56행)에는 b6 ≠ 0 인 행이 하나도 없어 지금 경기 결과는 바뀌지 않는다 (b6 은 타자·투수편 표만 쓴다).
  */
 export function burstGameRecordOf(
   progress: TeamGameProgress,
@@ -4798,7 +4808,7 @@ export function burstGameRecordOf(
     return {
       hitsInGame: progress.ourEntryRecords[slot]?.hits ?? 0,
       homeRunsInGame: progress.ourEntryRecords[slot]?.homeRuns ?? 0,
-      strikeoutsInGame: line?.strikeouts ?? 0,
+      strikeoutsInGame: entry !== undefined && entry.aceIndex >= 0 ? progress.opponentAceStrikeouts : line?.strikeouts ?? 0,
     }
   }
   return {
@@ -5194,6 +5204,8 @@ function applyPitcherChange(
       progress.options.aceLevels,
     ),
     opponentPitcherCounters: EMPTY_MOUND_COUNTERS,
+    // 새 투수의 경기 기록 R 은 이 경기에 처음 서니 0 이다 (우리 쪽 `recordTally.moundStrikeouts` 와 같다)
+    opponentAceStrikeouts: 0,
   }
 }
 
@@ -6049,6 +6061,7 @@ function playAutoOffenseAtBat(
       game,
       // 간이 엔진 득점(0xc0fb4·0xc1054)도 같은 0xa5c34 를 부른다
       decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
+      opponentAceStrikeouts: opponentAceStrikeoutsAfter(progress, outcome.kind === '삼진'),
       atBat: createAtBat(),
       atBatPrepared: false,
       // 투구마다 state[0xd]·state[0xe] 가 내려간다 (0xa5e14 의 a5e72·a5e7c, c26ca)
@@ -6261,6 +6274,26 @@ function addRunsToCounters(
 }
 
 /** 지금 마운드 투수 줄에 더한다 — 붙박이 표 칸이 없는 투수(마투수)는 리그 기록표에 칸이 없어 건너뛴다 */
+/**
+ * 상대 마운드 삼진 하나 뒤의 `opponentAceStrikeouts` — 지금 상대 투수가 마투수일 때만 센다(붙박이 투수는 `pitcherLines` 가 든다).
+ * 정산 0xa8024 의 삼진 콜 0xa7c4c 가 지금 마운드 투수 R[0] 을 올리는 자리와 같다 (`pitcherLines` 의 삼진과 같은 두 곳)
+ */
+function opponentAceStrikeoutsAfter(progress: TeamGameProgress, strikeout: boolean): number {
+  if (!strikeout) return progress.opponentAceStrikeouts
+  const entry = pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)
+  return entry !== undefined && entry.aceIndex >= 0 ? progress.opponentAceStrikeouts + 1 : progress.opponentAceStrikeouts
+}
+
+/**
+ * **옛 이어하기 블록 이사** — 진행 꼴이 넓어지기 전에 쓴 블록에 빠진 칸을 채운다. 저장 블록을 읽는 두 곳(일반 `generalGameOfSave` ·
+ * 시즌 `seasonGameProgressOf`)이 꼴을 가린 뒤 부른다. 빠진 칸이 없으면 같은 객체
+ * - `opponentAceStrikeouts`(2026-10-26): 0 — 옛 블록은 상대 마투수 삼진을 안 셌다(그 경기 남은 몫만 센다)
+ */
+export function migrateTeamGameProgress(progress: TeamGameProgress): TeamGameProgress {
+  const raw = progress as Partial<TeamGameProgress>
+  return typeof raw.opponentAceStrikeouts === 'number' ? progress : { ...progress, opponentAceStrikeouts: 0 }
+}
+
 function chargeMoundLine(
   progress: TeamGameProgress,
   ours: boolean,
