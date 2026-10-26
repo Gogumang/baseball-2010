@@ -23,7 +23,6 @@ import { PitchingScreen } from '@/pages/pitching/ui/PitchingScreen'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useFreePassPlayStart } from '@/pages/defense/model/useFreePassPlayStart'
 import { useHitByPitchWait } from '@/pages/defense/model/useHitByPitchWait'
-import { pitchResultEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { RESULT_WAIT_TICKS_AT_BAT_END } from '@/pages/game/lib/batterRecordAlert'
 import { isWalkPlayResult } from '@/features/defense-play/model/walkPlay'
 import { AutoPlayRelayScreen } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
@@ -859,10 +858,11 @@ function useMissionPitchSceneBeforePlay(
     // 일시정지 팝업(0x741a0)이 장면 틱을 세운다(0x52cc6) — 투구 화면이 알린다
     isFrozen: isPopupFrozen,
   })
-  // 투수 미션 사구 — 놓은 틱에서 0x12 틱 0 까지 + 0x12 대기 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
+  // 투수 미션 사구 — 0x12 대기 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22). 세션은 못 맞힌 공의 공 도착을 0x12 진입
+  // 틀에 돌려(r293) 붙든 칸이 0x12 틱 0 그림에 서므로 그 그림부터 0x1f − 1
   useHitByPitchWait({
     hold: session.pendingBenchClearing,
-    waitTicks: pitchResultEntryDelayTicksOf(lastThrow?.pitch.frameCount ?? 0) - 1 + RESULT_WAIT_TICKS_AT_BAT_END,
+    waitTicks: RESULT_WAIT_TICKS_AT_BAT_END - 1,
     isFrozen: isPopupFrozen,
     random: session.random,
     onJudge: session.actions.judgeHitByPitch,

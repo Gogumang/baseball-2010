@@ -649,17 +649,13 @@ function TeamGameScene({
     resolution !== null,
   )
   const isReplaying = play !== null && play !== shownPlay && play.ticks.length > 0 && isReplayReady
-  // 사구 — 0x12 대기 틱 31 의 4e74c 판정(공 끝 칸 채우기와 같은 셈: 타석 공은 판정 틀 다음 그림이 틱 0, 내 공은 놓은 틱에서
-  // 0x12 틱 0 까지를 더한다), 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
+  // 사구 — 0x12 대기 틱 31 의 4e74c 판정(공 끝 칸 채우기와 같은 셈: 타석 공은 판정 틀 다음 그림이 틱 0, 내 공은 0x12 진입 틀
+  // (`enterPitchResult` — r293)에 붙든 칸이 서 그 그림이 틱 0 이라 하나 적다), 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
   const heldHitByPitch = progress.pendingBenchClearing
   useHitByPitchWait({
     hold: heldHitByPitch,
     waitTicks:
-      heldHitByPitch?.side === '수비'
-        ? pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order) -
-          1 +
-          RESULT_WAIT_TICKS_AT_BAT_END
-        : RESULT_WAIT_TICKS_AT_BAT_END,
+      heldHitByPitch?.side === '수비' ? RESULT_WAIT_TICKS_AT_BAT_END - 1 : RESULT_WAIT_TICKS_AT_BAT_END,
     isFrozen: isMenuOpen || overlay === '조작방법',
     random,
     onJudge: actions.judgeHitByPitch,

@@ -48,8 +48,10 @@ import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
-import { playSoundIdsAfterSceneTicks, resultEntryStepTimingOf, type PitchStepSoundTiming } from '@/features/play-game/model/sceneTickSounds'
-import { clearGameSceneTimeout, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  playSoundIdsAfterSceneTicks, resultEntryStepTimingOf, scheduleSceneFrameUpdate, type PitchStepSoundTiming,
+} from '@/features/play-game/model/sceneTickSounds'
+import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import type {
   PitchInput,
   PitcherGameOptions,
@@ -189,10 +191,10 @@ export function usePitcherGame(
    * 붙든 공(`pendingPitchArrival`)의 0x12 진입 틀 시계 — 경기 화면이 내려가면 거둔다(원본도 그 틀에 닿지 않는다). 장면 시계라 공용 창이
    * 서 있으면 함께 선다
    */
-  const resultEntryTimerRef = useRef<number | null>(null)
+  const cancelResultEntryRef = useRef<(() => void) | null>(null)
   useEffect(() => () => {
-    clearGameSceneTimeout(resultEntryTimerRef.current)
-    resultEntryTimerRef.current = null
+    cancelResultEntryRef.current?.()
+    cancelResultEntryRef.current = null
   }, [])
 
   // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 모드 3 은 적재 상태 8 끝(48b20)에서 0xc 로 오므로 로딩 판이 끝나는 자리다
@@ -268,9 +270,9 @@ export function usePitcherGame(
         // 0x12 진입 틀 — 0x3dfac 의 굴림(`rollPassedBall` · 판 시작)과 그 뒤 걸음. 공이 나는 동안의 관리자 틱 굴림(마구 공 파티클 따위)이
         // 먼저 난다. 걸음의 소리는 그 틀(지금), 0xf 진입 교체 소리는 남은 틱 뒤(`resultEntryStepTimingOf`)
         const releaseTiming = releaseTimingOf(before, released)
-        clearGameSceneTimeout(resultEntryTimerRef.current)
-        resultEntryTimerRef.current = setGameSceneTickTimeout(() => {
-          resultEntryTimerRef.current = null
+        cancelResultEntryRef.current?.()
+        cancelResultEntryRef.current = scheduleSceneFrameUpdate(() => {
+          cancelResultEntryRef.current = null
           step(
             (current) => enterPitchResult(current, random),
             (entryBefore, entryAfter) => [arrivalCallSoundIdOf(entryBefore, entryAfter)],

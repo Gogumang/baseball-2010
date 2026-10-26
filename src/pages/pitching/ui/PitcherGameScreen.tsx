@@ -448,10 +448,11 @@ function PitcherGameScene({
     notePitchPlayOpened()
   }, [arrivalPlay, notePitchPlayOpened])
   useSceneTick(() => setPitchWaitTicks((left) => Math.max(0, left - 1)), pitchWaitTicks > 0 && !isPopupOpen)
-  // 사구 — 놓은 틱에서 0x12 틱 0 까지 + 0x12 대기 틱 31 의 4e74c 판정(공 끝 칸 채우기와 같은 셈), 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22)
+  // 사구 — 0x12 대기 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0 (A-22). 진행기는 붙든 공의 공 도착을 0x12 진입 틀에 돌려
+  // (`enterPitchResult` — r293) 붙든 칸이 0x12 틱 0 그림에 서므로 그 그림부터 0x1f − 1
   useHitByPitchWait({
     hold: progress.pendingBenchClearing,
-    waitTicks: pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0) - 1 + RESULT_WAIT_TICKS_AT_BAT_END,
+    waitTicks: RESULT_WAIT_TICKS_AT_BAT_END - 1,
     isFrozen: isPopupOpen || asksGiveUp,
     random,
     onJudge: actions.judgeHitByPitch,

@@ -53,6 +53,13 @@ import {
   markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest,
 } from '@/shared/lib/commonWindow/commonWindow'
 import { AIM_STILL, aimAfterTicks, aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
+import { runSceneFrameUpdatesForTest } from '@/entities/particle/model/sceneParticleManager'
+
+/** 투수 미션 공 하나 — 놓는 걸음 뒤 못 맞힌 공의 0x12 진입 틀 갱신(공 도착 0x3dfac — `scheduleSceneFrameUpdate`)까지 돌린다 */
+const 던지기 = (throwIt: () => void) => {
+  act(throwIt)
+  act(() => runSceneFrameUpdatesForTest())
+}
 
 /**
  * 이벤트 112 의 match 명령이 여는 마선수 대결 — 이기면 114, 지면 115 로 돌아가야 한다.
@@ -248,6 +255,8 @@ function drawsOfOnePitch(missionId: number, gaugeCell = 9, gaugeSettingOn = true
     // 조준(0x10)에서 안 움직이고 곧장 OK — 그 틱의 0x39c5c 가 한 번 돈다(투수 미션이면 흔들림 굴림)
     session.handleThrow(PITCH_TYPES[0], session.aimTick(aimStartOf(1), AIM_STILL), gaugeCell, gaugeSettingOn)
   })
+  // 못 맞힌 공의 공 도착 0x3dfac 은 0x12 진입 틀 갱신이다 — 그 틀까지 돌린다
+  act(() => runSceneFrameUpdatesForTest())
   const drawn = counter.drawn() - before
   const banner = rendered.result.current.runner.bannerText
   // 이 공이 낸 타석 판정 — 타석 화면은 맞는 순간 결과 글자를 안 띄우므로(1e53a14) 글자 대신 판정 코드 · 쏜 패턴으로 가른다
@@ -849,7 +858,7 @@ describe('투수 미션 CPU 도루 출발 표시 — st[0x15 + i] (0x520de → 0
           주자판끝(rendered)
           continue
         }
-        act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
+        던지기(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
         // 도루 판(종류 5)은 붙들어 수비 화면이 송구 키(+0x160)를 받으며 돈다 — 판 끝이 같은 타석 다음 공(0xf)을 낸다
         const held = rendered.result.current.session.pendingRunnerPlay
         if (held !== null) {
@@ -889,7 +898,7 @@ function 투수미션붙든판까지(seed: number, random: RandomPort) {
       act(() => session.actions.finishBenchClearing(false))
       continue
     }
-    act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
+    던지기(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
     if (rendered.result.current.session.pendingRunnerPlay !== null) return rendered
   }
   rendered.unmount()
@@ -1318,7 +1327,7 @@ function sessionInBenchClearing() {
       const current = rendered.result.current
       const before = counter.drawn()
       // 구석 칸들을 돌려 가며 게이지 없이 — 사구가 나올 만한 자리
-      act(() => current.handleThrow(PITCH_TYPES[0], CORNER_AIMS[pitch % CORNER_AIMS.length], 0, false))
+      던지기(() => current.handleThrow(PITCH_TYPES[0], CORNER_AIMS[pitch % CORNER_AIMS.length], 0, false))
       // 사구는 공 도착에서 굴림 없이 붙든다(0x12 대기) — 화면 대신 틱 31 의 판정 · 다음 틀 진입을 부른다 (A-22)
       if (rendered.result.current.pendingBenchClearing?.phase === 'wait') {
         expect(counter.drawn() - before).toBeLessThan(45)
@@ -1341,7 +1350,7 @@ describe('투수 미션 사구 뒤 벤치 클리어링 — 0x4e72c → 0x1e 는 
     const held = rendered.result.current
     expect(held.pendingBenchClearing?.outcome.kind).toBe('사구')
     const run = held.pitcherRun
-    act(() => held.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
+    던지기(() => held.handleThrow(PITCH_TYPES[0], aimStartOf(1), 0, false))
     expect(rendered.result.current.pitcherRun).toBe(run)
 
     act(() => rendered.result.current.actions.finishBenchClearing(false))
@@ -1425,7 +1434,7 @@ describe('투수 미션 마구 — 남은 횟수 팀+0x28 과 공+0x10', () => {
   it('웨이브 볼(+0x18 = 2)은 0xd84ff[2] = 5 회 — 던질 때마다 줄고 다시 세우면 새로 채운다', () => {
     const { rendered, mission } = 마구세션()
     expect(rendered.result.current.pitcherMagicRemaining).toBe(5)
-    act(() => rendered.result.current.handleThrow(마구칸(5), aimStartOf(1), 0, false))
+    던지기(() => rendered.result.current.handleThrow(마구칸(5), aimStartOf(1), 0, false))
     expect(rendered.result.current.pitcherMagicRemaining).toBe(4)
     act(() => rendered.result.current.actions.begin(mission))
     expect(rendered.result.current.pitcherMagicRemaining).toBe(5)
@@ -1437,12 +1446,12 @@ describe('투수 미션 마구 — 남은 횟수 팀+0x28 과 공+0x10', () => {
       if (rendered.result.current.pitcherRun?.status !== '진행중' || rendered.result.current.pendingDefensePlay !== null) {
         return
       }
-      act(() => rendered.result.current.handleThrow(마구칸(5 - thrown), aimStartOf(1), 0, false))
+      던지기(() => rendered.result.current.handleThrow(마구칸(5 - thrown), aimStartOf(1), 0, false))
     }
     expect(rendered.result.current.pitcherMagicRemaining).toBe(0)
     if (rendered.result.current.pitcherRun?.status !== '진행중' || rendered.result.current.pendingDefensePlay !== null) return
     const before = rendered.result.current.pitcherRun
-    act(() => rendered.result.current.handleThrow(마구칸(0), aimStartOf(1), 0, false))
+    던지기(() => rendered.result.current.handleThrow(마구칸(0), aimStartOf(1), 0, false))
     expect(rendered.result.current.pitcherRun).toBe(before)
   })
 })
@@ -1481,7 +1490,7 @@ describe('투수편 마선수 대결 — 투수 미션 team − 1 을 던지고 
         act(() => session.actions.finishBenchClearing(false))
         continue
       }
-      act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 9, true))
+      던지기(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 9, true))
     }
     const status = rendered.result.current.pitcherRun?.status
     let isWin: boolean | null = null
@@ -1703,7 +1712,7 @@ describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히�
           continue
         }
         const 앞 = rendered.result.current.runner.atBat
-        act(() => session.handleThrow(PITCH_TYPES[0], aimAfterTicks(1, { dx: (pitch % 3) - 1, dy: 1 - Math.floor((pitch % 9) / 3) }, 11), 9, true))
+        던지기(() => session.handleThrow(PITCH_TYPES[0], aimAfterTicks(1, { dx: (pitch % 3) - 1, dy: 1 - Math.floor((pitch % 9) / 3) }, 11), 9, true))
         const pending = rendered.result.current.session.pendingDefensePlay
         if (pending?.isFoulPlay !== true) continue
         파울판 += 1
@@ -2149,7 +2158,7 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
         act(() => session.actions.finishBenchClearing(false))
         continue
       }
-      act(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 9, true))
+      던지기(() => session.handleThrow(PITCH_TYPES[0], aimStartOf(1), 9, true))
     }
     const status = rendered.result.current.pitcherRun?.status
     // 판이 선 그 순간(정산 진입 0x4ea0c) 이미 적은 것들 — 판을 닫기 전

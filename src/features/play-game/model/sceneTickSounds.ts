@@ -1,5 +1,12 @@
 import { playSoundIds, type SoundPort } from '@/shared/api/audio/soundPort'
-import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  appTickOfGameSceneTick,
+  clearGameSceneTimeout,
+  gameSceneTickNow,
+  isGameSceneFrozen,
+  setGameSceneTickTimeout,
+} from '@/shared/lib/commonWindow/commonWindow'
+import { runBeforeSceneParticleTick } from '@/entities/particle/model/sceneParticleManager'
 
 /**
  * **경기 장면 틱 `ticks` 뒤 틀 머리에 소리를 낸다** — 0 이하면 지금 낸다. 원본 경기 장면은 소리를 그 소리를 부른 상태 전이의 틀에서
@@ -49,6 +56,35 @@ export function resultEntryStepTimingOf(release: PitchStepSoundTiming): PitchSte
     resultEntryTicks: 0,
     pitchSelectionTicks: Math.max(0, release.pitchSelectionTicks - release.resultEntryTicks),
   }
+}
+
+/**
+ * **장면 틱 `ticks` 뒤 틀의 갱신** — 그 틀 머리(장면 틱 시계)에 `update` 를 부르되, 그 틀의 관리자 틱 0x6de85 가 먼저 그 틀을 잡으려
+ * 하면 그 앞에서 부른다(`runBeforeSceneParticleTick`) — 원본 틀 차례 갱신(52e14) → 관리자 틱(53048)을 두 시계 울림 차례와 무관하게 고정한다.
+ * 사람이 던진 공의 0x12 진입 0x3dfac(공 도착 — `enterPitchResult` 따위)이 쓴다: 공이 나는 틀들의 관리자 틱 굴림은 그 앞, 진입 틀의 것은
+ * 그 뒤다. 공용 창이 서 있으면 함께 선다. 돌려준 함수로 거둔다(이미 돌았으면 아무 일 없다).
+ */
+export function scheduleSceneFrameUpdate(update: () => void, ticks: number): () => void {
+  const dueTick = gameSceneTickNow() + Math.max(0, ticks)
+  let isDone = false
+  let timer: number | null = null
+  let removeHook: () => void = () => {}
+  const cancel = () => {
+    isDone = true
+    clearGameSceneTimeout(timer)
+    removeHook()
+  }
+  const run = () => {
+    if (isDone) return
+    cancel()
+    update()
+  }
+  removeHook = runBeforeSceneParticleTick(
+    (appTick) => !isGameSceneFrozen() && appTick >= appTickOfGameSceneTick(dueTick),
+    run,
+  )
+  timer = setGameSceneTickTimeout(run, ticks)
+  return cancel
 }
 
 /**

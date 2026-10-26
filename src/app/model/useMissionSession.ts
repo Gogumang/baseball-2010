@@ -158,7 +158,9 @@ import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel,
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
-import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
+import {
+  BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks, scheduleSceneFrameUpdate,
+} from '@/features/play-game/model/sceneTickSounds'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
@@ -178,7 +180,7 @@ import {
 import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
-import { clearGameSceneTimeout, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -652,14 +654,14 @@ export function useMissionSession({
    * 못 맞힌 공의 0x12 진입 틀 시계(`handleThrow`) — 서 있는 동안은 공이 날거나 0x12 라 다음 공 · 견제가 없다. 미션을 나가거나 포기하면
    * 거둔다(원본도 그 틀에 닿지 않는다). 장면 시계라 공용 창이 서 있으면 함께 선다
    */
-  const pitcherResultEntryTimerRef = useRef<number | null>(null)
+  const cancelPitcherResultEntryRef = useRef<(() => void) | null>(null)
   const cancelPitcherResultEntry = () => {
-    clearGameSceneTimeout(pitcherResultEntryTimerRef.current)
-    pitcherResultEntryTimerRef.current = null
+    cancelPitcherResultEntryRef.current?.()
+    cancelPitcherResultEntryRef.current = null
   }
   useEffect(() => () => {
-    clearGameSceneTimeout(pitcherResultEntryTimerRef.current)
-    pitcherResultEntryTimerRef.current = null
+    cancelPitcherResultEntryRef.current?.()
+    cancelPitcherResultEntryRef.current = null
   }, [])
   /**
    * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
@@ -1516,7 +1518,7 @@ export function useMissionSession({
     // 화면이 수비를 돌리는 동안에는 다음 공이 나가지 않는다 (원본 0x17 이 도는 동안 0xf 로 안 간다) — 실시간 주자 판도 같다
     if (pendingDefensePlay !== null || pendingRunnerPlayRef.current !== null) return
     // 앞 공이 아직 날거나 0x12 진입 전이다(0x12 진입 틀 시계)
-    if (pitcherResultEntryTimerRef.current !== null) return
+    if (cancelPitcherResultEntryRef.current !== null) return
     // 벤치 클리어링 연출(0x1e)이 도는 동안에도 다음 공은 없다
     if (pendingBenchClearing !== null) return
 
@@ -1748,7 +1750,8 @@ export function useMissionSession({
      * **0x12 진입 0x3dfac 과 그 뒤** — `entryDelayTicks` 는 지금에서 0x12 진입 틀까지 남은 장면 틱이다. 못 맞힌 공은 그 틀에 부르고(0),
      * 맞은 공(파울 각 · 타구 — 0x3dfac 을 안 지난다)은 놓는 걸음에 부른다(`resultEntryTicks`)
      */
-    const finishThrow = (entryDelayTicks: number) => {    // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다. 판 시작까지만 연다 —
+    const finishThrow = (entryDelayTicks: number) => {
+      // 공 도착 0x3dfac — 못 맞힌 공이면 0.1% 폭투·포일(종류 9)이나 CPU 가 건 도루(종류 5) 판을 연다. 판 시작까지만 연다 —
       // 상태 0x17 키 0x53420 은 조작 [+0xc] ≠ 0(사람 수비)이면 판 종류 · 모드를 안 보고 송구 0x533c8 → 메시지 0x588 → 0x51890 →
       // 플레이 vt60 0xb3118 → +0x160 을 적고, 슬롯 2 의 52602 가 종류 ∉ 0x58c {2, 3, 7, 8, 10} 이면 vt4c 0xb45dc(b4660 사람 목표)를
       // 부른다 — 도루(5) · 폭투(9) 판은 사람 키로 던지므로 붙들어 화면이 실시간으로 돌린다(투수편 `startPitch(…, true)` 와 같은 길)
@@ -1911,8 +1914,8 @@ export function useMissionSession({
     // 못 맞힌 공 — 공 도착 0x3dfac(`rollPassedBall` · 판 시작 굴림)은 0x12 진입 틀이다. 공이 나는 동안의 관리자 틱 굴림(마구 공 파티클
     // 따위 — 프레임 끝 0x6de85)이 먼저 나도록 그 틀까지 미룬다(r293). 그동안 판정 칸은 아직 안 지워졌다
     setLastPitchJudgementCleared(false)
-    pitcherResultEntryTimerRef.current = setGameSceneTickTimeout(() => {
-      pitcherResultEntryTimerRef.current = null
+    cancelPitcherResultEntryRef.current = scheduleSceneFrameUpdate(() => {
+      cancelPitcherResultEntryRef.current = null
       finishThrow(0)
     }, resultEntryTicks)
   }
@@ -2547,7 +2550,7 @@ export function useMissionSession({
       if (pendingDefensePlay !== null || pendingBenchClearing !== null || pickoffReplay !== null) return
       if (pendingRunnerPlayRef.current !== null) return
       // 공이 날거나 0x12 진입 전(0x12 진입 틀 시계)도 0xf 가 아니다
-      if (pitcherResultEntryTimerRef.current !== null) return
+      if (cancelPitcherResultEntryRef.current !== null) return
       const { bases } = pitcherRun
       const play = pickoffPlayForKey(webKey, (base) =>
         base === 1 ? bases.first : base === 2 ? bases.second : bases.third,
