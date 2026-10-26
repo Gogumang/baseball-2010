@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 export interface BaseState {
   readonly first: boolean
@@ -100,11 +101,14 @@ function advanceForHit(bases: BaseState, hitBases: 1 | 2 | 3): AdvanceResult {
 /**
  * **간이 엔진의 볼넷** (0xc1818 c1918~c194a, 디스어셈 대조 — 확정): 타자를 주자 목록 0번 칸에 넣고(0xa93ac, 루 0) 곧장
  * `0xc0fb4(sim, 1)` 로 **모든 주자를 한 루씩** 민다 — 안타 진루와 같은 함수다. 밀려나지 않는 주자도 가므로(2루 주자 → 3루,
- * 3루 주자 → 득점) 밀어내기가 아니다. ⚠️ 원본 버그 그대로.
+ * 3루 주자 → 득점) 밀어내기가 아니다. ⚠️ 원본 버그(B-14).
  * 사람 경기의 볼넷·사구(판정 A 0xae24c → 상태 0x17 밀어내기 주루)는 `advanceRunners` 의 밀어내기다.
+ *
+ * **고침(`bugfixes.json` B-14, 기본 켬)**: 사람 경기와 같은 밀어내기 — 밀려난 주자만 한 루 가고 만루에서만 1점.
+ * 이 함수는 굴림을 안 쓰지만, 루가 달라지면 뒤이은 도루 굴림(후보가 있을 때만)·땅볼 진루 판정이 달라져 난수 차례가 바뀔 수 있다.
  */
 export function advanceOnQuickWalk(bases: BaseState): AdvanceResult {
-  return advanceForHit(bases, 1)
+  return isBugFixed('B-14') ? advanceForWalk(bases) : advanceForHit(bases, 1)
 }
 
 /** 볼넷·사구는 밀려난 주자만 진루한다. 만루에서만 점수가 난다. */

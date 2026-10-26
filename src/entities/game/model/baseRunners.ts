@@ -124,6 +124,19 @@ export function shiftRunners(runners: BaseRunners, n: number, batter: number | n
   return { runners: { first: seats[0] ?? null, second: seats[1] ?? null, third: seats[2] ?? null }, scored }
 }
 
+/**
+ * **밀어내기 진루** — 타자가 1루에 들고 밀려난 주자만 한 루 간다(만루면 3루 주자 득점).
+ * 원본 간이 엔진 볼넷(c1918)은 `shiftRunners(…, 1, 타자)` 로 전원을 밀지만(원본 버그 B-14), 고친 길은 이 함수를 쓴다.
+ */
+export function forceRunners(runners: BaseRunners, batter: number): ShiftedRunners {
+  if (runners.first === null) return { runners: { ...runners, first: batter }, scored: [] }
+  if (runners.second === null) return { runners: { ...runners, first: batter, second: runners.first }, scored: [] }
+  if (runners.third === null) {
+    return { runners: { first: batter, second: runners.first, third: runners.second }, scored: [] }
+  }
+  return { runners: { first: batter, second: runners.first, third: runners.second }, scored: [runners.third] }
+}
+
 export interface RunnerChange {
   /** 이 플레이의 타자 (타순 칸) */
   readonly batter: number

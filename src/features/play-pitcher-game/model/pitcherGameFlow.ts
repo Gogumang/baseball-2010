@@ -167,7 +167,7 @@ import {
   saveSituationOf,
 } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import type { PitcherGameRecord } from '@/entities/pitcher-career/model/pitcherGameRecord'
-import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
+import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberOfPitch } from '@/entities/pitcher-career/model/magicPitch'
 import { FULL_STAMINA, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import {
   cancelBurst,
@@ -1225,8 +1225,14 @@ export function startPitch(
   )
   // 0x50e9c(코스 확정) 마구 소모 → 0x3de10(0x11 진입) 공+0x10 싣기 차례 — 소모 뒤 남은 > 0 일 때만 싣는다
   const magicRemaining = isMagic ? progress.magicRemaining - 1 : progress.magicRemaining
-  const ballMagicNumber =
-    isMagic && magicRemaining > 0 ? options.repertoire.magicNumber : progress.ballMagicNumber
+  // 고침(B-01)이면 마구로 던진 이 공에만 싣는다 — `ballMagicNumberOfPitch`
+  const ballMagicNumber = ballMagicNumberOfPitch({
+    previous: progress.ballMagicNumber,
+    pitchTypeNumber: input.typeNumber,
+    pitcherMagicNumber: options.repertoire.magicNumber,
+    remainingBefore: progress.magicRemaining,
+    remainingAfter: magicRemaining,
+  })
   const builtPitch = buildHumanPitch(
     {
       typeNumber: input.typeNumber,

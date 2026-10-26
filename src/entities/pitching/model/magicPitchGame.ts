@@ -1,6 +1,7 @@
 import type { PitcherAbility, PitcherRepertoireInfo } from '@/entities/pitching/model/pitch'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
-import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberAfterPitch, magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
+import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberOfPitch, magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * 상대(CPU) 투수의 한 경기 마구 상태 — 원본에서 경기에 걸쳐 남는 두 칸이다.
@@ -67,10 +68,11 @@ export function createMagicPitchGameState(
 /**
  * 한 번 던진 뒤 두 칸을 원본 순서대로 고친다.
  *   ① 소모 0x345fc — `구질 == 22 && 공+0x10 != 0 && 남은 > 0` 이면 남은−1.
- *      ⚠️ **원본 버그 그대로**: 조건이 "공에 이미 마구가 실려 있을 때" 라서 **그 경기 첫 마구는
- *      공짜다**. 그래서 한 경기에 나가는 마구는 표 값보다 하나 많다.
+ *      ⚠️ **원본 버그(B-08)**: 조건이 "공에 이미 마구가 실려 있을 때" 라서 **그 경기 첫 마구는
+ *      공짜다**. 그래서 한 경기에 나가는 마구는 표 값보다 하나 많다. 고친 길(기본)은 첫 마구도 깎는다.
  *   ② 싣기 0x3de10 — `구질 == 22 && 남은 > 0` 이면 공+0x10 = 투수+0x18.
- *      상태 예약(0xbcb48) 때문에 ① 다음에 돌고, 0 으로 되돌리는 줄이 없다.
+ *      상태 예약(0xbcb48) 때문에 ① 다음에 돌고, 0 으로 되돌리는 줄이 없다(원본 버그 B-01 —
+ *      고친 길은 `ballMagicNumberOfPitch`).
  *
  * **홈런더비(모드 7)** 는 ① 이 없다 — 0x345fc 가 0x3460e 에서 0x348d6 으로 바로 끝나 소모 0x34894 를 안 지난다
  * (`isHomeRunDerby`). ② 0x3de10 은 모드를 안 가린다. 채우기 0xaebe4 도 모드를 안 가리고(0x48d50 이 마투수 레코드를
@@ -84,13 +86,17 @@ export function advanceMagicPitchGameState(
   isHomeRunDerby = false,
 ): void {
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
-  if (!isHomeRunDerby && isMagic && state.ballMagicNumber !== 0 && state.remaining > 0) state.remaining -= 1
-  state.ballMagicNumber = ballMagicNumberAfterPitch(
-    state.ballMagicNumber,
-    typeNumber,
+  const remainingBefore = state.remaining
+  // 고침(B-08, `bugfixes.json`): 첫 마구도 횟수를 깎는다 — 한 경기 마구는 표 값만큼이다. 원본은 `공+0x10 != 0` 일 때만 깎는다
+  const ballLoaded = isBugFixed('B-08') || state.ballMagicNumber !== 0
+  if (!isHomeRunDerby && isMagic && ballLoaded && state.remaining > 0) state.remaining -= 1
+  state.ballMagicNumber = ballMagicNumberOfPitch({
+    previous: state.ballMagicNumber,
+    pitchTypeNumber: typeNumber,
     pitcherMagicNumber,
-    state.remaining,
-  )
+    remainingBefore,
+    remainingAfter: state.remaining,
+  })
 }
 
 /**

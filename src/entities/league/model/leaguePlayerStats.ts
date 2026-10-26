@@ -77,7 +77,7 @@ export interface LeaguePitcherLine {
   /**
    * +0x24 세이브.
    *
-   * ⚠️ **원본에서도 늘 0 이다 (원본 버그 그대로).** 세이브 후보는 교체 0xa60c0 이 잡지만, 같은 자리에서
+   * ⚠️ **원본에서는 늘 0 이다 (원본 버그 B-10 — 고친 길(기본)은 `winLossSave.gameEndDecisionOf` 가 세이브를 낸다).** 세이브 후보는 교체 0xa60c0 이 잡지만, 같은 자리에서
    * 세이브 종류 코드 `state+0x64` 를 1·3·9 로 세우고 그 칸을 0 으로 되돌리는 코드가 없어 경기 끝 0xa7de8 의
    * `코드 > 0 이면 건너뜀`(0xa7eaa)에 늘 걸린다 (S1 4-1, CORRECTIONS 2-1). 판정은 `winLossSave` 가 원본대로 돌리고
    * 여기서는 그 결과(`'세'`)가 오면 그대로 +1 한다 — 실제로는 오지 않는다.
@@ -496,7 +496,7 @@ function addPitcherAppearance(
   return {
     outs: line.outs + appearance.outs,
     runsAllowed: line.runsAllowed + appearance.runsAllowed,
-    // 원본에서 세이브는 늘 0 이다 — 판정이 `'세'` 를 내지 않는다 (`LeaguePitcherLine.saves` 주석)
+    // 원본에서 세이브는 늘 0 이다 — 판정이 `'세'` 를 내지 않는다 (B-10, `LeaguePitcherLine.saves` 주석)
     saves: line.saves + (appearance.decision === '세' ? 1 : 0),
     strikeouts: line.strikeouts + appearance.strikeouts,
     pitches: Math.min(MAXIMUM_PITCH_COUNT, line.pitches + appearance.pitches),

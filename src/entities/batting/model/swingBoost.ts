@@ -1,4 +1,5 @@
 import { D_LEVEL } from '@/shared/config/original/dLevel'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * **필살타법·마구 보정 구조체** — 경기 `0x34d6c(out12, 경기)` 가 만들어 타격 판정 `0xab214` 에
@@ -25,7 +26,9 @@ import { D_LEVEL } from '@/shared/config/original/dLevel'
  * - out+0xa/+0xb 는 투수 쪽이 **나중에 덮어쓴다** (0x34ff0 이 sp+8·r6 을 한 번만 쓴다) — 필살과 마구가
  *   겹치면 % 는 마구 값이다. 투수가 마선수도 비트7 도 아니면(공+0x10 은 남았는데 투수가 바뀐 경우)
  *   타자 쪽 % 가 그대로 남는다.
- * - ⚠️ **원본 버그 그대로**: 마구의 % 도 0xab214 에서 **타자의** B·C 에 더해진다(부호 양수).
+ * - ⚠️ **원본 버그(B-02)**: 마구의 % 도 0xab214 에서 **타자의** B·C 에 더해진다(부호 양수).
+ *   **고침(`bugfixes.json` B-02, 기본 켬)**: 투수 쪽이 채운 % 는 부호를 뒤집어 B·C 를 **깎는다** — 마구는 잘 맞음·홈런을
+ *   억누른다(이름 그대로의 뜻). 값의 크기와 "투수 쪽이 덮어쓴다" 차례는 원본 그대로 둔다(가장 작은 고침). 굴림은 없다.
  */
 export interface SwingBoost {
   /** out+0 — 타자 히트 + (0xab4e0) */
@@ -88,6 +91,8 @@ export function swingBoostOf(batter: SwingBoostSide, pitcher: SwingBoostSide): S
   let pitcherControl = 0
   let solidPercent = 0
   let homeRunPercent = 0
+  /** 투수 쪽이 % 를 덮어썼나 (B-02 고친 길이 본다) */
+  let pitcherFilled = false
 
   if (batter.number !== 0) {
     if (batter.isAce) {
@@ -112,13 +117,20 @@ export function swingBoostOf(batter: SwingBoostSide, pitcher: SwingBoostSide): S
       pitcherControl = table.acePitcherControl[k] ?? 0
       solidPercent = table.acePitcherSolidPercent[k] ?? 0
       homeRunPercent = table.acePitcherHomeRunPercent[k] ?? 0
+      pitcherFilled = true
     } else if (pitcher.isOwnPlayer) {
       const n = pitcher.number - 1
       pitcherVelocity = table.magicPitchSpeed[n] ?? 0
       pitcherControl = table.magicPitchControl[n] ?? 0
       solidPercent = table.magicPitchSolidPercent[n] ?? 0
       homeRunPercent = table.magicPitchHomeRunPercent[n] ?? 0
+      pitcherFilled = true
     }
+  }
+
+  if (pitcherFilled && isBugFixed('B-02')) {
+    solidPercent = -solidPercent
+    homeRunPercent = -homeRunPercent
   }
 
   return { batterHit, batterPower, pitcherVelocity, pitcherControl, solidPercent, homeRunPercent }

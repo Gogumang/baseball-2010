@@ -6,7 +6,7 @@ import {
   canAdvanceOnGroundOut,
 } from '@/entities/game/model/baseState'
 import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
-import { shiftRunners } from '@/entities/game/model/baseRunners'
+import { forceRunners, shiftRunners } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
 import type {
@@ -17,6 +17,7 @@ import type {
 } from '@/entities/game/model/quickAtBat'
 import { quickEngineSteal, quickStealBaseOf } from '@/entities/game/model/steal'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 const OUTS_PER_INNING = 3
 const RANDOM_LIMIT = 10_000
@@ -93,7 +94,8 @@ export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, rando
         const walked = advanceOnQuickWalk(bases)
         bases = walked.bases
         walkRuns = walked.runsScored
-        runners = shiftRunners(runners, 1, input.batterId).runners
+        // 고침(B-14)이면 밀려난 주자만 — `advanceOnQuickWalk` 와 같은 갈래
+        runners = (isBugFixed('B-14') ? forceRunners(runners, input.batterId) : shiftRunners(runners, 1, input.batterId)).runners
       }
       // c1982~c19ec — 주자 목록이 비지 않았으면 앞선 주자 주력을 0xb570c(공격 팀 레코드, 3, …)로 읽는다 (도루 굴림 앞, 3루가 차도)
       if (bases.first || bases.second || bases.third) touchesOffenseRecord = true

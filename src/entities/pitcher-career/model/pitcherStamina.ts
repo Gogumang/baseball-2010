@@ -1,3 +1,5 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
+
 /**
  * 투수 스태미나 (binary.mod 0xa5e14 투구 한 개 · 0x66ef0 기본 소모 · 0xaeb08 소모 적용 ·
  * 0x66e44 용량 · 0xb60e0 경기 사이 회복 · 0x66ed0 회복량 · 0xb58e6 체력%에 따른 능력치 감소 —
@@ -91,8 +93,9 @@ export function staminaCapacityOf(staminaAbility: number, teamMorale: number, is
  * if s > 0:  s' = s + trunc((X − c)·10000 / X) − 10000   (음수면 0)
  * else:      s' = 100
  * ```
- * ⚠️ **원본 버그 그대로**: 스태미나가 0 인 투수가 공을 하나 더 던지면 **1% 로 되살아난다**
- * (else 가지의 100). 고치지 않는다.
+ * ⚠️ **원본 버그(B-09)**: 스태미나가 0 인 투수가 공을 하나 더 던지면 **1% 로 되살아난다**
+ * (else 가지의 100). **고침(`bugfixes.json` B-09, 기본 켬)**: 0 에서 더 던지면 0 에 머문다(소모는 줄이기만 한다).
+ * 굴림은 없다.
  *
  * 용량 X 가 0 이하면 원본은 0 으로 나누게 되는데(투수 포인터가 없을 때뿐),
  * 웹판에는 그 상황이 없으므로 **값을 그대로 돌려준다**.
@@ -100,7 +103,9 @@ export function staminaCapacityOf(staminaAbility: number, teamMorale: number, is
 export function consumeStamina(stamina: number, cost: number, capacity: number): number {
   if (capacity <= 0) return stamina
   const next =
-    stamina > 0 ? stamina + Math.trunc(((capacity - cost) * FULL_STAMINA) / capacity) - FULL_STAMINA : 100
+    stamina > 0
+      ? stamina + Math.trunc(((capacity - cost) * FULL_STAMINA) / capacity) - FULL_STAMINA
+      : isBugFixed('B-09') ? 0 : 100
   return Math.min(FULL_STAMINA, Math.max(0, next))
 }
 
