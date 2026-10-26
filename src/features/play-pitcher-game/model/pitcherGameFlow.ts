@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import {
@@ -1604,16 +1605,17 @@ function arrivePitcherPitch(
 
 /**
  * 도루 판(종류 5) 정산의 리그 기록 — 0xa8024 0xa8340~0xa83c0 (R8 5-2): 잡힌 도루 주자가 하나라도 있으면 아무도 안 쌓고, 게이트
- * sp+0x34 = 0xa56dc(ctx, **지금 타자**, 0)(마타자 타석이면 아무도 안 쌓인다 — 원본 그대로), 루를 옮긴 도루 주자 r 마다 마선수가
- * 아니면 +0x2c. 주자는 판 앞 루의 신원(`GameState.runners`)이다.
+ * sp+0x34 = 0xa56dc(ctx, **지금 타자**, 0)(a8070), 루를 옮긴 도루 주자 r 마다 마선수가 아니면 +0x2c. 주자는 판 앞 루의 신원(`GameState.runners`)이다.
+ * ⚠️ 원본 버그(B-61): 게이트가 지금 타자를 봐서 마타자 타석에 한 도루는 아무도 안 쌓인다.
+ * 고침(bugfixes.json B-61, 기본 켬): 지금 타자 게이트를 건너뛰고 주자마다의 마선수 거르기만 본다. 굴림 없음.
  */
-function withStealPlayLeagueSteals(
+export function withStealPlayLeagueSteals(
   next: PitcherGameProgress,
   before: PitcherGameProgress,
   play: PitchArrivalPlay,
 ): PitcherGameProgress {
   if (play.kind !== 5 || play.result.caughtFrom.length > 0 || play.result.stolenFrom.length === 0) return next
-  if (rosterSlotAt(before.opponentLineup, before.opponentOrderIndex) === ACE_BATTER_ROSTER_SLOT) return next
+  if (!isBugFixed('B-61') && rosterSlotAt(before.opponentLineup, before.opponentOrderIndex) === ACE_BATTER_ROSTER_SLOT) return next
   const runners = runnersOfGame(before.game, before.opponentOrderIndex)
   const stolen = play.result.stolenFrom
     .map((from) => runnerOnBase(runners, from as 1 | 2 | 3))

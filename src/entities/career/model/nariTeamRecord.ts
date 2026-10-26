@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
 import { ACE_BATTER_ROSTER_SLOT } from '@/entities/league/model/leagueDay'
 import { teamBatters } from '@/entities/team/model/teamRoster'
@@ -280,8 +281,8 @@ export function myBatterIndexOf(record: NariTeamRecord): number {
  * rec[b] = A (위치 posB) ; rec[i] = B (위치 0) ; rec[a] = C (위치 posA) — 차례대로 쓴다 ; 0x1faa1 로 내 선수를 다시 찾는다
  * ```
  * 곧 "내 선수는 새 칸에, 그 칸의 선수는 떠난 칸의 원래 주인이 있던 자리(벤치)로, 원래 주인은 떠난 칸으로" 셋이 돈다.
- * ⚠️ 원본 그대로: i == b 면(떠난 칸의 원래 주인이 새 칸에 서 있으면) 쓰는 차례 때문에 내 선수가 레코드에서 사라진다. b == a 면
- * 내 선수가 벤치로 내려간다. 마스터 행의 +0 이 마선수 레코드의 +0 과 겹칠 수 있는지는 안 읽었다 — 표 칸으로만 견준다.
+ * ⚠️ 원본 버그(B-71): i == b 면(떠난 칸의 원래 주인이 새 칸에 서 있으면) 쓰는 차례 때문에 내 선수가 레코드에서 사라진다. b == a 면
+ * 내 선수가 벤치로 내려간다. 못 찾으면 i = 0 으로 첫 칸을 덮는다. **고침(`bugfixes.json` B-71, 기본 켬)** — 이 세 갈래만 막는다(아래). 마스터 행의 +0 이 마선수 레코드의 +0 과 겹칠 수 있는지는 안 읽었다 — 표 칸으로만 견준다.
  */
 export function moveMyBatter(record: NariTeamRecord, newIndex: number): NariTeamRecord {
   const a = myBatterIndexOf(record)
@@ -292,6 +293,17 @@ export function moveMyBatter(record: NariTeamRecord, newIndex: number): NariTeam
   const positionA = rowA.position & 0xf
   const positionB = rowB.position & 0xf
   const found = record.batters.findIndex((row) => row.ace === undefined && row.slot === a)
+  if (isBugFixed('B-71')) {
+    // 고침(bugfixes.json B-71, 기본 켬): 셋이 도는 것은 의도(떠난 칸에 원래 주인을 되돌림)라 두고, 망가지는 갈래만 막는다 —
+    // 같은 칸이면 그대로 · 원래 주인을 못 찾거나 그가 새 칸에 서 있으면(i == b) 내 선수와 새 칸 선수 둘만 맞바꾼다. 굴림 없음
+    if (b === a) return record
+    if (found < 0 || found === b) {
+      const swapped = [...record.batters]
+      swapped[b] = { ...rowA, position: positionB }
+      swapped[a] = { ...rowB, position: positionA }
+      return { ...record, batters: swapped }
+    }
+  }
   const i = found < 0 ? 0 : found
   // 못 찾으면 C 는 빈 레코드(0xb8de5) — 웹은 표 칸 a 로 둔다
   const rowC = found < 0 ? { slot: a, position: 0 } : record.batters[i] ?? { slot: a, position: 0 }

@@ -17,6 +17,7 @@
  * (0x311a8, 아래 `rollQuickRespinTeams` · `finishQuickRespin`). R4 3b 의 "매 틱 다섯을 다 굴린다 · 구장 = 유저 팀" 은
  * 0x314b0(진입)과 섞인 것이다 — 재굴림은 구장을 안 건드린다.
  */
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
@@ -65,6 +66,18 @@ export function quickStartTeamCandidates(openedHiddenTeamIds: readonly number[] 
 }
 
 /**
+ * AI 팀 뽑기 — 원본은 유저 팀과 같은 `0x9f5a0` 을 한 번 더 부를 뿐 재추첨이 없다(31512 · 3122a).
+ * ⚠️ 원본 버그(B-63): 같은 팀끼리 경기가 나올 수 있다.
+ * 고침(bugfixes.json B-63, 기본 켬): 후보에서 유저 팀을 뺀 목록에서 균등하게 하나 — 굴림은 원본처럼 **한 번**(범위만 n − 1)이라
+ * 난수 차례는 같고 뽑힌 값만 다르다.
+ */
+function rollAiTeam(random: RandomPort, candidates: readonly number[], userTeamId: number): number {
+  if (!isBugFixed('B-63')) return candidates[uniform(random, candidates.length)]
+  const others = candidates.filter((id) => id !== userTeamId)
+  return others[uniform(random, others.length)]
+}
+
+/**
  * `0x9f650` / `0x9f604` — 열린 마선수 중 균등. 하나도 없으면 표 0xd7638[0] = −1(없음).
  * 하나도 없어도 `bfa55(0, 0)` 을 **부른다**(0x9f67c · 0x9f630 — 개수 검사가 없다). bfa55 는 범위를 보기 전에
  * 씨앗부터 돌리므로(0xbfa5c~0xbfa68) 난수 하나를 쓰고 0 을 돌려준다 → 표 [0] = −1.
@@ -80,9 +93,9 @@ function rollAce(random: RandomPort, opened: readonly number[] = []): number {
 /**
  * 준비 기록을 한 번 굴린다.
  *
- * ⚠️ **원본 버그 — 같은 팀끼리 경기가 나올 수 있다.** 유저 팀과 AI 팀을 같은 함수로 따로 뽑기만
- * 하고 재추첨하는 코드가 없다 (J 2절 "원본 버그" 첫 줄). 상태 18·19 에서 사람이 고를 때도
- * 같은 팀 검사가 없으니(R4 3a 상태 19) 원본 동작이 한결같다 — **고치지 않는다**.
+ * ⚠️ **원본 버그(B-63) — 같은 팀끼리 경기가 나올 수 있다.** 유저 팀과 AI 팀을 같은 함수로 따로 뽑기만
+ * 하고 재추첨하는 코드가 없다 (J 2절 "원본 버그" 첫 줄). **고침(bugfixes.json B-63, 기본 켬)** — `rollAiTeam`.
+ * 상태 18·19 에서 사람이 고를 때의 같은 팀은 사람이 고른 것이라 그대로 둔다(R4 3a 상태 19).
  *
  * ⚠️ **구장은 유저 팀 번호를 그대로 쓴다.** 구장 목록은 0~9 뿐인데 유저 팀이 히든(10~14)이면
  * 구장 번호도 10~14 가 된다. 원본이 자르지 않으므로 여기서도 자르지 않는다 —
@@ -91,7 +104,7 @@ function rollAce(random: RandomPort, opened: readonly number[] = []): number {
 export function rollQuickStart(random: RandomPort, open: QuickStartOpenState = {}): GeneralModeSetup {
   const candidates = quickStartTeamCandidates(open.openedHiddenTeamIds)
   const userTeamId = candidates[uniform(random, candidates.length)]
-  const aiTeamId = candidates[uniform(random, candidates.length)]
+  const aiTeamId = rollAiTeam(random, candidates, userTeamId)
   const playerSide = uniform(random, 2) !== 0 ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT
   // 굴림 차례가 원본과 같아야 같은 시드에서 같은 결과가 나온다 — 마투수(+0xe) 가 마타자(+0xd) 보다 먼저다
   const acePitcherId = rollAce(random, open.openedAcePitcherIds)
@@ -113,7 +126,7 @@ export function rollQuickRespinTeams(
 ): { readonly userTeamId: number; readonly aiTeamId: number } {
   const candidates = quickStartTeamCandidates(open.openedHiddenTeamIds)
   const userTeamId = candidates[uniform(random, candidates.length)]
-  const aiTeamId = candidates[uniform(random, candidates.length)]
+  const aiTeamId = rollAiTeam(random, candidates, userTeamId)
   return { userTeamId, aiTeamId }
 }
 

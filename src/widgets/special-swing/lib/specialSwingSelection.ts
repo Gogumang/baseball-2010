@@ -7,6 +7,7 @@
  * 웹도 창은 하나라 `mode` 로 갈라 쓴다.
  */
 import { BATTER_BURSTS } from '@/shared/config/original/bursts'
+import { isBugFixed } from '@/shared/config/bugfixes'
 
 /** 칸 → 기술 번호 표 (타자 `0xcc378` · 투수 `0xcc368`, 둘 다 [1,2,3,4]) */
 export const SPECIAL_SWING_SLOT_NUMBERS: readonly number[] = [1, 2, 3, 4]
@@ -61,7 +62,8 @@ export type SpecialSwingPick =
  * ```
  * 1 의 비교값은 `0xa43c4(선수, 칸)` = `칸+1, 그게 4 면 + 타입` 이다 — 그런데 저장은 `표[칸]`(4)이라
  * ⚠️ **원본 그대로의 어긋남**: 장타형(타입 1)이 메테오 스윙을 고르면 +0x18 = 4 인데 비교값은 5 라,
- * 다시 골라도 "사용 중" 이 안 뜨고 주황 아이콘(0x803d4 도 같은 0xa43c4)도 안 붙는다. 고치지 않는다.
+ * 다시 골라도 "사용 중" 이 안 뜨고 아래 글 "사용중"(0x80be8 도 같은 0xa43c4)도 안 붙는다 (B-77).
+ * **고침(bugfixes.json B-77, 기본 켬)**: 비교값을 저장 번호(`칸 + 1`, 1~4)로 — 메테오 스윙도 "사용 중". 굴림 없음.
  */
 export function specialSwingPickOf(
   slot: number,
@@ -70,7 +72,8 @@ export function specialSwingPickOf(
   selectedNumber: number,
 ): SpecialSwingPick {
   const number = specialSwingNumberOf(slot, battingTypeIndex)
-  if (number === selectedNumber) return { kind: '사용중' }
+  // 고침(B-77): 저장 번호(1~4)와 견준다 — 원본 0xa43c4 는 넷째 칸에 타입을 더한 `number` 와 견준다
+  if ((isBugFixed('B-77') ? specialSwingStoredNumberOf(slot) : number) === selectedNumber) return { kind: '사용중' }
   if (learnedCount <= slot) return { kind: '미습득' }
   return { kind: '묻기', number: specialSwingStoredNumberOf(slot), name: specialSwingNameOf(number) }
 }

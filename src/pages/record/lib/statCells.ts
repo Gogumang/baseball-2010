@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 import { gamePointEarnedOf, gamePointUsageOf, itemPurchaseCountOf, playTimeOf, totalPlayTimeOf } from '@/entities/collection/model/annalsStats'
 import { STAT_NAME_FIRST_INDEX } from '@/pages/record/lib/statNames'
@@ -125,10 +126,18 @@ export function typeSecretDigit(state: SecretCodeState, digit: string): SecretCo
 
 /**
  * 통계 탭 아래 합계 (0x2fafa~0x2fb90) — 쪽 0 은 `0x588d1` 플레이 시간 합, 쪽 6·7 은 `0x58801(…, 6)`·`(…, 7)`.
- * ⚠️ **원본 버그 그대로**: `0x58801` 은 인자 4(획득 합)·5(소모 합)만 더하고 그 밖은 0 이라 쪽 6·7 은 늘 **"0G"** 다.
+ * ⚠️ **원본 버그(B-66)**: `0x58801` 은 인자 4(획득 합 — `0x2325d(i)` i 0~6, 58822~5883e)·5(소모 합 — `0x2322d(i)` i 0~7,
+ * 58842~5885e)만 더하고 그 밖은 0 이라 쪽 6·7 은 늘 **"0G"** 다(부르는 쪽 0x2fb3c 가 6·7 을 넘긴다).
+ * **고침(bugfixes.json B-66, 기본 켬)**: 쪽 6 = 그 쪽 칸(획득 GP 0~6)의 합, 쪽 7 = 소모 GP 0~7 의 합 — `0x58801` 의 4·5 갈래 그대로.
  * 다른 쪽은 값 글이 없다.
  */
 export function statTotalTextOf(page: number, stats?: AnnalsStats): string | null {
+  if ((page === 6 || page === 7) && isBugFixed('B-66') && stats !== undefined) {
+    const total = page === 6
+      ? range(0, 6).reduce((sum, slot) => sum + gamePointEarnedOf(stats, slot), 0)
+      : range(0, 7).reduce((sum, kind) => sum + gamePointUsageOf(stats, kind), 0)
+    return `${total}G`
+  }
   if (page === 6 || page === 7) return '0G'
   if (page === 0 && stats !== undefined) return playTimeTotalTextOf(totalPlayTimeOf(stats))
   return null

@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /** 구장 번호가 그대로인 끝 — 기본 열 팀 0~9 (`0x78664` · `0x788d4` 의 `cmp r1, #9`) */
@@ -20,7 +21,9 @@ export function rollStadiumNumber(random: RandomPort, stadium: number): number {
 
 /**
  * 표 `0xcfd0c` — 경기 장면 셋업 0x39fdc 모드 1·8·9 갈래가 **st+0x30 을 그대로** 첨자로 읽어 두 구장 객체 +0xc(바닥 팔레트 줄)에 넣는다.
- * −1 = 기본색. 표는 열 칸이라 st+0x30 이 10~14(빠른실행 히든 유저 팀)면 뒤 자료를 읽는다 — 그 다섯 낱말도 그대로 둔다(원본 버그).
+ * −1 = 기본색. 표는 열 칸이라 st+0x30 이 10~14(빠른실행 히든 유저 팀)면 뒤 자료를 읽는다 — 그 다섯 낱말도 그대로 둔다(원본 버그 B-64).
+ * 고침(bugfixes.json B-64, 기본 켬): 10~14 는 같은 st+0x30 으로 읽는 열다섯 칸 표 `0xce9d8`(일반모드 경기정보 미리보기 — 히든 팀 줄
+ * −1 · −1 · 9 · 12 · 15 가 원본에 있다)을 읽는다 — 미리보기와 경기 바닥이 같은 줄이 된다. 0~9 는 두 표가 같다. 굴림 없음.
  */
 const STADIUM_PALETTE_ROWS: readonly number[] = [
   -1, 0, 1, 2, 0, -1, -1, 0, 1, 2,
@@ -57,7 +60,10 @@ export interface SceneStadium {
 export function rollSceneStadium(random: RandomPort, stadiumId: number): SceneStadium {
   const stadium = rollStadiumNumber(random, stadiumId)
   const defenseStadium = rollStadiumNumber(random, stadiumId)
-  return { stadium, defenseStadium, paletteRow: STADIUM_PALETTE_ROWS[stadiumId] ?? -1 }
+  const paletteRow = isBugFixed('B-64')
+    ? (GENERAL_MATCH_INFO_PALETTE_ROWS[stadiumId] ?? -1)
+    : (STADIUM_PALETTE_ROWS[stadiumId] ?? -1)
+  return { stadium, defenseStadium, paletteRow }
 }
 
 /**

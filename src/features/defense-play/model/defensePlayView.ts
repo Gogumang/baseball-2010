@@ -1,4 +1,5 @@
 import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
 import {
   basePosition,
@@ -258,11 +259,14 @@ function laserShiningSlotOf(slot: number | null | undefined): number | null {
  *
  * `viewStateOf` 는 이것을 **자동으로 해 주지 않는다**(진행기는 받은 표를 그대로 넘긴다).
  * 버그를 되살리려면 표를 만드는 쪽이 이 함수를 통과시켜야 한다.
+ *
+ * **고침(bugfixes.json B-83, 기본 켬)**: 뭉개지 않고 칸마다 제 마선수 그림 — 표를 그대로 돌려준다. 굴림 없음(그림만).
  */
 export function aceIndexesWithOriginalBug(
   aces: readonly (number | null | undefined)[] | undefined,
 ): readonly (number | null | undefined)[] | undefined {
   if (aces === undefined) return undefined
+  if (isBugFixed('B-83')) return aces
   // 칸 1 부터 훑어 첫 타자 마선수를 찾는다 (칸 0 은 투수 마선수라 셈에서 뺀다)
   let first: number | null = null
   for (let slot = 1; slot < aces.length; slot += 1) {

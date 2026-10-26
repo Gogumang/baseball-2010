@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { BALANCE } from '@/shared/config/original/balance'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { PITCHER_BURSTS } from '@/shared/config/original/bursts'
@@ -415,7 +416,10 @@ export function seasonPitcherTrainingTotalOf(career: PitcherCareer): number {
   const menuIds = new Set([...Object.keys(career.trainingCounts), ...Object.keys(career.seasonStartTrainingCounts)])
   let total = 0
   for (const menuId of menuIds) {
-    total += ((career.trainingCounts[menuId] ?? 0) & 0xff) - toInt8((career.seasonStartTrainingCounts[menuId] ?? 0) & 0xff)
+    const count = career.trainingCounts[menuId] ?? 0
+    const copy = career.seasonStartTrainingCounts[menuId] ?? 0
+    // 고침(bugfixes.json B-70, 기본 켬): u8 − s8 대신 참 값끼리 뺀다(사본 128 이상에서 차이가 256 커지는 원본 버그)
+    total += isBugFixed('B-70') ? count - copy : (count & 0xff) - toInt8(copy & 0xff)
   }
   return total
 }

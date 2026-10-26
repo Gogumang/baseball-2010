@@ -1054,6 +1054,20 @@ function withGameEndStamina(save: SeasonSave, summary: TeamGameSummary, ownRotat
 }
 
 /**
+ * 경기 끝에 저장에 남길 레코드 마선수 (`SeasonSave.recordAces`).
+ * ⚠️ 원본 버그(B-72): 0xdd 진입 0x6548 · CPU 끼리 0xc239c 가 열 팀 시즌 레코드에 넣은 마선수를 빼는 `0xb512c` 는 0xdf 진입 0x5980 ·
+ * 0xe5 진입 0x5cd0 두 곳만 부른다 — 그 사이 0xf1 트레이드 요청 0x93c8 · 0xe8 스태미나 목록(십전대보탕) 0x5870 · 포스트시즌 첫날 목표
+ * 0xa3764 가 마선수 줄을 본다. **고침(`bugfixes.json` B-72, 기본 켬)**: 경기가 끝나면 곧장 뺀 것(0xb512c × 열 팀)으로 둔다 —
+ * 지난 날 남은 것까지 비운다. 굴림 수는 같다(트레이드 요청 · 목표 판정이 마선수 줄 없는 목록을 본다 — 뽑히는 선수가 바뀔 수 있다).
+ */
+export function seasonRecordAcesAfterGame(
+  previous: Readonly<Record<number, SeasonRecordAces>> | undefined,
+  added: Readonly<Record<number, SeasonRecordAces>>,
+): Readonly<Record<number, SeasonRecordAces>> {
+  return isBugFixed('B-72') ? {} : { ...previous, ...added }
+}
+
+/**
  * 사람 경기 두 팀 레코드에 남는 마선수 (U-105 r154) — 0xdd 진입 0x6548 이 내 팀(66da · 66e6 — 0xd7 에서 고른 rec+0xe · +0xd)과
  * 상대(66f8 · 670a — 굴린 `opponentAces`)의 **시즌 레코드**에 넣은 줄이다(0xb8680 모드 2 → 0x1f571). 내 마투수 +0x2c 는 경기 끝 값에
  * 하루 끝 4f2bc `0xb617c`(팀 투수 수 [+0xc] 만큼 — 8번 마투수 포함 +20%)를 먹인 값이다. 국가대항전은 넣지 않는다(66ae).
@@ -2481,7 +2495,7 @@ export function useSeasonSession(
           commit({
             ...rested,
             // 포스트시즌도 0xdd 진입이 두 팀 시즌 레코드에 마선수를 넣는다(L+0x34 를 안 본다 — 66ae 는 S+0x12c 만) (U-105 r154)
-            recordAces: { ...rested.recordAces, ...humanGameRecordAcesOf(gameOptions, summary, record.teamId) },
+            recordAces: seasonRecordAcesAfterGame(rested.recordAces, humanGameRecordAcesOf(gameOptions, summary, record.teamId)),
             // 사사구 +0x2a(정산 꼬리 a8b04~a8bee) · 실책 +0x2e(그림 0x43278)는 게이트 0xa56dc 밖이라 포스트시즌에도 쌓인다
             playerStats: recordUngatedSeasonRecords(current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS, summary),
             series: advanced,
@@ -2584,11 +2598,10 @@ export function useSeasonSession(
         ...rested,
         // 그날 열 팀 레코드에 들어간 마선수 — CPU 끼리 0xc239c(c24aa~c24ee) · 사람 경기 0xdd 0x6548. 0xb512c 는 0xdf · 0xe5 진입만
         // 부르므로 0xf1 트레이드 요청 · 0xe8 목록까지 남는다 (U-105 r154)
-        recordAces: {
-          ...rested.recordAces,
+        recordAces: seasonRecordAcesAfterGame(rested.recordAces, {
           ...Object.fromEntries(Object.entries(day.recordAces).map(([team, aces]) => [team, { pitcher: aces.pitcher, batter: aces.batter }])),
           ...humanGameRecordAcesOf(gameOptions, summary, record.teamId),
-        },
+        }),
         league: day.league,
         playerStats: day.playerStats,
         state: {

@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { startNextPitcherSeason } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
@@ -72,8 +73,9 @@ export function judgePitcherEnding(career: PitcherCareer): number | null {
   if (popularity > 1500) return 5
   if (popularity > 1000 && money > 199) return 4
   if (popularity > 1000) return 3
-  // ⚠️ **원본 그대로**: "999 이하" 만 은퇴식이라 인기도가 정확히 1000 이면 판정이 없다 (−1)
-  return popularity <= 999 ? PITCHER_RETIREMENT_ENDING : null
+  // ⚠️ 원본 버그(B-76): "999 이하" 만 은퇴식(0xa3b66)이고 3 은 `> 1000` 이라 인기도가 정확히 1000 이면 판정이 없다 (−1) —
+  // 141 이 키를 안 먹는 화면에 갇힌다. 고침(bugfixes.json B-76, 기본 켬): 1000 도 은퇴식. 굴림 없음 (타자편 `judgeEnding` 과 같다)
+  return popularity <= (isBugFixed('B-76') ? 1000 : 999) ? PITCHER_RETIREMENT_ENDING : null
 }
 
 /**

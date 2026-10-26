@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionKeyOf } from '@/entities/mission/model/missionGoal'
 
@@ -26,8 +27,14 @@ export const ACE_MATCH_CLEAR_LAST_INDEX = 15
 const LOCKED = -1
 const MAXIMUM_CLEARS = 99
 
-/** 대결 레코드가 클리어 칸을 올리는가 — idx = 레코드 번호 = `mission.id − 1` ≤ 15 */
+/**
+ * 대결 레코드가 클리어 칸을 올리는가 — idx = 레코드 번호 = `mission.id − 1` ≤ 15.
+ * ⚠️ 원본 버그(B-74): 미션 클리어 함수 0xa5368 을 대결에도 불러(8d878) a5396~a539a `ldrsb +0xbd ; cmp #0xf ; bgt` 만 걸러
+ * 메디카(team 16 · idx 15)를 이길 때만 목록에 없는 15번 칸이 −1 → 0 → 1 … 로 오른다.
+ * **고침(`bugfixes.json` B-74, 기본 켬)**: 대결은 미션 클리어 칸을 건드리지 않는다(대결 다섯이 모두 같게). 굴림 없음 · 저장 칸 그대로.
+ */
 export function aceMatchClearKeyOf(mission: OriginalMission): string | null {
+  if (isBugFixed('B-74')) return null
   return mission.id - 1 <= ACE_MATCH_CLEAR_LAST_INDEX ? missionKeyOf(mission) : null
 }
 

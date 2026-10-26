@@ -14,7 +14,8 @@
  *                   ? StrMAINMENU[212] (종류 1) · 0x74189 · 하위 0
  *                   : StrMAINMENU[210] (종류 2) + 0x749d5(창, 1) · this+0x104 = 0 · 하위 2
  *   r = 1(투수편) → 0xb5054(내 시즌 팀, 0 = 투수) && +0x4e
- *                   ? **StrMAINMENU[213]** "…삭제 하실 수 없습니다" (0x2c950 movs r1,#0xd5 — [212] 가 아니다. 원본 버그 그대로)
+ *                   ? **StrMAINMENU[213]** "…삭제 하실 수 없습니다" (0x2c950 movs r1,#0xd5 — [212] 가 아니다. 원본 버그 B-62;
+ *                     [213] 의 제 자리는 다른 삭제 창 0x2ae6e 다)
  *                   : StrMAINMENU[211] · this+0x104 = 1 · 하위 2
  *   r = −1(CLR) → 하위 0 · 그 밖(아직 답 없음) → 그대로
  * 하위 2 답 0(예) → 하위 0 · this+0x104 == 0 ? 0x224ec(mgr, 4) : 0x224ec(mgr, 3) · 알림 0xcf900 / 1·−1 → 하위 0
@@ -53,6 +54,7 @@
  * 경기진행 설정(+0x12c+1)·창 본 표시(+0x11e)는 원본에서 이 함수가 안 건드리는 전역 칸이라 시즌 초기화 뒤에도 남긴다
  * (`useSeasonSession.resetSeason`).
  */
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 export type ModeResetTarget = 'career-batter' | 'career-pitcher' | 'season' | 'edit'
@@ -111,7 +113,9 @@ export function judgeModeReset(target: ModeResetTarget, context: ModeResetContex
     return {
       canReset: false,
       blockReason: 'season-game-in-progress',
-      blockText: target === 'career-batter' ? MODE_RESET_TEXT.blockedReset : MODE_RESET_TEXT.blockedDelete,
+      // ⚠️ 원본 버그(B-62): 투수편은 [213] "삭제 하실 수 없습니다"(0x2c950). 고침(bugfixes.json B-62, 기본 켬): 두 편 모두 [212] "초기화 하실 수 없습니다"
+      blockText:
+        target === 'career-batter' || isBugFixed('B-62') ? MODE_RESET_TEXT.blockedReset : MODE_RESET_TEXT.blockedDelete,
     }
   }
   return { canReset: true, blockReason: null, blockText: null }

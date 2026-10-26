@@ -1,3 +1,4 @@
+import { isBugFixed } from '@/shared/config/bugfixes'
 import {
   BASE_POSITIONS,
   BASE_SCORE,
@@ -191,8 +192,10 @@ function rethrowTicks(input: ThrowTargetInput, from: number, to: number): number
     finalSlot: coverTo,
     base: to,
   })
-  // **원본 그대로**: 중계 포함 전체 틱([6])이 아니라 1구간 틱([5])을 쓴다 → 외야 재송구를 실제보다 짧게 본다 (S7 4-1)
-  return toSignedByte(plan.firstLegTicks)
+  // ⚠️ 원본 버그(B-60): 중계 포함 전체 틱([6])이 아니라 1구간 틱([5])을 쓴다 → 외야 재송구를 실제보다 짧게 본다
+  // (0xafe7e: res = sp+0x9c 에서 [sp+0xa0] 의 둘째 바이트 = res[5], S7 4-1).
+  // 고침(bugfixes.json B-60, 기본 켬): 전체 틱 res[6](중계면 1구간 + 2구간 + 3, 중계가 아니면 [5] 와 같다)을 같은 s8 로 읽는다. 굴림 없음
+  return toSignedByte(isBugFixed('B-60') ? plan.totalTicks : plan.firstLegTicks)
 }
 
 export interface ThrowTargetDebug {

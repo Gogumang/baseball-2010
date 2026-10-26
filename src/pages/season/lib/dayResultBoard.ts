@@ -1,4 +1,5 @@
 import type { SeasonDayBoard } from '@/entities/season-mode/model/seasonRecord'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 
 /**
@@ -140,6 +141,13 @@ export function boardRowsOf(board: SeasonDayBoard): readonly BoardRow[] {
 export const isWinA = (row: BoardRow) => row.scoreA > row.scoreB
 /** 박스 4 (B 쪽) — scoreA < scoreB 면 WIN (b6c4). 동점이면 둘 다 LOSE */
 export const isWinB = (row: BoardRow) => row.scoreA < row.scoreB
+
+/**
+ * 박스 3·4 에 WIN/LOSE 그림을 그리는가.
+ * ⚠️ 원본 버그(B-68): b676 `ble` · b6c6 `bge` 라 동점이면 두 칸 모두 그림 57 "LOSE" 다(무승부 그림은 mode_ui 에 없다).
+ * **고침(`bugfixes.json` B-68, 기본 켬)**: 동점 줄은 두 칸 모두 비운다(점수 숫자는 그대로). 굴림 없음 · 그림만.
+ */
+export const showsResultMark = (row: BoardRow) => !(isBugFixed('B-68') && row.scoreA === row.scoreB)
 
 /** 박스를 줄 r 만큼 내린다 */
 export function shifted(cell: BoardBox, row: number): BoardBox {

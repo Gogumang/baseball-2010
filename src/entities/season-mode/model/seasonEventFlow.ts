@@ -1,4 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { ORIGINAL_SEASON_EVENTS } from '@/shared/config/original/seasonEvents'
 import type { SeasonOriginalEvent } from '@/shared/config/original/seasonEvents'
 import type { EventCommand, OriginalEvent } from '@/shared/config/original/eventTypes'
@@ -545,9 +546,15 @@ export function cureIllnessByItem(record: SeasonRecord): SeasonRecord {
  */
 export const ILLNESS_ABILITY_PENALTY_PERCENT = 30
 
-/** 경기 능력치 보정이 보는 질병 칸 — SR+6 (`0xb5824`) */
-export function illnessPenaltyFieldOf(record: Pick<SeasonRecord, 'illnessSlack'>): number {
-  return record.illnessSlack
+/**
+ * 경기 능력치 보정이 보는 질병 칸 — SR+6 (`0xb5824`).
+ * ⚠️ 원본 버그(B-80): 상세 글 0x897e8(89df6 `ldrb [SR,#5]`)은 질병 종류 SR+5 로 "질병 30% 감소" 줄을 띄우는데 실제 −30% 는 SR+6 을 봐서,
+ * 입원에 세 번 실패해 SR+6 이 0 이 되면 앓고 있어도 줄만 뜨고 깎이지 않는다.
+ * **고침(bugfixes.json B-80, 기본 켬)**: 실제 −30% 도 질병 종류 SR+5 를 본다 — 앓는 동안 늘 깎인다(글과 같다). 굴림 없음
+ * (그 드문 판에서 내 팀 능력치가 30% 깎여 경기 결과가 바뀔 수 있다).
+ */
+export function illnessPenaltyFieldOf(record: Pick<SeasonRecord, 'illness' | 'illnessSlack'>): number {
+  return isBugFixed('B-80') ? record.illness : record.illnessSlack
 }
 
 /** 팀 능력치 정액 감소 — 사기 구간별 (J-4). 질병은 여기가 아니라 별도로 −30% 다 */

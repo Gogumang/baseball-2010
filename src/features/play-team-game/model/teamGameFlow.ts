@@ -4439,11 +4439,12 @@ function applyTeamArrival(progress: TeamGameProgress, play: PitchArrivalPlay, hu
  * (가) 잡힌 도루 주자가 하나라도 있으면 아무도 안 쌓는다
  * (나) 루를 옮긴 도루 주자 r 마다: p = 0xb8b99(공격팀, r) ; sp+0x34 && p && !마선수(p) → p+0x2c += 1
  * ```
- * 원본 그대로: 게이트가 **주자가 아니라 지금 타자**를 본다 — 마타자 타석에 한 도루는 아무도 안 쌓인다.
+ * ⚠️ 원본 버그(B-61): 게이트가 **주자가 아니라 지금 타자**를 본다 — 마타자 타석에 한 도루는 아무도 안 쌓인다(0xa8058~0xa8070 · a8362).
+ * 고침(bugfixes.json B-61, 기본 켬): 지금 타자 게이트를 건너뛰고 주자마다의 마선수 거르기만 본다(간이 엔진 0xc1a42 와 같은 꼴). 굴림 없음.
  * 국가대항전·포스트시즌 거르기는 기록표에 넣는 쪽(시즌 세션의 정규시즌 갈래)이 맡는다.
  * 주자는 판 앞 루의 신원(`GameState.runners`, 원본 주자 목록)대로다.
  */
-function withLeagueStolenBases(
+export function withLeagueStolenBases(
   next: TeamGameProgress,
   before: TeamGameProgress,
   play: PitchArrivalPlay,
@@ -4455,7 +4456,7 @@ function withLeagueStolenBases(
   const order = humanOffense ? before.game.battingOrderIndex : before.opponentOrderIndex
   const runners = runnersOfGame(before.game, order)
   const isAce = (slot: number) => (entry[slot]?.aceIndex ?? NO_ACE_BATTER) >= 0
-  if (isAce(((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE)) return next
+  if (!isBugFixed('B-61') && isAce(((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE)) return next
   const stolen: LeagueStolenBase[] = []
   for (const from of play.result.stolenFrom) {
     const slot = runnerOnBase(runners, from as 1 | 2 | 3)
