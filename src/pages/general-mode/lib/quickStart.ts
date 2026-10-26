@@ -20,7 +20,6 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { isBugFixed } from '@/shared/config/bugfixes'
 import {
   ACE_PER_ROLE,
   NO_ACE,

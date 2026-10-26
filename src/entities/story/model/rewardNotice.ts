@@ -9,7 +9,6 @@ import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import { hiddenOpenNoticeTextOf as hiddenOpenWindowTextOf } from '@/entities/collection/model/hiddenOpenNotice'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
  * **보상 명령 7 의 알림** — 실행 0x8d4c4 · 글 0x8beb8 · 기다림 0x8daa0 (직접 떴다).
