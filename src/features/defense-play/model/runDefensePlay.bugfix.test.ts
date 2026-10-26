@@ -11,20 +11,21 @@ const 단타: AtBatOutcome = { kind: '안타', bases: 1 }
 const 주자1루: BaseState = { first: true, second: false, third: false }
 
 /**
- * 사람 수비 · CPU 공격 · 수동 송구 — 3루 주자 · 원본 코드 [100, 188, 125, 1](투수 앞 번트 땅볼). 3틱에 홈 송구 키('8')를 누르면
- * 홈으로 달려오는 3루 주자(1번)를 두고 공 쥔 포수(1)와 3루수(4)가 협살을 세운다(B-11 고친 길).
+ * 사람 수비 · CPU 공격 · 수동 송구 — 2루 주자 · 원본 코드 [125, 1000, 100, 0](3루 쪽 땅볼). 3틱에 3루 송구 키('4')를 누르면
+ * 3루로 달려오는 2루 주자(1번)를 두고 공 쥔 3루 커버(4)와 2루 커버(3)가 협살을 세운다(B-11 고친 길).
+ * (r268 맨해튼 거리 0xbfa2c 뒤의 틱이다 — 예전 장면 [100, 188, 125, 1] 3루 주자 홈 송구는 협살 조건이 안 선다)
  */
-const 홈송구판 = (keys: Record<number, string> = { 3: '8' }) =>
+const 삼루송구판 = () =>
   runDefensePlay({
     outcome: 단타,
-    trajectory: battedBallTrajectory([100, 188, 125, 1]),
-    bases: { first: false, second: false, third: true },
+    trajectory: battedBallTrajectory([125, 1000, 100, 0]),
+    bases: { first: false, second: true, third: false },
     outs: 0,
     runAbility: 500,
     defenseIsCpu: false,
     offenseIsCpu: true,
     throwMode: '수동',
-    controls: { side: '수비', keyAt: (tick) => (keys[tick] === undefined ? null : { key: keys[tick] }) },
+    controls: { side: '수비', keyAt: (tick) => (tick === 3 ? { key: '4' } : null) },
   })
 
 /** `runDefensePlay.test.ts` 협살 절과 같은 판 — 원본 코드 5, 16틱 귀루 키로 1루로 돌아오는 1번 주자 */
@@ -40,21 +41,23 @@ const 협살상황 = (defenseIsCpu: boolean, keys: Record<number, string> = { 16
   })
 
 describe('B-11 사람 수비에서 협살이 안 걸림', () => {
-  it('원본: 사람이 수비하면 협살이 시작하지 않는다 — 3루 주자는 16틱에 그냥 태그로 죽는다', () => {
-    const 결과 = 홈송구판()
+  it('원본: 사람이 수비하면 협살이 시작하지 않는다 — 2루 주자는 16틱에 그냥 태그로 죽고 타자주자는 28틱 1루 아웃', () => {
+    const 결과 = 삼루송구판()
     expect(결과.rundowns).toBe(0)
     expect(결과.log.some((line) => line.includes('협살'))).toBe(false)
     expect(결과.log).toContain('16틱 1번 주자 태그 아웃 (0xb36d0 결과 3)')
+    expect(결과.log).toContain('28틱 0번 주자 루 아웃 (0xb36d0 결과 2)')
   })
 
-  it('고침: 사람 수비도 협살을 세워 마주 쫓아 태그한다 — 판 결과(진루 · 아웃)는 원본과 같다', () => {
-    const 원본 = 홈송구판()
+  it('고침: 사람 수비도 협살을 세워 마주 쫓아 태그한다 — 태그는 결과 코드 13 이라 0xafa60 이 이어 던져 판 결과는 원본과 같다', () => {
+    const 원본 = 삼루송구판()
     setBugfixConfigForTests(bugfixConfigWith(['B-11']))
-    const 고침 = 홈송구판()
-    expect(고침.log).toContain('9틱 협살 시작 — 1번 주자 4↔3루 (야수 1·4)')
-    expect(고침.log).toContain('13틱 협살 태그 — 1번 주자 아웃')
+    const 고침 = 삼루송구판()
+    expect(고침.log).toContain('12틱 협살 시작 — 1번 주자 3↔2루 (야수 4·3)')
+    expect(고침.log).toContain('14틱 협살 태그 — 1번 주자 아웃')
     expect(고침.rundowns).toBe(1)
     expect(고침.rundownOuts).toBe(1)
+    expect(고침.advance.outsAdded).toBe(2)
     expect(고침.advance).toEqual(원본.advance)
   })
 

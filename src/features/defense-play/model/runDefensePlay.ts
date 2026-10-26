@@ -2611,6 +2611,18 @@ export function stepDefensePlay(
               tagOut = true
               released = true
               log.push(`${tick}틱 협살 태그 — ${rundown.runnerIndex}번 주자 아웃`)
+              // 원본은 이 태그를 아웃 판정 0xb36d0(결과 3)이 낸다 — 아웃 꼬리 0xb36fa(+0x110 = 0 · 0xa9648 포스 풀기)를 지나고,
+              // 같은 틱 b4540 이 "이번 틱 vt90 결과" 로 결과 코드 13 을 세워 0x51d40 이 0xafa60 을 한 번 부른다(6c 절, 사람 수비 ·
+              // 수동 송구에서도). 예전 웹은 이 자리에서 아웃만 적어 13 이 안 서고 이어 던지기가 없었다 (r272 — `runOutJudgement` 와 맞춤)
+              {
+                outJudgedThisTick = true
+                foulFlag = false
+                wideFair = true
+                const relaxed = releaseForcesAfterOut(runners.map((runner) => runner.state))
+                runners.forEach((runner, index) => {
+                  runner.state = relaxed[index] ?? runner.state
+                })
+              }
             }
           }
         }
