@@ -1232,8 +1232,9 @@ function PitcherGameScene({
           />
         )}
 
-        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c (0x53066) — 그리기 표 다음. 판 안이라 기둥 없이 */}
-        <RecordAlertStageOverlay frame={recordAlert} />
+        {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c (0x53066) — 그리기 표 다음 · 팝업 0x746cd 앞. 판 안이라 기둥 없이.
+            돌발 창 · 감독 강판 창(상태 그리기) 위, 경기 중 메뉴 · 강판 물음 상자(팝업) 아래 */}
+        <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />
       </RawScreen>
 
       {overlay === '조작방법' && (

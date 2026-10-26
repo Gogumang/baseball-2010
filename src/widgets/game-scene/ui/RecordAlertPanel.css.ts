@@ -1,5 +1,6 @@
 import { style } from '@vanilla-extract/css'
 import { theme } from '@/app/styles/theme.css'
+import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
 /** 240×320 판 — 안쪽은 원본 절대 좌표, 화면 밖으로 나간 줄 막대는 자른다 */
 export const layer = style({
@@ -32,7 +33,7 @@ export const screenLayer = style({
   justifyContent: 'center',
   alignItems: 'center',
   pointerEvents: 'none',
-  zIndex: 4,
+  zIndex: SCREEN_LAYERS.RECORD_ALERT,
 })
 
 export const screenColumn = style({
@@ -44,10 +45,20 @@ export const screenColumn = style({
   pointerEvents: 'none',
 })
 
-/** 240×320 판(RawScreen) **안**에 얹는 자리 — 판이 이미 배율을 먹었으므로 다시 키우지 않는다 */
+/**
+ * 240×320 판(RawScreen) **안**에 얹는 자리 — 판이 이미 배율을 먹었으므로 다시 키우지 않는다.
+ * 겹은 `RECORD_ALERT` — 장면 창(돌발 창 · 교체 창 따위, 상태 그리기 표 0xd05a0) 위, 팝업 상자(0x746cd) 아래 (0x52c50 53066)
+ */
 export const stageLayer = style({
   position: 'absolute',
   inset: 0,
   pointerEvents: 'none',
-  zIndex: 4,
+  zIndex: SCREEN_LAYERS.RECORD_ALERT,
 })
+
+/**
+ * 경기 중 메뉴(일시정지 창 0x741a0 — 0x746cd 가 알림 **뒤**에 그린다)가 떠 있는 동안의 겹. 메뉴 층(`stageScreen.menuLayer` 6 ·
+ * 투수편 `popupLayer` 5)은 '*' 누름 칸(7) 아래여야 해 `RECORD_ALERT` 보다 낮으므로, 그동안은 알림이 메뉴 층 아래로 내려간다.
+ * 메뉴와 장면 창(돌발 0x1b~0x1d · 교체 0xb)은 함께 서지 않는다 — '*' 는 0xd~0x15 에서만 메뉴를 연다(4991c)
+ */
+export const stageLayerUnderMenu = style([stageLayer, { zIndex: 4 }])

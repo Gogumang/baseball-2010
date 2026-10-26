@@ -66,7 +66,11 @@ import type {
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { hasFightingSpiritBit, withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
-import { isLiveGameFightingSpiritSituation } from '@/shared/lib/liveGameState/liveGameState'
+import {
+  isFightingSpiritSituationOf,
+  isLiveGameFightingSpiritSituation,
+  sideFightingSpiritStateOf,
+} from '@/shared/lib/liveGameState/liveGameState'
 
 /**
  * 하루치 리그 경기 (binary.mod 0xc2a48).
@@ -554,6 +558,31 @@ function withStaleMorale(defense: HalfInningDefense, staleMorale: number | undef
   return staleMorale === undefined ? defense : { ...defense, staleMorale }
 }
 
+/** CPU 끼리 경기 자신의 상태 한 벌 — 반 이닝 앞 (B-107 고친 길) */
+export interface LeagueHalfInningGameState {
+  /** +0x6b — 0 부터 */
+  readonly inningIndex: number
+  /** +0x28 · +0x29 — 원정 · 홈 */
+  readonly sideTeamIds: readonly [number, number]
+  /** +0x7e · +0x7f — 반 이닝 앞 점수 (원정 · 홈) */
+  readonly scoresBefore: readonly [number, number]
+  /** 이번 반 이닝 공격 측 — 득점이 이 측에 오른다 */
+  readonly offenseSide: 0 | 1
+}
+
+/**
+ * CPU 끼리 경기의 스킬 14(투지) 갈래 경기 상태가 `teamId` 에게 서는가 (`HalfInningDefense.fightingSpiritAt`).
+ * - 원본(B-107): 0xb570c b5a16 이 늘 전역 [0x1552d0c] 를 읽어 **마지막 사람 경기**의 이닝 · 팀 · 점수를 본다
+ *   (`isLiveGameFightingSpiritSituation`) — 사람 경기가 원정 승리로 끝났으면 그 +0x28 팀 말고 모든 팀이 내내 지는 측이다.
+ * - 고친 길: 이 경기 자신의 상태 — 6회(+0x6b > 4)부터 지금 점수로 지는 측
+ */
+export function leagueFightingSpiritOf(game: LeagueHalfInningGameState, runsThisHalf: number, teamId: number): boolean {
+  if (!isBugFixed('B-107')) return isLiveGameFightingSpiritSituation(teamId)
+  const scores: [number, number] = [game.scoresBefore[0], game.scoresBefore[1]]
+  scores[game.offenseSide] += runsThisHalf
+  return isFightingSpiritSituationOf(sideFightingSpiritStateOf(game.inningIndex, game.sideTeamIds, scores), teamId)
+}
+
 /**
  * 한 팀의 수비 쪽 재료 (`HalfInningDefense`) — 반 이닝마다 리드와 마운드만 갈아 끼운다.
  *
@@ -572,6 +601,8 @@ function defenseOf(
   abilityContext?: LeagueAbilityContext,
   /** 팀 레코드 선수 배열 — 트레이드로 옮겨 온 투수는 옛 팀 표 행으로 선다 (`LeagueTeamRecord`) */
   record?: LeagueTeamRecord,
+  /** 이 CPU 경기 자신의 상태(sim+0x60 — 스택 상태) — B-107 고친 길의 스킬 14 갈래가 본다 */
+  ownGame?: LeagueHalfInningGameState,
 ): HalfInningDefense {
   const rowAt = (slot: number) => recordPitcherRowAt(record, teamId, slot)
   /** 그 칸 투수의 밑값 간이 능력 (마투수는 레벨 배율을 먹은 레코드 값) */
@@ -606,8 +637,11 @@ function defenseOf(
     },
     // 0xb570c 스킬 14 갈래의 경기 상태 — CPU 끼리 경기(0xc239c · 0xc2a48 · 0xc2760 · 0xc2dac)는 0xc0dac 에 제 스택 상태를 넘겨
     // 전역 [0x1552d0c] 를 안 건드리지만 0xb570c 는 늘 전역을 읽는다 → **마지막 사람 경기**의 이닝 · 측별 팀 · 점수가 그대로다.
-    // 팀은 넘겨 받은 팀 레코드 +0 = 이 팀 번호 — 그 경기 +0x28 팀이 아니면 측 1 이다 (A-23)
-    fightingSpiritAt: () => isLiveGameFightingSpiritSituation(teamId),
+    // 팀은 넘겨 받은 팀 레코드 +0 = 이 팀 번호 — 그 경기 +0x28 팀이 아니면 측 1 이다 (A-23).
+    // **B-107 고친 길**: 이 경기 자신의 상태(0xc0dac 가 sim+0x60 에 둔 스택 상태 — 0xb6b6c 이닝 · 0xb6a9c 득점이 그 칸을 굴린다)로
+    // 이닝 · 측별 팀(원정 · 홈) · 지금 점수(반 이닝 앞 점수 + 이번 반 이닝 득점)를 본다
+    fightingSpiritAt: (runsThisHalf) =>
+      ownGame === undefined ? isLiveGameFightingSpiritSituation(teamId) : leagueFightingSpiritOf(ownGame, runsThisHalf, teamId),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3) — 용량 0x66e44 는 `0xb6415(P, 3, 1)` 이라 장비 니블을 먹는다
     staminaAbilityAt: (slot) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
@@ -899,7 +933,12 @@ export function simulateLeagueGame(
           isGameOverAt({ inning, half: '초', outs, awayScore: awayRuns + runs, homeScore: homeRuns }),
       },
       withStaleMorale(
-        defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord),
+        defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord, {
+          inningIndex: inning - 1,
+          sideTeamIds: [matchup.away, matchup.home],
+          scoresBefore: [awayRuns, homeRuns],
+          offenseSide: AWAY_SIDE,
+        }),
         extras?.abilityContext?.staleRecordMorales?.[matchup.home],
       ),
       { lineup: awayLineup, batterOf: awayBatterOf, pinchHitUsed, isAceRosterSlot },
@@ -942,7 +981,12 @@ export function simulateLeagueGame(
       // 판정 경로 c19ec 가 없던 반 이닝) 1회말 첫 공의 소모 c26cc 가 c1446 · c1852 보다 먼저라 레코드에 남은 값을 본다 (r104).
       // 두 팀이 한 레코드면(`sharedRoster`) 1회초 첫 공의 c1446 이 이미 덮었다
       withStaleMorale(
-        defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext, awayRecord),
+        defenseOf(matchup.away, awayMound, awayRuns - homeRuns, awayStaminas, awayAcePitcher, awayPitcherOrder, extras?.abilityContext, awayRecord, {
+          inningIndex: inning - 1,
+          sideTeamIds: [matchup.away, matchup.home],
+          scoresBefore: [awayRuns, homeRuns],
+          offenseSide: HOME_SIDE,
+        }),
         inning === 1 && !awayRecordTouched && !sharedRoster ? extras?.abilityContext?.staleRecordMorales?.[matchup.away] : undefined,
       ),
       { lineup: homeLineup, batterOf: homeBatterOf, pinchHitUsed, isAceRosterSlot },

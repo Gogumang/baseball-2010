@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { FrameSprite, MessageBox, PressArea } from '@/shared/ui'
 import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -90,6 +90,13 @@ interface TeamAutoRelayProps {
    * 이 길은 0x47cc8 을 안 거친다(`teamRelayEntryFiguresOf`). 안 주면(0x18 → 0x21 길) 들어설 때 다시 싣는다.
    */
   readonly entryLoadedRunnerAce?: number | null
+  /**
+   * 기록 달성 알림 0x4e35c — 0x21 에도 프레임 0x52c50 이 53066 에서 그린다(0x17 말고는 늘). 중계 그리기(상태 그리기 표) 위,
+   * CLR 질문 창(0x746cd) 아래 자리에 얹는다 (r297)
+   */
+  readonly recordAlert?: ReactNode
+  /** CLR 중단 질문 창이 섰다 · 내렸다 — 창이 서 있는 동안 알림 폭 · 시간이 안 오른다(52cc6 → 0x4e35c 그리기만) */
+  readonly onAskingChange?: (isAsking: boolean) => void
 }
 
 /**
@@ -121,7 +128,9 @@ interface TeamAutoRelayProps {
  * 함께 창이 내려간다(미이식).
  *
  */
-export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, grassPalette = null, entryLoadedRunnerAce }: TeamAutoRelayProps) {
+export function TeamAutoRelay({
+  progress, onStep, onStop, sideTeams, humanSide, grassPalette = null, entryLoadedRunnerAce, recordAlert = null, onAskingChange,
+}: TeamAutoRelayProps) {
   const [shown, setShown] = useState<MissionAutoRelayStep>(() => teamAutoRelayEntryStepOf(progress))
   // 0x18 길은 4faf8 0x47cc8 이 주자 그림판에 마선수 그림을 다시 싣는다(타자 → 가장 앞선 마선수 주자) · 메뉴 길은 타석 0xd 때 그림
   const [figures, setFigures] = useState<TeamRelayFiguresValue>(() => teamRelayEntryFiguresOf(progress, entryLoadedRunnerAce))
@@ -132,6 +141,13 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
   const [isAsking, setAsking] = useState(false)
   const isAskingRef = useRef(false)
   isAskingRef.current = isAsking
+  const onAskingChangeRef = useRef(onAskingChange)
+  onAskingChangeRef.current = onAskingChange
+  useEffect(() => {
+    onAskingChangeRef.current?.(isAsking)
+  }, [isAsking])
+  // 중계 화면이 내려가면 창도 함께 내려간다
+  useEffect(() => () => onAskingChangeRef.current?.(false), [])
   /** CLR 을 받았다 — 다음 그림(그 키의 그림)이 갱신 · 그리기를 다 한 뒤 질문 창을 띄운다 */
   const clrPendingRef = useRef(false)
   const [sceneTick, setSceneTick] = useState(0)
@@ -284,6 +300,7 @@ export function TeamAutoRelay({ progress, onStep, onStop, sideTeams, humanSide, 
         <img alt="CHANGE" data-testid="중계-CHANGE" src={`${GAME_UI}/${String(CHANGE_IMAGE).padStart(3, '0')}.png`}
           style={imageStyle(changeImagePosition.x, changeImagePosition.y)} />
       )}
+      {recordAlert}
       {isAsking && (
         <MessageBox
           text={AUTO_RELAY_STOP_QUESTION}

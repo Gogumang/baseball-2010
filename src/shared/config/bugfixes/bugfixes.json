@@ -910,6 +910,15 @@
       "impact": "거의 없음",
       "implemented": false,
       "fixed": null
+    },
+    {
+      "id": "B-107",
+      "name": "CPU 끼리 경기 투지(스킬 14)",
+      "symptom": "CPU 끼리 간이 엔진이 투지 갈래(0xb570c)에서 그 경기가 아니라 전역 경기 상태 — 마지막 사람 경기의 이닝 · 팀 · 점수를 본다. 사람 경기가 원정 승리로 끝났으면 그 원정 팀 말고 모든 팀이 CPU 경기 내내 지는 측이라 투지 장착 투수가 +10% 를 받는다(6회 이후 경기를 한 번도 안 했으면 아무도 못 받는다)",
+      "source": "0xb570c b5a16~b5a66 ([0x1552d0c] · +0x6b · 0xb6be9 · 0xb6a4d) ← 0xc239c · 0xc2a48 · 0xc2760 · 0xc2dac (0xc0dac sim+0x60 = 스택 상태)",
+      "impact": "작음",
+      "implemented": true,
+      "fixed": null
     }
   ]
 }

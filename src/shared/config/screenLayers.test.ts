@@ -20,6 +20,9 @@ describe('화면 겹 차례', () => {
   it('누름 칸 < 장면 창 < 팝업 상자 < 앱 공용 창', () => {
     expect(SCREEN_LAYERS.PRESS_AREA).toBeLessThan(SCREEN_LAYERS.SCENE_WINDOW)
     expect(SCREEN_LAYERS.SCENE_WINDOW).toBeLessThan(SCREEN_LAYERS.POPUP_WINDOW)
+    // 0x52c50 — 상태 그리기(장면 창) → 53066 기록 알림 0x4e35c → 0x746cd 팝업 (r297)
+    expect(SCREEN_LAYERS.SCENE_WINDOW).toBeLessThan(SCREEN_LAYERS.RECORD_ALERT)
+    expect(SCREEN_LAYERS.RECORD_ALERT).toBeLessThan(SCREEN_LAYERS.POPUP_WINDOW)
     expect(SCREEN_LAYERS.POPUP_WINDOW).toBeLessThan(SCREEN_LAYERS.COMMON_WINDOW)
   })
 
