@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { NARI_STATE, pitcherLeagueBgmOf, restartsManagementBgmFrom, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useResumeCoverStop, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { NARI_STATE, pitcherLeagueBgmOf, restartsManagementBgmFrom, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useResumeCoverStop, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, seasonSceneBgmOf, restartsTeamSelectBgm, playEndingContinueBgm, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import type { Screen } from '@/app/model/screen'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { useSceneBgm } from '@/app/model/useSound'
@@ -111,6 +111,67 @@ describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록�
     rerender({ scene: 0xcf, shown: true })
     rerender({ scene: 0xc9, shown: false })
     expect(played).toEqual([4, 4])
+  })
+})
+
+describe('안쪽 상태별 배경음 (r296 — 호출지 전수)', () => {
+  it("최상위 '시즌모드' 는 배경음을 안 바꾼다 — 0xcb 진입 분기가 고른 첫 상태가 튼다", () => {
+    expect(screenBgmOf({ kind: '시즌모드' })).toBeNull()
+  })
+
+  it('시즌 상태 진입 — 0xca 팀 고르기 0x50a8 은 조건 없이 3, 0xc9 는 이전 상태 목록이면 4, 그 밖(0xd8 · 0xf3 …)은 안 바꾼다', () => {
+    expect(seasonSceneBgmOf(null, 0xca)).toBe(3)
+    expect(seasonSceneBgmOf(0xc9, 0xca)).toBe(3)
+    expect(seasonSceneBgmOf(null, 0xc9)).toBe(4)
+    expect(seasonSceneBgmOf(0xcd, 0xc9)).toBeNull()
+    for (const scene of [0xd8, 0xf3, 0xcd, 0xe1, 0xdd]) expect(seasonSceneBgmOf(null, scene)).toBeNull()
+  })
+
+  it('훅 — 시즌모드에 0xca 로 들어서면 3, 관리 메뉴에서 0xca 로 가도 3 을 처음부터, 0xd8 로 들어서면 아무것도 안 튼다', () => {
+    const played: number[] = []
+    const port = { ...createSilentSound(), playBgm: (id: number) => { played.push(id) } }
+    const { rerender } = renderHook(
+      ({ isActive, scene }: { isActive: boolean; scene: number }) => useSeasonMenuBgm(port, isActive, scene),
+      { initialProps: { isActive: true, scene: 0xca } },
+    )
+    expect(played).toEqual([3])
+    rerender({ isActive: true, scene: 0xc9 })
+    rerender({ isActive: true, scene: 0xca })
+    expect(played).toEqual([3, 4, 3])
+    rerender({ isActive: false, scene: 0xd8 })
+    rerender({ isActive: true, scene: 0xd8 })
+    expect(played).toEqual([3, 4, 3])
+  })
+
+  it('타자편 등록(102)에서 팀 고르기(101)로 물러나면 101 진입 0x10790 이 3 을 처음부터 다시 튼다', () => {
+    expect(restartsTeamSelectBgm('선수등록', '팀선택')).toBe(true)
+    expect(restartsTeamSelectBgm('메인메뉴', '팀선택')).toBe(false)
+    const { result, rerender } = renderHook(({ screen }: { screen: Screen }) => useScreenBgm(screen), {
+      initialProps: { screen: { kind: '팀선택' } as Screen },
+    })
+    const start = result.current.restartSerial
+    rerender({ screen: { kind: '선수등록', teamId: 1 } as Screen })
+    expect(result.current.restartSerial).toBe(start)
+    rerender({ screen: { kind: '팀선택' } as Screen })
+    expect(result.current.restartSerial).toBe(start + 1)
+    expect(result.current.bgm).toBe(3)
+  })
+
+  it('투수편 — 3 은 등록(101)만, 마선수 대결(경기 장면이 끊음)과 판정 없는 엔딩은 안 바꾼다', () => {
+    expect(pitcherLeagueBgmOf('등록', false)).toBe(3)
+    expect(pitcherLeagueBgmOf('마선수대결', false)).toBeNull()
+    expect(pitcherLeagueBgmOf('엔딩', false, null)).toBeNull()
+  })
+
+  it('엔딩 141 이어하기 1be2a~1be40 — 끊고(0x6e418) 4 를 튼다', () => {
+    const calls: string[] = []
+    const port = {
+      ...createSilentSound(),
+      stop: () => { calls.push('stop') },
+      playBgm: (id: number) => { calls.push(`bgm ${id}`) },
+    }
+    playEndingContinueBgm(port)
+    expect(calls).toEqual(['stop', 'bgm 4'])
   })
 })
 

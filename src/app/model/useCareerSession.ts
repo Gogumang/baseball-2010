@@ -5,7 +5,7 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { batterCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GameEvaluationScreenData, Screen } from '@/app/model/screen'
-import { NARI_STATE, restartsManagementBgmFrom } from '@/app/model/screenBgm'
+import { NARI_STATE, playEndingContinueBgm, restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
 import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
@@ -2749,6 +2749,8 @@ export function useCareerSession({
       // 팝업 0x32 예 → 0x1bdc6 `0x22c29(모드 4 → 1, 5000)`
       recordStat({ kind: 'G사용', usage: leagueUsageOf(BATTER_LEAGUE_MODE), amount: CONTINUE_COST_GAME_POINT })
       if (career.endingIndex !== INJURY_ENDING_INDEX) {
+        // 1be2a~1be40 — 두 갈래가 만나 소리를 끊고 4 를 튼다. 방출은 화면이 엔딩 그대로라 여기서 (`playEndingContinueBgm`)
+        playEndingContinueBgm(audio)
         startNewSeason(continueAfterEndingPayment(career), false, true)
         return true
       }

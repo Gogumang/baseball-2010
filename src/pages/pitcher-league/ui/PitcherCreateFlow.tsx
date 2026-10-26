@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { MyLeagueTeamSelectScreen } from '@/pages/create-player/ui/MyLeagueTeamSelectScreen'
 import { PitcherRegisterScreen } from '@/pages/pitcher-league/ui/PitcherRegisterScreen'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
+import { activeSound } from '@/shared/api/audio/soundPort'
+
+/** 101 팀 고르기 진입 0x10790 의 배경음 — 107a2 `0x6ea6d(소리, 3, −1, 1)` 조건 없이 (모드 준비 배경음) */
+const TEAM_SELECT_BGM = 3
 
 /**
  * 투수편 선수 만들기 흐름 — **0x65 팀 고르기 → 0x66 등록 → 0x67 확인** (C-4 확정,
@@ -37,7 +41,12 @@ export function PitcherCreateFlow({ openedHiddenIds = [], onCreate, onCancel, ga
       // 머리띠 G — 제목이 있는 머리띠 0x54d95 는 늘 전역 G(+0x64)를 그린다 (0x550d8~0x550de)
       {...(gamePoint === undefined ? {} : { gamePoint })}
       onCreate={(name, profile) => onCreate(name, { ...profile, teamId })}
-      onCancel={() => setTeamId(null)}
+      // 102 취소(키 0x16f28 171dc~17202 → `0xbcb49(0x65)`)는 101 진입 0x10790 을 다시 지나 3 을 처음부터 튼다 — 웹은 두 상태가
+      // 한 화면(투수편 '등록')이라 화면 표가 못 보므로 여기서 튼다 (타자편은 `screenBgm` 의 `restartsTeamSelectBgm`)
+      onCancel={() => {
+        activeSound().playBgm(TEAM_SELECT_BGM)
+        setTeamId(null)
+      }}
     />
   )
 }
