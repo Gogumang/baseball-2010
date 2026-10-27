@@ -134,21 +134,34 @@ export function ballPatternCounterAfter(draws: number): number {
   return ((draws - 1) % BALL_PATTERN_PERIOD) + 1
 }
 
-/** c 일 때 공 칸들의 왼쪽 위 — 줄마다 홀수 줄은 반 칸 왼쪽 */
-export function ballPatternTilesOf(counter: number): readonly { readonly x: number; readonly y: number }[] {
+/** c 일 때 첫 칸(0 줄 0 칸)의 왼쪽 위 — x · y 가 같다. 모든 칸이 이 값만큼 함께 움직인다 */
+export function ballPatternStartOf(counter: number): number {
   const stepX = tileWidth + gap
   const rawStart = 2 * (counter - tileWidth)
   // B-91 고친 길 — 무늬 주기 2 · (w + 15) 만큼 당겨 왼쪽 · 위 가장자리 빈 줄을 채운다. 굴림 없음
-  const start = isBugFixed('B-91') && rawStart > 0 ? rawStart - 2 * stepX : rawStart
-  // 줄 간격도 높이가 아니라 **폭** + 15 다 (0x5fe74 `adds r3, r2, r7` — r7 = 폭). gpoint 12 는 23×23 이라 같다
+  return isBugFixed('B-91') && rawStart > 0 ? rawStart - 2 * stepX : rawStart
+}
+
+/**
+ * 첫 칸에서 잰 칸들의 자리 — 카운터와 무관한 고정 격자. 줄마다 홀수 줄은 반 칸 왼쪽.
+ * 줄 간격도 높이가 아니라 **폭** + 15 다 (0x5fe74 `adds r3, r2, r7` — r7 = 폭). gpoint 12 는 23×23 이라 같다
+ */
+export const BALL_PATTERN_GRID: readonly { readonly x: number; readonly y: number }[] = (() => {
+  const stepX = tileWidth + gap
   const stepY = tileWidth + gap
-  const tiles: { x: number; y: number }[] = []
+  const grid: { x: number; y: number }[] = []
   for (let row = 0; row < BALL_PATTERN_ROWS; row += 1) {
     for (let column = 0; column < BALL_PATTERN_COLUMNS; column += 1) {
-      tiles.push({ x: start + stepX * column - (row % 2 === 1 ? stepX >> 1 : 0), y: start + stepY * row })
+      grid.push({ x: stepX * column - (row % 2 === 1 ? stepX >> 1 : 0), y: stepY * row })
     }
   }
-  return tiles
+  return grid
+})()
+
+/** c 일 때 공 칸들의 왼쪽 위 — 첫 칸 자리 + 고정 격자(`BALL_PATTERN_GRID` 와 같은 차례) */
+export function ballPatternTilesOf(counter: number): readonly { readonly x: number; readonly y: number }[] {
+  const start = ballPatternStartOf(counter)
+  return BALL_PATTERN_GRID.map((at) => ({ x: start + at.x, y: start + at.y }))
 }
 
 /**

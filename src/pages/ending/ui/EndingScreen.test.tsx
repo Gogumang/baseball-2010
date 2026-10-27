@@ -378,7 +378,11 @@ describe('명예의 전당 등록 목록(상태 145) 머리띠 — 0x15d54 → 0
     const { container } = 띄우기({ bonusGamePoint: 0, hallOfFame: 명전('타자') })
     등록목록까지()
     expect(container.querySelector('[data-testid="바탕-공무늬"]')).not.toBeNull()
-    expect(그림들(container).filter((src) => src.startsWith('./sprites/gpoint/frames/'))).toHaveLength(13 * 15)
+    // gpoint 그림마다 한 벌씩 만들어 두고 지금 그림의 벌만 보인다(r321) — 보이는 벌이 13 × 15 칸
+    const 보이는칸 = [...container.querySelectorAll<HTMLElement>('[data-testid="바탕-공무늬"] > [data-frame-layer]')]
+      .filter((layer) => layer.style.display !== 'none')
+      .flatMap((layer) => [...layer.querySelectorAll('img')].map((image) => image.getAttribute('src') ?? ''))
+    expect(보이는칸.filter((src) => src.startsWith('./sprites/gpoint/frames/'))).toHaveLength(13 * 15)
   })
 })
 

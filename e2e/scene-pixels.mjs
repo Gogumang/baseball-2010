@@ -3,6 +3,12 @@
 //   PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ yarn node e2e/scene-pixels.mjs              # 장면 표 전부 × chromium · webkit 아이폰
 //   PIXELS_A=… PIXELS_B=… yarn node e2e/scene-pixels.mjs general-bat derby-start                             # 몇 개만
 //   PIXELS_ONLY=webkit PIXELS_SETTLE=2000 …                                                                   # 한 브라우저 · ready 뒤 더 돌릴 가상 ms
+//   PIXELS_RUNS=chromium:iphone,webkit:iphone-land …                                                         # 브라우저:기기 짝 (기본 chromium:desktop,webkit:iphone)
+//   PIXELS_SHOTS=48 PIXELS_SHOT_STEP=50 …                                                                     # ready + SETTLE 뒤 STEP ms 씩 밀며 여러 틱 위상을 찍어 다 견준다
+//   PIXELS_REPEAT=3 …                                                                                          # 다르면 두 쪽을 3 판까지 찍어 같은 서버끼리의 흔들림을 걸러 낸다
+//
+// 기기: `lib/scene.mjs` 의 desktop · iphone(배율 1.625) · iphone-land(1.2125) 에 더해 분수 배율 꼴 phone-1.6625 · phone-1.7125 ·
+// land-1.2875 (배율은 1/80 단위라 1/64 레이아웃 단위로 딱 떨어지지 않는 값 — 반올림 차이를 잡으려고).
 //
 // 같은 틱에서 찍기: Playwright 가짜 시계(`page.clock`)를 쪽이 열리기 전에 멈춰 두고, **망 요청이 다 끝난 뒤에만** 시계를 STEP ms 씩
 // 민다. 그래서 두 서버 모두 "청한 그림 · JSON 은 다음 걸음 전에 와 있다" 는 같은 조건에서 같은 틱 수만큼 돈다(그림이 늦게 와서
@@ -22,6 +28,17 @@ if (A === undefined || B === undefined) throw new Error('PIXELS_A · PIXELS_B (�
 const ONLY = process.env.PIXELS_ONLY
 const STEP = Number(process.env.PIXELS_STEP ?? 50)
 const SETTLE = Number(process.env.PIXELS_SETTLE ?? 1500)
+const SHOTS = Number(process.env.PIXELS_SHOTS ?? 1)
+const SHOT_STEP = Number(process.env.PIXELS_SHOT_STEP ?? STEP)
+const REPEAT = Number(process.env.PIXELS_REPEAT ?? 1)
+/** 분수 배율 꼴 — 아이폰 13 꼴(터치 · 모바일)에 창 크기만 바꾼다 */
+const phoneOf = (width, height) => ({ ...DEVICES.iphone, viewport: { width, height }, screen: { width, height } })
+const EXTRA_DEVICES = {
+  'phone-1.6625': phoneOf(400, 700),
+  'phone-1.7125': phoneOf(412, 915),
+  'land-1.2875': phoneOf(915, 412),
+}
+const deviceOf = (name) => EXTRA_DEVICES[name] ?? DEVICES[name]
 /** 가상 시간 한도 — 공을 여러 번 보내는 장면은 넉넉히 */
 const LIMIT = { 'nari-burst-result': 240000, 'mission-result': 240000 }
 const OUT = new URL('./.run/pixels/', import.meta.url).pathname
@@ -55,7 +72,7 @@ const IMAGE_PROBE = `(() => {
 })()`
 
 async function openPage(browser, browserName, device) {
-  const context = await browser.newContext(DEVICES[device])
+  const context = await browser.newContext(deviceOf(device))
   const page = await context.newPage()
   const stats = { pageErrors: [], consoleErrors: [], badResponses: [], failed: [], spriteJson: 0, bundle: 0, inFlight: 0 }
   if (browserName !== 'chromium') await page.route(CDN, (route) => route.abort())
@@ -138,14 +155,23 @@ async function capture(browser, browserName, device, base, scene, label, target 
   } catch (caught) {
     error = String(caught).slice(0, 300)
   }
-  const shotPath = `${OUT}${browserName}-${scene}-${label}.png`
-  const png = await page.screenshot({ path: shotPath, animations: 'disabled' }).catch(() => null)
+  const pngs = []
+  const zoom = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--zoom')).catch(() => '?')
+  for (let shot = 0; shot < SHOTS; shot += 1) {
+    if (shot > 0) {
+      await page.clock.runFor(SHOT_STEP)
+      await waitQuiet(page, stats)
+    }
+    const shotPath = `${OUT}${browserName}-${device}-${scene}-${label}${SHOTS > 1 ? `-${shot}` : ''}.png`
+    pngs.push(await page.screenshot({ path: shotPath, animations: 'disabled' }).catch(() => null))
+  }
+  const png = pngs[0]
   const images = await page.evaluate(() => ({
     errors: window.__imageProbe?.errors ?? [],
     broken: [...document.images].filter((image) => image.getAttribute('src') && image.complete && image.naturalWidth === 0).map((image) => image.src.slice(0, 160)),
   })).catch(() => ({ errors: ['쪽을 못 읽음'], broken: [] }))
   await context.close()
-  return { png, error, virtual, stats, images }
+  return { png, pngs, zoom, error, virtual, stats, images }
 }
 
 /** 두 PNG 의 다른 픽셀 수 — 바이트가 같으면 0, 아니면 도우미 쪽에서 풀어 센다 */
@@ -193,10 +219,10 @@ const isOk = (row) => row.diff === 0 && row.errorA === null && row.errorB === nu
 
 const asked = process.argv.slice(2)
 const names = asked.length > 0 ? asked : sceneNames()
-const RUNS = [
-  { browserName: 'chromium', device: 'desktop' },
-  { browserName: 'webkit', device: 'iphone' },
-].filter((run) => ONLY === undefined || run.browserName === ONLY)
+const RUNS = (process.env.PIXELS_RUNS ?? 'chromium:desktop,webkit:iphone').split(',').map((pair) => {
+  const [browserName, device] = pair.split(':')
+  return { browserName, device }
+}).filter((run) => ONLY === undefined || run.browserName === ONLY)
 
 const rows = []
 const started = Date.now()
@@ -213,18 +239,57 @@ for (const { browserName, device } of RUNS) {
   for (const scene of names) {
     let a = await capture(browser, browserName, device, A, scene, 'a')
     let b = await capture(browser, browserName, device, B, scene, 'b')
-    let diff = await diffPixels(helper, a.png, b.png)
+    const diffAll = async () => {
+      let total = 0
+      let shots = 0
+      for (let shot = 0; shot < SHOTS; shot += 1) {
+        const count = await diffPixels(helper, a.pngs[shot], b.pngs[shot])
+        if (count !== 0) shots += 1
+        total = count < 0 ? count : total < 0 ? total : total + count
+      }
+      differingShots = shots
+      return total
+    }
+    let differingShots = 0
+    let diff = await diffAll()
     // ready 가 선 가상 시각이 한 걸음 갈리면(웹킷에서 가끔 — 같은 서버끼리도 갈린다) 둘 다 늦은 쪽 시각까지 민 화면으로 다시 견준다
     let aligned = false
     for (let retry = 0; retry < 2 && diff !== 0 && a.virtual !== b.virtual && a.error === null && b.error === null; retry += 1) {
       const target = Math.max(a.virtual, b.virtual) - SETTLE
       a = await capture(browser, browserName, device, A, scene, 'a', target)
       b = await capture(browser, browserName, device, B, scene, 'b', target)
-      diff = await diffPixels(helper, a.png, b.png)
+      diff = await diffAll()
       aligned = true
     }
+    // 같은 서버끼리도 갈리는 픽셀(웹킷 분수 배율에서 겹친 사각형 가장자리 몇 픽셀이 판마다 다르다)을 걸러 낸다 —
+    // 두 쪽을 REPEAT 번까지 더 찍어, 찍은 자리마다 A 판 하나와 B 판 하나가 바이트까지 같으면 같은 것으로 본다
+    let selfNoise = 0
+    if (diff !== 0 && REPEAT > 1 && a.error === null && b.error === null) {
+      const target = Math.max(a.virtual, b.virtual) - SETTLE
+      const as = [a]
+      const bs = [b]
+      for (let more = 1; more < REPEAT; more += 1) {
+        as.push(await capture(browser, browserName, device, A, scene, 'a', target))
+        bs.push(await capture(browser, browserName, device, B, scene, 'b', target))
+      }
+      let total = 0
+      let shots = 0
+      for (let shot = 0; shot < SHOTS; shot += 1) {
+        const pairs = as.flatMap((x) => bs.map((y) => [x.pngs[shot], y.pngs[shot]]))
+        if (pairs.some(([x, y]) => x !== null && y !== null && Buffer.compare(x, y) === 0)) continue
+        let least = Infinity
+        for (const [x, y] of pairs) least = Math.min(least, await diffPixels(helper, x, y))
+        total += least
+        shots += 1
+      }
+      for (let shot = 0; shot < SHOTS; shot += 1) {
+        if (as.some((x) => Buffer.compare(x.pngs[shot], as[0].pngs[shot]) !== 0)) selfNoise += 1
+      }
+      diff = total
+      differingShots = shots
+    }
     const row = {
-      browserName, scene, diff, aligned, virtualA: a.virtual, virtualB: b.virtual,
+      browserName, device, zoom: a.zoom, shots: SHOTS, differingShots, selfNoise, scene, diff, aligned, virtualA: a.virtual, virtualB: b.virtual,
       errorA: a.error, errorB: b.error,
       jsonA: a.stats.spriteJson, jsonB: b.stats.spriteJson, bundleA: a.stats.bundle, bundleB: b.stats.bundle,
       problemsA: problemsOf(a, A), problemsB: problemsOf(b, B),
@@ -235,7 +300,8 @@ for (const { browserName, device } of RUNS) {
     rows.push(row)
     const ok = isOk(row)
     const known = row.problemsA.paths.length + row.problemsA.messages.length
-    console.log(`${ok ? 'ok  ' : 'DIFF'} ${browserName.padEnd(8)} ${scene.padEnd(28)} 다른 픽셀 ${String(diff).padStart(6)} · 가상 ${a.virtual}/${b.virtual}ms${aligned ? '(맞춤)' : ''}` +
+    console.log(`${ok ? 'ok  ' : 'DIFF'} ${browserName.padEnd(8)} ${device}(×${a.zoom}) ${scene.padEnd(28)} 다른 픽셀 ${String(diff).padStart(6)}` +
+      `${SHOTS > 1 ? ` (찍은 ${SHOTS} 장 중 다른 ${differingShots})` : ''}${selfNoise > 0 ? ` · A 끼리 흔들린 장 ${selfNoise}` : ''} · 가상 ${a.virtual}/${b.virtual}ms${aligned ? '(맞춤)' : ''}` +
       ` · 새 문제 ${row.newPaths.length + row.newMessages.length} (둘 다 있던 것 ${known}) · JSON 낱개 A ${row.jsonA} B ${row.jsonB} · 묶음 A ${row.bundleA} B ${row.bundleB}` +
       `${row.errorA ? ` · A: ${row.errorA}` : ''}${row.errorB ? ` · B: ${row.errorB}` : ''}` +
       `${row.newPaths.length + row.newMessages.length > 0 ? ` · B 에만: ${[...row.newPaths, ...row.newMessages].slice(0, 5).join(' | ')}` : ''}` +
