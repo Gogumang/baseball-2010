@@ -1,6 +1,8 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
-import { gamePointEarnedOf, gamePointUsageOf, itemPurchaseCountOf, playTimeOf, totalPlayTimeOf } from '@/entities/collection/model/annalsStats'
+import {
+  gamePointEarnedOf, gamePointUsageOf, itemPurchaseCountOf, leagueFirstCountOf, playTimeOf, totalPlayTimeOf,
+} from '@/entities/collection/model/annalsStats'
 import { STAT_NAME_FIRST_INDEX } from '@/pages/record/lib/statNames'
 
 /**
@@ -27,19 +29,19 @@ export interface StatCell {
   /** StrMAINMENU 번호 */
   readonly nameIndex: number
   readonly valueKind: StatValueKind
-  /** 값을 읽는다 — 웹이 아직 저장하지 않는 칸이면 null */
-  readonly valueOf: (stats: AnnalsStats) => number | null
+  /** 값을 읽는다 — 표의 모든 칸이 원본 저장 칸을 읽는다(쓰는 곳이 없는 칸은 늘 0) */
+  readonly valueOf: (stats: AnnalsStats) => number
 }
-
-const NOT_SAVED = () => null
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, offset) => from + offset)
 
 const STAT_CELLS: ReadonlyMap<number, StatCell> = new Map<number, StatCell>([
   // 모드별 플레이 시간 (0x4e8b0 → 0x22efc 가 쌓는다)
   ...range(0, 6).map((id): [number, StatCell] => [id, { nameIndex: 129 + id, valueKind: '시간', valueOf: (stats) => playTimeOf(stats, id) }]),
-  // 우승 횟수·친구 추천·이벤트 미션 다운 — 웹은 저장하지 않는다
-  ...range(8, 12).map((id): [number, StatCell] => [id, { nameIndex: 136 + id - 8, valueKind: '횟수', valueOf: NOT_SAVED }]),
+  // 나리 타자편 · 투수편 · 시즌 우승(정규시즌 1위, 0xb818c) · 친구 추천 · 이벤트 미션 다운(쓰는 곳 없음 — 늘 0회)
+  ...range(8, 12).map((id): [number, StatCell] => [id, {
+    nameIndex: 136 + id - 8, valueKind: '횟수', valueOf: (stats) => leagueFirstCountOf(stats, id - 8),
+  }]),
   ...range(16, 25).map((id): [number, StatCell] => [id, {
     nameIndex: 141 + id - 16, valueKind: '개수', valueOf: (stats) => itemPurchaseCountOf(stats, 4, id - 16),
   }]),

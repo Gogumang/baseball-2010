@@ -2705,6 +2705,9 @@ export function useSeasonSession(
          * 라운드를 하나씩 진행시킨다 (내 팀 차례면 사람이 치고, 아니면 0xc2760 으로 돌린다).
          */
         const end = finishRegularSeason(save.league, settled.teamId)
+        // 같은 1위 갈래(b82a4~b830a)가 SR+0x7a 다음에 통계 [mgr+0xc8]+0x100(기록연감 셀 10 "시즌모드 우승")을 +1 하고 저장한다.
+        // 전역기록 +0x5e(b82ce~b82ea)도 +1 하지만 그 칸을 읽는 곳이 없다(이진 전체 ldrh 훑기 — 이 증가 하나) → 웹은 안 둔다
+        if (end.isRegularSeasonFirst) recordStat?.({ kind: '리그1위', mode: SEASON_STAT_MODE })
         commit({
           ...save,
           // 포스트시즌 선발·벤치 차례는 정규시즌이 끝났을 때의 리그 투수 레코드 차례에서 이어 돈다 (3eb7301)
@@ -2747,7 +2750,7 @@ export function useSeasonSession(
       activeSound().playBgm(SEASON_MANAGEMENT_BGM)
       setScene(SEASON_SCENE_STATE.경기뒤마무리)
     },
-    [commit, random, save],
+    [commit, random, recordStat, save],
   )
 
   /** 0xf1 키 0x49a4 — 확인이면 포스트시즌 0xef · 경기 수 짝수 0xc9 · 홀수 0xd8 */

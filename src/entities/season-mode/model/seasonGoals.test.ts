@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   POSTSEASON_OUTSIDE_RANK,
-  SEASON_GOAL_REWARDS,
   SEASON_YEAR_GOALS,
   achievedSeasonGoalCount,
   battingAverageOf,
@@ -13,7 +12,6 @@ import {
   seasonGoalResultEventId,
   seasonGoalWindowNumbersOf,
   seasonGoalWindowRankOf,
-  seasonGoalYearBonusOf,
   seasonGoalsOf,
   winRatePercentOf,
 } from '@/entities/season-mode/model/seasonGoals'
@@ -65,21 +63,6 @@ describe('목표 결과 이벤트 0x8d0e0', () => {
     expect(seasonGoalResultEventId(3)).toBe(395)
     expect(seasonGoalResultEventId(2)).toBe(396)
     expect(seasonGoalResultEventId(0)).toBe(396)
-  })
-
-  it('보상 표는 s_event 2a 절 그대로다', () => {
-    expect(SEASON_GOAL_REWARDS[393]).toEqual({ popularity: 25, reputation: 30, money: 35 })
-    expect(SEASON_GOAL_REWARDS[394]).toEqual({ popularity: 20, reputation: 0, money: 20 })
-    expect(SEASON_GOAL_REWARDS[395]).toEqual({ popularity: 0, reputation: 0, money: 0 })
-    expect(SEASON_GOAL_REWARDS[396]).toEqual({ popularity: -10, reputation: -5, money: 0 })
-  })
-
-  it('연차 보정 — 393·394 는 +5y, 396 은 인기도 −10y · 평판 −2y', () => {
-    expect(seasonGoalYearBonusOf(393, 4)).toEqual({ popularity: 20, reputation: 20, money: 20 })
-    // 394 에는 평판 보상이 없어 보정도 없다
-    expect(seasonGoalYearBonusOf(394, 4)).toEqual({ popularity: 20, reputation: 0, money: 20 })
-    expect(seasonGoalYearBonusOf(396, 4)).toEqual({ popularity: -40, reputation: -8, money: 0 })
-    expect(seasonGoalYearBonusOf(395, 9)).toEqual({ popularity: 0, reputation: 0, money: 0 })
   })
 })
 

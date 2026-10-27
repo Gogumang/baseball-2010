@@ -1435,6 +1435,22 @@ describe('포스트시즌', () => {
     expect(result.current.state?.record.regularSeasonFirsts).toBe(일위 === 0 ? 1 : 0)
   })
 
+  it('정규시즌 1위면 같은 갈래(0xb818c b82ec~b830a)가 기록연감 통계 +0x100(셀 10 시즌모드 우승)을 센다 — 아니면 안 낸다', () => {
+    for (const team of [0, 5]) {
+      const recordStat = vi.fn()
+      const { result } = renderHook(() =>
+        useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, recordStat))
+      시작(result, team)
+      act(() => result.current.actions.confirmIncome({
+        ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
+      }))
+      const 일위 = result.current.ranking[0] === team
+      const calls = recordStat.mock.calls.filter(([event]) => event.kind === '리그1위')
+      expect(calls).toEqual(일위 ? [[{ kind: '리그1위', mode: 2 }]] : [])
+      expect(result.current.state?.record.regularSeasonFirsts).toBe(일위 ? 1 : 0)
+    }
+  })
+
   it('새 해로 넘어가면 시리즈·순위가 비워진다', () => {
     const { result } = 시즌끝()
 

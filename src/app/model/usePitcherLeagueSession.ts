@@ -1427,6 +1427,10 @@ export function usePitcherLeagueSession(
       // 45경기째면 하루 끝(0xb818c)이 정규시즌을 닫고 대진(0xb80a8)을 연다. CPU 끼리의 포스트시즌 경기는
       // 여기서 돌리지 않는다 — 원본은 대진 128 의 [확인](0x13da0)에서 돌린다 (`pressPostseasonBracket`)
       const seasoned = applyPitcherSeasonEnd(day)
+      // 하루 끝 0xb818c 의 1위 갈래(b8266~b829c) — S+0x7a 다음에 통계 [mgr+0xc8]+0xfe(기록연감 셀 9 "나리 투수편 우승") +1 · 저장
+      if (seasoned.regularSeasonFirstCount > day.regularSeasonFirstCount) {
+        recordStat({ kind: '리그1위', mode: PITCHER_LEAGUE_MODE })
+      }
       /*
        * 경기 뒤 평가 0xa719c(인기도 0xa690c → 평판 0xa6218 → 사기)는 **정규시즌 경기만** 탄다. 유일한 호출지
        * 0x4ea0c 안 0x4f274 앞에서 0x4f216(L+0xac 국가대항전)·0x4f268(L+0x34 포스트시즌)이 0x4f29a(하루 끝)로
