@@ -378,6 +378,13 @@ interface PitcherSoakOptions {
   readonly outingEvery?: number
   /** 새 길: 지갑 처음 G (기본 60000) */
   readonly startGamePoint?: number
+  /**
+   * 긴 판 나누기(A-06) — 앞 구간이 끝낸 커리어로 시작한다(`startPatch` 와 같은 길: 새로 만든 뒤 그 저장으로 갈아 끼운다 = 이어하기 꼴).
+   * 한 판이 10분을 넘지 않게 연차 경계에서 끊어 잇는다
+   */
+  readonly startCareer?: PitcherCareer
+  /** 긴 판 나누기 — 이 연차 관리 화면에 서면 멈춘다(연차 경계의 깨끗한 자리) */
+  readonly stopAtSeason?: number
 }
 
 interface PitcherSoakResult {
@@ -394,6 +401,11 @@ interface PitcherSoakResult {
   readonly ledger: Readonly<Record<string, number>>
   /** 돌린 그림 틀 수 */
   readonly frames: number
+  /** 끝난 때의 커리어 · 지갑 — 다음 구간(`startCareer`)으로 넘긴다 */
+  readonly career: PitcherCareer | null
+  readonly gamePoint: number
+  /** `stopAtSeason` 에서 멈췄나 */
+  readonly stoppedAtSeason: boolean
 }
 
 interface PathCounts {
@@ -1250,6 +1262,7 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   }
 
   const maxSteps = soakNumber('SOAK_MAX_STEPS', 2_000_000)
+  let stoppedAtSeason = false
   let lastKey = ''
   let sameKeySteps = 0
   try {
@@ -1261,6 +1274,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     if (boostAbility && result.current.career !== null) {
       const created = result.current.career
       act(() => result.current.actions.save({ ...created, ability: pitcherAbilityLimitsOf(created) }))
+    }
+    if (options.startCareer !== undefined && result.current.career !== null) {
+      const created = result.current.career
+      act(() => result.current.actions.save(migratePitcherYearlyStats({ ...created, ...options.startCareer })))
     }
     if (options.startPatch !== undefined && result.current.career !== null) {
       const created = result.current.career
@@ -1309,6 +1326,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
         break
       }
       if (maxGames !== undefined && games.리그 + games.포스트시즌 + games.대회 >= maxGames) break
+      if (options.stopAtSeason !== undefined && scene === '관리' && career.season >= options.stopAtSeason) {
+        stoppedAtSeason = true
+        break
+      }
 
       switch (scene) {
         case '관리': {
@@ -1498,8 +1519,33 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   }
   return {
     problems, steps, games, seasons: holder.current?.session.career?.season ?? lastSeason, endingIndex, stoppedAt, yearLog, paths,
-    ledger: ledgerSums, frames,
+    ledger: ledgerSums, frames, career: holder.current?.session.career ?? null, gamePoint: holder.current?.wallet.balance ?? 0, stoppedAtSeason,
   }
+}
+
+/**
+ * 긴 판 나누기(A-06) — `SOAK_CAREER_IN`(앞 구간이 쓴 파일)이 있으면 그 커리어 · 지갑으로 시작하고, `SOAK_STOP_SEASON` 연차 관리 화면에서
+ * 멈춰 `SOAK_CAREER_OUT` 에 커리어 · 지갑을 쓴다. 한 판이 10분을 넘지 않게 연차 경계에서 끊어 잇는다:
+ * `SOAK=1 SOAK_SEEDS=2 SOAK_STOP_SEASON=5 SOAK_CAREER_OUT=a.json yarn vitest run … -t "긴 판 — 씨앗 2"` →
+ * `SOAK_CAREER_IN=a.json SOAK_STOP_SEASON=9 SOAK_CAREER_OUT=b.json …` → `SOAK_CAREER_IN=b.json …`(끝까지)
+ */
+async function segmentOptions(): Promise<Pick<PitcherSoakOptions, 'startCareer' | 'stopAtSeason' | 'startGamePoint'>> {
+  const input = process.env.SOAK_CAREER_IN
+  const stopAtSeason = soakNumber('SOAK_STOP_SEASON', 0)
+  const segment: { startCareer?: PitcherCareer; stopAtSeason?: number; startGamePoint?: number } = {}
+  if (stopAtSeason > 0) segment.stopAtSeason = stopAtSeason
+  if (input !== undefined && input !== '') {
+    const saved = JSON.parse((await import('node:fs')).readFileSync(input, 'utf8')) as { career: PitcherCareer; gamePoint: number }
+    segment.startCareer = saved.career
+    segment.startGamePoint = saved.gamePoint
+  }
+  return segment
+}
+
+async function writeSegment(result: PitcherSoakResult): Promise<void> {
+  const output = process.env.SOAK_CAREER_OUT
+  if (output === undefined || output === '') return
+  (await import('node:fs')).writeFileSync(output, JSON.stringify({ career: result.career, gamePoint: result.gamePoint }))
 }
 
 function report(result: PitcherSoakResult): string {
@@ -1507,6 +1553,7 @@ function report(result: PitcherSoakResult): string {
   return `걸음 ${result.steps} · 경기 리그 ${games.리그} · PS ${games.포스트시즌} · 대회 ${games.대회} · 등판 ${games.등판} · 대결 ${games.대결}`
     + ` · ${result.seasons}년차 · 엔딩 ${result.endingIndex} · [${result.yearLog.join(' / ')}]`
     + ` · 새 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)} · 틀 ${result.frames}`
+    + (result.stoppedAtSeason ? ` · ${result.seasons}년차 관리에서 구간 끝` : '')
     + (result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`)
     + (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
 }
@@ -1617,15 +1664,16 @@ describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
       const result = await runPitcherSoak({
         seed, role, boostAbility: true, teamId: seed % 10, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10), extras: true,
         gameScreen: soakNumber('SOAK_GAME_SCREEN', 1) === 1,
-        resumeEvery: soakNumber('SOAK_RESUME_EVERY', 7),
+        resumeEvery: soakNumber('SOAK_RESUME_EVERY', 7), ...(await segmentOptions()),
       })
+      await writeSegment(result)
       const line = `[투수편 soak 새 길] 씨앗 ${seed} · 보직 ${role} · ${(Date.now() - started) / 1000}s · ${report(result)}`
       process.stderr.write(`${line}\n`)
       if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
       expect(result.stoppedAt, report(result)).toBeNull()
-      expect(result.endingIndex, report(result)).not.toBeNull()
+      if (!result.stoppedAtSeason) expect(result.endingIndex, report(result)).not.toBeNull()
       expect(result.problems.size, report(result)).toBe(0)
-      expect(result.paths.대결, report(result)).toBeGreaterThan(0)
+      if (process.env.SOAK_CAREER_IN === undefined && !result.stoppedAtSeason) expect(result.paths.대결, report(result)).toBeGreaterThan(0)
     }, 3_600_000)
   }
 
@@ -1636,13 +1684,14 @@ describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
       const boostAbility = Math.floor(seed / 2) % 2 === 1
       const result = await runPitcherSoak({
         seed, role, boostAbility, teamId: seed % 10, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
-        gameScreen: soakNumber('SOAK_GAME_SCREEN', 1) === 1,
+        gameScreen: soakNumber('SOAK_GAME_SCREEN', 1) === 1, ...(await segmentOptions()),
       })
+      await writeSegment(result)
       const line = `[투수편 soak] 씨앗 ${seed} · 보직 ${role}${boostAbility ? '(상한)' : ''} · ${(Date.now() - started) / 1000}s · ${report(result)}`
       console.info(line)
       if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
       expect(result.stoppedAt, report(result)).toBeNull()
-      expect(result.endingIndex, report(result)).not.toBeNull()
+      if (!result.stoppedAtSeason) expect(result.endingIndex, report(result)).not.toBeNull()
       expect(result.problems.size, report(result)).toBe(0)
     }, 3_600_000)
   }
