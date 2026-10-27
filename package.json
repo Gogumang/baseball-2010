@@ -14,6 +14,7 @@
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "e2e:hits": "node e2e/hits.mjs",
     "e2e:all": "node e2e/all.mjs",
+    "e2e:quick": "node e2e/quick.mjs",
     "e2e:fixtures": "SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx"
   },
   "dependencies": {
