@@ -1051,6 +1051,7 @@ function PitcherGameScene({
         }}
         {...stageBatterOf(progress)}
         pitcherForm={options.repertoire.form}
+        pitcherMagicNumber={options.repertoire.magicNumber}
         // 내 투수 손 0xb63c0 = 폼 & 1 (마투수 아님)
         pitcherHand={pitcherHandOf(options.repertoire.form, false)}
         // 내 투수가 마운드에 있을 때만 — 강판 뒤 마운드는 다른 투수다
@@ -1177,6 +1178,8 @@ function PitcherGameScene({
                       aimSide: progress.options.stageSide ?? 1,
                       gaugeSettingOn: options.gaugeSettingOn === true,
                       gameMode: PITCHER_CAREER_MODE,
+                      // [경기+0xfc8] == 22 — 놓기 전 0x11 그림의 마구 공 파티클(Q-09)
+                      isMagicPitch: slot?.isMagic === true,
                     },
                   })}
             />

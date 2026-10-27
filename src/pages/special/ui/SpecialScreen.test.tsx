@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { noteSkinShakeKey, resetSkinShakeDirectionForTest } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScreen'
@@ -754,6 +755,37 @@ describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c
 })
 
 describe('설명 판 까딱임 (0x252c6 · 0x25716 — 표 0xce8bc · 0xce88c)', () => {
+  beforeEach(() => resetSkinShakeDirectionForTest())
+
+  it('숫자키는 [skin+0x8c] 를 안 바꾼다 — 앱을 켠 뒤 화살표가 없으면 0x5390c 의 0(←), 앞 화면 화살표가 있으면 그 방향 (Q-10)', () => {
+    vi.useFakeTimers()
+    try {
+      const { container, unmount } = 띄우기()
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 3)
+      })
+      const 판 = () => container.querySelector('img[src$="main_ui/003.png"]') as HTMLElement
+      fireEvent.keyDown(window, { key: '8' })
+      expect([판().style.left, 판().style.top]).toEqual(['94px', '289px'])
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
+      expect(판().style.left).toBe('98px')
+      unmount()
+      // 앞 화면(메인 메뉴 따위)이 0x5550d 에 ↑ 를 적었다 — 새로 선 스페셜도 그 칸을 본다
+      noteSkinShakeKey('ArrowUp')
+      const 다시 = 띄우기()
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 3)
+      })
+      const 판2 = () => 다시.container.querySelector('img[src$="main_ui/003.png"]') as HTMLElement
+      fireEvent.keyDown(window, { key: '2' })
+      expect([판2().style.left, 판2().style.top]).toEqual(['96px', '287px'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('↓ 로 옮기면 설명 판(96, 289)이 +2 · −2 뒤 제자리로', () => {
     vi.useFakeTimers()
     try {

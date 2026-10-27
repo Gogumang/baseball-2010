@@ -13,6 +13,9 @@ import { HUMAN_PITCH_RELEASE_STATE_TICK } from '@/widgets/batting-stage/lib/pitc
 import { PITCHER_RELEASE_TICKS } from '@/widgets/batting-stage/lib/stageScenery'
 import { HIT_STOP_TICKS } from '@/widgets/batting-stage/lib/hitPause'
 import { BIG_HIT_PARTICLE } from '@/widgets/batting-stage/lib/hitParticles'
+import type { PitchGaugeOverlay, PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import { resetSceneBallPath } from '@/widgets/batting-stage/model/sceneBallPath'
+import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 
 /**
  * **사람 투구 장면(`PitcherSideStage`)의 0x11 · 0x13 연출** — 타자편 타석(`useStageAnimation`)과 같은 그리기 부품을 같은 재료로 탄다:
@@ -69,6 +72,7 @@ beforeEach(() => {
   resetSceneParticlesForTest()
   resetCommonWindowShownForTest()
   resetSceneCloudClock()
+  resetSceneBallPath()
 })
 afterEach(() => {
   cleanup()
@@ -138,6 +142,50 @@ describe('사람 투구 장면의 0x11 · 0x13 연출 (타자편과 같은 부�
     const 투구틱 = new Set(그린장면.filter((scene) => scene.stagePhase?.kind === '투구중').map((scene) => scene.tick))
     expect(마구.length).toBe(투구틱.size)
     expect(마구.length).toBe(PITCHER_RELEASE_TICKS - HUMAN_PITCH_RELEASE_STATE_TICK + 공.frameCount + 2)
+  })
+
+  it('놓기 전 0x11 그림(틱 0~9)도 게이지가 실은 마구 22 로 앞 공 경로 자리(장면 첫 공이면 0 채움 점)에 쏜다 (Q-09)', () => {
+    resetSceneBallPath()
+    const 상태틱 = { current: -1 }
+    const 게이지: PitchGaugeOverlay = {
+      kind: '게이지', aim: { x: 0, y: 0, z: 0 }, aimSide: 1, showsGauge: false, gaugeSettingOn: true, cursor: 0, pressed: 0,
+      decidedTicks: 0, isMagicPitch: true, stateTickRef: 상태틱,
+    }
+    const inputOverlayRef = { current: 게이지 as PitchInputOverlay | null }
+    const 마구투수 = { ...기본, pitcherMagicNumber: 2 }
+    const { rerender } = render(<PitcherSideStage {...마구투수} pitch={null} resolution={null} inputOverlayRef={inputOverlayRef} />)
+    그림()
+    expect(쏜것).toEqual([])
+    // 게이지가 0x11 틱 0~6 을 셌다 — 그 그림 몫마다 하나씩
+    상태틱.current = 6
+    그림()
+    expect(쏜것.filter((call) => call.callId === 0x15)).toHaveLength(7)
+    expect(new Set(쏜것.map((call) => call.y))).toEqual(new Set([projectToScreen({ x: 0, y: 0, z: 0 }, 1).y]))
+    // 틱 10 에 놓았다 — 장면이 못 본 틱 7~9 를 마저 쏘고, 놓은 뒤는 공 경로로
+    상태틱.current = 10
+    inputOverlayRef.current = null
+    rerender(
+      <PitcherSideStage {...마구투수} pitch={공} resolution={{ kind: '볼' }} inputOverlayRef={inputOverlayRef} />,
+    )
+    for (let index = 0; index < 300; index += 1) 그림()
+    expect(쏜것.filter((call) => call.callId === 0x15)).toHaveLength(
+      HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS - HUMAN_PITCH_RELEASE_STATE_TICK + 공.frameCount + 2,
+    )
+  })
+
+  it('마구가 아닌 게이지 · 마구 번호 0 투수는 놓기 전 그림에 안 쏜다', () => {
+    const 상태틱 = { current: 9 }
+    const 게이지: PitchGaugeOverlay = {
+      kind: '게이지', aim: { x: 0, y: 0, z: 0 }, aimSide: 1, showsGauge: true, gaugeSettingOn: true, cursor: 0, pressed: 0,
+      decidedTicks: 0, stateTickRef: 상태틱,
+    }
+    const { rerender } = render(<PitcherSideStage {...기본} pitcherMagicNumber={2} pitch={null} resolution={null} inputOverlayRef={{ current: 게이지 }} />)
+    그림()
+    rerender(
+      <PitcherSideStage {...기본} pitch={null} resolution={null} inputOverlayRef={{ current: { ...게이지, isMagicPitch: true } }} />,
+    )
+    그림()
+    expect(쏜것).toEqual([])
   })
 
   it('CPU 필살 스윙으로 맞은 공 — 판정 틀에 보통 불꽃 대신 필살 파티클 · 그림, 0x13 은 큰 타구 꼬리 · 투수 홈런 갈래 재료', () => {

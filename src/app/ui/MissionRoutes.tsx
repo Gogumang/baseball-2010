@@ -922,6 +922,7 @@ function pitchingStageOf(session: ReturnType<typeof useMissionSession>, run: Pit
     // 붙든 삼진의 0x12 대기 — HUD 아웃은 진입 3e1a6 이 올린 값 (r298)
     resultHold: session.pendingBenchClearing,
     pitcherForm: form,
+    pitcherMagicNumber: session.pitcher.repertoire.magicNumber,
     pitcherHand: pitcherHandOf(form, false),
     ...(equipment === undefined ? {} : { pitcherEquipment: pitcherEquipmentOf(equipment) }),
     // 마운드 바탕 벌 = 피부 × 15 + 사람 칸 팀 (482c0~482fc → 0x793b0 의 794c2) — 팀은 hud.ourTeamId
