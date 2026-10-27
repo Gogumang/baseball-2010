@@ -28,9 +28,9 @@ describe('bugfixes.json 모양', () => {
     }
   })
 
-  it('항목 id 가 ORIGINAL-BUGS 1절의 B-01~B-100 · B-106 · B-107 과 1:1 이다', () => {
+  it('항목 id 가 ORIGINAL-BUGS 1절의 B-01~B-100 · B-106 · B-107 · B-124 · B-128 과 1:1 이다', () => {
     expect(BUGFIX_CONFIG.entries.map((entry) => entry.id)).toEqual(ORIGINAL_BUG_IDS)
-    expect(ORIGINAL_BUG_IDS).toHaveLength(102)
+    expect(ORIGINAL_BUG_IDS).toHaveLength(104)
   })
 
   it('implemented 가 코드의 고친 길 목록과 1:1 이다', () => {

@@ -12,15 +12,18 @@ import {
 import {
   createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf,
 } from '@/pages/management/model/nariMainMenuCursor'
+import { isNariMenuOkKey, nariMenuCursorAfterStep, nariMenuStepOfKey } from '@/pages/management/lib/nariMenuKeys'
+import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 
 /** 커서를 옮긴 뒤 두 번 갱신하는 동안 +1, −1 로 튄다 (카운터 +0x98) */
 const BOUNCE_BY_UPDATE = [1, -1]
 /**
  * 관리 메뉴에 **막힌 칸은 없다** — 105 키 0x1261c 는 확인(−5 · '5')이면 켬 표(+0x28)를 보지 않고 커서 칸으로 곧장 간다
  * (12644~12670 점프표 0xcc540 · 칸 3 = 126be → 0x70 = 112). 켬 표가 0 인 칸(행동함이면 트레이닝 · 휴식 · 외출, 첫 해
- * 10경기 전 외출 — 105 진입 0x11910)은 흑백으로 그려질 뿐이고(`nariMainMenuOffIdsOf` → 커맨드 줄 0x7e418), 켬 표를 보는 곳은
- * 메뉴 키 0x6c520(6c54e~6c55c — 숫자 바로 고르기만 막는다) 하나다. r_event_txt[176] "한 가지만" 은 안내 글일 뿐 원본 코드가
- * 막지 않는다(107 키 0x12d48 · 휴식 1261c 12682 · 113 가드 0x16cf0 모두 S+4 를 안 본다) — 원본 그대로 옮긴다
+ * 10경기 전 외출 — 105 진입 0x11910)은 흑백으로 그려지고(`nariMainMenuOffIdsOf` → 커맨드 줄 0x7e418), 확인 키는 켬 표를 안 본다
+ * (107 키 0x12d48 · 휴식 1261c 12682 · 113 가드 0x16cf0 모두 S+4 를 안 본다). 대신 **커서가 그 칸에 서지 못한다** — 메뉴 객체
+ * (0x6c219, vtable 0xd2ea0)의 이동 vt+8 0x6c445 가 켬 표 0 칸을 건너뛴다(`nariMenuCursorAfterStep`). 그래서 웹도 꺼진 칸은
+ * 방향키로 건너뛰고 눌러(터치) 고르지 못하게 한다 — 한 주기에 두 번 행동할 길이 원본처럼 없다
  */
 const NO_DISABLED_IDS: ReadonlySet<string> = new Set()
 const SUB_MENU_KINDS: readonly string[] = ['선수정보', '트레이닝', '아이템']
@@ -120,6 +123,12 @@ export function useManagementMenu(props: ManagementScreenProps) {
     setCursor(0)
     setOpenedAt(update)
   }
+  /** 105 켬 표가 0 인 칸 — 하위 메뉴(106 · 107 · 110)의 표는 늘 켜져 있다 */
+  const mainOffIds = nariMainMenuOffIdsOf(props.career)
+  const isOffSlot = (index: number) => kind === 'main' && mainOffIds.has(slots[index]?.id ?? '')
+  /** 119 기본정보 카드 · 하위 창이 떠 있으면 그 상태의 키만 돈다(119 는 0x1056c 의 취소 · '*' · '0') — 커맨드 줄은 키를 안 받는다 */
+  const isCommandBarIdle = () =>
+    !isShowingBasicInfo && overlay === null && abilityDetailOffset === null && !isTrainingState && restPhase === null
   const moveCursor = (index: number) => {
     if (index === cursor) return
     if (kind === 'main') mainCursor.current = index
@@ -244,11 +253,16 @@ export function useManagementMenu(props: ManagementScreenProps) {
         if (isShowingBasicInfo && overlay === null) return setOverlay('칭호')
         return
       }
-      // 창이 열려 있으면 뒤쪽 커맨드 줄은 방향키·확인에 반응하지 않는다
-      if (overlay !== null) return
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (step !== 0) moveCursor((cursor + step + slots.length) % slots.length)
-      if (event.key === 'Enter') select(slots[cursor].id)
+      // 창이 열려 있거나 119 카드 · 125 연출이 떠 있으면 뒤쪽 커맨드 줄은 방향키·확인에 반응하지 않는다
+      if (!isCommandBarIdle()) return
+      // vt+0x18 0x6c299 → 0x6c031(숫자키 꼴 1) → vt+8 0x6c445 — ←↑'4''2' / →↓'6''8', 꺼진 칸은 건너뛴다 (`nariMenuKeys`)
+      const step = nariMenuStepOfKey(event.key)
+      if (step !== 0) {
+        event.preventDefault()
+        return moveCursor(nariMenuCursorAfterStep(cursor, step, slots.length, isOffSlot))
+      }
+      // 105 키 0x1261c · 106 키 0x13010 — OK(−5) · '5'(0x35)
+      if (isNariMenuOkKey(event.key)) select(slots[cursor].id)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -293,6 +307,13 @@ export function useManagementMenu(props: ManagementScreenProps) {
     answer,
     moveCursor,
     select,
+    /** 커맨드 줄 칸 누름(터치) — 커서가 설 수 없는 칸(켬 표 0 · 119 카드 아래)은 원본에 고를 길이 없다 */
+    hoverSlot: (index: number) => {
+      if (isCommandBarIdle() && !isOffSlot(index)) moveCursor(index)
+    },
+    tapSlot: (id: string) => {
+      if (isCommandBarIdle() && !isOffSlot(slots.findIndex((slot) => slot.id === id))) select(id)
+    },
     back,
   }
 }

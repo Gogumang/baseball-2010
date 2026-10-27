@@ -50,6 +50,7 @@ import {
   countSkillGameCounters,
   endNationalCup,
   isSkillEquipped,
+  seasonStartCountersOf,
   setSkillEquipped,
 } from '@/entities/career/model/playerCareer'
 import type { SeasonEndState } from '@/entities/career/model/playerCareer'
@@ -1180,8 +1181,9 @@ export function isPitcherSeasonFinished(career: PitcherCareer): boolean {
  * 시즌을 넘긴다 (0x1b768). 타자편 `startNextSeason` 과 같은 자리에
  * **스태미나 되돌리기**(시즌 시작 0xb6cc4 → 10000)가 하나 더 붙는다.
  */
-export function startNextPitcherSeason(career: PitcherCareer, random: RandomPort): PitcherCareer {
-  const next = startNextPitcherSeasonRecords(career)
+export function startNextPitcherSeason(career: PitcherCareer, random: RandomPort, afterRelease = false): PitcherCareer {
+  // +0x6b+i 사본 · +0x1c2 는 연말 132 꼬리(10d08~10d28)가 쓴다 — 방출 이어하기(`afterRelease`)는 그 꼬리를 안 지났다 (B-128)
+  const next = { ...startNextPitcherSeasonRecords(career), ...seasonStartCountersOf(career, afterRelease) }
   // 1b86c — 0x665e8(g, S+0xb3(새 연차 = 지난 season), S[1]) 가 내 팀 뺀 아홉 팀 레코드의 장비 니블을 굴린다
   // (투수편 모드 3 → 0x1f940). 0x1b684(1b852)의 내 투수 옮기기 뒤다 — 내 팀은 굴리지 않으니 차례만 지킨다 (`nariCpuEquipment`)
   const records = nariTeamsOf(next)
@@ -1208,8 +1210,6 @@ function startNextPitcherSeasonRecords(career: PitcherCareer): PitcherCareer {
     popularityAtSeasonStart: career.popularity,
     hasSeenYearGoalWindow: false,
     yearGoalEventDone: false,
-    seasonStartTrainingCounts: { ...career.trainingCounts },
-    seasonPopularityGain: 0,
     morale: MAXIMUM_MORALE,
     money: Math.min(MAXIMUM_MONEY, career.money + career.salary * ORIGINAL_MONEY_UNIT),
     stamina: FULL_STAMINA,

@@ -617,10 +617,19 @@ export function trainingCountOf(career: PlayerCareer, menuId: string): number {
 /** 몹쓸몸·유리몸 스킬 번호 — 그 스킬을 가진 채로 훈련한 횟수를 따로 센다 (A-4) */
 const BAD_BODY_SKILL = 3
 const FRAGILE_SKILL = 4
+/**
+ * 해제 카운터 +0x70+칸 을 올리는 (훈련 메뉴, 보유 스킬) 짝 — 0x18a5c~0x18b58 의 모드 4(타자편) 갈래(직접 떴다):
+ * 칸 0 히트 · 18 / 칸 1 파워 · 19 / 칸 2 수비 · 20 (0xa3a75 = **보유** 비트)
+ */
+const RELEASE_STREAK_SKILL_OF_MENU: Readonly<Record<string, number>> = { 히트: 18, 파워: 19, 수비: 20 }
+/** 칸은 s8 (ldrsb · strb, 0x18b68~0x18b6c) */
+const toSignedByte = (value: number) => ((value & 0xff) << 24) >> 24
 
 /**
  * 훈련 한 번을 센다 (0x18a80).
- * 통산 수와 함께 **칸별 연속 훈련 수**도 갱신한다 — 훈련한 칸은 +1, **나머지 칸은 모두 0** 이다.
+ * 통산 수와 함께 **칸별 연속 훈련 수**(+0x70+칸)도 갱신한다 — 0x18a5c~0x18b84: 훈련한 칸이 그 칸의 해제 스킬(18 · 19 · 20)을
+ * **가진 채**면 그 칸만 +1(0x18b5a), 아니면 **다섯 칸 모두 0**(0x18b70 — 주루 · 필살타법 칸, 스킬이 없을 때).
+ * (예전 웹은 스킬과 상관없이 같은 칸이면 올려, 스킬을 얻기 전 훈련이 해제 수에 들어갔다.)
  * 몹쓸몸·유리몸은 0x18b86~0x18bd6(모드 갈림 없음, 직접 떴다): 보유 비트(0xa3a75)면 u8 +0x75/+0x76 += 1, **아니면 0 으로** —
  * 가진 채 이어 한 훈련 수다(예전 웹은 안 가졌을 때 그대로 두어, 풀린 뒤 다시 얻으면 곧 풀렸다).
  */
@@ -628,7 +637,9 @@ export function countTraining(career: PlayerCareer, menuId: string): PlayerCaree
   return {
     ...career,
     trainingCounts: { ...career.trainingCounts, [menuId]: trainingCountOf(career, menuId) + 1 },
-    consecutiveTrainingCounts: { [menuId]: (career.consecutiveTrainingCounts[menuId] ?? 0) + 1 },
+    consecutiveTrainingCounts: hasSkill(career, RELEASE_STREAK_SKILL_OF_MENU[menuId] ?? -1)
+      ? { [menuId]: toSignedByte((career.consecutiveTrainingCounts[menuId] ?? 0) + 1) }
+      : {},
     badBodyTrainings: hasSkill(career, BAD_BODY_SKILL) ? (career.badBodyTrainings + 1) & 0xff : 0,
     fragileTrainings: hasSkill(career, FRAGILE_SKILL) ? (career.fragileTrainings + 1) & 0xff : 0,
   }
@@ -1184,12 +1195,44 @@ export function withNariSceneSetupOutings<T extends Pick<PlayerCareer, 'gamesPla
   return { ...career, outingsThisSeason: 0, outingsLastSeason: 0 }
 }
 
+/** 연말 132 의 꼬리가 쓰는 두 칸 (`seasonStartCountersOf`) — 타자편 · 투수편 커리어 둘 다 이 모양이다 */
+export interface SeasonStartCounters {
+  readonly seasonStartTrainingCounts: Readonly<Record<string, number>>
+  readonly seasonPopularityGain: number
+}
+
 /**
- * 새 시즌 처리 `0x1b768`. `random` 은 1b86c 의 CPU 장비 굴림 `0x665e8` 몫 — 이 처리 안의 난수는 그것뿐이다
+ * **새 시즌의 +0x6b+i(시즌 시작 훈련 수 사본) · +0x1c2(이번 시즌 인기도 변화 합)** — 타자편 · 투수편 공용(장면 0x106 모드 3·4).
+ * 원본은 이 두 칸을 새 시즌 0x1b768 이 아니라 **연말 132 진입 0x10c54 의 꼬리**에서 쓴다(직접 떴다):
+ * ```
+ * 10c84  0xa3a85(S) == 1 → 501 · 10c9c 연차idx == 12 → 504   ; [114 → 141] — 10cc8 에서 꼬리를 건너뛴다
+ * 10cca  그 밖 380 / 502 → (짝수 idx 면 133) · 114
+ * 10d08  strh 0 → S+0x1c2                                     ; 이번 시즌 인기도 변화 합
+ * 10d14  i = 0..4: S+0x6b+i = S+0x4b+i                         ; 통산 훈련 수 사본
+ * ```
+ * 0x1b768 (· 그 안 0xa39a8)은 두 칸을 안 건드린다. 132 와 0x1b768 사이(133 · 134 · 연봉 이벤트)엔 훈련도 경기 뒤 평가도 없어
+ * 132 를 거친 새 시즌은 여기서 써도 같은 값이다. 다른 길은 **방출 501 → 141 → 5000 G 이어하기 → 0x1b768(1be26)** 하나 —
+ * 그 해 132 는 501 갈래라 꼬리를 안 지나, 원본은 사본이 그 앞 해 132 것 · 인기도 합이 그 해 합 그대로 다음 해로 넘어간다.
+ * ⚠️ 원본 버그(B-128): 이어한 해의 몹쓸몸 · 유리몸 · 스킬 18~20(이번 시즌 훈련 수) · 먹튀(인기도 합 — g == 14 · 32 판정)가
+ * 두 해치를 본다. 고침(bugfixes.json B-128, 기본 켬): 그 길도 다른 길처럼 새로 뜬다. 굴림 없음(스킬 조건 판정만 바뀐다)
+ */
+export function seasonStartCountersOf(
+  career: Pick<PlayerCareer, 'trainingCounts' | 'seasonStartTrainingCounts' | 'seasonPopularityGain'>,
+  afterRelease: boolean,
+): SeasonStartCounters {
+  if (afterRelease && !isBugFixed('B-128')) {
+    return { seasonStartTrainingCounts: career.seasonStartTrainingCounts, seasonPopularityGain: career.seasonPopularityGain }
+  }
+  return { seasonStartTrainingCounts: { ...career.trainingCounts }, seasonPopularityGain: 0 }
+}
+
+/**
+ * 새 시즌 처리 `0x1b768`. `afterRelease` 는 방출 엔딩 141 의 5000 G 이어하기(1be26)로 온 길 — 그 해 132 꼬리를 안 지났다
+ * (`seasonStartCountersOf`). `random` 은 1b86c 의 CPU 장비 굴림 `0x665e8` 몫 — 이 처리 안의 난수는 그것뿐이다
  * (`nariCpuEquipment` 머리말). 새 연차 S+0xb3 = 지난 `season`(첫 시즌 S+0xb3 = 0 = `season` − 1).
  */
-export function startNextSeason(career: PlayerCareer, random: RandomPort): PlayerCareer {
-  const next = startNextSeasonRecords(career)
+export function startNextSeason(career: PlayerCareer, random: RandomPort, afterRelease = false): PlayerCareer {
+  const next = { ...startNextSeasonRecords(career), ...seasonStartCountersOf(career, afterRelease) }
   // 1b86c — 0x665e8(g, S+0xb3, S[1]) 가 내 팀 뺀 아홉 팀 레코드의 장비 니블을 굴린다 (타자편 모드 4 → 0x1f8f8)
   const records = nariTeamsOf(career)
   const rolled = rollNariCpuEquipment(records, random, career.season, career.teamId, (team) => pitcherOrderOf(next.league, team))
@@ -1212,10 +1255,7 @@ function startNextSeasonRecords(career: PlayerCareer): PlayerCareer {
     // 올해의 목표 플래그 두 개를 되돌린다 — +0x1b7(0xa39d0) 창을 봤다 · +0x1bc(0x1b882) 연초 이벤트
     hasSeenYearGoalWindow: false,
     yearGoalEventDone: false,
-    // 새 시즌 시작 때 통산 훈련 수를 떠 둔다 (+0x6b+i) — 이번 시즌 훈련 수를 빼서 구한다
-    seasonStartTrainingCounts: { ...career.trainingCounts },
-    // 이번 시즌 인기도 변화 합은 새 시즌에 0 이다 (+0x1c2)
-    seasonPopularityGain: 0,
+    // +0x6b+i 사본 · +0x1c2 인기도 합은 연말 132 의 꼬리가 쓴다 — `startNextSeason` 이 `seasonStartCountersOf` 로 얹는다
     // 새 시즌 전환 0x1b768: 사기 100, 소지금 += 연봉
     morale: MAXIMUM_MORALE,
     money: Math.min(MAXIMUM_MONEY, career.money + career.salary * ORIGINAL_MONEY_UNIT),

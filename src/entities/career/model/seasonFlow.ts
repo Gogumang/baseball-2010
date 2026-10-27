@@ -263,7 +263,8 @@ export function continueAfterEnding(career: PlayerCareer, random: RandomPort): P
   const paid = continueAfterEndingPayment(career)
   // 0x1bddc~0x1bdfa: 부상 기간 +0x1b5 · +0x1ce · 부상 경기 수 +0x1b6 을 0 으로 (원본 부상 판정은 +0x1b5 > 0)
   if (career.endingIndex === INJURY_ENDING_INDEX) return { ...paid, isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0 }
-  return startNextSeason(paid, random)
+  // 방출은 그 해 132 꼬리(10d08~10d28)를 안 지난 새 시즌이다 — +0x6b 사본 · +0x1c2 는 B-128 (`seasonStartCountersOf`)
+  return startNextSeason(paid, random, true)
 }
 
 /** 부상 엔딩 이벤트 — 105 진입 0x11b32 의 판정 0 → 0x113e8 이 번호로 튼다(대상 0) */

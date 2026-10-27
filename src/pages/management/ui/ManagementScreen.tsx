@@ -183,7 +183,8 @@ export function ManagementScreen(props: ManagementScreenProps) {
         disabledIds={menu.disabledIds} labelWidths={labelWidths} parent={menu.parent}
         // 켬 표 0 칸은 흑백 — 105 진입 0x11910(첫 해 10경기 전 외출 포함). 0x7e418 은 하위 메뉴가 없을 때만 본다
         grayedIds={menu.parent === null ? nariMainMenuOffIdsOf(career) : undefined}
-        onHover={menu.moveCursor} onSelect={menu.select} />
+        // 흑백 칸에는 커서가 서지 못한다(vt+8 0x6c445) — 눌러도 고르지 않는다
+        onHover={menu.hoverSlot} onSelect={menu.tapSlot} />
       {/* 125 연출 중 화면 탭 = 확인 키 — 0x105a4 가 게이지를 끝으로 보낸다(`TrainingScene` 이 키로 받는다) */}
       {menu.playingMenuId !== null && (
         <PressArea label="훈련 연출 건너뛰기" testId="훈련연출-건너뛰기" onPress={() => pressKey('5')} />

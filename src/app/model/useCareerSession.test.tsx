@@ -1703,6 +1703,28 @@ describe('117 중간 성적표 — 105 진입 곁가지 11bda: S+0xb2 == 22 && �
     expect(성적표까지(rendered)).toBeNull()
   })
 
+  it('1년차 다섯 개 — 칭호 1 은 117 이 +0x270 에 넣기만 하고(11ee6~11f0e) 452 뒤 105 의 팝업이 판정 0x1a1c0 보다 먼저 선다(1af9c)', async () => {
+    const rendered = 띄우기(목표달성선수({ gamesPlayed: 22, seenEventIds: ['451'], hasSeenYearGoalWindow: true }))
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen.kind).toBe('이벤트'))
+    const report = 성적표까지(rendered)
+    expect(report).toEqual(expect.objectContaining({ kind: '이벤트', eventId: 452 }))
+    expect(rendered.result.current.session.career?.titleIds).not.toContain(TITLE_NAMES[1])
+    if (report === null || report.kind !== '이벤트') return
+    // 0x8cbaa — 보상이 돌아야 그 해 비트가 켜져 117 이 다시 안 선다
+    act(() => rendered.result.current.session.actions.giveEventReward([{ kind: 1, value: 5 }], report.eventId))
+    for (let step = 0; step < 30 && rendered.result.current.screen.kind === '이벤트'; step += 1) {
+      const screen = rendered.result.current.screen
+      if (screen.kind !== '이벤트') break
+      act(() => rendered.result.current.session.actions.completeScene([], [screen.eventId]))
+    }
+    await waitFor(() => expect(rendered.result.current.session.pendingTitle).toBe(TITLE_NAMES[1]))
+    act(() => rendered.result.current.session.actions.confirmTitle())
+    expect(rendered.result.current.session.career?.titleIds).toContain(TITLE_NAMES[1])
+    expect(rendered.result.current.session.career?.equippedTitle).toBe(1)
+    expect(rendered.result.current.session.pendingTitle).not.toBe(TITLE_NAMES[1])
+  })
+
   it('그 해 비트가 이미 켜져 있으면 22경기째여도 117 을 안 세운다', async () => {
     const rendered = 띄우기({
       ...createCareer('절반'), season: 2, gamesPlayed: 22, seenEventIds: ['451'], hasSeenYearGoalWindow: true, midSeasonEvaluatedYears: [1],

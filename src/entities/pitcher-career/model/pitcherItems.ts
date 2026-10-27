@@ -6,6 +6,7 @@ import {
   gpItemOf,
   gpItemBlockReasonWith,
   gpItemNoticeWith,
+  gpItemQuestionWith,
   purchaseGpItemWith,
 } from '@/entities/career/model/gpItems'
 import type { GpItem, GpItemResultOf, GpItemRules, GpPurchaseOf, LotteryPrize } from '@/entities/career/model/gpItems'
@@ -99,6 +100,20 @@ export function pitcherGpItemBlockReasonOf(career: PitcherCareer, id: number): s
     },
     id,
   )
+}
+
+/**
+ * GP 칸 구매 확인 글 (0x13460 kind 2 끝, `gpItemQuestionWith`) — 엄마의도시락은 최대인 칸 줄(이름 StrMODE[0x28 + k]) + "!N" 이 앞에 선다.
+ * 칸 9(십전대보탕)에는 이글아이 안내줄 224 가 안 붙는다 (0x13ab4 는 모드 4 일 때만)
+ */
+export function pitcherGpItemQuestionOf(career: PitcherCareer, id: number): string {
+  const limits = pitcherAbilityLimitsOf(career)
+  const view = {
+    abilities: PITCHER_ABILITY_ORDER.map((key) => career.ability[key]),
+    limits: PITCHER_ABILITY_ORDER.map((key) => limits[key]),
+    abilityNames: PITCHER_ABILITY_NAMES,
+  }
+  return gpItemQuestionWith(view, id, PITCHER_GP_ITEMS[id].price, false)
 }
 
 /** 사용 알림 — 능력치 이름 StrMODE[40+k] · 모든능력치 [39] · 십전대보탕 [125] */

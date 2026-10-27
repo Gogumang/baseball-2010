@@ -323,6 +323,8 @@ export function App({ bootScreen }: AppProps = {}) {
     screen.kind === '투수편',
     // 정규시즌 우승 팝업 0xb 닫힘의 0x62369(0x29 · 0x32) 알림 창
     hiddenOpenNotice.announce,
+    // 자동 훑기 0x1cf9c 의 대결 대기 가드(1cfe4~1d008) — 두 편 칸을 다 본다 (B-124)
+    aceMatchHoldPort,
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(
@@ -359,6 +361,8 @@ export function App({ bootScreen }: AppProps = {}) {
     nariGameSave: batterNariGameSave,
     // 나간 마선수 대결 대기 — 전역기록 g[0xec] · g[0xee] · g[0x11f] · g[0x144] (선수를 새로 만들어도 남는다)
     aceMatchPending: aceMatchPendingPorts[NARI_BATTER_MODE],
+    // 자동 훑기 0x1cf9c 의 대결 대기 가드(1cfe4~1d008) — 두 편 칸을 다 본다 (B-124)
+    aceMatchHold: aceMatchHoldPort,
     onManagementBgmRestart: bumpBatterManagementBgmRestart,
   })
   const pitcherMissionPitcher = useMemo(() => modePitcherOf(pitcherSession.career), [pitcherSession.career])

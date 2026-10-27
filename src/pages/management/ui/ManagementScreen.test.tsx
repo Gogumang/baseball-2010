@@ -681,3 +681,68 @@ describe('125 훈련 연출 · 결과 창 (진입 0x11744 · 키 0x105a4 · 틀 
     expect(screen.getByTestId('가운데판')).toBeTruthy()
   })
 })
+
+describe('관리 메뉴 이동 — 메뉴 객체 0x6c219(vtable 0xd2ea0) · 숫자키 꼴 1 · 이동 vt+8 0x6c445', () => {
+  const current = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-current')
+
+  it("행동함이면 흑백 칸(트레이닝 · 휴식 · 외출)을 건너뛰고, 눌러도 고르지 않는다", () => {
+    const career = { ...createCareer('테스터'), season: 2, hasActedThisCycle: true }
+    const onSelect = vi.fn()
+    render(<ManagementScreen {...propsWith({ career, onSelect })} />)
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(current('아이템')).toBe('true')
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(current('선수정보')).toBe('true')
+
+    clickCommand('외출')
+    clickCommand('휴식')
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(current('선수정보')).toBe('true')
+  })
+
+  it("'4' · '6' · ↑ · ↓ 도 칸을 옮기고 '5' 는 확인 (0x6c031 표 0xd2e7c · 꼴 0x330 세로 감기 → 열 ±1)", () => {
+    const career = { ...createCareer('테스터'), season: 2 }
+    const onSelect = vi.fn()
+    render(<ManagementScreen {...propsWith({ career, onSelect })} />)
+
+    fireEvent.keyDown(window, { key: '6' })
+    expect(current('트레이닝')).toBe('true')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(current('휴식')).toBe('true')
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: '6' })
+    expect(current('아이템')).toBe('true')
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: '2' })
+    fireEvent.keyDown(window, { key: '4' })
+    expect(current('트레이닝')).toBe('true')
+
+    // 다음경기(5) 로 가서 '5'
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: '4' })
+    expect(current('다음경기')).toBe('true')
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onSelect).toHaveBeenCalledWith('다음경기')
+  })
+
+  it('119 기본정보 카드가 떠 있으면 106 커맨드 줄은 키를 안 받는다 — 119 키 0x1056c 는 취소 · \'*\' · \'0\' 뿐', () => {
+    const onOpenPlayerInfo = vi.fn()
+    render(<ManagementScreen {...propsWith({ onOpenPlayerInfo })} />)
+    clickCommand('선수정보')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(screen.getByRole('button', { name: '기본정보' }).getAttribute('aria-current')).toBe('true')
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    clickCommand('장비착용')
+    expect(onOpenPlayerInfo).not.toHaveBeenCalled()
+    expect(current('기본정보')).toBe('true')
+
+    // 취소 → 106, 그다음엔 커맨드 줄이 다시 받는다
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(current('장비착용')).toBe('true')
+  })
+})
