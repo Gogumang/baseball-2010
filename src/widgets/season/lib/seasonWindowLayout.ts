@@ -3,11 +3,10 @@
  *
  * 근거: `docs/re/P6-screens.md` 1·3 절 · `docs/re/F-ui-layout.md` 6 절 · `docs/re/S3-stadium-items.md`.
  *
- * ⚠️ **시즌 관리 메뉴·구단관리 메뉴·선수영입·목표 화면의 원본 배치는 아직 안 풀렸다.**
- * P6 22절이 "시즌 끝 요약 화면(대진표 밖)의 그리기 함수" 를 남은 것으로 적어 두었고,
- * F 6절도 시즌 쪽 줄 좌표를 못 찾았다고 적었다. 그래서 이 파일에서 **확정**인 것은
- *   - 공용 판 (24, 54, 192, 212)
- * 하나뿐이고, 나머지 줄·글 자리는 전부 **근사**다. 근사한 값에는 하나하나 표시해 두었다.
+ * 판 · 줄 자리(`SEASON_WINDOW` · `rowBoxOf` · `FOOTER_BOX` …)는 이제 시험 전용 길 `SeasonListWindow`(앱 `SeasonRoute` 는 안 띄움 —
+ * `PlayerRecruitScreen` 머리)만 쓴다. 앱의 시즌 화면들은 저마다 그리기 함수를 떠 옮긴 배치(`pages/season/lib/*`)를 쓴다(r305 확인).
+ * 그래서 이 파일에서 **확정**인 것은 공용 판 (24, 54, 192, 212) 하나뿐이고, 나머지 줄 자리는 그 시험 전용 창의 **근사**다.
+ * 앱 화면이 쓰는 것은 `TEXT`(웹 글꼴 크기 — 웹 DOM 몫) · `MILLION_TO_TEN_THOUSAND` 둘이다.
  * (구장 아이템 창은 0x83378 종류 4 를 직접 떠 `pages/season/lib/stadiumItemWindow` 로 옮겼다.)
  */
 

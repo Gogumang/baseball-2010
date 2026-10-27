@@ -19,7 +19,7 @@ export interface EntryFace {
   readonly name: string
   /** 능력치 네 칸 `0xb6414(rec, k, 1)` — '0' 상세 창 도형 (없으면 빈 배열) */
   readonly ability: readonly number[]
-  /** '0' 상세 창 0x5b798 이 레코드에서 읽는 칸 — 없으면 값 칸을 비운다(⚠️ 그 명단은 레코드 칸을 아직 안 싣는다) */
+  /** '0' 상세 창 0x5b798 이 레코드에서 읽는 칸 — 없으면 값 칸을 비운다(시즌 · 나리 · 투수편 · 에디트 명단은 모두 싣는다 — 표 밖이면서 기록도 없는 칸만, 앱 길에서는 안 닿음) */
   readonly detailSource?: PlayerDetailSource
   /** 레코드 `+0xb & 3` — 타자 이름 칸 세로 줄 색 · 투수 보직 딱지 (없으면 비운다) */
   readonly profileLow?: number
