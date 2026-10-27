@@ -46,6 +46,9 @@
  *
  * 기본은 짧은 판(몇 경기)만 — 긴 판은 `SOAK=1`:
  * `SOAK=1 SOAK_SEEDS=1,2,3 yarn vitest run src/app/model/soak/pitcherLeagueSoak.test.tsx --maxWorkers=2`
+ * 화면 경기 긴 판은 씨앗 하나가 13년차까지 20~30분이라, 한 판이 10분을 넘지 않게 연차 경계에서 나눠 잇는다(`segmentOptions` —
+ * `SOAK_STOP_SEASON` · `SOAK_CAREER_IN` · `SOAK_CAREER_OUT`, A-06 r303). 3년씩 끊으면 한 구간이 3~8분이다.
+ * 테스트 이름 거르기(`-t`)는 정규식이라 `긴 판 \(새 길\) — 씨앗 1` 처럼 괄호를 이스케이프한다.
  */
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
