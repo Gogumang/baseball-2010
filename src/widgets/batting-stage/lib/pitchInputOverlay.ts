@@ -1,5 +1,6 @@
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
+import { fetchSpriteJson } from '@/shared/lib/sprite/spriteJsonBundle'
 import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { drawFrameAt, frameAnimations, placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
@@ -200,8 +201,9 @@ function frameBoxes(folder: string): Readonly<Record<string, readonly (readonly 
   const cached = boxesCache.get(folder)
   if (cached !== undefined) return cached
   boxesCache.set(folder, null)
-  void fetch(`${folder}/boxes.json`)
-    .then((response) => (response.ok ? response.json() : null))
+  // 스프라이트 JSON 묶음에서 꺼낸다(없으면 낱개 파일) — 못 받으면 예전처럼 null (r311 A5)
+  void (fetchSpriteJson(`${folder}/boxes.json`) as Promise<Readonly<Record<string, readonly (readonly number[])[]>>>)
+    .catch(() => null)
     .then((data) => {
       boxesCache.set(folder, data)
       noteAssetLoaded()

@@ -2,10 +2,12 @@ import { configDefaults, defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
+import { spriteJsonBundle } from './tools/viteSpriteJsonBundle.ts'
 
 export default defineConfig({
   base: './',
-  plugins: [react(), vanillaExtractPlugin()],
+  // 스프라이트 JSON 265개를 한 파일로 — `sprites/sprite-json.bundle.json` (r311 A5, `shared/lib/sprite/spriteJsonBundle`)
+  plugins: [react(), vanillaExtractPlugin(), spriteJsonBundle()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
