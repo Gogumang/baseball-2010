@@ -70,6 +70,15 @@ describe('팀 고르기', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  it('처음 칸을 줄 수 있다 — 일반모드 19 진입 0x23e70 은 격자 (0, 1) = 팀 5 (23eb2 · 23eb4)', () => {
+    const onSelect = vi.fn()
+    띄우기({ onSelect, initialCursor: 5 })
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+
+    expect(onSelect).toHaveBeenCalledWith(5)
+  })
+
   it('좌우 키로 커서가 움직이고 엔터로 고른다', () => {
     const onSelect = vi.fn()
     띄우기({ onSelect })

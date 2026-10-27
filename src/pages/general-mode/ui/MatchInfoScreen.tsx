@@ -117,7 +117,8 @@ export function MatchInfoScreen({
       // 설정 창이 열렸으면([skin+0x2ba]) 키는 창 0x5ffcd 로만 간다(312bc~312ce). 아니면 **날 키**를 0x5550d 에 넘긴다(312dc~312e2) —
       // 화살표면 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
       if (!isSettingsOpen) noteSkinShakeKey(event.key)
-      if (event.key === 'Enter') {
+      // OK −5 와 '5' 는 같은 0x31322 경기 시작이다 (312f0 · 31318 `cmp r4,#0x35`, r333 — 예전 웹은 '5' 를 버렸다)
+      if (event.key === 'Enter' || event.key === '5') {
         event.preventDefault()
         return onStart()
       }

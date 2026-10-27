@@ -121,7 +121,9 @@ const CLOSE_SHRINK = 2
 const CLOSE_END_WIDTH = 99
 
 /** 상자가 받는 키 — 펼치는 동안 · 닫히는 동안에도 기본 동작(스크롤 따위)은 막는다 */
-const HANDLED_KEYS: ReadonlySet<string> = new Set(['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Enter', ' ', 'Escape', 'Backspace'])
+const HANDLED_KEYS: ReadonlySet<string> = new Set([
+  'ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Enter', ' ', 'Escape', 'Backspace', '2', '4', '5', '6', '8',
+])
 
 type BoxAnimation =
   | { readonly kind: '열림'; readonly height: number }
@@ -313,13 +315,16 @@ export function MessageBox({
         if (HANDLED_KEYS.has(event.key)) event.preventDefault()
         return
       }
-      const dx = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      const dy = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0
+      // 창 격자는 0x753f4 가 vt+0x10(격자, 열, 줄, **1**, 0x330, 0)으로 짓는다 — 셋째 인자 1 은 숫자키 꼴 1(표 0xd2e7c)이라
+      // '2' '4' '6' '8' 도 ↑ ← → ↓ 로 바뀌어 격자를 옮긴다(미션 고르기 격자 vt+0x1c(5, 3, 1, 0x330)와 같은 꼴, r333)
+      const dx = event.key === 'ArrowRight' || event.key === '6' ? 1 : event.key === 'ArrowLeft' || event.key === '4' ? -1 : 0
+      const dy = event.key === 'ArrowDown' || event.key === '8' ? 1 : event.key === 'ArrowUp' || event.key === '2' ? -1 : 0
       if (dx !== 0 || dy !== 0) {
         event.preventDefault()
         return setSelected((previous) => moveGridCursor(previous, columns, buttons.length, dx, dy))
       }
-      if (event.key === 'Enter' || event.key === ' ') {
+      // OK 는 날 키로 견준다 — 75634~7563e `키 + 5 == 0 || 키 == 0x35` → 답 [+0x21c] (r333 — 예전 웹은 '5' 를 버렸다)
+      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
         return answer(selectedRef.current)
       }

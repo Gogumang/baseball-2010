@@ -430,13 +430,17 @@ export function descriptionOf(state: MatchSettingsWindowState): string {
   return DETAIL_ROW_DESCRIPTIONS[state.detailRow] ?? ''
 }
 
-/** 키보드 → 원본 키 */
+/**
+ * 키보드 → 원본 키. 키 함수 0x5ffcc 는 단계마다 숫자키를 화살표와 같은 갈래로 받는다 (r333): 종류 '2' · '8' · '5'(60020~60030) ·
+ * 찬스 '4' · '6' · '5'(60094~600a4) · 이닝 '2' · '8' · '5'(600d8~600e8) · 상세 '2' '8' '4' '6' '5'(60180~60198).
+ * 단계가 안 보는 방향은 화살표와 같이 버린다(`matchSettingsMenu`).
+ */
 function keyOf(key: string): MatchSettingsKey | null {
-  if (key === 'ArrowUp') return '위'
-  if (key === 'ArrowDown') return '아래'
-  if (key === 'ArrowLeft') return '왼쪽'
-  if (key === 'ArrowRight') return '오른쪽'
-  if (key === 'Enter' || key === ' ') return '확인'
+  if (key === 'ArrowUp' || key === '2') return '위'
+  if (key === 'ArrowDown' || key === '8') return '아래'
+  if (key === 'ArrowLeft' || key === '4') return '왼쪽'
+  if (key === 'ArrowRight' || key === '6') return '오른쪽'
+  if (key === 'Enter' || key === ' ' || key === '5') return '확인'
   if (key === 'Escape' || key === 'Backspace') return '취소'
   return null
 }

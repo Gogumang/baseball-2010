@@ -95,6 +95,13 @@ interface TeamSelectScreenProps {
    * (s8)SR[1] 을 넘기고 그 밖(0xca 등)은 −1 이다. `TEAM_COVER_STEP` 참고.
    */
   readonly coveredTeamId?: number
+  /** 처음 커서 칸 — 안 주면 0 (격자 vt+0x14(0, 0)). 일반모드 19 진입 0x23e70 은 (0, 1) = 팀 5 로 둔다 */
+  readonly initialCursor?: number
+  /**
+   * 들어올 때 연출을 도나 — 공용 목록 0x63b15 의 넷째 인자. 0 이면 0x63bd8~0x63be0 이 머리띠 미끄러짐([skin+0x84])과
+   * 격자 열림 애니([skin+0xe8])를 끈다. 일반모드 18 ↔ 19 끼리 넘어올 때만 0 이다(0x2de7e · 0x2ddf2). 안 주면 참
+   */
+  readonly isEntryAnimated?: boolean
 }
 
 /**
@@ -116,18 +123,19 @@ const TEAM_COVER_STEP = 7
  */
 export function TeamSelectScreen({
   openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape = TEAM_GRID_SHAPE, onSelect, onSelectLocked, onCancel, overlay,
-  coveredTeamId = -1, hiddenTeamsSelectable = true,
+  coveredTeamId = -1, hiddenTeamsSelectable = true, initialCursor = 0, isEntryAnimated = true,
 }: TeamSelectScreenProps) {
   /** 확인으로 등록에 넘어가는 칸 — 열린 칸, 나만의리그면 히든 줄 밖 (0x14114) */
   const isSelectable = (teamId: number) => isTeamOpen(teamId, openedHiddenIds) && (hiddenTeamsSelectable || teamId < OPEN_TEAM_COUNT)
-  const [cursor, setCursor] = useState(0)
+  const [cursor, setCursor] = useState(initialCursor)
 
   const team = TEAMS[cursor] ?? TEAMS[0]
   const isOpen = isTeamOpen(cursor, openedHiddenIds)
 
   // 머리띠가 미끄러지는 동안은 본문이 없고, 본문 첫 그림에 지은 격자가 열림 애니(0x79fa8)를 다 돌 때까지 키 함수가
-  // [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useListPageEntry`). 격자 시작 애니 = [skin+0xe8] — 이 화면들은 모두 넷째 인자 1 이다
-  const entry = useListPageEntry({ grid: { shape: TEAM_GRID_OPEN, isAnimated: true } })
+  // [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useListPageEntry`). 격자 시작 애니 = [skin+0xe8] — 넷째 인자가 1 이면 켜고, 0 이면
+  // (일반모드 18 ↔ 19 사이) 머리띠도 안 미끄러지고 격자도 곧바로 다 연다 (`isEntryAnimated`, r333)
+  const entry = useListPageEntry({ slides: isEntryAnimated, grid: { shape: TEAM_GRID_OPEN, isAnimated: isEntryAnimated } })
   const { keyLock } = entry
   const gridOpen = entry.grid
   // 격자 시작 0x7a005(격자, [skin+0xe8], 1, 1) — 셋째 인자 [격자+6] = 1 이라 커서 튕김이 있다 (0x6409c)
@@ -286,7 +294,7 @@ export function TeamSelectScreen({
       {/* 머리띠(제목)·바닥띠 — 원본 상태 101 그리기 0x15de4 도 이 둘을 얹는다 (P6 1-1 · R9 206 · F 489) */}
       {/* 바닥띠의 "되돌아가기" 가 원본의 되돌아가기 소프트키다 (P6 1-1) — 따로 둔 버튼은 없앴다:
           흐름 배치라 스테이지 왼쪽 위 (0,0) 에 그려져 머리띠 제목을 가리고 있었다 */}
-      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onCancel} />
+      <ScreenFrame title={title} gamePoint={gamePoint} onBack={onCancel} slides={isEntryAnimated} />
       {overlay}
     </RawScreen>
   )

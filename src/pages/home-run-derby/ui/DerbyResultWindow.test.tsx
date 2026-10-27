@@ -57,6 +57,20 @@ describe('홈런더비 결과 화면 (0x45c18)', () => {
     expect(onRetry).not.toHaveBeenCalled()
   })
 
+  it('← · → · 4 · 6 은 방향과 상관없이 커서를 뒤집는다 (0x40a08 40a42)', () => {
+    const { onRetry } = 띄우기()
+    // 예에서 ← → 아니오 (원본은 고정 방향이 아니다)
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByLabelText('아니오').getAttribute('aria-pressed')).toBe('true')
+    // → 를 두 번 → 아니오 → 예 → 아니오
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByLabelText('예').getAttribute('aria-pressed')).toBe('true')
+    fireEvent.keyDown(window, { key: '6' })
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
   it('취소 키는 아니오와 같은 길이다', () => {
     const { onExit } = 띄우기()
     fireEvent.keyDown(window, { key: 'Escape' })

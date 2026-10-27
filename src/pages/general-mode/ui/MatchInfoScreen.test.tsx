@@ -80,6 +80,15 @@ describe('키', () => {
     expect(onStart).toHaveBeenCalled()
   })
 
+  it("'5' 도 OK 와 같은 경기 시작이다 — 0x311a8 312f0 · 31318 `cmp r4,#0x35` → 0x31322", () => {
+    const onStart = vi.fn()
+    띄우기({ onStart })
+
+    fireEvent.keyDown(window, { key: '5' })
+
+    expect(onStart).toHaveBeenCalled()
+  })
+
   it("'0' 이 경기진행 설정 창을 연다 — 일반모드에서만 여는 그 창이다", () => {
     const onOpenSettings = vi.fn()
     띄우기({ onOpenSettings })

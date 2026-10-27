@@ -54,6 +54,23 @@ describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
     expect(onAnswer).toHaveBeenCalledWith(0)
   })
 
+  it('\'5\' 도 OK 다 — 0x754f8 75634~7563e `키 + 5 == 0 || 키 == 0x35`', () => {
+    const onAnswer = vi.fn()
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onAnswer).toHaveBeenCalledWith(0)
+  })
+
+  it('숫자키 \'6\' · \'4\' 는 → ← 처럼 칸을 옮긴다 — 창 격자는 숫자키 꼴 1 (0x753f4 vt+0x10(…, 1, 0x330, 0))', () => {
+    const onAnswer = vi.fn()
+    render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
+
+    fireEvent.keyDown(window, { key: '6' })
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onAnswer).toHaveBeenCalledWith(1)
+  })
+
   it('처음 칸을 주면 그 칸이 고른 그림으로 시작한다 — 0x749d5(창, 1) 은 [아니오]', () => {
     const onAnswer = vi.fn()
     render(<MessageBox text="질문" buttons={['예', '아니오']} initialSelected={1} onAnswer={onAnswer} />)
