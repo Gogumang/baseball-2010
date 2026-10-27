@@ -965,7 +965,7 @@ const PITCHER_SEED = Number(process.env.SOAK_FIXTURE_PITCHER_SEED ?? 5)
  * r315 — 경기 마지막 내 타석의 돌발 결과 창 · 보상(0x1d 진입 0x8e34c)을 정산 앞에 세우자 판이 갈려 1 이 못 닿아 2 로 옮겼다
  * (2~12 가운데 2 · 4 · 11 이 닿는다). 저장된 픽스처 파일은 그대로 둔다(smoke 통과)
  */
-const NARI_CUP_WIN_SEED = Number(process.env.SOAK_FIXTURE_NARI_CUP_WIN_SEED ?? 2)
+const NARI_CUP_WIN_SEED = Number(process.env.SOAK_FIXTURE_NARI_CUP_WIN_SEED ?? 4)
 
 describe.runIf(isEnabled)('soak 로 e2e 픽스처 뜨기 (SOAK_FIXTURE=1)', () => {
   beforeEach(() => {
