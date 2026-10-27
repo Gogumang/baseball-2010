@@ -158,6 +158,9 @@ yarn test:browser        # src/**/*.browser.test.tsx — chromium(데스크톱) 
 jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
 설정은 `vitest.browser.config.ts` 에 있다. 앱과 같은 vite 플러그인을 써서 vanilla-extract CSS 가 실린다.
 진짜 손가락 탭은 `commands.touchTap(x, y)` 로 한다.
+시험이 닿는 바깥 꾸러미(react · react-dom/client · @testing-library/react 등)는 설정의 `optimizeDeps.include` 에 미리 적어 둔다 —
+빠지면 캐시가 빈 첫 실행에서 vite 가 도중에 다시 묶고 페이지를 다시 불러 react 가 두 벌 실리고 `reading 'useState'` 로 여러 개가 실패한다(r304).
+실행 기록에 `optimized dependencies changed. reloading` 이 뜨면 빠진 꾸러미를 더한다.
 
 ## 5. 누름 칸 맞음 검사 (`yarn e2e:hits`)
 
