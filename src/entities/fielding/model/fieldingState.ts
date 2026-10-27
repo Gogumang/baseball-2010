@@ -391,6 +391,32 @@ export function createRunner(
   }
 }
 
+/** 타석 자리의 홈 x 비킴 — 0xa0884 a089e `movs r0,#0xaf ; lsls #2`(= 700) · a08a6 리터럴 0xfffffd44(= −700) */
+export const BATTER_BOX_OFFSET_X = 700
+/** 타석 자리의 홈 z 비킴 — 0xa0884 a08ae `subs r3,#0x64`(z − 100, 내야 쪽) */
+export const BATTER_BOX_OFFSET_Z = 100
+
+/**
+ * **타자주자 vt94 = 0xa0884(주자, 손) — 타석 자리에 세우기** (직접 뜬 것, r324 Q-07).
+ * ```
+ * a0888  p = 0xd77d8[0]                          ; 홈 (20000, 0, 29445)
+ * a089a  손 ≠ 0 → p.x += 700 ; 아니면 p.x −= 700 ; p.z −= 100
+ * a08c6  0xbef58(주자, p) = 0xbee60(위치 +0x20 · +0x14 ← p) + vt14(p)(이동 목표점 +0x2c ← p)
+ * ```
+ * 부르는 곳은 타자주자 만들기 `0xa93ac` 의 a9446 하나 — vt10 · vt88(0) · vt48(1) 다음에 `0xb63c0(타자)`(손, 1 = 좌타)를 넘긴다.
+ * 곧 **타자주자는 홈이 아니라 타석 자리(좌타 1루 쪽 x+700 · 우타 3루 쪽 x−700, z−100)에서 뛰기 시작한다.**
+ * 이동 목표점은 상태 0x17 진입 리드 고리 `0x3d7b8` 의 vt48(1)이 1루 좌표로 되돌린다(b == 0 이라 0xbee60 순간이동 없음,
+ * 틱 0xcffb0[0] = 0). 다음 판 세우기 `0xa9e44` 는 목록 번호 1 부터 돌아 타자주자를 안 건드린다(a9e62 `[sp+8] = 1`).
+ */
+export function batterBoxPosition(hand: number): WorldPoint {
+  const home = basePosition(0)
+  return {
+    x: home.x + (hand !== 0 ? BATTER_BOX_OFFSET_X : -BATTER_BOX_OFFSET_X),
+    y: home.y,
+    z: home.z - BATTER_BOX_OFFSET_Z,
+  }
+}
+
 /** 목표점까지 남은 틱 — 0xbefec = self.vt1c(self+0x2c) */
 export function remainingTicksOf(mover: { position: WorldPoint; target: WorldPoint; speed: number }): number {
   return ticksToReach(mover.position, mover.target, mover.speed)
