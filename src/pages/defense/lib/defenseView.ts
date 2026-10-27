@@ -519,9 +519,15 @@ export interface DefenseViewState {
   readonly closingListFrame?: boolean
   /**
    * **이 판 틱에 진행기가 낸 소리**(차례대로) — 주자 판(도루 · 폭투 · 견제)의 판정 콜(결과 메시지 0xbba → 0x51a56: 9 → 17 · 13 → 62/20)과
-   * 슬라이딩 10. 미리 돌린 판을 재생만 하는 화면이 그 틱을 그릴 때 낸다(실시간 화면은 진행기 칸 `soundsThisTick` 을 읽는다). 없으면 소리 없음
+   * 슬라이딩 10. 재생 화면 · 실시간 주자 판 화면 모두 그 틱을 그릴 때 낸다(`DefensePlayback` 의 `playRunnerTickSounds`). 없으면 소리 없음
    */
   readonly tickSoundIds?: readonly number[]
+  /**
+   * **이 판 틱의 득점 0xaa0a8(슬롯 2 525fc)이 `tickSoundIds` 의 몇 번째 자리에 끼는가** — 그 앞(사람 슬라이딩 키 · 플레이 틱 525e8 의
+   * 판정 콜)을 낸 뒤 득점 함성(메시지 0x13 → 0x51fb8)을 내고, 그 뒤(자동 슬라이딩 10, 52670)를 낸다. 소리 통로가 하나라 차례가 곧 들리는
+   * 소리다. 없으면 `tickSoundIds` 를 다 낸 뒤 함성이다
+   */
+  readonly tickRunInSoundAt?: number
   /** 플레이 +0x111 — 사건 코드 8(홈런). 안 주면 거짓 */
   readonly homeRunFlag?: boolean
   /** 플레이 +0x129 — 사건 코드 12(폴 홈런). 안 주면 거짓 */

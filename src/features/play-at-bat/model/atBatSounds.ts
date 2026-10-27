@@ -227,10 +227,11 @@ export interface DefenseCallContext {
    * 수비 진행기 `DefensePlayResult.tagOut` 이 그대로 들어온다.
    */
   readonly tagOut?: boolean
-  /** CPU 가 고른 송구 목표 루. −1 이면 안 던졌다 */
-  readonly throwBase?: number
-  /** 송구 도착 틱. 송구가 없으면 −1 */
-  readonly throwArrivalTick?: number
+  /**
+   * **결과 코드 9 의 메시지가 간 판 틱** — 수비 진행기 `DefensePlayResult.safeCallTick`(플레이 틱 b43ec~b444c 가 9 를 세우고 b4562 가
+   * 메시지 0xbba(9)를 보낸 틱). −1 이면 그런 틱이 없었다. 판이 그 틱에 낸 "Safe!" 17(0x51c14)을 판 끝에 몰아 낼 때 쓴다
+   */
+  readonly safeCallTick?: number
   /**
    * **2스트라이크 번트 파울 아웃**(원본 판정 v11)인가 — 서 있으면 두 칸을 보지 않고 곧장 62 다.
    * 판 끝 결과 코드 11 로 닫힌 판의 `DefensePlayResult.buntFoulOut` 이 그대로 들어온다(메시지 0xbba(11) → 0x51b20).
@@ -306,10 +307,13 @@ const SAFE_CALL = 17
  * **0x87 의 나머지 절반(0xb4312: 결과 2 + 야수 `+0x3b`)도 판 결과의 `tagOut` 에 들어 있다** — 타구 판은
  * `runDefensePlay` 6b 절의 `baseOutFold`(r87), 주자 판 · 견제 판은 `runnerPlayEngine` · `pickoffPlay` 의 같은 갈래(r201)다.
  * 그래서 "루를 밟은 야수가 막 도착해 있던 포스 아웃" 도 원본대로 62 다. 수비 결과를 안 넘기는 근사(위)에서만 20 이다.
- * ⚠️ **17 은 근사다.** 원본(0xb442a~0xb444a)은 야수가 그 루에서 **공을 쥔 채**(`+0xe0`) 있는데
- * 아웃 판정(0xb36d0)이 서지 않고 주자가 들어오는 **틱**에 v = 9 를 낸다. 즉 "아웃 될 뻔했는데
- * 살았다" 만이고 외야로 나간 안타는 이 길이 아니다. 웹 타석 모델에는 틱이 없어
- * **"안타인데 어느 루로 송구가 도착했다"** 로 근사했다.
+ * **17 은 판 틱 조건이다(r310, A-28).** 원본은 플레이 틱 b43ec~b444c 가 공 쥔 야수 H 의 목표점이 루 b 이고 그 루에 아웃 아닌 주자 R 이
+ * 서 있으며 H 가 목표점에 있고(vt18) **막 닿았고**(+0x3b) **공을 쥐었고**(+0xe0) R 도 목표점(vt18)에 있는 틱에 결과 코드 9 를 세운다.
+ * 그 틱에 아웃 판정(0xb36d0, b4540 → 13)이 서면 13 이 덮고, 아니면 b4562 의 메시지 0xbba(9) → 0x51c14 가 17 을 낸다 — "공 든 야수가
+ * 루에 막 닿았는데 주자가 이미 서 있다" 만이고 외야로 나간 안타는 이 길이 아니다. 수비 진행기가 그 틱을 결과에 싣는다
+ * (`DefensePlayResult.safeCallTick`). 화면이 판을 돌리면 그 틱에 이미 났고(`DefensePlayback` 의 `tickSounds`), 이 함수는 화면이 결과를
+ * 못 넘겨 판 끝에 몰아 내는 갈래에서만 그 칸을 본다. (예전 웹은 틱이 없어 "안타인데 어느 루로 송구가 도착했다" 로 근사했다.)
+ * 난수에는 닿지 않는다 — 진행기가 이미 돈 판의 칸을 읽기만 한다.
  *
  * ⚠️ **도루에는 17 을 안 이었다.** 원본에서 17 을 내는 자리는 판정 v9 **하나뿐**이고
  * (리터럴 `0x6ea6d`·`0x6e499` 를 부르는 65곳을 전수로 떠서 `movs r1,#0x11` 을 찾으면
@@ -338,10 +342,8 @@ export function inPlayCallSoundIdOf(atBatOutcome: AtBatOutcome, play?: DefenseCa
     // 0x51b3a·0x51b44 — 두 칸 중 하나라도 서면 62 다 (`bne`/`beq` 두 갈래)
     return caught || play?.tagOut === true ? CAUGHT_OUT_CALL : FORCE_OUT_CALL
   }
-  if (outcome.kind === '안타' && play != null) {
-    const thrown = (play.throwBase ?? -1) >= 0 && (play.throwArrivalTick ?? -1) >= 0
-    if (thrown) return SAFE_CALL
-  }
+  // 판정 v9 — 판 안에서 결과 코드 9 의 메시지(b4562 → 0x51c14)가 간 틱이 있었다 (위 "17 은 판 틱 조건" 주석)
+  if (outcome.kind === '안타' && (play?.safeCallTick ?? -1) >= 0) return SAFE_CALL
   return null
 }
 

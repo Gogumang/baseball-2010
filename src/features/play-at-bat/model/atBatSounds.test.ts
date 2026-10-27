@@ -152,10 +152,11 @@ describe('플레이가 끝난 뒤의 콜', () => {
     expect(inPlayCallSoundIdOf(땅볼, { caughtOnTheFly: true, tagOut: false })).toBe(62)
   })
 
-  it('안타인데 루로 송구가 도착했으면 세이프 콜 17 (0xb442a 근사)', () => {
-    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { throwBase: 1, throwArrivalTick: 20 })).toBe(17)
-    // 송구가 없었으면 "아웃 될 뻔" 이 아니다 — 원본도 외야 안타에는 이 콜을 안 낸다
-    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 2 }, { throwBase: -1, throwArrivalTick: -1 })).toBeNull()
+  it('판 안에서 결과 코드 9 의 메시지가 간 틱이 있으면 세이프 콜 17 (b43ec~b444c → b4562 → 0x51c14)', () => {
+    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { safeCallTick: 20 })).toBe(17)
+    // 9 가 안 선 판(외야 안타 · 송구가 늦지 않은 판)은 콜이 없다 — 송구가 루에 닿았는지는 보지 않는다
+    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 2 }, { safeCallTick: -1 })).toBeNull()
+    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 2 }, {})).toBeNull()
   })
 
   it('파울로 닫힌 판은 "Foul!" 25 하나다 (결과 코드 7 → 51c5c) — 판 앞 예측 칸이 무엇이든', () => {
