@@ -633,6 +633,14 @@ export interface DefensePlayResult {
   readonly throwBase: number
   /** 첫 송구의 도착 틱. 송구가 없으면 −1 */
   readonly throwArrivalTick: number
+  /**
+   * **결과 코드 9 의 메시지가 마지막으로 간 판 틱** — 플레이 틱 b43ec~b444c(공 쥔 야수 H 의 목표점이 루 b · 그 루에 선 아웃 아닌 주자 R ·
+   * H 가 목표점에 있음(vt18) · H+0x3b(막 닿음) · H+0xe0(쥠) · R 도 목표점(vt18) → [sp+0x38] = 9)에서 9 가 서고, 6d 절 0x9d5bc 와
+   * b4540 의 13 에 덮이지 않아 b4562 가 메시지 0xbba(9)를 보낸 틱이다 — 그 메시지의 0x51c14 가 "Safe!" 17 을 낸다(`judgeCall`).
+   * 없으면 −1. 화면이 판을 돌리지 않은 판의 콜(`atBatSounds.inPlayCallSoundIdOf`)이 이 칸으로 17 을 가른다.
+   * 타구 판만 싣는다 — 주자 판(견제 · 도루 · 폭투)은 콜을 판 결과의 `callSoundId` 로 따로 낸다
+   */
+  readonly safeCallTick?: number
   /** 보류됐다가 3아웃으로 날아간 득점 수 (state[0]) */
   readonly voidedRuns: number
   /** 펌블(에러)이 났는가 — 0xb41d0 굴림 (`random` 을 줘야 돈다) */
@@ -896,6 +904,8 @@ export interface DefensePlayState {
   /** 첫 송구의 목표 루 · 도착 틱 — 결과(`DefensePlayResult.throwBase`)로 내보낸다 */
   firstThrowBase: number
   firstThrowArrivalTick: number
+  /** 결과 코드 9 의 메시지 0xbba 가 마지막으로 간 판 틱 (`DefensePlayResult.safeCallTick`). 없으면 −1 */
+  safeCallTick: number
   /** state[0x1f] — 쥐기 0xb2710 의 아웃 판정이 타자주자를 뜬공 아웃(결과 1)으로 죽였다 */
   flyOut: boolean
   /** 판 끝 정산 0xa8024 가 세는 사건 — 6(안타 · 결과 코드 6·10) · 8(홈런 · 8·12)이 났나, 0xd(아웃 · 결과 코드 13) 몇 번 */
@@ -1314,6 +1324,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     throwCount: 0,
     firstThrowBase: NONE,
     firstThrowArrivalTick: -1,
+    safeCallTick: -1,
     flyOut: false,
     hitEvent: false,
     homeRunEvent: false,
@@ -2816,6 +2827,8 @@ export function stepDefensePlay(
     if (resultCode !== 0) {
       const call = judgeCallSoundIdOf(resultCode, { caughtOnTheFly: flyOut, tagOut })
       if (call !== null) tickSounds.push({ kind: 'sound', soundId: call })
+      // 9 → 0x51c14 "Safe!" 17 — 그 틱을 결과에 싣는다(화면이 돌리지 않은 판의 콜, `safeCallTick`)
+      if (resultCode === 9) state.safeCallTick = tick
     }
     // b4588 — 플레이.vt74 = 0xb3420 → 야수.vte4 = 0xa1e60 a1e82 즉시 재생 53. 0xbba 메시지(b457c~b4584) 바로 뒤다
     if (hitStaggerSoundThisTick) tickSounds.push({ kind: 'sound', soundId: HIT_STAGGER_SOUND_EFFECT })
@@ -3619,6 +3632,7 @@ export function defensePlayResultOf(state: DefensePlayState): DefensePlayResult 
     tagOut: state.tagOut,
     throwBase: state.firstThrowBase,
     throwArrivalTick: state.firstThrowArrivalTick,
+    safeCallTick: state.safeCallTick,
     voidedRuns: held.heldRuns,
     fumbled: state.fumbled,
     errantThrow: state.errantThrow,

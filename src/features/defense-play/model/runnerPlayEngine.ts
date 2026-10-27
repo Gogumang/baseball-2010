@@ -305,10 +305,16 @@ export interface RunnerPlayStepper {
   result(): RunnerPlayEngineResult
 }
 
-/** 진행기가 틱마다 적는 소리 칸 — 슬라이딩 10 이 났나 · 그 틱에 낸 소리(차례대로) */
+/** 진행기가 틱마다 적는 소리 칸 — 슬라이딩 10 이 났나 · 그 틱에 낸 소리(차례대로) · 득점 0xaa0a8 이 끼는 자리 */
 export interface RunnerPlayTickSound {
   slidingThisTick: boolean
   thisTick: number[]
+  /**
+   * 이 틱의 득점 0xaa0a8(슬롯 2 525fc)이 `thisTick` 의 몇 번째 자리에 끼는가 — 그 앞은 사람 슬라이딩 키(틱 머리) · 플레이 틱
+   * vt48(525e8)의 판정 콜, 그 뒤는 자동 슬라이딩 0x5268c(52670). 득점의 메시지 0x13 → 0x51fb8 함성은 화면이 그림으로 세어
+   * 이 자리에 낀다(`DefenseViewState.tickRunInSoundAt`). 0xaa0a8 을 안 부른 틱이면 없다
+   */
+  runInAt?: number
 }
 
 /**
@@ -810,6 +816,7 @@ function* runnerPlaySteps(
     const press = yield tick
     sound.slidingThisTick = false
     sound.thisTick = []
+    sound.runInAt = undefined
     outJudgedThisTick = false
     tickMessageCode = 0
     /** 이 틱이 멈춘 그림인가 — 머리에서 이미 +0x1993 이 서 있다(0x3f060 의 목록 틱 · 슬롯 2 가 통째로 없다, 타구 진행기와 같다) */
@@ -1069,6 +1076,9 @@ function* runnerPlaySteps(
 
     // ── 2e. 득점 0xaa0a8 (슬롯 2 525fc — 플레이 틱 뒤 · vt4c 앞): 내림차순으로 +0x3b(목록 틱에 막 닿음) && +0x8c == 4 인 주자 ──
     // +0x3b 는 그림 N 의 목록 틱(앞 판 틱 6 절 이동)에서만 선다 — 관문 G2 가 닫힌 그림은 0xaa0a8 을 안 부른다(타구 진행기 6f 절)
+    // 득점의 함성(메시지 0x13 → 0x51fb8, 예약 0x6e499)은 판정 콜(위 2b, 525e8 안) 뒤 · 자동 슬라이딩 10(아래 4, 52670 → 0x6e499) 앞이다.
+    // 한 틱에 둘 다 나면 뒤에 부른 예약이 앞 소리를 끊고 칸을 덮어 슬라이딩 10 이 남는다(`soundPort` 머리 주석)
+    sound.runInAt = sound.thisTick.length
     for (let index = runners.length - 1; index >= 0; index -= 1) {
       const runner = runners[index]!
       if (runner.state.isOut || runner.state.scored || runner.counted || !runner.arrivedThisListTick) continue
@@ -1323,7 +1333,16 @@ function* runnerPlaySteps(
       })
     // 이 판 틱에 낸 소리(차례대로)를 그림에 싣는다 — 미리 돌린 판을 재생만 하는 화면(`DefensePlayback` 의 재생 갈래)이 그 틱에 낸다
     const tickView = snapshotAt(tick, fielders)
-    ticks.push(sound.thisTick.length > 0 ? { ...tickView, tickSoundIds: [...sound.thisTick] } : tickView)
+    // 득점 0xaa0a8 의 자리(`tickRunInSoundAt`)는 그 뒤에 낸 소리(자동 슬라이딩)가 있을 때만 싣는다 — 없으면 함성이 맨 뒤다
+    ticks.push(
+      sound.thisTick.length > 0
+        ? {
+            ...tickView,
+            tickSoundIds: [...sound.thisTick],
+            ...(sound.runInAt !== undefined && sound.runInAt < sound.thisTick.length ? { tickRunInSoundAt: sound.runInAt } : {}),
+          }
+        : tickView,
+    )
     // ── 5b. 이 그림의 수비 화면 그리기 0x46c88 의 연출 몫 (`defenseScene`) — 관문을 안 보고 그리기마다 돈다(46de4~46e24) ──
     const drawSceneEffects = (): void => {
       const view = ticks[ticks.length - 1]

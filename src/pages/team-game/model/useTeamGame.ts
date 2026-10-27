@@ -418,7 +418,7 @@ export function useTeamGame(
         }, releaseTiming.resultEntryTicks)
       },
       // 판정 콜 — 세이프면 늘 17 (0x51c14 의 종류 4·5 갈래), 견제사면 62/20 (0x51b36). 원본은 결과 코드가 선 **틱**에 낸다 —
-      // 사람 견제는 판을 붙들고 수비 화면이 실시간으로 돌리며 그 틱에 내고(송구 키 +0x160 · `soundsThisTick`), 미리 돌려 재생 칸에 넣은
+      // 사람 견제는 판을 붙들고 수비 화면이 실시간으로 돌리며 그 틱에 내고(송구 키 +0x160 · `playRunnerTickSounds`), 미리 돌려 재생 칸에 넣은
       // 판은 재생 화면이 기록된 틱에 낸다. 재생하지 않는 판만 판을 연 자리에서 낸다(`pickoffCallSoundsOf`)
       pickoff: (key: string) => step((current) => pickoff(current, key, random, true), pickoffCallSoundsOf),
       // CPU 견제(사람 공격) — 판을 붙들고 수비 화면이 실시간으로 돌린다(사람 주루 키 0x5331c · OK 슬라이딩 0x585). 콜은 판 끝에 낸다
@@ -460,7 +460,7 @@ export function useTeamGame(
         step(
           (current) => resolveRunnerPlay(current, played, random),
           // 판정 콜(도루 · 폭투 · 견제)은 원본처럼 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 화면이 냈다
-          // (`LiveRunnerPlayback` 의 `soundsThisTick`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 낸다
+          // (`LiveRunnerPlayback` 의 `playRunnerTickSounds`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 낸다
           (before, after) =>
             result !== undefined
               ? []

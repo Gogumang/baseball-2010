@@ -328,7 +328,7 @@ export function usePitcherGame(
         step(
           (current) => resolveRunnerPlay(current, played, random),
           // 판정 콜(도루 · 폭투 · 견제)은 원본처럼 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 화면이 냈다
-          // (`LiveRunnerPlayback` 의 `soundsThisTick`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 낸다
+          // (`LiveRunnerPlayback` 의 `playRunnerTickSounds`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에 낸다
           (before, after) =>
             result !== undefined
               ? []

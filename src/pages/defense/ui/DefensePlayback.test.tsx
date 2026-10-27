@@ -954,3 +954,48 @@ describe('수비 재생 — 공용 창이 서면 판이 멈춘다 (경기 장면
     expect(leaves).toBe(1)
   })
 })
+
+/**
+ * A-33 — 한 틱 안 소리 차례. 슬롯 2 는 525e8 플레이 vt48(판정 콜) → 525fc 주자 관리 vt18 = 0xaa0a8(득점 → 메시지 0x13 → 0x51fb8 함성)
+ * → 52670 자동 슬라이딩(5268c 효과음 10) 차례다. 통로가 하나라 뒤 소리가 앞 소리를 끊으므로 셋이 한 틱에 나면 10 이 남는다.
+ */
+describe('주자 판 한 틱의 소리 차례 — 판정 콜 → 득점 함성 → 자동 슬라이딩 (525e8 → 525fc → 52670)', () => {
+  it('진행기는 자동 슬라이딩 10 앞에 득점 자리(`tickRunInSoundAt`)를 싣는다', () => {
+    // 1루 주자 도루에 포수가 2루로 — 5틱 자동 슬라이딩(52670)
+    const result = runStealPlay({ bases: 주자1루, stealingFrom: [1], outs: 0, runAbility: 999, manualThrowBase: 2 })
+    const 슬라이딩틱 = result.ticks.find((view) => (view.tickSoundIds ?? []).includes(10))
+    expect(슬라이딩틱).toBeDefined()
+    expect(슬라이딩틱!.tickRunInSoundAt).toBe(슬라이딩틱!.tickSoundIds!.indexOf(10))
+    // 자동 슬라이딩이 없는 틱(판정 콜만)은 함성이 맨 뒤라 자리를 안 싣는다
+    const 콜틱 = result.ticks.find((view) => (view.tickSoundIds ?? []).includes(17))
+    expect(콜틱?.tickRunInSoundAt).toBeUndefined()
+  })
+
+  it('재생 갈래 — 한 틱에 판정 콜 17 · 득점 · 자동 슬라이딩 10 이 함께 나면 17 → 함성 60 → 10 차례로 낸다', () => {
+    // 1·3루 이중 도루 판의 그림에서 3루 주자가 홈에 닿는 그림에 소리를 몰아 싣는다(장면 틱 시계는 가짜 시계로 넘긴다)
+    const result = runStealPlay({ bases: { first: true, second: false, third: true }, stealingFrom: [1, 3], outs: 0, runAbility: 999, manualThrowBase: 2 })
+    expect(result.advance.runsScored).toBe(1)
+    const 홈 = basePosition(0)
+    const 홈인틱 = result.ticks.findIndex((view) => view.runners.some((runner) => runner.x === 홈.x && runner.z === 홈.z))
+    expect(홈인틱).toBeGreaterThan(0)
+    const ticks = result.ticks.map((view, index) => {
+      const { tickSoundIds: _ids, tickRunInSoundAt: _at, ...rest } = view
+      return index === 홈인틱 ? { ...rest, tickSoundIds: [17, 10], tickRunInSoundAt: 1 } : rest
+    })
+    vi.useFakeTimers()
+    const onDone = vi.fn()
+    const 울린것 = 소리기록(onDone)
+    try {
+      render(<DefensePlayback ticks={ticks} onDone={onDone} />)
+      // 홈인 그림 앞까지는 아무 소리도 없다
+      for (let 갱신 = 0; 갱신 < 홈인틱; 갱신 += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
+      expect(울린것).toEqual([])
+      끝까지(onDone)
+      // 예전 웹은 17 → 10 → 60 이라 함성 60 이 남았다 — 원본은 슬라이딩 10 이 남는다
+      expect(울린것.map(({ id }) => id)).toEqual([17, 60, 10])
+    } finally {
+      setActiveSound(null)
+      vi.useRealTimers()
+    }
+  })
+})
