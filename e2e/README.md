@@ -69,6 +69,15 @@ yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤
 
 경기 결과 → 116 평가 대사(키 · 탭) · 대회 끝 134 위 효과기 → 137 → 105 는 `e2e/year-cover-evaluation.mjs` 로 본다(r287, chromium 키 · webkit 아이폰 탭).
 
+나리 투수편을 실제 브라우저로 길게 치는 것은 `e2e/pitcher-season-play.mjs` 다(A-06, r303). 관리 [다음경기] → [경기시작] 단추를 실제로 누르고 경기는
+Enter 만 되풀이하며(`E2E_FULL_EVERY` 번째 경기만 끝까지, 나머지는 '#' 강판), 구간(`E2E_SEGMENT_MS`, 기본 8분)마다 저장을 떠 새 브라우저에서 이어하기로
+다시 들어간다. 기본 목표는 2년차 3경기(`E2E_STOP_SEASON` · `E2E_STOP_GAMES`). 쪽 오류나 90초 넘게 그대로인 화면이 있으면 끝 코드 1.
+
+```sh
+E2E_PORT=5731 yarn node e2e/pitcher-season-play.mjs                                   # chromium · 1년차 첫날부터 (약 1시간 반)
+E2E_PORT=5731 E2E_BROWSER=webkit E2E_DEVICE=iphone E2E_SCENE=pitcher-postseason yarn node e2e/pitcher-season-play.mjs   # 포스트시즌 · 대회 → 2년차
+```
+
 타석 탭 타이밍은 `e2e/swing-timing.mjs` 로 잰다(r242). `nari-bat` 에서 공마다 최적 틱(보이는 공 그림 N − 3)에 `touchscreen.tap` 하고,
 쪽 안 기록(`window.__batting` — 공 그림 · 틱 격자와 스윙 · 판정 줄)으로 탭 → 받은 틱 → 키 틱 F → 판정을 표로 낸다.
 
