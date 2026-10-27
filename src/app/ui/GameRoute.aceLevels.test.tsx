@@ -39,7 +39,7 @@ const 띄우기 = (aceLevels?: Readonly<Record<number, number>>) => {
     loadingTip: null,
     handlePitchResolved: noop,
     actions: {
-      finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, quitGame: noop, stealBase: noop, cpuPickoff: noop, attachReplayHost: () => noop, finishReplay: noop,
+      finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, quitGame: noop, stealBase: noop, cpuPickoff: noop, attachReplayHost: () => noop, finishReplay: noop, attachRelayHost: () => noop, finishRelay: noop,
     },
   }
   const runner = { atBat: createAtBat(), isPaused: false, bannerText: '' }
