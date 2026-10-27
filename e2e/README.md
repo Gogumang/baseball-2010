@@ -233,6 +233,55 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK' dist || echo clean
 ```
 
+## 빠른 확인 (`yarn e2e:quick`, r328)
+
+평소 머지 확인용이다. 장면 표의 **장면 전부(49) × 기기 넷**에서 장면을 열고(smoke) 그 자리 · 연 상태(hits `ACTIONS`) **전부(368 상태)** 의
+누름 칸을 훑는다 — `e2e/quick.mjs`. `e2e:all` 의 smoke 와 hits 는 같은 장면을 따로 두 번(대상마다 또 두 번) 열었는데, quick 은 한 번 열어
+둘 다 보고, 장면 × 기기 일감 196개를 맥락 여러 개로 함께 돌린다.
+
+```sh
+yarn e2e:quick                                                     # e2e 빌드(약 5초) → preview :4910 → 장면 전부 × 기기 넷 (약 1분 반)
+yarn e2e:quick season-management general-bat                       # 장면만 골라
+E2E_QUICK_DEVICES=chromium-desktop,webkit-iphone yarn e2e:quick    # 기기만 골라 (smoke 와 같은 둘)
+E2E_QUICK_SKIP=nari-burst-result,mission-result yarn e2e:quick     # 장면 빼기
+E2E_QUICK_JOBS=chromium:12,webkit:10 yarn e2e:quick                # 브라우저마다 함께 여는 맥락 수 (기본 24 · 20 — 메모리가 빠듯하면 줄인다)
+E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄운 서버로(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
+```
+
+- 서버: 기본은 늘 `vite build --mode e2e`(`e2e/.run/dist-quick`)를 새로 묶어 preview 로 띄우고 끝에 pid 로 끈다(포트 `E2E_QUICK_PORT`, 기본 4910).
+  빌드는 4~5초라 낡은 산출물로 도는 일을 막으려고 매번 한다. 빌드 시간은 따로 찍는다.
+- 브라우저는 크로미움 · 웹킷 프로세스 하나씩, 일감마다 새 맥락(빈 localStorage). 일감은 지난 실행에서 오래 걸린 차례로 꺼낸다
+  (`e2e/.run/quick-times.json`) — 긴 장면이 끝에 남지 않게.
+- 실패: 장면이 안 열림 · 쪽 오류 · 허용 목록에 없는 겹침 · 연 상태 동작 실패(`expect` 안 섬). 끝 코드 1, 보고는 `e2e/.run/quick-report.json`
+  (빌드 · 돌리기 · 일감 합 · 장면 열기 합 · 브라우저 RSS 최고 · 쓸 수 있는 메모리 최저 · 오래 걸린 일감).
+- 장면 하나의 누름 칸 검사(`checkSceneHits`)와 `ACTIONS` 는 `e2e/lib/hits-scene.mjs` 에 있고 `e2e/hits.mjs` 와 같이 쓴다.
+
+**언제 quick, 언제 all** — 화면 · 흐름을 바꾼 머지는 quick 으로 본다. 아래는 quick 이 안 보므로 `e2e:all` 을 돌린다:
+개발 서버(HMR · StrictMode 두 번 그림) 판, `test:browser`, 픽스처가 아직 닿는지(`e2e:fixtures` dry), 팔레트 PNG RGBA, 느린 4G 성능,
+배포 빌드에 바로가기가 새는지. 픽스처 · 씨앗을 다시 떴거나 저장 꼴 · 난수 차례가 바뀐 판, 자산 · 빌드 설정을 바꾼 판, 큰 묶음 머지 앞에도 all.
+
+**잰 것** (r328, 14코어 · 48GB, 다른 브라우저 일 없을 때):
+
+| 판 | 일감 · 상태 | 돌리기 (빌드 뺌) | 일감 합 (그중 장면 열기) | 브라우저 RSS 최고 |
+|---|---|---:|---:|---:|
+| 장면 49 × 기기 4, 맥락 8 · 6 | 196 · 368 | 141s | 1630s (1305s) | 5.1GB |
+| 장면 49 × 기기 4, 맥락 16 · 14 | 196 · 368 | 90s | 1937s (1495s) | 8.3GB |
+| 장면 49 × 기기 4, 맥락 24 · 20 (기본) | 196 · 368 | 91~93s | 2540~2632s (1812~1845s) | 10.7~11.4GB |
+| 긴 장면 둘 빼고 47 × 4, 맥락 24 · 20 | 188 · 360 | 54s | 2137s (1281s) | 10.2GB |
+| 긴 장면 둘 빼고 47 × 2(크로미움 데스크톱 · 웹킷 아이폰), 맥락 20 · 20 | 94 · 180 | 28s | 992s (617s) | 10.0GB |
+
+빌드는 4.3~5.1초. 같은 일을 `e2e:all` 의 smoke + hits(dev · e2e) 는 약 1490초에 했다.
+
+**1분 안에 못 넣는 것** — 벽시계의 바닥은 가장 긴 일감이다. `nari-burst-result`(씨앗 5, 첫 경기를 9회말까지 실제 시간으로 쳐서 약 89초)와
+`mission-result`(10구, 약 58초)는 맥락을 늘려도 줄지 않는다. 둘을 빼면 장면 47 × 기기 4 · 360 상태가 54초다. 맥락을 더 늘려도
+(16 · 14 → 24 · 20) 일감 합이 1937 → 2540초로 부풀어(14코어가 실제 시간 게임 44판을 함께 그린다) 나머지는 50초 안팎에서 더 안 준다.
+둘을 1분 안에 넣으려면 그 자리(돌발 결과 창 · 미션 결과 판)를 미리 떠 둔 스냅샷으로 곧장 세워야 하는데, 지금 저장(localStorage)에는
+경기 중간 상태가 없다 — 나리 타자편 경기 진행은 `useCareerSession` · 미션은 `useMissionSession`(상태 · ref 수십 개)과 세션 난수(32비트
+하나, `createSeededRandom` 클로저) · 장면 틱 · 그림 부품 안에 흩어져 있다. 그 길(세션 상태 · 난수 상태를 뜨고 되살리는 개발 전용 손잡이)을 만드는 일은 따로 잡는다.
+
+**잡아내는지** (r328): `NextGameScreen` 의 `되돌아가기 칸`(r186)을 지운 판은 4 기기 모두 `season-management · 다음경기 순위표` 동작 실패,
+`확인` 칸 앞으로 옮긴 판은 `되돌아가기 칸 ← 확인` 겹침으로 끝 코드 1 이었다(되돌림).
+
 ## 전체 회귀 (`yarn e2e:all`)
 
 위 넷과 픽스처 · 바로가기 새는지까지 한 번에 돌리고 요약을 낸다 — `e2e/all.mjs`.
