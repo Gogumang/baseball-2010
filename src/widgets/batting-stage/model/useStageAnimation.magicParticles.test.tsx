@@ -136,9 +136,8 @@ describe('0x11 마구 공 파티클 (0x3b2f4 3b4fa)', () => {
     const 마구 = 쏜것.filter((call) => call.callId === 0x15)
     expect(마구.length).toBeGreaterThan(0)
     expect(마구.every((call) => call.img === 15)).toBe(true)
-    // 0x11 에 머문 틱 수와 같다 — 틱마다 꼭 한 번(첫 공의 놓기 전 틱은 앞 공 경로가 없어 빠진다)
+    // 0x11 에 머문 틱 수와 같다 — 틱마다 꼭 한 번. 첫 공의 놓기(0x11 틱 10) 전 열 틱도 0 채움 경로 칸(N = 0 → 점 0)에 쏜다 (A-26)
     const 투구틱 = new Set(그린장면.filter((scene) => scene.stagePhase?.kind === '투구중').map((scene) => scene.tick))
-    // 첫 공의 놓기(0x11 틱 10) 전 열 틱은 공 경로 [경기+0x1140] 를 채운 공이 없어 빠진다
-    expect(마구.length).toBe(투구틱.size - 10)
+    expect(마구.length).toBe(투구틱.size)
   })
 })
