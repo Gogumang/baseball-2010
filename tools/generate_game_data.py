@@ -209,6 +209,7 @@ def generate_ace_players() -> None:
     """마선수 — 원작의 특별 상대. 타자 5명 + 투수 5명."""
     lines = [
         "import type { BatterAbility } from '@/entities/batting/model/batter'",
+        "import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'",
         '',
         'export interface AcePlayer {',
         '  readonly id: string',
@@ -259,19 +260,41 @@ def generate_ace_players() -> None:
             identifier = sprite_ids[role][index]
             folder = ('batter_' if role == '타자' else 'pitcher_') + identifier
             icon = f'./sprites/ace_icon/{icon_start[role] + index:03d}.png'
+            still = ACE_STILL_IMAGES.get(folder) or largest_image(folder)
             burst = bursts[role][index] if index < len(bursts[role]) else ''
             lines.append(
                 f"  {{ id: {quote(identifier)}, name: {quote(name)}, "
                 f"role: '{role}', ability: {{ hit: {hit}, power: {power}, "
-                f"run: {run}, defense: {defense} }}, iconUrl: {quote(icon)}, "
-                f"framesUrl: {quote('./sprites/' + folder + '/frames')}, "
+                f"run: {run}, defense: {defense} }}, iconUrl: {asset_url(icon)}, "
+                f"framesUrl: {asset_url('./sprites/' + folder + '/frames')}, "
                 f"frameCount: {frame_counts.get(folder, 0)}, "
-                f"stillUrl: {quote(largest_image(folder))}, burst: {quote(burst)}, "
+                f"stillUrl: {asset_url(still)}, burst: {quote(burst)}, "
                 f"skillBits: 0x{skill_bits_of(row):x}, profile: 0x{profile_of(row):02x}, "
                 f"recordLine: [{', '.join(str(value) for value in record_line_of(row))}] }},"
             )
     lines.append(']')
     write('acePlayers.ts', '\n'.join(lines) + '\n')
+
+
+def asset_url(url: str) -> str:
+    """배포 판의 자산 경로는 `assetUrl()` 이 버전 경로를 붙인다(r318 OPTIMIZATION A2). 빈 경로는 그대로 둔다."""
+    return f'assetUrl({quote(url)})' if url else quote(url)
+
+
+# 정지 그림은 원본 표가 아니라 웹이 고른 것이다. 예전에는 "가장 큰 파트 그림" 을 그때그때 골랐는데 스프라이트를
+# 다시 묶을 때마다 답이 바뀌어(로제 018 → 000 · 싸이커 000 → 012) 생성 결과가 커밋과 어긋났다 — 지금 쓰는 그림으로 못 박는다.
+ACE_STILL_IMAGES = {
+    'batter_medica': './sprites/batter_medica/024.png',
+    'batter_kao': './sprites/batter_kao/002.png',
+    'batter_roze': './sprites/batter_roze/000.png',
+    'batter_death': './sprites/batter_death/037.png',
+    'batter_tiger': './sprites/batter_tiger/001.png',
+    'pitcher_psyker': './sprites/pitcher_psyker/012.png',
+    'pitcher_leony': './sprites/pitcher_leony/000.png',
+    'pitcher_bbmachine': './sprites/pitcher_bbmachine/003.png',
+    'pitcher_ballantine': './sprites/pitcher_ballantine/012.png',
+    'pitcher_dragona': './sprites/pitcher_dragona/000.png',
+}
 
 
 def largest_image(folder: str) -> str:
@@ -495,6 +518,8 @@ def generate_teams() -> None:
     names = clean_strings(load('StrCOMMON'))[slice(*COMMON_TEAM_RANGE)]
 
     lines = [
+        "import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'",
+        '',
         'export interface TeamRecord {',
         '  readonly id: number',
         '  readonly name: string',
@@ -512,7 +537,7 @@ def generate_teams() -> None:
         name = names[index] if index < len(names) else f'팀 {index}'
         lines.append(
             f"  {{ id: {index}, name: {quote(name)}, "
-            f"logoUrl: {quote(f'./sprites/team_logo/{index:03d}.png')}, "
+            f"logoUrl: {asset_url(f'./sprites/team_logo/{index:03d}.png')}, "
             f"values: [{', '.join(map(str, values))}] }},"
         )
     lines.append(']')
@@ -884,7 +909,12 @@ def goal_counts_of(row: bytes, fields: dict) -> dict:
 
 
 def fixed_cp949(row: bytes, offset: int, size: int) -> str:
-    return row[offset:offset + size].split(b'\x00', 1)[0].decode('cp949').strip()
+    """
+    고정 칸 CP949 글 — 첫 NUL 앞까지 **원문 그대로**. 앞뒤 빈칸은 원본 글의 일부다(`clean_strings` 와 같은 원칙).
+    예전에는 `.strip()` 으로 깎아 미션 설명문 6줄 · 돌발미션 대사 194줄의 끝 빈칸과 시즌 돌발 45번 실패 줄의
+    앞 빈칸(' 마음 가다듬고…')이 빠져 있었다 (r337 원본 대조).
+    """
+    return row[offset:offset + size].split(b'\x00', 1)[0].decode('cp949')
 
 
 # 142~159 = 9이닝 × 2측 점수판 (0xaa608~0xaa64e): 앞 9칸 = 측 0(선공), 뒤 9칸 = 측 1(후공). 우리 점수는 **사람 칸**(+3 윗 4비트)
@@ -1113,15 +1143,17 @@ def read_pitch_curves() -> list[dict]:
         end = offsets[index + 1] if index + 1 < count else len(raw)
         block = raw[offsets[index]:end]
         record_count = block[1]
-        record_size = int.from_bytes(block[2:4], 'little')
+        # 레코드 머리 = u8 크기 · u8 곡선 · u8 틱 · u8 점 수 · u8 폼 (generate_pitch_curves 와 같다). 예전에는 크기를
+        # u16(크기 + 곡선 << 8)으로 읽었다 — 곡선 1(B-스플라인) 레코드가 구질 22 에만 있어 출력은 같았다 (r337 원본 대조).
+        record_size = block[2]
         record = block[2:2 + record_size]
-        point_count = int.from_bytes(record[3:5], 'little') & 0xFF
+        point_count = record[3]
 
         # 앞 4개 레코드가 구속 1~4단계다. 그 `단계` 값이 비행 프레임 수다.
         flight_steps = []
         cursor = 2
         for _ in range(min(4, record_count)):
-            size = int.from_bytes(block[cursor:cursor + 2], 'little')
+            size = block[cursor]
             if size <= 0 or cursor + size > len(block):
                 break
             flight_steps.append(block[cursor + 2])
