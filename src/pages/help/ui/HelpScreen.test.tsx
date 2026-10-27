@@ -246,6 +246,40 @@ describe('경기 중 [조작방법] — 멈춘 경기 장면 위에 얹힌다', 
   })
 })
 
+describe("숫자키 — 격자 [skin+0x454] 숫자키 꼴 1 이 바꾼 키로 간다 (0x6371a · 0x637d0 r6, Q-14)", () => {
+  it("장 고르기에서 '6' '4' 는 장을 넘기고 '5' 는 OK 라 쪽 보기로 든다", () => {
+    띄우기()
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.getByText('<일반모드에 대하여>')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: '5' })
+    // 쪽 보기라 '6' 은 쪽을 넘긴다
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.getByRole('img', { name: '2/5' })).toBeTruthy()
+  })
+
+  it("장 고르기의 '8' 은 ↓ 와 같아 쪽 보기로 든다(0x63828) — '2' 는 ↑ 라 아무 일 없다", () => {
+    띄우기()
+    fireEvent.keyDown(window, { key: '2' })
+    fireEvent.keyDown(window, { key: '8' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('img', { name: '2/5' })).toBeTruthy()
+  })
+
+  it("쪽 보기의 '8' '2' 는 ↓ ↑ 처럼 글 줄을 내리고 올린다 (0x61ce4)", () => {
+    띄우기()
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: '5' })
+    fireEvent.keyDown(window, { key: '6' })
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.getByText('<스페셜>')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '8' })
+    expect(screen.queryByText('<스페셜>')).toBeNull()
+    fireEvent.keyDown(window, { key: '2' })
+    expect(screen.getByText('<스페셜>')).toBeTruthy()
+  })
+})
+
 describe('뷰어 그리기 0x58fd4 — 장 고르기/쪽 보기 그림 차이와 줄 넘기기', () => {
   it('쪽 보기에서 아래 키는 글을 한 줄 내리고 스크롤 손잡이가 걸음만큼 내려간다 (0x61ce4)', () => {
     띄우기()
