@@ -37,6 +37,22 @@ export function ballPixelAt(pitch: Pitch, frame: number): { x: number; y: number
   return { x: point.x / FIXED_POINT, y: point.y / FIXED_POINT }
 }
 
+/** 0 채움 경로 칸 — 장면 객체는 장면 전환 0x3874 의 new(0x1b80)(0 채움)로 서서 첫 놓기 전 [경기+0x1140] 은 모두 (0, 0, 0) 이다 */
+const ZERO_PATH_POINT: WorldPoint = { x: 0, y: 0, z: 0 }
+
+/**
+ * **장면 공 경로 칸의 화면 자리** — 0x35854(공 틱) = 0x35820 이 고른 점을 [경기+0x17e1](지금 타자 좌우, 타석 시작 0x3b084)의 원점으로
+ * 투영한다. 0x35820 의 자르기는 **위 먼저**(35828~3582e: `t > N − 1` 이면 N − 1) **다음 아래**(35830~35834: `t < 0` 이면 0)라,
+ * 장면 첫 놓기 전처럼 N = [+0x109c] = 0 이면 점 0 — 0 채움 칸 (0, 0, 0) 을 읽는다 (A-26, 2026-10-27 직접 떴다).
+ * `path` 는 이 장면에서 마지막으로 경로를 채운 공(`sceneBallPathPitch`), 아직 없으면 null(0 채움 칸, N = 0).
+ * 원점은 경로를 채운 공의 좌우가 아니라 **그리는 때의** 좌우 `side` 다(0x35896 이 그림마다 [+0x17e1] 을 읽는다)
+ */
+export function sceneBallPathPixelAt(path: readonly WorldPoint[] | null, ballTick: number, side: number): { x: number; y: number } {
+  const count = path?.length ?? 0
+  const index = Math.max(0, Math.min(ballTick, count - 1))
+  return projectToScreen(path?.[index] ?? ZERO_PATH_POINT, side)
+}
+
 /** 공이 도착할 화면 좌표 — 이글아이 표시용 */
 /**
  * 이글아이 자리 — 0x4d2ac 는 [경기+0x10b8](0x10 목표점, 오차 전)을 투영한다(4d2dc~4d2ea). 놓은 공은 그 점(`aimTarget`)을,
