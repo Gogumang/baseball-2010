@@ -880,15 +880,102 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(기본.log.some((line) => line.includes('협살'))).toBe(false)
   })
 
-  it('송구가 닿으면 공은 받은 야수의 손으로 옮겨 간다 — 받은 짝이 다시 던질 수 있다 (0xb2734)', () => {
-    // 같은 판에서 19틱 진루 키('2')로 주자가 다시 2루로 가면 1루수(1루 커버)가 짝(유격수 5)에게 던지고,
-    // 20틱 귀루 키로 또 돌아서면 받은 유격수가 공을 쥐어 다시 1루수에게 던진다
+  it('짝 송구는 보통 송구 0xb2e38 이다 — 받는 짝은 고르기 vt34 가 AI 1 로 바꿔 협살 AI 를 떠나고, 포구 틱 갈래로 쥔다 (b4a4a, A-34)', () => {
+    // 같은 판에서 19틱 진루 키('2')로 주자가 다시 2루로 가면 1루수(1루 커버)가 짝(유격수 5)에게 던진다. 공은 세계 공이고
+    // 목표 루 [7] 은 짝의 목표점(2루 좌표, vt68)이다. 받는 틱은 예보가 정한 포구 틱(받는 점이 점[T − 1])이라 27틱이고,
+    // 받는 것은 보통 포구 틱 갈래(펌블 굴림 · 쥐기 0xb2710)다. 받은 유격수는 AI 1 이라 협살 AI(분기표 0xd8808[8])를 안 탄다 —
+    // 20틱 귀루로 주자가 1루로 돌아가 협살이 풀린 뒤, 쥔 유격수가 다시 협살을 세운다(45틱, 2↔1루)
     const 결과 = 협살상황(true, { 18: '3', 19: '2', 20: '3' })
 
-    expect(결과.rundowns).toBe(1)
     expect(결과.log).toContain('18틱 협살 시작 — 1번 주자 1↔2루 (야수 2·5)')
-    expect(결과.log).toContain('19틱 협살 송구 2→5 — 28틱 도착')
-    expect(결과.log).toContain('28틱 협살 송구 5→2 — 35틱 도착')
+    expect(결과.log).toContain('19틱 2루로 송구 — 27틱 도착 (협살 짝 송구) (2번 야수)')
+    expect(결과.log).toContain('19틱 협살 송구 2→5 — 27틱 도착 (5번 야수가 받는다)')
+    expect(결과.log).toContain('27틱 5번 야수가 잡았다 (종류 0)')
+    expect(결과.log.some((line) => line.includes('협살 송구 5→2'))).toBe(false)
+    expect(결과.log).toContain('45틱 협살 시작 — 1번 주자 2↔1루 (야수 5·2)')
+    expect(결과.rundowns).toBe(2)
+    // 그림: 날아가는 동안(20~26틱) 공은 세계 공 궤적 위에 떠 있다 — 예전 웹은 마지막 보통 송구의 루(1루) 자리에 붙박아 그렸다
+    const 일루 = basePosition(1)
+    for (let 틱 = 20; 틱 < 27; 틱 += 1) {
+      const 공 = 결과.ticks[틱].ball
+      expect(공.isFlying).toBe(true)
+      expect(공.height).toBeGreaterThan(0)
+      expect(공.x === 일루.x && 공.z === 일루.z).toBe(false)
+    }
+  })
+
+  it('짝 송구는 보통 송구처럼 악송구 · 흔들림 굴림을 먹고, 받는 짝의 포구 틱에 펌블 굴림이 선다 (0xa1620 a1828 · b4228, A-34)', () => {
+    // 키 표(`keyAt`)는 판 틱마다 머리(0 절)에서 한 번 불리므로 그 사이 굴림을 틱별로 모은다
+    const 씨앗 = createSeededRandom(1)
+    const 틱별: Record<number, string[]> = {}
+    let 지금 = -1
+    const 난수: RandomPort = {
+      rand: (min, max) => {
+        ;(틱별[지금] ??= []).push(`${min}..${max}`)
+        return 씨앗.rand(min, max)
+      },
+      rand9d: (n) => 씨앗.rand9d(n),
+    }
+    const 키: Record<number, string> = { 18: '3', 19: '2' }
+    const 결과 = runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory([...협살판]),
+      bases: 주자1루,
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+      random: 난수,
+      controls: {
+        side: '공격',
+        keyAt: (tick) => {
+          지금 = tick
+          return 키[tick] === undefined ? null : { key: 키[tick] }
+        },
+      },
+    })
+    expect(결과.log).toContain('19틱 협살 송구 2→5 — 27틱 도착 (5번 야수가 받는다)')
+    // 19틱: 악송구 굴림 rand(0, 10000)(a1828) — 거리 ≤ 0x2008 이라 긴 송구 흔들림 굴림(a198c)은 없다
+    expect(틱별[19]).toEqual(['0..10000'])
+    // 27틱: 받는 짝의 펌블 굴림(b4228) — 예전 웹은 도착 틱만 세어 이 굴림도 없었다
+    expect(틱별[27]).toEqual(['0..10000'])
+  })
+
+  // r313 — 협살 AI 0xb48b6 은 플레이 vt4c 야수 고리(분기표 0xd8808[8])에서 칸 차례로 돈다. 목표만 vt14 관문으로 적고 걸음은 다음
+  // 목록 틱이 하며, 태그는 아웃 판정 0xb36d0(6b 절)이 다음 그림에 낸다
+  const 협살판돌리기 = (pattern: BattedBallPattern, bases: BaseState, seed: number, key?: (tick: number) => string | null) =>
+    runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(pattern),
+      bases,
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+      random: createSeededRandom(seed),
+      controls: {
+        side: '공격',
+        keyAt: (tick) => {
+          const pressed = key?.(tick) ?? null
+          return pressed === null ? null : { key: pressed }
+        },
+      },
+    })
+
+  it('협살 AI 는 목표만 고치고 걸음은 다음 목록 틱이라, 태그는 아웃 판정(6b)이 그다음 그림에 낸다 (b4a96 vt4c → vt14 · b43da, r313)', () => {
+    // 예전 웹은 2b 절이 공 쥔 유격수를 관문 없이 곧바로 한 걸음 옮기고 그 자리에서 태그를 봐 24틱에 잡았다
+    const 결과 = 협살판돌리기([48, 800, 282, 1], 주자1루, 405 * 31 + 1)
+    expect(결과.log).toContain('20틱 협살 시작 — 1번 주자 2↔1루 (야수 5·0)')
+    expect(결과.log).toContain('25틱 협살 태그 — 1번 주자 아웃')
+    expect(결과.log.some((line) => line.startsWith('24틱 협살 태그'))).toBe(false)
+  })
+
+  it('협살 AI 는 계획을 지금 상태로 다시 세어(0xb3a04) 이 칸이 [0] · [1] 에 없으면 푼다 — 기록칸 야수가 아니라 (b48f0~b4912, r313)', () => {
+    // 53틱 협살(유격수 5 · 포수 0) 뒤 1루 커버(+0xf0)가 1루수 2 로 바뀌자, 다시 센 계획에 포수가 없어 포수 차례(56틱)에 푼다.
+    // 예전 웹은 기록칸의 두 야수만 보아 풀지 않았다
+    const 결과 = 협살판돌리기([9, 687, 658, 0], { first: false, second: true, third: false }, 726 * 31 + 7 + 3, (tick) =>
+      tick >= 10 && tick % 6 === 0 ? '3' : tick >= 10 && tick % 6 === 3 ? '2' : null,
+    )
+    expect(결과.log).toContain('53틱 협살 시작 — 0번 주자 2↔1루 (야수 5·0)')
+    expect(결과.log).toContain('56틱 협살 종료 — 0번 야수의 협살 AI 가 풀었다 (b4912)')
   })
 
   it('주자가 다시 진루로 돌아도 2루에 닿기 전까지는 협살 대상이다 — 주자 +0x14 = 위치라 0xb398c 의 비율은 늘 100 (r276)', () => {
@@ -899,8 +986,9 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
 
     expect(결과.rundowns).toBe(1)
     expect(결과.log).toContain('18틱 협살 시작 — 1번 주자 1↔2루 (야수 2·5)')
-    expect(결과.log).toContain('19틱 협살 송구 2→5 — 28틱 도착')
-    expect(결과.log).toContain('28틱 1번 주자 태그 아웃 (0xb36d0 결과 3)')
+    expect(결과.log).toContain('19틱 협살 송구 2→5 — 27틱 도착 (5번 야수가 받는다)')
+    // 짝이 받는 쥐기 0xb2710 의 판정(b2758)이 태그(결과 3)를 낸다 — 협살 중이라 협살 아웃으로 센다
+    expect(결과.log).toContain('27틱 협살 태그 — 1번 주자 아웃')
     expect(결과.advance.bases).toEqual({ first: false, second: false, third: false })
     expect(결과.advance.outsAdded).toBe(2)
   })
@@ -2088,7 +2176,7 @@ describe('판 진행 관문 0xb0d28 · 판 끝 결과 코드 0x9d5bc (b44f6) —
       controls: { side: '공격', keyAt: (tick) => (keys[tick] === undefined ? null : { key: keys[tick] }) },
     })
     expect(result.rundowns).toBeGreaterThan(0)
-    expect(result.log).toContain('19틱 협살 송구 2→5 — 28틱 도착')
+    expect(result.log).toContain('19틱 협살 송구 2→5 — 27틱 도착 (5번 야수가 받는다)')
     expect(result.ticks.length).toBeLessThan(240)
   })
 })
@@ -2251,6 +2339,21 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
     expect(굴림.log.some((line) => line.includes('잡았다'))).toBe(false)
     expect(굴림.foulEnded).toBe(true)
     expect(굴림.ticks.length).toBe(48)
+  })
+
+  it('받는 틱이 지나도 아무도 안 쥔 공은 궤적 점에 그린다 — 0x36dfc 는 공을 늘 0xa25b0(공, 공+0x68) 에 둔다 (36ea6, r313)', () => {
+    // 예전 웹은 포구 틱이 지난 안 쥔 공을 공 가진 야수 자리(또는 마지막 송구의 루 자리)에 그렸다
+    const 무늬: BattedBallPattern = [209, 317, 295, 1]
+    const 굴림 = 쏘기(무늬, 9, 0)
+    const 궤적 = battedBallTrajectory(무늬)
+    const 지난틱 = 굴림.ticks.map((_, 틱) => 틱).filter((틱) => 틱 >= 굴림.catchTick)
+    expect(지난틱.length).toBeGreaterThan(0)
+    for (const 틱 of 지난틱) {
+      const 공 = 굴림.ticks[틱].ball
+      const 점 = 궤적.pointAt(틱)
+      expect(공.isHeld).toBe(false)
+      expect([공.x, 공.z, 공.height]).toEqual([점.x, 점.z, 점.y])
+    }
   })
 
   it('넓은 페어 각(0x9d640, 35~145) 밖 파울은 state[7] = 0 — 커버 0xb1c90 이 머리(b1cc6)에서 끝나 아무도 루 커버를 안 받는다', () => {
