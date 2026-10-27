@@ -74,9 +74,11 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
       else exitRef.current.onExit()
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowLeft' || event.key === '4') pushSceneKey(() => choose(true))
-      else if (event.key === 'ArrowRight' || event.key === '6') pushSceneKey(() => choose(false))
-      else if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
+      // ←/→(−3 · −4) · '4' · '6' 은 방향과 상관없이 모두 40a42 로 가 [장면+0x17f9] 를 0 ↔ 1 **뒤집는다** (40a1c~40a50, r333).
+      // 예전 웹은 ← = 예 · → = 아니오로 고정해, 예에서 ← 를 누르면 원본은 아니오로 가는데 웹은 예에 머물렀다
+      if (event.key === 'ArrowLeft' || event.key === '4' || event.key === 'ArrowRight' || event.key === '6') {
+        pushSceneKey(() => choose(!answerRef.current))
+      } else if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
         // 예(5/−5 키) → 모드 7 재시작 · 아니오 → 메인 메뉴 (0x40a08)
         pushSceneKey(() => leave(answerRef.current))
