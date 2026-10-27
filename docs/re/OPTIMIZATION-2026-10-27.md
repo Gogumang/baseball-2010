@@ -311,7 +311,11 @@ Hobby 에는 Skew Protection 이 없어 새 배포 뒤 옛 탭이 옛 코드 조
     (A ↔ A) 대조에서도 webkit derby-start 가 1,635 로 한 번 갈렸다 — 틱 흔들림이다.
   - derby-pick · derby-start 의 "새 문제 4" 는 원래부터 없는 `batter_balancer/frames/023 · 027.png`(+ index) 4개가 주소만 `v/<해시>/` 로 바뀐 것
     (6절과 같은 것). 그 밖의 404 · 실패 요청 · 그림 오류 0.
-- vitest 853 파일(9,809 통과) · `yarn test:browser` 80 통과 · `yarn e2e:all` (아래 8절 끝에 적음).
+- vitest 853 파일(9,809 통과) · `yarn test:browser` 80 통과.
+- `yarn e2e:all` (포트 5720~): smoke dev · e2e 98/98, hits:e2e 356 상태 겹침 없음, browser · fixtures · png(4,978 × 2 같음) · perf · leak 통과.
+  hits:dev 만 3 상태 실패(pitcher-cup "Execution context was destroyed" · pitcher-postseason "다음 안 섬" · pitcher-cup-result goto 30초 넘김 —
+  기기 넷을 함께 돌린 개발 서버의 부하 · 다시 불러오기). 개발 서버에서는 새 코드의 문서 확인이 꺼져 있어 다시 부를 수 없다.
+  그 세 장면만 다시 돌리니 24 상태 겹침 없음.
 - 난수 · 경기 · 저장: 게임 코드는 주소 글자만 바뀌었고 개발 · 시험에서는 그 글자도 같다.
 
 ### 배포 뒤 사용자가 볼 것
