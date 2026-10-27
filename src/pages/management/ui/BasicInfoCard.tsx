@@ -16,8 +16,9 @@ import { CardPlate } from '@/pages/management/ui/CardPlate'
 import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
 import { InfoTable } from '@/pages/management/ui/InfoTable'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
 /** 정보 칸 값 칸 그림 — 타자편 mode_ui 2 (투수편은 1) */
 const INFO_FRAME = 2
 

@@ -5,9 +5,10 @@ import {
   type DefenseRunner,
   type DefenseViewState,
 } from '@/pages/defense/lib/defenseView'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** effect/player_effect.pzx (게임+0x1030) */
-export const PLAYER_EFFECT_FRAMES = './sprites/player_effect/frames'
+export const PLAYER_EFFECT_FRAMES = assetUrl('./sprites/player_effect/frames')
 
 /** 그리기 목록에 넣는 부착 효과 한 장 */
 export interface PlayerEffectMark {

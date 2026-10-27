@@ -2,8 +2,9 @@ import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { RUN_SCORE_BOARD_FRAME_AT, RUN_SCORE_SLOTS, runScoreGlyphsOf } from '@/pages/defense/lib/runScoreBoard'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const NUM = './sprites/num'
+const NUM = assetUrl('./sprites/num')
 
 export interface RunScoreBoardProps {
   /** 점수판 틀 0x41440 의 두 측 — 팀(0xb6bdd)·CPU(0xb6c21) */

@@ -11,11 +11,12 @@ import {
 } from '@/pages/nari-record-room/lib/rankingBoard'
 import { seasonRankingValueTextOf } from '@/entities/season-mode/model/seasonRecordRanking'
 import type { SeasonRankingEntry } from '@/entities/season-mode/model/seasonRecordRanking'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const SLT_FRAME = './sprites/slt_frame'
-const NUM = './sprites/num'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
+const NUM = assetUrl('./sprites/num')
 const imageOf = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 const pixel = { position: 'absolute', pointerEvents: 'none' } as const
 /** 0x6aff8 의 점 — 흰 1×2 */

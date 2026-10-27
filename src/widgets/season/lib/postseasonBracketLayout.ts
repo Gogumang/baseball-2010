@@ -2,6 +2,7 @@ import { withSemiPlayoffWinner } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import { glyphsWidthOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 포스트시즌 대진표 배치 (그리기 `0x853ac` — P6 4a-1 **확정**).
@@ -25,7 +26,7 @@ export interface BracketBox {
 
 /** 대진표 그림 = mode_ui 프레임 53 (195×210). 앵커 (0,0) 에 놓으면 원점 (24,48) 로 들어간다 */
 export const BRACKET_BACKDROP = {
-  folder: './sprites/mode_ui/frames',
+  folder: assetUrl('./sprites/mode_ui/frames'),
   frame: 53,
   anchorX: 0,
   anchorY: 0,
@@ -230,7 +231,7 @@ export function bracketViewOf(series: PostseasonSeries | null): BracketView {
  * 숫자 그림은 num **0~9**(기준 0 — 흰 테두리 8×10, '1' 만 4×10)다. [this+0x13c] 는 순위표 0x7f070 이 "%"(num 106)를 꺼내는
  * 같은 num 이다(0x7f35e). 예전 웹은 P6 의 "numBox(…, 33, 8)" 를 못 풀어 하늘색 숫자(90번대)로 두었다.
  */
-export const RANK_UNIT = { folder: './sprites/img_text/frames', frame: 307, width: 9, height: 10 } as const
+export const RANK_UNIT = { folder: assetUrl('./sprites/img_text/frames'), frame: 307, width: 9, height: 10 } as const
 /** "위" 의 ox (0x854ec `movs r3, #6; rsbs`) */
 const RANK_UNIT_DX = -6
 /** 숫자의 ox · oy (0x85508 · 0x8550e) */

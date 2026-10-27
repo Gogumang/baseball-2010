@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as styles from '@/shared/ui/IconMenu/IconMenu.css'
 import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
 import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 원작 메뉴.
@@ -11,8 +12,8 @@ import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
  * 글자 목록이 아니라 **아이콘 상자 격자에 노란 프레임이 얹히는** 형태다.
  */
 
-const SLOT_BACKGROUND = './sprites/slt_frame/000.png'
-const SELECTION_FRAME = './sprites/slt_frame/001.png'
+const SLOT_BACKGROUND = assetUrl('./sprites/slt_frame/000.png')
+const SELECTION_FRAME = assetUrl('./sprites/slt_frame/001.png')
 
 export interface IconMenuItem {
   readonly id: string

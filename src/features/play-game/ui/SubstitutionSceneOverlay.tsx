@@ -10,8 +10,9 @@ import * as styles from '@/features/play-game/ui/SubstitutionSceneOverlay.css'
 import { ACE_CUT_IN_DRAWS } from '@/features/play-game/model/aceCutIn'
 import { AceCutInCanvas } from '@/features/play-game/ui/AceCutInCanvas'
 import { isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FOLDER = './sprites/game_ui/frames'
+const GAME_UI_FOLDER = assetUrl('./sprites/game_ui/frames')
 
 interface SubstitutionSceneOverlayProps {
   /**

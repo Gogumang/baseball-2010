@@ -11,10 +11,11 @@ import {
 import type { EvaluationChangeValues } from '@/pages/story/lib/evaluationChangeWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 import { EVENT_WINDOW_DIM_OPACITY } from '@/pages/story/lib/eventDialogue'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
-const NUM = './sprites/num'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
 const pad = (frame: number) => String(frame).padStart(3, '0')
 
 /**

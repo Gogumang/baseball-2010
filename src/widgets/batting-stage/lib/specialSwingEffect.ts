@@ -1,4 +1,5 @@
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **필살 스윙 연출 그림** — 스윙 그리기 0x49e64 가 부르는 0x49aec (2026-10-14 직접 떴다).
@@ -32,19 +33,19 @@ import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoad
 
 /** 마타자 순번 → +0x1034 그림 (0x47e1c 점프표 0xd01a8) */
 const ACE_BATTER_EFFECT_FOLDERS: readonly string[] = [
-  './sprites/medica_effect/frames',
-  './sprites/effect_frame/frames',
-  './sprites/effect_power/frames',
-  './sprites/effect_tornado/frames',
-  './sprites/effect_meteor/frames',
+  assetUrl('./sprites/medica_effect/frames'),
+  assetUrl('./sprites/effect_frame/frames'),
+  assetUrl('./sprites/effect_power/frames'),
+  assetUrl('./sprites/effect_tornado/frames'),
+  assetUrl('./sprites/effect_meteor/frames'),
 ]
 
 /** 필살 번호(레코드 +0x18) → +0x103c 그림 (0x47ec0~0x47f0a) */
 const SPECIAL_SWING_EFFECT_FOLDERS: Readonly<Record<number, string>> = {
-  1: './sprites/effect_power/frames',
-  2: './sprites/effect_frame/frames',
-  3: './sprites/effect_tornado/frames',
-  4: './sprites/effect_meteor/frames',
+  1: assetUrl('./sprites/effect_power/frames'),
+  2: assetUrl('./sprites/effect_frame/frames'),
+  3: assetUrl('./sprites/effect_tornado/frames'),
+  4: assetUrl('./sprites/effect_meteor/frames'),
 }
 
 /** 마타자 1(어거지죠) · 번호 2(플레임) — 우타면 효과 0x11, 늘 깊이 −1 */

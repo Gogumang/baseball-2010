@@ -1,6 +1,7 @@
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { loopingAnimationStepAt } from '@/widgets/batting-stage/lib/baseRunners'
 import { pitchLastStepOf, pitchStepStartTickOf } from '@/widgets/batting-stage/lib/stageScenery'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **마운드 투수 체력 그림** — 투수 그리기 0x38d1c 의 0x38f42~0x39086 (2026-10-14 직접 떴다).
@@ -20,7 +21,7 @@ import { pitchLastStepOf, pitchStepStartTickOf } from '@/widgets/batting-stage/l
  * 되감기 · 그린 수는 웹 장면 단계 틱으로 센다(그림 한 번 = 장면 틱 하나 — 아래 실투 "!" 머리말). +0x14 는 장면의 투수 그림 객체 상태(`stageScenery.pitcherAnimationAt`)다 —
  * 투구 뒤 다음 0xf 진입까지 상태 1 에 머물므로 0x12 · 0x13 에도 안 그린다.
  */
-export const PLAYER_EFFECT_FRAMES = './sprites/player_effect/frames'
+export const PLAYER_EFFECT_FRAMES = assetUrl('./sprites/player_effect/frames')
 const EXHAUSTED_ANIMATION = 10
 const TIRED_ANIMATION = 9
 const EXHAUSTED_MAX = 19

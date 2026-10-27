@@ -3,8 +3,9 @@ import { MarkupText } from '@/shared/ui'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { EVENT_WINDOW_DIM_OPACITY, SCREEN_HEIGHT, SCREEN_WIDTH } from '@/pages/story/lib/eventDialogue'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 /**
  * **스킬 보상 창** — 보상 명령의 첫 종류가 4 일 때(0x8d6bc~0x8d708) 공용 창 대신 띄운다.

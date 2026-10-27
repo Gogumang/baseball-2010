@@ -4,12 +4,14 @@
  * `public/sprites/**\/*.json` 을 모두 읽어 `{ version: 1, files: { "<sprites/ 아래 경로>": "<파일 글 그대로>" } }` 로 묶는다.
  * 읽는 쪽은 `src/shared/lib/sprite/spriteJsonBundle.ts` 다.
  *  - 개발 서버: 요청이 올 때마다 새로 만든다(공용 폴더 JSON 을 고치면 바로 따라온다). 하위 경로로 열어도 되게 끝 경로로 고른다.
- *  - 빌드: 산출물 `sprites/sprite-json.bundle.json` 으로 쓴다. 낱개 JSON 도 공용 폴더 복사로 그대로 남는다(묶음에 없는 주소 대비).
+ *  - 빌드: 산출물 `v/<해시>/sprites/sprite-json.bundle.json` 으로 쓴다(자산 버전 경로 — `viteVersionedAssets`, r318).
+ *    낱개 JSON 도 공용 폴더 복사로 그대로 남는다(묶음에 없는 주소 대비).
  * 열쇠는 경로 차례로 정렬해 같은 입력이면 같은 바이트가 나온다.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import type { Plugin } from 'vite'
+import { versionedAssetDir } from './viteVersionedAssets.ts'
 
 export const SPRITE_JSON_BUNDLE_PATH = 'sprites/sprite-json.bundle.json'
 
@@ -34,10 +36,12 @@ export function buildSpriteJsonBundle(spritesDir: string): string {
 
 export function spriteJsonBundle(): Plugin {
   let spritesDir = ''
+  let publicDir = ''
   return {
     name: 'sprite-json-bundle',
     configResolved(config) {
-      spritesDir = join(config.publicDir, 'sprites')
+      publicDir = config.publicDir
+      spritesDir = join(publicDir, 'sprites')
     },
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
@@ -49,7 +53,9 @@ export function spriteJsonBundle(): Plugin {
       })
     },
     generateBundle() {
-      this.emitFile({ type: 'asset', fileName: SPRITE_JSON_BUNDLE_PATH, source: buildSpriteJsonBundle(spritesDir) })
+      // 다른 자산과 같은 버전 폴더에 — 읽는 쪽 주소도 `assetUrl('./sprites/sprite-json.bundle.json')` 이다
+      const fileName = `${versionedAssetDir(publicDir)}${SPRITE_JSON_BUNDLE_PATH}`
+      this.emitFile({ type: 'asset', fileName, source: buildSpriteJsonBundle(spritesDir) })
     },
   }
 }

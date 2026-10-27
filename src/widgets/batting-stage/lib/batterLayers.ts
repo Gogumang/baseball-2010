@@ -18,12 +18,13 @@
  * 파일 끝에 **투수 장비 레이어**(0x79790 적재 · 0x79524 겹치기)도 같이 있다 — 같은
  * `BatterLayer`·`layerPaletteIndexOf` 를 쓰기 때문이다. 두 쪽 차이는 `PitcherEquipment` 주석 참고.
  */
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 import { outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import type { RecolorRequest } from '@/shared/lib/sprite/paletteSwap'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import { PITCHER_OVERLAY_FRAME_OFFSET } from '@/widgets/batting-stage/lib/stageScenery'
 
-const SPRITES = './sprites'
+const SPRITES = assetUrl('./sprites')
 const BODY_FOLDERS = [`${SPRITES}/batter_balancer/frames`, `${SPRITES}/batter_sluger/frames`]
 const SHADOW = `${SPRITES}/batter_shadow/frames`
 const HELMET = `${SPRITES}/batter_helmet/frames`
@@ -313,6 +314,13 @@ const ORDER_RULES = [
 ]
 const SLUGER_ADJUST = 14
 const FRONT_OFFSETS = [14, 13]
+/**
+ * 몸통 앞 프레임 중 **원본 PZX 에 파트가 하나도 없는 칸** — balancer 23 · 27(자세 9 · 13 + 14), sluger 22(자세 9 + 13).
+ * 원본 0x78cfc 는 이 칸도 그리기를 부르지만 파트가 없어 아무것도 안 나온다. 뽑기(`tools/decode_pzx.py`)는 빈 칸을 PNG 로 안 내므로
+ * 웹이 그 겹을 청하면 없는 그림을 받으러 간다(r311 이 찾은 derby-pick · derby-start 의 `frames/023 · 027.png` 와 번호 지도).
+ * 그린 것이 같도록 겹 목록에서 뺀다 (r319, `bat/batter_balancer.pzx` · `batter_sluger.pzx` 프레임 구간을 다시 풀어 확인).
+ */
+const EMPTY_FRONT_FRAMES: readonly (readonly number[])[] = [[23, 27], [22]]
 const GHOST_FRAMES = [8, 9]
 const GHOST_BALANCER_OFFSET = 6
 const GHOST_SLUGER_OFFSET = 8
@@ -336,7 +344,8 @@ export function batterLayersOf(
   const type = bodyType === 1 ? 1 : 0
   const adjust = type === 1 ? SLUGER_ADJUST : 0
   const body: BatterLayer = { folder: BODY_FOLDERS[type], frame }
-  const front: BatterLayer = { folder: BODY_FOLDERS[type], frame: frame + FRONT_OFFSETS[type] }
+  const frontFrame = frame + FRONT_OFFSETS[type]
+  const front: BatterLayer | null = EMPTY_FRONT_FRAMES[type].includes(frontFrame) ? null : { folder: BODY_FOLDERS[type], frame: frontFrame }
   const shadow: BatterLayer | null = withShadow ? { folder: SHADOW, frame: frame + adjust } : null
   // 머리 장비가 등급 2 이상이면 원본은 **헬멧을 지운다** (0x78df4 — 헬멧 슬롯에 0 을 넣는다)
   const helmet: BatterLayer | null = equipment.head > 1 ? null : { folder: HELMET, frame: frame + adjust }

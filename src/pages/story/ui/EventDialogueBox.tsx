@@ -11,8 +11,9 @@ import {
 } from '@/pages/story/lib/eventDialogue'
 import type { DialogueLayout, DialogueLine, DialogueState } from '@/pages/story/lib/eventDialogue'
 import * as styles from '@/pages/story/ui/EventDialogueBox.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
 
 /** 선택지 갈래(0x7fd22) — [창+0xe4] = 갈래 수 ≠ 1 */
 export interface DialogueChoiceList {

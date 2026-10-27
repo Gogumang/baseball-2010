@@ -19,10 +19,11 @@ import type { EquipmentRow } from '@/pages/shop/lib/equipmentRows'
 import { equipmentKeyOf, equipmentWindowKeyOf } from '@/pages/shop/lib/equipmentWindowState'
 import type { EquipmentWindowState } from '@/pages/shop/lib/equipmentWindowState'
 import * as styles from '@/pages/shop/ui/EquipmentWindow.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
-const NUM = './sprites/num'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
 const pad = (frame: number) => String(frame).padStart(3, '0')
 
 /** 0xca911(틱, 10) ≠ 0 — 열 번에 아홉 번 켜진다 (탭 커서 · 줄 테두리) */

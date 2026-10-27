@@ -24,12 +24,13 @@ import {
 } from '@/pages/team-game/lib/substitutionWindow'
 import type { PlayerDetail, SubstitutionRow } from '@/pages/team-game/lib/substitutionWindow'
 import { PlayerDetailWindow, SUBSTITUTION_DETAIL_ORIGIN } from '@/widgets/player-detail-window'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI = './sprites/game_ui'
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const NUM = './sprites/num'
-const TEAM_LOGO = './sprites/team_logo'
+const GAME_UI = assetUrl('./sprites/game_ui')
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
+const TEAM_LOGO = assetUrl('./sprites/team_logo')
 const pad = (index: number) => String(index).padStart(3, '0')
 const pixel: CSSProperties = { position: 'absolute', pointerEvents: 'none', imageRendering: 'pixelated' }
 

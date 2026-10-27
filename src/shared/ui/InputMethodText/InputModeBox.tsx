@@ -3,10 +3,11 @@ import { FrameSprite } from '@/shared/ui/FrameSprite/FrameSprite'
 import { PaintedRects } from '@/shared/ui/CommonPanel/CommonPanel'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { roundFillPaintsOf } from '@/shared/lib/commonPanel/commonPanel'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
 
-const MODE_UI = './sprites/mode_ui/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
 /** mode_ui 24 화살 (5×8) — 폭은 0x161c0 · 0x161de 의 `ldrh [그림+0x12]` */
 const ARROW_FRAME = 24
 const ARROW_WIDTH = 5

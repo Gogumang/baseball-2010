@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * 원본 소리 52개 (`sound/%03d.mmf`) 의 번호 → 쓰임 표.
  *
@@ -245,7 +246,10 @@ export function isLoopingSound(id: number): boolean {
   return LOOPING_SOUND_IDS.includes(id)
 }
 
-/** `sounds/%03d.mp3` — 원본 `sprintf("%s/%03d.mmf", dir, n)` 를 그대로 옮긴 것. */
-export function soundFileUrl(id: number, baseUrl = 'sounds'): string {
+/**
+ * `sounds/%03d.mp3` — 원본 `sprintf("%s/%03d.mmf", dir, n)` 를 그대로 옮긴 것.
+ * 기본 폴더는 자산 주소 앞부분(`assetUrl`)을 거친다 — 개발 · 시험은 `sounds`, 빌드는 `./v/<해시>/sounds` (r318).
+ */
+export function soundFileUrl(id: number, baseUrl = assetUrl('sounds')): string {
   return `${baseUrl}/${String(id).padStart(3, '0')}.mp3`
 }

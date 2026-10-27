@@ -27,11 +27,12 @@ import type { GridCursor, GridDirection, LayoutBox } from '@/widgets/skill-windo
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/skill-window/ui/SkillWindow.css'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
-const NUM = './sprites/num'
-const ITEM_ICON = './sprites/item_icon'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
+const ITEM_ICON = assetUrl('./sprites/item_icon')
 
 const pad = (frame: number) => String(frame).padStart(3, '0')
 

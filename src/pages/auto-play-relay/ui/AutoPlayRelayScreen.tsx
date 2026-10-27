@@ -14,6 +14,7 @@ import { relayFieldBackgroundAt } from '@/pages/auto-play-relay/lib/relayFieldBa
 import { DEFENSE_BACKGROUND_HEIGHT, DEFENSE_BACKGROUND_URL, DEFENSE_BACKGROUND_WIDTH } from '@/pages/defense/lib/defenseView'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
 import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** "공격팀(%s)" 의 %s — st[0x31 + st[9]] == 0(사람 칸)이면 "PLAYER"(0xd0724), 아니면 "COM"(0xd072c) */
 export const OFFENSE_LABEL = { player: 'PLAYER', computer: 'COM' } as const
@@ -67,7 +68,7 @@ export const RELAY_BOX = {
   height: 0x12,
 } as const
 
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 
 interface AutoPlayRelayScreenProps {
   /** 마지막으로 굴린 틱의 중계 칸 (`useMissionSession.autoRelayStep`) — 아직 안 굴렸으면 null */

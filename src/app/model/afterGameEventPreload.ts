@@ -23,12 +23,13 @@ import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import { portraitAnimationOf, portraitPaletteOf } from '@/widgets/event-portraits/lib/portraitSlots'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const PORTRAIT_JSON = ['animations.json', 'origins.json'] as const
 
 /** 평가 감독(event_char_0 · 캐릭터 2) — 띄울 수 있는 애니 전부 */
 export function afterGameEvaluationPreloads(): SpriteFolderPreload[] {
-  return [{ folder: './sprites/event_char_0/frames', frames: [], animations: evaluationManagerAnimations(), json: PORTRAIT_JSON }]
+  return [{ folder: assetUrl('./sprites/event_char_0/frames'), frames: [], animations: evaluationManagerAnimations(), json: PORTRAIT_JSON }]
 }
 
 /** 이벤트가 닿는 다른 이벤트 — 선택지 gotoEvent · 예아니오 · 대결 결과 (events.json 명령 칸) */
@@ -70,12 +71,12 @@ export function portraitPreloadsOf(
 ): SpriteFolderPreload[] {
   const requests: SpriteFolderPreload[] = []
   for (const portrait of portraits) {
-    const frames = `./sprites/${portrait.file}/frames`
+    const frames = assetUrl(`./sprites/${portrait.file}/frames`)
     const animation = portraitAnimationOf(portrait, battingTypeIndex)
     requests.push({ folder: frames, frames: [], animations: [animation], json: PORTRAIT_JSON })
     if (portraitPaletteOf(portrait, skinIndex) !== null) {
       requests.push(
-        { folder: `./sprites/${portrait.file}`, frames: [], json: ['palette.json'] },
+        { folder: assetUrl(`./sprites/${portrait.file}`), frames: [], json: ['palette.json'] },
         { folder: `${frames}/index`, frames: [], animations: [animation], animationsIn: frames },
       )
     }

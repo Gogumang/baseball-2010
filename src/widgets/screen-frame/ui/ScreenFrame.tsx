@@ -10,9 +10,10 @@ import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLay
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import * as styles from '@/widgets/screen-frame/ui/ScreenFrame.css'
 import { PressArea } from '@/shared/ui/PressArea/PressArea'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const frameImage = (index: number) => `./sprites/game_frame/${String(index).padStart(3, '0')}.png`
-const markImage = (frame: number) => `./sprites/game_frame/frames/${String(frame).padStart(3, '0')}.png`
+const frameImage = (index: number) => assetUrl(`./sprites/game_frame/${String(index).padStart(3, '0')}.png`)
+const markImage = (frame: number) => assetUrl(`./sprites/game_frame/frames/${String(frame).padStart(3, '0')}.png`)
 
 interface ScreenFrameProps {
   readonly title: ScreenFrameTitle

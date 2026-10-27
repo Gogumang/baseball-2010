@@ -1,6 +1,7 @@
 import { ABILITY_AXIS_ANGLES, abilityVertexOf } from '@/pages/create-player/lib/teamSelectLayout'
 import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 스페셜 목록 배치 (메인 메뉴 상태 6 — P6 2d).
@@ -369,7 +370,7 @@ export function hallOfFameChartVerticesOf(center: ChartPoint, values: readonly n
  */
 export const HALL_OF_FAME_DETAIL = { a: { x: 58, y: 110 }, b: { x: 178, y: 96 } } as const
 
-export const SLT_FRAME = './sprites/slt_frame'
+export const SLT_FRAME = assetUrl('./sprites/slt_frame')
 
 /**
  * 빈 칸 그림 (0x6535a~0x65432 확정).

@@ -8,10 +8,11 @@ import { drawFrameLayers, frameLayersUrl, placedFrameLayersOf, type FrameLayerLi
 import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as styles from '@/pages/title/ui/TitleScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SPRITE = './sprites/main_title'
+const SPRITE = assetUrl('./sprites/main_title')
 /** 판 번호는 main_title 이 아니라 ui/num.pzx 의 131 번 그림이다 (0x2cd2a: 기준 0x81 = 129 + 값 2) */
-const NUM_SPRITE = './sprites/num'
+const NUM_SPRITE = assetUrl('./sprites/num')
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320

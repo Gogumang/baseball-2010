@@ -33,6 +33,7 @@
  * 숫자 글자는 num.pzx 그림 20~29(주황, 6×10 · "1" 만 4×10)와 30~39(타순)다.
  */
 import { sineSixteen } from '@/shared/lib/math/originalTrigonometry'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 export interface CardBox {
   readonly x: number
@@ -67,9 +68,9 @@ export const BATTER_BOXES: readonly CardBox[] = [
   box(106, 24, 27, 13), box(104, 43, 29, 13), box(78, 43, 22, 13), box(43, 24, 21, 13),
 ]
 
-export const GAME_UI_FOLDER = './sprites/game_ui/frames'
-export const IMG_TEXT_FOLDER = './sprites/img_text/frames'
-export const NUM_FOLDER = './sprites/num'
+export const GAME_UI_FOLDER = assetUrl('./sprites/game_ui/frames')
+export const IMG_TEXT_FOLDER = assetUrl('./sprites/img_text/frames')
+export const NUM_FOLDER = assetUrl('./sprites/num')
 
 /** 판 바탕 그림 — game_ui 프레임 1(투수) · 2(타자) */
 export const PITCHER_CARD_FRAME = 1

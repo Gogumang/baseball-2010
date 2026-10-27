@@ -24,11 +24,12 @@ import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_IMAGE = './sprites/slt_frame'
+const SLT_IMAGE = assetUrl('./sprites/slt_frame')
 /** [skin+0xac] — 격자 칸 그림 (0~9 마선수 얼굴 · 10 "?") */
-const ACE_ICON = './sprites/ace_icon'
-const IMG_TEXT_FRAME = './sprites/img_text/frames'
+const ACE_ICON = assetUrl('./sprites/ace_icon')
+const IMG_TEXT_FRAME = assetUrl('./sprites/img_text/frames')
 
 /** 0xb6415(기록, i, 1) 네 칸 — 기록 칸 차례(투수도 같은 네 칸에 제구 · 구속 · 변화 · 체력) */
 const abilityValuesOf = (ability: { readonly hit: number; readonly power: number; readonly defense: number; readonly run: number }) =>

@@ -39,6 +39,7 @@ import {
   createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf,
 } from '@/pages/management/model/nariMainMenuCursor'
 import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 나만의리그 **투수편 관리 화면** — 원본 장면 **0x106** 의 상태 **105(허브)** 와 그 하위
@@ -114,7 +115,7 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
   const kind = menu.kind as PitcherCommandKind
   const slots = PITCHER_COMMAND_BAR[kind]
   const update = useUpdateCounter()
-  const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
+  const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   // 하위 메뉴가 선 채로 마운트되면(하위 창 119 · 122~124 · 108 이나 상점 111 · 121 에서 돌아옴) 그 하위 메뉴 객체의 커서 그대로,
   // 칸은 다 펼쳐져 있다(106 진입 0x11530 은 이전 105 일 때만 · 107 · 110 진입은 커서를 안 건드리고 펼침 0x7ff55 도 없다)
   const [state, setState] = useState(() => ({

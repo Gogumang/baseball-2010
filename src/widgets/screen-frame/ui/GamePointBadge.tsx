@@ -3,8 +3,9 @@ import {
 } from '@/widgets/screen-frame/lib/gamePointBadge'
 import type { GamePointBadgeArgs } from '@/widgets/screen-frame/lib/gamePointBadge'
 import * as styles from '@/widgets/screen-frame/ui/ScreenFrame.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const pointImage = (index: number) => `./sprites/gpoint/${String(index).padStart(3, '0')}.png`
+const pointImage = (index: number) => assetUrl(`./sprites/gpoint/${String(index).padStart(3, '0')}.png`)
 
 /**
  * **G 숫자 0x54a60** (판 ≠ 0 갈래) — 둥근 판 · G 동전 · "+" · 숫자. 자리 식은 `lib/gamePointBadge` 머리말.

@@ -14,6 +14,7 @@ import {
 } from '@/widgets/management/lib/titleListLayout'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as local from '@/widgets/management/ui/TitleListWindow.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface TitleListWindowProps {
   readonly career: PlayerCareer
@@ -29,8 +30,8 @@ interface TitleListWindowProps {
   readonly onTopChange?: (top: number) => void
 }
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const pad = (frame: number) => String(frame).padStart(3, '0')
 /** 0xca911(틱, 10) ≠ 0 — 고른 줄 테두리 깜박임 */
 const BLINK_PERIOD = 10
@@ -157,7 +158,7 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
               const left = digitLeft
               digitLeft += titleNumberWidthOf(digit)
               return (
-                <img key={digitIndex} className={styles.layer} alt="" src={`./sprites/num/${pad(Number(digit))}.png`}
+                <img key={digitIndex} className={styles.layer} alt="" src={assetUrl(`./sprites/num/${pad(Number(digit))}.png`)}
                   style={{ left, top: centeredTopOf(numberBox, TITLE_NUMBER_HEIGHT) + dy }} />
               )
             })}

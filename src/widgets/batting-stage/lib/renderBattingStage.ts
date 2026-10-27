@@ -112,6 +112,7 @@ import {
   type BigHitScreen,
 } from '@/widgets/batting-stage/lib/bigHitScreen'
 import { stageCameraShiftOf, type StageCamera } from '@/widgets/batting-stage/lib/hitCamera'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
 
@@ -1069,7 +1070,7 @@ function drawBatter(
  * ```
  * 카메라 (−120, −70) → 앵커 우타 (122, 256) · 좌타 (117, 256), 그림 왼쪽 위 우타 (104, 238) · 좌타 (99, 238).
  */
-const ZONE_FRAME_FOLDER = './sprites/slt_pitch/frames'
+const ZONE_FRAME_FOLDER = assetUrl('./sprites/slt_pitch/frames')
 const ZONE_FRAME_INDEX = 0x49
 const ZONE_ANCHOR_INSET = 2
 
@@ -1290,7 +1291,7 @@ function drawBallShadow(context: CanvasRenderingContext2D, pitch: Pitch, ballTic
 }
 
 /** ball.pzx 합성 프레임 — 원점이 공 가운데라 투영 좌표에 원점대로 놓는다 */
-const BALL_FRAMES = './sprites/ball/frames'
+const BALL_FRAMES = assetUrl('./sprites/ball/frames')
 
 /** 공 그림 (3b6ac 0xbe8d5) — 그림자는 `drawBallShadow`(3b388~3b422) */
 function drawBall(context: CanvasRenderingContext2D, pitch: Pitch, frame: number): void {

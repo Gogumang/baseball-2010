@@ -1,6 +1,7 @@
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 원작 타이틀 — `mainui/main_title.pzx` 의 **애니 0 · 1 을 프레임 그대로** 돌린다 (2026-10-24 직접 뜸).
@@ -41,7 +42,7 @@ import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
  * 곧 그리기 d 가 보이는 동안 누른 키는 d + 1 을 그린 뒤 d + 2 틀에 메뉴로 넘어간다(`TITLE_KEY_FRAMES_TO_MENU`).
  */
 
-export const TITLE_FRAMES = './sprites/main_title/frames'
+export const TITLE_FRAMES = assetUrl('./sprites/main_title/frames')
 
 /** 애니 0 — 인트로 (frames/animations.json [0], 테스트가 맞춰 본다) */
 export const INTRO_ANIMATION: readonly AnimationEntry[] = [

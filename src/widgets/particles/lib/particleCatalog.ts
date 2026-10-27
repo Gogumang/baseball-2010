@@ -1,5 +1,6 @@
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import { fetchSpriteJson } from '@/shared/lib/sprite/spriteJsonBundle'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * `public/sprites/ptcimg/particles.json` — `.ptc` 26개 설정을 불러온다.
@@ -19,7 +20,7 @@ interface ParticleCatalogFile {
   readonly emitters: readonly ParticleCatalogEntry[]
 }
 
-const CATALOG_URL = './sprites/ptcimg/particles.json'
+const CATALOG_URL = assetUrl('./sprites/ptcimg/particles.json')
 
 let catalog: readonly ParticleCatalogEntry[] | null = null
 let requested = false

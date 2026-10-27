@@ -20,10 +20,11 @@ import type { InGameMenuCloser, InGameMenuOpening } from '@/features/play-team-g
 import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import * as styles from '@/features/play-team-game/ui/InGameMenu.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 /** ui/num.pzx — 칸 번호 0xba689 의 글꼴 [[[장면+0x1014]+8]+8], 기준 그림 0 */
-const NUM = './sprites/num'
+const NUM = assetUrl('./sprites/num')
 /** num 그림 0~9 의 폭 (public/sprites/num/000~009.png — "1" 만 4, 나머지 8 · 높이 모두 10) */
 const NUM_DIGIT_WIDTHS = [8, 4, 8, 8, 8, 8, 8, 8, 8, 8] as const
 

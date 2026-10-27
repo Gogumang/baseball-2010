@@ -1,5 +1,6 @@
 import { placedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import { stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **홈런더비 투구 기계 `0x42f2c`** — 타석 화면 공용 그리기가 그리기 목록을 비운 뒤(0xbe6a1) · HUD 0x4c4bc 앞에 부른다
@@ -16,7 +17,7 @@ import { stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
  * 효과 0x11(좌우 뒤집기)은 투수 그림과 같은 축 잡기(`renderBattingStage.pitcherMirrorOf` — 근사, `drawBatter` 주석)로 옮긴다.
  */
 
-const TRAINING_FRAMES = './sprites/trainning/frames'
+const TRAINING_FRAMES = assetUrl('./sprites/trainning/frames')
 export const DERBY_MACHINE_FRAME = 0
 /** 원본 전역 모드 7 = 홈런더비 */
 export const HOME_RUN_DERBY_MODE = 7

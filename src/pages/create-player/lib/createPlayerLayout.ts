@@ -6,6 +6,7 @@ import {
 } from '@/pages/management/lib/basicInfoLayout'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 선수 등록 배치 (나만의리그 상태 0x66 — 진입 0x17360 · 갱신 0x16f28 · 그리기 **0x15f34**).
@@ -162,7 +163,7 @@ export const INFO_FRAME = { batter: 2, pitcher: 1 } as const
  * 세로 0x20 은 `(d >> 1) + d % 2`, d = R.h − 8 (15 → 4). 뒤집기 0x11 은 왼쪽 끝을 그대로 두고 그린다(환경설정 화살과 같은 쓰임).
  * 곧 왼쪽 화살은 값 칸 **안** 왼쪽 끝에, 오른쪽 화살은 값 칸 바로 **바깥** 오른쪽에 선다(원본 그대로).
  */
-export const ARROW = { image: './sprites/mode_ui/frames/024.png', width: 5, height: 8 } as const
+export const ARROW = { image: assetUrl('./sprites/mode_ui/frames/024.png'), width: 5, height: 8 } as const
 
 /** 화살 자리 — `step` < 0 왼쪽 · > 0 오른쪽 */
 export function arrowTopLeftOf(box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }, step: number) {

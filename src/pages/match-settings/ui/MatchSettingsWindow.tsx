@@ -34,11 +34,12 @@ import {
 import * as styles from '@/pages/match-settings/ui/MatchSettingsWindow.css'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_FRAMES = './sprites/slt_frame/frames'
-const SLT_IMAGES = './sprites/slt_frame'
-const POPUP_FRAMES = './sprites/popup/frames'
-const NUM_IMAGES = './sprites/num'
+const SLT_FRAMES = assetUrl('./sprites/slt_frame/frames')
+const SLT_IMAGES = assetUrl('./sprites/slt_frame')
+const POPUP_FRAMES = assetUrl('./sprites/popup/frames')
+const NUM_IMAGES = assetUrl('./sprites/num')
 
 const pngOf = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 

@@ -1,6 +1,7 @@
 import { placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **표시 구속 "Km" 판** — 타석 화면 공용 그리기 `0x4c4bc` 의 0x4c9fc~0x4cac8, 소프트키 글자(0x4c8e0) 뒤 · 필살 횟수 0x38a30 앞
@@ -19,8 +20,8 @@ import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayo
  * 표시 구속은 공을 놓을 때 0x34968 이 굴린 값이다(`entities/pitching/model/displaySpeed`, 공 객체 `displaySpeedKmh`).
  */
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const NUM_IMAGE = (index: number) => `./sprites/num/${String(index).padStart(3, '0')}.png`
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const NUM_IMAGE = (index: number) => assetUrl(`./sprites/num/${String(index).padStart(3, '0')}.png`)
 
 /** game_ui 프레임 20 — "Km" 판 (42 × 18, 원점 (−21, −18)) */
 export const PITCH_SPEED_PLATE_FRAME = 0x50 / 4

@@ -32,9 +32,10 @@ import { RivalryBandCanvas } from '@/widgets/game-scene/ui/RivalryBandCanvas'
 import { introCanvasOverlayOf } from '@/widgets/game-scene/ui/introCanvas'
 import type { SceneryBackdropStage } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 
 interface GameIntroProps {
   /**

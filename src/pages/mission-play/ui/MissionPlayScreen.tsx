@@ -46,6 +46,7 @@ import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBa
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface MissionPlayScreenProps {
   readonly run: MissionRun
@@ -193,7 +194,7 @@ interface MissionPlayScreenProps {
  */
 const MISSION_BATTER_MODE = 6
 /** `team_logo_ini` 작은 로고 — 팀 경기 · 타자편 화면과 같은 경로 */
-const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+const smallLogoUrlOf = (teamId: number) => assetUrl(`./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`)
 
 type MenuOverlay = '조작방법' | '설정'
 

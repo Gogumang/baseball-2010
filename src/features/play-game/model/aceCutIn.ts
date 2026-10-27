@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * **마선수 등장 컷인 `0x473f0`** — 교체 연출 0x16 의 그리기 0x4da30 이 "CHANGE" 애니(`substitutionScene`)를 그린 뒤
  * `+0x195c` 비트 2(들어온 선수가 마선수)면 4dafa 에서 부른다 (2026-10-08 직접 뜸, R2 11절을 줄 단위로 다시 맞춤).
@@ -49,7 +50,7 @@ export function aceCutInPortraitOf(aceSlot: number): { readonly folder: string; 
   const index = ACE_CUT_IN_PORTRAITS[aceSlot]
   if (index === undefined) return null
   const file = index >= 10 && index <= 13 ? 'event_char_1' : index >= 17 && index <= 22 ? 'event_char_2' : 'event_char_0'
-  return { folder: `./sprites/${file}/frames`, animation: PORTRAIT_ANIMATION_BASE[index] ?? 0 }
+  return { folder: assetUrl(`./sprites/${file}/frames`), animation: PORTRAIT_ANIMATION_BASE[index] ?? 0 }
 }
 
 /** 컷인 번호 — 0xb63a1(들어온 선수) 에 타자면 +5 (474c0) */

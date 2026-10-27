@@ -5,6 +5,7 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { CENTER_STAGE, stageSlideOffsetAt } from '@/pages/management/lib/centerStage'
 import type { StageCharacter } from '@/pages/management/lib/centerStage'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface CenterStageProps {
   /** 그리는 차례대로 (시즌: 코치 → 감독) */
@@ -31,7 +32,7 @@ export function CenterStage({ characters, slidesIn = false }: CenterStageProps) 
 }
 
 function StageSprite({ character, x, update }: { readonly character: StageCharacter; readonly x: number; readonly update: number }) {
-  const folder = `./sprites/${character.file}/frames`
+  const folder = assetUrl(`./sprites/${character.file}/frames`)
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   const entries = animations?.[character.animation]

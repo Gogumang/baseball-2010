@@ -1,10 +1,11 @@
 import { lineScorePlacementOf } from '@/widgets/line-score/lib/lineScoreLayout'
 import type { LineScoreGlyph, LineScoreState } from '@/widgets/line-score/lib/lineScoreLayout'
 import * as styles from '@/widgets/line-score/ui/LineScoreBoard.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FOLDER = './sprites/game_ui'
-const NUM_FOLDER = './sprites/num'
-const SMALL_LOGO_FOLDER = './sprites/team_logo_ini'
+const GAME_UI_FOLDER = assetUrl('./sprites/game_ui')
+const NUM_FOLDER = assetUrl('./sprites/num')
+const SMALL_LOGO_FOLDER = assetUrl('./sprites/team_logo_ini')
 const pad = (value: number) => String(value).padStart(3, '0')
 
 interface LineScoreBoardProps extends LineScoreState {

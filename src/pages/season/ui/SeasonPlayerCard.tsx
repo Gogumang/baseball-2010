@@ -27,10 +27,11 @@ import type { SeasonCardAbility } from '@/pages/season/lib/seasonPlayerDetail'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { TEAMS } from '@/shared/config/original/teams'
 import { alignedPositionOf } from '@/pages/shop/lib/equipmentWindowLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
-const SLT_FRAME = './sprites/slt_frame'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
 const BACKGROUND_HALF = { width: 31, height: 62 }
 /** num 20번대 숫자 높이 (관리 화면 레이더와 같다) */
 const NUMBER_HEIGHT = 10

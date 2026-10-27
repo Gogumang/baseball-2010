@@ -19,19 +19,20 @@ import {
   slotNameOf, slotProgressOf, specialTrainingIconFrameOf, specialTrainingTitleFrameOf, statusLabelOf,
 } from '@/widgets/special-swing/lib/specialTrainingWindow'
 import type { SpecialTrainingSide, SpecialTrainingState, TrainingBox } from '@/widgets/special-swing/lib/specialTrainingWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
-const MODE_ICON = './sprites/mode_icon'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const MODE_ICON = assetUrl('./sprites/mode_icon')
 /** mode_icon.mpl 팔레트 0(주황)으로 다시 칠한 아이콘 — tools/generate_management_sprites.py 가 만든다 */
-const ICON_ORANGE = './sprites/management/icon_selected_'
+const ICON_ORANGE = assetUrl('./sprites/management/icon_selected_')
 /** num 흰 숫자 0~9 (8×10, "1" 만 4×10) · "/" 101 (10×10) */
-const NUM = './sprites/num'
+const NUM = assetUrl('./sprites/num')
 const WHITE_DIGIT_HEIGHT = 10
 const SLASH_SIZE = 10
 const whiteDigitWidthOf = (digit: number) => (digit === 1 ? 4 : 8)
 /** G 동전 gpoint 11 (18×18) — 박스 3 에 정렬 0x21 · ox 2 */
-const G_COIN = { src: './sprites/gpoint/011.png', x: SPECIAL_TRAINING_COST_BOX.x + 2, y: SPECIAL_TRAINING_COST_BOX.y } as const
+const G_COIN = { src: assetUrl('./sprites/gpoint/011.png'), x: SPECIAL_TRAINING_COST_BOX.x + 2, y: SPECIAL_TRAINING_COST_BOX.y } as const
 const SCREEN = { width: 240, height: 320 } as const
 const pad3 = (frame: number) => String(frame).padStart(3, '0')
 const layer = { position: 'absolute', left: 0, top: 0, pointerEvents: 'none' } as const

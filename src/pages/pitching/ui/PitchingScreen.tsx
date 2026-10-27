@@ -58,6 +58,7 @@ import { MAGIC_TYPE_NUMBER } from '@/widgets/batting-stage/lib/pitchInputOverlay
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 투수 미션 타석 장면(`PitcherSideStage`)의 재료 — 세션이 든 마지막 공과 마운드 · 타석 그림 값.
@@ -157,7 +158,7 @@ function missionHudLimitsOf(run: PitcherRun): MissionLimitState {
   }
 }
 /** `team_logo_ini` 작은 로고 — 팀 경기 · 타자편 화면과 같은 경로 */
-const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+const smallLogoUrlOf = (teamId: number) => assetUrl(`./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`)
 
 interface PitchingScreenProps {
   readonly run: PitcherRun

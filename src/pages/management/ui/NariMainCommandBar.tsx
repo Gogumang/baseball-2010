@@ -3,6 +3,7 @@ import { COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
 import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 import type { NariMenuEnableInput } from '@/pages/management/lib/nariMenuEnable'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 칸 등장 0x7ff8c 가 다 내려온 뒤 — 메뉴는 105 진입 때 열려 이벤트가 끝날 무렵에는 제자리다 */
 const SETTLED_SLIDE_UPDATES = 1_000
@@ -28,7 +29,7 @@ export function NariMainCommandBar({ menuEnable, cursor, slideUpdates = SETTLED_
    */
   readonly slideUpdates?: number
 }) {
-  const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
+  const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   const labelWidths = Object.fromEntries(
     COMMAND_SLOTS.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
   )
