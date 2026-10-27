@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
-import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import { preRollContactMessage, type DefensePlayInput } from '@/features/defense-play/model/runDefensePlay'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchHitSceneTicksOf, pitcherHitSceneOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
@@ -14,6 +14,11 @@ export interface PitcherHitSceneState {
   readonly isShowing: boolean
   /** 장면이 0x17 이 선 틀에 부른다(`PitcherSideStage.onHitSceneEnd`) */
   readonly end: () => void
+  /**
+   * 장면이 **판정 틀**(0x6aa → 0x51408)에 부른다(`PitcherSideStage.onHitJudged`) — 메시지 0x11 굴림 묶음(필살수비 · 표시 패턴 · 두 공 폴 ·
+   * 필살타법)을 판 입력으로 미리 굴려(`preRollContactMessage`) 쏜 공에 묶고, 표시 패턴으로 다시 만든 0x13 재료를 돌려준다(A-37)
+   */
+  readonly judge: () => PitcherHitScene | null
 }
 
 /**
@@ -22,7 +27,8 @@ export interface PitcherHitSceneState {
  * 웹 진행기는 공을 놓는 순간(0x11 틱 10) 판정까지 내고 수비 판(`pendingDefensePlay`)을 세운다. 원본은 그 공이 판정 틀(스윙 F + 1 ·
  * 번트 N − 1)까지 0x11 을 날고, 0x13(맞은 직후 — 큰 타구면 문턱 + 7 틱)을 지나 0x17 로 간다(`pitcherSideStage.pitcherHitSceneOf`).
  * 이 훅은 새 수비 판이 쏜 공(`contactOfOutcome`)을 들고 있으면 그 판을 붙들어 두고, 장면이 0x17 이 선 틀을 알리면 놓는다.
- * 수비 판 입력은 굴림 없이 세운 값이라(판 시작 굴림은 `DefensePlayback` 이 판이 설 때 한다) 미뤄도 난수 차례는 그대로다.
+ * 수비 판 입력은 굴림 없이 세운 값이다. 메시지 0x11 굴림 묶음은 장면이 판정 틀에 `judge` 로 굴리고(0x13 그림의 파티클 굴림보다 앞 —
+ * 원본 차례), 나머지 판 굴림은 `DefensePlayback` 이 판이 설 때 한다. 장면이 판정 틀을 못 알리면 판 시작이 묶음까지 굴린다.
  * 화면이 설 때 이미 떠 있던 판(이어하기 따위)은 붙들지 않는다 — 그 공은 장면이 다시 날리지 않는다.
  * 장면이 못 알리는 자리(캔버스가 없는 시험 · 장면이 내려간 동안)를 위해 화면 쪽도 장면 틱으로 0x17 틱(`pitchHitSceneTicksOf`)을 세어
  * 한 틱 늦게 놓는다(웹 전용 안전판 — 장면의 알림이 먼저 온다).
@@ -35,8 +41,8 @@ export function usePitcherHitScene({
   aceOrder = null,
   isFrozen = false,
 }: {
-  /** 진행기가 세운 수비 판 — 쏜 공이 묶인 임시 결과(`outcome`)만 본다. 사람 수비 판이 아니면 null */
-  readonly play: { readonly outcome: AtBatOutcome } | null
+  /** 진행기가 세운 수비 판 — 쏜 공이 묶인 임시 결과(`outcome`)와 판정 틀에 미리 굴릴 입력. 사람 수비 판이 아니면 null */
+  readonly play: DefensePlayInput | null
   /** 그 판을 낸 공(진행기 `lastPitch`) */
   readonly pitch: Pitch | null
   readonly cpuSwing: CpuSwingPose | null
@@ -59,19 +65,42 @@ export function usePitcherHitScene({
     // 판 하나 · 공 하나에 한 번 — 타자 손은 판이 서는 그림의 값
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [play, pitch, mountedPlay])
-  const isShowing = hitScene !== null && play !== null && endedPlay !== play
+  /** 판정 틀에 굴려 다시 만든 0x13 재료 — 그 판의 것만 쓴다 */
+  const [judged, setJudged] = useState<{ readonly play: object; readonly scene: PitcherHitScene } | null>(null)
+  const shownScene = hitScene === null ? null : judged !== null && judged.play === play ? judged.scene : hitScene
+  const isShowing = shownScene !== null && play !== null && endedPlay !== play
   const end = useCallback(() => setEndedPlay(playRef.current), [])
-  // 안전판 — 0x17 틱 + 1 에 놓는다 (판마다 처음부터 센다)
-  const fallbackRef = useRef<{ readonly play: object | null; left: number }>({ play: null, left: 0 })
-  if (isShowing && hitScene !== null && fallbackRef.current.play !== play) {
-    fallbackRef.current = { play, left: pitchHitSceneTicksOf(hitScene, aceOrder) + HIT_SCENE_FALLBACK_SLACK_TICKS }
-  }
+  const sceneInputsRef = useRef({ pitch, cpuSwing, batterHand })
+  sceneInputsRef.current = { pitch, cpuSwing, batterHand }
+  const judge = useCallback((): PitcherHitScene | null => {
+    const current = playRef.current
+    const inputs = sceneInputsRef.current
+    if (current === null || inputs.pitch === null) return null
+    const contact = contactOfOutcome(current.outcome)
+    if (contact === undefined) return null
+    const shot = preRollContactMessage(current)
+    const scene = pitcherHitSceneOf(contact, inputs.cpuSwing, inputs.pitch.frameCount, inputs.batterHand, shot)
+    setJudged({ play: current, scene })
+    return scene
+  }, [])
+  // 안전판 — 0x17 틱 + 1 에 놓는다 (판마다 처음부터 센다). 길이는 지금 재료(판정 틀에 다시 만든 것)로 센다
+  const fallbackRef = useRef<{ readonly play: object | null; elapsed: number }>({ play: null, elapsed: 0 })
+  if (isShowing && fallbackRef.current.play !== play) fallbackRef.current = { play, elapsed: 0 }
+  const shownSceneRef = useRef(shownScene)
+  shownSceneRef.current = shownScene
   useSceneTick(() => {
     const fallback = fallbackRef.current
-    fallback.left -= 1
-    if (fallback.left <= 0 && fallback.play === playRef.current) setEndedPlay(fallback.play)
+    const scene = shownSceneRef.current
+    fallback.elapsed += 1
+    if (
+      scene !== null &&
+      fallback.elapsed >= pitchHitSceneTicksOf(scene, aceOrder) + HIT_SCENE_FALLBACK_SLACK_TICKS &&
+      fallback.play === playRef.current
+    ) {
+      setEndedPlay(fallback.play)
+    }
   }, isShowing && !isFrozen)
-  return { hitScene: isShowing ? hitScene : null, isShowing, end }
+  return { hitScene: isShowing ? shownScene : null, isShowing, end, judge }
 }
 
 /** 화면 쪽 안전판이 장면의 0x17 알림보다 늦게 서는 틱 수 */

@@ -112,6 +112,8 @@ export interface PitchingStageSource {
    */
   readonly hitScene?: PitcherHitScene | null
   readonly onHitSceneEnd?: () => void
+  /** 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴리고 표시 패턴의 0x13 재료를 돌려준다 (`usePitcherHitScene.judge`, A-37) */
+  readonly onHitJudged?: () => PitcherHitScene | null
   /**
    * 판(맞은 공 · 공 도착 판)이 섰지만 아직 0x17 전 — 장면이 0x11 끝 · 0x13 · 0x12 틱 0 을 그리는 동안. 원본은 그동안 상태 0x11 · 0x12 ·
    * 0x13 이라 구질 키 · 견제 · 0xe 의 OK 를 안 받는다('*' 는 0xd~0x15 라 받는다)
@@ -599,6 +601,7 @@ export function PitchingScreen({
               // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다 (투수편과 같다)
               hitScene={stage.hitScene ?? null}
               {...(stage.onHitSceneEnd === undefined ? {} : { onHitSceneEnd: stage.onHitSceneEnd })}
+              {...(stage.onHitJudged === undefined ? {} : { onHitJudged: stage.onHitJudged })}
               // 경기 칸(이닝 st[0x6b] · 공격 측 st[9] · 점수 0xb69b0 · 팀 st[0x28 + 칸]) — 타자 미션 화면과 같다
               hud={{
                 inning: run.game.inning + 1,

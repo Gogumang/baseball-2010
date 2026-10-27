@@ -349,6 +349,8 @@ export function MissionRoutes({
           // 0x3dfac 의 답(낫아웃이면 판정 칸을 지웠다) — 타석 화면이 0x12 틱 0 그림에 쓴다
           return session.handleMissionPitch(detail, isUncatchable, buntKind)
         }}
+        // 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린다 (A-37)
+        onContact={session.preRollContact}
         sceneBuntKind={sceneBuntKindRef.current}
         // 필살타법 — 나리 타자편 저장 선수의 번호(+0x18)와 이 미션 한 판의 남은 횟수 (0xaebe4 가 채운다)
         specialSwingNumber={stageBatter.specialSwingNumber}
@@ -853,7 +855,7 @@ interface MissionPitchSceneBeforePlay {
   /** 공 도착 판(도루 · 폭투)의 0x11 끝 · 0x12 틱 0 을 투구 장면이 그리는 중 — 주자 판(`pendingRunnerPlay`)을 아직 안 띄운다 */
   readonly isArrivalHolding: boolean
   /** 투구 화면 장면 재료에 얹을 값 (`PitchingStageSource`) */
-  readonly stage: Pick<PitchingStageSource, 'hitScene' | 'onHitSceneEnd' | 'isBeforePlay'>
+  readonly stage: Pick<PitchingStageSource, 'hitScene' | 'onHitSceneEnd' | 'onHitJudged' | 'isBeforePlay'>
 }
 
 /**
@@ -900,6 +902,8 @@ function useMissionPitchSceneBeforePlay(
     stage: {
       hitScene: hitScene.hitScene,
       onHitSceneEnd: hitScene.end,
+      // 판정 틀의 메시지 0x11 굴림 묶음 (A-37)
+      onHitJudged: hitScene.judge,
       isBeforePlay: hitScene.isShowing || isArrivalHolding,
     },
   }

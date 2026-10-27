@@ -235,6 +235,7 @@ import {
 } from '@/entities/batting/model/pinchHitAi'
 import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { contactOutcomeOfDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { enterSceneConfirm, enterSceneConfirmFromSubstitutionWindow } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
@@ -2644,6 +2645,25 @@ export function startBatterPitch(
   options: BatterOutcomeOptions = {},
 ): TeamGameProgress {
   return batterPitch(progress, detail, random, options, startBatterOutcome)
+}
+
+/**
+ * **사람 타석의 맞은 판정 틀 판 입력** — 타석 화면이 맞은 틀에 메시지 0x11 굴림 묶음을 미리 굴릴 때(`preRollContactMessage`, A-37) 쓴다.
+ * 0x13 뒤 `startBatterPitch` 가 세울 판(우리 타석 · 파울 각 공)과 같은 수비 · 쏜 공 · 난수다(투구 소모를 먹인 뒤의 경기 칸 —
+ * `batterPitch` 머리와 같다). 굴림 없이 만든다. 쏜 공이 없거나 우리 타석이 아니면 null.
+ */
+export function batterContactDefenseInputOf(
+  progress: TeamGameProgress,
+  detail: PitchOutcomeDetail,
+  random: RandomPort,
+  options: BatterOutcomeOptions = {},
+): DefensePlayInput | null {
+  if (!isBatterTurn(progress)) return null
+  const outcome = contactOutcomeOfDetail(detail)
+  const contact = outcome === null ? undefined : contactOfOutcome(outcome)
+  if (outcome === null || contact === undefined) return null
+  const thrown = throwOpponentPitch(progress, detail.pitchTypeNumber)
+  return batterDefenseInputOf(thrown, outcome, contact.pattern, random, options)
 }
 
 function batterPitch(

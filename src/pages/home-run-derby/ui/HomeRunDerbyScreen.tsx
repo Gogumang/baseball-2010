@@ -397,6 +397,8 @@ export function HomeRunDerbyScreen({
             fieldPlayShotsAt={fieldPlayShotsAt}
             random={random}
             onPitchResolved={(detail, _pitch, _isUncatchable, _buntKind, sceneTick) => session.onPitchResolved(detail, sceneTick)}
+            // 맞은 판정 틀 — 판 공 · [경기+0xf2c] 공의 폴 굴림 (A-37)
+            onContact={(detail) => session.preRollContact(detail)}
           />
         </div>
 

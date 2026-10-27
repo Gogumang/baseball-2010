@@ -51,9 +51,10 @@ import type {
   TeamGameSummary,
   TeamPitchInput,
 } from '@/features/play-team-game/model/teamGameFlow'
-import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { preRollContactMessage, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { batterContactDefenseInputOf } from '@/features/play-team-game/model/teamGameFlow'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import type { ContactMessageRoll, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
 import { replayCallsOnScreen } from '@/features/defense-play/model/judgeCall'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
@@ -132,6 +133,11 @@ export interface TeamGameSession {
      */
     /** 먹인 뒤의 진행 — 타석 화면이 공 도착의 판정 칸(`lastPitchJudgementCleared`)을 같은 틀에 읽는다 */
     readonly resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean, buntKind?: number) => TeamGameProgress
+    /**
+     * **맞은 판정 틀** — 메시지 0x11 굴림 묶음(필살수비 · 표시 패턴 · 두 공 폴 · 필살타법)을 이 공으로 설 판 입력으로 미리 굴린다(A-37).
+     * 0x13 뒤 `resolvePitch` 가 세우는 판은 쏜 공에 묶인 그 값을 되찾는다. 돌려준 쏜 공으로 타석 화면이 0x13 을 그린다
+     */
+    readonly preRollContact: (detail: PitchOutcomeDetail, buntKind: number) => ContactMessageRoll | null
     /**
      * 사람 타석의 필살 스윙이 나갔다 (0x4e136) — `BattingStage` 의 `onSpecialSwingUsed` 를 그대로 잇는다.
      * 인자는 줄인 뒤 남은 횟수다.
@@ -305,6 +311,10 @@ export function useTeamGame(
   const actions = useMemo(
     () => ({
       // 인플레이 타구가 나오면 **여기서 멈춘다** — 주자 처리는 수비 화면이 끝난 뒤다 (상태 0x17)
+      preRollContact: (detail: PitchOutcomeDetail, buntKind: number) => {
+        const input = batterContactDefenseInputOf(progressRef.current, detail, random, { buntKind })
+        return input === null ? null : preRollContactMessage(input)
+      },
       resolvePitch: (detail: PitchOutcomeDetail, isUncatchable?: boolean, buntKind?: number) =>
         step(
           // 판정 11(2스트라이크 번트 파울)은 파울 각 공 판이 판 끝 결과 코드 11 로 낸다(콜 62 는 판 결과 `played.buntFoulOut`).

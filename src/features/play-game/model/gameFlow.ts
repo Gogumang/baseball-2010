@@ -1224,6 +1224,20 @@ function withFoulRecords(progress: GameProgress, foulRecordIds: readonly number[
 }
 
 /**
+ * **맞은 판정 틀의 판 입력** — 타석 화면이 맞은 틀에 메시지 0x11 굴림 묶음을 미리 굴릴 때(`preRollContactMessage`, A-37) 쓴다.
+ * 그 공이 0x13 뒤 설 판(`startPlayerOutcome` · `startPlayerFoulPlay`)과 같은 수비 · 쏜 공 · 난수다. 쏜 공이 없으면 null.
+ */
+export function contactDefensePlayInputOf(
+  progress: GameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  options: PlayerOutcomeOptions = {},
+): DefensePlayInput | null {
+  const contact = contactOfOutcome(outcome)
+  return contact === undefined ? null : defensePlayInputOf(progress, outcome, contact.pattern, random, options)
+}
+
+/**
  * 진행기에 넘길 한 타구 — 능력치·난수·모드·수비 주체까지 다 여기서 채운다.
  * 이 객체를 만드는 데는 난수를 **한 번도 쓰지 않는다** (굴림은 전부 진행기 안에서 돈다).
  */

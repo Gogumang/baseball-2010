@@ -1,4 +1,5 @@
 import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
+import type { LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
 import { useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
@@ -89,6 +90,8 @@ interface MissionPlayScreenProps {
   readonly random: RandomPort
   /** 셋째 인자는 필살타법이 성공한 타구인가 · 넷째는 번트 종류 장면 +0xfdc (`BattingStage.onPitchResolved` 그대로) */
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => PitchResolvedReply | void
+  /** 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린 쏜 공 (`BattingStage.onContact`, A-37) */
+  readonly onContact?: (detail: PitchOutcomeDetail, buntKind: number) => LaunchedShot | null | undefined
   /**
    * 치는 선수의 **고른 필살 번호** (레코드 +0x18) — '0' 키 0x51dee 가 S+0x10 에 싣는다. 안 넘기면 0 = '0' 키 무시.
    */
@@ -211,6 +214,7 @@ export function MissionPlayScreen({
   bannerText,
   random,
   onPitchResolved,
+  onContact,
   specialSwingNumber,
   specialSwingRemaining,
   onSpecialSwingUsed,
@@ -482,6 +486,7 @@ export function MissionPlayScreen({
             aceLevels={aceLevels}
             {...(cpuMagic === undefined ? {} : { cpuMagic })}
             onPitchResolved={onPitchResolved}
+            onContact={onContact}
             onPickoff={onPickoff}
             flightProbeRef={flightProbeRef}
           />

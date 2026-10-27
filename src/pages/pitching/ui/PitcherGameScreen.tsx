@@ -1020,6 +1020,8 @@ function PitcherGameScene({
         // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다
         hitScene={pitcherHitScene.hitScene}
         onHitSceneEnd={pitcherHitScene.end}
+        // 판정 틀의 메시지 0x11 굴림 묶음 — 0x13 그림의 파티클 굴림보다 앞 (A-37)
+        onHitJudged={pitcherHitScene.judge}
         hud={{
           inning: progress.game.inning,
           half: progress.game.half,

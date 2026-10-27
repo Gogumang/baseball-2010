@@ -1330,6 +1330,8 @@ function TeamGameScene({
                   // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
                   return { judgementCleared: after.lastPitchJudgementCleared === true }
                 }}
+                // 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린다 (A-37)
+                onContact={actions.preRollContact}
                 flightProbeRef={flightProbeRef}
                 // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
                 onPickoff={(base) => actions.cpuPickoff(base)}
@@ -1364,6 +1366,8 @@ function TeamGameScene({
             // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다
             hitScene={teamHitScene.hitScene}
             onHitSceneEnd={teamHitScene.end}
+            // 판정 틀의 메시지 0x11 굴림 묶음 — 0x13 그림의 파티클 굴림보다 앞 (A-37)
+            onHitJudged={teamHitScene.judge}
             hud={{
               inning: game.inning,
               half: game.half,

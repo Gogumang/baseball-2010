@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
 import { startPlayClock } from '@/entities/collection/model/playClock'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
@@ -341,6 +342,8 @@ export interface HomeRunDerbySession {
 
   /** 둘째 인자는 타석 화면이 넘긴 틀의 장면 틱(`BattingStage.onPitchResolved` 다섯째 인자) — 없으면 지금 틱 */
   readonly onPitchResolved: (detail: PitchOutcomeDetail, sceneTick?: number) => void
+  /** 맞은 판정 틀 — 판 공 · [경기+0xf2c] 공의 폴 굴림을 이 틀에 돌리고 쏜 공을 돌려준다 (`BattingStage.onContact`, A-37) */
+  readonly preRollContact: (detail: PitchOutcomeDetail) => LaunchedShot | null
   /** 경기 중 메뉴 [다시하기] 예 — 새 경기 장면 (0x3c98e 모드 7 갈래, `restart` 머리말) */
   readonly restart: () => void
   /** 결과 창 [예] — 단계 > 0 이면 rand(1, 4) 를 하나 더 굴린 뒤 `restart` 와 같다 (0x40a08) */
@@ -642,6 +645,20 @@ export function useHomeRunDerby({
     enterNextPitch()
   }, [])
 
+  /**
+   * **맞은 판정 틀에 쏜 공** (A-37) — 원본은 맞은 틀의 0x51408 이 판 공(51188) · [경기+0xf2c] 공(5174c)을 쏘며 폴 굴림을 돌린 뒤
+   * 0x13 을 세운다(모드 7 이라 필살수비 · 표시 패턴은 없다 — 0x50fba). 그래서 0x13 그림의 파티클 굴림보다 앞이다. 타석 화면이 그 틀에
+   * `preRollContact` 를 부르면 여기서 깔아 두고, 0x13 뒤 `onPitchResolved` 가 같은 공이면 그 판을 쓴다
+   */
+  const contactShotRef = useRef<{ readonly detail: PitchOutcomeDetail; readonly batted: DerbyBattedBall } | null>(null)
+  const preRollContact = useCallback((detail: PitchOutcomeDetail) => {
+    contactShotRef.current = null
+    if (detail.pattern === undefined || runRef.current.isFinished) return null
+    const batted = derbyBattedBallOf(detail.pattern, randomRef.current, detail.batterHand)
+    contactShotRef.current = { detail, batted }
+    return { launchedPattern: detail.pattern, trajectory: batted.trajectory }
+  }, [])
+
   const onPitchResolved = useCallback((detail: PitchOutcomeDetail, sceneTick?: number) => {
     const passedTick = sceneTick ?? gameSceneTickNow()
     // 원본은 공 하나가 상태 0xf 에서 21 갱신 안에 끝날 수 없어 표시는 늘 그 전에 꺼진다 — 웹 타이머가 늦으면 여기서 먼저 끈다
@@ -673,7 +690,15 @@ export function useHomeRunDerby({
     // 필살타법은 더비 타석에 번호가 없어(`HomeRunDerbyScreen` 이 `specialSwingNumber` 를 안 넘김) 0x517e6 굴림 차례 문제가 없다.
     // 홈런 = 땅에 닿기 전에 담장선 · 폴을 넘은 페어 공(0x52720). 예전 웹은 타석의 임시 결과(`provisionalOutcomeOf`)로 정했다
     // 이어 [경기+0xf2c] 공(수평각 d)의 점 깔기 — 폴에 맞으면 굴림이 하나 더 (`derbyBattedBallOf` 머리말)
-    const batted = detail.pattern === undefined ? null : derbyBattedBallOf(detail.pattern, randomRef.current, detail.batterHand)
+    // 맞은 판정 틀에 이미 쏜 공이면(`preRollContact`) 그 판 — 굴림은 그 틀에 돌았다
+    const shot = contactShotRef.current
+    contactShotRef.current = null
+    const batted =
+      detail.pattern === undefined
+        ? null
+        : shot !== null && shot.detail === detail
+          ? shot.batted
+          : derbyBattedBallOf(detail.pattern, randomRef.current, detail.batterHand)
     // 판 안 소리 — 홈런 갈래 0x527c4 의 11 · 파울 공 낙구 0x5284a 의 25 "Foul!"(즉시, 그 공 틱에)
     // 공 틱 0 = 이 자리(타석 화면이 상태 0x13 을 지나 판을 넘긴 틀)의 장면 틱 — 판 시각은 그 틱의 머리라 판 안의 틱(소리 · 글자 창 ·
     // 키 틱 · 판 끝)이 모두 경기 장면 틱 격자에 선다. 판을 넘긴 틀의 틱은 타석 화면이 그 틀의 틱으로 넘긴다(`sceneTick`) — 이 자리에서
@@ -1000,6 +1025,7 @@ export function useHomeRunDerby({
     loadingTip,
     finishLoading,
     onPitchResolved,
+    preRollContact,
     restart,
     retryFromResult,
   }

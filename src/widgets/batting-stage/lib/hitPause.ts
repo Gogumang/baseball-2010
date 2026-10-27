@@ -200,7 +200,44 @@ export function hitBallTrajectoryOf(pattern: BattedBallPattern, batterHand: numb
 }
 
 /**
- * 방금 친 공의 궤적에서 0x13 판정에 쓸 값을 꺼낸다.
+ * **맞은 틀에 쏜 공** — 메시지 0x11(0x50faa)이 굴림을 다 마친 뒤 0x13 이 보는 것 (A-37, r314). 표시 패턴(+0xfcc)과 판 공 [+0x204]
+ * 의 궤적(폴 굴림까지 깐 것)이다. 부르는 쪽이 맞은 틀에 미리 굴린 묶음(`preRollContactMessage`)을 그대로 넘기면 된다.
+ */
+export interface LaunchedShot {
+  /** +0xfcc — 필살수비 창이 열리면 표시 패턴(5107c · 5112c), 아니면 쏜 패턴 */
+  readonly launchedPattern?: BattedBallPattern
+  /** 판 공 [+0x204] 궤적 — 51188 쏘기의 폴 굴림까지 깐 것 */
+  readonly trajectory?: {
+    readonly landingTick: number
+    readonly poleTick: number
+    readonly carryScale?: number
+  }
+}
+
+/**
+ * 0x13 이 보는 쏜 공의 값 — 각 0x406a4 는 +0xfcc, 낙구 · 폴 · 거리(0x392ac)는 판 공 [+0x204], 이른 넘김 0x406e8 은
+ * [경기+0xf2c] 공(+0xfcc + d, `hitBallTrajectoryOf`)이다. `board` 를 안 주면 쏜 패턴을 굴림 없이 깐다.
+ */
+export function launchedPauseInputOf(
+  resultCode: number,
+  pattern: BattedBallPattern,
+  batterHand: number,
+  board?: LaunchedShot['trajectory'],
+): HitPauseInput {
+  const trajectory = board ?? battedBallTrajectory(pattern)
+  return {
+    resultCode,
+    angle: pattern[0],
+    landingTick: trajectory.landingTick,
+    poleTick: trajectory.poleTick,
+    carryScale: trajectory.carryScale ?? 0,
+    // 이른 넘김은 [경기+0xf2c] 공 — 판 공과 수평각이 d 다른 공을 따로 깐다 (0x5174c)
+    earlyTick: earlyHitPauseTickOf(resultCode, hitBallTrajectoryOf(pattern, batterHand)),
+  }
+}
+
+/**
+ * 방금 친 공의 궤적에서 0x13 판정에 쓸 값을 꺼낸다 — 덱에서 방금 꺼낸 패턴으로(쏜 공을 모르는 호출).
  *
  * 원본은 타구 순간 공 객체에 깔아 둔 점 목록에서 `+0xaa0`(낙구 틱)·`+0xab0`(폴 틱)·`+0xac0`(거리)
  * 을 그대로 읽는다. 웹은 그 점 목록을 `battedBallFlight` 가 **근사로** 다시 만들므로
@@ -210,14 +247,5 @@ export function hitBallTrajectoryOf(pattern: BattedBallPattern, batterHand: numb
 export function pauseInputOf(resultCode: number, deck: PatternDeck, batterHand: number): HitPauseInput {
   const pattern = lastDrawnPattern(deck, resultCode)
   if (pattern === null) return { resultCode, angle: 90, landingTick: 0, poleTick: 0, carryScale: 0, earlyTick: null }
-  const trajectory = battedBallTrajectory(pattern)
-  return {
-    resultCode,
-    angle: pattern[0],
-    landingTick: trajectory.landingTick,
-    poleTick: trajectory.poleTick,
-    carryScale: trajectory.carryScale,
-    // 이른 넘김은 [경기+0xf2c] 공 — 판 공과 수평각이 d 다른 공을 따로 깐다 (0x5174c)
-    earlyTick: earlyHitPauseTickOf(resultCode, hitBallTrajectoryOf(pattern, batterHand)),
-  }
+  return launchedPauseInputOf(resultCode, pattern, batterHand)
 }

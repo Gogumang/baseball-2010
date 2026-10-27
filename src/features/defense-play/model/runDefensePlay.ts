@@ -1106,43 +1106,58 @@ export function isBallBeyondFence(tick: number, landingTick: number, fenceTick: 
 }
 
 /**
- * 타구 하나를 **시작 상태**로 세운다 — 포구 예보 · 필살수비 굴림 · 커버 배정까지.
- *
- * ⚠️ 난수는 여기서 **필살수비 굴림(최대 2번)만** 돈다. 펌블·악송구·레이저는 틱 안에서 돈다 —
- * 그 순서와 횟수가 씨앗 결과를 정하므로 자리를 옮기면 안 된다.
+ * 예보 0xb12d0 은 틱 구간을 자르지 않고 궤적 끝까지(t = 1 → 공+0x6c − 1) 한 표를 만들고, 0xb3b38 은 낙구 전 포구
+ * (우선순위 1~5)가 있으면 그것을, 없으면 6~8 갈래로 **바운드 뒤에 줍는 야수**를 고른다(P2 1a · 2a). 잡힐 뜬공인지는 이 예보가
+ * 정한다 — 플레이.vt94 = 0xb1b2c(+0x11c 가장 이른 포구 틱 ≤ 낙구 틱)가 0xa9e44(a9ed6)·0xaf918(af98e)에 넘기는 그 값이다.
+ * (예전 웹은 타석 결과 코드가 뜬공·직선타 아웃이면 낙구 전까지만, 그 밖이면 낙구 다음 틱부터 보도록 구간을 잘랐다 —
+ * 결과를 먼저 정한 웹 다리였다. 원본처럼 결과는 이 판의 끝 정산이 내므로 걷었다.)
  */
-export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
+const FULL_FORECAST_WINDOW = { from: 0, to: Number.POSITIVE_INFINITY }
+
+/**
+ * **메시지 0x11 의 굴림 묶음 결과** — 맞은 판정 틀(0x51408)이 0x13 을 세우기 전에 다 굴린 것 (A-37, r314):
+ * ```
+ * 515c0  0xbfbac(…, 0x11, 0, &+0xfcc) → 0x50faa
+ * 50fe6 · 51012  필살수비 A(점프) · B(슬라이딩) 굴림
+ * 5107c · 5112c  창이 열리면 표시 패턴(0xb097c · 0xb09ac rand)으로 +0xfcc 를 덮는다
+ * 51188  판 공 [+0x204] 쏘기 — 세계 0xbfed0 의 폴 굴림 rand(−25, 25)
+ * 5174c · 517ce  [+0xf2c] 공(+0xfcc + d) 쏘기 — 같은 폴 굴림
+ * 517e6  필살타법 성공 0x34c74
+ * ```
+ * 그 뒤 0x13(0x3d720 → 경로 0x33e34 · 이른 넘김 0x406e8 · 각 0x406a4 · 카메라 3f23e)이 서므로 0x13 은 전부 **표시 패턴**을 본다.
+ */
+export interface ContactMessageRoll {
+  /** 필살수비 창 — 점프(A) · 슬라이딩(B) */
+  readonly specialDefense: { readonly jumpUnlocked: boolean; readonly slideUnlocked: boolean }
+  /** 실제로 쏜 패턴 (+0xfcc — 창이 열리면 표시 패턴). 쏜 공이 없는 호출(시험 · 옛 길)은 없다 */
+  readonly launchedPattern: BattedBallPattern | undefined
+  /** 판 공 [+0x204] 의 궤적 — 쏜 패턴 · 폴 굴림까지 깐 것 */
+  readonly trajectory: BattedBallTrajectory
+  /** 폴 굴림으로 판 공 궤적을 다시 깔았는가 (예보를 다시 만든다) */
+  readonly relaid: boolean
+  /** 필살타법 성공 (0x517e6) — 결과를 넘겨받은 호출의 `isUncatchable` 은 따로 본다 */
+  readonly uncatchable: boolean
+}
+
+/** 맞은 틀에 미리 굴린 묶음 — 쏜 공(`BattedContact`) 하나에 한 번. 판 시작이 되찾는다 */
+const CONTACT_MESSAGE_ROLLS = new WeakMap<object, ContactMessageRoll>()
+
+/**
+ * 메시지 0x11 굴림 묶음을 **판 입력으로** 굴린다 — 판 시작(`startDefensePlay`)과 맞은 틀(`preRollContactMessage`)이 같은 셈을 쓴다.
+ * 난수를 안 준 입력(예측 · 시험)은 하나도 굴리지 않는다.
+ */
+function rollContactMessage(input: DefensePlayInput): ContactMessageRoll {
   let trajectory = input.trajectory
-  const abilities =
-    input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
-  const speedOf = (fromBase: number) =>
-    runnerSpeedOf(
-      input.runAbilities?.[fromBase as 0 | 1 | 2 | 3] ?? input.runAbility ?? DEFAULT_ABILITY,
-      input.runnerTeamGrade ?? 0,
-    )
-  const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
-
-  let fielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
-  // 결과를 넘겨받은 호출(옛 길 · 시험)이 미리 굴려 둔 필살타법 성공. 쏜 공(`contactOfOutcome`)의 필살 스윙은 아래 0x517e6 자리에서 굴린다
-  let uncatchable = input.isUncatchable === true
-
-  // ── 포구 예보 ──
-  // 원본 예보 0xb12d0 은 틱 구간을 자르지 않고 궤적 끝까지(t = 1 → 공+0x6c − 1) 한 표를 만들고, 0xb3b38 은 낙구 전 포구
-  // (우선순위 1~5)가 있으면 그것을, 없으면 6~8 갈래로 **바운드 뒤에 줍는 야수**를 고른다(P2 1a · 2a). 잡힐 뜬공인지는 이 예보가
-  // 정한다 — 플레이.vt94 = 0xb1b2c(+0x11c 가장 이른 포구 틱 ≤ 낙구 틱)가 0xa9e44(a9ed6)·0xaf918(af98e)에 넘기는 그 값이다.
-  // (예전 웹은 타석 결과 코드가 뜬공·직선타 아웃이면 낙구 전까지만, 그 밖이면 낙구 다음 틱부터 보도록 구간을 잘랐다 —
-  // 결과를 먼저 정한 웹 다리였다. 원본처럼 결과는 이 판의 끝 정산이 내므로 걷었다.)
-  const window = { from: 0, to: Number.POSITIVE_INFINITY }
-  // 플레이 +0x127 — 패턴 플래그 비트 1 (0x514e6). 예보 · 추적야수가 낙구 지점으로 달린다
-  const landingChase = trajectory.landingChase === true
-  const chase = { chaseToLanding: landingChase }
+  const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
+  const fielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
+  const window = FULL_FORECAST_WINDOW
+  const chase = { chaseToLanding: trajectory.landingChase === true }
   let forecast = forecastCatch(trajectory, fielders, window, chase)
 
   // ── 필살수비 굴림 (메시지 0x11 = 타구가 떠난 순간, I-controls 2c) ──
   // A(점프, +0x1f5) 를 먼저 굴리고 실패했을 때만 B(슬라이딩, +0x1f6). 창을 여는 것뿐이라
   // 보통 포구가 낙구 전에 되면 쓰이지 않는다 (고르기 우선순위 4·5 — P2 3절).
-  // 원본은 "이미 고른 추적야수" 의 칸으로 조건을 보므로 여기서도 예보를 한 번 돌린 뒤에 굴리고,
-  // 창이 열리면 예보(0xb12d0 = vt24)를 다시 만든다 — 원본도 vt24 를 여러 번 부른다.
+  // 원본은 "이미 고른 추적야수" 의 칸으로 조건을 보므로 여기서도 예보를 한 번 돌린 뒤에 굴린다
   const specialDefense = rollSpecialDefenseFor({
     random: input.random,
     ability: abilities[forecast.choice.slot] ?? DEFAULT_ABILITY,
@@ -1179,14 +1194,6 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   const rolledTrajectory = trajectoryWithRandom(trajectory, input.random)
   const relaid = rolledTrajectory !== trajectory
   trajectory = rolledTrajectory
-  if (relaid) forecast = forecastCatch(trajectory, fielders, window, chase)
-  if (specialDefense.jumpUnlocked || specialDefense.slideUnlocked || relaid) {
-    forecast = forecastCatch(trajectory, fielders, window, {
-      ...chase,
-      jumpUnlocked: specialDefense.jumpUnlocked,
-      slideUnlocked: specialDefense.slideUnlocked,
-    })
-  }
   // ── [경기+0xf2c] 공 쏘기 + 세계 0xbfed0 (0x51408 5174c · 517ce) — 판 공과 수평각만 d 다른 공(`earlyPassPatternOf`, 50faa 가
   // 고친 +0xfcc 그대로 + d). 그 공도 점을 깔며 폴에 맞으면 rand(−25, 25) 를 하나 굴린다 — 판 공 굴림 뒤 · 필살타법 굴림 앞.
   // 궤적은 이른 넘김(상태 0x13 0x406e8)만 보고 판은 안 본다 — 여기서는 굴림 차례만 맞춘다. 손을 모르는 결과(시험 · 옛 길)는 건너뛴다
@@ -1197,10 +1204,74 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   // 51188 쏘기의 폴 굴림) · [경기+0xf2c] 의 폴 굴림 **뒤**다. 515c6 과 517e6 사이(0x392ac · 0x35988 · 0x39304 · 0x34be0 · 0xac758 ·
   // 메시지 0xbc5 진동 · 0x494b4 · 0xae89c)에는 그 밖의 굴림이 없다(호출 그래프). 성공하면 517ec 0xaf180(공+0x5c, 4) — 포구 틱 b4246 이 보고 0xbc3.
   // 예전 웹은 타석 판정 안(방향 · 패턴 바로 뒤)에서 굴려 필살수비 · 폴 굴림보다 앞섰고, "필살타법 타구면 필살수비를 안 굴린다"
-  // 를 두었다 — 원본 차례에서는 필살수비를 굴릴 때 성공 여부를 아직 모른다
-  if (!uncatchable && swungContact?.specialSwing !== undefined && input.random !== undefined) {
-    uncatchable = rollSpecialSwing(swungContact.specialSwing.number, input.random, swungContact.specialSwing.isAceBatter)
-  }
+  // 를 두었다 — 원본 차례에서는 필살수비를 굴릴 때 성공 여부를 아직 모른다. 결과를 넘겨받은 호출이 이미 성공을 실었으면 굴리지 않는다
+  const uncatchable =
+    input.isUncatchable !== true && swungContact?.specialSwing !== undefined && input.random !== undefined
+      ? rollSpecialSwing(swungContact.specialSwing.number, input.random, swungContact.specialSwing.isAceBatter)
+      : false
+  return { specialDefense, launchedPattern, trajectory, relaid, uncatchable }
+}
+
+/**
+ * **맞은 판정 틀에 메시지 0x11 굴림 묶음을 미리 굴린다** (A-37, r314) — 사람 타격 화면(타자편 `BattingStage` · 사람 투구 장면의
+ * CPU 타자)이 판정 틀에 부른다. 판 입력은 그 판이 설 때와 같은 것(같은 수비 · 같은 쏜 공 · 같은 난수)이어야 한다.
+ * 굴린 묶음은 쏜 공(`contactOfOutcome(input.outcome)`)에 묶여 판 시작(`startDefensePlay`)이 되찾는다 — 같은 공은 두 번 굴리지 않는다.
+ * 쏜 공이 없거나 난수가 없는 입력은 굴리지 않고 null.
+ */
+export function preRollContactMessage(input: DefensePlayInput): ContactMessageRoll | null {
+  const contact = contactOfOutcome(input.outcome)
+  if (contact === undefined || input.random === undefined) return null
+  const rolled = CONTACT_MESSAGE_ROLLS.get(contact)
+  if (rolled !== undefined) return rolled
+  const roll = rollContactMessage(input)
+  CONTACT_MESSAGE_ROLLS.set(contact, roll)
+  return roll
+}
+
+/** 이 쏜 공에 맞은 틀이 미리 굴린 묶음 — 없으면 undefined */
+export function contactMessageRollOf(contact: object): ContactMessageRoll | undefined {
+  return CONTACT_MESSAGE_ROLLS.get(contact)
+}
+
+/**
+ * 타구 하나를 **시작 상태**로 세운다 — 포구 예보 · 필살수비 굴림 · 커버 배정까지.
+ *
+ * ⚠️ 난수는 여기서 **필살수비 굴림(최대 2번)만** 돈다. 펌블·악송구·레이저는 틱 안에서 돈다 —
+ * 그 순서와 횟수가 씨앗 결과를 정하므로 자리를 옮기면 안 된다.
+ */
+export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
+  const abilities =
+    input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
+  const speedOf = (fromBase: number) =>
+    runnerSpeedOf(
+      input.runAbilities?.[fromBase as 0 | 1 | 2 | 3] ?? input.runAbility ?? DEFAULT_ABILITY,
+      input.runnerTeamGrade ?? 0,
+    )
+  const maximumTicks = input.maximumTicks ?? DEFAULT_MAXIMUM_TICKS
+
+  let fielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
+  const window = FULL_FORECAST_WINDOW
+  // 플레이 +0x127 — 패턴 플래그 비트 1 (0x514e6). 예보 · 추적야수가 낙구 지점으로 달린다
+  const landingChase = input.trajectory.landingChase === true
+  const chase = { chaseToLanding: landingChase }
+
+  // ── 메시지 0x11 굴림 묶음 (필살수비 · 표시 패턴 · 두 공 폴 · 필살타법) ──
+  // 원본은 맞은 판정 틀(0x51408 515c0 → 0x50faa · 5174c · 517e6)에서 굴린다. 사람 타격 화면은 그 틀에 미리 굴려 쏜 공에 묶어 두고
+  // (`preRollContactMessage`) 판은 그 값을 되찾는다 — 0x13 그림의 파티클 굴림이 그 사이에 든다. 미리 굴리지 않은 판(머리 없는 진행 ·
+  // 시험)은 여기서 굴린다 — 맞은 틀과 판 시작 사이에 다른 굴림이 없으니 차례가 같다
+  const swungContact = contactOfOutcome(input.outcome)
+  const message = (swungContact === undefined ? undefined : CONTACT_MESSAGE_ROLLS.get(swungContact)) ?? rollContactMessage(input)
+  const { specialDefense, launchedPattern, trajectory } = message
+  const uncatchable = message.uncatchable || input.isUncatchable === true
+  // 예보 0xb12d0 (vt24) — 원본은 굴림 사이사이 여러 번 다시 만든다. 마지막 것은 쏜 궤적 · 열린 창으로 만든 표다
+  const forecast =
+    specialDefense.jumpUnlocked || specialDefense.slideUnlocked || message.relaid
+      ? forecastCatch(trajectory, fielders, window, {
+          ...chase,
+          jumpUnlocked: specialDefense.jumpUnlocked,
+          slideUnlocked: specialDefense.slideUnlocked,
+        })
+      : forecastCatch(trajectory, fielders, window, chase)
   // 잡힐 뜬공인가(vt94) — 고른 포구가 낙구 전(0xb3b38 우선순위 1~5)일 때. 점프·슬라이딩 창이 열려 낙구 전 포구가 생기면
   // 그것도 뜬공이다. 필살타법 타구(공 속성 4 = 필살타법 표시)는 아무도 쥐지 않는다. 실제 뜬공 아웃(state[0x1f])은 쥐는 틱의 0xb36d0 이 낸다
   const onTheFly = !uncatchable && forecast.choice.catchTick <= trajectory.landingTick
@@ -1284,9 +1355,14 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     runners,
   )
 
+  // 큰 타구 감상 플래그 0x392ac(515e0)는 0x50faa 뒤의 쏜 판 공을 본다 — 표시 패턴 · 폴 굴림으로 다시 깐 공이면 그 공으로 다시 본다
+  const watchedInput =
+    trajectory === input.trajectory || input.bigHitWatch !== undefined
+      ? input
+      : { ...input, bigHitWatch: bigHitWatchOf({ outcome: input.outcome, trajectory }) }
   return {
     // 판 시작이 굴린 필살타법 성공(0x517e6)을 입력 칸에 적어 둔다 — 결과의 `isUncatchable` 이 그 값을 낸다
-    input: uncatchable === (input.isUncatchable === true) ? input : { ...input, isUncatchable: uncatchable },
+    input: uncatchable === (input.isUncatchable === true) ? watchedInput : { ...watchedInput, isUncatchable: uncatchable },
     trajectory,
     abilities,
     maximumTicks,

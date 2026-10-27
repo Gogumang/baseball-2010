@@ -1,4 +1,5 @@
 import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
+import type { LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { useEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
@@ -87,6 +88,8 @@ interface GameScreenProps {
   /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
   /** 넷째 인자는 이 공의 번트 종류(장면 +0xfdc, `BattingStage.onPitchResolved`) — 타구 판 리드(0x3d7b8)가 본다 */
   readonly onPitchResolved: (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number) => PitchResolvedReply | void
+  /** 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린 쏜 공 (`BattingStage.onContact`, A-37) */
+  readonly onContact?: (detail: PitchOutcomeDetail, buntKind: number) => LaunchedShot | null | undefined
   /** 경기를 그만두고 메인 메뉴로 (이 경기 기록은 사라진다) */
   readonly onQuit: () => void
   /**
@@ -173,6 +176,7 @@ export function GameScreen({
   bannerText,
   random,
   onPitchResolved,
+  onContact,
   onQuit,
   onSteal,
   onPickoff,
@@ -479,6 +483,7 @@ export function GameScreen({
             isBatterOwnPlayer
             careerYearIndex={career.season - 1}
             onPitchResolved={onPitchResolved}
+            onContact={onContact}
             flightProbeRef={flightProbeRef}
             onPickoff={onPickoff}
           />
