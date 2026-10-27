@@ -122,6 +122,54 @@ describe('단계 1 — 구장 고르기', () => {
   })
 })
 
+describe('숫자키 — 키 0x2896c (단계 0 날 키 · 단계 1 구장 격자 숫자키 꼴 1, Q-14)', () => {
+  it("단계 0: '4' '6' 은 커서를 뒤집고 ↓ '8' '5' 는 OK 다 · ↑ 는 아무 일 없다", () => {
+    const onMoveFirstBat = vi.fn()
+    const onChooseFirstBat = vi.fn()
+    const onCancel = vi.fn()
+    띄우기({ playerSide: PLAYER_SIDE_LAST_BAT, onMoveFirstBat, onChooseFirstBat, onCancel })
+
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: '6' })
+    expect(onMoveFirstBat).toHaveBeenCalledTimes(2)
+    expect(onMoveFirstBat).toHaveBeenLastCalledWith(PLAYER_SIDE_FIRST_BAT)
+
+    for (const key of ['ArrowDown', '8', '5']) fireEvent.keyDown(window, { key })
+    expect(onChooseFirstBat).toHaveBeenCalledTimes(3)
+    expect(onChooseFirstBat).toHaveBeenLastCalledWith(PLAYER_SIDE_LAST_BAT)
+
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: '2' })
+    expect(onMoveFirstBat).toHaveBeenCalledTimes(2)
+    expect(onChooseFirstBat).toHaveBeenCalledTimes(3)
+    expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  it("단계 1: '4' '6' 은 구장을 넘기고 '5' 는 OK · ↑ '2' 는 CLR 처럼 단계 0 으로 · ↓ '8' 은 아무 일 없다", () => {
+    const onMoveStadium = vi.fn()
+    const onChooseStadium = vi.fn()
+    const onCancel = vi.fn()
+    띄우기({ phase: FIRST_BAT_PHASE.구장, stadiumId: 0, onMoveStadium, onChooseStadium, onCancel })
+
+    fireEvent.keyDown(window, { key: '6' })
+    expect(onMoveStadium).toHaveBeenLastCalledWith(1)
+    fireEvent.keyDown(window, { key: '4' })
+    expect(onMoveStadium).toHaveBeenLastCalledWith(STADIUM_COUNT - 1)
+
+    fireEvent.keyDown(window, { key: '5' })
+    expect(onChooseStadium).toHaveBeenCalledWith(0)
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    fireEvent.keyDown(window, { key: '8' })
+    expect(onCancel).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    fireEvent.keyDown(window, { key: '2' })
+    expect(onCancel).toHaveBeenCalledTimes(2)
+    expect(onMoveStadium).toHaveBeenCalledTimes(2)
+    expect(onChooseStadium).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('CLR', () => {
   it('되돌아가기를 부른다', () => {
     const onCancel = vi.fn()

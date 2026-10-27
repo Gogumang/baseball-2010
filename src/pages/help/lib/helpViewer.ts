@@ -31,10 +31,11 @@ export function openHelpViewer(chapter: number, isLocked: boolean): HelpViewerSt
 }
 
 /**
- * 원본 키 — 위 −1 · 아래 −2 · 왼 −3 · 오른 −4 · OK −5 · CLR −16 (I-controls 키 코드).
- * `'2'`·`'8'` 은 줄 넘기기 `0x61ce4` 만 받는다(0x61cf4 `cmp 0x32` · 0x61cf8 `cmp 0x38`) — 점프표 `0xd1dbc` 에는 없다.
+ * 원본 키 — 위 −1 · 아래 −2 · 왼 −3 · 오른 −4 · OK −5 · CLR −16 (I-controls 키 코드). **격자 [skin+0x454] 가 바꾼 뒤의 키**다:
+ * 숫자키 꼴 1 이라 '2' '8' '4' '6' '5' 는 여기 오기 전에 ↑ ↓ ← → OK 가 된다(0x6c096 · 표 0xd2e7c — Q-14).
+ * 줄 넘기기 `0x61ce4` 의 `'2'`(0x61cf4 `cmp 0x32`) · `'8'`(0x61cf8 `cmp 0x38`) 비교는 뷰어 길에서는 닿지 않는다.
  */
-export type HelpViewerKey = '위' | '아래' | '왼' | '오른' | 'OK' | 'CLR' | '2' | '8'
+export type HelpViewerKey = '위' | '아래' | '왼' | '오른' | 'OK' | 'CLR'
 
 /** 키 하나를 먹은 뒤 — `'닫기'` 면 뷰어를 닫는다 */
 export type HelpViewerStep = HelpViewerState | '닫기'
@@ -44,16 +45,16 @@ const BROWSABLE_CHAPTER_COUNT = HELP_LAST_BROWSABLE_CHAPTER + 1
 /**
  * 쪽 보기의 줄 넘기기 **0x61ce4** — 0x637fc 가 `+0xe5 == 0`(쪽 보기)일 때만 점프표보다 먼저 부른다.
  * ```
- * 61cfe  위 −1 · '2':  전체 > 보이는 줄 && 맨 윗줄 > 0 이면  맨 윗줄−− · 손잡이 −= 걸음 (0 에서 멈춤)
- * 61d3e  아래 −2 · '8': 전체 > 보이는 줄 && 맨 윗줄 + 보이는 줄 < 전체 이면  맨 윗줄++ · 손잡이 += 걸음 (막대 − 10 에서 멈춤)
+ * 61cfe  위 −1:  전체 > 보이는 줄 && 맨 윗줄 > 0 이면  맨 윗줄−− · 손잡이 −= 걸음 (0 에서 멈춤)
+ * 61d3e  아래 −2: 전체 > 보이는 줄 && 맨 윗줄 + 보이는 줄 < 전체 이면  맨 윗줄++ · 손잡이 += 걸음 (막대 − 10 에서 멈춤)
  * ```
  */
 function scrollHelpText(state: HelpViewerState, key: HelpViewerKey, lineCount: number): HelpViewerState {
   const { maxTop } = helpScrollMetricsOf(lineCount)
-  if (key === '위' || key === '2') {
+  if (key === '위') {
     return maxTop > 0 && state.scrollTop > 0 ? { ...state, scrollTop: state.scrollTop - 1 } : state
   }
-  if (key === '아래' || key === '8') {
+  if (key === '아래') {
     return maxTop > 0 && state.scrollTop < maxTop ? { ...state, scrollTop: state.scrollTop + 1 } : state
   }
   return state
@@ -62,7 +63,7 @@ function scrollHelpText(state: HelpViewerState, key: HelpViewerKey, lineCount: n
 /**
  * 뷰어 키 **0x637d0** (점프표 `0xd1dbc` = 키 + 16):
  * ```
- * 637fc  +0xe5 == 0(쪽 보기)이면 0x61ce4(뷰어, 키) — 위·'2' / 아래·'8' 로 글 줄을 올리고 내린다
+ * 637fc  +0xe5 == 0(쪽 보기)이면 0x61ce4(뷰어, 키) — 위 / 아래로 글 줄을 올리고 내린다
  * −5 OK · −2 아래 → 63828  잠김이면 끝 · 장 고르기면 +0xe5 = 0(쪽 보기로)
  * −16 CLR        → 63840  잠김 → 닫기 · 장 고르기 → 닫기 · 쪽 보기 → +0xe5 = 1(장 고르기로)
  * −3 왼          → 638a0  장 고르기: +0xfc = 0 · 장 = 장 > 0 ? 장 − 1 : 5 / 쪽 보기: 쪽 = 쪽 > 0 ? 쪽 − 1 : 쪽수 − 1
@@ -84,7 +85,7 @@ export function stepHelpViewer(
   pageCount: number,
   lineCount = 0,
 ): HelpViewerStep {
-  // 0x637f4 — 쪽 보기면 줄 넘기기를 먼저 (위·아래·'2'·'8' 만 본다)
+  // 0x637f4 — 쪽 보기면 줄 넘기기를 먼저 (위·아래만 본다)
   const scrolled = state.isChoosingChapter ? state : scrollHelpText(state, key, lineCount)
   switch (key) {
     case 'OK':
@@ -104,8 +105,6 @@ export function stepHelpViewer(
       return { ...state, page: (state.page + step + pageCount) % pageCount, scrollTop: 0 }
     }
     case '위':
-    case '2':
-    case '8':
       return scrolled
   }
 }

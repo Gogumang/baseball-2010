@@ -63,21 +63,29 @@ interface HelpScreenProps {
 }
 
 /**
- * 웹 키 → 원본 키 (위 −1 · 아래 −2 · 왼 −3 · 오른 −4 · OK −5 · CLR −16).
- * '2'·'8' 은 쪽 보기의 줄 넘기기 0x61ce4 만 받는다. '4'·'5'·'6' 은 0x637d0 이 안 본다.
+ * 웹 키 → 원본 키 (위 −1 · 아래 −2 · 왼 −3 · 오른 −4 · OK −5 · CLR −16) — **격자가 바꾼 키**다 (Q-14, 직접 떴다).
+ * 뷰어 키 0x637d0 은 맨 앞(637d2~637e8)에서 날 키를 격자 [skin+0x454] 의 vt+0x18(0x6c299 → 0x6c521 → 0x6c031)에 넘기고
+ * **돌려받은 값(r6)** 으로 줄 넘기기 0x61ce4 와 점프표 0xd1dbc(63816 `r6 + 0x10`)를 고른다. 그 격자는 뷰어 열기 0x63688 의
+ * `vt+0x1c(3, 1, 숫자키 꼴 1, 0x10)`(6371a) 라 0x6c096 이 표 0xd2e7c 로 '2' → −1 · '8' → −2 · '4' → −3 · '6' → −4 · '5' → −5 로
+ * 바꾼다. 그래서 숫자 '2' '8' 은 ↑ ↓ 와 똑같이 가고(장 고르기의 '8' 도 쪽 보기로 든다), '4' '6' 은 ← →, '5' 는 OK 다.
+ * 0x61ce4 의 '2'(0x32) · '8'(0x38) 비교(61cf4 · 61cf8)는 날 키를 넘기는 다른 부르는 곳(0x2b7a0 · 0x2d370 · 0x407f0) 몫이고
+ * 뷰어 길에서는 닿지 않는다 — r207 머리말의 "'4'·'5'·'6' 은 안 본다" 는 바꾸기 전 키를 본 잘못이었다.
  */
 const viewerKeyOf = (key: string): HelpViewerKey | null => {
   switch (key) {
-    case 'ArrowUp': return '위'
-    case 'ArrowDown': return '아래'
-    case 'ArrowLeft': return '왼'
-    case 'ArrowRight': return '오른'
+    case 'ArrowUp':
+    case '2': return '위'
+    case 'ArrowDown':
+    case '8': return '아래'
+    case 'ArrowLeft':
+    case '4': return '왼'
+    case 'ArrowRight':
+    case '6': return '오른'
     case 'Enter':
-    case ' ': return 'OK'
+    case ' ':
+    case '5': return 'OK'
     case 'Escape':
     case 'Backspace': return 'CLR'
-    case '2': return '2'
-    case '8': return '8'
     default: return null
   }
 }
