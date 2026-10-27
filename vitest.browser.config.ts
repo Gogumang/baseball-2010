@@ -41,6 +41,24 @@ const touchTap: BrowserCommand<[x: number, y: number]> = async (context, x, y) =
 
 export default defineConfig({
   ...viteConfig,
+  /**
+   * 시험이 닿는 바깥 꾸러미를 **첫 실행 전에 미리 묶는다.** 빠지면 캐시(`node_modules/.vite/vitest/…/deps`)가 빈 첫 실행에서
+   * vite 가 도중에 새 꾸러미(예: `src/app/main.tsx` 의 `react-dom/client`)를 찾아 다시 묶고 페이지를 다시 불러,
+   * 묶음 해시(`?v=`)가 다른 react 가 두 벌 실린다 → 80 개 중 14~20 개가 `Cannot read properties of null (reading 'useState')`.
+   * 두 번째 실행부터는 캐시에 다 있어 통과했다. 이 칸은 시험 설정에만 있어 `yarn build` · dev 서버와는 무관하다.
+   * 시험에서 새 바깥 꾸러미를 import 하면 여기에도 더할 것(실행 기록에 "optimized dependencies changed. reloading" 이 뜨면 빠진 것).
+   */
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+      '@testing-library/react',
+      '@vanilla-extract/css',
+    ],
+  },
   test: {
     include: ['src/**/*.browser.test.tsx'],
     setupFiles: [
