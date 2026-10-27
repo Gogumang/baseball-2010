@@ -69,6 +69,15 @@ describe('단계 0 — 종류 고르기', () => {
     expect(screen.getByText(/시작 이닝을 선택하여 경기/)).toBeTruthy()
   })
 
+  it("숫자키도 받는다 — 0x5ffcc 종류 단계 '8' 아래(6002e) · '2' 위(60028)", () => {
+    띄우기()
+
+    누르기('8')
+    expect(screen.getByText(/시작 이닝을 선택하여 경기/)).toBeTruthy()
+    누르기('2')
+    expect(screen.getByText(/미리 정해진 상황에 맞춰/)).toBeTruthy()
+  })
+
   it('CLR(Esc) 은 저장하지 않고 창을 닫는다', () => {
     const props = 띄우기()
 
