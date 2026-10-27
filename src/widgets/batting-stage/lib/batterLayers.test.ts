@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { existsSync } from 'node:fs'
 import { aceBatterLayersOf, batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf, pitcherEquipmentOf, pitcherLayerPaletteIndexOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 
@@ -37,10 +38,20 @@ describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
     expect(파일(batterLayersOf(0, 0)).slice(3, 5)).toEqual(['batter_balancer:14', 'batter_batter:0'])
   })
 
-  it('규칙 2 (f=13): 배트가 몸통 뒤로 간다', () => {
-    expect(파일(batterLayersOf(13, 0)).slice(0, 5)).toEqual([
-      'batter_shadow:13', 'batter_batter:13', 'batter_balancer:13', 'batter_helmet:13', 'batter_balancer:27',
+  it('규칙 2 (f=13): 배트가 몸통 뒤로 간다 — 몸통 앞 27 은 원본 PZX 에서 파트가 없는 빈 칸이라 겹에서 뺀다 (r319)', () => {
+    expect(파일(batterLayersOf(13, 0))).toEqual([
+      'batter_shadow:13', 'batter_batter:13', 'batter_balancer:13', 'batter_helmet:13',
     ])
+  })
+
+  it('빈 몸통 앞 칸(balancer 23 · 27, sluger 22)은 그리지 않는다 — 자세표 0~13 의 겹 그림은 모두 뽑은 파일이 있다 (r319)', () => {
+    expect(파일(batterLayersOf(9, 0))).not.toContain('batter_balancer:23')
+    expect(파일(batterLayersOf(9, 1))).not.toContain('batter_sluger:22')
+    // 폼마다 자세표가 낼 수 있는 자세 — balancer 0 ~ 13 · sluger 0 ~ 12 (0xb905c, `figureBatterPosesOf`)
+    const missing = [0, 1].flatMap((bodyType) => Array.from({ length: bodyType === 1 ? 13 : 14 }, (_, pose) => batterLayersOf(pose, bodyType)).flat())
+      .map((layer) => `public/${layer.folder.replace(/^\.\//, '')}/${String(layer.frame).padStart(3, '0')}.png`)
+      .filter((path) => !existsSync(path))
+    expect([...new Set(missing)]).toEqual([])
   })
 
   it('f 8·9 는 잔상(batter_ghost)을 한 번 더 그린다 — balancer 는 f−6, 8 은 슬롯 4 뒤 · 9 는 슬롯 1 뒤', () => {
