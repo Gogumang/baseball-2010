@@ -120,6 +120,9 @@ export interface GeneralModeScreenProps {
  * 잠긴 히든 팀에서 OK 하면 힌트 팝업(`hiddenTeamHintMessage` — 18: 0x29d74 · 0x29d8a, 19: 0x29bfe · 0x29c14)만 뜨고
  * 단계는 그대로다.
  */
+/** 19 진입 0x23e70 의 처음 칸 — 격자 x 0 · y 1(23eb2 · 23eb4), 폭 5 라 팀 5 */
+const AI_TEAM_INITIAL_CURSOR = 5
+
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
   const live = withLiveGameInning(props)
   if (live.resumeGame !== undefined) return <GeneralModeResume {...live} resumeGame={live.resumeGame} />
@@ -254,6 +257,13 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
   const matchViewTrail = useRef<{ readonly view: string | null; readonly previous: string | null }>({ view: matchView, previous: null })
   if (matchViewTrail.current.view !== matchView) matchViewTrail.current = { view: matchView, previous: matchViewTrail.current.view }
   const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '23'
+  /**
+   * 18 · 19 그림(0x2de3c · 0x2ddb0)의 0x63b15 넷째 인자 = `[메뉴+0x28] ≠ 0x13` · `≠ 0x12` — 상대 팀 고르기에서 넘어왔으면 0 이라
+   * 0x63bd8~0x63be0 이 머리띠 미끄러짐([skin+0x84]) · 격자 열림 애니([skin+0xe8])를 끈다 (2de7e · 2ddf2, r333)
+   */
+  const stepTrail = useRef<{ readonly step: number; readonly previous: number | null }>({ step: flow.step, previous: null })
+  if (stepTrail.current.step !== flow.step) stepTrail.current = { step: flow.step, previous: stepTrail.current.step }
+  const isTeamSelectEntryAnimated = (otherTeamStep: number) => stepTrail.current.previous !== otherTeamStep
   /** 준비 단계 취소 — 18 · 빠른실행 22 의 CLR 은 게임시작 목록(하위 5)으로 (0x29d9a · 0x313c4) */
   const cancelPrepare = () => onExit(5)
   const back = () => {
@@ -290,14 +300,16 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
 
   switch (flow.step) {
     // 18 · 19 는 다른 하위 상태라 들어설 때마다 새로 선다: 들어옴 0x23e08 · 0x23e70 이 목록 [메뉴+0x74] 커서를
-    // vt+0x14(0, 0)(0x6c00c) 로 0 칸에 두고, 그림 0x2de3c · 0x2ddb0 의 공용 목록 0x63b14 가 상태 틱 0 인 첫 그림에서
-    // [skin+0x84] 를 세워 머리띠가 다시 미끄러진다 — key 로 둘을 갈라 같은 화면을 이어 쓰지 않는다
+    // vt+0x14(0, 0)(0x6c00c) 로 0 칸에 두고(19 는 이어서 (0, 1) = 팀 5 로 고쳐 쓴다 — 23eb2 · 23eb4), 그림 0x2de3c · 0x2ddb0 의
+    // 공용 목록 0x63b14 가 상태 틱 0 인 첫 그림에서 넷째 인자대로 들어옴 연출을 다시 건다(상대 팀 고르기에서 왔으면 끈다 —
+    // `isTeamSelectEntryAnimated`) — key 로 둘을 갈라 같은 화면을 이어 쓰지 않는다
     case GENERAL_MODE_STEP.유저팀:
       return (
         <TeamSelectScreen
           key="18"
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
+          isEntryAnimated={isTeamSelectEntryAnimated(GENERAL_MODE_STEP.AI팀)}
           {...(gamePoint === undefined ? {} : { gamePoint })}
           onSelect={actions.selectUserTeam}
           onSelectLocked={showHiddenHint}
@@ -311,6 +323,9 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           key="19"
           title="팀선택"
           openedHiddenIds={openedHiddenTeamIds ?? []}
+          // 19 진입 0x23e70 이 격자 [메뉴+0x74] 의 칸을 x 0 · y 1 로 둔다(23eb2 · 23eb4) — 팀 = y × 5 + x = 5 (r333)
+          initialCursor={AI_TEAM_INITIAL_CURSOR}
+          isEntryAnimated={isTeamSelectEntryAnimated(GENERAL_MODE_STEP.유저팀)}
           // ⚠️ 유저 팀과 같은 팀인지 보지 않는다 — 원본 그대로다 (R4 3a 상태 19)
           {...(gamePoint === undefined ? {} : { gamePoint })}
           onSelect={actions.selectAiTeam}
