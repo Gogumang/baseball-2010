@@ -31,7 +31,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `pitcher-pitch` · `pitcher-defense` | 나리 투수편 첫 경기 — 첫 수비 타석 구질 고르기 · 던진 공이 맞은 내 수비 판 (관리 [다음경기] → 경기시작, 약 5~7초) | `pitcher-y1` |
 | `general-relay` | 일반모드 자동진행 중계 0x21 — 첫 타석에서 경기 중 메뉴 '*' [자동진행] 예 (약 8초) | `general-bat` |
 | `mission-bat` · `mission-pitch` | 타자 미션 1 첫 타석 0xe · 투수 미션 3 구질 고르기 (미션 선수 고르기 → 나리 선수 → [61] 예, 약 2초) | `nari-y1` · `pitcher-y1` |
-| `mission-result` | 투수 미션 3 결과 판 0x19 — 10구 제한까지 OK 만 되풀이 (약 55초) | `pitcher-y1` |
+| `mission-result` | 투수 미션 3 결과 판 0x19 — 10구 제한까지 OK 만 되풀이 (실제 진행 약 55초 — 바로가기는 경기 중간 스냅샷으로 곧장, `&real=1` 이면 실제 진행) | `pitcher-y1` |
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
 | `derby-stage2` · `derby-stage3` · `derby-stage4` | 홈런더비 단계 N 시작 상태(누적 = 문턱 0xd84dc[N − 1] · 기회 10, `&derbyPitches=` 로 바꿈) — 마투수 소개 0xe (웹 개발 도구 `shared/lib/devDerbyStart`, r294) | `nari-y1` |
 | `season-ending` | 시즌모드 10년차 엔딩 0xf5 (저장 phase 6 → 진입 분기가 곧장 엔딩, 약 3초) | `season-ending` |
@@ -47,7 +47,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `nari-cup-win` · `pitcher-cup-win` | 국가대항전 한국 우승 — 끝난 대진판 확인 → 결과 팝업 0x25 "[대한민국] 대표팀 제n회 국가대항전 우승!!" | `nari-cup-win`(씨앗 5 판) · `pitcher-cup-win` |
 | `nari-evaluation` | 나리 타자편 116 경기 뒤 평가 — 경기 결과(정산 판 0x19)를 세우고 OK 로 나가면 나리 장면 116 → 114 평가 대사 (r287) | `nari-y1` |
 | `nari-cup-cover` | 나리 타자편 국가대항전 끝 → 134 대진판이 선 채 아홉 틀 어두워진 뒤 137 "N년차" 표지 (r287) | `nari-cup-win` |
-| `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 5 로 첫 경기 9회말 넷째 타석 앞에 제안이 뜨고 공을 그냥 보내 삼진 뒤 경기 끝 정산 앞 결과 창까지 (약 85초, 아래 「씨앗 기록」) | `nari-y1` + 씨앗 5 |
+| `nari-burst-result` | 나리 타자편 돌발미션 결과 창 — 꺼진 확인 칸 위(r195). 씨앗 5 로 첫 경기 9회말 넷째 타석 앞에 제안이 뜨고 공을 그냥 보내 삼진 뒤 경기 끝 정산 앞 결과 창까지 (실제 진행 약 85초, 아래 「씨앗 기록」 — 바로가기는 경기 중간 스냅샷으로 곧장, `&real=1` 이면 실제 진행) | `nari-y1` + 씨앗 5 |
 
 G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/devOptions.ts` — vitest 밖에서는 켜짐) 때문에 늘 99999 로 보이고 써도 줄지 않는다. 실제로 깎이는 것을 볼 때는 주소에 `&real-gp`(또는 `&원본G`)를 붙인다.
 
@@ -230,7 +230,7 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 ## 배포 빌드에 안 들어가는지
 
 ```sh
-yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK' dist || echo clean
+yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK|devSnapshot|stageAnimation|sceneCloudClock|snapshotOverride|rebaseAppTick|경기 중간 스냅샷' dist || echo clean
 ```
 
 ## 빠른 확인 (`yarn e2e:quick`, r328)
@@ -240,10 +240,10 @@ yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitch
 둘 다 보고, 장면 × 기기 일감 196개를 맥락 여러 개로 함께 돌린다.
 
 ```sh
-yarn e2e:quick                                                     # e2e 빌드(약 5초) → preview :4910 → 장면 전부 × 기기 넷 (약 1분 반)
+yarn e2e:quick                                                     # e2e 빌드(약 5초) → preview :4910 → 장면 전부 × 기기 넷 (약 1분)
 yarn e2e:quick season-management general-bat                       # 장면만 골라
 E2E_QUICK_DEVICES=chromium-desktop,webkit-iphone yarn e2e:quick    # 기기만 골라 (smoke 와 같은 둘)
-E2E_QUICK_SKIP=nari-burst-result,mission-result yarn e2e:quick     # 장면 빼기
+E2E_QUICK_SKIP=general-defense yarn e2e:quick                      # 장면 빼기
 E2E_QUICK_JOBS=chromium:12,webkit:10 yarn e2e:quick                # 브라우저마다 함께 여는 맥락 수 (기본 24 · 20 — 메모리가 빠듯하면 줄인다)
 E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄운 서버로(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
 ```
@@ -272,12 +272,47 @@ E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄�
 
 빌드는 4.3~5.1초. 같은 일을 `e2e:all` 의 smoke + hits(dev · e2e) 는 약 1490초에 했다.
 
-**1분 안에 못 넣는 것** — 벽시계의 바닥은 가장 긴 일감이다. `nari-burst-result`(씨앗 5, 첫 경기를 9회말까지 실제 시간으로 쳐서 약 89초)와
-`mission-result`(10구, 약 58초)는 맥락을 늘려도 줄지 않는다. 둘을 빼면 장면 47 × 기기 4 · 360 상태가 54초다. 맥락을 더 늘려도
-(16 · 14 → 24 · 20) 일감 합이 1937 → 2540초로 부풀어(14코어가 실제 시간 게임 44판을 함께 그린다) 나머지는 50초 안팎에서 더 안 준다.
-둘을 1분 안에 넣으려면 그 자리(돌발 결과 창 · 미션 결과 판)를 미리 떠 둔 스냅샷으로 곧장 세워야 하는데, 지금 저장(localStorage)에는
-경기 중간 상태가 없다 — 나리 타자편 경기 진행은 `useCareerSession` · 미션은 `useMissionSession`(상태 · ref 수십 개)과 세션 난수(32비트
-하나, `createSeededRandom` 클로저) · 장면 틱 · 그림 부품 안에 흩어져 있다. 그 길(세션 상태 · 난수 상태를 뜨고 되살리는 개발 전용 손잡이)을 만드는 일은 따로 잡는다.
+**긴 장면 둘은 경기 중간 스냅샷으로** (r329) — 벽시계의 바닥이던 `nari-burst-result`(첫 경기 9회말까지 실제 시간, 약 89초)와
+`mission-result`(10구, 약 58초)는 이제 그 순간을 떠 둔 스냅샷(`e2e/snapshots/<장면>.json.gz`)으로 곧장 연다 — 시간을 빨리 감지 않는다
+(아래 「경기 중간 스냅샷」). 일감 하나가 8~10초로 줄었다. 실제 진행 길은 `e2e:all` 의 smoke(`&real=1`)가 맡는다.
+
+| 판 (r329) | 일감 · 상태 | 돌리기 (빌드 뺌) | 모두 | 일감 합 (그중 장면 열기) | 그때 |
+|---|---|---:|---:|---:|---|
+| 장면 49 × 기기 4, 맥락 24 · 20 | 196 · 368 | 67s | 73s | 2680s (1525s) | 다른 에이전트 4개가 함께 돎(load 26~34) |
+
+부하가 있으면 바닥은 이제 보통 장면(관리 · 외출 화면 30~40초 — 맥락 44개가 14코어를 나눠 씀)이다. r328 의 「긴 장면 둘 빼고 54초」 판과
+같은 일감 꼴이라 한가한 기계면 1분 안이다.
+
+### 경기 중간 스냅샷 (`yarn e2e:snapshot`, r329)
+
+장면 표에 `snapshot: '<이름>'` 이 있고 `e2e/snapshots/<이름>.json.gz` 가 있으면 `?scene=` 바로가기가 단계를 밟지 않고 그 순간을 되살린다
+(`src/app/dev/sessionSnapshot.ts`). `&real=1` 이면 예전처럼 단계를 밟는다.
+
+```sh
+yarn e2e:snapshot                          # 뜨기 — snapshot 장면 전부, 크로미움 데스크톱 · 가짜 시계로 실제 진행 (약 1분 반, preview :4920)
+yarn e2e:snapshot nari-burst-result        # 하나만
+yarn e2e:snapshot verify                   # 같음 확인 — 실제 진행(A) vs 그 순간을 되살린 쪽(B) + 그 뒤 몇 걸음, 크로미움 · 웹킷
+E2E_SNAPSHOT_RUNS=webkit:iphone yarn e2e:snapshot verify mission-result
+```
+
+- **뜨는 것**: React 나무(앱 갈래 — `ViewportShell` 은 기기 꼴이라 뺀다)의 함수 부품마다 훅 칸(useState · useReducer 값, useRef current,
+  useMemo 값)을 부품 자리(`fiber.index` · key · 종류)로, 그리고 앱 난수 씨앗 칸(32비트 — 개발 · e2e 빌드는 `createSeededRandomOn` 으로
+  칸을 따로 쥔다), 앱 틱(틱 안 위상까지), localStorage, 모듈 · 루프 칸(`shared/lib/dev/snapshotSlots` — 경기 장면 멈춤 셈 · 파티클 관리자 ·
+  구름 셈 · 결과 코드 · 공 경로 · 스킨 카운터 · 확인 대기 약한 표 · 타석 그림 루프 `useStageAnimation` 의 let 변수). 값은 한 그래프로 적어
+  상태와 ref 가 쥔 같은 객체는 되살려도 같은 객체다. 함수 · DOM 은 적지 않고 새로 그린 쪽의 같은 자리 값을 쓴다 — 그런 자리가 없는
+  클로저(궤적 `pointAt` 따위)는 부르면 쪽 오류를 내는 덫이 선다(그 장면이 안 부르는 동안만 스냅샷이 맞다).
+- **되살리기**: 저장을 깔고 앱을 그린 뒤 부모부터 자리가 맞는(훅 차례가 같은) 부품에 값을 넣는다(상태는 dispatch, ref 는 current) —
+  부모 상태로 새로 선 자식은 다음 바퀴에. 그동안 앱 틱은 뜬 틱에 세워 둔다. 끝에 ref · 모듈 칸 · 난수 칸을 한 번 더 덮는다. 0.3~1초.
+- **낡음**: 끝내 안 선 자리가 있으면(부품 훅 차례가 바뀜) "스냅샷이 낡았다" 로 실패한다 — `e2e:quick` 은 그 장면만 실제 진행 길로 다시
+  열고 "낡은 스냅샷" 을 알린다. 값만 달라진 낡음(씨앗 · 난수 차례 · 단계가 바뀜)은 `verify` 의 "파일 vs 지금 뜬 것" 줄이 알린다. 다시 뜬다.
+- **같음 확인**(`verify`)이 보는 것: 화면 · 커리어 · 진행 칸 · 투수편 커리어 · 시즌 장면 · 미션 세션 · 난수 칸 · 저장 · 모듈 칸(다르면 실패),
+  같은 앱 틱에 맞춘 화면 판 스크린샷(픽셀), 그 뒤 걸음(Enter 를 같은 틱에 누르고 60~90틱 민 뒤 위 둘) — 돌발 결과 창은 정산 · 관리
+  화면까지 넷, 미션 결과 판은 셋. 부품 자리 해시 차이는 참고(그림 캐시 따위). ms 로 세는 모듈 칸(멈춘 시간 합 · 결과 배경 시계 · 플레이
+  시계)이 몇십 ms 갈리는 것은 참고로만 찍는다 — 가짜 시계의 그림 틀(rAF 16ms 격자) 위상이 쪽마다 달라서다(틱 · 난수 · 화면은 같다).
+- r329 결과: 크로미움 데스크톱 두 장면 모두 처음 · 걸음마다 핵심 다름 0 · 다른 픽셀 0. 웹킷 아이폰도 핵심 · 화면 같음(돌발 장면은 걸음 2
+  부터 ms 칸 27ms 차이만).
+- **루프에 상태를 더하면**: effect 안 그림 루프의 `let` 은 나무에 없다. `useStageAnimation` 처럼 칸을 단 루프에 변수를 더하면 그 칸에도
+  더한다 — 빠지면 `verify` 가 다름을 찾는다. 새 장면을 스냅샷으로 열려면 장면 표에 `snapshot` 을 달고 뜬 뒤 `verify` 로 확인한다.
 
 **잡아내는지** (r328): `NextGameScreen` 의 `되돌아가기 칸`(r186)을 지운 판은 4 기기 모두 `season-management · 다음경기 순위표` 동작 실패,
 `확인` 칸 앞으로 옮긴 판은 `되돌아가기 칸 ← 확인` 겹침으로 끝 코드 1 이었다(되돌림).

@@ -62,7 +62,7 @@ import { recordUnlockNoticeTextOf } from '@/entities/collection/model/hiddenOpen
 import { aceOpenPriceOf, isAceCellOpen } from '@/pages/general-mode/lib/aceOpenState'
 import { leaveGameSceneObject } from '@/widgets/game-scene/model/gameSceneObject'
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
-import { devBootSeed, publishSceneHandles } from '@/app/dev/sceneShortcut'
+import { devBootSeed, devSeededRandom, publishSceneHandles } from '@/app/dev/sceneShortcut'
 import { lazyScreen, preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreen'
 import { noteSafePoint } from '@/shared/lib/staleBuild/staleBuild'
 
@@ -199,7 +199,11 @@ export function App({ bootScreen }: AppProps = {}) {
   useSoundPauseOnHide(sound)
   // 부팅 씨앗 — 원본 0x2ed8 은 밀리초 시계의 아래 32비트 (저장 · 읽기 때 다시 세우기는 옮기지 않았다 — seededRandom 머리 주석)
   // 개발 · e2e 장면 바로가기 픽스처가 씨앗을 정했으면 그 값 (`app/dev` — 배포 빌드에서는 빠진다)
-  const random = useMemo(() => createSeededRandom((import.meta.env.DEV || import.meta.env.MODE === 'e2e' ? devBootSeed() : null) ?? bootSeed()), [])
+  // 개발 · e2e 빌드는 씨앗 칸을 따로 쥐어 경기 중간 스냅샷(`app/dev/sessionSnapshot`)이 읽고 되살린다 — 수열은 같다
+  const random = useMemo(() => {
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') return devSeededRandom(devBootSeed() ?? bootSeed())
+    return createSeededRandom(bootSeed())
+  }, [])
   // 켤 때는 장면 0x103 생성자의 [0x140006c] = −1 갈래 — 하위 0x2a <이용안내> 부터 (→ 2 로고 → 3 타이틀)
   const [screen, setScreen] = useState<Screen>(() => bootScreen ?? { kind: '이용안내' })
   // 모드 화면 덩이(`lazyScreen`)는 로고가 끝난 뒤(타이틀부터) 받아 둔다 — 타이틀 · 메인 메뉴에 머무는 동안 다 온다.
@@ -604,7 +608,7 @@ export function App({ bootScreen }: AppProps = {}) {
   if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
     publishSceneHandles({
       screen, setScreen, career: careerSession, pitcher: pitcherSession, season: seasonSession, mission,
-      startGeneralMode, setLastPlayedMode,
+      startGeneralMode, setLastPlayedMode, random,
     })
   }
 

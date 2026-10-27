@@ -1,3 +1,4 @@
+import { trackCellForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect } from 'react'
 
 /**
@@ -15,6 +16,8 @@ import { useEffect } from 'react'
  * 스페셜 에디트 0x2b2e0 은 이 칸을 안 세워 앞 화면이 남긴 값으로 그린다 — 부팅 뒤 위 화면을 한 번도 안 거쳤으면 0, 거쳤으면 1.
  */
 const flag = { value: 0 }
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다)
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') trackCellForSnapshot('skinNameBars.flag', flag)
 
 /** 지금 [skin+0x333] */
 export const skinNameBarsValue = () => flag.value

@@ -20,7 +20,10 @@ function sceneNames() {
   return [...table.matchAll(/^ {2}'?([a-z][a-z0-9-]*)'?: \{/gm)].map((match) => match[1])
 }
 
-/** 공을 여러 번 보내야 닿는 장면 — 넉넉히 기다린다 */
+/**
+ * 공을 여러 번 보내야 닿는 장면 — 넉넉히 기다린다. 이 장면들은 바로가기가 기본으로 경기 중간 스냅샷(`e2e/snapshots`)을 열지만
+ * smoke 는 **실제 진행 길**(`&real=1`)로 연다 — 그 순간까지 가는 길의 부작용(난수 차례 · 저장 · 쪽 오류)을 보는 것이 smoke 몫이다
+ */
 const LONG_SCENES = new Set(['nari-burst-result', 'mission-result'])
 
 const RUNS = [
@@ -45,7 +48,7 @@ async function runBrowser({ browserName, device }, names) {
       let error = null
       try {
         // nari-burst-result(약 85초) · mission-result(약 55초)는 씨앗 · 투구 제한까지 공을 보낸다
-        await openScene(page, scene, { timeout: LONG_SCENES.has(scene) ? 240000 : 60000 })
+        await openScene(page, scene, LONG_SCENES.has(scene) ? { timeout: 240000, query: 'real=1' } : { timeout: 60000 })
       } catch (caught) {
         error = String(caught).slice(0, 300)
       }

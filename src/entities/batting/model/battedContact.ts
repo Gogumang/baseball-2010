@@ -1,3 +1,4 @@
+import { trackWeakCollectionForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { playEndResultCode } from '@/entities/fielding/model/playGate'
@@ -40,6 +41,10 @@ export interface BattedContact {
 }
 
 const CONTACTS = new WeakMap<object, BattedContact>()
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 상태 객체를 열쇠로 든 약한 표
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+  trackWeakCollectionForSnapshot('battedContact.CONTACTS', CONTACTS)
+}
 
 /** 결과 객체를 새로 만들어 쏜 패턴을 묶는다. contact 가 null 이면 묶지 않는다(판 없이 끝나는 결과) */
 export function registerContact(outcome: AtBatOutcome, contact: BattedContact | null): AtBatOutcome {

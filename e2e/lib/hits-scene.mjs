@@ -172,9 +172,10 @@ export async function hasLabel(page, label) {
 /**
  * 장면 `scene` 을 `page` 에서 열고 기본 상태 · 연 상태마다 누름 칸을 훑는다. 돌려주는 `results` 한 줄이 상태 하나다
  * (`failures` — 허용 목록에 없는 겹침, `error` — 장면 · 동작 실패). 동작 뒤 자리가 기본과 다르면 다음 동작 전에 장면을 다시 연다.
- * `open` 을 주면 장면 열기를 그것으로 한다(기본: `openScene` 240초 한도).
+ * `open` 을 주면 장면 열기를 그것으로 한다(기본: `openScene` 240초 한도). `query` 는 바로가기 주소에 더할 것(예: `real=1` — 경기 중간
+ * 스냅샷 대신 실제로 진행해 연다).
  */
-export async function checkSceneHits(page, scene, { device, orientation, verbose = false, open: openOnce } = {}) {
+export async function checkSceneHits(page, scene, { device, orientation, verbose = false, open: openOnce, query = '' } = {}) {
   const results = []
   let reopened = 0
   const record = (state, report, error) => {
@@ -193,7 +194,7 @@ export async function checkSceneHits(page, scene, { device, orientation, verbose
     })
   }
   const open = async () => {
-    if (openOnce === undefined) await openScene(page, scene, { timeout: 240000 })
+    if (openOnce === undefined) await openScene(page, scene, { timeout: 240000, query })
     else await openOnce()
     await waitLayoutStable(page)
     const expected = SCENE_EXPECT[scene]
@@ -232,7 +233,7 @@ export async function checkSceneHits(page, scene, { device, orientation, verbose
       reopened++
       if (verbose) console.log(`  ${device} ${scene} · ${action.name} 뒤 다시 연다`)
       // 다시 열 때는 늘 바로가기로 — 맨 처음 열기(`open`)가 다른 길(예: 맥락 재사용)이어도 같은 자리로 돌아온다
-      await openScene(page, scene, { timeout: 240000 })
+      await openScene(page, scene, { timeout: 240000, query })
       await waitLayoutStable(page)
     }
   }

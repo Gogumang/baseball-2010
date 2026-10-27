@@ -5,6 +5,9 @@ import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { useMissionSession } from '@/app/model/useMissionSession'
 import type { usePitcherLeagueSession } from '@/app/model/usePitcherLeagueSession'
 import type { useSeasonSession } from '@/app/model/useSeasonSession'
+import { createSeededRandomOn } from '@/shared/api/random/seededRandom'
+import type { SeededRandomCell } from '@/shared/api/random/seededRandom'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * **장면 바로가기 손잡이** (웹 개발 도구 — 원본에 없다). `?scene=nari-outing&fixture=nari-y1` 처럼 주소로 화면에 곧바로 들어간다.
@@ -29,6 +32,8 @@ export interface SceneHandles {
   readonly startGeneralMode: (isQuickStart: boolean) => void
   /** 전역기록 +0x3c 적기 — 메인 메뉴가 모드에 들어가기 전에 적는 칸 */
   readonly setLastPlayedMode: (mode: number) => void
+  /** 앱 난수 하나 — 씨앗 칸은 `devRandomCellOf` 로 (경기 중간 스냅샷) */
+  readonly random: RandomPort
 }
 
 let handles: SceneHandles | null = null
@@ -51,4 +56,19 @@ export function devBootSeed(): number | null {
 
 export function setDevBootSeed(seed: number | null): void {
   bootSeedOverride = seed
+}
+
+const randomCells = new WeakMap<RandomPort, SeededRandomCell>()
+
+/** 개발 · e2e 빌드의 앱 난수 — `createSeededRandom(seed)` 와 같은 수열, 씨앗 칸을 `devRandomCellOf` 로 내놓는다 */
+export function devSeededRandom(seed: number): RandomPort {
+  const cell: SeededRandomCell = { state: seed >>> 0 }
+  const random = createSeededRandomOn(cell)
+  randomCells.set(random, cell)
+  return random
+}
+
+/** 앱 난수의 씨앗 칸 (32비트 상태) — 경기 중간 스냅샷이 읽고 되살린다 */
+export function devRandomCellOf(random: RandomPort): SeededRandomCell | null {
+  return randomCells.get(random) ?? null
 }
