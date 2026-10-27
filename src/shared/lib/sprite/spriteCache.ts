@@ -202,8 +202,16 @@ export function spriteJsonNow<T>(url: string): T | null {
   return entry.status === 'ready' ? (entry.value as T) : null
 }
 
+/** JSON 캐시를 비운 횟수 — 비운 뒤에는 `spriteJsonNow` 가 받기를 다시 시작하므로, 「바뀐 것이 없으면 다시 안 본다」 기억(`warmRecoloredFrames`)이 이 값도 본다 */
+let jsonCacheEpoch = 0
+
+export function spriteJsonCacheEpoch(): number {
+  return jsonCacheEpoch
+}
+
 /** 시험 전용 — 캐시를 비운다 */
 export function resetSpriteCacheForTest(): void {
   images.clear()
   jsons.clear()
+  jsonCacheEpoch += 1
 }
