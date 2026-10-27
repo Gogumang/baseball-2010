@@ -229,7 +229,13 @@ function PitcherGameScene({
    */
   const play = progress.lastDefensePlay
   const { shownPlay, finishPlayback, isReplayPending } = useShownReplay(play)
-  const summary = summaryAfterReplay(progressSummary, isReplayPending)
+  /**
+   * **돌발 결과 창 뒤의 경기 끝** (r317 — 타자편 r315 의 짝) — 0x12 끝(4e7ca) · 0x17 끝(52a8e)의 돌발 판정 0x8f414 가 참이면 0x1d · 0x1c
+   * (결과 창, 진입 보상 0x3b04c · 0x3b068 → 0x8e34c)를 먼저 거친 뒤 +0x1b6c 로 간다 — 그 다음이 경기 끝 0x18 · 0x19 여도 같다(R9 18-2 ·
+   * R10). 경기 끝 판 갈래가 타석 장면(창이 얹히는 자리)보다 앞이라 판정이 남아 있는 동안은 요약을 안 낸다 — 창을 닫으면(`closeBurst`)
+   * 남은 중계(0x21) 뒤 경기 끝 판 0x18 · 정산 0x19 가 선다. 보상은 판정 때 `burstRewardDeltas` 에 쌓여 정산 앞에 커리어에 얹히므로 그대로다
+   */
+  const summary = progress.lastBurstResolution !== null ? null : summaryAfterReplay(progressSummary, isReplayPending)
   const audio = activeSound()
   /** 경기 시작 인트로(상태 0xc)가 끝났는가 — 모드 3 은 인트로가 선다 (`hasGameIntro`) */
   const [isIntroDone, setIntroDone] = useState(!hasGameIntro(PITCHER_CAREER_MODE))
@@ -470,7 +476,9 @@ function PitcherGameScene({
   const isPitchFlightShown =
     isPitchSceneBusy || lastResolutionRef.current !== lastResolution || isHitSceneShowing || isArrivalHolding
   const hiddenRunnerBases = hiddenStealBasesOf(progress, isPitchFlightShown)
-  const isRelaying = relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0
+  // 0x12 끝 돌발 판정이 참이면 0x35108 이 0x21 로 덮은 +0x1b6c 는 결과 창(0x1d)을 닫은 뒤다 (K 돌발 · R10 0x12 끝) — 창이 먼저
+  const isRelaying =
+    relay !== null && relay.serial !== shownRelaySerial && !isReplaying && pitchWaitTicks === 0 && resolution === null
   /**
    * **상태 0xe — 내가 던지는 타석마다 사람 OK 를 기다린다** (`features/play-game/model/sceneConfirm`, 0x39e14 → 0x532b0 —
    * 0x532b0 은 조작 객체의 공수를 안 본다). 진입에서 감독 강판(0x504cc)이 참이면 0x23 이라 OK 를 기다리지 않고 0xd 두 그림 ·
