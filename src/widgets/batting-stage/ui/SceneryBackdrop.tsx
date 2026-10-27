@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -12,10 +12,21 @@ import {
 /** 배경 고르기 `0x40ff0` 이 쓰는 구장 값 — 틱(구름 · 전광판 흐름)과 세로 밀기는 부르는 쪽이 따로 준다 */
 export type SceneryBackdropStage = Omit<SceneryState, 'tick' | 'offsetY' | 'cloudCalls'>
 
+/**
+ * 배경 뒤에 같은 캔버스에 이어 그리는 장면 겹 — 인트로 0x417ac 의 띠 · 막대 · 글씨 · 점수판(효과 1 반투명이 이 배경 화면을 읽는다).
+ * `key` 가 같으면 같은 그림이다(다시 그리기 건너뛰기 · 바뀐 커밋에서 곧바로 다시 칠하기에 쓴다)
+ */
+export interface SceneryOverlay {
+  readonly key: string
+  readonly draw: (context: CanvasRenderingContext2D) => void
+}
+
 interface SceneryBackdropProps {
   readonly stage: SceneryBackdropStage
   /** `0x78578(구장, y, …)` 의 y — 구장 · 바닥만 내린다(하늘 · 구름은 그대로) */
   readonly offsetY: number
+  /** 배경 위에 같은 화면으로 이어 그리는 겹 (Q-03 r301 — 인트로 `GameIntro`). 없으면 배경만 */
+  readonly overlay?: SceneryOverlay
 }
 
 /**
@@ -35,10 +46,12 @@ interface SceneryBackdropProps {
  *   st[9] = 0 은 0xb6814, 팀[+0x32] = 0 은 상태 7 의 0 채운 새 팀 객체) 손을 넘긴다 — 팀 경기 `teamIntroBatterHandOf`(이어하기면
  *   되복사한 블록의 지금 공격 팀 다음 타자) · 투수편 `pitcherIntroBatterHandOf` · 타자편 `gameIntroBatterHandOf`.
  */
-export function SceneryBackdrop({ stage, offsetY }: SceneryBackdropProps) {
+export function SceneryBackdrop({ stage, offsetY, overlay }: SceneryBackdropProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const latestRef = useRef({ stage, offsetY })
-  latestRef.current = { stage, offsetY }
+  const latestRef = useRef({ stage, offsetY, overlay })
+  latestRef.current = { stage, offsetY, overlay }
+  /** 지금 곧바로 한 번 칠한다 — 겹이 바뀐 커밋에서 DOM 과 한 틀도 어긋나지 않게(아래 레이아웃 효과) */
+  const drawNowRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     let frame = 0
@@ -46,7 +59,7 @@ export function SceneryBackdrop({ stage, offsetY }: SceneryBackdropProps) {
     const drawMemo = createDrawMemo()
     /** 구름 셈(`sceneCloudClock`)에서 이 판이 마지막으로 본 그림 — 인트로 0xc 는 갱신마다 센다 */
     const cloudCursor = createCloudFrameCursor()
-    const draw = (rawNow: number) => {
+    const paint = (rawNow: number) => {
       // 그림 번호는 경기 장면 시계라 공용 창이 서 있는 동안(52cc6 — 0x3f060 도 안 돈다)은 안 올라 세지 않는다
       const cloudCalls = observeSceneCloudFrame(sceneCloudFrameOf(rawNow), true, cloudCursor)
       let context: CanvasRenderingContext2D | null = null
@@ -57,16 +70,32 @@ export function SceneryBackdrop({ stage, offsetY }: SceneryBackdropProps) {
         context = null
       }
       if (context !== null) {
-        const { stage: current, offsetY: y } = latestRef.current
+        const { stage: current, offsetY: y, overlay: over } = latestRef.current
         const sceneTick = gameSceneTickOf(gameSceneTimeOf(rawNow))
         const scenery = { ...current, tick: sceneTick, scoreboardTick: sceneScoreboardTickOf(sceneTick), cloudCalls, offsetY: y }
-        if (drawMemo.needsDraw(canvasRef.current, scenery)) drawScenery(context, scenery)
+        if (drawMemo.needsDraw(canvasRef.current, { scenery, overlay: over?.key ?? null })) {
+          drawScenery(context, scenery)
+          over?.draw(context)
+        }
       }
+    }
+    const draw = (rawNow: number) => {
+      paint(rawNow)
       frame = requestAnimationFrame(draw)
     }
+    drawNowRef.current = () => paint(performance.now())
     draw(performance.now())
-    return () => cancelAnimationFrame(frame)
+    return () => {
+      drawNowRef.current = null
+      cancelAnimationFrame(frame)
+    }
   }, [])
+
+  // 겹이 바뀐 커밋 — 다음 틀을 기다리지 않고 칠한다(겹을 DOM 에서 캔버스로 옮기는 커밋에 빈 틀이 끼지 않게)
+  const overlayKey = overlay?.key ?? null
+  useLayoutEffect(() => {
+    drawNowRef.current?.()
+  }, [overlayKey])
 
   return (
     <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="구장-배경"

@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
-  BALL_PATTERN_COLUMNS, BALL_PATTERN_PERIOD, BALL_PATTERN_ROWS, MAIN_TITLE_BACKDROP, ballPatternCounterAfter,
+  BALL_PATTERN_COLUMNS, BALL_PATTERN_PERIOD, BALL_PATTERN_ROWS, MAIN_TITLE_BACKDROP, ballPatternCounterAfter, ballPatternRect565,
   ballPatternTilesOf, blurScreen565, mainTitleLineYs, nextBallPatternCounter, rgbOf565, rgbTo565, whitenStep3Of565,
 } from '@/pages/special/lib/skinBackdrops'
 import { GPOINT_ANIMATION } from '@/pages/special/ui/SkinBackdrops'
+import { grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
+import type { Sprite565 } from '@/shared/lib/pixelEffect/screenCompose'
 
 describe('메뉴 바탕 0x58371', () => {
   it('main_title 프레임 13 · 이미지 7 을 (240 − 40 − 2, 2), 3줄마다 검정 선 107 개', () => {
@@ -113,3 +115,25 @@ describe('B-91 고친 길 — 흐리기는 사본에서 읽고, 공 무늬 왼�
     expect(모든c.filter((counter) => 그린(counter).join() !== 끝없는(counter).join())).toEqual([])
   })
 })
+
+describe('공 무늬 사각형 다시 그리기 (Q-03 r301 — 카드 로고 아래)', () => {
+  // 23×23 칸 — 왼쪽 위 한 칸만 불투명
+  const tile: Sprite565 = {
+    width: 23, height: 23, pixels: new Uint16Array(23 * 23).fill(0x1234), opaque: new Uint8Array(23 * 23).map((_, index) => (index === 0 ? 1 : 0)),
+  }
+  const backdrop = rgbTo565(147, 199, 229)
+
+  it('바탕 색 위에 칸마다 gpoint 그림 — 칸 자리는 `ballPatternTilesOf` 그대로', () => {
+    const counter = 7
+    const first = ballPatternTilesOf(counter).find((at) => at.x >= 0 && at.y >= 0 && at.x < 200 && at.y < 200)!
+    const rect = { x: first.x - 1, y: first.y, width: 3, height: 1 }
+    expect(Array.from(ballPatternRect565(rect, counter, tile))).toEqual([backdrop, 0x1234, backdrop])
+  })
+
+  it('흑백 사각형 안은 회색 식', () => {
+    const rect = { x: 0, y: 0, width: 2, height: 1 }
+    const out = ballPatternRect565(rect, 1, { ...tile, opaque: new Uint8Array(23 * 23) }, [{ x: 1, y: 0, width: 5, height: 5 }])
+    expect(Array.from(out)).toEqual([backdrop, grayPixel565(backdrop)])
+  })
+})
+

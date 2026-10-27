@@ -37,7 +37,7 @@ import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
-import type { StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageMissionStrip, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { describeResolution, isHomeRunResolution, judgeTextOf, situationOf } from '@/widgets/batting-stage/lib/stageText'
 import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
@@ -261,6 +261,11 @@ interface BattingStageProps {
    * **하늘 줄 — 구장 +0x10** (`stadiumSkyRowOf`, 0x783b0). 원본은 경기 장면을 세울 때(적재 상태 8) 한 번 고르고 정산 결과 그림까지 같은 줄을
    * 쓴다 — 부르는 쪽이 경기 하나 동안 같은 값을 넘긴다. ⚠️ 안 넘기면 그림을 세울 때마다 `random` 으로 rand(0, 6) 을 굴린다(미션 · 홈런더비).
    */
+  /**
+   * **미션 HUD 띠** (0x36714 — trainning 프레임 13 · 효과 1 · 10) — 점수판 0x373d0 끝에서 그리므로 이 캔버스 화면에 원본 식으로 섞는다
+   * (Q-03 r301). 띠 위 글 · 숫자는 부르는 쪽 DOM(`MissionHud`)이 그린다. 안 넘기면 안 그린다
+   */
+  readonly missionStrips?: readonly StageMissionStrip[]
   readonly skyRow?: number
   readonly random: RandomPort
   /**

@@ -1,16 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  BALL_PATTERN_BACKDROP, MAIN_TITLE_BACKDROP, SKIN_SCREEN, ballPatternCounterAfter, ballPatternTilesOf,
+  BALL_PATTERN_BACKDROP, MAIN_TITLE_BACKDROP, SKIN_SCREEN, ballPatternCounterAfter, ballPatternRect565, ballPatternTilesOf,
   finishMainTitleBackdrop565, mainTitleLineYs, rgbOf565, rgbTo565,
 } from '@/pages/special/lib/skinBackdrops'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { DRAW_EFFECT, color565Of, css565, effectContextOf, effectSpriteUrl, grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
 import { drawFrameLayers, frameLayersUrl, frameLayerUrl, type FrameLayerListing, type PlacedFrameLayer } from '@/shared/lib/sprite/frameLayers'
 import { loadSpriteJson } from '@/shared/lib/sprite/spriteCache'
-import { useScreenGrayRects } from '@/shared/lib/pixelEffect/screenGrayRects'
+import { screenGrayRectsNow, subscribeScreenGrayRects, useScreenGrayRects } from '@/shared/lib/pixelEffect/screenGrayRects'
+import { translucentOpacityOf, translucentPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
+import { sprite565At } from '@/shared/lib/pixelEffect/sprite565Cache'
+import { loadSpriteImage } from '@/shared/lib/sprite/spriteCache'
 import type { ScreenGrayRect } from '@/shared/lib/pixelEffect/screenGrayRects'
 import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 
@@ -176,8 +180,9 @@ function BallPatternBackdrop() {
   const grayRects = useScreenGrayRects()
   const tiles = ballPatternTilesOf(counter)
   const src = `${GPOINT_FRAMES}/${pad(frame)}.png`
+  usePublishBallPattern(counter, frame)
   return (
-    <div className={styles.skinBackdrop} data-testid="바탕-공무늬" data-counter={counter}
+    <div className={styles.skinBackdrop} data-testid="바탕-공무늬" data-counter={counter} data-frame={frame}
       style={{ width, height, background: BALL_PATTERN_BACKDROP.color }}>
       {tiles.map((tile, index) => (
         <img key={index} className={styles.sprite} alt="" src={src} style={{ left: tile.x, top: tile.y }} />
@@ -216,5 +221,169 @@ function BallPatternGrayRect({ rect, tiles, src }: {
           style={{ left: tile.x - rect.x, top: tile.y - rect.y }} />
       ))}
     </div>
+  )
+}
+
+/* ── 공 무늬 위 반투명 그림 (Q-03, r301) ─────────────────────────────────── */
+
+/** 지금 그린 공 무늬 — 카운터 [skin+0x414] · gpoint 애니 그림. 무늬가 없으면 null */
+interface BallPatternNow {
+  readonly counter: number
+  readonly frame: number
+}
+
+const ballPatternOwners = new Map<symbol, BallPatternNow>()
+let ballPatternNow: BallPatternNow | null = null
+const ballPatternListeners = new Set<() => void>()
+
+function setBallPattern(owner: symbol, now: BallPatternNow | null): void {
+  if (now === null) ballPatternOwners.delete(owner)
+  else ballPatternOwners.set(owner, now)
+  ballPatternNow = [...ballPatternOwners.values()].at(-1) ?? null
+  for (const listener of ballPatternListeners) listener()
+}
+
+/**
+ * 무늬를 그린 커밋의 레이아웃 단계에서 알린다 — 위 반투명 그림이 **같은 틀**에 다시 그려 무늬와 한 틀도 어긋나지 않는다
+ * (알림을 받는 쪽은 React 를 거치지 않고 캔버스를 곧바로 칠한다)
+ */
+function usePublishBallPattern(counter: number, frame: number): void {
+  const owner = useRef(Symbol('공무늬')).current
+  useLayoutEffect(() => {
+    setBallPattern(owner, { counter, frame })
+  }, [owner, counter, frame])
+  useLayoutEffect(() => () => setBallPattern(owner, null), [owner])
+}
+
+interface BallPatternTranslucentImageProps {
+  readonly src: string
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  /** 효과 1 의 인자 L (그림 몫 L/16) */
+  readonly level: number
+  /**
+   * 무늬와 이 그림 사이에 먼저 그린 것의 줄 색(565) — null 이면 그 줄은 무늬가 그대로, undefined 면 다룰 수 없는 줄이라
+   * CSS 불투명도 근사로 둔다
+   */
+  readonly rowOver?: (y: number) => number | null | undefined
+  /**
+   * 그림 크기(w, h)로 왼쪽 위를 정한다 — 원본처럼 실제 크기로 가운데를 잡는 자리. 안 주면 (x, y). 캔버스 칸은 (x, y, width, height)
+   * 이라 그 칸이 그림을 다 덮게 잡는다
+   */
+  readonly imagePlaceOf?: (width: number, height: number) => { readonly x: number; readonly y: number }
+  /** CSS 근사로 둘 때 `<img>` 자리 · 크기 — 안 주면 캔버스 칸 */
+  readonly fallbackRect?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+  readonly className?: string
+  readonly alt?: string
+  readonly testId?: string
+}
+
+/**
+ * **공 무늬 바탕 위 반투명 그림** — 효과 1(0x9a449)을 원본 식(`translucentPixel565`, 마스크 내림 · 565)으로 칠한다.
+ * DOM 겹이라 아래 화면을 못 읽으므로 아래를 **같은 좌표로 다시 그린다**: 공 무늬(지금 카운터 · gpoint 그림 · 흑백 사각형) 위에
+ * 그 사이에 먼저 그린 줄 색(`rowOver` — 카드 계단형 판)을 얹고, 그림의 불투명 칸만 섞어 캔버스에 찍는다(투명 칸은 비워 DOM 이 보인다).
+ * 무늬가 없거나 그림을 아직 못 받았거나 캔버스가 없으면(jsdom) CSS 불투명도 L/16 근사(`translucentOpacityOf`)로 둔다.
+ */
+export function BallPatternTranslucentImage({
+  src, x, y, width, height, level, rowOver, imagePlaceOf, fallbackRect, className, alt = '', testId,
+}: BallPatternTranslucentImageProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isComposed, setComposed] = useState(false)
+  const latest = useRef({ src, x, y, width, height, level, rowOver, imagePlaceOf })
+  latest.current = { src, x, y, width, height, level, rowOver, imagePlaceOf }
+
+  useLayoutEffect(() => {
+    let isActive = true
+    let waiting: string | null = null
+    /** 그렸으면 참 — 못 그리면(무늬 없음 · 그림 못 받음 · 다룰 수 없는 줄) 거짓 */
+    const draw = (): boolean => {
+      const current = latest.current
+      const pattern = ballPatternNow
+      if (pattern === null) return false
+      const tileSrc = `${GPOINT_FRAMES}/${pad(pattern.frame)}.png`
+      const image = sprite565At(current.src)
+      const tile = sprite565At(tileSrc)
+      if (image === null || tile === null) {
+        const missing = image === null ? current.src : tileSrc
+        if (waiting !== missing) {
+          waiting = missing
+          void loadSpriteImage(missing).then((loaded) => {
+            if (!isActive || loaded === null) return
+            waiting = null
+            setComposed(redraw())
+          })
+        }
+        return false
+      }
+      const place = current.imagePlaceOf?.(image.width, image.height) ?? { x: current.x, y: current.y }
+      const left = place.x - current.x
+      const top = place.y - current.y
+      if (left < 0 || top < 0 || left + image.width > current.width || top + image.height > current.height) return false
+      const rows: (number | null)[] = []
+      for (let row = 0; row < image.height; row += 1) {
+        const over = current.rowOver === undefined ? null : current.rowOver(place.y + row)
+        if (over === undefined) return false
+        rows.push(over)
+      }
+      const context = effectContextOf(canvasRef.current)
+      if (context === null) return false
+      const rect = { x: current.x, y: current.y, width: current.width, height: current.height }
+      const under = ballPatternRect565(rect, pattern.counter, tile, screenGrayRectsNow())
+      const out = context.createImageData(rect.width, rect.height)
+      for (let row = 0; row < image.height; row += 1) {
+        const over = rows[row]
+        for (let column = 0; column < image.width; column += 1) {
+          const from = row * image.width + column
+          if (image.opaque[from] === 0) continue
+          const at = (top + row) * rect.width + left + column
+          const screen = over ?? under[at]
+          const [r, g, b] = rgbOf565(translucentPixel565(current.level, image.pixels[from], screen))
+          out.data[at * 4] = r
+          out.data[at * 4 + 1] = g
+          out.data[at * 4 + 2] = b
+          out.data[at * 4 + 3] = 255
+        }
+      }
+      context.putImageData(out, 0, 0)
+      return true
+    }
+    /** 한 번이라도 칠했는가 — 못 그리게 되면 지운다(캔버스를 안 연 jsdom 에서는 문맥을 열지 않는다) */
+    let hasDrawn = false
+    const redraw = () => {
+      const drawn = draw()
+      if (!drawn && hasDrawn) effectContextOf(canvasRef.current)?.clearRect(0, 0, latest.current.width, latest.current.height)
+      hasDrawn = drawn
+      return drawn
+    }
+    const onChange = () => {
+      if (isActive) setComposed(redraw())
+    }
+    ballPatternListeners.add(onChange)
+    const unsubscribeGray = subscribeScreenGrayRects(onChange)
+    setComposed(redraw())
+    return () => {
+      isActive = false
+      ballPatternListeners.delete(onChange)
+      unsubscribeGray()
+    }
+  }, [src, x, y, width, height, level])
+
+  const place: CSSProperties = { left: x, top: y, width, height }
+  return (
+    <>
+      <canvas ref={canvasRef} className={className} width={width} height={height} aria-hidden
+        style={{ ...place, visibility: isComposed ? 'visible' : 'hidden' }}
+        {...(isComposed && testId !== undefined ? { 'data-testid': testId } : {})} data-effect-level={level} data-composed={isComposed} />
+      {!isComposed && (
+        <img className={className} alt={alt} src={src} data-testid={testId} style={{
+          ...(fallbackRect === undefined
+            ? place
+            : { left: fallbackRect.x, top: fallbackRect.y, width: fallbackRect.width, height: fallbackRect.height }),
+          opacity: translucentOpacityOf(level),
+        }} />
+      )}
+    </>
   )
 }

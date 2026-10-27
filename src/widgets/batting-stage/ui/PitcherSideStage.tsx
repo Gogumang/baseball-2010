@@ -5,7 +5,7 @@ import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { renderBattingStage, STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/renderBattingStage'
-import type { StageScene, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageMissionStrip, StageScene, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
@@ -150,6 +150,8 @@ interface PitcherSideStageProps {
    * 상태 0xe(쉬는 대기) · 0xf(구질 목록이 실린 동안)에만 그린다
    */
   readonly timeKeyCount?: number | null
+  /** 미션 HUD 띠 — 타자편 `BattingStage` 의 같은 이름 props 주석 참고 (Q-03 r301) */
+  readonly missionStrips?: readonly StageMissionStrip[]
   /** 교체 창(상태 0xb)이 떠 있는가 — 소프트키 글자 "*MENU" · "#TIME" 을 안 그린다 (`BattingStage` 의 같은 이름 props 주석 참고) */
   readonly isSubstitutionWindowOpen?: boolean
   /**
@@ -747,6 +749,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         specialSwingRemaining: null,
         // 0x4cad4 → 0x4b5b4 — 경기 스킬 표시 판
         skillPanel: skillPanelView,
+        // 0x373d0 끝의 미션 HUD 띠 (모드 5 — `MissionHud`)
+        missionStrips: current.missionStrips ?? null,
         scenery: {
           // 구름 0x78448 — 0x3f060 은 '대기'(0xd~0x10)에서만 센다. 팝업으로 장면이 선 동안(`isFrozen`)은 안 센다
           cloudCalls: observeSceneCloudFrame(sceneCloudFrameOf(rawNow), isIdle && current.isFrozen !== true, cloudCursor),

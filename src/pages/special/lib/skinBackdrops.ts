@@ -67,7 +67,9 @@
  */
 
 import { isBugFixed } from '@/shared/config/bugfixes'
-import { finishSkinBackdrop565 } from '@/shared/lib/screen565/screen565'
+import { finishSkinBackdrop565, rgbTo565 } from '@/shared/lib/screen565/screen565'
+import { grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
+import type { Sprite565 } from '@/shared/lib/pixelEffect/screenCompose'
 
 export const SKIN_SCREEN = { width: 240, height: 320 } as const
 
@@ -115,6 +117,8 @@ export const BALL_PATTERN_BACKDROP = {
 } as const
 
 const { tileWidth, tileHeight, gap } = BALL_PATTERN_BACKDROP
+/** 바탕 색 147, 199, 229 의 565 */
+const BALL_PATTERN_BACKDROP_565 = rgbTo565(147, 199, 229)
 export const BALL_PATTERN_COLUMNS = Math.trunc(SKIN_SCREEN.width / tileWidth) + 3
 export const BALL_PATTERN_ROWS = Math.trunc(SKIN_SCREEN.height / tileHeight) + 2
 /** 한 주기 — c 가 이 값에 닿으면 1 로 돈다 */
@@ -145,4 +149,39 @@ export function ballPatternTilesOf(counter: number): readonly { readonly x: numb
     }
   }
   return tiles
+}
+
+/**
+ * 공 무늬 0x5fd61 를 화면 사각형 하나만 565 로 다시 그린다 — 바탕 색을 칠하고 칸마다 gpoint 그림(투명 칸은 바탕)을
+ * 왼쪽 위 (칸 x, 칸 y) 에 복사한다(`BallPatternBackdrop` 과 같은 자리). 흑백 사각형(0xc37a8 — 커맨드 줄이 무늬 **뒤에** 건다)
+ * 안은 회색 식으로 바꾼다. 위에 반투명으로 얹는 그림이 아래 화면을 읽을 때 쓴다(`BallPatternTranslucentImage`).
+ */
+export function ballPatternRect565(
+  rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  counter: number,
+  tile: Sprite565,
+  grayRects: readonly { readonly x: number; readonly y: number; readonly width: number; readonly height: number }[] = [],
+): Uint16Array {
+  const out = new Uint16Array(rect.width * rect.height).fill(BALL_PATTERN_BACKDROP_565)
+  for (const at of ballPatternTilesOf(counter)) {
+    for (let row = 0; row < tile.height; row += 1) {
+      const y = at.y + row - rect.y
+      if (y < 0 || y >= rect.height) continue
+      for (let column = 0; column < tile.width; column += 1) {
+        const x = at.x + column - rect.x
+        if (x < 0 || x >= rect.width) continue
+        const from = row * tile.width + column
+        if (tile.opaque[from] !== 0) out[y * rect.width + x] = tile.pixels[from]
+      }
+    }
+  }
+  for (const gray of grayRects) {
+    for (let y = Math.max(gray.y, rect.y); y < Math.min(gray.y + gray.height, rect.y + rect.height); y += 1) {
+      for (let x = Math.max(gray.x, rect.x); x < Math.min(gray.x + gray.width, rect.x + rect.width); x += 1) {
+        const at = (y - rect.y) * rect.width + (x - rect.x)
+        out[at] = grayPixel565(out[at])
+      }
+    }
+  }
+  return out
 }

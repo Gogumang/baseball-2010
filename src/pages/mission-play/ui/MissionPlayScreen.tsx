@@ -11,6 +11,8 @@ import { PressArea, RawScreen } from '@/shared/ui'
 import { MENU_PRESS_RECT, stealPressRectOf } from '@/features/play-game/model/stagePressAreas'
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
 import { MissionHud } from '@/pages/mission-play/ui/MissionHud'
+import { missionStageStripsOf } from '@/pages/mission-play/lib/missionHudLayout'
+import type { MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
@@ -281,6 +283,13 @@ export function MissionPlayScreen({
     onPopupFrozenChange?.(isPopupFrozen)
   }, [isPopupFrozen, onPopupFrozenChange])
   const isOver = run.status !== '진행중'
+  /** 미션 HUD 한도 — 0x369f6 타석 · 0x36b04 스윙 (쓴 수 = 한도 − 남은 수) */
+  const hudLimits: MissionLimitState = {
+    plateAppearanceLimit: run.mission.plateAppearanceLimit,
+    plateAppearancesUsed: run.mission.plateAppearanceLimit - (run.remainingPlateAppearances ?? run.mission.plateAppearanceLimit),
+    swingLimit: run.mission.swingLimit,
+    swingsUsed: run.mission.swingLimit - (run.remainingSwings ?? run.mission.swingLimit),
+  }
   /** [미션+0xbc] — 결과 판 · 정산 효과의 "이겼나" (0x4ea0c 4ef2a · 0x4a384 4a3ea) */
   const isSuccess = run.status === '성공'
   /** 정산 효과 층(비 · 파티클) — 결과 배경 타석 캔버스와 미션 결과 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
@@ -374,6 +383,8 @@ export function MissionPlayScreen({
         {/* 타석 캔버스 — RawScreen 판 (0, 0) 에 맞춘다(`stageScreen.css`) */}
         <div className={stageScreen.canvasSlot}>
           <BattingStage
+            // 미션 HUD 띠 — 점수판 0x373d0 끝이라 타석 캔버스가 원본 식으로 섞는다 (Q-03 r301, `missionStageStripsOf`)
+            {...(isOver ? {} : { missionStrips: missionStageStripsOf(hudLimits, run.remainingSeconds) })}
             skyRow={skyRow}
             batterAbility={ability}
             batterSkillIds={batterSkillIds}
@@ -485,13 +496,9 @@ export function MissionPlayScreen({
           <MissionHud
             mission={run.mission}
             progress={run.progress}
-            limits={{
-              plateAppearanceLimit: run.mission.plateAppearanceLimit,
-              plateAppearancesUsed: run.mission.plateAppearanceLimit - (run.remainingPlateAppearances ?? run.mission.plateAppearanceLimit),
-              swingLimit: run.mission.swingLimit,
-              swingsUsed: run.mission.swingLimit - (run.remainingSwings ?? run.mission.swingLimit),
-            }}
+            limits={hudLimits}
             remainingSeconds={run.remainingSeconds}
+            stripsOnStage
           />
         )}
 

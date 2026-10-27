@@ -1,7 +1,31 @@
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
-import { SEASON_CARD_BOARD, SEASON_CARD_LOGO, steppedBoardPointsOf } from '@/pages/season/lib/seasonPlayerCard'
+import {
+  SEASON_CARD_BOARD, SEASON_CARD_LOGO, seasonCardLogoPlaceOf, steppedBoardLeftEnd, steppedBoardLeftRow565, steppedBoardPointsOf,
+} from '@/pages/season/lib/seasonPlayerCard'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
+import { BallPatternTranslucentImage } from '@/pages/special/ui/SkinBackdrops'
+import { color565Of } from '@/shared/lib/pixelEffect/pixelEffect'
+
+/** 판 색 셋 (565) — SVG 판과 같은 색 */
+const BOARD_COLORS_565 = {
+  edge: color565Of(ORIGINAL_COLORS.boardEdge) ?? 0,
+  highlight: color565Of(ORIGINAL_COLORS.boardHighlight) ?? 0,
+  fill: color565Of(ORIGINAL_COLORS.boardFill) ?? 0,
+} as const
+
+/**
+ * 합성 캔버스 칸 — team_logo 는 팀마다 크기가 달라(73×33 ~ 78×76) 원본처럼 실제 크기로 가운데를 잡으므로(`seasonCardLogoPlaceOf`)
+ * 가장 큰 80×80 까지 덮는 칸을 잡는다
+ */
+const LOGO_BOX = { ...seasonCardLogoPlaceOf(80, 80), width: 80, height: 80 } as const
+
+/** 로고 칸이 판의 왼쪽 평평한 몫 안에 드는가 — 아니면 줄 색으로 다룰 수 없다 */
+const LOGO_IN_BOARD_LEFT = LOGO_BOX.x >= 1 && LOGO_BOX.x + LOGO_BOX.width <= steppedBoardLeftEnd(SEASON_CARD_BOARD.offset)
+
+/** 로고 아래 줄 — 판 위면 null(공 무늬가 그대로), 판이면 그 줄 색 */
+const boardRowUnderLogo = (y: number) =>
+  LOGO_IN_BOARD_LEFT ? steppedBoardLeftRow565(y, SEASON_CARD_BOARD.top, SEASON_CARD_BOARD.height, BOARD_COLORS_565) : undefined
 
 /**
  * **카드 판 — 0x7ba44 머리 (계단형 판 · 반투명 로고)**. 직접 떴다:
@@ -39,12 +63,14 @@ export function CardPlate({ teamId, testIdPrefix = '카드' }: { readonly teamId
         <polyline points={line(points.slice(0, 4))} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardHighlight} />
         <polyline points={line(points.slice(4).reverse())} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardEdge} />
       </svg>
+      {/*
+        로고 효과 1 · 12 — 아래(공 무늬 + 판)를 같은 좌표로 다시 그려 원본 식으로 섞는다(Q-03 r301, `BallPatternTranslucentImage`).
+        카드가 서는 화면(기본정보 119 · 상점 · 등록 0x66 · 0x67 · 시즌 0xd9 · 0xdc)은 모두 공 무늬 바탕 0x5fd61 위다
+      */}
       {team !== undefined && (
-        <img className={managementStyles.layer} alt={team.name} data-testid={`${testIdPrefix}-로고`} src={team.logoUrl}
-          style={{
-            left: SEASON_CARD_LOGO.x, top: SEASON_CARD_LOGO.y, width: SEASON_CARD_LOGO.width, height: SEASON_CARD_LOGO.height,
-            opacity: SEASON_CARD_LOGO.opacity,
-          }} />
+        <BallPatternTranslucentImage className={managementStyles.layer} alt={team.name} testId={`${testIdPrefix}-로고`} src={team.logoUrl}
+          {...LOGO_BOX} level={SEASON_CARD_LOGO.level} rowOver={boardRowUnderLogo} imagePlaceOf={seasonCardLogoPlaceOf}
+          fallbackRect={SEASON_CARD_LOGO} />
       )}
     </>
   )
