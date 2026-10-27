@@ -832,7 +832,8 @@ export function App({ bootScreen }: AppProps = {}) {
           const saved = generalGameOfSave(modeSave.save.generalGame)
           setGeneralQuickStart(false)
           if (saved === null) {
-            // ⚠️ 웹 전용: 블록을 경기로 못 읽으면(옛 꼴) 저장이 없는 것으로 보고 새로하기(상태 18)로 간다
+            // ⚠️ 웹 전용(남김 — 옛 저장 호환, Q-13): 블록을 경기로 못 읽으면(옛 웹 판이 쓴 꼴) 저장이 없는 것으로 보고 새로하기(상태 18)로
+            // 간다. 모드 저장은 블록을 꼴 검사 없이 들고 있어 읽을 때 거를 곳이 여기뿐이다 — r325 계측에서 앱 길은 안 지났다
             modeSave.finishGeneralGame()
             setGeneralResume(null)
           } else {

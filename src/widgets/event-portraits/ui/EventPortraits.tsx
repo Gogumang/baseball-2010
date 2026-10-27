@@ -112,6 +112,8 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
  * 상태로 들고 있어서, 프레임이 바뀐 그 그리기 한 번은 **앞 프레임 주소**를 내보낸다.
  * 새로 마운트하면 처음 상태가 이번 프레임의 구운 주소라 엉뚱한 칸이 비칠 일이 없다.
  * ⚠️ 캔버스가 없거나(테스트의 jsdom) 아직 다 안 칠했으면 구운 그림을 그대로 쓴다 — 색만 한 박자 늦는다.
+ *   (남김, Q-13: 앱 길에서도 지난다 — 팔레트 JSON · 그림을 비동기로 받아 칠하는 동안의 첫 그림들. 원본은 팔레트를 적재 때 다 들고 있어
+ *   대응이 없는 웹 적재 몫이다. 칠한 그림은 `useRecoloredSprite` 가 모아 두어 두 번째부터는 곧장 쓴다)
  */
 function PaintedFrame({
   url, palette, style,

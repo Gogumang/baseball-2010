@@ -124,6 +124,7 @@ import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillChee
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { SceneCloudCountingSpan } from '@/widgets/batting-stage/model/useSceneCloudCountingSpan'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -1243,8 +1244,11 @@ function PitcherGameScene({
         )}
 
         {burstWindow}
+        {/* 돌발 제안 0x1b · 타석 위 돌발 결과 0x1d 는 원본이 구름을 센다 — 아래 루프가 '대기' 가 아니어도 (Q-08) */}
+        {burstWindow !== null && <SceneCloudCountingSpan />}
 
-        {/* 0x16 → 0xd → 0xe 진입 0x50674 의 감독 강판 — 연출 뒤다 */}
+        {/* 0x16 → 0xd → 0xe 진입 0x50674 의 감독 강판 — 연출 뒤다. 감독 대사 0x23 도 원본이 구름을 센다 (Q-08) */}
+        {progress.managerHookText !== null && !substitution.isShown && !isHookPassing && <SceneCloudCountingSpan />}
         {progress.managerHookText !== null && !substitution.isShown && !isHookPassing && (
           <ManagerHookWindow
             userEventIndex={progress.managerHookText}

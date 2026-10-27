@@ -47,7 +47,7 @@ import { TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
-import { noteSkinShakeKey, skinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
+import { noteSkinShakeDirection, noteSkinShakeKey, skinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
@@ -707,6 +707,9 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         : event.key === 'ArrowDown' || event.key === '8' ? 'down'
         : event.key === 'ArrowUp' || event.key === '2' ? 'up'
         : null
+      // 창이 없으면 격자가 바꾼 키를 0x5550c 에 넘긴다(0x62568 625a0~625be) — 숫자키도 방향으로 [skin+0x8c] 에 남는다(Q-10).
+      // 말풍선(0x2ac00 [skin+0x126] ≠ 0 → 2ac76)은 목록을 안 불러 위에서 끝난다
+      if (direction !== null) noteSkinShakeDirection(direction)
       if (direction !== null) {
         event.preventDefault()
         const next = view.firstSlot + moveGridCursor(menuGrid, slot - view.firstSlot, direction)
@@ -960,7 +963,9 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
       {popupView !== null && <MessageBox text={popupView.text} buttons={popupView.buttons}
-        {...(popupView.initialSelected === undefined ? {} : { initialSelected: popupView.initialSelected })} onAnswer={answerPopup} />}
+        {...(popupView.initialSelected === undefined ? {} : { initialSelected: popupView.initialSelected })} onAnswer={answerPopup}
+        // 창이 떠 있으면 0x62568 이 격자를 건너 날 키를 0x5550c 에 넘긴다(625a6~625be) — 화살표면 [skin+0x8c] 에 남는다(Q-10)
+        onRawKey={noteSkinShakeKey} />}
     </RawScreen>
   )
 }

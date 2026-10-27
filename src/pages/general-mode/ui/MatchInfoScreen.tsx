@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import type { ReactNode } from 'react'
 import { FrameSprite, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -113,6 +114,9 @@ export function MatchInfoScreen({
       if (!isKeyReady.current) return
       // 0x311a8: 빠른실행이고 [메뉴+0x154] ≤ 0x13(재굴림이 도는 중)이면 312ba 에서 끝 — 키를 안 본다
       if (isRespinning) return
+      // 설정 창이 열렸으면([skin+0x2ba]) 키는 창 0x5ffcd 로만 간다(312bc~312ce). 아니면 **날 키**를 0x5550d 에 넘긴다(312dc~312e2) —
+      // 화살표면 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
+      if (!isSettingsOpen) noteSkinShakeKey(event.key)
       if (event.key === 'Enter') {
         event.preventDefault()
         return onStart()
@@ -141,7 +145,7 @@ export function MatchInfoScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isQuickStart, isRespinning, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry])
+  }, [isQuickStart, isRespinning, isSettingsOpen, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = setup.playerSide === PLAYER_SIDE_FIRST_BAT

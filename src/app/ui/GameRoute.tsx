@@ -50,6 +50,7 @@ import { AutoPlayRelayReplay } from '@/pages/auto-play-relay'
 import { RecordAlertScreenOverlay, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import { gameAutoRelayStepsOf } from '@/pages/game/lib/gameAutoRelay'
+import { SceneCloudCountingSpan } from '@/widgets/batting-stage/model/useSceneCloudCountingSpan'
 
 /** 나리 타자편 — 전역 모드 [0x1552d10] = 4 */
 const BATTER_CAREER_MODE = 4
@@ -476,6 +477,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       />
       {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
       {burstWindow !== null && <ScreenOverlay>{burstWindow}</ScreenOverlay>}
+      {/* 돌발 제안 0x1b · 타석 위 돌발 결과 0x1d 는 원본이 구름을 센다 — 아래 루프가 '대기' 가 아니어도 (Q-08) */}
+      {burstWindow !== null && <SceneCloudCountingSpan />}
     </>
   )
 }

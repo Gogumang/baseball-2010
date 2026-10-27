@@ -707,8 +707,8 @@ function seasonGlobalCarryOf(raw: unknown): SeasonGlobalCarry {
 
 /** 시즌 저장의 경기 블록 (`SeasonSave.gameSave`) */
 interface SeasonGameSaveBlock {
-  /** 마지막으로 쓴 경기 진행 — 모르는 꼴로 담고 `seasonGameProgressOf` 가 가려 낸다 */
-  readonly progress: unknown
+  /** 마지막으로 쓴 경기 진행 — 읽을 때 `normalizeGameSave` 가 `seasonGameProgressOf` 로 가려 낸 것만 남는다 */
+  readonly progress: TeamGameProgress
   readonly kind: SeasonGameKind
   readonly ownRotationShift: number
 }
@@ -1159,7 +1159,9 @@ const SEASON_GAME_KINDS: readonly SeasonGameKind[] = ['정규', '포스트시즌
 
 /**
  * **시즌 경기 블록 → 이어 세울 진행.** 시즌 저장이 블록을 모르는 값으로 들고 있으므로 시즌(모드 2) 경기 진행인지 가려 낸다.
- * ⚠️ 웹 전용: 원본은 파일을 그대로 올린다(0x213c0). 웹은 진행 꼴이 바뀌어 옛 블록을 못 읽으면 null(저장 없음)로 거른다.
+ * ⚠️ 웹 전용(남김 — 옛 저장 호환, Q-13): 원본은 파일을 그대로 올린다(0x213c0). 웹은 진행 꼴이 바뀌어 옛 블록을 못 읽으면 null(저장 없음)로
+ * 거른다. 읽는 곳은 저장을 올릴 때(`normalizeGameSave`) 하나 — r325 전체 시험 계측에서 null 갈래는 이 함수의 단위 시험(옛 꼴 블록)만 지났다.
+ * 웹 판이 저장 꼴을 넓히기 전에 쓴 브라우저 저장을 위해 남긴다.
  */
 export function seasonGameProgressOf(raw: unknown): TeamGameProgress | null {
   if (raw === null || typeof raw !== 'object') return null
@@ -3239,13 +3241,11 @@ export function useSeasonSession(
   const resumeSavedGame = useCallback((): boolean => {
     const current = latestSave.current
     if (current === null || current.isGameInProgress !== true) return false
+    // +0x4e 와 블록은 함께 선다 — 쓰는 곳(경기 중간 저장)이 둘을 같이 적고, 읽을 때(`normalizeSeasonSave`)는 블록을 못 가려 내면
+    // +0x4e 도 내린다. 그래서 여기서 다시 가리던 웹 전용 안전망(못 읽으면 표시를 내림)은 앱 길에서 안 닿아 걷었다(Q-13, r325 계측)
     const block = current.gameSave ?? null
-    const saved = block === null ? null : seasonGameProgressOf(block.progress)
-    if (block === null || saved === null) {
-      // ⚠️ 웹 전용: 블록을 경기로 못 읽으면 저장이 없는 것으로 보고 표시를 내린다
-      commit({ ...current, isGameInProgress: false, gameSave: null })
-      return false
-    }
+    if (block === null) return false
+    const saved = block.progress
     // 이어하기도 지금 환경설정으로 선다 (일반모드 `GeneralModeResume` 와 같다 — 원본은 설정 칸을 경기 중에 읽는다)
     const options: TeamGameOptions = withGameSettings({ ...saved.options, ...(aceLevels === undefined ? {} : { aceLevels }) })
     // 옛 블록 이사 — 기록으로 선 영입 선수의 니블 · +0xb 가 없으면 같은 레코드(지금 시즌 명단의 기록 사본)에서 채운다

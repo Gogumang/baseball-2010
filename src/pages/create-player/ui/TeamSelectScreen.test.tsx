@@ -5,6 +5,7 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
 import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { TEAMS } from '@/shared/config/original/teams'
+import { resetSkinShakeDirectionForTest, skinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { GRID, MY_LEAGUE_TEAM_GRID_SHAPE, TEAM_COUNT, cellPositionOf } from '@/pages/create-player/lib/teamSelectLayout'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
@@ -108,6 +109,20 @@ describe('팀 고르기', () => {
     fireEvent.keyDown(window, { key: '5' })
 
     expect(onSelect).toHaveBeenLastCalledWith(4)
+  })
+
+  it('격자가 바꾼 키를 0x5550d 에 넘긴다 — 숫자키도 방향으로 [skin+0x8c] 에 남는다 (0x8da4 8de0 · 0x14114 1414a, Q-10)', () => {
+    resetSkinShakeDirectionForTest()
+    띄우기()
+    fireEvent.keyDown(window, { key: '6' })
+    expect(skinShakeDirection()).toBe('right')
+    fireEvent.keyDown(window, { key: '8' })
+    expect(skinShakeDirection()).toBe('down')
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(skinShakeDirection()).toBe('up')
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(skinShakeDirection()).toBe('up')
+    resetSkinShakeDirectionForTest()
   })
 
   it('칸마다 파란 바탕 그림(slt_frame 0)을 깐다', () => {

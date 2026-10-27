@@ -7,6 +7,7 @@ import { INITIAL_SETUP } from '@/pages/general-mode/lib/generalModeSetup'
 import { MatchInfoScreen } from '@/pages/general-mode/ui/MatchInfoScreen'
 import { MATCH_INFO_LAYOUT } from '@/pages/general-mode/lib/prepareLayout'
 import { resetSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
+import { resetSkinShakeDirectionForTest, skinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 
 /** 경기정보 (하위 상태 22, 목록 k = 4) */
 
@@ -56,6 +57,20 @@ describe('다섯 줄', () => {
 })
 
 describe('키', () => {
+  it('날 키를 0x5550d 에 넘긴다 — 화살표만 [skin+0x8c] 에, 숫자키 · 설정 창이 열렸을 때는 안 적는다 (0x311a8 312dc, Q-10)', () => {
+    resetSkinShakeDirectionForTest()
+    const { unmount } = 띄우기({ onOpenEntry: vi.fn() })
+    fireEvent.keyDown(window, { key: '8' })
+    expect(skinShakeDirection()).toBe('left')
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(skinShakeDirection()).toBe('down')
+    unmount()
+    띄우기({ isSettingsOpen: true })
+    fireEvent.keyDown(window, { key: 'ArrowUp' })
+    expect(skinShakeDirection()).toBe('down')
+    resetSkinShakeDirectionForTest()
+  })
+
   it('OK 면 경기를 시작한다', () => {
     const onStart = vi.fn()
     띄우기({ onStart })

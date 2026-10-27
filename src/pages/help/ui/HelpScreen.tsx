@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CommonPanel, InsetBox, PressArea, RawScreen, ScreenOverlay, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
 import { tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import { noteSkinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
@@ -79,6 +80,11 @@ const viewerKeyOf = (key: string): HelpViewerKey | null => {
     case '8': return '8'
     default: return null
   }
+}
+
+/** 숫자키 꼴 1 격자가 방향으로 돌려주는 키 (표 0xd2e7c) — 까딱임 방향 칸만 본다 */
+const HELP_GRID_DIRECTIONS: Readonly<Record<string, 'left' | 'right' | 'up' | 'down'>> = {
+  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
 }
 
 /** 장 고르기 → 쪽 보기 — OK(Enter) */
@@ -197,6 +203,11 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
       // 장면 팝업 걸음이라 뷰어 skin 과 같은 객체지만, 뷰어를 열 때 0x63688 이 0 을 쓰고(63774) 메인 장면은 상태가 바뀔 때마다
       // 0x3299c 가 0 으로 지운다. 0 아닌 값은 뷰어가 아닌 메인 상태 21(0x29df8) · 27(0x2ad88 · 0x2ae56) · 28(0x2b234)의 팝업만
       // 쓴다 — 뷰어 키(메인 상태 7 · 10 의 0x2cd54, 경기 0x3ca36) 때는 늘 0 이라 버리는 길이 서지 않는다(r207, U-86)
+      // 뷰어 키 0x637d0 은 맨 앞에서 격자 [skin+0x454] vt+0x18 이 돌려준 키를 0x5550c(skin, 키)에 넘긴다(637e2~637f0) — 갈래 없이
+      // 늘. 그 격자는 뷰어 열기 0x63688 의 `vt+0x1c(3, 1, 1, 0x10)`(6371a) 로 [격자+4] = 숫자키 꼴 1 이라(0x6bfe8) '2' '4' '6' '8' 도
+      // 방향으로 바뀌어 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
+      const noted = HELP_GRID_DIRECTIONS[event.key]
+      if (noted !== undefined) noteSkinShakeDirection(noted)
       const key = viewerKeyOf(event.key)
       if (key === null) return
       event.preventDefault()

@@ -81,6 +81,12 @@ interface MessageBoxProps {
    * 자리(예: 이벤트 보상의 기다림 0x8daa0)가 쓴다. `onAnswer` 는 그대로 다 닫힌 뒤에 온다.
    */
   readonly onAnswerKey?: (index: number) => void
+  /**
+   * 창이 떠 있어도 뒤 화면 키 함수가 같은 틀에 **날 키**를 보는 자리 — 이 상자가 키를 잡아 뒤로 안 넘기므로(아래) 띄운 쪽이 받는다.
+   * 예: 공용 목록 0x62568 은 창([0x140005c]+9 · [skin+0x314])이 떠 있으면 격자를 건너 날 키를 0x5550c 에 넘긴다(625a6~625be, Q-10).
+   * 펼침 · 닫힘 중에도 온다
+   */
+  readonly onRawKey?: (key: string) => void
 }
 
 /**
@@ -177,8 +183,10 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 
 export function MessageBox({
   text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, cancelPressRect, dimOpacity, closesWithoutShrink: closesWithoutShrinkProp,
-  opensOneStepIn = false, onAnswer, onAnswerKey,
+  opensOneStepIn = false, onAnswer, onAnswerKey, onRawKey,
 }: MessageBoxProps) {
+  const onRawKeyRef = useRef(onRawKey)
+  onRawKeyRef.current = onRawKey
   // 창을 띄울 때 [창+0x24f] 를 [창+0x24e] 로 옮긴다(0x7503c) — 띄운 자리가 정하지 않았으면 지금 장면의 값
   const sceneClosesWithoutShrink = useSceneClosesWithoutShrink()
   const closesWithoutShrink = closesWithoutShrinkProp ?? sceneClosesWithoutShrink
@@ -299,6 +307,7 @@ export function MessageBox({
     const onKeyDown = (event: KeyboardEvent) => {
       // 잡는 단계에서 멈춰 뒤쪽 화면의 window 리스너(메뉴 목록·커맨드 줄·타석)까지 막는다
       event.stopImmediatePropagation()
+      onRawKeyRef.current?.(event.key)
       // 펼치는 동안 · 닫히는 동안(답한 뒤)은 키를 보지 않는다 — 0x75556 · 0x7558a 갈래
       if (animationRef.current !== null || isAnsweredRef.current) {
         if (HANDLED_KEYS.has(event.key)) event.preventDefault()

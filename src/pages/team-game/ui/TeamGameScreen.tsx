@@ -153,6 +153,7 @@ import type { DefensePlayResult } from '@/features/defense-play/model/runDefense
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { SceneCloudCountingSpan } from '@/widgets/batting-stage/model/useSceneCloudCountingSpan'
 
 /**
  * **팀 경기 화면** — 원본 게임 모드 1 일반 · 2 시즌 · 8·9 대전 이 쓰는 경기 장면(0x104)이다.
@@ -1529,6 +1530,8 @@ function TeamGameScene({
           </PressLayer>
         )}
 
+        {/* 교체 창 0xb 도 원본이 구름을 센다 (Q-08) */}
+        {changeWindow !== null && <SceneCloudCountingSpan />}
         {substitutionRows !== null && changeWindow !== null && (
           <SubstitutionWindow
             kind={changeWindow}
@@ -1602,6 +1605,8 @@ function TeamGameScene({
         )}
 
         {burstWindow}
+        {/* 돌발 제안 0x1b · 타석 위 돌발 결과 0x1d 는 원본이 구름을 센다 — 아래 루프가 '대기' 가 아니어도 (Q-08) */}
+        {burstWindow !== null && <SceneCloudCountingSpan />}
       </RawScreen>
 
       {overlay === '조작방법' && (
