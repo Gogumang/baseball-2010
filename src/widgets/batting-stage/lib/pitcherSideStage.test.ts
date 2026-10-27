@@ -174,7 +174,7 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
 
   it('판정 공 틱 — 스윙은 F + 1(스윙이 나간 다음 틀), 번트는 N − 1 (0x4e15c)', () => {
     const pattern = [90, 900, 300, 0] as const
-    const contact = { pattern, resultCode: 10 }
+    const contact = { pattern, resultCode: 10, batterHand: 0 }
     expect(pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0).judgeBallTick).toBe(16)
     expect(pitcherHitSceneOf(contact, { frame: 5, buntKind: 2 }, 20, 0).judgeBallTick).toBe(19)
     // 0x13 길이는 타자편과 같은 셈(`hitPauseTicksOf`)
@@ -184,7 +184,7 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
   })
 
   it('필살 스윙으로 맞은 공은 보통 불꽃 대신 필살 파티클을 쏜다 (0x49aec 가 [sp+0x60] 을 세운다)', () => {
-    const contact = { pattern: [90, 1300, 300, 0] as const, resultCode: 10, specialSwing: { number: 1, isAceBatter: false } }
+    const contact = { pattern: [90, 1300, 300, 0] as const, resultCode: 10, batterHand: 0, specialSwing: { number: 1, isAceBatter: false } }
     const special = pitcherHitSceneOf(contact, { frame: 15, buntKind: 0 }, 20, 0)
     expect(special.specialSwing).toEqual({ number: 1, isAceBatter: false })
     expect(special.resultCode).toBe(10)
@@ -202,7 +202,7 @@ describe('CPU 타자가 맞힌 공 — 판정 틀(스윙 F + 1)까지 0x11, 다�
   })
 
   it('번트로 맞은 공은 보통 불꽃 · ptc 가 없다 — 49faa 스윙 객체 S+8(번트 자세) ≠ 0 (r215)', () => {
-    const contact = { pattern: [90, 1300, 300, 0] as const, resultCode: 10 }
+    const contact = { pattern: [90, 1300, 300, 0] as const, resultCode: 10, batterHand: 0 }
     const bunt = pitcherHitSceneOf(contact, { frame: 5, buntKind: 2 }, 20, 0)
     expect(bunt.isBuntStance).toBe(true)
     expect(pitcherHitContactOf(bunt, 0, null, 0)).toEqual({ effect: null, particles: [] })

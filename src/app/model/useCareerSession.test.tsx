@@ -710,7 +710,7 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
       act(() => rendered.result.current.session.actions.confirmMatchPrepare())
       act(() => rendered.result.current.session.actions.finishLoading())
       const 헛스윙: PitchOutcomeDetail = {
-        resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+        batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
       }
       for (let step = 0; step < 3000 && rendered.result.current.screen.kind === '경기'; step += 1) {
         const { session } = rendered.result.current
@@ -740,6 +740,7 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
 
 describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 기록까지', () => {
   const 공 = (resolution: PitchOutcomeDetail['resolution']): PitchOutcomeDetail => ({
+    batterHand: 0,
     resolution,
     hasSwung: resolution.kind !== '볼',
     isBunt: false,
@@ -808,7 +809,7 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
 
   it('판을 도는 파울 각 공도 같다 — 판이 파울로 닫힐 때(결과 코드 7 메시지 51c5c 의 0xa7dbc) 센다', () => {
     const 파울코드 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
-      patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
+      patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern, batterHand: 0 })),
     )[0]
     const 판파울: PitchOutcomeDetail = { ...파울, resultCode: 파울코드.resultCode, pattern: 파울코드.pattern, foulContact: 파울코드 }
     const rendered = 경기띄우기()
@@ -851,7 +852,7 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
 
 describe('공마다 상대 투수 투구 수·스태미나 (0x3dec6 → 0xa5e14(ctx, 구질))', () => {
   const 볼 = (pitchTypeNumber?: number): PitchOutcomeDetail => ({
-    resolution: { kind: '볼' },
+    batterHand: 0, resolution: { kind: '볼' },
     hasSwung: false,
     isBunt: false,
     resultCode: null,
@@ -978,7 +979,7 @@ describe('부상 둘째 팝업 0x29 — 105 틀 0x1aec4 1af3c~1af7e (r197)', () 
 
 describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판을 돌리고 같은 타석을 잇는다', () => {
   const 볼: PitchOutcomeDetail = {
-    resolution: { kind: '볼' },
+    batterHand: 0, resolution: { kind: '볼' },
     hasSwung: false,
     isBunt: false,
     resultCode: null,
@@ -2068,7 +2069,7 @@ describe('돌발 결과 창 뒤의 경기 끝 (r315)', () => {
       act(() => rendered.result.current.session.actions.confirmMatchPrepare())
       act(() => rendered.result.current.session.actions.finishLoading())
       const 헛스윙: PitchOutcomeDetail = {
-        resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+        batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
       }
       for (let step = 0; step < 3000 && rendered.result.current.screen.kind === '경기'; step += 1) {
         const { session } = rendered.result.current

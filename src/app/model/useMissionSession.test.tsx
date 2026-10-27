@@ -109,7 +109,7 @@ function playAceMatch(hit: boolean, counts: Readonly<Record<string, number>> = {
 
   act(() => {
     rendered.result.current.session.handleMissionPitch({
-      resolution: hit ? { kind: '타구', outcome: { kind: '안타', bases: 1 } } : { kind: '스트라이크', isSwinging: true },
+      batterHand: 0, resolution: hit ? { kind: '타구', outcome: { kind: '안타', bases: 1 } } : { kind: '스트라이크', isSwinging: true },
       hasSwung: true,
       isBunt: false,
       resultCode: null,
@@ -126,7 +126,7 @@ function playAceMatch(hit: boolean, counts: Readonly<Record<string, number>> = {
     for (let count = 0; count < 2; count += 1) {
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          resolution: { kind: '스트라이크', isSwinging: true },
+          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -384,7 +384,7 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
       const rendered = setUpBatterMission(1, createSeededRandom(7), manual)
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+          batterHand: 0, resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -409,7 +409,7 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
 
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+        batterHand: 0, resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
         hasSwung: true,
         isBunt: false,
         resultCode: null,
@@ -437,7 +437,7 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     const 안타 = () =>
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+          batterHand: 0, resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -466,7 +466,7 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     for (let count = 0; count < 3; count += 1) {
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          resolution: { kind: '스트라이크', isSwinging: true },
+          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -494,7 +494,7 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
 
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        resolution: { kind: '볼' },
+        batterHand: 0, resolution: { kind: '볼' },
         hasSwung: false,
         isBunt: false,
         resultCode: null,
@@ -531,7 +531,7 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
     })
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        resolution: { kind: '볼' },
+        batterHand: 0, resolution: { kind: '볼' },
         hasSwung: false,
         isBunt: false,
         resultCode: null,
@@ -552,7 +552,7 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
   })
 
   it('키 없이 끝낸 실시간 도루 판은 미리 돌린 판과 같다 — 진루 · 기록 후보 · 판 안 굴림 수', () => {
-    const 볼 = { resolution: { kind: '볼' as const }, hasSwung: false, isBunt: false, resultCode: null }
+    const 볼 = { batterHand: 0, resolution: { kind: '볼' as const }, hasSwung: false, isBunt: false, resultCode: null }
     const 실시간Random = createSeededRandom(7)
     const 실시간 = setUpBatterMission(5, 실시간Random)
     act(() => 실시간.result.current.session.actions.steal(1))
@@ -587,7 +587,7 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
     const rendered = setUpBatterMission(5)
     act(() => rendered.result.current.session.actions.steal(1))
     act(() => {
-      rendered.result.current.session.handleMissionPitch({ resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null })
+      rendered.result.current.session.handleMissionPitch({ batterHand: 0, resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null })
     })
     const pending = rendered.result.current.session.pendingRunnerPlay
     if (pending === null) throw new Error('도루 판이 안 붙들렸다')
@@ -609,7 +609,7 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
 
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        resolution: { kind: '스트라이크', isSwinging: false },
+        batterHand: 0, resolution: { kind: '스트라이크', isSwinging: false },
         hasSwung: false,
         isBunt: false,
         resultCode: null,
@@ -664,7 +664,7 @@ describe('미션 마선수의 레벨 배율 0xd88aa (0xb6414)', () => {
     for (let pitch = 0; pitch < 2; pitch += 1) {
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          resolution: { kind: '볼' },
+          batterHand: 0, resolution: { kind: '볼' },
           hasSwung: false,
           isBunt: false,
           resultCode: null,
@@ -1376,7 +1376,7 @@ describe('투수 미션 사구 뒤 벤치 클리어링 — 0x4e72c → 0x1e 는 
 /* ── 타자 미션 볼넷 · 사구의 0x12 대기 · 벤치 클리어링 (r298) ───────────────────────── */
 
 describe('타자 미션(모드 6)도 0x12 갱신 0x4e6d4 를 탄다 — 사구는 틱 31 에 4e74c 를 굴리고 들어가면 0x1e (r298)', () => {
-  const 사구 = { resolution: { kind: '사구' as const }, hasSwung: false, isBunt: false, resultCode: null }
+  const 사구 = { batterHand: 0, resolution: { kind: '사구' as const }, hasSwung: false, isBunt: false, resultCode: null }
 
   it('사구는 공 도착에서 굴림 없이 붙들고 판정 1 · 진입 45 · 틱 10 의 8 — 들어가면 CPU 마운드 투구 수 +10(0x3ab82)', () => {
     let 들어감 = false
@@ -1451,7 +1451,7 @@ describe('타자 미션(모드 6)도 0x12 갱신 0x4e6d4 를 탄다 — 사구�
   it('볼넷도 붙들고 판정에서 굴림 없이 진루 — 삼진은 붙들지 않는다(정산 굴림이 없다)', () => {
     const counter = countedSeeded(3)
     const rendered = setUpBatterMission(1, counter.port, undefined)
-    const 볼 = { resolution: { kind: '볼' as const }, hasSwung: false, isBunt: false, resultCode: null }
+    const 볼 = { batterHand: 0, resolution: { kind: '볼' as const }, hasSwung: false, isBunt: false, resultCode: null }
     for (let count = 0; count < 4; count += 1) {
       act(() => {
         rendered.result.current.session.handleMissionPitch(볼)
@@ -1470,7 +1470,7 @@ describe('타자 미션(모드 6)도 0x12 갱신 0x4e6d4 를 탄다 — 사구�
     for (let count = 0; count < 3; count += 1) {
       act(() => {
         삼진판.result.current.session.handleMissionPitch({
-          resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null,
+          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null,
         })
       })
     }
@@ -1735,7 +1735,7 @@ describe('상태 0xe 의 OK 대기 — 미션(모드 5·6)도 새 타석마다 (
     const 스트라이크 = () =>
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          resolution: { kind: '스트라이크', isSwinging: true },
+          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -1765,14 +1765,14 @@ describe('투수 미션 경기 중 메뉴 "나가기" (0x40140 모드 5·6 갈�
 
 describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히면 같은 타석 스트라이크(0x35108 → 0xb6b58), 잡히면 파울 뜬공 아웃', () => {
   const 파울코드 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
-    patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
+    patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern, batterHand: 0 })),
   )[0]
 
   it('타자 미션: 쏜 공이 실린 파울은 판을 붙들고 스트라이크는 판이 파울로 닫힐 때 오른다', () => {
     const rendered = setUpBatterMission(1)
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        resolution: { kind: '파울' },
+        batterHand: 0, resolution: { kind: '파울' },
         hasSwung: true,
         isBunt: false,
         resultCode: 파울코드.resultCode,
@@ -1871,7 +1871,7 @@ describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428
 
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          resolution: { kind: '타구', outcome: { kind: '홈런' } },
+          batterHand: 0, resolution: { kind: '타구', outcome: { kind: '홈런' } },
           hasSwung: true,
           isBunt: false,
           resultCode: null,

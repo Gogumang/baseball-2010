@@ -247,7 +247,9 @@ export interface DefensePlayInput {
   readonly outcomeIsGiven?: boolean
   /**
    * 친 타자의 손 `0xb63c0`(1 = 좌타) — 타자주자가 서는 타석 자리(`batterBoxPosition`, vt94 0xa0884)를 고른다.
-   * 안 주면 쏜 공(`contactOfOutcome(outcome).batterHand`)의 손을 쓰고, 그것도 없으면(결과를 넘겨받은 시험 · 옛 길) ⚠️ 홈에서 뛴다(웹 근사).
+   * 안 주면 쏜 공(`contactOfOutcome(outcome).batterHand` — 쏜 공은 손이 필수다)의 손을 쓴다. 쏜 공이 없는 결과 넘김 길
+   * (시험 · `fixturePatternFor` · `homeRunPlaybackOf` 처럼 결과만 들고 오는 웹 다리 — 타자가 없다)만 ⚠️ 홈에서 뛴다(웹 근사).
+   * 이 길은 앱에서 안 지난다(r326 계측: soak 짧은 판 원본 · json, `yarn test:browser`, e2e 경기 장면 — 0번)
    */
   readonly batterHand?: number
   /** 원본 패턴에서 만든 타구 궤적 */
@@ -1206,8 +1208,8 @@ function rollContactMessage(input: DefensePlayInput): ContactMessageRoll {
   trajectory = rolledTrajectory
   // ── [경기+0xf2c] 공 쏘기 + 세계 0xbfed0 (0x51408 5174c · 517ce) — 판 공과 수평각만 d 다른 공(`earlyPassPatternOf`, 50faa 가
   // 고친 +0xfcc 그대로 + d). 그 공도 점을 깔며 폴에 맞으면 rand(−25, 25) 를 하나 굴린다 — 판 공 굴림 뒤 · 필살타법 굴림 앞.
-  // 궤적은 이른 넘김(상태 0x13 0x406e8)만 보고 판은 안 본다 — 여기서는 굴림 차례만 맞춘다. 손을 모르는 결과(시험 · 옛 길)는 건너뛴다
-  if (input.random !== undefined && launchedPattern !== undefined && swungContact?.batterHand !== undefined) {
+  // 궤적은 이른 넘김(상태 0x13 0x406e8)만 보고 판은 안 본다 — 여기서는 굴림 차례만 맞춘다. 쏜 공이 없는 결과(결과 넘김 길)는 건너뛴다
+  if (input.random !== undefined && launchedPattern !== undefined && swungContact !== undefined) {
     trajectoryWithRandom(battedBallTrajectory(earlyPassPatternOf(launchedPattern, swungContact.batterHand)), input.random)
   }
   // ── 필살타법 성공 굴림 0x517e6 (0x34c74 · p·10 > rand(0, 1000)) — 메시지 0x11(515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 ·

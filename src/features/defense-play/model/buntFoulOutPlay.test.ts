@@ -15,7 +15,7 @@ function 파울판(
   bases: BaseState = EMPTY_BASES,
 ): DefensePlayInput {
   return {
-    outcome: registerContact({ kind: '아웃', detail: '뜬공아웃' }, { pattern, resultCode: 12 }),
+    outcome: registerContact({ kind: '아웃', detail: '뜬공아웃' }, { batterHand: 0, pattern, resultCode: 12 }),
     trajectory: battedBallTrajectory(pattern),
     bases,
     outs: 0,

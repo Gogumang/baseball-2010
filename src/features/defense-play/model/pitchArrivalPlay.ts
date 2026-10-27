@@ -221,6 +221,12 @@ export interface PitchArrivalPlayInput {
   readonly bases: BaseState
   /** 이 투구 전의 아웃 수 (state[6]) — 판 종류 고르기(0x3e0ee)가 읽는다. 판은 삼진이 서면 + 1 로 연다(`playOutsOf`) */
   readonly outs: number
+  /**
+   * 지금 타자의 손 `0xb63c0`(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자가 서는 타석 자리(0x4650e 0xa93ac a9446 → vt94 0xa0884,
+   * `batterBoxPosition`)를 고른다. 사람 타석은 판정 공의 `PitchOutcomeDetail.batterHand`, CPU 타석은 공의 화면 배치 `Pitch.stageSide`
+   * (`simulateBatter` 가 맞은 공의 손으로 쓰는 값과 같다)
+   */
+  readonly batterHand: number
   readonly defenseAbilities?: readonly (number | null)[]
   /**
    * **수비 팀 보너스** (판 시작 0xb0fb4 b10d0 — `defenseTeamBonusOf`): 모드 1·2·8·9 에서 수비 팀 '집중' 등급.
@@ -353,6 +359,7 @@ export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: Ran
         bases: input.bases,
         outs: input.outs,
         pitchJudgement: input.pitchJudgement,
+        batterHand: input.batterHand,
         stealingFrom: input.stealingFrom,
         defenseAbilities: input.defenseAbilities,
         defenseTeamBonus: input.defenseTeamBonus,
@@ -407,6 +414,7 @@ export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: Ran
       ...common,
       shot,
       batterRuns: strikeout === 'batterRuns',
+      batterHand: input.batterHand,
       runAbilities: input.runAbilities,
       // 0x3d7b8 — 도루 주자 리드(rand(0,9)) · 도루 안 한 주자의 번트 +3 틱
       stealingFrom: input.stealingFrom,

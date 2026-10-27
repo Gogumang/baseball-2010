@@ -2690,7 +2690,7 @@ function batterPitch(
   // 파울 각 공 — 원본도 판(상태 0x17)을 돈다. 연속 파울 기록(0xa7dbc)은 판의 결과 코드 7 메시지(51c5c)에서라 판이 파울로 닫힐 때 센다.
   // 필살 스윙의 성공 굴림(0x517e6)은 타석 판정이 쏜 공(`detail.foulContact`)에 재료만 실어 판 시작(필살수비 · 폴 굴림 뒤)이 굴린다
   if (detail.resolution.kind === '파울' && detail.pattern !== undefined && detail.resultCode !== null) {
-    const contact = detail.foulContact ?? { pattern: detail.pattern, resultCode: detail.resultCode }
+    const contact = detail.foulContact ?? { pattern: detail.pattern, resultCode: detail.resultCode, batterHand: detail.batterHand }
     const started = startBatterFoulPlay(progress, contact, random, options)
     if (applyOutcome === startBatterOutcome) return started
     const pending = started.pendingDefensePlay
@@ -2706,7 +2706,7 @@ function batterPitch(
   const arrival = arriveTeamPitch(
     { ...progress, atBat },
     // 사람 타자의 이 공 번트 종류 — 못 맞힌 번트면 그 종류 (useTeamGame 이 타석 화면에서 받아 넘긴다)
-    { resolution: detail.resolution, outcomeAfter: outcome, buntKind: options.buntKind ?? 0 },
+    { resolution: detail.resolution, outcomeAfter: outcome, buntKind: options.buntKind ?? 0, batterHand: detail.batterHand },
     '공격',
     random,
     undefined,
@@ -3259,6 +3259,8 @@ export interface TeamPendingPitchArrival {
   readonly outcomeAfter: AtBatOutcome | null
   /** 장면 +0xfdc — CPU 타자의 이 공 번트 종류 */
   readonly buntKind: number
+  /** CPU 타자의 손 0xb63c0 — 공의 화면 배치 `Pitch.stageSide`(`simulateBatter` 가 맞은 공의 손으로 쓰는 값). 밀어내기 · 낫아웃 타석 자리 */
+  readonly batterHand: number
   /** 0x517e6 — CPU 마타자 필살 성공 타구 (못 맞힌 공이면 늘 거짓이지만 나머지 길이 같은 값을 쓴다) */
   readonly isUncatchable?: boolean
 }
@@ -3273,7 +3275,7 @@ function arriveOurPitchThenRest(
   const resume = { isUncatchable: pitch.isUncatchable, buntKind: pitch.buntKind }
   const arrival = arriveTeamPitch(
     progress,
-    { resolution: pitch.resolution, outcomeAfter: pitch.outcomeAfter, buntKind: pitch.buntKind },
+    { resolution: pitch.resolution, outcomeAfter: pitch.outcomeAfter, buntKind: pitch.buntKind, batterHand: pitch.batterHand },
     '수비',
     random,
     defer ? resume : undefined,
@@ -3559,6 +3561,7 @@ function pitchOnce(
     outcomeAfter: afterPitch.atBat.outcome,
     // CPU 타자의 이 공 번트 종류(`simulateBatter`) — 번트 헛스윙도 0x3445a 가 쓴 종류가 남는다(0x34436~0x34464, 안 휘두르면 0x340dc 가 지운 0)
     buntKind: thrown.buntKind ?? 0,
+    batterHand: pitch.stageSide,
     isUncatchable: thrown.isUncatchable,
   }
   // 화면 갈래 — 0x3dfac 은 0x12 진입 틀이다. 공이 나는 동안의 관리자 틱 굴림이 먼저 나도록 그 틀까지 붙든다 (`enterPitchResult`)
@@ -4419,6 +4422,8 @@ function arriveTeamPitch(
     readonly outcomeAfter: AtBatOutcome | null
     /** 장면 +0xfdc — 이 공의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
     readonly buntKind?: number
+    /** 지금 타자의 손 0xb63c0(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884, `PitchArrivalPlayInput.batterHand`) */
+    readonly batterHand: number
   },
   humanSide: ControlSide,
   random: RandomPort,
@@ -4447,6 +4452,7 @@ function arriveTeamPitch(
       stealingFrom: progress.stealingFrom,
       bases: before.bases,
       outs: before.outs,
+      batterHand: pitch.batterHand,
       runAbilities: runAbilitiesOnBaseOf(progress, humanSide),
       // 주자 속도의 팀 등급(0xa93ac a9488) — 공격 팀 근성
       runnerTeamGrade: offenseRunnerTeamGradeOf(progress, humanOffense),

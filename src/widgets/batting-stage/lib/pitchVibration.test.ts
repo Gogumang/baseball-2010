@@ -4,7 +4,7 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 
 const 공 = { frameCount: 18, type: 'FASTBALL' }
 const 타구: PitchOutcomeDetail = {
-  resolution: { kind: '파울' },
+  batterHand: 0, resolution: { kind: '파울' },
   hasSwung: true,
   isBunt: false,
   resultCode: 9,
@@ -21,7 +21,7 @@ describe('타석 진동 — 0xbc5(0x5228c) · 사구 0x51b0e', () => {
   it('사구는 200ms', () => {
     expect(
       pitchVibrationMillisecondsOf(
-        { resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null },
+        { batterHand: 0, resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null },
         null,
         공,
       ),
@@ -31,20 +31,20 @@ describe('타석 진동 — 0xbc5(0x5228c) · 사구 0x51b0e', () => {
   it('헛스윙·볼은 울리지 않는다', () => {
     expect(
       pitchVibrationMillisecondsOf(
-        { resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null },
+        { batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null },
         10,
         공,
       ),
     ).toBe(0)
     expect(
-      pitchVibrationMillisecondsOf({ resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null }, null, 공),
+      pitchVibrationMillisecondsOf({ batterHand: 0, resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null }, null, 공),
     ).toBe(0)
   })
 })
 
 describe('삼진 진동 — 상태 0x12 첫 그리기 0x4d0d6 (state[0xc] == 5)', () => {
   const 스트라이크 = (isSwinging: boolean): PitchOutcomeDetail => ({
-    resolution: { kind: '스트라이크', isSwinging },
+    batterHand: 0, resolution: { kind: '스트라이크', isSwinging },
     hasSwung: isSwinging,
     isBunt: false,
     resultCode: null,
@@ -59,7 +59,7 @@ describe('삼진 진동 — 상태 0x12 첫 그리기 0x4d0d6 (state[0xc] == 5)'
     expect(pitchVibrationMillisecondsOf(스트라이크(true), 10, 공, 1)).toBe(0)
     expect(pitchVibrationMillisecondsOf(스트라이크(false), null, 공, 0)).toBe(0)
     expect(
-      pitchVibrationMillisecondsOf({ resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null }, null, 공, 2),
+      pitchVibrationMillisecondsOf({ batterHand: 0, resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null }, null, 공, 2),
     ).toBe(0)
     expect(pitchVibrationMillisecondsOf(스트라이크(true), 10, 공, null)).toBe(0)
   })

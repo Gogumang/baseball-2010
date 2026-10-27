@@ -1342,6 +1342,7 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
       stealingFrom: stealing ? [1] : [],
       atBat: { balls: kind === '볼넷' ? 4 : 0, strikes: 0, outcome: { kind } },
       pendingPitchArrival: {
+        batterHand: 0,
         resolution: kind === '볼넷' ? { kind: '볼' } : { kind: '사구' },
         outcomeAfter: { kind },
         buntKind: 0,

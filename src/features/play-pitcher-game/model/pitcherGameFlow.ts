@@ -1424,6 +1424,8 @@ export function startPitch(
     resolution,
     outcomeAfter: afterPitch.atBat.outcome,
     buntKind: thrown.buntKind ?? 0,
+    // CPU 타자의 손 0xb63c0 — 공의 화면 배치(`simulateBatter` 가 맞은 공의 손으로 쓰는 값). 밀어내기 · 낫아웃 타석 자리
+    batterHand: pitch.stageSide,
     grade,
     live,
   }
@@ -1462,6 +1464,8 @@ export interface PitcherPendingPitchArrival {
   readonly outcomeAfter: AtBatOutcome | null
   /** 장면 +0xfdc — CPU 타자의 이 공 번트 종류 */
   readonly buntKind: number
+  /** CPU 타자의 손 0xb63c0 (`Pitch.stageSide`) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리 */
+  readonly batterHand: number
   /** 이 공의 등급 t (scene+0x17c0) */
   readonly grade: number
   /** 도루 · 폭투 판을 화면이 실시간으로 돌리는 갈래인가 (`startPitch` 의 `live`) */
@@ -1624,6 +1628,8 @@ function arrivePitcherPitch(
     readonly buntKind?: number
     /** 이 공의 등급 t (scene+0x17c0) — 결과 코드 스위치의 R+0x158(`recordPitchGrade`)이 본다 */
     readonly grade: number
+    /** 지금 타자의 손 0xb63c0(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884, `PitchArrivalPlayInput.batterHand`) */
+    readonly batterHand: number
   },
   random: RandomPort,
   /** 화면이 도는 갈래면 도루 · 폭투 판을 붙든다 — `afterMyPitchArrival` 이 쓸 값 */
@@ -1641,6 +1647,7 @@ function arrivePitcherPitch(
       stealingFrom: progress.stealingFrom,
       bases: before.bases,
       outs: before.outs,
+      batterHand: pitch.batterHand,
       // 수비 아홉 칸은 우리 팀 — 칸 0(나)은 진행기가 선수 없는 칸으로 둔다(0xb0fb4 b1032, `myDefenseAbilitiesOf`)
       defenseAbilities: myDefenseAbilitiesOf(progress),
       // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)

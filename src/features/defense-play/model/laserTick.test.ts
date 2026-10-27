@@ -181,7 +181,7 @@ describe('도루 키 0x583 끝의 0xafa60 한 번 — 앞 판이 끝난 그대�
   const 앞판 = () => {
     const pattern: BattedBallPattern = [160, 101, 752, 0]
     return runDefensePlay({
-      outcome: registerContact({ kind: '아웃', detail: '땅볼아웃' }, { pattern, resultCode: 1 }),
+      outcome: registerContact({ kind: '아웃', detail: '땅볼아웃' }, { batterHand: 0, pattern, resultCode: 1 }),
       trajectory: battedBallTrajectory(pattern),
       bases: EMPTY_BASES,
       outs: 0,
@@ -247,7 +247,7 @@ describe('도루 키 0x583 끝의 0xafa60 한 번 — 앞 판이 끝난 그대�
     const 기록 = (scene: DefenseScene | undefined) => {
       const arrival = 던지는난수()
       openPitchArrivalPlay(
-        { gameMode: 1, pitchJudgement: 2, stealingFrom: [2], bases: { ...EMPTY_BASES, second: true }, outs: 0, scene },
+        { batterHand: 0, gameMode: 1, pitchJudgement: 2, stealingFrom: [2], bases: { ...EMPTY_BASES, second: true }, outs: 0, scene },
         arrival,
       )
       return arrival.calls

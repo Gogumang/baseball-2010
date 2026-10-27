@@ -91,7 +91,7 @@ describe('타구 판의 판 안 소리 (`DefensePlayState.tickSounds`)', () => {
   it('파울 각 공이 파울로 닫히면 그 틱에 "Foul!" 25 (7 → 51c5c) — 함성 60 후보는 없다(공+0xac4 는 페어 각만)', () => {
     // 쏜 공(`contactOfOutcome`)이 실려야 state[0x1c](파울 각, 511b8)가 선다
     const 파울공 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
-      patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ pattern, resultCode: Number(code) })),
+      patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ pattern, resultCode: Number(code), batterHand: 0 })),
     )
     let 파울판 = 0
     for (const contact of 파울공) {
@@ -121,7 +121,7 @@ describe('세이프 콜 17 의 판 틱 (`DefensePlayResult.safeCallTick`)', () =
       for (const pattern of patterns) {
         if (!isFairAngle(pattern[0])) continue
         for (const bases of 주자들) {
-          const contact = { pattern, resultCode: Number(code) }
+          const contact = { pattern, resultCode: Number(code), batterHand: 0 }
           const { sounds, log, result } = 틱소리(판(registerContact(땅볼아웃, contact), bases, pattern))
           const 세이프틱 = sounds.filter(({ sound }) => sound.kind === 'sound' && sound.soundId === 17).map(({ tick }) => tick)
           const 코드9틱 = log.filter((줄) => 줄.includes('결과 코드 9')).map((줄) => Number(줄.match(/^(\d+)틱/)![1]))

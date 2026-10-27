@@ -9,6 +9,7 @@ import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPredic
 import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import {
   AI_STATE,
+  batterBoxPosition,
   createFielders,
   createRunner,
   initialPlayView,
@@ -78,6 +79,8 @@ import {
  * - 낫아웃 타자주자는 0xa93ac 가 세우는 대로 처음부터 1루로 뛴다 — a93f8~a9400 `주자.vt48(1)`(= 0xa07b0 → +0x80 · +0x7c ·
  *   +0x84 = 1)로 목표 루 1, a940a `+0x88 = 1`(요구 루) · a940c `+0x94 = 1` · a940e `+0x98 = 1`(타자주자). 판 시작 목표 0xa9e44 는
  *   목록 1 번부터 돌아(a9e5c `movs r1, #1`) 타자주자(0 번)를 건드리지 않는다.
+ *   출발 자리는 홈이 아니라 **타석 자리**다 — 같은 0xa93ac 의 a9446 vt94 0xa0884(주자, 0xb63c0(타자))가 홈 x ±700(좌타 +) · z −100 으로
+ *   옮긴다(`batterBoxPosition`, r326). 0x4650e 이 넘기는 타자는 0x464e6 0xae89c(지금 타순의 타자)라 타구 판과 같다.
  */
 export interface PassedBallPlayInput {
   /** 0x3507c 가 굴린 값 — `passedBallShot(random)` 을 rollPassedBall 이 선 투구에서 그대로 */
@@ -91,6 +94,8 @@ export interface PassedBallPlayInput {
   readonly outs: number
   /** `passedBallStrikeoutOf` 가 `'batterRuns'` 면 참 — 타자주자를 맨 앞에 만든다 (state[0x1a]) */
   readonly batterRuns?: boolean
+  /** 지금 타자의 손 `0xb63c0`(1 = 좌타) — 낫아웃 타자주자가 서는 타석 자리(`batterBoxPosition`, vt94 0xa0884)를 고른다 */
+  readonly batterHand: number
   /**
    * 이번 투구에 출발한 도루 주자들의 루 — state[0x14 + 루] (`0xa9bd4`, 종류 마스크 0xae794 = {1, 4, 5, 9}). 출발한 주자는 목표가
    * 이미 다음 루이고, 판 시작 리드(0x3d7b8)가 `0xcffa8`[루] + rand(0,9)(2 이하 → 3) 틱 몰아 돌린다. 안 주면 아무도 출발 안 했다
@@ -211,8 +216,15 @@ export function passedBallPlayEngineInputOf(input: PassedBallPlayInput): RunnerP
   const speedOf = (base: 0 | 1 | 2 | 3) =>
     runnerSpeedOf(input.runAbilities?.[base] ?? input.runAbility ?? DEFAULT_ABILITY, input.runnerTeamGrade ?? 0)
   if (batterRuns) {
-    // 0xa93ac: 홈에 세우고 +0x88 = 1(요구 루) · +0x90 = 0 · +0x98 = 1(타자주자)
-    runners.push(createRunner(0, 0, speedOf(0), { targetBase: 1, requiredBase: 1, isBatterRunner: true }))
+    // 0xa93ac: +0x88 = 1(요구 루) · +0x90 = 0 · +0x98 = 1(타자주자) · a9446 vt94 0xa0884 타석 자리(legStart 는 홈 그대로 — 진행률 분모)
+    runners.push(
+      createRunner(0, 0, speedOf(0), {
+        targetBase: 1,
+        requiredBase: 1,
+        isBatterRunner: true,
+        position: batterBoxPosition(input.batterHand),
+      }),
+    )
   }
   ;([1, 2, 3] as const).forEach((base) => {
     const occupied = base === 1 ? input.bases.first : base === 2 ? input.bases.second : input.bases.third

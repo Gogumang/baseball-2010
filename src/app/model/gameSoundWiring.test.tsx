@@ -60,7 +60,7 @@ function 메모리저장(held: PlayerCareer): SaveGamePort {
 }
 
 const 공 = (overrides: Partial<PitchOutcomeDetail>): PitchOutcomeDetail => ({
-  resolution: { kind: '볼' },
+  batterHand: 0, resolution: { kind: '볼' },
   hasSwung: false,
   isBunt: false,
   resultCode: null,
@@ -234,7 +234,7 @@ describe('경기 소리 배선', () => {
  */
 describe('내 타석의 파울 각 공 — 판을 돌고, 콜은 판 안의 그 틱 (결과 코드 7 메시지 51c5c)', () => {
   const 파울코드 = Object.entries(BATTED_BALL_PATTERNS).flatMap(([code, patterns]) =>
-    patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern })),
+    patterns.filter((pattern) => !isFairAngle(pattern[0])).map((pattern) => ({ resultCode: Number(code), pattern, batterHand: 0 })),
   )[0]
   const 파울 = 공({
     resolution: { kind: '파울' },

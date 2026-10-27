@@ -652,8 +652,9 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         // 판정 없는 헛스윙은 이 틀(공 끝 0x4e060 의 4e21c — 0x12 예약 4e24e 와 같은 갱신)에 8/27 을 낸다. 심판 콜은 다음 틀 0x12 진입이다
         playContactSoundNow(swing.isUnjudgedWhiff ? unjudgedWhiffSoundIdOf(aceBatterIndex >= 0) : null)
         const pitchTypeNumber = pitchTypeNumberRef.current
-        const detail = unjudgedSwingDetailOf(null)
         const latest = latestRef.current
+        // 타자 손 — 판정 공(`situationOf`)과 같은 값. 공 도착 판(낫아웃)의 타자주자 타석 자리를 고른다
+        const detail = unjudgedSwingDetailOf(null, latest.batterHand ?? batterSideOfForm(latest.batterForm))
         const withType = pitchTypeNumber === null ? detail : { ...detail, pitchTypeNumber }
         vibrate(
           pitchVibrationMillisecondsOf(withType, swing.frame, pitch, latest.hud?.strikes ?? null),

@@ -43,7 +43,8 @@ const STRIKEOUT: AtBatOutcome = { kind: '삼진' }
  * r268: 주자 걸음 · 도착 틱이 원본대로 맨해튼 거리(0xbf158 · 0xbf01c → 0xbfa2c)라 네 구간이 평면 속도의 0.71 배다 — 주루 500 으로는
  * 1275 패턴 어느 것도 판 안에서 홈을 못 돈다(예전 [67, 1150, 600] 은 이제 3루타). 미션 타자는 나리 저장 선수라 빠른 선수면 깬다
  */
-const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { pattern: [45, 279, 324, 0], resultCode: 14 })
+// 좌타(손 1) — 타자주자가 타석 자리(홈 x+700, vt94 0xa0884)에서 뛰어 판 안에서 홈을 돈다. 우타(x−700)면 홈에서 잡힌다 (r326)
+const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { batterHand: 1, pattern: [45, 279, 324, 0], resultCode: 14 })
 /** 그라운드 홈런 판은 주루 999 타자로 미리 돌려 넘긴다(`applyOutcome` 의 played — 화면이 판을 다 돌린 길) */
 const 빠른타자판 = (run: MissionRun, outcome: AtBatOutcome) =>
   runDefensePlay({ ...missionDefensePlayInputOf(run.bases, run.outs, outcome), runAbilities: { 0: 999 } })
@@ -276,7 +277,7 @@ describe('판정 규칙', () => {
     // 투수편은 사람 수비 · 송구 설정 기본 수동이다. 키를 안 누르면 원본은 아무도 던지지 않는다
     // (0xb1c90 자동 가지에는 송구 호출이 없다). 타석이 쏜 단타(원본 코드 2 [47, 1038, 596])는 원본 궤적으로
     // 1루 쪽 깊숙이 떨어져 우익수가 늦게 줍고, 자동 진루 0xaf918 이 2루 주자를 홈까지 보낸다.
-    const 깊은단타 = registerContact(SINGLE, { pattern: [47, 1038, 596, 0], resultCode: 2 })
+    const 깊은단타 = registerContact(SINGLE, { batterHand: 0, pattern: [47, 1038, 596, 0], resultCode: 2 })
     const afterSingle = applyPitcherOutcome(startPitcherMission(findMission('투수', 5)), 깊은단타)
     expect(afterSingle.allowed.runs).toBe(1)
     expect(afterSingle.status).toBe('실패')

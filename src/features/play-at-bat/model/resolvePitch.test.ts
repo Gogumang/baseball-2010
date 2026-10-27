@@ -88,14 +88,15 @@ describe('스트라이크 판정 — 0x3dfac 의 상자 0xcfb7c[side] (경계 �
 
 describe('판정 없는 스윙 — 0x6aa 를 안 탄 스윙은 헛스윙 스트라이크 (0x3dfac st[0x10] = S+0xe)', () => {
   it('스윙 수에 들고 굴림 없이 헛스윙 스트라이크다', () => {
-    expect(unjudgedSwingDetailOf(8)).toEqual({
+    expect(unjudgedSwingDetailOf(8, 1)).toEqual({
       resolution: { kind: '스트라이크', isSwinging: true },
       hasSwung: true,
       isBunt: false,
       resultCode: null,
       contactSoundId: 8,
+      batterHand: 1,
     })
-    expect(unjudgedSwingDetailOf(null).contactSoundId).toBeNull()
+    expect(unjudgedSwingDetailOf(null, 0).contactSoundId).toBeNull()
   })
 })
 

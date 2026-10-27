@@ -39,7 +39,7 @@ const 칸 = (progress: GameProgress) => ({
 })
 
 describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 키를 받는다 — 0x53420 → 0x5331c', () => {
-  const 공 = (resolution: PitchResolution, outcomeAfter: AtBatOutcome | null) => ({ resolution, outcomeAfter })
+  const 공 = (resolution: PitchResolution, outcomeAfter: AtBatOutcome | null) => ({ resolution, outcomeAfter, batterHand: 0 })
 
   it('live 면 도루 판(종류 5)을 붙든다 — 판이 도는 동안 경기 상태 · 다음 공은 그대로', () => {
     let held = 0
@@ -193,7 +193,7 @@ describe('붙든 판도 판 끝 0xf 진입의 볼카운트를 들고 간다 — 
     for (let seed = 1; seed <= 20 && held === 0; seed += 1) {
       const 시작 = startGame(createSeededRandom(seed))
       const 출발 = startSteal(주자(시작, 일루), 1, createSeededRandom(0))
-      const step = arrivePitch(출발, { resolution: { kind: '볼' }, outcomeAfter: null }, createSeededRandom(seed), {
+      const step = arrivePitch(출발, { batterHand: 0, resolution: { kind: '볼' }, outcomeAfter: null }, createSeededRandom(seed), {
         live: true,
         countAfter: { strikes: 1, balls: 2 },
       })

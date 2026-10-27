@@ -33,9 +33,10 @@ export interface BattedContact {
   /**
    * 친 타자의 손 `0xb63c1(0xae89d(공격 팀))` (≠ 0 좌타) — 0x51408 이 [경기+0xf2c] 공의 수평각 d 를 고른다(`earlyPassAngleOffsetOf`).
    * 그 공도 세계 0xbfed0 에 점을 깔아(517ce) 폴에 맞으면 굴림 rand(−25, 25) 가 하나 더 돈다 — 판 시작이 판 공 굴림 뒤 · 필살타법
-   * 굴림 앞에서 돌린다. 없으면(시험 · 옛 길) 그 굴림을 건너뛴다
+   * 굴림 앞에서 돌린다. 판의 타자주자가 서는 타석 자리(vt94 0xa0884, `batterBoxPosition`)도 이 손으로 고른다 — 쏜 공이면 늘 있다
+   * (`resolvePitch` · `simulateBatter`, r326 에서 필수로)
    */
-  readonly batterHand?: number
+  readonly batterHand: number
 }
 
 const CONTACTS = new WeakMap<object, BattedContact>()

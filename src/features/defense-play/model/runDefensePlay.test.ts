@@ -2245,7 +2245,7 @@ describe('포구 틱 b4292 — 발밑 루에 주자가 서 있는 포구는 결�
 describe('필살타법 성공 굴림 0x517e6 — 메시지 0x11(필살수비 · 쏘기) 뒤, 판 시작에서', () => {
   // 코드 15 [49, 802, 799] — 쫓는 야수가 투수·포수가 아니라 필살수비 굴림 둘(점프 · 슬라이딩)이 돈다. 폴에 안 닿는다
   const 쏜공 = (specialSwing?: { number: number; isAceBatter: boolean }) =>
-    registerContact(땅볼아웃, { pattern: [49, 802, 799, 0], resultCode: 15, ...(specialSwing === undefined ? {} : { specialSwing }) })
+    registerContact(땅볼아웃, { batterHand: 0, pattern: [49, 802, 799, 0], resultCode: 15, ...(specialSwing === undefined ? {} : { specialSwing }) })
   const 시작 = (outcome: AtBatOutcome, values: readonly number[]) =>
     startDefensePlay({
       outcome,
@@ -2284,7 +2284,7 @@ describe('필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 
   }
   const 시작 = (random: RandomPort) =>
     startDefensePlay({
-      outcome: registerContact(땅볼아웃, { pattern: 쏜패턴, resultCode: 15 }),
+      outcome: registerContact(땅볼아웃, { batterHand: 0, pattern: 쏜패턴, resultCode: 15 }),
       trajectory: battedBallTrajectory(쏜패턴),
       bases: EMPTY_BASES,
       outs: 0,
@@ -2309,7 +2309,7 @@ describe('필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 
 describe('맞은 판정 틀에 미리 굴린 메시지 0x11 묶음 — 판 시작이 쏜 공에서 되찾는다 (A-37)', () => {
   // 코드 15 [49, 802, 799] — 필살수비 굴림 둘(점프 · 슬라이딩) · 필살타법 하나가 돈다. 폴에 안 닿는다
   const 입력 = (random: RandomPort): DefensePlayInput => ({
-    outcome: registerContact(땅볼아웃, {
+    outcome: registerContact(땅볼아웃, { batterHand: 0,
       pattern: [49, 802, 799, 0],
       resultCode: 15,
       specialSwing: { number: 1, isAceBatter: false },
@@ -2361,7 +2361,7 @@ describe('맞은 판정 틀에 미리 굴린 메시지 0x11 묶음 — 판 시�
 describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 · 담장선 틱에 0x9d5bc 가 7, 잡히면 13', () => {
   const 쏘기 = (pattern: BattedBallPattern, resultCode: number, strikes: number) =>
     runDefensePlay({
-      outcome: registerContact(땅볼아웃, { pattern, resultCode }),
+      outcome: registerContact(땅볼아웃, { batterHand: 0, pattern, resultCode }),
       trajectory: battedBallTrajectory(pattern),
       bases: 주자1루,
       outs: 0,
@@ -2412,7 +2412,7 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
   it('넓은 페어 각(0x9d640, 35~145) 밖 파울은 state[7] = 0 — 커버 0xb1c90 이 머리(b1cc6)에서 끝나 아무도 루 커버를 안 받는다', () => {
     const 커버받음 = (pattern: BattedBallPattern, resultCode: number) => {
       let state = startDefensePlay({
-        outcome: registerContact(땅볼아웃, { pattern, resultCode }),
+        outcome: registerContact(땅볼아웃, { batterHand: 0, pattern, resultCode }),
         trajectory: battedBallTrajectory(pattern),
         bases: 주자1루,
         outs: 0,
@@ -2795,7 +2795,7 @@ describe('야수 자세 워드 +0xb0 · 판을 넘는 플레이 +0xf0 (r171)', (
   it('넓은 파울 각으로 열린 판(state[7] = 0)은 앞 판이 남긴 +0xf0 을 그대로 두고 끝에 다음 판으로 넘긴다', () => {
     const 남은커버 = [8, 7, 6, 5]
     const 입력 = (pattern: BattedBallPattern, resultCode: number): DefensePlayInput => ({
-      outcome: registerContact(땅볼아웃, { pattern, resultCode }),
+      outcome: registerContact(땅볼아웃, { batterHand: 0, pattern, resultCode }),
       trajectory: battedBallTrajectory(pattern),
       bases: 주자1루,
       outs: 0,
@@ -2811,7 +2811,7 @@ describe('야수 자세 워드 +0xb0 · 판을 넘는 플레이 +0xf0 (r171)', (
 
   it('밀어내기(종류 2)는 +0xf0 을 안 건드린다 — vt1c 0xb0edc 도 안 지운다', () => {
     const 남은커버 = [1, 2, 3, 4]
-    const result = runWalkPlay({
+    const result = runWalkPlay({ batterHand: 0,
       bases: EMPTY_BASES,
       outs: 0,
       pitchJudgement: 4,

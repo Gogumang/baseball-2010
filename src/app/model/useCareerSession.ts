@@ -1318,6 +1318,8 @@ export function useCareerSession({
                 outcomeAfter: nextAtBat.outcome,
                 buntKind: buntKind ?? 0,
                 resultCode: detail.resultCode,
+                // 타자 손 0xb63c0 — 밀어내기 · 낫아웃 판의 타자주자 타석 자리
+                batterHand: detail.batterHand,
               },
               random,
               {

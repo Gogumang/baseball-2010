@@ -18,7 +18,7 @@ describe('내 타석의 2스트라이크 번트 파울도 판을 돈다 — 판 
     for (const { pattern, resultCode } of 번트파울들) {
       const random = createSeededRandom(7)
       const 시작 = startGame(random)
-      const 붙듦 = startPlayerFoulPlay(시작, { pattern, resultCode }, random, { strikes: 2, buntKind: 1 })
+      const 붙듦 = startPlayerFoulPlay(시작, { batterHand: 0, pattern, resultCode }, random, { strikes: 2, buntKind: 1 })
       const pending = 붙듦.pendingDefensePlay
       if (pending === null) throw new Error('판이 안 섰다')
       expect(pending.strikes).toBe(2)

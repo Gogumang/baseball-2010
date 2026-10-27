@@ -55,7 +55,7 @@ describe('DefensePlayback.burstWindow — 0x1c', () => {
 
   it('재생 판도 같다 — 끝난 뒤 창을 받으면 그 판 위에 창', () => {
     vi.useFakeTimers()
-    const 밀어내기 = runWalkPlay({ bases: { first: true, second: false, third: false }, outs: 0, pitchJudgement: 3 })
+    const 밀어내기 = runWalkPlay({ batterHand: 0, bases: { first: true, second: false, third: false }, outs: 0, pitchJudgement: 3 })
     const onDone = vi.fn()
     const { rerender, queryByTestId } = render(<DefensePlayback ticks={밀어내기.ticks} onDone={onDone} freePassPlay />)
     for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) 흘리기(1)

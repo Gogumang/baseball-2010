@@ -73,7 +73,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     const random = 세는난수(0.5)
     expect(
       runPitchArrivalPlay(
-        { gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 },
+        { batterHand: 0, gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 },
         random,
       ),
     ).toBeNull()
@@ -84,7 +84,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     const random = 세는난수(0)
     expect(
       runPitchArrivalPlay(
-        { gameMode: 7, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 },
+        { batterHand: 0, gameMode: 7, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 },
         random,
       ),
     ).toBeNull()
@@ -95,7 +95,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     // 1루 도루는 늘 세이프라 CPU 점수식도 루를 안 고르고, 키 없는 사람 수동 송구는 아예 안 던진다
     // → 결과 코드(9 세이프 · 13 아웃)가 안 서서 판정 콜도 없다
     const play = runPitchArrivalPlay(
-      { gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [1], bases: 일루, outs: 0, runAbility: 500 },
+      { batterHand: 0, gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [1], bases: 일루, outs: 0, runAbility: 500 },
       세는난수(0.5),
     )
     expect(play?.kind).toBe(5)
@@ -109,7 +109,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     const 일이루 = { ...EMPTY_BASES, first: true, second: true }
     const playOf = (buntKind?: number) =>
       runPitchArrivalPlay(
-        {
+        { batterHand: 0,
           gameMode: 4,
           pitchJudgement: PITCH_JUDGEMENT.STRIKE,
           stealingFrom: [2],
@@ -133,7 +133,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
   it('2아웃 삼진이면 도루 판이 안 열린다', () => {
     expect(
       runPitchArrivalPlay(
-        { gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.STRIKEOUT, stealingFrom: [1], bases: 일루, outs: 2 },
+        { batterHand: 0, gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.STRIKEOUT, stealingFrom: [1], bases: 일루, outs: 2 },
         세는난수(0.5),
       ),
     ).toBeNull()
@@ -141,7 +141,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
 
   it('0.1% 가 서면 종류 9 — 1루 비고 삼진이면 낫아웃(타자주자)', () => {
     const play = runPitchArrivalPlay(
-      { gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.STRIKEOUT, stealingFrom: [], bases: EMPTY_BASES, outs: 0 },
+      { batterHand: 0, gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.STRIKEOUT, stealingFrom: [], bases: EMPTY_BASES, outs: 0 },
       세는난수(0),
     )
     expect(play?.kind).toBe(9)
@@ -154,7 +154,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
 
   it('판정 칸을 지우는 것은 낫아웃 갈래뿐 — 1루 주자 · 1아웃 이하 삼진(3e0cc 되돌림) · 볼 · 판 없음은 남긴다 (r213)', () => {
     const 판 = (pitchJudgement: number, bases: typeof EMPTY_BASES, outs: number) =>
-      runPitchArrivalPlay({ gameMode: 4, pitchJudgement, stealingFrom: [], bases, outs }, 세는난수(0))
+      runPitchArrivalPlay({ batterHand: 0, gameMode: 4, pitchJudgement, stealingFrom: [], bases, outs }, 세는난수(0))
     const 그대로 = 판(PITCH_JUDGEMENT.STRIKEOUT, 일루, 1)
     expect(그대로?.strikeout).toBe('strikeoutStands')
     expect(clearsPitchJudgement(그대로)).toBe(false)

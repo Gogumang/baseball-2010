@@ -211,7 +211,7 @@ describe('사람이 치는 타석', () => {
 })
 
 describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac428)·CPU 대타(0xac228)를 다시 묻는다', () => {
-  const 볼 = { resolution: { kind: '볼' } as const, hasSwung: false, isBunt: false, resultCode: null, pitchTypeNumber: 1 }
+  const 볼 = { batterHand: 0, resolution: { kind: '볼' } as const, hasSwung: false, isBunt: false, resultCode: null, pitchTypeNumber: 1 }
   /** 우리 공격 · 상대 투수가 다 지쳐 0xac428 이 바꾸는 판 (0-기준 이닝 0 · 체력 0) */
   const 지친상대 = () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
@@ -271,7 +271,7 @@ describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac4
 
 describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 0xa5e14(ctx, 구질)', () => {
   const 볼 = (pitchTypeNumber?: number) => ({
-    resolution: { kind: '볼' } as const,
+    batterHand: 0, resolution: { kind: '볼' } as const,
     hasSwung: false,
     isBunt: false,
     resultCode: null,
@@ -553,7 +553,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
       random,
     }
   }
-  const 볼: PitchOutcomeDetail = { resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null }
+  const 볼: PitchOutcomeDetail = { batterHand: 0, resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null }
 
   it('출발시킬 수 있는 루 — canStartSteal(앞길 검사). 만루면 3루 주자만 홈으로 뛸 수 있다', () => {
     const { progress } = 일루주자()
@@ -746,7 +746,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
 
 describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 번 부른다 (판정 B 0xae3e8 ae576 → ae5a8)', () => {
   const 헛스윙: PitchOutcomeDetail = {
-    resolution: { kind: '스트라이크', isSwinging: true },
+    batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
     hasSwung: true,
     isBunt: false,
     resultCode: null,
@@ -2017,14 +2017,14 @@ describe('우리 타석 도루 출발 중 볼넷 · 사구 — 0x3dfac 3e0e4 →
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
     const 놓음 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
     for (const kind of ['볼넷', '사구'] as const) {
-      const result = runWalkPlay({ bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4, stealingFrom: [1] })
+      const result = runWalkPlay({ batterHand: 0, bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4, stealingFrom: [1] })
       const arrivalPlay = { kind: 2, result, strikeout: 'none', callSoundId: null, recordIds: [] } as const
       const 끝 = startBatterOutcome(놓음, { kind }, createSeededRandom(5), { arrivalPlay })
       expect(끝.pendingBenchClearing).toBeNull()
       expect(끝.game.bases.first).toBe(true)
       expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
       // 도루가 없으면 0x12 대기로 붙든다
-      const 보통판 = { ...arrivalPlay, result: runWalkPlay({ bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4 }) }
+      const 보통판 = { ...arrivalPlay, result: runWalkPlay({ batterHand: 0, bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4 }) }
       expect(startBatterOutcome(놓음, { kind }, createSeededRandom(5), { arrivalPlay: 보통판 }).pendingBenchClearing?.phase).toBe('wait')
     }
   })
@@ -2240,7 +2240,7 @@ describe('야수 +0xec 칸 0 — 교대 판 0x3fac4 가 적고 판 없이 지난
 describe('기록달성 — 팀 경기도 0xa77f0 으로 쌓고 경기 끝 0x4ea0c 가 G 로 준다 (모드 1·2·8·9)', () => {
   const 우리공격 = () => 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
   const 공 = (kind: '볼' | '파울') => ({
-    resolution: kind === '볼' ? ({ kind: '볼' } as const) : ({ kind: '파울' } as const),
+    batterHand: 0, resolution: kind === '볼' ? ({ kind: '볼' } as const) : ({ kind: '파울' } as const),
     hasSwung: kind === '파울',
     isBunt: false,
     resultCode: null,
@@ -3037,7 +3037,7 @@ describe('파울 각 공도 수비 판을 돈다 — 판이 파울로 닫히면 
     expect(isBatterTurn(progress)).toBe(true)
     // 원본 코드 1 [160, 101, 752] — 1루 쪽 파울 각의 높은 공
     const 파울: PitchOutcomeDetail = {
-      resolution: { kind: '파울' },
+      batterHand: 0, resolution: { kind: '파울' },
       hasSwung: true,
       isBunt: false,
       resultCode: 1,

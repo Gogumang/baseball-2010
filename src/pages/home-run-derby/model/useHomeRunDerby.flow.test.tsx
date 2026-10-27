@@ -50,17 +50,17 @@ function 기록난수(value: (lo: number, hi: number) => number = (lo, hi) => Ma
 }
 
 const 홈런: PitchOutcomeDetail = {
-  resolution: { kind: '타구', outcome: { kind: '홈런' } },
+  batterHand: 0, resolution: { kind: '타구', outcome: { kind: '홈런' } },
   hasSwung: true,
   isBunt: false,
   resultCode: 24,
   pattern: [75, 1451, 1004, 0],
   contactSoundId: 5,
 }
-const 볼: PitchOutcomeDetail = { resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null }
-const 사구: PitchOutcomeDetail = { resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null }
+const 볼: PitchOutcomeDetail = { batterHand: 0, resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null }
+const 사구: PitchOutcomeDetail = { batterHand: 0, resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null }
 const 헛스윙: PitchOutcomeDetail = {
-  resolution: { kind: '스트라이크', isSwinging: true },
+  batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
   hasSwung: true,
   isBunt: false,
   resultCode: null,
