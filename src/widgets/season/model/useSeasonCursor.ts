@@ -14,7 +14,9 @@ export interface SeasonCursorOptions {
   readonly count: number
   readonly onSelect: (index: number) => void
   readonly onCancel?: () => void
-  /** 팝업이 떠 있으면 화면은 키를 안 받는다 (원본 `this+0xc0 +0x99 ≠ 0` 이면 키 무시) */
+  /**
+   * 거짓이면 화면은 키를 안 받는다 — 팝업(장면 틀 0xe9ac 의 창 게이트 0x754f9) · 관리 메뉴 0xc9 칸 펼침(`[this+0xc0]+0x99`, A-50)
+   */
   readonly isEnabled?: boolean
   /**
    * 커서를 부르는 쪽이 들고 있으면 넘긴다 — 원본 메뉴 객체(관리 메뉴 this+0x70 · 구단관리 this+0x78)는 장면이 사는 동안

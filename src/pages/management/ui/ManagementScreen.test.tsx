@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, render, screen } from '@testing-library/react'
+import { fireEvent as rawFireEvent } from '@testing-library/react'
+import { fakeAppTickClock, settledFireEvent as fireEvent } from '@/shared/lib/testing/slideSettledEvents'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { ManagementScreen } from '@/pages/management/ui/ManagementScreen'
 import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScreen'
@@ -10,7 +12,12 @@ import { createNariMainMenuCursor } from '@/pages/management/model/nariMainMenuC
 
 /** 알림 상자는 "확인"을 누르면 닫히고, 같은 문구라도 다시 띄우면 다시 보여야 한다. */
 
-afterEach(cleanup)
+// 칸이 펼쳐지는 일곱 틀은 키를 버린다(A-50) — 앱 틱을 가짜 시계로 돌리고 누르기 전에 넘긴다(`settledFireEvent`)
+beforeEach(fakeAppTickClock)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 const BLOCKED_NOTICE = '트레이닝·휴식·외출은 한 번에 한 가지만 할 수 있습니다'
 
@@ -725,6 +732,37 @@ describe('관리 메뉴 이동 — 메뉴 객체 0x6c219(vtable 0xd2ea0) · 숫�
     expect(current('다음경기')).toBe('true')
     fireEvent.keyDown(window, { key: '5' })
     expect(onSelect).toHaveBeenCalledWith('다음경기')
+  })
+
+  it('칸이 펼쳐지는 동안(그린 갱신 수 < 7)은 키 · 취소 · 누름을 버린다 — 105 [gfx+0x99] · 하위 메뉴 [+0x9a] (0x1261c · 0x13010 머리, A-50)', () => {
+    const onExit = vi.fn()
+    render(<ManagementScreen {...propsWith({ career: { ...createCareer('테스터'), season: 2 }, onExit })} />)
+    const 틀 = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+    const 누름 = (key: string) => rawFireEvent.keyDown(window, { key })
+
+    누름('6')
+    누름('Escape')
+    rawFireEvent.click(screen.getByRole('button', { name: '선수정보' }))
+    expect(current('선수정보')).toBe('true')
+    expect(onExit).not.toHaveBeenCalled()
+    틀(6)
+    누름('6')
+    expect(current('선수정보')).toBe('true')
+    // rAF 가 틀 머리와 어긋나 그린 갱신 수는 7 시간 안팎에 7 이 된다 — 한 틀 더 넉넉히
+    틀(2)
+    누름('6')
+    expect(current('트레이닝')).toBe('true')
+
+    // 하위 메뉴(107)를 열면 다시 일곱 틀 — 취소도 버린다
+    누름('5')
+    expect(screen.getByRole('button', { name: '히트' })).toBeTruthy()
+    누름('Escape')
+    누름('6')
+    expect(screen.getByRole('button', { name: '히트' })).toBeTruthy()
+    expect(current('히트')).toBe('true')
+    틀(8)
+    누름('6')
+    expect(current('파워')).toBe('true')
   })
 
   it('119 기본정보 카드가 떠 있으면 106 커맨드 줄은 키를 안 받는다 — 119 키 0x1056c 는 취소 · \'*\' · \'0\' 뿐', () => {

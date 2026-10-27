@@ -343,6 +343,15 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     // 재료 없는 옛 저장은 예전처럼 116 의 끝으로
     const { lastGame: _없음, ...옛 } = 끊김
     expect(저장(옛).current.scene).toBe('다음경기순위')
+
+    // 114 보상 명령 창이 서면 그 몫을 주고 저장한다(0x8c460 끝 — S+0x50 은 114 진입이 이미 3, Q-23) — 그 뒤 끊으면 116 이 아니다
+    const 보상중 = 저장(끊김)
+    act(() => 보상중.current.actions.giveEvaluationRewards(1))
+    const 보상뒤 = 보상중.current.career!
+    expect(보상뒤.seasonEndState).toBeNull()
+    const 이어 = 저장(보상뒤)
+    expect(이어.current.scene).not.toBe('경기결과')
+    expect(이어.current.career?.seasonPopularityGain).toBe(보상뒤.seasonPopularityGain)
   })
 
   /** 저장해 두고 다시 띄운다 — 장면 0x106 에 다시 들어오는 이어하기 (상태 100 진입 0x1c154) */
@@ -1486,6 +1495,12 @@ describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
     expect(result.current.scene).toBe('외출')
     expect(result.current.career?.hasActedThisCycle).toBe(false)
     expect(result.current.career?.outingsThisSeason).toBe(0)
+    // 1c07c — 112 진입이 아니라 그 장소 말풍선 113 으로 선다(훑지 않는다, Q-22)
+    expect(result.current.outingReturnPlaceId).toBe(빈곳.id)
+    expect(result.current.story).toBeNull()
+    // 113 취소 → 112 진입 — 돌아갈 장소를 지운다
+    act(() => result.current.actions.reenterOutingMap())
+    expect(result.current.outingReturnPlaceId).toBeNull()
   })
 })
 

@@ -9,7 +9,7 @@ import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateM
  * 0x3b14 (장면 생성) this+0x74 = 0x6c219(메뉴, 4, 1, 1) · +0x34 = 4 · +0x38 = 1     ; 네 줄 한 열
  * 0x4d58 (들어옴)    이전 상태 == 0xc9 → 메뉴 vt+0x14(메뉴, 0, 0) · +0x2c = +0x30 = 0   ; 커서·스크롤 (0,0)
  *                    [this+0xc0]+0x15c = 메뉴 · 0x76705([this+0xc4], 0x23, 0xbe, 0x1e)
- * 0x9008 (키)        팝업 중([this+0xc0]+0x99)이면 무시
+ * 0x9008 (키)        [this+0xc0]+0x99(0xc9 칸 펼침 깃발 — 여기서는 늘 0)이면 무시 · 팝업 중은 창 게이트 0x754f9 가 막음
  *                    확인(−5 / '5'): 칸 = 행 × 열수 + 열
  *                      0 → 0xd5 · 1 → 0xd6 · 2 → this+0x110 = 2 · 0xdf
  *                      3 → this+0x16c = 1 · 0x741a1(G, 0x80, 0xf655, 0xf661, this)   ; 기록순위 창

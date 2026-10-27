@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
@@ -7,6 +8,9 @@ import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
 import { TeamGameScreen } from '@/pages/team-game/ui/TeamGameScreen'
 import { XLS_ROW_MATCHUP_RECORDS } from '@/pages/team-game/lib/teamMatchupCards'
 import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
+import { generalPrepPushDirectionOf } from '@/pages/general-mode/lib/generalPrepPush'
+import type { GeneralPrepPushView } from '@/pages/general-mode/lib/generalPrepPush'
+import { NariScreenPush } from '@/pages/management/ui/NariScreenPush'
 import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 import type { MatchSettingsSeenSlot } from '@/pages/general-mode/model/useGeneralMode'
 import { AceSelectScreen } from '@/pages/general-mode/ui/AceSelectScreen'
@@ -298,13 +302,25 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
     )
   }
 
+  /**
+   * 18 ↔ 19 · 22 ↔ 23 은 화면 밀기(효과기 종류 8)로 바뀐다 — 모든 단계를 같은 밀기 틀에 담아 앞 화면을 떠 둔다(A-68,
+   * `lib/generalPrepPush`). 23 은 [메뉴+0xec](유저 팀 1 · CPU 팀 0)에 따라 방향이 갈린다
+   */
+  const pushView: GeneralPrepPushView = flow.step === GENERAL_MODE_STEP.유저팀 ? '18'
+    : flow.step === GENERAL_MODE_STEP.AI팀 ? '19'
+      : flow.step === GENERAL_MODE_STEP.경기정보 ? (session.entryEdit === null ? '22' : session.entryEdit.isUserTeam ? '23:유저' : '23:CPU')
+        : '그밖'
+  const wrap = (content: ReactNode) => (
+    <NariScreenPush view={pushView} directionOf={generalPrepPushDirectionOf}>{content}</NariScreenPush>
+  )
+
   switch (flow.step) {
     // 18 · 19 는 다른 하위 상태라 들어설 때마다 새로 선다: 들어옴 0x23e08 · 0x23e70 이 목록 [메뉴+0x74] 커서를
     // vt+0x14(0, 0)(0x6c00c) 로 0 칸에 두고(19 는 이어서 (0, 1) = 팀 5 로 고쳐 쓴다 — 23eb2 · 23eb4), 그림 0x2de3c · 0x2ddb0 의
     // 공용 목록 0x63b14 가 상태 틱 0 인 첫 그림에서 넷째 인자대로 들어옴 연출을 다시 건다(상대 팀 고르기에서 왔으면 끈다 —
     // `isTeamSelectEntryAnimated`) — key 로 둘을 갈라 같은 화면을 이어 쓰지 않는다
     case GENERAL_MODE_STEP.유저팀:
-      return (
+      return wrap(
         <TeamSelectScreen
           key="18"
           title="팀선택"
@@ -318,7 +334,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
         />
       )
     case GENERAL_MODE_STEP.AI팀:
-      return (
+      return wrap(
         <TeamSelectScreen
           key="19"
           title="팀선택"
@@ -335,7 +351,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
         />
       )
     case GENERAL_MODE_STEP.선공구장:
-      return (
+      return wrap(
         <FirstBatStadiumScreen
           userTeamId={flow.setup.userTeamId}
           aiTeamId={flow.setup.aiTeamId}
@@ -352,7 +368,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
         />
       )
     case GENERAL_MODE_STEP.마선수:
-      return (
+      return wrap(
         <AceSelectScreen
           phase={flow.acePhase}
           // rec+0xe — 마타자 단계에서 회색으로 안 그릴 마투수 칸 (0x7b1d8)
@@ -374,7 +390,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
       // 상태 23 엔트리 편집 — 그리기 0x2e070 (엔트리 목록 창 0x5cfec + 머리띠 6/7), 키 0x2a370 → 0x55864
       if (session.entryEdit !== null) {
         const { entryEdit } = session
-        return (
+        return wrap(
           <EntryEditorScreen
             editor={entryEdit.editor}
             lists={entryEdit.lists}
@@ -394,7 +410,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           />
         )
       }
-      return (
+      return wrap(
         <>
           <MatchInfoScreen
             setup={flow.setup}

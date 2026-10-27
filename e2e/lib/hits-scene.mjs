@@ -12,18 +12,19 @@ export const ACTIONS = {
   'main-menu': [
     { name: '게임시작 목록', steps: ['Enter'], expect: '나만의리그', undo: ['Escape'] },
   ],
+  // 커맨드 줄 칸이 펼쳐지는 여덟 틀(약 0.5초)은 키 · 누름을 버린다(105 [gfx+0x99] · 하위 메뉴 [+0x9a], A-50) — 메뉴를 연 뒤 기다린다
   'nari-management': [
     { name: '휴식 알림 상자', steps: ['@휴식'], expect: '알림', undo: ['Escape'] },
-    { name: '트레이닝 → 히트 질문 상자', steps: ['@트레이닝', '@히트'], expect: '예', undo: ['Escape', 'w200', 'Escape'] },
-    { name: '선수정보 → 칭호 창', steps: ['@선수정보', 'Enter', 'w300', '@* 칭호'], expect: '칭호', undo: ['Escape', 'w200', 'Escape', 'w200', 'Escape'] },
+    { name: '트레이닝 → 히트 질문 상자', steps: ['@트레이닝', 'w600', '@히트'], expect: '예', undo: ['Escape', 'w200', 'Escape', 'w600'] },
+    { name: '선수정보 → 칭호 창', steps: ['@선수정보', 'w600', 'Enter', 'w300', '@* 칭호'], expect: '칭호', undo: ['Escape', 'w200', 'Escape', 'w200', 'Escape', 'w600'] },
     { name: '다음경기 기록실 창', steps: ['@다음경기'], expect: '기록실', undo: ['Escape'] },
   ],
   'pitcher-management': [
     { name: '휴식 알림 상자', steps: ['@휴식'], expect: '알림', undo: ['Escape'] },
     // r203 — 구질훈련 창 칸이 예 · 아니오를 덮었다
-    { name: '트레이닝 → 변화 질문 상자', steps: ['@트레이닝', '@변화'], expect: '예', undo: ['Escape', 'w200', 'Escape'] },
+    { name: '트레이닝 → 변화 질문 상자', steps: ['@트레이닝', 'w600', '@변화'], expect: '예', undo: ['Escape', 'w200', 'Escape', 'w600'] },
     // r207 — 칭호 창
-    { name: '선수정보 → 칭호 창', steps: ['@선수정보', 'Enter', 'w300', '@* 칭호'], expect: '칭호', undo: ['Escape', 'w200', 'Escape', 'w200', 'Escape'] },
+    { name: '선수정보 → 칭호 창', steps: ['@선수정보', 'w600', 'Enter', 'w300', '@* 칭호'], expect: '칭호', undo: ['Escape', 'w200', 'Escape', 'w200', 'Escape', 'w600'] },
     { name: '다음경기 기록실 창', steps: ['@다음경기'], expect: '기록실', undo: ['Escape'] },
   ],
   'season-management': [

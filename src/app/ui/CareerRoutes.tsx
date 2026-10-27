@@ -264,6 +264,8 @@ function CareerScreens({
           {...(career.lastGame === undefined ? {} : { recordLine: nariLastGameRecordLineOf(career.lastGame) })}
           career={career}
           onContinue={actions.confirmGameResult}
+          // 114 보상 명령마다 몫 · 저장(0x8c460 끝 — S+0x50 은 114 진입이 이미 3 · 0xb, Q-23)
+          onRewardsGiven={actions.giveEvaluationRewards}
           // 116(0x11e0c) → 114 평가 대화 0x8b5ac: 공 무늬 · 상태판([이벤트+0xb] = 1 — 0x8a71e) · 머리띠
           underlay={<NariEventUnderlay career={career} isPreviousGame />}
           // 116 이 선 첫 틀 — 그림 0x11e0c(머리띠 · 상태판 0x7d34c(gfx, 0)). 114 는 다음 틀
@@ -299,6 +301,9 @@ function CareerScreens({
           // [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 에 찍은 값 그대로(0x7ed6c 는 행동 여부를 안 본다)
           eventPlaceIds={session.eventPlaceIds}
           onEnter={actions.enterPlace}
+          // 빈 장소(440~444) 뒤는 113 그 장소 말풍선 · 113 취소는 112 에 다시 들어선다(Q-22)
+          initialOpenPlaceId={screen.openPlaceId ?? null}
+          onCloseBubble={actions.reenterOutingMap}
           // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 알림으로)
           resultText={session.outingResult?.effectText ?? null}
           onCloseResult={actions.closeOutingResult}

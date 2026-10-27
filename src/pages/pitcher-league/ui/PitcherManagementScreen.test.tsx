@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import { fireEvent as rawFireEvent } from '@testing-library/react'
+import { fakeAppTickClock, settleSlide, settledFireEvent as fireEvent } from '@/shared/lib/testing/slideSettledEvents'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -15,7 +17,12 @@ import { createNariMainMenuCursor } from '@/pages/management/model/nariMainMenuC
  * 커맨드 여섯 칸은 타자편과 같고(StrHOWTO[11] · 점프표 0xcc540), 하위 메뉴 둘만 투수 것이다.
  */
 
-afterEach(cleanup)
+// 커맨드 줄 칸이 펼쳐지는 일곱 틀은 키를 버린다(A-50) — 앱 틱을 가짜 시계로 돌리고 누르기 전에 넘긴다(`settledFireEvent`)
+beforeEach(fakeAppTickClock)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 /** 고정 난수 0 — 씨앗 몫이 늘 0 이라 `rand(lo, hi)` 는 아래끝, `rand(n)` 은 0 */
 const 난수: RandomPort = {
@@ -857,6 +864,40 @@ describe('하위 메뉴로 돌아오기 — 111 → 110 · 121 → 106 · 하위
     )
   const 커서칸 = () => [...document.querySelectorAll('[data-testid="command-bar"] button')]
     .find((button) => button.getAttribute('aria-current') === 'true')?.getAttribute('aria-label')
+
+  it('칸이 펼쳐지는 동안(그린 갱신 수 < 7)은 키 · 취소를 버린다 — 105 [gfx+0x99] · 하위 메뉴 [+0x9a] (A-50), 상점에서 돌아온 하위 메뉴는 펼침이 없다', () => {
+    const mainCursor = createNariMainMenuCursor()
+    const onExit = vi.fn()
+    const onOpenShop = vi.fn()
+    render(
+      <PitcherManagementScreen career={투수({ season: 2 })} random={난수} onSave={() => {}} onNextGame={() => {}}
+        onOuting={() => {}} onOpenShop={onOpenShop} onExit={onExit} mainCursor={mainCursor} />,
+    )
+    rawFireEvent.keyDown(window, { key: '6' })
+    rawFireEvent.keyDown(window, { key: 'Escape' })
+    expect(커서칸()).toBe('선수정보')
+    expect(onExit).not.toHaveBeenCalled()
+    settleSlide()
+    rawFireEvent.keyDown(window, { key: '4' })
+    expect(커서칸()).toBe('다음경기')
+    rawFireEvent.keyDown(window, { key: '4' })
+    rawFireEvent.keyDown(window, { key: '5' })
+    expect(칸이름들()).toEqual(['장착', '서브', 'GP'])
+    rawFireEvent.keyDown(window, { key: '6' })
+    expect(커서칸()).toBe('장착')
+    settleSlide()
+    rawFireEvent.keyDown(window, { key: '6' })
+    rawFireEvent.keyDown(window, { key: '5' })
+    expect(onOpenShop).toHaveBeenLastCalledWith('서브')
+    cleanup()
+
+    render(
+      <PitcherManagementScreen career={투수({ season: 2 })} random={난수} onSave={() => {}} onNextGame={() => {}}
+        onOuting={() => {}} onOpenShop={onOpenShop} onExit={onExit} mainCursor={mainCursor} />,
+    )
+    rawFireEvent.keyDown(window, { key: '6' })
+    expect(커서칸()).toBe('GP')
+  })
 
   it('상점에서 돌아오면 아이템 하위 메뉴 고른 칸에 서고, 그 취소가 105 진입(이전 110 — 행동함이어도 아이템 칸)이다', () => {
     const mainCursor = createNariMainMenuCursor()

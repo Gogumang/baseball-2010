@@ -103,7 +103,6 @@ import {
   finishEvent,
   NARI_YEAR_START_EVENT,
   NARI_YEAR_START_EVENT_ID,
-  OPENING_EVENT_ID,
   nextEventFor,
   placeTriggerOf,
 } from '@/entities/story/model/storyScene'
@@ -154,7 +153,7 @@ import {
   rewardItemsResumeCodeOf,
   rewardResumePatchOf,
 } from '@/entities/story/model/storyScene'
-import { battingOrderEventId, emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
+import { battingOrderEventId, emptyPlaceEventId, emptyPlaceFrameOf, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { applyEventRewards } from '@/entities/story/model/eventReward'
 import { effectiveAbilityOf, INJURY_FOLLOW_UP_NOTICE, rollTrainingInjury } from '@/entities/career/model/condition'
@@ -503,6 +502,16 @@ export function useCareerSession({
   /** 상점 GP 결과 창 (0x872a1) — 칸 0~4·6 구매 뒤. 닫아도 굴림 없이 상점 그대로 (0x1d649) */
   const [shopGpDetail, setShopGpDetail] = useState<GpDetailOf<PlayerCareer> | null>(null)
   const [outingNotice, setOutingNotice] = useState('')
+  /**
+   * 새 선수 플래그 장면+0x165 — 100 진입 끝 0x1c3be~0x1c3f8 이 이전 상태가 104(등록)일 때만 켜고, 105 · 112 틀의 0x1cfa6 이 오프닝
+   * 451 을 번호로 부르며 지운다(1cfd6~1cfd8). 저장에 없는 칸이라 이어하기로는 안 선다(투수편 `newPlayerRef` 와 같다, A-54)
+   */
+  const newPlayerRef = useRef(false)
+  /**
+   * 116 → 114 평가 이벤트의 보상 명령 — 이미 준 몫(`given`). 0x8c460 이 명령마다 주고 끝(0x8b0e4 · 0x8cd44)에서 저장하므로
+   * 첫 몫을 줄 때 S+0x50 이 114 진입 값(3 · 0xb — 웹 null)으로 저장된다(Q-23). 116 에 들어설 때 비운다
+   */
+  const evaluationRewardsRef = useRef<{ readonly rewards: readonly EventReward[]; readonly given: number } | null>(null)
   /** 105 → 112 로 들어설 때의 행동함(S+4) — B-26 고친 길에서 지도 취소가 되돌릴 값. 지도 밖이면 null */
   const outingEntryActedRef = useRef<boolean | null>(null)
   /** 상태 126 결과 팝업 두 장 — 효과 글(0x15234)과 입원 회복 글(0x1575c). 효과 팝업이 떠 있지 않으면 null */
@@ -1386,7 +1395,9 @@ export function useCareerSession({
     // 0x8cdc0 은 찍고 나서 reader+0x28 = 0 (`rewindCursor`) — 다음 훑기는 처음부터다
     if (entered) story.rewindCursor()
   }
-  const outingEntryCount = outingEntryRef.current.count
+  /** 113 취소로 112 에 다시 들어선 횟수 — 화면은 '외출' 그대로라 위 셈에 안 잡힌다(`reenterOutingMap`, Q-22) */
+  const [outingReentryCount, setOutingReentryCount] = useState(0)
+  const outingEntryCount = outingEntryRef.current.count + outingReentryCount
   const outingSlots = useMemo(() => {
     const current = careerForSlotsRef.current
     const events = story.events
@@ -1474,10 +1485,11 @@ export function useCareerSession({
      * 장면+0x165(새 선수 — 100 진입 끝 0x1c3be 가 이전 상태 104 면 켠다) ≠ 0 이면 `0x8bde0`(모드 2 → 400 · 3·4 → 451) ·
      * `0xbcb49(105)` · `0xbcb49(114)` 로 예약을 덮는다(0xbcb48: +0xc = +8 ; +8 = s — 115 는 밀려 사라진다).
      * 451 이 끝나 114 → 뒤 105 로 다시 들어오면 진입이 115 를 또 세운다 → **451 → 115**.
-     * 웹 타자편은 새 선수 플래그 대신 "451 을 안 봤다" 로 가른다(`scanEventFrom` 오프닝 갈래와 같은 잣대 · 굴림 없음).
+     * 판정은 새 선수 플래그 하나다 — "451 을 봤는가" 가 아니다(A-54: 451 도중 끊고 이어하면 원본은 다시 틀지 않는다). 굴림 없음.
      */
-    if (!career.seenEventIds.includes(String(OPENING_EVENT_ID))) {
-      const opening = story.eventFor(career, EVENT_TRIGGER.관리, undefined)
+    if (newPlayerRef.current) {
+      newPlayerRef.current = false
+      const opening = story.openingEvent()
       if (opening !== null) return setScreen({ kind: '이벤트', eventId: opening.id, context: '관리' })
     }
     /*
@@ -1571,6 +1583,7 @@ export function useCareerSession({
    * 승패 징글 31 · 32 는 경기 장면의 정산 0x19 진입이 따로 냈다 — 두 상태가 따로 서 소리도 따로다
    */
   const enterGameEvaluationScreen = (data: GameEvaluationScreenData) => {
+    evaluationRewardsRef.current = null
     playSoundIds(audio, [evaluationJingleIdOf(data.evaluation.popularityChange)])
     setScreen({ kind: '경기평가', ...data })
   }
@@ -2015,6 +2028,8 @@ export function useCareerSession({
       setUpNariScene()
       const created = createCareer(name, profile)
       setCareer(created)
+      // 104 → 100 진입 끝 0x1c3be 가 이전 상태 104 를 보고 새 선수 플래그를 켠다 → 105 첫 틀에 오프닝 451
+      newPlayerRef.current = true
       // 0x112d0~0x112dc 0xa4bd8(P, 0) · (P, 8) — 얻자마자 0xa4b04 → 0xb663c 가 켠 스킬 비트(+0xf4)도 세운다.
       // 새 선수는 아래 장착 비교 효과가 견주지 않으니(앞이 없거나 다른 선수) 여기서 적는다
       skillEquipStatEventsOf(BATTER_LEAGUE_MODE, [], created.equippedSkillIds).forEach(recordStat)
@@ -2256,13 +2271,34 @@ export function useCareerSession({
       setCareer(awardTitles(career, [title]))
     },
 
+    /**
+     * 114 평가 이벤트의 보상 명령 창이 섰다 — 0x8c460 이 그 명령의 보상을 주고 끝에서 저장한다(0x8b0e4 · 0x8cd44 → 0x22755). 114 진입
+     * 0x11d00 이 S+0x50 = 2 → 3(포스트시즌 g == 0 이면 0xb — 웹 null, 136 진입이 다시 쓴다)으로 둔 뒤라 그 저장부터 이어하기가 116 을
+     * 다시 안 띄운다 — B-28 원본 길의 카운터 겹쳐 쌓임도 그 뒤로는 없다(Q-23). `count` 는 이제까지 준 명령 수
+     */
+    giveEvaluationRewards: (count: number) => {
+      if (rawCareer === null || screen.kind !== '경기평가') return
+      const held = evaluationRewardsRef.current
+      if (held === null && rawCareer.seasonEndState !== 116) return
+      const rewards = held?.rewards ?? screen.streakRewards ?? streakEventOf(rawCareer).rewards
+      const given = held?.given ?? 0
+      if (count <= given) return
+      evaluationRewardsRef.current = { rewards, given: count }
+      setCareer({ ...applyEventRewards(rawCareer, rewards.slice(given, count)), seasonEndState: null })
+    },
+
     confirmGameResult: () => {
       if (rawCareer === null) return
       // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 보상 명령(연속 기록 평판 · 슬럼프 스킬)을 먹고, 114 진입 0x11d00 이
-      // S+0x50 = 2 → 3 으로 둔다(웹 null — 포스트시즌 g == 0 의 0xb 는 136 진입이 다시 쓴다)
-      const career = rawCareer.seasonEndState === 116
-        ? { ...streakEventOf(rawCareer).apply(rawCareer), seasonEndState: null }
-        : rawCareer
+      // S+0x50 = 2 → 3 으로 둔다(웹 null — 포스트시즌 g == 0 의 0xb 는 136 진입이 다시 쓴다). 창이 선 명령은 이미 줬다
+      // (`giveEvaluationRewards`) — 남은 몫만
+      const held = evaluationRewardsRef.current
+      evaluationRewardsRef.current = null
+      const career = held !== null
+        ? { ...applyEventRewards(rawCareer, held.rewards.slice(held.given)), seasonEndState: null }
+        : rawCareer.seasonEndState === 116
+          ? { ...streakEventOf(rawCareer).apply(rawCareer), seasonEndState: null }
+          : rawCareer
       setCareer(career)
       // 경기 뒤 평가 116 의 끝(0x12b74~0x12b94) — S+0xb4(포스트시즌 중) ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
       // 아니면 [114 → 128]** 이다. 관리 주기·중간평가를 안 탄다 (R9 116절).
@@ -2498,6 +2534,18 @@ export function useCareerSession({
       setCareer(outcome.career)
     },
 
+    /**
+     * 113 취소 → 112 — 키 0x16c64 의 −16 이 `0xbcb49(0x70)`: 112 진입 0x118e4 가 [!] 를 다시 찍고(0x8cdc0 — 커서 0) 그 틀의 자동 발동
+     * 0x1cf9c 가 화면 112 로 훑는다(0x8be80 — 무작위 조건까지 · 대결 대기 가드 B-124). 찾으면 [다음 114, 뒤 112] (Q-22)
+     */
+    reenterOutingMap: () => {
+      if (career === null) return
+      setOutingReentryCount((count) => count + 1)
+      story.rewindCursor()
+      const event = isAutoScanHeldByAceMatch(aceMatchHoldRef.current) ? null : story.eventFor(career, EVENT_TRIGGER.외출, random)
+      if (event !== null) setScreen({ kind: '이벤트', eventId: event.id, context: '외출진입' })
+    },
+
     /** 113 막힘 팝업(0xbbef9(글, 1, 1, 1)) [확인] — 상태는 113(말풍선) 그대로다 */
     closeOutingNotice: () => setOutingNotice(''),
 
@@ -2673,7 +2721,10 @@ export function useCareerSession({
         // 앞서 웹은 빈 장소에서도 행동을 썼다 — 원본과 반대였다.
         if (isEmptyPlaceEventId(screen.eventId)) {
           setCareer(viewed)
-          return setScreen({ kind: '외출' })
+          // 1c07c — +0x167 을 지우고 113(그 장소 말풍선)으로. 112 진입이 아니라 [!] 다시 찍기 · 자동 발동이 없다(Q-22)
+          const frame = emptyPlaceFrameOf(screen.eventId)
+          const place = OUTING_PLACES.find((candidate) => candidate.frame === frame)
+          return setScreen(place === undefined ? { kind: '외출' } : { kind: '외출', openPlaceId: place.id })
         }
         // 장소 이벤트도 외출이다 — 행동을 쓰고 외출 횟수(칭호 "1년간 외출")에 센다
         const visited = spendCycleAction({ ...viewed, outingsThisSeason: viewed.outingsThisSeason + 1 })

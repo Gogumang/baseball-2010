@@ -141,7 +141,8 @@ export type Screen =
     }
   /** 상점 — 관리 화면 [아이템] 하위 메뉴의 탭 (장착·서브·GP) */
   | { readonly kind: '아이템'; readonly tab: string }
-  | { readonly kind: '외출' }
+  /** 외출 지도 112 — `openPlaceId` 가 있으면 그 장소 말풍선 113 (빈 장소 이벤트 440~444 뒤, 0x1c014 1c07c) */
+  | { readonly kind: '외출'; readonly openPlaceId?: string }
   | {
       readonly kind: '이벤트'
       readonly eventId: number

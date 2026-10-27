@@ -31,6 +31,14 @@ const SUB_MENU_KINDS: readonly string[] = ['선수정보', '트레이닝', '아�
 const SPECIAL_SWING_MENU_ID = '필살타법'
 /** 칸 등장 0x7ff8c 가 다 내려온 뒤의 갱신 수 — 하위 메뉴로 돌아올 때는 펼침(0x7ff55)이 없어 칸이 제자리다 */
 const SETTLED_UPDATES = 1_000
+/**
+ * 칸이 펼쳐지는 동안 커맨드 줄은 키를 안 받는다 — 105 키 0x1261c 머리 [gfx+0x99] · 106 0x13010 · 107 0x12d48 · 110 0x11478 머리
+ * [gfx+0x9a] 가 0 이 아니면 취소까지 통째로 건너뛴다. 105 진입 0x11910(11c26) 의 0x7ff21 이 +0x99 = 1, 105 키가 하위 메뉴를 열며
+ * 0x7ff55(126d4)가 +0x9a = 1, 틀(105 0x1aec4 의 1af8a → 0x7ff8d · 하위 0x14690 → 0x8003d)이 상태 틀 수 t 로 칸을 옮기고 여섯 칸이
+ * 다 제자리면(t ≥ 7 — 16t 가 110 에 닿는다, 0x80026 · 0x80212) 0 으로 내린다. 한 틀은 키(1d06a~) 다음 틀 함수(1d1b2~)라 t = 7 인
+ * 틀의 키까지 막힌다 — 그려진 갱신 수가 7 미만이면 다음 키는 버려진다(A-50)
+ */
+const SLIDE_KEY_LOCK_UPDATES = 7
 
 type MenuKind = 'main' | SubMenuKind
 
@@ -129,6 +137,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
   /** 119 기본정보 카드 · 하위 창이 떠 있으면 그 상태의 키만 돈다(119 는 0x1056c 의 취소 · '*' · '0') — 커맨드 줄은 키를 안 받는다 */
   const isCommandBarIdle = () =>
     !isShowingBasicInfo && overlay === null && abilityDetailOffset === null && !isTrainingState && restPhase === null
+  /** [gfx+0x99] · [+0x9a] — 칸이 펼쳐지는 중이면 커맨드 줄 키(취소 포함) · 누름을 버린다 */
+  const isSliding = () => isCommandBarIdle() && update - openedAt < SLIDE_KEY_LOCK_UPDATES
   const moveCursor = (index: number) => {
     if (index === cursor) return
     if (kind === 'main') mainCursor.current = index
@@ -137,7 +147,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
   }
   const back = () => {
     // 125 키 0x105a4 · 127 키 0x10650 은 확인만 본다 — 취소 없음(결과 창은 제 키로 닫힌다)
-    if (isTrainingState || restPhase === 'playing') return
+    if (isTrainingState || restPhase === 'playing' || isSliding()) return
     // 120 의 취소 → 119 (0x1b654)
     if (abilityDetailOffset !== null) return setAbilityDetailOffset(null)
     if (overlay !== null) return setOverlay(null)
@@ -228,6 +238,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
       }
       // 127 연출 중 확인 키는 `RestScene` 이 받는다(0x10650) — 그 밖 키는 아무 일도 없다
       if (restPhase === 'playing') return
+      if (isSliding()) return
       // 120 키 0x1b654 — 취소·'0' → 119, 그 밖은 0x8a044 글 스크롤(↑·'2' / ↓·'8', 나머지 키는 아무 일도 없다)
       if (abilityDetailOffset !== null) {
         if (event.key === 'Escape' || event.key === 'Backspace' || event.key === '0') return setAbilityDetailOffset(null)
@@ -309,10 +320,10 @@ export function useManagementMenu(props: ManagementScreenProps) {
     select,
     /** 커맨드 줄 칸 누름(터치) — 커서가 설 수 없는 칸(켬 표 0 · 119 카드 아래)은 원본에 고를 길이 없다 */
     hoverSlot: (index: number) => {
-      if (isCommandBarIdle() && !isOffSlot(index)) moveCursor(index)
+      if (isCommandBarIdle() && !isSliding() && !isOffSlot(index)) moveCursor(index)
     },
     tapSlot: (id: string) => {
-      if (isCommandBarIdle() && !isOffSlot(slots.findIndex((slot) => slot.id === id))) select(id)
+      if (isCommandBarIdle() && !isSliding() && !isOffSlot(slots.findIndex((slot) => slot.id === id))) select(id)
     },
     back,
   }

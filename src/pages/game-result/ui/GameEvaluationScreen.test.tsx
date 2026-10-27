@@ -84,13 +84,14 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
   it('연속 기록 say 뒤 보상 명령(종류 7)마다 창 — 평판 합은 공용 알림, 슬럼프 +18 은 스킬 창 0x8e054 (0x8d4c4), 다 닫으면 114 끝', () => {
     vi.useFakeTimers()
     const onContinue = vi.fn()
+    const onRewardsGiven = vi.fn()
     const 밑그림 = vi.fn((career: { readonly reputation: number }) => <div data-testid="밑그림" data-reputation={career.reputation} />)
     const career = { ...createCareer('선수'), reputation: 100 }
     render(
       <GameEvaluationScreen newTitles={[]} evaluation={평가}
         streakNotices={[{ labelIndex: 102, count: 4, commentIndex: 111, reputationChange: -10 }]}
         streakRewards={[{ kind: 1, value: -10 }, { kind: 4, value: 18 }]}
-        career={career} onContinue={onContinue} rewardUnderlay={밑그림} />,
+        career={career} onContinue={onContinue} rewardUnderlay={밑그림} onRewardsGiven={onRewardsGiven} />,
     )
     for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
       프레임(200)
@@ -107,12 +108,15 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     expect(알림.textContent).toContain('평판')
     expect(알림.textContent).toContain('-10')
     expect(screen.getByTestId('밑그림').getAttribute('data-reputation')).toBe('90')
+    // 그 갱신에 세션이 몫을 주고 저장한다(0x8c460 끝, Q-23)
+    expect(onRewardsGiven).toHaveBeenLastCalledWith(1)
     프레임(20)
     fireEvent.keyDown(window, { key: 'Enter' })
     프레임(20)
     // 스킬 창 — img_text 370(획득)
     expect(screen.getByTestId('스킬-보상-창')).toBeTruthy()
     expect(screen.getByTestId('스킬-보상-창').textContent).toContain('획득')
+    expect(onRewardsGiven).toHaveBeenLastCalledWith(2)
     expect(onContinue).not.toHaveBeenCalled()
     프레임(20)
     fireEvent.keyDown(window, { key: 'Escape' })

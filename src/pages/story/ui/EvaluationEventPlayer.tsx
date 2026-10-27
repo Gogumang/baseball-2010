@@ -69,6 +69,11 @@ interface EvaluationEventPlayerProps {
    * 인자는 이미 준 보상 명령 수. 없으면 `underlay` 그대로
    */
   readonly underlayAfterRewards?: (givenRewardCount: number) => ReactNode
+  /**
+   * 보상 명령의 창이 선 갱신 — 0x8c460 이 그 명령의 보상을 주고 끝(0x8b0e4 · 0x8cd44)에서 **저장한다**(S+0x50 은 114 진입이 이미 3 ·
+   * 0xb). 인자는 이제까지 준 보상 명령 수. 세션이 그 몫을 주고 저장한다(Q-23)
+   */
+  readonly onRewardsGiven?: (givenRewardCount: number) => void
   /** 마지막 명령이 끝나면 — 114 끝 */
   readonly onDone: () => void
 }
@@ -85,7 +90,7 @@ interface EvaluationEventPlayerProps {
  */
 export function EvaluationEventPlayer({
   underlay, dialogue, dialogueExpression, changeValues, goals, year, game, streak, streakExpression, gauge, finalNotice = null,
-  rewardNotices = [], underlayAfterRewards, onDone,
+  rewardNotices = [], underlayAfterRewards, onRewardsGiven, onDone,
 }: EvaluationEventPlayerProps) {
   const [step, setStep] = useState<EvaluationStep>('대사')
   /** 마지막 say 가 연속 기록이었는가 — 알림 창 밑에 남는 상자가 그 글이다 */
@@ -111,6 +116,7 @@ export function EvaluationEventPlayer({
     if (first >= rewardNotices.length) return finish()
     setRewardIndex(first)
     setStep('보상')
+    onRewardsGiven?.(first + 1)
   }
   const afterChange = () => (streak !== '' ? (setStreakShown(true), setStep('연속기록')) : afterStreak())
   const answerReward = () => {
@@ -120,6 +126,7 @@ export function EvaluationEventPlayer({
     const next = nextRewardFrom(rewardIndex + 1)
     if (next >= rewardNotices.length) return finish()
     setRewardIndex(next)
+    onRewardsGiven?.(next + 1)
   }
   const finishRewardWindow = (key: number) => setClosingReward((closing) => (closing?.key === key ? null : closing))
   const currentReward = step === '보상' ? rewardNotices[rewardIndex] : undefined

@@ -66,6 +66,11 @@ export function emptyPlaceEventId(placeFrame: number): number {
   return EMPTY_PLACE_EVENT_BASE + placeFrame - 1
 }
 
+/** 빈 장소 이벤트(440~444)의 장소 프레임(1~5) — 아니면 null. 그 이벤트가 끝나면 그 장소의 말풍선(113)으로 돌아간다(0x1c014 1c07c) */
+export function emptyPlaceFrameOf(eventId: number): number | null {
+  return isEmptyPlaceEventId(eventId) ? eventId - EMPTY_PLACE_EVENT_BASE + 1 : null
+}
+
 /** 440~444 — 이벤트 없는 장소에서 나오는 "특별한 일이 없다" 다섯 개 */
 export function isEmptyPlaceEventId(eventId: number): boolean {
   return eventId >= EMPTY_PLACE_EVENT_BASE && eventId < EMPTY_PLACE_EVENT_BASE + EMPTY_PLACE_COUNT

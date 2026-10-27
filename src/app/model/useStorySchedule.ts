@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import { nextEventFor, placeTriggerOf, scanEventFrom } from '@/entities/story/model/storyScene'
+import { nextEventFor, openingScanOf, placeTriggerOf, scanEventFrom } from '@/entities/story/model/storyScene'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -58,6 +58,14 @@ export function useStorySchedule(career: PlayerCareer | null) {
     return scan.event
   }
 
+  /** 새 선수 오프닝 451 — 0x1cfa6 의 번호 호출(`openingScanOf`). 커서에 "그 다음 칸" 이 남는다 */
+  const openingEvent = () => {
+    if (events === null) return null
+    const scan = openingScanOf(events, cursorRef.current)
+    cursorRef.current = scan.cursor
+    return scan.event
+  }
+
   /**
    * **나리 장면이 새로 선다** (셋업 0xf684 — 이어하기 · 경기 뒤 · 마선수 대결 뒤): fb1c `0x8ce94` → `0xacf60` 이 커서를 0 으로,
    * fb7a 가 mgr+0x304 = 1. 반복 이벤트 본 표시 지우기(같은 `0xacf60`)는 커리어 쪽이 한다 (`forgetRepeatableEvents`).
@@ -81,5 +89,5 @@ export function useStorySchedule(career: PlayerCareer | null) {
     cursorRef.current = 0
   }
 
-  return { events, eventPlaceIds, eventFor, rewindCursor, setUpScene, pressManagementConfirm }
+  return { events, eventPlaceIds, eventFor, openingEvent, rewindCursor, setUpScene, pressManagementConfirm }
 }
