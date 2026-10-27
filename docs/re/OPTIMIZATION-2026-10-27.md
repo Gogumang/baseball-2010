@@ -478,3 +478,6 @@ Hobby 에는 Skew Protection 이 없어 새 배포 뒤 옛 탭이 옛 코드 조
   - 응답 머리: `asset-packs/*.bin` 은 `application/octet-stream`, `asset-sw.js` 는 캐시 짧게.
 - `vercel.json` 에 `asset-packs/*.bin` immutable 을 더할 수 있다. 앱이 `cache: 'no-store'` 로 받아 Cache Storage 에 두므로 꼭 필요하지는 않다.
 - 진행 막대 화면은 원본에 없는 웹 전용 화면이다.
+
+## 9. r330 — B1 등 단위 시험 속도
+B1(`spriteLoader.warmRecoloredFrames` 가 재료 도착 수 · JSON 캐시 비움 수가 그대로면 다시 안 봄)을 고쳤다 — 나리 타자편 긴 soak 355 → 319초, 요약 같음. 전체 vitest 는 워커 2 에서 약 225 → 205초, 혼자 돌 때 워커 6 은 76초(최대 5.3GB). `yarn test:quick` 은 짧은 화면 soak 둘(careerSoak · pitcherLeagueSoak)을 뺀다.
