@@ -198,3 +198,57 @@
   - 색 ≤ 256 이면 투명색을 앞에 두는 팔레트 + tRNS 로 다시 쓰고(Pillow `optimize`), 작아질 때만 바꿨다.
   - Pillow RGBA 를 대조했다.
   - 두 브라우저에서 data URL → `Image` → `drawImage` → `getImageData`(willReadFrequently) 를 바이트 단위로 대조했다.
+
+## 6. r311 결과 — A8 · A4 · A5 (웹 37bda236 · 56ea59ec · ca70c97b)
+
+A1 · A2(HTTP/2 · 캐시 머리)는 배포 호스트를 몰라 하지 않았다. A3 도 h2 확인 뒤로 둔다.
+
+### A8 측정 도구 (`e2e/perf.mjs`)
+- 크로미움은 `page.route` 를 걷고 `--host-resolver-rules=MAP cdn.jsdelivr.net 127.0.0.1:9` 로 웹폰트 CDN 을 끊는다. 캐시에서 꺼낸 응답(`requestServedFromCache` · `fromDiskCache`)은 요청에서 뺀다. `PERF_SCENES` 로 잴 장면을 고른다.
+- 웹킷은 그대로 라우트로 늦추고 표에 "캐시 꺼짐" 으로 적는다.
+- 같은 빌드(afd0770e e2e 빌드)를 옛 도구 · 새 도구로 잰 요청 수 (망 그대로, ready 까지, 2번 가운데 값):
+
+| 장면 | 옛 도구 | 새 도구 |
+|---|---:|---:|
+| 첫 타석(general-bat) | 1,515 | 1,246 |
+| general-defense | 1,880 | 1,449 |
+| 나리 관리 | 835 | 825 |
+
+### A4 PNG 무손실 팔레트 (`tools/repack_sprite_png.py`)
+- 9,025장 중 **4,978장**을 바꿨다. 그 파일들이 5.47MB → 4.20MB(−1.28MB, −23.3%). 색표 차례 둘 × Pillow optimize 켬 · 끔 중 가장 작은 것, 작아질 때만.
+- 덩이는 IHDR · PLTE · tRNS · IDAT · IEND 뿐(`spritePng.test.ts` 가 지킨다). gAMA · iCCP · sRGB 없음.
+- RGBA 대조: Pillow 되풀기(도구 안) + `e2e/png-rgba.mjs` chromium 4,978/4,978 · webkit 4,978/4,978 바이트 같음. 일부러 한 픽셀 바꾼 파일은 두 브라우저 다 잡았다.
+- `prune_sprites.py` · `apply_mpl.py` · `generate_management_sprites.py` 끝에서 부른다. apply_mpl · 관리 그림을 다시 돌려도 같은 바이트(멱등).
+- 시험의 PNG 읽기를 팔레트 꼴도 읽게(`readPngForTests.ts`), `find_overlay_slots.py` · `sprite_sheet.py` 는 Pillow 로 읽게.
+- `e2e:all` 에 `png` 단계를 넣었다.
+
+### A5 스프라이트 JSON 묶음 (`sprites/sprite-json.bundle.json`)
+- vite 플러그인(`tools/viteSpriteJsonBundle.ts`)이 `public/sprites/**/*.json` 265개를 묶는다. 개발 서버는 요청 때 만들고, 빌드는 산출물에 쓴다. 날것 937KB · gzip 61KB.
+  - 값은 각 파일 **글 그대로의 문자열**이다. 꺼낼 때 `JSON.parse` 하므로 낱개 `fetch().json()` 과 같은 값의 새 객체다.
+  - ⚠️ 압축 없이 보내는 호스트면 937KB 를 통째로 받는다(낱개는 장면당 일부만). 호스트가 JSON 을 gzip 하는지 A1 · A2 와 함께 볼 것.
+- 읽는 쪽 `shared/lib/sprite/spriteJsonBundle.ts`: 처음 스프라이트 JSON 을 청할 때 묶음을 받기 시작한다(이용안내는 JSON 을 안 써 첫 화면은 그대로 7요청 · 0.9초). 묶음에 없거나 못 받으면 낱개 파일. vitest 에서는 꺼 둔다.
+- `spriteCache` · 파티클 표 · 투구 고르기 박스가 묶음을 거친다. 장면당 JSON 요청 26~80개 → 묶음 1개.
+
+### 결과가 같다는 근거
+- 난수 · 경기 · 저장: 게임 코드는 바꾸지 않았다(받는 길만). vitest 850 파일 · 9,793 시험 통과, `e2e:fixtures` 같음.
+- 화면 픽셀: `e2e/scene-pixels.mjs` — 가짜 시계를 멈추고 망 요청이 다 끝난 뒤에만 50ms 씩 밀어 같은 틱에서 찍는다. afd0770e e2e 빌드 ↔ r311 e2e 빌드(정적 서버 하위 경로 `/sub/dir/` — base './' 확인) 장면 49 × chromium · webkit 아이폰 = 98 화면.
+  - 92/98 은 첫 판에 다른 픽셀 0.
+  - 웹킷 4장면(season-new · nari-management · mission-bat · mission-result)은 첫 판에 배경 무늬 · 애니 틱이 갈렸고, 다시 찍으니 0. 같은 빌드끼리 대조(A ↔ A)에서도 웹킷은 ready 틱이 한 걸음 갈릴 때가 있다.
+  - nari-burst-result 는 두 빌드 모두 같은 자리에서 장면이 안 선다(아래) — 그 자리 화면은 다른 픽셀 0.
+- 로드 오류: 새로 생긴 404 · 실패 요청 · 그림 error · naturalWidth 0 은 98 화면 모두 0. 원래부터 있던 것: derby-start 의 `batter_balancer/frames/023 · 027.png` 와 `index/023 · 027.png` 4개(없는 프레임을 청한다, 두 빌드 같음).
+- 묶음 뒤 스프라이트 JSON 낱개 요청 0 · 묶음 1 (98 화면 모두).
+
+### 전후 (chromium, 느린 4G, 2번 가운데 값, 새 도구)
+
+| 지점 | 전 ready ms | 후 ready ms | 전 요청 | 후 요청 | 전 KB | 후 KB |
+|---|---:|---:|---:|---:|---:|---:|
+| 나리 관리(바로가기) | 9,111 | 8,825 | 223 | 209 | 1,003 | 1,045 |
+| 첫 타석(바로가기) | 12,978 | 12,849 | 364 | 354 | 1,202 | 1,258 |
+| general-defense | 16,969 | 16,685 | 510 | 498 | 1,474 | 1,432 |
+| 메인 메뉴 +3초 | 13,473 | 13,482 | 307 | 288 | 1,239 | 1,350 |
+
+망 그대로(ready 까지 요청 · 받은 KB): 나리 관리 825 → 783 · 1,772 → 1,686KB, 첫 타석 1,246 → 1,182 · 2,160 → 1,972KB, general-defense 1,449 → 1,377 · 2,472 → 2,242KB.
+느린 4G 의 ready 는 0.1~0.3초 줄었다. 시간 대부분은 장면 표의 고정 기다림과 HTTP/1.1 줄서기(A1)라 이 셋만으로는 크게 줄지 않는다. 느린 4G 받은 KB 는 묶음(61KB)을 ready 전에 다 받아 장면에 따라 조금 늘기도 한다.
+
+### 남은 것
+- **nari-burst-result 장면이 서지 않는다 — 이번 일 전부터.** afd0770e 빌드에서도 smoke · hits 가 "키를 눌러도 안 닿았다: 돌발미션 결과 창" 으로 실패한다(화면은 경기결과). 씨앗 5 길의 난수 차례가 앞 라운드(r308 A-26 파티클 등)에서 바뀐 것으로 보인다 — 장면 표 씨앗 · 픽스처를 다시 찾아야 한다. e2e:all 의 다른 장면은 smoke 96/98(그 장면 × 2) · hits 실패 4(그 장면 × 4 기기) 외 모두 통과.
