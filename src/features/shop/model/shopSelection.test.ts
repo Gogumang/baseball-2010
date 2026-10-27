@@ -20,7 +20,28 @@ describe('구매 확인 — StrMODE[79]', () => {
   })
 
   it('GP 아이템은 StrMODE[82]', () => {
-    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 4))).toBe('!C!cFFFF001000 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
+    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 0))).toBe('!C!cFFFF00300 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
+  })
+
+  it('엄마의도시락(칸 4)은 최대인 칸마다 [192] + "!N", 그 뒤 "!N" + [82] — 0 칸이어도 "!N" 이 앞에 선다 (0x138ca~0x13998)', () => {
+    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 4))).toBe('!N!C!cFFFF001000 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
+    const 히트최대 = 선수({ gamePoint: 1000, ability: { ...선수().ability, hit: 800, run: 800 } })
+    expect(purchaseQuestionOf(히트최대, shopItemId('GP', 4))).toBe(
+      '!C[!cFFFF00히트!cFFFFFF] 능력치가 최대입니다!N!C[!cFFFF00주루!cFFFFFF] 능력치가 최대입니다!N!N!C!cFFFF001000 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?',
+    )
+  })
+
+  it('엄마의도시락 네 칸이 다 최대면 줄마다 "!N" 을 붙인 글로 막는다 — 끝 줄 뒤에도 (0x13932 · 0x13998)', () => {
+    const 꽉 = 선수({ gamePoint: 1000, ability: { ...선수().ability, hit: 800, power: 800, defense: 800, run: 800 } })
+    expect(purchaseQuestionOf(꽉, shopItemId('GP', 4))).toBeNull()
+    expect(selectShopItem(꽉, shopItemId('GP', 4), 난수).notice).toBe(
+      ['히트', '파워', '수비', '주루'].map((name) => `!C[!cFFFF00${name}!cFFFFFF] 능력치가 최대입니다!N`).join(''),
+    )
+  })
+
+  it('이글아이(칸 9)는 [224] + "!N!N" + [82] (0x13ab4~0x13ae4)', () => {
+    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 9)))
+      .toBe('!C최대 99회 누적 가능합니다!N!N!C!cFFFF00500 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
   })
 
   it('막혔거나 이미 가진 장비를 고르면 묻지 않는다 — 바로 알림·장착으로 간다', () => {

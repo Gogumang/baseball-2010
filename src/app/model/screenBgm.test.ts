@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { NARI_STATE, pitcherLeagueBgmOf, restartsManagementBgmFrom, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useResumeCoverStop, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, seasonSceneBgmOf, restartsTeamSelectBgm, playEndingContinueBgm, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import { NARI_STATE, pitcherLeagueBgmOf, restartsManagementBgmFrom, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useResumeCoverStop, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, seasonSceneBgmOf, restartsTeamSelectBgm, restartsNextGameStandingsBgm, playEndingContinueBgm, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
 import type { Screen } from '@/app/model/screen'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { useSceneBgm } from '@/app/model/useSound'
@@ -172,6 +172,39 @@ describe('안쪽 상태별 배경음 (r296 — 호출지 전수)', () => {
     }
     playEndingContinueBgm(port)
     expect(calls).toEqual(['stop', 'bgm 4'])
+  })
+})
+
+describe('109 진입 0x10d8c — 142 취소로 돌아오면(이전 ≠ 105) 4 를 처음부터 다시 튼다', () => {
+  it('규칙 — 경기준비 → 다음경기순위만', () => {
+    expect(restartsNextGameStandingsBgm('경기준비', '다음경기순위')).toBe(true)
+    expect(restartsNextGameStandingsBgm('관리', '다음경기순위')).toBe(false)
+    expect(restartsNextGameStandingsBgm('경기준비', '포스트시즌')).toBe(false)
+  })
+
+  it('타자편 — 관리 → 109 는 잇고, 142 → 109 는 다시 틀기 표가 오른다', () => {
+    const { result, rerender } = renderHook(({ screen }: { screen: Screen }) => useScreenBgm(screen), {
+      initialProps: { screen: { kind: '관리' } as Screen },
+    })
+    const start = result.current.restartSerial
+    rerender({ screen: { kind: '다음경기순위', fromManagement: true } as Screen })
+    expect(result.current.restartSerial).toBe(start)
+    rerender({ screen: { kind: '경기준비' } as Screen })
+    rerender({ screen: { kind: '다음경기순위', fromManagement: false } as Screen })
+    expect(result.current.restartSerial).toBe(start + 1)
+    expect(result.current.bgm).toBe(4)
+  })
+
+  it('투수편 — 경기준비 → 다음경기순위에 표가 오른다', () => {
+    const { result, rerender } = renderHook(
+      ({ scene }: { scene: '관리' | '다음경기순위' | '경기준비' }) => usePitcherLeagueBgmRestart(true, scene),
+      { initialProps: { scene: '관리' as '관리' | '다음경기순위' | '경기준비' } },
+    )
+    rerender({ scene: '다음경기순위' })
+    expect(result.current).toBe(0)
+    rerender({ scene: '경기준비' })
+    rerender({ scene: '다음경기순위' })
+    expect(result.current).toBe(1)
   })
 })
 

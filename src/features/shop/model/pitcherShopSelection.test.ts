@@ -107,6 +107,11 @@ describe('투수 서브·GP 아이템 (0x13460 kind 1·2 → 0x14a74)', () => {
       .toBe('!C!cFFFF00500 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
   })
 
+  it('GP: 엄마의도시락 확인창은 최대인 칸 줄(이름 StrMODE[0x28 + k]) + "!N" 뒤 "!N" + [82] (0x138ca, 두 모드 공용)', () => {
+    expect(pitcherPurchaseQuestionOf(투수({ gamePoint: 1000 }), shopItemId('GP', 4)))
+      .toBe('!N!C!cFFFF001000 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
+  })
+
   it('GP: 사면 G 를 빼고 곧바로 쓴다', () => {
     const { career, notice } = selectPitcherShopItem(투수({ gamePoint: 1000, stamina: 10 }), shopItemId('GP', 9), 고정(0))
     expect(notice).toBe('!C!cFFFF00스태미나가 100%!cFFFFFF!N회복되었습니다 ') // StrMODE[125] 끝 빈칸 원문

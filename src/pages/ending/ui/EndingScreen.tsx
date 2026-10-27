@@ -6,6 +6,7 @@ import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
+import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import type { Collection, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
@@ -74,7 +75,7 @@ interface EndingScreenProps {
   /**
    * 엔딩을 떠나 메인 메뉴로 — `isRegistered` 는 명예의 전당에 등록하고 떠나는가. 모드 저장 지우기(0x62dbe 의 0x224ec)는 등록이 된
    * 그 순간이라 `hallOfFame.onRegister` 를 넘기는 쪽이 '등록' 결과에서 한다.
-   * 팝업 0x2d · 0x32 의 "아니오" · 145 의 "나중에 등록" · 안내 창은 등록 없이 떠난다(저장을 안 건드린다).
+   * 팝업 0x2d · 0x32 의 "아니오" · 145 의 "나중에 등록" · G 부족 팝업 2 의 "아니오" 는 등록 없이 떠난다(저장을 안 건드린다).
    */
   readonly onFinish: (isRegistered: boolean) => void
   /**
@@ -103,13 +104,13 @@ const TEXT = {
   bonus: '!C엔딩 보너스 획득!N[!cFFFF00%d G포인트!cFFFFFF]', // StrMODE[214]
   ask: '!C나만의 리그 선수를!N[!cFFFF00명예의 전당!cFFFFFF]에!N등록 하시겠습니까?', // StrMODE[215]
   continue: '!C!cFFFF005000 G포인트!cFFFFFF를 소모하여 현재!N상태에서 이어하시겠습니까? ', // StrMODE[221]
-  shortage: '!C!cFF0000%d G포인트!cFFFFFF가 부족합니다', // StrCOMMON[41]
+  /** StrMODE[65] "G포인트가 부족합니다. 구매 페이지로 이동하시겠습니까?" — 141 틀 0x1bbc4 1bd68~1bd80 `0x702b5(…, 0x41)` · 팝업 (2, 2) */
+  shortage: ORIGINAL_MODE_TEXT[65] ?? '',
 }
-const CONTINUE_COST = 5000
 
 /** '이어하기' — 팝업 0x32 예를 받아 이어하기로 넘어갔다(창 없이 엔딩 판만 — 방출이면 141 이 새 시즌 효과기 끝을 기다리며 그린다) */
-type Phase = '엔딩' | '제작진' | '보너스' | '이어하기질문' | '이어하기' | '등록질문' | '등록목록' | '안내'
-type QuestionPhase = '이어하기질문' | '등록질문'
+type Phase = '엔딩' | '제작진' | '보너스' | '이어하기질문' | '이어하기' | '등록질문' | '등록목록' | '부족질문'
+type QuestionPhase = '이어하기질문' | '등록질문' | '부족질문'
 
 interface Question {
   readonly text: string
@@ -127,7 +128,9 @@ interface Question {
  * 제작진(단계 > 2)의 키가 엔딩 보너스(StrMODE[214]) → 명예의 전당 등록(StrMODE[215])을 묻는다.
  * 등록은 명예의 전당 목록(상태 145, `HallOfFameScreen` 의 '등록')에서 칸을 골라 한다. 저장을 지우는 것은 등록(0x62dbe 의
  * 0x224ec)뿐이라 "나중에 등록" · 아니오로 떠나면 선수 저장이 남는다(`onFinish(false)`).
- * G포인트가 모자랄 때 원본이 어디로 가는지는 미확인 — StrCOMMON[41] 을 띄우고 끝낸다 (추정).
+ * G포인트가 모자라면(0x32 예 — 1bd5a~1bd84: 전역 +0x64 < 5000) StrMODE[65] 팝업 2(예/아니오, 2 · 2). 그 닫힘(1be58~1beae):
+ * 예(답 0) → `0xbcb49(0x8b)` 139 G포인트 충전 페이지(실제 결제 — 웹에 없다, Q) → 끝나면 앞 상태 141 로 돌아와 진입 0x12300 을 다시 밟는다.
+ * 아니오(답 1) → +0x278 = 1 · 효과기 → 메인 메뉴(0x2d · 0x32 의 아니오와 같은 꼬리). 웹은 예를 결제 없이 돌아온 141 로 둔다(엔딩 그대로).
  *
  * 단계(`ENDING_STAGE` 머리말 — 화면 효과기 0xbdae8 의 아홉 틀을 기다린다): 0 은 아무것도 안 그리고, 1 은 검정에서 밝아지며 엔딩,
  * 키가 단계 2 로 엔딩을 어둡게 덮은 뒤 3 이 제작진을 밝힌다(틀 수 n 을 0 으로). 부상·방출의 키는 단계를 안 보고 곧장 이어하기를 묻는다.
@@ -139,7 +142,6 @@ export function EndingScreen(props: EndingScreenProps) {
   const walkInLook = props.walkInLook ?? DEFAULT_WALK_IN_LOOK
   const seenEventIds = props.seenEventIds ?? NO_EVENTS
   const [phase, setPhase] = useState<Phase>('엔딩')
-  const [message, setMessage] = useState('')
   /** 141 에 들어와 돈 틀 수 n = [장면+0x2c] */
   const tick = useUpdateCounter()
   /** 단계 1 의 키(0x12246)를 받은 틀 — 단계 2 의 시작 */
@@ -154,16 +156,13 @@ export function EndingScreen(props: EndingScreenProps) {
   useEffect(() => {
     if (stage === 3 && phase === '엔딩') setPhase('제작진')
   }, [stage, phase])
-  const inform = (text: string) => {
-    setMessage(text)
-    setPhase('안내')
-  }
 
   const questions: Record<QuestionPhase, Question> = {
     이어하기질문: {
       text: TEXT.continue,
       onYes: () => {
-        if (!onContinue()) return inform(TEXT.shortage.replace('%d', String(CONTINUE_COST)))
+        // 1bd60~1bd84 — G < 5000 이면 StrMODE[65] 팝업 2
+        if (!onContinue()) return setPhase('부족질문')
         // 창은 닫혔다 — 방출 이어하기(0x1b768, 1be26)는 141 이 엔딩 판을 그리며 효과기 끝을 기다린다(1beb4~1beea)
         setPhase('이어하기')
       },
@@ -175,8 +174,14 @@ export function EndingScreen(props: EndingScreenProps) {
       onYes: () => setPhase('등록목록'),
       onNo: onFinish,
     },
+    // 팝업 2 (1be58~1beae): 예 → 139 G포인트 충전(웹에 결제가 없어 충전 없이 141 로 돌아온 길) · 아니오 → 메인 메뉴
+    부족질문: {
+      text: TEXT.shortage,
+      onYes: () => setPhase('엔딩'),
+      onNo: onFinish,
+    },
   }
-  const question = phase === '이어하기질문' || phase === '등록질문' ? questions[phase] : null
+  const question = phase === '이어하기질문' || phase === '등록질문' || phase === '부족질문' ? questions[phase] : null
 
   /**
    * **키 길** — 나리 장면 0x1cdec 의 키 갈래(1d06a~1d09a)는 공용 창 0x754f9 가 키를 안 먹고 이 틀에 누름([this+0x34])이 있으면
@@ -290,7 +295,6 @@ export function EndingScreen(props: EndingScreenProps) {
           }}
         />
       )}
-      {phase === '안내' && <MessageBox text={message} buttons={['OK']} onAnswer={onFinish} />}
       {question !== null && (
         <MessageBox
           text={question.text}

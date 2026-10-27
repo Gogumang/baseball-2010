@@ -1,5 +1,6 @@
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
@@ -130,6 +131,27 @@ describe('엔딩 보너스와 이어하기 (141 틀 0x1bbc4)', () => {
     expect(이어함.gamesPlayed).toBe(0)
     expect(이어함.stamina).toBe(10_000)
     expect(이어함.gamePoint).toBe(0)
+  })
+
+  describe('방출 이어하기의 +0x6b 사본 · +0x1c2 — 연말 132 꼬리 10d08~10d28 을 안 지났다 (B-128)', () => {
+    afterEach(() => setBugfixConfigForTests(null))
+    const 방출 = () => 투수({
+      season: 7, gamePoint: 5000, endingIndex: 1,
+      trainingCounts: { '2': 15 }, seasonStartTrainingCounts: { '2': 6 }, seasonPopularityGain: -3,
+    })
+
+    it('원본: 사본 · 인기도 합이 그대로 다음 해로', () => {
+      const 이어함 = continueAfterPitcherEnding(방출(), createConstantRandom(0))
+
+      expect([이어함.seasonStartTrainingCounts, 이어함.seasonPopularityGain]).toEqual([{ '2': 6 }, -3])
+    })
+
+    it('고친 길: 새로 뜬다', () => {
+      setBugfixConfigForTests(bugfixConfigWith(['B-128']))
+      const 이어함 = continueAfterPitcherEnding(방출(), createConstantRandom(0))
+
+      expect([이어함.seasonStartTrainingCounts, 이어함.seasonPopularityGain]).toEqual([{ '2': 15 }, 0])
+    })
   })
 })
 

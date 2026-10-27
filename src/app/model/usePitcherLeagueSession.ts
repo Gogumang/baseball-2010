@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { playEndingContinueBgm, restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
-import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchHoldPort, AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import { isAutoScanHeldByAceMatch } from '@/app/model/aceMatchScanGuard'
 import { pitcherCollectorHiddenIdsOf } from '@/entities/collection/model/collection'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
@@ -735,6 +736,11 @@ export function usePitcherLeagueSession(
   isOnScreen = true,
   /** 공용 창에 히든 오픈 알림 (0x62368 → 0x74ef5) — 새로 연 k 만 넘긴다. 정규시즌 우승 팝업 0xb 닫힘이 쓴다 */
   announceHiddenOpen?: (ids: readonly number[]) => void,
+  /**
+   * 두 편의 대결 대기 칸 g[0x11f] · g[0x176] (전역기록) — 자동 훑기 0x1cf9c 의 가드(1cfe4~1d008)가 모드를 안 보고 둘 다 본다
+   * (`isAutoScanHeldByAceMatch`, B-124). 안 넘기면 가드가 없다.
+   */
+  aceMatchHold?: AceMatchHoldPort,
 ): PitcherLeagueSession {
   /** 전역기록 +0x4f 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
@@ -743,6 +749,9 @@ export function usePitcherLeagueSession(
   const memoryAceMatchPending = useMemo(() => createMemoryAceMatchPendingPort(), [])
   const aceMatchPendingRef = useRef(aceMatchPending ?? memoryAceMatchPending)
   aceMatchPendingRef.current = aceMatchPending ?? memoryAceMatchPending
+  /** 두 편 대결 대기(전역기록) — 자동 훑기 가드 1cfe4~1d008 (`isAutoScanHeldByAceMatch`) */
+  const aceMatchHoldRef = useRef(aceMatchHold)
+  aceMatchHoldRef.current = aceMatchHold
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
   /** 띄울 때 저장에 들어 있던 G — 다리가 갈아 끼우기 전의 값이라 첫 렌더에서 떠 둔다 */
@@ -998,21 +1007,29 @@ export function usePitcherLeagueSession(
   }, [mergeStore, wallet])
 
 
+  /**
+   * 관리 장면 +0x270 — 117 진입 0x11e84(11ee6~11f4a)가 칭호 1 · 9 를 주지 않고 넣어 두는 칸. 서 있으면 105 둘째 틀에 판정 0x1a1c0
+   * 대신 그 칭호의 팝업이 선다(`pendingTitle`). 확인 0x1b1e4 가 비트 · 장착 · 저장 뒤 −1 로 둔다
+   */
+  const [heldTitle, setHeldTitle] = useState<string | null>(null)
   /** 칭호 팝업 확인 0x1b1e4 */
   const confirmTitle = useCallback(() => {
+    setHeldTitle(null)
     // 직전 값을 받아 붙인다 — 지갑 다리가 맞춰 둔 G를 옛 값으로 되돌리지 않는다 (`commitWith` 머리글)
     commitWith((current) => {
-      const title = nextPitcherTitleOf(current)
+      const title = heldTitle ?? nextPitcherTitleOf(current)
       return title === null ? current : awardPitcherTitles(current, [title])
     })
-  }, [commitWith])
+  }, [commitWith, heldTitle])
 
   /**
    * 자동 발동 한 번 — 0x8be80 → 0xadc70 (커서에서 이어 훑기). 끝까지 없으면 커서가 0 으로 되감기고 그 호출은 "없음" 이다.
    * 훑기는 상태가 바뀐 틀에만 돌아(0x1cdec 1ce02) 다음 틀에 처음부터 다시 훑는 일은 없다 — 다음 진입이 0 부터 본다(타자편과 같다).
+   * 105 · 112 의 자동 발동 둘만 부른다 — 대결 대기(어느 편이든)가 서 있으면 커서를 안 건드리고 건너뛴다(1cfe4~1d008, B-124 원본 길).
    */
   const scanAuto = useCallback(
     (current: PitcherCareer, events: readonly OriginalEvent[], trigger: number, rolling: RandomPort | undefined) => {
+      if (isAutoScanHeldByAceMatch(aceMatchHoldRef.current)) return null
       const scan = scanPitcherEventFrom(current, events, trigger, cursorRef.current, rolling, freshSceneRef.current)
       cursorRef.current = scan.cursor
       return scan.event
@@ -1127,11 +1144,11 @@ export function usePitcherLeagueSession(
        * +0x270 에 넣고(0x11ee6~0x11f4a, 공통 칭호라 두 편 같다) 끝에 +0x1cc = k (0x11f5a).
        */
       const achieved = achievedPitcherGoalCount(career, '중간')
+      // 칭호는 +0x270 에 넣기만 한다(조건이 안 서면 그대로) — 팝업 · 비트 · 장착은 105 둘째 틀의 확인(`heldTitle` · `confirmTitle`)
+      const [midSeasonTitle] = midSeasonTitlesOf(career, achieved).filter((title) => !career.titleIds.includes(title))
+      if (midSeasonTitle !== undefined) setHeldTitle(midSeasonTitle)
       // 직전 값을 받아 고친다 — 같은 프레임의 칭호·지갑 고리가 고친 것을 덮지 않게 (`commitWith` 머리글)
-      commitWith((current) => {
-        const titles = midSeasonTitlesOf(current, achieved).filter((title) => !current.titleIds.includes(title))
-        return { ...awardPitcherTitles(current, titles), lastMidSeasonGoalCount: achieved }
-      })
+      commitWith((current) => ({ ...current, lastMidSeasonGoalCount: achieved }))
       openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
     }
   }, [
@@ -2296,10 +2313,11 @@ export function usePitcherLeagueSession(
    * this+0x270 에 남겨 팝업 0x1274c 를 띄우고, 확인 0x1b1e4 가 비트·곧바로 장착(+0x1c4)·저장 뒤 다음 틀에 다시 판정한다
    * (P3 4절 — 장면 0x106 은 모드 3·4 공용). 105 에 있고 이벤트·알림이 없으면 판정한 값으로 둔다(타자편 `pendingTitle` 과 같다).
    * 훈련 · 휴식 결과 창은 원본에서 125 · 127 상태라(창이 닫혀야 105 로 돌아온다) 그동안은 판정하지 않는다(`isResultWindowOpen`).
+   * 117 이 넣어 둔 +0x270(`heldTitle` — 칭호 1 · 9)이 서 있으면 판정 대신 그것이다(0x1af9c~0x1afa8 — +0x270 ≥ 0 이면 0x1a1c0 을 건너뛴다).
    */
   const pendingTitle = career !== null && scene === '관리' && story === null && fileEvents !== null
     && outingRecoveryNotice === '' && !isResultWindowOpen
-    ? nextPitcherTitleOf(career)
+    ? heldTitle ?? nextPitcherTitleOf(career)
     : null
 
   return {

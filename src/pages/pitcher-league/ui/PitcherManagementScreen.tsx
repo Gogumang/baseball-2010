@@ -39,6 +39,7 @@ import {
   createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf,
 } from '@/pages/management/model/nariMainMenuCursor'
 import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
+import { isNariMenuOkKey, nariMenuCursorAfterStep, nariMenuStepOfKey } from '@/pages/management/lib/nariMenuKeys'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
@@ -141,19 +142,21 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
     else mainCursor.subCursor = index
     setState((held) => ({ ...held, cursor: index, movedAt: update }))
   }
-  const latest = useRef({ cursor, slots, moveTo, menu })
-  latest.current = { cursor, slots, moveTo, menu }
+  /** 105 켬 표 0 칸 — 메뉴 객체 이동 vt+8 0x6c445 가 건너뛰어 커서가 서지 못한다(하위 메뉴 표는 늘 켜져 있다) */
+  const isOffSlot = (index: number) => kind === '관리' && mainOffIds.has(slots[index]?.id ?? '')
+  const latest = useRef({ cursor, slots, moveTo, menu, isOffSlot })
+  latest.current = { cursor, slots, moveTo, menu, isOffSlot }
   useEffect(() => {
     if (!isKeyEnabled) return undefined
     const onKey = (event: KeyboardEvent) => {
       const held = latest.current
-      const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1
-        : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+      // vt+0x18 0x6c299 → 0x6c031(숫자키 꼴 1) → vt+8 0x6c445 — ←↑'4''2' / →↓'6''8', 꺼진 칸은 건너뛴다 (`nariMenuKeys`)
+      const step = nariMenuStepOfKey(event.key)
       if (step !== 0) {
         event.preventDefault()
-        return held.moveTo((held.cursor + step + held.slots.length) % held.slots.length)
+        return held.moveTo(nariMenuCursorAfterStep(held.cursor, step, held.slots.length, held.isOffSlot))
       }
-      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
+      if (isNariMenuOkKey(event.key) || event.key === ' ') {
         event.preventDefault()
         return held.menu.select(held.slots[held.cursor].id)
       }
@@ -174,12 +177,13 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
       bounce={state.movedAt === null ? 0 : (BOUNCE_BY_UPDATE[update - state.movedAt] ?? 0)}
       slideUpdates={Math.max(0, update - state.openedAt)}
       // 메인 메뉴 켬 표(흑백 0xc37a8)는 105 진입 0x11910 이 타자편과 같은 코드로 끈다 — 0x7e418 은 하위 메뉴가 없을 때만
-      // 그 표를 본다. 흑백은 그림만이고, 이미 행동한 칸을 고르면 r_event_txt[176] 알림이 막는다(`usePitcherManagementMenu`)
+      // 그 표를 본다. 확인 키는 표를 안 보지만 커서가 흑백 칸에 서지 못한다(vt+8 0x6c445) — 눌러도(터치) 고르지 않는다
       disabledIds={NO_DISABLED}
       grayedIds={kind === '관리' ? mainOffIds : undefined}
       labelWidths={labelWidths} parent={pitcherParentSlotOf(kind)}
       labelDxOf={(slot) => pitcherLabelDxOf(kind, slot)}
-      onHover={moveTo} onSelect={menu.select} />
+      onHover={(index) => { if (isKeyEnabled && !isOffSlot(index)) moveTo(index) }}
+      onSelect={(id) => { if (!isOffSlot(slots.findIndex((slot) => slot.id === id))) menu.select(id) }} />
   )
 }
 

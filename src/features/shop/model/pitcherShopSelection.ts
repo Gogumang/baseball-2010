@@ -14,6 +14,7 @@ import {
   PITCHER_SUB_ITEMS,
   pitcherGpItemBlockReasonOf,
   pitcherGpItemNoticeOf,
+  pitcherGpItemQuestionOf,
   purchasePitcherGpItem,
 } from '@/entities/pitcher-career/model/pitcherItems'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -87,8 +88,8 @@ export function pitcherPurchaseQuestionOf(career: PitcherCareer, itemId: string)
   if (tab === '서브' || tab === 'GP') {
     if (pitcherItemBlockNoticeOf(career, tab, part) !== null) return null
     if (tab === '서브') return moneyQuestion(PITCHER_SUB_ITEMS[part].price)
-    // StrMODE[82] — 투수 칸 9(십전대보탕)에는 이글아이 안내줄 224 가 안 붙는다 (0x13ab4 는 모드 4 일 때만)
-    return `!C!cFFFF00${PITCHER_GP_ITEMS[part].price} G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?`
+    // StrMODE[82] — 엄마의도시락은 최대인 칸 줄이 앞에 선다(0x138ca). 칸 9(십전대보탕)에는 이글아이 안내줄 224 가 안 붙는다
+    return pitcherGpItemQuestionOf(career, part)
   }
   if (tab === '착용') {
     if (!ownsPitcherEquipment(career, part, level) || isPitcherEquipmentEquipped(career, part, level)) return null

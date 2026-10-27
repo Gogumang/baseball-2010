@@ -179,6 +179,16 @@ export function restartsManagementBgm(previousKind: string | null, kind: string)
   return kind === '관리' && previousKind === '외출'
 }
 
+/**
+ * 142 경기 준비의 취소(−16, 키 0x13c72 → `0xbcb49(0x6d)`)로 109 순위표에 돌아올 때 배경음 4 를 **처음부터** 다시 트는가 — 109 진입
+ * 0x10d8c 의 10d8e~10da4 가 이전 상태 ≠ 105 면 `0x6ea6d(소리, 4, −1, 1)` 을 부르고, 0x6ea6c 는 번호를 견주지 않아(0x6e9d4 가 울리던
+ * 소리를 멈추고 새로 튼다) 105 → 109 → 142(0x1c46c 는 소리를 안 건드린다) 동안 이어지던 4 를 끊고 새로 튼다(r332 직접 뜸).
+ * 다른 길(경기 뒤 116 → 114 · 이어하기 1)은 앞 배경음이 4 가 아니라 번호가 바뀌어 저절로 튼다. 타자편 · 투수편(모드 갈림 없음) 같다.
+ */
+export function restartsNextGameStandingsBgm(previousKind: string | null, kind: string): boolean {
+  return kind === '다음경기순위' && previousKind === '경기준비'
+}
+
 /** 105 처리 0x1aec4 의 배경음 4 목록 (1aece~1aef2) — 이전 상태가 이 가운데 하나면 105 의 첫 틀(+0x2c == 2)이 4 를 처음부터 튼다 */
 const MANAGEMENT_BGM_FROM: ReadonlySet<number> = new Set([0x64, 0x74, 0x84, 0x7d, 0x7e, 0x72, 0x86, 1, 0x70])
 
@@ -217,7 +227,12 @@ export function usePitcherLeagueBgmRestart(
   const current = isActive ? scene : null
   if (current !== previousScene) {
     setPreviousScene(current)
-    if (current !== null && restartsManagementBgm(previousScene, current)) setRestartSerial((serial) => serial + 1)
+    if (
+      current !== null &&
+      (restartsManagementBgm(previousScene, current) || restartsNextGameStandingsBgm(previousScene, current))
+    ) {
+      setRestartSerial((serial) => serial + 1)
+    }
   }
   return restartSerial
 }
@@ -264,7 +279,7 @@ export function useScreenBgm(
     setYearCoverCarry(carriesYearCoverBgm(isYearCoverCarry, previousKind, screen.kind))
     if (
       restartsMenuBgm(previousKind, screen) || restartsManagementBgm(previousKind, screen.kind) ||
-      restartsTeamSelectBgm(previousKind, screen.kind)
+      restartsTeamSelectBgm(previousKind, screen.kind) || restartsNextGameStandingsBgm(previousKind, screen.kind)
     ) {
       setRestartSerial((serial) => serial + 1)
     }

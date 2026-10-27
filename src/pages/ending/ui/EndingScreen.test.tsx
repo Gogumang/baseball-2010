@@ -316,18 +316,36 @@ describe('엔딩 흐름', () => {
     expect(onContinue).toHaveBeenCalled()
   })
 
-  it('G포인트가 모자라면 StrCOMMON[41] 을 띄우고 끝낸다', () => {
+  it('G포인트가 모자라면 StrMODE[65] 예/아니오(141 틀 1bd68~1bd80) — 아니오(1be8c)는 메인 메뉴로', () => {
     const onFinish = vi.fn()
     띄우기({ endingIndex: 0, isContinuable: true, onContinue: () => false, onFinish })
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
 
-    expect(screen.getByText(/부족합니다/)).toBeTruthy()
+    expect(screen.getByText(/구매/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'OK' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
 
-    expect(onFinish).toHaveBeenCalled()
+    expect(onFinish).toHaveBeenCalledWith(false)
+  })
+
+  it('G 부족 팝업의 예(1be78 → 139 G 충전)는 결제 없이 141 로 돌아온다 — 다시 누르면 이어하기를 또 묻는다', () => {
+    const onFinish = vi.fn()
+    const onContinue = vi.fn(() => false)
+    띄우기({ endingIndex: 1, isContinuable: true, onContinue, onFinish })
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+
+    expect(onFinish).not.toHaveBeenCalled()
+    expect(screen.queryByText(/구매/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }))
+
+    expect(screen.getByText(/이어하시겠습니까/)).toBeTruthy()
   })
 })
 

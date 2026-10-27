@@ -8,7 +8,8 @@ import type { GameEvaluationScreenData, Screen } from '@/app/model/screen'
 import { NARI_STATE, playEndingContinueBgm, restartsManagementBgmFrom } from '@/app/model/screenBgm'
 import { EMPTY_STORY_CARRY, matchResultEventOf } from '@/entities/story/model/aceMatch'
 import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
-import type { AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import type { AceMatchHoldPort, AceMatchPendingPort } from '@/entities/mode-save/model/modeSave'
+import { isAutoScanHeldByAceMatch } from '@/app/model/aceMatchScanGuard'
 import { atBatEndFramesOf } from '@/app/model/useAtBatRunner'
 import { RESULT_WAIT_TICKS_AT_BAT_END } from '@/pages/game/lib/batterRecordAlert'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
@@ -372,6 +373,11 @@ interface CareerSessionInput {
    */
   readonly aceMatchPending?: AceMatchPendingPort
   /**
+   * 두 편의 대결 대기 칸 g[0x11f] · g[0x176] (전역기록) — 자동 훑기 0x1cf9c 의 가드(1cfe4~1d008)가 모드를 안 보고 둘 다 본다
+   * (`isAutoScanHeldByAceMatch`, B-124). 안 넘기면 가드가 없다.
+   */
+  readonly aceMatchHold?: AceMatchHoldPort
+  /**
    * 화면이 '관리' 인 채 105 에 다시 들어온 앞 상태가 0x1aec4 의 배경음 4 목록에 들 때(125 훈련 결과 → 105) 부른다 — 배경음 표
    * `useScreenBgm` 의 다시 틀기(`restartsManagementBgmFrom`). 앱이 세션보다 먼저 배경음 표를 세우므로 수를 앱이 든다
    */
@@ -457,6 +463,7 @@ export function useCareerSession({
   openedAces = DEFAULT_NARI_OPENED_ACES,
   nariGameSave,
   aceMatchPending,
+  aceMatchHold,
   onManagementBgmRestart = NO_BGM_RESTART,
 }: CareerSessionInput) {
   // 통로를 안 받으면 조용한 포트로 — 아래 자리들이 `sound` 가 있는지 매번 보지 않게 한다
@@ -569,6 +576,9 @@ export function useCareerSession({
   const memoryAceMatchPending = useMemo(() => createMemoryAceMatchPendingPort(), [])
   const aceMatchPendingRef = useRef(aceMatchPending ?? memoryAceMatchPending)
   aceMatchPendingRef.current = aceMatchPending ?? memoryAceMatchPending
+  /** 두 편 대결 대기(전역기록) — 자동 훑기 가드 1cfe4~1d008 (`isAutoScanHeldByAceMatch`) */
+  const aceMatchHoldRef = useRef(aceMatchHold)
+  aceMatchHoldRef.current = aceMatchHold
 
   // 캔버스 루프에서 최신 값을 읽어야 한다 — useAtBatRunner의 atBatRef와 같은 이유다.
   const progressRef = useRef(progress)
@@ -1434,8 +1444,11 @@ export function useCareerSession({
    * 곧바로 장착(+0x1c4)·저장한 뒤 +0x270 = −1 · +0x274 = 1 로 다음 틀에 다시 판정한다 — 그래서 여러 개가 하나씩 이어진다.
    * 원본은 105 에 머무는 동안 커리어가 바뀌지 않는다(훈련·휴식·상점·외출은 다른 상태로 갔다 105 로 다시 들어온다).
    * 웹은 훈련 결과 따위를 관리 화면 위 알림으로 보이므로 "105 에 있고 진입 이벤트 검사가 끝났으면" 늘 판정한 값으로 둔다.
+   * 117 진입 0x11e84(11ee6~11f4a)는 칭호 1 · 9 를 주지 않고 +0x270 에 **넣기만** 한다(`heldTitle`) — 452~454 를 보고 105 에
+   * 머무는 둘째 틀에 0x1a1c0 대신 그 팝업이 서고(+0x270 ≥ 0 이라 판정을 건너뛴다) 확인이 비트 · 장착 · 저장을 한다.
    */
-  const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? nextTitleOf(career) : null
+  const [heldTitle, setHeldTitle] = useState<string | null>(null)
+  const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? heldTitle ?? nextTitleOf(career) : null
   // 장면이 새로 서면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60, `setUpNariScene`) — 이벤트 본문이 도착한 뒤에.
   // ⚠️ 내보인 `career` 가 아니라 **지금 칸**(`current`)에서 지운다 (r245): 경기 끝(`finishGame`)은 셋업과 같은 그림에 기록 달성 G
   // (0x4ea0c)를 커리어 칸에 얹는데, 그 그림의 내보인 커리어는 아직 지갑 값(얹기 전 G)이라 그것으로 갈아 끼우면 지갑 다리가
@@ -1494,7 +1507,8 @@ export function useCareerSession({
      * 훑기 0x8be80 은 늘 무작위 조건까지 굴린다.
      */
     const orderEventId = battingOrderEventId(career)
-    const event = story.eventFor(career, EVENT_TRIGGER.관리, random)
+    // 1cfe4~1d008 — 대결 대기(어느 편이든)가 서 있으면 훑지 않는다(B-124 원본 길, `isAutoScanHeldByAceMatch`)
+    const event = isAutoScanHeldByAceMatch(aceMatchHoldRef.current) ? null : story.eventFor(career, EVENT_TRIGGER.관리, random)
     if (event !== null) return setScreen({ kind: '이벤트', eventId: event.id, context: '관리' })
     /*
      * **117 중간 성적표** — 진입 곁가지 11bda~11c0e: 115 다음, 138 앞. `S+0xb2 == 22 && 0xa4280(S, 모드 == 4, S+0xb3) == 0`
@@ -1506,8 +1520,10 @@ export function useCareerSession({
      */
     if (leagueDayCounterOf(career) === MID_SEASON_GAME && !career.midSeasonEvaluatedYears.includes(career.season - 1)) {
       const achieved = achievedGoalCount(career, '중간')
-      const evaluated = awardTitles(career, midSeasonTitlesOf(career, achieved).filter((title) => !career.titleIds.includes(title)))
-      setCareer({ ...evaluated, lastMidSeasonGoalCount: achieved })
+      // 11ee6~11f4a — 칭호는 +0x270 에 넣기만 한다(조건이 안 서면 +0x270 은 그대로). 팝업 · 비트는 105 둘째 틀(`pendingTitle`)
+      const [midSeasonTitle] = midSeasonTitlesOf(career, achieved).filter((title) => !career.titleIds.includes(title))
+      if (midSeasonTitle !== undefined) setHeldTitle(midSeasonTitle)
+      setCareer({ ...career, lastMidSeasonGoalCount: achieved })
       return setScreen({ kind: '이벤트', eventId: midSeasonEventId(achieved), context: '관리' })
     }
     if (orderEventId !== null) setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
@@ -1535,9 +1551,10 @@ export function useCareerSession({
    * 예약하지 않지만, 100 → 1 → 100 → 1 → 105 → 115 → 114 로 가는 사이 남은 +0x289 를 연초 114 의 틀 0x1c014(1c0dc — 재생 중에도
    * 매 틀)가 효과기 끝(0x1b768 의 틀부터 9 틀째)에 받아 137 을 띄운다(r156 직접 뜸 — `nariYearCover` 의 이어하기 길).
    */
-  const startNewSeason = (finished: PlayerCareer, fromResume = false, holdsPrevious = false) => {
-    // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`)
-    const next = startNextSeason(finished, random)
+  const startNewSeason = (finished: PlayerCareer, fromResume = false, holdsPrevious = false, afterRelease = false) => {
+    // 0x1b768 의 1b86c — CPU 장비 굴림 0x665e8 이 여기서 난수를 쓴다 (`nariCpuEquipment`).
+    // `afterRelease` — 방출 141 의 이어하기(1be26)는 그 해 132 꼬리를 안 지났다 (`seasonStartCountersOf`, B-128)
+    const next = startNextSeason(finished, random, afterRelease)
     setCareer(next)
     // 134(0x1b92c 1bb30~1bb64) · 141(0x1bbc4 1beb4~1beea)은 0x1b768 뒤에도 제 그리기를 돌며 효과기 끝을 기다린다 — 그 화면을 그대로 둔다
     if (holdsPrevious) return setYearCoverHeld(true)
@@ -2141,8 +2158,9 @@ export function useCareerSession({
         // 112 진입 0x118e4 → 0x8cdc0 이 커서를 0 으로 되감은 **뒤에** 자동 발동 0x1cf9c 가 훑는다 — 웹은 그 훑기를 화면을
         // 바꾸기 전에 하므로 되감기를 먼저 한다
         story.rewindCursor()
-        // trigger 1 — 외출 지도에 들어설 때 먼저 보는 이벤트
-        const event = story.eventFor(career, EVENT_TRIGGER.외출)
+        // trigger 1 — 외출 지도에 들어설 때 먼저 보는 이벤트. 0x1cf9c 는 112 에서도 105 와 같은 0x8be80 이라 무작위 조건까지
+        // 굴린다(지금 trigger 1 이벤트에는 무작위 조건이 없어 굴림은 안 생긴다). 대결 대기 가드 1cfe4~1d008 도 같다(B-124)
+        const event = isAutoScanHeldByAceMatch(aceMatchHoldRef.current) ? null : story.eventFor(career, EVENT_TRIGGER.외출, random)
         if (event !== null) return setScreen({ kind: '이벤트', eventId: event.id, context: '외출진입' })
         return setScreen({ kind: '외출' })
       }
@@ -2426,9 +2444,10 @@ export function useCareerSession({
     /** 105 관리 메뉴 확인 키(−5 · '5') — 0x12654 가 메뉴 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
     pressManagementConfirm: story.pressManagementConfirm,
 
-    /** 칭호 팝업 확인 0x1b1e4 — 비트·곧바로 장착(+0x1c4)·저장, 다음 틀에 다시 판정 */
+    /** 칭호 팝업 확인 0x1b1e4 — 비트·곧바로 장착(+0x1c4)·저장 · +0x270 = −1, 다음 틀에 다시 판정 */
     confirmTitle: () => {
       if (career === null || pendingTitle === null) return
+      setHeldTitle(null)
       setCareer(awardTitles(career, [pendingTitle]))
     },
 
@@ -2671,7 +2690,7 @@ export function useCareerSession({
         // 114 → 112 — 상태가 바뀐 틀이라 112 진입 0x118e4(0x8cdc0 이 커서를 0 으로) 뒤 자동 발동 0x1cf9c 가 화면 112 로 다시
         // 훑는다(0x8be80 — 무작위 조건까지). 찾으면 또 [다음 114, 뒤 112]
         story.rewindCursor()
-        const again = story.eventFor(acted, EVENT_TRIGGER.외출, random)
+        const again = isAutoScanHeldByAceMatch(aceMatchHoldRef.current) ? null : story.eventFor(acted, EVENT_TRIGGER.외출, random)
         if (again !== null) return setScreen({ kind: '이벤트', eventId: again.id, context: '외출진입' })
         return setScreen({ kind: '외출' })
       }
@@ -2835,7 +2854,7 @@ export function useCareerSession({
       if (career.endingIndex !== INJURY_ENDING_INDEX) {
         // 1be2a~1be40 — 두 갈래가 만나 소리를 끊고 4 를 튼다. 방출은 화면이 엔딩 그대로라 여기서 (`playEndingContinueBgm`)
         playEndingContinueBgm(audio)
-        startNewSeason(continueAfterEndingPayment(career), false, true)
+        startNewSeason(continueAfterEndingPayment(career), false, true, true)
         return true
       }
       setCareer(continueAfterEnding(career, random))

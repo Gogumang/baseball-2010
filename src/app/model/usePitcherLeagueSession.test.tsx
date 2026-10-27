@@ -1148,7 +1148,7 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       expect(result.current.scene).toBe('관리')
     })
 
-    it('1년차에 다섯 개를 모두 이루면 칭호 1 "떠오르는 샛별" 을 준다 (0x11ee6)', async () => {
+    it('1년차에 다섯 개를 모두 이루면 칭호 1 "떠오르는 샛별" 을 +0x270 에 넣고, 452 뒤 105 의 팝업 확인으로 준다 (0x11ee6 · 0x1af9c)', async () => {
       const result = 판짜기({
         gamesPlayed: 22,
         popularity: 500,
@@ -1160,7 +1160,16 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
 
       expect(result.current.story?.eventId).toBe(452)
       expect(result.current.career?.lastMidSeasonGoalCount).toBe(5)
+      // 117 진입은 칭호를 주지 않는다 — +0x270 에 넣기만
+      expect(result.current.career?.titleIds).not.toContain('떠오르는 샛별')
+
+      while (result.current.scene === '이벤트') 이벤트끝내기(result)
+      expect(result.current.scene).toBe('관리')
+      expect(result.current.pendingTitle).toBe('떠오르는 샛별')
+
+      act(() => result.current.actions.confirmTitle())
       expect(result.current.career?.titleIds).toContain('떠오르는 샛별')
+      expect(result.current.pendingTitle).not.toBe('떠오르는 샛별')
     })
   })
 })

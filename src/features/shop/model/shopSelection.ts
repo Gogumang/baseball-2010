@@ -4,7 +4,7 @@ import {
 } from '@/entities/career/model/equipment'
 import type { EquipmentBlockReason } from '@/entities/career/model/equipment'
 import { purchaseSubItem, SUB_ITEM_BLOCK_TEXT, SUB_ITEMS, subItemBlockReasonOf } from '@/entities/career/model/subItems'
-import { BATTER_GP_ITEMS, EAGLE_EYE_ITEM_ID, EAGLE_EYE_NOTICE, gpItemBlockReasonOf, gpItemNoticeOf, purchaseGpItem } from '@/entities/career/model/gpItems'
+import { BATTER_GP_ITEMS, gpItemBlockReasonOf, gpItemNoticeOf, gpItemQuestionOf, purchaseGpItem } from '@/entities/career/model/gpItems'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
@@ -147,10 +147,8 @@ export function purchaseQuestionOf(career: PlayerCareer, itemId: string): string
   // G 부족(StrMODE[65])이 가장 먼저, 그 다음 아이템별 가드 여섯 (0x13460)
   if (career.gamePoint < price) return null
   if (gpItemBlockReasonOf(career, index) !== null) return null
-  // 이글아이는 확인창 앞에 StrMODE[224] 안내줄이 붙는다 (0x13ab4) — 가드가 아니다
-  const notice = index === EAGLE_EYE_ITEM_ID ? `!C${EAGLE_EYE_NOTICE}!N` : '!C'
-  // StrMODE[82] (0x13966)
-  return `${notice}!cFFFF00${price} G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?`
+  // StrMODE[82] — 엄마의도시락은 최대인 칸 줄 + "!N" 이, 이글아이는 StrMODE[224] 안내줄 + "!N!N" 이 앞에 선다 (0x138ca · 0x13ab4)
+  return gpItemQuestionOf(career, index)
 }
 
 /** 상점에서 한 칸을 고르고 (구매라면 확인을 마친 뒤) 결과를 낸다 */

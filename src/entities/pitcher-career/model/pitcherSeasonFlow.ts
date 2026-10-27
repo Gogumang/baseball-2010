@@ -159,7 +159,8 @@ export function continueAfterPitcherEnding(career: PitcherCareer, random: Random
   if (career.endingIndex === PITCHER_INJURY_ENDING) {
     return { ...paid, isInjured: false, injuredGamesPlayed: 0, injuryRemaining: 0 }
   }
-  return startNextPitcherSeason(paid, random)
+  // 방출은 그 해 132 꼬리를 안 지난 새 시즌이다 — +0x6b 사본 · +0x1c2 는 B-128 (`seasonStartCountersOf`)
+  return startNextPitcherSeason(paid, random, true)
 }
 
 /* ── 개인 타이틀(130) · MVP(131) · 연봉협상 등급 k ──────────────────────────── */

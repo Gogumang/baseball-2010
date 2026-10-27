@@ -1,6 +1,7 @@
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
-import { describe, expect, it } from 'vitest'
-import { createCareer } from '@/entities/career/model/playerCareer'
+import { afterEach, describe, expect, it } from 'vitest'
+import { bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
+import { createCareer, startNextSeason } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import { effectiveAbilityOf, equippedAbilityOf } from '@/entities/career/model/condition'
@@ -203,6 +204,37 @@ describe('엔딩 뒤 — 0x1220c', () => {
     expect(continued.endingIndex).toBeNull()
     expect(continued.season).toBe(4)
     expect(continued.morale).toBe(100)
+  })
+
+  describe('방출 이어하기의 +0x6b 사본 · +0x1c2 — 연말 132 꼬리 10d08~10d28 을 안 지났다 (B-128)', () => {
+    afterEach(() => setBugfixConfigForTests(null))
+    const 방출 = () => 선수({
+      gamePoint: 6000, endingIndex: 1, season: 7,
+      trainingCounts: { '0': 30, '1': 12 }, seasonStartTrainingCounts: { '0': 20, '1': 4 }, seasonPopularityGain: 9,
+    })
+
+    it('원본: 사본은 앞 해 132 것 · 인기도 합은 그 해 합 그대로 다음 해로 넘어간다', () => {
+      const continued = continueAfterEnding(방출(), createConstantRandom(0))
+
+      expect(continued.season).toBe(8)
+      expect(continued.seasonStartTrainingCounts).toEqual({ '0': 20, '1': 4 })
+      expect(continued.seasonPopularityGain).toBe(9)
+    })
+
+    it('고친 길: 다른 새 시즌처럼 사본을 새로 뜨고 인기도 합을 0 으로', () => {
+      setBugfixConfigForTests(bugfixConfigWith(['B-128']))
+      const continued = continueAfterEnding(방출(), createConstantRandom(0))
+
+      expect(continued.seasonStartTrainingCounts).toEqual({ '0': 30, '1': 12 })
+      expect(continued.seasonPopularityGain).toBe(0)
+    })
+
+    it('132 를 거친 새 시즌(연봉 · 대회 뒤)은 원본에서도 새로 뜬다 — 132 와 0x1b768 사이엔 훈련 · 평가가 없다', () => {
+      const next = startNextSeason(방출(), createConstantRandom(0))
+
+      expect(next.seasonStartTrainingCounts).toEqual({ '0': 30, '1': 12 })
+      expect(next.seasonPopularityGain).toBe(0)
+    })
   })
 
   it('부상 엔딩을 이어하면 같은 시즌 그 자리에서 부상만 풀고 계속한다', () => {

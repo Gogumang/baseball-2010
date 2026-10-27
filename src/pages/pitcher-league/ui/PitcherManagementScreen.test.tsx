@@ -114,9 +114,26 @@ describe('커맨드 여섯 칸 (상태 105 · 점프표 0xcc540)', () => {
 
   it('[외출] 은 상태 112 로 간다', () => {
     const onOuting = vi.fn()
-    화면({ onOuting })
+    // 첫 해 10경기 전에는 외출 칸이 꺼져(105 진입 11c2c) 커서가 못 선다 — 10경기째부터
+    화면({ onOuting, career: 투수({ gamesPlayed: 10 }) })
     누르기('외출')
     expect(onOuting).toHaveBeenCalledOnce()
+  })
+
+  it('꺼진 칸(첫 해 10경기 전 외출)은 커서가 건너뛰고 눌러도 고르지 않는다 — 메뉴 이동 vt+8 0x6c445', () => {
+    const onOuting = vi.fn()
+    화면({ onOuting })
+    누르기('외출')
+    expect(onOuting).not.toHaveBeenCalled()
+    // 숫자키 꼴 1 — '6' 은 →, ↓ 는 → 와 같다(꼴 0x330 의 세로 감기 → 열 +1), '4' 는 ←
+    fireEvent.keyDown(window, { key: '6' })
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.getByRole('button', { name: '휴식', current: true })).toBeTruthy()
+    // 휴식(2) 에서 → 는 외출(3)을 건너뛰어 아이템(4) 으로
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
+    expect(screen.getByRole('button', { name: '아이템', current: true })).toBeTruthy()
+    fireEvent.keyDown(window, { key: '4' })
+    expect(screen.getByRole('button', { name: '휴식', current: true })).toBeTruthy()
   })
 })
 
@@ -574,12 +591,15 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('행동함이어도 휴식을 막지 않는다 — 105 키 0x1261c 휴식 칸(12682)은 사기 최고만 본다', () => {
+  it('행동함이면 휴식 칸에 커서가 서지 못한다 — 확인 키(12682)는 사기만 보지만 이동 vt+8 0x6c445 가 흑백 칸을 건너뛴다', () => {
     화면({ career: 투수({ hasActedThisCycle: true }) })
 
     누르기('휴식')
+    expect(document.body.textContent).not.toContain('[휴식]을 취하시겠습니까?')
 
-    expect(document.body.textContent).toContain('[휴식]을 취하시겠습니까?')
+    // 선수정보(0) → 트레이닝 · 휴식 · 외출을 건너뛰어 아이템(4)
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: '아이템', current: true })).toBeTruthy()
   })
 })
 

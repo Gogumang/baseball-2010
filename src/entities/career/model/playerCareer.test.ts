@@ -553,3 +553,26 @@ describe('몹쓸몸 · 유리몸 훈련 수 +0x75/+0x76 — 0x18b86~0x18bd6', ()
     expect(countTraining({ ...createCareer('몸'), skillIds: [4], fragileTrainings: 255 }, '히트').fragileTrainings).toBe(0)
   })
 })
+
+describe('해제 카운터 +0x70+칸 — 0x18a5c~0x18b84 모드 4(타자편)', () => {
+  it('히트 · 18 / 파워 · 19 / 수비 · 20 을 가진 채면 그 칸만 +1', () => {
+    const 선수 = { ...createCareer('연속'), skillIds: [18, 19, 20], consecutiveTrainingCounts: { 히트: 3 } }
+    expect(countTraining(선수, '히트').consecutiveTrainingCounts).toEqual({ 히트: 4 })
+    expect(countTraining(선수, '파워').consecutiveTrainingCounts).toEqual({ 파워: 1 })
+    expect(countTraining(선수, '수비').consecutiveTrainingCounts).toEqual({ 수비: 1 })
+  })
+
+  it('짝 스킬이 없으면(또는 주루 · 필살타법 칸이면) 다섯 칸 모두 0 — 스킬을 얻기 전 훈련은 세지 않는다', () => {
+    const 없음 = { ...createCareer('연속'), skillIds: [], consecutiveTrainingCounts: { 히트: 5 } }
+    expect(countTraining(없음, '히트').consecutiveTrainingCounts).toEqual({})
+    const 가짐 = { ...createCareer('연속'), skillIds: [18], consecutiveTrainingCounts: { 히트: 5 } }
+    expect(countTraining(가짐, '파워').consecutiveTrainingCounts).toEqual({})
+    expect(countTraining(가짐, '주루').consecutiveTrainingCounts).toEqual({})
+    expect(countTraining(가짐, '필살타법').consecutiveTrainingCounts).toEqual({})
+  })
+
+  it('칸은 s8 — 127 다음은 −128', () => {
+    const 선수 = { ...createCareer('연속'), skillIds: [18], consecutiveTrainingCounts: { 히트: 127 } }
+    expect(countTraining(선수, '히트').consecutiveTrainingCounts).toEqual({ 히트: -128 })
+  })
+})
