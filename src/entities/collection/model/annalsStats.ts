@@ -68,7 +68,6 @@ export const ITEM_SLOTS_PER_MODE = 10
 export const GAME_POINT_USAGE_KINDS = 8
 /** `0x22c29` 의 자름 상한 `0x5f5e0ff` */
 export const GAME_POINT_USAGE_LIMIT = 99_999_999
-const U16 = 0x10000
 
 /** `0x22c29` 의 사용처 번호 — StrMAINMENU[175 + k] 순서 */
 export const GAME_POINT_USAGE = {
@@ -123,7 +122,19 @@ export interface AnnalsStats {
   readonly achievementMarks: readonly number[]
   /** `+0x2c + 8i` u64 [8] — 모드 칸별 플레이 시간 밀리초 (0x22efc). 옛 저장에는 없어 0 으로 */
   readonly playTimes?: readonly number[]
+  /**
+   * `+0xfc + 2i` u16 [5] — 기록연감 통계 셀 8~12 "%d회"(StrMAINMENU[136~140]). 쓰는 곳은 하루 끝 `0xb818c` 의 정규시즌 1위
+   * 갈래 하나: 모드 4 → `+0xfc`(b827e) · 3 → `+0xfe`(b8288) · 2 → `+0x100`(b82ec~b830a), 바이트 둘로 읽어 +1 하고 되쓴다
+   * (16비트 넘침은 0). 칸 3 · 4(친구 추천 · 이벤트 미션 다운)는 쓰는 곳이 없어 늘 0. 옛 저장에는 없어 0 으로
+   */
+  readonly leagueFirstCounts?: readonly number[]
 }
+
+/** `+0xfc` u16 다섯 칸 — 셀 8~12 */
+export const LEAGUE_FIRST_SLOTS = 5
+/** 하루 끝 0xb818c 의 모드 → 칸 (모드 4 · 3 · 2) */
+const LEAGUE_FIRST_MODE_SLOTS: Readonly<Record<number, number>> = { 4: 0, 3: 1, 2: 2 }
+const U16 = 0x10000
 
 /** `+0x2c` u64 여덟 칸 — 합계 `0x588d1` 이 여덟 칸을 다 더한다(칸 7 은 쓰는 모드가 없다) */
 export const PLAY_TIME_SLOTS = 8
@@ -151,6 +162,24 @@ export const EMPTY_ANNALS_STATS: AnnalsStats = {
   pitcherEquippedSkillBits: 0,
   achievementMarks: Array.from({ length: ACHIEVEMENT_MARK_KINDS }, () => 0),
   playTimes: Array.from({ length: PLAY_TIME_SLOTS }, () => 0),
+  leagueFirstCounts: Array.from({ length: LEAGUE_FIRST_SLOTS }, () => 0),
+}
+
+/** 셀 8 + i 의 값 (`+0xfc + 2i`) — 옛 저장은 0 */
+export function leagueFirstCountOf(stats: AnnalsStats, slot: number): number {
+  return stats.leagueFirstCounts?.[slot] ?? 0
+}
+
+/**
+ * 하루 끝 `0xb818c` — 정규시즌을 닫으며 내 팀이 1위면(SR+0x7a · S+0x7a 를 올린 바로 뒤) 그 모드 칸 u16 을 +1 하고
+ * 통계를 저장한다(0x1f1e1). 1위가 아니면 이 갈래를 안 탄다. 모드 2 · 3 · 4 밖은 무시
+ */
+export function countLeagueFirst(stats: AnnalsStats, mode: number): AnnalsStats {
+  const slot = LEAGUE_FIRST_MODE_SLOTS[mode]
+  if (slot === undefined) return stats
+  const leagueFirstCounts = Array.from({ length: LEAGUE_FIRST_SLOTS }, (_unused, at) =>
+    at === slot ? (leagueFirstCountOf(stats, at) + 1) % U16 : leagueFirstCountOf(stats, at))
+  return { ...stats, leagueFirstCounts }
 }
 
 /** 칸 i 의 플레이 시간 밀리초 (`+0x2c + 8i`) — 옛 저장은 0 */
@@ -350,6 +379,8 @@ export type AnnalsStatEvent =
   | { readonly kind: '달성표시'; readonly index: number }
   /** `0x4e8b0` — 장면 시작(또는 지난 누계)부터 지난 밀리초를 그 모드 칸에 (`playClock.lapPlayClock`) */
   | { readonly kind: '플레이시간'; readonly mode: number; readonly elapsed: number }
+  /** `0xb818c` 정규시즌 1위 — `+0xfc + 2·칸` (`countLeagueFirst`) */
+  | { readonly kind: '리그1위'; readonly mode: number }
 
 /**
  * 장착 목록이 바뀐 사이에 **새로 켜진** 스킬마다 `스킬장착` 한 건 — `0xb663c` 는 이미 켜진 스킬엔 들어오지 않으니
@@ -376,6 +407,7 @@ export function applyAnnalsStat(stats: AnnalsStats, event: AnnalsStatEvent): Ann
   if (event.kind === '달성표시') return markAchievement(stats, event.index)
   if (event.kind === '기록달성') return addRecordCounts(stats, event.recordIds)
   if (event.kind === '플레이시간') return addPlayTime(stats, event.mode, event.elapsed)
+  if (event.kind === '리그1위') return countLeagueFirst(stats, event.mode)
   return markSkillEquipped(stats, event.mode, event.skillId)
 }
 
@@ -411,5 +443,9 @@ export function normalizeAnnalsStats(raw: unknown): AnnalsStats {
       && candidate.playTimes.every((time) => Number.isFinite(time) && (time as number) >= 0)
       ? (candidate.playTimes as number[])
       : EMPTY_ANNALS_STATS.playTimes,
+    leagueFirstCounts: isCountArray(candidate.leagueFirstCounts, LEAGUE_FIRST_SLOTS)
+      && candidate.leagueFirstCounts.every((count) => count < U16)
+      ? candidate.leagueFirstCounts
+      : EMPTY_ANNALS_STATS.leagueFirstCounts,
   }
 }

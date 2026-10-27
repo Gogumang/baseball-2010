@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addGamePointEarned, addPlayTime, EMPTY_ANNALS_STATS } from '@/entities/collection/model/annalsStats'
+import { addGamePointEarned, addPlayTime, applyAnnalsStat, EMPTY_ANNALS_STATS } from '@/entities/collection/model/annalsStats'
 import {
   INITIAL_SECRET_CODE_STATE, enterAnnalsSecretCode, statCellOf, statPageCellsOf, statTotalTextOf, statValueTextOf, typeSecretDigit,
 } from '@/pages/record/lib/statCells'
@@ -31,6 +31,13 @@ describe('통계 칸 번호 = 쪽 × 8 + 줄', () => {
     const stats = addGamePointEarned(EMPTY_ANNALS_STATS, 120, 4)
     expect(statCellOf(49)?.valueOf(stats)).toBe(120)
     expect(statCellOf(48)?.valueOf(stats)).toBe(0)
+  })
+
+  it('칸 8~12 는 +0xfc + 2i — 하루 끝 0xb818c 정규시즌 1위가 모드 4 · 3 · 2 칸을 센다, 11 · 12 는 늘 0회', () => {
+    expect([8, 9, 10, 11, 12].map((cell) => statCellOf(cell)?.valueOf(EMPTY_ANNALS_STATS))).toEqual([0, 0, 0, 0, 0])
+    const stats = [4, 2, 2, 3, 7].reduce((acc, mode) => applyAnnalsStat(acc, { kind: '리그1위', mode }), EMPTY_ANNALS_STATS)
+    expect([8, 9, 10, 11, 12].map((cell) => statCellOf(cell)?.valueOf(stats))).toEqual([1, 1, 2, 0, 0])
+    expect(statValueTextOf('횟수', statCellOf(10)?.valueOf(stats) ?? -1)).toBe('2회')
   })
 
   it('합계 — 쪽 6·7 은 0x58801(…, 6·7) 이 4·5 만 더해 늘 0G (원본 버그) · 쪽 0 은 0x588d1 플레이 시간 합', () => {

@@ -940,6 +940,10 @@ export function useCareerSession({
         [finished.opponentTeamId],
         finished.opponentRecordMorale ?? finished.teamMorale ?? nariMoraleOf(currentCareer),
       )
+      // 하루 끝 0xb818c 의 1위 갈래(b8266~b829c) — S+0x7a 다음에 통계 [mgr+0xc8]+0xfc(기록연감 셀 8 "나리 타자편 우승") +1 · 저장
+      if (settled.regularSeasonFirstCount > resulted.regularSeasonFirstCount) {
+        recordStat({ kind: '리그1위', mode: BATTER_LEAGUE_MODE })
+      }
       // 평가 0xa719c 안 0xa690c 가 경기 뒤 누적 카운터 S+0x1f0 을 더한다 — 정규시즌(평가하는 경기)만 (`withGameSkillCounters`)
       const evaluated = applyGameEvaluation(
         isEvaluated ? withGameSkillCounters(settled, summary) : settled,

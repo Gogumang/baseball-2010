@@ -735,12 +735,10 @@ function StatRows({ page, stats }: { readonly page: number; readonly stats: Anna
               style={{ left: LIST_GRID.cellX + STAT_NAME.dx, top: top + STAT_NAME.dy, width: LIST_GRID.cellWidth - STAT_NAME.widthInset }}>
               {STAT_NAMES[statNameOffsetOf(cell)]}
             </div>
-            {value !== null && (
-              <div className={styles.statValue}
-                style={{ left: LIST_GRID.cellX + STAT_VALUE.dx, top: top + STAT_VALUE.dy, width: LIST_GRID.cellWidth - STAT_VALUE.widthInset }}>
-                {statValueTextOf(cell.valueKind, value)}
-              </div>
-            )}
+            <div className={styles.statValue}
+              style={{ left: LIST_GRID.cellX + STAT_VALUE.dx, top: top + STAT_VALUE.dy, width: LIST_GRID.cellWidth - STAT_VALUE.widthInset }}>
+              {statValueTextOf(cell.valueKind, value)}
+            </div>
           </div>
         )
       })}

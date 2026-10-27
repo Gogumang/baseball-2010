@@ -120,35 +120,10 @@ export function seasonGoalResultEventId(achieved: number): number {
   return 396
 }
 
-export interface SeasonGoalReward {
-  readonly popularity: number
-  readonly reputation: number
-  /** 100만 원 단위 */
-  readonly money: number
-}
-
-/**
- * 목표 결과 보상 (s_event 393~396 의 보상 명령, P4 2a).
- * 연차 보정(A-6 의 시즌값)은 **보상을 주는 쪽**에서 따로 더한다 — 아래 `SEASON_GOAL_YEAR_BONUS` 참고.
+/*
+ * 목표 결과 393~396 의 보상은 이벤트 보상 명령 그대로(재생기 0x8c460)이고 연차 보정은 0x8d508 — `seasonEventFlow.withSeasonYearAdjust`.
+ * (예전 이 자리의 보상 표 · 연차 보정 함수는 앱에서 안 쓰였고 값도 0x8d508 과 달라(394 평판 · 395 보정 빠짐) 걷었다 — r331)
  */
-export const SEASON_GOAL_REWARDS: Readonly<Record<number, SeasonGoalReward>> = {
-  393: { popularity: 25, reputation: 30, money: 35 },
-  394: { popularity: 20, reputation: 0, money: 20 },
-  395: { popularity: 0, reputation: 0, money: 0 },
-  396: { popularity: -10, reputation: -5, money: 0 },
-}
-
-/**
- * 연차 보정 (A-6 시즌값, `y` = 연차 idx).
- * 393·394 는 보상 종류 0(인기도)·1(평판)·3(소지금)에 **+5y**,
- * 396 은 인기도 **−10y** · 평판 **−2y** 를 더한다.
- */
-export function seasonGoalYearBonusOf(eventId: number, yearIndex: number): SeasonGoalReward {
-  if (eventId === 393) return { popularity: 5 * yearIndex, reputation: 5 * yearIndex, money: 5 * yearIndex }
-  if (eventId === 394) return { popularity: 5 * yearIndex, reputation: 0, money: 5 * yearIndex }
-  if (eventId === 396) return { popularity: -10 * yearIndex, reputation: -2 * yearIndex, money: 0 }
-  return { popularity: 0, reputation: 0, money: 0 }
-}
 
 /* ── 목표 ①③④ 의 재료 — 0xa37bc 가 부르는 셈 (직접 떴다) ───────────────────────── */
 

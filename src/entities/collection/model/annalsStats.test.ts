@@ -6,6 +6,7 @@ import {
   addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
   gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats, markAchievement, achievementMarkOf,
   addRecordCounts, recordCountOf, RECORD_COUNT_KINDS, addPlayTime, playTimeHiddenIdOf, totalPlayTimeOf, earnedGamePointHiddenIdOf,
+  countLeagueFirst, leagueFirstCountOf,
 } from '@/entities/collection/model/annalsStats'
 
 /** 기록연감 통계 기록 `[mgr+0xc8]` — 0x22e35 · 0x22c29 · 0xb663c (디스어셈 확정) */
@@ -227,5 +228,26 @@ describe('정산 0x4ea0c 획득 GP 합 → 히든 33 (4eca0~4ecda)', () => {
     const at = (amounts: readonly number[]) => ({ ...EMPTY_ANNALS_STATS, gamePointEarned: amounts })
     expect(earnedGamePointHiddenIdOf(at([99_998, 0, 0, 0, 0, 0, 0]))).toBeNull()
     expect(earnedGamePointHiddenIdOf(at([50_000, 0, 49_999, 0, 0, 0, 0]))).toBe(33)
+  })
+})
+
+describe('정규시즌 1위 횟수 +0xfc + 2i — 하루 끝 0xb818c (b8266~b830a)', () => {
+  it('모드 4 → +0xfc · 3 → +0xfe · 2 → +0x100, 그 밖 모드는 무시', () => {
+    const stats = [4, 3, 2, 2, 1, 7].reduce(countLeagueFirst, EMPTY_ANNALS_STATS)
+    expect([0, 1, 2, 3, 4].map((slot) => leagueFirstCountOf(stats, slot))).toEqual([1, 1, 2, 0, 0])
+  })
+
+  it('u16 이라 65535 다음은 0 이다 — 바이트 둘로 읽어 +1 하고 되쓴다', () => {
+    const full = { ...EMPTY_ANNALS_STATS, leagueFirstCounts: [0, 0, 0xffff, 0, 0] }
+    expect(leagueFirstCountOf(countLeagueFirst(full, 2), 2)).toBe(0)
+  })
+
+  it('옛 저장(칸 없음)은 0 으로 읽고 다섯 칸이 아니면 버린다', () => {
+    const { leagueFirstCounts: _dropped, ...old } = EMPTY_ANNALS_STATS
+    expect(leagueFirstCountOf(old, 2)).toBe(0)
+    expect(normalizeAnnalsStats({ ...old }).leagueFirstCounts).toEqual([0, 0, 0, 0, 0])
+    expect(normalizeAnnalsStats({ ...old, leagueFirstCounts: [1, 2, 3] }).leagueFirstCounts).toEqual([0, 0, 0, 0, 0])
+    expect(normalizeAnnalsStats({ ...old, leagueFirstCounts: [1, 2, 3, 0, 0] }).leagueFirstCounts).toEqual([1, 2, 3, 0, 0])
+    expect(applyAnnalsStat(old, { kind: '리그1위', mode: 2 }).leagueFirstCounts).toEqual([0, 0, 1, 0, 0])
   })
 })
