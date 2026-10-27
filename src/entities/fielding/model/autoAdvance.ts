@@ -92,8 +92,17 @@ export interface AutoAdvanceInput extends DefenseContext {
  * 9fed0  t != g → 0
  * 9fed4  0xbc124(위치 +0x20, 이동 목표점 +0x2c) = (두 점이 다르다) → 그 값        ; 0xbc124 = !0xbc0f4(같은 점)
  * ```
- * ⚠️ 근사(남김 — 웹 주자 모델) 둘: `+0x3a`(앞 틱 끝의 멈춤 값)는 지금의 `isRunnerStopped` 로, 이동 목표점 `+0x2c` 는 `basePosition(+0x7c)` 로
- * 본다(웹 주자는 목표 루 좌표로만 걷는다 — `isRunnerStopped` 와 같은 근사).
+ * `+0x3a` 는 `!isRunnerStopped` 로, 이동 목표점 `+0x2c` 는 `basePosition(+0x7c)` 로 본다 — **닿는 모든 상태에서 원본과 같다**
+ * (r324 Q-07, 주자 구조 전수 — 직접 뜬 것):
+ * - 주자 `+0x2c` 를 쓰는 곳은 넷뿐이다: vt48 `0xa07b0` → `0xa0a18`(루표 0xd78f0[+0x7c] 그대로) · vt88 `0xa0820`(루 좌표로 순간이동
+ *   0xbef58 뒤 vt10 0xa01ac → 0xbf2b0 `+0x2c = 위치`) · vt10 단독(타자주자 만들기 a93de · 목록 밀기 0xa9374/0xa9844 의 vt9c) ·
+ *   vt94 `0xa0884`(타자주자 타석 자리 — `fieldingState.batterBoxPosition`). 아웃 `0xa9520` 은 +0x96 만 세우고 멈추지 않는다.
+ *   그래서 산 주자의 +0x2c 는 늘 루[+0x7c] 이고, 다른 것은 판 시작 리드 고리 0x3d7b8 의 vt48(1) 전 타자주자뿐인데 이 함수의 대상
+ *   (앞길 검사의 "앞 주자" = 목록 번호 ≥ 1 · 도루 주자)이 아니다.
+ * - `+0x3a` 는 이동 0xbf0dc 가 걸음 뒤 `vt18()` 로 적고(bf138), 0xbf2b0 정지가 1 로 적는다. 0xbf094 는 멈춘(vt18 참) 주자에게
+ *   0xbf0dc 를 안 부르므로, `+0x3a ≠ !vt18` 는 "멈춘 주자에게 새 목표를 준 뒤 첫 걸음 전" 뿐이다 — 그때 목표 루 t 는 닿은 루 g 와
+ *   다르거나(도착 0xa040c 의 vt48(+0x80) 포함) 같은 루라 vt18 이 그대로 참이어서, 9feb6 갈래(t == g 이고 걷는 중)에 닿지 않는다.
+ *   리드 고리(n 틱 걸음 뒤 vt48(둠))도 걸음이 +0x3a = 0 을 적은 뒤라 같다.
  */
 export function isHeadingBack(runner: RunnerState, previousTarget: number): boolean {
   let target = runner.targetBase
