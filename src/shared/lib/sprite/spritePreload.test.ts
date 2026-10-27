@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { animationFramesOf, createSpritePreloader, frameUrl, mergeSpritePreloads, preloadImageUrlsOf } from '@/shared/lib/sprite/spritePreload'
+import { animationFramesOf, createSpritePreloader, frameUrl, mergeSpritePreloads, preloadImageUrlsOf, sceneConcurrencyFor } from '@/shared/lib/sprite/spritePreload'
 import type { SpritePreloadDeps } from '@/shared/lib/sprite/spritePreload'
 
 interface Pending {
@@ -49,6 +49,16 @@ describe('frameUrl', () => {
   it('프레임 번호를 세 자리로 채운다', () => {
     expect(frameUrl('./sprites/num', 7)).toBe('./sprites/num/007.png')
     expect(frameUrl('./sprites/img_text/frames', 123)).toBe('./sprites/img_text/frames/123.png')
+  })
+})
+
+describe('sceneConcurrencyFor', () => {
+  it('HTTP/2 · 3 이면 장면 줄 24, HTTP/1.1 · 모르면 예전 값 6 (r322 A3)', () => {
+    expect(sceneConcurrencyFor('h2')).toBe(24)
+    expect(sceneConcurrencyFor('h3')).toBe(24)
+    expect(sceneConcurrencyFor('http/1.1')).toBe(6)
+    expect(sceneConcurrencyFor('')).toBe(6)
+    expect(sceneConcurrencyFor(undefined)).toBe(6)
   })
 })
 

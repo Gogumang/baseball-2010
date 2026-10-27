@@ -6,7 +6,7 @@
 import { SPRITE_PRELOAD_SCENES } from '@/shared/config/spritePreloadScenes'
 import type { SpriteSceneKey } from '@/shared/config/spritePreloadScenes'
 import { loadSpriteImage, loadSpriteJson, retainDisplayedSprites } from '@/shared/lib/sprite/spriteCache'
-import { createSpritePreloader } from '@/shared/lib/sprite/spritePreload'
+import { createSpritePreloader, sceneConcurrencyFor } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteFolderPreload, SpritePreloadPriority } from '@/shared/lib/sprite/spritePreload'
 
 /**
@@ -21,10 +21,22 @@ function scheduleIdle(callback: () => void): void {
   else setTimeout(callback, 50)
 }
 
+/** 문서를 받은 HTTP 판 — `h2` · `h3` · `http/1.1`. 모르면 undefined */
+function documentProtocol(): string | undefined {
+  try {
+    const entry = typeof performance === 'undefined' ? undefined : performance.getEntriesByType?.('navigation')[0]
+    return entry !== undefined && 'nextHopProtocol' in entry ? String(entry.nextHopProtocol) : undefined
+  } catch {
+    return undefined
+  }
+}
+
 const preloader = createSpritePreloader({
   loadImage: loadSpriteImage,
   loadJson: loadSpriteJson,
   scheduleIdle,
+  // HTTP/2 · 3 이면 장면 줄을 넓힌다 (r322 A3 — `sceneConcurrencyFor`)
+  sceneConcurrency: sceneConcurrencyFor(documentProtocol()),
 })
 
 /** 장면 하나를 미리 받는다. 기다리지 않는다 */
