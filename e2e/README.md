@@ -239,12 +239,12 @@ yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitch
 ```sh
 yarn e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (r249 에 16.7분, 끝 코드 1 이면 실패)
 E2E_ALL_TARGETS=e2e yarn e2e:all          # 한쪽만 (dev · e2e)
-E2E_ALL_SKIP=perf,hits yarn e2e:all       # 빼기 (smoke · hits · browser · fixtures · perf · leak)
+E2E_ALL_SKIP=perf,hits yarn e2e:all       # 빼기 (smoke · hits · browser · fixtures · png · perf · leak)
 E2E_ALL_PORT=5640 yarn e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드 preview +2
 ```
 
 차례: smoke(대상끼리 함께) → hits(대상마다 차례로, 보고는 `e2e/.run/hits-report-<대상>.json`) → `yarn test:browser` →
-`SOAK_FIXTURE_DRY=1 yarn e2e:fixtures` → perf(느린 4G 한 번, 숫자만 — 표를 요약에 붙인다) → 배포 빌드 grep(아래 「배포 빌드에 안 들어가는지」 낱말).
+`SOAK_FIXTURE_DRY=1 yarn e2e:fixtures` → png(팔레트 PNG RGBA 대조) → perf(느린 4G 한 번, 숫자만 — 표를 요약에 붙인다) → 배포 빌드 grep(아래 「배포 빌드에 안 들어가는지」 낱말).
 서버는 떠 있으면 그대로 쓰고 제가 띄운 것만 끈다. 그런데 이미 떠 있는 e2e 빌드는 **그때 픽스처 · 코드로 굳은 것**이라, 고친 뒤에는 그 포트를
 `e2e/serve.sh stop` 으로 끄고 돌린다. 요약은 `e2e/.run/all-report.json` 에도 남는다.
 
@@ -265,3 +265,20 @@ E2E_ALL_PORT=5640 yarn e2e:all            # 포트 바닥 — 개발 서버 +0 �
 | fixtures (dry) | 4 통과 | 40 |
 | perf | 숫자만 | 94 |
 | leak | clean | 0 |
+
+## 자산만 바꾼 판 확인 (r311)
+
+스프라이트 PNG 를 무손실 팔레트로 다시 쓰고(`tools/repack_sprite_png.py`) 스프라이트 JSON 을 한 묶음(`sprites/sprite-json.bundle.json`)으로
+받게 한 판이 화면을 바꾸지 않았는지 본다.
+
+```sh
+yarn node e2e/png-rgba.mjs                      # 기준 판(PNG_RGBA_BASE, 기본 afd0770e)과 다른 PNG 전부를 chromium · webkit 에서 풀어 RGBA 바이트 대조
+PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ yarn node e2e/scene-pixels.mjs   # 두 서버의 장면 전부 × 두 브라우저 화면 픽셀 대조
+```
+
+`scene-pixels.mjs` 는 Playwright 가짜 시계를 멈춰 두고 망 요청이 다 끝난 뒤에만 50ms 씩 밀어, 두 서버를 같은 틱에서 찍는다.
+장면마다 다른 픽셀 수 · B 에만 생긴 로드 오류(4xx · 실패 요청 · 그림 error · naturalWidth 0) · 스프라이트 JSON 낱개 요청 수 · 묶음 요청 수를 낸다.
+웹킷은 같은 서버끼리도 ready 가 한 걸음(50ms) 갈릴 때가 있어, 그러면 둘 다 늦은 쪽 시각까지 민 화면으로 다시 견준다(`(맞춤)`).
+
+`e2e/perf.mjs` 의 크로미움은 r311 부터 `page.route` 를 쓰지 않는다 — 라우트가 걸리면 HTTP 캐시가 꺼져 요청 수가 부푼다.
+웹폰트 CDN 은 실행 인자 `--host-resolver-rules` 로 끊는다. 웹킷은 라우트로 늦추므로 표에 "캐시 꺼짐" 으로 적는다.

@@ -11,18 +11,14 @@ GAP = 3
 
 
 def read_png(path: Path):
-    raw = path.read_bytes()
-    width, height = struct.unpack_from('>II', raw, 16)
-    data = b''
-    pos = 8
-    while pos < len(raw):
-        length = struct.unpack_from('>I', raw, pos)[0]
-        if raw[pos + 4:pos + 8] == b'IDAT':
-            data += raw[pos + 8:pos + 8 + length]
-        pos += 12 + length
-    plain = zlib.decompress(data)
+    # RGBA 와 팔레트 PNG(tools/repack_sprite_png.py, r311) 둘 다 — Pillow 로 RGBA 로 푼다
+    from PIL import Image
+    with Image.open(path) as image:
+        rgba = image.convert('RGBA')
+    width, height = rgba.size
+    plain = rgba.tobytes()
     stride = width * 4
-    rows = [bytearray(plain[y * (stride + 1) + 1:y * (stride + 1) + 1 + stride]) for y in range(height)]
+    rows = [bytearray(plain[y * stride:(y + 1) * stride]) for y in range(height)]
     return width, height, rows
 
 

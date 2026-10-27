@@ -15,6 +15,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).parent))
 from decode_pzx import decode_image, is_transparent, read_image_section, rgb565  # noqa: E402
+import repack_sprite_png  # noqa: E402
 
 UI = Path('base/work/jar/ui')
 PUBLIC = Path('public/sprites')
@@ -104,6 +105,8 @@ def main() -> int:
     write_yellow_labels()
     write_command_labels()
     print(f'관리 화면 그림을 {OUTPUT} 에 만들었다')
+    # 무손실 팔레트 PNG 로 (픽셀 같음, r311 A4 — tools/repack_sprite_png.py)
+    repack_sprite_png.report([OUTPUT])
     return 0
 
 

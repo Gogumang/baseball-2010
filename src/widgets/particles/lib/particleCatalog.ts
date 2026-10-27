@@ -1,4 +1,5 @@
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
+import { fetchSpriteJson } from '@/shared/lib/sprite/spriteJsonBundle'
 
 /**
  * `public/sprites/ptcimg/particles.json` — `.ptc` 26개 설정을 불러온다.
@@ -28,8 +29,9 @@ export function particleConfigOf(callId: number): ParticleConfig | null {
   if (catalog === null) {
     if (!requested) {
       requested = true
-      void fetch(CATALOG_URL)
-        .then((response) => (response.ok ? (response.json() as Promise<ParticleCatalogFile>) : null))
+      // 스프라이트 JSON 묶음에서 꺼낸다(없으면 낱개 파일) — 못 받으면 예전처럼 null 로 남는다 (r311 A5)
+      void (fetchSpriteJson(CATALOG_URL) as Promise<ParticleCatalogFile>)
+        .catch(() => null)
         .then((data) => {
           catalog = data?.emitters ?? null
         })

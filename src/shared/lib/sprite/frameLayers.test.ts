@@ -1,5 +1,4 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { inflateSync } from 'node:zlib'
 import { describe, expect, it, vi } from 'vitest'
 import {
   FRAME_LAYER_FOLDERS,
@@ -10,24 +9,10 @@ import {
   type FrameLayerListing,
   type PlacedFrameLayer,
 } from '@/shared/lib/sprite/frameLayers'
+import { readPngRgba as readToolPng } from '@/shared/lib/sprite/readPngForTests'
 
 const listingOf = (name: string) =>
   JSON.parse(readFileSync(`public/sprites/${name}/frames/layers.json`, 'utf8')) as FrameLayerListing
-
-/** `tools/decode_pzx.py` 의 write_rgba_png 꼴(RGBA 8비트 · 줄 거르개 0)만 읽는다 */
-function readToolPng(path: string): { readonly width: number; readonly height: number; readonly data: Uint8Array } {
-  const file = readFileSync(path)
-  const width = file.readUInt32BE(16)
-  const height = file.readUInt32BE(20)
-  const length = file.readUInt32BE(33)
-  const raw = inflateSync(file.subarray(41, 41 + length))
-  const data = new Uint8Array(width * height * 4)
-  for (let y = 0; y < height; y += 1) {
-    expect(raw[y * (width * 4 + 1)]).toBe(0)
-    data.set(raw.subarray(y * (width * 4 + 1) + 1, (y + 1) * (width * 4 + 1)), y * width * 4)
-  }
-  return { width, height, data }
-}
 
 describe('0x67 겹 목록 (layers.json)', () => {
   it('목록을 청하는 폴더 = layers.json 을 둔 폴더', () => {

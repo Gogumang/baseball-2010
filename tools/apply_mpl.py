@@ -76,6 +76,7 @@ from decode_pzx import (  # noqa: E402
     parse_frame,
 )
 import struct  # noqa: E402
+import repack_sprite_png  # noqa: E402
 
 JAR = Path('base/work/jar')
 PUBLIC = Path('public/sprites')
@@ -426,6 +427,10 @@ def main() -> int:
     print('4. 프레임 박스 → boxes.json')
     boxes = export_boxes(arguments.dry_run)
     print(f'   박스를 가진 프레임 {boxes}개')
+
+    # 1 · 3 이 RGBA 로 다시 쓴 그림을 무손실 팔레트 PNG 로 (픽셀 같음 · 멱등, r311 A4 — tools/repack_sprite_png.py)
+    print('5. 팔레트 PNG 다시 쓰기')
+    repack_sprite_png.report([PUBLIC], arguments.dry_run)
     return 0
 
 

@@ -13,6 +13,7 @@
  */
 import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
 
+import { fetchSpriteJson } from '@/shared/lib/sprite/spriteJsonBundle'
 import { isSpriteMaskSrc } from '@/shared/lib/sprite/spriteMask'
 
 type ImageStatus = 'loading' | 'ready' | 'failed'
@@ -156,11 +157,8 @@ function startJson(url: string): JsonEntry {
   const entry: JsonEntry = {
     status: 'loading',
     value: null,
-    request: fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`스프라이트 정보를 불러오지 못했습니다 (${response.status}): ${url}`)
-        return response.json() as Promise<unknown>
-      })
+    // 묶음(`sprites/sprite-json.bundle.json`)에 있으면 거기서 꺼내고, 없으면 낱개 파일 — 값은 같다 (r311 A5)
+    request: fetchSpriteJson(url)
       .then(
         (value) => {
           entry.status = 'ready'

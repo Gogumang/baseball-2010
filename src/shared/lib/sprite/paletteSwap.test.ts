@@ -1,5 +1,4 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { inflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import {
   TEAM_COUNT,
@@ -11,55 +10,11 @@ import {
   recolorPixels,
   type SpritePalettes,
 } from '@/shared/lib/sprite/paletteSwap'
+import { readPngRgba as readRgbaPng } from '@/shared/lib/sprite/readPngForTests'
 import { frameBoxesOf, type FrameBoxes } from '@/shared/lib/sprite/useFrameOrigins'
 
 function loadPalettes(folder: string): SpritePalettes {
   return JSON.parse(readFileSync(`public/sprites/${folder}/palette.json`, 'utf8')) as SpritePalettes
-}
-
-/** 8비트 RGBA · 비비월 PNG 만 읽는다 (`tools/apply_mpl.py` · `decode_pzx.py` 가 PIL 로 쓴 꼴) */
-function readRgbaPng(path: string): { readonly width: number; readonly height: number; readonly data: Uint8ClampedArray } {
-  const file = readFileSync(path)
-  let at = 8
-  let width = 0
-  let height = 0
-  const chunks: Buffer[] = []
-  while (at < file.length) {
-    const length = file.readUInt32BE(at)
-    const type = file.toString('latin1', at + 4, at + 8)
-    const body = file.subarray(at + 8, at + 8 + length)
-    if (type === 'IHDR') {
-      width = body.readUInt32BE(0)
-      height = body.readUInt32BE(4)
-      if (body[8] !== 8 || body[9] !== 6 || body[12] !== 0) throw new Error(`RGBA 8비트 비비월이 아니다: ${path}`)
-    } else if (type === 'IDAT') chunks.push(body)
-    at += 12 + length
-  }
-  const raw = inflateSync(Buffer.concat(chunks))
-  const stride = width * 4
-  const data = new Uint8ClampedArray(stride * height)
-  for (let y = 0; y < height; y += 1) {
-    const filter = raw[y * (stride + 1)]
-    for (let x = 0; x < stride; x += 1) {
-      const value = raw[y * (stride + 1) + 1 + x]
-      const left = x >= 4 ? data[y * stride + x - 4] : 0
-      const up = y > 0 ? data[(y - 1) * stride + x] : 0
-      const upLeft = x >= 4 && y > 0 ? data[(y - 1) * stride + x - 4] : 0
-      let predictor = 0
-      if (filter === 1) predictor = left
-      else if (filter === 2) predictor = up
-      else if (filter === 3) predictor = (left + up) >> 1
-      else if (filter === 4) {
-        const estimate = left + up - upLeft
-        const toLeft = Math.abs(estimate - left)
-        const toUp = Math.abs(estimate - up)
-        const toUpLeft = Math.abs(estimate - upLeft)
-        predictor = toLeft <= toUp && toLeft <= toUpLeft ? left : toUp <= toUpLeft ? up : upLeft
-      }
-      data[y * stride + x] = (value + predictor) & 0xff
-    }
-  }
-  return { width, height, data }
 }
 
 describe('팔레트 번호', () => {

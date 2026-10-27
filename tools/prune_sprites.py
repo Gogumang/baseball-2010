@@ -16,7 +16,11 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+import repack_sprite_png  # noqa: E402
 
 SOURCE_ROOT = Path('base/sprites')
 TARGET_ROOT = Path('public/sprites')
@@ -104,6 +108,8 @@ def main() -> int:
         shutil.copy2(SOURCE_ROOT / path, target)
 
     print(f'→ {TARGET_ROOT}')
+    # 마지막 단계 — 색 256개 이하 그림을 무손실 팔레트 PNG 로 (픽셀 같음, r311 A4)
+    repack_sprite_png.report([TARGET_ROOT])
     return 0
 
 
