@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SEASON_FIRST_NOTICE } from '@/shared/config/original/mainMenu'
 import {
-  MODE_ENTRIES, RANKING_ENTRIES, RANKING_SERVER_NOTICE, RESTART_MODE_STATE, TOP_ENTRIES, generalModeEntryCursorOf, initialMainMenu, isEntryEnabled,
+  MODE_ENTRIES, RANKING_ENTRIES, RANKING_SERVER_NOTICE, RESTART_MODE_STATE, TOP_ENTRIES, generalModeEntryCursorOf, initialMainMenu, isEntryDimmed, isEntryEnabled,
   reduceMainMenu, selectedIdOf,
 } from '@/pages/main-menu/model/mainMenu'
 import type { MainMenuState } from '@/pages/main-menu/model/mainMenu'
@@ -333,5 +333,14 @@ describe('들어갈 수 없는 칸 (`isAvailable`)', () => {
   it('처음 메뉴 여섯 칸은 모두 들어가고, 막힌 칸은 게임시작 목록의 대전모드 하나다 — 공용 설정을 덮어 열던 낡은 값을 걷었다', () => {
     expect(TOP_ENTRIES.filter((entry) => !isEntryEnabled(entry, false))).toEqual([])
     expect(MODE_ENTRIES.filter((entry) => !isEntryEnabled(entry, false)).map((entry) => entry.id)).toEqual(['대전모드'])
+  })
+})
+
+describe('흐린 칸 — 원본에 없는 웹 안전망 (r305)', () => {
+  it('세 단 어느 칸도 흐리게 그리지 않는다 — 막힌 칸은 대전모드 하나이고 그 칸은 [115] 안내가 뜬다', () => {
+    for (const entry of [...TOP_ENTRIES, ...MODE_ENTRIES, ...RANKING_ENTRIES]) {
+      expect(isEntryDimmed(entry, false), entry.id).toBe(false)
+      expect(isEntryDimmed(entry, true), entry.id).toBe(false)
+    }
   })
 })

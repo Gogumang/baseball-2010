@@ -63,10 +63,12 @@ import {
  * - 사람이 공격하면서 주루 수동이면 이 진루는 아예 안 돈다 — 사람 주루 키(0x582)로만 간다.
  * 곧 폭투·포일의 진루 = 위 규칙 그대로다. 사람 주루 키는 이 진행기가 받지 않는다(미리 돌려 재생만 한다).
  *
- * ## 근사 (지어내지 않은 자리)
- * - ⚠️ **공 궤적**은 웹 타구 근사(`battedBallFlight`)에 0x3507c 의 각·세기·수직 속도를 넣은 것이다.
- *   원본 물리 루프(0xb401c)는 해독 금지 구역이다. 각은 0x3507c 가 부호 없이 넣고(+0xfcc = +60…+130),
- *   타격은 −a 를 넣으므로 웹 패턴 각으로는 −각 이다(S8 5-4: 홈플레이트 뒤쪽).
+ * ## 공 궤적 · 그 밖의 자리
+ * - **공 궤적**은 타구와 같은 쏘기 길이다(r305 다시 뜸): 0x3507c 가 +0xfcc · +0xfce · +0xfd0 에 각 · 세기 · 수직(−100)을 적고
+ *   메시지 0x11 의 인자로 +0xfcc 를 넘긴다(350b0~350b8). 받는 쪽 0x50faa 는 덱 갈래([sp+0xa0] · [sp+0x9c])가 서지 않으면
+ *   그 칸을 그대로 쓴다 — 공은 늘 0xbef58(공, 0xcfb70 = (20000, 1000, 30000))에 놓이고(51040~51058) 51172~51188 이
+ *   vt44(+2 세기, +4 수직, +0 각)로 쏜다. 물리 · 충돌은 `ballPhysics`(원본을 직접 뜬 것)가 그대로 돈다. 각은 0x3507c 가
+ *   부호 없이 넣고(+60…+130), 타격 덱은 그 칸에 −a 를 넣으므로 웹 패턴 각으로는 −각 이다(S8 5-4: 홈플레이트 뒤쪽).
  * - **포수 +0xb8 = 6(놓침 동작)** 은 포구 예보·이동에 효과가 없다 — `.text` 를 훑어(`adds rX, #0xb8` · `adds #0x80 + [#0x38]` ·
  *   `movs #0xb8` 레지스터 오프셋) 야수 +0xb8 을 만지는 곳은 쓰기 b4276(펌블) · 3e08e(폭투) · 줄이기 a12da(야수 틱) · 읽기
  *   4381a(그리기 — 29 · 실책 · "!") 넷뿐이다(나머지 `+0xb8` 은 vtable 칸 호출 · 주자 객체 베끼기 af786). 동작 잠금 칸은 +0xb4 라 따로다.
@@ -143,7 +145,7 @@ export interface PassedBallPlayResult extends RunnerPlayEngineResult {
 const DEFAULT_ABILITY = 500
 const CATCHER_SLOT = 1
 
-/** 0x3507c 의 쏘기 값 → 웹 궤적 (근사 — 머리말). 시작점은 타구와 같은 표준 배팅 지점 */
+/** 0x3507c 의 쏘기 값 → 공 궤적 (머리말 — 메시지 0x11 의 덱 없는 갈래 51172). 시작점은 타구와 같은 0xcfb70 */
 export function passedBallTrajectoryOf(shot: PassedBallShot): BattedBallTrajectory {
   return battedBallTrajectory([-shot.angle, shot.strength, shot.verticalSpeed, 0], { origin: BATTING_POINT })
 }

@@ -150,7 +150,7 @@ export interface LeagueGameScore {
   readonly steals: number
   /**
    * 도루로 한 루 간 주자들 (0xc1a42~0xc1a98) — `playLeagueDay` 가 레코드 +0x2c(`LeagueBatterLine.steals`)에 쌓는다.
-   * 마타자 칸은 뺀다(0xa56dc 의 마선수 거짓). ⚠️ 주자 신원은 반 이닝 엔진의 근사(`HalfInningStolenBase`)다.
+   * 마타자 칸은 뺀다(0xa56dc 의 마선수 거짓). 주자 신원은 원본 주자 목록 sim+0x80 대로다(`HalfInningStolenBase`).
    */
   readonly stolenBases: readonly LeagueStolenBase[]
   /**

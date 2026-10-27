@@ -6,7 +6,7 @@ import { DESCRIPTION_BOX_COLORS, DESCRIPTION_LINE_HEIGHT } from '@/pages/match-s
  * 경기진행 설정 창의 모양.
  *
  * 배치는 그리기 0x6042c 를 떠서 `matchSettingsLayout.ts` 에 옮겼다. 여기는 모양만 둔다.
- * ⚠️ 판(공용 판 0x55e60)의 모양만 근사다 — 공용 판 컴포넌트로 옮기는 중이라 그대로 둔다.
+ * 판은 공용 판 0x55e60 을 옮긴 `CommonPanel`(제목 탭 · 어둡게)이 그린다 — 여기에는 판 모양이 없다.
  */
 
 /** 그림 한 장 — 원작 좌표에 그대로 놓는다 */
