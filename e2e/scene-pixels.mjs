@@ -135,7 +135,15 @@ async function capture(browser, browserName, device, base, scene, label, target 
   let error = null
   let virtual = 0
   try {
-    if ((base === A && WARM.includes('A')) || (base === B && WARM.includes('B'))) await warmAssetPacks(page, base)
+    if ((base === A && WARM.includes('A')) || (base === B && WARM.includes('B'))) {
+      await warmAssetPacks(page, base)
+      // 첫 화면이 받던 것은 장면으로 옮기며 끊긴다 — 그 셈은 장면 몫이 아니다
+      await page.goto('about:blank')
+      for (const key of ['pageErrors', 'consoleErrors', 'badResponses', 'failed']) stats[key].length = 0
+      stats.inFlight = 0
+      stats.spriteJson = 0
+      stats.bundle = 0
+    }
     await page.goto(`${base}?scene=${scene}`, { waitUntil: 'commit' })
     await page.waitForLoadState('domcontentloaded')
     const limit = LIMIT[scene] ?? 120000
