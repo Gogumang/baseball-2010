@@ -64,6 +64,19 @@ export interface SpritePreloader {
   readonly preload: (requests: readonly SpriteFolderPreload[], priority: SpritePreloadPriority) => Promise<void>
 }
 
+/**
+ * 장면 줄 동시 요청 수 — 문서를 받은 HTTP 판(`nextHopProtocol`)으로 고른다 (r322, OPTIMIZATION-2026-10-27 A3).
+ *
+ * HTTP/1.1 은 호스트당 연결이 6개라 장면 줄도 6 이다(더 올리면 JS · JSON 이 그림 뒤에 줄을 선다 — 개발 서버 · `vite preview`).
+ * HTTP/2 · 3(배포 호스트)은 요청이 한 연결에 겹쳐 가므로 6 이 오히려 병목이었다: 느린 4G(왕복 150ms · 1.6Mbps)에서 줄이 늘
+ * 4~6 개뿐이라 망은 5~30% 만 쓰였고, 장면 그림이 ready 뒤 1.0~3.1초 더 걸렸다. 24 로 올리면 ready 는 그대로(±0.1초)이고
+ * 장면 그림은 ready 무렵에 다 온다. 유휴 줄(기본 4)은 그대로 둔다 — 16 으로 올리면 JS 와 대역을 다퉈 ready 가 0.4~0.6초 늦었다.
+ * 판을 모르면(빈 글자 · 옛 브라우저) 예전 값 6.
+ */
+export function sceneConcurrencyFor(protocol: string | undefined): number {
+  return protocol === 'h2' || protocol === 'h3' ? 24 : 6
+}
+
 export function frameUrl(folder: string, frame: number): string {
   return `${folder}/${String(frame).padStart(3, '0')}.png`
 }

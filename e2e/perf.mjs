@@ -143,7 +143,8 @@ async function throttleByCdp(page, tally) {
 }
 
 async function openPage(browser, browserName, device) {
-  const context = await browser.newContext(DEVICES[device])
+  // https 로 띄운 HTTP/2 시험 서버(자체 서명 인증서)도 열게 (r322)
+  const context = await browser.newContext({ ...DEVICES[device], ignoreHTTPSErrors: true })
   const page = await context.newPage()
   await page.addInitScript(BLOCK_PROBE)
   const tally = { requests: 0, bytes: 0, byKind: {}, notModified: 0 }
@@ -193,6 +194,13 @@ async function measureBoot(browser, browserName, device) {
   const { context, page, tally, errors } = await openPage(browser, browserName, device)
   const started = Date.now()
   await page.goto(BOOT_URL, { waitUntil: 'commit' })
+  // 자산 묶음 받기 화면(r322 `app/assetPacks`)이 끝난 때 — 묶음이 없는 빌드면 이용안내와 같은 때로 잡힌다
+  await page.waitForFunction(
+    () => document.documentElement.dataset.assetPacks !== undefined || document.querySelector('[data-part="글줄"]') !== null,
+    null,
+    { timeout: 300000, polling: 50 },
+  )
+  const packs = await snapshot(page, tally, started)
   await waitNoticeVisible(page)
   const notice = await snapshot(page, tally, started)
   await page.keyboard.press('Enter', { delay: 40 })
@@ -205,7 +213,7 @@ async function measureBoot(browser, browserName, device) {
   await page.waitForTimeout(3000)
   const menuIdle = await snapshot(page, tally, started)
   await context.close()
-  return { notice, title, menu, menuIdle, errors }
+  return { packs, notice, title, menu, menuIdle, errors }
 }
 
 /** 픽스처 저장을 쪽이 열리기 전에 깐다 (처음 한 번만 — 앱이 쓴 저장을 다시 덮지 않게) */
@@ -349,7 +357,7 @@ console.log('요청: chromium = 망 요청(캐시 켬, 캐시에서 꺼낸 것 �
 console.log('| 브라우저 | 지점 | 시간 ms | 요청 | 그중 304 | 받은 KB | 그중 JS KB | 막힘 ms | 가장 긴 틈 ms |')
 console.log('|---|---|---:|---:|---:|---:|---:|---:|---:|')
 const LABELS = {
-  notice: '이용안내', title: '타이틀 PRESS', menu: '메인 메뉴', menuIdle: '메뉴 +3초', nariByKeys: '나리 관리(키로)', 'nari-management': '나리 관리(바로가기)', 'general-bat': '첫 타석(바로가기)',
+  packs: '자산 묶음 받기 끝', notice: '이용안내', title: '타이틀 PRESS', menu: '메인 메뉴', menuIdle: '메뉴 +3초', nariByKeys: '나리 관리(키로)', 'nari-management': '나리 관리(바로가기)', 'general-bat': '첫 타석(바로가기)',
 }
 for (const [browserName, points] of Object.entries(results)) {
   for (const [key, value] of Object.entries(points)) {

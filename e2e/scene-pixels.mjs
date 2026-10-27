@@ -26,6 +26,11 @@ const A = process.env.PIXELS_A
 const B = process.env.PIXELS_B
 if (A === undefined || B === undefined) throw new Error('PIXELS_A · PIXELS_B (두 서버 주소) 가 필요하다')
 const ONLY = process.env.PIXELS_ONLY
+/**
+ * `A` · `B` · `AB` — 그 서버는 장면을 열기 전에 같은 맥락에서 첫 화면(`/`)을 한 번 열어 자산 묶음 받기(r322 `app/assetPacks`)를
+ * 끝내 둔다. 그러면 장면 바로가기도 묶음(서비스 워커 · Cache Storage)에서 자산을 받는다 — 묶음 길과 낱개 길의 화면을 견줄 때
+ */
+const WARM = process.env.PIXELS_WARM ?? ''
 const STEP = Number(process.env.PIXELS_STEP ?? 50)
 const SETTLE = Number(process.env.PIXELS_SETTLE ?? 1500)
 const SHOTS = Number(process.env.PIXELS_SHOTS ?? 1)
@@ -72,7 +77,8 @@ const IMAGE_PROBE = `(() => {
 })()`
 
 async function openPage(browser, browserName, device) {
-  const context = await browser.newContext(deviceOf(device))
+  // https 로 띄운 HTTP/2 시험 서버(자체 서명 인증서)도 열게 (r322)
+  const context = await browser.newContext({ ...deviceOf(device), ignoreHTTPSErrors: true })
   const page = await context.newPage()
   const stats = { pageErrors: [], consoleErrors: [], badResponses: [], failed: [], spriteJson: 0, bundle: 0, inFlight: 0 }
   if (browserName !== 'chromium') await page.route(CDN, (route) => route.abort())
@@ -122,6 +128,20 @@ async function waitQuiet(page, stats) {
   })).catch(() => {})
 }
 
+/** 첫 화면을 열어 자산 묶음 받기 문이 끝날 때까지 (가짜 시계가 멈춰 있어 쪽 타이머로 기다리지 않는다) */
+async function warmAssetPacks(page, base) {
+  await page.goto(base, { waitUntil: 'commit' })
+  for (let tries = 0; tries < 4000; tries += 1) {
+    const result = await page.evaluate(() => document.documentElement.dataset.assetPacks ?? null).catch(() => null)
+    if (result !== null) {
+      if (result !== 'downloaded' && result !== 'cached') throw new Error(`자산 묶음 문: ${result}`)
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error('자산 묶음 문이 안 끝났다')
+}
+
 async function sceneState(page) {
   return page.evaluate(() => document.documentElement.dataset.scene ?? null).catch(() => null)
 }
@@ -132,6 +152,15 @@ async function capture(browser, browserName, device, base, scene, label, target 
   let error = null
   let virtual = 0
   try {
+    if ((base === A && WARM.includes('A')) || (base === B && WARM.includes('B'))) {
+      await warmAssetPacks(page, base)
+      // 첫 화면이 받던 것은 장면으로 옮기며 끊긴다 — 그 셈은 장면 몫이 아니다
+      await page.goto('about:blank')
+      for (const key of ['pageErrors', 'consoleErrors', 'badResponses', 'failed']) stats[key].length = 0
+      stats.inFlight = 0
+      stats.spriteJson = 0
+      stats.bundle = 0
+    }
     await page.goto(`${base}?scene=${scene}`, { waitUntil: 'commit' })
     await page.waitForLoadState('domcontentloaded')
     const limit = LIMIT[scene] ?? 120000
@@ -146,6 +175,10 @@ async function capture(browser, browserName, device, base, scene, label, target 
     if (state !== 'ready') {
       const status = await page.evaluate(() => window.__scene).catch(() => null)
       throw new Error(`장면이 안 섰다 (${state}, 가상 ${virtual}ms): ${status?.error ?? ''}`)
+    }
+    if ((base === A && WARM.includes('A')) || (base === B && WARM.includes('B'))) {
+      const packs = await page.evaluate(() => document.documentElement.dataset.assetPacks ?? null)
+      if (packs !== 'cached') throw new Error(`장면이 자산 묶음을 안 썼다 (${packs})`)
     }
     for (let extra = 0; extra < SETTLE; extra += STEP) {
       await page.clock.runFor(STEP)

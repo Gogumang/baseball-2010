@@ -5,6 +5,7 @@ import { ViewportShell } from '@/app/ui/ViewportShell'
 import { installAppKeyGate } from '@/shared/lib/sceneKeyLatch/appKeyGate'
 import { preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreen'
 import { installStaleBuildReload } from '@/shared/lib/staleBuild/staleBuild'
+import { runAssetPackGate } from '@/app/assetPacks/assetPackGate'
 import './styles/global.css'
 
 const container = document.getElementById('root')
@@ -37,12 +38,15 @@ if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
   // 앱 덩이를 먼저 받아 둔다 — 껍데기가 첫 틀부터 앱을 그려 진행기가 예전처럼 곧바로 손잡이를 받는다.
   // 장면 단계는 모드 화면 덩이(`lazyScreen`)까지 다 받은 뒤 밟는다 — 켤 때 길을 건너뛰어 덩이가 아직 안 왔는데 키를 보내면
   // 빈 화면이 키를 먹는다(사람 길은 로고 · 타이틀 연출 동안 다 받는다)
-  void Promise.all([import('@/app/dev/sceneRunner'), loadApp()]).then(async ([runner, App]) => {
+  // 자산 묶음 문(r322) — 바로가기(`?scene=`)는 받기를 건너뛴다(같은 맥락에서 받아 둔 묶음이 있으면 쓴다)
+  const isShortcut = new URLSearchParams(location.search).has('scene')
+  void runAssetPackGate({ isShortcut }).then(() => Promise.all([import('@/app/dev/sceneRunner'), loadApp()])).then(async ([runner, App]) => {
     await runner.bootSceneShortcut()
     render(container, App)
     await preloadLazyScreens()
     await runner.runSceneShortcut()
   })
 } else {
-  render(container)
+  // 첫 진입에 게임 자산을 묶음으로 한꺼번에 받고(진행 막대) 그린다 — 두 번째 방문은 캐시에서 곧바로 (r322, `app/assetPacks`)
+  void runAssetPackGate({ isShortcut: false }).then(() => render(container))
 }
