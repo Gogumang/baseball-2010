@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  BALL_PATTERN_BACKDROP, MAIN_TITLE_BACKDROP, SKIN_SCREEN, ballPatternCounterAfter, ballPatternRect565, ballPatternTilesOf,
+  BALL_PATTERN_BACKDROP, BALL_PATTERN_GRID, MAIN_TITLE_BACKDROP, SKIN_SCREEN, ballPatternCounterAfter, ballPatternRect565,
+  ballPatternStartOf,
   finishMainTitleBackdrop565, mainTitleLineYs, rgbOf565, rgbTo565,
 } from '@/pages/special/lib/skinBackdrops'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
@@ -178,16 +179,44 @@ function BallPatternBackdrop() {
   const frame = animationStepAt(GPOINT_ANIMATION, draws)?.frame ?? 0
   const { width, height } = SKIN_SCREEN
   const grayRects = useScreenGrayRects()
-  const tiles = ballPatternTilesOf(counter)
+  const start = ballPatternStartOf(counter)
   const src = `${GPOINT_FRAMES}/${pad(frame)}.png`
   usePublishBallPattern(counter, frame)
+  // 칸 약 200 개를 gpoint 그림마다 한 벌씩(여섯 벌) 한 번만 만들어 두고, 지금 그림의 벌만 보인다(r316 P1).
+  // 틱마다 보이는 벌의 자리(left · top)만 레이아웃 단계에서 DOM 에 곧바로 적는다 — React 가 칸 200 개를 다시 맞춰 보지 않고,
+  // 3 틱마다 칸 200 개의 src 를 바꾸지(그림 다시 찾기) 않는다. 그리기 전(같은 틀)에 적으니 화면은 그대로다.
+  // 자리 값은 예전과 같은 정수 하나(첫 칸 + 격자)다 — 감싸개를 옮기거나 calc 로 나누면 분수 배율에서 1px 반올림이 갈린다(r321)
+  const layerRefs = useRef<(HTMLDivElement | null)[]>([])
+  const layers = useMemo(() => GPOINT_ANIMATION.map((entry, layer) => (
+    <div key={entry.frame} ref={(element) => { layerRefs.current[layer] = element }} data-frame-layer={entry.frame}
+      style={{ display: 'none' }}>
+      {BALL_PATTERN_GRID.map((_, index) => (
+        <img key={index} className={styles.sprite} alt="" src={`${GPOINT_FRAMES}/${pad(entry.frame)}.png`} />
+      ))}
+    </div>
+  )), [])
+  useLayoutEffect(() => {
+    GPOINT_ANIMATION.forEach((entry, layer) => {
+      const element = layerRefs.current[layer]
+      if (element === null || element === undefined) return
+      const isShown = entry.frame === frame
+      if (isShown) {
+        BALL_PATTERN_GRID.forEach((tile, index) => {
+          const image = element.children[index] as HTMLElement | undefined
+          if (image === undefined) return
+          image.style.left = `${start + tile.x}px`
+          image.style.top = `${start + tile.y}px`
+        })
+      }
+      const display = isShown ? '' : 'none'
+      if (element.style.display !== display) element.style.display = display
+    })
+  }, [start, frame])
   return (
     <div className={styles.skinBackdrop} data-testid="바탕-공무늬" data-counter={counter} data-frame={frame}
       style={{ width, height, background: BALL_PATTERN_BACKDROP.color }}>
-      {tiles.map((tile, index) => (
-        <img key={index} className={styles.sprite} alt="" src={src} style={{ left: tile.x, top: tile.y }} />
-      ))}
-      {grayRects.map((rect, index) => <BallPatternGrayRect key={index} rect={rect} tiles={tiles} src={src} />)}
+      {layers}
+      {grayRects.map((rect, index) => <BallPatternGrayRect key={index} rect={rect} start={start} src={src} />)}
     </div>
   )
 }
@@ -198,10 +227,13 @@ const BALL_PATTERN_GRAY = css565(grayPixel565(color565Of(BALL_PATTERN_BACKDROP.c
 /**
  * 0xc37a8 흑백 사각형 안의 공 무늬 — 위에 그린 것(커맨드 줄 아이콘)이 흑백 사각형을 걸면 그 아래 바탕도 회색이 된다.
  * 바탕 색 · 공 그림을 회색 식으로 칠해 사각형으로 잘라 얹는다(`shared/lib/pixelEffect/screenGrayRects`).
+ * 칸은 몇 개뿐이라 React 로 그대로 그린다. 열쇠를 칸 자리 대신 격자 번호로 둬 틱마다 다시 붙지 않는다(r316 P2 —
+ * 다시 붙으면 칠한 주소를 다시 받아 틱마다 커밋이 한 번 더 났다. 칠한 주소는 미리 칠해 둬 바로 보이므로 화면은 그대로다).
  */
-function BallPatternGrayRect({ rect, tiles, src }: {
+function BallPatternGrayRect({ rect, start, src }: {
   readonly rect: ScreenGrayRect
-  readonly tiles: readonly { readonly x: number; readonly y: number }[]
+  /** 첫 칸 자리 (`ballPatternStartOf`) */
+  readonly start: number
   readonly src: string
 }) {
   const { tileWidth, tileHeight } = BALL_PATTERN_BACKDROP
@@ -209,17 +241,21 @@ function BallPatternGrayRect({ rect, tiles, src }: {
   useEffect(() => {
     for (const entry of GPOINT_ANIMATION) void effectSpriteUrl(`${GPOINT_FRAMES}/${pad(entry.frame)}.png`, DRAW_EFFECT.GRAY, 0)
   }, [])
-  const touches = (tile: { readonly x: number; readonly y: number }) =>
-    tile.x < rect.x + rect.width && tile.x + tileWidth > rect.x && tile.y < rect.y + rect.height && tile.y + tileHeight > rect.y
+  const touches = (tile: { readonly x: number; readonly y: number }) => {
+    const x = start + tile.x
+    const y = start + tile.y
+    return x < rect.x + rect.width && x + tileWidth > rect.x && y < rect.y + rect.height && y + tileHeight > rect.y
+  }
   return (
     <div data-testid="바탕-공무늬-흑백" style={{
       position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, overflow: 'hidden',
       background: BALL_PATTERN_GRAY, pointerEvents: 'none',
     }}>
-      {tiles.filter(touches).map((tile) => (
-        <EffectImage key={`${tile.x},${tile.y}`} className={styles.sprite} src={src} effect={DRAW_EFFECT.GRAY}
-          style={{ left: tile.x - rect.x, top: tile.y - rect.y }} />
-      ))}
+      {BALL_PATTERN_GRID.map((tile, index) => (touches(tile)
+        // 자리는 예전처럼 정수 하나(첫 칸 + 격자 − 사각형)로 준다 — 나눠 더하면 분수 배율에서 1px 반올림이 갈린다
+        ? <EffectImage key={index} className={styles.sprite} src={src} effect={DRAW_EFFECT.GRAY}
+          style={{ left: start + tile.x - rect.x, top: start + tile.y - rect.y }} />
+        : null))}
     </div>
   )
 }
