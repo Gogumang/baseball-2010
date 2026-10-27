@@ -20,14 +20,15 @@ import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPane
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import { GridCellBack } from '@/pages/create-player/ui/GridCellBack'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 이미지 폴더 (128장) — 노트가 "slt_frame 이미지 N" 이라 부르는 막대들이 여기 있다.
  *  프레임 폴더(`slt_frame/frames`, 62장)와 **번호 체계가 다르다** — 116·117 은 프레임 쪽에 없다 */
-const SLT_IMAGE = './sprites/slt_frame'
+const SLT_IMAGE = assetUrl('./sprites/slt_frame')
 /** team_logo 이미지 묶음 — 15 = 잠긴 칸 "?" (32×48) */
-const TEAM_LOGO_IMAGE = './sprites/team_logo'
+const TEAM_LOGO_IMAGE = assetUrl('./sprites/team_logo')
 const imageSrc = (folder: string, image: number) => `${folder}/${String(image).padStart(3, '0')}.png`
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 /** 큰 로고는 A 자리에만 쓴다 (77×76 을 가운데 맞춤) */
 const BIG_LOGO_HALF = { width: 38, height: 38 } as const
 

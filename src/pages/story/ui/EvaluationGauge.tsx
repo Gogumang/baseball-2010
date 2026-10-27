@@ -7,9 +7,10 @@ import {
   EVALUATION_GAUGE_ANCHOR, EVALUATION_GAUGE_FILL, EVALUATION_GAUGE_FRAMES, EVALUATION_GAUGE_SIGN_COLOR,
   evaluationGaugeRowsOf, evaluationGaugeValueOf, startEvaluationGauge, tickEvaluationGauge,
 } from '@/pages/story/lib/evaluationGauge'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const NUM = './sprites/num'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const NUM = assetUrl('./sprites/num')
 const pad = (frame: number) => String(frame).padStart(3, '0')
 const layer = { position: 'absolute', imageRendering: 'pixelated', pointerEvents: 'none' } as const
 

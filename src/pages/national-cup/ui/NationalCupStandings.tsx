@@ -13,11 +13,12 @@ import {
 } from '@/pages/national-cup/lib/nationalCupLayout'
 import type { StandingsBox } from '@/widgets/standings/lib/standingsLayout'
 import * as styles from '@/pages/national-cup/ui/NationalCupStandings.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const MODE_UI = './sprites/mode_ui/frames'
-const NUM = './sprites/num'
-const navyLabel = (frame: number) => `./sprites/management/label_navy_${frame}.png`
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const NUM = assetUrl('./sprites/num')
+const navyLabel = (frame: number) => assetUrl(`./sprites/management/label_navy_${frame}.png`)
 const frameImage = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface NationalCupStandingsProps {

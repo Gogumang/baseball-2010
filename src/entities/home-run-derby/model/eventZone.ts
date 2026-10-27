@@ -1,6 +1,7 @@
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { isBugFixed } from '@/shared/config/bugfixes'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 이벤트 존 (H-2 · P7 H1 · U-93).
@@ -26,7 +27,7 @@ import { isBugFixed } from '@/shared/config/bugfixes'
 export const EVENT_ZONE_BLINK_PERIOD = 8
 
 /** 존 그림 — `stadium/event_zone.pzx` (this+0x1070, 0x486e0 로드). 프레임 0 = 부품 두 장(원점 (51, 16) · 518×66) */
-export const EVENT_ZONE_FRAMES = './sprites/event_zone/frames'
+export const EVENT_ZONE_FRAMES = assetUrl('./sprites/event_zone/frames')
 
 /** 플레이 +0x127 을 세우는 패턴 플래그 비트 — 0xb07c8 = `플래그 & 2` */
 export const BIG_FLY_PATTERN_FLAG = 2
@@ -114,7 +115,7 @@ export function isEventZoneTranslucentAt(tick: number): boolean {
  * 0x46c88 보다 먼저 존을 그린다. 존(+0x17cc/+0x17d0)은 다음 공 0x3de10 이 −1 로 비울 때까지 남는다.
  */
 export const EVENT_ZONE_REWARD = {
-  folder: './sprites/trainning/frames',
+  folder: assetUrl('./sprites/trainning/frames'),
   /** 애니 표 칸 3 */
   animation: 3,
   /** 0x41158 `movs r2, #0x46` */

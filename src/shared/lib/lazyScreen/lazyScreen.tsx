@@ -1,5 +1,6 @@
 import { Suspense, lazy, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
+import { noteBlockingLoadFailure } from '@/shared/lib/staleBuild/staleBuild'
 
 /**
  * **화면 덩이 나눠 받기** (웹 전용 — 원본에 없다). 첫 화면(이용안내)에 안 쓰는 큰 화면(경기 엔진 · 수비 진행기 · 생성 표를 끌고 오는
@@ -42,7 +43,13 @@ export function lazyScreen<Props extends object>(
     return pending
   }
   // `lazy` 의 겉꼴(ref 칸이 섞인 props)을 화면 props 그대로로 본다 — 화면 컴포넌트는 함수 컴포넌트라 ref 를 안 받는다
-  const Lazy = lazy(async () => ({ default: await fetchOnce() })) as unknown as ComponentType<Props>
+  // 그릴 때 덩이를 못 받으면 그 화면은 서지 못한다 — 새 배포로 옛 덩이가 없어진 탭이면 곧바로 다시 부른다 (r318)
+  const Lazy = lazy(async () => ({
+    default: await fetchOnce().catch((error: unknown) => {
+      noteBlockingLoadFailure()
+      throw error
+    }),
+  })) as unknown as ComponentType<Props>
 
   function Screen(props: Props) {
     // 처음 그릴 때 정한 꼴을 끝까지 쓴다

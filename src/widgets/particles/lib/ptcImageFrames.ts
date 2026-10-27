@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * `ptc/ptcimg.pzx` 의 **프레임 → 파트** 표.
  *
@@ -74,7 +75,7 @@ export const PTC_IMAGE_FRAMES: readonly (readonly PtcPart[])[] = [
 ]
 
 /** 파트 그림 한 장의 주소 */
-export const PTC_PART_IMAGE = (index: number) => `./sprites/ptcimg/${String(index).padStart(3, '0')}.png`
+export const PTC_PART_IMAGE = (index: number) => assetUrl(`./sprites/ptcimg/${String(index).padStart(3, '0')}.png`)
 
 /** 이번 틱에 그릴 파트 — `파트[ life % 파트수 ]` (0x6dc6a) */
 export function ptcPartOf(img: number, life: number): PtcPart | null {

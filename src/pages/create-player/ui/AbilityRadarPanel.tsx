@@ -9,10 +9,11 @@ import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
 import {
   ABILITY_RADAR_BACK, ABILITY_RADAR_BOX, ABILITY_RADAR_EMPTY, abilityRadarAxesOf,
 } from '@/pages/create-player/lib/abilityRadarPanel'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_FRAME = './sprites/slt_frame'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const NUM = './sprites/num'
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
 const pad = (index: number) => String(index).padStart(3, '0')
 const pixel: CSSProperties = { position: 'absolute', pointerEvents: 'none', imageRendering: 'pixelated' }
 /** `yearCellDrawingOf` 는 칸 x + 0x18 기준이라 옮긴다 (숫자 윗변 = 상자 y + 0x11 — 교체 창 `DetailRadar` 와 같다) */

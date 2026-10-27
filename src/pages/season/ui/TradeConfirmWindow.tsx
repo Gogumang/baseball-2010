@@ -11,9 +11,10 @@ import { yearLabelOffsetOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import {
   TRADE_CONFIRM, teamNameFrameOf, tradeBadgeOf, tradeBoostTextOf, tradeCostBoxPaintsOf, tradeCostTextOf,
 } from '@/pages/season/lib/tradeConfirmLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI_FRAMES = './sprites/mode_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const MODE_UI_FRAMES = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 const pad = (index: number) => String(index).padStart(3, '0')
 const pixel: CSSProperties = { position: 'absolute', pointerEvents: 'none', imageRendering: 'pixelated' }
 

@@ -13,11 +13,12 @@ import {
 } from '@/pages/home-run-derby/lib/derbyResultLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyResultWindow.css'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const POPUP_FRAMES = './sprites/popup/frames'
-const RESULT_TITLE_IMAGE = `./sprites/game_ui/${String(RESULT_TITLE.image).padStart(3, '0')}.png`
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const POPUP_FRAMES = assetUrl('./sprites/popup/frames')
+const RESULT_TITLE_IMAGE = assetUrl(`./sprites/game_ui/${String(RESULT_TITLE.image).padStart(3, '0')}.png`)
 /** 둥근 칸 0x5eec5 의 공통 인자 — 둥글기 4 · 반사 길이 0x56 · 걸음 2 · 칠 #395DCE · 테두리 0(검정) (45d84~45daa · 460ec · 46238) */
 const ROUND_BOX = { round: 4, shineLength: 0x56, shineStep: 2, fill: '#395DCE', edge: '#000000' } as const
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`

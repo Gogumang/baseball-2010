@@ -152,6 +152,7 @@ import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **팀 경기 화면** — 원본 게임 모드 1 일반 · 2 시즌 · 8·9 대전 이 쓰는 경기 장면(0x104)이다.
@@ -183,7 +184,7 @@ function batterEquipmentPropsOf(equipment: readonly number[] | undefined) {
   return { batterEquipmentLevels: { hit, power, defense, run } }
 }
 
-const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+const smallLogoUrlOf = (teamId: number) => assetUrl(`./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`)
 
 type PitchPhase = '구질' | '코스' | '게이지'
 /** 경기 화면을 통째로 덮는 하위 화면 — 경기 중 메뉴가 연다 */

@@ -15,6 +15,7 @@ import { ABILITY_DETAIL_VISIBLE_LINES, abilityDetailScrollKeyOf, scrollAbilityDe
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { SeasonPlayerCard } from '@/pages/season/ui/SeasonPlayerCard'
 import { seasonCardLookOf } from '@/pages/season/lib/seasonPlayerCard'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 export interface SeasonPlayerCardScreenProps {
   readonly teamId: number
@@ -38,7 +39,7 @@ export interface SeasonPlayerCardScreenProps {
   readonly hasCardBadge?: boolean
 }
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 /**
  * **선수 기본정보 카드 0xd9 ↔ 능력치 상세 창 0xda** (R13 3절 확정, 나리 119/120 과 같은 쌍).

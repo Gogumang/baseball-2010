@@ -1,3 +1,4 @@
+import { ASSET_ROOT, assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * **스프라이트 JSON 묶음** (r311, OPTIMIZATION-2026-10-27 A5).
  *
@@ -14,7 +15,7 @@
  * - vitest(MODE `test`)에서는 끈다 — 시험들이 가짜 `fetch` 로 낱개 주소를 받는다. 묶음 시험은 `setSpriteJsonBundleForTests` 로 켠다.
  */
 
-export const SPRITE_JSON_BUNDLE_URL = './sprites/sprite-json.bundle.json'
+export const SPRITE_JSON_BUNDLE_URL = assetUrl('./sprites/sprite-json.bundle.json')
 
 /** 묶음 파일 꼴 — `files` 열쇠는 `sprites/` 아래 경로, 값은 그 파일의 글 */
 export interface SpriteJsonBundleFile {
@@ -25,9 +26,13 @@ export interface SpriteJsonBundleFile {
 let bundleUrl: string | null = import.meta.env.MODE === 'test' ? null : SPRITE_JSON_BUNDLE_URL
 let bundle: Promise<Readonly<Record<string, string>> | null> | null = null
 
-/** `./sprites/a/b.json` · `sprites/a/b.json` → `a/b.json`. 스프라이트 JSON 이 아니면 null */
+/**
+ * `./sprites/a/b.json` · `sprites/a/b.json` → `a/b.json`. 스프라이트 JSON 이 아니면 null.
+ * 빌드에서는 주소 앞부분이 `./v/<해시>/`(`assetUrl`)이라 그 앞부분도 떼어 본다.
+ */
 export function spriteJsonBundleKey(url: string): string | null {
-  const match = /^(?:\.\/)?sprites\/([^?#]+\.json)$/.exec(url)
+  const path = ASSET_ROOT !== './' && url.startsWith(ASSET_ROOT) ? url.slice(ASSET_ROOT.length) : url
+  const match = /^(?:\.\/)?sprites\/([^?#]+\.json)$/.exec(path)
   return match === null ? null : match[1]
 }
 

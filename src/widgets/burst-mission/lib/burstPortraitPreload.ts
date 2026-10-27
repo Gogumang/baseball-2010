@@ -10,6 +10,7 @@
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import { burstPortraitOf } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const PORTRAIT_JSON = ['animations.json', 'origins.json'] as const
 
@@ -30,7 +31,7 @@ export function burstPortraitPreloads(): SpriteFolderPreload[] {
   return [...animationsByFile]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([file, animations]) => ({
-      folder: `./sprites/${file}/frames`,
+      folder: assetUrl(`./sprites/${file}/frames`),
       frames: [],
       animations: [...animations].sort((a, b) => a - b),
       json: PORTRAIT_JSON,

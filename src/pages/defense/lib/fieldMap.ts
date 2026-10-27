@@ -19,6 +19,7 @@
  * (`defenseCamera` — [0x14000bc]+0xc 를 세우는 곳 미발견, U-52) **테두리 칠과 +2 비낌은 없다**.
  */
 import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 월드 크기 (I-controls 1b) */
 export const WORLD = { width: 40000, height: 32500 } as const
@@ -44,12 +45,12 @@ export const DOT_OFFSET = { x: 1, y: 4 } as const
 export const MAP_ANCHOR = { x: 0x1e, y: 0x1e } as const
 
 /** 바탕 = game_ui 합성 프레임 9 — 원점 (−29, −28) · 61 × 59 (origins.json, S10 6-1) */
-export const MAP_FRAMES = './sprites/game_ui/frames'
+export const MAP_FRAMES = assetUrl('./sprites/game_ui/frames')
 export const MAP_FRAME = 9
 export const MAP_FRAME_BOX = { x: -29, y: -28, width: 61, height: 59 } as const
 
 /** 주자 점 = game_ui 이미지 21 (13×11, 가운데 노랑인 주황 불빛) — 그림 칸 +0x54 (S10 6-1·6-2) */
-export const DOT_IMAGE = './sprites/game_ui/021.png'
+export const DOT_IMAGE = assetUrl('./sprites/game_ui/021.png')
 export const DOT_SIZE = { width: 13, height: 11 } as const
 
 /**

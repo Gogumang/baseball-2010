@@ -1,5 +1,6 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 마구 공 이펙트 — **공 그림 자리에 겹치는 한 벌** (경기+0x1040).
@@ -35,9 +36,9 @@ import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoad
  */
 
 /** `effect/effect_fire.pzx` — 마구 번호 1 */
-export const EFFECT_FIRE_FRAMES = './sprites/effect_fire/frames'
+export const EFFECT_FIRE_FRAMES = assetUrl('./sprites/effect_fire/frames')
 /** `effect/effect_shinning.pzx` — 마구 번호 4, 폼 묶음 0 */
-export const EFFECT_SHINNING_FRAMES = './sprites/effect_shinning/frames'
+export const EFFECT_SHINNING_FRAMES = assetUrl('./sprites/effect_shinning/frames')
 
 /** `0x3b554 cmp r3,#7 / ble` — 공 경로 번호가 **8 이 되는 틱부터** 그린다 */
 export const MAGIC_BALL_EFFECT_FIRST_PATH_INDEX = 8

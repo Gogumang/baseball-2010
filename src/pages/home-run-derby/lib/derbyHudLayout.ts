@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * 홈런더비 HUD 배치 — 원본 `0x45a54` (**직접 떴다**, 0x45a54~0x45be8).
  *
@@ -34,11 +35,11 @@
 const SCREEN_WIDTH = 240
 
 /** num.pzx 이미지 폴더 */
-const NUM_FOLDER = './sprites/num'
+const NUM_FOLDER = assetUrl('./sprites/num')
 
 /** HUD 판 — trainning.pzx 합성 프레임 2 (83×51, 앵커 (0,0)) 를 (W − 83 − 6, 6) 에 */
 export const HUD_PANEL = {
-  folder: './sprites/trainning/frames',
+  folder: assetUrl('./sprites/trainning/frames'),
   frame: 2,
   width: 83,
   x: SCREEN_WIDTH - 83 - 6,
@@ -145,7 +146,7 @@ export function totalDistanceGlyphsOf(totalDistance: number): HudGlyph[] {
  * 세로는 가장 큰 글자 높이에 맞춰 아래를 가지런히 한다(0xba628).
  */
 export const COMBO_DISPLAY = {
-  folder: './sprites/trainning/frames',
+  folder: assetUrl('./sprites/trainning/frames'),
   /** W·H — 0x14008b8 · 0x14008c8 (타석 캔버스 240×320) */
   screenWidth: 240,
   screenHeight: 320,

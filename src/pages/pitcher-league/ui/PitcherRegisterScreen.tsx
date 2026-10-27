@@ -43,6 +43,7 @@ import type { RegisterBox } from '@/pages/pitcher-league/lib/pitcherRegisterLayo
 import { PitcherBasicInfoCard } from '@/pages/pitcher-league/ui/PitcherBasicInfoCard'
 import { PitcherInfoBoard, PitcherInfoPlate } from '@/pages/pitcher-league/ui/PitcherInfoBoard'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 투수 선수 등록 (나만의리그 상태 **0x66** — 갱신 0x16f28 · 그리기 0x15f34) 과 **기본 변화구 2개 고르기 0x67**
@@ -83,8 +84,8 @@ const PITCH_SHORTAGE_TEXT = ORIGINAL_MODE_TEXT[13] ?? ''
 const CONFIRM_TEXT = ORIGINAL_MODE_TEXT[2] ?? ''
 const NAME_ROW = 0
 
-const MODE_UI = './sprites/mode_ui/frames'
-const SLT_PITCH = './sprites/slt_pitch/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const SLT_PITCH = assetUrl('./sprites/slt_pitch/frames')
 const pad3 = (frame: number) => String(frame).padStart(3, '0')
 /** num 50+숫자 — 8×10 */
 const ROW_DIGIT = { width: 8, height: 10 } as const
@@ -317,7 +318,7 @@ export function PitcherRegisterScreen({
             const d = box.height - ROW_DIGIT.height
             return (
               <img key={number} alt="" className={managementStyles.layer}
-                src={`./sprites/num/${pad3(BREAKING_ROW_NUMBER_BASE + number)}.png`}
+                src={assetUrl(`./sprites/num/${pad3(BREAKING_ROW_NUMBER_BASE + number)}.png`)}
                 style={{ left: box.x + ((box.width - ROW_DIGIT.width) >> 1), top: box.y + Math.trunc(d / 2) + (d % 2) + 1 }} />
             )
           })}

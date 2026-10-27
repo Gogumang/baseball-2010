@@ -14,14 +14,15 @@ import {
   tabMarkTopLeftOf, tabPressRectOf,
 } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import type { PitchTrainingCursor, PitchWindowState } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
-const SLT_PITCH = './sprites/slt_pitch/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const SLT_PITCH = assetUrl('./sprites/slt_pitch/frames')
 /** gpoint 이미지 11 — G 동전 18×18 ([skin+0x9c] = ui/gpoint) 을 박스 3 에 정렬 0x21 · ox 2 (세로 (18 − 18)/2 = 0) */
-const G_COIN = { src: './sprites/gpoint/011.png', x: PITCH_TRAINING_COST_BOX.x + 2, y: PITCH_TRAINING_COST_BOX.y } as const
+const G_COIN = { src: assetUrl('./sprites/gpoint/011.png'), x: PITCH_TRAINING_COST_BOX.x + 2, y: PITCH_TRAINING_COST_BOX.y } as const
 /** num 흰 숫자 0~9 (8×10, "1" 만 4×10) · "/" 101 (10×10) */
-const NUM = './sprites/num'
+const NUM = assetUrl('./sprites/num')
 const WHITE_DIGIT_HEIGHT = 10
 const SLASH_SIZE = 10
 const whiteDigitWidthOf = (digit: number) => (digit === 1 ? 4 : 8)

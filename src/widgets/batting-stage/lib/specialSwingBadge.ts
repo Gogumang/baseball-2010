@@ -2,6 +2,7 @@ import { frameAnimations, placedFrame, sprite } from '@/widgets/batting-stage/li
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { BATTER_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **필살 남은 횟수 표시 `0x38a30`** — 타석 화면 공용 그리기 0x4c4bc 가 소프트키 글자 · 구속 뒤(0x4cace)에 부른다 (2026-10-08 직접 뜸):
@@ -27,7 +28,7 @@ import { BATTER_SIDE, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLay
  * 반복이 아니라 마지막 칸(62)에 멈춘다(0x93e26~0x93e30). 그래서 0xe · 0xf 에 들어선 뒤 그림 k 의 칸은 `칸[min(k, 7)]` 이다.
  */
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
 
 /** game_ui 애니 5 */
 export const SPECIAL_SWING_BADGE_ANIMATION = 5
@@ -111,8 +112,8 @@ export function drawSpecialSwingBadge(
   const frame = frameIndex === null ? null : placedFrame(GAME_UI_FRAMES, frameIndex)
   if (frame !== null) context.drawImage(frame.image, plate.x + frame.offsetX, plate.y + frame.offsetY)
 
-  const images = specialSwingCountImagesOf(remaining).map((index) => sprite(`./sprites/num/${String(index).padStart(3, '0')}.png`))
-  const base = sprite(`./sprites/num/${String(SPECIAL_SWING_COUNT_DIGIT_BASE).padStart(3, '0')}.png`)
+  const images = specialSwingCountImagesOf(remaining).map((index) => sprite(assetUrl(`./sprites/num/${String(index).padStart(3, '0')}.png`)))
+  const base = sprite(assetUrl(`./sprites/num/${String(SPECIAL_SWING_COUNT_DIGIT_BASE).padStart(3, '0')}.png`))
   if (base === null || images.some((image) => image === null)) return
   // 전진은 그림 [기준] 의 폭 + 자간 — 자리마다 제 폭이 아니다 (0x6b02c · 0x6b250)
   const advance = base.width + COUNT_LETTER_SPACING

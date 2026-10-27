@@ -12,10 +12,11 @@ import {
   type ScoreboardSide,
 } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { SceneryOverlay } from '@/widgets/batting-stage/ui/SceneryBackdrop'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const TEAM_LOGO = './sprites/team_logo'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const TEAM_LOGO = assetUrl('./sprites/team_logo')
 const pad = (index: number) => String(index).padStart(3, '0')
 /** PLAYER · COM 글자 팔레트 (0x913e5(img_text, 4)) — 구운 팔레트가 이것이어야 캔버스로 그린다 */
 const SIDE_LABEL_PALETTE = 4

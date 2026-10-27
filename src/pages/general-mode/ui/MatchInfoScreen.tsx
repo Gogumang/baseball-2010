@@ -19,10 +19,11 @@ import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 import { matchInfoValueCellDy } from '@/pages/management/lib/matchInfoEntry'
 import { useMatchInfoEntry } from '@/pages/management/ui/useMatchInfoEntry'
 import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_IMAGE = './sprites/slt_frame'
-const SLT_FRAME = './sprites/slt_frame/frames'
-const IMG_TEXT_FRAME = './sprites/img_text/frames'
+const SLT_IMAGE = assetUrl('./sprites/slt_frame')
+const SLT_FRAME = assetUrl('./sprites/slt_frame/frames')
+const IMG_TEXT_FRAME = assetUrl('./sprites/img_text/frames')
 
 /**
  * 바닥비트 — 그림 0x2e0c4 의 모드 1(일반모드, [메뉴+0x13c] == 1) 갈래 (0x2e128~0x2e15e, 직접 떴다):

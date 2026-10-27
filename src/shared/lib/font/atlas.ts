@@ -1,4 +1,5 @@
 import atlasData from '@/shared/lib/font/fontAtlas.generated.json'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * tools/extract_font.py 가 원본 synGak9_11.ft2 · synGulimAsc5_11.ft2 에서 뽑아낸 아틀라스 정보.
@@ -9,11 +10,11 @@ import atlasData from '@/shared/lib/font/fontAtlas.generated.json'
  * JSON 은 생성물이다 — 손으로 고치지 말고 스크립트를 고쳐라.
  */
 
-/** 한글 벌 글꼴 아틀라스. 한 줄이 한 벌이고 칸은 9x11 이다. */
-export const HANGUL_ATLAS = atlasData.hangul
+/** 한글 벌 글꼴 아틀라스. 한 줄이 한 벌이고 칸은 9x11 이다. 그림 주소는 자산 주소 앞부분(`assetUrl`)을 거친다 (r318). */
+export const HANGUL_ATLAS = { ...atlasData.hangul, atlas: assetUrl(atlasData.hangul.atlas) }
 
 /** 영문 1바이트 글꼴 아틀라스. 0x21~0x7E 94자가 16열로 놓여 있다. */
-export const ASCII_ATLAS = atlasData.ascii
+export const ASCII_ATLAS = { ...atlasData.ascii, atlas: assetUrl(atlasData.ascii.atlas) }
 
 /**
  * 원본이 그릴 수 있는 KS X 1001 완성형 2350자.

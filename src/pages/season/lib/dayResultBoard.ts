@@ -1,6 +1,7 @@
 import type { SeasonDayBoard } from '@/entities/season-mode/model/seasonRecord'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { glyphsWidthOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 경기 뒤 마무리 판 — 장면 0x105 상태 **0xf1** 의 그림 **0xb400** (직접 떴다).
@@ -34,7 +35,7 @@ const box = (x: number, y: number, width: number, height: number): BoardBox => (
 
 /** mode_ui 프레임 69 박스 0~6 (`public/sprites/mode_ui/frames/boxes.json` 의 "069") */
 export const BOARD_FRAME = {
-  folder: './sprites/mode_ui/frames',
+  folder: assetUrl('./sprites/mode_ui/frames'),
   frame: 69,
   /** 박스 0 — 한 줄 판 (높이 56 이 줄 간격) */
   row: box(24, 49, 193, 56),
@@ -107,7 +108,7 @@ export const LOGO_INSET = 2
 
 /** WIN · LOSE — mode_ui **그림** 56 · 57 (`[[this+0xc8]+8]+8` 목록, 0x38·0x39) */
 export const RESULT_IMAGE = {
-  folder: './sprites/mode_ui',
+  folder: assetUrl('./sprites/mode_ui'),
   win: { image: 56, width: 19, height: 9 },
   lose: { image: 57, width: 29, height: 9 },
 } as const

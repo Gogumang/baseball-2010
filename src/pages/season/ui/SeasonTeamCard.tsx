@@ -8,9 +8,10 @@ import { ABILITY_TITLE, RADAR_CENTER, RADAR_RADIUS } from '@/pages/management/li
 import { SEASON_CARD_LOGO } from '@/pages/season/lib/seasonPlayerCard'
 import { SeasonCardBadge, SteppedBoard } from '@/pages/season/ui/SeasonPlayerCard'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const MODE_UI = './sprites/mode_ui/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
 
 /**
  * **시즌 카드 0x7ba44 의 팀 갈래** — 구단정보 0xd5(그림 0xae68) · 이름 입력 0xc8(그림 0xba28) 이 같은 차례로 그린다 (직접 떴다).

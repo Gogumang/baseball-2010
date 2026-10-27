@@ -29,12 +29,13 @@ import {
 import type { PanelFold } from '@/pages/settings/lib/settingsLayout'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_FRAME = './sprites/slt_frame'
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
 /** 값 줄 왼 화살 투명 칸 — 화살(x0 + 91) 앞으로 더 잡는 폭. 칸 끝은 막대 왼끝(x0 + 98) */
 const VALUE_ARROW_TOUCH_PAD = 4
-const IMG_TEXT = './sprites/img_text/frames'
-const POPUP = './sprites/popup/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const POPUP = assetUrl('./sprites/popup/frames')
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 

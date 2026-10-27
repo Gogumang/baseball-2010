@@ -14,8 +14,9 @@ import * as styles from '@/features/play-game/ui/SubstitutionSceneOverlay.css'
 import { DRAW_EFFECT, brightenedImageOf, drawImageWithEffect, effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { drawFrameLayers, frameLayersUrl, placedFrameLayersOf, type FrameLayerListing } from '@/shared/lib/sprite/frameLayers'
 import { spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI = './sprites/game_ui'
+const GAME_UI = assetUrl('./sprites/game_ui')
 const GAME_UI_FRAMES = `${GAME_UI}/frames`
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320

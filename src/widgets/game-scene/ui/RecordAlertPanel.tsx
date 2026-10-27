@@ -5,9 +5,10 @@ import { RECORD_ALERT_ROW_FRAME, RECORD_ALERT_TITLE_FRAME } from '@/widgets/game
 import type { RecordAlertFrame } from '@/widgets/game-scene/lib/recordAlert'
 import * as styles from '@/widgets/game-scene/ui/RecordAlertPanel.css'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 
 /** "!cffff00%s"(0xd09b4) · "!cffffff%s"(0xd09a8) */
 const HIGHLIGHT_COLOR = '#FFFF00'

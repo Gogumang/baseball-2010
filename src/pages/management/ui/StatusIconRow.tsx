@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import { STATUS_BOXES, STATUS_ICON_STEP } from '@/pages/management/lib/managementLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 상태 아이콘 줄 — 상태판 0x7d34c 끝(0x7dd46~0x7df92). 타자편(모드 4)·투수편(모드 3)이 같은 코드를 탄다.
@@ -76,7 +77,7 @@ export function eagleEyeDigitsOf(count: number, box: { x: number; y: number; wid
   })
 }
 
-const iconImageOf = (frame: number) => `./sprites/mode_ui/frames/${String(frame).padStart(3, '0')}.png`
+const iconImageOf = (frame: number) => assetUrl(`./sprites/mode_ui/frames/${String(frame).padStart(3, '0')}.png`)
 
 interface StatusIconRowProps {
   readonly state: StatusIconState
@@ -96,7 +97,7 @@ export function StatusIconRow({ state, originX = 0, originY = 0 }: StatusIconRow
           <Fragment key={frame}>
             <img className={styles.layer} src={iconImageOf(frame)} alt="" style={{ left: slot.x, top: slot.y }} />
             {frame === EAGLE_EYE_FRAME && eagleEyeDigitsOf(state.eagleEyeGamesRemaining, slot).map((digit, digitIndex) => (
-              <img key={digitIndex} className={styles.layer} src={`./sprites/num/${String(digit.frame).padStart(3, '0')}.png`}
+              <img key={digitIndex} className={styles.layer} src={assetUrl(`./sprites/num/${String(digit.frame).padStart(3, '0')}.png`)}
                 alt="" style={{ left: digit.left, top: digit.top }} />
             ))}
           </Fragment>

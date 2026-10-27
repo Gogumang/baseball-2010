@@ -14,9 +14,10 @@ import {
 } from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
 import type { RegisterBox } from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const pad3 = (frame: number) => String(frame).padStart(3, '0')
 
 /** 0xb9d74 프레임 맞춤 — 0x2 가로 가운데(내림) · 0x4 오른쪽 · 0x20 세로 가운데(올림), 그 뒤 ox */

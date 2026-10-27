@@ -14,8 +14,9 @@ import { TEAM_INFO_LEFT_ROWS } from '@/pages/season/lib/seasonTeamInfo'
 import type { TeamInfoRow } from '@/pages/season/lib/seasonTeamInfo'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
 
 /** mode_ui 프레임 3 박스 — 판 (21,176,197,83) · 이름표 1 (30,·,25) · 값 2 (60,·,81) · 이름표 3 (147,·,25) · 값 4 (176,·,32) */

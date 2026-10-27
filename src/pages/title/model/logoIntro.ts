@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * **켤 때 로고 화면** — 장면 0x103 하위 2. 갱신 0x28784 가 로고 객체(0x67989 로 만들고 [this+0x11c] 에 둔다, 진입 0x258c0)의
  * 갱신 `0x69401` 을 부르고, 그 답이 1 이면 하위 3(타이틀)으로 간다. 그리기 0x246b8 은 그 객체의 vtable+0x48 = `0x68c19` 하나다.
@@ -30,7 +31,7 @@
  */
 
 /** 로고 그림 경로 — 합성 프레임 0(빈 말풍선) · 1(칠한 말풍선) · 2(GAMEVIL) */
-export const LOGO_FRAMES = './sprites/logo/frames'
+export const LOGO_FRAMES = assetUrl('./sprites/logo/frames')
 
 /** 프레임 1 높이 — 상태 1 의 문턱(높이 + 10)과 자르개 높이가 쓴다 */
 export const LOGO_REVEAL_FRAME_HEIGHT = 118

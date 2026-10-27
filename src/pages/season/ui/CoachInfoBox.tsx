@@ -2,9 +2,10 @@ import { useMemo } from 'react'
 import { FrameSprite, MarkupText, PaintedRects } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { COACH_INFO_BOX, coachInfoBoxPaintsOf, coachInfoTextOf } from '@/pages/season/lib/coachInfoBox'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 /** 코치채용 정보 상자 (0xaa6c~0xad78) — 배치 · 글은 `lib/coachInfoBox` 머리말 */
 export function CoachInfoBox({ slot }: { readonly slot: number }) {

@@ -7,6 +7,7 @@ import {
 } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import type { HudGlyph } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyHud.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface DerbyHudProps {
   readonly run: DerbyRun
@@ -96,7 +97,7 @@ export function DerbyHud({
               key={index}
               className={styles.sprite}
               style={{ left: digit.left, top: digit.top }}
-              src={spriteSrcOf('./sprites/num', digit.frame)}
+              src={spriteSrcOf(assetUrl('./sprites/num'), digit.frame)}
               alt=""
               data-testid="콤보숫자"
             />

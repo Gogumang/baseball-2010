@@ -27,9 +27,10 @@ import type { CreatePlayerRowId, InfoCellId } from '@/pages/create-player/lib/cr
 import { nameWithoutLastChar, registerKeyOf, registerKeyOutcomeOf } from '@/pages/create-player/lib/registerKeys'
 import type { RegisterKey } from '@/pages/create-player/lib/registerKeys'
 import * as styles from '@/pages/create-player/ui/CreatePlayerScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 /** 누름 칸이 보내는 키 — 키 처리(window 듣개, 0x16f28 꼴)가 그대로 받는다 */
 const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))

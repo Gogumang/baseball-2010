@@ -42,10 +42,11 @@ import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 import { RECORD_COUNT_KINDS, achievementMarkOf, annalsSkillOfCell, isAnnalsSkillGained, recordCountOf } from '@/entities/collection/model/annalsStats'
 import * as styles from '@/pages/record/ui/RecordAnnals.css'
 import { ANNALS_SECRET_PAGES_UNLOCK_ID, isUnlocked } from '@/shared/config/unlocks'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_FRAME = './sprites/slt_frame'
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
 const SLT_FRAMES = `${SLT_FRAME}/frames`
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 

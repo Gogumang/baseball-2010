@@ -3,11 +3,13 @@ import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
 import { spriteJsonBundle } from './tools/viteSpriteJsonBundle.ts'
+import { versionedAssets } from './tools/viteVersionedAssets.ts'
 
 export default defineConfig({
   base: './',
   // 스프라이트 JSON 265개를 한 파일로 — `sprites/sprite-json.bundle.json` (r311 A5, `shared/lib/sprite/spriteJsonBundle`)
-  plugins: [react(), vanillaExtractPlugin(), spriteJsonBundle()],
+  // 빌드 산출물의 `public/` 을 `v/<내용 해시>/` 로 — 호스트가 오래 캐시해도 배포 뒤 옛 그림이 안 섞인다 (r318 A2, `shared/lib/assetUrl`)
+  plugins: [react(), vanillaExtractPlugin(), spriteJsonBundle(), versionedAssets()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

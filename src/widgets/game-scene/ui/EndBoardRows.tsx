@@ -10,10 +10,11 @@ import {
   pitcherRowTopOf,
 } from '@/widgets/game-scene/lib/endBoardLayout'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const NUM_IMAGES = './sprites/num'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const NUM_IMAGES = assetUrl('./sprites/num')
 const frameSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 
 interface EndBoardRowsProps {

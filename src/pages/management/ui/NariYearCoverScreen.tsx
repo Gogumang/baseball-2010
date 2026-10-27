@@ -12,9 +12,10 @@ import {
 } from '@/pages/management/lib/nariYearCover'
 import type { YearCoverStep } from '@/pages/management/lib/nariYearCover'
 import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const NUM_IMAGES = './sprites/num'
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const NUM_IMAGES = assetUrl('./sprites/num')
 
 interface NariYearCoverScreenProps {
   /** S+0xb3 — 새 시즌 0x1b768 이 1 올린 뒤의 연차 idx (표지는 idx 에서 idx + 1 로 숫자를 굴린다) */

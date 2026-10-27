@@ -41,9 +41,10 @@ import { DefensePlayerEffect } from '@/pages/defense/ui/DefensePlayerEffect'
 import { DefenseLaserTrail } from '@/pages/defense/ui/DefenseLaserTrail'
 import { playerEffectMarksOf } from '@/pages/defense/lib/playerEffectMarks'
 import { zoomSourceRect } from '@/features/defense-play/model/laserPresentation'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 판정 글자 그림 (game_judge.pzx, 게임+0x101c) */
-const JUDGE_FRAMES = './sprites/game_judge/frames'
+const JUDGE_FRAMES = assetUrl('./sprites/game_judge/frames')
 /** 0x46844 의 큰 OUT 은 자리에서 60 위 (468e2 `subs r3, #0x3c`) */
 const BIG_OUT_RAISE = 60
 /** 0x46844 의 보통 판정 글자는 자리에서 30 위 (468c8 `subs r2, #0x1e`) */

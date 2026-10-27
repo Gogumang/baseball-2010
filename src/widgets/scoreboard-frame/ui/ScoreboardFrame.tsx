@@ -5,10 +5,11 @@ import {
 } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import * as styles from '@/widgets/scoreboard-frame/ui/ScoreboardFrame.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const TEAM_LOGO = './sprites/team_logo'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const TEAM_LOGO = assetUrl('./sprites/team_logo')
 
 export interface ScoreboardFrameProps {
   /** 0x41440 의 x · y — 틀 프레임 16 의 원점 */

@@ -4,12 +4,17 @@ import { BootShell } from '@/app/ui/BootShell'
 import { ViewportShell } from '@/app/ui/ViewportShell'
 import { installAppKeyGate } from '@/shared/lib/sceneKeyLatch/appKeyGate'
 import { preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreen'
+import { installStaleBuildReload } from '@/shared/lib/staleBuild/staleBuild'
 import './styles/global.css'
 
 const container = document.getElementById('root')
 if (container === null) {
   throw new Error('#root 엘리먼트를 찾을 수 없습니다')
 }
+
+// 새 배포 뒤 열려 있던 탭 — 옛 코드 조각 404(`vite:preloadError`) · 새 배포를 저장된 자리(켤 때 길 · 메인 메뉴)에서 다시 불러 맞춘다 (r318).
+// 문서 확인은 배포 꼴 빌드에서만 (개발 서버는 배포 판이 없다)
+installStaleBuildReload(window, { checkDocument: !import.meta.env.DEV })
 
 // 앱 키 문 — 화면들보다 먼저 단다(잡기 단계 맨 앞). 받은 키는 다음 앱 틱에 화면 · 창에 간다(0xbca05 받은 칸)
 installAppKeyGate(window)

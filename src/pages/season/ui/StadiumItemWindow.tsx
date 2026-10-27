@@ -14,9 +14,10 @@ import {
   STADIUM_COLORS, STADIUM_WINDOW, stadiumItemDescriptionOf, stadiumKindBoxOf, stadiumPriceTenThousandsOf, stadiumRowLookOf,
   stadiumRowNameOf, stadiumSlotCountOf,
 } from '@/pages/season/lib/stadiumItemWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const imageOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 const pixel = { position: 'absolute', pointerEvents: 'none' } as const
 /** 글상자 0x6ecd0 의 앱 전역 글꼴 줄 — 11 + 줄간 3 */

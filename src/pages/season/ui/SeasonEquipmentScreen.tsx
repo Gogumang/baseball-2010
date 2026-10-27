@@ -26,10 +26,11 @@ import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
-const NUM = './sprites/num'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
 const imageOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 const pixel = { position: 'absolute', pointerEvents: 'none' } as const
 /** num "+" 105 크기 */

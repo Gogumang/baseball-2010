@@ -16,12 +16,13 @@ import {
 } from '@/widgets/ace-level-up/lib/aceLevelUpLayout'
 import type { AceLevelUpGlyph } from '@/widgets/ace-level-up/lib/aceLevelUpLayout'
 import * as styles from '@/widgets/ace-level-up/ui/AceLevelUpWindow.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const SLT_FRAME = './sprites/slt_frame/frames'
-const SLT_IMAGE = './sprites/slt_frame'
-const POPUP = './sprites/popup/frames'
-const NUM = './sprites/num'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const SLT_FRAME = assetUrl('./sprites/slt_frame/frames')
+const SLT_IMAGE = assetUrl('./sprites/slt_frame')
+const POPUP = assetUrl('./sprites/popup/frames')
+const NUM = assetUrl('./sprites/num')
 const pad = (frame: number) => String(frame).padStart(3, '0')
 
 /** 마투수/마타자 구분 — 창 그리기 0x5f4be `cmp idx,#4; bgt` (칸 0~4 마투수) */

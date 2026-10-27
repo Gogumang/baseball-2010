@@ -1,6 +1,7 @@
 import type { BurstJudgement } from '@/entities/burst-mission/model/burstMissionJudge'
 import { BURST_TEXT_LINE } from '@/entities/burst-mission/model/burstMissionJudge'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 돌발미션 창 — 경기 장면 **상태 0x1b**(갱신 0x3b014 → 0x8e5b8 · 그리기 0x4a198 → 0x8f3c0, r126 직접 떴다).
@@ -134,7 +135,7 @@ export function burstTextBoxOf(height: number) {
 }
 
 /** 넘김 표시 — game_ui 이미지 0x34 (0x8eaf4 · 0x8eb0a~0x8eb20) */
-export const BURST_NEXT_MARK_IMAGE = './sprites/game_ui/052.png'
+export const BURST_NEXT_MARK_IMAGE = assetUrl('./sprites/game_ui/052.png')
 export function burstNextMarkAt(ticks: number) {
   return {
     x: BURST_SCREEN.width - 0xf,

@@ -18,12 +18,13 @@
  * 파일 끝에 **투수 장비 레이어**(0x79790 적재 · 0x79524 겹치기)도 같이 있다 — 같은
  * `BatterLayer`·`layerPaletteIndexOf` 를 쓰기 때문이다. 두 쪽 차이는 `PitcherEquipment` 주석 참고.
  */
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 import { outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
 import type { RecolorRequest } from '@/shared/lib/sprite/paletteSwap'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import { PITCHER_OVERLAY_FRAME_OFFSET } from '@/widgets/batting-stage/lib/stageScenery'
 
-const SPRITES = './sprites'
+const SPRITES = assetUrl('./sprites')
 const BODY_FOLDERS = [`${SPRITES}/batter_balancer/frames`, `${SPRITES}/batter_sluger/frames`]
 const SHADOW = `${SPRITES}/batter_shadow/frames`
 const HELMET = `${SPRITES}/batter_helmet/frames`

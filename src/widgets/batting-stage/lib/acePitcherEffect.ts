@@ -1,6 +1,7 @@
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **마투수(마선수 투수) 이펙트** — 투수 앵커에 겹치는 두 가지 (r112 직접 뜸).
@@ -53,15 +54,15 @@ import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoad
  */
 
 /** effect_pitcher.pzx (+0x1044) */
-export const EFFECT_PITCHER_FRAMES = './sprites/effect_pitcher/frames'
+export const EFFECT_PITCHER_FRAMES = assetUrl('./sprites/effect_pitcher/frames')
 
 /** 마투수 순번 0xb63a1 → 적재 0x47cc8 이 +0x1038 에 싣는 그림 (점프표 0xd01bc) */
 const ACE_EFFECT_FOLDERS = [
-  './sprites/psyker_effect',
-  './sprites/leony_effect',
-  './sprites/bbmachine_effect',
-  './sprites/ballantine_effect',
-  './sprites/dragona_effect',
+  assetUrl('./sprites/psyker_effect'),
+  assetUrl('./sprites/leony_effect'),
+  assetUrl('./sprites/bbmachine_effect'),
+  assetUrl('./sprites/ballantine_effect'),
+  assetUrl('./sprites/dragona_effect'),
 ] as const
 
 const PSYKER_NUMBER = 5
@@ -170,7 +171,7 @@ export function aceMagicScaledOriginOf(
 }
 
 /** leony_effect 프레임 폴더 (0x67 겹이 있다 — `FRAME_LAYER_FOLDERS`) */
-export const LEONY_EFFECT_FRAMES = './sprites/leony_effect/frames'
+export const LEONY_EFFECT_FRAMES = assetUrl('./sprites/leony_effect/frames')
 /** [0xcfa8c+8] — 투수 깊이 24500. 레오니 그림은 이것 −1(투수 뒤) · +1(투수 앞)로 넣는다 */
 const LEONY_BASE_DEPTH = 24500
 

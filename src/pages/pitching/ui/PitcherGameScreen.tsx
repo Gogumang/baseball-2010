@@ -123,6 +123,7 @@ import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 나만의리그 **투수편**(원본 모드 3) 경기 화면.
@@ -1264,7 +1265,7 @@ const GIVE_UP_CONFIRM_TEXT = '!C그만 던지시겠습니까?'
 
 /** 장면 판 전체 — 0xe 의 OK 누름 칸 */
 /** 작은 팀 로고 (team_logo_ini) — 팀 경기 HUD 와 같은 그림 */
-const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
+const smallLogoUrlOf = (teamId: number) => assetUrl(`./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`)
 
 /**
  * 타석에 선 상대 타자의 그림 재료 — 폼 `rec[0xb] >> 4`(몸통 · 자세 · 손) · 피부 `(rec[0xb] >> 2) & 3` · 팀(헬멧 · 몸통 벌).

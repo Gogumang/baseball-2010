@@ -11,8 +11,9 @@ import type { SeasonOutingPresentation } from '@/pages/season/lib/seasonOutingPo
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const WINDOW_FOLDER = './sprites/mode_back/frames'
+const WINDOW_FOLDER = assetUrl('./sprites/mode_back/frames')
 const { x: RX, y: RY, width: RW, height: RH, d: D } = OUTING_PANEL
 /** 연출 기준점 ((R.x + R.w) / 2, R.y + R.h + d) = (120, 196) */
 const ANCHOR = { x: (RX + RW) >> 1, y: RY + RH + D }

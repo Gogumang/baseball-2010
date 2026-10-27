@@ -12,6 +12,7 @@ import * as styles from '@/widgets/loading-tip/ui/LoadingTip.css'
 import {
   LOADING_BAR, LOADING_FILL_STRIPES, loadingFillWidthOf, loadingRunnerAnchorOf, tipNumberGlyphsOf,
 } from '@/widgets/loading-tip/lib/loadingTipLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const rgbOf = ([red, green, blue]: readonly number[]) => `rgb(${red}, ${green}, ${blue})`
 
@@ -37,8 +38,8 @@ const rgbOf = ([red, green, blue]: readonly number[]) => `rgb(${red}, ${green}, 
  * 0x41230 을 안 부르고(52f28~52f32), 그리기 표 0xd05a0 은 상태 9 만 0x3e328(= 판 그리기 0x53e04)이다 — 이것도 52efe 게이트 안이다. 그래서 이 판도 경기 장면으로 센다(`useMarksGameScene` — 창이 줄임
  * 없이 닫히고 [창+0x24f]) 진행은 경기 장면 시계로 잰다. 쓰는 곳은 나리 타자편 · 팀 경기(일반 · 시즌 · 대전) · 나리 투수편 · 미션 · 더비다(시즌 0x105 의 0x75fc 판은 웹에 없다).
  */
-const FOLDER = './sprites/loadingbar/frames'
-const NUM_FOLDER = './sprites/num'
+const FOLDER = assetUrl('./sprites/loadingbar/frames')
+const NUM_FOLDER = assetUrl('./sprites/num')
 const RUNNER_ANIMATION = 0
 /** 진행 칸 끝 — 0x39f88 의 0x24 (모드 4 가 아닌 모든 경기 장면: 팀 경기 일반 · 시즌 · 대전 · 나리 투수편 · 미션 · 마선수 대결 · 홈런더비) */
 export const LOADING_STEPS_DEFAULT = 0x24

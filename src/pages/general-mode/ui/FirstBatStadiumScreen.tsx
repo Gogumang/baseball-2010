@@ -15,11 +15,12 @@ import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter, stadiumInfoOf } fro
 import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_IMAGE = './sprites/slt_frame'
-const GAME_UI_FRAME = './sprites/game_ui/frames'
-const IMG_TEXT_FRAME = './sprites/img_text/frames'
-const STADIUM_SYMBOL = './sprites/stadium_symbol'
+const SLT_IMAGE = assetUrl('./sprites/slt_frame')
+const GAME_UI_FRAME = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAME = assetUrl('./sprites/img_text/frames')
+const STADIUM_SYMBOL = assetUrl('./sprites/stadium_symbol')
 
 /** 화면 폭의 반 — 가운데 맞춤 글을 (가운데 − 120, 폭 240) 상자에 둔다 */
 const SCREEN_HALF_WIDTH = 120

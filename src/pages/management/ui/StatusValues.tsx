@@ -13,8 +13,9 @@ import {
   HELPLESSNESS_SKILL_ID, LUCK_SKILL_ID, StatusIconRow, statusIconFramesFrom,
 } from '@/pages/management/ui/StatusIconRow'
 import type { StatusIconState } from '@/pages/management/ui/StatusIconRow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const LABEL_HEIGHT = 10
 /** 값 숫자는 박스 오른쪽 끝에서 2px 안쪽 */
 const VALUE_INSET = 2
@@ -86,12 +87,12 @@ export function MessageLineText({ year, game, box }: { readonly year: number; re
   const layout = messageLineLayoutOf(game, box)
   return (
     <>
-      <img className={styles.layer} src="./sprites/management/label_yellow_335.png" alt="" style={{ left: layout.gameLabelLeft, top: layout.labelTop }} />
+      <img className={styles.layer} src={assetUrl("./sprites/management/label_yellow_335.png")} alt="" style={{ left: layout.gameLabelLeft, top: layout.labelTop }} />
       <SpriteNumber glyphs={numberGlyphsOf(GAMES_PER_SEASON)} right={layout.totalRight} boxTop={box.y} boxHeight={box.height} />
-      <img className={styles.layer} src={`./sprites/num/${String(SLASH_FRAME).padStart(3, '0')}.png`} alt=""
+      <img className={styles.layer} src={assetUrl(`./sprites/num/${String(SLASH_FRAME).padStart(3, '0')}.png`)} alt=""
         style={{ left: layout.slashLeft, top: layout.slashTop }} />
       <SpriteNumber glyphs={numberGlyphsOf(game)} right={layout.gameRight} boxTop={box.y} boxHeight={box.height} />
-      <img className={styles.layer} src="./sprites/management/label_yellow_334.png" alt="" style={{ left: layout.yearLabelLeft, top: layout.labelTop }} />
+      <img className={styles.layer} src={assetUrl("./sprites/management/label_yellow_334.png")} alt="" style={{ left: layout.yearLabelLeft, top: layout.labelTop }} />
       <SpriteNumber glyphs={numberGlyphsOf(year)} right={layout.yearRight} boxTop={box.y} boxHeight={box.height} />
     </>
   )

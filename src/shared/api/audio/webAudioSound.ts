@@ -1,5 +1,6 @@
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { soundFileUrl } from '@/shared/config/original/sounds'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * WebAudio 로 `public/sounds/%03d.mp3` 를 트는 포트 구현.
@@ -52,7 +53,7 @@ const clampVolume = (volume: number): number => {
 }
 
 export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPort {
-  const baseUrl = options.baseUrl ?? 'sounds'
+  const baseUrl = options.baseUrl ?? assetUrl('sounds')
   const createContext = options.createContext ?? defaultCreateContext
   const fetchAudio = options.fetchAudio ?? defaultFetchAudio
 

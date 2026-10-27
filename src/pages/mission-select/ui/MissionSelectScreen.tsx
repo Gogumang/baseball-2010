@@ -23,9 +23,10 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as styles from '@/pages/mission-select/ui/MissionSelectScreen.css'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 import { isUnlocked, missionUnlockIdOf } from '@/shared/config/unlocks'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_FRAME = './sprites/slt_frame'
-const IMG_TEXT = './sprites/img_text/frames'
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 /** StrMAINMENU[60] — 잠긴 칸 OK (0x1db84~0x1dba4: 0x74ef5(…, 종류 1)) */
 const LOCKED_MISSION_TEXT = ORIGINAL_MAIN_MENU_TEXT[60] ?? ''

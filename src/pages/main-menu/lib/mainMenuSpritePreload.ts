@@ -7,8 +7,9 @@
  */
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import { MENU_REEL_ITEM_FRAMES, MENU_WHEEL_ITEM_FRAMES, menuReelFrameListOf } from '@/pages/main-menu/lib/mainMenuLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 
 /** 메인 메뉴 글자 — 바퀴 칸(본 글자) · 릴 칸(본 글자 + 그림자 마스크) · 하위 목록 판 제목(마스크) */
 export function mainMenuSpritePreloads(): SpriteFolderPreload[] {

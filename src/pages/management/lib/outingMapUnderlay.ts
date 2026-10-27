@@ -3,6 +3,7 @@ import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
 import { frameComposeOps, type ComposeImageOp, type ComposeOp } from '@/shared/lib/pixelEffect/screenCompose'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { backgroundFrameOf } from '@/pages/management/lib/managementLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 외출 지도 0x7ea64 를 고른 칸 −1 · 이름숨김 0 으로 부를 때(이벤트 대화창 0x8b5ac 의 지도 갈래)의 자리 — 직접 떴다.
@@ -58,7 +59,7 @@ export function outingMapUnderlayLayoutOf(hour: number): OutingMapUnderlayLayout
 }
 
 /** 이름 그림 — img_text 229~233 에 8방향 1px 테두리를 둘러 구운 것 */
-export const mapLabelSrc = (frame: number) => `./sprites/management/map_label_${frame}.png`
+export const mapLabelSrc = (frame: number) => assetUrl(`./sprites/management/map_label_${frame}.png`)
 
 /** 고르지 않은 건물 — 효과 1 · 인자 7 (0x7eb0a~0x7eb4a, R6 3a) */
 export const UNSELECTED_PLACE_LEVEL = 7

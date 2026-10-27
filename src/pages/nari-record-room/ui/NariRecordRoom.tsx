@@ -22,8 +22,9 @@ import {
 import type {
   NariRecordEdition, RecordRoomPick, YearCellNumber, YearRecordKey, YearRecordView,
 } from '@/pages/nari-record-room/lib/nariRecordRoom'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
 const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
 
@@ -96,9 +97,9 @@ export function NariRecordPickPopup({ onChoose, onCancel, onClosed }: NariRecord
   )
 }
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const SLT_FRAME = './sprites/slt_frame'
-const NUM = './sprites/num'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
+const NUM = assetUrl('./sprites/num')
 const imageOf = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 /** game_ui 프레임 — 번호 칸 0x1b(25×15) · 넘기는 칸 0x23(36×15) */
 const NUMBER_CELL_FRAME = 0x1b
