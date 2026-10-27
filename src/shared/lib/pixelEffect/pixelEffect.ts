@@ -114,8 +114,10 @@ export function translucentPixel565(level: number, source: number, screen: numbe
 /**
  * DOM 겹치기용 효과 1 무게 — 그림 L/16.
  * ⚠️ 근사(남김 — 웹 DOM 한계): CSS opacity 는 화면 픽셀을 모르는 채 8비트로 섞어 마스크 내림 · 565 양자화를 못 따른다(캔버스면 `drawImageWithEffect`).
- * 아래 화면을 그 장면이 다 그리는 자리(외출 지도)는 RGB565 버퍼 합성(`screenCompose` · `ComposedScreen`)으로 원본 식 그대로 그린다 —
- * 남은 DOM 자리는 아래가 다른 겹(경기 · 수비 화면 · 공 무늬 바탕)이라 읽을 수 없는 곳이다.
+ * 아래 화면을 그 장면이 다 그리는 자리(외출 지도)는 RGB565 버퍼 합성(`screenCompose` · `ComposedScreen`)으로 원본 식 그대로 그린다.
+ * r301 — 아래 겹을 같은 좌표로 다시 그릴 수 있는 자리도 옮겼다: 카드 로고(공 무늬 + 판, `BallPatternTranslucentImage`) · 중계 속도판
+ * (운동장, `ComposedOverlay`) · 미션 띠(타석 캔버스 `missionStrips`) · 인트로(배경 캔버스 `introCanvasOverlayOf`).
+ * 남은 DOM 자리는 아래가 바뀌는 여러 겹(수비 화면 야수 · 공, 창 뒤 장면 전체)이라 다시 그릴 수 없는 곳이다(`fieldMap` · `popupDim` 머리).
  */
 export const translucentOpacityOf = (level: number) => (isTranslucentLevelDrawn(level) ? level / 16 : 0)
 

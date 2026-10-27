@@ -134,7 +134,9 @@ export function scoreboardPlacementOf(x: number, y: number, sides: readonly [Sco
 
 /**
  * 효과 1 · 인자 L 의 그림 불투명도 — L/16, 0 이나 16 이상이면 0 (안 그린다). 효과 0 이면 1.
- * ⚠️ 근사(남김 — 웹 DOM 한계): DOM 겹치기라 아래 화면 픽셀을 못 읽는다 — 공용 `translucentOpacityOf` 머리(마스크 내림 · 565 를 못 따른다)
+ * ⚠️ 근사(남김 — 웹 DOM 한계): DOM 겹치기라 아래 화면 픽셀을 못 읽는다 — 공용 `translucentOpacityOf` 머리(마스크 내림 · 565 를 못 따른다).
+ * 인트로(효과 1 이 실제로 서는 유일한 자리)는 r301(Q-03)부터 배경 캔버스에 원본 식으로 그린다(`introCanvasOverlayOf`) — 이 값은 그
+ * 캔버스를 못 쓸 때(그림 받는 중 · jsdom)의 근사다
  */
 export function effectOpacityOf(effectLevel: number | null): number {
   if (effectLevel === null) return 1

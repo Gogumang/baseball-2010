@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { FrameSprite, MessageBox, PressArea } from '@/shared/ui'
+import { ComposedOverlay, FrameSprite, MessageBox, PressArea } from '@/shared/ui'
+import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
+import { frameComposeOps, type ComposeImageOp, type ComposeOp } from '@/shared/lib/pixelEffect/screenCompose'
+import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
+import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
+import { relayFieldBackgroundAt } from '@/pages/auto-play-relay/lib/relayFieldBackground'
 import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { activeSound } from '@/shared/api/audio/soundPort'
@@ -157,6 +162,8 @@ export function TeamAutoRelay({
   const audio = activeSound()
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
+  /** 배경 운동장 — `AutoPlayRelayScreen` 과 같은 칠한 그림(같은 캐시) */
+  const fieldUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
 
   // 진입 0x3abf0 — v ≠ 2 면 배경음 33
   useEffect(() => {
@@ -252,6 +259,24 @@ export function TeamAutoRelay({
   const label = textOrigins?.[String(SPEED_LABEL_FRAME).padStart(3, '0')]
   const labelWidth = label?.width ?? 0
   const marksX = SCREEN_WIDTH / 2 - Math.trunc((3 * ARROW_SIZE.width + 3) / 2)
+  /**
+   * 속도 칸 바탕(효과 1, 0xc) · 꺼진 세모(효과 1, 6) 아래는 0x41230 이 깐 수비 운동장뿐이다 — 운동장 그림(투수 발 y 190 · 타자 머리
+   * y ≥ 238 이고 x 가 세모 줄 밖 · 주자 x 33 · 207 · 포수 y ≥ 250)도 중계 칸(y < 214)도 이 사각형에 안 닿는다. 그래서 운동장 두 장
+   * (`AutoPlayRelayScreen` 의 왼쪽 · 뒤집은 오른쪽)을 같은 좌표로 다시 그려 원본 식으로 섞는다(Q-03 r301, `ComposedOverlay`)
+   */
+  const fieldAt = relayFieldBackgroundAt()
+  const fieldUnderOps: readonly ComposeOp[] = [
+    { kind: 'image', src: fieldUrl, x: fieldAt.x, y: fieldAt.y },
+    { kind: 'image', src: fieldUrl, x: fieldAt.mirroredX, y: fieldAt.y, flipX: true },
+  ]
+  const plateX = SCREEN_WIDTH / 2 - Math.trunc((plate?.width ?? 0) / 2)
+  const plateOps = frameComposeOps(GAME_UI_FRAMES, SPEED_PLATE_FRAME, gameUiOrigins, plateX, SPEED_PLATE_Y,
+    DRAW_EFFECT.TRANSLUCENT, SPEED_PLATE_EFFECT_LEVEL)
+  const markSrc = `${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`
+  const dimMarkOps: readonly ComposeImageOp[] = [0, 1, 2].map((index) => ({
+    kind: 'image', src: markSrc, x: marksX + index * (ARROW_SIZE.width + 1), y: SPEED_MARKS_Y,
+    effect: DRAW_EFFECT.TRANSLUCENT, argument: SPEED_MARK_DIM_EFFECT_LEVEL,
+  }))
   const overlay = (
     <>
       {/* 모드 ∈ {1,2,8,9} 면 속도와 상관없이 (42ab2 · 42bbe) */}
@@ -260,9 +285,13 @@ export function TeamAutoRelay({
           <FrameSprite folder={GAME_UI_FRAMES} frame={GUIDE_FRAME} origins={gameUiOrigins}
             x={SCREEN_WIDTH / 2 - Math.trunc(guide.width / 2)} y={SCREEN_HEIGHT - guide.height - 1} />
         )}
-        {plate !== undefined && (
-          <FrameSprite folder={GAME_UI_FRAMES} frame={SPEED_PLATE_FRAME} origins={gameUiOrigins}
-            x={SCREEN_WIDTH / 2 - Math.trunc(plate.width / 2)} y={SPEED_PLATE_Y} style={{ opacity: effectOpacityOf(SPEED_PLATE_EFFECT_LEVEL) }} />
+        {plate !== undefined && plateOps[0] !== undefined && (
+          <ComposedOverlay testId="중계-속도칸" rect={{ x: plateOps[0].x, y: plateOps[0].y, width: plate.width, height: plate.height }}
+            underOps={fieldUnderOps} ops={plateOps}
+            fallback={
+              <FrameSprite folder={GAME_UI_FRAMES} frame={SPEED_PLATE_FRAME} origins={gameUiOrigins}
+                x={plateX} y={SPEED_PLATE_Y} style={{ opacity: effectOpacityOf(SPEED_PLATE_EFFECT_LEVEL) }} />
+            } />
         )}
         {label !== undefined && (
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={SPEED_LABEL_FRAME} origins={textOrigins}
@@ -290,10 +319,15 @@ export function TeamAutoRelay({
             )}
           </>
         )}
-        {[0, 1, 2].map((index) => (
-          <img key={index} alt="" data-lit={index <= speed}
-            src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
-            style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y, { opacity: index <= speed ? 1 : effectOpacityOf(SPEED_MARK_DIM_EFFECT_LEVEL) })} />
+        {/* 42e7c~42efa — 세 개를 효과 (1, 6) 으로 깐 뒤 i ≤ v 만 효과 0 으로 한 번 더 */}
+        <ComposedOverlay testId="중계-속도세모" rect={{ x: marksX, y: SPEED_MARKS_Y, width: 3 * ARROW_SIZE.width + 2, height: ARROW_SIZE.height }}
+          underOps={fieldUnderOps} ops={dimMarkOps}
+          fallback={[0, 1, 2].filter((index) => index > speed).map((index) => (
+            <img key={index} alt="" src={markSrc}
+              style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y, { opacity: effectOpacityOf(SPEED_MARK_DIM_EFFECT_LEVEL) })} />
+          ))} />
+        {[0, 1, 2].filter((index) => index <= speed).map((index) => (
+          <img key={index} alt="" data-lit src={markSrc} style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y)} />
         ))}
       </div>
       {isChangeShown && (

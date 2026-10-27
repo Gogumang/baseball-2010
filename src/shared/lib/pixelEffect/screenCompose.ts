@@ -26,6 +26,8 @@ export interface ComposeImageOp {
   readonly y: number
   readonly effect?: number
   readonly argument?: number
+  /** 좌우 뒤집어 그린다 (효과 0x11 · CSS `scaleX(-1)` 겹) — 칸 (x + c) 에 그림 열 (w − 1 − c) */
+  readonly flipX?: boolean
 }
 
 /**
@@ -83,6 +85,8 @@ export function drawSprite565(
   y: number,
   effect: number = DRAW_EFFECT.COPY,
   argument = 0,
+  flipX = false,
+  touched: Uint8Array | null = null,
 ): void {
   if (effect === DRAW_EFFECT.JITTER || !isEffectDrawn(effect, argument)) return
   const left = Math.floor(x)
@@ -93,10 +97,11 @@ export function drawSprite565(
     for (let column = 0; column < sprite.width; column += 1) {
       const sx = left + column
       if (sx < 0 || sx >= width) continue
-      const from = row * sprite.width + column
+      const from = row * sprite.width + (flipX ? sprite.width - 1 - column : column)
       if (sprite.opaque[from] === 0) continue
       const at = sy * width + sx
       screen[at] = effectPixel565(effect, argument, sprite.pixels[from], screen[at])
+      if (touched !== null) touched[at] = 1
     }
   }
 }
@@ -140,16 +145,51 @@ export function composeScreen565(
       missing = true
       continue
     }
-    drawSprite565(pixels, width, height, sprite, op.x, op.y, op.effect, op.argument)
+    drawSprite565(pixels, width, height, sprite, op.x, op.y, op.effect, op.argument, op.flipX)
   }
   return { pixels, missing }
 }
 
+/**
+ * **겹 하나만 합성** — 화면 사각형 `rect`(화면 좌표) 안에서 아래 그리기(`underOps`, DOM 이 이미 그린 것을 같은 좌표로 다시)를 깔고
+ * 그 위 그리기(`ops`, 원본 식 효과)를 덮는다. `touched` 는 위 그리기가 칠한 칸 — 나머지는 DOM 아래 겹이 그대로 보이게 비운다.
+ * 아래 그리기는 바탕 색(`backdrop`) 위에 효과 그대로 깐다. 좌표는 모두 화면 좌표다.
+ */
+export function composeOverlay565(
+  rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  underOps: readonly ComposeOp[],
+  ops: readonly ComposeImageOp[],
+  spriteOf: (src: string) => Sprite565 | null,
+  backdrop = 0,
+): { readonly pixels: Uint16Array; readonly touched: Uint8Array; readonly missing: boolean } {
+  const shift = <T extends ComposeOp>(op: T): T => ({ ...op, x: op.x - rect.x, y: op.y - rect.y })
+  const under = composeScreen565(rect.width, rect.height, backdrop, underOps.map(shift), spriteOf)
+  const touched = new Uint8Array(rect.width * rect.height)
+  let missing = under.missing
+  for (const op of ops.map(shift)) {
+    const sprite = spriteOf(op.src)
+    if (sprite === null) {
+      missing = true
+      continue
+    }
+    drawSprite565(under.pixels, rect.width, rect.height, sprite, op.x, op.y, op.effect, op.argument, op.flipX, touched)
+  }
+  return { pixels: under.pixels, touched, missing }
+}
+
 /** 565 화면 → 불투명 RGBA (비트 복제로 편다 — 웹 그림과 같은 꼴) */
-export function rgbaOfScreen565(pixels: Uint16Array, out: Uint8ClampedArray = new Uint8ClampedArray(pixels.length * 4)): Uint8ClampedArray {
+export function rgbaOfScreen565(
+  pixels: Uint16Array,
+  out: Uint8ClampedArray = new Uint8ClampedArray(pixels.length * 4),
+  mask: Uint8Array | null = null,
+): Uint8ClampedArray {
   for (let index = 0; index < pixels.length; index += 1) {
-    const [r, g, b] = rgbOf565(pixels[index])
     const at = index * 4
+    if (mask !== null && mask[index] === 0) {
+      out[at + 3] = 0
+      continue
+    }
+    const [r, g, b] = rgbOf565(pixels[index])
     out[at] = r
     out[at + 1] = g
     out[at + 2] = b

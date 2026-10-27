@@ -38,7 +38,8 @@ export function DefenseLaserTrail({
         <div
           key={index}
           className={styles.actor}
-          // 효과 1 · 단계 → 그림 무게 단계/16. ⚠️ 근사(남김 — 웹 DOM 한계): 수비 화면은 DOM 겹이라 아래 화면을 못 읽는다(공용 `translucentOpacityOf` 머리)
+          // 효과 1 · 단계 → 그림 무게 단계/16. ⚠️ 근사(남김 — 웹 DOM 한계): 수비 화면은 DOM 겹이라 아래 화면을 못 읽는다(공용 `translucentOpacityOf` 머리).
+          // r301(Q-03) 비교 — 잔상은 공 길(운동장 · 공을 잡는 야수 위)을 지나 아래를 다시 그리면 야수가 빠진다 → CSS 근사로 남긴다(`fieldMap` MAP_OPACITY)
           style={{ left: stamp.x, top: stamp.y, opacity: translucentOpacityOf(stamp.level) }}
           data-testid="defense-laser-trail"
           data-level={stamp.level}

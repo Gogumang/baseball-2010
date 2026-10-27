@@ -30,6 +30,11 @@ interface MissionHudProps {
    * 어둡게 한다. 판은 투수 둘레 원(지름 60) 밖이라 늘 15/32 다
    */
   readonly isDimmed?: boolean
+  /**
+   * 반투명 띠(타석 · 스윙/투구 · 시계)를 타석 캔버스가 그린다 — 참이면 이 판은 띠 그림을 빼고 글 · 숫자 · 시계 그림만 얹는다
+   * (`missionStageStripsOf`, Q-03 r301). 거짓이면 띠도 CSS 불투명도 근사로 그린다
+   */
+  readonly stripsOnStage?: boolean
 }
 
 function Sprite({ sprite }: { readonly sprite: HudSprite }) {
@@ -89,6 +94,7 @@ export function MissionHud({
   allowedRuns = 0,
   isFrozen = false,
   isDimmed = false,
+  stripsOnStage = false,
 }: MissionHudProps) {
   const lines = mission.goals
   const lineCount = lines.length
@@ -150,14 +156,14 @@ export function MissionHud({
       <Sprite sprite={missionHudIconOf(mode)} />
       {limitStripsOf(limits).map((strip, index) => (
         <div key={index} data-testid="미션-한도-띠">
-          <Sprite sprite={strip.strip} />
+          {!stripsOnStage && <Sprite sprite={strip.strip} />}
           <Sprite sprite={strip.label} />
           <Glyphs glyphs={strip.glyphs} testId="미션-한도-수" />
         </div>
       ))}
       {timer !== null && (
         <div data-testid="미션-시계">
-          <Sprite sprite={TIMER_STRIP} />
+          {!stripsOnStage && <Sprite sprite={TIMER_STRIP} />}
           <Sprite sprite={TIMER_ICON} />
           {timer.glyphs.map((glyph, index) => {
             const mask = spriteMaskImage(glyph.src)

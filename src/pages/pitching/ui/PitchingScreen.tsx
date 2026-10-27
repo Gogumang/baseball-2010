@@ -3,6 +3,8 @@ import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { MutableRefObject } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { MissionHud } from '@/pages/mission-play/ui/MissionHud'
+import { missionStageStripsOf } from '@/pages/mission-play/lib/missionHudLayout'
+import type { MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { MENU_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
@@ -135,6 +137,20 @@ type MenuOverlay = '조작방법' | '설정'
  * (모드 5~7 → 1: 자동진행 자리에 다시하기). 미션 장면도 경기 장면 0x104 라 '*' 가 같은 메뉴를 연다.
  */
 const MISSION_PITCHER_MODE = 5
+
+/** 투수 미션 HUD 한도 — 0x369f6 타석 · 0x36b04 모드 5 투구(행[9] 아랫 4비트 · P+0x1c) */
+function missionHudLimitsOf(run: PitcherRun): MissionLimitState {
+  return {
+    plateAppearanceLimit: run.mission.plateAppearanceLimit,
+    plateAppearancesUsed: run.mission.plateAppearanceLimit - (run.remainingPlateAppearances ?? run.mission.plateAppearanceLimit),
+    swingLimit: 0,
+    swingsUsed: 0,
+    pitches: {
+      limit: run.mission.pitchLimit,
+      thrown: run.mission.pitchLimit - Math.max(0, run.remainingPitches ?? run.mission.pitchLimit),
+    },
+  }
+}
 /** `team_logo_ini` 작은 로고 — 팀 경기 · 타자편 화면과 같은 경로 */
 const smallLogoUrlOf = (teamId: number) => `./sprites/team_logo_ini/${String(teamId).padStart(3, '0')}.png`
 
@@ -568,6 +584,8 @@ export function PitchingScreen({
           }
           return (
             <PitcherSideStage
+              // 미션 HUD 띠 — 점수판 0x373d0 끝이라 타석 캔버스가 원본 식으로 섞는다 (Q-03 r301, `missionStageStripsOf`)
+              missionStrips={missionStageStripsOf(missionHudLimitsOf(run), run.remainingSeconds)}
               // 0xd 진입마다 투수 그림 객체를 상태 0 으로 (48ee4 — '#' 교체 창에서 곧장 선 0xe 는 0xd 가 없다)
               sceneDEntryMark={sceneConfirm.sceneDEntryMark}
               pitch={stage.lastThrow?.pitch ?? null}
@@ -644,18 +662,9 @@ export function PitchingScreen({
           mode={MISSION_PITCHER_MODE}
           mission={run.mission}
           progress={run.progress}
-          limits={{
-            plateAppearanceLimit: run.mission.plateAppearanceLimit,
-            plateAppearancesUsed: run.mission.plateAppearanceLimit - (run.remainingPlateAppearances ?? run.mission.plateAppearanceLimit),
-            swingLimit: 0,
-            swingsUsed: 0,
-            // 행[9] 아랫 4비트 · P+0x1c
-            pitches: {
-              limit: run.mission.pitchLimit,
-              thrown: run.mission.pitchLimit - Math.max(0, run.remainingPitches ?? run.mission.pitchLimit),
-            },
-          }}
+          limits={missionHudLimitsOf(run)}
           remainingSeconds={run.remainingSeconds}
+          stripsOnStage
           allowedRuns={run.allowed.runs}
           isFrozen={isPopupOpen}
           isDimmed={isPitchMenuShown}
