@@ -1491,6 +1491,8 @@ function TeamGameScene({
                           aimSide: options.stageSide ?? 1,
                           gaugeSettingOn: options.gaugeSettingOn === true,
                           gameMode: options.mode,
+                          // [경기+0xfc8] == 22 — 놓기 전 0x11 그림의 마구 공 파티클(Q-09)
+                          isMagicPitch: slot?.isMagic === true,
                         },
                       })}
                 />

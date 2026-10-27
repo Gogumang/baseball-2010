@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { noteSkinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, InsetBox, PressArea, RawScreen, useImgTextPalette3 } from '@/shared/ui'
 import { tapKey, useTouchKeyOffer, useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
@@ -190,6 +191,9 @@ export function RecordAnnals({
       const { key } = event
       // 숫자 키는 아직 안 열렸으면 비밀 번호 버퍼에 쌓인다 (0x2b7b4~0x2b838, 탭·초점과 상관없다)
       if (/^[0-9]$/.test(key)) setSecretCode((previous) => typeSecretDigit(previous, key))
+      // 본문 초점이면([skin+0xf6] == 0, 2b846) 격자가 바꾼 키를 0x5550d 에 넘긴다(2b85c) — [skin+0x8c] 에 남는다(Q-10). 판 열림 앞이다
+      const notedDirection = isTabFocused ? null : annalsDirectionOf(key)
+      if (notedDirection !== null) noteSkinShakeDirection(notedDirection)
       // 판이 다 열리기 전·닫는 중에는 키를 안 받는다 (0x2b87c — 비밀 번호 버퍼 0x2b7b4 는 그 앞이라 받는다)
       if (!isPanelOpen) return
       if (key === 'Escape' || key === 'Backspace') {

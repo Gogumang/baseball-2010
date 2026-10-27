@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { initialMainMenu, listCursorOf, reduceMainMenu, topCursorOf } from '@/pages/main-menu/model/mainMenu'
 import type {
   GameStartCursor, MainMenuAction, MainMenuEffect, MainMenuOpenTier, MainMenuState, NariGameReady,
@@ -114,6 +115,8 @@ export function useMainMenu(
       const action = actionOfKey(event.key)
       if (action === null) return
       event.preventDefault()
+      // 하위 4 · 5 · 9 의 앞 칸 · 뒤 칸 갈래(29518 · 28e58 · 28b82)가 날 키를 0x5550d 에 넘긴다 — 화살표면 [skin+0x8c] 에 남는다(Q-10)
+      if (action.type === '커서' && !isInputBlockedRef.current) noteSkinShakeKey(event.key)
       dispatchRef.current(action)
     }
     window.addEventListener('keydown', onKeyDown)

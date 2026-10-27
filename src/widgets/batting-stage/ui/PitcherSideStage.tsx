@@ -30,7 +30,7 @@ import { hitCameraAt, stageCameraShiftOf } from '@/widgets/batting-stage/lib/hit
 import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
-import { ballPixelAt, platePixelOf } from '@/widgets/batting-stage/lib/trajectory'
+import { ballPixelAt, platePixelOf, sceneBallPathPixelAt } from '@/widgets/batting-stage/lib/trajectory'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
@@ -48,11 +48,11 @@ import type { SkillPanelFrame } from '@/widgets/batting-stage/model/skillPanelDr
 import {
   createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
-import { rememberSceneBallPath } from '@/widgets/batting-stage/model/sceneBallPath'
+import { rememberSceneBallPath, sceneBallPathPitch } from '@/widgets/batting-stage/model/sceneBallPath'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
-import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
+import type { PitchGaugeOverlay, PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import {
   appTickOfGameSceneTick, createGameSceneDrawGate, gameSceneTickOf, gameSceneTimeOf, isGameSceneFrozen,
 } from '@/shared/lib/commonWindow/commonWindow'
@@ -114,6 +114,11 @@ interface PitcherSideStageProps {
   readonly batterEquipment?: BatterEquipment
   /** 마운드의 내 투수 — 폼(단계 표) · 손(좌투 뒤집기) · 장비 겹(0x79790) */
   readonly pitcherForm: number
+  /**
+   * 마운드 투수 레코드 +0x18 (마구 · 마선수 번호) — 공 그림 0x3b2f4 3b4dc 가 마구 공 파티클 갈래(0xcff20)를 고른다. 놓기 전 0x11 그림
+   * (틱 0~9)은 아직 공이 없어 이 값으로 쏜다(Q-09). 안 넘기면 0(파티클 없음)
+   */
+  readonly pitcherMagicNumber?: number
   readonly pitcherHand: number
   readonly pitcherEquipment?: PitcherEquipment
   /**
@@ -281,6 +286,41 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
     let hitSpecialEffect: (SpecialSwingStageEffect & { readonly x: number; readonly y: number }) | null = null
     /** 마구 공 파티클(0x3b2f4 3b496)을 마지막으로 쏜 장면 틱 — 그림(장면 틱) 하나에 한 번 */
     let magicEmittedTick: number | null = null
+    /**
+     * 놓기 전 0x11 그림(틱 0~9)의 마구 공 파티클 — 지금 게이지(0x11)의 상태 틱 칸과 마지막으로 쏜 0x11 틱. 그 게이지가 서 있는 동안만
+     * (`windUpMagicAt`). 놓은 공이 들면 남은 틱(≤ 9)을 마저 쏘고 비운다
+     */
+    let windUpMagic: {
+      readonly stateTickRef: { readonly current: number }
+      readonly overlay: PitchGaugeOverlay
+      emittedStateTick: number
+    } | null = null
+    /**
+     * 놓기 전 0x11 그림의 마구 공 파티클 — 공 그림 0x3b2f4 의 3b496 갈래는 상태 0x11 이고 [경기+0xfc8] == 22 면 쏜다(3b4dc~3b4e4).
+     * 구질은 0xf 가 적고 0x10 OK(0x50e9c)가 그 값으로 0x11 을 예약하므로 와인드업 그림(틱 0~9)에도 선다. 공 틱 [+0x1098] 은 0x11 진입이
+     * 0 으로 두고 투수가 놓는 단계(≥ 11)에 닿아야 오르니 0 이고, 경로 칸 [+0x1140] 은 아직 앞 공의 것(장면 첫 공이면 0 채움 N = 0 —
+     * `sceneBallPathPixelAt`, 타자편 A-26 과 같은 길). 갈래는 지금 투수 레코드 +0x18 · 폼 0xb6e25(3b4dc · 3b528). 0x11 틱 `upTo`(≤ 9)까지
+     * 아직 안 쏜 그림 몫을 쏜다 — 그 틀 끝 관리자 틱(0x6de84) 앞이라 파티클이 늘면 관리자 틱의 굴림(경기 난수)도 그만큼 는다
+     */
+    const emitWindUpMagicUpTo = (upTo: number) => {
+      const windUp = windUpMagic
+      if (windUp === null) return
+      const last = Math.min(upTo, HUMAN_PITCH_RELEASE_STATE_TICK - 1)
+      const path = sceneBallPathPitch()
+      const current = latestRef.current
+      for (let stateTick = windUp.emittedStateTick + 1; stateTick <= last; stateTick += 1) {
+        const particles = magicBallParticlesOf(
+          { isMagicPitch: true, pitcherMagicNumber: current.pitcherMagicNumber ?? 0, pitcherForm: current.pitcherForm },
+          0,
+          path?.frameCount ?? 0,
+        )
+        const at = sceneBallPathPixelAt(path?.worldPath ?? null, 0, windUp.overlay.aimSide)
+        for (const particle of particles) {
+          emitParticles(sceneParticleScene(), particleConfigOf(particle.id), at.x, at.y, particle.img)
+        }
+      }
+      windUp.emittedStateTick = Math.max(windUp.emittedStateTick, last)
+    }
     /** 이 공의 0x12 첫 그림에서 삼진 양끝 파티클을 쐈나 (`strikeoutJudgeParticlesOf`) */
     let strikeoutShot = false
     /** OK · '5' 를 읽은 0x13 상태 틱 (0x406e8 40708) */
@@ -368,7 +408,20 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         frozenSinceTick = null
       }
       const nowTick = (frozenSinceTick ?? sceneTick) - frozenTicks
+      // 놓기 전 0x11 그림(틱 0~9)의 마구 공 파티클 — 게이지가 센 상태 틱까지(Q-09)
+      const inputOverlay = current.inputOverlayRef?.current ?? null
+      if (inputOverlay?.kind === '게이지' && inputOverlay.isMagicPitch === true && inputOverlay.stateTickRef !== undefined) {
+        if (windUpMagic?.stateTickRef !== inputOverlay.stateTickRef) {
+          windUpMagic = { stateTickRef: inputOverlay.stateTickRef, overlay: inputOverlay, emittedStateTick: -1 }
+        }
+        emitWindUpMagicUpTo(inputOverlay.stateTickRef.current)
+      }
       if (current.pitch !== shownPitch) {
+        // 놓은 공(0x11 틱 10)이 들었다 — 이 그림 전에 못 센 와인드업 그림(틱 ≤ 9)을 앞 공 경로로 마저 쏘고 비운다
+        if (windUpMagic !== null) {
+          emitWindUpMagicUpTo(windUpMagic.stateTickRef.current)
+          windUpMagic = null
+        }
         shownPitch = current.pitch
         releaseTick = current.pitch === null ? null : nowTick
         // 놓기 0x4dc78 이 경로 칸 [경기+0x1140] 을 채운다 — 다음 공의 놓기 전 그림이 본다(`sceneBallPath`)
@@ -507,8 +560,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       }
       // 0x11 그림의 마구 공 파티클 — 공 그리기 0x3b2f4 3b496~3b62c(구질 22 · 투수 레코드 +0x18, `magicBallParticlesOf`). 0x11 그림마다
       // 공 틱 [+0x1098](0 ~ N − 1 로 자른 점 0x35854)에 쏜다 — 타자편 `useStageAnimation` 과 같은 셈. 그림 한 번 = 장면 틱 하나.
-      // ⚠️ 근사(남김 — 진행기 구조): 진행기가 놓는 순간(0x11 틱 10)에 공(구질 22 인가)을 알려 주므로 그 앞 0x11 그림(틱 0~9 — 원본은
-      // 앞 공 경로 자리)에는 안 쏜다. 사람 투수가 고른 구질을 장면이 놓기 전에 받는 길이 없다
+      // 놓기 전 0x11 그림(틱 0~9)은 게이지가 실은 구질 · 상태 틱으로 위 `emitWindUpMagicUpTo` 가 앞 공 경로 자리에 쏜다(Q-09).
+      // 갈래의 폼은 지금 투수 레코드 0xb6e25(3b528) — 사람 공에는 `pitcherForm` 칸이 없어 마운드 폼을 본다
       if (pitch !== null && releaseTick !== null && pitch.isMagicPitch === true) {
         const from = magicEmittedTick === null ? releaseTick : magicEmittedTick + 1
         for (let tick = from; tick <= nowTick; tick += 1) {
@@ -519,7 +572,9 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           })
           if (at.phase.kind !== '투구중') continue
           const ballTick = Math.max(0, at.ballFrame)
-          const particles = magicBallParticlesOf(pitch, ballTick, pitch.frameCount)
+          const particles = magicBallParticlesOf(
+            { ...pitch, pitcherForm: pitch.pitcherForm ?? current.pitcherForm }, ballTick, pitch.frameCount,
+          )
           if (particles.length === 0) continue
           const point = ballPixelAt(pitch, ballTick)
           for (const particle of particles) {

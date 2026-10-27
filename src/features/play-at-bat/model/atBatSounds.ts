@@ -294,8 +294,12 @@ const SAFE_CALL = 17
  * ⚠️ `docs/re/L-sound-effects.md` 가 적던 "특수 모드" 는 오독이다. `0x1552d0c` 는 모드 플래그가
  * 아니라 **경기 상태 구조체 포인터**고, 두 칸은 이번 플레이의 아웃 종류다. 그 문서도 같이 고쳤다.
  *
- * ⚠️ **근사인 곳**: 수비 결과를 안 넘기면 타석 결과 detail 로만 가른다 —
- * 뜬공·직선타 아웃은 잡은 아웃(62), 땅볼 아웃은 포스 아웃(20) 으로 본다.
+ * **수비 결과를 안 넘기는 길(판 없이 끝나는 타석) — Q-12, 원본 근거로 정리:** 위 콜 다섯(62 · 20 · 17 · 11 · 25)은 모두 상태 0x17 판 안의
+ * 메시지(0xbba → 0x51408 의 결과 코드 갈래)다. 원본에서 판 없이 끝나는 타석은 공 도착 0x3dfac 이 0x12 로 보내는 삼진 · 볼넷 · 사구
+ * 뿐이고(맞은 공은 파울까지 0x13 → 0x17), 그 콜은 0x12 진입의 심판 콜(`pitchCallSoundIdOf`) · 공 도착 판의 콜(`PitchArrivalPlay.callSoundId`)이라 여기서는 null 이다 — 웹도 같다.
+ * 판 없이 들어오는 안타 · 아웃 · 홈런은 원본에 없는 **웹 전용 길**(쏜 패턴이 안 묶인 시험 · 옛 호출 — 앱 길은 늘 판을 돌리거나
+ * (`gameFlow.startPlayerOutcome` 의 `fixturePatternFor`) 그 판 결과를 넘긴다)이라, 그때만 타석 결과로 고른다 —
+ * 홈런 11, 뜬공·직선타 아웃은 잡은 아웃(62), 땅볼 아웃은 포스 아웃(20).
  *
  * **`state[0x87]`(태그 몫)은 이제 이었다** — `DefensePlayResult.tagOut` → `DefenseCallContext.tagOut`.
  * 그 칸은 **"플레이 중 한 번이라도 태그" 가 아니라 "마지막 아웃 판정이 태그"** 다:
@@ -337,7 +341,7 @@ export function inPlayCallSoundIdOf(atBatOutcome: AtBatOutcome, play?: DefenseCa
     // 원본은 이 아웃을 수비 시뮬레이션 없이 그 자리에서 내므로 state[0x1f]·state[0x87] 을 아예 안 본다
     if (play?.buntFoulOut === true) return CAUGHT_OUT_CALL
     // 수비 결과를 받았으면 원본과 같은 칸(state[0x1f]·state[0x87])을 본다.
-    // 없으면 타석 결과로 근사한다 — 그때는 태그 몫을 알 길이 없어 뜬공/직선타만 62 다
+    // 없으면(판 없이 들어온 아웃 — 웹 전용 길, 위 머리말) 타석 결과로 고른다: 뜬공/직선타만 62 다
     const caught = play?.caughtOnTheFly ?? (outcome.detail === '뜬공아웃' || outcome.detail === '직선타아웃')
     // 0x51b3a·0x51b44 — 두 칸 중 하나라도 서면 62 다 (`bne`/`beq` 두 갈래)
     return caught || play?.tagOut === true ? CAUGHT_OUT_CALL : FORCE_OUT_CALL

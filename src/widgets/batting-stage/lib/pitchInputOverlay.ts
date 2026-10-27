@@ -108,6 +108,16 @@ export interface PitchGaugeOverlay {
   readonly pressed: number
   /** 칸을 정한 뒤 그림 수 */
   readonly decidedTicks: number
+  /**
+   * 고른 구질이 마구(22)인가 — [경기+0xfc8] 은 0xf 가 적고 0x10 OK(0x50e9c 50ea6~50eaa)가 그 값으로 남은 마구를 줄인 뒤 0x11 을
+   * 예약한다. 그래서 0x11 그리기의 공 그림 0x3b2f4(3b4dc~3b4e4)는 놓기(틱 10) 전 와인드업 그림부터 마구 파티클을 쏜다(Q-09). 안 주면 거짓
+   */
+  readonly isMagicPitch?: boolean
+  /**
+   * 0x11 상태 틱 [+0x2c] — 게이지가 장면 틱 머리마다 올리는 칸(아직 안 셌으면 −1, 틱 10 에 놓는다). 장면이 놓기 전 그림(틱 0~9)을
+   * 셀 때 읽는다(`PitcherSideStage`). 그림 재료가 아니라 칸이라 다시 그리지 않아도 지금 값이다
+   */
+  readonly stateTickRef?: { readonly current: number }
 }
 
 export type PitchInputOverlay = PitchMenuOverlay | PitchAimOverlay | PitchGaugeOverlay
