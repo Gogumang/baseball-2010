@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type {
@@ -47,8 +47,7 @@ import { TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
-import { cursorShakeDirectionOfKey } from '@/shared/lib/cursorShake/cursorShake'
-import type { CursorShakeDirection } from '@/shared/lib/cursorShake/cursorShake'
+import { noteSkinShakeDirection, noteSkinShakeKey, skinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import type { SkinBackdropKind } from '@/pages/special/ui/SkinBackdrops'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
@@ -160,11 +159,6 @@ export function SpecialScreen({
   const [notice, setNotice] = useState<string | null>(null)
   /** 설명 판 까딱임 — 표 0xce8bc · 0xce88c (`specialLayout` 의 까딱임 주석) */
   const panelShake = useCursorShake(useUpdateCounter())
-  /**
-   * 0x5550d 가 마지막으로 적은 방향 [skin+0x8c] — 숫자키는 이 칸을 안 바꾼다. ⚠️ 근사(남김 — 웹 구조): 원본 칸은 skin 공용이라 앞 화면에서
-   * 적힌 방향이 남아 있을 수 있지만, 웹은 이 화면에서 화살표를 누르기 전엔 없음(까딱이지 않음)으로 둔다
-   */
-  const shakeDirectionRef = useRef<CursorShakeDirection | null>(null)
   /** 바탕 띠 [메뉴+0xe4] — 처음 메뉴 OK(0x294b8)가 1 로 두고 이 화면에서 자란다. 하위 화면을 다녀와도 되돌리지 않는다 */
   const band = useMenuBand(true, isBandGrown)
   /** 릴 돌기 — 스크롤 석 장 뒤 회전 (0x25386) */
@@ -192,9 +186,9 @@ export function SpecialScreen({
         event.preventDefault()
         // 갱신 0x28b9c: 앞 칸 · 뒤 칸 키가 [메뉴+0xf4] = 1 을 세우고 0x5550d 에 **날 키**를 넘긴다 → 그리기 머리 0x252c6 가 까딱임을 건다.
         // 0x5550d 는 화살표(−1~−4)만 방향 칸 [skin+0x8c] 에 적어, 숫자키는 앞서 적힌 방향 그대로 까딱인다 (`cursorShakeDirectionOfKey`)
-        const direction = cursorShakeDirectionOfKey(event.key)
-        if (direction !== null) shakeDirectionRef.current = direction
-        if (shakeDirectionRef.current !== null) panelShake.start(shakeDirectionRef.current)
+        // 방향 칸은 skin 공용이라(`skinShakeDirection` — 앱을 켤 때 0x5390c 가 0 = ←) 앞 화면에서 적힌 방향이 남는다 (Q-10)
+        noteSkinShakeKey(event.key)
+        panelShake.start(skinShakeDirection())
         return setCursor((previous) => (previous + step + ITEM_COUNT) % ITEM_COUNT)
       }
       if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
@@ -713,6 +707,9 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         : event.key === 'ArrowDown' || event.key === '8' ? 'down'
         : event.key === 'ArrowUp' || event.key === '2' ? 'up'
         : null
+      // 창이 없으면 격자가 바꾼 키를 0x5550c 에 넘긴다(0x62568 625a0~625be) — 숫자키도 방향으로 [skin+0x8c] 에 남는다(Q-10).
+      // 말풍선(0x2ac00 [skin+0x126] ≠ 0 → 2ac76)은 목록을 안 불러 위에서 끝난다
+      if (direction !== null) noteSkinShakeDirection(direction)
       if (direction !== null) {
         event.preventDefault()
         const next = view.firstSlot + moveGridCursor(menuGrid, slot - view.firstSlot, direction)
@@ -966,7 +963,9 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
       {popupView !== null && <MessageBox text={popupView.text} buttons={popupView.buttons}
-        {...(popupView.initialSelected === undefined ? {} : { initialSelected: popupView.initialSelected })} onAnswer={answerPopup} />}
+        {...(popupView.initialSelected === undefined ? {} : { initialSelected: popupView.initialSelected })} onAnswer={answerPopup}
+        // 창이 떠 있으면 0x62568 이 격자를 건너 날 키를 0x5550c 에 넘긴다(625a6~625be) — 화살표면 [skin+0x8c] 에 남는다(Q-10)
+        onRawKey={noteSkinShakeKey} />}
     </RawScreen>
   )
 }

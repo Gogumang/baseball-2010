@@ -9,8 +9,10 @@ import { effectSpriteUrl, paintedEffectSpriteUrlOf } from '@/shared/lib/pixelEff
 export function useEffectSpriteUrl(url: string | null, effect: number, argument: number, backdrop: number | null = null): string | null {
   const [painted, setPainted] = useState<{ readonly key: string; readonly url: string } | null>(null)
   const key = url === null ? null : `${url}#${effect}:${argument}@${backdrop ?? ''}`
+  // 이 그림에서 이미 칠해 둔 주소를 보였으면 상태를 다시 올릴 것이 없다 — 같은 주소로 커밋을 한 번 더 하지 않게(r316 P2)
+  const known = url === null ? null : paintedEffectSpriteUrlOf(url, effect, argument, backdrop)
   useEffect(() => {
-    if (url === null || key === null) return
+    if (url === null || key === null || known !== null) return
     let isLive = true
     void effectSpriteUrl(url, effect, argument, backdrop).then((to) => {
       if (isLive) setPainted({ key, url: to })

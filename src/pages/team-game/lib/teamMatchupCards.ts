@@ -282,6 +282,8 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
   readonly aceBatterOrder?: number
   readonly batterEquipment?: BatterEquipment
   readonly pitcherForm: number
+  /** 마운드 투수 레코드 +0x18 (마구 · 마선수 번호) — 놓기 전 0x11 그림의 마구 공 파티클 갈래(0x3b2f4 3b4dc · Q-09) */
+  readonly pitcherMagicNumber: number
   readonly pitcherHand: number
   readonly pitcherEquipment?: PitcherEquipment
   readonly pitcherSkinIndex: number
@@ -296,6 +298,7 @@ export function teamPitcherSideStageOf(progress: TeamGameProgress): {
   const ace = pitcher === undefined ? undefined : ACE_PITCHERS[pitcher.aceIndex]
   const mound = {
     pitcherForm,
+    pitcherMagicNumber: pitcher?.repertoire.magicId ?? 0,
     pitcherHand,
     // 마운드 바탕 벌 = 피부 × 15 + 수비 팀(482c0~482fc → 0x793b0 의 794c2) — 사람이 던지는 장면의 수비 팀 = 우리
     pitcherSkinIndex: teamPitcherSkinIndexOf(progress.options.ourTeamId, pitcher),

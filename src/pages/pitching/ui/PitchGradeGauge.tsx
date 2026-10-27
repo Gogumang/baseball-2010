@@ -47,6 +47,10 @@ interface PitchGradeGaugeProps {
      * 공격 측은 늘 CPU 다(이글아이 줄 4d380 은 사람 공격 갈래라 안 탄다). 안 주면 예전처럼 게이지 설정만 본다
      */
     readonly gameMode?: number
+    /**
+     * 고른 구질이 마구(22)인가 — 장면이 0x11 놓기 전 그림(틱 0~9)에 마구 공 파티클을 쏜다(0x3b2f4 3b4dc · Q-09). 안 주면 거짓
+     */
+    readonly isMagicPitch?: boolean
   }
 }
 
@@ -109,6 +113,8 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
           cursor,
           pressed,
           decidedTicks: resultTick,
+          ...(overlay.isMagicPitch === true ? { isMagicPitch: true } : {}),
+          stateTickRef: tickRef,
         },
   )
   const onReleaseRef = useRef(onRelease)

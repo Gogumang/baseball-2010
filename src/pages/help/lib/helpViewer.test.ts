@@ -33,22 +33,22 @@ describe('StrHOWTO 뷰어 키 0x637d0 — 장 고르기(+0xe5 = 1) / 쪽 보기(
   })
 })
 
-describe('쪽 보기의 줄 넘기기 0x61ce4 — 위·아래·\'2\'·\'8\' (보이는 줄 11)', () => {
+describe('쪽 보기의 줄 넘기기 0x61ce4 — 위·아래 (보이는 줄 11)', () => {
   const 보기 = { isChoosingChapter: false, chapter: 5, page: 3, scrollTop: 0 }
 
   it('줄이 11 보다 많으면 아래로 한 줄씩, 끝(줄수 − 11)에서 멈춘다', () => {
     const 한줄 = stepHelpViewer(보기, '아래', false, 6, 13)
     expect(한줄).toEqual({ ...보기, scrollTop: 1 })
-    const 두줄 = stepHelpViewer(한줄 as typeof 보기, '8', false, 6, 13)
+    const 두줄 = stepHelpViewer(한줄 as typeof 보기, '아래', false, 6, 13)
     expect(두줄).toEqual({ ...보기, scrollTop: 2 })
     expect(stepHelpViewer(두줄 as typeof 보기, '아래', false, 6, 13)).toBe(두줄)
-    expect(stepHelpViewer(두줄 as typeof 보기, '2', false, 6, 13)).toEqual({ ...보기, scrollTop: 1 })
+    expect(stepHelpViewer(두줄 as typeof 보기, '위', false, 6, 13)).toEqual({ ...보기, scrollTop: 1 })
   })
 
   it('줄이 11 이하면 움직이지 않는다 · 장 고르기에서는 줄 넘기기를 안 부른다', () => {
     expect(stepHelpViewer(보기, '아래', false, 6, 11)).toBe(보기)
     const 고르기 = { ...보기, isChoosingChapter: true }
-    expect(stepHelpViewer(고르기, '8', false, 6, 30)).toBe(고르기)
+    expect(stepHelpViewer(고르기, '위', false, 6, 30)).toBe(고르기)
     expect(stepHelpViewer(고르기, '아래', false, 6, 30)).toEqual({ ...고르기, isChoosingChapter: false })
   })
 

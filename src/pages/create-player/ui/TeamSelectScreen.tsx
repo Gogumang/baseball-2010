@@ -18,6 +18,7 @@ import * as styles from '@/pages/create-player/ui/TeamSelectScreen.css'
 import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
 import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
+import { noteSkinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { GridCellBack } from '@/pages/create-player/ui/GridCellBack'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
@@ -141,6 +142,9 @@ export function TeamSelectScreen({
         : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
         : event.key === 'ArrowDown' || event.key === '8' ? 'down'
         : event.key === 'ArrowUp' || event.key === '2' ? 'up' : null
+      // 격자가 돌려준 키를 곧바로 0x5550d 에 넘긴다(0x8250 828c · 0x8da4 8de0 · 0x14114 1414a · 0x29b38 29b66 · 0x29c98 29cc6) —
+      // 숫자키도 방향으로 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
+      if (direction !== null) noteSkinShakeDirection(direction)
       if (direction !== null) {
         event.preventDefault()
         const next = moveGridCursor(gridShape, cursor, direction)

@@ -2821,3 +2821,25 @@ describe('야수 자세 워드 +0xb0 · 판을 넘는 플레이 +0xf0 (r171)', (
     expect(result.scene.playCovers).toEqual(남은커버)
   })
 })
+
+describe('타자주자는 타석 자리에서 뛴다 — vt94 0xa0884 (0xa93ac a9446, r324 Q-07)', () => {
+  const 시작 = (batterHand?: number) =>
+    startDefensePlay({
+      outcome: 이루타,
+      trajectory: battedBallTrajectory([100, 1300, 600, 2]),
+      bases: EMPTY_BASES,
+      outs: 0,
+      ...(batterHand === undefined ? {} : { batterHand }),
+    }).runners[0].state
+
+  it('좌타(손 1)는 홈 x+700 · 우타(손 0)는 x−700, 둘 다 z−100 — 진행률 분모 자리(legStart)는 홈 그대로', () => {
+    expect(시작(1).position).toEqual({ x: 20_700, y: 0, z: 29_345 })
+    expect(시작(0).position).toEqual({ x: 19_300, y: 0, z: 29_345 })
+    expect(시작(1).legStart).toEqual({ x: 20_000, y: 0, z: 29_445 })
+    expect(시작(1).targetBase).toBe(1)
+  })
+
+  it('손을 모르는 호출(결과를 넘겨받은 시험 · 옛 길)은 홈에서 뛴다 (웹 근사)', () => {
+    expect(시작().position).toEqual({ x: 20_000, y: 0, z: 29_445 })
+  })
+})

@@ -80,6 +80,8 @@ export interface PitchingStageSource {
   /** 붙든 볼넷 · 사구 · 삼진(세션 `pendingBenchClearing`) — 0x12 대기 중 삼진이면 HUD 아웃을 진입 3e1a6 이 올린 값으로 그린다 (r298) */
   readonly resultHold?: Parameters<typeof outsShownDuringResultWait>[1]
   readonly pitcherForm: number
+  /** 미션 투수 레코드 +0x18 (마구 번호) — 놓기 전 0x11 그림의 마구 공 파티클 갈래(0x3b2f4 3b4dc · Q-09). 안 주면 0 */
+  readonly pitcherMagicNumber?: number
   readonly pitcherHand: number
   /** 미션 투수 장비 겹 (0x10810 → 0x79790) — 없으면 맨몸 */
   readonly pitcherEquipment?: PitcherEquipment
@@ -628,6 +630,7 @@ export function PitchingScreen({
               batterSkinIndex={stage.batterSkinIndex}
               batterTeamIndex={stage.batterTeamIndex}
               pitcherForm={stage.pitcherForm}
+              {...(stage.pitcherMagicNumber === undefined ? {} : { pitcherMagicNumber: stage.pitcherMagicNumber })}
               pitcherHand={stage.pitcherHand}
               {...(stage.pitcherEquipment === undefined ? {} : { pitcherEquipment: stage.pitcherEquipment })}
               {...(stage.pitcherSkinIndex === undefined ? {} : { pitcherSkinIndex: stage.pitcherSkinIndex })}
@@ -745,7 +748,17 @@ export function PitchingScreen({
             onRelease={throwPitch}
             {...(stage === undefined || aim === null
               ? {}
-              : { overlay: { ref: inputOverlayRef, aim, aimSide, gaugeSettingOn: usesGauge, gameMode: MISSION_PITCHER_MODE } })}
+              : {
+                  overlay: {
+                    ref: inputOverlayRef,
+                    aim,
+                    aimSide,
+                    gaugeSettingOn: usesGauge,
+                    gameMode: MISSION_PITCHER_MODE,
+                    // [경기+0xfc8] == 22 — 놓기 전 0x11 그림의 마구 공 파티클(Q-09)
+                    isMagicPitch: pitchType !== null && isMagicType?.(pitchType) === true,
+                  },
+                })}
           />
         </div>
       )}

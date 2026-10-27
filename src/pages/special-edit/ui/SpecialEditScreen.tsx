@@ -3,6 +3,7 @@ import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { skinNameBarsValue } from '@/shared/lib/skinNameBars/skinNameBars'
+import { noteSkinShakeDirection, noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { MarkupText, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { nameByteLengthOf } from '@/entities/career/model/playerCareer'
@@ -81,6 +82,14 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
   const [hasLeftTeamSelect, setLeftTeamSelect] = useState(false)
   useEffect(() => {
     if (state.step !== SPECIAL_EDIT_STEP.팀고르기) setLeftTeamSelect(true)
+  }, [state.step])
+  // 하위 1(선수 고르기 — 엔트리 창, [skin+0xe6] == 1)은 갱신 0x2b2e0 의 2b444~2b44e 가 **날 키**를 0x5550d 에 넘긴 뒤 창 키 0x55865 에
+  // 준다([skin+0xe4] 확인 없이) — 화살표면 까딱임 방향 [skin+0x8c] 에 남는다(Q-10). 하위 2(이름 창)는 안 넘긴다
+  useEffect(() => {
+    if (state.step !== SPECIAL_EDIT_STEP.선수고르기) return undefined
+    const onKeyDown = (event: KeyboardEvent) => { noteSkinShakeKey(event.key) }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
   }, [state.step])
 
   if (state.step === SPECIAL_EDIT_STEP.팀고르기) {
@@ -183,6 +192,8 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
     const onKeyDown = (event: KeyboardEvent) => {
       if (keyLock.current) return
       const direction = ARROW_DIRECTIONS[event.key]
+      // 하위 0: 격자 vt+0x18(숫자키 꼴 1)이 바꾼 키를 0x5550d 에 넘긴다(2b328~2b33e) — '2' '4' '6' '8' 도 방향으로 남는다(Q-10)
+      if (direction !== undefined) noteSkinShakeDirection(direction)
       if (direction !== undefined) {
         event.preventDefault()
         if (moveGridCursor(EDIT_GRID_SHAPE, cursor, direction) !== cursor) bounce.start(direction)

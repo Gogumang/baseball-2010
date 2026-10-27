@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
+import { noteSkinShakeDirection, noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { FrameSprite, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -57,6 +58,43 @@ export interface FirstBatStadiumScreenProps {
  *    때문에 유저 팀이 히든(10~14)이면 여기 없는 번호가 들어올 수 있다 — 원본이 자르지 않으므로
  *    그림은 빈칸, 좌석 줄은 스택 옆 칸(연고지 포인터 값)을 숫자로 찍는다 (`stadiumInfoOf`).
  */
+/** 숫자키 꼴 1 격자가 방향으로 바꾸는 키 (표 0xd2e7c) */
+const GRID_NUMERIC_DIRECTIONS: Readonly<Record<string, 'left' | 'right' | 'up' | 'down'>> = {
+  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
+}
+
+/** 키 0x2896c 가 하는 일 — 'none' 은 아무것도 안 한다 */
+export type FirstBatStadiumKeyAction = 'flip' | 'previous' | 'next' | 'ok' | 'back' | 'none'
+
+/**
+ * 키 0x2896c 의 두 갈래 (Q-14, 직접 떴다 — R4 3a 표와 같다):
+ * ```
+ * 단계 0 날 키 [장면+0x40] (289ca~289f6)
+ *   ← −3 · → −4 · '4' · '6'      → 289f8  선공 커서 skin+0x74 뒤집기
+ *   ↓ −2 · OK −5 · '5' · '8'      → 28a12  rec+8 = (skin+0x74 ≠ 0) · 단계 1 로
+ *   CLR −16                       → 28a2e  상태 19 로
+ *   ↑ −1 · 그 밖                  → 아무것도 안 한다
+ * 단계 1 구장 격자 [this+0x74] vt+0x18(진입 0x23f18 `vt+0x1c(10, 1, 숫자키 꼴 1, 0x10)`)이 바꾼 키 (28a36~28a64)
+ *   ← → '4' '6'                   격자가 커서를 옮긴다(0x6c0bc vt+8 — 꼴 0x10 은 끝에서 감는다). 키 함수는 그 값을 안 본다
+ *   OK −5 · '5'                   → 28a66  rec+0xc = 커서 → 상태 21
+ *   ↑ −1 · '2' · CLR −16          → 28a84 · 28a96  rec+0xc = 커서 · 단계 0 으로
+ *   ↓ −2 · '8' · 그 밖            → 아무것도 안 한다 (28a60 의 '2'(0x32) 비교는 격자가 −1 로 바꾼 뒤라 닿지 않는다)
+ * ```
+ */
+export function firstBatStadiumKeyActionOf(isStadiumPhase: boolean, key: string): FirstBatStadiumKeyAction {
+  if (key === 'Escape') return 'back'
+  if (!isStadiumPhase) {
+    if (key === 'ArrowLeft' || key === 'ArrowRight' || key === '4' || key === '6') return 'flip'
+    if (key === 'Enter' || key === 'ArrowDown' || key === '5' || key === '8') return 'ok'
+    return 'none'
+  }
+  if (key === 'ArrowLeft' || key === '4') return 'previous'
+  if (key === 'ArrowRight' || key === '6') return 'next'
+  if (key === 'Enter' || key === '5') return 'ok'
+  if (key === 'ArrowUp' || key === '2') return 'back'
+  return 'none'
+}
+
 export function FirstBatStadiumScreen({
   userTeamId, aiTeamId, phase, playerSide, stadiumId, gamePoint = 0,
   onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel,
@@ -73,33 +111,30 @@ export function FirstBatStadiumScreen({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (keyLock.current) return
-      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        return onCancel()
+      // 0x5550d — 까딱임 방향 [skin+0x8c] (Q-10). 단계 0([skin+0xcc] == 0)은 **날 키**(0x289ba~0x289c6), 단계 1 은 구장 격자
+      // [this+0x74](진입 0x23f18 `vt+0x1c(10, 1, 숫자키 꼴 1, 0x10)`)의 vt+0x18 이 바꾼 키(0x28a36~0x28a4a) — '2' '4' '6' '8' 도 방향
+      if (isStadiumPhase) {
+        const direction = GRID_NUMERIC_DIRECTIONS[event.key]
+        if (direction !== undefined) noteSkinShakeDirection(direction)
+      } else {
+        noteSkinShakeKey(event.key)
       }
-      if (!isStadiumPhase) {
-        // 단계 0 — 좌·우가 선공 커서(skin+0x74)를 뒤집고, OK 가 rec+8 에 적으며 단계 1 로 간다
-        if (step !== 0) {
-          event.preventDefault()
-          return onMoveFirstBat(
-            playerSide === PLAYER_SIDE_FIRST_BAT ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
-          )
-        }
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          onChooseFirstBat(playerSide)
-        }
-        return
-      }
-      if (step !== 0) {
-        event.preventDefault()
+      // 숫자키도 원본 키 함수 0x2896c 대로 (`firstBatStadiumKeyActionOf` — Q-14)
+      const action = firstBatStadiumKeyActionOf(isStadiumPhase, event.key)
+      if (action === 'none') return
+      event.preventDefault()
+      switch (action) {
+        // 단계 0 CLR → 19 · 단계 1 CLR · ↑ · '2' → 단계 0 (구장 커서는 rec+0xc 에 남는다 — 커서가 곧 rec+0xc 다)
+        case 'back': return onCancel()
+        // 단계 0 — 좌·우가 선공 커서(skin+0x74)를 뒤집는다
+        case 'flip': return onMoveFirstBat(
+          playerSide === PLAYER_SIDE_FIRST_BAT ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
+        )
         // 구장 목록은 꼴 0x10 — 끝에서 감는다 (0x6bead)
-        return onMoveStadium(stadiumCursorAfter(stadiumId, step))
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        onChooseStadium(stadiumId)
+        case 'previous': return onMoveStadium(stadiumCursorAfter(stadiumId, -1))
+        case 'next': return onMoveStadium(stadiumCursorAfter(stadiumId, 1))
+        // 단계 0 OK 는 rec+8 에 적으며 단계 1 로, 단계 1 OK 는 rec+0xc 에 적고 21 로
+        case 'ok': return isStadiumPhase ? onChooseStadium(stadiumId) : onChooseFirstBat(playerSide)
       }
     }
 

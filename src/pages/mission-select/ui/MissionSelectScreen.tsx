@@ -11,6 +11,7 @@ import {
   GRADE_MARKS, MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import { noteSkinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
 import { EventMissionWindow } from '@/pages/mission-select/ui/EventMissionWindow'
 import type { EventMissionAnswer } from '@/pages/mission-select/ui/EventMissionWindow'
@@ -156,6 +157,8 @@ export function MissionSelectScreen({
         : null
       if (direction !== null) {
         event.preventDefault()
+        // 키 0x1daa4 머리(1dacc)가 격자가 바꾼 키를 0x5550d 에 넘긴다 — [skin+0x8c] 에 남는다(Q-10)
+        noteSkinShakeDirection(direction)
         const next = moveGridCursor(MISSION_GRID_SHAPE, cursor, direction)
         // 칸이 바뀐 키(커서 +0x25)면 고른 칸을 튕긴다 — 시작 0x7a005(격자, 1, 1, 0) 의 [격자+6] = 1 (0x1e1b0). 키 0x1daa4 가 방향을 적는다
         if (next !== cursor) bounce.start(direction)

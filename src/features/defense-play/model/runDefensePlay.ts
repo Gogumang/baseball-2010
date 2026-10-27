@@ -81,6 +81,7 @@ import {
 } from '@/entities/fielding/model/rundown'
 import {
   AI_STATE,
+  batterBoxPosition,
   createFielders,
   createRunner,
   fielderAbilityOf,
@@ -244,6 +245,11 @@ export interface DefensePlayInput {
    * 실제 타석(쏜 패턴이 있는 판)은 늘 거짓이다.
    */
   readonly outcomeIsGiven?: boolean
+  /**
+   * 친 타자의 손 `0xb63c0`(1 = 좌타) — 타자주자가 서는 타석 자리(`batterBoxPosition`, vt94 0xa0884)를 고른다.
+   * 안 주면 쏜 공(`contactOfOutcome(outcome).batterHand`)의 손을 쓰고, 그것도 없으면(결과를 넘겨받은 시험 · 옛 길) ⚠️ 홈에서 뛴다(웹 근사).
+   */
+  readonly batterHand?: number
   /** 원본 패턴에서 만든 타구 궤적 */
   readonly trajectory: BattedBallTrajectory
   /** 투구 때의 루 상황 */
@@ -726,6 +732,7 @@ function createPlayRunners(
   bases: BaseState,
   speedOf: (fromBase: number) => number,
   firstBaseException: FirstBaseException | null = null,
+  batterHand: number | undefined = undefined,
 ): MutableRunner[] {
   // 포스 사슬 머리 — 타자주자는 1루로 간다 (0xa93ac 가 +0x88 = 1)
   const batterMinimum = 1
@@ -740,8 +747,11 @@ function createPlayRunners(
     const chained = Math.min(HOME_BASE, Math.max(fromBase, batterMinimum + index))
     const minimumBase = pushed === null || index === 0 ? chained : pushed[index] ? fromBase + 1 : fromBase
     const targetBase = minimumBase > fromBase ? fromBase + 1 : fromBase
+    // 타자주자 0xa93ac a9446 → vt94 0xa0884: 위치(+0x20)는 타석 자리다(`batterBoxPosition`). 구간 출발점(`legStart`)은 홈으로 둔다 —
+    // 웹 진행률(`progressPercent`)의 분모 자리이고, 원본 진행률 vt90 0xa04e8 은 거리(루[+0x8c] = 홈, 루[+0x7c])로 잰다
+    const batterBox = index === 0 && batterHand !== undefined ? { position: batterBoxPosition(batterHand) } : {}
     return {
-      state: createRunner(index, fromBase, speedOf(fromBase), { targetBase, isBatterRunner: index === 0 }),
+      state: createRunner(index, fromBase, speedOf(fromBase), { targetBase, isBatterRunner: index === 0, ...batterBox }),
       minimumBase,
       previousTarget: fromBase,
       counted: false,
@@ -1280,6 +1290,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
     input.bases,
     speedOf,
     onTheFly && input.outs !== 2 ? { stealingFrom: input.stealingFrom ?? [] } : null,
+    input.batterHand ?? swungContact?.batterHand,
   )
 
   // ── 상태 0x17 진입 0x46418 → 0x3d7b8: 판 시작(vt18) 뒤 주자 목록 차례로 리드 틱을 몰아서 돌린다 ──

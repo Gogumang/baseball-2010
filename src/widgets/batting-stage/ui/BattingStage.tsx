@@ -94,7 +94,8 @@ interface BattingStageProps {
   /**
    * 마운드 투수 레코드의 **피부** `(rec[0xb] >> 2) & 3` 와 **수비 팀 번호** 0xb6c08(게임). 타석 교대 0x47cc8 의 482c0~482fc 가 마운드 그림
    * `[장면+0xf1c]` 을 적재 0x793b0 으로 다시 실을 때 이 둘을 넘기고, 794c2 가 `pitcher.pzx` 를 **피부 × 15 + 팀** 벌로 연다(모드 무관).
-   * 피부를 안 넘기면 0, 팀을 안 넘기면 `hud.opponentTeamId`(타석에 선 쪽이 내 팀이라는 `batterTeamIndex` 와 같은 근사)다
+   * 피부를 안 넘기면 0, 팀을 안 넘기면 `hud.opponentTeamId` 다 — 0x47cc8 47d06 0xb6c09(경기) = state[10](수비 측)의 팀(0xb6c08)을
+   * [sp+0x30] 에 두고 482f6 이 넘긴다. 이 부품은 사람이 치는 타석에만 서므로 수비 팀 = 상대 팀이다(`batterTeamIndex` 와 같은 근거)
    */
   readonly pitcherSkinIndex?: number
   readonly pitcherTeamIndex?: number
@@ -125,8 +126,9 @@ interface BattingStageProps {
    * 헬멧 팔레트 `팀` 을 고른다 (0x10810 → 0x78be8·0x78c14, C-1).
    *
    * 안 넘기면 피부는 0(황인 — 구운 PNG 가 쓰는 벌도 피부 0 이다), 팀은 `hud.ourTeamId` 다.
-   * ⚠️ 팀을 hud 에서 꺼내는 것은 **근사**다 — "타석에 선 쪽이 내 팀" 이라고 본 것이라
-   * 상대 팀 공격을 그리는 화면이 생기면 `batterTeamIndex` 를 따로 넘겨야 한다.
+   * 원본 팀 = **공격 팀**: 타석 교대 0x47cc8 이 47cfe 0xb6bf9(경기) — state[9](공격 측)의 팀 번호(0xb6bf8 b6bfc) — 를 [sp+0x34] 에 두고
+   * 47dd0 에서 몸통 적재에 넘긴다(Q-12, 2026-10-27 직접 떴다). 이 부품은 사람이 치는 타석(state[9] = 사람 측)에만 서므로 공격 팀 = 내 팀
+   * = `hud.ourTeamId` 다. 사람이 던지는 타석(상대 공격)은 `PitcherSideStage` 가 `batterTeamIndex` 로 상대 팀을 받는다
    */
   readonly batterSkinIndex?: number
   readonly batterTeamIndex?: number
@@ -404,7 +406,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     // 마운드 바탕 벌 = 피부 × 15 + 수비 팀 (482c0~482fc → 0x793b0 의 794c2)
     pitcherSkinIndex,
     pitcherTeamIndex: pitcherTeamIndex ?? props.hud?.opponentTeamId ?? null,
-    // 팀을 안 넘기면 HUD 의 내 팀 번호를 쓴다 (근사 — props 주석 참고)
+    // 팀을 안 넘기면 공격 팀(0xb6bf8 — 사람이 치는 타석이라 HUD 의 내 팀 번호)이다 (props 주석 참고)
     batterTeamIndex: batterTeamIndex ?? props.hud?.ourTeamId ?? 0,
     batterSkillIds,
     recentAtBatCodes,

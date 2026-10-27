@@ -18,13 +18,14 @@
     <!--
       Galmuri: 한글 도트 폰트 (SIL OFL). 피처폰 화면 느낌을 만드는 핵심 요소.
       CDN이 막혀도 monospace로 떨어지도록 styles.css에 대체 스택을 둔다.
+      판을 박는다(2.40.3 — 10-27 판 없는 주소가 내준 판, CSS · woff2 바이트 같음 확인). 판 없는 주소는 CDN 최신을 따라가 글자 그림이 저절로 바뀐다(r321).
       원본 글꼴(synGak9)에 없는 글자에만 쓰는 대체 글꼴이라 첫 그림을 막지 않게 받는다(media 를 print 로 받았다가 다 오면 all) —
       다른 곳(CDN)의 막는 스타일시트는 연결을 새로 열어야 해서 첫 그림과 스크립트 실행을 함께 늦춘다(r224).
     -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css"
+      href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css"
       media="print"
       onload="this.media = 'all'"
     />

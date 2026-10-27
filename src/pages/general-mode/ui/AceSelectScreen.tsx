@@ -23,6 +23,7 @@ import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
+import { noteSkinShakeDirection, noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -300,6 +301,14 @@ export function AceSelectScreen({
         : event.key === 'ArrowDown' || event.key === '8' ? 'down'
         : event.key === 'ArrowUp' || event.key === '2' ? 'up'
         : null
+      // 팝업(0x5fb25)이 키를 안 가져갔으면 0x5550d 에 넘긴다 — 까딱임 방향 [skin+0x8c] (Q-10).
+      // 상태 21 0x29df8(29e4a~29e54) · 시즌 0xd7 0xa248(a4fc~a50a)은 **날 키**(숫자키는 안 적힌다), 상태 28 0x2af20(2af68~2af7e)은
+      // 격자가 바꾼 키(숫자키도 방향)
+      if (isLevelUpMode) {
+        if (direction !== null) noteSkinShakeDirection(direction)
+      } else {
+        noteSkinShakeKey(event.key)
+      }
       if (direction !== null) {
         event.preventDefault()
         if (!isLevelUpMode && !isCoachMode && (direction === 'up' || direction === 'down')) return

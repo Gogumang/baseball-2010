@@ -7,6 +7,7 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import { useCursorShake } from '@/shared/lib/cursorShake/useCursorShake'
+import { noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { isFrameSlideClearedAt, isFrameSlidingAt } from '@/widgets/screen-frame/lib/frameSlide'
 import { PITCH_CONTROLS, SOUND_LEVEL_COUNT, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
@@ -267,6 +268,8 @@ export function SettingsScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       // 숫자키 꼴 1 격자 — '2' '8' '4' '6' '5' 를 ↑ ↓ ← → OK 로 (`gridKeyOf`)
       const key = gridKeyOf(event.key)
+      // 격자가 바꾼 키를 0x5550d 에도 넘긴다(2958a · 288e4 · 2c706) — 화살표 꼴이면 [skin+0x8c] 에 남는다(Q-10)
+      noteSkinShakeKey(key)
       const vertical = key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
@@ -574,6 +577,8 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
     const onKeyDown = (event: KeyboardEvent) => {
       // 숫자키 꼴 1 격자 — '2' '8' '4' '6' '5' 를 ↑ ↓ ← → OK 로 (`gridKeyOf`)
       const key = gridKeyOf(event.key)
+      // 격자가 바꾼 키를 0x5550d 에도 넘긴다(2958a · 288e4 · 2c706) — 화살표 꼴이면 [skin+0x8c] 에 남는다(Q-10)
+      noteSkinShakeKey(key)
       const vertical = key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
@@ -785,6 +790,8 @@ function ModeResetPage({
     const onKeyDown = (event: KeyboardEvent) => {
       // 숫자키 꼴 1 격자 — '2' '8' '4' '6' '5' 를 ↑ ↓ ← → OK 로 (`gridKeyOf`)
       const key = gridKeyOf(event.key)
+      // 격자가 바꾼 키를 0x5550d 에도 넘긴다(2958a · 288e4 · 2c706) — 화살표 꼴이면 [skin+0x8c] 에 남는다(Q-10)
+      noteSkinShakeKey(key)
       const vertical = key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0
       if (vertical !== 0) {
         event.preventDefault()
