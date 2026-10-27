@@ -151,7 +151,29 @@ const SWING_TICK_EARLY = 3
 let frameCallbacks = new Map<number, FrameRequestCallback>()
 let nextFrameHandle = 1
 let clock = 1_000
-let originals: { now: () => number; raf: typeof window.requestAnimationFrame; caf: typeof window.cancelAnimationFrame } | null = null
+let originals: {
+  now: () => number
+  raf: typeof window.requestAnimationFrame
+  caf: typeof window.cancelAnimationFrame
+  queueMicrotask: typeof globalThis.queueMicrotask
+} | null = null
+
+/**
+ * `queueMicrotask` 로 건 일 — 걸음이 끝날 때마다 비운다(`runQueuedMicrotasks`). 브라우저는 일(그림 틀 · 키 하나)이 끝날 때마다
+ * 마이크로태스크를 비우는데, 이 판은 걸음 수십만 개를 await 없이 한 덩이로 돌아 진짜 마이크로태스크가 판 내내 안 돈다.
+ * 그러면 그 일이 쥔 것이 판 내내 남는다 — 앞 화면 판(`leftFrame` 의 `leaveFrame` 은 마이크로태스크 하나가 지나면 맡긴 판을
+ * 잊는데, 안 지나 내려간 화면 판 DOM 이 몽땅 쌓여 긴 판이 기본 힙 4GB 를 넘겼다, r336). 약속(Promise) 차례는 그대로 둔다
+ * (이벤트 본문 받기 따위는 지금처럼 판의 await 에서 돈다)
+ */
+let queuedMicrotasks: VoidFunction[] = []
+
+function runQueuedMicrotasks() {
+  while (queuedMicrotasks.length > 0) {
+    const pending = queuedMicrotasks
+    queuedMicrotasks = []
+    for (const callback of pending) callback()
+  }
+}
 
 function resetStageStores() {
   resetSceneParticlesForTest()
@@ -1137,6 +1159,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     // 이벤트 본문(535KB)은 커리어가 선 뒤 따로 받는다 — 먼저 받아 두고 세션이 싣게 한다
     await import('@/shared/config/original/events')
     for (; steps < maxSteps; steps += 1) {
+      // 앞 걸음(브라우저의 일 하나)이 건 마이크로태스크
+      runQueuedMicrotasks()
       const { screen, session } = result.current
       const { actions } = session
       const career = session.career
@@ -1338,7 +1362,10 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     // 손으로 갈아 끼운다 — `vi.spyOn` 은 부른 기록을 다 들고 있어 긴 판(수백만 틀)에서 메모리가 넘친다
-    originals = { now: performance.now, raf: window.requestAnimationFrame, caf: window.cancelAnimationFrame }
+    originals = {
+      now: performance.now, raf: window.requestAnimationFrame, caf: window.cancelAnimationFrame, queueMicrotask: globalThis.queueMicrotask,
+    }
+    globalThis.queueMicrotask = (callback) => void queuedMicrotasks.push(callback)
     performance.now = () => clock
     window.requestAnimationFrame = (callback) => {
       const handle = nextFrameHandle
@@ -1364,6 +1391,8 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
       performance.now = originals.now
       window.requestAnimationFrame = originals.raf
       window.cancelAnimationFrame = originals.caf
+      runQueuedMicrotasks()
+      globalThis.queueMicrotask = originals.queueMicrotask
       originals = null
     }
     vi.useRealTimers()
