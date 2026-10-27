@@ -1,17 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
-import { PressArea } from '@/shared/ui'
-import * as styles from '@/pages/pitching/ui/ManagerHookWindow.css'
+import type { EventPortrait } from '@/shared/config/original/eventTypes'
 import { gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 import { runSceneKeys, useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
+import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
+import { PORTRAIT_HEIGHT } from '@/pages/story/ui/StoryScreen.css'
+import * as styles from '@/pages/pitching/ui/ManagerHookWindow.css'
 
-/** 창 높이 0 → 55, 틱마다 +15 (0x7fae2 의 `+= 0xf`, 0x37 에서 멈춤) */
-const WINDOW_HEIGHT = 55
-const HEIGHT_STEP = 15
-/** 드러나는 글자 수는 틱마다 +3 (dlg+0xe8) */
-const LETTERS_PER_TICK = 3
-/** 화자 머리글 — 0x861c0 이 붙이는 문자열 그대로다 */
-const SPEAKER_PREFIX = '[감독님] : '
+/** 0x861c0 — 0xbc964(dlg+0xa8, 0xd4c70) 가 글 버퍼 머리에 붙이는 화자 머리글(원본 마크업 그대로 — "감독님" 은 #00CC00) */
+const SPEAKER_PREFIX = '[!c00CC00감독님!cFFFFFF] : '
+
+/**
+ * 0x86198 861b2 `0x7f54c(dlg, &{2, 0, 0, 3}, 1)` — 초상화 하나: 인물 2(감독, 애니 기준 0xd4774[2] = 16) · 바이트 1 = 0(오른쪽) ·
+ * 표정 3 → event_char_0 애니 19 (0x63a04 — 10~13 · 17~22 말고는 event_char_0)
+ */
+const MANAGER_PORTRAIT: readonly EventPortrait[] = [{ file: 'event_char_0', animation: 16 + 3, side: 'right' }]
+
+/** 0x7fbc4 끝 0x7fdfe — 셋째 인자(0x50828 은 1)가 서면 초상화 바닥 y = H − 0x44 */
+const PORTRAIT_BASE_Y = 320 - 0x44
 
 interface ManagerHookWindowProps {
   /** StrUSER_EVT 번호 — 체력 ≤20% 85~87 · 체력 0% 88~90 · 4실점 91~93 · 만루 94~96 */
@@ -21,93 +28,50 @@ interface ManagerHookWindowProps {
 }
 
 /**
- * 강판 뒤 감독 대사 창 — 경기 상태 **0x23** (진입 0x50754 → 0x86198, 키 0x50794 · R14 3절).
+ * 강판 뒤 감독 대사 창 — 경기 상태 **0x23** (진입 0x50754 → 0x86198, 키 0x50794, 그리기 0x50828 · R14 3절).
  *
- * 원본은 **확인 키 하나만** 받는다. 좌/우·취소가 없어 강판을 무를 수 없다. 키는 받은 다음 틀의 상태 키 자리(52da2 → 52e10)에서
- * 그 틀의 갱신보다 먼저 돈다(r167).
- * 키 0x50794 (직접 떴다): −5 · '5' 만 보고 대화 상자 단계 [dlg+0xec] 로 가른다 — 1(글 찍는 중) → 2(다 보이기) ·
- * 4(다 찍힘) → 닫기(0x7b871 · 0x86229 …) → 0x21. 그 밖 단계(상자가 올라오는 중)에는 아무 일도 없다.
- * (r82 정정 기록) 앞서 웹은 키를 안 받고 웹 글자 단추 "확인" 만 있어 키보드로는 경기가 멈췄다 — 단추를 투명 누름 칸으로 바꾸고 키를 이었다.
- * 얼굴 그림은 쓰지 않는 "글만 있는 창" 이다 (0x85f38 은 이 창이 아니다 — R14 3-5 정정).
+ * ```
+ * 50754  [장면+0x19a8] 이 비었으면 대화창 객체 0x7b7b8(new 0x398) — 이벤트 재생기 대사 상자와 같은 창 클래스
+ * 86198  0x7f54c(창, {2, 0, 0, 3}, 1) 초상화 · 글 버퍼 = "[!c00CC00감독님!cFFFFFF] : " + 0x1552af4(StrUSER_EVT 대사) ·
+ *        +0xe4 = 1(say 갈래) · 0x7f7d4 · 0x7f7cc(높이 0 · 글 찍기 처음으로) · mode_ui 적재
+ * 50828  그리기: 0x38d1c · 0x49e64 · 0x35b94 · 0xbe6a1(타석 공용 묶음 — HUD 0x4c4bc 없음) → 0x7fbc4(창, 0, 1, 0)
+ *        = 상자 0x7fad0(높이 +15, 장식 없음 — 넷째 인자 0) · 글 0x6ef4c(3줄 한 쪽, 3 바이트씩) · 넘김 표시 · 초상화(바닥 H − 0x44)
+ * 50794  키 −5 · '5' 만: 단계 1 → 2(그 쪽을 다 보인다) · 3 → 0x7f7f4(다음 쪽) · 4 → 0x7b871 · 0x86229 · 창 소멸 · 0xc1b48 · 0x21
+ * ```
+ * 상자 · 쪽 나누기 · 찍기는 이벤트 재생기와 같은 0x7fbc4 라 `EventDialogueBox`(`pages/story/lib/eventDialogue`)를 그대로 쓴다.
+ * 찍기는 그리기 안에서 돈다 — 상자가 다 올라온 그 그림부터 3 바이트씩. 원본은 **확인 키 하나만** 받는다(좌우 · 취소 없음 — 강판을 못 무른다).
+ * 키는 받은 다음 틀의 상태 키 자리(52da2 → 52e10)에서 그 틀의 그리기보다 먼저 돈다(r167). 공용 창이 서 있으면 52efe 가 상태 그리기를
+ * 건너뛰어 상자 · 찍기도 선다(경기 장면 시계).
+ * (r334 정정: 예전 웹은 CSS 글꼴 11px 한 덩이 글 · 쪽 나누기 없음 · 초상화 없음 · 상자가 다 오른 다음 틀부터 찍기로 근사했다.
+ * R14 3-5 의 "얼굴 그림을 쓰지 않는다" 도 틀렸다 — 0x7f54c 로 감독 초상화를 싣는다)
  *
  * 스스로 강판(`#`)은 이 창을 거치지 않고 곧장 0x21 로 간다 (P1 2-2).
  */
 export function ManagerHookWindow({ userEventIndex, onConfirm }: ManagerHookWindowProps) {
-  const line = ORIGINAL_USER_EVENTS[userEventIndex] ?? ''
-  const [height, setHeight] = useState(0)
-  const [letters, setLetters] = useState(0)
-  /** 틀이 보는 값 — 키(52da2 0x50794)와 갱신이 그리기를 기다리지 않고 이 값을 본다 */
-  const heightRef = useRef(0)
-  const lettersRef = useRef(0)
-  const lineRef = useRef(line)
-  lineRef.current = line
-  const onConfirmRef = useRef(onConfirm)
-  onConfirmRef.current = onConfirm
-  /**
-   * 받은 키 칸 — 키 0x50794 는 받은 다음 틀의 52da2~ 상태 키 자리(52e10)에서 그 틀의 갱신(52e14~ — 상자 높이 · 글자 수)보다 먼저
-   * 돈다(`sceneKeyLatch`). 창이 선 틀(52cc6)에는 버린다
-   */
+  const raw = SPEAKER_PREFIX + (ORIGINAL_USER_EVENTS[userEventIndex] ?? '')
+  /** 받은 키 칸 — 키 0x50794 는 받은 다음 틀의 52da2~ 상태 키 자리(52e10)에서 그 틀의 그리기(0x7fbc4 — 높이 · 찍기)보다 먼저 돈다 */
   const keyLatch = useSceneKeyLatchOwner()
-
-  /** OK 한 번 — 상자가 다 올라오기 전엔 버리고, 글을 찍는 중이면 다 보이고, 다 찍혔으면 닫는다 */
-  const pressOkNow = () => {
-    if (heightRef.current < WINDOW_HEIGHT) return
-    const length = lineRef.current.length
-    if (lettersRef.current < length) {
-      lettersRef.current = length
-      setLetters(length)
-      return
-    }
-    onConfirmRef.current()
-  }
-  const pressOkNowRef = useRef(pressOkNow)
-  pressOkNowRef.current = pressOkNow
-  const pressOk = () => keyLatch.push(() => pressOkNowRef.current())
-
-  useEffect(() => {
-    const tick = setGameSceneTickInterval(() => {
-      // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 키 · 갱신을 건너뛴다 — 이 틱도 안 오르고 닫히면 이어 오른다
-      if (isGameSceneFrozen()) {
-        keyLatch.clear()
-        return
-      }
-      // 52da2~52e10 — 앞 틀 뒤에 받은 키가 갱신보다 먼저
-      runSceneKeys(keyLatch, gameSceneTickNow())
-      // 상자가 다 올라온 뒤에야 글을 그린다 (0x7fba6 의 반환값)
-      if (heightRef.current < WINDOW_HEIGHT) {
-        heightRef.current = Math.min(heightRef.current + HEIGHT_STEP, WINDOW_HEIGHT)
-        setHeight(heightRef.current)
-        return
-      }
-      lettersRef.current += LETTERS_PER_TICK
-      setLetters(lettersRef.current)
-    })
-    return () => tick()
-  }, [keyLatch])
-
-  const shown = line.slice(0, letters)
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Enter' && event.key !== '5' && event.key !== ' ') return
-      event.preventDefault()
-      keyLatch.push(() => pressOkNowRef.current())
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [keyLatch])
-
+  const tickInterval = useMemo(
+    () => (callback: () => void) =>
+      setGameSceneTickInterval(() => {
+        // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 키를, 52efe 에서 상태 그리기를 건너뛴다 — 닫히면 이어 돈다
+        if (isGameSceneFrozen()) {
+          keyLatch.clear()
+          return
+        }
+        runSceneKeys(keyLatch, gameSceneTickNow())
+        callback()
+      }),
+    [keyLatch],
+  )
   return (
     <div className={styles.overlay}>
-      <div className={styles.band} />
-      <div className={styles.box} style={{ height: `${height}px` }}>
-        <p className={styles.text}>
-          <span className={styles.speaker}>{SPEAKER_PREFIX}</span>
-          {shown}
-        </p>
+      <EventDialogueBox raw={raw} slideIn showsOrnament={false} tickInterval={tickInterval}
+        deferPress={(run) => keyLatch.push(run)} onAdvance={onConfirm} />
+      {/* 0x7fbc4 끝 0x7fdee — 상자 · 글 · 넘김 표시 다음에 초상화 0x7f998 */}
+      <div className={styles.portraitLayer} style={{ bottom: 320 - PORTRAIT_BASE_Y, height: PORTRAIT_HEIGHT }}>
+        <EventPortraits portraits={MANAGER_PORTRAIT} height={PORTRAIT_HEIGHT} />
       </div>
-      {/* 원본 창에는 글자 단추가 없다 — 창 자리(띠 12 + 본체 55, 바닥에서 67)를 투명 누름 칸으로 */}
-      <PressArea label="확인" rect={{ x: 0, y: 320 - 12 - WINDOW_HEIGHT, width: 240, height: 12 + WINDOW_HEIGHT }} onPress={pressOk} />
     </div>
   )
 }

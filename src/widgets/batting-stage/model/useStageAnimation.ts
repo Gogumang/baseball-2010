@@ -972,6 +972,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         // 0x13 타석 카메라 — 틀 머리 0x3f060 이 공을 따라 옮긴 [+0x1ec] (`hitCamera`)
         camera: hitNow === null || isBackdrop ? null : hitCameraNow(hitNow, sceneTick - hitNow.startTick),
         isFieldPlay: latestRef.current.isFieldPlay === true,
+        omitsHud: latestRef.current.isHudOmitted === true,
         bodyType,
         ...(latestRef.current.aceBatterOrder === undefined ? {} : { aceBatterOrder: latestRef.current.aceBatterOrder }),
         batterSkinIndex: latestRef.current.batterSkinIndex,

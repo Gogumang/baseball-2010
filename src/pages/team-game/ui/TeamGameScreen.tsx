@@ -48,7 +48,7 @@ import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { useWarmFieldBackgrounds } from '@/pages/defense/model/useWarmFieldBackgrounds'
-import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { BURST_RESULT_STATE_TICK, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
 import { usePitcherHitScene } from '@/widgets/batting-stage/model/usePitcherHitScene'
 import { usePitchArrivalHold } from '@/widgets/batting-stage/model/usePitchArrivalHold'
@@ -828,7 +828,10 @@ function TeamGameScene({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, notePitchResolved])
   const pitchEndSerial = pitchEnd.serial
+  /** 타석 위 돌발 결과 창(0x1d)이 서 있으면 그 그리기 0x4d1e0 이 상태 틱을 100 으로 박는다 — 아래 창 갈래에서 넣는다 */
+  const burstResultTickRef = useRef<number | null>(null)
   const recordAlert = useRecordAlert(progress.recordIds, {
+    pinnedStateTickRef: burstResultTickRef,
     // 0x11 끝 · 0x13 을 그리는 동안은 아직 0x17 이 아니다
     isDrawing: isIntroDone && summary === null && (!isDefenseInPlay || isPitchSceneBeforePlay) && !isReplaying,
     // 중계 0x21 의 CLR 질문 창도 팝업이다(52cc6)
@@ -1084,6 +1087,8 @@ function TeamGameScene({
       <RecordAlertStageOverlay frame={recordAlert} />
     </>,
   )
+  // 0x1c(판 위 창 0x46ee0)는 상태 틱을 안 박고, 타석 위 결과 창 0x1d(0x4d1e0)만 박는다
+  burstResultTickRef.current = heldDefense === null && burstWindow !== null && resolution !== null ? BURST_RESULT_STATE_TICK : null
   if (heldDefense !== null) return heldDefense
 
   // 사구 뒤 벤치 클리어링 (상태 0x1e) — 타석이 붙들린 채 연출이 돈다 (진입 굴림 45 번은 진행기가 이미 썼다)
@@ -1241,6 +1246,8 @@ function TeamGameScene({
           <>
             <div className={stageScreen.canvasSlot}>
               <BattingStage
+                // 돌발 제안 창 0x1b 의 그리기 0x4a198 은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
+                isHudOmitted={visibleBurstLines !== null && resolution === null}
                 batterAbility={currentBatterAbility(progress)}
                 // 타자 폼 rec[0xb] >> 4 · 피부 · 손 0xb63c0 (타석 교대 0x47d58~0x47dd6) — 몸통 · 자세표 · 배치 side 와 스윙 판정 0xab214 ·
                 // CPU 투구의 타자 손. 마타자 손은 표 0xd88b0
@@ -1364,6 +1371,8 @@ function TeamGameScene({
             단계 상태(0xf·0x10·0x11)와 조준점·게이지 틱은 그대로다 (0x52cc6, 투수편 `isPitchInputPaused` 와 같은 자리)
           */
           <PitcherSideStage
+            // 돌발 제안 창 0x1b 의 그리기 0x4a198 은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
+            isHudOmitted={visibleBurstLines !== null && resolution === null}
             // 0xd 진입마다 투수 그림 객체를 상태 0 으로 (48ee4 — '#' 교체 창에서 곧장 선 0xe 는 0xd 가 없다)
             sceneDEntryMark={sceneConfirm.sceneDEntryMark}
             pitch={progress.lastPitch}

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { BURST_RESULT_STATE_TICK, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import type { RecordAlertOptions } from '@/widgets/game-scene/model/useRecordAlert'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -112,6 +112,28 @@ describe('useRecordAlert — 칸 채우기 0x4e600 은 공 끝에만', () => {
     expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([true, false])
     tick()
     expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([false, true])
+  })
+})
+
+describe('useRecordAlert — 돌발 결과 창 0x1d 의 상태 틱 박기 (0x4d1e0 4d1e2)', () => {
+  it('창이 서 있는 동안 노랑 줄은 (100 % 18) / 6 = 1 에 박히고, 걷히면 다시 센다', () => {
+    const pin: { current: number | null } = { current: null }
+    const options: RecordAlertOptions = { isDrawing: true, sceneStateKey: 'a', pitchEnd: { serial: 1 }, pinnedStateTickRef: pin }
+    const { result, rerender } = renderHook(({ ids, options: current }: Props) => useRecordAlert(ids, current), {
+      initialProps: { ids: [], options: { ...options, pitchEnd: { serial: 0 } } } as Props,
+    })
+    rerender({ ids: [1, 2, 3], options })
+    tick(2)
+    expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([true, false, false])
+    pin.current = BURST_RESULT_STATE_TICK
+    for (let step = 0; step < 20; step += 1) {
+      tick()
+      expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([false, true, false])
+    }
+    pin.current = null
+    rerender({ ids: [1, 2, 3], options: { ...options, sceneStateKey: 'b' } })
+    tick()
+    expect(result.current.rows.map((row) => row.isHighlighted)).toEqual([true, false, false])
   })
 })
 

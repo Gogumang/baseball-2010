@@ -57,6 +57,21 @@ interface EventDialogueBoxProps {
   readonly onChoiceMove?: (selected: number) => void
   /** 선택지 확인 — 고른 줄의 갈 이벤트로. 상자 단계와 상관없이 곧바로 받는다 */
   readonly onChoiceConfirm?: (selected: number) => void
+  /**
+   * 0x7fad0 의 장식(mode_ui 프레임 21 "CLR:SKIP")을 그리는가 — 0x7fbc4 의 넷째 인자. 이벤트 재생기 0x8b5ac 는 1, 강판 감독 대사
+   * 0x50828 은 0 이다(r334 직접 뜸 — 7fbd6 r2 = 넷째 인자 → 0x7fad0 의 7fb5a 장식 문). 안 주면 참
+   */
+  readonly showsOrnament?: boolean
+  /**
+   * 그리기 틀 시계 — 틀마다 `callback` 을 한 번 부르고 끊는 함수를 돌려준다. 안 주면 앱 틀 시계(`setAppTickInterval`).
+   * 경기 장면 위 상자(0x23)는 경기 장면 시계를 넘긴다 — 공용 창이 서면 52efe 가 상태 그리기를 건너뛰어 상자도 선다
+   */
+  readonly tickInterval?: (callback: () => void) => () => void
+  /**
+   * 확인(say 갈래)을 곧바로 하지 않고 넘겨 미룬다 — 경기 장면의 상태 키는 받은 다음 틀의 키 자리(52da2)에서 그리기보다 먼저 돈다
+   * (`sceneKeyLatch`). 안 주면 곧바로
+   */
+  readonly deferPress?: (run: () => void) => void
 }
 
 /** 그리기 한 번(0x7fbc4)을 거친 상자 — 명령이 돌거나 상자를 내린 틀에도 그 틀의 그리기가 높이를 올리고 글을 찍는다 */
@@ -71,7 +86,7 @@ const drawnState = (state: DialogueState, layout: DialogueLayout | null) => tick
  */
 export function EventDialogueBox({
   raw, replacements = [], choices = null, slideIn, textKey, lowerKey = 0, onAdvance, isActive = true, onCancel, onChoiceMove,
-  onChoiceConfirm,
+  onChoiceConfirm, showsOrnament = true, tickInterval = setAppTickInterval, deferPress,
 }: EventDialogueBoxProps) {
   const text = useMemo(() => substituteDialogue(raw, replacements), [raw, replacements])
   const isList = choices !== null && choices.lines.length !== 1
@@ -101,8 +116,10 @@ export function EventDialogueBox({
   const layoutRef = useRef(typingLayout)
   layoutRef.current = typingLayout
   // 명령이 돌거나 상자를 내린 틀은 위에서 이미 그렸다 — 다음 그리기는 한 틀 뒤다(틀 시계를 그 틀에 맞춘다)
+  const tickIntervalRef = useRef(tickInterval)
+  tickIntervalRef.current = tickInterval
   useEffect(() => {
-    const tick = setAppTickInterval(() => {
+    const tick = tickIntervalRef.current(() => {
       const next = tickDialogue(stateRef.current, layoutRef.current)
       stateRef.current = next
       setState(next)
@@ -122,13 +139,20 @@ export function EventDialogueBox({
   onChoiceConfirmRef.current = onChoiceConfirm
   const onCancelRef = useRef(onCancel)
   onCancelRef.current = onCancel
-  const press = () => {
+  const deferPressRef = useRef(deferPress)
+  deferPressRef.current = deferPress
+  const pressNow = () => {
     const list = choicesRef.current
     if (list !== null) return onChoiceConfirmRef.current?.(list.selected)
     const pressed = pressDialogue(stateRef.current)
     if (pressed.advance) return onAdvanceRef.current()
     stateRef.current = pressed.state
     setState(pressed.state)
+  }
+  const press = () => {
+    const defer = deferPressRef.current
+    if (defer === undefined) return pressNow()
+    defer(pressNow)
   }
 
   useEffect(() => {
@@ -207,7 +231,7 @@ export function EventDialogueBox({
         <rect data-part="본체" x={0} y={boxTop} width={SCREEN_WIDTH} height={height} fill="#000000" fillOpacity={EVENT_DIALOGUE.boxAlpha} />
       </svg>
       {/* 0xba19d 장식 — mode_ui 프레임 21 을 (W, 본체 위) */}
-      <FrameSprite folder={MODE_UI} frame={EVENT_DIALOGUE.ornamentFrame} origins={origins} x={SCREEN_WIDTH} y={boxTop} />
+      {showsOrnament && <FrameSprite folder={MODE_UI} frame={EVENT_DIALOGUE.ornamentFrame} origins={origins} x={SCREEN_WIDTH} y={boxTop} />}
       <button type="button" className={styles.hit} aria-label="대사 넘기기"
         style={{ height: height + EVENT_DIALOGUE.bandHeight }} onClick={isActive ? press : undefined} />
       {/*

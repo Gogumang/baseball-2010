@@ -21,7 +21,7 @@ describe('경기 시작 인트로 그리기 (0x417ac)', () => {
     expect(screen.getByTestId('인트로-팀이름').dataset.frame).toBe(String(0x41 + 2))
   })
 
-  it('배경을 주면 구장을 카운터(270 − 5t)만큼 내려 그린다 (0x40ff0)', () => {
+  it('배경을 주면 구장을 카운터(진입 틀도 갱신이 돌아 270 − 5(t + 1))만큼 내려 그린다 (0x40ff0)', () => {
     vi.useFakeTimers()
     render(
       <GameIntro
@@ -30,9 +30,9 @@ describe('경기 시작 인트로 그리기 (0x417ac)', () => {
         onDone={() => {}}
       />,
     )
-    expect(screen.getByTestId('구장-배경').dataset.offsetY).toBe('270')
+    expect(screen.getByTestId('구장-배경').dataset.offsetY).toBe('265')
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 2))
-    expect(screen.getByTestId('구장-배경').dataset.offsetY).toBe('260')
+    expect(screen.getByTestId('구장-배경').dataset.offsetY).toBe('255')
   })
 
   it('라이벌전이면 그림 1 부터 맨 위에 라이벌전 띠 0x3b80c 를 단계 min(n, 9) 로 그린다 — 아니면 없다', () => {

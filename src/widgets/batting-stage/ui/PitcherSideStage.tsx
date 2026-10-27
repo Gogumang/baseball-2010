@@ -143,6 +143,11 @@ interface PitcherSideStageProps {
   readonly isScoreboardOn?: boolean
   /** 0xd · 0xe 대기(확인 · 소개 판) — 쉬는 '대기' */
   readonly isPaused: boolean
+  /**
+   * **HUD 를 안 그리는 상태가 섰다** — 돌발 제안 창 0x1b(그리기 0x4a198) · 강판 감독 대사 0x23(0x50828)은 0x42f2c · 0x4c4bc 를 안 부른다
+   * (점수판 · 램프 · 존 · 소프트키 · 구속 · 필살 · 스킬 판이 없다 — `renderBattingStage` 의 `omitsHud`). 안 주면 거짓
+   */
+  readonly isHudOmitted?: boolean
   /** 일시정지 팝업(0x741a0) — 장면 틱이 멈춘다(0x52cc6). 그림은 그 자리에 둔다 */
   readonly isFrozen?: boolean
   /**
@@ -818,6 +823,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         skillPanel: skillPanelView,
         // 0x373d0 끝의 미션 HUD 띠 (모드 5 — `MissionHud`)
         missionStrips: current.missionStrips ?? null,
+        omitsHud: current.isHudOmitted === true,
         scenery: {
           // 구름 0x78448 — 0x3f060 은 '대기'(0xd~0x10)에서만 센다. 팝업으로 장면이 선 동안(`isFrozen`)은 안 센다
           cloudCalls: observeSceneCloudFrame(sceneCloudFrameOf(rawNow), isIdle && current.isFrozen !== true, cloudCursor),

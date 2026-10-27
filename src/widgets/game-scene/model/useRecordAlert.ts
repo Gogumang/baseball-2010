@@ -46,7 +46,16 @@ export interface RecordAlertOptions {
    * 거짓(기본)이면 이미 지난 것으로 본다(이어하기는 원본도 장면 객체를 새로 세워 줄이 빈다).
    */
   readonly queuesInitialRecords?: boolean
+  /**
+   * 상태 틱을 이 값으로 박아 두는 동안(그리기마다) — 타석 위 돌발 결과 창 0x1d 의 그리기 0x4d1e0 은 4d1e2~4d1e4 에서 경기+0x2c = 100 을
+   * 쓰고 0x12 그림 0x4ce9c 를 부른다. 같은 틀 뒤 53064 의 0x4e35c 는 그 100 을 보므로 창이 서 있는 동안 노랑 줄은 (100 % 18) / 6 = 1 에
+   * 박힌다(`BURST_RESULT_STATE_TICK`). 부르는 화면이 그 창을 세울 때 `current` 에 넣는다 — 갱신 때 읽는다. null 이면 보통대로 센다
+   */
+  readonly pinnedStateTickRef?: { readonly current: number | null }
 }
+
+/** 0x4d1e0 4d1e2~4d1e4 `movs r3, #0x64 ; str r3, [r0, #0x2c]` — 돌발 결과 창(0x1d)이 그림마다 박는 상태 틱 */
+export const BURST_RESULT_STATE_TICK = 100
 
 /**
  * **경기 중 기록 달성 알림 0x4e35c 의 상태** — 진행기가 쌓는 이번 경기 기록 번호(`recordIds`, 달성 차례)가 늘면
@@ -64,7 +73,7 @@ export function useRecordAlert(
   recordIds: readonly number[],
   {
     isDrawing, isFrozen = false, isSettled = false, sceneStateKey, pitchEnd, isPitcherRemoved = false,
-    queuesInitialRecords = false,
+    queuesInitialRecords = false, pinnedStateTickRef,
   }: RecordAlertOptions,
 ): RecordAlertFrame {
   const stateRef = useRef<RecordAlertState>(EMPTY_RECORD_ALERT)
@@ -80,6 +89,8 @@ export function useRecordAlert(
   removedRef.current = isPitcherRemoved
   const humanCountOfRef = useRef(pitchEnd?.humanCountOf)
   humanCountOfRef.current = pitchEnd?.humanCountOf
+  const pinnedRef = useRef(pinnedStateTickRef)
+  pinnedRef.current = pinnedStateTickRef
   const sceneKeyRef = useRef(sceneStateKey)
   sceneKeyRef.current = sceneStateKey
   const tickedKeyRef = useRef(sceneStateKey)
@@ -142,6 +153,9 @@ export function useRecordAlert(
       } else {
         stateTickRef.current += 1
       }
+      // 상태 그리기가 틱을 박는 창(0x1d 0x4d1e0) — 0x4e35c 는 그 상태 그리기 뒤라 박힌 값을 본다. 팝업 중에는 상태 그리기도 서서 그대로다
+      const pinned = pinnedRef.current?.current ?? null
+      if (pinned !== null) stateTickRef.current = pinned
     }
     const drawn = drawRecordAlert(stateRef.current, stateTickRef.current, frozenRef.current)
     stateRef.current = drawn.next

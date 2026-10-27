@@ -146,6 +146,8 @@ interface GameScreenProps {
    * 모드 4 는 사람 장면이 늘 내 타석이라 아이콘은 방망이(공격)다
    */
   readonly burstRow?: BurstMissionRow | null
+  /** 돌발 제안 창(0x1b, 그리기 0x4a198)이 섰다 — 타석 캔버스가 HUD 0x4c4bc 를 안 그린다(`BattingStage.isHudOmitted`) */
+  readonly isHudOmitted?: boolean
 }
 
 /**
@@ -193,6 +195,7 @@ export function GameScreen({
   recordAlert,
   onRecordAlertSceneChange,
   burstRow = null,
+  isHudOmitted = false,
 }: GameScreenProps) {
   const menu = useInGameMenuState()
   // 경기 장면 0x104 — 생성자 0x3301c 가 [창+0x24f] = 1 (공용 창이 줄임 없이 닫힌다)
@@ -387,6 +390,7 @@ export function GameScreen({
             웹 전용 "등판!" 띠 · 조작 안내(Hint) · 큰 결과 글자(BigResult)를 걷어 냈다
           */}
           <BattingStage
+            isHudOmitted={isHudOmitted}
             // 0xb570c 의 사기 감소는 b5768 이 넘겨 받은 팀 레코드 +2 에 쓴 0xa3a24 값을 읽는다 — 국가대항전 중이면 상대국 칸 +2
             // (원본 버그, `withNariGameMorale`)
             batterAbility={effectiveAbilityOf(withNariGameMorale(career))}

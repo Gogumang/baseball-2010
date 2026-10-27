@@ -5,7 +5,7 @@ import {
   INTRO_TICKS,
   introBandAlphaOf,
   introCounterAt,
-  introFadeOf,
+  introFadeAt,
 } from '@/widgets/game-scene/lib/introSchedule'
 import {
   INTRO_BAND,
@@ -107,7 +107,7 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   }, [])
 
   const counter = introCounterAt(tick)
-  const fade = introFadeOf(counter)
+  const fade = introFadeAt(tick)
   const effectLevel = introScoreboardEffectOf(fade.level)
   const imageOpacity = effectOpacityOf(effectLevel)
   const imageStyle = imageOpacity === 1 ? undefined : { opacity: imageOpacity }
