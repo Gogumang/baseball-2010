@@ -1,6 +1,9 @@
 import { Suspense, lazy, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { noteBlockingLoadFailure } from '@/shared/lib/staleBuild/staleBuild'
+import { registerLazyScreenPreload } from '@/shared/lib/lazyScreen/lazyScreenRegistry'
+
+export { preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreenRegistry'
 
 /**
  * **화면 덩이 나눠 받기** (웹 전용 — 원본에 없다). 첫 화면(이용안내)에 안 쓰는 큰 화면(경기 엔진 · 수비 진행기 · 생성 표를 끌고 오는
@@ -18,8 +21,6 @@ export interface LazyScreen<Props extends object> {
   /** 덩이를 받아 둔다 — 여러 번 불러도 한 번만 받는다 */
   readonly preload: () => Promise<void>
 }
-
-const preloads: { readonly order: number; readonly preload: () => Promise<void> }[] = []
 
 /**
  * @param load 덩이를 받아 화면 컴포넌트를 돌려준다 (`import('…').then((module) => module.X)`)
@@ -62,21 +63,6 @@ export function lazyScreen<Props extends object>(
     )
   }
   const preload = () => fetchOnce().then(() => undefined)
-  preloads.push({ order, preload })
+  registerLazyScreenPreload(order, preload)
   return Object.assign(Screen, { preload })
-}
-
-/**
- * 지금까지 만든 나눠 받는 화면을 모두 받아 둔다 — 차례대로(한꺼번에 띄우면 느린 망에서 첫 화면 그림과 다툰다).
- * 실패는 삼킨다(그 화면을 그릴 때 다시 받는다).
- */
-export async function preloadLazyScreens(): Promise<void> {
-  // 같은 차례면 만든 차례대로 (sort 는 안정 정렬이다)
-  for (const { preload } of [...preloads].sort((a, b) => a.order - b.order)) {
-    try {
-      await preload()
-    } catch {
-      // 그릴 때 다시 받는다
-    }
-  }
 }

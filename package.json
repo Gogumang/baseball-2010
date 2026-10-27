@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:quick": "vitest run --exclude src/app/model/soak/careerSoak.test.tsx --exclude src/app/model/soak/pitcherLeagueSoak.test.tsx",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "verify": "yarn typecheck && yarn test && yarn build",

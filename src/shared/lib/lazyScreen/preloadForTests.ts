@@ -1,5 +1,5 @@
 import { beforeAll } from 'vitest'
-import { preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreen'
+import { preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreenRegistry'
 
 /**
  * 시험 준비 파일(vitest `setupFiles`) — 시험 파일을 읽은 뒤(그 사이 `lazyScreen` 이 다 만들어진다) 시험 전에 나눠 받는 화면 덩이를

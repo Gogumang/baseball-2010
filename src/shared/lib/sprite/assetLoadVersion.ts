@@ -12,6 +12,11 @@ export function assetLoadVersion(): number {
   return version
 }
 
+/** `assetLoadVersion` 과 같은 값 — 글꼴 지켜보기를 걸지 않는다(그리기가 아닌 자리에서 「그 뒤로 도착한 것이 있나」만 볼 때) */
+export function assetLoadCount(): number {
+  return version
+}
+
 /** 재료 하나가 도착했다(캐시에 실렸다) */
 export function noteAssetLoaded(): void {
   version += 1

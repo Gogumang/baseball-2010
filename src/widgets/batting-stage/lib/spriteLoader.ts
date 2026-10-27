@@ -5,8 +5,8 @@
  */
 import { paletteUrl, recoloredSpriteUrl } from '@/shared/lib/sprite/paletteSwap'
 import type { SpritePalettes } from '@/shared/lib/sprite/paletteSwap'
-import { noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
-import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
+import { assetLoadCount, noteAssetLoaded } from '@/shared/lib/sprite/assetLoadVersion'
+import { spriteImage, spriteJsonCacheEpoch, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
 import { drawFrameLayers, frameLayersUrl, frameLayerUrl, hasFrameLayers, placedFrameLayersOf } from '@/shared/lib/sprite/frameLayers'
 import type { FrameLayerListing, PlacedFrameLayer } from '@/shared/lib/sprite/frameLayers'
 import { flippedFrameUrlOf, frameCopiesUrl, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
@@ -158,6 +158,8 @@ export interface RecolorFrame {
 
 /** 칠하기를 다 걸어 둔 묶음 열쇠 */
 const warmedFrameSets = new Set<string>()
+/** 못 다 건 묶음 열쇠 → 그때의 (재료 도착 수 | JSON 캐시 비운 수) */
+const pendingFrameSets = new Map<string, string>()
 
 /**
  * 한 그림 객체가 그릴 수 있는 프레임 전부의 칠하기를 미리 건다 (`warmRecoloredFrame`) — 원본은 팔레트를 적재 때 갈아 끼우므로
@@ -167,17 +169,29 @@ const warmedFrameSets = new Set<string>()
  */
 export function warmRecoloredFrames(key: string, framesOf: () => readonly RecolorFrame[]): boolean {
   if (warmedFrameSets.has(key)) return true
+  // 못 다 건 묶음은 그 뒤로 재료(JSON)가 하나도 안 왔으면 다시 봐도 똑같이 못 건다 — 원점 · 팔레트 · 겹 목록은 도착할 때만
+  // 바뀌고(`noteAssetLoaded`), 이미 건 칠하기 · 시작한 받기는 다시 불러도 아무 일이 없다. 그림이 끝내 안 오는 자리(jsdom 시험)에서
+  // 틀마다 목록 · 주소를 다시 만들던 몫을 던다 (r330, OPTIMIZATION B1). 캐시를 비우면(시험) 받기를 다시 시작해야 하므로 그 횟수도 본다
+  const stamp = `${assetLoadCount()}|${spriteJsonCacheEpoch()}`
+  if (pendingFrameSets.get(key) === stamp) return false
   let isAllWarmed = true
   for (const { folder, frame, paletteIndex } of framesOf()) {
     if (paletteIndex !== null && !warmRecoloredFrame(folder, frame, paletteIndex)) isAllWarmed = false
   }
-  if (isAllWarmed) warmedFrameSets.add(key)
+  if (isAllWarmed) {
+    warmedFrameSets.add(key)
+    pendingFrameSets.delete(key)
+  } else {
+    // 도착은 늘 비동기(받기 `then`)라 이번에 보는 동안에는 값이 안 바뀐다
+    pendingFrameSets.set(key, stamp)
+  }
   return isAllWarmed
 }
 
 /** 시험 전용 — 다 건 묶음 기억을 비운다 */
 export function resetWarmedRecolorsForTest(): void {
   warmedFrameSets.clear()
+  pendingFrameSets.clear()
 }
 
 function loadSprite(url: string): Promise<HTMLImageElement | null> {
