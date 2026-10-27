@@ -76,7 +76,6 @@ import {
   chooseRundownRunner,
   endRundown,
   rundownAction,
-  tagsRunner,
   NO_RUNDOWN,
   type RundownPlan,
 } from '@/entities/fielding/model/rundown'
@@ -2040,6 +2039,74 @@ export function stepDefensePlay(
   }
 
   /**
+   * **AI 8 = 0xb48b6 — 협살 야수 한 칸** (플레이 vt4c 야수 고리의 분기표 0xd8808[8], 직접 뜬 것, r313):
+   * ```
+   * b48b6  s = (s8)P+0x1ec == 칸 ? 0 : 1 ; 짝 = (s8)P+0x1ec[1 − s]          ; 기록칸 그대로
+   * b48f0  0xb3a04(지역 8바이트, P) — 계획을 **지금 상태로 다시 셈**(기록칸 P+0x1ec 는 안 건드린다)
+   * b48f6  0xb398c() == −1 이거나 지역 [0] · [1] 어느 쪽도 이 칸이 아니면 0xb26b8 협살 종료(b4912) → 다음 칸
+   * b4940  R = 0xa9564(P+0x1f0) — 기록칸의 주자 그대로(아웃인지 안 본다)
+   * b496e  이 칸 == +0x130(공 가진 야수):
+   *   b49dc  +0xe0 == 0 → 포구 점의 (x, 0, z) 로 0xa100c(= vt14) (b4b50)
+   *   b4a30  커버[R+0x7c] == 칸 || R.vt1c(짝 위치) > vtb4(짝) + 5 → vt4c(R) = vt14(R 위치) (b4a96)
+   *   b4a3a  아니고 +0x12c(쥠) 면 플레이.vt5c(짝, 0) = 0xb2e38 보통 송구 (b4a4a) — 아니면 아무것도 안 한다
+   * b4a58  아니면 r = R.vt1c(내 위치) ; r0 = 짝.vtb4(나) ;
+   *        r > r0 + 4 → vt4c(R) ; r > r0 → vt10 0xa124c ; 아니면 vt48(P+0x1ee[s] 루) = vt14(루 좌표)
+   * ```
+   * vt4c 0xa0a5c · vt48 0xa0a18 · 0xa100c 는 모두 vt14 0xa14c8 로 목표만 적는다 — 관문(잠금 +0xb4 ≤ 0 · vtc8)이 막으면 목표는
+   * 그대로이고, 걸음은 다른 AI 처럼 다음 목록 틱(6 절 `moveFielder` — 야수 틱 a1376)이 한다. 태그 아웃은 이 함수가 아니라 아웃 판정
+   * 0xb36d0(6b 절 · 쥐기 b2758)이 낸다(결과 3 → 0xb3946 이 협살을 끝낸다).
+   * (예전 웹은 2b 절에서 두 야수를 back · front 차례로 돌리며 자리를 곧바로 한 걸음 옮기고(관문 없이), 그 자리에서 태그를 따로
+   * 보고, 쫓던 주자가 아웃이면 협살을 풀었다 — r313 에서 걷었다)
+   */
+  const runRundownAi = (slot: number): void => {
+    const action = rundownAction({ ...contextAt(tick), plan: rundown, slot, ballTarget: catchPoint })
+    if (action.kind === '협살해제') {
+      // 0xb26b8 — 기록칸을 지우고 상태 8 인 야수를 전부 상태 0 으로. 날아가던 짝 송구는 보통 송구 공이라 그대로 날아가 예보가 고른 야수가 받는다
+      fielders = endRundown(fielders)
+      rundown = NO_RUNDOWN
+      log.push(`${tick}틱 협살 종료 — ${slot}번 야수의 협살 AI 가 풀었다 (b4912)`)
+      return
+    }
+    const self = fielders[slot]
+    if (self === undefined) return
+    /** vt14 0xa14c8 — 관문이 열려 있을 때만 목표를 받는다 */
+    const retarget = (to: WorldPoint): void => {
+      if (!acceptsTargetVt14(self) || isSamePoint(self.target, to)) return
+      fielders = fielders.map((fielder) => (fielder.slot === slot ? { ...fielder, target: to } : fielder))
+    }
+    if (action.kind === '주자추적') {
+      // vt4c 0xa0a5c — 주자의 지금 위치(+0x20)를 그대로 목표로
+      const chased = runners[action.runnerIndex]
+      if (chased !== undefined) retarget(chased.state.position)
+    } else if (action.kind === '공쫓기') {
+      retarget(groundPointOf(action.target))
+    } else if (action.kind === '루로') {
+      // vt48 0xa0a18 — 표 0xd78f0[루 % 4] 좌표로 vt14
+      retarget(basePosition(action.base))
+    } else if (action.kind === '짝에게송구') {
+      // b4a4a 플레이.vt5c(짝, 0) = **0xb2e38 보통 송구** (A-34, r312) — 준비(vtC4) · 계획 0xb3444 · 미루기(AI 9) ·
+      // 0xa1620 악송구 · 흔들림 굴림 · 세계 공 · 예보 vt24(0) · 고르기 vt34(받을 야수 AI 1 · +0x130) · 커버 vt30 이 모두 같다.
+      // 계획 [7](+0x153, 목표 루)은 0xb3444 b347c~b34b2 가 낸다:
+      //   [7] = 짝.vt68()(목표점이 루 좌표인가) ; < 0 이면 [7] = 바이트[P + 0x1ef + (s8)P+0x1f1] — 협살 칸 [3 + 공 쥔 쪽]
+      // 공 쥔 쪽 [5](+0x1f1)는 시작 0xb3a94 가 적은 값 그대로다(0xb3444 밖에서 읽는 곳이 없다). 0 이면 [3] 짝의 루, 1 이면
+      // [4] 주자 번호다 — 1 은 두 루의 커버가 한 야수일 때만이고 그때 짝 = 자신이라 공 쥔 쪽은 늘 주자를 쫓아(b4976) 닿지 않는다.
+      // 던진 야수는 0xb2c90 을 거치지 않아 AI 0 이 안 되고 8 그대로다 — 다음 칸부터 +0x130 이 받을 야수라 공 없는 갈래(b4a58)를 탄다
+      const partner = fielders[action.toSlot]
+      if (partner === undefined) return
+      const partnerBase = baseAtPoint(partner.target)
+      const base = partnerBase !== NONE ? partnerBase : rundown.holderSide === 1 ? rundown.runnerIndex : rundown.frontBase
+      // 참이어도 미뤘으면(AI 9) 공은 아직 손에 있다(+0x12c 그대로)
+      if (throwBall(slot, action.toSlot, base, '협살', false) && !play.held) {
+        log.push(`${tick}틱 협살 송구 ${slot}→${action.toSlot} — ${throwArrivalTick}틱 도착 (${chaserSlot}번 야수가 받는다)`)
+      }
+    } else if (action.kind === '대기' && slot !== play.ballHolderSlot) {
+      // 공 없는 야수(b4aa0~b4aaa: 주자 틱 r > 짝 송구 틱 r0 이고 r ≤ r0 + 4)는 vt10 0xa124c(목표 = 위치 · 동작 · 자세 워드 0, r176).
+      // 공 가진 야수의 '대기'(b4a3a — 안 쥠 +0x12c == 0)는 b4c60 으로 끝나 아무것도 안 한다
+      fielders = fielders.map((fielder) => (fielder.slot === slot ? withPoseCleared(fielder) : fielder))
+    }
+  }
+
+  /**
    * **플레이.vt70 = 0xb3148 — 공을 야수에게서 튕겨 다시 쏜다** (직접 뜬 것). 틱 끝 b45a0 이 사건(sp+0x24)이면 부른다.
    * ```
    * b3148 p = 공.vt60(지금 점) ; 속도 = max(p.속도·60/100, 300) · v0 = min(p.수직속도·30/100, 100) · 각 = p.각 + rand(−20, 20)
@@ -2495,7 +2562,7 @@ export function stepDefensePlay(
     // 공 쥔 야수가 늘 주자가 달려오는 루의 커버(`coversBack`)다 — 짝에게 던질 일이 없어 수동 송구 원칙(키 없이 공이 안 나감)과 안 부딪친다.
     const rundownEnabled = defenseIsCpu || isBugFixed('B-11')
     if (rundownEnabled && !play.finished && play.everHeld) {
-      // 협살 짝 송구는 보통 송구(`throwBall`)라 공은 세계 공이고, 받는 것은 1 절 포구 틱 갈래(펌블 굴림 · 쥐기 0xb2710)다 (A-34, 아래)
+      // 협살 짝 송구는 보통 송구(`throwBall`)라 공은 세계 공이고, 받는 것은 1 절 포구 틱 갈래(펌블 굴림 · 쥐기 0xb2710)다 (A-34 — 1c 절 `runRundownAi`)
       // b42ee 갈래를 탄 틱은 협살 시작 b433c~b4378 을 건너뛴다 (위)
       if (rundown.runnerIndex === NONE && !arrivalBranch) {
         const context = contextAt(tick)
@@ -2521,100 +2588,9 @@ export function stepDefensePlay(
               `(야수 ${rundown.backFielder}·${rundown.frontFielder})`,
           )
         }
-      } else {
-        const chased = runners[rundown.runnerIndex]
-        let released = true
-        if (chased !== undefined && !chased.state.isOut) {
-          released = false
-          // "공 쪽" 은 지금 공의 포구점이다 — 짝 송구도 예보가 세운 받는 점이다 (원본은 공 객체의 목표점 공+0x2c 을 본다)
-          const ballTarget = catchPoint
-          for (const slot of [rundown.backFielder, rundown.frontFielder]) {
-            if (released) break
-            // 0xb48b6 은 야수 고리의 분기표 0xd8808[8] — **AI 상태가 8 인 야수에게만** 돈다. 시작 0xb3a94 가 잠긴 야수(+0xb4 > 0)는
-            // 8 로 안 만들고, 짝 송구(0xb2e38)를 받는 짝은 고르기 vt34(0xb3e54)가 AI 1 로, 미룬 송구(b30a2)는 던질 야수를 AI 9 로
-            // 바꾼다 — 그 야수는 더는 협살 AI 를 안 탄다(쫓기 · 쥐기 · CPU 송구 결정은 보통 길로)
-            if (fielders[slot]?.aiState !== AI_STATE.RUNDOWN) continue
-            const action = rundownAction({ ...contextAt(tick), plan: rundown, slot, ballTarget })
-            if (action.kind === '협살해제') {
-              released = true
-              break
-            }
-            const self = fielders[slot]
-            if (self === undefined) continue
-            if (action.kind === '주자추적') {
-              // vt0x4c — 상대의 현재 위치를 그대로 목표로 삼는다
-              const to = chased.state.position
-              fielders = fielders.map((fielder) =>
-                fielder.slot === slot
-                  ? { ...fielder, target: to, position: stepToward(fielder.position, to, fielder.speed) }
-                  : fielder,
-              )
-            } else if (action.kind === '짝에게송구') {
-              // b4a4a 플레이.vt5c(짝, 0) = **0xb2e38 보통 송구** (A-34, 직접 뜬 것) — 준비(vtC4) · 계획 0xb3444 · 미루기(AI 9) ·
-              // 0xa1620 악송구 · 흔들림 굴림 · 세계 공 · 예보 vt24(0) · 고르기 vt34(받을 야수 AI 1 · +0x130) · 커버 vt30 이 모두 같다.
-              // 계획 [7](+0x153, 목표 루)은 0xb3444 b347c~b34b2 가 낸다:
-              //   [7] = 짝.vt68()(목표점이 루 좌표인가) ; < 0 이면 [7] = 바이트[P + 0x1ef + (s8)P+0x1f1] — 협살 칸 [3 + 공 쥔 쪽]
-              // 공 쥔 쪽 [5](+0x1f1)는 시작 0xb3a94 가 적은 값 그대로다(0xb3444 밖에서 읽는 곳이 없다). 0 이면 [3] 짝의 루, 1 이면
-              // [4] 주자 번호다 — 1 은 두 루의 커버가 한 야수일 때만이고 그때 짝 = 자신이라 공 쥔 쪽은 늘 주자를 쫓아(b4976) 닿지 않는다.
-              // 던진 야수는 0xb2c90 을 거치지 않아 AI 0 이 안 되고 8 그대로다 — 다음 틱부터 +0x130 이 받을 야수라 공 없는 갈래(b4a58)를 탄다
-              const partner = fielders[action.toSlot]
-              if (partner !== undefined) {
-                const partnerBase = baseAtPoint(partner.target)
-                const base =
-                  partnerBase !== NONE ? partnerBase : rundown.holderSide === 1 ? rundown.runnerIndex : rundown.frontBase
-                // 참이어도 미뤘으면(AI 9) 공은 아직 손에 있다(+0x12c 그대로)
-                if (throwBall(slot, action.toSlot, base, '협살', false) && !play.held) {
-                  log.push(`${tick}틱 협살 송구 ${slot}→${action.toSlot} — ${throwArrivalTick}틱 도착 (${chaserSlot}번 야수가 받는다)`)
-                }
-              }
-            } else if (action.kind === '루로' || action.kind === '공쫓기') {
-              const to = action.kind === '루로' ? basePosition(action.base) : action.target
-              fielders = fielders.map((fielder) =>
-                fielder.slot === slot
-                  ? { ...fielder, target: to, position: stepToward(fielder.position, to, fielder.speed) }
-                  : fielder,
-              )
-            } else if (action.kind === '대기' && slot !== play.ballHolderSlot) {
-              // '대기' — 공 없는 야수(b4aa0~b4aaa: 주자 틱 r > 짝 송구 틱 r0 이고 r ≤ r0 + 4)는 vt10 0xa124c(목표 = 위치 · 동작 ·
-              // 자세 워드 0, r176). 공 가진 야수의 '대기'(b4a3a — 안 쥠 +0x12c == 0)는 b4c60 으로 끝나 아무것도 안 한다
-              fielders = fielders.map((fielder) => (fielder.slot === slot ? withPoseCleared(fielder) : fielder))
-            }
-
-            // ── 태그 아웃 판정 (0xb36d0 결과 3 → 0xb3946 이 협살을 끝낸다) ──
-            // 원본은 AI 상태와 무관하게 아웃 판정이 돌아, **공 쥔 야수와 주자의 거리가 499 이하**이고
-            // 주자가 루 위가 아니면 아웃이다. 여기서는 협살에 낀 두 야수에 대해서만 본다.
-            const afterMove = fielders[slot]
-            if (afterMove !== undefined && tagsRunner(afterMove, chased.state)) {
-              markOut(chased)
-              outs += 1
-              outsAdded += 1
-              rundownOuts += 1
-              // 이것도 0xb36d0 결과 3 이다 — state[0x87] = 1 (0xb394e)
-              tagOut = true
-              released = true
-              log.push(`${tick}틱 협살 태그 — ${rundown.runnerIndex}번 주자 아웃`)
-              // 원본은 이 태그를 아웃 판정 0xb36d0(결과 3)이 낸다 — 아웃 꼬리 0xb36fa(+0x110 = 0 · 0xa9648 포스 풀기)를 지나고,
-              // 같은 틱 b4540 이 "이번 틱 vt90 결과" 로 결과 코드 13 을 세워 0x51d40 이 0xafa60 을 한 번 부른다(6c 절, 사람 수비 ·
-              // 수동 송구에서도). 예전 웹은 이 자리에서 아웃만 적어 13 이 안 서고 이어 던지기가 없었다 (r272 — `runOutJudgement` 와 맞춤)
-              {
-                outJudgedThisTick = true
-                foulFlag = false
-                wideFair = true
-                const relaxed = releaseForcesAfterOut(runners.map((runner) => runner.state))
-                runners.forEach((runner, index) => {
-                  runner.state = relaxed[index] ?? runner.state
-                })
-              }
-            }
-          }
-        }
-        if (released) {
-          // 협살 종료 0xb26b8 — 기록칸을 지우고 상태 8 인 야수를 전부 상태 0 으로 되돌린다
-          // 날아가던 짝 송구는 보통 송구 공이라 그대로 날아가 예보가 고른 야수가 받는다
-          fielders = endRundown(fielders)
-          rundown = NO_RUNDOWN
-        }
       }
+      // 협살 중인 두 야수의 AI(0xb48b6)는 여기서 돌지 않는다 — 플레이 vt4c 야수 고리의 분기표 0xd8808[8] 이라 1c 절(`runRundownAi`)이
+      // 칸 차례로 돌린다 (r313)
     }
 
     // ── 6b. 아웃 판정 0xb36d0 — 플레이 틱 b43cc~b43ea: 이 플레이의 야수(0xb0c90)가 +0xe0(쥠) 이면 매 틱 vt90 (직접 뜬 것) ──
@@ -3012,6 +2988,13 @@ export function stepDefensePlay(
           fielders = withCoverBaseTarget(fielders, slot, base)
           continue
         }
+        // AI 8 b48b6 — 협살 (분기표 0xd8808[8], 직접 뜬 것, r313 — `runRundownAi`). 고리 안이라 득점(6f) · 중계(1a) · 사람 목표(1b)
+        // 뒤에 **칸 차례**로, 다른 칸의 AI 9 미룬 송구 · 커버 가져가기와 섞여 돈다. 협살을 시작한 틱(2b 절 — 플레이 틱 vt48)에도 돈다.
+        // 앞 칸이 협살을 풀면(0xb26b8) 뒤 칸은 이미 AI 0 이라 그 칸의 차례에 AI 0 갈래(b476a)를 탄다
+        if (dispatchState === AI_STATE.RUNDOWN) {
+          runRundownAi(slot)
+          continue
+        }
         if (deferredThrowReceiver === NONE) continue
         if (self.aiState !== AI_STATE.RECEIVE) continue
         const receiver = fielders[deferredThrowReceiver]
@@ -3135,8 +3118,6 @@ export function stepDefensePlay(
           fielders: fieldersNow,
           holderSlot: play.ballHolderSlot,
           held: play.held,
-          throwBase,
-          throwArrivalTick,
           uncatchable,
         }),
         ballIsFlying:
@@ -3187,14 +3168,15 @@ export function stepDefensePlay(
         // 레이저 잔상 0x37076 — +0x1991 동안 지금 공 궤적의 t = 0 점에서 공까지
         laserTrailFrom: laserTrailOn ? ballSegmentStart : null,
         // 공 그리기 0x36dfc 의 큰 타구 · 튐 파티클 — 진행기 쪽 조건 (`ballParticleFactsOf`).
-        // 튐은 공을 **궤적에서 읽어 그리는 틱**(`ballPointAt` 의 앞 두 갈래 — 잡히기 전 · 못 잡는 공 · 송구 · 튕긴 공)에만 본다.
+        // 튐은 공을 **궤적에서 읽어 그리는 틱**(`ballPointAt` 의 궤적 갈래 — 잡히기 전 · 못 잡는 공 · 송구 · 튕긴 공 · 안 쥔 공)에만 본다.
+        // 0x36dfc 의 파티클은 공 그림 깃발 [sp+0x58](+0x12c == 0, 36e8a~36ef8)이 선 그림에서만 돈다 — 받는 틱이 지난 안 쥔 공도 본다 (r313)
         // 날아가는 송구도 이 갈래다 — 송구공은 세계 공(`launchThrow`)을 이 틱부터 이어 깔고(`takeLooseBall` 의 `spliceTrajectory`)
         // 받는 틱 = 예보 포구 틱(catchTick = throwArrivalTick)이라, 0x36dfc 가 [장면+0x204] 공을 그리듯 송구 공 점으로 튐을 본다 (A-29)
         ballParticles: ballParticleFactsOf({
           ballTick: tick,
           at: tick,
           trajectory,
-          onTrajectory: uncatchable || tick < catchTick,
+          onTrajectory: uncatchable || !play.held || tick < catchTick,
           bigHitWatch: input.bigHitWatch ?? bigHitWatchOf(input),
           playKind: play.kind,
           resultCode: contactOfOutcome(input.outcome)?.resultCode ?? null,
@@ -3827,8 +3809,6 @@ interface FielderMoveInput {
  *   한다 — 던진 뒤(b2e14 · b48ac)·커버를 내준 뒤(b1d38 · b2540)·커버를 빼앗긴 뒤(b2a7e) AI 0 이 된 야수가 다음 고리에서 돌아선다 (r180)
  */
 function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderState {
-  // 협살(상태 8) 중인 야수는 분기표가 0xb48b6 으로 가므로 커버 이동을 하지 않는다 — 2b 절이 이미 옮겼다
-  if (fielder.aiState === AI_STATE.RUNDOWN) return fielder
   const walk = (target: WorldPoint): FielderState =>
     isSamePoint(fielder.position, target) || !input.canStep
       ? { ...fielder, target }
@@ -3842,6 +3822,8 @@ function moveFielder(fielder: FielderState, input: FielderMoveInput): FielderSta
     fielder.aiState === AI_STATE.BACKUP ||
     // AI 0xf(시작 자리로) — AI 고리 b4c2a 가 고친 목표로. +0xcc(vt8c(5))가 서 있는 동안은 관문이 닫혀 제자리다
     fielder.aiState === AI_STATE.RETURN ||
+    // AI 8(협살) — AI 고리의 0xb48b6(`runRundownAi`)이 vt14 관문을 거쳐 고친 목표로 (r313 — 예전 웹은 2b 절이 관문 없이 곧바로 옮기고 여기서 멈췄다)
+    fielder.aiState === AI_STATE.RUNDOWN ||
     (fielder.aiState === AI_STATE.BUSY && fielder.slot !== input.chaserSlot)
   ) {
     return walk(fielder.target)
@@ -3880,29 +3862,27 @@ interface BallPointInput {
   readonly holderSlot: number
   /** 지금 누가 쥐고 있나 P+0x12c */
   readonly held: boolean
-  readonly throwBase: number
-  readonly throwArrivalTick: number
   /** 아무도 잡지 않는 타구인가 — 그러면 공은 끝까지 궤적 위에 있다 */
   readonly uncatchable: boolean
 }
 
 /**
- * 이번 틱에 공이 어디 있나 — 포구(받기) 전에는 궤적, 그 밖에는 쥔 야수 손.
+ * 이번 틱에 공이 어디 있나 — **아무도 안 쥐었으면(+0x12c == 0) 궤적, 쥐었으면 쥔 야수 손.**
+ *
+ * 원본 공 그리기 0x36dfc(직접 뜸, r313): [장면+0x204] 공의 자리는 늘 0xa25d4(공) = 0xa25b0(공, 공+0x68) — **지금 재생 틱의 궤적 점**이다
+ * (36ea6~36eae). 공을 그릴지는 [sp+0x58] = 홈런 숨김(36e2a~36e80 — 웹 `ballBeyondFence`) 아님 && 플레이+0x12c(쥠) == 0 (36e8a~36ea4)이 정한다.
+ * 쥐지 않은 동안은 그림마다 0x3f378(G4)이 공+0x68 을 올리므로 공은 받는 틱이 지나도(못 받았거나 판 끝) 궤적을 따라 계속 간다.
+ * 쥐었으면 공 그림은 안 그리고(`defenseView` 의 `isHeld`), 그 자리는 웹 카메라 · 포구 동작이 보는 쥔 야수 손으로 둔다.
  *
  * **송구 공도 궤적이다** (A-29, 2026-10-27): 송구 0xb2e38 은 0xa1620(레이저 0xa222c)이 쏜 세계 공을 b2f8c 의 0xbfed0 으로 깔고
  * b2f9c 가 점[T − 1] 에 받는 점 (목표 x, 1000, 목표 z) 을 끼운다 — 웹 `launchThrow` 가 같은 공을 짓고 `takeLooseBall` 이 이 틱부터
- * 판 궤적에 잇는다(`spliceTrajectory`). 받는 틱 = 예보 vt24(0) · 고르기 vt34 의 포구 틱이라 `throwArrivalTick` 은 늘 `catchTick` 과
- * 같고, 날아가는 동안은 첫 갈래(`tick < catchTick`)가 세계 공 점(높이 · 원바운드 · 악송구 흔들림 그대로)을 낸다. 예전 "낮은 포물선(1200)"
- * 갈래는 `tick ≥ catchTick && tick < throwArrivalTick` 이라 닿을 수 없었다(r308 — 시험 · soak 짧은 판에서 한 번도 안 닿음을 확인하고 걷었다).
+ * 판 궤적에 잇는다(`spliceTrajectory`).
+ * (r313 정정: 예전 웹은 받는 틱이 지났는데 안 쥔 공을 마지막 송구의 루 자리(판 끝 240틱으로 잘린 송구)나 공 가진 야수 자리
+ * (홈런 · 파울 · 못 잡고 떨어진 공)에 그렸다 — 둘 다 원본에 없는 근사라 걷었다)
  */
 function ballPointAt(input: BallPointInput): WorldPoint {
-  if (input.uncatchable) return input.trajectory.pointAt(input.tick)
-  if (input.tick < input.catchTick) return input.trajectory.pointAt(input.tick)
+  if (input.uncatchable || !input.held || input.tick < input.catchTick) return input.trajectory.pointAt(input.tick)
   const holder = input.fielders[input.holderSlot] ?? input.fielders[0]
-  // ⚠️ 근사(남김): 받는 틱이 지났는데 아무도 안 쥔 공은 마지막 송구의 루 자리에 둔다. 협살 짝 송구는 이제 보통 송구(세계 공)라
-  //    이 갈래에 안 온다(A-34, r312). 남은 것은 예보 포구 틱이 판 끝(`maximumTicks`, 240)으로 잘린 공의 마지막 틱 그림뿐이다
-  //    (시험의 레이저 송구 판들이 판 끝 240틱 그림에서 닿는다 — r308 의 "협살만 닿는다" 는 틀렸다). 이 그림의 원본 자리는 아직 안 떴다
-  if (!input.held && input.throwArrivalTick >= 0 && input.throwBase !== NONE) return basePosition(input.throwBase)
   return holder.position
 }
 

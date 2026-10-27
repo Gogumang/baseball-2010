@@ -940,6 +940,44 @@ describe('협살 — AI 상태 8 (0xb48b6 · 시작 0xb3a94, S8 1절)', () => {
     expect(틱별[27]).toEqual(['0..10000'])
   })
 
+  // r313 — 협살 AI 0xb48b6 은 플레이 vt4c 야수 고리(분기표 0xd8808[8])에서 칸 차례로 돈다. 목표만 vt14 관문으로 적고 걸음은 다음
+  // 목록 틱이 하며, 태그는 아웃 판정 0xb36d0(6b 절)이 다음 그림에 낸다
+  const 협살판돌리기 = (pattern: BattedBallPattern, bases: BaseState, seed: number, key?: (tick: number) => string | null) =>
+    runDefensePlay({
+      outcome: 단타,
+      trajectory: battedBallTrajectory(pattern),
+      bases,
+      outs: 0,
+      runAbility: 500,
+      defenseIsCpu: true,
+      random: createSeededRandom(seed),
+      controls: {
+        side: '공격',
+        keyAt: (tick) => {
+          const pressed = key?.(tick) ?? null
+          return pressed === null ? null : { key: pressed }
+        },
+      },
+    })
+
+  it('협살 AI 는 목표만 고치고 걸음은 다음 목록 틱이라, 태그는 아웃 판정(6b)이 그다음 그림에 낸다 (b4a96 vt4c → vt14 · b43da, r313)', () => {
+    // 예전 웹은 2b 절이 공 쥔 유격수를 관문 없이 곧바로 한 걸음 옮기고 그 자리에서 태그를 봐 24틱에 잡았다
+    const 결과 = 협살판돌리기([48, 800, 282, 1], 주자1루, 405 * 31 + 1)
+    expect(결과.log).toContain('20틱 협살 시작 — 1번 주자 2↔1루 (야수 5·0)')
+    expect(결과.log).toContain('25틱 협살 태그 — 1번 주자 아웃')
+    expect(결과.log.some((line) => line.startsWith('24틱 협살 태그'))).toBe(false)
+  })
+
+  it('협살 AI 는 계획을 지금 상태로 다시 세어(0xb3a04) 이 칸이 [0] · [1] 에 없으면 푼다 — 기록칸 야수가 아니라 (b48f0~b4912, r313)', () => {
+    // 53틱 협살(유격수 5 · 포수 0) 뒤 1루 커버(+0xf0)가 1루수 2 로 바뀌자, 다시 센 계획에 포수가 없어 포수 차례(56틱)에 푼다.
+    // 예전 웹은 기록칸의 두 야수만 보아 풀지 않았다
+    const 결과 = 협살판돌리기([9, 687, 658, 0], { first: false, second: true, third: false }, 726 * 31 + 7 + 3, (tick) =>
+      tick >= 10 && tick % 6 === 0 ? '3' : tick >= 10 && tick % 6 === 3 ? '2' : null,
+    )
+    expect(결과.log).toContain('53틱 협살 시작 — 0번 주자 2↔1루 (야수 5·0)')
+    expect(결과.log).toContain('56틱 협살 종료 — 0번 야수의 협살 AI 가 풀었다 (b4912)')
+  })
+
   it('주자가 다시 진루로 돌아도 2루에 닿기 전까지는 협살 대상이다 — 주자 +0x14 = 위치라 0xb398c 의 비율은 늘 100 (r276)', () => {
     // 자동 주루(0xaf918)는 앞으로 가는 판정만 한다. 18틱 귀루 뒤 19틱 진루 키로 주자가 다시 2루로 가도, 원본 고르기(0xb398c)는
     // 0xbf01c 를 +0x14(움직인 틱마다 위치 — 0xbf240)에서 재므로 루에 거의 다 와도 대상에서 안 빠진다(예전 웹은 35% 미만 남으면 풀었다).
@@ -2301,6 +2339,21 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
     expect(굴림.log.some((line) => line.includes('잡았다'))).toBe(false)
     expect(굴림.foulEnded).toBe(true)
     expect(굴림.ticks.length).toBe(48)
+  })
+
+  it('받는 틱이 지나도 아무도 안 쥔 공은 궤적 점에 그린다 — 0x36dfc 는 공을 늘 0xa25b0(공, 공+0x68) 에 둔다 (36ea6, r313)', () => {
+    // 예전 웹은 포구 틱이 지난 안 쥔 공을 공 가진 야수 자리(또는 마지막 송구의 루 자리)에 그렸다
+    const 무늬: BattedBallPattern = [209, 317, 295, 1]
+    const 굴림 = 쏘기(무늬, 9, 0)
+    const 궤적 = battedBallTrajectory(무늬)
+    const 지난틱 = 굴림.ticks.map((_, 틱) => 틱).filter((틱) => 틱 >= 굴림.catchTick)
+    expect(지난틱.length).toBeGreaterThan(0)
+    for (const 틱 of 지난틱) {
+      const 공 = 굴림.ticks[틱].ball
+      const 점 = 궤적.pointAt(틱)
+      expect(공.isHeld).toBe(false)
+      expect([공.x, 공.z, 공.height]).toEqual([점.x, 점.z, 점.y])
+    }
   })
 
   it('넓은 페어 각(0x9d640, 35~145) 밖 파울은 state[7] = 0 — 커버 0xb1c90 이 머리(b1cc6)에서 끝나 아무도 루 커버를 안 받는다', () => {
