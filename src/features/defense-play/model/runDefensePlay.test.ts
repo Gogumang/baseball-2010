@@ -27,6 +27,7 @@ import {
   isDefensePlayFinished,
   runDefensePlay,
   defenseSkillIdsOf,
+  preRollContactMessage,
   startDefensePlay,
   stepDefensePlay,
 } from '@/features/defense-play/model/runDefensePlay'
@@ -2302,6 +2303,58 @@ describe('필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 
   it('창이 안 열리면 쏜 패턴 그대로다', () => {
     const state = 시작(장면난수([0.999, 0.999]))
     expect(state.trajectory.pointAt(10)).toEqual(battedBallTrajectory(쏜패턴).pointAt(10))
+  })
+})
+
+describe('맞은 판정 틀에 미리 굴린 메시지 0x11 묶음 — 판 시작이 쏜 공에서 되찾는다 (A-37)', () => {
+  // 코드 15 [49, 802, 799] — 필살수비 굴림 둘(점프 · 슬라이딩) · 필살타법 하나가 돈다. 폴에 안 닿는다
+  const 입력 = (random: RandomPort): DefensePlayInput => ({
+    outcome: registerContact(땅볼아웃, {
+      pattern: [49, 802, 799, 0],
+      resultCode: 15,
+      specialSwing: { number: 1, isAceBatter: false },
+    }),
+    trajectory: battedBallTrajectory([49, 802, 799, 0]),
+    bases: EMPTY_BASES,
+    outs: 0,
+    random,
+  })
+
+  it('미리 굴리면 판 시작은 그 묶음을 쓰고 더 굴리지 않는다 — 그 사이 굴림(0x13 파티클)은 묶음 뒤다', () => {
+    const 값들 = [0.999, 0.999, 0, 0.5, 0.25]
+    let 걸음 = 0
+    const random = createFractionRandom(() => 값들[Math.min(걸음++, 값들.length - 1)])
+    const input = 입력(random)
+    const 묶음 = preRollContactMessage(input)
+    // 필살수비 둘(실패) · 필살타법(0 → 성공) 세 걸음
+    expect(걸음).toBe(3)
+    expect(묶음?.uncatchable).toBe(true)
+    // 0x13 그림의 파티클 굴림 하나
+    random.rand9d(10)
+    const state = startDefensePlay(input)
+    expect(걸음).toBe(4)
+    expect(state.uncatchable).toBe(true)
+    expect(state.specialDefense).toEqual({ jumpUnlocked: false, slideUnlocked: false })
+    // 같은 공을 다시 미리 굴려도 굴리지 않는다
+    expect(preRollContactMessage(input)).toBe(묶음)
+    expect(걸음).toBe(4)
+  })
+
+  it('미리 굴린 판은 머리 없는 판(판 시작에서 굴림)과 같은 결과다 — 사이에 굴림이 없으면 차례가 같다', () => {
+    const 미리 = createSeededRandom(77)
+    const 미리입력 = 입력(미리)
+    preRollContactMessage(미리입력)
+    const 미리판 = runDefensePlay(미리입력)
+    const 바로 = createSeededRandom(77)
+    const 바로판 = runDefensePlay(입력(바로))
+    expect(미리판.log).toEqual(바로판.log)
+    expect(미리판.outcome).toEqual(바로판.outcome)
+    expect(미리.rand(0, 1000000)).toBe(바로.rand(0, 1000000))
+  })
+
+  it('난수가 없는 입력(예측)은 굴리지 않고 null — 판 시작도 굴리지 않는다', () => {
+    const input = { ...입력(createSeededRandom(1)), random: undefined }
+    expect(preRollContactMessage(input)).toBeNull()
   })
 })
 

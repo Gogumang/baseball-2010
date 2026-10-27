@@ -22,6 +22,7 @@ import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunne
 import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import type { HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
+import type { LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
 import type { StageParticleShot } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { createSceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import type { SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
@@ -222,6 +223,8 @@ export interface StageLatest {
   readonly onPitchResolved: (
     detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number, sceneTick?: number,
   ) => PitchResolvedReply | void
+  /** 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린 쏜 공 (`BattingStage` 의 같은 이름 props 주석 참고) */
+  readonly onContact?: (detail: PitchOutcomeDetail, buntKind: number) => LaunchedShot | null | undefined
   /**
    * CPU 투수가 공 대신 **견제**를 걸었다 (0x34848 → 메시지 0x10). 없으면 CPU 견제가 꺼진다 —
    * `BattingStage` 의 같은 이름 props 주석 참고.

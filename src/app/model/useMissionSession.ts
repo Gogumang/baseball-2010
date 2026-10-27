@@ -130,7 +130,7 @@ import type { Collection, HallOfFamePlayerPick } from '@/entities/collection/mod
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import type { ModePitcher } from '@/app/model/modePitcher'
 import { ROOKIE_BATTER_ABILITY } from '@/entities/batting/model/batter'
-import { recordedOutcomeOf, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
+import { preRollContactMessage, recordedOutcomeOf, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { registerContact } from '@/entities/batting/model/battedContact'
 import type { DefensePlayInput, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-play/model/pickoffPlay'
@@ -141,6 +141,7 @@ import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { contactOutcomeOfDetail } from '@/features/play-at-bat/model/resolvePitch'
 import {
   deepHitCheerSoundIdOf,
   inPlayCallSoundIdOf,
@@ -1217,6 +1218,23 @@ export function useMissionSession({
    * 0xa5e14~0xa5f62) 미션(모드 6)에서도 깎인다(`missionOpponentStaminaAfterPitch`). 깎인 체력%(0xaebb0)는 다음 공의
    * CPU 제구 등급·피로(0xb58e6)와 스윙 판정 0xab214 가 본다 (`missionPitcherAbility` 셋째 인자).
    */
+  /**
+   * **맞은 판정 틀** — 메시지 0x11 굴림 묶음(필살수비 · 표시 패턴 · 두 공 폴 · 필살타법)을 이 공으로 설 판 입력으로 미리 굴린다(A-37).
+   * 0x13 뒤 `handleMissionPitch` 가 세우는 판은 쏜 공에 묶인 그 값을 되찾는다 (수비 칸은 그 사이 안 바뀐다)
+   */
+  const preRollContact = useCallback(
+    (detail: PitchOutcomeDetail, buntKind: number) => {
+      const current = missionRunRef.current
+      const outcome = contactOutcomeOfDetail(detail)
+      if (current === null || outcome === null) return null
+      return preRollContactMessage({
+        ...missionDefensePlayInputOf(current.bases, current.outs, outcome, random, undefined, undefined, playAbilitiesOf(current)),
+        buntKind,
+      })
+    },
+    [random],
+  )
+
   const handleMissionPitch = useCallback(
     (
       detail: PitchOutcomeDetail,
@@ -2785,7 +2803,7 @@ export function useMissionSession({
     /** 지금 대기 칸 (g[0x11f] · g[0x176] · g[0xf6]) — 결과 판이 대결 꼴인지 본다 */
     aceMatchHold: hold,
     player, hallOfFameBatter,
-    missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, pendingRunnerPlay, handleMissionPitch, handleThrow, actions,
+    missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, pendingRunnerPlay, handleMissionPitch, preRollContact, handleThrow, actions,
     lastPitchJudgementCleared,
     /** 투수 미션의 마지막 공 — 타석 장면이 그림으로만 다시 날린다 */
     lastPitcherThrow,

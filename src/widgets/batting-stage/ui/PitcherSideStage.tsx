@@ -174,6 +174,11 @@ interface PitcherSideStageProps {
   readonly hitScene?: PitcherHitScene | null
   /** 0x13 이 끝나 0x17 이 선 틀 — 이 장면이 그 공을 날리지 않았으면(화면이 설 때 이미 있던 공) 첫 그림에 부른다 */
   readonly onHitSceneEnd?: () => void
+  /**
+   * 판정 틀(0x6aa → 0x51408) — 메시지 0x11 이 필살수비 · 표시 패턴 · 두 공 폴 · 필살타법을 굴린 뒤 0x13 이 선다(A-37). 부르는 화면이
+   * 판 입력으로 그 묶음을 미리 굴리고 표시 패턴으로 다시 만든 0x13 재료를 돌려준다(`usePitcherHitScene.judge`). 안 넘기면 굴리지 않는다
+   */
+  readonly onHitJudged?: () => PitcherHitScene | null
   /** 장면 위에 얹는 UI (소개 판 · 교체 연출 · 조준 그림 따위) — 원본도 상태 그리기가 장면 다음에 그린다 */
   readonly children?: ReactNode
 }
@@ -404,7 +409,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       const resolution = current.resolution
       const aceOrder = current.acePitcher?.order ?? null
       // 52d9e 키 0x498d4 — 앞 틀 뒤에 받은 OK · '5' 를 이 틀의 0x13 갱신 앞에서 꺼낸다
-      const hitBase = pitch === null ? null : shownHit
+      let hitBase = pitch === null ? null : shownHit
       const hitTickNow =
         hitBase === null || releaseTick === null
           ? null
@@ -435,6 +440,13 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         // 0x49aec 의 그림 갈래를 타면 보통 불꽃 대신 필살 파티클이다(49fa2 → 4a0ce · 49dbc · 49de0 — `pitcherHitContactOf`)
         if (stateTickNow >= judgeStateTick && !hitSparkShot) {
           hitSparkShot = true
+          // 판정 틀의 갱신 — 0x51408 515c0 메시지 0x11(0x50faa: 필살수비 · 표시 패턴 · 판 공 51188 · [경기+0xf2c] 공 5174c 의 폴 굴림) ·
+          // 필살타법 517e6 을 굴린 뒤 0x13 을 예약한다. 0x13 의 경로 · 이른 넘김 · 각 · 카메라 · 이 틀의 불꽃은 표시 패턴(+0xfcc)을 본다
+          const judged = current.onHitJudged?.() ?? null
+          if (judged !== null) {
+            shownHit = judged
+            hitBase = judged
+          }
           const contact = platePixelOf(pitch)
           const side = current.batterSide ?? batterSideOfForm(current.batterForm)
           const chosen = pitcherHitContactOf(hitBase, current.batterForm, current.aceBatterOrder ?? null, side)

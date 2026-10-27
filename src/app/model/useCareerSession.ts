@@ -16,7 +16,7 @@ import { applyPitchResolution, isAtBatFinished } from '@/entities/at-bat/model/a
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
-import { arrivePitch, cpuPickoff, enterBenchClearing, judgeHitByPitch, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
+import { arrivePitch, contactDefensePlayInputOf, cpuPickoff, enterBenchClearing, judgeHitByPitch, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
@@ -27,6 +27,8 @@ import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-pl
 import { replayCallsOnScreen } from '@/features/defense-play/model/judgeCall'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { contactOutcomeOfDetail } from '@/features/play-at-bat/model/resolvePitch'
+import { preRollContactMessage } from '@/features/defense-play/model/runDefensePlay'
 import type { PitchArrivalStep } from '@/features/play-game/model/gameFlow'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/model/atBatPitchTally'
@@ -1217,6 +1219,22 @@ export function useCareerSession({
       finishAtBat(advanced, context.nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(context.nextAtBat.outcome, arrival?.play))
     },
     [audio, endGame, finishAtBat, random, runner],
+  )
+
+  /**
+   * **맞은 판정 틀** — 메시지 0x11 굴림 묶음(필살수비 · 표시 패턴 · 두 공 폴 · 필살타법)을 이 공으로 설 판 입력으로 미리 굴린다(A-37).
+   * 0x13 뒤 `handlePitchResolved` 가 세우는 판(`startPlayerOutcome` · `startPlayerFoulPlay`)은 쏜 공에 묶인 그 값을 되찾는다.
+   * 판정 틀과 0x13 끝 사이에 수비 칸(능력 · 스킬 · 모드)은 안 바뀐다
+   */
+  const preRollContact = useCallback(
+    (detail: PitchOutcomeDetail, buntKind: number) => {
+      const progress = progressRef.current
+      const outcome = contactOutcomeOfDetail(detail)
+      if (progress === null || outcome === null) return null
+      const input = contactDefensePlayInputOf(progress, outcome, random, { buntKind })
+      return input === null ? null : preRollContactMessage(input)
+    },
+    [random],
   )
 
   const handlePitchResolved = useCallback(
@@ -2842,6 +2860,7 @@ export function useCareerSession({
     storyEvents,
     eventPlaceIds,
     handlePitchResolved,
+    preRollContact,
     actions,
   }
 }

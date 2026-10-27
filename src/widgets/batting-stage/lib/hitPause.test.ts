@@ -9,6 +9,7 @@ import {
   hitPauseTicksOf,
   HIT_STOP_TICKS,
   isBigHit,
+  launchedPauseInputOf,
   pauseInputOf,
   SHORT_HIT_TICKS,
 } from '@/widgets/batting-stage/lib/hitPause'
@@ -205,5 +206,22 @@ describe('[경기+0xf2c] 공의 폴 굴림 (A-25, r309)', () => {
       }
     }
     expect(poleCases).toBe(4)
+  })
+})
+
+describe('0x13 은 메시지 0x11 이 고친 표시 패턴을 본다 — `launchedPauseInputOf` (A-37)', () => {
+  it('각은 표시 패턴(+0xfcc), 낙구 · 폴 · 거리는 판 공 궤적, 이른 넘김은 표시 패턴의 [경기+0xf2c] 공이다', () => {
+    const 표시 = BATTED_BALL_PATTERNS[15][0]
+    const 판공 = { landingTick: 33, poleTick: -1, carryScale: 120 }
+    const input = launchedPauseInputOf(15, 표시, 0, 판공)
+    expect(input.angle).toBe(표시[0])
+    expect(input).toMatchObject(판공)
+    expect(input.earlyTick).toBe(earlyHitPauseTickOf(15, battedBallTrajectory(earlyPassPatternOf(표시, 0))))
+  })
+
+  it('판 공을 안 주면 표시 패턴을 굴림 없이 깐다 — 덱에서 꺼낸 패턴 그대로면 `pauseInputOf` 와 같다', () => {
+    const deck = drawPattern(createPatternDeck(createSeededRandom(5)), 15).deck
+    const 꺼낸 = drawPattern(createPatternDeck(createSeededRandom(5)), 15).pattern
+    expect(launchedPauseInputOf(15, 꺼낸, 1)).toEqual(pauseInputOf(15, deck, 1))
   })
 })

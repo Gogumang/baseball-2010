@@ -9,11 +9,12 @@ import { unjudgedWhiffSoundIdOf } from '@/features/play-at-bat/model/atBatSounds
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
 import { createPatternDeck, lastDrawnPattern, scenePatternDeckOf } from '@/entities/batting/model/battedBallOutcome'
+import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { emitParticles } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { useClaimSceneParticles } from '@/widgets/particles/model/useClaimSceneParticles'
 import { batterEquipmentOf, NO_EQUIPMENT, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
-import { canSkipHitPause, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit, pauseInputOf } from '@/widgets/batting-stage/lib/hitPause'
+import { canSkipHitPause, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit, launchedPauseInputOf, pauseInputOf, type LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
 import { hitBallPathOf } from '@/widgets/batting-stage/lib/hitBallPath'
 import { hitCameraAngleOf } from '@/widgets/batting-stage/lib/hitCamera'
 import type { StageParticleShot } from '@/widgets/batting-stage/lib/homeRunEffects'
@@ -316,6 +317,13 @@ interface BattingStageProps {
     detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number, sceneTick?: number,
   ) => PitchResolvedReply | void
   /**
+   * **맞은 판정 틀**(0x6aa → 0x51408)에 부른다 — 원본은 이 틀 안에서 메시지 0x11(515c0 → 0x50faa: 필살수비 A · B · 표시 패턴 ·
+   * 판 공 51188 · [경기+0xf2c] 공 5174c 의 폴 굴림)과 필살타법 517e6 을 다 굴린 뒤 0x13 을 세운다(A-37). 받는 쪽은 이 공으로 설
+   * 판 입력을 지어 그 묶음을 미리 굴리고(`preRollContactMessage`) 쏜 공(+0xfcc 표시 패턴 · 판 공 궤적)을 돌려준다 — 0x13 의 경로 ·
+   * 이른 넘김 · 각 · 카메라 · 불꽃이 그 공을 본다. 안 넘기거나 null 이면 굴리지 않고(판 시작이 굴린다) 쏜 패턴으로 그린다.
+   */
+  readonly onContact?: (detail: PitchOutcomeDetail, buntKind: number) => LaunchedShot | null | undefined
+  /**
    * **상태 0x11 인가** 를 밖에서 물을 수 있게 이 칸에 묻는 함수를 넣어 준다. 원본 도루 키(0x53610 → 메시지 0x583)는
    * 0x11 의 키 함수 0x53670 이 부른다 — 0x11 은 투수 와인드업부터(공 틱 0 인 동안도) 맞은 공 판정 · 공 끝(틱 N + 1)까지다.
    * 타석 화면 밖 키 처리(`GameScreen` 등)가 이 함수로 거른다. 화면이 내려가면 null 로 되돌린다.
@@ -506,13 +514,25 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
 
     // 맞은 공이면 인플레이(0x17) 앞에 **상태 0x13** 을 한 번 거친다. 헛스윙·볼은 0x12 라 그냥 결과다.
     if (result.detail.resultCode !== null) {
+      // 맞은 판정 틀의 0x51408 — 515c0 메시지 0x11(0x50faa: 필살수비 · 표시 패턴 · 판 공 · [경기+0xf2c] 공 폴 굴림) · 517e6 필살타법을
+      // 이 틀(아래 진동 0xbc5 · 0x13 예약 · 이 틀 그림의 불꽃보다 앞)에 굴린다 — 받는 쪽이 판 입력으로 미리 굴려 쏜 공을 돌려준다(A-37)
+      const buntKindNow = sceneBuntKindOfThisPitch()
+      const shot: LaunchedShot | null = latest.onContact?.(result.detail, buntKindNow) ?? null
       vibrateNow()
       buntRef.current = null
-      const pauseInput = pauseInputOf(result.detail.resultCode, result.deck, latest.batterHand ?? batterSideOfForm(latest.batterForm))
+      const hitSide = latest.batterHand ?? batterSideOfForm(latest.batterForm)
+      // 0x13 이 보는 +0xfcc — 메시지 0x11 이 고친 표시 패턴(창이 열렸으면), 아니면 쏜 패턴(0x514f2 특수 표 덮어쓰기 뒤). 쏜 공을 모르는
+      // 결과(시험)만 덱에서 방금 꺼낸 패턴이다
+      const shotContact =
+        result.detail.resolution.kind === '타구' ? contactOfOutcome(result.detail.resolution.outcome) : result.detail.foulContact
+      const pattern = shot?.launchedPattern ?? shotContact?.pattern ?? lastDrawnPattern(result.deck, result.detail.resultCode)
+      const pauseInput =
+        pattern === null
+          ? pauseInputOf(result.detail.resultCode, result.deck, hitSide)
+          : launchedPauseInputOf(result.detail.resultCode, pattern, hitSide, shot?.trajectory)
       const watchesBigHit = isBigHit(pauseInput)
       // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 (+0x10dc, +0x10e0) 투영 0xb94b5 + 카메라(4a03a · 필살 49b02 · 큰 타구 4cb80).
       // +0x10dc 는 놓기 0x4dc78(4dffa~4e024)만 적는 공 도착점(경로 끝 점의 투영)이라 `platePixelOf` 다 (r184 직접 떴다)
-      const pattern = lastDrawnPattern(result.deck, result.detail.resultCode)
       const contact = swing === null ? null : platePixelOf(pitch)
       // 필살 스윙(S+0x10)이 0x49aec 의 그림 갈래를 타면 그 함수가 [sp+0x60] = 1 을 세워 보통 불꽃(49faa~4a0ce)을 건너뛰고,
       // 같은 타격점에 필살 파티클을 쏜다(49dbc · 49de0) — 0x49aec 는 0x13 · 맞은 공에서만 불리므로 헛스윙엔 아무것도 없다
@@ -540,7 +560,6 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
           : hitFlameAnimationOf(hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit)), watchesBigHit)
       // 0x13 진입 0x33e34 — [경기+0xf2c] 공(수평각 d 다른 공)의 점을 옮겨 타석 공 경로를 다시 채운다(`hitBallPath`). 꼬리선은
       // 강한 타구(0x35988) · 결과 코드 24~26(0x357e0)일 때만(3b440)
-      const hitSide = latest.batterHand ?? batterSideOfForm(latest.batterForm)
       const hitPath = pattern === null ? null : hitBallPathOf(hitBallTrajectoryOf(pattern, hitSide), hitSide)
       const showsHitTrail =
         pattern !== null &&
@@ -561,7 +580,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         bigHitAt: watchesBigHit ? contact : null,
         watchesBigHit,
         resultText,
-        buntKind: sceneBuntKindOfThisPitch(),
+        buntKind: buntKindNow,
         specialEffect: specialEffect === null || contact === null ? null : { ...specialEffect, x: contact.x, y: contact.y },
         hitFlame: flameAnimation === null || contact === null ? null : { animation: flameAnimation, x: contact.x, y: contact.y },
       }

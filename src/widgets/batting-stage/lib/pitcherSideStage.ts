@@ -4,9 +4,8 @@ import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { SCENE_STATE } from '@/shared/lib/commonWindow/sceneStateEntries'
 import type { SceneStateEntry } from '@/shared/lib/commonWindow/sceneStateEntries'
 import type { BattedContact } from '@/entities/batting/model/battedContact'
-import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
-import { earlyHitPauseTickOf, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit } from '@/widgets/batting-stage/lib/hitPause'
+import { hitBallTrajectoryOf, hitPauseTicksOf, isBigHit, launchedPauseInputOf, type LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
 import { hitBallPathOf, type HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
 import { hitCameraAngleOf } from '@/widgets/batting-stage/lib/hitCamera'
 import { bigHitEndTickOf, bigHitReleaseTickOf } from '@/widgets/batting-stage/lib/bigHitScreen'
@@ -318,20 +317,18 @@ export function pitcherHitSceneOf(
   frameCount: number,
   /** 친 타자의 손 — 이른 넘김 공의 수평각 d 를 고른다(0x51408). 판 입력의 `contact.batterHand` 가 없을 때 쓴다 */
   batterHand: number,
+  /**
+   * 판정 틀에 메시지 0x11 이 굴려 쏜 공(`preRollContactMessage`) — 0x13 의 경로 · 이른 넘김 · 각 · 카메라 · 불꽃은 이 표시 패턴(+0xfcc)과
+   * 판 공을 본다(A-37). 아직 안 굴렸으면(판정 틀 앞) 쏜 패턴 그대로다
+   */
+  shot?: LaunchedShot | null,
 ): PitcherHitScene {
-  const { pattern, resultCode } = contact
-  const trajectory = battedBallTrajectory(pattern)
+  const { resultCode } = contact
+  const pattern = shot?.launchedPattern ?? contact.pattern
   const hitSide = contact.batterHand ?? batterHand
   const earlyPassTrajectory = hitBallTrajectoryOf(pattern, hitSide)
-  const pauseInput: HitPauseInput = {
-    resultCode,
-    angle: pattern[0],
-    landingTick: trajectory.landingTick,
-    poleTick: trajectory.poleTick,
-    carryScale: trajectory.carryScale,
-    // 이른 넘김은 [경기+0xf2c] 공 — 판 공과 수평각이 d 다른 공 (0x5174c, `hitPause.pauseInputOf` 와 같다)
-    earlyTick: earlyHitPauseTickOf(resultCode, earlyPassTrajectory),
-  }
+  // 각 0x406a4 는 +0xfcc · 낙구 · 폴 · 거리는 판 공 · 이른 넘김은 [경기+0xf2c] 공 (`hitPause.launchedPauseInputOf` — 타자편과 같다)
+  const pauseInput: HitPauseInput = launchedPauseInputOf(resultCode, pattern, hitSide, shot?.trajectory)
   const watchesBigHit = isBigHit(pauseInput)
   const isBunt = cpuSwing !== null && cpuSwing.buntKind !== 0
   const judgeBallTick = cpuSwing === null || isBunt ? frameCount - 1 : cpuSwing.frame + 1

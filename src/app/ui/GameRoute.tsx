@@ -447,6 +447,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         sceneStadium={session.sceneStadium}
         random={random}
         onPitchResolved={handlePitchResolved}
+        // 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린다 (A-37)
+        onContact={session.preRollContact}
         sceneBuntKind={sceneBuntKindRef.current}
         runnerAnimationClock={runnerAnimationClockRef}
         skillPanelScene={skillPanelSceneRef}
