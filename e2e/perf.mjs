@@ -8,7 +8,12 @@
 // 느린 4G (Lighthouse 모바일 기준): 왕복 150ms · 내려받기 1.6Mbps · 올리기 750kbps.
 //  - chromium: CDP `Network.emulateNetworkConditions` (받은 바이트 = `encodedDataLength`)
 //  - webkit: CDP 가 없어 라우트로 늦춘다 — 요청마다 왕복 150ms 뒤 한 줄(1.6Mbps)을 나눠 쓰며 보낸다. 글(js · css · json · html)은
-//    gzip 크기로 센다(preview 가 gzip 으로 보내는 것과 맞춘다).
+//    gzip 크기로 센다(preview 가 gzip 으로 보내는 것과 맞춘다). **라우트가 걸리면 HTTP 캐시가 꺼진다** — 같은 주소를 다시 받은 것까지
+//    요청으로 센다(표에 "캐시 꺼짐"으로 적는다).
+//
+// 크로미움은 `page.route` 를 쓰지 않는다(r311, OPTIMIZATION-2026-10-27 A8). 라우트가 하나라도 걸리면 HTTP 캐시가 꺼져
+// 같은 그림을 여러 번 다시 받고 요청 수가 부푼다(general-defense 1,861 ↔ 실제 1,342). 웹폰트 CDN 은 실행 인자
+// `--host-resolver-rules` 로 닫힌 포트에 묶어 끊는다. 요청 수는 CDP 로 센 망 요청이고 디스크 · 메모리 캐시에서 온 것은 빼고 센다.
 //
 // 잰 것 (쪽 이동 시작부터 ms):
 //  - 이용안내: 글줄(`data-part="글줄"`)이 서고 웹폰트까지 온 때 — 바로가기 없이 켤 때 길 그대로
@@ -35,6 +40,8 @@ const CDN = process.env.PERF_CDN === '1'
 const ONLY = process.env.PERF_ONLY
 /** 켤 때 길은 바로가기가 없는 배포 빌드로 잰다(e2e 빌드는 그리기 전에 진행기 덩이를 한 번 더 받는다) — 없으면 BASE_URL */
 const BOOT_URL = process.env.PERF_BOOT_URL ?? BASE_URL
+/** 잴 장면 바로가기 (쉼표) */
+const SCENES = (process.env.PERF_SCENES ?? 'nari-management,general-bat').split(',').filter(Boolean)
 
 const BROWSERS = [
   { browserName: 'chromium', device: 'desktop' },
@@ -98,9 +105,11 @@ function kindOf(url) {
   return 'other'
 }
 
-/** 크로미움 — CDP 로 느린 4G, 받은 바이트는 encodedDataLength */
+/** 크로미움 — CDN 끊기는 라우트 대신 실행 인자로(라우트가 걸리면 HTTP 캐시가 꺼진다). 닫힌 포트 9 라 곧바로 실패한다 */
+const CHROMIUM_ARGS = CDN ? [] : ['--host-resolver-rules=MAP cdn.jsdelivr.net 127.0.0.1:9']
+
+/** 크로미움 — CDP 로 느린 4G, 받은 바이트는 encodedDataLength. 캐시에서 꺼낸 것은 요청으로 세지 않는다 */
 async function throttleByCdp(page, tally) {
-  if (!CDN) await page.route(/cdn\.jsdelivr\.net/, (route) => route.abort())
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Network.enable')
   await cdp.send('Network.setCacheDisabled', { cacheDisabled: false })
@@ -108,10 +117,15 @@ async function throttleByCdp(page, tally) {
     offline: false, latency: RTT_MS, downloadThroughput: DOWN_BPS, uploadThroughput: UP_BPS,
   })
   const urls = new Map()
+  const cached = new Set()
   cdp.on('Network.requestWillBeSent', (event) => urls.set(event.requestId, event.request.url))
+  cdp.on('Network.requestServedFromCache', (event) => cached.add(event.requestId))
+  cdp.on('Network.responseReceived', (event) => {
+    if (event.response.fromDiskCache || event.response.fromServiceWorker || event.response.fromPrefetchCache) cached.add(event.requestId)
+  })
   cdp.on('Network.loadingFinished', (event) => {
     const url = urls.get(event.requestId) ?? ''
-    if (url.startsWith('data:') || url === '') return
+    if (url.startsWith('data:') || url === '' || cached.has(event.requestId)) return
     tally.requests += 1
     tally.bytes += event.encodedDataLength
     tally.byKind[kindOf(url)] = (tally.byKind[kindOf(url)] ?? 0) + event.encodedDataLength
@@ -259,17 +273,19 @@ const results = {}
 for (const { browserName, device } of BROWSERS) {
   const type = browserName === 'webkit' ? webkit : chromium
   const executablePath = browserName === 'webkit' ? undefined : chromiumExecutable()
-  const browser = await type.launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })
+  const args = browserName === 'chromium' ? CHROMIUM_ARGS : []
+  const browser = await type.launch({ headless: true, args, ...(executablePath === undefined ? {} : { executablePath }) })
   const runs = []
   for (let index = 0; index < RUNS; index += 1) {
     const boot = await measureBoot(browser, browserName, device)
     const nari = await measureNariByKeys(browser, browserName, device)
-    const management = await measureScene(browser, browserName, device, 'nari-management')
-    // 장면의 기본 픽스처(general-bat) — 개발 · 빌드가 같은 씨앗에서 같은 선공이다(r231). PERF_BAT_FIXTURE 로 바꿀 수 있다
-    const bat = await measureScene(browser, browserName, device, 'general-bat', process.env.PERF_BAT_FIXTURE)
-    const errors = [...boot.errors, ...nari.errors, ...management.errors, ...bat.errors]
+    // 장면 바로가기 — 기본은 나리 관리 · 첫 타석. general-bat 은 장면의 기본 픽스처라 개발 · 빌드가 같은 씨앗에서 같은 선공이다(r231).
+    // PERF_BAT_FIXTURE 로 general-bat 의 픽스처를, PERF_SCENES(쉼표)로 잴 장면을 바꿀 수 있다
+    const scenes = []
+    for (const scene of SCENES) scenes.push(await measureScene(browser, browserName, device, scene, scene === 'general-bat' ? process.env.PERF_BAT_FIXTURE : undefined))
+    const errors = [...boot.errors, ...nari.errors, ...scenes.flatMap((scene) => scene.errors)]
     if (errors.length > 0) console.log(`  ! ${browserName} 실행 ${index + 1}: ${errors.slice(0, 3).join(' / ')}`)
-    runs.push({ ...boot, ...nari, ...management, ...bat })
+    runs.push(Object.assign({}, boot, nari, ...scenes))
     console.log(`  ${browserName} 실행 ${index + 1} 끝`)
   }
   await browser.close()
@@ -277,6 +293,7 @@ for (const { browserName, device } of BROWSERS) {
 }
 
 console.log(`\n${NET === 'off' ? '망 그대로' : `느린 4G (왕복 ${RTT_MS}ms · ${DOWN_BPS * 8 / 1e6}Mbps)`}${CPU > 1 ? ` · 크로미움 CPU ×${CPU}` : ''}${CDN ? ' · CDN 받음' : ''} · ${BASE_URL} · 실행 ${RUNS}번의 가운데 값`)
+console.log('요청: chromium = 망 요청(캐시 켬, 캐시에서 꺼낸 것 뺌) · webkit = 라우트로 늦춤(캐시 꺼짐 — 다시 받은 것도 셈)')
 console.log('| 브라우저 | 지점 | 시간 ms | 요청 | 받은 KB | 그중 JS KB | 막힘 ms | 가장 긴 틈 ms |')
 console.log('|---|---|---:|---:|---:|---:|---:|---:|')
 const LABELS = {
@@ -284,6 +301,6 @@ const LABELS = {
 }
 for (const [browserName, points] of Object.entries(results)) {
   for (const [key, value] of Object.entries(points)) {
-    console.log(`| ${browserName} | ${LABELS[key] ?? key} | ${value.ms} | ${value.requests} | ${value.kb} | ${value.js} | ${value.blocked} | ${value.longest} |`)
+    console.log(`| ${browserName === 'webkit' ? 'webkit(캐시 꺼짐)' : browserName} | ${LABELS[key] ?? key} | ${value.ms} | ${value.requests} | ${value.kb} | ${value.js} | ${value.blocked} | ${value.longest} |`)
   }
 }
