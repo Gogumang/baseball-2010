@@ -65,7 +65,7 @@ describe('나리 타자편 기록 달성 알림 — 칸 채우기 0x4e600 은 �
       session: {
         loadingTip: null,
         handlePitchResolved: noop,
-        actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop },
+        actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop, attachRelayHost: () => noop, finishRelay: noop },
       } as never,
       progress,
       runner: { atBat: { ...createAtBat(), balls }, isPaused: false, bannerText: '' } as never,

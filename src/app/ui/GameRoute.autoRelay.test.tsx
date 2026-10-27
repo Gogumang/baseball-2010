@@ -31,7 +31,7 @@ describe('나리 타자편 자동진행 중계 (상태 0x21 — 모드 4: 매 �
         session={{
           loadingTip: null,
           handlePitchResolved: noop,
-          actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop },
+          actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop, attachRelayHost: () => noop, finishRelay: noop },
         } as never}
         progress={progress}
         runner={{ atBat: createAtBat(), isPaused: false, bannerText: '' } as never}

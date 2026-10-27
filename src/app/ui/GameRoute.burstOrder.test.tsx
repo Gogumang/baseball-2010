@@ -59,7 +59,7 @@ const 띄우기 = (wait: SceneConfirmWait) => {
       session={{
         loadingTip: null,
         handlePitchResolved: noop,
-        actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop },
+        actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop, attachRelayHost: () => noop, finishRelay: noop },
       } as never}
       progress={progress}
       runner={{ atBat: createAtBat(), isPaused: false, bannerText: '' } as never}

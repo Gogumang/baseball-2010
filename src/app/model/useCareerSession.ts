@@ -18,7 +18,7 @@ import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import { arrivePitch, contactDefensePlayInputOf, cpuPickoff, enterBenchClearing, judgeHitByPitch, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
-import type { GameProgress } from '@/features/play-game/model/gameFlow'
+import type { GameAutoRelay, GameProgress } from '@/features/play-game/model/gameFlow'
 import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
@@ -1088,6 +1088,16 @@ export function useCareerSession({
    * 그려진 뒤 정산한다(아래 효과). 재생 판 기다림이 먼저다 — 판을 다 그린 뒤(`finishReplay`) 여기로 다시 온다.
    */
   const [isGameEndHeldByBurst, setGameEndHeldByBurst] = useState(false)
+  /**
+   * **남은 중계 뒤의 경기 끝** (A-38) — 0x12 끝(4e7ca) · 0x17 끝(52a8e)이 예약한 +0x1b6c 를 0x35108 이 자동진행 중계 0x21 로 덮으면
+   * 동료 타석 · 상대 반 이닝을 그 상태에서 다 돈 뒤에야 0xc2198 이 거짓을 내 경기 끝 판 0x18 → 정산 0x19 다(K · R10). 돌발 판정이
+   * 참이면 그 앞에 결과 창 0x1d 가 선다(위). 웹 진행기는 그 중계를 한 걸음에 굴려 `autoRelay` 에 담고 경기 화면(`GameRoute`)이 틱마다
+   * 튼다 — 예전 웹은 정산이 그것을 기다리지 않아 경기를 끝낸 중계가 잘렸다. 중계 화면이 붙어 있는 동안(`attachRelayHost`) 아직 다
+   * 틀지 않은 중계가 있으면 정산을 그 끝(`finishRelay`)까지 미룬다. 화면이 붙어 있지 않으면(화면 없는 시험 · soak) 곧장 — 예전과 같다
+   */
+  const relayHostCountRef = useRef(0)
+  const relayedRef = useRef<GameAutoRelay | null>(null)
+  const isGameEndAwaitingRelayRef = useRef(false)
   const endGame = useCallback(
     (finished: GameProgress) => {
       // 재생 판이 실책을 올렸으면 진행 칸이 더 새 값이다 — 같은 끝난 경기면 그것으로 정산한다
@@ -1103,6 +1113,13 @@ export function useCareerSession({
         setGameEndHeldByBurst(true)
         return
       }
+      // 결과 창 다음이 남은 중계(0x21)다 — 다 튼 뒤 경기 끝 판 · 정산
+      const relay = settled.autoRelay ?? null
+      if (relayHostCountRef.current > 0 && relay !== null && relay.ticks.length > 0 && relay !== relayedRef.current) {
+        isGameEndAwaitingRelayRef.current = true
+        return
+      }
+      isGameEndAwaitingRelayRef.current = false
       // 국가대항전 경기는 커리어 정산을 타지 않고 대회 하루를 넘긴다 (상태 142 → 101 → 134)
       const cup = cupGameRef.current
       if (cup !== null) return finishCupGame(settled, cup)
@@ -1796,6 +1813,31 @@ export function useCareerSession({
           endGameRef.current(current)
         }
       }
+    },
+
+    /**
+     * 중계 화면이 붙었다 — 붙어 있는 동안 경기를 끝낸 남은 중계(`autoRelay`)를 다 틀 때까지 정산을 미룬다(`endGame`, A-38). 돌려준 함수로 뗀다.
+     * 떼는 자리에서 미룬 정산이 남았으면 곧장 한다(화면이 그 중계를 못 틀고 내려갔다)
+     */
+    attachRelayHost: () => {
+      relayHostCountRef.current += 1
+      return () => {
+        relayHostCountRef.current -= 1
+        if (relayHostCountRef.current > 0 || !isGameEndAwaitingRelayRef.current) return
+        const current = progressRef.current
+        if (current !== null && current.game.isFinished) {
+          relayedRef.current = current.autoRelay ?? null
+          endGameRef.current(current)
+        }
+      }
+    },
+
+    /** 중계 묶음(`autoRelay`)을 다 틀었다 — 0xc2198 이 거짓을 낸 틱. 미룬 정산이 있으면 이제 경기 끝 판 · 정산 */
+    finishRelay: (relay: GameAutoRelay | null) => {
+      relayedRef.current = relay
+      if (!isGameEndAwaitingRelayRef.current) return
+      const current = progressRef.current
+      if (current !== null && current.game.isFinished) endGameRef.current(current)
     },
 
     /** 재생 판(`lastDefensePlay`)을 다 그렸다 — 그 판 실책(`recordFieldingErrors`)이 먼저 들어와 있다. 미룬 정산이 있으면 이제 한다 */
