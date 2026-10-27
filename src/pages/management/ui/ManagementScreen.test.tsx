@@ -612,6 +612,45 @@ describe('127 휴식 연출 (0x190e4 → 0x85230 · 키 0x10650 · 틀 0x19080 �
     expect(onSelect).toHaveBeenCalledTimes(1)
     expect(onSelect).toHaveBeenCalledWith('휴식')
   })
+
+  it('결과 창이 닫혀 105 에 다시 들면 칸을 처음 자리로 되돌려 다시 펼치고, 그동안 키를 버린다 (0x1b466 → 0x11910 11c26 0x7ff21)', () => {
+    const career = { ...createCareer('테스터'), morale: 50 }
+    const acted = { ...career, hasActedThisCycle: true }
+    // 세션 몫 — 휴식(0x18e3c)이 행동함을 세우고 결과 창을 띄운다, 창 키가 닫는다
+    function Harness() {
+      const [held, setHeld] = useState<{ career: typeof career; detail: ManagementScreenProps['detail'] }>({ career, detail: null })
+      return (
+        <ManagementScreen {...propsWith({
+          career: held.career,
+          detail: held.detail,
+          onSelect: () => setHeld({ career: acted, detail: { before: acted, after: acted, messages: ['사기 1 상승하였습니다'] } }),
+          onCloseDetail: () => setHeld((current) => ({ ...current, detail: null })),
+        })} />
+      )
+    }
+    render(<Harness />)
+    const 틀 = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+    const 칸위 = (name: string) => (screen.getByRole('button', { name }) as HTMLElement).style.top
+    const current = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-current')
+
+    clickCommand('휴식')
+    fireEvent.click(screen.getByRole('button', { name: '예' }))
+    fireEvent.keyDown(window, { key: '5' })
+    // 127 — 결과 창이 떠 있는 동안 칸은 제자리
+    틀(10)
+    expect(칸위('선수정보')).toBe('245px')
+
+    rawFireEvent.keyDown(window, { key: 'Enter' })
+    // 105 진입 0x7ff21 — y 0xaa(170) 에서 다시 내려온다
+    expect(칸위('선수정보')).toBe('170px')
+    rawFireEvent.keyDown(window, { key: '6' })
+    expect(current('선수정보')).toBe('true')
+    틀(8)
+    expect(칸위('선수정보')).toBe('245px')
+    // 행동함 — 트레이닝 · 휴식 · 외출을 건너뛴다
+    rawFireEvent.keyDown(window, { key: '6' })
+    expect(current('아이템')).toBe('true')
+  })
 })
 
 describe('125 훈련 연출 · 결과 창 (진입 0x11744 · 키 0x105a4 · 틀 0x18dd8 · 그림 0x19da4)', () => {

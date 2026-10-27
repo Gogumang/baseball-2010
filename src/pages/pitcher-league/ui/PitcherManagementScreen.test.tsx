@@ -579,6 +579,33 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
     expect(screen.getByText(/부상에서 회복 되었습니다/)).toBeTruthy()
   })
 
+  it('결과 창이 닫혀 105 에 다시 들면 칸을 처음 자리로 되돌려 다시 펼치고, 그동안 키를 버린다 (0x1b466 → 0x11910 11c26 0x7ff21)', () => {
+    const onReenter = vi.fn()
+    render(
+      <PitcherManagementScreen career={투수()} random={난수} onSave={() => {}} onNextGame={() => {}} onOuting={() => {}}
+        onOpenShop={() => {}} onExit={() => {}} onReenter={onReenter} />,
+    )
+    const 칸위 = (name: string) => (screen.getByRole('button', { name }) as HTMLElement).style.top
+
+    누르기('휴식')
+    fireEvent.click(칸('예'))
+    fireEvent.click(screen.getByTestId('나리-휴식연출'))
+    // 127 — 결과 창이 떠 있는 동안 칸은 제자리
+    expect(칸위('휴식')).toBe('245px')
+    fireEvent.click(screen.getByRole('dialog', { name: '상세정보' }))
+
+    expect(onReenter).toHaveBeenCalledTimes(1)
+    // 105 진입 0x7ff21 — y 0xaa(170) 에서 다시 내려온다
+    expect(칸위('휴식')).toBe('170px')
+    // 누름(터치)으로 골라 커서는 선수정보 그대로 — 펼치는 동안의 키는 버린다
+    rawFireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: '선수정보', current: true })).toBeTruthy()
+    settleSlide()
+    expect(칸위('휴식')).toBe('245px')
+    rawFireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: '트레이닝', current: true })).toBeTruthy()
+  })
+
   it('127 연출은 캐릭터 없이 event_ani 애니 5 · event_char_0 애니 0x62 (0x85230) — 취소 키는 안 먹는다 (0x10650)', () => {
     화면({})
     누르기('휴식')

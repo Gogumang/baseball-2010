@@ -201,6 +201,12 @@ export interface PitcherManagementMenu {
   readonly trainingPresentation: PitcherTrainingPresentation | null
   /** 상태 125 인가(연출 · 결과 창) — 그림 0x19da4 가 가운데 판 0x7f814 를 빼고, 커맨드 줄 키는 안 받는다 */
   readonly isTrainingState: boolean
+  /**
+   * 이 화면 안에서 105 에 다시 들어온 수 — 하위 메뉴 106 · 107 · 110 취소, 125 훈련 결과 · 127 휴식 결과 창이 닫힘.
+   * 105 진입 0x11910 은 늘 11c26 에서 0x7ff21 을 불러 칸을 처음 자리(표 0xd4740, y 0xaa)로 되돌리고 [gfx+0x99] = 1 —
+   * 커맨드 줄은 이 수가 바뀌면 다시 펼친다(그동안 키를 버린다, A-50). 하위 메뉴가 그대로인 휴식 뒤에도 그렇다
+   */
+  readonly entryCount: number
   /** 게이지 끝 — 틀 0x18dd8 의 `0x84e58 → 0x17f5c` */
   readonly finishTraining: () => void
 }
@@ -213,8 +219,16 @@ const REST_STATE = 0x7f
 const modeTextOf = (index: number): string => (ORIGINAL_MODE_TEXT[index] ?? '').replace(/^!C/, '')
 
 export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): PitcherManagementMenu {
-  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit, onReenter, onMainConfirm, onResultWindowChange } = input
+  const { career, random, onSave, onNextGame, onOuting, onOpenShop, onExit, onMainConfirm, onResultWindowChange } = input
   const [kind, setKind] = useState<PitcherMenuKind>(input.initialKind ?? '관리')
+  /** 이 화면 안에서 105 에 다시 들어온 수 (`PitcherManagementMenu.entryCount`) */
+  const [entryCount, setEntryCount] = useState(0)
+  const { onReenter: onSessionReenter } = input
+  /** 105 진입 — 세션에 알리고(`onReenter`) 커맨드 줄이 칸을 처음 자리로 되돌려 다시 펼치게 센다(0x11910 11c26 → 0x7ff21) */
+  const onReenter = useCallback((from?: number) => {
+    setEntryCount((count) => count + 1)
+    onSessionReenter?.(from)
+  }, [onSessionReenter])
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
   const [isTitleWindowOpen, setIsTitleWindowOpen] = useState(false)
@@ -279,7 +293,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const leaveTrainingResult = useCallback(() => {
     setKind('관리')
     setTraining(null)
-    onReenter?.(TRAINING_RESULT_STATE)
+    onReenter(TRAINING_RESULT_STATE)
   }, [onReenter])
 
   /** 두 갈래 팝업을 연다 — 커서는 늘 첫 칸부터다 (원본도 `+0x166` 을 0 으로 두고 연다) */
@@ -476,7 +490,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
         if (recovered.recoveries.length > 0) setNotice(recovered.recoveries.join(' '))
         else setIsResultWindowOpen(false)
         // 127 → 105 (0x1b466 `0xbcb49(0x69)`) — 알림(1b45c)은 105 위에 뜬다: 다음 틀 0xbc9c9 가 창과 상관없이 105 를 세운다
-        onReenter?.(REST_STATE)
+        onReenter(REST_STATE)
       },
     })
   }, [career, onReenter, onSave, random, restPhase])
@@ -570,7 +584,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     if (kind !== '관리') {
       // 106 · 107 · 110 취소 → 105 진입
       setKind('관리')
-      return onReenter?.()
+      return onReenter()
     }
     return onExit()
   }, [abilityDetailOffset, closeWindow, isTitleWindowOpen, kind, onExit, onReenter, restPhase, subWindow, training])
@@ -797,6 +811,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       ? pitcherTrainingPresentationOf(training.slot, career.typeIndex)
       : null,
     isTrainingState: training !== null,
+    entryCount,
     finishTraining,
   }
 }
