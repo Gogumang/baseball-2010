@@ -38,6 +38,11 @@ export interface SceneDefinition {
   readonly fixture: string
   /** 픽스처의 부팅 씨앗 대신 쓸 씨앗 — 난수로만 닿는 장면(돌발미션)을 정하려고. `&seed=` 가 오면 그것이 먼저다 */
   readonly seed?: number
+  /**
+   * 경기 중간 스냅샷 이름 — `e2e/snapshots/<이름>.json.gz` 가 있으면 단계를 밟지 않고 그 순간을 곧장 되살린다(`&real=1` 이면 밟는다).
+   * 실제 시간으로 공을 여러 번 보내야 닿는 장면. 뜨기 · 같음 확인은 `yarn e2e:snapshot`
+   */
+  readonly snapshot?: string
   readonly steps: readonly SceneStep[]
 }
 
@@ -494,6 +499,7 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     // 첫 경기 마지막 내 타석(9회말)으로 밀렸고, 그 타석 뒤 남은 반 이닝이 경기를 끝내 웹이 결과 창 없이 정산으로 갔다(r315 고침 —
     // 0x12 끝 돌발 판정이 참이면 0x1d 를 먼저 거친다). 이제 이 장면은 경기 끝 앞 결과 창 길을 밟는다
     seed: 5,
+    snapshot: 'nari-burst-result',
     steps: [
       ...TO_NARI_MANAGEMENT,
       call('관리 [다음경기]', (h) => h.career.actions.runCommand('다음경기')),
@@ -549,6 +555,7 @@ export const SCENES: Readonly<Record<string, SceneDefinition>> = {
     fixture: 'pitcher-y1',
     // 픽스처는 부팅 씨앗이 없어 시계로 굴린다 — 브라우저 · 기기마다 같은 공 · 같은 판에 닿게 정한다
     seed: 1,
+    snapshot: 'mission-result',
     steps: [
       ...toMission('투수', 3),
       keyUntil('Enter', '미션 결과 판 0x19', missionIs((peek) => peek.isResultShown), 300, 150000),

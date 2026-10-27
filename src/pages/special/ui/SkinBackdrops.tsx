@@ -1,3 +1,4 @@
+import { trackCellForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -161,6 +162,8 @@ export const GPOINT_ANIMATION: readonly AnimationEntry[] = [0, 1, 2, 3, 4, 5].ma
  * 0 으로 놓는 곳은 스킨을 만들 때(0x5390c) 뿐이다.
  */
 const ballPatternDraws = { value: 0 }
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다)
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') trackCellForSnapshot('SkinBackdrops.ballPatternDraws', ballPatternDraws)
 /** 앱을 새로 띄운 것과 같다 — 테스트용 */
 export const resetBallPatternDraws = () => {
   ballPatternDraws.value = 0

@@ -1,3 +1,4 @@
+import { trackCellForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import type { BurstJudgement } from '@/entities/burst-mission/model/burstMissionJudge'
 import { BURST_TEXT_LINE } from '@/entities/burst-mission/model/burstMissionJudge'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
@@ -59,6 +60,8 @@ export const BURST_WINDOW_START: BurstWindowState = { height: 0, shake: 0, ticks
  * 웹은 모듈 칸 하나로 들고 경기 화면이 붙을 때(`useBurstObjectTicksReset`) 0 으로 둔다.
  */
 export const burstObjectTicks = { value: 0 }
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다)
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') trackCellForSnapshot('burstMissionWindowLayout.burstObjectTicks', burstObjectTicks)
 
 /** 경기 장면 생성 — [+0x224] = 0 */
 export function resetBurstObjectTicks(): void {

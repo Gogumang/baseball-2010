@@ -1,3 +1,4 @@
+import { trackWeakCollectionForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
@@ -546,6 +547,12 @@ const atBatEntrySoundOf = new WeakMap<SceneConfirmWait, number>()
  * 같은 객체여야 한다. 등장음은 화면이 0xd 를 그리기 시작할 때 읽는 그때의 값이다.
  */
 const announcedWaits = new WeakMap<SceneConfirmWait, SceneConfirmWait>()
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 상태 객체를 열쇠로 든 약한 표
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+  trackWeakCollectionForSnapshot('useMissionSession.freshAtBatWaits', freshAtBatWaits)
+  trackWeakCollectionForSnapshot('useMissionSession.atBatEntrySoundOf', atBatEntrySoundOf)
+  trackWeakCollectionForSnapshot('useMissionSession.announcedWaits', announcedWaits)
+}
 function announcedWaitOf(wait: SceneConfirmWait): SceneConfirmWait {
   const known = announcedWaits.get(wait)
   if (known !== undefined) return known

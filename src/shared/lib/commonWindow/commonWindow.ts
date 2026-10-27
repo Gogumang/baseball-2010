@@ -1,3 +1,5 @@
+import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
+import type { SnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 import { createContext, useContext, useLayoutEffect } from 'react'
 import { appTickOf, appTickStartTime, resetAppTickClockForTest, setTickInterval } from '@/shared/lib/frameClock/frameClock'
 
@@ -367,6 +369,8 @@ export function rearmGameSceneFirstDraw(): void {
 
 export interface GameSceneDrawGate {
   readonly allowsDraw: () => boolean
+  /** 개발 · e2e 전용 — 경기 중간 스냅샷이 본 멈춤 셈을 읽고 되살린다(`shared/lib/dev/snapshotSlots`). 배포 빌드에는 없다 */
+  readonly devSnapshot?: SnapshotSlot
 }
 
 export function createGameSceneDrawGate(): GameSceneDrawGate {
@@ -384,6 +388,9 @@ export function createGameSceneDrawGate(): GameSceneDrawGate {
       seenSerial = freezeSerial
       return true
     },
+    ...(import.meta.env.DEV || import.meta.env.MODE === 'e2e'
+      ? { devSnapshot: { capture: () => seenSerial, restore: (value: unknown) => { seenSerial = value as number } } }
+      : {}),
   }
 }
 
@@ -507,4 +514,17 @@ export function resetCommonWindowShownForTest(): void {
   frozenSinceAppTick = null
   frozenTotal = 0
   frozenTicks = 0
+}
+
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 멈춤 셈. 선 창 · 경기 장면 · 로딩 판 수는
+// 되살린 부품이 서며 다시 센다(옮기지 않는다). 실제 시각(ms) 칸은 지난 시간으로 적는다. 장면 시계(`sceneTimers`)는 부품이 다시 건다
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+  registerSnapshotSlot('commonWindow', {
+    capture: () => ({ frozenAgo: frozenSince === null ? null : performance.now() - frozenSince, frozenTotal, frozenSinceAppTick, frozenTicks, freezeSerial, backdropFreezeSerial, inSceneUpdateOpenAppTick }),
+    restore: (value) => {
+      const saved = value as { frozenAgo: number | null } & Record<string, unknown>
+      ;({ frozenTotal, frozenSinceAppTick, frozenTicks, freezeSerial, backdropFreezeSerial, inSceneUpdateOpenAppTick } = saved as never)
+      frozenSince = saved.frozenAgo === null ? null : performance.now() - saved.frozenAgo
+    },
+  })
 }

@@ -1,3 +1,4 @@
+import { trackCellForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect, useId, useSyncExternalStore } from 'react'
 
 /**
@@ -22,6 +23,8 @@ import { useEffect, useId, useSyncExternalStore } from 'react'
  * 갈래는 0x5561c 를 안 지나므로 앞 화면들이 남긴 값에서 센다.
  */
 const counter = { value: 0 }
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다)
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') trackCellForSnapshot('skinStepCounter.counter', counter)
 const listeners = new Set<() => void>()
 const notify = () => {
   for (const listener of listeners) listener()

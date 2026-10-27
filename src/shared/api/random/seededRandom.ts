@@ -61,12 +61,23 @@ function step(state: number): number {
  * 인자는 원본 레지스터처럼 32비트 정수로 자른다(`| 0`).
  */
 export function createSeededRandom(seed: number): RandomPort {
-  let state = seed >>> 0
+  return createSeededRandomOn({ state: seed >>> 0 })
+}
 
+/**
+ * 씨앗 칸 [0x15606d4] — 32비트 상태 하나. `createSeededRandomOn` 이 이 칸을 굴린다. 웹 개발 도구(원본에 없다)인 경기 중간
+ * 스냅샷(`app/dev/sessionSnapshot`)이 이 칸을 읽고 되살린다 — 앱은 개발 · e2e 빌드에서만 칸을 따로 쥔다(`App.tsx`)
+ */
+export interface SeededRandomCell {
+  state: number
+}
+
+/** 칸 `cell` 을 굴리는 원본 난수 생성기 — `createSeededRandom` 과 같은 수열이다(씨앗을 칸에 넣었을 뿐) */
+export function createSeededRandomOn(cell: SeededRandomCell): RandomPort {
   return {
     rand(lo: number, hi: number): number {
       // bfa60~bfa68: s = (s * 0x343fd + 0x269ec3) >>> 1 — 밀린 값을 그대로 씨앗에 넣는다
-      state = step(state) >>> 1
+      const state = (cell.state = step(cell.state) >>> 1)
       const low = lo | 0
       const high = hi | 0
       if (low === high) return low
@@ -79,7 +90,7 @@ export function createSeededRandom(seed: number): RandomPort {
       const limit = n | 0
       // 9d46a: n ≤ 0(부호 있는 비교) 이면 씨앗을 건드리지 않고 0
       if (limit <= 0) return 0
-      state = step(state)
+      const state = (cell.state = step(cell.state))
       // 9d482~9d48a: ((s << 1) >>> 17) mod n — 0 ~ 0x7fff 를 부호 없이 나눈다
       return ((state << 1) >>> 17) % limit
     },

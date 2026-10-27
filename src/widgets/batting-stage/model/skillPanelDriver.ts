@@ -1,3 +1,4 @@
+import type { SnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import {
   SKILL_CHEER_SOUND_ID, batterSkillPanelBitsOf, createSkillPanelScene, enterAtBatSkillPanel,
@@ -49,12 +50,12 @@ const OUTSIDE_STATE_F = Symbol('0xf 밖')
  * 0xf · 0x10 · 0x11 의 그림마다 한 번 — 원본 틱으로 센다. 판을 세운 뒤 첫 그림에서 함성 29(4c26a~4c3a2)를 본다.
  * 장면 칸(`source.scene`)이 없으면 이 돌림이 사는 동안만 드는 칸을 쓴다.
  */
-export function createSkillPanelDriver(): (frame: SkillPanelFrame) => SkillPanelView | null {
+export function createSkillPanelDriver(): ((frame: SkillPanelFrame) => SkillPanelView | null) & { readonly devSnapshot?: SnapshotSlot } {
   let stateFMark: unknown = OUTSIDE_STATE_F
   let lastTick = -1
   let lastView: SkillPanelView | null = null
   const localScene = createSkillPanelScene()
-  return (frame) => {
+  const drive = (frame: SkillPanelFrame): SkillPanelView | null => {
     const { source } = frame
     const scene = source.scene?.current ?? localScene
     if (source.entryKey !== null && source.entryKey !== undefined && source.entryKey !== scene.entryKey) {
@@ -106,4 +107,19 @@ export function createSkillPanelDriver(): (frame: SkillPanelFrame) => SkillPanel
     }
     return lastView
   }
+  // 개발 · e2e 전용 — 경기 중간 스냅샷이 이 돌림의 칸을 읽고 되살린다. 0xf 표지는 그 객체가 아니라 "밖이냐" 만 옮긴다
+  if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+    const devSnapshot: SnapshotSlot = {
+      capture: () => ({ isOutside: stateFMark === OUTSIDE_STATE_F, stateFMark: stateFMark === OUTSIDE_STATE_F ? null : stateFMark, lastTick, lastView, localScene }),
+      restore: (value) => {
+        const saved = value as { isOutside: boolean; stateFMark: unknown; lastTick: number; lastView: SkillPanelView | null; localScene: typeof localScene }
+        stateFMark = saved.isOutside ? OUTSIDE_STATE_F : saved.stateFMark
+        lastTick = saved.lastTick
+        lastView = saved.lastView
+        Object.assign(localScene, saved.localScene)
+      },
+    }
+    return Object.assign(drive, { devSnapshot })
+  }
+  return drive
 }

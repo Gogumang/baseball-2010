@@ -1,3 +1,4 @@
+import { trackCellForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect, useId } from 'react'
 
 /**
@@ -17,6 +18,8 @@ import { useEffect, useId } from 'react'
  * 곧 처음 값은 앱을 켤 때 0 이고, 위 화면들이 그릴 때마다 함께 하나씩 올린다 — **화면을 건너 이어진다**. 읽는 값은 올린 뒤의 값이다.
  */
 const skinBlinkCounter = { value: 0 }
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다)
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') trackCellForSnapshot('skinBlink.skinBlinkCounter', skinBlinkCounter)
 
 /** 지금 [skin+0x410] — 읽기만 하는 화면(순위 판 0x5796c) · 시험용 */
 export const skinBlinkCounterValue = () => skinBlinkCounter.value

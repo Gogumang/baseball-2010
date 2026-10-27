@@ -1,3 +1,4 @@
+import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 /**
  * **경기 장면 객체의 결과 코드 칸 [장면+0xfd4]** — 타석 장면 부품(`BattingStage`)이 내려갔다 다시 서도(수비 판을 다녀와도) 이어지게
  * 경기 장면(0x104) 동안 하나만 둔다. 원본에서 이 칸은 장면 객체의 것이라 장면이 사는 동안 산다(2026-10-16 직접 떴다):
@@ -34,4 +35,14 @@ export function clearSceneResultCodeOnPitch(): void {
 /** 경기 장면 객체가 사라지고(0x332b8) 다음 장면이 새로 0 채움 객체(0x3874 → new)로 선다 */
 export function resetSceneResultCode(): void {
   resultCode = 0
+}
+
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 결과 코드 칸
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+  registerSnapshotSlot('sceneResultCode', {
+    capture: () => resultCode,
+    restore: (value) => {
+      resultCode = value as number | null
+    },
+  })
 }

@@ -1,3 +1,4 @@
+import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 /**
  * **전역 경기 상태 `[0x1552d0c]` 의 +0x6a · +0x6b** — 모든 모드가 같이 쓰는 경기 상태 한 벌이다 (직접 떴다).
  *
@@ -168,4 +169,14 @@ const FIGHTING_SPIRIT_AFTER_INNING_INDEX = 4
  */
 export function isLiveGameFightingSpiritSituation(teamId: number): boolean {
   return isFightingSpiritSituationOf(liveFightingSpiritState(), teamId)
+}
+
+// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 이닝 · 두 팀 · 점수
+if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+  registerSnapshotSlot('liveGameState', {
+    capture: () => ({ inningIndex, sideTeamIds, sideScores }),
+    restore: (value) => {
+      ;({ inningIndex, sideTeamIds, sideScores } = value as never)
+    },
+  })
 }

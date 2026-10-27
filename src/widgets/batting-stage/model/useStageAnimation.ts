@@ -1,3 +1,4 @@
+import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import {
   CPU_PITCH_TYPE_TICKS,
@@ -1078,7 +1079,41 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
     phaseStartTickRef.current = gameSceneTickNow()
     animationHandle = requestAnimationFrame(frame)
+    // 개발 · e2e 전용 — 경기 중간 스냅샷(`app/dev/sessionSnapshot`)이 이 루프의 변수를 읽고 되살린다. 배포 빌드에서는 빠진다.
+    // ⚠️ 이 루프에 상태 변수(let · 고쳐 쓰는 객체)를 더하면 여기에도 더한다 — 빠지면 `yarn e2e:snapshot verify` 가 다름을 찾는다
+    let releaseSnapshotSlot = () => {}
+    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
+      releaseSnapshotSlot = registerSnapshotSlot('stageAnimation', {
+        capture: () => ({
+          lastStageScene, runnerTick, redrawTicks, magic, releaseSoundPitch, cpuPitchCycle, releasePending, mistakeMarkPitch, pitcherTickEnd,
+          resultCodeBeforePitch, judgedResultCode, hitStopReleased, hitInStage, particleTick, stageEffects, settlementEffect,
+          pausedSince, hasSeenPause, localRunnerClock, cloudCursor,
+          // 결과 배경 시계는 실제 시각(ms) — 지난 시간으로 적는다
+          backdropAgo: backdropClock === null ? null : {
+            started: performance.now() - backdropClock.startedAt,
+            frozen: backdropClock.frozenSince === null ? null : performance.now() - backdropClock.frozenSince,
+          },
+          frozenDrawGate: frozenDrawGate.devSnapshot?.capture(), skillPanel: stepSkillPanel.devSnapshot?.capture(),
+        }),
+        restore: (value, shiftMs) => {
+          const saved = value as Record<string, unknown>
+          const now = performance.now()
+          ;({
+            lastStageScene, runnerTick, redrawTicks, magic, releaseSoundPitch, cpuPitchCycle, releasePending, mistakeMarkPitch, pitcherTickEnd,
+            resultCodeBeforePitch, judgedResultCode, hitStopReleased, hitInStage, particleTick, stageEffects, settlementEffect, pausedSince,
+            hasSeenPause,
+          } = saved as never)
+          const ago = saved.backdropAgo as { started: number; frozen: number | null } | null
+          backdropClock = ago === null ? null : { startedAt: now - ago.started, frozenSince: ago.frozen === null ? null : now - ago.frozen }
+          Object.assign(localRunnerClock, saved.localRunnerClock)
+          Object.assign(cloudCursor, saved.cloudCursor)
+          frozenDrawGate.devSnapshot?.restore(saved.frozenDrawGate, shiftMs)
+          stepSkillPanel.devSnapshot?.restore(saved.skillPanel, shiftMs)
+        },
+      })
+    }
     return () => {
+      releaseSnapshotSlot()
       cancelAnimationFrame(animationHandle)
       shownTicks.clear()
       // 부품이 내려가면 미리 적은 0x10 · 0x11 예약은 서지 않는다(지난 칸과 이미 정한 0x12 · 0x13 · 0x17 은 남는다 — 판정이 낸 것)
