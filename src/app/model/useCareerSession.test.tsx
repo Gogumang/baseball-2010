@@ -2043,3 +2043,60 @@ describe('이어하기 100 진입 0x1c154 머리 1c15e stopBgm (r163)', () => {
     }
   })
 })
+
+describe('돌발 결과 창 뒤의 경기 끝 (r315)', () => {
+  /**
+   * 0x12 끝(4e7ca)의 돌발 판정이 참이면 0x1d(결과 창 · 보상 0x8e34c)를 먼저 거친 뒤 +0x1b6c 로 간다 — 그 다음이 경기 끝 0x18 · 0x19
+   * 여도 같다(R9 18-2). 웹은 내 타석 뒤 남은 반 이닝을 한 번에 돌려 경기가 끝나면 곧장 정산으로 가 창 · 보상을 건너뛰었다.
+   * 씨앗 15: 헛스윙만 하면 첫 경기 마지막 내 타석에 돌발이 판정되고 그 뒤 경기가 끝난다
+   */
+  it('판정이 남은 채 경기가 끝나면 정산은 결과 창을 닫은 뒤다', async () => {
+    const saveGame = 메모리저장(createCareer('돌발'))
+    const random = createSeededRandom(15)
+    const rendered = renderHook(() => {
+      const [screen, setScreen] = useState<Screen>({ kind: '메인메뉴' })
+      const runner = useAtBatRunner()
+      return { screen, setScreen, session: useCareerSession({ runner, random, saveGame, screen, setScreen }) }
+    })
+    act(() => rendered.result.current.session.actions.continueSaved())
+    await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    let held = 0
+    try {
+      act(() => rendered.result.current.session.actions.runCommand('다음경기'))
+      act(() => rendered.result.current.session.actions.confirmNextGameStandings())
+      act(() => rendered.result.current.session.actions.confirmMatchPrepare())
+      act(() => rendered.result.current.session.actions.finishLoading())
+      const 헛스윙: PitchOutcomeDetail = {
+        resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+      }
+      for (let step = 0; step < 3000 && rendered.result.current.screen.kind === '경기'; step += 1) {
+        const { session } = rendered.result.current
+        const progress = session.progress
+        if (progress === null) break
+        if (progress.pendingDefensePlay !== null) act(() => session.actions.finishDefensePlay())
+        else if (progress.pendingRunnerPlay != null) act(() => session.actions.finishRunnerPlay())
+        else if (progress.pendingBenchClearing !== null) act(() => session.actions.finishBenchClearing(false))
+        else if (progress.lastBurstResolution != null) {
+          if (progress.game.isFinished) {
+            held += 1
+            // 끝난 경기인데 아직 정산 전 — 결과 창이 떠 있을 자리
+            act(() => {
+              vi.advanceTimersByTime(5000)
+            })
+            expect(rendered.result.current.screen.kind).toBe('경기')
+          }
+          act(() => session.actions.closeBurstResult())
+        } else act(() => session.handlePitchResolved(헛스윙))
+        act(() => {
+          vi.advanceTimersByTime(2000)
+        })
+      }
+      expect(held).toBe(1)
+      expect(rendered.result.current.screen.kind).toBe('경기결과')
+    } finally {
+      vi.useRealTimers()
+      act(() => rendered.unmount())
+    }
+  })
+})

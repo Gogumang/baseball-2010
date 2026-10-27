@@ -44,7 +44,7 @@ async function runBrowser({ browserName, device }, names) {
       const started = Date.now()
       let error = null
       try {
-        // nari-burst-result(약 45초) · mission-result(약 55초)는 씨앗 · 투구 제한까지 공을 보낸다
+        // nari-burst-result(약 85초) · mission-result(약 55초)는 씨앗 · 투구 제한까지 공을 보낸다
         await openScene(page, scene, { timeout: LONG_SCENES.has(scene) ? 240000 : 60000 })
       } catch (caught) {
         error = String(caught).slice(0, 300)
