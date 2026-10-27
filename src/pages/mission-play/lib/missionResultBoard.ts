@@ -36,11 +36,13 @@
  * ←/→(−3 · −4) · '4' · '6'   : g[0x176] · g[0x11f] 둘 다 0 이면 [+0x17f9] 뒤집기 (0x40840)
  * OK(−5) · '5'               : g[0x11f] ≠ 0 이고 g[0x176] ≠ 0 이면 대결 끝 길(0x4090e) — 아니면
  *                              [+0x17f9] ≠ 0 → 0x140006c = 3(장면 0x107 상태 3: 같은 미션 곧바로 다시) · 0 → 1(미션 목록)
+ *                              (원본 버그 B-106 — 고친 길은 CLR 처럼 둘 중 하나만 서도 대결 끝 길)
  * CLR(−16)                   : g[0x11f] · g[0x176] 하나라도 서 있으면 대결 끝 길(0x4090e) — 아니면 0x140006c = 1(미션 목록)
  * 그 뒤 화면 전환 0xbdae9([0x140007c], 1, 0, 5, 1500)
  * 대결 끝 길 0x4090e: g[0xf6](원래 모드) 가 4 · 3 이면 0x140006c = 0x69 · 화면 전환, 아니면 아무 일 없음
  * ```
  */
+import { isBugFixed } from '@/shared/config/bugfixes'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 const SCREEN_WIDTH = 240
@@ -117,8 +119,9 @@ export function missionResultKeyActionOf(key: string): MissionResultKeyAction {
 export type MissionResultExit = '다시' | '목록' | '대결끝'
 
 /**
- * 키 하나의 결과 — 마선수 대결은 `aceFlags` 의 g[0x11f] · g[0x176] 를 그대로 본다(OK 는 둘 다 서 있어야 대결 끝 길,
- * CLR 은 하나만 서도 대결 끝 길 — 원본 버그 B-106 그대로, 0x407f0 408ce~408f2 · 4087c~408a0). 커서를 뒤집으면 `toggle`, 나가면 `exit`.
+ * 키 하나의 결과 — 마선수 대결은 `aceFlags` 의 g[0x11f] · g[0x176] 를 그대로 본다. CLR 은 하나만 서도 대결 끝 길(4087c~408a0).
+ * OK 는 원본이 둘 다 서 있어야 대결 끝 길이다(408ce~408f2 의 && — 원본 버그 B-106). 고친 길(`isBugFixed('B-106')`)은 CLR 과 같이
+ * 하나만 서도 대결 끝 길로 간다. 커서를 뒤집으면 `answer`, 나가면 `exit`.
  */
 export function missionResultStepOf(
   action: MissionResultKeyAction,
@@ -128,7 +131,8 @@ export function missionResultStepOf(
   const isAce = aceFlags.flag11f || aceFlags.flag176
   if (action === '뒤집기') return { answer: isAce ? answer : !answer, exit: null }
   if (action === '확인') {
-    if (aceFlags.flag11f && aceFlags.flag176) return { answer, exit: '대결끝' }
+    const isAceExit = isBugFixed('B-106') ? isAce : aceFlags.flag11f && aceFlags.flag176
+    if (isAceExit) return { answer, exit: '대결끝' }
     return { answer, exit: answer ? '다시' : '목록' }
   }
   if (action === '취소') return { answer, exit: isAce ? '대결끝' : '목록' }
@@ -140,10 +144,11 @@ export function missionResultStepOf(
  * 0x4b100 이 읽는다. 다만 0x4b100 의 모드 5·6 갈래(4b31e~4b376, 직접 떴다)는 g[0x11f] || g[0x176] 이면 **0x140006c 를 안 읽고**
  * 전역 모드 = g[0xf6] · 장면 g[0xf6] == 2 ? 0x105 : 0x106 으로 간다(대기가 없을 때만 4b378 → 0x107 이 0x140006c 를 본다).
  *
- * 그래서 마선수 대결에서 칸이 하나만 서 OK 가 '다시'(0x140006c = 3 — `missionResultStepOf` 의 원본 버그 그대로, ORIGINAL-BUGS B-106)가 되어도 같은 대결을
- * 다시 세우지 않고 대결 끝과 같은 원래 모드 장면으로 떠난다. 남은 3 은 나리 장면이 메인 메뉴로 갈 때 5 로 덮는다(0x1bfd4 · 0x1ca92).
- * ⚠️ g[0xf6] 이 3 · 4 가 아닐 때(한 편 140 이 g[0xf6] 을 지운 뒤 남은 다른 편 대기)는 CLR(대결 끝 0x4090e)은 판에 갇히지만 OK 는
+ * 그래서 원본 길에서 마선수 대결 칸이 하나만 서 OK 가 '다시'(0x140006c = 3 — `missionResultStepOf` 의 원본 버그 B-106)가 되어도 같은 대결을
+ * 다시 세우지 않고 대결 끝과 같은 원래 모드 장면으로 떠난다(고친 길은 OK 도 '대결끝'이라 처음부터 같은 곳). 남은 3 은 나리 장면이 메인 메뉴로 갈 때 5 로 덮는다(0x1bfd4 · 0x1ca92).
+ * ⚠️ g[0xf6] 이 3 · 4 가 아닐 때(한 편 140 이 g[0xf6] 을 지운 뒤 남은 다른 편 대기)는 CLR(대결 끝 0x4090e)은 판에 갇히지만 원본 길의 OK 는
  * 0x4b100 이 전역 모드 g[0xf6] 그대로 0x106 을 세운다 — 웹은 그 장면(모드 0 의 0x106)을 몰라 두 키 모두 판에 갇힌다(`leaveMissionResult`).
+ * 고친 길(B-106)은 OK 도 대결 끝 길이라 원본에서도 CLR 과 같이 판에 남는다.
  */
 export function missionResultLeaveOf(exit: MissionResultExit, isAceFlagged: boolean): '다시하기' | '떠나기' {
   return exit === '다시' && !isAceFlagged ? '다시하기' : '떠나기'
