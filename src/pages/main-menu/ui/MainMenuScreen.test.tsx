@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { MainMenuScreen } from '@/pages/main-menu/ui/MainMenuScreen'
+import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
 import { resetSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 
@@ -379,6 +380,43 @@ describe('처음 메뉴 키 (0x29454) — CLR 은 안 보고, ←→·숫자도 
     누르기('ArrowLeft')
     누르기('Enter')
     expect(onInquiry).toHaveBeenCalledTimes(1)
+  })
+
+  it('바퀴가 도는 동안은 키를 버린다 — 0x29454 맨 앞 [this+0xe1] == 0 (0x24b1c 24c3a 에서 0, 24c7a~24c8a 에서 1)', () => {
+    const top = { current: 0 }
+    메뉴({ topMenuCursor: top })
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+    })
+    // 도는 중의 ↓ · OK 는 버린다
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+    })
+    틱지남()
+    expect(top.current).toBe(1)
+    누르기('ArrowDown')
+    expect(top.current).toBe(2)
+  })
+
+  it('전부 수집 보상 판정은 10번째 갱신에 바퀴가 돌고 있으면 건너뛴다 — [this+0x2c] == 10 판정(0x2951e)도 [+0xe1] 건너뛰기 안이다', () => {
+    const onTopMenuTenthTick = vi.fn()
+    메뉴({ onTopMenuTenthTick })
+    // 8틱 뒤에 ↓ — 바퀴는 다섯 틱 돌아 10번째 갱신에 아직 돈다
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 8)
+    })
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowDown' })
+    })
+    틱지남()
+    expect(onTopMenuTenthTick).not.toHaveBeenCalled()
+  })
+
+  it('전부 수집 보상 판정은 바퀴가 멈춰 있으면 10번째 갱신에 한 번 돈다', () => {
+    const onTopMenuTenthTick = vi.fn()
+    메뉴({ onTopMenuTenthTick })
+    틱지남()
+    expect(onTopMenuTenthTick).toHaveBeenCalledTimes(1)
   })
 
   it('바퀴 커서 [this+0xe8] — 루트가 든 칸에서 서고 움직이면 고쳐 적는다', () => {

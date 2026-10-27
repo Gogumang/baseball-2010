@@ -197,7 +197,7 @@ export function MainMenuScreen({
   // 자라는 동안은 릴 줄을 안 그리고(0x254d8) 하위 5·9 갱신이 키를 버린다([0xe2] ≠ 0 — 0x28cc2 · 0x28ae0)
   const [tier, setTier] = useState(openTier)
   const band = useMenuBand(tier !== 4, isBandGrown)
-  const { state, dispatch } = useMainMenu(hasSavedGame, false, (effect) => {
+  const { state, dispatch, turningRef } = useMainMenu(hasSavedGame, false, (effect) => {
     if (effect === '나리타자편') onNewGame('타자편')
     else if (effect === '나리투수편') onNewGame('투수편')
     else if (effect === '나리타자편경기') (onResumeNariGame ?? onNewGame)('타자편')
@@ -225,8 +225,12 @@ export function MainMenuScreen({
   tenthTickRef.current = onTopMenuTenthTick
   useEffect(() => {
     if (!isWheel) return undefined
-    return setAppTickTimeout(() => tenthTickRef.current?.(), TOP_MENU_REWARD_TICK)
-  }, [isWheel])
+    // 0x29454 의 `[this+0x2c] == 10` 판정(0x2951e~0x29536)도 맨 앞 `[+0xe1] == 0 → 0x29538` 건너뛰기 안이다 — 10번째 갱신에 바퀴가
+    // 돌고 있으면 판정을 건너뛰고, 틱은 11 · 12 … 로 넘어가 처음 메뉴에 다시 들어올 때까지 미뤄진다 (r333)
+    return setAppTickTimeout(() => {
+      if (!turningRef.current) tenthTickRef.current?.()
+    }, TOP_MENU_REWARD_TICK)
+  }, [isWheel, turningRef])
   const entries = entriesOf(state.tier)
   const selectedId = selectedIdOf(state)
   const selected = entries.find((entry) => entry.id === selectedId)
@@ -238,6 +242,8 @@ export function MainMenuScreen({
     entries.length,
     isWheel ? MENU_WHEEL_TURN_TICKS : MENU_REEL_SCROLL_STEPS.length,
   )
+  // 도는 동안은 키를 버린다 — `useMainMenu` 의 `turningRef` (0x29454 · 0x28cb0 · 0x28ad4 맨 앞 [+0xe1])
+  turningRef.current = turn.direction !== null
   /** 도는 동안은 **돌기 전 배열**을 그린다 (회전은 마지막 틱에 한 번 일어난다) */
   const shownCursor = turn.direction === null ? cursor : turn.fromCursor
 

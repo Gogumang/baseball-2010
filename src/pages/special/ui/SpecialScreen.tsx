@@ -179,8 +179,9 @@ export function SpecialScreen({
   useEffect(() => {
     if (view !== '목록' || notice !== null) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      // 0x28ba0~0x28bb4 — 바탕 띠가 자라는 동안([메뉴+0xe2] ≠ 0)은 키를 통째로 버린다
-      if (band.isGrowing) return
+      // 0x28ba0~0x28bb4 — 바탕 띠가 자라는 동안([메뉴+0xe2] ≠ 0)은 키를 통째로 버린다.
+      // 릴이 도는 동안도 — 0x28ba8 이 `[메뉴+0xe1] == 0` 이면 키를 건너뛰고(0x28c8e), 릴 0x2524c 가 돌기 시작에 0(2537a) · 끝에 1(253ca) (r333)
+      if (band.isGrowing || turn.direction !== null) return
       const step = SPECIAL_LIST_STEP[event.key] ?? 0
       if (step !== 0) {
         event.preventDefault()

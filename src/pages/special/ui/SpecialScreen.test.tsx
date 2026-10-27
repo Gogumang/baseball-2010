@@ -30,6 +30,18 @@ vi.mock('@/shared/lib/pixelEffect/pixelEffect', async (importOriginal) => {
 
 afterEach(cleanup)
 
+// 릴이 도는 동안(스크롤 석 장 + 회전)은 키를 버린다(0x28ba8 [메뉴+0xe1], r333) — 목록 키 하나마다 릴이 다 돌 때까지 틱을 넘긴다
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] })
+})
+afterEach(() => {
+  vi.useRealTimers()
+})
+const 릴키 = (key: string) => {
+  fireEvent.keyDown(window, { key })
+  act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 6) })
+}
+
 /** 띠가 다 자란 목록 — 자라는 동안은 키를 버린다(0x28ba0~0x28bb4). 자라는 것은 아래 '바탕 띠' 묶음이 따로 본다 */
 const 띄우기 = (overrides: Partial<Parameters<typeof SpecialScreen>[0]> = {}) =>
   render(<SpecialScreen collection={EMPTY_COLLECTION} onBack={vi.fn()} isBandGrown {...overrides} />)
@@ -37,7 +49,7 @@ const 띄우기 = (overrides: Partial<Parameters<typeof SpecialScreen>[0]> = {})
 /** 목록은 릴이라 고른 칸은 설명 판이 보여 준다 — ↓ 로 그 칸까지 돌리고 확인(Enter)으로 연다 */
 const 항목열기 = (name: string) => {
   const index = SPECIAL_ITEMS.findIndex((item) => item.id === name)
-  for (let step = 0; step < index; step += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+  for (let step = 0; step < index; step += 1) 릴키('ArrowDown')
   fireEvent.keyDown(window, { key: 'Enter' })
 }
 
@@ -59,7 +71,7 @@ describe('스페셜 목록 = 세로 릴 0x2524c(this, 6) — 메인 메뉴 아�
     for (const item of SPECIAL_ITEMS) {
       const 그림 = [...container.querySelectorAll('img')].map((image) => image.getAttribute('src'))
       expect(그림).toContain(`./sprites/main_ui/frames/${String(item.labelFrame).padStart(3, '0')}.png`)
-      fireEvent.keyDown(window, { key: 'ArrowDown' })
+      릴키('ArrowDown')
     }
   })
 
@@ -73,8 +85,8 @@ describe('스페셜 목록 = 세로 릴 0x2524c(this, 6) — 메인 메뉴 아�
       띠지남()
       expect(container.textContent).toContain('G포인트를 충전')
       // 기록연감은 일곱째 칸 — ↑ 두 번(맨 앞에서 감겨 마지막 · 그 앞)
-      fireEvent.keyDown(window, { key: 'ArrowUp' })
-      fireEvent.keyDown(window, { key: 'ArrowUp' })
+      릴키('ArrowUp')
+      릴키('ArrowUp')
       띠지남()
       expect(container.textContent).toContain('각종 기록과 게임 통계를')
     } finally {
@@ -176,7 +188,7 @@ describe('스페셜 칸 고르기', () => {
   it('↑↓ 로 커서를 옮기고 Enter 로 연다', () => {
     띄우기()
 
-    fireEvent.keyDown(window, { key: 'ArrowUp' })  // 위로 한 칸 = 마지막 칸 선물받기
+    릴키('ArrowUp')  // 위로 한 칸 = 마지막 칸 선물받기
     fireEvent.keyDown(window, { key: 'Enter' })
 
     expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()
@@ -185,9 +197,9 @@ describe('스페셜 칸 고르기', () => {
   it('날 키 0x28b9c — \'2\' · \'4\' · ← 는 앞 칸, \'6\' · \'8\' · → 는 뒤 칸, \'5\' 로 연다', () => {
     띄우기()
 
-    fireEvent.keyDown(window, { key: '4' })  // 앞 칸 = 마지막 칸 선물받기
-    fireEvent.keyDown(window, { key: '8' })
-    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    릴키('4')  // 앞 칸 = 마지막 칸 선물받기
+    릴키('8')
+    릴키('ArrowLeft')
     fireEvent.keyDown(window, { key: '5' })
 
     expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()

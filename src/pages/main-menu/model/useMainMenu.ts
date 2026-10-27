@@ -67,7 +67,16 @@ export function useMainMenu(
    * 렌더마다 고쳐 읽는다
    */
   isInputBlocked = false,
-): { state: MainMenuState; dispatch: (action: MainMenuAction) => void } {
+): {
+  state: MainMenuState
+  dispatch: (action: MainMenuAction) => void
+  /**
+   * 바퀴 · 릴이 도는 동안 — 화면이 렌더마다 적는다. 갱신 4 · 5 · 9(0x29454 29460 · 0x28cb0 · 0x28ad4)는 맨 앞에서
+   * `[this+0xe1] == 0` 이면 키를 통째로 건너뛴다. 바퀴 0x24b1c 는 돌기를 시작할 때 [+0xe1] = 0(24c3a), 다 돌면 1(24c7a~24c8a),
+   * 릴 0x2524c 도 시작 2537a 에서 0 · 끝 253ca 에서 1 로 둔다 (r333)
+   */
+  turningRef: { current: boolean }
+} {
   const [state, setState] = useState<MainMenuState>(
     () => initialMainMenu(
       hasSavedGame, openTier, openTier === 5 ? gameStartCursor?.current ?? 0 : 0, topMenuCursor?.current ?? 0,
@@ -90,10 +99,12 @@ export function useMainMenu(
   topMenuCursorRef.current = topMenuCursor
   const isInputBlockedRef = useRef(isInputBlocked)
   isInputBlockedRef.current = isInputBlocked
+  const turningRef = useRef(false)
+  const isKeyBlocked = () => isInputBlockedRef.current || turningRef.current
 
   // setState 업데이터 안에서 부모 콜백을 부르면 StrictMode 가 두 번 부른다 — ref 로 읽고 한 번만 반영한다.
   const dispatchRef = useRef((action: MainMenuAction) => {
-    if (isInputBlockedRef.current) return
+    if (isKeyBlocked()) return
     const { isGeneralGameInProgress, lastPlayedMode, nariGameReady } = globalRecordRef.current
     const result = reduceMainMenu(
       stateRef.current, action, hasSavedRef.current, isGeneralGameInProgress, lastPlayedMode, nariGameReady,
@@ -116,12 +127,12 @@ export function useMainMenu(
       if (action === null) return
       event.preventDefault()
       // 하위 4 · 5 · 9 의 앞 칸 · 뒤 칸 갈래(29518 · 28e58 · 28b82)가 날 키를 0x5550d 에 넘긴다 — 화살표면 [skin+0x8c] 에 남는다(Q-10)
-      if (action.type === '커서' && !isInputBlockedRef.current) noteSkinShakeKey(event.key)
+      if (action.type === '커서' && !isKeyBlocked()) noteSkinShakeKey(event.key)
       dispatchRef.current(action)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  return { state, dispatch: (action) => dispatchRef.current(action) }
+  return { state, dispatch: (action) => dispatchRef.current(action), turningRef }
 }
