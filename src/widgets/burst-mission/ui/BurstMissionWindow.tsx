@@ -20,6 +20,7 @@ import {
 import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 import * as styles from '@/widgets/burst-mission/ui/BurstMissionWindow.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface BurstMissionWindowProps {
   /**
@@ -161,7 +162,7 @@ function BurstPortrait({ speaker, expression, draws, anchor }: {
   readonly anchor: { readonly x: number; readonly y: number; readonly isFlipped: boolean }
 }) {
   const portrait = burstPortraitOf(speaker, expression)
-  const folder = `./sprites/${portrait?.file ?? 'event_char_0'}/frames`
+  const folder = assetUrl(`./sprites/${portrait?.file ?? 'event_char_0'}/frames`)
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   // 좌타는 깃발 0x11 로 그린다(0x8f310~) — 0xc9f98 ca07c 갈래라 0x66 반투명 파트(볼터치)도 섞지 않고 복사한 판(`frameCopies`)

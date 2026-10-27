@@ -8,6 +8,7 @@ import { placePortraits, portraitAnimationOf, portraitPaletteOf, slideX } from '
 import type { PlacedPortrait } from '@/widgets/event-portraits/lib/portraitSlots'
 import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import * as styles from '@/widgets/event-portraits/ui/EventPortraits.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const SCREEN_WIDTH = 240
 
@@ -50,7 +51,7 @@ export function EventPortraits({ portraits, height, skinIndex = 0, battingTypeIn
 }
 
 /** 다시 칠하는 초상화가 쓰는 폴더 — 팔레트가 붙는 것은 주인공(event_char_0)뿐이다 (`portraitPaletteOf`) */
-const HERO_FOLDER = './sprites/event_char_0/frames'
+const HERO_FOLDER = assetUrl('./sprites/event_char_0/frames')
 
 /**
  * 앞으로 띄울 초상화 중 다시 칠하는 것(벌이 있는 것)의 표정 애니 칸 전부를 미리 칠한다 — 애니 번호는 화면에서 그리는 것과 같은
@@ -60,7 +61,7 @@ function useWarmPortraitExpressions(portraits: readonly EventPortrait[], skinInd
   const animations = useAnimations(HERO_FOLDER)
   const requests = portraits.flatMap((portrait) => {
     const palette = portraitPaletteOf(portrait, skinIndex)
-    if (palette === null || `./sprites/${portrait.file}/frames` !== HERO_FOLDER) return []
+    if (palette === null || assetUrl(`./sprites/${portrait.file}/frames`) !== HERO_FOLDER) return []
     const entries = animations?.[portraitAnimationOf(portrait, battingTypeIndex)] ?? []
     return recolorRequestsOf(HERO_FOLDER, entries.map((entry) => entry.frame), palette)
   })
@@ -75,7 +76,7 @@ interface PortraitSpriteProps {
 }
 
 function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: PortraitSpriteProps) {
-  const folder = `./sprites/${placed.portrait.file}/frames`
+  const folder = assetUrl(`./sprites/${placed.portrait.file}/frames`)
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   const update = useUpdateClock()

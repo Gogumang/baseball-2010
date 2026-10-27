@@ -16,13 +16,14 @@ import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 import { matchInfoValueCellDy } from '@/pages/management/lib/matchInfoEntry'
 import { useMatchInfoEntry } from '@/pages/management/ui/useMatchInfoEntry'
 import { MatchInfoEntryBanners } from '@/pages/management/ui/MatchInfoEntryBanners'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_IMAGE = './sprites/slt_frame'
+const SLT_IMAGE = assetUrl('./sprites/slt_frame')
 /** 누름 칸이 보내는 키 — 키 처리(window 듣개)가 그대로 받는다 */
 const pressKey = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }))
 
-const SLT_FRAME = './sprites/slt_frame/frames'
-const IMG_TEXT_FRAME = './sprites/img_text/frames'
+const SLT_FRAME = assetUrl('./sprites/slt_frame/frames')
+const IMG_TEXT_FRAME = assetUrl('./sprites/img_text/frames')
 
 const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
 

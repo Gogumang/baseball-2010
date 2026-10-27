@@ -19,6 +19,7 @@ import { TeamRelayFigures } from '@/pages/team-game/ui/TeamRelayFigures'
 import { effectOpacityOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { AUTO_RELAY_SPEED_MAX, autoRelaySpeed, setAutoRelaySpeed } from '@/pages/team-game/model/autoRelaySpeed'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 화면 240×320 */
 const SCREEN_WIDTH = 240
@@ -30,9 +31,9 @@ export const AUTO_RELAY_CHANGE_WAIT = 10
 /** StrGAME[6] — CLR 중단 질문 (`base/extracted/StrGAME.json` [6] 원문 그대로) */
 export const AUTO_RELAY_STOP_QUESTION = '!C!cFFFFFF자동진행을 중단하시겠습니까?'
 
-const GAME_UI = './sprites/game_ui'
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const GAME_UI = assetUrl('./sprites/game_ui')
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 /** game_ui 프레임 92 — 아래 안내 띠 (W/2 − w/2, H − h − 1) */
 const GUIDE_FRAME = 92
 /** game_ui 프레임 33 — 속도 칸 바탕 (W/2 − w/2, 216), 효과 (1, 0xc) */

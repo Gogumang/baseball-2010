@@ -1,4 +1,5 @@
 import * as styles from '@/shared/ui/PixelNumber/PixelNumber.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /** 원본 ui/num.pzx 의 숫자 그림. 10개씩 색상별로 묶여 있다. */
 const DIGIT_SET_START: Readonly<Record<string, number>> = {
   흰색: 0,
@@ -22,7 +23,7 @@ export function PixelNumber({ value, color = '흰색', minimumDigits = 1 }: Pixe
       {[...digits].map((digit, index) => (
         <img
           key={index}
-          src={`./sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`}
+          src={assetUrl(`./sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`)}
           alt={digit}
         />
       ))}
@@ -51,7 +52,7 @@ export function HeadingSprite({ name }: { readonly name: keyof typeof HEADING_SP
   return (
     <img
       className={styles.headingSprite}
-      src={`./sprites/game_frame/${HEADING_SPRITE[name]}.png`}
+      src={assetUrl(`./sprites/game_frame/${HEADING_SPRITE[name]}.png`)}
       alt={name}
     />
   )
@@ -71,7 +72,7 @@ export const POPUP_LABEL = {
 
 export function PopupLabel({ name }: { readonly name: keyof typeof POPUP_LABEL }) {
   return (
-    <img className={styles.popupLabel} src={`./sprites/popup/${POPUP_LABEL[name]}.png`} alt={name} />
+    <img className={styles.popupLabel} src={assetUrl(`./sprites/popup/${POPUP_LABEL[name]}.png`)} alt={name} />
   )
 }
 
@@ -87,11 +88,11 @@ export function PopupLabel({ name }: { readonly name: keyof typeof POPUP_LABEL }
  * 그림 뜻과 순서가 둘 다 맞으므로 번호를 추측한 것이 아니다.
  */
 export const MODE_ICON = {
-  성적: './sprites/mode_icon/000.png',
-  훈련: './sprites/mode_icon/001.png',
-  휴식: './sprites/mode_icon/002.png',
-  외출: './sprites/mode_icon/003.png',
-  아이템: './sprites/mode_icon/004.png',
-  경기: './sprites/mode_icon/005.png',
-  이벤트: './sprites/mode_icon/009.png',
+  성적: assetUrl('./sprites/mode_icon/000.png'),
+  훈련: assetUrl('./sprites/mode_icon/001.png'),
+  휴식: assetUrl('./sprites/mode_icon/002.png'),
+  외출: assetUrl('./sprites/mode_icon/003.png'),
+  아이템: assetUrl('./sprites/mode_icon/004.png'),
+  경기: assetUrl('./sprites/mode_icon/005.png'),
+  이벤트: assetUrl('./sprites/mode_icon/009.png'),
 } as const

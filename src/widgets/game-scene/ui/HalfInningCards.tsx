@@ -6,11 +6,12 @@ import {
 } from '@/widgets/game-scene/lib/halfInningCardsLayout'
 import type { CardBox, PitcherCount } from '@/widgets/game-scene/lib/halfInningCardsLayout'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI = './sprites/game_ui'
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const NUM = './sprites/num'
+const GAME_UI = assetUrl('./sprites/game_ui')
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
 
 const pad = (index: number) => String(index).padStart(3, '0')
 

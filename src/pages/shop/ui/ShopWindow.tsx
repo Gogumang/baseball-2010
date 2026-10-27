@@ -16,10 +16,11 @@ import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/pages/shop/ui/ShopWindow.css'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const MODE_UI = './sprites/mode_ui/frames'
-const ITEM_ICON = './sprites/item_icon'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const ITEM_ICON = assetUrl('./sprites/item_icon')
 
 const spriteSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 

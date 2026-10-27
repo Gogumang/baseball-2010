@@ -6,6 +6,7 @@ import {
   MENU_WHEEL_CENTER, MENU_WHEEL_RINGS, SCREEN_HEIGHT, SCREEN_WIDTH,
 } from '@/pages/main-menu/lib/mainMenuLayout'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 반원 바퀴의 바닥 — 가운데에서 도는 공과 테두리 원 3겹만 그린다. 칸 글자는 부르는 쪽이 얹는다.
@@ -18,7 +19,7 @@ import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
  * 메뉴 +0xe6 에 넣는 값은 0(생성자 0x234f4 의 r5 → 0x237b4 · 0x2486c · 0x2593a · 0x2b4a0) · 1(0x2b37e · 0x2b5a4 ·
  * 0x24bb8 · 0x24c68) · 2(0x2b46e · 0x24c34) · 6(0x266bc) · 랭킹 커서 0~5(0x28b46) 뿐이라 음수가 없다.
  */
-const BALL_FOLDER = './sprites/main_ball/frames'
+const BALL_FOLDER = assetUrl('./sprites/main_ball/frames')
 const BALL_ANIMATION = 0
 
 export function MenuWheel() {

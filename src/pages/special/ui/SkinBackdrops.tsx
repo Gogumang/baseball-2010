@@ -17,9 +17,10 @@ import { sprite565At } from '@/shared/lib/pixelEffect/sprite565Cache'
 import { loadSpriteImage } from '@/shared/lib/sprite/spriteCache'
 import type { ScreenGrayRect } from '@/shared/lib/pixelEffect/screenGrayRects'
 import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MAIN_TITLE = './sprites/main_title'
-const GPOINT_FRAMES = './sprites/gpoint/frames'
+const MAIN_TITLE = assetUrl('./sprites/main_title')
+const GPOINT_FRAMES = assetUrl('./sprites/gpoint/frames')
 const pad = (index: number) => String(index).padStart(3, '0')
 
 /** 명예의 전당 목록을 쓰는 화면의 바탕 — 메뉴 바탕 0x58371 · 공 무늬 0x5fd61 (`lib/skinBackdrops.ts`) */

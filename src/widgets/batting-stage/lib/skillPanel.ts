@@ -4,6 +4,7 @@ import { frameAnimations, placedFrame, sprite } from '@/widgets/batting-stage/li
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { BATTER_SIDE, STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { PIXEL_FONT_FAMILY } from '@/app/styles/theme.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **경기 스킬 표시 판 (장면 +0x19b0 ~ +0x19c0)** — 타석이 서면(0xd) 타자 · 투수가 장착한 스킬 가운데 지금 걸리는 것의 이름을
@@ -80,7 +81,7 @@ const ICON_STEP = 0xf
 const BATTER_ICON_ORIGIN = { x: STAGE_WIDTH / 2 - 0x14, y: STAGE_HEIGHT - 0x60 } as const
 const PITCHER_ICON_OFFSET = { x: -0x14, cpuY: -0x34, humanY: -0x4e } as const
 
-export const GAME_UI_FOLDER = './sprites/game_ui'
+export const GAME_UI_FOLDER = assetUrl('./sprites/game_ui')
 const GAME_UI_FRAMES = `${GAME_UI_FOLDER}/frames`
 
 /** game_ui 프레임 — 58 "SKILL" · 59 파랑 칸 · 60 주황 칸 · 61 줄 (판 객체 [+0x1018]+0xc 의 +0xe8 ~ +0xf4) */

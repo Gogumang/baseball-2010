@@ -31,6 +31,7 @@ import { CenterStage } from '@/pages/management/ui/CenterStage'
 import { nariStageCharactersOf } from '@/pages/management/lib/centerStage'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 export type { ManagementCommand } from '@/pages/management/lib/managementLayout'
 
@@ -113,7 +114,7 @@ export function ManagementScreen(props: ManagementScreenProps) {
   const titleHolder = props.mainCursor ?? ownTitleHolder
   /** 108 필살타법 창에 들어선 횟수 — 139 G 충전에서 돌아오면 108 진입 0x17730 이 다시 돈다(창을 새로 마운트) */
   const [swingTrainingEntry, setSwingTrainingEntry] = useState(0)
-  const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
+  const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   const slots = menu.kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[menu.kind]
   const labelWidths = Object.fromEntries(
     slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),

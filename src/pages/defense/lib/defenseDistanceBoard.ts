@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * **비거리 판 — 원본 `0x36cd4`** (← 0x17 그리기 0x46c88 의 0x46cb6). 일반 · 팀 · 투수 · 미션 모드의 0x17 에서는
  * 플레이+0x118 == 8(더비 판)이 아니라 **+0x1960(HOMERUN 글자 켜짐)** 일 때만 그린다(`defenseHomeRunEffects`).
@@ -12,10 +13,10 @@
 
 /** 화면 폭 W (0x14008b8) */
 const SCREEN_WIDTH = 240
-const NUM_FOLDER = './sprites/num'
+const NUM_FOLDER = assetUrl('./sprites/num')
 
 export const DEFENSE_DISTANCE_BOARD = {
-  src: './sprites/trainning/frames/011.png',
+  src: assetUrl('./sprites/trainning/frames/011.png'),
   width: 40,
   x: SCREEN_WIDTH / 2 - 40 / 2,
   y: 10,

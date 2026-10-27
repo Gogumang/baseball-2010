@@ -3,6 +3,7 @@ import { BATTER_SIDE, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage
 import type { StagePhaseSnapshot } from '@/widgets/batting-stage/lib/softKeyLabels'
 import { grayPixel565, halfMixPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
 import { rgbOf565, rgbTo565 } from '@/shared/lib/screen565/screen565'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **타석 화면 루상 주자 0x35b94** (직접 떴다, 0x35b94~0x3605e). 타석 공용 묶음(0x50828 · 0x4cb1c · 0x4d2ac …)이 부른다.
@@ -39,7 +40,7 @@ import { rgbOf565, rgbTo565 } from '@/shared/lib/screen565/screen565'
  */
 
 /** game_ui 이미지 22 — 1·3루 쪽 작은 창(34×35) */
-export const BASE_WINDOW_IMAGE = './sprites/game_ui/022.png'
+export const BASE_WINDOW_IMAGE = assetUrl('./sprites/game_ui/022.png')
 const BASE_WINDOW_WIDTH = 34
 const SCREEN_MARGIN = 3
 const WINDOW_RAISE = 0x2f
@@ -49,7 +50,7 @@ const SECOND_RUNNER_RAISE = 0x12
 const SECOND_RUNNER_SHIFT = { left: 0x1b, right: 5 } as const
 
 /** 주자 그림 = defender.pzx 애니 0 · 1 · 2 (주자 칸 프레임 0 · 1 을 흔든다) */
-export const RUNNER_FRAMES = './sprites/defender/frames'
+export const RUNNER_FRAMES = assetUrl('./sprites/defender/frames')
 
 export interface BaseRunnerBases {
   readonly first: boolean
@@ -151,7 +152,7 @@ export function loopingAnimationStepAt(
  * 효과 0xa 는 팔레트 픽셀 함수 0x97f01(등록 0x3098)로 **회색**이다: s = R5 + G(위 5비트) + B5 + 3, g = s/4 + s/16 + s/64,
  * 565 = g<<11 | g<<6 | g (0xbb91d 의 종류 4 와 같은 식) — `grayRunPipPixel`.
  */
-export const RUN_PIP_IMAGE = './sprites/game_ui/097.png'
+export const RUN_PIP_IMAGE = assetUrl('./sprites/game_ui/097.png')
 const RUN_PIP_SLOTS = 4
 const RUN_PIP_STEP = 6
 const RUN_ABILITY_PER_PIP = 0x14d
@@ -234,11 +235,11 @@ export function grayRunPipPixel(red: number, green: number, blue: number): { r: 
 
 /** ace/defender_* — 표 0xd3f0c[번호](0x79cbc, 20바이트 간격): medica · kao · roze · death · tiger */
 const ACE_RUNNER_FRAMES: readonly string[] = [
-  './sprites/defender_medica/frames',
-  './sprites/defender_kao/frames',
-  './sprites/defender_roze/frames',
-  './sprites/defender_death/frames',
-  './sprites/defender_tiger/frames',
+  assetUrl('./sprites/defender_medica/frames'),
+  assetUrl('./sprites/defender_kao/frames'),
+  assetUrl('./sprites/defender_roze/frames'),
+  assetUrl('./sprites/defender_death/frames'),
+  assetUrl('./sprites/defender_tiger/frames'),
 ]
 
 /**

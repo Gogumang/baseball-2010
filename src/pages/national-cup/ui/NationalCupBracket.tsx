@@ -10,10 +10,11 @@ import {
 } from '@/pages/national-cup/lib/nationalCupLayout'
 import type { BracketBox } from '@/pages/national-cup/lib/nationalCupLayout'
 import * as styles from '@/pages/national-cup/ui/NationalCupStandings.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const MODE_UI = './sprites/mode_ui/frames'
-const TEAM_LOGO = './sprites/team_logo'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const TEAM_LOGO = assetUrl('./sprites/team_logo')
 
 interface NationalCupBracketProps {
   readonly cup: NationalCup

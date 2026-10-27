@@ -30,11 +30,12 @@ import {
   roundEdgeRectsOf,
 } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 import type { DetailWindowOrigin, PlayerDetail } from '@/widgets/player-detail-window/lib/playerDetailWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const SLT_FRAME = './sprites/slt_frame'
-const NUM = './sprites/num'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
+const NUM = assetUrl('./sprites/num')
 const pad = (index: number) => String(index).padStart(3, '0')
 const pixel: CSSProperties = { position: 'absolute', pointerEvents: 'none', imageRendering: 'pixelated' }
 

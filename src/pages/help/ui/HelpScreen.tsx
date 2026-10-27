@@ -34,11 +34,12 @@ import * as styles from '@/pages/help/ui/HelpScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_FRAME = './sprites/slt_frame'
-const SLT_FRAMES = './sprites/slt_frame/frames'
-const NUM = './sprites/num'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
+const SLT_FRAMES = assetUrl('./sprites/slt_frame/frames')
+const NUM = assetUrl('./sprites/num')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 const frameSrc = imageSrc

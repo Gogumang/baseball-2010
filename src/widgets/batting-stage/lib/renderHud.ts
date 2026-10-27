@@ -1,6 +1,7 @@
 import { placedFrame, sprite } from '@/widgets/batting-stage/lib/spriteLoader'
 import { ORIGINAL_COLORS, UI_COLORS } from '@/shared/config/design'
 import { isBugFixed } from '@/shared/config/bugfixes'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 경기 HUD — binary.mod 0x373d0 (position-re 2차, 바이트 확인).
@@ -50,9 +51,9 @@ export interface HudState {
   readonly hiddenRunnerBases?: readonly number[]
 }
 
-const HUD_FRAMES = './sprites/game_ui/frames'
+const HUD_FRAMES = assetUrl('./sprites/game_ui/frames')
 const HUD_ORIGIN = { x: 6, y: 6 }
-const PART = (index: number) => `./sprites/game_ui/${String(index).padStart(3, '0')}.png`
+const PART = (index: number) => assetUrl(`./sprites/game_ui/${String(index).padStart(3, '0')}.png`)
 
 const BOARD = { x: 5, y: 5, width: 82, height: 50 }
 const BOARD_ROUND = 5
@@ -328,7 +329,7 @@ function drawTeamRow(
   }
 }
 
-const numGlyphUrl = (index: number) => `./sprites/num/${String(index).padStart(3, '0')}.png`
+const numGlyphUrl = (index: number) => assetUrl(`./sprites/num/${String(index).padStart(3, '0')}.png`)
 
 function numGlyphSizeOf(index: number): { readonly width: number; readonly height: number } | null {
   const image = sprite(numGlyphUrl(index))

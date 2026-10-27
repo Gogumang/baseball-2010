@@ -1,6 +1,7 @@
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import type { InningHalf, PlayerSide } from '@/entities/game/model/gameState'
 import { BURST_REWARD_NAMES } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **타석 HUD 돌발 띠 — 원본 `0x8e858`** (r133 직접 떴다, 0x8e858~0x8e9e0). 돌발 창(0x8f3c0 · `BurstMissionWindow`)과 다른,
@@ -46,9 +47,9 @@ import { BURST_REWARD_NAMES } from '@/widgets/burst-mission/lib/burstMissionWind
 /** 타석 캔버스 폭 W (0x14008b8) */
 const SCREEN_WIDTH = 240
 
-export const BURST_BAND_FOLDER = './sprites/trainning'
+export const BURST_BAND_FOLDER = assetUrl('./sprites/trainning')
 /** trainning 합성 프레임 14 (83×51, 원점 (0, 0)) — 0xba815 의 상자 */
-export const BURST_BAND_FRAME_SRC = './sprites/trainning/frames/014.png'
+export const BURST_BAND_FRAME_SRC = assetUrl('./sprites/trainning/frames/014.png')
 const BAND_WIDTH = 83
 
 /** bx = W − w */

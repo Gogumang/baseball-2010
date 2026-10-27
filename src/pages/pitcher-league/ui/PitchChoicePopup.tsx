@@ -16,14 +16,15 @@ import { PITCH_WINDOW_CHOICES } from '@/pages/pitcher-league/lib/pitcherManageme
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
 
 /** `ui/mode_icon.pzx` 그림 · 33×33 ([장면+0xe0] — 나리 기록실 0x19448 과 같은 그림 객체). 고른 칸은 mpl 첫 벌(주황) 사본 */
 const MODE_ICON_SIZE = 33
-const modeIconOf = (frame: number) => `./sprites/mode_icon/${String(frame).padStart(3, '0')}.png`
-const selectedModeIconOf = (frame: number) => `./sprites/management/icon_selected_${frame}.png`
+const modeIconOf = (frame: number) => assetUrl(`./sprites/mode_icon/${String(frame).padStart(3, '0')}.png`)
+const selectedModeIconOf = (frame: number) => assetUrl(`./sprites/management/icon_selected_${frame}.png`)
 
 const pixel = { position: 'absolute', pointerEvents: 'none' } as const
 

@@ -5,6 +5,7 @@ import { PressArea } from '@/shared/ui/PressArea/PressArea'
 import type { PressRect } from '@/shared/ui/PressArea/PressArea'
 import { useMarksCommonWindowShown, useSceneClosesWithoutShrink } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface MessageBoxProps {
   /** 원문 마크업 (StrMODE) */
@@ -120,7 +121,7 @@ type BoxAnimation =
   | { readonly kind: '열림'; readonly height: number }
   | { readonly kind: '닫힘'; readonly width: number; readonly answer: number }
   | null
-const POPUP = './sprites/popup/frames'
+const POPUP = assetUrl('./sprites/popup/frames')
 /**
  * 버튼은 글자가 아니라 `ui/popup.pzx` 프레임 그림이다 (F-1 확정).
  *   알림(버튼 하나) = 프레임 0 "OK" · 예/아니오 = 1 "예" · 2 "아니오" (41×15)

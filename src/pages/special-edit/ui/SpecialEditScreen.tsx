@@ -30,9 +30,10 @@ import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const SLT_IMAGE = './sprites/slt_frame'
-const IMG_TEXT = './sprites/img_text/frames'
+const SLT_IMAGE = assetUrl('./sprites/slt_frame')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const imageSrc = (folder: string, image: number) => `${folder}/${String(image).padStart(3, '0')}.png`
 /** 격자 칸 바탕 slt_frame 이미지 0 · 고른 칸 테두리 이미지 1 (42×42) · 칸 로고 38 — 팀 고르기 화면과 같은 근사 */
 const CELL_FRAME_IMAGE = 0
@@ -299,7 +300,7 @@ const FIELD = { x: 120 - 50, y: 0xaf, width: 0x64, height: 0xf } as const
  * 일반 입력 칸이라 처음 표시 "가" 에 머문다.
  */
 const INPUT_MODE_MARK = { label: '가', x: 120 - 50 + 0x64 + 0xe, y: 0xaf + 1 } as const
-const INPUT_MODE_ARROWS = { image: './sprites/slt_frame/020.png', leftX: 120 - 50 + 0x64 + 5, rightX: 120 - 50 + 0x64 + 0x18, y: 0xaf + 2 } as const
+const INPUT_MODE_ARROWS = { image: assetUrl('./sprites/slt_frame/020.png'), leftX: 120 - 50 + 0x64 + 5, rightX: 120 - 50 + 0x64 + 0x18, y: 0xaf + 2 } as const
 
 interface EditNamePopupProps {
   readonly onConfirm: (name: string) => void

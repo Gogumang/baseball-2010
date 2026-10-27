@@ -1,4 +1,5 @@
 import { sineHundred } from '@/shared/lib/math/originalTrigonometry'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 나만의리그 엔딩 화면 (장면 0x106 상태 141 — 적재 `0x87c7c`, 그리기 `0x168fc`).
@@ -114,11 +115,11 @@ export function endingStageZeroCoverOpacityAt(
  * (S12 의 137·61 은 박스를 옮기기 전 값이다.)
  */
 export const WALK_IN = {
-  characterFolder: './sprites/event_char_0/frames',
+  characterFolder: assetUrl('./sprites/event_char_0/frames'),
   characterAnimation: 2,
   characterAnimationWithLook: 10,
   characterDx: -20,
-  iconFolder: './sprites/mode_ui/frames',
+  iconFolder: assetUrl('./sprites/mode_ui/frames'),
   iconFrame: 87,
   iconDx: -62,
   /** x = W − n/3 + dx — 3틱에 1px */
@@ -350,7 +351,7 @@ export function creditsWalkersOf(look: EndingWalkInLook, romanceEvents: readonly
     isPlayer: true,
   }
   const partners = romanceEvents.map((eventId, index): CreditsWalker => ({
-    folder: './sprites/event_char_1/frames',
+    folder: assetUrl('./sprites/event_char_1/frames'),
     animation: PARTNER_ANIMATION_BASE[eventId - FIRST_ROMANCE_EVENT] + PARTNER_CREDITS_ANIMATION[count - 2],
     x: SCREEN.width / 2 + (shifts[index + 1] ?? 0),
     isFlipped: index === 0 && (count === 2 || count === 3),

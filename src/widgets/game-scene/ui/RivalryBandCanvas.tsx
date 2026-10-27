@@ -7,10 +7,11 @@ import {
   rivalryDrawsOf,
 } from '@/widgets/game-scene/lib/rivalryBand'
 import { brightenedImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
-const LOGO_URL = `./sprites/team_logo/${String(RIVALRY_LOGO_FRAME).padStart(3, '0')}.png`
+const LOGO_URL = assetUrl(`./sprites/team_logo/${String(RIVALRY_LOGO_FRAME).padStart(3, '0')}.png`)
 
 let logoImage: HTMLImageElement | null = null
 let logoLoading = false

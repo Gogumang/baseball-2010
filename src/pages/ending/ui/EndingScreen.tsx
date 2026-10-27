@@ -22,8 +22,9 @@ import {
 } from '@/pages/ending/lib/endingLayout'
 import type { CreditsWalker, EndingWalkInLook } from '@/pages/ending/lib/endingLayout'
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const ENDING_FRAMES = './sprites/ending/frames'
+const ENDING_FRAMES = assetUrl('./sprites/ending/frames')
 
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 

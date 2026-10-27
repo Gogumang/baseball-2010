@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * 시즌 상태 **0xe3** 외출 연출 — 진입 0x5184 · 키 0x4944 · 갱신 0xce0c · 그리기 0xa06c (직접 떴다).
  *
@@ -30,10 +31,10 @@ export interface SeasonOutingPresentation {
   readonly overlays: { readonly char1: number; readonly char0: number } | null
 }
 
-const EVENT_ANI = './sprites/event_ani/frames'
-const TEAM_TRAINING_ANI = './sprites/team_traning_ani/frames'
-export const EVENT_CHAR_1 = './sprites/event_char_1/frames'
-export const EVENT_CHAR_0 = './sprites/event_char_0/frames'
+const EVENT_ANI = assetUrl('./sprites/event_ani/frames')
+const TEAM_TRAINING_ANI = assetUrl('./sprites/team_traning_ani/frames')
+export const EVENT_CHAR_1 = assetUrl('./sprites/event_char_1/frames')
+export const EVENT_CHAR_0 = assetUrl('./sprites/event_char_0/frames')
 
 const eventPresentationOf = (k: number): SeasonOutingPresentation => ({
   folder: EVENT_ANI, animation: k, overlays: { char1: k + 30, char0: k + 0x5d },

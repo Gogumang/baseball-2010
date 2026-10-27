@@ -11,9 +11,10 @@ import type { PlacedImage } from '@/pages/season/lib/seasonStatusPanel'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const NUM = './sprites/num'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const NUM = assetUrl('./sprites/num')
 /** SR+2 소지금은 100만 원 단위 — 0x7db42 가 ×100 해서 만 원 단위 0x63331 에 넘긴다 */
 const MONEY_TO_TEN_THOUSAND = 100
 const DIGIT_HEIGHT = 10

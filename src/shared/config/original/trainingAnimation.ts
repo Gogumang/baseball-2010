@@ -1,3 +1,4 @@
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 /**
  * 훈련 팝업 연출 — binary.mod 에서 읽은 표 그대로다.
  *
@@ -75,5 +76,5 @@ export const TRAINING_PRESENTATION_OF: Readonly<Record<string, TrainingPresentat
 export const TRAINING_POPUP_UPDATES = 60
 
 export function animationFolderOf(file: TrainingAnimationFile): string {
-  return `./sprites/${file}/frames`
+  return assetUrl(`./sprites/${file}/frames`)
 }

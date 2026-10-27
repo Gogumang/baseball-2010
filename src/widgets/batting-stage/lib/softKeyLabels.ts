@@ -1,5 +1,6 @@
 import { placedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **소프트키 글자 "*MENU" · "#TIME"** — 타석 화면 공용 그리기 `0x4c4bc` 의 0x4c8e0~0x4c9fc (2026-10-08 직접 뜸):
@@ -20,7 +21,7 @@ import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayo
  * 모든 미션(5·6)을 막는다(Q2 2e) — 타석 화면을 쓰는 곳 가운데 팀 경기(모드 1·2·8·9)만 "#TIME" 이 선다.
  */
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
 
 /** game_ui 프레임 90 "*MENU" · 91 "#TIME" — 둘 다 41 × 12, 원점 (0, 0) (origins.json) */
 export const MENU_LABEL_FRAME = 0x5a

@@ -10,18 +10,19 @@ import type { WorldPoint } from '@/pages/defense/lib/defenseCamera'
 import { TEAM_COUNT } from '@/shared/lib/sprite/paletteSwap'
 import { ballShadowPiecesAt } from '@/shared/lib/ballShadow/ballShadowPieces'
 import type { BallShadowPiece } from '@/shared/lib/ballShadow/ballShadowPieces'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 수비 배경 stadium/defense.pzx — 310×500 한 장 (FOR-IMPLEMENTER B-1) */
-export const DEFENSE_BACKGROUND_URL = './sprites/defense/000.png'
+export const DEFENSE_BACKGROUND_URL = assetUrl('./sprites/defense/000.png')
 export const DEFENSE_BACKGROUND_WIDTH = 310
 export const DEFENSE_BACKGROUND_HEIGHT = 500
 
 /** 보통 수비수 그림 (defender.pzx, 합성 프레임 125장 = 000~124) */
-export const DEFENDER_FRAMES = './sprites/defender/frames'
+export const DEFENDER_FRAMES = assetUrl('./sprites/defender/frames')
 /** 주자·공 그림 */
-export const BALL_FRAMES = './sprites/ball/frames'
+export const BALL_FRAMES = assetUrl('./sprites/ball/frames')
 /** 공 잡는 순간 번쩍임 (R2 2절) */
-export const DEADLY_EFFECT_FRAMES = './sprites/deadly_effect/frames'
+export const DEADLY_EFFECT_FRAMES = assetUrl('./sprites/deadly_effect/frames')
 
 /**
  * 마선수 수비 그림 (R3 7-1, 이름 표 0xd3f0c / 0xd4008).
@@ -31,18 +32,18 @@ export const DEADLY_EFFECT_FRAMES = './sprites/deadly_effect/frames'
  * 그래서 "38 이상이면 보통 그림으로 되돌린다" 던 땜질(`ACE_PITCHER_FRAME_COUNT`)은 **필요 없다** — 지웠다.
  */
 export const ACE_BATTER_DEFENDER_FRAMES = [
-  './sprites/defender_medica/frames',
-  './sprites/defender_kao/frames',
-  './sprites/defender_roze/frames',
-  './sprites/defender_death/frames',
-  './sprites/defender_tiger/frames',
+  assetUrl('./sprites/defender_medica/frames'),
+  assetUrl('./sprites/defender_kao/frames'),
+  assetUrl('./sprites/defender_roze/frames'),
+  assetUrl('./sprites/defender_death/frames'),
+  assetUrl('./sprites/defender_tiger/frames'),
 ] as const
 export const ACE_PITCHER_DEFENDER_FRAMES = [
-  './sprites/defender_psyker/frames',
-  './sprites/defender_leony/frames',
-  './sprites/defender_bbmachine/frames',
-  './sprites/defender_ballantine/frames',
-  './sprites/defender_dragona/frames',
+  assetUrl('./sprites/defender_psyker/frames'),
+  assetUrl('./sprites/defender_leony/frames'),
+  assetUrl('./sprites/defender_bbmachine/frames'),
+  assetUrl('./sprites/defender_ballantine/frames'),
+  assetUrl('./sprites/defender_dragona/frames'),
 ] as const
 
 /**

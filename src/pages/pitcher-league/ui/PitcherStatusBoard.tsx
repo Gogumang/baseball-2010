@@ -12,6 +12,7 @@ import { NariStatusValues } from '@/pages/management/ui/StatusValues'
 import { HELPLESSNESS_SKILL_ID, LUCK_SKILL_ID } from '@/pages/management/ui/StatusIconRow'
 import type { StatusIconState } from '@/pages/management/ui/StatusIconRow'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 상태 아이콘 줄의 조건 — 투수편(모드 3)도 0x7d34c 의 같은 줄을 탄다. 모드 갈림은 시즌(모드 2, 0x7b998) 하나뿐이라
@@ -110,7 +111,7 @@ export function PitcherStatusBoard({ career, hour, isPreviousGame = false }: Pit
           </>
         )}
       </svg>
-      <img className={styles.layer} src={`./sprites/img_text/frames/${STAMINA_LABEL_FRAME}.png`} alt=""
+      <img className={styles.layer} src={assetUrl(`./sprites/img_text/frames/${STAMINA_LABEL_FRAME}.png`)} alt=""
         style={{ left: bar.label.left, top: bar.label.top }} />
       <NariStatusValues isPreviousGame={isPreviousGame} fields={{
         popularity: career.popularity,

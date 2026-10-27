@@ -282,3 +282,21 @@ PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ yarn node e2e/sc
 
 `e2e/perf.mjs` 의 크로미움은 r311 부터 `page.route` 를 쓰지 않는다 — 라우트가 걸리면 HTTP 캐시가 꺼져 요청 수가 부푼다.
 웹폰트 CDN 은 실행 인자 `--host-resolver-rules` 로 끊는다. 웹킷은 라우트로 늦추므로 표에 "캐시 꺼짐" 으로 적는다.
+
+## 배포 캐시 머리 · 자산 버전 경로 확인 (r318)
+
+배포 호스트는 Vercel(Hobby)이다. `vercel.json` 이 `assets/*` · `v/*` 를 1년 immutable, `/` · `index.html` 을 매번 확인으로 둔다.
+빌드는 `public/` 을 `v/<내용 해시>/` 로 내보내고(`tools/viteVersionedAssets.ts`), 코드는 자산 주소를 모두 `assetUrl()` 로 만든다.
+`e2e/serve-vercel.mjs` 는 산출물을 `vercel.json` 머리 그대로(ETag · 304 · gzip) 내주는 로컬 서버다.
+
+```sh
+yarn vite build --mode e2e --outDir /tmp/old   # 견줄 옛 판 (다른 커밋에서)
+yarn vite build --mode e2e --outDir /tmp/new
+yarn node e2e/serve-vercel.mjs /tmp/old 5711 none   # vercel.json 없이 — 모든 파일이 Vercel 기본 머리(max-age=0, must-revalidate)
+yarn node e2e/serve-vercel.mjs /tmp/new 5712        # vercel.json 머리
+E2E_PORT=5712 PERF_ONLY=chromium PERF_NET=rtt PERF_REVISIT=nari-management,general-bat PERF_REVISIT_ONLY=1 yarn node e2e/perf.mjs   # 다시 방문
+PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5712/ yarn node e2e/scene-pixels.mjs
+```
+
+`PERF_REVISIT` 는 같은 맥락(같은 HTTP 캐시)에서 장면을 한 번 열어 다 받은 뒤 다시 열어 두 번째를 잰다(크로미움만). 표의 "그중 304" 가
+재검증 왕복 수다. `PERF_NET=rtt` 는 왕복 150ms 만 늦춘다(대역 제한 없음 — r306 다시 방문 표와 같은 조건).

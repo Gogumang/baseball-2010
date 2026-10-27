@@ -64,6 +64,7 @@ import { leaveGameSceneObject } from '@/widgets/game-scene/model/gameSceneObject
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import { devBootSeed, publishSceneHandles } from '@/app/dev/sceneShortcut'
 import { lazyScreen, preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreen'
+import { noteSafePoint } from '@/shared/lib/staleBuild/staleBuild'
 
 /*
  * 모드 화면은 따로 받는다(`lazyScreen` — 첫 화면 덩이를 줄인다, r224). 켤 때 길에서 `preloadLazyScreens` 가 미리 받아 두므로
@@ -76,6 +77,11 @@ const SeasonRoute = lazyScreen(() => import('@/app/ui/SeasonRoute').then((module
 const MissionRoutes = lazyScreen(() => import('@/app/ui/MissionRoutes').then((module) => module.MissionRoutes), 30)
 const PitcherAceMatchRoute = lazyScreen(() => import('@/app/ui/MissionRoutes').then((module) => module.PitcherAceMatchRoute), 30)
 
+/**
+ * 다시 불러도 날아갈 진행이 없는 화면 — 켤 때 길 · 타이틀 · 메인 메뉴. 모드는 나갈 때 저장을 마치고 메인 메뉴로 온다
+ * (새 배포 뒤 열린 탭 다시 부르기, `shared/lib/staleBuild`)
+ */
+const SAFE_TO_RELOAD_SCREENS: ReadonlySet<Screen['kind']> = new Set(['이용안내', '로고', '타이틀', '메인메뉴'])
 const SETTINGS_KEY = 'compus-baseball/settings'
 const COLLECTION_KEY = 'compus-baseball/collection'
 /** 시즌모드 저장 — 원본은 나만의리그와 **다른 칸**에 담는다 (0x22755) */
@@ -203,6 +209,11 @@ export function App({ bootScreen }: AppProps = {}) {
   useEffect(() => {
     if (isPastLogo) void preloadLazyScreens()
   }, [isPastLogo])
+  // 새 배포 뒤 열려 있던 탭은 저장된 자리에서만 다시 부른다 — 켤 때 길 · 타이틀 · 메인 메뉴는 날아갈 진행이 없다 (r318, `staleBuild`)
+  const isSafeToReload = SAFE_TO_RELOAD_SCREENS.has(screen.kind)
+  useEffect(() => {
+    noteSafePoint(isSafeToReload)
+  }, [isSafeToReload])
   /** 게임시작 목록 커서 전역 [0x1552d24] — 장면 0x103 이 내려가도 남는다(관리 메뉴 취소로 하위 5 에 바로 서면 그 칸) */
   const gameStartCursor = useRef(createGameStartCursor()).current
   /** 일반모드 진입 창 [13] 에서 빠른실행을 골랐는가 (원본 메인 메뉴 this+0x14c) */

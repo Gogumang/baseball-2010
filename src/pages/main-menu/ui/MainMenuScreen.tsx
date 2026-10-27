@@ -30,6 +30,7 @@ import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모드' | '일반모드빠른실행' | '일반모드경기이어하기'
 
@@ -133,8 +134,8 @@ interface MainMenuScreenProps {
 /** 판정을 부르는 상태 틱 (0x29520 `cmp r3,#0xa`) */
 const TOP_MENU_REWARD_TICK = 10
 
-const MAIN_UI = './sprites/main_ui'
-const IMG_TEXT = './sprites/img_text'
+const MAIN_UI = assetUrl('./sprites/main_ui')
+const IMG_TEXT = assetUrl('./sprites/img_text')
 const pad = (frame: number) => String(frame).padStart(3, '0')
 /** 합성 프레임 (main_ui/frames · img_text/frames) */
 const frameSrc = (folder: string, frame: number) => `${folder}/frames/${pad(frame)}.png`

@@ -4,10 +4,11 @@ import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import { TITLE_WINDOW, titleWindowLinesOf } from '@/widgets/title-window/lib/titleWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 
 /**
  * **칭호 팝업** 0x1274c — 그리기 0x1afe8 · 키 0x1b1e4 (`TITLE_WINDOW` 주석).

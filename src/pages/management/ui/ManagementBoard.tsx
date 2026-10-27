@@ -12,9 +12,10 @@ import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MODE_UI = './sprites/mode_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const STATUS_FRAME = 11
 const SCREEN_WIDTH = 240
 /** 띠의 비스듬한 끝 — 19 칸 계단 (0x7cfc8) */

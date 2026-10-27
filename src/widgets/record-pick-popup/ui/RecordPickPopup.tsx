@@ -17,15 +17,16 @@ import {
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
 const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
 
 /** `ui/mode_icon.pzx` 그림 · 33×33. mpl 첫 벌(주황)로 칠한 사본은 tools/generate_management_sprites.py 가 만든다 */
 const MODE_ICON_SIZE = 33
-const modeIconOf = (frame: number) => `./sprites/mode_icon/${String(frame).padStart(3, '0')}.png`
-const selectedModeIconOf = (frame: number) => `./sprites/management/icon_selected_${frame}.png`
+const modeIconOf = (frame: number) => assetUrl(`./sprites/mode_icon/${String(frame).padStart(3, '0')}.png`)
+const selectedModeIconOf = (frame: number) => assetUrl(`./sprites/management/icon_selected_${frame}.png`)
 
 const pixel = { position: 'absolute', pointerEvents: 'none' } as const
 

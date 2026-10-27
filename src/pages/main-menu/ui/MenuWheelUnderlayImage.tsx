@@ -1,7 +1,8 @@
 import type { MenuWheelUnderlay } from '@/pages/main-menu/lib/mainMenuLayout'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const MAIN_UI = './sprites/main_ui'
+const MAIN_UI = assetUrl('./sprites/main_ui')
 
 /**
  * 반원 바퀴 칸 밑판 한 장 — main_ui 이미지 0 · 1 · 2 (0x24b1c 24f6c~24f94, `menuWheelSlotDrawOf`).

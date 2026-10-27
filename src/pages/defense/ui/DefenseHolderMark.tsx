@@ -9,9 +9,10 @@ import {
 } from '@/pages/defense/lib/holderMarkLayout'
 import { IMG_TEXT_FRAMES } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI = './sprites/game_ui/frames'
-const IMG_TEXT = './sprites/img_text/frames'
+const GAME_UI = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const pad = (frame: number) => String(frame).padStart(3, '0')
 
 /**

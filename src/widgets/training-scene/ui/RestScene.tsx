@@ -9,10 +9,11 @@ import type { RestPresentation } from '@/widgets/training-scene/lib/restPresenta
 import { EventAnimationSprite } from '@/widgets/training-scene/ui/EventAnimationSprite'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const EVENT_ANI = './sprites/event_ani/frames'
-const EVENT_CHAR_0 = './sprites/event_char_0/frames'
-const WINDOW_FOLDER = './sprites/mode_back/frames'
+const EVENT_ANI = assetUrl('./sprites/event_ani/frames')
+const EVENT_CHAR_0 = assetUrl('./sprites/event_char_0/frames')
+const WINDOW_FOLDER = assetUrl('./sprites/mode_back/frames')
 /** 0x848d0(gfx, 0, 0) — 기준점 ((R.x + R.w)/2, R.y + R.h) = (120, 137) (훈련 팝업과 같다) */
 const ANCHOR = { x: 120, y: 137 }
 /** mode_back 을 (1, 52) 에 — 잘라내기 틀 (1, 66) 안에서 y −14 */

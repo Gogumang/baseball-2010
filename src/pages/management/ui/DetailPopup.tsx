@@ -13,14 +13,15 @@ import {
 } from '@/pages/management/lib/detailPopup'
 import type { DetailResult, DetailRow, ScrollBarRect } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/DetailPopup.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
-const MODE_UI = './sprites/mode_ui/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
+const MODE_UI = assetUrl('./sprites/mode_ui/frames')
 const imageOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
 const ROW_HEIGHT = 15
 /** 화살표는 3갱신마다 1px 흔들린다 */
 const ARROW_SWAY_UPDATES = 3
-const NUM = './sprites/num'
+const NUM = assetUrl('./sprites/num')
 /** 넷째 칸(보너스) 부호 — num 105 "+" · 128 "−" (0x875fa~0x8760c: 글자판 +0x1a4 / +0x200) */
 const BONUS_SIGN_FRAMES = { plus: 105, minus: 128 }
 /** 부호 그림 높이 (num 105 = 6px · 128 = 2px) — 세로 자리는 미확인이라 줄 가운데에 둔다 (추정) */
@@ -142,7 +143,7 @@ export function DetailWindow({
       {/* 띄운 그림은 펼침이라 그리기 콜백을 안 부른다(0x7479c) — 뒤 어둡게만 */}
       <div style={{ visibility: motion.openingHeight !== null ? 'hidden' : undefined }}>
       <CommonPanel x={DETAIL_WINDOW.x} y={DETAIL_WINDOW.y} width={DETAIL_WINDOW.width} height={DETAIL_WINDOW.height} titleTab />
-      <img className={styles.layer} alt="" src={`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`}
+      <img className={styles.layer} alt="" src={assetUrl(`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`)}
         style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }} />
       <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={tableYOffset} />
       <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, DETAIL_HEADER.frame)}

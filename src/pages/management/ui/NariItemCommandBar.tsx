@@ -1,6 +1,7 @@
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementLayout'
 import { CommandBar } from '@/pages/management/ui/CommandBar'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 칸 등장 0x7ff8c 가 다 내려온 뒤 — 110 에서 펼친 하위 메뉴가 111 동안 그대로 남는다 */
 const SETTLED_SLIDE_UPDATES = 1_000
@@ -19,7 +20,7 @@ export function NariItemCommandBar({ cursor }: {
   readonly cursor: number
 }) {
   const slots = COMMAND_MENUS.아이템
-  const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
+  const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   const labelWidths = Object.fromEntries(
     slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
   )

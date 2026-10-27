@@ -2,8 +2,9 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP } from '@/pages/management/lib/basicInfoLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 /**
  * 정보 칸 (0x7c450) — 이름표는 img_text 오른쪽 정렬, 값은 시스템 글꼴 가운데. 타순만 노란 숫자.

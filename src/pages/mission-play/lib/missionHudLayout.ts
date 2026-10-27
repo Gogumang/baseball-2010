@@ -2,6 +2,7 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
 import type { GoalTickerFrame } from '@/entities/mission/model/goalTicker'
 import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **미션 HUD — 원본 `0x36714`** (타자 미션 모드 6 · 투수 미션 모드 5) (2026-10-14 직접 뜸, 0x36714~0x36c90 · 줄 그리기 0x36358 · 숫자 0x3608c · 시계 0x361e4).
@@ -40,10 +41,10 @@ import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 /** 타석 캔버스 폭 W (0x14008b8) */
 const SCREEN_WIDTH = 240
 
-export const TRAINNING_FOLDER = './sprites/trainning'
-export const TRAINNING_FRAMES = './sprites/trainning/frames'
-export const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const NUM_FOLDER = './sprites/num'
+export const TRAINNING_FOLDER = assetUrl('./sprites/trainning')
+export const TRAINNING_FRAMES = assetUrl('./sprites/trainning/frames')
+export const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const NUM_FOLDER = assetUrl('./sprites/num')
 
 /** 합성 프레임 12 (83×51, 원점 (0, 0)) — 0xba815 의 상자 */
 const PANEL = { width: 83, height: 51 } as const

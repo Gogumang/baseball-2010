@@ -7,6 +7,7 @@ import { usePublishScreenGrayRects } from '@/shared/lib/pixelEffect/screenGrayRe
 import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 import type { MenuSlot } from '@/pages/management/lib/managementLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface CommandBarProps {
   readonly slots: readonly MenuSlot[]
@@ -38,7 +39,7 @@ interface CommandBarProps {
 }
 
 const iconOf = (index: number, isSelected: boolean) =>
-  isSelected ? `./sprites/management/icon_selected_${index}.png` : `./sprites/mode_icon/${String(index).padStart(3, '0')}.png`
+  isSelected ? assetUrl(`./sprites/management/icon_selected_${index}.png`) : assetUrl(`./sprites/mode_icon/${String(index).padStart(3, '0')}.png`)
 const LABEL_GLYPH_HEIGHT = 10
 /** 부모 칸이 (6,245) 면 mode_ui f60 파란 괄호(원점 −5,−9)를 dy +11 로 덧그린다 */
 const BRACKET = { left: -5, top: -9 + 11 }
@@ -71,7 +72,7 @@ export function CommandBar(props: CommandBarProps) {
           }} />
           {/* 도착하면 괄호를 그린다 */}
           {slidePositionAt(parent.x, PARENT_SLOT_TARGET.x, slideUpdates) === PARENT_SLOT_TARGET.x && (
-            <img className={styles.layer} style={{ left: PARENT_SLOT_TARGET.x + BRACKET.left, top: PARENT_SLOT_TARGET.y + BRACKET.top }} src="./sprites/mode_ui/frames/060.png" alt="" />
+            <img className={styles.layer} style={{ left: PARENT_SLOT_TARGET.x + BRACKET.left, top: PARENT_SLOT_TARGET.y + BRACKET.top }} src={assetUrl("./sprites/mode_ui/frames/060.png")} alt="" />
           )}
         </>
       )}
@@ -101,7 +102,7 @@ export function CommandBar(props: CommandBarProps) {
       {selected !== undefined && (
         <img
           className={styles.layer}
-          src={`./sprites/management/command_label_${selected.labelFrame}.png`}
+          src={assetUrl(`./sprites/management/command_label_${selected.labelFrame}.png`)}
           alt=""
           style={{
             left: commandLabelLeftOf(selected.x + (props.labelDxOf?.(selected) ?? 0), labelWidth, commandLabelAlignOf(isSubMenu, cursor)),

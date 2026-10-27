@@ -19,12 +19,13 @@ import * as styles from '@/pages/mission-play/ui/MissionResultBoard.css'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import { SettlementEffectCanvas } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import type { SettlementEffectLayers } from '@/widgets/batting-stage/model/stageRefs'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI = './sprites/game_ui'
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const RESULT_FRAMES = './sprites/result/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const POPUP_FRAMES = './sprites/popup/frames'
+const GAME_UI = assetUrl('./sprites/game_ui')
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const RESULT_FRAMES = assetUrl('./sprites/result/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const POPUP_FRAMES = assetUrl('./sprites/popup/frames')
 const imageSrc = (folder: string, image: number) => `${folder}/${String(image).padStart(3, '0')}.png`
 
 export interface MissionResultBoardProps {

@@ -7,6 +7,7 @@ import { drawFrameAt, frameAnimations, placedFrame, sprite } from '@/widgets/bat
 import type { StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { STAGE_HEIGHT, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { DRAW_EFFECT, drawImageWithEffect } from '@/shared/lib/pixelEffect/pixelEffect'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * **사람 투구 UI — 장면 위 그림** (구질 목록 0xf · 조준 0x10 · 게이지 0x11). 2026-10-09 직접 떴다.
@@ -111,10 +112,10 @@ export interface PitchGaugeOverlay {
 
 export type PitchInputOverlay = PitchMenuOverlay | PitchAimOverlay | PitchGaugeOverlay
 
-const SLT_FRAMES = './sprites/slt_pitch/frames'
-const SLT_IMAGE = (index: number) => `./sprites/slt_pitch/${String(index).padStart(3, '0')}.png`
-const NUM_IMAGE = (index: number) => `./sprites/num/${String(index).padStart(3, '0')}.png`
-const GAME_EFFECT_FRAMES = './sprites/game_effect/frames'
+const SLT_FRAMES = assetUrl('./sprites/slt_pitch/frames')
+const SLT_IMAGE = (index: number) => assetUrl(`./sprites/slt_pitch/${String(index).padStart(3, '0')}.png`)
+const NUM_IMAGE = (index: number) => assetUrl(`./sprites/num/${String(index).padStart(3, '0')}.png`)
+const GAME_EFFECT_FRAMES = assetUrl('./sprites/game_effect/frames')
 
 export const MAGIC_TYPE_NUMBER = 22
 

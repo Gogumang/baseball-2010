@@ -17,9 +17,10 @@
  * - **이름 그림**은 `ui/img_text.pzx` 합성 프레임이다(`public/sprites/img_text/frames`).
  */
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 이름 그림 폴더 — 다른 화면들과 같은 경로 관례 */
-export const IMG_TEXT = './sprites/img_text/frames'
+export const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 
 /** 종류 이름 그림 (표 0xd1c70) — 0 찬스 · 1 이닝 · 2 상세 */
 export const KIND_LABEL_FRAMES = [399, 400, 401] as const

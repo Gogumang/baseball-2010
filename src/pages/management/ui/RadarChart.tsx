@@ -13,11 +13,12 @@ import type { RadarGrowthOptions } from '@/shared/lib/radarGrowth/useRadarGrowth
 import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const KEYS: readonly (keyof BatterAbility)[] = ['hit', 'power', 'defense', 'run']
-const IMG_TEXT = './sprites/img_text/frames'
+const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const BACKGROUND_HALF = { width: 31, height: 62 }
-const NUM_FOLDER = './sprites/num'
+const NUM_FOLDER = assetUrl('./sprites/num')
 /** num 20번대 숫자 높이 — 칸 높이와 같아 세로 어긋남이 없다 */
 const NUMBER_HEIGHT = 10
 
@@ -68,13 +69,13 @@ export function AbilityRadar({ base, shown, labelFrames, growth }: {
   readonly labelFrames: readonly number[]
   readonly growth?: RadarGrowthOptions
 }) {
-  const origins = useFrameOrigins('./sprites/mode_ui/frames')
+  const origins = useFrameOrigins(assetUrl('./sprites/mode_ui/frames'))
   // 자라는 애니 — 꼭짓점 · 숫자는 지금값(E+8), 숫자 색은 카드가 견준 최종값 그대로(0x5ad94)
   const current = useRadarGrowth(shown, growth)
   const points = current.map((value, axis) => radarPointOf(axis, value))
   return (
     <>
-      <FrameSprite folder="./sprites/mode_ui/frames" frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
+      <FrameSprite folder={assetUrl("./sprites/mode_ui/frames")} frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
       <img className={styles.layer} alt="" src={`${IMG_TEXT}/${ABILITY_TITLE.frame}.png`}
         style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }} />
       {/* 배경 원 = slt_frame 그림3(반원)을 좌우로 붙인다 */}

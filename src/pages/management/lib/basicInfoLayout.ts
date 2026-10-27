@@ -1,6 +1,7 @@
 import { cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { BATTER_BURSTS } from '@/shared/config/original/bursts'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /**
  * 선수정보 → 기본정보 (0x15e20: 카드 0x7ba44 → 선수 그림 → 정보 칸 0x7c450, 레이더 0x5a990 — layout-re 3차).
@@ -56,8 +57,8 @@ export function radarLabelBoxOf(axis: number): { x: number; y: number } {
 export const RADAR_LABEL_FRAMES = [41, 42, 43, 44]
 /** 투수 축 이름 — 0x5a990 모드 3 의 번호 0~3 → img_text 37 제구 · 38 구속 · 39 변화 · 40 체력 */
 export const PITCHER_RADAR_LABEL_FRAMES = [37, 38, 39, 40]
-export const RADAR_LABEL_BOX_IMAGE = './sprites/slt_frame/017.png'
-export const RADAR_BACKGROUND_IMAGE = './sprites/slt_frame/003.png'
+export const RADAR_LABEL_BOX_IMAGE = assetUrl('./sprites/slt_frame/017.png')
+export const RADAR_BACKGROUND_IMAGE = assetUrl('./sprites/slt_frame/003.png')
 export const RADAR_COLORS = { axis: ORIGINAL_COLORS.radarAxis, fill: ORIGINAL_COLORS.highlightYellow, fillOpacity: 0xb4 / 255, edge: ORIGINAL_COLORS.text }
 
 /** 숫자 색 — 기본값보다 표시값이 크면 초록, 작으면 빨강 (0x7c008) */

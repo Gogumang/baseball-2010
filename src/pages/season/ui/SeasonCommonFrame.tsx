@@ -10,6 +10,7 @@ import { CenterStage } from '@/pages/management/ui/CenterStage'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** 커서를 옮긴 뒤 두 번 그리는 동안 +1, −1 로 튄다 (0x7e47a — 카운터 [gfx+0x98] 0 → +1 · 1 → −1) */
 const BOUNCE_BY_UPDATE = [1, -1]
@@ -41,7 +42,7 @@ export function SeasonCommandBar({
   slots, cursor, parent, disabledIds = NO_IDS, grayedIds, onHover, onSelect, slideUpdates,
 }: SeasonCommandBarProps) {
   const update = useUpdateCounter()
-  const labelOrigins = useFrameOrigins('./sprites/img_text/frames')
+  const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   const [movedAt, setMovedAt] = useState<number | null>(null)
   const lastCursor = useRef(cursor)
   const latestUpdate = useRef(update)

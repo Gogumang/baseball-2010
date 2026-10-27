@@ -17,11 +17,12 @@ import {
 import type {
   EntryBatterLine, EntryColumnTable, EntryListGeometry, EntryPitcherLine, EntryRect, PlacedEntryColumn,
 } from '@/widgets/entry-editor/lib/entryListWindow'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-const GAME_UI_FRAMES = './sprites/game_ui/frames'
-const IMG_TEXT_FRAMES = './sprites/img_text/frames'
-const SLT_FRAME = './sprites/slt_frame'
-const NUM = './sprites/num'
+const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
+const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
+const SLT_FRAME = assetUrl('./sprites/slt_frame')
+const NUM = assetUrl('./sprites/num')
 const pad = (index: number) => String(index).padStart(3, '0')
 const pixel: CSSProperties = { position: 'absolute', pointerEvents: 'none', imageRendering: 'pixelated' }
 const WHITE = ORIGINAL_COLORS.text

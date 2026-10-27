@@ -1,9 +1,10 @@
 import { modeBackPaletteOf, timeSlotOfHour } from '@/shared/lib/phoneClock/phoneClock'
 import type { TimeSlot } from '@/shared/lib/phoneClock/phoneClock'
 import { recolorRequestsOf, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
+import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** mode_back 합성 프레임 폴더 — 번호 지도는 `frames/index`, 팔레트는 `palette.json` (`tools/apply_mpl.py`) */
-export const MODE_BACK_FRAMES = './sprites/mode_back/frames'
+export const MODE_BACK_FRAMES = assetUrl('./sprites/mode_back/frames')
 
 const TIME_SLOTS: readonly TimeSlot[] = [0, 1, 2]
 
