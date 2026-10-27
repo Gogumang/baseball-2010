@@ -10,7 +10,7 @@ import type { BatterEquipment, BatterLayer } from '@/widgets/batting-stage/lib/b
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import { pitcherPoseFramesOf } from '@/widgets/batting-stage/lib/stageScenery'
 import {
-  FIGURE_BATTER_POSES, HALL_OF_FAME_FIGURE, INITIAL_FIGURE_ENTRY, INITIAL_FIGURE_LIST_MEMORY, drawListFigureTimes, figureHandOf, pitcherImageDxOf,
+  figureBatterPosesOf, HALL_OF_FAME_FIGURE, INITIAL_FIGURE_ENTRY, INITIAL_FIGURE_LIST_MEMORY, drawListFigureTimes, figureHandOf, pitcherImageDxOf,
 } from '@/pages/special/lib/hallOfFameFigure'
 import type {
   FigureDrawing, FigureEntryState, FigureListMemory, FigureSlotInput, HallOfFameFigureLook,
@@ -69,9 +69,9 @@ export function PitcherFigure({ look, pose }: { readonly look: HallOfFameFigureL
     warmLayers={pitcherPoseFramesOf(null).flatMap((frame) => pitcherLayersOf(frame, equipment))} />
 }
 
-/** 겹침 타자 그림이 낼 수 있는 자세(`FIGURE_BATTER_POSES`)의 겹 전부 — 그림자 끔 (미리 칠하기용) */
+/** 겹침 타자 그림이 낼 수 있는 자세(`figureBatterPosesOf`)의 겹 전부 — 그림자 끔 (미리 칠하기용) */
 export function figureBatterWarmLayersOf(bodyType: number, equipment: BatterEquipment): BatterLayer[] {
-  return FIGURE_BATTER_POSES.flatMap((pose) => batterLayersOf(pose, bodyType, equipment, false))
+  return figureBatterPosesOf(bodyType).flatMap((pose) => batterLayersOf(pose, bodyType, equipment, false))
 }
 
 export function FigureLayers({ layers, x, y, isMirrored, paletteOf, testId, warmLayers = [] }: {
