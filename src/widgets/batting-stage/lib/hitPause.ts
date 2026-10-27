@@ -189,9 +189,11 @@ export function canSkipHitPause(watchesBigHit: boolean): boolean {
 
 /**
  * **[경기+0xf2c] 공의 궤적** — 0x51408(5174c · 517ce)이 판 공과 수평각만 d 다른 패턴(`earlyPassPatternOf`)으로 쏘는 공. 0x13 의
- * 이른 넘김(0x406e8)과 0x13 공 경로(0x33e34 → `hitBallPath`)가 이 공을 본다. ⚠️ 근사(남김 — 굴림 차례): 그 공이 폴에 맞으면 원본은
- * 판 시작에서 rand(−25, 25) 로 폴 뒤 점을 다시 깐다(0xa2c64) — 그 굴림은 판 쪽(`runDefensePlay` · `derbyBattedBallOf`)이 차례만 맞추고
- * 타석은 굴림 없는 궤적을 쓴다. 폴 틱 앞 점은 같다
+ * 이른 넘김(0x406e8)과 0x13 공 경로(0x33e34 → `hitBallPath`)가 이 공을 본다. 그 공이 폴에 맞으면 원본은 쏜 순간(0x51408 517ce 의
+ * 세계 0xbfed0) rand(−25, 25) 로 폴 뒤 점을 다시 깐다(0xa2c64) — 그 굴림은 판 쪽(`runDefensePlay` · `derbyBattedBallOf`)이 차례를
+ * 맞추고, 타석은 굴림 없는 궤적을 쓴다. **그림은 원본과 같다**(r309 전수): 폴 틱 앞 점은 굴림과 상관없고, 원본 타구 패턴 표 전부 × 두 손
+ * 가운데 이 공이 폴에 맞는 4 경우(결과 11 · 24 · 25)는 모두 판 공이 큰 타구가 아니어서 0x13 이 틱 8 에 끝나는데 폴 틱이 20 이상이다
+ * — 0x13 이 그리는 마지막 공 틱보다 12 틱 넘게 뒤라 다시 깐 점이 화면에 안 나오고, 이른 넘김(결과 ≤ 2)에도 안 걸린다
  */
 export function hitBallTrajectoryOf(pattern: BattedBallPattern, batterHand: number) {
   return battedBallTrajectory(earlyPassPatternOf(pattern, batterHand))

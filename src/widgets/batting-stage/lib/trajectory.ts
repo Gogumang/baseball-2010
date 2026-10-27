@@ -55,11 +55,11 @@ export function sceneBallPathPixelAt(path: readonly WorldPoint[] | null, ballTic
 
 /** 공이 도착할 화면 좌표 — 이글아이 표시용 */
 /**
- * 이글아이 자리 — 0x4d2ac 는 [경기+0x10b8](0x10 목표점, 오차 전)을 투영한다(4d2dc~4d2ea). 놓은 공은 그 점(`aimTarget`)을,
- * 놓기 전 와인드업 자리 공은 존 자리 목표(`platePixelOf` 의 plate 갈래)를 쓴다. 목표점이 없는 공(사용자 투구 · 시험 공)은 도착점
+ * 이글아이 자리 — 0x4d2ac 는 [경기+0x10b8](0x10 목표점, 오차 전)을 투영한다(4d2dc~4d2ea). 틱을 안 가려 놓은 공 · 놓기 전
+ * 와인드업 자리 공(`windUpCpuPitchOf`) 모두 그 점(`aimTarget`)이다(r309). 목표점이 없는 공(사용자 투구 · 시험 공)은 도착점
  */
 export function eagleEyePixelOf(pitch: Pitch): { x: number; y: number } {
-  if (pitch.aimTarget !== undefined && pitch.worldPath !== null) return projectToScreen(pitch.aimTarget, pitch.stageSide)
+  if (pitch.aimTarget !== undefined) return projectToScreen(pitch.aimTarget, pitch.stageSide)
   return platePixelOf(pitch)
 }
 

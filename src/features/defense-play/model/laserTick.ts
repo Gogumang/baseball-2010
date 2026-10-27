@@ -27,8 +27,9 @@ import type { DefenseKeyPress } from '@/features/defense-play/model/runDefensePl
  * 52456  0x66a8c(장면, [sp]) 굴림 → 통과면 사람 수비 +0x19ad(반짝임) / CPU +0x19ae(확정) · 52488 늘 +0x19af = 1
  * ```
  * 0xb8da8 은 `ldr r3,[r0,#8] ; subs #6 ; cmp #2 ; bhi` — 수비 칸 6~8(외야) 판정이다(P2 1a 절의 같은 함수). 예전 웹 주석은 이것을
- * "공 가진 야수가 준비됐는지" 로 읽어 관문을 옮기지 않았다 — 그래서 내야수가 쫓는 타구에서도 굴림이 돌았다. 공 가진 야수가 없으면
- * (+0x130 = −1 — 0xb0c7c 가 0) 원본은 관문을 건너뛴다(아래 ⚠️). 굴림의 능력치도 같은 공 가진 야수의 것이다.
+ * "공 가진 야수가 준비됐는지" 로 읽어 관문을 옮기지 않았다 — 그래서 내야수가 쫓는 타구에서도 굴림이 돌았다. 굴림의 능력치도 같은 공
+ * 가진 야수의 것이다. 밀어내기 판(종류 2 · 3)도 공 가진 야수가 있다 — 판 시작 vt18(표 0xd877c[1] · [2] = 0xb288c, r309 직접 뜸)이
+ * b28a2~b28a8 에서 P+0x130 = 1(포수)을 적으므로 523e6 은 포수(내야)에서 끝나 굴리지 않는다(`walkPlay.ts` 와 같은 읽기).
  *
  * 창 0xb2648 의 카운터(+0x1e4 — 판 시작 vt1c b0f44 가 −1)는 0x4e858 이 매 틱 한 번씩 올리므로 웹은 포구 틱 기준 −10 ~ +8 틱으로 본다
  * (`isLaserWindowOpen` — 타구 진행기와 같은 근사. 0x523bc 가 외야 관문을 지나 한 번 더 부르는 틀에는 굴림이 곧바로 +0x19af 를 세워
@@ -94,9 +95,9 @@ export function laserWindowTick(input: LaserWindowTickInput): LaserWindowTickRes
     // b2666~b2670 — 공 가진 야수(0xb0c90 = +0x130).vtC4 (`fielderPose.isReadyToThrow`)
     isThrowerReady: input.holder !== undefined && isReadyToThrow(input.holder),
   })
-  // 523e6 — 공 가진 야수가 있으면 외야수(0xb8da8)일 때만 굴린다. 공 가진 야수가 없는 판(밀어내기 종류 2 · 3 — +0x130 = −1)은
-  // 원본이 관문을 건너뛰고 창 0xb2648 이 앞 판이 남긴 +0x174 로 열리면 0x66a8c 가 빈 야수(0)의 +0xec 를 읽는다 — 그 값을 정할 수 없어
-  // 웹은 굴리지 않는다(⚠️ 미해결 — 타구 판은 고르기 0xb3b38 이 늘 +0x130 을 세워 이 갈래가 없다)
+  // 523e6 — 공 가진 야수가 있으면 외야수(0xb8da8)일 때만 굴린다. 밀어내기 판(종류 2 · 3)은 시작 0xb288c(b28a2~b28a8)가
+  // P+0x130 = 1(포수)을 적어 여기서 끝난다 — `walkPlay` 가 `ballHolderSlot: CATCHER_SLOT` 으로 넘겨 같다(r309 직접 뜸).
+  // holder 가 없는(undefined) 길은 진행기가 늘 공 가진 야수를 세워 오지 않는다
   const holderGate = input.holder !== undefined && isOutfieldSlot(input.holder.slot)
   if (
     !rolled &&

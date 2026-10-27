@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ballFrameIndexAt, ballKindAt, ballPixelAt, platePixelOf, RELEASE_PIXEL, sceneBallPathPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import { ballFrameIndexAt, ballKindAt, ballPixelAt, eagleEyePixelOf, platePixelOf, RELEASE_PIXEL, sceneBallPathPixelAt } from '@/widgets/batting-stage/lib/trajectory'
 import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -143,5 +143,15 @@ describe('장면 공 경로 칸 자리 0x35854 · 0x35820 (A-26)', () => {
     expect(sceneBallPathPixelAt(경로, 1, 0)).toEqual(projectToScreen(경로[1], 0))
     expect(sceneBallPathPixelAt(경로, 9, 1)).toEqual(projectToScreen(경로[2], 1))
     expect(sceneBallPathPixelAt(경로, -3, 0)).toEqual(projectToScreen(경로[0], 0))
+  })
+})
+
+describe('eagleEyePixelOf — 0x4d2ac 는 틱을 안 가리고 [경기+0x10b8] 을 투영한다 (A-31, r309)', () => {
+  it('곡선이 없는 와인드업 자리 공도 0x10 목표점을 투영한다', () => {
+    const target = { x: 20300, y: 900, z: 29705 }
+    expect(eagleEyePixelOf({ ...커브, aimTarget: target })).toEqual(projectToScreen(target, 커브.stageSide))
+  })
+  it('목표점이 없는 공은 도착점(존 자리)이다', () => {
+    expect(eagleEyePixelOf(커브)).toEqual(platePixelOf(커브))
   })
 })
