@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { LOADING_CLOUD_CALLS } from '@/widgets/batting-stage/lib/stageScenery'
 import {
+  beginSceneCloudCountingSpan,
   createCloudFrameCursor,
   observeSceneCloudFrame,
   resetSceneCloudClock,
@@ -57,6 +58,33 @@ describe('경기 장면 구름 셈 — 구장 +0x1c~+0x28 (0x78448)', () => {
     const cursor = createCloudFrameCursor()
     const before = observeSceneCloudFrame(10, false, cursor)
     expect(observeSceneCloudFrame(14, true, cursor)).toBe(before + 4)
+  })
+
+  it('덮개 셈(0xb · 0x1b · 0x1d · 0x23) — 루프가 안 세는 단계여도 덮개가 선 틱부터 내린 틱까지 센다 (Q-08)', () => {
+    const cursor = createCloudFrameCursor()
+    observeSceneCloudFrame(10, true, cursor)
+    const start = sceneCloudCallsNow()
+    // 결과(0x12) 뒤 0x1d — 아래 루프는 '대기' 가 아니라 안 센다
+    observeSceneCloudFrame(12, false, cursor)
+    const span = beginSceneCloudCountingSpan(13)
+    // 루프 그림이 덮개 틱을 같이 센다 — 덮개 틱 13 · 14
+    expect(observeSceneCloudFrame(14, false, cursor)).toBe(start + 2)
+    span.countThrough(16)
+    span.end(17)
+    expect(sceneCloudCallsNow()).toBe(start + 5)
+    // 덮개를 내린 뒤 루프는 안 세는 단계 그대로 — 더 안 는다
+    expect(observeSceneCloudFrame(20, false, cursor)).toBe(start + 5)
+  })
+
+  it('덮개 셈과 아래 루프가 같은 틱을 세면 한 번만 든다 — 교체 창 0xb 아래 \'대기\' 루프', () => {
+    const cursor = createCloudFrameCursor()
+    observeSceneCloudFrame(10, true, cursor)
+    const start = sceneCloudCallsNow()
+    const span = beginSceneCloudCountingSpan(11)
+    expect(observeSceneCloudFrame(13, true, cursor)).toBe(start + 3)
+    span.end(15)
+    expect(sceneCloudCallsNow()).toBe(start + 5)
+    expect(observeSceneCloudFrame(16, true, cursor)).toBe(start + 6)
   })
 
   it('장면을 나가면 로딩 판 자리로 되돌린다', () => {

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useFrameSlideKeyLock } from '@/widgets/screen-frame/model/useFrameSlideKeyLock'
+import { noteSkinShakeDirection, noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { FrameSprite, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -57,6 +58,11 @@ export interface FirstBatStadiumScreenProps {
  *    때문에 유저 팀이 히든(10~14)이면 여기 없는 번호가 들어올 수 있다 — 원본이 자르지 않으므로
  *    그림은 빈칸, 좌석 줄은 스택 옆 칸(연고지 포인터 값)을 숫자로 찍는다 (`stadiumInfoOf`).
  */
+/** 숫자키 꼴 1 격자가 방향으로 바꾸는 키 (표 0xd2e7c) */
+const GRID_NUMERIC_DIRECTIONS: Readonly<Record<string, 'left' | 'right' | 'up' | 'down'>> = {
+  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
+}
+
 export function FirstBatStadiumScreen({
   userTeamId, aiTeamId, phase, playerSide, stadiumId, gamePoint = 0,
   onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel,
@@ -73,6 +79,14 @@ export function FirstBatStadiumScreen({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (keyLock.current) return
+      // 0x5550d — 까딱임 방향 [skin+0x8c] (Q-10). 단계 0([skin+0xcc] == 0)은 **날 키**(0x289ba~0x289c6), 단계 1 은 구장 격자
+      // [this+0x74](진입 0x23f18 `vt+0x1c(10, 1, 숫자키 꼴 1, 0x10)`)의 vt+0x18 이 바꾼 키(0x28a36~0x28a4a) — '2' '4' '6' '8' 도 방향
+      if (isStadiumPhase) {
+        const direction = GRID_NUMERIC_DIRECTIONS[event.key]
+        if (direction !== undefined) noteSkinShakeDirection(direction)
+      } else {
+        noteSkinShakeKey(event.key)
+      }
       const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
       if (event.key === 'Escape') {
         event.preventDefault()

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import type { ReactNode } from 'react'
 import { FrameSprite, PressArea, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -85,6 +86,9 @@ export function SeasonMatchInfoScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       // 키 함수 맨 앞 — [[0x1552cfc]+0xe4](값 줄 펼침 끝) == 0 이면 아무것도 안 한다 (`isMatchInfoKeyReadyAt`)
       if (!isKeyReady.current) return
+      // 설정 창이 열렸으면([skin+0x2ba]) 키는 창 0x5ffcd 로만 간다(83f2~8402). 아니면 **날 키**를 0x5550d 에 넘긴다(8410~8414) —
+      // 화살표면 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
+      if (!isSettingsOpen) noteSkinShakeKey(event.key)
       // 0x83cc: −5(OK)·'5'(0x35, 0x8442) → 0x847e 경기 시작
       if (event.key === 'Enter' || event.key === '5') {
         event.preventDefault()
@@ -110,7 +114,7 @@ export function SeasonMatchInfoScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onStart, onOpenSettings, onCancel, onOpenEntry])
+  }, [isSettingsOpen, onStart, onOpenSettings, onCancel, onOpenEntry])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT

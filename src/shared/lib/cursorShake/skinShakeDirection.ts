@@ -10,13 +10,26 @@ import type { CursorShakeDirection } from '@/shared/lib/cursorShake/cursorShake'
  * 5550e  키 −3(←) → 0 · −4(→) → 1 · −1(↑) → 2 · −2(↓) → 3 을 [skin+0x8c] 에 — 그 밖의 키는 안 적는다 (지우는 곳도 없다)
  * ```
  * 그래서 화면을 건너 마지막 화살표가 남는다 — 앱을 켠 뒤 화살표를 한 번도 안 눌렀으면 0(←)이다.
- * 0x5550d 를 부르는 곳(25곳)은 저마다 키 처리기다 — 웹은 메인 메뉴 나무의 다섯 화면에 붙였다:
- * 메인 메뉴 하위 4 · 5 · 9(0x29454 29518 · 0x28cb0 28e58 · 0x28ad4 28b82 — 앞 칸 · 뒤 칸 갈래에서 날 키) ·
- * 스페셜 목록 0x28b9c 28c88(같은 꼴) · 환경설정 0x29550 2958a · 0x288ac 288e4 · 0x2c6d8 2c706(격자가 바꾼 키) ·
- * 기록연감 0x2b7a0 2b85c(본문 초점일 때 격자가 바꾼 키) · 미션 고르기 0x1daa4 1dacc(머리 — 격자가 바꾼 키).
- * ⚠️ 근사(남김): 나머지 부르는 곳 — 팀 고르기(0x8250 · 0x8da4 · 0x14114 · 0x29b38 · 0x29c98) · 시즌(0x83cc · 0xa248) · 일반모드
- * (0x311a8 · 0x2896c) · 마선수 고르기 · 에디트(0x29df8 · 0x2ac00 · 0x2af20 · 0x2b2e0) · 도움말 0x637d0 · 목록 0x62568 · 경기 0x3c158 ·
- * 0x28808 — 는 아직 이 칸에 안 적는다. 그 화면의 마지막 화살표가 메인 메뉴를 숫자키 · 누름으로만 지나 스페셜 숫자키 까딱임까지 남는 길만 다르다.
+ * 0x5550d 를 부르는 곳은 저마다 키 처리기다(r323 · r325 전수 — 풀 xref 25개 중 0x2ac00 의 2af18 은 풀 자료라 실제 부름은 24곳).
+ * 날 키 = [장면+0x40] 그대로(숫자키는 안 적힌다) · 격자 키 = 숫자키 꼴 1 격자 vt+0x18(0x6c299 → 0x6c031, 표 0xd2e7c)이 바꾼 키(숫자키도 방향):
+ * ```
+ * 메인 메뉴 하위 4 · 5 · 9   0x29454 29518 · 0x28cb0 28e58 · 0x28ad4 28b82  날 키(앞 칸 · 뒤 칸 갈래)  useMainMenu
+ * 스페셜 목록 6              0x28b9c 28c88                  날 키                       SpecialScreen
+ * 환경설정 8 · 32 · 33        0x29550 2958a · 0x288ac 288e4 · 0x2c6d8 2c706  격자 키      SettingsScreen
+ * 경기 중 설정               0x3c158 3cae0(격자 [+0xf94])   격자 키                       SettingsScreen(경기 중)
+ * 기록연감 30                0x2b7a0 2b85c(본문 초점)       격자 키                       RecordAnnals
+ * 미션 고르기                0x1daa4 1dacc                  격자 키                       MissionSelectScreen
+ * 팀 고르기 다섯             0x8250 828c · 0x8da4 8de0 · 0x14114 1414a · 0x29b38 29b66 · 0x29c98 29cc6  격자 키  TeamSelectScreen
+ * 경기정보 시즌 0xdd · 일반 22  0x83cc 8410 · 0x311a8 312de(설정 창 [skin+0x2ba] 이 닫혔을 때)  날 키  SeasonMatchInfoScreen · MatchInfoScreen
+ * 마선수 21 · 시즌 0xd7        0x29df8 29e52 · 0xa248 a4fe(팝업 0x5fb25 이 안 가져갔을 때)  날 키  AceSelectScreen
+ * 마선수 레벨업 28            0x2af20 2af7c(같은 팝업 뒤)    격자 키                       AceSelectScreen
+ * 선공 · 구장 20             0x2896c 289c4(단계 0 날 키) · 28a44(단계 1 구장 격자 키)   FirstBatStadiumScreen
+ * 에디트 29                  0x2b2e0 2b33c(하위 0 격자 키) · 2b44a(하위 1 엔트리 창, 날 키)  SpecialEditScreen
+ * 공용 목록 0x62568          625be(16 · 17 · 27 · 시즌 0xe2 · 나리 145 — 창이 없으면 격자 키, 창이 떠 있으면 날 키)
+ *                                                           SpecialScreen 명예의 전당 격자 · MessageBox `onRawKey`
+ * 도움말 뷰어 0x637d0        637f0(메인 7 0x2cd54 · 경기 중 0x3ca36 — 격자 [skin+0x454] 숫자키 꼴 1)  격자 키  HelpScreen
+ * 데이터 관리 34             0x28808 28838                  격자 키 — 웹에 없는 화면(환경설정 칸 5 는 안내만)이라 없음
+ * ```
  * 읽는 곳: 스페셜 설명 판 0x252c6 · 환경설정 0x59462 · 기록연감 · 공용 격자 0x7a571(`gridCursorBounce`).
  */
 let direction: CursorShakeDirection = 'left'
