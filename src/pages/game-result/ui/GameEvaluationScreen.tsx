@@ -46,6 +46,8 @@ interface GameEvaluationScreenProps {
   readonly career: PlayerCareer
   /** 114 끝 — 116 의 끝(0x12b74~0x12bbe)이 예약해 둔 다음(105 · 109 · 128 · 136) */
   readonly onContinue: () => void
+  /** 보상 명령 창이 선 갱신 — 그 몫을 주고 저장한다(0x8c460 끝, Q-23). 인자는 이제까지 준 명령 수 */
+  readonly onRewardsGiven?: (givenRewardCount: number) => void
   /**
    * 114 평가 대화(내장 이벤트 0x8a6fc)의 밑그림. 116 그림 0x11e0c 와 대화창 0x8b5ac 가
    * 공 무늬 · 상태판 0x7d34c(gfx, [이벤트+0xb] = 1 — 메시지줄 경기 번호 −1) · 머리띠를 깐다. 부르는 쪽이 넘긴다.
@@ -86,11 +88,14 @@ export function GameEvaluationScreen({
   streakRewards = NO_STREAK_REWARDS,
   rewardUnderlay,
   recordLine,
-  career,
+  career: liveCareer,
   onContinue,
+  onRewardsGiven,
   underlay,
   entryUnderlay,
 }: GameEvaluationScreenProps) {
+  // 114 가 보상 명령마다 몫을 주고 저장하므로(Q-23) 세션 선수는 도중에 바뀐다 — 평가 이벤트는 116 이 쌓은 그때 값으로 돈다(0x8a6fc)
+  const [career] = useState(liveCareer)
   /**
    * 116 → 114 가 들어섰는가 — 116 진입 0x1278c 는 칭호 팝업 0x1274c 를 건 뒤 끝(12bb6~12bbe)에서 0xbcb49(114) 를 걸 뿐이라,
    * 그 틀은 116 그림(0x11e0c)과 팝업만 그리고 114 진입 0x11d00 · 갱신 0x1c014(이벤트 실행기)는 다음 틀 머리(1ce00)에서 돈다.
@@ -130,6 +135,7 @@ export function GameEvaluationScreen({
         {...(rewardUnderlay === undefined
           ? {}
           : { underlayAfterRewards: (given: number) => rewardUnderlay(applyEventRewards(career, streakRewards.slice(0, given))) })}
+        {...(onRewardsGiven === undefined ? {} : { onRewardsGiven })}
         onDone={onContinue}
       />}
       {isTitlePopupOpen && title !== undefined && (

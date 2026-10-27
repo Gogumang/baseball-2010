@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { fireEvent as rawFireEvent } from '@testing-library/react'
+import { fakeAppTickClock, settleSlide, settledFireEvent as fireEvent } from '@/shared/lib/testing/slideSettledEvents'
 import { SeasonManagementScreen } from '@/pages/season/ui/SeasonManagementScreen'
 import { SeasonTeamMenuScreen } from '@/pages/season/ui/SeasonTeamMenuScreen'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
@@ -12,7 +14,12 @@ import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMach
  * 6칸·4칸의 **차례**와 각 칸이 가는 **원본 장면 상태 번호**를 못박는다.
  */
 
-afterEach(cleanup)
+// 커맨드 줄 칸이 펼쳐지는 일곱 틀은 키를 버린다(A-50) — 앱 틱을 가짜 시계로 돌리고 누르기 전에 넘긴다(`settledFireEvent`)
+beforeEach(fakeAppTickClock)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 const 시즌 = (덮어쓰기: Partial<SeasonState['record']> = {}): SeasonState => {
   const state = startNewSeason(0, '테스터')
@@ -23,6 +30,23 @@ const 시즌 = (덮어쓰기: Partial<SeasonState['record']> = {}): SeasonState 
 const 칸이름들 = () => screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
 
 describe('시즌 관리 메뉴 (상태 0xc9)', () => {
+  it('칸이 펼쳐지는 동안(그린 갱신 수 < 7)은 키 · 취소 · 누름을 버린다 — 키 0x8f30 머리 [this+0xc0]+0x99 (A-50)', () => {
+    const onSelect = vi.fn()
+    const onExit = vi.fn()
+    render(<SeasonManagementScreen state={시즌()} onSelect={onSelect} onExit={onExit} />)
+    const 고른칸 = () => screen.getAllByRole('button').find((button) => button.getAttribute('aria-current') === 'true')?.getAttribute('aria-label')
+
+    rawFireEvent.keyDown(window, { key: 'ArrowRight' })
+    rawFireEvent.keyDown(window, { key: 'Escape' })
+    rawFireEvent.click(screen.getByRole('button', { name: '구단관리' }))
+    expect(고른칸()).toBe('시즌정보')
+    expect(onExit).not.toHaveBeenCalled()
+    expect(onSelect).not.toHaveBeenCalled()
+    settleSlide()
+    rawFireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(고른칸()).toBe('구단관리')
+  })
+
   it('StrHOWTO[18] 차례 그대로 6칸이 나온다', () => {
     render(<SeasonManagementScreen state={시즌()} onSelect={vi.fn()} onExit={vi.fn()} />)
 

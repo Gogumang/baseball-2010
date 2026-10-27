@@ -116,7 +116,7 @@ import {
   salaryOfferOf,
   SALARY_EVENT_ID,
 } from '@/entities/career/model/seasonFlow'
-import { emptyPlaceEventId, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
+import { emptyPlaceEventId, emptyPlaceFrameOf, isEmptyPlaceEventId } from '@/entities/career/model/battingOrder'
 import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import { aceMatchMissionOf, matchResultEventOf } from '@/entities/story/model/aceMatch'
@@ -302,6 +302,8 @@ export interface PitcherLeagueSession {
   readonly storyEvents: readonly OriginalEvent[] | null
   /** 외출 지도 [!] — 장소 이벤트 배정 0x8cdc0 이 이벤트를 넣은 장소 id */
   readonly eventPlaceIds: ReadonlySet<string>
+  /** 빈 장소 이벤트(440~444) 뒤 113 — 그 장소 말풍선으로 선다(0x1c014 1c07c). 112 진입이면 null */
+  readonly outingReturnPlaceId: string | null
   /** 이벤트 번호별 `%s` 글 — 380 연봉 제시액(0x8bc4c → 금액 서식 0x55cf4). 기본이면 undefined */
   readonly storyReplacementsFor: (eventId: number) => readonly string[] | undefined
   /** 128 대진 위 팝업 (0xb 정규시즌 우승 · 7 우승 팀 발표 · 8 한국시리즈 우승). 없으면 null */
@@ -343,6 +345,8 @@ export interface PitcherLeagueSession {
     readonly finishGame: (summary: PitcherGameSummary) => void
     /** 116 경기 뒤 평가 [확인] → 114 → 105/109/128/136 (116 의 끝 0x12b74) */
     readonly confirmGameResult: () => void
+    /** 114 평가 이벤트의 보상 명령 창이 섰다 — 그 몫을 주고 저장(0x8c460 끝, S+0x50 은 이미 3 · 0xb — Q-23). 인자는 이제까지 준 명령 수 */
+    readonly giveEvaluationRewards: (count: number) => void
     /** **웹 전용 디버그(시험용)** — 연말 사슬 136 → 130 → 131 → 132 (→ 133) 을 이벤트 392 부터 곧장 튼다. 화면은 부르지 않는다 */
     readonly beginYearEnd: () => void
     /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기. 모자라면 false */
@@ -383,6 +387,8 @@ export interface PitcherLeagueSession {
     readonly finishOutingPresentation: () => void
     /** 113 칸 0 [들어가기] — 배정된 장소 이벤트(0x8ce58), 없으면 빈 장소 440+장소를 114 로 튼다 */
     readonly enterOutingPlace: (place: OutingPlace) => void
+    /** 113 취소 → 112 진입(0x118e4 [!] 다시 찍기 · 커서 0 → 자동 발동 0x1cf9c) — Q-22 */
+    readonly reenterOutingMap: () => void
     /** 126 효과 팝업 [확인] → (입원이면 회복 글) → 105 (틀 0x1575c) */
     readonly closeOutingResult: () => void
     /** 113 막힘 팝업(0xbbef9(글, 1, 1, 1)) [확인] — 상태는 113(말풍선) 그대로다 */
@@ -1677,14 +1683,37 @@ export function usePitcherLeagueSession(
    * 116 [확인] → 114 — 0x8a6fc 가 쌓은 평가 내장 이벤트를 틀고, 114 진입 0x11d00 이 S+0x50 = 2 → 3(웹 null), 116 의 끝
    * (0x12b74~0x12bb2)이 고른 뒤 상태로 간다.
    */
+  /**
+   * 116 → 114 평가 이벤트의 보상 명령 — 이미 준 몫. 0x8c460 이 명령마다 주고 끝(0x8b0e4 · 0x8cd44)에서 저장하므로 첫 몫을 줄 때
+   * S+0x50 이 114 진입 값(3 · 0xb — 웹 null)으로 저장된다(타자편 `giveEvaluationRewards`, Q-23)
+   */
+  const evaluationRewardsRef = useRef<{ readonly rewards: readonly EventReward[]; readonly given: number } | null>(null)
+  const giveEvaluationRewards = useCallback(
+    (count: number) => {
+      if (career === null || scene !== '경기결과') return
+      const held = evaluationRewardsRef.current
+      if (held === null && career.seasonEndState !== 116) return
+      const rewards = held?.rewards ?? pitcherStreakEventOfCareer(career).rewards
+      const given = held?.given ?? 0
+      if (count <= given) return
+      evaluationRewardsRef.current = { rewards, given: count }
+      commit({ ...applyPitcherEventRewards(career, rewards.slice(given, count)), seasonEndState: null })
+    },
+    [career, commit, scene],
+  )
   const confirmGameResult = useCallback(
     () => {
       if (career === null) return
       // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 연속 기록 보상 명령(평판 · 집중/새가슴/더티볼)을 먹는다 —
-      // 이어하기로 116 을 다시 띄웠으면 또 먹는다(원본 그대로, 타자편 `streakEventOf` 와 같은 자리)
-      const rewarded = career.seasonEndState === 116
-        ? applyPitcherEventRewards(career, pitcherStreakEventOfCareer(career).rewards)
-        : career
+      // 이어하기로 116 을 다시 띄웠으면 또 먹는다(원본 그대로, 타자편 `streakEventOf` 와 같은 자리). 창이 선 명령은 이미 줬다
+      // (`giveEvaluationRewards`) — 남은 몫만
+      const held = evaluationRewardsRef.current
+      evaluationRewardsRef.current = null
+      const rewarded = held !== null
+        ? applyPitcherEventRewards(career, held.rewards.slice(held.given))
+        : career.seasonEndState === 116
+          ? applyPitcherEventRewards(career, pitcherStreakEventOfCareer(career).rewards)
+          : career
       const counted: PitcherCareer = { ...rewarded, seasonEndState: null }
 
       /*
@@ -1961,8 +1990,11 @@ export function usePitcherLeagueSession(
    * 돌아옴(`뒤 112`) · 대결결과 140(105 진입 0x11910 의 0x11bb2 가 0x118e4 를 부른다)에서 는다. 장소(113)에서 돌아오는 길은 아니다.
    */
   const [outingEntryCount, setOutingEntryCount] = useState(0)
+  /** 빈 장소 뒤 113 으로 돌아갈 장소 — 112 에 들어서면 지운다 */
+  const [outingReturnPlaceId, setOutingReturnPlaceId] = useState<string | null>(null)
   const enterOutingMap = useCallback(() => {
     setOutingEntryCount((count) => count + 1)
+    setOutingReturnPlaceId(null)
     // 0x8cdc0 은 머리 0x8cdd4 · 끝 0x8ce34 에서 reader+0x28 = 0 — 112 진입 뒤 자동 발동은 처음부터 훑는다
     cursorRef.current = 0
   }, [])
@@ -2035,24 +2067,20 @@ export function usePitcherLeagueSession(
   /**
    * **외출 지도(112)의 자동 발동** — 0x1cf9c 는 현재 상태가 112 일 때도 같은 훑기를 화면코드 112 로 돈다
    * (trigger 1: 10 "병원이…?" · 401 인기도 3000). 찾으면 `[다음 114, 뒤 112]` — 끝나면 지도로 돌아온다.
-   * 웹의 '외출' 장면은 112 지도와 113 장소를 함께 그려, 효과 팝업이 떠 있지 않을 때를 112 로 본다.
-   * 훑기는 **상태가 112 로 바뀐 틀에만** 돈다(0x1cdec 1ce02 — 105 와 같다). 머무는 동안 커리어가 바뀌어도 다시 훑지 않는다.
+   * 훑기는 **상태가 112 로 바뀐 틀에만** 돈다(0x1cdec 1ce02 — 105 와 같다) — 웹은 112 진입(`enterOutingMap`: 105 → 112 · 지도
+   * 이벤트 뒤 · 113 취소)마다 한 번이다. 빈 장소 이벤트(440~444) 뒤는 113 으로 돌아가(0x1c014 1c07c) 112 진입이 아니라 훑지 않는다(Q-22).
+   * 머무는 동안 커리어가 바뀌어도 다시 훑지 않는다.
    */
-  const wasIdleAtMapRef = useRef(false)
+  const scannedOutingEntryRef = useRef(0)
   useEffect(() => {
     const isIdle =
       career !== null && scene === '외출' && story === null && outingResult === null && outingPresentation === null
       && fileEvents !== null
-    if (!isIdle) {
-      wasIdleAtMapRef.current = false
-      return
-    }
-    const isArrival = !wasIdleAtMapRef.current
-    wasIdleAtMapRef.current = true
-    if (!isArrival) return
+    if (!isIdle || scannedOutingEntryRef.current === outingEntryCount) return
+    scannedOutingEntryRef.current = outingEntryCount
     const event = scanAuto(career, fileEvents, EVENT_TRIGGER.외출, random)
     if (event !== null) openStory({ eventId: event.id, context: '지도', viewed: [] })
-  }, [career, fileEvents, openStory, outingPresentation, outingResult, random, scanAuto, scene, story])
+  }, [career, fileEvents, openStory, outingEntryCount, outingPresentation, outingResult, random, scanAuto, scene, story])
 
   /**
    * 113 칸 0 [들어가기] (키 0x16c64): `0x8ce59` 가 배정된 이벤트를 부르고, 없으면 이벤트 440+장소
@@ -2137,6 +2165,9 @@ export function usePitcherLeagueSession(
       if (story.context === '장소') {
         if (isEmptyPlaceEventId(story.eventId)) {
           commit(viewed)
+          // 1c07c — +0x167 을 지우고 113(그 장소 말풍선)으로. 112 진입이 아니라 [!] 다시 찍기 · 자동 발동이 없다(Q-22)
+          const frame = emptyPlaceFrameOf(story.eventId)
+          setOutingReturnPlaceId(OUTING_PLACES.find((place) => place.frame === frame)?.id ?? null)
           return setScene('외출')
         }
         commit(spendPitcherCycleAction({ ...viewed, outingsThisSeason: viewed.outingsThisSeason + 1 }))
@@ -2348,6 +2379,7 @@ export function usePitcherLeagueSession(
     story,
     storyEvents,
     eventPlaceIds,
+    outingReturnPlaceId,
     storyReplacementsFor,
     pendingTitle,
     aceMatch,
@@ -2465,6 +2497,7 @@ export function usePitcherLeagueSession(
       },
       finishGame,
       confirmGameResult,
+      giveEvaluationRewards,
       /**
        * 135 [확인](0x10680) → **142 경기 준비** — 0x1c46c 가 내 팀을 대진 칸 0·1 중 대한민국(10)으로 끼운다. S+0x12c 라 마선수
        * 넣기(1c5fe)를 건너뛰고, 같은 문(장면+0x288) 안에서 대회 레코드를 오늘 준비로 고친다(`preparePitcherCupMatch` — 상대국 g ≠ 0
@@ -2545,6 +2578,7 @@ export function usePitcherLeagueSession(
       runOutingFunction,
       finishOutingPresentation,
       enterOutingPlace,
+      reenterOutingMap: enterOutingMap,
       closeOutingResult,
       closeOutingNotice,
       dismissOutingRecoveryNotice,

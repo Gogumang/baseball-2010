@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { OutingMapScreen } from '@/pages/outing-map/ui/OutingMapScreen'
+import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { resetTouchKeyOffersForTest, touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 
 afterEach(() => {
@@ -16,6 +17,24 @@ const 띄우기 = (onBack = vi.fn()) => render(
 const 누르기 = (key: string) => act(() => { fireEvent.keyDown(window, { key }) })
 
 describe('나리 외출 지도 키 0x13ba4', () => {
+  it('113 취소는 말풍선을 닫고 112 진입을 알린다 — 0x16c64 −16 → 0xbcb49(0x70) (Q-22)', () => {
+    const onBack = vi.fn()
+    const onCloseBubble = vi.fn()
+    render(<OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={onBack} eventPlaceIds={new Set()}
+      onEnter={vi.fn()} onCloseBubble={onCloseBubble} />)
+    누르기('Enter')
+    누르기('Escape')
+    expect(screen.queryByRole('button', { name: '들어가기' })).toBeNull()
+    expect(onCloseBubble).toHaveBeenCalledTimes(1)
+    expect(onBack).not.toHaveBeenCalled()
+  })
+
+  it('빈 장소 뒤는 그 장소 말풍선(113)으로 선다 — 0x1c014 1c07c (Q-22)', () => {
+    render(<OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={vi.fn()} eventPlaceIds={new Set()}
+      onEnter={vi.fn()} initialOpenPlaceId={OUTING_PLACES[2].id} />)
+    expect(screen.getByRole('button', { name: '입원' })).toBeTruthy()
+  })
+
   it('CLR(Escape) 은 관리(105)로 돌아간다', () => {
     const onBack = vi.fn()
     띄우기(onBack)

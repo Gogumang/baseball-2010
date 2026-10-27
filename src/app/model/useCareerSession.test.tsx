@@ -1127,6 +1127,13 @@ describe('보상 명령 하나 (0x8c460) — 끝(0x8cbe0~0x8cc1a)이 본 표시 
     act(() => rendered.result.current.session.actions.giveEventReward([{ kind: 0, value: 1 }], 440))
     expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(false)
   })
+
+  it('빈 장소(440~444)가 끝나면 그 장소 말풍선(113)으로 — 0x1c014 1c07c, 112 진입 · 훑기 없음 (Q-22)', () => {
+    const rendered = 띄우기({ ...createCareer('빈장소'), morale: 50, seenEventIds: ['451'], hasSeenYearGoalWindow: true })
+    act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId: 442, context: '장소' }))
+    act(() => rendered.result.current.session.actions.completeScene([], [442]))
+    expect(rendered.result.current.screen).toEqual({ kind: '외출', openPlaceId: OUTING_PLACES.find((place) => place.frame === 3)?.id })
+  })
 })
 
 describe('마선수 대결로 나가는 장소 이벤트 — match 의 "끝남" 으로 0x1c014 장소 끝 처리가 나가는 자리에서 돈다 (0x8d904)', () => {
@@ -1660,10 +1667,17 @@ describe('연초 115 (0x16aac) — 105 진입이 S+0x1b7 == 0 이면 내장 이�
   })
 
   it('새 선수는 오프닝 451 이 115 보다 먼저다 — 1cfa6 이 같은 틀에 115 예약을 덮는다(0x8bde0 모드 3·4 → 451)', async () => {
-    const rendered = 띄우기({ ...createCareer('신인'), seenEventIds: [], hasSeenYearGoalWindow: false })
+    const rendered = 띄우기({ ...createCareer('이전'), seenEventIds: ['451'], hasSeenYearGoalWindow: true })
     const 세션 = () => rendered.result.current.session
+    // 104 등록 → 100 진입 끝 0x1c3be 가 새 선수 플래그(장면+0x165)를 켠다
+    act(() => 세션().actions.startNewCareer('신인', DEFAULT_ROOKIE_PROFILE))
     await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: 451, context: '관리' }), { timeout: 5000 })
     act(() => 세션().actions.completeScene([], [451]))
+    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' }))
+  })
+
+  it('451 을 못 본 채 이어하면 오프닝을 다시 틀지 않는다 — 판정은 저장에 없는 새 선수 플래그 하나다 (1cfa6 · A-54)', async () => {
+    const rendered = 띄우기({ ...createCareer('끊김'), seenEventIds: [], hasSeenYearGoalWindow: false })
     await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' }))
   })
 
@@ -1956,6 +1970,24 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
     act(() => 셋.result.current.session.actions.confirmGameResult())
     expect(셋.result.current.session.career?.reputation).toBe(310)
     expect(셋.result.current.session.career?.seasonPopularityGain).toBe(14)
+  })
+
+  it('114 보상 명령 창이 서면 그 몫을 주고 저장한다 — 그 뒤 끊고 이어하면 116 을 다시 안 띄우고 카운터도 안 쌓인다 (0x8c460 끝 · Q-23)', () => {
+    const 첫 = 띄우기(평가중())
+    expect(첫.result.current.session.career?.seasonPopularityGain).toBe(12)
+    // 평판 합 +10 명령의 창이 섰다 — 114 진입이 S+0x50 = 3 으로 둔 뒤라 그 저장부터 116 이 아니다
+    act(() => 첫.result.current.session.actions.giveEvaluationRewards(1))
+    const 저장 = 첫.result.current.session.career!
+    expect(저장.reputation).toBe(310)
+    expect(저장.seasonEndState).toBeNull()
+    // 같은 몫을 두 번 주지 않고, [확인](114 끝)은 남은 몫만 준다
+    act(() => 첫.result.current.session.actions.giveEvaluationRewards(1))
+    act(() => 첫.result.current.session.actions.confirmGameResult())
+    expect(첫.result.current.session.career?.reputation).toBe(310)
+
+    const 이어 = 띄우기(저장)
+    expect(이어.result.current.screen.kind).not.toBe('경기평가')
+    expect(이어.result.current.session.career?.seasonPopularityGain).toBe(12)
   })
 
   it('116 은 이 경기 홈런 > 3 이면 칭호 39 팝업을 건다(1299e) — 주는 것은 키 0x1b1e4, 키 전에 끄면 다시 뜨고 비트가 섰으면 안 뜬다', () => {

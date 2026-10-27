@@ -31,6 +31,16 @@ interface OutingMapScreenProps {
    * 연출 중에는 지도가 키를 받지 않는다(126 키 0x105c8 은 건너뛰기뿐).
    */
   readonly presentation?: ReactNode
+  /**
+   * 113 으로 돌아와 선다 — 빈 장소 이벤트(440~444)가 끝나면 0x1c014 1c07c 가 +0x167 을 지우고 113(그 장소 말풍선)으로 보낸다
+   * (112 진입이 아니라 [!] 다시 찍기 · 자동 발동이 없다). 지도 커서 [gfx+0x184] 도 그 장소다. 없으면 112 지도 첫 칸
+   */
+  readonly initialOpenPlaceId?: string | null
+  /**
+   * 113 취소(말풍선 닫기) — 키 0x16c64 의 −16 이 `0xbcb49(0x70)` 로 112 에 **다시 들어선다**: 진입 0x118e4 가 [!] 를 다시 찍고
+   * 이벤트 커서를 되감은 뒤 자동 발동 0x1cf9c 가 훑는다(Q-22). 세션이 그 112 진입을 친다 — 말풍선은 화면이 닫는다
+   */
+  readonly onCloseBubble?: () => void
 }
 
 /**
@@ -40,9 +50,17 @@ interface OutingMapScreenProps {
  */
 export function OutingMapScreen({
   noticeText, onCloseNotice, onRun, onBack, eventPlaceIds, onEnter, resultText = null, onCloseResult, presentation = null,
+  initialOpenPlaceId = null, onCloseBubble,
 }: OutingMapScreenProps) {
-  const [openPlace, setOpenPlace] = useState<OutingPlace | null>(null)
-  const [selectedPlaceId, setSelectedPlaceId] = useState(OUTING_PLACES[0].id)
+  const [openPlace, setOpenPlace] = useState<OutingPlace | null>(
+    () => OUTING_PLACES.find((place) => place.id === initialOpenPlaceId) ?? null,
+  )
+  const [selectedPlaceId, setSelectedPlaceId] = useState(openPlace?.id ?? OUTING_PLACES[0].id)
+  /** 113 → 112 — 말풍선을 닫고 112 진입을 세션에 알린다 */
+  const closeBubble = () => {
+    setOpenPlace(null)
+    onCloseBubble?.()
+  }
 
   /**
    * 키 0x13ba4 (직접 떴다):
@@ -92,7 +110,7 @@ export function OutingMapScreen({
         setSelectedPlaceId(place.id)
         setOpenPlace(place)
       }}
-      onBack={openPlace === null ? onBack : () => setOpenPlace(null)}
+      onBack={openPlace === null ? onBack : closeBubble}
     >
       {/*
         말풍선은 0x7ee1a 가 [gfx+0x174] == 0x71(113) 일 때만 그린다 — 기능이 막히면 113 에 남아 팝업 밑에 그대로 있고,
@@ -104,7 +122,7 @@ export function OutingMapScreen({
           isKeyEnabled={noticeText === ''}
           onEnter={() => onEnter(openPlace)}
           onRun={onRun}
-          onClose={() => setOpenPlace(null)}
+          onClose={closeBubble}
         />
       )}
       {presentation}

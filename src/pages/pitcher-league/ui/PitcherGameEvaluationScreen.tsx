@@ -32,6 +32,8 @@ interface PitcherGameEvaluationScreenProps {
   readonly lastGame: PitcherLastGame
   /** [확인] = 114 */
   readonly onConfirm: () => void
+  /** 보상 명령 창이 선 갱신 — 그 몫을 주고 저장한다(0x8c460 끝, Q-23). 인자는 이제까지 준 명령 수 */
+  readonly onRewardsGiven?: (givenRewardCount: number) => void
 }
 
 /**
@@ -55,7 +57,9 @@ interface PitcherGameEvaluationScreenProps {
  * 창을 띄운다(평판 = 공용 알림 · 스킬 = 스킬 창 0x8e054). 보상 값은 [확인](114 끝)이 먹고, 밑그림 상태판만 창마다 먹인 값으로 그린다.
  * 대사 상자 · 찍기 · 표정 [명령+8] 은 `EvaluationEventPlayer` · `pages/story/lib/eventDialogue` · `evaluationDialogue` (직접 떴다).
  */
-export function PitcherGameEvaluationScreen({ career, lastGame, onConfirm }: PitcherGameEvaluationScreenProps) {
+export function PitcherGameEvaluationScreen({ career: liveCareer, lastGame, onConfirm, onRewardsGiven }: PitcherGameEvaluationScreenProps) {
+  // 114 가 보상 명령마다 몫을 주고 저장하므로(Q-23) 세션 선수는 도중에 바뀐다 — 평가 이벤트는 116 이 쌓은 그때 값으로 돈다(0x8a6fc)
+  const [career] = useState(liveCareer)
   const changes = career.lastEvaluation ?? NO_LAST_EVALUATION
   const streakEvent = pitcherStreakEventOfCareer(career)
   const dialogue = `${pitcherLastGameLineOf(lastGame)}${RECORD_LINE_END}${ORIGINAL_USER_EVENTS[lastGame.managerCommentIndex] ?? ''}`
@@ -104,6 +108,7 @@ export function PitcherGameEvaluationScreen({ career, lastGame, onConfirm }: Pit
         underlayAfterRewards={(given) => (
           <PitcherEventUnderlay career={applyPitcherEventRewards(career, streakEvent.rewards.slice(0, given))} isPreviousGame />
         )}
+        {...(onRewardsGiven === undefined ? {} : { onRewardsGiven })}
         onDone={onConfirm}
       />
     </RawScreen>

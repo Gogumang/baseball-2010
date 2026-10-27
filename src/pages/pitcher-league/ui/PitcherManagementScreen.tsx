@@ -97,6 +97,11 @@ const NO_DISABLED: ReadonlySet<string> = new Set()
 const BOUNCE_BY_UPDATE = [1, -1]
 /** 칸 등장 0x7ff8c 가 다 내려온 뒤의 갱신 수 — 하위 메뉴로 돌아올 때는 펼침(0x7ff55)이 없어 칸이 제자리다 */
 const SETTLED_UPDATES = 1_000
+/**
+ * 칸이 펼쳐지는 동안 키(취소 포함) · 누름을 버린다 — 105 키 0x1261c 머리 [gfx+0x99] · 106 0x13010 · 107 0x12d48 · 110 0x11478 머리
+ * [gfx+0x9a]. 0x7ff21(105 진입) · 0x7ff55(105 키가 하위 메뉴를 열 때)가 1, 틀의 0x7ff8d · 0x8003d 가 t ≥ 7 에 0 (타자편 `useManagementMenu`, A-50)
+ */
+const SLIDE_KEY_LOCK_UPDATES = 7
 
 /**
  * 커맨드 줄 0x7e418 (투수 표 `lib/pitcherCommandBar`). 칸 등장 0x7ff8c · 부모 칸 0x8003c 는 메뉴가 열린 뒤 갱신 수로,
@@ -104,9 +109,11 @@ const SETTLED_UPDATES = 1_000
  * 하위 메뉴에서 돌아오면 커서가 그 하위 메뉴 칸에 선다(타자편 `useManagementMenu` 와 같다) — 단 그 105 진입이 행동함이면 첫 칸
  * (0x11910 1194a~11970, 110 아이템에서 오면 남는다). 관리 메뉴 커서는 루트의 `mainCursor` 에 산다.
  */
-function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActed }: {
+function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActed, slidingRef }: {
   readonly menu: PitcherManagementMenu
   readonly isKeyEnabled: boolean
+  /** 칸이 펼쳐지는 중인가 — 머리띠 되돌아가기(취소)도 함께 막도록 화면에 알린다 */
+  readonly slidingRef: { current: boolean }
   /** 관리 메뉴 [this+0x8c] 켬 표가 0 인 칸 — 105 진입 0x11910 (`nariMainMenuOffIdsOf`) */
   readonly mainOffIds: ReadonlySet<string>
   readonly mainCursor: NariMainMenuCursor
@@ -144,12 +151,15 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
   }
   /** 105 켬 표 0 칸 — 메뉴 객체 이동 vt+8 0x6c445 가 건너뛰어 커서가 서지 못한다(하위 메뉴 표는 늘 켜져 있다) */
   const isOffSlot = (index: number) => kind === '관리' && mainOffIds.has(slots[index]?.id ?? '')
-  const latest = useRef({ cursor, slots, moveTo, menu, isOffSlot })
-  latest.current = { cursor, slots, moveTo, menu, isOffSlot }
+  const isSliding = update - state.openedAt < SLIDE_KEY_LOCK_UPDATES
+  slidingRef.current = isKeyEnabled && isSliding
+  const latest = useRef({ cursor, slots, moveTo, menu, isOffSlot, isSliding })
+  latest.current = { cursor, slots, moveTo, menu, isOffSlot, isSliding }
   useEffect(() => {
     if (!isKeyEnabled) return undefined
     const onKey = (event: KeyboardEvent) => {
       const held = latest.current
+      if (held.isSliding) return
       // vt+0x18 0x6c299 → 0x6c031(숫자키 꼴 1) → vt+8 0x6c445 — ←↑'4''2' / →↓'6''8', 꺼진 칸은 건너뛴다 (`nariMenuKeys`)
       const step = nariMenuStepOfKey(event.key)
       if (step !== 0) {
@@ -182,8 +192,8 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
       grayedIds={kind === '관리' ? mainOffIds : undefined}
       labelWidths={labelWidths} parent={pitcherParentSlotOf(kind)}
       labelDxOf={(slot) => pitcherLabelDxOf(kind, slot)}
-      onHover={(index) => { if (isKeyEnabled && !isOffSlot(index)) moveTo(index) }}
-      onSelect={(id) => { if (!isOffSlot(slots.findIndex((slot) => slot.id === id))) menu.select(id) }} />
+      onHover={(index) => { if (isKeyEnabled && !isSliding && !isOffSlot(index)) moveTo(index) }}
+      onSelect={(id) => { if (!isSliding && !isOffSlot(slots.findIndex((slot) => slot.id === id))) menu.select(id) }} />
   )
 }
 
@@ -214,6 +224,8 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
     mainCursor.returnSubMenu = null
   }, [mainCursor])
   const { onOpenShop } = props
+  /** 커맨드 줄 칸이 펼쳐지는 중(`PitcherCommandBar` 가 그릴 때마다 적는다) — 그동안 취소도 버린다 */
+  const slidingRef = useRef(false)
   const menu = usePitcherManagementMenu({
     ...props,
     ...(returned === null ? {} : { initialKind: returned.kind }),
@@ -296,7 +308,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         <>
           <SkinBackdrop kind="공무늬" />
           <PitcherCommandBar menu={menu} mainOffIds={nariMainMenuOffIdsOf(career)}
-            mainCursor={mainCursor} hasActed={career.hasActedThisCycle}
+            mainCursor={mainCursor} hasActed={career.hasActedThisCycle} slidingRef={slidingRef}
             isKeyEnabled={!menu.isTrainingState && !isRecordRoom && !isPitchTraining && !isMagicTraining && !isRepertoire && menu.choice === null && menu.detail === null && menu.question === null && menu.notice === '' && menu.restPhase !== 'playing'} />
           <PitcherStatusBoard career={career} />
           {/* 상태 125(훈련 연출 · 결과 창)·127(휴식 — 연출과 결과 창)은 0x19da4 가 가운데 판 0x7f814 를 뺀다(19dc0~19dd4) */}
@@ -358,7 +370,7 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
         머리띠 제목 9 · 바닥 — 기본정보(119)·칭호(129)는 0x87, 120 과 그 밖은 0x16928 의 5. 되돌아가기 = 취소(−16):
         105 는 메인 메뉴로, 그 아래 화면은 한 단계 위로.
       */}
-      <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={menu.back}
+      <ScreenFrame title="나만의리그투수편" gamePoint={career.gamePoint} onBack={() => { if (!slidingRef.current) menu.back() }}
         footer={isBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false}
         // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸.
         // 칭호 목록(129)이 떠 있으면 '0' 칸은 걷는다 — 129 키 0x11f78 은 '0' 을 목록에 넘기고 목록이 버린다(타자편 `ManagementScreen`

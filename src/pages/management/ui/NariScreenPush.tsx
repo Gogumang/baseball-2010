@@ -9,14 +9,17 @@ import * as styles from '@/pages/management/ui/NariScreenPush.css'
 const scaled = (pixels: number) => `calc(var(--zoom) * ${pixels}px)`
 const translate = (x: number, y: number) => `translate(${scaled(x)}, ${scaled(y)})`
 
-interface NariScreenPushProps {
-  /** 지금 선 화면 — 바뀌면 `nariMatchPushDirectionOf` 의 방향으로 민다 */
-  readonly view: NariMatchPushView
+interface NariScreenPushProps<V extends string> {
+  /** 지금 선 화면 — 바뀌면 `directionOf` 의 방향으로 민다 */
+  readonly view: V
+  /** 앞 화면 → 새 화면의 밀기 방향(없으면 null). 안 주면 나리 142 ↔ 143 (`nariMatchPushDirectionOf`) */
+  readonly directionOf?: (from: V, to: V) => ScreenPushDirection | null
   readonly children: ReactNode
 }
 
 /**
- * **142 ↔ 143 화면 밀기** (효과기 종류 8, `pages/management/lib/nariScreenPush` 머리말).
+ * **142 ↔ 143 화면 밀기** (효과기 종류 8, `pages/management/lib/nariScreenPush` 머리말). 일반모드 준비 18 ↔ 19 · 22 ↔ 23 도
+ * 같은 효과기를 건다(`directionOf`, 메인 메뉴 장면 키 누름 0x246d8 도 같은 효과기 문 — A-68).
  * 원본은 효과를 걸 때 지금 화면을 떠 두고(0xbda00) 갱신마다 새 화면을 옮긴 위에 떠 둔 화면을 그린다. 웹은 화면이 바뀔 때
  * 앞 화면의 DOM 을 복제해 두었다가 같은 자리에 겹친다.
  *
@@ -29,7 +32,7 @@ interface NariScreenPushProps {
  * 0xbd845 를 한 번에 부르고, 키 누름 0x10758 은 따로 불려 칸에 적기만 한다. 그래서 그 사이에 들어오는 키는 없고, 거는 순간부터
  * 막는 웹과 같다(시즌 틱 0xe9ac 도 끝 0xf136 에서 0xbd845 를 부른다).
  */
-export function NariScreenPush({ view, children }: NariScreenPushProps) {
+export function NariScreenPush<V extends string = NariMatchPushView>({ view, directionOf, children }: NariScreenPushProps<V>) {
   const liveRef = useRef<HTMLDivElement>(null)
   const snapshotHostRef = useRef<HTMLDivElement>(null)
   /** 마지막으로 그린 화면의 복제 — 다음 화면이 설 때 옛 화면으로 쓴다 */
@@ -62,7 +65,9 @@ export function NariScreenPush({ view, children }: NariScreenPushProps) {
     const previous = viewRef.current
     if (previous !== view) {
       viewRef.current = view
-      const direction = nariMatchPushDirectionOf(previous, view)
+      const direction = directionOf === undefined
+        ? nariMatchPushDirectionOf(previous as string as NariMatchPushView, view as string as NariMatchPushView)
+        : directionOf(previous, view)
       const host = snapshotHostRef.current
       const snapshot = lastSnapshotRef.current
       const first = direction === null ? null : screenPushFrameAt(direction, 0)

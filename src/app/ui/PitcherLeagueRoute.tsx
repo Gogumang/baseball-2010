@@ -210,7 +210,10 @@ function PitcherLeagueScreens({
 
   // 116 경기 뒤 평가 — [확인] = 114 → 105/109/128/136
   if (scene === '경기결과' && career.lastGame !== undefined) {
-    return <PitcherGameEvaluationScreen career={career} lastGame={career.lastGame} onConfirm={actions.confirmGameResult} />
+    return (
+      <PitcherGameEvaluationScreen career={career} lastGame={career.lastGame} onConfirm={actions.confirmGameResult}
+        onRewardsGiven={actions.giveEvaluationRewards} />
+    )
   }
 
   const management = (
@@ -286,6 +289,9 @@ function PitcherLeagueScreens({
       // 장소 이벤트 배정 0x8cdc0 — 장소마다 파일 순서 첫 이벤트(대상 1·3)
       eventPlaceIds={session.eventPlaceIds}
       onEnter={actions.enterOutingPlace}
+      // 빈 장소(440~444) 뒤는 113 그 장소 말풍선 · 113 취소는 112 에 다시 들어선다(Q-22)
+      initialOpenPlaceId={session.outingReturnPlaceId}
+      onCloseBubble={actions.reenterOutingMap}
       // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 위 팝업으로)
       resultText={session.outingResult?.effectText ?? null}
       onCloseResult={actions.closeOutingResult}

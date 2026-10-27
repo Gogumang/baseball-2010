@@ -10,6 +10,7 @@ import {
   nariSeasonEndStateOfResumeCode,
   nextEventFor,
   OPENING_EVENT_ID,
+  openingScanOf,
   placeTriggerOf,
   rewardResumePatchOf,
   scanEventFrom,
@@ -57,8 +58,8 @@ describe('원본 r_event 이벤트 데이터', () => {
 })
 
 describe('nextEventFor — 원본 이벤트 일정', () => {
-  it('새 선수는 관리 화면에서 오프닝(451)부터 본다', () => {
-    expect(nextEventFor(선수(), ORIGINAL_EVENTS, EVENT_TRIGGER.관리)?.id).toBe(OPENING_EVENT_ID)
+  it('오프닝(451)은 대상 0 이라 훑기로는 안 나온다 — 새 선수 플래그를 보는 0x1cfa6 이 번호로 부른다 (A-54)', () => {
+    expect(nextEventFor(선수(), ORIGINAL_EVENTS, EVENT_TRIGGER.관리)?.id).not.toBe(OPENING_EVENT_ID)
   })
 
   it('오프닝 다음은 1년차 1경기의 주장 이벤트(1)다 — 날짜 [1,1]', () => {
@@ -163,7 +164,7 @@ describe('scanEventFrom — 커서 이어 쓰기 (0xadc70)', () => {
   })
 
   it('오프닝은 번호 호출이라 커서에 "그 다음 칸" 이 남는다 (0xae170)', () => {
-    const scan = scanEventFrom(선수(), ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0)
+    const scan = openingScanOf(ORIGINAL_EVENTS, 0)
 
     expect(scan.event?.id).toBe(OPENING_EVENT_ID)
     expect(scan.cursor).toBe(ORIGINAL_EVENTS.findIndex((event) => event.id === OPENING_EVENT_ID) + 1)

@@ -74,7 +74,8 @@ describe('준비 흐름', () => {
     띄우기()
 
     // 18 · 19 · 20 · 21 그림(0x2de3c · 0x2ddb0 · 0x2dd30 · 0x2dfe0)은 모두 맨 앞에서 공 무늬 바탕 0x5fd61 을 깐다 — 검정 바탕이 아니다
-    const 공무늬 = () => screen.queryByTestId('바탕-공무늬')
+    // 18 → 19 는 화면 밀기(A-68) — 밀리는 동안 떠 둔 앞 화면에도 바탕이 있다
+    const 공무늬 = () => screen.queryAllByTestId('바탕-공무늬')[0] ?? null
     // 18 유저 팀
     expect(공무늬()).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: TEAMS[2].name }))
@@ -262,10 +263,15 @@ describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+  /** 22 ↔ 23 은 화면 밀기(A-68) — 다섯 그림 동안 키를 버리니(0x246d8) 다 밀린 뒤 누른다 */
+  const 밀기_지남 = () => act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * 6)
+  })
 
   it("'4' 로 유저 팀 투수 엔트리를 열고, 0번과 2번을 바꾸면 경기정보 선발이 바뀐다 — '6' 으로 돌아온다", () => {
     연출_뒤_띄우기({ isQuickStart: true })
     fireEvent.keyDown(window, { key: '4' })
+    밀기_지남()
     const 둘째 = 줄이름(2)
     for (const key of ['5', 'ArrowDown', 'ArrowDown', '5']) fireEvent.keyDown(window, { key })
     expect(줄이름(0)).toBe(둘째)
@@ -275,9 +281,24 @@ describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
     expect(screen.getByTestId('경기정보-선발-유저').textContent).toBe(둘째)
   })
 
+  it("22 → 23 은 화면 밀기(0xbdae9 종류 8, A-68) — 미는 다섯 그림 동안 키를 버린다(0x246d8)", () => {
+    연출_뒤_띄우기({ isQuickStart: true })
+    fireEvent.keyDown(window, { key: '4' })
+    // 떠 둔 22 가 새 23 위에 겹친다
+    const 떠둔화면 = () => document.querySelector('[class*="NariScreenPush_snapshot"]')?.childElementCount ?? 0
+    expect(떠둔화면()).toBe(1)
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.getByRole('group', { name: '엔트리 목록' })).toBeTruthy()
+    밀기_지남()
+    expect(떠둔화면()).toBe(0)
+    fireEvent.keyDown(window, { key: '6' })
+    expect(screen.queryByRole('group', { name: '엔트리 목록' })).toBeNull()
+  })
+
   it("'6' 으로 연 CPU 팀 엔트리는 보기 전용이다 — OK 해도 순서가 그대로다", () => {
     연출_뒤_띄우기({ isQuickStart: true })
     fireEvent.keyDown(window, { key: '6' })
+    밀기_지남()
     const 첫째 = 줄이름(0)
     for (const key of ['5', 'ArrowDown', '5']) fireEvent.keyDown(window, { key })
     expect(줄이름(0)).toBe(첫째)

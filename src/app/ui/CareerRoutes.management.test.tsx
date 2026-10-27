@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { fakeAppTickClock, settledFireEvent as fireEvent } from '@/shared/lib/testing/slideSettledEvents'
 import { CareerRoutes } from '@/app/ui/CareerRoutes'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { useCareerSession } from '@/app/model/useCareerSession'
@@ -20,7 +21,12 @@ import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
  *   스킬 창(선수정보 "아이템/스킬", 상태 122) — 대화 0x147b0 의 3 해제 · 4 장착 · 6 확장.
  */
 
-afterEach(cleanup)
+// 커맨드 줄 칸이 펼쳐지는 일곱 틀은 키를 버린다(A-50) — 앱 틱을 가짜 시계로 돌리고 누르기 전에 넘긴다(`settledFireEvent`)
+beforeEach(fakeAppTickClock)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 const 설정저장: JsonStorePort = (() => {
   let held: unknown = null

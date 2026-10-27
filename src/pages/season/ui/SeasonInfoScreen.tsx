@@ -19,7 +19,10 @@ export interface SeasonInfoScreenProps {
    */
   readonly cursor?: number
   readonly onCursorChange?: (index: number) => void
-  /** 팝업(기록순위 창 0x80)이 떠 있으면 메뉴는 키를 안 받는다 (0x9008 머리 `[this+0xc0]+0x99`) */
+  /**
+   * 팝업(기록순위 창 0x80)이 떠 있으면 메뉴는 키를 안 받는다 — 장면 틀 0xe9ac 의 창 게이트 0x754f9(ec70)가 키 함수를 안 부른다.
+   * 0x9008 머리 `[this+0xc0]+0x99` 는 팝업이 아니라 관리 메뉴 0xc9 칸 펼침 깃발이라(0x7ff21 → 0x7ff8d) 이 상태에서는 늘 0 이다(A-50)
+   */
   readonly isKeyEnabled?: boolean
   /** 메뉴 위에 얹을 팝업 */
   readonly overlay?: ReactNode

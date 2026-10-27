@@ -7,6 +7,14 @@ import type { ManagementMenuItem, SeasonSceneState } from '@/entities/season-mod
 import { SEASON_COMMAND_SLOTS } from '@/pages/season/lib/seasonCommandBar'
 import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
 import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
+import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+
+/**
+ * 칸이 펼쳐지는 동안 0xc9 는 키를 안 받는다 — 키 0x8f30 머리 `[this+0xc0]+0x99 ≠ 0` 이면 취소까지 건너뛴다. 진입 0x4efc 의 0x7ff21 이
+ * +0x99 = 1, 틀 0x73b8 의 0x7ff8d(7406)가 상태 틀 수 t ≥ 7 에 여섯 칸이 제자리면 0 (나리 105 와 같은 칸, A-50). 하위 메뉴 키(0x9008 ·
+ * 0x4da4 …)도 +0x99 를 보지만 0xc9 가 이미 내린 뒤라 늘 0 이다 — 하위 메뉴의 펼침 깃발 +0x9a 는 시즌 키가 보지 않는다
+ */
+const SLIDE_KEY_LOCK_UPDATES = 7
 
 /** 트레이닝·외출·다음경기 칸 번호 (점프표 0xcbe40 의 2·3·5) */
 const TRAINING_INDEX = 2
@@ -41,7 +49,8 @@ export interface SeasonManagementScreenProps {
   readonly onConfirmKey?: () => void
   /**
    * 진입에서 띄운 예·아니오 알림 — CPU 트레이드 요청 StrMODE[203] (팝업 id 0x27, 0xec10).
-   * 떠 있는 동안 메뉴는 키를 안 받는다(원본 `this+0xc0 +0x99 ≠ 0` 이면 키 무시). 답은 0x73b8 이 받는다.
+   * 떠 있는 동안 메뉴는 키를 안 받는다 — 장면 틀 0xe9ac 의 창 게이트 0x754f9(ec70)가 키 함수 0x8f30 을 안 부른다. 답은 0x73b8 이 받는다.
+   * (`[this+0xc0]+0x99` 는 팝업이 아니라 칸 펼침 깃발이다 — `SLIDE_KEY_LOCK_UPDATES`)
    */
   readonly alert?: { readonly text: string; readonly onAnswer: (accept: boolean) => void } | null
   /**
@@ -73,17 +82,19 @@ export function SeasonManagementScreen({
   state, onSelect, onExit, onConfirmKey, alert = null, cursor: heldCursor, onCursorChange, gamePoint = 0, centerSlidesIn = false,
 }: SeasonManagementScreenProps) {
   const { record } = state
+  const isSliding = useUpdateCounter() < SLIDE_KEY_LOCK_UPDATES
   const disabled = disabledManagementIndexesOf(record)
   const disabledIds = new Set(disabled.map((index) => MANAGEMENT_MENU[index]))
 
   const select = (index: number) => {
+    if (isSliding) return
     onConfirmKey?.()
     const target = managementMenuTarget(index)
     if (target === null || disabled.includes(index)) return
     onSelect(MANAGEMENT_MENU[index], target)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: MANAGEMENT_MENU.length, onSelect: select, onCancel: onExit, isEnabled: alert === null,
+    count: MANAGEMENT_MENU.length, onSelect: select, onCancel: onExit, isEnabled: alert === null && !isSliding,
     // 6열 × 1줄 (0x3b14 의 vt+0x1c(6, 1, 1, 0x330)) — ← → 도 칸을 옮긴다
     isCommandBar: true,
     // 0x6c444 — 꺼진 칸(켬 표 0)은 위·아래가 건너뛴다
@@ -95,11 +106,12 @@ export function SeasonManagementScreen({
   return (
     <RawScreen>
       <div role="group" aria-label="관리 메뉴">
-        <SeasonCommonFrame record={record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={onExit}
+        <SeasonCommonFrame record={record} teamMorale={state.teamMorale} gamePoint={gamePoint}
+          onBack={() => { if (!isSliding) onExit() }}
           centerSlidesIn={centerSlidesIn}
           commandBar={{
             slots: SEASON_COMMAND_SLOTS, cursor, parent: null, disabledIds,
-            onHover: moveTo,
+            onHover: (index) => { if (!isSliding) moveTo(index) },
             onSelect: (id) => select(MANAGEMENT_MENU.findIndex((label) => label === id)),
           }} />
       </div>
