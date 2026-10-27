@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import { isWalkPlayResult, WALK_PLAY_WAIT_TICKS } from '@/features/defense-play/model/walkPlay'
+import { isWalkPlayResult, opensWalkPlayAtArrival, WALK_PLAY_WAIT_TICKS } from '@/features/defense-play/model/walkPlay'
 
 /**
  * **볼넷 · 사구 밀어내기 판(종류 2)을 언제 띄우나** — 원본은 공 도착(0x12 진입 0x3dfac)에서 판 종류를 2 로 두고도 곧장 0x17 로
  * 가지 않는다. 0x12 갱신 0x4e6d4 가 상태 틱 [+0x2c] 를 0x1f(판정 3 · 4)까지 기다린 뒤 판정 A 0xae24c(ae344~ae35c)가 0x17 로 보낸다
- * (도루 · 폭투 판은 0x3e096 · 0x3e114 가 곧장 0x17 — 대기를 안 탄다). 사구가 벤치 클리어링(0x1e)에 들어갔으면 그 대기 끝(0x4e74c)에서
+ * (도루 · 폭투 판은 0x3e096 · 0x3e114 가 곧장 0x17 — 대기를 안 탄다. 도루 출발 중 볼넷 · 사구도 3e0e4 → 3e114 로 곧장 0x17 이라
+ * 그 밀어내기 판(`opensAtArrival`)은 기다리지 않는다 — A-24, r302). 사구가 벤치 클리어링(0x1e)에 들어갔으면 그 대기 끝(0x4e74c)에서
  * 연출로 갔다가 출구 0xae24c 에서 곧장 0x17 이라 연출 뒤에는 기다리지 않는다.
  *
  * 웹 진행기는 공을 판정한 그 걸음에 판을 재생 칸에 넣으므로, 재생 화면을 세우기 전에 그 대기만큼 타석 화면을 둔다.
@@ -26,7 +27,8 @@ export function useFreePassPlayStart(
   isFrozen = false,
   isResultWindowShown = false,
 ): boolean {
-  const isWalk = isWalkPlayResult(play)
+  // 도루 출발 중 볼넷 · 사구의 판(3e0e4 → 3e114 곧장 0x17, A-24)은 0x12 대기를 안 탄다 — 곧장 세운다
+  const isWalk = isWalkPlayResult(play) && !opensWalkPlayAtArrival(play)
   /** 대기를 다 채운(또는 안 기다리는) 판 */
   const [readyPlay, setReadyPlay] = useState<DefensePlayResult | null>(null)
   /** 지난 판 뒤로 벤치 클리어링 연출이 섰나 — 섰으면 다음 밀어내기 판은 출구에서 곧장 0x17 */

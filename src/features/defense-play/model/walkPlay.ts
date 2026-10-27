@@ -104,6 +104,14 @@ export interface WalkPlayInput {
 export interface WalkPlayResult extends RunnerPlayEngineResult {
   /** state[0xb] — 3 볼넷 · 4 사구. 판 동안 0x519cc 키 건너뛰기를 받는다 */
   readonly pitchJudgement: 3 | 4
+  /**
+   * **0x12 대기 없이 공 도착에서 곧장 연 판인가** (A-24, r302) — 도루 칸 st[0x24] 가 서 있던 공. 0x3dfac 3e062 가 v ∈ {3, 4} 면
+   * 폭투 판을 건너 3e0e4 로 오고, 도루 칸이 서 있으면 아웃과 무관하게(3e0f4 아웃 ≤ 1 · 3e0fa 는 v == 5 만 거름) 3e0fe 0xb0cb8(플레이, 5) ·
+   * 3e114 0xbcb49(…, 0x17) — 다음 틀이 곧장 0x17 이다. 그 뒤 판정 스위치 3e1ae/3e1b4 가 종류를 2 로 덮어 이 밀어내기 판이 된다.
+   * 0x12 갱신 0x4e6d4 를 안 지나므로 0x1f 대기 · 4e74c 벤치 클리어링 굴림 · 0x12 끝 돌발 판정(4e7ca)이 없고 정산은 판 끝 판정 B 0xae3e8 이다.
+   * 없으면(옛 저장 · 시험 값) 거짓 — 0x12 대기를 탄 판이다
+   */
+  readonly opensAtArrival?: boolean
 }
 
 /** 플레이 종류 2 — 0x3e1b4 0xb0cb8(플레이, 2) */
@@ -203,12 +211,22 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
     scene: input.scene,
     sceneResultCode: input.sceneResultCode,
   })
-  return { ...result, pitchJudgement: input.pitchJudgement }
+  return stealing.length > 0
+    ? { ...result, pitchJudgement: input.pitchJudgement, opensAtArrival: true }
+    : { ...result, pitchJudgement: input.pitchJudgement }
 }
 
 /** 재생 칸에 든 결과가 볼넷 · 사구 밀어내기 판인가 */
 export function isWalkPlayResult(result: DefensePlayResult | null): result is WalkPlayResult {
   return result !== null && 'pitchJudgement' in result && (result as WalkPlayResult).kind === WALK_PLAY_KIND
+}
+
+/**
+ * **0x12 대기를 안 타는 밀어내기 판인가** — 도루 출발 중 볼넷 · 사구(3e0e4 → 3e114 곧장 0x17, A-24). 화면은 이 판을 대기 없이 세운다
+ * (`useFreePassPlayStart`) · 진행기는 붙들지 않는다(`holdsUntilResultWaitEnd`)
+ */
+export function opensWalkPlayAtArrival(result: DefensePlayResult | null): boolean {
+  return isWalkPlayResult(result) && result.opensAtArrival === true
 }
 
 /**

@@ -3,6 +3,7 @@ import {
   announceHiddenOpens, closeHiddenOpenWindow, EMPTY_HIDDEN_OPEN_WINDOW, pushHiddenOpenWindow,
 } from '@/entities/collection/model/hiddenOpenNotice'
 import type { HiddenOpenWindow } from '@/entities/collection/model/hiddenOpenNotice'
+import { noteCommonWindowOpensInSceneUpdate } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * **히든 오픈 알림 — 공용 창 [0x140005c]** (0x62368 → 0x6249e `0x74ef5(창, 글, 종류 1, 0, 0)`).
@@ -25,7 +26,12 @@ export function useHiddenOpenNotice() {
    */
   const [serial, setSerial] = useState(0)
   const update = useCallback((next: (current: HiddenOpenWindow) => HiddenOpenWindow) => {
-    windowRef.current = next(windowRef.current)
+    const before = windowRef.current
+    windowRef.current = next(before)
+    // 비어 있던 창에 새 글을 띄운다 — 띄우는 쪽(0x62368 · 0x62234 · 대전 승리 팝업 · 돌발 · 정산 판)은 모두 장면 틀의 키 · 진입 · 갱신
+    // 안이라 경기 장면은 그 틀을 마저 돌고 다음 틀부터 선다(`noteCommonWindowOpensInSceneUpdate`). 대기 글을 잇는 닫기(0x754f8 →
+    // 0x75440)는 게이트 앞이라 알리지 않는다
+    if (before.shown === null && windowRef.current.shown !== null) noteCommonWindowOpensInSceneUpdate()
     setWindow(windowRef.current)
   }, [])
   const announce = useCallback((ids: readonly number[], then: (() => void) | null = null) => {

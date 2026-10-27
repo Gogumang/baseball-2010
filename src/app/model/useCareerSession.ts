@@ -1191,8 +1191,7 @@ export function useCareerSession({
         ...gameStepSoundIdsOf(currentProgress, advanced),
       ])
       // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
-      const arrivalKind = arrival?.play?.kind ?? null
-      finishAtBat(advanced, context.nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(context.nextAtBat.outcome, arrivalKind))
+      finishAtBat(advanced, context.nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(context.nextAtBat.outcome, arrival?.play))
     },
     [audio, endGame, finishAtBat, random, runner],
   )
@@ -1673,7 +1672,7 @@ export function useCareerSession({
     setProgress(judged)
     if (judged.pendingBenchClearing !== null) return
     playSoundIds(audio, [inPlayCallSoundIdOf(pending.outcome), ...gameStepSoundIdsOf(current, judged)])
-    const endFrames = atBatEndFramesOf(pending.outcome, pending.arrivalPlay?.kind ?? null) - RESULT_WAIT_TICKS_AT_BAT_END
+    const endFrames = atBatEndFramesOf(pending.outcome, pending.arrivalPlay) - RESULT_WAIT_TICKS_AT_BAT_END
     finishAtBat(judged, pending.outcome, runnersOnBase, Math.max(0, endFrames))
   }, [audio, finishAtBat, random])
 

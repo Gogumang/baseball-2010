@@ -1206,7 +1206,7 @@ export function useMissionSession({
     // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
     runner.pauseWithBanner(
       describeOutcomeBanner(outcome, runnersOnBase),
-      Math.max(0, atBatEndFramesOf(outcome, play?.kind ?? null) - elapsedFrames),
+      Math.max(0, atBatEndFramesOf(outcome, play) - elapsedFrames),
     )
   }
 
@@ -1384,7 +1384,8 @@ export function useMissionSession({
       // 볼넷 · 사구 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다(모드 6 도 상태 갱신 표 그대로 0x4e6d4). 틱 31 갱신의 4e74c 벤치
       // 클리어링 굴림(사구만)·판정 A 의 밀어내기 · 정산은 0x12 의 32 그림 뒤라 그동안 붙든다 — 화면이 `judgeHitByPitch` 를 부른다(r298).
       // 삼진은 정산 굴림이 없어 붙들지 않는다(판정 A 는 굴림 없이 0xd · 정산 — 웹 `applyMissionOutcome` 도 난수를 안 쓴다)
-      if (current !== null && (outcome.kind === '사구' || outcome.kind === '볼넷')) {
+      // 도루 출발 중이면(3e0e4 → 3e114 곧장 0x17, A-24) 붙들지 않는다 — 대기 · 굴림 없이 아래 보통 길(밀어내기 판 곧장)
+      if (current !== null && (outcome.kind === '사구' || outcome.kind === '볼넷') && holdsUntilResultWaitEnd(outcome, play)) {
         setPendingBenchClearing({
           side: '타자',
           phase: 'wait',
@@ -1519,6 +1520,10 @@ export function useMissionSession({
         })
         setPitcherRun(nextRun)
         return
+      }
+      // 도루 출발 중 볼넷 · 사구(A-24 — 3e0e4 → 3e114 가 곧장 0x17) — 밀어내기 판(종류 2)을 대기 없이 재생한다. 진루는 아래 보통 길과 같다
+      if (play !== null && arrivalApplicationOf(play) === 'freePass' && play.result.ticks.length > 0) {
+        setPickoffReplay(play.result)
       }
       nextRun =
         play !== null && arrivalApplicationOf(play) === 'batterRuns'

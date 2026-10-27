@@ -13,6 +13,7 @@ import {
   isGameSceneFrozen,
   markCommonWindowShown,
   markGameSceneUp,
+  noteCommonWindowOpensInSceneUpdate,
   resetCommonWindowShownForTest,
   setGameSceneTickTimeout,
   setGameSceneTimeout,
@@ -285,5 +286,110 @@ describe('단말 일시정지 0x2da0 → 0x74458 — 창이 선 첫 그림을 �
     expect(gameSceneBackdropFreezeSerialNow()).toBe(backdrop + 2)
     window()
     scene()
+  })
+})
+
+describe('갱신 뒤에 연 창 — 52cc6 을 지난 틀(키 · 진입 · 갱신)에 선 창은 그 틀을 다 돌고 다음 틀부터 선다 (Q-04 ①)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    resetCommonWindowShownForTest()
+  })
+
+  it('그 앱 틱 동안은 흐르고, 다음 앱 틱 머리에서 앞 틱에 멈춘다 — 창이 선 첫 그림은 따로 없다', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000) // 앱 틱 16 (992~1053)
+    const 장면 = markGameSceneUp()
+    const gate = createGameSceneDrawGate()
+    const 배경 = gameSceneBackdropFreezeSerialNow()
+    noteCommonWindowOpensInSceneUpdate()
+    const 창 = markCommonWindowShown()
+    // 그 틀은 보통 틀 — 갱신 · 그리기가 마저 돈다
+    expect(isGameSceneFrozen()).toBe(false)
+    expect(gate.allowsDraw()).toBe(true)
+    now.mockReturnValue(1053)
+    expect(isGameSceneFrozen()).toBe(false)
+    expect(gameSceneTickNow()).toBe(16)
+    now.mockReturnValue(1054) // 앱 틱 17 머리 — 여기서 선다
+    expect(isGameSceneFrozen()).toBe(true)
+    expect(gameSceneTickNow()).toBe(16)
+    // 52efe — [창+0x250] 은 그 틀 끝 0x746cc 가 이미 지웠다: 다시 그리지 않고 배경 셈도 안 오른다
+    expect(gate.allowsDraw()).toBe(false)
+    expect(gameSceneBackdropFreezeSerialNow()).toBe(배경)
+    now.mockReturnValue(5000) // 앱 틱 80
+    expect(gameSceneTickNow()).toBe(16)
+    창()
+    expect(gameSceneTickNow()).toBe(16)
+    now.mockReturnValue(5022) // 앱 틱 81 머리
+    expect(gameSceneTickNow()).toBe(17)
+    장면()
+  })
+
+  it('알린 틱이 지난 뒤에 선 창은 곧바로 멈추고 첫 그림을 센다 — 대기 칸 창 · 단말 일시정지(게이트 앞)', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000)
+    const 장면 = markGameSceneUp()
+    const gate = createGameSceneDrawGate()
+    noteCommonWindowOpensInSceneUpdate()
+    now.mockReturnValue(1060) // 다음 앱 틱 — 알림은 낡았다
+    const 창 = markCommonWindowShown()
+    expect(isGameSceneFrozen()).toBe(true)
+    expect(gate.allowsDraw()).toBe(true)
+    expect(gate.allowsDraw()).toBe(false)
+    창()
+    장면()
+  })
+
+  it('그 틱 머리에 걸린 장면 시계는 울리고, 다음 틱 머리의 시계는 창 아래에서 선다', () => {
+    vi.useFakeTimers()
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => Date.now())
+    vi.setSystemTime(1000) // 앱 틱 16
+    const 장면 = markGameSceneUp()
+    const 이번 = vi.fn()
+    const 다음 = vi.fn()
+    setGameSceneTickTimeout(다음, 1) // 장면 틱 17 머리 1054
+    noteCommonWindowOpensInSceneUpdate()
+    const 창 = markCommonWindowShown()
+    setGameSceneTimeout(이번, 30) // 1030 — 틱 16 안
+    vi.advanceTimersByTime(30)
+    expect(이번).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(4000)
+    expect(다음).not.toHaveBeenCalled()
+    창() // 5030 — 앱 틱 81(5022~5083)
+    // 장면 틱 16 에서 선 채 닫혔다 — 장면 틱 17 은 닫힌 앱 틱 다음 머리(앱 틱 82, 5084)
+    vi.advanceTimersByTime(53)
+    expect(다음).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(다음).toHaveBeenCalledTimes(1)
+    now.mockRestore()
+    장면()
+  })
+
+  it('그 틱 안에 다시 내려간 창은 장면을 세우지 않는다', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000)
+    const 장면 = markGameSceneUp()
+    noteCommonWindowOpensInSceneUpdate()
+    const 창 = markCommonWindowShown()
+    창()
+    now.mockReturnValue(1100)
+    expect(isGameSceneFrozen()).toBe(false)
+    expect(gameSceneTickNow()).toBe(17)
+    장면()
+  })
+
+  it('그 틱 안에 단말 일시정지가 오면 창이 서는 틀이 장면을 한 번 더 그린다(0x74458 [+0x250] = 1)', () => {
+    const now = vi.spyOn(performance, 'now')
+    now.mockReturnValue(1000)
+    const 장면 = markGameSceneUp()
+    const gate = createGameSceneDrawGate()
+    noteCommonWindowOpensInSceneUpdate()
+    const 창 = markCommonWindowShown()
+    rearmGameSceneFirstDraw()
+    now.mockReturnValue(1054)
+    expect(gate.allowsDraw()).toBe(true)
+    expect(gate.allowsDraw()).toBe(false)
+    창()
+    장면()
   })
 })

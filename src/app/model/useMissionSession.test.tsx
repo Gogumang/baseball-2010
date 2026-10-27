@@ -1430,6 +1430,24 @@ describe('타자 미션(모드 6)도 0x12 갱신 0x4e6d4 를 탄다 — 사구�
     expect(안들어감).toBe(true)
   })
 
+  it('도루 출발 중 사구는 붙들지 않는다 — 3e0e4 → 3e114 곧장 0x17, 4e74c 굴림 · 0x1e 가 없다 (A-24, r302)', () => {
+    const counter = countedSeeded(3)
+    const rendered = setUpBatterMission(5, counter.port)
+    act(() => rendered.result.current.session.actions.steal(1))
+    const 공앞 = counter.drawn()
+    act(() => {
+      rendered.result.current.session.handleMissionPitch(사구)
+    })
+    // 공 도착의 0.1% 폭투 굴림 하나뿐 — 밀어내기 판(종류 2)은 굴림이 없다
+    expect(counter.drawn() - 공앞).toBe(1)
+    expect(rendered.result.current.session.pendingBenchClearing).toBeNull()
+    expect(rendered.result.current.session.pendingRunnerPlay).toBeNull()
+    expect(rendered.result.current.session.missionRun?.bases).toEqual({ first: true, second: true, third: false })
+    const 판 = rendered.result.current.session.pickoffReplay
+    expect(판 !== null && 'opensAtArrival' in 판 && 판.opensAtArrival).toBe(true)
+    rendered.unmount()
+  })
+
   it('볼넷도 붙들고 판정에서 굴림 없이 진루 — 삼진은 붙들지 않는다(정산 굴림이 없다)', () => {
     const counter = countedSeeded(3)
     const rendered = setUpBatterMission(1, counter.port, undefined)
