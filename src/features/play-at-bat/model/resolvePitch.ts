@@ -92,8 +92,12 @@ export interface PitchOutcomeDetail {
    * 받는 쪽에는 null 로 비워 넘긴다 — 받는 쪽은 맞은 공을 0x13 이 끝난 틀에, 못 맞힌 공을 0x12 를 예약한 틀에 받기 때문이다.
    */
   readonly contactSoundId?: number | null
-  /** 맞은 공이면 친 타자의 손 0xb63c1 (`situation.batterSide`) — [경기+0xf2c] 공의 수평각 d (`BattedContact.batterHand`) */
-  readonly batterHand?: number
+  /**
+   * 지금 타자의 손 0xb63c1 (`situation.batterSide`, 1 = 좌타) — 모든 공에 싣는다. 맞은 공이면 [경기+0xf2c] 공의 수평각 d
+   * (`BattedContact.batterHand`), 못 맞힌 공이면 공 도착 판(밀어내기 · 낫아웃)의 타자주자 타석 자리(0xa93ac a9446 → vt94 0xa0884,
+   * `PitchArrivalPlayInput.batterHand`)를 고른다
+   */
+  readonly batterHand: number
   /**
    * 이 공의 **구질 번호** 1~22 (`game+0xfc8`). 원본은 공이 손을 떠날 때(0x3de10 의 0x3dec6)
    * `0xa5e14(ctx, 구질)` 로 상대 투수 투구 수·스태미나를 깎는다 — 받는 쪽이 그 일을 하라고 싣는다.
@@ -203,13 +207,14 @@ export function isStrikeZonePitch(pitch: Pitch): boolean {
  * 0x12 진입 0x3dfac 는 스윙 객체 +0xe(스윙함)를 st[0x10] 에 적고(3dfbe) 사구 판정 0x35a20 은 그 칸이 서 있으면 0 —
  * 헛스윙 스트라이크다. 굴림이 없다. 소리는 판정 없는 헛스윙에서만 0x4e21c 의 8/27 (`unjudgedWhiffSoundIdOf`), 늦은 스윙은 없다.
  */
-export function unjudgedSwingDetailOf(contactSoundId: number | null): PitchOutcomeDetail {
+export function unjudgedSwingDetailOf(contactSoundId: number | null, batterHand: number): PitchOutcomeDetail {
   return {
     resolution: { kind: '스트라이크', isSwinging: true },
     hasSwung: true,
     isBunt: false,
     resultCode: null,
     contactSoundId,
+    batterHand,
   }
 }
 
@@ -237,7 +242,14 @@ export function resolvePitch(
     // 사구가 볼·스트라이크보다 먼저다 (0x9d57c 첫머리 0x9d582 — state[0x12] 면 곧장 4)
     if (isHitByPitch(pitch, context.situation.batterSide)) {
       return {
-        detail: { resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null },
+        detail: {
+          resolution: { kind: '사구' },
+          hasSwung: false,
+          isBunt: false,
+          resultCode: null,
+          contactSoundId: null,
+          batterHand: context.situation.batterSide,
+        },
         deck,
         isUncatchable: false,
       }
@@ -246,7 +258,7 @@ export function resolvePitch(
       ? { kind: '스트라이크', isSwinging: false }
       : { kind: '볼' }
     return {
-      detail: { resolution, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null },
+      detail: { resolution, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null, batterHand: context.situation.batterSide },
       deck,
       isUncatchable: false,
     }
@@ -299,7 +311,11 @@ export function resolvePitch(
       pattern: null,
     })
     // 헛스윙(경기+0xfd2 == 0)은 0x5135c 에서 0x51840 으로 건너뛰어 필살 굴림이 없다
-    return { detail: { resolution, hasSwung: true, isBunt: false, resultCode: null, contactSoundId }, deck, isUncatchable: false }
+    return {
+      detail: { resolution, hasSwung: true, isBunt: false, resultCode: null, contactSoundId, batterHand: context.situation.batterSide },
+      deck,
+      isUncatchable: false,
+    }
   }
 
   const direction = hitDirectionOf(

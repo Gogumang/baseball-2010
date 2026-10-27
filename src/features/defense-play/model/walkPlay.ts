@@ -4,6 +4,7 @@ import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
 import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { DEFENSE_SCENE_START, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import {
+  batterBoxPosition,
   createFielders,
   createRunner,
   initialPlayView,
@@ -30,8 +31,10 @@ import { runRunnerPlay, type RunnerPlayEngineResult } from '@/features/defense-p
  *          0xa276c(공, 2) — 0xa2610 이 공 +0xaa0(낙구 틱) 등을 −1 로, 공 첫 점 = 0xd7c24 = (20000, 0, 24500)(투수판) ;
  *          **P+0x12c = 1**(쥠). vt24(예보) · vt34(고르기) · vt30(커버) · 0xb2710(쥐기)을 **안 부른다**
  *          — 야수 +0xe0(손에 쥠)은 vt20 이 지운 0 그대로, +0x128 · +0x112 도 세우지 않는다.
- * 0x464a8  state[0x11] || 종류 2·3 || state[0x1a] (그리고 종류 ≠ 8) → 0xa93ac 타자주자를 목록 맨 앞에:
- *          vt88(0)(홈) · vt48(1)(+0x7c = +0x80 = 1) · +0x88 = 1 · +0x94 = 1 · +0x98 = 1 · +0x90 = 0
+ * 0x464a8  state[0x11] || 종류 2·3 || state[0x1a] (그리고 종류 ≠ 8) → 0x4650e 0xa93ac 타자주자를 목록 맨 앞에:
+ *          vt88(0)(홈) · vt48(1)(+0x7c = +0x80 = 1) · +0x88 = 1 · +0x94 = 1 · +0x98 = 1 · +0x90 = 0 ;
+ *          a9446 vt94 0xa0884(주자, 0xb63c0(타자)) — **타석 자리**(홈 x ±700 · z −100)로 옮긴다(`batterBoxPosition`, r326).
+ *          타자는 0x464e6 0xae89c(지금 타순의 타자)라 타구 판과 같은 사람 · 같은 손이다. 판 종류를 안 가른다
  * 0x46516  주자관리.vt1c = 0xa9e44(플레이.vt94(), +0x111, 아웃, 0) — 목록 1 부터:
  *          도루 표시가 없으면 vt88(+0x8c)(제 루에 앉히기) ; +0x98 = +0x94 = 0 ; +0x88 = +0x90 = +0x8c
  *          포스(0xa9f60: 목록 0..i 산 주자 수 > +0x8c) || 아웃 == 2 || 도루 표시 일 때만:
@@ -67,6 +70,8 @@ import { runRunnerPlay, type RunnerPlayEngineResult } from '@/features/defense-p
  *   중이라 어느 쪽이든 서지 않는다(heldRuns 의 타자주자 갈래).
  */
 export interface WalkPlayInput {
+  /** 지금 타자의 손 `0xb63c0`(1 = 좌타) — 타자주자가 서는 타석 자리(`batterBoxPosition`, vt94 0xa0884)를 고른다 */
+  readonly batterHand: number
   /** 투구 때 루 상황 */
   readonly bases: BaseState
   /** 이 투구 전의 아웃 수 (state[6]) */
@@ -138,9 +143,15 @@ export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
   const speedOf = (base: 0 | 1 | 2 | 3) =>
     runnerSpeedOf(input.runAbilities?.[base] ?? input.runAbility ?? DEFAULT_ABILITY, input.runnerTeamGrade ?? 0)
 
-  // ── 0xa93ac 타자주자 — 홈 · 목표 1 · 요구 루 1 · +0x94 · +0x98 ──
+  // ── 0xa93ac 타자주자 — 목표 1 · 요구 루 1 · +0x94 · +0x98. 위치는 a9446 vt94 0xa0884 의 타석 자리(구간 출발점 legStart 는
+  // 진행률 vt90 의 분모 자리라 홈 그대로 — 타구 판 `createPlayRunners` 와 같다) ──
   const runners: RunnerState[] = [
-    createRunner(0, 0, speedOf(0), { targetBase: 1, requiredBase: 1, isBatterRunner: true }),
+    createRunner(0, 0, speedOf(0), {
+      targetBase: 1,
+      requiredBase: 1,
+      isBatterRunner: true,
+      position: batterBoxPosition(input.batterHand),
+    }),
   ]
   ;([1, 2, 3] as const).forEach((base) => {
     const occupied = base === 1 ? input.bases.first : base === 2 ? input.bases.second : input.bases.third

@@ -69,7 +69,7 @@ describe('수비 재생', () => {
   })
 
   it('볼넷 · 사구 밀어내기 판(종류 2)은 키가 오면 그 그림에서 끝난다 — 0x519cc(state[0xb] ∈ {3, 4}) → +0xfe7 → 0x35108', () => {
-    const 밀어내기 = runWalkPlay({ bases: 주자1루, outs: 0, pitchJudgement: 3 })
+    const 밀어내기 = runWalkPlay({ batterHand: 0, bases: 주자1루, outs: 0, pitchJudgement: 3 })
     const 가만히 = vi.fn()
     render(<DefensePlayback ticks={밀어내기.ticks} onDone={가만히} freePassPlay />)
     expect(가만히).not.toHaveBeenCalled()
@@ -520,7 +520,7 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
       }
       // 주자 없는 홈런 — 타자주자 홈인(n = 1 · 간격 20 · 타이머 20)이 판을 세운다
       const 맨 = { ...홈런(), bases: { first: false, second: false, third: false } }
-      const 코드 = { ...맨, outcome: registerContact(맨.outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
+      const 코드 = { ...맨, outcome: registerContact(맨.outcome, { batterHand: 0, pattern: 홈런패턴(), resultCode: 24 }) }
       const 판길이 = runDefensePlay(맨).ticks.length
       // 결과 코드가 없으면 닫힌 뒤 11 번째 갱신 — 앞뒤 두 갱신(시계로 도는 갱신 계수)
       expect(Math.abs(갱신수(맨) - (판길이 + 10))).toBeLessThanOrEqual(2)
@@ -529,7 +529,7 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
 
       // 1루 주자 홈런 — 1루 주자와 타자주자가 같은 틱에 홈을 밟는다(둘 다 1루에 섰다가 홈런 +0x111 로 함께 뛴다). 득점 0xaa0a8 은
       // 내림차순이라 1루 주자(칸 1, 판 내림) → 타자주자(칸 0, n = 2 · 간격 20 · 타이머 40) 차례로 메시지 0x13 이 와 판이 선다
-      const 일루 = { ...홈런(), outcome: registerContact(홈런().outcome, { pattern: 홈런패턴(), resultCode: 24 }) }
+      const 일루 = { ...홈런(), outcome: registerContact(홈런().outcome, { batterHand: 0, pattern: 홈런패턴(), resultCode: 24 }) }
       const 일루판 = runDefensePlay(일루)
       // 둘이 홈에 닿은 목록 틱 다음 그림 — 그 그림의 G2 는 득점 0xaa0a8(G2 뒤) 앞이라 아직 열리고, 그 그림 슬롯 2 의 득점(마지막 판 틱)
       // 뒤 그리기 G3 이 닫는다
@@ -558,7 +558,7 @@ describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌�
   /** 1루 주자가 도루를 건 볼 — 공 도착 판(종류 5)을 판 시작까지 연다 */
   const 도루판 = () => {
     const opened = openPitchArrivalPlay(
-      {
+      { batterHand: 0,
         gameMode: 2,
         pitchJudgement: 2,
         stealingFrom: [1],

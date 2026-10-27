@@ -53,7 +53,7 @@ describe('AI 0xf — 0xb2c58 이 사건 7 · 12 에 아홉 야수에 건다 · b
   it('파울(7)을 받은 틱부터 야수는 그 자리에 선다 — 결과 · 굴림은 그대로', () => {
     // 뒤로 튄 파울(코드 9 [311, 273, 247]) — 3틱 낙구에 7
     const 결과 = runDefensePlay({
-      outcome: registerContact(땅볼아웃, { pattern: [311, 273, 247, 1], resultCode: 9 }),
+      outcome: registerContact(땅볼아웃, { batterHand: 0, pattern: [311, 273, 247, 1], resultCode: 9 }),
       trajectory: battedBallTrajectory([311, 273, 247, 1]),
       bases: EMPTY_BASES,
       outs: 0,
@@ -73,7 +73,7 @@ describe('추적야수 AI 1(b4aca)의 목표 고치기는 AI 고리 안 — 같�
     // 예전 웹은 추적야수 목표를 6 절 걸음에서 고쳐, 낙구점 → 포구점으로 바뀐 틱의 커버 다시 고르기가 옛 목표(낙구점)로 중계 자리를 잡았다
     const pattern = BATTED_BALL_PATTERNS[18][26]
     const 결과 = runDefensePlay({
-      outcome: registerContact(땅볼아웃, { pattern, resultCode: 18 }),
+      outcome: registerContact(땅볼아웃, { batterHand: 0, pattern, resultCode: 18 }),
       trajectory: battedBallTrajectory(pattern),
       bases: EMPTY_BASES,
       outs: 0,

@@ -40,7 +40,7 @@ describe('공 그리기 0x36dfc 의 파티클 조건 — 판 종류를 안 본�
 describe('주자 판 스냅샷의 파티클 조건', () => {
   it('폭투 · 포일 판 — 쫓는 공이 굴러가는 그림은 다음 점 높이를 싣는다(판 틱으로 읽는 궤적)', () => {
     const shot = { angle: 95, strength: 220, verticalSpeed: -100 }
-    const result = runPassedBallPlay({ shot, bases: EMPTY_BASES, outs: 0 })
+    const result = runPassedBallPlay({ batterHand: 0, shot, bases: EMPTY_BASES, outs: 0 })
     const trajectory = passedBallTrajectoryOf(shot)
     const flying = result.ticks.filter((view) => view.ballParticles != null)
     expect(flying.length).toBeGreaterThan(0)
@@ -78,7 +78,7 @@ describe('주자 판이 보는 경기 +0xfd4 (`sceneResultCode`)', () => {
 
   it('폭투 · 포일 판 — 넘긴 값을 그대로 싣는다', () => {
     const shot = { angle: 95, strength: 220, verticalSpeed: -100 }
-    const result = runPassedBallPlay({ shot, bases: EMPTY_BASES, outs: 0, sceneResultCode: 0 })
+    const result = runPassedBallPlay({ batterHand: 0, shot, bases: EMPTY_BASES, outs: 0, sceneResultCode: 0 })
     expect(result.ticks.every((view) => view.sceneResultCode === 0)).toBe(true)
   })
 })

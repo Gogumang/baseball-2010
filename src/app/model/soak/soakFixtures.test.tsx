@@ -284,11 +284,11 @@ function policyRandom(seed: number) {
 
 function pitchDetailOf(roll: number, pick: number, batterHand: number): PitchOutcomeDetail {
   const base = { hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null, pitchTypeNumber: 1 } as const
-  if (roll < 0.33) return { ...base, resolution: { kind: '볼' } }
-  if (roll < 0.53) return { ...base, resolution: { kind: '스트라이크', isSwinging: false } }
-  if (roll < 0.66) return { ...base, hasSwung: true, resolution: { kind: '스트라이크', isSwinging: true } }
-  if (roll < 0.76) return { ...base, hasSwung: true, resolution: { kind: '파울' } }
-  if (roll < 0.765) return { ...base, resolution: { kind: '사구' } }
+  if (roll < 0.33) return { ...base, batterHand: 0, resolution: { kind: '볼' } }
+  if (roll < 0.53) return { ...base, batterHand: 0, resolution: { kind: '스트라이크', isSwinging: false } }
+  if (roll < 0.66) return { ...base, batterHand: 0, hasSwung: true, resolution: { kind: '스트라이크', isSwinging: true } }
+  if (roll < 0.76) return { ...base, batterHand: 0, hasSwung: true, resolution: { kind: '파울' } }
+  if (roll < 0.765) return { ...base, batterHand: 0, resolution: { kind: '사구' } }
   const contact = FAIR_CONTACTS[Math.floor(pick * FAIR_CONTACTS.length)]!
   return {
     ...base,

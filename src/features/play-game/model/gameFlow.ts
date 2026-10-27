@@ -3107,6 +3107,8 @@ export function arrivePitch(
     readonly buntKind?: number
     /** 맞은 공(타구)의 방향까지 붙인 결과 코드 (`PitchOutcomeDetail.resultCode`) — 경기 +0xfd4. 안 주면 쏜 공(`contactOfOutcome`)에서 */
     readonly resultCode?: number | null
+    /** 지금 타자의 손 0xb63c0(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884, `PitchArrivalPlayInput.batterHand`) */
+    readonly batterHand: number
   },
   random: RandomPort,
   options: {
@@ -3146,6 +3148,7 @@ export function arrivePitch(
       stealingFrom: progress.stealingFrom,
       bases: before.bases,
       outs: before.outs,
+      batterHand: pitch.batterHand,
       // 우리 공격이니 수비는 상대 팀 — 타구 진행기와 같은 아홉 칸
       defenseAbilities: opponentDefenseAbilitiesOf(progress),
       // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 타구 판과 같은 칸

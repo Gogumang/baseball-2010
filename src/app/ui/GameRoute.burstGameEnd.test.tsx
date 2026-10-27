@@ -97,7 +97,7 @@ function 메모리저장(held: PlayerCareer | null): SaveGamePort {
 }
 
 const 헛스윙: PitchOutcomeDetail = {
-  resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+  batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
 }
 
 interface 판 {

@@ -228,13 +228,14 @@ const STRIKEOUT: AtBatOutcome = { kind: '삼진' }
 const WALK: AtBatOutcome = { kind: '볼넷' }
 const HIT_BY_PITCH: AtBatOutcome = { kind: '사구' }
 /** 내야 뒤에 겨우 뜬 공 — 사람 수비가 키 없이도 뜬 채로 잡는다(주자는 태그업으로 못 들어온다, `pitcherRun.test` 와 같은 원본 코드 0 패턴) */
-const FLY_OUT = registerContact({ kind: '아웃', detail: '뜬공아웃' }, { pattern: [90, 250, 700, 0], resultCode: 0 })
+const FLY_OUT = registerContact({ kind: '아웃', detail: '뜬공아웃' }, { batterHand: 0, pattern: [90, 250, 700, 0], resultCode: 0 })
 /**
  * 원본 패턴 표 코드 14 칸 10 [45, 279, 324] — 1사 빈 루에서 **주루 999 타자**면 판 안 그라운드 홈런(state[0x25])이 난다.
  * r268: 주자 걸음 · 도착 틱이 원본대로 맨해튼 거리(0xbf158 · 0xbf01c → 0xbfa2c)라 네 구간이 평면 속도의 0.71 배다 — 주루 500 으로는
  * 1275 패턴 어느 것도 판 안에서 홈을 못 돈다(예전 [67, 1150, 600] 은 이제 3루타). 미션 타자는 나리 저장 선수라 빠른 선수면 깬다
  */
-const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { pattern: [45, 279, 324, 0], resultCode: 14 })
+// 좌타(손 1) — 타자주자가 타석 자리(홈 x+700, vt94 0xa0884)에서 뛰어 판 안에서 홈을 돈다. 우타(x−700)면 홈에서 잡힌다 (r326)
+const INSIDE_THE_PARK_HOME_RUN = registerContact(HOME_RUN, { batterHand: 1, pattern: [45, 279, 324, 0], resultCode: 14 })
 /** 그라운드 홈런 판은 주루 999 타자로 미리 돌려 넘긴다(`applyOutcome` 의 played — 화면이 판을 다 돌린 길) */
 const 빠른타자판 = (run: MissionRun, outcome: AtBatOutcome) =>
   runDefensePlay({ ...missionDefensePlayInputOf(run.bases, run.outs, outcome), runAbilities: { 0: 999 } })

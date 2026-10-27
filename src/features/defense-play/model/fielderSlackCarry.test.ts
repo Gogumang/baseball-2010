@@ -33,7 +33,7 @@ const 남김 = (value: number): DefenseScene => ({
 describe('야수 +0xcc 는 판 사이로 남는다 — 생성자 a0df0 · vt8c a0ee0 · vt20 b1156(인자 ≠ 0) · 목록 틱 a1330 (r196)', () => {
   it('뒤로 튄 파울(사건 7)은 아홉 야수 모두 5 를 남긴다 — 파울 갈래는 공 칸만 봐 같은 그림의 G1 · G2 가 같다', () => {
     const 결과 = runDefensePlay({
-      outcome: registerContact(땅볼아웃, { pattern: [311, 273, 247, 1], resultCode: 9 }),
+      outcome: registerContact(땅볼아웃, { batterHand: 0, pattern: [311, 273, 247, 1], resultCode: 9 }),
       trajectory: battedBallTrajectory([311, 273, 247, 1]),
       bases: EMPTY_BASES,
       outs: 0,
@@ -95,7 +95,7 @@ describe('야수 +0xcc 는 판 사이로 남는다 — 생성자 a0df0 · vt8c a
 
   it('폭투 판 — 예보 복제도 +0xcc 를 베껴 포수가 6 틱 늦게 쥔다', () => {
     const 폭투 = (scene?: DefenseScene) =>
-      runPassedBallPlay({
+      runPassedBallPlay({ batterHand: 0,
         shot: passedBallShot(createSeededRandom(7)),
         bases: { ...EMPTY_BASES, first: true },
         outs: 0,
@@ -123,7 +123,7 @@ describe('야수 +0xcc 는 판 사이로 남는다 — 생성자 a0df0 · vt8c a
     expect(남은판.ticks[0]?.fielders).not.toEqual(그냥.ticks[0]?.fielders)
     expect(남은판.scene.fielderSlack).toEqual(Array.from({ length: 9 }, () => 0))
 
-    const 밀어내기 = runWalkPlay({ bases: { ...EMPTY_BASES, first: true }, outs: 0, pitchJudgement: 3, scene: 남김(5) })
+    const 밀어내기 = runWalkPlay({ batterHand: 0, bases: { ...EMPTY_BASES, first: true }, outs: 0, pitchJudgement: 3, scene: 남김(5) })
     expect(밀어내기.scene.fielderSlack).toEqual(Array.from({ length: 9 }, () => 0))
   })
 })

@@ -113,6 +113,9 @@ export function runnerLeadOf(runner: Pick<RunnerState, 'startBase' | 'targetBase
 /**
  * 판 시작 위치를 원본대로 — 루 좌표에서 출발해 `lead.ticks` 번 한 틱 이동(`stepToward`, 0xbf158)하고
  * 목표를 되돌린다. 구간 출발점(+0x14)은 루 좌표 그대로다(0xbee60 이 세우고, 목표 바꾸기 0xbf2cc 는 +0x14 를 안 건드린다).
+ * 타자주자(루 0)만은 출발이 루 좌표가 아니라 지금 위치 — 0xa93ac a9446 vt94 0xa0884 가 세운 타석 자리(`batterBoxPosition`)다.
+ * 그래도 웹 `legStart` 는 홈으로 둔다 — 진행률(`progressPercent`)의 분모 자리이고 원본 진행률 vt90 0xa04e8 은 루[+0x8c](= 홈) ·
+ * 루[+0x7c] 거리로 잰다(r324 타구 판 `createPlayRunners` 와 같은 꼴, r326).
  *
  * 리드 안에서 목표 루에 닿으면 원본은 그 틱 안에서 도착 처리(vt38 = 0xa040c, +0x8c = +0x7c)까지 돈다.
  * 여기서는 위치만 루 위에 두고 도착 처리는 판의 첫 틱(진행기의 "제자리 + 미도착" 갈래)에 맡긴다 —
@@ -126,7 +129,7 @@ export function applyRunnerLead(runner: RunnerState, lead: RunnerLead): RunnerSt
   return {
     ...runner,
     position,
-    legStart: start,
+    legStart: basePosition(runner.startBase),
     targetBase: lead.restoredTargetBase ?? lead.leadTargetBase,
   }
 }

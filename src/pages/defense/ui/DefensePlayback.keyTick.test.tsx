@@ -106,7 +106,7 @@ describe('주자 판 송구 키 — 그리기가 밀려도 본 그림의 틱으�
   /** 1루 주자가 도루를 건 볼 — 공 도착 판(종류 5) */
   const 도루판 = () => {
     const opened = openPitchArrivalPlay(
-      {
+      { batterHand: 0,
         gameMode: 2,
         pitchJudgement: 2,
         stealingFrom: [1],

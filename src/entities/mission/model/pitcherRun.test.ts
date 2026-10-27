@@ -5,7 +5,7 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 
 /** 타석 판정이 쏜 패턴을 묶은 결과 — 진행기가 그 패턴으로 판을 돌리고 기록은 판 끝 정산 결과다(`battedContact`) */
 const 쏜공 = (outcome: AtBatOutcome, pattern: BattedBallPattern, resultCode: number): AtBatOutcome =>
-  registerContact(outcome, { pattern, resultCode })
+  registerContact(outcome, { batterHand: 0, pattern, resultCode })
 /** 원본 코드 2 [47, 1038, 596] — 1루 쪽 깊숙이 떨어져 우익수가 20틱에 줍는 단타 */
 const 깊은단타 = (): AtBatOutcome => 쏜공({ kind: '안타', bases: 1 }, [47, 1038, 596, 0], 2)
 /** 원본 코드 0 [0] [90, 810, 1592] — 중견수가 뜬 채로 잡는다(키 없는 사람 수비도 쥐기만 하면 뜬공 아웃이다) */

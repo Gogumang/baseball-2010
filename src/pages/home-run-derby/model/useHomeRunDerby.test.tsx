@@ -16,7 +16,7 @@ import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model
 const 홈런코드 = 24
 
 const 홈런: PitchOutcomeDetail = {
-  resolution: { kind: '타구', outcome: { kind: '홈런' } },
+  batterHand: 0, resolution: { kind: '타구', outcome: { kind: '홈런' } },
   hasSwung: true,
   isBunt: false,
   resultCode: 홈런코드,
@@ -25,7 +25,7 @@ const 홈런: PitchOutcomeDetail = {
 }
 
 const 헛스윙: PitchOutcomeDetail = {
-  resolution: { kind: '스트라이크', isSwinging: true },
+  batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
   hasSwung: true,
   isBunt: false,
   resultCode: null,
@@ -33,7 +33,7 @@ const 헛스윙: PitchOutcomeDetail = {
 
 /** 희생번트 타구 — 번트 판정(0x51226) 성공 코드 6 묶음 (`outcomeOfPattern` 의 case 6) */
 const 번트: PitchOutcomeDetail = {
-  resolution: { kind: '타구', outcome: { kind: '아웃', detail: '땅볼아웃' } },
+  batterHand: 0, resolution: { kind: '타구', outcome: { kind: '아웃', detail: '땅볼아웃' } },
   hasSwung: true,
   isBunt: true,
   resultCode: 7,

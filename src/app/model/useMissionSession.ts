@@ -1316,6 +1316,8 @@ export function useMissionSession({
                 stealingFrom: stealing,
                 bases: current.bases,
                 outs: current.outs,
+                // 사람 타자의 손 0xb63c0 — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884)
+                batterHand: detail.batterHand,
                 // 루별 주루 — 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로 0xb570d(ctx, 3, 주자, 1, 90, 1), 0 은 지금 타자.
                 // 아홉 칸 수비는 CPU 수비 팀 레코드(판 시작 0xb0fb4 — `missionDefenseAbilitiesOf`)
                 ...playAbilitiesOf(current),
@@ -1837,6 +1839,8 @@ export function useMissionSession({
               stealingFrom,
               bases: pitcherRun.bases,
               outs: pitcherRun.outs,
+              // CPU 타자의 손 0xb63c0 — 공의 화면 배치(`simulateBatter` 가 맞은 공의 손으로 쓰는 값). 밀어내기 · 낫아웃 타석 자리
+              batterHand: pitch.stageSide,
               // 루별 주루 — CPU 타선 주자 신원대로, 0 은 지금 타자(낫아웃 타자주자)
               runAbilities: pitcherRunAbilities,
               // 아홉 칸 수비 — 사람 칸 팀 레코드(판 시작 0xb0fb4 — `missionDefenseAbilitiesOf`)

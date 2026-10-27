@@ -36,7 +36,7 @@ const tick = (count = 1) => act(() => {
 })
 
 const BALL: PitchOutcomeDetail = {
-  resolution: { kind: '볼' },
+  batterHand: 0, resolution: { kind: '볼' },
   hasSwung: false,
   isBunt: false,
   resultCode: null,
