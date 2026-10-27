@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SEASON_CARD_BADGE, SEASON_CARD_FIGURE, SEASON_CARD_LOGO, initialSeasonCardFigure, seasonCardLookOf, stepSeasonCardFigure, steppedBoardPointsOf,
+  SEASON_CARD_BADGE, SEASON_CARD_BOARD, SEASON_CARD_FIGURE, SEASON_CARD_LOGO, initialSeasonCardFigure, seasonCardLogoPlaceOf,
+  seasonCardLookOf, stepSeasonCardFigure, steppedBoardLeftEnd, steppedBoardLeftRow565, steppedBoardPointsOf,
 } from '@/pages/season/lib/seasonPlayerCard'
 import type { SeasonCardFigureState } from '@/pages/season/lib/seasonPlayerCard'
 
@@ -65,3 +66,25 @@ describe('시즌 선수 카드 0x7ba44 · 그림 0xae98', () => {
       .toEqual([157, 0, -1, 4])
   })
 })
+
+describe('카드 로고 합성의 아래 줄 (Q-03 r301)', () => {
+  const colors = { edge: 1, highlight: 2, fill: 3 }
+  const { top, height, offset } = SEASON_CARD_BOARD
+
+  it('판 왼쪽 평평한 몫 — 위 테두리 T+19 · 밝은 줄 T+20 · 채움, 판 위는 null, 아래 테두리부터는 다룰 수 없다(undefined)', () => {
+    expect(steppedBoardLeftRow565(top + 18, top, height, colors)).toBeNull()
+    expect(steppedBoardLeftRow565(122, top, height, colors)).toBe(1)
+    expect(steppedBoardLeftRow565(123, top, height, colors)).toBe(2)
+    expect(steppedBoardLeftRow565(124, top, height, colors)).toBe(3)
+    expect(steppedBoardLeftRow565(top + height - 1, top, height, colors)).toBe(3)
+    expect(steppedBoardLeftRow565(top + height, top, height, colors)).toBeUndefined()
+    expect(steppedBoardLeftEnd(offset)).toBe(110)
+  })
+
+  it('0x7ba9c 로고 자리는 실제 그림 크기로 가운데를 잡는다 — 77×76 은 (20, 72), 76×77 도 (20, 72), 73×33 은 (22, 94)', () => {
+    expect(seasonCardLogoPlaceOf(77, 76)).toEqual({ x: SEASON_CARD_LOGO.x, y: SEASON_CARD_LOGO.y })
+    expect(seasonCardLogoPlaceOf(76, 77)).toEqual({ x: 20, y: 72 })
+    expect(seasonCardLogoPlaceOf(73, 33)).toEqual({ x: 22, y: 94 })
+  })
+})
+

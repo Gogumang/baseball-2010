@@ -32,7 +32,7 @@ import { bigHitEndTickOf, bigHitReleaseTickOf, bigHitScreenOf, bigHitSwingSkipsO
 import { hitCameraAt, stageCameraShiftOf, type StageCamera } from '@/widgets/batting-stage/lib/hitCamera'
 import { magicBallParticlesOf } from '@/widgets/batting-stage/lib/magicBallEffect'
 import { strikeoutJudgeParticlesOf } from '@/widgets/batting-stage/lib/judgeParticles'
-import { ballPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import { sceneBallPathPixelAt } from '@/widgets/batting-stage/lib/trajectory'
 import type { PendingHit } from '@/widgets/batting-stage/model/stageRefs'
 import { NO_STAGE_EFFECTS, fireworksPortOf, stepStageFrame } from '@/widgets/batting-stage/lib/homeRunEffects'
 import { tickParticles } from '@/entities/particle/model/particleScene'
@@ -253,7 +253,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     } | null = null
     // 공 경로 [경기+0x1140](점 N 개, N = [+0x109c])를 마지막으로 채운 공 — 놓기 0x4dc78 만 쓰므로 0x11 의 놓기 전 그림은 앞 공의 경로를
     // 본다(`magicBallParticlesOf` 의 자리 · N). 경로 칸은 경기 장면에 붙어 부품이 새로 서도 이어진다(`sceneBallPath`, r184).
-    // ⚠️ 근사(남김 — 0 채움 칸): 장면의 첫 공은 놓기 전 경로가 0 채움(N = 0)이라 원본은 그 칸을 투영해 쏘지만, 웹은 0 점 경로를 짓지 않아 안 쏜다
+    // 장면의 첫 공은 놓기 전 경로가 0 채움(N = 0)이라 0x35820 이 점 0 = (0, 0, 0) 을 내고 그 자리에 쏜다(`sceneBallPathPixelAt`, A-26)
     /**
      * 0x11 그림의 마구 공 파티클(0x3b2f4 3b496~3b62c — `magicBallParticlesOf`) — 장면 틱 `tick` 의 그림 몫. 그 틀 끝 관리자 틱(0x6de84)
      * 앞이다. 파티클이 늘면 관리자 틱의 굴림(경기 난수)도 그만큼 는다 — 원본과 같은 차례
@@ -262,14 +262,14 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       const pitch = pitchRef.current
       if (phaseRef.current !== '투구중' || pitch === null || tick < phaseStartTickRef.current) return
       rememberSceneBallPath(pitch)
+      // 아직 놓은 공이 없는 장면이면 0 채움 칸(N = 0) — 첫 공이 마구여도 그 칸 자리에 쏜다
       const path = sceneBallPathPitch()
-      if (path === null) return
       // 공 틱 [+0x1098] — 0x11 진입이 0 으로 두고 투수가 놓는 단계에 닿은 틀 끝부터 오른다(`ballFrameOf` 가 음수인 동안 0)
       const ballTick = Math.max(0, ballFrameOf(tick - phaseStartTickRef.current, latestRef.current.acePitcher?.order))
-      const particles = magicBallParticlesOf(pitch, ballTick, path.frameCount)
+      const particles = magicBallParticlesOf(pitch, ballTick, path?.frameCount ?? 0)
       if (particles.length === 0) return
-      // [sp+0x4c] — 0x35854(공 틱) 은 경로를 0 ~ N − 1 로 잘라 투영한다(`ballPixelAt` 이 같은 자르기)
-      const at = ballPixelAt(path, ballTick)
+      // [sp+0x4c] — 0x35854(공 틱) 은 경로를 0 ~ N − 1 로 잘라(위 먼저, N = 0 이면 점 0) 지금 타자 좌우 [+0x17e1] 로 투영한다
+      const at = sceneBallPathPixelAt(path?.worldPath ?? null, ballTick, pitch.stageSide)
       for (const particle of particles) {
         emitParticles(particlesRef.current, particleConfigOf(particle.id), at.x, at.y, particle.img)
       }
@@ -1026,6 +1026,8 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         specialSwingRemaining: latestRef.current.specialSwingRemaining ?? null,
         // 0x4cad4 → 0x4b5b4 — 경기 스킬 표시 판 (결과 창 뒤 배경에는 안 그린다)
         skillPanel: isBackdrop ? null : stepSkillPanelNow(nowTick),
+        // 0x373d0 끝의 미션 HUD 띠 (결과 창 뒤 배경 0x4a384 는 점수판을 안 그린다)
+        missionStrips: isBackdrop ? null : (latestRef.current.missionStrips ?? null),
         // 구장 번호(구장 +0x70)는 장면 셋업 0x39fdc 가 채운다 — 모드 1·8·9 만 넘어오고, 그 밖은 0 번 구장이다.
         // 시즌 구장 세 칸이 넘어오면 배경 묶음 자체가 0x77494 쪽으로 갈린다 (0x40ff0).
         scenery: {

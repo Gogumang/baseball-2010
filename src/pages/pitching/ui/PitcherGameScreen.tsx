@@ -1047,7 +1047,11 @@ function PitcherGameScene({
           ? {}
           : { pitcherEquipment: pitcherEquipmentOf(pitcherEquipmentLevels) })}
         // 마운드 바탕 벌 = 피부 × 15 + 내 팀 (482c0~482fc → 0x793b0 의 794c2).
-        // ⚠️ 강판 뒤 마운드 투수의 피부는 명단 레코드를 아직 안 이어 0 으로 둔다(팀 색은 그대로 내 팀)
+        // 강판 뒤(onMound 거짓)의 피부 0 은 화면에 안 나온다 — 원본 모드 3 은 강판(0x498d4 · 0x50794 → 0xc1b48) 뒤 경기 끝까지 0x21
+        // 중계다(c1eac → 0xc1d38: 마운드가 내 선수가 아니면 자동). 0x21 그리기 0x4258c 는 타석 무대를 안 그리고 투수 · 타자 그림도
+        // 모드 {1,2,8,9} 에서만이며, 0x21 의 마운드 다시 싣기(48526 0x47cc8)도 sim+0x9c(그 모드만 세움)일 때뿐이다(r309 직접 뜸).
+        // 웹도 강판 뒤 `advance` 가 경기 끝까지 돌아 이 무대를 onMound 거짓으로 그리지 않는다. 0x47cc8(482c0~)은 0xd 진입 48e90 마다
+        // 지금 마운드 투수로 다시 싣는다 — 사람 장면은 늘 내가 마운드라 내 피부다
         pitcherSkinIndex={progress.onMound ? pitcherSkinIndex : 0}
         pitcherTeamIndex={options.ourTeamId}
         warmCast={stageWarmCast}

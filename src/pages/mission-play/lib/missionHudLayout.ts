@@ -52,8 +52,10 @@ const STRIP_HEIGHT = 17
 /** 판 왼쪽 x0 = W − w − 6 */
 const PANEL_X = SCREEN_WIDTH - PANEL.width - 6
 
-/** 0xba759 효과 1 의 인자 — 반투명 10/16 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리) */
-export const STRIP_OPACITY = translucentOpacityOf(10)
+/** 0xba759 효과 1 의 인자 — 반투명 10/16 (R6 3a). 띠는 타석 캔버스가 원본 식으로 섞는다(`missionStageStripsOf`, Q-03 r301) */
+export const STRIP_LEVEL = 10
+/** 띠를 DOM 으로 그릴 때(캔버스 밖 — 시험)의 CSS 근사 (`translucentOpacityOf` 머리) */
+export const STRIP_OPACITY = translucentOpacityOf(STRIP_LEVEL)
 
 export interface HudSprite {
   /** 그림 주소 */
@@ -399,4 +401,18 @@ export function timerGlyphsOf(seconds: number): { readonly glyphs: TimerGlyph[];
       { left: x + 0x36, top: y + 0xb, size: 2, color: TIMER_COLORS.lit },
     ],
   }
+}
+
+/**
+ * **타석 캔버스가 그리는 띠** (Q-03 r301) — 0x36714 의 효과 1 · 10 띠 셋(타석 0x369f6 · 스윙/투구 0x36b04 · 시계 0x36c04, 이 차례)은
+ * 점수판 0x373d0 끝에서 화면에 섞이므로 DOM 불투명도 대신 타석 캔버스(`BattingStage` · `PitcherSideStage` 의 `missionStrips`)가
+ * 원본 식으로 그린다. 띠 위 글 · 숫자 · 시계 그림은 `MissionHud` 가 그대로 DOM 으로 얹는다(`stripsOnStage`).
+ */
+export function missionStageStripsOf(
+  limits: MissionLimitState,
+  remainingSeconds: number | null,
+): readonly { readonly src: string; readonly x: number; readonly y: number; readonly level: number }[] {
+  const strips = limitStripsOf(limits).map((strip) => strip.strip)
+  if (remainingSeconds !== null && remainingSeconds > 0) strips.push(TIMER_STRIP)
+  return strips.map((strip) => ({ src: strip.src, x: strip.left, y: strip.top, level: STRIP_LEVEL }))
 }

@@ -52,7 +52,12 @@ export const MAP_FRAME_BOX = { x: -29, y: -28, width: 61, height: 59 } as const
 export const DOT_IMAGE = './sprites/game_ui/021.png'
 export const DOT_SIZE = { width: 13, height: 11 } as const
 
-/** 효과 1 · 단계 12 — 반투명 겹치기, 그림 무게 12/16 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리) */
+/**
+ * 효과 1 · 단계 12 — 반투명 겹치기, 그림 무게 12/16 (R6 3a · ⚠️ DOM 근사는 공용 `translucentOpacityOf` 머리).
+ * r301(Q-03) 비교 — CSS 근사로 남긴다: 지도 아래는 따라가는 카메라의 운동장 · 야수 · 주자 · 공 · 그림자 · 판정 글자(수비 화면 DOM 겹)라
+ * 운동장만 다시 그려 섞으면 지도 밑을 지나는 선수가 사라진다(외야 뜬공에 늘 겹친다). 수비 화면 전체를 캔버스 한 장으로 옮기는 길은
+ * 확대 겹 · 그리기 목록 · 시험이 모두 DOM 에 걸려 있어 이 일감 밖이다.
+ */
 export const MAP_OPACITY = translucentOpacityOf(12)
 
 /** 테두리 색 (0x39680·0x396a8) — 데드존형 카메라에서만 쓴다 */

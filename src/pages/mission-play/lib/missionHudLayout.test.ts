@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BATTER_MISSIONS, createProgress } from '@/entities/mission/model/missionGoal'
 import { goalTickerFrameAt } from '@/entities/mission/model/goalTicker'
-import { missionHudIconOf, pitcherGoalCountOf } from '@/pages/mission-play/lib/missionHudLayout'
+import { missionHudIconOf, missionStageStripsOf, pitcherGoalCountOf } from '@/pages/mission-play/lib/missionHudLayout'
 import {
   COUNTER_BASE, COUNTER_CLIP, MISSION_HUD_BASE, TEXT_CLIP,
   goalCountOf, goalLineDrawsOf, limitStripsOf, slashCounterGlyphsOf, timerGlyphsOf,
@@ -115,4 +115,16 @@ describe('모드 5 투수 미션 갈래 (0x369b2 · 0x36b04 · 0x36466)', () => 
     expect(pitcherGoalCountOf(mission, progress, '피안타', 0)).toEqual({ current: 0, target: 0 })
     expect(pitcherGoalCountOf(mission, progress, '실점', 1)).toEqual({ current: 1, target: 2 })
   })
+
+  it('타석 캔버스가 그리는 띠 (Q-03 r301) — 타석 · 스윙 · 시계 차례, 효과 1 · 10, 남은 초가 0 이면 시계 띠는 없다', () => {
+    const limits = { plateAppearanceLimit: 3, plateAppearancesUsed: 0, swingLimit: 5, swingsUsed: 1 }
+    expect(missionStageStripsOf(limits, 30)).toEqual([
+      { src: './sprites/trainning/frames/013.png', x: 151, y: 59, level: 10 },
+      { src: './sprites/trainning/frames/013.png', x: 151, y: 78, level: 10 },
+      { src: './sprites/trainning/frames/013.png', x: 5, y: 58, level: 10 },
+    ])
+    expect(missionStageStripsOf(limits, 0)).toHaveLength(2)
+    expect(missionStageStripsOf({ plateAppearanceLimit: 0, plateAppearancesUsed: 0, swingLimit: 0, swingsUsed: 0 }, null)).toEqual([])
+  })
 })
+

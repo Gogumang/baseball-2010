@@ -1,9 +1,8 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { loadSpriteImage, spriteImage } from '@/shared/lib/sprite/spriteCache'
-import {
-  composeScreen565, rgbaOfScreen565, sprite565Of, type ComposeOp, type Sprite565,
-} from '@/shared/lib/pixelEffect/screenCompose'
+import { loadSpriteImage } from '@/shared/lib/sprite/spriteCache'
+import { composeScreen565, rgbaOfScreen565, type ComposeOp } from '@/shared/lib/pixelEffect/screenCompose'
+import { sprite565At } from '@/shared/lib/pixelEffect/sprite565Cache'
 
 interface ComposedScreenProps {
   /** 그리기 차례 — 바탕 색 위에 원본 식(`screenCompose`)으로 덮어 쓴다 */
@@ -15,25 +14,6 @@ interface ComposedScreenProps {
   readonly left?: number
   readonly top?: number
   readonly testId?: string
-}
-
-/** 다 받은 그림의 565 판 — 그림마다 한 번 읽는다 */
-const sprites = new Map<string, Sprite565>()
-
-function sprite565At(src: string): Sprite565 | null {
-  const cached = sprites.get(src)
-  if (cached !== undefined) return cached
-  const image = spriteImage(src)
-  if (image === null || image.naturalWidth === 0) return null
-  const canvas = document.createElement('canvas')
-  canvas.width = image.naturalWidth
-  canvas.height = image.naturalHeight
-  const context = canvas.getContext('2d', { willReadFrequently: true })
-  if (context === null) return null
-  context.drawImage(image, 0, 0)
-  const sprite = sprite565Of(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height)
-  sprites.set(src, sprite)
-  return sprite
 }
 
 /**

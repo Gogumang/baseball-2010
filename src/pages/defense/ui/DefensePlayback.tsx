@@ -496,6 +496,22 @@ function playRunInCheers(tally: RecordedBoardTally, homeRunHit: boolean): void {
 }
 
 /**
+ * **주자 판 한 틱의 소리를 원본 차례로** — 슬롯 2 의 차례(직접 뜸): 525e8 플레이 vt48(판정 콜 — 메시지 0xbba → 0x51a56, 즉시 재생 0x6ea6c)
+ * → 525fc 주자 관리 vt18 = 0xaa0a8(vtable 0xd8308 +0x18 = 0xd8320 → 0xaa0a9 — 득점 aa1b0 메시지 0x13 → 0x51fb8 함성 60/30, 예약 0x6e499)
+ * → 52612 플레이 vt4c → 52670 0xaf8fc 자동 슬라이딩 > 0 이면 5268c 효과음 10(예약 0x6e499). 사람 슬라이딩 키(0x5199c)는 그 틀의
+ * 키 처리라 갱신보다 앞이다. 소리 통로가 하나라 뒤 소리가 앞 소리를 끊으므로(예약도 늘 끊고 칸 하나를 덮는다 — `soundPort`) 한 틱에
+ * 판정 콜 · 함성 · 자동 슬라이딩이 함께 나면 슬라이딩 10 이 남는다. 진행기가 그 틱 소리에 득점 자리(`tickRunInSoundAt`)를 싣는다.
+ * 판이 닫힌 뒤 갱신(마지막 그림을 다시 쓰는 갱신)은 진행기 소리가 없고 함성만 센다
+ */
+function playRunnerTickSounds(view: DefenseViewState, withEngineSounds: boolean, tally: RecordedBoardTally, homeRunHit: boolean): void {
+  const ids = withEngineSounds ? (view.tickSoundIds ?? []) : []
+  const runInAt = Math.min(view.tickRunInSoundAt ?? ids.length, ids.length)
+  for (const soundId of ids.slice(0, runInAt)) activeSound().play(soundId)
+  playRunInCheers(tally, homeRunHit)
+  for (const soundId of ids.slice(runInAt)) activeSound().play(soundId)
+}
+
+/**
  * 재생 갱신 하나를 지난다. 마지막 틱까지는 그 틱의 갱신 — 홈을 떠난 적 있는 주자(타자주자는 홈에서 출발한다)가 홈 자리에 닿으면
  * 1점(메시지 0x13, 홈런 재생은 그 주자 칸으로 홈런 갈래). 마지막 틱 뒤는 닫힌 갱신(+0x1094 — `closesDefenseScene`).
  * 끝나지 않았으면 그 갱신 그리기 한 번까지 돌린다.
@@ -645,11 +661,9 @@ function RecordedPlayback({
     // G2 만 닫힌 그림(`closingListFrame`)은 그려지지만 슬롯 2 는 529f0 — 닫힌 셈(+0x1094)의 첫 갱신이다
     holder.tally = stepRecordedBoard(holder.tally, view, isHomeRun, at > lastIndex || view.closingListFrame === true)
     // 미리 돌린 주자 판이 그 틱에 낸 소리 — 판정 콜(플레이 틱 b4562 의 메시지 0xbba → 0x51a56: 9 → 17 · 13 → 62/20)과 자동 슬라이딩
-    // 10(0x5268c). 원본은 판을 연 자리가 아니라 결과 코드가 선 그 틱에 낸다 — 진행기가 그림에 실은 차례(`tickSoundIds`) 그대로다.
-    // 판이 닫힌 뒤 갱신(마지막 그림을 다시 쓰는 갱신)은 소리가 없다. 득점 함성(아래)은 실시간 주자 판(`LiveRunnerPlayback`)과 같이
-    // 그 뒤에 낸다 — ⚠️ 원본은 득점 0xaa0a8(525fc)이 자동 슬라이딩(52670)보다 먼저라 한 틱에 둘 다 나면 차례가 다르다(근사)
-    if (at <= lastIndex) for (const soundId of view.tickSoundIds ?? []) activeSound().play(soundId)
-    playRunInCheers(holder.tally, isHomeRun)
+    // 10(0x5268c). 원본은 판을 연 자리가 아니라 결과 코드가 선 그 틱에 낸다 — 진행기가 그림에 실은 차례(`tickSoundIds`) 그대로이고,
+    // 득점 함성은 득점 0xaa0a8(525fc)의 자리 — 판정 콜 뒤 · 자동 슬라이딩(52670) 앞 — 에 낀다(`playRunnerTickSounds`, r310 A-33)
+    playRunnerTickSounds(view, at <= lastIndex, holder.tally, isHomeRun)
     // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 파티클 · 프레임 끝 파티클 틱. 0x35108 로 끝난 갱신은 안 그린다
     const recordedStartTick = updateStartTickRef.current
     if (!holder.tally.ended) {
@@ -812,9 +826,8 @@ function LiveRunnerPlayback({
         pressesRef.current, pressTicksRef.current, updateStartTick === null ? null : updateStartTick + startedAt + stepper.tick, holdRef.current,
       ),
     )
-    // 그 틱의 소리 차례대로 — 슬라이딩 10(사람 OK 키 0x518da → 0x5199c · 자동 0x5268c)과 판정 콜(플레이 틱 b4562 의 메시지 0xbba →
-    // 0x51a56 → 9 는 0x51c14 의 17 · 13 은 0x51b36 의 62/20). 콜은 판 끝이 아니라 결과 코드가 선 이 틱에 난다
-    for (const soundId of stepper.soundsThisTick) activeSound().play(soundId)
+    // 그 틱의 소리(슬라이딩 10 · 판정 콜)는 진행기가 그림에 실었다(`tickSoundIds`) — 아래 그림 셈이 그 그림을 지날 때 득점 함성과
+    // 원본 차례로 함께 낸다(`playRunnerTickSounds`). 한 갱신 = 한 틱이라 같은 갱신 안이다
     guard += 1
   }
   const ticks = stepper.ticks
@@ -833,7 +846,8 @@ function LiveRunnerPlayback({
     // 공마다 0 으로 지우고 스윙 판정(5130e)만 덮어, 도루 · 폭투는 이 공의 값(안 휘둘렀으면 0), 견제는 앞 공의 값이다
     const homeRunHit = isHomeRunHitCode(view.sceneResultCode)
     holder.tally = stepRecordedBoard(holder.tally, view, homeRunHit, at > lastIndex || view.closingListFrame === true)
-    playRunInCheers(holder.tally, homeRunHit)
+    // 이 틱의 소리 — 사람 슬라이딩 키 · 판정 콜(9 → 0x51c14 의 17 · 13 → 0x51b36 의 62/20) → 득점 함성 → 자동 슬라이딩 10 (r310 A-33)
+    playRunnerTickSounds(view, at <= lastIndex, holder.tally, homeRunHit)
     // 그 갱신의 그리기 — 공 그리기 0x36dfc 의 튐 파티클 · 프레임 끝 파티클 틱(경기 난수 — 그 틱 진행기 굴림 뒤).
     // 0x35108 로 끝난 갱신은 안 그린다. ⚠️ 판 틱을 미리 몇 틱 앞서 돌린 갱신(따라잡기)은 굴림 차례가 그 틱들 뒤로 몰린다(근사)
     const runnerStartTick = updateStartTickRef.current

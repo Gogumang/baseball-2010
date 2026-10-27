@@ -29,6 +29,7 @@ import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFr
 import { SceneryBackdrop } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { rivalryStepAt } from '@/widgets/game-scene/lib/rivalryBand'
 import { RivalryBandCanvas } from '@/widgets/game-scene/ui/RivalryBandCanvas'
+import { introCanvasOverlayOf } from '@/widgets/game-scene/ui/introCanvas'
 import type { SceneryBackdropStage } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
@@ -110,9 +111,17 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   const imageOpacity = effectOpacityOf(effectLevel)
   const imageStyle = imageOpacity === 1 ? undefined : { opacity: imageOpacity }
   const { r, g, b } = INTRO_BAND_RGB
-  return (
-    <RawScreen onPress={() => keyLatch.push(finish)}>
-      {backdrop !== undefined && <SceneryBackdrop stage={backdrop} offsetY={counter} />}
+  /**
+   * 띠 · 막대 · 글씨 · 점수판을 배경 캔버스에 이어 그린다(Q-03 r301 — 흐려지는 동안 효과 1 이 배경 화면을 읽어 원본 식으로 섞는다).
+   * 배경이 없거나 그림을 다 받기 전(·jsdom)이면 아래 DOM 근사로 둔다
+   */
+  const canvasOverlay = backdrop === undefined
+    ? null
+    : introCanvasOverlayOf({ stadiumNameFrame, ...(scoreboardSides === undefined ? {} : { scoreboardSides }), fade, effectLevel },
+      gameUiOrigins, textOrigins)
+  /** DOM 근사 — 캔버스로 못 그릴 때(배경 없음 · 그림 받는 중 · jsdom) */
+  const domLayers = (
+    <>
       <div
         className={styles.introBand}
         data-testid="인트로-띠"
@@ -138,6 +147,14 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
         <ScoreboardFrame {...SCOREBOARD_AT.intro} side0={scoreboardSides[0]} side1={scoreboardSides[1]}
           effectLevel={effectLevel} introAlpha={fade.alpha} />
       )}
+    </>
+  )
+  return (
+    <RawScreen onPress={() => keyLatch.push(finish)}>
+      {backdrop !== undefined && (
+        <SceneryBackdrop stage={backdrop} offsetY={counter} {...(canvasOverlay === null ? {} : { overlay: canvasOverlay })} />
+      )}
+      {canvasOverlay === null && domLayers}
       {/* 41a00 — +0x194a && [+0x17e6] > 14 → 0x3b80c (그림 0 은 단계 0 이라 안 그린다) */}
       {isRivalry && fade.level > 14 && rivalryStepAt(tick) > 0 && <RivalryBandCanvas step={rivalryStepAt(tick)} />}
     </RawScreen>

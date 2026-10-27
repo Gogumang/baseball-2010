@@ -34,6 +34,12 @@ const sameRects = (a: readonly ScreenGrayRect[], b: readonly ScreenGrayRect[]) =
   a.length === b.length &&
   a.every((rect, index) => rect.x === b[index].x && rect.y === b[index].y && rect.width === b[index].width && rect.height === b[index].height)
 
+/** 지금 걸린 흑백 사각형들 — 훅 밖(캔버스 그리기)에서 읽는다 */
+export const screenGrayRectsNow = (): readonly ScreenGrayRect[] => snapshot
+
+/** 흑백 사각형이 바뀌면 부른다 — 끊는 함수를 돌려준다 */
+export const subscribeScreenGrayRects = subscribe
+
 /** 지금 화면에 걸린 흑백 사각형들 (아래 겹이 읽는다) */
 export function useScreenGrayRects(): readonly ScreenGrayRect[] {
   return useSyncExternalStore(subscribe, () => snapshot, () => snapshot)

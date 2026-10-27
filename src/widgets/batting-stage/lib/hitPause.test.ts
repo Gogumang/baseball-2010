@@ -16,6 +16,7 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { earlyPassAngleOffsetOf, earlyPassPatternOf, earlyPassZoneOf } from '@/entities/batting/model/earlyPassBall'
 import { createPatternDeck, drawPattern } from '@/entities/batting/model/battedBallOutcome'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
+import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 
 /** 큰 타구 세 조건을 다 만족하는 입력 */
 const 큰타구 = { resultCode: 24, poleTick: -1, carryScale: CARRY_THRESHOLD + 1 }
@@ -175,5 +176,34 @@ describe('[경기+0xf2c] 공 — 판 공과 수평각 d 만 다르다 (0x51408 5
     const drawn = drawPattern(createPatternDeck(random), 1, random)
     const input = pauseInputOf(1, drawn.deck, 0)
     expect(input.earlyTick).toBe(earlyHitPauseTickOf(1, battedBallTrajectory(earlyPassPatternOf(drawn.pattern, 0))))
+  })
+})
+
+describe('[경기+0xf2c] 공의 폴 굴림 (A-25, r309)', () => {
+  it('폴에 맞는 경우는 0x13 이 그리는 마지막 공 틱보다 폴 틱이 늘 뒤다 — 다시 깐 점이 타석 화면에 안 나온다', () => {
+    let poleCases = 0
+    for (const [codeText, patterns] of Object.entries(BATTED_BALL_PATTERNS)) {
+      const resultCode = Number(codeText)
+      for (const pattern of patterns) {
+        for (const hand of [0, 1]) {
+          const main = battedBallTrajectory(pattern)
+          const early = battedBallTrajectory(earlyPassPatternOf(pattern, hand))
+          if (early.poleTick < 0) continue
+          poleCases += 1
+          const input = {
+            resultCode,
+            angle: pattern[0],
+            landingTick: main.landingTick,
+            poleTick: main.poleTick,
+            carryScale: main.carryScale,
+            earlyTick: earlyHitPauseTickOf(resultCode, early),
+          }
+          const ticks = hitPauseTicksOf(input)
+          const lastBallTick = isBigHit(input) ? Math.max(0, ticks - HIT_STOP_TICKS) : ticks
+          expect(early.poleTick).toBeGreaterThan(lastBallTick + 1)
+        }
+      }
+    }
+    expect(poleCases).toBe(4)
   })
 })

@@ -42,7 +42,7 @@ import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import { drawHud } from '@/widgets/batting-stage/lib/renderHud'
-import { DRAW_EFFECT, drawImageScaledBlend, recoloredImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { DRAW_EFFECT, drawImageScaledBlend, drawImagesWithEffect, recoloredImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { drawSoftKeyLabels } from '@/widgets/batting-stage/lib/softKeyLabels'
 import {
   BASE_WINDOW_IMAGE,
@@ -285,6 +285,11 @@ export interface StageScene {
   /** 경기 스킬 표시 판(0x4b5b4) 이 그림의 모습 — 상태 0xf ~ 0x11 이고 수명이 남았을 때만 (`skillPanel`) */
   readonly skillPanel?: SkillPanelView | null
   /**
+   * 미션 HUD 0x36714 의 반투명 띠(trainning 합성 프레임 13 · 효과 1 · 10) — 점수판 0x373d0 끝(0x378f0 → 0x36cb8)에서 그린다.
+   * 띠 위 글 · 숫자 · 판은 DOM(`MissionHud`)이 그리고, 띠만 이 캔버스 화면에 원본 식으로 섞는다(Q-03 r301). 없거나 null 이면 안 그린다
+   */
+  readonly missionStrips?: readonly StageMissionStrip[] | null
+  /**
    * 필살 스윙 연출 그림 (0x49aec) — 타격점 (x, y) 에 그림 애니 0 의 `drawCall` 번째 부름 칸, 미라지면 반대쪽 타석의 타자 그림.
    * 맞은 틀(0x11)과 상태 0x13 동안만 부르는 쪽이 채운다 (`specialSwingEffect`). 없거나 null 이면 안 그린다
    */
@@ -502,6 +507,8 @@ export function renderBattingStage(
     // BL · 리터럴은 없다. 창 첫 그림도 타이머를 한 번 더 줄인다(그림 번호로 넘긴다)
     drawHud(context, scene.hud, scene.tick + redrawsSoFar)
   }
+  // 0x373d0 끝 0x378f0 → 0x36cb8(모드 5 · 6) → 0x36714 — 미션 HUD 띠 (Q-03 r301)
+  if (scene.missionStrips !== undefined && scene.missionStrips !== null) drawMissionStrips(context, scene.missionStrips)
   // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
   // 4c528 — 상태 0xf 이고 사람 수비면 존 대신 구질 목록(빛 지도 · 고리 · 칸)
   if (pitchInput?.kind === '구질') drawPitchMenu(context, pitchInput, side)
@@ -535,6 +542,22 @@ export function renderBattingStage(
   if (scene.particles !== null && scene.particles !== undefined) {
     drawParticles(context, scene.particles)
   }
+}
+
+/** 미션 HUD 띠 한 장 — 그림(원점 (0, 0) 합성 프레임) · 화면 자리 · 효과 1 의 인자 */
+export interface StageMissionStrip {
+  readonly src: string
+  readonly x: number
+  readonly y: number
+  readonly level: number
+}
+
+/** 미션 HUD 띠 — 효과 1 로 화면을 읽어 섞는다(`drawImagesWithEffect`). 그림이 아직 안 왔으면 그 장은 건너뛴다(오면 다시 그린다) */
+function drawMissionStrips(context: CanvasRenderingContext2D, strips: readonly StageMissionStrip[]): void {
+  drawImagesWithEffect(context, strips.flatMap((strip) => {
+    const image = sprite(strip.src)
+    return image === null ? [] : [{ image, x: strip.x, y: strip.y, effect: DRAW_EFFECT.TRANSLUCENT, argument: strip.level }]
+  }))
 }
 
 /**

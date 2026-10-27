@@ -28,8 +28,8 @@ export const menuRow = style({
 })
 
 /**
- * 못 들어가고 안내 문구도 없는 칸(랭킹·게임문의) — 흐리게 둔다.
- * ⚠️ **근사**: 원작이 이런 칸을 어떻게 보이는지는 해독 문서에 없다 (`model/mainMenu.ts` 참고).
+ * 못 들어가고 안내 문구도 없는 칸 — 흐리게 둔다. 원본에는 이런 칸이 없고 웹도 이제 없다(랭킹 · 게임문의는 들어간다,
+ * `model/mainMenu.isEntryDimmed` 가 늘 거짓 — 시험으로 못 박음). 웹 안전망이라 남긴다.
  */
 export const menuRowDimmed = style([menuRow, { opacity: 0.45 }])
 

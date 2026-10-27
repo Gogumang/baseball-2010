@@ -12,7 +12,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { sceneParticleScene } from '@/widgets/particles/model/sceneParticles'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 import type { BatterEquipment, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
-import type { StageScene, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
+import type { StageMissionStrip, StageScene, StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import type { SeasonStadium } from '@/widgets/batting-stage/lib/renderScenery'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import type { AcePlayer } from '@/shared/config/original/acePlayers'
@@ -209,6 +209,8 @@ export interface StageLatest {
   readonly resultBackdropOffsetOf?: (tick: number) => number
   /** 하늘 줄(구장 +0x10) — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly skyRow?: number
+  /** 미션 HUD 띠 — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly missionStrips?: readonly StageMissionStrip[]
   readonly random: RandomPort
   readonly swingMode: SwingMode
   readonly batterSkillIds: readonly number[]

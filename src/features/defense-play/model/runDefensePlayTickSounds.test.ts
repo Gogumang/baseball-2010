@@ -6,6 +6,7 @@ import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import {
+  defensePlayResultOf,
   isDefensePlayFinished,
   startDefensePlay,
   stepDefensePlay,
@@ -27,7 +28,7 @@ function 틱소리(input: DefensePlayInput) {
     state = stepDefensePlay(state)
     for (const sound of state.tickSounds) sounds.push({ tick, sound })
   }
-  return { sounds, log: state.log, trajectory: state.trajectory }
+  return { sounds, log: state.log, trajectory: state.trajectory, result: defensePlayResultOf(state) }
 }
 
 const 판 = (outcome: AtBatOutcome, bases: BaseState, pattern: BattedBallPattern = fixturePatternFor(outcome)): DefensePlayInput => ({
@@ -101,5 +102,36 @@ describe('타구 판의 판 안 소리 (`DefensePlayState.tickSounds`)', () => {
       expect(sounds.some(({ sound }) => sound.kind === 'deepLanding')).toBe(false)
     }
     expect(파울판).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * A-28 — "Safe!" 17 은 판 틱 조건이다: 플레이 틱 b43ec~b444c 가 결과 코드 9 를 세우고(공 쥔 야수가 루에 막 닿았는데 아웃 아닌 주자가
+ * 이미 서 있다) b4540 의 13 · 6d 절 0x9d5bc 가 덮지 않은 틱에 b4562 → 0x51c14 가 낸다. 진행기는 그 틱을 결과(`safeCallTick`)에 싣고,
+ * 화면이 판을 돌리지 않은 갈래(`atBatSounds.inPlayCallSoundIdOf`)가 그 칸으로 17 을 가른다
+ */
+describe('세이프 콜 17 의 판 틱 (`DefensePlayResult.safeCallTick`)', () => {
+  it('타구 판에서 17 이 난 마지막 틱과 결과 칸이 늘 같다 — 9 가 안 선 판은 −1', () => {
+    const 주자들: readonly BaseState[] = [
+      { first: true, second: false, third: false },
+      { first: true, second: true, third: true },
+    ]
+    let 세이프판 = 0
+    for (const [code, patterns] of Object.entries(BATTED_BALL_PATTERNS)) {
+      for (const pattern of patterns) {
+        if (!isFairAngle(pattern[0])) continue
+        for (const bases of 주자들) {
+          const contact = { pattern, resultCode: Number(code) }
+          const { sounds, log, result } = 틱소리(판(registerContact(땅볼아웃, contact), bases, pattern))
+          const 세이프틱 = sounds.filter(({ sound }) => sound.kind === 'sound' && sound.soundId === 17).map(({ tick }) => tick)
+          const 코드9틱 = log.filter((줄) => 줄.includes('결과 코드 9')).map((줄) => Number(줄.match(/^(\d+)틱/)![1]))
+          expect(result.safeCallTick).toBe(세이프틱.length > 0 ? 세이프틱[세이프틱.length - 1] : -1)
+          // 17 은 9 가 선 틱에만 난다(9 가 서도 같은 틱 13 이 덮으면 안 난다)
+          for (const tick of 세이프틱) expect(코드9틱).toContain(tick)
+          if (세이프틱.length > 0) 세이프판 += 1
+        }
+      }
+    }
+    expect(세이프판).toBeGreaterThan(0)
   })
 })

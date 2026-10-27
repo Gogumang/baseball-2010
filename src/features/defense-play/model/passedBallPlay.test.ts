@@ -47,6 +47,15 @@ describe('폭투·포일 한 판 — 종류 9 (0x3507c · 0xb284a)', () => {
     }
   })
 
+  it('공은 타구와 같은 쏘기 길이다 — 0xbef58(공, 0xcfb70) 자리에서 메시지 0x11 의 덱 없는 갈래(51172)로 (r305)', () => {
+    // 0x3507c 가 +0xfcc 를 인자로 넘기면 0x50faa 는 51040~51058 에서 공을 (20000, 1000, 30000) 에 놓고 그 칸으로 쏜다
+    const trajectory = passedBallTrajectoryOf(가운데)
+    expect(trajectory.pointAt(0)).toEqual({ x: 20000, y: 1000, z: 30000 })
+    // 수직 −100 이라 첫 틱부터 내려가고(0xa2870 의 ±c), 각 95 는 홈플레이트 뒤쪽(z 증가)
+    expect(trajectory.pointAt(1).y).toBeLessThan(1000)
+    expect(trajectory.pointAt(1).z).toBeGreaterThan(30000)
+  })
+
   it('포수가 쫓아 줍는다 — P+0x112 = 1 로 시작해 바운드 전에 잡아도 뜬공 아웃이 아니다', () => {
     const result = runPassedBallPlay({ shot: 가운데, bases: EMPTY_BASES, outs: 0 })
     expect(result.catchFielderSlot).toBe(1)

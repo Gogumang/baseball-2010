@@ -597,5 +597,7 @@ describe('CPU 투구 굴림을 원본 틱으로 나눈 세 걸음 — 0xf 틱 0~
     expect(와인드업.frameCount).toBe(0)
     expect(와인드업.worldPath).toBeNull()
     expect(와인드업.plate.x).toBeCloseTo((aim.target.x - ZONE_CENTERS[1].x) / 331)
+    // 이글아이 0x4d2ac 가 와인드업 동안에도 보는 0x10 목표점(+0x10b8)
+    expect(와인드업.aimTarget).toEqual(aim.target)
   })
 })

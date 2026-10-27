@@ -76,17 +76,48 @@ export function steppedBoardPointsOf(top: number, height: number, offset: number
   ]
 }
 
+/** 계단형 판의 색 셋(`ORIGINAL_COLORS` 의 boardEdge · boardHighlight · boardFill) */
+export interface SteppedBoardColors {
+  readonly edge: number
+  readonly highlight: number
+  readonly fill: number
+}
+
+/**
+ * 계단형 판 0x76724 의 **왼쪽 평평한 몫**(1 ≤ x < W/2 + O − 10) 한 줄의 색 — `CardPlate` SVG 와 같은 칸(r301 실측 120~127 줄):
+ * 위 테두리 T + 19 · 밝은 줄 T + 20 · 채움 T + 21 … T + H − 1. 판 위(아래 화면이 그대로)면 null, 이 몫 밖(아래 테두리 · 꺾임)이면
+ * undefined — 부르는 쪽이 그 자리를 다룰 수 없다.
+ */
+export function steppedBoardLeftRow565(y: number, top: number, height: number, colors: SteppedBoardColors): number | null | undefined {
+  if (y < top + 0x13) return null
+  if (y === top + 0x13) return colors.edge
+  if (y === top + 0x14) return colors.highlight
+  if (y < top + height) return colors.fill
+  return undefined
+}
+
+/** 왼쪽 평평한 몫의 오른쪽 끝(제외) — 꺾임 꼭짓점 W/2 + O − 9 의 테두리 한 칸 앞 */
+export const steppedBoardLeftEnd = (offset: number) => SCREEN.width / 2 + offset - 10
+
 /**
  * team_logo 77×76 — (W/2 − w/2 − 0x3e, H/2 − h/2 − 0x32), 효과 1 · 인자 12 = 무게 12/16 (R6 3절).
- * ⚠️ 근사(남김 — 웹 DOM 한계): 로고가 판 위 가장자리(y 122)를 걸쳐 아래 화면이 한 색이 아니고 DOM 이라 못 읽는다 — `translucentOpacityOf` 머리
+ * 로고가 판 위 가장자리(y 122)를 걸쳐 아래가 공 무늬 · 판 두 겹이다 — `CardPlate` 가 둘을 같은 좌표로 다시 그려 원본 식으로 섞는다
+ * (Q-03 r301, `BallPatternTranslucentImage`). `opacity` 는 캔버스가 없을 때(jsdom)의 CSS 근사다.
  */
 export const SEASON_CARD_LOGO = {
   x: SCREEN.width / 2 - (77 >> 1) - 0x3e,
   y: SCREEN.height / 2 - (76 >> 1) - 0x32,
   width: 77,
   height: 76,
+  level: 12,
   opacity: translucentOpacityOf(12),
 } as const
+
+/** 0x7ba9c 로고 왼쪽 위 — 실제 그림 크기 (w, h) 로 (W/2 − (w >> 1) − 0x3e, H/2 − (h >> 1) − 0x32) */
+export const seasonCardLogoPlaceOf = (width: number, height: number) => ({
+  x: SCREEN.width / 2 - (width >> 1) - 0x3e,
+  y: SCREEN.height / 2 - (height >> 1) - 0x32,
+})
 
 /**
  * 로고 아래 · 위 딱지 — 0x7bbda~0x7bdca (직접 떴다). 판 그림은 [gfx+0x168](ui/slt_frame) 이미지, 글은 img_text 를 그 판에

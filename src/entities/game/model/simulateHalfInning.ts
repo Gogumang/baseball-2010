@@ -83,7 +83,8 @@ export interface HalfInningPlateAppearance {
 /**
  * 간이 엔진 도루로 한 루 간 주자 하나 (0xc1818 끝 0xc1a42~0xc1aba) — 원본은 주자마다 `0xb8b99(공격팀, 주자)` 의 레코드
  * +0x2c 를 +1 한다(0xa56dc 가 참일 때). 누구의 레코드에 넣을지는 부르는 쪽이 `HalfInningPlateAppearance` 처럼 정한다.
- * ⚠️ 주자 신원은 근사 — 반 이닝 엔진이 주자를 들고 있지 않아 루 b 의 주자를 타순 커서 − b 로 본다(`onPitchJudged` 주석).
+ * 주자 신원은 원본 주자 목록 sim+0x80 대로다 — `playQuickPlateAppearance` 가 루마다 든 주자(`BaseRunners`)에서 옮긴 주자를
+ * 목록 차례(0번 = 가장 뒤 주자)로 낸다(`stolenRunners`, c1a42). 예전 근사(루 b = 커서 − b)는 걷혔다(`baseRunners.ts` 머리).
  */
 export interface HalfInningStolenBase {
   readonly battingOrderIndex: number
