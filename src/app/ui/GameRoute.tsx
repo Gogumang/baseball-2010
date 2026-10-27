@@ -40,7 +40,7 @@ import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { useIsSceneConfirmAwaiting } from '@/features/play-game/model/useSceneConfirm'
-import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { BURST_RESULT_STATE_TICK, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
 import { batterHumanRecordCountOf, RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import type { RecordAlertScene } from '@/pages/game/ui/GameScreen'
@@ -236,7 +236,10 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   /** 알림이 지난번에 받은 진행 — 공 끝을 기다리는 동안은 이것을 그대로 넘긴다 */
   const releasedRef = useRef(progress)
   const released = pitchEnd.isHolding ? releasedRef.current : progress
+  /** 타석 위 돌발 결과 창(0x1d)이 서 있으면 그 그리기 0x4d1e0 이 상태 틱을 100 으로 박는다 — 아래 창 갈래에서 넣는다 */
+  const burstResultTickRef = useRef<number | null>(null)
   const recordAlert = useRecordAlert(released.recordIds, {
+    pinnedStateTickRef: burstResultTickRef,
     isDrawing: session.loadingTip === null && isIntroDone && !isDefenseShown,
     isFrozen: alertScene.isFrozen,
     isSettled: released.game.isFinished,
@@ -397,6 +400,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
       <RecordAlertStageOverlay frame={recordAlert} />
     </>,
   )
+  // 0x1c(판 위 창 0x46ee0)는 상태 틱을 안 박고, 타석 위 결과 창 0x1d(0x4d1e0)만 박는다
+  burstResultTickRef.current = heldDefense === null && burstWindow !== null && resolution !== null ? BURST_RESULT_STATE_TICK : null
   if (heldDefense !== null) return heldDefense
   // 자동진행 중계(0x21) — 앞 판의 수비 재생 뒤 · 내 공의 0x12 대기(15/31 틱)가 끝난 뒤(판정 A 가 0x21 로 보낸다), 0x18 · 0xe ·
   // 다음 내 타석 앞. 기록 달성 알림 0x4e35c 는 0x17 말고는 늘 그리므로 중계 위에도 얹는다.
@@ -474,6 +479,8 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onRecordAlertSceneChange={reportAlertScene}
         // 돌발 띠 0x8e858 — [M+0xc] 는 판정 뒤에도 결과 창을 닫을 때(0x8e5b8 8e7ee~8e800)까지 남는다
         burstRow={burst?.current ?? resolution?.row ?? null}
+        // 돌발 제안 창 0x1b 의 그리기 0x4a198 은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
+        isHudOmitted={burstWindow !== null && resolution === null}
       />
       {/* 돌발 창도 화면 위 덮개라 기둥 안에 가둔다 — 안 그러면 창 전체로 퍼진다 */}
       {burstWindow !== null && <ScreenOverlay>{burstWindow}</ScreenOverlay>}

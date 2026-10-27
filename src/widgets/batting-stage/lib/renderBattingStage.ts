@@ -333,6 +333,13 @@ export interface StageScene {
    */
   readonly isFieldPlay?: boolean
   /**
+   * **HUD 를 안 그리는 상태** — 돌발 제안 창 0x1b 의 그리기 0x4a198 과 강판 감독 대사 0x23 의 그리기 0x50828 은 타석 공용 묶음 넷
+   * (0x38d1c 투수 · 0x49e64 타자 · 0x35b94 루상 주자 · 0xbe6a1 그리기 목록)만 부르고 0x42f2c(더비 투구 기계) · 0x4c4bc(점수판 HUD ·
+   * 램프 · 미션 띠 · 존/구질 목록 · "*MENU" "#TIME" · 구속 판 · 필살 남은 횟수 · 스킬 판)를 안 부른다(0xd 0x4db2c · 0xb 0x4db68 ·
+   * 0x16 0x4da30 은 부른다 — r334 직접 뜸). 참이면 그 몫을 건너뛴다
+   */
+  readonly omitsHud?: boolean
+  /**
    * 곧 타석 · 마운드에 설 수 있는 선수들(타순 다음 · 벤치 대타 · 교체 투수)의 그림 생김새 — 그림마다 그 칠하기를 미리 건다
    * (`warmStageCast`). 원본은 타석 교대 0x47cc8 이 적재(타자 0x78ab0 · 투수 0x793b0) 때 팔레트를 갈아 끼우므로 새 타자 · 투수의
    * 첫 그림부터 제 색이다. 웹은 칠하기가 비동기라 교대 직후 첫 그림에 구운 벌이 비치던 것을 막는다. 그림 · 차례 · 난수는 안 바꾼다
@@ -497,37 +504,41 @@ export function renderBattingStage(
   // 0x46fa8(장면, 1) 레오니 0x4703a — 원본은 목록 비우기 뒤에 넣어 버려진다(B-82). 고친 길만 목록에 든다(`leonyEffectDrawsOf`)
   addLeonyEffectDraws(context, drawList, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
   drawList.flush()
+  /** 0x42f2c · 0x4c4bc 를 부르는 상태인가 — 0x1b(0x4a198) · 0x23(0x50828)은 안 부른다(`omitsHud`) */
+  const drawsHud = scene.omitsHud !== true
   // 그리기 목록을 비운 뒤(0xbe6a1) · HUD(0x4c4bc) 앞 — 홈런더비 투구 기계 0x42f2c (`derbyPitchingMachine`)
-  drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
+  if (drawsHud) drawDerbyPitchingMachine(context, scene.scenery.gameMode, side, scene.pitcherHand ?? 0)
   // 0x46fa8(장면, 1) 싸이커 · 드래고나 — 목록 비우기(0x4d744) 뒤 · HUD(0x4c4bc) 앞에 화면에 바로 섞어 그린다
   drawAceMagicScaled(context, aceEffect, side, pitcherPoseOf(pitcherAnimation, scene.pitcherForm ?? 0, scene.acePitcher?.order ?? null))
   context.restore()
-  if (scene.hud !== null) {
-    // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x373d0 안 갈래 0x37828~0x37858)이 5틱 동안 배율을 줄인다
-    // HUD 그리기 0x4c4bc 가 4c50c 에서 램프 그리기 함수 0x373d0(373d0~378f8)을 부르고, 확대는 그 안 갈래다 — 0x37828 을 부르는
-    // BL · 리터럴은 없다. 창 첫 그림도 타이머를 한 번 더 줄인다(그림 번호로 넘긴다)
-    drawHud(context, scene.hud, scene.tick + redrawsSoFar)
+  if (drawsHud) {
+    if (scene.hud !== null) {
+      // 틱을 넘기는 까닭 = 새 램프 확대 연출(0x373d0 안 갈래 0x37828~0x37858)이 5틱 동안 배율을 줄인다
+      // HUD 그리기 0x4c4bc 가 4c50c 에서 램프 그리기 함수 0x373d0(373d0~378f8)을 부르고, 확대는 그 안 갈래다 — 0x37828 을 부르는
+      // BL · 리터럴은 없다. 창 첫 그림도 타이머를 한 번 더 줄인다(그림 번호로 넘긴다)
+      drawHud(context, scene.hud, scene.tick + redrawsSoFar)
+    }
+    // 0x373d0 끝 0x378f0 → 0x36cb8(모드 5 · 6) → 0x36714 — 미션 HUD 띠 (Q-03 r301)
+    if (scene.missionStrips !== undefined && scene.missionStrips !== null) drawMissionStrips(context, scene.missionStrips)
+    // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
+    // 4c528 — 상태 0xf 이고 사람 수비면 존 대신 구질 목록(빛 지도 · 고리 · 칸)
+    if (pitchInput?.kind === '구질') drawPitchMenu(context, pitchInput, side)
+    else if (showsStrikeZone(scene.stagePhase)) withCameraShift(context, cameraShift, () => drawStrikeZone(context, side))
+    // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`). 교체 창(0xb)은 상태 문턱 밖이라 둘 다 없다
+    if (scene.stagePhase !== undefined) {
+      drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null, scene.isSubstitutionState === true)
+    }
+    // 0x4c4bc 의 0x4c9fc — 상태 0x12 의 "Km" 판 · 표시 구속 [+0x19a0] (`pitchSpeedReadout`)
+    if (scene.stagePhase !== undefined) drawPitchSpeedReadout(context, scene.stagePhase, scene.pitch?.displaySpeedKmh)
+    // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)
+    // 0x38a30 — 자리는 [+0xff4] + 투영 (38ab4)이라 카메라를 탄다
+    if (scene.stagePhase !== undefined) {
+      const phase = scene.stagePhase
+      withCameraShift(context, cameraShift, () => drawSpecialSwingBadge(context, phase, scene.specialSwingRemaining ?? null, side))
+    }
+    // 0x4c4bc 꼬리 0x4cad4 — 경기 스킬 표시 판 0x4b5b4 (`skillPanel`)
+    if (scene.skillPanel !== undefined && scene.skillPanel !== null) drawSkillPanel(context, scene.skillPanel)
   }
-  // 0x373d0 끝 0x378f0 → 0x36cb8(모드 5 · 6) → 0x36714 — 미션 HUD 띠 (Q-03 r301)
-  if (scene.missionStrips !== undefined && scene.missionStrips !== null) drawMissionStrips(context, scene.missionStrips)
-  // 0x4c4bc 가 HUD(0x4c50c) 다음 0x4c53c 에서 존 0x35ae8 을 부른다 — 그리기 목록(투수·타자·공, 0xbe6a1) 위다
-  // 4c528 — 상태 0xf 이고 사람 수비면 존 대신 구질 목록(빛 지도 · 고리 · 칸)
-  if (pitchInput?.kind === '구질') drawPitchMenu(context, pitchInput, side)
-  else if (showsStrikeZone(scene.stagePhase)) withCameraShift(context, cameraShift, () => drawStrikeZone(context, side))
-  // 0x4c4bc 꼬리 0x4c8e0 — "*MENU" · "#TIME" (`softKeyLabels`). 교체 창(0xb)은 상태 문턱 밖이라 둘 다 없다
-  if (scene.stagePhase !== undefined) {
-    drawSoftKeyLabels(context, scene.stagePhase, scene.timeKeyCount ?? null, scene.isSubstitutionState === true)
-  }
-  // 0x4c4bc 의 0x4c9fc — 상태 0x12 의 "Km" 판 · 표시 구속 [+0x19a0] (`pitchSpeedReadout`)
-  if (scene.stagePhase !== undefined) drawPitchSpeedReadout(context, scene.stagePhase, scene.pitch?.displaySpeedKmh)
-  // 0x4c4bc 꼬리 0x4cace — 필살 남은 횟수 0x38a30 (`specialSwingBadge`)
-  // 0x38a30 — 자리는 [+0xff4] + 투영 (38ab4)이라 카메라를 탄다
-  if (scene.stagePhase !== undefined) {
-    const phase = scene.stagePhase
-    withCameraShift(context, cameraShift, () => drawSpecialSwingBadge(context, phase, scene.specialSwingRemaining ?? null, side))
-  }
-  // 0x4c4bc 꼬리 0x4cad4 — 경기 스킬 표시 판 0x4b5b4 (`skillPanel`)
-  if (scene.skillPanel !== undefined && scene.skillPanel !== null) drawSkillPanel(context, scene.skillPanel)
   // 0x4cb1c 꼬리 — 공용 그림 · HUD(0x4c4bc) 다 그린 화면을 확대 · 흐리기 · 번쩍임 · 테두리 (`bigHitScreen`). 파티클(53048)은 이 위다
   if (scene.bigHitScreen !== undefined && scene.bigHitScreen !== null) drawBigHitScreen(context, scene.bigHitScreen, cameraShift)
   // 홈런은 판정 글자(game_judge)가 없고 HOMERUN 글자 연출이 대신 나간다 (R2 3-2, 7절 표의 v = 8·12)

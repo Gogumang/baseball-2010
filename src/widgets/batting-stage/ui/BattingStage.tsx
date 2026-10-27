@@ -250,6 +250,11 @@ interface BattingStageProps {
    */
   readonly isFieldPlay?: boolean
   /**
+   * **HUD 를 안 그리는 상태가 섰다** — 돌발 제안 창 0x1b(그리기 0x4a198) · 강판 감독 대사 0x23(0x50828)은 0x42f2c · 0x4c4bc 를 안 부른다
+   * (점수판 · 램프 · 존 · 소프트키 · 구속 · 필살 · 스킬 판이 없다 — `renderBattingStage` 의 `omitsHud`). 안 주면 거짓
+   */
+  readonly isHudOmitted?: boolean
+  /**
    * 필드 화면의 공 그리기 0x36dfc 가 장면 틱 그림에 쏘는 파티클(큰 타구 · 튐) — 이 캔버스의 루프가 그 틱 프레임에서 치우기 뒤 · HOMERUN
    * 글자 효과 틱 앞에 쏜다(`lib/homeRunEffects` 의 `drawShots`). 파티클 관리자 · 굴림(경기 난수)이 하나라 차례가 원본과 같다
    */

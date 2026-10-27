@@ -75,7 +75,7 @@ import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
 import { BenchClearingScene } from '@/widgets/game-scene/ui/BenchClearingScene'
 import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
-import { useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
+import { BURST_RESULT_STATE_TICK, useRecordAlert } from '@/widgets/game-scene/model/useRecordAlert'
 import { useBatterPitchEnd } from '@/pages/game/model/useBatterPitchEnd'
 import { RecordAlertScreenOverlay, RecordAlertStageOverlay } from '@/widgets/game-scene/ui/RecordAlertPanel'
 import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/recordAlert'
@@ -660,7 +660,10 @@ function PitcherGameScene({
     (progress.pendingDefensePlay !== null && !isHitSceneShowing) ||
     (progress.pendingRunnerPlay != null && !isArrivalHolding) ||
     isReplaying
+  /** 타석 위 돌발 결과 창(0x1d)이 서 있으면 그 그리기 0x4d1e0 이 상태 틱을 100 으로 박는다 — 아래 창 갈래에서 넣는다 */
+  const burstResultTickRef = useRef<number | null>(null)
   const recordAlert = useRecordAlert(progress.recordIds, {
+    pinnedStateTickRef: burstResultTickRef,
     isDrawing: !isInPlayShown,
     isFrozen: isPopupOpen || asksGiveUp,
     isSettled: progress.game.isFinished,
@@ -813,6 +816,8 @@ function PitcherGameScene({
       <RecordAlertStageOverlay frame={recordAlert} />
     </>,
   )
+  // 0x1c(판 위 창 0x46ee0)는 상태 틱을 안 박고, 타석 위 결과 창 0x1d(0x4d1e0)만 박는다
+  burstResultTickRef.current = heldDefense === null && burstWindow !== null && resolution !== null ? BURST_RESULT_STATE_TICK : null
   if (heldDefense !== null) return heldDefense
   // 자동진행 중계(0x21) — 굴려 둔 틱을 매 틱 한 칸씩 (모드 3: 키 · 속도 · 배경음 없음)
   if (isRelaying && relay !== null) {
@@ -1019,6 +1024,11 @@ function PitcherGameScene({
       */}
       <RawScreen>
       <PitcherSideStage
+        // 돌발 제안 창 0x1b(그리기 0x4a198) · 강판 감독 대사 0x23(0x50828)은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
+        isHudOmitted={
+          (visibleBurstLines !== null && resolution === null) ||
+          (progress.managerHookText !== null && !substitution.isShown && !isHookPassing)
+        }
         // 0xd 진입마다 투수 그림 객체를 상태 0 으로 (48ee4 — '#' 교체 창에서 곧장 선 0xe 는 0xd 가 없다)
         sceneDEntryMark={sceneConfirm.sceneDEntryMark}
         pitch={progress.lastPitch}

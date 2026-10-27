@@ -202,6 +202,8 @@ export interface StageLatest {
   readonly effectsClearedAt?: number | null
   /** 홈런더비 판(0x17)의 필드 화면이 밑에 깔렸다 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly isFieldPlay?: boolean
+  /** HUD 를 안 그리는 상태(0x1b · 0x23) — `BattingStage` 의 같은 이름 props 주석 참고 */
+  readonly isHudOmitted?: boolean
   /** 필드 화면 그리기(0x46c88)가 그 장면 틱에 쏘는 파티클 — `BattingStage` 의 같은 이름 props 주석 참고 */
   readonly fieldPlayShotsAt?: (sceneTick: number) => readonly StageParticleShot[]
   /** 경기 정산 효과 — `BattingStage` 의 같은 이름 props 주석 참고 */
