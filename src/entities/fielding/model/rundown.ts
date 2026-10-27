@@ -179,8 +179,12 @@ export interface RundownTickInput extends DefenseContext {
 export function rundownAction(input: RundownTickInput): RundownAction {
   const { plan, slot, play, fielders, runners } = input
   if (plan.runnerIndex === NONE) return { kind: '협살해제' }
-  if (plan.backFielder !== slot && plan.frontFielder !== slot) return { kind: '협살해제' }
-  if (chooseRundownRunner(runners) === NONE) return { kind: '협살해제' }
+  // b48f0~b490e — 0xb3a04 로 계획을 **지금 상태로 다시 셈**(지역 칸 — 기록칸 P+0x1ec 는 그대로)한 뒤, 0xb398c 가 −1 이거나 다시 센
+  // [0] · [1] 어느 쪽도 이 칸이 아니면 푼다. 짝 · 루 · 주자는 기록칸에서 읽는다(b48b6~b48ee · b4940) (r313 — 예전 웹은 기록칸의
+  // 두 야수로 이 칸을 보았다. 다시 센 계획은 지금 주자 고르기와 커버 칸 +0xf0 으로 정해져 둘이 바뀌면 갈린다)
+  const recounted = buildRundownPlan(input, chooseRundownRunner(runners))
+  if (recounted.runnerIndex === NONE) return { kind: '협살해제' }
+  if (recounted.backFielder !== slot && recounted.frontFielder !== slot) return { kind: '협살해제' }
 
   const runner = runners[plan.runnerIndex]
   const partnerSlot = slot === plan.backFielder ? plan.frontFielder : plan.backFielder
