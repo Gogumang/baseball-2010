@@ -3118,8 +3118,6 @@ export function stepDefensePlay(
           fielders: fieldersNow,
           holderSlot: play.ballHolderSlot,
           held: play.held,
-          throwBase,
-          throwArrivalTick,
           uncatchable,
         }),
         ballIsFlying:
@@ -3170,14 +3168,15 @@ export function stepDefensePlay(
         // 레이저 잔상 0x37076 — +0x1991 동안 지금 공 궤적의 t = 0 점에서 공까지
         laserTrailFrom: laserTrailOn ? ballSegmentStart : null,
         // 공 그리기 0x36dfc 의 큰 타구 · 튐 파티클 — 진행기 쪽 조건 (`ballParticleFactsOf`).
-        // 튐은 공을 **궤적에서 읽어 그리는 틱**(`ballPointAt` 의 앞 두 갈래 — 잡히기 전 · 못 잡는 공 · 송구 · 튕긴 공)에만 본다.
+        // 튐은 공을 **궤적에서 읽어 그리는 틱**(`ballPointAt` 의 궤적 갈래 — 잡히기 전 · 못 잡는 공 · 송구 · 튕긴 공 · 안 쥔 공)에만 본다.
+        // 0x36dfc 의 파티클은 공 그림 깃발 [sp+0x58](+0x12c == 0, 36e8a~36ef8)이 선 그림에서만 돈다 — 받는 틱이 지난 안 쥔 공도 본다 (r313)
         // 날아가는 송구도 이 갈래다 — 송구공은 세계 공(`launchThrow`)을 이 틱부터 이어 깔고(`takeLooseBall` 의 `spliceTrajectory`)
         // 받는 틱 = 예보 포구 틱(catchTick = throwArrivalTick)이라, 0x36dfc 가 [장면+0x204] 공을 그리듯 송구 공 점으로 튐을 본다 (A-29)
         ballParticles: ballParticleFactsOf({
           ballTick: tick,
           at: tick,
           trajectory,
-          onTrajectory: uncatchable || tick < catchTick,
+          onTrajectory: uncatchable || !play.held || tick < catchTick,
           bigHitWatch: input.bigHitWatch ?? bigHitWatchOf(input),
           playKind: play.kind,
           resultCode: contactOfOutcome(input.outcome)?.resultCode ?? null,
@@ -3863,29 +3862,27 @@ interface BallPointInput {
   readonly holderSlot: number
   /** 지금 누가 쥐고 있나 P+0x12c */
   readonly held: boolean
-  readonly throwBase: number
-  readonly throwArrivalTick: number
   /** 아무도 잡지 않는 타구인가 — 그러면 공은 끝까지 궤적 위에 있다 */
   readonly uncatchable: boolean
 }
 
 /**
- * 이번 틱에 공이 어디 있나 — 포구(받기) 전에는 궤적, 그 밖에는 쥔 야수 손.
+ * 이번 틱에 공이 어디 있나 — **아무도 안 쥐었으면(+0x12c == 0) 궤적, 쥐었으면 쥔 야수 손.**
+ *
+ * 원본 공 그리기 0x36dfc(직접 뜸, r313): [장면+0x204] 공의 자리는 늘 0xa25d4(공) = 0xa25b0(공, 공+0x68) — **지금 재생 틱의 궤적 점**이다
+ * (36ea6~36eae). 공을 그릴지는 [sp+0x58] = 홈런 숨김(36e2a~36e80 — 웹 `ballBeyondFence`) 아님 && 플레이+0x12c(쥠) == 0 (36e8a~36ea4)이 정한다.
+ * 쥐지 않은 동안은 그림마다 0x3f378(G4)이 공+0x68 을 올리므로 공은 받는 틱이 지나도(못 받았거나 판 끝) 궤적을 따라 계속 간다.
+ * 쥐었으면 공 그림은 안 그리고(`defenseView` 의 `isHeld`), 그 자리는 웹 카메라 · 포구 동작이 보는 쥔 야수 손으로 둔다.
  *
  * **송구 공도 궤적이다** (A-29, 2026-10-27): 송구 0xb2e38 은 0xa1620(레이저 0xa222c)이 쏜 세계 공을 b2f8c 의 0xbfed0 으로 깔고
  * b2f9c 가 점[T − 1] 에 받는 점 (목표 x, 1000, 목표 z) 을 끼운다 — 웹 `launchThrow` 가 같은 공을 짓고 `takeLooseBall` 이 이 틱부터
- * 판 궤적에 잇는다(`spliceTrajectory`). 받는 틱 = 예보 vt24(0) · 고르기 vt34 의 포구 틱이라 `throwArrivalTick` 은 늘 `catchTick` 과
- * 같고, 날아가는 동안은 첫 갈래(`tick < catchTick`)가 세계 공 점(높이 · 원바운드 · 악송구 흔들림 그대로)을 낸다. 예전 "낮은 포물선(1200)"
- * 갈래는 `tick ≥ catchTick && tick < throwArrivalTick` 이라 닿을 수 없었다(r308 — 시험 · soak 짧은 판에서 한 번도 안 닿음을 확인하고 걷었다).
+ * 판 궤적에 잇는다(`spliceTrajectory`).
+ * (r313 정정: 예전 웹은 받는 틱이 지났는데 안 쥔 공을 마지막 송구의 루 자리(판 끝 240틱으로 잘린 송구)나 공 가진 야수 자리
+ * (홈런 · 파울 · 못 잡고 떨어진 공)에 그렸다 — 둘 다 원본에 없는 근사라 걷었다)
  */
 function ballPointAt(input: BallPointInput): WorldPoint {
-  if (input.uncatchable) return input.trajectory.pointAt(input.tick)
-  if (input.tick < input.catchTick) return input.trajectory.pointAt(input.tick)
+  if (input.uncatchable || !input.held || input.tick < input.catchTick) return input.trajectory.pointAt(input.tick)
   const holder = input.fielders[input.holderSlot] ?? input.fielders[0]
-  // ⚠️ 근사(남김): 받는 틱이 지났는데 아무도 안 쥔 공은 마지막 송구의 루 자리에 둔다. 협살 짝 송구는 이제 보통 송구(세계 공)라
-  //    이 갈래에 안 온다(A-34, r312). 남은 것은 예보 포구 틱이 판 끝(`maximumTicks`, 240)으로 잘린 공의 마지막 틱 그림뿐이다
-  //    (시험의 레이저 송구 판들이 판 끝 240틱 그림에서 닿는다 — r308 의 "협살만 닿는다" 는 틀렸다). 이 그림의 원본 자리는 아직 안 떴다
-  if (!input.held && input.throwArrivalTick >= 0 && input.throwBase !== NONE) return basePosition(input.throwBase)
   return holder.position
 }
 

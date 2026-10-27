@@ -2341,6 +2341,21 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
     expect(굴림.ticks.length).toBe(48)
   })
 
+  it('받는 틱이 지나도 아무도 안 쥔 공은 궤적 점에 그린다 — 0x36dfc 는 공을 늘 0xa25b0(공, 공+0x68) 에 둔다 (36ea6, r313)', () => {
+    // 예전 웹은 포구 틱이 지난 안 쥔 공을 공 가진 야수 자리(또는 마지막 송구의 루 자리)에 그렸다
+    const 무늬: BattedBallPattern = [209, 317, 295, 1]
+    const 굴림 = 쏘기(무늬, 9, 0)
+    const 궤적 = battedBallTrajectory(무늬)
+    const 지난틱 = 굴림.ticks.map((_, 틱) => 틱).filter((틱) => 틱 >= 굴림.catchTick)
+    expect(지난틱.length).toBeGreaterThan(0)
+    for (const 틱 of 지난틱) {
+      const 공 = 굴림.ticks[틱].ball
+      const 점 = 궤적.pointAt(틱)
+      expect(공.isHeld).toBe(false)
+      expect([공.x, 공.z, 공.height]).toEqual([점.x, 점.z, 점.y])
+    }
+  })
+
   it('넓은 페어 각(0x9d640, 35~145) 밖 파울은 state[7] = 0 — 커버 0xb1c90 이 머리(b1cc6)에서 끝나 아무도 루 커버를 안 받는다', () => {
     const 커버받음 = (pattern: BattedBallPattern, resultCode: number) => {
       let state = startDefensePlay({
