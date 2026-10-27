@@ -133,7 +133,8 @@ async function throttleByCdp(page, tally) {
 }
 
 async function openPage(browser, browserName, device) {
-  const context = await browser.newContext(DEVICES[device])
+  // https 로 띄운 HTTP/2 시험 서버(자체 서명 인증서)도 열게 (r322)
+  const context = await browser.newContext({ ...DEVICES[device], ignoreHTTPSErrors: true })
   const page = await context.newPage()
   await page.addInitScript(BLOCK_PROBE)
   const tally = { requests: 0, bytes: 0, byKind: {} }

@@ -3,11 +3,13 @@ import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
 import { spriteJsonBundle } from './tools/viteSpriteJsonBundle.ts'
+import { assetPacks } from './tools/viteAssetPacks.ts'
 
 export default defineConfig({
   base: './',
   // 스프라이트 JSON 265개를 한 파일로 — `sprites/sprite-json.bundle.json` (r311 A5, `shared/lib/sprite/spriteJsonBundle`)
-  plugins: [react(), vanillaExtractPlugin(), spriteJsonBundle()],
+  // 빌드 산출물 자산을 gzip 묶음 몇 개 + 서비스 워커로 — 첫 진입에 한꺼번에 받는다 (r322, `app/assetPacks`). 맨 끝에 둔다(산출물을 다 쓴 뒤 훑는다)
+  plugins: [react(), vanillaExtractPlugin(), spriteJsonBundle(), assetPacks()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
