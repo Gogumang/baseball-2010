@@ -131,7 +131,16 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
     cursor: kind === '관리' ? mainCursor.current : mainCursor.subCursor ?? 0,
     openedAt: kind === '관리' ? 0 : -SETTLED_UPDATES,
     movedAt: null as number | null,
+    entryCount: menu.entryCount,
   }))
+  /*
+   * 105 진입 0x11910 은 어디서 왔든 11c26 에서 0x7ff21 을 불러 여섯 칸을 처음 자리(표 0xd4740 x, y 0xaa)로 되돌리고 [gfx+0x99] = 1
+   * — 틀 0x1aec4 1af8a → 0x7ff8d 가 다시 펼친다. 하위 메뉴 취소 · 125 훈련 결과는 줄 표가 바뀌는 길이라 아래 갈래가 치고,
+   * 127 휴식 결과 창이 닫혀(0x1b308 1b466 · 틀 0x19080 190cc `0xbcb49(0x69)`) 다시 든 105 는 줄 표가 그대로라 진입 수로 친다
+   */
+  if (state.entryCount !== menu.entryCount && state.kind === kind) {
+    setState({ ...state, entryCount: menu.entryCount, openedAt: update, movedAt: null })
+  }
   if (state.kind !== kind) {
     if (kind === '관리') {
       const returning = Math.max(0, slots.findIndex((slot) => slot.id === state.kind))
@@ -140,7 +149,7 @@ function PitcherCommandBar({ menu, isKeyEnabled, mainOffIds, mainCursor, hasActe
       // 105 에서 하위 메뉴로 — 106 은 진입이, 107 · 110 은 앞선 105 진입이 커서를 0 으로 되감아 둔다
       mainCursor.subCursor = 0
     }
-    setState({ kind, cursor: kind === '관리' ? mainCursor.current : 0, openedAt: update, movedAt: null })
+    setState({ kind, cursor: kind === '관리' ? mainCursor.current : 0, openedAt: update, movedAt: null, entryCount: menu.entryCount })
   }
   const cursor = Math.min(kind === '관리' ? mainCursor.current : state.cursor, slots.length - 1)
   const moveTo = (index: number) => {

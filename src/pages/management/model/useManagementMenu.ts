@@ -113,7 +113,12 @@ export function useManagementMenu(props: ManagementScreenProps) {
    */
   const [restPhase, setRestPhase] = useState<'playing' | 'result' | null>(null)
   useLayoutEffect(() => {
-    if (restPhase === 'result' && props.detail === null) setRestPhase(null)
+    if (restPhase !== 'result' || props.detail !== null) return
+    setRestPhase(null)
+    // 결과 창이 닫혀 105 에 다시 든다(0x1b308 1b466 · 틀 0x19080 190cc `0xbcb49(0x69)`) — 진입 0x11910 은 늘 11c26 에서
+    // 0x7ff21 로 여섯 칸을 처음 자리에 되돌리고 [gfx+0x99] = 1 이라 다시 펼친다(그동안 키를 버린다, A-50). 줄 표는 그대로고
+    // 커서는 행동함 진입이 첫 칸으로 (`awaitingEntry`)
+    setOpenedAt(update)
   })
   const slots = kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[kind]
   const disabledIds = NO_DISABLED_IDS
