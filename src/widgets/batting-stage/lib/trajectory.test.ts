@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ballFrameIndexAt, ballKindAt, ballPixelAt, platePixelOf, RELEASE_PIXEL } from '@/widgets/batting-stage/lib/trajectory'
+import { ballFrameIndexAt, ballKindAt, ballPixelAt, eagleEyePixelOf, platePixelOf, RELEASE_PIXEL } from '@/widgets/batting-stage/lib/trajectory'
+import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 
@@ -125,5 +126,15 @@ describe('타석 화면 규격', () => {
 
     expect(STAGE_WIDTH).toBe(240)
     expect(STAGE_HEIGHT).toBe(320)
+  })
+})
+
+describe('eagleEyePixelOf — 0x4d2ac 는 틱을 안 가리고 [경기+0x10b8] 을 투영한다 (A-31, r309)', () => {
+  it('곡선이 없는 와인드업 자리 공도 0x10 목표점을 투영한다', () => {
+    const target = { x: 20300, y: 900, z: 29705 }
+    expect(eagleEyePixelOf({ ...커브, aimTarget: target })).toEqual(projectToScreen(target, 커브.stageSide))
+  })
+  it('목표점이 없는 공은 도착점(존 자리)이다', () => {
+    expect(eagleEyePixelOf(커브)).toEqual(platePixelOf(커브))
   })
 })

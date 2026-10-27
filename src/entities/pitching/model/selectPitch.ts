@@ -354,8 +354,9 @@ export function releaseCpuPitch(
 /**
  * **0x11 틱 0~9(와인드업) 동안의 공 자리** — 놓기 0x4dc78 은 틱 10 이라 그 전에는 곡선 · 제구 오차가 아직 없다.
  * 타석 화면이 와인드업을 그리고(투수 폼 · 손) 0x11 인지 묻는 데만 쓴다: 곡선이 비어 있고(`frameCount` 0, 공 틱 < 0 이라
- * 그리지도 판정하지도 않는다) 존 자리는 0x10 의 목표점이다(⚠️ 독수리눈 표시가 와인드업 동안 보는 자리는 미확인).
- * 틱 10 에 `releaseCpuPitch` 의 공으로 바꾼다
+ * 그리지도 판정하지도 않는다) 존 자리는 0x10 의 목표점이다. 독수리눈(이글아이)은 와인드업 동안에도 같은 0x10 목표점을 본다 —
+ * 0x11 그리기 0x4d2ac 는 틱을 안 가리고 4d2dc~4d2ea 에서 [경기+0x10b8](0x10 틱 6 의 0x345fc 가 쓴 점)을 떠 투영한다(r309 직접 뜸).
+ * 그래서 `aimTarget` 도 싣는다. 틱 10 에 `releaseCpuPitch` 의 공으로 바꾼다
  */
 export function windUpCpuPitchOf(args: CpuPitchArgs, typeNumber: number, target: WorldPoint): Pitch {
   const repertoire = args.pitcher.repertoire ?? DEFAULT_REPERTOIRE
@@ -368,6 +369,8 @@ export function windUpCpuPitchOf(args: CpuPitchArgs, typeNumber: number, target:
   return {
     type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
     plate: plateOf(target, args.situation.side),
+    // 0x4d2ac 이글아이가 와인드업 동안에도 투영하는 0x10 목표점(+0x10b8)
+    aimTarget: target,
     breakOffset: { x: type.horizontalBreak, y: type.verticalBreak },
     flightDurationMilliseconds: 0,
     frameCount: 0,
