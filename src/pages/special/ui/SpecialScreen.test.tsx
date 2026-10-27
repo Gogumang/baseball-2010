@@ -348,6 +348,21 @@ describe('명예의 전당 격자 5×3', () => {
     expect(screen.getByRole('button', { name: '2번 슬롯' })).toBeTruthy()
   })
 
+  it('말풍선은 숫자키도 받는다 — 0x2ac00 2ac76: \'2\' · \'8\' 은 ↑ ↓, \'5\' 는 OK, \'4\' · \'6\' 은 아무 일 없음', () => {
+    찬칸열기()
+    fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
+    const 지금 = (name: string) => screen.getByRole('menuitem', { name }).getAttribute('aria-current')
+    fireEvent.keyDown(window, { key: '8' })
+    expect(지금('슬롯에서 삭제')).toBe('true')
+    fireEvent.keyDown(window, { key: '4' })
+    fireEvent.keyDown(window, { key: '6' })
+    expect(지금('슬롯에서 삭제')).toBe('true')
+    fireEvent.keyDown(window, { key: '2' })
+    expect(지금('친구에게 선물')).toBe('true')
+    fireEvent.keyDown(window, { key: '5' })
+    expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('통신')
+  })
+
   it('선물은 통신(🌐)이라 안내만 띄운다', () => {
     찬칸열기()
 

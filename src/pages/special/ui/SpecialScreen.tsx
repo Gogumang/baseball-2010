@@ -686,11 +686,13 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       event.stopImmediatePropagation()
       if (keyLock.current) return
       if (isBubbleOpen) {
-        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        // 말풍선 갈래 2ac76 은 날 키로 가른다 — −1 · '2'(2aca8) → 2aea6 커서 −1 · −2 · '8'(2acb0) → 2aeb6 커서 +1(두 칸이라 감김),
+        // −5 · '5'(2aca0) → 2acb8 확인, −16 → 2aeca 닫기. ← → '4' '6' 은 아무 일 없음 (r333 — 예전 웹은 숫자키를 버렸다)
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === '2' || event.key === '8') {
           event.preventDefault()
           return setBubbleCursor((previous) => 1 - previous)
         }
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
           event.preventDefault()
           return chooseBubble(bubbleCursor)
         }
