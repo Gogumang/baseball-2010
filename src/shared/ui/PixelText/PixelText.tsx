@@ -104,12 +104,13 @@ export function PixelText({
 }: PixelTextProps) {
   const gaps = FONT_SPACING[spacing]
   const layout = useMemo(
-    () => layoutPixelText(children, {
-      letterGap: letterGap ?? gaps.letterGap,
-      lineGap: lineGap ?? gaps.lineGap,
-      maxWidth,
-      skipLeadingSpace,
-    }),
+    () =>
+      layoutPixelText(children, {
+        letterGap: letterGap ?? gaps.letterGap,
+        lineGap: lineGap ?? gaps.lineGap,
+        maxWidth,
+        skipLeadingSpace,
+      }),
     [children, letterGap, lineGap, gaps, maxWidth, skipLeadingSpace],
   )
 

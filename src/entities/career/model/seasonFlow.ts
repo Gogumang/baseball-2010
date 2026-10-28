@@ -68,13 +68,7 @@ export function yearGoalWindowValuesOf(career: PlayerCareer): YearGoalWindowValu
   const average = stats.atBats > 0 ? Math.min(AVERAGE_SCALE, Math.trunc((stats.hits * AVERAGE_SCALE) / stats.atBats)) : 0
   return {
     labelSet: 0,
-    current: [
-      average,
-      stats.hits,
-      stats.homeRuns,
-      stats.runsBattedIn,
-      Math.max(0, career.popularity - career.popularityAtSeasonStart),
-    ],
+    current: [average, stats.hits, stats.homeRuns, stats.runsBattedIn, Math.max(0, career.popularity - career.popularityAtSeasonStart)],
     goals: yearGoalsOf(career),
   }
 }
@@ -105,10 +99,7 @@ const COMEBACK_PREVIOUS_MAXIMUM = 1
  * 중간평가 칭호 (0x11e84) — 1년차에 다섯 개 모두 → 칭호 1, 2년차 이후 지난 중간평가 ≤ 1 개였다가 다섯 개 → 칭호 9.
  * 이번 값은 lastMidSeasonGoalCount(원본 +0x1cc)에 남긴다 — 호출하는 쪽이 저장한다.
  */
-export function midSeasonTitlesOf(
-  career: Pick<PlayerCareer, 'season' | 'lastMidSeasonGoalCount'>,
-  achieved: number,
-): string[] {
+export function midSeasonTitlesOf(career: Pick<PlayerCareer, 'season' | 'lastMidSeasonGoalCount'>, achieved: number): string[] {
   if (achieved < ALL_GOALS) return []
   if (career.season === 1) return [TITLE_NAMES[FIRST_YEAR_TITLE]]
   return career.lastMidSeasonGoalCount <= COMEBACK_PREVIOUS_MAXIMUM ? [TITLE_NAMES[COMEBACK_TITLE]] : []
@@ -145,9 +136,7 @@ export const NO_ENDING_JUDGEMENT = -1
  * 돌아간다(132 의 503 이면 9 → 502 다시). 받은 뒤 저장은 S+0x50 = 6 이라 이어하기가 141 로 간다(0x1c154 1c24e — `resumePointOf`).
  * 웹은 엔딩 번호를 커리어 칸에 두므로 보너스 전에는 그 칸만 비워 저장한다 — 메모리의 커리어(화면 · 기록연감 +0xa7)는 그대로다.
  */
-export function savedCareerOf<C extends { readonly endingIndex: number | null; readonly endingBonusReceived?: boolean }>(
-  career: C,
-): C {
+export function savedCareerOf<C extends { readonly endingIndex: number | null; readonly endingBonusReceived?: boolean }>(career: C): C {
   return career.endingIndex !== null && career.endingBonusReceived !== true ? { ...career, endingIndex: null } : career
 }
 

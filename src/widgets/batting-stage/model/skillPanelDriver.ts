@@ -1,8 +1,14 @@
 import type { SnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import {
-  SKILL_CHEER_SOUND_ID, batterSkillPanelBitsOf, createSkillPanelScene, enterAtBatSkillPanel,
-  enterPitchSkillPanel, pitcherSkillPanelBitsOf, skillCheerOf, stepSkillPanel,
+  SKILL_CHEER_SOUND_ID,
+  batterSkillPanelBitsOf,
+  createSkillPanelScene,
+  enterAtBatSkillPanel,
+  enterPitchSkillPanel,
+  pitcherSkillPanelBitsOf,
+  skillCheerOf,
+  stepSkillPanel,
 } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelSource } from '@/widgets/batting-stage/model/stageRefs'
@@ -110,9 +116,21 @@ export function createSkillPanelDriver(): ((frame: SkillPanelFrame) => SkillPane
   // 개발 · e2e 전용 — 경기 중간 스냅샷이 이 돌림의 칸을 읽고 되살린다. 0xf 표지는 그 객체가 아니라 "밖이냐" 만 옮긴다
   if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
     const devSnapshot: SnapshotSlot = {
-      capture: () => ({ isOutside: stateFMark === OUTSIDE_STATE_F, stateFMark: stateFMark === OUTSIDE_STATE_F ? null : stateFMark, lastTick, lastView, localScene }),
+      capture: () => ({
+        isOutside: stateFMark === OUTSIDE_STATE_F,
+        stateFMark: stateFMark === OUTSIDE_STATE_F ? null : stateFMark,
+        lastTick,
+        lastView,
+        localScene,
+      }),
       restore: (value) => {
-        const saved = value as { isOutside: boolean; stateFMark: unknown; lastTick: number; lastView: SkillPanelView | null; localScene: typeof localScene }
+        const saved = value as {
+          isOutside: boolean
+          stateFMark: unknown
+          lastTick: number
+          lastView: SkillPanelView | null
+          localScene: typeof localScene
+        }
         stateFMark = saved.isOutside ? OUTSIDE_STATE_F : saved.stateFMark
         lastTick = saved.lastTick
         lastView = saved.lastView

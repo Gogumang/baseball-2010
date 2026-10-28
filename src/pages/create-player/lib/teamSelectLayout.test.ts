@@ -1,9 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ABILITY_AXIS_ANGLES, ABILITY_AXIS_MAXIMUM, ABILITY_CHART, ABILITY_FRAME_RADIUS, ANCHOR_A,
-  ANCHOR_B, GRID, NAME_BAR, OPEN_TEAM_COUNT, TAG, TEAM_COUNT, abilityAxisLengthOf,
-  abilityAxisMaximumLengthOf, abilityChartFrameOf, abilityChartVerticesOf, cellPositionOf,
-  abilityGrowthVerticesOf, abilityVertexOf, gridRowCountOf, isTeamOpen, teamNameFrameOf,
+  ABILITY_AXIS_ANGLES,
+  ABILITY_AXIS_MAXIMUM,
+  ABILITY_CHART,
+  ABILITY_FRAME_RADIUS,
+  ANCHOR_A,
+  ANCHOR_B,
+  GRID,
+  NAME_BAR,
+  OPEN_TEAM_COUNT,
+  TAG,
+  TEAM_COUNT,
+  abilityAxisLengthOf,
+  abilityAxisMaximumLengthOf,
+  abilityChartFrameOf,
+  abilityChartVerticesOf,
+  cellPositionOf,
+  abilityGrowthVerticesOf,
+  abilityVertexOf,
+  gridRowCountOf,
+  isTeamOpen,
+  teamNameFrameOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 
 /** 팀 고르기 배치 (상태 0x65 → 목록 0x63b15 의 k=0, 본문 0x63dee — P6 2a 확정) */
@@ -90,8 +107,8 @@ describe('능력치 마름모', () => {
 
   it('꼭짓점 = 중심 + (길이 × cos·sin) >> 16 — ×65535 표(0xd2eec)와 산술 시프트다', () => {
     expect(abilityChartVerticesOf(중심, 드래곤즈)).toEqual([
-      { x: 170, y: 96 },  // 225° 왼위
-      { x: 187, y: 94 },  // 315° 오른위
+      { x: 170, y: 96 }, // 225° 왼위
+      { x: 187, y: 94 }, // 315° 오른위
       { x: 186, y: 112 }, // 45°  오른아래
       { x: 170, y: 111 }, // 135° 왼아래
     ])
@@ -100,7 +117,10 @@ describe('능력치 마름모', () => {
   it('바탕 테두리는 넘겨받은 30 이 아니라 **고정 29** 다 (0x7639c movs r3,#0x1d)', () => {
     expect(ABILITY_FRAME_RADIUS).toBe(29)
     expect(abilityChartFrameOf(중심)).toEqual([
-      { x: 157, y: 83 }, { x: 198, y: 83 }, { x: 198, y: 124 }, { x: 157, y: 124 },
+      { x: 157, y: 83 },
+      { x: 198, y: 83 },
+      { x: 198, y: 124 },
+      { x: 157, y: 124 },
     ])
   })
 

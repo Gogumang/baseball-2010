@@ -103,10 +103,7 @@ export function staminaCapacityOf(staminaAbility: number, teamMorale: number, is
  */
 export function consumeStamina(stamina: number, cost: number, capacity: number): number {
   if (capacity <= 0) return stamina
-  const next =
-    stamina > 0
-      ? stamina + Math.trunc(((capacity - cost) * FULL_STAMINA) / capacity) - FULL_STAMINA
-      : isBugFixed('B-09') ? 0 : 100
+  const next = stamina > 0 ? stamina + Math.trunc(((capacity - cost) * FULL_STAMINA) / capacity) - FULL_STAMINA : isBugFixed('B-09') ? 0 : 100
   return Math.min(FULL_STAMINA, Math.max(0, next))
 }
 

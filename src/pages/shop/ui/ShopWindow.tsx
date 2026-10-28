@@ -6,10 +6,32 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  CURSOR_BLINK_PERIOD, CURSOR_VISIBLE_UPDATES, DESCRIPTION_BOX, HEAD_LABEL_FRAME, INNER, LABEL_HEIGHT,
-  LEFT_TAB_BOX, MODE_UI_FRAME, MONEY_BAR_OFFSET, MONEY_DIGIT_OFFSET, MONEY_LABEL_OFFSET, NAME_BOX, RIGHT_TAB_BOX, SHOP_COLORS,
-  SLOT_COUNT, SLOT_SIZE, VALUE_BOX, VALUE_DIGIT_RIGHT_INSET, WINDOW_BOX, centeredLeftOf, centeredTopOf, movedSlotOf, slotCellRectsOf,
-  slotGridKeyOf, slotPositionOf, valueBarPositionOf,
+  CURSOR_BLINK_PERIOD,
+  CURSOR_VISIBLE_UPDATES,
+  DESCRIPTION_BOX,
+  HEAD_LABEL_FRAME,
+  INNER,
+  LABEL_HEIGHT,
+  LEFT_TAB_BOX,
+  MODE_UI_FRAME,
+  MONEY_BAR_OFFSET,
+  MONEY_DIGIT_OFFSET,
+  MONEY_LABEL_OFFSET,
+  NAME_BOX,
+  RIGHT_TAB_BOX,
+  SHOP_COLORS,
+  SLOT_COUNT,
+  SLOT_SIZE,
+  VALUE_BOX,
+  VALUE_DIGIT_RIGHT_INSET,
+  WINDOW_BOX,
+  centeredLeftOf,
+  centeredTopOf,
+  movedSlotOf,
+  slotCellRectsOf,
+  slotGridKeyOf,
+  slotPositionOf,
+  valueBarPositionOf,
 } from '@/pages/shop/lib/shopLayout'
 import type { ItemGridWindowKind, ShopBox } from '@/pages/shop/lib/shopLayout'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
@@ -54,9 +76,7 @@ interface ShopWindowProps {
  * 격자는 늘 5 열 × 2 줄 10칸이고 커서는 줄 · 열 안에서 감긴다(`movedSlotOf` — 목록 vt+0x1c(5, 2, 1, 0x30)).
  * 커서 칸이 비었으면 이름 · 값 · 설명을 그리지 않는다(종류 2 칸 > 6 은 0x826a6 · 0x827c6 · 0x828b4, 종류 5 안 가진 칸은 0x82646).
  */
-export function ShopWindow({
-  kind, entries, cursor, onMoveCursor, onSelect, money, isKeyEnabled, onCancel,
-}: ShopWindowProps) {
+export function ShopWindow({ kind, entries, cursor, onMoveCursor, onSelect, money, isKeyEnabled, onCancel }: ShopWindowProps) {
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const modeUiOrigins = useFrameOrigins(MODE_UI)
   const update = useUpdateCounter()
@@ -91,7 +111,11 @@ export function ShopWindow({
         className={styles.tintedLabel}
         style={{
           // 효과 0xb 는 인자 색의 아래 16비트(565)를 찍는다 — `solidColorCss`
-          left, top, width: size.width, height: size.height, background: solidColorCss(color),
+          left,
+          top,
+          width: size.width,
+          height: size.height,
+          background: solidColorCss(color),
           maskImage: spriteMaskImage(spriteSrc(IMG_TEXT, frame)),
           WebkitMaskImage: spriteMaskImage(spriteSrc(IMG_TEXT, frame)),
         }}
@@ -108,9 +132,7 @@ export function ShopWindow({
     const size = modeUiOrigins?.[String(MODE_UI_FRAME.valueBar).padStart(3, '0')] ?? null
     if (size === null) return null
     const { x, y } = valueBarPositionOf(box, align, size.width, ox, oy)
-    return (
-      <img className={styles.layer} alt="" src={spriteSrc(MODE_UI, MODE_UI_FRAME.valueBar)} style={{ left: x, top: y }} />
-    )
+    return <img className={styles.layer} alt="" src={spriteSrc(MODE_UI, MODE_UI_FRAME.valueBar)} style={{ left: x, top: y }} />
   }
   /** 칸 왼쪽 · 세로 가운데에 붙는 글 (정렬 0x21) */
   const leftLabel = (frame: number, box: ShopBox, color: string, ox = 0, oy = 0) => {
@@ -125,8 +147,7 @@ export function ShopWindow({
     <>
       {/* 박스 0 — 81e66 공용 판 0x55e61(skin, 24, 48, 192, 212, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)
           (81e3e~81e68 직접 뜸 — [창+0x1a4] ≠ 0 인 서브 · GP 갈래. 0 이면 81e20 → 0x81d0c 스킬 창 판). 제목 탭이 서서 위 띠는 안 본다 */}
-      <CommonPanel x={WINDOW_BOX.x} y={WINDOW_BOX.y} width={WINDOW_BOX.width} height={WINDOW_BOX.height}
-        topBand={0x10} titleTab testId="상점-판" />
+      <CommonPanel x={WINDOW_BOX.x} y={WINDOW_BOX.y} width={WINDOW_BOX.width} height={WINDOW_BOX.height} topBand={0x10} titleTab testId="상점-판" />
 
       {/* 머리 — 창 종류별 (0x81ea2~0x82254) */}
       {kind !== 'GP' && centeredLabel(HEAD_LABEL_FRAME.서브아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
@@ -136,9 +157,12 @@ export function ShopWindow({
         <>
           {valueBar(RIGHT_TAB_BOX, 0x11, MONEY_BAR_OFFSET.x, MONEY_BAR_OFFSET.y)}
           {leftLabel(HEAD_LABEL_FRAME.소지금, RIGHT_TAB_BOX, SHOP_COLORS.text, MONEY_LABEL_OFFSET.x, MONEY_LABEL_OFFSET.y)}
-          <SpriteNumber glyphs={moneyGlyphsOf(money)}
+          <SpriteNumber
+            glyphs={moneyGlyphsOf(money)}
             right={RIGHT_TAB_BOX.x + RIGHT_TAB_BOX.width + MONEY_DIGIT_OFFSET.x}
-            boxTop={RIGHT_TAB_BOX.y + MONEY_DIGIT_OFFSET.y} boxHeight={RIGHT_TAB_BOX.height} />
+            boxTop={RIGHT_TAB_BOX.y + MONEY_DIGIT_OFFSET.y}
+            boxHeight={RIGHT_TAB_BOX.height}
+          />
         </>
       )}
       {/* 값 칸 — 서브·GP 둘 다 막대 52(정렬 0x14) + img_text 303 "가격"(정렬 0x21) */}
@@ -146,11 +170,12 @@ export function ShopWindow({
       {leftLabel(HEAD_LABEL_FRAME.가격, VALUE_BOX, SHOP_COLORS.text)}
 
       {/* 칸 바탕 0x7e764 — 10칸 모두 (0x82420, 깃발 0) */}
-      <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
-        data-testid="shop-slot-cells">
-        {Array.from({ length: SLOT_COUNT }, (_unused, slot) => slotCellRectsOf(slotPositionOf(slot)).map((rect, part) => (
-          <rect key={`${slot}-${part}`} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />
-        )))}
+      <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges" data-testid="shop-slot-cells">
+        {Array.from({ length: SLOT_COUNT }, (_unused, slot) =>
+          slotCellRectsOf(slotPositionOf(slot)).map((rect, part) => (
+            <rect key={`${slot}-${part}`} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />
+          )),
+        )}
       </svg>
 
       {/* 격자 커서 — 칸을 1px 둘러싼다 */}
@@ -159,8 +184,12 @@ export function ShopWindow({
           <rect
             x={slotPositionOf(cursor).x - 0.5}
             y={slotPositionOf(cursor).y - 0.5}
-            width={SLOT_SIZE + 1} height={SLOT_SIZE + 1}
-            fill="none" stroke={SHOP_COLORS.text} strokeWidth={1} />
+            width={SLOT_SIZE + 1}
+            height={SLOT_SIZE + 1}
+            fill="none"
+            stroke={SHOP_COLORS.text}
+            strokeWidth={1}
+          />
         )}
       </svg>
 
@@ -171,8 +200,7 @@ export function ShopWindow({
         const { x, y } = slotPositionOf(index)
         return (
           <div key={entry.id} className={styles.slotIcon} style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}>
-            <img className={kind === '서브' && entry.isOwned ? styles.ownedIcon : undefined} alt=""
-              src={spriteSrc(ITEM_ICON, entry.iconFrame)} />
+            <img className={kind === '서브' && entry.isOwned ? styles.ownedIcon : undefined} alt="" src={spriteSrc(ITEM_ICON, entry.iconFrame)} />
           </div>
         )
       })}
@@ -184,31 +212,38 @@ export function ShopWindow({
         const entry = entries[index] ?? null
         const { x, y } = slotPositionOf(index)
         return (
-          <PressArea key={`누름:${index}`} label={entry?.name ?? `빈 칸 ${index}`}
+          <PressArea
+            key={`누름:${index}`}
+            label={entry?.name ?? `빈 칸 ${index}`}
             rect={{ x, y, width: SLOT_SIZE, height: SLOT_SIZE }}
             option={{ isSelected: cursor === index }}
             isDisabled={!isKeyEnabled}
-            onPress={() => (cursor === index ? onSelect(index) : onMoveCursor(index))} />
+            onPress={() => (cursor === index ? onSelect(index) : onMoveCursor(index))}
+          />
         )
       })}
 
       {/* 박스 3 이름 딱지 — 검정 그림자 뒤 흰 글 가운데 (0x8225e) */}
-      <div className={styles.nameTag}
-        style={{ left: NAME_BOX.x, top: NAME_BOX.y, width: NAME_BOX.width, height: NAME_BOX.height }} />
-      <div className={styles.nameShadow}
+      <div className={styles.nameTag} style={{ left: NAME_BOX.x, top: NAME_BOX.y, width: NAME_BOX.width, height: NAME_BOX.height }} />
+      <div
+        className={styles.nameShadow}
         style={{
           left: NAME_BOX.x + INNER.nameTextLeft + INNER.nameShadow,
           top: centeredTopOf(NAME_BOX, LABEL_HEIGHT) + INNER.nameShadow,
           width: NAME_BOX.width - INNER.nameTextLeft * 2,
-        }}>
+        }}
+      >
         {selected?.name ?? ''}
       </div>
-      <div className={styles.nameText} data-testid="shop-name"
+      <div
+        className={styles.nameText}
+        data-testid="shop-name"
         style={{
           left: NAME_BOX.x + INNER.nameTextLeft,
           top: centeredTopOf(NAME_BOX, LABEL_HEIGHT),
           width: NAME_BOX.width - INNER.nameTextLeft * 2,
-        }}>
+        }}
+      >
         {selected?.name ?? ''}
       </div>
 
@@ -217,21 +252,25 @@ export function ShopWindow({
         <SpriteNumber
           glyphs={kind === 'GP' ? numberGlyphsOf(selected.price) : moneyGlyphsOf(selected.price)}
           right={VALUE_BOX.x + VALUE_BOX.width - VALUE_DIGIT_RIGHT_INSET}
-          boxTop={VALUE_BOX.y} boxHeight={VALUE_BOX.height} />
+          boxTop={VALUE_BOX.y}
+          boxHeight={VALUE_BOX.height}
+        />
       )}
 
       {/* 박스 4 설명 — 왼쪽 위 정렬 (0x802dd + 조건 문구) */}
-      <div className={styles.description} data-testid="shop-description"
+      <div
+        className={styles.description}
+        data-testid="shop-description"
         style={{
           left: DESCRIPTION_BOX.x + INNER.descriptionPadding,
           top: DESCRIPTION_BOX.y + INNER.descriptionPadding,
           width: DESCRIPTION_BOX.width - INNER.descriptionPadding * 2,
           height: DESCRIPTION_BOX.height - INNER.descriptionPadding * 2,
           lineHeight: `${INNER.descriptionLineHeight}px`,
-        }}>
+        }}
+      >
         {descriptionLines.map((line, lineIndex) => (
-          <p key={lineIndex} className={styles.descriptionLine}
-            style={line.isCentered ? { textAlign: 'center' } : undefined}>
+          <p key={lineIndex} className={styles.descriptionLine} style={line.isCentered ? { textAlign: 'center' } : undefined}>
             {line.segments.map((segment, segmentIndex) => (
               <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
                 {segment.text}

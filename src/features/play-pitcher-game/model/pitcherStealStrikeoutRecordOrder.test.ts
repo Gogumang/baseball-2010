@@ -60,9 +60,7 @@ describe('삼진 + 도루 판(종류 5)의 기록 알림 차례 — 삼진 콜 1
       const caught = {
         ...played,
         advance: { ...played.advance, bases: { first: false, second: false, third: false }, outsAdded: 1 },
-        runnerFates: played.runnerFates.map((fate) =>
-          fate.fromBase === 2 ? { ...fate, retired: true, scored: false } : fate,
-        ),
+        runnerFates: played.runnerFates.map((fate) => (fate.fromBase === 2 ? { ...fate, retired: true, scored: false } : fate)),
       }
       const 끝 = resolveRunnerPlay(붙듦, caught, random)
       const added = 끝.recordIds.slice(주자.recordIds.length)
@@ -84,18 +82,11 @@ describe('삼진 + 도루 판(종류 5)의 기록 알림 차례 — 삼진 콜 1
         ...played,
         laserOutFlag: true,
         advance: { ...played.advance, bases: { first: false, second: false, third: false }, outsAdded: 1 },
-        runnerFates: played.runnerFates.map((fate) =>
-          fate.fromBase === 2 ? { ...fate, retired: true, scored: false } : fate,
-        ),
+        runnerFates: played.runnerFates.map((fate) => (fate.fromBase === 2 ? { ...fate, retired: true, scored: false } : fate)),
       }
       const 끝 = resolveRunnerPlay(붙듦, caught, random)
       const added = 끝.recordIds.slice(주자.recordIds.length)
-      expect(added).toEqual([
-        FULL_COUNT_STRIKEOUT_RECORD,
-        LASER_THROW_RECORD,
-        CAUGHT_STEALING_RECORD,
-        DOUBLE_PLAY_RECORD,
-      ])
+      expect(added).toEqual([FULL_COUNT_STRIKEOUT_RECORD, LASER_THROW_RECORD, CAUGHT_STEALING_RECORD, DOUBLE_PLAY_RECORD])
     }
     expect(checked).toBeGreaterThan(0)
   })

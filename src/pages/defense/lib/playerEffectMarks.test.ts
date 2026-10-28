@@ -3,7 +3,12 @@ import { FIELDER_ACTION, type DefenseFielder } from '@/pages/defense/lib/defense
 import { fielderEffectMarksOf, runnerEffectMarksOf } from '@/pages/defense/lib/playerEffectMarks'
 
 const 야수 = (over: Partial<DefenseFielder> = {}): DefenseFielder => ({
-  slot: 5, x: 15_000, z: 18_000, action: FIELDER_ACTION.stand, actionTick: 0, ...over,
+  slot: 5,
+  x: 15_000,
+  z: 18_000,
+  action: FIELDER_ACTION.stand,
+  actionTick: 0,
+  ...over,
 })
 const 고른 = (fielder: DefenseFielder) => fielderEffectMarksOf(fielder).map((mark) => `${mark.kind}${mark.index}@${mark.raise}`)
 
@@ -34,7 +39,14 @@ describe('야수 부착 효과 (0x43278)', () => {
 
 describe('주자 슬라이딩 먼지 (0x43b18)', () => {
   const 주자 = (slideDirection: number) => ({
-    index: 1, x: 1, z: 2, action: 6, actionTick: 0, base: 2, isAdvancing: true, slideDirection,
+    index: 1,
+    x: 1,
+    z: 2,
+    action: 6,
+    actionTick: 0,
+    base: 2,
+    isAdvancing: true,
+    slideDirection,
   })
   it('방향 1 · 2 · 3 · 4 → 애니 5 · 6 · 8 · 7, 깊이 키는 주자 z — 주자 그림(z + 1)보다 한 칸 앞(밑) (43aec)', () => {
     expect([1, 2, 3, 4].map((d) => runnerEffectMarksOf(주자(d))[0]?.index)).toEqual([5, 6, 8, 7])

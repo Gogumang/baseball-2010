@@ -17,14 +17,16 @@ afterEach(() => {
 })
 
 /** 상자가 오르고 글을 끝까지 찍게 둔다 */
-const 다찍기 = () => act(() => {
-  vi.advanceTimersByTime(200 * millisecondsPerFrame())
-})
+const 다찍기 = () =>
+  act(() => {
+    vi.advanceTimersByTime(200 * millisecondsPerFrame())
+  })
 
 /** 116 이 선 틀 — 114(평가 이벤트)는 다음 틀에 들어선다(116 진입 끝 12bb6~12bbe 의 0xbcb49) */
-const 한틀 = () => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame())
-})
+const 한틀 = () =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame())
+  })
 
 const 경기: PitcherLastGame = { decisionCode: 1, outs: 18, runs: 1, strikeouts: 5, managerCommentIndex: 2 }
 
@@ -38,8 +40,13 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
   })
 
   it('0x8b5ac 덧그림 — 인기도 변화 막대가 틀마다 한 줄씩 오른다 (선발 d 12: 6 → 30 줄)', () => {
-    render(<PitcherGameEvaluationScreen career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 0, popularityChange: 6, reputationChange: 0 } }}
-      lastGame={경기} onConfirm={vi.fn()} />)
+    render(
+      <PitcherGameEvaluationScreen
+        career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 0, popularityChange: 6, reputationChange: 0 } }}
+        lastGame={경기}
+        onConfirm={vi.fn()}
+      />,
+    )
     한틀()
     const 막대 = screen.getByTestId('인기도-막대')
     expect(막대.getAttribute('data-rows')).toBe('0')
@@ -59,8 +66,13 @@ describe('투수편 116 경기 뒤 평가 (0x11e0c · 0x8a6fc)', () => {
 
   it('대사(기록 줄 + 감독 글) → 변화 창(system sub 2 · 0x86c90) → 확인이면 114 로', () => {
     const onConfirm = vi.fn()
-    render(<PitcherGameEvaluationScreen career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 3, popularityChange: 0, reputationChange: -2 } }}
-      lastGame={경기} onConfirm={onConfirm} />)
+    render(
+      <PitcherGameEvaluationScreen
+        career={{ ...createPitcherCareer('테스터'), lastEvaluation: { moraleChange: 3, popularityChange: 0, reputationChange: -2 } }}
+        lastGame={경기}
+        onConfirm={onConfirm}
+      />,
+    )
     한틀()
     다찍기()
     const 대사 = screen.getByRole('group', { name: '경기 평가' }).textContent ?? ''

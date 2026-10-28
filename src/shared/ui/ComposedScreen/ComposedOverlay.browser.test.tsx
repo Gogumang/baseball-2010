@@ -37,10 +37,13 @@ describe('ComposedOverlay — 캔버스 합성', () => {
     const underSrc = pngOf(under)
     const topSrc = pngOf(top)
     render(
-      <ComposedOverlay testId="합성" rect={{ x: 10, y: 5, width: 4, height: 1 }}
+      <ComposedOverlay
+        testId="합성"
+        rect={{ x: 10, y: 5, width: 4, height: 1 }}
         underOps={[{ kind: 'image', src: underSrc, x: 10, y: 5, flipX: true }]}
         ops={[{ kind: 'image', src: topSrc, x: 11, y: 5, effect: DRAW_EFFECT.TRANSLUCENT, argument: 12 }]}
-        fallback={<span data-testid="근사" />} />,
+        fallback={<span data-testid="근사" />}
+      />,
     )
     const canvas = screen.getByTestId('합성') as HTMLCanvasElement
     await waitFor(() => expect(canvas.dataset.composed).toBe('true'), { timeout: 3000 })
@@ -56,8 +59,13 @@ describe('ComposedOverlay — 캔버스 합성', () => {
 
   it('그림을 못 받으면 근사로 둔다', async () => {
     render(
-      <ComposedOverlay testId="합성" rect={{ x: 0, y: 0, width: 1, height: 1 }} underOps={[]}
-        ops={[{ kind: 'image', src: '/없는-그림.png', x: 0, y: 0 }]} fallback={<span data-testid="근사" />} />,
+      <ComposedOverlay
+        testId="합성"
+        rect={{ x: 0, y: 0, width: 1, height: 1 }}
+        underOps={[]}
+        ops={[{ kind: 'image', src: '/없는-그림.png', x: 0, y: 0 }]}
+        fallback={<span data-testid="근사" />}
+      />,
     )
     await new Promise((resolve) => setTimeout(resolve, 300))
     expect(screen.getByTestId('근사')).toBeTruthy()

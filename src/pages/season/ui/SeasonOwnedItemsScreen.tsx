@@ -55,12 +55,19 @@ export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBa
   }, [])
 
   // 칸 k 는 SR[0x58 + k] 가 서 있을 때만 아이콘 · 이름 · 값 · 설명 (0x82542 · 0x82646)
-  const entries: readonly (ShopEntry | null)[] = seasonSubItemsOf(record).map((item) => (item.isOwned
-    ? {
-      id: `시즌보유:${item.slot}`, name: item.name, description: item.description, price: item.price,
-      iconFrame: item.iconFrame, isOwned: false, blockNotice: null,
-    }
-    : null))
+  const entries: readonly (ShopEntry | null)[] = seasonSubItemsOf(record).map((item) =>
+    item.isOwned
+      ? {
+          id: `시즌보유:${item.slot}`,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          iconFrame: item.iconFrame,
+          isOwned: false,
+          blockNotice: null,
+        }
+      : null,
+  )
 
   return (
     <RawScreen>

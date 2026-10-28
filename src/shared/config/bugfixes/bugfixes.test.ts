@@ -54,7 +54,14 @@ describe('bugfixes.json 모양', () => {
     const rows = section
       .split('\n')
       .filter((line) => /^\| B-\d+ \|/.test(line))
-      .map((line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split(' | ').map((cell) => cell.trim()))
+      .map((line) =>
+        line
+          .trim()
+          .replace(/^\|/, '')
+          .replace(/\|$/, '')
+          .split(' | ')
+          .map((cell) => cell.trim()),
+      )
     expect(rows.map((row) => row[0])).toEqual(ORIGINAL_BUG_IDS)
     for (const [index, row] of rows.entries()) {
       const entry = BUGFIX_CONFIG.entries[index]

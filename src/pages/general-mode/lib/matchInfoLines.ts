@@ -78,10 +78,7 @@ export function generalModeMatchInfoLines(
     // 모드 1 은 순위·승패가 늘 "-" 다 (저장 레코드를 아예 읽지 않는다)
     [EMPTY_VALUE, EMPTY_VALUE],
     [EMPTY_VALUE, EMPTY_VALUE],
-    [
-      userStarterName ?? startingPitcherNameOf(setup.userTeamId),
-      cpu?.starterName ?? startingPitcherNameOf(setup.aiTeamId),
-    ],
+    [userStarterName ?? startingPitcherNameOf(setup.userTeamId), cpu?.starterName ?? startingPitcherNameOf(setup.aiTeamId)],
     [acePitcherNameOf(setup.acePitcherId), cpu === null ? EMPTY_VALUE : acePitcherNameOf(cpu.acePitcherId)],
     [aceBatterNameOf(setup.aceBatterId), cpu === null ? EMPTY_VALUE : aceBatterNameOf(cpu.aceBatterId)],
   ]

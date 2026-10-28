@@ -18,7 +18,10 @@ const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...cr
 describe('장착 아이템 — 0x13460 · 0x14a74', () => {
   it('부위 네 개는 헬멧→히트, 배트→파워, 밴드→수비, 슈즈→주루 다', () => {
     expect(EQUIPMENT_PARTS.map((part) => [part.name, part.ability])).toEqual([
-      ['헬멧', 'hit'], ['배트', 'power'], ['밴드', 'defense'], ['슈즈', 'run'],
+      ['헬멧', 'hit'],
+      ['배트', 'power'],
+      ['밴드', 'defense'],
+      ['슈즈', 'run'],
     ])
   })
 

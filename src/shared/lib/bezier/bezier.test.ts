@@ -17,7 +17,11 @@ describe('bernsteinWeights — 0xbcb84 정수식', () => {
 })
 
 describe('bezierPointAt — 0xbcc6c', () => {
-  const 점 = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }]
+  const 점 = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+  ]
 
   it('i 번째 점은 t = trunc(i×10000/(N−1)) 이다', () => {
     expect(bezierPointAt(점, 0, 3)).toEqual({ x: 0, y: 0 })

@@ -59,28 +59,41 @@ const STAMINA_PICK_FOOTER = 7
  * 부모 칸 '아이템'만 그린다(0xdc 화면과 같다, r99).
  */
 export function SeasonStaminaPickScreen({
-  teamId, roster, nameOf, cells = SEASON_ENTRY_CELL_SOURCE, recordAces, aceLevels, state, gamePoint, onPick, onBack,
+  teamId,
+  roster,
+  nameOf,
+  cells = SEASON_ENTRY_CELL_SOURCE,
+  recordAces,
+  aceLevels,
+  state,
+  gamePoint,
+  onPick,
+  onBack,
 }: SeasonStaminaPickScreenProps) {
-  const [notice, setNotice] = useState<{ readonly text: string; readonly leave: boolean } | null>(
-    { text: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나선택), leave: false },
-  )
+  const [notice, setNotice] = useState<{ readonly text: string; readonly leave: boolean } | null>({
+    text: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나선택),
+    leave: false,
+  })
   const [editor, setEditor] = useState<EntryEditorState>(() => ({ ...openEntryEditor(false), tab: ENTRY_TAB.투수 }))
   const lists = seasonRecordEntryListsOf(teamId, roster, cells, nameOf, recordAces, aceLevels)
 
-  const onKey = useCallback((key: EntryKey) => {
-    if (notice !== null) return
-    // 0x7c00 — 확인 · 취소는 갱신이 먼저 본다
-    if (key === '확인') {
-      if (editor.cursor >= lists.pitchers.length) return
-      const result = onPick(editor.cursor)
-      if (result.notice !== '') setNotice({ text: result.notice, leave: result.recovered })
-      return
-    }
-    if (key === '취소') return onBack()
-    // 0x6f8c — '*' 는 편집기에 안 간다
-    if (key === '별') return
-    setEditor((current) => pressEntryKey(current, lists, key).state)
-  }, [editor.cursor, lists, notice, onBack, onPick])
+  const onKey = useCallback(
+    (key: EntryKey) => {
+      if (notice !== null) return
+      // 0x7c00 — 확인 · 취소는 갱신이 먼저 본다
+      if (key === '확인') {
+        if (editor.cursor >= lists.pitchers.length) return
+        const result = onPick(editor.cursor)
+        if (result.notice !== '') setNotice({ text: result.notice, leave: result.recovered })
+        return
+      }
+      if (key === '취소') return onBack()
+      // 0x6f8c — '*' 는 편집기에 안 간다
+      if (key === '별') return
+      setEditor((current) => pressEntryKey(current, lists, key).state)
+    },
+    [editor.cursor, lists, notice, onBack, onPick],
+  )
 
   return (
     <EntryEditorScreen
@@ -92,16 +105,28 @@ export function SeasonStaminaPickScreen({
       title="투수엔트리"
       footer={STAMINA_PICK_FOOTER}
       slides={false}
-      underlay={(
-        <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={null}
-          commandBar={{ slots: NO_SLOTS, cursor: 0, parent: seasonParentSlotOf('아이템') }} showsHeader={false} />
-      )}
-      overlay={notice !== null && (
-        <MessageBox text={notice.text} buttons={['OK']} onAnswer={() => {
-          setNotice(null)
-          if (notice.leave) onBack()
-        }} />
-      )}
+      underlay={
+        <SeasonCommonFrame
+          record={state.record}
+          teamMorale={state.teamMorale}
+          gamePoint={gamePoint}
+          onBack={null}
+          commandBar={{ slots: NO_SLOTS, cursor: 0, parent: seasonParentSlotOf('아이템') }}
+          showsHeader={false}
+        />
+      }
+      overlay={
+        notice !== null && (
+          <MessageBox
+            text={notice.text}
+            buttons={['OK']}
+            onAnswer={() => {
+              setNotice(null)
+              if (notice.leave) onBack()
+            }}
+          />
+        )
+      }
       onKey={onKey}
       onMoveCursor={(index) => setEditor((current) => pointEntryCursor(current, lists, index))}
       onCloseAceLocked={() => undefined}

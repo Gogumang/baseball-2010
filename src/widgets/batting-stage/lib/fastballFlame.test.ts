@@ -40,9 +40,7 @@ describe('강속구 불꽃 — 0x3b2f4 꼬리 0x3b6e4~0x3b7d8 (game_effect 애�
   it('공 틱 N 부터 N + 8 까지만 — 그린 틱마다 한 칸 (3b6fc · 3b794)', () => {
     const N = 20
     expect(fastballFlameFrameAt(불꽃, N - 1, N)).toBeNull()
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((k) => fastballFlameFrameAt(불꽃, N + k, N))).toEqual([
-      12, 12, 13, 14, 15, 16, 17, 21, 21,
-    ])
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((k) => fastballFlameFrameAt(불꽃, N + k, N))).toEqual([12, 12, 13, 14, 15, 16, 17, 21, 21])
     expect(fastballFlameFrameAt(불꽃, N + 9, N)).toBeNull()
   })
 

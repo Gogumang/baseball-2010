@@ -1,10 +1,4 @@
-import {
-  insertMyBatter,
-  myBatterIndexOf,
-  nariTeamRecordOf,
-  nariTeamsOf,
-  tableNariTeamRecord,
-} from '@/entities/career/model/nariTeamRecord'
+import { insertMyBatter, myBatterIndexOf, nariTeamRecordOf, nariTeamsOf, tableNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecord, NariTeamRecordFields } from '@/entities/career/model/nariTeamRecord'
 import { LEAGUE_TEAM_COUNT, UNSHUFFLED_PITCHER_ORDER } from '@/entities/league/model/league'
 import { advanceRotation } from '@/entities/pitcher-career/model/pitcherRotation'

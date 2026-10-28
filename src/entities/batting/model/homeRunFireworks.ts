@@ -128,11 +128,7 @@ function signedByte(value: number): number {
 }
 
 /** 0x901a0 종류 2 한 틱 — 칸 차례대로 */
-export function tickHomeRunFireworks<E>(
-  fireworks: HomeRunFireworks<E>,
-  port: FireworksParticlePort<E>,
-  random: RandomPort,
-): HomeRunFireworks<E> {
+export function tickHomeRunFireworks<E>(fireworks: HomeRunFireworks<E>, port: FireworksParticlePort<E>, random: RandomPort): HomeRunFireworks<E> {
   const slots = fireworks.slots.map((slot) => {
     const { alive, next } = tickSlot(slot, port, random)
     if (alive) return next

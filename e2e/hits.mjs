@@ -17,12 +17,52 @@ import { checkSceneHits } from './lib/hits-scene.mjs'
 import { DEVICE_SETS } from './lib/devices.mjs'
 
 const SCENE_NAMES = [
-  'title', 'main-menu', 'nari-new', 'pitcher-new', 'season-new', 'nari-management', 'nari-outing', 'pitcher-management',
-  'season-management', 'season-outing', 'general-quick', 'general-bat', 'general-pitch', 'general-defense', 'derby-pick', 'derby-start',
-  'nari-burst-result', 'pitcher-pitch', 'pitcher-defense', 'general-relay', 'mission-bat', 'mission-pitch', 'mission-result', 'season-postseason', 'season-cup',
-  'season-ending', 'nari-postseason', 'nari-cup', 'nari-cup-result', 'nari-ending', 'nari-hall-of-fame', 'pitcher-postseason', 'pitcher-cup', 'pitcher-cup-result',
-  'pitcher-ending', 'pitcher-hall-of-fame', 'nari-postseason-game', 'nari-postseason-next', 'nari-postseason-champion', 'nari-korean-series',
-  'nari-cup-win', 'pitcher-postseason-game', 'pitcher-postseason-next', 'pitcher-postseason-champion', 'pitcher-korean-series', 'pitcher-cup-win',
+  'title',
+  'main-menu',
+  'nari-new',
+  'pitcher-new',
+  'season-new',
+  'nari-management',
+  'nari-outing',
+  'pitcher-management',
+  'season-management',
+  'season-outing',
+  'general-quick',
+  'general-bat',
+  'general-pitch',
+  'general-defense',
+  'derby-pick',
+  'derby-start',
+  'nari-burst-result',
+  'pitcher-pitch',
+  'pitcher-defense',
+  'general-relay',
+  'mission-bat',
+  'mission-pitch',
+  'mission-result',
+  'season-postseason',
+  'season-cup',
+  'season-ending',
+  'nari-postseason',
+  'nari-cup',
+  'nari-cup-result',
+  'nari-ending',
+  'nari-hall-of-fame',
+  'pitcher-postseason',
+  'pitcher-cup',
+  'pitcher-cup-result',
+  'pitcher-ending',
+  'pitcher-hall-of-fame',
+  'nari-postseason-game',
+  'nari-postseason-next',
+  'nari-postseason-champion',
+  'nari-korean-series',
+  'nari-cup-win',
+  'pitcher-postseason-game',
+  'pitcher-postseason-next',
+  'pitcher-postseason-champion',
+  'pitcher-korean-series',
+  'pitcher-cup-win',
 ]
 
 const argScenes = process.argv.slice(2)
@@ -79,13 +119,17 @@ async function main() {
 
   const results = runs.flatMap((run) => run.results)
   const failures = results.filter((result) => result.failures.length > 0 || result.error !== null)
-  const allowed = results.flatMap((result) => result.allowed.map((row) => ({ ...row, device: result.device, scene: result.scene, state: result.state })))
+  const allowed = results.flatMap((result) =>
+    result.allowed.map((row) => ({ ...row, device: result.device, scene: result.scene, state: result.state })),
+  )
   writeFileSync('e2e/.run/hits-report.json', `${JSON.stringify({ results, ms: Date.now() - started }, null, 2)}\n`)
 
   console.log('\n기기별')
   for (const run of runs) {
     const own = run.results
-    console.log(`  ${run.deviceName}: 상태 ${own.length} · 요소 ${own.reduce((sum, r) => sum + r.checked, 0)} · 창 아래 ${own.reduce((sum, r) => sum + r.underWindow, 0)} · 다시 연 장면 ${run.reopened} · ${(run.ms / 1000).toFixed(1)}s`)
+    console.log(
+      `  ${run.deviceName}: 상태 ${own.length} · 요소 ${own.reduce((sum, r) => sum + r.checked, 0)} · 창 아래 ${own.reduce((sum, r) => sum + r.underWindow, 0)} · 다시 연 장면 ${run.reopened} · ${(run.ms / 1000).toFixed(1)}s`,
+    )
   }
   const allowedByWhy = new Map()
   for (const row of allowed) {
@@ -104,7 +148,9 @@ async function main() {
   for (const result of failures) {
     if (result.error !== null) console.log(`  ✗ [${result.device}] ${result.scene} · ${result.state}: ${result.error}`)
     for (const row of result.failures) {
-      console.log(`  ✗ [${result.device}] ${result.scene} · ${result.state}: ${row.label} (z ${row.z}) ← ${row.by} (z ${row.byZ}${row.byDisabled ? ' · 꺼짐' : ''}) 점 ${row.points.join('·')}`)
+      console.log(
+        `  ✗ [${result.device}] ${result.scene} · ${result.state}: ${row.label} (z ${row.z}) ← ${row.by} (z ${row.byZ}${row.byDisabled ? ' · 꺼짐' : ''}) 점 ${row.points.join('·')}`,
+      )
     }
   }
   console.log(`\n${((Date.now() - started) / 1000).toFixed(1)}s`)

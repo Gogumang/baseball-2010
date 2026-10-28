@@ -90,8 +90,8 @@ export function seasonPlayerRecordOf(
     }
   }
   const record = player.record ?? (isPitcher ? recordOf?.pitcher(player) : recordOf?.batter(player))
-  const pitcherRecord = isPitcher ? record as SeasonEntryPitcherRecord | undefined : undefined
-  const batterRecord = isPitcher ? undefined : record as SeasonEntryBatterRecord | undefined
+  const pitcherRecord = isPitcher ? (record as SeasonEntryPitcherRecord | undefined) : undefined
+  const batterRecord = isPitcher ? undefined : (record as SeasonEntryBatterRecord | undefined)
   // +0xb — 기록 사본의 바이트, 옛 사본(칸이 생기기 전)은 투수 보직(+0xb & 3, 0xb6dec)만
   const role: number = pitcherRecord?.role ?? 0
   // 밑값 +0xc · +0x14 · 니블을 든 기록 사본 — 0x30 바이트 그대로 읽는다(니블은 시즌 명단 값, 없으면 옮긴 기록의 값)
@@ -146,8 +146,14 @@ export function equippedSeasonAbilityOf(view: SeasonPlayerRecordView, slot: numb
 }
 
 /** 표 0xd1743 — 투수 한계 두 줄 (s8 × 10) · 0xd174b — 타자 타입 두 줄 */
-const PITCHER_LIMIT_ROWS: readonly (readonly number[])[] = [[80, 80, 80, 80], [85, 85, 85, 60]]
-const BATTER_LIMIT_ROWS: readonly (readonly number[])[] = [[80, 80, 80, 80], [80, 85, 75, 75]]
+const PITCHER_LIMIT_ROWS: readonly (readonly number[])[] = [
+  [80, 80, 80, 80],
+  [85, 85, 85, 60],
+]
+const BATTER_LIMIT_ROWS: readonly (readonly number[])[] = [
+  [80, 80, 80, 80],
+  [80, 85, 75, 75],
+]
 const LIMIT_SCALE = 10
 
 /**
@@ -159,8 +165,6 @@ const LIMIT_SCALE = 10
  * 표 값: 0xd1743 `[80,80,80,80, 85,85,85,60]` · 0xd174b `[80,80,80,80, 80,85,75,75]` (뒤는 0). 리그 타자 타입은 0·1 뿐이다.
  */
 export function seasonAbilityLimitsOf(view: Pick<SeasonPlayerRecordView, 'isPitcher' | 'profile'>): readonly number[] {
-  const row = view.isPitcher
-    ? PITCHER_LIMIT_ROWS[Math.min(seasonPositionBarOf(view), 1)]
-    : BATTER_LIMIT_ROWS[view.profile >> 5]
+  const row = view.isPitcher ? PITCHER_LIMIT_ROWS[Math.min(seasonPositionBarOf(view), 1)] : BATTER_LIMIT_ROWS[view.profile >> 5]
   return (row ?? [0, 0, 0, 0]).map((value) => value * LIMIT_SCALE)
 }

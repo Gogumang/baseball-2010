@@ -167,7 +167,7 @@ async function run(browserName, shiftOf) {
     let fieldStartedAt = null
     let shotField = 0
     let shotZone = false
-    for (const until = Date.now() + 30000; Date.now() < until; ) {
+    for (const until = Date.now() + 30000; Date.now() < until;) {
       const p = await derbyPeek(page)
       if (p === null || p.isResultShown || p.acceptsConfirm || p.run.remainingPitches !== before.remainingPitches) break
       if (await closeNotice()) continue

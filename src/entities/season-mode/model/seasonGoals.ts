@@ -82,11 +82,7 @@ export interface SeasonGoalWindowNumbers {
   readonly goals: readonly number[]
 }
 
-export function seasonGoalWindowNumbersOf(
-  yearIndex: number,
-  input: SeasonGoalInput,
-  windowRank: number,
-): SeasonGoalWindowNumbers {
+export function seasonGoalWindowNumbersOf(yearIndex: number, input: SeasonGoalInput, windowRank: number): SeasonGoalWindowNumbers {
   return {
     current: [
       windowRank,
@@ -196,10 +192,7 @@ export const ACE_PITCHER_GOAL_LINES: readonly GoalPitcherLine[] = [
 ]
 
 /** 목표 ④ 가 도는 투수 줄 — 레코드에 마투수(0..4)가 남았으면 그 줄을 하나 더 (차례는 합에 닿지 않는다) */
-export function goalPitcherLinesWithAce(
-  lines: readonly GoalPitcherLine[],
-  acePitcher: number | undefined,
-): readonly GoalPitcherLine[] {
+export function goalPitcherLinesWithAce(lines: readonly GoalPitcherLine[], acePitcher: number | undefined): readonly GoalPitcherLine[] {
   const ace = acePitcher === undefined || acePitcher < 0 ? undefined : ACE_PITCHER_GOAL_LINES[acePitcher]
   return ace === undefined ? lines : [...lines, ace]
 }
@@ -223,11 +216,7 @@ export interface GoalPostseasonBracket {
  * 그래서 **포스트시즌이 시작된 뒤 판정하는 392 에서는** 대진에 든 팀이 1~3, 못 든 팀이 10 이 된다
  * (정규시즌 1위 → 1 · 2위 → 2 · 3·4위 → 3). 원본 그대로다.
  */
-export function goalRankOf(
-  team: number,
-  regularSeasonRank: number,
-  bracket: GoalPostseasonBracket | null,
-): number {
+export function goalRankOf(team: number, regularSeasonRank: number, bracket: GoalPostseasonBracket | null): number {
   if (bracket === null) return regularSeasonRank
   if (bracket.champion === team) return 0
   for (let index = 0; index < bracket.pairs.length; index += 1) {

@@ -180,8 +180,7 @@ export function aimStartOf(side: number): WorldPoint {
   return { x: center.x, y: center.y, z: center.z }
 }
 
-const clampAround = (value: number, middle: number, half: number) =>
-  Math.max(middle - half, Math.min(middle + half, value))
+const clampAround = (value: number, middle: number, half: number) => Math.max(middle - half, Math.min(middle + half, value))
 
 /**
  * 0x10 매 틱 `0x39c5c` 의 앞부분 — 걸음 뒤 자르기 (모든 모드):
@@ -251,4 +250,3 @@ export function isPitchReleaseDue(tick: number): boolean {
 export function gaugePressedCellOf(pressedCell: number, cursorCell: number): number {
   return pressedCell === 0 ? cursorCell : pressedCell
 }
-

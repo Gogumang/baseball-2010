@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  battingAverageValueOf,
-  batterHandOf,
-  earnedRunAverageValueOf,
-  staminaGaugeOf,
-} from '@/widgets/matchup-cards/lib/matchupRecord'
+import { battingAverageValueOf, batterHandOf, earnedRunAverageValueOf, staminaGaugeOf } from '@/widgets/matchup-cards/lib/matchupRecord'
 import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 
 describe('소개 판 값의 셈', () => {

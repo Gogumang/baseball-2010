@@ -90,8 +90,12 @@ describe('장면 0x105 를 세운 상태 1 의 팁 굴림 (0x75fc 76cc · 3284e)
     const session = useSeasonSession(store, createSeededRandom(20100901))
     const gameSettings = useGameSettings(설정저장)
     return (
-      <SeasonRoute session={{ ...session, actions: { ...session.actions, constructScene } }}
-        random={createSeededRandom(20100901)} gameSettings={gameSettings} onExit={vi.fn()} />
+      <SeasonRoute
+        session={{ ...session, actions: { ...session.actions, constructScene } }}
+        random={createSeededRandom(20100901)}
+        gameSettings={gameSettings}
+        onExit={vi.fn()}
+      />
     )
   }
 
@@ -105,23 +109,31 @@ describe('장면 0x105 를 세운 상태 1 의 팁 굴림 (0x75fc 76cc · 3284e)
 
 describe('엔딩 0xf5 배선', () => {
   /** 효과기 종류 1 · 2 는 아홉 틀 — 그 끝을 본 다음 틀까지 넘긴다 (`SeasonScreenFade`) */
-  const 효과기넘기기 = () => act(() => {
-    vi.advanceTimersByTime(12 * millisecondsPerFrame())
-  })
+  const 효과기넘기기 = () =>
+    act(() => {
+      vi.advanceTimersByTime(12 * millisecondsPerFrame())
+    })
   /** 엔딩 글은 상태 틱 n > 15 부터 그린다 (0x87a1c 87bdc~87be0) */
-  const 글까지 = () => act(() => {
-    vi.advanceTimersByTime(16 * millisecondsPerFrame())
-  })
+  const 글까지 = () =>
+    act(() => {
+      vi.advanceTimersByTime(16 * millisecondsPerFrame())
+    })
   afterEach(() => {
     vi.useRealTimers()
   })
 
   it('phase 6 으로 들어오면 **엔딩 화면**이 뜬다 — 예전에는 "화면이 없습니다" 로 샜다', () => {
-    const store = 메모리저장(세이브(레코드({
-      phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
-      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
-      seenEvents: [400, 1, 5, 100],
-    })))
+    const store = 메모리저장(
+      세이브(
+        레코드({
+          phase: SEASON_PHASE.엔딩,
+          yearIndex: 9,
+          popularity: 900,
+          // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+          seenEvents: [400, 1, 5, 100],
+        }),
+      ),
+    )
 
     vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={vi.fn()} />)
@@ -134,11 +146,17 @@ describe('엔딩 0xf5 배선', () => {
 
   it('보너스 팝업 0x2b 를 닫고 다음 키로 넘기면 **관리 메뉴 0xc9** 로 간다 — SR+0x1bc 는 그때 선다 (0x8bd8 8ccc~8d2c)', () => {
     const onExit = vi.fn()
-    const store = 메모리저장(세이브(레코드({
-      phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
-      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
-      seenEvents: [400, 1, 5, 100],
-    })))
+    const store = 메모리저장(
+      세이브(
+        레코드({
+          phase: SEASON_PHASE.엔딩,
+          yearIndex: 9,
+          popularity: 900,
+          // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+          seenEvents: [400, 1, 5, 100],
+        }),
+      ),
+    )
     vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={onExit} />)
     // 진입 0x6be8 의 효과기 종류 2 — 도는 동안은 키가 안 먹는다(0x4b18)
@@ -173,11 +191,17 @@ describe('엔딩 0xf5 배선', () => {
   })
 
   it('보너스를 받고 넘기기 전에 끄면 다시 엔딩이다 — SR+0x7b 가 서 있어 보너스 팝업 없이 넘어간다 (0x6b3c)', () => {
-    const store = 메모리저장(세이브(레코드({
-      phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900,
-      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
-      seenEvents: [400, 1, 5, 100],
-    })))
+    const store = 메모리저장(
+      세이브(
+        레코드({
+          phase: SEASON_PHASE.엔딩,
+          yearIndex: 9,
+          popularity: 900,
+          // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+          seenEvents: [400, 1, 5, 100],
+        }),
+      ),
+    )
     render(<시즌화면 store={store} onExit={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
@@ -195,11 +219,18 @@ describe('엔딩 0xf5 배선', () => {
   })
 
   it('엔딩을 넘기면 SR+0x1bc 가 서서 다음에 들어올 때는 관리 메뉴다 (0x8bd8 → 0xcb)', () => {
-    const store = 메모리저장(세이브(레코드({
-      phase: SEASON_PHASE.엔딩, yearIndex: 9, popularity: 900, endingBonusReceived: true,
-      // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
-      seenEvents: [400, 1, 5, 100],
-    })))
+    const store = 메모리저장(
+      세이브(
+        레코드({
+          phase: SEASON_PHASE.엔딩,
+          yearIndex: 9,
+          popularity: 900,
+          endingBonusReceived: true,
+          // 10년을 다 치른 시즌이라 대상 4 자동 이벤트(400·1·5·100)는 이미 봤다 — 안 그러면 관리 메뉴 폴링이 400 을 튼다
+          seenEvents: [400, 1, 5, 100],
+        }),
+      ),
+    )
     vi.useFakeTimers()
     render(<시즌화면 store={store} onExit={vi.fn()} />)
     효과기넘기기()
@@ -219,9 +250,7 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
     const base = 레코드({ popularity: 9999, money: 9999, ...덮어쓰기 })
     return {
       ...base,
-      stadiumOwned: base.stadiumOwned.map((owned, index) =>
-        slots.some((slot) => stadiumOwnedIndexOf('관중석', slot) === index) ? true : owned,
-      ),
+      stadiumOwned: base.stadiumOwned.map((owned, index) => (slots.some((slot) => stadiumOwnedIndexOf('관중석', slot) === index) ? true : owned)),
     }
   }
 
@@ -475,7 +504,7 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
     fireEvent.click(screen.getByRole('button', { name: '예' }))
     expect(알림글()).toContain('해당 장비를 장착 했습니다')
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
-    const saved = store.load() as { state: { record: { money: number } } ; roster: { pitchers: { equipment?: number[] }[] } }
+    const saved = store.load() as { state: { record: { money: number } }; roster: { pitchers: { equipment?: number[] }[] } }
     expect(saved.state.record.money).toBe(10)
     expect(saved.roster.pitchers.some((player) => player.equipment?.[0] === 1)).toBe(true)
     // 낀 칸은 mode_ui 44 막대 위 (0xce, 0xc7, 0xbd) 글
@@ -497,8 +526,10 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
     const store = 메모리저장({
       ...세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })),
       roster: {
-        pitchers: [{ id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: { name: '나리투수', ability: [1, 2, 3, 4] } },
-          ...[1, 2, 3, 4, 5, 6, 7].map((slot) => ({ ...표, id: slot, kindByte: slot }))],
+        pitchers: [
+          { id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: { name: '나리투수', ability: [1, 2, 3, 4] } },
+          ...[1, 2, 3, 4, 5, 6, 7].map((slot) => ({ ...표, id: slot, kindByte: slot })),
+        ],
         batters: Array.from({ length: 12 }, (_, slot) => ({ ...표, id: slot, kindByte: slot })),
       },
     })
@@ -517,8 +548,13 @@ describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 
   const 띄우기 = () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100], yearGoalShown: true })))
     const 투수 = {
-      name: '김전당', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
-      equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 1,
+      name: '김전당',
+      ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+      equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+      endingIndex: 5,
+      season: 10,
+      titleIds: [],
+      slot: 1,
       look: { typeIndex: 0, handIndex: 0, skinIndex: 0, teamId: 1 },
     } satisfies HallOfFamePitcher
     const 타자 = { name: '이전당', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [] } satisfies HallOfFamer
@@ -569,8 +605,10 @@ describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 
 
 describe('선수영입 나리 칸 0·5 — 0x22168 · 0x220ec 의 내 선수 기록을 id 0xfe 로 통째 옮긴다', () => {
   const 나리투수 = {
-    name: '나리투수', ability: [10, 20, 30, 40] as const,
-    repertoire: { name: '나리투수', form: 0, magicId: 2, pitchMask: 0b101 }, role: 2 as const,
+    name: '나리투수',
+    ability: [10, 20, 30, 40] as const,
+    repertoire: { name: '나리투수', form: 0, magicId: 2, pitchMask: 0b101 },
+    role: 2 as const,
   }
   const 나리타자 = { name: '나리타자', ability: [1, 2, 3, 4] as const }
   const 띄우기 = () => {
@@ -670,11 +708,21 @@ describe('훈련 결과 팝업 첫 줄 [창+0x2d8] 의 수명 — 창은 장면 
     const gameSettings = useGameSettings(설정저장)
     return (
       <>
-        <SeasonRoute session={{ ...session, trainingResult: 결과 }} random={createSeededRandom(20100901)}
-          gameSettings={gameSettings} onExit={vi.fn()} />
-        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.트레이닝)}>훈련으로</button>
-        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.경기직전)}>경기로</button>
-        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.관리메뉴)}>관리로</button>
+        <SeasonRoute
+          session={{ ...session, trainingResult: 결과 }}
+          random={createSeededRandom(20100901)}
+          gameSettings={gameSettings}
+          onExit={vi.fn()}
+        />
+        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.트레이닝)}>
+          훈련으로
+        </button>
+        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.경기직전)}>
+          경기로
+        </button>
+        <button type="button" onClick={() => session.actions.goto(SEASON_SCENE_STATE.관리메뉴)}>
+          관리로
+        </button>
       </>
     )
   }

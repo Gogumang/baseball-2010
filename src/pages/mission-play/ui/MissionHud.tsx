@@ -4,8 +4,20 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
 import { goalTickerFrameAt } from '@/entities/mission/model/goalTicker'
 import {
-  COUNTER_BASE, COUNTER_CLIP, GOAL_TEXT_WIDTH, MISSION_HUD_BASE, TEXT_CLIP, TIMER_ICON, TIMER_STRIP,
-  goalCountOf, goalLineDrawsOf, limitStripsOf, missionHudIconOf, pitcherGoalCountOf, slashCounterGlyphsOf, timerGlyphsOf,
+  COUNTER_BASE,
+  COUNTER_CLIP,
+  GOAL_TEXT_WIDTH,
+  MISSION_HUD_BASE,
+  TEXT_CLIP,
+  TIMER_ICON,
+  TIMER_STRIP,
+  goalCountOf,
+  goalLineDrawsOf,
+  limitStripsOf,
+  missionHudIconOf,
+  pitcherGoalCountOf,
+  slashCounterGlyphsOf,
+  timerGlyphsOf,
 } from '@/pages/mission-play/lib/missionHudLayout'
 import type { ClipRect, HudGlyph, HudSprite, MissionHudMode, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import * as styles from '@/pages/mission-play/ui/MissionHud.css'
@@ -116,11 +128,7 @@ export function MissionHud({
   const timer = remainingSeconds === null || remainingSeconds <= 0 ? null : timerGlyphsOf(Math.ceil(remainingSeconds))
 
   return (
-    <div
-      className={styles.hud}
-      data-testid="미션-HUD"
-      {...(isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {})}
-    >
+    <div className={styles.hud} data-testid="미션-HUD" {...(isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {})}>
       {MISSION_HUD_BASE.slice(0, 2).map((sprite, index) => (
         <Sprite key={index} sprite={sprite} />
       ))}
@@ -140,9 +148,7 @@ export function MissionHud({
       <Clip rect={isSliding ? COUNTER_CLIP : null}>
         {draws.map((draw) => {
           const count =
-            mode === 5
-              ? pitcherGoalCountOf(mission, progress, lines[draw.index], allowedRuns)
-              : goalCountOf(mission, progress, lines[draw.index])
+            mode === 5 ? pitcherGoalCountOf(mission, progress, lines[draw.index], allowedRuns) : goalCountOf(mission, progress, lines[draw.index])
           return (
             <Glyphs
               key={`수-${draw.index}`}

@@ -181,7 +181,7 @@ describe('투수 미션 상태 0xe — 새 타석마다 사람 OK 를 기다린�
   })
 })
 
-describe('투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 \'*\' 로 연다 (0x498d4 · 표 0xcfcfc 행 1)', () => {
+describe("투수 미션 경기 중 메뉴 — 원본 미션 장면(0x104)도 '*' 로 연다 (0x498d4 · 표 0xcfcfc 행 1)", () => {
   function 메뉴화면(props: { onGiveUp?: () => void; onRestart?: () => void } = {}) {
     vi.useFakeTimers()
     render(

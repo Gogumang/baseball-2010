@@ -87,10 +87,7 @@ describe('관중 수 0xa34b8', () => {
     // 관중석 0 = 20000 수용. 18160 ≥ 16000 → 2
     expect(attendanceOf(기본({ reputation: 300, games: 10 }), { myRank: 0, opponentRank: 4 }).crowdLevel).toBe(2)
     // 하한 3000 은 35%(7000) 아래 → 0
-    expect(
-      attendanceOf(기본({ reputation: 0, games: 10, lastPopularityChange: -8 }), { myRank: 9, opponentRank: 9 })
-        .crowdLevel,
-    ).toBe(0)
+    expect(attendanceOf(기본({ reputation: 0, games: 10, lastPopularityChange: -8 }), { myRank: 9, opponentRank: 9 }).crowdLevel).toBe(0)
   })
 })
 

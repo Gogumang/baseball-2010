@@ -71,11 +71,7 @@ export const NO_THROW_ERROR: ThrowErrorResult = { errant: false, speedDelta: 0, 
  * 악송구면 0xa1620 은 이어서 방향 흔들림 rand(0, 22 − h/150) · 부호 rand(0,2) 를 굴린다 — `errantThrowFlight`.
  * 확률은 ≈1.03~1.10% 다.
  */
-export function rollThrowError(
-  defenseAbility: number | null,
-  special: boolean,
-  random: RandomPort,
-): ThrowErrorResult {
+export function rollThrowError(defenseAbility: number | null, special: boolean, random: RandomPort): ThrowErrorResult {
   const threshold = throwErrorChanceOf(defenseAbility, special)
   if (random.rand(0, RANDOM_LIMIT) >= threshold) return NO_THROW_ERROR
   return {
@@ -99,10 +95,7 @@ export interface SpecialDefenseOptions {
 }
 
 /** 천분율 기준값 — `rand(0, 1000) < 기준` 이면 발동 (0x66b30 = 0x66be4, 표가 같다) */
-export function specialDefenseThresholdOf(
-  defenseAbility: number,
-  options: SpecialDefenseOptions = {},
-): number {
+export function specialDefenseThresholdOf(defenseAbility: number, options: SpecialDefenseOptions = {}): number {
   const base = balanceList('fielding.specialDefensePercent')[abilityGradeOf(defenseAbility)] + (options.hasSixthSense === true ? 3 : 0)
   const threshold = base * 10
   return options.isBatterCareerMode === true ? Math.trunc(threshold / 2) : threshold

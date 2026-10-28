@@ -6,9 +6,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { emitParticles } from '@/entities/particle/model/particleScene'
-import {
-  isSceneParticleTickHeld, resetSceneParticleManagerForTest, sceneParticleScene,
-} from '@/entities/particle/model/sceneParticleManager'
+import { isSceneParticleTickHeld, resetSceneParticleManagerForTest, sceneParticleScene } from '@/entities/particle/model/sceneParticleManager'
 
 const 녹음 = { played: [] as number[], stopped: 0 }
 const 소리: SoundPort = {
@@ -101,7 +99,16 @@ describe('벤치 클리어링 연출 (상태 0x1e)', () => {
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 9))
     expect(asked).toHaveLength(0)
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
-    expect(asked).toEqual([[1000, 2000], [2000, 3000], [1000, 1500], [2500, 3000], [1000, 1500], [2500, 3000], [0, 2000], [0, 2000]])
+    expect(asked).toEqual([
+      [1000, 2000],
+      [2000, 3000],
+      [1000, 1500],
+      [2500, 3000],
+      [1000, 1500],
+      [2500, 3000],
+      [0, 2000],
+      [0, 2000],
+    ])
     fireEvent.keyDown(window, { key: '5' })
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
     expect(onDone).toHaveBeenCalledWith(false)
@@ -126,10 +133,28 @@ describe('벤치 클리어링 연출 (상태 0x1e)', () => {
     emitParticles(
       sceneParticleScene(),
       {
-        ang: 0, spread: 0, spd: 0, spdR: 0, emit: 1, emitR: 0, life: 40, lifeR: 0, a0: 0, a0R: 0, a1: 0, a1R: 0,
-        ax: 0, ay: 0, w: 0, h: 0, total: 50, mode: 2,
+        ang: 0,
+        spread: 0,
+        spd: 0,
+        spdR: 0,
+        emit: 1,
+        emitR: 0,
+        life: 40,
+        lifeR: 0,
+        a0: 0,
+        a0R: 0,
+        a1: 0,
+        a1R: 0,
+        ax: 0,
+        ay: 0,
+        w: 0,
+        h: 0,
+        total: 50,
+        mode: 2,
       },
-      0, 0, 0,
+      0,
+      0,
+      0,
     )
     const entryRolls = Array.from({ length: 9 }, () => ({ scatterX: 0, scatterZ: 100, speed: 200, targetX: 0, targetZ: 0 }))
     render(

@@ -1,6 +1,4 @@
-import {
-  MY_PITCHER_SLOT, OUR_ACE_PITCHER_SLOT, opponentPitcherOrderOf, ourPitcherOrderOf,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { MY_PITCHER_SLOT, OUR_ACE_PITCHER_SLOT, opponentPitcherOrderOf, ourPitcherOrderOf } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { equippedPitcherAbilityOf, pitcherFormOfCareer, pitcherRecordLineOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
@@ -15,7 +13,12 @@ import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import type { NariEntryFace } from '@/pages/management/lib/nariEntryView'
 import { ACE_PITCHER_SLOT } from '@/entities/league/model/leagueDay'
 import {
-  acePitcherFace, nariCupEntryCellSourceOf, nariEntryBattersOf, nariEntryPitchersOf, nariEntryTeamMoraleOf, openNariEntryView,
+  acePitcherFace,
+  nariCupEntryCellSourceOf,
+  nariEntryBattersOf,
+  nariEntryPitchersOf,
+  nariEntryTeamMoraleOf,
+  openNariEntryView,
 } from '@/pages/management/lib/nariEntryView'
 import type { NariEntryCellSource, NariEntryView } from '@/pages/management/lib/nariEntryView'
 import { ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
@@ -42,28 +45,35 @@ export function pitcherNariEntryViewOf(
   // (`nariCupEntryCellSourceOf`). 내 투수 줄은 상태 133 의 0xb53f1 이 내 레코드 0x30 바이트를 그대로 memcpy 한 것이라 커리어 시즌 줄이다
   // (대회 경기는 0xa56dc 거짓이라 안 쌓는다) — 다만 게이트 밖 +0x2a 사사구(a8b04~a8bee)는 그 사본에 쌓이고(`myCupWalks`), 사본 +0x2c 는
   // 첫날 베낀 내 스태미나 · 둘째 날부터 하루 끝 b81e0 의 0xb6190 이 채운 10000 이다(`myCupPitcherStaminaOf`)
-  const cells: NariEntryCellSource = cupTeams !== undefined
-    ? nariCupEntryCellSourceOf(career.leaguePlayerStats, PITCHER_EDITION_MODE, teamId, cupTeams)
-    : {
-      stats: career.leaguePlayerStats,
-      staminas: humanGamePitcherStaminasOf(career, options.dayCounter, teamId),
-      staminaMode: PITCHER_EDITION_MODE,
-      // 팀 레코드 +2 — 내 팀은 커리어 사기(0x1f988 +2), 상대는 그 팀이 마지막으로 선 경기 때의 나리 사기 (`teamRecordMorales`, r128)
-      morale: nariEntryTeamMoraleOf(career, isMyTeam, teamId),
-    }
+  const cells: NariEntryCellSource =
+    cupTeams !== undefined
+      ? nariCupEntryCellSourceOf(career.leaguePlayerStats, PITCHER_EDITION_MODE, teamId, cupTeams)
+      : {
+          stats: career.leaguePlayerStats,
+          staminas: humanGamePitcherStaminasOf(career, options.dayCounter, teamId),
+          staminaMode: PITCHER_EDITION_MODE,
+          // 팀 레코드 +2 — 내 팀은 커리어 사기(0x1f988 +2), 상대는 그 팀이 마지막으로 선 경기 때의 나리 사기 (`teamRecordMorales`, r128)
+          morale: nariEntryTeamMoraleOf(career, isMyTeam, teamId),
+        }
   return openNariEntryView(isMyTeam, teamId, {
     batters: nariEntryBattersOf(record, teamId, null, cells),
-    pitchers: nariEntryPitchersOf(teamId, order, (slot) => {
-      if (isMyTeam && slot === MY_PITCHER_SLOT) {
-        const face = myPitcherEntryFaceOf(career)
-        const cup = cupTeams === undefined ? undefined : { teams: cupTeams, day: career.nationalCup?.day ?? 0 }
-        return { ...face, ...myPitcherEntryCellsOf(career, face, cells, cup), isAce: false }
-      }
-      if (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE) return { ...acePitcherFace(record.acePitcher), isAce: true }
-      return undefined
-    }, cells, (slot) => (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE ? ACE_PITCHERS[record.acePitcher]?.recordLine ?? [] : undefined),
-    // 레코드 투수 장비 니블 (나리 새 시즌 CPU 장비 굴림 0x665e8) — 상세 창 도형 값이 그 보너스를 먹는다
-    record.pitcherEquipment),
+    pitchers: nariEntryPitchersOf(
+      teamId,
+      order,
+      (slot) => {
+        if (isMyTeam && slot === MY_PITCHER_SLOT) {
+          const face = myPitcherEntryFaceOf(career)
+          const cup = cupTeams === undefined ? undefined : { teams: cupTeams, day: career.nationalCup?.day ?? 0 }
+          return { ...face, ...myPitcherEntryCellsOf(career, face, cells, cup), isAce: false }
+        }
+        if (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE) return { ...acePitcherFace(record.acePitcher), isAce: true }
+        return undefined
+      },
+      cells,
+      (slot) => (slot === aceSlot && record.acePitcher !== NO_RECORD_ACE ? (ACE_PITCHERS[record.acePitcher]?.recordLine ?? []) : undefined),
+      // 레코드 투수 장비 니블 (나리 새 시즌 CPU 장비 굴림 0x665e8) — 상세 창 도형 값이 그 보너스를 먹는다
+      record.pitcherEquipment,
+    ),
   })
 }
 
@@ -112,9 +122,14 @@ export function myPitcherEntryFaceOf(career: PitcherCareer): NariEntryFace {
     ability,
     profileLow: profile & 3,
     detailSource: {
-      isPitcher: true, abilities: ability, aceIndex: -1, profile, skillBits: skillBitsOfIds(career.equippedSkillIds),
+      isPitcher: true,
+      abilities: ability,
+      aceIndex: -1,
+      profile,
+      skillBits: skillBitsOfIds(career.equippedSkillIds),
       repertoire: { form: pitcherFormOfCareer(career), magicNumber: career.selectedMagicNumber, pitchMask: career.pitchMask },
-      grade: null, nurturedSalary: career.salary,
+      grade: null,
+      nurturedSalary: career.salary,
     },
   }
 }

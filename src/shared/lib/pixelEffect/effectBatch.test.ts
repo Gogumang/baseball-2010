@@ -47,7 +47,15 @@ function createFakeCanvas(width: number, height: number, rounding: Rounding) {
       }
       return { data, width: sw, height: sh, colorSpace: 'srgb' } as ImageData
     },
-    putImageData(image: ImageData, dx: number, dy: number, dirtyX: number = 0, dirtyY: number = 0, dirtyWidth: number = image.width, dirtyHeight: number = image.height) {
+    putImageData(
+      image: ImageData,
+      dx: number,
+      dy: number,
+      dirtyX: number = 0,
+      dirtyY: number = 0,
+      dirtyWidth: number = image.width,
+      dirtyHeight: number = image.height,
+    ) {
       writes += 1
       for (let row = dirtyY; row < dirtyY + dirtyHeight; row += 1) {
         for (let column = dirtyX; column < dirtyX + dirtyWidth; column += 1) {
@@ -73,14 +81,7 @@ function drawBefore(context: EffectCanvasContext, sprite: RgbaSurface, x: number
   const bottom = Math.min(context.canvas.height, Math.floor(y) + sprite.height)
   if (right <= left || bottom <= top) return
   const region = context.getImageData(left, top, right - left, bottom - top)
-  composeRgba(
-    { data: region.data, width: region.width, height: region.height },
-    sprite,
-    Math.floor(x) - left,
-    Math.floor(y) - top,
-    effect,
-    argument,
-  )
+  composeRgba({ data: region.data, width: region.width, height: region.height }, sprite, Math.floor(x) - left, Math.floor(y) - top, effect, argument)
   context.putImageData(region, left, top)
 }
 
@@ -128,10 +129,13 @@ function randomDraws(random: () => number, width: number, height: number, cluste
   return Array.from({ length: count }, () => {
     const effect = EFFECTS[Math.floor(random() * EFFECTS.length)]
     const argument =
-      effect === DRAW_EFFECT.TRANSLUCENT ? Math.floor(random() * 17)
-      : effect === DRAW_EFFECT.ADDITIVE ? Math.floor(random() * 260)
-      : effect === DRAW_EFFECT.JITTER ? Math.floor(random() * 4)
-      : Math.floor(random() * 32)
+      effect === DRAW_EFFECT.TRANSLUCENT
+        ? Math.floor(random() * 17)
+        : effect === DRAW_EFFECT.ADDITIVE
+          ? Math.floor(random() * 260)
+          : effect === DRAW_EFFECT.JITTER
+            ? Math.floor(random() * 4)
+            : Math.floor(random() * 32)
     const spread = clustered ? 8 : width
     return {
       sprite: randomSprite(random),

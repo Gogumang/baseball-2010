@@ -76,9 +76,7 @@ export function enterSceneConfirm(atBatEntrySoundId?: number): SceneConfirmWait 
 
 /** 0xd → 0xe 진입에서 감독 강판(0x504cc 참 → 0x23)으로 빠진다 — OK 없이 0xd 두 그림 · 0xe 한 그림만 지난다(`hooksAtEntry`) */
 export function enterSceneHookPassage(atBatEntrySoundId?: number): SceneConfirmWait {
-  return atBatEntrySoundId === undefined
-    ? { entries: 1, hooksAtEntry: true }
-    : { entries: 1, atBatEntrySoundId, hooksAtEntry: true }
+  return atBatEntrySoundId === undefined ? { entries: 1, hooksAtEntry: true } : { entries: 1, atBatEntrySoundId, hooksAtEntry: true }
 }
 
 /** 교체 창 0xb 의 '#' · CLR(0x4984a) — 0xd 없이 곧장 0xe 에 선다(`skipsSceneD`) */

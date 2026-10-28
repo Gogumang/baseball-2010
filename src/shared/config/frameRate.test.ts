@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  DEFAULT_SPEED_LEVEL,
-  MILLISECONDS_PER_FRAME_BY_SPEED,
-  millisecondsPerFrame,
-  setGameSpeedLevel,
-} from '@/shared/config/frameRate'
+import { DEFAULT_SPEED_LEVEL, MILLISECONDS_PER_FRAME_BY_SPEED, millisecondsPerFrame, setGameSpeedLevel } from '@/shared/config/frameRate'
 
 describe('게임 속도 — binary.mod 속도 옵션 표 0xd7624', () => {
   afterEach(() => setGameSpeedLevel(DEFAULT_SPEED_LEVEL))

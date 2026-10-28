@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BURST_WINDOW_START, burstBandTopOf, burstNextMarkAt, burstPortraitAnchorOf, burstPortraitOf, burstResultPopupTextOf,
-  burstShakeOffsetOf, burstSpeakerPrefixOf, burstTextBoxOf, isBurstWindowOpen, tickBurstWindow,
+  BURST_WINDOW_START,
+  burstBandTopOf,
+  burstNextMarkAt,
+  burstPortraitAnchorOf,
+  burstPortraitOf,
+  burstResultPopupTextOf,
+  burstShakeOffsetOf,
+  burstSpeakerPrefixOf,
+  burstTextBoxOf,
+  isBurstWindowOpen,
+  tickBurstWindow,
 } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import { 행 } from '@/entities/burst-mission/model/burstMissionTestRows'
@@ -26,9 +35,7 @@ describe('갱신 0x8e5b8 — 판 높이 · 흔들기 카운터', () => {
 
   it('흔들기 0xba888(0, ±1) — c 홀수 +1 · 짝수 −1, c ≤ 0 이면 없다', () => {
     const states = 갱신(9)
-    expect(states.map(burstShakeOffsetOf)).toEqual([
-      null, null, null, null, null, { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 0, y: 1 }, null,
-    ])
+    expect(states.map(burstShakeOffsetOf)).toEqual([null, null, null, null, null, { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 0, y: 1 }, null])
   })
 })
 

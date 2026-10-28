@@ -20,15 +20,29 @@ describe('야수 그리기 0x43278 의 실책 +0x2e (4381a~43904)', () => {
   })
 
   it('펌블 갈래만 시즌 평판 0xa755d(ctx, 3) 표시를 단다 — 악송구 갈래(438c4)는 +0x2e 만 (r248)', () => {
-    expect(drawnFieldingErrorsOf([{ slot: 5, fumbleTicks: 6 }, { slot: 2, throwErrorTicks: 4 }]).map((error) => error.isFumble === true))
-      .toEqual([true, false])
+    expect(
+      drawnFieldingErrorsOf([
+        { slot: 5, fumbleTicks: 6 },
+        { slot: 2, throwErrorTicks: 4 },
+      ]).map((error) => error.isFumble === true),
+    ).toEqual([true, false])
   })
 
   it('재생 판을 끝까지 그린 실책 — 판 틱마다 그림 한 번 (재생 갈래와 같은 셈)', () => {
-    expect(drawnReplayFieldingErrorsOf([
-      { fielders: [{ slot: 5, fumbleTicks: 6 }] },
-      { fielders: [{ slot: 5, fumbleTicks: 5 }, { slot: 2, throwErrorTicks: 4 }] },
-    ])).toEqual([{ slot: 5, teamIndex: null, isFumble: true }, { slot: 2, teamIndex: null }])
+    expect(
+      drawnReplayFieldingErrorsOf([
+        { fielders: [{ slot: 5, fumbleTicks: 6 }] },
+        {
+          fielders: [
+            { slot: 5, fumbleTicks: 5 },
+            { slot: 2, throwErrorTicks: 4 },
+          ],
+        },
+      ]),
+    ).toEqual([
+      { slot: 5, teamIndex: null, isFumble: true },
+      { slot: 2, teamIndex: null },
+    ])
   })
 
   it('동작 잠금 +0xb4 > 0 인 야수는 건너뛴다 (437a4)', () => {
@@ -60,7 +74,10 @@ describe('야수 +0xec — 자리 니블이 칸 + 1 인 첫 선수 (0xb0fb4 · 0
 
   it('열쇠를 못 고른 칸은 버린다', () => {
     const 기록 = fieldingErrorRecordsOf(
-      [{ slot: 1, teamIndex: 2 }, { slot: 8, teamIndex: 2 }],
+      [
+        { slot: 1, teamIndex: 2 },
+        { slot: 8, teamIndex: 2 },
+      ],
       (error) => (error.slot === 1 ? { teamId: 2, battingOrderIndex: 4 } : null),
     )
     expect(기록).toEqual([{ teamId: 2, battingOrderIndex: 4 }])

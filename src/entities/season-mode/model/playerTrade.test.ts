@@ -4,8 +4,18 @@ import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { HALL_OF_FAME_FIRST_ID, PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_BOOST_RATE, masterRosterSlotOf, swapTradedPlayers, tradePenaltyOf, tradeSlotPenaltyOf, canUseTradeCommand, markTradeUsed,
-  rollTradeSuccess, tradeBoostCostOf, tradeMoneyChangeOf, tradeRefusalOf, tradeSuccessRate,
+  TRADE_BOOST_RATE,
+  masterRosterSlotOf,
+  swapTradedPlayers,
+  tradePenaltyOf,
+  tradeSlotPenaltyOf,
+  canUseTradeCommand,
+  markTradeUsed,
+  rollTradeSuccess,
+  tradeBoostCostOf,
+  tradeMoneyChangeOf,
+  tradeRefusalOf,
+  tradeSuccessRate,
   withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -21,7 +31,11 @@ const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
 })
 
 const 선수 = (덮어쓰기: Partial<SeasonPlayer> = {}): SeasonPlayer => ({
-  id: 0, kindByte: 0, fieldPosition: 0, stamina: 0, ...덮어쓰기,
+  id: 0,
+  kindByte: 0,
+  fieldPosition: 0,
+  stamina: 0,
+  ...덮어쓰기,
 })
 
 /** 뽑기를 정해 놓은 난수 — `bfa55(1,101)` 이 값 하나만 준다 */

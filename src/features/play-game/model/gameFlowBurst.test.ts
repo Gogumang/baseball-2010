@@ -61,10 +61,7 @@ describe('경기 진행기와 돌발미션', () => {
     const progress = startGame(씨앗(20100901))
     const 돌발없음 = {
       ...progress,
-      burst:
-        progress.burst === null
-          ? null
-          : { ...progress.burst, current: null, triggeredCount: MAXIMUM_BURSTS_PER_GAME },
+      burst: progress.burst === null ? null : { ...progress.burst, current: null, triggeredCount: MAXIMUM_BURSTS_PER_GAME },
       lastBurstResolution: null,
     }
 
@@ -168,7 +165,9 @@ describe('도루 (0x53610 → 0xa9bd4 출발 · 공 도착 0x3dfac 의 종류 5 
   it('출발한 주자는 공이 도착해야 판정된다 — 판이 열리면 1루가 빈다', () => {
     const before = startSteal(주자있는경기(), 1, createSeededRandom(0))
     const 결과들 = Array.from({ length: 10 }, (_unused, seed) =>
-      arrivePitch(before, { batterHand: 0, resolution: { kind: '볼' }, outcomeAfter: null }, 씨앗(seed + 1), { countAfter: { strikes: 0, balls: 1 } }),
+      arrivePitch(before, { batterHand: 0, resolution: { kind: '볼' }, outcomeAfter: null }, 씨앗(seed + 1), {
+        countAfter: { strikes: 0, balls: 1 },
+      }),
     )
     for (const { progress, play } of 결과들) {
       if (play === null) continue

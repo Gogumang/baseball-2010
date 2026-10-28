@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
-import {
-  canStartSteal,
-  isStealAllowedInPlayKind,
-  pitchPlayKindOf,
-  STEAL_PLAY_KIND,
-  stealTargetBaseOf,
-} from '@/entities/fielding/model/stealStart'
+import { canStartSteal, isStealAllowedInPlayKind, pitchPlayKindOf, STEAL_PLAY_KIND, stealTargetBaseOf } from '@/entities/fielding/model/stealStart'
 import { PASSED_BALL_PLAY_KIND } from '@/entities/fielding/model/passedBall'
 
 const 일루 = { ...EMPTY_BASES, first: true }

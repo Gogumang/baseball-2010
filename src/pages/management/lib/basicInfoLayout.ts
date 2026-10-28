@@ -59,7 +59,12 @@ export const RADAR_LABEL_FRAMES = [41, 42, 43, 44]
 export const PITCHER_RADAR_LABEL_FRAMES = [37, 38, 39, 40]
 export const RADAR_LABEL_BOX_IMAGE = assetUrl('./sprites/slt_frame/017.png')
 export const RADAR_BACKGROUND_IMAGE = assetUrl('./sprites/slt_frame/003.png')
-export const RADAR_COLORS = { axis: ORIGINAL_COLORS.radarAxis, fill: ORIGINAL_COLORS.highlightYellow, fillOpacity: 0xb4 / 255, edge: ORIGINAL_COLORS.text }
+export const RADAR_COLORS = {
+  axis: ORIGINAL_COLORS.radarAxis,
+  fill: ORIGINAL_COLORS.highlightYellow,
+  fillOpacity: 0xb4 / 255,
+  edge: ORIGINAL_COLORS.text,
+}
 
 /** 숫자 색 — 기본값보다 표시값이 크면 초록, 작으면 빨강 (0x7c008) */
 export function abilityColorOf(baseValue: number, shownValue: number): string | null {

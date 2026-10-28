@@ -156,8 +156,7 @@ describe('팀 고르기', () => {
     const 물음표 = screen.getAllByTestId('팀칸-물음표')
     expect(물음표).toHaveLength(5)
     expect(물음표[0].getAttribute('src')).toMatch(/team_logo\/015\.png$/)
-    expect([물음표[0].style.left, 물음표[0].style.top, 물음표[0].style.width, 물음표[0].style.height])
-      .toEqual(['12px', '7px', '16px', '24px'])
+    expect([물음표[0].style.left, 물음표[0].style.top, 물음표[0].style.width, 물음표[0].style.height]).toEqual(['12px', '7px', '16px', '24px'])
   })
 
   it('고른 칸에만 노란 테두리 그림(slt_frame 1)이 붙는다', () => {
@@ -225,8 +224,16 @@ describe('팀 고르기 능력치 도형 — 0x5aefc 종류 0 의 ABILITY 판 (0
   })
 
   it('넷 다 0 이면 값 도형 없이 가운데 한 점(축 선 끝)만 남는다 (0x75c88 · 0x75dc4 · 0x5b47c)', () => {
-    render(<AbilityRadarPanel center={{ x: 180, y: 100 }} radius={30} maximumLength={30} labelFrames={ABILITY_RADAR_LABELS.team}
-      targets={[0, 0, 0, 0]} restartKey={0} />)
+    render(
+      <AbilityRadarPanel
+        center={{ x: 180, y: 100 }}
+        radius={30}
+        maximumLength={30}
+        labelFrames={ABILITY_RADAR_LABELS.team}
+        targets={[0, 0, 0, 0]}
+        restartKey={0}
+      />,
+    )
     const 판 = screen.getByTestId('능력치 도형')
 
     expect(판.querySelector('[data-part="values"]') === null).toBe(true)
@@ -235,8 +242,18 @@ describe('팀 고르기 능력치 도형 — 0x5aefc 종류 0 의 ABILITY 판 (0
   })
 
   it('잠긴 팀([anim+0x1e4] = 0, 0x5b024)은 값이 남아 있어도 숫자 대신 물음표다', () => {
-    render(<AbilityRadarPanel center={{ x: 180, y: 100 }} radius={30} maximumLength={30} labelFrames={ABILITY_RADAR_LABELS.team}
-      targets={[500, 500, 500, 500]} restartKey={0} fromZero={false} showsNumbers={false} />)
+    render(
+      <AbilityRadarPanel
+        center={{ x: 180, y: 100 }}
+        radius={30}
+        maximumLength={30}
+        labelFrames={ABILITY_RADAR_LABELS.team}
+        targets={[500, 500, 500, 500]}
+        restartKey={0}
+        fromZero={false}
+        showsNumbers={false}
+      />,
+    )
     const 판 = screen.getByTestId('능력치 도형')
 
     expect(판.querySelectorAll('[data-part="value"]').length).toBe(0)

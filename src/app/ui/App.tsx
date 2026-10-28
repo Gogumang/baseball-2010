@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
-  CommonWindowOpenContext, CommonWindowPushContext, CommonWindowSceneContext, GameSceneMarkContext,
+  CommonWindowOpenContext,
+  CommonWindowPushContext,
+  CommonWindowSceneContext,
+  GameSceneMarkContext,
 } from '@/shared/lib/commonWindow/commonWindow'
 import { isGameSceneScreenKind, sceneClosesWithoutShrinkOf } from '@/app/model/commonWindowScene'
 import type { Screen } from '@/app/model/screen'
@@ -35,7 +38,12 @@ import type { AceMatchStarter } from '@/app/ui/CareerRoutes'
 import { useGameSettings } from '@/app/model/useGameSettings'
 import { useSceneBgm, useSceneEnterSound, useSound, useSoundLevelKeys, useSoundPauseOnHide } from '@/app/model/useSound'
 import {
-  screenEnterSoundOf, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useResumeCoverStop, useSceneEnterStop, useScreenBgm,
+  screenEnterSoundOf,
+  usePitcherLeagueBgm,
+  usePitcherLeagueBgmRestart,
+  useResumeCoverStop,
+  useSceneEnterStop,
+  useScreenBgm,
   useSeasonMenuBgm,
 } from '@/app/model/screenBgm'
 import { useSeasonSession } from '@/app/model/useSeasonSession'
@@ -127,14 +135,21 @@ const MODE_SAVE_KEY = 'compus-baseball/mode-save'
 const NARI_BATTER_MODE = 4
 const NARI_PITCHER_MODE = 3
 
-const ENTRY_SCREENS: readonly Screen['kind'][] = ['이용안내', '로고', '타이틀', '메인메뉴', '도움말', '환경설정', '스페셜', '팀선택', '선수등록', '홈런더비', '일반모드']
-
-const MISSION_SCREENS: readonly Screen['kind'][] = [
-  '마선수대결',
-  '미션선택',
-  '미션진행',
-  '투수미션',
+const ENTRY_SCREENS: readonly Screen['kind'][] = [
+  '이용안내',
+  '로고',
+  '타이틀',
+  '메인메뉴',
+  '도움말',
+  '환경설정',
+  '스페셜',
+  '팀선택',
+  '선수등록',
+  '홈런더비',
+  '일반모드',
 ]
+
+const MISSION_SCREENS: readonly Screen['kind'][] = ['마선수대결', '미션선택', '미션진행', '투수미션']
 
 /** 일반모드 = 원본 모드 1 (0x22c7d 의 획득 GP 칸 0) */
 const GENERAL_STAT_MODE = 1
@@ -174,21 +189,24 @@ export function App({ bootScreen }: AppProps = {}) {
   /** 옛 세이브 이사거리 — 지갑 칸이 없던 시절 G는 나만의리그 선수 안에 들어 있었다 */
   const legacyGamePoint = useMemo(() => saveGame.load()?.gamePoint ?? null, [saveGame])
   // 전역기록 +0x3c · +0x4d · 모드 1 저장 블록 — 옛 세이브면 타자편 커리어 유무로 +0x3c 를 정한다
-  const legacyLastPlayedMode = useMemo(
-    () => (saveGame.load() === null ? NEW_SAVE_LAST_PLAYED_MODE : NARI_BATTER_MODE),
-    [saveGame],
-  )
+  const legacyLastPlayedMode = useMemo(() => (saveGame.load() === null ? NEW_SAVE_LAST_PLAYED_MODE : NARI_BATTER_MODE), [saveGame])
   const modeSave = useModeSave(modeSaveStore, legacyLastPlayedMode)
   const { setLastPlayedMode, startNariGame, clearNariGame, aceMatchPendingPorts, aceMatchHoldPort } = modeSave
   // 전역기록 +0x4f · +0x50 손잡이 — 나리 두 편 세션이 142 확인·등록·정산·지우기에서 쓴다
-  const pitcherNariGameSave = useMemo<NariGameSavePort>(() => ({
-    start: (match) => startNariGame(NARI_PITCHER_MODE, match),
-    clear: () => clearNariGame(NARI_PITCHER_MODE),
-  }), [startNariGame, clearNariGame])
-  const batterNariGameSave = useMemo<NariGameSavePort>(() => ({
-    start: (match) => startNariGame(NARI_BATTER_MODE, match),
-    clear: () => clearNariGame(NARI_BATTER_MODE),
-  }), [startNariGame, clearNariGame])
+  const pitcherNariGameSave = useMemo<NariGameSavePort>(
+    () => ({
+      start: (match) => startNariGame(NARI_PITCHER_MODE, match),
+      clear: () => clearNariGame(NARI_PITCHER_MODE),
+    }),
+    [startNariGame, clearNariGame],
+  )
+  const batterNariGameSave = useMemo<NariGameSavePort>(
+    () => ({
+      start: (match) => startNariGame(NARI_BATTER_MODE, match),
+      clear: () => clearNariGame(NARI_BATTER_MODE),
+    }),
+    [startNariGame, clearNariGame],
+  )
   const gameSettings = useGameSettings(settingsStore)
   // 소리 통로 하나 — 환경설정 칸(0~4) × 25 가 원본 소리 크기다 (옵션 +0x2e)
   const sound = useSound(gameSettings.settings.soundLevel)
@@ -286,13 +304,23 @@ export function App({ bootScreen }: AppProps = {}) {
   const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
   const seasonGameSettingsRef = useRef(gameSettings.settings)
   seasonGameSettingsRef.current = gameSettings.settings
-  const seasonGameSettingsNow = useCallback(() => ({
-    gaugeSettingOn: seasonGameSettingsRef.current.pitchControl === '게이지',
-    runningModeManual: seasonGameSettingsRef.current.runningMode === '수동',
-    throwModeManual: seasonGameSettingsRef.current.throwMode === '수동',
-  }), [])
+  const seasonGameSettingsNow = useCallback(
+    () => ({
+      gaugeSettingOn: seasonGameSettingsRef.current.pitchControl === '게이지',
+      runningModeManual: seasonGameSettingsRef.current.runningMode === '수동',
+      throwModeManual: seasonGameSettingsRef.current.throwMode === '수동',
+    }),
+    [],
+  )
   const seasonSession = useSeasonSession(
-    seasonStore, random, wallet, aceLevels.levels, recordStat, readAutobotBatInput, collectionRewardStore, readHallOfFame,
+    seasonStore,
+    random,
+    wallet,
+    aceLevels.levels,
+    recordStat,
+    readAutobotBatInput,
+    collectionRewardStore,
+    readHallOfFame,
     // 전역기록 +0x11e — 0xdd 진입 0x6548 과 일반 22 진입 0x3163c 가 같은 칸을 본다
     modeSave.matchSettingsSeenPort,
     // 정산 0x4ea0c 의 정규시즌 승리 수 +0xbf → 100 이면 히든 45 (0x9f6f0 · 0x62368)
@@ -332,7 +360,10 @@ export function App({ bootScreen }: AppProps = {}) {
   )
   // 화면이 바뀌면 그 화면의 배경음으로 갈아탄다 (`screenBgm.ts` 의 표). 투수편은 안쪽 장면(128 이어하기 4)을 본다
   const pitcherBgm = usePitcherLeagueBgm(
-    screen.kind === '투수편', pitcherSession.scene, pitcherSession.career?.endingIndex ?? null, pitcherSession.story?.context ?? null,
+    screen.kind === '투수편',
+    pitcherSession.scene,
+    pitcherSession.career?.endingIndex ?? null,
+    pitcherSession.story?.context ?? null,
     pitcherSession.managementBgmRestart,
   )
   // 메인 메뉴는 환경설정에서 돌아올 때(0x24a40) · 게임시작 목록으로 새로 설 때(0x25b88) 1 을, 관리 화면은 외출 지도에서
@@ -341,18 +372,23 @@ export function App({ bootScreen }: AppProps = {}) {
   const [batterManagementBgmRestart, bumpBatterManagementBgmRestart] = useReducer((count: number) => count + 1, 0)
   const screenBgm = useScreenBgm(screen, batterManagementBgmRestart)
   const pitcherBgmRestart = usePitcherLeagueBgmRestart(screen.kind === '투수편', pitcherSession.scene, pitcherSession.managementBgmRestart)
-  useSceneBgm(
-    sound,
-    screen.kind === '투수편' ? pitcherBgm : screenBgm.bgm,
-    screenBgm.restartSerial + pitcherBgmRestart,
-  )
+  useSceneBgm(sound, screen.kind === '투수편' ? pitcherBgm : screenBgm.bgm, screenBgm.restartSerial + pitcherBgmRestart)
   // 시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록에 들면 배경음 4 (위 화면 표 뒤에 돌아야 이긴다)
   useSeasonMenuBgm(sound, screen.kind === '시즌모드', seasonSession.scene, seasonSession.trainingResult !== null)
   // 이어하기 길의 137 — 100 진입 1c15e 의 stopBgm (`useResumeCoverStop`)
-  useResumeCoverStop(sound, (screen.kind === '연차표지' && screen.fromResume === true) ||
-    (screen.kind === '투수편' && pitcherSession.scene === '연차표지' && pitcherSession.yearCoverFromResume))
+  useResumeCoverStop(
+    sound,
+    (screen.kind === '연차표지' && screen.fromResume === true) ||
+      (screen.kind === '투수편' && pitcherSession.scene === '연차표지' && pitcherSession.yearCoverFromResume),
+  )
   const careerSession = useCareerSession({
-    runner, random, saveGame, screen, setScreen, sound, wallet,
+    runner,
+    random,
+    saveGame,
+    screen,
+    setScreen,
+    sound,
+    wallet,
     // 환경설정 "주루" (설정 +0xbd) — 나리 타자편은 사람이 늘 공격이라 그대로 먹는다 (0xae690)
     runningModeManual: gameSettings.settings.runningMode === '수동',
     recordStat,
@@ -373,12 +409,18 @@ export function App({ bootScreen }: AppProps = {}) {
   // 타자 미션(모드 6)은 0x213c0 이 6→4 로 나리 타자편 저장을 올린다 — 마투수 투구 소모(0xa5e14)의 압도 22 가 이 타자를 본다
   const missionBatterCareer = careerSession.career ?? careerSession.savedCareer
   const missionBatterSkillIds = missionBatterCareer?.equippedSkillIds
-  const missionBatterRecordSlot = missionBatterCareer === null || missionBatterCareer === undefined
-    ? -1
-    : myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(missionBatterCareer), missionBatterCareer.teamId))
+  const missionBatterRecordSlot =
+    missionBatterCareer === null || missionBatterCareer === undefined
+      ? -1
+      : myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(missionBatterCareer), missionBatterCareer.teamId))
   // 미션 보상 G (0x4ef72) — 지갑으로 들어간다. 육성 선수가 없어도 사라지지 않는다
   const mission = useMissionSession({
-    runner, random, missionRecord, screen, setScreen, sound,
+    runner,
+    random,
+    missionRecord,
+    screen,
+    setScreen,
+    sound,
     onGamePointReward: careerSession.actions.gainGamePoint,
     // 정산 4ef86 — 편별 올클리어면 히든 37 · 21 을 열고 알림 창 (0x62368)
     openHidden,
@@ -431,9 +473,7 @@ export function App({ bootScreen }: AppProps = {}) {
   )
   // 시즌 엔딩 — 새 해 0x6e0c 가 판정 0xa3084 ≥ 0 으로 phase 6(엔딩)을 세우는 그 자리에서 전역기록 +0xa0+e = 1
   const seasonRecord = seasonSession.state?.record ?? null
-  const seasonEndingIndex = seasonRecord !== null && seasonRecord.phase === SEASON_PHASE.엔딩
-    ? judgeSeasonEnding(seasonRecord)
-    : null
+  const seasonEndingIndex = seasonRecord !== null && seasonRecord.phase === SEASON_PHASE.엔딩 ? judgeSeasonEnding(seasonRecord) : null
   const everyMissionCleared = isEveryMissionCleared(mission.clearedKeys)
   const collection = useCollection(
     collectionStore,
@@ -483,9 +523,8 @@ export function App({ bootScreen }: AppProps = {}) {
   const seasonRoster = seasonSession.state === null ? null : seasonSession.roster
   const hallOfFameDeletion: HallOfFameDeletion = {
     // 0x2ae0e — 그 명전 선수가 내 시즌 팀에 있고 && 전역기록 +0x4e(시즌모드 경기 중간 저장, 시즌 저장의 `isGameInProgress`)
-    isBlocked: (side, slot) => isHallOfFameDeleteBlocked(
-      seasonRoster, hallOfFameRecordIdOf(side, slot), side === '투수', seasonSession.isGameInProgress,
-    ),
+    isBlocked: (side, slot) =>
+      isHallOfFameDeleteBlocked(seasonRoster, hallOfFameRecordIdOf(side, slot), side === '투수', seasonSession.isGameInProgress),
     onDelete: (side, slot) => {
       seasonSession.actions.removeHallOfFamer(hallOfFameRecordIdOf(side, slot), side === '투수')
       collection.deleteHallOfFamer(side, slot)
@@ -551,20 +590,23 @@ export function App({ bootScreen }: AppProps = {}) {
   const { readStats: readCollectionStats, openHiddenQuietly } = collection
   const { open: openAceCellFlag } = aceOpen
   const { announceText: announceHiddenText } = hiddenOpenNotice
-  const unlockByRecord = useCallback((recordId: number) => {
-    const id = recordUnlockIdOf(readCollectionStats(), recordId)
-    if (id === null) return
-    const cell = aceCellOfUnlock(id)
-    if (cell !== null) {
-      if (isAceCellOpen(aceOpenSaveRef.current, cell)) return
-      aceOpenSaveRef.current = { cells: aceOpenSaveRef.current.cells.map((open, at) => (at === cell ? true : open)) }
-      openAceCellFlag(cell)
-    } else if (!openHiddenQuietly(id)) {
-      return
-    }
-    const text = recordUnlockNoticeTextOf(id)
-    if (text !== null) announceHiddenText(text)
-  }, [announceHiddenText, openAceCellFlag, openHiddenQuietly, readCollectionStats])
+  const unlockByRecord = useCallback(
+    (recordId: number) => {
+      const id = recordUnlockIdOf(readCollectionStats(), recordId)
+      if (id === null) return
+      const cell = aceCellOfUnlock(id)
+      if (cell !== null) {
+        if (isAceCellOpen(aceOpenSaveRef.current, cell)) return
+        aceOpenSaveRef.current = { cells: aceOpenSaveRef.current.cells.map((open, at) => (at === cell ? true : open)) }
+        openAceCellFlag(cell)
+      } else if (!openHiddenQuietly(id)) {
+        return
+      }
+      const text = recordUnlockNoticeTextOf(id)
+      if (text !== null) announceHiddenText(text)
+    },
+    [announceHiddenText, openAceCellFlag, openHiddenQuietly, readCollectionStats],
+  )
 
   /**
    * 지금 장면의 [창+0x24f] — 메인 메뉴 0x234d4 · 경기 0x3301c 는 1. 화면으로 정하고, 경기 장면(0x104)을 그리는 화면이 서 있으면
@@ -611,8 +653,15 @@ export function App({ bootScreen }: AppProps = {}) {
   // 개발 · e2e 장면 바로가기(`app/dev/sceneShortcut`)에 진입 손잡이를 내놓는다 — 배포 빌드에서는 빠진다
   if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
     publishSceneHandles({
-      screen, setScreen, career: careerSession, pitcher: pitcherSession, season: seasonSession, mission,
-      startGeneralMode, setLastPlayedMode, random,
+      screen,
+      setScreen,
+      career: careerSession,
+      pitcher: pitcherSession,
+      season: seasonSession,
+      mission,
+      startGeneralMode,
+      setLastPlayedMode,
+      random,
     })
   }
 
@@ -652,7 +701,7 @@ export function App({ bootScreen }: AppProps = {}) {
         gameSettings={gameSettings}
         // 하위 17 머리띠 0x54d95(skin, 11, 5) 는 제목이 −1 이 아니라 G포인트도 그린다 (29261d0)
         gamePoint={wallet.balance}
-      />
+      />,
     )
   }
 
@@ -679,7 +728,7 @@ export function App({ bootScreen }: AppProps = {}) {
         }}
         // 나리 칸을 고르면 영입할 기록 (0x22168 · 0x220ec — 같은 두 저장의 내 선수)
         nariRecords={nariSeasonRecordsOf(pitcherSession.career, careerSession.career ?? careerSession.savedCareer)}
-      />
+      />,
     )
   }
 
@@ -752,7 +801,7 @@ export function App({ bootScreen }: AppProps = {}) {
         // 결과 화면 확인 — 정산은 위 정산 진입(0x4ea0c)이 이미 했다
         onFinish={() => leaveGeneralMode()}
         onExit={leaveGeneralMode}
-      />
+      />,
     )
   }
 
@@ -791,15 +840,21 @@ export function App({ bootScreen }: AppProps = {}) {
             pitcherName={pitcherSession.career?.name ?? null}
           />
         )}
-      />
+      />,
     )
   }
 
   if (ENTRY_SCREENS.includes(screen.kind) || careerSession.career === null) {
     return withHiddenOpenNotice(
       <EntryRoutes
-        screen={screen} setScreen={setScreen} session={careerSession} gameSettings={gameSettings}
-        collection={collection.collection} random={random} wallet={wallet} aceSelect={aceSelect}
+        screen={screen}
+        setScreen={setScreen}
+        session={careerSession}
+        gameSettings={gameSettings}
+        collection={collection.collection}
+        random={random}
+        wallet={wallet}
+        aceSelect={aceSelect}
         gameStartCursor={gameStartCursor}
         // 켤 때 로고 객체 상태 2 끝의 0x6ea6d(소리, 0, −1, 0)
         onLogoVoice={() => sound.play(0)}
@@ -823,10 +878,12 @@ export function App({ bootScreen }: AppProps = {}) {
           seasonSession.actions.removeCareerPlayer(edition === '투수편')
         }}
         // 하위 1 막기 — 0xb5054(내 시즌 팀, 편) && +0x4e (0x2c880 · 0x2c900). 투수편 글은 [213](원본 버그)
-        careerResetBlockOf={(edition) => judgeModeReset(careerResetTargetOf(edition), {
-          isSeasonGameInProgress: seasonSession.isGameInProgress,
-          isCareerPlayerInSeasonTeam: hasCareerPlayerInSeasonTeam(seasonRoster, edition === '투수편'),
-        }).blockText}
+        careerResetBlockOf={(edition) =>
+          judgeModeReset(careerResetTargetOf(edition), {
+            isSeasonGameInProgress: seasonSession.isGameInProgress,
+            isCareerPlayerInSeasonTeam: hasCareerPlayerInSeasonTeam(seasonRoster, edition === '투수편'),
+          }).blockText
+        }
         // 시즌모드 초기화 0x224ec(mgr, 2) — 시즌 저장(+0x42)·+0x4e
         onResetSeason={seasonSession.actions.resetSeason}
         // 일반모드 진입 창 [13] — 빠른실행이면 경기정보(상태 22)부터 (0x299f8 this+0x14c = 1)
@@ -858,16 +915,14 @@ export function App({ bootScreen }: AppProps = {}) {
         // 0x213c0(앱, m, 0) 으로 그 편 저장을 올려 장면 0x104 — 경기 셋업 0x39fdc 모드 3·4 갈래가 그 저장으로 경기를 새로 세운다
         onResumeNariGame={(edition) => {
           if (edition === '투수편') {
-            pitcherSession.actions.resumeInterruptedGame(
-              nariGameMatchOfSave(modeSave.save.nariGames[NARI_PITCHER_MODE].match),
-            )
+            pitcherSession.actions.resumeInterruptedGame(nariGameMatchOfSave(modeSave.save.nariGames[NARI_PITCHER_MODE].match))
             return setScreen({ kind: '투수편' })
           }
           careerSession.actions.resumeInterruptedGame(nariGameMatchOfSave(modeSave.save.nariGames[NARI_BATTER_MODE].match))
         }}
         // 메인 메뉴 처음 단(하위 4)의 전부 수집 보상 판정 0x28e98 → 팝업 0x292f8
         claimCollectionReward={() => collection.claimCollectionReward(collectionRewardStore, everyMissionCleared, wallet)}
-      />
+      />,
     )
   }
 
@@ -893,6 +948,6 @@ export function App({ bootScreen }: AppProps = {}) {
       gameSettings={gameSettings}
       // 마선수 대결의 상대 마투수도 전역 레벨 칸을 본다 (0xb6414 배율 · 0xaebe4 마구 횟수)
       aceLevels={aceLevels.levels}
-    />
+    />,
   )
 }

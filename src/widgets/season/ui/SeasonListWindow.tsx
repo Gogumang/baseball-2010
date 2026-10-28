@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
 import { CommonPanel } from '@/shared/ui'
-import {
-  FOOTER_BOX, SEASON_WINDOW, TITLE_BOX, VISIBLE_ROWS, rowBoxOf,
-} from '@/widgets/season/lib/seasonWindowLayout'
+import { FOOTER_BOX, SEASON_WINDOW, TITLE_BOX, VISIBLE_ROWS, rowBoxOf } from '@/widgets/season/lib/seasonWindowLayout'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 
 export interface SeasonListRow {
@@ -51,13 +49,19 @@ export interface SeasonListPanel {
  * 줄 높이 18px 은 순위표(0x7f070)의 줄 간격을 그대로 따랐다.
  */
 export function SeasonListWindow({
-  title, rows, cursor, onMoveCursor, onSelect, footer, onBack, backLabel = '되돌아가기', panel,
+  title,
+  rows,
+  cursor,
+  onMoveCursor,
+  onSelect,
+  footer,
+  onBack,
+  backLabel = '되돌아가기',
+  panel,
 }: SeasonListWindowProps) {
   // 판에 들어가는 줄 수를 넘으면 커서를 따라 굴린다 (원본 목록 객체도 ▲▼ 로 굴린다 — 근사)
   const rowCount = VISIBLE_ROWS
-  const first = rows.length <= rowCount
-    ? 0
-    : Math.min(Math.max(0, cursor - rowCount + 1), rows.length - rowCount)
+  const first = rows.length <= rowCount ? 0 : Math.min(Math.max(0, cursor - rowCount + 1), rows.length - rowCount)
   const visible = rows.slice(first, first + rowCount)
 
   return (
@@ -69,14 +73,26 @@ export function SeasonListWindow({
           · 0xe5 · 0xe6 트레이드 선수(0xb0f4 · 0xb0b4) · 0xe8 십전대보탕 투수 고르기(0xafd0): 엔트리 목록 창 0x5cfec — `EntryListWindow`
           · 0xe7 트레이드 확인(0xd4e8): mode_ui 프레임 70 · 71 판 — `TradeConfirmWindow`
           · 레벨업 창 0x5f394 의 0x55e60(…, 192, 212, 0, 0x22, 0, 0, 제목 탭 1, 어둡게 1) 은 `widgets/ace-level-up` 의 창이다 */}
-      {panel === undefined
-        ? <CommonPanel x={SEASON_WINDOW.x} y={SEASON_WINDOW.y} width={SEASON_WINDOW.width} height={SEASON_WINDOW.height} />
-        : <CommonPanel x={panel.x} y={panel.y} width={panel.width} height={panel.height} topBand={panel.topBand ?? 0}
-            titleTab={panel.titleTab === true} testId="시즌-목록-판" />}
+      {panel === undefined ? (
+        <CommonPanel x={SEASON_WINDOW.x} y={SEASON_WINDOW.y} width={SEASON_WINDOW.width} height={SEASON_WINDOW.height} />
+      ) : (
+        <CommonPanel
+          x={panel.x}
+          y={panel.y}
+          width={panel.width}
+          height={panel.height}
+          topBand={panel.topBand ?? 0}
+          titleTab={panel.titleTab === true}
+          testId="시즌-목록-판"
+        />
+      )}
       <div
         className={styles.title}
         style={{
-          left: TITLE_BOX.x, top: TITLE_BOX.y, width: panel?.titleTab === true ? 80 : TITLE_BOX.width, height: TITLE_BOX.height,
+          left: TITLE_BOX.x,
+          top: TITLE_BOX.y,
+          width: panel?.titleTab === true ? 80 : TITLE_BOX.width,
+          height: TITLE_BOX.height,
           ...(panel === undefined ? {} : { color: '#10246B' }),
           ...(panel?.titleTab === true ? { textAlign: 'left' as const } : {}),
         }}
@@ -101,7 +117,9 @@ export function SeasonListWindow({
               onSelect(index)
             }}
           >
-            <span className={styles.cursor} aria-hidden>{isSelected ? '▶' : ''}</span>
+            <span className={styles.cursor} aria-hidden>
+              {isSelected ? '▶' : ''}
+            </span>
             <span className={styles.rowLabel}>{row.label}</span>
             {row.value !== undefined && <span className={styles.rowValue}>{row.value}</span>}
           </button>
@@ -109,10 +127,7 @@ export function SeasonListWindow({
       })}
 
       {footer !== undefined && (
-        <div
-          className={styles.notice}
-          style={{ left: FOOTER_BOX.x, top: FOOTER_BOX.y, width: FOOTER_BOX.width, height: FOOTER_BOX.height }}
-        >
+        <div className={styles.notice} style={{ left: FOOTER_BOX.x, top: FOOTER_BOX.y, width: FOOTER_BOX.width, height: FOOTER_BOX.height }}>
           {footer}
         </div>
       )}

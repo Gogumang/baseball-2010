@@ -76,7 +76,7 @@ describe('경기 장면 구름 셈 — 구장 +0x1c~+0x28 (0x78448)', () => {
     expect(observeSceneCloudFrame(20, false, cursor)).toBe(start + 5)
   })
 
-  it('덮개 셈과 아래 루프가 같은 틱을 세면 한 번만 든다 — 교체 창 0xb 아래 \'대기\' 루프', () => {
+  it("덮개 셈과 아래 루프가 같은 틱을 세면 한 번만 든다 — 교체 창 0xb 아래 '대기' 루프", () => {
     const cursor = createCloudFrameCursor()
     observeSceneCloudFrame(10, true, cursor)
     const start = sceneCloudCallsNow()

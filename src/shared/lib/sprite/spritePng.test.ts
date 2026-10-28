@@ -37,7 +37,8 @@ describe('스프라이트 PNG 꼴', () => {
       const interlace = bytes[28]
       const isRgba = colorType === 6 && depth === 8
       const isPalette = colorType === 3 && [1, 2, 4, 8].includes(depth) && types.includes('PLTE')
-      if (!types.every((type) => ALLOWED.has(type)) || !(isRgba || isPalette) || interlace !== 0) wrong.push(`${file} ${types.join(',')} ${colorType}/${depth}`)
+      if (!types.every((type) => ALLOWED.has(type)) || !(isRgba || isPalette) || interlace !== 0)
+        wrong.push(`${file} ${types.join(',')} ${colorType}/${depth}`)
     }
     expect(wrong).toEqual([])
   })

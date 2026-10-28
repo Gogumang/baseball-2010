@@ -6,8 +6,19 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { rankingOf } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import {
-  HEADER_CELLS, HEADER_DIVIDER_COUNT, PERCENT_OFFSET, RANK_GLYPH_HEIGHT, ROW_CELLS, ROW_COUNT, ROW_FRAME,
-  ROW_FRAME_ORIGIN, ROW_STEP, STANDINGS_WINDOW, TEAM_LABEL_BASE_FRAME, rankGlyphsOf, valueGlyphsOf,
+  HEADER_CELLS,
+  HEADER_DIVIDER_COUNT,
+  PERCENT_OFFSET,
+  RANK_GLYPH_HEIGHT,
+  ROW_CELLS,
+  ROW_COUNT,
+  ROW_FRAME,
+  ROW_FRAME_ORIGIN,
+  ROW_STEP,
+  STANDINGS_WINDOW,
+  TEAM_LABEL_BASE_FRAME,
+  rankGlyphsOf,
+  valueGlyphsOf,
   winningPercentOf,
 } from '@/widgets/standings/lib/standingsLayout'
 import type { StandingsBox } from '@/widgets/standings/lib/standingsLayout'
@@ -54,13 +65,11 @@ export function StandingsWindow({ league, rowCount = ROW_COUNT, onClose }: Stand
   return (
     <div className={styles.overlay} role="dialog" aria-label="기록실" onClick={onClose}>
       {/* 판 0x55e60(skin, x, y, w, h, 0, 정렬 0x11, 위 띠 0x10, 0, 0, 0) (0x7f0b6~0x7f0e4) */}
-      <CommonPanel x={STANDINGS_WINDOW.x} y={STANDINGS_WINDOW.y} width={STANDINGS_WINDOW.width}
-        height={STANDINGS_WINDOW.height} topBand={0x10} />
+      <CommonPanel x={STANDINGS_WINDOW.x} y={STANDINGS_WINDOW.y} width={STANDINGS_WINDOW.width} height={STANDINGS_WINDOW.height} topBand={0x10} />
 
       <svg className={styles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
         {HEADER_CELLS.slice(0, HEADER_DIVIDER_COUNT).map((cell) => (
-          <rect key={cell.frame} x={cell.x + cell.width} y={cell.y} width={1} height={cell.height}
-            fill={ORIGINAL_COLORS.tableDivider} />
+          <rect key={cell.frame} x={cell.x + cell.width} y={cell.y} width={1} height={cell.height} fill={ORIGINAL_COLORS.tableDivider} />
         ))}
       </svg>
       {HEADER_CELLS.map((cell) => (
@@ -77,21 +86,50 @@ export function StandingsWindow({ league, rowCount = ROW_COUNT, onClose }: Stand
         const percent = ROW_CELLS.winningPercent
         return (
           <div key={teamId}>
-            <img className={styles.layer} alt="" src={frameImage(MODE_UI, ROW_FRAME)}
-              style={{ left: ROW_FRAME_ORIGIN.x, top: ROW_FRAME_ORIGIN.y + dy }} />
-            <SpriteNumber glyphs={rankGlyphs} right={centerRight(rankGlyphs, ROW_CELLS.rank)}
-              boxTop={ROW_CELLS.rank.y + dy} boxHeight={ROW_CELLS.rank.height} glyphHeight={RANK_GLYPH_HEIGHT} />
-            <img className={styles.layer} alt="" src={frameImage(IMG_TEXT, TEAM_LABEL_BASE_FRAME + teamId)}
-              style={centered(TEAM_LABEL_BASE_FRAME + teamId, ROW_CELLS.team, dy)} />
-            <SpriteNumber glyphs={winGlyphs} right={centerRight(winGlyphs, ROW_CELLS.wins)}
-              boxTop={ROW_CELLS.wins.y + dy} boxHeight={ROW_CELLS.wins.height} />
-            <SpriteNumber glyphs={lossGlyphs} right={centerRight(lossGlyphs, ROW_CELLS.losses)}
-              boxTop={ROW_CELLS.losses.y + dy} boxHeight={ROW_CELLS.losses.height} />
+            <img
+              className={styles.layer}
+              alt=""
+              src={frameImage(MODE_UI, ROW_FRAME)}
+              style={{ left: ROW_FRAME_ORIGIN.x, top: ROW_FRAME_ORIGIN.y + dy }}
+            />
+            <SpriteNumber
+              glyphs={rankGlyphs}
+              right={centerRight(rankGlyphs, ROW_CELLS.rank)}
+              boxTop={ROW_CELLS.rank.y + dy}
+              boxHeight={ROW_CELLS.rank.height}
+              glyphHeight={RANK_GLYPH_HEIGHT}
+            />
+            <img
+              className={styles.layer}
+              alt=""
+              src={frameImage(IMG_TEXT, TEAM_LABEL_BASE_FRAME + teamId)}
+              style={centered(TEAM_LABEL_BASE_FRAME + teamId, ROW_CELLS.team, dy)}
+            />
+            <SpriteNumber
+              glyphs={winGlyphs}
+              right={centerRight(winGlyphs, ROW_CELLS.wins)}
+              boxTop={ROW_CELLS.wins.y + dy}
+              boxHeight={ROW_CELLS.wins.height}
+            />
+            <SpriteNumber
+              glyphs={lossGlyphs}
+              right={centerRight(lossGlyphs, ROW_CELLS.losses)}
+              boxTop={ROW_CELLS.losses.y + dy}
+              boxHeight={ROW_CELLS.losses.height}
+            />
             {/* 승률만 오른쪽 정렬이고, 그 오른쪽에 "%" 가 따로 붙는다 */}
-            <SpriteNumber glyphs={valueGlyphsOf(winningPercentOf(wins, losses))} right={percent.x + percent.width}
-              boxTop={percent.y + dy} boxHeight={percent.height} />
-            <img className={styles.layer} alt="" src={frameImage(NUM, PERCENT_FRAME)}
-              style={{ left: percent.x + PERCENT_OFFSET.x, top: percent.y + dy + PERCENT_OFFSET.y }} />
+            <SpriteNumber
+              glyphs={valueGlyphsOf(winningPercentOf(wins, losses))}
+              right={percent.x + percent.width}
+              boxTop={percent.y + dy}
+              boxHeight={percent.height}
+            />
+            <img
+              className={styles.layer}
+              alt=""
+              src={frameImage(NUM, PERCENT_FRAME)}
+              style={{ left: percent.x + PERCENT_OFFSET.x, top: percent.y + dy + PERCENT_OFFSET.y }}
+            />
           </div>
         )
       })}

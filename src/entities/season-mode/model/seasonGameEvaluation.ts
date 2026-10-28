@@ -31,9 +31,11 @@ export function seasonGameEvaluationLineOf(record: SeasonRecord): string {
   const hits = fixed ? (s[7] ?? 0) : (s[7] ?? 0) + (s[8] ?? 0) + (s[9] ?? 0)
   const store = record.storeGames > 0 ? '(+200)' : ''
   const income = originalMoneyText(record.lastIncome * 100)
-  return `득점: ${record.lastGameScore} / 실점: ${record.lastGameConceded} / ${result}!N` +
+  return (
+    `득점: ${record.lastGameScore} / 실점: ${record.lastGameConceded} / ${result}!N` +
     `안타: ${hits} / 피안타: ${s[2] ?? 0} / 에러: ${s[3] ?? 0}!N` +
     `관중: ${record.lastAttendance}명 / 수입: ${fixed ? `${income}만${store}` : `${income}${store}만`}`
+  )
 }
 
 /**

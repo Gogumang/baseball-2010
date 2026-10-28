@@ -92,11 +92,7 @@ export function isWideFairAngle(angle: number): boolean {
  * 맞은 공을 가른다 — 난수를 쓰지 않는다. 결과 코드는 번트 성공 표시(isBunt)에만 쓴다 — 원본도 쏜 뒤로는
  * 코드를 보지 않고 패턴(궤적)만 본다.
  */
-export function contactOfPattern(
-  code: number,
-  pattern: BattedBallPattern,
-  situation?: BuntFoulSituation,
-): BattedBallContact {
+export function contactOfPattern(code: number, pattern: BattedBallPattern, situation?: BuntFoulSituation): BattedBallContact {
   if (!isFairAngle(pattern[0])) {
     if (situation !== undefined && situation.strikes > 1 && situation.buntKind !== 0) return { kind: '번트파울아웃' }
     return { kind: '파울' }
@@ -316,12 +312,7 @@ export function displayPatternListOf(deck: PatternDeck, kind: DisplayPatternKind
  * 덮는 것은 (a, b, c) 셋뿐이다 — 플래그 비트 1(+0x127 낙구 쫓기)은 덱 패턴에서 514cc 가 이미 세웠고 커서도 그대로다.
  * c 의 부호는 바꿔 넣은 패턴의 비트 0 을 따른다(0xb0a50 → 0xb07b4). 목록이 비면 rand(0, 0) = 0 으로 지운 칸(코드 0 · 자리 0)을 읽는다.
  */
-export function displayPatternOf(
-  deck: PatternDeck,
-  kind: DisplayPatternKind,
-  shot: BattedBallPattern,
-  random: RandomPort,
-): BattedBallPattern {
+export function displayPatternOf(deck: PatternDeck, kind: DisplayPatternKind, shot: BattedBallPattern, random: RandomPort): BattedBallPattern {
   const list = displayPatternListOf(deck, kind)
   const index = random.rand(0, list.length)
   const shown = list[index] ?? BATTED_BALL_PATTERNS[0][(deck.orders[0] ?? [0])[0]]

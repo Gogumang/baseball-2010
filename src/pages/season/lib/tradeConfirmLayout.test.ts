@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  TRADE_CONFIRM, moneyTextOf, teamNameFrameOf, tradeBadgeOf, tradeBoostTextOf, tradeCostBoxPaintsOf, tradeCostTextOf,
+  TRADE_CONFIRM,
+  moneyTextOf,
+  teamNameFrameOf,
+  tradeBadgeOf,
+  tradeBoostTextOf,
+  tradeCostBoxPaintsOf,
+  tradeCostTextOf,
 } from '@/pages/season/lib/tradeConfirmLayout'
 
 /** 트레이드 확인 0xd4e8 — 기대값은 unicorn 으로 0xd4e8 을 돌려 받은 그리기 인자다(r89) */
@@ -14,10 +20,14 @@ describe('트레이드 확인 0xd4e8', () => {
 
   it('딱지 — 투수 탭 보직 0 선발(0x49 · 49) · 1 중계(0x4c · 170) · 2 구원(0x4a · 182), 타자 탭 0 내야 · 1 외야 · 그 밖 지명', () => {
     expect([0, 1, 2].map((role) => tradeBadgeOf(true, role))).toEqual([
-      { chip: 0x49, label: 49 }, { chip: 0x4c, label: 170 }, { chip: 0x4a, label: 182 },
+      { chip: 0x49, label: 49 },
+      { chip: 0x4c, label: 170 },
+      { chip: 0x4a, label: 182 },
     ])
     expect([0, 1, 2].map((low) => tradeBadgeOf(false, low))).toEqual([
-      { chip: 0x4a, label: 304 }, { chip: 0x49, label: 305 }, { chip: 0x4c, label: 183 },
+      { chip: 0x4a, label: 304 },
+      { chip: 0x49, label: 305 },
+      { chip: 0x4c, label: 183 },
     ])
   })
 

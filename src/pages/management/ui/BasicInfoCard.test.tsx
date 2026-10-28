@@ -43,8 +43,9 @@ describe('정보 칸 숫자 — 0x7c450 비시즌 갈래', () => {
     expect(타순, '타순 글 칸이 없다').toBeDefined()
     expect((타순 as HTMLElement).style.color).toBe('rgb(255, 255, 0)')
     // numBox 0xba719 는 시즌(모드 2)만 — 나리 정보 칸(판 y 176~)에는 ui/num 그림이 없다 (레이더 능력치 숫자는 위쪽이다)
-    const 칸숫자그림 = Array.from(container.querySelectorAll<HTMLElement>('img[src*="/num/"]'))
-      .filter((node) => Number.parseFloat(node.style.top) >= 176)
+    const 칸숫자그림 = Array.from(container.querySelectorAll<HTMLElement>('img[src*="/num/"]')).filter(
+      (node) => Number.parseFloat(node.style.top) >= 176,
+    )
     expect(칸숫자그림).toEqual([])
   })
 })

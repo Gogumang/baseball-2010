@@ -25,10 +25,17 @@ export function PitcherBasicInfoPanel({ career }: PitcherBasicInfoPanelProps) {
     <div data-testid="기본정보-카드">
       <PitcherBasicInfoCard career={career} />
       <PitcherInfoPlate />
-      <PitcherInfoBoard values={{
-        teamId: career.teamId, name: career.name, typeIndex: career.typeIndex, magicNumber: career.selectedMagicNumber,
-        role: career.role, handIndex: career.handIndex, skinIndex: career.skinIndex,
-      }} />
+      <PitcherInfoBoard
+        values={{
+          teamId: career.teamId,
+          name: career.name,
+          typeIndex: career.typeIndex,
+          magicNumber: career.selectedMagicNumber,
+          role: career.role,
+          handIndex: career.handIndex,
+          skinIndex: career.skinIndex,
+        }}
+      />
     </div>
   )
 }

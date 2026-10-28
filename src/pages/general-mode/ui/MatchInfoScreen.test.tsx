@@ -22,16 +22,7 @@ type Props = Parameters<typeof MatchInfoScreen>[0]
 const 기록 = { ...INITIAL_SETUP, userTeamId: 2, aiTeamId: 5, acePitcherId: 0, aceBatterId: 4 }
 
 const 띄우기 = (overrides: Partial<Props> = {}) =>
-  render(
-    <MatchInfoScreen
-      setup={기록}
-      onStart={vi.fn()}
-      onOpenSettings={vi.fn()}
-      onRespin={vi.fn()}
-      onCancel={vi.fn()}
-      {...overrides}
-    />,
-  )
+  render(<MatchInfoScreen setup={기록} onStart={vi.fn()} onOpenSettings={vi.fn()} onRespin={vi.fn()} onCancel={vi.fn()} {...overrides} />)
 
 describe('다섯 줄', () => {
   it('일반모드는 순위·승패가 "-" 다', () => {
@@ -198,7 +189,7 @@ describe('바닥 (0x2e0c4 모드 1 갈래)', () => {
     expect(marks(container)).toEqual([5, 6])
   })
 
-  it("빠른실행이라도 '*' 재굴림이 도는 동안([skin+0xf4])은 0x44 — \"#재선택\" 이 빠진다", () => {
+  it('빠른실행이라도 \'*\' 재굴림이 도는 동안([skin+0xf4])은 0x44 — "#재선택" 이 빠진다', () => {
     const { container } = 띄우기({ isQuickStart: true, isRespinning: true })
     expect(marks(container)).toEqual([6])
   })

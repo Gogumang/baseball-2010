@@ -27,7 +27,7 @@ describe('투수편 125 훈련 연출 (0x84664 모드 3 · 점프표 0xd4990)', 
     expect(figure).toEqual({ poses: [0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14, 14, 14], dx: -0x34, dy: -12 })
   })
 
-  it('건너뛰기 키는 확인(−5) · \'5\' 뿐이다 — 취소는 안 받는다 (0x105a4)', () => {
+  it("건너뛰기 키는 확인(−5) · '5' 뿐이다 — 취소는 안 받는다 (0x105a4)", () => {
     expect(['Enter', '5', ' '].every(isPitcherTrainingSkipKey)).toBe(true)
     expect(['Escape', 'Backspace', '0'].some(isPitcherTrainingSkipKey)).toBe(false)
   })

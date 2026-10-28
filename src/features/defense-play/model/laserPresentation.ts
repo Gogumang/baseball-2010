@@ -357,8 +357,7 @@ export function stepJudgePopup(state: JudgePopupState): {
   return {
     next: { ...state, timer, bigOutArmed: false, bigOutRecord: false, shown: true, textAdvances },
     bigOut: null,
-    text:
-      entry === null ? null : { frame: entry.frame, dx: entry.dx ?? 0, dy: entry.dy ?? 0, holderSlot: state.holderSlot },
+    text: entry === null ? null : { frame: entry.frame, dx: entry.dx ?? 0, dy: entry.dy ?? 0, holderSlot: state.holderSlot },
     recordsLaserOut: false,
   }
 }

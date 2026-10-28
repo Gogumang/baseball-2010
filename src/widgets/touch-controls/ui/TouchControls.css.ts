@@ -64,14 +64,17 @@ const button = style({
 })
 
 /** 상황 버튼 (필살타 · 마구 · 번트 · 도루 · 교체 · 메뉴) */
-export const optionButton = style([button, {
-  flex: '0 1 96px',
-  minWidth: 0,
-  height: OPTION_HEIGHT,
-  padding: '0 4px',
-  overflow: 'hidden',
-  fontSize: '16px',
-}])
+export const optionButton = style([
+  button,
+  {
+    flex: '0 1 96px',
+    minWidth: 0,
+    height: OPTION_HEIGHT,
+    padding: '0 4px',
+    overflow: 'hidden',
+    fontSize: '16px',
+  },
+])
 
 /** 가로 배치는 상황 버튼을 세로로 쌓는다 */
 export const optionColumn = style({

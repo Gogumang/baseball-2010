@@ -91,10 +91,7 @@ export interface MatchControlContext {
  * 곧 **설정을 보는 것은 모드 1·2 뿐**이고, 대전(8·9)은 자동진행 표시(sim+0xa0)가 없으면 늘 사람이 잡는다 — 경기진행 설정을
  * 아예 안 본다(대전 경기정보에서는 설정 창도 안 열린다, R4 4절). 두 표시는 부르는 쪽(`isHumanTurn`)이 먼저 본다.
  */
-export function isHumanControlled(
-  settings: MatchProgressSettings,
-  context: MatchControlContext,
-): boolean {
+export function isHumanControlled(settings: MatchProgressSettings, context: MatchControlContext): boolean {
   const { mode } = context
   // 모드 3~7(나리·미션·홈런더비)은 이 분기를 타지 않는다 — 늘 사람이 친다
   if (mode !== TEAM_GAME_MODE.일반 && mode !== TEAM_GAME_MODE.시즌 && !isVersusMode(mode)) {
@@ -164,12 +161,7 @@ function isDetailPlay(settings: MatchProgressSettings, context: MatchControlCont
 
 /** 상세는 최소 한 항목을 골라야 한다 — StrMAINMENU[126] (0x60240) */
 export function hasAnyDetailSelection(settings: MatchProgressSettings): boolean {
-  return (
-    settings.battingOrderBits !== 0 ||
-    settings.pitchingInningBits !== 0 ||
-    settings.offenseRunnerBits !== 0 ||
-    settings.defenseRunnerBits !== 0
-  )
+  return settings.battingOrderBits !== 0 || settings.pitchingInningBits !== 0 || settings.offenseRunnerBits !== 0 || settings.defenseRunnerBits !== 0
 }
 
 /**
@@ -181,10 +173,7 @@ export function hasAnyDetailSelection(settings: MatchProgressSettings): boolean 
  * 곧 찬스·이닝으로 확인하면 상세 비트는 **저장에 있던 그대로** 남는다 — 창에서 상세에 들어가 비트를 고쳤다가
  * 종류를 바꿔 확인해도 고친 비트는 버려진다. `saved` 는 창을 열 때(0x5fef4) 복사해 온 저장 칸 값이다.
  */
-export function confirmedMatchSettings(
-  saved: MatchProgressSettings,
-  draft: MatchProgressSettings,
-): MatchProgressSettings {
+export function confirmedMatchSettings(saved: MatchProgressSettings, draft: MatchProgressSettings): MatchProgressSettings {
   if (draft.kind === MATCH_SETTING_KIND.상세) return draft
   return { ...saved, kind: draft.kind, value: draft.value }
 }

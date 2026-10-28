@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { gameSceneTickNow, gameSceneTickOf, gameSceneTimeOf, useMarksGameScene, useMarksGameSceneLoading } from '@/shared/lib/commonWindow/commonWindow'
+import {
+  gameSceneTickNow,
+  gameSceneTickOf,
+  gameSceneTimeOf,
+  useMarksGameScene,
+  useMarksGameSceneLoading,
+} from '@/shared/lib/commonWindow/commonWindow'
 import { isSceneFastForward } from '@/shared/lib/scenePeek/scenePeek'
 import { preloadSpriteScene, preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
@@ -10,7 +16,11 @@ import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
 import * as styles from '@/widgets/loading-tip/ui/LoadingTip.css'
 import {
-  LOADING_BAR, LOADING_FILL_STRIPES, loadingFillWidthOf, loadingRunnerAnchorOf, tipNumberGlyphsOf,
+  LOADING_BAR,
+  LOADING_FILL_STRIPES,
+  loadingFillWidthOf,
+  loadingRunnerAnchorOf,
+  tipNumberGlyphsOf,
 } from '@/widgets/loading-tip/lib/loadingTipLayout'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -66,9 +76,7 @@ interface LoadingTipProps {
   readonly preloadRequests?: readonly SpriteFolderPreload[]
 }
 
-export function LoadingTip({
-  tip, onDone, steps = LOADING_STEPS_DEFAULT, preloadScenes = GAME_SCENE_PRELOADS, preloadRequests,
-}: LoadingTipProps) {
+export function LoadingTip({ tip, onDone, steps = LOADING_STEPS_DEFAULT, preloadScenes = GAME_SCENE_PRELOADS, preloadRequests }: LoadingTipProps) {
   const origins = useFrameOrigins(FOLDER)
   const animations = useAnimations(FOLDER)
   const [update, setUpdate] = useState(0)
@@ -119,19 +127,45 @@ export function LoadingTip({
       <div className={styles.box}>
         <img className={styles.sprite} src={`${FOLDER}/000.png`} alt="" />
         {numberGlyphs.map((glyph) => (
-          <img key={glyph.x} className={styles.sprite} data-testid="로딩-팁-번호" data-image={glyph.image}
+          <img
+            key={glyph.x}
+            className={styles.sprite}
+            data-testid="로딩-팁-번호"
+            data-image={glyph.image}
             style={{ left: glyph.x, top: glyph.y }}
-            src={`${NUM_FOLDER}/${String(glyph.image).padStart(3, '0')}.png`} alt="" />
+            src={`${NUM_FOLDER}/${String(glyph.image).padStart(3, '0')}.png`}
+            alt=""
+          />
         ))}
         <div className={styles.tipArea}>
           <MarkupText raw={tip} />
         </div>
-        <div className={styles.bar} data-testid="로딩-막대"
-          style={{ left: LOADING_BAR.x, top: LOADING_BAR.y, width: LOADING_BAR.width, height: LOADING_BAR.height, background: rgbOf(LOADING_BAR.rgb) }} />
-        {fillWidth > 0 && LOADING_FILL_STRIPES.map((stripe) => (
-          <div key={stripe.y} className={styles.bar} data-testid="로딩-채움"
-            style={{ left: LOADING_BAR.x + 1, top: LOADING_BAR.y + stripe.y, width: fillWidth, height: stripe.height, background: rgbOf(stripe.rgb) }} />
-        ))}
+        <div
+          className={styles.bar}
+          data-testid="로딩-막대"
+          style={{
+            left: LOADING_BAR.x,
+            top: LOADING_BAR.y,
+            width: LOADING_BAR.width,
+            height: LOADING_BAR.height,
+            background: rgbOf(LOADING_BAR.rgb),
+          }}
+        />
+        {fillWidth > 0 &&
+          LOADING_FILL_STRIPES.map((stripe) => (
+            <div
+              key={stripe.y}
+              className={styles.bar}
+              data-testid="로딩-채움"
+              style={{
+                left: LOADING_BAR.x + 1,
+                top: LOADING_BAR.y + stripe.y,
+                width: fillWidth,
+                height: stripe.height,
+                background: rgbOf(stripe.rgb),
+              }}
+            />
+          ))}
         {origin !== undefined && frameKey !== null && (
           <img
             className={styles.sprite}

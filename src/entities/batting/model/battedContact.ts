@@ -76,8 +76,7 @@ export function provisionalOutcomeOf(pattern: BattedBallPattern): AtBatOutcome {
   const trajectory = battedBallTrajectory(pattern)
   // 6d 절과 같은 틱 — 담장선 틱(공+0xaa4)이 낙구 틱보다 늦지 않으면 그 틱(땅에 안 닿음, 진행기도 담장선을 먼저 본다),
   // 아니면 낙구 틱(닿음)에 한 번 돈다
-  const fenceFirst =
-    trajectory.fenceTick >= 0 && (trajectory.landingTick < 0 || trajectory.fenceTick <= trajectory.landingTick)
+  const fenceFirst = trajectory.fenceTick >= 0 && (trajectory.landingTick < 0 || trajectory.fenceTick <= trajectory.landingTick)
   const code = playEndResultCode({
     flyOut: false,
     specialEvent: false,

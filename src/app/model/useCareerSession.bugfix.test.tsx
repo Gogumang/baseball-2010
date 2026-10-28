@@ -86,11 +86,17 @@ describe('B-05 포스트시즌 시리즈마다 연말 시상 사슬이 다시 �
 describe('B-28 116 이어하기가 경기 뒤 카운터를 다시 씀 (0x1c154 1c26a → 0x1278c)', () => {
   const 지난경기 = {
     summary: {
-      result: '승' as const, ourScore: 5, opponentScore: 2,
+      result: '승' as const,
+      ourScore: 5,
+      opponentScore: 2,
       stats: { ...createCareer('x').stats, atBats: 4, hits: 2 },
-      popularityPoints: 3, doublePlays: 0, scoringPositionOuts: 0,
+      popularityPoints: 3,
+      doublePlays: 0,
+      scoringPositionOuts: 0,
       reputationCounts: { grandSlams: 0, walkOffs: 0, walks: 0, goAheadRuns: 0 },
-      ourTeamId: 0, opponentTeamId: 1, recordIds: [],
+      ourTeamId: 0,
+      opponentTeamId: 1,
+      recordIds: [],
     },
     evaluation: { popularityChange: 2, reputationChange: 3, moraleChange: 1, commentIndex: 40 },
   }
@@ -120,7 +126,11 @@ describe('B-28 116 이어하기가 경기 뒤 카운터를 다시 씀 (0x1c154 1
 
 describe('B-26 행동한 뒤 흑백 외출 칸 취소 (0x13ba4)', () => {
   const 행동함 = (): PlayerCareer => ({
-    ...createCareer('외출취소'), season: 3, seenEventIds: [String(451)], hasSeenYearGoalWindow: true, hasActedThisCycle: true,
+    ...createCareer('외출취소'),
+    season: 3,
+    seenEventIds: [String(451)],
+    hasSeenYearGoalWindow: true,
+    hasActedThisCycle: true,
   })
   const 지도에서취소 = async () => {
     const rendered = 띄우기(행동함())

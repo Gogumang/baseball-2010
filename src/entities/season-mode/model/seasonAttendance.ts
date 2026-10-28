@@ -98,15 +98,11 @@ export interface AttendanceResult {
  */
 export function attendanceOf(record: SeasonRecord, input: AttendanceInput): AttendanceResult {
   let p = record.reputation + lastGameBonusOf(record.lastPopularityChange)
-  p +=
-    record.games <= EARLY_SEASON_GAMES
-      ? EARLY_SEASON_BONUS
-      : (MY_RANK_BONUS[input.myRank] ?? 0) + (OPPONENT_RANK_BONUS[input.opponentRank] ?? 0)
+  p += record.games <= EARLY_SEASON_GAMES ? EARLY_SEASON_BONUS : (MY_RANK_BONUS[input.myRank] ?? 0) + (OPPONENT_RANK_BONUS[input.opponentRank] ?? 0)
   p += ALWAYS_BONUS
 
   const capacity = standCapacityOf(record)
-  let attendance =
-    Math.trunc(Math.max(p, 1) / POPULARITY_DIVISOR) * POPULARITY_FACTOR + boardBonusOf(record) + ATTENDANCE_BASE
+  let attendance = Math.trunc(Math.max(p, 1) / POPULARITY_DIVISOR) * POPULARITY_FACTOR + boardBonusOf(record) + ATTENDANCE_BASE
   attendance = Math.min(attendance, capacity)
   attendance = Math.max(attendance, ATTENDANCE_FLOOR)
 
@@ -114,8 +110,7 @@ export function attendanceOf(record: SeasonRecord, input: AttendanceInput): Atte
   const income = clampTo(base + (record.storeGames > 0 ? STORE_INCOME_BONUS : 0), MONEY_LIMIT)
 
   // 만원 판정 SR+0x65 (a3690~a36ca, r260 다시 뜸) — 관중 ≥ 수용×80/100 이면 2, > 수용×35/100 이면 1, 그 밖 0 (정수 나눗셈)
-  const crowdLevel =
-    attendance >= Math.trunc((capacity * 80) / 100) ? 2 : attendance > Math.trunc((capacity * 35) / 100) ? 1 : 0
+  const crowdLevel = attendance >= Math.trunc((capacity * 80) / 100) ? 2 : attendance > Math.trunc((capacity * 35) / 100) ? 1 : 0
 
   return { attendance, income, crowdLevel }
 }

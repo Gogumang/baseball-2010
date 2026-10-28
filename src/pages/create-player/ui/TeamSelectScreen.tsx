@@ -9,8 +9,21 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import {
-  ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, LOCKED_CIRCLES, LOCKED_NAME, NAME_BAR, TAG,
-  OPEN_TEAM_COUNT, TEAM_COUNT, TEAM_GRID_SHAPE, abilityAxisMaximumLengthOf, cellPositionOf, isTeamOpen, teamGridOpenShapeOf,
+  ABILITY_CHART,
+  ANCHOR_A,
+  ANCHOR_B,
+  GRID,
+  LOCKED_CIRCLES,
+  LOCKED_NAME,
+  NAME_BAR,
+  TAG,
+  OPEN_TEAM_COUNT,
+  TEAM_COUNT,
+  TEAM_GRID_SHAPE,
+  abilityAxisMaximumLengthOf,
+  cellPositionOf,
+  isTeamOpen,
+  teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
@@ -122,8 +135,18 @@ const TEAM_COVER_STEP = 7
  * 능력치 도형은 0x5aefc 종류 0 의 ABILITY 판 전체다 (아래 `TeamAbilityChart` — 값 도형 채우기 0x75c70 · 테두리 0x75dc4 까지 풀렸다).
  */
 export function TeamSelectScreen({
-  openedHiddenIds = [], title = '팀선택', gamePoint = 0, gridShape = TEAM_GRID_SHAPE, onSelect, onSelectLocked, onCancel, overlay,
-  coveredTeamId = -1, hiddenTeamsSelectable = true, initialCursor = 0, isEntryAnimated = true,
+  openedHiddenIds = [],
+  title = '팀선택',
+  gamePoint = 0,
+  gridShape = TEAM_GRID_SHAPE,
+  onSelect,
+  onSelectLocked,
+  onCancel,
+  overlay,
+  coveredTeamId = -1,
+  hiddenTeamsSelectable = true,
+  initialCursor = 0,
+  isEntryAnimated = true,
 }: TeamSelectScreenProps) {
   /** 확인으로 등록에 넘어가는 칸 — 열린 칸, 나만의리그면 히든 줄 밖 (0x14114) */
   const isSelectable = (teamId: number) => isTeamOpen(teamId, openedHiddenIds) && (hiddenTeamsSelectable || teamId < OPEN_TEAM_COUNT)
@@ -146,10 +169,16 @@ export function TeamSelectScreen({
       // 장면 키(나만의리그 0x14114 · 시즌 0xca 0x8da4 · 트레이드 0xe4 0x8250 · 일반모드 18 0x29b38 · 19 0x29c98)는
       // 모두 키 [this+0x40] 을 걸러 내지 않고 격자 vt+0x18(0x6c299 → 0x6c521 → 0x6c031)에 그대로 넘긴다 —
       // 숫자키 꼴 1 이라 '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK(−5) 로 돌아온다 (표 0xd2e7c).
-      const direction = event.key === 'ArrowRight' || event.key === '6' ? 'right'
-        : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
-        : event.key === 'ArrowDown' || event.key === '8' ? 'down'
-        : event.key === 'ArrowUp' || event.key === '2' ? 'up' : null
+      const direction =
+        event.key === 'ArrowRight' || event.key === '6'
+          ? 'right'
+          : event.key === 'ArrowLeft' || event.key === '4'
+            ? 'left'
+            : event.key === 'ArrowDown' || event.key === '8'
+              ? 'down'
+              : event.key === 'ArrowUp' || event.key === '2'
+                ? 'up'
+                : null
       // 격자가 돌려준 키를 곧바로 0x5550d 에 넘긴다(0x8250 828c · 0x8da4 8de0 · 0x14114 1414a · 0x29b38 29b66 · 0x29c98 29cc6) —
       // 숫자키도 방향으로 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
       if (direction !== null) noteSkinShakeDirection(direction)
@@ -185,111 +214,154 @@ export function TeamSelectScreen({
         시즌 0xca · 트레이드 0xe4 (공통 앞그림 0xb810, 0xdd · 0xe0 · 0xe1 밖 → 0xb864). 공용 목록 0x63b15 는 화면을 칠하지 않는다
       */}
       <SkinBackdrop kind="공무늬" />
-      {gridOpen !== null && (<>
-      {/* A·B 딱지 — A 는 흰 막대(이미지 116), B 는 파란 막대(이미지 117)로 서로 다르다 */}
-      {[
-        { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
-        { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
-      ].map(({ anchor, bar, barDy, textDy, frame }) => (
-        <span key={frame}>
-          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, bar)}
-            style={{ left: anchor.x + TAG.dx, top: anchor.y + barDy }} />
-          <img className={styles.layer} alt="" src={frameSrc(IMG_TEXT, frame)}
-            style={{
-              left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none',
-            }} />
-        </span>
-      ))}
+      {gridOpen !== null && (
+        <>
+          {/* A·B 딱지 — A 는 흰 막대(이미지 116), B 는 파란 막대(이미지 117)로 서로 다르다 */}
+          {[
+            { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
+            { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
+          ].map(({ anchor, bar, barDy, textDy, frame }) => (
+            <span key={frame}>
+              <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, bar)} style={{ left: anchor.x + TAG.dx, top: anchor.y + barDy }} />
+              <img
+                className={styles.layer}
+                alt=""
+                src={frameSrc(IMG_TEXT, frame)}
+                style={{
+                  left: anchor.x + TAG.dx,
+                  top: anchor.y + textDy,
+                  width: TAG.barWidth,
+                  objectFit: 'none',
+                }}
+              />
+            </span>
+          ))}
 
-      {/* A — 열린 팀은 로고, 잠긴 히든 팀은 파란 원 두 개 */}
-      {isOpen ? (
-        <img className={styles.layer} alt={team.name} src={team.logoUrl}
-          style={{ left: ANCHOR_A.x - BIG_LOGO_HALF.width, top: ANCHOR_A.y - BIG_LOGO_HALF.height }} />
-      ) : (
-        LOCKED_CIRCLES.map((circle) => (
-          <span key={circle.diameter} className={styles.lockedCircle}
-            style={{
-              left: ANCHOR_A.x - circle.diameter / 2,
-              top: ANCHOR_A.y - circle.diameter / 2,
-              width: circle.diameter,
-              height: circle.diameter,
-              background: circle.color,
-            }} />
-        ))
+          {/* A — 열린 팀은 로고, 잠긴 히든 팀은 파란 원 두 개 */}
+          {isOpen ? (
+            <img
+              className={styles.layer}
+              alt={team.name}
+              src={team.logoUrl}
+              style={{ left: ANCHOR_A.x - BIG_LOGO_HALF.width, top: ANCHOR_A.y - BIG_LOGO_HALF.height }}
+            />
+          ) : (
+            LOCKED_CIRCLES.map((circle) => (
+              <span
+                key={circle.diameter}
+                className={styles.lockedCircle}
+                style={{
+                  left: ANCHOR_A.x - circle.diameter / 2,
+                  top: ANCHOR_A.y - circle.diameter / 2,
+                  width: circle.diameter,
+                  height: circle.diameter,
+                  background: circle.color,
+                }}
+              />
+            ))
+          )}
+
+          {/* 이름 막대 (slt_frame **이미지** 9, 82×15) + 이름. 잠긴 팀은 ??? 다 */}
+          <img
+            className={styles.layer}
+            alt=""
+            src={imageSrc(SLT_IMAGE, NAME_BAR.image)}
+            style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + NAME_BAR.dy }}
+          />
+          <span className={styles.centeredText} style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + 42, width: NAME_BAR.width }}>
+            {isOpen ? team.name : LOCKED_NAME}
+          </span>
+
+          {/* B — 능력치 도형. 잠긴 팀은 원본도 idx −1 을 넘겨 네 값을 0 으로 채운다 */}
+          <TeamAbilityChart values={isOpen ? team.values.slice(2) : []} cursor={cursor} isOpen={isOpen} />
+
+          {/* 15팀 격자 — 시작 0x7a005(격자, [skin+0xe8], 1, 1) 의 넷째 인자 [격자+8] = 1 이라 칸 바탕(남색 둥근 네모)을 모든 칸에 먼저 깐다 */}
+          {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
+            const shake = index === cursor ? bounce.offset : null
+            return (
+              <GridCellBack
+                key={`back-${entry.id}`}
+                className={styles.layer}
+                x={cellPositionOf(index).x + (shake?.dx ?? 0)}
+                y={cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)}
+                width={GRID.cell}
+                height={GRID.cell}
+              />
+            )
+          })}
+          {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
+            const shake = index === cursor ? bounce.offset : null
+            const x = cellPositionOf(index).x + (shake?.dx ?? 0)
+            const y = cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)
+            const open = isTeamOpen(index, openedHiddenIds)
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                aria-label={open ? entry.name : LOCKED_NAME}
+                aria-pressed={index === cursor}
+                className={styles.cell}
+                style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
+                onClick={() => {
+                  if (isSelectable(index)) return onSelect(index)
+                  setCursor(index)
+                  onSelectLocked?.(index)
+                }}
+              >
+                {/* 칸 바탕(slt_frame 0) 먼저 깔고 그 위에 로고·물음표를 얹는다 */}
+                <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)} style={{ left: 0, top: 0 }} />
+                {open ? (
+                  // 0x66431 — 0x663c4 가 원본 식(0x662dc → 0x65f64)으로 미리 줄인 35×34 버퍼를 칸 + (2, 2) 에 제 크기로
+                  <OriginalScaledImage
+                    className={styles.layer}
+                    alt=""
+                    src={entry.logoUrl}
+                    boxWidth={CELL_LOGO.width}
+                    boxHeight={CELL_LOGO.height}
+                    style={{ left: CELL_LOGO.x, top: CELL_LOGO.y }}
+                  />
+                ) : (
+                  <img
+                    className={styles.layer}
+                    alt="?"
+                    data-testid="팀칸-물음표"
+                    src={imageSrc(TEAM_LOGO_IMAGE, CELL_LOCKED_MARK.image)}
+                    style={{
+                      left: CELL_LOCKED_MARK.x,
+                      top: CELL_LOCKED_MARK.y,
+                      width: CELL_LOCKED_MARK.width,
+                      height: CELL_LOCKED_MARK.height,
+                    }}
+                  />
+                )}
+                {open && index === coveredTeamId && (
+                  <span
+                    className={styles.layer}
+                    data-testid="팀칸-덮기"
+                    style={{
+                      left: 0,
+                      top: 0,
+                      width: CELL_COVER_SIZE.width,
+                      height: CELL_COVER_SIZE.height,
+                      background: ORIGINAL_COLORS.black,
+                      opacity: blackStepCoverOpacityOf(TEAM_COVER_STEP),
+                    }}
+                  />
+                )}
+                {/* 커서는 열림 애니가 끝난 뒤([격자+9])에만 0x7b3a0 이 그린다 */}
+                {index === cursor && gridOpen.state.isDone && (
+                  <img
+                    className={styles.layer}
+                    alt=""
+                    src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
+                    style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }}
+                  />
+                )}
+              </button>
+            )
+          })}
+        </>
       )}
-
-      {/* 이름 막대 (slt_frame **이미지** 9, 82×15) + 이름. 잠긴 팀은 ??? 다 */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, NAME_BAR.image)}
-        style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + NAME_BAR.dy }} />
-      <span className={styles.centeredText}
-        style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + 42, width: NAME_BAR.width }}>
-        {isOpen ? team.name : LOCKED_NAME}
-      </span>
-
-      {/* B — 능력치 도형. 잠긴 팀은 원본도 idx −1 을 넘겨 네 값을 0 으로 채운다 */}
-      <TeamAbilityChart values={isOpen ? team.values.slice(2) : []} cursor={cursor} isOpen={isOpen} />
-
-      {/* 15팀 격자 — 시작 0x7a005(격자, [skin+0xe8], 1, 1) 의 넷째 인자 [격자+8] = 1 이라 칸 바탕(남색 둥근 네모)을 모든 칸에 먼저 깐다 */}
-      {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
-        const shake = index === cursor ? bounce.offset : null
-        return (
-          <GridCellBack key={`back-${entry.id}`} className={styles.layer}
-            x={cellPositionOf(index).x + (shake?.dx ?? 0)}
-            y={cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)}
-            width={GRID.cell} height={GRID.cell} />
-        )
-      })}
-      {TEAMS.slice(0, TEAM_COUNT).map((entry, index) => {
-        const shake = index === cursor ? bounce.offset : null
-        const x = cellPositionOf(index).x + (shake?.dx ?? 0)
-        const y = cellPositionOf(index).y + gridOpenCellDy(TEAM_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)
-        const open = isTeamOpen(index, openedHiddenIds)
-        return (
-          <button
-            key={entry.id}
-            type="button"
-            aria-label={open ? entry.name : LOCKED_NAME}
-            aria-pressed={index === cursor}
-            className={styles.cell}
-            style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
-            onClick={() => {
-              if (isSelectable(index)) return onSelect(index)
-              setCursor(index)
-              onSelectLocked?.(index)
-            }}
-          >
-            {/* 칸 바탕(slt_frame 0) 먼저 깔고 그 위에 로고·물음표를 얹는다 */}
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)}
-              style={{ left: 0, top: 0 }} />
-            {open
-              // 0x66431 — 0x663c4 가 원본 식(0x662dc → 0x65f64)으로 미리 줄인 35×34 버퍼를 칸 + (2, 2) 에 제 크기로
-              ? <OriginalScaledImage className={styles.layer} alt="" src={entry.logoUrl}
-                  boxWidth={CELL_LOGO.width} boxHeight={CELL_LOGO.height}
-                  style={{ left: CELL_LOGO.x, top: CELL_LOGO.y }} />
-              : <img className={styles.layer} alt="?" data-testid="팀칸-물음표" src={imageSrc(TEAM_LOGO_IMAGE, CELL_LOCKED_MARK.image)}
-                  style={{
-                    left: CELL_LOCKED_MARK.x, top: CELL_LOCKED_MARK.y,
-                    width: CELL_LOCKED_MARK.width, height: CELL_LOCKED_MARK.height,
-                  }} />}
-            {open && index === coveredTeamId && (
-              <span className={styles.layer} data-testid="팀칸-덮기" style={{
-                left: 0,
-                top: 0,
-                width: CELL_COVER_SIZE.width,
-                height: CELL_COVER_SIZE.height,
-                background: ORIGINAL_COLORS.black,
-                opacity: blackStepCoverOpacityOf(TEAM_COVER_STEP),
-              }} />
-            )}
-            {/* 커서는 열림 애니가 끝난 뒤([격자+9])에만 0x7b3a0 이 그린다 */}
-            {index === cursor && gridOpen.state.isDone && (
-              <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
-                style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }} />
-            )}
-          </button>
-        )
-      })}
-      </>)}
 
       {/* 머리띠(제목)·바닥띠 — 원본 상태 101 그리기 0x15de4 도 이 둘을 얹는다 (P6 1-1 · R9 206 · F 489) */}
       {/* 바닥띠의 "되돌아가기" 가 원본의 되돌아가기 소프트키다 (P6 1-1) — 따로 둔 버튼은 없앴다:
@@ -319,12 +391,17 @@ export function TeamSelectScreen({
  * (격자 키 0x6c030 이 칸이 바뀌면 커서 +0x25 = 1 — 0x6c17c~0x6c192)에 0x63b14 가 [anim+0x1e3] = 0 으로 두어(0x63c36~0x63c56)
  * 지난 목표값에서 새 팀 값으로 오르내린다.
  */
-function TeamAbilityChart({ values, cursor, isOpen }: {
-  readonly values: readonly number[]; readonly cursor: number; readonly isOpen: boolean
-}) {
+function TeamAbilityChart({ values, cursor, isOpen }: { readonly values: readonly number[]; readonly cursor: number; readonly isOpen: boolean }) {
   const center = { x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }
   return (
-    <AbilityRadarPanel center={center} radius={ABILITY_CHART.radius} maximumLength={abilityAxisMaximumLengthOf(ABILITY_CHART.radius)}
-      labelFrames={ABILITY_RADAR_LABELS.team} targets={values} restartKey={cursor} showsNumbers={isOpen} />
+    <AbilityRadarPanel
+      center={center}
+      radius={ABILITY_CHART.radius}
+      maximumLength={abilityAxisMaximumLengthOf(ABILITY_CHART.radius)}
+      labelFrames={ABILITY_RADAR_LABELS.team}
+      targets={values}
+      restartKey={cursor}
+      showsNumbers={isOpen}
+    />
   )
 }

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SEASON_CARD_BADGE, SEASON_CARD_BOARD, SEASON_CARD_FIGURE, SEASON_CARD_LOGO, initialSeasonCardFigure, seasonCardLogoPlaceOf,
-  seasonCardLookOf, stepSeasonCardFigure, steppedBoardLeftEnd, steppedBoardLeftRow565, steppedBoardPointsOf,
+  SEASON_CARD_BADGE,
+  SEASON_CARD_BOARD,
+  SEASON_CARD_FIGURE,
+  SEASON_CARD_LOGO,
+  initialSeasonCardFigure,
+  seasonCardLogoPlaceOf,
+  seasonCardLookOf,
+  stepSeasonCardFigure,
+  steppedBoardLeftEnd,
+  steppedBoardLeftRow565,
+  steppedBoardPointsOf,
 } from '@/pages/season/lib/seasonPlayerCard'
 import type { SeasonCardFigureState } from '@/pages/season/lib/seasonPlayerCard'
 
@@ -17,10 +26,16 @@ const run = (isBatter: boolean, form: number, lastTick: number) => {
 
 describe('시즌 선수 카드 0x7ba44 · 그림 0xae98', () => {
   it('계단형 판 0x7650c — 관리 화면 값(35, 190, 30)과 카드 값(0x67, 0x38, 0)', () => {
-    expect(steppedBoardPointsOf(35, 190, 30).map(({ x, y }) => `${x},${y}`).join(' '))
-      .toBe('0,54 141,54 160,35 240,35 240,206 160,206 141,225 0,225')
-    expect(steppedBoardPointsOf(0x67, 0x38, 0).map(({ x, y }) => `${x},${y}`).join(' '))
-      .toBe('0,122 111,122 130,103 240,103 240,140 130,140 111,159 0,159')
+    expect(
+      steppedBoardPointsOf(35, 190, 30)
+        .map(({ x, y }) => `${x},${y}`)
+        .join(' '),
+    ).toBe('0,54 141,54 160,35 240,35 240,206 160,206 141,225 0,225')
+    expect(
+      steppedBoardPointsOf(0x67, 0x38, 0)
+        .map(({ x, y }) => `${x},${y}`)
+        .join(' '),
+    ).toBe('0,122 111,122 130,103 240,103 240,140 130,140 111,159 0,159')
   })
 
   it('로고 (20, 72) 무게 12/16 · 타자 발 (57, 160) · 투수 이미지 (11, 18) 두 배', () => {
@@ -30,8 +45,7 @@ describe('시즌 선수 카드 0x7ba44 · 그림 0xae98', () => {
   })
 
   it('그림 값 — 폼 +0xb >> 4 · 피부 bit2-3 · 니블 네 칸', () => {
-    expect(seasonCardLookOf({ profile: 0x3c, equipment: [1, 2, 0, 3] }, 4))
-      .toEqual({ form: 3, skin: 3, team: 4, equipment: [1, 2, 0, 3] })
+    expect(seasonCardLookOf({ profile: 0x3c, equipment: [1, 2, 0, 3] }, 4)).toEqual({ form: 3, skin: 3, team: 4, equipment: [1, 2, 0, 3] })
   })
 
   it('0x45e8 타자 — 틱 30 에 준비(2) → 스윙(3) → 대기(5)', () => {
@@ -62,8 +76,9 @@ describe('시즌 선수 카드 0x7ba44 · 그림 0xae98', () => {
     expect(SEASON_CARD_BADGE.title.board.y + SEASON_CARD_BADGE.title.board.height).toBe(SEASON_CARD_LOGO.y)
     expect(SEASON_CARD_BADGE.name.board.y).toBe(SEASON_CARD_LOGO.y + SEASON_CARD_LOGO.height + 2)
     expect([SEASON_CARD_BADGE.name.ox, SEASON_CARD_BADGE.name.oy, SEASON_CARD_BADGE.name.palette]).toEqual([1, -1, 0])
-    expect([SEASON_CARD_BADGE.title.frame, SEASON_CARD_BADGE.title.ox, SEASON_CARD_BADGE.title.oy, SEASON_CARD_BADGE.title.palette])
-      .toEqual([157, 0, -1, 4])
+    expect([SEASON_CARD_BADGE.title.frame, SEASON_CARD_BADGE.title.ox, SEASON_CARD_BADGE.title.oy, SEASON_CARD_BADGE.title.palette]).toEqual([
+      157, 0, -1, 4,
+    ])
   })
 })
 
@@ -87,4 +102,3 @@ describe('카드 로고 합성의 아래 줄 (Q-03 r301)', () => {
     expect(seasonCardLogoPlaceOf(73, 33)).toEqual({ x: 22, y: 94 })
   })
 })
-

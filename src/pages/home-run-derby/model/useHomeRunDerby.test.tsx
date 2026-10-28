@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { CONFIRM_LOCK_FRAMES, resultHoldMillisecondsOf, rollDerbySceneStart, SCENE_D_FRAMES, useHomeRunDerby } from '@/pages/home-run-derby/model/useHomeRunDerby'
+import {
+  CONFIRM_LOCK_FRAMES,
+  resultHoldMillisecondsOf,
+  rollDerbySceneStart,
+  SCENE_D_FRAMES,
+  useHomeRunDerby,
+} from '@/pages/home-run-derby/model/useHomeRunDerby'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import { derbyBattedBallOf } from '@/entities/home-run-derby/model/derbyBattedBall'
@@ -16,7 +22,8 @@ import { createPatternDeck, rollSceneEffectInit } from '@/entities/batting/model
 const 홈런코드 = 24
 
 const 홈런: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '타구', outcome: { kind: '홈런' } },
+  batterHand: 0,
+  resolution: { kind: '타구', outcome: { kind: '홈런' } },
   hasSwung: true,
   isBunt: false,
   resultCode: 홈런코드,
@@ -25,7 +32,8 @@ const 홈런: PitchOutcomeDetail = {
 }
 
 const 헛스윙: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
+  batterHand: 0,
+  resolution: { kind: '스트라이크', isSwinging: true },
   hasSwung: true,
   isBunt: false,
   resultCode: null,
@@ -33,7 +41,8 @@ const 헛스윙: PitchOutcomeDetail = {
 
 /** 희생번트 타구 — 번트 판정(0x51226) 성공 코드 6 묶음 (`outcomeOfPattern` 의 case 6) */
 const 번트: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '타구', outcome: { kind: '아웃', detail: '땅볼아웃' } },
+  batterHand: 0,
+  resolution: { kind: '타구', outcome: { kind: '아웃', detail: '땅볼아웃' } },
   hasSwung: true,
   isBunt: true,
   resultCode: 7,
@@ -330,7 +339,10 @@ describe('경기 시작 굴림 — 0x39fdc 모드 7 갈래 3a454 rand(0, 9) 뒤 
 
   it('장면 시작 굴림에 rand(0, 9) → rand(0, 2) 가 이어 든다', () => {
     const at = 한장면.findIndex(([lo, hi]) => lo === 0 && hi === 9)
-    expect(한장면.slice(at, at + 2)).toEqual([[0, 9], [0, 2]])
+    expect(한장면.slice(at, at + 2)).toEqual([
+      [0, 9],
+      [0, 2],
+    ])
   })
 
   it('들어서면 한 번 — 다시 그려도 더 굴리지 않는다', () => {
@@ -558,14 +570,26 @@ describe('홈런더비 장면 시작 굴림 차례 (`rollDerbySceneStart`)', () 
     }
     rollDerbySceneStart(random, 12)
     const at = calls.findIndex(([lo, hi]) => lo === 0 && hi === 9)
-    expect(calls.slice(at, at + 4)).toEqual([[0, 9], [0, 10], [0, 10], [0, 2]])
+    expect(calls.slice(at, at + 4)).toEqual([
+      [0, 9],
+      [0, 10],
+      [0, 10],
+      [0, 2],
+    ])
   })
 })
 
 describe('판 끝 누적 비거리 > 1999 → 히든 39 (0x52a00~0x52a16)', () => {
   it('맞은 공의 판이 끝날 때 누적이 1999 를 넘었으면 그때마다 부른다 (이미 열렸는지는 받는 쪽)', () => {
     const opened: number[] = []
-    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => { opened.push(id) } }))
+    const rendered = renderHook(() =>
+      useHomeRunDerby({
+        bestDistance: 0,
+        onOpenHidden: (id) => {
+          opened.push(id)
+        },
+      }),
+    )
     OK(rendered)
     const 존홈런: PitchOutcomeDetail = { ...홈런, pattern: [118, 961, 1367, 2] }
     let expected = 0
@@ -586,14 +610,16 @@ describe('판 끝 누적 비거리 > 1999 → 히든 39 (0x52a00~0x52a16)', () =
 
   it('창이 서면 판(0x17)의 필드 화면이 창 뒤에 남고, 창을 닫아야 다음 상태로 간다 (52a54 0xbcb48 · 52efe → 0x46c88)', () => {
     let close: (() => void) | null = null
-    const rendered = renderHook(() => useHomeRunDerby({
-      bestDistance: 0,
-      onOpenHidden: (_id, then) => {
-        if (close !== null) return false
-        close = then
-        return true
-      },
-    }))
+    const rendered = renderHook(() =>
+      useHomeRunDerby({
+        bestDistance: 0,
+        onOpenHidden: (_id, then) => {
+          if (close !== null) return false
+          close = then
+          return true
+        },
+      }),
+    )
     OK(rendered)
     const 존홈런: PitchOutcomeDetail = { ...홈런, pattern: [118, 961, 1367, 2] }
     for (let ball = 0; ball < 40 && close === null && rendered.result.current.result === null; ball += 1) {
@@ -624,7 +650,14 @@ describe('판 끝 누적 비거리 > 1999 → 히든 39 (0x52a00~0x52a16)', () =
 
   it('맞지 않은 공(0x12)에서는 부르지 않는다', () => {
     const opened: number[] = []
-    const rendered = renderHook(() => useHomeRunDerby({ bestDistance: 0, onOpenHidden: (id) => { opened.push(id) } }))
+    const rendered = renderHook(() =>
+      useHomeRunDerby({
+        bestDistance: 0,
+        onOpenHidden: (id) => {
+          opened.push(id)
+        },
+      }),
+    )
     OK(rendered)
     한구(rendered, 헛스윙)
     expect(opened).toEqual([])

@@ -153,20 +153,17 @@ export function popupAfterChampion(career: PostseasonCareerFields, champion: num
  * 두 0x62369 는 저마다 새로 열면 공용 창에 알림을 띄운다 — 부르는 쪽이 `regularSeasonOpenedHiddenIds` 로 새로 연 k 를 차례대로
  * 받아 창에 넣는다(0x29 가 먼저 뜨고 자기 모드 것은 대기했다가 닫으면 뜬다).
  */
-export function applyRegularSeasonReward<T extends PostseasonCareerFields>(
-  career: T,
-  hiddenId: number,
-  otherModes?: RegularSeasonOtherModes,
-): T {
+export function applyRegularSeasonReward<T extends PostseasonCareerFields>(career: T, hiddenId: number, otherModes?: RegularSeasonOtherModes): T {
   const rewarded: T = {
     ...career,
     popularity: clamp(career.popularity + REGULAR_SEASON_REWARD.popularity, 0, MAXIMUM_POPULARITY),
     money: clamp(career.money + REGULAR_SEASON_REWARD.moneyUnits * ORIGINAL_MONEY_UNIT, 0, MAXIMUM_MONEY),
     regularSeasonRewardTaken: true,
   }
-  const withAutobot = otherModes !== undefined && opensAutobotBat(career, otherModes)
-    ? { ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, AUTOBOT_BAT_HIDDEN_ID] }
-    : rewarded
+  const withAutobot =
+    otherModes !== undefined && opensAutobotBat(career, otherModes)
+      ? { ...rewarded, openedHiddenIds: [...rewarded.openedHiddenIds, AUTOBOT_BAT_HIDDEN_ID] }
+      : rewarded
   if (signedByteOf(career.regularSeasonFirstCount) <= REGULAR_SEASON_HIDDEN_COUNT_ABOVE) return withAutobot
   if (withAutobot.openedHiddenIds.includes(hiddenId)) return withAutobot
   return { ...withAutobot, openedHiddenIds: [...withAutobot.openedHiddenIds, hiddenId] }
@@ -205,9 +202,9 @@ export function opensAutobotBat(career: PostseasonCareerFields, otherModes: Regu
   if (otherModes.globalOpenedHiddenIds.includes(AUTOBOT_BAT_HIDDEN_ID)) return false
   if (career.openedHiddenIds.includes(AUTOBOT_BAT_HIDDEN_ID)) return false
   return (
-    signedByteOf(career.regularSeasonFirstCount) > 0
-    && signedByteOf(otherModes.otherLeagueFirstCount) > 0
-    && signedByteOf(otherModes.seasonModeFirstCount) > 0
+    signedByteOf(career.regularSeasonFirstCount) > 0 &&
+    signedByteOf(otherModes.otherLeagueFirstCount) > 0 &&
+    signedByteOf(otherModes.seasonModeFirstCount) > 0
   )
 }
 

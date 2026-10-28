@@ -64,10 +64,7 @@ describe('원본 스프라이트 경로', () => {
   it('마선수 대부분이 애니메이션 프레임을 갖는다', () => {
     const withFrames = ACE_PLAYERS.filter((ace) => ace.frameCount > 0)
 
-    expect(
-      withFrames.length,
-      `프레임 없는 마선수: ${ACE_PLAYERS.filter((a) => a.frameCount === 0).map((a) => a.name)}`,
-    ).toBeGreaterThanOrEqual(8)
+    expect(withFrames.length, `프레임 없는 마선수: ${ACE_PLAYERS.filter((a) => a.frameCount === 0).map((a) => a.name)}`).toBeGreaterThanOrEqual(8)
   })
 })
 
@@ -83,18 +80,16 @@ describe('메뉴 아이콘', () => {
 
   it('훈련 메뉴 수만큼 아이콘이 있다', async () => {
     const { TRAINING_MENUS } = await import('@/shared/config/trainingMenus')
-    const missing = TRAINING_MENUS.map((_unused, index) =>
-      `./sprites/mode_icon/${String(7 + index).padStart(3, '0')}.png`,
-    ).filter((url) => !publicFileExists(url))
+    const missing = TRAINING_MENUS.map((_unused, index) => `./sprites/mode_icon/${String(7 + index).padStart(3, '0')}.png`).filter(
+      (url) => !publicFileExists(url),
+    )
 
     expect(missing).toEqual([])
   })
 
   it('모든 마선수가 프레임이든 정지 그림이든 화면에 나올 수 있다', async () => {
     const { ACE_PLAYERS } = await import('@/shared/config/original/acePlayers')
-    const invisible = ACE_PLAYERS.filter(
-      (ace) => ace.frameCount === 0 && !publicFileExists(ace.stillUrl),
-    ).map((ace) => ace.name)
+    const invisible = ACE_PLAYERS.filter((ace) => ace.frameCount === 0 && !publicFileExists(ace.stillUrl)).map((ace) => ace.name)
 
     expect(invisible).toEqual([])
   })

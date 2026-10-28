@@ -64,11 +64,7 @@ export function reachablePortraitsOf(events: readonly OriginalEvent[], first: Or
 }
 
 /** 초상 목록 → 받을 그림. 애니 번호는 화면과 같은 식(`portraitAnimationOf`), 피부 팔레트를 쓰면 번호 지도 · palette.json 도 */
-export function portraitPreloadsOf(
-  portraits: readonly EventPortrait[],
-  battingTypeIndex: number,
-  skinIndex: number,
-): SpriteFolderPreload[] {
+export function portraitPreloadsOf(portraits: readonly EventPortrait[], battingTypeIndex: number, skinIndex: number): SpriteFolderPreload[] {
   const requests: SpriteFolderPreload[] = []
   for (const portrait of portraits) {
     const frames = assetUrl(`./sprites/${portrait.file}/frames`)
@@ -94,10 +90,7 @@ export function afterGameStoryEventOf(career: PlayerCareer, events: readonly Ori
 export function afterGameEventPreloadsOf(career: PlayerCareer, events: readonly OriginalEvent[]): SpriteFolderPreload[] {
   const story = afterGameStoryEventOf(career, events)
   const portraits = story === null ? [] : reachablePortraitsOf(events, story)
-  return mergeSpritePreloads(
-    portraitPreloadsOf(portraits, career.battingTypeIndex, career.skinIndex),
-    afterGameEvaluationPreloads(),
-  )
+  return mergeSpritePreloads(portraitPreloadsOf(portraits, career.battingTypeIndex, career.skinIndex), afterGameEvaluationPreloads())
 }
 
 /**

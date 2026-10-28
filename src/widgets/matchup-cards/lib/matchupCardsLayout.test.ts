@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BATTER_BOXES, BATTER_CARD_TOP, PITCHER_BOXES, PITCHER_CARD_TOP,
-  batterPositionBadgeOf, battingAverageGlyphsOf, boxNumberGlyphsOf, cardOriginsAt, earnedRunAverageGlyphsOf,
-  framePlacementOf, paddedNumberGlyphsOf, pitcherRoleBadgeOf, recentResultChipsOf, roundFillRectsOf, slideOffsetAt,
+  BATTER_BOXES,
+  BATTER_CARD_TOP,
+  PITCHER_BOXES,
+  PITCHER_CARD_TOP,
+  batterPositionBadgeOf,
+  battingAverageGlyphsOf,
+  boxNumberGlyphsOf,
+  cardOriginsAt,
+  earnedRunAverageGlyphsOf,
+  framePlacementOf,
+  paddedNumberGlyphsOf,
+  pitcherRoleBadgeOf,
+  recentResultChipsOf,
+  roundFillRectsOf,
+  slideOffsetAt,
   staminaGaugeRectsOf,
 } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 
@@ -79,7 +91,10 @@ describe('숫자', () => {
 describe('칸', () => {
   it('보직 0x545e8 — 0 선발 · 1 중계 · 2 구원, 그 밖은 칸 0 과 PLAYER/COM 글자가 남는다', () => {
     expect([0, 1, 2, 3].map((role) => pitcherRoleBadgeOf(role, 158))).toEqual([
-      { chip: 4, label: 49 }, { chip: 7, label: 170 }, { chip: 5, label: 182 }, { chip: 0, label: 158 },
+      { chip: 4, label: 49 },
+      { chip: 7, label: 170 },
+      { chip: 5, label: 182 },
+      { chip: 0, label: 158 },
     ])
   })
 
@@ -136,7 +151,8 @@ describe('둥근 칠 0x6b7d4 — 사각 칠 하나와 선 넷 (둥글기 ≤ 3 �
     const cells = cellsOf(roundFillRectsOf({ x: 10, y: 10, width: 4, height: 3, round: 1 }))
     expect(cells.size).toBe(5 * 4 - 4)
     expect(['10,10', '14,10', '10,13', '14,13'].some((cell) => cells.has(cell))).toBe(false)
-    expect(cellsOf(roundFillRectsOf({ x: 0, y: 0, width: 6, height: 4, round: 99 })))
-      .toEqual(cellsOf(roundFillRectsOf({ x: 0, y: 0, width: 6, height: 4, round: 5 })))
+    expect(cellsOf(roundFillRectsOf({ x: 0, y: 0, width: 6, height: 4, round: 99 }))).toEqual(
+      cellsOf(roundFillRectsOf({ x: 0, y: 0, width: 6, height: 4, round: 5 })),
+    )
   })
 })

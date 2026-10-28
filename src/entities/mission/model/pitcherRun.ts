@@ -1,13 +1,7 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { MissionGameSetup } from '@/entities/mission/model/missionGame'
 import type { OriginalMission } from '@/shared/config/original/missions'
-import {
-  createProgress,
-  inningGoalOf,
-  isCleared,
-  OUTS_PER_INNING,
-  recordPitcherOutcome,
-} from '@/entities/mission/model/missionGoal'
+import { createProgress, inningGoalOf, isCleared, OUTS_PER_INNING, recordPitcherOutcome } from '@/entities/mission/model/missionGoal'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { limitOrNull, missionPlay, missionStartFielderZeroOf } from '@/entities/mission/model/missionRun'
@@ -187,7 +181,11 @@ function brokenConditionsOf(mission: OriginalMission, allowed: PitcherRun['allow
  * 실점(`allowed.runs`)·이닝 목표(`totalOuts`)가 이 결과를 그대로 받는다 (P2 7절 · U-02).
  */
 function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: PitcherOutcomeOptions) {
-  const { advance, runnerFates, outcome: settled } = missionPlay(run.bases, run.outs, outcome, {
+  const {
+    advance,
+    runnerFates,
+    outcome: settled,
+  } = missionPlay(run.bases, run.outs, outcome, {
     random: options.random,
     played: options.played,
     gameMode: MISSION_PITCHER_MODE,
@@ -197,11 +195,15 @@ function advanceDefense(run: PitcherRun, outcome: AtBatOutcome, options: Pitcher
   return {
     bases: isInningOver ? EMPTY_BASES : advance.bases,
     // 판의 살아남은 주자로 CPU 타선 신원을 민다 — 지금 타자 칸은 판 앞 타순(정산 뒤 0xaf020 이 넘긴다)
-    runners: missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
-      batterReached: settled.kind === '안타' || settled.kind === '볼넷' || settled.kind === '사구',
-      runsScored: advance.runsScored,
-      survivorsFromBase: survivorsFromBaseOfFates(runnerFates),
-    }),
+    runners: missionRunnersAfterPlay(
+      run,
+      { bases: advance.bases, inningOver: isInningOver },
+      {
+        batterReached: settled.kind === '안타' || settled.kind === '볼넷' || settled.kind === '사구',
+        runsScored: advance.runsScored,
+        survivorsFromBase: survivorsFromBaseOfFates(runnerFates),
+      },
+    ),
     outs: isInningOver ? 0 : outs,
     outsAdded: advance.outsAdded,
     /** 점수판 득점 (0xa5c34) — CPU 측 점수 */
@@ -236,11 +238,7 @@ export interface PitcherOutcomeOptions {
 }
 
 /** 타석이 끝났다. 목표를 채우면 성공, 한도·제한에 닿으면 실패다. */
-export function applyPitcherOutcome(
-  run: PitcherRun,
-  outcome: AtBatOutcome,
-  options: PitcherOutcomeOptions = {},
-): PitcherRun {
+export function applyPitcherOutcome(run: PitcherRun, outcome: AtBatOutcome, options: PitcherOutcomeOptions = {}): PitcherRun {
   if (run.status !== '진행중') return run
 
   const defense = advanceDefense(run, outcome, options)
@@ -254,8 +252,7 @@ export function applyPitcherOutcome(
     walks: run.allowed.walks + (countsTowardWalkLimit(settled.kind) ? 1 : 0),
     // R+0x130 = 이번 플레이 하나의 값 (덮어쓴다) — 목록 마지막 원소의 +0x96 이 꺼져 있나.
     // B-31 고침이면 볼넷 · 사구 플레이는 출루 허용으로 안 친다(사사구는 위 "무사사구" 한도의 몫)
-    baserunner: !isWalkBaserunnerExempt(settled.kind)
-      && baserunnerAllowedOfFates(options.settledRunnerFates ?? defense.runnerFates) ? 1 : 0,
+    baserunner: !isWalkBaserunnerExempt(settled.kind) && baserunnerAllowedOfFates(options.settledRunnerFates ?? defense.runnerFates) ? 1 : 0,
   }
   const progress = recordPitcherOutcome(
     run.progress,
@@ -266,8 +263,7 @@ export function applyPitcherOutcome(
     // 아웃 콜 수 — 병살 2 · 삼중살 3 · 안타 판의 주자 아웃 1 (R+0x13c, `recordPitcherOutcome` 머리글). 셋째 아웃에서 판이 끝난다
     defense.outsAtSettlement - run.outs,
   )
-  const remainingPlate =
-    run.remainingPlateAppearances === null ? null : run.remainingPlateAppearances - 1
+  const remainingPlate = run.remainingPlateAppearances === null ? null : run.remainingPlateAppearances - 1
   const totalOuts = run.totalOuts + defense.outsAdded
 
   const next: PitcherRun = {

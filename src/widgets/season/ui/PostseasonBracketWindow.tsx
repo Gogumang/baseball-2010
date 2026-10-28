@@ -5,9 +5,24 @@ import { blackStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
-  BRACKET_BACKDROP, DARK_CELL_STEP, LINE_COLOR, LINE_FRAMES, LOGO_INSET, RANK_GLYPH_HEIGHT, RANK_TAGS, RANK_UNIT,
-  TEAM_CELLS, WON_LINE_COLOR, bracketViewOf, darkCellBoxOf, lineFrameOfCell, rankDigitBoxTopOf, rankDigitRightOf,
-  rankGlyphsOf, rankLabelOfCell, rankUnitPositionOf,
+  BRACKET_BACKDROP,
+  DARK_CELL_STEP,
+  LINE_COLOR,
+  LINE_FRAMES,
+  LOGO_INSET,
+  RANK_GLYPH_HEIGHT,
+  RANK_TAGS,
+  RANK_UNIT,
+  TEAM_CELLS,
+  WON_LINE_COLOR,
+  bracketViewOf,
+  darkCellBoxOf,
+  lineFrameOfCell,
+  rankDigitBoxTopOf,
+  rankDigitRightOf,
+  rankGlyphsOf,
+  rankLabelOfCell,
+  rankUnitPositionOf,
 } from '@/widgets/season/lib/postseasonBracketLayout'
 import type { BracketBox } from '@/widgets/season/lib/postseasonBracketLayout'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
@@ -60,38 +75,63 @@ export function PostseasonBracketWindow({ series }: PostseasonBracketWindowProps
         return (
           <div key={k} data-cell={k}>
             {LINE_FRAMES[frame].map((box, index) => (
-              <div key={index} className={styles.segment} data-frame={frame} data-box={index}
-                style={{ ...placeOf(box), background: LINE_COLOR }} />
+              <div key={index} className={styles.segment} data-frame={frame} data-box={index} style={{ ...placeOf(box), background: LINE_COLOR }} />
             ))}
             {team === undefined ? (
               // 아직 자리가 안 정해진 칸 — 원본은 빈 칸을 그냥 비워 둔다
               <div className={styles.emptyCell} style={logoBox} />
             ) : (
               // 0x66431 — 0x663c4 가 원본 식으로 미리 줄인 35×34 버퍼를 (칸 + 3) 에 제 크기로
-              <OriginalScaledImage className={styles.logo} src={team.logoUrl} alt={team.name}
-                boxWidth={TEAM_LOGO_BOX.width} boxHeight={TEAM_LOGO_BOX.height}
-                style={{ left: logoBox.left, top: logoBox.top }} />
+              <OriginalScaledImage
+                className={styles.logo}
+                src={team.logoUrl}
+                alt={team.name}
+                boxWidth={TEAM_LOGO_BOX.width}
+                boxHeight={TEAM_LOGO_BOX.height}
+                style={{ left: logoBox.left, top: logoBox.top }}
+              />
             )}
             {/* 순위 딱지 = num 0~9 숫자 (x + 8 왼쪽 붙임) + img_text 307 "위" 오른쪽 정렬 ox −6 — `rankGlyphsOf` 주석 */}
             <div className={styles.rankTag} data-rank={rank} style={placeOf(tag)} />
-            <SpriteNumber glyphs={rankGlyphsOf(rank)} right={rankDigitRightOf(tag, rank)}
-              boxTop={rankDigitBoxTopOf(tag)} boxHeight={tag.height} glyphHeight={RANK_GLYPH_HEIGHT} />
-            <img className={styles.rankUnit} alt="위"
+            <SpriteNumber
+              glyphs={rankGlyphsOf(rank)}
+              right={rankDigitRightOf(tag, rank)}
+              boxTop={rankDigitBoxTopOf(tag)}
+              boxHeight={tag.height}
+              glyphHeight={RANK_GLYPH_HEIGHT}
+            />
+            <img
+              className={styles.rankUnit}
+              alt="위"
               src={`${RANK_UNIT.folder}/${String(RANK_UNIT.frame).padStart(3, '0')}.png`}
-              style={{ left: rankUnitPositionOf(tag).x, top: rankUnitPositionOf(tag).y }} />
+              style={{ left: rankUnitPositionOf(tag).x, top: rankUnitPositionOf(tag).y }}
+            />
           </div>
         )
       })}
 
       {view.redBoxes.map(({ frame, box }, index) => (
-        <div key={`red-${index}`} className={styles.segment} data-frame={frame} data-box={box} data-won="true"
-          style={{ ...placeOf(LINE_FRAMES[frame][box]), background: WON_LINE_COLOR }} />
+        <div
+          key={`red-${index}`}
+          className={styles.segment}
+          data-frame={frame}
+          data-box={box}
+          data-won="true"
+          style={{ ...placeOf(LINE_FRAMES[frame][box]), background: WON_LINE_COLOR }}
+        />
       ))}
 
-      {view.darkCells.map((dark, k) => dark && (
-        <div key={`dark-${k}`} className={styles.segment} data-dark-cell={k}
-          style={{ ...placeOf(darkCellBoxOf(k)), background: '#000', opacity: darkOpacity }} />
-      ))}
+      {view.darkCells.map(
+        (dark, k) =>
+          dark && (
+            <div
+              key={`dark-${k}`}
+              className={styles.segment}
+              data-dark-cell={k}
+              style={{ ...placeOf(darkCellBoxOf(k)), background: '#000', opacity: darkOpacity }}
+            />
+          ),
+      )}
     </div>
   )
 }

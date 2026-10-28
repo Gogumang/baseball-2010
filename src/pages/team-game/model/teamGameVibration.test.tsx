@@ -71,11 +71,17 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
     }
     if (!result.current.canPitch) break
     const { progress } = result.current
-    const 구질 = pitchSlotsFor(progress).map((slot) => slot.typeNumber).filter((type) => type !== 22)
+    const 구질 = pitchSlotsFor(progress)
+      .map((slot) => slot.typeNumber)
+      .filter((type) => type !== 22)
     const strikesBefore = progress.atBat.strikes
     진동.mockClear()
     act(() =>
-      result.current.actions.throwPitch({ typeNumber: 구질[step % 구질.length] ?? 1, aim: aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11), gaugeCell: 0 }),
+      result.current.actions.throwPitch({
+        typeNumber: 구질[step % 구질.length] ?? 1,
+        aim: aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11),
+        gaugeCell: 0,
+      }),
     )
     결과틀까지기다리기(result.current.progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order)
     기록.push({

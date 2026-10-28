@@ -14,9 +14,19 @@ describe('두 칸 고르기 팝업 — 터치 CLR (r186: 늘 있던 뒤로 버�
     const onCancel = vi.fn()
     const onConfirm = vi.fn()
     render(
-      <RecordPickPopup ariaLabel="기록" testIdPrefix="기록" selected={0} closeKind="바로"
-        cells={[{ label: '개인', labelFrame: 6 }, { label: '순위', labelFrame: 10 }]}
-        onToggle={vi.fn()} onConfirm={onConfirm} onCancel={onCancel} />,
+      <RecordPickPopup
+        ariaLabel="기록"
+        testIdPrefix="기록"
+        selected={0}
+        closeKind="바로"
+        cells={[
+          { label: '개인', labelFrame: 6 },
+          { label: '순위', labelFrame: 10 },
+        ]}
+        onToggle={vi.fn()}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />,
     )
     const back = screen.getByRole('button', { name: '취소' })
     expect(back.style.left).toBe('204px')
@@ -26,12 +36,22 @@ describe('두 칸 고르기 팝업 — 터치 CLR (r186: 늘 있던 뒤로 버�
     expect(onConfirm).not.toHaveBeenCalled()
   })
 
-  it('창 그림 0x19448 에 CLR 글자 자리가 없어 \'취소\' 상황 버튼(Escape)을 낸다 — 닫히면 걷는다 (r194)', () => {
+  it("창 그림 0x19448 에 CLR 글자 자리가 없어 '취소' 상황 버튼(Escape)을 낸다 — 닫히면 걷는다 (r194)", () => {
     const onCancel = vi.fn()
     render(
-      <RecordPickPopup ariaLabel="기록" testIdPrefix="기록" selected={0} closeKind="바로"
-        cells={[{ label: '개인', labelFrame: 6 }, { label: '순위', labelFrame: 10 }]}
-        onToggle={vi.fn()} onConfirm={vi.fn()} onCancel={onCancel} />,
+      <RecordPickPopup
+        ariaLabel="기록"
+        testIdPrefix="기록"
+        selected={0}
+        closeKind="바로"
+        cells={[
+          { label: '개인', labelFrame: 6 },
+          { label: '순위', labelFrame: 10 },
+        ]}
+        onToggle={vi.fn()}
+        onConfirm={vi.fn()}
+        onCancel={onCancel}
+      />,
     )
     expect(touchKeyOffersNow()).toContainEqual({ key: 'Escape', label: '취소' })
     fireEvent.keyDown(window, { key: 'Escape' })

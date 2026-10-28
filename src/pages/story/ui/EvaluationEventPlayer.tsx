@@ -89,8 +89,21 @@ interface EvaluationEventPlayerProps {
  * 변화 창(0x8d386, 키 표 −5 · '5' 뿐)은 CLR 을 받지 않는다.
  */
 export function EvaluationEventPlayer({
-  underlay, dialogue, dialogueExpression, changeValues, goals, year, game, streak, streakExpression, gauge, finalNotice = null,
-  rewardNotices = [], underlayAfterRewards, onRewardsGiven, onDone,
+  underlay,
+  dialogue,
+  dialogueExpression,
+  changeValues,
+  goals,
+  year,
+  game,
+  streak,
+  streakExpression,
+  gauge,
+  finalNotice = null,
+  rewardNotices = [],
+  underlayAfterRewards,
+  onRewardsGiven,
+  onDone,
 }: EvaluationEventPlayerProps) {
   const [step, setStep] = useState<EvaluationStep>('대사')
   /** 마지막 say 가 연속 기록이었는가 — 알림 창 밑에 남는 상자가 그 글이다 */
@@ -145,12 +158,24 @@ export function EvaluationEventPlayer({
         {hasStreakShown ? (
           // 명령 3 say 중 CLR → 0x8b7b0 이 뒤의 보상 명령(종류 7, 8ac54 · 8ad22~8af8a 가 say 뒤에 쌓는다)을 찾아 돌리거나, 없으면 끝 —
           // OK 로 글을 끝까지 넘긴 것과 같은 다음 명령이다
-          <EventDialogueBox key="연속기록" raw={streak} slideIn={false} isActive={step === '연속기록'} onAdvance={afterStreak}
-            onCancel={afterStreak} />
+          <EventDialogueBox
+            key="연속기록"
+            raw={streak}
+            slideIn={false}
+            isActive={step === '연속기록'}
+            onAdvance={afterStreak}
+            onCancel={afterStreak}
+          />
         ) : (
           // 명령 1 say 중 CLR(−16) → 0x8b7b0 이 바로 다음 명령 2(system 종류 2 · 하위 2 = 변화 창)에서 멈춘다 — 단계와 상관없이
-          <EventDialogueBox key="대사" raw={dialogue} slideIn isActive={step === '대사'} onAdvance={() => setStep('변화')}
-            onCancel={() => setStep('변화')} />
+          <EventDialogueBox
+            key="대사"
+            raw={dialogue}
+            slideIn
+            isActive={step === '대사'}
+            onAdvance={() => setStep('변화')}
+            onCancel={() => setStep('변화')}
+          />
         )}
       </div>
       {/* 0x8b72c~0x8b75a — 상자 · 초상화(0x7fbc4) 다음에 그린다. 팝업(변화 창)은 그 위 */}
@@ -166,15 +191,26 @@ export function EvaluationEventPlayer({
       {shownReward?.notice.kind === '알림' && (
         // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)을 받은 그 갱신에 다음 명령
         <div style={{ position: 'absolute', inset: 0, zIndex: 40 }}>
-          <MessageBox key={`보상${shownReward.key}`} text={shownReward.notice.text} buttons={NOTICE_BUTTONS}
-            dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswerKey={answerReward} onAnswer={() => finishRewardWindow(shownReward.key)} />
+          <MessageBox
+            key={`보상${shownReward.key}`}
+            text={shownReward.notice.text}
+            buttons={NOTICE_BUTTONS}
+            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
+            onAnswerKey={answerReward}
+            onAnswer={() => finishRewardWindow(shownReward.key)}
+          />
         </div>
       )}
       {shownReward?.notice.kind === '스킬' && (
         // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a1(그리기 0x87108 · 키 0x8e054 — OK · '5' · CLR, 받은 그 갱신에 다음 명령)
         <div style={{ position: 'absolute', inset: 0, zIndex: 40 }}>
-          <RewardSkillWindow key={`보상${shownReward.key}`} text={shownReward.notice.text} gained={shownReward.notice.gained}
-            onKey={answerReward} onClose={() => finishRewardWindow(shownReward.key)} />
+          <RewardSkillWindow
+            key={`보상${shownReward.key}`}
+            text={shownReward.notice.text}
+            gained={shownReward.notice.gained}
+            onKey={answerReward}
+            onClose={() => finishRewardWindow(shownReward.key)}
+          />
         </div>
       )}
       {step === '알림' && finalNotice !== null && (

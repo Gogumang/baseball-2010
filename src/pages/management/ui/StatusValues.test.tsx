@@ -19,15 +19,23 @@ describe('상태 아이콘 — 행운 91 · 이글아이 85 · 질병 86 · 부�
 
   it('다섯이 다 켜지면 원본 차례대로 22px 간격으로 놓인다', () => {
     const career = {
-      ...createCareer('테스터'), skillIds: [5, 6], equippedSkillIds: [5, 6],
-      eagleEyeGamesRemaining: 3, isSick: true, isInjured: true,
+      ...createCareer('테스터'),
+      skillIds: [5, 6],
+      equippedSkillIds: [5, 6],
+      eagleEyeGamesRemaining: 3,
+      isSick: true,
+      isInjured: true,
     }
     expect(statusIconFramesOf(career)).toEqual([91, 85, 86, 87, 88])
 
     const { container } = render(<StatusValues career={career} />)
     const icons = [...container.querySelectorAll('img')].filter((img) => img.src.includes('mode_ui/frames/'))
     expect(icons.map((img) => [img.src.slice(-7, -4), img.style.left, img.style.top])).toEqual([
-      ['091', '4px', '45px'], ['085', '26px', '45px'], ['086', '48px', '45px'], ['087', '70px', '45px'], ['088', '92px', '45px'],
+      ['091', '4px', '45px'],
+      ['085', '26px', '45px'],
+      ['086', '48px', '45px'],
+      ['087', '70px', '45px'],
+      ['088', '92px', '45px'],
     ])
   })
 })
@@ -37,10 +45,12 @@ describe('이글아이 남은 경기 수 — 0xba719(자간 0, 기준 0, ui/num,
 
   it('num 0~9 를 폭(1 만 4px, 나머지 8px) 그대로 이어 박스 오른쪽 아래에 붙인다', () => {
     expect(eagleEyeDigitsOf(20, slot)).toEqual([
-      { frame: 2, left: 30, top: 54 }, { frame: 0, left: 38, top: 54 },
+      { frame: 2, left: 30, top: 54 },
+      { frame: 0, left: 38, top: 54 },
     ])
     expect(eagleEyeDigitsOf(19, slot)).toEqual([
-      { frame: 1, left: 34, top: 54 }, { frame: 9, left: 38, top: 54 },
+      { frame: 1, left: 34, top: 54 },
+      { frame: 9, left: 38, top: 54 },
     ])
     expect(eagleEyeDigitsOf(7, slot)).toEqual([{ frame: 7, left: 38, top: 54 }])
   })
@@ -50,7 +60,8 @@ describe('이글아이 남은 경기 수 — 0xba719(자간 0, 기준 0, ui/num,
     const { container } = render(<StatusValues career={career} />)
     const digits = [...container.querySelectorAll('img')].filter((img) => img.src.includes('/sprites/num/00'))
     expect(digits.map((img) => [img.src.slice(-7, -4), img.style.left, img.style.top])).toEqual([
-      ['001', '34px', '54px'], ['005', '38px', '54px'],
+      ['001', '34px', '54px'],
+      ['005', '38px', '54px'],
     ])
   })
 })

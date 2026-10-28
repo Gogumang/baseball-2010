@@ -1,14 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import {
-  RUN_SCORE_BOARD_FRAME_AT, RUN_SCORE_BOARD_TICKS, RUN_SCORE_SLOTS, drawRunScoreBoard, runScoreBoardScoresOf,
-  runScoreBoardSourceOf, runScoreGlyphsOf, EMPTY_HOME_RUN_SCORE_BOARD, drawHomeRunScoreBoard, homeRunScoreBoardRunIn,
-  runScoreBoardHiddenScoresOf, closesDefenseScene, drawRunScoreBoardScene, isHomeRunHitCode, runScoreBoardRunIn,
+  RUN_SCORE_BOARD_FRAME_AT,
+  RUN_SCORE_BOARD_TICKS,
+  RUN_SCORE_SLOTS,
+  drawRunScoreBoard,
+  runScoreBoardScoresOf,
+  runScoreBoardSourceOf,
+  runScoreGlyphsOf,
+  EMPTY_HOME_RUN_SCORE_BOARD,
+  drawHomeRunScoreBoard,
+  homeRunScoreBoardRunIn,
+  runScoreBoardHiddenScoresOf,
+  closesDefenseScene,
+  drawRunScoreBoardScene,
+  isHomeRunHitCode,
+  runScoreBoardRunIn,
 } from '@/pages/defense/lib/runScoreBoard'
 
 describe('수비 장면 득점 점수판 0x41a64', () => {
   it('틀은 (0, 0x32), 두 점수는 가운데 (56, 205) · (187, 205)', () => {
     expect(RUN_SCORE_BOARD_FRAME_AT).toEqual({ x: 0, y: 50 })
-    expect(RUN_SCORE_SLOTS).toEqual([{ x: 56, y: 205 }, { x: 187, y: 205 }])
+    expect(RUN_SCORE_SLOTS).toEqual([
+      { x: 56, y: 205 },
+      { x: 187, y: 205 },
+    ])
   })
 
   it('1점이면 20번 선다 — 처음 5번(t > 0xf)은 앞 점수, 나머지 15번은 새 점수, t ≤ 0 이면 안 그린다', () => {
@@ -44,12 +59,18 @@ describe('수비 장면 득점 점수판 0x41a64', () => {
 describe('수비 재생에 넘길 득점 점수판 재료 (팀경기 · 투수편 · 타자편 공통)', () => {
   const sides = ['측0', '측1'] as const
   it('선공(측 0)이면 내 점수가 왼쪽, 초면 공격 측 0', () => {
-    expect(runScoreBoardSourceOf({ playerSide: 0, ourScore: 3, opponentScore: 1, half: '초' }, sides))
-      .toEqual({ sides, scores: [3, 1], battingSide: 0 })
+    expect(runScoreBoardSourceOf({ playerSide: 0, ourScore: 3, opponentScore: 1, half: '초' }, sides)).toEqual({
+      sides,
+      scores: [3, 1],
+      battingSide: 0,
+    })
   })
   it('후공(측 1)이면 상대 점수가 왼쪽, 말이면 공격 측 1', () => {
-    expect(runScoreBoardSourceOf({ playerSide: 1, ourScore: 3, opponentScore: 1, half: '말' }, sides))
-      .toEqual({ sides, scores: [1, 3], battingSide: 1 })
+    expect(runScoreBoardSourceOf({ playerSide: 1, ourScore: 3, opponentScore: 1, half: '말' }, sides)).toEqual({
+      sides,
+      scores: [1, 3],
+      battingSide: 1,
+    })
   })
 })
 
@@ -113,9 +134,7 @@ describe('판이 닫힌 뒤 0x35108 까지 — 529f0~52a32 · 메시지 0x13 두
 
   it('메시지 0x13 — 0x357e0 && +0xfe7 == 0 이면 홈런 갈래, 아니면 [+0x1100] = 0 · [+0x10fc] = 1 · 타이머 20 (52074)', () => {
     expect(runScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, 0, true, false)).toEqual(homeRunScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, true))
-    expect(runScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, 0x64, true, false)).toEqual(
-      homeRunScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, false),
-    )
+    expect(runScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, 0x64, true, false)).toEqual(homeRunScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, false))
     const 섰음 = homeRunScoreBoardRunIn(EMPTY_HOME_RUN_SCORE_BOARD, true)
     expect(runScoreBoardRunIn(섰음, 0, true, true)).toEqual({ ...섰음, active: false, count: 1, timer: RUN_SCORE_BOARD_TICKS })
     expect(runScoreBoardRunIn(섰음, 2, false, false)).toEqual({ ...섰음, active: false, count: 1, timer: RUN_SCORE_BOARD_TICKS })

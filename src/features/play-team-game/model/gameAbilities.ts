@@ -246,12 +246,7 @@ function gameAbilityStepsOf(input: GameAbilityInput): GameAbilitySteps {
   // ── 모드 2 & 내 팀 선수만 (0xb581a 가 세 보정을 함께 감싼다) ──
   if (isSeason && input.isMyTeam && season !== undefined) {
     if (season.illness > 0) value += illnessPenaltyOf(value)
-    if (
-      !isPitcher &&
-      slot === BATTER_SLOT.수비 &&
-      input.assignment !== undefined &&
-      hasPositionMismatch(input.assignment)
-    ) {
+    if (!isPitcher && slot === BATTER_SLOT.수비 && input.assignment !== undefined && hasPositionMismatch(input.assignment)) {
       value += positionMismatchPenaltyOf(value)
     }
     value -= moraleFlatPenaltyOf(season.morale)
@@ -313,10 +308,7 @@ export function gameAbilityOf(input: GameAbilityInput): number {
 /**
  * 네 칸을 한꺼번에 — 로스터 레코드의 `ability` 순서(히트·파워·수비·주루 / 제구·구속·변화·체력) 그대로.
  */
-export function gameAbilitiesOf(
-  base: readonly number[],
-  input: Omit<GameAbilityInput, 'base' | 'slot'>,
-): [number, number, number, number] {
+export function gameAbilitiesOf(base: readonly number[], input: Omit<GameAbilityInput, 'base' | 'slot'>): [number, number, number, number] {
   const at = (slot: number) => gameAbilityOf({ ...input, base: base[slot] ?? 0, slot })
   return [at(0), at(1), at(2), at(3)]
 }

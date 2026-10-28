@@ -9,7 +9,13 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { batterEquipmentOf, batterLayersOf, layerPaletteIndexOf, layerRecolorRequestsOf } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import {
-  BATTING_TYPE_NAMES, FIGURE_FOOT, INFO_BOARD, POSITION_NAMES, SIDE_NAMES, SKIN_NAMES, basicInfoSpecialNameOf,
+  BATTING_TYPE_NAMES,
+  FIGURE_FOOT,
+  INFO_BOARD,
+  POSITION_NAMES,
+  SIDE_NAMES,
+  SKIN_NAMES,
+  basicInfoSpecialNameOf,
 } from '@/pages/management/lib/basicInfoLayout'
 import { RadarChart } from '@/pages/management/ui/RadarChart'
 import { CardPlate } from '@/pages/management/ui/CardPlate'
@@ -119,18 +125,11 @@ export function basicInfoFigureRecolorRequestsOf(career: PlayerCareer): RecolorR
  *   78c14: 헬멧 "bat/batter_helmet" 팔레트 = 팀
  * 장비 손·다리는 등급 줄이 먼저다 — 한 겹이 두 벌을 같이 쓰는 일은 없다.
  */
-function LayerSprite({ layer, skinIndex, teamIndex }: {
-  readonly layer: BatterLayer
-  readonly skinIndex: number
-  readonly teamIndex: number
-}) {
+function LayerSprite({ layer, skinIndex, teamIndex }: { readonly layer: BatterLayer; readonly skinIndex: number; readonly teamIndex: number }) {
   const origins = useFrameOrigins(layer.folder)
   const key = String(layer.frame).padStart(3, '0')
   const src = useRecoloredSprite(`${layer.folder}/${key}.png`, layerPaletteIndexOf(layer, skinIndex, teamIndex))
   const origin = origins?.[key]
   if (origin === undefined) return null
-  return (
-    <img className={styles.layer} alt="" src={src}
-      style={{ left: FIGURE_FOOT.x + origin.x, top: FIGURE_FOOT.y + origin.y }} />
-  )
+  return <img className={styles.layer} alt="" src={src} style={{ left: FIGURE_FOOT.x + origin.x, top: FIGURE_FOOT.y + origin.y }} />
 }

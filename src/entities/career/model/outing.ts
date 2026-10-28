@@ -1,11 +1,5 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import {
-  gainMorale,
-  MAXIMUM_MORALE,
-  MAXIMUM_POPULARITY,
-  MAXIMUM_REPUTATION,
-  spendCycleAction,
-} from '@/entities/career/model/playerCareer'
+import { gainMorale, MAXIMUM_MORALE, MAXIMUM_POPULARITY, MAXIMUM_REPUTATION, spendCycleAction } from '@/entities/career/model/playerCareer'
 import type { OutingEffect, OutingFunction, OutingRange, RolledOutingEffect } from '@/shared/config/outingPlaces'
 import { HOSPITAL_RECOVERY, REST_RECOVERY, rollRecovery } from '@/entities/career/model/recovery'
 import type { RecoverableCareer } from '@/entities/career/model/recovery'
@@ -18,7 +12,6 @@ import { isBugFixed } from '@/shared/config/bugfixes'
  * 외출 커맨드 — 2010판에서 신규 추가된 기능이다.
  * 원작 설명서: "전체 맵으로 이동할 수 있으며 ... 각 건물마다 특수 기능을 사용할 수 있으며"
  */
-
 
 export type OutingBlockReason = '소지금부족' | '건강함' | '인기도부족' | '사기최고'
 
@@ -34,10 +27,7 @@ export type OutingBlockReason = '소지금부족' | '건강함' | '인기도부�
  * 그래서 커리어 타입을 묶지 않고 이 칸들을 가진 것이면 무엇이든 받는다 (`PlayerCareer`·`PitcherCareer`).
  */
 export type OutingCareer = RecoverableCareer &
-  Pick<
-    PlayerCareer,
-    'hasActedThisCycle' | 'popularity' | 'reputation' | 'morale' | 'money' | 'subItemIds' | 'outingsThisSeason'
-  >
+  Pick<PlayerCareer, 'hasActedThisCycle' | 'popularity' | 'reputation' | 'morale' | 'money' | 'subItemIds' | 'outingsThisSeason'>
 
 /**
  * 외출 막힘 판정 — **원본 0x16cf0 의 순서 그대로**다 (G-3 확정):
@@ -49,10 +39,7 @@ export type OutingCareer = RecoverableCareer &
  * ⚠️ **원본 버그를 그대로 옮긴다** (DECISIONS 2026-09-20): 2번 소지금 검사는 **보험증서를 보지 않는다**
  * (0x16d42) → 보험증서가 있어 실제로는 공짜인 입원도 소지금이 모자라면 막힌다.
  */
-export function outingBlockReasonOf(
-  career: OutingCareer,
-  outingFunction: OutingFunction,
-): OutingBlockReason | null {
+export function outingBlockReasonOf(career: OutingCareer, outingFunction: OutingFunction): OutingBlockReason | null {
   // 행동함(S+4)은 보지 않는다 — 0x16cf0 은 아래 넷뿐이다
   // StrMODE[62] "인기도가 부족합니다. 필요한 인기도 : %d"
   if (career.popularity < outingFunction.requiredPopularity) return '인기도부족'
@@ -163,22 +150,14 @@ function effectLineOf(nameId: number, rolled: number, bonus: number): string {
  * (StrMODE[22] · [23] · [25] · [24]). 소지금은 기록 단위(100만)에 ×100 해 찍으므로 웹 단위(만원) 그대로다.
  * 서브 아이템(`기록[0x5d+장소]`)이 있으면 "!N" + "!cFFFF00" + 아이템 이름(0x845d4 = 이름표 93+장소) + " " + [195] "효과".
  */
-function outingEffectTextOf(
-  outingFunction: OutingFunction,
-  rolled: RolledOutingEffect,
-  applied: RolledOutingEffect,
-  ownsSubItem: boolean,
-): string {
+function outingEffectTextOf(outingFunction: OutingFunction, rolled: RolledOutingEffect, applied: RolledOutingEffect, ownsSubItem: boolean): string {
   const subItemId = outingSubItemIdOf(outingFunction.id)
   const lines =
     effectLineOf(MODE_TEXT_POPULARITY, rolled.popularityGain, applied.popularityGain - rolled.popularityGain) +
     effectLineOf(MODE_TEXT_REPUTATION, rolled.reputationGain, applied.reputationGain - rolled.reputationGain) +
     effectLineOf(MODE_TEXT_MONEY, -rolled.moneyCost, rolled.moneyCost - applied.moneyCost) +
     effectLineOf(MODE_TEXT_MORALE, rolled.moraleGain, applied.moraleGain - rolled.moraleGain)
-  const subItemLine =
-    ownsSubItem && subItemId !== null
-      ? `!N!cFFFF00${SUB_ITEMS[subItemId].name} ${ORIGINAL_MODE_TEXT[MODE_TEXT_EFFECT]}`
-      : ''
+  const subItemLine = ownsSubItem && subItemId !== null ? `!N!cFFFF00${SUB_ITEMS[subItemId].name} ${ORIGINAL_MODE_TEXT[MODE_TEXT_EFFECT]}` : ''
   return `!C${lines}${subItemLine}`
 }
 
@@ -187,10 +166,7 @@ function outingEffectTextOf(
  * 부상이 나으면 (앞 글이 있으면 "!N", 없으면 "!C") + "부상에서 회복 되었습니다."(0xcca04).
  */
 function hospitalRecoveryTextOf(before: RecoverableCareer, after: RecoverableCareer): string {
-  const illness =
-    before.isSick && !after.isSick
-      ? ORIGINAL_MODE_TEXT[MODE_TEXT_ILLNESS_CURED].replace('%s', before.illnessName ?? '')
-      : ''
+  const illness = before.isSick && !after.isSick ? ORIGINAL_MODE_TEXT[MODE_TEXT_ILLNESS_CURED].replace('%s', before.illnessName ?? '') : ''
   const injury = before.isInjured && !after.isInjured ? `${illness === '' ? '!C' : '!N'}부상에서 회복 되었습니다.` : ''
   return illness + injury
 }
@@ -200,11 +176,7 @@ function hospitalRecoveryTextOf(before: RecoverableCareer, after: RecoverableCar
  * 굴림 차례는 원본 그대로: 인기도 → 평판 → 사기 bfa55 세 번, 입원이면 이어서 질병·부상 bfa55(0,100) (아픈 칸만).
  * 원본은 효과를 연출 끝(0x84e58)에, 회복을 효과 팝업이 닫힐 때 굴린다 — 그 사이 다른 굴림이 없어 차례는 같다.
  */
-export function performOuting<T extends OutingCareer>(
-  career: T,
-  outingFunction: OutingFunction,
-  random: RandomPort,
-): OutingOutcome<T> {
+export function performOuting<T extends OutingCareer>(career: T, outingFunction: OutingFunction, random: RandomPort): OutingOutcome<T> {
   const blockReason = outingBlockReasonOf(career, outingFunction)
   if (blockReason !== null) {
     throw new Error(`외출할 수 없습니다 (${blockReason}): ${outingFunction.name}`)

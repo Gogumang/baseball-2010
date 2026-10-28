@@ -9,12 +9,7 @@ import type { AdvanceResult, BaseState } from '@/entities/game/model/baseState'
 import { forceRunners, shiftRunners } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { playQuickAtBat } from '@/entities/game/model/quickAtBat'
-import type {
-  QuickAtBatBatter,
-  QuickAtBatPitcher,
-  QuickAtBatPlay,
-  QuickAtBatSituation,
-} from '@/entities/game/model/quickAtBat'
+import type { QuickAtBatBatter, QuickAtBatPitcher, QuickAtBatPlay, QuickAtBatSituation } from '@/entities/game/model/quickAtBat'
 import { quickEngineSteal, quickStealBaseOf } from '@/entities/game/model/steal'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isBugFixed } from '@/shared/config/bugfixes'
@@ -103,11 +98,7 @@ export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, rando
       if (base === null) return
       // 가장 앞선 주자 = 앞선 루의 주자 (목록 n−1)
       const lead = base === 2 ? runners.second : runners.first
-      const stolen = quickEngineSteal(
-        bases,
-        { hit: 0, power: 0, defense: 0, run: lead === null ? 0 : input.runnerRunOf(lead) },
-        random,
-      )
+      const stolen = quickEngineSteal(bases, { hit: 0, power: 0, defense: 0, run: lead === null ? 0 : input.runnerRunOf(lead) }, random)
       // 0xc1a42 — 루를 옮긴 주자마다 (목록 0번 = 가장 뒤 주자부터)
       if (stolen.stolen > 0) {
         for (const runner of [runners.first, runners.second]) {
@@ -121,9 +112,8 @@ export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, rando
   })
   const outcome = play.outcome
   // 볼넷은 판정 자리(c1918)에서 이미 주자를 밀었다 — 여기서는 그 득점만 싣는다
-  let advance: AdvanceResult = walkRuns !== null
-    ? { bases, runsScored: walkRuns, outsAdded: 0 }
-    : advanceRunners(bases, outcome, input.outs, { quickEngine: true })
+  let advance: AdvanceResult =
+    walkRuns !== null ? { bases, runsScored: walkRuns, outsAdded: 0 } : advanceRunners(bases, outcome, input.outs, { quickEngine: true })
   if (walkRuns === null) {
     // 안타 0xc0fb4(n) · 홈런 0xc1054(전원 득점) — 타자는 0xa93ac 로 0번 칸에 든다. 아웃 · 삼진은 주자를 안 움직인다
     if (outcome.kind === '안타') runners = shiftRunners(runners, outcome.bases, input.batterId).runners

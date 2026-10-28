@@ -1,13 +1,34 @@
 import { BOARD_BOXES, FENCE_BOXES } from '@/shared/config/original/stadiumScene'
 import {
-  CLOUD_FRAMES, CROWD_FRAMES, FENCE_BOARD_FRAMES, FENCE_FRAMES, FENCE_SEASON_FRAMES,
-  HIDDEN_BOARD_FRAMES, HIDDEN_FENCE_FRAMES, SCOREBOARD_FRAMES, SKY_LIGHT_FRAMES, TEAM_ICON, fieldBackground,
-  drawFrameAt, frameAnimations, placedFrame, sprite, warmRecoloredFrames,
+  CLOUD_FRAMES,
+  CROWD_FRAMES,
+  FENCE_BOARD_FRAMES,
+  FENCE_FRAMES,
+  FENCE_SEASON_FRAMES,
+  HIDDEN_BOARD_FRAMES,
+  HIDDEN_FENCE_FRAMES,
+  SCOREBOARD_FRAMES,
+  SKY_LIGHT_FRAMES,
+  TEAM_ICON,
+  fieldBackground,
+  drawFrameAt,
+  frameAnimations,
+  placedFrame,
+  sprite,
+  warmRecoloredFrames,
 } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { PlacedFrame } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
-  CLOUD_WRAP_WIDTH, SKY_LIGHT_LAST_COLOR_INDEX, cloudPaletteRowOf, isSkyLightModeShown, cloudScrollAt, isCloudVisible, skyColorsOf,
-  skyLightFrameAt, skyLightPaletteRowOf, teamIconOf,
+  CLOUD_WRAP_WIDTH,
+  SKY_LIGHT_LAST_COLOR_INDEX,
+  cloudPaletteRowOf,
+  isSkyLightModeShown,
+  cloudScrollAt,
+  isCloudVisible,
+  skyColorsOf,
+  skyLightFrameAt,
+  skyLightPaletteRowOf,
+  teamIconOf,
 } from '@/widgets/batting-stage/lib/stageScenery'
 import { BATTER_SIDE, STAGE_HEIGHT, STAGE_LAYOUT, STAGE_SIDE, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
@@ -207,7 +228,10 @@ export function stepSeasonScoreboardX(x: number, board: number, steps: number): 
  *   바탕 = `관중석 × 5` · 덧그림 = `관중석 × 5 + 관중단계 + 1`
  * 칸 ≤ 3 이면 `fence_season.pzf`(4묶음 × 5장), 4~6 이면 `hidden_fence_(칸−4)` 에서 0 부터 다시 센다.
  */
-export function seasonFenceFramesOf(stand: number, crowd: number): {
+export function seasonFenceFramesOf(
+  stand: number,
+  crowd: number,
+): {
   readonly folder: string
   readonly standFrame: number
   readonly crowdFrame: number
@@ -257,7 +281,13 @@ export function drawScenery(context: CanvasRenderingContext2D, state: ScenerySta
   }
   const offsetY = state.offsetY ?? 0
   withShift(context, dx, 0, () => drawFence(context, state, offsetY + dy))
-  drawField(context, state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null, offsetY + dy, (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타, dx)
+  drawField(
+    context,
+    state.seasonStadium?.grassPalette ?? state.fieldPalette ?? null,
+    offsetY + dy,
+    (state.side ?? STAGE_SIDE) === BATTER_SIDE.우타,
+    dx,
+  )
   if (offsetY === 0) drawSkyLight(context, state, colorIndex)
 }
 
@@ -414,12 +444,7 @@ function drawFenceParts(context: CanvasRenderingContext2D, state: SceneryState, 
  *   6. 관중(ppl) — **원본은 안 그린다**: 부르는 세 곳(0x41042·0xb178·0xb23c)이 모두
  *      셋째 인자를 0 으로 넘겨 0x777de 에서 곧바로 빠진다. 원본 그대로 여기서도 뺀다.
  */
-function drawSeasonFenceParts(
-  context: CanvasRenderingContext2D,
-  state: SceneryState,
-  season: SeasonStadium,
-  isMirrored: boolean,
-): void {
+function drawSeasonFenceParts(context: CanvasRenderingContext2D, state: SceneryState, season: SeasonStadium, isMirrored: boolean): void {
   const fence = seasonFenceFramesOf(season.stand, season.crowd)
   drawAtFenceAnchor(context, placedFrame(fence.folder, fence.standFrame), isMirrored)
   drawAtFenceAnchor(context, placedFrame(fence.folder, fence.crowdFrame), isMirrored)
@@ -454,17 +479,10 @@ function drawAtFenceAnchor(context: CanvasRenderingContext2D, frame: PlacedFrame
 }
 
 /** 박스 0·1 = 구장+0x84 / +0x80 팀 아이콘 — 어느 쪽이 우리 팀인지는 추정 */
-function drawTeamIcons(
-  context: CanvasRenderingContext2D,
-  state: SceneryState,
-  boxes: readonly (readonly number[])[],
-  shiftX = 0,
-): void {
+function drawTeamIcons(context: CanvasRenderingContext2D, state: SceneryState, boxes: readonly (readonly number[])[], shiftX = 0): void {
   // 0x77974 77ad6~77af0 · 77b4a~77b64 — 14 → 10, 10 이상 → 11 을 고른 뒤 **전역 모드 5 · 6(미션)이면 늘 11** 로 덮는다
   const isMissionMode = state.gameMode === 5 || state.gameMode === 6
-  const icons = [state.ourTeamId, state.opponentTeamId].map((teamId) =>
-    teamId === null || isMissionMode ? MISSION_TEAM_ICON : teamIconOf(teamId),
-  )
+  const icons = [state.ourTeamId, state.opponentTeamId].map((teamId) => (teamId === null || isMissionMode ? MISSION_TEAM_ICON : teamIconOf(teamId)))
   TEAM_ICON_BOXES.forEach((boxIndex, index) => {
     const box = boxes[boxIndex]
     const image = sprite(TEAM_ICON(icons[index] ?? MISSION_TEAM_ICON))
@@ -474,12 +492,7 @@ function drawTeamIcons(
 }
 
 /** 전광판 화면 — board_ani 프레임 0 을 상자 안에서 틱당 1px 씩 흘린다 (0x77726~0x777d8) */
-function drawScoreboardText(
-  context: CanvasRenderingContext2D,
-  box: readonly number[],
-  scrollX: number,
-  shiftX = 0,
-): void {
+function drawScoreboardText(context: CanvasRenderingContext2D, box: readonly number[], scrollX: number, shiftX = 0): void {
   const board = placedFrame(SCOREBOARD_FRAMES, 0)
   if (board === null) return
   const left = FENCE_ANCHOR.x + shiftX + box[0]
@@ -524,7 +537,8 @@ function drawSkyLight(context: CanvasRenderingContext2D, state: SceneryState, co
   const paletteRow = skyLightPaletteRowOf(colorIndex)
   // 애니 0 의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
   warmRecoloredFrames(`sky-light|${paletteRow}`, () =>
-    [...new Set(entries.map((entry) => entry.frame))].map((frame) => ({ folder: SKY_LIGHT_FRAMES, frame, paletteIndex: paletteRow })))
+    [...new Set(entries.map((entry) => entry.frame))].map((frame) => ({ folder: SKY_LIGHT_FRAMES, frame, paletteIndex: paletteRow })),
+  )
   const first = placedFrame(SKY_LIGHT_FRAMES, 0, paletteRow)
   if (first === null) return
   const originX = STAGE_WIDTH - first.offsetX - first.image.width
@@ -555,11 +569,7 @@ function drawField(context: CanvasRenderingContext2D, grassPalette: number | nul
     context.drawImage(field, -STAGE_LAYOUT.fieldSourceX + shiftX, STAGE_LAYOUT.fieldTopY + offsetY)
     return
   }
-  context.drawImage(
-    field,
-    STAGE_LAYOUT.fieldSourceX, 0, STAGE_WIDTH, field.height,
-    0, STAGE_LAYOUT.fieldTopY + offsetY, STAGE_WIDTH, field.height,
-  )
+  context.drawImage(field, STAGE_LAYOUT.fieldSourceX, 0, STAGE_WIDTH, field.height, 0, STAGE_LAYOUT.fieldTopY + offsetY, STAGE_WIDTH, field.height)
 }
 
 /**

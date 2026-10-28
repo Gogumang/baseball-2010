@@ -1,7 +1,12 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
-  equippedPlusSkillCountOf, isMinusSkill, isSkillEquipped, MAXIMUM_GAME_POINT, PLUS_SKILL_SLOT_LIMITS,
-  plusSkillSlotLimitOf, setSkillEquipped,
+  equippedPlusSkillCountOf,
+  isMinusSkill,
+  isSkillEquipped,
+  MAXIMUM_GAME_POINT,
+  PLUS_SKILL_SLOT_LIMITS,
+  plusSkillSlotLimitOf,
+  setSkillEquipped,
 } from '@/entities/career/model/playerCareer'
 
 /**

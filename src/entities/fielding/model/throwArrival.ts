@@ -1,27 +1,8 @@
-import {
-  basePosition,
-  BASE_DEFAULT_FIELDER,
-  horizontalDistance,
-  isOutfieldSlot,
-  ticksToReach,
-} from '@/entities/fielding/model/fieldGeometry'
-import {
-  AI_STATE,
-  fielderArrivalTicks,
-  isRunnerStopped,
-  NONE,
-  type DefenseContext,
-  type FielderState,
-} from '@/entities/fielding/model/fieldingState'
+import { basePosition, BASE_DEFAULT_FIELDER, horizontalDistance, isOutfieldSlot, ticksToReach } from '@/entities/fielding/model/fieldGeometry'
+import { AI_STATE, fielderArrivalTicks, isRunnerStopped, NONE, type DefenseContext, type FielderState } from '@/entities/fielding/model/fieldingState'
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import { integerSquareRoot } from '@/shared/lib/math/originalTrigonometry'
-import {
-  RELAY_DISTANCE,
-  readyTicksOf,
-  relayTicksToBase,
-  throwTicksTo,
-  throwTicksToFielder,
-} from '@/entities/fielding/model/throwPlan'
+import { RELAY_DISTANCE, readyTicksOf, relayTicksToBase, throwTicksTo, throwTicksToFielder } from '@/entities/fielding/model/throwPlan'
 
 /**
  * 0xaf284(제어기, 루 b) = **수비가 공을 루 b 에 보내는 데 드는 틱**.
@@ -49,15 +30,10 @@ export function defenseArrivalTicks(context: DefenseContext, base: number): numb
   }
 
   // ── (B) 커버가 있다 ──
-  const relayed =
-    holder.slot === catcher.slot &&
-    isOutfieldSlot(holder.slot) &&
-    horizontalDistance(holder.position, basePoint) >= RELAY_DISTANCE
+  const relayed = holder.slot === catcher.slot && isOutfieldSlot(holder.slot) && horizontalDistance(holder.position, basePoint) >= RELAY_DISTANCE
 
   // 원본은 중계가 아니면 두 갈래가 완전히 같은 코드다(0xaf532 / 0xaf53e) — "언제나 잡을야수.vtb4(커버야수)"
-  let ticks = relayed
-    ? relayTicksToBase(fielders, holder, cover, base)
-    : throwTicksToFielder(catcher, cover)
+  let ticks = relayed ? relayTicksToBase(fielders, holder, cover, base) : throwTicksToFielder(catcher, cover)
 
   let remaining = 0
   if (!catcher.holdingBall) {

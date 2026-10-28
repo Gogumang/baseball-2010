@@ -239,8 +239,6 @@ export function recordPitcherSeasonMvp(career: PitcherCareer): PitcherCareer {
 export function pitcherSalaryNegotiationRankOf(career: PitcherCareer): number {
   // 0xa4e0e: 보직 0xb6705 가 **0 이 아니면** 세이브(종류 3) — 보직 1 도 세이브 쪽이다 (등록은 0·2 만 만든다)
   const role: AwardRole = career.role === PITCHER_ROLE.starter ? '투수' : '마무리'
-  const wonCount = judgeTitles(pitcherLeagueRecordsOf(career), role).filter(
-    (title) => title.isMine,
-  ).length
+  const wonCount = judgeTitles(pitcherLeagueRecordsOf(career), role).filter((title) => title.isMine).length
   return wonCount + (hasMvpInSeason(career.mvpSeasonBits, career.season) ? MVP_SALARY_BONUS : 0)
 }

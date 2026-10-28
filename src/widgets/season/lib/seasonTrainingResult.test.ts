@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import {
-  applySeasonTraining, rollSeasonTraining, scrollSeasonTrainingMessages, seasonTrainingMessagesOf, seasonTrainingResultOf,
+  applySeasonTraining,
+  rollSeasonTraining,
+  scrollSeasonTrainingMessages,
+  seasonTrainingMessagesOf,
+  seasonTrainingResultOf,
 } from '@/widgets/season/lib/seasonTrainingResult'
 
 /** 차례로 값을 내는 난수 — 굴림 차례를 못박는다 */

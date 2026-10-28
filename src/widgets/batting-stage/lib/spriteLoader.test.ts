@@ -22,14 +22,22 @@ describe('warmRecoloredFrame — 처음 그리기 전에 칠하기를 건다 (r1
     recolored.length = 0
     resetSpriteCacheForTest()
     resetWarmedRecolorsForTest()
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      const body = url.endsWith('origins.json')
-        ? { '000': { x: 0, y: 0, width: 1, height: 1 }, '005': { x: 0, y: 0, width: 1, height: 1 } }
-        : url.endsWith('layers.json')
-          ? { '005': [{ png: '005_0.png', x: 0, y: 0, effect: 0x67 }, { png: '005_1.png', x: 0, y: 0, effect: 0 }] }
-          : { baked: 0, palettes: [['#000'], ['#fff']] }
-      return { ok: true, json: async () => body }
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const body = url.endsWith('origins.json')
+          ? { '000': { x: 0, y: 0, width: 1, height: 1 }, '005': { x: 0, y: 0, width: 1, height: 1 } }
+          : url.endsWith('layers.json')
+            ? {
+                '005': [
+                  { png: '005_0.png', x: 0, y: 0, effect: 0x67 },
+                  { png: '005_1.png', x: 0, y: 0, effect: 0 },
+                ],
+              }
+            : { baked: 0, palettes: [['#000'], ['#fff']] }
+        return { ok: true, json: async () => body }
+      }),
+    )
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -64,12 +72,15 @@ describe('warmRecoloredFrames — 한 그림 객체의 자세 전부를 한 번�
     recolored.length = 0
     resetSpriteCacheForTest()
     resetWarmedRecolorsForTest()
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      const body = url.endsWith('origins.json')
-        ? { '000': { x: 0, y: 0, width: 1, height: 1 }, '005': { x: 0, y: 0, width: 1, height: 1 } }
-        : { baked: 0, palettes: [['#000'], ['#fff'], ['#f00']] }
-      return { ok: true, json: async () => body }
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const body = url.endsWith('origins.json')
+          ? { '000': { x: 0, y: 0, width: 1, height: 1 }, '005': { x: 0, y: 0, width: 1, height: 1 } }
+          : { baked: 0, palettes: [['#000'], ['#fff'], ['#f00']] }
+        return { ok: true, json: async () => body }
+      }),
+    )
   })
   afterEach(() => {
     vi.unstubAllGlobals()

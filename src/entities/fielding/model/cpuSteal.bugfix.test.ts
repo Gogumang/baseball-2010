@@ -20,8 +20,7 @@ function 고정난수(value: number): RandomPort & { readonly count: () => numbe
 }
 
 const 일루 = { ...EMPTY_BASES, first: true }
-const 뛰나 = (run: number, roll: number) =>
-  rollCpuSteal({ bases: 일루, offenseIsCpu: true, runAbilityOf: () => run }, 고정난수(roll))
+const 뛰나 = (run: number, roll: number) => rollCpuSteal({ bases: 일루, offenseIsCpu: true, runAbilityOf: () => run }, 고정난수(roll))
 
 describe('B-15 CPU 도루 확률', () => {
   it('원본: 주루와 상관없이 칸 1 (1루 주자 표값 10)', () => {

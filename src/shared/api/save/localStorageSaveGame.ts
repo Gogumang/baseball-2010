@@ -101,9 +101,7 @@ function normalizeCareer(saved: PlayerCareer): PlayerCareer {
       // 투수 줄은 타자 줄보다 더 나중에 생겼다 — 저장에 없으면 칸 자체를 두지 않는다.
       // ⚠️ 빈 표를 `{}` 로 박아 두면 안 된다: `EMPTY_LEAGUE_PLAYER_STATS` 가 `{ batters: {} }`
       //    모양 그대로라 왕복 비교가 어긋난다 (저장 형식 번호는 그대로 둔다).
-      ...(saved.leaguePlayerStats?.pitchers === undefined
-        ? {}
-        : { pitchers: { ...saved.leaguePlayerStats.pitchers } }),
+      ...(saved.leaguePlayerStats?.pitchers === undefined ? {} : { pitchers: { ...saved.leaguePlayerStats.pitchers } }),
     },
     titleIds: saved.titleIds ?? [],
     // 장착 칸(선수기록 +0x14)은 나중에 생긴 칸이다. 예전 웹엔 장착 창이 없어 장착은 모두 획득 때의 자동 장착
@@ -113,8 +111,6 @@ function normalizeCareer(saved: PlayerCareer): PlayerCareer {
     seenEventIds: saved.seenEventIds ?? [],
     // 그 해 중간 성적표 비트(S+0x180)는 나중에 생긴 칸이다. 예전 웹은 22경기째 116 [확인]에서 곧장 117 을 띄웠으므로 올해 22경기를
     // 넘긴(또는 막 마친) 저장은 이미 본 것으로 둔다 — 지난 해들의 비트는 다시 읽는 곳이 없다(연차가 바뀐다)
-    midSeasonEvaluatedYears: saved.midSeasonEvaluatedYears
-      ?? ((saved.gamesPlayed ?? 0) >= MID_SEASON_GAME ? [(saved.season ?? 1) - 1] : []),
+    midSeasonEvaluatedYears: saved.midSeasonEvaluatedYears ?? ((saved.gamesPlayed ?? 0) >= MID_SEASON_GAME ? [(saved.season ?? 1) - 1] : []),
   }
 }
-

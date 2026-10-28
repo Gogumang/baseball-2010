@@ -254,9 +254,7 @@ export function resolvePitch(
         isUncatchable: false,
       }
     }
-    const resolution: PitchResolution = isStrikeZonePitch(pitch)
-      ? { kind: '스트라이크', isSwinging: false }
-      : { kind: '볼' }
+    const resolution: PitchResolution = isStrikeZonePitch(pitch) ? { kind: '스트라이크', isSwinging: false } : { kind: '볼' }
     return {
       detail: { resolution, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null, batterHand: context.situation.batterSide },
       deck,
@@ -267,9 +265,7 @@ export function resolvePitch(
   const error = plateErrorOf(pitch, swing.shift)
   // 투수 체력%는 공에 실린 **깎은 뒤** 값이다 — 원본은 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 이미 깎았다
   const pitcherStats = cpuPitchStatsOf(
-    pitch.pitcherStaminaPercent === undefined
-      ? context.pitcher
-      : { ...context.pitcher, staminaPercent: pitch.pitcherStaminaPercent },
+    pitch.pitcherStaminaPercent === undefined ? context.pitcher : { ...context.pitcher, staminaPercent: pitch.pitcherStaminaPercent },
   )
   const result = swingResultOf(
     {
@@ -336,9 +332,7 @@ export function resolvePitch(
   // (0x515c6 → 0x50faa: 필살수비 굴림 · 표시 패턴 · 쏘기의 폴 굴림) **뒤**라, 맞은 공은 모두(페어 타구 · 파울 각 공 · 2스트라이크
   // 번트 파울) 굴림 재료만 쏜 공에 실어 보내고 수비 판 시작(`startDefensePlay`)이 그 차례에 굴린다 — 여기서는 굴리지 않는다
   const specialSwing =
-    swing.isSpecial === true
-      ? { number: context.specialSwing?.number ?? 0, isAceBatter: context.specialSwing?.isAceBatter === true }
-      : undefined
+    swing.isSpecial === true ? { number: context.specialSwing?.number ?? 0, isAceBatter: context.specialSwing?.isAceBatter === true } : undefined
   // 타격음 7·9·5·59·6 — 쏜 패턴의 각·세기·높이로 고른다 (0x515de~0x5164a — 0x514f2 의 특수 표 덮어쓰기 뒤)
   const contactSoundId = contactSoundIdOf({
     hasSwung: true,
@@ -386,7 +380,6 @@ export function resolvePitch(
       }
   return { detail, deck: drawn.deck, isUncatchable: false }
 }
-
 
 /** 파울 각 공의 판 입력에 다는 자리 결과 — 판이 끝나 정산이 갈아 끼운다(세션의 `FOUL_PLAY_OUTCOME` 과 같은 값) */
 const FOUL_CONTACT_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃' }

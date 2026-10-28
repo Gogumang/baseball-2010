@@ -23,9 +23,7 @@ describe('공 그리기 0x36dfc 파티클', () => {
     const ball = 공(20000, 20000, 50)
     expect(toScreenY(50)).toBe(0)
     const shots = ballParticleShotsOf({ ball, ballParticles: { bigHit: false, bounceNextHeight: 400 } }, 오프셋)
-    expect(shots).toEqual([
-      { ...BOUNCE_BALL_PARTICLE, x: -100 + toScreenX(20000), y: -200 + toScreenY(20000), bounce: true },
-    ])
+    expect(shots).toEqual([{ ...BOUNCE_BALL_PARTICLE, x: -100 + toScreenX(20000), y: -200 + toScreenY(20000), bounce: true }])
   })
 
   it('다음 점 높이 투영도 0 이거나 화면 밖 조건이 안 맞으면(null) 튐이 없다', () => {
@@ -41,10 +39,7 @@ describe('공 그리기 0x36dfc 파티클', () => {
 
   it('땅점 화면 y 가 1 보다 작으면 튐을 안 쏜다 — 큰 타구는 그 문 앞이라 쏜다', () => {
     const ball = 공(20000, 1000, 0)
-    const shots = ballParticleShotsOf(
-      { ball, ballParticles: { bigHit: true, bounceNextHeight: 2000 } },
-      { x: 0, y: -toScreenY(1000) },
-    )
+    const shots = ballParticleShotsOf({ ball, ballParticles: { bigHit: true, bounceNextHeight: 2000 } }, { x: 0, y: -toScreenY(1000) })
     expect(shots.map((shot) => shot.id)).toEqual([BIG_HIT_BALL_PARTICLE.id])
   })
 

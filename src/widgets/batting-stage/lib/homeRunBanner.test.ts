@@ -97,8 +97,7 @@ describe('단계 4 — 14틱 주기 반짝임', () => {
   })
 
   it('2틱마다 한 글자씩 왼쪽에서 오른쪽으로 5px 올려 +140 밝힌다', () => {
-    const flashingAt = (tick: number) =>
-      homeRunLettersAt(tick).findIndex((letter) => letter.brighten > 0)
+    const flashingAt = (tick: number) => homeRunLettersAt(tick).findIndex((letter) => letter.brighten > 0)
     expect([28, 29, 30, 32, 34, 36, 38, 40].map(flashingAt)).toEqual([0, 0, 1, 2, 3, 4, 5, 6])
     // 한 바퀴(14틱) 돌면 다시 첫 글자
     expect(flashingAt(28 + HOME_RUN_FLASH_CYCLE_TICKS)).toBe(0)

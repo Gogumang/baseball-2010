@@ -79,6 +79,11 @@ describe('마스터 타자 줄의 타석 재료', () => {
       run: row.equipment[3],
     })
     for (const id of batter.skillIds) expect((row.skillBits >>> id) & 1).toBe(1)
-    expect(batter.skillIds.length).toBe(row.skillBits.toString(2).split('').filter((bit) => bit === '1').length)
+    expect(batter.skillIds.length).toBe(
+      row.skillBits
+        .toString(2)
+        .split('')
+        .filter((bit) => bit === '1').length,
+    )
   })
 })

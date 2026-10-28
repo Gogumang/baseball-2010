@@ -50,8 +50,14 @@ import { homeRunTextFrameAt } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import {
-  appTickOfGameSceneTick, createGameSceneDrawGate, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime, gameSceneTimeOf,
-  isCommonWindowShown, isGameSceneFrozen,
+  appTickOfGameSceneTick,
+  createGameSceneDrawGate,
+  gameSceneTickNow,
+  gameSceneTickOf,
+  gameSceneTickStartTime,
+  gameSceneTimeOf,
+  isCommonWindowShown,
+  isGameSceneFrozen,
 } from '@/shared/lib/commonWindow/commonWindow'
 import { openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
@@ -61,14 +67,15 @@ import { isBallInSwingReach, nextFlightEvent, swingReleaseTickOf } from '@/widge
 import { DERBY_ORDINARY_PITCH_TYPE } from '@/entities/home-run-derby/model/derbyRules'
 import { resultBackdropOffsetAt } from '@/widgets/batting-stage/lib/stageScenery'
 import { PRE_PITCH_TICKS } from '@/widgets/batting-stage/lib/stagePhaseTicks'
-import {
-  SCENE_STATE, cancelSceneStateEntriesAfter, markSceneStateEntries, sceneStateEntryAt,
-} from '@/shared/lib/commonWindow/sceneStateEntries'
+import { SCENE_STATE, cancelSceneStateEntriesAfter, markSceneStateEntries, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { createRunnerAnimationClock, stepRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import { withRedrawAt } from '@/widgets/batting-stage/lib/stageRedraws'
 import { hitByPitchMarkDrawCallOf } from '@/widgets/batting-stage/lib/batterOverlayMarks'
 import {
-  createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
+  createCloudFrameCursor,
+  observeSceneCloudFrame,
+  sceneCloudFrameOf,
+  sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
 import { rememberSceneBallPath, sceneBallPathPitch } from '@/widgets/batting-stage/model/sceneBallPath'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
@@ -90,7 +97,7 @@ const CPU_RELEASE_TICK_IN_0X11 = 10
 
 /** 수비 투수 레코드 +0x14 — 번호를 직접 든 능력치(마투수)면 번호 − 16, 아니면 비트 그대로 (`resolvePitch.pitcherSkillIdsOf` 와 같은 고름) */
 function pitcherSkillBitsOf(pitcher: PitcherAbility): number {
-  return pitcher.skillIds !== undefined ? skillBitsOfIds(pitcher.skillIds, true) : pitcher.skillBits ?? 0
+  return pitcher.skillIds !== undefined ? skillBitsOfIds(pitcher.skillIds, true) : (pitcher.skillBits ?? 0)
 }
 
 /** 투구 단계가 부르는 고리 — 타석 화면(`BattingStage`)이 채운다 */
@@ -344,17 +351,14 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           onPickoff === undefined
             ? undefined
             : {
-                hasRunnerOnBase: (base) =>
-                  base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false,
+                hasRunnerOnBase: (base) => (base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false),
               },
         // 실투 판정 0x33cbc 의 타자 비트 22 압도 — 0xb62b4 는 **장착** 비트라 장착 스킬 번호로 본다
         batterIntimidates: latestRef.current.batterSkillIds.includes(INTIMIDATE_SKILL_ID),
         // 홈런더비(모드 7)는 0x344ea 가 구질을 굴리지 않고(마투수가 나왔으면 22, 아니면 1),
         // 0x345fc 가 종류·목표점을 굴리지 않고 존 한가운데를 노리며(0x3460e) 마구 소모(0x34894)도 건너뛴다
         derbyPitchType:
-          latestRef.current.gameMode === HOME_RUN_DERBY_GAME_MODE
-            ? latestRef.current.derbyPitchType ?? DERBY_ORDINARY_PITCH_TYPE
-            : undefined,
+          latestRef.current.gameMode === HOME_RUN_DERBY_GAME_MODE ? (latestRef.current.derbyPitchType ?? DERBY_ORDINARY_PITCH_TYPE) : undefined,
       }
     }
 
@@ -450,12 +454,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 0x11 틱 10 — 0x4dc78: 제구 등급 · 제구 오차 · 실투 · 곡선을 굴려 와인드업 자리를 진짜 공으로 바꾼다
       if (phaseRef.current === '투구중' && releasePending !== null) {
         if (sceneTick - phaseStartTickRef.current < CPU_RELEASE_TICK_IN_0X11) return
-        const choice = releaseCpuPitch(
-          cpuPitchArgsNow(),
-          releasePending.typeNumber,
-          releasePending.target,
-          latestRef.current.random,
-        )
+        const choice = releaseCpuPitch(cpuPitchArgsNow(), releasePending.typeNumber, releasePending.target, latestRef.current.random)
         releasePending = null
         // 4de9c +8 = 0 · 4deae 실투면 +8 = 4 — 공마다 다시 적는다
         mistakeMarkPitch = choice.isMistakePitch ? choice.pitch : null
@@ -549,7 +548,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         const held = sceneTick - phaseStartTickRef.current
         if (pending !== null && hitInStage?.pending !== pending) {
           hitInStage = {
-            pending, startTick: phaseStartTickRef.current, endTick: null, swingStartTick: swingStartTickRef.current, frozenDraws: [],
+            pending,
+            startTick: phaseStartTickRef.current,
+            endTick: null,
+            swingStartTick: swingStartTickRef.current,
+            frozenDraws: [],
           }
         }
         const frozenDraws = hitInStage !== null && hitInStage.pending === pending ? hitInStage.frozenDraws : []
@@ -570,10 +573,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       }
 
       // 0x12 는 16 그림(볼넷 · 사구 · 삼진 32) — 결과를 세울 때 정한 틱 수(`resultPhaseTicksOf`)
-      if (
-        phaseRef.current === '결과' &&
-        sceneTick - phaseStartTickRef.current >= resultTicksRef.current
-      ) {
+      if (phaseRef.current === '결과' && sceneTick - phaseStartTickRef.current >= resultTicksRef.current) {
         phaseRef.current = '대기'
         phaseStartTickRef.current = sceneTick
         // 0x12 끝 — 판정 A 가 예약한 다음 상태(0xf · 0xd · 0x17)가 이 틀에 선다. 그 칸은 0x12 를 세울 때 이미 적었다(`BattingStage`
@@ -735,9 +735,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
           let frozenBigHitScreen = frozenScene.bigHitScreen
           if (frozenHit !== null && frozenHit.pending.watchesBigHit && latestRef.current.isResultBackdrop !== true) {
             const lastHeld = frozenTick - frozenHit.startTick
-            frozenBigHitScreen = bigHitScreenOf(
-              true, lastHeld + 1, frozenScene.side ?? 0, frozenHit.pending.bigHitAt, frozenHit.frozenDraws,
-            )
+            frozenBigHitScreen = bigHitScreenOf(true, lastHeld + 1, frozenScene.side ?? 0, frozenHit.pending.bigHitAt, frozenHit.frozenDraws)
             // 4ccba — 옛값이 음수면 이 그림이 막음을 풀고 016 을 쏜다(파티클 틱 53048 은 건너뛴다)
             if (frozenBigHitScreen?.kind === '멈춤' && frozenBigHitScreen.counter < 0) emitHitStopParticle(frozenHit.pending)
             frozenHit.frozenDraws.push(lastHeld)
@@ -762,9 +760,10 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
             redrawTicks,
             ...(frozenRunnerSteps === undefined ? {} : { runnerAnimationSteps: frozenRunnerSteps }),
             // 0x4c4bc 4cad4 → 0x4b5b4 — 판을 그리던 상태면 한 번 더 돈다(마지막으로 센 틱은 그대로)
-            skillPanel: frozenScene.skillPanel === null || frozenScene.skillPanel === undefined
-              ? frozenScene.skillPanel
-              : stepSkillPanelNow(frozenScene.tick, true),
+            skillPanel:
+              frozenScene.skillPanel === null || frozenScene.skillPanel === undefined
+                ? frozenScene.skillPanel
+                : stepSkillPanelNow(frozenScene.tick, true),
           }
           // 다음 그림이 이 그림과 견주도록 입력을 남긴다
           drawMemo.needsDraw(canvas, {
@@ -850,8 +849,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 틱마다 원본 프레임 차례 — (치우기) → (홈런 효과 깔기) → 글자 유지 그림의 효과 틱 0x40faa → 파티클 틱 0x6de84
       const firstSteppedTick = nowTick - steps
       /** 이 걸음(장면 틱 `firstSteppedTick + step + 1`)의 앱 틀에 관리자 틱이 아직 안 돌았는가 — 앱 틀당 한 번(`claimSceneParticleTick`) */
-      const claimsManagerTick = (step: number) =>
-        claimSceneParticleTick(particlesRef.current, appTickOfGameSceneTick(firstSteppedTick + step + 1))
+      const claimsManagerTick = (step: number) => claimSceneParticleTick(particlesRef.current, appTickOfGameSceneTick(firstSteppedTick + step + 1))
       for (let step = 0; step < steps && settlement !== undefined; step += 1) {
         if (settlementEffect !== null && settlementEffect !== undefined) {
           tickSettlementEffect(settlementEffect, fireworksPortOf(particlesRef.current, particleConfigOf), settlement.random)
@@ -931,7 +929,11 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         swingHold === null
           ? 0
           : bigHitSwingSkipsOf(
-              swingHold.pending.watchesBigHit, swingHold.startTick, swingHold.endTick, sceneTick, bigHitReleaseTickOf(swingHold.frozenDraws),
+              swingHold.pending.watchesBigHit,
+              swingHold.startTick,
+              swingHold.endTick,
+              sceneTick,
+              bigHitReleaseTickOf(swingHold.frozenDraws),
             )
       const stageScene: StageScene = {
         pitcherForm,
@@ -983,9 +985,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
         pitcherStaminaPercent: latestRef.current.pitcherStaminaPercent ?? null,
         // 실투 "!" — 놓은 0x11 틱 10 의 그림이 첫 그림(1)이다 (`pitcherFatigue` 의 실투 "!")
         pitcherMistakeMarkDraw:
-          isPitching && pitch !== null && pitch === mistakeMarkPitch
-            ? sceneTick - phaseStartTickRef.current - CPU_RELEASE_TICK_IN_0X11 + 1
-            : null,
+          isPitching && pitch !== null && pitch === mistakeMarkPitch ? sceneTick - phaseStartTickRef.current - CPU_RELEASE_TICK_IN_0X11 + 1 : null,
         ...(latestRef.current.runnerAces === undefined ? {} : { runnerAces: latestRef.current.runnerAces }),
         acePitcher: latestRef.current.acePitcher,
         ...(latestRef.current.pitcherEquipment === undefined ? {} : { pitcherEquipment: latestRef.current.pitcherEquipment }),
@@ -1055,14 +1055,16 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
       // 창이 닫힌 앱 틱 동안은 장면 틱이 창 첫 그림의 틱 그대로다 — 원본은 그 틱을 다시 그리지 않는다(창이 닫힌 틀은 갱신이 없고 다음
       // 틀이 다음 틱을 그린다). 창 첫 그림을 그대로 둔다
       const isRedrawnTick = redrawTicks.at(-1) === sceneTick
-      const shouldDraw = !isRedrawnTick && drawMemo.needsDraw(canvas, {
-        scene: { ...stageScene, particles: particleSignatureOf(stageScene.particles) },
-        layerParticles: layers === undefined || isParticleGated ? null : particleSignatureOf(particlesRef.current),
-        rainLayer,
-        rainLayerSize: rainLayer === null ? null : [rainLayer.width, rainLayer.height],
-        particleLayer,
-        particleLayerSize: particleLayer === null ? null : [particleLayer.width, particleLayer.height],
-      })
+      const shouldDraw =
+        !isRedrawnTick &&
+        drawMemo.needsDraw(canvas, {
+          scene: { ...stageScene, particles: particleSignatureOf(stageScene.particles) },
+          layerParticles: layers === undefined || isParticleGated ? null : particleSignatureOf(particlesRef.current),
+          rainLayer,
+          rainLayerSize: rainLayer === null ? null : [rainLayer.width, rainLayer.height],
+          particleLayer,
+          particleLayerSize: particleLayer === null ? null : [particleLayer.width, particleLayer.height],
+        })
       if (shouldDraw) renderBattingStage(context, stageScene)
       if (!isRedrawnTick) lastStageScene = stageScene
       if (shouldDraw && layers !== undefined) {
@@ -1086,22 +1088,58 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
       releaseSnapshotSlot = registerSnapshotSlot('stageAnimation', {
         capture: () => ({
-          lastStageScene, runnerTick, redrawTicks, magic, releaseSoundPitch, cpuPitchCycle, releasePending, mistakeMarkPitch, pitcherTickEnd,
-          resultCodeBeforePitch, judgedResultCode, hitStopReleased, hitInStage, particleTick, stageEffects, settlementEffect,
-          pausedSince, hasSeenPause, localRunnerClock, cloudCursor,
+          lastStageScene,
+          runnerTick,
+          redrawTicks,
+          magic,
+          releaseSoundPitch,
+          cpuPitchCycle,
+          releasePending,
+          mistakeMarkPitch,
+          pitcherTickEnd,
+          resultCodeBeforePitch,
+          judgedResultCode,
+          hitStopReleased,
+          hitInStage,
+          particleTick,
+          stageEffects,
+          settlementEffect,
+          pausedSince,
+          hasSeenPause,
+          localRunnerClock,
+          cloudCursor,
           // 결과 배경 시계는 실제 시각(ms) — 지난 시간으로 적는다
-          backdropAgo: backdropClock === null ? null : {
-            started: performance.now() - backdropClock.startedAt,
-            frozen: backdropClock.frozenSince === null ? null : performance.now() - backdropClock.frozenSince,
-          },
-          frozenDrawGate: frozenDrawGate.devSnapshot?.capture(), skillPanel: stepSkillPanel.devSnapshot?.capture(),
+          backdropAgo:
+            backdropClock === null
+              ? null
+              : {
+                  started: performance.now() - backdropClock.startedAt,
+                  frozen: backdropClock.frozenSince === null ? null : performance.now() - backdropClock.frozenSince,
+                },
+          frozenDrawGate: frozenDrawGate.devSnapshot?.capture(),
+          skillPanel: stepSkillPanel.devSnapshot?.capture(),
         }),
         restore: (value, shiftMs) => {
           const saved = value as Record<string, unknown>
           const now = performance.now()
           ;({
-            lastStageScene, runnerTick, redrawTicks, magic, releaseSoundPitch, cpuPitchCycle, releasePending, mistakeMarkPitch, pitcherTickEnd,
-            resultCodeBeforePitch, judgedResultCode, hitStopReleased, hitInStage, particleTick, stageEffects, settlementEffect, pausedSince,
+            lastStageScene,
+            runnerTick,
+            redrawTicks,
+            magic,
+            releaseSoundPitch,
+            cpuPitchCycle,
+            releasePending,
+            mistakeMarkPitch,
+            pitcherTickEnd,
+            resultCodeBeforePitch,
+            judgedResultCode,
+            hitStopReleased,
+            hitInStage,
+            particleTick,
+            stageEffects,
+            settlementEffect,
+            pausedSince,
             hasSeenPause,
           } = saved as never)
           const ago = saved.backdropAgo as { started: number; frozen: number | null } | null

@@ -31,16 +31,18 @@ export interface NextGameStandingsScreenProps {
  * ```
  * 시즌 0xd8(`NextGameScreen`)과 같은 짜임이다. 난수는 안 쓴다.
  */
-export function NextGameStandingsScreen({
-  league, edition, onConfirm, onCancel, isFromManagement, gamePoint,
-}: NextGameStandingsScreenProps) {
+export function NextGameStandingsScreen({ league, edition, onConfirm, onCancel, isFromManagement, gamePoint }: NextGameStandingsScreenProps) {
   useSeasonCursor({ count: 1, onSelect: onConfirm, onCancel })
 
   return (
     <RawScreen>
       <StandingsWindow league={league} onClose={onConfirm} />
-      <ScreenFrame title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'} gamePoint={gamePoint}
-        onBack={isFromManagement ? onCancel : null} slides={false} />
+      <ScreenFrame
+        title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'}
+        gamePoint={gamePoint}
+        onBack={isFromManagement ? onCancel : null}
+        slides={false}
+      />
     </RawScreen>
   )
 }

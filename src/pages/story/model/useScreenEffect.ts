@@ -59,9 +59,7 @@ export function useScreenEffect(
   /** 막는 효과를 다 기다린 틀 — 이 걸음의 멈출 명령이 돈다 (`isStepHeld`) */
   onRelease?: (stepKey: string) => void,
 ): ScreenEffectView {
-  const [view, setView] = useState<ScreenEffectView>(
-    { frame: null, phase: '없음', serial: 0, lastEffectId: null },
-  )
+  const [view, setView] = useState<ScreenEffectView>({ frame: null, phase: '없음', serial: 0, lastEffectId: null })
   const handledRef = useRef<string | null>(null)
   const handleRef = useRef(0)
   const serialRef = useRef(0)
@@ -97,10 +95,12 @@ export function useScreenEffect(
     }
     if (entries.every((entry) => entry.kind === null)) {
       // 효과기를 안 건드리는 걸음 — 앞 효과는 그대로 돌고, 명령 하나에 한 틀씩 지나 멈출 명령이 돈다
-      const timers = entries.map((entry) => setAppTickTimeout(() => {
-        vibrateUpTo(entry.start)
-        setView((previous) => ({ ...previous, lastEffectId: entry.id }))
-      }, entry.start))
+      const timers = entries.map((entry) =>
+        setAppTickTimeout(() => {
+          vibrateUpTo(entry.start)
+          setView((previous) => ({ ...previous, lastEffectId: entry.id }))
+        }, entry.start),
+      )
       const release = setAppTickTimeout(() => onReleaseRef.current?.(key), releaseFrame)
       return () => {
         timers.forEach((clear) => clear())
@@ -153,7 +153,9 @@ export function useScreenEffect(
         const phase = entry.kind === null ? '없음' : effectorPhaseAt(entry.kind, local)
         setView({
           frame: entry.kind === null ? null : screenEffectFrameAt(entry.kind, entry.color, local),
-          phase, serial, lastEffectId,
+          phase,
+          serial,
+          lastEffectId,
         })
       }
       if (!isReleased && frameIndex >= releaseFrame) {

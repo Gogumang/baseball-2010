@@ -45,12 +45,7 @@ function 타자(hit: number): BatterAbility {
 
 const 무사주자없음 = { strikes: 0, balls: 0, outs: 0, hasRunner: false }
 
-function 비율(
-  pitch: Pitch,
-  ability: BatterAbility,
-  situation: BatterSituation = 무사주자없음,
-  attempts = 2000,
-): number {
+function 비율(pitch: Pitch, ability: BatterAbility, situation: BatterSituation = 무사주자없음, attempts = 2000): number {
   const random = createSeededRandom(20100901)
   let swings = 0
   for (let i = 0; i < attempts; i += 1) {
@@ -227,9 +222,7 @@ describe('CPU 번트 — 원본 0x3445a', () => {
     expect(thrown.buntKind).toBe(1)
     // 휘두른 타구는 0
     const 굴림 = [0.65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    expect(
-      pitchAgainstBatterDetailed(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMagicBatter: true }).buntKind,
-    ).toBe(0)
+    expect(pitchAgainstBatterDetailed(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMagicBatter: true }).buntKind).toBe(0)
   })
 
   it('안 휘두른 공은 장면 +0xfdc 가 0 이다 — 0x11 진입 0x3de10(3deb8 0x340dc)이 공마다 memset 하고 0x34436 은 휘두를 때만 쓴다', () => {
@@ -263,9 +256,10 @@ describe('CPU 번트 — 원본 0x3445a', () => {
       kind: '타구',
       outcome: { kind: '아웃', detail: '땅볼아웃' },
     })
-    expect(
-      pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMagicBatter: true }),
-    ).toEqual({ kind: '타구', outcome: { kind: '홈런' } })
+    expect(pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMagicBatter: true })).toEqual({
+      kind: '타구',
+      outcome: { kind: '홈런' },
+    })
   })
 })
 
@@ -294,9 +288,7 @@ describe('실투면 CPU 타자는 치기로 간다 — 0x34376 · 0x34162', () =
     // 표 0.99(지켜보기) → 실투로 치기 → 타이밍 0.9999 도 K=10000 밑 → d=0
     const 굴림 = [0.99, 0.9999, 0.99, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
     expect(pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음).kind).toBe('스트라이크')
-    expect(
-      pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMistakePitch: true }).kind,
-    ).not.toBe('스트라이크')
+    expect(pitchAgainstBatter(한가운데, 타자(500), 각본(굴림), undefined, 무사주자없음, { isMistakePitch: true }).kind).not.toBe('스트라이크')
   })
 })
 
@@ -324,18 +316,14 @@ describe('CPU 마타자 필살 — 원본 0x34468~0x34488', () => {
 describe('pitchAgainstBatter', () => {
   it('존 밖 공을 안 휘두르면 볼이다', () => {
     const random = createSeededRandom(20100901)
-    const results = Array.from({ length: 200 }, () =>
-      pitchAgainstBatter(크게빠진공, 타자(900), random),
-    )
+    const results = Array.from({ length: 200 }, () => pitchAgainstBatter(크게빠진공, 타자(900), random))
 
     expect(results.filter((r) => r.kind === '볼').length).toBeGreaterThan(100)
   })
 
   it('존 안 공은 스트라이크나 타구로 이어진다', () => {
     const random = createSeededRandom(20100901)
-    const results = Array.from({ length: 200 }, () =>
-      pitchAgainstBatter(한가운데, 타자(500), random),
-    )
+    const results = Array.from({ length: 200 }, () => pitchAgainstBatter(한가운데, 타자(500), random))
 
     expect(results.some((r) => r.kind === '스트라이크')).toBe(true)
     expect(results.some((r) => r.kind === '타구')).toBe(true)
@@ -378,9 +366,7 @@ describe('pitchAgainstBatter', () => {
   it('던진 투수의 깎은 뒤 체력%가 0 이면 ab838 이 B · C 에 +2000 — 같은 씨앗에서 결과가 갈리고 1% 면 예전과 같다', () => {
     const 백번 = (pitcherStaminaPercent?: number) => {
       const random = createSeededRandom(20100901)
-      return Array.from({ length: 100 }, () =>
-        pitchAgainstBatter(한가운데, 타자(500), random, undefined, undefined, { pitcherStaminaPercent }),
-      )
+      return Array.from({ length: 100 }, () => pitchAgainstBatter(한가운데, 타자(500), random, undefined, undefined, { pitcherStaminaPercent }))
     }
     expect(백번(1)).toEqual(백번())
     expect(백번(0)).not.toEqual(백번())
@@ -480,9 +466,10 @@ describe('pitchAgainstBatterDetailed — CPU 마타자 필살 (0x34488 → 0x4e1
     expect(
       pitchAgainstBatterDetailed(한가운데, 타자(500), 없음, undefined, undefined, { ...마타자, specialSwing: { swingNumber: 7, remaining: 0 } }),
     ).toMatchObject({ isSpecialSwing: false, specialSwingRemaining: 0 })
-    expect(
-      pitchAgainstBatterDetailed(한가운데, 타자(500), 일반, undefined, undefined, { ...마타자, isMagicBatter: false }),
-    ).toMatchObject({ isSpecialSwing: false, specialSwingRemaining: 2 })
+    expect(pitchAgainstBatterDetailed(한가운데, 타자(500), 일반, undefined, undefined, { ...마타자, isMagicBatter: false })).toMatchObject({
+      isSpecialSwing: false,
+      specialSwingRemaining: 2,
+    })
     expect(없음.used()).toBe(기준.used())
     expect(일반.used()).toBe(기준.used())
   })

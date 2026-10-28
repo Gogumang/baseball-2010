@@ -160,7 +160,15 @@ function kindOf(hook: Hook): HookKind {
 // ─── 값 적기 · 풀기 ───────────────────────────────────────────────────────────────────────────────────────────
 
 const TYPED_ARRAYS: Record<string, new (values: number[]) => ArrayLike<number>> = {
-  Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array, Float32Array, Float64Array,
+  Int8Array,
+  Uint8Array,
+  Uint8ClampedArray,
+  Int16Array,
+  Uint16Array,
+  Int32Array,
+  Uint32Array,
+  Float32Array,
+  Float64Array,
 }
 
 function isOpaque(value: object): string | null {
@@ -171,7 +179,8 @@ function isOpaque(value: object): string | null {
   if (value instanceof Error) return 'error'
   if (typeof Event !== 'undefined' && value instanceof Event) return 'event'
   const tag = Object.prototype.toString.call(value)
-  if (tag === '[object Object]' || tag === '[object Array]' || tag === '[object Map]' || tag === '[object Set]' || tag === '[object Date]') return null
+  if (tag === '[object Object]' || tag === '[object Array]' || tag === '[object Map]' || tag === '[object Set]' || tag === '[object Date]')
+    return null
   if (ArrayBuffer.isView(value) && value.constructor.name in TYPED_ARRAYS) return null
   return tag.slice(8, -1)
 }
@@ -255,7 +264,10 @@ class Decoder {
   /** 객체 번호 → 그 객체를 처음 적은 자리 — `r` 이 아직 안 푼 객체를 가리키면 그 자리를 먼저 푼다(칸을 어느 차례로 풀어도 된다) */
   private readonly definitions = new Map<number, EncodedNode>()
 
-  constructor(private readonly values: readonly EncodedNode[], private readonly adopt: ReadonlyMap<number, object> = new Map()) {
+  constructor(
+    private readonly values: readonly EncodedNode[],
+    private readonly adopt: ReadonlyMap<number, object> = new Map(),
+  ) {
     const stack: unknown[] = [...values]
     while (stack.length > 0) {
       const node = stack.pop()
@@ -275,7 +287,11 @@ class Decoder {
   }
 
   private decode(
-    node: EncodedNode, route: (string | number)[], holes: Hole[], holder: Record<string | number, unknown> | null, key: string | number | null,
+    node: EncodedNode,
+    route: (string | number)[],
+    holes: Hole[],
+    holder: Record<string | number, unknown> | null,
+    key: string | number | null,
   ): unknown {
     if (node === null || typeof node !== 'object') return node
     if ('u' in node) return undefined
@@ -415,7 +431,9 @@ const STORAGE_PREFIX = 'compus-baseball/'
 
 function storageNow(): Record<string, string> {
   const storage: Record<string, string> = {}
-  for (const key of Object.keys(window.localStorage).filter((name) => name.startsWith(STORAGE_PREFIX)).sort()) {
+  for (const key of Object.keys(window.localStorage)
+    .filter((name) => name.startsWith(STORAGE_PREFIX))
+    .sort()) {
     storage[key] = window.localStorage.getItem(key) ?? ''
   }
   return storage
@@ -635,8 +653,10 @@ export async function restoreSnapshot(file: SessionSnapshotFile, { maxPasses = 8
   if (missing.length > 0) {
     const first = byPath.get(missing[0]!)!
     const standing = hookFibers().find((entry) => entry.path === first.path)
-    throw new Error(`스냅샷이 낡았다 — 부품 자리 ${missing.length} 곳이 끝내 안 섰다. 처음: ${first.path} (훅 ${first.kinds} → ` +
-      `${standing === undefined ? '자리 없음' : hooksOf(standing.fiber).map(kindOf).join('')}). yarn e2e:snapshot 으로 다시 뜰 것`)
+    throw new Error(
+      `스냅샷이 낡았다 — 부품 자리 ${missing.length} 곳이 끝내 안 섰다. 처음: ${first.path} (훅 ${first.kinds} → ` +
+        `${standing === undefined ? '자리 없음' : hooksOf(standing.fiber).map(kindOf).join('')}). yarn e2e:snapshot 으로 다시 뜰 것`,
+    )
   }
   return { passes, fibers: file.fibers.length, restored: appliedPaths.size, missing }
 }

@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ACE_DEFAULT_OPEN_CELLS,
-  ACE_GAMEPOINT_LOCKED_CELLS,
-} from '@/shared/config/original/aceOpen'
+import { ACE_DEFAULT_OPEN_CELLS, ACE_GAMEPOINT_LOCKED_CELLS } from '@/shared/config/original/aceOpen'
 import {
   ACE_OPEN_CELL_COUNT,
   aceBatterIdsOf,
@@ -25,8 +22,7 @@ describe('저장 칸 정규화', () => {
   it('저장이 없던 옛 세이브는 기본 개방 둘(칸 0 싸이커 · 5 메디카)만 켜진다', () => {
     const save = normalizeAceOpenSave(null)
 
-    expect(save.cells.map((open, cell) => (open ? cell : null)).filter((cell) => cell !== null))
-      .toEqual([...ACE_DEFAULT_OPEN_CELLS])
+    expect(save.cells.map((open, cell) => (open ? cell : null)).filter((cell) => cell !== null)).toEqual([...ACE_DEFAULT_OPEN_CELLS])
   })
 
   it('칸이 모자란 옛 저장은 빠진 칸을 거짓으로 채운다 — 읽은 칸은 그대로 산다', () => {

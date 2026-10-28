@@ -5,8 +5,16 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { FINAL_STAGE, matchTeamOf } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import {
-  BRACKET_END_BOXES, BRACKET_FINAL_BOXES, BRACKET_FINAL_TITLE_FRAME, BRACKET_FRAME, BRACKET_LEAGUE_BOXES,
-  BRACKET_LEAGUE_TITLE_BASE, TEAM_LABEL_BASE_FRAME, TEAM_LOGO_SIZES, frameCenterOf, imageCenterOf,
+  BRACKET_END_BOXES,
+  BRACKET_FINAL_BOXES,
+  BRACKET_FINAL_TITLE_FRAME,
+  BRACKET_FRAME,
+  BRACKET_LEAGUE_BOXES,
+  BRACKET_LEAGUE_TITLE_BASE,
+  TEAM_LABEL_BASE_FRAME,
+  TEAM_LOGO_SIZES,
+  frameCenterOf,
+  imageCenterOf,
 } from '@/pages/national-cup/lib/nationalCupLayout'
 import type { BracketBox } from '@/pages/national-cup/lib/nationalCupLayout'
 import * as styles from '@/pages/national-cup/ui/NationalCupStandings.css'
@@ -47,19 +55,22 @@ export function NationalCupBracket({ cup, onConfirm, isConfirmable = true }: Nat
 
   const stage = cup.stage
   const frame = stage > FINAL_STAGE ? BRACKET_FRAME.풀리그 : stage === FINAL_STAGE ? BRACKET_FRAME.결승 : BRACKET_FRAME.끝
-  const titleFrame = stage > FINAL_STAGE
-    ? BRACKET_LEAGUE_TITLE_BASE - stage
-    : stage === FINAL_STAGE ? BRACKET_FINAL_TITLE_FRAME : null
-  const slots: readonly Slot[] = stage > FINAL_STAGE
-    ? [0, 1, 2, 3].map((i) => ({
-        team: matchTeamOf(cup, stage, i), logoBox: BRACKET_LEAGUE_BOXES[i + 1], labelBox: BRACKET_LEAGUE_BOXES[i + 5],
-      }))
-    : stage === FINAL_STAGE
-      ? [0, 1].map((i) => ({
-          team: matchTeamOf(cup, stage, i), logoBox: BRACKET_FINAL_BOXES[i + 1], labelBox: BRACKET_FINAL_BOXES[i + 3],
+  const titleFrame = stage > FINAL_STAGE ? BRACKET_LEAGUE_TITLE_BASE - stage : stage === FINAL_STAGE ? BRACKET_FINAL_TITLE_FRAME : null
+  const slots: readonly Slot[] =
+    stage > FINAL_STAGE
+      ? [0, 1, 2, 3].map((i) => ({
+          team: matchTeamOf(cup, stage, i),
+          logoBox: BRACKET_LEAGUE_BOXES[i + 1],
+          labelBox: BRACKET_LEAGUE_BOXES[i + 5],
         }))
-      // n ≤ 0: S+0x12c(대회 중) 이면 S+0x144 우승국 — 이 화면은 대회 중에만 뜬다
-      : [{ team: cup.champion, logoBox: BRACKET_END_BOXES[0], labelBox: BRACKET_END_BOXES[1] }]
+      : stage === FINAL_STAGE
+        ? [0, 1].map((i) => ({
+            team: matchTeamOf(cup, stage, i),
+            logoBox: BRACKET_FINAL_BOXES[i + 1],
+            labelBox: BRACKET_FINAL_BOXES[i + 3],
+          }))
+        : // n ≤ 0: S+0x12c(대회 중) 이면 S+0x144 우승국 — 이 화면은 대회 중에만 뜬다
+          [{ team: cup.champion, logoBox: BRACKET_END_BOXES[0], labelBox: BRACKET_END_BOXES[1] }]
   const titleBox = stage > FINAL_STAGE ? BRACKET_LEAGUE_BOXES[0] : BRACKET_FINAL_BOXES[0]
 
   const textAt = (textFrame: number, box: BracketBox, filter?: string) => {
@@ -67,8 +78,14 @@ export function NationalCupBracket({ cup, onConfirm, isConfirmable = true }: Nat
     if (size === null) return null
     const at = frameCenterOf(box, size.width, size.height)
     return (
-      <FrameSprite folder={IMG_TEXT} frame={textFrame} origins={textOrigins} x={at.x} y={at.y}
-        style={filter === undefined ? undefined : { filter }} />
+      <FrameSprite
+        folder={IMG_TEXT}
+        frame={textFrame}
+        origins={textOrigins}
+        x={at.x}
+        y={at.y}
+        style={filter === undefined ? undefined : { filter }}
+      />
     )
   }
 
@@ -77,8 +94,7 @@ export function NationalCupBracket({ cup, onConfirm, isConfirmable = true }: Nat
       <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
         <filter id={navyFilterId} colorInterpolationFilters="sRGB">
           {/* 흰 글자(R=G=B) → 팔레트 3 두 색. 255 → 41·73·165, 239 → 16·36·107 이 되는 1차식 */}
-          <feColorMatrix type="matrix"
-            values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
+          <feColorMatrix type="matrix" values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
         </filter>
       </svg>
 
@@ -96,9 +112,12 @@ export function NationalCupBracket({ cup, onConfirm, isConfirmable = true }: Nat
         return (
           <span key={index} data-slot={index} data-team={slot.team}>
             {logo !== null && (
-              <img className={styles.layer} alt={TEAMS[slot.team]?.name ?? ''}
+              <img
+                className={styles.layer}
+                alt={TEAMS[slot.team]?.name ?? ''}
                 src={`${TEAM_LOGO}/${String(slot.team).padStart(3, '0')}.png`}
-                style={{ left: logo.x, top: logo.y }} />
+                style={{ left: logo.x, top: logo.y }}
+              />
             )}
             {textAt(TEAM_LABEL_BASE_FRAME + slot.team, slot.labelBox)}
           </span>

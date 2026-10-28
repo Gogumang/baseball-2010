@@ -36,9 +36,7 @@ export function useMenuTurn(cursor: number, count: number, ticks: number): MenuT
     if (from === cursor || count <= 1) return undefined
 
     // ↓ 는 커서 +1(배열 왼쪽으로), ↑ 는 −1(오른쪽으로) — 감싸기까지 원본 클램프(0x2532e)와 같다
-    const direction: MenuTurnDirection | null = cursor === (from + 1) % count
-      ? -2
-      : (cursor === (from - 1 + count) % count ? -1 : null)
+    const direction: MenuTurnDirection | null = cursor === (from + 1) % count ? -2 : cursor === (from - 1 + count) % count ? -1 : null
     if (direction === null) {
       setTurn(STILL)
       return undefined

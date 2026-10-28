@@ -17,14 +17,7 @@ export { IconMenu } from '@/shared/ui/IconMenu/IconMenu'
 export type { IconMenuItem } from '@/shared/ui/IconMenu/IconMenu'
 export { StatusBar, AbilityBars } from '@/shared/ui/StatusBar/StatusBar'
 export { MarkupText } from '@/shared/ui/MarkupText/MarkupText'
-export {
-  PixelNumber,
-  HeadingSprite,
-  HEADING_SPRITE,
-  PopupLabel,
-  POPUP_LABEL,
-  MODE_ICON,
-} from '@/shared/ui/PixelNumber/PixelNumber'
+export { PixelNumber, HeadingSprite, HEADING_SPRITE, PopupLabel, POPUP_LABEL, MODE_ICON } from '@/shared/ui/PixelNumber/PixelNumber'
 export { FrameSprite } from '@/shared/ui/FrameSprite/FrameSprite'
 export { LayeredFrameSprite } from '@/shared/ui/LayeredFrameSprite/LayeredFrameSprite'
 export { SolidStamp } from '@/shared/ui/SolidStamp/SolidStamp'
@@ -41,7 +34,11 @@ export type { ButtonVariant } from '@/shared/ui/Button/Button'
 export { TextField } from '@/shared/ui/TextField/TextField'
 export { CommonPanel, InsetBox, PaintedRects, RoundBox } from '@/shared/ui/CommonPanel/CommonPanel'
 export {
-  IMG_TEXT_BAKED_PALETTE, bakedImgTextPaletteOf, imgTextPaletteMatrix, useImgTextPalette3, useImgTextPalettes,
+  IMG_TEXT_BAKED_PALETTE,
+  bakedImgTextPaletteOf,
+  imgTextPaletteMatrix,
+  useImgTextPalette3,
+  useImgTextPalettes,
 } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
 export type { ImgTextPaletteIndex } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
 export { EffectImage } from '@/shared/ui/EffectImage/EffectImage'

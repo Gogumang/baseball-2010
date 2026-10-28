@@ -69,10 +69,7 @@ export function holderPlateLayoutOf(
   plate: HolderPlate,
   screen: { readonly width: number; readonly height: number },
 ): HolderPlateLayout | null {
-  const badge =
-    slot === 0
-      ? pitcherRoleBadgeOf(plate.pitcherRole ?? -1, 0)
-      : batterPositionBadgeOf((plate.positionCode ?? 0) & 0xf, 0, 0)
+  const badge = slot === 0 ? pitcherRoleBadgeOf(plate.pitcherRole ?? -1, 0) : batterPositionBadgeOf((plate.positionCode ?? 0) & 0xf, 0, 0)
   if (badge.chip <= 0) return null
   const chipFrame = badge.chip + HOLDER_CHIP_FRAME_OFFSET
   const chipSize = HOLDER_CHIP_SIZE[chipFrame]

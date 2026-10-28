@@ -2,10 +2,22 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { tableDetailSourceOf } from '@/entities/season-mode/model/seasonEntry'
 import type { PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 import {
-  ENTRY_TAB, advanceEntrySlide, entryBatterLineOfRecord, entryPitcherLineOfRecord, openEntryEditor, pressEntryKey, tickEntryEditor,
+  ENTRY_TAB,
+  advanceEntrySlide,
+  entryBatterLineOfRecord,
+  entryPitcherLineOfRecord,
+  openEntryEditor,
+  pressEntryKey,
+  tickEntryEditor,
 } from '@/entities/season-mode/model/entryEditor'
 import type {
-  EntryBatterLine, EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherLine, EntryPitcherRow,
+  EntryBatterLine,
+  EntryBatterRow,
+  EntryEditorState,
+  EntryKey,
+  EntryLists,
+  EntryPitcherLine,
+  EntryPitcherRow,
 } from '@/entities/season-mode/model/entryEditor'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
@@ -35,7 +47,10 @@ export const EDIT_GRID_COLUMNS = 5
  * 세로는 끝에서 멈춘다 (0x6bead — 기록연감 격자 [this+0x7c] 와 같은 객체 vtable 0xd2ea0).
  */
 export const EDIT_GRID_SHAPE: AnnalsGridShape = {
-  columns: EDIT_GRID_COLUMNS, rows: EDIT_TEAM_COUNT / EDIT_GRID_COLUMNS, wrapsColumns: true, wrapsRows: false,
+  columns: EDIT_GRID_COLUMNS,
+  rows: EDIT_TEAM_COUNT / EDIT_GRID_COLUMNS,
+  wrapsColumns: true,
+  wrapsRows: false,
 }
 
 export interface SpecialEditState {
@@ -84,7 +99,10 @@ export function pointEditGrid(state: SpecialEditState, index: number): SpecialEd
  */
 export function chooseEditTeam(state: SpecialEditState): SpecialEditState {
   return {
-    ...state, step: SPECIAL_EDIT_STEP.선수고르기, team: state.gridCursor, editor: openEntryEditor(false, EDIT_SCROLL_COLUMN_COUNT),
+    ...state,
+    step: SPECIAL_EDIT_STEP.선수고르기,
+    team: state.gridCursor,
+    editor: openEntryEditor(false, EDIT_SCROLL_COLUMN_COUNT),
   }
 }
 
@@ -113,12 +131,23 @@ export interface EditEntryRow {
 export function editEntryListsOf(team: number): EntryLists<EditEntryRow & EntryBatterRow, EditEntryRow & EntryPitcherRow> {
   return {
     pitchers: teamPitchers(team).map((player) => ({
-      id: player.id, name: player.name, ability: player.ability, isAce: false, position: 0, profileLow: player.profile & 3,
-      pitcherLine: entryPitcherLineOfRecord(player.recordLine), detailSource: tableDetailSourceOf(player, true, player.ability),
+      id: player.id,
+      name: player.name,
+      ability: player.ability,
+      isAce: false,
+      position: 0,
+      profileLow: player.profile & 3,
+      pitcherLine: entryPitcherLineOfRecord(player.recordLine),
+      detailSource: tableDetailSourceOf(player, true, player.ability),
     })),
     batters: teamBatters(team).map((player) => ({
-      id: player.id, name: player.name, ability: player.ability, isAce: false, position: player.position ?? 0,
-      profileLow: player.profile & 3, batterLine: entryBatterLineOfRecord(player.recordLine),
+      id: player.id,
+      name: player.name,
+      ability: player.ability,
+      isAce: false,
+      position: player.position ?? 0,
+      profileLow: player.profile & 3,
+      batterLine: entryBatterLineOfRecord(player.recordLine),
       detailSource: tableDetailSourceOf(player, false, player.ability),
     })),
   }

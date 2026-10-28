@@ -35,11 +35,14 @@ export function BootShell({ loadApp, readyApp }: BootShellProps) {
     let isAlive = true
     let retry: ReturnType<typeof setTimeout> | undefined
     const load = () => {
-      loadApp().then((App) => {
-        if (isAlive) setApp({ App })
-      }, () => {
-        if (isAlive) retry = setTimeout(load, RETRY_MS)
-      })
+      loadApp().then(
+        (App) => {
+          if (isAlive) setApp({ App })
+        },
+        () => {
+          if (isAlive) retry = setTimeout(load, RETRY_MS)
+        },
+      )
     }
     load()
     return () => {

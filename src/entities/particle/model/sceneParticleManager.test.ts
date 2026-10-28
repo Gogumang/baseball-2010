@@ -13,8 +13,24 @@ import {
 } from '@/entities/particle/model/sceneParticleManager'
 
 const config = {
-  ang: 0, spread: 360, spd: 512, spdR: 0, emit: 2, emitR: 0, life: 5, lifeR: 0,
-  a0: 0, a0R: 0, a1: 0, a1R: 0, ax: 0, ay: 0, w: 0, h: 0, total: 10, mode: 2,
+  ang: 0,
+  spread: 360,
+  spd: 512,
+  spdR: 0,
+  emit: 2,
+  emitR: 0,
+  life: 5,
+  lifeR: 0,
+  a0: 0,
+  a0R: 0,
+  a1: 0,
+  a1R: 0,
+  ax: 0,
+  ay: 0,
+  w: 0,
+  h: 0,
+  total: 10,
+  mode: 2,
 } as unknown as ParticleConfig
 
 describe('앱 전역 파티클 관리자 [0x1400068]', () => {
@@ -44,8 +60,14 @@ describe('앱 전역 파티클 관리자 [0x1400068]', () => {
 
   it('그리기 앞 갱신 — 그 틀에 걸린 갱신만 보이고 한 번만 돈다 (r295)', () => {
     const ran: number[] = []
-    const cancel = runBeforeSceneParticleTick((appTick) => appTick >= 5, () => ran.push(5))
-    runBeforeSceneParticleTick((appTick) => appTick >= 9, () => ran.push(9))
+    const cancel = runBeforeSceneParticleTick(
+      (appTick) => appTick >= 5,
+      () => ran.push(5),
+    )
+    runBeforeSceneParticleTick(
+      (appTick) => appTick >= 9,
+      () => ran.push(9),
+    )
     expect(hasDueSceneFrameUpdate(4)).toBe(false)
     runDueSceneFrameUpdates(4)
     expect(ran).toEqual([])

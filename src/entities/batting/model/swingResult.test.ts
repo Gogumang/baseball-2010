@@ -18,7 +18,18 @@ const 기본입력 = (overrides: Partial<SwingResultInput> = {}): SwingResultInp
   isPitcherExhausted: false,
   batterSkillIds: [],
   pitcherSkillIds: [],
-  situation: { inning: 1, isLosing: false, runnerCount: 0, hasSecondBaseRunner: false, pitcherSide: 0, batterSide: 0, balls: 0, strikes: 0, batterOrderIndex: 0, recentAtBatCodes: [] },
+  situation: {
+    inning: 1,
+    isLosing: false,
+    runnerCount: 0,
+    hasSecondBaseRunner: false,
+    pitcherSide: 0,
+    batterSide: 0,
+    balls: 0,
+    strikes: 0,
+    batterOrderIndex: 0,
+    recentAtBatCodes: [],
+  },
   ...overrides,
 })
 
@@ -187,9 +198,7 @@ describe('내 선수 비트7 · 팀 조작 보정 (0xab3d4 · 0xab5c0)', () => {
   })
 
   it('모드 3·4 밖에서 수비 팀이 사람이면 hit·power 쪽 −10 — 능력치 −10 과 같다 (contact 포함)', () => {
-    expect(swingFactorsOf(기본입력({ isDefenseHuman: true }))).toEqual(
-      swingFactorsOf(기본입력({ batter: { hit: 290, power: 290 } })),
-    )
+    expect(swingFactorsOf(기본입력({ isDefenseHuman: true }))).toEqual(swingFactorsOf(기본입력({ batter: { hit: 290, power: 290 } })))
     expect(swingFactorsOf(기본입력({ mode: '투수미션', isDefenseHuman: true }))).toEqual(
       swingFactorsOf(기본입력({ batter: { hit: 290, power: 290 } })),
     )
@@ -200,9 +209,7 @@ describe('내 선수 비트7 · 팀 조작 보정 (0xab3d4 · 0xab5c0)', () => {
   })
 
   it('타자 미션(모드 6)에서 공격이 사람이면 +100 — 다른 모드·CPU 공격은 없다', () => {
-    expect(swingFactorsOf(기본입력({ mode: '미션', isOffenseHuman: true }))).toEqual(
-      swingFactorsOf(기본입력({ batter: { hit: 400, power: 400 } })),
-    )
+    expect(swingFactorsOf(기본입력({ mode: '미션', isOffenseHuman: true }))).toEqual(swingFactorsOf(기본입력({ batter: { hit: 400, power: 400 } })))
     expect(swingFactorsOf(기본입력({ isOffenseHuman: true }))).toEqual(보통())
     expect(swingFactorsOf(기본입력({ mode: '미션' }))).toEqual(보통())
   })

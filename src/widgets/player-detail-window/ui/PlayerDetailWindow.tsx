@@ -45,25 +45,59 @@ const pixel: CSSProperties = { position: 'absolute', pointerEvents: 'none', imag
  */
 const detailRadarObject: { previous: readonly number[]; hasPrevious: boolean } = { previous: [0, 0, 0, 0], hasPrevious: false }
 
-function Rect({ x, y, width, height, color }: {
-  readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string
+function Rect({
+  x,
+  y,
+  width,
+  height,
+  color,
+}: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
 }) {
   if (width <= 0 || height <= 0) return null
   return <span style={{ ...pixel, left: x, top: y, width, height, background: color }} />
 }
 
 /** 둥근 칠 0x6b7d4 (둥글기 1) */
-function RoundFill({ x, y, width, height, color }: { readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string }) {
+function RoundFill({
+  x,
+  y,
+  width,
+  height,
+  color,
+}: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
+}) {
   return (
     <>
-      {roundFillRectsOf({ x, y, width, height, round: 1 }).map((rect, index) => <Rect key={index} {...rect} color={color} />)}
+      {roundFillRectsOf({ x, y, width, height, round: 1 }).map((rect, index) => (
+        <Rect key={index} {...rect} color={color} />
+      ))}
     </>
   )
 }
 
 /** 0xb9d75 꼴 0x22 — (x, y, 폭, 15) 안 가운데 */
-function CenteredImgText({ origins, frame, x, y, width }: {
-  readonly origins: FrameOrigins | null; readonly frame: number; readonly x: number; readonly y: number; readonly width: number
+function CenteredImgText({
+  origins,
+  frame,
+  x,
+  y,
+  width,
+}: {
+  readonly origins: FrameOrigins | null
+  readonly frame: number
+  readonly x: number
+  readonly y: number
+  readonly width: number
 }) {
   const origin = origins?.[pad(frame)]
   if (origin === undefined) return null
@@ -118,19 +152,33 @@ export function PlayerDetailWindow({ detail, origin, draw, radarDraw, radarKey }
   return (
     <div data-testid="선수 정보 창">
       <RoundFill x={x} y={y} width={width} height={height} color={DETAIL_COLORS.outer} />
-      {roundEdgeRectsOf(x + 1, y + 1, width - 2, height - 2).map((rect, index) => <Rect key={index} {...rect} color={DETAIL_COLORS.edge} />)}
-      {[[x + 2, y + 2], [x + width - 2, y + 2], [x + 2, y + height - 2], [x + width - 2, y + height - 2]].map(([px, py], index) => (
+      {roundEdgeRectsOf(x + 1, y + 1, width - 2, height - 2).map((rect, index) => (
+        <Rect key={index} {...rect} color={DETAIL_COLORS.edge} />
+      ))}
+      {[
+        [x + 2, y + 2],
+        [x + width - 2, y + 2],
+        [x + 2, y + height - 2],
+        [x + width - 2, y + height - 2],
+      ].map(([px, py], index) => (
         <Rect key={`p${index}`} x={px} y={py} width={1} height={1} color={DETAIL_COLORS.edge} />
       ))}
       <RoundFill x={x + 2} y={y + 2} width={width - 4} height={height - 4} color={DETAIL_COLORS.white} />
       <RoundFill x={x + 4} y={y + 4} width={width - 8} height={height - 8} color={DETAIL_COLORS.edge} />
       {/* 0xbae25(x + 5, y + 5, w − 10, h − 10) — 안쪽은 이 칸으로 자른다 */}
-      <div style={{ position: 'absolute', left: x + 5, top: y + 5, width: width - 10, height: height - 10, overflow: 'hidden', pointerEvents: 'none' }}>
+      <div
+        style={{ position: 'absolute', left: x + 5, top: y + 5, width: width - 10, height: height - 10, overflow: 'hidden', pointerEvents: 'none' }}
+      >
         <div style={{ position: 'absolute', left: -(x + 5), top: -(y + 5), width: 240, height: 320 }}>
           {frame.isOpen && (
             // 도형은 창이 다 열린 그림부터 그린다([+0x425], 0x5b838) — 그 전 그림은 자람 걸음을 안 굴린다
-            <DetailRadar abilities={detail.abilities} isPitcher={isPitcher} restartKey={radarKey} center={detailRadarCenterOf(origin, isPitcher)}
-              draw={Math.min(radarDraw, draw - openDraw)} />
+            <DetailRadar
+              abilities={detail.abilities}
+              isPitcher={isPitcher}
+              restartKey={radarKey}
+              center={detailRadarCenterOf(origin, isPitcher)}
+              draw={Math.min(radarDraw, draw - openDraw)}
+            />
           )}
           {rows.map((row, index) => {
             const value = detail.values[index]
@@ -179,7 +227,15 @@ function DetailTicker({ text, x, y, counter }: { readonly text: string; readonly
   const clipLeft = x + SKIN_TICKER_CLIP_INSET
   return (
     <div style={{ position: 'absolute', left: clipLeft, top: y, width: width - SKIN_TICKER_CLIP_INSET * 2, height: 15, overflow: 'hidden' }}>
-      <PixelText style={{ position: 'absolute', left: skinTickerTextXOf(x, width, counter, textWidth) - clipLeft, top: 0, color: ORIGINAL_COLORS.text, whiteSpace: 'nowrap' }}>
+      <PixelText
+        style={{
+          position: 'absolute',
+          left: skinTickerTextXOf(x, width, counter, textWidth) - clipLeft,
+          top: 0,
+          color: ORIGINAL_COLORS.text,
+          whiteSpace: 'nowrap',
+        }}
+      >
         {text}
       </PixelText>
     </div>
@@ -191,8 +247,17 @@ function DetailTicker({ text, x, y, counter }: { readonly text: string; readonly
  * 값 도형(자람 0x760e8, 레이더 객체 [skin+0xd8]) · 축 줄 · 이름 상자 slt_frame 17 · 이름 · 숫자.
  * ⚠️ 유력: 숫자 색(기본값 `0xb6414(rec, k, 0)` 과의 비교)은 기본값이 웹 명단에 없어 흰색으로 둔다. 꼭짓점 그림(프레임 8~11)은 웹에 근거가 없다.
  */
-function DetailRadar({ abilities, isPitcher, draw, restartKey, center }: {
-  readonly abilities: readonly number[]; readonly isPitcher: boolean; readonly draw: number; readonly restartKey: number
+function DetailRadar({
+  abilities,
+  isPitcher,
+  draw,
+  restartKey,
+  center,
+}: {
+  readonly abilities: readonly number[]
+  readonly isPitcher: boolean
+  readonly draw: number
+  readonly restartKey: number
   readonly center: { readonly x: number; readonly y: number }
 }) {
   const startRef = useRef<{ key: string; start: RadarGrowthState } | null>(null)
@@ -213,12 +278,24 @@ function DetailRadar({ abilities, isPitcher, draw, restartKey, center }: {
     <div data-testid="선수 정보 도형">
       <img alt="" src={`${SLT_FRAME}/003.png`} style={{ ...pixel, left: center.x - 31, top: center.y - 31 }} />
       <img alt="" src={`${SLT_FRAME}/003.png`} style={{ ...pixel, left: center.x - 1, top: center.y - 31, transform: 'scaleX(-1)' }} />
-      <svg style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} width={240} height={320} viewBox="0 0 240 320" shapeRendering="crispEdges">
+      <svg
+        style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
+        width={240}
+        height={320}
+        viewBox="0 0 240 320"
+        shapeRendering="crispEdges"
+      >
         <polygon points={polygon(abilityChartFrameOf(center))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} />
         <polygon points={polygon(points)} fill={ORIGINAL_COLORS.highlightYellow} fillOpacity={0xb4 / 0xff} stroke={ORIGINAL_COLORS.text} />
         {DETAIL_RADAR_AXES.map((axis, index) => (
-          <line key={index} x1={center.x + axis.end.x} y1={center.y + axis.end.y} x2={points[index]?.x} y2={points[index]?.y}
-            stroke={ORIGINAL_COLORS.radarAxis} />
+          <line
+            key={index}
+            x1={center.x + axis.end.x}
+            y1={center.y + axis.end.y}
+            x2={points[index]?.x}
+            y2={points[index]?.y}
+            stroke={ORIGINAL_COLORS.radarAxis}
+          />
         ))}
       </svg>
       {DETAIL_RADAR_AXES.map((axis, index) => {

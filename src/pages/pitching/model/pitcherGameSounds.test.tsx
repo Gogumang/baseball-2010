@@ -67,8 +67,7 @@ beforeEach(() => {
 })
 afterEach(() => setActiveSound(null))
 
-const 띄우기 = (seed = 20100901) =>
-  renderHook(() => usePitcherGame(기본옵션, createSeededRandom(seed)))
+const 띄우기 = (seed = 20100901) => renderHook(() => usePitcherGame(기본옵션, createSeededRandom(seed)))
 
 /**
  * 한 개 던지고 그 공의 0x12 진입(못 맞힌 공의 공 도착 `enterPitchResult`)과 같은 타석 다음 공의 0xf 진입 틀까지 장면 시계를 흘린다 —
@@ -192,9 +191,7 @@ describe('투수편 화면의 소리 배선', () => {
 
   it('승리 31 · 패배 32 징글은 경기가 끝난 자리가 아니라 결과 판 OK 뒤 정산(0x19 진입 0x4ea0c)에서 난다', () => {
     // 등판이 없는 날은 경기를 세우는 자리에서 이미 끝나 있다
-    const { result } = renderHook(() =>
-      usePitcherGame({ ...기본옵션, dayCounter: 3 }, createSeededRandom(5)),
-    )
+    const { result } = renderHook(() => usePitcherGame({ ...기본옵션, dayCounter: 3 }, createSeededRandom(5)))
     expect(result.current.summary).not.toBeNull()
     expect(녹음.played.some((id) => id === 31 || id === 32)).toBe(false)
 

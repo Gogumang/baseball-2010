@@ -2,7 +2,24 @@ import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { pitcherOrdersAfterPostseason } from '@/entities/league/model/league'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { describe, expect, it } from 'vitest'
-import { applyGameResult, applySeasonEnd, countGameForSkills, countReputationZeroGame, createCareer, nextOpponentOf, GAMES_PER_SEASON, gamePointRewardOf, nameByteLengthOf, rookieAbilityOf, startNextSeason, leagueGamePitchersOf, applyLeagueDay, countTraining, nariLastGameRecordLineOf, nariRecordLineTextOf } from '@/entities/career/model/playerCareer'
+import {
+  applyGameResult,
+  applySeasonEnd,
+  countGameForSkills,
+  countReputationZeroGame,
+  createCareer,
+  nextOpponentOf,
+  GAMES_PER_SEASON,
+  gamePointRewardOf,
+  nameByteLengthOf,
+  rookieAbilityOf,
+  startNextSeason,
+  leagueGamePitchersOf,
+  applyLeagueDay,
+  countTraining,
+  nariLastGameRecordLineOf,
+  nariRecordLineTextOf,
+} from '@/entities/career/model/playerCareer'
 import type { NariLastGame, PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE, opponentOf, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -83,11 +100,14 @@ describe('새 시즌 전환 — 0x1b768', () => {
   })
 
   it('올해의 목표 플래그 둘을 되돌린다 — +0x1b7(0xa39d0) · +0x1bc(0x1b882)', () => {
-    const next = startNextSeason({
-      ...createCareer('선수'),
-      hasSeenYearGoalWindow: true,
-      yearGoalEventDone: true,
-    }, createConstantRandom(0))
+    const next = startNextSeason(
+      {
+        ...createCareer('선수'),
+        hasSeenYearGoalWindow: true,
+        yearGoalEventDone: true,
+      },
+      createConstantRandom(0),
+    )
 
     expect([next.hasSeenYearGoalWindow, next.yearGoalEventDone]).toEqual([false, false])
   })
@@ -148,8 +168,12 @@ describe('새 시즌 전환 — 0x1b768', () => {
  * 동료 여덟 타순과 상대 팀 타석이 CPU 끼리 경기와 **한 표**에 쌓여야 한다.
  */
 describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0xa8024', () => {
-  const 타석 = (teamId: number, battingOrderIndex: number, outcome: AtBatOutcome, runsBattedIn = 0) =>
-    ({ teamId, battingOrderIndex, outcome, runsBattedIn })
+  const 타석 = (teamId: number, battingOrderIndex: number, outcome: AtBatOutcome, runsBattedIn = 0) => ({
+    teamId,
+    battingOrderIndex,
+    outcome,
+    runsBattedIn,
+  })
 
   it('동료·상대 타석이 각자의 레코드에 들어간다', () => {
     const summary = {
@@ -170,11 +194,18 @@ describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0x
 
     // 볼넷은 타수에서 빠진다 (countsAsAtBat)
     expect(career.leaguePlayerStats.batters[leagueBatterIdOf(0, 1)]).toEqual({
-      atBats: 1, hits: 1, homeRuns: 1, runsBattedIn: 2,
+      atBats: 1,
+      hits: 1,
+      homeRuns: 1,
+      runsBattedIn: 2,
     })
     // 2루타는 +0x24 에도 쌓인다 (a8520~a85ac, 6d505634)
     expect(career.leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]).toEqual({
-      atBats: 2, hits: 1, doubles: 1, homeRuns: 0, runsBattedIn: 1,
+      atBats: 2,
+      hits: 1,
+      doubles: 1,
+      homeRuns: 0,
+      runsBattedIn: 1,
     })
   })
 
@@ -185,7 +216,10 @@ describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0x
       recordIds: [],
       ourTeamId: 0,
       opponentTeamId: 3,
-      leagueStolenBases: [{ teamId: 3, battingOrderIndex: 4 }, { teamId: 3, battingOrderIndex: 4 }],
+      leagueStolenBases: [
+        { teamId: 3, battingOrderIndex: 4 },
+        { teamId: 3, battingOrderIndex: 4 },
+      ],
     } as unknown as GameSummary
 
     expect(applyGameResult(createCareer('선수'), summary).leaguePlayerStats.batters[leagueBatterIdOf(3, 4)]?.steals).toBe(2)
@@ -224,7 +258,13 @@ describe('사람 경기의 타석도 리그 선수 기록표에 쌓인다 — 0x
   })
 
   it('내 도루(동료 간이 타석 0xc1a42)는 내 시즌 줄 +0x2c 에 쌓인다 — 포스트시즌은 0xa56dc 가 거짓이라 안 쌓는다', () => {
-    const summary = { result: '승', stats: { ...EMPTY_SEASON_STATS, stolenBases: 2 }, recordIds: [], ourTeamId: 0, opponentTeamId: 3 } as unknown as GameSummary
+    const summary = {
+      result: '승',
+      stats: { ...EMPTY_SEASON_STATS, stolenBases: 2 },
+      recordIds: [],
+      ourTeamId: 0,
+      opponentTeamId: 3,
+    } as unknown as GameSummary
 
     const 정규 = applyGameResult(applyGameResult(createCareer('선수'), summary), summary)
     expect(정규.stats.stolenBases).toBe(4)
@@ -516,7 +556,10 @@ describe('116 경기 뒤 카운터 12bc2~12c84 — 무력감 +0x1c7 · 먹튀 +0
 
   it('먹튀가 있으면 경기 수 +1 · 인기도 변화 합, 없으면 둘 다 0', () => {
     const base = { ...createCareer('카운터'), moneyGrubberGames: 2, moneyGrubberPopularityGain: 5 }
-    expect(countGameForSkills({ ...base, skillIds: [...base.skillIds, 2] }, -2)).toMatchObject({ moneyGrubberGames: 3, moneyGrubberPopularityGain: 3 })
+    expect(countGameForSkills({ ...base, skillIds: [...base.skillIds, 2] }, -2)).toMatchObject({
+      moneyGrubberGames: 3,
+      moneyGrubberPopularityGain: 3,
+    })
     expect(countGameForSkills(base, 4)).toMatchObject({ moneyGrubberGames: 0, moneyGrubberPopularityGain: 0 })
   })
 })
@@ -540,8 +583,12 @@ describe('116 기록 줄 글 — 0x1278c 모드 4 갈래 12958~1299a', () => {
     const stats = { ...createCareer('x').stats, atBats: 4, hits: 1, runsBattedIn: 0, homeRuns: 0 }
     const lastGame = { summary: { stats } } as unknown as NariLastGame
     expect(nariLastGameRecordLineOf(lastGame)).toEqual({ atBats: 4, hits: 1, runsBattedIn: 0, homeRuns: 0 })
-    expect(nariLastGameRecordLineOf({ ...lastGame, recordLine: { atBats: 1, hits: 1, runsBattedIn: 1, homeRuns: 1 } }))
-      .toEqual({ atBats: 1, hits: 1, runsBattedIn: 1, homeRuns: 1 })
+    expect(nariLastGameRecordLineOf({ ...lastGame, recordLine: { atBats: 1, hits: 1, runsBattedIn: 1, homeRuns: 1 } })).toEqual({
+      atBats: 1,
+      hits: 1,
+      runsBattedIn: 1,
+      homeRuns: 1,
+    })
   })
 })
 

@@ -51,18 +51,12 @@ describe('CPU 투수 교체 판정 0xac428', () => {
     expect(judgePitcherChange({ ...기본, inningIndex: 3, runsAllowed: 5 }).replace).toBe(true)
     expect(judgePitcherChange({ ...기본, inningIndex: 3, runsAllowed: 4 }).replace).toBe(false)
     // 0-기준 4 = 5회
-    expect(
-      judgePitcherChange({ ...기본, inningIndex: 4, runsAllowed: 5, stamina: 4900 }).replace,
-    ).toBe(true)
-    expect(
-      judgePitcherChange({ ...기본, inningIndex: 4, runsAllowed: 5, stamina: 5000 }).replace,
-    ).toBe(false)
+    expect(judgePitcherChange({ ...기본, inningIndex: 4, runsAllowed: 5, stamina: 4900 }).replace).toBe(true)
+    expect(judgePitcherChange({ ...기본, inningIndex: 4, runsAllowed: 5, stamina: 5000 }).replace).toBe(false)
   })
 
   it('7회(0-기준 6)는 3실점 + 체력 ≤29%, 6회·8회 이상은 이닝 2실점', () => {
-    expect(
-      judgePitcherChange({ ...기본, inningIndex: 6, runsAllowed: 3, stamina: 2900 }).replace,
-    ).toBe(true)
+    expect(judgePitcherChange({ ...기본, inningIndex: 6, runsAllowed: 3, stamina: 2900 }).replace).toBe(true)
     // 0-기준 5 = 6회, 0-기준 7 = 8회 — 둘 다 A>1
     expect(judgePitcherChange({ ...기본, inningIndex: 5, inningRunsAllowed: 2 }).replace).toBe(true)
     expect(judgePitcherChange({ ...기본, inningIndex: 7, inningRunsAllowed: 2 }).replace).toBe(true)
@@ -71,8 +65,7 @@ describe('CPU 투수 교체 판정 0xac428', () => {
 
   it('9회 이후 0<리드≤5 이고 (리드≤3 또는 리드≤주자수+2) 면 마무리 상황이다', () => {
     const 상황 = (lead: number, runnerCount: number) =>
-      judgePitcherChange({ ...기본, inningIndex: 8, inningRunsAllowed: 2, lead, runnerCount })
-        .saveSituation
+      judgePitcherChange({ ...기본, inningIndex: 8, inningRunsAllowed: 2, lead, runnerCount }).saveSituation
     expect(상황(3, 0)).toBe(true)
     expect(상황(5, 3)).toBe(true)
     expect(상황(5, 0)).toBe(false)
@@ -150,10 +143,7 @@ describe('마무리 투입 굴림 0xac360', () => {
   })
 
   it('두 팀 다 CPU 면 굴리지 않는다 (0xb6c20)', () => {
-    const 굴림 = rollsCloser(
-      { inningIndex: 8, lead: 1, runnerCount: 0, bothTeamsAreCpu: true },
-      createSeededRandom(1),
-    )
+    const 굴림 = rollsCloser({ inningIndex: 8, lead: 1, runnerCount: 0, bothTeamsAreCpu: true }, createSeededRandom(1))
     expect(굴림).toBe(false)
   })
 })
@@ -188,17 +178,21 @@ describe('새 투수 고르기 0xabfcc', () => {
   it('마선수는 어느 보직 목록에도 안 든다 — 보직을 몰라도 (ac084 0xb633c)', () => {
     expect(
       chooseReplacementPitcher(
-        [{ index: 2, isSpecialPitcher: true }, { index: 3, stamina: 100 }],
+        [
+          { index: 2, isSpecialPitcher: true },
+          { index: 3, stamina: 100 },
+        ],
         { inningIndex: 3, currentStamina: 0 },
       ),
     ).toBe(3)
-    expect(
-      chooseReplacementPitcher([{ index: 8, isSpecialPitcher: true }], { inningIndex: 3, currentStamina: 0 }),
-    ).toBe(-1)
+    expect(chooseReplacementPitcher([{ index: 8, isSpecialPitcher: true }], { inningIndex: 3, currentStamina: 0 })).toBe(-1)
   })
 
   it('내 육성 선수(0xb6388)는 넷째 인자(모드 3)가 설 때만 거른다', () => {
-    const 후보 = [{ index: 8, isOwnPlayer: true }, { index: 3, stamina: 100 }]
+    const 후보 = [
+      { index: 8, isOwnPlayer: true },
+      { index: 3, stamina: 100 },
+    ]
     expect(chooseReplacementPitcher(후보, { inningIndex: 3, currentStamina: 0 })).toBe(8)
     expect(chooseReplacementPitcher(후보, { inningIndex: 3, currentStamina: 0, excludeOwnPlayers: true })).toBe(3)
   })
@@ -214,23 +208,27 @@ describe('새 투수 고르기 0xabfcc', () => {
     const 벤치 = (slots: number[], stamina: (slot: number) => number = () => FULL_STAMINA) =>
       slots.map((index) => ({ index, role: rosterPitcherRoleOf(index), stamina: stamina(index) }))
     expect(
-      chooseReplacementPitcher(벤치([1, 2, 3, 4, 5, 6, 7], (slot) => (slot === 5 ? FULL_STAMINA : 5000)), {
-        inningIndex: 3,
-        currentStamina: 5000,
-      }),
+      chooseReplacementPitcher(
+        벤치([1, 2, 3, 4, 5, 6, 7], (slot) => (slot === 5 ? FULL_STAMINA : 5000)),
+        {
+          inningIndex: 3,
+          currentStamina: 5000,
+        },
+      ),
     ).toBe(5)
     expect(chooseReplacementPitcher(벤치([1, 2, 3, 7]), { inningIndex: 3, currentStamina: 5000 })).toBe(7)
     // 마무리 스태미나 ≤ 30 이고 마운드 투수가 아직 남았으면 마무리를 건너뛰고 선발 끝
     expect(
-      chooseReplacementPitcher(벤치([1, 2, 3, 7], (slot) => (slot === 7 ? 30 : FULL_STAMINA)), {
-        inningIndex: 3,
-        currentStamina: 5000,
-      }),
+      chooseReplacementPitcher(
+        벤치([1, 2, 3, 7], (slot) => (slot === 7 ? 30 : FULL_STAMINA)),
+        {
+          inningIndex: 3,
+          currentStamina: 5000,
+        },
+      ),
     ).toBe(3)
     // 9회 이후 마무리 플래그면 마무리부터
-    expect(
-      chooseReplacementPitcher(벤치([1, 4, 7]), { inningIndex: 8, lateInningFlag: true, currentStamina: 5000 }),
-    ).toBe(7)
+    expect(chooseReplacementPitcher(벤치([1, 4, 7]), { inningIndex: 8, lateInningFlag: true, currentStamina: 5000 })).toBe(7)
     expect(chooseReplacementPitcher(벤치([1, 4, 7]), { inningIndex: 8, currentStamina: 5000 })).toBe(4)
   })
 
@@ -242,10 +240,16 @@ describe('새 투수 고르기 0xabfcc', () => {
       }),
     ).toBe(2)
     expect(
-      chooseReplacementPitcher([{ index: 2, stamina: 100 }, { index: 3, stamina: 9000 }], {
-        inningIndex: 3,
-        currentStamina: 0,
-      }),
+      chooseReplacementPitcher(
+        [
+          { index: 2, stamina: 100 },
+          { index: 3, stamina: 9000 },
+        ],
+        {
+          inningIndex: 3,
+          currentStamina: 0,
+        },
+      ),
     ).toBe(3)
   })
 
@@ -265,9 +269,7 @@ describe('새 투수 고르기 0xabfcc', () => {
     // 능력 합이 가장 큰 후보가 스태미나 ≤ 30 이면 다음 후보
     expect(chooseReplacementPitcher([마무리(6, 2000, FULL_STAMINA), 마무리(7, 2400, 30)], 입력)).toBe(6)
     // 마운드 투수가 다 지쳤으면(+0x2c ≤ 0) 스태미나를 안 보고 능력 합 첫 후보
-    expect(
-      chooseReplacementPitcher([마무리(6, 2000, FULL_STAMINA), 마무리(7, 2400, 30)], { ...입력, currentStamina: 0 }),
-    ).toBe(7)
+    expect(chooseReplacementPitcher([마무리(6, 2000, FULL_STAMINA), 마무리(7, 2400, 30)], { ...입력, currentStamina: 0 })).toBe(7)
     // 같은 합이면 벤치 차례 그대로 (거품 정렬은 `<` 일 때만 맞바꾼다)
     expect(chooseReplacementPitcher([마무리(7, 2400, 4000), 마무리(6, 2400, FULL_STAMINA)], 입력)).toBe(7)
   })
@@ -316,46 +318,24 @@ describe('새 투수 고르기 앞의 갈림길 0xac5d8', () => {
   })
 
   it('마무리 상황이 아니고 벤치에 마선수가 있고 굴림에 이기면 벤치 **마지막**을 올린다', () => {
-    expect(
-      replacementPitcherSlotOf(후보, { ...기본상황, saveSituation: false }, 고정난수(0)),
-    ).toBe(5)
+    expect(replacementPitcherSlotOf(후보, { ...기본상황, saveSituation: false }, 고정난수(0))).toBe(5)
     // 굴림에 지면 0xabfcc — 마선수는 거른다
-    expect(
-      replacementPitcherSlotOf(후보, { ...기본상황, saveSituation: false }, 고정난수(0.99)),
-    ).toBe(2)
+    expect(replacementPitcherSlotOf(후보, { ...기본상황, saveSituation: false }, 고정난수(0.99))).toBe(2)
   })
 
   it('벤치에 마선수가 없으면(0xb8a8d 거짓) 굴리지 않는다', () => {
     const 굴림 = 세는(0)
-    expect(
-      replacementPitcherSlotOf(
-        [{ index: 2 }, { index: 3 }, { index: 5 }],
-        { ...기본상황, saveSituation: false },
-        굴림.random,
-      ),
-    ).toBe(2)
+    expect(replacementPitcherSlotOf([{ index: 2 }, { index: 3 }, { index: 5 }], { ...기본상황, saveSituation: false }, 굴림.random)).toBe(2)
     expect(굴림.calls()).toBe(0)
   })
 
   it('굴림에 지고 벤치가 하나면 0xabfcc 없이 0번 — 그 하나가 마선수여도 (ac604)', () => {
-    expect(
-      replacementPitcherSlotOf(
-        [{ index: 8, isSpecialPitcher: true }],
-        { ...기본상황, saveSituation: false },
-        고정난수(0.99),
-      ),
-    ).toBe(8)
+    expect(replacementPitcherSlotOf([{ index: 8, isSpecialPitcher: true }], { ...기본상황, saveSituation: false }, 고정난수(0.99))).toBe(8)
   })
 
   it('두 팀 다 CPU 면 0xac360 이 난수 없이 거짓이라 늘 0xabfcc 다 (0xb6c20 — 리그 CPU 경기)', () => {
     const 굴림 = 세는(0)
-    expect(
-      replacementPitcherSlotOf(
-        후보,
-        { ...기본상황, saveSituation: false, bothTeamsAreCpu: true },
-        굴림.random,
-      ),
-    ).toBe(2)
+    expect(replacementPitcherSlotOf(후보, { ...기본상황, saveSituation: false, bothTeamsAreCpu: true }, 굴림.random)).toBe(2)
     expect(굴림.calls()).toBe(0)
   })
 
@@ -365,9 +345,7 @@ describe('새 투수 고르기 앞의 갈림길 0xac5d8', () => {
     let 차례 = 0
     const 값 = [0, 0, 0.99]
     const random: RandomPort = createFractionRandom(() => 값[Math.min(차례++, 값.length - 1)])
-    expect(
-      replacementPitcherSlotOf(벤치, { ...기본상황, saveSituation: false, excludeOwnPlayers: true }, random),
-    ).toBe(2)
+    expect(replacementPitcherSlotOf(벤치, { ...기본상황, saveSituation: false, excludeOwnPlayers: true }, random)).toBe(2)
     expect(차례).toBe(3)
   })
 

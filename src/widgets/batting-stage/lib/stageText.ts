@@ -35,11 +35,7 @@ export function describeResolution(detail: PitchOutcomeDetail): string {
  * (`clearsPitchJudgement`). 진입이 그림보다 먼저라 웹도 공 도착 판을 연 뒤의 값(`judgementCleared`)으로 고른다(r213) —
  * 타자편 타석은 `onPitchResolved` 의 답, 사람이 던지는 타석은 진행기 칸(`lastPitchJudgementCleared` 따위)이 싣는다.
  */
-export function judgeTextOf(
-  resolution: PitchOutcomeDetail['resolution'],
-  endsAtBat: boolean,
-  judgementCleared = false,
-): string {
+export function judgeTextOf(resolution: PitchOutcomeDetail['resolution'], endsAtBat: boolean, judgementCleared = false): string {
   if (endsAtBat && resolution.kind === '스트라이크') return judgementCleared ? '' : '삼진'
   if (endsAtBat && resolution.kind === '볼') return '볼넷'
   return describePitchResolution(resolution)
@@ -56,7 +52,6 @@ export interface PitchResolvedReply {
 
 /** 판정 하나의 문구 — 공 판정만 아는 화면(사람이 던지는 타석 `PitcherSideStage`)이 쓴다 */
 export function describePitchResolution(resolution: PitchOutcomeDetail['resolution']): string {
-
   switch (resolution.kind) {
     case '볼':
       return '볼'

@@ -250,8 +250,7 @@ describe('경기진행 설정', () => {
 })
 
 describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
-  const 줄이름 = (index: number) =>
-    screen.getByTestId(`엔트리-칸-${index}-이름`).getAttribute('aria-label') ?? ''
+  const 줄이름 = (index: number) => screen.getByTestId(`엔트리-칸-${index}-이름`).getAttribute('aria-label') ?? ''
   // 빠른실행 22 는 들어올 때 연출이 있어 머리띠 5 · 배너 4 · 값 줄 펼침 8 그림 뒤(그림 16)부터 키를 받는다 (0x311b2)
   const 연출_뒤_띄우기 = (overrides: Partial<Props>) => {
     vi.useFakeTimers()
@@ -264,9 +263,10 @@ describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
     vi.useRealTimers()
   })
   /** 22 ↔ 23 은 화면 밀기(A-68) — 다섯 그림 동안 키를 버리니(0x246d8) 다 밀린 뒤 누른다 */
-  const 밀기_지남 = () => act(() => {
-    vi.advanceTimersByTime(millisecondsPerFrame() * 6)
-  })
+  const 밀기_지남 = () =>
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 6)
+    })
 
   it("'4' 로 유저 팀 투수 엔트리를 열고, 0번과 2번을 바꾸면 경기정보 선발이 바뀐다 — '6' 으로 돌아온다", () => {
     연출_뒤_띄우기({ isQuickStart: true })
@@ -281,7 +281,7 @@ describe('엔트리 편집 (상태 23, 편집기 0x55864)', () => {
     expect(screen.getByTestId('경기정보-선발-유저').textContent).toBe(둘째)
   })
 
-  it("22 → 23 은 화면 밀기(0xbdae9 종류 8, A-68) — 미는 다섯 그림 동안 키를 버린다(0x246d8)", () => {
+  it('22 → 23 은 화면 밀기(0xbdae9 종류 8, A-68) — 미는 다섯 그림 동안 키를 버린다(0x246d8)', () => {
     연출_뒤_띄우기({ isQuickStart: true })
     fireEvent.keyDown(window, { key: '4' })
     // 떠 둔 22 가 새 23 위에 겹친다

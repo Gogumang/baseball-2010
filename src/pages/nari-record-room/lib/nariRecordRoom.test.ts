@@ -3,9 +3,23 @@ import { createCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import { EMPTY_PITCHER_SEASON_STATS, createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
-  BATTER_YEAR_COLUMNS, OPEN_YEAR_RECORD_VIEW, PITCHER_YEAR_COLUMNS, advanceYearSlide, batterYearCellTextOf, batterYearRowsOf,
-  nariBatterRankingRecordsOf, pitcherYearCellTextOf, pitcherYearRowsOf, pressYearRecordKey, yearSlideOffsetOf,
-  visibleYearRowCountOf, yearArrowBlinkOf, yearCellDrawingOf, yearCursorIsInsetOf, yearLabelOffsetOf, yearNumberGlyphsOf,
+  BATTER_YEAR_COLUMNS,
+  OPEN_YEAR_RECORD_VIEW,
+  PITCHER_YEAR_COLUMNS,
+  advanceYearSlide,
+  batterYearCellTextOf,
+  batterYearRowsOf,
+  nariBatterRankingRecordsOf,
+  pitcherYearCellTextOf,
+  pitcherYearRowsOf,
+  pressYearRecordKey,
+  yearSlideOffsetOf,
+  visibleYearRowCountOf,
+  yearArrowBlinkOf,
+  yearCellDrawingOf,
+  yearCursorIsInsetOf,
+  yearLabelOffsetOf,
+  yearNumberGlyphsOf,
 } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import type { YearRecordView } from '@/pages/nari-record-room/lib/nariRecordRoom'
 
@@ -35,11 +49,28 @@ describe('124 첫 갈래 — 연도별 기록 (0x5761c · 0x5c984)', () => {
   })
 
   it('투수 칸 — 방어율은 소수((v > 100 ? v × 10 : v), 3) · 이닝은 아웃 / 3 · 사사구는 +0x2a', () => {
-    const stats = { ...EMPTY_PITCHER_SEASON_STATS, outs: 100, runsAllowed: 13, wins: 7, losses: 3, saves: 1, strikeouts: 55, pitches: 1500, walks: 21 }
+    const stats = {
+      ...EMPTY_PITCHER_SEASON_STATS,
+      outs: 100,
+      runsAllowed: 13,
+      wins: 7,
+      losses: 3,
+      saves: 1,
+      strikeouts: 55,
+      pitches: 1500,
+      walks: 21,
+    }
     // 13 × 2700 / 100 = 351 → 3510 → "3.51"
     expect(pitcherYearCellTextOf(stats, 0x100)).toBe('3.51')
-    expect([0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000].map((bit) => pitcherYearCellTextOf(stats, bit)))
-      .toEqual(['33', '13', '7', '3', '1', '55', '1500'])
+    expect([0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000].map((bit) => pitcherYearCellTextOf(stats, bit))).toEqual([
+      '33',
+      '13',
+      '7',
+      '3',
+      '1',
+      '55',
+      '1500',
+    ])
     expect(pitcherYearCellTextOf(stats, 0x10000)).toBe('21')
     // 옛 저장(칸 없음)은 0
     const { walks: _walks, ...old } = stats
@@ -105,21 +136,37 @@ describe('124 첫 갈래 키 — 0x55864 보기 전용 · [편집기+0x337] 열 
 describe('124 칸 그림 — 0x5c984 · 0x5658c · 0x56ebc · 0x6aff8 · 0xba51c', () => {
   it('번호 열 — num 0x1e + 숫자를 25 칸 가운데 (x += (25 − 합) >> 1)', () => {
     expect(yearNumberGlyphsOf(1)).toEqual([{ frame: 31, x: 10 }])
-    expect(yearNumberGlyphsOf(12)).toEqual([{ frame: 31, x: 7 }, { frame: 32, x: 11 }])
+    expect(yearNumberGlyphsOf(12)).toEqual([
+      { frame: 31, x: 7 },
+      { frame: 32, x: 11 },
+    ])
   })
 
   it('넘기는 칸 숫자 — 자릿수 −1 은 오른쪽 자리(x + 24)부터 7 씩 왼쪽으로, 0 도 한 자리', () => {
     expect(yearCellDrawingOf({ value: 0, digits: -1, isDecimal: false })).toEqual({ glyphs: [{ frame: 20, x: 24 }], dots: [] })
-    expect(yearCellDrawingOf({ value: 105, digits: -1, isDecimal: false }).glyphs)
-      .toEqual([{ frame: 25, x: 24 }, { frame: 20, x: 17 }, { frame: 21, x: 10 }])
+    expect(yearCellDrawingOf({ value: 105, digits: -1, isDecimal: false }).glyphs).toEqual([
+      { frame: 25, x: 24 },
+      { frame: 20, x: 17 },
+      { frame: 21, x: 10 },
+    ])
   })
 
   it('소수점 갈래 — 타율 315 는 ".315" · 1000 은 "1.00" · 방어율 3510 은 "3.51" (점은 그 자리 왼쪽 3, 뒤 자리 3 더 밀림)', () => {
     expect(yearCellDrawingOf({ value: 315, digits: 0, isDecimal: true })).toEqual({
-      glyphs: [{ frame: 25, x: 24 }, { frame: 21, x: 17 }, { frame: 23, x: 10 }], dots: [{ x: 7, y: 11 }],
+      glyphs: [
+        { frame: 25, x: 24 },
+        { frame: 21, x: 17 },
+        { frame: 23, x: 10 },
+      ],
+      dots: [{ x: 7, y: 11 }],
     })
     expect(yearCellDrawingOf({ value: 1000, digits: 3, isDecimal: true })).toEqual({
-      glyphs: [{ frame: 20, x: 24 }, { frame: 20, x: 17 }, { frame: 21, x: 7 }], dots: [{ x: 14, y: 11 }],
+      glyphs: [
+        { frame: 20, x: 24 },
+        { frame: 20, x: 17 },
+        { frame: 21, x: 7 },
+      ],
+      dots: [{ x: 14, y: 11 }],
     })
     expect(yearCellDrawingOf({ value: 3510, digits: 3, isDecimal: true }).glyphs.map((glyph) => glyph.frame - 20)).toEqual([1, 5, 3])
   })

@@ -14,9 +14,7 @@ import {
   countSeasonRegularWin,
 } from '@/entities/collection/model/collection'
 import type { Collection, EndingViewer, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
-import {
-  applyAnnalsStat, earnedGamePointHiddenIdOf, GAME_POINT_USAGE, playTimeHiddenIdOf,
-} from '@/entities/collection/model/annalsStats'
+import { applyAnnalsStat, earnedGamePointHiddenIdOf, GAME_POINT_USAGE, playTimeHiddenIdOf } from '@/entities/collection/model/annalsStats'
 import { hiddenOpenStoredIdOf } from '@/entities/collection/model/hiddenOpenNotice'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -25,8 +23,12 @@ import { equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitche
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import {
-  collectionRewardGamePointOf, collectionRewardStatModeOf, collectionRewardTextOf, judgeCollectionReward,
-  normalizeCollectionRewardRecord, withAwardedBit,
+  collectionRewardGamePointOf,
+  collectionRewardStatModeOf,
+  collectionRewardTextOf,
+  judgeCollectionReward,
+  normalizeCollectionRewardRecord,
+  withAwardedBit,
 } from '@/entities/collection/model/collectionRewards'
 
 const NO_IDS: readonly number[] = []
@@ -50,9 +52,7 @@ export interface CollectionRewardWallet {
  * 원본 해금표는 모드와 상관없는 전역 `app+0xc0`(0x9f69c / 0x62368) 하나다.
  */
 export function mergeOpenedHiddenIds(collection: Collection, openedHiddenIds: readonly number[]): Collection {
-  const missing = openedHiddenIds.filter(
-    (id, index) => !collection.openedHiddenIds.includes(id) && openedHiddenIds.indexOf(id) === index,
-  )
+  const missing = openedHiddenIds.filter((id, index) => !collection.openedHiddenIds.includes(id) && openedHiddenIds.indexOf(id) === index)
   return missing.length === 0 ? collection : { ...collection, openedHiddenIds: [...collection.openedHiddenIds, ...missing] }
 }
 
@@ -114,8 +114,7 @@ export function useCollection(
   const pitcherEndingIndex = pitcherEnding?.endingIndex ?? null
   const pitcherSeenEventIds = pitcherEnding?.seenEventIds ?? NO_EVENTS
   useEffect(() => {
-    setCollection((previous) =>
-      mergeEndingIntoCollection(previous, { endingIndex: pitcherEndingIndex, seenEventIds: pitcherSeenEventIds }))
+    setCollection((previous) => mergeEndingIntoCollection(previous, { endingIndex: pitcherEndingIndex, seenEventIds: pitcherSeenEventIds }))
   }, [pitcherEndingIndex, pitcherSeenEventIds])
 
   useEffect(() => {
@@ -167,16 +166,18 @@ export function useCollection(
     if (collectionRef.current.openedHiddenIds.includes(stored) || openingRef.current.has(stored)) return false
     openingRef.current.add(stored)
     setCollection((previous) =>
-      previous.openedHiddenIds.includes(stored)
-        ? previous
-        : { ...previous, openedHiddenIds: [...previous.openedHiddenIds, stored] })
+      previous.openedHiddenIds.includes(stored) ? previous : { ...previous, openedHiddenIds: [...previous.openedHiddenIds, stored] },
+    )
     return true
   }, [])
-  const openHidden = useCallback((id: number, then: (() => void) | null = null): boolean => {
-    if (!openHiddenQuietly(id)) return false
-    announceRef.current([id], then)
-    return true
-  }, [openHiddenQuietly])
+  const openHidden = useCallback(
+    (id: number, then: (() => void) | null = null): boolean => {
+      if (!openHiddenQuietly(id)) return false
+      announceRef.current([id], then)
+      return true
+    },
+    [openHiddenQuietly],
+  )
 
   /**
    * 시즌모드 정규시즌 경기 승리 (0x4ea0c 4f1e8~4f212) — 전역기록 +0xbf 를 올리고(100 상한) 100 이면 히든 45
@@ -192,21 +193,24 @@ export function useCollection(
   const readStats = useCallback(() => statsRef.current, [])
 
   /** 통계 기록 `[mgr+0xc8]` 에 한 건 쌓는다 (0x22e35 · 0x22c29 · 0xb663c) — 원본도 곧바로 저장(0x1f1e1)한다 */
-  const recordStat = useCallback((event: AnnalsStatEvent) => {
-    setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
-    statsRef.current = applyAnnalsStat(statsRef.current, event)
-    if (event.kind === '기록달성') {
-      // 정산 0x4ea0c 4eca0~4ecda — 0x22c7d · 0x22e10(이 사건) · 0x1f1e1 바로 뒤 획득 GP 일곱 칸 합 > 99998 이면 히든 33.
-      // 이 사건은 정산(모드 5 · 6 제외) 자리에서만 난다
-      const earnedId = earnedGamePointHiddenIdOf(statsRef.current)
-      if (earnedId !== null) openHidden(earnedId)
-      return
-    }
-    if (event.kind !== '플레이시간') return
-    // 0x4e8b0 끝 — 모드 3 · 4 의 그 칸이 10시간을 넘으면 0x62368(ui, 31 · 47, 0) — 열기 + 알림 창. 문턱은 더한 뒤 값으로 본다
-    const hiddenId = playTimeHiddenIdOf(statsRef.current, event.mode)
-    if (hiddenId !== null) openHidden(hiddenId)
-  }, [openHidden])
+  const recordStat = useCallback(
+    (event: AnnalsStatEvent) => {
+      setCollection((previous) => ({ ...previous, stats: applyAnnalsStat(previous.stats, event) }))
+      statsRef.current = applyAnnalsStat(statsRef.current, event)
+      if (event.kind === '기록달성') {
+        // 정산 0x4ea0c 4eca0~4ecda — 0x22c7d · 0x22e10(이 사건) · 0x1f1e1 바로 뒤 획득 GP 일곱 칸 합 > 99998 이면 히든 33.
+        // 이 사건은 정산(모드 5 · 6 제외) 자리에서만 난다
+        const earnedId = earnedGamePointHiddenIdOf(statsRef.current)
+        if (earnedId !== null) openHidden(earnedId)
+        return
+      }
+      if (event.kind !== '플레이시간') return
+      // 0x4e8b0 끝 — 모드 3 · 4 의 그 칸이 10시간을 넘으면 0x62368(ui, 31 · 47, 0) — 열기 + 알림 창. 문턱은 더한 뒤 값으로 본다
+      const hiddenId = playTimeHiddenIdOf(statsRef.current, event.mode)
+      if (hiddenId !== null) openHidden(hiddenId)
+    },
+    [openHidden],
+  )
 
   /**
    * **전부 수집 보상** — 메인 메뉴 하위 4 갱신 0x29454 가 그 상태 열 번째 갱신([this+0x2c] == 10)에서 부른다:
@@ -235,10 +239,11 @@ export function useCollection(
       // 판정 쪽 0x22dd5 → 팝업 쪽 0x22c7d 차례 그대로 쌓는다 (다음 판정은 이 두 칸을 안 본다)
       setCollection((previous) => ({
         ...previous,
-        stats: applyAnnalsStat(
-          applyAnnalsStat(previous.stats, { kind: '달성표시', index: kind }),
-          { kind: 'G획득', mode: collectionRewardStatModeOf(kind), amount },
-        ),
+        stats: applyAnnalsStat(applyAnnalsStat(previous.stats, { kind: '달성표시', index: kind }), {
+          kind: 'G획득',
+          mode: collectionRewardStatModeOf(kind),
+          amount,
+        }),
       }))
       rewardStore.save(withAwardedBit(record, kind))
       wallet.gain(amount)
@@ -248,8 +253,17 @@ export function useCollection(
   )
 
   return {
-    collection, register, registerPitcher, deleteHallOfFamer, syncSeasonHallOfFameEquipment, syncSeasonHallOfFameRecruit, recordStat, claimCollectionReward,
-    openHidden, openHiddenQuietly, recordSeasonRegularWin,
+    collection,
+    register,
+    registerPitcher,
+    deleteHallOfFamer,
+    syncSeasonHallOfFameEquipment,
+    syncSeasonHallOfFameRecruit,
+    recordStat,
+    claimCollectionReward,
+    openHidden,
+    openHiddenQuietly,
+    recordSeasonRegularWin,
     /** 기록달성 누계 해금 0x62234 가 문턱에 견주는 지금 통계 (렌더를 기다리지 않는다) */
     readStats,
   }

@@ -39,12 +39,7 @@ import {
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
-import {
-  EMPTY_SEASON_STATS,
-  mergeStats,
-  recordGamePlayed,
-  withoutRecordLine,
-} from '@/entities/career/model/seasonStats'
+import { EMPTY_SEASON_STATS, mergeStats, recordGamePlayed, withoutRecordLine } from '@/entities/career/model/seasonStats'
 import type { SeasonStats } from '@/entities/career/model/seasonStats'
 import { ROOKIE_BATTER_SLOT, nariTeamsOf, withCpuGameRecordAces } from '@/entities/career/model/nariTeamRecord'
 import { nariLeagueTeamRecordOf, rollNariCpuEquipment } from '@/entities/career/model/nariCpuEquipment'
@@ -486,9 +481,7 @@ const ROOKIE_POSITION_BONUS = BALANCE.ability.rookiePositionBonus
 
 export function rookieAbilityOf(battingTypeIndex: number, positionIndex: number): BatterAbility {
   const base = ROOKIE_ABILITY_BY_TYPE[battingTypeIndex] ?? ROOKIE_ABILITY_BY_TYPE[0]
-  return positionIndex === 0
-    ? { ...base, defense: base.defense + ROOKIE_POSITION_BONUS }
-    : { ...base, run: base.run + ROOKIE_POSITION_BONUS }
+  return positionIndex === 0 ? { ...base, defense: base.defense + ROOKIE_POSITION_BONUS } : { ...base, run: base.run + ROOKIE_POSITION_BONUS }
 }
 
 /** 등록 화면 기본 선택(0, 0)의 능력치 */
@@ -683,13 +676,9 @@ export function countSkillGameCounters(
   input: { readonly hasHelpless: boolean; readonly hasMoneyGrubber: boolean; readonly morale: number; readonly popularityChange: number },
 ): SkillGameCounters {
   return {
-    highMoraleStreak: !input.hasHelpless
-      ? counters.highMoraleStreak
-      : input.morale >= HIGH_MORALE ? toInt8(counters.highMoraleStreak + 1) : 0,
+    highMoraleStreak: !input.hasHelpless ? counters.highMoraleStreak : input.morale >= HIGH_MORALE ? toInt8(counters.highMoraleStreak + 1) : 0,
     moneyGrubberGames: input.hasMoneyGrubber ? toInt8(counters.moneyGrubberGames + 1) : 0,
-    moneyGrubberPopularityGain: input.hasMoneyGrubber
-      ? toInt16(counters.moneyGrubberPopularityGain + toInt8(input.popularityChange))
-      : 0,
+    moneyGrubberPopularityGain: input.hasMoneyGrubber ? toInt16(counters.moneyGrubberPopularityGain + toInt8(input.popularityChange)) : 0,
   }
 }
 
@@ -699,10 +688,7 @@ export function countSkillGameCounters(
  *   +0x1c7 무력감 보유 중 "경기 뒤 사기 ≥ 90" 연속 경기 수 (`countSkillGameCounters`)
  * 먹튀 카운터는 그 스킬이 **없으면 0** 으로 되돌리고, 무력감 카운터는 없으면 **그대로 둔다**(12bee~12bfc).
  */
-export function countGameForSkills(
-  career: PlayerCareer,
-  popularityChange: number,
-): PlayerCareer {
+export function countGameForSkills(career: PlayerCareer, popularityChange: number): PlayerCareer {
   return {
     ...career,
     seasonPopularityGain: addSeasonPopularityGain(career.seasonPopularityGain, popularityChange),
@@ -732,10 +718,7 @@ export function seasonTrainingCountOf(career: PlayerCareer, menuId: string): num
 
 /** 이번 시즌 훈련 수 합계 */
 export function seasonTrainingTotalOf(career: PlayerCareer): number {
-  return Object.keys(career.trainingCounts).reduce(
-    (total, menuId) => total + seasonTrainingCountOf(career, menuId),
-    0,
-  )
+  return Object.keys(career.trainingCounts).reduce((total, menuId) => total + seasonTrainingCountOf(career, menuId), 0)
 }
 
 export function gainPopularity(career: PlayerCareer, amount: number): PlayerCareer {
@@ -822,11 +805,7 @@ export function equippedPlusSkillCountOf(career: Pick<PlayerCareer, 'equippedSki
  *    (`markSkillEquipped`), 부르는 자리는 세션의 장착 비교 효과 · 등록(`skillEquipStatEventsOf`)이다.
  * ⚠️ 모드 4 면 팀 로스터 칸(0xb53d1)에도 켠다(같은 칸인지 유력).
  */
-export function setSkillEquipped<T extends Pick<PlayerCareer, 'equippedSkillIds' | 'skillSlotLevel'>>(
-  career: T,
-  skillId: number,
-  on: boolean,
-): T {
+export function setSkillEquipped<T extends Pick<PlayerCareer, 'equippedSkillIds' | 'skillSlotLevel'>>(career: T, skillId: number, on: boolean): T {
   if (!on) {
     if (!isSkillEquipped(career, skillId)) return career
     return { ...career, equippedSkillIds: career.equippedSkillIds.filter((id) => id !== skillId) }
@@ -889,30 +868,27 @@ export function applySkillReward<T extends SkillRewardCareer>(career: T, value: 
   const removed = MINUS_SKILL_IDS.includes(skillId) && !career.removedMinusSkillIds.includes(skillId)
   // 제거 0xa4430 = 가졌으면 보유 비트를 끄고, 가졌든 안 가졌든 0xb66dd 로 장착을 끄고 해제 기록(0xa43fc)을 남긴다
   if (!owns && !removed && !isSkillEquipped(career, skillId)) return career
-  return setSkillEquipped({
-    ...career,
-    skillIds: owns ? career.skillIds.filter((id) => id !== skillId) : career.skillIds,
-    removedMinusSkillIds: removed ? [...career.removedMinusSkillIds, skillId] : career.removedMinusSkillIds,
-  }, skillId, false)
+  return setSkillEquipped(
+    {
+      ...career,
+      skillIds: owns ? career.skillIds.filter((id) => id !== skillId) : career.skillIds,
+      removedMinusSkillIds: removed ? [...career.removedMinusSkillIds, skillId] : career.removedMinusSkillIds,
+    },
+    skillId,
+    false,
+  )
 }
 
 export function affectionOf(career: PlayerCareer, heroineId: string): number {
   return career.affection[heroineId] ?? 0
 }
 
-export function gainAffection(
-  career: PlayerCareer,
-  heroineId: string,
-  amount: number,
-): PlayerCareer {
+export function gainAffection(career: PlayerCareer, heroineId: string, amount: number): PlayerCareer {
   const next = clamp(affectionOf(career, heroineId) + amount, 0, MAXIMUM_AFFECTION)
   return { ...career, affection: { ...career.affection, [heroineId]: next } }
 }
 
-export function gainAbility(
-  career: PlayerCareer,
-  gains: Partial<BatterAbility>,
-): PlayerCareer {
+export function gainAbility(career: PlayerCareer, gains: Partial<BatterAbility>): PlayerCareer {
   return {
     ...career,
     ability: {
@@ -956,9 +932,9 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
         recordHumanGamePitchers(
           recordLeagueStolenBases(
             // 동료 · 상대 타석의 레코드 줄도 같은 게이트(0xa56dc — 타자마다)라 포스트시즌이면 안 쌓인다
-            recordLeaguePlateAppearances(career.leaguePlayerStats, regularSeason ? summary.leaguePlateAppearances ?? [] : []),
+            recordLeaguePlateAppearances(career.leaguePlayerStats, regularSeason ? (summary.leaguePlateAppearances ?? []) : []),
             // 도루 +0x2c 의 게이트 0xa56dc(c1a42)는 모드 4 포스트시즌이면 거짓 — 정규시즌 경기만
-            regularSeason ? summary.leagueStolenBases ?? [] : [],
+            regularSeason ? (summary.leagueStolenBases ?? []) : [],
           ),
           summary.leaguePitchers,
           regularSeason,
@@ -994,10 +970,7 @@ export function applyGameResult(career: PlayerCareer, summary: GameSummary): Pla
     postseason:
       career.postseason === null
         ? career.postseason
-        : advancePostseason(
-            career.postseason,
-            summary.result === '승' ? summary.ourTeamId : summary.opponentTeamId,
-          ),
+        : advancePostseason(career.postseason, summary.result === '승' ? summary.ourTeamId : summary.opponentTeamId),
     wins: career.wins + (summary.result === '승' ? 1 : 0),
     losses: career.losses + (summary.result === '승' ? 0 : 1),
   }
@@ -1083,11 +1056,7 @@ export function leagueGamePitchersOf(
  * 대진 128 [확인]의 CPU 끼리 포스트시즌(0x13da0 → 0xc2760) — 리그 표의 +0x2c 로 서고 깎인 값을 남긴다(회복 없음).
  * 내 차례이거나 끝난 대진이면 그대로다.
  */
-export function applyPostseasonCpuGames(
-  career: PlayerCareer,
-  random: RandomPort,
-  aceLevels?: Readonly<Record<number, number>>,
-): PlayerCareer {
+export function applyPostseasonCpuGames(career: PlayerCareer, random: RandomPort, aceLevels?: Readonly<Record<number, number>>): PlayerCareer {
   if (career.postseason === null) return career
   const result = runCpuPostseasonWithStamina(
     career.postseason,
@@ -1267,9 +1236,7 @@ function startNextSeasonRecords(career: PlayerCareer): PlayerCareer {
     // 승패는 비우되 **투수 레코드 차례는 잇는다** — 새 시즌 처리는 팀 저장 레코드를 다시 짓지 않아 지난 시즌·포스트시즌에
     // 섞인 차례가 그대로 남는다 (`nextSeasonLeague`). 레코드 +0x2c 는 첫 경기 준비(g == 0)가 열 팀 10000 으로 채운다
     league: nextSeasonLeague(
-      career.postseason === null
-        ? career.league.pitcherOrders
-        : pitcherOrdersAfterPostseason(career.postseason, career.league.pitcherOrders),
+      career.postseason === null ? career.league.pitcherOrders : pitcherOrdersAfterPostseason(career.postseason, career.league.pitcherOrders),
     ),
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,

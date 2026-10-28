@@ -19,12 +19,7 @@ import { runSceneKeys, type SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sce
  * 52da2~ 상태 키 함수) → 갱신 표(52e14) 차례(`sceneKeyLatch`). 키 처리는 이 상태의 틱(진입 틱 0 부터 센 값)을 받는다.
  * 창이 서 있는 틀은 키 칸을 비운다(52cc6 — 다음 틀 0xbca05 가 지운다).
  */
-export function useSceneTick(
-  onTick?: (tick: number) => void,
-  isRunning = true,
-  runsUnderCommonWindow = false,
-  keyLatch?: SceneKeyLatch,
-): number {
+export function useSceneTick(onTick?: (tick: number) => void, isRunning = true, runsUnderCommonWindow = false, keyLatch?: SceneKeyLatch): number {
   const [tick, setTick] = useState(0)
   // 틱은 ref 로 센다 — setState 갱신 함수 안에서 `onTick` 을 부르면 StrictMode 가 두 번 불러
   // 굴림이 두 번 나간다

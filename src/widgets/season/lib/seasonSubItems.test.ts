@@ -8,7 +8,16 @@ describe('시즌 서브아이템 10칸 (0x81dc0 시즌 갈래)', () => {
   it('이름 StrITEM[0x6d + k] · 아이콘 0xd464e · 값 0xd45f4 × 1000 만원', () => {
     const items = seasonSubItemsOf(레코드)
     expect(items.map((item) => item.name)).toEqual([
-      '표적판', '피칭머신', 'MG스퀘어', '하드타이어', '자동안마기', '서포터스', '출장부페', '보험증서', '야구교본', '마스코트',
+      '표적판',
+      '피칭머신',
+      'MG스퀘어',
+      '하드타이어',
+      '자동안마기',
+      '서포터스',
+      '출장부페',
+      '보험증서',
+      '야구교본',
+      '마스코트',
     ])
     expect(items.map((item) => item.iconFrame)).toEqual([0, 26, 25, 3, 4, 24, 6, 7, 8, 23])
     expect(items[0].price).toBe(25000)

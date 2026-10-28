@@ -1,6 +1,4 @@
-import {
-  GAME_POINT_IMAGE, GAME_POINT_PLATE_COLOR, GAME_POINT_PLATE_EDGE, gamePointBadgeOf,
-} from '@/widgets/screen-frame/lib/gamePointBadge'
+import { GAME_POINT_IMAGE, GAME_POINT_PLATE_COLOR, GAME_POINT_PLATE_EDGE, gamePointBadgeOf } from '@/widgets/screen-frame/lib/gamePointBadge'
 import type { GamePointBadgeArgs } from '@/widgets/screen-frame/lib/gamePointBadge'
 import * as styles from '@/widgets/screen-frame/ui/ScreenFrame.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
@@ -14,7 +12,11 @@ const pointImage = (index: number) => assetUrl(`./sprites/gpoint/${String(index)
 export function GamePointBadge({ testId, ...args }: GamePointBadgeArgs & { readonly testId?: string }) {
   const badge = gamePointBadgeOf(args)
   const rectStyle = (rect: { x: number; y: number; width: number; height: number }, color: string) => ({
-    left: rect.x, top: rect.y, width: rect.width, height: rect.height, background: color,
+    left: rect.x,
+    top: rect.y,
+    width: rect.width,
+    height: rect.height,
+    background: color,
   })
   return (
     <span data-testid={testId} data-value={args.value}>
@@ -26,15 +28,31 @@ export function GamePointBadge({ testId, ...args }: GamePointBadgeArgs & { reado
           ))}
         </span>
       )}
-      <img className={styles.layer} data-badge-coin="" style={{ left: badge.coin.x, top: badge.coin.y }}
-        src={pointImage(GAME_POINT_IMAGE.coin)} alt="" />
+      <img
+        className={styles.layer}
+        data-badge-coin=""
+        style={{ left: badge.coin.x, top: badge.coin.y }}
+        src={pointImage(GAME_POINT_IMAGE.coin)}
+        alt=""
+      />
       {badge.plus !== null && (
-        <img className={styles.layer} data-badge-plus="" style={{ left: badge.plus.x, top: badge.plus.y }}
-          src={pointImage(GAME_POINT_IMAGE.plus)} alt="" />
+        <img
+          className={styles.layer}
+          data-badge-plus=""
+          style={{ left: badge.plus.x, top: badge.plus.y }}
+          src={pointImage(GAME_POINT_IMAGE.plus)}
+          alt=""
+        />
       )}
       {badge.digits.map((digit, index) => (
-        <img key={index} className={styles.layer} data-badge-digit={digit.digit} style={{ left: digit.x, top: digit.y }}
-          src={pointImage(digit.digit)} alt="" />
+        <img
+          key={index}
+          className={styles.layer}
+          data-badge-digit={digit.digit}
+          style={{ left: digit.x, top: digit.y }}
+          src={pointImage(digit.digit)}
+          alt=""
+        />
       ))}
     </span>
   )

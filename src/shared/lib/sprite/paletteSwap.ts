@@ -72,11 +72,7 @@ export function parseHexColor(text: string): readonly [number, number, number] {
  * 그 그림의 (갈아 끼운) 팔레트[번호] 로 색을 얻는다 (r134, 그리기 0xc9f98 · 표 0xda988).
  * 알파는 구운 그림 것을 그대로 두고 RGB 만 바꾼다.
  */
-export function recolorPixels(
-  color: Uint8ClampedArray,
-  index: Uint8ClampedArray,
-  palette: readonly string[],
-): Uint8ClampedArray {
+export function recolorPixels(color: Uint8ClampedArray, index: Uint8ClampedArray, palette: readonly string[]): Uint8ClampedArray {
   const table = paletteTableOf(palette)
   const output = new Uint8ClampedArray(color)
   for (let at = 0; at < output.length; at += 4) {
@@ -214,11 +210,7 @@ function paletteRowOf(palettes: SpritePalettes, paletteIndex: number): readonly 
  * 팔레트를 갈아 끼운 그림의 URL. 같은 (그림, 벌) 은 한 번만 칠한다.
  * `paletteIndex` 가 null 이거나 벌이 없으면 구운 그림을 그대로 쓴다.
  */
-export function recoloredSpriteUrl(
-  spriteUrl: string,
-  palettes: SpritePalettes | null,
-  paletteIndex: number | null,
-): Promise<string> {
+export function recoloredSpriteUrl(spriteUrl: string, palettes: SpritePalettes | null, paletteIndex: number | null): Promise<string> {
   if (palettes === null || paletteIndex === null) return Promise.resolve(spriteUrl)
   if (paletteIndex === palettes.baked) return Promise.resolve(spriteUrl)
   const palette = paletteRowOf(palettes, paletteIndex)
@@ -242,11 +234,7 @@ export function recoloredSpriteUrl(
 /**
  * 기다리지 않고 바로 쓸 수 있는 그림 — 칠할 것이 없으면 구운 그림, 이미 칠했으면 그 그림, 아직 칠하는 중이면 null.
  */
-export function readyRecoloredSpriteUrl(
-  spriteUrl: string,
-  palettes: SpritePalettes | null,
-  paletteIndex: number | null,
-): string | null {
+export function readyRecoloredSpriteUrl(spriteUrl: string, palettes: SpritePalettes | null, paletteIndex: number | null): string | null {
   if (palettes === null || paletteIndex === null) return spriteUrl
   if (paletteIndex === palettes.baked) return spriteUrl
   if (paletteRowOf(palettes, paletteIndex) === undefined) return spriteUrl

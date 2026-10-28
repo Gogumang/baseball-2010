@@ -53,18 +53,27 @@ for (let segment = 1; segment <= SEGMENTS && !isDone; segment++) {
       for (const key of Object.keys(localStorage)) if (key.startsWith('compus-baseball/')) localStorage.removeItem(key)
       for (const [key, value] of Object.entries(items)) localStorage.setItem(key, value)
     }, saved)
-    await openScene(page, 'pitcher-management', { fixture: 'none' }).catch((error) => log(`관리 기다림 실패 — 이어 감: ${String(error).slice(0, 100)}`))
-    const where = await page.evaluate(() => { const probe = window.__sceneProbe?.(); return `${probe?.screen} ${probe?.pitcherScene}` })
+    await openScene(page, 'pitcher-management', { fixture: 'none' }).catch((error) =>
+      log(`관리 기다림 실패 — 이어 감: ${String(error).slice(0, 100)}`),
+    )
+    const where = await page.evaluate(() => {
+      const probe = window.__sceneProbe?.()
+      return `${probe?.screen} ${probe?.pitcherScene}`
+    })
     log(`저장에서 이어 감 — ${where}`)
   }
   // 첫 goto 를 곧바로 떠나며 끊긴 그림 요청(웹킷 "access control checks")은 세지 않는다 — 들어선 뒤부터 본다
-  page.on('pageerror', (error) => { failures++; log(`pageerror ${error.message}`) })
+  page.on('pageerror', (error) => {
+    failures++
+    log(`pageerror ${error.message}`)
+  })
 
   async function pressButton(name) {
     const found = await page.evaluate((label) => {
       for (const old of document.querySelectorAll('[data-pitcher-play]')) old.removeAttribute('data-pitcher-play')
-      const target = [...document.querySelectorAll('button, [role="button"]')]
-        .find((element) => !element.matches(':disabled') && (element.getAttribute('aria-label') === label || element.textContent?.trim() === label))
+      const target = [...document.querySelectorAll('button, [role="button"]')].find(
+        (element) => !element.matches(':disabled') && (element.getAttribute('aria-label') === label || element.textContent?.trim() === label),
+      )
       target?.setAttribute('data-pitcher-play', '')
       return target !== undefined
     }, name)
@@ -74,11 +83,14 @@ for (let segment = 1; segment <= SEGMENTS && !isDone; segment++) {
     await tapPage(page, box.x + box.width / 2, box.y + box.height / 2)
     return true
   }
-  const careerLine = () => page.evaluate(() => {
-    const stored = JSON.parse(localStorage.getItem('compus-baseball/pitcher-league') ?? 'null')
-    const career = stored?.state ?? stored
-    return career === null ? null : { season: career.season, games: career.gamesPlayed, isPostseason: career.postseason != null, stamina: career.stamina }
-  })
+  const careerLine = () =>
+    page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem('compus-baseball/pitcher-league') ?? 'null')
+      const career = stored?.state ?? stored
+      return career === null
+        ? null
+        : { season: career.season, games: career.gamesPlayed, isPostseason: career.postseason != null, stamina: career.stamina }
+    })
 
   const segmentStart = Date.now()
   let last = ''
@@ -104,7 +116,11 @@ for (let segment = 1; segment <= SEGMENTS && !isDone; segment++) {
       log(`저장 ${line}`)
       lastCareer = line
     }
-    if (career !== null && probe?.pitcherScene === '관리' && (career.season > STOP_SEASON || (career.season === STOP_SEASON && career.games >= STOP_GAMES))) {
+    if (
+      career !== null &&
+      probe?.pitcherScene === '관리' &&
+      (career.season > STOP_SEASON || (career.season === STOP_SEASON && career.games >= STOP_GAMES))
+    ) {
       isDone = true
       break
     }
@@ -139,9 +155,13 @@ for (let segment = 1; segment <= SEGMENTS && !isDone; segment++) {
     await pressKey(page, sameMs > 30000 && polls % 5 === 0 ? 'Escape' : 'Enter')
     await page.waitForTimeout(200)
   }
-  saved = await page.evaluate(() => Object.fromEntries(
-    Object.keys(localStorage).filter((key) => key.startsWith('compus-baseball/')).map((key) => [key, localStorage.getItem(key)]),
-  ))
+  saved = await page.evaluate(() =>
+    Object.fromEntries(
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('compus-baseball/'))
+        .map((key) => [key, localStorage.getItem(key)]),
+    ),
+  )
   await shot(page, `e2e/.run/pitcher-season-${TAG}-end.png`)
   await browser.close()
 }

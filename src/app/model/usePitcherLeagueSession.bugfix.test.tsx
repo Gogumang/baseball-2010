@@ -28,8 +28,7 @@ const 평가중 = () => ({
   lastGame: { decisionCode: 0, outs: 0, runs: 0, strikeouts: 0, walksAndHitByPitch: 0, hitsAllowed: 0, pitches: 0, managerCommentIndex: 38 },
 })
 
-const 이어하기 = () =>
-  renderHook(() => usePitcherLeagueSession(메모리저장(평가중()), createSeededRandom(20100901), false)).result.current.career
+const 이어하기 = () => renderHook(() => usePitcherLeagueSession(메모리저장(평가중()), createSeededRandom(20100901), false)).result.current.career
 
 describe('B-28 투수편 116 이어하기가 경기 뒤 카운터를 다시 씀 (0x1278c)', () => {
   it('원본: +0x1c2 += +0x4a 를 한 번 더 한다', () => {

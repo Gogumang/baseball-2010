@@ -63,13 +63,29 @@ function 띄우기(saved: PlayerCareer) {
     const gameSettings = useGameSettings(설정저장)
     latest.career = session.career
     if (session.career === null) {
-      return <button type="button" onClick={() => { session.actions.continueSaved() }}>이어하기</button>
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            session.actions.continueSaved()
+          }}
+        >
+          이어하기
+        </button>
+      )
     }
     return (
-      <CareerRoutes screen={screenState} setScreen={setScreen} session={session} runner={runner} random={random}
-        career={session.career} hallOfFame={{ collection: EMPTY_COLLECTION, nariPitcher: null, register: () => '엔딩전' }}
+      <CareerRoutes
+        screen={screenState}
+        setScreen={setScreen}
+        session={session}
+        runner={runner}
+        random={random}
+        career={session.career}
+        hallOfFame={{ collection: EMPTY_COLLECTION, nariPitcher: null, register: () => '엔딩전' }}
         onAceMatch={() => {}}
-        gameSettings={gameSettings} />
+        gameSettings={gameSettings}
+      />
     )
   }
   render(<Harness />)

@@ -168,9 +168,7 @@ function defaultFielderBeatsARunner(runners: readonly RunnerState[], base: numbe
     const next = runner.startBase <= 3 ? runner.startBase + 1 : runner.startBase
     if (next === base) {
       if (runner.isOut) return false
-      const ticks = isRunnerStopped(runner)
-        ? ticksToReach(runner.position, basePosition(base), runner.speed)
-        : runnerRemainingTicks(runner)
+      const ticks = isRunnerStopped(runner) ? ticksToReach(runner.position, basePosition(base), runner.speed) : runnerRemainingTicks(runner)
       return ticks > fallbackTicks
     }
     if (runner.targetBase === ((base + 3) & 3)) return runnerOneMoreBaseTicks(runner) > fallbackTicks
@@ -302,11 +300,7 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
     if (slot === NONE) continue
     const fielder = working[slot]
     if (fielder === undefined) continue
-    if (
-      fielder.aiState === AI_STATE.RUNDOWN ||
-      fielder.aiState === AI_STATE.CHASE ||
-      fielder.aiState === AI_STATE.RECEIVE
-    ) {
+    if (fielder.aiState === AI_STATE.RUNDOWN || fielder.aiState === AI_STATE.CHASE || fielder.aiState === AI_STATE.RECEIVE) {
       continue
     }
     // b2592 — 플레이 +0x110(파울)이 서 있으면 건너뛴다
@@ -317,10 +311,7 @@ export function assignCoversForTick(input: CoverAssignmentInput): CoverAssignmen
 }
 
 /** `assignCoversForTick` 의 답을 야수에게 — AI 0(b1d38 · b2540 0xb8dbc — AI 칸만, 목표는 다음 AI 0 b476a 가 고친다) 뒤 커버 야수 AI 루 + 2 · 루 좌표 (b1d38 · b2540 · b2564) */
-export function applyCoverAssignment(
-  fielders: readonly FielderState[],
-  assigned: CoverAssignment,
-): readonly FielderState[] {
+export function applyCoverAssignment(fielders: readonly FielderState[], assigned: CoverAssignment): readonly FielderState[] {
   return fielders.map((fielder) => {
     let next = fielder
     if (assigned.idleSlots.includes(fielder.slot)) {

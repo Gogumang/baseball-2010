@@ -97,7 +97,12 @@ function 메모리저장(held: PlayerCareer | null): SaveGamePort {
 }
 
 const 헛스윙: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+  batterHand: 0,
+  resolution: { kind: '스트라이크', isSwinging: true },
+  hasSwung: true,
+  isBunt: false,
+  resultCode: null,
+  contactSoundId: null,
 }
 
 interface 판 {
@@ -186,9 +191,7 @@ async function 치르기(seed: number): Promise<경기끝> {
       act(() => 창.close!())
     } else if (progress.game.isFinished && relayShown) {
       relayFramesAfterEnd += 1
-    } else if (
-      screen.queryByTestId('타석화면') !== null && !화면.isPaused && !progress.game.isFinished && tick - lastPitchFrame > 8
-    ) {
+    } else if (screen.queryByTestId('타석화면') !== null && !화면.isPaused && !progress.game.isFinished && tick - lastPitchFrame > 8) {
       if (화면.isAwaiting) act(() => 화면.confirm!())
       else {
         lastPitchFrame = tick
@@ -198,7 +201,12 @@ async function 치르기(seed: number): Promise<경기끝> {
     frame()
   }
   return {
-    finalRelay, judgedAtEnd, relayBeforeWindow, windowShownAtEnd, relayFramesAfterEnd, screenKind: 지금.current!.screen.kind,
+    finalRelay,
+    judgedAtEnd,
+    relayBeforeWindow,
+    windowShownAtEnd,
+    relayFramesAfterEnd,
+    screenKind: 지금.current!.screen.kind,
   }
 }
 

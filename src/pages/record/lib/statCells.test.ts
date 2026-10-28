@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { addGamePointEarned, addPlayTime, applyAnnalsStat, EMPTY_ANNALS_STATS } from '@/entities/collection/model/annalsStats'
 import {
-  INITIAL_SECRET_CODE_STATE, enterAnnalsSecretCode, statCellOf, statPageCellsOf, statTotalTextOf, statValueTextOf, typeSecretDigit,
+  INITIAL_SECRET_CODE_STATE,
+  enterAnnalsSecretCode,
+  statCellOf,
+  statPageCellsOf,
+  statTotalTextOf,
+  statValueTextOf,
+  typeSecretDigit,
 } from '@/pages/record/lib/statCells'
 
 /** 기록연감 통계 칸 0x7a08c · 비밀 번호 0x2b7a0 */

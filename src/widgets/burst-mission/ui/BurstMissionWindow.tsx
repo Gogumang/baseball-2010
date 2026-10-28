@@ -12,9 +12,24 @@ import type { BurstJudgement } from '@/entities/burst-mission/model/burstMission
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import type { OriginalBurstLine } from '@/shared/config/original/burstMissions'
 import {
-  BURST_BAND_HEIGHT, BURST_BAND_SLASH_LENGTH, BURST_BAND_SLASH_X, BURST_COLORS, BURST_NEXT_MARK_IMAGE, BURST_SCREEN,
-  BURST_WINDOW_START, burstBandTopOf, burstLineIndexOf, burstNextMarkAt, burstPortraitAnchorOf, burstPortraitOf,
-  burstResultPopupTextOf, burstShakeOffsetOf, burstSpeakerPrefixOf, burstTextBoxOf, isBurstWindowOpen, tickBurstWindow,
+  BURST_BAND_HEIGHT,
+  BURST_BAND_SLASH_LENGTH,
+  BURST_BAND_SLASH_X,
+  BURST_COLORS,
+  BURST_NEXT_MARK_IMAGE,
+  BURST_SCREEN,
+  BURST_WINDOW_START,
+  burstBandTopOf,
+  burstLineIndexOf,
+  burstNextMarkAt,
+  burstPortraitAnchorOf,
+  burstPortraitOf,
+  burstResultPopupTextOf,
+  burstShakeOffsetOf,
+  burstSpeakerPrefixOf,
+  burstTextBoxOf,
+  isBurstWindowOpen,
+  tickBurstWindow,
   burstObjectTicks,
 } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
@@ -59,11 +74,15 @@ interface BurstMissionWindowProps {
  * ⚠️ 유력: 초상 깃발 0x11 을 좌우 뒤집기로 본 것(엔딩 · 제작진과 같은 읽기, `FramePiece`).
  */
 export function BurstMissionWindow({
-  lines, judgement, row = null, isBatterLeftHanded = false, replacements = [], onClose,
+  lines,
+  judgement,
+  row = null,
+  isBatterLeftHanded = false,
+  replacements = [],
+  onClose,
 }: BurstMissionWindowProps) {
   const line = lines[burstLineIndexOf(judgement)]
-  const [state, setState] = useState<BurstWindowState>(
-    () => tickBurstWindow({ ...BURST_WINDOW_START, ticks: burstObjectTicks.value }))
+  const [state, setState] = useState<BurstWindowState>(() => tickBurstWindow({ ...BURST_WINDOW_START, ticks: burstObjectTicks.value }))
   /** 그린 수 — 초상 애니는 그린 뒤 한 칸 나아간다(0x93d91) */
   const [draws, setDraws] = useState(0)
   const stateRef = useRef(state)
@@ -114,14 +133,29 @@ export function BurstMissionWindow({
   return (
     // 겹 차례 — 경기 화면의 누름 칸(PressArea 7: 다음 타석 OK 대기 0xe 의 '확인' · 도루 · '*')보다 위다. 결과 창이 설 때 다음 타석의
     // 0xe 대기가 이미 실려 화면 전체 '확인' 칸(창 동안은 꺼짐)이 서는데, 이 창(예전 5)이 그 아래라 클릭 · 탭이 꺼진 칸에 먹혔다(r195)
-    <div className={styles.overlay} style={{ zIndex: SCREEN_LAYERS.SCENE_WINDOW }} role="dialog" aria-label="돌발미션"
-      onPointerDown={(event) => event.stopPropagation()}>
+    <div
+      className={styles.overlay}
+      style={{ zIndex: SCREEN_LAYERS.SCENE_WINDOW }}
+      role="dialog"
+      aria-label="돌발미션"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
       {line !== undefined && (
-        <BurstPortrait speaker={line.speaker} expression={line.expression} draws={draws}
-          anchor={burstPortraitAnchorOf(state.height, isBatterLeftHanded)} />
+        <BurstPortrait
+          speaker={line.speaker}
+          expression={line.expression}
+          draws={draws}
+          anchor={burstPortraitAnchorOf(state.height, isBatterLeftHanded)}
+        />
       )}
-      <svg className={styles.layer} width={BURST_SCREEN.width} height={BURST_SCREEN.height}
-        viewBox={`0 0 ${BURST_SCREEN.width} ${BURST_SCREEN.height}`} shapeRendering="crispEdges" aria-hidden>
+      <svg
+        className={styles.layer}
+        width={BURST_SCREEN.width}
+        height={BURST_SCREEN.height}
+        viewBox={`0 0 ${BURST_SCREEN.width} ${BURST_SCREEN.height}`}
+        shapeRendering="crispEdges"
+        aria-hidden
+      >
         {/* 0x8f194 윗 띠 */}
         <rect x={0} y={bandTop} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT} fill={BURST_COLORS.bandEdge} />
         <rect x={0} y={bandTop + 1} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT - 2} fill={BURST_COLORS.bandLight} />
@@ -155,7 +189,12 @@ export function BurstMissionWindow({
 }
 
 /** 0x8f29c 초상 — 0x63a04 애니를 그린 뒤 한 칸 나아간다(되풀이) */
-function BurstPortrait({ speaker, expression, draws, anchor }: {
+function BurstPortrait({
+  speaker,
+  expression,
+  draws,
+  anchor,
+}: {
   readonly speaker: number
   readonly expression: number
   readonly draws: number
@@ -182,4 +221,3 @@ function BurstPortrait({ speaker, expression, draws, anchor }: {
   const src = anchor.isFlipped ? flippedFrameUrlOf(folder, step.frame, copies) : `${folder}/${key}.png`
   return <img className={styles.sprite} style={style} src={src} alt="" data-frame={step.frame} />
 }
-

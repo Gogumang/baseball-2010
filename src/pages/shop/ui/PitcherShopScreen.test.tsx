@@ -36,13 +36,7 @@ describe('투수 장비 상점 화면', () => {
   it('GP 창은 투수 표다 — 칸 9 가 십전대보탕이고, 막힌 칸은 묻지 않고 그 글만 띄운다', () => {
     const onPurchase = vi.fn()
     render(
-      <PitcherShopScreen
-        tab="GP"
-        career={{ ...createPitcherCareer('투수'), gamePoint: 0 }}
-        noticeText=""
-        onPurchase={onPurchase}
-        onBack={vi.fn()}
-      />,
+      <PitcherShopScreen tab="GP" career={{ ...createPitcherCareer('투수'), gamePoint: 0 }} noticeText="" onPurchase={onPurchase} onBack={vi.fn()} />,
     )
 
     // 창은 커서 칸(0 장어구이) 이름만 그린다 — 칸 9 는 표에서 본다

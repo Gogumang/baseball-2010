@@ -85,7 +85,10 @@ async function navigate(request) {
     const response = await fetch(request)
     if (response.ok && response.type === 'basic') {
       const copy = response.clone()
-      caches.open(CACHE).then((cache) => cache.put(self.registration.scope, copy)).catch(() => {})
+      caches
+        .open(CACHE)
+        .then((cache) => cache.put(self.registration.scope, copy))
+        .catch(() => {})
     }
     return response
   } catch (error) {

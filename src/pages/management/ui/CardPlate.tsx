@@ -1,7 +1,12 @@
 import { TEAMS } from '@/shared/config/original/teams'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import {
-  SEASON_CARD_BOARD, SEASON_CARD_LOGO, seasonCardLogoPlaceOf, steppedBoardLeftEnd, steppedBoardLeftRow565, steppedBoardPointsOf,
+  SEASON_CARD_BOARD,
+  SEASON_CARD_LOGO,
+  seasonCardLogoPlaceOf,
+  steppedBoardLeftEnd,
+  steppedBoardLeftRow565,
+  steppedBoardPointsOf,
 } from '@/pages/season/lib/seasonPlayerCard'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
 import { BallPatternTranslucentImage } from '@/pages/special/ui/SkinBackdrops'
@@ -58,8 +63,13 @@ export function CardPlate({ teamId, testIdPrefix = '카드' }: { readonly teamId
     <>
       {/* 계단형 판 0x76724 — 채움 · 테두리, 위 세 변 y+1 밝은 선 · 아래 세 변 y+1 어두운 선 (관리 화면 판과 같은 그리기) */}
       <svg className={managementStyles.board} viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid={`${testIdPrefix}-판`}>
-        <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')} transform="translate(0.5 0.5)"
-          fill={ORIGINAL_COLORS.boardFill} stroke={ORIGINAL_COLORS.boardEdge} strokeWidth={1} />
+        <polygon
+          points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+          transform="translate(0.5 0.5)"
+          fill={ORIGINAL_COLORS.boardFill}
+          stroke={ORIGINAL_COLORS.boardEdge}
+          strokeWidth={1}
+        />
         <polyline points={line(points.slice(0, 4))} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardHighlight} />
         <polyline points={line(points.slice(4).reverse())} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardEdge} />
       </svg>
@@ -68,9 +78,17 @@ export function CardPlate({ teamId, testIdPrefix = '카드' }: { readonly teamId
         카드가 서는 화면(기본정보 119 · 상점 · 등록 0x66 · 0x67 · 시즌 0xd9 · 0xdc)은 모두 공 무늬 바탕 0x5fd61 위다
       */}
       {team !== undefined && (
-        <BallPatternTranslucentImage className={managementStyles.layer} alt={team.name} testId={`${testIdPrefix}-로고`} src={team.logoUrl}
-          {...LOGO_BOX} level={SEASON_CARD_LOGO.level} rowOver={boardRowUnderLogo} imagePlaceOf={seasonCardLogoPlaceOf}
-          fallbackRect={SEASON_CARD_LOGO} />
+        <BallPatternTranslucentImage
+          className={managementStyles.layer}
+          alt={team.name}
+          testId={`${testIdPrefix}-로고`}
+          src={team.logoUrl}
+          {...LOGO_BOX}
+          level={SEASON_CARD_LOGO.level}
+          rowOver={boardRowUnderLogo}
+          imagePlaceOf={seasonCardLogoPlaceOf}
+          fallbackRect={SEASON_CARD_LOGO}
+        />
       )}
     </>
   )

@@ -86,9 +86,7 @@ export function applyRunScored(state: DecisionState, input: RunScoredInput): Dec
   let winner = state.winner
   // 고침(B-35): 이닝 · 경기 종류 문을 걷어 패전 투수와 같은 셈으로 — 앞선 팀이 리드를 잡은 순간의 마운드 투수가 승리 투수다
   const canDecideWinner =
-    isBugFixed('B-35') ||
-    (input.inningIndex >= WIN_PITCHER_FROM_INNING_INDEX &&
-      input.lastInningIndex === REGULATION_LAST_INNING_INDEX)
+    isBugFixed('B-35') || (input.inningIndex >= WIN_PITCHER_FROM_INNING_INDEX && input.lastInningIndex === REGULATION_LAST_INNING_INDEX)
   if (canDecideWinner) {
     // 이미 정해져 있는데 그 팀이 더 이상 앞서지 않으면 지운다 (0xa5d2e)
     if (winner.side !== NO_SIDE && scoreOf(winner.side) <= scoreOf(1 - winner.side)) {
@@ -115,10 +113,7 @@ export function applyRunScored(state: DecisionState, input: RunScoredInput): Dec
   }
 
   // 세이브 후보는 **무효화만** 한다 — 재지정은 다음 교체 때뿐이다 (0xa5dea)
-  const save =
-    state.save.side !== NO_SIDE && scoreOf(state.save.side) <= scoreOf(1 - state.save.side)
-      ? NO_PITCHER_OF_RECORD
-      : state.save
+  const save = state.save.side !== NO_SIDE && scoreOf(state.save.side) <= scoreOf(1 - state.save.side) ? NO_PITCHER_OF_RECORD : state.save
 
   return { ...state, winner, loser, save }
 }
@@ -136,11 +131,7 @@ export interface SaveChanceInput {
 }
 
 /** 남은 아웃 수 `3·(마지막 − 지금) − 아웃 + 3` (0xa60c0) */
-export function outsRemainingOf(input: {
-  lastInningIndex: number
-  inningIndex: number
-  outs: number
-}): number {
+export function outsRemainingOf(input: { lastInningIndex: number; inningIndex: number; outs: number }): number {
   return 3 * (input.lastInningIndex - input.inningIndex) - input.outs + 3
 }
 
@@ -210,9 +201,7 @@ export function gameEndDecisionOf(state: DecisionState): GameEndDecision {
   const winner = state.winner.side === NO_SIDE ? null : state.winner
   const loser = state.loser.side === NO_SIDE ? null : state.loser
   const hasSave =
-    state.save.side !== NO_SIDE &&
-    !(winner !== null && winner.number === state.save.number) &&
-    (isBugFixed('B-10') || state.saveCode <= 0)
+    state.save.side !== NO_SIDE && !(winner !== null && winner.number === state.save.number) && (isBugFixed('B-10') || state.saveCode <= 0)
   return { winner, loser, save: hasSave ? state.save : null }
 }
 
@@ -220,12 +209,8 @@ export function gameEndDecisionOf(state: DecisionState): GameEndDecision {
 export const PITCHER_DECISION_CODE = { none: 0, win: 1, loss: 2, save: 3 } as const
 
 /** 내 투수(측·등번호가 같은 사람)가 무엇으로 적히는가 */
-export function decisionCodeForMine(
-  decision: GameEndDecision,
-  mine: { readonly side: number; readonly number: number },
-): number {
-  const matches = (record: PitcherOfRecord | null) =>
-    record !== null && record.side === mine.side && record.number === mine.number
+export function decisionCodeForMine(decision: GameEndDecision, mine: { readonly side: number; readonly number: number }): number {
+  const matches = (record: PitcherOfRecord | null) => record !== null && record.side === mine.side && record.number === mine.number
   if (matches(decision.winner)) return PITCHER_DECISION_CODE.win
   if (matches(decision.loser)) return PITCHER_DECISION_CODE.loss
   if (matches(decision.save)) return PITCHER_DECISION_CODE.save

@@ -56,8 +56,7 @@ export function stepDustTrail(
   action: number,
   position: WorldPoint,
 ): { readonly state: DustTrailState; readonly mark: { readonly point: WorldPoint; readonly frame: number } | null } {
-  const isRunning =
-    action === FIELDER_ACTION.runUp || action === FIELDER_ACTION.runLeft || action === FIELDER_ACTION.runRight
+  const isRunning = action === FIELDER_ACTION.runUp || action === FIELDER_ACTION.runLeft || action === FIELDER_ACTION.runRight
   if (!isRunning) return { state: { ...state, on: false }, mark: null }
   if (!state.on) {
     const point =

@@ -279,8 +279,12 @@ function rowOrderOf(): readonly { readonly bit: number; readonly frame: number }
   return [
     ...range(20, 17).map((bit) => ({ bit, frame: SKILL_PANEL_FRAME.나쁜칸 })),
     ...range(5, 2).map((bit) => ({ bit, frame: SKILL_PANEL_FRAME.나쁜칸 })),
-    ...range(23, 8).filter((bit) => bit < 17 || bit > 20).map((bit) => ({ bit, frame: SKILL_PANEL_FRAME.좋은칸 })),
-    ...range(7, 0).filter((bit) => bit < 2 || bit > 5).map((bit) => ({ bit, frame: SKILL_PANEL_FRAME.좋은칸 })),
+    ...range(23, 8)
+      .filter((bit) => bit < 17 || bit > 20)
+      .map((bit) => ({ bit, frame: SKILL_PANEL_FRAME.좋은칸 })),
+    ...range(7, 0)
+      .filter((bit) => bit < 2 || bit > 5)
+      .map((bit) => ({ bit, frame: SKILL_PANEL_FRAME.좋은칸 })),
   ]
 }
 const ROW_ORDER = rowOrderOf()

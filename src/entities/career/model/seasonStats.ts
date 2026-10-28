@@ -41,11 +41,7 @@ export function batterRecordLineOf(stats: SeasonStats): readonly number[] {
   return [stats.atBats, stats.hits, stats.doubles, stats.triples, stats.homeRuns, stats.runsBattedIn]
 }
 
-export function recordAtBat(
-  stats: SeasonStats,
-  outcome: AtBatOutcome,
-  runsBattedIn: number,
-): SeasonStats {
+export function recordAtBat(stats: SeasonStats, outcome: AtBatOutcome, runsBattedIn: number): SeasonStats {
   return {
     ...stats,
     plateAppearances: stats.plateAppearances + 1,
@@ -87,9 +83,7 @@ export function mergeStats(left: SeasonStats, right: SeasonStats): SeasonStats {
     runsBattedIn: left.runsBattedIn + right.runsBattedIn,
     walks: left.walks + right.walks,
     strikeouts: left.strikeouts + right.strikeouts,
-    ...(left.stolenBases === undefined && right.stolenBases === undefined
-      ? {}
-      : { stolenBases: (left.stolenBases ?? 0) + (right.stolenBases ?? 0) }),
+    ...(left.stolenBases === undefined && right.stolenBases === undefined ? {} : { stolenBases: (left.stolenBases ?? 0) + (right.stolenBases ?? 0) }),
   }
 }
 

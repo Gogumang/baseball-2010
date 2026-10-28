@@ -122,13 +122,23 @@ const CLOSE_END_WIDTH = 99
 
 /** 상자가 받는 키 — 펼치는 동안 · 닫히는 동안에도 기본 동작(스크롤 따위)은 막는다 */
 const HANDLED_KEYS: ReadonlySet<string> = new Set([
-  'ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Enter', ' ', 'Escape', 'Backspace', '2', '4', '5', '6', '8',
+  'ArrowRight',
+  'ArrowLeft',
+  'ArrowDown',
+  'ArrowUp',
+  'Enter',
+  ' ',
+  'Escape',
+  'Backspace',
+  '2',
+  '4',
+  '5',
+  '6',
+  '8',
 ])
 
 type BoxAnimation =
-  | { readonly kind: '열림'; readonly height: number }
-  | { readonly kind: '닫힘'; readonly width: number; readonly answer: number }
-  | null
+  { readonly kind: '열림'; readonly height: number } | { readonly kind: '닫힘'; readonly width: number; readonly answer: number } | null
 const POPUP = assetUrl('./sprites/popup/frames')
 /**
  * 버튼은 글자가 아니라 `ui/popup.pzx` 프레임 그림이다 (F-1 확정).
@@ -146,9 +156,14 @@ const SELECTED_OVERFLOW = 4
  * 고른 그림(6~10 · 13·14)은 사방 4px 큰 같은 꼴이고 원점이 (−4,−4) 다.
  */
 const NORMAL_FRAME_SIZES: Readonly<Record<number, { readonly width: number; readonly height: number }>> = {
-  0: { width: 41, height: 15 }, 1: { width: 41, height: 15 }, 2: { width: 41, height: 15 },
-  3: { width: 59, height: 15 }, 4: { width: 59, height: 15 }, 5: { width: 59, height: 15 },
-  11: { width: 35, height: 53 }, 12: { width: 35, height: 53 },
+  0: { width: 41, height: 15 },
+  1: { width: 41, height: 15 },
+  2: { width: 41, height: 15 },
+  3: { width: 59, height: 15 },
+  4: { width: 59, height: 15 },
+  5: { width: 59, height: 15 },
+  11: { width: 35, height: 53 },
+  12: { width: 35, height: 53 },
 }
 
 /** 버튼 칸 → 그림 프레임. 버튼이 하나면 알림이라 "OK" 한 장뿐이고 고른 그림이 따로 없다 */
@@ -184,8 +199,20 @@ function moveGridCursor(index: number, columns: number, count: number, dx: numbe
 }
 
 export function MessageBox({
-  text, buttons, listItems, initialSelected = 0, buttonFrames, grid, cancelAnswer, cancelPressRect, dimOpacity, closesWithoutShrink: closesWithoutShrinkProp,
-  opensOneStepIn = false, onAnswer, onAnswerKey, onRawKey,
+  text,
+  buttons,
+  listItems,
+  initialSelected = 0,
+  buttonFrames,
+  grid,
+  cancelAnswer,
+  cancelPressRect,
+  dimOpacity,
+  closesWithoutShrink: closesWithoutShrinkProp,
+  opensOneStepIn = false,
+  onAnswer,
+  onAnswerKey,
+  onRawKey,
 }: MessageBoxProps) {
   const onRawKeyRef = useRef(onRawKey)
   onRawKeyRef.current = onRawKey
@@ -342,40 +369,42 @@ export function MessageBox({
   // 닫는 동안에는 판만 폭을 줄인다 — 판 0x744c4 는 채움 0x6a9f0 · 가로줄 0x6a904 뿐이고 자르기 칸을 안 세워, 뒤에 그리는 글 0x74664 ·
   // 버튼 0x7448c 는 (W/2 − 75, …) · 버튼 자리 그대로 판 밖까지 그려진다. 그래서 상자는 240 폭 그대로 두고 판만 따로 줄인다.
   const boxStyle =
-    animation === null
-      ? undefined
-      : animation.kind === '열림'
-        ? { height: animation.height, overflow: 'hidden' as const }
-        : { background: 'none' }
+    animation === null ? undefined : animation.kind === '열림' ? { height: animation.height, overflow: 'hidden' as const } : { background: 'none' }
   const closingPanelStyle =
-    animation?.kind === '닫힘'
-      ? { left: Math.floor((CLOSE_START_WIDTH - animation.width) / 2), width: animation.width }
-      : null
+    animation?.kind === '닫힘' ? { left: Math.floor((CLOSE_START_WIDTH - animation.width) / 2), width: animation.width } : null
   // 펼치는 동안은 글·버튼을 안 그린다 (0x7479c). 닫는 동안에는 원본도 그대로 그린다.
   const contentStyle = animation?.kind === '열림' ? { visibility: 'hidden' as const } : undefined
 
   // 격자 칸 크기 = 버튼 그림의 가장 큰 폭·높이(0x74824 의 0x7484e~0x74888) — 그림을 고른 자리만 다르다
-  const cellSize = buttonFrames === undefined || listItems !== undefined
-    ? null
-    : buttonFrames.reduce(
-      (size, pictures) => ({
-        width: Math.max(size.width, NORMAL_FRAME_SIZES[pictures.normal]?.width ?? 0),
-        height: Math.max(size.height, NORMAL_FRAME_SIZES[pictures.normal]?.height ?? 0),
-      }),
-      { width: 0, height: 0 },
-    )
+  const cellSize =
+    buttonFrames === undefined || listItems !== undefined
+      ? null
+      : buttonFrames.reduce(
+          (size, pictures) => ({
+            width: Math.max(size.width, NORMAL_FRAME_SIZES[pictures.normal]?.width ?? 0),
+            height: Math.max(size.height, NORMAL_FRAME_SIZES[pictures.normal]?.height ?? 0),
+          }),
+          { width: 0, height: 0 },
+        )
   // 격자를 준 자리만 칸을 열·줄로 놓는다 — 간격은 [+0x264] 가로 · [+0x268] 세로, 가운데 맞춤(0x74824)
-  const gridStyle = grid === undefined ? undefined : {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${columns}, auto)`,
-    columnGap: `${grid.gapX}px`,
-    rowGap: `${grid.gapY}px`,
-    justifyContent: 'center',
-  }
+  const gridStyle =
+    grid === undefined
+      ? undefined
+      : {
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columns}, auto)`,
+          columnGap: `${grid.gapX}px`,
+          rowGap: `${grid.gapY}px`,
+          justifyContent: 'center',
+        }
 
   return (
-    <div className={styles.dim} role="dialog" aria-label="알림"
-      style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}>
+    <div
+      className={styles.dim}
+      role="dialog"
+      aria-label="알림"
+      style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}
+    >
       <div className={styles.box} ref={boxRef} style={boxStyle}>
         {closingPanelStyle !== null && <div className={styles.closingPanel} style={closingPanelStyle} />}
         <div className={styles.text} style={contentStyle}>
@@ -386,19 +415,33 @@ export function MessageBox({
             const isSelected = index === selected
             const pictures = buttonFrames?.[index]
             // 글자 목록이면 그림을 쓰지 않는다 — 예/아니오 그림으로는 다른 것을 고를 수 없다
-            const frame = listItems !== undefined
-              ? undefined
-              : pictures !== undefined
-                ? (isSelected ? pictures.selected : pictures.normal)
-                : buttonFrameOf(buttons.length, index, isSelected)
+            const frame =
+              listItems !== undefined
+                ? undefined
+                : pictures !== undefined
+                  ? isSelected
+                    ? pictures.selected
+                    : pictures.normal
+                  : buttonFrameOf(buttons.length, index, isSelected)
             const shown = listItems?.[index] ?? label
             return (
-              <button key={label} type="button" className={styles.button} aria-label={label}
+              <button
+                key={label}
+                type="button"
+                className={styles.button}
+                aria-label={label}
                 style={cellSize === null ? undefined : { width: cellSize.width, height: cellSize.height }}
                 // 마우스 올리기로는 고르지 않는다 — 원본은 키패드뿐이고, 창이 뜰 때 멈춘 포인터 아래 단추가 선택을 빼앗았다(나만의리그 [14])
                 onFocus={() => setSelected(index)}
-                onClick={() => answer(index)}>
-                {frame === undefined ? (isSelected ? `▶ ${shown}` : shown) : (
+                onClick={() => answer(index)}
+              >
+                {frame === undefined ? (
+                  isSelected ? (
+                    `▶ ${shown}`
+                  ) : (
+                    shown
+                  )
+                ) : (
                   <img
                     className={styles.buttonImage}
                     src={`${POPUP}/${String(frame).padStart(3, '0')}.png`}

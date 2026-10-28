@@ -73,9 +73,7 @@ export interface MistakePitchInput {
 export function mistakePercentOf(input: Omit<MistakePitchInput, 'isMagicPitch'>): number {
   const t = input.grade
   const scaled =
-    t >= 0 && t <= 5
-      ? Math.trunc((input.effectiveVelocity * balanceList('pitching.mistakeAbilityPercent')[t]) / 100)
-      : input.effectiveVelocity
+    t >= 0 && t <= 5 ? Math.trunc((input.effectiveVelocity * balanceList('pitching.mistakeAbilityPercent')[t]) / 100) : input.effectiveVelocity
   const bonus = t >= 0 && t <= 5 ? balanceList('pitching.mistakeGradeBonus')[t] : 0
   let p = Math.max(balanceNumber('pitching.mistakeBase') - abilityGradeOf(scaled) + bonus, MISTAKE_FLOOR)
   if (t === 0) p = balanceNumber('pitching.unpressedMistakePercent')

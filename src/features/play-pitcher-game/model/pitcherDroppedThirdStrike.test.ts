@@ -140,9 +140,7 @@ describe('삼진 없이 경기 끝으로 정산되는 폭투·포일 판(종류 
         if (끝.lastArrivalPlay?.kind !== 9 || !끝.game.isFinished || 끝.atBat.outcome !== null) continue
         checked += 1
         const slot = 끝내기판.opponentOrderIndex % 9
-        expect(끝.opponentLineup.records[slot]?.plateAppearances ?? 0).toBe(
-          (끝내기판.opponentLineup.records[slot]?.plateAppearances ?? 0) + 1,
-        )
+        expect(끝.opponentLineup.records[slot]?.plateAppearances ?? 0).toBe((끝내기판.opponentLineup.records[slot]?.plateAppearances ?? 0) + 1)
         expect(끝.pitcherRecord.battersFaced).toBe(끝내기판.pitcherRecord.battersFaced + 1)
         expect(끝.moundStrikeoutCombo).toBe(0)
         expect(끝.record.strikeoutCombo).toBe(0)

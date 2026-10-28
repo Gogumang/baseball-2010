@@ -14,7 +14,12 @@ describe('G 숫자 0x54a60 (판 ≠ 0 갈래)', () => {
     expect(badge.coin).toEqual({ x: 168, y: 9 })
     expect(badge.plus).toBeNull()
     // 합 = (4+1) + (8+1)·3 = 32 → 시작 168 + 65 − 32 + 2 = 203
-    expect(badge.digits.map((d) => [d.digit, d.x, d.y])).toEqual([[1, 203, 14], [2, 208, 14], [5, 217, 14], [0, 226, 14]])
+    expect(badge.digits.map((d) => [d.digit, d.x, d.y])).toEqual([
+      [1, 203, 14],
+      [2, 208, 14],
+      [5, 217, 14],
+      [0, 226, 14],
+    ])
   })
 
   it('정산 기본 화면 (80, 289, 0x46, 정렬 2, "+", 둥근 판) — "+" 는 숫자 시작 − 8 − 2', () => {

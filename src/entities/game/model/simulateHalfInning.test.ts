@@ -158,22 +158,12 @@ describe('반 이닝의 CPU 투수 교체·체력 소모 (0xc1ba4 → 0xac428 ·
   })
 
   it('던진 만큼 체력이 깎인다 — 투구 수도 마운드에 쌓인다 (0xa5e14 → 0xaeb08)', () => {
-    const result = simulateHalfInning(
-      0,
-      () => 타자(500),
-      투수(500),
-      1,
-      씨앗난수(21),
-      undefined,
-      undefined,
-      수비(마운드()),
-    )
+    const result = simulateHalfInning(0, () => 타자(500), 투수(500), 1, 씨앗난수(21), undefined, undefined, 수비(마운드()))
 
     expect(result.mound?.pitches).toBe(result.pitches)
     expect(result.mound?.stamina).toBeLessThan(FULL_STAMINA)
     // 줄의 합은 반 이닝 합과 같다
-    const 합 = (고르기: (줄: (typeof result.pitcherLines)[number]) => number) =>
-      result.pitcherLines.reduce((sum, 줄) => sum + 고르기(줄), 0)
+    const 합 = (고르기: (줄: (typeof result.pitcherLines)[number]) => number) => result.pitcherLines.reduce((sum, 줄) => sum + 고르기(줄), 0)
     expect(합((줄) => 줄.outs)).toBe(result.outs)
     expect(합((줄) => 줄.runsAllowed)).toBe(result.runs)
     expect(합((줄) => 줄.pitches)).toBe(result.pitches)
@@ -396,7 +386,11 @@ describe('새 투수 고르기의 마무리 갈래 — 능력 합 0xb5b50 (ac0be
   const 상황 = { inningIndex: 2, lead: 0, runnerCount: 0, inningRunsAllowed: 0, random: 고정난수, force: true }
 
   it('능력 합을 넘기면 합이 큰 7 이 올라온다 — 스태미나가 더 많은 6 이 아니다', () => {
-    const 바뀜 = changePitcherIfNeeded(수비((slot) => (slot === 7 ? 2400 : 2000)), 수비().mound, 상황)
+    const 바뀜 = changePitcherIfNeeded(
+      수비((slot) => (slot === 7 ? 2400 : 2000)),
+      수비().mound,
+      상황,
+    )
     expect(바뀜.pitcherSlot).toBe(7)
   })
 

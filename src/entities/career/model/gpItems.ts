@@ -200,8 +200,7 @@ function removeEquippedMinusSkills<T extends GpItemCareer>(career: T): T {
 
 /** 타자편 규칙 — 타입 한계 표 · 이글아이 */
 const BATTER_GP_RULES: GpItemRules<PlayerCareer> = {
-  applyAbilityItem: (career, id) =>
-    raiseWithinLimit(career, id === ALL_ABILITY_ITEM ? ABILITY_ORDER : [ABILITY_ORDER[id]]),
+  applyAbilityItem: (career, id) => raiseWithinLimit(career, id === ALL_ABILITY_ITEM ? ABILITY_ORDER : [ABILITY_ORDER[id]]),
   applyNinthItem: (career) => ({
     ...career,
     eagleEyeGamesRemaining: Math.min(MAXIMUM_EAGLE_EYE_GAMES, career.eagleEyeGamesRemaining + EAGLE_EYE_GAMES),
@@ -243,20 +242,14 @@ function drawLottery<T extends GpItemCareer>(rules: GpItemRules<T>, career: T, r
     const money = Math.min(MAXIMUM_MONEY, counted.money + LOTTERY_MONEY[prize - 1] * MONEY_UNIT)
     return { career: { ...counted, money }, lotteryPrize: prize }
   }
-  const effectId =
-    prize === '아차상' ? random.rand(0, RANDOM_ABILITY_ITEM_COUNT) : LOTTERY_EFFECT_OF[prize]
+  const effectId = prize === '아차상' ? random.rand(0, RANDOM_ABILITY_ITEM_COUNT) : LOTTERY_EFFECT_OF[prize]
   return { career: applyEffect(rules, counted, effectId), lotteryPrize: prize, prizeItemId: effectId }
 }
 
 const LOTTERY_ITEM = 5
 
 /** 0xa4488 — 모드 규칙을 받아 아이템 하나를 쓴다 (투수편 `pitcherItems.ts` 도 이것을 부른다) */
-export function applyGpItemWith<T extends GpItemCareer>(
-  rules: GpItemRules<T>,
-  career: T,
-  id: number,
-  random: RandomPort,
-): GpItemResultOf<T> {
+export function applyGpItemWith<T extends GpItemCareer>(rules: GpItemRules<T>, career: T, id: number, random: RandomPort): GpItemResultOf<T> {
   if (id === LOTTERY_ITEM) return drawLottery(rules, career, random)
   return { career: applyEffect(rules, career, id), lotteryPrize: null }
 }
@@ -266,8 +259,7 @@ export function applyGpItem(career: PlayerCareer, id: number, random: RandomPort
 }
 
 export type GpPurchaseOf<T> =
-  | { readonly kind: '구입'; readonly result: GpItemResultOf<T> }
-  | { readonly kind: '거절'; readonly reason: 'G포인트부족' }
+  { readonly kind: '구입'; readonly result: GpItemResultOf<T> } | { readonly kind: '거절'; readonly reason: 'G포인트부족' }
 export type GpPurchase = GpPurchaseOf<PlayerCareer>
 
 /** 사면 곧바로 쓴다 (0x14a74 탭 2 — 전역 G 차감, 0~99999) */
@@ -307,16 +299,12 @@ export function gpItemBlockReasonWith(view: GpGuardView, id: number): string | n
   }
   if (id === ITEM.도시락) {
     // 일부만 최대면 살 수 있다 — 네 개 다 최대일 때만 막는다. 줄마다 뒤에 "!N"(0x13932~0x1393a) — 끝 줄 뒤에도 붙는다
-    return maxedNames.length === view.abilities.length
-      ? maxedNames.map((name) => abilityMaxTextOf(name) + LINE_BREAK).join('')
-      : null
+    return maxedNames.length === view.abilities.length ? maxedNames.map((name) => abilityMaxTextOf(name) + LINE_BREAK).join('') : null
   }
-  if (id === ITEM.영지버섯) return view.morale >= MAXIMUM_MORALE ? ORIGINAL_MODE_TEXT[91] ?? '' : null
-  if (id === ITEM.건강진단) return !view.isInjured && !view.isSick ? ORIGINAL_MODE_TEXT[208] ?? '' : null
+  if (id === ITEM.영지버섯) return view.morale >= MAXIMUM_MORALE ? (ORIGINAL_MODE_TEXT[91] ?? '') : null
+  if (id === ITEM.건강진단) return !view.isInjured && !view.isSick ? (ORIGINAL_MODE_TEXT[208] ?? '') : null
   if (id === ITEM.최면요법) {
-    return view.skillIds.some((skill) => MINUS_SKILL_IDS.includes(skill))
-      ? null
-      : ORIGINAL_MODE_TEXT[209] ?? ''
+    return view.skillIds.some((skill) => MINUS_SKILL_IDS.includes(skill)) ? null : (ORIGINAL_MODE_TEXT[209] ?? '')
   }
   if (id === ITEM.이글아이) return view.ninthItemBlock
   return null
@@ -374,9 +362,7 @@ export function gpItemQuestionWith(
 ): string {
   const question = (ORIGINAL_MODE_TEXT[82] ?? '').replace('%d', String(price))
   if (id === ITEM.도시락) {
-    const maxedLines = view.abilityNames
-      .filter((_name, i) => view.abilities[i] >= view.limits[i])
-      .map((name) => abilityMaxTextOf(name) + LINE_BREAK)
+    const maxedLines = view.abilityNames.filter((_name, i) => view.abilities[i] >= view.limits[i]).map((name) => abilityMaxTextOf(name) + LINE_BREAK)
     return maxedLines.join('') + LINE_BREAK + question
   }
   if (id === ITEM.이글아이 && withEagleEyeNotice) return (ORIGINAL_MODE_TEXT[224] ?? '') + LINE_BREAK + LINE_BREAK + question
@@ -389,12 +375,7 @@ export function gpItemQuestionOf(career: PlayerCareer, id: number): string {
 }
 
 /** 사면 곧바로 쓴다 (0x14a74 탭 2 — 전역 G 차감 0~99999 뒤 0xa4488). 가격 표는 두 모드 같은 값이다 */
-export function purchaseGpItemWith<T extends GpItemCareer>(
-  rules: GpItemRules<T>,
-  career: T,
-  id: number,
-  random: RandomPort,
-): GpPurchaseOf<T> {
+export function purchaseGpItemWith<T extends GpItemCareer>(rules: GpItemRules<T>, career: T, id: number, random: RandomPort): GpPurchaseOf<T> {
   const price = BATTER_GP_ITEMS[id].price
   if (career.gamePoint < price) return { kind: '거절', reason: 'G포인트부족' }
   const paid = { ...career, gamePoint: Math.min(MAXIMUM_GAME_POINT, career.gamePoint - price) }
@@ -470,12 +451,7 @@ export interface GpNoticeTexts {
 }
 
 /** 사용 알림 — 원문 조각을 이어 붙인다 (StrMODE[35+k]/[40+k]+[83] · [116]/[117] · [122~126]). 상의 아이템 이름은 StrITEM[98+k] */
-export function gpItemNoticeWith(
-  texts: GpNoticeTexts,
-  id: number,
-  prize: LotteryPrize | null,
-  prizeItemId?: number,
-): string {
+export function gpItemNoticeWith(texts: GpNoticeTexts, id: number, prize: LotteryPrize | null, prizeItemId?: number): string {
   // 실제 상승은 +10 이지만 글에는 6·8 이 찍힌다 (원본 그대로).
   // 0xa455c~0xa45fe: StrMODE[35+k](투수 40+k · 모든능력치 39) + " "(0xd80bc) + 0xbc73d(6 · 8) + " "(0xd80bc) + StrMODE[83]
   if (id < texts.abilityNames.length) {

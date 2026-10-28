@@ -3,13 +3,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { registerContact } from '@/entities/batting/model/battedContact'
 import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
-import {
-  POSE,
-  RETURN_SLACK_TICKS,
-  canStepNextListTick,
-  listTickFielder,
-  withReturnToStartTick,
-} from '@/entities/fielding/model/fielderPose'
+import { POSE, RETURN_SLACK_TICKS, canStepNextListTick, listTickFielder, withReturnToStartTick } from '@/entities/fielding/model/fielderPose'
 import { AI_STATE, createFielders, initialPlayView } from '@/entities/fielding/model/fieldingState'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { runCoverTick } from '@/features/defense-play/model/coverTick'
@@ -69,7 +63,7 @@ describe('AI 0xf — 0xb2c58 이 사건 7 · 12 에 아홉 야수에 건다 · b
 })
 
 describe('추적야수 AI 1(b4aca)의 목표 고치기는 AI 고리 안 — 같은 틱 끝 b4c72 가 고친 목표를 본다 (r190)', () => {
-  it('중계 자리 b203a 가 이번 틱 목표로 잡혀 외야 송구의 중계 도착이 한 틱 늦다 (CPU 표 18/26 · 사람 \'6\')', () => {
+  it("중계 자리 b203a 가 이번 틱 목표로 잡혀 외야 송구의 중계 도착이 한 틱 늦다 (CPU 표 18/26 · 사람 '6')", () => {
     // 예전 웹은 추적야수 목표를 6 절 걸음에서 고쳐, 낙구점 → 포구점으로 바뀐 틱의 커버 다시 고르기가 옛 목표(낙구점)로 중계 자리를 잡았다
     const pattern = BATTED_BALL_PATTERNS[18][26]
     const 결과 = runDefensePlay({

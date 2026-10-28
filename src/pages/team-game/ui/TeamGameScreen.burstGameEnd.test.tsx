@@ -110,15 +110,7 @@ describe('시즌 경기 — 경기를 끝낸 타석의 돌발 결과 창은 경�
     판정칸.판정 = 시즌판정()
     vi.useFakeTimers()
     const onSettlementEnter = vi.fn()
-    render(
-      <TeamGameScreen
-        options={옵션}
-        random={createSeededRandom(1)}
-        onFinish={vi.fn()}
-        onQuit={vi.fn()}
-        onSettlementEnter={onSettlementEnter}
-      />,
-    )
+    render(<TeamGameScreen options={옵션} random={createSeededRandom(1)} onFinish={vi.fn()} onQuit={vi.fn()} onSettlementEnter={onSettlementEnter} />)
     fireEvent.keyDown(window, { key: 'Enter' })
     for (let 번 = 0; 번 < 4000 && 창() === null && screen.queryByAltText('승리투수') === null; 번 += 1) 흘리기(8)
     // 예전 화면은 요약이 서자마자 경기 끝 판 — 창이 안 섰다
@@ -141,9 +133,7 @@ describe('시즌 경기 — 경기를 끝낸 타석의 돌발 결과 창은 경�
     판정칸.판정 = 시즌판정()
     판정칸.때 = '중계'
     vi.useFakeTimers()
-    render(
-      <TeamGameScreen options={옵션} random={createSeededRandom(1)} onFinish={vi.fn()} onQuit={vi.fn()} onSettlementEnter={vi.fn()} />,
-    )
+    render(<TeamGameScreen options={옵션} random={createSeededRandom(1)} onFinish={vi.fn()} onQuit={vi.fn()} onSettlementEnter={vi.fn()} />)
     fireEvent.keyDown(window, { key: 'Enter' })
     for (let 번 = 0; 번 < 50 && 창() === null; 번 += 1) 흘리기(1)
     // 예전 화면은 중계 갈래가 경기 장면보다 앞이라 창 없이 중계가 경기 끝까지 돌았다

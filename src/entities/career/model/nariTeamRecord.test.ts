@@ -22,8 +22,7 @@ import { rosterLineupOf } from '@/entities/game/model/quickLineup'
 
 const 팀 = 3
 const 칸들 = (record: { readonly batters: readonly { readonly slot: number }[] }) => record.batters.map((row) => row.slot)
-const 위치들 = (record: { readonly batters: readonly { readonly position: number }[] }) =>
-  record.batters.map((row) => row.position)
+const 위치들 = (record: { readonly batters: readonly { readonly position: number }[] }) => record.batters.map((row) => row.position)
 
 describe('나리 팀 레코드 — 등록 0x10fb4 (0x204e1 · 0xb53f0 의 0x80 갈래)', () => {
   it('붙박이 표 그대로 — 타자 열둘 · 수비 위치 니블 · 마투수 없음', () => {
@@ -69,7 +68,10 @@ describe('142 마선수 넣기 — 0xb8870 · 0xb88c8 (0xb53f0 의 0x40 · 0xb52
 
   it('두 팀에 넣고 다시 읽는다 — 번호는 0x1f824 · 0x1f84c 처럼 0..4 로 자른다', () => {
     const records = seatNariMatchAces(createNariTeamRecords(팀, 7), 팀, 5, {
-      myBatter: 1, myPitcher: 0, opponentPitcher: 3, opponentBatter: -1,
+      myBatter: 1,
+      myPitcher: 0,
+      opponentPitcher: 3,
+      opponentBatter: -1,
     })
     expect(recordMatchAcesOf(records, 팀, 5)).toEqual({ myBatter: 1, myPitcher: 0, opponentPitcher: 3, opponentBatter: 0 })
     expect(recordMatchAcesOf(records, 팀, 6)).toEqual({ myBatter: 1, myPitcher: 0, opponentPitcher: -1, opponentBatter: -1 })

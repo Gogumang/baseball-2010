@@ -21,8 +21,13 @@ export function RunScoreBoard({ sides, scores }: RunScoreBoardProps) {
       {RUN_SCORE_SLOTS.map((slot, side) => (
         <span key={side} data-testid={`수비-득점판-점수-${side}`} data-value={scores[side]}>
           {runScoreGlyphsOf(scores[side]!, slot).map((glyph, index) => (
-            <img key={index} className={styles.runScoreDigit} alt="" src={`${NUM}/${String(glyph.image).padStart(3, '0')}.png`}
-              style={{ left: glyph.x, top: glyph.y }} />
+            <img
+              key={index}
+              className={styles.runScoreDigit}
+              alt=""
+              src={`${NUM}/${String(glyph.image).padStart(3, '0')}.png`}
+              style={{ left: glyph.x, top: glyph.y }}
+            />
           ))}
         </span>
       ))}

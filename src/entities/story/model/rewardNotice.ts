@@ -111,13 +111,22 @@ const HIDDEN_PITCH_TYPE_NUMBERS: readonly number[] = [18, 19, 20, 21]
 function salaryAfter(base: number, code: number): number {
   const part = (divisor: number) => Math.trunc(base / divisor)
   switch (code) {
-    case 0: return base + Math.trunc((base * 30) / 100)
-    case 1: case 4: return base + part(5)
-    case 2: case 5: return base + part(10)
-    case 3: return base - part(5)
-    case 6: return base + part(20)
-    case 7: return base - part(10)
-    default: return base
+    case 0:
+      return base + Math.trunc((base * 30) / 100)
+    case 1:
+    case 4:
+      return base + part(5)
+    case 2:
+    case 5:
+      return base + part(10)
+    case 3:
+      return base - part(5)
+    case 6:
+      return base + part(20)
+    case 7:
+      return base - part(10)
+    default:
+      return base
   }
 }
 
@@ -143,11 +152,16 @@ const sprintf = (format: string, value: string | number) => format.replace(/%[ds
 function yearAdjusted(items: readonly EventReward[], eventId: number, ctx: RewardNoticeContext): readonly EventReward[] {
   const y = ctx.years
   const isSeason = ctx.mode === SEASON_MODE
-  const table: Readonly<Record<number, number>> | null = eventId >= 393 && eventId <= 395
-    ? (isSeason ? { 0: 5, 1: 5, 3: 5 } : { 0: 3, 1: -2, 3: 1 })
-    : eventId === 396
-      ? (isSeason ? { 0: -10, 1: -2 } : { 0: -4, 1: -3 })
-      : null
+  const table: Readonly<Record<number, number>> | null =
+    eventId >= 393 && eventId <= 395
+      ? isSeason
+        ? { 0: 5, 1: 5, 3: 5 }
+        : { 0: 3, 1: -2, 3: 1 }
+      : eventId === 396
+        ? isSeason
+          ? { 0: -10, 1: -2 }
+          : { 0: -4, 1: -3 }
+        : null
   if (table === null) return items
   return items.map((item) => {
     const perYear = table[item.kind]
@@ -156,9 +170,7 @@ function yearAdjusted(items: readonly EventReward[], eventId: number, ctx: Rewar
 }
 
 /** 0x8beb8 — 항목들의 알림 글과 고친 항목 (굴림은 종류 11 값 ≥ 0 마다 한 번) */
-function buildRewardText(
-  items: readonly EventReward[], ctx: RewardNoticeContext,
-): { readonly text: string; readonly items: readonly EventReward[] } {
+function buildRewardText(items: readonly EventReward[], ctx: RewardNoticeContext): { readonly text: string; readonly items: readonly EventReward[] } {
   let text = ''
   const resolved: EventReward[] = []
   items.forEach((item, index) => {
@@ -223,8 +235,7 @@ export function rewardNoticeOf(items: readonly EventReward[], eventId: number, c
   const adjusted = yearAdjusted(items, eventId, ctx)
   const built = buildRewardText(adjusted, ctx)
   // 연차 보정은 종류 0 · 1 · 3 만 건드린다 — 질병 굴림만 원래 항목에 옮긴다
-  const resolved = items.map((item, index) =>
-    item.kind === ILLNESS_KIND && item.value >= 0 ? (built.items[index] ?? item) : item)
+  const resolved = items.map((item, index) => (item.kind === ILLNESS_KIND && item.value >= 0 ? (built.items[index] ?? item) : item))
   if (first === SKILL_KIND) {
     return { notice: { kind: '스킬', text: built.text, gained: (adjusted[0]?.value ?? 0) > 0 }, items: resolved }
   }

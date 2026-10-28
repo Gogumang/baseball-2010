@@ -4,7 +4,12 @@ import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
-  applySeasonGpItem, applySeasonSubItem, checkSeasonGpItem, checkSeasonSubItem, seasonGamePointAfter, seasonGpItemPriceOf,
+  applySeasonGpItem,
+  applySeasonSubItem,
+  checkSeasonGpItem,
+  checkSeasonSubItem,
+  seasonGamePointAfter,
+  seasonGpItemPriceOf,
 } from '@/entities/season-mode/model/seasonItemShop'
 
 const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({ ...startNewSeason(0, '테스터').record, ...덮어쓰기 })

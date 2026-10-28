@@ -64,15 +64,12 @@ export function equipmentItemOf(part: number, level: number): EquipmentItem {
     price: PRICE_TABLE[part][level] * PRICE_UNIT,
     requiredPopularity: REQUIRED_POPULARITY[level],
     isHidden,
-    hiddenHint: isHidden
-      ? ORIGINAL_ITEMS[HIDDEN_HINT_START + part * HIDDEN_HINTS_PER_PART + level - FIRST_HIDDEN_LEVEL]
-      : null,
+    hiddenHint: isHidden ? ORIGINAL_ITEMS[HIDDEN_HINT_START + part * HIDDEN_HINTS_PER_PART + level - FIRST_HIDDEN_LEVEL] : null,
   }
 }
 
 const keyOf = (part: number, level: number) => `${part}-${level}`
-export const ownsEquipment = (career: PlayerCareer, part: number, level: number) =>
-  career.ownedEquipment.includes(keyOf(part, level))
+export const ownsEquipment = (career: PlayerCareer, part: number, level: number) => career.ownedEquipment.includes(keyOf(part, level))
 
 /** 컬렉터 레벨 — 힌트 둘째 줄 "○○ 컬렉터" = 레벨 8 (0xa5020 이 타자 id 36/40/44/48 을 연다) */
 const COLLECTOR_LEVEL = 8

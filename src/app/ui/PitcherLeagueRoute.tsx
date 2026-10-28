@@ -44,11 +44,7 @@ import { MessageBox, ScreenOverlay } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
-import {
-  isContinuablePitcherEnding,
-  judgePitcherSeasonAwards,
-  pitcherEndingBonusOf,
-} from '@/entities/pitcher-career/model/pitcherSeasonFlow'
+import { isContinuablePitcherEnding, judgePitcherSeasonAwards, pitcherEndingBonusOf } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { PITCHER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { ReactNode } from 'react'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
@@ -131,9 +127,7 @@ export function PitcherLeagueRoute(props: PitcherLeagueRouteProps) {
  * 주인공 초상화는 피부 팔레트만 따른다: 장타형 +8(0x63a70)은 `모드 == 4` 일 때만이라 투수는 늘 +0 이다.
  * 상점은 [아이템] → 110 → **111 상점**(장비·서브·GP) · [선수정보] → **121 장비착용** 이 `PitcherShopScreen` 으로 간다.
  */
-function PitcherLeagueScreens({
-  session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch, hallOfFame,
-}: PitcherLeagueRouteProps) {
+function PitcherLeagueScreens({ session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch, hallOfFame }: PitcherLeagueRouteProps) {
   const { career, scene, gameOptions, shopTab, shopNotice, shopGpDetail, actions } = session
   /** 이전 장면 — 105 진입 0x11910 이 이전 상태 1 · 114 · 100 이면 가운데 판을 미끄러뜨린다 (0x8a2d8) */
   const sceneTrail = useRef<{ readonly scene: string; readonly previous: string | null }>({ scene, previous: null })
@@ -154,9 +148,14 @@ function PitcherLeagueScreens({
   const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '143'
   const mainCursor = useRef(createNariMainMenuCursor()).current
   const entryTrail = useRef<string | null>(null)
-  const entryKey = career === null ? null
-    : scene === '관리' ? '관리'
-      : scene === '이벤트' && session.story?.context === '관리' ? `이벤트:${session.story.eventId}` : null
+  const entryKey =
+    career === null
+      ? null
+      : scene === '관리'
+        ? '관리'
+        : scene === '이벤트' && session.story?.context === '관리'
+          ? `이벤트:${session.story.eventId}`
+          : null
   if (entryKey !== entryTrail.current) {
     const isFromManagementFrame = scene === '이벤트' && entryTrail.current === '관리'
     if (career !== null && entryKey !== null && !isFromManagementFrame) {
@@ -171,10 +170,15 @@ function PitcherLeagueScreens({
   const eventEnd = useEventEndFrame(actions.completeStory)
 
   if (career === null || scene === '등록') {
-    return <PitcherCreateFlow openedHiddenIds={openedHiddenIds} onCreate={actions.create}
-      {...(hallOfFame?.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint })}
-      // 101 팀 고르기 취소 0x14114 1424c~14264: [0x140006c] = 5 — 게임시작 목록으로 바로 연다([0x1552d14] = 1 은 전역 모드를 일반으로)
-      onCancel={() => onExit(5)} />
+    return (
+      <PitcherCreateFlow
+        openedHiddenIds={openedHiddenIds}
+        onCreate={actions.create}
+        {...(hallOfFame?.gamePoint === undefined ? {} : { gamePoint: hallOfFame.gamePoint })}
+        // 101 팀 고르기 취소 0x14114 1424c~14264: [0x140006c] = 5 — 게임시작 목록으로 바로 연다([0x1552d14] = 1 은 전역 모드를 일반으로)
+        onCancel={() => onExit(5)}
+      />
+    )
   }
 
   if (scene === '경기' && gameOptions !== null) {
@@ -211,8 +215,12 @@ function PitcherLeagueScreens({
   // 116 경기 뒤 평가 — [확인] = 114 → 105/109/128/136
   if (scene === '경기결과' && career.lastGame !== undefined) {
     return (
-      <PitcherGameEvaluationScreen career={career} lastGame={career.lastGame} onConfirm={actions.confirmGameResult}
-        onRewardsGiven={actions.giveEvaluationRewards} />
+      <PitcherGameEvaluationScreen
+        career={career}
+        lastGame={career.lastGame}
+        onConfirm={actions.confirmGameResult}
+        onRewardsGiven={actions.giveEvaluationRewards}
+      />
     )
   }
 
@@ -238,9 +246,14 @@ function PitcherLeagueScreens({
 
   if (scene === '다음경기순위') {
     return (
-      <NextGameStandingsScreen league={career.league} edition="투수편" gamePoint={career.gamePoint}
+      <NextGameStandingsScreen
+        league={career.league}
+        edition="투수편"
+        gamePoint={career.gamePoint}
         isFromManagement={session.nextGameFromManagement}
-        onConfirm={actions.confirmNextGameStandings} onCancel={actions.cancelNextGameStandings} />
+        onConfirm={actions.confirmNextGameStandings}
+        onCancel={actions.cancelNextGameStandings}
+      />
     )
   }
 
@@ -252,25 +265,43 @@ function PitcherLeagueScreens({
     if (entryView !== null) {
       return (
         <NariScreenPush view={pushView}>
-          <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
-            teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
-            onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}}
+          <EntryEditorScreen
+            editor={entryView.editor}
+            lists={entryView.lists}
+            teamName={TEAMS[entryView.teamId]?.name ?? ''}
+            isAceLocked={false}
+            gamePoint={career.gamePoint}
+            onKey={actions.pressEntryViewKey}
+            onMoveCursor={actions.pointEntryViewCursor}
+            onCloseAceLocked={() => {}}
             // 나리 틀 0x16928 은 142~144 면 142 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
-            underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} slides={false} />
+            underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
+            slides={false}
+          />
         </NariScreenPush>
       )
     }
     // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 (타자편과 같은 상태)
     // 국가대항전(135 에서 옴)이면 대회 표 · 마선수 "-" (1c5fe)
-    const match = session.cupMatch === null
-      ? pitcherMatchInfoOf(career, session.matchAces)
-      : pitcherCupMatchInfoOf(career, session.cupMatch.matchup, session.cupMatch.cup)
+    const match =
+      session.cupMatch === null
+        ? pitcherMatchInfoOf(career, session.matchAces)
+        : pitcherCupMatchInfoOf(career, session.cupMatch.matchup, session.cupMatch.cup)
     return (
       <NariScreenPush view={pushView}>
-        <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-          playerSide={match.playerSide} edition="투수편" gamePoint={career.gamePoint} stage={session.matchInfoStage}
-          onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView}
-            isEntryAnimated={isMatchInfoEntryAnimated} />
+        <NariMatchInfoScreen
+          lines={match.lines}
+          myTeamId={match.myTeamId}
+          opponentTeamId={match.opponentTeamId}
+          playerSide={match.playerSide}
+          edition="투수편"
+          gamePoint={career.gamePoint}
+          stage={session.matchInfoStage}
+          onStart={actions.confirmMatchPrepare}
+          onCancel={actions.cancelMatchPrepare}
+          onEntry={actions.openEntryView}
+          isEntryAnimated={isMatchInfoEntryAnimated}
+        />
       </NariScreenPush>
     )
   }
@@ -295,12 +326,16 @@ function PitcherLeagueScreens({
       // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 위 팝업으로)
       resultText={session.outingResult?.effectText ?? null}
       onCloseResult={actions.closeOutingResult}
-      presentation={session.outingPresentation === null ? null : (
-        <SeasonOutingPopup place={session.outingPresentation.place}
-          presentation={nariOutingPresentationOf(session.outingPresentation.place, { isSlugger: false })}
-          char0Palette={portraitPaletteIndex(career.skinIndex)}
-          onFinished={actions.finishOutingPresentation} />
-      )}
+      presentation={
+        session.outingPresentation === null ? null : (
+          <SeasonOutingPopup
+            place={session.outingPresentation.place}
+            presentation={nariOutingPresentationOf(session.outingPresentation.place, { isSlugger: false })}
+            char0Palette={portraitPaletteIndex(career.skinIndex)}
+            onFinished={actions.finishOutingPresentation}
+          />
+        )
+      }
     />
   )
 
@@ -312,14 +347,17 @@ function PitcherLeagueScreens({
       // 114 그림 0x19e64 → 대화창 0x8b5ac: [gfx+0x174] 가 0x70·0x71(112 · 113 · 140 진입)이면 외출 지도, 그 밖(105 · 115 ·
       // 116 · 117 · 130~138 뒤)은 공 무늬 + 상태판 + 머리띠 (`PitcherEventUnderlay`) — 커맨드 줄은 없다.
       // 지도(112) · 장소(113) · 대결결과(140) 뒤는 지도 0x7ea64(gfx, −1, 0) 만 — 선택 화살표 · 말풍선 · 머리띠 없음 (`OutingMapUnderlay`)
-      const isOverStatusBoard =
-        story.context === '관리' || story.context === '중간평가' || story.context === '연초' || story.context === '연말'
+      const isOverStatusBoard = story.context === '관리' || story.context === '중간평가' || story.context === '연초' || story.context === '연말'
       const isOverMap = story.context === '지도' || story.context === '장소' || story.context === '대결결과'
       // 재생이 끝난 한 틀 — 타자편과 같은 0x19e64: 앞 상태 112 · 113 만 지도, 그 밖(140 포함)은 0x19da4 = 공 무늬 · 상태판(0) ·
       // 커맨드 줄(앞 상태 105 = '관리' 갈래만 관리 6칸, 그 밖 칸 수 0) · 머리띠 제목 9
       if (eventEnd.isEnding) {
         if (story.context === '지도' || story.context === '장소') {
-          return <RawScreen><OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} /></RawScreen>
+          return (
+            <RawScreen>
+              <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
+            </RawScreen>
+          )
         }
         return (
           <RawScreen>
@@ -338,37 +376,35 @@ function PitcherLeagueScreens({
             {isOverMap && <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />}
           </RawScreen>
           <ScreenOverlay>
-          <StoryScreen
-            // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
-            isVibrationOn={gameSettings.settings.isVibrationOn}
-            // 초상화 바닥 y — [gfx+0x174] 0x70 · 0x71 이면 252, 그 밖 135 (0x7fdee)
-            isOverOutingMap={isOverMap}
-            key={`${story.context}:${event.id}`}
-            events={session.storyEvents}
-            event={event}
-            playerName={career.name}
-            teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
-            skinIndex={career.skinIndex}
-            battingTypeIndex={0}
-            replacementsFor={session.storyReplacementsFor}
-            onComplete={eventEnd.end}
-            carried={story.carried}
-            onMatch={actions.beginAceMatch}
-            // 370·375 의 system 3·4 — 타이틀(0x8b3bc, 투수 문구 79~81 · 마무리 82)·MVP(0x8b23c) 발표 창 (130·131 과 같은 판정)
-            systemWindowTextOf={(command) =>
-              awardWindowTextOf(command.sub, () => judgePitcherSeasonAwards(career))
-            }
-            // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
-            yearGoalWindowOf={() => pitcherYearGoalWindowValuesOf(career)}
-            // 보상 명령 7 의 알림 창 — 0x8beb8 글 → 0x74ef4 종류 1 · 첫 종류 4 는 스킬 창 0x741a0 (모드 3 투수편)
-            rewardNoticeContext={() => rewardNoticeContextOf(career, PITCHER_LEAGUE_MODE, random)}
-            // system 창 답 0 → 0x7fe90 (S+0x1b7 = 1 · 저장)
-            onSystemWindowConfirm={actions.confirmEventSystemWindow}
-            // 보상 명령 7 은 창을 세운 그 갱신에 준다 (0x8c460)
-            onReward={actions.giveStoryReward}
-            // 선택지 OK → 0x8b0e4 (떠나온 줄 본 표시 · 저장)
-            onChoiceConfirm={actions.confirmStoryChoice}
-          />
+            <StoryScreen
+              // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
+              isVibrationOn={gameSettings.settings.isVibrationOn}
+              // 초상화 바닥 y — [gfx+0x174] 0x70 · 0x71 이면 252, 그 밖 135 (0x7fdee)
+              isOverOutingMap={isOverMap}
+              key={`${story.context}:${event.id}`}
+              events={session.storyEvents}
+              event={event}
+              playerName={career.name}
+              teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
+              skinIndex={career.skinIndex}
+              battingTypeIndex={0}
+              replacementsFor={session.storyReplacementsFor}
+              onComplete={eventEnd.end}
+              carried={story.carried}
+              onMatch={actions.beginAceMatch}
+              // 370·375 의 system 3·4 — 타이틀(0x8b3bc, 투수 문구 79~81 · 마무리 82)·MVP(0x8b23c) 발표 창 (130·131 과 같은 판정)
+              systemWindowTextOf={(command) => awardWindowTextOf(command.sub, () => judgePitcherSeasonAwards(career))}
+              // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
+              yearGoalWindowOf={() => pitcherYearGoalWindowValuesOf(career)}
+              // 보상 명령 7 의 알림 창 — 0x8beb8 글 → 0x74ef4 종류 1 · 첫 종류 4 는 스킬 창 0x741a0 (모드 3 투수편)
+              rewardNoticeContext={() => rewardNoticeContextOf(career, PITCHER_LEAGUE_MODE, random)}
+              // system 창 답 0 → 0x7fe90 (S+0x1b7 = 1 · 저장)
+              onSystemWindowConfirm={actions.confirmEventSystemWindow}
+              // 보상 명령 7 은 창을 세운 그 갱신에 준다 (0x8c460)
+              onReward={actions.giveStoryReward}
+              // 선택지 OK → 0x8b0e4 (떠나온 줄 본 표시 · 저장)
+              onChoiceConfirm={actions.confirmStoryChoice}
+            />
           </ScreenOverlay>
         </>
       )
@@ -468,9 +504,7 @@ function PitcherLeagueScreens({
   if (scene === '상점') {
     // 해금표는 원본에서 전역(app+0xc0)이라 기록연감의 오픈 id 를 얹어 보여 준다 — 구매도 같은 값으로 판정한다
     const missing = openedHiddenIds.filter((id) => !career.openedHiddenIds.includes(id))
-    const shopCareer = missing.length === 0
-      ? career
-      : { ...career, openedHiddenIds: [...career.openedHiddenIds, ...missing] }
+    const shopCareer = missing.length === 0 ? career : { ...career, openedHiddenIds: [...career.openedHiddenIds, ...missing] }
     return (
       <PitcherShopScreen
         key={shopTab}
@@ -494,25 +528,43 @@ function PitcherLeagueScreens({
     const statusBoard = <PitcherEventUnderlay career={career} />
     const previousScreenAt = session.yearCoverFromResume
       ? (frame: number) => {
-        const underlay = resumeCoverUnderlayAt(frame)
-        if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
-        if (underlay === '관리') return <PitcherResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} />
-        if (underlay === '상태판') return statusBoard
-        // 연초 114 — 0x19e64 밑그림 위에 대화창 0x8b5ac(내장 이벤트 0x8a681 의 첫 say). 키는 장면 키 문이 버린다
-        return (
-          <>
-            {statusBoard}
-            <StoryScreen events={PITCHER_YEAR_START_EVENTS} event={PITCHER_YEAR_START_EVENT} playerName={career.name}
-              teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name} skinIndex={career.skinIndex} battingTypeIndex={0}
-              isVibrationOn={gameSettings.settings.isVibrationOn} onComplete={ignoreEventEnd} onMatch={ignoreEventEnd} isInputLocked />
-          </>
-        )
-      }
-      : previousScene === '이벤트' ? () => statusBoard : undefined
+          const underlay = resumeCoverUnderlayAt(frame)
+          if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
+          if (underlay === '관리')
+            return (
+              <PitcherResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} />
+            )
+          if (underlay === '상태판') return statusBoard
+          // 연초 114 — 0x19e64 밑그림 위에 대화창 0x8b5ac(내장 이벤트 0x8a681 의 첫 say). 키는 장면 키 문이 버린다
+          return (
+            <>
+              {statusBoard}
+              <StoryScreen
+                events={PITCHER_YEAR_START_EVENTS}
+                event={PITCHER_YEAR_START_EVENT}
+                playerName={career.name}
+                teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
+                skinIndex={career.skinIndex}
+                battingTypeIndex={0}
+                isVibrationOn={gameSettings.settings.isVibrationOn}
+                onComplete={ignoreEventEnd}
+                onMatch={ignoreEventEnd}
+                isInputLocked
+              />
+            </>
+          )
+        }
+      : previousScene === '이벤트'
+        ? () => statusBoard
+        : undefined
     // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다 — 타자편과 같은 137
     return (
-      <NariYearCoverScreen yearIndex={career.season - 1} onDone={() => actions.goto('관리')} previousScreenAt={previousScreenAt}
-        {...(session.yearCoverAfterHold ? { startFrame: YEAR_COVER_ENTRY_FRAMES } : {})} />
+      <NariYearCoverScreen
+        yearIndex={career.season - 1}
+        onDone={() => actions.goto('관리')}
+        previousScreenAt={previousScreenAt}
+        {...(session.yearCoverAfterHold ? { startFrame: YEAR_COVER_ENTRY_FRAMES } : {})}
+      />
     )
   }
 
@@ -524,17 +576,15 @@ function PitcherLeagueScreens({
       {/* 관리 화면(RawScreen)의 형제라 240×320 기둥(ScreenOverlay)에 가둔다 — 안 가두면 창 판(left 0 · 폭 240)이 창 전체 왼쪽에 붙어 그려졌다.
           기둥은 누름을 받으므로 창이 있을 때만 세운다 */}
       {(session.outingRecoveryNotice !== '' || session.pendingTitle !== null) && (
-      <ScreenOverlay>
-        {/* 126 → 105 뒤 남는 입원 회복 팝업 (0x1575c `0xbbef8(글, 1, 1, 1)`) */}
-        {session.outingRecoveryNotice !== '' && (
-          <MessageBox text={session.outingRecoveryNotice} buttons={['확인']} onAnswer={actions.dismissOutingRecoveryNotice} />
-        )}
-        {/* 칭호 팝업 0x1274c — 그리기 0x1afe8(투수편 i > 31 이면 이름 [i+16] · 조건 [i+80]) · 키 0x1b1e4 (`TitleWindow`).
+        <ScreenOverlay>
+          {/* 126 → 105 뒤 남는 입원 회복 팝업 (0x1575c `0xbbef8(글, 1, 1, 1)`) */}
+          {session.outingRecoveryNotice !== '' && (
+            <MessageBox text={session.outingRecoveryNotice} buttons={['확인']} onAnswer={actions.dismissOutingRecoveryNotice} />
+          )}
+          {/* 칭호 팝업 0x1274c — 그리기 0x1afe8(투수편 i > 31 이면 이름 [i+16] · 조건 [i+80]) · 키 0x1b1e4 (`TitleWindow`).
             키가 창을 그 자리에서 치우고 다음 갱신 0x1aec4 가 다음 칭호를 새 창으로 띄운다 — `key` 가 칭호마다 새 창을 세운다 */}
-        {session.pendingTitle !== null && (
-          <TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} />
-        )}
-      </ScreenOverlay>
+          {session.pendingTitle !== null && <TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} />}
+        </ScreenOverlay>
       )}
     </>
   )

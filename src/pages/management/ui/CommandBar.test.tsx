@@ -11,13 +11,24 @@ const SETTLED = 1_000
 
 /** 0x7e6f8~0x7e710 — 꺼진 칸은 0xc37a8(칸.x, 칸.y + 미끄럼, 32, 32) 로 이미 그린 화면을 흑백으로 바꾼다 */
 describe('커맨드 줄 흑백 칸 (0xc37a8)', () => {
-  const 띄우기 = (grayedIds: ReadonlySet<string>) => render(
-    <>
-      <SkinBackdrop kind="공무늬" />
-      <CommandBar slots={COMMAND_SLOTS} cursor={0} bounce={0} slideUpdates={SETTLED} disabledIds={new Set()}
-        grayedIds={grayedIds} labelWidths={{}} parent={null} onHover={vi.fn()} onSelect={vi.fn()} />
-    </>,
-  )
+  const 띄우기 = (grayedIds: ReadonlySet<string>) =>
+    render(
+      <>
+        <SkinBackdrop kind="공무늬" />
+        <CommandBar
+          slots={COMMAND_SLOTS}
+          cursor={0}
+          bounce={0}
+          slideUpdates={SETTLED}
+          disabledIds={new Set()}
+          grayedIds={grayedIds}
+          labelWidths={{}}
+          parent={null}
+          onHover={vi.fn()}
+          onSelect={vi.fn()}
+        />
+      </>,
+    )
 
   it('꺼진 칸에만 회색 겹을 얹는다 (CSS 거르개는 쓰지 않는다)', () => {
     띄우기(new Set([COMMAND_SLOTS[2].id]))

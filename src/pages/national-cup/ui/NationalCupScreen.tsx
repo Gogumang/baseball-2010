@@ -74,9 +74,7 @@ export interface NationalCupScreenProps {
 }
 
 /** 134 에 들어설 때 걸리는 팝업 — 히든 팀 오픈(0x22) · 칭호(0x1274c 창, 높이 0x78) */
-type EntryPopup =
-  | { readonly kind: '히든팀'; readonly text: string }
-  | { readonly kind: '칭호'; readonly title: string }
+type EntryPopup = { readonly kind: '히든팀'; readonly text: string } | { readonly kind: '칭호'; readonly title: string }
 
 interface EntryState {
   /** 이번 진입이 처음 연 히든 팀 (팝업이 대기 칸에서 밀려도 열기는 다 일어난다) */
@@ -97,10 +95,11 @@ function entryStateOf(
   if (!isEntering) return { openedTeams: [], popups: [] }
   const openedTeams = openedHiddenIds === undefined ? [] : newlyOpenedHiddenTeamsOf(cup, openedHiddenIds)
   const hiddenPopups: EntryPopup[] = openedTeams.map((team) => ({ kind: '히든팀', text: hiddenTeamOpenText(TEAMS[team]?.name ?? '') }))
-  const titlePopups: EntryPopup[] = entryTitle === null || entryTitle === undefined
-    ? []
-    // 칭호 팝업 0x1274c — 그리기 0x1afe8 · 키 0x1b1e4 (`TitleWindow`)
-    : [{ kind: '칭호', title: entryTitle }]
+  const titlePopups: EntryPopup[] =
+    entryTitle === null || entryTitle === undefined
+      ? []
+      : // 칭호 팝업 0x1274c — 그리기 0x1afe8 · 키 0x1b1e4 (`TitleWindow`)
+        [{ kind: '칭호', title: entryTitle }]
   return { openedTeams, popups: queuedPopupsOf([...hiddenPopups, ...titlePopups]) }
 }
 
@@ -139,8 +138,20 @@ type Step = '대진' | '순위' | '결과' | '보상' | '끝'
  *   시즌 0xf4 키 0x4a18 은 −16 → 0xf3 이 있다. 134 · 0xf3 키(0x19fdc · 0xe6f8)도 확인만 본다.
  */
 export function NationalCupScreen({
-  mode, cup, yearIndex, gamePoint = 0, random, onStartGame, onFinish, initialStep = '대진', underlay, edition: nariEdition = '타자편',
-  openedHiddenIds, onOpenHiddenTeams, entryTitle, onConfirmEntryTitle,
+  mode,
+  cup,
+  yearIndex,
+  gamePoint = 0,
+  random,
+  onStartGame,
+  onFinish,
+  initialStep = '대진',
+  underlay,
+  edition: nariEdition = '타자편',
+  openedHiddenIds,
+  onOpenHiddenTeams,
+  entryTitle,
+  onConfirmEntryTitle,
 }: NationalCupScreenProps) {
   const [step, setStep] = useState<Step>(initialStep)
   /** 들어선 그 순간의 팝업 — 진입은 한 번이라 처음 그린 때의 값으로 굳힌다 */
@@ -235,15 +246,25 @@ export function NationalCupScreen({
       )}
 
       {/* 시즌 0xf3 은 제목 10 · 바닥 1, 0xf4 는 10 · 5. 나리 134·135 는 제목 장면+0xcc == 4 ? 8(타자편) : 9(투수편) · 5 — 되돌아가기는 표시만 */}
-      {mode === '시즌모드'
-        ? <ScreenFrame title="시즌모드" gamePoint={gamePoint}
-            // 0xf4 키 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
-            onBack={step === '순위' ? () => setStep('대진') : null} slides={false} />
-        : <ScreenFrame title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'} gamePoint={gamePoint} onBack={null} footer={5} slides={false} />}
-
-      {entryPopup?.kind === '히든팀' && (
-        <MessageBox text={entryPopup.text} buttons={['확인']} onAnswer={closeEntryPopup} />
+      {mode === '시즌모드' ? (
+        <ScreenFrame
+          title="시즌모드"
+          gamePoint={gamePoint}
+          // 0xf4 키 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
+          onBack={step === '순위' ? () => setStep('대진') : null}
+          slides={false}
+        />
+      ) : (
+        <ScreenFrame
+          title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'}
+          gamePoint={gamePoint}
+          onBack={null}
+          footer={5}
+          slides={false}
+        />
       )}
+
+      {entryPopup?.kind === '히든팀' && <MessageBox text={entryPopup.text} buttons={['확인']} onAnswer={closeEntryPopup} />}
       {entryPopup?.kind === '칭호' && (
         // 칭호 팝업 확인 0x1b1e4 — 키를 받은 그 자리에서 비트 · 곧바로 장착(+0x1c4) · 저장 · 창을 바로 치운다(0x742a8, 닫힘 애니 없음)
         <TitleWindow key={entryPopupIndex} title={entryPopup.title} onKey={onConfirmEntryTitle} onClose={closeEntryPopup} />
@@ -257,13 +278,7 @@ export function NationalCupScreen({
         />
       )}
 
-      {step === '보상' && (
-        <MessageBox
-          text={nationalCupRewardText(finish.reward)}
-          buttons={['확인']}
-          onAnswer={finishCup}
-        />
-      )}
+      {step === '보상' && <MessageBox text={nationalCupRewardText(finish.reward)} buttons={['확인']} onAnswer={finishCup} />}
     </RawScreen>
   )
 }

@@ -86,7 +86,6 @@ const 그림 = (at: number) =>
     for (const callback of pending) callback(at)
   })
 
-
 const 틀간격 = () => millisecondsPerFrame() / 4 + 0.37
 
 describe('타자편 타석 — 창이 선 첫 그림 (r178)', () => {

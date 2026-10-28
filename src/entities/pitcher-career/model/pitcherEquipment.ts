@@ -90,9 +90,7 @@ export function pitcherEquipmentItemOf(part: number, level: number): PitcherEqui
     price: PRICE_TABLE[part][level] * PRICE_UNIT,
     requiredPopularity: REQUIRED_POPULARITY[level],
     isHidden,
-    hiddenHint: isHidden
-      ? ORIGINAL_ITEMS[HIDDEN_HINT_START + part * HIDDEN_LEVELS_PER_PART + level - FIRST_HIDDEN_LEVEL]
-      : null,
+    hiddenHint: isHidden ? ORIGINAL_ITEMS[HIDDEN_HINT_START + part * HIDDEN_LEVELS_PER_PART + level - FIRST_HIDDEN_LEVEL] : null,
   }
 }
 
@@ -103,13 +101,11 @@ export function pitcherHiddenOpenIdOf(part: number, level: number): number {
 /** 보유 표시 — 타자편과 같은 "부위-레벨" 문자열 (`rec[0x188 + 부위·11 + 레벨]`) */
 const keyOf = (part: number, level: number) => `${part}-${level}`
 
-export const ownsPitcherEquipment = (career: PitcherCareer, part: number, level: number) =>
-  career.ownedEquipment.includes(keyOf(part, level))
+export const ownsPitcherEquipment = (career: PitcherCareer, part: number, level: number) => career.ownedEquipment.includes(keyOf(part, level))
 
 /** 0xa5020 — 레벨 0~6 일곱 칸을 다 가졌나 */
 const isCollector = (career: PitcherCareer, part: number) =>
-  Array.from({ length: FIRST_HIDDEN_LEVEL }, (_unused, level) => level).every((level) =>
-    ownsPitcherEquipment(career, part, level))
+  Array.from({ length: FIRST_HIDDEN_LEVEL }, (_unused, level) => level).every((level) => ownsPitcherEquipment(career, part, level))
 
 /**
  * 히든 레벨이 열렸는가 — 원본은 **전역 해금표**(`app+0xc0`, 0x9f69c)만 본다. 웹은 커리어의 `openedHiddenIds`(앱이 전역 기록연감 것을
@@ -127,11 +123,7 @@ export function isPitcherHiddenOpen(career: PitcherCareer, part: number, level: 
 export type PitcherEquipmentBlockReason = '미오픈' | '이미보유' | '인기도부족' | '소지금부족'
 
 /** 0x13460 kind 3 의 가드 차례 그대로 — 미오픈(76) → 보유(78) → 인기도(62) → 소지금(77) */
-export function pitcherEquipmentBlockReasonOf(
-  career: PitcherCareer,
-  part: number,
-  level: number,
-): PitcherEquipmentBlockReason | null {
+export function pitcherEquipmentBlockReasonOf(career: PitcherCareer, part: number, level: number): PitcherEquipmentBlockReason | null {
   const item = pitcherEquipmentItemOf(part, level)
   if (!isPitcherHiddenOpen(career, part, level)) return '미오픈'
   if (ownsPitcherEquipment(career, part, level)) return '이미보유'
@@ -164,8 +156,7 @@ export function purchasePitcherEquipment(career: PitcherCareer, part: number, le
   )
   // 0x14bae~0x14c86 — 저장 직후 **네 부위 모두** 0xa5020 을 보고 참인 부위마다 0x62368(ui, 컬렉터 id, 0)
   return PITCHER_EQUIPMENT_PARTS.reduce(
-    (current, _part, index) =>
-      (isCollector(current, index) ? openHidden(current, pitcherHiddenOpenIdOf(index, COLLECTOR_LEVEL)) : current),
+    (current, _part, index) => (isCollector(current, index) ? openHidden(current, pitcherHiddenOpenIdOf(index, COLLECTOR_LEVEL)) : current),
     bought,
   )
 }

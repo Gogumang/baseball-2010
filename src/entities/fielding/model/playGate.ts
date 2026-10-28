@@ -93,8 +93,7 @@ export function passPlayGate(input: PlayGateInput): PlayGateResult {
     const ball = input.foulBall
     if (ball === undefined) return { open: true, endCounter: counter }
     // b0d70~b0d8c — 담장선을 먼저 넘고 떨어지는 바로 그 틱
-    const landedOutside =
-      ball.fenceTick !== -1 && ball.landingTick > ball.fenceTick && ball.currentTick === ball.landingTick
+    const landedOutside = ball.fenceTick !== -1 && ball.landingTick > ball.fenceTick && ball.currentTick === ball.landingTick
     // b0d8e~b0da4 — z > 0x7f57 && q + 0xe1 < 0 && q > −315 (0xfffffec5)
     const behindPlate = ball.z > 0x7f57 && ball.angle + 0xe1 < 0 && ball.angle > -315
     return { open: !(ball.stopped || landedOutside || behindPlate), endCounter: counter }
@@ -236,13 +235,8 @@ export function gateRunnerViewsOf(
  *   주자 틱 a0270 이 `+0x88 == −1` 이면 곧바로, 도착 0xa040c 가 `+0x8c == +0x88` 이면 지운다(+0x88 = −1 과 함께).
  *   그래서 이 웹 모델은 `requiredBase ≠ −1` 로 읽는다(`coverAssignment` 0xb1b88 과 같은 읽기).
  */
-export function someRunnerStillActive(
-  runners: readonly RunnerState[],
-  atTarget: (runner: RunnerState) => boolean,
-): boolean {
-  return runners.some(
-    (runner) => !runner.isOut && !runner.scored && (!atTarget(runner) || runner.requiredBase !== NONE),
-  )
+export function someRunnerStillActive(runners: readonly RunnerState[], atTarget: (runner: RunnerState) => boolean): boolean {
+  return runners.some((runner) => !runner.isOut && !runner.scored && (!atTarget(runner) || runner.requiredBase !== NONE))
 }
 
 /** **`0xa990c`(주자관리)** = 주자 수 − `+0x96` 선 주자 수 */

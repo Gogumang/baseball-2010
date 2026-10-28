@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import {
-  matchInfoEntryPhaseOf, matchInfoValueRowsAt, matchInfoValueRowsAtCall,
-} from '@/pages/management/lib/matchInfoEntry'
+import { matchInfoEntryPhaseOf, matchInfoValueRowsAt, matchInfoValueRowsAtCall } from '@/pages/management/lib/matchInfoEntry'
 import type { MatchInfoEntryPhase, MatchInfoValueRows } from '@/pages/management/lib/matchInfoEntry'
 
 export interface MatchInfoEntryView {
@@ -21,9 +19,10 @@ export interface MatchInfoEntryView {
  */
 export function useMatchInfoEntry(isEntryAnimated: boolean, isRespinning = false): MatchInfoEntryView {
   const draws = useUpdateCounter()
-  const [respin, setRespin] = useState<{ readonly wasRespinning: boolean; readonly endedAt: number | null }>(
-    { wasRespinning: isRespinning, endedAt: null },
-  )
+  const [respin, setRespin] = useState<{ readonly wasRespinning: boolean; readonly endedAt: number | null }>({
+    wasRespinning: isRespinning,
+    endedAt: null,
+  })
   if (respin.wasRespinning !== isRespinning) setRespin({ wasRespinning: isRespinning, endedAt: isRespinning ? null : draws })
   const { endedAt } = respin
   const phase = matchInfoEntryPhaseOf(draws, isEntryAnimated)

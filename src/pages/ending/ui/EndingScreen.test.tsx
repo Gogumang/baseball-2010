@@ -4,9 +4,22 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EndingScreen } from '@/pages/ending/ui/EndingScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
-  BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, ENDING_IMAGE, ENDING_STAGE, SHORT_ENDING_TEXT_TOP, WALK_IN,
-  creditsTopOf, creditsWalkersOf, endingImageOffsetOf, endingStageZeroCoverOpacityAt, endingWalkInAnimationOf, endingWalkInPaletteOf,
-  irisCircleOf, irisStartTickOf, risingTextTopOf,
+  BAND_BACKGROUND,
+  BAND_WINDOW,
+  BATTER_EDITION_MODE,
+  ENDING_IMAGE,
+  ENDING_STAGE,
+  SHORT_ENDING_TEXT_TOP,
+  WALK_IN,
+  creditsTopOf,
+  creditsWalkersOf,
+  endingImageOffsetOf,
+  endingStageZeroCoverOpacityAt,
+  endingWalkInAnimationOf,
+  endingWalkInPaletteOf,
+  irisCircleOf,
+  irisStartTickOf,
+  risingTextTopOf,
 } from '@/pages/ending/lib/endingLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { RawScreen } from '@/shared/ui'
@@ -192,9 +205,7 @@ describe('제작진 (0x88bb4)', () => {
 
   it('선수와 본 연애 상대가 c 에 따라 자리·뒤집기·애니를 받는다 (0x87fda~0x88266)', () => {
     const 기본 = { mode: BATTER_EDITION_MODE, typeIndex: 1, handIndex: 0, skinIndex: 0 }
-    expect(creditsWalkersOf(기본, [])).toEqual([
-      expect.objectContaining({ x: 120, animation: 8 + 6, isPlayer: true, isFlipped: false }),
-    ])
+    expect(creditsWalkersOf(기본, [])).toEqual([expect.objectContaining({ x: 120, animation: 8 + 6, isPlayer: true, isFlipped: false })])
     const 둘 = creditsWalkersOf(기본, [301])
     expect(둘.map((walker) => walker.x)).toEqual([160, 80])
     expect(둘[1]).toMatchObject({ folder: './sprites/event_char_1/frames', animation: 7 + 5, isFlipped: true })
@@ -436,11 +447,21 @@ describe('단계 [장면+0xd4] — 효과기 아홉 틀을 기다린다 (0x12300
 
   it('단계 0 은 남은 앞 화면 위에 진입의 종류 1 이 점점 어둡게 덮는다 (0x882c4 가 안 그린다)', () => {
     const 엔딩 = (
-      <EndingScreen playerName="홍길동" endingIndex={9} bonusGamePoint={3000} isContinuable={false}
+      <EndingScreen
+        playerName="홍길동"
+        endingIndex={9}
+        bonusGamePoint={3000}
+        isContinuable={false}
         hallOfFame={{ collection: EMPTY_COLLECTION, edition: '타자', nari: { 투수: null, 타자: null }, onRegister: vi.fn(() => '등록' as const) }}
-        onContinue={vi.fn(() => true)} onFinish={vi.fn()} />
+        onContinue={vi.fn(() => true)}
+        onFinish={vi.fn()}
+      />
     )
-    const { container, rerender } = render(<RawScreen><div data-testid="앞-화면">관리 화면</div></RawScreen>)
+    const { container, rerender } = render(
+      <RawScreen>
+        <div data-testid="앞-화면">관리 화면</div>
+      </RawScreen>,
+    )
     rerender(엔딩)
     const 단계0 = container.querySelector('[data-part="stage-0"]') as HTMLElement
     expect(단계0.textContent).toContain('관리 화면')
@@ -461,9 +482,16 @@ describe('단계 [장면+0xd4] — 효과기 아홉 틀을 기다린다 (0x12300
     // 이어하기 141 은 상태 1 의 단계 4 덮기(13f88)가 먼저 4/16 만 남긴다
     expect(endingStageZeroCoverOpacityAt(0, true, 효과기)).toBeCloseTo(0.75)
     const { container } = render(
-      <EndingScreen playerName="홍길동" endingIndex={9} bonusGamePoint={3000} isContinuable={false} isResumed
+      <EndingScreen
+        playerName="홍길동"
+        endingIndex={9}
+        bonusGamePoint={3000}
+        isContinuable={false}
+        isResumed
         hallOfFame={{ collection: EMPTY_COLLECTION, edition: '타자', nari: { 투수: null, 타자: null }, onRegister: vi.fn(() => '등록' as const) }}
-        onContinue={vi.fn(() => true)} onFinish={vi.fn()} />,
+        onContinue={vi.fn(() => true)}
+        onFinish={vi.fn()}
+      />,
     )
     expect(Number((container.querySelector('[data-part="stage-0-cover"]') as HTMLElement).style.opacity)).toBeCloseTo(0.75)
   })
@@ -499,8 +527,7 @@ describe('단계 [장면+0xd4] — 효과기 아홉 틀을 기다린다 (0x12300
 })
 
 describe('띠 창 배경 시간대 [gfx+0x1c] (0x7b9ac ← 0x7b934 ← 0xb8fbd)', () => {
-  const 배경프레임 = (container: HTMLElement) =>
-    container.querySelector('img[data-frame][src*="mode_back"]')?.getAttribute('data-frame')
+  const 배경프레임 = (container: HTMLElement) => container.querySelector('img[data-frame][src*="mode_back"]')?.getAttribute('data-frame')
 
   it('6~15시 낮 0 · 16~19시 저녁 1 · 그 밖 밤 2', () => {
     expect(배경프레임(띄우기({ endingIndex: 0, isContinuable: true, hour: 9 }).container)).toBe('0')

@@ -39,16 +39,25 @@ export interface SeasonInfoScreenProps {
  * 상태판 0x7d34c · 가운데 판 0x7f814 · 머리띠 0x7f4ec). 칸 등장은 틀 0x7538 의 0x8003c.
  */
 export function SeasonInfoScreen({
-  state, onSelect, onBack, cursor: heldCursor, onCursorChange, isKeyEnabled = true, overlay, gamePoint = 0,
+  state,
+  onSelect,
+  onBack,
+  cursor: heldCursor,
+  onCursorChange,
+  isKeyEnabled = true,
+  overlay,
+  gamePoint = 0,
 }: SeasonInfoScreenProps) {
-
   const select = (index: number) => {
     const entry = SEASON_INFO_MENU[index]
     if (entry === undefined) return
     onSelect(entry, index)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: SEASON_INFO_MENU.length, onSelect: select, onCancel: onBack, isEnabled: isKeyEnabled,
+    count: SEASON_INFO_MENU.length,
+    onSelect: select,
+    onCancel: onBack,
+    isEnabled: isKeyEnabled,
     // 4열 × 1줄 (0x3b14 의 [this+0x74] vt+0x1c(4, 1, 1, 0x330)) — ← → 도 칸을 옮긴다
     isCommandBar: true,
     ...(heldCursor === undefined ? {} : { cursor: heldCursor }),
@@ -58,12 +67,19 @@ export function SeasonInfoScreen({
   return (
     <RawScreen>
       <div role="group" aria-label="시즌정보">
-        <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={onBack}
+        <SeasonCommonFrame
+          record={state.record}
+          teamMorale={state.teamMorale}
+          gamePoint={gamePoint}
+          onBack={onBack}
           commandBar={{
-            slots: SEASON_SUB_COMMAND_SLOTS.시즌정보, cursor, parent: seasonParentSlotOf('시즌정보'),
+            slots: SEASON_SUB_COMMAND_SLOTS.시즌정보,
+            cursor,
+            parent: seasonParentSlotOf('시즌정보'),
             onHover: moveTo,
             onSelect: (id) => select(SEASON_INFO_MENU.findIndex((entry) => entry.label === id)),
-          }} />
+          }}
+        />
       </div>
       {overlay}
     </RawScreen>

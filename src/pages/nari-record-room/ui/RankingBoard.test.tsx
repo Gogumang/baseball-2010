@@ -17,8 +17,7 @@ describe('순위 판 0x5796c 그리기', () => {
       { record: { ...EMPTY_LEAGUE_RECORD, teamId: 1, name: '다라' }, value: 298 },
     ]
     const { container } = render(
-      <RankingBoard kind={12} kindLabelFrame={172} entries={entries} myTeamId={3}
-        hasPreviousPage={false} hasNextPage testIdPrefix="기록순위" />,
+      <RankingBoard kind={12} kindLabelFrame={172} entries={entries} myTeamId={3} hasPreviousPage={false} hasNextPage testIdPrefix="기록순위" />,
     )
     expect(screen.getByTestId('기록순위-줄-9').querySelectorAll('img')).toHaveLength(4)
     expect(screen.getByTestId('기록순위-이름-0').style.color).toBe('rgb(255, 212, 41)')
@@ -34,10 +33,7 @@ describe('순위 판 0x5796c 그리기', () => {
     const record = (event: KeyboardEvent) => seen.push(`${event.type}:${event.key}`)
     window.addEventListener('keydown', record)
     window.addEventListener('keyup', record)
-    render(
-      <RankingBoard kind={12} kindLabelFrame={172} entries={[]} myTeamId={3}
-        hasPreviousPage={false} hasNextPage testIdPrefix="기록순위" />,
-    )
+    render(<RankingBoard kind={12} kindLabelFrame={172} entries={[]} myTeamId={3} hasPreviousPage={false} hasNextPage testIdPrefix="기록순위" />)
     expect(screen.queryByRole('button', { name: '앞 쪽' })).toBeNull()
     expect(touchKeyOffersNow()).toEqual([])
     fireEvent.click(screen.getByRole('button', { name: '다음 쪽' }))

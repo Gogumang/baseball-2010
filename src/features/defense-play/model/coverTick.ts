@@ -2,12 +2,7 @@ import { applyCoverAssignment, assignCoversForTick } from '@/entities/fielding/m
 import { isBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
-import {
-  AI_STATE,
-  type DefenseContext,
-  type FielderState,
-  type PlayView,
-} from '@/entities/fielding/model/fieldingState'
+import { AI_STATE, type DefenseContext, type FielderState, type PlayView } from '@/entities/fielding/model/fieldingState'
 import { acceptsTargetVt14 } from '@/entities/fielding/model/fielderPose'
 import { secondBaseHelperPlacement } from '@/entities/fielding/model/throwArrival'
 

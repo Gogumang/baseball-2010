@@ -60,7 +60,8 @@ function 메모리저장(held: PlayerCareer): SaveGamePort {
 }
 
 const 공 = (overrides: Partial<PitchOutcomeDetail>): PitchOutcomeDetail => ({
-  batterHand: 0, resolution: { kind: '볼' },
+  batterHand: 0,
+  resolution: { kind: '볼' },
   hasSwung: false,
   isBunt: false,
   resultCode: null,

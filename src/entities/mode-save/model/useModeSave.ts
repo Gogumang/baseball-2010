@@ -18,9 +18,7 @@ import {
   withSeasonMatchSettings,
   aceMatchHoldOf,
 } from '@/entities/mode-save/model/modeSave'
-import type {
-  AceMatchHoldPort, AceMatchPendingPort, ModeMatchSettings, ModeSave, NariLeagueMode,
-} from '@/entities/mode-save/model/modeSave'
+import type { AceMatchHoldPort, AceMatchPendingPort, ModeMatchSettings, ModeSave, NariLeagueMode } from '@/entities/mode-save/model/modeSave'
 
 /** 전역기록 +0x11e 손잡이 — 일반 22 · 시즌 0xdd 가 함께 본다. 읽기는 곧바로 고친 값을 본다 */
 export interface MatchSettingsSeenPort {
@@ -99,30 +97,56 @@ export function useModeSave(store: JsonStorePort, legacyLastPlayedMode = NEW_SAV
     })
     return { 3: portOf(3), 4: portOf(4) }
   }, [update])
-  const aceMatchHoldPort = useMemo<AceMatchHoldPort>(() => ({
-    read: () => aceMatchHoldOf(saveRef.current),
-    writeResult: (isWon) => update((current) => withAceMatchResultWritten(current, isWon)),
-  }), [update])
+  const aceMatchHoldPort = useMemo<AceMatchHoldPort>(
+    () => ({
+      read: () => aceMatchHoldOf(saveRef.current),
+      writeResult: (isWon) => update((current) => withAceMatchResultWritten(current, isWon)),
+    }),
+    [update],
+  )
 
   const setGeneralMatchSettings = useCallback(
     (settings: ModeMatchSettings) => update((current) => withGeneralMatchSettings(current, settings)),
     [update],
   )
-  const matchSettingsSeenPort = useMemo<MatchSettingsSeenPort>(() => ({
-    read: () => saveRef.current.matchSettingsSeen,
-    markSeen: () => update(withMatchSettingsSeen),
-    readSeasonSettings: () => saveRef.current.seasonMatchSettings,
-    writeSeasonSettings: (settings) => update((current) => withSeasonMatchSettings(current, settings)),
-  }), [update])
+  const matchSettingsSeenPort = useMemo<MatchSettingsSeenPort>(
+    () => ({
+      read: () => saveRef.current.matchSettingsSeen,
+      markSeen: () => update(withMatchSettingsSeen),
+      readSeasonSettings: () => saveRef.current.seasonMatchSettings,
+      writeSeasonSettings: (settings) => update((current) => withSeasonMatchSettings(current, settings)),
+    }),
+    [update],
+  )
 
   return useMemo(
     () => ({
-      save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
-      aceMatchPendingPorts, aceMatchHoldPort, setGeneralMatchSettings, matchSettingsSeenPort,
+      save,
+      setLastPlayedMode,
+      startGeneralGame,
+      saveGeneralGame,
+      resumeGeneralGame,
+      finishGeneralGame,
+      startNariGame,
+      clearNariGame,
+      aceMatchPendingPorts,
+      aceMatchHoldPort,
+      setGeneralMatchSettings,
+      matchSettingsSeenPort,
     }),
     [
-      save, setLastPlayedMode, startGeneralGame, saveGeneralGame, resumeGeneralGame, finishGeneralGame, startNariGame, clearNariGame,
-      aceMatchPendingPorts, aceMatchHoldPort, setGeneralMatchSettings, matchSettingsSeenPort,
+      save,
+      setLastPlayedMode,
+      startGeneralGame,
+      saveGeneralGame,
+      resumeGeneralGame,
+      finishGeneralGame,
+      startNariGame,
+      clearNariGame,
+      aceMatchPendingPorts,
+      aceMatchHoldPort,
+      setGeneralMatchSettings,
+      matchSettingsSeenPort,
     ],
   )
 }

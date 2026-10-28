@@ -87,7 +87,12 @@ describe('목표 ③ 팀 타율 0xa3700(SR, 1) · ④ 팀 방어율 0xa3764', ()
   })
 
   it('팀 방어율은 투수 전원의 평균 — 안 던진 투수의 0 이 평균을 낮춘다 (원본 그대로)', () => {
-    expect(teamEarnedRunAverageOf([{ outs: 27, runsAllowed: 3 }, { outs: 0, runsAllowed: 0 }])).toBe(150)
+    expect(
+      teamEarnedRunAverageOf([
+        { outs: 27, runsAllowed: 3 },
+        { outs: 0, runsAllowed: 0 },
+      ]),
+    ).toBe(150)
   })
 })
 
@@ -97,7 +102,14 @@ describe('목표 ① 순위 0xb7aa0(L, 팀, 0)', () => {
   })
 
   it('포스트시즌 중이면 대진 칸 순위 — 1위 1 · 2위 2 · 3·4위 3 · 대진 밖 10', () => {
-    const 대진 = { champion: null, pairs: [[1, null], [2, null], [3, 4]] }
+    const 대진 = {
+      champion: null,
+      pairs: [
+        [1, null],
+        [2, null],
+        [3, 4],
+      ],
+    }
     expect(goalRankOf(1, 0, 대진)).toBe(1)
     expect(goalRankOf(2, 1, 대진)).toBe(2)
     expect(goalRankOf(4, 3, 대진)).toBe(3)
@@ -131,8 +143,12 @@ describe('판정 0xa37bc 와 창 0x8656c 는 같은 목표 값을 본다 (표 0x
       expect(창.goals).toEqual(row)
       const [rank, winRate, battingAverage, earnedRunAverage, popularityGain] = 창.goals
       const 문턱 = {
-        rank: rank!, wins: winRate!, losses: 100 - winRate!,
-        teamBattingAverage: battingAverage!, teamEarnedRunAverage: earnedRunAverage!, popularityGain: popularityGain!,
+        rank: rank!,
+        wins: winRate!,
+        losses: 100 - winRate!,
+        teamBattingAverage: battingAverage!,
+        teamEarnedRunAverage: earnedRunAverage!,
+        popularityGain: popularityGain!,
       }
       expect(achievedSeasonGoalCount(year, 문턱)).toBe(5)
       expect(achievedSeasonGoalCount(year, { ...문턱, rank: rank! + 1 })).toBe(4)
@@ -148,7 +164,10 @@ describe('판정 0xa37bc 와 창 0x8656c 는 같은 목표 값을 본다 (표 0x
 
 describe('목표 ④ 0xa3764 — 레코드에 남은 마투수 줄 (U-105 r163)', () => {
   it('마투수 줄(XlsACE_PIT 행 +0x20 · +0x22)이 하나 더 들어 평균과 수가 바뀐다', () => {
-    const lines = [{ outs: 27, runsAllowed: 3 }, { outs: 0, runsAllowed: 0 }]
+    const lines = [
+      { outs: 27, runsAllowed: 3 },
+      { outs: 0, runsAllowed: 0 },
+    ]
     // 싸이커 23 × 2700 / 300 = 207 → (300 + 0 + 207) / 3
     expect(teamEarnedRunAverageOf(goalPitcherLinesWithAce(lines, 0))).toBe(169)
     // 드래고나 5 × 2700 / 300 = 45

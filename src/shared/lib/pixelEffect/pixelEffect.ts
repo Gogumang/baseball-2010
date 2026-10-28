@@ -185,8 +185,12 @@ export function addColorPixel565(source: number, color: number): number {
 
 /** 화면을 안 보는 효과 — 그림만 다시 칠하면 된다 */
 export const isScreenIndependentEffect = (effect: number) =>
-  effect === DRAW_EFFECT.COPY || effect === DRAW_EFFECT.GRAY || effect === DRAW_EFFECT.SOLID ||
-  effect === DRAW_EFFECT.HALF_MIX || effect === DRAW_EFFECT.ADD_COLOR || effect === DRAW_EFFECT.SCALE ||
+  effect === DRAW_EFFECT.COPY ||
+  effect === DRAW_EFFECT.GRAY ||
+  effect === DRAW_EFFECT.SOLID ||
+  effect === DRAW_EFFECT.HALF_MIX ||
+  effect === DRAW_EFFECT.ADD_COLOR ||
+  effect === DRAW_EFFECT.SCALE ||
   effect === DRAW_EFFECT.FLIP
 
 /** 이 효과 · 인자로 그림이 그려지는가 (인자 검사로 통째로 건너뛰는 경우) */
@@ -239,8 +243,7 @@ export function brightenPixel565(source: number, amount: number): number {
  * (마스크 0xf81f07e0 · 0x07e0f81f 로 G 와 R·B 를 갈라 곱한다 — 16비트 값이라 위 반쪽은 비어 채널끼리 안 넘친다).
  */
 export function blendPixel565(source: number, screen: number, weight: number): number {
-  const part = (pixel: number, factor: number) =>
-    ((((pixel & 0x7e0) >> 5) * factor) & 0xf81f07e0) | ((((pixel & 0xf81f) * factor) >> 5) & 0x07e0f81f)
+  const part = (pixel: number, factor: number) => ((((pixel & 0x7e0) >> 5) * factor) & 0xf81f07e0) | ((((pixel & 0xf81f) * factor) >> 5) & 0x07e0f81f)
   return (part(source, 32 - weight) + part(screen, weight)) & 0xffff
 }
 
@@ -422,10 +425,7 @@ function rgbaOfImage(image: DrawableImage): ImageData | null {
  * 키(그림)마다 한 번 읽어 두는 캐시 — `signatureOf` 가 null 이면 캐시하지 않고(바뀔 수 있는 그림) 매번 읽는다.
  * 같은 그림이라도 서명(크기 · 주소)이 바뀌면 다시 읽는다. 읽기가 null(아직 못 읽음)이면 남기지 않는다.
  */
-export function createReadCache<K extends object, V>(
-  read: (key: K) => V | null,
-  signatureOf: (key: K) => string | null,
-): (key: K) => V | null {
+export function createReadCache<K extends object, V>(read: (key: K) => V | null, signatureOf: (key: K) => string | null): (key: K) => V | null {
   const entries = new WeakMap<K, { readonly signature: string; readonly value: V }>()
   return (key) => {
     const signature = signatureOf(key)
@@ -560,10 +560,7 @@ export function drawRgbasWithEffect(context: EffectCanvasContext, draws: readonl
   flushEffectDraws(context, pending)
 }
 
-function flushEffectDraws(
-  context: EffectCanvasContext,
-  pending: readonly { readonly draw: EffectDraw; readonly rect: PixelRect }[],
-): void {
+function flushEffectDraws(context: EffectCanvasContext, pending: readonly { readonly draw: EffectDraw; readonly rect: PixelRect }[]): void {
   let start = 0
   while (start < pending.length) {
     const bounds = boundsOf(pending.slice(start).map((item) => item.rect))
@@ -582,8 +579,15 @@ function flushEffectDraws(
     for (let index = start; index < end; index += 1) {
       const { draw, rect } = pending[index]
       composeAt(draw)
-      context.putImageData(region, bounds.left, bounds.top,
-        rect.left - bounds.left, rect.top - bounds.top, rect.right - rect.left, rect.bottom - rect.top)
+      context.putImageData(
+        region,
+        bounds.left,
+        bounds.top,
+        rect.left - bounds.left,
+        rect.top - bounds.top,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
+      )
     }
     start = end
   }
@@ -635,14 +639,7 @@ export function drawImagesWithEffect(context: CanvasRenderingContext2D, draws: r
 }
 
 /** 변환이 걸린 캔버스용 근사 그리기 (`drawImageWithEffect` 머리 참고) */
-function drawApproximately(
-  context: CanvasRenderingContext2D,
-  image: DrawableImage,
-  x: number,
-  y: number,
-  effect: number,
-  argument: number,
-): void {
+function drawApproximately(context: CanvasRenderingContext2D, image: DrawableImage, x: number, y: number, effect: number, argument: number): void {
   if (isScreenIndependentEffect(effect)) {
     context.drawImage(recoloredImageOf(image, effect, argument), x, y)
     return
@@ -658,11 +655,7 @@ function drawApproximately(
 const recolorCache = new Map<string, HTMLCanvasElement>()
 
 /** 그림을 다시 칠한 캔버스 — 키가 있으면(이미지 주소가 있으면) 한 번만 칠한다 */
-function paintedCanvasOf(
-  image: DrawableImage,
-  key: string | null,
-  paint: (rgba: Uint8ClampedArray) => Uint8ClampedArray,
-): DrawableImage {
+function paintedCanvasOf(image: DrawableImage, key: string | null, paint: (rgba: Uint8ClampedArray) => Uint8ClampedArray): DrawableImage {
   const cached = key === null ? undefined : recolorCache.get(key)
   if (cached !== undefined) return cached
   const pixels = rgbaOfImage(image)
@@ -775,9 +768,7 @@ async function paintUrl(url: string, effect: number, argument: number, backdrop:
   canvas.height = image.height
   const context = canvas.getContext('2d')
   if (context === null) return url
-  pixels.data.set(backdrop === null
-    ? recolorRgba(pixels.data, effect, argument)
-    : composeOverSolidRgba(pixels.data, effect, argument, backdrop))
+  pixels.data.set(backdrop === null ? recolorRgba(pixels.data, effect, argument) : composeOverSolidRgba(pixels.data, effect, argument, backdrop))
   context.putImageData(pixels, 0, 0)
   return canvas.toDataURL('image/png')
 }
@@ -790,10 +781,12 @@ export function effectSpriteUrl(url: string, effect: number, argument: number, b
   const key = effectSpriteKeyOf(url, effect, argument, backdrop)
   const cached = urlCache.get(key)
   if (cached !== undefined) return cached
-  const request = paintUrl(url, effect, argument, backdrop).catch(() => url).then((painted) => {
-    paintedUrls.set(key, painted)
-    return painted
-  })
+  const request = paintUrl(url, effect, argument, backdrop)
+    .catch(() => url)
+    .then((painted) => {
+      paintedUrls.set(key, painted)
+      return painted
+    })
   urlCache.set(key, request)
   return request
 }

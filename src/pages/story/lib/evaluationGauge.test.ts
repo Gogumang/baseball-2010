@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
-  EVALUATION_GAUGE_ANCHOR, EVALUATION_GAUGE_FILL, EVALUATION_GAUGE_VALUE_BOX, evaluationGaugeDivisorOf,
-  evaluationGaugeRowsOf, evaluationGaugeValueOf, startEvaluationGauge, tickEvaluationGauge,
+  EVALUATION_GAUGE_ANCHOR,
+  EVALUATION_GAUGE_FILL,
+  EVALUATION_GAUGE_VALUE_BOX,
+  evaluationGaugeDivisorOf,
+  evaluationGaugeRowsOf,
+  evaluationGaugeValueOf,
+  startEvaluationGauge,
+  tickEvaluationGauge,
 } from '@/pages/story/lib/evaluationGauge'
 import type { EvaluationGaugeState } from '@/pages/story/lib/evaluationGauge'
 
@@ -48,15 +54,24 @@ describe('0x8587c · 0x858cc — 인기도 변화 막대', () => {
     expect(EVALUATION_GAUGE_VALUE_BOX).toEqual({ x: 25, y: 125, width: 14, height: 10 })
     expect(evaluationGaugeValueOf(3)).toEqual({
       sign: '+',
-      signs: [{ x: 25, y: 124 }, { x: 26, y: 124 }],
+      signs: [
+        { x: 25, y: 124 },
+        { x: 26, y: 124 },
+      ],
       digits: [{ image: 83, x: 31, y: 125 }],
     })
     expect(evaluationGaugeValueOf(-1)).toEqual({
       sign: '-',
-      signs: [{ x: 25, y: 124 }, { x: 25, y: 125 }],
+      signs: [
+        { x: 25, y: 124 },
+        { x: 25, y: 125 },
+      ],
       digits: [{ image: 81, x: 35, y: 125 }],
     })
     // |v| > 9 면 ox 5 — 12: 4 + 8 = 12 → x = 25 + 5 + 14 − 12 = 32
-    expect(evaluationGaugeValueOf(12).digits).toEqual([{ image: 81, x: 32, y: 125 }, { image: 82, x: 36, y: 125 }])
+    expect(evaluationGaugeValueOf(12).digits).toEqual([
+      { image: 81, x: 32, y: 125 },
+      { image: 82, x: 36, y: 125 },
+    ])
   })
 })

@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MISSIONS } from '@/shared/config/original/missions'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import {
-  RELAY_RESULT_WORDS,
-  missionAutoRelayStepsOf,
-  relayCodeOf,
-  relayLineOf,
-} from '@/entities/mission/model/missionAutoRelay'
+import { RELAY_RESULT_WORDS, missionAutoRelayStepsOf, relayCodeOf, relayLineOf } from '@/entities/mission/model/missionAutoRelay'
 import { pitcherMissionAutoTicks, startPitcherMission, runPitcherMissionAutoHalves } from '@/entities/mission/model/pitcherRun'
 import { batterMissionAutoTicks, runBatterMissionAutoHalves, startMission } from '@/entities/mission/model/missionRun'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -93,8 +88,14 @@ function counted(seed: number): { readonly port: RandomPort; readonly draws: () 
   let draws = 0
   return {
     port: {
-      rand: (lo, hi) => { draws += 1; return inner.rand(lo, hi) },
-      rand9d: (n) => { if (n > 0) draws += 1; return inner.rand9d(n) },
+      rand: (lo, hi) => {
+        draws += 1
+        return inner.rand(lo, hi)
+      },
+      rand9d: (n) => {
+        if (n > 0) draws += 1
+        return inner.rand9d(n)
+      },
     },
     draws: () => draws,
   }

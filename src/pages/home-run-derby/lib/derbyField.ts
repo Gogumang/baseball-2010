@@ -5,15 +5,7 @@ import { isBallInEventZone } from '@/entities/home-run-derby/model/eventZone'
 import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleFacts'
 import { isBallBeyondFence } from '@/features/defense-play/model/runDefensePlay'
 import { ballParticleShotsOf } from '@/pages/defense/lib/ballParticles'
-import {
-  type CameraState,
-  cameraBoundsOf,
-  centerOn,
-  screenOffsetOf,
-  stepCamera,
-  toScreenX,
-  toScreenY,
-} from '@/pages/defense/lib/defenseCamera'
+import { type CameraState, cameraBoundsOf, centerOn, screenOffsetOf, stepCamera, toScreenX, toScreenY } from '@/pages/defense/lib/defenseCamera'
 import { FIELDER_ACTION, type DefenseFielder, type DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '@/pages/defense/ui/DefenseScreen.css'
 import { isBugFixed } from '@/shared/config/bugfixes'
@@ -167,12 +159,7 @@ export interface DerbyFieldLook {
 }
 
 /** 판 틱 t 의 수비 화면 스냅샷 (`DefenseScreen`) */
-export function derbyFieldViewOf(
-  input: DerbyFieldInput,
-  timeline: DerbyFieldTimeline,
-  tick: number,
-  look: DerbyFieldLook,
-): DefenseViewState {
+export function derbyFieldViewOf(input: DerbyFieldInput, timeline: DerbyFieldTimeline, tick: number, look: DerbyFieldLook): DefenseViewState {
   const { batted } = input
   const frame = derbyFieldFrameAt(timeline, tick)
   const point = pointAt(batted, frame.ballTick)

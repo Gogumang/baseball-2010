@@ -20,8 +20,15 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly LineScoreGlyph[]
   return (
     <>
       {glyphs.map((glyph, index) => (
-        <img key={index} className={styles.sprite} style={{ left: glyph.x, top: glyph.y }}
-          src={`${NUM_FOLDER}/${pad(glyph.image)}.png`} alt="" data-testid={testId} data-image={glyph.image} />
+        <img
+          key={index}
+          className={styles.sprite}
+          style={{ left: glyph.x, top: glyph.y }}
+          src={`${NUM_FOLDER}/${pad(glyph.image)}.png`}
+          alt=""
+          data-testid={testId}
+          data-image={glyph.image}
+        />
       ))}
     </>
   )
@@ -36,19 +43,34 @@ export function LineScoreBoard({ x, y, sideTeams, ...state }: LineScoreBoardProp
   return (
     <div className={styles.group} data-testid="이닝별점수판" data-x={x} data-y={y}>
       {placement.rects.map((rect, index) => (
-        <span key={index} className={styles.block}
-          style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height, background: rect.color }} />
+        <span
+          key={index}
+          className={styles.block}
+          style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height, background: rect.color }}
+        />
       ))}
       {placement.logos.map((at, side) => (
-        <img key={side} className={styles.sprite} style={{ left: at.x, top: at.y }}
-          src={`${SMALL_LOGO_FOLDER}/${pad(sideTeams[side] ?? 0)}.png`} alt="" data-testid={`이닝별점수판-로고-${side}`} />
+        <img
+          key={side}
+          className={styles.sprite}
+          style={{ left: at.x, top: at.y }}
+          src={`${SMALL_LOGO_FOLDER}/${pad(sideTeams[side] ?? 0)}.png`}
+          alt=""
+          data-testid={`이닝별점수판-로고-${side}`}
+        />
       ))}
       <Glyphs glyphs={placement.inningNumbers} testId="이닝별점수판-이닝" />
       <Glyphs glyphs={placement.runs} testId="이닝별점수판-점수" />
       <Glyphs glyphs={placement.totals} testId="이닝별점수판-합" />
       {placement.images.map((image) => (
-        <img key={image.image} className={styles.sprite} style={{ left: image.x, top: image.y }}
-          src={`${GAME_UI_FOLDER}/${pad(image.image)}.png`} alt="" data-testid={`이닝별점수판-그림-${image.image}`} />
+        <img
+          key={image.image}
+          className={styles.sprite}
+          style={{ left: image.x, top: image.y }}
+          src={`${GAME_UI_FOLDER}/${pad(image.image)}.png`}
+          alt=""
+          data-testid={`이닝별점수판-그림-${image.image}`}
+        />
       ))}
     </div>
   )

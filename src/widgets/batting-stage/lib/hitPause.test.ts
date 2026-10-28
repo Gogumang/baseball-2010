@@ -28,9 +28,7 @@ describe('감상 플래그 +0x199a (0x392ac)', () => {
   })
 
   it('홈런성이 아니면 꺼진다', () => {
-    expect([null, 0, 15, 23, 27].map((resultCode) => isBigHit({ ...큰타구, resultCode }))).toEqual([
-      false, false, false, false, false,
-    ])
+    expect([null, 0, 15, 23, 27].map((resultCode) => isBigHit({ ...큰타구, resultCode }))).toEqual([false, false, false, false, false])
   })
 
   it('폴에 닿았으면 꺼진다', () => {
@@ -104,9 +102,31 @@ describe('플래그가 꺼진 갈래의 이른 넘김 (0x406e8 4071a~40784)', ()
   const 땅 = { x: 25068 + 265 * 45, y: 0, z: 23275 }
 
   it('땅 번호는 trunc(6y/10) 이 처음 0 이 된 점이다 (0x33e34) — |y| ≤ 1', () => {
-    expect(groundPathIndexOf(궤적([{ x: 0, y: 900, z: 0 }, { x: 0, y: 2, z: 0 }, { x: 0, y: 1, z: 0 }]))).toBe(2)
-    expect(groundPathIndexOf(궤적([{ x: 0, y: 900, z: 0 }, { x: 0, y: -1, z: 0 }]))).toBe(1)
-    expect(groundPathIndexOf(궤적([{ x: 0, y: 900, z: 0 }, { x: 0, y: -2, z: 0 }]))).toBe(-1)
+    expect(
+      groundPathIndexOf(
+        궤적([
+          { x: 0, y: 900, z: 0 },
+          { x: 0, y: 2, z: 0 },
+          { x: 0, y: 1, z: 0 },
+        ]),
+      ),
+    ).toBe(2)
+    expect(
+      groundPathIndexOf(
+        궤적([
+          { x: 0, y: 900, z: 0 },
+          { x: 0, y: -1, z: 0 },
+        ]),
+      ),
+    ).toBe(1)
+    expect(
+      groundPathIndexOf(
+        궤적([
+          { x: 0, y: 900, z: 0 },
+          { x: 0, y: -2, z: 0 },
+        ]),
+      ),
+    ).toBe(-1)
   })
 
   it('결과 코드 ≤ 2 이고 땅 점 거리 ÷ 265 가 40~55 면 땅 번호 − 1 틱에 넘긴다', () => {
@@ -118,11 +138,25 @@ describe('플래그가 꺼진 갈래의 이른 넘김 (0x406e8 4071a~40784)', ()
   it('결과 코드 3 이상 · 거리 밖이면 틱 8 그대로', () => {
     const 공 = 궤적([{ x: 0, y: 900, z: 0 }, 땅])
     expect(earlyHitPauseTickOf(3, 공)).toBeNull()
-    expect(earlyHitPauseTickOf(0, 궤적([{ x: 0, y: 900, z: 0 }, { ...땅, x: 25068 + 265 * 56 }]))).toBeNull()
-    expect(earlyHitPauseTickOf(0, 궤적([{ x: 0, y: 900, z: 0 }, { ...땅, x: 25068 + 265 * 39 }]))).toBeNull()
-    expect(hitPauseTicksOf({ resultCode: 1, poleTick: -1, carryScale: 0, angle: 90, landingTick: 3, earlyTick: 12 })).toBe(
-      SHORT_HIT_TICKS,
-    )
+    expect(
+      earlyHitPauseTickOf(
+        0,
+        궤적([
+          { x: 0, y: 900, z: 0 },
+          { ...땅, x: 25068 + 265 * 56 },
+        ]),
+      ),
+    ).toBeNull()
+    expect(
+      earlyHitPauseTickOf(
+        0,
+        궤적([
+          { x: 0, y: 900, z: 0 },
+          { ...땅, x: 25068 + 265 * 39 },
+        ]),
+      ),
+    ).toBeNull()
+    expect(hitPauseTicksOf({ resultCode: 1, poleTick: -1, carryScale: 0, angle: 90, landingTick: 3, earlyTick: 12 })).toBe(SHORT_HIT_TICKS)
   })
 
   it('OK·5 건너뛰기는 큰 타구(+0x199a)에서만 된다', () => {

@@ -26,21 +26,21 @@ export interface LazyScreen<Props extends object> {
  * @param load 덩이를 받아 화면 컴포넌트를 돌려준다 (`import('…').then((module) => module.X)`)
  * @param order 미리 받는 차례 — 작을수록 먼저 (메뉴에서 곧바로 가는 화면이 앞)
  */
-export function lazyScreen<Props extends object>(
-  load: () => Promise<ComponentType<Props>>,
-  order = 100,
-): LazyScreen<Props> {
+export function lazyScreen<Props extends object>(load: () => Promise<ComponentType<Props>>, order = 100): LazyScreen<Props> {
   let loaded: ComponentType<Props> | null = null
   let pending: Promise<ComponentType<Props>> | null = null
   const fetchOnce = () => {
-    pending ??= load().then((component) => {
-      loaded = component
-      return component
-    }, (error: unknown) => {
-      // 망이 끊겼으면 다음에 다시 받게 둔다
-      pending = null
-      throw error
-    })
+    pending ??= load().then(
+      (component) => {
+        loaded = component
+        return component
+      },
+      (error: unknown) => {
+        // 망이 끊겼으면 다음에 다시 받게 둔다
+        pending = null
+        throw error
+      },
+    )
     return pending
   }
   // `lazy` 의 겉꼴(ref 칸이 섞인 props)을 화면 props 그대로로 본다 — 화면 컴포넌트는 함수 컴포넌트라 ref 를 안 받는다

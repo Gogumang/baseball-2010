@@ -18,12 +18,20 @@ function 띄우기(isDetailOpen: boolean, teamMorale = 100) {
   const view = seasonPlayerRecordOf(0, tableRosterOf(0).batters[0]!, false, 0)
   const context = { record, teamMorale }
   const props = {
-    onOpenDetail: vi.fn(), onCloseDetail: vi.fn(), onBack: vi.fn(),
+    onOpenDetail: vi.fn(),
+    onCloseDetail: vi.fn(),
+    onBack: vi.fn(),
   }
   render(
-    <SeasonPlayerCardScreen teamId={0} view={view} abilities={seasonCardAbilitiesOf(view, context)}
+    <SeasonPlayerCardScreen
+      teamId={0}
+      view={view}
+      abilities={seasonCardAbilitiesOf(view, context)}
       info={seasonCardInfoOf(view, '서울 드래곤즈', 0)}
-      detail={seasonPlayerDetailViewOf(view, context)} isDetailOpen={isDetailOpen} {...props} />,
+      detail={seasonPlayerDetailViewOf(view, context)}
+      isDetailOpen={isDetailOpen}
+      {...props}
+    />,
   )
   return props
 }

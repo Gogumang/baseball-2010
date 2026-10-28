@@ -112,8 +112,7 @@ describe('10년차 엔딩 0xa3084', () => {
   })
 
   it('앞에서부터 먼저 맞는 것이 답이다', () => {
-    const 열년차 = (popularity: number, firsts: number) =>
-      judgeSeasonEnding(기본({ yearIndex: 9, popularity, regularSeasonFirsts: firsts }))
+    const 열년차 = (popularity: number, firsts: number) => judgeSeasonEnding(기본({ yearIndex: 9, popularity, regularSeasonFirsts: firsts }))
     expect(열년차(2_001, 10)).toBe(4)
     expect(열년차(1_501, 7)).toBe(3)
     expect(열년차(1_001, 4)).toBe(2)
@@ -154,7 +153,10 @@ describe('결산 0x6900 의 세 모드 해금 0x29 (0x6944~0x69d2)', () => {
 describe('돌발 보상 0x8e34c 모드 2 — 국가대항전 중 사기는 리그 칸이 아니다', () => {
   it('정규는 리그 사기에 더하고, 국가대항전이면 상대국 슬롯 +0x934 로 가서 리그 사기는 그대로다 (1f5a0, 원본 버그)', () => {
     const state = { ...startNewSeason(0, 'T'), teamMorale: 40 }
-    const deltas = [{ name: '사기' as const, amount: 3 }, { name: '평판' as const, amount: 3 }]
+    const deltas = [
+      { name: '사기' as const, amount: 3 },
+      { name: '평판' as const, amount: 3 },
+    ]
     expect(applySeasonBurstRewards(state, deltas).teamMorale).toBe(43)
     const 대회 = applySeasonBurstRewards(state, deltas, true)
     expect(대회.teamMorale).toBe(40)

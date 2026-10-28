@@ -4,9 +4,7 @@ import { ORIGINAL_SEASON_EVENTS } from '@/shared/config/original/seasonEvents'
 import type { SeasonOriginalEvent } from '@/shared/config/original/seasonEvents'
 import type { EventCommand, OriginalEvent } from '@/shared/config/original/eventTypes'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
-import {
-  clampTo, MONEY_LIMIT, MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, SEASON_GAME_COUNT,
-} from '@/entities/season-mode/model/seasonRecord'
+import { clampTo, MONEY_LIMIT, MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
@@ -79,10 +77,7 @@ export function markEventSeen(record: SeasonRecord, eventId: number): SeasonReco
  * 장면 0x105 를 만들 때 (`0x3b14` 의 4016 → `0x8ce94` → `0xacf60`) — **반복 이벤트의 본 비트를 지운다.**
  * 경기를 마치고 돌아올 때도 장면을 새로 만들므로 질병 490 은 경기마다 다시 뜰 수 있다.
  */
-export function clearRepeatableSeen(
-  record: SeasonRecord,
-  events: readonly SeasonOriginalEvent[] = ORIGINAL_SEASON_EVENTS,
-): SeasonRecord {
+export function clearRepeatableSeen(record: SeasonRecord, events: readonly SeasonOriginalEvent[] = ORIGINAL_SEASON_EVENTS): SeasonRecord {
   const repeatable = new Set(events.filter((event) => event.repeatable).map((event) => event.id))
   if (!record.seenEvents.some((id) => repeatable.has(id))) return record
   return { ...record, seenEvents: record.seenEvents.filter((id) => !repeatable.has(id)) }
@@ -138,14 +133,9 @@ export function illnessChancePercentOf(teamMorale: number): number {
 }
 
 /** 조건 하나 (switch 0xad1ba, 점프표 0xd83a0) — 모드 2 에서 쓰이는 갈래 */
-function passesCondition(
-  condition: { readonly type: number; readonly value: number },
-  input: SeasonEventJudgeInput,
-  random: RandomPort,
-): boolean {
+function passesCondition(condition: { readonly type: number; readonly value: number }, input: SeasonEventJudgeInput, random: RandomPort): boolean {
   const { record } = input
-  const compare = (actual: number) =>
-    condition.value >= 0 ? actual >= condition.value : actual < Math.abs(condition.value)
+  const compare = (actual: number) => (condition.value >= 0 ? actual >= condition.value : actual < Math.abs(condition.value))
   switch (condition.type) {
     // 0~3 능력치 — 모드 2 는 통과 (0xad1ca)
     case 0:
@@ -190,15 +180,11 @@ function passesCondition(
  * 날짜 창 · 조건 목록
  * ```
  */
-export function judgeSeasonEvent(
-  event: SeasonOriginalEvent,
-  input: SeasonEventJudgeInput,
-  random: RandomPort,
-): SeasonEventJudgement {
+export function judgeSeasonEvent(event: SeasonOriginalEvent, input: SeasonEventJudgeInput, random: RandomPort): SeasonEventJudgement {
   const { record } = input
   const fail = { passes: false, record }
   if (event.audience !== SEASON_EVENT_AUDIENCE) return fail
-  if (input.isFreshScene !== true && event.id === ILLNESS_EVENT_ID && ((record.illnessCooldown << 24) >> 24) > 0) return fail
+  if (input.isFreshScene !== true && event.id === ILLNESS_EVENT_ID && (record.illnessCooldown << 24) >> 24 > 0) return fail
   if (event.id === EVENT_100_ID && input.event100Awarded) {
     return { passes: false, record: markEventSeen(record, EVENT_100_ID) }
   }
@@ -312,11 +298,7 @@ export interface SeasonEventPollResult {
  * ```
  * 외출 지도(209)에서는 s_event(전부 trigger 0)가 하나도 통과하지 못한다 — 커서만 움직인다.
  */
-export function pollSeasonEvents(
-  cursor: SeasonEventCursor,
-  input: SeasonEventPollInput,
-  random: RandomPort,
-): SeasonEventPollResult {
+export function pollSeasonEvents(cursor: SeasonEventCursor, input: SeasonEventPollInput, random: RandomPort): SeasonEventPollResult {
   const { record } = input
   if (!pollsSeasonEvents(input.scene)) return { poll: { kind: '없음' }, cursor, record }
   const goesToYearGoal = input.scene === SEASON_SCENE_STATE.관리메뉴 && !record.endingSeen && !record.yearGoalShown
@@ -400,16 +382,10 @@ export function seasonRewardsIn(commands: readonly EventCommand[]): SeasonEventR
  * ```
  * y = SR+0xb3(연차 idx). **명령에 있는 항목만** 고친다 — 394 의 평판·395 의 전부는 항목이 없어 그대로다.
  */
-export function withSeasonYearAdjust(
-  rewards: readonly SeasonEventReward[],
-  eventId: number,
-  yearIndex: number,
-): readonly SeasonEventReward[] {
+export function withSeasonYearAdjust(rewards: readonly SeasonEventReward[], eventId: number, yearIndex: number): readonly SeasonEventReward[] {
   if (eventId === 393 || eventId === 394 || eventId === 395) {
     return rewards.map((reward) =>
-      reward.kind === 0 || reward.kind === 1 || reward.kind === 3
-        ? { ...reward, value: reward.value + 5 * yearIndex }
-        : reward,
+      reward.kind === 0 || reward.kind === 1 || reward.kind === 3 ? { ...reward, value: reward.value + 5 * yearIndex } : reward,
     )
   }
   if (eventId === 396) {
@@ -487,12 +463,11 @@ export function applySeasonEventRewards(
       case 11: {
         // 값 > 0 은 알림 글 0x8beb8 이 이미 굴려 적은 번호(r + 1, `rewardNoticeOf`) — 0x8c718 은 그 번호를 건다.
         // 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
-        const kind = reward.value > 0
-          ? reward.value
-          : reward.value === 0 ? random.rand(0, ILLNESS_KIND_COUNT) + 1 : reward.value
-        record = kind > 0
-          ? { ...record, illness: kind, illnessSlack: ILLNESS_SLACK_TABLE[kind] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }
-          : { ...record, illness: 0, illnessSlack: ILLNESS_SLACK_TABLE[0] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }
+        const kind = reward.value > 0 ? reward.value : reward.value === 0 ? random.rand(0, ILLNESS_KIND_COUNT) + 1 : reward.value
+        record =
+          kind > 0
+            ? { ...record, illness: kind, illnessSlack: ILLNESS_SLACK_TABLE[kind] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }
+            : { ...record, illness: 0, illnessSlack: ILLNESS_SLACK_TABLE[0] ?? 0, illnessCooldown: ILLNESS_COOLDOWN }
         break
       }
       default:

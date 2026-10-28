@@ -122,14 +122,22 @@ export function batterYearCellTextOf(stats: SeasonStats, bit: number): string | 
       const average = battingAverageValueOf(stats)
       return originalDecimalTextOf(average, average > 999 ? 3 : 0)
     }
-    case 1: return String(stats.atBats)
-    case 2: return String(stats.hits)
-    case 4: return String(stats.doubles)
-    case 8: return String(stats.triples)
-    case 0x10: return String(stats.homeRuns)
-    case 0x20: return String(stats.runsBattedIn)
-    case 0x40: return String(stats.stolenBases ?? 0)
-    default: return null
+    case 1:
+      return String(stats.atBats)
+    case 2:
+      return String(stats.hits)
+    case 4:
+      return String(stats.doubles)
+    case 8:
+      return String(stats.triples)
+    case 0x10:
+      return String(stats.homeRuns)
+    case 0x20:
+      return String(stats.runsBattedIn)
+    case 0x40:
+      return String(stats.stolenBases ?? 0)
+    default:
+      return null
   }
 }
 
@@ -144,15 +152,24 @@ export function pitcherYearCellTextOf(stats: PitcherSeasonStats, bit: number): s
       const average = seasonEarnedRunAverageOf(stats)
       return originalDecimalTextOf(average > 100 ? average * 10 : average, 3)
     }
-    case 0x200: return String(Math.trunc(stats.outs / 3))
-    case 0x400: return String(stats.runsAllowed)
-    case 0x800: return String(stats.wins)
-    case 0x1000: return String(stats.losses)
-    case 0x2000: return String(stats.saves)
-    case 0x4000: return String(stats.strikeouts)
-    case 0x8000: return String(stats.pitches)
-    case 0x10000: return String(pitcherWalksOf(stats))
-    default: return null
+    case 0x200:
+      return String(Math.trunc(stats.outs / 3))
+    case 0x400:
+      return String(stats.runsAllowed)
+    case 0x800:
+      return String(stats.wins)
+    case 0x1000:
+      return String(stats.losses)
+    case 0x2000:
+      return String(stats.saves)
+    case 0x4000:
+      return String(stats.strikeouts)
+    case 0x8000:
+      return String(stats.pitches)
+    case 0x10000:
+      return String(pitcherWalksOf(stats))
+    default:
+      return null
   }
 }
 
@@ -219,11 +236,16 @@ export function pressYearRecordKey(view: YearRecordView, key: YearRecordKey, row
   const counted = { ...view, keyPresses: view.keyPresses + 1 }
   if (view.slide !== null) return counted
   switch (key) {
-    case '위': return withCursor(counted, rowCount, -1)
-    case '아래': return withCursor(counted, rowCount, 1)
-    case '왼': return { ...counted, slide: { step: 0, direction: 'previous' } }
-    case '오른': return { ...counted, slide: { step: 0, direction: 'next' } }
-    case '기타': return counted
+    case '위':
+      return withCursor(counted, rowCount, -1)
+    case '아래':
+      return withCursor(counted, rowCount, 1)
+    case '왼':
+      return { ...counted, slide: { step: 0, direction: 'previous' } }
+    case '오른':
+      return { ...counted, slide: { step: 0, direction: 'next' } }
+    case '기타':
+      return counted
   }
 }
 
@@ -265,9 +287,7 @@ export function advanceYearSlide(view: YearRecordView, columnCount: number): Yea
 /** 0x5ccea~0x5cd1e — 다음 열: 첫 열 + 보이는 열 < 열 수 · 앞 열: 첫 열 > 0 */
 function canSlide(view: YearRecordView, columnCount: number): boolean {
   if (view.slide === null) return false
-  return view.slide.direction === 'next'
-    ? view.firstColumn + VISIBLE_YEAR_COLUMNS < columnCount
-    : view.firstColumn > 0
+  return view.slide.direction === 'next' ? view.firstColumn + VISIBLE_YEAR_COLUMNS < columnCount : view.firstColumn > 0
 }
 
 /**
@@ -430,7 +450,7 @@ export function yearCellDrawingOf(cell: YearCellNumber): YearCellDrawing {
 /** 0x5650c · 0xb9d75 꼴 0x22 — (칸 x, 56, 폭, 15) 안 가운데: x += (폭 − w) >> 1 · y += 올림((15 − h) / 2) */
 export function yearLabelOffsetOf(boxWidth: number, imageWidth: number, imageHeight: number): { readonly x: number; readonly y: number } {
   const dy = YEAR_TABLE_LAYOUT.cellHeight - imageHeight
-  return { x: (boxWidth - imageWidth) >> 1, y: (dy >> 1) + (dy - ((dy + (dy < 0 ? 1 : 0)) >> 1 << 1)) }
+  return { x: (boxWidth - imageWidth) >> 1, y: (dy >> 1) + (dy - (((dy + (dy < 0 ? 1 : 0)) >> 1) << 1)) }
 }
 
 /**
@@ -469,15 +489,9 @@ export function nariBatterRankingRecordsOf(career: PlayerCareer): readonly Leagu
 }
 
 /** 쪽 하나의 상위 10명 */
-export function nariRankingEntriesOf(
-  edition: NariRecordEdition,
-  career: PlayerCareer | PitcherCareer,
-  page: number,
-): readonly SeasonRankingEntry[] {
+export function nariRankingEntriesOf(edition: NariRecordEdition, career: PlayerCareer | PitcherCareer, page: number): readonly SeasonRankingEntry[] {
   const categories = rankingCategoriesOf(nariRankingSideOf(edition))
   const category = categories[page] ?? categories[0]
-  const records = edition === '타자'
-    ? nariBatterRankingRecordsOf(career as PlayerCareer)
-    : pitcherLeagueRecordsOf(career as PitcherCareer)
+  const records = edition === '타자' ? nariBatterRankingRecordsOf(career as PlayerCareer) : pitcherLeagueRecordsOf(career as PitcherCareer)
   return rankSeasonRecords(records, category.kind, career.gamesPlayed)
 }

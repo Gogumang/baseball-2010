@@ -47,8 +47,18 @@ export const GOAL_RANK_DIGIT_BASE = 20
 
 /** img_text 그림 폭 (높이는 모두 10, 원점 0) */
 const IMAGE_TEXT_WIDTHS: Readonly<Record<number, number>> = {
-  65: 65, 66: 53, 67: 53, 68: 54, 69: 64, 70: 63, 71: 54, 72: 64, 73: 62, 74: 65,
-  [GOAL_RANK_TEXT_FRAME]: 83, [ATTENDANCE_UNIT_FRAME]: 9,
+  65: 65,
+  66: 53,
+  67: 53,
+  68: 54,
+  69: 64,
+  70: 63,
+  71: 54,
+  72: 64,
+  73: 62,
+  74: 65,
+  [GOAL_RANK_TEXT_FRAME]: 83,
+  [ATTENDANCE_UNIT_FRAME]: 9,
 }
 const IMAGE_TEXT_HEIGHT = 10
 const NAME_IMAGE_OX = 6
@@ -63,9 +73,7 @@ export interface PlacedImage {
 }
 
 /** 0xb9e05 → 0xb9d74 — 0x2 가로 가운데(내림) · 0x4 오른쪽 · 0x20 세로 가운데(양수면 올림) · 그 뒤 ox */
-function placeImageText(
-  frame: number, area: { x: number; y: number; width: number; height: number }, align: number, ox: number,
-): PlacedImage {
+function placeImageText(frame: number, area: { x: number; y: number; width: number; height: number }, align: number, ox: number): PlacedImage {
   const width = IMAGE_TEXT_WIDTHS[frame] ?? 0
   const difference = area.height - IMAGE_TEXT_HEIGHT
   let left = area.x + ox

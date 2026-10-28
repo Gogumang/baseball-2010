@@ -15,7 +15,8 @@ describe('타자편 — 판 사이 야수 +0xcc 를 넘겨받는다', () => {
     const 남은 = cpuPickoff(
       { ...판, defenseScene: { ...DEFENSE_SCENE_START, fielderSlack: Array.from({ length: 9 }, () => 5) } },
       1,
-      createSeededRandom(1), { count: { strikes: 0, balls: 0 } },
+      createSeededRandom(1),
+      { count: { strikes: 0, balls: 0 } },
     )
     expect(남은.lastDefensePlay?.ticks[0]?.fielders).not.toEqual(그냥.lastDefensePlay?.ticks[0]?.fielders)
     expect(남은.defenseScene?.fielderSlack).toEqual(Array.from({ length: 9 }, () => 0))

@@ -77,10 +77,7 @@ export function offenseOffersFor(situation: InPlayRunnerSituation): readonly Tou
  * 사람이 잡은 쪽의 상황 버튼 — 자동(`side` 없음)이면 없다. 공격 쪽은 주자 형편(`situation`)을 주면 그 순간 먹는 키만 남긴다
  * (안 주면 아홉 다). 수비 송구는 네 루 모두 늘 먹는다(0x588)
  */
-export function inPlayTouchOffersOf(
-  side: ControlSide | undefined,
-  situation?: InPlayRunnerSituation | null,
-): readonly TouchKeyOffer[] {
+export function inPlayTouchOffersOf(side: ControlSide | undefined, situation?: InPlayRunnerSituation | null): readonly TouchKeyOffer[] {
   if (side === '수비') return DEFENSE_THROW_OFFERS
   if (side === '공격') return situation === undefined || situation === null ? OFFENSE_RUNNER_OFFERS : offenseOffersFor(situation)
   return []

@@ -65,9 +65,7 @@ describe('조건 20/21 투수 갈래 (0xd8408 · 0xd8454 의 모드 3 쪽)', () 
     expect(meetsPitcherSkillCondition(투수({ gamesPlayed: 16, stats: 시즌(44) }), 'acquire', 19)).toBe(true)
     expect(meetsPitcherSkillCondition(투수({ gamesPlayed: 16, stats: 시즌(45) }), 'acquire', 19)).toBe(false)
     expect(meetsPitcherSkillCondition(투수({ gamesPlayed: 17, stats: 시즌(0) }), 'acquire', 19)).toBe(false)
-    expect(
-      meetsPitcherSkillCondition(투수({ gamesPlayed: 16, stats: 시즌(0), removedMinusSkillIds: [18] }), 'acquire', 19),
-    ).toBe(false)
+    expect(meetsPitcherSkillCondition(투수({ gamesPlayed: 16, stats: 시즌(0), removedMinusSkillIds: [18] }), 'acquire', 19)).toBe(false)
   })
 
   it('해제 429·431·433 — 해제 카운터 +0x73 · +0x72 · +0x70 > 7', () => {
@@ -116,7 +114,13 @@ describe('먹튀 2 · 무력감 5 — 116 카운터를 세게 되어 두 편 공
 
   it('무력감 얻기: 사기 ≤ 20 · 연차idx > 2 뒤에만 rand(0,100) > 69 를 굴린다', () => {
     let rolls = 0
-    const 굴림 = (value: number) => ({ rand: () => { rolls += 1; return value } }) as never
+    const 굴림 = (value: number) =>
+      ({
+        rand: () => {
+          rolls += 1
+          return value
+        },
+      }) as never
     expect(meetsPitcherSkillCondition(투수({ season: 4, morale: 20 }), 'acquire', 6, 굴림(70))).toBe(true)
     expect(meetsPitcherSkillCondition(투수({ season: 4, morale: 20 }), 'acquire', 6, 굴림(69))).toBe(false)
     expect(rolls).toBe(2)

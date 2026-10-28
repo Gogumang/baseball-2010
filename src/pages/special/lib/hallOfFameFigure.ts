@@ -97,9 +97,8 @@ export function advancePitcherAnimation(animation: FigureAnimation): FigureAnima
   const rule = pitcherStepRuleOf(animation.state, null)
   if (rule !== null) {
     const reached = animation.count >= (rule.durations[animation.step] ?? 0)
-    next = reached && animation.step < rule.lastStep
-      ? { ...animation, step: animation.step + 1, count: 0 }
-      : { ...animation, count: animation.count + 1 }
+    next =
+      reached && animation.step < rule.lastStep ? { ...animation, step: animation.step + 1, count: 0 } : { ...animation, count: animation.count + 1 }
   }
   if (next.state === 2 && next.step > 3) return startAnimation(next.form, 0)
   return next
@@ -125,13 +124,14 @@ export function advanceBatterAnimation(animation: FigureAnimation): FigureAnimat
   const { state, step, count, form } = animation
   if (form < 0 || form > 3) return animation
   const slugger = isSluggerForm(form)
-  const rule = state === 2
-    ? { durations: [2, 3], steps: 2, wraps: false }
-    : state === 3
-      ? { durations: [], steps: slugger ? 5 : 7, wraps: false }
-      : state === 5
-        ? { durations: slugger ? [3, 3, 3, 3, 3] : [3, 3, 3, 3], steps: slugger ? 5 : 4, wraps: true }
-        : null
+  const rule =
+    state === 2
+      ? { durations: [2, 3], steps: 2, wraps: false }
+      : state === 3
+        ? { durations: [], steps: slugger ? 5 : 7, wraps: false }
+        : state === 5
+          ? { durations: slugger ? [3, 3, 3, 3, 3] : [3, 3, 3, 3], steps: slugger ? 5 : 4, wraps: true }
+          : null
   if (rule === null) return animation
   if (count < (rule.durations[step] ?? 0)) return { ...animation, count: count + 1 }
   if (step < rule.steps - 1) return { ...animation, step: step + 1, count: 0 }
@@ -184,7 +184,12 @@ export interface FigureEntryState {
 
 /** 진입 0x25f8c · 0x2613c · 0x25e6c 는 [목록+0x200] 을 1 로 둔다 */
 export const INITIAL_FIGURE_ENTRY: FigureEntryState = {
-  reload: true, slot: null, pitcher: null, batter: null, pitcherAnimation: null, batterAnimation: null,
+  reload: true,
+  slot: null,
+  pitcher: null,
+  batter: null,
+  pitcherAnimation: null,
+  batterAnimation: null,
 }
 
 /** 한 번 그린 A 자리 몸 그림 */
@@ -296,9 +301,7 @@ export function drawListFigure(memory: FigureListMemory, entry: FigureEntryState
   if (!input.isBatterSlot && nextEntry.pitcherAnimation !== null && nextEntry.pitcher !== null) {
     const stepped = stepPitcher(nextMemory, nextEntry.pitcherAnimation)
     // B-97 고친 길 — 이번 그림에 실은 투수와 이번 걸음의 자세로 뜬다(한 그림 늦음 · 타자 자세 번호를 걷는다). 굴림 없음
-    const drawnImage = isBugFixed('B-97')
-      ? (input.capturesImage ? { look: nextEntry.pitcher, pose: stepped.memory.pose } : null)
-      : image
+    const drawnImage = isBugFixed('B-97') ? (input.capturesImage ? { look: nextEntry.pitcher, pose: stepped.memory.pose } : null) : image
     return {
       memory: stepped.memory,
       entry: { ...nextEntry, pitcherAnimation: stepped.animation },
@@ -309,14 +312,11 @@ export function drawListFigure(memory: FigureListMemory, entry: FigureEntryState
 }
 
 /** 그림 n 번 (건너뛴 갱신도 원본은 한 번씩 그렸다) — 마지막 그림을 돌려준다 */
-export function drawListFigureTimes(
-  memory: FigureListMemory, entry: FigureEntryState, input: FigureSlotInput, times: number,
-): FigureFrame {
+export function drawListFigureTimes(memory: FigureListMemory, entry: FigureEntryState, input: FigureSlotInput, times: number): FigureFrame {
   let frame: FigureFrame = { memory, entry, drawing: { kind: '없음' } }
   for (let index = 0; index < Math.max(1, times); index += 1) frame = drawListFigure(frame.memory, frame.entry, input)
   return frame
 }
 
 /** 투수 이미지를 찍는 x 보정 — [투수그림+0x3c] ≠ 0 이면 0x32, 아니면 0x3b (0x655d4~0x655e6) */
-export const pitcherImageDxOf = (hand: number) =>
-  hand !== 0 ? HALL_OF_FAME_FIGURE.imageDx.leftHanded : HALL_OF_FAME_FIGURE.imageDx.rightHanded
+export const pitcherImageDxOf = (hand: number) => (hand !== 0 ? HALL_OF_FAME_FIGURE.imageDx.leftHanded : HALL_OF_FAME_FIGURE.imageDx.rightHanded)

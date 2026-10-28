@@ -52,7 +52,12 @@ function 세우기() {
     releaseBunt: () => done.push('번트 뗌'),
     moveBatter: (direction) => done.push(direction < 0 ? '왼쪽 이동' : '오른쪽 이동'),
   }
-  render(<RawScreen><Stage actions={actions} /></RawScreen>, { container: root })
+  render(
+    <RawScreen>
+      <Stage actions={actions} />
+    </RawScreen>,
+    { container: root },
+  )
   const canvas = root.querySelector('canvas') as HTMLCanvasElement
   return { done, box: screenRectOf(canvas) }
 }

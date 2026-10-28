@@ -12,12 +12,27 @@ import type { GameStartCursor, MainMenuOpenTier, NariGameReady } from '@/pages/m
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
 import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
 import {
-  MENU_DESCRIPTION_PANEL, MENU_DESCRIPTION_TEXT_BOX, MENU_PANEL_HEADING_COLOR,
-  MENU_REEL_ITEM_FRAMES, MENU_REEL_SCROLL_STEPS, MENU_REEL_SHADOW_COLOR, MENU_REEL_SHADOW_OFFSET,
-  MENU_REEL_SLOTS, MENU_WHEEL_ITEM_FRAMES, MENU_WHEEL_TURN_TICKS,
-  menuWheelSlotDrawOf, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
-  menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf, menuReelSlotRowOf,
-  menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf, menuWheelOrderOf,
+  MENU_DESCRIPTION_PANEL,
+  MENU_DESCRIPTION_TEXT_BOX,
+  MENU_PANEL_HEADING_COLOR,
+  MENU_REEL_ITEM_FRAMES,
+  MENU_REEL_SCROLL_STEPS,
+  MENU_REEL_SHADOW_COLOR,
+  MENU_REEL_SHADOW_OFFSET,
+  MENU_REEL_SLOTS,
+  MENU_WHEEL_ITEM_FRAMES,
+  MENU_WHEEL_TURN_TICKS,
+  menuWheelSlotDrawOf,
+  menuPanelHeadingFrameOf,
+  menuPanelHeadingTopLeftOf,
+  menuPanelLabelTopLeftOf,
+  menuReelEntryAtSlotOf,
+  menuReelFrameListOf,
+  menuReelSlotRowOf,
+  menuReelTextTopLeftOf,
+  menuWheelAngleAt,
+  menuWheelLabelTopLeftOf,
+  menuWheelOrderOf,
   menuWheelPointOf,
 } from '@/pages/main-menu/lib/mainMenuLayout'
 import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
@@ -40,7 +55,9 @@ export type GameMode = '미션' | '홈런더비' | '시즌모드' | '일반모�
  */
 const GENERAL_MODE_BUTTONS = ['이어하기', '새로하기', '빠른실행'] as const
 const GENERAL_MODE_BUTTON_FRAMES = [
-  { normal: 4, selected: 9 }, { normal: 3, selected: 8 }, { normal: 5, selected: 10 },
+  { normal: 4, selected: 9 },
+  { normal: 3, selected: 8 },
+  { normal: 5, selected: 10 },
 ] as const
 /** 격자 1열×3행(종류 0x10 인자 1, 3 — 0x297a0 · 0x753f4) · 간격 0x74805(창, 0, 5) */
 const GENERAL_MODE_GRID = { columns: 1, gapX: 0, gapY: 5 } as const
@@ -54,7 +71,10 @@ const NEW_GAME_CONFIRM_CURSOR = 1
  * 격자 2열×1행(종류 0x10 인자 2, 1) · 간격 0x74805(창, 0x3c, 0) · CLR → −1. 처음 커서는 0(0x749d5 를 안 부른다).
  */
 const NARI_EDITION_BUTTONS = ['타자편', '투수편'] as const
-const NARI_EDITION_BUTTON_FRAMES = [{ normal: 11, selected: 13 }, { normal: 12, selected: 14 }] as const
+const NARI_EDITION_BUTTON_FRAMES = [
+  { normal: 11, selected: 13 },
+  { normal: 12, selected: 14 },
+] as const
 const NARI_EDITION_GRID = { columns: 2, gapX: 0x3c, gapY: 0 } as const
 /** CLR(−16) → −1 (0x25dc2~0x25df2 가 창 키 표에 넣는다) → 상태 5 */
 const NARI_EDITION_CANCEL = -1
@@ -148,7 +168,6 @@ const slotOffsetOf = (offset: number, count: number) => {
   return forward > count / 2 ? forward - count : forward
 }
 
-
 /**
  * 메인 메뉴 — 원작대로 **두 단**이다. 윗단(하위 상태 4, 처음 메뉴)에서 [게임시작] 을 고르면
  * 아랫단(하위 상태 5, 게임시작 목록)으로 내려가고, 취소(Esc/CLR)하면 윗단으로 돌아온다.
@@ -197,24 +216,32 @@ export function MainMenuScreen({
   // 자라는 동안은 릴 줄을 안 그리고(0x254d8) 하위 5·9 갱신이 키를 버린다([0xe2] ≠ 0 — 0x28cc2 · 0x28ae0)
   const [tier, setTier] = useState(openTier)
   const band = useMenuBand(tier !== 4, isBandGrown)
-  const { state, dispatch, turningRef } = useMainMenu(hasSavedGame, false, (effect) => {
-    if (effect === '나리타자편') onNewGame('타자편')
-    else if (effect === '나리투수편') onNewGame('투수편')
-    else if (effect === '나리타자편경기') (onResumeNariGame ?? onNewGame)('타자편')
-    else if (effect === '나리투수편경기') (onResumeNariGame ?? onNewGame)('투수편')
-    else if (effect === '미션') onSelectMode('미션')
-    else if (effect === '홈런더비') onSelectMode('홈런더비')
-    else if (effect === '시즌모드') onSelectMode('시즌모드')
-    else if (effect === '일반모드') onSelectMode('일반모드')
-    else if (effect === '일반모드빠른실행') onSelectMode('일반모드빠른실행')
-    // 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8(this, 1) → 0x213c0(앱, 1, 0) → 장면 0x104
-    else if (effect === '일반모드경기이어하기') onSelectMode('일반모드경기이어하기')
-    else if (effect === '스페셜') onSpecial()
-    else if (effect === '도움말') onHelp()
-    else if (effect === '환경설정') onSettings()
-    else if (effect === '게임문의') onInquiry?.()
-  }, { isGeneralGameInProgress, lastPlayedMode, ...(nariGameReady === undefined ? {} : { nariGameReady }) },
-  openTier, gameStartCursor, topMenuCursor, band.isGrowing)
+  const { state, dispatch, turningRef } = useMainMenu(
+    hasSavedGame,
+    false,
+    (effect) => {
+      if (effect === '나리타자편') onNewGame('타자편')
+      else if (effect === '나리투수편') onNewGame('투수편')
+      else if (effect === '나리타자편경기') (onResumeNariGame ?? onNewGame)('타자편')
+      else if (effect === '나리투수편경기') (onResumeNariGame ?? onNewGame)('투수편')
+      else if (effect === '미션') onSelectMode('미션')
+      else if (effect === '홈런더비') onSelectMode('홈런더비')
+      else if (effect === '시즌모드') onSelectMode('시즌모드')
+      else if (effect === '일반모드') onSelectMode('일반모드')
+      else if (effect === '일반모드빠른실행') onSelectMode('일반모드빠른실행')
+      // 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8(this, 1) → 0x213c0(앱, 1, 0) → 장면 0x104
+      else if (effect === '일반모드경기이어하기') onSelectMode('일반모드경기이어하기')
+      else if (effect === '스페셜') onSpecial()
+      else if (effect === '도움말') onHelp()
+      else if (effect === '환경설정') onSettings()
+      else if (effect === '게임문의') onInquiry?.()
+    },
+    { isGeneralGameInProgress, lastPlayedMode, ...(nariGameReady === undefined ? {} : { nariGameReady }) },
+    openTier,
+    gameStartCursor,
+    topMenuCursor,
+    band.isGrowing,
+  )
   if (state.tier !== tier) setTier(state.tier)
   const origins = useFrameOrigins(`${MAIN_UI}/frames`)
   const textOrigins = useFrameOrigins(`${IMG_TEXT}/frames`)
@@ -234,14 +261,13 @@ export function MainMenuScreen({
   const entries = entriesOf(state.tier)
   const selectedId = selectedIdOf(state)
   const selected = entries.find((entry) => entry.id === selectedId)
-  const cursor = Math.max(entries.findIndex((entry) => entry.id === selectedId), 0)
+  const cursor = Math.max(
+    entries.findIndex((entry) => entry.id === selectedId),
+    0,
+  )
 
   // 윗단은 5틱(카운터 0~4), 아랫단은 스크롤 석 장을 그린 뒤 배열이 돈다
-  const turn = useMenuTurn(
-    cursor,
-    entries.length,
-    isWheel ? MENU_WHEEL_TURN_TICKS : MENU_REEL_SCROLL_STEPS.length,
-  )
+  const turn = useMenuTurn(cursor, entries.length, isWheel ? MENU_WHEEL_TURN_TICKS : MENU_REEL_SCROLL_STEPS.length)
   // 도는 동안은 키를 버린다 — `useMainMenu` 의 `turningRef` (0x29454 · 0x28cb0 · 0x28ad4 맨 앞 [+0xe1])
   turningRef.current = turn.direction !== null
   /** 도는 동안은 **돌기 전 배열**을 그린다 (회전은 마지막 틱에 한 번 일어난다) */
@@ -283,16 +309,15 @@ export function MainMenuScreen({
    * 판 안 글칸은 처음 메뉴(하위 4) 0x24ff0 만 쓴다 — 하위 5·9 는 판(0x256fc)에 글을 안 쓰고 설명 띠 0x55544 로 쓴다.
    * 잠긴 칸 안내(`lockedNotice`)는 판이 아니라 확인 상자(0x74ef5)로 뜬다 — 아래 `MessageBox`.
    */
-  const panelText = isWheel ? selected?.description ?? '' : ''
+  const panelText = isWheel ? (selected?.description ?? '') : ''
   /**
    * 하위 목록 설명 띠 — 0x2524c 끝 0x257f2~0x25860: 바탕 띠가 자라는 중(`[this+0xe2]`)이 아니고 상태가 4 가 아니면
    * `0x55545([this+0x120], StrMAINMENU[기준 + 커서])` — 기준은 하위 5 → 6 · 9 → 0x18 (6 → 0x10, 나머지는 글 없음).
    * 다시 펴는 계기는 커서를 옮기는 0x25366~0x25370 의 `[skin+0x88] = 1 · [+0x8a] = 1` 이라 커서를 씨앗으로 쓴다.
    */
-  const bandText = isWheel ? null : selected?.description ?? ''
+  const bandText = isWheel ? null : (selected?.description ?? '')
 
-  const sizeOf = (frames: ReturnType<typeof useFrameOrigins>, frame: number) =>
-    frames?.[pad(frame)] ?? null
+  const sizeOf = (frames: ReturnType<typeof useFrameOrigins>, frame: number) => frames?.[pad(frame)] ?? null
 
   /** 단색으로 찍는 글자 (원본 효과 0xb) — 그림을 마스크로 쓰고 색을 칠한다 */
   const tinted = (src: string, left: number, top: number, width: number, height: number, color: string) => (
@@ -305,91 +330,97 @@ export function MainMenuScreen({
   // ── 윗단 바퀴: 여섯 자리에 놓인 칸 글자 (아랫단에서도 그대로 깔린다) ──
   const wheelCursor = isWheel
     ? shownCursor
-    : Math.max(TOP_ENTRIES.findIndex((entry) => entry.id === state.selectedTopId), 0)
+    : Math.max(
+        TOP_ENTRIES.findIndex((entry) => entry.id === state.selectedTopId),
+        0,
+      )
   const wheelOrder = menuWheelOrderOf(wheelCursor)
   const wheelDirection = isWheel ? turn.direction : null
   // 칸 고리 0x24dd2~0x251e4 는 자리 5 → 0 차례로 칸마다 밑판(main_ui 이미지 0 · 1 · 2)을 찍고 그 위에 칸 글자를 그린다
-  const wheelLabels = wheelOrder.map((entryIndex, slot) => ({ entryIndex, slot })).reverse().map(({ entryIndex, slot }) => {
-    const angle = menuWheelAngleAt(slot, wheelDirection, turn.counter)
-    const draw = menuWheelSlotDrawOf(angle)
-    if (draw === null) return null
-    const entry = TOP_ENTRIES[entryIndex]
-    const underlay = <MenuWheelUnderlayImage key={`${entry.id}-밑판`} underlay={draw.underlay} />
-    const frame = MENU_WHEEL_ITEM_FRAMES[entryIndex]
-    const size = sizeOf(textOrigins, frame)
-    // 접힌 칸(경우 1~4)은 글자를 안 그린다 (24f98)
-    if (!draw.showsLabel || size === null) return underlay
-    const topLeft = menuWheelLabelTopLeftOf(menuWheelPointOf(angle), size.width, size.height)
-    return [underlay, (
-      <button
-        key={entry.id}
-        type="button"
-        aria-label={entry.id}
-        aria-current={isWheel && entryIndex === cursor}
-        className={isEntryDimmed(entry, hasSavedGame) ? styles.menuRowDimmed : styles.menuRow}
-        style={{ left: topLeft.x, top: topLeft.y }}
-        disabled={!isWheel}
-        // ⚠️ 마우스를 올리기만 해서 커서를 옮기지 않는다(onMouseEnter 없음) — 원본은 키패드뿐이다. 바퀴·릴이 돌면 멈춘 포인터 아래로
-        // 다른 칸이 들어와 브라우저가 mouseenter 를 쏘므로, 포인터를 메뉴 위에 둔 채 키로 고르면 커서가 엉뚱한 칸으로 튀었다
-        // (게임시작 → ↓↓ 나만의리그 → OK 가 일반모드 창 · 홈런더비 · 스페셜로 갔다).
-        // 누르면 **고르기만** 한다 — 그 칸까지 ↑/↓ 를 한 칸씩 보내 원본처럼 바퀴가 돈다. 시작은 설명 판 누름(OK)이다
-        onClick={() => stepToward(slotOffsetOf(slot, TOP_ENTRIES.length))}
-      >
-        <img src={frameSrc(IMG_TEXT, frame)} alt="" />
-      </button>
-    )]
-  })
+  const wheelLabels = wheelOrder
+    .map((entryIndex, slot) => ({ entryIndex, slot }))
+    .reverse()
+    .map(({ entryIndex, slot }) => {
+      const angle = menuWheelAngleAt(slot, wheelDirection, turn.counter)
+      const draw = menuWheelSlotDrawOf(angle)
+      if (draw === null) return null
+      const entry = TOP_ENTRIES[entryIndex]
+      const underlay = <MenuWheelUnderlayImage key={`${entry.id}-밑판`} underlay={draw.underlay} />
+      const frame = MENU_WHEEL_ITEM_FRAMES[entryIndex]
+      const size = sizeOf(textOrigins, frame)
+      // 접힌 칸(경우 1~4)은 글자를 안 그린다 (24f98)
+      if (!draw.showsLabel || size === null) return underlay
+      const topLeft = menuWheelLabelTopLeftOf(menuWheelPointOf(angle), size.width, size.height)
+      return [
+        underlay,
+        <button
+          key={entry.id}
+          type="button"
+          aria-label={entry.id}
+          aria-current={isWheel && entryIndex === cursor}
+          className={isEntryDimmed(entry, hasSavedGame) ? styles.menuRowDimmed : styles.menuRow}
+          style={{ left: topLeft.x, top: topLeft.y }}
+          disabled={!isWheel}
+          // ⚠️ 마우스를 올리기만 해서 커서를 옮기지 않는다(onMouseEnter 없음) — 원본은 키패드뿐이다. 바퀴·릴이 돌면 멈춘 포인터 아래로
+          // 다른 칸이 들어와 브라우저가 mouseenter 를 쏘므로, 포인터를 메뉴 위에 둔 채 키로 고르면 커서가 엉뚱한 칸으로 튀었다
+          // (게임시작 → ↓↓ 나만의리그 → OK 가 일반모드 창 · 홈런더비 · 스페셜로 갔다).
+          // 누르면 **고르기만** 한다 — 그 칸까지 ↑/↓ 를 한 칸씩 보내 원본처럼 바퀴가 돈다. 시작은 설명 판 누름(OK)이다
+          onClick={() => stepToward(slotOffsetOf(slot, TOP_ENTRIES.length))}
+        >
+          <img src={frameSrc(IMG_TEXT, frame)} alt="" />
+        </button>,
+      ]
+    })
 
   // ── 아랫단 세로 릴 ──
   const reelFrames = MENU_REEL_ITEM_FRAMES[reelState] ?? []
   const reelRow = menuReelSlotRowOf(reelState)
   const reelFrameList = menuReelFrameListOf(reelFrames)
   /** ↑(−1) 면 +, ↓(−2) 면 − 로 민다 (0x2534c) */
-  const scroll = turn.direction === null
-    ? 0
-    : (turn.direction === -1 ? 1 : -1) * (MENU_REEL_SCROLL_STEPS[turn.counter] ?? 0)
-  const reelLabels = isWheel || band.isGrowing ? [] : MENU_REEL_SLOTS.map((slot) => {
-    const entryIndex = menuReelEntryAtSlotOf(reelFrames, reelRow, shownCursor, slot)
-    if (entryIndex === null) return null
-    const frame = reelFrameList[entryIndex]
-    const size = sizeOf(textOrigins, frame)
-    if (size === null) return null
-    const topLeft = menuReelTextTopLeftOf(slot, size.width, scroll)
-    if (topLeft === null) return null
-    const entry = entries[entryIndex]
-    const src = frameSrc(IMG_TEXT, frame)
-    return (
-      <div key={entry.id}>
-        {/* 그림자를 #212B70 으로 (+1,+1) 에 먼저 찍고 진짜 글자를 원색으로 덮는다 (0x255c8) */}
-        {tinted(
-          src,
-          topLeft.x + MENU_REEL_SHADOW_OFFSET.x,
-          topLeft.y + MENU_REEL_SHADOW_OFFSET.y,
-          size.width,
-          size.height,
-          MENU_REEL_SHADOW_COLOR,
-        )}
-        <button
-          type="button"
-          aria-label={entry.id}
-          className={isEntryDimmed(entry, hasSavedGame) ? styles.menuRowDimmed : styles.menuRow}
-          style={{ left: topLeft.x, top: topLeft.y }}
-          // 마우스 올리기로는 고르지 않는다 — 바퀴 칸과 같은 까닭(멈춘 포인터 아래로 릴이 돌아 들어온 칸이 커서를 빼앗는다).
-          // 누르면 고르기만 한다 — 릴이 그 칸까지 한 칸씩 돈다. 보이는 윗줄(슬롯 1·2·3)이 커서 −3·−2·−1 이고 릴이 감기므로
-          // 바닥 밖 칸(슬롯 5·6·7)도 윗줄을 거듭 눌러 닿는다
-          onClick={() => stepToward(slotOffsetOf(entryIndex - shownCursor, entries.length))}
-        >
-          <img src={src} alt="" />
-        </button>
-      </div>
-    )
-  })
+  const scroll = turn.direction === null ? 0 : (turn.direction === -1 ? 1 : -1) * (MENU_REEL_SCROLL_STEPS[turn.counter] ?? 0)
+  const reelLabels =
+    isWheel || band.isGrowing
+      ? []
+      : MENU_REEL_SLOTS.map((slot) => {
+          const entryIndex = menuReelEntryAtSlotOf(reelFrames, reelRow, shownCursor, slot)
+          if (entryIndex === null) return null
+          const frame = reelFrameList[entryIndex]
+          const size = sizeOf(textOrigins, frame)
+          if (size === null) return null
+          const topLeft = menuReelTextTopLeftOf(slot, size.width, scroll)
+          if (topLeft === null) return null
+          const entry = entries[entryIndex]
+          const src = frameSrc(IMG_TEXT, frame)
+          return (
+            <div key={entry.id}>
+              {/* 그림자를 #212B70 으로 (+1,+1) 에 먼저 찍고 진짜 글자를 원색으로 덮는다 (0x255c8) */}
+              {tinted(
+                src,
+                topLeft.x + MENU_REEL_SHADOW_OFFSET.x,
+                topLeft.y + MENU_REEL_SHADOW_OFFSET.y,
+                size.width,
+                size.height,
+                MENU_REEL_SHADOW_COLOR,
+              )}
+              <button
+                type="button"
+                aria-label={entry.id}
+                className={isEntryDimmed(entry, hasSavedGame) ? styles.menuRowDimmed : styles.menuRow}
+                style={{ left: topLeft.x, top: topLeft.y }}
+                // 마우스 올리기로는 고르지 않는다 — 바퀴 칸과 같은 까닭(멈춘 포인터 아래로 릴이 돌아 들어온 칸이 커서를 빼앗는다).
+                // 누르면 고르기만 한다 — 릴이 그 칸까지 한 칸씩 돈다. 보이는 윗줄(슬롯 1·2·3)이 커서 −3·−2·−1 이고 릴이 감기므로
+                // 바닥 밖 칸(슬롯 5·6·7)도 윗줄을 거듭 눌러 닿는다
+                onClick={() => stepToward(slotOffsetOf(entryIndex - shownCursor, entries.length))}
+              >
+                <img src={src} alt="" />
+              </button>
+            </div>
+          )
+        })
 
   // ── 설명 판 (두 단 공통) ──
   const panelLabelSize = selected === undefined ? null : sizeOf(origins, selected.labelFrame)
-  const panelLabelAt = panelLabelSize === null
-    ? null
-    : menuPanelLabelTopLeftOf(panelLabelSize.width, panelLabelSize.height)
+  const panelLabelAt = panelLabelSize === null ? null : menuPanelLabelTopLeftOf(panelLabelSize.width, panelLabelSize.height)
   /** 판 왼쪽 위 회색 제목 — 하위 목록(0x257cc)에만 있다 */
   const headingFrame = isWheel ? null : menuPanelHeadingFrameOf(reelState)
   const headingSize = headingFrame === null ? null : sizeOf(textOrigins, headingFrame)
@@ -419,21 +450,18 @@ export function MainMenuScreen({
       />
       {/* 판 안 큰 글자 = main_ui 프레임, 첨자는 커서다 (0x25774 · 상태 4 는 0x25084) */}
       {selected !== undefined && panelLabelAt !== null && panelLabelSize !== null && (
-        <img
-          className={styles.layer}
-          style={{ left: panelLabelAt.x, top: panelLabelAt.y }}
-          src={frameSrc(MAIN_UI, selected.labelFrame)}
-          alt=""
-        />
+        <img className={styles.layer} style={{ left: panelLabelAt.x, top: panelLabelAt.y }} src={frameSrc(MAIN_UI, selected.labelFrame)} alt="" />
       )}
-      {headingFrame !== null && headingSize !== null && tinted(
-        frameSrc(IMG_TEXT, headingFrame),
-        menuPanelHeadingTopLeftOf().x,
-        menuPanelHeadingTopLeftOf().y,
-        headingSize.width,
-        headingSize.height,
-        MENU_PANEL_HEADING_COLOR,
-      )}
+      {headingFrame !== null &&
+        headingSize !== null &&
+        tinted(
+          frameSrc(IMG_TEXT, headingFrame),
+          menuPanelHeadingTopLeftOf().x,
+          menuPanelHeadingTopLeftOf().y,
+          headingSize.width,
+          headingSize.height,
+          MENU_PANEL_HEADING_COLOR,
+        )}
       {/*
         하위 목록 설명 띠 0x55544 는 0x2524c 의 **맨 끝**(0x25860)에 그린다 — 판 0x25770 · 판 안 큰 글자 0x257c8 · 회색 제목 0x257ee 뒤라
         띠(왼쪽 아래 (0, 275)~, 폭 160)가 판 왼쪽의 회색 제목을 덮는다. r77 점검의 "설명 판이 왼쪽 아래를 가린다"는 이 원본 차례 그대로다
@@ -458,8 +486,7 @@ export function MainMenuScreen({
           안 건드린다. 곧 타이틀에서 왔을 때만 미끄러지고(`headerSlides`), 두 단을 오가도 다시 내려오지 않는다 —
           같은 ScreenFrame 을 그대로 두어 미끄러짐을 이어 간다 */}
       {gamePoint !== undefined && (
-        <ScreenFrame title="2010프로야구" gamePoint={gamePoint}
-          onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} slides={headerSlides} />
+        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} slides={headerSlides} />
       )}
 
       {/*
@@ -467,18 +494,20 @@ export function MainMenuScreen({
         (바퀴 아래 자리 · 릴 자리 4 는 판이 대신 보인다) 마우스로 고른 칸을 시작할 길이 없었다. 바닥띠 되돌아가기(x 206~)는 비워 둔다
       */}
       {state.lockedNotice === null && state.generalModeWindow === null && !state.isPickingNariEdition && (
-        <PressArea label="고른 칸 시작" onPress={() => dispatch({ type: '시작' })}
-          rect={{ x: MENU_DESCRIPTION_PANEL.x, y: MENU_DESCRIPTION_PANEL.y, width: 200 - MENU_DESCRIPTION_PANEL.x, height: 320 - MENU_DESCRIPTION_PANEL.y }} />
+        <PressArea
+          label="고른 칸 시작"
+          onPress={() => dispatch({ type: '시작' })}
+          rect={{
+            x: MENU_DESCRIPTION_PANEL.x,
+            y: MENU_DESCRIPTION_PANEL.y,
+            width: 200 - MENU_DESCRIPTION_PANEL.x,
+            height: 320 - MENU_DESCRIPTION_PANEL.y,
+          }}
+        />
       )}
 
       {/* 잠긴 칸 안내 — 원본 확인 팝업 0x74ef5 종류 1(OK 하나). 바닥 판 글칸에 웹 단추를 얹던 근사를 걷고 공용 상자로 띄운다 */}
-      {state.lockedNotice !== null && (
-        <MessageBox
-          text={state.lockedNotice}
-          buttons={['OK']}
-          onAnswer={() => dispatch({ type: '시작' })}
-        />
-      )}
+      {state.lockedNotice !== null && <MessageBox text={state.lockedNotice} buttons={['OK']} onAnswer={() => dispatch({ type: '시작' })} />}
 
       {/* 나만의리그 편 고르기 창 [14] — 하위 13 */}
       {state.isPickingNariEdition && (

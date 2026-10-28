@@ -15,12 +15,10 @@ afterEach(cleanup)
 
 type OnCreate = (name: string, profile: RookieProfile) => void
 
-const 화면 = (onCreate: OnCreate = () => {}) =>
-  render(<CreatePlayerScreen onCreate={onCreate} onCancel={() => {}} />)
+const 화면 = (onCreate: OnCreate = () => {}) => render(<CreatePlayerScreen onCreate={onCreate} onCancel={() => {}} />)
 
 const 커서 = () => screen.getByTestId('선수등록-커서')
-const 이름넣기 = (name: string) =>
-  fireEvent.change(screen.getByRole('textbox'), { target: { value: name } })
+const 이름넣기 = (name: string) => fireEvent.change(screen.getByRole('textbox'), { target: { value: name } })
 
 /**
  * 웹 [등록] 단추를 걷었다 — 원본처럼 OK 키는 줄을 하나 내리고 피부 줄(마지막)에서 확인을 띄운다(0x16f28).
@@ -148,7 +146,14 @@ describe('선수 등록 — 줄 고르기 키 (0x16f28)', () => {
 
   it('CLR 은 다른 줄에선 위로, 이름 줄에선 한 글자를 지우고 비었을 때만 팀 고르기로', () => {
     let cancelled = 0
-    render(<CreatePlayerScreen onCreate={() => {}} onCancel={() => { cancelled += 1 }} />)
+    render(
+      <CreatePlayerScreen
+        onCreate={() => {}}
+        onCancel={() => {
+          cancelled += 1
+        }}
+      />,
+    )
     이름넣기('AB')
     키('ArrowDown')
     키('ArrowDown')
@@ -168,7 +173,9 @@ describe('선수 등록 — 줄 고르기 키 (0x16f28)', () => {
 
   it('이름은 다듬지 않는다 — 공백도 글자다 (strlen)', () => {
     let created = ''
-    화면((name) => { created = name })
+    화면((name) => {
+      created = name
+    })
     이름넣기(' ')
     등록()
     fireEvent.click(screen.getByRole('button', { name: '예' }))
@@ -191,7 +198,9 @@ describe('선수 등록 — 확인 질문은 화면을 비우지 않는다', () 
 
   it('[예] 를 고르면 입력한 이름과 고른 항목으로 등록된다', () => {
     let created: { name: string; profile: RookieProfile } | null = null
-    화면((name, profile) => { created = { name, profile } })
+    화면((name, profile) => {
+      created = { name, profile }
+    })
     이름넣기('테스트')
     fireEvent.click(screen.getByRole('button', { name: '손 우타' }))
     fireEvent.click(screen.getByRole('button', { name: '손 다음' }))

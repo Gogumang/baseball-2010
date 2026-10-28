@@ -150,11 +150,7 @@ describe('팀 경기 화면의 소리 배선', () => {
     const { result } = 띄우기({ playerSide: PLAYER_SIDE_FIRST_BAT })
     녹음.played.length = 0
 
-    act(() =>
-      result.current.actions.resolvePitch(
-        공({ resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, contactSoundId: 8 }),
-      ),
-    )
+    act(() => result.current.actions.resolvePitch(공({ resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, contactSoundId: 8 })))
     // 8 헛스윙 바람 소리 — 결과를 넘긴 틀(타석 화면은 판정 틀에 스스로 내고 비워 넘긴다. 이 시험은 실어 넘긴 옛 호출)
     expect(녹음.played).toEqual([8])
 
@@ -231,14 +227,7 @@ describe('팀 경기 화면의 소리 배선', () => {
 describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', () => {
   it('교체 화면을 열면 22 가 난다', () => {
     vi.useFakeTimers()
-    const { unmount } = render(
-      <TeamGameScreen
-        options={기본옵션}
-        random={createSeededRandom(20100901)}
-        onFinish={() => {}}
-        onQuit={() => {}}
-      />,
-    )
+    const { unmount } = render(<TeamGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={() => {}} onQuit={() => {}} />)
     판닫기()
     // 상태 0xe 의 OK — 교체 창은 OK 뒤(0xf)에 열린다
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * SCENE_CONFIRM_READY_FRAMES))
@@ -256,14 +245,7 @@ describe('`#` 투수 교체 화면 — "Time!" 22 (상태 0xb 진입 0x3af06)', 
 
   it('경기 중 메뉴(*)에서는 22 가 안 난다 — 0x3c158 은 22 를 안 튼다', () => {
     vi.useFakeTimers()
-    const { unmount } = render(
-      <TeamGameScreen
-        options={기본옵션}
-        random={createSeededRandom(20100901)}
-        onFinish={() => {}}
-        onQuit={() => {}}
-      />,
-    )
+    const { unmount } = render(<TeamGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={() => {}} onQuit={() => {}} />)
     판닫기()
     녹음.played.length = 0
 

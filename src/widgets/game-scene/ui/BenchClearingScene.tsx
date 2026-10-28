@@ -2,11 +2,7 @@ import { type MutableRefObject, useEffect, useRef } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import {
-  BENCH_CLEARING_SOUND,
-  BENCH_CLEARING_TARGET_TICK,
-  rollBenchClearingTargets,
-} from '@/features/play-game/model/benchClearingScene'
+import { BENCH_CLEARING_SOUND, BENCH_CLEARING_TARGET_TICK, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import { screenOffsetOf } from '@/pages/defense/lib/defenseCamera'
 import {
   BENCH_CLEARING_EXIT_TICK,
@@ -23,7 +19,10 @@ import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { irisHoleSpansOf } from '@/widgets/game-scene/lib/irisClose'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 import {
-  claimSceneParticleTick, clearSceneParticles, holdSceneParticleTicks, sceneParticleScene,
+  claimSceneParticleTick,
+  clearSceneParticles,
+  holdSceneParticleTicks,
+  sceneParticleScene,
 } from '@/entities/particle/model/sceneParticleManager'
 import { tickParticles } from '@/entities/particle/model/particleScene'
 import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
@@ -97,23 +96,28 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
    * (`sceneKeyLatch`). 그래서 틱 10 머리에 처리된 건너뛰기는 목표 굴림 8 번을 안 낸다
    */
   const keyLatch = useSceneKeyLatchOwner()
-  const tick = useSceneTick((next) => {
-    if (doneRef.current) return
-    if (next === BENCH_CLEARING_TARGET_TICK) {
-      reachedRef.current = true
-      // 0x401d4 틱 10 — 수비 8명 목표 굴림 8 번
-      if (randomRef.current !== undefined) targetRollsRef.current = rollBenchClearingTargets(randomRef.current)
-    }
-    if (next >= BENCH_CLEARING_EXIT_TICK) finish()
-    // 같은 틀의 프레임 끝 관리자 틱 0x6de85(53048) — 갱신 표(52e14) 뒤다. 앞 상태가 쏜 이미터가 남았으면 이 틀에 굴린다
-    // (틱 10 이면 목표 굴림 8 번 뒤). 앱 층의 그림 시계(requestAnimationFrame)에 맡기면 같은 틀의 두 굴림 차례가 어느 시계가 먼저
-    // 울리느냐에 달려 장면 갱신 바로 뒤에서 돌린다(`holdSceneParticleTicks`, r284). 공용 창이 서 있는 틀은 갱신과 함께 건너뛴다(52cc6 · 53048)
-    const random = randomRef.current
-    const scene = sceneParticleScene()
-    if (random !== undefined && scene.emitters.length > 0 && claimSceneParticleTick(scene, appTickOfGameSceneTick(gameSceneTickNow()))) {
-      tickParticles(scene, random)
-    }
-  }, true, false, keyLatch)
+  const tick = useSceneTick(
+    (next) => {
+      if (doneRef.current) return
+      if (next === BENCH_CLEARING_TARGET_TICK) {
+        reachedRef.current = true
+        // 0x401d4 틱 10 — 수비 8명 목표 굴림 8 번
+        if (randomRef.current !== undefined) targetRollsRef.current = rollBenchClearingTargets(randomRef.current)
+      }
+      if (next >= BENCH_CLEARING_EXIT_TICK) finish()
+      // 같은 틀의 프레임 끝 관리자 틱 0x6de85(53048) — 갱신 표(52e14) 뒤다. 앞 상태가 쏜 이미터가 남았으면 이 틀에 굴린다
+      // (틱 10 이면 목표 굴림 8 번 뒤). 앱 층의 그림 시계(requestAnimationFrame)에 맡기면 같은 틀의 두 굴림 차례가 어느 시계가 먼저
+      // 울리느냐에 달려 장면 갱신 바로 뒤에서 돌린다(`holdSceneParticleTicks`, r284). 공용 창이 서 있는 틀은 갱신과 함께 건너뛴다(52cc6 · 53048)
+      const random = randomRef.current
+      const scene = sceneParticleScene()
+      if (random !== undefined && scene.emitters.length > 0 && claimSceneParticleTick(scene, appTickOfGameSceneTick(gameSceneTickNow()))) {
+        tickParticles(scene, random)
+      }
+    },
+    true,
+    false,
+    keyLatch,
+  )
   // 경기 난수를 받았으면 관리자 틱을 이 장면이 맡는다 — 그리기는 앱 층(`SceneParticleLayer`)이 그대로 한다
   const holdsParticleTicks = random !== undefined
   useEffect(() => (holdsParticleTicks ? holdSceneParticleTicks() : undefined), [holdsParticleTicks])
@@ -147,9 +151,17 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
           grassPalette={field.grassPalette ?? null}
           rows={[
             // 43240 0x43010(장면, [+0xf20], +0x111c, 0) — 수비 줄
-            { walkers: walk.fielders, teamIndex: field.defenseTeam ?? null, ...(field.defenseAces === undefined ? {} : { aceSprites: field.defenseAces }) },
+            {
+              walkers: walk.fielders,
+              teamIndex: field.defenseTeam ?? null,
+              ...(field.defenseAces === undefined ? {} : { aceSprites: field.defenseAces }),
+            },
             // 43252 0x43010(장면, [+0x177c], +0x1758, 1) — 공격 줄
-            { walkers: walk.offense, teamIndex: field.offenseTeam ?? null, ...(field.offenseAces === undefined ? {} : { aceSprites: field.offenseAces }) },
+            {
+              walkers: walk.offense,
+              teamIndex: field.offenseTeam ?? null,
+              ...(field.offenseAces === undefined ? {} : { aceSprites: field.offenseAces }),
+            },
           ]}
         />
       )}
@@ -177,8 +189,15 @@ function IrisCloseCanvas({ x, y, size }: { readonly x: number; readonly y: numbe
     for (const span of irisHoleSpansOf(x, y, size)) context.clearRect(span.from, span.y, span.to - span.from + 1, 1)
   }, [x, y, size])
   return (
-    <canvas ref={canvasRef} className={styles.cover} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-      data-testid="벤치-원닫기" data-size={size} style={{ imageRendering: 'pixelated' }} />
+    <canvas
+      ref={canvasRef}
+      className={styles.cover}
+      width={SCREEN_WIDTH}
+      height={SCREEN_HEIGHT}
+      data-testid="벤치-원닫기"
+      data-size={size}
+      style={{ imageRendering: 'pixelated' }}
+    />
   )
 }
 
@@ -191,8 +210,11 @@ function useBenchClearingWalk(
   const memory = useRef<{ readonly field: BenchClearingWalkInput; readonly tick: number; readonly state: BenchClearingWalkState } | null>(null)
   if (field === undefined) return null
   let current = memory.current
-  const isSame = current !== null && current.field.entryRolls === field.entryRolls
-    && current.field.offenseSide === field.offenseSide && current.field.isLeftBatter === field.isLeftBatter
+  const isSame =
+    current !== null &&
+    current.field.entryRolls === field.entryRolls &&
+    current.field.offenseSide === field.offenseSide &&
+    current.field.isLeftBatter === field.isLeftBatter
   if (current === null || !isSame || current.tick > tick) {
     current = { field, tick: -1, state: startBenchClearingWalk(field) }
   }

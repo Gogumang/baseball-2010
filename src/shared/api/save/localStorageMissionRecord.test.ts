@@ -29,10 +29,7 @@ describe('미션 클리어 기록 저장 — 횟수를 센다 (0xa51d0)', () => 
   })
 
   it('0 이하나 숫자가 아닌 값은 버리고, 99 를 넘으면 99 로 자른다', () => {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ '타자:1': 0, '타자:2': '셋', '타자:3': 120, '타자:4': 2 }),
-    )
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ '타자:1': 0, '타자:2': '셋', '타자:3': 120, '타자:4': 2 }))
 
     expect(createLocalStorageMissionRecord().load()).toEqual({ '타자:3': 99, '타자:4': 2 })
   })

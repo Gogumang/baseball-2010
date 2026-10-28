@@ -16,19 +16,16 @@ const DUE_UP_ROWS = 3
  * - DUE UP = 상대 타순 칸 `(팀[+0x32] + i) mod 9` 의 선수 `0xae914` — `opponentBatterOf` 와 같은 길(명단 칸 → 붙박이 표 이름,
  *   마타자 칸은 마선수 이름)으로 칸만 옮겨 읽는다.
  */
-export function pitcherHalfInningCardsOf(
-  progress: PitcherGameProgress,
-  pitcherName: string | undefined,
-  half: '초' | '말',
-): HalfInningCardsData {
+export function pitcherHalfInningCardsOf(progress: PitcherGameProgress, pitcherName: string | undefined, half: '초' | '말'): HalfInningCardsData {
   const currentOrder = lineupSlotOf(progress.opponentOrderIndex)
   return {
     battingSide: half === '초' ? 0 : 1,
     count: { strikes: 0, balls: 0, outs: 0 },
     pitcherName: pitcherName ?? null,
     currentOrder,
-    dueUpNames: Array.from({ length: DUE_UP_ROWS }, (_unused, row) =>
-      opponentBatterOf({ ...progress, opponentOrderIndex: dueUpLineupSlotOf(currentOrder, row) }).name ?? null,
+    dueUpNames: Array.from(
+      { length: DUE_UP_ROWS },
+      (_unused, row) => opponentBatterOf({ ...progress, opponentOrderIndex: dueUpLineupSlotOf(currentOrder, row) }).name ?? null,
     ),
   }
 }

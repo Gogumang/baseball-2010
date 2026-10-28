@@ -74,11 +74,10 @@ export interface RunScoreGlyph {
 
 /** 0x585ad(…, 0x46, 값, x, y, 8, 0, 2) — 정렬 2 라 x 에서 폭/2 를 빼고, 세로는 y 그대로 */
 export function runScoreGlyphsOf(value: number, slot: { readonly x: number; readonly y: number }): RunScoreGlyph[] {
-  const digits = String(Math.max(0, Math.trunc(value))).split('').map(Number)
-  const measured = digits.reduce(
-    (sum, digit, index) => sum + RUN_SCORE_DIGIT_WIDTHS[digit]! + (index > 1 ? RUN_SCORE_GAP : 0),
-    0,
-  )
+  const digits = String(Math.max(0, Math.trunc(value)))
+    .split('')
+    .map(Number)
+  const measured = digits.reduce((sum, digit, index) => sum + RUN_SCORE_DIGIT_WIDTHS[digit]! + (index > 1 ? RUN_SCORE_GAP : 0), 0)
   let left = slot.x - (measured >> 1)
   return digits.map((digit) => {
     const placed = { image: RUN_SCORE_DIGIT_BASE + digit, x: left, y: slot.y }
@@ -103,9 +102,7 @@ export function drawRunScoreBoard(timer: number): RunScoreBoardFrame {
 }
 
 /** 판에 보이는 두 점수 — 공격 쪽(st[9])은 t > 0xf 동안 1 을 뺀다 */
-export function runScoreBoardScoresOf(
-  scores: readonly [number, number], battingSide: number, previousScore: boolean,
-): readonly [number, number] {
+export function runScoreBoardScoresOf(scores: readonly [number, number], battingSide: number, previousScore: boolean): readonly [number, number] {
   if (!previousScore) return scores
   return battingSide === 0 ? [scores[0] - 1, scores[1]] : [scores[0], scores[1] - 1]
 }
@@ -153,9 +150,11 @@ export function homeRunScoreBoardRunIn(board: HomeRunScoreBoard, isBatterRunner:
 }
 
 /** 0x41a64 홈런 갈래 (0x41a9e~0x41b0e) — 그리기 한 번. `hiddenRuns` 는 공격 쪽 점수에서 뺄 수 */
-export function drawHomeRunScoreBoard(
-  board: HomeRunScoreBoard,
-): { readonly visible: boolean; readonly hiddenRuns: number; readonly next: HomeRunScoreBoard } {
+export function drawHomeRunScoreBoard(board: HomeRunScoreBoard): {
+  readonly visible: boolean
+  readonly hiddenRuns: number
+  readonly next: HomeRunScoreBoard
+} {
   if (!board.active || board.timer < board.gap * (board.count - 1)) return { visible: false, hiddenRuns: 0, next: board }
   const timer = board.timer - 1
   if (timer >= board.gap * (board.count - 1)) {
@@ -166,9 +165,7 @@ export function drawHomeRunScoreBoard(
 }
 
 /** 판에 보이는 두 점수 — 공격 쪽(st[9])에서 `hidden` 만큼 뺀다 */
-export function runScoreBoardHiddenScoresOf(
-  scores: readonly [number, number], battingSide: number, hidden: number,
-): readonly [number, number] {
+export function runScoreBoardHiddenScoresOf(scores: readonly [number, number], battingSide: number, hidden: number): readonly [number, number] {
   return battingSide === 0 ? [scores[0] - hidden, scores[1]] : [scores[0], scores[1] - hidden]
 }
 
@@ -181,9 +178,7 @@ export function isHomeRunHitCode(resultCode: number | null | undefined): boolean
  * 메시지 0x13 한 번 (0x51fb8 → 5201a) — `0x357e0 && +0xfe7 == 0` 이면 홈런 갈래(0x52030), 아니면 보통 갈래 52074:
  * `[+0x1100] = 0 · [+0x10fc] = 1 · [+0x10f8] = 0x14`. 두 갈래가 같은 칸(+0x10f8 타이머 · +0x10fc 수)을 쓴다.
  */
-export function runScoreBoardRunIn(
-  board: HomeRunScoreBoard, slot: number, homeRunHit: boolean, fastForward: boolean,
-): HomeRunScoreBoard {
+export function runScoreBoardRunIn(board: HomeRunScoreBoard, slot: number, homeRunHit: boolean, fastForward: boolean): HomeRunScoreBoard {
   if (homeRunHit && !fastForward) return homeRunScoreBoardRunIn(board, slot === 0)
   return { ...board, active: false, count: 1, timer: RUN_SCORE_BOARD_TICKS }
 }
@@ -193,7 +188,8 @@ export function runScoreBoardRunIn(
  * 0x357e0 은 +0xfe7 을 안 본다(그리기 쪽).
  */
 export function drawRunScoreBoardScene(
-  board: HomeRunScoreBoard, homeRunHit: boolean,
+  board: HomeRunScoreBoard,
+  homeRunHit: boolean,
 ): { readonly visible: boolean; readonly hidden: number; readonly next: HomeRunScoreBoard } {
   if (homeRunHit) {
     const drawn = drawHomeRunScoreBoard(board)

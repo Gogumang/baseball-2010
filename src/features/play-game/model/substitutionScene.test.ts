@@ -19,16 +19,11 @@ describe('교체 연출 0x16 — 그리기 0x4da30 의 game_ui 애니 9', () => 
       frame: number
       delay: number
     }[][]
-    expect(animations[SUBSTITUTION_ANIMATION_INDEX].map(({ frame, delay }) => ({ frame, delay }))).toEqual(
-      SUBSTITUTION_ANIMATION,
-    )
+    expect(animations[SUBSTITUTION_ANIMATION_INDEX].map(({ frame, delay }) => ({ frame, delay }))).toEqual(SUBSTITUTION_ANIMATION)
   })
 
   it('자리는 프레임 81 상자(0xba815 종류 1)로 가운데 — (120 − 49, 160 − 9)', () => {
-    const origins = JSON.parse(readFileSync(resolve(GAME_UI, 'origins.json'), 'utf8')) as Record<
-      string,
-      { width: number; height: number }
-    >
+    const origins = JSON.parse(readFileSync(resolve(GAME_UI, 'origins.json'), 'utf8')) as Record<string, { width: number; height: number }>
     expect(origins['081']).toMatchObject({ width: SUBSTITUTION_FRAME_BOX.width, height: SUBSTITUTION_FRAME_BOX.height })
     expect(SUBSTITUTION_ANCHOR).toEqual({ x: 71, y: 151 })
   })

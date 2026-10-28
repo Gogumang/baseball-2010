@@ -105,9 +105,7 @@ export function seasonTeamInfoRowsOf({ record, teamAbilities, rank }: SeasonTeam
     { kind: '숫자', value: (STAND_CAPACITY_TABLE[record.stadiumEquipped[0] ?? 0] ?? 0) * 1000, suffixFrame: SEAT_SUFFIX_FRAME },
     { kind: '흐르는글', text: stadiumLineOf(record.stadiumEquipped) },
     { kind: '그림', frame: teamTypeFrameOf(teamAbilities) },
-    record.regularSeasonFirsts === 0
-      ? { kind: '글', text: NO_VALUE_TEXT }
-      : { kind: '숫자', value: record.regularSeasonFirsts },
+    record.regularSeasonFirsts === 0 ? { kind: '글', text: NO_VALUE_TEXT } : { kind: '숫자', value: record.regularSeasonFirsts },
     record.games === 0 ? { kind: '글', text: NO_VALUE_TEXT } : { kind: '숫자', value: rank + 1 },
   ]
   return TEAM_INFO_LABEL_FRAMES.map((labelFrame, index) => ({ labelFrame, value: values[index] }))

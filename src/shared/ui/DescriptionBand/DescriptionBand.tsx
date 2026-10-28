@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import { MarkupText } from '@/shared/ui/MarkupText/MarkupText'
-import {
-  DESCRIPTION_BAND, DESCRIPTION_BAND_FADE_END, descriptionBandAt,
-} from '@/shared/ui/DescriptionBand/descriptionBandLayout'
+import { DESCRIPTION_BAND, DESCRIPTION_BAND_FADE_END, descriptionBandAt } from '@/shared/ui/DescriptionBand/descriptionBandLayout'
 import * as styles from '@/shared/ui/DescriptionBand/DescriptionBand.css'
 
 const { r, g, b } = DESCRIPTION_BAND.color
@@ -15,7 +13,11 @@ const rgba = (alpha: number) => `rgba(${r}, ${g}, ${b}, ${alpha / 255})`
  * 그라데이션 한 장으로 그린다. 글이 비면(0x555d4 의 null 갈래) 띠만 그린다.
  * ⚠️ 유력: 띠가 화면에 처음 나타난 그림에서도 펴며 시작한다 (진입 때 [skin+0x8a] 값은 안 읽었다).
  */
-export function DescriptionBand({ text, seed, initialTicks = 0 }: {
+export function DescriptionBand({
+  text,
+  seed,
+  initialTicks = 0,
+}: {
   readonly text: string
   readonly seed: number
   /**
@@ -48,15 +50,15 @@ export function DescriptionBand({ text, seed, initialTicks = 0 }: {
           top: DESCRIPTION_BAND.y,
           width,
           height: DESCRIPTION_BAND.height,
-          background: `linear-gradient(to right, ${rgba(DESCRIPTION_BAND.alpha)} 0px, ${rgba(DESCRIPTION_BAND.alpha)} `
-            + `${DESCRIPTION_BAND.solidUntil + 1}px, ${rgba(fadeEndAlpha)} ${DESCRIPTION_BAND_FADE_END}px)`,
+          background:
+            `linear-gradient(to right, ${rgba(DESCRIPTION_BAND.alpha)} 0px, ${rgba(DESCRIPTION_BAND.alpha)} ` +
+            `${DESCRIPTION_BAND.solidUntil + 1}px, ${rgba(fadeEndAlpha)} ${DESCRIPTION_BAND_FADE_END}px)`,
           backgroundSize: `${DESCRIPTION_BAND_FADE_END}px 100%`,
           backgroundRepeat: 'no-repeat',
         }}
       />
       {!band.isGrowing && text !== '' && (
-        <div className={styles.text}
-          style={{ left: DESCRIPTION_BAND.text.x, top: DESCRIPTION_BAND.y + DESCRIPTION_BAND.text.dy }}>
+        <div className={styles.text} style={{ left: DESCRIPTION_BAND.text.x, top: DESCRIPTION_BAND.y + DESCRIPTION_BAND.text.dy }}>
           <MarkupText raw={text} />
         </div>
       )}

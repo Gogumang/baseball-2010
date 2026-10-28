@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ENTRY_DETAIL_ORIGIN, SUBSTITUTION_DETAIL_ORIGIN, detailRadarCenterOf, detailWindowFrameAt, playerDetailOf,
+  ENTRY_DETAIL_ORIGIN,
+  SUBSTITUTION_DETAIL_ORIGIN,
+  detailRadarCenterOf,
+  detailWindowFrameAt,
+  playerDetailOf,
 } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 
 describe('선수 정보 창 0x5b798 — 창 자리', () => {
@@ -19,7 +23,15 @@ describe('선수 정보 창 0x5b798 — 창 자리', () => {
 
 describe('선수 정보 창 값', () => {
   it('타자 — 타입 +0xb >> 5 · 손 비트 4 · 필살 +0x18 · 연봉 +0x1b × 1000', () => {
-    const detail = playerDetailOf({ isPitcher: false, abilities: [1, 2, 3, 4], aceIndex: -1, profile: 0x30, skillBits: 0, specialNumber: 4, grade: 12 })
+    const detail = playerDetailOf({
+      isPitcher: false,
+      abilities: [1, 2, 3, 4],
+      aceIndex: -1,
+      profile: 0x30,
+      skillBits: 0,
+      specialNumber: 4,
+      grade: 12,
+    })
     expect(detail.values.map((value) => value.text)).toEqual(['장타형', '좌타', '-', '메테오 스윙', '1억2000'])
   })
 

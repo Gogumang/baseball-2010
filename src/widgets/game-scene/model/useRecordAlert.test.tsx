@@ -18,9 +18,10 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const tick = (count = 1) => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame() * count)
-})
+const tick = (count = 1) =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * count)
+  })
 
 interface Props {
   readonly ids: readonly number[]
@@ -80,7 +81,10 @@ describe('useRecordAlert — 칸 채우기 0x4e600 은 공 끝에만', () => {
 
   it('노랑 줄 틱 [+0x2c] — 장면 상태가 바뀐 첫 그림이 0, 팝업 동안은 그대로', () => {
     const options = (key: string, isFrozen = false): RecordAlertOptions => ({
-      isDrawing: true, isFrozen, sceneStateKey: key, pitchEnd: { serial: 1 },
+      isDrawing: true,
+      isFrozen,
+      sceneStateKey: key,
+      pitchEnd: { serial: 1 },
     })
     const { result, rerender } = renderHook(({ ids, options: current }: Props) => useRecordAlert(ids, current), {
       initialProps: { ids: [], options: { isDrawing: true, sceneStateKey: 'a', pitchEnd: { serial: 0 } } } as Props,

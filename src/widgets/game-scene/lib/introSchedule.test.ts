@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  INTRO_TICKS,
-  hasGameIntro,
-  introBandAlphaOf,
-  introCounterAt,
-  introFadeAt,
-} from '@/widgets/game-scene/lib/introSchedule'
+import { INTRO_TICKS, hasGameIntro, introBandAlphaOf, introCounterAt, introFadeAt } from '@/widgets/game-scene/lib/introSchedule'
 
 describe('경기 시작 인트로 (상태 0xc)', () => {
   it('270 → 0 을 5씩 — 진입 틀에도 갱신이 돌아 틱 t 의 그림은 270 − 5(t + 1), 54틱이면 끝난다 (0x52c50 · 0x39e3c)', () => {

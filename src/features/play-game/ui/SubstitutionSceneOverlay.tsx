@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import {
-  SUBSTITUTION_ANCHOR,
-  SUBSTITUTION_SCENE_DRAWS,
-  substitutionFrameAt,
-} from '@/features/play-game/model/substitutionScene'
+import { SUBSTITUTION_ANCHOR, SUBSTITUTION_SCENE_DRAWS, substitutionFrameAt } from '@/features/play-game/model/substitutionScene'
 import * as styles from '@/features/play-game/ui/SubstitutionSceneOverlay.css'
 import { ACE_CUT_IN_DRAWS } from '@/features/play-game/model/aceCutIn'
 import { AceCutInCanvas } from '@/features/play-game/ui/AceCutInCanvas'

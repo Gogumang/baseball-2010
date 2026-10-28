@@ -90,11 +90,7 @@ export function isPitchCellLearned(career: PitcherCareer, row: number, column: n
  * ```
  * 가드는 보유 마스크가 아니라 **훈련 단계**를 본다 — 구질 훈련(0xa3bac 종류 5)은 마스크를 안 건드린다.
  */
-export function pitchCellSelectBlockReasonOf(
-  career: PitcherCareer,
-  row: number,
-  column: number,
-): PitchSelectBlockReason | null {
+export function pitchCellSelectBlockReasonOf(career: PitcherCareer, row: number, column: number): PitchSelectBlockReason | null {
   const typeNumber = pitchTypeNumberOf(row, columnOf(column))
   if (typeNumber === 0) return '훈련필요'
   if (isInPitchList(career, typeNumber)) return '사용중'

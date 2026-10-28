@@ -6,7 +6,10 @@ import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
 import {
-  createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
+  createCloudFrameCursor,
+  observeSceneCloudFrame,
+  sceneCloudFrameOf,
+  sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
 
 /** 배경 고르기 `0x40ff0` 이 쓰는 구장 값 — 틱(구름 · 전광판 흐름)과 세로 밀기는 부르는 쪽이 따로 준다 */
@@ -98,7 +101,15 @@ export function SceneryBackdrop({ stage, offsetY, overlay }: SceneryBackdropProp
   }, [overlayKey])
 
   return (
-    <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="구장-배경"
-      data-stadium={stage.stadium} data-offset-y={offsetY} style={{ position: 'absolute', left: 0, top: 0 }} />
+    <canvas
+      ref={canvasRef}
+      width={STAGE_WIDTH}
+      height={STAGE_HEIGHT}
+      aria-hidden
+      data-testid="구장-배경"
+      data-stadium={stage.stadium}
+      data-offset-y={offsetY}
+      style={{ position: 'absolute', left: 0, top: 0 }}
+    />
   )
 }

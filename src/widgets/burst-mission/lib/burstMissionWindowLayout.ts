@@ -151,8 +151,30 @@ export function burstNextMarkAt(ticks: number) {
  * 웹에 StrCOMMON 표가 없어 쓰는 칸을 원문 그대로 적는다(`base/extracted/StrCOMMON.json`).
  */
 const SPEAKER_NAMES_FROM_0X71: readonly string[] = [
-  '뱀파이어', '용인족', '감독', '주장', '선배', '안경', '꼬맹이', '김감독', '금발', '장발', '메디카', '레오니',
-  '로제', '발렌타인', '동료', '동료', '동료', '싸이커', '붕붕머신', '드래고나', '어거지죠', '크라이져', '킹타이거', '모두',
+  '뱀파이어',
+  '용인족',
+  '감독',
+  '주장',
+  '선배',
+  '안경',
+  '꼬맹이',
+  '김감독',
+  '금발',
+  '장발',
+  '메디카',
+  '레오니',
+  '로제',
+  '발렌타인',
+  '동료',
+  '동료',
+  '동료',
+  '싸이커',
+  '붕붕머신',
+  '드래고나',
+  '어거지죠',
+  '크라이져',
+  '킹타이거',
+  '모두',
 ]
 
 /** 0x8ea50~0x8ea8e — 이름 머리 "!cFFFFFF[" "!c00CC00" 이름 "!cFFFFFF] : " (0xd5150 · 0xd515c · 0xd5168) */
@@ -169,9 +191,7 @@ export function burstLineIndexOf(judgement: BurstJudgement | null): number {
 }
 
 /** 보상 이름 표 [0x14002c8] — 0 없음 · 1 사기 · 2 인기도 · 3 평판 · 4 소지금 (0xd4fb4~0xd4ff8). 돌발 띠 0x8e858 도 같은 표를 쓴다 */
-export const BURST_REWARD_NAMES: readonly string[] = [
-  '!C!cffffff없음', '!C!cffffff사기', '!C!cffffff인기도', '!C!cffffff평판', '!C!cffffff소지금',
-]
+export const BURST_REWARD_NAMES: readonly string[] = ['!C!cffffff없음', '!C!cffffff사기', '!C!cffffff인기도', '!C!cffffff평판', '!C!cffffff소지금']
 /** 소지금(4) 보상은 표시 값을 ×100 (0x8e68e · 0x8e6ee) */
 const MONEY_KIND = 4
 const MONEY_DISPLAY_SCALE = 100

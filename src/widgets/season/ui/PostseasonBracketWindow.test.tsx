@@ -27,8 +27,7 @@ describe('대진표 그림', () => {
     const 칸팀 = [2, 3, 1, 0]
     TEAM_CELLS.forEach((cell, k) => {
       const logo = screen.getByAltText(TEAMS[칸팀[k]].name)
-      expect([logo.style.left, logo.style.top, logo.style.width, logo.style.height])
-        .toEqual([`${cell.x + 3}px`, `${cell.y + 3}px`, '35px', '34px'])
+      expect([logo.style.left, logo.style.top, logo.style.width, logo.style.height]).toEqual([`${cell.x + 3}px`, `${cell.y + 3}px`, '35px', '34px'])
       const tag = container.querySelector<HTMLElement>(`div[data-cell="${k}"] div[data-rank]`)!
       expect(tag.dataset.rank).toBe(String(4 - k))
       expect(tag.style.left).toBe(`${RANK_TAGS[k].x}px`)

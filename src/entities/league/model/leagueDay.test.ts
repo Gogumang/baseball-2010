@@ -31,12 +31,7 @@ import {
 } from '@/entities/league/model/league'
 import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, startingPitcherOf } from '@/entities/team/model/teamRoster'
 import { advanceRotation, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
-import {
-  EMPTY_LEAGUE_PLAYER_STATS,
-  leagueBatterIdOf,
-  leaguePitcherIdOf,
-  leaguePitcherLineOf,
-} from '@/entities/league/model/leaguePlayerStats'
+import { EMPTY_LEAGUE_PLAYER_STATS, leagueBatterIdOf, leaguePitcherIdOf, leaguePitcherLineOf } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import type { HalfInningResult } from '@/entities/game/model/simulateHalfInning'
@@ -154,16 +149,16 @@ describe('playLeagueDay — 내 팀 경기만 빼고 전적에 넣는다', () =>
   it('경기마다 승 하나·패 하나가 짝으로 들어간다 — 무승부는 없다', () => {
     const { league } = playLeagueDay(EMPTY_LEAGUE, 2, 9, 씨앗난수(31))
 
-    expect(league.wins.reduce((sum, wins) => sum + wins, 0)).toBe(
-      league.losses.reduce((sum, losses) => sum + losses, 0),
-    )
+    expect(league.wins.reduce((sum, wins) => sum + wins, 0)).toBe(league.losses.reduce((sum, losses) => sum + losses, 0))
   })
 
   it('CPU 경기 준비 0xc239c 가 넣은 마선수가 그 명단 팀 레코드에 남는다 — 내 경기 두 팀만 빠진다 (U-105 r154)', () => {
     const 내팀 = 0
     const 상대 = opponentOf(1, 내팀)
     const { recordAces } = playLeagueDay(EMPTY_LEAGUE, 1, 내팀, 씨앗난수(77))
-    const teams = Object.keys(recordAces).map(Number).sort((a, b) => a - b)
+    const teams = Object.keys(recordAces)
+      .map(Number)
+      .sort((a, b) => a - b)
 
     expect(teams).toHaveLength(LEAGUE_TEAM_COUNT - 2)
     expect(teams).not.toContain(내팀)
@@ -258,8 +253,7 @@ describe('playLeagueDay — 선수별 타석 기록이 쌓인다', () => {
   it('이어서 돌리면 앞서 쌓은 표 위에 더해진다', () => {
     const 하루 = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
     const 이틀 = playLeagueDay(하루.league, 1, 4, 씨앗난수(6), 하루.playerStats)
-    const 합 = (stats: typeof 하루.playerStats) =>
-      Object.values(stats.batters).reduce((sum, line) => sum + line.atBats, 0)
+    const 합 = (stats: typeof 하루.playerStats) => Object.values(stats.batters).reduce((sum, line) => sum + line.atBats, 0)
 
     expect(합(이틀.playerStats)).toBeGreaterThan(합(하루.playerStats))
   })
@@ -359,8 +353,7 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
   it('하루치 네 경기 — 패는 경기마다 하나(4), 승은 그 이하다 (내 팀 경기는 빠진다)', () => {
     const { playerStats } = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
     const 줄들 = Object.values(playerStats.pitchers ?? {})
-    const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) =>
-      줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
+    const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) => 줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
 
     expect(합((줄) => 줄.wins)).toBeLessThanOrEqual(4)
     expect(합((줄) => 줄.losses)).toBe(4)
@@ -371,8 +364,7 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
   it('이어서 돌리면 투수 줄도 앞서 쌓은 표 위에 더해진다', () => {
     const 하루 = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5))
     const 이틀 = playLeagueDay(하루.league, 1, 4, 씨앗난수(6), 하루.playerStats)
-    const 이닝합 = (stats: typeof 하루.playerStats) =>
-      Object.values(stats.pitchers ?? {}).reduce((sum, 줄) => sum + 줄.outs, 0)
+    const 이닝합 = (stats: typeof 하루.playerStats) => Object.values(stats.pitchers ?? {}).reduce((sum, 줄) => sum + 줄.outs, 0)
 
     // 타자 표도 같이 살아 있어야 한다 (두 기록이 서로를 지우면 안 된다)
     expect(Object.keys(이틀.playerStats.batters).length).toBeGreaterThan(0)
@@ -390,8 +382,7 @@ describe('CPU 끼리 경기가 선발 투수 기록도 쌓는다 (0xa8024 · 경
       stats = 하루.playerStats
     }
     const 줄들 = Object.values(stats.pitchers ?? {})
-    const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) =>
-      줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
+    const 합 = (고르기: (줄: (typeof 줄들)[number]) => number) => 줄들.reduce((sum, 줄) => sum + 고르기(줄), 0)
 
     // 패는 경기마다 하나다(마투수 8번 칸이 진 경우만 빠진다). 승은 6회 이후 득점이 없는 경기에서 빈다 (S1 6절)
     expect(합((줄) => 줄.losses)).toBeGreaterThanOrEqual(220)
@@ -436,9 +427,7 @@ describe('CPU 끼리 경기의 투수 교체·도루가 실제로 돈다', () =>
     for (let day = 0; day < 45; day += 1) {
       for (const matchup of matchupsOf(day)) {
         const 경기 = simulateLeagueGame(matchup, random, rotationSlotOf(day))
-        const 팀별등판 = [matchup.away, matchup.home].map(
-          (teamId) => 경기.pitcherAppearances.filter((줄) => 줄.teamId === teamId).length,
-        )
+        const 팀별등판 = [matchup.away, matchup.home].map((teamId) => 경기.pitcherAppearances.filter((줄) => 줄.teamId === teamId).length)
         경기수 += 1
         등판 += 팀별등판[0] + 팀별등판[1]
         도루 += 경기.steals
@@ -461,9 +450,7 @@ describe('CPU 끼리 경기도 타순이 아홉 칸으로 이어진다 (team+0x3
     for (const seed of [26, 94, 184]) {
       const score = simulateLeagueGame({ away: 1, home: 2 }, 씨앗난수(seed), 0)
       for (const teamId of [1, 2]) {
-        const 칸들 = score.plateAppearances
-          .filter((appearance) => appearance.teamId === teamId)
-          .map((appearance) => appearance.battingOrderIndex)
+        const 칸들 = score.plateAppearances.filter((appearance) => appearance.teamId === teamId).map((appearance) => appearance.battingOrderIndex)
         expect(칸들, `씨앗 ${seed} 팀 ${teamId}`).toEqual(칸들.map((_slot, index) => index % 9))
       }
     }
@@ -495,9 +482,7 @@ describe('CPU 끼리 경기도 투수 스태미나를 잇는다 — 레코드 +0
     const score = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(5), 0)
     expect(score.pitcherStaminas.away[0]).toBeLessThan(10_000)
     expect(score.pitcherStaminas.home[0]).toBeLessThan(10_000)
-    const 던진칸 = new Set(
-      score.pitcherAppearances.filter((line) => line.teamId === 1).map((line) => line.pitcherSlot),
-    )
+    const 던진칸 = new Set(score.pitcherAppearances.filter((line) => line.teamId === 1).map((line) => line.pitcherSlot))
     score.pitcherStaminas.away.forEach((value, slot) => {
       if (!던진칸.has(slot)) expect(value).toBe(10_000)
     })
@@ -523,7 +508,9 @@ describe('CPU 끼리 경기도 투수 스태미나를 잇는다 — 레코드 +0
     const 내팀표 = [5_000, 5_000, 5_000, 5_000, 5_000, 5_000, 5_000, 5_000]
     const { pitcherStaminas } = playLeagueDay(EMPTY_LEAGUE, 0, 4, 씨앗난수(5), EMPTY_LEAGUE_PLAYER_STATS, { 4: 내팀표 })
     expect(pitcherStaminas[4]).toBe(내팀표)
-    const 친팀 = matchupsOf(0).flatMap((matchup) => [matchup.away, matchup.home]).filter((team) => team !== 4 && team !== opponentOfFour())
+    const 친팀 = matchupsOf(0)
+      .flatMap((matchup) => [matchup.away, matchup.home])
+      .filter((team) => team !== 4 && team !== opponentOfFour())
     for (const team of 친팀) expect(pitcherStaminas[team]?.[rotationSlotOf(0)]).toBeLessThan(10_000)
   })
 })
@@ -583,7 +570,13 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
   it('구장 rand(0,4) → x·y rand(0,5) → 0x66968(y) → 0x66994(x) 차례다', () => {
     const random = 차례난수([3, 1, 4, 2, 0])
     const rolls = rollCpuGamePrep(random)
-    expect(random.범위).toEqual([[0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
+    expect(random.범위).toEqual([
+      [0, 4],
+      [0, 5],
+      [0, 5],
+      [0, 5],
+      [0, 5],
+    ])
     expect(rolls.stadium).toBe(3)
     // 팀 A: 마타자 x = 1 · 마투수 y = 4
     expect(rolls.teamA).toEqual({ batter: 1, pitcher: 4 })
@@ -613,7 +606,14 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
       },
       rand9d: (n) => 바탕.rand9d(n),
     })
-    expect(범위.slice(0, 6)).toEqual([[0, 2], [0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
+    expect(범위.slice(0, 6)).toEqual([
+      [0, 2],
+      [0, 4],
+      [0, 5],
+      [0, 5],
+      [0, 5],
+      [0, 5],
+    ])
   })
 
   it('마선수가 들어가도 기록표·스태미나 표에는 명단 밖 칸(마타자 12 · 마투수 8)이 안 남는다', () => {
@@ -635,9 +635,15 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
     for (let seed = 1; seed <= 20; seed += 1) {
       const 없음 = simulateLeagueGame({ away: 2, home: 5 }, createSeededRandom(seed), 0, { away: 지침, home: 지침 })
       // 마타자 번호를 표 밖(−1)으로 두면 마투수만 들어간다
-      const 있음 = simulateLeagueGame({ away: 2, home: 5 }, createSeededRandom(seed), 0, { away: 지침, home: 지침 }, {
-        aces: { away: { batter: -1, pitcher: 1 }, home: { batter: -1, pitcher: 3 } },
-      })
+      const 있음 = simulateLeagueGame(
+        { away: 2, home: 5 },
+        createSeededRandom(seed),
+        0,
+        { away: 지침, home: 지침 },
+        {
+          aces: { away: { batter: -1, pitcher: 1 }, home: { batter: -1, pitcher: 3 } },
+        },
+      )
       if (JSON.stringify(없음) !== JSON.stringify(있음)) 달라짐 += 1
     }
     expect(달라짐).toBeGreaterThan(0)
@@ -646,12 +652,14 @@ describe('0xc239c 의 굴림 다섯과 마선수 (c2464~c24ea)', () => {
   it('마선수 레벨 배율이 능력치에 붙는다 — 레벨만 다른 같은 씨앗이 다른 경기가 되는 일이 있다', () => {
     const aces = { away: { batter: 4, pitcher: 4 }, home: { batter: 3, pitcher: 3 } }
     const 낮음 = Array.from({ length: 30 }, (_unused, seed) =>
-      simulateLeagueGame({ away: 1, home: 6 }, createSeededRandom(seed), 1, undefined, { aces }))
+      simulateLeagueGame({ away: 1, home: 6 }, createSeededRandom(seed), 1, undefined, { aces }),
+    )
     const 높음 = Array.from({ length: 30 }, (_unused, seed) =>
       simulateLeagueGame({ away: 1, home: 6 }, createSeededRandom(seed), 1, undefined, {
         aces,
         aceLevels: { 3: 4, 4: 4, 8: 4, 9: 4 },
-      }))
+      }),
+    )
     expect(높음).not.toEqual(낮음)
   })
 })
@@ -683,10 +691,7 @@ describe('CPU 끼리 경기의 수비 객체는 보직과 마선수를 넘긴다
 })
 
 describe('반 이닝 승·패 판정은 한 점마다 0xa5c34 를 밟는다 (S1 2·3절)', () => {
-  const 반이닝 = (
-    plays: readonly { runs: number; pitcherSlot: number }[],
-    changes: HalfInningResult['pitcherChanges'] = [],
-  ): HalfInningResult =>
+  const 반이닝 = (plays: readonly { runs: number; pitcherSlot: number }[], changes: HalfInningResult['pitcherChanges'] = []): HalfInningResult =>
     ({
       runs: plays.reduce((sum, play) => sum + play.runs, 0),
       plateAppearances: plays.map((play, index) => ({
@@ -710,11 +715,13 @@ describe('반 이닝 승·패 판정은 한 점마다 0xa5c34 를 밟는다 (S1 
   })
 
   it('5회까지의 득점은 승리 투수를 안 건드린다 — 패전만 잡힌다', () => {
-    const 판정 = decisionsAfterHalfInning(
-      EMPTY_DECISION_STATE,
-      반이닝([{ runs: 3, pitcherSlot: 0 }]),
-      { inningIndex: 4, offenseSide: 0, scoresBefore: [0, 0], offenseMoundSlot: 0, defenseMoundSlot: 0 },
-    )
+    const 판정 = decisionsAfterHalfInning(EMPTY_DECISION_STATE, 반이닝([{ runs: 3, pitcherSlot: 0 }]), {
+      inningIndex: 4,
+      offenseSide: 0,
+      scoresBefore: [0, 0],
+      offenseMoundSlot: 0,
+      defenseMoundSlot: 0,
+    })
     expect(판정.winner.side).toBe(NO_SIDE)
     expect(판정.loser).toEqual({ side: 1, number: 0 })
   })
@@ -723,9 +730,7 @@ describe('반 이닝 승·패 판정은 한 점마다 0xa5c34 를 밟는다 (S1 
     // 9회말(index 8) 홈 공격, 원정이 3:0 으로 앞선 채 0아웃에 원정 마무리 7번이 오른다
     const 판정 = decisionsAfterHalfInning(
       EMPTY_DECISION_STATE,
-      반이닝([], [
-        { pitcherSlot: 7, outs: 0, runnerCount: 0, runsBefore: 0, outgoingPitcherSlot: 0, outgoingStamina: 0 },
-      ]),
+      반이닝([], [{ pitcherSlot: 7, outs: 0, runnerCount: 0, runsBefore: 0, outgoingPitcherSlot: 0, outgoingStamina: 0 }]),
       { inningIndex: 8, offenseSide: 1, scoresBefore: [3, 0], offenseMoundSlot: 0, defenseMoundSlot: 0 },
     )
     expect(판정.save).toEqual({ side: 0, number: 7 })
@@ -822,10 +827,7 @@ describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다
     for (const seed of [3, 17, 2024]) {
       const day = 4
       const plain = playLeagueDay(EMPTY_LEAGUE, day, 0, createSeededRandom(seed))
-      const same = playLeagueDay(
-        EMPTY_LEAGUE, day, 0, createSeededRandom(seed), EMPTY_LEAGUE_PLAYER_STATS, {}, undefined, true, undefined,
-        identity,
-      )
+      const same = playLeagueDay(EMPTY_LEAGUE, day, 0, createSeededRandom(seed), EMPTY_LEAGUE_PLAYER_STATS, {}, undefined, true, undefined, identity)
       expect(same).toEqual(plain)
     }
   })
@@ -833,9 +835,9 @@ describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다
   it('옮겨 온 선수의 타석·투구 기록은 옛 팀 표 자리(원본 id)로 쌓인다 — 레코드 칸이 아니다', () => {
     let found = false
     for (let seed = 1; seed < 40 && !found; seed += 1) {
-      const score = simulateLeagueGame(
-        { away: 1, home: 2 }, createSeededRandom(seed), { away: 0, home: 0 }, undefined, { records: { away: traded() } },
-      )
+      const score = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), { away: 0, home: 0 }, undefined, {
+        records: { away: traded() },
+      })
       const pitched = score.pitcherAppearances.filter((line) => line.teamId === 5)
       const batted = score.plateAppearances.filter((line) => line.teamId === 5)
       // 1팀 칸 0 의 선수는 5팀 표 0번이다 — 1팀 표 0번(타자·투수)에는 하나도 안 쌓인다
@@ -851,9 +853,7 @@ describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다
   it('선발 칸 0 에 앉은 옮겨 온 투수의 능력치로 던진다 — 결과가 표 그대로와 갈린다', () => {
     const differs = [1, 2, 3, 4, 5, 6].some((seed) => {
       const plain = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
-      const swapped = simulateLeagueGame(
-        { away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: traded() } },
-      )
+      const swapped = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: traded() } })
       return plain.awayRuns !== swapped.awayRuns || plain.homeRuns !== swapped.homeRuns
     })
     expect(differs).toBe(true)
@@ -863,7 +863,15 @@ describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다
     const day = 4
     const plain = playLeagueDay(EMPTY_LEAGUE, day, 0, createSeededRandom(9))
     const withRecord = playLeagueDay(
-      EMPTY_LEAGUE, day, 0, createSeededRandom(9), EMPTY_LEAGUE_PLAYER_STATS, {}, undefined, true, undefined,
+      EMPTY_LEAGUE,
+      day,
+      0,
+      createSeededRandom(9),
+      EMPTY_LEAGUE_PLAYER_STATS,
+      {},
+      undefined,
+      true,
+      undefined,
       (team) => (team === 1 ? traded() : undefined),
     )
     expect(withRecord.playerStats.batters[leagueBatterIdOf(1, 0)]).toBeUndefined()
@@ -873,16 +881,24 @@ describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다
 
 describe('CPU 레코드의 장비 니블이 간이 경기 능력치(0xb6414 보너스)로 먹는다 — 새 해 0x665e8', () => {
   const equippedRecord = (teamId: number, nibble: number): LeagueTeamRecord => ({
-    batters: Array.from({ length: BATTERS_PER_TEAM }, (_, slot) => ({ tableTeamId: teamId, tableSlot: slot, equipment: [nibble, nibble, 0, nibble] })),
-    pitchers: Array.from({ length: PITCHERS_PER_TEAM }, (_, slot) => ({ tableTeamId: teamId, tableSlot: slot, equipment: [nibble, nibble, 0, nibble] })),
+    batters: Array.from({ length: BATTERS_PER_TEAM }, (_, slot) => ({
+      tableTeamId: teamId,
+      tableSlot: slot,
+      equipment: [nibble, nibble, 0, nibble],
+    })),
+    pitchers: Array.from({ length: PITCHERS_PER_TEAM }, (_, slot) => ({
+      tableTeamId: teamId,
+      tableSlot: slot,
+      equipment: [nibble, nibble, 0, nibble],
+    })),
   })
 
   it('니블 0 이면 표 그대로와 같다', () => {
     for (const seed of [2, 11]) {
       const plain = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
-      const zero = simulateLeagueGame(
-        { away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: equippedRecord(1, 0), home: equippedRecord(2, 0) } },
-      )
+      const zero = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, {
+        records: { away: equippedRecord(1, 0), home: equippedRecord(2, 0) },
+      })
       expect(zero).toEqual(plain)
     }
   })
@@ -890,9 +906,7 @@ describe('CPU 레코드의 장비 니블이 간이 경기 능력치(0xb6414 보�
   it('높은 장비를 낀 팀은 결과가 표 그대로와 갈린다', () => {
     const differs = [1, 2, 3, 4, 5, 6].some((seed) => {
       const plain = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0)
-      const equipped = simulateLeagueGame(
-        { away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: equippedRecord(1, 11) } },
-      )
+      const equipped = simulateLeagueGame({ away: 1, home: 2 }, createSeededRandom(seed), 0, undefined, { records: { away: equippedRecord(1, 11) } })
       return plain.awayRuns !== equipped.awayRuns || plain.homeRuns !== equipped.homeRuns
     })
     expect(differs).toBe(true)
@@ -902,7 +916,13 @@ describe('CPU 레코드의 장비 니블이 간이 경기 능력치(0xb6414 보�
 describe('나리 CPU 끼리 경기의 팀 사기 — 간이 엔진 0xb570c b5768 이 두 팀 레코드 +2 에 나리 사기를 쓴다', () => {
   it('nariMorale 을 주면 두 팀 용량(0x66e44 V[+2])이 그 값이라 같은 씨앗이라도 투수 소모가 갈린다 · 모드만 주면(시즌모드 꼴) 그대로', () => {
     const game = (abilityContext?: LeagueAbilityContext) =>
-      simulateLeagueGame({ away: 1, home: 0 }, createSeededRandom(20101015), 0, undefined, abilityContext === undefined ? undefined : { abilityContext })
+      simulateLeagueGame(
+        { away: 1, home: 0 },
+        createSeededRandom(20101015),
+        0,
+        undefined,
+        abilityContext === undefined ? undefined : { abilityContext },
+      )
     const 표값 = game()
     expect(game({ mode: 4 }).pitcherStaminas).toEqual(표값.pitcherStaminas)
     expect(game({ mode: 4, nariMorale: 100 }).pitcherStaminas).toEqual(표값.pitcherStaminas)

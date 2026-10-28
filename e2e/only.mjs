@@ -65,12 +65,18 @@ if (flags.changed !== null) {
   for (const [file, list] of byFile) if (list.length > 0) console.log(`  ${file} → ${list.join(' · ')}`)
   for (const scene of catalog.filter((row) => areas.includes(row.area))) picked.add(scene.name)
   if (broad.length > 0) {
-    console.log(`도메인 없는 바탕 파일 ${broad.length}개(${broad.slice(0, 3).join(' · ')}${broad.length > 3 ? ' …' : ''}) — 도메인마다 대표 장면 하나씩 더 본다`)
+    console.log(
+      `도메인 없는 바탕 파일 ${broad.length}개(${broad.slice(0, 3).join(' · ')}${broad.length > 3 ? ' …' : ''}) — 도메인마다 대표 장면 하나씩 더 본다`,
+    )
     for (const area of Object.values(AREAS)) if (area.representative !== null) picked.add(area.representative)
   }
 }
 if (picked.size === 0) {
-  console.log(flags.changed !== null ? '관련 장면 없음 — 볼 것이 없다' : '쓰는 법: yarn e2e:only <장면|무늬…> [--state <이름>] [--area <도메인>] [--changed] [--list]')
+  console.log(
+    flags.changed !== null
+      ? '관련 장면 없음 — 볼 것이 없다'
+      : '쓰는 법: yarn e2e:only <장면|무늬…> [--state <이름>] [--area <도메인>] [--changed] [--list]',
+  )
   process.exit(flags.changed !== null ? 0 : 2)
 }
 const scenes = catalog.map((scene) => scene.name).filter((name) => picked.has(name))
@@ -99,9 +105,12 @@ const devices = deviceList(flags.devices ?? 'chromium-desktop')
 const concurrency = Object.fromEntries([...new Set(devices.map((device) => DEVICE_SETS[device][0]))].map((browser) => [browser, flags.jobs]))
 if (flags.jobs * Object.keys(concurrency).length > 4) console.log(`⚠️ 맥락 ${flags.jobs} × 브라우저 — 기계를 나눠 쓴다면 모두 4 이하로`)
 const { hints, hintOf } = loadHints()
-const jobs = scenes.flatMap((scene) => devices.map((device) => ({ scene, device })))
+const jobs = scenes
+  .flatMap((scene) => devices.map((device) => ({ scene, device })))
   .sort((a, b) => hintOf(b.scene, b.device) - hintOf(a.scene, a.device))
-console.log(`장면 ${scenes.length}: ${scenes.join(' · ')}${flags.states.length > 0 ? ` · 상태 ${flags.states.join(' · ')}` : ''} · 기기 ${devices.join(' · ')} · 맥락 ${flags.jobs}`)
+console.log(
+  `장면 ${scenes.length}: ${scenes.join(' · ')}${flags.states.length > 0 ? ` · 상태 ${flags.states.join(' · ')}` : ''} · 기기 ${devices.join(' · ')} · 맥락 ${flags.jobs}`,
+)
 
 const started = Date.now()
 const meter = startUsageMeter()

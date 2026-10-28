@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  entryPitcherGameAbilities,
-  entryPitcherGameAbilityParts,
-  rosterEntryPitchersOf,
-} from '@/features/play-team-game/model/teamGameRoster'
+import { entryPitcherGameAbilities, entryPitcherGameAbilityParts, rosterEntryPitchersOf } from '@/features/play-team-game/model/teamGameRoster'
 import { hasFightingSpiritBit } from '@/features/play-team-game/model/gameAbilities'
 
 describe('팀 경기 투수 명단의 스킬 14(투지) — 레코드 +0x14 비트 14 ∧ 경기 상태 (A-23)', () => {

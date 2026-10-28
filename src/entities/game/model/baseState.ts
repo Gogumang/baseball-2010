@@ -137,16 +137,10 @@ function advanceForWalk(bases: BaseState): AdvanceResult {
  *
  * ⚠️ 아래 "3루 주자면 1점" 근사는 판 결과 없이 아웃을 먹이는 길(시험 · 판을 안 도는 옛 호출)에만 남는다.
  */
-function advanceForOut(
-  bases: BaseState,
-  detail: '땅볼아웃' | '뜬공아웃' | '직선타아웃',
-  outsBefore: number,
-  quickEngine: boolean,
-): AdvanceResult {
+function advanceForOut(bases: BaseState, detail: '땅볼아웃' | '뜬공아웃' | '직선타아웃', outsBefore: number, quickEngine: boolean): AdvanceResult {
   if (quickEngine) return { bases, runsScored: 0, outsAdded: 1 }
 
-  const canSacrifice =
-    detail === '뜬공아웃' && bases.third && outsBefore < MAXIMUM_OUTS_PER_INNING - 1
+  const canSacrifice = detail === '뜬공아웃' && bases.third && outsBefore < MAXIMUM_OUTS_PER_INNING - 1
 
   if (canSacrifice) {
     return { bases: { ...bases, third: false }, runsScored: 1, outsAdded: 1 }

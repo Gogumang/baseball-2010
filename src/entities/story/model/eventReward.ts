@@ -80,11 +80,7 @@ const ABILITY_REWARD_KINDS: Readonly<Record<number, 'hit' | 'power' | 'defense' 
 }
 
 /** 능력치 한 칸을 올리고 타입 한계로 자른다 (13~16, 0x8c8e8 과 같은 처리) */
-function raiseAbility(
-  career: PlayerCareer,
-  ability: 'hit' | 'power' | 'defense' | 'run',
-  value: number,
-): PlayerCareer {
+function raiseAbility(career: PlayerCareer, ability: 'hit' | 'power' | 'defense' | 'run', value: number): PlayerCareer {
   const raised = gainAbility(career, { [ability]: value })
   const limit = abilityLimitOf(career.battingTypeIndex)[ability]
   return { ...raised, ability: { ...raised.ability, [ability]: Math.min(raised.ability[ability], limit) } }
@@ -134,9 +130,12 @@ function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPo
         illnessRemaining: ILLNESS_DURATION,
         // 값 > 0 은 알림 글 0x8beb8 이 이미 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 0x8c718 은 그 번호를 건다.
         // 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
-        illnessName: reward.value > 0
-          ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
-          : random === undefined ? ILLNESS_NAMES[0] : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)],
+        illnessName:
+          reward.value > 0
+            ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
+            : random === undefined
+              ? ILLNESS_NAMES[0]
+              : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)],
       }
     default:
       return career
@@ -157,11 +156,7 @@ const YEAR_ADJUSTED_EVENTS: Readonly<Record<number, Readonly<Record<number, numb
   396: { 0: -4, 1: -3 },
 }
 
-function applyYearAdjust(
-  rewards: readonly EventReward[],
-  eventId: number | undefined,
-  season: number,
-): readonly EventReward[] {
+function applyYearAdjust(rewards: readonly EventReward[], eventId: number | undefined, season: number): readonly EventReward[] {
   const table = eventId === undefined ? undefined : YEAR_ADJUSTED_EVENTS[eventId]
   if (table === undefined) return rewards
   const years = Math.max(0, season - 1)

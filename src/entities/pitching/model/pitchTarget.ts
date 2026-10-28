@@ -69,9 +69,7 @@ const signed = (random: RandomPort, value: number) => (random.rand(0, 2) === 0 ?
  * 주자가 없거나 만루면 종류 1(모서리 투구)로 내려앉고, 그 밖(주자 1·2명)일 때만 견제다.
  */
 export function isCpuPickoff(kind: number, situation: Pick<TargetSituation, 'runnerCount'>): boolean {
-  return (
-    kind === PICKOFF_KIND && situation.runnerCount !== 0 && situation.runnerCount !== FULL_BASES
-  )
+  return kind === PICKOFF_KIND && situation.runnerCount !== 0 && situation.runnerCount !== FULL_BASES
 }
 
 /**
@@ -82,10 +80,7 @@ export function isCpuPickoff(kind: number, situation: Pick<TargetSituation, 'run
  * 돌려주는 루를 그대로 `entities/defense-controls/model/pickoff.pickoffPlayOf` 에 넣으면
  * 사람 견제('3'/'1'/'7' → 0x53548)와 **같은 메시지 0x10 경로**가 된다.
  */
-export function cpuPickoffBaseOf(
-  hasRunnerOnBase: (base: number) => boolean,
-  random: RandomPort,
-): 1 | 2 | 3 {
+export function cpuPickoffBaseOf(hasRunnerOnBase: (base: number) => boolean, random: RandomPort): 1 | 2 | 3 {
   // 원본에는 없는 안전망 — 부르는 쪽이 `isCpuPickoff` 를 안 걸렀을 때 무한 루프를 막는다
   for (let guard = 0; guard < 1000; guard += 1) {
     const base = random.rand(PICKOFF_BASE_LOW, PICKOFF_BASE_HIGH)
@@ -115,8 +110,7 @@ export function pitchTargetOf(kind: number, situation: TargetSituation, random: 
   // 종류 4 는 주자가 없거나 만루면 1 이다 (0x34684). 그 밖은 원본이 **투구를 안 하고 견제로 빠진다**
   // (0x34848, 위 주석) — 견제가 켜진 `selectPitch` 는 여기 오기 전에 갈라진다. 견제가 꺼진 채로 여기 오면
   // 모서리 투구로 던진다 — **알려진 어긋남**이다
-  const effective =
-    kind === PICKOFF_KIND && (situation.runnerCount === 0 || situation.runnerCount === FULL_BASES) ? 1 : kind
+  const effective = kind === PICKOFF_KIND && (situation.runnerCount === 0 || situation.runnerCount === FULL_BASES) ? 1 : kind
   switch (effective) {
     case 0: {
       const x = center.x + random.rand(-INNER, INNER)
@@ -162,15 +156,9 @@ const SIXTEEN_BITS = 16
  *
  * 흔들고 난 값은 원본도 다시 자르지 않는다 (다음 틱에서야 잘린다) — **원본 그대로 두었다**.
  */
-export function applyMissionAimShake(
-  aim: WorldPoint,
-  conditionCode: number,
-  side: number,
-  random: RandomPort,
-): WorldPoint {
+export function applyMissionAimShake(aim: WorldPoint, conditionCode: number, side: number, random: RandomPort): WorldPoint {
   const center = ZONE_CENTERS[side] ?? ZONE_CENTERS[0]
-  const clamp = (value: number, middle: number, half: number) =>
-    Math.max(middle - half, Math.min(middle + half, value))
+  const clamp = (value: number, middle: number, half: number) => Math.max(middle - half, Math.min(middle + half, value))
   let x = clamp(aim.x, center.x, MISSION_AIM_CLAMP.x)
   let y = clamp(aim.y, center.y, MISSION_AIM_CLAMP.y)
 

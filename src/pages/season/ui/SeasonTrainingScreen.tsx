@@ -3,10 +3,7 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { ABILITY_DETAIL_VISIBLE_LINES } from '@/pages/management/lib/abilityDetail'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import {
-  HELL_TRAINING_INDEX, TRAINING_GUARD_CEILING, TRAINING_SLOTS,
-  checkSeasonTraining,
-} from '@/widgets/season/lib/seasonTraining'
+import { HELL_TRAINING_INDEX, TRAINING_GUARD_CEILING, TRAINING_SLOTS, checkSeasonTraining } from '@/widgets/season/lib/seasonTraining'
 import type { TrainingSlot } from '@/widgets/season/lib/seasonTraining'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { fillModeText } from '@/widgets/season/lib/seasonText'
@@ -17,9 +14,7 @@ import { useSeasonCursor } from '@/widgets/season/model/useSeasonCursor'
 import { DetailWindow } from '@/pages/management/ui/DetailPopup'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import { detailRowsFromSlots } from '@/pages/management/lib/detailPopup'
-import {
-  SEASON_TEAM_DETAIL_LABEL_FRAMES, SEASON_TRAINING_MAXIMUMS, scrollSeasonTrainingMessages,
-} from '@/widgets/season/lib/seasonTrainingResult'
+import { SEASON_TEAM_DETAIL_LABEL_FRAMES, SEASON_TRAINING_MAXIMUMS, scrollSeasonTrainingMessages } from '@/widgets/season/lib/seasonTrainingResult'
 import type { SeasonTrainingResult } from '@/widgets/season/lib/seasonTrainingResult'
 
 /** StrMODE 번호 (가드 0x9108 이 0x702b4 로 꺼내는 글 — 직접 떴다) */
@@ -64,11 +59,7 @@ interface TrainingPopup {
  *         그 밖                    → sprintf([85], [44+칸])        (2,0x11)
  * ```
  */
-function trainingPopupOf(
-  checked: ReturnType<typeof checkSeasonTraining>,
-  index: number,
-  abilities: readonly number[],
-): TrainingPopup {
+function trainingPopupOf(checked: ReturnType<typeof checkSeasonTraining>, index: number, abilities: readonly number[]): TrainingPopup {
   if (!checked.ok && checked.reason === '사기없음') {
     return { text: ORIGINAL_MODE_TEXT[TEXT.사기없음] ?? '', asks: false, trainIndex: null }
   }
@@ -76,9 +67,7 @@ function trainingPopupOf(
     if (!checked.ok && checked.reason === 'G부족') {
       return { text: ORIGINAL_MODE_TEXT[TEXT.G부족] ?? '', asks: true, trainIndex: null }
     }
-    const maxed = abilities
-      .map((value, slot) => (value > TRAINING_GUARD_CEILING ? `${maxedLineOf(slot)}!N` : ''))
-      .join('')
+    const maxed = abilities.map((value, slot) => (value > TRAINING_GUARD_CEILING ? `${maxedLineOf(slot)}!N` : '')).join('')
     if (!checked.ok) return { text: maxed, asks: false, trainIndex: null }
     // 일부만 최대면 목록 뒤에 "!N" 을 한 번 더 붙이고 [141] 을 잇는다 (922e strcat(buf, "!N") → 9248 strcat(buf, [141]))
     // — 목록과 질문 사이에 빈 줄 하나. 최대가 없으면 [141] 만 (9256)
@@ -141,7 +130,12 @@ const SEASON_RESULT_TABLE_Y_OFFSET = 0
  * 0xf2c8 하나다. 0xc074 · 0x741a0 · 상태 들어옴 0xe9ac(0x7e84c · 0x75fc → 0x7f454)은 창+0x2d8 을 건드리지 않는다.
  * 그래서 앞 팝업에서 내린 첫 줄이 다음 팝업에도 남는다(줄이 적은 글이면 첫 줄이 끝을 넘어 글이 덜 보인다 — 원본 그대로).
  */
-function SeasonTrainingResultPopup({ result, onClose, firstLine, onFirstLineChange }: {
+function SeasonTrainingResultPopup({
+  result,
+  onClose,
+  firstLine,
+  onFirstLineChange,
+}: {
   readonly result: SeasonTrainingResult
   readonly onClose: () => void
   readonly firstLine: number
@@ -199,7 +193,14 @@ function SeasonTrainingResultPopup({ result, onClose, firstLine, onFirstLineChan
  * 같다(직접 떴다). 이 화면은 손대지 않고 부르는 쪽(`useSeasonSession.runTraining`)이 세운다.
  */
 export function SeasonTrainingScreen({
-  state, gamePoints, onTrain, onBack, result = null, onCloseResult, resultFirstLine, onResultFirstLineChange,
+  state,
+  gamePoints,
+  onTrain,
+  onBack,
+  result = null,
+  onCloseResult,
+  resultFirstLine,
+  onResultFirstLineChange,
 }: SeasonTrainingScreenProps) {
   const [ownFirstLine, setOwnFirstLine] = useState(0)
   const firstLine = resultFirstLine ?? ownFirstLine
@@ -226,23 +227,36 @@ export function SeasonTrainingScreen({
   return (
     <RawScreen>
       <div role="group" aria-label="트레이닝">
-        <SeasonCommonFrame record={record} teamMorale={teamMorale} gamePoint={gamePoints} onBack={playingIndex === null ? onBack : null}
+        <SeasonCommonFrame
+          record={record}
+          teamMorale={teamMorale}
+          gamePoint={gamePoints}
+          onBack={playingIndex === null ? onBack : null}
           // 0xde 는 공통 틀에서 가운데 판을 빼고 0x848d0 을 덧그린다
           showsCenterStage={playingIndex === null}
           // 결과 팝업이 떠 있는 동안도 상태는 0xde — 끝난 연출 위에 팝업이 뜬다
-          overlay={playingIndex === null ? undefined : (
-            <SeasonTrainingPopup slot={playingIndex} teamIndex={record.teamId}
-              onFinished={() => onTrain(TRAINING_SLOTS[playingIndex], playingIndex)} />
-          )}
+          overlay={
+            playingIndex === null ? undefined : (
+              <SeasonTrainingPopup
+                slot={playingIndex}
+                teamIndex={record.teamId}
+                onFinished={() => onTrain(TRAINING_SLOTS[playingIndex], playingIndex)}
+              />
+            )
+          }
           commandBar={{
-            slots: SEASON_SUB_COMMAND_SLOTS.트레이닝, cursor, parent: seasonParentSlotOf('트레이닝'),
+            slots: SEASON_SUB_COMMAND_SLOTS.트레이닝,
+            cursor,
+            parent: seasonParentSlotOf('트레이닝'),
             onHover: moveTo,
             onSelect: (id) => select(TRAINING_SLOTS.findIndex((label) => label === id)),
-          }} />
+          }}
+        />
       </div>
 
-      {result !== null && <SeasonTrainingResultPopup result={result} onClose={() => onCloseResult?.()}
-        firstLine={firstLine} onFirstLineChange={setFirstLine} />}
+      {result !== null && (
+        <SeasonTrainingResultPopup result={result} onClose={() => onCloseResult?.()} firstLine={firstLine} onFirstLineChange={setFirstLine} />
+      )}
 
       {popup !== null && (
         <MessageBox

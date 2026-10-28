@@ -97,11 +97,7 @@ export interface ManagerHookResult {
  *   3) 이번 이닝 4실점 이상 → 행 2 (조건이 설 때마다 다시 굴린다)
  *   4) 만루 → 행 3 (마찬가지)
  */
-export function judgeManagerHook(
-  input: ManagerHookInput,
-  flags: ManagerHookFlags,
-  random: RandomPort,
-): ManagerHookResult {
+export function judgeManagerHook(input: ManagerHookInput, flags: ManagerHookFlags, random: RandomPort): ManagerHookResult {
   const miss: ManagerHookResult = { hooked: false, userEventIndex: null, flags }
   if (input.mode !== PITCHER_EDITION_MODE) return miss
   if (input.role === PITCHER_ROLE.relief) return miss

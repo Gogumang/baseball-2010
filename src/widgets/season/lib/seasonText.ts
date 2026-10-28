@@ -27,7 +27,9 @@ export function incomeTextOf(millions: number): string {
 
 /** 팀 타율 — 목표 표는 ×1000 정수다 (P4 2b). 표기는 **근사** */
 export function battingAverageTextOf(perMille: number): string {
-  return `0.${String(Math.max(0, Math.trunc(perMille))).padStart(3, '0').slice(-3)}`
+  return `0.${String(Math.max(0, Math.trunc(perMille)))
+    .padStart(3, '0')
+    .slice(-3)}`
 }
 
 /** 팀 방어율 — 목표 표는 ×100 정수다 (P4 2b, "방어율로 보임" 유력). 표기는 **근사** */

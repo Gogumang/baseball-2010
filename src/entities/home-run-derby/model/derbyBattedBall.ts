@@ -1,8 +1,4 @@
-import {
-  battedBallTrajectory,
-  landingPointOf,
-  trajectoryWithRandom,
-} from '@/entities/batting/model/battedBallFlight'
+import { battedBallTrajectory, landingPointOf, trajectoryWithRandom } from '@/entities/batting/model/battedBallFlight'
 import { isFairAngle } from '@/entities/batting/model/battedBallOutcome'
 import { earlyPassPatternOf } from '@/entities/batting/model/earlyPassBall'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
@@ -191,11 +187,7 @@ export function derbyDisplayDistanceAt(batted: DerbyBattedBall, tick: number, pr
 }
 
 /** 판 하나를 공 틱 1 … closeTick − 1 로 돈다. `skipTick` 이면 그 틱을 끝으로 공 틱을 넘기고 다음 틱에 관문이 닫힌다 */
-function derbyPlayOf(
-  pattern: BattedBallPattern,
-  trajectory: BattedBallTrajectory,
-  skipTick: number | null,
-): DerbyBattedBall {
+function derbyPlayOf(pattern: BattedBallPattern, trajectory: BattedBallTrajectory, skipTick: number | null): DerbyBattedBall {
   const landingTick = trajectory.landingTick
   const stopTick = derbyBallStopTickOf(trajectory)
   // 5284e → 다음 틱 52502 의 관문이 마지막 점(멈춤)을 보고 닫는다
@@ -217,8 +209,7 @@ function derbyPlayOf(
     }
     // 52720 — 담장선 틱(aa4)이 낙구 이전이거나, 폴 틱(ab0)이 낙구 이전
     const reachesHomeRun =
-      (trajectory.fenceTick === tick && landingTick >= tick) ||
-      (trajectory.poleTick === tick && landingTick >= trajectory.poleTick)
+      (trajectory.fenceTick === tick && landingTick >= tick) || (trajectory.poleTick === tick && landingTick >= trajectory.poleTick)
     if (reachesHomeRun && !isFoul) {
       isHomeRun = true
       // 52780 — 낙구 틱의 점으로 0xa600c

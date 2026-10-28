@@ -107,12 +107,8 @@ describe('자동 슬라이딩 — 원본 0xb030c', () => {
   })
 
   it('송구 도착 예정과 ±9틱을 넘으면 안 건다', () => {
-    expect(
-      autoSlideRunnerIndexes({ ...기본, throwArrivalTicks: 15, runners: [주자({ ticksToArrive: 6 })] }),
-    ).toEqual([0])
-    expect(
-      autoSlideRunnerIndexes({ ...기본, throwArrivalTicks: 16, runners: [주자({ ticksToArrive: 6 })] }),
-    ).toEqual([])
+    expect(autoSlideRunnerIndexes({ ...기본, throwArrivalTicks: 15, runners: [주자({ ticksToArrive: 6 })] })).toEqual([0])
+    expect(autoSlideRunnerIndexes({ ...기본, throwArrivalTicks: 16, runners: [주자({ ticksToArrive: 6 })] })).toEqual([])
   })
 
   it('송구가 날아가는 중이 아니거나 목표 루가 없으면(−1) 돌지 않는다', () => {

@@ -23,15 +23,17 @@ afterEach(cleanup)
 describe('나리 101 팀 고르기 취소 — 0x14114 1424c~14264', () => {
   it('[0x140006c] = 5 — 메인 메뉴를 게임시작 목록(하위 5)으로 바로 연다', () => {
     const setScreen = vi.fn()
-    render(<EntryRoutes
-      screen={{ kind: '팀선택' } as Screen}
-      setScreen={setScreen}
-      session={{ career: null, savedCareer: null, actions: {} } as unknown as Props['session']}
-      gameSettings={{ settings: undefined, setSettings: vi.fn() } as unknown as Props['gameSettings']}
-      collection={EMPTY_COLLECTION}
-      random={createSeededRandom(1)}
-      wallet={{ balance: 0 } as unknown as Props['wallet']}
-    />)
+    render(
+      <EntryRoutes
+        screen={{ kind: '팀선택' } as Screen}
+        setScreen={setScreen}
+        session={{ career: null, savedCareer: null, actions: {} } as unknown as Props['session']}
+        gameSettings={{ settings: undefined, setSettings: vi.fn() } as unknown as Props['gameSettings']}
+        collection={EMPTY_COLLECTION}
+        random={createSeededRandom(1)}
+        wallet={{ balance: 0 } as unknown as Props['wallet']}
+      />,
+    )
 
     fireEvent.keyDown(window, { key: 'Escape' })
 

@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import { MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
-import {
-  applyBatterOutcome,
-  isBatterTurn,
-  startTeamGame,
-} from '@/features/play-team-game/model/teamGameFlow'
+import { applyBatterOutcome, isBatterTurn, startTeamGame } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
 /** 상세 설정 — 타순 아홉 칸 모두 사람이 치고, 수비는 어느 이닝·주자도 안 잡는다(초 = 사람, 말 = 자동) */

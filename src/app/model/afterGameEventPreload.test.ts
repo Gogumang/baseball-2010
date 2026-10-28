@@ -65,7 +65,10 @@ describe('경기 뒤 이야기 이벤트 초상', () => {
   })
 
   it('피부 1 · 2 주인공은 번호 지도와 palette.json 도 받는다 (0x63a7e)', () => {
-    const portraits = reachablePortraitsOf(ORIGINAL_EVENTS, ORIGINAL_EVENTS.find((event) => event.id === 5)!)
+    const portraits = reachablePortraitsOf(
+      ORIGINAL_EVENTS,
+      ORIGINAL_EVENTS.find((event) => event.id === 5)!,
+    )
     const requests = portraitPreloadsOf(portraits, 1, 2)
     const index = requests.find((request) => request.folder === './sprites/event_char_0/frames/index')
     expect(index?.animationsIn).toBe('./sprites/event_char_0/frames')
@@ -77,9 +80,7 @@ describe('경기 뒤 이야기 이벤트 초상', () => {
   it('선택지 · 대결 결과로 닿는 이벤트의 초상까지 모은다', () => {
     const branching = ORIGINAL_EVENTS.find((event) => event.commands.some((command) => command.op === 'choice'))!
     const choice = branching.commands.find((command) => command.op === 'choice')
-    const target = ORIGINAL_EVENTS.find(
-      (event) => choice?.op === 'choice' && event.id === choice.choices[0]?.gotoEvent,
-    )!
+    const target = ORIGINAL_EVENTS.find((event) => choice?.op === 'choice' && event.id === choice.choices[0]?.gotoEvent)!
     const own = reachablePortraitsOf(ORIGINAL_EVENTS, target)
     const all = reachablePortraitsOf(ORIGINAL_EVENTS, branching)
     for (const portrait of own) expect(all).toContainEqual(portrait)

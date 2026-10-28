@@ -122,7 +122,7 @@ describe("'*' 로 메뉴를 연 그림에도 0x39c5c 가 한 번 돈다 (52cc6 �
     return <AimCursor side={1} onConfirm={() => undefined} isPaused={menu.isOpen} onTick={onTick} />
   }
 
-  it("방향을 지운 뒤(메시지 8) 그 자리에서 한 틱 — 열린 뒤로는 멈춘다", () => {
+  it('방향을 지운 뒤(메시지 8) 그 자리에서 한 틱 — 열린 뒤로는 멈춘다', () => {
     const onTick = vi.fn((aim: WorldPoint, direction: AimDirection) => aimTickOf(aim, direction, 1))
     render(<메뉴와조준 onTick={onTick} />)
     키('6')

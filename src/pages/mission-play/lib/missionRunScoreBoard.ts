@@ -10,10 +10,7 @@ import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFr
  * - 공격 측 st[9](0xb6bc0, aa6ac): 투수 미션(모드 5)은 다른 칸, 타자 미션(모드 6)은 사람 칸.
  * - 두 점수 0xb69b0 — 플레이가 시작될 때 사람 측 · 다른 측 점수(`scores`, 부르는 쪽이 센다).
  */
-export function missionRunScoreBoardOf(
-  mission: OriginalMission,
-  scores: { readonly ours: number; readonly opponents: number },
-): RunScoreBoardSource {
+export function missionRunScoreBoardOf(mission: OriginalMission, scores: { readonly ours: number; readonly opponents: number }): RunScoreBoardSource {
   const humanSide = mission.humanSide
   const otherSide = humanSide === 0 ? 1 : 0
   const battingSide = mission.side === '투수' ? otherSide : humanSide

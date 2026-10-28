@@ -1,10 +1,5 @@
 import { TAG_DISTANCE } from '@/entities/fielding/model/autoAdvance'
-import {
-  basePosition,
-  horizontalDistance,
-  ticksToReach,
-  type WorldPoint,
-} from '@/entities/fielding/model/fieldGeometry'
+import { basePosition, horizontalDistance, ticksToReach, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import {
   isRunnerStopped,
   legTotalTicksOf,
@@ -111,8 +106,8 @@ export function buildRundownPlan(context: DefenseContext, runnerIndex: number): 
   if (runner === undefined) return NO_RUNDOWN
   const backBase = runner.targetBase
   const frontBase = runner.targetBase === runner.startBase ? runner.startBase + 1 : runner.startBase
-  const backFielder = context.play.coverOfBase[(((backBase % 4) + 4) % 4)] ?? NONE
-  const frontFielder = context.play.coverOfBase[(((frontBase % 4) + 4) % 4)] ?? NONE
+  const backFielder = context.play.coverOfBase[((backBase % 4) + 4) % 4] ?? NONE
+  const frontFielder = context.play.coverOfBase[((frontBase % 4) + 4) % 4] ?? NONE
   const holderSlot = context.play.ballHolderSlot
   // k = 0 → 1 차례로 덮어쓴다 — 둘 다 같은 야수면 1
   const holderSide = frontFielder === holderSlot ? 1 : backFielder === holderSlot ? 0 : NONE
@@ -196,10 +191,8 @@ export function rundownAction(input: RundownTickInput): RundownAction {
     // ── 내가 공을 쥐었다 ──
     if (!self.holdingBall) return { kind: '공쫓기', target: input.ballTarget }
     // b4976 — 내가 주자가 **달려가는 루(+0x7c)** 의 커버인가
-    const coversBack = slot === (play.coverOfBase[(((runner.targetBase % 4) + 4) % 4)] ?? NONE)
-    const safe =
-      ticksToReach(runner.position, partner.position, runner.speed) >
-      throwTicksToFielder(partner, self) + HOLDER_MARGIN_TICKS
+    const coversBack = slot === (play.coverOfBase[((runner.targetBase % 4) + 4) % 4] ?? NONE)
+    const safe = ticksToReach(runner.position, partner.position, runner.speed) > throwTicksToFielder(partner, self) + HOLDER_MARGIN_TICKS
     if (coversBack || safe) return { kind: '주자추적', runnerIndex: plan.runnerIndex }
     if (play.held) return { kind: '짝에게송구', toSlot: partnerSlot }
     return { kind: '대기' }

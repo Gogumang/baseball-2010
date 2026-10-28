@@ -3,11 +3,7 @@ import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } fro
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
-import {
-  startTeamGame,
-  withLeagueStolenBases,
-  type TeamGameProgress,
-} from '@/features/play-team-game/model/teamGameFlow'
+import { startTeamGame, withLeagueStolenBases, type TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 
 afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 

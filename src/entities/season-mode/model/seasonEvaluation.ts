@@ -1,9 +1,4 @@
-import {
-  MORALE_LIMIT,
-  POPULARITY_LIMIT,
-  REPUTATION_LIMIT,
-  clampTo,
-} from '@/entities/season-mode/model/seasonRecord'
+import { MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import { seasonReputationChangeOf } from '@/entities/season-mode/model/seasonReputation'
 import { isBugFixed } from '@/shared/config/bugfixes'
@@ -82,11 +77,7 @@ const kindOf = (flags: CompleteGameFlags): CompleteGameKind => {
 export const PERFECT_OUT_LIMIT = 27
 
 /** 인기도용 완투 판정 (`아웃 == 현재이닝×3+3`, 퍼펙트는 아웃 ≤ 27 도 봐야 한다) */
-export function popularityCompleteGameOf(
-  outs: number,
-  currentInningIndex: number,
-  flags: CompleteGameFlags,
-): CompleteGameKind {
+export function popularityCompleteGameOf(outs: number, currentInningIndex: number, flags: CompleteGameFlags): CompleteGameKind {
   if (outs !== currentInningIndex * 3 + 3) return null
   const kind = kindOf(flags)
   if (kind === '퍼펙트' && outs > PERFECT_OUT_LIMIT) return '노히트'
@@ -103,11 +94,7 @@ export function reputationCompleteGameInningIndexOf(currentInningIndex: number, 
 }
 
 /** 평판용 완투 판정 (`아웃 == 정규 마지막 이닝×3+3`, 퍼펙트는 아웃 ≤ 27 도 — a7014 · a703a) */
-export function reputationCompleteGameOf(
-  outs: number,
-  lastRegularInningIndex: number,
-  flags: CompleteGameFlags,
-): CompleteGameKind {
+export function reputationCompleteGameOf(outs: number, lastRegularInningIndex: number, flags: CompleteGameFlags): CompleteGameKind {
   if (outs !== lastRegularInningIndex * 3 + 3) return null
   const kind = kindOf(flags)
   if (kind === '퍼펙트' && outs > PERFECT_OUT_LIMIT) return '노히트'
@@ -125,12 +112,7 @@ export function reputationCompleteGameOf(
  * 범위는 [−8, +12]. 결과는 `SR+0x4a`(직전 경기 인기도 평가)에 남고, 그 칸을
  * 다음 경기의 관중 수 계산이 읽는다.
  */
-export function popularityChangeOf(
-  won: boolean,
-  myRuns: number,
-  opponentRuns: number,
-  completeGame: CompleteGameKind,
-): number {
+export function popularityChangeOf(won: boolean, myRuns: number, opponentRuns: number, completeGame: CompleteGameKind): number {
   let d: number
   if (!won) d = -2
   else if (completeGame === '퍼펙트') d = 8
@@ -239,10 +221,7 @@ export interface SeasonGameEvaluation {
 }
 
 /** 경기 한 판의 평가값 세 개 (인기도·평판·사기) */
-export function evaluateSeasonGame(
-  record: SeasonRecord,
-  input: SeasonGameEvaluationInput,
-): SeasonGameEvaluation {
+export function evaluateSeasonGame(record: SeasonRecord, input: SeasonGameEvaluationInput): SeasonGameEvaluation {
   const context: SeasonGameContext = {
     opponentRuns: input.opponentRuns,
     myRuns: input.myRuns,
@@ -251,12 +230,7 @@ export function evaluateSeasonGame(
     completeGame: input.reputationCompleteGame,
   }
   return {
-    popularityChange: popularityChangeOf(
-      input.won,
-      input.myRuns,
-      input.opponentRuns,
-      input.popularityCompleteGame,
-    ),
+    popularityChange: popularityChangeOf(input.won, input.myRuns, input.opponentRuns, input.popularityCompleteGame),
     reputationChange: seasonReputationChangeOf(record.gameRecord, context),
     moraleChange: moraleChangeOf(input.won, isRivalGame(record.teamId, input.opponentTeamId)),
   }

@@ -39,17 +39,11 @@ export interface MissionGoal {
  */
 const isListedMission = (mission: OriginalMission) => mission.stage > 0
 
-export const BATTER_MISSIONS: readonly OriginalMission[] = MISSIONS.filter(
-  (mission) => mission.side === '타자' && isListedMission(mission),
-)
+export const BATTER_MISSIONS: readonly OriginalMission[] = MISSIONS.filter((mission) => mission.side === '타자' && isListedMission(mission))
 
-export const PITCHER_MISSIONS: readonly OriginalMission[] = MISSIONS.filter(
-  (mission) => mission.side === '투수' && isListedMission(mission),
-)
+export const PITCHER_MISSIONS: readonly OriginalMission[] = MISSIONS.filter((mission) => mission.side === '투수' && isListedMission(mission))
 
-export const ACE_CHALLENGE_MISSIONS: readonly OriginalMission[] = MISSIONS.filter(
-  (mission) => !isListedMission(mission),
-)
+export const ACE_CHALLENGE_MISSIONS: readonly OriginalMission[] = MISSIONS.filter((mission) => !isListedMission(mission))
 
 export function createProgress(): MissionProgress {
   return { counts: {}, plateAppearances: 0, brokenConditions: [] }
@@ -96,9 +90,7 @@ export function requiredCountOf(mission: OriginalMission, goal: string): number 
 
 function achievedCountOf(mission: OriginalMission, goal: string, progress: MissionProgress): number {
   if (goal === CYCLE_HIT_GOAL) {
-    return CYCLE_HIT_PARTS.filter(
-      (part) => (progress.counts[part] ?? 0) >= (mission.goalCounts[part] ?? 1),
-    ).length
+    return CYCLE_HIT_PARTS.filter((part) => (progress.counts[part] ?? 0) >= (mission.goalCounts[part] ?? 1)).length
   }
   return progress.counts[goal] ?? 0
 }
@@ -162,12 +154,7 @@ const GRAND_SLAM_RUNS = 4
  *
  * `groundHomeRun` — 판 안 그라운드 홈런 state[0x25] (진행기 `DefensePlayResult.groundHomeRun`, 0xaa1e2).
  */
-export function goalNamesFor(
-  outcome: AtBatOutcome,
-  runsBattedIn: number,
-  isBunt = false,
-  groundHomeRun = false,
-): string[] {
+export function goalNamesFor(outcome: AtBatOutcome, runsBattedIn: number, isBunt = false, groundHomeRun = false): string[] {
   const names: string[] = []
 
   // 번트는 **번트 안타만** 센다 (직접 재역어셈). 판정 0xaaa6c 모드 6 갈래는 '번트' 를 0xaa928(R+0xf4, 행+0xa4 위)
@@ -201,10 +188,7 @@ export function goalNamesFor(
  * 투수편 목표 이름. 원본 레코드에 있는 그대로다:
  * 아웃 · 탈삼진 · MAX게이지 · 삼진콤보 · 무실점 · 노히트노런 · 퍼펙트게임
  */
-export function pitcherGoalNamesFor(
-  outcome: AtBatOutcome,
-  gauge: string,
-): string[] {
+export function pitcherGoalNamesFor(outcome: AtBatOutcome, gauge: string): string[] {
   const names: string[] = []
 
   if (outcome.kind === '삼진') names.push('탈삼진', '아웃')
@@ -336,4 +320,3 @@ export const MISSION_ALL_CLEAR_HIDDEN_ID: Readonly<Record<OriginalMission['side'
 export function isEveryMissionCleared(clearedKeys: readonly string[]): boolean {
   return [...BATTER_MISSIONS, ...PITCHER_MISSIONS].every((mission) => clearedKeys.includes(missionKeyOf(mission)))
 }
-

@@ -6,8 +6,15 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { batterEquipmentOf, batterLayersOf, bodyTypeOf, layerPaletteIndexOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import {
-  ABILITY_TITLE, RADAR_BACKGROUND_IMAGE, RADAR_CENTER, RADAR_COLORS, RADAR_LABEL_BOX_IMAGE,
-  abilityColorOf, radarAxisEndOf, radarLabelBoxOf, radarPointOf,
+  ABILITY_TITLE,
+  RADAR_BACKGROUND_IMAGE,
+  RADAR_CENTER,
+  RADAR_COLORS,
+  RADAR_LABEL_BOX_IMAGE,
+  abilityColorOf,
+  radarAxisEndOf,
+  radarLabelBoxOf,
+  radarPointOf,
 } from '@/pages/management/lib/basicInfoLayout'
 import { TintedNumber } from '@/pages/management/ui/RadarChart'
 import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
@@ -18,8 +25,13 @@ import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 import { FigureLayers, PitcherFigure, figureBatterWarmLayersOf } from '@/pages/special/ui/HallOfFameFigure'
 import * as specialStyles from '@/pages/special/ui/SpecialScreen.css'
 import {
-  SEASON_CARD_BADGE, SEASON_CARD_BOARD, SEASON_CARD_FIGURE, SEASON_CARD_RADAR_LABELS,
-  initialSeasonCardFigure, stepSeasonCardFigure, steppedBoardPointsOf,
+  SEASON_CARD_BADGE,
+  SEASON_CARD_BOARD,
+  SEASON_CARD_FIGURE,
+  SEASON_CARD_RADAR_LABELS,
+  initialSeasonCardFigure,
+  stepSeasonCardFigure,
+  steppedBoardPointsOf,
 } from '@/pages/season/lib/seasonPlayerCard'
 import { CardPlate } from '@/pages/management/ui/CardPlate'
 import type { SeasonCardFigureState } from '@/pages/season/lib/seasonPlayerCard'
@@ -58,9 +70,7 @@ export interface SeasonPlayerCardProps {
 }
 
 /** 카드 0x7ba44 시즌 · 선수 갈래 + 선수 그림 (`lib/seasonPlayerCard.ts` 머리말) */
-export function SeasonPlayerCard({
-  teamId, isPitcher, look, abilities, isAnimating, hasCardBadge = false, children,
-}: SeasonPlayerCardProps) {
+export function SeasonPlayerCard({ teamId, isPitcher, look, abilities, isAnimating, hasCardBadge = false, children }: SeasonPlayerCardProps) {
   const pose = useSeasonCardFigurePose(!isPitcher, look.form, isAnimating)
   return (
     <div data-testid="시즌카드" data-pose={pose}>
@@ -104,14 +114,26 @@ export function SeasonCardBadge({ teamId }: { readonly teamId: number }) {
     if (origin === undefined) return null
     const { x, y } = alignedPositionOf(part.board, origin.width, origin.height, align, part.ox, part.oy)
     return (
-      <img className={managementStyles.layer} alt="" data-testid={testId} data-frame={frame} data-palette={part.palette}
-        src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`} style={{ left: x + origin.x, top: y + origin.y }} />
+      <img
+        className={managementStyles.layer}
+        alt=""
+        data-testid={testId}
+        data-frame={frame}
+        data-palette={part.palette}
+        src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
+        style={{ left: x + origin.x, top: y + origin.y }}
+      />
     )
   }
   const board = (part: typeof name | typeof title, testId: string) => (
-    <img className={managementStyles.layer} alt="" data-testid={testId} data-image={part.board.image}
+    <img
+      className={managementStyles.layer}
+      alt=""
+      data-testid={testId}
+      data-image={part.board.image}
       src={`${SLT_FRAME}/${String(part.board.image).padStart(3, '0')}.png`}
-      style={{ left: part.board.x, top: part.board.y, width: part.board.width, height: part.board.height }} />
+      style={{ left: part.board.x, top: part.board.y, width: part.board.width, height: part.board.height }}
+    />
   )
   return (
     <div data-testid="시즌카드-딱지">
@@ -129,8 +151,13 @@ export function SteppedBoard() {
   const line = (list: readonly { x: number; y: number }[]) => list.map((point) => `${point.x},${point.y + 1.5}`).join(' ')
   return (
     <svg className={managementStyles.board} viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid="시즌카드-판">
-      <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')} transform="translate(0.5 0.5)"
-        fill={ORIGINAL_COLORS.boardFill} stroke={ORIGINAL_COLORS.boardEdge} strokeWidth={1} />
+      <polygon
+        points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+        transform="translate(0.5 0.5)"
+        fill={ORIGINAL_COLORS.boardFill}
+        stroke={ORIGINAL_COLORS.boardEdge}
+        strokeWidth={1}
+      />
       <polyline points={line(points.slice(0, 4))} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardHighlight} />
       <polyline points={line(points.slice(4).reverse())} transform="translate(0.5 0)" fill="none" stroke={ORIGINAL_COLORS.boardEdge} />
     </svg>
@@ -141,10 +168,7 @@ export function SteppedBoard() {
  * 레이더 0x5a990 — 관리 화면 `RadarChart` 와 같은 그리기에 축 이름 표만 종류(투수 3 · 타자 2)대로 고른다.
  * ABILITY 판(mode_ui 8) · 글(img_text 159) 도 0x7ba44 가 같은 자리에 찍는다.
  */
-function SeasonCardRadar({ abilities, labelFrames }: {
-  readonly abilities: readonly SeasonCardAbility[]
-  readonly labelFrames: readonly number[]
-}) {
+function SeasonCardRadar({ abilities, labelFrames }: { readonly abilities: readonly SeasonCardAbility[]; readonly labelFrames: readonly number[] }) {
   const origins = useFrameOrigins(MODE_UI)
   // 자라는 애니 — 꼭짓점 · 숫자는 지금값(E+8), 숫자 색은 카드가 견준 최종값 그대로(0x5ad94)
   const current = useRadarGrowth(abilities.map((ability) => ability.shown))
@@ -152,18 +176,39 @@ function SeasonCardRadar({ abilities, labelFrames }: {
   return (
     <>
       <FrameSprite folder={MODE_UI} frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
-      <img className={managementStyles.layer} alt="" src={`${IMG_TEXT}/${ABILITY_TITLE.frame}.png`}
-        style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }} />
-      <img className={managementStyles.layer} alt="" src={RADAR_BACKGROUND_IMAGE}
-        style={{ left: RADAR_CENTER.x - BACKGROUND_HALF.width, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2 }} />
-      <img className={managementStyles.layer} alt="" src={RADAR_BACKGROUND_IMAGE}
-        style={{ left: RADAR_CENTER.x, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2, transform: 'scaleX(-1)' }} />
+      <img
+        className={managementStyles.layer}
+        alt=""
+        src={`${IMG_TEXT}/${ABILITY_TITLE.frame}.png`}
+        style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }}
+      />
+      <img
+        className={managementStyles.layer}
+        alt=""
+        src={RADAR_BACKGROUND_IMAGE}
+        style={{ left: RADAR_CENTER.x - BACKGROUND_HALF.width, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2 }}
+      />
+      <img
+        className={managementStyles.layer}
+        alt=""
+        src={RADAR_BACKGROUND_IMAGE}
+        style={{ left: RADAR_CENTER.x, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2, transform: 'scaleX(-1)' }}
+      />
       {/* 0x764c8: 바탕 0x7633c(고정 29 마름모 #6B92F4) → 도형 0x75e30(채움 · 흰 테두리) → 축 이름 줄 0x5abe2~(기준점 → 지금 꼭짓점) */}
       <svg className={managementStyles.board} viewBox="0 0 240 320">
-        <polygon points={abilityChartFrameOf(RADAR_CENTER).map((point) => `${point.x},${point.y}`).join(' ')}
-          fill="none" stroke={RADAR_COLORS.axis} />
-        <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-          fill={RADAR_COLORS.fill} fillOpacity={RADAR_COLORS.fillOpacity} stroke={RADAR_COLORS.edge} />
+        <polygon
+          points={abilityChartFrameOf(RADAR_CENTER)
+            .map((point) => `${point.x},${point.y}`)
+            .join(' ')}
+          fill="none"
+          stroke={RADAR_COLORS.axis}
+        />
+        <polygon
+          points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+          fill={RADAR_COLORS.fill}
+          fillOpacity={RADAR_COLORS.fillOpacity}
+          stroke={RADAR_COLORS.edge}
+        />
         {points.map((point, axis) => {
           const end = radarAxisEndOf(axis)
           return <line key={axis} x1={end.x} y1={end.y} x2={point.x} y2={point.y} stroke={RADAR_COLORS.axis} />
@@ -175,14 +220,19 @@ function SeasonCardRadar({ abilities, labelFrames }: {
         const color = abilityColorOf(ability.base, ability.shown)
         const right = box.x + 13 + Math.ceil(glyphsWidthOf(glyphs) / 2)
         return (
-          <div key={axis} data-testid={`시즌카드-능력-${axis}`} data-value={ability.shown} data-color={color ?? ''}
-            data-label={labelFrames[axis]}>
+          <div key={axis} data-testid={`시즌카드-능력-${axis}`} data-value={ability.shown} data-color={color ?? ''} data-label={labelFrames[axis]}>
             <img className={managementStyles.layer} alt="" src={RADAR_LABEL_BOX_IMAGE} style={{ left: box.x, top: box.y }} />
-            <img className={managementStyles.layer} alt="" src={`${IMG_TEXT}/${String(labelFrames[axis]).padStart(3, '0')}.png`}
-              style={{ left: box.x + 3, top: box.y + 3 }} />
-            {color === null
-              ? <SpriteNumber glyphs={glyphs} right={right} boxTop={box.y + 17} boxHeight={NUMBER_HEIGHT} />
-              : <TintedNumber glyphs={glyphs} right={right} top={box.y + 17} color={color} />}
+            <img
+              className={managementStyles.layer}
+              alt=""
+              src={`${IMG_TEXT}/${String(labelFrames[axis]).padStart(3, '0')}.png`}
+              style={{ left: box.x + 3, top: box.y + 3 }}
+            />
+            {color === null ? (
+              <SpriteNumber glyphs={glyphs} right={right} boxTop={box.y + 17} boxHeight={NUMBER_HEIGHT} />
+            ) : (
+              <TintedNumber glyphs={glyphs} right={right} top={box.y + 17} color={color} />
+            )}
           </div>
         )
       })}
@@ -191,20 +241,24 @@ function SeasonCardRadar({ abilities, labelFrames }: {
 }
 
 /** 0xae98 af28~af56 · 0xb1f8 b31a~b346 — 투수는 54×75 이미지를 두 배로, 타자는 겹침 그림을 박스 가운데 아래에 */
-function SeasonCardFigure({ isPitcher, look, pose }: {
-  readonly isPitcher: boolean
-  readonly look: HallOfFameFigureLook
-  readonly pose: number
-}) {
+function SeasonCardFigure({ isPitcher, look, pose }: { readonly isPitcher: boolean; readonly look: HallOfFameFigureLook; readonly pose: number }) {
   if (isPitcher) {
     const { image } = HALL_OF_FAME_FIGURE
     const { pitcherImage } = SEASON_CARD_FIGURE
     return (
-      <div className={specialStyles.hofFigureImage} data-testid="시즌카드-투수그림"
+      <div
+        className={specialStyles.hofFigureImage}
+        data-testid="시즌카드-투수그림"
         style={{
-          left: pitcherImage.x, top: pitcherImage.y, width: image.width, height: image.height,
-          transform: `scale(${pitcherImage.scale})`, transformOrigin: '0 0', imageRendering: 'pixelated',
-        }}>
+          left: pitcherImage.x,
+          top: pitcherImage.y,
+          width: image.width,
+          height: image.height,
+          transform: `scale(${pitcherImage.scale})`,
+          transformOrigin: '0 0',
+          imageRendering: 'pixelated',
+        }}
+      >
         <PitcherFigure look={look} pose={pose} />
       </div>
     )
@@ -213,8 +267,15 @@ function SeasonCardFigure({ isPitcher, look, pose }: {
   const bodyType = bodyTypeOf(look.form)
   const equipment = batterEquipmentOf({ hit, power, run })
   const layers = batterLayersOf(pose, bodyType, equipment, false)
-  return <FigureLayers layers={layers} x={SEASON_CARD_FIGURE.batter.x} y={SEASON_CARD_FIGURE.batter.y}
-    isMirrored={figureHandOf(look) === 0} paletteOf={(layer) => layerPaletteIndexOf(layer, look.skin, look.team)}
-    testId="시즌카드-타자그림" warmLayers={figureBatterWarmLayersOf(bodyType, equipment)} />
+  return (
+    <FigureLayers
+      layers={layers}
+      x={SEASON_CARD_FIGURE.batter.x}
+      y={SEASON_CARD_FIGURE.batter.y}
+      isMirrored={figureHandOf(look) === 0}
+      paletteOf={(layer) => layerPaletteIndexOf(layer, look.skin, look.team)}
+      testId="시즌카드-타자그림"
+      warmLayers={figureBatterWarmLayersOf(bodyType, equipment)}
+    />
+  )
 }
-

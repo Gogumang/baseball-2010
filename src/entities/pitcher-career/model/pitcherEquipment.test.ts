@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { createPitcherCareer, equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
-  PITCHER_EQUIPMENT_PARTS, equipOwnedPitcherEquipment, isPitcherHiddenOpen, pitcherEquipmentBlockReasonOf,
-  pitcherEquipmentItemOf, pitcherHiddenOpenIdOf, purchasePitcherEquipment,
+  PITCHER_EQUIPMENT_PARTS,
+  equipOwnedPitcherEquipment,
+  isPitcherHiddenOpen,
+  pitcherEquipmentBlockReasonOf,
+  pitcherEquipmentItemOf,
+  pitcherHiddenOpenIdOf,
+  purchasePitcherEquipment,
 } from '@/entities/pitcher-career/model/pitcherEquipment'
 
 /** 투수편(모드 3) 장비 — 0x13460 kind 3 · 0x14a74 · 0x832e8 · 0xb6414 (pitcherEquipment.ts 머리글) */
@@ -21,8 +26,9 @@ describe('투수 장비 표', () => {
   })
 
   it('가격은 0xcc444 **앞 44칸** — 타자(뒤 44칸)와 모자 줄이 다르다 (0x13584 cmp r3,#3)', () => {
-    expect(Array.from({ length: 11 }, (_unused, level) => pitcherEquipmentItemOf(0, level).price / 1000))
-      .toEqual([4, 8, 12, 18, 24, 32, 40, 80, 110, 150, 200])
+    expect(Array.from({ length: 11 }, (_unused, level) => pitcherEquipmentItemOf(0, level).price / 1000)).toEqual([
+      4, 8, 12, 18, 24, 32, 40, 80, 110, 150, 200,
+    ])
     expect(pitcherEquipmentItemOf(1, 10).price).toBe(210_000)
     expect(pitcherEquipmentItemOf(2, 0).price).toBe(4_000)
     expect(pitcherEquipmentItemOf(3, 6).price).toBe(36_000)

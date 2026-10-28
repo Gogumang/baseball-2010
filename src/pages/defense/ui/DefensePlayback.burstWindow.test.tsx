@@ -60,9 +60,7 @@ describe('DefensePlayback.burstWindow — 0x1c', () => {
     const { rerender, queryByTestId } = render(<DefensePlayback ticks={밀어내기.ticks} onDone={onDone} freePassPlay />)
     for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) 흘리기(1)
     expect(onDone).toHaveBeenCalledTimes(1)
-    rerender(
-      <DefensePlayback ticks={밀어내기.ticks} onDone={() => onDone()} freePassPlay burstWindow={<div data-testid="돌발창" />} />,
-    )
+    rerender(<DefensePlayback ticks={밀어내기.ticks} onDone={() => onDone()} freePassPlay burstWindow={<div data-testid="돌발창" />} />)
     흘리기(10)
     expect(queryByTestId('돌발창')).not.toBeNull()
     // 0x1c 동안은 키가 창 몫 — 밀어내기 판의 넘기기 누름 칸이 없다
@@ -80,11 +78,7 @@ describe('useDefenseUnderBurstWindow — 판 끝 판정만 판 위 창', () => {
       mounted.current = true
       섰다()
     }
-    return (
-      <div data-testid="판">
-        {window}
-      </div>
-    )
+    return <div data-testid="판">{window}</div>
   }
   type 단계 = { readonly playing: boolean; readonly resolution: object | null }
   let 바꾸기: (next: 단계) => void = () => {}

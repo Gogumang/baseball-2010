@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ENTRY_TABLES_BASIC, ENTRY_TABLES_WIDE, entryColumnOf, entryCursorBorderOf, entryCursorRectOf, entryListGeometryOf, entryPickedFillOf,
-  entryRotationCellOf, entryRowYOf, entrySlideOffsetOf, entryStaminaLinesOf, entryStaminaPercentOf, entryStatCellOf,
+  ENTRY_TABLES_BASIC,
+  ENTRY_TABLES_WIDE,
+  entryColumnOf,
+  entryCursorBorderOf,
+  entryCursorRectOf,
+  entryListGeometryOf,
+  entryPickedFillOf,
+  entryRotationCellOf,
+  entryRowYOf,
+  entrySlideOffsetOf,
+  entryStaminaLinesOf,
+  entryStaminaPercentOf,
+  entryStatCellOf,
 } from '@/widgets/entry-editor/lib/entryListWindow'
 
 /**
@@ -10,8 +21,15 @@ import {
 describe('엔트리 목록 창 0x5c984', () => {
   it('기본 표 타자 탭 — 고정 열 타순(20) · 이름(48), 넘기는 열 수비 딱지(105) · 타율(144) · 홈런(183), 자르기 (105, 58, 117, 221)', () => {
     const g = entryListGeometryOf({ table: ENTRY_TABLES_BASIC.batter, firstColumn: 0, slideOffset: 0, keyPresses: 0 })
-    expect(g.fixed.map((placed) => [placed.column.kind, placed.x])).toEqual([['타순', 20], ['이름', 48]])
-    expect(g.scroll.map((placed) => [placed.column.kind, placed.x])).toEqual([['딱지', 105], ['기록', 144], ['기록', 183]])
+    expect(g.fixed.map((placed) => [placed.column.kind, placed.x])).toEqual([
+      ['타순', 20],
+      ['이름', 48],
+    ])
+    expect(g.scroll.map((placed) => [placed.column.kind, placed.x])).toEqual([
+      ['딱지', 105],
+      ['기록', 144],
+      ['기록', 183],
+    ])
     expect(g.clip).toEqual({ x: 105, y: 58, width: 117, height: 221 })
     expect(g.leftArrow).toBeNull()
     expect(g.rightArrow).toBeNull()
@@ -27,11 +45,27 @@ describe('엔트리 목록 창 0x5c984', () => {
     const at = (firstColumn: number) => entryListGeometryOf({ table: ENTRY_TABLES_WIDE.batter, firstColumn, slideOffset: 0, keyPresses: 0 })
     expect(at(0).leftArrow).toBeNull()
     expect(at(0).rightArrow).toEqual({ x: 219, y: 62 })
-    expect(at(0).scroll.map((placed) => [placed.index, placed.x])).toEqual([[0, 105], [1, 144], [2, 183], [3, 222]])
+    expect(at(0).scroll.map((placed) => [placed.index, placed.x])).toEqual([
+      [0, 105],
+      [1, 144],
+      [2, 183],
+      [3, 222],
+    ])
     expect(at(2).leftArrow).toEqual({ x: 98, y: 62 })
-    expect(at(2).scroll.map((placed) => [placed.index, placed.x])).toEqual([[1, 66], [2, 105], [3, 144], [4, 183], [5, 222]])
+    expect(at(2).scroll.map((placed) => [placed.index, placed.x])).toEqual([
+      [1, 66],
+      [2, 105],
+      [3, 144],
+      [4, 183],
+      [5, 222],
+    ])
     expect(at(7).rightArrow).toBeNull()
-    expect(at(7).scroll.map((placed) => [placed.index, placed.x])).toEqual([[6, 66], [7, 105], [8, 144], [9, 183]])
+    expect(at(7).scroll.map((placed) => [placed.index, placed.x])).toEqual([
+      [6, 66],
+      [7, 105],
+      [8, 144],
+      [9, 183],
+    ])
   })
 
   it('열 밀기 — 표 0xd1bbc 단계 3 = 13px: 다음 열이면 첫 그린 열이 105 − 39 − 13 = 53', () => {

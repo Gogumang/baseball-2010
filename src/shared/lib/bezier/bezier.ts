@@ -19,8 +19,7 @@ export function bernsteinWeights(degree: number, t: number): number[] {
   for (let order = 2; order <= degree; order += 1) {
     weights[order] = Math.trunc((weights[order - 1] * t) / T_SCALE)
     for (let index = order - 1; index >= 1; index -= 1) {
-      weights[index] =
-        Math.trunc((weights[index - 1] * t) / T_SCALE) + Math.trunc((weights[index] * (T_SCALE - t)) / T_SCALE)
+      weights[index] = Math.trunc((weights[index - 1] * t) / T_SCALE) + Math.trunc((weights[index] * (T_SCALE - t)) / T_SCALE)
     }
     weights[0] = Math.trunc((weights[0] * (T_SCALE - t)) / T_SCALE)
   }

@@ -6,7 +6,12 @@ import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 
 const 저장소 = (initial: unknown) => {
   let value = initial
-  const store: JsonStorePort = { load: () => value, save: (next) => { value = next } }
+  const store: JsonStorePort = {
+    load: () => value,
+    save: (next) => {
+      value = next
+    },
+  }
   return { store, read: () => value }
 }
 

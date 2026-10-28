@@ -42,7 +42,11 @@ describe('시즌 상태판 0x7d34c 모드 2 갈래', () => {
 
   it('상태 아이콘은 이글아이(SR+0x54)·질병(SR+5) 둘만 본다 — 행운·부상·무력감 칸은 건너뛴다', () => {
     expect(seasonStatusPanelLayoutOf(레코드({ aimVisionGames: 3, illness: 2 })).icons).toEqual({
-      isLuckEquipped: false, eagleEyeGamesRemaining: 3, isSick: true, isInjured: false, hasHelplessness: false,
+      isLuckEquipped: false,
+      eagleEyeGamesRemaining: 3,
+      isSick: true,
+      isInjured: false,
+      hasHelplessness: false,
     })
   })
 })

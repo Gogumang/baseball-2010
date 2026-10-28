@@ -6,7 +6,12 @@ import { createCareer } from '@/entities/career/model/playerCareer'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import {
-  TITLE_CURSOR_BOX, TITLE_LIST_BOXES, TITLE_ROW_STEP, titleListTopAfter, titleNumberLeftOf, titleScrollBarRectsOf,
+  TITLE_CURSOR_BOX,
+  TITLE_LIST_BOXES,
+  TITLE_ROW_STEP,
+  titleListTopAfter,
+  titleNumberLeftOf,
+  titleScrollBarRectsOf,
 } from '@/widgets/management/lib/titleListLayout'
 
 /** 칭호 목록 창 0x198fc — mode_ui 프레임 63 박스 · 줄 막대 64/65 */

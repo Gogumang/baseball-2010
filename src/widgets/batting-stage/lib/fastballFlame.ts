@@ -43,11 +43,7 @@ export function animationLengthOf(entries: readonly AnimationEntry[]): number {
  * (`commonWindow` 의 `gameSceneTickOf` — 원본 0xbc9c8 은 예약 다음 틀에 틱 0).
  * 그 밖(대기 · 0x13 타격 · 인플레이 결과)은 null — 불꽃을 안 그린다.
  */
-export function fastballFlameBallTickOf(
-  phase: StagePhaseSnapshot | undefined,
-  ballFrame: number,
-  frameCount: number,
-): number | null {
+export function fastballFlameBallTickOf(phase: StagePhaseSnapshot | undefined, ballFrame: number, frameCount: number): number | null {
   if (phase === undefined) return null
   if (phase.kind === '투구중') return ballFrame
   if (phase.kind === '결과' && phase.isInPlay !== true) return frameCount + 2 + phase.tick
@@ -62,11 +58,7 @@ export function hasFastballFlame(pitch: Pitch): boolean {
 /**
  * 이 공 틱에 그릴 game_effect 그림 번호 — 3b6fc · 3b794 를 지나면 애니 1 의 (공 틱 − N) 번째 틱 칸, 아니면 null
  */
-export function fastballFlameFrameAt(
-  entries: readonly AnimationEntry[],
-  ballTick: number,
-  frameCount: number,
-): number | null {
+export function fastballFlameFrameAt(entries: readonly AnimationEntry[], ballTick: number, frameCount: number): number | null {
   const elapsed = ballTick - frameCount
   if (elapsed < 0 || elapsed > animationLengthOf(entries)) return null
   return judgeFrameAt(entries, elapsed)

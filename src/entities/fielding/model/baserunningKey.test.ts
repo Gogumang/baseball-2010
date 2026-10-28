@@ -18,11 +18,7 @@ const running = (index: number, from: number, to: number): RunnerState => {
 }
 
 const keyOn = (runners: readonly RunnerState[], kind: '진루' | '귀루', target: 1 | 2 | 3 | '전원', playKind = 5) =>
-  applyBaserunningKey(
-    { playKind, homeRunFlag: false, runners, previousTargets: runners.map((runner) => runner.startBase) },
-    kind,
-    target,
-  )
+  applyBaserunningKey({ playKind, homeRunFlag: false, runners, previousTargets: runners.map((runner) => runner.startBase) }, kind, target)
 
 describe('사람 주루 키 0x582 · 0x584 → 0xa9b04', () => {
   it('인자는 +0x8c(닿은 루)로 찾는다 — 목록 앞에서부터 첫 산 주자 (0xa97a0)', () => {
@@ -102,11 +98,7 @@ describe('사람 주루 키 0x582 · 0x584 → 0xa9b04', () => {
   })
 
   it('플레이+0x111(홈런)이 서면 메시지가 통째로 아무것도 안 한다 (0x5209e · 0x5222a 머리)', () => {
-    const result = applyBaserunningKey(
-      { playKind: 1, homeRunFlag: true, runners: [standing(1, 1)], previousTargets: [1] },
-      '진루',
-      1,
-    )
+    const result = applyBaserunningKey({ playKind: 1, homeRunFlag: true, runners: [standing(1, 1)], previousTargets: [1] }, '진루', 1)
     expect(result.handled).toBe(false)
     expect(result.succeeded).toBe(false)
   })

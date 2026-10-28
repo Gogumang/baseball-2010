@@ -23,8 +23,7 @@ import { isSkinFrameSliding, resetSkinFrameSlide, startSkinFrameSlide } from '@/
 
 afterEach(cleanup)
 
-const 띄우기 = (overrides: Partial<Parameters<typeof HelpScreen>[0]> = {}) =>
-  render(<HelpScreen onBack={vi.fn()} {...overrides} />)
+const 띄우기 = (overrides: Partial<Parameters<typeof HelpScreen>[0]> = {}) => render(<HelpScreen onBack={vi.fn()} {...overrides} />)
 
 const 칸 = (name: string) => screen.getByRole('button', { name })
 
@@ -246,7 +245,7 @@ describe('경기 중 [조작방법] — 멈춘 경기 장면 위에 얹힌다', 
   })
 })
 
-describe("숫자키 — 격자 [skin+0x454] 숫자키 꼴 1 이 바꾼 키로 간다 (0x6371a · 0x637d0 r6, Q-14)", () => {
+describe('숫자키 — 격자 [skin+0x454] 숫자키 꼴 1 이 바꾼 키로 간다 (0x6371a · 0x637d0 r6, Q-14)', () => {
   it("장 고르기에서 '6' '4' 는 장을 넘기고 '5' 는 OK 라 쪽 보기로 든다", () => {
     띄우기()
     fireEvent.keyDown(window, { key: '6' })

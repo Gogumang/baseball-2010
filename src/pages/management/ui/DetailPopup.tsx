@@ -6,10 +6,24 @@ import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import {
-  CHANGE_ARROW_FRAMES, DETAIL_CHANGE_X, DETAIL_CURRENT_DX, DETAIL_HEADER, DETAIL_LABEL_BOX, DETAIL_MAXIMUM_DX,
-  DETAIL_MESSAGE_LINE_HEIGHT, DETAIL_SLASH_FRAME, DETAIL_TABLE_FRAME,
-  DETAIL_SCROLL_BAR_COLORS, DETAIL_TITLE_FRAME, DETAIL_VALUE_BOX, DETAIL_WINDOW, DETAIL_Y_OFFSET, detailRowsOf,
-  detailMessageBoxOf, detailRowTopOf, detailScrollBarOf,
+  CHANGE_ARROW_FRAMES,
+  DETAIL_CHANGE_X,
+  DETAIL_CURRENT_DX,
+  DETAIL_HEADER,
+  DETAIL_LABEL_BOX,
+  DETAIL_MAXIMUM_DX,
+  DETAIL_MESSAGE_LINE_HEIGHT,
+  DETAIL_SLASH_FRAME,
+  DETAIL_TABLE_FRAME,
+  DETAIL_SCROLL_BAR_COLORS,
+  DETAIL_TITLE_FRAME,
+  DETAIL_VALUE_BOX,
+  DETAIL_WINDOW,
+  DETAIL_Y_OFFSET,
+  detailRowsOf,
+  detailMessageBoxOf,
+  detailRowTopOf,
+  detailScrollBarOf,
 } from '@/pages/management/lib/detailPopup'
 import type { DetailResult, DetailRow, ScrollBarRect } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/DetailPopup.css'
@@ -89,7 +103,13 @@ interface DetailWindowProps {
  * 두 모드 공용 창(0x872d4)이라 줄(이름표 포함)만 받는다 — 투수편은 이름표 340~343 으로 세운 줄을 넘긴다.
  */
 export function DetailWindow({
-  rows, messages, onClose, scrollOffset = 0, tableYOffset = DETAIL_Y_OFFSET, hidesEmptyMessages = false, dimOpacity,
+  rows,
+  messages,
+  onClose,
+  scrollOffset = 0,
+  tableYOffset = DETAIL_Y_OFFSET,
+  hidesEmptyMessages = false,
+  dimOpacity,
   opensAsCommonPopup = false,
 }: DetailWindowProps) {
   // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침 틀을 건너뛴다
@@ -99,7 +119,9 @@ export function DetailWindow({
     if ((overlayRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
   }, [])
   const motion = usePopupWindowMotion({
-    targetHeight: 0, skipsMotion: !opensAsCommonPopup || hasNoLayout, isCommonWindow: opensAsCommonPopup,
+    targetHeight: 0,
+    skipsMotion: !opensAsCommonPopup || hasNoLayout,
+    isCommonWindow: opensAsCommonPopup,
   })
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -138,66 +160,120 @@ export function DetailWindow({
 
   if (motion.isClosed) return null
   return (
-    <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={close} ref={overlayRef}
-      style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}>
+    <div
+      className={styles.overlay}
+      role="dialog"
+      aria-label="상세정보"
+      onClick={close}
+      ref={overlayRef}
+      style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}
+    >
       {/* 띄운 그림은 펼침이라 그리기 콜백을 안 부른다(0x7479c) — 뒤 어둡게만 */}
       <div style={{ visibility: motion.openingHeight !== null ? 'hidden' : undefined }}>
-      <CommonPanel x={DETAIL_WINDOW.x} y={DETAIL_WINDOW.y} width={DETAIL_WINDOW.width} height={DETAIL_WINDOW.height} titleTab />
-      <img className={styles.layer} alt="" src={assetUrl(`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`)}
-        style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }} />
-      <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={tableYOffset} />
-      <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, DETAIL_HEADER.frame)}
-        style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_HEADER.frame) / 2), top: DETAIL_HEADER.box.y + 3 }} />
-      {rows.map((row, index) => {
-        const top = detailRowTopOf(index, tableYOffset)
-        return (
-          <div key={row.labelFrame}>
-            <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, row.labelFrame)}
-              style={{ left: DETAIL_LABEL_BOX.x + DETAIL_LABEL_BOX.width - widthOf(row.labelFrame), top: top + 3 }} />
-            {centered(row.current, valueCenter + DETAIL_CURRENT_DX, top)}
-            <img className={styles.layer} alt="" src={imageOf(IMG_TEXT, DETAIL_SLASH_FRAME)}
-              style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_SLASH_FRAME) / 2), top: top + 3 }} />
-            {centered(row.maximum, valueCenter + DETAIL_MAXIMUM_DX, top)}
-            {row.change !== 0 && (
-              <>
-                <img className={styles.layer} alt=""
-                  src={imageOf(MODE_UI, row.change > 0 ? CHANGE_ARROW_FRAMES.up : CHANGE_ARROW_FRAMES.down)}
-                  style={{ left: DETAIL_CHANGE_X, top: top + 2 - (row.change > 0 ? sway : -sway) }} />
-                {/* |값| 을 dx +4 — 기준(정렬)은 미확인이라 화살표 오른쪽에 둔다 (추정) */}
-                <SpriteNumber glyphs={numberGlyphsOf(Math.abs(row.change))} right={CHANGE_LEFT + glyphsWidthOf(numberGlyphsOf(Math.abs(row.change)))} boxTop={top} boxHeight={ROW_HEIGHT} />
-                {/* 넷째 칸 — 변화량이 0 이 아닐 때만 본다 (0x87548 이 변화량 0 이면 줄 끝으로 건너뛴다) */}
-                {row.bonus !== 0 && (
-                  <>
-                    <img className={styles.layer} alt=""
-                      src={imageOf(NUM, row.bonus > 0 ? BONUS_SIGN_FRAMES.plus : BONUS_SIGN_FRAMES.minus)}
-                      style={{ left: CHANGE_LEFT + BONUS_SIGN_DX, top: top + Math.trunc((ROW_HEIGHT - (row.bonus > 0 ? BONUS_SIGN_HEIGHTS.plus : BONUS_SIGN_HEIGHTS.minus)) / 2) }} />
-                    <SpriteNumber glyphs={numberGlyphsOf(Math.abs(row.bonus))} right={CHANGE_LEFT + BONUS_NUMBER_DX + glyphsWidthOf(numberGlyphsOf(Math.abs(row.bonus)))} boxTop={top} boxHeight={ROW_HEIGHT} />
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        )
-      })}
-      {showsMessages && (<>
-      <div className={styles.messages} style={{ left: messageBox.x, top: messageBox.y, width: messageBox.width, height: messageBox.height }}>
-        {/* 글은 0xba269 가 색 마크업(!c)을 읽으며 그린다 — 능력치 상세(120)의 "[!cFFFF00이름!cFFFFFF]" */}
-        {messages.slice(scrollOffset).map((message, index) => (
-          <div key={scrollOffset + index} style={{ height: DETAIL_MESSAGE_LINE_HEIGHT }}>
-            {parseGameMarkup(message).flatMap((line) => line.segments).map((segment, segmentIndex) => (
-              <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
-            ))}
-          </div>
-        ))}
-      </div>
-      {/* 오른쪽 스크롤 막대 (0x8a182~0x8a2a4) — 줄 수 ≤ 3 이면 가득, 아니면 4줄 몫 손잡이 */}
-      <svg className={styles.layer} style={{ left: 0, top: 0 }} viewBox="0 0 240 320" width={240} height={320}
-        shapeRendering="crispEdges" data-testid="상세스크롤막대">
-        {scrollBarRects(detailScrollBarOf(messages.length, scrollOffset, tableYOffset)).map(([name, rect, fill]) => (
-          <rect key={name} data-part={name} x={rect.x} y={rect.y} width={rect.width} height={Math.max(rect.height, 0)} fill={fill} />
-        ))}
-      </svg>
-      </>)}
+        <CommonPanel x={DETAIL_WINDOW.x} y={DETAIL_WINDOW.y} width={DETAIL_WINDOW.width} height={DETAIL_WINDOW.height} titleTab />
+        <img
+          className={styles.layer}
+          alt=""
+          src={assetUrl(`./sprites/management/label_navy_${DETAIL_TITLE_FRAME}.png`)}
+          style={{ left: DETAIL_WINDOW.x + Math.trunc((85 - widthOf(DETAIL_TITLE_FRAME)) / 2), top: DETAIL_WINDOW.y + 5 }}
+        />
+        <FrameSprite folder={MODE_UI} frame={DETAIL_TABLE_FRAME} origins={origins} x={0} y={tableYOffset} />
+        <img
+          className={styles.layer}
+          alt=""
+          src={imageOf(IMG_TEXT, DETAIL_HEADER.frame)}
+          style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_HEADER.frame) / 2), top: DETAIL_HEADER.box.y + 3 }}
+        />
+        {rows.map((row, index) => {
+          const top = detailRowTopOf(index, tableYOffset)
+          return (
+            <div key={row.labelFrame}>
+              <img
+                className={styles.layer}
+                alt=""
+                src={imageOf(IMG_TEXT, row.labelFrame)}
+                style={{ left: DETAIL_LABEL_BOX.x + DETAIL_LABEL_BOX.width - widthOf(row.labelFrame), top: top + 3 }}
+              />
+              {centered(row.current, valueCenter + DETAIL_CURRENT_DX, top)}
+              <img
+                className={styles.layer}
+                alt=""
+                src={imageOf(IMG_TEXT, DETAIL_SLASH_FRAME)}
+                style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_SLASH_FRAME) / 2), top: top + 3 }}
+              />
+              {centered(row.maximum, valueCenter + DETAIL_MAXIMUM_DX, top)}
+              {row.change !== 0 && (
+                <>
+                  <img
+                    className={styles.layer}
+                    alt=""
+                    src={imageOf(MODE_UI, row.change > 0 ? CHANGE_ARROW_FRAMES.up : CHANGE_ARROW_FRAMES.down)}
+                    style={{ left: DETAIL_CHANGE_X, top: top + 2 - (row.change > 0 ? sway : -sway) }}
+                  />
+                  {/* |값| 을 dx +4 — 기준(정렬)은 미확인이라 화살표 오른쪽에 둔다 (추정) */}
+                  <SpriteNumber
+                    glyphs={numberGlyphsOf(Math.abs(row.change))}
+                    right={CHANGE_LEFT + glyphsWidthOf(numberGlyphsOf(Math.abs(row.change)))}
+                    boxTop={top}
+                    boxHeight={ROW_HEIGHT}
+                  />
+                  {/* 넷째 칸 — 변화량이 0 이 아닐 때만 본다 (0x87548 이 변화량 0 이면 줄 끝으로 건너뛴다) */}
+                  {row.bonus !== 0 && (
+                    <>
+                      <img
+                        className={styles.layer}
+                        alt=""
+                        src={imageOf(NUM, row.bonus > 0 ? BONUS_SIGN_FRAMES.plus : BONUS_SIGN_FRAMES.minus)}
+                        style={{
+                          left: CHANGE_LEFT + BONUS_SIGN_DX,
+                          top: top + Math.trunc((ROW_HEIGHT - (row.bonus > 0 ? BONUS_SIGN_HEIGHTS.plus : BONUS_SIGN_HEIGHTS.minus)) / 2),
+                        }}
+                      />
+                      <SpriteNumber
+                        glyphs={numberGlyphsOf(Math.abs(row.bonus))}
+                        right={CHANGE_LEFT + BONUS_NUMBER_DX + glyphsWidthOf(numberGlyphsOf(Math.abs(row.bonus)))}
+                        boxTop={top}
+                        boxHeight={ROW_HEIGHT}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+        {showsMessages && (
+          <>
+            <div className={styles.messages} style={{ left: messageBox.x, top: messageBox.y, width: messageBox.width, height: messageBox.height }}>
+              {/* 글은 0xba269 가 색 마크업(!c)을 읽으며 그린다 — 능력치 상세(120)의 "[!cFFFF00이름!cFFFFFF]" */}
+              {messages.slice(scrollOffset).map((message, index) => (
+                <div key={scrollOffset + index} style={{ height: DETAIL_MESSAGE_LINE_HEIGHT }}>
+                  {parseGameMarkup(message)
+                    .flatMap((line) => line.segments)
+                    .map((segment, segmentIndex) => (
+                      <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
+                        {segment.text}
+                      </span>
+                    ))}
+                </div>
+              ))}
+            </div>
+            {/* 오른쪽 스크롤 막대 (0x8a182~0x8a2a4) — 줄 수 ≤ 3 이면 가득, 아니면 4줄 몫 손잡이 */}
+            <svg
+              className={styles.layer}
+              style={{ left: 0, top: 0 }}
+              viewBox="0 0 240 320"
+              width={240}
+              height={320}
+              shapeRendering="crispEdges"
+              data-testid="상세스크롤막대"
+            >
+              {scrollBarRects(detailScrollBarOf(messages.length, scrollOffset, tableYOffset)).map(([name, rect, fill]) => (
+                <rect key={name} data-part={name} x={rect.x} y={rect.y} width={rect.width} height={Math.max(rect.height, 0)} fill={fill} />
+              ))}
+            </svg>
+          </>
+        )}
       </div>
     </div>
   )

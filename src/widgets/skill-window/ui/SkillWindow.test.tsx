@@ -10,13 +10,20 @@ import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 afterEach(cleanup)
 
 const 선수 = (part: Partial<SkillWindowCareer> = {}): SkillWindowCareer => ({
-  skillIds: [0, 8], equippedSkillIds: [0, 8], skillSlotLevel: 0, gamePoint: 0, subItemIds: [], ...part,
+  skillIds: [0, 8],
+  equippedSkillIds: [0, 8],
+  skillSlotLevel: 0,
+  gamePoint: 0,
+  subItemIds: [],
+  ...part,
 })
 const 키 = (key: string) => fireEvent.keyDown(window, { key })
 const 알림글 = () => stripGameMarkup(screen.getByRole('dialog', { name: '알림' }).textContent ?? '').replace(/\s+/g, '')
-const 칸이름들 = () => screen.getAllByRole('button')
-  .map((button) => button.getAttribute('aria-label') ?? '')
-  .filter((name) => !['스킬', '서브아이템'].includes(name))
+const 칸이름들 = () =>
+  screen
+    .getAllByRole('button')
+    .map((button) => button.getAttribute('aria-label') ?? '')
+    .filter((name) => !['스킬', '서브아이템'].includes(name))
 
 function 띄우기(career = 선수(), handlers: Partial<{ onEquip: () => void; onExpandSlots: () => void; onClose: () => void }> = {}) {
   const onEquip = handlers.onEquip ?? vi.fn()

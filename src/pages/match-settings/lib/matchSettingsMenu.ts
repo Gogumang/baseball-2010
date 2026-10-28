@@ -1,7 +1,5 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
-import {
-  CHANCE_VALUE, INNING_VALUE, MATCH_SETTING_KIND, hasAnyDetailSelection,
-} from '@/features/play-team-game/model/matchSettings'
+import { CHANCE_VALUE, INNING_VALUE, MATCH_SETTING_KIND, hasAnyDetailSelection } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 
 /**
@@ -108,9 +106,7 @@ export function detailBitsOf(settings: MatchProgressSettings, row: number): numb
 }
 
 /** 상세 줄의 칸 하나를 뒤집는다 — OK 한 번이 비트 하나를 켜고, 한 번 더 누르면 끈다 */
-export function toggleDetailBit(
-  settings: MatchProgressSettings, row: number, cell: number,
-): MatchProgressSettings {
+export function toggleDetailBit(settings: MatchProgressSettings, row: number, cell: number): MatchProgressSettings {
   const bit = 1 << cell
   if (row === DETAIL_ROW.타자조작) return { ...settings, battingOrderBits: settings.battingOrderBits ^ bit }
   if (row === DETAIL_ROW.공격주자) return { ...settings, offenseRunnerBits: settings.offenseRunnerBits ^ bit }
@@ -129,9 +125,7 @@ export function valueCountOf(kind: number): number {
 const 유지 = (state: MatchSettingsWindowState): MatchSettingsAction => ({ kind: '유지', state })
 
 /** 키 한 번 (0x5ffcc) */
-export function pressMatchSettingsKey(
-  state: MatchSettingsWindowState, key: MatchSettingsKey,
-): MatchSettingsAction {
+export function pressMatchSettingsKey(state: MatchSettingsWindowState, key: MatchSettingsKey): MatchSettingsAction {
   // 확인창이 떠 있으면 키는 확인창 것이다 (0x5ffcc 머리에서 +0x314 ≠ 0 이면 0x60376 으로 샌다)
   if (state.popup !== null) return 유지(state)
   if (state.stage === SETTINGS_STAGE.종류) return pressKindKey(state, key)
@@ -179,9 +173,7 @@ function pressValueKey(state: MatchSettingsWindowState, key: MatchSettingsKey): 
   if (kind === MATCH_SETTING_KIND.찬스 && (key === '왼쪽' || key === '오른쪽')) {
     // **원본 그대로**: 찬스는 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다 (R4 4절).
     //    칸이 둘이라 감아 도는 좌·우 이동과 결과가 같다 — 버그가 아니다(B-65 정정 r279).
-    const flipped = state.settings.value === CHANCE_VALUE.공격득점권
-      ? CHANCE_VALUE.수비삼루
-      : CHANCE_VALUE.공격득점권
+    const flipped = state.settings.value === CHANCE_VALUE.공격득점권 ? CHANCE_VALUE.수비삼루 : CHANCE_VALUE.공격득점권
     return 유지({ ...state, settings: { ...state.settings, value: flipped } })
   }
   if (kind === MATCH_SETTING_KIND.이닝 && (key === '위' || key === '아래')) {
@@ -231,9 +223,7 @@ function pressDetailKey(state: MatchSettingsWindowState, key: MatchSettingsKey):
  *   +0x314 = 0 만 한다)
  * - [126] 알림은 대답이 하나뿐이라 무엇을 눌러도 알림만 닫는다
  */
-export function answerMatchSettingsPopup(
-  state: MatchSettingsWindowState, isYes: boolean,
-): MatchSettingsAction {
+export function answerMatchSettingsPopup(state: MatchSettingsWindowState, isYes: boolean): MatchSettingsAction {
   if (state.popup === '확인' && isYes) return { kind: '저장', settings: state.settings }
   return 유지({ ...state, popup: null })
 }

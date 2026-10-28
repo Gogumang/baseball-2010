@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { advancePostseason, startPostseason } from '@/entities/league/model/league'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
-  RANK_TAGS, bracketViewOf, rankDigitBoxTopOf, rankDigitRightOf, rankGlyphsOf, rankUnitPositionOf,
+  RANK_TAGS,
+  bracketViewOf,
+  rankDigitBoxTopOf,
+  rankDigitRightOf,
+  rankGlyphsOf,
+  rankUnitPositionOf,
 } from '@/widgets/season/lib/postseasonBracketLayout'
 import type { BracketView } from '@/widgets/season/lib/postseasonBracketLayout'
 

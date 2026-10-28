@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  atan2Degrees,
-  cosineHundred,
-  cosineSixteen,
-  integerSquareRoot,
-  sineHundred,
-  sineSixteen,
-} from '@/shared/lib/math/originalTrigonometry'
+import { atan2Degrees, cosineHundred, cosineSixteen, integerSquareRoot, sineHundred, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
 
 describe('원본 정수 삼각함수 — 0x6c6a8 · 0x6c768 · 0x6c7c0', () => {
   it('sin × 100 은 표를 0~90° 로 접고 180° 넘으면 부호를 뒤집는다', () => {

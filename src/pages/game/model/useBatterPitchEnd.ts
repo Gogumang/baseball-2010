@@ -48,7 +48,10 @@ export interface BatterPitchEnd {
  * 지나야 0x11 이고, 팝업(0x52cc6)이면 둘 다 선다. 아래 겹침 처리(앞 공 끝을 그 자리에서 부름)는 예전 결과 표시가 ms 로 짧던
  * 때의 안전판으로만 남는다.
  */
-export function useBatterPitchEnd({ isPlayShown, isFrozen }: {
+export function useBatterPitchEnd({
+  isPlayShown,
+  isFrozen,
+}: {
   /** 수비 판(상태 0x17)이 화면에 떠 있다 — 사람 주루 판 · 재생 판 */
   readonly isPlayShown: boolean
   /** 팝업이 떠 있다 — 0x12 상태 틱이 멈춘다 */
@@ -84,17 +87,20 @@ export function useBatterPitchEnd({ isPlayShown, isFrozen }: {
   }
   pendingRef.current = pending
 
-  useSceneTick(() => {
-    const current = pendingRef.current
-    if (current?.kind !== 'wait') return
-    const elapsed = current.elapsed + 1
-    if (elapsed >= current.waitTicks) {
-      pendingRef.current = { kind: 'due' }
-      setVersion((version) => version + 1)
-    } else {
-      pendingRef.current = { ...current, elapsed }
-    }
-  }, pending?.kind === 'wait' && !isFrozen)
+  useSceneTick(
+    () => {
+      const current = pendingRef.current
+      if (current?.kind !== 'wait') return
+      const elapsed = current.elapsed + 1
+      if (elapsed >= current.waitTicks) {
+        pendingRef.current = { kind: 'due' }
+        setVersion((version) => version + 1)
+      } else {
+        pendingRef.current = { ...current, elapsed }
+      }
+    },
+    pending?.kind === 'wait' && !isFrozen,
+  )
 
   const notePitchResolved = useCallback((pitch: { readonly isHit: boolean; readonly waitTicks: number }) => {
     const previous = pendingRef.current

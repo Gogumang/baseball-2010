@@ -6,12 +6,7 @@ import { rollsIntoBenchClearing } from '@/entities/game/model/benchClearing'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { BenchClearingEntryRoll } from '@/features/play-game/model/benchClearingScene'
 import { derbyNoContactWaitFramesOf, derbyPitchCallOf } from '@/pages/home-run-derby/lib/derbyPitchCall'
-import {
-  DERBY_HOME_RUN_SOUND,
-  derbyBattedBallOf,
-  skipDerbyBattedBall,
-  type DerbyBattedBall,
-} from '@/entities/home-run-derby/model/derbyBattedBall'
+import { DERBY_HOME_RUN_SOUND, derbyBattedBallOf, skipDerbyBattedBall, type DerbyBattedBall } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
 import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
 import { devDerbyStartNow, setDevDerbyStart } from '@/shared/lib/devDerbyStart/devDerbyStart'
@@ -61,8 +56,15 @@ import {
   type HomeRunTextWindow,
 } from '@/widgets/batting-stage/lib/homeRunBanner'
 import {
-  clearGameSceneTimeout, createGameSceneDrawGate, gameSceneNow, gameSceneTickNow, gameSceneTickOf, gameSceneTickStartTime,
-  setGameSceneTickInterval, setGameSceneTickTimeout, setGameSceneTimeout,
+  clearGameSceneTimeout,
+  createGameSceneDrawGate,
+  gameSceneNow,
+  gameSceneTickNow,
+  gameSceneTickOf,
+  gameSceneTickStartTime,
+  setGameSceneTickInterval,
+  setGameSceneTickTimeout,
+  setGameSceneTimeout,
 } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
@@ -596,13 +598,16 @@ export function useHomeRunDerby({
     armScenePrepare()
   }, [])
 
-  useEffect(() => () => {
-    clearTimer()
-    clearPlaySoundTimers()
-    clearComboTimer()
-    clearConfirmLockTimer()
-    clearPrepareTimer()
-  }, [])
+  useEffect(
+    () => () => {
+      clearTimer()
+      clearPlaySoundTimers()
+      clearComboTimer()
+      clearConfirmLockTimer()
+      clearPrepareTimer()
+    },
+    [],
+  )
 
   const audio = activeSound()
   const audioRef = useRef(audio)
@@ -741,9 +746,7 @@ export function useHomeRunDerby({
     // 사이에 틱 머리가 지났을 때 한 틱 늦었다
     isHitByPitchRef.current = call.judgment === 4
     armPlayEnd(
-      batted === null
-        ? passedTick + BATTER_PITCH_RESULT_ENTRY_TICKS + derbyNoContactWaitFramesOf(call.judgment)
-        : passedTick + batted.endTicks,
+      batted === null ? passedTick + BATTER_PITCH_RESULT_ENTRY_TICKS + derbyNoContactWaitFramesOf(call.judgment) : passedTick + batted.endTicks,
     )
   }, [])
 
@@ -759,10 +762,7 @@ export function useHomeRunDerby({
     const elapsed = gameSceneNow() - startedAt
     for (const { tick, soundId } of soundTicks) {
       playSoundTimersRef.current.push(
-        setGameSceneTimeout(
-          () => playSoundIds(audioRef.current, [soundId]),
-          Math.max(0, tick * millisecondsPerFrame() - elapsed),
-        ),
+        setGameSceneTimeout(() => playSoundIds(audioRef.current, [soundId]), Math.max(0, tick * millisecondsPerFrame() - elapsed)),
       )
     }
   }
@@ -782,11 +782,7 @@ export function useHomeRunDerby({
    * 화면 칸(`run`)은 판 끝 `armPlayEnd` 에서 맞춘다.
    */
   const nextSceneStateRef = useRef<number>(0xf)
-  const applyPlayResult = (
-    before: DerbyRun,
-    batted: DerbyBattedBall | null,
-    zoneHit: boolean,
-  ) => {
+  const applyPlayResult = (before: DerbyRun, batted: DerbyBattedBall | null, zoneHit: boolean) => {
     const isHomeRun = batted?.isHomeRun ?? false
     const next = applyDerbyPitch(before, {
       isHomeRun,
@@ -819,8 +815,10 @@ export function useHomeRunDerby({
       }
       // 52a00~52a16 — 판(0x17) 끝, 0x35108 · 0xae3e8 앞에서 누적 비거리 st+0x34 > 1999 면 히든 39. 누적은 판 안 0xa600c 가
       // 이미 더했다(웹은 판 시작에 셈해 둔 `runRef`). 맞지 않은 공(0x12)은 이 갈래를 안 지난다
-      const isHiddenShown = playRef.current !== null && runRef.current.totalDistance > DERBY_DISTANCE_HIDDEN_THRESHOLD
-        && onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID, () => {
+      const isHiddenShown =
+        playRef.current !== null &&
+        runRef.current.totalDistance > DERBY_DISTANCE_HIDDEN_THRESHOLD &&
+        onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID, () => {
           leavePlay()
           finishPitch()
         }) === true
@@ -849,10 +847,7 @@ export function useHomeRunDerby({
       if (isHitByPitchRef.current) {
         isHitByPitchRef.current = false
         const scene = randomRef.current
-        if (
-          scene !== undefined &&
-          rollsIntoBenchClearing({ isHitByPitch: true, isHomeRunDerby: false, burstInProgress: false }, scene)
-        ) {
+        if (scene !== undefined && rollsIntoBenchClearing({ isHitByPitch: true, isHomeRunDerby: false, burstInProgress: false }, scene)) {
           // 진입 0x3a5f0 — 공격 9명 굴림 45 번 (`rollBenchClearingEntry`). 꼬리 0x3ab4a~ 의 수비 CPU 투구 수 +10 · 평판 0xa755c 는
           // 더비에 보이는 곳이 없다(체력% 0xaebb0 은 모드 7 이면 늘 100 · 기록은 a780a 가 막는다)
           setBenchClearingEntryRolls(rollBenchClearingEntry(scene))
@@ -923,11 +918,7 @@ export function useHomeRunDerby({
     showPlay(skipped, field)
     // 두 번 더할 갈래가 키 뒤였으면 비거리가 달라진다 — 판 앞 진행에서 다시 셈한다(원본도 0xae3e8 은 판 끝에서 돈다).
     // 이벤트 존(경기+0x3f — 0xae3e8 의 +200G)이 키 뒤 그림에서 놓일 차례였으면 그것도 빠진다
-    if (
-      skipped.distance !== play.batted.distance ||
-      skipped.displayDistance !== play.batted.displayDistance ||
-      zoneHit !== play.isEventZoneHit
-    ) {
+    if (skipped.distance !== play.batted.distance || skipped.displayDistance !== play.batted.displayDistance || zoneHit !== play.isEventZoneHit) {
       applyPlayResult(play.runBefore, skipped, zoneHit)
     }
     if (zoneHit !== play.isEventZoneHit) {

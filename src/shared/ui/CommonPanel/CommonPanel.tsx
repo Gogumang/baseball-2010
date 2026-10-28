@@ -59,19 +59,18 @@ interface CommonPanelProps extends CommonPanelOptions {
  * **공용 판 `0x55e60`** — 원본 선·칠 목록(`commonPanelPaintsOf`) 그대로 그린다.
  * 띠 · 제목 탭 · 어둡게는 부르는 자리의 인자(위 띠 [sp+0x84] · 아래 띠 [sp+0x88] · 제목 탭 [sp+0x8c] · 어둡게 [sp+0x90])를 그대로 넘긴다.
  */
-export function CommonPanel({
-  x, y, width, height, topBand = 0, bottomBand = 0, titleTab = false, dim = false, testId,
-}: CommonPanelProps) {
-  const paints = useMemo(
-    () => commonPanelPaintsOf({ width, height, topBand, bottomBand, titleTab }),
-    [width, height, topBand, bottomBand, titleTab],
-  )
+export function CommonPanel({ x, y, width, height, topBand = 0, bottomBand = 0, titleTab = false, dim = false, testId }: CommonPanelProps) {
+  const paints = useMemo(() => commonPanelPaintsOf({ width, height, topBand, bottomBand, titleTab }), [width, height, topBand, bottomBand, titleTab])
   const panel = <PaintedRects x={x} y={y} width={width} height={height} paints={paints} testId={testId ?? '공용판'} />
   if (!dim) return panel
   return (
     <>
-      <div className={styles.paint} data-testid={`${testId ?? '공용판'}-어둡게`} aria-hidden
-        style={{ left: 0, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
+      <div
+        className={styles.paint}
+        data-testid={`${testId ?? '공용판'}-어둡게`}
+        aria-hidden
+        style={{ left: 0, top: 0, width: SCREEN_WIDTH, height: SCREEN_HEIGHT, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }}
+      />
       {panel}
     </>
   )

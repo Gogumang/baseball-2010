@@ -1,14 +1,42 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import {
-  GameIncomeScreen, NextGameScreen, PlayerRecruitScreen,
-  SeasonEndingScreen, SeasonInfoScreen, SeasonItemMenuScreen, SeasonManagementScreen, SeasonChainFrameScreen,
-  SeasonOutingScreen, SeasonSummaryScreen, SeasonTeamMenuScreen,
-  SeasonTrainingScreen, StadiumShopScreen, INITIAL_STADIUM_PREVIEW_SCENE, TradeScreen, CoachHireScreen,
-  SeasonMatchInfoScreen, seasonMatchInfoLines, DayResultBoardScreen,
-  SeasonPlayerPickScreen, SeasonPlayerCardScreen, seasonCardAbilitiesOf, seasonPlayerDetailViewOf, seasonCardInfoOf,
-  SeasonTeamInfoScreen, seasonTeamInfoRowsOf, seasonNameInfoRowsOf, FRESH_SEASON_INFO_RECORD, SeasonOwnedItemsScreen, SeasonRecordPickPopup, SeasonRecordRankScreen,
-  SeasonEquipmentScreen, SeasonItemShopScreen, SeasonStaminaPickScreen, SeasonEventUnderlay, SeasonEventEndFrame,
+  GameIncomeScreen,
+  NextGameScreen,
+  PlayerRecruitScreen,
+  SeasonEndingScreen,
+  SeasonInfoScreen,
+  SeasonItemMenuScreen,
+  SeasonManagementScreen,
+  SeasonChainFrameScreen,
+  SeasonOutingScreen,
+  SeasonSummaryScreen,
+  SeasonTeamMenuScreen,
+  SeasonTrainingScreen,
+  StadiumShopScreen,
+  INITIAL_STADIUM_PREVIEW_SCENE,
+  TradeScreen,
+  CoachHireScreen,
+  SeasonMatchInfoScreen,
+  seasonMatchInfoLines,
+  DayResultBoardScreen,
+  SeasonPlayerPickScreen,
+  SeasonPlayerCardScreen,
+  seasonCardAbilitiesOf,
+  seasonPlayerDetailViewOf,
+  seasonCardInfoOf,
+  SeasonTeamInfoScreen,
+  seasonTeamInfoRowsOf,
+  seasonNameInfoRowsOf,
+  FRESH_SEASON_INFO_RECORD,
+  SeasonOwnedItemsScreen,
+  SeasonRecordPickPopup,
+  SeasonRecordRankScreen,
+  SeasonEquipmentScreen,
+  SeasonItemShopScreen,
+  SeasonStaminaPickScreen,
+  SeasonEventUnderlay,
+  SeasonEventEndFrame,
   SeasonScreenFade,
 } from '@/pages/season'
 import { seasonPlayerEquipmentOf } from '@/entities/season-mode/model/seasonPlayerRecord'
@@ -22,9 +50,7 @@ import { EntryEditorScreen } from '@/widgets/entry-editor'
 import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
 import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 import { TEAMS } from '@/shared/config/original/teams'
-import {
-  DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
-} from '@/pages/general-mode/lib/generalModeSetup'
+import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import { MatchSettingsWindow } from '@/pages/match-settings'
 import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { SeasonTeamSelectScreen } from '@/pages/season/ui/SeasonTeamSelectScreen'
@@ -43,23 +69,28 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { seasonRewardNoticeContextOf } from '@/entities/story/model/rewardNotice'
 import type { useGameSettings } from '@/app/model/useGameSettings'
 import {
-  seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf, seasonTeamRankOf,
+  seasonGoalInputOf,
+  seasonGoalWindowNumbersFor,
+  seasonLeagueRecordsOf,
+  seasonPostseasonRankOf,
+  seasonTeamRankOf,
 } from '@/app/model/useSeasonSession'
 import type { SeasonSession } from '@/app/model/useSeasonSession'
 import { seasonStadiumOf } from '@/entities/season-mode/model/stadiumItems'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import {
-  EMPTY_COLLECTION, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS,
-  hallOfFameEquipmentNibblesOf, hallOfFameRecordIdOf,
+  EMPTY_COLLECTION,
+  HALL_OF_FAME_MAX_BATTERS,
+  HALL_OF_FAME_MAX_PITCHERS,
+  hallOfFameEquipmentNibblesOf,
+  hallOfFameRecordIdOf,
 } from '@/entities/collection/model/collection'
 import { HallOfFameScreen } from '@/pages/special/ui/SpecialScreen'
 import type { HallOfFameNariPlayer } from '@/pages/special/ui/SpecialScreen'
 import type { Collection, HallOfFameSide } from '@/entities/collection/model/collection'
 import type { RecruitCandidate, RecruitListInput } from '@/pages/season'
 import { isHallOfFameRecord, nariRecruitPlayerOf, slotOf } from '@/entities/season-mode/model/playerRecruit'
-import {
-  NARI_EQUIP_REFUSAL_TEXT_ID, PLAYER_PICK_PURPOSE, playerPickCancelTarget, refusesEquipment,
-} from '@/entities/season-mode/model/playerPick'
+import { NARI_EQUIP_REFUSAL_TEXT_ID, PLAYER_PICK_PURPOSE, playerPickCancelTarget, refusesEquipment } from '@/entities/season-mode/model/playerPick'
 import type { PlayerPickPurpose } from '@/entities/season-mode/model/playerPick'
 import { seasonPlayerRecordOf } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
@@ -133,7 +164,11 @@ interface SeasonRouteProps {
  * (0xca 에서 0xc9 로 오는 다른 길은 없다: 취소는 장면을 나간다).
  */
 const CENTER_SLIDE_FROM: readonly number[] = [
-  1, SEASON_SCENE_STATE.이벤트재생, SEASON_SCENE_STATE.진입분기, SEASON_SCENE_STATE.엔딩, SEASON_SCENE_STATE.경기뒤마무리,
+  1,
+  SEASON_SCENE_STATE.이벤트재생,
+  SEASON_SCENE_STATE.진입분기,
+  SEASON_SCENE_STATE.엔딩,
+  SEASON_SCENE_STATE.경기뒤마무리,
   SEASON_SCENE_STATE.팀고르기,
 ]
 
@@ -143,10 +178,7 @@ function withEntryCells(cells: SeasonEntryCellSource | undefined): { readonly ce
   return cells === undefined ? {} : { cells }
 }
 
-function nariRecruitOf(
-  record: SeasonEntryBatterRecord | SeasonEntryPitcherRecord | null | undefined,
-  isPitcher: boolean,
-): RecruitCandidate | null {
+function nariRecruitOf(record: SeasonEntryBatterRecord | SeasonEntryPitcherRecord | null | undefined, isPitcher: boolean): RecruitCandidate | null {
   return record === null || record === undefined ? null : { name: record.name, player: nariRecruitPlayerOf(record, isPitcher) }
 }
 
@@ -167,18 +199,22 @@ function hallOfFameRecruitsOf(hallOfFame: SeasonRouteProps['hallOfFame']): Pick<
   if (hallOfFame === undefined) return { hallOfFamePitchers: [], hallOfFameBatters: [] }
   const pitchers = Array.from({ length: HALL_OF_FAME_MAX_PITCHERS }, (_, slot): RecruitCandidate | null => {
     const famer = hallOfFame.hallOfFamePitchers.find((candidate) => candidate.slot === slot)
-    return famer === undefined ? null : {
-      name: famer.name,
-      player: { id: hallOfFameRecordIdOf('투수', slot), kindByte: HALL_OF_FAME_PITCHER_KIND, fieldPosition: 0, stamina: 0 },
-    }
+    return famer === undefined
+      ? null
+      : {
+          name: famer.name,
+          player: { id: hallOfFameRecordIdOf('투수', slot), kindByte: HALL_OF_FAME_PITCHER_KIND, fieldPosition: 0, stamina: 0 },
+        }
   })
   const batters = Array.from({ length: HALL_OF_FAME_MAX_BATTERS }, (_, slot): RecruitCandidate | null => {
     // 옛 저장은 칸 번호가 없어 목록 순서가 칸이다 (`normalizeCollection` 과 같다)
     const famer = hallOfFame.hallOfFame.find((candidate, index) => (candidate.slot ?? index) === slot)
-    return famer === undefined ? null : {
-      name: famer.name,
-      player: { id: hallOfFameRecordIdOf('타자', slot), kindByte: HALL_OF_FAME_BATTER_KIND, fieldPosition: 0, stamina: 0 },
-    }
+    return famer === undefined
+      ? null
+      : {
+          name: famer.name,
+          player: { id: hallOfFameRecordIdOf('타자', slot), kindByte: HALL_OF_FAME_BATTER_KIND, fieldPosition: 0, stamina: 0 },
+        }
   })
   return { hallOfFamePitchers: pitchers, hallOfFameBatters: batters }
 }
@@ -206,7 +242,16 @@ export function SeasonRoute(props: SeasonRouteProps) {
  * 시즌 상태는 모두 갈래가 있다 — 갈래가 기다리는 재료가 아직 없는 틀만 아무것도 안 그린다(맨 끝).
  */
 function SeasonScreens({
-  session, random, gameSettings, onExit, aceSelect, hallOfFame, nari, nariRecords, onHallOfFameEquipment, onHallOfFameRecruit,
+  session,
+  random,
+  gameSettings,
+  onExit,
+  aceSelect,
+  hallOfFame,
+  nari,
+  nariRecords,
+  onHallOfFameEquipment,
+  onHallOfFameRecruit,
 }: SeasonRouteProps) {
   const { state, scene, league, roster, playerStats, series, cup, gameOptions, notice, actions } = session
 
@@ -314,15 +359,21 @@ function SeasonScreens({
   // 취소는 관리 메뉴 취소와 같이 [0x140006c] = 5 로 메인 메뉴에 나간다 (0x8ec8)
   if (state === null || scene === SEASON_SCENE_STATE.팀고르기) {
     return (
-      <SeasonTeamSelectScreen openedHiddenIds={hallOfFame?.openedHiddenIds ?? []} gamePoint={session.gamePoints}
-        onChoose={actions.chooseTeam} onExit={() => onExit(5)}
+      <SeasonTeamSelectScreen
+        openedHiddenIds={hallOfFame?.openedHiddenIds ?? []}
+        gamePoint={session.gamePoints}
+        onChoose={actions.chooseTeam}
+        onExit={() => onExit(5)}
         // 0xc8 정보 칸 — SR 은 0xcc 초기화 전 버퍼(시즌 저장이 있으면 그 레코드, 없으면 막 만든 SR), 타입은 고른 팀 마스터 레코드,
         // 순위는 SR[1] = 고른 팀(b9ee)의 0xb7aa1(SR+0x80, 팀, 0) — 경기 수 0 이면 안 쓴다
-        nameInfoRowsOf={(teamId) => seasonNameInfoRowsOf({
-          record: state?.record ?? FRESH_SEASON_INFO_RECORD,
-          teamAbilities: TEAMS[teamId]?.values.slice(2) ?? [],
-          rank: state === null ? 0 : seasonTeamRankOf({ state, league, series }, teamId),
-        })} />
+        nameInfoRowsOf={(teamId) =>
+          seasonNameInfoRowsOf({
+            record: state?.record ?? FRESH_SEASON_INFO_RECORD,
+            teamAbilities: TEAMS[teamId]?.values.slice(2) ?? [],
+            rank: state === null ? 0 : seasonTeamRankOf({ state, league, series }, teamId),
+          })
+        }
+      />
     )
   }
 
@@ -332,7 +383,12 @@ function SeasonScreens({
   // 영입한 명전 선수의 기록(recordSource)도 세션 판정(392)과 같이 넘긴다 — 그 칸의 줄을 같은 열쇠로 센다
   const goalRecordOf = session.recordSource()
   const goalSource = {
-    state, league, roster, playerStats, series, ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
+    state,
+    league,
+    roster,
+    playerStats,
+    series,
+    ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
     // 레코드에 남은 마투수 — 목표 ④ 0xa3764 가 거르지 않고 센다 (U-105 r163)
     recordAces: session.myRecordAces,
   }
@@ -341,7 +397,11 @@ function SeasonScreens({
   const leagueRecordSourceOf = () => {
     const recordOf = session.recordSource()
     return {
-      league, myTeamId: state.record.teamId, roster, cpuRosterOf: session.cpuRosterOf, playerStats,
+      league,
+      myTeamId: state.record.teamId,
+      roster,
+      cpuRosterOf: session.cpuRosterOf,
+      playerStats,
       ...(recordOf === undefined ? {} : { recordOf }),
     }
   }
@@ -357,13 +417,21 @@ function SeasonScreens({
       if (eventEnd.isEnding) {
         // 앞 상태 [this+0x28] — 0xd1 지도면 지도, 0xc9 면 관리 6칸, 그 밖은 칸 없음. 연초 목표(내장 이벤트)는 0xc9 → 0xd4 → 0xd3 이라
         // 앞 상태가 0xd4 다(웹은 0xd4 를 상태로 안 두고 관리 메뉴에서 곧장 튼다)
-        const kind = previousScene === SEASON_SCENE_STATE.외출지도
-          ? '지도'
-          : previousScene === SEASON_SCENE_STATE.관리메뉴 && playback.eventId !== YEAR_GOAL_EVENT_ID ? '관리메뉴' : '칸없음'
+        const kind =
+          previousScene === SEASON_SCENE_STATE.외출지도
+            ? '지도'
+            : previousScene === SEASON_SCENE_STATE.관리메뉴 && playback.eventId !== YEAR_GOAL_EVENT_ID
+              ? '관리메뉴'
+              : '칸없음'
         return (
           <RawScreen>
-            <SeasonEventEndFrame record={state.record} teamMorale={session.statusBoardMorale} gamePoint={session.gamePoints}
-              kind={kind} cursor={session.menuCursors.management} />
+            <SeasonEventEndFrame
+              record={state.record}
+              teamMorale={session.statusBoardMorale}
+              gamePoint={session.gamePoints}
+              kind={kind}
+              cursor={session.menuCursors.management}
+            />
           </RawScreen>
         )
       }
@@ -413,29 +481,30 @@ function SeasonScreens({
     const request = session.tradeRequest
     return (
       <>
-      <SeasonManagementScreen
-        state={state}
-        // 0xec10 — StrMODE[203] "[%s] 팀에서 트레이드 요청이 왔습니다 확인 하시겠습니까?", %s = 팀 이름([this+0x158])
-        alert={session.isTradeRequestAlertOpen
-          ? { text: fillModeText(ORIGINAL_MODE_TEXT[203] ?? '', TEAMS[request.opponentTeamId]?.name ?? ''),
-            onAnswer: actions.answerTradeRequest }
-          : null}
-        // 메뉴 객체 this+0x70 의 커서 — 장면이 사는 동안 이어진다 (요청 "예" 는 칸 1 로 옮긴다)
-        cursor={session.menuCursors.management}
-        onCursorChange={(index) => actions.moveMenuCursor('management', index)}
-        onSelect={(item, target) => {
-          // 관리 메뉴 칸 5 → 0xd8 다음경기 (점프표 0xcbe40). 경기는 그 화면의 확인에서 시작한다
-          if (item === '다음경기') return actions.openNextGame()
-          actions.goto(target)
-        }}
-        onConfirmKey={actions.pressManagementConfirm}
-        // 관리 메뉴 키 0x8f30 의 취소(−16) 8f5a~8f6e: 0x375d · [0x140006c] = 5 · 장면 0x103 — 게임시작 목록으로 바로 연다
-        onExit={() => onExit(5)}
-        gamePoint={session.gamePoints}
-        centerSlidesIn={previousScene === null || CENTER_SLIDE_FROM.includes(previousScene)}
-      />
-      {/* 엔딩을 넘긴 0x8bd8 8d1e~8d2c 의 효과기 종류 2(검정에서 밝아짐) — 0xc9 위에서 아홉 틀, 그동안 키가 안 먹는다 */}
-      {isEndingFadeIn && <SeasonScreenFade kind="검게어두워짐" onEnd={() => setEndingFadeIn(false)} />}
+        <SeasonManagementScreen
+          state={state}
+          // 0xec10 — StrMODE[203] "[%s] 팀에서 트레이드 요청이 왔습니다 확인 하시겠습니까?", %s = 팀 이름([this+0x158])
+          alert={
+            session.isTradeRequestAlertOpen
+              ? { text: fillModeText(ORIGINAL_MODE_TEXT[203] ?? '', TEAMS[request.opponentTeamId]?.name ?? ''), onAnswer: actions.answerTradeRequest }
+              : null
+          }
+          // 메뉴 객체 this+0x70 의 커서 — 장면이 사는 동안 이어진다 (요청 "예" 는 칸 1 로 옮긴다)
+          cursor={session.menuCursors.management}
+          onCursorChange={(index) => actions.moveMenuCursor('management', index)}
+          onSelect={(item, target) => {
+            // 관리 메뉴 칸 5 → 0xd8 다음경기 (점프표 0xcbe40). 경기는 그 화면의 확인에서 시작한다
+            if (item === '다음경기') return actions.openNextGame()
+            actions.goto(target)
+          }}
+          onConfirmKey={actions.pressManagementConfirm}
+          // 관리 메뉴 키 0x8f30 의 취소(−16) 8f5a~8f6e: 0x375d · [0x140006c] = 5 · 장면 0x103 — 게임시작 목록으로 바로 연다
+          onExit={() => onExit(5)}
+          gamePoint={session.gamePoints}
+          centerSlidesIn={previousScene === null || CENTER_SLIDE_FROM.includes(previousScene)}
+        />
+        {/* 엔딩을 넘긴 0x8bd8 8d1e~8d2c 의 효과기 종류 2(검정에서 밝아짐) — 0xc9 위에서 아홉 틀, 그동안 키가 안 먹는다 */}
+        {isEndingFadeIn && <SeasonScreenFade kind="검게어두워짐" onEnd={() => setEndingFadeIn(false)} />}
       </>
     )
   }
@@ -469,9 +538,10 @@ function SeasonScreens({
       // 0xb6348: 마선수 비트(P[0xa]&0x40)면 아니다 · 투수(0xb6278)면 id − 0xb4 ≤ 0x18, 타자면 id − 0xc8 ≤ 8
       // (나리 0xfe 는 둘 다 아니다) — 적용 0x7d90 의 0x7ef4 가 이 함수를 그대로 부른다
       const isHallOfFamer = isHallOfFameRecord(player)
-      const equipment = player.equipment === undefined && isHallOfFamer && hallOfFame !== undefined
-        ? hallOfFameEquipmentNibblesOf(hallOfFame, side, player.id) ?? seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)
-        : seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)
+      const equipment =
+        player.equipment === undefined && isHallOfFamer && hallOfFame !== undefined
+          ? (hallOfFameEquipmentNibblesOf(hallOfFame, side, player.id) ?? seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher))
+          : seasonPlayerEquipmentOf(player, state.record.teamId, isPitcher)
       return (
         <SeasonEquipmentScreen
           record={state.record}
@@ -483,7 +553,10 @@ function SeasonScreens({
           gamePoint={session.gamePoints}
           onPurchase={(bought) => {
             actions.equipSeasonPlayer({
-              isPitcher, recordIndex: pick.cursor, money: bought.money, equipment: bought.equipment,
+              isPitcher,
+              recordIndex: pick.cursor,
+              money: bought.money,
+              equipment: bought.equipment,
               ...(bought.ownedEquipment === undefined ? {} : { ownedEquipment: bought.ownedEquipment }),
             })
             // 0x7ef4~0x7f12 — 명예 선수면 0x2328c(저장, 줄, ed+0x33f) 로 명전 기록에도
@@ -558,8 +631,9 @@ function SeasonScreens({
         // 시즌 레코드가 아니라 세션이 들고 있다. 안 넘기면 히든이 영영 안 열린다
         // 나리 명전 등록(0x1ca4c)이 연 전광판 17 은 기록연감의 전역 해금표에 든다. 그 표는 히든 팀을 팀 번호 10~14 로 들어
         // 관중석 13 · 14 와 번호가 겹치므로 거기서는 15 이상만 읽는다
-        isHiddenOpen={(unlockId) => session.openedStadiumIds.includes(unlockId)
-          || (unlockId > LAST_HIDDEN_TEAM_ID && (hallOfFame?.openedHiddenIds ?? []).includes(unlockId))}
+        isHiddenOpen={(unlockId) =>
+          session.openedStadiumIds.includes(unlockId) || (unlockId > LAST_HIDDEN_TEAM_ID && (hallOfFame?.openedHiddenIds ?? []).includes(unlockId))
+        }
         onUnlock={actions.openStadiumItems}
         onChange={actions.updateRecord}
         previewScene={stadiumPreviewScene}
@@ -608,10 +682,14 @@ function SeasonScreens({
         chosenPitcherCell={session.preGameAces.pitcher}
         openedAcePitcherIds={aceSelect?.openedAcePitcherIds ?? DEFAULT_OPENED_ACE_PITCHER_IDS}
         openedAceBatterIds={aceSelect?.openedAceBatterIds ?? DEFAULT_OPENED_ACE_BATTER_IDS}
-        {...(aceSelect === undefined ? {} : {
-          levels: aceSelect.levels, onOpenAce: aceSelect.onOpenAce, onLevelUp: aceSelect.onLevelUp,
-          ...(aceSelect.onAllAcesOpen === undefined ? {} : { onAllAcesOpen: aceSelect.onAllAcesOpen }),
-        })}
+        {...(aceSelect === undefined
+          ? {}
+          : {
+              levels: aceSelect.levels,
+              onOpenAce: aceSelect.onOpenAce,
+              onLevelUp: aceSelect.onLevelUp,
+              ...(aceSelect.onAllAcesOpen === undefined ? {} : { onAllAcesOpen: aceSelect.onAllAcesOpen }),
+            })}
         gamePoint={session.gamePoints}
         onSelect={actions.choosePreGameAce}
         onCancel={actions.cancelPreGameAce}
@@ -629,7 +707,10 @@ function SeasonScreens({
       <>
         <SeasonMatchInfoScreen
           lines={seasonMatchInfoLines({
-            league, series, cup, inPostseason: state.record.inPostseason,
+            league,
+            series,
+            cup,
+            inPostseason: state.record.inPostseason,
             myTeamId: options.ourTeamId,
             opponentTeamId: options.opponentTeamId,
             dayCounter: options.dayCounter ?? 0,
@@ -664,13 +745,11 @@ function SeasonScreens({
           }}
           isSettingsOpen={session.isMatchSettingsOpen}
           // 설정 창 0x6042c 는 화면 판 안, 머리띠 앞에 그린다 (0xb398)
-          settingsWindow={session.isMatchSettingsOpen && (
-            <MatchSettingsWindow
-              settings={session.matchSettings}
-              onConfirm={actions.applyMatchSettings}
-              onClose={actions.toggleMatchSettings}
-            />
-          )}
+          settingsWindow={
+            session.isMatchSettingsOpen && (
+              <MatchSettingsWindow settings={session.matchSettings} onConfirm={actions.applyMatchSettings} onClose={actions.toggleMatchSettings} />
+            )
+          }
         />
       </>
     )
@@ -723,9 +802,7 @@ function SeasonScreens({
         {...withEntryCells(session.entryCellSourceOf(state.record.teamId))}
         initialTab={pick.tab}
         gamePoint={session.gamePoints}
-        overlay={pickNotice === null ? undefined : (
-          <MessageBox text={pickNotice} buttons={['OK']} onAnswer={() => setPickNotice(null)} />
-        )}
+        overlay={pickNotice === null ? undefined : <MessageBox text={pickNotice} buttons={['OK']} onAnswer={() => setPickNotice(null)} />}
         onPick={(tab, index) => {
           setPlayerPick({ ...pick, tab, cursor: index })
           // 0xc3e8 확인 — 목적 2 → 카드 0xd9
@@ -878,9 +955,7 @@ function SeasonScreens({
       <RawScreen>
         <SeasonOutingMap selected={place} />
         <SeasonOutingPopup place={place} onFinished={() => actions.runOuting(place)} />
-        {resultText !== null && (
-          <MessageBox text={resultText} buttons={['확인']} onAnswer={actions.closeOutingResult} />
-        )}
+        {resultText !== null && <MessageBox text={resultText} buttons={['확인']} onAnswer={actions.closeOutingResult} />}
       </RawScreen>
     )
   }
@@ -948,9 +1023,7 @@ function SeasonScreens({
   if (scene === SEASON_SCENE_STATE.기록순위) {
     const category = rankingCategoriesOf(recordRank.side)[recordRank.page] ?? rankingCategoriesOf(recordRank.side)[0]
     // 순위 객체 0x9d789(…, 종류, 모드 2, 큰쪽 1, 고정문턱 0) — 열 팀 레코드를 훑는다. 규정 문턱은 SR+0xb2 경기 수
-    const entries = rankSeasonRecords(
-      seasonLeagueRecordsOf(leagueRecordSourceOf(), recordRank.side === '투수'), category.kind, state.record.games,
-    )
+    const entries = rankSeasonRecords(seasonLeagueRecordsOf(leagueRecordSourceOf(), recordRank.side === '투수'), category.kind, state.record.games)
     return (
       <SeasonRecordRankScreen
         side={recordRank.side}
@@ -971,18 +1044,20 @@ function SeasonScreens({
         state={state}
         gamePoint={session.gamePoints}
         isKeyEnabled={recordPick === null}
-        overlay={recordPick === null ? undefined : (
-          <SeasonRecordPickPopup
-            side={recordPick}
-            onToggle={() => setRecordPick((held) => (held === '타자' ? '투수' : '타자'))}
-            onConfirm={() => {
-              setRecordRank({ side: recordPick, page: 0 })
-              setRecordPick(null)
-              actions.goto(SEASON_SCENE_STATE.기록순위)
-            }}
-            onCancel={() => setRecordPick(null)}
-          />
-        )}
+        overlay={
+          recordPick === null ? undefined : (
+            <SeasonRecordPickPopup
+              side={recordPick}
+              onToggle={() => setRecordPick((held) => (held === '타자' ? '투수' : '타자'))}
+              onConfirm={() => {
+                setRecordRank({ side: recordPick, page: 0 })
+                setRecordPick(null)
+                actions.goto(SEASON_SCENE_STATE.기록순위)
+              }}
+              onCancel={() => setRecordPick(null)}
+            />
+          )
+        }
         // 메뉴 객체 this+0x74 의 커서 — 관리 메뉴에서 들어오면 0 (0x4d58), 하위 화면에서 돌아오면 남는다
         cursor={session.menuCursors.seasonInfo}
         onCursorChange={(index) => actions.moveMenuCursor('seasonInfo', index)}
@@ -1027,12 +1102,19 @@ function SeasonScreens({
   // (392 · 370 · 371 · 376 · 401~403)를 튼다. 세션이 들어온 틀에 곧장 0xd3 으로 넘기므로 한 틀만 그린다.
   // 시상 내용은 이벤트의 system 3 · 4 창, 결과 이벤트는 세션의 실행기 끝 갈래(0x8b04c · 0x8b370)가 맡는다
   if (
-    scene === SEASON_SCENE_STATE.포스트시즌시작 || scene === SEASON_SCENE_STATE.정규시즌순위
-    || scene === SEASON_SCENE_STATE.타자시상 || scene === SEASON_SCENE_STATE.투수시상 || scene === SEASON_SCENE_STATE.최우수선수
+    scene === SEASON_SCENE_STATE.포스트시즌시작 ||
+    scene === SEASON_SCENE_STATE.정규시즌순위 ||
+    scene === SEASON_SCENE_STATE.타자시상 ||
+    scene === SEASON_SCENE_STATE.투수시상 ||
+    scene === SEASON_SCENE_STATE.최우수선수
   ) {
     return (
-      <SeasonChainFrameScreen state={state} gamePoint={session.gamePoints} cursor={session.menuCursors.management}
-        showsCenterStage={scene !== SEASON_SCENE_STATE.포스트시즌시작} />
+      <SeasonChainFrameScreen
+        state={state}
+        gamePoint={session.gamePoints}
+        cursor={session.menuCursors.management}
+        showsCenterStage={scene !== SEASON_SCENE_STATE.포스트시즌시작}
+      />
     )
   }
 
@@ -1074,10 +1156,7 @@ function SeasonScreens({
 
   // 경기 뒤 마무리 0xf1 — 같은 날 다른 네 경기 결과판 (그림 0xb400, SR+0x1c0). 확인 키 0x49a4
   if (scene === SEASON_SCENE_STATE.경기뒤마무리) {
-    return (
-      <DayResultBoardScreen board={state.record.dayBoard} onConfirm={actions.confirmDayResults}
-        gamePoint={session.gamePoints} />
-    )
+    return <DayResultBoardScreen board={state.record.dayBoard} onConfirm={actions.confirmDayResults} gamePoint={session.gamePoints} />
   }
 
   if (scene === SEASON_SCENE_STATE.관중수입) {
@@ -1131,9 +1210,7 @@ function SeasonScreens({
         // 넣는 값이 대표팀 번호(10 대한민국 ~ 13 미국)인데, 비교 상대인 `SR[1]`(내 구단)은
         // 시즌모드에서 0~9 뿐이라(히든 팀은 일반모드에서만 고른다 — J-1) 절대 같아지지 않는다.
         seasonStadium={
-          gameOptions.playerSide === PLAYER_SIDE_LAST_BAT && session.gameKind !== '국가대항전'
-            ? seasonStadiumOf(state.record)
-            : undefined
+          gameOptions.playerSide === PLAYER_SIDE_LAST_BAT && session.gameKind !== '국가대항전' ? seasonStadiumOf(state.record) : undefined
         }
         // 상태 0xe 소개 판 0x44944 의 시즌 줄 — 레코드 +0x20~ 의 웹 자리(리그 기록표)와, 이 경기 줄을 더할지:
         // 기록 게이트 0xa56dc 모드 2 갈래(0xa56fa)는 국가대항전·포스트시즌이면 거짓, 그 밖엔 마선수만 거짓(받는 쪽이 거른다)
@@ -1145,8 +1222,13 @@ function SeasonScreens({
   if (scene === SEASON_SCENE_STATE.다음경기) {
     // 0xd8 — 리그 순위표 한 장 (그림 0xae24 → 0x7f070). 확인은 경기로, 취소는 관리 메뉴에서 왔을 때만
     return (
-      <NextGameScreen league={league} onConfirm={actions.confirmNextGame} onCancel={actions.cancelNextGame}
-        isFromManagement={session.isNextGameFromMenu} gamePoint={session.gamePoints} />
+      <NextGameScreen
+        league={league}
+        onConfirm={actions.confirmNextGame}
+        onCancel={actions.cancelNextGame}
+        isFromManagement={session.isNextGameFromMenu}
+        gamePoint={session.gamePoints}
+      />
     )
   }
 
@@ -1154,4 +1236,3 @@ function SeasonScreens({
   // 틀뿐이라, 빈 그리기 칸처럼 아무것도 안 그린다 (예전 웹 안내 "이 화면은 아직 없습니다" 는 원본에 없다)
   return null
 }
-

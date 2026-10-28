@@ -12,8 +12,7 @@ afterEach(cleanup)
 
 const 띄우기 = (cup: NationalCup) => render(<NationalCupBracket cup={cup} onConfirm={vi.fn()} />)
 
-const 칸 = (container: HTMLElement) =>
-  [...container.querySelectorAll('span[data-team]')].map((node) => Number(node.getAttribute('data-team')))
+const 칸 = (container: HTMLElement) => [...container.querySelectorAll('span[data-team]')].map((node) => Number(node.getAttribute('data-team')))
 
 const 로고 = (name: string) => screen.getByAltText(name)
 

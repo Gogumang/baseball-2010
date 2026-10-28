@@ -31,26 +31,49 @@ export function RecordAlertPanel({ frame }: { readonly frame: RecordAlertFrame }
       <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
         <filter id={navyFilterId} colorInterpolationFilters="sRGB">
           {/* 흰 글자(R=G=B) → img_text 팔레트 3 두 색. 255 → 41·73·165, 239 → 16·36·107 이 되는 1차식 */}
-          <feColorMatrix type="matrix"
-            values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
+          <feColorMatrix type="matrix" values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
         </filter>
       </svg>
-      <RoundBox x={panel.x} y={panel.y} width={panel.width} height={panel.height} round={4} shine shineLength={0x41} shineStep={2}
-        fill="#335FCD" edge="#000000" testId="기록달성-칸" />
-      <FrameSprite folder={IMG_TEXT_FRAMES} frame={RECORD_ALERT_TITLE_FRAME} origins={textOrigins}
-        x={panel.title.x} y={panel.title.y} style={{ filter: `url(#${navyFilterId})` }} />
+      <RoundBox
+        x={panel.x}
+        y={panel.y}
+        width={panel.width}
+        height={panel.height}
+        round={4}
+        shine
+        shineLength={0x41}
+        shineStep={2}
+        fill="#335FCD"
+        edge="#000000"
+        testId="기록달성-칸"
+      />
+      <FrameSprite
+        folder={IMG_TEXT_FRAMES}
+        frame={RECORD_ALERT_TITLE_FRAME}
+        origins={textOrigins}
+        x={panel.title.x}
+        y={panel.title.y}
+        style={{ filter: `url(#${navyFilterId})` }}
+      />
       {frame.rows.map((row) => (
         <span key={row.slot} data-testid={`기록달성-줄-${row.slot}`} data-highlighted={row.isHighlighted}>
           <FrameSprite folder={GAME_UI_FRAMES} frame={RECORD_ALERT_ROW_FRAME} origins={gameUiOrigins} x={row.x} y={row.y} />
-          <span className={styles.text}
-            style={{ left: row.x + 4, top: row.y + 2, color: row.isHighlighted ? HIGHLIGHT_COLOR : TEXT_COLOR }}>
+          <span className={styles.text} style={{ left: row.x + 4, top: row.y + 2, color: row.isHighlighted ? HIGHLIGHT_COLOR : TEXT_COLOR }}>
             {row.text}
           </span>
         </span>
       ))}
       {panel.gamePoint !== null && (
-        <GamePointBadge testId="기록달성-G" value={panel.gamePoint.value} x={panel.gamePoint.x} y={panel.gamePoint.y}
-          width={0x2c} align={1} plus={false} plate />
+        <GamePointBadge
+          testId="기록달성-G"
+          value={panel.gamePoint.value}
+          x={panel.gamePoint.x}
+          y={panel.gamePoint.y}
+          width={0x2c}
+          align={1}
+          plus={false}
+          plate
+        />
       )}
     </div>
   )
@@ -82,7 +105,10 @@ export function RecordAlertScreenOverlay({ frame }: { readonly frame: RecordAler
  * 240×320 판(RawScreen) **안**에 얹는 알림 — 판이 이미 화면 배율을 먹었으므로 기둥(zoom)을 다시 씌우지 않는다.
  * 예전에는 판 안에서도 `RecordAlertScreenOverlay` 를 써서 배율 2 · 3 창에서 알림이 두 번 커졌다(배율 1 에서만 맞았다).
  */
-export function RecordAlertStageOverlay({ frame, isUnderMenu = false }: {
+export function RecordAlertStageOverlay({
+  frame,
+  isUnderMenu = false,
+}: {
   readonly frame: RecordAlertFrame
   /** 경기 중 메뉴(0x741a0)가 떠 있다 — 알림을 메뉴 층 아래로 (`styles.stageLayerUnderMenu`) */
   readonly isUnderMenu?: boolean

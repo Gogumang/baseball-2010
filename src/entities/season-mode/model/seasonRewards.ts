@@ -1,11 +1,5 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
-import {
-  MONEY_LIMIT,
-  MORALE_LIMIT,
-  POPULARITY_LIMIT,
-  REPUTATION_LIMIT,
-  clampTo,
-} from '@/entities/season-mode/model/seasonRecord'
+import { MONEY_LIMIT, MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 
@@ -93,11 +87,7 @@ export function applySeasonReward(record: SeasonRecord, reward: SeasonReward): S
  * (1f596~1f5a4) 사기는 리그 칸이 아니라 그날 상대국 칸 +2 에 쌓인다 — 그 칸은 하루 끝 0xb818c(b8216)의 `0x20648` 이 다음 상대로
  * 새로 덮는다. `isNationalCup` 이면 사기를 리그 사기에 안 얹는다(그 칸 값은 경기 진행 `opponentTeamMorale` 이 든다).
  */
-export function applySeasonBurstRewards(
-  state: SeasonState,
-  deltas: readonly BurstRewardDelta[],
-  isNationalCup = false,
-): SeasonState {
+export function applySeasonBurstRewards(state: SeasonState, deltas: readonly BurstRewardDelta[], isNationalCup = false): SeasonState {
   return deltas.reduce<SeasonState>((current, delta) => {
     const { record } = current
     switch (delta.name) {
@@ -203,11 +193,7 @@ const signedByteOf = (value: number) => ((value & 0xff) << 24) >> 24
  */
 export function opensSeasonAutobotBat(record: SeasonRecord, input: SeasonAutobotBatInput): boolean {
   if (input.globalOpenedHiddenIds.includes(SEASON_AUTOBOT_BAT_HIDDEN_ID)) return false
-  return (
-    signedByteOf(input.batterEditionFirsts) > 0
-    && signedByteOf(input.pitcherEditionFirsts) > 0
-    && signedByteOf(record.regularSeasonFirsts) > 0
-  )
+  return signedByteOf(input.batterEditionFirsts) > 0 && signedByteOf(input.pitcherEditionFirsts) > 0 && signedByteOf(record.regularSeasonFirsts) > 0
 }
 
 /** 10년차 엔딩 보너스 표 `0xcbc2e` (s8) × 1000 G — StrMODE[214] (J 4-8) */

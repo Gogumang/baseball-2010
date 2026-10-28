@@ -21,5 +21,6 @@ export interface OriginalBurstTable {
 export type OriginalBurstTableName = 'BATTER' | 'PITCHER' | 'SEASON'
 
 /** 돌발미션 표 (원본 Xls{BATTER,PITCHER,SEASON}_BURST + _TEXT — 40 · 44 · 56행) */
-export const ORIGINAL_BURST_TABLES: Readonly<Record<OriginalBurstTableName, OriginalBurstTable>> =
-  data as unknown as Readonly<Record<OriginalBurstTableName, OriginalBurstTable>>
+export const ORIGINAL_BURST_TABLES: Readonly<Record<OriginalBurstTableName, OriginalBurstTable>> = data as unknown as Readonly<
+  Record<OriginalBurstTableName, OriginalBurstTable>
+>

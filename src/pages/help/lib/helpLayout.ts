@@ -40,23 +40,38 @@ export interface RankingMenuItem {
 
 export const RANKING_MENU_ITEMS: readonly RankingMenuItem[] = [
   {
-    id: '일반모드', labelFrame: 7, labelWidth: 97, labelHeight: 27,
+    id: '일반모드',
+    labelFrame: 7,
+    labelWidth: 97,
+    labelHeight: 27,
     description: ORIGINAL_MAIN_MENU_TEXT[24] ?? '', // StrMAINMENU[24]
   },
   {
-    id: '나만의리그', labelFrame: 8, labelWidth: 115, labelHeight: 27,
+    id: '나만의리그',
+    labelFrame: 8,
+    labelWidth: 115,
+    labelHeight: 27,
     description: ORIGINAL_MAIN_MENU_TEXT[25] ?? '', // [25]
   },
   {
-    id: '시즌모드', labelFrame: 9, labelWidth: 98, labelHeight: 27,
+    id: '시즌모드',
+    labelFrame: 9,
+    labelWidth: 98,
+    labelHeight: 27,
     description: ORIGINAL_MAIN_MENU_TEXT[26] ?? '', // [26]
   },
   {
-    id: '대전모드', labelFrame: 10, labelWidth: 96, labelHeight: 27,
+    id: '대전모드',
+    labelFrame: 10,
+    labelWidth: 96,
+    labelHeight: 27,
     description: ORIGINAL_MAIN_MENU_TEXT[27] ?? '', // [27]
   },
   {
-    id: '홈런더비', labelFrame: 13, labelWidth: 95, labelHeight: 27,
+    id: '홈런더비',
+    labelFrame: 13,
+    labelWidth: 95,
+    labelHeight: 27,
     // 원본 글은 "훈련모드의…" 다 (칸은 홈런더비인데 글이 어긋난 것 — 원본 그대로 옮긴다)
     description: ORIGINAL_MAIN_MENU_TEXT[28] ?? '', // [28]
   },
@@ -113,14 +128,14 @@ export interface HelpPagerNumber {
  * 마지막 글자 오른쪽 끝이 x + 1 이다. 정렬 1 은 x 에서 시작한다.
  */
 export function helpPagerOf(page: number, pageCount: number) {
-  const glyphsOf = (value: number) => [...String(Math.max(0, Math.trunc(value)))].map((digit) => ({
-    frame: Number(digit),
-    width: digit === '1' ? HELP_PAGER_ONE_WIDTH : HELP_PAGER_DIGIT_WIDTH,
-  }))
+  const glyphsOf = (value: number) =>
+    [...String(Math.max(0, Math.trunc(value)))].map((digit) => ({
+      frame: Number(digit),
+      width: digit === '1' ? HELP_PAGER_ONE_WIDTH : HELP_PAGER_DIGIT_WIDTH,
+    }))
   const gap = 1
   /** SpriteNumber 의 폭 = Σ(폭 + 1) 이므로, 원본 폭(첫 두 글자는 간격 없음)과 맞추려면 오른쪽 끝을 min(자리수, 2) 만큼 민다 */
-  const rightOf = (left: number, glyphs: readonly { width: number }[]) =>
-    left + glyphs.reduce((sum, glyph) => sum + glyph.width + gap, 0)
+  const rightOf = (left: number, glyphs: readonly { width: number }[]) => left + glyphs.reduce((sum, glyph) => sum + glyph.width + gap, 0)
   const pageGlyphs = glyphsOf(page + 1)
   const measured = pageGlyphs.reduce((sum, glyph, index) => sum + glyph.width + (index > 1 ? gap : 0), 0)
   const pageLeft = HELP_VIEWER_PAGER.pageX - measured
@@ -132,7 +147,6 @@ export function helpPagerOf(page: number, pageCount: number) {
     y: HELP_VIEWER_PAGER.y,
   }
 }
-
 
 /**
  * 뷰어 그리기 `0x58fd4`(→ 0x639a5 · 0x58d10) 의 배치 — x0 = W/2 − 0x60 = 24, y0 = H/2 − 0x6a = 54 (확정).

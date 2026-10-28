@@ -29,7 +29,10 @@ afterEach(() => {
 const 원본줄 = ORIGINAL_BURST_TABLES.BATTER.lines[0] as readonly OriginalBurstLine[]
 
 /** 첫 그림은 갱신 1 뒤다 — 갱신 9 에 열리므로 8 틀을 더 돌린다 */
-const 다열기 = () => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 8) })
+const 다열기 = () =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * 8)
+  })
 
 const 띄우기 = (props: Partial<Parameters<typeof BurstMissionWindow>[0]> = {}) => {
   const onClose = props.onClose ?? vi.fn()
@@ -83,7 +86,9 @@ describe('돌발미션 창 — 오르기 · 흔들기 · 글', () => {
     expect(burstObjectTicks.value).toBe(18)
     const mark = dialog.querySelector('img[src="./sprites/game_ui/052.png"]') as HTMLImageElement
     // 18 % 8 = 2 ≤ 3 → H − 8 (창마다 0 이면 9 → 같은 줄이라 한 그림 더 굴려 갈린다)
-    act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 2) })
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 2)
+    })
     // 20 % 8 = 4 > 3 → H − 10 (창마다 0 이면 11 % 8 = 3 → H − 8)
     expect(mark.style.top).toBe('310px')
   })
@@ -117,13 +122,16 @@ describe('돌발미션 창 닫기', () => {
   })
 
   it('성공을 닫으면 보상 글을 공용 창에 띄운다 (0x8e5b8 → 0x74ef5)', () => {
-    const row = 행({ successRewards: [{ kind: 2, amount: 5 }, { kind: 4, amount: 3 }] })
+    const row = 행({
+      successRewards: [
+        { kind: 2, amount: 5 },
+        { kind: 4, amount: 3 },
+      ],
+    })
     const { push } = 띄우기({ judgement: '성공', row })
     다열기()
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(push).toHaveBeenCalledWith(
-      '!C!cffffff[!cffff00돌발미션 성공!!!cffffff]!N!C!cffffff인기도 +5!N!C!cffffff소지금 +300',
-    )
+    expect(push).toHaveBeenCalledWith('!C!cffffff[!cffff00돌발미션 성공!!!cffffff]!N!C!cffffff인기도 +5!N!C!cffffff소지금 +300')
   })
 
   it('제안 · 무효는 공용 창이 없다', () => {

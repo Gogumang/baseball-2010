@@ -114,9 +114,7 @@ function gameBatterLineOf(progress: TeamGameProgress, teamId: number, entry: Tea
   return progress.leaguePlateAppearances.reduce<LeagueBatterLine>((line, appearance) => {
     const isSame =
       entry.rosterSlot !== NO_ROSTER_SLOT
-        ? appearance.recordId === undefined
-          && appearance.teamId === tableTeam
-          && appearance.battingOrderIndex === entry.rosterSlot
+        ? appearance.recordId === undefined && appearance.teamId === tableTeam && appearance.battingOrderIndex === entry.rosterSlot
         : entry.recordId !== undefined && appearance.recordId === entry.recordId
     if (!isSame) return line
     return {
@@ -230,9 +228,7 @@ export function teamMatchupCardsOf(progress: TeamGameProgress, records?: TeamMat
   const battingTeam = ourBatting ? options.ourTeamId : options.opponentTeamId
   const fieldingTeam = ourBatting ? options.opponentTeamId : options.ourTeamId
   const batterEntry = ourBatting ? currentBatterEntry(progress) : progress.opponentEntry[progress.opponentOrderIndex]
-  const pitcherEntry = ourBatting
-    ? progress.opponentPitcherEntry[progress.opponentPitcherIndex]
-    : progress.ourPitcherEntry[progress.ourPitcherIndex]
+  const pitcherEntry = ourBatting ? progress.opponentPitcherEntry[progress.opponentPitcherIndex] : progress.ourPitcherEntry[progress.ourPitcherIndex]
 
   const batterHand = batterEntry === undefined ? 0 : teamBatterHandOf(battingTeam, batterEntry)
 
@@ -347,11 +343,9 @@ export function opponentBatterRecordsOf(
   entry: readonly TeamEntryBatter[],
 ): { readonly profile: number; readonly equipment?: readonly number[] }[] {
   return entry.flatMap((batter) =>
-    batter.aceIndex >= 0 || batter.equipment === undefined
-      ? []
-      : [{ profile: batterProfileOf(teamId, batter) ?? 0, equipment: batter.equipment }])
+    batter.aceIndex >= 0 || batter.equipment === undefined ? [] : [{ profile: batterProfileOf(teamId, batter) ?? 0, equipment: batter.equipment }],
+  )
 }
-
 
 /**
  * **곧 설 선수들의 그림 생김새** (`StageWarmCast`) — 공격 팀 명단 전부(타순 다음 · 벤치 대타)와 수비 팀 투수 명단 전부(교체 투수).
@@ -370,16 +364,19 @@ export function teamStageWarmCastOf(progress: TeamGameProgress, isOursBatting: b
     if (entry.aceIndex >= 0) return []
     const profile = batterProfileOf(battingTeam, entry) ?? 0
     const [hit = 0, power = 0, , run = 0] = entry.equipment ?? []
-    return [{
-      bodyType: bodyTypeOf(profile >> 4),
-      skinIndex: (profile >> 2) & 3,
-      teamIndex: battingTeam,
-      equipment: entry.equipment === undefined ? NO_EQUIPMENT : batterEquipmentOf({ hit, power, run }),
-    }]
+    return [
+      {
+        bodyType: bodyTypeOf(profile >> 4),
+        skinIndex: (profile >> 2) & 3,
+        teamIndex: battingTeam,
+        equipment: entry.equipment === undefined ? NO_EQUIPMENT : batterEquipmentOf({ hit, power, run }),
+      },
+    ]
   })
   const pitcherLooks = pitchers.flatMap((entry): StagePitcherLook[] =>
     entry.aceIndex >= 0
       ? []
-      : [{ skinIndex: teamPitcherSkinIndexOf(fieldingTeam, entry), teamIndex: fieldingTeam, equipment: pitcherEquipmentOfNibbles(entry.equipment) }])
+      : [{ skinIndex: teamPitcherSkinIndexOf(fieldingTeam, entry), teamIndex: fieldingTeam, equipment: pitcherEquipmentOfNibbles(entry.equipment) }],
+  )
   return stageWarmCastOf(batterLooks, pitcherLooks)
 }

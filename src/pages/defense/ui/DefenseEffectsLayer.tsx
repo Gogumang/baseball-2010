@@ -17,8 +17,12 @@ import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 export function DefenseDistanceBoard({ value }: { readonly value: number }) {
   return (
     <div className={styles.overlay} data-testid="수비-비거리판" data-value={value}>
-      <img className={styles.runScoreDigit} style={{ left: DEFENSE_DISTANCE_BOARD.x, top: DEFENSE_DISTANCE_BOARD.y }}
-        src={DEFENSE_DISTANCE_BOARD.src} alt="" />
+      <img
+        className={styles.runScoreDigit}
+        style={{ left: DEFENSE_DISTANCE_BOARD.x, top: DEFENSE_DISTANCE_BOARD.y }}
+        src={DEFENSE_DISTANCE_BOARD.src}
+        alt=""
+      />
       {defenseDistanceGlyphsOf(value).map((glyph, index) => (
         <img key={index} className={styles.runScoreDigit} style={{ left: glyph.left, top: glyph.top }} src={glyph.src} alt="" />
       ))}
@@ -35,10 +39,7 @@ export function DefenseHomeRunText({ frame }: { readonly frame: HomeRunTextFrame
     context.clearRect(0, 0, styles.SCREEN_WIDTH, styles.SCREEN_HEIGHT)
     drawHomeRunTextFrame(context, frame)
   }, [frame])
-  return (
-    <canvas ref={canvasRef} className={styles.overlay} width={styles.SCREEN_WIDTH} height={styles.SCREEN_HEIGHT}
-      data-testid="수비-홈런글자" />
-  )
+  return <canvas ref={canvasRef} className={styles.overlay} width={styles.SCREEN_WIDTH} height={styles.SCREEN_HEIGHT} data-testid="수비-홈런글자" />
 }
 
 /**

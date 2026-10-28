@@ -113,11 +113,7 @@ const RUNNER_PLAY_PLACEHOLDER: AtBatOutcome = { kind: '아웃', detail: '땅볼�
  */
 export const INNING_RUN_SLOTS = 9
 
-export function addInningRuns(
-  runs: readonly number[],
-  inning: number,
-  scored: number,
-): readonly number[] {
+export function addInningRuns(runs: readonly number[], inning: number, scored: number): readonly number[] {
   if (scored === 0) return runs
   const slot = (inning - 1) % INNING_RUN_SLOTS
   const next = [...runs]

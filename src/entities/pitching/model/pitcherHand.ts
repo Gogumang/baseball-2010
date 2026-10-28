@@ -30,9 +30,6 @@ export function pitcherHandOf(form: number, isAce: boolean): number {
  * 마투수인가(비트6)는 공에 없어 +0x18 이 5~9 인가로 본다 — 원본 레코드에서 +0x18 이 5~9 인 것은
  * 마선수뿐이다(마투수 표 XlsACE_PIT_DATA 의 +0x18 = 5 + 순번).
  */
-export function pitcherHandOfPitch(pitch: {
-  readonly pitcherForm?: number
-  readonly pitcherMagicNumber?: number
-}): number {
+export function pitcherHandOfPitch(pitch: { readonly pitcherForm?: number; readonly pitcherMagicNumber?: number }): number {
   return pitcherHandOf(pitch.pitcherForm ?? 0, (pitch.pitcherMagicNumber ?? 0) >= ACE_MAGIC_NUMBER_FROM)
 }

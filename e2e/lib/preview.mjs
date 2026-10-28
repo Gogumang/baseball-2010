@@ -42,10 +42,17 @@ async function waitUp(url, child) {
 /** 자식 프로세스로 빌드 — 비동기라 자원 재기(`usage.mjs`)가 그동안도 뜬다 */
 function build(node, outDir) {
   return new Promise((resolve, reject) => {
-    const child = spawn('node', [...node, 'build', '--mode', 'e2e', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], { cwd: ROOT, stdio: 'pipe' })
+    const child = spawn('node', [...node, 'build', '--mode', 'e2e', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], {
+      cwd: ROOT,
+      stdio: 'pipe',
+    })
     let output = ''
-    child.stdout.on('data', (chunk) => { output += chunk })
-    child.stderr.on('data', (chunk) => { output += chunk })
+    child.stdout.on('data', (chunk) => {
+      output += chunk
+    })
+    child.stderr.on('data', (chunk) => {
+      output += chunk
+    })
     child.on('exit', (code) => {
       if (code === 0) return resolve()
       process.stderr.write(output)
@@ -68,10 +75,14 @@ export async function startE2ePreview({ port, dir, reuse = process.env.E2E_REBUI
     writeFileSync(stampFile, `${JSON.stringify({ newest, builtAt: new Date().toISOString() })}\n`)
   }
   const buildMs = Date.now() - buildStarted
-  const child = spawn('node', [...node, 'preview', '--mode', 'e2e', '--outDir', outDir, '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
-    cwd: ROOT,
-    stdio: 'ignore',
-  })
+  const child = spawn(
+    'node',
+    [...node, 'preview', '--mode', 'e2e', '--outDir', outDir, '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
+    {
+      cwd: ROOT,
+      stdio: 'ignore',
+    },
+  )
   const url = `http://127.0.0.1:${port}/`
   await waitUp(url, child)
   return { url, stop: () => child.kill(), buildMs, reused }

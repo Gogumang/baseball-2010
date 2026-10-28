@@ -40,9 +40,7 @@ const userEventOf = (index: number) => ORIGINAL_USER_EVENTS[index] ?? ''
 export function titleWindowTextOf(awards: SeasonAwards): string {
   return awards.titles.reduce((text, slot) => {
     if (slot.teamId > LAST_LEAGUE_TEAM || slot.userEventIndex === 0) return text
-    return (
-      text + userEventOf(slot.userEventIndex) + NEW_LINE + teamNameOf(slot.teamId) + SPACE + slot.winnerName + NEW_LINE + NEW_LINE
-    )
+    return text + userEventOf(slot.userEventIndex) + NEW_LINE + teamNameOf(slot.teamId) + SPACE + slot.winnerName + NEW_LINE + NEW_LINE
   }, CENTER)
 }
 

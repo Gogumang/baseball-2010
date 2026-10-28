@@ -5,20 +5,29 @@ import { TRAINING_MENUS } from '@/shared/config/trainingMenus'
 
 describe('animationStepAt — PZX 애니메이션 표 재생', () => {
   it('지연 0 은 한 번 갱신에 한 칸이다', () => {
-    const 표 = [{ frame: 114, delay: 0 }, { frame: 115, delay: 0 }]
+    const 표 = [
+      { frame: 114, delay: 0 },
+      { frame: 115, delay: 0 },
+    ]
     expect(animationStepAt(표, 0)?.frame).toBe(114)
     expect(animationStepAt(표, 1)?.frame).toBe(115)
   })
 
   it('지연만큼 갱신이 지나야 다음 칸이다', () => {
-    const 표 = [{ frame: 96, delay: 2 }, { frame: 98, delay: 3 }]
+    const 표 = [
+      { frame: 96, delay: 2 },
+      { frame: 98, delay: 3 },
+    ]
     expect(animationStepAt(표, 1)?.frame).toBe(96)
     expect(animationStepAt(표, 2)?.frame).toBe(98)
     expect(animationStepAt(표, 4)).toMatchObject({ entryIndex: 1, frame: 98 })
   })
 
   it('끝에 닿으면 처음으로 돈다 (훈련 팝업은 반복 재생)', () => {
-    const 표 = [{ frame: 1, delay: 2 }, { frame: 3, delay: 2 }]
+    const 표 = [
+      { frame: 1, delay: 2 },
+      { frame: 3, delay: 2 },
+    ]
     expect(animationStepAt(표, 4)?.frame).toBe(1)
   })
 

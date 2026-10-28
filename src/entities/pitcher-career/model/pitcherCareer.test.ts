@@ -81,7 +81,7 @@ describe('투수 커리어 레코드 — 타자편과 같은 칸·다른 칸', (
 
 describe('실효 능력치 — 0xb6414 → 0xb570c (G-1 차례)', () => {
   it('장착 레벨 보너스가 먼저 붙는다', () => {
-    const career =투수({ equipmentLevels: { control: 1, velocity: 0, breaking: 0, stamina: 0 } })
+    const career = 투수({ equipmentLevels: { control: 1, velocity: 0, breaking: 0, stamina: 0 } })
 
     expect(equippedPitcherAbilityOf(career).control).toBeGreaterThan(career.ability.control)
   })
@@ -96,7 +96,7 @@ describe('실효 능력치 — 0xb6414 → 0xb570c (G-1 차례)', () => {
   })
 
   it('질병 −30% 에 사기 감소가 이어 붙는다', () => {
-    const career =투수({ ability: { control: 100, velocity: 100, breaking: 100, stamina: 100 }, isSick: true })
+    const career = 투수({ ability: { control: 100, velocity: 100, breaking: 100, stamina: 100 }, isSick: true })
 
     // 100 − trunc(100×30/100) = 70
     expect(effectivePitcherAbilityOf(career).control).toBe(70)
@@ -352,7 +352,10 @@ describe('0xa4f60 의 −2 는 국가대항전(S+0x12c)만 — 포스트시즌�
 describe('투수편 사람 경기 도루 — 리그 타자 기록표 +0x2c (0xa56dc 모드 3 갈래 0xa571c)', () => {
   it('정규시즌이면 쌓고 포스트시즌(+0xb4)이면 거른다', () => {
     const career = createPitcherCareer('테스트')
-    const steals = [{ teamId: 3, battingOrderIndex: 5 }, { teamId: 3, battingOrderIndex: 5 }]
+    const steals = [
+      { teamId: 3, battingOrderIndex: 5 },
+      { teamId: 3, battingOrderIndex: 5 },
+    ]
     const id = leagueBatterIdOf(3, 5)
     const regular = withPitcherGameLeagueRecords(career, career, undefined, steals)
     expect(regular.leaguePlayerStats.batters[id]?.steals).toBe(2)

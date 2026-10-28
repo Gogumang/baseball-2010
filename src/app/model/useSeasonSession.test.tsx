@@ -3,11 +3,21 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import {
-  SEASON_DEFAULT_MATCH_SETTINGS, seasonGameProgressOf, seasonGoalInputOf, withRecordSalaryGrades, seasonGoalWindowNumbersFor, seasonLeagueRecordsOf, seasonPostseasonRankOf,
+  SEASON_DEFAULT_MATCH_SETTINGS,
+  seasonGameProgressOf,
+  seasonGoalInputOf,
+  withRecordSalaryGrades,
+  seasonGoalWindowNumbersFor,
+  seasonLeagueRecordsOf,
+  seasonPostseasonRankOf,
   useSeasonSession,
 } from '@/app/model/useSeasonSession'
 import {
-  EMPTY_LEAGUE, pitcherOrdersAfterPostseason, postseasonGameOf, postseasonRotationTurnsOf, postseasonStarterSlotOf,
+  EMPTY_LEAGUE,
+  pitcherOrdersAfterPostseason,
+  postseasonGameOf,
+  postseasonRotationTurnsOf,
+  postseasonStarterSlotOf,
 } from '@/entities/league/model/league'
 import { SEASON_GAME_COUNT } from '@/entities/season-mode/model/seasonRecord'
 import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
@@ -23,9 +33,7 @@ import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputa
 import { useGamePointWallet } from '@/entities/wallet/model/useGamePointWallet'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
-import {
-  applyBatterOutcome, isBatterTurn, rollOpponentAces, startTeamGame, summaryOf,
-} from '@/features/play-team-game/model/teamGameFlow'
+import { applyBatterOutcome, isBatterTurn, rollOpponentAces, startTeamGame, summaryOf } from '@/features/play-team-game/model/teamGameFlow'
 import { BURST_TABLES } from '@/entities/burst-mission/model/burstMissionRow'
 import { BURST_GOAL } from '@/entities/burst-mission/model/burstMissionJudge'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
@@ -46,8 +54,7 @@ function 메모리저장(): JsonStorePort {
   }
 }
 
-const 띄우기 = (store: JsonStorePort = 메모리저장()) =>
-  renderHook(() => useSeasonSession(store, createSeededRandom(20100901)))
+const 띄우기 = (store: JsonStorePort = 메모리저장()) => renderHook(() => useSeasonSession(store, createSeededRandom(20100901)))
 
 type 세션결과 = { readonly current: ReturnType<typeof useSeasonSession> }
 
@@ -153,8 +160,14 @@ describe('시즌 세션', () => {
     const seeded = createSeededRandom(20100901)
     let calls = 0
     const random = {
-      rand: (lo: number, hi: number) => { calls += 1; return seeded.rand(lo, hi) },
-      rand9d: (n: number) => { calls += 1; return seeded.rand9d(n) },
+      rand: (lo: number, hi: number) => {
+        calls += 1
+        return seeded.rand(lo, hi)
+      },
+      rand9d: (n: number) => {
+        calls += 1
+        return seeded.rand9d(n)
+      },
     }
     const { result } = renderHook(() => useSeasonSession(메모리저장(), random))
     const before = calls
@@ -242,9 +255,17 @@ describe('시즌 세션', () => {
     const 측 = result.current.gameOptions!.playerSide
     const 상대 = result.current.gameOptions!.opponentTeamId
 
-    act(() => result.current.actions.finishGame(요약({
-      result: '무', won: false, ourScore: 2, opponentScore: 2, opponentTeamId: 상대,
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          result: '무',
+          won: false,
+          ourScore: 2,
+          opponentScore: 2,
+          opponentTeamId: 상대,
+        }),
+      ),
+    )
 
     const 내승 = result.current.league.wins[0] ?? 0
     const 상대승 = result.current.league.wins[상대] ?? 0
@@ -345,8 +366,7 @@ describe('시즌 세션', () => {
     act(() => result.current.actions.confirmIncome({ ...result.current.state!.record, games: 2 }))
     act(() => result.current.actions.confirmDayResults())
 
-    expect(result.current.scene === SEASON_SCENE_STATE.관리메뉴 || result.current.scene === SEASON_SCENE_STATE.이벤트재생)
-      .toBe(true)
+    expect(result.current.scene === SEASON_SCENE_STATE.관리메뉴 || result.current.scene === SEASON_SCENE_STATE.이벤트재생).toBe(true)
   })
 
   it('정규시즌이 끝나면 **국가대항전 연차라도** 시즌 끝 사슬이 먼저다 (afterKoreanSeries)', () => {
@@ -484,7 +504,16 @@ describe('시즌 이벤트 재생 0xd3', () => {
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, inPostseason: true, games: 0, phase: 0xb }))
     const 전 = result.current.state!.record
 
-    act(() => result.current.actions.giveSeasonEventReward([{ kind: 0, value: 25 }, { kind: 3, value: 35 }], 393, [392, 393]))
+    act(() =>
+      result.current.actions.giveSeasonEventReward(
+        [
+          { kind: 0, value: 25 },
+          { kind: 3, value: 35 },
+        ],
+        393,
+        [392, 393],
+      ),
+    )
 
     // 393 은 연차 보정 +5y — 첫 해(y = 0)라 그대로. 재생 끝을 기다리지 않고 저장에 든다(0x8b0e4 · 0x8cd44 → 0x22755)
     type 저장꼴 = { state: { record: { popularity: number; money: number; seenEvents: number[]; phase: number } } }
@@ -585,9 +614,14 @@ describe('시즌 돌발미션 보상 (0x8e34c 모드 2)', () => {
     const 판 = () => {
       const { result } = 띄우기()
       시작(result, 0)
-      act(() => result.current.actions.updateRecord({
-        ...result.current.state!.record, money: 100, reputation: 100, popularity: 100,
-      }))
+      act(() =>
+        result.current.actions.updateRecord({
+          ...result.current.state!.record,
+          money: 100,
+          reputation: 100,
+          popularity: 100,
+        }),
+      )
       act(() => result.current.actions.playNextGame())
       return result
     }
@@ -691,7 +725,12 @@ describe('시즌 목표 ④ 팀 방어율 — 사람 경기의 투수 줄 (0xa37
 describe('결산 한국시리즈 보상 순위 0xb7aa0(L, 팀, 0) — 0x85ec (seasonPostseasonRankOf)', () => {
   // 정규 1~4위 = 3 · 1 · 5 · 7. 준PO 5 > 7 → PO 5 > 1 → 한국시리즈 3 > 5
   const 끝난시리즈 = {
-    round: '종료', qualifiers: [3, 1, 5, 7], teams: [3, 5], wins: [0, 0], winsNeeded: 4, champion: 3,
+    round: '종료',
+    qualifiers: [3, 1, 5, 7],
+    teams: [3, 5],
+    wins: [0, 0],
+    winsNeeded: 4,
+    champion: 3,
   } as const
   const 리그 = { ...EMPTY_LEAGUE, wins: [9, 8, 7, 6, 5, 4, 3, 2, 1, 0], losses: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
 
@@ -757,9 +796,13 @@ describe('전역기록 칸 — 구장 히든 +0xe0 · 이벤트 100 수령 +0xbe
     const record = first.result.current.state!.record
     // 관중석 기본 0~3 전부 + 관중석 히든 5번(14) · 전광판 히든 6번(18) 보유, 이벤트 100 을 봤다
     const owned = record.stadiumOwned.map((flag, index) => flag || index <= 3 || index === 5 || index === 7 + 6)
-    act(() => first.result.current.actions.updateRecord({
-      ...record, stadiumOwned: owned, seenEvents: [...record.seenEvents, 100],
-    }))
+    act(() =>
+      first.result.current.actions.updateRecord({
+        ...record,
+        stadiumOwned: owned,
+        seenEvents: [...record.seenEvents, 100],
+      }),
+    )
     const { openedStadiumIds: _ids, event100Awarded: _awarded, ...legacy } = store.load() as Record<string, unknown>
     store.save(legacy)
 
@@ -777,9 +820,14 @@ describe('트레이드로 옮겨 간 선수의 리그 성적은 선수를 따라
       { opponentTeamId: 3, tab: 1, myIndex: 0, opponentIndex: 5 },
       { opponentTeamId: 3, tab: 0, myIndex: 1, opponentIndex: 2 },
     ]) {
-      act(() => result.current.actions.finishTrade({
-        record: result.current.state!.record, gamePointCost: 0, isSuccess: true, swap,
-      }))
+      act(() =>
+        result.current.actions.finishTrade({
+          record: result.current.state!.record,
+          gamePointCost: 0,
+          isSuccess: true,
+          swap,
+        }),
+      )
     }
   }
 
@@ -852,10 +900,14 @@ describe('트레이드 칸은 로테이션으로 섞인 레코드 차례다 (0xb
 
     const 데려올 = result.current.tradeRosterOf(상대).pitchers[0]!
     const 내줄 = result.current.tradeRoster.pitchers[0]!
-    act(() => result.current.actions.finishTrade({
-      record: result.current.state!.record, gamePointCost: 0, isSuccess: true,
-      swap: { opponentTeamId: 상대, tab: 0, myIndex: 0, opponentIndex: 0 },
-    }))
+    act(() =>
+      result.current.actions.finishTrade({
+        record: result.current.state!.record,
+        gamePointCost: 0,
+        isSuccess: true,
+        swap: { opponentTeamId: 상대, tab: 0, myIndex: 0, opponentIndex: 0 },
+      }),
+    )
     // 명단 첨자 1(레코드 0번)에 데려온 선수, 상대 레코드 0번 칸(명단 첨자 차례[0])에 내준 선수
     expect(result.current.roster.pitchers[1]).toMatchObject({ id: 데려올.id, tableTeamId: 상대 })
     expect(result.current.cpuRosterOf(상대).pitchers[상대차례[0]!]).toMatchObject({ id: 내줄.id, tableTeamId: 0 })
@@ -890,9 +942,13 @@ describe('시즌 끝 사슬', () => {
   it('사슬은 0xee → 0xeb → 0xec → 0xed → 0xf0 → 0xef 차례다 — 시상 셋은 한 틀 뒤 곧장 이벤트(370 · 371 · 376)를 튼다', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
 
     // 0xee: 392 → (끝에서 목표 판정) 393~396 → 0xeb
     expect(이벤트넘기기(result, 2)).toEqual([392, expect.any(Number)])
@@ -920,9 +976,13 @@ describe('시즌 끝 사슬', () => {
     const store = 메모리저장()
     const { result } = 띄우기(store)
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     expect(result.current.state?.record.games).toBe(0)
     이벤트넘기기(result, 2)
     expect(result.current.state?.record.phase).toBe(0xc)
@@ -934,9 +994,13 @@ describe('시즌 끝 사슬', () => {
   it('포스트시즌 사람 경기 정산은 CPU 경기를 돌리지 않는다 — 0xc2760 은 결산 0xef 키 0x9dc8 에서만', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
       act(() => result.current.actions.continuePostseason())
     }
@@ -959,9 +1023,13 @@ describe('시즌 끝 사슬', () => {
   it('시상 창 글은 system 3 · 4 일 때만 — 370 은 타자 타이틀 세 칸(0x8b3bc), 376 은 축하 줄 없는 MVP 창(시즌 갈래)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     이벤트넘기기(result, 2)
 
     expect(result.current.awardWindowTextOf(1)).toBeNull()
@@ -975,10 +1043,14 @@ describe('시즌 끝 사슬', () => {
     시작(result, 0)
     // 2년차(idx 1), 아무 목표도 못 채움: 순위는 대진 밖(10), 승률 0, 인기도 상승 0 → 396
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, popularity: 100, reputation: 100 }))
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-      popularityAtSeasonStart: 100,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+        popularityAtSeasonStart: 100,
+      }),
+    )
     const 전 = result.current.state!.record
 
     expect(이벤트넘기기(result, 2)).toEqual([392, 396])
@@ -993,9 +1065,13 @@ describe('시즌 끝 사슬', () => {
   it('결산을 닫으면 홀수 연차는 새 해로 간다 — 연차가 오르고 리그 전적이 비워진다 (0x6e0c)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
 
     act(() => result.current.actions.finishSeason())
 
@@ -1010,9 +1086,13 @@ describe('시즌 끝 사슬', () => {
   it('새 해 0x6e0c 는 CPU 아홉 팀의 장비 니블을 굴린다 (0x665e8 — 3년차면 타자 0번 부위 0 · 3번 부위 1 · 투수 둘)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     const 내명단 = result.current.roster
 
     act(() => result.current.actions.finishSeason())
@@ -1031,9 +1111,13 @@ describe('시즌 끝 사슬', () => {
   it('한국시리즈 보상은 결산을 닫는 그 자리에서 더한다 — [197] 이 닫힐 때 0x85ec 가 더하고 곧장 0x87b4', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     const 전 = result.current.state!.record
 
     act(() => result.current.actions.finishSeason({ popularity: 25, reputation: 30, money: 40, gamePoint: 0, messageId: 197 }))
@@ -1048,9 +1132,13 @@ describe('시즌 끝 사슬', () => {
   it('**마지막 해(연차 idx 9)** 는 결산을 닫으면 새 해가 아니라 엔딩(0xf5)으로 간다 (0x6e0c 머리)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 9,
+      }),
+    )
 
     act(() => result.current.actions.finishSeason())
 
@@ -1064,15 +1152,28 @@ describe('시즌 끝 사슬', () => {
   })
 
   it('엔딩 0xf5 진입 0x6be8 은 판정 0(비 인기 구단)이면 배경음 52, 1 이상이면 46 을 튼다 (6c4a `cmp r5,#0`)', () => {
-    for (const [popularity, bgm] of [[100, 52], [900, 46]] as const) {
+    for (const [popularity, bgm] of [
+      [100, 52],
+      [900, 46],
+    ] as const) {
       const 튼것: number[] = []
-      setActiveSound({ ...createSilentSound(), playBgm: (id: number) => { 튼것.push(id) } })
+      setActiveSound({
+        ...createSilentSound(),
+        playBgm: (id: number) => {
+          튼것.push(id)
+        },
+      })
       try {
         const { result } = 띄우기()
         시작(result, 0)
-        act(() => result.current.actions.confirmIncome({
-          ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9, popularity,
-        }))
+        act(() =>
+          result.current.actions.confirmIncome({
+            ...result.current.state!.record,
+            games: SEASON_GAME_COUNT,
+            yearIndex: 9,
+            popularity,
+          }),
+        )
         act(() => result.current.actions.finishSeason())
         튼것.length = 0
         이벤트넘기기(result)
@@ -1088,9 +1189,13 @@ describe('시즌 끝 사슬', () => {
     const store = 메모리저장()
     const 첫판 = 띄우기(store)
     시작(첫판.result, 0)
-    act(() => 첫판.result.current.actions.confirmIncome({
-      ...첫판.result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9,
-    }))
+    act(() =>
+      첫판.result.current.actions.confirmIncome({
+        ...첫판.result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 9,
+      }),
+    )
     act(() => 첫판.result.current.actions.finishSeason())
     이벤트넘기기(첫판.result)
     expect(첫판.result.current.scene).toBe(SEASON_SCENE_STATE.엔딩)
@@ -1108,16 +1213,26 @@ describe('시즌 끝 사슬', () => {
   })
 
   it('엔딩 보너스 — 판정 0 은 진입 0x6be8 이 SR+0x7b = 1 · 저장, 그 밖은 팝업 0x2b 닫힘이 G · SR+0x7b · 통계 (0x8bd8)', () => {
-    for (const [popularity, endingIndex, bonus] of [[100, 0, 0], [900, 1, 3000]] as const) {
+    for (const [popularity, endingIndex, bonus] of [
+      [100, 0, 0],
+      [900, 1, 3000],
+    ] as const) {
       const store = 메모리저장()
       const 통계: unknown[] = []
-      const { result } = renderHook(() => useSeasonSession(store, createSeededRandom(20100901), null, undefined, (event) => {
-        통계.push(event)
-      }))
+      const { result } = renderHook(() =>
+        useSeasonSession(store, createSeededRandom(20100901), null, undefined, (event) => {
+          통계.push(event)
+        }),
+      )
       시작(result, 0)
-      act(() => result.current.actions.confirmIncome({
-        ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 9, popularity,
-      }))
+      act(() =>
+        result.current.actions.confirmIncome({
+          ...result.current.state!.record,
+          games: SEASON_GAME_COUNT,
+          yearIndex: 9,
+          popularity,
+        }),
+      )
       act(() => result.current.actions.finishSeason())
       이벤트넘기기(result)
       expect(result.current.scene).toBe(SEASON_SCENE_STATE.엔딩)
@@ -1142,9 +1257,13 @@ describe('시즌 끝 사슬', () => {
   it('국가대항전 경기는 평가를 안 탄다 — 인기도·평판·사기가 그대로다 (0x4ea0c 4f216)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     act(() => result.current.actions.playCupGame(10, 11))
@@ -1171,9 +1290,13 @@ describe('시즌 끝 사슬', () => {
   it('국가대항전 0xdd 진입은 무대 구장 0x78664(무대, 홈 대표팀)를 rand(0, 10) 로 굴린다 (0x6548 67f6) — 경기는 L+0xad 구장', () => {
     const { result } = 띄우기()
     시작(result, 3)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     act(() => result.current.actions.playCupGame(10, 11))
@@ -1191,9 +1314,13 @@ describe('시즌 끝 사슬', () => {
   it('국가대항전 내 팀은 시즌 팀이 아니라 대한민국(10)이고, 이긴 경기가 대한민국 승으로 쌓인다 (0x6548 65e2)', () => {
     const { result } = 띄우기()
     시작(result, 3)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
 
@@ -1205,9 +1332,14 @@ describe('시즌 끝 사슬', () => {
     expect(result.current.gameOptions?.opponentAces).toBeUndefined()
     expect(result.current.gameOptions?.opponentTeamId).toBe(11)
 
-    act(() => result.current.actions.finishGame(요약({
-      ourTeamId: result.current.gameOptions!.ourTeamId, opponentTeamId: 11,
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          ourTeamId: result.current.gameOptions!.ourTeamId,
+          opponentTeamId: 11,
+        }),
+      ),
+    )
 
     const cup = result.current.cup!
     // 참가국 칸 차례 = 한·일·쿠·미. 대한민국 1승, 일본 1패
@@ -1220,9 +1352,13 @@ describe('시즌 끝 사슬', () => {
   it('국가대항전 옵션은 시즌 팀 번호를 따로 넘기고 날짜 카운터는 대회 날짜다 (0xb5804 · 0x6548 670e)', () => {
     const { result } = 띄우기()
     시작(result, 3)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
 
@@ -1263,10 +1399,21 @@ describe('시즌 끝 사슬', () => {
 
   it('시즌 경기 옵션에 환경설정 게이지 · 주루 · 송구를 싣는다 — 0x3f500 · 0xae690 · 0xae6c8 은 모드를 안 가린다', () => {
     const 설정 = { gaugeSettingOn: true, runningModeManual: true, throwModeManual: false }
-    const { result } = renderHook(() => useSeasonSession(
-      메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
-      () => 설정,
-    ))
+    const { result } = renderHook(() =>
+      useSeasonSession(
+        메모리저장(),
+        createSeededRandom(20100901),
+        null,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        () => 설정,
+      ),
+    )
     시작(result, 0)
     act(() => result.current.actions.playNextGame())
     expect(result.current.gameOptions).toMatchObject(설정)
@@ -1283,9 +1430,13 @@ describe('시즌 끝 사슬', () => {
   it('짝수 연차는 결산 뒤 국가대항전이 열린다', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     // 결산 직전에 연차를 짝수로 바꾼다 (원본 afterKoreanSeries 가 보는 칸)
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
 
@@ -1301,20 +1452,26 @@ describe('시즌 끝 사슬', () => {
   it('대회가 끝나면 곧장 새 해 0x6e0c — 리그 초기화 memset 이 국가대항전 플래그를 지운다 (0x8b88 → 0xa305c → 0xb7b34)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     expect(result.current.state?.record.nationalCup).toBe(true)
 
-    act(() => result.current.actions.finishCup({
-      champion: 11,
-      isKoreaChampion: false,
-      koreaInFinal: false,
-      reward: { popularity: 0, reputation: 0, money: 0, gamePoint: 0, messageId: 0 },
-      openedTeams: [],
-    }))
+    act(() =>
+      result.current.actions.finishCup({
+        champion: 11,
+        isKoreaChampion: false,
+        koreaInFinal: false,
+        reward: { popularity: 0, reputation: 0, money: 0, gamePoint: 0, messageId: 0 },
+        openedTeams: [],
+      }),
+    )
 
     const record = result.current.state!.record
     expect(record.nationalCup).toBe(false)
@@ -1330,20 +1487,26 @@ describe('시즌 끝 사슬', () => {
   it('대한민국 우승이면 G +1000 도 받는다 (0x8acc~0x8b04 — 전역 +0x64 · 0x22c7d 통계)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     const 전 = result.current.gamePoints
 
-    act(() => result.current.actions.finishCup({
-      champion: 10,
-      isKoreaChampion: true,
-      koreaInFinal: true,
-      reward: { popularity: 30, reputation: 40, money: 50, gamePoint: 1000, messageId: 199 },
-      openedTeams: [],
-    }))
+    act(() =>
+      result.current.actions.finishCup({
+        champion: 10,
+        isKoreaChampion: true,
+        koreaInFinal: true,
+        reward: { popularity: 30, reputation: 40, money: 50, gamePoint: 1000, messageId: 199 },
+        openedTeams: [],
+      }),
+    )
 
     expect(result.current.gamePoints).toBe(전 + 1000)
   })
@@ -1355,13 +1518,15 @@ describe('시즌 끝 사슬', () => {
     act(() => result.current.actions.openCupHiddenTeams([10, 12]))
     expect(result.current.openedHiddenIds).toEqual([10, 12])
 
-    act(() => result.current.actions.finishCup({
-      champion: 10,
-      isKoreaChampion: true,
-      koreaInFinal: true,
-      reward: { popularity: 30, reputation: 40, money: 50, gamePoint: 1000, messageId: 199 },
-      openedTeams: [10, 12],
-    }))
+    act(() =>
+      result.current.actions.finishCup({
+        champion: 10,
+        isKoreaChampion: true,
+        koreaInFinal: true,
+        reward: { popularity: 30, reputation: 40, money: 50, gamePoint: 1000, messageId: 199 },
+        openedTeams: [10, 12],
+      }),
+    )
     expect(result.current.notice).toBe('')
   })
 })
@@ -1370,9 +1535,13 @@ describe('포스트시즌', () => {
   const 시즌끝 = () => {
     const rendered = 띄우기()
     시작(rendered.result, 0)
-    act(() => rendered.result.current.actions.confirmIncome({
-      ...rendered.result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      rendered.result.current.actions.confirmIncome({
+        ...rendered.result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     return rendered
   }
 
@@ -1438,12 +1607,15 @@ describe('포스트시즌', () => {
   it('정규시즌 1위면 같은 갈래(0xb818c b82ec~b830a)가 기록연감 통계 +0x100(셀 10 시즌모드 우승)을 센다 — 아니면 안 낸다', () => {
     for (const team of [0, 5]) {
       const recordStat = vi.fn()
-      const { result } = renderHook(() =>
-        useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, recordStat))
+      const { result } = renderHook(() => useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, recordStat))
       시작(result, team)
-      act(() => result.current.actions.confirmIncome({
-        ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-      }))
+      act(() =>
+        result.current.actions.confirmIncome({
+          ...result.current.state!.record,
+          games: SEASON_GAME_COUNT,
+          yearIndex: 1,
+        }),
+      )
       const 일위 = result.current.ranking[0] === team
       const calls = recordStat.mock.calls.filter(([event]) => event.kind === '리그1위')
       expect(calls).toEqual(일위 ? [[{ kind: '리그1위', mode: 2 }]] : [])
@@ -1518,8 +1690,7 @@ describe('전역 G 지갑 (mgr[+0x64])', () => {
 
   it('지급 뒤 0x22dd5(mgr, k) — 기록연감 통계 달성 표시 k 를 한 건 낸다 (0x6a98~0x6ab2)', () => {
     const recordStat = vi.fn()
-    const { result } = renderHook(() =>
-      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, recordStat))
+    const { result } = renderHook(() => useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, recordStat))
 
     act(() => result.current.actions.awardLeagueFirst({ threshold: 10, bit: 2, gamePoint: 30000 }))
 
@@ -1528,7 +1699,8 @@ describe('전역 G 지갑 (mgr[+0x64])', () => {
 
   it('옛 저장(지급 비트 칸 없음)은 0 에서 시작한다', () => {
     const { result } = renderHook(() =>
-      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, 메모리저장()))
+      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, 메모리저장()),
+    )
 
     expect(result.current.leagueFirstAwardedBits).toBe(0)
   })
@@ -1605,10 +1777,15 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
   it('+0x11e 는 일반모드 22 와 같은 전역 칸이다 — 그쪽이 먼저 봤으면 0xdd 는 창을 안 열고, 처음이면 그 칸에 1 을 쓴다', () => {
     const 들어가기 = (seen: boolean) => {
       let 칸 = seen
-      const slot = { read: () => 칸, markSeen: vi.fn(() => { 칸 = true }) }
-      const rendered = renderHook(() => useSeasonSession(
-        메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, undefined, slot,
-      ))
+      const slot = {
+        read: () => 칸,
+        markSeen: vi.fn(() => {
+          칸 = true
+        }),
+      }
+      const rendered = renderHook(() =>
+        useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, undefined, slot),
+      )
       시작(rendered.result, 0)
       act(() => rendered.result.current.actions.openNextGame())
       act(() => rendered.result.current.actions.confirmNextGame())
@@ -1732,7 +1909,13 @@ describe('경기 전 흐름 0xd8 → 0xd7 → 0xdd → 0xe1', () => {
   it('0xd7 CLR 로 0xd8 에 다시 들어오면 phase 4 는 쓰지만 저장하지 않는다 (0x4cb8 4cc8 — 이전 상태 0xd7)', () => {
     const inner = 메모리저장()
     const saves = vi.fn()
-    const store: JsonStorePort = { load: inner.load, save: (value) => { saves(); inner.save(value) } }
+    const store: JsonStorePort = {
+      load: inner.load,
+      save: (value) => {
+        saves()
+        inner.save(value)
+      },
+    }
     const { result } = 띄우기(store)
     시작(result, 0)
     act(() => result.current.actions.openNextGame())
@@ -1818,9 +2001,13 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
   it('국가대항전 대한민국 명단(+0x918)은 대회 내내 남는다 — 다음 대회 경기도 고친 차례로 선다', () => {
     const { result } = 띄우기()
     시작(result, 3)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     act(() => result.current.actions.playCupGame(10, 11))
@@ -1844,9 +2031,13 @@ describe('엔트리 편집 0xe0 (0x63dc · 0x7044 · 편집기 0x55864)', () => 
   it('국가대항전 0xe0 대한민국 투수 체력은 100% — 0xb6190(팀 10) b7c88 · b81e0', () => {
     const { result } = 띄우기()
     시작(result, 3)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     act(() => result.current.actions.playCupGame(10, 11))
@@ -1927,9 +2118,15 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const 내끝 = Array.from({ length: 투수수 }, (_v, i) => (i === 0 ? 3000 : i === 1 ? 9000 : 10_000))
     const 상대끝 = teamPitchers(options.opponentTeamId).map((_p, i) => (i === 0 ? 1000 : 10_000))
 
-    act(() => result.current.actions.finishGame(요약({
-      opponentTeamId: options.opponentTeamId, ourPitcherStaminas: 내끝, opponentPitcherStaminas: 상대끝,
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          opponentTeamId: options.opponentTeamId,
+          ourPitcherStaminas: 내끝,
+          opponentPitcherStaminas: 상대끝,
+        }),
+      ),
+    )
 
     expect(result.current.roster.pitchers.map((p) => p.stamina).slice(0, 3)).toEqual([5000, 10_000, 10_000])
     const 저장 = store.load() as 저장모양
@@ -1949,9 +2146,15 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
 
     // 끝 스태미나는 돈 차례로 돌아오고 저장(웹 명단 차례)으로 되돌려 적힌다
     const 돈끝 = Array.from({ length: 투수수 }, (_v, i) => (i === 0 ? 2000 : 10_000))
-    act(() => result.current.actions.finishGame(요약({
-      opponentTeamId: 다음.opponentTeamId, ourPitcherStaminas: 돈끝, opponentPitcherStaminas: 상대끝,
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          opponentTeamId: 다음.opponentTeamId,
+          ourPitcherStaminas: 돈끝,
+          opponentPitcherStaminas: 상대끝,
+        }),
+      ),
+    )
     // 진행기 0번 = 명단 1번 → 2000 + 20% 회복 = 4000
     expect(result.current.roster.pitchers[1]?.stamina).toBe(4000)
   })
@@ -1961,17 +2164,21 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const { result } = rendered
     시작(result, 0)
     const options = 경기까지(rendered)
-    act(() => result.current.actions.finishGame(요약({
-      opponentTeamId: options.opponentTeamId,
-      leaguePitchers: {
-        lines: [
-          { teamId: 0, pitcherSlot: 1, outs: 27, runsAllowed: 3, strikeouts: 13, pitches: 137 },
-          { teamId: options.opponentTeamId, pitcherSlot: 2, outs: 24, runsAllowed: 5, strikeouts: 11, pitches: 141 },
-        ],
-        decision: { winner: { side: 1, number: 1 }, loser: { side: 0, number: 2 }, save: null },
-        sideTeams: [options.opponentTeamId, 0],
-      },
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          opponentTeamId: options.opponentTeamId,
+          leaguePitchers: {
+            lines: [
+              { teamId: 0, pitcherSlot: 1, outs: 27, runsAllowed: 3, strikeouts: 13, pitches: 137 },
+              { teamId: options.opponentTeamId, pitcherSlot: 2, outs: 24, runsAllowed: 5, strikeouts: 11, pitches: 141 },
+            ],
+            decision: { winner: { side: 1, number: 1 }, loser: { side: 0, number: 2 }, save: null },
+            sideTeams: [options.opponentTeamId, 0],
+          },
+        }),
+      ),
+    )
     const 표 = Object.values(result.current.playerStats.pitchers ?? {})
     expect(표.find((line) => line.pitches === 137 && line.strikeouts === 13)).toMatchObject({ outs: 27, wins: 1 })
     expect(표.find((line) => line.pitches === 141 && line.strikeouts === 11)).toMatchObject({ outs: 24, losses: 1 })
@@ -1998,9 +2205,13 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const rendered = 띄우기(store)
     const { result } = rendered
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     // 내 차례가 올 때까지 결산 0xef 를 진행시킨다 (CPU 시리즈는 0x13da0 이 돌린다)
     for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
       act(() => result.current.actions.continuePostseason())
@@ -2013,9 +2224,14 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const options = result.current.gameOptions!
     const 내끝 = result.current.roster.pitchers.map(() => 2000)
 
-    act(() => result.current.actions.finishGame(요약({
-      opponentTeamId: options.opponentTeamId, ourPitcherStaminas: 내끝,
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          opponentTeamId: options.opponentTeamId,
+          ourPitcherStaminas: 내끝,
+        }),
+      ),
+    )
 
     expect(result.current.roster.pitchers.every((p) => p.stamina === 4000)).toBe(true)
   })
@@ -2025,16 +2241,19 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const rendered = 띄우기(store)
     const { result } = rendered
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     const 전 = (store.load() as 저장모양).cpuPitcherStaminas ?? {}
     for (let i = 0; i < 4 && result.current.pendingGame === null; i += 1) {
       act(() => result.current.actions.continuePostseason())
     }
     const 뒤 = (store.load() as 저장모양).cpuPitcherStaminas ?? {}
-    const 깎인팀 = Object.keys(뒤).filter((team) =>
-      (뒤[Number(team)] ?? []).some((value, slot) => value < (전[Number(team)]?.[slot] ?? 10_000)))
+    const 깎인팀 = Object.keys(뒤).filter((team) => (뒤[Number(team)] ?? []).some((value, slot) => value < (전[Number(team)]?.[slot] ?? 10_000)))
     expect(깎인팀.length).toBeGreaterThan(0)
     for (const staminas of Object.values(뒤)) {
       for (const value of staminas) expect(value).toBeGreaterThanOrEqual(0)
@@ -2045,9 +2264,13 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const rendered = 띄우기()
     const { result } = rendered
     시작(result, 3)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     act(() => result.current.actions.updateRecord({ ...result.current.state!.record, yearIndex: 2 }))
     act(() => result.current.actions.finishSeason())
     const 전 = result.current.roster
@@ -2056,9 +2279,15 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     expect(result.current.gameOptions?.ourPitcherStaminas).toBeUndefined()
     expect(result.current.gameOptions?.opponentPitcherStaminas).toBeUndefined()
 
-    act(() => result.current.actions.finishGame(요약({
-      ourTeamId: 10, opponentTeamId: 11, ourPitcherStaminas: [0, 0, 0],
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          ourTeamId: 10,
+          opponentTeamId: 11,
+          ourPitcherStaminas: [0, 0, 0],
+        }),
+      ),
+    )
     expect(result.current.roster).toEqual(전)
   })
 
@@ -2083,20 +2312,26 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const { result } = rendered
     시작(result, 0)
     const options = 경기까지(rendered)
-    act(() => result.current.actions.finishGame(요약({
-      opponentTeamId: options.opponentTeamId,
-      opponentPitcherStaminas: teamPitchers(options.opponentTeamId).map((_p, i) => (i === 2 ? 1000 : 10_000)),
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          opponentTeamId: options.opponentTeamId,
+          opponentPitcherStaminas: teamPitchers(options.opponentTeamId).map((_p, i) => (i === 2 ? 1000 : 10_000)),
+        }),
+      ),
+    )
     const 표 = (store.load() as 저장모양).cpuPitcherStaminas![options.opponentTeamId]!
     const roster = result.current.roster
     const 내준값 = roster.pitchers[1]!.stamina
 
-    act(() => result.current.actions.finishTrade({
-      record: result.current.state!.record,
-      gamePointCost: 0,
-      isSuccess: true,
-      swap: { opponentTeamId: options.opponentTeamId, tab: 0, myIndex: 1, opponentIndex: 2 },
-    }))
+    act(() =>
+      result.current.actions.finishTrade({
+        record: result.current.state!.record,
+        gamePointCost: 0,
+        isSuccess: true,
+        swap: { opponentTeamId: options.opponentTeamId, tab: 0, myIndex: 1, opponentIndex: 2 },
+      }),
+    )
 
     expect(result.current.roster.pitchers[1]?.stamina).toBe(표[2])
     expect(result.current.roster.pitchers[1]).toMatchObject({ id: 2, tableTeamId: options.opponentTeamId })
@@ -2111,12 +2346,14 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const rendered = 띄우기(store)
     const { result } = rendered
     시작(result, 0)
-    act(() => result.current.actions.finishTrade({
-      record: result.current.state!.record,
-      gamePointCost: 0,
-      isSuccess: true,
-      swap: { opponentTeamId: 3, tab: 1, myIndex: 0, opponentIndex: 5 },
-    }))
+    act(() =>
+      result.current.actions.finishTrade({
+        record: result.current.state!.record,
+        gamePointCost: 0,
+        isSuccess: true,
+        swap: { opponentTeamId: 3, tab: 1, myIndex: 0, opponentIndex: 5 },
+      }),
+    )
     expect(result.current.roster.batters[0]).toMatchObject({ id: 5, tableTeamId: 3 })
     // 상대 팀 레코드에는 내 0번 타자가 간다 — 그 팀 표 선수가 아니라 0팀 표의 0번
     expect(result.current.cpuRosterOf(3).batters[5]).toMatchObject({ id: 0, tableTeamId: 0, kindByte: 5 })
@@ -2125,7 +2362,9 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const 첫타자 = options.ourEntryOrder!.batters[0]!
     expect(첫타자).toMatchObject({ rosterSlot: 5, tableTeamId: 3 })
     expect(entryBattersOfOrder(0, options.ourEntryOrder!)[0]).toMatchObject({
-      name: teamBatters(3)[5]!.name, rosterSlot: 5, tableTeamId: 3,
+      name: teamBatters(3)[5]!.name,
+      rosterSlot: 5,
+      tableTeamId: 3,
     })
   })
 
@@ -2140,12 +2379,14 @@ describe('투수 스태미나 +0x2c — 첫날 6850 0xb6190 · 하루 끝 4f2bc 
     const rendered = 띄우기(store)
     const { result } = rendered
     시작(result, 0)
-    act(() => result.current.actions.finishTrade({
-      record: result.current.state!.record,
-      gamePointCost: 0,
-      isSuccess: true,
-      swap: { opponentTeamId: before.opponentTeamId, tab: 1, myIndex: 0, opponentIndex: 5 },
-    }))
+    act(() =>
+      result.current.actions.finishTrade({
+        record: result.current.state!.record,
+        gamePointCost: 0,
+        isSuccess: true,
+        swap: { opponentTeamId: before.opponentTeamId, tab: 1, myIndex: 0, opponentIndex: 5 },
+      }),
+    )
     const options = 경기까지(rendered)
     expect(options.opponentTeamId).toBe(before.opponentTeamId)
     const 상대명단 = entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder!)
@@ -2162,7 +2403,8 @@ describe('기록연감 통계 고리 — 시즌 G 사용처 k 3 (0xd152 · 0xa2f
     const { result } = renderHook(() =>
       useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, (event) => {
         events.push(event)
-      }))
+      }),
+    )
     act(() => result.current.actions.spendGamePoint(500))
     expect(events).toEqual([{ kind: 'G사용', usage: 3, amount: 500 }])
   })
@@ -2174,7 +2416,8 @@ describe('팀 경기 기록 달성 G (경기 끝 0x4ea0c 4ec5a → 0x4ec82)', ()
     const { result } = renderHook(() =>
       useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, (event) => {
         events.push(event)
-      }))
+      }),
+    )
     시작(result, 0)
     act(() => result.current.actions.playNextGame())
     const before = result.current.gamePoints
@@ -2185,7 +2428,8 @@ describe('팀 경기 기록 달성 G (경기 끝 0x4ea0c 4ec5a → 0x4ec82)', ()
     // 이어서 0x4ec8a 0x22e10 — 이번 경기 기록달성 횟수를 누계(+4+n)에 더한다
     // 끝 0x4f54a 0x4e8b0 — 지난 시간을 플레이 시간 칸(모드 2)에
     expect(events).toEqual([
-      { kind: 'G획득', mode: 2, amount: 25 }, { kind: '기록달성', recordIds: [1] },
+      { kind: 'G획득', mode: 2, amount: 25 },
+      { kind: '기록달성', recordIds: [1] },
       { kind: '플레이시간', mode: 2, elapsed: expect.any(Number) },
     ])
   })
@@ -2235,9 +2479,13 @@ describe('리그 투수 레코드 차례를 시즌 세션이 잇는다 (0xb5ca8 
   it('새 해 리그는 승패를 비우고 포스트시즌까지 돈 차례를 잇는다 (nextSeasonLeague)', () => {
     const { result } = 띄우기()
     시작(result, 0)
-    act(() => result.current.actions.confirmIncome({
-      ...result.current.state!.record, games: SEASON_GAME_COUNT, yearIndex: 1,
-    }))
+    act(() =>
+      result.current.actions.confirmIncome({
+        ...result.current.state!.record,
+        games: SEASON_GAME_COUNT,
+        yearIndex: 1,
+      }),
+    )
     const 리그 = result.current.league
     const series = result.current.series!
     expect(series.baseOrders).toEqual(리그.pitcherOrders)
@@ -2319,27 +2567,45 @@ describe('명전 칸 삭제의 시즌 명단 정리 (0x221dc)', () => {
 
 describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실린다 (0xb891c · 0xb8680 — 7da5044 의 받는 쪽)', () => {
   const 명전 = {
-    hallOfFame: [{
-      name: '전설', ability: { hit: 500, power: 600, defense: 300, run: 200 }, endingIndex: 6, season: 13, titleIds: [], slot: 0,
-    }],
-    hallOfFamePitchers: [{
-      name: '철완', ability: { control: 700, velocity: 650, breaking: 600, stamina: 550 },
-      equippedAbility: { control: 710, velocity: 660, breaking: 610, stamina: 560 }, endingIndex: 5, season: 10, titleIds: [], slot: 1,
-      look: { typeIndex: 1, handIndex: 1, skinIndex: 0, teamId: 1 }, pitchMask: 0b101, selectedMagicNumber: 2,
-    }],
+    hallOfFame: [
+      {
+        name: '전설',
+        ability: { hit: 500, power: 600, defense: 300, run: 200 },
+        endingIndex: 6,
+        season: 13,
+        titleIds: [],
+        slot: 0,
+      },
+    ],
+    hallOfFamePitchers: [
+      {
+        name: '철완',
+        ability: { control: 700, velocity: 650, breaking: 600, stamina: 550 },
+        equippedAbility: { control: 710, velocity: 660, breaking: 610, stamina: 560 },
+        endingIndex: 5,
+        season: 10,
+        titleIds: [],
+        slot: 1,
+        look: { typeIndex: 1, handIndex: 1, skinIndex: 0, teamId: 1 },
+        pitchMask: 0b101,
+        selectedMagicNumber: 2,
+      },
+    ],
   }
 
   it('투수 id − 0xb4 · 타자 id − 0xc8 칸의 이름·0xb6414 능력치·레퍼토리를 싣는다', () => {
-    const rendered = renderHook(() => useSeasonSession(
-      메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, () => 명전,
-    ))
+    const rendered = renderHook(() =>
+      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, () => 명전),
+    )
     const { result } = rendered
     시작(result, 0)
     const { roster } = result.current
-    act(() => result.current.actions.updateRoster({
-      pitchers: [roster.pitchers[0]!, { ...roster.pitchers[1]!, id: 0xb5, kindByte: 1 }, ...roster.pitchers.slice(2)],
-      batters: [{ ...roster.batters[0]!, id: 0xc8, kindByte: 0x20 }, ...roster.batters.slice(1)],
-    }))
+    act(() =>
+      result.current.actions.updateRoster({
+        pitchers: [roster.pitchers[0]!, { ...roster.pitchers[1]!, id: 0xb5, kindByte: 1 }, ...roster.pitchers.slice(2)],
+        batters: [{ ...roster.batters[0]!, id: 0xc8, kindByte: 0x20 }, ...roster.batters.slice(1)],
+      }),
+    )
     act(() => result.current.actions.openNextGame())
     act(() => result.current.actions.confirmNextGame())
     act(() => result.current.actions.choosePreGameAce(0))
@@ -2348,7 +2614,11 @@ describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실�
     act(() => result.current.actions.startPendingGame())
 
     const order = result.current.gameOptions?.ourEntryOrder
-    expect(order?.batters[0]).toEqual({ rosterSlot: -1, position: roster.batters[0]!.fieldPosition & 0xf, record: { name: '전설', ability: [500, 600, 300, 200], recordId: 0xc8, profile: 0 } })
+    expect(order?.batters[0]).toEqual({
+      rosterSlot: -1,
+      position: roster.batters[0]!.fieldPosition & 0xf,
+      record: { name: '전설', ability: [500, 600, 300, 200], recordId: 0xc8, profile: 0 },
+    })
     const pitcher = order?.pitchers.find((entry) => typeof entry !== 'number')
     expect(pitcher).toEqual({
       name: '철완',
@@ -2361,16 +2631,18 @@ describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실�
   })
 
   it('명전 선수의 사람 경기 기록은 제 레코드(원본 id)로 쌓이고 순위표에 내 팀 줄·기록 이름으로 나온다 (0xa56dc 모드 2)', () => {
-    const rendered = renderHook(() => useSeasonSession(
-      메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, () => 명전,
-    ))
+    const rendered = renderHook(() =>
+      useSeasonSession(메모리저장(), createSeededRandom(20100901), null, undefined, undefined, undefined, undefined, () => 명전),
+    )
     const { result } = rendered
     시작(result, 0)
     const { roster } = result.current
-    act(() => result.current.actions.updateRoster({
-      pitchers: roster.pitchers,
-      batters: [{ ...roster.batters[0]!, id: 0xc8, kindByte: 0x20 }, ...roster.batters.slice(1)],
-    }))
+    act(() =>
+      result.current.actions.updateRoster({
+        pitchers: roster.pitchers,
+        batters: [{ ...roster.batters[0]!, id: 0xc8, kindByte: 0x20 }, ...roster.batters.slice(1)],
+      }),
+    )
     act(() => result.current.actions.playNextGame())
     // 진행기가 그 칸으로 쌓아 보낸 타석 (표 밖 · 원본 id 0xc8)
     const 타석 = [
@@ -2384,9 +2656,7 @@ describe('영입한 명전 선수는 그 기록으로 팀 경기 명단에 실�
 
     const { state, league, playerStats, series, cpuRosterOf } = result.current
     const recordOf = result.current.recordSource()!
-    const 줄 = seasonLeagueRecordsOf(
-      { league, myTeamId: 0, roster: result.current.roster, cpuRosterOf, playerStats, recordOf }, false,
-    )
+    const 줄 = seasonLeagueRecordsOf({ league, myTeamId: 0, roster: result.current.roster, cpuRosterOf, playerStats, recordOf }, false)
     expect(줄[0]).toMatchObject({ teamId: 0, name: '전설', homeRuns: 1, atBatsOrOuts: 2 })
     // 목표 ③ 도 그 줄을 센다 — 0번 칸 타율 500
     const 입력 = seasonGoalInputOf({ state: state!, league, roster: result.current.roster, playerStats, series, recordOf })
@@ -2423,7 +2693,13 @@ describe('CPU 트레이드 요청 (0x953c → 0xec10 → 0xe5)', () => {
   /** 요청이 서는 굴림 — 상대 3팀 타자 0번(값 29 이하 아무나)을 내 타자 0번(값 40)과 */
   const 요청굴림 = (): readonly (readonly [number, number, number])[] => {
     const 내칸 = teamBatters(0).findIndex((player) => player.grade >= teamBatters(상대팀)[0].grade)
-    return [[0, 0, 10000], [상대팀, 0, 10], [1, 0, 2], [0, 0, 12], [내칸, 0, 12]]
+    return [
+      [0, 0, 10000],
+      [상대팀, 0, 10],
+      [1, 0, 2],
+      [0, 0, 12],
+      [내칸, 0, 12],
+    ]
   }
 
   it('0xf1 에 들어가면 굴린다 — 요청이 서면 SR+0x17a +1 · 짝수 경기 뒤 관리 메뉴에서 알림이 뜬다', () => {
@@ -2617,10 +2893,12 @@ describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록
 
     const 다시 = 경기시작(메모리저장())
     expect(liveGameInningIndex()).toBe(0)
-    act(() => 다시.result.current.actions.enterGameSettlement({
-      ...요약({ opponentTeamId: 다시.result.current.gameOptions!.opponentTeamId }),
-      inningsPlayed: 11,
-    }))
+    act(() =>
+      다시.result.current.actions.enterGameSettlement({
+        ...요약({ opponentTeamId: 다시.result.current.gameOptions!.opponentTeamId }),
+        inningsPlayed: 11,
+      }),
+    )
     expect(liveGameInningIndex()).toBe(10)
   })
 
@@ -2804,10 +3082,14 @@ describe('레코드에 남은 마선수 (0xb512c 는 0xdf · 0xe5 진입만)', (
 
     // 0xe8 — 레코드 8번 칸이 마투수다: 가득이 아니면 회복, 가득이면 [211]
     let 결과 = { notice: '', recovered: false }
-    act(() => { 결과 = result.current.actions.recoverSeasonPitcherStamina(8) })
+    act(() => {
+      결과 = result.current.actions.recoverSeasonPitcherStamina(8)
+    })
     expect(결과.recovered).toBe(true)
     expect(result.current.myRecordAces?.pitcherStamina).toBe(10000)
-    act(() => { 결과 = result.current.actions.recoverSeasonPitcherStamina(8) })
+    act(() => {
+      결과 = result.current.actions.recoverSeasonPitcherStamina(8)
+    })
     expect(결과.recovered).toBe(false)
 
     act(() => result.current.actions.goto(SEASON_SCENE_STATE.선수고르기))
@@ -2847,19 +3129,27 @@ describe('r278 Q-05 — 기록 · 저장 꼴', () => {
     act(() => result.current.actions.playCupGame(10, 11))
     act(() => result.current.actions.toggleMatchSettings())
     act(() => result.current.actions.startPendingGame())
-    act(() => result.current.actions.finishGame(요약({
-      ourTeamId: 10,
-      opponentTeamId: 11,
-      leaguePitchers: {
-        lines: [
-          { teamId: 10, pitcherSlot: 2, outs: 27, runsAllowed: 1, strikeouts: 9, pitches: 120, walks: 3 },
-          { teamId: 11, pitcherSlot: 0, outs: 24, runsAllowed: 5, strikeouts: 4, pitches: 130, walks: 4 },
-        ],
-        decision: { winner: null, loser: null, save: null },
-        sideTeams: [11, 10],
-      },
-      leagueErrors: [{ teamId: 10, battingOrderIndex: 4 }, { teamId: 10, battingOrderIndex: 4 }, { teamId: 11, battingOrderIndex: 1 }],
-    })))
+    act(() =>
+      result.current.actions.finishGame(
+        요약({
+          ourTeamId: 10,
+          opponentTeamId: 11,
+          leaguePitchers: {
+            lines: [
+              { teamId: 10, pitcherSlot: 2, outs: 27, runsAllowed: 1, strikeouts: 9, pitches: 120, walks: 3 },
+              { teamId: 11, pitcherSlot: 0, outs: 24, runsAllowed: 5, strikeouts: 4, pitches: 130, walks: 4 },
+            ],
+            decision: { winner: null, loser: null, save: null },
+            sideTeams: [11, 10],
+          },
+          leagueErrors: [
+            { teamId: 10, battingOrderIndex: 4 },
+            { teamId: 10, battingOrderIndex: 4 },
+            { teamId: 11, battingOrderIndex: 1 },
+          ],
+        }),
+      ),
+    )
     const saved = store.load() as { cupPlayerStats: { pitchers: Record<number, { walks?: number }>; batters: Record<number, { errors?: number }> } }
     expect(saved.cupPlayerStats.pitchers[10 * 8 + 2]?.walks).toBe(3)
     expect(saved.cupPlayerStats.batters[10 * 12 + 4]?.errors).toBe(2)
@@ -2881,9 +3171,17 @@ describe('r278 Q-05 — 기록 · 저장 꼴', () => {
     const raw = JSON.parse(JSON.stringify(store.load())) as Record<string, unknown> & { roster: { pitchers: Record<string, unknown>[] } }
     delete raw.cupPlayerStats
     delete raw.recordAces
-    const nari = { id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: {
-      name: '나리', ability: [500, 500, 500, 500], repertoire: { name: '나리', form: 0, magicId: 0, pitchMask: 1 },
-    } }
+    const nari = {
+      id: 0xfe,
+      kindByte: 0x80,
+      fieldPosition: 0,
+      stamina: 10000,
+      record: {
+        name: '나리',
+        ability: [500, 500, 500, 500],
+        repertoire: { name: '나리', form: 0, magicId: 0, pitchMask: 1 },
+      },
+    }
     raw.roster = { ...raw.roster, pitchers: [...raw.roster.pitchers, nari] }
     const oldStore = 메모리저장()
     oldStore.save(raw)
@@ -2915,11 +3213,11 @@ describe('r278 Q-05 — 기록 · 저장 꼴', () => {
       read: () => true,
       markSeen: vi.fn(),
       readSeasonSettings: () => 전역,
-      writeSeasonSettings: vi.fn((settings: MatchProgressSettings) => { 전역 = settings }),
+      writeSeasonSettings: vi.fn((settings: MatchProgressSettings) => {
+        전역 = settings
+      }),
     }
-    const 이사 = renderHook(() => useSeasonSession(
-      store, createSeededRandom(1), null, undefined, undefined, undefined, undefined, undefined, slot,
-    ))
+    const 이사 = renderHook(() => useSeasonSession(store, createSeededRandom(1), null, undefined, undefined, undefined, undefined, undefined, slot))
     expect(slot.writeSeasonSettings).toHaveBeenCalledWith(옛설정)
     expect(이사.result.current.matchSettings).toEqual(옛설정)
 
@@ -2930,9 +3228,9 @@ describe('r278 Q-05 — 기록 · 저장 꼴', () => {
     expect(이사.result.current.matchSettings).toEqual(새설정)
     // 시즌 파일은 안 쓴다 — 시즌 저장 칸을 지워도 설정은 전역 칸에 남는다
     expect(JSON.stringify(store.load())).toBe(before)
-    const 빈시즌 = renderHook(() => useSeasonSession(
-      메모리저장(), createSeededRandom(1), null, undefined, undefined, undefined, undefined, undefined, slot,
-    ))
+    const 빈시즌 = renderHook(() =>
+      useSeasonSession(메모리저장(), createSeededRandom(1), null, undefined, undefined, undefined, undefined, undefined, slot),
+    )
     expect(빈시즌.result.current.matchSettings).toEqual(새설정)
   })
 

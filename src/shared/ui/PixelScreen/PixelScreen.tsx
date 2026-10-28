@@ -64,22 +64,12 @@ export function PixelScreen({ title, badge, children, leftKey, rightKey }: Pixel
       {(leftKey !== undefined || rightKey !== undefined) && (
         <footer className={styles.softKeys}>
           {leftKey !== undefined && (
-            <button
-              type="button"
-              className={styles.softKey}
-              onClick={leftKey.onPress}
-              disabled={leftKey.isDisabled === true}
-            >
+            <button type="button" className={styles.softKey} onClick={leftKey.onPress} disabled={leftKey.isDisabled === true}>
               {leftKey.label}
             </button>
           )}
           {rightKey !== undefined && (
-            <button
-              type="button"
-              className={styles.softKey}
-              onClick={rightKey.onPress}
-              disabled={rightKey.isDisabled === true}
-            >
+            <button type="button" className={styles.softKey} onClick={rightKey.onPress} disabled={rightKey.isDisabled === true}>
               {rightKey.label}
             </button>
           )}

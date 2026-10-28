@@ -14,8 +14,17 @@ function 띄우기(equipment: readonly number[] = [0, 0, 0, 0]) {
   const record = { ...startNewSeason(0, '테스터').record, money: 5000 }
   const view = { ...seasonPlayerRecordOf(0, tableRosterOf(0).batters[0]!, false, 0), equipment }
   const onBack = vi.fn()
-  render(<SeasonEquipmentScreen record={record} teamMorale={100} view={view} equipment={equipment}
-    isHiddenOpen={() => false} onPurchase={vi.fn()} onBack={onBack} />)
+  render(
+    <SeasonEquipmentScreen
+      record={record}
+      teamMorale={100}
+      view={view}
+      equipment={equipment}
+      isHiddenOpen={() => false}
+      onPurchase={vi.fn()}
+      onBack={onBack}
+    />,
+  )
   return { onBack }
 }
 

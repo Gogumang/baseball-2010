@@ -6,22 +6,9 @@
  *
  * 화면에 붙이는 일은 shared/ui/PixelText 가 한다.
  */
-export {
-  ASCII_ATLAS,
-  DRAWABLE_SYLLABLES,
-  HANGUL_ATLAS,
-  JAMO_SLOTS,
-  TABLE_QUIRKS,
-} from '@/shared/lib/font/atlas'
+export { ASCII_ATLAS, DRAWABLE_SYLLABLES, HANGUL_ATLAS, JAMO_SLOTS, TABLE_QUIRKS } from '@/shared/lib/font/atlas'
 export { chooseSets, composePieces, decomposeSyllable, glyphOf } from '@/shared/lib/font/compose'
 export type { Glyph, GlyphPiece, JamoIndices, JamoSets } from '@/shared/lib/font/compose'
-export {
-  ASCII_WIDTH,
-  FONT_SPACING,
-  HANGUL_WIDTH,
-  LINE_HEIGHT,
-  layoutPixelText,
-  measurePixelTextWidth,
-} from '@/shared/lib/font/layout'
+export { ASCII_WIDTH, FONT_SPACING, HANGUL_WIDTH, LINE_HEIGHT, layoutPixelText, measurePixelTextWidth } from '@/shared/lib/font/layout'
 export type { PixelTextLayout, PixelTextOptions, PlacedPiece } from '@/shared/lib/font/layout'
 export { measureRawTextWidth, measuredTitleCenterXOf } from '@/shared/lib/font/rawText'

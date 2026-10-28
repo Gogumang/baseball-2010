@@ -65,9 +65,10 @@ export function NariScreenPush<V extends string = NariMatchPushView>({ view, dir
     const previous = viewRef.current
     if (previous !== view) {
       viewRef.current = view
-      const direction = directionOf === undefined
-        ? nariMatchPushDirectionOf(previous as string as NariMatchPushView, view as string as NariMatchPushView)
-        : directionOf(previous, view)
+      const direction =
+        directionOf === undefined
+          ? nariMatchPushDirectionOf(previous as string as NariMatchPushView, view as string as NariMatchPushView)
+          : directionOf(previous, view)
       const host = snapshotHostRef.current
       const snapshot = lastSnapshotRef.current
       const first = direction === null ? null : screenPushFrameAt(direction, 0)
@@ -97,8 +98,7 @@ export function NariScreenPush<V extends string = NariMatchPushView>({ view, dir
 
   return (
     <div className={styles.frame}>
-      <div ref={liveRef}
-        style={push === null ? undefined : { transform: translate(push.frame.newX, push.frame.newY), pointerEvents: 'none' }}>
+      <div ref={liveRef} style={push === null ? undefined : { transform: translate(push.frame.newX, push.frame.newY), pointerEvents: 'none' }}>
         {children}
       </div>
       <div

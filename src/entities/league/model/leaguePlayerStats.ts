@@ -213,11 +213,7 @@ export function leaguePitcherLineOf(stats: LeaguePlayerStats, pitcherId: number)
 /** +0x24·+0x26 의 상한 — a8552·a8594 `0x270f` */
 const EXTRA_BASE_HIT_LIMIT = 9999
 
-function addPlateAppearance(
-  line: LeagueBatterLine,
-  outcome: AtBatOutcome,
-  runsBattedIn: number,
-): LeagueBatterLine {
+function addPlateAppearance(line: LeagueBatterLine, outcome: AtBatOutcome, runsBattedIn: number): LeagueBatterLine {
   return {
     atBats: line.atBats + (countsAsAtBat(outcome) ? 1 : 0),
     hits: line.hits + (isHit(outcome) ? 1 : 0),
@@ -229,10 +225,14 @@ function addPlateAppearance(
     // a8520~a85ac — 2루타 +0x24 · 3루타 +0x26 (9999 상한)
     ...(outcome.kind === '안타' && outcome.bases === 2
       ? { doubles: Math.min(EXTRA_BASE_HIT_LIMIT, (line.doubles ?? 0) + 1) }
-      : line.doubles === undefined ? {} : { doubles: line.doubles }),
+      : line.doubles === undefined
+        ? {}
+        : { doubles: line.doubles }),
     ...(outcome.kind === '안타' && outcome.bases === 3
       ? { triples: Math.min(EXTRA_BASE_HIT_LIMIT, (line.triples ?? 0) + 1) }
-      : line.triples === undefined ? {} : { triples: line.triples }),
+      : line.triples === undefined
+        ? {}
+        : { triples: line.triples }),
   }
 }
 
@@ -248,10 +248,7 @@ export interface LeagueStolenBase {
 const addSteal = (line: LeagueBatterLine): LeagueBatterLine => ({ ...line, steals: (line.steals ?? 0) + 1 })
 
 /** 도루를 +0x2c 에 쌓는다 (0xa8380 · 0xc1a98 — `strh` 라 s16, 실제로 넘칠 일은 없다) */
-export function recordLeagueStolenBases(
-  stats: LeaguePlayerStats,
-  stolenBases: readonly LeagueStolenBase[],
-): LeaguePlayerStats {
+export function recordLeagueStolenBases(stats: LeaguePlayerStats, stolenBases: readonly LeagueStolenBase[]): LeaguePlayerStats {
   if (stolenBases.length === 0) return stats
   const batters: Record<number, LeagueBatterLine> = { ...stats.batters }
   let recordBatters: Record<number, LeagueBatterLine> | undefined
@@ -285,10 +282,7 @@ const addError = (line: LeagueBatterLine): LeagueBatterLine => ({
 })
 
 /** 실책을 +0x2e 에 쌓는다 (수비 그림 0x43278 4381a~43904 — `LeagueBatterLine.errors`). 게이트가 없다 */
-export function recordLeagueErrors(
-  stats: LeaguePlayerStats,
-  errors: readonly LeagueFieldingError[],
-): LeaguePlayerStats {
+export function recordLeagueErrors(stats: LeaguePlayerStats, errors: readonly LeagueFieldingError[]): LeaguePlayerStats {
   if (errors.length === 0) return stats
   const batters: Record<number, LeagueBatterLine> = { ...stats.batters }
   let recordBatters: Record<number, LeagueBatterLine> | undefined
@@ -308,10 +302,7 @@ export function recordLeagueErrors(
  * 타석 여러 개를 한 번에 쌓는다. 경기 하나(또는 하루치 다섯 경기)를 마친 뒤 한 번 부르면 된다 —
  * 원본은 타석마다 부르지만 결과는 같고, 불변 객체를 타석마다 새로 만들지 않아도 된다.
  */
-export function recordLeaguePlateAppearances(
-  stats: LeaguePlayerStats,
-  plateAppearances: readonly LeaguePlateAppearance[],
-): LeaguePlayerStats {
+export function recordLeaguePlateAppearances(stats: LeaguePlayerStats, plateAppearances: readonly LeaguePlateAppearance[]): LeaguePlayerStats {
   if (plateAppearances.length === 0) return stats
 
   const batters: Record<number, LeagueBatterLine> = { ...stats.batters }
@@ -327,11 +318,7 @@ export function recordLeaguePlateAppearances(
       continue
     }
     const id = leagueBatterIdOf(appearance.teamId, appearance.battingOrderIndex)
-    batters[id] = addPlateAppearance(
-      batters[id] ?? EMPTY_LEAGUE_BATTER_LINE,
-      appearance.outcome,
-      appearance.runsBattedIn,
-    )
+    batters[id] = addPlateAppearance(batters[id] ?? EMPTY_LEAGUE_BATTER_LINE, appearance.outcome, appearance.runsBattedIn)
   }
   // 표 밖 선수가 없으면 칸을 만들지 않는다 — 예전 저장과 같은 모양
   return recordBatters === undefined ? { ...stats, batters } : { ...stats, batters, recordBatters }
@@ -418,10 +405,7 @@ export function leaguePitcherAppearancesOf(
     const teamId = record.teamId ?? teamOfSide(record.side)
     if (skip(teamId, record.pitcherSlot, record.recordId)) return
     const index = appearances.findIndex(
-      (appearance) =>
-        appearance.teamId === teamId
-        && appearance.pitcherSlot === record.pitcherSlot
-        && appearance.recordId === record.recordId,
+      (appearance) => appearance.teamId === teamId && appearance.pitcherSlot === record.pitcherSlot && appearance.recordId === record.recordId,
     )
     const found = index < 0 ? undefined : appearances[index]
     if (found !== undefined && found.decision === null) {
@@ -460,10 +444,7 @@ const WALK_LIMIT = 9999
  * 사사구(+0x2a)를 쌓는다 — 정산 0xa8024 꼬리 a8b04~a8bee 는 앞머리 게이트 0xa56dc 를 안 보므로 **정규시즌 · 포스트시즌을 가리지
  * 않는다**(투수 줄 `recordLeaguePitcherAppearances` 는 게이트 안이라 따로 부른다). 붙박이 표 밖 칸(내 육성 선수 · 마선수)은 건너뛴다.
  */
-export function recordLeagueFreePasses(
-  stats: LeaguePlayerStats,
-  lines: readonly LeaguePitcherWalkLine[],
-): LeaguePlayerStats {
+export function recordLeagueFreePasses(stats: LeaguePlayerStats, lines: readonly LeaguePitcherWalkLine[]): LeaguePlayerStats {
   const walked = lines.filter((line) => (line.walks ?? 0) > 0)
   if (walked.length === 0) return stats
   const pitchers: Record<number, LeaguePitcherLine> = { ...stats.pitchers }
@@ -489,10 +470,7 @@ export function recordLeagueFreePasses(
 /** 원본 투구 수 칸은 u16 을 0~9999 에서 자른다 (P1 3-1 · 6절) */
 const MAXIMUM_PITCH_COUNT = 9999
 
-function addPitcherAppearance(
-  line: LeaguePitcherLine,
-  appearance: LeaguePitcherAppearance,
-): LeaguePitcherLine {
+function addPitcherAppearance(line: LeaguePitcherLine, appearance: LeaguePitcherAppearance): LeaguePitcherLine {
   return {
     outs: line.outs + appearance.outs,
     runsAllowed: line.runsAllowed + appearance.runsAllowed,
@@ -511,10 +489,7 @@ function addPitcherAppearance(
  * 등판 여러 개를 한 번에 쌓는다 — 타자 쪽 `recordLeaguePlateAppearances` 와 짝이다.
  * 원본은 투구·아웃마다 레코드를 건드리지만(0xa5e14·0xa8cca) 결과는 같다.
  */
-export function recordLeaguePitcherAppearances(
-  stats: LeaguePlayerStats,
-  appearances: readonly LeaguePitcherAppearance[],
-): LeaguePlayerStats {
+export function recordLeaguePitcherAppearances(stats: LeaguePlayerStats, appearances: readonly LeaguePitcherAppearance[]): LeaguePlayerStats {
   if (appearances.length === 0) return stats
 
   const pitchers: Record<number, LeaguePitcherLine> = { ...stats.pitchers }
@@ -522,10 +497,7 @@ export function recordLeaguePitcherAppearances(
   for (const appearance of appearances) {
     if (appearance.recordId !== undefined) {
       recordPitchers ??= { ...stats.recordPitchers }
-      recordPitchers[appearance.recordId] = addPitcherAppearance(
-        recordPitchers[appearance.recordId] ?? EMPTY_LEAGUE_PITCHER_LINE,
-        appearance,
-      )
+      recordPitchers[appearance.recordId] = addPitcherAppearance(recordPitchers[appearance.recordId] ?? EMPTY_LEAGUE_PITCHER_LINE, appearance)
       continue
     }
     const id = leaguePitcherIdOf(appearance.teamId, appearance.pitcherSlot)

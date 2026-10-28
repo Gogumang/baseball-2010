@@ -138,13 +138,7 @@ function 중계넘기기(): number {
  */
 const 띄우기 = (options: Partial<PitcherGameOptions> = {}, seed = 20100901) => {
   vi.useFakeTimers()
-  const rendered = render(
-    <PitcherGameScreen
-      options={{ ...기본옵션, ...options }}
-      random={createSeededRandom(seed)}
-      onFinish={vi.fn()}
-    />,
-  )
+  const rendered = render(<PitcherGameScreen options={{ ...기본옵션, ...options }} random={createSeededRandom(seed)} onFinish={vi.fn()} />)
   // 키는 받은 다음 틀의 키 자리에서 처리된다(`sceneKeyLatch`) — 한 틀씩 흘린다
   fireEvent.keyDown(window, { key: '5' })
   act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
@@ -324,14 +318,11 @@ describe('투수편 경기 화면', () => {
     expect(liveGameInningIndex()).toBeGreaterThanOrEqual(8)
   })
 
-  it('정산 판에서 \'0\' 이 아닌 키는 정산을 나간다 (키 0x407f0 → 메시지 0x3f3)', () => {
+  it("정산 판에서 '0' 이 아닌 키는 정산을 나간다 (키 0x407f0 → 메시지 0x3f3)", () => {
     const onFinish = vi.fn()
     vi.useFakeTimers()
     try {
-      render(
-        <PitcherGameScreen options={{ ...기본옵션, dayCounter: 3 }} random={createSeededRandom(20100901)} onFinish={onFinish}
-          gamePoint={100} />,
-      )
+      render(<PitcherGameScreen options={{ ...기본옵션, dayCounter: 3 }} random={createSeededRandom(20100901)} onFinish={onFinish} gamePoint={100} />)
       // 인트로(0xc)를 '5' 로 건너뛰면 자동진행 중계(0x21) 뒤 경기 끝 결과 판(0x18) — 10틱 잠금 뒤 OK 로 정산(0x19)
       fireEvent.keyDown(window, { key: '5' })
       틱(1)
@@ -379,13 +370,7 @@ describe('경기 시작 연출 (인트로 0xc → 1회초 판 0x18)', () => {
 
   it('선공이면 첫 장면이 우리 공격(자동)이라 판 없이 — 그 중계(0x21)를 본 뒤 곧장 던진다', () => {
     vi.useFakeTimers()
-    render(
-      <PitcherGameScreen
-        options={{ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }}
-        random={createSeededRandom(1)}
-        onFinish={vi.fn()}
-      />,
-    )
+    render(<PitcherGameScreen options={{ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }} random={createSeededRandom(1)} onFinish={vi.fn()} />)
     fireEvent.keyDown(window, { key: '5' })
     // 1회초 우리 공격 — 타석마다 한 틱(교체 틱 포함) · 마지막 칸 다음 틱에 0x18
     expect(중계넘기기()).toBeGreaterThan(3)

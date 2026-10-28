@@ -23,11 +23,14 @@ export function useEditedNames(store: JsonStorePort): EditedNamesSession {
     return loaded
   })
 
-  const commit = useCallback((next: EditedNameTable) => {
-    setActiveEditedNames(next)
-    store.save(next)
-    setTable(next)
-  }, [store])
+  const commit = useCallback(
+    (next: EditedNameTable) => {
+      setActiveEditedNames(next)
+      store.save(next)
+      setTable(next)
+    },
+    [store],
+  )
 
   const rename = useCallback(
     (id: number, isPitcher: boolean, name: string) => commit(withEditedName(activeEditedNames(), id, isPitcher, name)),

@@ -52,8 +52,12 @@ export function DerbyFieldPlay({ field, tick, look, distanceValue, rewardX }: De
       hidesFieldMap
       overBackground={
         <>
-          <div className={defenseStyles.actor} style={{ left: offset.x, top: offset.y }} data-testid="더비-이벤트존"
-            data-placed={isZonePlaced ? 'true' : undefined}>
+          <div
+            className={defenseStyles.actor}
+            style={{ left: offset.x, top: offset.y }}
+            data-testid="더비-이벤트존"
+            data-placed={isZonePlaced ? 'true' : undefined}
+          >
             <FrameSprite
               folder={EVENT_ZONE_FRAMES}
               frame={0}

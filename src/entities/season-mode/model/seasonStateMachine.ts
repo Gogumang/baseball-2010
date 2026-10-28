@@ -224,9 +224,7 @@ export function menuCursorsOnEnter(
   record: Pick<SeasonRecord, 'acted' | 'endingSeen'>,
 ): SeasonMenuCursors {
   if (entered === SEASON_SCENE_STATE.관리메뉴) {
-    const keeps = previous === SEASON_SCENE_STATE.다음경기
-      || previous === SEASON_SCENE_STATE.구단관리
-      || previous === SEASON_SCENE_STATE.아이템
+    const keeps = previous === SEASON_SCENE_STATE.다음경기 || previous === SEASON_SCENE_STATE.구단관리 || previous === SEASON_SCENE_STATE.아이템
     if ((record.acted && !keeps) || record.endingSeen) return { ...cursors, management: 0 }
     return cursors
   }

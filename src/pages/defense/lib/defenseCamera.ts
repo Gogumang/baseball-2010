@@ -87,11 +87,7 @@ export function clampCamera(bounds: CameraBounds, x: number, y: number): CameraS
 
 /** 가운데 맞추기 vt20 (0xc05f0) — 목표 = 대상 − 시야/2, 그 뒤 경계 */
 export function centerOn(bounds: CameraBounds, target: WorldPoint): CameraState {
-  return clampCamera(
-    bounds,
-    target.x - Math.trunc(bounds.viewWidth / 2),
-    target.z - Math.trunc(bounds.viewHeight / 2),
-  )
+  return clampCamera(bounds, target.x - Math.trunc(bounds.viewWidth / 2), target.z - Math.trunc(bounds.viewHeight / 2))
 }
 
 /** 한 축 따라가기 (vt28 0xc0690 안쪽) — 걸음이 0 으로 잘리면 부호만큼 ±1 움직인다 */
@@ -103,11 +99,7 @@ function followValue(current: number, target: number, percent: number): number {
 }
 
 /** 따라가기형 틱 vt28 (0xc0690) — 목표 쪽으로 percent%/틱 */
-export function followCamera(
-  current: CameraState,
-  target: CameraState,
-  percent: number = CAMERA_FOLLOW_PERCENT,
-): CameraState {
+export function followCamera(current: CameraState, target: CameraState, percent: number = CAMERA_FOLLOW_PERCENT): CameraState {
   return {
     x: followValue(current.x, target.x, percent),
     y: followValue(current.y, target.y, percent),
@@ -118,12 +110,7 @@ export function followCamera(
  * 한 틱 (0x3f060) — 대상을 가운데로 잡은 목표에 percent% 다가간다.
  * 목표만 경계로 자르고 현재 위치는 자르지 않는다(원본 vt30 이 목표에만 걸린다).
  */
-export function stepCamera(
-  bounds: CameraBounds,
-  current: CameraState,
-  target: WorldPoint,
-  percent: number = CAMERA_FOLLOW_PERCENT,
-): CameraState {
+export function stepCamera(bounds: CameraBounds, current: CameraState, target: WorldPoint, percent: number = CAMERA_FOLLOW_PERCENT): CameraState {
   return followCamera(current, centerOn(bounds, target), percent)
 }
 
@@ -133,10 +120,7 @@ export function screenOffsetOf(camera: CameraState): { readonly x: number; reado
 }
 
 /** 월드 점 → 화면 점 (배율 뒤 화면 오프셋을 더한다) */
-export function worldToScreen(
-  camera: CameraState,
-  point: WorldPoint,
-): { readonly x: number; readonly y: number } {
+export function worldToScreen(camera: CameraState, point: WorldPoint): { readonly x: number; readonly y: number } {
   const offset = screenOffsetOf(camera)
   return { x: toScreenX(point.x) + offset.x, y: toScreenY(point.z) + offset.y }
 }

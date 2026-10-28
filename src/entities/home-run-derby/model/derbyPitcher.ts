@@ -64,9 +64,7 @@ function ordinaryDerbyPitcherOf(opponentTeamId: number): {
       breaking: Math.round(breaking / ENGINE_DIVISOR),
       gameAbility: { beforeFatigue: { control, velocity, breaking } },
       staminaPercent: HOME_RUN_DERBY_STAMINA_PERCENT,
-      ...(repertoire === undefined
-        ? {}
-        : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+      ...(repertoire === undefined ? {} : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
       // 사람 타석 0xab214 의 스킬 갈래 — 그 줄 레코드 +0x14(Xls 행 사본)를 `0xb62b4(투수, n)` 로 읽는다
       skillIds: skillIdsOfBits(row.skillBits, true),
     },
@@ -135,19 +133,12 @@ export interface DerbyPitcher {
  * `selectPitch` 에 넘긴다. 마구면 제구 등급 5(0x4dbac)·실투 굴림 없음·마구 공 그림·공+0x10 이 일반 갈래와 같은 길로 간다.
  * 남은 마구 횟수는 줄지 않는다 — 0x345fc 가 모드 7 에서 소모 0x34894 앞에 끝난다(`magicPitchGame`).
  */
-export function derbyPitcherOf(
-  stage: number,
-  aceLevels?: Readonly<Record<number, number>>,
-  opponentTeamId?: number,
-): DerbyPitcher {
+export function derbyPitcherOf(stage: number, aceLevels?: Readonly<Record<number, number>>, opponentTeamId?: number): DerbyPitcher {
   // 구질은 단계만 보고 갈린다 — `0x344dc` 가 `단계 > 0 ? 0x16 : 1` 이다
   const pitchType = stage > 0 ? DERBY_MAGIC_PITCH_TYPE : DERBY_ORDINARY_PITCH_TYPE
   const ace = derbyAcePitcherOf(stage)
   if (ace === null) {
-    const ordinary =
-      opponentTeamId === undefined
-        ? { name: null, ability: LEGACY_ORDINARY_DERBY_PITCHER }
-        : ordinaryDerbyPitcherOf(opponentTeamId)
+    const ordinary = opponentTeamId === undefined ? { name: null, ability: LEGACY_ORDINARY_DERBY_PITCHER } : ordinaryDerbyPitcherOf(opponentTeamId)
     const row = opponentTeamId === undefined ? undefined : teamPitchers(opponentTeamId)[DERBY_ORDINARY_PITCHER_ROW]
     return {
       stage,

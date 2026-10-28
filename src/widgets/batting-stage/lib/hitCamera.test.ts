@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { projectToPlate } from '@/entities/pitching/model/pitchCurve'
 import type { HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
-import {
-  STAGE_CAMERA_HOME,
-  approachCameraAxis,
-  hitCameraAngleOf,
-  hitCameraAt,
-  stageCameraShiftOf,
-} from '@/widgets/batting-stage/lib/hitCamera'
+import { STAGE_CAMERA_HOME, approachCameraAxis, hitCameraAngleOf, hitCameraAt, stageCameraShiftOf } from '@/widgets/batting-stage/lib/hitCamera'
 
 /** 타격점에서 투수판 너머로 날아가는 공 — 높이가 오르며 깊이가 줄어든다 */
 const flyingPath: HitBallPath = {

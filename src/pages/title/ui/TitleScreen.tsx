@@ -74,9 +74,15 @@ export function TitleScreen({ onStart }: TitleScreenProps) {
 
   return (
     <RawScreen onPress={press}>
-      <canvas ref={canvasRef} className={styles.canvas} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-        data-intro-frame={scene.introFrame} data-prompt-frame={scene.promptFrame ?? undefined}
-        aria-label="2010 프로야구" />
+      <canvas
+        ref={canvasRef}
+        className={styles.canvas}
+        width={SCREEN_WIDTH}
+        height={SCREEN_HEIGHT}
+        data-intro-frame={scene.introFrame}
+        data-prompt-frame={scene.promptFrame ?? undefined}
+        aria-label="2010 프로야구"
+      />
       {scene.isSettled && (
         <>
           <Layer src={`${SPRITE}/006.png`} x={COPYRIGHT.x} y={COPYRIGHT.y} label="© 2009 GAMEVIL" />

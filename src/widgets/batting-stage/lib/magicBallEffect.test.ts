@@ -32,14 +32,12 @@ describe('마구 공 이펙트 고르기 (0x3b4e2 · 0x481c4)', () => {
 
   it('마구 번호 1 은 effect_fire 다 — 폼을 안 가린다', () => {
     for (const form of [0, 1, 2, 3, 4, 5]) {
-      expect(magicBallEffectFolderOf({ ...공, isMagicPitch: true, pitcherMagicNumber: 1, pitcherForm: form }))
-        .toBe(EFFECT_FIRE_FRAMES)
+      expect(magicBallEffectFolderOf({ ...공, isMagicPitch: true, pitcherMagicNumber: 1, pitcherForm: form })).toBe(EFFECT_FIRE_FRAMES)
     }
   })
 
   it('마구 번호 4 는 폼 묶음 0(폼 0·1)일 때만 effect_shinning 이다', () => {
-    const 이펙트 = (form: number) =>
-      magicBallEffectFolderOf({ ...공, isMagicPitch: true, pitcherMagicNumber: 4, pitcherForm: form })
+    const 이펙트 = (form: number) => magicBallEffectFolderOf({ ...공, isMagicPitch: true, pitcherMagicNumber: 4, pitcherForm: form })
     expect(이펙트(0)).toBe(EFFECT_SHINNING_FRAMES)
     expect(이펙트(1)).toBe(EFFECT_SHINNING_FRAMES)
     expect(이펙트(2)).toBeNull()
@@ -110,7 +108,10 @@ describe('0x11 마구 공 파티클 (0x3b2f4 갈래표 0xcff20)', () => {
   it('4 는 폼 >> 1 로 — 1 이면 공 틱 0 에만 0x18, 2 면 공 틱 ≤ N/2 에 0x16 · 0x17, 0 · 3 은 없다', () => {
     expect(magicBallParticlesOf(마구(4, 2), 0, 20)).toEqual([{ id: 0x18, img: 15 }])
     expect(magicBallParticlesOf(마구(4, 3), 1, 20)).toEqual([])
-    expect(magicBallParticlesOf(마구(4, 4), 10, 21)).toEqual([{ id: 0x16, img: 14 }, { id: 0x17, img: 14 }])
+    expect(magicBallParticlesOf(마구(4, 4), 10, 21)).toEqual([
+      { id: 0x16, img: 14 },
+      { id: 0x17, img: 14 },
+    ])
     expect(magicBallParticlesOf(마구(4, 5), 11, 21)).toEqual([])
     expect(magicBallParticlesOf(마구(4, 1), 0, 20)).toEqual([])
     expect(magicBallParticlesOf(마구(4, 6), 0, 20)).toEqual([])

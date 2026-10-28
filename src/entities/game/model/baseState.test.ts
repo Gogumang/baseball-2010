@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { advanceRunners, EMPTY_BASES, runnerCountOf , advanceOnGroundOut, advanceOnQuickWalk, canAdvanceOnGroundOut} from '@/entities/game/model/baseState'
+import {
+  advanceRunners,
+  EMPTY_BASES,
+  runnerCountOf,
+  advanceOnGroundOut,
+  advanceOnQuickWalk,
+  canAdvanceOnGroundOut,
+} from '@/entities/game/model/baseState'
 import type { BaseState } from '@/entities/game/model/baseState'
 
 const 만루: BaseState = { first: true, second: true, third: true }

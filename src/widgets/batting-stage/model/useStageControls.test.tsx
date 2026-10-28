@@ -4,11 +4,7 @@ import { cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import type { StageActions } from '@/widgets/batting-stage/model/useStageControls'
 import type { StageRefs } from '@/widgets/batting-stage/model/stageRefs'
-import {
-  markCommonWindowShown,
-  markGameSceneUp,
-  resetCommonWindowShownForTest,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 import { createSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 afterEach(cleanup)
@@ -222,7 +218,9 @@ describe('화면 탭 (웹판 추가) — 손가락이 닿는 순간 키 하나',
   const 누름 = (x: number, button = 0) => {
     const canvas = document.createElement('canvas')
     canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 240, height: 320, right: 240, bottom: 320, x: 0, y: 0, toJSON: () => ({}) })
-    return { currentTarget: canvas, clientX: x, clientY: 160, button, preventDefault: () => {} } as unknown as Parameters<ReturnType<typeof useStageControls>['onPointerDown']>[0]
+    return { currentTarget: canvas, clientX: x, clientY: 160, button, preventDefault: () => {} } as unknown as Parameters<
+      ReturnType<typeof useStageControls>['onPointerDown']
+    >[0]
   }
 
   it('가운데는 누르는 순간 스윙(OK) — 떼기를 기다리지 않는다, 처리는 다음 틀', () => {
@@ -320,10 +318,13 @@ describe('받은 틱 — 키 사건이 난 때 화면에 있던 그림의 틱 (r
     vi.spyOn(performance, 'now').mockReturnValue(1000)
     const 손잡이: StageActions = { swing: vi.fn(), pressBunt: vi.fn(), releaseBunt: vi.fn(), moveBatter: vi.fn() }
     const 받은시각: number[] = []
-    칸 = createSceneKeyLatch(() => 16, (time) => {
-      받은시각.push(time)
-      return 14
-    })
+    칸 = createSceneKeyLatch(
+      () => 16,
+      (time) => {
+        받은시각.push(time)
+        return 14
+      },
+    )
     const { result } = renderHook(() => useStageControls(가짜refs(true), 손잡이))
     const event = new KeyboardEvent('keydown', { key: '5' })
     Object.defineProperty(event, 'timeStamp', { value: 930 })
@@ -334,7 +335,11 @@ describe('받은 틱 — 키 사건이 난 때 화면에 있던 그림의 틱 (r
     const canvas = document.createElement('canvas')
     canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 240, height: 320 }) as DOMRect
     result.current.onPointerDown({
-      preventDefault: () => {}, button: 0, clientX: 120, currentTarget: canvas, nativeEvent: { timeStamp: 960 },
+      preventDefault: () => {},
+      button: 0,
+      clientX: 120,
+      currentTarget: canvas,
+      nativeEvent: { timeStamp: 960 },
     } as never)
     runSceneKeys(칸, 15)
     expect(손잡이.swing).toHaveBeenCalledTimes(2)

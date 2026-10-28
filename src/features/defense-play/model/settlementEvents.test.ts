@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  arrivalPlaySettles,
-  pendingSettlementEventsAfter,
-  withSettlementEvents,
-} from '@/features/defense-play/model/settlementEvents'
+import { arrivalPlaySettles, pendingSettlementEventsAfter, withSettlementEvents } from '@/features/defense-play/model/settlementEvents'
 
 describe('정산 사건 목록의 앞 몫 — 0xa5e14 · 0xa5bcc 만 비운다', () => {
   it('같은 타석이 이어지면 판의 아웃 · 득점을 얹고, 끝나면 없앤다', () => {

@@ -5,7 +5,12 @@ import { TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimati
 import { EventAnimationSprite as AnimationSprite } from '@/widgets/training-scene/ui/EventAnimationSprite'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import {
-  EVENT_CHAR_0, EVENT_CHAR_1, OUTING_PANEL, OUTING_PANEL_BAND, SEASON_OUTING_PRESENTATIONS, isSeasonOutingSkipKey,
+  EVENT_CHAR_0,
+  EVENT_CHAR_1,
+  OUTING_PANEL,
+  OUTING_PANEL_BAND,
+  SEASON_OUTING_PRESENTATIONS,
+  isSeasonOutingSkipKey,
 } from '@/pages/season/lib/seasonOutingPopup'
 import type { SeasonOutingPresentation } from '@/pages/season/lib/seasonOutingPopup'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
@@ -103,27 +108,60 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
   const panelTop = RY + D
 
   return (
-    <div data-testid="시즌-외출연출" data-place={place} style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}
-      onClick={() => skipRef.current()}>
+    <div
+      data-testid="시즌-외출연출"
+      data-place={place}
+      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}
+      onClick={() => skipRef.current()}
+    >
       {/* 0x84ea0 — R+d 검정 · 위아래 띠 */}
       <div style={{ position: 'absolute', left: RX, top: panelTop, width: RW, height: RH, background: '#000' }} />
-      <Band top={panelTop - OUTING_PANEL_BAND} lines={[[0, BAND_DARK], [1, BAND_LIGHT]]} />
-      <Band top={panelTop + RH} lines={[[OUTING_PANEL_BAND - 2, BAND_LIGHT], [OUTING_PANEL_BAND - 1, BAND_DARK]]} />
+      <Band
+        top={panelTop - OUTING_PANEL_BAND}
+        lines={[
+          [0, BAND_DARK],
+          [1, BAND_LIGHT],
+        ]}
+      />
+      <Band
+        top={panelTop + RH}
+        lines={[
+          [OUTING_PANEL_BAND - 2, BAND_LIGHT],
+          [OUTING_PANEL_BAND - 1, BAND_DARK],
+        ]}
+      />
       {!isDone && (
         <>
           <div style={{ position: 'absolute', overflow: 'hidden', ...WINDOW_CLIP }}>
             {windowOrigin !== undefined && (
-              <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-                src={windowSprite.src} alt="" />
+              <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
             )}
           </div>
           <div style={{ position: 'absolute', left: 0, top: 0, width: 240, height: ANIMATION_CLIP_HEIGHT, overflow: 'hidden' }}>
-            <AnimationSprite folder={presentation.folder} origins={origins} entries={animations?.[presentation.animation]} update={update} anchor={ANCHOR} />
+            <AnimationSprite
+              folder={presentation.folder}
+              origins={origins}
+              entries={animations?.[presentation.animation]}
+              update={update}
+              anchor={ANCHOR}
+            />
             {overlays !== null && (
               <>
-                <AnimationSprite folder={EVENT_CHAR_1} origins={char1Origins} entries={char1Animations?.[overlays.char1]} update={update} anchor={ANCHOR} />
-                <AnimationSprite folder={EVENT_CHAR_0} origins={char0Origins} entries={char0Animations?.[overlays.char0]} update={update}
-                  anchor={ANCHOR} palette={char0Palette} />
+                <AnimationSprite
+                  folder={EVENT_CHAR_1}
+                  origins={char1Origins}
+                  entries={char1Animations?.[overlays.char1]}
+                  update={update}
+                  anchor={ANCHOR}
+                />
+                <AnimationSprite
+                  folder={EVENT_CHAR_0}
+                  origins={char0Origins}
+                  entries={char0Animations?.[overlays.char0]}
+                  update={update}
+                  anchor={ANCHOR}
+                  palette={char0Palette}
+                />
               </>
             )}
           </div>

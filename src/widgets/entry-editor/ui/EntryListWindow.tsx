@@ -10,12 +10,31 @@ import { PixelText } from '@/shared/ui/PixelText/PixelText'
 import { yearCellDrawingOf, yearLabelOffsetOf, yearNumberGlyphsOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import { batterPositionBadgeOf, pitcherRoleBadgeOf, roundFillRectsOf } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 import {
-  ENTRY_BADGE_CHIP_BASE, ENTRY_BADGE_DASH, ENTRY_FIELDER_COLORS, ENTRY_LIST_LAYOUT, ENTRY_TODAY_LABEL_FRAME,
-  ENTRY_TODAY_OVERLAY_FRAME, entryArrowBlinkOf, entryCursorBorderOf, entryCursorRectOf, entryListGeometryOf, entryOrderCellOf,
-  entryPickedFillOf, entryRotationCellOf, entryRowYOf, entryStaminaLinesOf, entryStatCellOf, isPitcherColumn,
+  ENTRY_BADGE_CHIP_BASE,
+  ENTRY_BADGE_DASH,
+  ENTRY_FIELDER_COLORS,
+  ENTRY_LIST_LAYOUT,
+  ENTRY_TODAY_LABEL_FRAME,
+  ENTRY_TODAY_OVERLAY_FRAME,
+  entryArrowBlinkOf,
+  entryCursorBorderOf,
+  entryCursorRectOf,
+  entryListGeometryOf,
+  entryOrderCellOf,
+  entryPickedFillOf,
+  entryRotationCellOf,
+  entryRowYOf,
+  entryStaminaLinesOf,
+  entryStatCellOf,
+  isPitcherColumn,
 } from '@/widgets/entry-editor/lib/entryListWindow'
 import type {
-  EntryBatterLine, EntryColumnTable, EntryListGeometry, EntryPitcherLine, EntryRect, PlacedEntryColumn,
+  EntryBatterLine,
+  EntryColumnTable,
+  EntryListGeometry,
+  EntryPitcherLine,
+  EntryRect,
+  PlacedEntryColumn,
 } from '@/widgets/entry-editor/lib/entryListWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -73,8 +92,20 @@ export interface EntryListWindowProps {
  * 그림 차례: 판 → ▲▼ → 고정 열 → 옆 화살 → 자르기 안 넘기는 열 → 커서 0x56234 → 고른 줄 0x563dc.
  */
 export function EntryListWindow({
-  rows, table, cursor, top, firstColumn, slideOffset, keyPresses, subTab, picked, showsNameBars, isCursorNameOnly = false,
-  onPressRow, onPressArrow, testId = '엔트리-목록',
+  rows,
+  table,
+  cursor,
+  top,
+  firstColumn,
+  slideOffset,
+  keyPresses,
+  subTab,
+  picked,
+  showsNameBars,
+  isCursorNameOnly = false,
+  onPressRow,
+  onPressArrow,
+  testId = '엔트리-목록',
 }: EntryListWindowProps) {
   const gameUi = useFrameOrigins(GAME_UI_FRAMES)
   const imgText = useFrameOrigins(IMG_TEXT_FRAMES)
@@ -89,38 +120,53 @@ export function EntryListWindow({
   const visibleRows = rows.slice(top, top + visibleCount)
   const blink = entryArrowBlinkOf(keyPresses)
   const badgeX = geometry.scroll.find((placed) => placed.index === 0)?.x ?? geometry.clip.x
-  const cursorRect = cursor >= top && cursor < top + visibleCount
-    ? entryCursorRectOf({ geometry, rowY: entryRowYOf(cursor, top), subTab, isNameOnly: isCursorNameOnly, badgeX })
-    : null
-  const pickedRect = picked >= top && picked < top + visibleCount
-    ? entryPickedFillOf({ geometry, rowY: entryRowYOf(picked, top), subTab, badgeX })
-    : null
+  const cursorRect =
+    cursor >= top && cursor < top + visibleCount
+      ? entryCursorRectOf({ geometry, rowY: entryRowYOf(cursor, top), subTab, isNameOnly: isCursorNameOnly, badgeX })
+      : null
+  const pickedRect =
+    picked >= top && picked < top + visibleCount ? entryPickedFillOf({ geometry, rowY: entryRowYOf(picked, top), subTab, badgeX }) : null
 
   const columnProps = { rows: visibleRows, top, gameUi, imgText, palette3: palette3.style, showsNameBars }
   return (
     <div role="group" aria-label="엔트리 목록" data-testid={testId}>
       {palette3.definition}
       {/* 5ca4e 공용 판 — 아래 띠 (s8)[ed+0x3e8] 은 0x5561c 가 늘 0 으로 둔다 */}
-      <CommonPanel x={L.panel.x} y={L.panel.y} width={L.panel.width} height={L.panel.height} topBand={L.panel.topBand}
-        testId="엔트리-판" />
+      <CommonPanel x={L.panel.x} y={L.panel.y} width={L.panel.width} height={L.panel.height} topBand={L.panel.topBand} testId="엔트리-판" />
       {rows.length > 1 && (
         <>
           <img alt="" src={`${SLT_FRAME}/${pad(L.upArrowImage)}.png`} style={{ ...pixel, left: L.arrowX, top: L.upArrowY - blink }} />
           <img alt="" src={`${SLT_FRAME}/${pad(L.downArrowImage)}.png`} style={{ ...pixel, left: L.arrowX, top: L.downArrowY + blink }} />
         </>
       )}
-      {geometry.fixed.map((placed) => <EntryColumnCells key={placed.column.word} placed={placed} {...columnProps} />)}
+      {geometry.fixed.map((placed) => (
+        <EntryColumnCells key={placed.column.word} placed={placed} {...columnProps} />
+      ))}
       {geometry.leftArrow !== null && (
         <img alt="" src={`${SLT_FRAME}/${pad(L.sideArrowImage)}.png`} style={{ ...pixel, left: geometry.leftArrow.x, top: geometry.leftArrow.y }} />
       )}
       {geometry.rightArrow !== null && (
-        <img alt="" src={`${SLT_FRAME}/${pad(L.sideArrowImage)}.png`}
-          style={{ ...pixel, left: geometry.rightArrow.x, top: geometry.rightArrow.y, transform: 'scaleX(-1)' }} />
+        <img
+          alt=""
+          src={`${SLT_FRAME}/${pad(L.sideArrowImage)}.png`}
+          style={{ ...pixel, left: geometry.rightArrow.x, top: geometry.rightArrow.y, transform: 'scaleX(-1)' }}
+        />
       )}
-      <div style={{ ...pixel, left: geometry.clip.x, top: geometry.clip.y, width: geometry.clip.width, height: geometry.clip.height,
-        overflow: 'hidden' }} data-testid={`${testId}-넘기는-열`}>
+      <div
+        style={{
+          ...pixel,
+          left: geometry.clip.x,
+          top: geometry.clip.y,
+          width: geometry.clip.width,
+          height: geometry.clip.height,
+          overflow: 'hidden',
+        }}
+        data-testid={`${testId}-넘기는-열`}
+      >
         <div style={{ ...pixel, left: -geometry.clip.x, top: -geometry.clip.y }}>
-          {geometry.scroll.map((placed) => <EntryColumnCells key={placed.index} placed={placed} {...columnProps} />)}
+          {geometry.scroll.map((placed) => (
+            <EntryColumnCells key={placed.index} placed={placed} {...columnProps} />
+          ))}
         </div>
       </div>
       {cursorRect !== null && <CursorBorder rect={cursorRect} keyPresses={keyPresses} />}
@@ -131,14 +177,32 @@ export function EntryListWindow({
           ))}
         </div>
       )}
-      <EntryListPresses geometry={geometry} rows={visibleRows} top={top} cursor={cursor} onPressRow={onPressRow}
-        onPressArrow={onPressArrow} hasVerticalArrows={rows.length > 1} />
+      <EntryListPresses
+        geometry={geometry}
+        rows={visibleRows}
+        top={top}
+        cursor={cursor}
+        onPressRow={onPressRow}
+        onPressArrow={onPressArrow}
+        hasVerticalArrows={rows.length > 1}
+      />
     </div>
   )
 }
 
-function EntryListPresses({ geometry, rows, top, cursor, onPressRow, onPressArrow, hasVerticalArrows }: {
-  readonly geometry: EntryListGeometry; readonly rows: readonly EntryListRow[]; readonly top: number; readonly cursor: number
+function EntryListPresses({
+  geometry,
+  rows,
+  top,
+  cursor,
+  onPressRow,
+  onPressArrow,
+  hasVerticalArrows,
+}: {
+  readonly geometry: EntryListGeometry
+  readonly rows: readonly EntryListRow[]
+  readonly top: number
+  readonly cursor: number
   readonly onPressRow: ((index: number) => void) | undefined
   readonly onPressArrow: ((direction: '위' | '아래' | '왼' | '오른') => void) | undefined
   readonly hasVerticalArrows: boolean
@@ -148,15 +212,20 @@ function EntryListPresses({ geometry, rows, top, cursor, onPressRow, onPressArro
   const rowWidth = geometry.clip.x + geometry.clip.width - rowLeft
   return (
     <>
-      {onPressRow !== undefined && rows.map((row, offset) => {
-        const index = top + offset
-        return (
-          <PressArea key={index} label={row.name} testId={`엔트리-줄-${index}`}
-            option={{ isSelected: index === cursor }}
-            rect={{ x: rowLeft, y: entryRowYOf(index, top), width: rowWidth, height: L.cellHeight }}
-            onPress={() => onPressRow(index)} />
-        )
-      })}
+      {onPressRow !== undefined &&
+        rows.map((row, offset) => {
+          const index = top + offset
+          return (
+            <PressArea
+              key={index}
+              label={row.name}
+              testId={`엔트리-줄-${index}`}
+              option={{ isSelected: index === cursor }}
+              rect={{ x: rowLeft, y: entryRowYOf(index, top), width: rowWidth, height: L.cellHeight }}
+              onPress={() => onPressRow(index)}
+            />
+          )
+        })}
       {onPressArrow !== undefined && hasVerticalArrows && (
         <>
           <PressArea label="위" rect={{ x: L.arrowX - 2, y: L.upArrowY - 4, width: 17, height: 12 }} onPress={() => onPressArrow('위')} />
@@ -164,12 +233,18 @@ function EntryListPresses({ geometry, rows, top, cursor, onPressRow, onPressArro
         </>
       )}
       {onPressArrow !== undefined && geometry.leftArrow !== null && (
-        <PressArea label="앞 열" rect={{ x: geometry.leftArrow.x - 3, y: geometry.leftArrow.y - 2, width: 9, height: 12 }}
-          onPress={() => onPressArrow('왼')} />
+        <PressArea
+          label="앞 열"
+          rect={{ x: geometry.leftArrow.x - 3, y: geometry.leftArrow.y - 2, width: 9, height: 12 }}
+          onPress={() => onPressArrow('왼')}
+        />
       )}
       {onPressArrow !== undefined && geometry.rightArrow !== null && (
-        <PressArea label="다음 열" rect={{ x: geometry.rightArrow.x - 1, y: geometry.rightArrow.y - 2, width: 9, height: 12 }}
-          onPress={() => onPressArrow('오른')} />
+        <PressArea
+          label="다음 열"
+          rect={{ x: geometry.rightArrow.x - 1, y: geometry.rightArrow.y - 2, width: 9, height: 12 }}
+          onPress={() => onPressArrow('오른')}
+        />
       )}
     </>
   )
@@ -206,9 +281,22 @@ function EntryColumnCells({ placed, rows, top, gameUi, imgText, palette3, showsN
   )
 }
 
-function CellContent({ placed, row, index, y, gameUi, imgText, showsNameBars }: {
-  readonly placed: PlacedEntryColumn; readonly row: EntryListRow; readonly index: number; readonly y: number
-  readonly gameUi: FrameOrigins | null; readonly imgText: FrameOrigins | null; readonly showsNameBars: boolean
+function CellContent({
+  placed,
+  row,
+  index,
+  y,
+  gameUi,
+  imgText,
+  showsNameBars,
+}: {
+  readonly placed: PlacedEntryColumn
+  readonly row: EntryListRow
+  readonly index: number
+  readonly y: number
+  readonly gameUi: FrameOrigins | null
+  readonly imgText: FrameOrigins | null
+  readonly showsNameBars: boolean
 }) {
   const { column, x } = placed
   switch (column.kind) {
@@ -240,13 +328,15 @@ function CellContent({ placed, row, index, y, gameUi, imgText, showsNameBars }: 
       )
     case '딱지': {
       const badge = isPitcherColumn(column.word)
-        ? (row.profileLow === undefined ? null : pitcherRoleBadgeOf(row.profileLow, -1))
-        : (row.position === undefined ? null : batterPositionBadgeOf(row.position & 0xf, -1, -1))
+        ? row.profileLow === undefined
+          ? null
+          : pitcherRoleBadgeOf(row.profileLow, -1)
+        : row.position === undefined
+          ? null
+          : batterPositionBadgeOf(row.position & 0xf, -1, -1)
       if (badge === null) return null
       if (badge.chip < 0 || badge.label < 0) {
-        return (
-          <PixelText style={{ ...pixel, left: x + ENTRY_BADGE_DASH.dx, top: y + ENTRY_BADGE_DASH.dy, color: WHITE }}>-</PixelText>
-        )
+        return <PixelText style={{ ...pixel, left: x + ENTRY_BADGE_DASH.dx, top: y + ENTRY_BADGE_DASH.dy, color: WHITE }}>-</PixelText>
       }
       return (
         <>
@@ -263,8 +353,7 @@ function CellContent({ placed, row, index, y, gameUi, imgText, showsNameBars }: 
       return (
         <>
           {drawing.glyphs.map((glyph, glyphIndex) => (
-            <img key={glyphIndex} alt="" src={`${NUM}/${pad(glyph.frame)}.png`}
-              style={{ ...pixel, left: x + glyph.x, top: y + 3 }} />
+            <img key={glyphIndex} alt="" src={`${NUM}/${pad(glyph.frame)}.png`} style={{ ...pixel, left: x + glyph.x, top: y + 3 }} />
           ))}
           {drawing.dots.map((dot, dotIndex) => (
             <Rect key={`d${dotIndex}`} x={x + dot.x} y={y + dot.y} width={1} height={2} color={WHITE} />
@@ -276,8 +365,18 @@ function CellContent({ placed, row, index, y, gameUi, imgText, showsNameBars }: 
 }
 
 /** 0x571d8 — 타자 세로 두 줄(+0xb & 3 색) · 투수 체력 줄 */
-function NameBars({ row, isPitcher, x, y, width }: {
-  readonly row: EntryListRow; readonly isPitcher: boolean; readonly x: number; readonly y: number; readonly width: number
+function NameBars({
+  row,
+  isPitcher,
+  x,
+  y,
+  width,
+}: {
+  readonly row: EntryListRow
+  readonly isPitcher: boolean
+  readonly x: number
+  readonly y: number
+  readonly width: number
 }) {
   const h = ENTRY_LIST_LAYOUT.cellHeight
   if (!isPitcher) {
@@ -296,16 +395,30 @@ function NameBars({ row, isPitcher, x, y, width }: {
 }
 
 /** 0x5650c · 0xb9d74 꼴 0x22 — (x, y, 폭, 15) 안 가운데 (박스 y − 2 · dy 2 / y − 1 · dy 1 은 결국 y) */
-function CenteredImgText({ origins, frame, x, y, width, style }: {
-  readonly origins: FrameOrigins | null; readonly frame: number; readonly x: number; readonly y: number; readonly width: number
+function CenteredImgText({
+  origins,
+  frame,
+  x,
+  y,
+  width,
+  style,
+}: {
+  readonly origins: FrameOrigins | null
+  readonly frame: number
+  readonly x: number
+  readonly y: number
+  readonly width: number
   readonly style?: CSSProperties
 }) {
   const origin = origins?.[pad(frame)]
   if (origin === undefined) return null
   const offset = yearLabelOffsetOf(width, origin.width, origin.height)
   return (
-    <img alt="" src={`${IMG_TEXT_FRAMES}/${pad(frame)}.png`}
-      style={{ ...pixel, ...style, left: x + offset.x + origin.x, top: y + offset.y + origin.y }} />
+    <img
+      alt=""
+      src={`${IMG_TEXT_FRAMES}/${pad(frame)}.png`}
+      style={{ ...pixel, ...style, left: x + offset.x + origin.x, top: y + offset.y + origin.y }}
+    />
   )
 }
 
@@ -339,8 +452,18 @@ function CursorBorder({ rect, keyPresses }: { readonly rect: EntryRect; readonly
   )
 }
 
-function Rect({ x, y, width, height, color }: {
-  readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string
+function Rect({
+  x,
+  y,
+  width,
+  height,
+  color,
+}: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
 }) {
   if (width <= 0 || height <= 0) return null
   return <span style={{ ...pixel, left: x, top: y, width, height, background: color }} />

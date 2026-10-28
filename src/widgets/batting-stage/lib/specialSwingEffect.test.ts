@@ -3,7 +3,12 @@ import { specialSwingEffectFrameAt, specialSwingStageEffectOf } from '@/widgets/
 
 describe('필살 연출 그림 0x49aec — 갈래', () => {
   it('번호 → +0x103c 그림, 번호 2 는 우타면 뒤집고 늘 타자 아래, 번호 3 은 y + 25', () => {
-    expect(specialSwingStageEffectOf(1, 0, -1, 0)).toMatchObject({ folder: './sprites/effect_power/frames', isMirrored: false, isBehindBatter: false, offsetY: 0 })
+    expect(specialSwingStageEffectOf(1, 0, -1, 0)).toMatchObject({
+      folder: './sprites/effect_power/frames',
+      isMirrored: false,
+      isBehindBatter: false,
+      offsetY: 0,
+    })
     expect(specialSwingStageEffectOf(2, 0, -1, 0)).toMatchObject({ folder: './sprites/effect_frame/frames', isMirrored: true, isBehindBatter: true })
     expect(specialSwingStageEffectOf(2, 1, -1, 1)).toMatchObject({ isMirrored: false, isBehindBatter: true })
     expect(specialSwingStageEffectOf(3, 0, -1, 0)).toMatchObject({ folder: './sprites/effect_tornado/frames', offsetY: 25 })

@@ -2,7 +2,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 import {
-  createSceneKeyLatch, isRunningSceneKeys, openSceneKeyLatch, pushSceneKey, resetSceneKeyLatchesForTest, runSceneKeys,
+  createSceneKeyLatch,
+  isRunningSceneKeys,
+  openSceneKeyLatch,
+  pushSceneKey,
+  resetSceneKeyLatchesForTest,
+  runSceneKeys,
 } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 describe('키 사건 칸 0xbca05 — 틀 T 에 받은 키는 틀 T+1 의 키 0x498d4(52d9e)가 처리한다', () => {
@@ -80,7 +85,10 @@ describe('키 사건 칸 0xbca05 — 틀 T 에 받은 키는 틀 T+1 의 키 0x4
 
   it('누름 칸이 넘긴 사건 시각이 있으면 그때 본 그림의 틱으로 칸에 든다 (r222 — 도루 누름 칸)', () => {
     // 칸의 셈: 시각 100 에 본 그림은 틱 5, 지금은 틱 7
-    const 칸 = createSceneKeyLatch(() => 7, (inputTime) => (inputTime <= 100 ? 5 : 7))
+    const 칸 = createSceneKeyLatch(
+      () => 7,
+      (inputTime) => (inputTime <= 100 ? 5 : 7),
+    )
     openSceneKeyLatch(칸)
     const 차례: string[] = []
     pushSceneKey(() => 차례.push('지금'))
@@ -112,7 +120,7 @@ describe('키 사건 칸 0xbca05 — 틀 T 에 받은 키는 틀 T+1 의 키 0x4
     window.removeEventListener('keydown', 듣기)
   })
 
-  it('한 키 사건의 손잡이 여럿은 한 칸에 붙어 함께 처리된다 — 0x498d4 가 \'*\' 가지와 상태 키 함수에 같은 키를 보내듯', () => {
+  it("한 키 사건의 손잡이 여럿은 한 칸에 붙어 함께 처리된다 — 0x498d4 가 '*' 가지와 상태 키 함수에 같은 키를 보내듯", () => {
     const 칸 = createSceneKeyLatch(() => 7)
     openSceneKeyLatch(칸)
     const 차례: string[] = []

@@ -1,11 +1,5 @@
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
-import {
-  CURSOR_ANIMATION,
-  EVENT_MARKER_ANIMATION,
-  MAP_FRAMES,
-  OUTING_PLACES,
-  PLACE_LABEL_FRAMES,
-} from '@/shared/config/outingPlaces'
+import { CURSOR_ANIMATION, EVENT_MARKER_ANIMATION, MAP_FRAMES, OUTING_PLACES, PLACE_LABEL_FRAMES } from '@/shared/config/outingPlaces'
 import type { MapBox, OutingPlace } from '@/shared/config/outingPlaces'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
@@ -36,7 +30,12 @@ const cursorAnchorOf = (box: MapBox) => ({ x: box.x + Math.trunc(box.width / 2),
 const OUTING_CANCEL_PRESS_RECT = { x: 198, y: 307, width: 41, height: 12 } as const
 
 /** 고른 건물 테두리 0x7ec44~0x7ecb0 — 찍는 차례 (x−1, y) · (x, y−1) · (x+1, y) · (x, y+1) 과 색 RGB(255,255,255) */
-const SELECTED_OUTLINE_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
+const SELECTED_OUTLINE_WAYS: readonly (readonly [number, number])[] = [
+  [-1, 0],
+  [0, -1],
+  [1, 0],
+  [0, 1],
+]
 const SELECTED_OUTLINE_COLOR = '#FFFFFF'
 /** 시간대 2(밤) — 0xb8fbd 의 20~5시 */
 const NIGHT_TIME_SLOT = 2
@@ -65,7 +64,11 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, chil
   const isNight = backgroundFrameOf(hour ?? sceneHour) === NIGHT_TIME_SLOT
   const selectedIndex = OUTING_PLACES.findIndex((place) => place.id === selectedPlaceId)
   const composeOps = outingMapComposeOps({
-    origins, mapX: 0, mapY: styles.MAP_TOP, selected: selectedIndex, isNight,
+    origins,
+    mapX: 0,
+    mapY: styles.MAP_TOP,
+    selected: selectedIndex,
+    isNight,
     labelOf: (index) => {
       const place = OUTING_PLACES[index]
       const label = labelOrigins?.[String(place.labelFrame).padStart(3, '0')]
@@ -78,10 +81,7 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, chil
   const animated = (animation: number, anchor: { x: number; y: number }, key: string) => {
     const step = animationStepAt(animations?.[animation] ?? [], update)
     if (step === null) return null
-    return (
-      <FrameSprite key={key} folder={MAP_FRAMES} frame={step.frame} origins={origins}
-        x={anchor.x + step.dx} y={anchor.y + step.dy} />
-    )
+    return <FrameSprite key={key} folder={MAP_FRAMES} frame={step.frame} origins={origins} x={anchor.x + step.dx} y={anchor.y + step.dy} />
   }
 
   return (
@@ -104,18 +104,25 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, chil
       {OUTING_PLACES.filter((place) => place.id === selectedPlaceId).map((place) => (
         <Fragment key={place.id}>
           {SELECTED_OUTLINE_WAYS.map(([dx, dy]) => (
-            <SolidStamp key={`${dx},${dy}`} folder={MAP_FRAMES} frame={place.frame} origins={origins}
-              x={dx} y={styles.MAP_TOP + dy} color={SELECTED_OUTLINE_COLOR} />
+            <SolidStamp
+              key={`${dx},${dy}`}
+              folder={MAP_FRAMES}
+              frame={place.frame}
+              origins={origins}
+              x={dx}
+              y={styles.MAP_TOP + dy}
+              color={SELECTED_OUTLINE_COLOR}
+            />
           ))}
           <PlaceArt place={place} origins={origins} labelOrigins={labelOrigins} isSelected onOpen={onOpen} />
         </Fragment>
       ))}
-      {OUTING_PLACES.map((place) => (
-        place.id === selectedPlaceId ? animated(CURSOR_ANIMATION, cursorAnchorOf(place.cursorBox), `${place.id}-cursor`) : null
-      ))}
-      {OUTING_PLACES.map((place) => (
-        eventPlaceIds.has(place.id) ? animated(EVENT_MARKER_ANIMATION, markerAnchorOf(place.markerBox), `${place.id}-event`) : null
-      ))}
+      {OUTING_PLACES.map((place) =>
+        place.id === selectedPlaceId ? animated(CURSOR_ANIMATION, cursorAnchorOf(place.cursorBox), `${place.id}-cursor`) : null,
+      )}
+      {OUTING_PLACES.map((place) =>
+        eventPlaceIds.has(place.id) ? animated(EVENT_MARKER_ANIMATION, markerAnchorOf(place.markerBox), `${place.id}-event`) : null,
+      )}
 
       {/*
         ⚠️ 웹 자리: 취소(CLR → 105, 키 0x13ba4) — 112 그리기 0x16854 는 지도 0x7ea64 만 그려 머리띠 · 바닥띠 · 소프트키 글자가 없다.
@@ -131,7 +138,13 @@ export function OutingMap({ selectedPlaceId, eventPlaceIds, onOpen, onBack, chil
  * 건물 한 채의 누름 칸과(고른 건물이면) 그림 · 이름 — 고르지 않은 건물 · 이름은 합성 캔버스(`outingMapComposeOps`)가 그리고
  * 여기는 투명 누름 칸만 둔다. 이름은 박스에 mapY 를 안 더한다 (F-2 2-4 확정)
  */
-function PlaceArt({ place, origins, labelOrigins, isSelected, onOpen }: {
+function PlaceArt({
+  place,
+  origins,
+  labelOrigins,
+  isSelected,
+  onOpen,
+}: {
   readonly place: OutingPlace
   readonly origins: ReturnType<typeof useFrameOrigins>
   readonly labelOrigins: ReturnType<typeof useFrameOrigins>
@@ -143,18 +156,25 @@ function PlaceArt({ place, origins, labelOrigins, isSelected, onOpen }: {
   return (
     <>
       {frameOrigin !== undefined && (
-        <button type="button" className={styles.placeButton} aria-label={place.name}
+        <button
+          type="button"
+          className={styles.placeButton}
+          aria-label={place.name}
           style={{ left: frameOrigin.x, top: frameOrigin.y + styles.MAP_TOP, width: frameOrigin.width, height: frameOrigin.height }}
-          onClick={() => onOpen(place)}>
+          onClick={() => onOpen(place)}
+        >
           {isSelected && (
-            <img className={styles.sprite} style={{ left: 0, top: 0 }}
-              src={`${MAP_FRAMES}/${String(place.frame).padStart(3, '0')}.png`} alt="" />
+            <img className={styles.sprite} style={{ left: 0, top: 0 }} src={`${MAP_FRAMES}/${String(place.frame).padStart(3, '0')}.png`} alt="" />
           )}
         </button>
       )}
       {isSelected && label !== undefined && (
-        <FrameSprite folder={PLACE_LABEL_FRAMES} frame={place.labelFrame} origins={labelOrigins}
-          {...placeLabelTopLeftOf(place.nameBox, label.width, label.height)} />
+        <FrameSprite
+          folder={PLACE_LABEL_FRAMES}
+          frame={place.labelFrame}
+          origins={labelOrigins}
+          {...placeLabelTopLeftOf(place.nameBox, label.width, label.height)}
+        />
       )}
     </>
   )

@@ -20,12 +20,7 @@ import {
   startMission,
 } from '@/entities/mission/model/missionRun'
 import type { MissionRun } from '@/entities/mission/model/missionRun'
-import {
-  applyPitcherOutcome,
-  recordPitch,
-  runPitcherMissionAutoHalves,
-  startPitcherMission,
-} from '@/entities/mission/model/pitcherRun'
+import { applyPitcherOutcome, recordPitch, runPitcherMissionAutoHalves, startPitcherMission } from '@/entities/mission/model/pitcherRun'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { PitcherRun } from '@/entities/mission/model/pitcherRun'
 import { MISSIONS } from '@/shared/config/original/missions'
@@ -102,27 +97,21 @@ describe('원본 미션 레코드 38개(목록 28 + 마선수 공략 10)는 모�
     [...BATTER_MISSIONS, ...ACE_CHALLENGE_MISSIONS.filter((mission) => mission.side === '타자')].map(
       (mission) => [mission.id, mission.name, mission] as const,
     ),
-  )(
-    '타자편 %i %s',
-    (_id, _name, mission) => {
-      const run = playIdealBatter(mission)
+  )('타자편 %i %s', (_id, _name, mission) => {
+    const run = playIdealBatter(mission)
 
-      expect(run.status, `progress was: ${JSON.stringify(run.progress.counts)}`).toBe('성공')
-    },
-  )
+    expect(run.status, `progress was: ${JSON.stringify(run.progress.counts)}`).toBe('성공')
+  })
 
   it.each(
     [...PITCHER_MISSIONS, ...ACE_CHALLENGE_MISSIONS.filter((mission) => mission.side === '투수')].map(
       (mission) => [mission.id, mission.name, mission] as const,
     ),
-  )(
-    '투수편 %i %s',
-    (_id, _name, mission) => {
-      const run = playIdealPitcher(mission)
+  )('투수편 %i %s', (_id, _name, mission) => {
+    const run = playIdealPitcher(mission)
 
-      expect(run.status, `progress was: ${JSON.stringify(run.progress.counts)}`).toBe('성공')
-    },
-  )
+    expect(run.status, `progress was: ${JSON.stringify(run.progress.counts)}`).toBe('성공')
+  })
 })
 
 describe('원본 레코드의 제한값', () => {

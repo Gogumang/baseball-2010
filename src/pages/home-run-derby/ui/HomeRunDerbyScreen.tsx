@@ -133,7 +133,13 @@ export function HomeRunDerbyScreen({
   onOpenHidden,
 }: HomeRunDerbyScreenProps) {
   const session = useHomeRunDerby({
-    bestDistance, onFinish, aceLevels, random, myTeamId, modeBatterSlot, ...(onOpenHidden === undefined ? {} : { onOpenHidden }),
+    bestDistance,
+    onFinish,
+    aceLevels,
+    random,
+    myTeamId,
+    modeBatterSlot,
+    ...(onOpenHidden === undefined ? {} : { onOpenHidden }),
   })
   const tick = useGameSceneUpdateCounter()
   const menu = useInGameMenuState()
@@ -154,8 +160,7 @@ export function HomeRunDerbyScreen({
   const acceptsConfirm = session.isAwaitingConfirm && session.result === null && !isMenuOpen && overlay === null
   // 판(0x17)이 도는 동안의 키 — 0x53420 이 키마다 0x587 을 보내 홈런 뒤면 건너뛴다(0x519cc). 경기 중 메뉴 · 조작방법 · 설정이 떠 있으면 안 간다
   // 판이 끝나 히든 39 창 뒤에 필드 화면만 남긴 동안(`isPlayHeld`)은 판이 아니다
-  const isPlayRunning = session.distanceBoard !== null && !session.isPlayHeld && session.result === null && !isMenuOpen
-    && overlay === null
+  const isPlayRunning = session.distanceBoard !== null && !session.isPlayHeld && session.result === null && !isMenuOpen && overlay === null
   /**
    * 0xe 의 OK · 판(0x17)의 건너뛰기 키는 받은 그 자리에서 처리하지 않고 장면 키 칸에 든다 — 원본은 키 콜백이 [+0x20] 에 적기만 하고
    * 다음 틀의 0xbca05 → 키 0x498d4(52d9e) → 0x536bc 가 그 틀의 상태로 가른다(0xe 0x532b0 · 0x17 0x53420 → 0x587 → 0x519cc).
@@ -166,12 +171,18 @@ export function HomeRunDerbyScreen({
     if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
     const { remainingPitches, totalDistance, stage, isBonusGame } = session.run
     publishScenePeek('homeRunDerby', {
-      acceptsConfirm, isPlayRunning, isResultShown, run: { remainingPitches, totalDistance, stage, isBonusGame },
+      acceptsConfirm,
+      isPlayRunning,
+      isResultShown,
+      run: { remainingPitches, totalDistance, stage, isBonusGame },
     })
   }, [acceptsConfirm, isPlayRunning, isResultShown, session.run])
-  useEffect(() => () => {
-    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('homeRunDerby', null)
-  }, [])
+  useEffect(
+    () => () => {
+      if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('homeRunDerby', null)
+    },
+    [],
+  )
   const { confirm, skipHomeRun } = session
   const sceneKeyStateRef = useRef({ acceptsConfirm, isPlayRunning })
   sceneKeyStateRef.current = { acceptsConfirm, isPlayRunning }
@@ -211,8 +222,12 @@ export function HomeRunDerbyScreen({
    * (4991c~49922 — 모드를 안 본다). 더비(모드 7)도 경기 장면 0x104 라 그대로다. 로딩 판(7 · 9 · 8) · 판(0x17) · 결과 창(0x1a) ·
    * 벤치 클리어링(0x1e)은 범위 밖이고, 조작방법 뷰어의 키는 뷰어 0x637d0 만 받는다(0x3ca36).
    */
-  const acceptsMenuKey = !isResultShown && session.loadingTip === null && !session.isBenchClearing
-    && (isMenuOpen || session.distanceBoard === null) && overlay !== '조작방법'
+  const acceptsMenuKey =
+    !isResultShown &&
+    session.loadingTip === null &&
+    !session.isBenchClearing &&
+    (isMenuOpen || session.distanceBoard === null) &&
+    overlay !== '조작방법'
   // '*' 는 장면 키 칸으로 — 받은 다음 틀의 키 0x498d4 '*' 가지(49918~49948, 모드를 안 본다)가 연다. 창이 서 있으면(메뉴 열림)
   // 창 키 자리(52cc6 0x754f9 → 0x3c158)에서 닫는다(`pressStar` — 앱 키 문이 다음 앱 틱에 넘긴다). 0x463ac(463e6 0x741a1)는 키가
   // 아니라 장면 vtable 0xcfa0c [6] 멈춤 콜백(0xcfa24)이 같은 메뉴를 여는 자리다
@@ -244,8 +259,7 @@ export function HomeRunDerbyScreen({
   // 사구 뒤 벤치 클리어링(상태 0x1e) — 0x12 대기 끝 0x4e74c 굴림이 들어갔다. 출구는 0xae24c(`finishBenchClearing`)
   if (session.isBenchClearing) {
     // 지금 타자의 손 0xb63c0 = 폼 & 1 — 마스터 줄이 치면 그 줄의 폼 (아래 `stageBatter` 와 같은 길)
-    const benchMaster =
-      session.batter.isModeBatter || session.batter.row === null ? null : derbyMasterBatterOf(session.batter.row)
+    const benchMaster = session.batter.isModeBatter || session.batter.row === null ? null : derbyMasterBatterOf(session.batter.row)
     return (
       <BenchClearingScene
         // 그리기 0x43228 — 모드 7 은 내 팀이 측 0(공격) · 뽑은 상대 팀이 측 1(수비, 3a476 0xb6bd5(ctx, 1, v)) · 주자 없음
@@ -511,7 +525,12 @@ export function HomeRunDerbyScreen({
  * - 체력 막대: 길이 0x66e44(마스터 팀 v 레코드, 지금 투수, f = 늘 참) · % 0xaebb0 = 100 (`derbyStaminaGaugeOf`, U-133).
  */
 function DerbyMatchupCards({
-  batterHand, pitcherName, pitcherRecord, isAcePitcher, pitcherStamina, batter,
+  batterHand,
+  pitcherName,
+  pitcherRecord,
+  isAcePitcher,
+  pitcherStamina,
+  batter,
 }: {
   readonly batterHand: number
   readonly pitcherStamina: StaminaGauge | undefined

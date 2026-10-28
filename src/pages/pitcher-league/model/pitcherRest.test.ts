@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import {
-  pitcherRestBlockReasonOf,
-  recoverAfterPitcherRest,
-  runPitcherRest,
-} from '@/pages/pitcher-league/model/pitcherRest'
+import { pitcherRestBlockReasonOf, recoverAfterPitcherRest, runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
 
 /**
  * 투수편 [휴식] — 사기 10~15 (0x18e3c) + 결과 창을 닫을 때 회복 판정 (0x1b308).
@@ -38,20 +34,14 @@ describe('투수편 휴식 — 사기 회복 (0x18e3c)', () => {
 
 describe('투수편 휴식 회복 판정 (0x1b308) — 질병 60% · 부상 30%', () => {
   it('굴림이 낮으면 둘 다 낫는다', () => {
-    const 나음 = recoverAfterPitcherRest(
-      투수({ isInjured: true, isSick: true, illnessName: '감기', injuryRemaining: 2, illnessRemaining: 3 }),
-      최소,
-    )
+    const 나음 = recoverAfterPitcherRest(투수({ isInjured: true, isSick: true, illnessName: '감기', injuryRemaining: 2, illnessRemaining: 3 }), 최소)
 
     expect(나음.career).toMatchObject({ isInjured: false, isSick: false, injuredGamesPlayed: 0 })
     expect(나음.recoveries).toEqual(['다음 질병이 치료되었습니다 [감기]', '부상에서 회복 되었습니다.'])
   })
 
   it('굴림이 높으면 안 낫고 남은 기간만 하루씩 준다', () => {
-    const 그대로 = recoverAfterPitcherRest(
-      투수({ isInjured: true, isSick: true, injuryRemaining: 3, illnessRemaining: 3 }),
-      최대,
-    )
+    const 그대로 = recoverAfterPitcherRest(투수({ isInjured: true, isSick: true, injuryRemaining: 3, illnessRemaining: 3 }), 최대)
 
     expect(그대로.career).toMatchObject({
       isInjured: true,
@@ -63,10 +53,7 @@ describe('투수편 휴식 회복 판정 (0x1b308) — 질병 60% · 부상 30%'
   })
 
   it('남은 기간이 0 이 되면 굴림과 상관없이 낫는다', () => {
-    const 거의 = recoverAfterPitcherRest(
-      투수({ isInjured: true, isSick: true, illnessName: '몸살', injuryRemaining: 1, illnessRemaining: 0 }),
-      최대,
-    )
+    const 거의 = recoverAfterPitcherRest(투수({ isInjured: true, isSick: true, illnessName: '몸살', injuryRemaining: 1, illnessRemaining: 0 }), 최대)
 
     expect([거의.career.isInjured, 거의.career.isSick]).toEqual([false, false])
     // 치료된 질병은 이벤트 쿨다운 +0x7c = 20 을 받는다

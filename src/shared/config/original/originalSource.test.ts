@@ -123,17 +123,25 @@ function recordTable(name: string): RecordTable {
   }
   expect(cursor, `${name} 열 너비 합 = 줄 크기`).toBe(rowSize)
   const rows = Array.from({ length: rowCount }, (_, i) => raw.subarray(start + i * rowSize, start + (i + 1) * rowSize))
-  const cells = rows.map((row) => types.map((type, column): Cell => {
-    const at = offsets[column]
-    switch (type) {
-      case 0: return row.readUInt8(at)
-      case 1: return row.readInt8(at)
-      case 2: return row.readUInt16LE(at)
-      case 3: return row.readInt16LE(at)
-      case 4: return row.readUInt32LE(at)
-      default: return fixedText(row.subarray(at, at + type - 10))
-    }
-  }))
+  const cells = rows.map((row) =>
+    types.map((type, column): Cell => {
+      const at = offsets[column]
+      switch (type) {
+        case 0:
+          return row.readUInt8(at)
+        case 1:
+          return row.readInt8(at)
+        case 2:
+          return row.readUInt16LE(at)
+        case 3:
+          return row.readInt16LE(at)
+        case 4:
+          return row.readUInt32LE(at)
+        default:
+          return fixedText(row.subarray(at, at + type - 10))
+      }
+    }),
+  )
   return { rows, cells, offsets }
 }
 
@@ -151,12 +159,18 @@ const WIDTHS: readonly Width[] = ['u8', 's8', 'u16', 's16', 'u32', 's32']
 const SIZE: Record<Width, number> = { u8: 1, s8: 1, u16: 2, s16: 2, u32: 4, s32: 4 }
 function readAt(buffer: Buffer, offset: number, width: Width): number {
   switch (width) {
-    case 'u8': return buffer.readUInt8(offset)
-    case 's8': return buffer.readInt8(offset)
-    case 'u16': return buffer.readUInt16LE(offset)
-    case 's16': return buffer.readInt16LE(offset)
-    case 'u32': return buffer.readUInt32LE(offset)
-    case 's32': return buffer.readInt32LE(offset)
+    case 'u8':
+      return buffer.readUInt8(offset)
+    case 's8':
+      return buffer.readInt8(offset)
+    case 'u16':
+      return buffer.readUInt16LE(offset)
+    case 's16':
+      return buffer.readInt16LE(offset)
+    case 'u32':
+      return buffer.readUInt32LE(offset)
+    case 's32':
+      return buffer.readInt32LE(offset)
   }
 }
 let binaryCache: Buffer | undefined
@@ -171,7 +185,7 @@ function cString(va: number): string {
   const offset = binaryOffset(va)
   return cp949.decode(buffer.subarray(offset, buffer.indexOf(0, offset)))
 }
-const chunk = <T,>(values: readonly T[], size: number): T[][] =>
+const chunk = <T>(values: readonly T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(values.length / size) }, (_, i) => values.slice(i * size, (i + 1) * size))
 
 /* ── 시험 ─────────────────────────────────────────────────────────────── */
@@ -240,7 +254,10 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
 
     it('투수 폼 · 마구 · 보유 구질 (+0xb >> 4 · +0x18 · +0x1c)', () => {
       const repertoire = (cells: readonly Cell[]) => ({
-        name: cells[1], form: byte(cells[3]) >> 4, magicId: byte(cells[9]), pitchMask: num(cells[13]),
+        name: cells[1],
+        form: byte(cells[3]) >> 4,
+        magicId: byte(cells[9]),
+        pitchMask: num(cells[13]),
       })
       expect(ACE_PITCHER_REPERTOIRES).toEqual(recordTable('XlsACE_PIT_DATA').cells.map(repertoire))
       expect(ROSTER_PITCHER_REPERTOIRES).toEqual(recordTable('XlsPITCHER_DATA').cells.map(repertoire))
@@ -252,18 +269,26 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
 
     it('마선수 10 — 마타자(XlsACE_BAT_DATA) 5 뒤 마투수(XlsACE_PIT_DATA) 5, 이름 · 능력치 · 비트 · 시즌 줄', () => {
       const rows = [...recordTable('XlsACE_BAT_DATA').cells, ...recordTable('XlsACE_PIT_DATA').cells]
-      expect(ACE_PLAYERS.map((a) => ({
-        name: a.name, ability: [a.ability.hit, a.ability.power, a.ability.defense, a.ability.run],
-        skillBits: a.skillBits, profile: a.profile, recordLine: a.recordLine,
-      }))).toEqual(rows.map((cells, i) => {
-        const player = playerOf(cells, i)
-        return { name: player.name, ability: player.ability, skillBits: player.skillBits, profile: player.profile, recordLine: player.recordLine }
-      }))
+      expect(
+        ACE_PLAYERS.map((a) => ({
+          name: a.name,
+          ability: [a.ability.hit, a.ability.power, a.ability.defense, a.ability.run],
+          skillBits: a.skillBits,
+          profile: a.profile,
+          recordLine: a.recordLine,
+        })),
+      ).toEqual(
+        rows.map((cells, i) => {
+          const player = playerOf(cells, i)
+          return { name: player.name, ability: player.ability, skillBits: player.skillBits, profile: player.profile, recordLine: player.recordLine }
+        }),
+      )
     })
 
     it('마선수 오픈 표 (XlsACE_LEVEL_UP) — 번호 · 능력치 · G 가격 · 힌트', () => {
-      expect(ACE_OPEN_TABLE.map((e) => [e.number, e.ability.hit, e.ability.power, e.ability.defense, e.ability.run, e.openPriceGamePoint, e.openHint]))
-        .toEqual(recordTable('XlsACE_LEVEL_UP').cells)
+      expect(
+        ACE_OPEN_TABLE.map((e) => [e.number, e.ability.hit, e.ability.power, e.ability.defense, e.ability.run, e.openPriceGamePoint, e.openHint]),
+      ).toEqual(recordTable('XlsACE_LEVEL_UP').cells)
     })
   })
 
@@ -271,22 +296,42 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
     it('미션 — 타자 19 · 투수 19 줄 중 이름 있는 줄, 글은 원문 그대로(앞뒤 빈칸 포함)', () => {
       const expected = (['XlsBATTER_MISSION', 'XlsPITCHER_MISSION'] as const).flatMap((name) => {
         const side = name === 'XlsBATTER_MISSION' ? '타자' : '투수'
-        return recordTable(name).cells.filter((cells) => cells[13] !== '').map((cells) => {
-          const limits = num(cells[9])
-          return {
-            id: num(cells[0]), side, stage: num(cells[1]), name: cells[13],
-            goals: (cells[12] as string).split('|'), briefing: cells[14],
-            timeLimitSeconds: num(cells[10]),
-            plateAppearanceLimit: limits >> 8, swingLimit: (limits >> 4) & 0xf, pitchLimit: limits & 0xf,
-            opponentAce: byte(cells[8]) >> 4, conditionCode: num(cells[11]),
-          }
-        })
+        return recordTable(name)
+          .cells.filter((cells) => cells[13] !== '')
+          .map((cells) => {
+            const limits = num(cells[9])
+            return {
+              id: num(cells[0]),
+              side,
+              stage: num(cells[1]),
+              name: cells[13],
+              goals: (cells[12] as string).split('|'),
+              briefing: cells[14],
+              timeLimitSeconds: num(cells[10]),
+              plateAppearanceLimit: limits >> 8,
+              swingLimit: (limits >> 4) & 0xf,
+              pitchLimit: limits & 0xf,
+              opponentAce: byte(cells[8]) >> 4,
+              conditionCode: num(cells[11]),
+            }
+          })
       })
-      expect(MISSIONS.map((m) => ({
-        id: m.id, side: m.side, stage: m.stage, name: m.name, goals: m.goals, briefing: m.briefing,
-        timeLimitSeconds: m.timeLimitSeconds, plateAppearanceLimit: m.plateAppearanceLimit, swingLimit: m.swingLimit,
-        pitchLimit: m.pitchLimit, opponentAce: m.opponentAce, conditionCode: m.conditionCode,
-      }))).toEqual(expected)
+      expect(
+        MISSIONS.map((m) => ({
+          id: m.id,
+          side: m.side,
+          stage: m.stage,
+          name: m.name,
+          goals: m.goals,
+          briefing: m.briefing,
+          timeLimitSeconds: m.timeLimitSeconds,
+          plateAppearanceLimit: m.plateAppearanceLimit,
+          swingLimit: m.swingLimit,
+          pitchLimit: m.pitchLimit,
+          opponentAce: m.opponentAce,
+          conditionCode: m.conditionCode,
+        })),
+      ).toEqual(expected)
     })
 
     it.each(['BATTER', 'PITCHER', 'SEASON'] as const)('돌발미션 %s — 본문 16바이트 그대로 · 대사 4줄(화자 · 표정 · 원문)', (label) => {
@@ -294,9 +339,15 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
       const text = recordTable(`Xls${label}_BURST_TEXT`)
       const web = ORIGINAL_BURST_TABLES[label]
       expect(web.rowBytes).toEqual(body.rows.map((row) => [...row]))
-      expect(web.lines).toEqual(text.cells.map((cells) => chunk(cells, 3).map(([speaker, expression, line]) => ({
-        speaker: num(speaker), expression: num(expression), text: line,
-      }))))
+      expect(web.lines).toEqual(
+        text.cells.map((cells) =>
+          chunk(cells, 3).map(([speaker, expression, line]) => ({
+            speaker: num(speaker),
+            expression: num(expression),
+            text: line,
+          })),
+        ),
+      )
     })
   })
 
@@ -326,36 +377,73 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
         const length = raw.readUInt16LE(at)
         let p = at + 15
         const u8 = () => raw.readUInt8(p++)
-        const u16 = () => { const v = raw.readUInt16LE(p); p += 2; return v }
-        const s16 = () => { const v = raw.readInt16LE(p); p += 2; return v }
-        const portraits = () => Array.from({ length: u8() }, () => {
-          const id = u8(); const side = u8(); u8(); const expression = u8()
-          const base = id === 1 ? 0 : animationBase[id] ?? -1
-          return base < 0 ? null : { file: fileOf(id), animation: base + expression, side: side ? 'left' : 'right' }
-        }).filter((portrait) => portrait !== null)
+        const u16 = () => {
+          const v = raw.readUInt16LE(p)
+          p += 2
+          return v
+        }
+        const s16 = () => {
+          const v = raw.readInt16LE(p)
+          p += 2
+          return v
+        }
+        const portraits = () =>
+          Array.from({ length: u8() }, () => {
+            const id = u8()
+            const side = u8()
+            u8()
+            const expression = u8()
+            const base = id === 1 ? 0 : (animationBase[id] ?? -1)
+            return base < 0 ? null : { file: fileOf(id), animation: base + expression, side: side ? 'left' : 'right' }
+          }).filter((portrait) => portrait !== null)
         const conditions = Array.from({ length: raw.readUInt8(at + 14) }, () => ({ type: u8(), value: s16() }))
         const commands = Array.from({ length: u8() }, () => {
           const op = u8()
           switch (op) {
-            case 0: { const ps = portraits(); const text = texts[u16()]; return { op: 'say', text, speaker: u8(), format: u8(), portraits: ps } }
-            case 1: { const ps = portraits(); return { op: 'choice', portraits: ps, choices: Array.from({ length: u8() }, () => ({ text: texts[u16()], gotoEvent: u16() })) } }
-            case 2: { const sub = u8(); const arg = u16(); return sub === 0 ? { op: 'system', sub, arg, text: texts[arg] ?? '' } : { op: 'system', sub, arg } }
-            case 3: return { op: 'yesno', sub: u8(), text: texts[u16()], yesEvent: u16(), noEvent: u16() }
-            case 4: { const sub = u8(); const arg = u16(); return { op: 'op4', sub, arg, pairs: Array.from({ length: u8() }, () => [u16(), u16()]) } }
-            case 5: return { op: 'effect', id: u8() }
-            case 6: return { op: 'sound', id: u8() }
-            case 7: return { op: 'reward', items: Array.from({ length: u8() }, () => ({ kind: u8(), value: s16() })) }
-            case 8: return { op: 'match', team: u8(), resultEvents: [u16(), u16()] }
-            default: throw new Error(`${name} 알 수 없는 명령 ${op}`)
+            case 0: {
+              const ps = portraits()
+              const text = texts[u16()]
+              return { op: 'say', text, speaker: u8(), format: u8(), portraits: ps }
+            }
+            case 1: {
+              const ps = portraits()
+              return { op: 'choice', portraits: ps, choices: Array.from({ length: u8() }, () => ({ text: texts[u16()], gotoEvent: u16() })) }
+            }
+            case 2: {
+              const sub = u8()
+              const arg = u16()
+              return sub === 0 ? { op: 'system', sub, arg, text: texts[arg] ?? '' } : { op: 'system', sub, arg }
+            }
+            case 3:
+              return { op: 'yesno', sub: u8(), text: texts[u16()], yesEvent: u16(), noEvent: u16() }
+            case 4: {
+              const sub = u8()
+              const arg = u16()
+              return { op: 'op4', sub, arg, pairs: Array.from({ length: u8() }, () => [u16(), u16()]) }
+            }
+            case 5:
+              return { op: 'effect', id: u8() }
+            case 6:
+              return { op: 'sound', id: u8() }
+            case 7:
+              return { op: 'reward', items: Array.from({ length: u8() }, () => ({ kind: u8(), value: s16() })) }
+            case 8:
+              return { op: 'match', team: u8(), resultEvents: [u16(), u16()] }
+            default:
+              throw new Error(`${name} 알 수 없는 명령 ${op}`)
           }
         })
         expect(p - at, `${name} 레코드 ${raw.readUInt16LE(at + 2)} 길이`).toBe(length)
         out.push({
           id: raw.readUInt16LE(at + 2),
-          audience: raw[at + 4], repeatable: raw[at + 5] !== 0, trigger: raw[at + 6],
+          audience: raw[at + 4],
+          repeatable: raw[at + 5] !== 0,
+          trigger: raw[at + 6],
           requiresEvent: raw.readUInt16LE(at + 7),
-          dateFrom: [raw[at + 9], raw[at + 10]], dateTo: [raw[at + 11], raw[at + 12]],
-          conditions, commands,
+          dateFrom: [raw[at + 9], raw[at + 10]],
+          dateTo: [raw[at + 11], raw[at + 12]],
+          conditions,
+          commands,
         })
         at += length
       }
@@ -387,8 +475,11 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
         return Array.from({ length: records }, () => {
           const [size, curve, frames, pointCount, form] = raw.subarray(p, p + 5)
           expect(size).toBe(5 + 12 * pointCount)
-          const points = Array.from({ length: pointCount }, (_, k) =>
-            [raw.readInt32LE(p + 5 + 12 * k), raw.readInt32LE(p + 9 + 12 * k), raw.readInt32LE(p + 13 + 12 * k)])
+          const points = Array.from({ length: pointCount }, (_, k) => [
+            raw.readInt32LE(p + 5 + 12 * k),
+            raw.readInt32LE(p + 9 + 12 * k),
+            raw.readInt32LE(p + 13 + 12 * k),
+          ])
           p += size
           return { curve, frames, form, points }
         })
@@ -427,7 +518,10 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
         for (let i = 0; i < raw[base]; i += 1) {
           const at = base + raw.readUInt32LE(base + 1 + 4 * i)
           const size = raw.readUInt16LE(at + 1)
-          out.set(raw[at], Array.from({ length: size }, (_, k) => (itemSize === 4 ? raw.readUInt32LE(at + 3 + 4 * k) : raw[at + 3 + k])))
+          out.set(
+            raw[at],
+            Array.from({ length: size }, (_, k) => (itemSize === 4 ? raw.readUInt32LE(at + 3 + 4 * k) : raw[at + 3 + k])),
+          )
         }
         return out
       }
@@ -451,12 +545,28 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
       expect(D_LEVEL.swingTiming).toEqual({ floor: u16(0x0c), scale: u16(0x0e) })
       expect(D_LEVEL.wildPitchChance).toBe(u16(0x2a))
       expect(D_LEVEL.reliefChances).toEqual([...raw.subarray(0x36, 0x3c)].map((v) => (v << 24) >> 24))
-      const formula = (at: number) => ({ hitBase: u16(at), hitCoefficient: u16(at + 2), extraBase: u16(at + 4), extraCoefficient: u16(at + 6), contactFactor: u16(at + 8) })
+      const formula = (at: number) => ({
+        hitBase: u16(at),
+        hitCoefficient: u16(at + 2),
+        extraBase: u16(at + 4),
+        extraCoefficient: u16(at + 6),
+        contactFactor: u16(at + 8),
+      })
       expect(BALANCE.swing.aceFormula).toEqual(formula(0x42))
       expect(BALANCE.swing.normalFormula).toEqual(formula(0x4c))
-      expect([BALANCE.swing.hitWeight, BALANCE.swing.extraWeight, BALANCE.swing.powerPivot, BALANCE.swing.foulPercent, BALANCE.swing.outPercent])
-        .toEqual([...raw.subarray(0x56, 0x5b)])
-      expect(BALANCE.swing.aceBonus).toEqual({ batterBase: u16(0x1d4), batterPerLevel: u16(0x1d6), pitcherBase: u16(0x1d8), pitcherPerLevel: u16(0x1da) })
+      expect([
+        BALANCE.swing.hitWeight,
+        BALANCE.swing.extraWeight,
+        BALANCE.swing.powerPivot,
+        BALANCE.swing.foulPercent,
+        BALANCE.swing.outPercent,
+      ]).toEqual([...raw.subarray(0x56, 0x5b)])
+      expect(BALANCE.swing.aceBonus).toEqual({
+        batterBase: u16(0x1d4),
+        batterPerLevel: u16(0x1d6),
+        pitcherBase: u16(0x1d8),
+        pitcherPerLevel: u16(0x1da),
+      })
       expect(BALANCE.swing.pitchGradeMultipliers).toEqual([0, 1, 2, 3, 4, 5].map((i) => u16(0x1dc + 2 * i)))
       expect(BALANCE.quickAtBat.powerScale).toEqual({ minimum: u16(0x0c), maximumValue: u16(0x0e) })
     })
@@ -485,17 +595,26 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
       expect(BALANCE.quickAtBat.pitchGradeTable).toEqual(chunk(table(0xd896c, 'u32', 20), 5))
       expect(BALANCE.specialSwing.requiredSessions).toEqual(table(0xd7e92, 'u16', 4))
       expect(BALANCE.specialSwing.gamePointCost).toEqual(table(0xd80e1, 's8', 4).map((v) => -v * 100))
-      expect(BALANCE.ability.rookieByBattingType.map((a) => [a.hit, a.power, a.defense, a.run]))
-        .toEqual(chunk(table(0xcc3fa, 'u8', 8).map((v) => v * 10), 4))
+      expect(BALANCE.ability.rookieByBattingType.map((a) => [a.hit, a.power, a.defense, a.run])).toEqual(
+        chunk(
+          table(0xcc3fa, 'u8', 8).map((v) => v * 10),
+          4,
+        ),
+      )
       // 리터럴 풀 (간이 타석 0xc11f0 · 상한 0xc1b38)
-      expect([BALANCE.quickAtBat.weakSwingGate, BALANCE.quickAtBat.tightCourseGate, BALANCE.quickAtBat.extraBaseLimit])
-        .toEqual([table(0xc1584, 'u32', 1)[0], table(0xc1590, 'u32', 1)[0], table(0xc1804, 'u32', 1)[0]])
+      expect([BALANCE.quickAtBat.weakSwingGate, BALANCE.quickAtBat.tightCourseGate, BALANCE.quickAtBat.extraBaseLimit]).toEqual([
+        table(0xc1584, 'u32', 1)[0],
+        table(0xc1590, 'u32', 1)[0],
+        table(0xc1804, 'u32', 1)[0],
+      ])
       expect(BALANCE.ability.maximum).toBe(table(0xc1b38, 'u32', 1)[0])
     })
   })
 
   it('소리 — 표의 번호 = jar sound/%03d.mmf 파일 52개', () => {
-    const files = readdirSync(join(JAR_DIR as string, 'sound')).filter((f) => /^\d{3}\.mmf$/.test(f)).map((f) => Number(f.slice(0, 3)))
+    const files = readdirSync(join(JAR_DIR as string, 'sound'))
+      .filter((f) => /^\d{3}\.mmf$/.test(f))
+      .map((f) => Number(f.slice(0, 3)))
     expect(ORIGINAL_SOUNDS.map((s) => s.id).sort((a, b) => a - b)).toEqual(files.sort((a, b) => a - b))
   })
 
@@ -556,7 +675,12 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
         if (offset + values.length * SIZE[width] > buffer.length) return false
         return values.every((value, i) => transform(readAt(buffer, offset + i * SIZE[width], width)) === value)
       }
-      const transforms = [(v: number) => v, (v: number) => -v, Math.abs, ...[10, 100, 1000].flatMap((k) => [(v: number) => v * k, (v: number) => -v * k])]
+      const transforms = [
+        (v: number) => v,
+        (v: number) => -v,
+        Math.abs,
+        ...[10, 100, 1000].flatMap((k) => [(v: number) => v * k, (v: number) => -v * k]),
+      ]
       if (addresses.some((va) => WIDTHS.some((width) => transforms.some((transform) => fits(va, width, transform))))) return true
       // 줄 길이가 다른 표 — 줄마다 적힌 주소 뒤 1KB 안에서
       if (rows !== null) {

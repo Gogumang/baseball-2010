@@ -60,7 +60,12 @@ import { nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
 import { rankingOf } from '@/entities/league/model/league'
 import { purchaseQuestionOf, shopItemId } from '@/features/shop/model/shopSelection'
 import {
-  EQUIPMENT_LEVEL_COUNT, EQUIPMENT_PARTS, equipmentBlockReasonOf, equipmentBonusOf, equipmentItemOf, ownsEquipment,
+  EQUIPMENT_LEVEL_COUNT,
+  EQUIPMENT_PARTS,
+  equipmentBlockReasonOf,
+  equipmentBonusOf,
+  equipmentItemOf,
+  ownsEquipment,
 } from '@/entities/career/model/equipment'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { SUB_ITEMS, subItemBlockReasonOf } from '@/entities/career/model/subItems'
@@ -98,8 +103,17 @@ import { resetSceneResultCode } from '@/widgets/batting-stage/model/sceneResultC
 import { resetSceneCloudClock } from '@/widgets/batting-stage/model/sceneCloudClock'
 import { resetSceneBallPath, sceneBallPathPitch } from '@/widgets/batting-stage/model/sceneBallPath'
 import {
-  SoakProblems, batterLineProblemsOf, firstDiffOf, isSoakEnabled, jsonRoundTripDiffOf, leagueTallyProblemsOf,
-  outOfRangeOf, rankingOrderProblemsOf, soakNumber, soakSeeds, unserializablePathsOf,
+  SoakProblems,
+  batterLineProblemsOf,
+  firstDiffOf,
+  isSoakEnabled,
+  jsonRoundTripDiffOf,
+  leagueTallyProblemsOf,
+  outOfRangeOf,
+  rankingOrderProblemsOf,
+  soakNumber,
+  soakSeeds,
+  unserializablePathsOf,
 } from '@/app/model/soak/soakInvariants'
 
 // 그림 붓 — 타석 · 결과 그림은 아무 일도 안 한다(굴림 · 상태는 그대로 돈다)
@@ -295,7 +309,17 @@ interface CareerSoakOptions {
 
 /** 끊어 볼 화면 — 차례로 돈다. 엔딩 · 메인 메뉴 · 마선수 대결(미션 장면 — 나가면 결과 이벤트가 105 진입에서 뜬다)은 뺀다 */
 const RESUMABLE_SCREENS: readonly Screen['kind'][] = [
-  '관리', '경기', '이벤트', '경기결과', '다음경기순위', '경기준비', '외출', '포스트시즌', '국가대항전', '연차표지', '대회경기결과',
+  '관리',
+  '경기',
+  '이벤트',
+  '경기결과',
+  '다음경기순위',
+  '경기준비',
+  '외출',
+  '포스트시즌',
+  '국가대항전',
+  '연차표지',
+  '대회경기결과',
 ]
 
 /** 앱의 화면을 띄워 그림 틀 · 키로 치는 화면 */
@@ -303,8 +327,23 @@ const FRAME_SCREENS: ReadonlySet<Screen['kind']> = new Set(['경기', '경기결
 
 /** 이어하기 앞뒤로 같아야 하는 커리어 칸 — 이어하기 진입(장면 셋업 · 116 재진입)이 고치는 칸(본 이벤트 · 외출 수 · 카운터)은 뺀다 */
 const RESUME_STABLE_KEYS = [
-  'season', 'gamesPlayed', 'money', 'salary', 'ability', 'equipmentLevels', 'ownedEquipment', 'subItemIds', 'stats', 'careerStats',
-  'league', 'leaguePlayerStats', 'titleIds', 'teamId', 'postseason', 'nationalCup', 'endingIndex',
+  'season',
+  'gamesPlayed',
+  'money',
+  'salary',
+  'ability',
+  'equipmentLevels',
+  'ownedEquipment',
+  'subItemIds',
+  'stats',
+  'careerStats',
+  'league',
+  'leaguePlayerStats',
+  'titleIds',
+  'teamId',
+  'postseason',
+  'nationalCup',
+  'endingIndex',
 ] as const
 
 /** 한 틀 안에 변화가 없으면 OK 를 누르기까지 기다리는 틀 · 멈춤으로 보는 틀 */
@@ -313,7 +352,14 @@ const STUCK_FRAMES = 6_000
 
 async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResult> {
   const {
-    seed, maxRegularGames, roundTripEvery = 5, extras = false, resumeEvery = 0, startGamePoint, startPatch, continueEndings = false,
+    seed,
+    maxRegularGames,
+    roundTripEvery = 5,
+    extras = false,
+    resumeEvery = 0,
+    startGamePoint,
+    startPatch,
+    continueEndings = false,
     stopAfterContinues,
   } = options
   const saveGame = memorySave()
@@ -370,7 +416,12 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
    * 0x11b46 → 140 0x10df8) 결과 이벤트 · 대기 칸 · G · 클리어 칸이 원본대로인지 본다.
    */
   const aceWatch: {
-    opened: { readonly team: number; readonly resultEvents: readonly number[]; readonly gamePoint: number; readonly counts: MissionClearCounts } | null
+    opened: {
+      readonly team: number
+      readonly resultEvents: readonly number[]
+      readonly gamePoint: number
+      readonly counts: MissionClearCounts
+    } | null
     finished: { readonly isWin: boolean } | null
   } = { opened: null, finished: null }
   /** 대결 화면에 넘기는 미션 세션 — 결과 판을 닫는 `finishAceMatch` 때의 이겼나를 적는다 */
@@ -484,17 +535,27 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       clear: () => modeSave.clearNariGame(NARI_BATTER_MODE),
     }
     const session = useCareerSession({
-      runner, random, saveGame, screen, setScreen, wallet, nariGameSave, recordStat,
+      runner,
+      random,
+      saveGame,
+      screen,
+      setScreen,
+      wallet,
+      nariGameSave,
+      recordStat,
       runningModeManual: gameSettings.settings.runningMode === '수동',
       aceMatchPending: modeSave.aceMatchPendingPorts[NARI_BATTER_MODE],
     })
     const collection = useCollection(collectionStore, session.career)
     const missionBatterCareer = session.career ?? session.savedCareer
-    const missionBatterRecordSlot = missionBatterCareer === null
-      ? -1
-      : myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(missionBatterCareer), missionBatterCareer.teamId))
+    const missionBatterRecordSlot =
+      missionBatterCareer === null ? -1 : myBatterIndexOf(nariTeamRecordOf(nariTeamsOf(missionBatterCareer), missionBatterCareer.teamId))
     const mission = useMissionSession({
-      runner, random, missionRecord, screen, setScreen,
+      runner,
+      random,
+      missionRecord,
+      screen,
+      setScreen,
       onGamePointReward: (amount: number) => {
         ledger.add('미션보상', amount)
         session.actions.gainGamePoint(amount)
@@ -519,7 +580,11 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
 
   let rendered = render(<Harness />)
   /** 지금 띄운 훅 — 이어하기가 훅을 새로 띄워도 같은 이름으로 읽는다 */
-  const result = { get current(): HarnessBundle { return holder.current! } }
+  const result = {
+    get current(): HarnessBundle {
+      return holder.current!
+    },
+  }
   ledger.balance = result.current.wallet.balance
   const problems = new SoakProblems()
   const games = { 정규: 0, 포스트시즌: 0, 국가대항전: 0, 대결: 0 }
@@ -571,14 +636,16 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
 
   const where = () => {
     const career = result.current.session.career
-    return `씨앗 ${seed} · ${career === null ? '-' : `${career.season}년차 g${career.gamesPlayed}${career.postseason !== null ? '(PS)' : ''}`}`
-      + ` · 화면 ${result.current.screen.kind} · 걸음 ${steps}`
+    return (
+      `씨앗 ${seed} · ${career === null ? '-' : `${career.season}년차 g${career.gamesPlayed}${career.postseason !== null ? '(PS)' : ''}`}` +
+      ` · 화면 ${result.current.screen.kind} · 걸음 ${steps}`
+    )
   }
 
   /** 이벤트 화면이 알린 본 이벤트를 센다 — 이어 온(대결 결과) 이벤트가 들고 온 앞 이벤트는 이미 셌으므로 뺀다 */
   const countViewed = (viewedIds: readonly number[]) => {
     const screen = result.current.screen
-    const carried = screen.kind === '이벤트' ? screen.carried?.viewedEventIds ?? [] : []
+    const carried = screen.kind === '이벤트' ? (screen.carried?.viewedEventIds ?? []) : []
     const ids = new Set(viewedIds)
     if (screen.kind === '이벤트') ids.add(screen.eventId)
     for (const id of ids) if (!carried.includes(id)) eventsViewed[id] = (eventsViewed[id] ?? 0) + 1
@@ -609,7 +676,12 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       return
     }
     session.actions.holdAceMatch(command.resultEvents, carried.viewedEventIds)
-    aceWatch.opened = { team: command.team, resultEvents: command.resultEvents, gamePoint: result.current.wallet.balance, counts: missionRecord.load() }
+    aceWatch.opened = {
+      team: command.team,
+      resultEvents: command.resultEvents,
+      gamePoint: result.current.wallet.balance,
+      counts: missionRecord.load(),
+    }
     aceWatch.finished = null
     mission.actions.beginAceMatch(target, { resultEvents: command.resultEvents, context: '대결결과', carried })
   }
@@ -635,13 +707,16 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     if (wallet.balance !== opened.gamePoint) lines.push(`대결 G ${opened.gamePoint} → ${wallet.balance} (0x4ef3e 는 건너뛴다)`)
     const target = aceMatchMissionOf(opened.team)
     const key = target === null ? null : aceMatchClearKeyOf(target)
-    const expectedCounts = finished.isWin && key !== null
-      ? { ...opened.counts, [key]: aceMatchClearCountAfterWin(opened.counts[key]) }
-      : opened.counts
+    const expectedCounts =
+      finished.isWin && key !== null ? { ...opened.counts, [key]: aceMatchClearCountAfterWin(opened.counts[key]) } : opened.counts
     const firstDiff = firstDiffOf(expectedCounts, missionRecord.load())
     if (firstDiff !== null) lines.push(`클리어 칸 ${firstDiff}`)
-    problems.add(at, lines.map((line) => `마선수 대결 team ${opened.team}: ${line}`))
-    if (process.env.SOAK_DEBUG === '1') process.stderr.write(`[대결 대조] team ${opened.team} ${finished.isWin ? '이김' : '짐'} 문제 ${lines.length}\n`)
+    problems.add(
+      at,
+      lines.map((line) => `마선수 대결 team ${opened.team}: ${line}`),
+    )
+    if (process.env.SOAK_DEBUG === '1')
+      process.stderr.write(`[대결 대조] team ${opened.team} ${finished.isWin ? '이김' : '짐'} 문제 ${lines.length}\n`)
   }
 
   let lastCheckedCareer: PlayerCareer | null = null
@@ -651,19 +726,45 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     lastCheckedCareer = career
     const at = where()
     problems.add(at, unserializablePathsOf(career, 'career').slice(0, 5))
-    problems.add(at, outOfRangeOf('career', {
-      gamePoint: career.gamePoint, season: career.season, gamesPlayed: career.gamesPlayed, popularity: career.popularity,
-      reputation: career.reputation, money: career.money, salary: career.salary, outingsThisSeason: career.outingsThisSeason,
-      injuryRemaining: career.injuryRemaining, illnessRemaining: career.illnessRemaining, illnessCooldown: career.illnessCooldown,
-      eagleEyeGamesRemaining: career.eagleEyeGamesRemaining, battingOrder: career.battingOrder,
-    }, 0))
+    problems.add(
+      at,
+      outOfRangeOf(
+        'career',
+        {
+          gamePoint: career.gamePoint,
+          season: career.season,
+          gamesPlayed: career.gamesPlayed,
+          popularity: career.popularity,
+          reputation: career.reputation,
+          money: career.money,
+          salary: career.salary,
+          outingsThisSeason: career.outingsThisSeason,
+          injuryRemaining: career.injuryRemaining,
+          illnessRemaining: career.illnessRemaining,
+          illnessCooldown: career.illnessCooldown,
+          eagleEyeGamesRemaining: career.eagleEyeGamesRemaining,
+          battingOrder: career.battingOrder,
+        },
+        0,
+      ),
+    )
     problems.add(at, outOfRangeOf('career.morale', { morale: career.morale }, 0, 100))
     problems.add(at, outOfRangeOf('career.ability', { ...career.ability }, 0, 999))
     problems.add(at, batterLineProblemsOf('career.stats', career.stats))
     problems.add(at, batterLineProblemsOf('career.careerStats', career.careerStats))
-    problems.add(at, outOfRangeOf('career.stats', {
-      games: career.stats.games, plateAppearances: career.stats.plateAppearances, walks: career.stats.walks, strikeouts: career.stats.strikeouts,
-    }, 0))
+    problems.add(
+      at,
+      outOfRangeOf(
+        'career.stats',
+        {
+          games: career.stats.games,
+          plateAppearances: career.stats.plateAppearances,
+          walks: career.stats.walks,
+          strikeouts: career.stats.strikeouts,
+        },
+        0,
+      ),
+    )
     if (career.stats.plateAppearances < career.stats.atBats) problems.add(at, [`타석 ${career.stats.plateAppearances} < 타수 ${career.stats.atBats}`])
     // 정규시즌(대회 · 포스트시즌 밖)은 열 팀이 매일 한 경기씩 — 팀마다 승 + 패 = 경기 수
     const isRegular = career.postseason === null && career.nationalCup === undefined
@@ -687,7 +788,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       const equipped = equippedAbilityOf(career)
       for (const part of EQUIPMENT_PARTS) {
         const expected = Math.min(999, career.ability[part.ability] + equipmentBonusOf(career.equipmentLevels[part.ability]))
-        if (equipped[part.ability] !== expected) problems.add(at, [`장비 능력치 ${part.ability} ${equipped[part.ability]} ≠ 능력치 + 보너스 ${expected}`])
+        if (equipped[part.ability] !== expected)
+          problems.add(at, [`장비 능력치 ${part.ability} ${equipped[part.ability]} ≠ 능력치 + 보너스 ${expected}`])
       }
     }
     // G 는 지갑 한 칸 — 커리어 칸은 그림자다(지갑 다리가 맞춘다)
@@ -810,11 +912,13 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     const { screen, session, runner, mission } = result.current
     const progress = session.progress
     const run = mission.missionRun
-    return `${screen.kind}:${screen.kind === '이벤트' ? screen.eventId : ''}:${progress?.game.inning}:${progress?.game.half}:${progress?.game.outs}`
-      + `:${progress?.game.ourScore}:${progress?.game.opponentScore}:${runner.atBat.balls}:${runner.atBat.strikes}:${runner.isPaused}`
-      + `:${progress?.pendingDefensePlay === null}:${progress?.pendingRunnerPlay == null}:${progress?.lastDefensePlay === null}`
-      + `:${tickEntry?.state}:${tickEntry?.tick}:${run?.status}:${run?.outs}:${run?.game.inning}:${mission.halfInningBoard === null}`
-      + `:${mission.loadingTip === null}:${session.loadingTip === null}:${session.career?.gamePoint}`
+    return (
+      `${screen.kind}:${screen.kind === '이벤트' ? screen.eventId : ''}:${progress?.game.inning}:${progress?.game.half}:${progress?.game.outs}` +
+      `:${progress?.game.ourScore}:${progress?.game.opponentScore}:${runner.atBat.balls}:${runner.atBat.strikes}:${runner.isPaused}` +
+      `:${progress?.pendingDefensePlay === null}:${progress?.pendingRunnerPlay == null}:${progress?.lastDefensePlay === null}` +
+      `:${tickEntry?.state}:${tickEntry?.tick}:${run?.status}:${run?.outs}:${run?.game.inning}:${mission.halfInningBoard === null}` +
+      `:${mission.loadingTip === null}:${session.loadingTip === null}:${session.career?.gamePoint}`
+    )
   }
 
   /** 그림 틀 한 걸음 — 틀을 돌리고, 지금 보이는 자리에 맞춰 키를 누른다 */
@@ -831,9 +935,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       const released = sceneBallPathPitch()
       if (entry.state === SCENE_STATE.투구 && released !== null && released !== releasedPitch) {
         releasedPitch = released
-        swingAtTick = policy() < SWING_RATE
-          ? tick + Math.max(0, released.frameCount - 3 + Math.floor(policy() * SWING_TICK_SPAN) - SWING_TICK_EARLY)
-          : -1
+        swingAtTick =
+          policy() < SWING_RATE ? tick + Math.max(0, released.frameCount - 3 + Math.floor(policy() * SWING_TICK_SPAN) - SWING_TICK_EARLY) : -1
       }
       // 공이 나기 시작했다(0x11) — 새 길이면 도루 키
       if (entry.state === SCENE_STATE.투구 && entry.tick !== flightSeenAt) {
@@ -905,7 +1008,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     if (beforeGame.kind === '정규') {
       // 일정표 0xd89cb 대로 — 정규 경기 상대는 그날(g) 일정표 상대다
       const expected = nextOpponentOf(beforeGame.career)
-      if (summary.opponentTeamId !== expected) problems.add(where(), [`g${beforeGame.career.gamesPlayed} 상대 ${summary.opponentTeamId} ≠ 일정표 ${expected}`])
+      if (summary.opponentTeamId !== expected)
+        problems.add(where(), [`g${beforeGame.career.gamesPlayed} 상대 ${summary.opponentTeamId} ≠ 일정표 ${expected}`])
       // 경기 요약 → 시즌 · 통산 누계 (0xa8024 — 정규시즌만)
       for (const field of ['atBats', 'hits', 'homeRuns', 'runsBattedIn', 'plateAppearances'] as const) {
         const delta = career.stats[field] - beforeGame.career.stats[field]
@@ -933,7 +1037,11 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
 
   /** 상점 한 바퀴 — 장비 · 끼기 · 서브 · GP (막힌 칸은 화면처럼 묻지 않는다). 사면 돈 · G 차이를 본다 */
   const shopRound = () => {
-    const purchase = (label: string, itemId: string, expect: (before: PlayerCareer, after: PlayerCareer, gBefore: number, gAfter: number) => string[]) => {
+    const purchase = (
+      label: string,
+      itemId: string,
+      expect: (before: PlayerCareer, after: PlayerCareer, gBefore: number, gAfter: number) => string[],
+    ) => {
       const before = result.current.session.career
       if (before === null || purchaseQuestionOf(before, itemId) === null) return false
       const gBefore = result.current.wallet.balance
@@ -942,15 +1050,19 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       const after = result.current.session.career
       if (after === null) return false
       walked(label)
-      problems.add(where(), expect(before, after, gBefore, result.current.wallet.balance).map((line) => `${label}: ${line}`))
+      problems.add(
+        where(),
+        expect(before, after, gBefore, result.current.wallet.balance).map((line) => `${label}: ${line}`),
+      )
       return true
     }
     // 장비 — 부위마다 살 수 있는 가장 낮은 레벨 하나
     act(() => result.current.session.actions.openShop('장착'))
     for (const part of EQUIPMENT_PARTS) {
       const career = result.current.session.career!
-      const level = Array.from({ length: EQUIPMENT_LEVEL_COUNT }, (_unused, index) => index)
-        .find((candidate) => equipmentBlockReasonOf(career, part.index, candidate) === null)
+      const level = Array.from({ length: EQUIPMENT_LEVEL_COUNT }, (_unused, index) => index).find(
+        (candidate) => equipmentBlockReasonOf(career, part.index, candidate) === null,
+      )
       if (level === undefined) continue
       const item = equipmentItemOf(part.index, level)
       purchase('장비', shopItemId('장착', part.index, level), (before, after, gBefore, gAfter) => {
@@ -973,8 +1085,9 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       const career = result.current.session.career!
       for (const part of EQUIPMENT_PARTS) {
         const now = career.equipmentLevels[part.ability]
-        const level = Array.from({ length: EQUIPMENT_LEVEL_COUNT }, (_unused, index) => index)
-          .find((candidate) => candidate + 1 !== now && ownsEquipment(career, part.index, candidate))
+        const level = Array.from({ length: EQUIPMENT_LEVEL_COUNT }, (_unused, index) => index).find(
+          (candidate) => candidate + 1 !== now && ownsEquipment(career, part.index, candidate),
+        )
         if (level === undefined || policy() < 0.5) continue
         purchase('끼기', shopItemId('착용', part.index, level), (before, after, gBefore, gAfter) => {
           const out: string[] = []
@@ -994,7 +1107,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       if (index >= 0) {
         purchase('서브', shopItemId('서브', index), (before, after) => {
           const out: string[] = []
-          if (before.money - after.money !== SUB_ITEMS[index]!.price) out.push(`소지금 ${before.money} → ${after.money} (값 ${SUB_ITEMS[index]!.price})`)
+          if (before.money - after.money !== SUB_ITEMS[index]!.price)
+            out.push(`소지금 ${before.money} → ${after.money} (값 ${SUB_ITEMS[index]!.price})`)
           if (!after.subItemIds.includes(index)) out.push('산 서브 아이템이 없다')
           return out
         })
@@ -1039,7 +1153,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         walked(`외출:${fn.id}`)
         const spent = before.money - after.money
         // 보험증서 · 할인 서브아이템이면 덜 낸다 — 더 내거나 돈이 늘면 안 된다
-        if (spent < 0 || spent > fn.effect.moneyCost) problems.add(where(), [`외출 ${fn.id}: 소지금 ${before.money} → ${after.money} (값 ${fn.effect.moneyCost})`])
+        if (spent < 0 || spent > fn.effect.moneyCost)
+          problems.add(where(), [`외출 ${fn.id}: 소지금 ${before.money} → ${after.money} (값 ${fn.effect.moneyCost})`])
         if (after.gamePoint !== before.gamePoint) problems.add(where(), [`외출 ${fn.id}: G 가 바뀌었다`])
         if (!after.hasActedThisCycle) problems.add(where(), [`외출 ${fn.id}: 행동함이 안 섰다`])
       }
@@ -1052,7 +1167,10 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     }
     const functions = OUTING_PLACES.flatMap((place) => place.functions)
     const pick = (id: string) => functions.find((candidate) => candidate.id === id && outingBlockReasonOf(career, candidate) === null)
-    const sick = career.isInjured || career.isSick ? functions.find((candidate) => candidate.effect.healsInjury && outingBlockReasonOf(career, candidate) === null) : undefined
+    const sick =
+      career.isInjured || career.isSick
+        ? functions.find((candidate) => candidate.effect.healsInjury && outingBlockReasonOf(career, candidate) === null)
+        : undefined
     const chosen = sick ?? (career.morale < 70 ? pick('외식') : undefined)
     const eventPlace = OUTING_PLACES.find((place) => session.eventPlaceIds.has(place.id))
     if (chosen === undefined && eventPlace !== undefined) {
@@ -1076,7 +1194,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
     act(() => result.current.session.actions.receiveEndingBonus())
     if (!bonusReceived) {
       const expected = Math.min(GAME_POINT_LIMIT, gBeforeBonus + endingBonusOf(screen.endingIndex))
-      if (result.current.wallet.balance !== expected) problems.add(where(), [`엔딩 ${screen.endingIndex} 보너스 G ${gBeforeBonus} → ${result.current.wallet.balance} ≠ ${expected}`])
+      if (result.current.wallet.balance !== expected)
+        problems.add(where(), [`엔딩 ${screen.endingIndex} 보너스 G ${gBeforeBonus} → ${result.current.wallet.balance} ≠ ${expected}`])
     }
     const ended = result.current.session.career
     // 이어할 수 있는 엔딩(부상 · 방출)이면 5000 G 로 이어한다 (팝업 0x32 예 → 0x1bd36)
@@ -1091,12 +1210,15 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       if (continued) {
         continuedAfterEnding += 1
         walked(`엔딩이어하기${screen.endingIndex}`)
-        if (gBefore - result.current.wallet.balance !== CONTINUE_COST_GAME_POINT) problems.add(where(), [`엔딩 이어하기 G ${gBefore} → ${result.current.wallet.balance}`])
+        if (gBefore - result.current.wallet.balance !== CONTINUE_COST_GAME_POINT)
+          problems.add(where(), [`엔딩 이어하기 G ${gBefore} → ${result.current.wallet.balance}`])
         const after = result.current.session.career
         if (after === null || after.endingIndex !== null) problems.add(where(), [`엔딩 이어하기 뒤 엔딩 칸 ${after?.endingIndex}`])
         // 부상 엔딩은 부상만 풀고 같은 시즌, 방출 엔딩은 새 시즌(0x1bddc · 0x1b768)
         if (after !== null && screen.endingIndex === 0 && (after.isInjured || after.injuredGamesPlayed !== 0 || after.season !== seasonBefore)) {
-          problems.add(where(), [`부상 엔딩 이어하기 뒤 부상 ${after.isInjured} · 부상 경기 ${after.injuredGamesPlayed} · ${seasonBefore} → ${after.season}년차`])
+          problems.add(where(), [
+            `부상 엔딩 이어하기 뒤 부상 ${after.isInjured} · 부상 경기 ${after.injuredGamesPlayed} · ${seasonBefore} → ${after.season}년차`,
+          ])
         }
         if (after !== null && screen.endingIndex === 1 && after.season !== seasonBefore + 1) {
           problems.add(where(), [`방출 엔딩 이어하기 뒤 연차 ${seasonBefore} → ${after.season}`])
@@ -1116,7 +1238,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         }
         return
       }
-      if (result.current.wallet.balance >= CONTINUE_COST_GAME_POINT) problems.add(where(), [`G ${result.current.wallet.balance} 인데 엔딩 ${screen.endingIndex} 을 이어하지 못했다`])
+      if (result.current.wallet.balance >= CONTINUE_COST_GAME_POINT)
+        problems.add(where(), [`G ${result.current.wallet.balance} 인데 엔딩 ${screen.endingIndex} 을 이어하지 못했다`])
     }
     endingIndex = screen.endingIndex
     if (extras && ended !== null) {
@@ -1137,13 +1260,28 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
         if (famers.length !== famersBefore + 1 || famer === undefined) problems.add(where(), ['명전 칸이 하나 늘지 않았다'])
         else {
           const d = firstDiffOf(
-            { name: famer.name, endingIndex: famer.endingIndex, season: famer.season, ability: famer.ability, recordLine: famer.recordLine, equipmentLevels: famer.equipmentLevels },
-            { name: ended.name, endingIndex: screen.endingIndex, season: ended.season, ability: ended.ability, recordLine: batterRecordLineOf(ended.stats), equipmentLevels: ended.equipmentLevels },
+            {
+              name: famer.name,
+              endingIndex: famer.endingIndex,
+              season: famer.season,
+              ability: famer.ability,
+              recordLine: famer.recordLine,
+              equipmentLevels: famer.equipmentLevels,
+            },
+            {
+              name: ended.name,
+              endingIndex: screen.endingIndex,
+              season: ended.season,
+              ability: ended.ability,
+              recordLine: batterRecordLineOf(ended.stats),
+              equipmentLevels: ended.equipmentLevels,
+            },
             '명전 기록',
           )
           if (d !== null) problems.add(where(), [d])
         }
-        if (gBefore - result.current.wallet.balance !== HALL_OF_FAME_COST) problems.add(where(), [`명전 등록 G ${gBefore} → ${result.current.wallet.balance}`])
+        if (gBefore - result.current.wallet.balance !== HALL_OF_FAME_COST)
+          problems.add(where(), [`명전 등록 G ${gBefore} → ${result.current.wallet.balance}`])
         if (saveGame.held() !== null) problems.add(where(), ['명전 등록 뒤 커리어 저장이 남았다'])
         act(() => result.current.session.actions.finishEnding(true))
         return
@@ -1180,8 +1318,13 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
 
       // 이어하기 — 몇 걸음마다 앱을 끄고 다시 켠다(엔딩 · 메인 메뉴 · 대결 중은 빼고)
       // 끊는 화면을 차례로 바꾼다(관리 · 경기 중 · 이벤트 · 경기 결과 …) — 그 화면이 한참 안 오면 아무 데서나 끊는다
-      if (resumeEvery > 0 && steps - lastCutStep >= resumeEvery && career !== null && RESUMABLE_SCREENS.includes(screen.kind)
-        && (screen.kind === RESUMABLE_SCREENS[resumeTarget % RESUMABLE_SCREENS.length] || steps - lastCutStep >= resumeEvery * 4)) {
+      if (
+        resumeEvery > 0 &&
+        steps - lastCutStep >= resumeEvery &&
+        career !== null &&
+        RESUMABLE_SCREENS.includes(screen.kind) &&
+        (screen.kind === RESUMABLE_SCREENS[resumeTarget % RESUMABLE_SCREENS.length] || steps - lastCutStep >= resumeEvery * 4)
+      ) {
         lastCutStep = steps
         resumeTarget += 1
         cutAndResume()
@@ -1200,10 +1343,11 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
       }
 
       // 액션 화면 — 같은 자리를 30 걸음 넘게 돌면 멈춤
-      const key = `${screen.kind}:${career?.season}:${career?.gamesPlayed}:${career?.postseason?.wins.join(',')}`
-        + `:${screen.kind === '국가대항전' ? screen.cup.day : ''}:${session.managementNotice}:${session.managementDetail === null}`
-        + `:${career?.hasActedThisCycle}:${session.pendingTitle}:${screen.kind === '포스트시즌' ? screen.popup?.kind : ''}`
-        + `:${session.outingPresentation?.functionId}:${session.outingResult === null}:${session.outingNotice}`
+      const key =
+        `${screen.kind}:${career?.season}:${career?.gamesPlayed}:${career?.postseason?.wins.join(',')}` +
+        `:${screen.kind === '국가대항전' ? screen.cup.day : ''}:${session.managementNotice}:${session.managementDetail === null}` +
+        `:${career?.hasActedThisCycle}:${session.pendingTitle}:${screen.kind === '포스트시즌' ? screen.popup?.kind : ''}` +
+        `:${session.outingPresentation?.functionId}:${session.outingResult === null}:${session.outingNotice}`
       if (key === lastKey) sameKeySteps += 1
       else sameKeySteps = 0
       lastKey = key
@@ -1265,7 +1409,8 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
               break
             }
             const menus = TRAINING_MENUS.slice(0, 4)
-            const open = menus.map((_, offset) => menus[(trainingSlot + offset) % menus.length]!)
+            const open = menus
+              .map((_, offset) => menus[(trainingSlot + offset) % menus.length]!)
               .find((menu) => !result.current.session.actions.isTrainingBlocked(menu.id))
             trainingSlot += 1
             if (open !== undefined) {
@@ -1297,7 +1442,9 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
           act(() => actions.confirmMatchPrepare())
           break
         case '연차표지':
-          log.push(`${career?.season}년차 표지(통산 ${career?.careerStats.atBats}타수 ${career?.careerStats.hits}안타 ${career?.careerStats.homeRuns}홈런)`)
+          log.push(
+            `${career?.season}년차 표지(통산 ${career?.careerStats.atBats}타수 ${career?.careerStats.hits}안타 ${career?.careerStats.homeRuns}홈런)`,
+          )
           act(() => result.current.setScreen({ kind: '관리' }))
           break
         case '포스트시즌':
@@ -1346,16 +1493,28 @@ async function runCareerSoak(options: CareerSoakOptions): Promise<CareerSoakResu
   const lastSeason = Math.max(lastSeenSeason, saveGame.held()?.season ?? result.current.session.career?.season ?? firstSeason)
   log.push(`판 ${JSON.stringify(heldPlays)} · 공 ${JSON.stringify(pitchOutcomes)}`)
   return {
-    problems, steps, frames, games, seasons: lastSeason - firstSeason + 1, endingIndex, stoppedAt, log, paths, ledger: ledgerSums, eventsViewed,
+    problems,
+    steps,
+    frames,
+    games,
+    seasons: lastSeason - firstSeason + 1,
+    endingIndex,
+    stoppedAt,
+    log,
+    paths,
+    ledger: ledgerSums,
+    eventsViewed,
   }
 }
 
 function report(result: CareerSoakResult): string {
-  return `걸음 ${result.steps} · 틀 ${result.frames} · 경기 정규 ${result.games.정규} · PS ${result.games.포스트시즌} · 대회 ${result.games.국가대항전}`
-    + ` · 대결 ${result.games.대결} · 시즌 ${result.seasons} · 엔딩 ${result.endingIndex} · [${result.log.join(' / ')}]`
-    + ` · 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)} · 이벤트 ${JSON.stringify(result.eventsViewed)}`
-    + `${result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`}`
-    + (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
+  return (
+    `걸음 ${result.steps} · 틀 ${result.frames} · 경기 정규 ${result.games.정규} · PS ${result.games.포스트시즌} · 대회 ${result.games.국가대항전}` +
+    ` · 대결 ${result.games.대결} · 시즌 ${result.seasons} · 엔딩 ${result.endingIndex} · [${result.log.join(' / ')}]` +
+    ` · 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)} · 이벤트 ${JSON.stringify(result.eventsViewed)}` +
+    `${result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`}` +
+    (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
+  )
 }
 
 describe('나리 타자편 장기 진행 점검 (soak)', () => {
@@ -1363,7 +1522,10 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     // 손으로 갈아 끼운다 — `vi.spyOn` 은 부른 기록을 다 들고 있어 긴 판(수백만 틀)에서 메모리가 넘친다
     originals = {
-      now: performance.now, raf: window.requestAnimationFrame, caf: window.cancelAnimationFrame, queueMicrotask: globalThis.queueMicrotask,
+      now: performance.now,
+      raf: window.requestAnimationFrame,
+      caf: window.cancelAnimationFrame,
+      queueMicrotask: globalThis.queueMicrotask,
     }
     globalThis.queueMicrotask = (callback) => void queuedMicrotasks.push(callback)
     performance.now = () => clock
@@ -1375,10 +1537,11 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
     }
     window.cancelAnimationFrame = (handle) => void frameCallbacks.delete(handle)
     // 아무 일도 안 하는 붓 — 그라디언트 같은 돌려받는 붓 객체도
-    const noopBrush = (target: object): object => new Proxy(target, {
-      get: (held, key) => (key in held ? (held as Record<string | symbol, unknown>)[key] : () => noopBrush({})),
-      set: () => true,
-    })
+    const noopBrush = (target: object): object =>
+      new Proxy(target, {
+        get: (held, key) => (key in held ? (held as Record<string | symbol, unknown>)[key] : () => noopBrush({})),
+        set: () => true,
+      })
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
       return noopBrush({ canvas: this }) as never
     })
@@ -1405,29 +1568,44 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
     expect(result.problems.size, report(result)).toBe(0)
     expect(result.games.정규, report(result)).toBe(6)
     // 공을 실제로 쳤다(타석 화면의 판정 — 휘두른 공의 패턴 덱)
-    expect(result.log.some((line) => line.includes('"공":0')), report(result)).toBe(false)
+    expect(
+      result.log.some((line) => line.includes('"공":0')),
+      report(result),
+    ).toBe(false)
   }, 120_000)
 
   it('짧은 판(새 길) — 도루 · 상점 · 장비 · GP · 복권 · 외출 · 이어하기를 섞어 8경기를 치러도 값 · 수지가 맞는다', async () => {
     const result = await runCareerSoak({
-      seed: 2011, maxRegularGames: 8, roundTripEvery: 2, extras: true, resumeEvery: 997, startGamePoint: 60_000,
+      seed: 2011,
+      maxRegularGames: 8,
+      roundTripEvery: 2,
+      extras: true,
+      resumeEvery: 997,
+      startGamePoint: 60_000,
     })
     expect(result.stoppedAt, report(result)).toBeNull()
     expect(result.problems.size, report(result)).toBe(0)
     expect(result.games.정규, report(result)).toBe(8)
     // 새 길을 실제로 밟았다
     for (const path of ['장비', '외출']) expect(result.paths[path] ?? 0, `${path} — ${report(result)}`).toBeGreaterThan(0)
-    expect(Object.keys(result.paths).some((path) => path.startsWith('이어하기')), report(result)).toBe(true)
+    expect(
+      Object.keys(result.paths).some((path) => path.startsWith('이어하기')),
+      report(result),
+    ).toBe(true)
   }, 180_000)
 
   it('짧은 판(마선수 대결) — 4년차 방송국 [!] 206(team 16 싸이커)을 앱 화면으로 치르면 결과 이벤트 · 대기 · G · 클리어 칸이 원본대로', async () => {
     // 방송국(trigger 6) 앞 이벤트 200~205 와 다른 장소의 1회짜리 이벤트를 본 4년차 첫날 — 지도의 [!] 가 방송국 하나라
     // g29 부터 타자 대결 206(team 16)이 서고, 지면 210 으로 다시 붙는다
-    const seenPlaceEvents = ORIGINAL_EVENTS
-      .filter((event) => event.trigger >= 1 && event.trigger !== 6 && !event.repeatable && (event.audience === 1 || event.audience === 2))
-      .map((event) => String(event.id))
+    const seenPlaceEvents = ORIGINAL_EVENTS.filter(
+      (event) => event.trigger >= 1 && event.trigger !== 6 && !event.repeatable && (event.audience === 1 || event.audience === 2),
+    ).map((event) => String(event.id))
     const result = await runCareerSoak({
-      seed: 2015, maxRegularGames: 44, roundTripEvery: 4, extras: true, startGamePoint: 60_000,
+      seed: 2015,
+      maxRegularGames: 44,
+      roundTripEvery: 4,
+      extras: true,
+      startGamePoint: 60_000,
       startPatch: { season: 4, popularity: 1_600, seenEventIds: [...seenPlaceEvents, '200', '201', '202', '203', '204', '205'] },
     })
     if (process.env.SOAK_DEBUG === '1') process.stderr.write(`${report(result)}\n`)
@@ -1440,7 +1618,11 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
   it('짧은 판(엔딩 이어하기) — 부상 엔딩(0)을 5000 G 로 이어하고 같은 시즌 경기를 이어 친다 (0x1bd36 → 0x1bddc)', async () => {
     // 부상 경기 수 20 (0xa3a84 첫 줄) — 105 진입 판정 0 → 부상 엔딩 500
     const result = await runCareerSoak({
-      seed: 2012, maxRegularGames: 3, roundTripEvery: 3, startGamePoint: 30_000, continueEndings: true,
+      seed: 2012,
+      maxRegularGames: 3,
+      roundTripEvery: 3,
+      startGamePoint: 30_000,
+      continueEndings: true,
       startPatch: { injuredGamesPlayed: 20, isInjured: true, injuryRemaining: 5 },
     })
     expect(result.stoppedAt, report(result)).toBeNull()
@@ -1449,40 +1631,59 @@ describe('나리 타자편 장기 진행 점검 (soak)', () => {
     expect(result.games.정규, report(result)).toBeGreaterThanOrEqual(3)
   }, 180_000)
 
-  it.runIf(isSoakEnabled())('긴 판(엔딩 이어하기) — 7년차 인기도 ≤ 499 방출 엔딩(1)을 5000 G 로 이어해 8년차로 간다 (0x1b768)', async () => {
-    const result = await runCareerSoak({
-      seed: 2013, roundTripEvery: 10, startGamePoint: 30_000, continueEndings: true, stopAfterContinues: 1,
-      startPatch: { season: 7, popularity: 100 },
-    })
-    expect(result.stoppedAt, report(result)).toBeNull()
-    expect(result.problems.size, report(result)).toBe(0)
-    expect(result.paths.엔딩이어하기1 ?? 0, report(result)).toBe(1)
-  }, 3_600_000)
+  it.runIf(isSoakEnabled())(
+    '긴 판(엔딩 이어하기) — 7년차 인기도 ≤ 499 방출 엔딩(1)을 5000 G 로 이어해 8년차로 간다 (0x1b768)',
+    async () => {
+      const result = await runCareerSoak({
+        seed: 2013,
+        roundTripEvery: 10,
+        startGamePoint: 30_000,
+        continueEndings: true,
+        stopAfterContinues: 1,
+        startPatch: { season: 7, popularity: 100 },
+      })
+      expect(result.stoppedAt, report(result)).toBeNull()
+      expect(result.problems.size, report(result)).toBe(0)
+      expect(result.paths.엔딩이어하기1 ?? 0, report(result)).toBe(1)
+    },
+    3_600_000,
+  )
 
   for (const seed of soakSeeds([1, 2, 3])) {
-    it.runIf(isSoakEnabled())(`긴 판 — 씨앗 ${seed}: 새 선수 등록부터 은퇴 · 엔딩까지`, async () => {
-      const startedAt = Date.now()
-      const result = await runCareerSoak({ seed, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10) })
-      const line = `[타자편 soak] 씨앗 ${seed} · ${(Date.now() - startedAt) / 1000}s · ${report(result)}`
-      console.info(line)
-      if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
-      expect(result.stoppedAt, report(result)).toBeNull()
-      expect(result.endingIndex, report(result)).not.toBeNull()
-      expect(result.problems.size, report(result)).toBe(0)
-    }, 3_600_000)
-    it.runIf(isSoakEnabled())(`긴 판(새 길) — 씨앗 ${seed}: 상점 · 외출 · 도루 · 마선수 대결 · 이어하기를 섞어 엔딩 · 명전 등록까지`, async () => {
-      const startedAt = Date.now()
-      const result = await runCareerSoak({
-        seed, extras: true, startGamePoint: 60_000, resumeEvery: soakNumber('SOAK_RESUME_EVERY', 30_011),
-        roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
-      })
-      const line = `[타자편 soak 새 길] 씨앗 ${seed} · ${(Date.now() - startedAt) / 1000}s · ${report(result)}`
-      console.info(line)
-      // 통과한 판의 요약을 파일로 남긴다(`SOAK_REPORT=경로`) — 통과한 시험의 console 은 보고기에서 안 보일 때가 있다
-      if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
-      expect(result.stoppedAt, report(result)).toBeNull()
-      expect(result.endingIndex, report(result)).not.toBeNull()
-      expect(result.problems.size, report(result)).toBe(0)
-    }, 3_600_000)
+    it.runIf(isSoakEnabled())(
+      `긴 판 — 씨앗 ${seed}: 새 선수 등록부터 은퇴 · 엔딩까지`,
+      async () => {
+        const startedAt = Date.now()
+        const result = await runCareerSoak({ seed, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10) })
+        const line = `[타자편 soak] 씨앗 ${seed} · ${(Date.now() - startedAt) / 1000}s · ${report(result)}`
+        console.info(line)
+        if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
+        expect(result.stoppedAt, report(result)).toBeNull()
+        expect(result.endingIndex, report(result)).not.toBeNull()
+        expect(result.problems.size, report(result)).toBe(0)
+      },
+      3_600_000,
+    )
+    it.runIf(isSoakEnabled())(
+      `긴 판(새 길) — 씨앗 ${seed}: 상점 · 외출 · 도루 · 마선수 대결 · 이어하기를 섞어 엔딩 · 명전 등록까지`,
+      async () => {
+        const startedAt = Date.now()
+        const result = await runCareerSoak({
+          seed,
+          extras: true,
+          startGamePoint: 60_000,
+          resumeEvery: soakNumber('SOAK_RESUME_EVERY', 30_011),
+          roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
+        })
+        const line = `[타자편 soak 새 길] 씨앗 ${seed} · ${(Date.now() - startedAt) / 1000}s · ${report(result)}`
+        console.info(line)
+        // 통과한 판의 요약을 파일로 남긴다(`SOAK_REPORT=경로`) — 통과한 시험의 console 은 보고기에서 안 보일 때가 있다
+        if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
+        expect(result.stoppedAt, report(result)).toBeNull()
+        expect(result.endingIndex, report(result)).not.toBeNull()
+        expect(result.problems.size, report(result)).toBe(0)
+      },
+      3_600_000,
+    )
   }
 })

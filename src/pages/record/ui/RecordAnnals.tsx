@@ -19,24 +19,90 @@ import { useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 import { measureRawTextWidth } from '@/shared/lib/font'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import {
-  ACHIEVEMENT_MARK, DESCRIPTION_BAR, LIST_CURSOR, LIST_NAME, LIST_ROW_FRAME_DY, listFirstYOf, STAT_NAME, STAT_VALUE, listRowFrameOf, NICKNAME_SCROLLBAR, NICKNAME_TAB_LABEL, DESCRIPTION_TICKER, RECORD_COUNT, tickerTextXOf, CELL_FRAMES, CELL_GRID, LIST_GRID, LOCKED_MARK, NAME_ROW, PAGER, PAGE_TITLE, PANEL,
-  SPECIAL_RECORD_FIRST_CELL, SPECIAL_RECORD_NAMES,
-  ENDING_CELL_NAMES, NARI_ENDING_CELL_COUNT, PROGRESS_ROW, SCROLL_MARKS, endingCellFrameOf, endingProgressOf, SKILL_BADGE, SKILL_DESCRIPTION, SKILL_NOT_GAINED_TEXT, skillGradeOf, TAB_BAR, TAB_COUNT, TAB_CURSOR, TAB_NAMES,
-  TAB_NAME_FRAMES, TAB_NAME_Y, TAB_PAGE_COUNTS, TOTAL_ROW, cellPositionOf, tabIconWidthOf,
-  tabIconXOf, tabNameXOf, tabSlotXOf,
+  ACHIEVEMENT_MARK,
+  DESCRIPTION_BAR,
+  LIST_CURSOR,
+  LIST_NAME,
+  LIST_ROW_FRAME_DY,
+  listFirstYOf,
+  STAT_NAME,
+  STAT_VALUE,
+  listRowFrameOf,
+  NICKNAME_SCROLLBAR,
+  NICKNAME_TAB_LABEL,
+  DESCRIPTION_TICKER,
+  RECORD_COUNT,
+  tickerTextXOf,
+  CELL_FRAMES,
+  CELL_GRID,
+  LIST_GRID,
+  LOCKED_MARK,
+  NAME_ROW,
+  PAGER,
+  PAGE_TITLE,
+  PANEL,
+  SPECIAL_RECORD_FIRST_CELL,
+  SPECIAL_RECORD_NAMES,
+  ENDING_CELL_NAMES,
+  NARI_ENDING_CELL_COUNT,
+  PROGRESS_ROW,
+  SCROLL_MARKS,
+  endingCellFrameOf,
+  endingProgressOf,
+  SKILL_BADGE,
+  SKILL_DESCRIPTION,
+  SKILL_NOT_GAINED_TEXT,
+  skillGradeOf,
+  TAB_BAR,
+  TAB_COUNT,
+  TAB_CURSOR,
+  TAB_NAMES,
+  TAB_NAME_FRAMES,
+  TAB_NAME_Y,
+  TAB_PAGE_COUNTS,
+  TOTAL_ROW,
+  cellPositionOf,
+  tabIconWidthOf,
+  tabIconXOf,
+  tabNameXOf,
+  tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import {
-  ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_FULL_HEIGHT, VISIBLE_GRID_ROWS,
-  NICKNAME_PAGE_FIRST_NAMES, NICKNAME_PAGE_TITLE_FRAMES, NICKNAME_PAGE_TOTALS, NICKNAME_SCROLL_TRACK,
-  NICKNAME_VISIBLE_ROWS, closingPanelHeightOf, cursorShakeOf, hasDownMark, isBlinkOn, isListCursorBlinkOn, moveGridCursor,
-  nicknameScrollDirectionOf, openingPanelHeightOf, panelTopOf, scrollNicknames, scrollTopAfter, startNicknameScroll,
+  ANNALS_GRID_SHAPES,
+  DIRECTION_CODES,
+  PANEL_ANIMATION_DRAWS,
+  PANEL_FULL_HEIGHT,
+  VISIBLE_GRID_ROWS,
+  NICKNAME_PAGE_FIRST_NAMES,
+  NICKNAME_PAGE_TITLE_FRAMES,
+  NICKNAME_PAGE_TOTALS,
+  NICKNAME_SCROLL_TRACK,
+  NICKNAME_VISIBLE_ROWS,
+  closingPanelHeightOf,
+  cursorShakeOf,
+  hasDownMark,
+  isBlinkOn,
+  isListCursorBlinkOn,
+  moveGridCursor,
+  nicknameScrollDirectionOf,
+  openingPanelHeightOf,
+  panelTopOf,
+  scrollNicknames,
+  scrollTopAfter,
+  startNicknameScroll,
 } from '@/pages/record/lib/annalsGrid'
 import type { NicknameScroll } from '@/pages/record/lib/annalsGrid'
 import {
-  INITIAL_SECRET_CODE_STATE, UNLOCKED_STAT_PAGE_COUNT, enterAnnalsSecretCode, statNameOffsetOf, statPageCellsOf, statTotalTextOf,
-  statValueTextOf, typeSecretDigit,
+  INITIAL_SECRET_CODE_STATE,
+  UNLOCKED_STAT_PAGE_COUNT,
+  enterAnnalsSecretCode,
+  statNameOffsetOf,
+  statPageCellsOf,
+  statTotalTextOf,
+  statValueTextOf,
+  typeSecretDigit,
 } from '@/pages/record/lib/statCells'
 import type { SecretCodeState } from '@/pages/record/lib/statCells'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
@@ -52,8 +118,7 @@ const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const imageSrc = (folder: string, id: number) => `${folder}/${String(id).padStart(3, '0')}.png`
 
 /** 탭 이름 그림 폭 — 원본은 `0xba815(…, img_text, 276+탭, 1)` 로 크기를 재 가운데를 맞춘다 (0x2e546) */
-const nameWidthOf = (origins: ReturnType<typeof useFrameOrigins>, frame: number) =>
-  origins?.[String(frame).padStart(3, '0')]?.width ?? 0
+const nameWidthOf = (origins: ReturnType<typeof useFrameOrigins>, frame: number) => origins?.[String(frame).padStart(3, '0')]?.width ?? 0
 
 interface RecordAnnalsProps {
   readonly collection: Collection
@@ -100,9 +165,7 @@ const ANNALS_ENTER_BODY_OFFER: TouchKeyOffer = { key: 'Enter', label: '본문 �
  * OK·↓ 로 본문에 들어가 ←→ 는 쪽(진행·스킬은 같은 줄 안 커서 감기), ↑↓ 는 커서 — 진행·스킬은 보이는 3줄 창이
  * 커서를 따라 한 줄씩 움직인다. 취소는 본문 → 탭 막대 → 닫기. 탭 아이콘·칸 누르기는 웹 덧붙임이다.
  */
-export function RecordAnnals({
-  collection, onBack, gamePoint = 0, secretCode: heldSecretCode, onSecretCodeChange, underlay,
-}: RecordAnnalsProps) {
+export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: heldSecretCode, onSecretCodeChange, underlay }: RecordAnnalsProps) {
   // 들어옴 0x2407c 가 [skin+0x84] = 0 (240b2~240c0) — 앞 화면이 남긴 미끄러짐을 끊어 머리띠가 첫 그림부터 내려온 자리다(r168).
   // 들어옴은 첫 그림보다 앞이라 머리띠(아래 ScreenFrame)가 그리기 전에 지운다
   useState(() => {
@@ -155,9 +218,7 @@ export function RecordAnnals({
   /** 진행 탭 칸 20 — 0~14 나리 엔딩(전역기록 +0xa8 + i) · 15~19 시즌 엔딩(+0xa0 + j) (0x58b5c) */
   const endingCells = ENDING_CELL_NAMES.map((name, index) => ({
     name,
-    isGained: index < NARI_ENDING_CELL_COUNT
-      ? collection.endings.includes(index)
-      : collection.seasonEndings.includes(index - NARI_ENDING_CELL_COUNT),
+    isGained: index < NARI_ENDING_CELL_COUNT ? collection.endings.includes(index) : collection.seasonEndings.includes(index - NARI_ENDING_CELL_COUNT),
     gainedFrame: endingCellFrameOf(index),
   }))
 
@@ -267,199 +328,243 @@ export function RecordAnnals({
           0x55e60(skin, W/2, H/2, 192, h, 0, 정렬 0x22, 위 띠 0x10, 0, 0, 0) (0x2e40a~0x2e42a) */}
       <CommonPanel x={PANEL.x} y={panelTopOf(panelHeight)} width={PANEL.width} height={panelHeight} topBand={0x10} />
       {/* 판 안 그림 — 높이 ≤ 211 동안은 (24, 160 − h/2 + 5, 192, h − 10) 로 잘린다 (0x2e42e~0x2e452) */}
-      <div className={styles.content}
-        style={panelHeight >= PANEL_FULL_HEIGHT ? undefined : {
-          clipPath: `inset(${panelTopOf(panelHeight) + 5}px ${SCREEN.width - PANEL.x - PANEL.width}px `
-            + `${SCREEN.height - (panelTopOf(panelHeight) + panelHeight - 5)}px ${PANEL.x}px)`,
-        }}>
-
-      {/* 탭 막대 — 고른 탭만 넓은 칸이라 탭마다 프레임이 다르다 */}
-      <FrameSprite folder={SLT_FRAMES} frame={TAB_BAR.firstFrame + tab} origins={frames}
-        x={TAB_BAR.x} y={TAB_BAR.y} />
-      {/* 커서 프레임 9 — 고른 탭 박스 (24 + 박스x, 54). 탭 막대에 초점이 있으면 깜박인다 (0x2e5be) */}
-      {(!isTabFocused || isBlinking) && (
-        <FrameSprite folder={SLT_FRAMES} frame={TAB_CURSOR.frame} origins={frames}
-          x={tabSlotXOf(tab)} y={TAB_CURSOR.y} />
-      )}
-      {/* 이름은 고른 탭 하나만 — 박스 안 가운데 맞춤 (0x2e568) */}
-      {tabNamePalette.definition}
-      <FrameSprite folder={IMG_TEXT} frame={TAB_NAME_FRAMES[tab]} origins={textFrames} style={tabNamePalette.style}
-        x={tabNameXOf(tab, nameWidthOf(textFrames, TAB_NAME_FRAMES[tab]))} y={TAB_NAME_Y} />
-      {TAB_NAMES.map((name, index) => (
-        <button key={name} type="button" className={styles.tab} aria-label={name}
-          style={{
-            left: tabIconXOf(index, tab), top: TAB_BAR.y,
-            width: tabIconWidthOf(index, tab), height: TAB_BAR.height,
-          }}
-          onClick={() => isPanelOpen && changeTab(index)} />
-      ))}
-
-      {pageCount > 0 && (
-        <>
-          <img className={styles.sprite} alt=""
-            src={imageSrc(SLT_FRAME, PAGER.leftArrow.image)}
-            style={{ left: PAGER.leftArrow.x, top: PAGER.leftArrow.y }} />
-          <img className={styles.sprite} alt=""
-            src={imageSrc(SLT_FRAME, PAGER.rightArrow.image)}
-            style={{ left: PAGER.rightArrow.x, top: PAGER.rightArrow.y, transform: 'scaleX(-1)' }} />
-          <div className={styles.pagerText} style={{ left: PAGER.numberX, top: PAGER.y }}>
-            {page + 1}/{pageCount}
-          </div>
-          {/* 웹 덧붙임 — 쪽 화살 그림(5×8) 위 투명 칸: 원본 ← · → 키 한 번. 같은 키를 상황 버튼으로 또 내지 않는다(r192, 필요한 버튼만) */}
-          {isPanelOpen && (
-            <>
-              <PressArea label="앞 쪽" rect={{ x: PAGER.leftArrow.x - 3, y: PAGER.leftArrow.y - 3, width: 11, height: 14 }}
-                onPress={() => tapKey('ArrowLeft')} />
-              <PressArea label="뒤 쪽" rect={{ x: PAGER.rightArrow.x - 3, y: PAGER.rightArrow.y - 3, width: 11, height: 14 }}
-                onPress={() => tapKey('ArrowRight')} />
-            </>
-          )}
-        </>
-      )}
-
-      {tab === 1 && (
-        <CellGrid
-          frames={frames}
-          gainedFrame={CELL_FRAMES.progress}
-          cursor={cursor}
-          top={gridTop}
-          hasDownMark={hasDownMark(1, gridTop)}
-          isCursorShown={!isTabFocused && isBlinking}
-          isBlinking={isBlinking}
-          cursorShake={cursorShake}
-          onSelect={selectCell}
-          items={endingCells}
+      <div
+        className={styles.content}
+        style={
+          panelHeight >= PANEL_FULL_HEIGHT
+            ? undefined
+            : {
+                clipPath:
+                  `inset(${panelTopOf(panelHeight) + 5}px ${SCREEN.width - PANEL.x - PANEL.width}px ` +
+                  `${SCREEN.height - (panelTopOf(panelHeight) + panelHeight - 5)}px ${PANEL.x}px)`,
+              }
+        }
+      >
+        {/* 탭 막대 — 고른 탭만 넓은 칸이라 탭마다 프레임이 다르다 */}
+        <FrameSprite folder={SLT_FRAMES} frame={TAB_BAR.firstFrame + tab} origins={frames} x={TAB_BAR.x} y={TAB_BAR.y} />
+        {/* 커서 프레임 9 — 고른 탭 박스 (24 + 박스x, 54). 탭 막대에 초점이 있으면 깜박인다 (0x2e5be) */}
+        {(!isTabFocused || isBlinking) && (
+          <FrameSprite folder={SLT_FRAMES} frame={TAB_CURSOR.frame} origins={frames} x={tabSlotXOf(tab)} y={TAB_CURSOR.y} />
+        )}
+        {/* 이름은 고른 탭 하나만 — 박스 안 가운데 맞춤 (0x2e568) */}
+        {tabNamePalette.definition}
+        <FrameSprite
+          folder={IMG_TEXT}
+          frame={TAB_NAME_FRAMES[tab]}
+          origins={textFrames}
+          style={tabNamePalette.style}
+          x={tabNameXOf(tab, nameWidthOf(textFrames, TAB_NAME_FRAMES[tab]))}
+          y={TAB_NAME_Y}
         />
-      )}
+        {TAB_NAMES.map((name, index) => (
+          <button
+            key={name}
+            type="button"
+            className={styles.tab}
+            aria-label={name}
+            style={{
+              left: tabIconXOf(index, tab),
+              top: TAB_BAR.y,
+              width: tabIconWidthOf(index, tab),
+              height: TAB_BAR.height,
+            }}
+            onClick={() => isPanelOpen && changeTab(index)}
+          />
+        ))}
 
-      {tab === 2 && (
-        <>
+        {pageCount > 0 && (
+          <>
+            <img
+              className={styles.sprite}
+              alt=""
+              src={imageSrc(SLT_FRAME, PAGER.leftArrow.image)}
+              style={{ left: PAGER.leftArrow.x, top: PAGER.leftArrow.y }}
+            />
+            <img
+              className={styles.sprite}
+              alt=""
+              src={imageSrc(SLT_FRAME, PAGER.rightArrow.image)}
+              style={{ left: PAGER.rightArrow.x, top: PAGER.rightArrow.y, transform: 'scaleX(-1)' }}
+            />
+            <div className={styles.pagerText} style={{ left: PAGER.numberX, top: PAGER.y }}>
+              {page + 1}/{pageCount}
+            </div>
+            {/* 웹 덧붙임 — 쪽 화살 그림(5×8) 위 투명 칸: 원본 ← · → 키 한 번. 같은 키를 상황 버튼으로 또 내지 않는다(r192, 필요한 버튼만) */}
+            {isPanelOpen && (
+              <>
+                <PressArea
+                  label="앞 쪽"
+                  rect={{ x: PAGER.leftArrow.x - 3, y: PAGER.leftArrow.y - 3, width: 11, height: 14 }}
+                  onPress={() => tapKey('ArrowLeft')}
+                />
+                <PressArea
+                  label="뒤 쪽"
+                  rect={{ x: PAGER.rightArrow.x - 3, y: PAGER.rightArrow.y - 3, width: 11, height: 14 }}
+                  onPress={() => tapKey('ArrowRight')}
+                />
+              </>
+            )}
+          </>
+        )}
+
+        {tab === 1 && (
           <CellGrid
             frames={frames}
-            gainedFrame={CELL_FRAMES.skill}
+            gainedFrame={CELL_FRAMES.progress}
             cursor={cursor}
             top={gridTop}
-            hasDownMark={hasDownMark(2, gridTop)}
+            hasDownMark={hasDownMark(1, gridTop)}
             isCursorShown={!isTabFocused && isBlinking}
             isBlinking={isBlinking}
             cursorShake={cursorShake}
             onSelect={selectCell}
-            // 얻음 = 표 [+0x13c](0x58a3c) 가 −1 이 아님 — 켠 스킬 비트 +0xf4/+0xf8 (0x2f150~0x2f162)
-            items={ORIGINAL_SKILLS.map((skill) => ({
-              name: skill.name,
-              isGained: isAnnalsSkillGained(collection.stats, skill.id),
-            }))}
+            items={endingCells}
           />
-          <FrameSprite folder={SLT_FRAMES} frame={SKILL_DESCRIPTION.tabFrame} origins={frames}
-            x={SKILL_DESCRIPTION.tabX} y={SKILL_DESCRIPTION.tabY} />
-          {/* 설명 상자 0xbb28d(W/2, …, 0xad, 0x3c, 정렬 2) — 왼쪽 = 120 − (173 >> 1) = 34 (0x2f35e~0x2f36e) */}
-          <InsetBox
-            x={SKILL_DESCRIPTION.box.centerX - (SKILL_DESCRIPTION.box.width >> 1)}
-            y={SKILL_DESCRIPTION.box.y}
-            width={SKILL_DESCRIPTION.box.width}
-            height={SKILL_DESCRIPTION.box.height}
-          />
-          {/* 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488) — img_text 등급(팔레트 0) · slt_frame 이미지 0x7c/0x7d 화살 */}
-          {isAnnalsSkillGained(collection.stats, cursor) && (
-            <>
-              <FrameSprite folder={IMG_TEXT} frame={SKILL_BADGE.gradeFrames[skillGradeOf(cursor)]} origins={textFrames}
-                x={SKILL_BADGE.gradeX} y={SKILL_BADGE.gradeY} />
-              <img className={styles.sprite} alt="" data-testid="스킬-화살"
-                src={imageSrc(SLT_FRAME, isMinusSkill(annalsSkillOfCell(collection.stats, cursor)) ? SKILL_BADGE.minusImage : SKILL_BADGE.plusImage)}
-                style={{ left: SKILL_BADGE.arrowX, top: SKILL_BADGE.arrowY + (isBlinking ? 1 : 0) }} />
-            </>
-          )}
-          {/* 0xba269(글, 39, 202, 폭 −1) — 날 글 폭이라 `!N` 에서만 줄이 끊긴다 (0x2f3a0 · 0x2f4d8 → 0x2fb8e) */}
-          <div className={styles.descriptionText} data-testid="스킬-설명"
-            style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y }}>
-            {parseGameMarkup(isAnnalsSkillGained(collection.stats, cursor)
-              // `"%s!N효과 : !cFFFF00%s"`(0xcf978) — StrSKILL[i] · StrSKILL[i + 40]
-              ? `${ORIGINAL_SKILLS[cursor]?.description ?? ''}!N효과 : !cFFFF00${ORIGINAL_SKILLS[cursor]?.effect ?? ''}`
-              : SKILL_NOT_GAINED_TEXT).map((line, lineIndex) => (
-              <div key={lineIndex}>
-                {line.segments.map((segment, segmentIndex) => (
-                  <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
-                ))}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+        )}
 
-      {tab === 3 && (
-        <NameRows
-          frames={frames}
-          textFrames={textFrames}
-          page={page}
-          scroll={nicknameScroll}
-          owned={collection.titles}
-        />
-      )}
-
-      {(tab === 0 || tab === 4) && <ListRowFrames frames={frames} tab={tab} page={page} />}
-      {tab === 0 && <ListRows page={page} names={RECORD_TAB_NAMES} />}
-      {tab === 0 && <RecordCounts page={page} stats={collection.stats} />}
-      {tab === 0 && <AchievementMarks page={page} stats={collection.stats} />}
-      {tab === 0 && (
-        <FrameSprite folder={SLT_FRAMES} frame={DESCRIPTION_BAR.frame} origins={frames} x={DESCRIPTION_BAR.x} y={DESCRIPTION_BAR.y} />
-      )}
-      {tab === 0 && !isTabFocused && (
-        <DescriptionTicker text={RECORD_DESCRIPTIONS[page * LIST_GRID.rows + cursor] ?? ''} tick={tick} />
-      )}
-
-      {tab === 4 && <StatRows page={page} stats={collection.stats} />}
-      {/* 줄 커서 — 칸을 다 그린 뒤 0x7a571 꼬리가 고른 칸 위에 (본문 초점 + 깜박임 켜짐) */}
-      {(tab === 0 || tab === 4) && !isTabFocused && isListCursorBlinkOn(tick - listBuiltAt) && (
-        <FrameSprite folder={SLT_FRAMES} frame={LIST_CURSOR.frame} origins={frames}
-          x={LIST_GRID.x + (cursorShake?.dx ?? 0)}
-          y={listFirstYOf(tab) + LIST_GRID.step * cursor + LIST_CURSOR.dy + (cursorShake?.dy ?? 0)} />
-      )}
-
-      {tab === 1 && PROGRESS_ROW.modeFrames.map((modeFrame, row) => {
-        const y = PROGRESS_ROW.firstY + PROGRESS_ROW.step * row
-        const gained = endingCells
-          .filter((cell, index) => cell.isGained && (row === 0) === (index < NARI_ENDING_CELL_COUNT)).length
-        return (
-          <div key={modeFrame}>
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, PROGRESS_ROW.bulletImage)}
-              style={{ left: PROGRESS_ROW.bulletX, top: y + PROGRESS_ROW.bulletDy }} />
-            <FrameSprite folder={IMG_TEXT} frame={modeFrame} origins={textFrames}
-              x={PROGRESS_ROW.modeLabelX} y={y} />
-            <FrameSprite folder={IMG_TEXT} frame={PROGRESS_ROW.labelFrame} origins={textFrames}
-              x={PROGRESS_ROW.modeLabelX + nameWidthOf(textFrames, modeFrame) + PROGRESS_ROW.labelGap} y={y} />
-            <FrameSprite folder={SLT_FRAMES} frame={PROGRESS_ROW.frame} origins={frames}
-              x={PROGRESS_ROW.frameX} y={y + PROGRESS_ROW.frameDy} />
-            <div className={styles.progressValue}
-              style={{ left: PROGRESS_ROW.frameX, top: y, width: PROGRESS_ROW.frameWidth }}>
-              {endingProgressOf(row, gained)}%
+        {tab === 2 && (
+          <>
+            <CellGrid
+              frames={frames}
+              gainedFrame={CELL_FRAMES.skill}
+              cursor={cursor}
+              top={gridTop}
+              hasDownMark={hasDownMark(2, gridTop)}
+              isCursorShown={!isTabFocused && isBlinking}
+              isBlinking={isBlinking}
+              cursorShake={cursorShake}
+              onSelect={selectCell}
+              // 얻음 = 표 [+0x13c](0x58a3c) 가 −1 이 아님 — 켠 스킬 비트 +0xf4/+0xf8 (0x2f150~0x2f162)
+              items={ORIGINAL_SKILLS.map((skill) => ({
+                name: skill.name,
+                isGained: isAnnalsSkillGained(collection.stats, skill.id),
+              }))}
+            />
+            <FrameSprite
+              folder={SLT_FRAMES}
+              frame={SKILL_DESCRIPTION.tabFrame}
+              origins={frames}
+              x={SKILL_DESCRIPTION.tabX}
+              y={SKILL_DESCRIPTION.tabY}
+            />
+            {/* 설명 상자 0xbb28d(W/2, …, 0xad, 0x3c, 정렬 2) — 왼쪽 = 120 − (173 >> 1) = 34 (0x2f35e~0x2f36e) */}
+            <InsetBox
+              x={SKILL_DESCRIPTION.box.centerX - (SKILL_DESCRIPTION.box.width >> 1)}
+              y={SKILL_DESCRIPTION.box.y}
+              width={SKILL_DESCRIPTION.box.width}
+              height={SKILL_DESCRIPTION.box.height}
+            />
+            {/* 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488) — img_text 등급(팔레트 0) · slt_frame 이미지 0x7c/0x7d 화살 */}
+            {isAnnalsSkillGained(collection.stats, cursor) && (
+              <>
+                <FrameSprite
+                  folder={IMG_TEXT}
+                  frame={SKILL_BADGE.gradeFrames[skillGradeOf(cursor)]}
+                  origins={textFrames}
+                  x={SKILL_BADGE.gradeX}
+                  y={SKILL_BADGE.gradeY}
+                />
+                <img
+                  className={styles.sprite}
+                  alt=""
+                  data-testid="스킬-화살"
+                  src={imageSrc(
+                    SLT_FRAME,
+                    isMinusSkill(annalsSkillOfCell(collection.stats, cursor)) ? SKILL_BADGE.minusImage : SKILL_BADGE.plusImage,
+                  )}
+                  style={{ left: SKILL_BADGE.arrowX, top: SKILL_BADGE.arrowY + (isBlinking ? 1 : 0) }}
+                />
+              </>
+            )}
+            {/* 0xba269(글, 39, 202, 폭 −1) — 날 글 폭이라 `!N` 에서만 줄이 끊긴다 (0x2f3a0 · 0x2f4d8 → 0x2fb8e) */}
+            <div className={styles.descriptionText} data-testid="스킬-설명" style={{ left: SKILL_DESCRIPTION.text.x, top: SKILL_DESCRIPTION.text.y }}>
+              {parseGameMarkup(
+                isAnnalsSkillGained(collection.stats, cursor)
+                  ? // `"%s!N효과 : !cFFFF00%s"`(0xcf978) — StrSKILL[i] · StrSKILL[i + 40]
+                    `${ORIGINAL_SKILLS[cursor]?.description ?? ''}!N효과 : !cFFFF00${ORIGINAL_SKILLS[cursor]?.effect ?? ''}`
+                  : SKILL_NOT_GAINED_TEXT,
+              ).map((line, lineIndex) => (
+                <div key={lineIndex}>
+                  {line.segments.map((segment, segmentIndex) => (
+                    <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
+                      {segment.text}
+                    </span>
+                  ))}
+                </div>
+              ))}
             </div>
-          </div>
-        )
-      })}
+          </>
+        )}
 
-      {/* 합계 줄(프레임 15 · 이미지 0x26 · img_text 0x10d)은 탭 3(0x2f834~0x2f8ca) · 탭 4(0x2fa60~0x2faf6)에만 있다 —
+        {tab === 3 && <NameRows frames={frames} textFrames={textFrames} page={page} scroll={nicknameScroll} owned={collection.titles} />}
+
+        {(tab === 0 || tab === 4) && <ListRowFrames frames={frames} tab={tab} page={page} />}
+        {tab === 0 && <ListRows page={page} names={RECORD_TAB_NAMES} />}
+        {tab === 0 && <RecordCounts page={page} stats={collection.stats} />}
+        {tab === 0 && <AchievementMarks page={page} stats={collection.stats} />}
+        {tab === 0 && <FrameSprite folder={SLT_FRAMES} frame={DESCRIPTION_BAR.frame} origins={frames} x={DESCRIPTION_BAR.x} y={DESCRIPTION_BAR.y} />}
+        {tab === 0 && !isTabFocused && <DescriptionTicker text={RECORD_DESCRIPTIONS[page * LIST_GRID.rows + cursor] ?? ''} tick={tick} />}
+
+        {tab === 4 && <StatRows page={page} stats={collection.stats} />}
+        {/* 줄 커서 — 칸을 다 그린 뒤 0x7a571 꼬리가 고른 칸 위에 (본문 초점 + 깜박임 켜짐) */}
+        {(tab === 0 || tab === 4) && !isTabFocused && isListCursorBlinkOn(tick - listBuiltAt) && (
+          <FrameSprite
+            folder={SLT_FRAMES}
+            frame={LIST_CURSOR.frame}
+            origins={frames}
+            x={LIST_GRID.x + (cursorShake?.dx ?? 0)}
+            y={listFirstYOf(tab) + LIST_GRID.step * cursor + LIST_CURSOR.dy + (cursorShake?.dy ?? 0)}
+          />
+        )}
+
+        {tab === 1 &&
+          PROGRESS_ROW.modeFrames.map((modeFrame, row) => {
+            const y = PROGRESS_ROW.firstY + PROGRESS_ROW.step * row
+            const gained = endingCells.filter((cell, index) => cell.isGained && (row === 0) === index < NARI_ENDING_CELL_COUNT).length
+            return (
+              <div key={modeFrame}>
+                <img
+                  className={styles.sprite}
+                  alt=""
+                  src={imageSrc(SLT_FRAME, PROGRESS_ROW.bulletImage)}
+                  style={{ left: PROGRESS_ROW.bulletX, top: y + PROGRESS_ROW.bulletDy }}
+                />
+                <FrameSprite folder={IMG_TEXT} frame={modeFrame} origins={textFrames} x={PROGRESS_ROW.modeLabelX} y={y} />
+                <FrameSprite
+                  folder={IMG_TEXT}
+                  frame={PROGRESS_ROW.labelFrame}
+                  origins={textFrames}
+                  x={PROGRESS_ROW.modeLabelX + nameWidthOf(textFrames, modeFrame) + PROGRESS_ROW.labelGap}
+                  y={y}
+                />
+                <FrameSprite folder={SLT_FRAMES} frame={PROGRESS_ROW.frame} origins={frames} x={PROGRESS_ROW.frameX} y={y + PROGRESS_ROW.frameDy} />
+                <div className={styles.progressValue} style={{ left: PROGRESS_ROW.frameX, top: y, width: PROGRESS_ROW.frameWidth }}>
+                  {endingProgressOf(row, gained)}%
+                </div>
+              </div>
+            )
+          })}
+
+        {/* 합계 줄(프레임 15 · 이미지 0x26 · img_text 0x10d)은 탭 3(0x2f834~0x2f8ca) · 탭 4(0x2fa60~0x2faf6)에만 있다 —
           탭 2 그리기(0x2efa4~0x2f4ec)는 이 셋을 안 그리고, 함께 쓰는 0x2fb8e 호출은 합계가 아니라 스킬 설명이다 */}
-      {tab === 3 && (
-        <TotalRow
-          frames={frames}
-          textFrames={textFrames}
-          // 탭 3 은 쪽(갈래)마다 얻은 수 [skin+0x124] / 칸 수 — "!C!cffff00%d/%d" (0x2f8ee~0x2f8fa)
-          value={`${ownedNicknameCountOf(page, collection.titles)}/${NICKNAME_PAGE_TOTALS[page] ?? 0}`}
-        />
-      )}
+        {tab === 3 && (
+          <TotalRow
+            frames={frames}
+            textFrames={textFrames}
+            // 탭 3 은 쪽(갈래)마다 얻은 수 [skin+0x124] / 칸 수 — "!C!cffff00%d/%d" (0x2f8ee~0x2f8fa)
+            value={`${ownedNicknameCountOf(page, collection.titles)}/${NICKNAME_PAGE_TOTALS[page] ?? 0}`}
+          />
+        )}
 
-      {tab === 4 && (
-        // 통계 합계는 `"!R!cFFFF00…G"` 오른쪽 맞춤 (0x58870)
-        <TotalRow frames={frames} textFrames={textFrames} value={statTotalTextOf(page, collection.stats) ?? ''} isRightAligned />
-      )}
-
+        {tab === 4 && (
+          // 통계 합계는 `"!R!cFFFF00…G"` 오른쪽 맞춤 (0x58870)
+          <TotalRow frames={frames} textFrames={textFrames} value={statTotalTextOf(page, collection.stats) ?? ''} isRightAligned />
+        )}
       </div>
 
       {/* 머리띠·바닥 — 그리기 꼬리 0x2fc1e `0x54d95(skin, 0, 5)` (판 자르기를 푼 뒤라 안 잘린다).
           들어옴 0x2407c 가 [skin+0x84] = 0 이라(위 stopSkinFrameSlide) 미끄러지지 않는다. 되돌아가기는 CLR 과 같은 일 */}
-      <ScreenFrame title="2010프로야구" gamePoint={gamePoint} footer={5} slides={false}
-        onBack={() => isPanelOpen && pressClear()} />
+      <ScreenFrame title="2010프로야구" gamePoint={gamePoint} footer={5} slides={false} onBack={() => isPanelOpen && pressClear()} />
     </RawScreen>
   )
 }
@@ -476,7 +581,16 @@ interface CellItem {
  * 보이는 i 번째 칸 = 번호 − 윗줄 × 4.
  */
 function CellGrid({
-  frames, items, gainedFrame, cursor, top, hasDownMark: isDownMarkShown, isCursorShown, isBlinking, cursorShake, onSelect,
+  frames,
+  items,
+  gainedFrame,
+  cursor,
+  top,
+  hasDownMark: isDownMarkShown,
+  isCursorShown,
+  isBlinking,
+  cursorShake,
+  onSelect,
 }: {
   readonly frames: ReturnType<typeof useFrameOrigins>
   readonly items: readonly CellItem[]
@@ -503,8 +617,13 @@ function CellGrid({
         const y = base.y + shift.dy
         return (
           <div key={item.name + index}>
-            <FrameSprite folder={SLT_FRAMES} frame={item.isGained ? (item.gainedFrame ?? gainedFrame) : CELL_FRAMES.locked}
-              origins={frames} x={x} y={y} />
+            <FrameSprite
+              folder={SLT_FRAMES}
+              frame={item.isGained ? (item.gainedFrame ?? gainedFrame) : CELL_FRAMES.locked}
+              origins={frames}
+              x={x}
+              y={y}
+            />
             {item.isGained ? (
               <>
                 <div className={styles.cellShadow} style={{ left: x, top: y + 7, width: CELL_GRID.width }}>
@@ -516,27 +635,43 @@ function CellGrid({
               </>
             ) : (
               LOCKED_MARK.dx.map((dx) => (
-                <img key={dx} className={styles.sprite} alt=""
+                <img
+                  key={dx}
+                  className={styles.sprite}
+                  alt=""
                   src={imageSrc(SLT_FRAME, LOCKED_MARK.image)}
-                  style={{ left: x + dx, top: y + LOCKED_MARK.dy }} />
+                  style={{ left: x + dx, top: y + LOCKED_MARK.dy }}
+                />
               ))
             )}
-            {index === cursor && isCursorShown && (
-              <FrameSprite folder={SLT_FRAMES} frame={CELL_FRAMES.cursor} origins={frames} x={x - 1} y={y - 1} />
-            )}
-            <button type="button" className={styles.cell} aria-label={item.isGained ? item.name : '???'}
+            {index === cursor && isCursorShown && <FrameSprite folder={SLT_FRAMES} frame={CELL_FRAMES.cursor} origins={frames} x={x - 1} y={y - 1} />}
+            <button
+              type="button"
+              className={styles.cell}
+              aria-label={item.isGained ? item.name : '???'}
               style={{ left: x, top: y, width: CELL_GRID.width, height: CELL_GRID.height }}
-              onClick={() => onSelect(index)} />
+              onClick={() => onSelect(index)}
+            />
           </div>
         )
       })}
       {top > 0 && (
-        <FrameSprite folder={SLT_FRAMES} frame={SCROLL_MARKS.up.frame} origins={frames}
-          x={SCROLL_MARKS.x} y={isBlinking ? SCROLL_MARKS.up.yOn : SCROLL_MARKS.up.yOff} />
+        <FrameSprite
+          folder={SLT_FRAMES}
+          frame={SCROLL_MARKS.up.frame}
+          origins={frames}
+          x={SCROLL_MARKS.x}
+          y={isBlinking ? SCROLL_MARKS.up.yOn : SCROLL_MARKS.up.yOff}
+        />
       )}
       {isDownMarkShown && (
-        <FrameSprite folder={SLT_FRAMES} frame={SCROLL_MARKS.down.frame} origins={frames}
-          x={SCROLL_MARKS.x} y={isBlinking ? SCROLL_MARKS.down.yOn : SCROLL_MARKS.down.yOff} />
+        <FrameSprite
+          folder={SLT_FRAMES}
+          frame={SCROLL_MARKS.down.frame}
+          origins={frames}
+          x={SCROLL_MARKS.x}
+          y={isBlinking ? SCROLL_MARKS.down.yOn : SCROLL_MARKS.down.yOff}
+        />
       )}
     </>
   )
@@ -557,12 +692,12 @@ function DescriptionTicker({ text, tick }: { readonly text: string; readonly tic
   const segments = parseGameMarkup(raw).flatMap((line) => line.segments)
   const { x, y, width, height, clipInset } = DESCRIPTION_TICKER
   return (
-    <div className={styles.tickerClip} data-testid="기록-설명"
-      style={{ left: x + clipInset, top: y, width: width - clipInset * 2, height }}>
-      <span className={styles.tickerText}
-        style={{ left: tickerTextXOf(counter, textWidth) - (x + clipInset) }}>
+    <div className={styles.tickerClip} data-testid="기록-설명" style={{ left: x + clipInset, top: y, width: width - clipInset * 2, height }}>
+      <span className={styles.tickerText} style={{ left: tickerTextXOf(counter, textWidth) - (x + clipInset) }}>
         {segments.map((segment, index) => (
-          <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+          <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>
+            {segment.text}
+          </span>
         ))}
       </span>
     </div>
@@ -583,8 +718,7 @@ const isNicknameOwned = (page: number, index: number, owned: readonly string[]) 
   owned.includes(TITLE_NAMES[(NICKNAME_PAGE_FIRST_NAMES[page] ?? 0) + index] ?? '')
 /** 쪽(갈래)에서 얻은 수 [skin+0x124] — 그릴 때마다 0 에서 센다 (0x2f5d8~0x2f692) */
 const ownedNicknameCountOf = (page: number, owned: readonly string[]) =>
-  Array.from({ length: NICKNAME_PAGE_TOTALS[page] ?? 0 }, (_, index) => index)
-    .filter((index) => isNicknameOwned(page, index, owned)).length
+  Array.from({ length: NICKNAME_PAGE_TOTALS[page] ?? 0 }, (_, index) => index).filter((index) => isNicknameOwned(page, index, owned)).length
 
 /**
  * 탭 3 닉네임 (0x2f4ee~0x2f920) — 쪽 제목 · 164×18 이름 줄 8개 · 스크롤 막대.
@@ -597,7 +731,11 @@ const ownedNicknameCountOf = (page: number, owned: readonly string[]) =>
  * 줄 커서는 그리지 않는다 (탭 3 은 0x7a571 을 안 부른다).
  */
 function NameRows({
-  frames, textFrames, page, scroll, owned,
+  frames,
+  textFrames,
+  page,
+  scroll,
+  owned,
 }: {
   readonly frames: ReturnType<typeof useFrameOrigins>
   readonly textFrames: ReturnType<typeof useFrameOrigins>
@@ -611,11 +749,20 @@ function NameRows({
   const { x: barX, y: barY } = NICKNAME_SCROLLBAR
   return (
     <>
-      <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, PAGE_TITLE.bulletImage)}
-        style={{ left: PAGE_TITLE.bulletX, top: PAGE_TITLE.bulletY }} />
+      <img
+        className={styles.sprite}
+        alt=""
+        src={imageSrc(SLT_FRAME, PAGE_TITLE.bulletImage)}
+        style={{ left: PAGE_TITLE.bulletX, top: PAGE_TITLE.bulletY }}
+      />
       <FrameSprite folder={IMG_TEXT} frame={titleFrame} origins={textFrames} x={PAGE_TITLE.x} y={PAGE_TITLE.y} />
-      <FrameSprite folder={IMG_TEXT} frame={NICKNAME_TAB_LABEL.frame} origins={textFrames}
-        x={PAGE_TITLE.x + nameWidthOf(textFrames, titleFrame) + NICKNAME_TAB_LABEL.gap} y={PAGE_TITLE.y} />
+      <FrameSprite
+        folder={IMG_TEXT}
+        frame={NICKNAME_TAB_LABEL.frame}
+        origins={textFrames}
+        x={PAGE_TITLE.x + nameWidthOf(textFrames, titleFrame) + NICKNAME_TAB_LABEL.gap}
+        y={PAGE_TITLE.y}
+      />
       {indices.map((index, offset) => {
         const y = NAME_ROW.firstY + NAME_ROW.step * offset
         const name = TITLE_NAMES[(NICKNAME_PAGE_FIRST_NAMES[page] ?? 0) + index] ?? ''
@@ -634,28 +781,51 @@ function NameRows({
         )
       })}
       {/* 스크롤 막대 0x58c10 — 길 · ▲▼ · 흰 막대 */}
-      <div className={styles.scrollTrack} data-testid="닉네임-스크롤"
-        style={{ left: barX, top: barY, width: NICKNAME_SCROLLBAR.width, height: NICKNAME_SCROLL_TRACK + 2,
-          background: NICKNAME_SCROLLBAR.trackColor }} />
-      <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, NICKNAME_SCROLLBAR.arrowImage)}
-        style={{ left: barX, top: barY + NICKNAME_SCROLLBAR.arrowDy }} />
-      <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, NICKNAME_SCROLLBAR.arrowImage)}
-        style={{ left: barX, top: barY + NICKNAME_SCROLL_TRACK + 1, transform: 'scaleY(-1)' }} />
-      <div className={styles.scrollThumb} data-testid="닉네임-스크롤-막대"
-        style={{ left: barX + 1, top: barY + scroll.thumb + 1, width: NICKNAME_SCROLLBAR.thumbWidth, height: scroll.thumbLength }} />
+      <div
+        className={styles.scrollTrack}
+        data-testid="닉네임-스크롤"
+        style={{
+          left: barX,
+          top: barY,
+          width: NICKNAME_SCROLLBAR.width,
+          height: NICKNAME_SCROLL_TRACK + 2,
+          background: NICKNAME_SCROLLBAR.trackColor,
+        }}
+      />
+      <img
+        className={styles.sprite}
+        alt=""
+        src={imageSrc(SLT_FRAME, NICKNAME_SCROLLBAR.arrowImage)}
+        style={{ left: barX, top: barY + NICKNAME_SCROLLBAR.arrowDy }}
+      />
+      <img
+        className={styles.sprite}
+        alt=""
+        src={imageSrc(SLT_FRAME, NICKNAME_SCROLLBAR.arrowImage)}
+        style={{ left: barX, top: barY + NICKNAME_SCROLL_TRACK + 1, transform: 'scaleY(-1)' }}
+      />
+      <div
+        className={styles.scrollThumb}
+        data-testid="닉네임-스크롤-막대"
+        style={{ left: barX + 1, top: barY + scroll.thumb + 1, width: NICKNAME_SCROLLBAR.thumbWidth, height: scroll.thumbLength }}
+      />
     </>
   )
 }
 
 /** 탭 0·4 칸 바탕 — slt_frame 프레임 10 · 11(탭 0 쪽 5) · 13(탭 4) 을 (칸 x − 1, 칸 y − 1) 에 (0x7a916 · 0x7a9cc) */
-function ListRowFrames({
-  frames, tab, page,
-}: { readonly frames: ReturnType<typeof useFrameOrigins>; readonly tab: number; readonly page: number }) {
+function ListRowFrames({ frames, tab, page }: { readonly frames: ReturnType<typeof useFrameOrigins>; readonly tab: number; readonly page: number }) {
   return (
     <>
       {Array.from({ length: LIST_GRID.rows }, (_, row) => (
-        <FrameSprite key={row} folder={SLT_FRAMES} frame={listRowFrameOf(tab, page)} origins={frames}
-          x={LIST_GRID.x} y={listFirstYOf(tab) + LIST_GRID.step * row + LIST_ROW_FRAME_DY} />
+        <FrameSprite
+          key={row}
+          folder={SLT_FRAMES}
+          frame={listRowFrameOf(tab, page)}
+          origins={frames}
+          x={LIST_GRID.x}
+          y={listFirstYOf(tab) + LIST_GRID.step * row + LIST_ROW_FRAME_DY}
+        />
       ))}
     </>
   )
@@ -667,8 +837,11 @@ function ListRows({ page, names }: { readonly page: number; readonly names: read
   return (
     <>
       {names.slice(start, start + LIST_GRID.rows).map((name, offset) => (
-        <div key={name} className={styles.rowText}
-          style={{ left: LIST_GRID.cellX + LIST_NAME.dx, top: LIST_GRID.firstY + LIST_GRID.step * offset + LIST_NAME.dy }}>
+        <div
+          key={name}
+          className={styles.rowText}
+          style={{ left: LIST_GRID.cellX + LIST_NAME.dx, top: LIST_GRID.firstY + LIST_GRID.step * offset + LIST_NAME.dy }}
+        >
           {name}
         </div>
       ))}
@@ -687,12 +860,16 @@ function RecordCounts({ page, stats }: { readonly page: number; readonly stats: 
         const cell = page * LIST_GRID.rows + row
         if (cell >= RECORD_COUNT_KINDS) return null
         return (
-          <div key={cell} className={styles.statValue} data-cell={cell}
+          <div
+            key={cell}
+            className={styles.statValue}
+            data-cell={cell}
             style={{
               left: LIST_GRID.cellX + RECORD_COUNT.dx,
               top: LIST_GRID.firstY + LIST_GRID.step * row + RECORD_COUNT.dy,
               width: LIST_GRID.cellWidth - RECORD_COUNT.widthInset,
-            }}>
+            }}
+          >
             {recordCountOf(stats, cell)}
           </div>
         )
@@ -709,12 +886,17 @@ function AchievementMarks({ page, stats }: { readonly page: number; readonly sta
         const cell = page * LIST_GRID.rows + row
         if (cell < SPECIAL_RECORD_FIRST_CELL || achievementMarkOf(stats, cell - SPECIAL_RECORD_FIRST_CELL) === 0) return null
         return (
-          <img key={cell} className={styles.sprite} alt="달성" data-cell={cell}
+          <img
+            key={cell}
+            className={styles.sprite}
+            alt="달성"
+            data-cell={cell}
             src={imageSrc(SLT_FRAME, ACHIEVEMENT_MARK.image)}
             style={{
               left: LIST_GRID.cellX + LIST_GRID.cellWidth - ACHIEVEMENT_MARK.width + ACHIEVEMENT_MARK.dx,
               top: LIST_GRID.firstY + LIST_GRID.step * row + ACHIEVEMENT_MARK.dy,
-            }} />
+            }}
+          />
         )
       })}
     </>
@@ -731,12 +913,16 @@ function StatRows({ page, stats }: { readonly page: number; readonly stats: Anna
         const value = cell.valueOf(stats)
         return (
           <div key={cell.nameIndex}>
-            <div className={styles.rowText}
-              style={{ left: LIST_GRID.cellX + STAT_NAME.dx, top: top + STAT_NAME.dy, width: LIST_GRID.cellWidth - STAT_NAME.widthInset }}>
+            <div
+              className={styles.rowText}
+              style={{ left: LIST_GRID.cellX + STAT_NAME.dx, top: top + STAT_NAME.dy, width: LIST_GRID.cellWidth - STAT_NAME.widthInset }}
+            >
               {STAT_NAMES[statNameOffsetOf(cell)]}
             </div>
-            <div className={styles.statValue}
-              style={{ left: LIST_GRID.cellX + STAT_VALUE.dx, top: top + STAT_VALUE.dy, width: LIST_GRID.cellWidth - STAT_VALUE.widthInset }}>
+            <div
+              className={styles.statValue}
+              style={{ left: LIST_GRID.cellX + STAT_VALUE.dx, top: top + STAT_VALUE.dy, width: LIST_GRID.cellWidth - STAT_VALUE.widthInset }}
+            >
               {statValueTextOf(cell.valueKind, value)}
             </div>
           </div>
@@ -748,7 +934,10 @@ function StatRows({ page, stats }: { readonly page: number; readonly stats: Anna
 
 /** 아래 합계 줄 — 프레임 15 + 노란 네모 38 + img_text 269 "전체합계", 값은 노랑 */
 function TotalRow({
-  frames, textFrames, value, isRightAligned = false,
+  frames,
+  textFrames,
+  value,
+  isRightAligned = false,
 }: {
   readonly frames: ReturnType<typeof useFrameOrigins>
   readonly textFrames: ReturnType<typeof useFrameOrigins>
@@ -757,15 +946,23 @@ function TotalRow({
 }) {
   return (
     <>
-      <img className={styles.sprite} alt=""
+      <img
+        className={styles.sprite}
+        alt=""
         src={imageSrc(SLT_FRAME, PAGE_TITLE.bulletImage)}
-        style={{ left: TOTAL_ROW.bulletX, top: TOTAL_ROW.y + TOTAL_ROW.bulletDy }} />
-      <FrameSprite folder={IMG_TEXT} frame={TOTAL_ROW.labelFrame} origins={textFrames}
-        x={TOTAL_ROW.labelX} y={TOTAL_ROW.y + TOTAL_ROW.labelDy} />
-      <FrameSprite folder={SLT_FRAMES} frame={TOTAL_ROW.frame} origins={frames}
-        x={TOTAL_ROW.frameX} y={TOTAL_ROW.y} />
-      <div className={styles.totalValue}
-        style={{ left: TOTAL_ROW.value.x, top: TOTAL_ROW.y + TOTAL_ROW.value.dy, width: TOTAL_ROW.value.width, textAlign: isRightAligned ? 'right' : undefined }}>
+        style={{ left: TOTAL_ROW.bulletX, top: TOTAL_ROW.y + TOTAL_ROW.bulletDy }}
+      />
+      <FrameSprite folder={IMG_TEXT} frame={TOTAL_ROW.labelFrame} origins={textFrames} x={TOTAL_ROW.labelX} y={TOTAL_ROW.y + TOTAL_ROW.labelDy} />
+      <FrameSprite folder={SLT_FRAMES} frame={TOTAL_ROW.frame} origins={frames} x={TOTAL_ROW.frameX} y={TOTAL_ROW.y} />
+      <div
+        className={styles.totalValue}
+        style={{
+          left: TOTAL_ROW.value.x,
+          top: TOTAL_ROW.y + TOTAL_ROW.value.dy,
+          width: TOTAL_ROW.value.width,
+          textAlign: isRightAligned ? 'right' : undefined,
+        }}
+      >
         {value}
       </div>
     </>

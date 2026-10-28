@@ -21,9 +21,7 @@ const LINEUP_SIZE = 9
 export function teamHalfInningCardsOf(progress: TeamGameProgress, half: '초' | '말'): HalfInningCardsData {
   const ourBatting = isOurOffense(progress)
   const entries = ourBatting ? progress.ourEntry : progress.opponentEntry
-  const pitcher = ourBatting
-    ? progress.opponentPitcherEntry[progress.opponentPitcherIndex]
-    : progress.ourPitcherEntry[progress.ourPitcherIndex]
+  const pitcher = ourBatting ? progress.opponentPitcherEntry[progress.opponentPitcherIndex] : progress.ourPitcherEntry[progress.ourPitcherIndex]
   const orderIndex = ourBatting ? progress.game.battingOrderIndex : progress.opponentOrderIndex
   const currentOrder = ((orderIndex % LINEUP_SIZE) + LINEUP_SIZE) % LINEUP_SIZE
   return {
@@ -31,9 +29,6 @@ export function teamHalfInningCardsOf(progress: TeamGameProgress, half: '초' | 
     count: { strikes: 0, balls: 0, outs: 0 },
     pitcherName: pitcher?.name ?? null,
     currentOrder,
-    dueUpNames: Array.from(
-      { length: DUE_UP_ROWS },
-      (_unused, row) => entries[dueUpLineupSlotOf(currentOrder, row)]?.name ?? null,
-    ),
+    dueUpNames: Array.from({ length: DUE_UP_ROWS }, (_unused, row) => entries[dueUpLineupSlotOf(currentOrder, row)]?.name ?? null),
   }
 }

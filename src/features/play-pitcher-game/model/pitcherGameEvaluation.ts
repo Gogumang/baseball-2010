@@ -100,19 +100,10 @@ const REGULATION_OUTS = 27
 /** 완투 계열 갈래 — 인기도·평판이 각각 다른 점수를 준다 */
 export type CompleteGameKind = '퍼펙트' | '노히트' | '완봉' | '완투' | '없음'
 
-export function completeGameKindOf(
-  record: PitcherEvaluationRecord,
-  context: PitcherEvaluationContext,
-): CompleteGameKind {
+export function completeGameKindOf(record: PitcherEvaluationRecord, context: PitcherEvaluationContext): CompleteGameKind {
   if (!isCompleteGame(record, context.endedInningIndex)) return '없음'
   const noRuns = record.runsAllowedField === 0
-  if (
-    record.walksAllowed === 0 &&
-    record.hitByPitch === 0 &&
-    record.hitsAllowed === 0 &&
-    noRuns &&
-    record.outsRecorded <= REGULATION_OUTS
-  ) {
+  if (record.walksAllowed === 0 && record.hitByPitch === 0 && record.hitsAllowed === 0 && noRuns && record.outsRecorded <= REGULATION_OUTS) {
     return '퍼펙트'
   }
   if (record.hitsAllowed === 0 && noRuns) return '노히트'
@@ -207,21 +198,10 @@ function reliefInningPoints(outs: number): number {
 }
 
 /** 경기 뒤 인기도 변화 p — `career+0x4a` 에 적히고 평판·사기가 읽는다 */
-export function popularityChangeOf(
-  record: PitcherEvaluationRecord,
-  context: PitcherEvaluationContext,
-): number {
+export function popularityChangeOf(record: PitcherEvaluationRecord, context: PitcherEvaluationContext): number {
   if (isStarterTypePosition(context.positionCode)) {
     const kind = completeGameKindOf(record, context)
-    let score = context.won
-      ? kind === '퍼펙트' || kind === '노히트'
-        ? 6
-        : kind === '완봉'
-          ? 5
-          : kind === '완투'
-            ? 3
-            : 2
-      : -1
+    let score = context.won ? (kind === '퍼펙트' || kind === '노히트' ? 6 : kind === '완봉' ? 5 : kind === '완투' ? 3 : 2) : -1
     score += starterStrikeoutPoints(record.strikeouts)
     score += starterOutPoints(record.outsRecorded)
     score += starterRunPoints(record.runsAllowedField)
@@ -235,10 +215,7 @@ export function popularityChangeOf(
     score += reliefInningPoints(record.outsRecorded)
     if (record.outsRecorded <= 2) score -= 2
     if (!context.won) score -= 4
-    if (
-      record.decisionCode === PITCHER_DECISION_CODE.win ||
-      record.decisionCode === PITCHER_DECISION_CODE.save
-    ) {
+    if (record.decisionCode === PITCHER_DECISION_CODE.win || record.decisionCode === PITCHER_DECISION_CODE.save) {
       score += 3
     }
   } else {
@@ -284,11 +261,7 @@ export interface ReputationParts {
 }
 
 /** 선발(보직 0)의 가점·감점 (0xa6374~) */
-function starterReputationParts(
-  record: PitcherEvaluationRecord,
-  context: PitcherEvaluationContext,
-  popularity: number,
-): ReputationParts {
+function starterReputationParts(record: PitcherEvaluationRecord, context: PitcherEvaluationContext, popularity: number): ReputationParts {
   let gain = starterReputationFromPopularity(popularity)
   const combo = record.strikeoutCombo
   if (combo >= 6) gain += 8
@@ -305,12 +278,7 @@ function starterReputationParts(
   if (record.hitsAllowed <= 3) gain += 3
 
   if (isCompleteGame(record, context.endedInningIndex)) {
-    if (
-      !context.teamBaserunnerAllowed &&
-      context.teamHitsAllowed === 0 &&
-      context.teamRunsAllowed === 0 &&
-      record.outsRecorded <= REGULATION_OUTS
-    ) {
+    if (!context.teamBaserunnerAllowed && context.teamHitsAllowed === 0 && context.teamRunsAllowed === 0 && record.outsRecorded <= REGULATION_OUTS) {
       gain += 7
     } else if (context.teamHitsAllowed === 0 && context.teamRunsAllowed === 0) gain += 6
     else if (context.teamRunsAllowed === 0) gain += 5
@@ -329,11 +297,7 @@ function starterReputationParts(
 }
 
 /** 구원(보직 ≠ 0)의 가점·감점 (0xa64.. ~ 0xa6684) */
-function reliefReputationParts(
-  record: PitcherEvaluationRecord,
-  context: PitcherEvaluationContext,
-  popularity: number,
-): ReputationParts {
+function reliefReputationParts(record: PitcherEvaluationRecord, context: PitcherEvaluationContext, popularity: number): ReputationParts {
   let gain = reliefReputationFromPopularity(popularity)
   const combo = record.strikeoutCombo
   if (combo >= 6) gain += 4
@@ -364,11 +328,7 @@ function reliefReputationParts(
   return context.neverEntered ? { gain: 0, penalty: 0 } : { gain, penalty }
 }
 
-export function reputationPartsOf(
-  record: PitcherEvaluationRecord,
-  context: PitcherEvaluationContext,
-  popularity: number,
-): ReputationParts {
+export function reputationPartsOf(record: PitcherEvaluationRecord, context: PitcherEvaluationContext, popularity: number): ReputationParts {
   return context.role === PITCHER_ROLE.starter
     ? starterReputationParts(record, context, popularity)
     : reliefReputationParts(record, context, popularity)
@@ -387,8 +347,7 @@ export function reputationPartsOf(
 export function applyReputationTail(parts: ReputationParts, reputation: number): number {
   const index = Math.min(Math.max(trunc((reputation - 1) / 100), 0), REPUTATION_GAIN_TABLE.length - 1)
   const gain = parts.gain + trunc((parts.gain * REPUTATION_GAIN_TABLE[index]) / 100)
-  const penalty =
-    parts.penalty - trunc((Math.abs(parts.penalty) * REPUTATION_PENALTY_TABLE[index]) / 100)
+  const penalty = parts.penalty - trunc((Math.abs(parts.penalty) * REPUTATION_PENALTY_TABLE[index]) / 100)
   return gain + penalty
 }
 
@@ -439,9 +398,7 @@ export function managerCommentIndexOf(
   // 0x128d8~0x128f4: 평판 < 문턱인 첫 칸에서만 바꾼다 — 다 넘으면(≥ 1000) 0x12876 이 먼저 둔 구간 0(바탕 2) 그대로.
   // 평판은 쓰는 곳마다 0~999 로 잘려 실제로는 안 닿는다(타자편 97398e8 과 같다)
   const sectionIndex = section < 0 ? 0 : section
-  const grades = isStarterTypePosition(context.positionCode)
-    ? MANAGER_TEXT_GRADES_STARTER
-    : MANAGER_TEXT_GRADES
+  const grades = isStarterTypePosition(context.positionCode) ? MANAGER_TEXT_GRADES_STARTER : MANAGER_TEXT_GRADES
   const slot = grades.indexOf(popularity)
   return MANAGER_TEXT_SECTION_STARTS[sectionIndex] + (slot < 0 ? 0 : slot)
 }
@@ -465,10 +422,7 @@ export interface PitcherGameEvaluation {
   readonly countedCompleteGame: CompleteGameKind
 }
 
-export function evaluatePitcherGame(
-  record: PitcherEvaluationRecord,
-  context: PitcherEvaluationContext,
-): PitcherGameEvaluation {
+export function evaluatePitcherGame(record: PitcherEvaluationRecord, context: PitcherEvaluationContext): PitcherGameEvaluation {
   const popularityChange = popularityChangeOf(record, context)
   const parts = reputationPartsOf(record, context, popularityChange)
   return {
@@ -477,7 +431,6 @@ export function evaluatePitcherGame(
     moraleChange: moraleChangeOf(context, popularityChange),
     managerCommentIndex: managerCommentIndexOf(context, popularityChange),
     completeGame: completeGameKindOf(record, context),
-    countedCompleteGame:
-      isStarterTypePosition(context.positionCode) && context.won ? completeGameKindOf(record, context) : '없음',
+    countedCompleteGame: isStarterTypePosition(context.positionCode) && context.won ? completeGameKindOf(record, context) : '없음',
   }
 }

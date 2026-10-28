@@ -3,9 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { isCommonWindowShown, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
-import {
-  nextPopupClosingWidth, nextPopupOpeningHeight, popupBoxStyleOf, usePopupWindowMotion,
-} from '@/shared/lib/commonWindow/popupWindow'
+import { nextPopupClosingWidth, nextPopupOpeningHeight, popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 
 describe('nextPopupOpeningHeight — 0x75562~0x75586', () => {
   it('높이 0x78 은 6 → 12 → 24 → 48 → 96 → 다 펼침', () => {
@@ -44,7 +42,10 @@ describe('popupBoxStyleOf — 0x744c4 판은 가로 가운데로 준다', () => 
 describe('usePopupWindowMotion', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
-  const 틀 = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+  const 틀 = (n: number) =>
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * n)
+    })
 
   it('펼치는 동안은 키를 안 받는다 — 다 펼친 뒤에만 닫는다', () => {
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 100 }))
@@ -62,7 +63,9 @@ describe('usePopupWindowMotion', () => {
     const onClosed = vi.fn()
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 100, skipsMotion: false }))
     틀(5)
-    act(() => { result.current.close('바로', onClosed) })
+    act(() => {
+      result.current.close('바로', onClosed)
+    })
     expect(onClosed).toHaveBeenCalledTimes(1)
     expect(result.current.isClosed).toBe(true)
     expect(result.current.acceptsKeys()).toBe(false)
@@ -72,7 +75,9 @@ describe('usePopupWindowMotion', () => {
     const onClosed = vi.fn()
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 100 }))
     틀(5)
-    act(() => { result.current.close('줄임', onClosed) })
+    act(() => {
+      result.current.close('줄임', onClosed)
+    })
     expect(result.current.closingWidth).toBe(240)
     expect(result.current.close('줄임')).toBe(false)
     틀(1)
@@ -88,7 +93,9 @@ describe('usePopupWindowMotion', () => {
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 0, expands: false }))
     expect(result.current.openingHeight).toBe(6)
     expect(result.current.acceptsKeys()).toBe(true)
-    act(() => { result.current.close('줄임', onClosed) })
+    act(() => {
+      result.current.close('줄임', onClosed)
+    })
     expect(onClosed).not.toHaveBeenCalled()
     틀(1)
     expect(onClosed).toHaveBeenCalledTimes(1)
@@ -98,7 +105,13 @@ describe('usePopupWindowMotion', () => {
     const calls: string[] = []
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 100 }))
     틀(5)
-    act(() => { result.current.close('줄임', () => calls.push('닫힘'), () => calls.push('다음갱신')) })
+    act(() => {
+      result.current.close(
+        '줄임',
+        () => calls.push('닫힘'),
+        () => calls.push('다음갱신'),
+      )
+    })
     expect(calls).toEqual([])
     틀(1)
     expect(calls).toEqual(['다음갱신'])
@@ -110,7 +123,9 @@ describe('usePopupWindowMotion', () => {
     const onClosed = vi.fn()
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 0, opensAtOnce: true }))
     expect(result.current.openingHeight).toBeNull()
-    act(() => { result.current.close('줄임', onClosed) })
+    act(() => {
+      result.current.close('줄임', onClosed)
+    })
     틀(1)
     expect(result.current.closingWidth).toBe(120)
     틀(1)
@@ -129,7 +144,9 @@ describe('usePopupWindowMotion', () => {
     const { result } = renderHook(() => usePopupWindowMotion({ targetHeight: 100 }))
     expect(isCommonWindowShown()).toBe(true)
     틀(5)
-    act(() => { result.current.close('줄임') })
+    act(() => {
+      result.current.close('줄임')
+    })
     틀(1)
     expect(isCommonWindowShown()).toBe(true)
     틀(1)

@@ -38,8 +38,12 @@ describe('미션·홈런더비 타자 — 0xb570c 모드 5·6·7 = 0xb6414', () 
 
 describe('명예 타자 — 0x1fc20 의 +0xa6 ≥ 0 갈래 = 0x1f640 명전 기록', () => {
   const 나리 = {
-    ...createCareer('전설'), endingIndex: 4,
-    equipmentLevels: { hit: 3, power: 2, run: 0, defense: 0 }, skillIds: [22, 7], equippedSkillIds: [22, 7], specialSwingNumber: 2,
+    ...createCareer('전설'),
+    endingIndex: 4,
+    equipmentLevels: { hit: 3, power: 2, run: 0, defense: 0 },
+    skillIds: [22, 7],
+    equippedSkillIds: [22, 7],
+    specialSwingNumber: 2,
   }
   const 등록 = registerHallOfFame(EMPTY_COLLECTION, 나리, 99_999, 1)
   if (등록.kind !== '등록') throw new Error('등록 실패')
@@ -59,8 +63,7 @@ describe('명예 타자 — 0x1fc20 의 +0xa6 ≥ 0 갈래 = 0x1f640 명전 기�
   })
 
   it('옛 저장은 남긴 장비 얹은 능력치(없으면 기본)로 — 스킬 없음, 필살 0', () => {
-    const { equipmentLevels: _e, equippedSkillIds: _s, specialSwingNumber: _n, look: _l, recordLine: _r, ...옛기록 } =
-      collection.hallOfFame[0]
+    const { equipmentLevels: _e, equippedSkillIds: _s, specialSwingNumber: _n, look: _l, recordLine: _r, ...옛기록 } = collection.hallOfFame[0]
     expect(modeBatterOfHallOfFame(옛기록)).toEqual({ ability: 옛기록.equippedAbility, skillIds: [], specialSwingNumber: 0, recordSlot: 0 })
     const { equippedAbility: _a, ...더옛기록 } = 옛기록
     expect(modeBatterOfHallOfFame(더옛기록).ability).toEqual(나리.ability)

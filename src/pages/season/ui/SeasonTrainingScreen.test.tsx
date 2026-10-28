@@ -28,16 +28,17 @@ const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textConte
 
 describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
   it('칸 0~3 능력치와 칸 4 지옥훈련이 차례대로 나온다 — 커맨드 줄 표 0xd47c0 · 0xd47ca (값은 그리지 않는다)', () => {
-    const { container } = render(
-      <SeasonTrainingScreen state={시즌([111, 222, 333, 444])} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()} />,
-    )
+    const { container } = render(<SeasonTrainingScreen state={시즌([111, 222, 333, 444])} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()} />)
 
     const 칸들 = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
     expect(칸들.slice(0, 5)).toEqual(['투구', '타격', '집중', '근성', '지옥훈련'])
     const 아이콘 = [...container.querySelectorAll('[data-testid="command-bar"] button img')].map((img) => img.getAttribute('src'))
     expect(아이콘).toEqual([
-      './sprites/management/icon_selected_17.png', './sprites/mode_icon/011.png', './sprites/mode_icon/013.png',
-      './sprites/mode_icon/014.png', './sprites/mode_icon/019.png',
+      './sprites/management/icon_selected_17.png',
+      './sprites/mode_icon/011.png',
+      './sprites/mode_icon/013.png',
+      './sprites/mode_icon/014.png',
+      './sprites/mode_icon/019.png',
     ])
     expect(container.textContent).not.toContain('500G')
   })
@@ -166,11 +167,11 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
       messages: ['가', '나', '다', '라', '마'],
     }
     const { container } = render(
-      <SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
-        result={result} onCloseResult={onCloseResult} />,
+      <SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()} result={result} onCloseResult={onCloseResult} />,
     )
     const 창 = screen.getByRole('dialog', { name: '상세정보' })
-    const 이름표 = [...창.querySelectorAll('img')].map((img) => img.getAttribute('src'))
+    const 이름표 = [...창.querySelectorAll('img')]
+      .map((img) => img.getAttribute('src'))
       .filter((src) => /img_text\/frames\/(046|347|204|205|084)\.png$/.test(src ?? ''))
     expect(이름표).toHaveLength(5)
     // 0x872d4(창, 0) — 글 상자는 박스 5 y 180 그대로 (나리 0x8a0a4 는 −4)
@@ -193,16 +194,41 @@ describe('시즌 팀 트레이닝 (상태 0xcf)', () => {
     }
     const onResultFirstLineChange = vi.fn()
     const { rerender } = render(
-      <SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
-        result={result} resultFirstLine={0} onResultFirstLineChange={onResultFirstLineChange} />,
+      <SeasonTrainingScreen
+        state={시즌()}
+        gamePoints={1000}
+        onTrain={vi.fn()}
+        onBack={vi.fn()}
+        result={result}
+        resultFirstLine={0}
+        onResultFirstLineChange={onResultFirstLineChange}
+      />,
     )
     fireEvent.keyDown(window, { key: '8' })
     expect(onResultFirstLineChange).toHaveBeenLastCalledWith(1)
     // 닫았다가 다시 열어도 1 에서 시작한다
-    rerender(<SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
-      result={null} resultFirstLine={1} onResultFirstLineChange={onResultFirstLineChange} />)
-    rerender(<SeasonTrainingScreen state={시즌()} gamePoints={1000} onTrain={vi.fn()} onBack={vi.fn()}
-      result={result} resultFirstLine={1} onResultFirstLineChange={onResultFirstLineChange} />)
+    rerender(
+      <SeasonTrainingScreen
+        state={시즌()}
+        gamePoints={1000}
+        onTrain={vi.fn()}
+        onBack={vi.fn()}
+        result={null}
+        resultFirstLine={1}
+        onResultFirstLineChange={onResultFirstLineChange}
+      />,
+    )
+    rerender(
+      <SeasonTrainingScreen
+        state={시즌()}
+        gamePoints={1000}
+        onTrain={vi.fn()}
+        onBack={vi.fn()}
+        result={result}
+        resultFirstLine={1}
+        onResultFirstLineChange={onResultFirstLineChange}
+      />,
+    )
     expect(screen.getByRole('dialog', { name: '상세정보' }).textContent).not.toContain('가')
     fireEvent.keyDown(window, { key: '8' })
     expect(onResultFirstLineChange).toHaveBeenLastCalledWith(0)

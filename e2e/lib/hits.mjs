@@ -19,7 +19,7 @@ const CORNERS_ONLY = (row) => !row.points.includes('가운데')
 export const ALLOWED_OVERLAPS = [
   {
     match: (_scene, row) => row.full && CORNERS_ONLY(row) && /"(메뉴|닫기|# 대타|# 교체|# 취소)"$/.test(row.by),
-    why: '판 전체 OK 칸(0xe 확인) 위 바닥띠 소프트키 글자 칸(*MENU · #TIME) — 원본도 \'*\' · \'#\' 는 OK 와 다른 키다. 판 가운데는 OK',
+    why: "판 전체 OK 칸(0xe 확인) 위 바닥띠 소프트키 글자 칸(*MENU · #TIME) — 원본도 '*' · '#' 는 OK 와 다른 키다. 판 가운데는 OK",
   },
   {
     match: (_scene, row) => CORNERS_ONLY(row) && row.by === row.label.replace(/"$/, ' (OK 글자)"'),

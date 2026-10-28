@@ -6,8 +6,19 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  DIALOGUE_CURSOR, EVENT_DIALOGUE, EVENT_DIALOGUE_CHOICE, SCREEN_HEIGHT, SCREEN_WIDTH, layoutDialogue, lowerDialogueBox,
-  pressDialogue, restartDialogueText, startDialogue, substituteDialogue, tickDialogue, visibleDialogueLinesOf,
+  DIALOGUE_CURSOR,
+  EVENT_DIALOGUE,
+  EVENT_DIALOGUE_CHOICE,
+  SCREEN_HEIGHT,
+  SCREEN_WIDTH,
+  layoutDialogue,
+  lowerDialogueBox,
+  pressDialogue,
+  restartDialogueText,
+  startDialogue,
+  substituteDialogue,
+  tickDialogue,
+  visibleDialogueLinesOf,
 } from '@/pages/story/lib/eventDialogue'
 import type { DialogueLayout, DialogueLine, DialogueState } from '@/pages/story/lib/eventDialogue'
 import * as styles from '@/pages/story/ui/EventDialogueBox.css'
@@ -85,8 +96,20 @@ const drawnState = (state: DialogueState, layout: DialogueLayout | null) => tick
  * 웹은 줄을 눌러도 그 줄을 고른다(원본에는 누르기가 없다).
  */
 export function EventDialogueBox({
-  raw, replacements = [], choices = null, slideIn, textKey, lowerKey = 0, onAdvance, isActive = true, onCancel, onChoiceMove,
-  onChoiceConfirm, showsOrnament = true, tickInterval = setAppTickInterval, deferPress,
+  raw,
+  replacements = [],
+  choices = null,
+  slideIn,
+  textKey,
+  lowerKey = 0,
+  onAdvance,
+  isActive = true,
+  onCancel,
+  onChoiceMove,
+  onChoiceConfirm,
+  showsOrnament = true,
+  tickInterval = setAppTickInterval,
+  deferPress,
 }: EventDialogueBoxProps) {
   const text = useMemo(() => substituteDialogue(raw, replacements), [raw, replacements])
   const isList = choices !== null && choices.lines.length !== 1
@@ -213,10 +236,21 @@ export function EventDialogueBox({
   const selectedTop = isList && choices !== null ? textTop + choices.selected * EVENT_DIALOGUE_CHOICE.lineStep : null
 
   return (
-    <div className={styles.root} role="group" aria-label="대사" data-testid="대사-상자"
-      data-text={stripGameMarkup(isList && choices !== null ? choices.lines.join('\n') : text)}>
-      <svg className={styles.layer} style={{ left: 0, top: 0 }} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-        viewBox={`0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}`} shapeRendering="crispEdges">
+    <div
+      className={styles.root}
+      role="group"
+      aria-label="대사"
+      data-testid="대사-상자"
+      data-text={stripGameMarkup(isList && choices !== null ? choices.lines.join('\n') : text)}
+    >
+      <svg
+        className={styles.layer}
+        style={{ left: 0, top: 0 }}
+        width={SCREEN_WIDTH}
+        height={SCREEN_HEIGHT}
+        viewBox={`0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}`}
+        shapeRendering="crispEdges"
+      >
         {/* 0x7cfc8 윗 띠 — 바깥 #12307E · 안 #1D44A8 · 꺾임 계단(높이 − 1 칸) · 밝은 줄 #3563D7 */}
         <rect data-part="띠" x={0} y={bandTop} width={SCREEN_WIDTH} height={EVENT_DIALOGUE.bandHeight} fill={ORIGINAL_COLORS.bandDark} />
         <rect x={0} y={bandTop + 1} width={SCREEN_WIDTH} height={EVENT_DIALOGUE.bandHeight - 2} fill={ORIGINAL_COLORS.panelDeep} />
@@ -232,19 +266,34 @@ export function EventDialogueBox({
       </svg>
       {/* 0xba19d 장식 — mode_ui 프레임 21 을 (W, 본체 위) */}
       {showsOrnament && <FrameSprite folder={MODE_UI} frame={EVENT_DIALOGUE.ornamentFrame} origins={origins} x={SCREEN_WIDTH} y={boxTop} />}
-      <button type="button" className={styles.hit} aria-label="대사 넘기기"
-        style={{ height: height + EVENT_DIALOGUE.bandHeight }} onClick={isActive ? press : undefined} />
+      <button
+        type="button"
+        className={styles.hit}
+        aria-label="대사 넘기기"
+        style={{ height: height + EVENT_DIALOGUE.bandHeight }}
+        onClick={isActive ? press : undefined}
+      />
       {/*
         "CLR:SKIP" 장식(0xba19d — mode_ui 21 을 (W, 본체 위)) 자리의 투명 누름 칸 = CLR(−16). 0x8b804 는 say 갈래에서만 −16 을
         0x8b7b0 으로 넘기므로 `onCancel` 이 있을 때만 세운다. 칸은 장식이 앉는 윗 띠의 곧은 오른쪽(꺾임 끝 ~ W)
       */}
       {isActive && choices === null && onCancel !== undefined && (
-        <PressArea label="CLR 건너뛰기" onPress={() => onCancelRef.current?.()} rect={{
-          x: split + slope, y: bandTop, width: SCREEN_WIDTH - split - slope, height: EVENT_DIALOGUE.bandHeight,
-        }} />
+        <PressArea
+          label="CLR 건너뛰기"
+          onPress={() => onCancelRef.current?.()}
+          rect={{
+            x: split + slope,
+            y: bandTop,
+            width: SCREEN_WIDTH - split - slope,
+            height: EVENT_DIALOGUE.bandHeight,
+          }}
+        />
       )}
       {placed.map(({ key, line, top, choice }) => (
-        <div key={key} className={styles.textLine} data-part="글줄"
+        <div
+          key={key}
+          className={styles.textLine}
+          data-part="글줄"
           role={choice === null ? undefined : 'option'}
           aria-selected={choice === null ? undefined : choice === choices?.selected}
           style={{
@@ -254,25 +303,46 @@ export function EventDialogueBox({
             textAlign: line.align === '가운데' ? 'center' : line.align === '오른' ? 'right' : 'left',
             pointerEvents: choice === null || !isActive ? undefined : 'auto',
           }}
-          onClick={choice === null || !isActive ? undefined : () => onChoiceConfirm?.(choice)}>
+          onClick={choice === null || !isActive ? undefined : () => onChoiceConfirm?.(choice)}
+        >
           {line.glyphs.map((glyph) => (
-            <span key={glyph.start} style={glyph.color === null ? undefined : { color: glyph.color }}>{glyph.character}</span>
+            <span key={glyph.start} style={glyph.color === null ? undefined : { color: glyph.color }}>
+              {glyph.character}
+            </span>
           ))}
         </div>
       ))}
       {isUp && selectedTop !== null && (
         // 0x6a978 — 고른 줄 노랑 테두리 (글 뒤에 그린다)
-        <svg className={styles.layer} style={{ left: 0, top: 0 }} width={SCREEN_WIDTH} height={SCREEN_HEIGHT}
-          viewBox={`0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}`} shapeRendering="crispEdges" data-part="고른줄">
-          <rect x={EVENT_DIALOGUE_CHOICE.cursor.x + 0.5} y={selectedTop + EVENT_DIALOGUE_CHOICE.cursor.top + 0.5}
-            width={EVENT_DIALOGUE_CHOICE.cursor.width - 1} height={EVENT_DIALOGUE_CHOICE.cursor.height - 1}
-            fill="none" stroke={EVENT_DIALOGUE_CHOICE.cursor.color} strokeWidth={1} />
+        <svg
+          className={styles.layer}
+          style={{ left: 0, top: 0 }}
+          width={SCREEN_WIDTH}
+          height={SCREEN_HEIGHT}
+          viewBox={`0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}`}
+          shapeRendering="crispEdges"
+          data-part="고른줄"
+        >
+          <rect
+            x={EVENT_DIALOGUE_CHOICE.cursor.x + 0.5}
+            y={selectedTop + EVENT_DIALOGUE_CHOICE.cursor.top + 0.5}
+            width={EVENT_DIALOGUE_CHOICE.cursor.width - 1}
+            height={EVENT_DIALOGUE_CHOICE.cursor.height - 1}
+            fill="none"
+            stroke={EVENT_DIALOGUE_CHOICE.cursor.color}
+            strokeWidth={1}
+          />
         </svg>
       )}
       {isUp && cursorStep !== null && (
         // 0x7fd9a — 넘김 표시 mode_ui 애니 0 (W − 3, H − 3)
-        <FrameSprite folder={MODE_UI} frame={cursorStep.frame} origins={origins}
-          x={DIALOGUE_CURSOR.x + cursorStep.dx} y={DIALOGUE_CURSOR.y + cursorStep.dy} />
+        <FrameSprite
+          folder={MODE_UI}
+          frame={cursorStep.frame}
+          origins={origins}
+          x={DIALOGUE_CURSOR.x + cursorStep.dx}
+          y={DIALOGUE_CURSOR.y + cursorStep.dy}
+        />
       )}
     </div>
   )

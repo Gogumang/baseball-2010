@@ -11,8 +11,11 @@ afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...createCareer('테스트'), ...overrides })
 /** 통산 = 사본 = 200 (이번 시즌 훈련 0) — s8 사본은 −56 */
 const 몹쓸몸후보 = 선수({
-  skillIds: [], gamesPlayed: 12, ability: { hit: 400, power: 400, defense: 400, run: 400 },
-  trainingCounts: { 히트: 200 }, seasonStartTrainingCounts: { 히트: 200 },
+  skillIds: [],
+  gamesPlayed: 12,
+  ability: { hit: 400, power: 400, defense: 400, run: 400 },
+  trainingCounts: { 히트: 200 },
+  seasonStartTrainingCounts: { 히트: 200 },
 })
 
 describe('B-70 칸별 훈련 수 u8 − s8', () => {

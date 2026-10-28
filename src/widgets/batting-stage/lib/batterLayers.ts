@@ -185,10 +185,7 @@ export function pitcherLayerPaletteIndexOf(layer: BatterLayer, skinIndex: number
  * 겹들 → 미리 칠하기 요청 (`useWarmRecoloredSprites`) — 그림 객체가 그릴 수 있는 자세의 겹을 모아 넘기면
  * 자세가 넘어가는 그 그림부터 칠한 색이 나간다(원본은 적재 때 팔레트를 갈아 끼운다). 벌이 없는 겹은 뺀다.
  */
-export function layerRecolorRequestsOf(
-  layers: readonly BatterLayer[],
-  paletteOf: (layer: BatterLayer) => number | null,
-): RecolorRequest[] {
+export function layerRecolorRequestsOf(layers: readonly BatterLayer[], paletteOf: (layer: BatterLayer) => number | null): RecolorRequest[] {
   return layers.flatMap((layer) => {
     const paletteIndex = paletteOf(layer)
     return paletteIndex === null ? [] : [{ url: `${layer.folder}/${String(layer.frame).padStart(3, '0')}.png`, paletteIndex }]
@@ -335,12 +332,7 @@ const GHOST_SLOT_LATE = 1
  * 아이템 슬롯도 그 표의 빈 자리에 그대로 들어간다 (바이트 단위로 다시 확인했다).
  * `withShadow` = `fig+0x48` — false 면 슬롯 0 을 비운다 (0x78dc6, 파일 머리 주석의 여섯 자리 표).
  */
-export function batterLayersOf(
-  frame: number,
-  bodyType: number,
-  equipment: BatterEquipment = NO_EQUIPMENT,
-  withShadow = true,
-): BatterLayer[] {
+export function batterLayersOf(frame: number, bodyType: number, equipment: BatterEquipment = NO_EQUIPMENT, withShadow = true): BatterLayer[] {
   const type = bodyType === 1 ? 1 : 0
   const adjust = type === 1 ? SLUGER_ADJUST : 0
   const body: BatterLayer = { folder: BODY_FOLDERS[type], frame }
@@ -443,12 +435,7 @@ export const NO_PITCHER_EQUIPMENT: PitcherEquipment = { head: -1, hand: -1, body
  *   니블 자리도 같다: 부위 0·1 = `rec[0x19]` 의 상·하위, 부위 2·3 = `rec[0x1a]` 의 상·하위이고
  *   `니블 − 1 < 0` 이면 그 부위를 건너뛴다(미장착).
  */
-export function pitcherEquipmentOf(nibbles: {
-  control: number
-  velocity: number
-  breaking: number
-  stamina: number
-}): PitcherEquipment {
+export function pitcherEquipmentOf(nibbles: { control: number; velocity: number; breaking: number; stamina: number }): PitcherEquipment {
   return {
     head: equipmentGradeOf(nibbles.control),
     hand: equipmentGradeOf(nibbles.velocity),
@@ -505,10 +492,7 @@ function pitcherGradeLayer(folders: readonly string[], grade: number, frame: num
  * 빈 칸은 그리기 루프(0x7969a `cmp r2,#0 / beq`)가 건너뛴다 — 여기서도 `null` 을 걸러 낸다.
  * **아이템 칸에는 프레임 보정이 없다** — 여섯 칸 모두 같은 f 이고 3번 칸만 +22 다.
  */
-export function pitcherLayersOf(
-  frame: number,
-  equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT,
-): BatterLayer[] {
+export function pitcherLayersOf(frame: number, equipment: PitcherEquipment = NO_PITCHER_EQUIPMENT): BatterLayer[] {
   const slots: (BatterLayer | null)[] = [
     { folder: PITCHER_FRAMES, frame },
     equipment.head < 0 ? null : { folder: PITCHER_HEAD_FOLDER(equipment.head), frame },

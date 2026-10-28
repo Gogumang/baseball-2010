@@ -14,12 +14,7 @@ import { ORIGINAL_TITLES } from '@/shared/config/original/titles'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_EVENTS } from '@/shared/config/original/events'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import {
-  BATTING_PATTERNS,
-  battingPatternChoiceOf,
-  battingPatternOdds,
-  battingPatternRunnerColumn,
-} from '@/shared/config/original/battingPatterns'
+import { BATTING_PATTERNS, battingPatternChoiceOf, battingPatternOdds, battingPatternRunnerColumn } from '@/shared/config/original/battingPatterns'
 import { D_LEVEL, D_LEVEL_RAW } from '@/shared/config/original/dLevel'
 import { magicPitchRecord, magicPitchRecordIndex } from '@/shared/config/original/pitchRecords'
 import { MISSIONS, MISSION_AIM_SHAKES } from '@/shared/config/original/missions'
@@ -130,9 +125,7 @@ describe('마선수 G 오픈 가격·오픈 힌트 (XlsACE_LEVEL_UP, K-3 3-3)', 
   })
 
   it('G 오픈 가격이 0/6000/9000/12000 이다 — 레벨업 비용(3000~)과 다른 표다', () => {
-    expect(ACE_OPEN_TABLE.map((entry) => entry.openPriceGamePoint)).toEqual([
-      0, 6000, 9000, 12000, 0, 0, 6000, 9000, 12000, 0,
-    ])
+    expect(ACE_OPEN_TABLE.map((entry) => entry.openPriceGamePoint)).toEqual([0, 6000, 9000, 12000, 0, 0, 6000, 9000, 12000, 0])
     // 레벨업 비용 표 0xd1724 는 3000 으로 시작한다 — 이 표에는 3000 이 없다
     expect(ACE_OPEN_TABLE.some((entry) => entry.openPriceGamePoint === 3000)).toBe(false)
   })
@@ -352,8 +345,7 @@ describe('미션 조건코드 = 투수 미션 조준점 흔들림 세기 (0x39c5
   })
 
   it('원본이 흔들림을 붙인 미션 다섯 개가 그대로다 (E-7)', () => {
-    const 세기 = (id: number) =>
-      MISSIONS.find((mission) => mission.side === '투수' && mission.id === id)?.conditionCode
+    const 세기 = (id: number) => MISSIONS.find((mission) => mission.side === '투수' && mission.id === id)?.conditionCode
 
     expect(세기(4)).toBe(1)
     expect(세기(5)).toBe(1)

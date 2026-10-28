@@ -265,10 +265,12 @@ export function MissionPlayScreen({
   const sideCpuScore = run.game.scores[cpuSideOf(run.mission)]
   const sideOfHuman = humanSideOf(run.mission)
   useEffect(() => {
-    setLiveGameSides(liveGameSidesOf(
-      { ourTeamId: sideHumanTeam, opponentTeamId: sideCpuTeam },
-      { ourScore: sideHumanScore ?? 0, opponentScore: sideCpuScore ?? 0, playerSide: sideOfHuman },
-    ))
+    setLiveGameSides(
+      liveGameSidesOf(
+        { ourTeamId: sideHumanTeam, opponentTeamId: sideCpuTeam },
+        { ourScore: sideHumanScore ?? 0, opponentScore: sideCpuScore ?? 0, playerSide: sideOfHuman },
+      ),
+    )
   }, [sideHumanTeam, sideCpuTeam, sideHumanScore, sideCpuScore, sideOfHuman])
   const humanScore = run.game.scores[humanSideOf(run.mission)]
   const cpuScore = run.game.scores[cpuSideOf(run.mission)]
@@ -324,9 +326,13 @@ export function MissionPlayScreen({
   /** `event` — 누름 칸의 사건(닿은 시각이 붙어 있다 — `PressArea`). 키는 창 잡기 단계가 이미 사건 시각으로 칸을 넣었다 */
   const stealIfFlying = (base: StealBase, event?: Event) => {
     // 도루 키는 장면 키 칸에 든다 — 다음 틀의 키 0x498d4 → 0x53670 → 0x53610 이 그 틀의 상태(0x11)를 보고 출발시킨다
-    pushSceneKey(() => {
-      if (flightProbeRef.current?.() === true) onSteal(base)
-    }, 'press', event === undefined ? undefined : inputTimeOf(event))
+    pushSceneKey(
+      () => {
+        if (flightProbeRef.current?.() === true) onSteal(base)
+      },
+      'press',
+      event === undefined ? undefined : inputTimeOf(event),
+    )
   }
   // 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' (공이 나는 동안만, 그 밖의 키는 먹고 끝난다)
   const { pressStar } = menu
@@ -360,12 +366,18 @@ export function MissionPlayScreen({
   useEffect(() => {
     if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
     publishScenePeek('mission', {
-      side: '타자', isAwaitingConfirm, isPitchSlotPickerShown: peekPitchSlotPicker, isResultShown: peekResultShown,
+      side: '타자',
+      isAwaitingConfirm,
+      isPitchSlotPickerShown: peekPitchSlotPicker,
+      isResultShown: peekResultShown,
     })
   }, [isAwaitingConfirm, peekPitchSlotPicker, peekResultShown])
-  useEffect(() => () => {
-    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('mission', null)
-  }, [])
+  useEffect(
+    () => () => {
+      if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('mission', null)
+    },
+    [],
+  )
 
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (
@@ -396,9 +408,7 @@ export function MissionPlayScreen({
             batterRecordSlot={batterRecordSlot}
             // 그 타순 칸의 오늘 타석 결과 링 — 공격(사람 칸) 팀 + 타순(팀+0x32)×0x18 + 0x34 (0x445cc 4477a~4478c · 0xab214 aba8e~abaac).
             // 스윙 판정의 16 상승세 · 17 하락세와 스킬 판 비트 16 · 17 이 같은 링을 읽는다 (사람 타석 결과는 `afterHumanPlateAppearance` 가 넣는다)
-            recentAtBatCodes={
-              run.game.humanBatting.lineup.records[lineupSlotOf(run.game.humanBatting.order)]?.results ?? []
-            }
+            recentAtBatCodes={run.game.humanBatting.lineup.records[lineupSlotOf(run.game.humanBatting.order)]?.results ?? []}
             // 타자 그림 · 손 — 레코드 +0xb (사람 칸에 마타자는 없어 손 = 폼 & 1, 0xb63c0)
             batterForm={batterLook?.form ?? 0}
             batterSkinIndex={batterLook?.skinIndex ?? 0}
@@ -499,13 +509,7 @@ export function MissionPlayScreen({
           웹 제목줄(미션 이름) · 배지(남은 초 · 타석 · 스윙)와 껍데기 목표 띠(옛 GoalBar, 지금은 지웠다)는 걷었다 — 그 값은 이 판이 그린다.
         */}
         {!isOver && (
-          <MissionHud
-            mission={run.mission}
-            progress={run.progress}
-            limits={hudLimits}
-            remainingSeconds={run.remainingSeconds}
-            stripsOnStage
-          />
+          <MissionHud mission={run.mission} progress={run.progress} limits={hudLimits} remainingSeconds={run.remainingSeconds} stripsOnStage />
         )}
 
         {/*
@@ -557,7 +561,9 @@ export function MissionPlayScreen({
           // 0xe — OK 하나만 받는다 (0x532b0)
           <PressArea label="확인" onPress={sceneConfirm.confirm} isDisabled={!sceneConfirm.acceptsConfirm} />
         )}
-        {!isAwaitingConfirm && !isMenuOpen && canSteal &&
+        {!isAwaitingConfirm &&
+          !isMenuOpen &&
+          canSteal &&
           stealableBases.map((base) => (
             <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={(event) => stealIfFlying(base, event)} />
           ))}

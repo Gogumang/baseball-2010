@@ -3,9 +3,7 @@ import { MessageBox } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCH_TRAINING_TEXT, pitchTrainingGateOf } from '@/entities/pitcher-career/model/pitchTraining'
-import {
-  PITCH_TRAINING_START, pitchTrainingKeyOf, pitchTrainingKeyOutcomeOf,
-} from '@/pages/pitcher-league/lib/pitchTrainingWindow'
+import { PITCH_TRAINING_START, pitchTrainingKeyOf, pitchTrainingKeyOutcomeOf } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import type { PitchTrainingCursor } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import { PitchWindowFigure } from '@/pages/pitcher-league/ui/PitchWindowFigure'
 
@@ -62,31 +60,40 @@ export function PitchTrainingScreen({ career, onTrain, onClose }: PitchTrainingS
 
   return (
     <div data-testid="구질훈련-창">
-      <PitchWindowFigure career={career} cursor={cursor} state="훈련"
+      <PitchWindowFigure
+        career={career}
+        cursor={cursor}
+        state="훈련"
         onPressTab={(tab) => setCursor({ ...cursor, tab, isCellFocus: false })}
         onPressCell={(cellColumn) => {
           setCursor({ ...cursor, isCellFocus: true, cell: cellColumn })
           confirm(cursor.tab, cellColumn)
-        }} />
+        }}
+      />
 
       {popup?.kind === '알림' && <MessageBox text={popup.text} buttons={['확인']} onAnswer={() => setPopup(null)} />}
       {popup?.kind === 'G부족' && (
-        <MessageBox text={ORIGINAL_MODE_TEXT[PITCH_TRAINING_TEXT.notEnoughPoints] ?? ''} buttons={['예', '아니오']}
+        <MessageBox
+          text={ORIGINAL_MODE_TEXT[PITCH_TRAINING_TEXT.notEnoughPoints] ?? ''}
+          buttons={['예', '아니오']}
           onAnswer={(index) => {
             setPopup(null)
             // 예 → 139 G 충전(틀 0x106bc) — 웹에 결제가 없어 충전 없이 떠난 길만 옮긴다: 108 진입 0x17730 이 다시 돌아 커서가 처음으로.
             // ⚠️ 139 화면은 옮기지 않았다
             if (index === 0) setCursor(PITCH_TRAINING_START)
-          }} />
+          }}
+        />
       )}
       {popup?.kind === '확인' && (
-        <MessageBox text={(ORIGINAL_MODE_TEXT[PITCH_TRAINING_TEXT.confirm] ?? '').replace('%d', String(popup.cost))}
+        <MessageBox
+          text={(ORIGINAL_MODE_TEXT[PITCH_TRAINING_TEXT.confirm] ?? '').replace('%d', String(popup.cost))}
           buttons={['예', '아니오']}
           onAnswer={(index) => {
             const chosen = popup
             setPopup(null)
             if (index === 0) onTrain(chosen.row, chosen.column)
-          }} />
+          }}
+        />
       )}
     </div>
   )

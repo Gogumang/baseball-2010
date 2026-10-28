@@ -72,8 +72,13 @@ describe.skipIf(OUTPUT === undefined)('숨은 판정값 효과 측정 (BALANCE_S
 
   it('내 선수 보너스 연차당 감소 — 7년차(연차 idx 6)', () => {
     for (const value of [0, 20, 35, 50, 67]) {
-      measure('swing.ownBatterBonusPerYear', `${value} (7년차 보너스 ${Math.max(0, 400 - value * 6)})`,
-        { 'swing.ownBatterBonusPerYear': value }, value === 35, { careerYearIndex: 6 })
+      measure(
+        'swing.ownBatterBonusPerYear',
+        `${value} (7년차 보너스 ${Math.max(0, 400 - value * 6)})`,
+        { 'swing.ownBatterBonusPerYear': value },
+        value === 35,
+        { careerYearIndex: 6 },
+      )
     }
   })
 
@@ -115,16 +120,31 @@ describe.skipIf(OUTPUT === undefined)('숨은 판정값 효과 측정 (BALANCE_S
 
   it('사기 구간 감소 — 사기 25 (31~ 구간 아래 · 11~30 구간)', () => {
     for (const cut of [0, 10, 20, 40, 60]) {
-      measure('ability.moraleCuts', `11~30 구간 ${cut}%`, { 'ability.moraleCuts': [[10, 50], [30, cut], [50, 10]] }, cut === 20,
-        { careerPatch: { morale: 25 } })
+      measure(
+        'ability.moraleCuts',
+        `11~30 구간 ${cut}%`,
+        {
+          'ability.moraleCuts': [
+            [10, 50],
+            [30, cut],
+            [50, 10],
+          ],
+        },
+        cut === 20,
+        { careerPatch: { morale: 25 } },
+      )
     }
   })
 
   it('CPU 투수 제구 흩어짐 계수', () => {
     const original = ORIGINAL_BALANCE_VALUES['pitching.controlErrorCoefficients'] as readonly number[]
     for (const factor of [0.5, 1, 1.5, 2]) {
-      measure('pitching.controlErrorCoefficients', `×${factor} [${scaled(original, factor).join(',')}]`,
-        { 'pitching.controlErrorCoefficients': scaled(original, factor) }, factor === 1)
+      measure(
+        'pitching.controlErrorCoefficients',
+        `×${factor} [${scaled(original, factor).join(',')}]`,
+        { 'pitching.controlErrorCoefficients': scaled(original, factor) },
+        factor === 1,
+      )
     }
   })
 

@@ -6,11 +6,7 @@ import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { ACE_BATTER_ROSTER_SLOT } from '@/entities/league/model/leagueDay'
 import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
-import {
-  startPitcherGame,
-  withStealPlayLeagueSteals,
-  type PitcherGameProgress,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { startPitcherGame, withStealPlayLeagueSteals, type PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 
 afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 

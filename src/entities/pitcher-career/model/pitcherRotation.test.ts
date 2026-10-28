@@ -57,18 +57,12 @@ describe('선발 등판 판정 0xa4f60', () => {
   })
 
   it('구원과 보직 1 은 보통 로테이션만 돈다', () => {
-    expect(startAssignmentOf({ ...starter, dayCounter: 4, role: PITCHER_ROLE.relief })).toBe(
-      START_ASSIGNMENT.rotate,
-    )
-    expect(startAssignmentOf({ ...starter, dayCounter: 4, role: PITCHER_ROLE.unknown })).toBe(
-      START_ASSIGNMENT.rotate,
-    )
+    expect(startAssignmentOf({ ...starter, dayCounter: 4, role: PITCHER_ROLE.relief })).toBe(START_ASSIGNMENT.rotate)
+    expect(startAssignmentOf({ ...starter, dayCounter: 4, role: PITCHER_ROLE.unknown })).toBe(START_ASSIGNMENT.rotate)
   })
 
   it('투수편이 아니면 판정 자체가 없다', () => {
-    expect(startAssignmentOf({ ...starter, mode: BATTER_EDITION_MODE, dayCounter: 4 })).toBe(
-      START_ASSIGNMENT.rotate,
-    )
+    expect(startAssignmentOf({ ...starter, mode: BATTER_EDITION_MODE, dayCounter: 4 })).toBe(START_ASSIGNMENT.rotate)
   })
 })
 
@@ -88,9 +82,7 @@ describe('내 선발은 짝수 날마다 마운드에 선다 (StrHOWTO[11] "2경
       startersByDay.push(roster[0])
     }
     expect(startersByDay).toEqual(['M', 'A', 'M', 'B', 'M', 'C', 'M', 'A', 'M'])
-    expect(startersByDay.map((_name, day) => isMyStartDay(day))).toEqual(
-      startersByDay.map((name) => name === 'M'),
-    )
+    expect(startersByDay.map((_name, day) => isMyStartDay(day))).toEqual(startersByDay.map((name) => name === 'M'))
   })
 
   it('상대 팀은 첫 경기만 빼고 날마다 한 칸 돈다', () => {

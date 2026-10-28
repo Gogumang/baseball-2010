@@ -59,22 +59,37 @@ export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalW
 
   return (
     // 뒤 어둡게 — 이벤트 장면의 창은 떠 있는 그리기마다 검정 6/16 (0x746cc, `EVENT_WINDOW_DIM_OPACITY`)
-    <div className={windowStyles.overlay} data-testid="올해의-목표-창" onClick={close} ref={overlayRef}
-      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}>
+    <div
+      className={windowStyles.overlay}
+      data-testid="올해의-목표-창"
+      onClick={close}
+      ref={overlayRef}
+      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}
+    >
       {/* 띄운 그림은 [창+0x214] 라 그리기 콜백을 안 부른다(0x7479c) — 뒤 어둡게만 */}
       <div style={{ visibility: motion.openingHeight !== null ? 'hidden' : undefined }}>
-      {palettes.definition}
-      <CommonPanel x={area.x} y={area.y} width={area.width} height={area.height} titleTab />
-      <FrameSprite folder={MODE_UI} frame={YEAR_GOAL_MODE_UI_FRAME} origins={modeUiOrigins} x={0} y={0} />
-      {layout.texts.map((piece, index) => (
-        <img key={`t${index}`} className={windowStyles.layer} src={`${IMG_TEXT}/${pad(piece.frame)}.png`} alt=""
-          data-frame={piece.frame}
-          style={{ left: piece.x, top: piece.y, ...palettes.styleOf(piece.frame, piece.palette) }} />
-      ))}
-      {layout.numbers.map((piece, index) => (
-        <img key={`n${index}`} className={windowStyles.layer} src={`${NUM}/${pad(piece.frame)}.png`} alt=""
-          style={{ left: piece.x, top: piece.y }} />
-      ))}
+        {palettes.definition}
+        <CommonPanel x={area.x} y={area.y} width={area.width} height={area.height} titleTab />
+        <FrameSprite folder={MODE_UI} frame={YEAR_GOAL_MODE_UI_FRAME} origins={modeUiOrigins} x={0} y={0} />
+        {layout.texts.map((piece, index) => (
+          <img
+            key={`t${index}`}
+            className={windowStyles.layer}
+            src={`${IMG_TEXT}/${pad(piece.frame)}.png`}
+            alt=""
+            data-frame={piece.frame}
+            style={{ left: piece.x, top: piece.y, ...palettes.styleOf(piece.frame, piece.palette) }}
+          />
+        ))}
+        {layout.numbers.map((piece, index) => (
+          <img
+            key={`n${index}`}
+            className={windowStyles.layer}
+            src={`${NUM}/${pad(piece.frame)}.png`}
+            alt=""
+            style={{ left: piece.x, top: piece.y }}
+          />
+        ))}
       </div>
     </div>
   )

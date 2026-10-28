@@ -58,11 +58,12 @@ describe('SceneParticleLayer — 경기 장면 0x52c50 의 공용 창 게이트(
     resetCommonWindowShownForTest()
   })
   /** 쌓인 그림 콜백을 시각 `at` 으로 한 번 돌린다 */
-  const 그림 = (at: number) => act(() => {
-    const pending = frames
-    frames = []
-    for (const callback of pending) callback(at)
-  })
+  const 그림 = (at: number) =>
+    act(() => {
+      const pending = frames
+      frames = []
+      for (const callback of pending) callback(at)
+    })
 
   it('경기 장면에 공용 창이 떠 있으면 틱도 그림도 없다 — 창이 내려가면 다시 굴린다(따라잡지 않는다)', () => {
     emitMenuSparkle()

@@ -19,7 +19,11 @@ import { resetSceneBallPath } from '@/widgets/batting-stage/model/sceneBallPath'
 const 그린장면: StageScene[] = []
 vi.mock('@/widgets/batting-stage/lib/renderBattingStage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/widgets/batting-stage/lib/renderBattingStage')>()
-  return { ...actual, renderBattingStage: (_context: CanvasRenderingContext2D, scene: StageScene) => void 그린장면.push(scene), renderSettlementLayer: () => {} }
+  return {
+    ...actual,
+    renderBattingStage: (_context: CanvasRenderingContext2D, scene: StageScene) => void 그린장면.push(scene),
+    renderSettlementLayer: () => {},
+  }
 })
 const catalog = JSON.parse(readFileSync('public/sprites/ptcimg/particles.json', 'utf8')) as {
   emitters: { callId: number; callable: boolean }[]

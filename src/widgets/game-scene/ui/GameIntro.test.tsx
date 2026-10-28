@@ -24,11 +24,7 @@ describe('경기 시작 인트로 그리기 (0x417ac)', () => {
   it('배경을 주면 구장을 카운터(진입 틀도 갱신이 돌아 270 − 5(t + 1))만큼 내려 그린다 (0x40ff0)', () => {
     vi.useFakeTimers()
     render(
-      <GameIntro
-        stadiumNameFrame={0x41}
-        backdrop={{ skyRow: 0, skyColumn: 0, stadium: 3, ourTeamId: 0, opponentTeamId: 1 }}
-        onDone={() => {}}
-      />,
+      <GameIntro stadiumNameFrame={0x41} backdrop={{ skyRow: 0, skyColumn: 0, stadium: 3, ourTeamId: 0, opponentTeamId: 1 }} onDone={() => {}} />,
     )
     expect(screen.getByTestId('구장-배경').dataset.offsetY).toBe('265')
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 2))

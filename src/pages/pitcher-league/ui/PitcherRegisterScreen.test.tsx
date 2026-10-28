@@ -25,11 +25,12 @@ type OnCreate = (name: string, profile: PitcherRookieProfile) => void
 const 화면 = (onCreate: OnCreate = () => {}, onCancel: () => void = () => {}) =>
   render(<PitcherRegisterScreen onCreate={onCreate} onCancel={onCancel} />)
 
-const 이름넣기 = (name: string) =>
-  fireEvent.change(screen.getByLabelText('이름'), { target: { value: name } })
+const 이름넣기 = (name: string) => fireEvent.change(screen.getByLabelText('이름'), { target: { value: name } })
 const 키 = (key: string) => fireEvent.keyDown(window, { key })
 /** 0x66 마지막 줄까지 OK — 피부 줄에서 한 번 더면 0x67 */
-const 변화구로 = () => { for (let row = 0; row < 5; row += 1) 키('Enter') }
+const 변화구로 = () => {
+  for (let row = 0; row < 5; row += 1) 키('Enter')
+}
 const 칸 = (name: string) => screen.getByRole('option', { name })
 const 구질 = (name: string) => fireEvent.click(칸(name))
 const 골랐나 = (cell: number) => screen.getByTestId(`변화구칸-${cell}`).dataset.chosen
@@ -68,7 +69,9 @@ describe('투수 등록 화면 (0x66)', () => {
     vi.useFakeTimers()
     try {
       화면()
-      act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 3) })
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 3)
+      })
       const cursor = screen.queryByTestId('선수등록-커서')
       if (cursor !== null) expect(cursor.getAttribute('style')).toContain('left: 59px; top: 200px')
     } finally {
@@ -86,7 +89,12 @@ describe('투수 등록 화면 (0x66)', () => {
 
   it('이름이 빈 채 되돌아가기(CLR)면 팀 고르기로 (0x16f28)', () => {
     let canceled = false
-    화면(() => {}, () => { canceled = true })
+    화면(
+      () => {},
+      () => {
+        canceled = true
+      },
+    )
 
     fireEvent.click(screen.getByRole('button', { name: '되돌아가기' }))
 
@@ -115,9 +123,13 @@ describe('기본 변화구 고르기 (0x67)', () => {
       const 띠 = () => screen.getByTestId('변화구-고르기').querySelector('[data-description-band]')
       expect(띠()).not.toBeNull()
 
-      act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 0x31) })
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 0x31)
+      })
       expect(띠()).not.toBeNull()
-      act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
       expect(띠()).toBeNull()
 
       키('Escape')
@@ -135,7 +147,9 @@ describe('기본 변화구 고르기 (0x67)', () => {
       이름넣기('테스트')
       const 띠폭 = () => document.querySelector('[data-description-band]')?.getAttribute('data-description-band')
       변화구로()
-      act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 10) })
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * 10)
+      })
       키('Escape')
       expect(screen.queryByTestId('변화구-고르기')).toBeNull()
       expect(띠폭()).toBe('160')
@@ -225,7 +239,9 @@ describe('기본 변화구 고르기 (0x67)', () => {
 
   it('[예] 로 고른 값이 그대로 넘어간다', () => {
     let created: { name: string; profile: PitcherRookieProfile } | null = null
-    화면((name, profile) => { created = { name, profile } })
+    화면((name, profile) => {
+      created = { name, profile }
+    })
     이름넣기('투수')
     fireEvent.click(칸('2줄 값'))
     fireEvent.click(screen.getByRole('button', { name: '2줄 다음' }))
@@ -267,7 +283,14 @@ describe('만들기 흐름 — 0x65 팀 고르기 → 0x66 등록', () => {
 
   it('고른 팀이 프로필에 실려 넘어온다', () => {
     let created: PitcherRookieProfile | null = null
-    render(<PitcherCreateFlow onCreate={(_, profile) => { created = profile }} onCancel={() => {}} />)
+    render(
+      <PitcherCreateFlow
+        onCreate={(_, profile) => {
+          created = profile
+        }}
+        onCancel={() => {}}
+      />,
+    )
     fireEvent.click(screen.getByRole('button', { name: '대전 호크스' }))
     fireEvent.change(screen.getByLabelText('이름'), { target: { value: '투수' } })
     변화구로()

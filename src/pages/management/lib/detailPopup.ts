@@ -139,10 +139,7 @@ export function detailRowsFromSlots(
     change: pick(change),
     bonus: pick(bonus),
   })
-  return [
-    ...[0, 1, 2, 3].map((k) => row(k, (slots) => slots.ability[k] ?? 0)),
-    row(4, (slots) => slots.morale),
-  ]
+  return [...[0, 1, 2, 3].map((k) => row(k, (slots) => slots.ability[k] ?? 0)), row(4, (slots) => slots.morale)]
 }
 
 /**
@@ -229,11 +226,7 @@ export function detailRowsOf(before: PlayerCareer, after: PlayerCareer, changes?
 const GP_ABILITY_CHANGE = 10
 const GP_MORALE_CHANGE = 40
 
-export function gpItemDetailChangesOf(
-  itemIndex: number,
-  baseBefore: readonly number[],
-  limits: readonly number[],
-): DetailSlots | null {
+export function gpItemDetailChangesOf(itemIndex: number, baseBefore: readonly number[], limits: readonly number[]): DetailSlots | null {
   if (itemIndex > 4 && itemIndex !== 6) return null
   const raises = (k: number) => (limits[k] ?? 0) > (baseBefore[k] ?? 0)
   return {

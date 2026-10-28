@@ -1,10 +1,5 @@
 import { PITCHERS_PER_TEAM } from '@/entities/team/model/teamRoster'
-import {
-  MY_RECORD_SLOT,
-  nariTeamRecordOf,
-  nariTeamsOf,
-  withNariTeamRecord,
-} from '@/entities/career/model/nariTeamRecord'
+import { MY_RECORD_SLOT, nariTeamRecordOf, nariTeamsOf, withNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecordFields, NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'

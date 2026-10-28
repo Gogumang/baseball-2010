@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  RANKING_BLINK_AT_REST, rankingBlinkCountersOf, rankingColumnXOf, rankingRowYOf, rankingSideArrowXOf, rankingValueDrawingOf,
+  RANKING_BLINK_AT_REST,
+  rankingBlinkCountersOf,
+  rankingColumnXOf,
+  rankingRowYOf,
+  rankingSideArrowXOf,
+  rankingValueDrawingOf,
 } from '@/pages/nari-record-room/lib/rankingBoard'
 
 describe('순위 판 0x5796c', () => {

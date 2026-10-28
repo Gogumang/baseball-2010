@@ -1,12 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import {
-  INTRO_TICKS,
-  introBandAlphaOf,
-  introCounterAt,
-  introFadeAt,
-} from '@/widgets/game-scene/lib/introSchedule'
+import { INTRO_TICKS, introBandAlphaOf, introCounterAt, introFadeAt } from '@/widgets/game-scene/lib/introSchedule'
 import {
   INTRO_BAND,
   INTRO_BAND_RGB,
@@ -22,9 +17,7 @@ import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
-import {
-  SCOREBOARD_AT, effectOpacityOf, introScoreboardEffectOf,
-} from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import { SCOREBOARD_AT, effectOpacityOf, introScoreboardEffectOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { SceneryBackdrop } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { rivalryStepAt } from '@/widgets/game-scene/lib/rivalryBand'
@@ -89,9 +82,14 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   }
   /** 받은 키 칸 — 인트로 키 0x39b54 는 받은 다음 틀의 52da2~ 상태 키 자리(갱신 표 52e14 앞)에서 돈다(`sceneKeyLatch`) */
   const keyLatch = useSceneKeyLatchOwner()
-  const tick = useSceneTick((next) => {
-    if (next >= INTRO_TICKS) finish()
-  }, true, false, keyLatch)
+  const tick = useSceneTick(
+    (next) => {
+      if (next >= INTRO_TICKS) finish()
+    },
+    true,
+    false,
+    keyLatch,
+  )
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
 
@@ -116,10 +114,14 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
    * 띠 · 막대 · 글씨 · 점수판을 배경 캔버스에 이어 그린다(Q-03 r301 — 흐려지는 동안 효과 1 이 배경 화면을 읽어 원본 식으로 섞는다).
    * 배경이 없거나 그림을 다 받기 전(·jsdom)이면 아래 DOM 근사로 둔다
    */
-  const canvasOverlay = backdrop === undefined
-    ? null
-    : introCanvasOverlayOf({ stadiumNameFrame, ...(scoreboardSides === undefined ? {} : { scoreboardSides }), fade, effectLevel },
-      gameUiOrigins, textOrigins)
+  const canvasOverlay =
+    backdrop === undefined
+      ? null
+      : introCanvasOverlayOf(
+          { stadiumNameFrame, ...(scoreboardSides === undefined ? {} : { scoreboardSides }), fade, effectLevel },
+          gameUiOrigins,
+          textOrigins,
+        )
   /** DOM 근사 — 캔버스로 못 그릴 때(배경 없음 · 그림 받는 중 · jsdom) */
   const domLayers = (
     <>
@@ -127,26 +129,45 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
         className={styles.introBand}
         data-testid="인트로-띠"
         style={{
-          left: INTRO_BAND.x, top: INTRO_BAND.y, width: INTRO_BAND.width, height: INTRO_BAND.height,
+          left: INTRO_BAND.x,
+          top: INTRO_BAND.y,
+          width: INTRO_BAND.width,
+          height: INTRO_BAND.height,
           background: `rgba(${r}, ${g}, ${b}, ${introBandAlphaOf(fade) / 255})`,
         }}
       />
       {imageOpacity > 0 && (
         <>
-          <FrameSprite folder={GAME_UI_FRAMES} frame={INTRO_BAR_FRAME} origins={gameUiOrigins}
-            x={INTRO_BAR_X} y={INTRO_BAR_Y} style={imageStyle} />
+          <FrameSprite folder={GAME_UI_FRAMES} frame={INTRO_BAR_FRAME} origins={gameUiOrigins} x={INTRO_BAR_X} y={INTRO_BAR_Y} style={imageStyle} />
           <span data-testid="인트로-팀이름" data-frame={stadiumNameFrame}>
-            <FrameSprite folder={IMG_TEXT_FRAMES} frame={stadiumNameFrame} origins={textOrigins}
-              x={INTRO_TEAM_NAME_X} y={INTRO_TEXT_Y} style={imageStyle} />
+            <FrameSprite
+              folder={IMG_TEXT_FRAMES}
+              frame={stadiumNameFrame}
+              origins={textOrigins}
+              x={INTRO_TEAM_NAME_X}
+              y={INTRO_TEXT_Y}
+              style={imageStyle}
+            />
           </span>
-          <FrameSprite folder={IMG_TEXT_FRAMES} frame={INTRO_STADIUM_LABEL_FRAME} origins={textOrigins}
-            x={INTRO_STADIUM_LABEL_X} y={INTRO_TEXT_Y} style={imageStyle} />
+          <FrameSprite
+            folder={IMG_TEXT_FRAMES}
+            frame={INTRO_STADIUM_LABEL_FRAME}
+            origins={textOrigins}
+            x={INTRO_STADIUM_LABEL_X}
+            y={INTRO_TEXT_Y}
+            style={imageStyle}
+          />
         </>
       )}
       {/* 띠·막대·팀 글씨 뒤에 그린다 (0x419f4) */}
       {scoreboardSides !== undefined && (
-        <ScoreboardFrame {...SCOREBOARD_AT.intro} side0={scoreboardSides[0]} side1={scoreboardSides[1]}
-          effectLevel={effectLevel} introAlpha={fade.alpha} />
+        <ScoreboardFrame
+          {...SCOREBOARD_AT.intro}
+          side0={scoreboardSides[0]}
+          side1={scoreboardSides[1]}
+          effectLevel={effectLevel}
+          introAlpha={fade.alpha}
+        />
       )}
     </>
   )

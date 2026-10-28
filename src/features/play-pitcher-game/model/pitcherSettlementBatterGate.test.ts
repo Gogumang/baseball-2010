@@ -7,12 +7,7 @@ import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { PitcherGameOptions, PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow'
-import {
-  isPitchTurn,
-  resolveDefensePlay,
-  startPitch,
-  startPitcherGame,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { isPitchTurn, resolveDefensePlay, startPitch, startPitcherGame } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 const 기본옵션: PitcherGameOptions = {

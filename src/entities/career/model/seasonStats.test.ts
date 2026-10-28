@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  battingAverageOf,
-  EMPTY_SEASON_STATS,
-  formatBattingAverage,
-  recordAtBat,
-} from '@/entities/career/model/seasonStats'
+import { battingAverageOf, EMPTY_SEASON_STATS, formatBattingAverage, recordAtBat } from '@/entities/career/model/seasonStats'
 
 describe('recordAtBat', () => {
   it('안타는 타수와 안타 수를 함께 올린다', () => {

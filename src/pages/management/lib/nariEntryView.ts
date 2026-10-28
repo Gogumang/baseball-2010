@@ -25,12 +25,8 @@
  * 화면 밀기(0xbdae9 종류 8)는 라우트가 `NariScreenPush` 로 건다.
  */
 import { leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey } from '@/entities/season-mode/model/entryEditor'
-import type {
-  EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherRow,
-} from '@/entities/season-mode/model/entryEditor'
-import {
-  MY_RECORD_SLOT, NO_RECORD_ACE, nariTeamRecordOf, nariTeamsOf, tableNariTeamRecord,
-} from '@/entities/career/model/nariTeamRecord'
+import type { EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherRow } from '@/entities/season-mode/model/entryEditor'
+import { MY_RECORD_SLOT, NO_RECORD_ACE, nariTeamRecordOf, nariTeamsOf, tableNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import { leagueGamePitchersOf, nextOpponentOf } from '@/entities/career/model/playerCareer'
 import { nariCupRecordOf } from '@/entities/career/model/nariCupTeams'
@@ -43,17 +39,13 @@ import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import {
-  aceDetailSourceOf, seasonRecordProfileOf, staminaPercentOf, tableDetailSourceOf,
-} from '@/entities/season-mode/model/seasonEntry'
+import { aceDetailSourceOf, seasonRecordProfileOf, staminaPercentOf, tableDetailSourceOf } from '@/entities/season-mode/model/seasonEntry'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import type { EntryBatterLine, EntryPitcherLine, PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 import { entryBatterLineOfRecord, entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
 import { batterRecordLineOf } from '@/entities/career/model/seasonStats'
-import {
-  leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf,
-} from '@/entities/league/model/leaguePlayerStats'
+import { leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { BATTER_EDITION_MODE } from '@/entities/pitcher-career/model/pitcherRotation'
@@ -162,10 +154,16 @@ export function nariCupEntryCellSourceOf(
   const isOpponentSlot = teams !== undefined && teams.opponentTeamId === teamId
   const isKoreaSlot = teamId === KOREA_CUP_TEAM
   const morale = isOpponentSlot
-    ? teams.opponentMorale ?? teamRecordMoraleOf(teamId)
-    : isKoreaSlot ? teams?.koreaMorale ?? teamRecordMoraleOf(teamId) : teamRecordMoraleOf(teamId)
+    ? (teams.opponentMorale ?? teamRecordMoraleOf(teamId))
+    : isKoreaSlot
+      ? (teams?.koreaMorale ?? teamRecordMoraleOf(teamId))
+      : teamRecordMoraleOf(teamId)
   return {
-    stats, staminas: undefined, staminaMode, morale, isCupRecord: true,
+    stats,
+    staminas: undefined,
+    staminaMode,
+    morale,
+    isCupRecord: true,
     ...(isKoreaSlot && teams?.koreaErrors !== undefined ? { cupErrors: teams.koreaErrors } : {}),
   }
 }
@@ -174,11 +172,7 @@ export function nariCupEntryCellSourceOf(
  * 143 의 나리 리그 팀 레코드 +2 (`NariEntryCellSource.morale`). 내 팀 칸은 0xa3a24 가 읽는 칸 그 자체라 커리어 사기
  * (대회 중에도 리그 칸은 그대로 — 대회 동안 0xa3a24 는 상대국 칸을 읽는다, `nariMoraleOf`), 그 밖 팀은 `teamRecordMorales`.
  */
-export function nariEntryTeamMoraleOf(
-  career: NariTeamRecordMoraleCareer & { readonly morale: number },
-  isMyTeam: boolean,
-  teamId: number,
-): number {
+export function nariEntryTeamMoraleOf(career: NariTeamRecordMoraleCareer & { readonly morale: number }, isMyTeam: boolean, teamId: number): number {
   return isMyTeam ? career.morale : nariTeamRecordMoraleOf(career, teamId)
 }
 
@@ -191,8 +185,14 @@ function nariBatterCellsOf(cells: NariEntryCellSource | undefined, teamId: numbe
   const line = leagueBatterLineOf(cells.stats, leagueBatterIdOf(teamId, slot))
   // +0x2e 실책 — 수비 그림 0x43278 4381a~43904 가 쌓은 칸(옛 저장은 0)
   const batterLine: EntryBatterLine = {
-    atBats: line.atBats, hits: line.hits, doubles: line.doubles ?? 0, triples: line.triples ?? 0, homeRuns: line.homeRuns,
-    runsBattedIn: line.runsBattedIn, steals: line.steals ?? 0, errors: line.errors ?? 0,
+    atBats: line.atBats,
+    hits: line.hits,
+    doubles: line.doubles ?? 0,
+    triples: line.triples ?? 0,
+    homeRuns: line.homeRuns,
+    runsBattedIn: line.runsBattedIn,
+    steals: line.steals ?? 0,
+    errors: line.errors ?? 0,
   }
   return { batterLine }
 }
@@ -205,8 +205,14 @@ function nariPitcherCellsOf(cells: NariEntryCellSource | undefined, teamId: numb
   const line = leaguePitcherLineOf(cells.stats, leaguePitcherIdOf(teamId, slot))
   // +0x2a 사사구 — 정산 0xa8024 꼬리 a8b04~a8bee 가 쌓은 칸(옛 저장은 0)
   const pitcherLine: EntryPitcherLine = {
-    outs: line.outs, runsAllowed: line.runsAllowed, saves: line.saves, strikeouts: line.strikeouts, pitches: line.pitches,
-    walks: line.walks ?? 0, wins: line.wins, losses: line.losses,
+    outs: line.outs,
+    runsAllowed: line.runsAllowed,
+    saves: line.saves,
+    strikeouts: line.strikeouts,
+    pitches: line.pitches,
+    walks: line.walks ?? 0,
+    wins: line.wins,
+    losses: line.losses,
   }
   return {
     pitcherLine,
@@ -255,16 +261,16 @@ export const acePitcherFace = (index: number): NariEntryFace => {
  * 타자 탭 목록 — 레코드 타자 배열 차례 그대로(`0x55724` 가 `[팀+0x18]` 을 훑는다). 내 선수 줄은 `me`(타자편 커리어) 로,
  * 마타자 줄은 마선수 표로, 나머지는 그 팀 붙박이 표 행으로 채운다.
  */
-export function nariEntryBattersOf(
-  record: NariTeamRecord,
-  teamId: number,
-  me: NariEntryFace | null,
-  cells?: NariEntryCellSource,
-): NariEntryBatter[] {
+export function nariEntryBattersOf(record: NariTeamRecord, teamId: number, me: NariEntryFace | null, cells?: NariEntryCellSource): NariEntryBatter[] {
   const table = teamBatters(teamId)
   return record.batters.map((row) => {
     if (row.ace !== undefined) {
-      return { ...aceBatterFace(row.ace), ...aceCellsOf(cells, ACE_BATTERS[row.ace]?.recordLine ?? [], false, 0), isAce: true, position: row.position }
+      return {
+        ...aceBatterFace(row.ace),
+        ...aceCellsOf(cells, ACE_BATTERS[row.ace]?.recordLine ?? [], false, 0),
+        isAce: true,
+        position: row.position,
+      }
     }
     if (row.slot === MY_RECORD_SLOT) {
       return { ...(me ?? { name: '', ability: [] }), isAce: false, position: row.position }
@@ -273,7 +279,10 @@ export function nariEntryBattersOf(
     // 레코드 장비 니블(나리 새 시즌 CPU 장비 굴림 0x665e8)이 있으면 상세 창 도형 값 0xb6414(rec, k, 1) 이 그 보너스를 먹는다
     const ability = player === undefined ? [] : equippedRowAbilityOf(player, row.equipment, false)
     return {
-      name: player?.name ?? '', ability, isAce: false, position: row.position,
+      name: player?.name ?? '',
+      ability,
+      isAce: false,
+      position: row.position,
       ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, false, ability) }),
       ...(player === undefined ? {} : nariBatterCellsOf(cells, teamId, row.slot, player)),
     }
@@ -302,7 +311,9 @@ export function nariEntryPitchersOf(
     const player = table[slot]
     const ability = player === undefined ? [] : equippedRowAbilityOf(player, pitcherEquipment?.[slot], true)
     return {
-      name: player?.name ?? '', ability, isAce: false,
+      name: player?.name ?? '',
+      ability,
+      isAce: false,
       ...(player === undefined ? {} : { profileLow: player.profile & 3, detailSource: tableDetailSourceOf(player, true, ability) }),
       ...(player === undefined ? {} : nariPitcherCellsOf(cells, teamId, slot, player)),
     }
@@ -334,15 +345,13 @@ function withRecordAcePitcher(order: readonly number[], record: NariTeamRecord):
 /** 표 밖 투수 칸 — 마투수 */
 function recordAcePitcherSpecial(record: NariTeamRecord) {
   return (slot: number) =>
-    slot === ACE_PITCHER_SLOT && record.acePitcher !== NO_RECORD_ACE
-      ? { ...acePitcherFace(record.acePitcher), isAce: true }
-      : undefined
+    slot === ACE_PITCHER_SLOT && record.acePitcher !== NO_RECORD_ACE ? { ...acePitcherFace(record.acePitcher), isAce: true } : undefined
 }
 
 /** 표 밖 투수 칸 — 마투수 레코드 줄 */
 export function recordAcePitcherLineOf(record: NariTeamRecord) {
   return (slot: number) =>
-    slot === ACE_PITCHER_SLOT && record.acePitcher !== NO_RECORD_ACE ? ACE_PITCHERS[record.acePitcher]?.recordLine ?? [] : undefined
+    slot === ACE_PITCHER_SLOT && record.acePitcher !== NO_RECORD_ACE ? (ACE_PITCHERS[record.acePitcher]?.recordLine ?? []) : undefined
 }
 
 /**
@@ -359,9 +368,7 @@ export function batterNariEntryViewOf(
     const me = face
     // 국가대항전 — 0x1f9a9 가 팀 10 은 대표팀 칸(+0xbc4, 내 선수가 낀), 그 밖은 상대국 칸(+0xbe0)을 준다. 투수는 142 가 돌린 그 칸 차례
     const teamId = isMyTeam ? cup.myTeam : cup.opponent
-    const record = career.nariCupTeams === undefined
-      ? tableNariTeamRecord(teamId)
-      : nariCupRecordOf(career.nariCupTeams, teamId)
+    const record = career.nariCupTeams === undefined ? tableNariTeamRecord(teamId) : nariCupRecordOf(career.nariCupTeams, teamId)
     // 기록 열 — 붙박이 줄은 마스터 복사(Xls 행) 줄, 내 선수 줄은 상태 133 의 0xb53f1 이 0x1fc21(g) 내 레코드 0x30 바이트를 그대로
     // memcpy(b54f6 · 0x1400418)한 것이라 커리어 시즌 줄이다(대회 경기는 게이트 0xa56dc 가 거짓이라 그 뒤로 안 바뀐다)
     const cells = nariCupEntryCellSourceOf(career.leaguePlayerStats, BATTER_EDITION_MODE, teamId, career.nariCupTeams)
@@ -411,8 +418,14 @@ export function myBatterEntryFaceOf(career: PlayerCareer): NariEntryFace {
     ability,
     profileLow: profile & 3,
     detailSource: {
-      isPitcher: false, abilities: ability, aceIndex: -1, profile, skillBits: skillBitsOfIds(career.equippedSkillIds),
-      specialNumber: career.specialSwingNumber, grade: null, nurturedSalary: career.salary,
+      isPitcher: false,
+      abilities: ability,
+      aceIndex: -1,
+      profile,
+      skillBits: skillBitsOfIds(career.equippedSkillIds),
+      specialNumber: career.specialSwingNumber,
+      grade: null,
+      nurturedSalary: career.salary,
     },
   }
 }

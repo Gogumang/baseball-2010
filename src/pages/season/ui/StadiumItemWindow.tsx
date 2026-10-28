@@ -7,12 +7,24 @@ import { STADIUM_KINDS } from '@/entities/season-mode/model/stadiumItems'
 import type { StadiumKind } from '@/entities/season-mode/model/stadiumItems'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
-  centeredOffsetOf, descriptionBoxRectsOf, isBlinkOn, partSeparatorRectsOf, scrollThumbRectsOf, tabPanelRectsOf, windowRowOf,
+  centeredOffsetOf,
+  descriptionBoxRectsOf,
+  isBlinkOn,
+  partSeparatorRectsOf,
+  scrollThumbRectsOf,
+  tabPanelRectsOf,
+  windowRowOf,
 } from '@/pages/season/lib/seasonEquipmentWindow'
 import type { WindowBox, WindowRect } from '@/pages/season/lib/seasonEquipmentWindow'
 import {
-  STADIUM_COLORS, STADIUM_WINDOW, stadiumItemDescriptionOf, stadiumKindBoxOf, stadiumPriceTenThousandsOf, stadiumRowLookOf,
-  stadiumRowNameOf, stadiumSlotCountOf,
+  STADIUM_COLORS,
+  STADIUM_WINDOW,
+  stadiumItemDescriptionOf,
+  stadiumKindBoxOf,
+  stadiumPriceTenThousandsOf,
+  stadiumRowLookOf,
+  stadiumRowNameOf,
+  stadiumSlotCountOf,
 } from '@/pages/season/lib/stadiumItemWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -45,9 +57,10 @@ export interface StadiumItemWindowProps {
 
 function Rects({ rects, testId }: { readonly rects: readonly WindowRect[]; readonly testId?: string }) {
   return (
-    <svg viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid={testId}
-      style={{ ...pixel, left: 0, top: 0, width: 240, height: 320 }}>
-      {rects.map((rect, index) => <rect key={index} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />)}
+    <svg viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid={testId} style={{ ...pixel, left: 0, top: 0, width: 240, height: 320 }}>
+      {rects.map((rect, index) => (
+        <rect key={index} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />
+      ))}
     </svg>
   )
 }
@@ -56,11 +69,7 @@ function Rects({ rects, testId }: { readonly rects: readonly WindowRect[]; reado
 function CenteredText({ text, box, color }: { readonly text: string; readonly box: WindowBox; readonly color: string }) {
   const d = box.height - LINE_HEIGHT
   const dy = d > 0 ? (d >> 1) + (d % 2) : d >> 1
-  return (
-    <PixelText style={{ ...pixel, left: box.x + ((box.width - measurePixelTextWidth(text)) >> 1), top: box.y + dy, color }}>
-      {text}
-    </PixelText>
-  )
+  return <PixelText style={{ ...pixel, left: box.x + ((box.width - measurePixelTextWidth(text)) >> 1), top: box.y + dy, color }}>{text}</PixelText>
 }
 
 /**
@@ -68,7 +77,16 @@ function CenteredText({ text, box, color }: { readonly text: string; readonly bo
  * 시즌 0xdc 상점(그리기 0xb1f8 의 메뉴 칸 1 갈래)과 0xea 구장관리(0xb158)가 같이 쓴다.
  */
 export function StadiumItemWindow({
-  record, kind, slot, top, isSlotFocus, tick, isShop, isHiddenOpen, onPickKind, onPickSlot,
+  record,
+  kind,
+  slot,
+  top,
+  isSlotFocus,
+  tick,
+  isShop,
+  isHiddenOpen,
+  onPickKind,
+  onPickSlot,
 }: StadiumItemWindowProps) {
   const uiOrigins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
@@ -81,19 +99,32 @@ export function StadiumItemWindow({
   const descriptionText = isSlotFocus ? stadiumItemDescriptionOf(kind, slot, isHiddenOpen) : null
 
   return (
-    <div role="group" aria-label={isShop ? '구장 아이템' : '구장관리'} data-testid="구장-창" data-kind={kind}
-      data-focus={isSlotFocus ? '칸' : '종류'}>
-      <Rects rects={[
-        ...tabPanelRectsOf(STADIUM_WINDOW.panel, true), ...partSeparatorRectsOf(), ...descriptionBoxRectsOf(description),
-      ]} testId="구장-판" />
+    <div
+      role="group"
+      aria-label={isShop ? '구장 아이템' : '구장관리'}
+      data-testid="구장-창"
+      data-kind={kind}
+      data-focus={isSlotFocus ? '칸' : '종류'}
+    >
+      <Rects
+        rects={[...tabPanelRectsOf(STADIUM_WINDOW.panel, true), ...partSeparatorRectsOf(), ...descriptionBoxRectsOf(description)]}
+        testId="구장-판"
+      />
       <FrameSprite folder={MODE_UI} frame={STADIUM_WINDOW.frame} origins={uiOrigins} x={0} y={0} />
       {STADIUM_WINDOW.labelFrames.map((frame, row) => {
         const size = textOrigins?.[String(frame).padStart(3, '0')]
         const box = windowRowOf(labels, row)
         return size === undefined ? null : (
-          <img key={frame} alt="" src={imageOf(IMG_TEXT, frame)}
-            style={{ ...pixel, left: box.x + box.width - size.width - STADIUM_WINDOW.valueInset,
-              top: box.y + centeredOffsetOf(box.height, size.height) }} />
+          <img
+            key={frame}
+            alt=""
+            src={imageOf(IMG_TEXT, frame)}
+            style={{
+              ...pixel,
+              left: box.x + box.width - size.width - STADIUM_WINDOW.valueInset,
+              top: box.y + centeredOffsetOf(box.height, size.height),
+            }}
+          />
         )
       })}
       {/* 박스 2 줄 0 — 소지금 0x63331(SR+2 × 100 만원, 0x24, ox −2) */}
@@ -102,13 +133,19 @@ export function StadiumItemWindow({
       </div>
       {/* 종류 표시 mode_ui 51 — 종류 목록에 있을 때는 틱 % 10 == 0 에 꺼진다 (0x83740) */}
       {(isSlotFocus || isBlinkOn(tick)) && markerOrigin !== undefined && (
-        <img alt="" data-testid="구장-종류표시" src={imageOf(MODE_UI, STADIUM_WINDOW.partMarkerFrame)}
-          style={{ ...pixel, left: marker.x + centeredOffsetOf(marker.width, markerOrigin.width),
-            top: marker.y + centeredOffsetOf(marker.height, markerOrigin.height) }} />
+        <img
+          alt=""
+          data-testid="구장-종류표시"
+          src={imageOf(MODE_UI, STADIUM_WINDOW.partMarkerFrame)}
+          style={{
+            ...pixel,
+            left: marker.x + centeredOffsetOf(marker.width, markerOrigin.width),
+            top: marker.y + centeredOffsetOf(marker.height, markerOrigin.height),
+          }}
+        />
       )}
       {STADIUM_KINDS.map((name) => (
-        <PressArea key={name} label={name} rect={stadiumKindBoxOf(name)} option={{ isSelected: name === kind }}
-          onPress={() => onPickKind(name)} />
+        <PressArea key={name} label={name} rect={stadiumKindBoxOf(name)} option={{ isSelected: name === kind }} onPress={() => onPickKind(name)} />
       ))}
       {visible.map((index, row) => {
         const box = windowRowOf(items, row)
@@ -121,9 +158,18 @@ export function StadiumItemWindow({
             <CenteredText text={name} box={box} color={look.color} />
             {/* 노랑 테두리 0xb9ed5 (0x83c4e) — 0x6a978 이 (w + 1) × (h + 1) 칸을 덮는다 (U-113) */}
             {isCursor && isBlinkOn(tick) && (
-              <div data-testid="구장-커서"
-                style={{ ...pixel, left: box.x, top: box.y, width: box.width + 1, height: box.height + 1, boxSizing: 'border-box',
-                  border: `1px solid ${STADIUM_COLORS.cursor}` }} />
+              <div
+                data-testid="구장-커서"
+                style={{
+                  ...pixel,
+                  left: box.x,
+                  top: box.y,
+                  width: box.width + 1,
+                  height: box.height + 1,
+                  boxSizing: 'border-box',
+                  border: `1px solid ${STADIUM_COLORS.cursor}`,
+                }}
+              />
             )}
             <PressArea label={`${kind} ${name}`} rect={box} option={{ isSelected: isCursor }} onPress={() => onPickSlot(index)} />
           </div>
@@ -133,16 +179,27 @@ export function StadiumItemWindow({
         <>
           {/* 박스 2 줄 1 — 가격 0xd45c0 × 10000 만원, 노랑 (0x83c80 · 0x83d5c) */}
           <div data-testid="구장-가격" aria-label={String(stadiumPriceTenThousandsOf(kind, slot))}>
-            <SpriteNumber glyphs={moneyGlyphsOf(stadiumPriceTenThousandsOf(kind, slot))}
-              right={valueRight} boxTop={windowRowOf(values, 1).y} boxHeight={values.height} />
+            <SpriteNumber
+              glyphs={moneyGlyphsOf(stadiumPriceTenThousandsOf(kind, slot))}
+              right={valueRight}
+              boxTop={windowRowOf(values, 1).y}
+              boxHeight={values.height}
+            />
           </div>
           {descriptionText !== null && (
             <div data-testid="구장-설명" aria-label={descriptionText.replaceAll('!N', '\n')}>
               {descriptionText.split('!N').map((line, index) => (
-                <PixelText key={index} style={{
-                  ...pixel, left: description.x + STADIUM_WINDOW.descriptionInset,
-                  top: description.y + STADIUM_WINDOW.descriptionInset + index * TEXT_LINE, color: STADIUM_COLORS.cursor,
-                }}>{line}</PixelText>
+                <PixelText
+                  key={index}
+                  style={{
+                    ...pixel,
+                    left: description.x + STADIUM_WINDOW.descriptionInset,
+                    top: description.y + STADIUM_WINDOW.descriptionInset + index * TEXT_LINE,
+                    color: STADIUM_COLORS.cursor,
+                  }}
+                >
+                  {line}
+                </PixelText>
               ))}
             </div>
           )}

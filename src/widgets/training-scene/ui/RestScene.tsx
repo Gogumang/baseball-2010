@@ -86,19 +86,32 @@ export function RestScene({ presentation, char0Palette, onFinished }: RestSceneP
   if (isDone) return null
   const windowOrigin = windowOrigins?.[windowSprite.key]
   return (
-    <div data-testid="나리-휴식연출" style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 140, zIndex: 1 }}
-      onClick={() => skipRef.current()}>
+    <div
+      data-testid="나리-휴식연출"
+      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 140, zIndex: 1 }}
+      onClick={() => skipRef.current()}
+    >
       <div className={styles.windowClip}>
         {windowOrigin !== undefined && (
-          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-            src={windowSprite.src} alt="" />
+          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
         )}
       </div>
       <div className={styles.animationClip}>
-        <EventAnimationSprite folder={EVENT_ANI} origins={eventOrigins}
-          entries={eventAnimations?.[presentation.eventAnimation]} update={update} anchor={ANCHOR} />
-        <EventAnimationSprite folder={EVENT_CHAR_0} origins={char0Origins}
-          entries={char0Animations?.[presentation.char0Animation]} update={update} anchor={ANCHOR} palette={char0Palette} />
+        <EventAnimationSprite
+          folder={EVENT_ANI}
+          origins={eventOrigins}
+          entries={eventAnimations?.[presentation.eventAnimation]}
+          update={update}
+          anchor={ANCHOR}
+        />
+        <EventAnimationSprite
+          folder={EVENT_CHAR_0}
+          origins={char0Origins}
+          entries={char0Animations?.[presentation.char0Animation]}
+          update={update}
+          anchor={ANCHOR}
+          palette={char0Palette}
+        />
       </div>
       <TrainingGauge filled={update} />
     </div>

@@ -132,7 +132,10 @@ describe('협살 계획 0xb3a04 · 시작 조건', () => {
     const 외야커버 = 야수들.map((fielder, slot) => (slot === 6 ? { ...fielder, holdingBall: true } : fielder))
     const 문 = { ...문맥({ coverOfBase: [1, 2, 6, 4], ballHolderSlot: 6 }, 주자들), fielders: 외야커버 }
     expect(canStartRundown(문, true)).toBe(false)
-    const 내야 = { ...문맥({ coverOfBase: [1, 2, 5, 4], ballHolderSlot: 5 }, 주자들), fielders: 야수들.map((fielder, slot) => (slot === 5 ? { ...fielder, holdingBall: true } : fielder)) }
+    const 내야 = {
+      ...문맥({ coverOfBase: [1, 2, 5, 4], ballHolderSlot: 5 }, 주자들),
+      fielders: 야수들.map((fielder, slot) => (slot === 5 ? { ...fielder, holdingBall: true } : fielder)),
+    }
     expect(canStartRundown(내야, true)).toBe(true)
   })
 
@@ -177,25 +180,19 @@ describe('협살 한 틱 0xb48b6', () => {
 
   it('공이 없는 쪽은 주자 도착이 송구 도착보다 4틱 넘게 늦을 때만 쫓아가고, 그 사이면 멈춰 기다린다', () => {
     // 2루수가 2루에 붙어 있으면 주자 16틱 > 송구 7틱(0xa1adc) + 4 → 쫓아간다
-    const 루위 = 야수들.map((fielder, slot) =>
-      slot === 3 ? { ...fielder, position: basePosition(2) } : fielder,
-    )
+    const 루위 = 야수들.map((fielder, slot) => (slot === 3 ? { ...fielder, position: basePosition(2) } : fielder))
     expect(rundownAction(틱(3, 2, { fielders: 루위 })).kind).toBe('주자추적')
     // 주자가 45% 까지 왔고(남은 비율 53% > 35) 2루수가 2루 앞 (21785, 20672) 에 나와 있으면 주자 8틱 > 송구 5틱 이지만
     // +4 를 못 넘겨 대기다. 한 틱 이동 · 도착 틱이 맨해튼 거리라(0xbfa2c) 2루수가 루에 붙은 채로는 이 틈이 안 생긴다
     // (주자 틱 ≤ 11 이면 남은 비율이 35% 아래라 협살 대상이 아니다)
-    const 앞으로 = 야수들.map((fielder, slot) =>
-      slot === 3 ? { ...fielder, position: { x: 21_785, y: 0, z: 20_672 } } : fielder,
-    )
+    const 앞으로 = 야수들.map((fielder, slot) => (slot === 3 ? { ...fielder, position: { x: 21_785, y: 0, z: 20_672 } } : fielder))
     const 절반 = [타자주자, 사이주자(1, 45)]
     expect(rundownAction(틱(3, 2, { fielders: 앞으로, runners: 절반 })).kind).toBe('대기')
   })
 
   it('주자가 코앞이면 내 루로 가서 밟는다', () => {
     const 붙은주자 = 사이주자(1, 30)
-    const 야수 = 야수들.map((fielder, slot) =>
-      slot === 3 ? { ...fielder, position: 붙은주자.position } : fielder,
-    )
+    const 야수 = 야수들.map((fielder, slot) => (slot === 3 ? { ...fielder, position: 붙은주자.position } : fielder))
     const 결과 = rundownAction({ ...틱(3, 2, { fielders: 야수 }), plan: 계획 })
     expect(결과).toEqual({ kind: '루로', base: 2 })
   })
@@ -203,9 +200,7 @@ describe('협살 한 틱 0xb48b6', () => {
 
 describe('협살 종료 0xb26b8', () => {
   it('상태 8 인 야수를 전부 상태 0 으로 되돌린다', () => {
-    const 협살중 = 야수들.map((fielder, slot) =>
-      slot === 2 || slot === 3 ? { ...fielder, aiState: AI_STATE.RUNDOWN } : fielder,
-    )
+    const 협살중 = 야수들.map((fielder, slot) => (slot === 2 || slot === 3 ? { ...fielder, aiState: AI_STATE.RUNDOWN } : fielder))
     expect(endRundown(협살중).map((fielder) => fielder.aiState)).toEqual(Array(9).fill(AI_STATE.IDLE))
   })
 })

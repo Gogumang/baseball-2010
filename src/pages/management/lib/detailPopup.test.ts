@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import {
-  detailRowsOf, detailScrollBarOf, DETAIL_ROW_TOP, gpItemDetailChangesOf, restDetailChangesOf, trainingDetailChangesOf,
+  detailRowsOf,
+  detailScrollBarOf,
+  DETAIL_ROW_TOP,
+  gpItemDetailChangesOf,
+  restDetailChangesOf,
+  trainingDetailChangesOf,
 } from '@/pages/management/lib/detailPopup'
 import { runTraining } from '@/entities/career/model/training'
 import { runRest } from '@/entities/career/model/outing'

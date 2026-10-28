@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import {
-  abilityDetailScrollKeyOf, abilityDetailViewOf, batterAbilityDetailViewOf, scrollAbilityDetail,
-} from '@/pages/management/lib/abilityDetail'
+import { abilityDetailScrollKeyOf, abilityDetailViewOf, batterAbilityDetailViewOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
 import type { AbilityDetailSource } from '@/pages/management/lib/abilityDetail'
 import { BATTER_DETAIL_LABEL_FRAMES, PITCHER_DETAIL_LABEL_FRAMES } from '@/pages/management/lib/detailPopup'
 import { pitcherAbilityDetailViewOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
@@ -51,10 +49,7 @@ describe('글 줄 (창 +0x354, 0x89134~0x897cc)', () => {
   })
 
   it('투수 장비는 StrITEM 44 칸부터 · 능력치 이름은 StrMODE[40+k]', () => {
-    const { messages } = abilityDetailViewOf(
-      { ...바탕, isBatter: false, equipmentNibbles: [1, 2, 1, 1] },
-      PITCHER_DETAIL_LABEL_FRAMES,
-    )
+    const { messages } = abilityDetailViewOf({ ...바탕, isBatter: false, equipmentNibbles: [1, 2, 1, 1] }, PITCHER_DETAIL_LABEL_FRAMES)
     expect(messages).toEqual([
       '[!cFFFF00나이스 모자!cFFFFFF] 제구 +30',
       '[!cFFFF00라이트글러브!cFFFFFF] 구속 +50',
@@ -64,15 +59,18 @@ describe('글 줄 (창 +0x354, 0x89134~0x897cc)', () => {
   })
 
   it('장비 → 무력감(5) → 전설(7) → 질병 → 부상 → 사기 차례다', () => {
-    const { messages } = abilityDetailViewOf({
-      ...바탕,
-      equipmentNibbles: [0, 1, 0, 0],
-      isPowerlessEquipped: true,
-      isLegendEquipped: true,
-      isSick: true,
-      isInjured: true,
-      morale: 50,
-    }, BATTER_DETAIL_LABEL_FRAMES)
+    const { messages } = abilityDetailViewOf(
+      {
+        ...바탕,
+        equipmentNibbles: [0, 1, 0, 0],
+        isPowerlessEquipped: true,
+        isLegendEquipped: true,
+        isSick: true,
+        isInjured: true,
+        morale: 50,
+      },
+      BATTER_DETAIL_LABEL_FRAMES,
+    )
     expect(messages).toEqual([
       '[!cFFFF00나이스 배트!cFFFFFF] 파워 +30',
       '[!cFFFF00무력감!cFFFFFF] 모든능력치 -100',

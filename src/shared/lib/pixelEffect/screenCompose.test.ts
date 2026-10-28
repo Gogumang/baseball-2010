@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { DRAW_EFFECT, translucentPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
 import {
-  composeOverlay565, composeScreen565, frameComposeOps, rgbaOfScreen565, sprite565Of, type Sprite565,
+  composeOverlay565,
+  composeScreen565,
+  frameComposeOps,
+  rgbaOfScreen565,
+  sprite565Of,
+  type Sprite565,
 } from '@/shared/lib/pixelEffect/screenCompose'
 import { blackStepCoverPixel565 } from '@/shared/lib/stepCover/stepCover'
 import { rgbOf565 } from '@/shared/lib/screen565/screen565'
 
-const rgbaOf = (pixels: readonly (number | null)[]) =>
-  pixels.flatMap((pixel) => (pixel === null ? [0, 0, 0, 0] : [...rgbOf565(pixel), 255]))
+const rgbaOf = (pixels: readonly (number | null)[]) => pixels.flatMap((pixel) => (pixel === null ? [0, 0, 0, 0] : [...rgbOf565(pixel), 255]))
 
 describe('화면 버퍼 합성 (RGB565)', () => {
   const sprite: Sprite565 = sprite565Of(rgbaOf([0xf800, null, 0x07e0, 0x001f]), 2, 2)
@@ -19,20 +23,26 @@ describe('화면 버퍼 합성 (RGB565)', () => {
 
   it('효과 1 반투명은 그 자리 화면 픽셀과 0x9a449 식으로 섞는다 — 투명 칸 · 화면 밖은 그대로', () => {
     const backdrop = 0x8410
-    const { pixels, missing } = composeScreen565(3, 2, backdrop, [
-      { kind: 'image', src: 'a', x: 1, y: 0, effect: DRAW_EFFECT.TRANSLUCENT, argument: 7 },
-    ], () => sprite)
+    const { pixels, missing } = composeScreen565(
+      3,
+      2,
+      backdrop,
+      [{ kind: 'image', src: 'a', x: 1, y: 0, effect: DRAW_EFFECT.TRANSLUCENT, argument: 7 }],
+      () => sprite,
+    )
     expect(missing).toBe(false)
     expect(Array.from(pixels)).toEqual([
-      backdrop, translucentPixel565(7, 0xf800, backdrop), backdrop,
-      backdrop, translucentPixel565(7, 0x07e0, backdrop), translucentPixel565(7, 0x001f, backdrop),
+      backdrop,
+      translucentPixel565(7, 0xf800, backdrop),
+      backdrop,
+      backdrop,
+      translucentPixel565(7, 0x07e0, backdrop),
+      translucentPixel565(7, 0x001f, backdrop),
     ])
   })
 
   it('단계 덮기는 화면 안으로 자른 사각형만 — 검정 몸통 0x9aac4', () => {
-    const { pixels } = composeScreen565(2, 2, 0xffff, [
-      { kind: 'cover', x: 1, y: -3, width: 9, height: 4, step: 9, color: null },
-    ], () => null)
+    const { pixels } = composeScreen565(2, 2, 0xffff, [{ kind: 'cover', x: 1, y: -3, width: 9, height: 4, step: 9, color: null }], () => null)
     expect(Array.from(pixels)).toEqual([0xffff, blackStepCoverPixel565(9, 0xffff), 0xffff, 0xffff])
   })
 
@@ -59,9 +69,12 @@ describe('화면 버퍼 합성 (RGB565)', () => {
     const under: Sprite565 = sprite565Of(rgbaOf([0x1111, 0x2222, 0x3333, 0x4444]), 4, 1)
     const top: Sprite565 = sprite565Of(rgbaOf([0xffff, null]), 2, 1)
     const spriteOf = (src: string) => (src === 'under' ? under : top)
-    const drawn = composeOverlay565({ x: 10, y: 5, width: 3, height: 1 },
+    const drawn = composeOverlay565(
+      { x: 10, y: 5, width: 3, height: 1 },
       [{ kind: 'image', src: 'under', x: 10, y: 5, flipX: true }],
-      [{ kind: 'image', src: 'top', x: 11, y: 5, effect: DRAW_EFFECT.TRANSLUCENT, argument: 12 }], spriteOf)
+      [{ kind: 'image', src: 'top', x: 11, y: 5, effect: DRAW_EFFECT.TRANSLUCENT, argument: 12 }],
+      spriteOf,
+    )
     expect(drawn.missing).toBe(false)
     // 뒤집은 아래: 칸 0 = 그림 열 3 · 칸 1 = 열 2 · 칸 2 = 열 1
     expect(Array.from(drawn.pixels)).toEqual([0x4444, translucentPixel565(12, 0xffff, 0x3333), 0x2222])

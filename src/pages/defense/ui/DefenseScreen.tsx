@@ -252,8 +252,7 @@ export function DefenseScreen({
     cameraRef.current = { update, state: centerOn(bounds, state.cameraTarget ?? { x: state.ball.x, z: state.ball.z }) }
   } else if (cameraRef.current.update !== update) {
     // 경기 멈춤(+0x1993) · 판이 닫힌 그림은 0x3f060 이 대상 · 따라가기 앞에서 돌아간다(3f0a4 · 3f0ea) — 카메라가 그 자리에 선다
-    const ticks =
-      state.cameraFrozen === true ? 0 : Math.min(Math.max(update - cameraRef.current.update, 0), MAX_CATCH_UP_TICKS)
+    const ticks = state.cameraFrozen === true ? 0 : Math.min(Math.max(update - cameraRef.current.update, 0), MAX_CATCH_UP_TICKS)
     let moved = cameraRef.current.state
     for (let i = 0; i < ticks; i += 1) moved = stepCamera(bounds, moved, target, followPercent)
     cameraRef.current = { update, state: moved }
@@ -275,9 +274,7 @@ export function DefenseScreen({
    */
   const zoom = state.zoom ?? null
   const zoomRect =
-    zoom === null || zoom.percent === 100
-      ? null
-      : zoomSourceRect(zoom, offset, { width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT })
+    zoom === null || zoom.percent === 100 ? null : zoomSourceRect(zoom, offset, { width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT })
   const zoomStyle =
     zoomRect === null
       ? undefined
@@ -301,8 +298,7 @@ export function DefenseScreen({
   const ballGround = screenOf(state.ball)
   const ballPoint = { x: ballGround.x, y: ballGround.y - toScreenY(state.ball.height) }
   const flash = state.flash ?? null
-  const flashBase =
-    flash !== null && flash.x !== undefined && flash.z !== undefined ? screenOf({ x: flash.x, z: flash.z }) : ballPoint
+  const flashBase = flash !== null && flash.x !== undefined && flash.z !== undefined ? screenOf({ x: flash.x, z: flash.z }) : ballPoint
 
   /**
    * 그리기 목록 0xbe810(장면 +0x234) — 넣을 때 **키 오름차순 자리**에 끼우고(be85a~be86a: 처음으로 `새 키 < 그 칸 키` 인 칸 앞),
@@ -335,14 +331,7 @@ export function DefenseScreen({
       .sort((a, b) => a.index - b.index)
       .map((runner) => ({
         key: runner.z + 1,
-        node: (
-          <Runner
-            key={`runner-${runner.index}`}
-            runner={runner}
-            point={screenOf(runner)}
-            loadedAce={state.runnerAceSprite ?? null}
-          />
-        ),
+        node: <Runner key={`runner-${runner.index}`} runner={runner} point={screenOf(runner)} loadedAce={state.runnerAceSprite ?? null} />,
       })),
     // player_effect 부착 효과(0x43278 · 0x43a0c) — 야수 · 주자를 그리며 같은 그리기 목록에 깊이 키로 넣는다(공 0x36dfc 보다 먼저).
     // 같은 키면 먼저 넣은 선수 그림 뒤(위)다
@@ -369,123 +358,123 @@ export function DefenseScreen({
     <>
       <div className={styles.field} data-testid="defense-field">
         <div className={styles.zoomLayer} style={zoomStyle} data-testid="defense-zoom" data-zoom={zoom?.percent ?? 100}>
-        <img
-          className={styles.background}
-          style={{ left: offset.x, top: offset.y, width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }}
-          src={backgroundUrl}
-          alt=""
-          data-testid="defense-background-left"
-        />
-        <img
-          className={styles.backgroundMirrored}
-          style={{
-            left: offset.x + DEFENSE_BACKGROUND_WIDTH,
-            top: offset.y,
-            width: DEFENSE_BACKGROUND_WIDTH,
-            height: DEFENSE_BACKGROUND_HEIGHT,
-          }}
-          src={backgroundUrl}
-          alt=""
-          data-testid="defense-background-right"
-        />
+          <img
+            className={styles.background}
+            style={{ left: offset.x, top: offset.y, width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }}
+            src={backgroundUrl}
+            alt=""
+            data-testid="defense-background-left"
+          />
+          <img
+            className={styles.backgroundMirrored}
+            style={{
+              left: offset.x + DEFENSE_BACKGROUND_WIDTH,
+              top: offset.y,
+              width: DEFENSE_BACKGROUND_WIDTH,
+              height: DEFENSE_BACKGROUND_HEIGHT,
+            }}
+            src={backgroundUrl}
+            alt=""
+            data-testid="defense-background-right"
+          />
 
-        {/* 0x411e0 의 구장 다음 0x41098 — 이벤트 존 · 200G (홈런더비 판). 공 그림자(0x46c88 의 0x36dfc)보다 먼저다 */}
-        {overBackground}
+          {/* 0x411e0 의 구장 다음 0x41098 — 이벤트 존 · 200G (홈런더비 판). 공 그림자(0x46c88 의 0x36dfc)보다 먼저다 */}
+          {overBackground}
 
-        {/*
+          {/*
           공 그림자 0x356f8 — 0x36dfc(37268)가 땅점 (x, z) 자리에 검정 (s+1)² 칸 + 회색 테두리 넷을 **곧바로** 칠한다
           (공중 s = 3 · 땅 s = 5). 그리기 목록보다 먼저라 모든 야수 · 주자 · 공 아래다. ball.pzx 023~033(날개 달린 마구 공)은
           그림자가 아니다 — 예전에 그것을 깔던 것과 다르다.
         */}
-        {isBallDrawn(state.ball) &&
-          ballShadowOf(ballGround, toScreenY(state.ball.height)).map((piece, index) => (
-            <div
-              key={index}
-              className={styles.ballShadowPiece}
-              style={{
-                left: piece.x,
-                top: piece.y,
-                width: piece.width,
-                height: piece.height,
-                background: `rgb(${piece.color.r}, ${piece.color.g}, ${piece.color.b})`,
-              }}
-              data-testid="defense-ball-shadow"
+          {isBallDrawn(state.ball) &&
+            ballShadowOf(ballGround, toScreenY(state.ball.height)).map((piece, index) => (
+              <div
+                key={index}
+                className={styles.ballShadowPiece}
+                style={{
+                  left: piece.x,
+                  top: piece.y,
+                  width: piece.width,
+                  height: piece.height,
+                  background: `rgb(${piece.color.r}, ${piece.color.g}, ${piece.color.b})`,
+                }}
+                data-testid="defense-ball-shadow"
+              />
+            ))}
+
+          {underActors}
+
+          {/* 공 가진 야수 고리 + 이름 판 0x43cb0 — 0x46cbc, 비거리 판 뒤 · 야수 목록(0x43278) 앞에 곧바로 그린다 */}
+          {holderMark !== null && (
+            <DefenseHolderMark
+              mark={holderMark}
+              plate={state.holderPlate ?? null}
+              fielderPoint={holderFielder === undefined ? null : fielderScreenOf(holderFielder)}
+              update={drawnPictures}
+              screen={{ width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT }}
             />
-          ))}
+          )}
 
-        {underActors}
+          {/* 그리기 목록 차례 — 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
+          {actors.map((actor) => actor.node)}
 
-        {/* 공 가진 야수 고리 + 이름 판 0x43cb0 — 0x46cbc, 비거리 판 뒤 · 야수 목록(0x43278) 앞에 곧바로 그린다 */}
-        {holderMark !== null && (
-          <DefenseHolderMark
-            mark={holderMark}
-            plate={state.holderPlate ?? null}
-            fielderPoint={holderFielder === undefined ? null : fielderScreenOf(holderFielder)}
-            update={drawnPictures}
-            screen={{ width: styles.SCREEN_WIDTH, height: styles.SCREEN_HEIGHT }}
-          />
-        )}
+          {/* 레이저 잔상 0x37076 — 장면 +0x1991 동안 궤적 첫 점에서 공까지 */}
+          {state.laserTrailFrom != null && (
+            <DefenseLaserTrail
+              folder={BALL_FRAMES}
+              frame={ballFrameOf(state.ball.height)}
+              from={(() => {
+                const ground = screenOf(state.laserTrailFrom)
+                return { x: ground.x, y: ground.y - toScreenY(state.laserTrailFrom.height) }
+              })()}
+              ball={ballPoint}
+              ballHeight={toScreenY(state.ball.height)}
+              ballGroundY={ballGround.y}
+            />
+          )}
 
-        {/* 그리기 목록 차례 — 공은 바닥(z)에서 높이만큼 위에 그린다 (높이 단위도 월드 단위다 — R3 1-3) */}
-        {actors.map((actor) => actor.node)}
-
-        {/* 레이저 잔상 0x37076 — 장면 +0x1991 동안 궤적 첫 점에서 공까지 */}
-        {state.laserTrailFrom != null && (
-          <DefenseLaserTrail
-            folder={BALL_FRAMES}
-            frame={ballFrameOf(state.ball.height)}
-            from={(() => {
-              const ground = screenOf(state.laserTrailFrom)
-              return { x: ground.x, y: ground.y - toScreenY(state.laserTrailFrom.height) }
-            })()}
-            ball={ballPoint}
-            ballHeight={toScreenY(state.ball.height)}
-            ballGroundY={ballGround.y}
-          />
-        )}
-
-        {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
-        {judgeText !== null && judgeTextPoint !== null && (
-          <div
-            className={styles.actor}
-            style={{ left: judgeTextPoint.x + judgeText.dx, top: judgeTextPoint.y - JUDGE_TEXT_RAISE + judgeText.dy }}
-            data-testid="defense-judge-text"
-            data-frame={judgeText.frame}
-          >
-            {/* 0x393b4 → 0xbe8a5 효과 [sp+8] = 0 (393f6) — 0xc9f98 이 파트 효과를 따른다: 애니 0 · 9 의 0x67 파트(칸 20 · 21 · 23 · 24 ·
+          {/* 결과 판 0x46844 — 보통 판정 글자(0x393b4)를 (x + dx, y − 30 + dy) 에 */}
+          {judgeText !== null && judgeTextPoint !== null && (
+            <div
+              className={styles.actor}
+              style={{ left: judgeTextPoint.x + judgeText.dx, top: judgeTextPoint.y - JUDGE_TEXT_RAISE + judgeText.dy }}
+              data-testid="defense-judge-text"
+              data-frame={judgeText.frame}
+            >
+              {/* 0x393b4 → 0xbe8a5 효과 [sp+8] = 0 (393f6) — 0xc9f98 이 파트 효과를 따른다: 애니 0 · 9 의 0x67 파트(칸 20 · 21 · 23 · 24 ·
                 26 · 28 · 29)는 화면에 더한다(`LayeredFrameSprite` — plus-lighter) */}
-            <JudgeTextSprite frame={judgeText.frame} />
-          </div>
-        )}
+              <JudgeTextSprite frame={judgeText.frame} />
+            </div>
+          )}
 
-        {/* 결과 판 0x46844 — 레이저 · 필살 포구 연출 뒤 아웃(코드 13)이면 game_judge 애니 2 "큰 OUT" 을 (x, y − 60) 에 */}
-        {bigOut !== null && bigOutPoint !== null && (
-          <div
-            className={styles.actor}
-            style={{ left: bigOutPoint.x, top: bigOutPoint.y - BIG_OUT_RAISE }}
-            data-testid="defense-big-out"
-            data-frame={bigOut.frame}
-          >
-            <ActorSprite folder={JUDGE_FRAMES} frame={bigOut.frame} />
-          </div>
-        )}
+          {/* 결과 판 0x46844 — 레이저 · 필살 포구 연출 뒤 아웃(코드 13)이면 game_judge 애니 2 "큰 OUT" 을 (x, y − 60) 에 */}
+          {bigOut !== null && bigOutPoint !== null && (
+            <div
+              className={styles.actor}
+              style={{ left: bigOutPoint.x, top: bigOutPoint.y - BIG_OUT_RAISE }}
+              data-testid="defense-big-out"
+              data-frame={bigOut.frame}
+            >
+              <ActorSprite folder={JUDGE_FRAMES} frame={bigOut.frame} />
+            </div>
+          )}
 
-        {/* 작은 지도 0x395f4(장면, 0x1e, 0x1e) — 0x46c88 의 0x46e02, 결과 판(0x46844) 뒤 · 번쩍임(0x4403c~) 앞 */}
-        {!hidesFieldMap && <DefenseFieldMap runners={state.runners} />}
+          {/* 작은 지도 0x395f4(장면, 0x1e, 0x1e) — 0x46c88 의 0x46e02, 결과 판(0x46844) 뒤 · 번쩍임(0x4403c~) 앞 */}
+          {!hidesFieldMap && <DefenseFieldMap runners={state.runners} />}
 
-        {/* 필살 포구 연출 B 0x441c4 · C 0x44398(그리기 46e0e · 46e14 — 결과 판 뒤) — 공 가진 야수 자리에서 B 는 y − 50, C 는 방향대로 ±10 */}
-        {state.flash != null && (
-          <div
-            className={styles.actor}
-            style={{
-              left: flashBase.x + flashOffsetOf(state.flash).x,
-              top: flashBase.y + flashOffsetOf(state.flash).y,
-            }}
-            data-testid="defense-flash"
-          >
-            <ActorSprite folder={DEADLY_EFFECT_FRAMES} frame={state.flash.step} />
-          </div>
-        )}
+          {/* 필살 포구 연출 B 0x441c4 · C 0x44398(그리기 46e0e · 46e14 — 결과 판 뒤) — 공 가진 야수 자리에서 B 는 y − 50, C 는 방향대로 ±10 */}
+          {state.flash != null && (
+            <div
+              className={styles.actor}
+              style={{
+                left: flashBase.x + flashOffsetOf(state.flash).x,
+                top: flashBase.y + flashOffsetOf(state.flash).y,
+              }}
+              data-testid="defense-flash"
+            >
+              <ActorSprite folder={DEADLY_EFFECT_FRAMES} frame={state.flash.step} />
+            </div>
+          )}
         </div>
       </div>
       {children}
@@ -544,11 +533,7 @@ function Runner({
       data-folder={sprite.folder}
     >
       {/* 주자도 defender.pzx 를 쓴다 — 앞 17장(000~016)이 주자 칸이다 (S12 4-1 확정). 마선수 그림도 같은 125장 짜임이다 */}
-      <ActorSprite
-        folder={sprite.folder}
-        frame={frame}
-        paletteIndex={sprite.isAce ? null : defenderPaletteIndexOf(runner.teamIndex)}
-      />
+      <ActorSprite folder={sprite.folder} frame={frame} paletteIndex={sprite.isAce ? null : defenderPaletteIndexOf(runner.teamIndex)} />
     </div>
   )
 }

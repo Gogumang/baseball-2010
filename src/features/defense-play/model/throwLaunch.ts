@@ -145,7 +145,6 @@ function withReceivePoint(ball: BallTrajectory, index: number, target: WorldPoin
   return {
     ...ball,
     pointAt: (tick: number) => (at(tick) === index ? point : ball.pointAt(tick)),
-    pointDetailAt: (tick: number): BallPoint =>
-      at(tick) === index ? { ...ball.pointDetailAt(tick), ...point } : ball.pointDetailAt(tick),
+    pointDetailAt: (tick: number): BallPoint => (at(tick) === index ? { ...ball.pointDetailAt(tick), ...point } : ball.pointDetailAt(tick)),
   }
 }

@@ -176,8 +176,12 @@ describe('중복 검사 — StrMODE[181] "이미 영입된 선수 입니다"', (
 
 describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () => {
   const 명전투수 = (slot: number): SeasonPlayer => ({ id: 0xb4, kindByte: PLAYER_KIND.일반투수 | slot, fieldPosition: 0, stamina: 10_000 })
-  const 명전타자 = (slot: number, position: number): SeasonPlayer =>
-    ({ id: 0xc9, kindByte: PLAYER_KIND.일반타자 | slot, fieldPosition: position, stamina: 0 })
+  const 명전타자 = (slot: number, position: number): SeasonPlayer => ({
+    id: 0xc9,
+    kindByte: PLAYER_KIND.일반타자 | slot,
+    fieldPosition: position,
+    stamina: 0,
+  })
 
   it('0xb6348 — 마선수 비트가 아니고 투수 id 0xb4..0xcc · 타자 id 0xc8..0xd0', () => {
     expect(isHallOfFameRecord(명전투수(0))).toBe(true)
@@ -223,8 +227,7 @@ describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () 
 
     expect(next.pitchers.map((player) => player.id)).toEqual([8, 1, 2, 3, 4, 5, 6, 7, 10, 9])
     // 마선수 없으면 [10, 1..9]
-    expect(removeHallOfFamerFromRoster(roster, 0xb4, true).pitchers.map((player) => player.id))
-      .toEqual([10, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(removeHallOfFamerFromRoster(roster, 0xb4, true).pitchers.map((player) => player.id)).toEqual([10, 1, 2, 3, 4, 5, 6, 7, 8, 9])
   })
 
   it('레코드에 마타자가 남았으면: 9번 뒤 칸이면 옛 9번이 수비 위치 · 칸 번호를 이어받고, 9번 자리 선수면 차례는 웹과 같다', () => {
@@ -240,8 +243,9 @@ describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () 
 
     const ninth = batters.map((player, index) => (index === 9 ? 명전타자(9, 0) : player))
     const same = removeHallOfFamerFromRoster({ pitchers: [], batters: ninth }, 0xc9, false, 9)
-    expect(same.batters.map((player) => player.id))
-      .toEqual(removeHallOfFamerFromRoster({ pitchers: [], batters: ninth }, 0xc9, false).batters.map((player) => player.id))
+    expect(same.batters.map((player) => player.id)).toEqual(
+      removeHallOfFamerFromRoster({ pitchers: [], batters: ninth }, 0xc9, false).batters.map((player) => player.id),
+    )
   })
 
   it('막기 — 내 팀에 있고 시즌모드 경기 진행 중일 때만 (0xb50ad && 전역기록 +0x4e)', () => {
@@ -254,8 +258,12 @@ describe('명전 칸 삭제의 시즌 명단 정리 — 0x221dc · 0xb6348', () 
 })
 
 describe('나만의리그 초기화의 시즌 명단 정리 — 0x223a8 · 0xb6388 · 막기 앞쪽 0xb5054', () => {
-  const 나리타자 = (slot: number, position: number): SeasonPlayer =>
-    ({ id: 0xfe, kindByte: PLAYER_OWN_BIT | PLAYER_KIND.일반타자 | slot, fieldPosition: position, stamina: 0 })
+  const 나리타자 = (slot: number, position: number): SeasonPlayer => ({
+    id: 0xfe,
+    kindByte: PLAYER_OWN_BIT | PLAYER_KIND.일반타자 | slot,
+    fieldPosition: position,
+    stamina: 0,
+  })
 
   it('타자편: 첫 나리 타자 자리로 맨 끝 선수가 와서 수비 위치·칸 번호를 이어받는다', () => {
     const roster: SeasonTeamRoster = { pitchers: [나리투수], batters: [타자(1, 0, 2), 나리타자(1, 6), 타자(3, 2, 7), 타자(4, 3, 0)] }

@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
-import {
-  reputationCompleteGameInningIndexOf,
-  reputationCompleteGameOf,
-  seasonHumanWonOf,
-} from '@/entities/season-mode/model/seasonEvaluation'
+import { reputationCompleteGameInningIndexOf, reputationCompleteGameOf, seasonHumanWonOf } from '@/entities/season-mode/model/seasonEvaluation'
 import { nationalCupRewardOf } from '@/entities/season-mode/model/seasonRewards'
 import { masterRosterSlotOf, tradePenaltyOf } from '@/entities/season-mode/model/playerTrade'
 import type { SeasonPlayer } from '@/entities/season-mode/model/playerRecruit'
@@ -59,7 +55,11 @@ describe('B-43 시즌 국가대항전 준우승 — 글 2500만 · 실제 2000�
 
 describe('B-47 트레이드 자리 벌점을 id 아래 비트로 찾는다', () => {
   const 선수 = (덮어쓰기: Partial<SeasonPlayer> = {}): SeasonPlayer => ({
-    id: 0, kindByte: 0, fieldPosition: 0, stamina: 0, ...덮어쓰기,
+    id: 0,
+    kindByte: 0,
+    fieldPosition: 0,
+    stamina: 0,
+    ...덮어쓰기,
   })
 
   it('원본: 3팀 2번 투수 · 4팀 8번 타자는 못 찾아 벌점 0', () => {

@@ -25,11 +25,7 @@ const 속도 = runnerSpeedOf(500)
 /** 0xd8758 — 타구 판의 공 시작점 */
 const 타격점 = { x: 20_000, y: 1_000, z: 30_000 }
 
-const 문맥 = (
-  play: Partial<PlayView>,
-  runners: readonly RunnerState[] = [],
-  fielders: readonly FielderState[] = 야수들,
-): DefenseContext => ({
+const 문맥 = (play: Partial<PlayView>, runners: readonly RunnerState[] = [], fielders: readonly FielderState[] = 야수들): DefenseContext => ({
   play: { ...initialPlayView(1), ...play },
   fielders,
   runners,
@@ -83,11 +79,7 @@ describe('0xb1c90 커버 매 틱 다시 고르기 — 표 0xd8774 · b1d48 · b1
     expect(답.idleSlots).toContain(0)
     // 쫓는 중(AI 1)이면 투수에게 넘기지만, 그 뒤 b23a4 가 "루로 가는 공 가진 야수" 로 다시 1루수를 커버로 적는다
     const 쫓기 = 돌리기(
-      문맥(
-        { ballHolderSlot: 2 },
-        [createRunner(0, 0, 속도, { targetBase: 1 })],
-        고치기(2, { target: basePosition(1), aiState: AI_STATE.CHASE }),
-      ),
+      문맥({ ballHolderSlot: 2 }, [createRunner(0, 0, 속도, { targetBase: 1 })], 고치기(2, { target: basePosition(1), aiState: AI_STATE.CHASE })),
     )
     expect(쫓기.covers[1]).toBe(2)
     expect(쫓기.idleSlots).not.toContain(0)
@@ -140,7 +132,11 @@ describe('0xb1c90 커버 매 틱 다시 고르기 — 표 0xd8774 · b1d48 · b1
 
   it('대신 선 야수가 루에 닿았고 쉬는 기본 야수가 주자보다 먼저 닿으면 되찾는다 (b23dc · b2440)', () => {
     // 1루수가 공을 가져 투수가 1루 커버 — 투수가 1루에 서 있고, 1루수는 AI 0 으로 1루 옆에 쉬고 있다
-    const 야수 = 고치기(0, { position: basePosition(1), target: basePosition(1), aiState: AI_STATE.COVER_FIRST }, 고치기(2, { aiState: AI_STATE.IDLE, position: { x: 25_900, y: 0, z: 24_100 }, target: { x: 25_900, y: 0, z: 24_100 } }))
+    const 야수 = 고치기(
+      0,
+      { position: basePosition(1), target: basePosition(1), aiState: AI_STATE.COVER_FIRST },
+      고치기(2, { aiState: AI_STATE.IDLE, position: { x: 25_900, y: 0, z: 24_100 }, target: { x: 25_900, y: 0, z: 24_100 } }),
+    )
     // 타자주자가 1루까지 한참 남았다
     const 타자주자 = createRunner(0, 0, 속도, { targetBase: 1 })
     const 답 = 돌리기(문맥({ ballHolderSlot: 2 }, [타자주자], 야수))
@@ -227,7 +223,6 @@ describe('0xb203a 자리 잡기의 차례 — b1f06(2루 커버) 뒤 · b23a4 �
     expect(잡음.idleSlots).not.toContain(5)
   })
 })
-
 
 describe('0xb2a48 — 루 커버 칸 가져가기 (AI 2~5 b4814 · 직접 밟기 b2d64, r176)', () => {
   const 판 = (coverOfBase: number[], ballHolderSlot = 0): PlayView => ({ ...initialPlayView(1), coverOfBase, ballHolderSlot })

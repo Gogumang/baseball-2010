@@ -115,7 +115,13 @@ export function aceLevelUpRowOf(row: number): AceLevelUpRowPlacement {
     currentRight: X0 + d + 0x3f,
     nextRight: X0 + d + 0x7e,
     numberY: y + 2,
-    times: row === 4 ? [{ x: X0 + BAR_WIDTH + 0x2e, y: y + 2 }, { x: X0 + BAR_WIDTH + 0x6c, y: y + 2 }] : [],
+    times:
+      row === 4
+        ? [
+            { x: X0 + BAR_WIDTH + 0x2e, y: y + 2 },
+            { x: X0 + BAR_WIDTH + 0x6c, y: y + 2 },
+          ]
+        : [],
   }
 }
 

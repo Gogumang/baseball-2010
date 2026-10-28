@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  isSpriteImageRequested, loadSpriteImage, loadSpriteJson, readySpriteJson, resetSpriteCacheForTest, retainDisplayedSprites, spriteImage,
+  isSpriteImageRequested,
+  loadSpriteImage,
+  loadSpriteJson,
+  readySpriteJson,
+  resetSpriteCacheForTest,
+  retainDisplayedSprites,
+  spriteImage,
   spriteJsonNow,
 } from '@/shared/lib/sprite/spriteCache'
 

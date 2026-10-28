@@ -9,21 +9,13 @@ import {
   type FielderState,
   type RunnerState,
 } from '@/entities/fielding/model/fieldingState'
-import {
-  baseUnderFoot,
-  isStillForced,
-  judgeOut,
-  OUT_KIND,
-  releaseForcesAfterOut,
-} from '@/entities/fielding/model/outJudgement'
+import { baseUnderFoot, isStillForced, judgeOut, OUT_KIND, releaseForcesAfterOut } from '@/entities/fielding/model/outJudgement'
 
 /** 루 위에 정확히 선, 공을 쥔 야수 하나 (나머지 여덟은 시작 위치 그대로) */
 function 루에선야수(slot: number, base: number): FielderState[] {
   const point = basePosition(base)
   return createFielders(Array.from({ length: FIELDER_COUNT }, () => 500)).map((fielder) =>
-    fielder.slot === slot
-      ? { ...fielder, position: point, target: point, targetBase: base, holdingBall: true }
-      : fielder,
+    fielder.slot === slot ? { ...fielder, position: point, target: point, targetBase: base, holdingBall: true } : fielder,
   ) as FielderState[]
 }
 
@@ -103,10 +95,7 @@ describe('아웃 판정 0xb36d0 — 0/1/2/3 을 갈라서 돌려준다', () => {
 
   it('2 = 루 아웃 — 요구 루(+0x88)를 밟은 야수가 공을 쥐면 거리와 상관없이 아웃 (0xb38e4)', () => {
     // 태그 거리 밖(5000)이지만 요구 루가 서 있으면 포스로 죽는다
-    const 주자 = [
-      createRunner(0, 0, 335),
-      달리는중(createRunner(1, 1, 335, { targetBase: 2, requiredBase: 2 }), 5000),
-    ]
+    const 주자 = [createRunner(0, 0, 335), 달리는중(createRunner(1, 1, 335, { targetBase: 2, requiredBase: 2 }), 5000)]
     expect(judgeOut({ ...문맥(루에선야수(3, 2), 주자, 3), skipRunnerIndexes: [0] })).toEqual({
       kind: OUT_KIND.BASE,
       runnerIndex: 1,

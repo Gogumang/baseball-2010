@@ -1,10 +1,6 @@
 import { derbyDistanceOf } from '@/entities/home-run-derby/model/derbyRules'
 import { claimSceneParticleTick } from '@/entities/particle/model/sceneParticleManager'
-import {
-  initHomeRunFireworks,
-  tickHomeRunFireworks,
-  type HomeRunFireworks,
-} from '@/entities/batting/model/homeRunFireworks'
+import { initHomeRunFireworks, tickHomeRunFireworks, type HomeRunFireworks } from '@/entities/batting/model/homeRunFireworks'
 import { isFoulEnded } from '@/entities/fielding/model/playGate'
 import { clearParticles, emitParticles, tickParticles, type ParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'

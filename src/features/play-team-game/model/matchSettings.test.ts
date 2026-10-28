@@ -23,13 +23,7 @@ const 빈설정: MatchProgressSettings = {
 
 const 루 = (options: Partial<BaseState>): BaseState => ({ ...EMPTY_BASES, ...options })
 
-const 상황 = (options: {
-  offense?: boolean
-  bases?: BaseState
-  inningIndex?: number
-  battingOrderIndex?: number
-  mode?: number
-}) => ({
+const 상황 = (options: { offense?: boolean; bases?: BaseState; inningIndex?: number; battingOrderIndex?: number; mode?: number }) => ({
   mode: options.mode ?? 2,
   humanControlsOffense: options.offense ?? true,
   humanControlsDefense: !(options.offense ?? true),
@@ -90,9 +84,7 @@ describe('경기진행 설정 — 상세', () => {
     }
     expect(isHumanControlled(설정, 상황({ offense: true, battingOrderIndex: 2 }))).toBe(true)
     expect(isHumanControlled(설정, 상황({ offense: true, battingOrderIndex: 1 }))).toBe(false)
-    expect(
-      isHumanControlled(설정, 상황({ offense: true, battingOrderIndex: 1, bases: 루({ third: true }) })),
-    ).toBe(true)
+    expect(isHumanControlled(설정, 상황({ offense: true, battingOrderIndex: 1, bases: 루({ third: true }) }))).toBe(true)
   })
 
   it('수비 가지는 이닝 비트와 수비주자 비트를 본다', () => {
@@ -104,9 +96,7 @@ describe('경기진행 설정 — 상세', () => {
     }
     expect(isHumanControlled(설정, 상황({ offense: false, inningIndex: 0 }))).toBe(true)
     expect(isHumanControlled(설정, 상황({ offense: false, inningIndex: 1 }))).toBe(false)
-    expect(
-      isHumanControlled(설정, 상황({ offense: false, inningIndex: 1, bases: 루({ second: true }) })),
-    ).toBe(true)
+    expect(isHumanControlled(설정, 상황({ offense: false, inningIndex: 1, bases: 루({ second: true }) }))).toBe(true)
   })
 
   it('투수조작 칸 8 은 9회부터 **연장까지 전부** 덮는다 (R4 4절 확정)', () => {
@@ -127,7 +117,9 @@ describe('모드별 분기', () => {
     const 찬스 = { ...빈설정, value: CHANCE_VALUE.공격득점권 }
     expect(isHumanControlled(찬스, 상황({ mode: 8, inningIndex: 5 }))).toBe(true)
     expect(isHumanControlled(찬스, 상황({ mode: 9, inningIndex: 0 }))).toBe(true)
-    expect(isHumanControlled({ ...빈설정, kind: MATCH_SETTING_KIND.이닝, value: INNING_VALUE.일곱째이닝부터 }, 상황({ mode: 8, inningIndex: 0 }))).toBe(true)
+    expect(
+      isHumanControlled({ ...빈설정, kind: MATCH_SETTING_KIND.이닝, value: INNING_VALUE.일곱째이닝부터 }, 상황({ mode: 8, inningIndex: 0 })),
+    ).toBe(true)
     expect(isHumanControlled(찬스, 상황({ mode: 8, inningIndex: 6 }))).toBe(true)
     expect(isHumanControlled(찬스, 상황({ mode: 9, inningIndex: 6 }))).toBe(true)
   })
@@ -144,15 +136,21 @@ describe('모드별 분기', () => {
 
 describe('확인창 "예" 의 되쓰기 (0x60376 · 0x603b0)', () => {
   const 저장: MatchProgressSettings = {
-    kind: MATCH_SETTING_KIND.상세, value: 0,
-    battingOrderBits: 0b101, pitchingInningBits: 0b11, offenseRunnerBits: 0b1, defenseRunnerBits: 0b100,
+    kind: MATCH_SETTING_KIND.상세,
+    value: 0,
+    battingOrderBits: 0b101,
+    pitchingInningBits: 0b11,
+    offenseRunnerBits: 0b1,
+    defenseRunnerBits: 0b100,
   }
 
   it('찬스·이닝으로 확인하면 종류·값만 되쓰고 상세 비트는 저장에 있던 그대로다', () => {
     const 창 = { ...저장, kind: MATCH_SETTING_KIND.이닝, value: INNING_VALUE.일곱째이닝부터, battingOrderBits: 0b1111 }
 
     expect(confirmedMatchSettings(저장, 창)).toEqual({
-      ...저장, kind: MATCH_SETTING_KIND.이닝, value: INNING_VALUE.일곱째이닝부터,
+      ...저장,
+      kind: MATCH_SETTING_KIND.이닝,
+      value: INNING_VALUE.일곱째이닝부터,
     })
   })
 

@@ -24,10 +24,7 @@ export function ballPixelAt(pitch: Pitch, frame: number): { x: number; y: number
     return projectToScreen(path[clampFrame(frame, path.length)], pitch.stageSide)
   }
   const plate = toPixel(pitch.plate, pitch.stageSide)
-  const bend = toPixel(
-    { x: pitch.plate.x - pitch.breakOffset.x, y: pitch.plate.y - pitch.breakOffset.y },
-    pitch.stageSide,
-  )
+  const bend = toPixel({ x: pitch.plate.x - pitch.breakOffset.x, y: pitch.plate.y - pitch.breakOffset.y }, pitch.stageSide)
   const controlPoints = [RELEASE_PIXEL, bend, plate].map((point) => ({
     x: Math.round(point.x * FIXED_POINT),
     y: Math.round(point.y * FIXED_POINT),

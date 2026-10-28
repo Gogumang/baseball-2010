@@ -2,10 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createPitcherCareer, EMPTY_PITCHER_SEASON_STATS } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer, PitcherSeasonStats } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
-import {
-  achievedPitcherGoalCount,
-  pitcherYearGoalsOf,
-} from '@/entities/pitcher-career/model/pitcherYearGoals'
+import { achievedPitcherGoalCount, pitcherYearGoalsOf } from '@/entities/pitcher-career/model/pitcherYearGoals'
 import { PITCHER_YEAR_GOALS } from '@/shared/config/original/yearGoals'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({

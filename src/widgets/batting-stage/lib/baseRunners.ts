@@ -217,12 +217,7 @@ export function runPipDrawsOf(
  * 레이저 반짝임 0x43406~0x4342c 도 0x79b48 → 0xbe8d5 의 같은 [sp+8] · [sp+0xc] 에 효과 12 · 색 RGB(255, 0, 0)(0x1400748 이 만든 565)을 넣어
  * 같은 칸 +0x1c 로 간다 — 그 칸이 픽셀 함수의 색이므로 2루 주자는 색 0(검정)과 반반 = 반 밝기 그림이다.
  */
-export function halfShadeRunnerPixel(
-  red: number,
-  green: number,
-  blue: number,
-  argument = 0,
-): { r: number; g: number; b: number } {
+export function halfShadeRunnerPixel(red: number, green: number, blue: number, argument = 0): { r: number; g: number; b: number } {
   const [r, g, b] = rgbOf565(halfMixPixel565(rgbTo565(red, green, blue), argument))
   return { r, g, b }
 }

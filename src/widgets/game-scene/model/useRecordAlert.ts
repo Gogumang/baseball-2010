@@ -3,9 +3,7 @@ import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchieved
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
 import { sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
-import {
-  EMPTY_RECORD_ALERT, drawRecordAlert, enqueueRecordAlert, flushRecordAlertQueue,
-} from '@/widgets/game-scene/lib/recordAlert'
+import { EMPTY_RECORD_ALERT, drawRecordAlert, enqueueRecordAlert, flushRecordAlertQueue } from '@/widgets/game-scene/lib/recordAlert'
 import type { RecordAlertFrame, RecordAlertState } from '@/widgets/game-scene/lib/recordAlert'
 
 const NO_FRAME: RecordAlertFrame = { panel: null, rows: [] }
@@ -72,8 +70,14 @@ export const BURST_RESULT_STATE_TICK = 100
 export function useRecordAlert(
   recordIds: readonly number[],
   {
-    isDrawing, isFrozen = false, isSettled = false, sceneStateKey, pitchEnd, isPitcherRemoved = false,
-    queuesInitialRecords = false, pinnedStateTickRef,
+    isDrawing,
+    isFrozen = false,
+    isSettled = false,
+    sceneStateKey,
+    pitchEnd,
+    isPitcherRemoved = false,
+    queuesInitialRecords = false,
+    pinnedStateTickRef,
   }: RecordAlertOptions,
 ): RecordAlertFrame {
   const stateRef = useRef<RecordAlertState>(EMPTY_RECORD_ALERT)
@@ -136,33 +140,37 @@ export function useRecordAlert(
     stateRef.current = enqueueRecordAlert(ended, added.slice(human))
   }, [recordIds, hasPitchEnd, serial])
 
-  useSceneTick(() => {
-    // 0xbc9c8 — 팝업이 떠 있으면(0x754f9 참) 상태 틱을 안 건드린다
-    if (!frozenRef.current) {
-      const now = gameSceneTickNow()
-      const entry = sceneStateEntryAt(now)
-      const origin = stateOriginRef.current
-      if (!Object.is(tickedKeyRef.current, sceneKeyRef.current)) {
-        tickedKeyRef.current = sceneKeyRef.current
-        stateOriginRef.current = now
-        stateTickRef.current = 0
-      } else if (entry !== null && (origin === null || entry.tick > origin)) {
-        // 부품이 적은 상태가 섰다 — 그 틱이 0 (이 갱신이 늦게 돌았어도 장면 틱으로 센다)
-        stateOriginRef.current = entry.tick
-        stateTickRef.current = now - entry.tick
-      } else {
-        stateTickRef.current += 1
+  useSceneTick(
+    () => {
+      // 0xbc9c8 — 팝업이 떠 있으면(0x754f9 참) 상태 틱을 안 건드린다
+      if (!frozenRef.current) {
+        const now = gameSceneTickNow()
+        const entry = sceneStateEntryAt(now)
+        const origin = stateOriginRef.current
+        if (!Object.is(tickedKeyRef.current, sceneKeyRef.current)) {
+          tickedKeyRef.current = sceneKeyRef.current
+          stateOriginRef.current = now
+          stateTickRef.current = 0
+        } else if (entry !== null && (origin === null || entry.tick > origin)) {
+          // 부품이 적은 상태가 섰다 — 그 틱이 0 (이 갱신이 늦게 돌았어도 장면 틱으로 센다)
+          stateOriginRef.current = entry.tick
+          stateTickRef.current = now - entry.tick
+        } else {
+          stateTickRef.current += 1
+        }
+        // 상태 그리기가 틱을 박는 창(0x1d 0x4d1e0) — 0x4e35c 는 그 상태 그리기 뒤라 박힌 값을 본다. 팝업 중에는 상태 그리기도 서서 그대로다
+        const pinned = pinnedRef.current?.current ?? null
+        if (pinned !== null) stateTickRef.current = pinned
       }
-      // 상태 그리기가 틱을 박는 창(0x1d 0x4d1e0) — 0x4e35c 는 그 상태 그리기 뒤라 박힌 값을 본다. 팝업 중에는 상태 그리기도 서서 그대로다
-      const pinned = pinnedRef.current?.current ?? null
-      if (pinned !== null) stateTickRef.current = pinned
-    }
-    const drawn = drawRecordAlert(stateRef.current, stateTickRef.current, frozenRef.current)
-    stateRef.current = drawn.next
-    // 빈 그림이 이어지면 다시 그리지 않는다 — 부르는 화면을 갱신마다 다시 그리지 않게
-    setFrame((previous) => (previous.panel === null && drawn.frame.panel === null ? previous : drawn.frame))
-    // 0x4e35c 는 경기 장면 프레임 53064 에서 공용 창 게이트(52cc6 · 52efe · 53048) 밖이라 창이 떠 있어도 그림마다 돈다
-  }, isDrawing, true)
+      const drawn = drawRecordAlert(stateRef.current, stateTickRef.current, frozenRef.current)
+      stateRef.current = drawn.next
+      // 빈 그림이 이어지면 다시 그리지 않는다 — 부르는 화면을 갱신마다 다시 그리지 않게
+      setFrame((previous) => (previous.panel === null && drawn.frame.panel === null ? previous : drawn.frame))
+      // 0x4e35c 는 경기 장면 프레임 53064 에서 공용 창 게이트(52cc6 · 52efe · 53048) 밖이라 창이 떠 있어도 그림마다 돈다
+    },
+    isDrawing,
+    true,
+  )
 
   return isDrawing ? frame : NO_FRAME
 }

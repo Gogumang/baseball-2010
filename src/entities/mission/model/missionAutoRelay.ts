@@ -86,8 +86,21 @@ export interface MissionAutoRelayCards {
  * 9 1루타 · 10 2루타 · 11 3루타 · 12 홈런!!! · 13 파울 · 14 포볼 · 15 데드볼
  */
 export const RELAY_RESULT_WORDS: readonly string[] = [
-  '플라이 아웃', '아웃', '태그 아웃', '3번트 아웃', '삼진 아웃', '주자중복 아웃', '번트 실패', '번트 성공',
-  '1루타', '2루타', '3루타', '홈런!!!', '파울', '포볼', '데드볼',
+  '플라이 아웃',
+  '아웃',
+  '태그 아웃',
+  '3번트 아웃',
+  '삼진 아웃',
+  '주자중복 아웃',
+  '번트 실패',
+  '번트 성공',
+  '1루타',
+  '2루타',
+  '3루타',
+  '홈런!!!',
+  '파울',
+  '포볼',
+  '데드볼',
 ]
 
 /** 0xc25e4 의 이름 뒤 사이 글 (0xd8ffc = " ") */
@@ -169,9 +182,13 @@ export function missionAutoRelayStepOfTick(
 ): MissionAutoRelayStep {
   const scores: [number, number] = [scoresBefore[0], scoresBefore[1]]
   if (tick.kind === 'plateAppearance') scores[half.offenseSide] += tick.appearance.runsBattedIn
-  const line = tick.kind === 'substitution'
-    ? null
-    : relayLineOf(nameOf(tick.appearance), relayCodeOf(tick.appearance.outcome, tick.appearance.fouled === true, tick.appearance.swingingStrikeOutLost === true))
+  const line =
+    tick.kind === 'substitution'
+      ? null
+      : relayLineOf(
+          nameOf(tick.appearance),
+          relayCodeOf(tick.appearance.outcome, tick.appearance.fouled === true, tick.appearance.swingingStrikeOutLost === true),
+        )
   return {
     inning: half.inning,
     offenseSide: half.offenseSide,

@@ -66,22 +66,33 @@ interface TrainingFigureProps {
   readonly warmPoses?: readonly number[]
 }
 
-export function TrainingFigure({ pose, x, y, equipment = NO_EQUIPMENT, skinIndex, teamIndex, form = 1, mirrorFlag, warmPoses = [] }: TrainingFigureProps) {
-  const layersOf = (shown: number) => batterLayersOf(shown, bodyTypeOf(form), equipment, false)
-    .filter((layer) => !OMITTED.some((folder) => layer.folder.includes(folder)))
+export function TrainingFigure({
+  pose,
+  x,
+  y,
+  equipment = NO_EQUIPMENT,
+  skinIndex,
+  teamIndex,
+  form = 1,
+  mirrorFlag,
+  warmPoses = [],
+}: TrainingFigureProps) {
+  const layersOf = (shown: number) =>
+    batterLayersOf(shown, bodyTypeOf(form), equipment, false).filter((layer) => !OMITTED.some((folder) => layer.folder.includes(folder)))
   const layers = layersOf(pose)
-  const paletteOf = (layer: BatterLayer) => skinIndex === undefined || teamIndex === undefined
-    ? layer.gradePaletteRow ?? null
-    : layerPaletteIndexOf(layer, skinIndex, teamIndex)
+  const paletteOf = (layer: BatterLayer) =>
+    skinIndex === undefined || teamIndex === undefined ? (layer.gradePaletteRow ?? null) : layerPaletteIndexOf(layer, skinIndex, teamIndex)
   useWarmRecoloredSprites(layerRecolorRequestsOf([...new Set(warmPoses)].flatMap(layersOf), paletteOf))
   const isMirrored = (mirrorFlag ?? batterSideOfForm(form)) === RIGHT_HANDED
   // 겹들을 그림 x 에 놓은 폭 0 상자 안에 두고 그 상자를 뒤집는다 — 축 = 그림 x
   return (
-    <div className={styles.figureAxis} style={{ left: x, transform: isMirrored ? 'scaleX(-1)' : undefined }}
-      data-mirrored={isMirrored ? 'true' : undefined}>
+    <div
+      className={styles.figureAxis}
+      style={{ left: x, transform: isMirrored ? 'scaleX(-1)' : undefined }}
+      data-mirrored={isMirrored ? 'true' : undefined}
+    >
       {layers.map((layer, index) => (
-        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={0} y={y} isFlipped={isMirrored}
-          paletteIndex={paletteOf(layer)} />
+        <FigureLayer key={`${layer.folder}#${index}`} layer={layer} x={0} y={y} isFlipped={isMirrored} paletteIndex={paletteOf(layer)} />
       ))}
     </div>
   )
@@ -105,13 +116,8 @@ function FigureLayer({ layer, x, y, paletteIndex, isFlipped = false }: FigureLay
   // 효과 0x11 이면 0xc9f98 ca07c 갈래 — 0x66 반투명 파트(머리 장비 3~6)를 섞지 않고 복사한 판(`frameCopies`)
   const usesCopy = isFlipped && paletteIndex === null && hasFrameCopies(layer.folder)
   const copies = useSpriteJson<unknown>(usesCopy ? frameCopiesUrl(layer.folder) : null)
-  const src = useRecoloredSprite(
-    usesCopy ? flippedFrameUrlOf(layer.folder, layer.frame, copies) : `${layer.folder}/${key}.png`,
-    paletteIndex,
-  )
+  const src = useRecoloredSprite(usesCopy ? flippedFrameUrlOf(layer.folder, layer.frame, copies) : `${layer.folder}/${key}.png`, paletteIndex)
   const origin = useFrameOrigins(layer.folder)?.[key]
   if (origin === undefined) return null
-  return (
-    <img className={styles.sprite} style={{ left: x + origin.x, top: y + origin.y }} src={src} alt="" />
-  )
+  return <img className={styles.sprite} style={{ left: x + origin.x, top: y + origin.y }} src={src} alt="" />
 }

@@ -44,14 +44,25 @@ export interface HalfInningFieldProps {
  * 비추며 그 선수 이름표를 단다. 모드 0 · 자동진행(+0x1784) · 경기 끝이면 원본도 안 그린다 — 부르는 쪽이 판을 세울 때만 쓴다.
  */
 export function HalfInningField({
-  input, tick, defenseTeam = null, offenseTeam = null, grassPalette = null, fielderNames, defenseAces, offenseAces, walkStateRef,
+  input,
+  tick,
+  defenseTeam = null,
+  offenseTeam = null,
+  grassPalette = null,
+  fielderNames,
+  defenseAces,
+  offenseAces,
+  walkStateRef,
 }: HalfInningFieldProps) {
   const memory = useRef<{ readonly input: HalfInningWalkInput; readonly tick: number; readonly state: HalfInningWalkState } | null>(null)
   let current = memory.current
   // 판 재료가 같으면(굴림 · 측 · 앞 자리) 이어서 굴린다 — 부르는 쪽이 그림마다 새 꼴을 만들어도 처음부터 다시 돌지 않는다
-  const isSameInput = current !== null && current.input.rolls === input.rolls
-    && current.input.offenseSide === input.offenseSide && current.input.previousFielders === input.previousFielders
-    && current.input.previousCamera === input.previousCamera
+  const isSameInput =
+    current !== null &&
+    current.input.rolls === input.rolls &&
+    current.input.offenseSide === input.offenseSide &&
+    current.input.previousFielders === input.previousFielders &&
+    current.input.previousCamera === input.previousCamera
   if (current === null || !isSameInput || current.tick > tick) {
     current = { input, tick: -1, state: startHalfInningWalk(input) }
   }
@@ -62,11 +73,12 @@ export function HalfInningField({
 
   const offset = screenOffsetOf(state.camera)
   const tagSlot = halfInningNameTagSlotOf(state, tick)
-  const tagName = tagSlot === null ? null : fielderNames?.[tagSlot] ?? null
+  const tagName = tagSlot === null ? null : (fielderNames?.[tagSlot] ?? null)
   const tagFielder = tagSlot === null ? undefined : state.fielders[tagSlot]
-  const tagBox = tagName === null || tagFielder === undefined
-    ? null
-    : nameTagBoxOf({ x: toScreenX(tagFielder.x) + offset.x, y: toScreenY(tagFielder.z) + offset.y })
+  const tagBox =
+    tagName === null || tagFielder === undefined
+      ? null
+      : nameTagBoxOf({ x: toScreenX(tagFielder.x) + offset.x, y: toScreenY(tagFielder.z) + offset.y })
 
   return (
     <FieldWalkView
@@ -82,11 +94,13 @@ export function HalfInningField({
       {tagBox !== null && (
         <div data-testid="운동장-이름표" data-slot={tagSlot}>
           {nameTagPiecesOf(tagBox).map((piece, index) => (
-            <span key={index} className={styles.block}
-              style={{ left: piece.x, top: piece.y, width: piece.width, height: piece.height, background: piece.color }} />
+            <span
+              key={index}
+              className={styles.block}
+              style={{ left: piece.x, top: piece.y, width: piece.width, height: piece.height, background: piece.color }}
+            />
           ))}
-          <div className={styles.tagText}
-            style={{ left: tagBox.x, top: tagBox.y, width: tagBox.width, height: tagBox.height }}>
+          <div className={styles.tagText} style={{ left: tagBox.x, top: tagBox.y, width: tagBox.width, height: tagBox.height }}>
             {tagName}
           </div>
         </div>

@@ -25,9 +25,7 @@ export interface HelpViewerState {
  * 상태 10 만 그 뒤 `+0xe5 = 0`(쪽 보기) · `+0xe6 = 6` · `+0x45c = 1` 로 고쳐 쓴다 (0x266a6~0x266c6).
  */
 export function openHelpViewer(chapter: number, isLocked: boolean): HelpViewerState {
-  return isLocked
-    ? { isChoosingChapter: false, chapter, page: 0, scrollTop: 0 }
-    : { isChoosingChapter: true, chapter, page: 0, scrollTop: 0 }
+  return isLocked ? { isChoosingChapter: false, chapter, page: 0, scrollTop: 0 } : { isChoosingChapter: true, chapter, page: 0, scrollTop: 0 }
 }
 
 /**
@@ -78,13 +76,7 @@ function scrollHelpText(state: HelpViewerState, key: HelpViewerKey, lineCount: n
  *
  * 닫기 연출은 뷰어 그리기 쪽 일이다(`HelpScreen` — `+0x125` 가 서면 곧장 닫는다).
  */
-export function stepHelpViewer(
-  state: HelpViewerState,
-  key: HelpViewerKey,
-  isLocked: boolean,
-  pageCount: number,
-  lineCount = 0,
-): HelpViewerStep {
+export function stepHelpViewer(state: HelpViewerState, key: HelpViewerKey, isLocked: boolean, pageCount: number, lineCount = 0): HelpViewerStep {
   // 0x637f4 — 쪽 보기면 줄 넘기기를 먼저 (위·아래만 본다)
   const scrolled = state.isChoosingChapter ? state : scrollHelpText(state, key, lineCount)
   switch (key) {

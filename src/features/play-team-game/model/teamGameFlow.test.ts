@@ -8,11 +8,7 @@ import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
-import {
-  INNING_VALUE,
-  MATCH_SETTING_KIND,
-  FULL_PLAY_SETTINGS,
-} from '@/features/play-team-game/model/matchSettings'
+import { INNING_VALUE, MATCH_SETTING_KIND, FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
   applyBatterOutcome,
@@ -67,10 +63,7 @@ import { runLiveRunnerPlayWithoutKeys, startLiveRunnerPlay } from '@/features/de
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { baserunnerAllowedOfFates } from '@/features/defense-play/model/runnerFates'
 import { isPickoffPlayResult, PICKOFF_RESULT } from '@/features/defense-play/model/pickoffPlay'
-import {
-  clearSeasonGameRecord,
-  seasonReputationChangeOf,
-} from '@/entities/season-mode/model/seasonReputation'
+import { clearSeasonGameRecord, seasonReputationChangeOf } from '@/entities/season-mode/model/seasonReputation'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -201,9 +194,7 @@ describe('사람이 치는 타석', () => {
     const play = after.lastDefensePlay
     expect(play).not.toBeNull()
     // 원본처럼 같은 수비 판을 돈 틱이다 (`homeRunPlayback`)
-    expect(play!.ticks).toEqual(
-      homeRunPlaybackOf({ outcome: { kind: '홈런' }, bases: progress.game.bases, outs: progress.game.outs })!.ticks,
-    )
+    expect(play!.ticks).toEqual(homeRunPlaybackOf({ outcome: { kind: '홈런' }, bases: progress.game.bases, outs: progress.game.outs })!.ticks)
     // 주자 없는 홈런은 1점 — 재생을 붙였다고 점수가 달라지면 안 된다
     expect(after.game.ourScore).toBe(progress.game.ourScore + 1)
     expect(play!.runnerFates.every((fate) => fate.scored)).toBe(true)
@@ -235,7 +226,13 @@ describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac4
     const 판 = 지친상대()
     const calls: [number, number][] = []
     const inner = createSeededRandom(1)
-    const 기록 = { rand: (lo: number, hi: number) => { calls.push([lo, hi]); return inner.rand(lo, hi) }, rand9d: inner.rand9d }
+    const 기록 = {
+      rand: (lo: number, hi: number) => {
+        calls.push([lo, hi])
+        return inner.rand(lo, hi)
+      },
+      rand9d: inner.rand9d,
+    }
     const 뒤 = applyBatterPitch(판, 볼, 기록)
     expect(뒤.scenePitcherChange?.serial).toBe(1)
     // 교체 굴림(0xac428) 뒤 맨 끝 — 그 뒤 0x16 → 0xd → 0xe 는 OK 를 기다려 굴림이 없다
@@ -271,7 +268,8 @@ describe('사람 장면 0xf 진입 0x3d954 — 공마다 CPU 투수 교체(0xac4
 
 describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 0xa5e14(ctx, 구질)', () => {
   const 볼 = (pitchTypeNumber?: number) => ({
-    batterHand: 0, resolution: { kind: '볼' } as const,
+    batterHand: 0,
+    resolution: { kind: '볼' } as const,
     hasSwung: false,
     isBunt: false,
     resultCode: null,
@@ -294,9 +292,7 @@ describe('사람 타석의 공마다 상대 투수를 깎는다 — 0x3dec6 의 
   it('같은 공 수면 결과는 구질 소모를 따른다 — 마구(22)는 직구와 같은 9', () => {
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
     const random = createSeededRandom(1)
-    expect(applyBatterPitch(progress, 볼(22), random).opponentStamina).toBe(
-      applyBatterPitch(progress, 볼(1), random).opponentStamina,
-    )
+    expect(applyBatterPitch(progress, 볼(22), random).opponentStamina).toBe(applyBatterPitch(progress, 볼(1), random).opponentStamina)
   })
 
   it('같은 0xa5e14 가 CPU 대타 막음 칸 state[0xe] 도 내린다 (a5e7c) — 사람 공도 마찬가지 (0x3dec6)', () => {
@@ -484,9 +480,7 @@ describe('경기 중 투수 교체 (0xc1ba4 → 0xac428)', () => {
   it('벤치 투수가 **한 명**만 남아도 바꾼다 — 0xac428 의 최소 벤치 인자는 0 (0xc1cd8 max(r7,0), r7 = −1)', () => {
     const { progress, random } = 시작()
     const 남길칸 = progress.ourPitcherEntry.length - 1
-    const 다쓴칸 = progress.ourPitcherEntry
-      .map((_unused, index) => index)
-      .filter((index) => index !== progress.ourPitcherIndex && index !== 남길칸)
+    const 다쓴칸 = progress.ourPitcherEntry.map((_unused, index) => index).filter((index) => index !== progress.ourPitcherIndex && index !== 남길칸)
     // 1회초 우리 수비 — 이닝 실점 A = 3 > 2 라 첫 자동 타석의 0xac428 이 교체를 부른다
     const 한명남음: TeamGameProgress = {
       ...progress,
@@ -567,10 +561,12 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
   it('우리 수비 차례에는 도루가 없다 (원본도 공격일 때만 0x53610 을 탄다)', () => {
     const { progress } = 시작()
 
-    expect(stealableBases({
-      ...progress,
-      game: { ...progress.game, bases: { first: true, second: false, third: false } },
-    })).toEqual([])
+    expect(
+      stealableBases({
+        ...progress,
+        game: { ...progress.game, bases: { first: true, second: false, third: false } },
+      }),
+    ).toEqual([])
   })
 
   it('키는 주자를 출발만 시킨다 — 루·아웃·기록은 그대로, 난수 없음', () => {
@@ -652,7 +648,11 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     for (let seed = 1; seed <= 400; seed += 1) {
       const { progress } = 시작({}, seed)
       const 일루 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
-      const next = throwPitch(일루, { typeNumber: 첫구질(일루), aim: aimAfterTicks(1, { dx: -1, dy: 1 }, 11), gaugeCell: 0 }, createSeededRandom(seed * 7919))
+      const next = throwPitch(
+        일루,
+        { typeNumber: 첫구질(일루), aim: aimAfterTicks(1, { dx: -1, dy: 1 }, 11), gaugeCell: 0 },
+        createSeededRandom(seed * 7919),
+      )
       if (next.lastArrivalPlay?.kind === 5) {
         opened += 1
         caught += next.lastArrivalPlay.result.caughtFrom.length
@@ -717,7 +717,7 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
     }
   })
 
-  it('붙든 도루 판에서 귀루 키(\'3\' — 0x584 · 인자 1)를 누르면 1루 주자가 돌아서고 도루 기록 8 이 안 선다', () => {
+  it("붙든 도루 판에서 귀루 키('3' — 0x584 · 인자 1)를 누르면 1루 주자가 돌아서고 도루 기록 8 이 안 선다", () => {
     const { progress } = 일루주자()
     const started = startSteal(progress, 1, createSeededRandom(0))
     const random = createSeededRandom(1)
@@ -746,7 +746,8 @@ describe('도루 출발 (0x53610 → 메시지 0x583 → 0xa9bd4) · 공 도착 
 
 describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 번 부른다 (판정 B 0xae3e8 ae576 → ae5a8)', () => {
   const 헛스윙: PitchOutcomeDetail = {
-    batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
+    batterHand: 0,
+    resolution: { kind: '스트라이크', isSwinging: true },
     hasSwung: true,
     isBunt: false,
     resultCode: null,
@@ -763,9 +764,7 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
     }
   }
   const 상대투수삼진 = (progress: TeamGameProgress) =>
-    progress.pitcherLines
-      .filter((line) => line.teamId === progress.options.opponentTeamId)
-      .reduce((sum, line) => sum + line.strikeouts, 0)
+    progress.pitcherLines.filter((line) => line.teamId === progress.options.opponentTeamId).reduce((sum, line) => sum + line.strikeouts, 0)
 
   it('우리 타자 삼진 + 도루 — 타석 칸 · 결과 링(a8ac8 · a8a04) · 리그 타수(a8852)가 안 오르고, 상대 투수 탈삼진(a8d14)은 오른다', () => {
     const { progress } = 투스트라이크일루()
@@ -833,11 +832,7 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
       found += 1
       const added = next.recordIds.slice(풀카운트.recordIds.length)
       // 36 은 같은 정산의 머리 a80f8 이라 도루 루프의 24 앞이다 ([sp+0x30] 에 삼진 사건이 들어 늘 0 보다 크다)
-      const expected = [
-        17,
-        ...(play.result.laserOutFlag ? [36] : []),
-        ...(play.result.caughtFrom.length > 0 ? [24] : []),
-      ]
+      const expected = [17, ...(play.result.laserOutFlag ? [36] : []), ...(play.result.caughtFrom.length > 0 ? [24] : [])]
       expect(added.filter((id) => id === 17 || id === 24 || id === 36 || (id >= 18 && id <= 23))).toEqual(expected)
     }
     expect(found).toBeGreaterThan(0)
@@ -868,7 +863,10 @@ describe('자동으로 넘긴 상대 간이 타석의 출루 허용 state[0x88] 
       }
     }
     // 갈래가 다 나와야 시험이 뜻이 있다 — "주자 있는 아웃" 은 앞 타석이 득점과 함께 나간 뒤에만 아직 안 선 채 와서 드물다
-    expect([seen.나감, seen.득점나감, seen.빈루아웃].every((count) => count > 0), JSON.stringify(seen)).toBe(true)
+    expect(
+      [seen.나감, seen.득점나감, seen.빈루아웃].every((count) => count > 0),
+      JSON.stringify(seen),
+    ).toBe(true)
   })
 })
 
@@ -908,8 +906,7 @@ describe('시즌모드 선발은 4인 로테이션이다 (0x6548 → 0xb8c80 →
   })
 
   it('국가대항전 상대국은 매일 새로 복사돼 첫날 0번 · 그 뒤 늘 1번 — 대한민국만 cup.day % 4 (7dd3826)', () => {
-    const 대회 = (day: number) =>
-      시작({ mode: 2, ourTeamId: 10, dayCounter: day, opponentDayCounter: day === 0 ? 0 : 1 }).progress
+    const 대회 = (day: number) => 시작({ mode: 2, ourTeamId: 10, dayCounter: day, opponentDayCounter: day === 0 ? 0 : 1 }).progress
     expect([0, 1, 2, 3, 4, 5].map((day) => 대회(day).ourPitcherIndex)).toEqual([0, 1, 2, 3, 0, 1])
     expect([0, 1, 2, 3, 4, 5].map((day) => 대회(day).opponentPitcherIndex)).toEqual([0, 1, 1, 1, 1, 1])
   })
@@ -939,10 +936,7 @@ describe('시즌모드 선발은 4인 로테이션이다 (0x6548 → 0xb8c80 →
     const 대전 = 시작({ mode: 8, dayCounter: 3 }, 20100901).progress
     const 대전2 = 시작({ mode: 8, dayCounter: 3 }, 777).progress
     // 날짜를 넘겨도 로테이션을 안 탄다 — 씨앗이 다르면 갈린다
-    expect(
-      대전.ourPitcherIndex !== 대전2.ourPitcherIndex ||
-        대전.opponentPitcherIndex !== 대전2.opponentPitcherIndex,
-    ).toBe(true)
+    expect(대전.ourPitcherIndex !== 대전2.ourPitcherIndex || 대전.opponentPitcherIndex !== 대전2.opponentPitcherIndex).toBe(true)
   })
 })
 
@@ -1000,22 +994,14 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
     // 합을 안 주면 스태미나 순 근사 — 같은 스태미나면 벤치 차례 앞
     expect(replacementPitcherIndexOf(벤치, 마무리둘, createSeededRandom(1))).toBe(5)
     expect(
-      replacementPitcherIndexOf(
-        벤치,
-        { ...마무리둘, benchAbilitySumOf: (index: number) => (index === 7 ? 2_400 : 2_000) },
-        createSeededRandom(1),
-      ),
+      replacementPitcherIndexOf(벤치, { ...마무리둘, benchAbilitySumOf: (index: number) => (index === 7 ? 2_400 : 2_000) }, createSeededRandom(1)),
     ).toBe(7)
   })
 
   it('마무리 상황이면 굴리지 않고 0xabfcc 로 간다 — 벤치 마지막이 아니다', () => {
     // 굴림 칸 1(9회)은 45% 라 씨앗을 여럿 훑어도 **한 번도** 벤치 마지막이 나오면 안 된다
     for (let seed = 1; seed <= 40; seed += 1) {
-      const picked = replacementPitcherIndexOf(
-        벤치,
-        { ...상황, saveSituation: true },
-        createSeededRandom(seed),
-      )
+      const picked = replacementPitcherIndexOf(벤치, { ...상황, saveSituation: true }, createSeededRandom(seed))
       expect(picked, `씨앗 ${seed}`).not.toBe(벤치[벤치.length - 1])
     }
   })
@@ -1024,9 +1010,7 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
     const 마투수 = { benchIsSpecialPitcherAt: (index: number) => index === 벤치[벤치.length - 1] }
     const 고른칸 = new Set<number>()
     for (let seed = 1; seed <= 40; seed += 1) {
-      고른칸.add(
-        replacementPitcherIndexOf(벤치, { ...상황, ...마투수, saveSituation: false }, createSeededRandom(seed)),
-      )
+      고른칸.add(replacementPitcherIndexOf(벤치, { ...상황, ...마투수, saveSituation: false }, createSeededRandom(seed)))
     }
 
     expect(고른칸.has(벤치[벤치.length - 1]), '굴림이 참인 씨앗에서는 벤치 마지막').toBe(true)
@@ -1042,13 +1026,9 @@ describe('새 투수 고르기 방향 (0xac5d8, V3-E 정정)', () => {
     expect(replacementPitcherIndexOf(벤치, { ...상황, saveSituation: false }, 세는난수)).toBe(벤치[0])
     expect(굴린횟수).toBe(0)
     // 마투수가 벤치 앞에 있어도 0xabfcc 는 건너뛴다 (마무리 상황 → 굴림 없음)
-    expect(
-      replacementPitcherIndexOf(
-        벤치,
-        { ...상황, saveSituation: true, benchIsSpecialPitcherAt: (index) => index === 벤치[0] },
-        세는난수,
-      ),
-    ).toBe(벤치[1])
+    expect(replacementPitcherIndexOf(벤치, { ...상황, saveSituation: true, benchIsSpecialPitcherAt: (index) => index === 벤치[0] }, 세는난수)).toBe(
+      벤치[1],
+    )
   })
 
   it('마무리 상황이면 난수를 아예 쓰지 않는다 (0xac360 을 건너뛴다)', () => {
@@ -1200,9 +1180,7 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
     // 이 타석의 수비는 사람이다 → 협살은 원본에서도 안 일어난다 (S8 1-4)
     expect(진행중.pendingDefensePlay!.input.defenseIsCpu).toBe(false)
     // 이름 판 칸 0 은 우리 마운드 투수
-    expect(진행중.pendingDefensePlay!.input.fielderPlates?.[0]?.name).toBe(
-      progress.ourPitcherEntry[progress.ourPitcherIndex]?.name,
-    )
+    expect(진행중.pendingDefensePlay!.input.fielderPlates?.[0]?.name).toBe(progress.ourPitcherEntry[progress.ourPitcherIndex]?.name)
     // 붙들려 있는 동안은 던질 차례가 아니다
     expect(isPitchTurn(진행중)).toBe(false)
     // 경기 상태는 한 톨도 안 바뀐다 (투구 수·스태미나만 이미 깎여 있다)
@@ -1267,8 +1245,7 @@ describe('주자 처리는 수비 화면이 끝나야 정해진다 (상태 0x17 
 })
 
 describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
-  const 공격시작 = (options: Partial<TeamGameOptions> = {}) =>
-    시작({ playerSide: PLAYER_SIDE_FIRST_BAT, ...options })
+  const 공격시작 = (options: Partial<TeamGameOptions> = {}) => 시작({ playerSide: PLAYER_SIDE_FIRST_BAT, ...options })
 
   it('로스터 12명이면 타순 아홉 + 벤치 셋이다', () => {
     const { progress } = 공격시작()
@@ -1411,7 +1388,6 @@ describe('대타 (0xaf06c → 0xaebe4 의 +0x291 가지, R4 1a·1c)', () => {
   })
 })
 
-
 /* ── AI 팀 마선수(0x66968·0x66994)와 CPU 대타(0xac228) ─────────────────────── */
 
 /** 굴림 횟수를 세는 껍데기 */
@@ -1440,10 +1416,7 @@ const 전부자동: MatchProgressSettings = {
 describe('일반모드 경기 세우기 0x30f20 — AI 팀 마선수', () => {
   it('굴림 차례가 원본과 같다 — 마투수·마타자·AI 선발·사람 선발 (31058·3106c·3107a·31090)', () => {
     const random = 세는난수(createSeededRandom(20100901))
-    startTeamGame(
-      { ...기본옵션, mode: 1, season: undefined, aceBatterId: 0, acePitcherId: 1, settings: FULL_PLAY_SETTINGS },
-      random,
-    )
+    startTeamGame({ ...기본옵션, mode: 1, season: undefined, aceBatterId: 0, acePitcherId: 1, settings: FULL_PLAY_SETTINGS }, random)
     // 0x66968·0x66994 는 rand(0,5), 선발 둘은 rand(0,4) 다
     expect(random.rolls.slice(0, 4)).toEqual([5, 5, 4, 4])
   })
@@ -1475,17 +1448,12 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
   it('state[0xe] 는 공마다 내려간다 — 한 경기에 여러 번 나올 수 있고, 나올 때마다 그 팀 명단이 한 칸 준다', () => {
     let 여러번 = 0
     for (let seed = 1; seed <= 24; seed += 1) {
-      const progress = startTeamGame(
-        { ...기본옵션, mode: 1, season: undefined, settings: 전부자동 },
-        createSeededRandom(seed * 7919),
-      )
+      const progress = startTeamGame({ ...기본옵션, mode: 1, season: undefined, settings: 전부자동 }, createSeededRandom(seed * 7919))
       expect(progress.game.isFinished).toBe(true)
       // 명단은 우리 12(마타자 없음) · 상대 13(AI 마타자) 로 시작한다
       const 줄어든칸 = 12 - progress.ourEntry.length + (13 - progress.opponentEntry.length)
       // 대타 한 번마다 벤치 타자 수 team+0x28c 도 하나씩 준다 (aed9c~aedae)
-      expect(3 - progress.ourBenchBatters + (4 - progress.opponentBenchBatters), `씨앗 ${seed * 7919}`).toBe(
-        줄어든칸,
-      )
+      expect(3 - progress.ourBenchBatters + (4 - progress.opponentBenchBatters), `씨앗 ${seed * 7919}`).toBe(줄어든칸)
       // 마지막 공(0xa5e14 a5e7c)이 칸을 내렸다
       expect(progress.cpuPinchHitUsed).toBe(false)
       // 간이 엔진(0xc1ba4) 대타는 교체 연출 0x16 을 안 지난다 — 소리 고리에 아무것도 안 남긴다
@@ -1499,10 +1467,7 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
   it('CPU 대타가 들어오면 그 뒤 타석은 들어온 벤치 선수(로스터 9번 이후)의 리그 기록에 쌓인다', () => {
     let 나온경기 = 0
     for (let seed = 1; seed <= 24; seed += 1) {
-      const progress = startTeamGame(
-        { ...기본옵션, settings: 전부자동 },
-        createSeededRandom(seed * 7919),
-      )
+      const progress = startTeamGame({ ...기본옵션, settings: 전부자동 }, createSeededRandom(seed * 7919))
       expect(progress.game.isFinished).toBe(true)
       // 시즌(모드 2)은 마타자가 없어 두 팀 다 명단 12 로 시작한다
       const 우리대타 = 12 - progress.ourEntry.length
@@ -1514,9 +1479,7 @@ describe('CPU 대타 0xac228 — 자동 타석에서', () => {
         [기본옵션.opponentTeamId, 상대대타],
       ] as const) {
         if (줄어든칸 === 0) continue
-        const 벤치칸기록 = progress.leaguePlateAppearances.filter(
-          (appearance) => appearance.teamId === 대타팀 && appearance.battingOrderIndex >= 9,
-        )
+        const 벤치칸기록 = progress.leaguePlateAppearances.filter((appearance) => appearance.teamId === 대타팀 && appearance.battingOrderIndex >= 9)
         // 예전에는 타순 칸(0~8)으로만 쌓여 벤치 선수 기록이 하나도 없고 빠진 선수에게 붙었다
         expect(벤치칸기록.length, `씨앗 ${seed * 7919}`).toBeGreaterThan(0)
       }
@@ -1561,8 +1524,9 @@ describe('마투수 등판 — 0xb88c8 → 0xb521c 의 0x60 가지 (8번 칸)', 
 
   it('마투수 능력치는 0xb6414 첫 단계에서 0xd88aa[mgr[0x13a + 순번]] 배율을 먹는다 — 모드 1 도 (팀 보정은 그 뒤)', () => {
     const 구속 = (aceLevels?: Readonly<Record<number, number>>) =>
-      ourPitcherStats(changePitcher(시작({ mode: 1, acePitcherId: 1, ...(aceLevels === undefined ? {} : { aceLevels }) }).progress, 8, createSeededRandom(0)))
-        .velocity
+      ourPitcherStats(
+        changePitcher(시작({ mode: 1, acePitcherId: 1, ...(aceLevels === undefined ? {} : { aceLevels }) }).progress, 8, createSeededRandom(0)),
+      ).velocity
     // 레오니 구속 850: Lv1 60% = 510 · Lv5 100% = 850. 팀 능력치 보정은 더하기라 차이가 그대로 남는다
     expect(구속({ 1: 4 }) - 구속()).toBe(850 - 510)
     // 안 넘기면 새 저장 기본값 Lv1 과 같다. 다른 칸(마타자 칸 6)의 레벨은 상관없다
@@ -2017,14 +1981,23 @@ describe('우리 타석 도루 출발 중 볼넷 · 사구 — 0x3dfac 3e0e4 →
     const { progress } = 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
     const 놓음 = { ...progress, game: { ...progress.game, bases: { first: true, second: false, third: false } } }
     for (const kind of ['볼넷', '사구'] as const) {
-      const result = runWalkPlay({ batterHand: 0, bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4, stealingFrom: [1] })
+      const result = runWalkPlay({
+        batterHand: 0,
+        bases: 놓음.game.bases,
+        outs: 놓음.game.outs,
+        pitchJudgement: kind === '볼넷' ? 3 : 4,
+        stealingFrom: [1],
+      })
       const arrivalPlay = { kind: 2, result, strikeout: 'none', callSoundId: null, recordIds: [] } as const
       const 끝 = startBatterOutcome(놓음, { kind }, createSeededRandom(5), { arrivalPlay })
       expect(끝.pendingBenchClearing).toBeNull()
       expect(끝.game.bases.first).toBe(true)
       expect(끝.log.some((entry) => entry.text.includes('벤치 클리어링'))).toBe(false)
       // 도루가 없으면 0x12 대기로 붙든다
-      const 보통판 = { ...arrivalPlay, result: runWalkPlay({ batterHand: 0, bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4 }) }
+      const 보통판 = {
+        ...arrivalPlay,
+        result: runWalkPlay({ batterHand: 0, bases: 놓음.game.bases, outs: 놓음.game.outs, pitchJudgement: kind === '볼넷' ? 3 : 4 }),
+      }
       expect(startBatterOutcome(놓음, { kind }, createSeededRandom(5), { arrivalPlay: 보통판 }).pendingBenchClearing?.phase).toBe('wait')
     }
   })
@@ -2194,8 +2167,7 @@ describe('공수 교대 판 (상태 0x18 교대 가지 — 앞뒤 장면이 모�
 
 describe('야수 +0xec 칸 0 — 교대 판 0x3fac4 가 적고 판 없이 지난 반 이닝엔 남는다 (`entities/fielding/model/fielderRecords`)', () => {
   const 지명칸 = (entry: readonly { readonly position: number }[]) => entry.findIndex((player) => (player.position & 0xf) === 1)
-  const 수비팀 = (progress: TeamGameProgress) =>
-    isOurOffense(progress) ? progress.options.opponentTeamId : progress.options.ourTeamId
+  const 수비팀 = (progress: TeamGameProgress) => (isOurOffense(progress) ? progress.options.opponentTeamId : progress.options.ourTeamId)
 
   it('1회초 판이 서면 칸 0 은 그 판 수비 팀의 지명타자 레코드다', () => {
     const { progress } = 시작()
@@ -2240,7 +2212,8 @@ describe('야수 +0xec 칸 0 — 교대 판 0x3fac4 가 적고 판 없이 지난
 describe('기록달성 — 팀 경기도 0xa77f0 으로 쌓고 경기 끝 0x4ea0c 가 G 로 준다 (모드 1·2·8·9)', () => {
   const 우리공격 = () => 시작({ playerSide: PLAYER_SIDE_FIRST_BAT })
   const 공 = (kind: '볼' | '파울') => ({
-    batterHand: 0, resolution: kind === '볼' ? ({ kind: '볼' } as const) : ({ kind: '파울' } as const),
+    batterHand: 0,
+    resolution: kind === '볼' ? ({ kind: '볼' } as const) : ({ kind: '파울' } as const),
     hasSwung: kind === '파울',
     isBunt: false,
     resultCode: null,
@@ -2267,11 +2240,7 @@ describe('기록달성 — 팀 경기도 0xa77f0 으로 쌓고 경기 끝 0x4ea0
   it('연타석·한 타자 볼넷은 타순 칸 결과 목록으로 본다 — 대타가 오면 목록도 같이 움직인다 (aed02~aed16)', () => {
     const { progress, random } = 우리공격()
     const 슬롯 = progress.game.battingOrderIndex
-    const 두번안타 = recordBatterAtBat(
-      recordBatterAtBat(EMPTY_BATTER_GAME_LOG, { kind: '안타', bases: 1 }, 0).log,
-      { kind: '안타', bases: 1 },
-      0,
-    ).log
+    const 두번안타 = recordBatterAtBat(recordBatterAtBat(EMPTY_BATTER_GAME_LOG, { kind: '안타', bases: 1 }, 0).log, { kind: '안타', bases: 1 }, 0).log
     const 판 = { ...progress, ourBatterLogs: progress.ourBatterLogs.map((log, index) => (index === 슬롯 ? 두번안타 : log)) }
     // 세 번째 연속 안타 → 9 연타석 x3 (0xa7b90)
     expect(applyBatterOutcome(판, { kind: '안타', bases: 1 }, random).recordIds).toEqual([9])
@@ -2369,9 +2338,7 @@ describe('엔트리 편집기(0x55864)가 고친 명단으로 경기를 세운�
       expect(progress.ourPitcherEntry[progress.ourPitcherIndex]?.orderIndex).toBe(dayCounter % 4)
       // 차례 [3,2,1,0,…] 의 g%4 번 = 표 3−g%4 번 투수
       const 표선발 = startTeamGame({ ...기본옵션, dayCounter: 3 - (dayCounter % 4) }, createSeededRandom(1))
-      expect(progress.ourPitcherEntry[progress.ourPitcherIndex]?.name).toBe(
-        표선발.ourPitcherEntry[표선발.ourPitcherIndex]?.name,
-      )
+      expect(progress.ourPitcherEntry[progress.ourPitcherIndex]?.name).toBe(표선발.ourPitcherEntry[표선발.ourPitcherIndex]?.name)
     }
   })
 
@@ -2433,7 +2400,12 @@ describe('엔트리 편집기(0x55864)가 고친 명단으로 경기를 세운�
 describe('미리 굴린 0x30f20 넷 — 일반모드 상태 22 진입(0x314b0)이 굴린다', () => {
   it('rollTeamSetup 을 먼저 부르고 넘기면 경기는 같은 결과에 같은 난수 차례다 (위치만 앞당김)', () => {
     const 옵션: TeamGameOptions = {
-      ...기본옵션, mode: 1, season: undefined, acePitcherId: 1, aceBatterId: 0, settings: 전부자동,
+      ...기본옵션,
+      mode: 1,
+      season: undefined,
+      acePitcherId: 1,
+      aceBatterId: 0,
+      settings: 전부자동,
     }
     const 그대로 = startTeamGame(옵션, createSeededRandom(20100901))
     const random = createSeededRandom(20100901)
@@ -2449,8 +2421,11 @@ describe('미리 굴린 0x30f20 넷 — 일반모드 상태 22 진입(0x314b0)�
     const random = 세는난수(createSeededRandom(3))
     startTeamGame(
       {
-        ...기본옵션, mode: 1, season: undefined,
-        opponentAces: { pitcher: 2, batter: 3 }, startingPitcherSlots: { opponent: 1, ours: 2 },
+        ...기본옵션,
+        mode: 1,
+        season: undefined,
+        opponentAces: { pitcher: 2, batter: 3 },
+        startingPitcherSlots: { opponent: 1, ours: 2 },
       },
       random,
     )
@@ -2585,13 +2560,8 @@ describe('돌발 경기 기록 검사 0x8ec9c — 공격 팀 지금 타순 칸 +
   it('사람 수비면 상대 타순 칸 안타·홈런(+0x12·+0x13)과 우리 지금 투수의 탈삼진(R[0])을 본다', () => {
     const { progress } = 시작()
     const slot = progress.opponentOrderIndex
-    const opponentEntryRecords = progress.opponentEntryRecords.map((record, index) =>
-      index === slot ? { ...record, hits: 1, homeRuns: 1 } : record,
-    )
-    const 기록 = burstGameRecordOf(
-      { ...progress, opponentEntryRecords, recordTally: { ...progress.recordTally, moundStrikeouts: 6 } },
-      false,
-    )
+    const opponentEntryRecords = progress.opponentEntryRecords.map((record, index) => (index === slot ? { ...record, hits: 1, homeRuns: 1 } : record))
+    const 기록 = burstGameRecordOf({ ...progress, opponentEntryRecords, recordTally: { ...progress.recordTally, moundStrikeouts: 6 } }, false)
     expect(기록).toEqual({ hitsInGame: 1, homeRunsInGame: 1, strikeoutsInGame: 6 })
   })
 })
@@ -2761,7 +2731,8 @@ describe('트레이드로 옮겨 온 선수 — 표 팀 + 칸으로 서고 그 �
   /** 1팀 레코드: 0번 타자 자리에 5팀 표 0번 타자, 0번 투수 자리에 5팀 표 0번 투수 */
   const 상대차례 = {
     batters: Array.from({ length: 12 }, (_u, i) =>
-      i === 0 ? { rosterSlot: 0, position: 2, tableTeamId: 5 } : { rosterSlot: i, position: teamBatters(1)[i]?.position ?? 0 }),
+      i === 0 ? { rosterSlot: 0, position: 2, tableTeamId: 5 } : { rosterSlot: i, position: teamBatters(1)[i]?.position ?? 0 },
+    ),
     pitchers: [{ tableTeamId: 5, tableSlot: 0 }, 1, 2, 3, 4, 5, 6, 7],
   }
 
@@ -2819,8 +2790,7 @@ describe('트레이드로 옮겨 온 선수 — 표 팀 + 칸으로 서고 그 �
   it('내 팀 차례에 실린 표 팀 + 칸(ourEntryOrder)도 같다', () => {
     const { progress } = 시작({
       ourEntryOrder: {
-        batters: Array.from({ length: 12 }, (_u, i) =>
-          i === 3 ? { rosterSlot: 7, position: 4, tableTeamId: 6 } : { rosterSlot: i, position: 0 }),
+        batters: Array.from({ length: 12 }, (_u, i) => (i === 3 ? { rosterSlot: 7, position: 4, tableTeamId: 6 } : { rosterSlot: i, position: 0 })),
         pitchers: [0, 1, { tableTeamId: 6, tableSlot: 5 }, 3, 4, 5, 6, 7],
       },
     })
@@ -2914,8 +2884,7 @@ describe('상태 0xe 의 OK 대기 (0x39e14 → 0x532b0) — 진행기가 0xe �
         if (current.sceneConfirmPending === true) {
           current = confirmScene(current, random)
           const 교체 =
-            current.scenePinchHit?.serial !== before.scenePinchHit?.serial ||
-            current.scenePitcherChange?.serial !== before.scenePitcherChange?.serial
+            current.scenePinchHit?.serial !== before.scenePinchHit?.serial || current.scenePitcherChange?.serial !== before.scenePitcherChange?.serial
           if (교체) {
             다시섬 += 1
             expect(current.sceneConfirmPending).toBe(true)
@@ -3037,7 +3006,8 @@ describe('파울 각 공도 수비 판을 돈다 — 판이 파울로 닫히면 
     expect(isBatterTurn(progress)).toBe(true)
     // 원본 코드 1 [160, 101, 752] — 1루 쪽 파울 각의 높은 공
     const 파울: PitchOutcomeDetail = {
-      batterHand: 0, resolution: { kind: '파울' },
+      batterHand: 0,
+      resolution: { kind: '파울' },
       hasSwung: true,
       isBunt: false,
       resultCode: 1,

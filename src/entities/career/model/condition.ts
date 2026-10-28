@@ -37,8 +37,7 @@ const clampAbility = (value: number) => Math.min(MAXIMUM_ABILITY, Math.max(0, va
  * (사기 > 50 이면 그대로)이고 숨은 판정값 표 `ability.moraleCuts` 에서 읽는다.
  * 안내문은 StrMODE[213] "사기가 낮아 선수 능력치가 %d 감소하였습니다".
  */
-const reduceByPercent = (value: number, percent: number) =>
-  value - Math.trunc((value * percent) / 100)
+const reduceByPercent = (value: number, percent: number) => value - Math.trunc((value * percent) / 100)
 
 /**
  * 경기에 쓰는 능력치 `0xb570c(…, k, 기록, 1, 체력인자, …)` — 모드 3·4 이고 내 선수(0xb6389)일 때의 갈래
@@ -73,9 +72,7 @@ const reduceByPercent = (value: number, percent: number) =>
  * 장착 여부는 모두 0xb62b4 = 선수기록 +0x14 **장착** 비트 (H-modes 6절 "장착 칸").
  * 기본 능력치·장비 보너스가 0 이상이라 1 의 `clampAbility` 바닥은 값을 바꾸지 않는다.
  */
-export function equippedAbilityOf(
-  career: Pick<PlayerCareer, 'ability' | 'equipmentLevels' | 'equippedSkillIds'>,
-): BatterAbility {
+export function equippedAbilityOf(career: Pick<PlayerCareer, 'ability' | 'equipmentLevels' | 'equippedSkillIds'>): BatterAbility {
   const adjust = (key: keyof BatterAbility) => {
     let value = clampAbility(career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
     if (isSkillEquipped(career, POWERLESS_SKILL)) value = clampAbility(value - balanceNumber('ability.skillPenalty'))

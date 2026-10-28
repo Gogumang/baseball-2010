@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { initialMainMenu, listCursorOf, reduceMainMenu, topCursorOf } from '@/pages/main-menu/model/mainMenu'
 import type {
-  GameStartCursor, MainMenuAction, MainMenuEffect, MainMenuOpenTier, MainMenuState, NariGameReady,
+  GameStartCursor,
+  MainMenuAction,
+  MainMenuEffect,
+  MainMenuOpenTier,
+  MainMenuState,
+  NariGameReady,
 } from '@/pages/main-menu/model/mainMenu'
 
 /**
@@ -77,10 +82,8 @@ export function useMainMenu(
    */
   turningRef: { current: boolean }
 } {
-  const [state, setState] = useState<MainMenuState>(
-    () => initialMainMenu(
-      hasSavedGame, openTier, openTier === 5 ? gameStartCursor?.current ?? 0 : 0, topMenuCursor?.current ?? 0,
-    ),
+  const [state, setState] = useState<MainMenuState>(() =>
+    initialMainMenu(hasSavedGame, openTier, openTier === 5 ? (gameStartCursor?.current ?? 0) : 0, topMenuCursor?.current ?? 0),
   )
 
   const stateRef = useRef(state)
@@ -106,9 +109,7 @@ export function useMainMenu(
   const dispatchRef = useRef((action: MainMenuAction) => {
     if (isKeyBlocked()) return
     const { isGeneralGameInProgress, lastPlayedMode, nariGameReady } = globalRecordRef.current
-    const result = reduceMainMenu(
-      stateRef.current, action, hasSavedRef.current, isGeneralGameInProgress, lastPlayedMode, nariGameReady,
-    )
+    const result = reduceMainMenu(stateRef.current, action, hasSavedRef.current, isGeneralGameInProgress, lastPlayedMode, nariGameReady)
     stateRef.current = result.state
     const listCursor = listCursorOf(result.state)
     if (gameStartCursorRef.current !== undefined && listCursor !== null) gameStartCursorRef.current.current = listCursor

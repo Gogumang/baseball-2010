@@ -28,7 +28,12 @@ function 대기중미션닫기() {
   const rendered = renderHook(() => {
     const runner = useAtBatRunner()
     return useMissionSession({
-      runner, random: createSeededRandom(1), missionRecord, screen, setScreen, pitcher,
+      runner,
+      random: createSeededRandom(1),
+      missionRecord,
+      screen,
+      setScreen,
+      pitcher,
       nariTeamIds: { batter: 5, pitcher: 6 },
       aceMatchHold: { read: () => ({ batter: false, pitcher: true, originalMode: 0 }), writeResult: vi.fn() },
       onReturnToNari,

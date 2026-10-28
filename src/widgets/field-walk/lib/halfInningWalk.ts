@@ -1,12 +1,6 @@
 import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
-import {
-  type CameraBounds,
-  type CameraState,
-  cameraBoundsOf,
-  centerOn,
-  followCamera,
-} from '@/pages/defense/lib/defenseCamera'
+import { type CameraBounds, type CameraState, cameraBoundsOf, centerOn, followCamera } from '@/pages/defense/lib/defenseCamera'
 import {
   type FieldWalker,
   NEW_FIELD_WALKER,
@@ -107,8 +101,7 @@ export interface HalfInningWalkInput {
 }
 
 /** 3fb7c~3fba4 — O(= F 의 지금 자리) 의 x + y + z == 0 */
-const isZeroPoint = (point: { readonly x: number; readonly y?: number; readonly z: number }) =>
-  point.x + (point.y ?? 0) + point.z === 0
+const isZeroPoint = (point: { readonly x: number; readonly y?: number; readonly z: number }) => point.x + (point.y ?? 0) + point.z === 0
 
 /** 0x3fac4 — 판 틱 0 의 세우기 (그 틱의 0x4f7ac 앞) */
 export function startHalfInningWalk(input: HalfInningWalkInput): HalfInningWalkState {

@@ -115,9 +115,7 @@ export function coverRect565(screen: Uint16Array, width: number, height: number,
   for (let row = top; row < bottom; row += 1) {
     for (let column = left; column < right; column += 1) {
       const at = row * width + column
-      screen[at] = op.color === null
-        ? blackStepCoverPixel565(op.step, screen[at])
-        : colorStepCoverPixel565(op.step, op.color, screen[at])
+      screen[at] = op.color === null ? blackStepCoverPixel565(op.step, screen[at]) : colorStepCoverPixel565(op.step, op.color, screen[at])
     }
   }
 }

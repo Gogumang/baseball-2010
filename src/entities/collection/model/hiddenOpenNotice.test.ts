@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  announceHiddenOpens, closeHiddenOpenWindow, EMPTY_HIDDEN_OPEN_WINDOW, hiddenItemNameOf, hiddenOpenNoticeTextOf,
-  hiddenOpenStoredIdOf, recordUnlockNoticeTextOf,
+  announceHiddenOpens,
+  closeHiddenOpenWindow,
+  EMPTY_HIDDEN_OPEN_WINDOW,
+  hiddenItemNameOf,
+  hiddenOpenNoticeTextOf,
+  hiddenOpenStoredIdOf,
+  recordUnlockNoticeTextOf,
 } from '@/entities/collection/model/hiddenOpenNotice'
 
 describe('0x62368 히든 오픈 알림 글', () => {
@@ -21,10 +26,8 @@ describe('0x62368 히든 오픈 알림 글', () => {
 
   it('StrCOMMON[139] + "!N!N" + 쓰는 곳 줄 [141] · [142] · [143] (원문)', () => {
     expect(hiddenOpenNoticeTextOf(13)).toBe('!C히든 아이템 오픈!!!N[!cFFFF00트로피컬!cFFFFFF]!N!N시즌모드에서!N사용가능합니다')
-    expect(hiddenOpenNoticeTextOf(31)).toBe(
-      '!C히든 아이템 오픈!!!N[!cFFFF00토끼털 신발!cFFFFFF]!N!N나만의리그 투수편!N에서 사용가능합니다')
-    expect(hiddenOpenNoticeTextOf(47)).toBe(
-      '!C히든 아이템 오픈!!!N[!cFFFF00바이커 부츠!cFFFFFF]!N!N나만의리그 타자편!N에서 사용가능합니다')
+    expect(hiddenOpenNoticeTextOf(31)).toBe('!C히든 아이템 오픈!!!N[!cFFFF00토끼털 신발!cFFFFFF]!N!N나만의리그 투수편!N에서 사용가능합니다')
+    expect(hiddenOpenNoticeTextOf(47)).toBe('!C히든 아이템 오픈!!!N[!cFFFF00바이커 부츠!cFFFFFF]!N!N나만의리그 타자편!N에서 사용가능합니다')
     expect(hiddenOpenNoticeTextOf(51)).toBeNull()
   })
 

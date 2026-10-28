@@ -1,7 +1,4 @@
-import {
-  DEFAULT_SPEED_LEVEL,
-  MILLISECONDS_PER_FRAME_BY_SPEED,
-} from '@/shared/config/frameRate'
+import { DEFAULT_SPEED_LEVEL, MILLISECONDS_PER_FRAME_BY_SPEED } from '@/shared/config/frameRate'
 
 /**
  * 원작 환경설정 (StrMAINMENU[32]~[42], [63]~[81], StrHOWTO[30]).
@@ -152,11 +149,9 @@ export function normalizeSettings(raw: unknown): GameSettings {
     speedLevel,
     pitchControl: pitchControl ?? DEFAULT_SETTINGS.pitchControl,
     soundLevel,
-    isVibrationOn:
-      typeof candidate.isVibrationOn === 'boolean' ? candidate.isVibrationOn : DEFAULT_SETTINGS.isVibrationOn,
+    isVibrationOn: typeof candidate.isVibrationOn === 'boolean' ? candidate.isVibrationOn : DEFAULT_SETTINGS.isVibrationOn,
     runningMode: runningMode ?? DEFAULT_SETTINGS.runningMode,
     throwMode: throwMode ?? DEFAULT_SETTINGS.throwMode,
-    isScoreboardOn:
-      typeof candidate.isScoreboardOn === 'boolean' ? candidate.isScoreboardOn : DEFAULT_SETTINGS.isScoreboardOn,
+    isScoreboardOn: typeof candidate.isScoreboardOn === 'boolean' ? candidate.isScoreboardOn : DEFAULT_SETTINGS.isScoreboardOn,
   }
 }

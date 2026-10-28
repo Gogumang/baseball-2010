@@ -7,8 +7,14 @@ import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/season
 afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 
 const 타자: SeasonPlayerRecordView = {
-  name: '시험타자', isPitcher: false, base: [500, 500, 500, 500], profile: 0, skillBits: 0,
-  equipment: [0, 0, 0, 0], fieldPosition: 3, isComplete: true,
+  name: '시험타자',
+  isPitcher: false,
+  base: [500, 500, 500, 500],
+  profile: 0,
+  skillBits: 0,
+  equipment: [0, 0, 0, 0],
+  fieldPosition: 3,
+  isComplete: true,
 }
 /** 앓고 있는데(SR+5 = 1) 입원 여유 SR+6 이 0 */
 const 앓음여유0: SeasonPlayerDetailContext = { record: { illness: 1, illnessSlack: 0, coach: -1, teamId: 0 }, teamMorale: 100 }

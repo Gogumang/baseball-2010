@@ -33,11 +33,7 @@ export function useStorySchedule(career: PlayerCareer | null) {
   /** 지도 [!] — 무작위 조건 없이 볼 수 있는 이벤트가 있는 장소 */
   const eventPlaceIds = useMemo(() => {
     if (career === null || events === null) return new Set<string>()
-    return new Set(
-      OUTING_PLACES.filter((place) => nextEventFor(career, events, placeTriggerOf(place.frame)) !== null).map(
-        (place) => place.id,
-      ),
-    )
+    return new Set(OUTING_PLACES.filter((place) => nextEventFor(career, events, placeTriggerOf(place.frame)) !== null).map((place) => place.id))
   }, [career, events])
 
   /**

@@ -10,7 +10,7 @@ afterEach(() => {
 })
 
 describe('조준(0x10) — 터치 CLR (r194)', () => {
-  it('CLR 글자 자리가 없어 CLR 이 먹을 때(onCancel) \'구질로\' 상황 버튼(Escape)을 낸다', () => {
+  it("CLR 글자 자리가 없어 CLR 이 먹을 때(onCancel) '구질로' 상황 버튼(Escape)을 낸다", () => {
     render(<AimCursor side={0} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     expect(touchKeyOffersNow()).toContainEqual({ key: 'Escape', label: '구질로' })
   })

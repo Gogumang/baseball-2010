@@ -70,7 +70,14 @@ export const UNSELECTED_PLACE_LEVEL = 7
  * 0x9a449, sel = −1 이면 효과 0) · 이름 0x7eb98 → 0x7eba2 밤이면 화면 전체 [0x15605d4] 단계 9(검정 몸통 0x9aac4) · 프레임 6(창문 불빛).
  * 고른 건물 · 테두리 · 화살표 · [!] 는 그 위(DOM)에 보통으로 얹는다.
  */
-export function outingMapComposeOps({ origins, mapX, mapY, selected, labelOf, isNight }: {
+export function outingMapComposeOps({
+  origins,
+  mapX,
+  mapY,
+  selected,
+  labelOf,
+  isNight,
+}: {
   readonly origins: FrameOrigins | null
   readonly mapX: number
   readonly mapY: number
@@ -84,9 +91,11 @@ export function outingMapComposeOps({ origins, mapX, mapY, selected, labelOf, is
   const buildingArgument = selected === -1 ? 0 : UNSELECTED_PLACE_LEVEL
   return [
     ...frameComposeOps(MAP_FRAMES, MAP_FRAME, origins, mapX, mapY),
-    ...OUTING_PLACES.flatMap((place, index) => (index === selected
-      ? []
-      : [...frameComposeOps(MAP_FRAMES, place.frame, origins, mapX, mapY, buildingEffect, buildingArgument), ...labelOf(index)])),
+    ...OUTING_PLACES.flatMap((place, index) =>
+      index === selected
+        ? []
+        : [...frameComposeOps(MAP_FRAMES, place.frame, origins, mapX, mapY, buildingEffect, buildingArgument), ...labelOf(index)],
+    ),
     ...(isNight
       ? [
           { kind: 'cover', x: 0, y: 0, width: 240, height: 320, step: NIGHT_DIM_STEP, color: null } as const,

@@ -1,12 +1,6 @@
 import { TAG_DISTANCE } from '@/entities/fielding/model/autoAdvance'
 import { basePosition, horizontalDistance, isSamePoint } from '@/entities/fielding/model/fieldGeometry'
-import {
-  isRunnerStopped,
-  NONE,
-  type DefenseContext,
-  type FielderState,
-  type RunnerState,
-} from '@/entities/fielding/model/fieldingState'
+import { isRunnerStopped, NONE, type DefenseContext, type FielderState, type RunnerState } from '@/entities/fielding/model/fieldingState'
 
 /**
  * **아웃 판정 0xb36d0** (플레이 vtable `0xd8618` 의 `vt90`).
@@ -214,12 +208,7 @@ export function judgeOut(input: OutJudgementInput): OutJudgement {
     let kind: OutKind = OUT_KIND.NONE
 
     // ── 3a 0xb380e — 태그. 공 쥔 야수와의 거리 ≤ 499 이고 주자가 루에 안 붙었다
-    if (
-      fielder !== undefined &&
-      play.held &&
-      horizontalDistance(fielder.position, runner.position) <= TAG_DISTANCE &&
-      !runnerStopped
-    ) {
+    if (fielder !== undefined && play.held && horizontalDistance(fielder.position, runner.position) <= TAG_DISTANCE && !runnerStopped) {
       kind = OUT_KIND.TAG
     }
 
@@ -228,13 +217,7 @@ export function judgeOut(input: OutJudgementInput): OutJudgement {
 
     // ── 2a 0xb3890 — 공 쥔 야수가 **주자가 달려가는 루**를 밟고 있고, 그 주자가 아직 밀려 있다.
     // 평범한 포스(루) 아웃이 여기서 난다.
-    if (
-      holderReady &&
-      footBase === targetBase &&
-      runner.targetBase !== 0 &&
-      isStillForced(runners, index) &&
-      !runnerStopped
-    ) {
+    if (holderReady && footBase === targetBase && runner.targetBase !== 0 && isStillForced(runners, index) && !runnerStopped) {
       kind = OUT_KIND.BASE
     }
 

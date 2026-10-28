@@ -74,25 +74,39 @@ interface HelpScreenProps {
 const viewerKeyOf = (key: string): HelpViewerKey | null => {
   switch (key) {
     case 'ArrowUp':
-    case '2': return '위'
+    case '2':
+      return '위'
     case 'ArrowDown':
-    case '8': return '아래'
+    case '8':
+      return '아래'
     case 'ArrowLeft':
-    case '4': return '왼'
+    case '4':
+      return '왼'
     case 'ArrowRight':
-    case '6': return '오른'
+    case '6':
+      return '오른'
     case 'Enter':
     case ' ':
-    case '5': return 'OK'
+    case '5':
+      return 'OK'
     case 'Escape':
-    case 'Backspace': return 'CLR'
-    default: return null
+    case 'Backspace':
+      return 'CLR'
+    default:
+      return null
   }
 }
 
 /** 숫자키 꼴 1 격자가 방향으로 돌려주는 키 (표 0xd2e7c) — 까딱임 방향 칸만 본다 */
 const HELP_GRID_DIRECTIONS: Readonly<Record<string, 'left' | 'right' | 'up' | 'down'>> = {
-  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  4: 'left',
+  6: 'right',
+  2: 'up',
+  8: 'down',
 }
 
 /** 장 고르기 → 쪽 보기 — OK(Enter) */
@@ -179,9 +193,10 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
     if (isOverGame) return onBack()
     setClosing((previous) => {
       // 지금 그림 뒤의 높이 칸 — 여는 중 · 다 열린 판이면 열기 걸음 뒤, 닫는 중이면 닫기 걸음 뒤(끝이 섰으면 바닥 10)
-      const start = previous === null
-        ? helpPanelHeightAfterOpenDraw(bodyTick)
-        : helpPanelHeightAfterCloseDraw(previous.heights, Math.max(0, bodyTick - previous.from))
+      const start =
+        previous === null
+          ? helpPanelHeightAfterOpenDraw(bodyTick)
+          : helpPanelHeightAfterCloseDraw(previous.heights, Math.max(0, bodyTick - previous.from))
       return { from: Math.max(0, bodyTick), heights: helpPanelCloseHeightsFrom(start) }
     })
   }
@@ -190,9 +205,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
   const moveBy = (isChapter: boolean, step: number) => {
     if (isChapter && isChapterLocked) return
     setViewer((previous) => {
-      const next = stepHelpViewer(
-        { ...previous, isChoosingChapter: isChapter }, step > 0 ? '오른' : '왼', false, helpPageCountOf(previous.chapter),
-      )
+      const next = stepHelpViewer({ ...previous, isChoosingChapter: isChapter }, step > 0 ? '오른' : '왼', false, helpPageCountOf(previous.chapter))
       return next === '닫기' ? previous : { ...next, isChoosingChapter: previous.isChoosingChapter }
     })
   }
@@ -253,14 +266,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
     <>
       {namePalette.definition}
       {/* 판 0x55e60(skin, W/2, H/2, 192, +0x90, 0, 0x22, …) — [+0x45c] 면 (띠 0, 0, 제목 탭 1) 아니면 (띠 0x10, 0, 0) (0x58dea~0x58ec6) */}
-      <CommonPanel
-        x={x0}
-        y={panelTop}
-        width={panelWidth}
-        height={panelHeight}
-        topBand={isChapterLocked ? 0 : 0x10}
-        titleTab={isChapterLocked}
-      />
+      <CommonPanel x={x0} y={panelTop} width={panelWidth} height={panelHeight} topBand={isChapterLocked ? 0 : 0x10} titleTab={isChapterLocked} />
 
       <div className={styles.clip} style={{ left: 0, top: clipTop, width: SCREEN.width, height: clipHeight }}>
         <div style={{ position: 'absolute', left: 0, top: -clipTop, width: SCREEN.width, height: SCREEN.height }}>
@@ -310,12 +316,9 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
 
           {/* 쪽 번호 — num.pzx 숫자 0x585ac 두 자리 + 사이 "/" 이미지 0x65 (0x59102~0x59192) */}
           <div role="img" aria-label={`${page + 1}/${pageCount}`}>
-            <SpriteNumber glyphs={pager.page.glyphs} right={pager.page.right} boxTop={pager.y}
-              boxHeight={HELP_PAGER_GLYPH_HEIGHT} folder={NUM} />
-            <img className={styles.sprite} alt="" src={imageSrc(NUM, pager.slash.image)}
-              style={{ left: pager.slash.x, top: pager.slash.y }} />
-            <SpriteNumber glyphs={pager.count.glyphs} right={pager.count.right} boxTop={pager.y}
-              boxHeight={HELP_PAGER_GLYPH_HEIGHT} folder={NUM} />
+            <SpriteNumber glyphs={pager.page.glyphs} right={pager.page.right} boxTop={pager.y} boxHeight={HELP_PAGER_GLYPH_HEIGHT} folder={NUM} />
+            <img className={styles.sprite} alt="" src={imageSrc(NUM, pager.slash.image)} style={{ left: pager.slash.x, top: pager.slash.y }} />
+            <SpriteNumber glyphs={pager.count.glyphs} right={pager.count.right} boxTop={pager.y} boxHeight={HELP_PAGER_GLYPH_HEIGHT} folder={NUM} />
           </div>
 
           {/* 쪽 화살 slt_frame 이미지 20 — 장 고르기면 늘, 쪽 보기면 깜빡인다 (0x59196~0x59204). 웹판은 누를 수도 있다 */}
@@ -339,12 +342,7 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
           </button>
 
           {/* 본문 상자 0xbb28d(x0 + 5, y0 + 0x24, 0xac, 0xab, 정렬 1) (0x59208~0x5921a) */}
-          <InsetBox
-            x={HELP_VIEWER.innerBox.x}
-            y={HELP_VIEWER.innerBox.y}
-            width={HELP_VIEWER.innerBox.width}
-            height={HELP_VIEWER.innerBox.height}
-          />
+          <InsetBox x={HELP_VIEWER.innerBox.x} y={HELP_VIEWER.innerBox.y} width={HELP_VIEWER.innerBox.width} height={HELP_VIEWER.innerBox.height} />
 
           {/* 스크롤 막대 0x58c10 — 바탕 · 위아래 화살(slt_frame 이미지 78) · 흰 손잡이 */}
           <div
@@ -370,10 +368,16 @@ export function HelpScreen({ onBack, chapter = 0, isChapterLocked = false, gameP
           {/* 웹 덧붙임 — 막대 위 · 아래 끝 화살(7×5) 위 투명 칸: 원본 ↑ · ↓ 키 한 번. 같은 키를 상황 버튼으로 또 내지 않는다(필요한 버튼만) */}
           {maxTop > 0 && !viewer.isChoosingChapter && (
             <>
-              <PressArea label="위 줄" onPress={() => tapKey('ArrowUp')}
-                rect={{ x: HELP_SCROLL_BAR.x - 4, y: HELP_SCROLL_BAR.y - 10, width: 15, height: 14 }} />
-              <PressArea label="아래 줄" onPress={() => tapKey('ArrowDown')}
-                rect={{ x: HELP_SCROLL_BAR.x - 4, y: HELP_SCROLL_BAR.y + HELP_SCROLL_BAR.trackLength - 2, width: 15, height: 14 }} />
+              <PressArea
+                label="위 줄"
+                onPress={() => tapKey('ArrowUp')}
+                rect={{ x: HELP_SCROLL_BAR.x - 4, y: HELP_SCROLL_BAR.y - 10, width: 15, height: 14 }}
+              />
+              <PressArea
+                label="아래 줄"
+                onPress={() => tapKey('ArrowDown')}
+                rect={{ x: HELP_SCROLL_BAR.x - 4, y: HELP_SCROLL_BAR.y + HELP_SCROLL_BAR.trackLength - 2, width: 15, height: 14 }}
+              />
             </>
           )}
           <div

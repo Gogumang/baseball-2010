@@ -14,11 +14,7 @@ import { SUB_ITEMS, subItemEffectTextOf } from '@/entities/career/model/subItems
 import type { SubItem } from '@/entities/career/model/subItems'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { pitcherAbilityLimitsOf } from '@/entities/pitcher-career/model/pitcherCareer'
-import {
-  PITCHER_ABILITY_NAMES,
-  PITCHER_ABILITY_ORDER,
-  applyPitcherAbilityItem,
-} from '@/entities/pitcher-career/model/pitcherAbility'
+import { PITCHER_ABILITY_NAMES, PITCHER_ABILITY_ORDER, applyPitcherAbilityItem } from '@/entities/pitcher-career/model/pitcherAbility'
 import { applyStaminaTonic, canBuyStaminaTonic } from '@/entities/pitcher-career/model/pitcherStamina'
 
 /**
@@ -66,20 +62,12 @@ const PITCHER_GP_RULES: GpItemRules<PitcherCareer> = {
   applyNinthItem: (career) => ({ ...career, stamina: applyStaminaTonic() }),
 }
 
-export function applyPitcherGpItem(
-  career: PitcherCareer,
-  id: number,
-  random: RandomPort,
-): GpItemResultOf<PitcherCareer> {
+export function applyPitcherGpItem(career: PitcherCareer, id: number, random: RandomPort): GpItemResultOf<PitcherCareer> {
   return applyGpItemWith(PITCHER_GP_RULES, career, id, random)
 }
 
 /** G 부족이면 거절, 아니면 G 를 빼고 곧바로 쓴다 (0x14a74 kind 2) */
-export function purchasePitcherGpItem(
-  career: PitcherCareer,
-  id: number,
-  random: RandomPort,
-): GpPurchaseOf<PitcherCareer> {
+export function purchasePitcherGpItem(career: PitcherCareer, id: number, random: RandomPort): GpPurchaseOf<PitcherCareer> {
   return purchaseGpItemWith(PITCHER_GP_RULES, career, id, random)
 }
 

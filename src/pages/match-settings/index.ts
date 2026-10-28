@@ -20,18 +20,40 @@ export type { MatchSettingsWindowProps } from '@/pages/match-settings/ui/MatchSe
 
 /** 창 상태·키 처리 (0x5ffcc) — 화면 없이 규칙만 쓰고 싶을 때 */
 export {
-  SETTINGS_STAGE, DETAIL_ROW, DETAIL_ROW_COUNT, DETAIL_CELL_COUNTS,
-  KIND_COUNT, CHANCE_VALUE_COUNT, INNING_VALUE_COUNT,
-  openMatchSettings, pressMatchSettingsKey, answerMatchSettingsPopup,
-  detailCellCountOf, detailBitsOf, toggleDetailBit, valueCountOf,
+  SETTINGS_STAGE,
+  DETAIL_ROW,
+  DETAIL_ROW_COUNT,
+  DETAIL_CELL_COUNTS,
+  KIND_COUNT,
+  CHANCE_VALUE_COUNT,
+  INNING_VALUE_COUNT,
+  openMatchSettings,
+  pressMatchSettingsKey,
+  answerMatchSettingsPopup,
+  detailCellCountOf,
+  detailBitsOf,
+  toggleDetailBit,
+  valueCountOf,
 } from '@/pages/match-settings/lib/matchSettingsMenu'
 export type {
-  MatchSettingsAction, MatchSettingsKey, MatchSettingsPopup, MatchSettingsWindowState,
+  MatchSettingsAction,
+  MatchSettingsKey,
+  MatchSettingsPopup,
+  MatchSettingsWindowState,
 } from '@/pages/match-settings/lib/matchSettingsMenu'
 
 /** 원본 문구·이름 그림 표 (R4 4절 · StrMAINMENU[121]~[126]) */
 export {
-  KIND_LABELS, KIND_LABEL_FRAMES, KIND_DESCRIPTIONS,
-  CHANCE_DESCRIPTIONS, CHANCE_LABELS, INNING_LABELS, INNING_LABEL_FRAMES, INNING_DESCRIPTIONS,
-  DETAIL_ROW_LABELS, DETAIL_ROW_DESCRIPTIONS, CONFIRM_TEXT, NO_DETAIL_TEXT,
+  KIND_LABELS,
+  KIND_LABEL_FRAMES,
+  KIND_DESCRIPTIONS,
+  CHANCE_DESCRIPTIONS,
+  CHANCE_LABELS,
+  INNING_LABELS,
+  INNING_LABEL_FRAMES,
+  INNING_DESCRIPTIONS,
+  DETAIL_ROW_LABELS,
+  DETAIL_ROW_DESCRIPTIONS,
+  CONFIRM_TEXT,
+  NO_DETAIL_TEXT,
 } from '@/pages/match-settings/lib/matchSettingsText'

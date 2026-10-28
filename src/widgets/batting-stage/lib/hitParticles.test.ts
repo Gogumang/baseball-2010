@@ -108,20 +108,24 @@ describe('필살타법 파티클 (0x49aec)', () => {
   })
 
   it('마타자 순번은 점프표 0xd01e4 그대로다', () => {
-    const 쏘는것 = [0, 1, 2, 3, 4].map((index) =>
-      specialSwingParticlesOf(0, 0, index).map((one) => [one.id, one.img]))
+    const 쏘는것 = [0, 1, 2, 3, 4].map((index) => specialSwingParticlesOf(0, 0, index).map((one) => [one.id, one.img]))
     expect(쏘는것).toEqual([
       [[9, 2]],
-      [[18, 1], [19, 1]],
-      [[13, 1], [1, 6]],
+      [
+        [18, 1],
+        [19, 1],
+      ],
+      [
+        [13, 1],
+        [1, 6],
+      ],
       [[20, 5]],
       [[17, 13]],
     ])
   })
 
   it('크라이져(3)만 25px 아래에서 터진다', () => {
-    expect([0, 1, 2, 3, 4].map((index) => specialSwingParticlesOf(0, 0, index)[0]?.offsetY))
-      .toEqual([0, 0, 0, 25, 0])
+    expect([0, 1, 2, 3, 4].map((index) => specialSwingParticlesOf(0, 0, index)[0]?.offsetY)).toEqual([0, 0, 0, 25, 0])
   })
 
   it('마타자면 필살 번호는 안 본다 (0x49b4e 가 먼저 가른다)', () => {

@@ -3,9 +3,7 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import {
-  LOGO_FRAMES, LOGO_REVEAL_FRAME_HEIGHT, LOGO_VOICE_UPDATE, logoDoneUpdateOf, logoPoseAt,
-} from '@/pages/title/model/logoIntro'
+import { LOGO_FRAMES, LOGO_REVEAL_FRAME_HEIGHT, LOGO_VOICE_UPDATE, logoDoneUpdateOf, logoPoseAt } from '@/pages/title/model/logoIntro'
 import * as styles from '@/pages/title/ui/BootScreen.css'
 import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
 import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
@@ -74,9 +72,15 @@ export function LogoScreen({ onDone, onVoice }: LogoScreenProps) {
     const origin = origins?.[name]
     if (origin === undefined) return null
     return (
-      <EffectImage key={`${index}-반투명`} className={styles.layer} src={`${LOGO_FRAMES}/${name}.png`}
-        effect={DRAW_EFFECT.TRANSLUCENT} argument={level} backdrop={WHITE_BACKDROP}
-        style={{ left: ANCHOR.x + origin.x, top: ANCHOR.y + origin.y }} />
+      <EffectImage
+        key={`${index}-반투명`}
+        className={styles.layer}
+        src={`${LOGO_FRAMES}/${name}.png`}
+        effect={DRAW_EFFECT.TRANSLUCENT}
+        argument={level}
+        backdrop={WHITE_BACKDROP}
+        style={{ left: ANCHOR.x + origin.x, top: ANCHOR.y + origin.y }}
+      />
     )
   }
 

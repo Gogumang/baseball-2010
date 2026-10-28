@@ -18,8 +18,9 @@ describe('ScoreboardFrame — 0x41440', () => {
   })
 
   it('효과 1 · 인자 0 이면 그림은 안 그리고 칠만 남는다 (인트로 끝)', () => {
-    render(<ScoreboardFrame x={0} y={90} side0={{ team: 0, isComputer: false }} side1={{ team: 1, isComputer: true }}
-      effectLevel={0} introAlpha={135} />)
+    render(
+      <ScoreboardFrame x={0} y={90} side0={{ team: 0, isComputer: false }} side1={{ team: 1, isComputer: true }} effectLevel={0} introAlpha={135} />,
+    )
     expect(screen.queryByTestId('점수판-로고-0')).toBeNull()
     expect(screen.getByTestId('점수판-이름칸-0').style.opacity).toBe(String(135 / 255))
   })

@@ -11,18 +11,8 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
-import {
-  GAUGE_LAST_CELL,
-  MAGIC_PITCH_GRADE,
-  gaugeGradeOf,
-  usesGauge,
-} from '@/entities/pitcher-career/model/pitchGauge'
-import {
-  MAGIC_PITCH_TYPE_NUMBER,
-  MAGIC_PITCH_SLOT,
-  magicPitchNameOf,
-  magicPitchRecordIndexOf,
-} from '@/entities/pitcher-career/model/magicPitch'
+import { GAUGE_LAST_CELL, MAGIC_PITCH_GRADE, gaugeGradeOf, usesGauge } from '@/entities/pitcher-career/model/pitchGauge'
+import { MAGIC_PITCH_TYPE_NUMBER, MAGIC_PITCH_SLOT, magicPitchNameOf, magicPitchRecordIndexOf } from '@/entities/pitcher-career/model/magicPitch'
 import {
   pitchStaminaCostOf,
   staminaCapacityOf,
@@ -202,8 +192,7 @@ const NON_GAUGE_AIM_OFFSET = 3
  * 안 누른 공은 t = 0 이라 어느 칸이든 같은 반지름이므로 이 가름은 원본과 결과가 같다.
  */
 function aimCellOf(input: Pick<HumanPitchInput, 'typeNumber' | 'gaugeCell' | 'grade'>): number {
-  const pressedGauge =
-    input.typeNumber !== MAGIC_PITCH_TYPE_NUMBER && input.gaugeCell >= 1 && input.gaugeCell <= GAUGE_LAST_CELL
+  const pressedGauge = input.typeNumber !== MAGIC_PITCH_TYPE_NUMBER && input.gaugeCell >= 1 && input.gaugeCell <= GAUGE_LAST_CELL
   return pressedGauge ? input.gaugeCell : input.grade + NON_GAUGE_AIM_OFFSET
 }
 
@@ -241,11 +230,7 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
   )
   // 투수 미션의 조준 흔들림(0x39c5c)은 0x10 의 틱마다 이미 지나왔다(`pitchAim.aimTickOf`) — 여기는 놓는 순간
   // 0x4dc78 의 표시 구속 · 제구 흩어짐뿐이다
-  const finalTarget = applyControlError(
-    target,
-    { tier: input.grade, isComputer: false, aimIndex: aimCellOf(input) },
-    random,
-  )
+  const finalTarget = applyControlError(target, { tier: input.grade, isComputer: false, aimIndex: aimCellOf(input) }, random)
   const speedStage = isMagic ? MAGIC_PITCH_SPEED_STAGE : pitchSpeedStageOf(typeNumber - 1, stats, input.grade)
   const worldPath = pitchPathOf({
     typeNumber,
@@ -257,7 +242,7 @@ export function buildHumanPitch(input: HumanPitchInput, random: RandomPort): Pit
   const type = isMagic ? null : (PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0])
 
   return {
-    type: type?.name ?? (magicPitchNameOf(repertoire.magicNumber, repertoire.form) ?? '마구'),
+    type: type?.name ?? magicPitchNameOf(repertoire.magicNumber, repertoire.form) ?? '마구',
     plate: plateOf(finalTarget, side),
     breakOffset: { x: type?.horizontalBreak ?? 0, y: type?.verticalBreak ?? 0 },
     flightDurationMilliseconds: worldPath.length * millisecondsPerFrame(),

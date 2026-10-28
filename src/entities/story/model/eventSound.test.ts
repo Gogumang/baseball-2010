@@ -15,9 +15,15 @@ describe('이벤트 명령 6 소리 — 0x8d470~0x8d4be', () => {
     const calls: string[] = []
     const port = {
       ...createSilentSound(),
-      play: (id: number) => { calls.push(`효과 ${id}`) },
-      playBgm: (id: number) => { calls.push(`배경 ${id}`) },
-      stopBgm: () => { calls.push('멈춤') },
+      play: (id: number) => {
+        calls.push(`효과 ${id}`)
+      },
+      playBgm: (id: number) => {
+        calls.push(`배경 ${id}`)
+      },
+      stopBgm: () => {
+        calls.push('멈춤')
+      },
     }
     playEventSound(port, 35)
     playEventSound(port, 47)

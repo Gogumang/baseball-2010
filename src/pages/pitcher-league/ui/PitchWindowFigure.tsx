@@ -6,12 +6,30 @@ import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCH_TRAINING_TABLE, pitchTypeNameOf } from '@/entities/pitcher-career/model/pitchTraining'
 import {
-  PITCH_TRAINING_CELL_BOXES, PITCH_TRAINING_CONNECTORS, PITCH_TRAINING_CONNECTOR_COLOR, PITCH_TRAINING_COST_BOX,
-  PITCH_TRAINING_COUNT_BOX, PITCH_TRAINING_CURSOR_COLOR, PITCH_TRAINING_INNER, PITCH_TRAINING_INNER_COLORS,
-  PITCH_TRAINING_LAYOUT_FRAME, PITCH_TRAINING_PANEL, PITCH_TRAINING_SLASH_IMAGE, PITCH_TRAINING_STATUS_BOX,
-  PITCH_TRAINING_TAB_MARK_FRAME, PITCH_TRAINING_TAB_STRIP, PITCH_TRAINING_TIMES_LABEL, PITCH_TRAINING_TREE_FRAME,
-  cellColumnOf, cellLookOf, isPitchTrainingBlinkOn, pitchTrainingWindowCostOf, pitchTrainingWindowProgressOf, statusLabelOf,
-  tabMarkTopLeftOf, tabPressRectOf,
+  PITCH_TRAINING_CELL_BOXES,
+  PITCH_TRAINING_CONNECTORS,
+  PITCH_TRAINING_CONNECTOR_COLOR,
+  PITCH_TRAINING_COST_BOX,
+  PITCH_TRAINING_COUNT_BOX,
+  PITCH_TRAINING_CURSOR_COLOR,
+  PITCH_TRAINING_INNER,
+  PITCH_TRAINING_INNER_COLORS,
+  PITCH_TRAINING_LAYOUT_FRAME,
+  PITCH_TRAINING_PANEL,
+  PITCH_TRAINING_SLASH_IMAGE,
+  PITCH_TRAINING_STATUS_BOX,
+  PITCH_TRAINING_TAB_MARK_FRAME,
+  PITCH_TRAINING_TAB_STRIP,
+  PITCH_TRAINING_TIMES_LABEL,
+  PITCH_TRAINING_TREE_FRAME,
+  cellColumnOf,
+  cellLookOf,
+  isPitchTrainingBlinkOn,
+  pitchTrainingWindowCostOf,
+  pitchTrainingWindowProgressOf,
+  statusLabelOf,
+  tabMarkTopLeftOf,
+  tabPressRectOf,
 } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import type { PitchTrainingCursor, PitchWindowState } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
@@ -96,8 +114,15 @@ export function PitchWindowFigure({ career, cursor, state, onPressTab, onPressCe
   return (
     <div data-testid="구질창-그림" data-state={state}>
       {/* 8046c 공용 판 — 필살타법 창과 같은 인자 */}
-      <CommonPanel x={PITCH_TRAINING_PANEL.x} y={PITCH_TRAINING_PANEL.y} width={PITCH_TRAINING_PANEL.width}
-        height={PITCH_TRAINING_PANEL.height} topBand={0x10} titleTab testId="구질훈련-판" />
+      <CommonPanel
+        x={PITCH_TRAINING_PANEL.x}
+        y={PITCH_TRAINING_PANEL.y}
+        width={PITCH_TRAINING_PANEL.width}
+        height={PITCH_TRAINING_PANEL.height}
+        topBand={0x10}
+        titleTab
+        testId="구질훈련-판"
+      />
       {/* 0x802dc — 박스 2 칠 · 위(x..x+w−1, y) · 왼(x, y..y+h) #0A266F · 아래(x+1..x+w−1, y+h) · 오른(x+w−1, y+1..y+h) #5683F5 */}
       <svg style={layer} width={SCREEN.width} height={SCREEN.height} viewBox="0 0 240 320" shapeRendering="crispEdges" aria-hidden>
         <rect x={inner.x} y={inner.y} width={inner.width} height={inner.height} fill={PITCH_TRAINING_INNER_COLORS.fill} />
@@ -107,8 +132,13 @@ export function PitchWindowFigure({ career, cursor, state, onPressTab, onPressCe
         <rect x={inner.x + inner.width - 1} y={inner.y + 1} width={1} height={inner.height} fill={PITCH_TRAINING_INNER_COLORS.lit} />
       </svg>
       <FrameSprite folder={MODE_UI} frame={PITCH_TRAINING_LAYOUT_FRAME} origins={uiOrigins} x={0} y={0} />
-      <FrameSprite folder={MODE_UI} frame={PITCH_TRAINING_TAB_STRIP.frame} origins={uiOrigins}
-        x={PITCH_TRAINING_TAB_STRIP.x} y={PITCH_TRAINING_TAB_STRIP.y} />
+      <FrameSprite
+        folder={MODE_UI}
+        frame={PITCH_TRAINING_TAB_STRIP.frame}
+        origins={uiOrigins}
+        x={PITCH_TRAINING_TAB_STRIP.x}
+        y={PITCH_TRAINING_TAB_STRIP.y}
+      />
       {/* 805a8 — 상태 ≠ 0x7b 일 때만 */}
       {isTraining && <img alt="" src={G_COIN.src} style={{ position: 'absolute', left: G_COIN.x, top: G_COIN.y }} />}
       <FrameSprite folder={MODE_UI} frame={PITCH_TRAINING_TREE_FRAME} origins={uiOrigins} x={0} y={0} />
@@ -134,27 +164,37 @@ export function PitchWindowFigure({ career, cursor, state, onPressTab, onPressCe
         )
       })}
       {cursor.isCellFocus && isBlinkOn && (
-        <svg style={layer} width={SCREEN.width} height={SCREEN.height} viewBox="0 0 240 320" shapeRendering="crispEdges"
-          data-testid="구질칸-커서">
+        <svg style={layer} width={SCREEN.width} height={SCREEN.height} viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid="구질칸-커서">
           {/* 0xb9ed5 테두리 (x−1, y−1, w+1, h+1) — 칸을 1px 둘러싼다 */}
-          <rect x={cursorBox.x - 0.5} y={cursorBox.y - 0.5} width={cursorBox.width + 1} height={cursorBox.height + 1}
-            fill="none" stroke={PITCH_TRAINING_CURSOR_COLOR} strokeWidth={1} />
+          <rect
+            x={cursorBox.x - 0.5}
+            y={cursorBox.y - 0.5}
+            width={cursorBox.width + 1}
+            height={cursorBox.height + 1}
+            fill="none"
+            stroke={PITCH_TRAINING_CURSOR_COLOR}
+            strokeWidth={1}
+          />
         </svg>
       )}
 
       {/* 811a6 — 초점이 칸이고 상태 ≠ 0x7b 일 때만 */}
       {isTraining && cursor.isCellFocus && (
-        <div data-testid="구질훈련-비용-횟수" data-cost={pitchTrainingWindowCostOf(cursor.cell)}
-          data-progress={`${progress.count}/${progress.required}`}>
-          <SpriteNumber glyphs={numberGlyphsOf(pitchTrainingWindowCostOf(cursor.cell))}
+        <div
+          data-testid="구질훈련-비용-횟수"
+          data-cost={pitchTrainingWindowCostOf(cursor.cell)}
+          data-progress={`${progress.count}/${progress.required}`}
+        >
+          <SpriteNumber
+            glyphs={numberGlyphsOf(pitchTrainingWindowCostOf(cursor.cell))}
             right={PITCH_TRAINING_COST_BOX.x + PITCH_TRAINING_COST_BOX.width - 4}
-            boxTop={PITCH_TRAINING_COST_BOX.y} boxHeight={PITCH_TRAINING_COST_BOX.height} />
+            boxTop={PITCH_TRAINING_COST_BOX.y}
+            boxHeight={PITCH_TRAINING_COST_BOX.height}
+          />
           <img alt="" src={`${NUM}/${pad3(progress.count)}.png`} style={{ position: 'absolute', ...countAt }} />
           <img alt="" src={`${NUM}/${pad3(PITCH_TRAINING_SLASH_IMAGE)}.png`} style={{ position: 'absolute', ...slashAt }} />
           <img alt="" src={`${NUM}/${pad3(progress.required)}.png`} style={{ position: 'absolute', ...requiredAt }} />
-          {timesAt !== null && (
-            <FrameSprite folder={IMG_TEXT} frame={PITCH_TRAINING_TIMES_LABEL} origins={textOrigins} x={timesAt.x} y={timesAt.y} />
-          )}
+          {timesAt !== null && <FrameSprite folder={IMG_TEXT} frame={PITCH_TRAINING_TIMES_LABEL} origins={textOrigins} x={timesAt.x} y={timesAt.y} />}
         </div>
       )}
       {label !== null && (
@@ -165,12 +205,22 @@ export function PitchWindowFigure({ career, cursor, state, onPressTab, onPressCe
 
       {/* 마우스 길 — 탭은 그 탭을 고르고(초점 탭 줄), 칸은 초점을 칸으로 옮겨 그 칸을 확인한다 */}
       {PITCH_TRAINING_TABLE.map((_, tab) => (
-        <PressArea key={`탭${tab}`} label={`구질 계열 ${tab + 1}`} rect={tabPressRectOf(tab)}
-          option={{ isSelected: tab === row }} onPress={() => onPressTab(tab)} />
+        <PressArea
+          key={`탭${tab}`}
+          label={`구질 계열 ${tab + 1}`}
+          rect={tabPressRectOf(tab)}
+          option={{ isSelected: tab === row }}
+          onPress={() => onPressTab(tab)}
+        />
       ))}
       {PITCH_TRAINING_CELL_BOXES.map((box, cellColumn) => (
-        <PressArea key={`칸${cellColumn}`} label={pitchTypeNameOf(PITCH_TRAINING_TABLE[row][cellColumn])} rect={box}
-          option={{ isSelected: cursor.isCellFocus && cellColumn === column }} onPress={() => onPressCell(cellColumn)} />
+        <PressArea
+          key={`칸${cellColumn}`}
+          label={pitchTypeNameOf(PITCH_TRAINING_TABLE[row][cellColumn])}
+          rect={box}
+          option={{ isSelected: cursor.isCellFocus && cellColumn === column }}
+          onPress={() => onPressCell(cellColumn)}
+        />
       ))}
     </div>
   )

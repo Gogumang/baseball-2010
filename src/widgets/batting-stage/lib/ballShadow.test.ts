@@ -35,7 +35,14 @@ describe('타석 공 그림자 0x3b2f4 3b388~3b422 (r271)', () => {
   })
 
   it('상태 0x11 은 땅점 y + 크기 ≥ 화면 높이면 안 그리고(3b3f8), 0x13 은 늘 그린다', () => {
-    const 가까운공: Pitch = { ...공, worldPath: [{ x: 20000, y: 1500, z: 24600 }, { x: 20000, y: 3470, z: 31490 }], frameCount: 2 }
+    const 가까운공: Pitch = {
+      ...공,
+      worldPath: [
+        { x: 20000, y: 1500, z: 24600 },
+        { x: 20000, y: 3470, z: 31490 },
+      ],
+      frameCount: 2,
+    }
     expect(ballShadowAt(가까운공, 1)).toBeNull()
     expect(ballShadowAt(가까운공, 1, true)).not.toBeNull()
   })

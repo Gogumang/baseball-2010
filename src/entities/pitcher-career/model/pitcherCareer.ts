@@ -35,12 +35,7 @@ import {
   recordLeagueFreePasses,
   recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
-import type {
-  LeagueFieldingError,
-  LeaguePlateAppearance,
-  LeaguePlayerStats,
-  LeagueStolenBase,
-} from '@/entities/league/model/leaguePlayerStats'
+import type { LeagueFieldingError, LeaguePlateAppearance, LeaguePlayerStats, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { equipmentBonusOf } from '@/entities/career/model/equipment'
 import { NO_EQUIPPED_TITLE } from '@/entities/career/model/titles'
@@ -57,11 +52,7 @@ import type { SeasonEndState } from '@/entities/career/model/playerCareer'
 import type { NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
-import {
-  MAXIMUM_PITCHER_ABILITY,
-  PITCHER_ABILITY_ORDER,
-  pitcherAbilityLimitOf,
-} from '@/entities/pitcher-career/model/pitcherAbility'
+import { MAXIMUM_PITCHER_ABILITY, PITCHER_ABILITY_ORDER, pitcherAbilityLimitOf } from '@/entities/pitcher-career/model/pitcherAbility'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { EMPTY_PITCHER_STREAKS } from '@/entities/pitcher-career/model/pitcherStreaks'
@@ -229,10 +220,7 @@ const COMPLETE_GAME_COUNT_KEY = {
 } as const
 
 /** 완투 계열 한 번을 센다 (0xa6b54~0xa6c1a, u16 — 65535 를 넘으면 원본은 0 으로 돈다) */
-export function countCompleteGame(
-  career: PitcherCareer,
-  kind: keyof typeof COMPLETE_GAME_COUNT_KEY | '없음',
-): PitcherCareer {
+export function countCompleteGame(career: PitcherCareer, kind: keyof typeof COMPLETE_GAME_COUNT_KEY | '없음'): PitcherCareer {
   if (kind === '없음') return career
   const key = COMPLETE_GAME_COUNT_KEY[kind]
   return {
@@ -544,13 +532,11 @@ export interface PitcherCareer {
 /** 등록 꼴 열 팀 레코드 — 타자 배열은 붙박이, 내 팀은 투수 배열에 내 투수 */
 function registeredNariTeamsOf(teamId: number, role: PitcherRole): NariTeamRecords {
   return createNariTeamRecords(teamId, null).map((record, team) =>
-    team === teamId ? { ...record, pitchers: registeredMyPitcherOrderOf(role) } : record)
+    team === teamId ? { ...record, pitchers: registeredMyPitcherOrderOf(role) } : record,
+  )
 }
 
-export function createPitcherCareer(
-  name: string,
-  profile: PitcherRookieProfile = DEFAULT_PITCHER_ROOKIE_PROFILE,
-): PitcherCareer {
+export function createPitcherCareer(name: string, profile: PitcherRookieProfile = DEFAULT_PITCHER_ROOKIE_PROFILE): PitcherCareer {
   return {
     name,
     ability: rookiePitcherAbilityOf(profile.role, profile.typeIndex),
@@ -756,9 +742,7 @@ const COOL_CONTROL_DIVISOR = 10
  *      그래서 제구는 999 를 넘을 수 있다(최대 999 + 99). 칭호 0x1ad7e 는 이 값을 `> 998` 로 보고,
  *      경기용 0xb570c 는 맨 끝(0xb5b06)에서야 0..999 로 자른다.
  */
-export function equippedPitcherAbilityOf(
-  career: Pick<PitcherCareer, 'ability' | 'equipmentLevels' | 'equippedSkillIds'>,
-): PitcherAbility {
+export function equippedPitcherAbilityOf(career: Pick<PitcherCareer, 'ability' | 'equipmentLevels' | 'equippedSkillIds'>): PitcherAbility {
   const adjust = (key: keyof PitcherAbility) => {
     let value = Math.min(MAXIMUM_ABILITY, career.ability[key] + equipmentBonusOf(career.equipmentLevels[key]))
     if (isPitcherSkillEquipped(career, POWERLESS_SKILL)) value = Math.max(0, value - balanceNumber('ability.skillPenalty'))
@@ -930,10 +914,7 @@ export function applyPitcherGameResult(career: PitcherCareer, outcome: PitcherGa
     postseason:
       career.postseason === null
         ? career.postseason
-        : advancePostseason(
-            career.postseason,
-            outcome.result === '승' ? outcome.ourTeamId : outcome.opponentTeamId,
-          ),
+        : advancePostseason(career.postseason, outcome.result === '승' ? outcome.ourTeamId : outcome.opponentTeamId),
     wins: career.wins + (outcome.result === '승' ? 1 : 0),
     losses: career.losses + (outcome.result === '승' ? 0 : 1),
   }
@@ -963,9 +944,7 @@ export function applyPitcherLeagueDay(
   }
   const day = Math.max(0, career.gamesPlayed - 1)
   const opponent = opponentOf(day, career.teamId)
-  const league = cpuGameRotationAdvances(PITCHER_EDITION_MODE, day)
-    ? rotateLeaguePitchers(career.league, [opponent])
-    : career.league
+  const league = cpuGameRotationAdvances(PITCHER_EDITION_MODE, day) ? rotateLeaguePitchers(career.league, [opponent]) : career.league
   const played = playLeagueDay(
     league,
     day,
@@ -1087,9 +1066,7 @@ export function withPitcherGameLeagueRecords(
 ): PitcherCareer {
   const regularSeason = before.postseason === null
   const withPitchers = recordHumanGamePitchers(after.leaguePlayerStats, pitchers, regularSeason)
-  const gated = regularSeason
-    ? recordLeagueStolenBases(recordLeaguePlateAppearances(withPitchers, plateAppearances), stolenBases)
-    : withPitchers
+  const gated = regularSeason ? recordLeagueStolenBases(recordLeaguePlateAppearances(withPitchers, plateAppearances), stolenBases) : withPitchers
   // 사사구 +0x2a(a8b04~a8bee) · 실책 +0x2e(0x43278)는 0xa56dc 게이트 밖이다. 사람 투구 판정이 볼넷을 세는 투수는 내 투수뿐이라
   // CPU 줄에는 `walks` 가 없다(내 투수는 커리어가 센다) — 그래도 같은 길로 둔다
   const leaguePlayerStats = recordLeagueErrors(recordLeagueFreePasses(gated, pitchers?.lines ?? []), errors)
@@ -1150,13 +1127,13 @@ export function applyPitcherPostseasonProgress(
   return result.series === career.postseason
     ? career
     : {
-      ...career,
-      postseason: result.series,
-      leaguePitcherStaminas: result.pitcherStaminas,
-      ...(result.staleRecordMorales === undefined ? {} : { teamRecordMorales: result.staleRecordMorales }),
-      // 0xc2760 → 0xc239c 도 나리 레코드에 마선수를 넣고 남긴다 (A-05)
-      ...(result.recordAces === undefined ? {} : { nariTeams: withCpuGameRecordAces(nariTeamsOf(career), result.recordAces) }),
-    }
+        ...career,
+        postseason: result.series,
+        leaguePitcherStaminas: result.pitcherStaminas,
+        ...(result.staleRecordMorales === undefined ? {} : { teamRecordMorales: result.staleRecordMorales }),
+        // 0xc2760 → 0xc239c 도 나리 레코드에 마선수를 넣고 남긴다 (A-05)
+        ...(result.recordAces === undefined ? {} : { nariTeams: withCpuGameRecordAces(nariTeamsOf(career), result.recordAces) }),
+      }
 }
 
 /** 다음 경기 상대 (0xb765c) — 타자편 `nextOpponentOf` 와 같은 규칙이다 */
@@ -1217,9 +1194,7 @@ function startNextPitcherSeasonRecords(career: PitcherCareer): PitcherCareer {
     // 승패는 비우되 **투수 레코드 차례는 잇는다** (`nextSeasonLeague` — 새 시즌 처리는 팀 저장 레코드를 다시 짓지 않는다).
     // 레코드 +0x2c 는 첫 경기 준비(g == 0)가 열 팀 10000 으로 채운다
     league: nextSeasonLeague(
-      career.postseason === null
-        ? career.league.pitcherOrders
-        : pitcherOrdersAfterPostseason(career.postseason, career.league.pitcherOrders),
+      career.postseason === null ? career.league.pitcherOrders : pitcherOrdersAfterPostseason(career.postseason, career.league.pitcherOrders),
     ),
     leaguePlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
     postseason: null,
@@ -1252,9 +1227,7 @@ const PITCHER_STAT_KEYS = ['games', 'outs', 'runsAllowed', 'saves', 'strikeouts'
  *   `pitcherStoryScene`)은 앞 칸이 0 으로 읽힌다(예전 웹도 없는 해를 0 으로 읽었다).
  * 사사구(+0x2a)는 통산 칸이 0~9999 로 잘려 빼기가 맞지 않아 0 으로 둔다. 칸이 모자라지 않으면 같은 객체
  */
-export function migratePitcherYearlyStats<T extends Pick<PitcherCareer, 'season' | 'stats' | 'careerStats' | 'yearlyStats'>>(
-  career: T,
-): T {
+export function migratePitcherYearlyStats<T extends Pick<PitcherCareer, 'season' | 'stats' | 'careerStats' | 'yearlyStats'>>(career: T): T {
   const years = pitcherYearlyStatsOf(career)
   const missing = career.season - 1 - years.length
   if (missing <= 0) return career
@@ -1264,7 +1237,8 @@ export function migratePitcherYearlyStats<T extends Pick<PitcherCareer, 'season'
     earlier[key] = Math.max(0, career.careerStats[key] - career.stats[key] - known)
   }
   const filler: PitcherSeasonStats[] = Array.from({ length: missing }, (_unused, index) =>
-    index === missing - 1 ? { ...EMPTY_PITCHER_SEASON_STATS, ...earlier } : EMPTY_PITCHER_SEASON_STATS)
+    index === missing - 1 ? { ...EMPTY_PITCHER_SEASON_STATS, ...earlier } : EMPTY_PITCHER_SEASON_STATS,
+  )
   return { ...career, yearlyStats: [...filler, ...years] }
 }
 

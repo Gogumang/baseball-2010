@@ -60,11 +60,7 @@ import { aceBatterProfileOf, batterHandOf } from '@/widgets/matchup-cards/lib/ma
 import { batterEquipmentOf, pitcherEquipmentOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 import { missionFielderPlatesOf, missionRunnerAcesOf, missionWalkTeamOf } from '@/entities/mission/model/missionRunners'
-import {
-  type BenchClearingOffenseAces,
-  aceRunnerBasesOf,
-  benchClearingFieldOf,
-} from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { type BenchClearingOffenseAces, aceRunnerBasesOf, benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import type { WalkerLineSeats, WalkerSeat } from '@/widgets/field-walk/lib/walkerAces'
 import { castOfRosterBatters, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
@@ -131,9 +127,10 @@ function resultBoardOf(
   ownFlags?: { readonly flag11f: boolean; readonly flag176: boolean },
 ) {
   const hold = session.aceMatchHold
-  const aceMatch = ownFlags === undefined && !hold.batter && !hold.pitcher
-    ? undefined
-    : { flag11f: (ownFlags?.flag11f ?? false) || hold.batter, flag176: (ownFlags?.flag176 ?? false) || hold.pitcher }
+  const aceMatch =
+    ownFlags === undefined && !hold.batter && !hold.pitcher
+      ? undefined
+      : { flag11f: (ownFlags?.flag11f ?? false) || hold.batter, flag176: (ownFlags?.flag176 ?? false) || hold.pitcher }
   const earnedGamePoint = session.resultEarnedGamePointOf(mission, status, aceMatch !== undefined)
   return {
     earnedGamePoint,
@@ -197,9 +194,7 @@ export function MissionRoutes({
   const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), playScreenRef.current)
 
   const playingRun =
-    screen.kind === '투수미션' ? session.pitcherRun
-      : screen.kind === '미션진행' || screen.kind === '마선수대결' ? session.missionRun
-        : null
+    screen.kind === '투수미션' ? session.pitcherRun : screen.kind === '미션진행' || screen.kind === '마선수대결' ? session.missionRun : null
   // 볼넷 · 사구 밀어내기 판(종류 2)은 0x12 대기(0x1f 틱) 뒤 판정 A 가 0x17 로 보낸다 — 그동안 타석 · 투구 화면을 둔다
   // 경기 중 메뉴 · 조작방법 · 설정(일시정지 팝업 0x741a0)이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 타석 · 투구 화면이 알린다
   const [isPopupFrozen, setPopupFrozen] = useState(false)
@@ -208,9 +203,7 @@ export function MissionRoutes({
    * 메인 메뉴에서 들어오면 이 라우트가 새로 서므로 거짓에서 시작한다
    */
   const [isPickSceneRebuilt, setPickSceneRebuilt] = useState(false)
-  const isFreePassReady = useFreePassPlayStart(
-    session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
-  )
+  const isFreePassReady = useFreePassPlayStart(session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen)
   const pitchScene = useMissionPitchSceneBeforePlay(session, isPopupFrozen)
   // 타자 미션 볼넷 · 사구 — 0x12 대기(판정 틀 T 다음 그림이 틱 0) 틱 31 의 4e74c 판정, 들어갔으면 다음 틀의 진입 0x3a5f0
   // (r298 — 모드 6 도 0x4e6d4 를 탄다). 타자편 `GameRoute` 와 같은 셈이다
@@ -231,7 +224,7 @@ export function MissionRoutes({
   const walkerSeats = useWalkerLineSeats({
     sceneKey: playScreenRef.current,
     playKey: session.pendingDefensePlay ?? session.pendingRunnerPlay ?? session.pickoffReplay,
-    playDefenseRecords: playingRun === null ? null : missionWalkTeamOf(playingRun, true)?.records ?? null,
+    playDefenseRecords: playingRun === null ? null : (missionWalkTeamOf(playingRun, true)?.records ?? null),
     board:
       session.halfInningBoard === null || playingRun === null
         ? null
@@ -246,7 +239,11 @@ export function MissionRoutes({
         : { key: session.pendingBenchClearing, offense: missionBenchOffenseOf(benchRun) },
   })
   const overlay = missionOverlayOf(
-    session, defenseSceneRef, playingRun, runner.bannerText, isFreePassReady,
+    session,
+    defenseSceneRef,
+    playingRun,
+    runner.bannerText,
+    isFreePassReady,
     missionBatterNameOf(session, hallOfFame, nari.타자, screen.kind === '마선수대결'),
     missionPitcherNameOf(session, hallOfFame, nari.투수),
     walkerSeats,
@@ -275,9 +272,8 @@ export function MissionRoutes({
     // 결과 0(되돌아가기)은 표 0xcec00 → 하위 5 게임시작 목록(0x29a92) — 장면을 새로 세우지 않아 커서 [0x1552d24] 는 그 칸 그대로다.
     // 메인 메뉴에서 내려왔으면 띠는 이미 다 자랐고, 미션 목록 CLR(0x11 로 장면을 새로 세움)로 왔으면 생성자가 1 로 세운 채라
     // 하위 5 에서 처음 자란다(하위 17 그리기 0x2dec8 은 0x2524c 를 안 불러 띠가 안 자란다)
-    const leaveToGameStartList = () => setScreen(isPickSceneRebuilt
-      ? { kind: '메인메뉴', openTier: 5 }
-      : { kind: '메인메뉴', openTier: 5, isBandGrown: true })
+    const leaveToGameStartList = () =>
+      setScreen(isPickSceneRebuilt ? { kind: '메인메뉴', openTier: 5 } : { kind: '메인메뉴', openTier: 5, isBandGrown: true })
     return (
       <HallOfFameScreen
         {...(gamePoint === undefined ? {} : { frame: { title: '미션모드' as const, gamePoint } })}
@@ -333,8 +329,7 @@ export function MissionRoutes({
         pitcherAbility={{
           ...missionMoundPitcherAbility(missionRun, session.aceLevels, session.opponentStaminaPercent),
           // 공이 손을 떠나며(0x3dec6 → 0xa5e14) 깎은 뒤 체력%를 놓기 0x4dc78 · 스윙 0xab214 가 본다
-          staminaPercentAfterPitch: (pitchTypeNumber) =>
-            session.opponentStaminaPercentAfterPitch(missionRun, pitchTypeNumber),
+          staminaPercentAfterPitch: (pitchTypeNumber) => session.opponentStaminaPercentAfterPitch(missionRun, pitchTypeNumber),
         }}
         opponent={missionMoundOpponent(missionRun)}
         // 마운드 마스터 줄 +0x19 · +0x1a 니블 — 마투수 칸이면 없다 (0x47cc8 48138~4816a)
@@ -380,8 +375,13 @@ export function MissionRoutes({
         onFinish={screen.kind === '마선수대결' ? actions.finishAceMatch : actions.finishBatter}
         // 결과 판 0x4a384(모드 5·6) — "예"는 같은 미션 곧바로 다시(0x140006c = 3)
         onRetry={actions.retryBatter}
-        resultBoard={resultBoardOf(session, missionRun.mission, missionRun.status, gamePoint,
-          screen.kind === '마선수대결' ? BATTER_ACE_MATCH_FLAGS : undefined)}
+        resultBoard={resultBoardOf(
+          session,
+          missionRun.mission,
+          missionRun.status,
+          gamePoint,
+          screen.kind === '마선수대결' ? BATTER_ACE_MATCH_FLAGS : undefined,
+        )}
         // 경기 중 메뉴 "다시하기" (StrGAME[7]) — 같은 미션을 처음부터 다시 세운다. 0x3c98e 는 g[0x11f] 를 안 보고 모드 5·6 이면
         // 장면 0x107 → 0x104 로 같은 미션을 다시 세운다 — g[0x11f] 는 아무도 안 내려 마선수 대결은 **같은 대결**로 다시 선다
         // (투수편 대결 `PitcherAceMatchRoute` 와 같다)
@@ -573,9 +573,7 @@ function missionOverlayOf(
           opponentTeamId: sideTeams[1],
           // 타자 미션이면 사구를 맞은 사람 칸 타자(타석 화면과 같은 손 — `missionStageBatterOf` 의 레코드 +0xb 폼)
           batterHand:
-            session.pendingBenchClearing.side === '투수'
-              ? missionCpuBatterHandOf(session.pendingBenchClearing.run)
-              : (benchBatterHand ?? 0),
+            session.pendingBenchClearing.side === '투수' ? missionCpuBatterHandOf(session.pendingBenchClearing.run) : (benchBatterHand ?? 0),
           bases: benchRun.bases,
           // 마선수 그림 0x79b48 — 수비 줄은 사람 칸 팀(미션 투수), 공격 줄은 CPU 타선(마타자 칸 포함)
           defenseAces: missionWalkTeamOf(benchRun, true),
@@ -639,7 +637,9 @@ function missionOverlayOf(
           // 같은 훑기라 수비 판 이름 판의 야수(`missionFielderPlatesOf`, 대타 니블 맞바꿈까지)를 그대로 쓴다.
           fielderNames: [
             boardCards.pitcherName,
-            ...missionFielderPlatesOf(playingRun).slice(1).map((plate) => plate?.name ?? null),
+            ...missionFielderPlatesOf(playingRun)
+              .slice(1)
+              .map((plate) => plate?.name ?? null),
           ],
           // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (`missionWalkTeamOf`). 판 앞 +0xec 는 장면을 세운 직후라 0
           defenseAces: missionWalkTeamOf(playingRun, true),
@@ -698,8 +698,7 @@ function missionPitcherNameOf(
   nariPitcher: HallOfFameNariPlayer | null,
 ): string | null {
   const pick = session.player
-  if (session.pitcherAceMatchMission === null && !session.aceMatchHold.pitcher
-    && pick?.side === '투수' && pick.hallOfFameIndex !== null) {
+  if (session.pitcherAceMatchMission === null && !session.aceMatchHold.pitcher && pick?.side === '투수' && pick.hallOfFameIndex !== null) {
     return hallOfFamePitcherAt(hallOfFame, pick.hallOfFameIndex)?.name ?? null
   }
   return nariPitcher?.name ?? null
@@ -741,9 +740,16 @@ interface PitcherAceMatchRouteProps {
  * 끝나면 결과 화면에서 재도전 커서 없이(0x407f0 의 +0x176 갈래) 원래 모드로 돌아온다 (0x4b328 · 0x4090c).
  * 들어서면 `beginPitcherAceMatch` 로 미션을 세우고, 결과 [확인]에서 `finishPitcherAceMatch` 의 이겼나를 넘긴다.
  */
-export function PitcherAceMatchRoute(
-  { mission, session, runner, pitchControl, gameSettings, onFinish, onQuit, pitcherName }: PitcherAceMatchRouteProps,
-) {
+export function PitcherAceMatchRoute({
+  mission,
+  session,
+  runner,
+  pitchControl,
+  gameSettings,
+  onFinish,
+  onQuit,
+  pitcherName,
+}: PitcherAceMatchRouteProps) {
   const beginRef = useRef(session.actions.beginPitcherAceMatch)
   beginRef.current = session.actions.beginPitcherAceMatch
   useEffect(() => {
@@ -755,13 +761,18 @@ export function PitcherAceMatchRoute(
   // 볼넷 · 사구 밀어내기 판은 0x12 대기(0x1f 틱) 뒤 — 보통 미션과 같다
   // 경기 중 메뉴 · 조작방법 · 설정(일시정지 팝업 0x741a0)이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 타석 · 투구 화면이 알린다
   const [isPopupFrozen, setPopupFrozen] = useState(false)
-  const isFreePassReady = useFreePassPlayStart(
-    session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen,
-  )
+  const isFreePassReady = useFreePassPlayStart(session.pickoffReplay, session.pendingBenchClearing !== null, isPopupFrozen)
   const pitchScene = useMissionPitchSceneBeforePlay(session, isPopupFrozen)
   const overlay = missionOverlayOf(
-    session, defenseSceneRef, session.pitcherAceMatchMission === mission ? session.pitcherRun : null, runner.bannerText,
-    isFreePassReady, null, pitcherName ?? null, undefined, pitchScene,
+    session,
+    defenseSceneRef,
+    session.pitcherAceMatchMission === mission ? session.pitcherRun : null,
+    runner.bannerText,
+    isFreePassReady,
+    null,
+    pitcherName ?? null,
+    undefined,
+    pitchScene,
   )
   if (overlay !== null) return overlay
 
@@ -865,10 +876,7 @@ interface MissionPitchSceneBeforePlay {
  * 0x12 진입 0x3dfac 이 열어 다음 그림이 0x17 이다(`usePitchArrivalHold` — 세션도 못 맞힌 공의 공 도착을 그 틀에 돌린다). 그동안 투구
  * 화면(`PitchingScreen`)이 장면을 그린다. 맞은 공의 판 입력 · 판 시작 굴림은 세션이 이미 냈으니 미뤄도 그 굴림 차례는 그대로다.
  */
-function useMissionPitchSceneBeforePlay(
-  session: ReturnType<typeof useMissionSession>,
-  isPopupFrozen: boolean,
-): MissionPitchSceneBeforePlay {
+function useMissionPitchSceneBeforePlay(session: ReturnType<typeof useMissionSession>, isPopupFrozen: boolean): MissionPitchSceneBeforePlay {
   const lastThrow = session.lastPitcherThrow
   const run = session.pitcherRun
   const stage = run === null ? null : pitchingStageOf(session, run)

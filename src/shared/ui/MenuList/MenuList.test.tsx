@@ -6,7 +6,11 @@ import { IconMenu } from '@/shared/ui/IconMenu/IconMenu'
 
 afterEach(cleanup)
 
-const 항목 = [{ id: 'a', label: '가' }, { id: 'b', label: '나' }, { id: 'c', label: '다' }]
+const 항목 = [
+  { id: 'a', label: '가' },
+  { id: 'b', label: '나' },
+  { id: 'c', label: '다' },
+]
 
 describe('마우스 길 — 원본 목록은 키패드뿐이라 포인터를 올려 두기만 해서는 커서가 안 옮겨진다', () => {
   it('MenuList', () => {

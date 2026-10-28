@@ -150,7 +150,7 @@ describe('evaluateGame — 경기 뒤 인기도·평판·사기 (0xa719c)', () =
   })
 
   it('평판이 높을수록 덜 오르고 더 깎인다 (0xd82a0 / 0xd82c8)', () => {
-    const 고평판 = 선수({ reputation: 900 })  // i = 8 → 가산 −15% · 감산 +20%
+    const 고평판 = 선수({ reputation: 900 }) // i = 8 → 가산 −15% · 감산 +20%
     const 올림 = evaluateGame(고평판, 경기({ stats: 기록({ hits: 2, homeRuns: 1 }), popularityPoints: 8 }))
     expect(올림.reputationChange).toBe(7 - 1)
 

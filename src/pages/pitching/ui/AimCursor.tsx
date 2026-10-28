@@ -2,12 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, isRunningSceneKeys, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { gameSceneTickSeenAt, inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
-import {
-  AIM_STILL,
-  aimKeyActionOf,
-  aimStartOf,
-  aimTickOf,
-} from '@/features/play-pitcher-game/model/pitchAim'
+import { AIM_STILL, aimKeyActionOf, aimStartOf, aimTickOf } from '@/features/play-pitcher-game/model/pitchAim'
 import type { AimDirection, AimKeyAction } from '@/features/play-pitcher-game/model/pitchAim'
 import { AIM_KEYPAD_KEYS, aimTapRectsOf } from '@/pages/pitching/lib/pitchInputTapZones'
 import { CLEAR_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
@@ -16,9 +11,7 @@ import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import {
-  createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 import { subscribeInGameMenuStarOpen } from '@/features/play-team-game/model/useInGameMenuState'
 
 interface AimCursorProps {
@@ -41,7 +34,15 @@ interface AimCursorProps {
 
 /** 누름 칸 읽기 이름 — 휴대폰 숫자판 그대로 ('5' = OK) */
 const KEYPAD_LABELS: Readonly<Record<string, string>> = {
-  '1': '↖', '2': '↑', '3': '↗', '4': '←', '5': 'OK', '6': '→', '7': '↙', '8': '↓', '9': '↘',
+  '1': '↖',
+  '2': '↑',
+  '3': '↗',
+  '4': '←',
+  '5': 'OK',
+  '6': '→',
+  '7': '↙',
+  '8': '↓',
+  '9': '↘',
 }
 
 /**
@@ -78,9 +79,7 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
 
   const tick = () => {
     const { side: currentSide, onTick: currentOnTick } = propsRef.current
-    const next = currentOnTick
-      ? currentOnTick(aimRef.current, directionRef.current)
-      : aimTickOf(aimRef.current, directionRef.current, currentSide)
+    const next = currentOnTick ? currentOnTick(aimRef.current, directionRef.current) : aimTickOf(aimRef.current, directionRef.current, currentSide)
     aimRef.current = next
     setAim(next)
   }

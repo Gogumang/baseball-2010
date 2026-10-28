@@ -49,8 +49,14 @@ const LABEL_PALETTE: ImgTextPaletteIndex = 0
 function valueOf(row: TeamInfoRow, styleOf: (frame: number, palette: ImgTextPaletteIndex) => CSSProperties | undefined) {
   const { value } = row
   if (value.kind === '그림') {
-    return <img alt="" data-frame={value.frame} src={frameSrc(value.frame)}
-      style={{ verticalAlign: 'middle', ...styleOf(value.frame, VALUE_IMAGE_PALETTE) }} />
+    return (
+      <img
+        alt=""
+        data-frame={value.frame}
+        src={frameSrc(value.frame)}
+        style={{ verticalAlign: 'middle', ...styleOf(value.frame, VALUE_IMAGE_PALETTE) }}
+      />
+    )
   }
   // 숫자는 `NumberValue`(num 그림)가 그린다
   return value.kind === '숫자' ? null : value.text
@@ -73,7 +79,13 @@ function nonZeroQuotientsOf(value: number): number {
  * 좌석 꼬리 img_text 345 "석"(팔레트 1)은 0xb9e05(…, 정렬 0x22, dx = r >> 1) — r = (0x6c805(값, 10) + 2) × (num 20 폭 + 2)
  * (0x7c8f2~0x7c930), 0xb9d74 가 x = 칸 x + dx + (w − 그림 폭) >> 1 · 세로 가운데로 놓는다.
  */
-function NumberValue({ value, suffixFrame, box, styleOf, sizeOf }: {
+function NumberValue({
+  value,
+  suffixFrame,
+  box,
+  styleOf,
+  sizeOf,
+}: {
   readonly value: number
   readonly suffixFrame?: number
   readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
@@ -84,18 +96,23 @@ function NumberValue({ value, suffixFrame, box, styleOf, sizeOf }: {
   const total = glyphsWidthOf(glyphs)
   const right = box.x + ((box.width - total) >> 1) + total
   // 크기 표가 아직 없으면(첫 틀 · 시험) 0 으로 셈한다 — 표가 오면 다시 그린다
-  const suffixSize = suffixFrame === undefined ? undefined : sizeOf(suffixFrame) ?? { width: 0, height: 0 }
+  const suffixSize = suffixFrame === undefined ? undefined : (sizeOf(suffixFrame) ?? { width: 0, height: 0 })
   const suffixDx = ((nonZeroQuotientsOf(value) + 2) * (NUM_ZERO_WIDTH + 2)) >> 1
   return (
     <>
       <SpriteNumber glyphs={glyphs} right={right} boxTop={box.y} boxHeight={box.height} />
       {suffixFrame !== undefined && suffixSize !== undefined && (
-        <img className={styles.layer} alt="" data-frame={suffixFrame} src={frameSrc(suffixFrame)}
+        <img
+          className={styles.layer}
+          alt=""
+          data-frame={suffixFrame}
+          src={frameSrc(suffixFrame)}
           style={{
             left: box.x + suffixDx + ((box.width - suffixSize.width) >> 1),
             top: box.y + Math.trunc((box.height - suffixSize.height + 1) / 2),
             ...styleOf(suffixFrame, VALUE_IMAGE_PALETTE),
-          }} />
+          }}
+        />
       )}
     </>
   )
@@ -117,9 +134,7 @@ function NumberValue({ value, suffixFrame, box, styleOf, sizeOf }: {
  * 이름 입력 0xc8(그림 0xba28)도 같은 카드 갈래라 `SeasonTeamCard` 를 같이 쓴다.
  * 구장 줄은 흐르는 글 0x5a8c8 (`StadiumTicker`).
  */
-export function SeasonTeamInfoScreen({
-  teamId, teamAbilities, rows, gamePoint = 0, hasCardBadge = false, onBack,
-}: SeasonTeamInfoScreenProps) {
+export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 0, hasCardBadge = false, onBack }: SeasonTeamInfoScreenProps) {
   const latestBack = useRef(onBack)
   latestBack.current = onBack
   useEffect(() => {
@@ -149,10 +164,7 @@ export function SeasonTeamInfoScreen({
  * **정보 칸 0x7c450 시즌 갈래**의 판과 일곱 줄 — 구단정보 0xd5 · 이름 입력 0xc8(그림 0xba28 의 ba5a) 이 같이 쓴다.
  * 이름 입력은 창+0x28 = 1 이라 줄 0 단장 값(0x7c6f4~0x7c724 `ldrb [gfx+0x28]` ≠ 0 → 건너뜀)을 안 쓴다 — 부르는 쪽이 빈 글로 넘긴다.
  */
-export function SeasonTeamInfoPanel({ rows, testIdPrefix = '구단정보' }: {
-  readonly rows: readonly TeamInfoRow[]
-  readonly testIdPrefix?: string
-}) {
+export function SeasonTeamInfoPanel({ rows, testIdPrefix = '구단정보' }: { readonly rows: readonly TeamInfoRow[]; readonly testIdPrefix?: string }) {
   // 이름표 47 "순위" 는 팔레트 3 으로 구워 둔 프레임이라 팔레트 0 자리에서 흰 글자로 되돌린다
   const palettes = useImgTextPalettes()
   const origins = useFrameOrigins(IMG_TEXT)
@@ -160,8 +172,10 @@ export function SeasonTeamInfoPanel({ rows, testIdPrefix = '구단정보' }: {
   return (
     <>
       {palettes.definition}
-      <div className={styles.layer}
-        style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: BOARD_WIDTH, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
+      <div
+        className={styles.layer}
+        style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: BOARD_WIDTH, height: INFO_BOARD.height, background: INFO_BOARD.color }}
+      />
       {rows.map((row, index) => {
         const column = COLUMNS[index < TEAM_INFO_LEFT_ROWS ? 0 : 1]
         const top = INFO_TOP + (index < TEAM_INFO_LEFT_ROWS ? index : index - TEAM_INFO_LEFT_ROWS) * INFO_ROW_STEP
@@ -169,23 +183,42 @@ export function SeasonTeamInfoPanel({ rows, testIdPrefix = '구단정보' }: {
         const width = row.value.kind === '흐르는글' ? column.value.width * 2 - 14 : column.value.width
         return (
           <div key={row.labelFrame} data-testid={`${testIdPrefix}-줄-${index}`}>
-            <img className={styles.layer} alt="" data-frame={row.labelFrame} src={frameSrc(row.labelFrame)}
+            <img
+              className={styles.layer}
+              alt=""
+              data-frame={row.labelFrame}
+              src={frameSrc(row.labelFrame)}
               style={{
-                left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)',
+                left: column.label.x + column.label.width,
+                top: top + 3,
+                transform: 'translateX(-100%)',
                 ...palettes.styleOf(row.labelFrame, LABEL_PALETTE),
-              }} />
+              }}
+            />
             {row.value.kind === '흐르는글' && (
-              <StadiumTicker text={row.value.text} testId={`${testIdPrefix}-값-${index}`} box={{ x: column.value.x, y: top + 2, width, height: INFO_ROW_HEIGHT }} />
+              <StadiumTicker
+                text={row.value.text}
+                testId={`${testIdPrefix}-값-${index}`}
+                box={{ x: column.value.x, y: top + 2, width, height: INFO_ROW_HEIGHT }}
+              />
             )}
             {row.value.kind === '숫자' && (
               <div data-testid={`${testIdPrefix}-값-${index}`} data-value={row.value.value}>
-                <NumberValue value={row.value.value} suffixFrame={row.value.suffixFrame} styleOf={palettes.styleOf} sizeOf={sizeOf}
-                  box={{ x: column.value.x, y: top, width, height: INFO_ROW_HEIGHT }} />
+                <NumberValue
+                  value={row.value.value}
+                  suffixFrame={row.value.suffixFrame}
+                  styleOf={palettes.styleOf}
+                  sizeOf={sizeOf}
+                  box={{ x: column.value.x, y: top, width, height: INFO_ROW_HEIGHT }}
+                />
               </div>
             )}
             {row.value.kind !== '흐르는글' && row.value.kind !== '숫자' && (
-              <div className={styles.infoValue} data-testid={`${testIdPrefix}-값-${index}`}
-                style={{ left: column.value.x, top, width, height: INFO_ROW_HEIGHT, color: ORIGINAL_COLORS.text }}>
+              <div
+                className={styles.infoValue}
+                data-testid={`${testIdPrefix}-값-${index}`}
+                style={{ left: column.value.x, top, width, height: INFO_ROW_HEIGHT, color: ORIGINAL_COLORS.text }}
+              >
                 {valueOf(row, palettes.styleOf)}
               </div>
             )}
@@ -200,7 +233,11 @@ export function SeasonTeamInfoPanel({ rows, testIdPrefix = '구단정보' }: {
  * 구장 줄 0x7ca7e — `0x5a8c8(skin, 글, 상자 x, y + 2, w, h, 1, 1, 1)`: 자르기 (x + 2, y, w − 4, h) ·
  * 글 왼쪽 = x + w − [skin+0x284] % (글폭 + w) · 그린 뒤 3 올린다 (`shared/lib/skinTicker` — 앱에 하나인 카운터).
  */
-function StadiumTicker({ text, testId, box }: {
+function StadiumTicker({
+  text,
+  testId,
+  box,
+}: {
   readonly text: string
   readonly testId: string
   readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
@@ -212,15 +249,28 @@ function StadiumTicker({ text, testId, box }: {
   useLayoutEffect(() => setTextWidth(textRef.current?.offsetWidth ?? 0), [text])
   const clipLeft = box.x + SKIN_TICKER_CLIP_INSET
   return (
-    <div className={styles.layer} data-testid={testId}
+    <div
+      className={styles.layer}
+      data-testid={testId}
       style={{
-        left: clipLeft, top: box.y, width: box.width - SKIN_TICKER_CLIP_INSET * 2, height: box.height, overflow: 'hidden',
-      }}>
-      <span ref={textRef} className={styles.infoValue}
+        left: clipLeft,
+        top: box.y,
+        width: box.width - SKIN_TICKER_CLIP_INSET * 2,
+        height: box.height,
+        overflow: 'hidden',
+      }}
+    >
+      <span
+        ref={textRef}
+        className={styles.infoValue}
         style={{
-          left: skinTickerTextXOf(box.x, box.width, counter, textWidth) - clipLeft, top: 0, width: 'auto', whiteSpace: 'nowrap',
+          left: skinTickerTextXOf(box.x, box.width, counter, textWidth) - clipLeft,
+          top: 0,
+          width: 'auto',
+          whiteSpace: 'nowrap',
           color: ORIGINAL_COLORS.text,
-        }}>
+        }}
+      >
         {text}
       </span>
     </div>

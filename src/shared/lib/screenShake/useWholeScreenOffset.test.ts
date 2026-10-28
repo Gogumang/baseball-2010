@@ -3,9 +3,18 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useWholeScreenOffset } from '@/shared/lib/screenShake/useWholeScreenOffset'
 
-const boxOf = (left: number, top: number, width: number, height: number) => () => ({
-  left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}),
-}) as DOMRect
+const boxOf = (left: number, top: number, width: number, height: number) => () =>
+  ({
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  }) as DOMRect
 
 /** 480×800 창 — 뿌리는 창 전체, 화면 판 바깥 틀은 (120, 0) 240×800, 판은 (120, 240) 240×320 (배율 1) */
 function mountRoot() {

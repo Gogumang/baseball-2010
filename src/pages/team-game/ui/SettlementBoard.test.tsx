@@ -12,14 +12,25 @@ afterEach(() => {
 })
 
 const 기본 = {
-  mode: 2, isWin: true, side0Score: 3, side1Score: 5, recordIds: [3, 3, 7], gamePoints: 120, heldGamePoints: 900,
-  scoreboardSides: [{ team: 2, isComputer: false }, { team: 7, isComputer: true }],
+  mode: 2,
+  isWin: true,
+  side0Score: 3,
+  side1Score: 5,
+  recordIds: [3, 3, 7],
+  gamePoints: 120,
+  heldGamePoints: 900,
+  scoreboardSides: [
+    { team: 2, isComputer: false },
+    { team: 7, isComputer: true },
+  ],
 } as const
 
 /** 키 0x407f0 은 상태 0x19 의 상태 키 함수라 받은 다음 틀에 돈다(`sceneKeyLatch`) — 누르고 한 틀 흘린다 */
 const 누르기 = (key: string) => {
   fireEvent.keyDown(window, { key })
-  act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame())
+  })
 }
 
 describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
@@ -34,7 +45,9 @@ describe('SettlementBoard — 정산 판 (0x4a384 · 키 0x407f0)', () => {
     render(<SettlementBoard {...기본} onExit={vi.fn()} />)
     fireEvent.keyDown(window, { key: '0' })
     expect(screen.queryByTestId('정산-기록-3')).toBeNull()
-    act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame())
+    })
     expect(screen.getByTestId('정산-기록-3')).toBeTruthy()
   })
 
@@ -124,7 +137,10 @@ describe('대전 승리 팝업 — 0x4b100 4b1f8~4b2d4 (틱 0x14 · 기록 판 �
         <SettlementBoard {...기본} mode={8} onExit={vi.fn()} {...props} />
       </CommonWindowPushContext.Provider>,
     )
-    const frames = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+    const frames = (n: number) =>
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * n)
+      })
     return { push, frames }
   }
   it('기록 판이 열린 채 틱 20 에 이겼으면 "!C추가 …GP 획득" 을 띄운다', async () => {
@@ -159,4 +175,3 @@ describe('대전 승리 팝업 — 0x4b100 4b1f8~4b2d4 (틱 0x14 · 기록 판 �
     }
   })
 })
-

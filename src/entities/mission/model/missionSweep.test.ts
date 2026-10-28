@@ -122,8 +122,16 @@ function decode([side, head, goalRow, board]: (typeof RAW)[number]): DecodedReco
   const goals: Record<string, number> =
     side === '타자'
       ? {
-          안타: g[6], 단타: low(g[1]), '2루타': high(g[0]), '3루타': low(g[0]), 홈런: low(g[3]),
-          만루홈런: high(g[2]), 그라운드홈런: low(g[2]), 번트: high(g[4]), 타점: g[5], 도루: low(g[4]),
+          안타: g[6],
+          단타: low(g[1]),
+          '2루타': high(g[0]),
+          '3루타': low(g[0]),
+          홈런: low(g[3]),
+          만루홈런: high(g[2]),
+          그라운드홈런: low(g[2]),
+          번트: high(g[4]),
+          타점: g[5],
+          도루: low(g[4]),
         }
       : { 탈삼진: high(g[0]), 삼진콤보: low(g[0]), MAX게이지: high(g[1]), 아웃: g[4] }
   return {
@@ -253,7 +261,12 @@ function toMissionBatter(run: MissionRun, random: RandomPort): MissionRun {
 }
 
 /** 미션 타자 타석 하나 — 스윙 칸(코드 9)은 미션 타자의 스윙만 센다 */
-function bat(run: MissionRun, outcome: AtBatOutcome, random: RandomPort, options: { readonly bunt?: boolean; readonly swings?: number } = {}): MissionRun {
+function bat(
+  run: MissionRun,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  options: { readonly bunt?: boolean; readonly swings?: number } = {},
+): MissionRun {
   let next = toMissionBatter(run, random)
   if (next.status !== '진행중') return next
   for (let swing = 0; swing < (options.swings ?? 1); swing += 1) next = recordSwing(next)
@@ -636,19 +649,22 @@ const findAnyMission = (side: '타자' | '투수', id: number): OriginalMission 
 }
 
 describe('마선수 공략 레코드 10칸 — 원본 바이트 · 레코드 게터 · 상대 · 보상 · 클리어 칸', () => {
-  it.each(['타자', '투수'] as const)('%s편 — SYS 8 의 team 16~20 → idx team − 1 → 0xa5268/0xa5294 파일 줄 14~18 → 레코드 번호 바이트가 곧 team', (side) => {
-    const rows = [...DECODED.filter((row) => row.side === side), ...DECODED_ACE.filter((row) => row.side === side)]
-    expect(rows).toHaveLength(19)
-    for (const team of [16, 17, 18, 19, 20]) {
-      const fileRow = fileRowOfRecordIndex(team - 1)
-      expect(fileRow).toBe(team - 2)
-      expect(rows[fileRow ?? -1]?.id).toBe(team)
-      expect(aceMatchMissionOf(team, side)?.id).toBe(team)
-    }
-    // 목록(미션 1~14)에는 없다 — 고르기 화면에 안 나온다
-    const listed = side === '타자' ? BATTER_MISSIONS : PITCHER_MISSIONS
-    expect(listed.some((mission) => mission.id >= 16)).toBe(false)
-  })
+  it.each(['타자', '투수'] as const)(
+    '%s편 — SYS 8 의 team 16~20 → idx team − 1 → 0xa5268/0xa5294 파일 줄 14~18 → 레코드 번호 바이트가 곧 team',
+    (side) => {
+      const rows = [...DECODED.filter((row) => row.side === side), ...DECODED_ACE.filter((row) => row.side === side)]
+      expect(rows).toHaveLength(19)
+      for (const team of [16, 17, 18, 19, 20]) {
+        const fileRow = fileRowOfRecordIndex(team - 1)
+        expect(fileRow).toBe(team - 2)
+        expect(rows[fileRow ?? -1]?.id).toBe(team)
+        expect(aceMatchMissionOf(team, side)?.id).toBe(team)
+      }
+      // 목록(미션 1~14)에는 없다 — 고르기 화면에 안 나온다
+      const listed = side === '타자' ? BATTER_MISSIONS : PITCHER_MISSIONS
+      expect(listed.some((mission) => mission.id >= 16)).toBe(false)
+    },
+  )
 
   it.each(DECODED_ACE.map((row) => [row.side, row.id, row] as const))('%s %i — 레코드 · 판정 목표 · 한도 · CPU 표 · 상대 · 보상', (side, id, row) => {
     const mission = findAnyMission(side, id)
@@ -680,34 +696,37 @@ describe('마선수 공략 레코드 10칸 — 원본 바이트 · 레코드 게
     expect(aceMatchClearKeyOf(mission)).toBe(id === 16 ? key : null)
   })
 
-  it.each(DECODED_ACE.map((row) => [row.side, row.id, row] as const))('%s %i 의 시작 판 — 1회 무사 빈 루 · 사람 칸 0(선공) · 상대 마선수가 첫 타석에 선다', (side, id, row) => {
-    const mission = findAnyMission(side, id)
-    const human = humanSideOf(mission)
-    const cpu = cpuSideOf(mission)
-    if (side === '타자') {
-      const run = startMission(mission)
-      expect(run.status).toBe('진행중')
-      expect(run.game.offenseSide).toBe(human)
-      expect(run.remainingPlateAppearances).toBe(1)
-      expect(run.remainingSwings).toBeNull()
-      // 마투수는 명부 8번에 베낀 뒤 0 ↔ 8 (aafca~ab06e) — 선발 칸이 마투수다
-      expect(run.cpu.pitching?.roster[0]).toBe(MISSION_ACE_ROSTER_SLOT)
-      expect(run.game.scores).toEqual([0, 0])
-    } else {
-      const run = startPitcherMission(mission)
-      expect(run.status).toBe('진행중')
-      expect(run.game.offenseSide).toBe(cpu)
-      expect(run.remainingPlateAppearances).toBe(1)
-      expect(run.remainingPitches).toBe(5)
-      // 마타자는 지금 타순(레코드 +7 아래 4비트 = 3) 레코드에 끼운다 (ab078~ab0f4)
-      expect(missionCpuBatterOf(run.cpu)).toMatchObject({ order: row.cpuBattingOrder, isAce: true })
-      // 점수판 +0x8e 앞 9칸(측 0 = 사람 칸)의 합 1 — 1:0 으로 앞선 채 수비
-      expect(run.game.scores[human]).toBe(1)
-      expect(run.game.scores[cpu]).toBe(0)
-    }
-    expect(row.start).toMatchObject({ inning: 1, outs: 0, balls: 0, strikes: 0 })
-    expect(human).toBe(0)
-  })
+  it.each(DECODED_ACE.map((row) => [row.side, row.id, row] as const))(
+    '%s %i 의 시작 판 — 1회 무사 빈 루 · 사람 칸 0(선공) · 상대 마선수가 첫 타석에 선다',
+    (side, id, row) => {
+      const mission = findAnyMission(side, id)
+      const human = humanSideOf(mission)
+      const cpu = cpuSideOf(mission)
+      if (side === '타자') {
+        const run = startMission(mission)
+        expect(run.status).toBe('진행중')
+        expect(run.game.offenseSide).toBe(human)
+        expect(run.remainingPlateAppearances).toBe(1)
+        expect(run.remainingSwings).toBeNull()
+        // 마투수는 명부 8번에 베낀 뒤 0 ↔ 8 (aafca~ab06e) — 선발 칸이 마투수다
+        expect(run.cpu.pitching?.roster[0]).toBe(MISSION_ACE_ROSTER_SLOT)
+        expect(run.game.scores).toEqual([0, 0])
+      } else {
+        const run = startPitcherMission(mission)
+        expect(run.status).toBe('진행중')
+        expect(run.game.offenseSide).toBe(cpu)
+        expect(run.remainingPlateAppearances).toBe(1)
+        expect(run.remainingPitches).toBe(5)
+        // 마타자는 지금 타순(레코드 +7 아래 4비트 = 3) 레코드에 끼운다 (ab078~ab0f4)
+        expect(missionCpuBatterOf(run.cpu)).toMatchObject({ order: row.cpuBattingOrder, isAce: true })
+        // 점수판 +0x8e 앞 9칸(측 0 = 사람 칸)의 합 1 — 1:0 으로 앞선 채 수비
+        expect(run.game.scores[human]).toBe(1)
+        expect(run.game.scores[cpu]).toBe(0)
+      }
+      expect(row.start).toMatchObject({ inning: 1, outs: 0, balls: 0, strikes: 0 })
+      expect(human).toBe(0)
+    },
+  )
 })
 
 describe('마선수 공략 레코드 — 성공 길과 실패 길 (같은 판정 0xaaa6c)', () => {

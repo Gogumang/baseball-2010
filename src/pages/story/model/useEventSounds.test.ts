@@ -17,14 +17,23 @@ describe('이벤트 소리 명령을 그 틀에 낸다 (0x8d470)', () => {
     const calls: string[] = []
     setActiveSound({
       ...createSilentSound(),
-      play: (id) => { calls.push(`효과 ${id}`) },
-      playBgm: (id) => { calls.push(`배경 ${id}`) },
-      stopBgm: () => { calls.push('멈춤') },
+      play: (id) => {
+        calls.push(`효과 ${id}`)
+      },
+      playBgm: (id) => {
+        calls.push(`배경 ${id}`)
+      },
+      stopBgm: () => {
+        calls.push('멈춤')
+      },
     })
     const step: EventStep = {
       cursor: { eventId: 1, commandIndex: 2 },
       command: null,
-      passed: [{ op: 'sound', id: 41 }, { op: 'sound', id: 35 }],
+      passed: [
+        { op: 'sound', id: 41 },
+        { op: 'sound', id: 35 },
+      ],
     }
     const wrapper = ({ children }: { children: ReactNode }) => createElement(StrictMode, null, children)
     renderHook(() => useEventSounds(step), { wrapper })

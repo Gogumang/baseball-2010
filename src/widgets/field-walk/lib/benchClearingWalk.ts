@@ -95,8 +95,7 @@ export function benchClearingCamera(): CameraState {
 
 /** 진입 0x3a5f0 */
 export function startBenchClearingWalk(input: BenchClearingWalkInput): BenchClearingWalkState {
-  const fielders = FIELDER_START_POSITIONS.map((home) =>
-    aimWalker(placeWalker(standWalker(NEW_FIELD_WALKER), home), home))
+  const fielders = FIELDER_START_POSITIONS.map((home) => aimWalker(placeWalker(standWalker(NEW_FIELD_WALKER), home), home))
   const dugout = DUGOUT_POSITIONS[input.offenseSide]
   // 측 0 은 3루수 칸 · 측 1 은 1루수 칸 둘레로 몰려 나온다 (3a7dc `cmp 측, #0`)
   const rally = FIELDER_START_POSITIONS[input.offenseSide === 0 ? 4 : 2]
@@ -111,8 +110,7 @@ export function startBenchClearingWalk(input: BenchClearingWalkInput): BenchClea
   // 타자 — 타석에서 마운드로
   const home = BASE_POSITIONS[0]
   const box = { x: home.x + (input.isLeftBatter ? BATTER_BOX_OFFSET : -BATTER_BOX_OFFSET), z: home.z }
-  offense[BATTER_INDEX] = aimWalker(
-    setWalkerAction(standWalker(setWalkerAt(offense[BATTER_INDEX], box)), 3), PLATE)
+  offense[BATTER_INDEX] = aimWalker(setWalkerAction(standWalker(setWalkerAt(offense[BATTER_INDEX], box)), 3), PLATE)
   // 루상 주자 — 그 루에 선다
   input.occupiedBases.forEach((isOccupied, baseIndex) => {
     if (!isOccupied) return
@@ -163,12 +161,10 @@ export function stepBenchClearingWalk(
       return target.speed === null ? aimed : setWalkerSpeed(aimed, target.speed)
     })
   } else if (tick === BENCH_CLEARING_TICKS.actions) {
-    fielders = fielders.map((walker, index) =>
-      TICK30_ACTIONS[index].reduce((current, action) => setWalkerAction(current, action), walker))
+    fielders = fielders.map((walker, index) => TICK30_ACTIONS[index].reduce((current, action) => setWalkerAction(current, action), walker))
   } else if (tick === BENCH_CLEARING_TICKS.retreat) {
     const dugout = DUGOUT_POSITIONS[input.offenseSide]
-    offense = offense.map((walker, index) =>
-      index === BATTER_INDEX ? setWalkerAction(walker, side0 ? 3 : 4) : aimWalker(walker, dugout))
+    offense = offense.map((walker, index) => (index === BATTER_INDEX ? setWalkerAction(walker, side0 ? 3 : 4) : aimWalker(walker, dugout)))
   } else if (tick === BENCH_CLEARING_TICKS.lookAway || tick === BENCH_CLEARING_TICKS.lookBack) {
     const action = (tick === BENCH_CLEARING_TICKS.lookAway) === side0 ? 4 : 3
     offense = offense.map((walker, index) => (index === BATTER_INDEX ? setWalkerAction(walker, action) : walker))

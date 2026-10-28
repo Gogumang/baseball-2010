@@ -8,7 +8,10 @@ import type { HalfInningDefense, HalfInningMound } from '@/entities/game/model/s
 import { pitcherAbilitySumOf, rosterPitcherRoleOf } from '@/entities/pitching/model/pitcherChange'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import {
-  FRESH_HELD_CPU_MAGIC, heldCpuMagicAfterPitch, heldCpuMagicAfterPitcherChange, type HeldCpuMagic,
+  FRESH_HELD_CPU_MAGIC,
+  heldCpuMagicAfterPitch,
+  heldCpuMagicAfterPitcherChange,
+  type HeldCpuMagic,
 } from '@/entities/pitching/model/magicPitchGame'
 import {
   QUICK_LINEUP_SIZE,
@@ -343,9 +346,7 @@ export function missionCpuMoundPitcherAbilityOf(team: MissionCpuTeam): PitcherAb
     breaking: Math.round(breaking / STAGE_PITCHER_DIVISOR),
     gameAbility: { beforeFatigue: { control, velocity, breaking } },
     staminaPercent: staminaPercentOf(pitching.mound.stamina),
-    ...(repertoire === undefined
-      ? {}
-      : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
+    ...(repertoire === undefined ? {} : { repertoire: { form: repertoire.form, pitchMask: repertoire.pitchMask, magicId: repertoire.magicId } }),
     // 레코드 +0x14 — 실투 판정 0x33cbc 의 투수 비트 16 · 17 · 22 (마스터 줄 = Xls 행 사본)
     skillBits: row.skillBits,
   }
@@ -377,9 +378,7 @@ export function missionCpuMoundPitcherSkinIndexOf(team: MissionCpuTeam): number 
  * **투수 미션의 지금 CPU 타자** `0xae89c(공격 팀)` — 타순 `team+0x32` 칸에 선 명단 줄. 마타자 칸이면 `isAce`(줄은 null),
  * 아니면 마스터 팀 타자 줄(Xls 행 사본, 0x1ff98 — 대타로 들어온 벤치 줄 포함). CPU 공격 팀이 없으면(타자 미션) null.
  */
-export function missionCpuBatterOf(
-  team: MissionCpuTeam,
-): {
+export function missionCpuBatterOf(team: MissionCpuTeam): {
   readonly order: number
   readonly isAce: boolean
   readonly row: RosterPlayer | null
@@ -426,10 +425,7 @@ export interface MissionAcePitcher {
 }
 
 /** 타자 미션의 마투수 (마투수 미션이 아니면 undefined) */
-export function missionAcePitcherOf(
-  mission: OriginalMission,
-  aceLevels?: Readonly<Record<number, number>>,
-): MissionAcePitcher | undefined {
+export function missionAcePitcherOf(mission: OriginalMission, aceLevels?: Readonly<Record<number, number>>): MissionAcePitcher | undefined {
   if (mission.side !== '타자' || mission.opponentAce <= 0) return undefined
   const ace = ACE_PITCHERS[mission.opponentAce - 1]
   if (ace === undefined) return undefined
@@ -470,14 +466,10 @@ export function missionPitchingDefenseOf(
     pitcherSlots: pitching.roster.map((_master, slot) => slot),
     // 0xb570c 스킬 14 갈래 — 모드 5 · 6 은 정액이 없어 밑값에 곧장 v/10 (`withQuickFightingSpirit`, 장착은 skillIds 30)
     pitcherAt: (slot, fightingSpirit) =>
-      withQuickFightingSpirit(
-        isAce(slot) && options.ace !== undefined ? options.ace.quick : quickPitcherOf(masterAt(slot)),
-        fightingSpirit,
-      ),
+      withQuickFightingSpirit(isAce(slot) && options.ace !== undefined ? options.ace.quick : quickPitcherOf(masterAt(slot)), fightingSpirit),
     ...(options.fightingSpiritAt === undefined ? {} : { fightingSpiritAt: options.fightingSpiritAt }),
     // 투수 능력치 칸 3 = 체력 — 소모(0x66e44 용량)에만 쓴다. 사람 타석의 마투수 소모는 세션이 든다(`ace` 를 안 넘긴다)
-    staminaAbilityAt: (slot) =>
-      isAce(slot) && options.ace !== undefined ? options.ace.staminaAbility : masterAt(slot).ability[3],
+    staminaAbilityAt: (slot) => (isAce(slot) && options.ace !== undefined ? options.ace.staminaAbility : masterAt(slot).ability[3]),
     // 벤치 줄의 +0x2c — 확정(직접 떴다): 미션의 CPU 팀은 명부 0xb8680 의 모드 5·6 갈래(b86e2)라 g[0x11f] · g[0x176] 대기와
     // g[0xf6] == 2(시즌) 가 함께 설 때만 시즌 팀 0x1f571 이고(그 조합은 SYS 8 이 시즌에서 대기를 안 세워 안 생긴다) 늘 마스터 팀
     // 0x1f8c1 이다. 마스터 팀은 0x1ff98 이 XlsPITCHER_DATA 행(0x21 + 팀×0x180 + 칸×0x30)을 통째 베끼고, 그 +0x2c 는 15 팀 120 줄
@@ -495,15 +487,13 @@ export function missionPitchingDefenseOf(
     abilitySumAt: (slot, fightingSpirit) => {
       const spirit = fightingSpirit === true && hasFightingSpiritBit(masterAt(slot).skillBits)
       return pitcherAbilitySumOf(
-        masterAt(slot).ability.map((value, k) =>
-          Math.min(999, Math.max(0, spirit && k !== 3 ? withFightingSpirit(value) : value)),
-        ),
+        masterAt(slot).ability.map((value, k) => Math.min(999, Math.max(0, spirit && k !== 3 ? withFightingSpirit(value) : value))),
       )
     },
     isSpecialPitcherAt: isAce,
     // 소모 0xa5e14 의 비트 18 · 10 — 마스터 줄 +0x14 (Xls 행 사본). 마투수 소모는 세션이 든다
     skillBitsAt: (slot) =>
-      isAce(slot) && options.ace !== undefined ? options.ace.skillBits ?? 0 : masterPitcherRowAt(pitching, slot)?.skillBits ?? 0,
+      isAce(slot) && options.ace !== undefined ? (options.ace.skillBits ?? 0) : (masterPitcherRowAt(pitching, slot)?.skillBits ?? 0),
     ...(options.pitcherChangeBlocked === true ? { pitcherChangeBlocked: true } : {}),
   }
 }
@@ -598,12 +588,7 @@ export function missionCpuAfterPitch(
       ...(pitch.magic === undefined
         ? {}
         : {
-            magic: heldCpuMagicAfterPitch(
-              pitching.magic ?? FRESH_HELD_CPU_MAGIC,
-              pitch.magic.pitcher,
-              pitch.magic.aceLevels,
-              pitch.pitchTypeNumber,
-            ),
+            magic: heldCpuMagicAfterPitch(pitching.magic ?? FRESH_HELD_CPU_MAGIC, pitch.magic.pitcher, pitch.magic.aceLevels, pitch.pitchTypeNumber),
           }),
     },
   }
@@ -657,11 +642,7 @@ export function enterMissionPitchSelection(
     const isAceMound = pitching.roster[pitching.mound.pitcherSlot] === MISSION_ACE_ROSTER_SLOT
     const mound = isAceMound ? { ...pitching.mound, stamina: situation.aceStamina } : pitching.mound
     const after = changePitcherIfNeeded(
-      missionPitchingDefenseOf(
-        { ...pitching, mound },
-        lead,
-        situation.fightingSpirit === true ? { fightingSpiritAt: () => true } : {},
-      ),
+      missionPitchingDefenseOf({ ...pitching, mound }, lead, situation.fightingSpirit === true ? { fightingSpiritAt: () => true } : {}),
       mound,
       {
         // state[0x6b] — 0xaa57c 가 레코드 +3 아래 4비트로 적고 말이 끝날 때마다 0xb6b6c 가 올린다 (`MissionRun.game`)

@@ -35,7 +35,7 @@ export const BASE_POSITIONS: readonly WorldPoint[] = [
 
 /** 루 번호(0~4, 원본 표의 [4] = 홈)를 좌표로. 음수도 감싼다 */
 export function basePosition(base: number): WorldPoint {
-  return BASE_POSITIONS[(((base % 4) + 4) % 4)]
+  return BASE_POSITIONS[((base % 4) + 4) % 4]
 }
 
 /**

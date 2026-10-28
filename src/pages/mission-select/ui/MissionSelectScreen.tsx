@@ -7,8 +7,24 @@ import type { OriginalMission } from '@/shared/config/original/missions'
 import { missionRewardOf, missionRewardTierOf } from '@/entities/mission/model/missionReward'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  BOTTOM_FRAME, DESCRIPTION_BOX, DESCRIPTION_TEXT, EVENT_MISSION_CELL, EVENT_MISSION_EMPTY_TEXT, EVENT_MISSION_TITLE, EVENT_TAB_LABEL, GRID, MISSION_GRID_SHAPE,
-  GRADE_MARKS, MISSION_GRID_OPEN, NO_MISSION_TEXT, PANEL, REWARD_ROW, SUCCESS_ROW, TAB_LABEL, TITLE, cellPositionOf,
+  BOTTOM_FRAME,
+  DESCRIPTION_BOX,
+  DESCRIPTION_TEXT,
+  EVENT_MISSION_CELL,
+  EVENT_MISSION_EMPTY_TEXT,
+  EVENT_MISSION_TITLE,
+  EVENT_TAB_LABEL,
+  GRID,
+  MISSION_GRID_SHAPE,
+  GRADE_MARKS,
+  MISSION_GRID_OPEN,
+  NO_MISSION_TEXT,
+  PANEL,
+  REWARD_ROW,
+  SUCCESS_ROW,
+  TAB_LABEL,
+  TITLE,
+  cellPositionOf,
 } from '@/pages/mission-select/lib/missionSelectLayout'
 import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
 import { noteSkinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
@@ -150,11 +166,15 @@ export function MissionSelectScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       // 숫자키 꼴 1 (표 0xd2e7c): '2' ↑ · '4' ← · '6' → · '8' ↓ · '5' OK
       const direction =
-        event.key === 'ArrowRight' || event.key === '6' ? 'right'
-        : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
-        : event.key === 'ArrowDown' || event.key === '8' ? 'down'
-        : event.key === 'ArrowUp' || event.key === '2' ? 'up'
-        : null
+        event.key === 'ArrowRight' || event.key === '6'
+          ? 'right'
+          : event.key === 'ArrowLeft' || event.key === '4'
+            ? 'left'
+            : event.key === 'ArrowDown' || event.key === '8'
+              ? 'down'
+              : event.key === 'ArrowUp' || event.key === '2'
+                ? 'up'
+                : null
       if (direction !== null) {
         event.preventDefault()
         // 키 0x1daa4 머리(1dacc)가 격자가 바꾼 키를 0x5550d 에 넘긴다 — [skin+0x8c] 에 남는다(Q-10)
@@ -178,13 +198,12 @@ export function MissionSelectScreen({
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
-  const clears = selected === undefined ? 0 : clearCounts[missionKeyOf(selected)] ?? 0
+  const clears = selected === undefined ? 0 : (clearCounts[missionKeyOf(selected)] ?? 0)
   const reward = selected === undefined ? 0 : missionRewardOf(selected.stage, clears)
   const cursorCell = cellPositionOf(cursor)
 
   const frame = (
-    <ScreenFrame title={side === '타자' ? '미션모드타자편' : '미션모드투수편'} gamePoint={gamePoint} footer={5} onBack={onBack}
-      slides={slides} />
+    <ScreenFrame title={side === '타자' ? '미션모드타자편' : '미션모드투수편'} gamePoint={gamePoint} footer={5} onBack={onBack} slides={slides} />
   )
   if (!isBodyShown) {
     return (
@@ -202,9 +221,8 @@ export function MissionSelectScreen({
           r7 = [skin+0x84] 는 0 이 아니면 0x1e730(이 함수의 끝 — 아무것도 안 그리고 돌아간다)로 빠지므로 여기서는 늘 0 이다 */}
       <CommonPanel x={PANEL.x} y={PANEL.y} width={PANEL.width} height={PANEL.height} topBand={0x10} testId="미션-고르기-판" />
 
-      <div className={styles.title}
-        style={{ left: TITLE.x, top: TITLE.y, width: TITLE.width, color: TITLE.color }}>
-        {cursor === EVENT_MISSION_CELL ? EVENT_MISSION_TITLE : selected?.name ?? ''}
+      <div className={styles.title} style={{ left: TITLE.x, top: TITLE.y, width: TITLE.width, color: TITLE.color }}>
+        {cursor === EVENT_MISSION_CELL ? EVENT_MISSION_TITLE : (selected?.name ?? '')}
       </div>
 
       {/*
@@ -219,94 +237,123 @@ export function MissionSelectScreen({
         const y = cellPositionOf(index).y + (gridOpen === null ? 0 : gridOpenCellDy(MISSION_GRID_OPEN, gridOpen.state, index)) + (shake?.dy ?? 0)
         if (mission === undefined) {
           return (
-            <div key={index} className={styles.cell}
+            <div
+              key={index}
+              className={styles.cell}
               style={{ left: x, top: y, width: GRID.cellWidth, height: GRID.cell, background: '#1D2A55', color: '#4A5C8F' }}
-              onClick={() => { setCursor(index); openEventWindowOrSelect(index) }} />
+              onClick={() => {
+                setCursor(index)
+                openEventWindowOrSelect(index)
+              }}
+            />
           )
         }
         const isLocked = isLockedAt(index)
         const isCleared = clearedKeys.includes(missionKeyOf(mission))
         return (
-          <button key={index} type="button" className={styles.cell} aria-label={mission.name}
+          <button
+            key={index}
+            type="button"
+            className={styles.cell}
+            aria-label={mission.name}
             style={{
-              left: x, top: y, width: GRID.cellWidth, height: GRID.cell,
+              left: x,
+              top: y,
+              width: GRID.cellWidth,
+              height: GRID.cell,
               background: isLocked ? '#1D2A55' : isCleared ? '#2E4694' : '#213473',
               color: isLocked ? '#4A5C8F' : '#FFFFFF',
             }}
-            onClick={() => { setCursor(index); openEventWindowOrSelect(index) }}>
+            onClick={() => {
+              setCursor(index)
+              openEventWindowOrSelect(index)
+            }}
+          >
             {isLocked ? '' : isCleared ? '★' : index + 1}
           </button>
         )
       })}
 
       {cursor < cellCount && (gridOpen === null || gridOpen.state.isDone) && (
-        <div className={styles.cursor}
-          style={{ left: cursorCell.x + bounce.offset.dx, top: cursorCell.y + bounce.offset.dy, width: GRID.cellWidth, height: GRID.cell }} />
+        <div
+          className={styles.cursor}
+          style={{ left: cursorCell.x + bounce.offset.dx, top: cursorCell.y + bounce.offset.dy, width: GRID.cellWidth, height: GRID.cell }}
+        />
       )}
 
-      <FrameSprite folder={`${SLT_FRAME}/frames`} frame={BOTTOM_FRAME.frame} origins={frames}
-        x={BOTTOM_FRAME.x} y={BOTTOM_FRAME.y} />
+      <FrameSprite folder={`${SLT_FRAME}/frames`} frame={BOTTOM_FRAME.frame} origins={frames} x={BOTTOM_FRAME.x} y={BOTTOM_FRAME.y} />
       {/* 0x1e018: 고른 칸이 14 면 이미지 52, 아니면 51 */}
-      {cursor === EVENT_MISSION_CELL
-        ? <img className={styles.sprite} alt="EVENT"
-            src={imageSrc(SLT_FRAME, EVENT_TAB_LABEL.image)} style={{ left: EVENT_TAB_LABEL.x, top: EVENT_TAB_LABEL.y }} />
-        : <img className={styles.sprite} alt="MISSION"
-            src={imageSrc(SLT_FRAME, TAB_LABEL.image)} style={{ left: TAB_LABEL.x, top: TAB_LABEL.y }} />}
+      {cursor === EVENT_MISSION_CELL ? (
+        <img
+          className={styles.sprite}
+          alt="EVENT"
+          src={imageSrc(SLT_FRAME, EVENT_TAB_LABEL.image)}
+          style={{ left: EVENT_TAB_LABEL.x, top: EVENT_TAB_LABEL.y }}
+        />
+      ) : (
+        <img className={styles.sprite} alt="MISSION" src={imageSrc(SLT_FRAME, TAB_LABEL.image)} style={{ left: TAB_LABEL.x, top: TAB_LABEL.y }} />
+      )}
 
       {/* 1dfe0 칸 0xbb28d(W/2, H/2 + 0x21, 173, 65, 정렬 2) — 왼쪽 = 120 − (173 >> 1) = 34 */}
-      <InsetBox x={DESCRIPTION_BOX.centerX - (DESCRIPTION_BOX.width >> 1)} y={DESCRIPTION_BOX.y}
-        width={DESCRIPTION_BOX.width} height={DESCRIPTION_BOX.height} testId="미션-설명-칸" />
-      <div className={styles.descriptionText}
-        style={{ left: DESCRIPTION_TEXT.x, top: DESCRIPTION_TEXT.y, width: DESCRIPTION_TEXT.width }}>
+      <InsetBox
+        x={DESCRIPTION_BOX.centerX - (DESCRIPTION_BOX.width >> 1)}
+        y={DESCRIPTION_BOX.y}
+        width={DESCRIPTION_BOX.width}
+        height={DESCRIPTION_BOX.height}
+        testId="미션-설명-칸"
+      />
+      <div className={styles.descriptionText} style={{ left: DESCRIPTION_TEXT.x, top: DESCRIPTION_TEXT.y, width: DESCRIPTION_TEXT.width }}>
         {/* 1e5e8~1e624: sprintf("%s"(0xd09bc), 레코드 +0x4e 설명) → 0xba269(45, 197, 폭 0x96, 흰 글). 잠김 0xa520d 는 이 그리기에서
             안 본다(부르는 곳은 진입 1da6c · 키 1db26 · 격자 칸 0x7a690 뿐) — 잠긴 칸도 그 미션 설명이 그대로 나온다.
             원문 StrMAINMENU[60] "오픈 되지 않은 미션입니다…" 은 OK 팝업(1db84)에만 쓴다 */}
-        {selected === undefined
-          ? <MarkupText raw={NO_MISSION_TEXT} />
-          : stripGameMarkup(selected.briefing)}
+        {selected === undefined ? <MarkupText raw={NO_MISSION_TEXT} /> : stripGameMarkup(selected.briefing)}
       </div>
 
-      <FrameSprite folder={IMG_TEXT} frame={REWARD_ROW.labelFrame} origins={textFrames}
-        x={REWARD_ROW.labelX} y={REWARD_ROW.y} />
-      <div className={styles.value}
-        style={{ left: REWARD_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
+      <FrameSprite folder={IMG_TEXT} frame={REWARD_ROW.labelFrame} origins={textFrames} x={REWARD_ROW.labelX} y={REWARD_ROW.y} />
+      <div className={styles.value} style={{ left: REWARD_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
         {reward}G
       </div>
-      <FrameSprite folder={IMG_TEXT} frame={SUCCESS_ROW.labelFrame} origins={textFrames}
-        x={SUCCESS_ROW.labelX} y={REWARD_ROW.y} />
-      <div className={styles.value}
-        style={{ left: SUCCESS_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
+      <FrameSprite folder={IMG_TEXT} frame={SUCCESS_ROW.labelFrame} origins={textFrames} x={SUCCESS_ROW.labelX} y={REWARD_ROW.y} />
+      <div className={styles.value} style={{ left: SUCCESS_ROW.valueX, top: REWARD_ROW.y, width: REWARD_ROW.valueWidth }}>
         {clears}회
       </div>
       {/* 0x1e6ce~0x1e722 — 등급 표시 네모 (byte1 >> 1) & 7 개를 (165 + 8i, 183) */}
-      {selected !== undefined && Array.from({ length: missionRewardTierOf(selected.stage) }, (_, index) => (
-        <img key={index} className={styles.sprite} alt="" data-testid="미션-등급-네모"
-          src={imageSrc(SLT_FRAME, GRADE_MARKS.image)}
-          style={{ left: GRADE_MARKS.x + GRADE_MARKS.step * index, top: GRADE_MARKS.y }} />
-      ))}
+      {selected !== undefined &&
+        Array.from({ length: missionRewardTierOf(selected.stage) }, (_, index) => (
+          <img
+            key={index}
+            className={styles.sprite}
+            alt=""
+            data-testid="미션-등급-네모"
+            src={imageSrc(SLT_FRAME, GRADE_MARKS.image)}
+            style={{ left: GRADE_MARKS.x + GRADE_MARKS.step * index, top: GRADE_MARKS.y }}
+          />
+        ))}
 
       {/* 웹 [투수편/타자편] 바꾸기 단추는 걷었다 — 원본은 선수 고르기(하위 17)에서 고른 선수가 편을 정해(투수 → 모드 5,
           타자 → 모드 6) 목록 안에서 편을 바꾸는 길이 없다 */}
       {frame}
 
       {eventWindow === '창' && (
-        <EventMissionWindow isRunSelected={isEventRunSelected}
+        <EventMissionWindow
+          isRunSelected={isEventRunSelected}
           onToggle={() => setIsEventRunSelected((previous) => !previous)}
-          onKey={setEventKeyAnswer} onClosed={() => setEventWindow(null)} />
+          onKey={setEventKeyAnswer}
+          onClosed={() => setEventWindow(null)}
+        />
       )}
-      {popup?.kind === '잠김' && (
-        <MessageBox text={LOCKED_MISSION_TEXT} buttons={['OK']} onAnswer={() => setPopup(null)} />
-      )}
+      {popup?.kind === '잠김' && <MessageBox text={LOCKED_MISSION_TEXT} buttons={['OK']} onAnswer={() => setPopup(null)} />}
       {popup?.kind === '도전' && (
-        <MessageBox text={challengeTextOf(popup.mission.name)} buttons={['예', '아니오']}
+        <MessageBox
+          text={challengeTextOf(popup.mission.name)}
+          buttons={['예', '아니오']}
           onAnswer={(answer) => {
             setPopup(null)
             if (answer === 0) onSelect(popup.mission)
-          }} />
+          }}
+        />
       )}
-      {eventWindow === '알림' && (
-        <MessageBox text={EVENT_MISSION_EMPTY_TEXT} buttons={['OK']} onAnswer={() => setEventWindow(null)} />
-      )}
+      {eventWindow === '알림' && <MessageBox text={EVENT_MISSION_EMPTY_TEXT} buttons={['OK']} onAnswer={() => setEventWindow(null)} />}
     </RawScreen>
   )
 }

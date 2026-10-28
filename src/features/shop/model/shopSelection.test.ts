@@ -16,7 +16,12 @@ describe('구매 확인 — StrMODE[79]', () => {
   })
 
   it('원본 금액 서식 — 10050 은 "1억050", 15000 은 "1억5000"', () => {
-    expect([formatOriginalMoney(10050), formatOriginalMoney(15000), formatOriginalMoney(20000), formatOriginalMoney(800)]).toEqual(['1억050', '1억5000', '2억', '800'])
+    expect([formatOriginalMoney(10050), formatOriginalMoney(15000), formatOriginalMoney(20000), formatOriginalMoney(800)]).toEqual([
+      '1억050',
+      '1억5000',
+      '2억',
+      '800',
+    ])
   })
 
   it('GP 아이템은 StrMODE[82]', () => {
@@ -24,7 +29,9 @@ describe('구매 확인 — StrMODE[79]', () => {
   })
 
   it('엄마의도시락(칸 4)은 최대인 칸마다 [192] + "!N", 그 뒤 "!N" + [82] — 0 칸이어도 "!N" 이 앞에 선다 (0x138ca~0x13998)', () => {
-    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 4))).toBe('!N!C!cFFFF001000 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
+    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 4))).toBe(
+      '!N!C!cFFFF001000 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?',
+    )
     const 히트최대 = 선수({ gamePoint: 1000, ability: { ...선수().ability, hit: 800, run: 800 } })
     expect(purchaseQuestionOf(히트최대, shopItemId('GP', 4))).toBe(
       '!C[!cFFFF00히트!cFFFFFF] 능력치가 최대입니다!N!C[!cFFFF00주루!cFFFFFF] 능력치가 최대입니다!N!N!C!cFFFF001000 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?',
@@ -40,8 +47,9 @@ describe('구매 확인 — StrMODE[79]', () => {
   })
 
   it('이글아이(칸 9)는 [224] + "!N!N" + [82] (0x13ab4~0x13ae4)', () => {
-    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 9)))
-      .toBe('!C최대 99회 누적 가능합니다!N!N!C!cFFFF00500 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?')
+    expect(purchaseQuestionOf(선수({ gamePoint: 1000 }), shopItemId('GP', 9))).toBe(
+      '!C최대 99회 누적 가능합니다!N!N!C!cFFFF00500 G포인트!cFFFFFF가 소모됩니다!N구매하시겠습니까?',
+    )
   })
 
   it('막혔거나 이미 가진 장비를 고르면 묻지 않는다 — 바로 알림·장착으로 간다', () => {
@@ -83,8 +91,12 @@ describe('상점 선택 — 0x14a74', () => {
 
   it('막히면 원문 이유를 알린다', () => {
     expect(selectShopItem(선수({ money: 0 }), shopItemId('장착', 0, 0), 난수).notice).toBe('!C소지금이 부족합니다')
-    expect(selectShopItem(선수({ popularity: 0, money: 99999 }), shopItemId('장착', 0, 1), 난수).notice).toBe('!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 50')
-    expect(selectShopItem(선수({ money: 99999 }), shopItemId('장착', 0, 8), 난수).notice).toBe('!C아직 구매할 수 없는 아이템!N입니다. 특별한 조건을 통해!N오픈됩니다')
+    expect(selectShopItem(선수({ popularity: 0, money: 99999 }), shopItemId('장착', 0, 1), 난수).notice).toBe(
+      '!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 50',
+    )
+    expect(selectShopItem(선수({ money: 99999 }), shopItemId('장착', 0, 8), 난수).notice).toBe(
+      '!C아직 구매할 수 없는 아이템!N입니다. 특별한 조건을 통해!N오픈됩니다',
+    )
   })
 
   it('장비 구매는 구매 완료 창이 없고(0x14a74 kind 3) 새로 연 컬렉터 k 만 낸다 — 공용 창이 확인 창 뒤에 띄운다', () => {
@@ -99,7 +111,9 @@ describe('상점 선택 — 0x14a74', () => {
     expect(하나.openedHiddenIds).toEqual([])
     // 이미 열린 k(0x61f5c)면 0x62368 셋째 인자 0 이라 창이 없다
     const 열림 = selectShopItem(
-      선수({ money: 999999, popularity: 999, ownedEquipment: 여섯개, openedHiddenIds: [36] }), shopItemId('장착', 0, 6), 난수,
+      선수({ money: 999999, popularity: 999, ownedEquipment: 여섯개, openedHiddenIds: [36] }),
+      shopItemId('장착', 0, 6),
+      난수,
     )
     expect(열림.openedHiddenIds).toEqual([])
   })
@@ -116,8 +130,7 @@ describe('상점 선택 — 0x14a74', () => {
   })
 
   it('GP 결과 창은 칸 0~4·6 만 — 5·7·8·9 는 알림 그대로 (0x14f28 · 0x15030)', () => {
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(opensGpDetailWindow))
-      .toEqual([true, true, true, true, true, false, true, false, false, false])
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(opensGpDetailWindow)).toEqual([true, true, true, true, true, false, true, false, false, false])
     const sick = selectShopItem(선수({ gamePoint: 500, isSick: true, illnessName: '감기', illnessRemaining: 3 }), shopItemId('GP', 7), 난수)
     expect(sick.detail ?? null).toBeNull()
     expect(sick.notice).toBe('!C부상 및 질병이!N!cFFFF00모두 치료!cFFFFFF 되었습니다')

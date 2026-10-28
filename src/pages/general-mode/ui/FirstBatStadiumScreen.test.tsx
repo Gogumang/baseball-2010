@@ -60,8 +60,7 @@ describe('단계 0 — 선공 고르기', () => {
 })
 
 describe('단계 1 — 구장 고르기', () => {
-  const 구장단계 = (overrides: Partial<Props> = {}) =>
-    띄우기({ phase: FIRST_BAT_PHASE.구장, ...overrides })
+  const 구장단계 = (overrides: Partial<Props> = {}) => 띄우기({ phase: FIRST_BAT_PHASE.구장, ...overrides })
 
   it('좌·우 화살이 구장 커서를 옮긴다', () => {
     const onMoveStadium = vi.fn()

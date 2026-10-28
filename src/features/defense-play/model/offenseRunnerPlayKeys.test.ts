@@ -31,7 +31,7 @@ describe('사람 공격의 주자 판 키 — 0x53420 → 0x5331c(0x582 · 0x584
     expect(귀루.advance).toEqual({ bases: EMPTY_BASES, runsScored: 0, outsAdded: 1 })
   })
 
-  it('도루 판 진루 — 수동 주루에서도 3루 주자를 홈으로 보낸다 (\'8\' = 진루 3, 목표 = +0x8c + 1 = 홈 4)', () => {
+  it("도루 판 진루 — 수동 주루에서도 3루 주자를 홈으로 보낸다 ('8' = 진루 3, 목표 = +0x8c + 1 = 홈 4)", () => {
     const 그냥 = runStealPlay({ ...빠른공격, bases: 일삼루, stealingFrom: [1], runningMode: '수동' })
     expect(그냥.advance.bases).toEqual({ first: false, second: true, third: true })
 
@@ -57,7 +57,7 @@ describe('사람 공격의 주자 판 키 — 0x53420 → 0x5331c(0x582 · 0x584
     expect(진루.advance).toEqual({ bases: EMPTY_BASES, runsScored: 0, outsAdded: 1 })
   })
 
-  it('수비 쪽 키 뜻(송구)과 섞이지 않는다 — 같은 \'2\' 도 사람이 수비면 2루 송구다', () => {
+  it("수비 쪽 키 뜻(송구)과 섞이지 않는다 — 같은 '2' 도 사람이 수비면 2루 송구다", () => {
     const 수비 = runPickoffPlay({
       targetBase: 1,
       bases: 일루,

@@ -30,12 +30,7 @@ import { isPickoffPlayResult, pickoffCallSoundIdOf } from '@/features/defense-pl
 import { replayCallsOnScreen } from '@/features/defense-play/model/judgeCall'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
-import {
-  deepHitCheerSoundIdOf,
-  inPlayCallSoundIdOf,
-  pitchCallSoundIdOf,
-  walkCheerSoundIdOf,
-} from '@/features/play-at-bat/model/atBatSounds'
+import { deepHitCheerSoundIdOf, inPlayCallSoundIdOf, pitchCallSoundIdOf, walkCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
@@ -49,15 +44,13 @@ import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/str
 import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import {
-  playSoundIdsAfterSceneTicks, resultEntryStepTimingOf, scheduleSceneFrameUpdate, type PitchStepSoundTiming,
+  playSoundIdsAfterSceneTicks,
+  resultEntryStepTimingOf,
+  scheduleSceneFrameUpdate,
+  type PitchStepSoundTiming,
 } from '@/features/play-game/model/sceneTickSounds'
 import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
-import type {
-  PitchInput,
-  PitcherGameOptions,
-  PitcherGameProgress,
-  PitcherGameSummary,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import type { PitchInput, PitcherGameOptions, PitcherGameProgress, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 
 /**
  * 투수편 경기 한 판을 들고 있는 상태 고리.
@@ -135,14 +128,17 @@ export function usePitcherGame(
   // 이 칸이 아래 진행 칸보다 먼저 선다
   // 두 초기화는 마운트에 한 번 — 개발 StrictMode 의 두 번째 그림이 난수를 더 굴리지 않게(`mountOnce`)
   const [loadingTip, setLoadingTip] = useState<string | null>(() =>
-    mountOnce('pitcherGame.loadingTip', () => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null))
-  const [progress, setProgress] = useState<PitcherGameProgress>(() => mountOnce('pitcherGame.progress', () => {
-    // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다 (인트로 61 효과보다 먼저)
-    activeSound().stop()
-    // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다 (이어하기도 장면을 새로 세운다)
-    startPlayClock()
-    return startPitcherGame(options, random)
-  }))
+    mountOnce('pitcherGame.loadingTip', () => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null),
+  )
+  const [progress, setProgress] = useState<PitcherGameProgress>(() =>
+    mountOnce('pitcherGame.progress', () => {
+      // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다 (인트로 61 효과보다 먼저)
+      activeSound().stop()
+      // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다 (이어하기도 장면을 새로 세운다)
+      startPlayClock()
+      return startPitcherGame(options, random)
+    }),
+  )
 
   /**
    * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 내면 StrictMode 가
@@ -161,10 +157,7 @@ export function usePitcherGame(
   const step = useMemo(() => {
     return (
       next: (current: PitcherGameProgress) => PitcherGameProgress,
-      soundsOf?: (
-        before: PitcherGameProgress,
-        after: PitcherGameProgress,
-      ) => readonly (number | null)[],
+      soundsOf?: (before: PitcherGameProgress, after: PitcherGameProgress) => readonly (number | null)[],
       timingOf?: (before: PitcherGameProgress, after: PitcherGameProgress) => PitchStepSoundTiming,
     ) => {
       const current = progressRef.current
@@ -174,10 +167,11 @@ export function usePitcherGame(
       setProgress(after)
       const timing = timingOf?.(current, after) ?? null
       if (timing !== null) playSoundIds(audio, [timing.releaseSoundId])
-      playSoundIdsAfterSceneTicks(audio, [
-        ...(soundsOf === undefined ? [] : soundsOf(current, after)),
-        ...stepSoundIdsOf(current, after),
-      ], timing?.resultEntryTicks ?? 0)
+      playSoundIdsAfterSceneTicks(
+        audio,
+        [...(soundsOf === undefined ? [] : soundsOf(current, after)), ...stepSoundIdsOf(current, after)],
+        timing?.resultEntryTicks ?? 0,
+      )
       // 사람 장면 CPU 대타(0x3d954 3da70)가 교체 연출 0x16 을 지났으면 — 22(3da88) 뒤 0xe 에서 들어온 타자 등판음.
       // 다음 공을 고르기 전(0xf 진입)에 서므로 걸음 끝에 둔다 (팀경기 `useTeamGame` 과 같은 자리).
       // 투수편 사람 장면은 늘 우리 수비라 CPU 투수 교체(3da3e — 수비가 CPU 일 때)는 없고, 8회 구원 등판·강판 교체는
@@ -192,10 +186,13 @@ export function usePitcherGame(
    * 서 있으면 함께 선다
    */
   const cancelResultEntryRef = useRef<(() => void) | null>(null)
-  useEffect(() => () => {
-    cancelResultEntryRef.current?.()
-    cancelResultEntryRef.current = null
-  }, [])
+  useEffect(
+    () => () => {
+      cancelResultEntryRef.current?.()
+      cancelResultEntryRef.current = null
+    },
+    [],
+  )
 
   // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 모드 3 은 적재 상태 8 끝(48b20)에서 0xc 로 오므로 로딩 판이 끝나는 자리다
   const finishLoading = useCallback(() => {
@@ -235,10 +232,7 @@ export function usePitcherGame(
             const strikeoutMs = strikeoutVibrationMillisecondsOf(resolution, before.atBat.strikes)
             const isVibrationOn = isVibrationOnRef.current !== false
             if (strikeoutMs > 0) {
-              setGameSceneTickTimeout(
-                () => vibrate(strikeoutMs, isVibrationOn),
-                pitchResultEntryDelayTicksOf(after.lastPitch?.frameCount ?? 0),
-              )
+              setGameSceneTickTimeout(() => vibrate(strikeoutMs, isVibrationOn), pitchResultEntryDelayTicksOf(after.lastPitch?.frameCount ?? 0))
             }
             // 진행기가 타석이 끝나면 볼카운트를 새 타석으로 되돌리므로, 심판 콜이 보는
             // "이 공을 먹인 뒤" 의 카운트는 여기서 따로 만든다
@@ -256,9 +250,7 @@ export function usePitcherGame(
               // 한 칸 예약이라, 24 를 끊고 이어 트는 웹 동작이 그대로다 (1ce7ba7, soundPort.ts 머리 주석)
               walkCheerSoundIdOf(nextAtBat.outcome, true),
               // 인플레이 타구면 아웃 콜은 수비 화면이 끝난 뒤다
-              after.pendingDefensePlay !== null || nextAtBat.outcome === null
-                ? null
-                : inPlayCallSoundIdOf(nextAtBat.outcome),
+              after.pendingDefensePlay !== null || nextAtBat.outcome === null ? null : inPlayCallSoundIdOf(nextAtBat.outcome),
             ]
           },
           // 투구 순간 소리 12 / 마구 28 (0x3f378 — 놓는 틀). 내 투수는 육성(rec+0xa 비트7)이라 0xb633d 가 거짓 — 구질 22 일 때만 28.
@@ -333,9 +325,7 @@ export function usePitcherGame(
             result !== undefined
               ? []
               : [
-                  after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay
-                    ? after.lastArrivalPlay.callSoundId
-                    : null,
+                  after.lastArrivalPlay !== null && after.lastArrivalPlay !== before.lastArrivalPlay ? after.lastArrivalPlay.callSoundId : null,
                   pending.kind === 'pickoff' && isPickoffPlayResult(played) ? pickoffCallSoundIdOf(played) : null,
                 ],
         )
@@ -361,8 +351,7 @@ export function usePitcherGame(
       closeBurst: () => step((current) => closeBurstWindow(current)),
       judgeHitByPitch: () => step((current) => judgeHitByPitch(current, random)),
       enterBenchClearing: () => step((current) => enterBenchClearing(current, random)),
-      finishBenchClearing: (reachedTargetTick: boolean) =>
-        step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
+      finishBenchClearing: (reachedTargetTick: boolean) => step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
       enterSettlement: () => {
         const finished = progressRef.current
         if (!finished.game.isFinished) return
@@ -373,10 +362,7 @@ export function usePitcherGame(
     [audio, random, step],
   )
 
-  const summary = useMemo(
-    () => (progress.game.isFinished ? summaryOf(progress) : null),
-    [progress],
-  )
+  const summary = useMemo(() => (progress.game.isFinished ? summaryOf(progress) : null), [progress])
 
   return { progress, loadingTip, finishLoading, canPitch: isPitchTurn(progress), summary, actions }
 }

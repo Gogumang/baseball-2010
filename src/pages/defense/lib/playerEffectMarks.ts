@@ -1,10 +1,4 @@
-import {
-  FIELDER_ACTION,
-  fielderActionFrameOf,
-  type DefenseFielder,
-  type DefenseRunner,
-  type DefenseViewState,
-} from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION, fielderActionFrameOf, type DefenseFielder, type DefenseRunner, type DefenseViewState } from '@/pages/defense/lib/defenseView'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 /** effect/player_effect.pzx (게임+0x1030) */

@@ -131,9 +131,7 @@ describe('구워 둔 원본 데이터', () => {
 
 describe('프레임 박스 (C-10)', () => {
   it('mode_ui 프레임 2 는 등록·관리 화면 기본정보 카드의 상자다', () => {
-    const boxes = JSON.parse(
-      readFileSync('public/sprites/mode_ui/frames/boxes.json', 'utf8'),
-    ) as FrameBoxes
+    const boxes = JSON.parse(readFileSync('public/sprites/mode_ui/frames/boxes.json', 'utf8')) as FrameBoxes
     // C-create-palette.md C-6 의 표와 같은 숫자여야 한다
     expect(frameBoxesOf(boxes, 2)).toEqual([
       [21, 176, 196, 83],

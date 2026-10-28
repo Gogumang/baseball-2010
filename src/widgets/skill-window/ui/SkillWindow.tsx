@@ -12,16 +12,46 @@ import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
-  PLUS_SKILL_SLOT_LIMITS, equippedPlusSkillCountOf, isMinusSkill, isSkillEquipped, plusSkillSlotLimitOf,
+  PLUS_SKILL_SLOT_LIMITS,
+  equippedPlusSkillCountOf,
+  isMinusSkill,
+  isSkillEquipped,
+  plusSkillSlotLimitOf,
 } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots, skillConfirmKindOf, skillSlotExpansionCostOf } from '@/entities/career/model/skillEquip'
 import { pitcherSkillTableIdOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
-  CELL_FRAME, DESCRIPTION_BOX, EMPTY_CELL_OFFSET, EQUIP_COUNT_LAYOUT, EQUIP_LABEL_FRAME, ITEM_CELL_BOXES, ITEM_COLUMNS,
-  ITEM_ROWS, ITEM_TEXT_INSET, MODE_UI_FRAME, NAME_BOX, SIDE_LABEL_FRAME, SKILL_CELL_BOXES, SKILL_COLUMNS,
-  SKILL_SIGN_ANIMATION, SKILL_SIGN_POSITION, SKILL_TEXT_OFFSET, SKILL_WINDOW_COLORS, TAB_BOXES,
-  TAB_COUNT, TAB_LABEL_FRAMES, WINDOW_BOX, WINDOW_COLORS, gridIndexOf, isBlinkVisible, moveGridCursor,
-  SKILL_VISIBLE_ROWS, scrolledTopRowOf, skillCellFrameOf, skillGridRowsOf, skillListOf,
+  CELL_FRAME,
+  DESCRIPTION_BOX,
+  EMPTY_CELL_OFFSET,
+  EQUIP_COUNT_LAYOUT,
+  EQUIP_LABEL_FRAME,
+  ITEM_CELL_BOXES,
+  ITEM_COLUMNS,
+  ITEM_ROWS,
+  ITEM_TEXT_INSET,
+  MODE_UI_FRAME,
+  NAME_BOX,
+  SIDE_LABEL_FRAME,
+  SKILL_CELL_BOXES,
+  SKILL_COLUMNS,
+  SKILL_SIGN_ANIMATION,
+  SKILL_SIGN_POSITION,
+  SKILL_TEXT_OFFSET,
+  SKILL_WINDOW_COLORS,
+  TAB_BOXES,
+  TAB_COUNT,
+  TAB_LABEL_FRAMES,
+  WINDOW_BOX,
+  WINDOW_COLORS,
+  gridIndexOf,
+  isBlinkVisible,
+  moveGridCursor,
+  SKILL_VISIBLE_ROWS,
+  scrolledTopRowOf,
+  skillCellFrameOf,
+  skillGridRowsOf,
+  skillListOf,
 } from '@/widgets/skill-window/lib/skillWindowLayout'
 import type { GridCursor, GridDirection, LayoutBox } from '@/widgets/skill-window/lib/skillWindowLayout'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
@@ -85,9 +115,8 @@ const tableIdOf = (side: SkillWindowSide, skillId: number) => (side === '타자'
 function subItemDescriptionOf(side: SkillWindowSide, index: number): string {
   // 0~3 은 sprintf(StrITEM[148] "%s 훈련 시 +2", StrMODE[35+i] (모드 3 이면 40+i)) — 표 [win+0x164] 를 StrMODE 로 읽었다
   // (히트·파워·수비·주루 / 제구·구속·변화·체력 이 번호와 맞아 유력). 4~9 는 StrITEM[145+i].
-  const effect = index <= 3
-    ? (ORIGINAL_ITEMS[148] ?? '').replace('%s', textOf((side === '투수' ? 40 : 35) + index))
-    : ORIGINAL_ITEMS[145 + index] ?? ''
+  const effect =
+    index <= 3 ? (ORIGINAL_ITEMS[148] ?? '').replace('%s', textOf((side === '투수' ? 40 : 35) + index)) : (ORIGINAL_ITEMS[145 + index] ?? '')
   return `!cFFFFFF${ORIGINAL_ITEMS[155 + index] ?? ''}!N효과 : !cFFFF00${effect}`
 }
 
@@ -233,8 +262,9 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
         return ask(`!C[${name}${textOf(TEXT.사용확인)}`, () => onEquip(skillId, true))
       case '확장확인': {
         const nextLimit = PLUS_SKILL_SLOT_LIMITS[career.skillSlotLevel + 1]
-        return ask(`!C${skillSlotExpansionCostOf(career)}${textOf(TEXT.확장앞)} ${nextLimit} ${textOf(TEXT.확장뒤)}`,
-          expand, () => tell(maximumText()))
+        return ask(`!C${skillSlotExpansionCostOf(career)}${textOf(TEXT.확장앞)} ${nextLimit} ${textOf(TEXT.확장뒤)}`, expand, () =>
+          tell(maximumText()),
+        )
       }
       case '최대':
         return tell(maximumText())
@@ -269,8 +299,16 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
     // 대화가 떠 있으면 MessageBox 가 먼저 키를 가져간다
     if (prompt !== null) return undefined
     const onKey = (event: KeyboardEvent) => {
-      const direction: GridDirection | null = event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down'
-        : event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
+      const direction: GridDirection | null =
+        event.key === 'ArrowUp'
+          ? 'up'
+          : event.key === 'ArrowDown'
+            ? 'down'
+            : event.key === 'ArrowLeft'
+              ? 'left'
+              : event.key === 'ArrowRight'
+                ? 'right'
+                : null
       const isCancel = event.key === 'Escape' || event.key === 'Backspace'
       if (direction === null && !isCancel && event.key !== 'Enter') return
       // 뒤쪽 관리 화면의 키 처리(취소 = 창 닫기)보다 먼저 받는다
@@ -301,16 +339,38 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
     const src = `${IMG_TEXT}/${pad(frame)}.png`
     if (tint === null) return <img key={`t${frame}`} className={styles.layer} src={src} alt="" style={{ left, top }} />
     return (
-      <div key={`t${frame}`} className={styles.tinted}
-        style={{ left, top, width: size.width, height: size.height, background: solidColorCss(tint), maskImage: spriteMaskImage(src), WebkitMaskImage: spriteMaskImage(src) }} />
+      <div
+        key={`t${frame}`}
+        className={styles.tinted}
+        style={{
+          left,
+          top,
+          width: size.width,
+          height: size.height,
+          background: solidColorCss(tint),
+          maskImage: spriteMaskImage(src),
+          WebkitMaskImage: spriteMaskImage(src),
+        }}
+      />
     )
   }
   /** num 그림 한 장을 효과 11 흰색으로 — 0xb9d35 (`key` 는 같은 그림이 두 번 나올 수 있어 따로 받는다) */
   const whiteGlyph = (key: string, frame: number, left: number, top: number, width: number, height: number) => {
     const src = `${NUM}/${pad(frame)}.png`
     return (
-      <div key={key} className={styles.tinted}
-        style={{ left, top, width, height, background: solidColorCss(SKILL_WINDOW_COLORS.text), maskImage: spriteMaskImage(src), WebkitMaskImage: spriteMaskImage(src) }} />
+      <div
+        key={key}
+        className={styles.tinted}
+        style={{
+          left,
+          top,
+          width,
+          height,
+          background: solidColorCss(SKILL_WINDOW_COLORS.text),
+          maskImage: spriteMaskImage(src),
+          WebkitMaskImage: spriteMaskImage(src),
+        }}
+      />
     )
   }
 
@@ -330,8 +390,16 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
       parts.push(whiteGlyph('c', DIGIT_BASE_FRAME + count, rightAligned(L.countRightDx, count), digitTop, digitWidth(count), 10))
     }
     // "/" 는 5×8 — 가로 가운데는 올림, 세로는 내림 (0xb9c5c)
-    parts.push(whiteGlyph('s', SLASH_FRAME, NAME_BOX.x + L.slashDx + Math.ceil((NAME_BOX.width - 5) / 2),
-      NAME_BOX.y + L.digitDy + Math.trunc((NAME_BOX.height - 8) / 2), 5, 8))
+    parts.push(
+      whiteGlyph(
+        's',
+        SLASH_FRAME,
+        NAME_BOX.x + L.slashDx + Math.ceil((NAME_BOX.width - 5) / 2),
+        NAME_BOX.y + L.digitDy + Math.trunc((NAME_BOX.height - 8) / 2),
+        5,
+        8,
+      ),
+    )
     if (limit === 10) {
       parts.push(whiteGlyph('l1', DIGIT_BASE_FRAME + 1, NAME_BOX.x + L.limitDx, digitTop, 4, 10))
       parts.push(whiteGlyph('l0', DIGIT_BASE_FRAME, NAME_BOX.x + L.limitTenZeroDx, digitTop, 6, 10))
@@ -345,10 +413,12 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
 
   /** 칸 안 이름 — 검정 그림자(+1,+1) 뒤 흰 글 */
   const cellLabel = (key: string, text: string, area: LayoutBox) => [
-    <div key={`${key}-s`} className={styles.textShadow}
-      style={{ left: area.x + 1, top: area.y + 1, width: area.width, height: area.height }}>{text}</div>,
-    <div key={`${key}-f`} className={styles.textFace}
-      style={{ left: area.x, top: area.y, width: area.width, height: area.height }}>{text}</div>,
+    <div key={`${key}-s`} className={styles.textShadow} style={{ left: area.x + 1, top: area.y + 1, width: area.width, height: area.height }}>
+      {text}
+    </div>,
+    <div key={`${key}-f`} className={styles.textFace} style={{ left: area.x, top: area.y, width: area.width, height: area.height }}>
+      {text}
+    </div>,
   ]
 
   const skillCursorIndex = gridIndexOf(skillCursor, SKILL_COLUMNS)
@@ -362,28 +432,48 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
   })()
 
   return (
-    <div className={prompt !== null ? `${windowStyles.overlay} ${windowStyles.overlayWithPopup}` : windowStyles.overlay} role="dialog" aria-label="아이템/스킬" onClick={onClose}>
+    <div
+      className={prompt !== null ? `${windowStyles.overlay} ${windowStyles.overlayWithPopup}` : windowStyles.overlay}
+      role="dialog"
+      aria-label="아이템/스킬"
+      onClick={onClose}
+    >
       <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
         {/* 0x81d0c — 종류 0 의 판. 0x81dc0 은 [win+0x1a4] == 0 이면(81e1c~81e76) 공용 판 0x55e60 을 부르지 않고
             0x81d0c(둥글기 1 판 0xba0bd 셋: 검정 · 흰 −1 · #335FCD −2)로 그린다 — 0x55e61(…, 0x11, 0x10, 0, 제목 탭 1, 0)은
             종류 ≠ 0(상점 · 장비) 갈래(81e3e~81e68)만 쓴다 */}
         <RoundPlate x={WINDOW_BOX.x} y={WINDOW_BOX.y} width={WINDOW_BOX.width - 1} height={WINDOW_BOX.height - 1} color={WINDOW_COLORS.outer} />
-        <RoundPlate x={WINDOW_BOX.x + 1} y={WINDOW_BOX.y + 1} width={WINDOW_BOX.width - 3} height={WINDOW_BOX.height - 3} color={WINDOW_COLORS.inner} />
+        <RoundPlate
+          x={WINDOW_BOX.x + 1}
+          y={WINDOW_BOX.y + 1}
+          width={WINDOW_BOX.width - 3}
+          height={WINDOW_BOX.height - 3}
+          color={WINDOW_COLORS.inner}
+        />
         <rect x={WINDOW_BOX.x + 2} y={WINDOW_BOX.y + 2} width={WINDOW_BOX.width - 4} height={WINDOW_BOX.height - 4} fill={WINDOW_COLORS.fill} />
       </svg>
       {/* 탭 띠 — 고른 탭이 흰 탭인 mode_ui 프레임 36/37 을 원점 (0,0) 에 */}
-      <FrameSprite folder={MODE_UI} frame={tab === 0 ? MODE_UI_FRAME.스킬탭띠 : MODE_UI_FRAME.서브아이템탭띠}
-        origins={modeUiOrigins} x={0} y={0} />
-      {TAB_LABEL_FRAMES.map((frame, index) => centeredTextFrame(frame, TAB_BOXES[index], 0, 0,
-        index === tab ? SKILL_WINDOW_COLORS.tabOn : SKILL_WINDOW_COLORS.tabOff))}
+      <FrameSprite folder={MODE_UI} frame={tab === 0 ? MODE_UI_FRAME.스킬탭띠 : MODE_UI_FRAME.서브아이템탭띠} origins={modeUiOrigins} x={0} y={0} />
+      {TAB_LABEL_FRAMES.map((frame, index) =>
+        centeredTextFrame(frame, TAB_BOXES[index], 0, 0, index === tab ? SKILL_WINDOW_COLORS.tabOn : SKILL_WINDOW_COLORS.tabOff),
+      )}
       {focus === '탭' && isBlinkOn && (
         <FrameSprite folder={MODE_UI} frame={MODE_UI_FRAME.탭커서} origins={modeUiOrigins} x={TAB_BOXES[tab].x} y={TAB_BOXES[tab].y} />
       )}
       {TAB_BOXES.map((area, index) => (
-        <button key={index} type="button" className={styles.hitArea}
-          aria-label={index === 0 ? '스킬' : '서브아이템'} aria-pressed={index === tab}
+        <button
+          key={index}
+          type="button"
+          className={styles.hitArea}
+          aria-label={index === 0 ? '스킬' : '서브아이템'}
+          aria-pressed={index === tab}
           style={{ left: area.x, top: area.y, width: area.width, height: area.height }}
-          onClick={(event) => { event.stopPropagation(); setTab(index); setFocus('탭') }} />
+          onClick={(event) => {
+            event.stopPropagation()
+            setTab(index)
+            setFocus('탭')
+          }}
+        />
       ))}
 
       <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
@@ -408,41 +498,76 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
             )
             if (skillId === undefined) {
               return [
-                <FrameSprite key={`e${cell}`} folder={MODE_UI} frame={CELL_FRAME.회색} origins={modeUiOrigins}
-                  x={area.x + EMPTY_CELL_OFFSET.x} y={area.y + EMPTY_CELL_OFFSET.y} />,
+                <FrameSprite
+                  key={`e${cell}`}
+                  folder={MODE_UI}
+                  frame={CELL_FRAME.회색}
+                  origins={modeUiOrigins}
+                  x={area.x + EMPTY_CELL_OFFSET.x}
+                  y={area.y + EMPTY_CELL_OFFSET.y}
+                />,
                 cursor,
               ]
             }
             const name = nameOf(skillId)
             return [
-              <FrameSprite key={`f${cell}`} folder={MODE_UI} frame={skillCellFrameOf(skillId, isSkillEquipped(career, skillId))}
-                origins={modeUiOrigins} x={area.x} y={area.y} />,
+              <FrameSprite
+                key={`f${cell}`}
+                folder={MODE_UI}
+                frame={skillCellFrameOf(skillId, isSkillEquipped(career, skillId))}
+                origins={modeUiOrigins}
+                x={area.x}
+                y={area.y}
+              />,
               ...cellLabel(`n${cell}`, name, area),
               cursor,
-              <button key={`b${cell}`} type="button" className={styles.hitArea}
-                aria-label={name} aria-pressed={isSkillEquipped(career, skillId)}
+              <button
+                key={`b${cell}`}
+                type="button"
+                className={styles.hitArea}
+                aria-label={name}
+                aria-pressed={isSkillEquipped(career, skillId)}
                 style={{ left: area.x, top: area.y, width: area.width, height: area.height }}
                 onClick={(event) => {
                   event.stopPropagation()
                   setFocus('격자')
                   setSkillCursor({ column: cell % SKILL_COLUMNS, row: topRow + Math.trunc(cell / SKILL_COLUMNS) })
                   confirm(index)
-                }} />,
+                }}
+              />,
             ]
           })}
 
           {cursorSkill !== undefined && (
             <>
               {signStep !== null && (
-                <FrameSprite folder={MODE_UI} frame={signStep.frame} origins={modeUiOrigins}
-                  x={SKILL_SIGN_POSITION.x + signStep.dx} y={SKILL_SIGN_POSITION.y + signStep.dy} />
+                <FrameSprite
+                  folder={MODE_UI}
+                  frame={signStep.frame}
+                  origins={modeUiOrigins}
+                  x={SKILL_SIGN_POSITION.x + signStep.dx}
+                  y={SKILL_SIGN_POSITION.y + signStep.dy}
+                />
               )}
-              <div className={styles.description} data-testid="skill-description"
-                style={{ left: DESCRIPTION_BOX.x + SKILL_TEXT_OFFSET.x, top: DESCRIPTION_BOX.y + SKILL_TEXT_OFFSET.introY, width: DESCRIPTION_BOX.width }}>
+              <div
+                className={styles.description}
+                data-testid="skill-description"
+                style={{
+                  left: DESCRIPTION_BOX.x + SKILL_TEXT_OFFSET.x,
+                  top: DESCRIPTION_BOX.y + SKILL_TEXT_OFFSET.introY,
+                  width: DESCRIPTION_BOX.width,
+                }}
+              >
                 <MarkupText raw={ORIGINAL_SKILLS[tableIdOf(side, cursorSkill)]?.description ?? ''} />
               </div>
-              <div className={styles.description}
-                style={{ left: DESCRIPTION_BOX.x + SKILL_TEXT_OFFSET.x, top: DESCRIPTION_BOX.y + SKILL_TEXT_OFFSET.effectY, width: DESCRIPTION_BOX.width }}>
+              <div
+                className={styles.description}
+                style={{
+                  left: DESCRIPTION_BOX.x + SKILL_TEXT_OFFSET.x,
+                  top: DESCRIPTION_BOX.y + SKILL_TEXT_OFFSET.effectY,
+                  width: DESCRIPTION_BOX.width,
+                }}
+              >
                 <MarkupText raw={`효과 : !cFFFF00${ORIGINAL_SKILLS[tableIdOf(side, cursorSkill)]?.effect ?? ''}`} />
               </div>
             </>
@@ -457,24 +582,33 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
             return [
               // 아이콘 = [win+0x1a0] 그림 표 0xd463a[i] = i (item_icon), 0xb9d35 가운데 — 가진 칸만 (0x82514)
               isOwned && <ItemIcon key={`i${index}`} index={index} area={area} />,
-              <button key={`b${index}`} type="button" className={styles.hitArea}
+              <button
+                key={`b${index}`}
+                type="button"
+                className={styles.hitArea}
                 aria-label={isOwned ? ORIGINAL_ITEMS[88 + index] : `빈 칸 ${index + 1}`}
                 style={{ left: area.x, top: area.y, width: area.width, height: area.height }}
                 onClick={(event) => {
                   event.stopPropagation()
                   setFocus('격자')
                   setItemCursor({ column: index % ITEM_COLUMNS, row: Math.trunc(index / ITEM_COLUMNS) })
-                }} />,
+                }}
+              />,
             ]
           })}
           {cursorItemOwned && (
             <>
               {cellLabel('item', ORIGINAL_ITEMS[88 + itemCursorIndex] ?? '', NAME_BOX)}
-              <div className={styles.description} data-testid="skill-description"
+              <div
+                className={styles.description}
+                data-testid="skill-description"
                 style={{
-                  left: DESCRIPTION_BOX.x + ITEM_TEXT_INSET, top: DESCRIPTION_BOX.y + ITEM_TEXT_INSET,
-                  width: DESCRIPTION_BOX.width - ITEM_TEXT_INSET * 2, height: DESCRIPTION_BOX.height - ITEM_TEXT_INSET * 2,
-                }}>
+                  left: DESCRIPTION_BOX.x + ITEM_TEXT_INSET,
+                  top: DESCRIPTION_BOX.y + ITEM_TEXT_INSET,
+                  width: DESCRIPTION_BOX.width - ITEM_TEXT_INSET * 2,
+                  height: DESCRIPTION_BOX.height - ITEM_TEXT_INSET * 2,
+                }}
+              >
                 <MarkupText raw={subItemDescriptionOf(side, itemCursorIndex)} />
               </div>
             </>
@@ -485,17 +619,18 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
       {/* 대화의 단추 클릭이 창 바깥 클릭(닫기)으로 번지지 않게 막는다 — 대화 뒤에도 창은 남는다(0x147b0) */}
       <div onClick={(event) => event.stopPropagation()}>
         {prompt?.kind === '질문' && (
-          <MessageBox text={prompt.text} buttons={['예', '아니오']}
+          <MessageBox
+            text={prompt.text}
+            buttons={['예', '아니오']}
             onAnswer={(answer) => {
               const pending = prompt
               setPrompt(null)
               if (answer === 0) pending.onYes()
               else pending.onNo?.()
-            }} />
+            }}
+          />
         )}
-        {prompt?.kind === '알림' && (
-          <MessageBox text={prompt.text} buttons={['확인']} onAnswer={() => setPrompt(null)} />
-        )}
+        {prompt?.kind === '알림' && <MessageBox text={prompt.text} buttons={['확인']} onAnswer={() => setPrompt(null)} />}
       </div>
     </div>
   )
@@ -503,14 +638,27 @@ export function SkillWindow({ career, side = '타자', onEquip, onExpandSlots, o
 
 /** item_icon 그림 0~9 의 크기 (PNG 를 읽어 적었다) — 0xb9d35 가 가운데 맞춤에 쓴다 */
 const ITEM_ICON_SIZES: readonly (readonly [number, number])[] = [
-  [24, 26], [26, 23], [23, 24], [25, 24], [29, 22], [29, 26], [27, 18], [24, 22], [27, 25], [29, 23],
+  [24, 26],
+  [26, 23],
+  [23, 24],
+  [25, 24],
+  [29, 22],
+  [29, 26],
+  [27, 18],
+  [24, 22],
+  [27, 25],
+  [29, 23],
 ]
 
 /** 서브아이템 아이콘 — 0xb9d35(그림) 가운데: 가로 올림, 세로 내림 (0xb9c5c) */
 function ItemIcon({ index, area }: { readonly index: number; readonly area: LayoutBox }) {
   const [width, height] = ITEM_ICON_SIZES[index]
   return (
-    <img className={styles.layer} src={`${ITEM_ICON}/${pad(index)}.png`} alt=""
-      style={{ left: area.x + Math.ceil((area.width - width) / 2), top: area.y + Math.trunc((area.height - height) / 2) }} />
+    <img
+      className={styles.layer}
+      src={`${ITEM_ICON}/${pad(index)}.png`}
+      alt=""
+      style={{ left: area.x + Math.ceil((area.width - width) / 2), top: area.y + Math.trunc((area.height - height) / 2) }}
+    />
   )
 }

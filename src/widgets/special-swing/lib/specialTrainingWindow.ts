@@ -104,8 +104,7 @@ export const specialTrainingTitleFrameOf = (side: SpecialTrainingSide) => SIDE_S
 export const specialTrainingIconFrameOf = (side: SpecialTrainingSide) => SIDE_SPECS[side].iconFrame
 
 /** StrCOMMON 25~29 (필살타법 다섯) · 31~36 (마구 여섯) */
-const commonNameOf = (index: number): string =>
-  (index >= 0x1f ? PITCHER_BURSTS[index - 0x1f] : BATTER_BURSTS[index - 0x19]) ?? ''
+const commonNameOf = (index: number): string => (index >= 0x1f ? PITCHER_BURSTS[index - 0x1f] : BATTER_BURSTS[index - 0x19]) ?? ''
 
 /** 표 0xd4704 — 조건 인기도 ÷ 100 (s8 [1, 5, 10, 15]) */
 const REQUIRED_POPULARITY_HUNDREDS: readonly number[] = [1, 5, 10, 15]
@@ -130,8 +129,7 @@ export function slotNameIndexOf(side: SpecialTrainingSide, slot: number, typeInd
   return typeIndex === 1 ? base + 1 : typeIndex === 2 ? base + 2 : base
 }
 
-export const slotNameOf = (side: SpecialTrainingSide, slot: number, typeIndex: number) =>
-  commonNameOf(slotNameIndexOf(side, slot, typeIndex))
+export const slotNameOf = (side: SpecialTrainingSide, slot: number, typeIndex: number) => commonNameOf(slotNameIndexOf(side, slot, typeIndex))
 
 /**
  * 설명 글 (0x807d2~0x809e4 — 0xbc75d · 0xbc965 · 0xbc73d 로 잇는다):

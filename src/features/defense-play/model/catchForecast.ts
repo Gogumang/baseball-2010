@@ -305,11 +305,7 @@ export function forecastCatch(
 function fenceChasePointOf(trajectory: BattedBallTrajectory, table: CatchTable): WorldPoint | null {
   const fenceTick = trajectory.fenceTick
   if (fenceTick === -1) return null
-  const earliest = Math.min(
-    table.grounder?.tick ?? NO_LOW_TICK,
-    table.chest?.tick ?? NO_LOW_TICK,
-    table.low?.tick ?? NO_LOW_TICK,
-  )
+  const earliest = Math.min(table.grounder?.tick ?? NO_LOW_TICK, table.chest?.tick ?? NO_LOW_TICK, table.low?.tick ?? NO_LOW_TICK)
   if (fenceTick >= earliest) return null
   const point = trajectory.pointAt(fenceTick - 2)
   return { x: point.x, y: 0, z: point.z }

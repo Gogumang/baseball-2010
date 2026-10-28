@@ -181,16 +181,17 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
   // 내 선수 보너스와 그 계수는 나리(원본 모드 3·4)에서만 켜진다 (sp40, 0xab2ce~0xab2d8)
   const isCareerMode = input.mode === '나만의리그'
   const yearIndex = input.careerYearIndex ?? 0
-  const ownBonusOf = ({ base, perLevel }: { base: number; perLevel: number }) =>
-    Math.max(0, base - perLevel * yearIndex)
-  const batterBonus = isCareerMode && input.isBatterOwnPlayer === true
-    ? ownBonusOf({ base: balanceNumber('swing.ownBatterBonusBase'), perLevel: balanceNumber('swing.ownBatterBonusPerYear') })
-    : 0
-  const pitcherBonus = isCareerMode && input.isPitcherOwnPlayer === true
-    ? ownBonusOf({ base: balanceNumber('swing.ownPitcherBonusBase'), perLevel: balanceNumber('swing.ownPitcherBonusPerYear') })
-    : input.mode === '투수미션' && input.isPitcherOwnPlayer === true
-      ? balanceNumber('swing.missionOwnPitcherBonus')
+  const ownBonusOf = ({ base, perLevel }: { base: number; perLevel: number }) => Math.max(0, base - perLevel * yearIndex)
+  const batterBonus =
+    isCareerMode && input.isBatterOwnPlayer === true
+      ? ownBonusOf({ base: balanceNumber('swing.ownBatterBonusBase'), perLevel: balanceNumber('swing.ownBatterBonusPerYear') })
       : 0
+  const pitcherBonus =
+    isCareerMode && input.isPitcherOwnPlayer === true
+      ? ownBonusOf({ base: balanceNumber('swing.ownPitcherBonusBase'), perLevel: balanceNumber('swing.ownPitcherBonusPerYear') })
+      : input.mode === '투수미션' && input.isPitcherOwnPlayer === true
+        ? balanceNumber('swing.missionOwnPitcherBonus')
+        : 0
   // 그 계수(K 1000 …)는 나리에서 타자·투수 중 한쪽이라도 비트7 일 때만 쓴다 (0xab628~0xab646)
   const isAceFormula = isCareerMode && (input.isBatterOwnPlayer === true || input.isPitcherOwnPlayer === true)
   // 팀 조작 보정 0xab5c0~0xab5fc — 모드 3·4 밖에서 수비가 사람이면 −10, 모드 6 에서 공격이 사람이면 +100
@@ -202,11 +203,15 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
   const multiplier = input.controlTier < 0 ? NEUTRAL_MULTIPLIER : balanceList('swing.pitchGradeMultipliers')[Math.min(input.controlTier, 5)]
   // 0xab4dc~0xab5a2 — 구조체 out[0]·out[2] 는 타자 쪽, out[4]·out[6] 은 투수 쪽(배율 앞)에 더한다
   const hitEdge =
-    input.batter.hit + boost.batterHit + batterBonus -
+    input.batter.hit +
+    boost.batterHit +
+    batterBonus -
     trunc((multiplier * (input.pitcher.velocity + boost.pitcherVelocity + pitcherBonus)) / 100) +
     teamAdjust
   const powerEdge =
-    input.batter.power + boost.batterPower + batterBonus -
+    input.batter.power +
+    boost.batterPower +
+    batterBonus -
     trunc((multiplier * (input.pitcher.control + boost.pitcherControl + pitcherBonus)) / 100) +
     teamAdjust
   const scaledContact = trunc((baseContact * (300 - multiplier)) / 200)
@@ -224,8 +229,7 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
     const derbyContact = trunc(((hit + contactBase) * trunc((scaledContact * input.timing) / 10_000)) / 10)
     const derbySolidWeight =
       ace.hitBase * 10 +
-      trunc(trunc((ace.hitCoefficient * hit * hitWeight + ace.extraCoefficient * power * extraWeight) / 100) /
-        (hitWeight + extraWeight))
+      trunc(trunc((ace.hitCoefficient * hit * hitWeight + ace.extraCoefficient * power * extraWeight) / 100) / (hitWeight + extraWeight))
     const derbySolid = trunc(((baseSolid + derbySolidWeight) * timingScale) / 100) + exhausted
     const derbyHomeRunWeight = ace.extraBase * 10 + trunc((ace.hitCoefficient * power) / 100)
     const derbyHomeRun = trunc(((baseHomeRun + exhausted + derbyHomeRunWeight) * timingScale) / 100)
@@ -233,19 +237,16 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
   }
 
   const formula = swingFormulaOf(isAceFormula)
-  const contact = input.buntKind > 0
-    ? trunc((scaledContact * 12) / 10)
-    : trunc(
-        (trunc((hitEdge * formula.contactFactor) / 1000 + contactBase) *
-          trunc((scaledContact * input.timing) / 10_000)) /
-          10,
-      )
+  const contact =
+    input.buntKind > 0
+      ? trunc((scaledContact * 12) / 10)
+      : trunc((trunc((hitEdge * formula.contactFactor) / 1000 + contactBase) * trunc((scaledContact * input.timing) / 10_000)) / 10)
 
   const solidWeight =
     trunc(
-      trunc((hitEdge * formula.hitCoefficient * hitWeight + powerEdge * formula.extraCoefficient * extraWeight) / 100) /
-        (hitWeight + extraWeight),
-    ) + formula.hitBase * 10
+      trunc((hitEdge * formula.hitCoefficient * hitWeight + powerEdge * formula.extraCoefficient * extraWeight) / 100) / (hitWeight + extraWeight),
+    ) +
+    formula.hitBase * 10
   // 원본은 B 를 먼저 배율까지 끝내고 나서 탈진 보너스를 더하고, C 는 그 보너스를 먼저 받은 뒤 배율을 먹는다
   const solid = trunc(((baseSolid + solidWeight + strengthBonus) * timingScale) / 100) + exhausted
   const homeRunWeight = formula.extraBase * 10 + trunc((powerEdge * formula.extraCoefficient) / 100)
@@ -254,13 +255,7 @@ export function swingFactorsOf(input: SwingResultInput): SwingFactors {
 }
 
 /** 스킬(0xab91c~) → 보정 구조체 % (0xabd92~0xabe02) — 모든 모드가 같은 길로 모인다 */
-function finishFactors(
-  contact: number,
-  solid: number,
-  homeRun: number,
-  input: SwingResultInput,
-  boost: SwingBoost,
-): SwingFactors {
+function finishFactors(contact: number, solid: number, homeRun: number, input: SwingResultInput, boost: SwingBoost): SwingFactors {
   const skilled = applySwingSkills({ solid, homeRun }, input.batterSkillIds, input.pitcherSkillIds, input.situation)
   // 0xabd92~0xabe02 — 스킬 보정 뒤, 상한(0xabeba) 앞. 마구 % 도 부호가 양수라 타자 쪽을 올린다 (원본 버그 B-02 — 고친 길은 swingBoostOf 가 음수 % 를 준다)
   const boostedSolid = skilled.solid + trunc((skilled.solid * boost.solidPercent) / 100)
@@ -296,7 +291,5 @@ export function swingResultOf(input: SwingResultInput, random: RandomPort): Swin
   }
   const roll = random.rand(0, 10_000) - balanceNumber('swing.foulPercent') * 100
   if (roll < 0) return { kind: '타구', code: 9, isSolid: true }
-  return roll - balanceNumber('swing.outPercent') * 100 < 0
-    ? { kind: '타구', code: 0, isSolid: false }
-    : { kind: '타구', code: 3, isSolid: false }
+  return roll - balanceNumber('swing.outPercent') * 100 < 0 ? { kind: '타구', code: 0, isSolid: false } : { kind: '타구', code: 3, isSolid: false }
 }

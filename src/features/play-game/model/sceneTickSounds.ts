@@ -16,11 +16,7 @@ import { runBeforeSceneParticleTick } from '@/entities/particle/model/sceneParti
  * 소리 통로는 하나다(`shared/api/audio/soundPort` 머리말) — 같은 틀의 소리는 원본처럼 뒤 소리가 앞 소리를 끊고, 다른 틀의 소리는
  * 그 사이만큼 들린다.
  */
-export function playSoundIdsAfterSceneTicks(
-  sound: SoundPort,
-  ids: readonly (number | null | undefined)[],
-  ticks: number,
-): void {
+export function playSoundIdsAfterSceneTicks(sound: SoundPort, ids: readonly (number | null | undefined)[], ticks: number): void {
   const live = ids.filter((id): id is number => id !== null && id !== undefined)
   if (live.length === 0) return
   if (ticks <= 0) {
@@ -79,10 +75,7 @@ export function scheduleSceneFrameUpdate(update: () => void, ticks: number): () 
     cancel()
     update()
   }
-  removeHook = runBeforeSceneParticleTick(
-    (appTick) => !isGameSceneFrozen() && appTick >= appTickOfGameSceneTick(dueTick),
-    run,
-  )
+  removeHook = runBeforeSceneParticleTick((appTick) => !isGameSceneFrozen() && appTick >= appTickOfGameSceneTick(dueTick), run)
   timer = setGameSceneTickTimeout(run, ticks)
   return cancel
 }

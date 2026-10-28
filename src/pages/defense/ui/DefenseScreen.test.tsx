@@ -26,8 +26,7 @@ const 기본_상태: DefenseViewState = {
   runners: [],
 }
 
-const 띄우기 = (state: DefenseViewState = 기본_상태) =>
-  render(<DefenseScreen state={state} isRunning={false} />)
+const 띄우기 = (state: DefenseViewState = 기본_상태) => render(<DefenseScreen state={state} isRunning={false} />)
 
 describe('수비 배경', () => {
   it('310 폭 두 장으로 620×500 을 만든다 — 오른쪽은 좌우 반전이다', () => {
@@ -66,10 +65,7 @@ describe('월드 좌표 → 화면 좌표', () => {
   it('1루 쪽(x 큰 쪽) 야수는 오른쪽에 놓인다', () => {
     띄우기({
       ...기본_상태,
-      fielders: [
-        ...기본_상태.fielders,
-        { slot: 2, x: 25068, z: 23275, action: FIELDER_ACTION.runRight, actionTick: 1 },
-      ],
+      fielders: [...기본_상태.fielders, { slot: 2, x: 25068, z: 23275, action: FIELDER_ACTION.runRight, actionTick: 1 }],
     })
 
     const first = screen.getByTestId('defense-fielder-2')
@@ -113,9 +109,7 @@ describe('카메라 — 진입 맞춤 0x46418 · 멈춤 0x3f060(3f0a4 경기 멈
     vi.useFakeTimers()
     try {
       const view = render(<DefenseScreen state={{ ...기본_상태, cameraTarget: { x: 20000, z: 24500 } }} />)
-      view.rerender(
-        <DefenseScreen state={{ ...기본_상태, cameraTarget: { x: 26000, z: 24500 }, cameraFrozen }} />,
-      )
+      view.rerender(<DefenseScreen state={{ ...기본_상태, cameraTarget: { x: 26000, z: 24500 }, cameraFrozen }} />)
       for (let i = 0; i < 5; i += 1) act(() => void vi.advanceTimersByTime(millisecondsPerFrame()))
       return Number.parseInt(screen.getByTestId('defense-fielder-0').style.left, 10)
     } finally {
@@ -155,13 +149,7 @@ describe('그리기 목록 차례 0xbe810 (키 오름차순 · 같은 키는 먼
       ],
       runners: [{ index: 0, x: 21000, z: 24500, action: RUNNER_ACTION.run, actionTick: 0, base: 1, isAdvancing: true }],
     })
-    expect(차례()).toEqual([
-      'defense-fielder-8',
-      'defense-fielder-0',
-      'defense-runner-0',
-      'defense-ball',
-      'defense-fielder-1',
-    ])
+    expect(차례()).toEqual(['defense-fielder-8', 'defense-fielder-0', 'defense-runner-0', 'defense-ball', 'defense-fielder-1'])
   })
 
   it('같은 키면 먼저 넣은 것이 아래다 — 야수는 칸 8 → 0 차례로 넣고, 공은 맨 나중에 넣는다', () => {
@@ -291,10 +279,7 @@ describe('좌·우 그림 (S12 8절 — 좌우 반전이 아니다)', () => {
  */
 describe('팀 팔레트로 다시 칠하기', () => {
   const 원점들 = Object.fromEntries(
-    Array.from({ length: 125 }, (_, frame) => [
-      String(frame).padStart(3, '0'),
-      { x: -7, y: -20, width: 15, height: 21 },
-    ]),
+    Array.from({ length: 125 }, (_, frame) => [String(frame).padStart(3, '0'), { x: -7, y: -20, width: 15, height: 21 }]),
   )
   const 팔레트표 = { mpl: 'defender.mpl', select: '팀', baked: 2, colors: [], palettes: [] }
 
@@ -352,9 +337,7 @@ describe('팀 팔레트로 다시 칠하기', () => {
   it('마선수 그림은 팀 색을 안 탄다 — 제 그림판을 그대로 쓴다', async () => {
     띄우기({
       ...기본_상태,
-      fielders: [
-        { slot: 4, x: 20000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0, teamIndex: 7, aceIndex: 0 },
-      ],
+      fielders: [{ slot: 4, x: 20000, z: 24500, action: FIELDER_ACTION.stand, actionTick: 0, teamIndex: 7, aceIndex: 0 }],
     })
     await act(async () => {})
 
@@ -365,15 +348,11 @@ describe('팀 팔레트로 다시 칠하기', () => {
   it('주자도 같은 팔레트 표를 타되 공격 팀 번호를 쓴다', async () => {
     띄우기({
       ...기본_상태,
-      runners: [
-        { index: 0, x: 22000, z: 26000, action: RUNNER_ACTION.stand, actionTick: 0, base: 1, isAdvancing: true, teamIndex: 3 },
-      ],
+      runners: [{ index: 0, x: 22000, z: 26000, action: RUNNER_ACTION.stand, actionTick: 0, base: 1, isAdvancing: true, teamIndex: 3 }],
     })
     await act(async () => {})
 
-    expect(screen.getByTestId('defense-runner-0').querySelector('img')?.getAttribute('src')).toBe(
-      './sprites/defender/frames/000.png',
-    )
+    expect(screen.getByTestId('defense-runner-0').querySelector('img')?.getAttribute('src')).toBe('./sprites/defender/frames/000.png')
   })
 
   it('팀 번호 → 팔레트 벌 번호는 팀 번호 그대로다 (수비수 .mpl 은 피부가 없다)', () => {
@@ -390,10 +369,7 @@ describe('팀 팔레트로 다시 칠하기', () => {
 describe('레이저 송구 반짝임', () => {
   const 야수둘: DefenseViewState = {
     ...기본_상태,
-    fielders: [
-      ...기본_상태.fielders,
-      { slot: 6, x: 30700, z: 12300, action: FIELDER_ACTION.stand, actionTick: 0 },
-    ],
+    fielders: [...기본_상태.fielders, { slot: 6, x: 30700, z: 12300, action: FIELDER_ACTION.stand, actionTick: 0 }],
   }
 
   it('칸을 안 주면 아무도 안 반짝인다', () => {
@@ -421,7 +397,14 @@ describe('레이저 송구 반짝임', () => {
 
 describe('작은 지도 0x395f4 (0x46e02 — 앵커 (30, 30))', () => {
   const 주자 = (index: number, x: number, z: number, isFinished = false) => ({
-    index, x, z, action: RUNNER_ACTION.stand, actionTick: 0, base: 0, isAdvancing: false, isFinished,
+    index,
+    x,
+    z,
+    action: RUNNER_ACTION.stand,
+    actionTick: 0,
+    base: 0,
+    isAdvancing: false,
+    isFinished,
   })
 
   it('처리 끝(+0x96) 아닌 주자만 점을 찍는다 — 카메라와 상관없이 화면 좌표', () => {

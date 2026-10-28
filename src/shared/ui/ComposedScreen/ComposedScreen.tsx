@@ -47,6 +47,15 @@ export function ComposedScreen({ ops, backdrop = 0, width = 240, height = 320, l
   }, [opsKey, backdrop, width, height, loadedVersion])
 
   const style: CSSProperties = { position: 'absolute', left, top, width, height, imageRendering: 'pixelated', pointerEvents: 'none' }
-  return <canvas ref={canvasRef} width={width} height={height} style={style} data-testid={testId} data-composed-ops={ops.length}
-    data-composed-covers={ops.filter((op) => op.kind === 'cover').length} />
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      style={style}
+      data-testid={testId}
+      data-composed-ops={ops.length}
+      data-composed-covers={ops.filter((op) => op.kind === 'cover').length}
+    />
+  )
 }

@@ -53,8 +53,7 @@ export function blurScreen565(pixels: Uint16Array, width: number, height: number
 }
 
 /** 0x9a628 — 단계 3 덮기: 화면 3/4 + 색 1/4 를 마스크로 더한다 */
-export const whitenStep3Of565 = (pixel: number, color: number) =>
-  ((pixel & 0xf7de) >> 1) + ((pixel & 0xe79c) >> 2) + ((color & 0xe79c) >> 2)
+export const whitenStep3Of565 = (pixel: number, color: number) => ((pixel & 0xf7de) >> 1) + ((pixel & 0xe79c) >> 2) + ((color & 0xe79c) >> 2)
 
 /** 3줄 선 — 검정 알파 0x10. ⚠️ 섞기는 플랫폼 몫이라 칸마다 v × (255 − 알파) / 255 근사 */
 export function darkenLine565(pixel: number, alpha: number): number {
@@ -108,7 +107,7 @@ export function finishSkinBackdropOnCanvas(context: CanvasRenderingContext2D, wi
  * n = 1 이면 둘의 평균, n = 2 면 넷의 평균이다. 끝 n 칸 · n 줄은 그대로 남는다. `pixels` 를 고친다.
  */
 export function blurRightDown565(pixels: Uint16Array, width: number, height: number, x: number, y: number, w: number, h: number, n: number): void {
-  const field = (bits: number) => ((bits >> n) << n)
+  const field = (bits: number) => (bits >> n) << n
   const mask = (field(0x1f) << 11) | (field(0x3f) << 5) | field(0x1f)
   const rowEnd = Math.min(height, h) - n
   const columnEnd = w - n
@@ -189,12 +188,7 @@ export function applyZoom565(pixels: Uint16Array, indexes: Int32Array): void {
 }
 
 /** 캔버스 그림을 565 로 떠 `edit` 로 고친 뒤 다시 그 자리에 놓는다(화면 버퍼를 직접 고치는 원본 함수 자리). 읽기가 안 되는 문맥이면 아무것도 안 한다 */
-export function editScreen565OnCanvas(
-  context: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  edit: (pixels: Uint16Array) => void,
-): void {
+export function editScreen565OnCanvas(context: CanvasRenderingContext2D, width: number, height: number, edit: (pixels: Uint16Array) => void): void {
   if (typeof context.getImageData !== 'function') return
   const image = context.getImageData(0, 0, width, height)
   const pixels = new Uint16Array(width * height)

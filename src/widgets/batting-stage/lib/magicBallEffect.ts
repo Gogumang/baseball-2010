@@ -64,10 +64,7 @@ export function magicBallEffectFolderOf(pitch: Pitch): string | null {
  * 애니는 **그린 틱에만** 한 칸 넘어가므로(0x3b5a4) 흐른 틱 = `경로번호 − 8` 이다.
  * 칸 길이는 판정 글자와 같은 `max(1, 지연)` 틱이고(0x93d90), **마지막 칸은 안 그린다**.
  */
-export function magicBallEffectFrameAt(
-  entries: readonly StageAnimationEntry[],
-  ballPathIndex: number,
-): number | null {
+export function magicBallEffectFrameAt(entries: readonly StageAnimationEntry[], ballPathIndex: number): number | null {
   if (entries.length < 2) return null
   if (ballPathIndex < MAGIC_BALL_EFFECT_FIRST_PATH_INDEX) return null
 
@@ -116,7 +113,12 @@ export function magicBallParticlesOf(
       const formGroup = (pitch.pitcherForm ?? 0) >> 1
       if (formGroup === 1) return ballTick === 0 ? [{ id: 0x18, img: 15 }] : []
       if (formGroup === 2) {
-        return ballTick <= Math.trunc(frameCount / 2) ? [{ id: 0x16, img: 14 }, { id: 0x17, img: 14 }] : []
+        return ballTick <= Math.trunc(frameCount / 2)
+          ? [
+              { id: 0x16, img: 14 },
+              { id: 0x17, img: 14 },
+            ]
+          : []
       }
       return []
     }

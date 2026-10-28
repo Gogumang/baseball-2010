@@ -6,8 +6,13 @@ import { seasonDetailSourceOf } from '@/entities/season-mode/model/seasonEntry'
 import { nariRecordSalaryGradeOf } from '@/entities/career/model/seasonFlow'
 
 const 투수: HallOfFamePitcher = {
-  name: '김구원', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
-  equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 0,
+  name: '김구원',
+  ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+  equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+  endingIndex: 5,
+  season: 10,
+  titleIds: [],
+  slot: 0,
   look: { typeIndex: 0, handIndex: 0, skinIndex: 0, teamId: 1 },
 }
 const 영입투수: SeasonPlayer = { id: 0xb4, kindByte: 0, fieldPosition: 0, stamina: 10000 }

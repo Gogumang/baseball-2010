@@ -4,7 +4,6 @@ import { laserTrailStampsOf } from '@/pages/defense/lib/laserTrail'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
-
 /**
  * 레이저 잔상 (0x37076~0x3724a) — 공과 같은 깊이로 공 **뒤에**(위에) 넣는다(그리기 목록에 공 그림 0x36f70 이 먼저 들어간다).
  * 공이 화면에서 떠 있을 때(높이 투영 > 0)와 공 바닥점이 화면 위쪽 1 이상일 때만(0x36fc0 · 0x36fce) 그린다.

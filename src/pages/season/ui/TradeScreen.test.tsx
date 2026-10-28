@@ -42,10 +42,16 @@ const 상태 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonState => {
 /** 내 팀 명단 — 세션이 만드는 것과 같은 모양(칸 번호만 채운다) */
 const 명단 = (덮어쓰기: Partial<SeasonTeamRoster> = {}): SeasonTeamRoster => ({
   pitchers: Array.from({ length: 8 }, (_unused, slot) => ({
-    id: slot, kindByte: slot, fieldPosition: 0, stamina: 0,
+    id: slot,
+    kindByte: slot,
+    fieldPosition: 0,
+    stamina: 0,
   })),
   batters: Array.from({ length: 12 }, (_unused, slot) => ({
-    id: slot, kindByte: slot, fieldPosition: 0, stamina: 0,
+    id: slot,
+    kindByte: slot,
+    fieldPosition: 0,
+    stamina: 0,
   })),
   ...덮어쓰기,
 })
@@ -53,10 +59,7 @@ const 명단 = (덮어쓰기: Partial<SeasonTeamRoster> = {}): SeasonTeamRoster 
 /** 뽑기를 정해 놓은 난수 — `bfa55(1,101)` */
 const 고정난수 = (value: number): RandomPort => createConstantRandom((value - 0.5) / 100)
 
-const 띄우기 = (
-  state: SeasonState,
-  나머지: Partial<Parameters<typeof TradeScreen>[0]> = {},
-) => {
+const 띄우기 = (state: SeasonState, 나머지: Partial<Parameters<typeof TradeScreen>[0]> = {}) => {
   const onTrade = vi.fn()
   const onBack = vi.fn()
   const onFinish = vi.fn()
@@ -78,9 +81,10 @@ const 띄우기 = (
 }
 
 /** 0xe7 진행 게이지(0xcecc, 틀마다 +2)가 다 찰 만큼 틀을 보낸다 — 누를 때마다 보내 둔다 */
-const 틀보내기 = () => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame() * 120)
-})
+const 틀보내기 = () =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * 120)
+  })
 /** 누름 칸 — 보통 단추, 엔트리 목록 창 줄은 목록 칸(option) */
 const 칸 = (이름: string | RegExp) => screen.queryByRole('button', { name: 이름 }) ?? screen.getByRole('option', { name: 이름 })
 const 누르기 = (이름: string | RegExp) => {
@@ -218,10 +222,7 @@ describe('0xe5 영입 선수 → 0xe6 보상 선수', () => {
 
   it('영입해 온 나리 선수는 보상으로 못 낸다 (StrMODE[165])', () => {
     const 나리가낀명단 = 명단({
-      batters: [
-        { id: 0xfe, kindByte: PLAYER_OWN_BIT | 0, fieldPosition: 0, stamina: 0 },
-        ...명단().batters.slice(1),
-      ],
+      batters: [{ id: 0xfe, kindByte: PLAYER_OWN_BIT | 0, fieldPosition: 0, stamina: 0 }, ...명단().batters.slice(1)],
     })
     띄우기(상태(), { roster: 나리가낀명단 })
 
@@ -260,12 +261,9 @@ describe('r263 — 키 다시 뜸 (0x7104 · 0x727c · 0xc66c · 목록 0x55724 
     expect(커서줄()?.getAttribute('aria-label')).toContain(teamBatters(MY_TEAM)[0].name)
   })
 
-  it("0xe5 에서 상대 팀의 나리 선수를 고르면 [165] 알림만 — 0x71bc~0x723a (0xb6389)", () => {
+  it('0xe5 에서 상대 팀의 나리 선수를 고르면 [165] 알림만 — 0x71bc~0x723a (0xb6389)', () => {
     const 나리가낀상대 = 명단({
-      batters: [
-        { id: 0xfe, kindByte: PLAYER_OWN_BIT | 0, fieldPosition: 0, stamina: 0 },
-        ...명단().batters.slice(1),
-      ],
+      batters: [{ id: 0xfe, kindByte: PLAYER_OWN_BIT | 0, fieldPosition: 0, stamina: 0 }, ...명단().batters.slice(1)],
     })
     띄우기(상태(), { opponentRosterOf: () => 나리가낀상대 })
     타자로()
@@ -567,7 +565,11 @@ describe('SR+0x56 (이번 주기에 트레이드를 썼다)', () => {
 
 describe('CPU 트레이드 요청으로 들어오면 (0xe5 진입 0x5cd0 · 키 0x7104 · 0x727c · 0xc66c)', () => {
   const 요청 = {
-    isRequested: true, myIndex: 3, opponentIndex: 2, tab: 1, opponentTeamId: OPPONENT,
+    isRequested: true,
+    myIndex: 3,
+    opponentIndex: 2,
+    tab: 1,
+    opponentTeamId: OPPONENT,
   } as const
 
   it('팀 고르기를 건너뛰고 [204] 알림부터 — 닫으면 상대 칸이 묶인 목록이다', () => {
@@ -648,9 +650,11 @@ describe('상대 팀 레코드 (시즌 저장의 CPU 명단)', () => {
   it('지난 트레이드로 간 내 옛 선수가 상대 목록에 제 이름(옛 팀 표)으로 나온다', () => {
     const 상대 = {
       pitchers: teamPitchers(OPPONENT).map((_p, slot) => ({ id: slot, kindByte: slot, fieldPosition: 0, stamina: 0 })),
-      batters: teamBatters(OPPONENT).map((_p, slot) => (slot === 4
-        ? { id: 1, kindByte: slot, fieldPosition: 0, stamina: 0, tableTeamId: MY_TEAM }
-        : { id: slot, kindByte: slot, fieldPosition: 0, stamina: 0 })),
+      batters: teamBatters(OPPONENT).map((_p, slot) =>
+        slot === 4
+          ? { id: 1, kindByte: slot, fieldPosition: 0, stamina: 0, tableTeamId: MY_TEAM }
+          : { id: slot, kindByte: slot, fieldPosition: 0, stamina: 0 },
+      ),
     }
     띄우기(상태(), { opponentRosterOf: () => 상대 })
     타자로()

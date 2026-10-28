@@ -49,10 +49,7 @@ export interface LooseBallChase {
 }
 
 /** 예보 칸 — 필살수비 창 · +0x127 은 타구 판(메시지 0x11 · 0x51408)만 세운다. 이 판들에선 늘 꺼져 있다 */
-export type LooseBallForecastOptions = Pick<
-  CatchForecastOptions,
-  'initialChaserSlot' | 'thrownSlot' | 'secondPass' | 'onlySlot'
->
+export type LooseBallForecastOptions = Pick<CatchForecastOptions, 'initialChaserSlot' | 'thrownSlot' | 'secondPass' | 'onlySlot'>
 
 /** 새 공 `ball` 을 판 틱 `atTick` 부터 잇고 예보 0xb12d0 · 고르기 0xb3b38 로 줍는 야수 · 틱을 정한다 */
 export function chaseLooseBall(

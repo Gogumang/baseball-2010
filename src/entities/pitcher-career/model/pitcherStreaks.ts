@@ -217,9 +217,7 @@ export function pitcherStreakEventOf(input: PitcherStreakEventInput): PitcherStr
 }
 
 /** 116 이 지금 커리어로 쌓는 연속 기록 몫 — 기록 줄(`lastGame`)이 없는 옛 저장은 116 평가 창도 없어 비운다 */
-export function pitcherStreakEventOfCareer(
-  career: Pick<PitcherCareer, 'role' | 'streaks' | 'season' | 'skillIds' | 'lastGame'>,
-): PitcherStreakEvent {
+export function pitcherStreakEventOfCareer(career: Pick<PitcherCareer, 'role' | 'streaks' | 'season' | 'skillIds' | 'lastGame'>): PitcherStreakEvent {
   const { lastGame } = career
   if (lastGame === undefined) return EMPTY_EVENT
   return pitcherStreakEventOf({

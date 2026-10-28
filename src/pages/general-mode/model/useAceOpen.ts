@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
-import {
-  aceBatterIdsOf,
-  acePitcherIdsOf,
-  normalizeAceOpenSave,
-  openAceCell,
-} from '@/pages/general-mode/lib/aceOpenState'
+import { aceBatterIdsOf, acePitcherIdsOf, normalizeAceOpenSave, openAceCell } from '@/pages/general-mode/lib/aceOpenState'
 import type { AceOpenSave } from '@/pages/general-mode/lib/aceOpenState'
 
 export interface AceOpenSession {

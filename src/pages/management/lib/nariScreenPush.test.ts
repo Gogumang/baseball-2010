@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  nariMatchPushDirectionOf,
-  screenPushFrameAt,
-  screenPushStepOf,
-} from '@/pages/management/lib/nariScreenPush'
+import { nariMatchPushDirectionOf, screenPushFrameAt, screenPushStepOf } from '@/pages/management/lib/nariScreenPush'
 
 describe('효과기 종류 8 화면 밀기 — 0xbdae8 · 0xbd966 · 0xbd740', () => {
   it('보폭 = 크기 × 200 / 길이 — 가로 240 · 1000 이면 48, 세로 320 이면 64', () => {

@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
-  STADIUM_KINDS, buyStadiumItem, canEquipStadiumItem, checkStadiumPurchase, equipStadiumItem, stadiumCollectorUnlocks, stadiumPreviewOf,
+  STADIUM_KINDS,
+  buyStadiumItem,
+  canEquipStadiumItem,
+  checkStadiumPurchase,
+  equipStadiumItem,
+  stadiumCollectorUnlocks,
+  stadiumPreviewOf,
 } from '@/entities/season-mode/model/stadiumItems'
 import { stadiumSkyRowOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { stepSeasonScoreboardX } from '@/widgets/batting-stage/lib/renderScenery'
@@ -97,8 +103,15 @@ const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
  * 그리고 **잔디는 1·2·3억을 받으면서 어떤 계산에도 들어가지 않는다** (S3 8절).
  */
 export function StadiumShopScreen({
-  record, mode = '상점', isHiddenOpen = () => false, onChange, onUnlock, onBack, gamePoint = 0,
-  previewScene = INITIAL_STADIUM_PREVIEW_SCENE, onPreviewSceneChange,
+  record,
+  mode = '상점',
+  isHiddenOpen = () => false,
+  onChange,
+  onUnlock,
+  onBack,
+  gamePoint = 0,
+  previewScene = INITIAL_STADIUM_PREVIEW_SCENE,
+  onPreviewSceneChange,
 }: StadiumShopScreenProps) {
   const isShop = mode === '상점'
   const [kind, setKind] = useState<StadiumKind>(STADIUM_KINDS[0])
@@ -112,13 +125,15 @@ export function StadiumShopScreen({
    * 을 새로 잰다. 상점 진입 0x5f3c 는 0x783b0 을 안 불러 앞서 구장관리가 둔 값(없으면 0)이고, 0x77edc(구장, 1)로 전광판 글자를
    * 저장된 전광판 칸으로 되감는다(62ee).
    */
-  const [entryScene] = useState<StadiumPreviewScene>(() => isShop
-    ? { ...previewScene, scoreboardX: rewoundScoreboardX(previewScene.scoreboardX, stadiumPreviewOf(record).board) }
-    : {
-      ...previewScene,
-      skyRow: stadiumSkyRowOf({ mode: SEASON_MODE, dayCounter: record.games }) ?? 0,
-      skyColumn: liveGameInningIndex(),
-    })
+  const [entryScene] = useState<StadiumPreviewScene>(() =>
+    isShop
+      ? { ...previewScene, scoreboardX: rewoundScoreboardX(previewScene.scoreboardX, stadiumPreviewOf(record).board) }
+      : {
+          ...previewScene,
+          skyRow: stadiumSkyRowOf({ mode: SEASON_MODE, dayCounter: record.games }) ?? 0,
+          skyColumn: liveGameInningIndex(),
+        },
+  )
   /** 구장 +0x8c — 상점 그리기 0xb1f8 만 0x77fb5(구장, 1)로 흘린다. 구장관리 0xb158 은 그대로 둔다 */
   const [scoreboardX, setScoreboardX] = useState(entryScene.scoreboardX)
   const [notice, setNotice] = useState<string | null>(null)
@@ -259,14 +274,23 @@ export function StadiumShopScreen({
         키가 지금 종류의 칸 하나만 갈아 끼운다(`stadiumPreviewOf`). 하늘 줄 · 칸과 전광판 글자 자리는 장면 구장 칸이다
         (`StadiumPreviewScene` — 상점은 구장관리가 앞서 둔 하늘을 쓰고, 0xb1f8 만 0x77fb5 로 글자를 흘린다).
       */}
-      <StadiumPreviewCanvas state={{
-        skyRow: entryScene.skyRow,
-        skyColumn: entryScene.skyColumn,
-        scoreboardX,
-        seasonStadium: previewStadium,
-      }} />
-      <StadiumItemWindow record={record} kind={kind} slot={slot} top={top} isSlotFocus={isSlotFocus} tick={tick}
-        isShop={isShop} isHiddenOpen={isHiddenOpen}
+      <StadiumPreviewCanvas
+        state={{
+          skyRow: entryScene.skyRow,
+          skyColumn: entryScene.skyColumn,
+          scoreboardX,
+          seasonStadium: previewStadium,
+        }}
+      />
+      <StadiumItemWindow
+        record={record}
+        kind={kind}
+        slot={slot}
+        top={top}
+        isSlotFocus={isSlotFocus}
+        tick={tick}
+        isShop={isShop}
+        isHiddenOpen={isHiddenOpen}
         onPickKind={(next) => {
           if (isPopup) return
           setKind(next)
@@ -280,20 +304,15 @@ export function StadiumShopScreen({
             moveSlotTo(index)
           } else if (index === slot) select(kind, slot)
           else moveSlotTo(index)
-        }} />
+        }}
+      />
       {/* 머리띠 — 공통 틀 0xb810 의 기본 갈래(제목 10 시즌모드 · 바닥 5 되돌아가기) */}
       <ScreenFrame title="시즌모드" onBack={isSlotFocus ? leaveSlots : onBack} footer={5} slides={false} gamePoint={gamePoint} />
 
       {question !== null && (
-        <MessageBox
-          text={question.text}
-          buttons={['예', '아니오']}
-          onAnswer={(index) => (index === 0 ? buy() : setQuestion(null))}
-        />
+        <MessageBox text={question.text} buttons={['예', '아니오']} onAnswer={(index) => (index === 0 ? buy() : setQuestion(null))} />
       )}
-      {question === null && notice !== null && (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={closeNotice} />
-      )}
+      {question === null && notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={closeNotice} />}
       {question === null && notice === null && hiddenNotices[0] !== undefined && (
         <MessageBox
           key={hiddenNotices.length}

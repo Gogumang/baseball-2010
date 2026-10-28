@@ -203,19 +203,20 @@ export function playerDetailOf(source: PlayerDetailSource): PlayerDetail {
   const isAce = source.aceIndex >= 0
   const aceGrade = isAce ? (source.isPitcher ? ACE_PITCHER_GRADES : ACE_BATTER_GRADES)[source.aceIndex] : undefined
   // 5c848~5c886 — 모드 3 · 4 의 육성 선수는 저장 +0x1c8 × 100, 그 밖은 +0x1b × 10 × 100
-  const salary = textValue(source.nurturedSalary !== undefined
-    ? salaryTextOf(source.nurturedSalary * 100)
-    : salaryTextOf((source.grade ?? aceGrade ?? 0) * 1000))
+  const salary = textValue(
+    source.nurturedSalary !== undefined ? salaryTextOf(source.nurturedSalary * 100) : salaryTextOf((source.grade ?? aceGrade ?? 0) * 1000),
+  )
   if (source.isPitcher) {
     const { form, magicNumber, pitchMask } = source.repertoire ?? { form: 0, magicNumber: 0, pitchMask: 0 }
     const pitches: string[] = []
     // 5c2b0 — k = 1..22, 레코드 +0x1c & 표 0xd17a8[k](= 1 << (k − 1)) 이면 이름 표 0x14000c8[k]
     for (let k = 1; k <= 0x16; k += 1) if ((pitchMask & (1 << (k - 1))) !== 0) pitches.push(PITCH_TYPES[k - 1]?.name ?? '')
-    const magic = magicNumber <= 0
-      ? textValue(DETAIL_NONE_TEXT)
-      : isAce
-        ? { kind: 'ticker' as const, text: ACE_PLAYERS[5 + source.aceIndex]?.burst ?? '' }
-        : { kind: 'ticker' as const, text: magicNumber === 4 ? (FORM_MAGIC_TEXT[form >> 1] ?? '') : (MAGIC_TEXT[magicNumber - 1] ?? '') }
+    const magic =
+      magicNumber <= 0
+        ? textValue(DETAIL_NONE_TEXT)
+        : isAce
+          ? { kind: 'ticker' as const, text: ACE_PLAYERS[5 + source.aceIndex]?.burst ?? '' }
+          : { kind: 'ticker' as const, text: magicNumber === 4 ? (FORM_MAGIC_TEXT[form >> 1] ?? '') : (MAGIC_TEXT[magicNumber - 1] ?? '') }
     return {
       kind: '투수',
       abilities: source.abilities,

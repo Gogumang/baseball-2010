@@ -4,8 +4,14 @@ import { FrameSprite } from '@/shared/ui'
 import { PixelText } from '@/shared/ui/PixelText/PixelText'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  EVALUATION_GAUGE_ANCHOR, EVALUATION_GAUGE_FILL, EVALUATION_GAUGE_FRAMES, EVALUATION_GAUGE_SIGN_COLOR,
-  evaluationGaugeRowsOf, evaluationGaugeValueOf, startEvaluationGauge, tickEvaluationGauge,
+  EVALUATION_GAUGE_ANCHOR,
+  EVALUATION_GAUGE_FILL,
+  EVALUATION_GAUGE_FRAMES,
+  EVALUATION_GAUGE_SIGN_COLOR,
+  evaluationGaugeRowsOf,
+  evaluationGaugeValueOf,
+  startEvaluationGauge,
+  tickEvaluationGauge,
 } from '@/pages/story/lib/evaluationGauge'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -39,15 +45,18 @@ export function EvaluationGauge({ popularityChange, divisor }: EvaluationGaugePr
   const rows = evaluationGaugeRowsOf(state)
   return (
     <div data-testid="인기도-막대" data-rows={rows.length} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-      <FrameSprite folder={MODE_UI} frame={EVALUATION_GAUGE_FRAMES.base} origins={origins}
-        x={EVALUATION_GAUGE_ANCHOR.x} y={EVALUATION_GAUGE_ANCHOR.y} />
+      <FrameSprite
+        folder={MODE_UI}
+        frame={EVALUATION_GAUGE_FRAMES.base}
+        origins={origins}
+        x={EVALUATION_GAUGE_ANCHOR.x}
+        y={EVALUATION_GAUGE_ANCHOR.y}
+      />
       {rows.map((y) => (
-        <FrameSprite key={y} folder={MODE_UI} frame={EVALUATION_GAUGE_FRAMES.fill} origins={origins}
-          x={EVALUATION_GAUGE_FILL.x} y={y} />
+        <FrameSprite key={y} folder={MODE_UI} frame={EVALUATION_GAUGE_FRAMES.fill} origins={origins} x={EVALUATION_GAUGE_FILL.x} y={y} />
       ))}
       {value.signs.map((place, index) => (
-        <PixelText key={index}
-          style={{ position: 'absolute', left: place.x, top: place.y, color: EVALUATION_GAUGE_SIGN_COLOR }}>
+        <PixelText key={index} style={{ position: 'absolute', left: place.x, top: place.y, color: EVALUATION_GAUGE_SIGN_COLOR }}>
           {value.sign}
         </PixelText>
       ))}

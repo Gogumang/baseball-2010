@@ -4,12 +4,7 @@ import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { registerContact } from '@/entities/batting/model/battedContact'
 import { applyCoverAssignment, claimCoverOfBase } from '@/entities/fielding/model/coverAssignment'
 import { basePosition, FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
-import {
-  RETURN_SLACK_TICKS,
-  fielderSlackAtPlayEnd,
-  placedAt,
-  withCarriedSlack,
-} from '@/entities/fielding/model/fielderPose'
+import { RETURN_SLACK_TICKS, fielderSlackAtPlayEnd, placedAt, withCarriedSlack } from '@/entities/fielding/model/fielderPose'
 import { AI_STATE, createFielders, initialPlayView } from '@/entities/fielding/model/fieldingState'
 import { passedBallShot } from '@/entities/fielding/model/passedBall'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
@@ -95,7 +90,8 @@ describe('야수 +0xcc 는 판 사이로 남는다 — 생성자 a0df0 · vt8c a
 
   it('폭투 판 — 예보 복제도 +0xcc 를 베껴 포수가 6 틱 늦게 쥔다', () => {
     const 폭투 = (scene?: DefenseScene) =>
-      runPassedBallPlay({ batterHand: 0,
+      runPassedBallPlay({
+        batterHand: 0,
         shot: passedBallShot(createSeededRandom(7)),
         bases: { ...EMPTY_BASES, first: true },
         outs: 0,
@@ -151,8 +147,6 @@ describe('움직임 허용 +0x13c — 예보 머리 b1376 이 `a ≠ 0 || 공+0x
     expect(forecastCatch(공, 야수들, { from: 0, to: Number.POSITIVE_INFINITY }).movable).toBe(true)
     const 보통 = forecastCatch(공, 야수들, { from: 0, to: Number.POSITIVE_INFINITY }, { secondPass: { movable: false } })
     expect(보통.movable).toBe(보통.secondPassStarted)
-    expect(
-      forecastCatch(공, 야수들, { from: 0, to: Number.POSITIVE_INFINITY }, { secondPass: { movable: true } }).movable,
-    ).toBe(true)
+    expect(forecastCatch(공, 야수들, { from: 0, to: Number.POSITIVE_INFINITY }, { secondPass: { movable: true } }).movable).toBe(true)
   })
 })

@@ -72,10 +72,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
   it('0.1% 가 안 서고 도루도 없으면 판이 없다 — 굴림은 rollPassedBall 한 번', () => {
     const random = 세는난수(0.5)
     expect(
-      runPitchArrivalPlay(
-        { batterHand: 0, gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 },
-        random,
-      ),
+      runPitchArrivalPlay({ batterHand: 0, gameMode: 4, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 }, random),
     ).toBeNull()
     expect(random.count()).toBe(1)
   })
@@ -83,10 +80,7 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
   it('모드 7(홈런더비)은 0.1% 굴림이 없다', () => {
     const random = 세는난수(0)
     expect(
-      runPitchArrivalPlay(
-        { batterHand: 0, gameMode: 7, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 },
-        random,
-      ),
+      runPitchArrivalPlay({ batterHand: 0, gameMode: 7, pitchJudgement: PITCH_JUDGEMENT.BALL, stealingFrom: [], bases: 일루, outs: 0 }, random),
     ).toBeNull()
     expect(random.count()).toBe(0)
   })
@@ -109,7 +103,8 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
     const 일이루 = { ...EMPTY_BASES, first: true, second: true }
     const playOf = (buntKind?: number) =>
       runPitchArrivalPlay(
-        { batterHand: 0,
+        {
+          batterHand: 0,
           gameMode: 4,
           pitchJudgement: PITCH_JUDGEMENT.STRIKE,
           stealingFrom: [2],
@@ -165,9 +160,6 @@ describe('투구 하나의 주자 판 — 0x3dfac 의 0x35034 → 0x9d57c → �
 
   it('도루 기록 — 잡힌 주자가 있으면 24 한 번뿐', () => {
     expect(stealRecordIdsOf({ stolenFrom: [2], caughtFrom: [1] })).toEqual([24])
-    expect(stealRecordIdsOf({ stolenFrom: [1, 2], caughtFrom: [] })).toEqual([
-      8,
-      8,
-    ])
+    expect(stealRecordIdsOf({ stolenFrom: [1, 2], caughtFrom: [] })).toEqual([8, 8])
   })
 })

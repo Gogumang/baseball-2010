@@ -1,16 +1,7 @@
 import { TEAMS } from '@/shared/config/original/teams'
-import {
-  ACE_PITCHER_REPERTOIRES,
-  ROSTER_PITCHER_REPERTOIRES,
-} from '@/shared/config/original/pitcherRepertoires'
+import { ACE_PITCHER_REPERTOIRES, ROSTER_PITCHER_REPERTOIRES } from '@/shared/config/original/pitcherRepertoires'
 import type { PitcherRepertoire } from '@/shared/config/original/pitcherRepertoires'
-import {
-  BATTERS_PER_TEAM,
-  PITCHERS_PER_TEAM,
-  skillIdsOfBits,
-  teamBatters,
-  teamPitchers,
-} from '@/entities/team/model/teamRoster'
+import { BATTERS_PER_TEAM, PITCHERS_PER_TEAM, skillIdsOfBits, teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { recordAbilityOf } from '@/entities/team/model/recordAbility'
 import type { RosterPlayer } from '@/shared/config/original/roster'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
@@ -23,10 +14,7 @@ import { gameAbilitiesOf, hasFightingSpiritBit, pitcherGameAbilityPartsOf, TEAM_
 import { defenseTeamBonusOf, runnerTeamGradeOf } from '@/entities/fielding/model/fieldingState'
 import type { PitcherGameAbilityParts } from '@/entities/pitching/model/pitcherGameStats'
 import { aceLevelOf, aceLevelSlotOf, applyAceLevelRate } from '@/entities/mission/model/aceLevel'
-import type {
-  FieldingAssignment,
-  SeasonTeamCondition,
-} from '@/features/play-team-game/model/gameAbilities'
+import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-team-game/model/gameAbilities'
 
 /**
  * 팀 경기에 서는 선수의 **경기용 능력치**를 만든다 (J-4 를 로스터 표에 먹이는 자리).
@@ -147,11 +135,7 @@ export function runnerTeamGradeFor(context: TeamGameAbilityContext, teamId: numb
 }
 
 /** 타자 한 명의 경기용 능력치 네 칸 — 히트·파워·수비·주루 */
-export function batterGameAbilities(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  rosterSlot: number,
-): [number, number, number, number] {
+export function batterGameAbilities(context: TeamGameAbilityContext, teamId: number, rosterSlot: number): [number, number, number, number] {
   const roster = teamBatters(teamId)
   const slot = ((rosterSlot % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM
   const player = roster[slot]
@@ -167,11 +151,7 @@ export function batterGameAbilities(
 }
 
 /** 투수 한 명의 경기용 능력치 네 칸 — 제구·구속·변화·체력 */
-export function pitcherGameAbilities(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  rosterSlot: number,
-): [number, number, number, number] {
+export function pitcherGameAbilities(context: TeamGameAbilityContext, teamId: number, rosterSlot: number): [number, number, number, number] {
   const roster = teamPitchers(teamId)
   const slot = ((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
   const player = roster[slot]
@@ -186,11 +166,7 @@ export function pitcherGameAbilities(
 }
 
 /** 간이 타석 엔진이 보는 타자 — 히트·파워·주루만 쓴다 */
-export function quickBatterFor(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  battingOrderIndex: number,
-): QuickAtBatBatter {
+export function quickBatterFor(context: TeamGameAbilityContext, teamId: number, battingOrderIndex: number): QuickAtBatBatter {
   const ability = batterGameAbilities(context, teamId, battingOrderIndex)
   const roster = teamBatters(teamId)
   const slot = ((battingOrderIndex % BATTERS_PER_TEAM) + BATTERS_PER_TEAM) % BATTERS_PER_TEAM
@@ -201,11 +177,7 @@ export function quickBatterFor(
 }
 
 /** 간이 타석 엔진이 보는 투수 */
-export function quickPitcherFor(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  rosterSlot: number,
-): QuickAtBatPitcher {
+export function quickPitcherFor(context: TeamGameAbilityContext, teamId: number, rosterSlot: number): QuickAtBatPitcher {
   const ability = pitcherGameAbilities(context, teamId, rosterSlot)
   const roster = teamPitchers(teamId)
   const player = roster[((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM]
@@ -214,11 +186,7 @@ export function quickPitcherFor(
 }
 
 /** 타석 화면이 보는 타자 능력치 (0~999 그대로) */
-export function stageBatterAbility(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  battingOrderIndex: number,
-): BatterAbility {
+export function stageBatterAbility(context: TeamGameAbilityContext, teamId: number, battingOrderIndex: number): BatterAbility {
   const ability = batterGameAbilities(context, teamId, battingOrderIndex)
   return { hit: ability[0], power: ability[1], defense: ability[2], run: ability[3] }
 }
@@ -227,11 +195,7 @@ export function stageBatterAbility(
 const STAGE_ABILITY_DIVISOR = 10
 
 /** 투수 한 명의 제구·구속·변화를 피로(0xb58e6) 앞뒤로 쪼갠 재료 — `pitcherGameAbilities` 와 같은 보정 */
-export function pitcherGameAbilityParts(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  rosterSlot: number,
-): PitcherGameAbilityParts {
+export function pitcherGameAbilityParts(context: TeamGameAbilityContext, teamId: number, rosterSlot: number): PitcherGameAbilityParts {
   const roster = teamPitchers(teamId)
   const slot = ((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
   return pitcherGameAbilityPartsOf(rowAbilityOf(roster[slot], true), {
@@ -248,12 +212,7 @@ export function pitcherGameAbilityParts(
  * 피로 뒤 팀·코치 정액)와 `staminaPercent`(0xaebb0) 로 원본 눈금 값을 다시 낸다 (`cpuPitchStatsOf`).
  * 체력%를 안 넘기면 지치지 않은 것으로 본다.
  */
-export function stagePitcherAbility(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  rosterSlot: number,
-  staminaPercent?: number,
-): PitcherAbility {
+export function stagePitcherAbility(context: TeamGameAbilityContext, teamId: number, rosterSlot: number, staminaPercent?: number): PitcherAbility {
   const ability = pitcherGameAbilities(context, teamId, rosterSlot)
   const repertoire = rosterRepertoireOf(teamId, rosterSlot)
   return {
@@ -277,10 +236,7 @@ export function stagePitcherAbility(
 export function rosterRepertoireOf(teamId: number, rosterSlot: number): PitcherRepertoire {
   const slot = ((rosterSlot % PITCHERS_PER_TEAM) + PITCHERS_PER_TEAM) % PITCHERS_PER_TEAM
   const index = teamId * PITCHERS_PER_TEAM + slot
-  return (
-    ROSTER_PITCHER_REPERTOIRES[index] ??
-    ROSTER_PITCHER_REPERTOIRES[0] ?? { name: '', form: 0, magicId: 0, pitchMask: 1 }
-  )
+  return ROSTER_PITCHER_REPERTOIRES[index] ?? ROSTER_PITCHER_REPERTOIRES[0] ?? { name: '', form: 0, magicId: 0, pitchMask: 1 }
 }
 
 /* ── 명단(엔트리) 한 줄 ─────────────────────────────────────────────────────── */
@@ -414,10 +370,7 @@ export function rosterEntryBattersOf(teamId: number): readonly TeamEntryBatter[]
  * `data/XlsACE_BAT_DATA.zt1` 을 풀어 머리 0x20 뒤를 그대로 베낀다(200dc~20104) — 다섯 행의 +0x1c 바이트가 모두 0 이다.
  * 대타 확정이 이 니블을 옛 타자 것과 맞바꾸므로(0xaecce~0xacfe) 빠진 선수가 벤치로 내려간다.
  */
-export function withAceBatter(
-  entry: readonly TeamEntryBatter[],
-  aceIndex: number,
-): readonly TeamEntryBatter[] {
+export function withAceBatter(entry: readonly TeamEntryBatter[], aceIndex: number): readonly TeamEntryBatter[] {
   const ace = ACE_BATTERS[aceIndex]
   if (ace === undefined) return entry
   const inserted: TeamEntryBatter = {
@@ -679,8 +632,7 @@ export interface TeamEntryPitcherRecord {
  * 시즌 명단에서도 그 선수를 뺀다(0x221dc). 기록 원천을 안 넘기는 시험 · 부르는 쪽만 이 대체를 탄다.
  */
 function tableSlotsOfOrder(slots: readonly (number | null)[], tableSize: number): readonly (number | null)[] {
-  const isTableSlot = (slot: number | null): slot is number =>
-    slot !== null && Number.isInteger(slot) && slot >= 0 && slot < tableSize
+  const isTableSlot = (slot: number | null): slot is number => slot !== null && Number.isInteger(slot) && slot >= 0 && slot < tableSize
   const used = new Set(slots.filter(isTableSlot))
   let spare = 0
   return slots.map((slot) => {
@@ -693,15 +645,13 @@ function tableSlotsOfOrder(slots: readonly (number | null)[], tableSize: number)
 }
 
 /** 차례 한 칸이 경기 팀이 아닌 붙박이 표 팀을 가리키는가 (트레이드로 옮겨 온 선수) */
-const isForeignTable = (tableTeamId: number | undefined, teamId: number): tableTeamId is number =>
-  tableTeamId !== undefined && tableTeamId !== teamId
+const isForeignTable = (tableTeamId: number | undefined, teamId: number): tableTeamId is number => tableTeamId !== undefined && tableTeamId !== teamId
 
 /** 고친 차례로 세운 타자 명단 — 수비 위치는 차례가 든 값(편집기가 고친 +0x1c)이다 */
 export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): readonly TeamEntryBatter[] {
   const table = teamBatters(teamId)
   const slots = tableSlotsOfOrder(
-    order.batters.map((batter) =>
-      batter.record === undefined && !isForeignTable(batter.tableTeamId, teamId) ? batter.rosterSlot : null),
+    order.batters.map((batter) => (batter.record === undefined && !isForeignTable(batter.tableTeamId, teamId) ? batter.rosterSlot : null)),
     table.length,
   )
   return order.batters.map((batter, index) => {
@@ -757,15 +707,10 @@ export function entryBattersOfOrder(teamId: number, order: TeamEntryOrder): read
  * 원본은 팀 레코드(영입 0xc554 가 옮긴 0x30 바이트) 하나를 경기와 시즌이 함께 쓰므로, 지금 시즌 명단으로 만든 명단 차례(`order`)의
  * 같은 원본 id(`recordId`) 기록에서 빠진 칸만 채운다 — 있는 값은 그대로다. 표 줄 · 마선수는 손대지 않는다.
  */
-export function withBatterRecordNibbles(
-  entry: readonly TeamEntryBatter[],
-  order: TeamEntryOrder,
-): readonly TeamEntryBatter[] {
+export function withBatterRecordNibbles(entry: readonly TeamEntryBatter[], order: TeamEntryOrder): readonly TeamEntryBatter[] {
   return entry.map((batter) => {
-    if (
-      batter.recordId === undefined
-      || (batter.equipment !== undefined && batter.profile !== undefined && batter.salaryGrade !== undefined)
-    ) return batter
+    if (batter.recordId === undefined || (batter.equipment !== undefined && batter.profile !== undefined && batter.salaryGrade !== undefined))
+      return batter
     const record = order.batters.find((candidate) => candidate.record?.recordId === batter.recordId)?.record
     if (record === undefined) return batter
     return {
@@ -778,10 +723,7 @@ export function withBatterRecordNibbles(
 }
 
 /** `withBatterRecordNibbles` 의 투수 쪽 — 기록으로 선 영입 투수의 니블(마운드 장비 겹 0x79790) · +0x1b(상세 창 연봉)만 채운다 */
-export function withPitcherRecordNibbles(
-  entry: readonly TeamEntryPitcher[],
-  order: TeamEntryOrder,
-): readonly TeamEntryPitcher[] {
+export function withPitcherRecordNibbles(entry: readonly TeamEntryPitcher[], order: TeamEntryOrder): readonly TeamEntryPitcher[] {
   return entry.map((pitcher) => {
     if (pitcher.recordId === undefined || (pitcher.equipment !== undefined && pitcher.salaryGrade !== undefined)) return pitcher
     const record = order.pitchers.find(
@@ -874,10 +816,7 @@ export function entryPitchersOfOrder(teamId: number, order: TeamEntryOrder): rea
  * 이다 (`XlsACE_PIT_DATA` 싸이커 줄 `9e 02 26 02 34 03 2c 01` = 670·550·820·300 이 웹
  * `acePlayers` 의 hit·power·defense·run 과 차례까지 같다).
  */
-export function withAcePitcher(
-  entry: readonly TeamEntryPitcher[],
-  aceIndex: number,
-): readonly TeamEntryPitcher[] {
+export function withAcePitcher(entry: readonly TeamEntryPitcher[], aceIndex: number): readonly TeamEntryPitcher[] {
   const ace = ACE_PITCHERS[aceIndex]
   if (ace === undefined) return entry
   const inserted: TeamEntryPitcher = {
@@ -908,11 +847,7 @@ export function withAcePitcher(
 }
 
 /** 투수 명단 한 칸을 피로 앞뒤로 쪼갠 재료 — `entryPitcherGameAbilities` 와 같은 보정 (마선수는 레벨 배율 먼저) */
-export function entryPitcherGameAbilityParts(
-  context: TeamGameAbilityContext,
-  teamId: number,
-  entry: TeamEntryPitcher,
-): PitcherGameAbilityParts {
+export function entryPitcherGameAbilityParts(context: TeamGameAbilityContext, teamId: number, entry: TeamEntryPitcher): PitcherGameAbilityParts {
   return pitcherGameAbilityPartsOf(aceLeveledAbility(entry.ability, '투수', entry.aceIndex, context.aceLevels), {
     mode: context.mode,
     isMyTeam: context.seasonTeamId === teamId,

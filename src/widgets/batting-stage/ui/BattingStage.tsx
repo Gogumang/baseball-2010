@@ -14,7 +14,15 @@ import { emitParticles } from '@/entities/particle/model/particleScene'
 import { particleConfigOf } from '@/widgets/particles/lib/particleCatalog'
 import { useClaimSceneParticles } from '@/widgets/particles/model/useClaimSceneParticles'
 import { batterEquipmentOf, NO_EQUIPMENT, pitcherEquipmentOfNibbles } from '@/widgets/batting-stage/lib/batterLayers'
-import { canSkipHitPause, hitBallTrajectoryOf, hitPauseTicksOf, isBigHit, launchedPauseInputOf, pauseInputOf, type LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
+import {
+  canSkipHitPause,
+  hitBallTrajectoryOf,
+  hitPauseTicksOf,
+  isBigHit,
+  launchedPauseInputOf,
+  pauseInputOf,
+  type LaunchedShot,
+} from '@/widgets/batting-stage/lib/hitPause'
 import { hitBallPathOf } from '@/widgets/batting-stage/lib/hitBallPath'
 import { hitCameraAngleOf } from '@/widgets/batting-stage/lib/hitCamera'
 import type { StageParticleShot } from '@/widgets/batting-stage/lib/homeRunEffects'
@@ -321,7 +329,11 @@ interface BattingStageProps {
    * 예약한 틀이다. 받는 쪽이 판 안의 때를 이 틱에 맞춘다(`gameSceneTickNow()` 를 다시 읽으면 틀 머리가 지난 뒤일 수 있다).
    */
   readonly onPitchResolved: (
-    detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number, sceneTick?: number,
+    detail: PitchOutcomeDetail,
+    pitch: Pitch,
+    isUncatchable?: boolean,
+    buntKind?: number,
+    sceneTick?: number,
   ) => PitchResolvedReply | void
   /**
    * **맞은 판정 틀**(0x6aa → 0x51408)에 부른다 — 원본은 이 틀 안에서 메시지 0x11(515c0 → 0x50faa: 필살수비 A · B · 표시 패턴 ·
@@ -386,7 +398,30 @@ const BUNT_9_TOUCH_ORDER = 1.5
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
 
-export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pitcherTeamIndex, batterHand, canBunt = false, swingMode = '일반', batterForm = 0, batterSkinIndex = 0, batterTeamIndex, batterEquipmentLevels, batterSkillIds = [], recentAtBatCodes = [], batterRecordSlot = 0, specialSwingNumber = 0, aceBatterIndex = -1, specialSwingRemaining, onSpecialSwingUsed, isBatterOwnPlayer = false, careerYearIndex = 0, flightProbeRef, sceneBuntKind, ...props }: BattingStageProps) {
+export function BattingStage({
+  pitcherEquipmentNibbles,
+  pitcherSkinIndex = 0,
+  pitcherTeamIndex,
+  batterHand,
+  canBunt = false,
+  swingMode = '일반',
+  batterForm = 0,
+  batterSkinIndex = 0,
+  batterTeamIndex,
+  batterEquipmentLevels,
+  batterSkillIds = [],
+  recentAtBatCodes = [],
+  batterRecordSlot = 0,
+  specialSwingNumber = 0,
+  aceBatterIndex = -1,
+  specialSwingRemaining,
+  onSpecialSwingUsed,
+  isBatterOwnPlayer = false,
+  careerYearIndex = 0,
+  flightProbeRef,
+  sceneBuntKind,
+  ...props
+}: BattingStageProps) {
   const isCommonWindowOpen = useIsCommonWindowOpen()
   // 지금 선 타자 · 투수의 스윙 · 번트 · 투구 그림을 미리 받는다(안 기다린다 — 그리기는 그대로)
   useStageCastPreload({
@@ -421,7 +456,28 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     // 공용 창(히든 오픈 알림 등)이 떠 있으면 경기 장면 갱신이 멈춘다 (0x52cc6)
     isSceneFrozen: isCommonWindowOpen,
   })
-  const { pitchRef, pitchTypeNumberRef, phaseRef, phaseStartTickRef, phaseEntryRef, hitSkipKeyTickRef, resultTextRef, homeRunStartTickRef, shiftRef, buntRef, deckRef, pendingHitRef, resultTicksRef, isInPlayResultRef, isHitByPitchResultRef, swingRef, heldResultRef, particlesRef, inPlayEnteredTickRef, latestRef } = refs
+  const {
+    pitchRef,
+    pitchTypeNumberRef,
+    phaseRef,
+    phaseStartTickRef,
+    phaseEntryRef,
+    hitSkipKeyTickRef,
+    resultTextRef,
+    homeRunStartTickRef,
+    shiftRef,
+    buntRef,
+    deckRef,
+    pendingHitRef,
+    resultTicksRef,
+    isInPlayResultRef,
+    isHitByPitchResultRef,
+    swingRef,
+    heldResultRef,
+    particlesRef,
+    inPlayEnteredTickRef,
+    latestRef,
+  } = refs
   // 0xd 진입 0x48d50 의 48f88 — 좌우 이동 +0xfe4 = 0 (번호가 바뀔 때만. 쉬는 동안은 안 지운다)
   useEffect(() => {
     if (props.shiftResetSerial !== undefined) shiftRef.current = 0
@@ -434,10 +490,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
   /** +0xfdc 를 마지막으로 지운 공 — 새 공이면 0x11 진입 0x3de10(3deb8 0x340dc)의 memset 처럼 0 으로 지운다(`sceneBuntKindOnPitch`) */
   const sceneBuntPitchRef = useRef<Pitch | null>(null)
   const sceneBuntKindOfThisPitch = () => {
-    const memory = sceneBuntKindOnPitch(
-      { pitch: sceneBuntPitchRef.current, kind: sceneBuntKindRef.current },
-      pitchRef.current,
-    )
+    const memory = sceneBuntKindOnPitch({ pitch: sceneBuntPitchRef.current, kind: sceneBuntKindRef.current }, pitchRef.current)
     sceneBuntPitchRef.current = memory.pitch
     sceneBuntKindRef.current = memory.kind
     return memory.kind
@@ -448,165 +501,176 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
     if (soundId !== null && soundId !== undefined) activeSound().play(soundId)
   }
 
-  const finishPitch = useCallback((swing: BattingSwing | null, tick: number) => {
-    const pitch = pitchRef.current
-    if (pitch === null) return
-    const latest = latestRef.current
-    // 장면 덱(0x3e340 이 경기 시작에 연 하나 — 같은 난수로 도는 진행기가 연다)을 CPU 타자와 같이 쓴다.
-    // 장면을 열지 않은 화면(시험 · 장면 없는 연습)만 이 화면이 첫 공에 덱을 섞어 들고 있는다(웹 전용)
-    const scene = scenePatternDeckOf(latest.random)
-    const deck = scene?.deck ?? deckRef.current ?? createPatternDeck(latest.random)
-    const context = {
-      batter: latest.batterAbility,
-      pitcher: latest.pitcherAbility,
-      mode: latest.swingMode,
-      batterSkillIds: latest.batterSkillIds,
-      // 0xab214 는 투수 레코드로 손 0xb63c0 을 바로 읽는다(스킬 13 좌완UP · 14 우완UP) — 던진 공이 그 투수의 폼·+0x18 을 든다.
-      // 다섯째 인자는 타자 레코드 칸 0xb6394(투수 스킬 31) — 부르는 쪽이 그 모드의 레코드 칸을 넘긴다(`batterRecordSlot`)
-      situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm, pitch, latest.batterRecordSlot, latest.batterHand),
-      // 내 선수 보너스·계수는 비트7(육성·명전)만 본다 — 마선수(비트6) 등판은 해당하지 않는다 (0xb6389).
-      // 마구 번호(+0x18) 1~4 를 가진 투수는 비트7 이다 (일반 레코드 +0x18 은 모두 0 — H2 4-2)
-      isBatterOwnPlayer,
-      isPitcherOwnPlayer: (pitch.pitcherMagicNumber ?? 0) >= 1 && (pitch.pitcherMagicNumber ?? 0) <= 4,
-      careerYearIndex,
-      // 보정 구조체 0x34d6c — 판정 바로 앞(0x51294)에서 이번 스윙(S+0x10)·공(P+0x10)으로 만든다
-      swingBoost: swingBoostOf(
-        {
-          // S+0x10 = 타자 +0x18 (0x51e40). 마타자 레코드 +0x18 은 5~9 (H2 4-1) — 0 만 아니면 된다
-          number: swing?.isSpecial === true ? (aceBatterIndex >= 0 ? aceBatterIndex + 5 : specialSwingNumber) : 0,
-          isAce: aceBatterIndex >= 0,
-          aceOrder: Math.max(aceBatterIndex, 0),
-          aceLevel: aceBatterIndex >= 0 ? aceLevelOf(latest.aceLevels, aceLevelSlotOf('타자', aceBatterIndex + 1)) : 0,
-          // 번호(+0x18)를 가진 비마선수는 육성·명전(비트7)뿐이다 — 일반 선수 레코드는 +0x18 이 모두 0 (H2 4-2)
-          isOwnPlayer: aceBatterIndex < 0 && specialSwingNumber > 0,
-        },
-        pitcherBoostSideOf(pitch.magicNumber ?? 0, pitch.pitcherMagicNumber ?? 0, (order) =>
-          aceLevelOf(latest.aceLevels, aceLevelSlotOf('투수', order + 1)),
+  const finishPitch = useCallback(
+    (swing: BattingSwing | null, tick: number) => {
+      const pitch = pitchRef.current
+      if (pitch === null) return
+      const latest = latestRef.current
+      // 장면 덱(0x3e340 이 경기 시작에 연 하나 — 같은 난수로 도는 진행기가 연다)을 CPU 타자와 같이 쓴다.
+      // 장면을 열지 않은 화면(시험 · 장면 없는 연습)만 이 화면이 첫 공에 덱을 섞어 들고 있는다(웹 전용)
+      const scene = scenePatternDeckOf(latest.random)
+      const deck = scene?.deck ?? deckRef.current ?? createPatternDeck(latest.random)
+      const context = {
+        batter: latest.batterAbility,
+        pitcher: latest.pitcherAbility,
+        mode: latest.swingMode,
+        batterSkillIds: latest.batterSkillIds,
+        // 0xab214 는 투수 레코드로 손 0xb63c0 을 바로 읽는다(스킬 13 좌완UP · 14 우완UP) — 던진 공이 그 투수의 폼·+0x18 을 든다.
+        // 다섯째 인자는 타자 레코드 칸 0xb6394(투수 스킬 31) — 부르는 쪽이 그 모드의 레코드 칸을 넘긴다(`batterRecordSlot`)
+        situation: situationOf(latest.hud, latest.recentAtBatCodes, latest.batterForm, pitch, latest.batterRecordSlot, latest.batterHand),
+        // 내 선수 보너스·계수는 비트7(육성·명전)만 본다 — 마선수(비트6) 등판은 해당하지 않는다 (0xb6389).
+        // 마구 번호(+0x18) 1~4 를 가진 투수는 비트7 이다 (일반 레코드 +0x18 은 모두 0 — H2 4-2)
+        isBatterOwnPlayer,
+        isPitcherOwnPlayer: (pitch.pitcherMagicNumber ?? 0) >= 1 && (pitch.pitcherMagicNumber ?? 0) <= 4,
+        careerYearIndex,
+        // 보정 구조체 0x34d6c — 판정 바로 앞(0x51294)에서 이번 스윙(S+0x10)·공(P+0x10)으로 만든다
+        swingBoost: swingBoostOf(
+          {
+            // S+0x10 = 타자 +0x18 (0x51e40). 마타자 레코드 +0x18 은 5~9 (H2 4-1) — 0 만 아니면 된다
+            number: swing?.isSpecial === true ? (aceBatterIndex >= 0 ? aceBatterIndex + 5 : specialSwingNumber) : 0,
+            isAce: aceBatterIndex >= 0,
+            aceOrder: Math.max(aceBatterIndex, 0),
+            aceLevel: aceBatterIndex >= 0 ? aceLevelOf(latest.aceLevels, aceLevelSlotOf('타자', aceBatterIndex + 1)) : 0,
+            // 번호(+0x18)를 가진 비마선수는 육성·명전(비트7)뿐이다 — 일반 선수 레코드는 +0x18 이 모두 0 (H2 4-2)
+            isOwnPlayer: aceBatterIndex < 0 && specialSwingNumber > 0,
+          },
+          pitcherBoostSideOf(pitch.magicNumber ?? 0, pitch.pitcherMagicNumber ?? 0, (order) =>
+            aceLevelOf(latest.aceLevels, aceLevelSlotOf('투수', order + 1)),
+          ),
         ),
-      ),
-      // 필살 성공 굴림 0x34c74 — 확률은 번호(+0x18)로, 마타자는 30% (판정 안에서 맞은 공일 때만 굴린다)
-      specialSwing: { number: specialSwingNumber, isAceBatter: aceBatterIndex >= 0 },
-    }
-    const resolved = resolvePitch(pitch, swing, context, deck, latest.random)
-    if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') && swing !== null) {
-      const { resolution } = resolved.detail
-      pushBattingLog({
-        kind: '판정', tick, keyTick: swing.frame, frameCount: pitch.frameCount, at: performance.now(),
-        result: resolution.kind === '스트라이크' ? (resolution.isSwinging ? '헛스윙' : '스트라이크') : resolution.kind,
-      })
-    }
-    // 진동 — 맞은 공은 0xbc5 → 0x5228c 의 100/200/300ms, 사구는 0x51b0e 의 200ms, 삼진은 0x4d0d6 의 100ms.
-    // 환경설정 진동(+0x3b)이 켜졌을 때만. HUD 는 이 공 전 볼카운트다. 맞은 공은 판정 순간, 나머지는 결과(0x12)를 세울 때 울린다
-    const vibrateNow = () =>
-      vibrate(
-        pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch, latest.hud?.strikes ?? null),
-        latest.isVibrationOn !== false,
-      )
-    // 타구 순간 소리(배트 · 헛스윙 바람 — 0x515de~0x5164a)는 판정 메시지를 받은 0x51408 이 **이 판정 틀**에 낸다. 심판 콜(0x12 진입 ·
-    // 수비 판)은 뒤 틀이라 받는 쪽이 낸다 — 그래서 받는 쪽에는 이미 낸 소리를 비워 넘긴다(`contactSoundId: null`)
-    playContactSoundNow(resolved.detail.contactSoundId)
-    // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
-    const pitchTypeNumber = pitchTypeNumberRef.current
-    const result = {
-      ...resolved,
-      detail: { ...resolved.detail, contactSoundId: null, ...(pitchTypeNumber === null ? {} : { pitchTypeNumber }) },
-    }
-    // 필살 성공(0x34c74 → 0x517e6)은 판정이 방향·패턴 뒤에 굴려 실어 준다 — 헛스윙이면 굴리지 않는다
-    const isUncatchable = resolved.isUncatchable
-    if (scene !== undefined) scene.deck = result.deck
-    else deckRef.current = result.deck
-    const resultText = describeResolution(result.detail)
-    // 홈런이면 판정 글자 대신 HOMERUN 글자 연출을 켠다 (원본 0x51cd8 의 +0x1960, 사운드 11 은 웹에 없음)
-    const isHomeRun = isHomeRunResolution(result.detail)
-
-    // 맞은 공이면 인플레이(0x17) 앞에 **상태 0x13** 을 한 번 거친다. 헛스윙·볼은 0x12 라 그냥 결과다.
-    if (result.detail.resultCode !== null) {
-      // 맞은 판정 틀의 0x51408 — 515c0 메시지 0x11(0x50faa: 필살수비 · 표시 패턴 · 판 공 · [경기+0xf2c] 공 폴 굴림) · 517e6 필살타법을
-      // 이 틀(아래 진동 0xbc5 · 0x13 예약 · 이 틀 그림의 불꽃보다 앞)에 굴린다 — 받는 쪽이 판 입력으로 미리 굴려 쏜 공을 돌려준다(A-37)
-      const buntKindNow = sceneBuntKindOfThisPitch()
-      const shot: LaunchedShot | null = latest.onContact?.(result.detail, buntKindNow) ?? null
-      vibrateNow()
-      buntRef.current = null
-      const hitSide = latest.batterHand ?? batterSideOfForm(latest.batterForm)
-      // 0x13 이 보는 +0xfcc — 메시지 0x11 이 고친 표시 패턴(창이 열렸으면), 아니면 쏜 패턴(0x514f2 특수 표 덮어쓰기 뒤). 쏜 공을 모르는
-      // 결과(시험)만 덱에서 방금 꺼낸 패턴이다
-      const shotContact =
-        result.detail.resolution.kind === '타구' ? contactOfOutcome(result.detail.resolution.outcome) : result.detail.foulContact
-      const pattern = shot?.launchedPattern ?? shotContact?.pattern ?? lastDrawnPattern(result.deck, result.detail.resultCode)
-      const pauseInput =
-        pattern === null
-          ? pauseInputOf(result.detail.resultCode, result.deck, hitSide)
-          : launchedPauseInputOf(result.detail.resultCode, pattern, hitSide, shot?.trajectory)
-      const watchesBigHit = isBigHit(pauseInput)
-      // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 (+0x10dc, +0x10e0) 투영 0xb94b5 + 카메라(4a03a · 필살 49b02 · 큰 타구 4cb80).
-      // +0x10dc 는 놓기 0x4dc78(4dffa~4e024)만 적는 공 도착점(경로 끝 점의 투영)이라 `platePixelOf` 다 (r184 직접 떴다)
-      const contact = swing === null ? null : platePixelOf(pitch)
-      // 필살 스윙(S+0x10)이 0x49aec 의 그림 갈래를 타면 그 함수가 [sp+0x60] = 1 을 세워 보통 불꽃(49faa~4a0ce)을 건너뛰고,
-      // 같은 타격점에 필살 파티클을 쏜다(49dbc · 49de0) — 0x49aec 는 0x13 · 맞은 공에서만 불리므로 헛스윙엔 아무것도 없다
-      // 49faa 스윙 객체 S+8(번트 자세 — 0xb93a8 이 쓰는 번트 종류) ≠ 0 이면 보통 불꽃 · ptc 를 건너뛴다(직접 뜸, r215).
-      // 번트 판정은 자세가 선 채 나므로(`buntStance`) 맞은 번트에는 불꽃 · 007/006 이 없다
-      const isBuntStance = (swing?.buntKind ?? 0) !== 0
-      const specialEffect =
-        swing?.isSpecial === true
-          ? specialSwingStageEffectOf(specialSwingNumber, latest.batterForm, aceBatterIndex, latest.batterHand ?? batterSideOfForm(latest.batterForm))
-          : null
-      if (specialEffect !== null && contact !== null) {
-        for (const special of specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)) {
-          emitParticles(particlesRef.current, particleConfigOf(special.id), contact.x, contact.y + special.offsetY, special.img)
-        }
-      } else if (specialEffect === null && !isBuntStance && pattern !== null && contact !== null) {
-        const particleId = hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))
-        if (particleId !== null) {
-          emitParticles(particlesRef.current, particleConfigOf(particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
-        }
+        // 필살 성공 굴림 0x34c74 — 확률은 번호(+0x18)로, 마타자는 30% (판정 안에서 맞은 공일 때만 굴린다)
+        specialSwing: { number: specialSwingNumber, isAceBatter: aceBatterIndex >= 0 },
       }
-      // 같은 갈래의 그림 — game_effect 애니 2 · 3 을 타격점에 (49fe6~4a0a2, `batterOverlayMarks`). 고르기는 ptc 와 같은 판정이다
-      const flameAnimation =
-        specialEffect !== null || isBuntStance || pattern === null || contact === null
-          ? null
-          : hitFlameAnimationOf(hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit)), watchesBigHit)
-      // 0x13 진입 0x33e34 — [경기+0xf2c] 공(수평각 d 다른 공)의 점을 옮겨 타석 공 경로를 다시 채운다(`hitBallPath`). 꼬리선은
-      // 강한 타구(0x35988) · 결과 코드 24~26(0x357e0)일 때만(3b440)
-      const hitPath = pattern === null ? null : hitBallPathOf(hitBallTrajectoryOf(pattern, hitSide), hitSide)
-      const showsHitTrail =
-        pattern !== null &&
-        (isHomeRunHitResult(result.detail.resultCode) ||
-          // 0x35988 머리 359a0 — 스윙 객체 [+0xf9c]+8(번트 자세)이 서 있으면 거짓
-          (!isBuntStance && isStrongHit(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))))
-      pendingHitRef.current = {
-        hitPath,
-        showsHitTrail,
-        // 0x13 카메라(0x3f060 3f23e)가 보는 판정 각 [+0xfcc] — 판 패턴 각의 부호를 뒤집은 값
-        hitAngle: pattern === null ? null : hitCameraAngleOf(pattern[0]),
-        ticks: hitPauseTicksOf(pauseInput),
-        detail: result.detail,
-        pitch,
-        isUncatchable,
-        isHomeRun,
-        // 큰 타구 멈춤이 풀리는 0x13 그림(틱 7)에 016 을 쏜다 (0x4cb1c → 0x4cd14, `useStageAnimation`)
-        bigHitAt: watchesBigHit ? contact : null,
-        watchesBigHit,
-        resultText,
-        buntKind: buntKindNow,
-        specialEffect: specialEffect === null || contact === null ? null : { ...specialEffect, x: contact.x, y: contact.y },
-        hitFlame: flameAnimation === null || contact === null ? null : { animation: flameAnimation, x: contact.x, y: contact.y },
+      const resolved = resolvePitch(pitch, swing, context, deck, latest.random)
+      if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') && swing !== null) {
+        const { resolution } = resolved.detail
+        pushBattingLog({
+          kind: '판정',
+          tick,
+          keyTick: swing.frame,
+          frameCount: pitch.frameCount,
+          at: performance.now(),
+          result: resolution.kind === '스트라이크' ? (resolution.isSwinging ? '헛스윙' : '스트라이크') : resolution.kind,
+        })
       }
-      // 0x6aa 가 이 틀(판정 틱)의 갱신에서 0x13 을 예약한다 — 0x13 은 다음 틀이 틱 0 이다(`phaseEntryRef`)
-      hitSkipKeyTickRef.current = null
-      phaseEntryRef.current = { phase: '타격', tick: tick + 1 }
-      markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.타격 })
-      return
-    }
+      // 진동 — 맞은 공은 0xbc5 → 0x5228c 의 100/200/300ms, 사구는 0x51b0e 의 200ms, 삼진은 0x4d0d6 의 100ms.
+      // 환경설정 진동(+0x3b)이 켜졌을 때만. HUD 는 이 공 전 볼카운트다. 맞은 공은 판정 순간, 나머지는 결과(0x12)를 세울 때 울린다
+      const vibrateNow = () =>
+        vibrate(
+          pitchVibrationMillisecondsOf(resolved.detail, swing?.frame ?? null, pitch, latest.hud?.strikes ?? null),
+          latest.isVibrationOn !== false,
+        )
+      // 타구 순간 소리(배트 · 헛스윙 바람 — 0x515de~0x5164a)는 판정 메시지를 받은 0x51408 이 **이 판정 틀**에 낸다. 심판 콜(0x12 진입 ·
+      // 수비 판)은 뒤 틀이라 받는 쪽이 낸다 — 그래서 받는 쪽에는 이미 낸 소리를 비워 넘긴다(`contactSoundId: null`)
+      playContactSoundNow(resolved.detail.contactSoundId)
+      // 구질 번호(game+0xfc8)를 실어 보낸다 — 받는 쪽이 0xa5e14 처럼 상대 투수 투구 수·스태미나를 깎는다
+      const pitchTypeNumber = pitchTypeNumberRef.current
+      const result = {
+        ...resolved,
+        detail: { ...resolved.detail, contactSoundId: null, ...(pitchTypeNumber === null ? {} : { pitchTypeNumber }) },
+      }
+      // 필살 성공(0x34c74 → 0x517e6)은 판정이 방향·패턴 뒤에 굴려 실어 준다 — 헛스윙이면 굴리지 않는다
+      const isUncatchable = resolved.isUncatchable
+      if (scene !== undefined) scene.deck = result.deck
+      else deckRef.current = result.deck
+      const resultText = describeResolution(result.detail)
+      // 홈런이면 판정 글자 대신 HOMERUN 글자 연출을 켠다 (원본 0x51cd8 의 +0x1960, 사운드 11 은 웹에 없음)
+      const isHomeRun = isHomeRunResolution(result.detail)
 
-    // 맞지 않은 스윙(헛스윙 · 번트 헛맞음)은 0x51226 이 0x51840 으로 끝나 상태를 안 바꾼다 — 공 끝(틱 N + 1, 0x4e24e)의
-    // 0x12 에서 결과가 선다. 그때까지 들고 있는다(`endPitch`). 안 친 공은 이미 공 끝이라 곧바로 세운다
-    const show = (at: number) => {
-      vibrateNow()
-      showResult(result.detail, pitch, isUncatchable, at)
-    }
-    if (swing !== null) heldResultRef.current = show
-    else show(tick)
-  }, [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex])
+      // 맞은 공이면 인플레이(0x17) 앞에 **상태 0x13** 을 한 번 거친다. 헛스윙·볼은 0x12 라 그냥 결과다.
+      if (result.detail.resultCode !== null) {
+        // 맞은 판정 틀의 0x51408 — 515c0 메시지 0x11(0x50faa: 필살수비 · 표시 패턴 · 판 공 · [경기+0xf2c] 공 폴 굴림) · 517e6 필살타법을
+        // 이 틀(아래 진동 0xbc5 · 0x13 예약 · 이 틀 그림의 불꽃보다 앞)에 굴린다 — 받는 쪽이 판 입력으로 미리 굴려 쏜 공을 돌려준다(A-37)
+        const buntKindNow = sceneBuntKindOfThisPitch()
+        const shot: LaunchedShot | null = latest.onContact?.(result.detail, buntKindNow) ?? null
+        vibrateNow()
+        buntRef.current = null
+        const hitSide = latest.batterHand ?? batterSideOfForm(latest.batterForm)
+        // 0x13 이 보는 +0xfcc — 메시지 0x11 이 고친 표시 패턴(창이 열렸으면), 아니면 쏜 패턴(0x514f2 특수 표 덮어쓰기 뒤). 쏜 공을 모르는
+        // 결과(시험)만 덱에서 방금 꺼낸 패턴이다
+        const shotContact = result.detail.resolution.kind === '타구' ? contactOfOutcome(result.detail.resolution.outcome) : result.detail.foulContact
+        const pattern = shot?.launchedPattern ?? shotContact?.pattern ?? lastDrawnPattern(result.deck, result.detail.resultCode)
+        const pauseInput =
+          pattern === null
+            ? pauseInputOf(result.detail.resultCode, result.deck, hitSide)
+            : launchedPauseInputOf(result.detail.resultCode, pattern, hitSide, shot?.trajectory)
+        const watchesBigHit = isBigHit(pauseInput)
+        // 타격 순간 불꽃 (0x49e64 → 0x4a0ca) — 타격점은 (+0x10dc, +0x10e0) 투영 0xb94b5 + 카메라(4a03a · 필살 49b02 · 큰 타구 4cb80).
+        // +0x10dc 는 놓기 0x4dc78(4dffa~4e024)만 적는 공 도착점(경로 끝 점의 투영)이라 `platePixelOf` 다 (r184 직접 떴다)
+        const contact = swing === null ? null : platePixelOf(pitch)
+        // 필살 스윙(S+0x10)이 0x49aec 의 그림 갈래를 타면 그 함수가 [sp+0x60] = 1 을 세워 보통 불꽃(49faa~4a0ce)을 건너뛰고,
+        // 같은 타격점에 필살 파티클을 쏜다(49dbc · 49de0) — 0x49aec 는 0x13 · 맞은 공에서만 불리므로 헛스윙엔 아무것도 없다
+        // 49faa 스윙 객체 S+8(번트 자세 — 0xb93a8 이 쓰는 번트 종류) ≠ 0 이면 보통 불꽃 · ptc 를 건너뛴다(직접 뜸, r215).
+        // 번트 판정은 자세가 선 채 나므로(`buntStance`) 맞은 번트에는 불꽃 · 007/006 이 없다
+        const isBuntStance = (swing?.buntKind ?? 0) !== 0
+        const specialEffect =
+          swing?.isSpecial === true
+            ? specialSwingStageEffectOf(
+                specialSwingNumber,
+                latest.batterForm,
+                aceBatterIndex,
+                latest.batterHand ?? batterSideOfForm(latest.batterForm),
+              )
+            : null
+        if (specialEffect !== null && contact !== null) {
+          for (const special of specialSwingParticlesOf(specialSwingNumber, latest.batterForm, aceBatterIndex)) {
+            emitParticles(particlesRef.current, particleConfigOf(special.id), contact.x, contact.y + special.offsetY, special.img)
+          }
+        } else if (specialEffect === null && !isBuntStance && pattern !== null && contact !== null) {
+          const particleId = hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))
+          if (particleId !== null) {
+            emitParticles(particlesRef.current, particleConfigOf(particleId), contact.x, contact.y, HIT_PARTICLE_IMAGE)
+          }
+        }
+        // 같은 갈래의 그림 — game_effect 애니 2 · 3 을 타격점에 (49fe6~4a0a2, `batterOverlayMarks`). 고르기는 ptc 와 같은 판정이다
+        const flameAnimation =
+          specialEffect !== null || isBuntStance || pattern === null || contact === null
+            ? null
+            : hitFlameAnimationOf(hitParticleIdOf(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit)), watchesBigHit)
+        // 0x13 진입 0x33e34 — [경기+0xf2c] 공(수평각 d 다른 공)의 점을 옮겨 타석 공 경로를 다시 채운다(`hitBallPath`). 꼬리선은
+        // 강한 타구(0x35988) · 결과 코드 24~26(0x357e0)일 때만(3b440)
+        const hitPath = pattern === null ? null : hitBallPathOf(hitBallTrajectoryOf(pattern, hitSide), hitSide)
+        const showsHitTrail =
+          pattern !== null &&
+          (isHomeRunHitResult(result.detail.resultCode) ||
+            // 0x35988 머리 359a0 — 스윙 객체 [+0xf9c]+8(번트 자세)이 서 있으면 거짓
+            (!isBuntStance && isStrongHit(hitParticleInputOf(pattern, result.detail.resultCode, watchesBigHit))))
+        pendingHitRef.current = {
+          hitPath,
+          showsHitTrail,
+          // 0x13 카메라(0x3f060 3f23e)가 보는 판정 각 [+0xfcc] — 판 패턴 각의 부호를 뒤집은 값
+          hitAngle: pattern === null ? null : hitCameraAngleOf(pattern[0]),
+          ticks: hitPauseTicksOf(pauseInput),
+          detail: result.detail,
+          pitch,
+          isUncatchable,
+          isHomeRun,
+          // 큰 타구 멈춤이 풀리는 0x13 그림(틱 7)에 016 을 쏜다 (0x4cb1c → 0x4cd14, `useStageAnimation`)
+          bigHitAt: watchesBigHit ? contact : null,
+          watchesBigHit,
+          resultText,
+          buntKind: buntKindNow,
+          specialEffect: specialEffect === null || contact === null ? null : { ...specialEffect, x: contact.x, y: contact.y },
+          hitFlame: flameAnimation === null || contact === null ? null : { animation: flameAnimation, x: contact.x, y: contact.y },
+        }
+        // 0x6aa 가 이 틀(판정 틱)의 갱신에서 0x13 을 예약한다 — 0x13 은 다음 틀이 틱 0 이다(`phaseEntryRef`)
+        hitSkipKeyTickRef.current = null
+        phaseEntryRef.current = { phase: '타격', tick: tick + 1 }
+        markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.타격 })
+        return
+      }
+
+      // 맞지 않은 스윙(헛스윙 · 번트 헛맞음)은 0x51226 이 0x51840 으로 끝나 상태를 안 바꾼다 — 공 끝(틱 N + 1, 0x4e24e)의
+      // 0x12 에서 결과가 선다. 그때까지 들고 있는다(`endPitch`). 안 친 공은 이미 공 끝이라 곧바로 세운다
+      const show = (at: number) => {
+        vibrateNow()
+        showResult(result.detail, pitch, isUncatchable, at)
+      }
+      if (swing !== null) heldResultRef.current = show
+      else show(tick)
+    },
+    [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex],
+  )
 
   /** 결과(0x12)를 세운다 — 문구 · 결과 길이 · 알림 */
   const showResult = (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable: boolean, tick: number) => {
@@ -661,10 +725,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         // 타자 손 — 판정 공(`situationOf`)과 같은 값. 공 도착 판(낫아웃)의 타자주자 타석 자리를 고른다
         const detail = unjudgedSwingDetailOf(null, latest.batterHand ?? batterSideOfForm(latest.batterForm))
         const withType = pitchTypeNumber === null ? detail : { ...detail, pitchTypeNumber }
-        vibrate(
-          pitchVibrationMillisecondsOf(withType, swing.frame, pitch, latest.hud?.strikes ?? null),
-          latest.isVibrationOn !== false,
-        )
+        vibrate(pitchVibrationMillisecondsOf(withType, swing.frame, pitch, latest.hud?.strikes ?? null), latest.isVibrationOn !== false)
         showResult(withType, pitch, false, tick)
         return
       }
@@ -759,8 +820,12 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
         swingRef.current = { frame: keyTickNow(tick), isSpecial: false, isReleased: false, isUnjudgedWhiff: false }
         if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
           pushBattingLog({
-            kind: '스윙', tick, tickNow: gameSceneTickNow(), keyTick: keyTickNow(tick),
-            frameCount: pitchRef.current?.frameCount ?? -1, at: performance.now(),
+            kind: '스윙',
+            tick,
+            tickNow: gameSceneTickNow(),
+            keyTick: keyTickNow(tick),
+            frameCount: pitchRef.current?.frameCount ?? -1,
+            at: performance.now(),
           })
         }
       },
@@ -864,9 +929,7 @@ export function BattingStage({ pitcherEquipmentNibbles, pitcherSkinIndex = 0, pi
   // 마타자가 아닐 때(0x51e48 이 마선수면 예약하지 않는다). 공을 안 던지는 동안(결과 연출 `isPaused` · 결과 창 배경 · 공용 창)은 거둔다
   const takesStageKeys = !props.isPaused && props.isResultBackdrop !== true && !isCommonWindowOpen
   useTouchKeyOffer(
-    takesStageKeys && canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining)
-      ? { key: '0', label: '필살타' }
-      : null,
+    takesStageKeys && canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining) ? { key: '0', label: '필살타' } : null,
   )
   // 번트 '7' · '9' 도 같은 0x51e48 로 종류 2 · 3 을 예약한다(0x535a4) — '8' 처럼 누르는 동안만(뗄 때 0x6a8). 버튼은 '8' 바로 뒤에 선다
   const offersBunt = takesStageKeys && canBunt && aceBatterIndex < 0

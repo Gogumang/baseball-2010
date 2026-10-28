@@ -35,7 +35,12 @@ export const REWARD_SKILL_WINDOW = {
   textTop: SCREEN_HEIGHT / 2 - 5,
 } as const
 
-export function RewardSkillWindow({ text, gained, onKey, onClose }: {
+export function RewardSkillWindow({
+  text,
+  gained,
+  onKey,
+  onClose,
+}: {
   readonly text: string
   readonly gained: boolean
   /** 키 0x8e054 를 받은 그 갱신 — 0x742a9(그 자리에서 치움) · [mgr+8] = 1 (다음 명령) */
@@ -50,10 +55,11 @@ export function RewardSkillWindow({ text, gained, onKey, onClose }: {
   onKeyRef.current = onKey
 
   // 0x8e054 → 0x742a9: [창+0x215] 를 켜지 않고 그 자리에서 치운다 — 펼치는 동안은 키 콜백이 불리지 않는다(0x75556)
-  const close = () => motion.close('바로', () => {
-    onKeyRef.current?.()
-    onCloseRef.current()
-  })
+  const close = () =>
+    motion.close('바로', () => {
+      onKeyRef.current?.()
+      onCloseRef.current()
+    })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -75,16 +81,28 @@ export function RewardSkillWindow({ text, gained, onKey, onClose }: {
   const isOpening = motion.openingHeight !== null
 
   return (
-    <div className={boxStyles.dim} role="dialog" aria-label="스킬 보상" data-testid="스킬-보상-창"
-      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }} onClick={close}>
-      <div className={boxStyles.box}
-        style={{ ...popupBoxStyleOf(motion, REWARD_SKILL_WINDOW.height), padding: 0, overflow: 'hidden' }}>
+    <div
+      className={boxStyles.dim}
+      role="dialog"
+      aria-label="스킬 보상"
+      data-testid="스킬-보상-창"
+      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}
+      onClick={close}
+    >
+      <div className={boxStyles.box} style={{ ...popupBoxStyleOf(motion, REWARD_SKILL_WINDOW.height), padding: 0, overflow: 'hidden' }}>
         {/* 펼치는 동안에는 안을 안 그린다 (0x7479c) */}
         <div style={{ visibility: isOpening ? 'hidden' : undefined }}>
-          <img src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`} alt="" data-frame={frame}
-            style={{ position: 'absolute', left: imageLeft, top: REWARD_SKILL_WINDOW.imageTop - boxTop, imageRendering: 'pixelated' }} />
-          <div className={boxStyles.text} data-part="글"
-            style={{ position: 'absolute', left: 0, top: REWARD_SKILL_WINDOW.textTop - boxTop, marginLeft: 0, width: SCREEN_WIDTH }}>
+          <img
+            src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
+            alt=""
+            data-frame={frame}
+            style={{ position: 'absolute', left: imageLeft, top: REWARD_SKILL_WINDOW.imageTop - boxTop, imageRendering: 'pixelated' }}
+          />
+          <div
+            className={boxStyles.text}
+            data-part="글"
+            style={{ position: 'absolute', left: 0, top: REWARD_SKILL_WINDOW.textTop - boxTop, marginLeft: 0, width: SCREEN_WIDTH }}
+          >
             <MarkupText raw={text} />
           </div>
         </div>

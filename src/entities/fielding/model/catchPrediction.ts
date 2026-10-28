@@ -1,9 +1,5 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
-import {
-  isOutfieldSlot,
-  manhattanDistance,
-  type WorldPoint,
-} from '@/entities/fielding/model/fieldGeometry'
+import { isOutfieldSlot, manhattanDistance, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 
 /**
  * 포구 예측기 0xb12d0 (플레이 vt 0x24) 와 추적야수 고르기 0xb3b38 (vt 0x34).
@@ -153,11 +149,7 @@ export function catchKindsAt(input: CatchWindowInput): readonly CatchKind[] {
   const chest = !restricted && height >= HEIGHT_WINDOW.chest.minimum && height <= HEIGHT_WINDOW.chest.maximum
   const low = !restricted && height <= HEIGHT_WINDOW.low
   const grounderHeight = height <= HEIGHT_WINDOW.grounder
-  const jump =
-    input.jumpUnlocked === true &&
-    !chest &&
-    height >= HEIGHT_WINDOW.jump.minimum &&
-    height <= HEIGHT_WINDOW.jump.maximum
+  const jump = input.jumpUnlocked === true && !chest && height >= HEIGHT_WINDOW.jump.minimum && height <= HEIGHT_WINDOW.jump.maximum
   const slide = input.slideUnlocked === true && !grounderHeight && height <= HEIGHT_WINDOW.slide
 
   const distance = approachedDistanceOf(input)
@@ -198,12 +190,7 @@ export function catchKindsAt(input: CatchWindowInput): readonly CatchKind[] {
  */
 export function isDiveCandidate(input: CatchWindowInput & { readonly startedAtPlate: boolean }): boolean {
   const distance = approachedDistanceOf(input)
-  return (
-    input.startedAtPlate &&
-    input.ball.y <= HEIGHT_WINDOW.grounder &&
-    distance > DIVE_DISTANCE.minimum &&
-    distance <= DIVE_DISTANCE.maximum
-  )
+  return input.startedAtPlate && input.ball.y <= HEIGHT_WINDOW.grounder && distance > DIVE_DISTANCE.minimum && distance <= DIVE_DISTANCE.maximum
 }
 
 /** 종류별 "가장 이른 포구 틱과 그 야수". 없으면 null */
@@ -252,11 +239,7 @@ export interface ChaseChoice {
  * `nearestSlotToLowPoint` = 낮은 공 틱의 공 예측점 Q 에 가장 가까운 야수(동작 잠금이 아닌 야수 중).
  * 우선순위 1·8 이 이 야수를 쓴다.
  */
-export function chooseChaser(
-  table: CatchTable,
-  landingTick: number,
-  nearestSlotToLowPoint: number,
-): ChaseChoice {
+export function chooseChaser(table: CatchTable, landingTick: number, nearestSlotToLowPoint: number): ChaseChoice {
   const tickOf = (entry: CatchOpportunity | null) => (entry === null ? NO_TICK : entry.tick)
   const low = tickOf(table.low)
   const chest = tickOf(table.chest)

@@ -114,11 +114,7 @@ export function nariTeamRecordMoraleOf(career: NariTeamRecordMoraleCareer, teamI
 }
 
 /** 이 팀들이 경기를 치러 0xb570c 가 레코드 +2 를 `morale` 로 덮었다 */
-export function withNariTeamRecordMorales<T extends NariTeamRecordMoraleCareer>(
-  career: T,
-  teamIds: readonly number[],
-  morale: number,
-): T {
+export function withNariTeamRecordMorales<T extends NariTeamRecordMoraleCareer>(career: T, teamIds: readonly number[], morale: number): T {
   if (teamIds.length === 0) return career
   const next = { ...(career.teamRecordMorales ?? {}) }
   for (const teamId of teamIds) next[teamId] = morale

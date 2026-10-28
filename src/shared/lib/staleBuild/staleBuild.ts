@@ -93,15 +93,18 @@ function checkForNewBuild(force = false): void {
   state.isChecking = true
   state.lastCheck = state.now()
   const entrySrc = state.entrySrc
-  state.fetchDocument().then((html) => {
-    state.isChecking = false
-    if (isSameBuild(html, entrySrc, ASSET_ROOT)) return
-    state.isStale = true
-    reloadIfAllowed()
-  }, () => {
-    // 망이 끊겼으면 다음 기회에
-    state.isChecking = false
-  })
+  state.fetchDocument().then(
+    (html) => {
+      state.isChecking = false
+      if (isSameBuild(html, entrySrc, ASSET_ROOT)) return
+      state.isStale = true
+      reloadIfAllowed()
+    },
+    () => {
+      // 망이 끊겼으면 다음 기회에
+      state.isChecking = false
+    },
+  )
 }
 
 /**

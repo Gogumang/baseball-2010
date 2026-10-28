@@ -1,16 +1,41 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  SKILL_CHEER_BITS_START, SKILL_PANEL_IDLE, SKILL_PANEL_LIFETIME, SKILL_ROW_TEXT_BOX, TWO_STRIKE_PITCHER_BITS,
-  batterSkillPanelBitsOf, createSkillPanelScene, enterAtBatSkillPanel, enterPitchSkillPanel, pitcherIconOriginOf,
-  pitcherSkillPanelBitsOf, restoreCheerBit, skillArrowEntryOf, skillBitsOfIds, skillCategoryOf, skillCheerOf,
-  skillIconSlotsOf, skillPanelSheetOf, skillPanelViewOf, skillPanelXOf, skillRowTextOf, stepSkillPanel,
+  SKILL_CHEER_BITS_START,
+  SKILL_PANEL_IDLE,
+  SKILL_PANEL_LIFETIME,
+  SKILL_ROW_TEXT_BOX,
+  TWO_STRIKE_PITCHER_BITS,
+  batterSkillPanelBitsOf,
+  createSkillPanelScene,
+  enterAtBatSkillPanel,
+  enterPitchSkillPanel,
+  pitcherIconOriginOf,
+  pitcherSkillPanelBitsOf,
+  restoreCheerBit,
+  skillArrowEntryOf,
+  skillBitsOfIds,
+  skillCategoryOf,
+  skillCheerOf,
+  skillIconSlotsOf,
+  skillPanelSheetOf,
+  skillPanelViewOf,
+  skillPanelXOf,
+  skillRowTextOf,
+  stepSkillPanel,
 } from '@/widgets/batting-stage/lib/skillPanel'
 import type { SkillPanelSituation } from '@/widgets/batting-stage/lib/skillPanel'
 
 const 상황: SkillPanelSituation = {
-  inning: 1, attackScore: 0, defenseScore: 0, runnerCount: 0, hasSecondBaseRunner: false,
-  pitcherHand: 0, batterHand: 0, batterRecordSlot: 0, recentAtBatCodes: [],
+  inning: 1,
+  attackScore: 0,
+  defenseScore: 0,
+  runnerCount: 0,
+  hasSecondBaseRunner: false,
+  pitcherHand: 0,
+  batterHand: 0,
+  batterRecordSlot: 0,
+  recentAtBatCodes: [],
 }
 const 비트 = (...bits: number[]) => bits.reduce((sum, bit) => sum | (1 << bit), 0)
 const 모두 = 0xffffff
@@ -75,7 +100,11 @@ describe('세우기 — 0xd 진입 48fa4 · 0xf 진입 3dd4e', () => {
   it('2 스트라이크이고 투수가 비트 11 이면 투수 비트 = 0x800 하나 · 타자 비트는 그대로', () => {
     const state = { ...SKILL_PANEL_IDLE, batterBits: 비트(9), pitcherBits: 비트(8) }
     expect(enterPitchSkillPanel(state, 2, 비트(11, 8))).toEqual({
-      batterBits: 비트(9), pitcherBits: TWO_STRIKE_PITCHER_BITS, remaining: 20, tick: 0, cheerPending: true,
+      batterBits: 비트(9),
+      pitcherBits: TWO_STRIKE_PITCHER_BITS,
+      remaining: 20,
+      tick: 0,
+      cheerPending: true,
     })
     expect(enterPitchSkillPanel(state, 1, 비트(11))).toBe(state)
     expect(enterPitchSkillPanel(state, 2, 비트(8))).toBe(state)
@@ -147,13 +176,24 @@ describe('아이콘 — 0x4b550 · 0x5f350', () => {
     expect(skillIconSlotsOf(비트(15, 17), true)).toEqual([{ image: 0x4a, isUp: false }])
     // 16 상승세(파워 · 좋음) → 10 해결사(파워 · 좋음)
     expect(skillIconSlotsOf(비트(10, 16), true)).toEqual([{ image: 0x4b, isUp: true }])
-    expect(skillIconSlotsOf(비트(10, 15), true)).toEqual([{ image: 0x4a, isUp: true }, { image: 0x4b, isUp: true }])
+    expect(skillIconSlotsOf(비트(10, 15), true)).toEqual([
+      { image: 0x4a, isUp: true },
+      { image: 0x4b, isUp: true },
+    ])
   })
 
   it('없는 그림(−1)도 칸을 차지하고(셋까지) 그리지만 않는다 — 그린 칸만 15 씩 위로', () => {
     const slots = skillIconSlotsOf(비트(23, 22, 21, 9, 10), true)
-    expect(slots).toEqual([{ image: -1, isUp: true }, { image: 0x4c, isUp: true }, { image: 0x4b, isUp: true }])
-    const view = skillPanelViewOf({ ...SKILL_PANEL_IDLE, batterBits: 비트(23, 22, 21, 9, 10), remaining: 1 }, { batterHand: 0, isDefenseCpu: true }, 0)
+    expect(slots).toEqual([
+      { image: -1, isUp: true },
+      { image: 0x4c, isUp: true },
+      { image: 0x4b, isUp: true },
+    ])
+    const view = skillPanelViewOf(
+      { ...SKILL_PANEL_IDLE, batterBits: 비트(23, 22, 21, 9, 10), remaining: 1 },
+      { batterHand: 0, isDefenseCpu: true },
+      0,
+    )
     expect(view.batterIcons).toEqual([
       { image: 0x4c, isUp: true, x: 100, y: 224 },
       { image: 0x4b, isUp: true, x: 100, y: 209 },
@@ -161,7 +201,10 @@ describe('아이콘 — 0x4b550 · 0x5f350', () => {
   })
 
   it('투수 아이콘 — 표 0xd020c, 칸은 투수 앵커 + (−20, CPU 수비면 −0x34)', () => {
-    expect(skillIconSlotsOf(비트(19, 11), false)).toEqual([{ image: 0x50, isUp: false }, { image: 0x4f, isUp: true }])
+    expect(skillIconSlotsOf(비트(19, 11), false)).toEqual([
+      { image: 0x50, isUp: false },
+      { image: 0x4f, isUp: true },
+    ])
     expect(pitcherIconOriginOf({ batterHand: 0, isDefenseCpu: true })).toEqual({ x: 136, y: 136 })
     expect(pitcherIconOriginOf({ batterHand: 1, isDefenseCpu: false })).toEqual({ x: 63, y: 110 })
   })

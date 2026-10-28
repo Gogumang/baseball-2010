@@ -1,23 +1,40 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
-import type {
-  Collection, HallOfFamePlayerPick, HallOfFameResult, HallOfFameSide,
-} from '@/entities/collection/model/collection'
-import {
-  firstEmptyHallOfFameSlot, hallOfFameBatterAt, hallOfFamePitcherAt, isHallOfFameSlotOpen,
-} from '@/entities/collection/model/collection'
+import type { Collection, HallOfFamePlayerPick, HallOfFameResult, HallOfFameSide } from '@/entities/collection/model/collection'
+import { firstEmptyHallOfFameSlot, hallOfFameBatterAt, hallOfFamePitcherAt, isHallOfFameSlotOpen } from '@/entities/collection/model/collection'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { PitcherAbility } from '@/entities/pitcher-career/model/pitcherAbility'
 import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
 import { RecordAnnals } from '@/pages/record/ui/RecordAnnals'
 import {
-  FOOTER, HALL_OF_FAME_BUBBLE, HALL_OF_FAME_CHART, HALL_OF_FAME_DETAIL, HALL_OF_FAME_GRID,
-  HALL_OF_FAME_PITCHER_SLOTS, HALL_OF_FAME_SLOTS, HALL_OF_FAME_SLOT_ART, HALL_OF_FAME_TAGS,
-  HEADBAND, ITEM_COUNT, NARI_BATTER_SLOT, NARI_PITCHER_SLOT, SCREEN, SLT_FRAME, SPECIAL_ITEMS, SPECIAL_REEL_STATE,
-  hallOfFameBubblePositionOf, hallOfFameCellOf, HALL_OF_FAME_CHART_MAXIMUM_LENGTH, HALL_OF_FAME_CELL_ART, hallOfFameCellImagesOf,
-  hallOfFameCellImageTopLeftOf, isHallOfFameCellDimmed,
-  hallOfFameEntryOfSlot, hallOfFameKeyCodeOf, HOME_RUN_DERBY_FIRST_ROW_Y,
+  FOOTER,
+  HALL_OF_FAME_BUBBLE,
+  HALL_OF_FAME_CHART,
+  HALL_OF_FAME_DETAIL,
+  HALL_OF_FAME_GRID,
+  HALL_OF_FAME_PITCHER_SLOTS,
+  HALL_OF_FAME_SLOTS,
+  HALL_OF_FAME_SLOT_ART,
+  HALL_OF_FAME_TAGS,
+  HEADBAND,
+  ITEM_COUNT,
+  NARI_BATTER_SLOT,
+  NARI_PITCHER_SLOT,
+  SCREEN,
+  SLT_FRAME,
+  SPECIAL_ITEMS,
+  SPECIAL_REEL_STATE,
+  hallOfFameBubblePositionOf,
+  hallOfFameCellOf,
+  HALL_OF_FAME_CHART_MAXIMUM_LENGTH,
+  HALL_OF_FAME_CELL_ART,
+  hallOfFameCellImagesOf,
+  hallOfFameCellImageTopLeftOf,
+  isHallOfFameCellDimmed,
+  hallOfFameEntryOfSlot,
+  hallOfFameKeyCodeOf,
+  HOME_RUN_DERBY_FIRST_ROW_Y,
 } from '@/pages/special/lib/specialLayout'
 import type { HallOfFameSlotState } from '@/pages/special/lib/specialLayout'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
@@ -31,10 +48,22 @@ import type { GridOpenShape } from '@/shared/lib/gridOpen/gridOpen'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
 import { MenuWheelUnderlayImage } from '@/pages/main-menu/ui/MenuWheelUnderlayImage'
 import {
-  MENU_DESCRIPTION_PANEL, MENU_PANEL_HEADING_COLOR, MENU_REEL_ITEM_FRAMES, MENU_REEL_SCROLL_STEPS,
-  MENU_REEL_SHADOW_COLOR, MENU_REEL_SHADOW_OFFSET, MENU_REEL_SLOTS,
-  menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf, menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf,
-  menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelLabelTopLeftOf, menuWheelRestingLabelsOf,
+  MENU_DESCRIPTION_PANEL,
+  MENU_PANEL_HEADING_COLOR,
+  MENU_REEL_ITEM_FRAMES,
+  MENU_REEL_SCROLL_STEPS,
+  MENU_REEL_SHADOW_COLOR,
+  MENU_REEL_SHADOW_OFFSET,
+  MENU_REEL_SLOTS,
+  menuPanelHeadingFrameOf,
+  menuPanelHeadingTopLeftOf,
+  menuPanelLabelTopLeftOf,
+  menuReelEntryAtSlotOf,
+  menuReelFrameListOf,
+  menuReelSlotRowOf,
+  menuReelTextTopLeftOf,
+  menuWheelLabelTopLeftOf,
+  menuWheelRestingLabelsOf,
 } from '@/pages/main-menu/lib/mainMenuLayout'
 import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
 import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
@@ -121,8 +150,14 @@ interface SpecialScreenProps {
  * ```
  */
 const SPECIAL_LIST_STEP: Readonly<Record<string, number>> = {
-  ArrowUp: -1, ArrowLeft: -1, '2': -1, '4': -1,
-  ArrowDown: 1, ArrowRight: 1, '6': 1, '8': 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
+  '2': -1,
+  '4': -1,
+  ArrowDown: 1,
+  ArrowRight: 1,
+  '6': 1,
+  '8': 1,
 }
 
 /**
@@ -151,8 +186,15 @@ const SPECIAL_LIST_STEP: Readonly<Record<string, number>> = {
  * 원본에 없다(mode_back 은 0x7b8ec 만 싣고, 그리기 0x7b9ac 를 부르는 곳은 0x7d34c · 0x84928 · 0x88572 · 0x88d76 뿐, 2026-10-15 r97 직접 뜸).
  */
 export function SpecialScreen({
-  collection, renderAceSelect, renderEdit, hallOfFameDeletion, gamePoint, annalsSecretCode, onAnnalsSecretCodeChange,
-  isBandGrown = false, onBack,
+  collection,
+  renderAceSelect,
+  renderEdit,
+  hallOfFameDeletion,
+  gamePoint,
+  annalsSecretCode,
+  onAnnalsSecretCodeChange,
+  isBandGrown = false,
+  onBack,
 }: SpecialScreenProps) {
   const [view, setView] = useState<SpecialView>('목록')
   const [cursor, setCursor] = useState(0)
@@ -207,12 +249,15 @@ export function SpecialScreen({
 
   if (view === '기록연감') {
     return (
-      <RecordAnnals collection={collection} {...(gamePoint === undefined ? {} : { gamePoint })}
+      <RecordAnnals
+        collection={collection}
+        {...(gamePoint === undefined ? {} : { gamePoint })}
         {...(annalsSecretCode === undefined ? {} : { secretCode: annalsSecretCode })}
         {...(onAnnalsSecretCodeChange === undefined ? {} : { onSecretCodeChange: onAnnalsSecretCodeChange })}
         // 하위 30 그리기 0x2e29c 도 맨 앞(0x2e2b6)에 메뉴 바탕 0x58371 을 깐다
         underlay={<SkinBackdrop kind="메뉴바탕" />}
-        onBack={() => setView('목록')} />
+        onBack={() => setView('목록')}
+      />
     )
   }
 
@@ -225,13 +270,15 @@ export function SpecialScreen({
   }
 
   if (view === '명예의 전당') {
-    const mode: HallOfFameMode = hallOfFameDeletion === undefined
-      ? { kind: '보기' }
-      : { kind: '보기', deletion: hallOfFameDeletion }
+    const mode: HallOfFameMode = hallOfFameDeletion === undefined ? { kind: '보기' } : { kind: '보기', deletion: hallOfFameDeletion }
     // 하위 27 그리기 0x2dcd8: 배경 0x58371 · 목록 k 8 · 머리띠 0x54d95(skin, 16 "명예의전당", 5)
     return (
-      <HallOfFameScreen collection={collection} mode={mode} onBack={() => setView('목록')}
-        {...(gamePoint === undefined ? {} : { frame: { title: '명예의전당', gamePoint } })} />
+      <HallOfFameScreen
+        collection={collection}
+        mode={mode}
+        onBack={() => setView('목록')}
+        {...(gamePoint === undefined ? {} : { frame: { title: '명예의전당', gamePoint } })}
+      />
     )
   }
 
@@ -241,40 +288,55 @@ export function SpecialScreen({
   /** 판 안 큰 글자 자리 — 프레임 크기는 PNG 머리에서 읽어 둔 `labelWidth` · `labelHeight` (0x25794~0x257c4 가운데 + (2, 5)) */
   const panelLabelAt = menuPanelLabelTopLeftOf(selected.labelWidth, selected.labelHeight)
   const headingFrame = menuPanelHeadingFrameOf(SPECIAL_REEL_STATE)
-  const headingSize = headingFrame === null ? null : textOrigins?.[String(headingFrame).padStart(3, '0')] ?? null
+  const headingSize = headingFrame === null ? null : (textOrigins?.[String(headingFrame).padStart(3, '0')] ?? null)
   /** 단색으로 찍는 글자 (원본 효과 0xb) — 그림을 마스크로 쓰고 색을 칠한다 */
   const tinted = (src: string, left: number, top: number, width: number, height: number, color: string) => (
-    <div className={menuStyles.tintedLabel}
-      style={{ left, top, width, height, background: solidColorCss(color), maskImage: spriteMaskImage(src), WebkitMaskImage: spriteMaskImage(src) }} />
+    <div
+      className={menuStyles.tintedLabel}
+      style={{ left, top, width, height, background: solidColorCss(color), maskImage: spriteMaskImage(src), WebkitMaskImage: spriteMaskImage(src) }}
+    />
   )
 
   // ── 세로 릴 0x2524c(…, 6) — 슬롯 1·2·3 · 5·6·7 (4 는 판이 대신) ──
   /** ↑(−1) 면 +, ↓(−2) 면 − 로 민다 (0x2534c) */
   const scroll = turn.direction === null ? 0 : (turn.direction === -1 ? 1 : -1) * (MENU_REEL_SCROLL_STEPS[turn.counter] ?? 0)
-  const reelLabels = band.isGrowing ? [] : MENU_REEL_SLOTS.map((slot) => {
-    const entryIndex = menuReelEntryAtSlotOf(REEL_FRAMES, REEL_SLOT_ROW, shownCursor, slot)
-    if (entryIndex === null) return null
-    const frame = REEL_FRAME_LIST[entryIndex]
-    const item = SPECIAL_ITEMS[entryIndex]
-    const size = textOrigins?.[String(frame).padStart(3, '0')] ?? null
-    if (size === null || item === undefined) return null
-    const topLeft = menuReelTextTopLeftOf(slot, size.width, scroll)
-    if (topLeft === null) return null
-    const src = imageSrc(IMG_TEXT_FRAMES, frame)
-    return (
-      <div key={item.id} data-reel-slot={slot}>
-        {/* 그림자를 #212B70 으로 (+1,+1) 에 먼저 찍고 진짜 글자를 원색으로 덮는다 (0x255c8) */}
-        {tinted(src, topLeft.x + MENU_REEL_SHADOW_OFFSET.x, topLeft.y + MENU_REEL_SHADOW_OFFSET.y, size.width, size.height,
-          MENU_REEL_SHADOW_COLOR)}
-        <button type="button" aria-label={item.id} className={menuStyles.menuRow} data-frame={frame}
-          style={{ left: topLeft.x, top: topLeft.y }}
-          // ⚠️ 웹 조작 — 누르면 고르기만 한다(원본은 키패드뿐). 여는 것은 설명 판 누름(OK)이다
-          onClick={() => (band.isGrowing ? undefined : setCursor(entryIndex))}>
-          <img src={src} alt="" />
-        </button>
-      </div>
-    )
-  })
+  const reelLabels = band.isGrowing
+    ? []
+    : MENU_REEL_SLOTS.map((slot) => {
+        const entryIndex = menuReelEntryAtSlotOf(REEL_FRAMES, REEL_SLOT_ROW, shownCursor, slot)
+        if (entryIndex === null) return null
+        const frame = REEL_FRAME_LIST[entryIndex]
+        const item = SPECIAL_ITEMS[entryIndex]
+        const size = textOrigins?.[String(frame).padStart(3, '0')] ?? null
+        if (size === null || item === undefined) return null
+        const topLeft = menuReelTextTopLeftOf(slot, size.width, scroll)
+        if (topLeft === null) return null
+        const src = imageSrc(IMG_TEXT_FRAMES, frame)
+        return (
+          <div key={item.id} data-reel-slot={slot}>
+            {/* 그림자를 #212B70 으로 (+1,+1) 에 먼저 찍고 진짜 글자를 원색으로 덮는다 (0x255c8) */}
+            {tinted(
+              src,
+              topLeft.x + MENU_REEL_SHADOW_OFFSET.x,
+              topLeft.y + MENU_REEL_SHADOW_OFFSET.y,
+              size.width,
+              size.height,
+              MENU_REEL_SHADOW_COLOR,
+            )}
+            <button
+              type="button"
+              aria-label={item.id}
+              className={menuStyles.menuRow}
+              data-frame={frame}
+              style={{ left: topLeft.x, top: topLeft.y }}
+              // ⚠️ 웹 조작 — 누르면 고르기만 한다(원본은 키패드뿐). 여는 것은 설명 판 누름(OK)이다
+              onClick={() => (band.isGrowing ? undefined : setCursor(entryIndex))}
+            >
+              <img src={src} alt="" />
+            </button>
+          </div>
+        )
+      })
 
   return (
     <RawScreen>
@@ -288,29 +350,51 @@ export function SpecialScreen({
       {reelLabels}
 
       {/* 설명 판 = main_ui 이미지 3 (149×63) 을 (96, 289) — 아래 절반은 화면 밖(원본 그대로). 판 안 큰 글자 = main_ui 프레임(0x25774) */}
-      <img className={styles.sprite} alt="" data-testid="스페셜-설명판" src={imageSrc(MAIN_UI, MENU_DESCRIPTION_PANEL.frame)}
-        style={{ left: panel.x, top: panel.y }} />
+      <img
+        className={styles.sprite}
+        alt=""
+        data-testid="스페셜-설명판"
+        src={imageSrc(MAIN_UI, MENU_DESCRIPTION_PANEL.frame)}
+        style={{ left: panel.x, top: panel.y }}
+      />
       <EffectImage
         className={`${styles.sprite} ${selected.availability === '됨' ? '' : styles.dimmed}`}
         effect={selected.availability === '됨' ? null : DRAW_EFFECT.GRAY}
         src={imageSrc(MAIN_UI_FRAMES, selected.labelFrame)}
-        style={{ left: panelLabelAt.x + shakeDx, top: panelLabelAt.y + shakeDy }} />
+        style={{ left: panelLabelAt.x + shakeDx, top: panelLabelAt.y + shakeDy }}
+      />
       {/* 판 왼쪽 위 회색 제목 img_text 1 "스페셜" (0x257cc~0x257ee) */}
-      {headingFrame !== null && headingSize !== null && tinted(
-        imageSrc(IMG_TEXT_FRAMES, headingFrame), menuPanelHeadingTopLeftOf().x + shakeDx, menuPanelHeadingTopLeftOf().y + shakeDy,
-        headingSize.width, headingSize.height, MENU_PANEL_HEADING_COLOR,
-      )}
+      {headingFrame !== null &&
+        headingSize !== null &&
+        tinted(
+          imageSrc(IMG_TEXT_FRAMES, headingFrame),
+          menuPanelHeadingTopLeftOf().x + shakeDx,
+          menuPanelHeadingTopLeftOf().y + shakeDy,
+          headingSize.width,
+          headingSize.height,
+          MENU_PANEL_HEADING_COLOR,
+        )}
       {/* 설명 띠 0x55545(StrMAINMENU[0x10 + 커서]) — 0x2524c 맨 끝. 띠가 자라는 동안은 안 그린다 */}
       {!band.isGrowing && <DescriptionBand text={selected.description} seed={cursor} />}
       {/* 설명 판 = 고른 칸 — 투명 누름 칸으로 OK (바닥띠 되돌아가기 x 206~ 는 비워 둔다) */}
       {notice === null && (
-        <PressArea label={`${selected.id} 열기`} onPress={() => (band.isGrowing ? undefined : openItem(cursor))}
-          rect={{ x: MENU_DESCRIPTION_PANEL.x, y: MENU_DESCRIPTION_PANEL.y, width: 200 - MENU_DESCRIPTION_PANEL.x, height: 320 - MENU_DESCRIPTION_PANEL.y }} />
+        <PressArea
+          label={`${selected.id} 열기`}
+          onPress={() => (band.isGrowing ? undefined : openItem(cursor))}
+          rect={{
+            x: MENU_DESCRIPTION_PANEL.x,
+            y: MENU_DESCRIPTION_PANEL.y,
+            width: 200 - MENU_DESCRIPTION_PANEL.x,
+            height: 320 - MENU_DESCRIPTION_PANEL.y,
+          }}
+        />
       )}
 
-      {gamePoint === undefined
-        ? <SpecialBands onBack={onBack} />
-        : <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} slides={false} />}
+      {gamePoint === undefined ? (
+        <SpecialBands onBack={onBack} />
+      ) : (
+        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={onBack} slides={false} />
+      )}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
@@ -384,15 +468,42 @@ function SpecialBands({ onBack, slides = false }: { readonly onBack: () => void;
         <rect x={0} y={FOOTER.line.y + dyBottom} width={SCREEN.width} height={1} fill={FOOTER.line.color} />
       </svg>
       {HEADBAND.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.tileImage)} style={{ left: x, top: HEADBAND.tileY + dyTop }} />
+        <img
+          key={x}
+          className={styles.sprite}
+          alt=""
+          src={imageSrc(GAME_FRAME, HEADBAND.tileImage)}
+          style={{ left: x, top: HEADBAND.tileY + dyTop }}
+        />
       ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, HEADBAND.cornerImage)} style={{ left: HEADBAND.cornerX, top: HEADBAND.tileY + dyTop }} />
-      <img className={styles.sprite} alt="" data-testid="스페셜-머리띠-제목" src={imageSrc(GAME_FRAME, HEADBAND.title.image)}
-        style={{ left: HEADBAND.title.x, top: HEADBAND.title.y + dyTop }} />
+      <img
+        className={styles.sprite}
+        alt=""
+        src={imageSrc(GAME_FRAME, HEADBAND.cornerImage)}
+        style={{ left: HEADBAND.cornerX, top: HEADBAND.tileY + dyTop }}
+      />
+      <img
+        className={styles.sprite}
+        alt=""
+        data-testid="스페셜-머리띠-제목"
+        src={imageSrc(GAME_FRAME, HEADBAND.title.image)}
+        style={{ left: HEADBAND.title.x, top: HEADBAND.title.y + dyTop }}
+      />
       {FOOTER.tileXs.map((x) => (
-        <img key={x} className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.tileImage)} style={{ left: x, top: FOOTER.tileY + dyBottom }} />
+        <img
+          key={x}
+          className={styles.sprite}
+          alt=""
+          src={imageSrc(GAME_FRAME, FOOTER.tileImage)}
+          style={{ left: x, top: FOOTER.tileY + dyBottom }}
+        />
       ))}
-      <img className={styles.sprite} alt="" src={imageSrc(GAME_FRAME, FOOTER.cornerImage)} style={{ left: FOOTER.cornerX, top: FOOTER.tileY + dyBottom }} />
+      <img
+        className={styles.sprite}
+        alt=""
+        src={imageSrc(GAME_FRAME, FOOTER.cornerImage)}
+        style={{ left: FOOTER.cornerX, top: FOOTER.tileY + dyBottom }}
+      />
       <button
         type="button"
         className={styles.backButton}
@@ -500,8 +611,10 @@ const HALL_OF_FAME_TEXT = {
   deleted: '!C!cffffff선수를 삭제하였습니다', // StrCOMMON[46]
   hallOfFameFirst: '!C!cFFFFFF명예의전당 선수를!N먼저 등록해야합니다', // StrCOMMON[39]
   // StrCOMMON[45] / [54] — 슬롯 현금 구매 (🌐)
-  buyPitcherSlots: '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N투수 슬롯 2개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF0000500원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
-  buyBatterSlots: '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N타자 슬롯 4개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF00001000원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
+  buyPitcherSlots:
+    '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N투수 슬롯 2개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF0000500원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
+  buyBatterSlots:
+    '!C!cFFFFFF슬롯을 오픈하여 명예선수를!N추가로 등록할 수 있습니다!N타자 슬롯 4개가 오픈됩니다!N!N!cFFFFFF실제 현금 !cFF00001000원!cFFFFFF의 추가 정보!N이용료 (통화료별도)가 부과!N됩니다. 아이템 구매 중 일부!N시간이 소요 될 수 있으므로!N강제종료 하지 마세요!N!N구매 하시겠습니까?',
 } as const
 
 /** 등록 목록에 뜬 팝업 — 0x62568 의 창 종류 [목록+0x314] (0x16 확인 · 0x17 G 부족) 와 알림 */
@@ -529,7 +642,14 @@ type HallOfFamePopup =
  *  - "친구에게 선물" 은 통신이 필요해 안내만 띄운다. "슬롯에서 삭제" 는 `deletion`(HallOfFameDeletion) 대로 돈다.
  *    슬롯 현금 구매·G 충전 페이지(🌐)도 열 수 없어 목록으로 돌아온다.
  */
-export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, listOwner }: {
+export function HallOfFameScreen({
+  collection,
+  mode,
+  onBack,
+  frame,
+  backdrop,
+  listOwner,
+}: {
   readonly collection: Collection
   readonly mode: HallOfFameMode
   readonly onBack: () => void
@@ -582,8 +702,8 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   const { keyLock } = entry
   const gridOpen = entry.grid
   const bounce = useGridCursorBounce()
-  const teamLogo = current.kind === '찬칸' && (slot === NARI_PITCHER_SLOT || slot === NARI_BATTER_SLOT) && current.figure !== null
-    ? current.figure.team : null
+  const teamLogo =
+    current.kind === '찬칸' && (slot === NARI_PITCHER_SLOT || slot === NARI_BATTER_SLOT) && current.figure !== null ? current.figure.team : null
 
   /** 등록 목록의 키 확인 (0x62604~0x627d0) — 결과 코드와 지금 모드(3 투수 · 4 타자)로 가른다 */
   const pressRegisterSlot = (target: number) => {
@@ -705,11 +825,15 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
       // 메인 메뉴 16 · 17 · 27 · 나리 145 · 시즌 0xe2: 키 0x62568 이 격자 [목록+0x134] 의 vt+0x18(0x6c299 → 0x6c521 → 0x6c031,
       // 숫자키 꼴 1)에 넘긴다 — '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK
       const direction: AnnalsDirection | null =
-        event.key === 'ArrowRight' || event.key === '6' ? 'right'
-        : event.key === 'ArrowLeft' || event.key === '4' ? 'left'
-        : event.key === 'ArrowDown' || event.key === '8' ? 'down'
-        : event.key === 'ArrowUp' || event.key === '2' ? 'up'
-        : null
+        event.key === 'ArrowRight' || event.key === '6'
+          ? 'right'
+          : event.key === 'ArrowLeft' || event.key === '4'
+            ? 'left'
+            : event.key === 'ArrowDown' || event.key === '8'
+              ? 'down'
+              : event.key === 'ArrowUp' || event.key === '2'
+                ? 'up'
+                : null
       // 창이 없으면 격자가 바꾼 키를 0x5550c 에 넘긴다(0x62568 625a0~625be) — 숫자키도 방향으로 [skin+0x8c] 에 남는다(Q-10).
       // 말풍선(0x2ac00 [skin+0x126] ≠ 0 → 2ac76)은 목록을 안 불러 위에서 끝난다
       if (direction !== null) noteSkinShakeDirection(direction)
@@ -770,72 +894,81 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
   return (
     <RawScreen>
       <SkinBackdrop kind={backdrop ?? (mode.kind === '등록' ? '공무늬' : '메뉴바탕')} />
-      {gridOpen !== null && (<>
-      {/*
+      {gridOpen !== null && (
+        <>
+          {/*
         A 자리 — 빈 칸·잠긴 칸(0x5ea18 이 0, 0x6535a~)만 원 두 개 (A−38 지름 77 · A−31 지름 63) 를 깐다.
         찬 칸(0x6522e~)은 원 없이 나리 칸(0·5)이면 team_logo 프레임 [그림+0x30](= 팀) 을 A 가운데(0x65554~0x65598),
         그 위에 고른 선수 몸 그림 — 타자는 그림을 바로, 투수는 그리기 앞에 0x669c1 → 0x65e80 이 떠 둔 54×75 이미지
         [0x1552ae0] 를 (A.x − (손 ? 0x32 : 0x3b), A.y − 0x61) 에 (`lib/hallOfFameFigure.ts`).
       */}
-      {current.kind !== '찬칸' && HALL_OF_FAME_SLOT_ART.circles.map((circle) => (
-        <div
-          key={circle.size}
-          className={styles.hofCircle}
-          style={{
-            left: a.x - circle.offset, top: a.y - circle.offset,
-            width: circle.size, height: circle.size, background: circle.color,
-          }}
-        />
-      ))}
-      {teamLogo !== null && <TeamLogo team={teamLogo} x={a.x} y={a.y} />}
-      <HallOfFameFigure drawing={figure} ax={a.x} ay={a.y} />
+          {current.kind !== '찬칸' &&
+            HALL_OF_FAME_SLOT_ART.circles.map((circle) => (
+              <div
+                key={circle.size}
+                className={styles.hofCircle}
+                style={{
+                  left: a.x - circle.offset,
+                  top: a.y - circle.offset,
+                  width: circle.size,
+                  height: circle.size,
+                  background: circle.color,
+                }}
+              />
+            ))}
+          {teamLogo !== null && <TeamLogo team={teamLogo} x={a.x} y={a.y} />}
+          <HallOfFameFigure drawing={figure} ax={a.x} ay={a.y} />
 
-      {/* 빈 칸·잠긴 칸 아이콘은 A 가운데 (글러브 23 · 방망이 24 · 자물쇠 31) */}
-      {current.kind !== '찬칸' && (
-        <img
-          className={styles.sprite}
-          alt=""
-          src={imageSrc(SLT_FRAME, hallOfFameIconOf(slot, current.state).image)}
-          style={{
-            left: a.x - Math.floor(hallOfFameIconOf(slot, current.state).width / 2),
-            top: a.y - Math.floor(hallOfFameIconOf(slot, current.state).height / 2),
-          }}
-        />
-      )}
+          {/* 빈 칸·잠긴 칸 아이콘은 A 가운데 (글러브 23 · 방망이 24 · 자물쇠 31) */}
+          {current.kind !== '찬칸' && (
+            <img
+              className={styles.sprite}
+              alt=""
+              src={imageSrc(SLT_FRAME, hallOfFameIconOf(slot, current.state).image)}
+              style={{
+                left: a.x - Math.floor(hallOfFameIconOf(slot, current.state).width / 2),
+                top: a.y - Math.floor(hallOfFameIconOf(slot, current.state).height / 2),
+              }}
+            />
+          )}
 
-      {/* 이름 막대 slt_frame 9 (82×15) 을 (A.x−41, A.y+40) + 글 (A.x−41, A.y+42, 폭 82) 가운데 */}
-      <img
-        className={styles.sprite}
-        alt=""
-        src={imageSrc(SLT_FRAME, HALL_OF_FAME_SLOT_ART.nameBar.image)}
-        style={{ left: a.x + HALL_OF_FAME_SLOT_ART.nameBar.dx, top: a.y + HALL_OF_FAME_SLOT_ART.nameBar.dy }}
-      />
-      {current.kind === '찬칸' ? (
-        <div
-          className={styles.hofName}
-          style={{
-            left: a.x + HALL_OF_FAME_SLOT_ART.nameBar.dx,
-            top: a.y + HALL_OF_FAME_SLOT_ART.nameTextDy,
-            width: HALL_OF_FAME_SLOT_ART.nameBar.width,
-          }}
-        >
-          {current.name}
-        </div>
-      ) : (
-        <img
-          className={styles.sprite}
-          alt={current.state === 5 ? 'LOCK' : 'EMPTY'}
-          src={imageSrc(SLT_FRAME, hallOfFameBarLabelOf(current.state).image)}
-          style={{
-            left: a.x + HALL_OF_FAME_SLOT_ART.nameBar.dx
-              + Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.width - hallOfFameBarLabelOf(current.state).width) / 2),
-            top: a.y + HALL_OF_FAME_SLOT_ART.nameBar.dy
-              + Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.height - hallOfFameBarLabelOf(current.state).height) / 2),
-          }}
-        />
-      )}
+          {/* 이름 막대 slt_frame 9 (82×15) 을 (A.x−41, A.y+40) + 글 (A.x−41, A.y+42, 폭 82) 가운데 */}
+          <img
+            className={styles.sprite}
+            alt=""
+            src={imageSrc(SLT_FRAME, HALL_OF_FAME_SLOT_ART.nameBar.image)}
+            style={{ left: a.x + HALL_OF_FAME_SLOT_ART.nameBar.dx, top: a.y + HALL_OF_FAME_SLOT_ART.nameBar.dy }}
+          />
+          {current.kind === '찬칸' ? (
+            <div
+              className={styles.hofName}
+              style={{
+                left: a.x + HALL_OF_FAME_SLOT_ART.nameBar.dx,
+                top: a.y + HALL_OF_FAME_SLOT_ART.nameTextDy,
+                width: HALL_OF_FAME_SLOT_ART.nameBar.width,
+              }}
+            >
+              {current.name}
+            </div>
+          ) : (
+            <img
+              className={styles.sprite}
+              alt={current.state === 5 ? 'LOCK' : 'EMPTY'}
+              src={imageSrc(SLT_FRAME, hallOfFameBarLabelOf(current.state).image)}
+              style={{
+                left:
+                  a.x +
+                  HALL_OF_FAME_SLOT_ART.nameBar.dx +
+                  Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.width - hallOfFameBarLabelOf(current.state).width) / 2),
+                top:
+                  a.y +
+                  HALL_OF_FAME_SLOT_ART.nameBar.dy +
+                  Math.floor((HALL_OF_FAME_SLOT_ART.nameBar.height - hallOfFameBarLabelOf(current.state).height) / 2),
+              }}
+            />
+          )}
 
-      {/*
+          {/*
         딱지 — B(117 파란 막대 + img_text 159 "ABILITY") 만 그린다 (0x65744).
         ⚠️ **A 딱지는 원본도 명예의 전당(k 8)에서 안 그린다.** 공용 목록 0x63b15 가 A 딱지
         플래그 `[sp+0xb4]` 를 기본 1 로 두는데(0x63cea `movs r2,#1`), k 6·7·8·9 갈래가
@@ -843,98 +976,133 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         그리는 쪽 0x65764~0x65768 이 `cmp r2,#0; beq` 로 A 를 통째로 건너뛴다.
         (0 으로 쓰는 곳 셋을 전수 확인했다 — A 가 그려지는 k 는 0·1·3·4·5 뿐이다.)
       */}
-      {([['b', b] as const]).map(([side, point]) => {
-        const tag = HALL_OF_FAME_TAGS[side]
-        return (
-          <div key={side}>
-            <img
-              className={styles.sprite}
-              alt=""
-              src={imageSrc(SLT_FRAME, tag.plate)}
-              style={{ left: point.x + tag.plateDx, top: point.y + tag.plateDy }}
-            />
-            <img
-              className={styles.sprite}
-              alt="ABILITY"
-              src={imageSrc(IMG_TEXT_FRAMES, tag.label)}
-              style={{
-                left: point.x - Math.floor(tag.labelWidth / 2),
-                top: point.y + tag.labelDy,
-              }}
-            />
-          </div>
-        )
-      })}
+          {[['b', b] as const].map(([side, point]) => {
+            const tag = HALL_OF_FAME_TAGS[side]
+            return (
+              <div key={side}>
+                <img
+                  className={styles.sprite}
+                  alt=""
+                  src={imageSrc(SLT_FRAME, tag.plate)}
+                  style={{ left: point.x + tag.plateDx, top: point.y + tag.plateDy }}
+                />
+                <img
+                  className={styles.sprite}
+                  alt="ABILITY"
+                  src={imageSrc(IMG_TEXT_FRAMES, tag.label)}
+                  style={{
+                    left: point.x - Math.floor(tag.labelWidth / 2),
+                    top: point.y + tag.labelDy,
+                  }}
+                />
+              </div>
+            )
+          })}
 
-      {/*
+          {/*
         ABILITY 판 0x5aefc(…, B.x, B.y + 8, 종류, 기록, 0, 반지름 30) — 0x65690~0x65740: k 7(홈런더비 하위 16 0x2df20)은 **늘 종류 2**(타자 이름),
         그 밖(k 6 미션 · k 8 명예의 전당)은 칸 ≤ 4 면 종류 3(투수 이름) · 아니면 2. 축 최대치 0x5e864 = 800.
         ⚠️ 나리 145 등록이 어느 k 인지는 안 떴다 — 칸으로 가르는 쪽에 둔다.
       */}
-      <AbilityRadarPanel center={chartCenter} radius={HALL_OF_FAME_CHART.radius} maximumLength={HALL_OF_FAME_CHART_MAXIMUM_LENGTH}
-        labelFrames={(mode.kind === '선수고르기' && mode.purpose === '홈런더비') || slot >= HALL_OF_FAME_PITCHER_SLOTS
-          ? ABILITY_RADAR_LABELS.batter : ABILITY_RADAR_LABELS.pitcher}
-        targets={chartValues} restartKey={slot} />
+          <AbilityRadarPanel
+            center={chartCenter}
+            radius={HALL_OF_FAME_CHART.radius}
+            maximumLength={HALL_OF_FAME_CHART_MAXIMUM_LENGTH}
+            labelFrames={
+              (mode.kind === '선수고르기' && mode.purpose === '홈런더비') || slot >= HALL_OF_FAME_PITCHER_SLOTS
+                ? ABILITY_RADAR_LABELS.batter
+                : ABILITY_RADAR_LABELS.pitcher
+            }
+            targets={chartValues}
+            restartKey={slot}
+          />
 
-      {/* 5×3 격자 0x7a571 종류 6 — 칸 바탕 없이(시작 넷째 인자 [격자+8] = 0) 칸 틀 · 상태 그림 · (145) 다른 편 덮개 (0x7ac2e) */}
-      {slots.map((entry, index) => {
-        if (index < view.firstSlot || index >= view.firstSlot + view.rows * HALL_OF_FAME_GRID.columns) return null
-        const box = hallOfFameCellOf(index - view.firstSlot, view.firstRowY)
-        const shake = index === slot ? bounce.offset : null
-        const x = box.x + (shake?.dx ?? 0)
-        const y = box.y + gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot) + (shake?.dy ?? 0)
-        const typeIndex = entry.kind === '찬칸' && entry.figure !== null ? entry.figure.form >> 1 : null
-        const isDimmed = isHallOfFameCellDimmed(mode.kind === '등록' ? mode.edition : null, index)
-        return (
-          <button
-            key={index}
-            type="button"
-            className={styles.hofCell}
-            aria-label={`${index + 1}번 슬롯`}
-            aria-current={index === slot}
-            data-slot={index}
-            data-kind={entry.kind}
-            data-state={entry.state}
-            style={{ left: x, top: y, width: box.width, height: box.height }}
-            onClick={() => { setSlot(index); pressSlot(index) }}
-          >
-            <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.frame.image)} style={{ left: 0, top: 0 }} />
-            {hallOfFameCellImagesOf(index, entry.state, typeIndex).map((image) => {
-              const at = hallOfFameCellImageTopLeftOf(image)
-              return <img key={image.image} className={styles.sprite} alt="" data-cell-image={image.image}
-                src={imageSrc(SLT_FRAME, image.image)} style={{ left: at.dx, top: at.dy }} />
-            })}
-            {isDimmed && (
-              // 0x6b7d5(gfx, x, y, 39, 38, 둥글기 1, 0x80000000) — (w + 1)×(h + 1) 에서 네 모서리 점이 빠진 꼴, 한 겹이라 clip-path 로 깎는다
-              <span className={styles.hofCellDim} data-part="덮개" style={{
-                width: HALL_OF_FAME_CELL_ART.frame.width + 1, height: HALL_OF_FAME_CELL_ART.frame.height + 1,
-                opacity: HALL_OF_FAME_CELL_ART.dimOpacity,
-              }} />
-            )}
-          </button>
-        )
-      })}
-      {/* 커서 0x7b3a0 → 0x7b432 — 열림 애니가 끝났고([격자+9]) 깜빡일 때([격자+0x18] % 8 ≤ 4) slt_frame 1 을 (x − 2, y − 2) */}
-      {gridOpen.state.isDone && gridOpen.blink % 8 <= 4 && slot >= view.firstSlot && (
-        <img className={styles.sprite} alt="" data-testid="명전-커서" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.cursor.image)}
-          style={{
-            left: hallOfFameCellOf(slot - view.firstSlot, view.firstRowY).x + HALL_OF_FAME_CELL_ART.cursor.dx + bounce.offset.dx,
-            top: hallOfFameCellOf(slot - view.firstSlot, view.firstRowY).y + HALL_OF_FAME_CELL_ART.cursor.dy + bounce.offset.dy,
-          }} />
+          {/* 5×3 격자 0x7a571 종류 6 — 칸 바탕 없이(시작 넷째 인자 [격자+8] = 0) 칸 틀 · 상태 그림 · (145) 다른 편 덮개 (0x7ac2e) */}
+          {slots.map((entry, index) => {
+            if (index < view.firstSlot || index >= view.firstSlot + view.rows * HALL_OF_FAME_GRID.columns) return null
+            const box = hallOfFameCellOf(index - view.firstSlot, view.firstRowY)
+            const shake = index === slot ? bounce.offset : null
+            const x = box.x + (shake?.dx ?? 0)
+            const y = box.y + gridOpenCellDy(gridOpenShape, gridOpen.state, index - view.firstSlot) + (shake?.dy ?? 0)
+            const typeIndex = entry.kind === '찬칸' && entry.figure !== null ? entry.figure.form >> 1 : null
+            const isDimmed = isHallOfFameCellDimmed(mode.kind === '등록' ? mode.edition : null, index)
+            return (
+              <button
+                key={index}
+                type="button"
+                className={styles.hofCell}
+                aria-label={`${index + 1}번 슬롯`}
+                aria-current={index === slot}
+                data-slot={index}
+                data-kind={entry.kind}
+                data-state={entry.state}
+                style={{ left: x, top: y, width: box.width, height: box.height }}
+                onClick={() => {
+                  setSlot(index)
+                  pressSlot(index)
+                }}
+              >
+                <img className={styles.sprite} alt="" src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.frame.image)} style={{ left: 0, top: 0 }} />
+                {hallOfFameCellImagesOf(index, entry.state, typeIndex).map((image) => {
+                  const at = hallOfFameCellImageTopLeftOf(image)
+                  return (
+                    <img
+                      key={image.image}
+                      className={styles.sprite}
+                      alt=""
+                      data-cell-image={image.image}
+                      src={imageSrc(SLT_FRAME, image.image)}
+                      style={{ left: at.dx, top: at.dy }}
+                    />
+                  )
+                })}
+                {isDimmed && (
+                  // 0x6b7d5(gfx, x, y, 39, 38, 둥글기 1, 0x80000000) — (w + 1)×(h + 1) 에서 네 모서리 점이 빠진 꼴, 한 겹이라 clip-path 로 깎는다
+                  <span
+                    className={styles.hofCellDim}
+                    data-part="덮개"
+                    style={{
+                      width: HALL_OF_FAME_CELL_ART.frame.width + 1,
+                      height: HALL_OF_FAME_CELL_ART.frame.height + 1,
+                      opacity: HALL_OF_FAME_CELL_ART.dimOpacity,
+                    }}
+                  />
+                )}
+              </button>
+            )
+          })}
+          {/* 커서 0x7b3a0 → 0x7b432 — 열림 애니가 끝났고([격자+9]) 깜빡일 때([격자+0x18] % 8 ≤ 4) slt_frame 1 을 (x − 2, y − 2) */}
+          {gridOpen.state.isDone && gridOpen.blink % 8 <= 4 && slot >= view.firstSlot && (
+            <img
+              className={styles.sprite}
+              alt=""
+              data-testid="명전-커서"
+              src={imageSrc(SLT_FRAME, HALL_OF_FAME_CELL_ART.cursor.image)}
+              style={{
+                left: hallOfFameCellOf(slot - view.firstSlot, view.firstRowY).x + HALL_OF_FAME_CELL_ART.cursor.dx + bounce.offset.dx,
+                top: hallOfFameCellOf(slot - view.firstSlot, view.firstRowY).y + HALL_OF_FAME_CELL_ART.cursor.dy + bounce.offset.dy,
+              }}
+            />
+          )}
+        </>
       )}
-
-      </>)}
 
       {/* 말풍선 (0x65866) — 판 76×36 #2E4694 + 흰 테, 칸 두 개 70×14 #213473 */}
       {isBubbleOpen && (
-        <div className={styles.hofBubble} role="menu" aria-label="명예의 전당 슬롯"
+        <div
+          className={styles.hofBubble}
+          role="menu"
+          aria-label="명예의 전당 슬롯"
           style={{
-            left: bubble.x, top: bubble.y,
-            width: HALL_OF_FAME_BUBBLE.width, height: HALL_OF_FAME_BUBBLE.height,
+            left: bubble.x,
+            top: bubble.y,
+            width: HALL_OF_FAME_BUBBLE.width,
+            height: HALL_OF_FAME_BUBBLE.height,
             background: HALL_OF_FAME_BUBBLE.panelColor,
             border: `1px solid ${HALL_OF_FAME_BUBBLE.borderColor}`,
             borderRadius: HALL_OF_FAME_BUBBLE.cornerRadius,
-          }}>
+          }}
+        >
           {HALL_OF_FAME_BUBBLE.labels.map((label, index) => (
             <button
               key={label}
@@ -960,15 +1128,23 @@ export function HallOfFameScreen({ collection, mode, onBack, frame, backdrop, li
         </div>
       )}
 
-      {frame === undefined
-        ? <SpecialBands onBack={goBack} slides />
-        : <ScreenFrame title={frame.title} gamePoint={frame.gamePoint} onBack={goBack} />}
+      {frame === undefined ? (
+        <SpecialBands onBack={goBack} slides />
+      ) : (
+        <ScreenFrame title={frame.title} gamePoint={frame.gamePoint} onBack={goBack} />
+      )}
 
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
-      {popupView !== null && <MessageBox text={popupView.text} buttons={popupView.buttons}
-        {...(popupView.initialSelected === undefined ? {} : { initialSelected: popupView.initialSelected })} onAnswer={answerPopup}
-        // 창이 떠 있으면 0x62568 이 격자를 건너 날 키를 0x5550c 에 넘긴다(625a6~625be) — 화살표면 [skin+0x8c] 에 남는다(Q-10)
-        onRawKey={noteSkinShakeKey} />}
+      {popupView !== null && (
+        <MessageBox
+          text={popupView.text}
+          buttons={popupView.buttons}
+          {...(popupView.initialSelected === undefined ? {} : { initialSelected: popupView.initialSelected })}
+          onAnswer={answerPopup}
+          // 창이 떠 있으면 0x62568 이 격자를 건너 날 키를 0x5550c 에 넘긴다(625a6~625be) — 화살표면 [skin+0x8c] 에 남는다(Q-10)
+          onRawKey={noteSkinShakeKey}
+        />
+      )}
     </RawScreen>
   )
 }
@@ -995,7 +1171,11 @@ function popupTextOf(popup: HallOfFamePopup): {
  * 가속 시프트 1) · 시작 `0x7a005(격자, [skin+0xe8], 1, 0)`(0x651dc~0x651ea).
  */
 const hallOfFameGridOpenShapeOf = (rows: number): GridOpenShape => ({
-  rows, columns: HALL_OF_FAME_GRID.columns, rowHeight: HALL_OF_FAME_GRID.rowHeight, rowGap: HALL_OF_FAME_GRID.verticalGap, shift: 1,
+  rows,
+  columns: HALL_OF_FAME_GRID.columns,
+  rowHeight: HALL_OF_FAME_GRID.rowHeight,
+  rowGap: HALL_OF_FAME_GRID.verticalGap,
+  shift: 1,
 })
 
 /** 말풍선 둘째 칸 — 슬롯에서 삭제 */
@@ -1005,10 +1185,7 @@ const HALL_OF_FAME_BUBBLE_DELETE = 1
  * 말풍선 칸을 웹이 못 할 때의 안내 — 선물은 통신(🌐)이라 늘 이 글이다. 삭제는 `deletion` 을 안 넘긴 화면에서만 뜬다.
  * ⚠️ 원본 선물 칸은 막기 검사(StrMAINMENU[214]) 뒤 [127] 설명 · 통신(0x62956)이다 — 통신이라 옮기지 않았다.
  */
-const HALL_OF_FAME_BUBBLE_NOTICES = [
-  '친구에게 선물은!N통신이 필요합니다',
-  '슬롯에서 삭제는!N여기서 할 수 없습니다',
-] as const
+const HALL_OF_FAME_BUBBLE_NOTICES = ['친구에게 선물은!N통신이 필요합니다', '슬롯에서 삭제는!N여기서 할 수 없습니다'] as const
 
 type HallOfFameSlotView =
   | {
@@ -1046,7 +1223,10 @@ function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readon
       return famer === null
         ? { kind: '빈칸', state: 4 }
         : {
-            kind: '찬칸', state: 3, name: famer.name, chartValues: pitcherChartOf(famer.equippedAbility),
+            kind: '찬칸',
+            state: 3,
+            name: famer.name,
+            chartValues: pitcherChartOf(famer.equippedAbility),
             figure: hallOfFameFigureLookOf(famer.look, famer.equipmentLevels === undefined ? undefined : pitcherChartOf(famer.equipmentLevels)),
           }
     }
@@ -1055,9 +1235,14 @@ function hallOfFameSlotsOf(collection: Collection, mode: HallOfFameMode): readon
     return famer === null
       ? { kind: '빈칸', state: 4 }
       : {
-          kind: '찬칸', state: 3, name: famer.name, chartValues: batterChartOf(famer.equippedAbility ?? famer.ability),
-          figure: famer.look === undefined ? null
-            : hallOfFameFigureLookOf(famer.look, famer.equipmentLevels === undefined ? undefined : batterChartOf(famer.equipmentLevels)),
+          kind: '찬칸',
+          state: 3,
+          name: famer.name,
+          chartValues: batterChartOf(famer.equippedAbility ?? famer.ability),
+          figure:
+            famer.look === undefined
+              ? null
+              : hallOfFameFigureLookOf(famer.look, famer.equipmentLevels === undefined ? undefined : batterChartOf(famer.equipmentLevels)),
         }
   })
 }
@@ -1083,12 +1268,18 @@ function hallOfFameFigureLookOf(
 function TeamLogo({ team, x, y }: { readonly team: number; readonly x: number; readonly y: number }) {
   const [size, setSize] = useState<{ readonly width: number; readonly height: number } | null>(null)
   return (
-    <img className={styles.sprite} alt="" data-testid="명전-팀로고" src={imageSrc(TEAM_LOGO, team)}
+    <img
+      className={styles.sprite}
+      alt=""
+      data-testid="명전-팀로고"
+      src={imageSrc(TEAM_LOGO, team)}
       onLoad={(event) => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
       style={{
-        left: x - ((size?.width ?? 0) >> 1), top: y - ((size?.height ?? 0) >> 1),
+        left: x - ((size?.width ?? 0) >> 1),
+        top: y - ((size?.height ?? 0) >> 1),
         visibility: size === null ? 'hidden' : undefined,
-      }} />
+      }}
+    />
   )
 }
 
@@ -1129,6 +1320,7 @@ const FULL_GRID: HallOfFameGridView = { firstSlot: 0, rows: HALL_OF_FAME_GRID.ro
  *   두 줄은 y 184 · 224 (미션·명전 k 6 · 8 은 H/2 + 0x13 = 179).
  */
 function hallOfFameGridViewOf(mode: HallOfFameMode): HallOfFameGridView {
-  if (mode.kind === '선수고르기' && mode.purpose === '홈런더비') return { firstSlot: NARI_BATTER_SLOT, rows: 2, firstRowY: HOME_RUN_DERBY_FIRST_ROW_Y }
+  if (mode.kind === '선수고르기' && mode.purpose === '홈런더비')
+    return { firstSlot: NARI_BATTER_SLOT, rows: 2, firstRowY: HOME_RUN_DERBY_FIRST_ROW_Y }
   return FULL_GRID
 }

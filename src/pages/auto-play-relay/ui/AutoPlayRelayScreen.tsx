@@ -115,8 +115,7 @@ function RelayFieldBackground({ grassPalette }: { readonly grassPalette: number 
   const size = { width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }
   return (
     <>
-      <img className={styles.fieldBackground} style={{ left: at.x, top: at.y, ...size }} src={url} alt=""
-        data-testid="중계-배경" />
+      <img className={styles.fieldBackground} style={{ left: at.x, top: at.y, ...size }} src={url} alt="" data-testid="중계-배경" />
       <img className={styles.fieldBackgroundMirrored} style={{ left: at.mirroredX, top: at.y, ...size }} src={url} alt="" />
     </>
   )
@@ -145,7 +144,16 @@ function RelayFieldBackground({ grassPalette }: { readonly grassPalette: number 
  *   안 가린다.
  */
 export function AutoPlayRelayScreen({
-  step, onTick, isPaused = false, sideTeams, humanSide, missionBatterName, overlay, field, grassPalette = null, keyLatch,
+  step,
+  onTick,
+  isPaused = false,
+  sideTeams,
+  humanSide,
+  missionBatterName,
+  overlay,
+  field,
+  grassPalette = null,
+  keyLatch,
 }: AutoPlayRelayScreenProps) {
   // 자동진행 중계 0x21도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
   // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
@@ -193,8 +201,7 @@ export function AutoPlayRelayScreen({
             count: { strikes: cards.strikes, balls: cards.balls, outs: cards.outs },
             pitcherName: cards.pitcherName,
             currentOrder: cards.currentOrder,
-            dueUpNames: cards.dueUpNames.map((name, row) =>
-              cards.dueUpIsMissionBatter?.[row] === true ? missionBatterName ?? null : name),
+            dueUpNames: cards.dueUpNames.map((name, row) => (cards.dueUpIsMissionBatter?.[row] === true ? (missionBatterName ?? null) : name)),
           }}
         />
       )}
@@ -202,20 +209,21 @@ export function AutoPlayRelayScreen({
         className={styles.offenseBand}
         style={{ left: OFFENSE_BAND.x, top: OFFENSE_BAND.y, width: OFFENSE_BAND.width, height: OFFENSE_BAND.height }}
       />
-      <div className={styles.offenseText} style={{ left: OFFENSE_TEXT_AT.x, top: OFFENSE_TEXT_AT.y }}
-        data-testid="중계-공격팀" data-team={offenseTeam}>
+      <div
+        className={styles.offenseText}
+        style={{ left: OFFENSE_TEXT_AT.x, top: OFFENSE_TEXT_AT.y }}
+        data-testid="중계-공격팀"
+        data-team={offenseTeam}
+      >
         공격팀({label})
       </div>
-      <FrameSprite folder={IMG_TEXT_FRAMES} frame={teamFrame} origins={textOrigins}
-        x={OFFENSE_TEAM_RIGHT - teamFrameWidth} y={OFFENSE_TEXT_AT.y} />
+      <FrameSprite folder={IMG_TEXT_FRAMES} frame={teamFrame} origins={textOrigins} x={OFFENSE_TEAM_RIGHT - teamFrameWidth} y={OFFENSE_TEXT_AT.y} />
       {step.line !== null && (
         <>
           {roundPlateRectsOf(RELAY_BOX).map((rect, part) => (
-            <span key={part} className={styles.relayPlate}
-              style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} />
+            <span key={part} className={styles.relayPlate} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} />
           ))}
-          <div className={styles.relayLine} style={{ left: RELAY_BOX.x, top: RELAY_BOX.y + 4, width: RELAY_BOX.width }}
-            data-testid="중계-글">
+          <div className={styles.relayLine} style={{ left: RELAY_BOX.x, top: RELAY_BOX.y + 4, width: RELAY_BOX.width }} data-testid="중계-글">
             {step.line}
           </div>
         </>

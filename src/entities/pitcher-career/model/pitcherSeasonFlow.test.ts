@@ -22,10 +22,7 @@ import {
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { NO_TEAM } from '@/entities/awards/model/seasonAwards'
-import {
-  EMPTY_LEAGUE_PITCHER_LINE,
-  leaguePitcherIdOf,
-} from '@/entities/league/model/leaguePlayerStats'
+import { EMPTY_LEAGUE_PITCHER_LINE, leaguePitcherIdOf } from '@/entities/league/model/leaguePlayerStats'
 
 const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
   ...createPitcherCareer('테스트'),
@@ -113,7 +110,9 @@ describe('엔딩 보너스와 이어하기 (141 틀 0x1bbc4)', () => {
 
   it('부상 엔딩을 이어하면 같은 시즌에 남고 부상 누적만 풀린다', () => {
     const 이어함 = continueAfterPitcherEnding(
-      투수({ season: 4, gamesPlayed: 12, gamePoint: 6000, endingIndex: 0, isInjured: true, injuredGamesPlayed: 20 }), createConstantRandom(0))
+      투수({ season: 4, gamesPlayed: 12, gamePoint: 6000, endingIndex: 0, isInjured: true, injuredGamesPlayed: 20 }),
+      createConstantRandom(0),
+    )
 
     expect(이어함.season).toBe(4)
     expect(이어함.gamesPlayed).toBe(12)
@@ -125,7 +124,9 @@ describe('엔딩 보너스와 이어하기 (141 틀 0x1bbc4)', () => {
 
   it('방출 엔딩을 이어하면 새 시즌으로 넘어간다 (0x1b768) — 스태미나도 되돌아온다', () => {
     const 이어함 = continueAfterPitcherEnding(
-      투수({ season: 7, gamesPlayed: 45, gamePoint: 5000, endingIndex: 1, stamina: 1200 }), createConstantRandom(0))
+      투수({ season: 7, gamesPlayed: 45, gamePoint: 5000, endingIndex: 1, stamina: 1200 }),
+      createConstantRandom(0),
+    )
 
     expect(이어함.season).toBe(8)
     expect(이어함.gamesPlayed).toBe(0)
@@ -135,10 +136,15 @@ describe('엔딩 보너스와 이어하기 (141 틀 0x1bbc4)', () => {
 
   describe('방출 이어하기의 +0x6b 사본 · +0x1c2 — 연말 132 꼬리 10d08~10d28 을 안 지났다 (B-128)', () => {
     afterEach(() => setBugfixConfigForTests(null))
-    const 방출 = () => 투수({
-      season: 7, gamePoint: 5000, endingIndex: 1,
-      trainingCounts: { '2': 15 }, seasonStartTrainingCounts: { '2': 6 }, seasonPopularityGain: -3,
-    })
+    const 방출 = () =>
+      투수({
+        season: 7,
+        gamePoint: 5000,
+        endingIndex: 1,
+        trainingCounts: { '2': 15 },
+        seasonStartTrainingCounts: { '2': 6 },
+        seasonPopularityGain: -3,
+      })
 
     it('원본: 사본 · 인기도 합이 그대로 다음 해로', () => {
       const 이어함 = continueAfterPitcherEnding(방출(), createConstantRandom(0))
@@ -178,11 +184,7 @@ describe('투수편 개인 타이틀·MVP·연봉 등급 (0x8dad4 · 0x8dd60 · 
     const 마무리 = 투수({ role: PITCHER_ROLE.relief, stats: { ...좋은성적, saves: 30 } })
 
     expect(pitcherAwardRoleOf(마무리)).toBe('마무리')
-    expect(judgePitcherSeasonAwards(마무리).titles.map((칸) => 칸.name)).toEqual([
-      '세이브왕',
-      '삼진왕',
-      '방어왕',
-    ])
+    expect(judgePitcherSeasonAwards(마무리).titles.map((칸) => 칸.name)).toEqual(['세이브왕', '삼진왕', '방어왕'])
   })
 
   it('리그 투수 표가 비어 있으면 내 성적만으로 세 타이틀을 쓸어 담고 MVP 가 된다', () => {
@@ -232,9 +234,7 @@ describe('투수편 개인 타이틀·MVP·연봉 등급 (0x8dad4 · 0x8dd60 · 
     expect(시상.isMostValuablePlayer).toBe(true)
 
     // 실점 70 이면 방어율(466)·실점 두 목표가 빠져 3개 — MVP 가 아니다 (방어왕은 그대로 내 것)
-    const 실점많음 = judgePitcherSeasonAwards(
-      투수({ stats: { ...좋은성적, runsAllowed: 70 }, leaguePlayerStats: 리그 }),
-    )
+    const 실점많음 = judgePitcherSeasonAwards(투수({ stats: { ...좋은성적, runsAllowed: 70 }, leaguePlayerStats: 리그 }))
     expect(실점많음.wonCount).toBe(2)
     expect(실점많음.isMostValuablePlayer).toBe(false)
   })

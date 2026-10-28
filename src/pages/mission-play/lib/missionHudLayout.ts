@@ -156,7 +156,18 @@ export function slashCounterGlyphsOf(a: number, b: number, x: number, y: number,
  * 런닝홈런 칸 R+0xcc 는 웹 '그라운드홈런' 이 든다.
  */
 const GOAL_KEYWORDS = [
-  '안타', '2루타', '3루타', '홈런', '만루홈런', '런닝홈런', '타점', '번트', '도루', '그라운드홈런', '승리', '사이클링히트',
+  '안타',
+  '2루타',
+  '3루타',
+  '홈런',
+  '만루홈런',
+  '런닝홈런',
+  '타점',
+  '번트',
+  '도루',
+  '그라운드홈런',
+  '승리',
+  '사이클링히트',
 ] as const
 
 /** 줄 글 → 웹 진행 칸 이름 (null = 칸을 안 읽고 0/1) */
@@ -188,12 +199,7 @@ const COUNT_KEY_OF: Readonly<Record<(typeof GOAL_KEYWORDS)[number], string | nul
  */
 const PITCHER_GOAL_KEYWORDS = ['탈삼진', '삼진콤보', 'MAX게이지', '무실점', '노히트노런', '퍼펙트게임', '실점', '아웃', '피안타'] as const
 
-export function pitcherGoalCountOf(
-  mission: OriginalMission,
-  progress: MissionProgress,
-  line: string,
-  allowedRuns: number,
-): GoalCount {
+export function pitcherGoalCountOf(mission: OriginalMission, progress: MissionProgress, line: string, allowedRuns: number): GoalCount {
   const keyword = PITCHER_GOAL_KEYWORDS.find((word) => word === line) ?? PITCHER_GOAL_KEYWORDS[0]
   if (keyword === '무실점' || keyword === '노히트노런' || keyword === '퍼펙트게임') return { current: 0, target: 1 }
   if (keyword === '피안타') return { current: 0, target: 0 }
@@ -260,10 +266,7 @@ export function goalLineDrawsOf(frame: GoalTickerFrame): GoalLineDraw[] {
   const counterX = PANEL_X + 0x31 - frame.offsetY
   const current = { index: frame.index, textX, textY: 0x19, counterX, counterY: 0x29 }
   if (frame.nextIndex === null) return [current]
-  return [
-    current,
-    { index: frame.nextIndex, textX: textX + NEXT_TEXT_SHIFT, textY: 0x19, counterX: counterX + NEXT_COUNTER_SHIFT, counterY: 0x29 },
-  ]
+  return [current, { index: frame.nextIndex, textX: textX + NEXT_TEXT_SHIFT, textY: 0x19, counterX: counterX + NEXT_COUNTER_SHIFT, counterY: 0x29 }]
 }
 
 // ── 한도 띠 ──

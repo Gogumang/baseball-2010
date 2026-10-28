@@ -12,24 +12,39 @@ import type { TeamGameOptions, TeamGameProgress, TeamSetupRolls } from '@/featur
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { swapWithStarter } from '@/entities/pitcher-career/model/pitcherRotation'
 import {
-  chooseAce, chooseAiTeam, chooseFirstBat, chooseStadium, chooseUserTeam, createFlowState,
-  moveFirstBat, moveStadium, stepBack, withSetup,
+  chooseAce,
+  chooseAiTeam,
+  chooseFirstBat,
+  chooseStadium,
+  chooseUserTeam,
+  createFlowState,
+  moveFirstBat,
+  moveStadium,
+  stepBack,
+  withSetup,
 } from '@/pages/general-mode/lib/generalModeFlow'
 import { GENERAL_MODE_STEP } from '@/pages/general-mode/lib/generalModeSetup'
 import type { GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
 import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
 import type { GeneralModeFlowState } from '@/pages/general-mode/lib/generalModeFlow'
-import {
-  QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart,
-} from '@/pages/general-mode/lib/quickStart'
+import { QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart } from '@/pages/general-mode/lib/quickStart'
 import type { QuickStartOpenState } from '@/pages/general-mode/lib/quickStart'
 import { teamGameOptionsOf } from '@/pages/general-mode/lib/generalModeSetup'
 import {
-  advanceEntrySlide, leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey, tickEntryEditor,
+  advanceEntrySlide,
+  leavesEntryEditor,
+  openEntryEditor,
+  pointEntryCursor,
+  pressEntryKey,
+  tickEntryEditor,
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  seasonEntryListsOf,
+  seasonEntryOrderOf,
+  seasonRosterOfEntry,
+  seasonStarterNameOf,
+  tableRosterOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryInput, SeasonEntryLists } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -156,8 +171,19 @@ export interface GeneralModeSession {
  */
 export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSession {
   const {
-    random, isQuickStart = false, initialSettings, onSettingsConfirm, matchSettingsSeen, gaugeSettingOn, runningModeManual,
-    throwModeManual, aceLevels, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds, onMatchBlockWrite,
+    random,
+    isQuickStart = false,
+    initialSettings,
+    onSettingsConfirm,
+    matchSettingsSeen,
+    gaugeSettingOn,
+    runningModeManual,
+    throwModeManual,
+    aceLevels,
+    openedHiddenTeamIds,
+    openedAcePitcherIds,
+    openedAceBatterIds,
+    onMatchBlockWrite,
   } = options
 
   /**
@@ -166,17 +192,17 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
    * 아니라 여기서 굴리므로 경기정보·엔트리 편집(상태 23)이 이미 굴린 팀을 보고, OK 키(0x311a8)는 굴리지 않는다.
    * 마운트에 한 번만 굴린다 — 개발 StrictMode 의 두 번째 그림은 첫 그림의 값을 받는다(`mountOnce`, r231).
    */
-  const [initial] = useState(() => mountOnce('generalMode.initial', () => {
-    const created = createFlowState({
-      isQuickStart,
-      // 준비 기록 skin+0xbc 는 앱 전역이다 — 새로하기는 지난 판 기록에서 시작한다(`setupRecord`)
-      setup: isQuickStart
-        ? rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds })
-        : readSetupRecord(),
-    })
-    const entry = created.step === GENERAL_MODE_STEP.경기정보 ? matchInfoEntryOf(created.setup, random) : null
-    return { flow: created, rolls: entry?.rolls ?? null, stadium: entry?.stadium ?? null, stage: entry?.stage ?? null }
-  }))
+  const [initial] = useState(() =>
+    mountOnce('generalMode.initial', () => {
+      const created = createFlowState({
+        isQuickStart,
+        // 준비 기록 skin+0xbc 는 앱 전역이다 — 새로하기는 지난 판 기록에서 시작한다(`setupRecord`)
+        setup: isQuickStart ? rollQuickStart(random, { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }) : readSetupRecord(),
+      })
+      const entry = created.step === GENERAL_MODE_STEP.경기정보 ? matchInfoEntryOf(created.setup, random) : null
+      return { flow: created, rolls: entry?.rolls ?? null, stadium: entry?.stadium ?? null, stage: entry?.stage ?? null }
+    }),
+  )
   const [flow, setFlow] = useState<GeneralModeFlowState>(initial.flow)
   // 갱신 함수 끝의 되쓰기 — 화면이 고친 기록(빠른실행 굴림 · 재굴림 포함)이 다음 판까지 남는다
   useEffect(() => {
@@ -301,9 +327,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     (isUserTeam: boolean): SeasonEntryInput => {
       const teamId = isUserTeam ? builtTeams.userTeamId : builtTeams.aiTeamId
       const roster = (isUserTeam ? userEntryRoster : null) ?? tableRosterOf(teamId)
-      const starterSlot = rolls === null
-        ? 0
-        : isUserTeam ? rolls.startingPitcherSlots.ours : rolls.startingPitcherSlots.opponent
+      const starterSlot = rolls === null ? 0 : isUserTeam ? rolls.startingPitcherSlots.ours : rolls.startingPitcherSlots.opponent
       return {
         teamId,
         roster: { ...roster, pitchers: swapWithStarter(roster.pitchers, starterSlot) },
@@ -375,16 +399,16 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   }, [])
 
   const isMatchInfo = flow.step === GENERAL_MODE_STEP.경기정보
-  const userStarterName = isMatchInfo && (rolls !== null || userEntryRoster !== null)
-    ? seasonStarterNameOf(builtTeams.userTeamId, entrySourceOf(true).roster, 0)
-    : null
-  const cpuMatchInfo: CpuMatchInfo | null = isMatchInfo && rolls !== null
-    ? {
-        starterName: seasonStarterNameOf(builtTeams.aiTeamId, entrySourceOf(false).roster, 0) ?? '-',
-        acePitcherId: rolls.opponentAces.pitcher,
-        aceBatterId: rolls.opponentAces.batter,
-      }
-    : null
+  const userStarterName =
+    isMatchInfo && (rolls !== null || userEntryRoster !== null) ? seasonStarterNameOf(builtTeams.userTeamId, entrySourceOf(true).roster, 0) : null
+  const cpuMatchInfo: CpuMatchInfo | null =
+    isMatchInfo && rolls !== null
+      ? {
+          starterName: seasonStarterNameOf(builtTeams.aiTeamId, entrySourceOf(false).roster, 0) ?? '-',
+          acePitcherId: rolls.opponentAces.pitcher,
+          aceBatterId: rolls.opponentAces.batter,
+        }
+      : null
 
   const actions = useMemo(
     () => ({
@@ -420,22 +444,31 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
       closeEntryAceLocked,
     }),
     [
-      respin, isRespinning, selectAce, back, openEntry, pressEntryKeyAction, pointEntryCursorAction, frameEntryAction, closeEntryAceLocked,
+      respin,
+      isRespinning,
+      selectAce,
+      back,
+      openEntry,
+      pressEntryKeyAction,
+      pointEntryCursorAction,
+      frameEntryAction,
+      closeEntryAceLocked,
       onSettingsConfirm,
     ],
   )
 
   const gameOptions = useMemo(
-    () => teamGameOptionsOf(flow.setup, {
-      settings,
-      ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
-      ...(runningModeManual === undefined ? {} : { runningModeManual }),
-      ...(throwModeManual === undefined ? {} : { throwModeManual }),
-      ...(aceLevels === undefined ? {} : { aceLevels }),
-      ...(rolls === null ? {} : { teamSetupRolls: rolls }),
-      // 고친 차례는 맞바꾸기 전 모양 — 선발 칸 k 는 teamSetupRolls 가 든다
-      ...(userEntryRoster === null ? {} : { ourEntryOrder: seasonEntryOrderOf(userEntryRoster) }),
-    }),
+    () =>
+      teamGameOptionsOf(flow.setup, {
+        settings,
+        ...(gaugeSettingOn === undefined ? {} : { gaugeSettingOn }),
+        ...(runningModeManual === undefined ? {} : { runningModeManual }),
+        ...(throwModeManual === undefined ? {} : { throwModeManual }),
+        ...(aceLevels === undefined ? {} : { aceLevels }),
+        ...(rolls === null ? {} : { teamSetupRolls: rolls }),
+        // 고친 차례는 맞바꾸기 전 모양 — 선발 칸 k 는 teamSetupRolls 가 든다
+        ...(userEntryRoster === null ? {} : { ourEntryOrder: seasonEntryOrderOf(userEntryRoster) }),
+      }),
     [flow.setup, settings, gaugeSettingOn, runningModeManual, throwModeManual, aceLevels, rolls, userEntryRoster],
   )
 
@@ -454,7 +487,18 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   }, [blockWriteSerial])
 
   return {
-    flow, entryEdit, userStarterName, cpuMatchInfo, matchInfoStadium, matchInfoStage, settings, isPlaying, isSettingsOpen, isRespinning, gameOptions, actions,
+    flow,
+    entryEdit,
+    userStarterName,
+    cpuMatchInfo,
+    matchInfoStadium,
+    matchInfoStage,
+    settings,
+    isPlaying,
+    isSettingsOpen,
+    isRespinning,
+    gameOptions,
+    actions,
   }
 }
 

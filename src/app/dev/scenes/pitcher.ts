@@ -23,7 +23,13 @@ export const PITCHER_SCENES: Readonly<Record<string, SceneDefinition>> = {
     seed: 1,
     steps: [
       ...TO_PITCHER_PITCH,
-      keyUntil('Enter', '투수편 수비 판 0x17', pitcherGameIs((peek) => peek.isDefensePlayShown), 500, 90000),
+      keyUntil(
+        'Enter',
+        '투수편 수비 판 0x17',
+        pitcherGameIs((peek) => peek.isDefensePlayShown),
+        500,
+        90000,
+      ),
       wait(300),
     ],
   },

@@ -2,13 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
-import {
-  pitchSlotsFor,
-  resolveRunnerPlay,
-  startTeamGame,
-  startThrowPitch,
-  throwPitch,
-} from '@/features/play-team-game/model/teamGameFlow'
+import { pitchSlotsFor, resolveRunnerPlay, startTeamGame, startThrowPitch, throwPitch } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamGameOptions, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
@@ -95,9 +89,7 @@ describe('팀 경기 우리 수비 낫아웃(state[0x1a]) — 삼진 사건 5 �
     // a8f8c R[3] += 3 · a8fa8 −1
     expect(끝.recordTally.moundOuts).toBe(before.recordTally.moundOuts + 2)
     const 우리줄아웃 = (progress: TeamGameProgress) =>
-      progress.pitcherLines
-        .filter((line) => line.teamId === progress.options.ourTeamId)
-        .reduce((sum, line) => sum + line.outs, 0)
+      progress.pitcherLines.filter((line) => line.teamId === progress.options.ourTeamId).reduce((sum, line) => sum + line.outs, 0)
     // a8cb0 +0x20 += [sp+0x30] — 보정 없음(원본 그대로)
     expect(우리줄아웃(끝) - 우리줄아웃(before)).toBe(3)
   })
@@ -115,11 +107,7 @@ describe('팀 경기 우리 수비 낫아웃(state[0x1a]) — 삼진 사건 5 �
         { fromBase: 2, scored: false, retired: false },
       ],
     }
-    const 끝 = resolveRunnerPlay(
-      { ...붙듦, recordTally: { ...붙듦.recordTally, moundStrikeoutCombo: 1 } },
-      타자잡음,
-      random,
-    )
+    const 끝 = resolveRunnerPlay({ ...붙듦, recordTally: { ...붙듦.recordTally, moundStrikeoutCombo: 1 } }, 타자잡음, random)
     expect(끝.recordIds.slice(before.recordIds.length)).not.toContain(26)
     expect(끝.recordTally.moundStrikeoutCombo).toBe(0)
     expect(끝.recordTally.moundStrikeouts).toBe(before.recordTally.moundStrikeouts + 1)
@@ -151,9 +139,7 @@ describe('팀 경기 삼진 없이 경기 끝으로 정산되는 폭투·포일 
         if (끝.lastArrivalPlay?.kind !== 9 || !끝.game.isFinished || 끝.lastArrivalPlay.strikeout !== 'none') continue
         checked += 1
         const slot = 끝내기판.opponentOrderIndex
-        expect(끝.opponentEntryRecords[slot]?.plateAppearances ?? 0).toBe(
-          (끝내기판.opponentEntryRecords[slot]?.plateAppearances ?? 0) + 1,
-        )
+        expect(끝.opponentEntryRecords[slot]?.plateAppearances ?? 0).toBe((끝내기판.opponentEntryRecords[slot]?.plateAppearances ?? 0) + 1)
         expect(끝.recordTally.moundStrikeoutCombo).toBe(0)
       }
     }

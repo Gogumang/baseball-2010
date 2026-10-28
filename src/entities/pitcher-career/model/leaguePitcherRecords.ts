@@ -1,16 +1,9 @@
-import {
-  pitcherOrderOf,
-  postseasonPitcherOrderOf,
-  rotateLeaguePitchers,
-} from '@/entities/league/model/league'
+import { pitcherOrderOf, postseasonPitcherOrderOf, rotateLeaguePitchers } from '@/entities/league/model/league'
 import type { League, PostseasonSeries } from '@/entities/league/model/league'
 import type { PitcherStaminaTable } from '@/entities/league/model/postseasonPlay'
 import { cpuGameRotationAdvances } from '@/entities/pitcher-career/model/pitcherRotation'
 import { recoverStaminaAfterGameDay } from '@/entities/pitcher-career/model/pitcherStamina'
-import {
-  leaguePitcherAppearancesOf,
-  recordLeaguePitcherAppearances,
-} from '@/entities/league/model/leaguePlayerStats'
+import { leaguePitcherAppearancesOf, recordLeaguePitcherAppearances } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
@@ -57,23 +50,14 @@ function isPostseasonRunning(series: PostseasonSeries | null): series is Postsea
  *   `playLeagueDay` 가 같은 칸을 리그에 남긴다(타자편 `rotatesHumanGameTeams` 참 · 투수편은 상대만 — `applyPitcherLeagueDay`).
  * - 포스트시즌: 정규시즌 끝 차례 + 앞 시리즈에서 이어 온 칸 + 이 시리즈 g 칸 (`postseasonPitcherOrderOf`).
  */
-export function humanGamePitcherOrderOf(
-  fields: LeaguePitcherRecordFields,
-  mode: number,
-  dayCounter: number,
-  teamId: number,
-): readonly number[] {
+export function humanGamePitcherOrderOf(fields: LeaguePitcherRecordFields, mode: number, dayCounter: number, teamId: number): readonly number[] {
   if (isPostseasonRunning(fields.postseason)) return postseasonPitcherOrderOf(fields.postseason, teamId)
   const league = cpuGameRotationAdvances(mode, dayCounter) ? rotateLeaguePitchers(fields.league, [teamId]) : fields.league
   return pitcherOrderOf(league, teamId)
 }
 
 /** 사람 경기 준비 뒤 그 팀의 칸별 레코드 `+0x2c` — g == 0 이면 1c8a8 이 열 팀을 10000 으로 채운다(없음 = 10000) */
-export function humanGamePitcherStaminasOf(
-  fields: LeaguePitcherRecordFields,
-  dayCounter: number,
-  teamId: number,
-): readonly number[] | undefined {
+export function humanGamePitcherStaminasOf(fields: LeaguePitcherRecordFields, dayCounter: number, teamId: number): readonly number[] | undefined {
   if (dayCounter === 0) return undefined
   return fields.leaguePitcherStaminas?.[teamId]
 }
@@ -95,9 +79,7 @@ export function staminaTableAfterHumanGame(
 export function recoveredLeagueStaminas(table: PitcherStaminaTable, mode: number): PitcherStaminaTable {
   const recovered: Record<number, readonly number[]> = {}
   for (const [team, staminas] of Object.entries(table)) {
-    recovered[Number(team)] = staminas.map((stamina) =>
-      recoverStaminaAfterGameDay(stamina, { mode, isMine: false, isStarterRole: false }),
-    )
+    recovered[Number(team)] = staminas.map((stamina) => recoverStaminaAfterGameDay(stamina, { mode, isMine: false, isStarterRole: false }))
   }
   return recovered
 }
@@ -116,8 +98,7 @@ export function recordHumanGamePitchers(
   isRegularSeason: boolean,
 ): LeaguePlayerStats {
   if (pitchers === undefined || !isRegularSeason) return stats
-  const recordOf = (record: PitcherOfRecord | null) =>
-    record === null ? null : { side: record.side, pitcherSlot: record.number }
+  const recordOf = (record: PitcherOfRecord | null) => (record === null ? null : { side: record.side, pitcherSlot: record.number })
   const appearances = leaguePitcherAppearancesOf(
     pitchers.lines,
     {

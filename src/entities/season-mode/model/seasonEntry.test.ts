@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SEASON_ENTRY_CELL_SOURCE, recordAceSeatOf, rotatedPitchersOf, seasonEntryListsOf, seasonRecordEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf,
-  tableRosterOf, unrotatedPitchersOf,
+  SEASON_ENTRY_CELL_SOURCE,
+  recordAceSeatOf,
+  rotatedPitchersOf,
+  seasonEntryListsOf,
+  seasonRecordEntryListsOf,
+  seasonEntryOrderOf,
+  seasonRosterOfEntry,
+  seasonStarterNameOf,
+  tableRosterOf,
+  unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import { swapEntryBatters, swapEntryPitchers } from '@/entities/season-mode/model/entryEditor'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
@@ -43,7 +51,12 @@ describe('시즌 엔트리 명단', () => {
     const ace = ACE_BATTERS[2]!
     const 레벨 = { [aceLevelSlotOf('타자', 3)]: 4, [aceLevelSlotOf('투수', 발렌타인 + 1)]: 4 }
     const lv5 = seasonEntryListsOf({
-      teamId: 0, roster: tableRosterOf(0), dayCounter: 0, acePitcherId: 발렌타인, aceBatterId: 2, aceLevels: 레벨,
+      teamId: 0,
+      roster: tableRosterOf(0),
+      dayCounter: 0,
+      acePitcherId: 발렌타인,
+      aceBatterId: 2,
+      aceLevels: 레벨,
     })
     const 기대 = aceRecordAbilityAtLevel(ace, 4)
     expect(lv5.batters[9]?.ability).toEqual([기대.hit, 기대.power, 기대.defense, 기대.run])
@@ -79,11 +92,17 @@ describe('시즌 엔트리 명단', () => {
 
 describe('영입한 나리 선수(0xfe)는 명단에 든 기록 사본으로 선다', () => {
   const 투수기록 = {
-    name: '나리투', ability: [1, 2, 3, 4] as const, repertoire: { name: '나리투', form: 1, magicId: 2, pitchMask: 3 }, role: 2 as const,
+    name: '나리투',
+    ability: [1, 2, 3, 4] as const,
+    repertoire: { name: '나리투', form: 1, magicId: 2, pitchMask: 3 },
+    role: 2 as const,
   }
   const 타자기록 = { name: '나리타', ability: [5, 6, 7, 8] as const }
   const roster = {
-    pitchers: [{ id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: 투수기록 }, { id: 1, kindByte: 1, fieldPosition: 0, stamina: 0 }],
+    pitchers: [
+      { id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000, record: 투수기록 },
+      { id: 1, kindByte: 1, fieldPosition: 0, stamina: 0 },
+    ],
     batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 타자기록 }],
   }
 
@@ -134,12 +153,7 @@ describe('영입 선수 기록에 밑값 · +0x14 · 니블이 있으면 경기 
       pitchers: [],
       batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: 타자기록, equipment: [2, 5, 0, 0] }],
     })
-    expect(order.batters[0]?.record?.ability).toEqual([
-      500 + equipmentBonusOf(2) + 50,
-      500 + equipmentBonusOf(5) + 50,
-      550,
-      550,
-    ])
+    expect(order.batters[0]?.record?.ability).toEqual([500 + equipmentBonusOf(2) + 50, 500 + equipmentBonusOf(5) + 50, 550, 550])
   })
 
   it('기록 사본의 니블 · +0xb 도 경기로 넘긴다 — 타석 그림 장비 겹(0x78fd8 · 0x79790)과 폼 · 손이 본다', () => {
@@ -160,7 +174,9 @@ describe('영입 선수 기록에 밑값 · +0x14 · 니블이 있으면 경기 
   it('밑값이 없는 옛 사본은 영입 때 남긴 0xb6414 값 그대로', () => {
     const order = seasonEntryOrderOf({
       pitchers: [],
-      batters: [{ id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: { name: '옛', ability: [1, 2, 3, 4] as const }, equipment: [5, 5, 5, 5] }],
+      batters: [
+        { id: 0xfe, kindByte: 0xa0, fieldPosition: 3, stamina: 0, record: { name: '옛', ability: [1, 2, 3, 4] as const }, equipment: [5, 5, 5, 5] },
+      ],
     })
     expect(order.batters[0]?.record?.ability).toEqual([1, 2, 3, 4])
   })
@@ -180,7 +196,10 @@ describe('명단 차례는 저장 명단의 장비 니블을 싣는다 — 팀 �
     }
     const order = seasonEntryOrderOf(roster)
     expect(order.pitchers).toEqual([{ tableSlot: 3, equipment: [1, 0, 0, 0] }, 1])
-    expect(order.batters).toEqual([{ rosterSlot: 4, position: 5, equipment: [0, 2, 0, 0] }, { rosterSlot: 0, position: 2 }])
+    expect(order.batters).toEqual([
+      { rosterSlot: 4, position: 5, equipment: [0, 2, 0, 0] },
+      { rosterSlot: 0, position: 2 },
+    ])
   })
 })
 
@@ -208,12 +227,7 @@ describe('0xe0 목록 능력치 = 레코드 0xb6415(rec, k, 1) — 상세 창 0x
       acePitcherId: -1,
       aceBatterId: -1,
     })
-    expect(lists.batters[0]?.ability).toEqual([
-      표.ability[0],
-      Math.min(표.ability[1]! + equipmentBonusOf(2), 999),
-      표.ability[2],
-      표.ability[3],
-    ])
+    expect(lists.batters[0]?.ability).toEqual([표.ability[0], Math.min(표.ability[1]! + equipmentBonusOf(2), 999), 표.ability[2], 표.ability[3]])
     expect(lists.batters[1]?.ability).toEqual(표.ability)
   })
 
@@ -267,8 +281,7 @@ describe('레코드 차례 목록 — 레코드에 남은 마선수', () => {
   })
 
   it('남은 마투수는 8번 · 마타자는 9번, 마투수 체력은 레코드 +0x2c 값', () => {
-    const lists = seasonRecordEntryListsOf(0, tableRosterOf(0), SEASON_ENTRY_CELL_SOURCE, undefined,
-      { pitcher: 1, batter: 2, pitcherStamina: 5000 })
+    const lists = seasonRecordEntryListsOf(0, tableRosterOf(0), SEASON_ENTRY_CELL_SOURCE, undefined, { pitcher: 1, batter: 2, pitcherStamina: 5000 })
     expect(lists.pitchers).toHaveLength(9)
     expect(lists.pitchers[8]).toMatchObject({ name: ACE_PITCHERS[1]?.name, isAce: true, rosterIndex: -1 })
     expect(lists.pitchers[8]?.stamina?.percent).toBe(50)

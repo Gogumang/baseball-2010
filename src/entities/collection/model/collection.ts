@@ -173,7 +173,13 @@ export function countSeasonRegularWin(collection: Collection): { readonly collec
 }
 
 export const EMPTY_COLLECTION: Collection = {
-  titles: [], endings: [], seasonEndings: [], hallOfFame: [], hallOfFamePitchers: [], openedHiddenIds: [], stats: EMPTY_ANNALS_STATS,
+  titles: [],
+  endings: [],
+  seasonEndings: [],
+  hallOfFame: [],
+  hallOfFamePitchers: [],
+  openedHiddenIds: [],
+  stats: EMPTY_ANNALS_STATS,
 }
 
 const union = <T>(left: readonly T[], right: readonly T[]): T[] => [...new Set([...left, ...right])]
@@ -199,7 +205,10 @@ const COLLECTOR_LEVEL = 8
  * 그보다 앞서 산 옛 커리어는 칸이 비어 있을 수 있어, 기록연감에 모을 때 보유에서 다시 센다.
  */
 export function batterCollectorHiddenIdsOf(career: PlayerCareer): number[] {
-  return collectorIdsOf((part, level) => ownsEquipment(career, part, level), (part) => hiddenOpenIdOf(part, COLLECTOR_LEVEL))
+  return collectorIdsOf(
+    (part, level) => ownsEquipment(career, part, level),
+    (part) => hiddenOpenIdOf(part, COLLECTOR_LEVEL),
+  )
 }
 
 /** 투수편 짝 — id 20·24·28·32 (`batterCollectorHiddenIdsOf` 주석) */
@@ -321,12 +330,7 @@ export type HallOfFameResult =
  * G 를 실제로 깎고 통계를 적는 것은 부르는 쪽(지갑)이 한다 — 여기서는 칸만 채운다.
  * 빈 칸이 없으면 '빈칸없음' — 원본은 확인 팝업 전에 StrCOMMON[51] 로 막는다(0x6267a).
  */
-export function registerHallOfFame(
-  collection: Collection,
-  career: PlayerCareer,
-  gamePoint: number,
-  slot: number | null = null,
-): HallOfFameResult {
+export function registerHallOfFame(collection: Collection, career: PlayerCareer, gamePoint: number, slot: number | null = null): HallOfFameResult {
   if (career.endingIndex === null) return { kind: '엔딩전' }
   const target = slot ?? firstEmptyHallOfFameSlot(collection, '타자')
   if (target === null || !isHallOfFameSlotOpen('타자', target) || hallOfFameBatterAt(collection, target) !== null) {
@@ -431,19 +435,17 @@ export function hallOfFameEquipmentNibblesOf(
  * 니블 두 바이트를 통째로 옮기므로 네 부위가 모두 줄의 값이 된다. 칸 +0 은 등록이 칸 + 0xb4 / + 0xc8 로 덮어쓴 번호라
  * 번호에서 칸을 되찾는다(빈 칸은 +0 = 0 이라 맞지 않는다). 맞는 칸이 없으면 같은 객체.
  */
-export function syncHallOfFameEquipment(
-  collection: Collection,
-  side: HallOfFameSide,
-  recordId: number,
-  nibbles: readonly number[],
-): Collection {
+export function syncHallOfFameEquipment(collection: Collection, side: HallOfFameSide, recordId: number, nibbles: readonly number[]): Collection {
   const slot = recordId - (side === '투수' ? HALL_OF_FAME_PITCHER_FIRST_RECORD_ID : HALL_OF_FAME_BATTER_FIRST_RECORD_ID)
   const nibbleAt = (part: number) => nibbles[part] ?? 0
   if (side === '투수') {
     if (slot < 0 || slot >= HALL_OF_FAME_MAX_PITCHERS || hallOfFamePitcherAt(collection, slot) === null) return collection
     // 니블 t ↔ `PITCHER_ABILITY_ORDER[t]` (제구·구속·변화·체력)
     const equipmentLevels: PitcherAbility = {
-      control: nibbleAt(0), velocity: nibbleAt(1), breaking: nibbleAt(2), stamina: nibbleAt(3),
+      control: nibbleAt(0),
+      velocity: nibbleAt(1),
+      breaking: nibbleAt(2),
+      stamina: nibbleAt(3),
     }
     return {
       ...collection,
@@ -479,12 +481,7 @@ export function hallOfFameRecordSlotOf(famer: HallOfFamer | HallOfFamePitcher): 
  * ([앱+0x40], 시즌) 파일과 전역 블록만 쓰고 0xc5fa~0xc608 `0x1f24d(앱, 4) · (앱, 3)` 가 그 저장을 쓰지 않고 풀어(0x1f3c6 ·
  * 0x1f4e6) 파일에 안 남는다 — 그래서 여기는 명전 칸만 받는다. 없는 칸이면 같은 객체.
  */
-export function withHallOfFameRecordSlot(
-  collection: Collection,
-  side: HallOfFameSide,
-  recordId: number,
-  recordSlot: number,
-): Collection {
+export function withHallOfFameRecordSlot(collection: Collection, side: HallOfFameSide, recordId: number, recordSlot: number): Collection {
   const slot = recordId - (side === '투수' ? HALL_OF_FAME_PITCHER_FIRST_RECORD_ID : HALL_OF_FAME_BATTER_FIRST_RECORD_ID)
   const value = recordSlot & RECORD_SLOT_MASK
   if (side === '투수') {
@@ -522,10 +519,8 @@ export function deleteHallOfFame(collection: Collection, side: HallOfFameSide, s
   return { ...collection, hallOfFame: collection.hallOfFame.filter((famer, index) => (famer.slot ?? index) !== slot) }
 }
 
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'string')
-const isNumberArray = (value: unknown): value is number[] =>
-  Array.isArray(value) && value.every((item) => typeof item === 'number')
+const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
+const isNumberArray = (value: unknown): value is number[] => Array.isArray(value) && value.every((item) => typeof item === 'number')
 
 const ABILITY_KEYS = ['hit', 'power', 'defense', 'run'] as const
 const PITCHER_ABILITY_KEYS = ['control', 'velocity', 'breaking', 'stamina'] as const
@@ -621,9 +616,9 @@ export function normalizeCollection(raw: unknown): Collection {
     hallOfFamePitchers,
     openedHiddenIds,
     stats: normalizeAnnalsStats(candidate.stats),
-    ...(Number.isInteger(candidate.seasonRegularWinCount)
-      && (candidate.seasonRegularWinCount as number) >= 0
-      && (candidate.seasonRegularWinCount as number) <= SEASON_REGULAR_WIN_CAP
+    ...(Number.isInteger(candidate.seasonRegularWinCount) &&
+    (candidate.seasonRegularWinCount as number) >= 0 &&
+    (candidate.seasonRegularWinCount as number) <= SEASON_REGULAR_WIN_CAP
       ? { seasonRegularWinCount: candidate.seasonRegularWinCount as number }
       : {}),
   }

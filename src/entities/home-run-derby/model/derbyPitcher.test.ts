@@ -19,12 +19,7 @@ describe('홈런더비 상대 투수 (S13 5절 확정)', () => {
   })
 
   it('단계 1~4 는 레오니 · 붕붕머신 · 발렌타인 · 드래고나 차례다', () => {
-    expect([1, 2, 3, 4].map((stage) => derbyPitcherOf(stage).ace?.name)).toEqual([
-      '레오니',
-      '붕붕머신',
-      '발렌타인',
-      '드래고나',
-    ])
+    expect([1, 2, 3, 4].map((stage) => derbyPitcherOf(stage).ace?.name)).toEqual(['레오니', '붕붕머신', '발렌타인', '드래고나'])
   })
 
   it('싸이커는 안 나온다', () => {

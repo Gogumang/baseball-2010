@@ -14,16 +14,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 afterEach(cleanup)
 
 const 띄우기 = (overrides: Partial<Parameters<typeof MissionSelectScreen>[0]> = {}) =>
-  render(
-    <MissionSelectScreen
-      clearedKeys={[]}
-      initialSide="타자"
-      onSelect={vi.fn()}
-      onBack={vi.fn()}
-      slides={false}
-      {...overrides}
-    />,
-  )
+  render(<MissionSelectScreen clearedKeys={[]} initialSide="타자" onSelect={vi.fn()} onBack={vi.fn()} slides={false} {...overrides} />)
 
 const 칸 = (name: string) => screen.getByRole('button', { name })
 
@@ -182,11 +173,16 @@ describe('미션 선택 격자', () => {
   })
 
   describe('칸 14 = 이벤트 미션 (0x1db06)', () => {
-    afterEach(() => { vi.useRealTimers() })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
 
     const 칸14로 = () => fireEvent.keyDown(window, { key: 'ArrowLeft' })
     /** 열림 · 닫힘 애니를 끝까지 돌린다 */
-    const 애니끝내기 = () => act(() => { vi.advanceTimersByTime(1000) })
+    const 애니끝내기 = () =>
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
 
     it('OK 를 누르면 StrMAINMENU[56] 창을 띄우고 처음 고름은 미션실행이다', () => {
       vi.useFakeTimers()
@@ -230,7 +226,10 @@ describe('미션 선택 격자', () => {
       띄우기()
       칸14로()
       fireEvent.keyDown(window, { key: 'Enter' })
-      const 틀 = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+      const 틀 = (n: number) =>
+        act(() => {
+          vi.advanceTimersByTime(millisecondsPerFrame() * n)
+        })
       // 펼치는 동안 → 는 뒤집지 않는다 (0x75556)
       fireEvent.keyDown(window, { key: 'ArrowRight' })
       틀(5)
@@ -254,7 +253,10 @@ describe('미션 선택 격자', () => {
       칸14로()
       fireEvent.keyDown(window, { key: 'Enter' })
       애니끝내기()
-      const 틀 = () => act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      const 틀 = () =>
+        act(() => {
+          vi.advanceTimersByTime(millisecondsPerFrame())
+        })
       fireEvent.keyDown(window, { key: 'Enter' })
       틀()
       expect(screen.getByRole('dialog', { name: '이벤트 미션' })).toBeTruthy()

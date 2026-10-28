@@ -49,21 +49,13 @@ describe('감독 말투 단계', () => {
 
 describe('강판이 아예 없는 경우', () => {
   it('투수편이 아니면 판정하지 않는다', () => {
-    const result = judgeManagerHook(
-      { ...healthy, mode: 4, staminaPercent: 0 },
-      EMPTY_MANAGER_HOOK_FLAGS,
-      alwaysHits,
-    )
+    const result = judgeManagerHook({ ...healthy, mode: 4, staminaPercent: 0 }, EMPTY_MANAGER_HOOK_FLAGS, alwaysHits)
     expect(result.hooked).toBe(false)
     expect(result.flags).toBe(EMPTY_MANAGER_HOOK_FLAGS)
   })
 
   it('구원은 감독 강판이 없다', () => {
-    const result = judgeManagerHook(
-      { ...healthy, role: PITCHER_ROLE.relief, staminaPercent: 0 },
-      EMPTY_MANAGER_HOOK_FLAGS,
-      alwaysHits,
-    )
+    const result = judgeManagerHook({ ...healthy, role: PITCHER_ROLE.relief, staminaPercent: 0 }, EMPTY_MANAGER_HOOK_FLAGS, alwaysHits)
     expect(result.hooked).toBe(false)
   })
 })
@@ -76,21 +68,13 @@ describe('체력 사유 (한 경기에 한 번씩만 굴린다)', () => {
   })
 
   it('평판이 높으면 같은 조건에서도 살아남는다 (평판 900 → 10%)', () => {
-    const result = judgeManagerHook(
-      { ...healthy, staminaPercent: 0, reputation: 900 },
-      EMPTY_MANAGER_HOOK_FLAGS,
-      neverHits,
-    )
+    const result = judgeManagerHook({ ...healthy, staminaPercent: 0, reputation: 900 }, EMPTY_MANAGER_HOOK_FLAGS, neverHits)
     expect(result.hooked).toBe(false)
     expect(result.flags.rolledAtZeroStamina).toBe(true)
   })
 
   it('한 번 굴린 체력 0% 주사위는 다시 굴리지 않고 체력 ≤20% 쪽으로 넘어간다', () => {
-    const first = judgeManagerHook(
-      { ...healthy, staminaPercent: 0, reputation: 900 },
-      EMPTY_MANAGER_HOOK_FLAGS,
-      neverHits,
-    )
+    const first = judgeManagerHook({ ...healthy, staminaPercent: 0, reputation: 900 }, EMPTY_MANAGER_HOOK_FLAGS, neverHits)
     const second = judgeManagerHook({ ...healthy, staminaPercent: 0, reputation: 0 }, first.flags, alwaysHits)
     expect(second.hooked).toBe(true)
     expect(second.userEventIndex).toBe(HOOK_USER_EVENT_BASE.lowStamina)
@@ -109,11 +93,7 @@ describe('체력 사유 (한 경기에 한 번씩만 굴린다)', () => {
   })
 
   it('체력 ≤20% 는 평판 900 이면 표가 0% 라 절대 걸리지 않는다', () => {
-    const result = judgeManagerHook(
-      { ...healthy, staminaPercent: 20, reputation: 900 },
-      EMPTY_MANAGER_HOOK_FLAGS,
-      alwaysHits,
-    )
+    const result = judgeManagerHook({ ...healthy, staminaPercent: 20, reputation: 900 }, EMPTY_MANAGER_HOOK_FLAGS, alwaysHits)
     expect(result.hooked).toBe(false)
     expect(result.flags.rolledAtLowStamina).toBe(true)
   })
@@ -121,14 +101,8 @@ describe('체력 사유 (한 경기에 한 번씩만 굴린다)', () => {
 
 describe('이닝 사유 (조건이 설 때마다 다시 굴린다)', () => {
   it('한 이닝 4실점부터 걸린다', () => {
-    expect(
-      judgeManagerHook({ ...healthy, runsAllowedThisInning: 3 }, EMPTY_MANAGER_HOOK_FLAGS, alwaysHits).hooked,
-    ).toBe(false)
-    const result = judgeManagerHook(
-      { ...healthy, runsAllowedThisInning: 4 },
-      EMPTY_MANAGER_HOOK_FLAGS,
-      alwaysHits,
-    )
+    expect(judgeManagerHook({ ...healthy, runsAllowedThisInning: 3 }, EMPTY_MANAGER_HOOK_FLAGS, alwaysHits).hooked).toBe(false)
+    const result = judgeManagerHook({ ...healthy, runsAllowedThisInning: 4 }, EMPTY_MANAGER_HOOK_FLAGS, alwaysHits)
     expect(result.userEventIndex).toBe(HOOK_USER_EVENT_BASE.bigInning)
   })
 
@@ -139,21 +113,13 @@ describe('이닝 사유 (조건이 설 때마다 다시 굴린다)', () => {
 
   it('플래그를 다 쓴 뒤에도 4실점·만루로는 계속 내려갈 수 있다', () => {
     const flags = { rolledAtZeroStamina: true, rolledAtLowStamina: true }
-    const result = judgeManagerHook(
-      { ...healthy, staminaPercent: 0, runsAllowedThisInning: 5 },
-      flags,
-      alwaysHits,
-    )
+    const result = judgeManagerHook({ ...healthy, staminaPercent: 0, runsAllowedThisInning: 5 }, flags, alwaysHits)
     expect(result.hooked).toBe(true)
     expect(result.userEventIndex).toBe(HOOK_USER_EVENT_BASE.bigInning)
   })
 
   it('말투 단계가 글 번호에 더해진다', () => {
-    const result = judgeManagerHook(
-      { ...healthy, reputation: 700, basesLoaded: true },
-      EMPTY_MANAGER_HOOK_FLAGS,
-      alwaysHits,
-    )
+    const result = judgeManagerHook({ ...healthy, reputation: 700, basesLoaded: true }, EMPTY_MANAGER_HOOK_FLAGS, alwaysHits)
     // 평판 700 → 칸 7 → 만루 2%, 굴림 0 이라 걸린다
     expect(result.userEventIndex).toBe(HOOK_USER_EVENT_BASE.basesLoaded + 2)
   })

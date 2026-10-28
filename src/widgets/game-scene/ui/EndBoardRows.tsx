@@ -41,8 +41,7 @@ export function EndBoardRows({ side0Score, side1Score, names }: EndBoardRowsProp
       {scores.map(({ slot, value }, side) => (
         <span key={side} data-testid={`경기끝-점수-${side}`} data-value={value}>
           {endScoreGlyphsOf(value, slot).map((glyph, index) => (
-            <img key={index} className={styles.sprite} alt="" src={frameSrc(NUM_IMAGES, glyph.image)}
-              style={{ left: glyph.x, top: glyph.y }} />
+            <img key={index} className={styles.sprite} alt="" src={frameSrc(NUM_IMAGES, glyph.image)} style={{ left: glyph.x, top: glyph.y }} />
           ))}
         </span>
       ))}
@@ -71,10 +70,7 @@ export function EndBoardRows({ side0Score, side1Score, names }: EndBoardRowsProp
               src={frameSrc(IMG_TEXT_FRAMES, label.frame)}
               alt={label.name}
             />
-            <div
-              className={styles.pitcherName}
-              style={{ left: nameBox.x, top: nameBox.y, width: nameBox.width }}
-            >
+            <div className={styles.pitcherName} style={{ left: nameBox.x, top: nameBox.y, width: nameBox.width }}>
               {names[row] ?? ''}
             </div>
           </div>

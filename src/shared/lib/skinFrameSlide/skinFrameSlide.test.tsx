@@ -2,7 +2,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import {
-  FRAME_SLIDE_END, drawSkinFrameSlide, isSkinFrameSliding, resetSkinFrameSlide, startSkinFrameSlide, stopSkinFrameSlide,
+  FRAME_SLIDE_END,
+  drawSkinFrameSlide,
+  isSkinFrameSliding,
+  resetSkinFrameSlide,
+  startSkinFrameSlide,
+  stopSkinFrameSlide,
   useSkinFrameSlide,
 } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import { frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'

@@ -113,10 +113,7 @@ function batterRecordIndexOf(batting: MissionCpuBatting): number {
 }
 
 /** 타자 미션의 CPU 마운드 판 — 마스터 줄이면 그 행, 마투수면 XlsACE_PIT 행 */
-function cpuMoundCardOf(
-  run: MissionRun,
-  aceLevels: Readonly<Record<number, number>> | undefined,
-): MatchupPitcherCard {
+function cpuMoundCardOf(run: MissionRun, aceLevels: Readonly<Record<number, number>> | undefined): MatchupPitcherCard {
   const pitching = run.cpu.pitching
   if (pitching === null) return { isComputer: true }
   const { mound } = pitching
@@ -176,12 +173,9 @@ export function missionBatterMatchupCardsOf(
     // 끝 칸(12)은 0xb4e34 가 늘린 새 칸이다 — 새 배열의 칸마다 0xb8de4 가 0x30 바이트를 0 으로 지운 뒤(memset 0x1400428) 옛 칸만
     // 베끼므로(b4f6e) 옛 레코드[12]+0x1c = 0 → 수비 0 (직접 뜬 것). k > 12 는 웹이 12 로 둔다(`missionRecordSlotOf`).
     // k 를 모르면(부르는 쪽이 안 넘김) 비운다
-    const position = k === undefined
-      ? undefined
-      : k >= MISSION_NARI_RECORD_FALLBACK ? 0 : teamBatters(batting.teamId)[k]?.position
-    const line = missionBatter.recordLine === undefined
-      ? null
-      : sumBatterLines(batterLineOfRecord(missionBatter.recordLine), missionBatterGameLineOf(run))
+    const position = k === undefined ? undefined : k >= MISSION_NARI_RECORD_FALLBACK ? 0 : teamBatters(batting.teamId)[k]?.position
+    const line =
+      missionBatter.recordLine === undefined ? null : sumBatterLines(batterLineOfRecord(missionBatter.recordLine), missionBatterGameLineOf(run))
     return {
       batterHand: missionBatter.hand,
       pitcher,
@@ -198,22 +192,22 @@ export function missionBatterMatchupCardsOf(
   return {
     batterHand: hand,
     pitcher,
-    batter: player === undefined
-      ? common
-      : {
-          ...common,
-          name: player.name,
-          ...(player.position === undefined ? {} : { position: player.position }),
-          ...batterCardStatsOf(batterLineOfRecord(player.recordLine)),
-        },
+    batter:
+      player === undefined
+        ? common
+        : {
+            ...common,
+            name: player.name,
+            ...(player.position === undefined ? {} : { position: player.position }),
+            ...batterCardStatsOf(batterLineOfRecord(player.recordLine)),
+          },
   }
 }
 
 /** 투수 미션의 소개 판 — 미션 투수(이 경기 줄을 더한다)와 CPU 타선 지금 타자(마스터 줄 · 마타자, 표값) */
 export function missionPitcherMatchupCardsOf(run: PitcherRun, missionPitcher: MissionCardPitcher): MissionMatchupCards {
-  const line = missionPitcher.recordLine === undefined
-    ? null
-    : sumPitcherLines(pitcherLineOfRecord(missionPitcher.recordLine), missionPitcherGameLineOf(run))
+  const line =
+    missionPitcher.recordLine === undefined ? null : sumPitcherLines(pitcherLineOfRecord(missionPitcher.recordLine), missionPitcherGameLineOf(run))
   const pitcher: MatchupPitcherCard = {
     isComputer: false,
     ...(missionPitcher.name === null ? {} : { name: missionPitcher.name }),
@@ -242,29 +236,31 @@ export function missionPitcherMatchupCardsOf(run: PitcherRun, missionPitcher: Mi
     return {
       batterHand: hand,
       pitcher,
-      batter: ace === null
-        ? common
-        : {
-            ...common,
-            name: ace.name,
-            // XlsACE_BAT 행 +0x1c 는 다섯 줄 모두 0 이지만, 0xaae7c 의 맞바꿈 0xb8cb8(팀, team+0x32, 9) → 0xb5e98(r3 = 0)이
-            // 한쪽 자리가 0 이면 자리를 칸에 되써(b5f10~b5f4a) 마타자는 옛 그 칸 선수의 자리로 선다(`missionRecordNibbleRowOf`)
-            position: positionOfRow(missionRecordNibbleRowOf(batting.records, batterRecordIndexOf(batting))),
-            ...batterCardStatsOf(batterLineOfRecord(ace.recordLine)),
-          },
+      batter:
+        ace === null
+          ? common
+          : {
+              ...common,
+              name: ace.name,
+              // XlsACE_BAT 행 +0x1c 는 다섯 줄 모두 0 이지만, 0xaae7c 의 맞바꿈 0xb8cb8(팀, team+0x32, 9) → 0xb5e98(r3 = 0)이
+              // 한쪽 자리가 0 이면 자리를 칸에 되써(b5f10~b5f4a) 마타자는 옛 그 칸 선수의 자리로 선다(`missionRecordNibbleRowOf`)
+              position: positionOfRow(missionRecordNibbleRowOf(batting.records, batterRecordIndexOf(batting))),
+              ...batterCardStatsOf(batterLineOfRecord(ace.recordLine)),
+            },
     }
   }
   const player = cpuBatter.row
   return {
     batterHand: player === null ? 0 : batterHandOf(player.profile),
     pitcher,
-    batter: player === null
-      ? common
-      : {
-          ...common,
-          name: player.name,
-          ...(player.position === undefined ? {} : { position: player.position }),
-          ...batterCardStatsOf(batterLineOfRecord(player.recordLine)),
-        },
+    batter:
+      player === null
+        ? common
+        : {
+            ...common,
+            name: player.name,
+            ...(player.position === undefined ? {} : { position: player.position }),
+            ...batterCardStatsOf(batterLineOfRecord(player.recordLine)),
+          },
   }
 }

@@ -7,7 +7,12 @@ import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { ACE_ENTRY_LOCKED_TEXT, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import type {
-  EntryBatterRow, EntryEditorState, EntryKey, EntryLists, EntryPitcherRow, PlayerDetailSource,
+  EntryBatterRow,
+  EntryEditorState,
+  EntryKey,
+  EntryLists,
+  EntryPitcherRow,
+  PlayerDetailSource,
 } from '@/entities/season-mode/model/entryEditor'
 import { ENTRY_TABLES_BASIC, entrySlideOffsetOf } from '@/widgets/entry-editor/lib/entryListWindow'
 import type { EntryBatterLine, EntryColumnTables, EntryPitcherLine } from '@/widgets/entry-editor/lib/entryListWindow'
@@ -98,22 +103,52 @@ const ENTRY_FOOTER = { 투수: 0xf, 타자: 0x17 } as const
  * [목록+0x25](0x6c030 이 커서가 바뀌면 1)가 서면 도형을 다시 만든다([[ed+0xd8]+0x1e3] = 0) — 웹은 커서가 바뀐 그림으로 본다.
  */
 export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extends EntryPitcherRow & EntryFace>({
-  editor, lists, teamName, isAceLocked, gamePoint = 0, title, overlay, underlay, footer, slides, onKey, onMoveCursor, onCloseAceLocked,
-  tables = ENTRY_TABLES_BASIC, showsNameBars = true, isCursorNameOnly = false, onFrame, ticksEveryFrame = false,
+  editor,
+  lists,
+  teamName,
+  isAceLocked,
+  gamePoint = 0,
+  title,
+  overlay,
+  underlay,
+  footer,
+  slides,
+  onKey,
+  onMoveCursor,
+  onCloseAceLocked,
+  tables = ENTRY_TABLES_BASIC,
+  showsNameBars = true,
+  isCursorNameOnly = false,
+  onFrame,
+  ticksEveryFrame = false,
 }: EntryEditorScreenProps<B, P>) {
   useEffect(() => {
     if (isAceLocked) return undefined
     const keyOf = (key: string): EntryKey | null => {
       switch (key) {
-        case 'ArrowUp': case '2': return '위'
-        case 'ArrowDown': case '8': return '아래'
-        case 'ArrowLeft': case '4': return '왼'
-        case 'ArrowRight': case '6': return '오른'
-        case 'Enter': case '5': return '확인'
-        case 'Escape': return '취소'
-        case '*': return '별'
-        case '0': return '영'
-        default: return null
+        case 'ArrowUp':
+        case '2':
+          return '위'
+        case 'ArrowDown':
+        case '8':
+          return '아래'
+        case 'ArrowLeft':
+        case '4':
+          return '왼'
+        case 'ArrowRight':
+        case '6':
+          return '오른'
+        case 'Enter':
+        case '5':
+          return '확인'
+        case 'Escape':
+          return '취소'
+        case '*':
+          return '별'
+        case '0':
+          return '영'
+        default:
+          return null
       }
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -159,10 +194,14 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
           showsNameBars={showsNameBars}
           isCursorNameOnly={isCursorNameOnly}
           // 웹 전용: 처음 누르면 커서만 옮기고, 커서 줄을 다시 누르면 확인 — 원본은 위·아래 키뿐이다
-          onPressRow={isAceLocked ? undefined : (index) => {
-            if (index === editor.cursor) onKey('확인')
-            else onMoveCursor(index)
-          }}
+          onPressRow={
+            isAceLocked
+              ? undefined
+              : (index) => {
+                  if (index === editor.cursor) onKey('확인')
+                  else onMoveCursor(index)
+                }
+          }
           onPressArrow={isAceLocked ? undefined : onKey}
         />
       </div>
@@ -172,18 +211,25 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
 
       {/* 바닥 — 투수 탭 0xf "#타자"+"0상세정보"+되돌아가기 · 타자 탭 0x17 "#투수"+… (일반 0x2e0a2 · 시즌 0xb090).
           표시는 "#" 지만 탭을 바꾸는 키는 편집기 0x55864 의 '*'(0x2a, 0x558c4)다 — '#'(0x23)는 아무 일도 안 한다. 원본 그대로 둔다. */}
-      <ScreenFrame title={title ?? (isPitcherTab ? '투수엔트리' : '타자엔트리')} gamePoint={gamePoint}
-        onBack={() => onKey('취소')} footer={footer ?? (isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자)} slides={slides}
+      <ScreenFrame
+        title={title ?? (isPitcherTab ? '투수엔트리' : '타자엔트리')}
+        gamePoint={gamePoint}
+        onBack={() => onKey('취소')}
+        footer={footer ?? (isPitcherTab ? ENTRY_FOOTER.투수 : ENTRY_FOOTER.타자)}
+        slides={slides}
         // 바닥띠 "#타자" · "#투수" 표시 = 탭 바꾸기 '*'(0x558c4) · "0상세정보" = '0' — 그 표시 위 투명 누름 칸. 마선수 잠금 창이 떠 있으면 키를 안 받는다
-        footerPresses={isAceLocked ? undefined : {
-          [FOOTER_BITS.batter]: { label: '* 타자', onPress: () => onKey('별') },
-          [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: () => onKey('별') },
-          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => onKey('영') },
-        }} />
+        footerPresses={
+          isAceLocked
+            ? undefined
+            : {
+                [FOOTER_BITS.batter]: { label: '* 타자', onPress: () => onKey('별') },
+                [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: () => onKey('별') },
+                [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => onKey('영') },
+              }
+        }
+      />
 
-      {isAceLocked && (
-        <MessageBox text={ACE_ENTRY_LOCKED_TEXT} buttons={['OK']} onAnswer={onCloseAceLocked} />
-      )}
+      {isAceLocked && <MessageBox text={ACE_ENTRY_LOCKED_TEXT} buttons={['OK']} onAnswer={onCloseAceLocked} />}
       {overlay}
     </RawScreen>
   )

@@ -23,7 +23,10 @@ import { translucentPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
 
 /** 마스크 · 밀기 — 몫 1/2 · 1/4 · 1/8 · 1/16 (표 0xd5e58 · 0xd5de0 와 같은 짝) */
 const WEIGHT_TERMS: readonly (readonly [bit: number, mask: number, shift: number])[] = [
-  [8, 0xf7de, 1], [4, 0xe79c, 2], [2, 0xc718, 3], [1, 0x8610, 4],
+  [8, 0xf7de, 1],
+  [4, 0xe79c, 2],
+  [2, 0xc718, 3],
+  [1, 0x8610, 4],
 ]
 
 /** 몫 w(0~15)/16 — w 의 비트마다 `(p & M) >> k` 를 더한다(채널마다 내림) */

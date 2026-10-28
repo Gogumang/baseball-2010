@@ -4,8 +4,16 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { titleDisplayNameOf } from '@/entities/career/model/titles'
 import {
-  BOARD_COLOR, BOARD_POLYGON, MORALE_GAUGE_BACKGROUND, MORALE_LABEL_FRAME, NAME_BAND, STADIUM_BAND,
-  STATUS_BOXES, moraleGaugeColumnsOf, moraleGaugeFrameOf, nameBandSplitOf,
+  BOARD_COLOR,
+  BOARD_POLYGON,
+  MORALE_GAUGE_BACKGROUND,
+  MORALE_LABEL_FRAME,
+  NAME_BAND,
+  STADIUM_BAND,
+  STATUS_BOXES,
+  moraleGaugeColumnsOf,
+  moraleGaugeFrameOf,
+  nameBandSplitOf,
 } from '@/pages/management/lib/managementLayout'
 import { StatusValues } from '@/pages/management/ui/StatusValues'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
@@ -78,7 +86,16 @@ export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent, mora
         <rect x={gauge.x + gauge.width} y={gauge.y + 1} width={1} height={gauge.height - 2} fill={MORALE_GAUGE_BACKGROUND} />
       </svg>
 
-      <div className={styles.layer} style={{ left: STADIUM_BAND.imageLeft, top: STADIUM_BAND.imageTop, width: SCREEN_WIDTH - 1, height: STADIUM_BAND.imageHeight, overflow: 'hidden' }}>
+      <div
+        className={styles.layer}
+        style={{
+          left: STADIUM_BAND.imageLeft,
+          top: STADIUM_BAND.imageTop,
+          width: SCREEN_WIDTH - 1,
+          height: STADIUM_BAND.imageHeight,
+          overflow: 'hidden',
+        }}
+      >
         {/* 프레임 · 팔레트 = 시간대 [win+0x1c] (0x7b934 — mode_back.mpl 줄 t − 1). 세 프레임 원점은 모두 (0, 0) */}
         <img className={styles.layer} style={{ left: 0, top: 0 }} src={stadiumBand.src} data-frame={stadiumBand.slot} alt="" />
       </div>
@@ -87,11 +104,20 @@ export function StatusBoardBase({ hour, nameBandSplit, morale, nameContent, mora
 
       <FrameSprite folder={MODE_UI} frame={STATUS_FRAME} origins={uiOrigins} x={0} y={0} />
       {/* "사기" 20×10 을 박스 (33×15) 가운데에 */}
-      <img className={styles.layer} style={{ left: STATUS_BOXES.moraleLabel.x + 6, top: moraleLabelY + 3 }}
-        src={`${IMG_TEXT}/${String(MORALE_LABEL_FRAME).padStart(3, '0')}.png`} alt="" />
+      <img
+        className={styles.layer}
+        style={{ left: STATUS_BOXES.moraleLabel.x + 6, top: moraleLabelY + 3 }}
+        src={`${IMG_TEXT}/${String(MORALE_LABEL_FRAME).padStart(3, '0')}.png`}
+        alt=""
+      />
       {Array.from({ length: columns }, (_unused, index) => (
-        <img key={index} className={styles.layer} style={{ left: gauge.x + 1 + index, top: gauge.y + 1 }}
-          src={`${MODE_UI}/${String(moraleGaugeFrameOf(morale)).padStart(3, '0')}.png`} alt="" />
+        <img
+          key={index}
+          className={styles.layer}
+          style={{ left: gauge.x + 1 + index, top: gauge.y + 1 }}
+          src={`${MODE_UI}/${String(moraleGaugeFrameOf(morale)).padStart(3, '0')}.png`}
+          alt=""
+        />
       ))}
     </>
   )
@@ -110,13 +136,21 @@ export function ManagementBoard({ career, titleName, hour, isPreviousGame = fals
   const band = NAME_BAND
   return (
     <>
-      <StatusBoardBase hour={hour} nameBandSplit={nameBandSplitOf(false)} morale={career.morale}
-        nameContent={(
+      <StatusBoardBase
+        hour={hour}
+        nameBandSplit={nameBandSplitOf(false)}
+        morale={career.morale}
+        nameContent={
           <>
-            <div className={styles.nameText} style={{ left: band.nameBox.x, top: band.top, width: band.nameBox.width }}>{career.name}</div>
-            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>{titleDisplayNameOf(titleName)}</div>
+            <div className={styles.nameText} style={{ left: band.nameBox.x, top: band.top, width: band.nameBox.width }}>
+              {career.name}
+            </div>
+            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>
+              {titleDisplayNameOf(titleName)}
+            </div>
           </>
-        )} />
+        }
+      />
       <StatusValues career={career} isPreviousGame={isPreviousGame} />
     </>
   )

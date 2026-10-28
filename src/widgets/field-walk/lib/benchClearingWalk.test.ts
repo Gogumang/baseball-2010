@@ -10,7 +10,11 @@ import {
 import { DUGOUT_POSITIONS } from '@/widgets/field-walk/lib/halfInningWalk'
 
 const entryRolls = Array.from({ length: 9 }, (_unused, i) => ({
-  scatterX: 10 * i, scatterZ: 100 + i, speed: 300 + i, targetX: 50 * i, targetZ: 100 * i,
+  scatterX: 10 * i,
+  scatterZ: 100 + i,
+  speed: 300 + i,
+  targetX: 50 * i,
+  targetZ: 100 * i,
 }))
 const input = { entryRolls, offenseSide: 0 as const, isLeftBatter: false, occupiedBases: [false, true, false] as const }
 
@@ -19,7 +23,10 @@ describe('벤치 클리어링 진입 0x3a5f0', () => {
     const state = startBenchClearingWalk(input)
     state.fielders.forEach((walker, i) => {
       expect([walker.x, walker.z, walker.targetX, walker.targetZ]).toEqual([
-        FIELDER_START_POSITIONS[i].x, FIELDER_START_POSITIONS[i].z, FIELDER_START_POSITIONS[i].x, FIELDER_START_POSITIONS[i].z,
+        FIELDER_START_POSITIONS[i].x,
+        FIELDER_START_POSITIONS[i].z,
+        FIELDER_START_POSITIONS[i].x,
+        FIELDER_START_POSITIONS[i].z,
       ])
       expect(walker.action).toBe(FIELDER_ACTION.stand)
     })

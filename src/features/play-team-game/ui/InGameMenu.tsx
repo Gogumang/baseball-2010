@@ -47,8 +47,7 @@ const PALETTE4_MATRIX = '2.5625 0 0 0 -2.08015  0 2.5 0 0 -2.02549  0 0 2.5625 0
  * StrGAME[3]/[4] — "자동진행을 하시겠습니까? %d G포인트가 소모됩니다" (R10 7절 116행에 원문이 있다).
  * `%d` 는 `sprintf` 로 비용이 들어간다 (0x3c67e = 100 · 0x3c694 = 30).
  */
-const autoProgressConfirmOf = (cost: number) =>
-  `!C!cFFFFFF자동진행을 하시겠습니까?!N!cFFFF00${cost} G포인트!cFFFFFF가 소모됩니다`
+const autoProgressConfirmOf = (cost: number) => `!C!cFFFFFF자동진행을 하시겠습니까?!N!cFFFF00${cost} G포인트!cFFFFFF가 소모됩니다`
 
 /** StrGAME[2] — 대전모드 6회 제한 알림 (`base/extracted/StrGAME.json` [2] 원문 그대로) */
 const VERSUS_INNING_LIMIT_NOTICE = '!C!cFFFFFF대전모드는 6회까지만!N자동진행 가능합니다'
@@ -237,7 +236,11 @@ export function InGameMenu({
 
   if (notice !== null) {
     return (
-      <MessageBox text={notice.text} buttons={['확인']} dimOpacity={POPUP_DIM_OPACITY} closesWithoutShrink
+      <MessageBox
+        text={notice.text}
+        buttons={['확인']}
+        dimOpacity={POPUP_DIM_OPACITY}
+        closesWithoutShrink
         opensOneStepIn={notice.after === '메뉴' && opensOneStepIn}
         onAnswer={() => {
           const after = notice.after
@@ -249,17 +252,14 @@ export function InGameMenu({
           // 옮긴 뒤 0x754e6 에서 지운다). 알림이 닫히면 창이 하나도 없어 경기가 이어진다 — 메뉴를 다시 띄우지 않는다
           handedOffRef.current = true
           onContinue()
-        }} />
+        }}
+      />
     )
   }
 
   if (confirming !== null) {
     const text =
-      confirming === '나가기'
-        ? quitConfirmTextOf(mode)
-        : confirming === '다시하기'
-          ? REPLAY_CONFIRM
-          : autoProgressConfirmOf(autoProgressCost)
+      confirming === '나가기' ? quitConfirmTextOf(mode) : confirming === '다시하기' ? REPLAY_CONFIRM : autoProgressConfirmOf(autoProgressCost)
     // 질문 창이 뜨는 갱신은 0x74ef4 가 [+0x250] = 1 이라 경기 장면을 한 번 다시 그리고(52efe) 그 위를 한 번 어둡게 덮는다 —
     // 메뉴 판은 그때 지워진다. 경기 장면 [창+0x24e] = 1 이라 답하면 줄임 없이 다음 갱신에 닫힌다(`closesWithoutShrink`).
     // '별표' 창 뒤의 질문은 첫 그림이 이미 높이 20 이다(`opensOneStepIn`)
@@ -316,7 +316,16 @@ export function InGameMenu({
  * 240 → 120 → 닫힘 두 갱신 뒤에 내려간다(`InGameMenuOpening`).
  */
 function PauseWindow({
-  opening, slidesIn, actions, cursor, canAutoProgress, isEnabled, onMoveCursor, onChoose, onRequestClose, windowCloseRef,
+  opening,
+  slidesIn,
+  actions,
+  cursor,
+  canAutoProgress,
+  isEnabled,
+  onMoveCursor,
+  onChoose,
+  onRequestClose,
+  windowCloseRef,
 }: {
   readonly opening: InGameMenuOpening
   readonly slidesIn: boolean
@@ -421,8 +430,7 @@ function PauseWindow({
         (0x74228) [창+0x24f] 를 [창+0x24e] 로 옮기므로 0x746cc 는 **한 번** — 연 그림에 검정 단계 5 = 6/16 — 덮는다.
         메뉴 동안 경기를 다시 안 그려 그 한 겹이 멈춘 그림 위에 남는다 (`popupDim`).
       */}
-      <div ref={dimRef} className={styles.dim} data-testid="경기-메뉴-어둡게"
-        style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
+      <div ref={dimRef} className={styles.dim} data-testid="경기-메뉴-어둡게" style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
       {isShown && !motion.isClosed && (
         <>
           <MenuPanel layout={layout} actions={actions} cursor={cursor} canAutoProgress={canAutoProgress} />
@@ -454,7 +462,12 @@ function PauseWindow({
 }
 
 /** 그리기 0x3cdd0 하위 0~3 갈래 — 둥근 칸 · "MENU" · 칸들 (`inGameMenuLayoutOf` 머리말) */
-function MenuPanel({ layout, actions, cursor, canAutoProgress }: {
+function MenuPanel({
+  layout,
+  actions,
+  cursor,
+  canAutoProgress,
+}: {
   readonly layout: InGameMenuLayout
   readonly actions: readonly InGameMenuAction[]
   readonly cursor: number
@@ -472,10 +485,27 @@ function MenuPanel({ layout, actions, cursor, canAutoProgress }: {
           <feColorMatrix type="matrix" values={PALETTE4_MATRIX} />
         </filter>
       </svg>
-      <RoundBox x={box.x} y={box.y} width={box.width} height={box.height} round={4} shine shineLength={0x3c} shineStep={2}
-        fill={BOX_FILL} edge={BOX_EDGE} testId="경기-메뉴-칸" />
-      <FrameSprite folder={IMG_TEXT_FRAMES} frame={IN_GAME_MENU_TITLE_FRAME} origins={textOrigins} x={title.x} y={title.y}
-        style={{ filter: `url(#${palette4Id})` }} />
+      <RoundBox
+        x={box.x}
+        y={box.y}
+        width={box.width}
+        height={box.height}
+        round={4}
+        shine
+        shineLength={0x3c}
+        shineStep={2}
+        fill={BOX_FILL}
+        edge={BOX_EDGE}
+        testId="경기-메뉴-칸"
+      />
+      <FrameSprite
+        folder={IMG_TEXT_FRAMES}
+        frame={IN_GAME_MENU_TITLE_FRAME}
+        origins={textOrigins}
+        x={title.x}
+        y={title.y}
+        style={{ filter: `url(#${palette4Id})` }}
+      />
       {actions.map((action, index) => {
         const row = layout.rows[index]
         if (row === undefined) return null
@@ -486,18 +516,32 @@ function MenuPanel({ layout, actions, cursor, canAutoProgress }: {
         const digitWidth = NUM_DIGIT_WIDTHS[digit] ?? 8
         return (
           <div key={action} data-testid={`경기-메뉴-칸-${index}`} data-selected={isSelected} data-grey={isGrey}>
-            <RoundFill x={row.pill.x} y={row.pill.y} width={row.pill.width} height={row.pill.height}
-              color={isSelected ? PILL_SELECTED : PILL_NORMAL} />
+            <RoundFill
+              x={row.pill.x}
+              y={row.pill.y}
+              width={row.pill.width}
+              height={row.pill.height}
+              color={isSelected ? PILL_SELECTED : PILL_NORMAL}
+            />
             {isGrey ? (
-              <SolidStamp folder={IMG_TEXT_FRAMES} frame={frame} origins={textOrigins} x={row.label.x} y={row.label.y}
-                color={DISABLED_LABEL} />
+              <SolidStamp folder={IMG_TEXT_FRAMES} frame={frame} origins={textOrigins} x={row.label.x} y={row.label.y} color={DISABLED_LABEL} />
             ) : (
-              <FrameSprite folder={IMG_TEXT_FRAMES} frame={frame} origins={textOrigins} x={row.label.x} y={row.label.y}
-                {...(isSelected ? { style: palette3.style } : {})} />
+              <FrameSprite
+                folder={IMG_TEXT_FRAMES}
+                frame={frame}
+                origins={textOrigins}
+                x={row.label.x}
+                y={row.label.y}
+                {...(isSelected ? { style: palette3.style } : {})}
+              />
             )}
             {/* 0xba689 정렬 2 — 왼쪽 = 가운데 + (0 − 폭) >> 1 (0xba5e4~0xba5ee) */}
-            <img className={styles.sprite} alt="" src={`${NUM}/${String(digit).padStart(3, '0')}.png`}
-              style={{ left: row.digit.centerX + ((0 - digitWidth) >> 1), top: row.digit.y }} />
+            <img
+              className={styles.sprite}
+              alt=""
+              src={`${NUM}/${String(digit).padStart(3, '0')}.png`}
+              style={{ left: row.digit.centerX + ((0 - digitWidth) >> 1), top: row.digit.y }}
+            />
           </div>
         )
       })}
@@ -509,12 +553,29 @@ function MenuPanel({ layout, actions, cursor, canAutoProgress }: {
  * 둥근 칠 0x6b7d4(x, y, w, h, 둥글기 4, 색) — 칠(x+1, y+1, w−1, h−1) 위에 두 칸 안쪽에서 시작하는 선 넷, (w+1)×(h+1)
  * (`shared/lib/commonPanel` 의 `roundFillOf` 와 같은 식)
  */
-function RoundFill({ x, y, width: w, height: h, color }: {
-  readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string
+function RoundFill({
+  x,
+  y,
+  width: w,
+  height: h,
+  color,
+}: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
 }) {
   return (
-    <svg className={styles.paint} width={w + 1} height={h + 1} viewBox={`0 0 ${w + 1} ${h + 1}`} shapeRendering="crispEdges"
-      style={{ left: x, top: y }} aria-hidden>
+    <svg
+      className={styles.paint}
+      width={w + 1}
+      height={h + 1}
+      viewBox={`0 0 ${w + 1} ${h + 1}`}
+      shapeRendering="crispEdges"
+      style={{ left: x, top: y }}
+      aria-hidden
+    >
       <rect x={1} y={1} width={w - 1} height={h - 1} fill={color} />
       <rect x={2} y={0} width={w - 3} height={1} fill={color} />
       <rect x={2} y={h} width={w - 3} height={1} fill={color} />

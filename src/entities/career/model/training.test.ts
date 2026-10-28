@@ -145,7 +145,9 @@ describe('필살타법 훈련 — 0xa3bac 종류 4', () => {
 
   it('넷째 칸 이름은 4 + 타입 — 장타형이면 메테오 스윙, 고른 번호는 4 그대로 (0x180e8 · 0x1816c)', () => {
     const outcome = runTraining(
-      선수({ gamePoint: 5000, battingTypeIndex: 1, specialSwingLevel: 3, specialSwingSessions: 6, skillIds: [] }), 필살(), 최대,
+      선수({ gamePoint: 5000, battingTypeIndex: 1, specialSwingLevel: 3, specialSwingSessions: 6, skillIds: [] }),
+      필살(),
+      최대,
     )
     expect(outcome.specialSwing).toMatchObject({ isLevelUp: true, name: '메테오 스윙' })
     expect(outcome.career.specialSwingNumber).toBe(4)

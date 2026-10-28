@@ -51,8 +51,7 @@ const 신인 = {
   teamId: 3,
 }
 
-const 띄우기 = (store: JsonStorePort = 메모리저장()) =>
-  renderHook(() => usePitcherLeagueSession(store, createSeededRandom(20100901), false))
+const 띄우기 = (store: JsonStorePort = 메모리저장()) => renderHook(() => usePitcherLeagueSession(store, createSeededRandom(20100901), false))
 
 type 판 = ReturnType<typeof 띄우기>['result']
 
@@ -181,7 +180,10 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
   }
 
   it('경기 뒤 평가(0xa719c)는 정규시즌만 — 포스트시즌 경기는 0x4f268 이 건너뛴다, 45번째 경기는 평가된다', () => {
-    const 평가요약 = { ...경기요약, evaluation: { popularityChange: 7, reputationChange: 3, moraleChange: -5, countedCompleteGame: '완봉' } } as typeof 경기요약
+    const 평가요약 = {
+      ...경기요약,
+      evaluation: { popularityChange: 7, reputationChange: 3, moraleChange: -5, countedCompleteGame: '완봉' },
+    } as typeof 경기요약
     const 정규 = 판짜기({ gamesPlayed: 44, popularity: 100, reputation: 100, morale: 50 })
     act(() => 정규.current.actions.beginGame())
     act(() => 정규.current.actions.finishGame(평가요약))
@@ -275,13 +277,21 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       postseason: startPostseason([3, 0, 1, 2, 4, 5, 6, 7]),
     })
     act(() => 포스트.current.actions.beginGame())
-    act(() => 포스트.current.actions.finishGame({
-      ...경기요약,
-      decisionCode: 1,
-      record: { outsRecorded: 27, strikeouts: 9, runsAllowedField: 0, walksAllowed: 0, hitByPitch: 0, hitsAllowed: 2 },
-    } as typeof 경기요약))
+    act(() =>
+      포스트.current.actions.finishGame({
+        ...경기요약,
+        decisionCode: 1,
+        record: { outsRecorded: 27, strikeouts: 9, runsAllowedField: 0, walksAllowed: 0, hitByPitch: 0, hitsAllowed: 2 },
+      } as typeof 경기요약),
+    )
     expect(포스트.current.career?.lastGame).toMatchObject({
-      decisionCode: 2, outs: 18, runs: 4, strikeouts: 3, walksAndHitByPitch: 1, hitsAllowed: 9, pitches: 101,
+      decisionCode: 2,
+      outs: 18,
+      runs: 4,
+      strikeouts: 3,
+      walksAndHitByPitch: 1,
+      hitsAllowed: 9,
+      pitches: 101,
     })
   })
 
@@ -323,10 +333,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
   it('이어하기 S+0x50 == 2 → 116 을 다시 띄우고 카운터가 겹쳐 쌓인다 (0x1c154 1c26a · 0x1278c)', () => {
     const 첫 = 판짜기({ gamesPlayed: 4, seasonPopularityGain: 10 })
     act(() => 첫.current.actions.beginGame())
-    act(() => 첫.current.actions.finishGame({
-      ...경기요약,
-      evaluation: { ...경기요약.evaluation, popularityChange: 2 },
-    } as typeof 경기요약))
+    act(() =>
+      첫.current.actions.finishGame({
+        ...경기요약,
+        evaluation: { ...경기요약.evaluation, popularityChange: 2 },
+      } as typeof 경기요약),
+    )
     const 끊김 = 첫.current.career!
     expect(끊김.seasonPopularityGain).toBe(12)
     const 저장 = (career: object) => {
@@ -365,7 +377,9 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
 
   it('이어하기 — 시즌 끝 사슬 136·130·131·132 면 그 상태의 이벤트(392·370·375·380)부터 다시 튼다 (S+0x50)', () => {
     expect(이어하기({ season: 2, gamesPlayed: 45, seasonEndState: 136 }).current.story).toEqual({
-      eventId: 392, context: '연말', viewed: [],
+      eventId: 392,
+      context: '연말',
+      viewed: [],
     })
     expect(이어하기({ season: 2, gamesPlayed: 45, seasonEndState: 130 }).current.story?.eventId).toBe(370)
     const 엠브이피 = 이어하기({ season: 2, gamesPlayed: 45, seasonEndState: 131 })
@@ -442,9 +456,11 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       },
       rand9d: (n: number) => seeded.rand9d(n),
     }
-    const { result, rerender } = renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
-      store, random, false, null, null, true, undefined, undefined, undefined, undefined, undefined, undefined, onScreen,
-    ), { initialProps: { onScreen: false } })
+    const { result, rerender } = renderHook(
+      ({ onScreen }: { onScreen: boolean }) =>
+        usePitcherLeagueSession(store, random, false, null, null, true, undefined, undefined, undefined, undefined, undefined, undefined, onScreen),
+      { initialProps: { onScreen: false } },
+    )
 
     // 앱을 띄운 동안(메인 메뉴) — 저장 그대로, 0x665e8 굴림 없음
     expect(result.current.career).toMatchObject({ season: 2, seasonEndState: 137 })
@@ -481,7 +497,11 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
   it('이어하기 — 128(0xf)이면 대진으로, 끝나면 앞 사슬 없이도 132(380)로 간다', () => {
     const 대진 = startPostseason([3, 0, 1, 2, 4, 5, 6, 7])
     const result = 이어하기({
-      season: 2, gamesPlayed: 45, postseason: 대진, regularSeasonRewardTaken: true, seasonEndState: 128,
+      season: 2,
+      gamesPlayed: 45,
+      postseason: 대진,
+      regularSeasonRewardTaken: true,
+      seasonEndState: 128,
     })
     expect(result.current.scene).toBe('포스트시즌')
     expect(result.current.postseasonPopup).toBeNull()
@@ -490,7 +510,6 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     act(() => result.current.actions.closePostseasonPopup())
     expect(result.current.story).toMatchObject({ eventId: 380, context: '연말' })
     expect(result.current.career?.seasonEndState).toBe(132)
-
   })
 
   it('정규시즌 우승 팝업 0xb 닫힘 — 다른 편·시즌 저장 +0x7a 가 모두 0 보다 크면 0x29 오토봇 배트를 연다 (0x15b84)', () => {
@@ -500,16 +519,25 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
       act(() => 첫판.result.current.actions.create('투수', 신인))
       const 내팀 = 첫판.result.current.career!.teamId
       const wins = EMPTY_LEAGUE.wins.map((_w, team) => (team === 내팀 ? 40 : 10))
-      act(() => 첫판.result.current.actions.save({
-        ...첫판.result.current.career!,
-        season: 2, gamesPlayed: 45, regularSeasonFirstCount: 1, regularSeasonRewardTaken: false, seasonEndState: 128,
-        league: { ...EMPTY_LEAGUE, wins },
-        postseason: startPostseason([내팀, ...Array.from({ length: 9 }, (_v, i) => (i >= 내팀 ? i + 1 : i))]),
-      }))
-      const 다시 = renderHook(() => usePitcherLeagueSession(
-        store, createSeededRandom(20100901), false, null, null, true, undefined, undefined,
-        () => ({ otherLeagueFirstCount: other, seasonModeFirstCount: 1, globalOpenedHiddenIds: [] }),
-      ))
+      act(() =>
+        첫판.result.current.actions.save({
+          ...첫판.result.current.career!,
+          season: 2,
+          gamesPlayed: 45,
+          regularSeasonFirstCount: 1,
+          regularSeasonRewardTaken: false,
+          seasonEndState: 128,
+          league: { ...EMPTY_LEAGUE, wins },
+          postseason: startPostseason([내팀, ...Array.from({ length: 9 }, (_v, i) => (i >= 내팀 ? i + 1 : i))]),
+        }),
+      )
+      const 다시 = renderHook(() =>
+        usePitcherLeagueSession(store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, () => ({
+          otherLeagueFirstCount: other,
+          seasonModeFirstCount: 1,
+          globalOpenedHiddenIds: [],
+        })),
+      )
       expect(다시.result.current.postseasonPopup).toEqual({ kind: '정규시즌우승' })
       act(() => 다시.result.current.actions.closePostseasonPopup())
       return 다시.result.current.career!.openedHiddenIds
@@ -781,7 +809,13 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(result.current.scene).toBe('경기')
     const options = result.current.gameOptions!
     expect(options).toMatchObject({
-      ourTeamId: 10, opponentTeamId: 11, isNationalCup: true, isPostseason: false, dayCounter: 0, stamina: 10000, playerSide: 1,
+      ourTeamId: 10,
+      opponentTeamId: 11,
+      isNationalCup: true,
+      isPostseason: false,
+      dayCounter: 0,
+      stamina: 10000,
+      playerSide: 1,
       positionCode: 0,
     })
     expect(options.ourPitcherOrder?.[0]).toBe(8)
@@ -801,10 +835,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     // 다음 날 상대국 칸은 마스터에서 새로
     expect(result.current.career?.nariCupTeams?.opponentTeamId).toBe(12)
 
-    act(() => result.current.actions.finishCup({
-      reward: { messageId: 199, popularity: 20, reputation: 30, money: 20, gamePoint: 1000 },
-      openedTeams: [10],
-    } as never))
+    act(() =>
+      result.current.actions.finishCup({
+        reward: { messageId: 199, popularity: 20, reputation: 30, money: 20, gamePoint: 1000 },
+        openedTeams: [10],
+      } as never),
+    )
     // 134 는 0x1b768 뒤에도 대진판을 그리며 효과기 끝을 기다린다(1bb2c~1bb64) — 장면 · 대진은 그대로, 아홉 틀 뒤 137
     expect(result.current.scene).toBe('국가대항전')
     expect(result.current.cup).not.toBeNull()
@@ -870,10 +906,12 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     expect(다시.current.gameOptions).toMatchObject({ ourTeamId: 10, opponentTeamId: 12, isNationalCup: true, dayCounter: 1 })
 
     // 대회 끝 → 새 시즌 0x1b768 이 S+0x12c 를 내린다
-    act(() => 다시.current.actions.finishCup({
-      reward: { messageId: 0, popularity: 0, reputation: 0, money: 0, gamePoint: 0 },
-      openedTeams: [10],
-    } as never))
+    act(() =>
+      다시.current.actions.finishCup({
+        reward: { messageId: 0, popularity: 0, reputation: 0, money: 0, gamePoint: 0 },
+        openedTeams: [10],
+      } as never),
+    )
     expect(다시.current.career?.nationalCup).toBeUndefined()
   })
 
@@ -908,9 +946,16 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     const store = 메모리저장()
     const 첫판 = 띄우기(store).result
     act(() => 첫판.current.actions.create('투수', 신인))
-    act(() => 첫판.current.actions.save({
-      ...첫판.current.career!, season: 9, gamesPlayed: 45, popularity: 1600, gamePoint: 0, seasonEndState: 132,
-    }))
+    act(() =>
+      첫판.current.actions.save({
+        ...첫판.current.career!,
+        season: 9,
+        gamesPlayed: 45,
+        popularity: 1600,
+        gamePoint: 0,
+        seasonEndState: 132,
+      }),
+    )
     const result = 띄우기(store).result
     expect(result.current.story?.eventId).toBe(502)
     act(() => result.current.actions.completeStory([], [502, 496, 503], 503))
@@ -1042,9 +1087,16 @@ describe('시즌 끝 → 연말 → 엔딩', () => {
     const store = 메모리저장()
     const 첫판 = 띄우기(store).result
     act(() => 첫판.current.actions.create('투수', 신인))
-    act(() => 첫판.current.actions.save({
-      ...첫판.current.career!, season: 9, gamesPlayed: 45, popularity: 1600, gamePoint: 0, seasonEndState: 132,
-    }))
+    act(() =>
+      첫판.current.actions.save({
+        ...첫판.current.career!,
+        season: 9,
+        gamesPlayed: 45,
+        popularity: 1600,
+        gamePoint: 0,
+        seasonEndState: 132,
+      }),
+    )
     const result = 띄우기(store).result
     act(() => result.current.actions.completeStory([], [502, 496, 503], 503))
     expect(result.current.scene).toBe('엔딩')
@@ -1227,7 +1279,16 @@ describe('자동 발동 (0x1cf9c → 0x8be80 → 0xadc70) · 연초 115', () => 
     const 전 = result.current.career!
 
     // 이벤트 1(trigger 0) — 앞서 거친 이벤트 3 도 떠나온 줄(0x8b0e4)이라 본 표시
-    act(() => result.current.actions.giveStoryReward([{ kind: 0, value: 7 }, { kind: 10, value: 30 }], 1, [3, 1]))
+    act(() =>
+      result.current.actions.giveStoryReward(
+        [
+          { kind: 0, value: 7 },
+          { kind: 10, value: 30 },
+        ],
+        1,
+        [3, 1],
+      ),
+    )
 
     expect(result.current.career?.popularity).toBe(전.popularity + 7)
     expect(result.current.career?.gamePoint).toBe(전.gamePoint + 30)
@@ -1345,10 +1406,25 @@ describe('마선수 대결 (match → 투수 미션 team−1 → 140 결과 이�
 
   /** 전역기록 대기 칸(모드 저장 투수편 손잡이)과 화면이 서 있나를 넘겨 띄운다 */
   const 대기띄우기 = (store: JsonStorePort, port: AceMatchPendingPort, isOnScreen = true) =>
-    renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
-      store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
-      port, onScreen,
-    ), { initialProps: { onScreen: isOnScreen } })
+    renderHook(
+      ({ onScreen }: { onScreen: boolean }) =>
+        usePitcherLeagueSession(
+          store,
+          createSeededRandom(20100901),
+          false,
+          null,
+          null,
+          true,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          port,
+          onScreen,
+        ),
+      { initialProps: { onScreen: isOnScreen } },
+    )
 
   it('경기 중 "나가기" 0x40140 — 대기(SYS 8, 전역기록)는 남고 메인 메뉴에 있는 동안은 105 진입이 안 돈다 · 다시 들어오면 140 진 결과', async () => {
     const store = 메모리저장()
@@ -1451,17 +1527,39 @@ describe('외출 [!] · [들어가기] (0x8cdc0 · 0x16c64 · 114)', () => {
 
   it('보상 종류 7(히든 오픈)은 0x62368(…, |v|, 1) — 공용 알림 창에 k 를 넘긴다(글은 공용 창의 원문 마크업)', async () => {
     const 알림 = vi.fn()
-    const { result } = renderHook(() => usePitcherLeagueSession(
-      메모리저장(), createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
-      undefined, true, 알림,
-    ))
+    const { result } = renderHook(() =>
+      usePitcherLeagueSession(
+        메모리저장(),
+        createSeededRandom(20100901),
+        false,
+        null,
+        null,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+        알림,
+      ),
+    )
     act(() => result.current.actions.create('투수', 신인))
     act(() => result.current.actions.save({ ...result.current.career!, gamesPlayed: 0 }))
     await 이벤트불러오기(result)
     첫이벤트넘기기(result)
     act(() => result.current.actions.openOuting())
     act(() => result.current.actions.enterOutingPlace(OUTING_PLACES[0]))
-    act(() => result.current.actions.completeStory([{ kind: 7, value: 19 }, { kind: 7, value: 43 }], [result.current.story!.eventId]))
+    act(() =>
+      result.current.actions.completeStory(
+        [
+          { kind: 7, value: 19 },
+          { kind: 7, value: 43 },
+        ],
+        [result.current.story!.eventId],
+      ),
+    )
 
     expect(result.current.career?.openedHiddenIds).toEqual([19, 43])
     expect(알림).toHaveBeenCalledWith([19, 43])
@@ -1702,14 +1800,33 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
 describe('투수편 상점 — 장비(111 · 121) · 서브 · GP', () => {
   it('컬렉터가 되는 일곱째 구매는 구매 완료 창 없이 공용 알림 창에 k 를 넘긴다 (0x14a74 → 0x62368(ui, 20, 0))', () => {
     const 알림 = vi.fn()
-    const { result } = renderHook(() => usePitcherLeagueSession(
-      메모리저장(), createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
-      undefined, true, 알림,
-    ))
+    const { result } = renderHook(() =>
+      usePitcherLeagueSession(
+        메모리저장(),
+        createSeededRandom(20100901),
+        false,
+        null,
+        null,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+        알림,
+      ),
+    )
     act(() => result.current.actions.create('투수', 신인))
-    act(() => result.current.actions.save({
-      ...result.current.career!, money: 200_000, popularity: 999, ownedEquipment: ['0-0', '0-1', '0-2', '0-3', '0-4', '0-5'],
-    }))
+    act(() =>
+      result.current.actions.save({
+        ...result.current.career!,
+        money: 200_000,
+        popularity: 999,
+        ownedEquipment: ['0-0', '0-1', '0-2', '0-3', '0-4', '0-5'],
+      }),
+    )
     act(() => result.current.actions.openShop('장착'))
     act(() => result.current.actions.purchase(shopItemId('장착', 0, 6)))
 
@@ -1824,7 +1941,9 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
     expect(saved.hasActedThisCycle).toBe(true)
     expect(saved.outingsThisSeason).toBe(1)
     // 126 효과 팝업이 지도 위에 뜬다 (StrMODE[25] 소지금 · [24] 사기 + 외식회원증 보정 · [195] 효과 줄)
-    expect(result.current.outingResult?.effectText).toMatch(/^!C소지금 100 !cFF0000하락!cFFFFFF하였습니다!N사기 \d+\(\+4\) !c00CC00상승!cFFFFFF하였습니다!N!N!cFFFF00외식회원증 효과$/)
+    expect(result.current.outingResult?.effectText).toMatch(
+      /^!C소지금 100 !cFF0000하락!cFFFFFF하였습니다!N사기 \d+\(\+4\) !c00CC00상승!cFFFFFF하였습니다!N!N!cFFFF00외식회원증 효과$/,
+    )
     expect(result.current.scene).toBe('외출')
 
     // [확인] → 105 (입원이 아니라 회복 글 없음)
@@ -1837,9 +1956,7 @@ describe('투수편 외출 (112 지도 · 113 장소 — 타자편과 같은 코
   it('입원: 효과 팝업을 닫으면 105 로 가고 회복 글이 관리 화면 위에 남는다 (0x1575c)', () => {
     const { result } = 띄우기()
     act(() => result.current.actions.create('투수', 신인))
-    act(() =>
-      result.current.actions.save({ ...result.current.career!, morale: 50, money: 1000, isInjured: true, injuryRemaining: 1 }),
-    )
+    act(() => result.current.actions.save({ ...result.current.career!, morale: 50, money: 1000, isInjured: true, injuryRemaining: 1 }))
     act(() => result.current.actions.openOuting())
     act(() => result.current.actions.runOutingFunction('입원'))
     act(() => result.current.actions.finishOutingPresentation())
@@ -1887,7 +2004,8 @@ describe('기록연감 통계 고리 — 투수편 모드 3 (0x22e35 · 0x22c29 
     const rendered = renderHook(() =>
       usePitcherLeagueSession(store, createSeededRandom(20100901), false, null, null, true, (event) => {
         events.push(event)
-      }))
+      }),
+    )
     return { rendered, events }
   }
 
@@ -1910,7 +2028,10 @@ describe('기록연감 통계 고리 — 투수편 모드 3 (0x22e35 · 0x22c29 
   it('새 선수 등록은 신인 스킬 0 · 8 을 켜 0xb663c(모드 3) 비트를 적는다 (0x112d0)', () => {
     const { rendered, events } = 통계띄우기(createPitcherCareer('이전'))
     act(() => rendered.result.current.actions.create('신인투수', 신인))
-    expect(events).toEqual([{ kind: '스킬장착', mode: 3, skillId: 0 }, { kind: '스킬장착', mode: 3, skillId: 8 }])
+    expect(events).toEqual([
+      { kind: '스킬장착', mode: 3, skillId: 0 },
+      { kind: '스킬장착', mode: 3, skillId: 8 },
+    ])
   })
 
   it('GP 아이템 구매가 확정되면 0x22e35(3, 칸) + 0x22c29(2, 가격)', () => {
@@ -1961,9 +2082,9 @@ describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · �
     const calls: (NariGameMatch | '지움')[] = []
     const port: NariGameSavePort = { start: (match) => calls.push(match), clear: () => calls.push('지움') }
     const store = 메모리저장()
-    const rendered = renderHook(() => usePitcherLeagueSession(
-      store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, port,
-    ))
+    const rendered = renderHook(() =>
+      usePitcherLeagueSession(store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, port),
+    )
     return { calls, rendered, store, port }
   }
 
@@ -2066,14 +2187,34 @@ describe('전역기록 +0x4f(모드 3 경기 중간 저장) — 142 확인 · �
 describe('투수편 이어하기 — 100 진입 0x1c154 머리 1c15e stopBgm (r163)', () => {
   it('저장이 있으면 투수편 화면에 들어설 때마다 한 번 끊고, 저장이 없으면(등록 104) 안 끊는다', () => {
     let stops = 0
-    setActiveSound({ ...createSilentSound(), stopBgm: () => { stops += 1 } })
+    setActiveSound({
+      ...createSilentSound(),
+      stopBgm: () => {
+        stops += 1
+      },
+    })
     try {
       const store = 메모리저장()
       store.save(createPitcherCareer('이어'))
-      const { rerender } = renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
-        store, createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
-        undefined, onScreen,
-      ), { initialProps: { onScreen: false } })
+      const { rerender } = renderHook(
+        ({ onScreen }: { onScreen: boolean }) =>
+          usePitcherLeagueSession(
+            store,
+            createSeededRandom(20100901),
+            false,
+            null,
+            null,
+            true,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            onScreen,
+          ),
+        { initialProps: { onScreen: false } },
+      )
       expect(stops).toBe(0)
       rerender({ onScreen: true })
       rerender({ onScreen: true })
@@ -2083,10 +2224,25 @@ describe('투수편 이어하기 — 100 진입 0x1c154 머리 1c15e stopBgm (r1
       expect(stops).toBe(2)
 
       stops = 0
-      const empty = renderHook(({ onScreen }: { onScreen: boolean }) => usePitcherLeagueSession(
-        메모리저장(), createSeededRandom(20100901), false, null, null, true, undefined, undefined, undefined, undefined, undefined,
-        undefined, onScreen,
-      ), { initialProps: { onScreen: false } })
+      const empty = renderHook(
+        ({ onScreen }: { onScreen: boolean }) =>
+          usePitcherLeagueSession(
+            메모리저장(),
+            createSeededRandom(20100901),
+            false,
+            null,
+            null,
+            true,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            onScreen,
+          ),
+        { initialProps: { onScreen: false } },
+      )
       empty.rerender({ onScreen: true })
       expect(stops).toBe(0)
     } finally {

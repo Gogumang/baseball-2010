@@ -86,7 +86,11 @@ const 기본 = {
 } as const
 
 const 구질목록 = (pitcherIdlePress: number): PitchInputOverlay => ({
-  kind: '구질', typeNumbers: [1, 0, 0, 0, 0, 0], magicRemaining: 0, tick: 0, pitcherIdlePress,
+  kind: '구질',
+  typeNumbers: [1, 0, 0, 0, 0, 0],
+  magicRemaining: 0,
+  tick: 0,
+  pitcherIdlePress,
 })
 
 /** 마지막 그림의 투수 그림 객체 상태 (0x9e0b8 이 보는 +0x14 · +0x1c) */

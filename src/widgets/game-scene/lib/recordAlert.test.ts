@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  EMPTY_RECORD_ALERT, RECORD_ALERT_LIFETIME, accrueRecordGamePoint, drawRecordAlert, enqueueRecordAlert,
-  fillRecordAlertSlots, flushRecordAlertQueue, isGameEndRecord, leadingRecordCountOf,
+  EMPTY_RECORD_ALERT,
+  RECORD_ALERT_LIFETIME,
+  accrueRecordGamePoint,
+  drawRecordAlert,
+  enqueueRecordAlert,
+  fillRecordAlertSlots,
+  flushRecordAlertQueue,
+  isGameEndRecord,
+  leadingRecordCountOf,
 } from '@/widgets/game-scene/lib/recordAlert'
 import { RECORD_NAMES, recordGamePointsOf } from '@/entities/game/model/gameRecords'
 

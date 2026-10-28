@@ -38,9 +38,7 @@ const NO_IDS: ReadonlySet<string> = new Set()
  * 시즌 커맨드 줄 — 공용 0x7e418(`CommandBar`)에 시즌 표(`lib/seasonCommandBar`)를 넘긴다.
  * 칸 등장(0x7ff8c · 부모 칸 0x8003c)은 상태의 틀 수 [this+0x2c] 로 그린다 — 화면이 서고 난 갱신 수.
  */
-export function SeasonCommandBar({
-  slots, cursor, parent, disabledIds = NO_IDS, grayedIds, onHover, onSelect, slideUpdates,
-}: SeasonCommandBarProps) {
+export function SeasonCommandBar({ slots, cursor, parent, disabledIds = NO_IDS, grayedIds, onHover, onSelect, slideUpdates }: SeasonCommandBarProps) {
   const update = useUpdateCounter()
   const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   const [movedAt, setMovedAt] = useState<number | null>(null)
@@ -53,14 +51,20 @@ export function SeasonCommandBar({
     lastCursor.current = cursor
     setMovedAt(latestUpdate.current)
   }, [cursor])
-  const labelWidths = Object.fromEntries(
-    slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
-  )
+  const labelWidths = Object.fromEntries(slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]))
   return (
-    <CommandBar slots={slots} cursor={cursor}
+    <CommandBar
+      slots={slots}
+      cursor={cursor}
       bounce={movedAt === null ? 0 : (BOUNCE_BY_UPDATE[update - movedAt] ?? 0)}
-      slideUpdates={slideUpdates ?? update} disabledIds={disabledIds} grayedIds={grayedIds} labelWidths={labelWidths} parent={parent}
-      onHover={onHover ?? (() => undefined)} onSelect={onSelect ?? (() => undefined)} />
+      slideUpdates={slideUpdates ?? update}
+      disabledIds={disabledIds}
+      grayedIds={grayedIds}
+      labelWidths={labelWidths}
+      parent={parent}
+      onHover={onHover ?? (() => undefined)}
+      onSelect={onSelect ?? (() => undefined)}
+    />
   )
 }
 
@@ -102,7 +106,15 @@ export interface SeasonCommonFrameProps {
  * 상태 0xd6(0xb1b4) · 0xdc 서브/GP(0xb1f8)도 같은 차례로 커맨드 줄 · 상태판 · 창 · 머리띠를 그린다(가운데 판 없음).
  */
 export function SeasonCommonFrame({
-  record, teamMorale, gamePoint, commandBar, showsCenterStage = true, centerSlidesIn = false, onBack, children, overlay,
+  record,
+  teamMorale,
+  gamePoint,
+  commandBar,
+  showsCenterStage = true,
+  centerSlidesIn = false,
+  onBack,
+  children,
+  overlay,
   showsHeader = true,
 }: SeasonCommonFrameProps) {
   return (
@@ -111,8 +123,7 @@ export function SeasonCommonFrame({
       <SeasonCommandBar {...commandBar} />
       <SeasonStatusPanel record={record} teamMorale={teamMorale} />
       {showsCenterStage && (
-        <CenterStage slidesIn={centerSlidesIn}
-          characters={seasonStageCharactersOf({ teamMorale, illness: record.illness, coach: record.coach })} />
+        <CenterStage slidesIn={centerSlidesIn} characters={seasonStageCharactersOf({ teamMorale, illness: record.illness, coach: record.coach })} />
       )}
       {children}
       {showsHeader && <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />}

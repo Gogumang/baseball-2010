@@ -73,9 +73,17 @@ export function SeasonEventEndFrame({ record, teamMorale, gamePoint, kind, curso
   if (kind === '지도') return <OutingMapUnderlay eventPlaceIds={NO_PLACES} />
   const disabledIds = new Set(disabledManagementIndexesOf(record).map((index) => MANAGEMENT_MENU[index]))
   return (
-    <SeasonCommonFrame record={record} teamMorale={teamMorale} gamePoint={gamePoint} onBack={null} showsCenterStage={false}
-      commandBar={kind === '관리메뉴'
-        ? { slots: SEASON_COMMAND_SLOTS, cursor, parent: null, disabledIds, slideUpdates: SETTLED_SLIDE_UPDATES }
-        : { slots: NO_SLOTS, cursor, parent: null }} />
+    <SeasonCommonFrame
+      record={record}
+      teamMorale={teamMorale}
+      gamePoint={gamePoint}
+      onBack={null}
+      showsCenterStage={false}
+      commandBar={
+        kind === '관리메뉴'
+          ? { slots: SEASON_COMMAND_SLOTS, cursor, parent: null, disabledIds, slideUpdates: SETTLED_SLIDE_UPDATES }
+          : { slots: NO_SLOTS, cursor, parent: null }
+      }
+    />
   )
 }

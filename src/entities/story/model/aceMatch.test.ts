@@ -3,9 +3,7 @@ import { aceMatchMissionOf, aceMatchPitcherOf, matchResultEventOf, mergeStoryCar
 
 describe('마선수 대결 — r_event match 명령', () => {
   it('team 16~20 은 마투수 싸이커·레오니·붕붕머신·발렌타인·드래고나다 (StrCOMMON[15~19])', () => {
-    expect([16, 17, 18, 19, 20].map((team) => aceMatchPitcherOf(team)?.name)).toEqual([
-      '싸이커', '레오니', '붕붕머신', '발렌타인', '드래고나',
-    ])
+    expect([16, 17, 18, 19, 20].map((team) => aceMatchPitcherOf(team)?.name)).toEqual(['싸이커', '레오니', '붕붕머신', '발렌타인', '드래고나'])
     expect(aceMatchPitcherOf(3)).toBeNull()
   })
 
@@ -33,7 +31,10 @@ describe('마선수 대결 — r_event match 명령', () => {
     ])
 
     expect(mergeStoryCarry(carried, cursors)).toEqual({
-      rewards: [{ kind: 0, value: 3 }, { kind: 10, value: 500 }],
+      rewards: [
+        { kind: 0, value: 3 },
+        { kind: 10, value: 500 },
+      ],
       viewedEventIds: [112, 114],
     })
   })

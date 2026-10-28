@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
-  EMPTY_COLLECTION_REWARD_RECORD, isRewardAwarded, normalizeCollectionRewardRecord, withAwardedBit,
-  collectionRewardGamePointOf, collectionRewardStatModeOf, collectionRewardTextOf, judgeCollectionReward,
+  EMPTY_COLLECTION_REWARD_RECORD,
+  isRewardAwarded,
+  normalizeCollectionRewardRecord,
+  withAwardedBit,
+  collectionRewardGamePointOf,
+  collectionRewardStatModeOf,
+  collectionRewardTextOf,
+  judgeCollectionReward,
   withStoredAwardedBits,
 } from '@/entities/collection/model/collectionRewards'
 import type { CollectionRewardJudgeInput } from '@/entities/collection/model/collectionRewards'
@@ -35,7 +41,10 @@ const 빈판정: CollectionRewardJudgeInput = {
   endings: [],
   seasonEndings: [],
 }
-const 마흔기록 = addRecordCounts(EMPTY_ANNALS_STATS, Array.from({ length: 40 }, (_, n) => n))
+const 마흔기록 = addRecordCounts(
+  EMPTY_ANNALS_STATS,
+  Array.from({ length: 40 }, (_, n) => n),
+)
 /** 비트 0~23 이 다 선 스킬 비트 */
 const 스킬다 = { ...EMPTY_ANNALS_STATS, batterEquippedSkillBits: 0xffffff, pitcherEquippedSkillBits: 0xffff00 }
 const 엔딩다 = { endings: Array.from({ length: 15 }, (_, e) => e), seasonEndings: [0, 1, 2, 3, 4] }
@@ -53,9 +62,15 @@ describe('전부 수집 보상 판정 0x28e98 — k 3 → 7 차례, 받은 비�
 
   it('k 4 기록달성 40칸이 모두 ≠ 0 — 하나라도 0 이면(u8 이 넘쳐 0 이 된 칸도) 아니다', () => {
     expect(judgeCollectionReward({ ...빈판정, stats: 마흔기록 })).toBe(4)
-    const 하나빠짐 = addRecordCounts(EMPTY_ANNALS_STATS, Array.from({ length: 39 }, (_, n) => n))
+    const 하나빠짐 = addRecordCounts(
+      EMPTY_ANNALS_STATS,
+      Array.from({ length: 39 }, (_, n) => n),
+    )
     expect(judgeCollectionReward({ ...빈판정, stats: 하나빠짐 })).toBe(-1)
-    const 넘침 = addRecordCounts(마흔기록, Array.from({ length: 255 }, () => 0))
+    const 넘침 = addRecordCounts(
+      마흔기록,
+      Array.from({ length: 255 }, () => 0),
+    )
     expect(judgeCollectionReward({ ...빈판정, stats: 넘침 })).toBe(-1)
   })
 
@@ -83,7 +98,13 @@ describe('전부 수집 보상 판정 0x28e98 — k 3 → 7 차례, 받은 비�
 
   it('다 맞으면 3 부터, 받을 때마다 하나씩 뒤로', () => {
     let record = EMPTY_COLLECTION_REWARD_RECORD
-    const 전부 = { ...빈판정, isEveryMissionCleared: true, stats: { ...마흔기록, batterEquippedSkillBits: 0xffffff, pitcherEquippedSkillBits: 0xffff00 }, titles: TITLE_NAMES, ...엔딩다 }
+    const 전부 = {
+      ...빈판정,
+      isEveryMissionCleared: true,
+      stats: { ...마흔기록, batterEquippedSkillBits: 0xffffff, pitcherEquippedSkillBits: 0xffff00 },
+      titles: TITLE_NAMES,
+      ...엔딩다,
+    }
     const order: number[] = []
     for (let k = judgeCollectionReward({ ...전부, record }); k >= 0; k = judgeCollectionReward({ ...전부, record })) {
       order.push(k)

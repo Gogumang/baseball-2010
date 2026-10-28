@@ -3,13 +3,9 @@ import { MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import {
-  SEASON_AUTOBOT_BAT_HIDDEN_ID, koreanSeriesRewardOf, nextLeagueFirstAward,
-} from '@/entities/season-mode/model/seasonRewards'
+import { SEASON_AUTOBOT_BAT_HIDDEN_ID, koreanSeriesRewardOf, nextLeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import { hiddenOpenNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
-import type {
-  LeagueFirstAward, SeasonReward, SeasonSummaryEntry,
-} from '@/entities/season-mode/model/seasonRewards'
+import type { LeagueFirstAward, SeasonReward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
 import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
 import { usePostseasonNextKey } from '@/widgets/season/model/usePostseasonNextKey'
@@ -108,10 +104,7 @@ const NO_CHAMPION = 0xf
  * 대진표 좌표는 P6 4a-1 확정값이라 근사하지 않았다.
  */
 export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
-  const {
-    record, series, postseasonRank, leagueFirstAwardedBits, entry,
-    onLeagueFirstAward, onContinuePostseason, onFinish, gamePoint = 0,
-  } = props
+  const { record, series, postseasonRank, leagueFirstAwardedBits, entry, onLeagueFirstAward, onContinuePostseason, onFinish, gamePoint = 0 } = props
 
   const [phase, setPhase] = useState<Phase>('대진표')
   const [pendingAward, setPendingAward] = useState<LeagueFirstAward | null>(null)
@@ -140,7 +133,7 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
 
   const isFinished = series !== null && series.round === '종료'
   const championId = series?.champion ?? (record.postseasonChampion === NO_CHAMPION ? null : record.postseasonChampion)
-  const championName = championId === null ? '' : TEAMS[championId]?.name ?? ''
+  const championName = championId === null ? '' : (TEAMS[championId]?.name ?? '')
   const reward = koreanSeriesRewardOf(postseasonRank)
 
   const onPressNext = () => {

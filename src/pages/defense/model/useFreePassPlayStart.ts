@@ -47,12 +47,15 @@ export function useFreePassPlayStart(
   const waiting = waitingRef.current
   const due = isWalk && waiting !== null && waiting.play === play && waiting.elapsed >= WALK_PLAY_WAIT_TICKS
 
-  useSceneTick(() => {
-    const current = waitingRef.current
-    if (current === null || current.play !== play) return
-    current.elapsed += 1
-    if (current.elapsed >= WALK_PLAY_WAIT_TICKS) setReadyPlay(play)
-  }, isWalk && play !== readyPlay && !due && !isFrozen)
+  useSceneTick(
+    () => {
+      const current = waitingRef.current
+      if (current === null || current.play !== play) return
+      current.elapsed += 1
+      if (current.elapsed >= WALK_PLAY_WAIT_TICKS) setReadyPlay(play)
+    },
+    isWalk && play !== readyPlay && !due && !isFrozen,
+  )
 
   if (!isWalk) return true
   if (isResultWindowShown) return false

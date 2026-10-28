@@ -48,8 +48,12 @@ const 틱지남 = () => {
  * 창(MessageBox)의 단추는 돌지 않는 자리라 여기서 건드리지 않는다
  */
 const 포인터아래로칸이지나감 = () => {
-  const 칸들 = view.queryAllByRole('button').filter((button) => !(button as HTMLButtonElement).disabled
-    && button.getAttribute('aria-label') !== '되돌아가기' && button.closest('[role="dialog"]') === null)
+  const 칸들 = view
+    .queryAllByRole('button')
+    .filter(
+      (button) =>
+        !(button as HTMLButtonElement).disabled && button.getAttribute('aria-label') !== '되돌아가기' && button.closest('[role="dialog"]') === null,
+    )
   for (const 칸 of 칸들) {
     act(() => {
       fireEvent.mouseEnter(칸)
@@ -74,16 +78,18 @@ const 화면밖 = (name: string) => {
 
 function 메인메뉴(continueSaved = vi.fn()) {
   const setScreen = vi.fn()
-  render(<EntryRoutes
-    screen={{ kind: '메인메뉴' } as Screen}
-    setScreen={setScreen}
-    // 타자편 커리어가 저장돼 있다 — [14] 타자편이면 이어하기(장면 0x106 → 0x1c154)로 간다
-    session={{ career: null, savedCareer: createCareer('나리'), actions: { continueSaved } } as unknown as Props['session']}
-    gameSettings={{ settings: undefined, setSettings: vi.fn() } as unknown as Props['gameSettings']}
-    collection={EMPTY_COLLECTION}
-    random={createSeededRandom(1)}
-    wallet={{ balance: 0 } as unknown as Props['wallet']}
-  />)
+  render(
+    <EntryRoutes
+      screen={{ kind: '메인메뉴' } as Screen}
+      setScreen={setScreen}
+      // 타자편 커리어가 저장돼 있다 — [14] 타자편이면 이어하기(장면 0x106 → 0x1c154)로 간다
+      session={{ career: null, savedCareer: createCareer('나리'), actions: { continueSaved } } as unknown as Props['session']}
+      gameSettings={{ settings: undefined, setSettings: vi.fn() } as unknown as Props['gameSettings']}
+      collection={EMPTY_COLLECTION}
+      random={createSeededRandom(1)}
+      wallet={{ balance: 0 } as unknown as Props['wallet']}
+    />,
+  )
   return { setScreen, continueSaved }
 }
 

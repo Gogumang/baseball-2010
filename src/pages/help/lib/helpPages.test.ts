@@ -37,7 +37,7 @@ describe('줄 나누기 0x6ef4c — 글자 단위, 한글 9 · 영문 5 · 자�
     expect(글(wrapHelpText('가'.repeat(17)))).toEqual(['가'.repeat(16), '가'])
   })
 
-  it('글자 폭은 0x9c52c 한 글자 폭 — 못 그리는 기호는 0(줄 첫 글자가 아니면 자간 1 만), \'·\' 은 영문 \'.\' 폭 5', () => {
+  it("글자 폭은 0x9c52c 한 글자 폭 — 못 그리는 기호는 0(줄 첫 글자가 아니면 자간 1 만), '·' 은 영문 '.' 폭 5", () => {
     // 159 + 3×(0 + 1) = 162 ≤ 162
     expect(글(wrapHelpText('가'.repeat(16) + '★★★'))).toEqual(['가'.repeat(16) + '★★★'])
     // 9 + 14×10 = 149 · '·' 둘 = 161 · 셋째 167 > 162
@@ -52,7 +52,10 @@ describe('줄 나누기 0x6ef4c — 글자 단위, 한글 9 · 영문 5 · 자�
   it('!C 정렬과 !c 색은 다음 표시까지 이어진다', () => {
     const lines = wrapHelpText('!C가!N!cFFFF00나!L다')
     expect(lines[0].align).toBe('가운데')
-    expect(lines[1].segments).toEqual([{ text: '나', color: '#FFFF00' }, { text: '다', color: '#FFFF00' }])
+    expect(lines[1].segments).toEqual([
+      { text: '나', color: '#FFFF00' },
+      { text: '다', color: '#FFFF00' },
+    ])
     expect(lines[1].align).toBe('왼')
   })
 })

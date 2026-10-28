@@ -3,7 +3,10 @@ import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } fro
 import { MORALE_LIMIT, startNewSeason, startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import { buyStadiumItem, canEquipStadiumItem, equipStadiumItem } from '@/entities/season-mode/model/stadiumItems'
 import {
-  SEASON_RECORD_CODE, clearSeasonGameRecord, recordSeasonGameEvent, seasonReputationScoreOf,
+  SEASON_RECORD_CODE,
+  clearSeasonGameRecord,
+  recordSeasonGameEvent,
+  seasonReputationScoreOf,
 } from '@/entities/season-mode/model/seasonReputation'
 import { rollTradeSuccess, tradeSuccessRate } from '@/entities/season-mode/model/playerTrade'
 import { PLAYER_KIND, insertBatter, insertPitcher, recruitPlayer, slotOf } from '@/entities/season-mode/model/playerRecruit'
@@ -100,7 +103,13 @@ describe('B-19 트레이드 성공률이 절댓값으로 계산됨', () => {
   it('고침도 뽑기는 하나다', () => {
     켜기('B-19')
     let calls = 0
-    const 세기: RandomPort = { rand: () => { calls += 1; return 50 }, rand9d: () => 0 }
+    const 세기: RandomPort = {
+      rand: () => {
+        calls += 1
+        return 50
+      },
+      rand9d: () => 0,
+    }
     rollTradeSuccess(세기, 50, true)
     expect(calls).toBe(1)
   })
@@ -109,7 +118,10 @@ describe('B-19 트레이드 성공률이 절댓값으로 계산됨', () => {
 describe('B-22 영입에서 밀려난 선수가 안 빠지고, 투수 칸 번호가 겹침', () => {
   const 투수 = (id: number, slot: number): SeasonPlayer => ({ id, kindByte: PLAYER_KIND.일반투수 | slot, fieldPosition: 0, stamina: 5000 })
   const 타자 = (id: number, slot: number, position: number): SeasonPlayer => ({
-    id, kindByte: PLAYER_KIND.일반타자 | slot, fieldPosition: position, stamina: 0,
+    id,
+    kindByte: PLAYER_KIND.일반타자 | slot,
+    fieldPosition: position,
+    stamina: 0,
   })
   const 로스터 = (): SeasonTeamRoster => ({
     pitchers: [0, 1, 2, 3, 4, 5, 6, 7].map((slot) => 투수(100 + slot, slot)),
@@ -144,8 +156,10 @@ describe('B-23 장비를 바꿔 끼우면 앞 장비가 사라짐', () => {
   const 없음 = () => false
 
   it('원본: 예전에 끼었던 칸도 다시 산다 · 산 칸 비트가 없다', () => {
-    expect(checkSeasonEquipment(레코드, { isBatter: false, equipment: [3, 0, 0, 0], ownedEquipment: [1, 0, 0, 0] }, 0, 0, 없음))
-      .toEqual({ ok: true, price: 4 })
+    expect(checkSeasonEquipment(레코드, { isBatter: false, equipment: [3, 0, 0, 0], ownedEquipment: [1, 0, 0, 0] }, 0, 0, 없음)).toEqual({
+      ok: true,
+      price: 4,
+    })
     expect(applySeasonEquipment(500, { isBatter: false, equipment: [0, 0, 0, 0] }, 0, 0)).toEqual({ money: 460, equipment: [1, 0, 0, 0] })
   })
 

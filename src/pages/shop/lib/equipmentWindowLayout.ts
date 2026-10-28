@@ -270,7 +270,13 @@ export const tabCursorBoxOf = (part: number): ShopBox => ({
  * 0xb9d35 는 내림(`trunc(e/2)`) 이다 (managementLayout · nationalCupLayout 과 같은 근거).
  */
 export function alignedPositionOf(
-  target: ShopBox, width: number, height: number, align: number, ox = 0, oy = 0, isRoundingDown = false,
+  target: ShopBox,
+  width: number,
+  height: number,
+  align: number,
+  ox = 0,
+  oy = 0,
+  isRoundingDown = false,
 ): { readonly x: number; readonly y: number } {
   const dx = target.width - width
   const dy = target.height - height

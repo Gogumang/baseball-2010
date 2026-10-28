@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { judgePitchOf, pitchGradeOf, playQuickAtBat, quickPitchOf, quickSwingBoostOf, simulateQuickAtBat, thirdStrikeContestOf } from '@/entities/game/model/quickAtBat'
+import {
+  judgePitchOf,
+  pitchGradeOf,
+  playQuickAtBat,
+  quickPitchOf,
+  quickSwingBoostOf,
+  simulateQuickAtBat,
+  thirdStrikeContestOf,
+} from '@/entities/game/model/quickAtBat'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
@@ -180,7 +188,10 @@ describe('judgePitchOf — 스윙하지 않는 투구 (0xc1818 → 0x9d57c)', ()
 describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
   it('약한 투수를 만나면 볼넷이 나온다 — 판정 경로가 살아 있다는 증거', () => {
     let seed = 20100901
-    const random: RandomPort = createFractionRandom(() => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 })
+    const random: RandomPort = createFractionRandom(() => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    })
     const 약한투수 = { control: 100, velocity: 100, stamina: 90, skillIds: [] }
     let walks = 0
     for (let index = 0; index < 2000; index += 1) {
@@ -192,7 +203,10 @@ describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
 
   it('15회에는 스윙만 한다 — 볼넷으로 끝나지 않는다 (0xc262c, 0-기준 0xe)', () => {
     let seed = 7
-    const random: RandomPort = createFractionRandom(() => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 })
+    const random: RandomPort = createFractionRandom(() => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    })
     const 약한투수 = { control: 100, velocity: 100, stamina: 90, skillIds: [] }
     const 결과들 = Array.from({ length: 500 }, () => simulateQuickAtBat(타자, 약한투수, { inning: 15 }, random))
 
@@ -207,13 +221,23 @@ describe('타석 루프 — 스윙 60% · 판정 40% (0xc262c)', () => {
 describe('quickSwingBoostOf — 간이 타석의 마선수 보정 구조체 (0xc11f0 c1226~c12c4)', () => {
   it('마선수가 아니면 0 이다', () => {
     expect(quickSwingBoostOf(타자, 투수)).toEqual({
-      batterHit: 0, batterPower: 0, pitcherVelocity: 0, pitcherControl: 0, solidPercent: 0, homeRunPercent: 0,
+      batterHit: 0,
+      batterPower: 0,
+      pitcherVelocity: 0,
+      pitcherControl: 0,
+      solidPercent: 0,
+      homeRunPercent: 0,
     })
   })
 
   it('마선수면 번호와 상관없이 레벨대로 붙는다 — 0·1 150 · 2 180 · 3 200 · 4 220, % 칸은 0', () => {
     expect(quickSwingBoostOf({ ...타자, ace: { order: 3, level: 0 } }, { ...투수, ace: { order: 1, level: 4 } })).toEqual({
-      batterHit: 150, batterPower: 150, pitcherVelocity: 220, pitcherControl: 220, solidPercent: 0, homeRunPercent: 0,
+      batterHit: 150,
+      batterPower: 150,
+      pitcherVelocity: 220,
+      pitcherControl: 220,
+      solidPercent: 0,
+      homeRunPercent: 0,
     })
     expect(quickSwingBoostOf({ ...타자, ace: { order: 0, level: 2 } }, 투수).batterHit).toBe(180)
     expect(quickSwingBoostOf(타자, { ...투수, ace: { order: 4, level: 3 } }).pitcherControl).toBe(200)

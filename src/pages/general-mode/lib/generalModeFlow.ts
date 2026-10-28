@@ -21,12 +21,7 @@ import {
   aceRoleOfCell,
   stadiumCursorOnEntry,
 } from '@/pages/general-mode/lib/generalModeSetup'
-import type {
-  AcePhase,
-  FirstBatPhase,
-  GeneralModeSetup,
-  GeneralModeStep,
-} from '@/pages/general-mode/lib/generalModeSetup'
+import type { AcePhase, FirstBatPhase, GeneralModeSetup, GeneralModeStep } from '@/pages/general-mode/lib/generalModeSetup'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 
@@ -47,9 +42,7 @@ export interface GeneralModeFlowState {
   readonly isQuickStart: boolean
 }
 
-export function createFlowState(
-  options: { readonly setup?: GeneralModeSetup; readonly isQuickStart?: boolean } = {},
-): GeneralModeFlowState {
+export function createFlowState(options: { readonly setup?: GeneralModeSetup; readonly isQuickStart?: boolean } = {}): GeneralModeFlowState {
   const isQuickStart = options.isQuickStart ?? false
   return {
     // 빠른실행은 1~6 단계를 건너뛰고 곧바로 경기정보(상태 22)로 들어간다 (StrHOWTO[6] · R4 3b)

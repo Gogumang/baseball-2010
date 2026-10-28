@@ -21,14 +21,16 @@ describe('나리 101 팀 고르기 — 히든 줄 0x14114', () => {
     fireEvent.click(screen.getByRole('button', { name: TEAMS[10].name }))
 
     expect(onSelect).not.toHaveBeenCalled()
-    expect(hiddenTeamHintMessage(10, { openedHiddenIds: [10], mode: 4 }))
-      .toBe(`${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[226]}!N!N${ORIGINAL_MODE_TEXT[1]}`)
+    expect(hiddenTeamHintMessage(10, { openedHiddenIds: [10], mode: 4 })).toBe(
+      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[226]}!N!N${ORIGINAL_MODE_TEXT[1]}`,
+    )
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it('잠긴 히든 팀은 [225]!N[226+k]!N!N[0]!N[1] (0xcc1fc)', () => {
-    expect(hiddenTeamHintMessage(14, { openedHiddenIds: [], mode: 3 }))
-      .toBe(`${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[230]}!N!N${ORIGINAL_MODE_TEXT[0]}!N${ORIGINAL_MODE_TEXT[1]}`)
+    expect(hiddenTeamHintMessage(14, { openedHiddenIds: [], mode: 3 })).toBe(
+      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[230]}!N!N${ORIGINAL_MODE_TEXT[0]}!N${ORIGINAL_MODE_TEXT[1]}`,
+    )
   })
 
   it('기본 팀은 그대로 등록으로 넘긴다 — 키 5', () => {

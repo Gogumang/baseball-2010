@@ -6,9 +6,7 @@ import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import {
-  opponentCpuMagicStateOf, opponentStaminaPercentAfterPitchOf, stageOpponentPitcherAbilityOf,
-} from '@/features/play-game/model/gameFlow'
+import { opponentCpuMagicStateOf, opponentStaminaPercentAfterPitchOf, stageOpponentPitcherAbilityOf } from '@/features/play-game/model/gameFlow'
 import { GameScreen } from '@/pages/game/ui/GameScreen'
 import { sceneFieldPaletteOf } from '@/features/play-team-game/model/sceneStadium'
 import { LOADING_STEPS_BATTER_CAREER, LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
@@ -32,7 +30,14 @@ import { BurstMissionWindow } from '@/widgets/burst-mission/ui/BurstMissionWindo
 import { useBurstObjectTicksReset } from '@/widgets/burst-mission/model/useBurstObjectTicksReset'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
-import { castOfAces, castOfCareer, castOfTeamRecordEquipment, defensePreloadsOf, gameEntryCastPreloadsOf, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
+import {
+  castOfAces,
+  castOfCareer,
+  castOfTeamRecordEquipment,
+  defensePreloadsOf,
+  gameEntryCastPreloadsOf,
+  stageSpritePreloadsOf,
+} from '@/app/model/gameSpritePreload'
 import { useAfterGameEventPreload } from '@/app/model/afterGameEventPreload'
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
@@ -160,9 +165,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const isAwaitingConfirm = useIsSceneConfirmAwaiting(progress.sceneConfirm)
   /** 팝업이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 아래 알림 장면 칸을 밀어내기 판 대기도 본다 */
   const alertSceneFrozenRef = useRef(false)
-  const proposal = burst !== null && burst.current !== null && burst.current !== shownProposal && !isAwaitingConfirm
-    ? burst.current
-    : null
+  const proposal = burst !== null && burst.current !== null && burst.current !== shownProposal && !isAwaitingConfirm ? burst.current : null
   const closeProposal = useCallback(() => setShownProposal(proposal), [proposal])
   const { closeBurstResult } = session.actions
   /** 판 끝에서 난 돌발 판정(상태 0x1c)이면 그 판을 창 아래에 이어 그린다 (`useDefenseUnderBurstWindow`) */
@@ -316,18 +319,18 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   }
   // 결과가 먼저다 — 타석이 끝나며 난 판정을 보여 준 뒤에야 다음 타석 제안이 뜬다
   const burstRow = resolution?.row ?? proposal
-  const burstLines =
-    burst === null || burstRow === null ? null : ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null
-  const burstWindow = burstLines === null ? null : (
-    <BurstMissionWindow
-      lines={burstLines}
-      judgement={resolution?.judgement ?? null}
-      row={resolution?.row ?? null}
-      // 0xb63c0(지금 타자) — 모드 4 의 돌발은 사람 장면(내 타석)에서만 뜨므로 내 선수 손으로 본다(⚠️ 유력: 결과 창은 타석이 끝난 뒤다)
-      isBatterLeftHanded={battingSide !== 0}
-      onClose={resolution !== null ? closeBurstResult : closeProposal}
-    />
-  )
+  const burstLines = burst === null || burstRow === null ? null : (ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null)
+  const burstWindow =
+    burstLines === null ? null : (
+      <BurstMissionWindow
+        lines={burstLines}
+        judgement={resolution?.judgement ?? null}
+        row={resolution?.row ?? null}
+        // 0xb63c0(지금 타자) — 모드 4 의 돌발은 사람 장면(내 타석)에서만 뜨므로 내 선수 손으로 본다(⚠️ 유력: 결과 창은 타석이 끝난 뒤다)
+        isBatterLeftHanded={battingSide !== 0}
+        onClose={resolution !== null ? closeBurstResult : closeProposal}
+      />
+    )
 
   // 사람이 주루를 잡는 갈래가 먼저다 — 진행 중인 타구가 있으면 그것을 실시간으로 돌린다
   const pendingDefensePlay = progress.pendingDefensePlay
@@ -341,9 +344,10 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         // 수비 장면 득점 점수판 0x41a64 — 점수판 틀 두 측 · 플레이 시작 점수 · 공격 측 st[9]
         runScoreBoard={{
           sides: humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId),
-          scores: progress.game.playerSide === 0
-            ? [progress.game.ourScore, progress.game.opponentScore]
-            : [progress.game.opponentScore, progress.game.ourScore],
+          scores:
+            progress.game.playerSide === 0
+              ? [progress.game.ourScore, progress.game.opponentScore]
+              : [progress.game.opponentScore, progress.game.ourScore],
           battingSide: progress.game.half === '초' ? 0 : 1,
         }}
         sceneMemory={defenseSceneRef}
@@ -366,9 +370,10 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         grassPalette={grassPalette}
         runScoreBoard={{
           sides: humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId),
-          scores: progress.game.playerSide === 0
-            ? [progress.game.ourScore, progress.game.opponentScore]
-            : [progress.game.opponentScore, progress.game.ourScore],
+          scores:
+            progress.game.playerSide === 0
+              ? [progress.game.ourScore, progress.game.opponentScore]
+              : [progress.game.opponentScore, progress.game.ourScore],
           battingSide: progress.game.half === '초' ? 0 : 1,
         }}
         onFieldingErrors={session.actions.recordFieldingErrors}
@@ -407,19 +412,14 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   // 다음 내 타석 앞. 기록 달성 알림 0x4e35c 는 0x17 말고는 늘 그리므로 중계 위에도 얹는다.
   // 0x12 끝(4e7ca) 돌발 판정이 참이면 0x35108 이 0x21 로 덮은 +0x1b6c 는 결과 창 0x1d 를 닫은 뒤다(K · R10, A-38) — 창이 먼저다.
   // 그 중계가 경기를 끝냈으면 세션이 정산을 이 중계 끝(`finishRelay`)까지 미룬다
-  if (
-    relay !== null && !pitchEnd.isHolding && resolution === null
-    && !(shownRelay?.scene === relayScene && shownRelay.serial === relay.serial)
-  ) {
+  if (relay !== null && !pitchEnd.isHolding && resolution === null && !(shownRelay?.scene === relayScene && shownRelay.serial === relay.serial)) {
     return (
       // 기록 달성 알림(`RecordAlertScreenOverlay`)은 이 틀 안의 절대 자리다
       <div style={{ position: 'relative' }}>
         <AutoPlayRelayReplay
           key={`${relayScene}-${relay.serial}`}
           steps={gameAutoRelayStepsOf(relay.ticks, career.name)}
-          sideTeams={
-            progress.game.playerSide === 0 ? [progress.ourTeamId, progress.opponentTeamId] : [progress.opponentTeamId, progress.ourTeamId]
-          }
+          sideTeams={progress.game.playerSide === 0 ? [progress.ourTeamId, progress.opponentTeamId] : [progress.opponentTeamId, progress.ourTeamId]}
           humanSide={progress.game.playerSide === 0 ? 0 : 1}
           grassPalette={grassPalette}
           onDone={finishRelay}

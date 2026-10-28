@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  MAX_SEEN_LAG_TICKS, createShownSceneTicks, inputTimeOf, stampInputTime,
-} from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
+import { MAX_SEEN_LAG_TICKS, createShownSceneTicks, inputTimeOf, stampInputTime } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { createSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 describe('키를 누를 때 화면에 있던 그림의 틱 (r211)', () => {
@@ -60,7 +58,10 @@ describe('키 칸 — 사건 시각으로 받은 틱 (`tickAt`)', () => {
     let now = 14
     const shown = createShownSceneTicks()
     shown.mark(12, 760)
-    const latch = createSceneKeyLatch(() => now, (time) => shown.tickSeenAt(time, now))
+    const latch = createSceneKeyLatch(
+      () => now,
+      (time) => shown.tickSeenAt(time, now),
+    )
     const applied: string[] = []
     latch.push(() => applied.push('본 그림'), 'press', 800)
     expect(latch.tickAt(800)).toBe(12)

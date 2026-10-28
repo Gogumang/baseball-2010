@@ -196,12 +196,7 @@ const RUNNER_SLIDE_RETURN = [3, 0, 1, 2] as const
  * 주자 그리기 `0x79d10` 은 vt40 값을 **그대로** 쓰므로 주자 칸은 `defender.pzx` 앞 17장(000~016)이고,
  * 야수 쪽만 +17 이 붙어 017~086 을 쓴다 — 두 구역은 겹치지 않는다.
  */
-export function runnerFrameOf(
-  action: number,
-  tick: number,
-  base: number,
-  isAdvancing: boolean,
-): number {
+export function runnerFrameOf(action: number, tick: number, base: number, isAdvancing: boolean): number {
   const step = ((tick % 4) + 4) % 4
   if (action === RUNNER_ACTION.stand) return 0
   if (action === RUNNER_ACTION.run) return [0, 1][((tick % 2) + 2) % 2]
@@ -560,7 +555,10 @@ export function cameraTargetOf(state: DefenseViewState): WorldPoint {
  * 주자 한 명을 그릴 그림판 (0x79d10) — 마선수 주자(+0x9c ≠ −1)는 실린 마선수 그림(팔레트 없음), 아니면 `defender.pzx`.
  * 마선수 주자인데 실린 그림이 없으면(웹에서만 나는 경우) 보통 그림으로 둔다.
  */
-export function runnerSpriteFolderOf(runner: DefenseRunner, loadedAce: number | null | undefined): {
+export function runnerSpriteFolderOf(
+  runner: DefenseRunner,
+  loadedAce: number | null | undefined,
+): {
   readonly folder: string
   readonly isAce: boolean
 } {
@@ -639,10 +637,7 @@ export const BALL_SHADOW_SIZE_GROUND = 5
  * 그리기 목록(0xbe6a0)이 아니라 **곧바로 화면에** 칠하므로 목록으로 그리는 야수 · 주자 · 공보다 아래다.
  * 공을 안 그리는 그림(`isBallDrawn` 거짓)에는 그림자도 없다(36ef8 → 3736c).
  */
-export function ballShadowOf(
-  ground: { readonly x: number; readonly y: number },
-  screenHeight: number,
-): readonly BallShadowPiece[] {
+export function ballShadowOf(ground: { readonly x: number; readonly y: number }, screenHeight: number): readonly BallShadowPiece[] {
   if (screenHeight < 0 || ground.y < 1) return []
   const size = screenHeight === 0 ? BALL_SHADOW_SIZE_GROUND : BALL_SHADOW_SIZE_AIR
   return ballShadowPiecesAt(ground.x, ground.y, size)

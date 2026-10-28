@@ -66,21 +66,15 @@ const wrap = (value: number, count: number) => (value + count) % count
 function movedRow(state: EquipmentWindowState, step: number, rowCount: number): EquipmentWindowState {
   if (rowCount === 0) return state
   const cursor = wrap(state.cursor + step, rowCount)
-  const top = cursor < state.top
-    ? cursor
-    : cursor >= state.top + EQUIPMENT_VISIBLE_ROWS ? cursor - EQUIPMENT_VISIBLE_ROWS + 1 : state.top
+  const top = cursor < state.top ? cursor : cursor >= state.top + EQUIPMENT_VISIBLE_ROWS ? cursor - EQUIPMENT_VISIBLE_ROWS + 1 : state.top
   return { ...state, cursor, top }
 }
 
-export function equipmentWindowKeyOf(
-  state: EquipmentWindowState, key: EquipmentKey, rowCount: number,
-): EquipmentKeyResult {
+export function equipmentWindowKeyOf(state: EquipmentWindowState, key: EquipmentKey, rowCount: number): EquipmentKeyResult {
   if (state.focus === '탭') {
     if (key === '취소') return { kind: '나가기' }
     if (key === '아래' || key === '확인') {
-      return rowCount > 0
-        ? { kind: '상태', state: { ...state, focus: '줄', cursor: 0, top: 0 } }
-        : { kind: '상태', state }
+      return rowCount > 0 ? { kind: '상태', state: { ...state, focus: '줄', cursor: 0, top: 0 } } : { kind: '상태', state }
     }
     if (key === '왼' || key === '오른') {
       const part = wrap(state.part + (key === '왼' ? -1 : 1), EQUIPMENT_PART_COUNT)

@@ -34,7 +34,12 @@ const MODE_UI = assetUrl('./sprites/mode_ui/frames')
  * 값 도형은 레이더 [skin+0xd4] 의 자라는 애니 — 들어옴(0xd5 0x5324 0x534c~0x5376 · 0xc8 0xb8fc 0xb904~0xb940)이
  * +0xac = 1 · +0xad = 0 · +0x1e3 = 0 으로 두어 0 에서 자란다.
  */
-export function SeasonTeamCard({ teamId, teamAbilities, hasCardBadge, testIdPrefix }: {
+export function SeasonTeamCard({
+  teamId,
+  teamAbilities,
+  hasCardBadge,
+  testIdPrefix,
+}: {
   readonly teamId: number
   /** rec +4 · +6 · +8 · +0xa — 0xd5 는 시즌 팀 레코드 0x1f571(전역, SR+1) · 0xc8 은 마스터 팀 레코드 0x1f8c1(전역, 고른 팀) */
   readonly teamAbilities: readonly number[]
@@ -48,16 +53,31 @@ export function SeasonTeamCard({ teamId, teamAbilities, hasCardBadge, testIdPref
     <>
       <SteppedBoard />
       {team !== undefined && (
-        <img className={styles.layer} alt={team.name} data-testid={`${testIdPrefix}-로고`} src={team.logoUrl}
-          style={{ left: SEASON_CARD_LOGO.x, top: SEASON_CARD_LOGO.y, width: SEASON_CARD_LOGO.width, height: SEASON_CARD_LOGO.height }} />
+        <img
+          className={styles.layer}
+          alt={team.name}
+          data-testid={`${testIdPrefix}-로고`}
+          src={team.logoUrl}
+          style={{ left: SEASON_CARD_LOGO.x, top: SEASON_CARD_LOGO.y, width: SEASON_CARD_LOGO.width, height: SEASON_CARD_LOGO.height }}
+        />
       )}
       {team !== undefined && hasCardBadge && <SeasonCardBadge teamId={teamId} />}
 
       <FrameSprite folder={MODE_UI} frame={8} origins={modeUiOrigins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
-      <img className={styles.layer} alt="" src={`${IMG_TEXT}/${String(ABILITY_TITLE.frame).padStart(3, '0')}.png`}
-        style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }} />
-      <AbilityRadarPanel center={RADAR_CENTER} radius={RADAR_RADIUS} maximumLength={abilityAxisMaximumLengthOf(RADAR_RADIUS)}
-        labelFrames={ABILITY_RADAR_LABELS.team} targets={teamAbilities} restartKey={teamId} />
+      <img
+        className={styles.layer}
+        alt=""
+        src={`${IMG_TEXT}/${String(ABILITY_TITLE.frame).padStart(3, '0')}.png`}
+        style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }}
+      />
+      <AbilityRadarPanel
+        center={RADAR_CENTER}
+        radius={RADAR_RADIUS}
+        maximumLength={abilityAxisMaximumLengthOf(RADAR_RADIUS)}
+        labelFrames={ABILITY_RADAR_LABELS.team}
+        targets={teamAbilities}
+        restartKey={teamId}
+      />
     </>
   )
 }

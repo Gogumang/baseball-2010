@@ -49,9 +49,7 @@ import { SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm
 import { SKY_ROW_COUNT } from '@/widgets/batting-stage/lib/stageScenery'
 import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import {
-  markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 import { AIM_STILL, aimAfterTicks, aimStartOf } from '@/features/play-pitcher-game/model/pitchAim'
 import { runSceneFrameUpdatesForTest } from '@/entities/particle/model/sceneParticleManager'
 
@@ -109,7 +107,8 @@ function playAceMatch(hit: boolean, counts: Readonly<Record<string, number>> = {
 
   act(() => {
     rendered.result.current.session.handleMissionPitch({
-      batterHand: 0, resolution: hit ? { kind: '타구', outcome: { kind: '안타', bases: 1 } } : { kind: '스트라이크', isSwinging: true },
+      batterHand: 0,
+      resolution: hit ? { kind: '타구', outcome: { kind: '안타', bases: 1 } } : { kind: '스트라이크', isSwinging: true },
       hasSwung: true,
       isBunt: false,
       resultCode: null,
@@ -126,7 +125,8 @@ function playAceMatch(hit: boolean, counts: Readonly<Record<string, number>> = {
     for (let count = 0; count < 2; count += 1) {
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
+          batterHand: 0,
+          resolution: { kind: '스트라이크', isSwinging: true },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -144,12 +144,13 @@ function playAceMatch(hit: boolean, counts: Readonly<Record<string, number>> = {
   return { afterStart, status, afterFinish: screenNow(), save }
 }
 
-
 /**
  * 붙든 주자 판(도루 · 폭투 · CPU 견제 — `pendingRunnerPlay`)을 키 없이 끝까지 돌려 세션에 먹인다 — 화면 `DefensePlayback` 의
  * `runnerPlay` 갈래가 하는 일. 판이 없으면 null
  */
-function 주자판끝(rendered: { readonly result: { readonly current: { readonly session: ReturnType<typeof useMissionSession> } } }): DefensePlayResult | null {
+function 주자판끝(rendered: {
+  readonly result: { readonly current: { readonly session: ReturnType<typeof useMissionSession> } }
+}): DefensePlayResult | null {
   const pending = rendered.result.current.session.pendingRunnerPlay
   if (pending === null) return null
   const played = runLiveRunnerPlayWithoutKeys(pending)
@@ -188,8 +189,9 @@ describe('마선수 대결 화면 전환', () => {
   })
 
   it('성공 정산은 대결이어도 편별 올클리어 0xa5184 를 보고 0x62368(37) — 지면 안 본다 (4ef84~4efae)', () => {
-    const allBatter = Object.fromEntries(MISSIONS.filter((mission) => mission.side === '타자' && mission.stage > 0)
-      .map((mission) => [`타자:${mission.id}`, 1]))
+    const allBatter = Object.fromEntries(
+      MISSIONS.filter((mission) => mission.side === '타자' && mission.stage > 0).map((mission) => [`타자:${mission.id}`, 1]),
+    )
     const opened: number[] = []
     const openHidden = (id: number) => {
       opened.push(id)
@@ -364,7 +366,12 @@ function setUpBatterMission(missionId: number, random: RandomPort = createSeeded
     return {
       runner,
       session: useMissionSession({
-        runner, random, missionRecord, screen, setScreen, ...(runningModeManual === undefined ? {} : { runningModeManual }),
+        runner,
+        random,
+        missionRecord,
+        screen,
+        setScreen,
+        ...(runningModeManual === undefined ? {} : { runningModeManual }),
       }),
     }
   })
@@ -384,7 +391,8 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
       const rendered = setUpBatterMission(1, createSeededRandom(7), manual)
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+          batterHand: 0,
+          resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -409,7 +417,8 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
 
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        batterHand: 0, resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+        batterHand: 0,
+        resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
         hasSwung: true,
         isBunt: false,
         resultCode: null,
@@ -437,7 +446,8 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     const 안타 = () =>
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
+          batterHand: 0,
+          resolution: { kind: '타구', outcome: { kind: '안타', bases: 1 } },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -466,7 +476,8 @@ describe('미션 인플레이 타구는 수비 화면을 거친다 — 0x13 → 
     for (let count = 0; count < 3; count += 1) {
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
+          batterHand: 0,
+          resolution: { kind: '스트라이크', isSwinging: true },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -494,7 +505,8 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
 
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        batterHand: 0, resolution: { kind: '볼' },
+        batterHand: 0,
+        resolution: { kind: '볼' },
         hasSwung: false,
         isBunt: false,
         resultCode: null,
@@ -531,7 +543,8 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
     })
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        batterHand: 0, resolution: { kind: '볼' },
+        batterHand: 0,
+        resolution: { kind: '볼' },
         hasSwung: false,
         isBunt: false,
         resultCode: null,
@@ -587,7 +600,13 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
     const rendered = setUpBatterMission(5)
     act(() => rendered.result.current.session.actions.steal(1))
     act(() => {
-      rendered.result.current.session.handleMissionPitch({ batterHand: 0, resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null })
+      rendered.result.current.session.handleMissionPitch({
+        batterHand: 0,
+        resolution: { kind: '볼' },
+        hasSwung: false,
+        isBunt: false,
+        resultCode: null,
+      })
     })
     const pending = rendered.result.current.session.pendingRunnerPlay
     if (pending === null) throw new Error('도루 판이 안 붙들렸다')
@@ -609,7 +628,8 @@ describe('타자 미션 도루 — 키는 출발만(0xa9bd4), 공이 도착하�
 
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        batterHand: 0, resolution: { kind: '스트라이크', isSwinging: false },
+        batterHand: 0,
+        resolution: { kind: '스트라이크', isSwinging: false },
         hasSwung: false,
         isBunt: false,
         resultCode: null,
@@ -664,7 +684,8 @@ describe('미션 마선수의 레벨 배율 0xd88aa (0xb6414)', () => {
     for (let pitch = 0; pitch < 2; pitch += 1) {
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '볼' },
+          batterHand: 0,
+          resolution: { kind: '볼' },
           hasSwung: false,
           isBunt: false,
           resultCode: null,
@@ -1073,7 +1094,7 @@ describe("투수 미션 견제사는 '아웃' 목표(R+0x13c)에 든다 — 0x51
   })
 
   it("'아웃' 목표가 견제사로 차면 판 끝 판정에서 바로 성공 — 0xaa928 이 상태 1 로 안 남는다", () => {
-    const 아웃한개 = { ...mission12, goals: ['아웃'], goalCounts: { '아웃': 1 } }
+    const 아웃한개 = { ...mission12, goals: ['아웃'], goalCounts: { 아웃: 1 } }
     const rendered = setUpPitcherMissionOf(아웃한개, 102)
 
     act(() => rendered.result.current.session.actions.pickoff('3'))
@@ -1111,14 +1132,22 @@ describe('투수 미션 투수는 투수편 커리어의 0xb6414 값으로 던�
     const screen: Screen = { kind: '미션선택' }
     const rendered = renderHook(() =>
       useMissionSession({
-        runner: useAtBatRunner(), random: createSeededRandom(1), missionRecord, screen, setScreen: vi.fn(),
+        runner: useAtBatRunner(),
+        random: createSeededRandom(1),
+        missionRecord,
+        screen,
+        setScreen: vi.fn(),
         pitcher: 강투수,
       }),
     )
     expect(rendered.result.current.pitcher).toBe(강투수)
     const bare = renderHook(() =>
       useMissionSession({
-        runner: useAtBatRunner(), random: createSeededRandom(1), missionRecord, screen, setScreen: vi.fn(),
+        runner: useAtBatRunner(),
+        random: createSeededRandom(1),
+        missionRecord,
+        screen,
+        setScreen: vi.fn(),
       }),
     )
     expect(bare.result.current.pitcher).toEqual(modePitcherOf(null))
@@ -1149,7 +1178,12 @@ describe('투수 미션 투수는 투수편 커리어의 0xb6414 값으로 던�
 /* ── 미션 선수 고르기 (하위 17 · +0xa5/+0xa6) ───────────────────────────── */
 
 describe('미션 선수 고르기 — 명예 선수를 고르면 0x1fbd0 · 0x1fc20 이 명전 기록을 준다', () => {
-  const 명전투수 = { ...createPitcherCareer('철완'), endingIndex: 5, ability: { control: 950, velocity: 950, breaking: 950, stamina: 950 }, selectedMagicNumber: 2 }
+  const 명전투수 = {
+    ...createPitcherCareer('철완'),
+    endingIndex: 5,
+    ability: { control: 950, velocity: 950, breaking: 950, stamina: 950 },
+    selectedMagicNumber: 2,
+  }
   const 명전타자 = { ...createCareer('전설'), endingIndex: 4, equippedSkillIds: [22], specialSwingNumber: 3 }
   const 투수등록 = registerHallOfFamePitcher(EMPTY_COLLECTION, 명전투수, 99_999)
   if (투수등록.kind !== '등록') throw new Error('등록 실패')
@@ -1160,11 +1194,20 @@ describe('미션 선수 고르기 — 명예 선수를 고르면 0x1fbd0 · 0x1f
 
   function 세션(initial: Screen = { kind: '미션선택' }) {
     const missionRecord: MissionRecordPort = { load: () => ({}), save: vi.fn() }
-    return renderHook(({ screen }: { screen: Screen }) =>
-      useMissionSession({
-        runner: useAtBatRunner(), random: createSeededRandom(1), missionRecord, screen, setScreen: vi.fn(),
-        pitcher: 나리투수, batterSkillIds: [7], hallOfFame,
-      }), { initialProps: { screen: initial } })
+    return renderHook(
+      ({ screen }: { screen: Screen }) =>
+        useMissionSession({
+          runner: useAtBatRunner(),
+          random: createSeededRandom(1),
+          missionRecord,
+          screen,
+          setScreen: vi.fn(),
+          pitcher: 나리투수,
+          batterSkillIds: [7],
+          hallOfFame,
+        }),
+      { initialProps: { screen: initial } },
+    )
   }
 
   it('처음에는 아무도 안 골랐다 — 나리 투수·명예 타자 없음', () => {
@@ -1246,25 +1289,35 @@ describe('미션 경기 시작은 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 �
     return calls
   }
 
-  it.each([['타자', MISSIONS.find((m) => m.side === '타자')!], ['투수', MISSIONS.find((m) => m.side === '투수')!]] as const)(
-    '%s 미션 begin — 굴림 하나 rand(0, 2)', (_side, mission) => {
-      const { port, calls } = 기록난수()
-      const rendered = renderHook(() =>
-        useMissionSession({
-          runner: useAtBatRunner(), random: port, missionRecord: { load: () => ({}), save: vi.fn() },
-          screen: { kind: '미션선택' }, setScreen: vi.fn(),
-        }))
-      act(() => rendered.result.current.actions.begin(mission))
-      expect(calls).toEqual(시작굴림())
-    })
+  it.each([
+    ['타자', MISSIONS.find((m) => m.side === '타자')!],
+    ['투수', MISSIONS.find((m) => m.side === '투수')!],
+  ] as const)('%s 미션 begin — 굴림 하나 rand(0, 2)', (_side, mission) => {
+    const { port, calls } = 기록난수()
+    const rendered = renderHook(() =>
+      useMissionSession({
+        runner: useAtBatRunner(),
+        random: port,
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '미션선택' },
+        setScreen: vi.fn(),
+      }),
+    )
+    act(() => rendered.result.current.actions.begin(mission))
+    expect(calls).toEqual(시작굴림())
+  })
 
   it('마선수 대결(beginAceMatch · beginPitcherAceMatch)도 한 번', () => {
     const { port, calls } = 기록난수()
     const rendered = renderHook(() =>
       useMissionSession({
-        runner: useAtBatRunner(), random: port, missionRecord: { load: () => ({}), save: vi.fn() },
-        screen: { kind: '투수편' }, setScreen: vi.fn(),
-      }))
+        runner: useAtBatRunner(),
+        random: port,
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' },
+        setScreen: vi.fn(),
+      }),
+    )
     const batter = aceMatchMissionOf(SIKER_TEAM, '타자')
     const pitcher = aceMatchMissionOf(16, '투수')
     if (batter === null || pitcher === null) throw new Error('대결 미션이 없다')
@@ -1315,9 +1368,7 @@ function sessionInBenchClearing() {
     const setScreen = vi.fn((next: Screen) => {
       screen = next
     })
-    const rendered = renderHook(() =>
-      useMissionSession({ runner: useAtBatRunner(), random: counter.port, missionRecord, screen, setScreen }),
-    )
+    const rendered = renderHook(() => useMissionSession({ runner: useAtBatRunner(), random: counter.port, missionRecord, screen, setScreen }))
     act(() => rendered.result.current.actions.begin(mission))
     for (let pitch = 0; pitch < 60; pitch += 1) {
       // 인플레이 타구(수비 화면)나 미션 끝이면 같은 미션을 다시 세운다
@@ -1470,7 +1521,11 @@ describe('타자 미션(모드 6)도 0x12 갱신 0x4e6d4 를 탄다 — 사구�
     for (let count = 0; count < 3; count += 1) {
       act(() => {
         삼진판.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null,
+          batterHand: 0,
+          resolution: { kind: '스트라이크', isSwinging: true },
+          hasSwung: true,
+          isBunt: false,
+          resultCode: null,
         })
       })
     }
@@ -1528,7 +1583,12 @@ describe('투수 미션 마구 — 남은 횟수 팀+0x28 과 공+0x10', () => {
     })
     const rendered = renderHook(() =>
       useMissionSession({
-        runner: useAtBatRunner(), random: createSeededRandom(5), missionRecord, screen, setScreen, pitcher: 마구투수,
+        runner: useAtBatRunner(),
+        random: createSeededRandom(5),
+        missionRecord,
+        screen,
+        setScreen,
+        pitcher: 마구투수,
       }),
     )
     act(() => rendered.result.current.actions.begin(mission))
@@ -1735,7 +1795,8 @@ describe('상태 0xe 의 OK 대기 — 미션(모드 5·6)도 새 타석마다 (
     const 스트라이크 = () =>
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
+          batterHand: 0,
+          resolution: { kind: '스트라이크', isSwinging: true },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -1772,7 +1833,8 @@ describe('미션의 파울 각 공도 수비 판을 돈다 — 파울로 닫히�
     const rendered = setUpBatterMission(1)
     act(() => {
       rendered.result.current.session.handleMissionPitch({
-        batterHand: 0, resolution: { kind: '파울' },
+        batterHand: 0,
+        resolution: { kind: '파울' },
         hasSwung: true,
         isBunt: false,
         resultCode: 파울코드.resultCode,
@@ -1871,7 +1933,8 @@ describe('미션 상대 CPU 교체 — 0xf 진입 0x3d954 (타자 미션 0xac428
 
       act(() => {
         rendered.result.current.session.handleMissionPitch({
-          batterHand: 0, resolution: { kind: '타구', outcome: { kind: '홈런' } },
+          batterHand: 0,
+          resolution: { kind: '타구', outcome: { kind: '홈런' } },
           hasSwung: true,
           isBunt: false,
           resultCode: null,
@@ -1968,10 +2031,14 @@ describe('마선수 대결의 사람 칸 팀 — g[0xf6] 모드 저장 레코드
   const sessionWith = (nariTeamIds?: { batter?: number; pitcher?: number }) =>
     renderHook(() =>
       useMissionSession({
-        runner: useAtBatRunner(), random: createSeededRandom(3), missionRecord: { load: () => ({}), save: vi.fn() },
-        screen: { kind: '투수편' }, setScreen: vi.fn(),
+        runner: useAtBatRunner(),
+        random: createSeededRandom(3),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' },
+        setScreen: vi.fn(),
         ...(nariTeamIds === undefined ? {} : { nariTeamIds }),
-      }))
+      }),
+    )
 
   it('타자편 대결(g[0xf6] = 4)은 타자편 저장 팀, 투수편 대결(3)은 투수편 저장 팀이 사람 칸에 선다', () => {
     const batter = aceMatchMissionOf(16, '타자')
@@ -2000,9 +2067,14 @@ describe('타자 미션의 미션 타자 레코드 칸 — 나리 저장 선수 
     const mission = MISSIONS.find((m) => m.side === '타자' && m.id === 1)!
     const rendered = renderHook(() =>
       useMissionSession({
-        runner: useAtBatRunner(), random: createSeededRandom(3), missionRecord: { load: () => ({}), save: vi.fn() },
-        screen: { kind: '미션선택' }, setScreen: vi.fn(), nariBatterRecordSlot: 5,
-      }))
+        runner: useAtBatRunner(),
+        random: createSeededRandom(3),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '미션선택' },
+        setScreen: vi.fn(),
+        nariBatterRecordSlot: 5,
+      }),
+    )
     act(() => rendered.result.current.actions.begin(mission))
     const records = rendered.result.current.missionRun?.game.humanBatting.records
     const order = rendered.result.current.missionRun?.game.humanBatting.order
@@ -2058,9 +2130,14 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
     const random = createSeededRandom(seed)
     const rendered = renderHook(() =>
       useMissionSession({
-        runner: useAtBatRunner(), random, missionRecord: { load: () => ({}), save: vi.fn() },
-        screen, setScreen: vi.fn(), pitcher: modePitcherOf(createPitcherCareer('판투수')),
-      }))
+        runner: useAtBatRunner(),
+        random,
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen,
+        setScreen: vi.fn(),
+        pitcher: modePitcherOf(createPitcherCareer('판투수')),
+      }),
+    )
     return { rendered, random }
   }
   /** 장면 시작 굴림(팁 rand(0, 73) → 덱 → rand(0, 2) → 하늘 줄 rand(0, 6)) 뒤 첫 판 굴림 36 까지 먹인 같은 씨앗의 다음 값 */
@@ -2150,9 +2227,13 @@ describe('미션 시작의 첫 0x18 판 — 첫 반 이닝이 사람 몫이라 �
       })
       expect(rendered.result.current.missionRun!.remainingSeconds).toBe(seconds! - 1)
       // 마선수 대결도 미션 장면 — 로딩 판이 다시 선다
-      act(() => rendered.result.current.actions.beginAceMatch(
-        aceMatchMissionOf(16, '타자')!, { resultEvents: [1, 2], context: '대결결과', carried: EMPTY_STORY_CARRY },
-      ))
+      act(() =>
+        rendered.result.current.actions.beginAceMatch(aceMatchMissionOf(16, '타자')!, {
+          resultEvents: [1, 2],
+          context: '대결결과',
+          carried: EMPTY_STORY_CARRY,
+        }),
+      )
       expect(rendered.result.current.loadingTip).not.toBeNull()
     } finally {
       vi.useRealTimers()
@@ -2243,7 +2324,13 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
     const rendered = renderHook(() => {
       const runner = useAtBatRunner()
       return useMissionSession({
-        runner, random, missionRecord, screen, setScreen, onGamePointReward, pitcher,
+        runner,
+        random,
+        missionRecord,
+        screen,
+        setScreen,
+        onGamePointReward,
+        pitcher,
         nariTeamIds: { batter: 5, pitcher: 6 },
         aceMatchHold: { read: () => hold, writeResult },
         onReturnToNari,
@@ -2272,9 +2359,10 @@ describe('대기가 서 있는 동안의 보통 미션 — 대결 꼴 (0xaa57c a
       writes: writeResult.mock.calls.length,
       saves: save.mock.calls.length,
       rewards: onGamePointReward.mock.calls.length,
-      earned: rendered.result.current.pitcherRun === null
-        ? 0
-        : rendered.result.current.resultEarnedGamePointOf(mission, rendered.result.current.pitcherRun.status, false),
+      earned:
+        rendered.result.current.pitcherRun === null
+          ? 0
+          : rendered.result.current.resultEarnedGamePointOf(mission, rendered.result.current.pitcherRun.status, false),
     }
     setScreen.mockClear()
     act(() => rendered.result.current.actions.finishPitcher())

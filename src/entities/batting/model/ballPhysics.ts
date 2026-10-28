@@ -161,7 +161,7 @@ const VERTICAL_SLOPE = 0x4000_0000
 export function divide(numerator: number, denominator: number): number {
   if (denominator === 0) return 0
   const quotient = Math.floor(Math.abs(numerator) / Math.abs(denominator))
-  return ((numerator < 0) !== (denominator < 0) ? -quotient : quotient) | 0
+  return (numerator < 0 !== denominator < 0 ? -quotient : quotient) | 0
 }
 
 const multiply = Math.imul
@@ -453,18 +453,13 @@ function crossingOf(segment: Segment, previous: BallPoint, current: BallPoint): 
   if (signOf(previousSide) === signOf(currentSide)) return null
   // 9f97a — 32비트 정수로 감기는 그대로 (기울기가 크면 곱이 넘친다)
   const numerator =
-    ((((multiply(segment.x1, slope) - multiply(segment.z1, 100)) | 0) - multiply(current.x, pathSlope)) | 0) +
-    multiply(current.z, 100)
+    ((((multiply(segment.x1, slope) - multiply(segment.z1, 100)) | 0) - multiply(current.x, pathSlope)) | 0) + multiply(current.z, 100)
   const x = vertical ? current.x : divide(numerator | 0, (slope - pathSlope) | 0)
   const z = divide(multiply(x - segment.x1, slope), 100) + segment.z1
   const dx = current.x - previous.x
   const dz = current.z - previous.z
   const rise = current.y - previous.y
-  const y =
-    previous.y +
-    (Math.abs(dx) > Math.abs(dz)
-      ? divide(multiply(x - previous.x, rise), dx)
-      : divide(multiply(z - previous.z, rise), dz))
+  const y = previous.y + (Math.abs(dx) > Math.abs(dz) ? divide(multiply(x - previous.x, rise), dx) : divide(multiply(z - previous.z, rise), dz))
   return { x, y, z, slope, pathSlope }
 }
 
@@ -539,9 +534,7 @@ export function collideWithStadium(previous: BallPoint, current: BallPoint): Col
   const crossing = crossingOf(stand, previous, current)
   if (crossing === null) return NO_COLLISION
   let newAngle = arctangentOfSlope(crossing.slope)
-  const between = arctangentOfSlope(
-    (crossing.pathSlope - crossing.slope + multiply(crossing.slope, crossing.pathSlope)) | 0,
-  )
+  const between = arctangentOfSlope((crossing.pathSlope - crossing.slope + multiply(crossing.slope, crossing.pathSlope)) | 0)
   const run = stand.x2 - stand.x1
   const fall = stand.z2 - stand.z1
   if (run !== 0 && fall !== 0) {
@@ -632,12 +625,7 @@ function applyCollision(
 // ── 세계 0xbfed0 ─────────────────────────────────────────────────────────
 
 /** 0xa29bc — 점을 적고 낙구 · ac4 를 본다. i > 129 면 거짓 */
-function recordPoint(
-  body: BallBody,
-  points: BallPoint[],
-  events: MutableEvents,
-  index: number,
-): boolean {
+function recordPoint(body: BallBody, points: BallPoint[], events: MutableEvents, index: number): boolean {
   if (index > MAXIMUM_BALL_POINTS - 1) return false
   const point: BallPoint = {
     x: body.x,
@@ -652,7 +640,7 @@ function recordPoint(
   points[index] = point
   if (point.y <= 0 && events.landingTick === -1 && index > 0) {
     events.landingTick = index
-    if (((body.angle + 135) >>> 0) <= 90) {
+    if ((body.angle + 135) >>> 0 <= 90) {
       if (horizontalDistance(DEEP_HIT_ORIGIN, point) > DEEP_HIT_DISTANCE) events.deepHit = true
     }
   }
@@ -690,12 +678,9 @@ export function simulateBall(body: BallBody, random?: RandomPort): BallFlight {
   // 0xa2a88 마무리
   const count = Math.min(index, MAXIMUM_BALL_POINTS)
   points.length = Math.min(points.length, count)
-  if (events.fenceTick !== -1 && events.landingTick !== -1 && ((body.angle + 135) >>> 0) <= 90) {
+  if (events.fenceTick !== -1 && events.landingTick !== -1 && (body.angle + 135) >>> 0 <= 90) {
     const landing = points[Math.min(events.landingTick, points.length - 1)]
-    events.carryScale = Math.min(
-      divide(horizontalDistance(BALL_LAUNCH_POINT, landing), CARRY_SCALE_DIVISOR),
-      CARRY_SCALE_MAXIMUM,
-    )
+    events.carryScale = Math.min(divide(horizontalDistance(BALL_LAUNCH_POINT, landing), CARRY_SCALE_DIVISOR), CARRY_SCALE_MAXIMUM)
   }
   return { points, events, randomRolls: rolls.count, body }
 }

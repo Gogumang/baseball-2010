@@ -141,9 +141,11 @@ function isEveryTitleCollected(titles: readonly string[]): boolean {
   const owned = new Set(titles.map(titleNumberOf).filter((number) => number >= 0 && number < TITLE_COUNT))
   const countIn = (from: number, to: number) => [...owned].filter((number) => number >= from && number < to).length
   const sideCount = PITCHER_TITLE_OFFSET
-  return countIn(0, COMMON_TITLE_COUNT) === COMMON_TITLE_COUNT
-    && countIn(COMMON_TITLE_COUNT, COMMON_TITLE_COUNT + sideCount) === sideCount
-    && countIn(COMMON_TITLE_COUNT + sideCount, TITLE_COUNT) === sideCount
+  return (
+    countIn(0, COMMON_TITLE_COUNT) === COMMON_TITLE_COUNT &&
+    countIn(COMMON_TITLE_COUNT, COMMON_TITLE_COUNT + sideCount) === sideCount &&
+    countIn(COMMON_TITLE_COUNT + sideCount, TITLE_COUNT) === sideCount
+  )
 }
 
 /** k 7 "엔딩 모두 수집" — ≠ 0 인 칸이 20 (0x2928e~0x292ba) */

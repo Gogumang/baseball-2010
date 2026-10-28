@@ -44,14 +44,9 @@ export const SEASON_FIRST_HIDDEN_LEVEL = 7
 
 /** 0xcbca8 s16[88] — 앞 44칸 투수 · 뒤 44칸 타자 (× 10 = 100만 원 단위) */
 const PRICE_TABLE: readonly number[] = [
-  4, 8, 12, 18, 24, 32, 40, 80, 110, 150, 200,
-  5, 9, 14, 20, 27, 35, 45, 90, 120, 160, 210,
-  4, 8, 12, 18, 24, 32, 40, 80, 110, 150, 200,
-  3, 6, 10, 15, 21, 28, 36, 70, 100, 140, 190,
-  5, 9, 14, 20, 27, 35, 45, 90, 120, 150, 200,
-  5, 9, 14, 20, 27, 35, 45, 90, 120, 160, 210,
-  3, 6, 10, 15, 21, 28, 36, 70, 100, 140, 190,
-  3, 6, 10, 15, 21, 28, 36, 70, 100, 140, 190,
+  4, 8, 12, 18, 24, 32, 40, 80, 110, 150, 200, 5, 9, 14, 20, 27, 35, 45, 90, 120, 160, 210, 4, 8, 12, 18, 24, 32, 40, 80, 110, 150, 200, 3, 6, 10, 15,
+  21, 28, 36, 70, 100, 140, 190, 5, 9, 14, 20, 27, 35, 45, 90, 120, 150, 200, 5, 9, 14, 20, 27, 35, 45, 90, 120, 160, 210, 3, 6, 10, 15, 21, 28, 36,
+  70, 100, 140, 190, 3, 6, 10, 15, 21, 28, 36, 70, 100, 140, 190,
 ]
 const BATTER_PRICE_OFFSET = 44
 const PRICE_SCALE = 10
@@ -136,15 +131,11 @@ export interface SeasonEquipmentApplied {
   readonly ownedEquipment?: readonly number[]
 }
 
-export function applySeasonEquipment(
-  money: number,
-  target: SeasonEquipmentTarget,
-  part: number,
-  level: number,
-): SeasonEquipmentApplied {
+export function applySeasonEquipment(money: number, target: SeasonEquipmentTarget, part: number, level: number): SeasonEquipmentApplied {
   const price = seasonEquipmentPriceOf(target.isBatter, part, level)
   const equipment = Array.from({ length: SEASON_EQUIPMENT_PART_COUNT }, (_unused, slot) =>
-    slot === part ? level + 1 : target.equipment[slot] ?? 0)
+    slot === part ? level + 1 : (target.equipment[slot] ?? 0),
+  )
   if (!isBugFixed('B-23')) return { money: Math.min(MONEY_LIMIT, Math.max(0, money - price * PRICE_SCALE)), equipment }
   // 고친 길 — 산 적 있는 칸은 돈을 안 받고, 빼낸 칸(니블 − 1)과 새 칸을 산 칸 비트에 적는다
   const owned = ownsSeasonEquipment(target, part, level)

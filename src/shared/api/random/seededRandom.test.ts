@@ -11,22 +11,15 @@ describe('createSeededRandom — 원본 0xbfa54 · 0x9d468', () => {
   it('rand(lo, hi) 첫 값들이 원본 산술과 같다 — lo == hi 도 한 번 굴리고, lo > hi 는 hi 에서 센다', () => {
     const random = createSeededRandom(20100901)
 
-    expect([
-      random.rand(0, 100),
-      random.rand(0, 10000),
-      random.rand(5, 5),
-      random.rand(10, 3),
-      random.rand(-20, 20),
-      random.rand(0, 2),
-    ]).toEqual([14, 6370, 5, 7, 11, 1])
+    expect([random.rand(0, 100), random.rand(0, 10000), random.rand(5, 5), random.rand(10, 3), random.rand(-20, 20), random.rand(0, 2)]).toEqual([
+      14, 6370, 5, 7, 11, 1,
+    ])
   })
 
   it('rand9d(n) 첫 값들이 원본 산술과 같다 — n ≤ 0 은 굴리지 않고 0', () => {
     const random = createSeededRandom(20100901)
 
-    expect([random.rand9d(100), random.rand9d(16), random.rand9d(0), random.rand9d(-3), random.rand9d(7)]).toEqual([
-      19, 3, 0, 0, 3,
-    ])
+    expect([random.rand9d(100), random.rand9d(16), random.rand9d(0), random.rand9d(-3), random.rand9d(7)]).toEqual([19, 3, 0, 0, 3])
   })
 
   it('두 함수는 씨앗 칸 하나를 함께 굴린다', () => {
@@ -45,9 +38,7 @@ describe('createSeededRandom — 원본 0xbfa54 · 0x9d468', () => {
     const first = createSeededRandom(20100901)
     const second = createSeededRandom(20100901)
 
-    expect(Array.from({ length: 20 }, () => first.rand(0, 1000))).toEqual(
-      Array.from({ length: 20 }, () => second.rand(0, 1000)),
-    )
+    expect(Array.from({ length: 20 }, () => first.rand(0, 1000))).toEqual(Array.from({ length: 20 }, () => second.rand(0, 1000)))
   })
 
   it('rand(lo, hi) 는 위끝을 빼고 [lo, hi) 안에 든다', () => {

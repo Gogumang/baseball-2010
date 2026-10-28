@@ -19,7 +19,12 @@ export function soakNumber(name: string, fallback: number): number {
 export function soakSeeds(fallback: readonly number[]): readonly number[] {
   const raw = typeof process === 'undefined' ? undefined : process.env.SOAK_SEEDS
   if (raw === undefined || raw.trim() === '') return fallback
-  return raw.split(',').map((part) => part.trim()).filter((part) => part !== '').map(Number).filter((value) => Number.isFinite(value))
+  return raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .map(Number)
+    .filter((value) => Number.isFinite(value))
 }
 
 /**
@@ -119,12 +124,7 @@ export function outOfRangeOf(
 }
 
 /** 순위표가 승 많은 차례 · 승이 같으면 패 적은 차례인가 (`rankingOf` 0xb7aa1 의 앞 두 기준 — 셋째 기준은 원본 색인 버그) */
-export function rankingOrderProblemsOf(
-  label: string,
-  ranking: readonly number[],
-  wins: readonly number[],
-  losses: readonly number[],
-): string[] {
+export function rankingOrderProblemsOf(label: string, ranking: readonly number[], wins: readonly number[], losses: readonly number[]): string[] {
   const out: string[] = []
   if (new Set(ranking).size !== ranking.length) out.push(`${label}: 순위에 같은 팀이 둘 (${ranking.join(',')})`)
   for (let rank = 1; rank < ranking.length; rank += 1) {
@@ -167,15 +167,29 @@ export function leagueTallyProblemsOf(
 /** 타자 기록 줄 — 타수 ≥ 안타 ≥ 장타 합 · 모두 0 이상 정수 */
 export function batterLineProblemsOf(
   label: string,
-  line: { readonly atBats: number; readonly hits: number; readonly homeRuns: number; readonly runsBattedIn: number;
-    readonly doubles?: number; readonly triples?: number; readonly steals?: number },
+  line: {
+    readonly atBats: number
+    readonly hits: number
+    readonly homeRuns: number
+    readonly runsBattedIn: number
+    readonly doubles?: number
+    readonly triples?: number
+    readonly steals?: number
+  },
 ): string[] {
-  const out = outOfRangeOf(label, {
-    atBats: line.atBats, hits: line.hits, homeRuns: line.homeRuns, runsBattedIn: line.runsBattedIn,
-    ...(line.doubles === undefined ? {} : { doubles: line.doubles }),
-    ...(line.triples === undefined ? {} : { triples: line.triples }),
-    ...(line.steals === undefined ? {} : { steals: line.steals }),
-  }, 0)
+  const out = outOfRangeOf(
+    label,
+    {
+      atBats: line.atBats,
+      hits: line.hits,
+      homeRuns: line.homeRuns,
+      runsBattedIn: line.runsBattedIn,
+      ...(line.doubles === undefined ? {} : { doubles: line.doubles }),
+      ...(line.triples === undefined ? {} : { triples: line.triples }),
+      ...(line.steals === undefined ? {} : { steals: line.steals }),
+    },
+    0,
+  )
   if (line.hits > line.atBats) out.push(`${label}: 안타 ${line.hits} > 타수 ${line.atBats}`)
   const extra = line.homeRuns + (line.doubles ?? 0) + (line.triples ?? 0)
   if (extra > line.hits) out.push(`${label}: 장타 ${extra} > 안타 ${line.hits}`)

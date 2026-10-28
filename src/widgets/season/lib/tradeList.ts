@@ -39,11 +39,7 @@ export interface TradePlayerEntry {
 const PROFILE_ONLY: SeasonEntryCellSource = { staminaMode: 2, teamMorale: 100 }
 
 /** 한 팀 레코드의 탭 명단 — 내 팀(0xe6)·상대 팀(0xe5) 모두 같은 규칙이다 */
-export function tradeEntriesOf(
-  teamId: number,
-  roster: SeasonTeamRoster,
-  isPitcher: boolean,
-): readonly TradePlayerEntry[] {
+export function tradeEntriesOf(teamId: number, roster: SeasonTeamRoster, isPitcher: boolean): readonly TradePlayerEntry[] {
   const players = isPitcher ? roster.pitchers : roster.batters
   const tab = isPitcher ? TRADE_REQUEST_TAB.투수 : TRADE_REQUEST_TAB.타자
   return players.map((player, index) => ({
@@ -63,19 +59,11 @@ function profileLowOf(teamId: number, player: SeasonPlayer, isPitcher: boolean):
 }
 
 /** 상대 팀 명단 (0xe5) — 시즌 저장의 그 팀 레코드 */
-export function opponentTradeEntriesOf(
-  teamId: number,
-  roster: SeasonTeamRoster,
-  isPitcher: boolean,
-): readonly TradePlayerEntry[] {
+export function opponentTradeEntriesOf(teamId: number, roster: SeasonTeamRoster, isPitcher: boolean): readonly TradePlayerEntry[] {
   return tradeEntriesOf(teamId, roster, isPitcher)
 }
 
 /** 내 팀 명단 (0xe6) — 시즌 세이브의 명단. 나리·명예 선수는 고를 때 걸러진다 */
-export function myTradeEntriesOf(
-  teamId: number,
-  roster: SeasonTeamRoster,
-  isPitcher: boolean,
-): readonly TradePlayerEntry[] {
+export function myTradeEntriesOf(teamId: number, roster: SeasonTeamRoster, isPitcher: boolean): readonly TradePlayerEntry[] {
   return tradeEntriesOf(teamId, roster, isPitcher)
 }

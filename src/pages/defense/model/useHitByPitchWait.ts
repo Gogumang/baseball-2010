@@ -56,25 +56,28 @@ export function useHitByPitchWait({
   const latestRef = useRef({ waitTicks, random, onJudge, onEnter })
   latestRef.current = { waitTicks, random, onJudge, onEnter }
 
-  useSceneTick(() => {
-    const current = holdRef.current
-    if (current === null) return
-    const latest = latestRef.current
-    if (current.phase === 'wait') {
-      const waiting = waitingRef.current
-      if (waiting === null || waiting.hold !== current) return
-      waiting.elapsed += 1
-      if (waiting.elapsed < latest.waitTicks) return
-      waitingRef.current = null
-      finishFrameParticles(latest.random)
-      latest.onJudge()
-      return
-    }
-    if (current.phase === 'entry') {
-      finishFrameParticles(latest.random)
-      latest.onEnter()
-    }
-  }, hold !== null && hold.phase !== 'scene' && !isFrozen)
+  useSceneTick(
+    () => {
+      const current = holdRef.current
+      if (current === null) return
+      const latest = latestRef.current
+      if (current.phase === 'wait') {
+        const waiting = waitingRef.current
+        if (waiting === null || waiting.hold !== current) return
+        waiting.elapsed += 1
+        if (waiting.elapsed < latest.waitTicks) return
+        waitingRef.current = null
+        finishFrameParticles(latest.random)
+        latest.onJudge()
+        return
+      }
+      if (current.phase === 'entry') {
+        finishFrameParticles(latest.random)
+        latest.onEnter()
+      }
+    },
+    hold !== null && hold.phase !== 'scene' && !isFrozen,
+  )
 }
 
 /**

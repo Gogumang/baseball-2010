@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import {
-  koreanHourOf, modeBackPaletteOf, timeSlotOfHour, useSceneEntryHour,
-} from '@/shared/lib/phoneClock/phoneClock'
+import { koreanHourOf, modeBackPaletteOf, timeSlotOfHour, useSceneEntryHour } from '@/shared/lib/phoneClock/phoneClock'
 
 const HOUR = 60 * 60 * 1000
 

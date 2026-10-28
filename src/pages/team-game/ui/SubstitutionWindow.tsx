@@ -103,7 +103,6 @@ export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
     // 키 처리는 stateRef · latest 로 지금 값을 읽는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const gameUi = useFrameOrigins(GAME_UI_FRAMES)
@@ -120,35 +119,67 @@ export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, 
   return (
     <div data-testid={isPitcher ? '투수 교체 창' : '타자 교체 창'}>
       {palette3.definition}
-      <CommonPanel x={W.panel.x} y={W.panel.y} width={W.panel.width} height={W.panel.height} topBand={W.panel.topBand}
-        bottomBand={W.panel.bottomBand} titleTab dim testId="교체 창 판" />
+      <CommonPanel
+        x={W.panel.x}
+        y={W.panel.y}
+        width={W.panel.width}
+        height={W.panel.height}
+        topBand={W.panel.topBand}
+        bottomBand={W.panel.bottomBand}
+        titleTab
+        dim
+        testId="교체 창 판"
+      />
       <img alt="" src={`${GAME_UI}/${pad(W.arrows.upImage)}.png`} style={{ ...pixel, left: W.arrows.x, top: W.arrows.upY[blinkOut ? 0 : 1] }} />
       <img alt="" src={`${GAME_UI}/${pad(W.arrows.downImage)}.png`} style={{ ...pixel, left: W.arrows.x, top: W.arrows.downY[blinkOut ? 0 : 1] }} />
       {/* 사람 팀 큰 로고 — 1.5 배 · 섞기 7/32 (0xbb91d 종류 0x12) */}
-      <img alt="" src={`${TEAM_LOGO}/${pad(ourTeamId)}.png`} data-testid="교체 창 로고"
-        style={{ ...pixel, left: W.logo.centerX, top: W.logo.centerY, opacity: W.logo.opacity,
-          transform: `translate(-50%, -50%) scale(${W.logo.scale})` }} />
-      <img alt={isPitcher ? '투수' : '타자'} src={`${IMG_TEXT_FRAMES}/${pad(isPitcher ? W.title.pitcherFrame : W.title.batterFrame)}.png`}
-        style={{ ...pixel, ...palette3.style, left: W.title.firstX, top: W.title.y }} />
+      <img
+        alt=""
+        src={`${TEAM_LOGO}/${pad(ourTeamId)}.png`}
+        data-testid="교체 창 로고"
+        style={{
+          ...pixel,
+          left: W.logo.centerX,
+          top: W.logo.centerY,
+          opacity: W.logo.opacity,
+          transform: `translate(-50%, -50%) scale(${W.logo.scale})`,
+        }}
+      />
+      <img
+        alt={isPitcher ? '투수' : '타자'}
+        src={`${IMG_TEXT_FRAMES}/${pad(isPitcher ? W.title.pitcherFrame : W.title.batterFrame)}.png`}
+        style={{ ...pixel, ...palette3.style, left: W.title.firstX, top: W.title.y }}
+      />
       <img alt="교체" src={`${IMG_TEXT_FRAMES}/${pad(W.title.changeFrame)}.png`} style={{ ...pixel, left: W.title.secondX, top: W.title.y }} />
 
       {/* 지금 선수 칸 0x37904 — 머리 줄 + 값 줄 */}
       {HEADER_TEXT_FRAMES[isPitcher ? 'pitcher' : 'batter'].map((frame, column) => (
-        <CenteredImgText key={column} origins={imgText} frame={frame} x={W.columnX[column]} y={W.current.headerY}
-          width={W.columnWidth[column]} />
+        <CenteredImgText key={column} origins={imgText} frame={frame} x={W.columnX[column]} y={W.current.headerY} width={W.columnWidth[column]} />
       ))}
       <RowCells row={current} y={W.current.cellY} isPitcher={isPitcher} gameUi={gameUi} imgText={imgText} testId="지금 선수" />
       <FrameSprite folder={GAME_UI_FRAMES} frame={changeFrameAt(tick)} origins={gameUi} x={W.change.x} y={W.change.y} />
 
       {/* 벤치 목록 0x37e5c — 6 줄 · 커서 상자 0x37dd4 */}
       {visible.map((row, offset) => (
-        <RowCells key={row.index} row={row} y={W.bench.firstY + offset * W.bench.step} isPitcher={isPitcher} gameUi={gameUi}
-          imgText={imgText} testId={`벤치 ${offset}`} />
+        <RowCells
+          key={row.index}
+          row={row}
+          y={W.bench.firstY + offset * W.bench.step}
+          isPitcher={isPitcher}
+          gameUi={gameUi}
+          imgText={imgText}
+          testId={`벤치 ${offset}`}
+        />
       ))}
       {visible.length > 0 && <CursorBox rowY={W.bench.firstY + cursorRow * W.bench.step} tick={tick} />}
       {detail !== null && detailOpenedAt !== null && (
-        <PlayerDetailWindow detail={detail} origin={SUBSTITUTION_DETAIL_ORIGIN} draw={tick - detailOpenedAt} radarDraw={tick - radarRestartAt}
-          radarKey={radarRestartAt} />
+        <PlayerDetailWindow
+          detail={detail}
+          origin={SUBSTITUTION_DETAIL_ORIGIN}
+          draw={tick - detailOpenedAt}
+          radarDraw={tick - radarRestartAt}
+          radarKey={radarRestartAt}
+        />
       )}
 
       {/* 바닥 소프트키 자리 — game_ui 이미지 12 · "0 INFO" */}
@@ -156,9 +187,12 @@ export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, 
       <FrameSprite folder={IMG_TEXT_FRAMES} frame={W.info.textFrame} origins={imgText} x={W.info.textX - 1} y={W.info.textY} />
 
       {visible.map((row, offset) => (
-        <PressArea key={row.index} label={offset === cursorRow ? `${row.name} 교체` : `${row.name} 고르기`}
+        <PressArea
+          key={row.index}
+          label={offset === cursorRow ? `${row.name} 교체` : `${row.name} 고르기`}
           rect={{ x: W.cursorBox.x, y: W.bench.firstY + offset * W.bench.step, width: W.cursorBox.width, height: W.cursorBox.height }}
-          onPress={() => (offset === cursorRow ? confirm() : move(offset - cursorRow))} />
+          onPress={() => (offset === cursorRow ? confirm() : move(offset - cursorRow))}
+        />
       ))}
       <PressArea label="위" rect={{ x: W.arrows.x, y: W.arrows.upY[0], width: 13, height: 10 }} onPress={() => move(-1)} />
       <PressArea label="아래" rect={{ x: W.arrows.x, y: W.arrows.downY[1], width: 13, height: 10 }} onPress={() => move(1)} />
@@ -171,8 +205,19 @@ export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, 
 }
 
 /** 0x5650c · 0xb9d75 꼴 0x22 — (x, y, 폭, 15) 안 가운데 */
-function CenteredImgText({ origins, frame, x, y, width, style }: {
-  readonly origins: FrameOrigins | null; readonly frame: number; readonly x: number; readonly y: number; readonly width: number
+function CenteredImgText({
+  origins,
+  frame,
+  x,
+  y,
+  width,
+  style,
+}: {
+  readonly origins: FrameOrigins | null
+  readonly frame: number
+  readonly x: number
+  readonly y: number
+  readonly width: number
   readonly style?: CSSProperties
 }) {
   const origin = origins?.[pad(frame)]
@@ -182,17 +227,31 @@ function CenteredImgText({ origins, frame, x, y, width, style }: {
 }
 
 /** 칸 넷 — 이름(game_ui 28) · 딱지 · 방어율/타율 · 탈삼진/홈런 (game_ui 35) */
-function RowCells({ row, y, isPitcher, gameUi, imgText, testId }: {
-  readonly row: SubstitutionRow; readonly y: number; readonly isPitcher: boolean
-  readonly gameUi: FrameOrigins | null; readonly imgText: FrameOrigins | null; readonly testId: string
+function RowCells({
+  row,
+  y,
+  isPitcher,
+  gameUi,
+  imgText,
+  testId,
+}: {
+  readonly row: SubstitutionRow
+  readonly y: number
+  readonly isPitcher: boolean
+  readonly gameUi: FrameOrigins | null
+  readonly imgText: FrameOrigins | null
+  readonly testId: string
 }) {
   const W = SUBSTITUTION_WINDOW
   const [nameX, badgeX, rateX, countX] = W.columnX
   // 0xba2e5(x − 1, y, 54, 15, 이름, 정렬 2(가로 가운데), dy 2) — 앱 글꼴 흰색
   const nameWidth = measurePixelTextWidth(row.name)
-  const rate = row.rate === null ? null : isPitcher
-    ? yearCellDrawingOf({ value: row.rate > 100 ? row.rate * 10 : row.rate, digits: 3, isDecimal: true })
-    : yearCellDrawingOf({ value: row.rate, digits: row.rate > 999 ? 3 : 0, isDecimal: true })
+  const rate =
+    row.rate === null
+      ? null
+      : isPitcher
+        ? yearCellDrawingOf({ value: row.rate > 100 ? row.rate * 10 : row.rate, digits: 3, isDecimal: true })
+        : yearCellDrawingOf({ value: row.rate, digits: row.rate > 999 ? 3 : 0, isDecimal: true })
   const count = row.count === null ? null : yearCellDrawingOf({ value: row.count, digits: -1, isDecimal: false })
   return (
     <div data-testid={`교체 줄 ${testId}`} aria-label={row.name}>
@@ -227,8 +286,16 @@ function RowCells({ row, y, isPitcher, gameUi, imgText, testId }: {
 }
 
 /** 0x6aff8(칸 x + 0x18, 칸 y + 3, …, num 0x14, 앵커 4) — `yearCellDrawingOf` 는 칸 왼쪽 기준이다 */
-function CellNumber({ drawing, x, y, dx = 0 }: {
-  readonly drawing: ReturnType<typeof yearCellDrawingOf>; readonly x: number; readonly y: number; readonly dx?: number
+function CellNumber({
+  drawing,
+  x,
+  y,
+  dx = 0,
+}: {
+  readonly drawing: ReturnType<typeof yearCellDrawingOf>
+  readonly x: number
+  readonly y: number
+  readonly dx?: number
 }) {
   return (
     <>
@@ -242,8 +309,20 @@ function CellNumber({ drawing, x, y, dx = 0 }: {
   )
 }
 
-function Rect({ x, y, width, height, color, opacity = 1 }: {
-  readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string; readonly opacity?: number
+function Rect({
+  x,
+  y,
+  width,
+  height,
+  color,
+  opacity = 1,
+}: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
+  readonly opacity?: number
 }) {
   if (width <= 0 || height <= 0) return null
   return <span style={{ ...pixel, left: x, top: y, width, height, background: color, opacity }} />

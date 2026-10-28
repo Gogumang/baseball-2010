@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf } from '@/pages/home-run-derby/lib/derbyHudLayout'
+import { ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf } from '@/pages/home-run-derby/lib/derbyHudLayout'
 
 describe('콤보 표시 배치 (0x4585c)', () => {
   it('좌타는 trainning 애니 1(칸 3·4·5·6)을 (0, H/2) 에 그리고, 끝 칸 전에는 숫자가 없다', () => {

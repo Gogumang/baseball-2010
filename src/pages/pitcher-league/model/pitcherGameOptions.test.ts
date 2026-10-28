@@ -156,7 +156,9 @@ describe('경기 옵션 조립 — 커리어 → PitcherGameOptions', () => {
     const 리그 = pitcherGameOptionsOf(낮은사기)
     expect(리그.teamMorale).toBe(20)
     // 사기 ≤ 30 −20%
-    expect(리그.stats.control).toBe(리그.statsBeforeMoraleCut?.control !== undefined ? 리그.statsBeforeMoraleCut.control - 리그.statsBeforeMoraleCut.control / 5 : -1)
+    expect(리그.stats.control).toBe(
+      리그.statsBeforeMoraleCut?.control !== undefined ? 리그.statsBeforeMoraleCut.control - 리그.statsBeforeMoraleCut.control / 5 : -1,
+    )
     const 대회 = pitcherGameOptionsOf({ ...낮은사기, nationalCup: createNationalCup(), nariCupTeams: createPitcherCupTeams(0, 11) })
     expect(대회.teamMorale).toBe(100)
     expect(대회.stats).toEqual(대회.statsBeforeMoraleCut)

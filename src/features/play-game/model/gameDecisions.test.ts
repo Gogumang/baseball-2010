@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createGame } from '@/entities/game/model/gameState'
 import type { GameState } from '@/entities/game/model/gameState'
 import { EMPTY_DECISION_STATE, NO_SIDE } from '@/entities/game/model/winLossSave'
-import {
-  decisionsAfterPitcherChange,
-  decisionsAfterPlay,
-  decisionsAfterRuns,
-  pitcherOfRecordNamesOf,
-} from '@/features/play-game/model/gameDecisions'
+import { decisionsAfterPitcherChange, decisionsAfterPlay, decisionsAfterRuns, pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 
 /** 사람이 후공(측 1) — 초에 상대(측 0)가 공격한다 */
 const 경기 = (overrides: Partial<GameState>): GameState => ({ ...createGame(2, 1), ...overrides })

@@ -24,10 +24,7 @@ function drawnGameOf(after: GameState, before: GameState): GameState {
  *   DUE UP = 공격 팀 팀[+0x32](타석 틱이면 방금 친 타자 — 예약 확정 0xaebe4 는 다음 부름 머리) 부터 세 칸.
  * - 점수판 0x41c18: 그 틱 그림 경기의 이닝별 칸(`lineScoreSlotsOf`).
  */
-export function pitcherAutoRelayStepsOf(
-  ticks: readonly PitcherAutoRelayTick[],
-  myName: string | null,
-): MissionAutoRelayStep[] {
+export function pitcherAutoRelayStepsOf(ticks: readonly PitcherAutoRelayTick[], myName: string | null): MissionAutoRelayStep[] {
   return ticks.map((tick) => {
     const progress: PitcherGameProgress = tick.progress
     const game = drawnGameOf(progress.game, tick.before)
@@ -35,13 +32,14 @@ export function pitcherAutoRelayStepsOf(
     const ourHalf = game.playerSide === PLAYER_SIDE_FIRST_BAT ? '초' : '말'
     const offenseOurs = game.half === ourHalf
     const atBat = tick.atBat
-    const currentOrder = lineupSlotOf(
-      atBat !== null ? atBat.orderIndex : offenseOurs ? progress.game.battingOrderIndex : progress.opponentOrderIndex,
-    )
+    const currentOrder = lineupSlotOf(atBat !== null ? atBat.orderIndex : offenseOurs ? progress.game.battingOrderIndex : progress.opponentOrderIndex)
     const line =
       atBat === null
         ? null
-        : relayLineOf(batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '', relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true))
+        : relayLineOf(
+            batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '',
+            relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true),
+          )
     return {
       inning: slots.inning,
       offenseSide: slots.offenseSide,
@@ -54,8 +52,7 @@ export function pitcherAutoRelayStepsOf(
         balls: atBat?.balls ?? 0,
         outs: game.outs,
         currentOrder,
-        dueUpNames: Array.from({ length: DUE_UP_ROWS }, (_unused, row) =>
-          batterNameAt(progress, offenseOurs, dueUpLineupSlotOf(currentOrder, row))),
+        dueUpNames: Array.from({ length: DUE_UP_ROWS }, (_unused, row) => batterNameAt(progress, offenseOurs, dueUpLineupSlotOf(currentOrder, row))),
         gameOver: game.isFinished,
       },
     }

@@ -225,10 +225,24 @@ export interface DetailCellShape {
 }
 
 const INNING_CELL: DetailCellShape = {
-  offFrame: 48, onFrame: 49, width: 19, height: 15, x: 29, dy: 11, numberDx: 0, hasBaseLabel: false,
+  offFrame: 48,
+  onFrame: 49,
+  width: 19,
+  height: 15,
+  x: 29,
+  dy: 11,
+  numberDx: 0,
+  hasBaseLabel: false,
 }
 const BASE_CELL: DetailCellShape = {
-  offFrame: 50, onFrame: 51, width: 33, height: 15, x: 107, dy: -6, numberDx: -3, hasBaseLabel: true,
+  offFrame: 50,
+  onFrame: 51,
+  width: 33,
+  height: 15,
+  x: 107,
+  dy: -6,
+  numberDx: -3,
+  hasBaseLabel: true,
 }
 
 /** 줄별 칸 꼴 — 0 타자조작 · 1 공격주자 · 2 투수조작 · 3 수비주자 */

@@ -42,7 +42,14 @@ export interface SeasonItemShopScreenProps {
  * 0x826a6 · 0x827c6 · 0x828b4) 확인해도 가드가 아무 일도 안 한다.
  */
 export function SeasonItemShopScreen({
-  kind, record, teamMorale, gamePoint, initialCursor = 0, onBuySubItem, onBuyGpItem, onBack,
+  kind,
+  record,
+  teamMorale,
+  gamePoint,
+  initialCursor = 0,
+  onBuySubItem,
+  onBuyGpItem,
+  onBack,
 }: SeasonItemShopScreenProps) {
   const [cursor, setCursor] = useState(initialCursor)
   const [notice, setNotice] = useState<string | null>(null)
@@ -50,20 +57,29 @@ export function SeasonItemShopScreen({
   const [lackNotice, setLackNotice] = useState<string | null>(null)
   const [question, setQuestion] = useState<{ readonly text: string; readonly slot: number } | null>(null)
 
-  const entries: readonly ShopEntry[] = kind === 1
-    ? seasonSubItemsOf(record).map((item) => ({
-      id: `시즌서브:${item.slot}`, name: item.name, description: item.description, price: item.price,
-      iconFrame: item.iconFrame, isOwned: item.isOwned, blockNotice: null,
-    }))
-    : seasonGpItemsOf().map((item) => ({
-      id: `시즌GP:${item.slot}`, name: item.name, description: item.description, price: item.price,
-      iconFrame: item.iconFrame, isOwned: false, blockNotice: null,
-    }))
+  const entries: readonly ShopEntry[] =
+    kind === 1
+      ? seasonSubItemsOf(record).map((item) => ({
+          id: `시즌서브:${item.slot}`,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          iconFrame: item.iconFrame,
+          isOwned: item.isOwned,
+          blockNotice: null,
+        }))
+      : seasonGpItemsOf().map((item) => ({
+          id: `시즌GP:${item.slot}`,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          iconFrame: item.iconFrame,
+          isOwned: false,
+          blockNotice: null,
+        }))
 
   const select = (slot: number) => {
-    const checked = kind === 1
-      ? checkSeasonSubItem(record, slot)
-      : checkSeasonGpItem({ record, teamMorale, gamePoint }, slot)
+    const checked = kind === 1 ? checkSeasonSubItem(record, slot) : checkSeasonGpItem({ record, teamMorale, gamePoint }, slot)
     if (checked === null) return
     if (!checked.ok) return checked.asks === true ? setLackNotice(checked.notice) : setNotice(checked.notice)
     return setQuestion({ text: checked.question, slot })
@@ -109,15 +125,10 @@ export function SeasonItemShopScreen({
       </div>
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
       {question !== null && (
-        <MessageBox text={question.text} buttons={['예', '아니오']}
-          onAnswer={(index) => (index === 0 ? buy(question.slot) : setQuestion(null))} />
+        <MessageBox text={question.text} buttons={['예', '아니오']} onAnswer={(index) => (index === 0 ? buy(question.slot) : setQuestion(null))} />
       )}
-      {lackNotice !== null && (
-        <MessageBox text={lackNotice} buttons={['예', '아니오']} onAnswer={() => setLackNotice(null)} />
-      )}
-      {question === null && notice !== null && (
-        <MessageBox text={notice} buttons={['OK']} onAnswer={() => setNotice(null)} />
-      )}
+      {lackNotice !== null && <MessageBox text={lackNotice} buttons={['예', '아니오']} onAnswer={() => setLackNotice(null)} />}
+      {question === null && notice !== null && <MessageBox text={notice} buttons={['OK']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
   )
 }

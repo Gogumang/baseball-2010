@@ -22,7 +22,12 @@ describe('마운드 투수 체력 그림 (0x38f42~0x39086)', () => {
     expect(showsPitcherFatigue({ gameMode: 3, isAcePitcher: false, isThrowing: true })).toBe(false)
   })
   it('k 번째 그림은 k 칸 나아간 칸 — 애니 10(2,3,2,2) 은 9 그림 주기', () => {
-    const 표 = [{ frame: 46, delay: 2 }, { frame: 47, delay: 3 }, { frame: 48, delay: 2 }, { frame: 49, delay: 2 }]
+    const 표 = [
+      { frame: 46, delay: 2 },
+      { frame: 47, delay: 3 },
+      { frame: 48, delay: 2 },
+      { frame: 49, delay: 2 },
+    ]
     expect([1, 2, 5, 7, 9, 10].map((k) => pitcherFatigueFrameAt(표, k)?.frame)).toEqual([46, 47, 48, 49, 46, 46])
   })
 })

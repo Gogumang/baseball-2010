@@ -160,10 +160,7 @@ export function skyLightPaletteRowOf(colorIndex: number): number | null {
  * 하늘 조명 애니 칸 — 0x78490 이 그린 뒤 `0x93d90`(한 칸 넘기기) · `0x93cfc(애니, 1)`(되풀이로 켜기)를
  * 부르므로 **끝나면 처음으로 돌아가는** 되풀이다. 칸 길이는 판정 글자와 같은 `max(1, 지연)` 틱(0x93d90).
  */
-export function skyLightFrameAt(
-  entries: readonly { frame: number; delay: number }[],
-  tick: number,
-): number | null {
+export function skyLightFrameAt(entries: readonly { frame: number; delay: number }[], tick: number): number | null {
   if (entries.length === 0) return null
   const total = entries.reduce((sum, entry) => sum + Math.max(1, entry.delay), 0)
   let remaining = Math.max(0, tick) % total
@@ -315,9 +312,8 @@ export const PITCHER_IDLE_TICKS = IDLE_STARTS[IDLE_END_STEP]
  */
 export function pitcherPoseFramesOf(aceOrder?: number | null): number[] {
   const row = aceRowOf(aceOrder)
-  const frames = row === null
-    ? [...PITCH_STEP_FRAMES.flat(), ...IDLE_FRAMES]
-    : [0, ...ACE_PITCH_STEP_FRAMES[row].slice(0, ACE_PITCH_LAST_STEPS[row] + 1)]
+  const frames =
+    row === null ? [...PITCH_STEP_FRAMES.flat(), ...IDLE_FRAMES] : [0, ...ACE_PITCH_STEP_FRAMES[row].slice(0, ACE_PITCH_LAST_STEPS[row] + 1)]
   return [...new Set(frames)].sort((a, b) => a - b)
 }
 
@@ -452,10 +448,7 @@ export function teamIconOf(teamId: number): number {
  * 칸 길이 = max(1, 지연 + 보정) 틱 (0x93d90, R2-game-effects.md 9절). 보정(correction)은
  * 애니 상태별 s8 값으로 보통 0 이다 — 표에 값이 없으면 0 으로 본다.
  */
-export function judgeFrameAt(
-  entries: readonly { frame: number; delay: number; correction?: number }[],
-  tick: number,
-): number | null {
+export function judgeFrameAt(entries: readonly { frame: number; delay: number; correction?: number }[], tick: number): number | null {
   let remaining = Math.max(0, tick)
   for (const entry of entries) {
     const length = Math.max(1, entry.delay + (entry.correction ?? 0))

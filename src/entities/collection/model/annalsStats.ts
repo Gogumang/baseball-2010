@@ -82,8 +82,7 @@ export const GAME_POINT_USAGE = {
 } as const
 
 /** 나리 편 사용처 — 호출지가 모두 `모드 == 4 ? 1 : 2` 로 고른다 (0x148c6 · 0x1500c · 0x62e16 …) */
-export const leagueUsageOf = (mode: number): number =>
-  mode === BATTER_LEAGUE_MODE ? GAME_POINT_USAGE.batterLeague : GAME_POINT_USAGE.pitcherLeague
+export const leagueUsageOf = (mode: number): number => (mode === BATTER_LEAGUE_MODE ? GAME_POINT_USAGE.batterLeague : GAME_POINT_USAGE.pitcherLeague)
 
 /** `0x22c7d` 의 모드 → `+0x8c` 칸 (점프표 0xcda88) */
 const EARNED_MODE_SLOTS: Readonly<Record<number, number>> = { 1: 0, 4: 1, 3: 2, 2: 3, 8: 4, 9: 4, 5: 5, 6: 5, 7: 6 }
@@ -178,7 +177,8 @@ export function countLeagueFirst(stats: AnnalsStats, mode: number): AnnalsStats 
   const slot = LEAGUE_FIRST_MODE_SLOTS[mode]
   if (slot === undefined) return stats
   const leagueFirstCounts = Array.from({ length: LEAGUE_FIRST_SLOTS }, (_unused, at) =>
-    at === slot ? (leagueFirstCountOf(stats, at) + 1) % U16 : leagueFirstCountOf(stats, at))
+    at === slot ? (leagueFirstCountOf(stats, at) + 1) % U16 : leagueFirstCountOf(stats, at),
+  )
   return { ...stats, leagueFirstCounts }
 }
 
@@ -254,7 +254,8 @@ export function itemPurchaseCountOf(stats: AnnalsStats, mode: number, index: num
 export function addGamePointUsage(stats: AnnalsStats, kind: number, amount: number): AnnalsStats {
   if (kind > 7 || kind < 0) return stats
   const gamePointUsage = stats.gamePointUsage.map((total, at) =>
-    at === kind ? Math.min(GAME_POINT_USAGE_LIMIT, Math.max(0, total + Math.trunc(amount))) : total)
+    at === kind ? Math.min(GAME_POINT_USAGE_LIMIT, Math.max(0, total + Math.trunc(amount))) : total,
+  )
   return { ...stats, gamePointUsage }
 }
 
@@ -272,7 +273,8 @@ export function addGamePointEarned(stats: AnnalsStats, amount: number, mode: num
   const slot = EARNED_MODE_SLOTS[mode]
   if (slot === undefined) return stats
   const gamePointEarned = stats.gamePointEarned.map((total, at) =>
-    at === slot ? Math.min(GAME_POINT_USAGE_LIMIT, Math.max(0, total + Math.trunc(amount))) : total)
+    at === slot ? Math.min(GAME_POINT_USAGE_LIMIT, Math.max(0, total + Math.trunc(amount))) : total,
+  )
   return { ...stats, gamePointEarned }
 }
 
@@ -386,11 +388,7 @@ export type AnnalsStatEvent =
  * 장착 목록이 바뀐 사이에 **새로 켜진** 스킬마다 `스킬장착` 한 건 — `0xb663c` 는 이미 켜진 스킬엔 들어오지 않으니
  * 앞뒤 장착 목록을 견줘 새로 생긴 번호만 낸다. 켜는 길(창 0x147b0 · 획득 0xa4bd8)이 어디든 같은 칸이다.
  */
-export function skillEquipStatEventsOf(
-  mode: number,
-  before: readonly number[],
-  after: readonly number[],
-): AnnalsStatEvent[] {
+export function skillEquipStatEventsOf(mode: number, before: readonly number[], after: readonly number[]): AnnalsStatEvent[] {
   return after
     .filter((skillId, index) => !before.includes(skillId) && after.indexOf(skillId) === index)
     .map((skillId) => ({ kind: '스킬장착', mode, skillId }))
@@ -420,32 +418,32 @@ export function normalizeAnnalsStats(raw: unknown): AnnalsStats {
   if (typeof raw !== 'object' || raw === null) return EMPTY_ANNALS_STATS
   const candidate = raw as Record<string, unknown>
   return {
-    recordCounts: isCountArray(candidate.recordCounts, RECORD_COUNT_KINDS)
-      && candidate.recordCounts.every((count) => count < U8)
-      ? candidate.recordCounts
-      : EMPTY_ANNALS_STATS.recordCounts,
+    recordCounts:
+      isCountArray(candidate.recordCounts, RECORD_COUNT_KINDS) && candidate.recordCounts.every((count) => count < U8)
+        ? candidate.recordCounts
+        : EMPTY_ANNALS_STATS.recordCounts,
     itemPurchaseCounts: isCountArray(candidate.itemPurchaseCounts, 3 * ITEM_SLOTS_PER_MODE)
       ? candidate.itemPurchaseCounts
       : EMPTY_ANNALS_STATS.itemPurchaseCounts,
-    gamePointUsage: isCountArray(candidate.gamePointUsage, GAME_POINT_USAGE_KINDS)
-      ? candidate.gamePointUsage
-      : EMPTY_ANNALS_STATS.gamePointUsage,
+    gamePointUsage: isCountArray(candidate.gamePointUsage, GAME_POINT_USAGE_KINDS) ? candidate.gamePointUsage : EMPTY_ANNALS_STATS.gamePointUsage,
     gamePointEarned: isCountArray(candidate.gamePointEarned, GAME_POINT_EARNED_KINDS)
       ? candidate.gamePointEarned
       : EMPTY_ANNALS_STATS.gamePointEarned,
     batterEquippedSkillBits: isBits(candidate.batterEquippedSkillBits) ? candidate.batterEquippedSkillBits : 0,
     pitcherEquippedSkillBits: isBits(candidate.pitcherEquippedSkillBits) ? candidate.pitcherEquippedSkillBits : 0,
-    achievementMarks: isCountArray(candidate.achievementMarks, ACHIEVEMENT_MARK_KINDS)
-      && candidate.achievementMarks.every((mark) => mark <= 0xff)
-      ? candidate.achievementMarks
-      : EMPTY_ANNALS_STATS.achievementMarks,
-    playTimes: Array.isArray(candidate.playTimes) && candidate.playTimes.length === PLAY_TIME_SLOTS
-      && candidate.playTimes.every((time) => Number.isFinite(time) && (time as number) >= 0)
-      ? (candidate.playTimes as number[])
-      : EMPTY_ANNALS_STATS.playTimes,
-    leagueFirstCounts: isCountArray(candidate.leagueFirstCounts, LEAGUE_FIRST_SLOTS)
-      && candidate.leagueFirstCounts.every((count) => count < U16)
-      ? candidate.leagueFirstCounts
-      : EMPTY_ANNALS_STATS.leagueFirstCounts,
+    achievementMarks:
+      isCountArray(candidate.achievementMarks, ACHIEVEMENT_MARK_KINDS) && candidate.achievementMarks.every((mark) => mark <= 0xff)
+        ? candidate.achievementMarks
+        : EMPTY_ANNALS_STATS.achievementMarks,
+    playTimes:
+      Array.isArray(candidate.playTimes) &&
+      candidate.playTimes.length === PLAY_TIME_SLOTS &&
+      candidate.playTimes.every((time) => Number.isFinite(time) && (time as number) >= 0)
+        ? (candidate.playTimes as number[])
+        : EMPTY_ANNALS_STATS.playTimes,
+    leagueFirstCounts:
+      isCountArray(candidate.leagueFirstCounts, LEAGUE_FIRST_SLOTS) && candidate.leagueFirstCounts.every((count) => count < U16)
+        ? candidate.leagueFirstCounts
+        : EMPTY_ANNALS_STATS.leagueFirstCounts,
   }
 }

@@ -37,16 +37,8 @@ interface MenuListProps {
  * 키보드(↑↓ + Enter)와 터치(탭)를 같은 동작으로 다룬다 — 데스크탑과 모바일에서
  * 조작 방식만 다를 뿐 화면은 동일하다.
  */
-export function MenuList({
-  items,
-  onSelect,
-  initialIndex = 0,
-  onCursorChange,
-  selectsByDigit = false,
-}: MenuListProps) {
-  const [selectedIndex, setSelectedIndex] = useState(() =>
-    initialIndex >= 0 && initialIndex < items.length ? initialIndex : 0,
-  )
+export function MenuList({ items, onSelect, initialIndex = 0, onCursorChange, selectsByDigit = false }: MenuListProps) {
+  const [selectedIndex, setSelectedIndex] = useState(() => (initialIndex >= 0 && initialIndex < items.length ? initialIndex : 0))
   const itemsRef = useRef(items)
   itemsRef.current = items
 
@@ -88,9 +80,7 @@ export function MenuList({
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
         const step = event.key === 'ArrowDown' ? 1 : -1
-        setSelectedIndex(
-          (previous) => (previous + step + currentItems.length) % currentItems.length,
-        )
+        setSelectedIndex((previous) => (previous + step + currentItems.length) % currentItems.length)
         return
       }
 
@@ -134,15 +124,9 @@ export function MenuList({
             }}
           >
             <span className={styles.cursor}>{index === selectedIndex ? '▶' : ''}</span>
-            {item.iconUrl !== undefined && (
-              <img className={styles.icon} src={item.iconUrl} alt="" aria-hidden />
-            )}
+            {item.iconUrl !== undefined && <img className={styles.icon} src={item.iconUrl} alt="" aria-hidden />}
             <span className={styles.label}>
-              {item.labelSpriteUrl === undefined ? (
-                item.label
-              ) : (
-                <img className={popupLabel} src={item.labelSpriteUrl} alt={item.label} />
-              )}
+              {item.labelSpriteUrl === undefined ? item.label : <img className={popupLabel} src={item.labelSpriteUrl} alt={item.label} />}
               {item.detail !== undefined && <span className={styles.detail}>{item.detail}</span>}
             </span>
             {item.cost !== undefined && <span className={styles.cost}>{item.cost}</span>}

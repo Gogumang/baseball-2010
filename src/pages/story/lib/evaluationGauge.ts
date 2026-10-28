@@ -100,9 +100,16 @@ export function evaluationGaugeValueOf(popularityChange: number): EvaluationGaug
   // 0xba2e4 정렬 0x20: d = 칸 높이 − 글꼴 높이 → d > 0 이면 (d >> 1) + 나머지, 아니면 d >> 1
   const difference = box.height - FONT_HEIGHT
   const signY = box.y + (difference > 0 ? (difference >> 1) + (difference % 2) : difference >> 1)
-  const signs = sign === '+'
-    ? [{ x: box.x, y: signY }, { x: box.x + 1, y: signY }]
-    : [{ x: box.x, y: signY }, { x: box.x, y: signY + 1 }]
+  const signs =
+    sign === '+'
+      ? [
+          { x: box.x, y: signY },
+          { x: box.x + 1, y: signY },
+        ]
+      : [
+          { x: box.x, y: signY },
+          { x: box.x, y: signY + 1 },
+        ]
 
   const magnitude = Math.abs(popularityChange)
   const images = [...String(magnitude)].map((digit) => DIGIT_BASE + Number(digit))

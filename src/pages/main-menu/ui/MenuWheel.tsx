@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import {
-  MENU_WHEEL_CENTER, MENU_WHEEL_RINGS, SCREEN_HEIGHT, SCREEN_WIDTH,
-} from '@/pages/main-menu/lib/mainMenuLayout'
+import { MENU_WHEEL_CENTER, MENU_WHEEL_RINGS, SCREEN_HEIGHT, SCREEN_WIDTH } from '@/pages/main-menu/lib/mainMenuLayout'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 

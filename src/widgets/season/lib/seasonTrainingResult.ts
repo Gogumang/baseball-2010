@@ -4,8 +4,14 @@ import { MORALE_LIMIT } from '@/entities/season-mode/model/seasonRecord'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
-  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_INDEX, HELL_TRAINING_MORALE_LOSS_RANGE, MASSAGER_MORALE_RELIEF,
-  TRAINING_APPLY_LIMIT, TRAINING_GAIN_RANGE, TRAINING_MORALE_LOSS_RANGE, TRAINING_SUB_ITEM_GAIN,
+  HELL_TRAINING_GAIN_RANGE,
+  HELL_TRAINING_INDEX,
+  HELL_TRAINING_MORALE_LOSS_RANGE,
+  MASSAGER_MORALE_RELIEF,
+  TRAINING_APPLY_LIMIT,
+  TRAINING_GAIN_RANGE,
+  TRAINING_MORALE_LOSS_RANGE,
+  TRAINING_SUB_ITEM_GAIN,
 } from '@/widgets/season/lib/seasonTraining'
 
 /**
@@ -54,7 +60,8 @@ export function rollSeasonTraining(random: RandomPort, slot: number, items: Trai
     moraleLoss = random.rand(TRAINING_MORALE_LOSS_RANGE[0], TRAINING_MORALE_LOSS_RANGE[1])
   }
   const bonuses = gains.map((_gain, index) =>
-    trainedSlotsOf(slot).includes(index) && items.trainingSubItems[index] === true ? TRAINING_SUB_ITEM_GAIN : 0)
+    trainedSlotsOf(slot).includes(index) && items.trainingSubItems[index] === true ? TRAINING_SUB_ITEM_GAIN : 0,
+  )
   return { gains, bonuses, moraleLoss, moraleBonus: items.massager ? -MASSAGER_MORALE_RELIEF : 0 }
 }
 
@@ -67,8 +74,7 @@ export function applySeasonTraining(
   roll: SeasonTrainingRoll,
 ): { readonly abilities: number[]; readonly teamMorale: number } {
   return {
-    abilities: abilities.map((value, index) =>
-      Math.min(TRAINING_APPLY_LIMIT, value + (roll.gains[index] ?? 0) + (roll.bonuses[index] ?? 0))),
+    abilities: abilities.map((value, index) => Math.min(TRAINING_APPLY_LIMIT, value + (roll.gains[index] ?? 0) + (roll.bonuses[index] ?? 0))),
     teamMorale: Math.max(0, Math.min(MORALE_LIMIT, teamMorale - (roll.moraleLoss + roll.moraleBonus))),
   }
 }

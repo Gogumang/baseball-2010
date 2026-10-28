@@ -1,8 +1,14 @@
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
-  BATTING_TYPE_NAMES, INFO_COLUMNS, INFO_ROW_HEIGHT, INFO_ROW_STEP, INFO_TOP,
-  POSITION_NAMES, SIDE_NAMES, SKIN_NAMES,
+  BATTING_TYPE_NAMES,
+  INFO_COLUMNS,
+  INFO_ROW_HEIGHT,
+  INFO_ROW_STEP,
+  INFO_TOP,
+  POSITION_NAMES,
+  SIDE_NAMES,
+  SKIN_NAMES,
 } from '@/pages/management/lib/basicInfoLayout'
 import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { ROOKIE_BATTER_SLOT } from '@/entities/career/model/nariTeamRecord'

@@ -93,23 +93,15 @@ export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, l
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 칸은 부품마다 하나 · 처리는 ref 만 본다
+    // 칸은 부품마다 하나 · 처리는 ref 만 본다
   }, [keyLatch])
 
   return (
     <RawScreen>
-      {scoreboardSides !== undefined && (
-        <ScoreboardFrame {...SCOREBOARD_AT.gameEnd} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
-      )}
+      {scoreboardSides !== undefined && <ScoreboardFrame {...SCOREBOARD_AT.gameEnd} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />}
       <EndBoardRows side0Score={side0Score} side1Score={side1Score} names={names} />
       {lineScore !== undefined && (
-        <LineScoreBoard
-          {...LINE_SCORE_AT.gameEnd}
-          {...lineScore}
-          totals={[side0Score, side1Score]}
-          isGameOver
-          tick={tick}
-        />
+        <LineScoreBoard {...LINE_SCORE_AT.gameEnd} {...lineScore} totals={[side0Score, side1Score]} isGameOver tick={tick} />
       )}
       {/* OK 키를 대신하는 투명 눌림 칸(웹 전용) — 10틱 동안은 원본처럼 먹지 않는다 */}
       <OkTapArea disabled={isLocked} onTap={confirm} />

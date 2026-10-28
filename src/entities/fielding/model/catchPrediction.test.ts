@@ -25,9 +25,7 @@ const 창 = (overrides: Partial<CatchWindowInput> = {}): CatchWindowInput => ({
 
 describe('포구 반경 — 내야 500 · 외야 300 (0xb1644)', () => {
   it('칸 ≤ 5 는 500, 6~8 은 300', () => {
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map(catchRadiusOf)).toEqual([
-      500, 500, 500, 500, 500, 500, 300, 300, 300,
-    ])
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map(catchRadiusOf)).toEqual([500, 500, 500, 500, 500, 500, 300, 300, 300])
   })
 
   it('내야수는 500 까지 닿고 501 은 못 닿는다', () => {
@@ -37,9 +35,7 @@ describe('포구 반경 — 내야 500 · 외야 300 (0xb1644)', () => {
 
   it('외야수는 300 까지다', () => {
     expect(catchKindsAt(창({ slot: 8, ball: { x: 20_300, y: 800, z: 20_000 } }))).toContain(CATCH_KIND.LOW)
-    expect(catchKindsAt(창({ slot: 8, ball: { x: 20_301, y: 800, z: 20_000 } }))).not.toContain(
-      CATCH_KIND.LOW,
-    )
+    expect(catchKindsAt(창({ slot: 8, ball: { x: 20_301, y: 800, z: 20_000 } }))).not.toContain(CATCH_KIND.LOW)
   })
 })
 
@@ -107,9 +103,7 @@ describe('높이 창 (0xb14e2~0xb1584)', () => {
     const 앞쪽공 = { x: 20_000, y: 1200, z: 22_500 } // 야수보다 홈 쪽(z 가 큼)
     expect(catchKindsAt(창({ ball: 앞쪽공, slideUnlocked: true, tick: 29 }))).toEqual([CATCH_KIND.SLIDE])
     // 야수 뒤쪽 공은 안 된다
-    expect(
-      catchKindsAt(창({ ball: { x: 20_000, y: 1200, z: 17_500 }, slideUnlocked: true, tick: 29 })),
-    ).toEqual([])
+    expect(catchKindsAt(창({ ball: { x: 20_000, y: 1200, z: 17_500 }, slideUnlocked: true, tick: 29 }))).toEqual([])
     // 낙구까지 3틱 이상 남으면 안 된다
     expect(catchKindsAt(창({ ball: 앞쪽공, slideUnlocked: true, tick: 27 }))).toEqual([])
   })
@@ -144,9 +138,7 @@ describe('추적야수 고르기 0xb3b38 — 우선순위', () => {
   })
 
   it('땅볼이 세 번째, 필살(점프·슬라이딩)은 그 뒤다 — 보통 포구가 되면 필살은 안 쓰인다', () => {
-    expect(chooseChaser(표({ grounder: { tick: 9, slot: 5 }, jump: { tick: 5, slot: 8 } }), 30, 6).kind).toBe(
-      CATCH_KIND.GROUNDER,
-    )
+    expect(chooseChaser(표({ grounder: { tick: 9, slot: 5 }, jump: { tick: 5, slot: 8 } }), 30, 6).kind).toBe(CATCH_KIND.GROUNDER)
     expect(chooseChaser(표({ jump: { tick: 5, slot: 8 } }), 30, 6)).toEqual({
       kind: CATCH_KIND.JUMP,
       slot: 8,

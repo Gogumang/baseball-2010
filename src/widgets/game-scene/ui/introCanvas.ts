@@ -3,12 +3,24 @@ import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { DRAW_EFFECT, drawImagesWithEffect, type ImageEffectDraw } from '@/shared/lib/pixelEffect/pixelEffect'
 import { bakedImgTextPaletteOf } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
 import {
-  INTRO_BAND, INTRO_BAND_RGB, INTRO_BAR_FRAME, INTRO_BAR_X, INTRO_BAR_Y, INTRO_STADIUM_LABEL_FRAME, INTRO_STADIUM_LABEL_X,
-  INTRO_TEAM_NAME_X, INTRO_TEXT_Y,
+  INTRO_BAND,
+  INTRO_BAND_RGB,
+  INTRO_BAR_FRAME,
+  INTRO_BAR_X,
+  INTRO_BAR_Y,
+  INTRO_STADIUM_LABEL_FRAME,
+  INTRO_STADIUM_LABEL_X,
+  INTRO_TEAM_NAME_X,
+  INTRO_TEXT_Y,
 } from '@/widgets/game-scene/lib/introLayout'
 import { introBandAlphaOf, type IntroFade } from '@/widgets/game-scene/lib/introSchedule'
 import {
-  NAME_PLATE_COLOR, SCOREBOARD_AT, SCOREBOARD_FRAME, namePlateOpacityOf, roundPlateRectsOf, scoreboardPlacementOf,
+  NAME_PLATE_COLOR,
+  SCOREBOARD_AT,
+  SCOREBOARD_FRAME,
+  namePlateOpacityOf,
+  roundPlateRectsOf,
+  scoreboardPlacementOf,
   type ScoreboardSide,
 } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { SceneryOverlay } from '@/widgets/batting-stage/ui/SceneryBackdrop'

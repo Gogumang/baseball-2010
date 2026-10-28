@@ -30,9 +30,7 @@ describe('시즌 아이템 메뉴 (상태 0xd0)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
 
-    expect(onSelect).toHaveBeenCalledWith(
-      SEASON_ITEM_MENU[0], SEASON_SCENE_STATE.선수고르기, ITEM_WINDOW_KIND.장비,
-    )
+    expect(onSelect).toHaveBeenCalledWith(SEASON_ITEM_MENU[0], SEASON_SCENE_STATE.선수고르기, ITEM_WINDOW_KIND.장비)
   })
 
   it('GP아이템 칸은 아이템 상점(0xdc)으로, 창 종류는 2(GP)다', () => {
@@ -41,9 +39,7 @@ describe('시즌 아이템 메뉴 (상태 0xd0)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'GP아이템' }))
 
-    expect(onSelect).toHaveBeenCalledWith(
-      SEASON_ITEM_MENU[3], SEASON_SCENE_STATE.아이템상점, ITEM_WINDOW_KIND.GP아이템,
-    )
+    expect(onSelect).toHaveBeenCalledWith(SEASON_ITEM_MENU[3], SEASON_SCENE_STATE.아이템상점, ITEM_WINDOW_KIND.GP아이템)
   })
 
   it('아이템 창 종류 번호는 [win+0x1a4] 그대로다 (1 서브 · 2 GP · 3 장비 · 4 구장)', () => {

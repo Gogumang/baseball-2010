@@ -11,12 +11,29 @@ import { EDITED_NAME_BYTES } from '@/entities/player-name/model/editedNames'
 import { pointEntryCursor } from '@/entities/season-mode/model/entryEditor'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  ABILITY_CHART, ANCHOR_A, ANCHOR_B, GRID, NAME_BAR, TAG, abilityAxisMaximumLengthOf, cellPositionOf,
+  ABILITY_CHART,
+  ANCHOR_A,
+  ANCHOR_B,
+  GRID,
+  NAME_BAR,
+  TAG,
+  abilityAxisMaximumLengthOf,
+  cellPositionOf,
   teamGridOpenShapeOf,
 } from '@/pages/create-player/lib/teamSelectLayout'
 import {
-  EDIT_GRID_SHAPE, EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
-  editEntryListsOf, editTargetOf, frameEditEntry, moveEditGrid, pointEditGrid, pressEditEntryKey,
+  EDIT_GRID_SHAPE,
+  EDIT_TEAM_COUNT,
+  SPECIAL_EDIT_STEP,
+  chooseEditTeam,
+  closeEditName,
+  createSpecialEditState,
+  editEntryListsOf,
+  editTargetOf,
+  frameEditEntry,
+  moveEditGrid,
+  pointEditGrid,
+  pressEditEntryKey,
 } from '@/pages/special-edit/lib/specialEditFlow'
 import type { AnnalsDirection } from '@/pages/record/lib/annalsGrid'
 import * as styles from '@/pages/special-edit/ui/SpecialEditScreen.css'
@@ -87,7 +104,9 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
   // 준다([skin+0xe4] 확인 없이) — 화살표면 까딱임 방향 [skin+0x8c] 에 남는다(Q-10). 하위 2(이름 창)는 안 넘긴다
   useEffect(() => {
     if (state.step !== SPECIAL_EDIT_STEP.선수고르기) return undefined
-    const onKeyDown = (event: KeyboardEvent) => { noteSkinShakeKey(event.key) }
+    const onKeyDown = (event: KeyboardEvent) => {
+      noteSkinShakeKey(event.key)
+    }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [state.step])
@@ -114,16 +133,21 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
     <EntryEditorScreen
       editor={state.editor}
       lists={lists}
-      underlay={(
+      underlay={
         <>
           <SkinBackdrop kind="메뉴바탕" />
           {/* 팀 고르기 본문 0x63dee 의 ABILITY 판 — 오른쪽 이름 상자가 엔트리 창 오른쪽 밖으로 나온다(머리말) */}
-          <AbilityRadarPanel center={{ x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }}
-            radius={ABILITY_CHART.radius} maximumLength={abilityAxisMaximumLengthOf(ABILITY_CHART.radius)}
-            labelFrames={ABILITY_RADAR_LABELS.team} targets={(TEAMS[state.team] ?? TEAMS[0]).values.slice(2)}
-            restartKey={state.team} fromZero={false} />
+          <AbilityRadarPanel
+            center={{ x: ANCHOR_B.x + ABILITY_CHART.dx, y: ANCHOR_B.y + ABILITY_CHART.dy }}
+            radius={ABILITY_CHART.radius}
+            maximumLength={abilityAxisMaximumLengthOf(ABILITY_CHART.radius)}
+            labelFrames={ABILITY_RADAR_LABELS.team}
+            targets={(TEAMS[state.team] ?? TEAMS[0]).values.slice(2)}
+            restartKey={state.team}
+            fromZero={false}
+          />
         </>
-      )}
+      }
       teamName={TEAMS[state.team]?.name ?? ''}
       isAceLocked={false}
       gamePoint={gamePoint}
@@ -140,16 +164,18 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
       onKey={onKey}
       onMoveCursor={(index) => setState((previous) => ({ ...previous, editor: pointEntryCursor(previous.editor, lists, index) }))}
       onCloseAceLocked={() => undefined}
-      overlay={state.step === SPECIAL_EDIT_STEP.이름입력 && (
-        <EditNamePopup
-          onConfirm={(name) => {
-            const target = editTargetOf(state)
-            if (target !== null) onRename(target.id, target.isPitcher, name)
-            setState((previous) => closeEditName(previous))
-          }}
-          onCancel={() => setState((previous) => closeEditName(previous))}
-        />
-      )}
+      overlay={
+        state.step === SPECIAL_EDIT_STEP.이름입력 && (
+          <EditNamePopup
+            onConfirm={(name) => {
+              const target = editTargetOf(state)
+              if (target !== null) onRename(target.id, target.isPitcher, name)
+              setState((previous) => closeEditName(previous))
+            }}
+            onCancel={() => setState((previous) => closeEditName(previous))}
+          />
+        )
+      }
     />
   )
 }
@@ -170,7 +196,14 @@ const EDIT_GRID_OPEN = teamGridOpenShapeOf(EDIT_TEAM_COUNT)
 
 /** 격자 키 — 방향키와 숫자 2·4·6·8 (격자 키 처리 0x6c299 의 표 0xd2e7c) */
 const ARROW_DIRECTIONS: Readonly<Record<string, AnnalsDirection>> = {
-  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  4: 'left',
+  6: 'right',
+  2: 'up',
+  8: 'down',
 }
 
 /**
@@ -220,67 +253,106 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
     <RawScreen>
       {/* 0x2e1e0 첫 부름 — 메뉴 바탕 0x58371(skin, main_title, 0) */}
       <SkinBackdrop kind="메뉴바탕" />
-      {gridOpen !== null && (<>
-      {[
-        { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
-        { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
-      ].map(({ anchor, bar, barDy, textDy, frame }) => (
-        <span key={frame}>
-          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, bar)}
-            style={{ left: anchor.x + TAG.dx, top: anchor.y + barDy }} />
-          <img className={styles.layer} alt="" src={imageSrc(IMG_TEXT, frame)}
-            style={{ left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none' }} />
-        </span>
-      ))}
+      {gridOpen !== null && (
+        <>
+          {[
+            { anchor: ANCHOR_A, bar: TAG.aBarImage, barDy: TAG.aDy, textDy: TAG.aTextDy, frame: TAG.aTextFrame },
+            { anchor: ANCHOR_B, bar: TAG.bBarImage, barDy: TAG.bDy, textDy: TAG.bTextDy, frame: TAG.bTextFrame },
+          ].map(({ anchor, bar, barDy, textDy, frame }) => (
+            <span key={frame}>
+              <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, bar)} style={{ left: anchor.x + TAG.dx, top: anchor.y + barDy }} />
+              <img
+                className={styles.layer}
+                alt=""
+                src={imageSrc(IMG_TEXT, frame)}
+                style={{ left: anchor.x + TAG.dx, top: anchor.y + textDy, width: TAG.barWidth, objectFit: 'none' }}
+              />
+            </span>
+          ))}
 
-      <img className={styles.layer} alt={team.name} src={team.logoUrl}
-        style={{ left: ANCHOR_A.x - BIG_LOGO_HALF, top: ANCHOR_A.y - BIG_LOGO_HALF }} />
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, NAME_BAR.image)}
-        style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + NAME_BAR.dy }} />
-      <span className={styles.centeredText}
-        style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + 42, width: NAME_BAR.width }}>
-        {team.name}
-      </span>
+          <img
+            className={styles.layer}
+            alt={team.name}
+            src={team.logoUrl}
+            style={{ left: ANCHOR_A.x - BIG_LOGO_HALF, top: ANCHOR_A.y - BIG_LOGO_HALF }}
+          />
+          <img
+            className={styles.layer}
+            alt=""
+            src={imageSrc(SLT_IMAGE, NAME_BAR.image)}
+            style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + NAME_BAR.dy }}
+          />
+          <span className={styles.centeredText} style={{ left: ANCHOR_A.x + NAME_BAR.dx, top: ANCHOR_A.y + 42, width: NAME_BAR.width }}>
+            {team.name}
+          </span>
 
-      {/* 능력치 도형 0x5aefd(…, 종류 0, 0, 칸(≤ 9 라 잠김 없음), 반지름 30) — 공용 목록 k 9 도 점프표 0xd1edc 로 팀 고르기와 같은
+          {/* 능력치 도형 0x5aefd(…, 종류 0, 0, 칸(≤ 9 라 잠김 없음), 반지름 30) — 공용 목록 k 9 도 점프표 0xd1edc 로 팀 고르기와 같은
           본문 0x63dee 를 타고 0x63f38 에서 ABILITY 판 전체(바탕 · 축 · 이름 상자 46 · 45 · 204 · 205 · 숫자)를 그린다.
           값 도형은 레이더 [skin+0xd4] 의 자라는 애니 — 들어옴 0x24804 가 +0xad = 0 으로 두어 0 에서, 커서가 움직인 그림(커서 +0x25)엔
           0x63b14 가 +0x1e3 = 0 으로 두어 지난 값에서. 하위 1 · 2 에서 돌아오면 들어옴도 틱 0 도 안 거쳐 다 자란 그대로다 */}
-      <AbilityRadarPanel center={chartCenter} radius={radius} maximumLength={abilityAxisMaximumLengthOf(radius)}
-        labelFrames={ABILITY_RADAR_LABELS.team} targets={team.values.slice(2)} restartKey={cursor} fromZero={slides} />
+          <AbilityRadarPanel
+            center={chartCenter}
+            radius={radius}
+            maximumLength={abilityAxisMaximumLengthOf(radius)}
+            labelFrames={ABILITY_RADAR_LABELS.team}
+            targets={team.values.slice(2)}
+            restartKey={cursor}
+            fromZero={slides}
+          />
 
-      {/* 칸 바탕 — 시작 0x7a005(격자, [skin+0xe8], 1, 1) 의 [격자+8] = 1 (0x7a7da~0x7a89c) */}
-      {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
-        const shake = index === cursor ? bounce.offset : null
-        return (
-          <GridCellBack key={`back-${entry.id}`} className={styles.layer}
-            x={cellPositionOf(index, EDIT_TEAM_COUNT).x + (shake?.dx ?? 0)}
-            y={cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)}
-            width={GRID.cell} height={GRID.cell} />
-        )
-      })}
-      {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
-        const shake = index === cursor ? bounce.offset : null
-        const x = cellPositionOf(index, EDIT_TEAM_COUNT).x + (shake?.dx ?? 0)
-        const y = cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)
-        return (
-          <button key={entry.id} type="button" aria-label={entry.name} aria-pressed={index === cursor}
-            className={styles.cell} style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
-            onClick={() => (index === cursor ? onChoose() : onPoint(index))}>
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)} style={{ left: 0, top: 0 }} />
-            <img className={styles.layer} alt="" src={entry.logoUrl}
-              style={{
-                left: (GRID.cell - CELL_LOGO_SIZE) / 2, top: (GRID.cell - CELL_LOGO_SIZE) / 2,
-                width: CELL_LOGO_SIZE, height: CELL_LOGO_SIZE,
-              }} />
-            {index === cursor && gridOpen.state.isDone && (
-              <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
-                style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }} />
-            )}
-          </button>
-        )
-      })}
-      </>)}
+          {/* 칸 바탕 — 시작 0x7a005(격자, [skin+0xe8], 1, 1) 의 [격자+8] = 1 (0x7a7da~0x7a89c) */}
+          {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
+            const shake = index === cursor ? bounce.offset : null
+            return (
+              <GridCellBack
+                key={`back-${entry.id}`}
+                className={styles.layer}
+                x={cellPositionOf(index, EDIT_TEAM_COUNT).x + (shake?.dx ?? 0)}
+                y={cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)}
+                width={GRID.cell}
+                height={GRID.cell}
+              />
+            )
+          })}
+          {TEAMS.slice(0, EDIT_TEAM_COUNT).map((entry, index) => {
+            const shake = index === cursor ? bounce.offset : null
+            const x = cellPositionOf(index, EDIT_TEAM_COUNT).x + (shake?.dx ?? 0)
+            const y = cellPositionOf(index, EDIT_TEAM_COUNT).y + gridOpenCellDy(EDIT_GRID_OPEN, gridOpen.state, index) + (shake?.dy ?? 0)
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                aria-label={entry.name}
+                aria-pressed={index === cursor}
+                className={styles.cell}
+                style={{ left: x, top: y, width: GRID.cell, height: GRID.cell }}
+                onClick={() => (index === cursor ? onChoose() : onPoint(index))}
+              >
+                <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, CELL_FRAME_IMAGE)} style={{ left: 0, top: 0 }} />
+                <img
+                  className={styles.layer}
+                  alt=""
+                  src={entry.logoUrl}
+                  style={{
+                    left: (GRID.cell - CELL_LOGO_SIZE) / 2,
+                    top: (GRID.cell - CELL_LOGO_SIZE) / 2,
+                    width: CELL_LOGO_SIZE,
+                    height: CELL_LOGO_SIZE,
+                  }}
+                />
+                {index === cursor && gridOpen.state.isDone && (
+                  <img
+                    className={styles.layer}
+                    alt=""
+                    src={imageSrc(SLT_IMAGE, CELL_CURSOR_IMAGE)}
+                    style={{ left: (GRID.cell - CELL_CURSOR_SIZE) / 2, top: (GRID.cell - CELL_CURSOR_SIZE) / 2 }}
+                  />
+                )}
+              </button>
+            )
+          })}
+        </>
+      )}
 
       {/* 머리띠 0x54d95(skin, 1 "팀선택", 5 되돌아가기) — 0x2e224 */}
       <ScreenFrame title="팀선택" gamePoint={gamePoint} onBack={onBack} footer={5} slides={slides} />
@@ -311,7 +383,12 @@ const FIELD = { x: 120 - 50, y: 0xaf, width: 0x64, height: 0xf } as const
  * 일반 입력 칸이라 처음 표시 "가" 에 머문다.
  */
 const INPUT_MODE_MARK = { label: '가', x: 120 - 50 + 0x64 + 0xe, y: 0xaf + 1 } as const
-const INPUT_MODE_ARROWS = { image: assetUrl('./sprites/slt_frame/020.png'), leftX: 120 - 50 + 0x64 + 5, rightX: 120 - 50 + 0x64 + 0x18, y: 0xaf + 2 } as const
+const INPUT_MODE_ARROWS = {
+  image: assetUrl('./sprites/slt_frame/020.png'),
+  leftX: 120 - 50 + 0x64 + 5,
+  rightX: 120 - 50 + 0x64 + 0x18,
+  y: 0xaf + 2,
+} as const
 
 interface EditNamePopupProps {
   readonly onConfirm: (name: string) => void
@@ -407,19 +484,44 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
       <div className={styles.prompt} style={{ left: PROMPT.x, top: PROMPT.y, width: PROMPT.width, visibility: isOpening ? 'hidden' : undefined }}>
         <MarkupText raw={NAME_PROMPT} />
       </div>
-      <img alt="" data-testid="입력방식-왼쪽" src={INPUT_MODE_ARROWS.image}
-        style={{ position: 'absolute', left: INPUT_MODE_ARROWS.leftX, top: INPUT_MODE_ARROWS.y, visibility: isOpening ? 'hidden' : undefined }} />
-      <img alt="" data-testid="입력방식-오른쪽" src={INPUT_MODE_ARROWS.image}
-        style={{ position: 'absolute', left: INPUT_MODE_ARROWS.rightX, top: INPUT_MODE_ARROWS.y, transform: 'scaleX(-1)', visibility: isOpening ? 'hidden' : undefined }} />
-      <div className={styles.prompt} data-testid="입력방식" style={{ left: INPUT_MODE_MARK.x, top: INPUT_MODE_MARK.y, visibility: isOpening ? 'hidden' : undefined }}>
+      <img
+        alt=""
+        data-testid="입력방식-왼쪽"
+        src={INPUT_MODE_ARROWS.image}
+        style={{ position: 'absolute', left: INPUT_MODE_ARROWS.leftX, top: INPUT_MODE_ARROWS.y, visibility: isOpening ? 'hidden' : undefined }}
+      />
+      <img
+        alt=""
+        data-testid="입력방식-오른쪽"
+        src={INPUT_MODE_ARROWS.image}
+        style={{
+          position: 'absolute',
+          left: INPUT_MODE_ARROWS.rightX,
+          top: INPUT_MODE_ARROWS.y,
+          transform: 'scaleX(-1)',
+          visibility: isOpening ? 'hidden' : undefined,
+        }}
+      />
+      <div
+        className={styles.prompt}
+        data-testid="입력방식"
+        style={{ left: INPUT_MODE_MARK.x, top: INPUT_MODE_MARK.y, visibility: isOpening ? 'hidden' : undefined }}
+      >
         <MarkupText raw={`!cFFFFFF${INPUT_MODE_MARK.label}`} />
       </div>
-      <input ref={fieldRef} className={styles.field} aria-label="이름" value={name} autoFocus readOnly={isOpening}
+      <input
+        ref={fieldRef}
+        className={styles.field}
+        aria-label="이름"
+        value={name}
+        autoFocus
+        readOnly={isOpening}
         style={{ left: FIELD.x, top: FIELD.y, width: FIELD.width, height: FIELD.height, visibility: isOpening ? 'hidden' : undefined }}
         onChange={(event) => {
           // CP949 8 바이트까지 (입력기 최대 I+8 = min(8, 64), R11 1b — 한글 2 · 그 밖 1, 섞어 써도 된다)
           if (nameByteLengthOf(event.target.value) <= EDITED_NAME_BYTES) setName(event.target.value)
-        }} />
+        }}
+      />
     </div>
   )
 }

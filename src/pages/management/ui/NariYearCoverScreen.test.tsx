@@ -12,9 +12,10 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const advance = (frames: number) => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame() * frames)
-})
+const advance = (frames: number) =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * frames)
+  })
 
 describe('NariYearCoverScreen — 137 "N년차" 표지', () => {
   it('기다리면 표지를 보이고 81 틀 뒤 어두워져 105 로 간다', () => {
@@ -48,8 +49,7 @@ describe('NariYearCoverScreen — 137 "N년차" 표지', () => {
 
   it('앞 화면 틀에는 넘긴 앞 상태 그림을 매 틀 다시 그린다 — 없으면 멈춘 판', () => {
     const { container } = render(
-      <NariYearCoverScreen yearIndex={1} onDone={() => {}}
-        previousScreenAt={(frame) => <div data-part="앞상태" data-frame={frame} />} />,
+      <NariYearCoverScreen yearIndex={1} onDone={() => {}} previousScreenAt={(frame) => <div data-part="앞상태" data-frame={frame} />} />,
     )
     expect(container.querySelector('[data-part="year-cover-left"]')).toBeNull()
     expect(container.querySelector('[data-part="앞상태"]')?.getAttribute('data-frame')).toBe('0')

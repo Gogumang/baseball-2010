@@ -156,9 +156,7 @@ export interface LaserWindowInput {
  */
 export function isLaserWindowOpen(input: LaserWindowInput): boolean {
   if (input.hasChosenThrowTarget && input.isBallHeld && input.isThrowerReady) return false
-  return (
-    input.ticksSinceCatch >= LASER_WINDOW_FIRST_TICK && input.ticksSinceCatch <= LASER_WINDOW_LAST_TICK
-  )
+  return input.ticksSinceCatch >= LASER_WINDOW_FIRST_TICK && input.ticksSinceCatch <= LASER_WINDOW_LAST_TICK
 }
 
 export interface LaserInputJudgement {

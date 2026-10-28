@@ -158,13 +158,28 @@ export const COMBO_DISPLAY = {
 
 /** trainning.pzx 합성 프레임의 앵커 기준 왼쪽 위 (origins.json) */
 const COMBO_FRAME_ORIGINS: Readonly<Record<number, { x: number; y: number }>> = {
-  3: { x: -38, y: 0 }, 4: { x: 0, y: 0 }, 5: { x: -1, y: 0 }, 6: { x: 0, y: 0 },
-  7: { x: -90, y: 0 }, 8: { x: -74, y: 0 }, 9: { x: -62, y: 0 }, 10: { x: -63, y: 0 },
+  3: { x: -38, y: 0 },
+  4: { x: 0, y: 0 },
+  5: { x: -1, y: 0 },
+  6: { x: 0, y: 0 },
+  7: { x: -90, y: 0 },
+  8: { x: -74, y: 0 },
+  9: { x: -62, y: 0 },
+  10: { x: -63, y: 0 },
 }
 
 /** num.pzx 70~79 (큰 숫자) 그림 크기 [폭, 높이] */
 const BIG_DIGIT_SIZES: readonly (readonly [number, number])[] = [
-  [32, 36], [22, 35], [29, 35], [29, 36], [32, 36], [30, 36], [30, 36], [31, 34], [30, 36], [30, 36],
+  [32, 36],
+  [22, 35],
+  [29, 35],
+  [29, 36],
+  [32, 36],
+  [30, 36],
+  [30, 36],
+  [31, 34],
+  [30, 36],
+  [30, 36],
 ]
 
 export interface ComboDisplayPlacement {

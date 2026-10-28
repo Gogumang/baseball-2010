@@ -109,7 +109,9 @@ describe('팀경기 자동진행 중계 화면 (상태 0x21 — 갱신 0x48480 �
   it('운동장 그림 (0x4258c 425bc~42812) — 배경 위에 투수(프레임 17) · 포수(90) · 타자(좌타 7 / 우타 10) · 주자(0)', async () => {
     띄우기()
     // 원점 표를 읽을 때까지 기다린다
-    await act(async () => { await Promise.resolve() })
+    await act(async () => {
+      await Promise.resolve()
+    })
     expect(screen.getByTestId('중계-배경')).toBeTruthy()
     let 주자봤다 = false
     for (let frame = 0; frame < 8 * 80 && !주자봤다; frame += 1) {

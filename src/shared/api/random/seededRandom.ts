@@ -82,9 +82,7 @@ export function createSeededRandomOn(cell: SeededRandomCell): RandomPort {
       const high = hi | 0
       if (low === high) return low
       // bfa74: lo > hi 면 hi + s mod (lo − hi), 아니면 lo + s mod (hi − lo) — 0xca848 은 부호 없는 나머지
-      return low > high
-        ? (high + (state % ((low - high) >>> 0))) | 0
-        : (low + (state % ((high - low) >>> 0))) | 0
+      return low > high ? (high + (state % ((low - high) >>> 0))) | 0 : (low + (state % ((high - low) >>> 0))) | 0
     },
     rand9d(n: number): number {
       const limit = n | 0

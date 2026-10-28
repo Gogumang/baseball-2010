@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  RADAR_CENTER, radarLabelBoxOf, radarPointOf, abilityColorOf, basicInfoSpecialNameOf,
-} from '@/pages/management/lib/basicInfoLayout'
+import { RADAR_CENTER, radarLabelBoxOf, radarPointOf, abilityColorOf, basicInfoSpecialNameOf } from '@/pages/management/lib/basicInfoLayout'
 
 describe('기본정보 레이더 차트 — 0x5a990', () => {
   it('중심 (178,104), 반지름 30, 값 999 면 축 끝이다', () => {
@@ -23,7 +21,10 @@ describe('기본정보 레이더 차트 — 0x5a990', () => {
 
   it('축 이름 상자 — 기준점은 (R + 18)·표 >> 16 (0x5ac00~0x5ac1e), 양수 쪽이 1 작다', () => {
     expect([0, 1, 2, 3].map(radarLabelBoxOf)).toEqual([
-      { x: 120, y: 43 }, { x: 210, y: 43 }, { x: 210, y: 136 }, { x: 120, y: 136 },
+      { x: 120, y: 43 },
+      { x: 210, y: 43 },
+      { x: 210, y: 136 },
+      { x: 120, y: 136 },
     ])
   })
 

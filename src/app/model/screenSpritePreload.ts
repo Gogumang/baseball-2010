@@ -28,7 +28,17 @@ export interface ScreenSpritePreload {
 
 /** 경기(타석) 장면으로 이어지는 앞 화면 — 여기 서 있는 동안 경기 진입 그림을 받아 둔다 */
 const BEFORE_GAME_SCREENS: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>([
-  '팀선택', '선수등록', '일반모드', '시즌모드', '관리', '경기준비', '미션선택', '마선수대결', '투수편', '다음경기순위', '투수미션',
+  '팀선택',
+  '선수등록',
+  '일반모드',
+  '시즌모드',
+  '관리',
+  '경기준비',
+  '미션선택',
+  '마선수대결',
+  '투수편',
+  '다음경기순위',
+  '투수미션',
 ])
 
 /**
@@ -43,7 +53,14 @@ const MAIN_MENU_NEXT_SCENES: readonly SpriteSceneKey[] = ['nariMenu', 'teamSelec
 
 /** 나리(나만의리그) 관리 쪽 화면 — 관리 · 순위 · 경기 준비 그림을 바로 받는다 */
 const NARI_MENU_SCREENS: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>([
-  '관리', '다음경기순위', '경기준비', '투수편', '이벤트', '외출', '아이템', '연차표지',
+  '관리',
+  '다음경기순위',
+  '경기준비',
+  '투수편',
+  '이벤트',
+  '외출',
+  '아이템',
+  '연차표지',
 ])
 
 /**

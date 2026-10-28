@@ -19,11 +19,7 @@
  * 갱신에서 0xa5a6 이 그 2 를 보고 3 으로 올리며 **부족 팝업(id 0x20)** 을 띄운다 — 글은 문자열표가
  * 아니라 코드에 박힌 0xcc214 다 (`ACE_OPEN_SHORTAGE_POPUP`). **G는 한 푼도 안 깎이고 플래그도 안 선다.**
  */
-import {
-  ACE_DEFAULT_OPEN_CELLS,
-  ACE_OPEN_TABLE,
-  aceOpensWithGamePoint,
-} from '@/shared/config/original/aceOpen'
+import { ACE_DEFAULT_OPEN_CELLS, ACE_OPEN_TABLE, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
 import { aceCellUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
@@ -127,5 +123,4 @@ export function openAceCell(save: AceOpenSave, cell: number): AceOpenSave {
  * ⚠️ **근사**: 원본에서 "예" 는 유료 구매 페이지로 나간다 (0xa374 → 0xa4f0). 웹판에는 그 길이
  *    없어 **예·아니오 둘 다 그냥 닫는다.**
  */
-export const ACE_OPEN_SHORTAGE_POPUP =
-  '!C!cFF0000G포인트가 부족합니다.!cFFFFFF 구매!N페이지로 이동하시겠습니까?'
+export const ACE_OPEN_SHORTAGE_POPUP = '!C!cFF0000G포인트가 부족합니다.!cFFFFFF 구매!N페이지로 이동하시겠습니까?'

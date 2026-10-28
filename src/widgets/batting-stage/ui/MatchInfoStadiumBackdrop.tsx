@@ -69,7 +69,14 @@ export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoS
 
   if (stage === null || stage === undefined) return null
   return (
-    <canvas ref={canvasRef} width={STAGE_WIDTH} height={STAGE_HEIGHT} aria-hidden data-testid="경기정보-구장"
-      data-stadium={stage.stadium} style={{ position: 'absolute', left: 0, top: 0 }} />
+    <canvas
+      ref={canvasRef}
+      width={STAGE_WIDTH}
+      height={STAGE_HEIGHT}
+      aria-hidden
+      data-testid="경기정보-구장"
+      data-stadium={stage.stadium}
+      style={{ position: 'absolute', left: 0, top: 0 }}
+    />
   )
 }

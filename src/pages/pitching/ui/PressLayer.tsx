@@ -16,10 +16,7 @@ export function PressLayer({
   readonly isOnTop?: boolean
 }) {
   return (
-    <div
-      className={isOnTop ? `${styles.layer} ${styles.layerOnTop}` : styles.layer}
-      {...(testId === undefined ? {} : { 'data-testid': testId })}
-    >
+    <div className={isOnTop ? `${styles.layer} ${styles.layerOnTop}` : styles.layer} {...(testId === undefined ? {} : { 'data-testid': testId })}>
       {children}
     </div>
   )

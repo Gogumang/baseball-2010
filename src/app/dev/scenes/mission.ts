@@ -11,7 +11,13 @@ export const MISSION_SCENES: Readonly<Record<string, SceneDefinition>> = {
     seed: 1,
     steps: [
       ...toMission('타자', 1),
-      keyUntil('Enter', '미션 타석 0xe', missionIs((peek) => peek.side === '타자' && peek.isAwaitingConfirm), 400, 30000),
+      keyUntil(
+        'Enter',
+        '미션 타석 0xe',
+        missionIs((peek) => peek.side === '타자' && peek.isAwaitingConfirm),
+        400,
+        30000,
+      ),
       wait(400),
     ],
   },
@@ -22,7 +28,13 @@ export const MISSION_SCENES: Readonly<Record<string, SceneDefinition>> = {
     seed: 1,
     steps: [
       ...toMission('투수', 3),
-      keyUntil('Enter', '미션 구질 고르기 0xf', missionIs((peek) => peek.side === '투수' && peek.isPitchSlotPickerShown), 400, 30000),
+      keyUntil(
+        'Enter',
+        '미션 구질 고르기 0xf',
+        missionIs((peek) => peek.side === '투수' && peek.isPitchSlotPickerShown),
+        400,
+        30000,
+      ),
       wait(400),
     ],
   },
@@ -34,7 +46,13 @@ export const MISSION_SCENES: Readonly<Record<string, SceneDefinition>> = {
     snapshot: 'mission-result',
     steps: [
       ...toMission('투수', 3),
-      keyUntil('Enter', '미션 결과 판 0x19', missionIs((peek) => peek.isResultShown), 300, 150000),
+      keyUntil(
+        'Enter',
+        '미션 결과 판 0x19',
+        missionIs((peek) => peek.isResultShown),
+        300,
+        150000,
+      ),
       wait(1500),
     ],
   },

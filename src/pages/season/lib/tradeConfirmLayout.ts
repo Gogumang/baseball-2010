@@ -35,8 +35,16 @@ export const TRADE_CONFIRM = {
     { frame: 81, box: { x: 130, y: 80, width: 75, height: 15 } },
   ],
   /** 박스 4 · 5 · 8 — 내 선수 줄 / 박스 6 · 7 · 9 — 상대 선수 줄 */
-  myRow: { name: { x: 34, y: 94, width: 54, height: 15 }, team: { x: 130, y: 94, width: 75, height: 15 }, badge: { x: 91, y: 94, width: 36, height: 15 } },
-  opponentRow: { name: { x: 34, y: 148, width: 54, height: 15 }, team: { x: 130, y: 148, width: 75, height: 15 }, badge: { x: 91, y: 148, width: 36, height: 15 } },
+  myRow: {
+    name: { x: 34, y: 94, width: 54, height: 15 },
+    team: { x: 130, y: 94, width: 75, height: 15 },
+    badge: { x: 91, y: 94, width: 36, height: 15 },
+  },
+  opponentRow: {
+    name: { x: 34, y: 148, width: 54, height: 15 },
+    team: { x: 130, y: 148, width: 75, height: 15 },
+    badge: { x: 91, y: 148, width: 36, height: 15 },
+  },
   /** mode_ui 애니 3 (77~82, 지연 4) */
   animation: 3,
   costBox: { x: 33, y: 170, width: 174, height: 34 },

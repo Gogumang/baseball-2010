@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MATCH_INFO_BANNER_COLORS, MATCH_INFO_BANNER_OFFSETS, MATCH_INFO_VALUE_SETTLED, isMatchInfoKeyReadyAt, matchInfoBannersOf,
-  matchInfoEntryPhaseOf, matchInfoValueCellDy, matchInfoValueRowsAt, matchInfoValueUnfoldAfter,
+  MATCH_INFO_BANNER_COLORS,
+  MATCH_INFO_BANNER_OFFSETS,
+  MATCH_INFO_VALUE_SETTLED,
+  isMatchInfoKeyReadyAt,
+  matchInfoBannersOf,
+  matchInfoEntryPhaseOf,
+  matchInfoValueCellDy,
+  matchInfoValueRowsAt,
+  matchInfoValueUnfoldAfter,
 } from '@/pages/management/lib/matchInfoEntry'
 
 describe('경기 준비 들어올 때 연출 (0x63b14 넷째 인자 · 0x54790)', () => {
@@ -23,8 +30,18 @@ describe('경기 준비 들어올 때 연출 (0x63b14 넷째 인자 · 0x54790)'
 
   it('배너 꼭짓점 — y0 = 145 → r = 125 · 왼 A 는 x − D · 오른 B 는 x + D', () => {
     const [left, right] = matchInfoBannersOf(36)
-    expect(left.points).toEqual([{ x: -86, y: 125 }, { x: 104, y: 125 }, { x: 64, y: 165 }, { x: -86, y: 165 }])
-    expect(right.points).toEqual([{ x: 176, y: 106 }, { x: 326, y: 106 }, { x: 326, y: 146 }, { x: 136, y: 146 }])
+    expect(left.points).toEqual([
+      { x: -86, y: 125 },
+      { x: 104, y: 125 },
+      { x: 64, y: 165 },
+      { x: -86, y: 165 },
+    ])
+    expect(right.points).toEqual([
+      { x: 176, y: 106 },
+      { x: 326, y: 106 },
+      { x: 326, y: 146 },
+      { x: 136, y: 146 },
+    ])
     expect(left.lines[2]).toEqual({ from: { x: -86, y: 128 }, to: { x: 101, y: 128 }, color: MATCH_INFO_BANNER_COLORS.shade })
   })
 })

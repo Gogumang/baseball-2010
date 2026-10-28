@@ -31,15 +31,17 @@ export function nameTagBoxOf(point: { readonly x: number; readonly y: number }) 
 }
 
 /** 둥근 칠 셋을 조각으로 — 그리는 차례대로 */
-export function nameTagPiecesOf(box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }):
-  readonly NameTagPiece[] {
+export function nameTagPiecesOf(box: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}): readonly NameTagPiece[] {
   const { x, y, width: w, height: h } = box
   const layers = [
     { x, y, width: w, height: h, color: 'rgb(24, 36, 90)' },
     { x: x + 1, y: y + 1, width: w - 2, height: h - 2, color: 'rgb(24, 44, 107)' },
     { x: x + 2, y: y + 2, width: w - 4, height: h - Math.trunc(h / 2) - 2, color: 'rgb(41, 60, 140)' },
   ]
-  return layers.flatMap((layer) =>
-    roundFillRectsOf({ ...layer, round: NAME_TAG_ROUND }).map((rect) => ({ ...rect, color: layer.color })),
-  )
+  return layers.flatMap((layer) => roundFillRectsOf({ ...layer, round: NAME_TAG_ROUND }).map((rect) => ({ ...rect, color: layer.color })))
 }

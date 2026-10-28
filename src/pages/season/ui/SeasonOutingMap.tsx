@@ -6,8 +6,22 @@ import { CURSOR_ANIMATION, MAP_FRAMES, OUTING_PLACES, PLACE_LABEL_FRAMES } from 
 import { mapLabelSrc, outingMapComposeOps, outingMapUnderlayLayoutOf } from '@/pages/management/lib/outingMapUnderlay'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 /** 0x7ec04 · 0x7e300 의 단색 찍기 자리 — 건물은 네 방향, 글자 테두리는 여덟 방향(표 0xd48c8 · 0xd48e8) */
-const FOUR_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
-const EIGHT_WAYS: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1], [-1, -1], [1, -1], [1, 1], [-1, 1]]
+const FOUR_WAYS: readonly (readonly [number, number])[] = [
+  [-1, 0],
+  [0, -1],
+  [1, 0],
+  [0, 1],
+]
+const EIGHT_WAYS: readonly (readonly [number, number])[] = [
+  [-1, 0],
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+]
 
 export interface SeasonOutingMapProps {
   /** 고른 칸 p (this+0xf8) — −1 이면 고른 칸 없음(엔딩 0x87a1c) */
@@ -38,19 +52,37 @@ export function SeasonOutingMap({ selected, hidesNames = false, hour }: SeasonOu
   const cursorStep = animationStepAt(animations?.[CURSOR_ANIMATION] ?? [], update)
 
   return (
-    <div data-testid="시즌-외출지도" data-selected={selected}
-      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320, background: '#000', overflow: 'hidden', pointerEvents: 'none' }}>
-      <ComposedScreen testId="시즌-외출지도-합성" ops={outingMapComposeOps({
-        origins, mapX: layout.mapX, mapY: layout.mapY, selected, isNight: layout.isNight,
-        labelOf: (index) => (hidesNames
-          ? []
-          : [{ kind: 'image', src: mapLabelSrc(layout.labels[index].frame), x: layout.labels[index].left, y: layout.labels[index].top }]),
-      })} />
+    <div
+      data-testid="시즌-외출지도"
+      data-selected={selected}
+      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320, background: '#000', overflow: 'hidden', pointerEvents: 'none' }}
+    >
+      <ComposedScreen
+        testId="시즌-외출지도-합성"
+        ops={outingMapComposeOps({
+          origins,
+          mapX: layout.mapX,
+          mapY: layout.mapY,
+          selected,
+          isNight: layout.isNight,
+          labelOf: (index) =>
+            hidesNames
+              ? []
+              : [{ kind: 'image', src: mapLabelSrc(layout.labels[index].frame), x: layout.labels[index].left, y: layout.labels[index].top }],
+        })}
+      />
       {selectedPlace !== undefined && (
         <>
           {FOUR_WAYS.map(([dx, dy]) => (
-            <SolidStamp key={`${dx},${dy}`} folder={MAP_FRAMES} frame={selectedPlace.frame} origins={origins}
-              x={layout.mapX + dx} y={layout.mapY + dy} color="#FFFFFF" />
+            <SolidStamp
+              key={`${dx},${dy}`}
+              folder={MAP_FRAMES}
+              frame={selectedPlace.frame}
+              origins={origins}
+              x={layout.mapX + dx}
+              y={layout.mapY + dy}
+              color="#FFFFFF"
+            />
           ))}
           <FrameSprite folder={MAP_FRAMES} frame={selectedPlace.frame} origins={origins} x={layout.mapX} y={layout.mapY} />
         </>
@@ -59,17 +91,34 @@ export function SeasonOutingMap({ selected, hidesNames = false, hour }: SeasonOu
         // 이름 그림(map_label_*)은 1px 테두리를 둘러 글자보다 1px 왼쪽 위에서 시작한다 — 글자 자리는 +1
         <>
           {EIGHT_WAYS.map(([dx, dy]) => (
-            <SolidStamp key={`label${dx},${dy}`} folder={PLACE_LABEL_FRAMES} frame={selectedPlace.labelFrame} origins={labelOrigins}
-              x={selectedLabel.left + 1 + dx} y={selectedLabel.top + 1 + dy} color="#FFFF00" />
+            <SolidStamp
+              key={`label${dx},${dy}`}
+              folder={PLACE_LABEL_FRAMES}
+              frame={selectedPlace.labelFrame}
+              origins={labelOrigins}
+              x={selectedLabel.left + 1 + dx}
+              y={selectedLabel.top + 1 + dy}
+              color="#FFFF00"
+            />
           ))}
-          <SolidStamp folder={PLACE_LABEL_FRAMES} frame={selectedPlace.labelFrame} origins={labelOrigins}
-            x={selectedLabel.left + 1} y={selectedLabel.top + 1} color="#000000" />
+          <SolidStamp
+            folder={PLACE_LABEL_FRAMES}
+            frame={selectedPlace.labelFrame}
+            origins={labelOrigins}
+            x={selectedLabel.left + 1}
+            y={selectedLabel.top + 1}
+            color="#000000"
+          />
         </>
       )}
       {selectedPlace !== undefined && cursorStep !== null && (
-        <FrameSprite folder={MAP_FRAMES} frame={cursorStep.frame} origins={origins}
+        <FrameSprite
+          folder={MAP_FRAMES}
+          frame={cursorStep.frame}
+          origins={origins}
           x={layout.mapX + selectedPlace.cursorBox.x + Math.trunc(selectedPlace.cursorBox.width / 2) + cursorStep.dx}
-          y={layout.mapY + selectedPlace.cursorBox.y + cursorStep.dy} />
+          y={layout.mapY + selectedPlace.cursorBox.y + cursorStep.dy}
+        />
       )}
     </div>
   )

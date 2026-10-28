@@ -56,16 +56,34 @@ export const BATTER_CARD_TOP = MATCHUP_SCREEN.height - 0x5f
 
 /** game_ui 프레임 1 박스 0~11 — 투수 판 */
 export const PITCHER_BOXES: readonly CardBox[] = [
-  box(0, 0, 137, 62), box(7, 4, 37, 7), box(65, 6, 17, 13), box(84, 6, 49, 13),
-  box(8, 25, 23, 12), box(8, 44, 22, 12), box(34, 43, 30, 13), box(75, 23, 26, 13),
-  box(106, 24, 27, 13), box(75, 43, 56, 13), box(48, 24, 16, 13), box(36, 24, 11, 13),
+  box(0, 0, 137, 62),
+  box(7, 4, 37, 7),
+  box(65, 6, 17, 13),
+  box(84, 6, 49, 13),
+  box(8, 25, 23, 12),
+  box(8, 44, 22, 12),
+  box(34, 43, 30, 13),
+  box(75, 23, 26, 13),
+  box(106, 24, 27, 13),
+  box(75, 43, 56, 13),
+  box(48, 24, 16, 13),
+  box(36, 24, 11, 13),
 ]
 
 /** game_ui 프레임 2 박스 0~11 — 타자 판 */
 export const BATTER_BOXES: readonly CardBox[] = [
-  box(0, 0, 137, 62), box(7, 4, 37, 7), box(65, 7, 17, 13), box(84, 6, 49, 13),
-  box(8, 25, 23, 12), box(8, 44, 22, 12), box(34, 43, 30, 13), box(75, 23, 26, 13),
-  box(106, 24, 27, 13), box(104, 43, 29, 13), box(78, 43, 22, 13), box(43, 24, 21, 13),
+  box(0, 0, 137, 62),
+  box(7, 4, 37, 7),
+  box(65, 7, 17, 13),
+  box(84, 6, 49, 13),
+  box(8, 25, 23, 12),
+  box(8, 44, 22, 12),
+  box(34, 43, 30, 13),
+  box(75, 23, 26, 13),
+  box(106, 24, 27, 13),
+  box(104, 43, 29, 13),
+  box(78, 43, 22, 13),
+  box(43, 24, 21, 13),
 ]
 
 export const GAME_UI_FOLDER = assetUrl('./sprites/game_ui/frames')
@@ -101,12 +119,36 @@ export const GAME_UI_FRAMES: Readonly<Record<number, FrameSize>> = {
 
 /** img_text 프레임 크기 (쓰는 것만) */
 export const IMG_TEXT_FRAMES: Readonly<Record<number, FrameSize>> = {
-  49: frame(20, 10), 54: frame(21, 10), 55: frame(21, 10), 56: frame(21, 10), 57: frame(21, 10),
-  58: frame(21, 10), 59: frame(28, 10), 60: frame(28, 10), 61: frame(20, 10),
-  157: frame(39, 5), 158: frame(20, 5), 170: frame(21, 10), 173: frame(15, 10, 2), 174: frame(17, 10),
-  175: frame(17, 10), 176: frame(21, 10), 177: frame(19, 10), 178: frame(20, 10), 179: frame(20, 10),
-  180: frame(20, 10), 181: frame(21, 10), 182: frame(21, 10), 183: frame(20, 10), 184: frame(20, 11),
-  316: frame(20, 10), 317: frame(21, 10), 318: frame(21, 10), 319: frame(21, 10), 361: frame(21, 10), 362: frame(21, 10),
+  49: frame(20, 10),
+  54: frame(21, 10),
+  55: frame(21, 10),
+  56: frame(21, 10),
+  57: frame(21, 10),
+  58: frame(21, 10),
+  59: frame(28, 10),
+  60: frame(28, 10),
+  61: frame(20, 10),
+  157: frame(39, 5),
+  158: frame(20, 5),
+  170: frame(21, 10),
+  173: frame(15, 10, 2),
+  174: frame(17, 10),
+  175: frame(17, 10),
+  176: frame(21, 10),
+  177: frame(19, 10),
+  178: frame(20, 10),
+  179: frame(20, 10),
+  180: frame(20, 10),
+  181: frame(21, 10),
+  182: frame(21, 10),
+  183: frame(20, 10),
+  184: frame(20, 11),
+  316: frame(20, 10),
+  317: frame(21, 10),
+  318: frame(21, 10),
+  319: frame(21, 10),
+  361: frame(21, 10),
+  362: frame(21, 10),
 }
 
 /** num 그림 크기 — 20~29 · 30~39 모두 6×10, "1"(21 · 31)만 4×10 */
@@ -216,9 +258,7 @@ const digitsOf = (value: number) => [...String(Math.max(0, Math.trunc(value)))].
  * 폭 = Σ(글자 폭 + 자간) (마지막 글자 뒤 자간까지), 정렬 0x4 → x += 박스폭 − 폭 · 0x2 → x += (박스폭 − 폭) >> 1 ·
  * 0x20 → y += 세로 가운데(박스높이 − 가장 큰 높이) · 0x40 → 아래. 글자마다 가장 큰 높이에 아래를 맞춘다.
  */
-export function boxNumberGlyphsOf(
-  value: number, cardBox: CardBox, origin: Placed, base: number, spacing: number, align: number,
-): NumberGlyph[] {
+export function boxNumberGlyphsOf(value: number, cardBox: CardBox, origin: Placed, base: number, spacing: number, align: number): NumberGlyph[] {
   const digits = digitsOf(value)
   const total = digits.reduce((sum, digit) => sum + numImageWidthOf(base + digit) + spacing, 0)
   let x = cardBox.x + origin.x
@@ -240,9 +280,7 @@ export function boxNumberGlyphsOf(
  * 0x40 → y −= 높이 · 0x20 → y −= trunc(높이/2) (높이 = 그림[기준] 높이). 자리가 모자라면 정렬 0x4 일 때 모자란 만큼
  * (그림[기준] 폭 + 간격)씩 더 왼쪽으로 가서 그림[기준]("0")을 먼저 찍는다. 글자마다 폭 + 간격씩 나아간다.
  */
-export function paddedNumberGlyphsOf(
-  value: number, x: number, y: number, base: number, gap: number, places: number, align: number,
-): NumberGlyph[] {
+export function paddedNumberGlyphsOf(value: number, x: number, y: number, base: number, gap: number, places: number, align: number): NumberGlyph[] {
   const digits = digitsOf(value)
   const measured = digits.reduce((sum, digit, index) => sum + numImageWidthOf(base + digit) + (index > 1 ? gap : 0), 0)
   const shift = (align & 0x1) !== 0 ? 0 : (align & 0x2) !== 0 ? measured >> 1 : measured
@@ -276,8 +314,7 @@ export interface FillRect {
   readonly round: number
 }
 
-const fill = (x: number, y: number, width: number, height: number, color: string, round = 0): FillRect =>
-  ({ x, y, width, height, color, round })
+const fill = (x: number, y: number, width: number, height: number, color: string, round = 0): FillRect => ({ x, y, width, height, color, round })
 
 export interface PlainRect {
   readonly x: number
@@ -345,9 +382,7 @@ export function earnedRunAverageGlyphsOf(value: number, origin: Placed): { glyph
       ...boxNumberGlyphsOf(hundredths, decimalBox, origin, NUMBER_BASE.stat, 0, 0x24),
       ...boxNumberGlyphsOf(tenths, decimalBox, tenthsOrigin, NUMBER_BASE.stat, 0, 0x24),
     ],
-    point: fill(
-      origin.x + intBox.x + intBox.width + 1, origin.y + intBox.y + intBox.height - 3, 1, 2, CARD_COLORS.point,
-    ),
+    point: fill(origin.x + intBox.x + intBox.width + 1, origin.y + intBox.y + intBox.height - 3, 1, 2, CARD_COLORS.point),
   }
 }
 
@@ -440,14 +475,18 @@ export function pitcherRoleBadgeOf(role: number, playerLabel: number): { chip: n
  */
 const POSITION_BADGES: readonly { chip: number; label: number }[] = [
   { chip: -1, label: -1 },
-  { chip: 7, label: 0xb7 }, { chip: 5, label: 0xb0 }, { chip: 5, label: 0xad }, { chip: 5, label: 0xae },
-  { chip: 5, label: 0xaf }, { chip: 5, label: 0xb8 }, { chip: 4, label: 0xb3 }, { chip: 4, label: 0xb1 },
+  { chip: 7, label: 0xb7 },
+  { chip: 5, label: 0xb0 },
+  { chip: 5, label: 0xad },
+  { chip: 5, label: 0xae },
+  { chip: 5, label: 0xaf },
+  { chip: 5, label: 0xb8 },
+  { chip: 4, label: 0xb3 },
+  { chip: 4, label: 0xb1 },
   { chip: 4, label: 0xb2 },
 ]
 
-export function batterPositionBadgeOf(
-  position: number, leftoverChip: number, playerLabel: number,
-): { chip: number; label: number } {
+export function batterPositionBadgeOf(position: number, leftoverChip: number, playerLabel: number): { chip: number; label: number } {
   return POSITION_BADGES[position] ?? { chip: leftoverChip, label: playerLabel }
 }
 

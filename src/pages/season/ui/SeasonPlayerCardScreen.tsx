@@ -63,7 +63,17 @@ const IMG_TEXT = assetUrl('./sprites/img_text/frames')
  * 창 0x8a0a4 는 나리 120 과 같은 창이라 `DetailWindow` 를 그대로 쓴다.
  */
 export function SeasonPlayerCardScreen({
-  teamId, view, abilities, info, detail, isDetailOpen, onOpenDetail, onCloseDetail, onBack, gamePoint = 0, hasCardBadge = false,
+  teamId,
+  view,
+  abilities,
+  info,
+  detail,
+  isDetailOpen,
+  onOpenDetail,
+  onCloseDetail,
+  onBack,
+  gamePoint = 0,
+  hasCardBadge = false,
 }: SeasonPlayerCardScreenProps) {
   const [scrollOffset, setScrollOffset] = useState(0)
   // 0x52f4 가 들어올 때마다 글을 새로 만들고 창+0x380 = 0 — 창을 다시 열면 맨 위부터
@@ -107,23 +117,43 @@ export function SeasonPlayerCardScreen({
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xd9 · 0xda 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
-      <SeasonPlayerCard teamId={teamId} isPitcher={view.isPitcher} look={seasonCardLookOf(view, teamId)} abilities={abilities}
-        isAnimating={!isDetailOpen} hasCardBadge={hasCardBadge}>
+      <SeasonPlayerCard
+        teamId={teamId}
+        isPitcher={view.isPitcher}
+        look={seasonCardLookOf(view, teamId)}
+        abilities={abilities}
+        isAnimating={!isDetailOpen}
+        hasCardBadge={hasCardBadge}
+      >
         {info !== undefined && (
           <>
-            <div className={infoStyles.layer}
-              style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }} />
+            <div
+              className={infoStyles.layer}
+              style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }}
+            />
             {SEASON_CARD_INFO_LABELS[view.isPitcher ? '투수' : '타자'].map((frame, row) => {
               const column = INFO_COLUMNS[row < 4 ? 0 : 1]
               const top = INFO_TOP + (row % 4) * INFO_ROW_STEP
               const isBattingOrder = row === 7
               return (
                 <div key={frame} data-testid={`선수상세-정보-${row}`}>
-                  <img className={infoStyles.layer} alt="" src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
-                    style={{ left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)' }} />
-                  <div className={infoStyles.infoValue} data-testid={`선수상세-정보값-${row}`}
-                    style={{ left: column.value.x, top, width: column.value.width, height: INFO_ROW_HEIGHT,
-                      color: isBattingOrder ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text }}>
+                  <img
+                    className={infoStyles.layer}
+                    alt=""
+                    src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
+                    style={{ left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)' }}
+                  />
+                  <div
+                    className={infoStyles.infoValue}
+                    data-testid={`선수상세-정보값-${row}`}
+                    style={{
+                      left: column.value.x,
+                      top,
+                      width: column.value.width,
+                      height: INFO_ROW_HEIGHT,
+                      color: isBattingOrder ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text,
+                    }}
+                  >
                     {isBattingOrder ? info.battingOrder : info.values[row]}
                   </div>
                 </div>
@@ -133,13 +163,17 @@ export function SeasonPlayerCardScreen({
         )}
       </SeasonPlayerCard>
 
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={isDetailOpen ? onCloseDetail : onBack} footer={7} slides={false}
+      <ScreenFrame
+        title="시즌모드"
+        gamePoint={gamePoint}
+        onBack={isDetailOpen ? onCloseDetail : onBack}
+        footer={7}
+        slides={false}
         // 웹 덧붙임 — 바닥띠 "0상세정보" 글자 자리(가운데) 위 투명 칸 = 원본 '0' (0x48a0 → 0xda)
-        footerPresses={{ [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: isDetailOpen ? onCloseDetail : onOpenDetail } }} />
+        footerPresses={{ [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: isDetailOpen ? onCloseDetail : onOpenDetail } }}
+      />
 
-      {isDetailOpen && (
-        <DetailWindow rows={detail.rows} messages={detail.messages} scrollOffset={scrollOffset} onClose={onCloseDetail} />
-      )}
+      {isDetailOpen && <DetailWindow rows={detail.rows} messages={detail.messages} scrollOffset={scrollOffset} onClose={onCloseDetail} />}
     </RawScreen>
   )
 }

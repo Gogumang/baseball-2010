@@ -11,7 +11,14 @@ import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderSc
 import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT } from '@/entities/game/model/gameState'
 import {
-  MATCH_INFO_LAYOUT, MATCH_INFO_PLAY_BALL_PRESS_RECT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, matchInfoLogoPressRectOf, isPrepareBobOn, matchInfoRowY,
+  MATCH_INFO_LAYOUT,
+  MATCH_INFO_PLAY_BALL_PRESS_RECT,
+  TAG,
+  TEAM_LOGO_HALF,
+  firstBatTagPlacementOf,
+  matchInfoLogoPressRectOf,
+  isPrepareBobOn,
+  matchInfoRowY,
 } from '@/pages/general-mode/lib/prepareLayout'
 import { generalModeMatchInfoLines } from '@/pages/general-mode/lib/matchInfoLines'
 import type { CpuMatchInfo } from '@/pages/general-mode/lib/matchInfoLines'
@@ -100,8 +107,21 @@ export interface MatchInfoScreenProps {
  *   - '4'/왼 → 유저 팀 · '6'/오른 → CPU 팀(보기 전용) **엔트리 편집**(상태 23, 편집기 0x55864)
  */
 export function MatchInfoScreen({
-  setup, isQuickStart = false, isSettingsOpen = false, settingsWindow = null, isRespinning = false, gamePoint = 0, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry,
-  userStarterName = null, cpuMatchInfo = null, stage = null, isEntryAnimated = false,
+  setup,
+  isQuickStart = false,
+  isSettingsOpen = false,
+  settingsWindow = null,
+  isRespinning = false,
+  gamePoint = 0,
+  onStart,
+  onOpenSettings,
+  onRespin,
+  onCancel,
+  onOpenEntry,
+  userStarterName = null,
+  cpuMatchInfo = null,
+  stage = null,
+  isEntryAnimated = false,
 }: MatchInfoScreenProps) {
   const { phase, valueRows, areValueCellsHidden, isKeyReady } = useMatchInfoEntry(isEntryAnimated, isRespinning)
   const sltOrigins = useFrameOrigins(SLT_FRAME)
@@ -161,94 +181,168 @@ export function MatchInfoScreen({
       {phase.kind === '배너' && <MatchInfoEntryBanners offset={phase.offset} testId="경기정보-배너" />}
       {phase.kind === '본문' && (
         <>
-      {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
-      {[
-        { anchor: anchorA, frame: 157 },
-        { anchor: anchorB, frame: 158 },
-      ].map(({ anchor, frame }) => (
-        <span key={frame}>
-          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
-            style={{ left: anchor.x + TAG.dx, top: anchor.y + TAG.bDyMatchScreens }} />
-          {/* 둘 다 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
-          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} centerX
-            x={anchor.x} y={anchor.y + TAG.bDyMatchScreens + TAG.textDdy} />
-        </span>
-      ))}
+          {/* A·B 딱지 — k 4 는 둘 다 흰 막대(116) 에 53 위, PLAYER · COM */}
+          {[
+            { anchor: anchorA, frame: 157 },
+            { anchor: anchorB, frame: 158 },
+          ].map(({ anchor, frame }) => (
+            <span key={frame}>
+              <img
+                className={styles.layer}
+                alt=""
+                src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
+                style={{ left: anchor.x + TAG.dx, top: anchor.y + TAG.bDyMatchScreens }}
+              />
+              {/* 둘 다 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
+              <FrameSprite
+                folder={IMG_TEXT_FRAME}
+                frame={frame}
+                origins={imgTextOrigins}
+                centerX
+                x={anchor.x}
+                y={anchor.y + TAG.bDyMatchScreens + TAG.textDdy}
+              />
+            </span>
+          ))}
 
-      {/* 두 팀 엠블럼 */}
-      <img className={styles.layer} alt={TEAMS[setup.userTeamId]?.name ?? ''} src={TEAMS[setup.userTeamId]?.logoUrl}
-        style={{ left: anchorA.x - TEAM_LOGO_HALF.width, top: anchorA.y - TEAM_LOGO_HALF.height }} />
-      <img className={styles.layer} alt={TEAMS[setup.aiTeamId]?.name ?? ''} src={TEAMS[setup.aiTeamId]?.logoUrl}
-        style={{ left: anchorB.x - TEAM_LOGO_HALF.width, top: anchorB.y - TEAM_LOGO_HALF.height }} />
+          {/* 두 팀 엠블럼 */}
+          <img
+            className={styles.layer}
+            alt={TEAMS[setup.userTeamId]?.name ?? ''}
+            src={TEAMS[setup.userTeamId]?.logoUrl}
+            style={{ left: anchorA.x - TEAM_LOGO_HALF.width, top: anchorA.y - TEAM_LOGO_HALF.height }}
+          />
+          <img
+            className={styles.layer}
+            alt={TEAMS[setup.aiTeamId]?.name ?? ''}
+            src={TEAMS[setup.aiTeamId]?.logoUrl}
+            style={{ left: anchorB.x - TEAM_LOGO_HALF.width, top: anchorB.y - TEAM_LOGO_HALF.height }}
+          />
 
-      {/* 선공 꼬리표 */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, firstBatTag.image)}
-        style={{
-          left: tagPlace.tag.x,
-          top: tagPlace.tag.y,
-          transform: isUserFirstBat ? 'scaleX(-1)' : undefined,
-        }} />
-      <FrameSprite folder={IMG_TEXT_FRAME} frame={firstBatTag.textFrame} origins={imgTextOrigins}
-        x={tagPlace.text.x} y={tagPlace.text.y} />
+          {/* 선공 꼬리표 */}
+          <img
+            className={styles.layer}
+            alt=""
+            src={imageSrc(SLT_IMAGE, firstBatTag.image)}
+            style={{
+              left: tagPlace.tag.x,
+              top: tagPlace.tag.y,
+              transform: isUserFirstBat ? 'scaleX(-1)' : undefined,
+            }}
+          />
+          <FrameSprite folder={IMG_TEXT_FRAME} frame={firstBatTag.textFrame} origins={imgTextOrigins} x={tagPlace.text.x} y={tagPlace.text.y} />
 
-      {/* 가운데 PLAY BALL 공 — 노랑 반원 두 쪽은 값 줄 0x5dcc0 뒤에 깜빡일 때만 그린다 (0x65086) */}
-      <FrameSprite folder={SLT_FRAME} frame={MATCH_INFO_LAYOUT.playBall.frame} origins={sltOrigins}
-        x={120 - 23} y={MATCH_INFO_LAYOUT.playBall.y} />
-      {/* 좌우 화살 slt_frame 이미지 20 — d = 깜빡 [sp+0xd4] (0x64eba~0x64f08) */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
-        style={{ left: MATCH_INFO_LAYOUT.arrow.leftX - (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y }} />
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
-        style={{ left: MATCH_INFO_LAYOUT.arrow.rightX + (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
+          {/* 가운데 PLAY BALL 공 — 노랑 반원 두 쪽은 값 줄 0x5dcc0 뒤에 깜빡일 때만 그린다 (0x65086) */}
+          <FrameSprite
+            folder={SLT_FRAME}
+            frame={MATCH_INFO_LAYOUT.playBall.frame}
+            origins={sltOrigins}
+            x={120 - 23}
+            y={MATCH_INFO_LAYOUT.playBall.y}
+          />
+          {/* 좌우 화살 slt_frame 이미지 20 — d = 깜빡 [sp+0xd4] (0x64eba~0x64f08) */}
+          <img
+            className={styles.layer}
+            alt=""
+            src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
+            style={{ left: MATCH_INFO_LAYOUT.arrow.leftX - (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y }}
+          />
+          <img
+            className={styles.layer}
+            alt=""
+            src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.arrow.image)}
+            style={{ left: MATCH_INFO_LAYOUT.arrow.rightX + (isBob ? 1 : 0), top: MATCH_INFO_LAYOUT.arrow.y, transform: 'scaleX(-1)' }}
+          />
 
-      {/* 줄 다섯 — 가운데 딱지 (0x64d30 본문) */}
-      {lines.map((line, index) => {
-        const y = matchInfoRowY(index)
-        return (
-          <span key={line.label}>
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.labelBar.image)}
-              style={{ left: MATCH_INFO_LAYOUT.labelBar.x, top: y }} />
-            {/* 가운데 딱지 막대(이미지 18)도 116 과 같은 흰 막대다 — 글자는 팔레트 3(짙은 파랑)으로 구웠다 */}
-            <FrameSprite folder={IMG_TEXT_FRAME} frame={line.labelFrame} origins={imgTextOrigins}
-              x={MATCH_INFO_LAYOUT.labelBar.x} y={y + MATCH_INFO_LAYOUT.labelBar.textDy} />
-          </span>
-        )
-      })}
+          {/* 줄 다섯 — 가운데 딱지 (0x64d30 본문) */}
+          {lines.map((line, index) => {
+            const y = matchInfoRowY(index)
+            return (
+              <span key={line.label}>
+                <img
+                  className={styles.layer}
+                  alt=""
+                  src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.labelBar.image)}
+                  style={{ left: MATCH_INFO_LAYOUT.labelBar.x, top: y }}
+                />
+                {/* 가운데 딱지 막대(이미지 18)도 116 과 같은 흰 막대다 — 글자는 팔레트 3(짙은 파랑)으로 구웠다 */}
+                <FrameSprite
+                  folder={IMG_TEXT_FRAME}
+                  frame={line.labelFrame}
+                  origins={imgTextOrigins}
+                  x={MATCH_INFO_LAYOUT.labelBar.x}
+                  y={y + MATCH_INFO_LAYOUT.labelBar.textDy}
+                />
+              </span>
+            )
+          })}
 
-      {/*
+          {/*
         값 칸 0x5dcc0 — 딱지 뒤에 칸 i = 0 … 9 (짝 유저 · 홀 CPU) 차례로. 유저 slt_frame 이미지 10 (16, y + 3) · CPU 뒤집어 (138, y − 3),
         펼치는 동안은 아랫줄 칸이 첫 줄 자리에서 떨어져 내려온다(`matchInfoValueCellDy`). 재굴림 중에는 안 그린다.
       */}
-      {!areValueCellsHidden && lines.map((line, index) => {
-        const y = matchInfoRowY(index)
-        const userY = y + MATCH_INFO_LAYOUT.valueCell.userDy + matchInfoValueCellDy(valueRows.unfold, 2 * index)
-        const cpuY = y + MATCH_INFO_LAYOUT.valueCell.cpuDy + matchInfoValueCellDy(valueRows.unfold, 2 * index + 1)
-        return (
-          <span key={line.label}>
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: userY }} />
-            <span className={styles.centeredText} data-testid={`경기정보-${line.label}-유저`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: userY + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
-              {line.user}
-            </span>
-            <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: cpuY, transform: 'scaleX(-1)' }} />
-            <span className={styles.centeredText} data-testid={`경기정보-${line.label}-CPU`}
-              style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: cpuY + MATCH_INFO_LAYOUT.valueCell.textDy, width: MATCH_INFO_LAYOUT.valueCell.width }}>
-              {line.cpu}
-            </span>
-          </span>
-        )
-      })}
+          {!areValueCellsHidden &&
+            lines.map((line, index) => {
+              const y = matchInfoRowY(index)
+              const userY = y + MATCH_INFO_LAYOUT.valueCell.userDy + matchInfoValueCellDy(valueRows.unfold, 2 * index)
+              const cpuY = y + MATCH_INFO_LAYOUT.valueCell.cpuDy + matchInfoValueCellDy(valueRows.unfold, 2 * index + 1)
+              return (
+                <span key={line.label}>
+                  <img
+                    className={styles.layer}
+                    alt=""
+                    src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
+                    style={{ left: MATCH_INFO_LAYOUT.valueCell.userX, top: userY }}
+                  />
+                  <span
+                    className={styles.centeredText}
+                    data-testid={`경기정보-${line.label}-유저`}
+                    style={{
+                      left: MATCH_INFO_LAYOUT.valueCell.userX,
+                      top: userY + MATCH_INFO_LAYOUT.valueCell.textDy,
+                      width: MATCH_INFO_LAYOUT.valueCell.width,
+                    }}
+                  >
+                    {line.user}
+                  </span>
+                  <img
+                    className={styles.layer}
+                    alt=""
+                    src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.valueCell.image)}
+                    style={{ left: MATCH_INFO_LAYOUT.valueCell.cpuX, top: cpuY, transform: 'scaleX(-1)' }}
+                  />
+                  <span
+                    className={styles.centeredText}
+                    data-testid={`경기정보-${line.label}-CPU`}
+                    style={{
+                      left: MATCH_INFO_LAYOUT.valueCell.cpuX,
+                      top: cpuY + MATCH_INFO_LAYOUT.valueCell.textDy,
+                      width: MATCH_INFO_LAYOUT.valueCell.width,
+                    }}
+                  >
+                    {line.cpu}
+                  </span>
+                </span>
+              )
+            })}
 
-      {/* 노랑 반원 두 쪽 — 값 줄 0x5dcc0 이 다 펼쳤다고 돌려줬고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108) */}
-      {valueRows.isReady && isBob && (
-        <>
-          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
-            style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }} />
-          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
-            style={{ left: MATCH_INFO_LAYOUT.halfCircle.rightX, top: MATCH_INFO_LAYOUT.halfCircle.y, transform: 'scaleX(-1)' }} />
-        </>
-      )}
+          {/* 노랑 반원 두 쪽 — 값 줄 0x5dcc0 이 다 펼쳤다고 돌려줬고([skin+0xe4]) 깜빡일 때만 (0x65078~0x65108) */}
+          {valueRows.isReady && isBob && (
+            <>
+              <img
+                className={styles.layer}
+                alt=""
+                src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
+                style={{ left: MATCH_INFO_LAYOUT.halfCircle.leftX, top: MATCH_INFO_LAYOUT.halfCircle.y }}
+              />
+              <img
+                className={styles.layer}
+                alt=""
+                src={imageSrc(SLT_IMAGE, MATCH_INFO_LAYOUT.halfCircle.image)}
+                style={{ left: MATCH_INFO_LAYOUT.halfCircle.rightX, top: MATCH_INFO_LAYOUT.halfCircle.y, transform: 'scaleX(-1)' }}
+              />
+            </>
+          )}
         </>
       )}
 
@@ -273,12 +367,17 @@ export function MatchInfoScreen({
 
       {/* 머리띠(제목 12 "경기정보")·바닥띠 — 원본 공용 목록 k 4 도 이 둘을 얹는다 (P6 1-1 · 2a-6) */}
       {/* 바닥띠의 "되돌아가기" 가 원본 소프트키다 — 따로 두었던 버튼은 없앴다 (스테이지 (0,0) 에 떨어져 있었다) */}
-      <ScreenFrame title="경기정보" gamePoint={gamePoint} onBack={onCancel}
-        footer={generalMatchInfoFooterOf(isQuickStart, isRespinning, isSettingsOpen)} slides={isEntryAnimated}
+      <ScreenFrame
+        title="경기정보"
+        gamePoint={gamePoint}
+        onBack={onCancel}
+        footer={generalMatchInfoFooterOf(isQuickStart, isRespinning, isSettingsOpen)}
+        slides={isEntryAnimated}
         footerPresses={{
           [FOOTER_BITS.gameSettings]: { label: '0 경기설정', onPress: () => pressKey('0') },
           [FOOTER_BITS.reselect]: { label: '* 재선택', onPress: () => pressKey('*') },
-        }} />
+        }}
+      />
     </RawScreen>
   )
 }

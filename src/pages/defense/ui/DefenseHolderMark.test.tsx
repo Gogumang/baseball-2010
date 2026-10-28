@@ -48,12 +48,7 @@ describe('공 가진 야수 고리 + 이름 판 (0x43cb0)', () => {
   })
 
   it('투수 칸이면 보직 아이콘 · 글자와 이름을 오른쪽 아래 판에 적는다', async () => {
-    render(
-      <DefenseScreen
-        state={상태({ holderMark: { slot: 0, anim: 1 }, holderPlate: { name: '마무리', pitcherRole: 2 } })}
-        isRunning={false}
-      />,
-    )
+    render(<DefenseScreen state={상태({ holderMark: { slot: 0, anim: 1 }, holderPlate: { name: '마무리', pitcherRole: 2 } })} isRunning={false} />)
     await act(async () => {})
     expect(screen.getByTestId('수비-이름').textContent).toBe('마무리')
     // 구원 → 칸 5 + 0x20 = 37, 글자 0xb6

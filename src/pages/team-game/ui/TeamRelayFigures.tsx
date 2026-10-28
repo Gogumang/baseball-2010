@@ -60,19 +60,25 @@ function RelayFigure({
   const key = String(frame).padStart(3, '0')
   const origin = origins?.[key]
   return (
-    <div data-testid={testId} data-frame={frame} data-folder={folder}
-      style={{ position: 'absolute', left: x, top: y, width: 0, height: 0, pointerEvents: 'none' }}>
+    <div
+      data-testid={testId}
+      data-frame={frame}
+      data-folder={folder}
+      style={{ position: 'absolute', left: x, top: y, width: 0, height: 0, pointerEvents: 'none' }}
+    >
       {origin !== undefined && (
         // 칠한 주소는 그림마다 따로 마운트한다 — 바뀐 그 그리기에 앞 그림 주소가 비치지 않게 (`DefenseScreen` 의 PaintedSprite 와 같다)
-        <PaintedImage key={`${folder}/${key}`} url={`${folder}/${key}.png`} paletteIndex={paletteIndex}
-          left={origin.x} top={origin.y} />
+        <PaintedImage key={`${folder}/${key}`} url={`${folder}/${key}.png`} paletteIndex={paletteIndex} left={origin.x} top={origin.y} />
       )}
     </div>
   )
 }
 
 function PaintedImage({
-  url, paletteIndex, left, top,
+  url,
+  paletteIndex,
+  left,
+  top,
 }: {
   readonly url: string
   readonly paletteIndex: number | null
@@ -80,8 +86,11 @@ function PaintedImage({
   readonly top: number
 }) {
   return (
-    <img alt="" src={useRecoloredSprite(url, paletteIndex)}
-      style={{ position: 'absolute', left, top, imageRendering: 'pixelated', pointerEvents: 'none' }} />
+    <img
+      alt=""
+      src={useRecoloredSprite(url, paletteIndex)}
+      style={{ position: 'absolute', left, top, imageRendering: 'pixelated', pointerEvents: 'none' }}
+    />
   )
 }
 
@@ -121,35 +130,60 @@ export function TeamRelayFigures({ figures }: { readonly figures: TeamRelayFigur
     <>
       {RELAY_BASE_OFFSETS.map((offset, index) => {
         if (!figures.bases[index]) return null
-        const aceFolder = figures.aceRunners[index] && figures.loadedRunnerAce !== null
-          ? ACE_BATTER_DEFENDER_FRAMES[figures.loadedRunnerAce]
-          : undefined
+        const aceFolder =
+          figures.aceRunners[index] && figures.loadedRunnerAce !== null ? ACE_BATTER_DEFENDER_FRAMES[figures.loadedRunnerAce] : undefined
         return (
-          <RelayFigure key={`base-${index}`} testId={`중계-주자-${index + 1}`} folder={aceFolder ?? DEFENDER_FRAMES} frame={RUNNER_FRAME}
-            paletteIndex={aceFolder === undefined ? offensePalette : null} x={center.x + offset.x} y={center.y + offset.y} />
+          <RelayFigure
+            key={`base-${index}`}
+            testId={`중계-주자-${index + 1}`}
+            folder={aceFolder ?? DEFENDER_FRAMES}
+            frame={RUNNER_FRAME}
+            paletteIndex={aceFolder === undefined ? offensePalette : null}
+            x={center.x + offset.x}
+            y={center.y + offset.y}
+          />
         )
       })}
       {pitcherAce !== null && (
         <>
           {pitcherAce >= 0 ? (
-            <RelayFigure testId="중계-투수" folder={ACE_PITCHER_DEFENDER_FRAMES[pitcherAce] ?? DEFENDER_FRAMES}
-              frame={PITCHER_FRAME} paletteIndex={null} x={center.x} y={center.y} />
+            <RelayFigure
+              testId="중계-투수"
+              folder={ACE_PITCHER_DEFENDER_FRAMES[pitcherAce] ?? DEFENDER_FRAMES}
+              frame={PITCHER_FRAME}
+              paletteIndex={null}
+              x={center.x}
+              y={center.y}
+            />
           ) : (
-            <RelayFigure testId="중계-투수" folder={DEFENDER_FRAMES} frame={PITCHER_FRAME + FIELDER_FRAME_OFFSET}
-              paletteIndex={defensePalette} x={center.x} y={center.y} />
+            <RelayFigure
+              testId="중계-투수"
+              folder={DEFENDER_FRAMES}
+              frame={PITCHER_FRAME + FIELDER_FRAME_OFFSET}
+              paletteIndex={defensePalette}
+              x={center.x}
+              y={center.y}
+            />
           )}
-          <RelayFigure testId="중계-포수"
-            folder={figures.catcherAce >= 0 ? ACE_BATTER_DEFENDER_FRAMES[figures.catcherAce] ?? DEFENDER_FRAMES : DEFENDER_FRAMES}
-            frame={CATCHER_FRAME + FIELDER_FRAME_OFFSET} paletteIndex={figures.catcherAce >= 0 ? null : defensePalette}
-            x={center.x} y={center.y + CATCHER_DY} />
+          <RelayFigure
+            testId="중계-포수"
+            folder={figures.catcherAce >= 0 ? (ACE_BATTER_DEFENDER_FRAMES[figures.catcherAce] ?? DEFENDER_FRAMES) : DEFENDER_FRAMES}
+            frame={CATCHER_FRAME + FIELDER_FRAME_OFFSET}
+            paletteIndex={figures.catcherAce >= 0 ? null : defensePalette}
+            x={center.x}
+            y={center.y + CATCHER_DY}
+          />
         </>
       )}
       {batter !== null && (
-        <RelayFigure testId="중계-타자"
-          folder={batter.aceIndex >= 0 ? ACE_BATTER_DEFENDER_FRAMES[batter.aceIndex] ?? DEFENDER_FRAMES : DEFENDER_FRAMES}
+        <RelayFigure
+          testId="중계-타자"
+          folder={batter.aceIndex >= 0 ? (ACE_BATTER_DEFENDER_FRAMES[batter.aceIndex] ?? DEFENDER_FRAMES) : DEFENDER_FRAMES}
           frame={batter.isLeft ? BATTER_LEFT_FRAME : BATTER_RIGHT_FRAME}
           paletteIndex={batter.aceIndex >= 0 ? null : offensePalette}
-          x={center.x + (batter.isLeft ? BATTER_DX : -BATTER_DX)} y={center.y + BATTER_DY} />
+          x={center.x + (batter.isLeft ? BATTER_DX : -BATTER_DX)}
+          y={center.y + BATTER_DY}
+        />
       )}
     </>
   )

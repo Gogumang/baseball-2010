@@ -1,22 +1,25 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
-  INITIAL_FIGURE_ENTRY, INITIAL_FIGURE_LIST_MEMORY, advanceBatterAnimation, advancePitcherAnimation, batterPoseOf,
-  drawListFigure, drawListFigureTimes, pitcherImageDxOf, pitcherPoseOf,
+  INITIAL_FIGURE_ENTRY,
+  INITIAL_FIGURE_LIST_MEMORY,
+  advanceBatterAnimation,
+  advancePitcherAnimation,
+  batterPoseOf,
+  drawListFigure,
+  drawListFigureTimes,
+  pitcherImageDxOf,
+  pitcherPoseOf,
 } from '@/pages/special/lib/hallOfFameFigure'
 import type { FigureAnimation, FigureFrame, HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
-import {
-  pitchStepAt, pitcherAnimationAt, pitcherFrameAt, pitcherPoseOf as stagePitcherPoseOf,
-} from '@/widgets/batting-stage/lib/stageScenery'
+import { pitchStepAt, pitcherAnimationAt, pitcherFrameAt, pitcherPoseOf as stagePitcherPoseOf } from '@/widgets/batting-stage/lib/stageScenery'
 
 const 투수: HallOfFameFigureLook = { form: 1, skin: 2, team: 14, equipment: [0, 0, 0, 0] }
 const 우완: HallOfFameFigureLook = { form: 2, skin: 0, team: 14, equipment: [0, 0, 0, 0] }
 const 타자: HallOfFameFigureLook = { form: 0, skin: 1, team: 14, equipment: [1, 0, 0, 0] }
 
-const 투수칸 = (slot: number, look: HallOfFameFigureLook | null = 투수) =>
-  ({ slot, isBatterSlot: false, look, capturesImage: true })
-const 타자칸 = (slot: number, look: HallOfFameFigureLook | null = 타자) =>
-  ({ slot, isBatterSlot: true, look, capturesImage: true })
+const 투수칸 = (slot: number, look: HallOfFameFigureLook | null = 투수) => ({ slot, isBatterSlot: false, look, capturesImage: true })
+const 타자칸 = (slot: number, look: HallOfFameFigureLook | null = 타자) => ({ slot, isBatterSlot: true, look, capturesImage: true })
 
 describe('투수 애니 0x9df30', () => {
   it('상태 1 투구 — 유지 0xd73e9 대로 단계가 오르고 13 에서 멈춘다, 프레임은 폼 >> 1 표', () => {

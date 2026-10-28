@@ -99,24 +99,24 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
 
   const isDense = offers.length >= BELOW_DENSE_FROM
   const optionClass = isDense ? `${styles.optionButton} ${styles.denseOption}` : styles.optionButton
-  const optionButtons = offers.map((offer) =>
-    keyButton(touchKeyOf(offer.key), offer.label, offer.label, optionClass))
-  const sidesOptionClass = optionButtons.length > SIDES_COLUMN_MAX
-    ? styles.optionGrid
-    : `${styles.optionRow} ${styles.optionColumn}`
+  const optionButtons = offers.map((offer) => keyButton(touchKeyOf(offer.key), offer.label, offer.label, optionClass))
+  const sidesOptionClass = optionButtons.length > SIDES_COLUMN_MAX ? styles.optionGrid : `${styles.optionRow} ${styles.optionColumn}`
 
   if (layout === 'sides') {
     return (
       <div className={styles.panel} role="group" aria-label="상황 버튼">
-        {optionButtons.length > 0 && <div className={sidesOptionClass} data-option-layout={optionButtons.length > SIDES_COLUMN_MAX ? 'grid' : 'column'}>{optionButtons}</div>}
+        {optionButtons.length > 0 && (
+          <div className={sidesOptionClass} data-option-layout={optionButtons.length > SIDES_COLUMN_MAX ? 'grid' : 'column'}>
+            {optionButtons}
+          </div>
+        )}
       </div>
     )
   }
   return (
     <div className={styles.panel} role="group" aria-label="터치 조작">
       {optionButtons.length > 0 && (
-        <div className={isDense ? `${styles.optionGrid} ${styles.optionGridFour}` : styles.optionRow}
-          data-option-layout={isDense ? 'grid' : 'row'}>
+        <div className={isDense ? `${styles.optionGrid} ${styles.optionGridFour}` : styles.optionRow} data-option-layout={isDense ? 'grid' : 'row'}>
           {optionButtons}
         </div>
       )}

@@ -2,21 +2,29 @@ import { describe, expect, it } from 'vitest'
 import { EMPTY_LEAGUE, startPostseason } from '@/entities/league/model/league'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
 import { teamPitchers } from '@/entities/team/model/teamRoster'
-import {
-  POSTSEASON_RANK_TEXT, nationalCupMatchInfoRankOf, seasonMatchInfoLines,
-} from '@/pages/season/lib/seasonMatchInfo'
+import { POSTSEASON_RANK_TEXT, nationalCupMatchInfoRankOf, seasonMatchInfoLines } from '@/pages/season/lib/seasonMatchInfo'
 import type { SeasonMatchInfoInput } from '@/pages/season/lib/seasonMatchInfo'
 import { aceBatterNameOf, acePitcherNameOf } from '@/pages/general-mode/lib/matchInfoLines'
 
 const 기본: SeasonMatchInfoInput = {
-  league: EMPTY_LEAGUE, series: null, cup: null, inPostseason: false,
-  myTeamId: 0, opponentTeamId: 1, dayCounter: 0, acePitcherId: -1, aceBatterId: -1,
+  league: EMPTY_LEAGUE,
+  series: null,
+  cup: null,
+  inPostseason: false,
+  myTeamId: 0,
+  opponentTeamId: 1,
+  dayCounter: 0,
+  acePitcherId: -1,
+  aceBatterId: -1,
 }
 
 describe('시즌 경기정보 값 줄 (0x5dcc0 모드 2)', () => {
   it('정규시즌 — 순위는 숫자만, 승패는 "%d승%d패", 선발은 그날 로테이션 칸', () => {
-    const league = { ...EMPTY_LEAGUE, wins: EMPTY_LEAGUE.wins.map((_w, team) => (team === 1 ? 3 : 0)),
-      losses: EMPTY_LEAGUE.losses.map((_l, team) => (team === 0 ? 2 : 0)) }
+    const league = {
+      ...EMPTY_LEAGUE,
+      wins: EMPTY_LEAGUE.wins.map((_w, team) => (team === 1 ? 3 : 0)),
+      losses: EMPTY_LEAGUE.losses.map((_l, team) => (team === 0 ? 2 : 0)),
+    }
     const [순위, 승패, 선발, 마투수, 마타자] = seasonMatchInfoLines({ ...기본, league, dayCounter: 5 })
     expect(순위).toMatchObject({ user: expect.stringMatching(/^\d+$/), cpu: '1' })
     expect(승패).toMatchObject({ user: '0승2패', cpu: '3승0패' })
@@ -32,14 +40,19 @@ describe('시즌 경기정보 값 줄 (0x5dcc0 모드 2)', () => {
 
   it('상대 선발 이름을 받으면 그것을 쓴다 — 트레이드로 바뀐 레코드 0번 칸의 선수 (0x5e0e8)', () => {
     const [, , 선발] = seasonMatchInfoLines({
-      ...기본, opponentPitcherOrder: [5, 0, 1, 2, 3, 4, 6, 7], opponentStarterName: '옮겨온투수',
+      ...기본,
+      opponentPitcherOrder: [5, 0, 1, 2, 3, 4, 6, 7],
+      opponentStarterName: '옮겨온투수',
     })
     expect(선발.cpu).toBe('옮겨온투수')
   })
 
   it('상대 마선수 칸은 0xdd 진입에서 굴린 값이다 (0x6548 66f8·670a → 0xb56b5·0xb56e1)', () => {
     const [, , , 마투수, 마타자] = seasonMatchInfoLines({
-      ...기본, acePitcherId: 0, aceBatterId: 1, opponentAces: { pitcher: 2, batter: 3 },
+      ...기본,
+      acePitcherId: 0,
+      aceBatterId: 1,
+      opponentAces: { pitcher: 2, batter: 3 },
     })
     expect(마투수).toMatchObject({ user: acePitcherNameOf(0), cpu: acePitcherNameOf(2) })
     expect(마타자).toMatchObject({ user: aceBatterNameOf(1), cpu: aceBatterNameOf(3) })

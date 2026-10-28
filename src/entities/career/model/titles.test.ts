@@ -18,7 +18,10 @@ import {
   TITLE_ROWS_PER_PAGE,
   TITLE_NAMES,
   titleListOf,
-  titleNumberOf, gameResultTitleOf, titleDisplayNameOf } from '@/entities/career/model/titles'
+  titleNumberOf,
+  gameResultTitleOf,
+  titleDisplayNameOf,
+} from '@/entities/career/model/titles'
 import { createCareer, GAMES_PER_SEASON, startNextSeason, withNariSceneSetupOutings } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
@@ -324,9 +327,9 @@ describe('새로 옮긴 판정 (P3 5·6·7절)', () => {
     expect(evaluateNewTitles(선수({ ability: 만렙, morale: 10 }))).toContain('5툴 플레이어')
     expect(evaluateNewTitles(선수({ ability: 만렙, isInjured: true, isSick: true }))).toContain('5툴 플레이어')
     // 장비 보너스는 들어간다 — 주루 998 + 장비 니블 1(+30) 이면 999 로 잘려 받는다
-    expect(
-      evaluateNewTitles(선수({ ability: { ...만렙, run: 998 }, equipmentLevels: { hit: 0, power: 0, defense: 0, run: 1 } })),
-    ).toContain('5툴 플레이어')
+    expect(evaluateNewTitles(선수({ ability: { ...만렙, run: 998 }, equipmentLevels: { hit: 0, power: 0, defense: 0, run: 1 } }))).toContain(
+      '5툴 플레이어',
+    )
     // 장착한 무력감(5)은 −100 이라 못 받는다
     expect(evaluateNewTitles(선수({ ability: 만렙, skillIds: [5], equippedSkillIds: [5] }))).not.toContain('5툴 플레이어')
   })
@@ -379,11 +382,7 @@ describe('칭호 표·목록·완성 보상 (P3 10절)', () => {
   })
 
   it('목록은 얻은 순서가 아니라 번호 오름차순이다 (0x104cc)', () => {
-    expect(titleListOf(['사이클링 히터', '이름 없는 신인', '슈퍼 스타'])).toEqual([
-      '이름 없는 신인',
-      '슈퍼 스타',
-      '사이클링 히터',
-    ])
+    expect(titleListOf(['사이클링 히터', '이름 없는 신인', '슈퍼 스타'])).toEqual(['이름 없는 신인', '슈퍼 스타', '사이클링 히터'])
     // 모르는 이름은 버린다
     expect(titleListOf(['없는칭호'])).toEqual([])
   })

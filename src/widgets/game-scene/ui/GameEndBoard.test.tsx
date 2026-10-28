@@ -41,8 +41,18 @@ describe('경기 끝 결과 판 (상태 0x18 경기 끝 가지)', () => {
   })
 
   it('점수판 틀 0x41440(경기, 0, 3) — 경기 끝 판은 늘 그린다', () => {
-    render(<GameEndBoard side0Score={0} side1Score={1} names={[null, null, null]}
-      scoreboardSides={[{ team: 1, isComputer: true }, { team: 4, isComputer: false }]} onConfirm={() => {}} />)
+    render(
+      <GameEndBoard
+        side0Score={0}
+        side1Score={1}
+        names={[null, null, null]}
+        scoreboardSides={[
+          { team: 1, isComputer: true },
+          { team: 4, isComputer: false },
+        ]}
+        onConfirm={() => {}}
+      />,
+    )
     const frame = screen.getByTestId('점수판-틀')
     expect([frame.dataset.x, frame.dataset.y]).toEqual(['0', '3'])
   })
@@ -52,8 +62,13 @@ describe('경기 끝 판의 이닝별 점수판 0x41c18 (503d8)', () => {
   it('넘기면 (14, 252) 에 그리고 합은 경기 끝이라 8틱에 5틱(틱 mod 8 ≤ 4)만 보인다 · 지금 칸 테는 없다', () => {
     vi.useFakeTimers()
     const lineScore = {
-      sideTeams: [2, 5] as const, inning: 8, offenseSide: 1 as const,
-      inningRuns: [[0, 0, 0, 0, 0, 0, 0, 0, 2], [0, 0, 0, 0, 0, 0, 0, 0, 3]] as const,
+      sideTeams: [2, 5] as const,
+      inning: 8,
+      offenseSide: 1 as const,
+      inningRuns: [
+        [0, 0, 0, 0, 0, 0, 0, 0, 2],
+        [0, 0, 0, 0, 0, 0, 0, 0, 3],
+      ] as const,
     }
     render(<GameEndBoard side0Score={2} side1Score={3} names={[null, null, null]} lineScore={lineScore} onConfirm={() => {}} />)
     const board = screen.getByTestId('이닝별점수판')
@@ -73,8 +88,17 @@ describe('경기 끝 판의 이닝별 점수판 0x41c18 (503d8)', () => {
 describe('공수 교대 판 (상태 0x18 교대 가지)', () => {
   it('점수판 틀 0x41440(경기, 0, 0) 은 틱 > 0x45 부터 (0x4ff00)', () => {
     vi.useFakeTimers()
-    render(<HalfInningBoard inning={3} half="말" onConfirm={() => {}}
-      scoreboardSides={[{ team: 1, isComputer: true }, { team: 4, isComputer: false }]} />)
+    render(
+      <HalfInningBoard
+        inning={3}
+        half="말"
+        onConfirm={() => {}}
+        scoreboardSides={[
+          { team: 1, isComputer: true },
+          { team: 4, isComputer: false },
+        ]}
+      />,
+    )
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 69))
     expect(screen.queryByTestId('점수판-틀')).toBeNull()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame()))
@@ -111,8 +135,14 @@ describe('공수 교대 판의 운동장 전경 0x4fb8c', () => {
   it('판이 선 틱부터 바탕으로 18명을 그리고, 틱 100 뒤 카메라가 비춘 야수에 이름표를 단다', () => {
     vi.useFakeTimers()
     const names = ['투수', '포수', '일루', '이루', '삼루', '유격', '우익', '좌익', '중견']
-    render(<HalfInningBoard inning={1} half="초" onConfirm={() => {}}
-      field={{ input: { rolls, offenseSide: 0, previousFielders: null }, defenseTeam: 3, offenseTeam: 5, fielderNames: names }} />)
+    render(
+      <HalfInningBoard
+        inning={1}
+        half="초"
+        onConfirm={() => {}}
+        field={{ input: { rolls, offenseSide: 0, previousFielders: null }, defenseTeam: 3, offenseTeam: 5, fielderNames: names }}
+      />,
+    )
     expect(screen.getByTestId('운동장-전경')).toBeTruthy()
     expect(screen.getAllByTestId(/^운동장-선수-/)).toHaveLength(18)
     expect(screen.queryByTestId('운동장-이름표')).toBeNull()

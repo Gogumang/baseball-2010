@@ -46,14 +46,9 @@ function deltaOf(reward: BurstReward, sign: 1 | -1): BurstRewardDelta | null {
 }
 
 /** 판정 결과에 따른 변화량 목록. 무효면 비어 있다 */
-export function burstRewardDeltasOf(
-  row: BurstMissionRow,
-  judgement: BurstJudgement,
-): BurstRewardDelta[] {
+export function burstRewardDeltasOf(row: BurstMissionRow, judgement: BurstJudgement): BurstRewardDelta[] {
   if (judgement === '성공') {
-    return row.successRewards
-      .map((reward) => deltaOf(reward, 1))
-      .filter((delta): delta is BurstRewardDelta => delta !== null)
+    return row.successRewards.map((reward) => deltaOf(reward, 1)).filter((delta): delta is BurstRewardDelta => delta !== null)
   }
   if (judgement === '실패') {
     const penalty = deltaOf(row.failurePenalty, -1)
@@ -85,10 +80,7 @@ const MAXIMUM = {
 const clamp = (value: number, maximum: number) => Math.min(maximum, Math.max(0, value))
 
 /** 변화량 하나를 더한다. 모든 종류가 0 아래로 내려가지 않고 상한에서 멈춘다 */
-export function applyBurstRewards(
-  target: BurstRewardTarget,
-  deltas: readonly BurstRewardDelta[],
-): BurstRewardTarget {
+export function applyBurstRewards(target: BurstRewardTarget, deltas: readonly BurstRewardDelta[]): BurstRewardTarget {
   return deltas.reduce<BurstRewardTarget>((current, delta) => {
     switch (delta.name) {
       case '사기':

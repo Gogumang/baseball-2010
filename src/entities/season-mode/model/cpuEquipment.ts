@@ -58,10 +58,7 @@ export interface CpuEquipmentCall {
 }
 
 /** `0x665e8` 의 열 줄 차례 (0x665f6~0x6677c) — 새 연차 idx 로 걸리는 줄만 */
-export function cpuEquipmentCallsOf(
-  newYearIndex: number,
-  yearLimit: number = SEASON_CPU_EQUIPMENT_YEAR_LIMIT,
-): readonly CpuEquipmentCall[] {
+export function cpuEquipmentCallsOf(newYearIndex: number, yearLimit: number = SEASON_CPU_EQUIPMENT_YEAR_LIMIT): readonly CpuEquipmentCall[] {
   const r4 = newYearIndex + 1
   if (r4 > yearLimit) return []
   const calls: CpuEquipmentCall[] = []

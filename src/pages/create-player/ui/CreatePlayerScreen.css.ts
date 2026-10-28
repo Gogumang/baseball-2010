@@ -16,10 +16,7 @@ export const figure = style({
 })
 
 /** 정보 칸 값 — 시스템 글꼴 가운데 (0x7c450) */
-export const infoValue = style([
-  layer,
-  { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' },
-])
+export const infoValue = style([layer, { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }])
 
 /** 노란 깜빡이 커서 (0x16038) — 값 칸을 사방 1px 키운 테두리 */
 export const cursor = style({
@@ -50,4 +47,3 @@ export const arrowButton = style({
   cursor: 'pointer',
   imageRendering: 'pixelated',
 })
-

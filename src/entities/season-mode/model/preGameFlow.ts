@@ -99,9 +99,7 @@ export function choosePreGameAce(aces: PreGameAces, cell: number): PreGameAceSte
   return { kind: '경기정보', aces: { ...aces, batter: cell - ACES_PER_ROW } }
 }
 
-export type PreGameAceCancel =
-  | { readonly kind: '고르기'; readonly aces: PreGameAces }
-  | { readonly kind: '나감'; readonly scene: SeasonSceneState }
+export type PreGameAceCancel = { readonly kind: '고르기'; readonly aces: PreGameAces } | { readonly kind: '나감'; readonly scene: SeasonSceneState }
 
 /**
  * 0xd7 의 CLR (0xa900~0xa972, this+0x11c == 1).

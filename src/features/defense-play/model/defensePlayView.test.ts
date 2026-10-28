@@ -1,17 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
-import {
-  BASE_POSITIONS,
-  runnerSpeedOf,
-  SLIDING_PROGRESS_RANGE,
-} from '@/entities/fielding/model/fieldGeometry'
+import { BASE_POSITIONS, runnerSpeedOf, SLIDING_PROGRESS_RANGE } from '@/entities/fielding/model/fieldGeometry'
 import { createFielders, createRunner, NONE } from '@/entities/fielding/model/fieldingState'
-import {
-  aceIndexesWithOriginalBug,
-  holderMarkOf,
-  viewStateOf,
-  type ActionMemory,
-} from '@/features/defense-play/model/defensePlayView'
+import { aceIndexesWithOriginalBug, holderMarkOf, viewStateOf, type ActionMemory } from '@/features/defense-play/model/defensePlayView'
 import {
   ACE_PITCHER_DEFENDER_FRAMES,
   cameraTargetOf,
@@ -53,8 +44,7 @@ describe('화면 스냅샷 만들기', () => {
     const 오른쪽 = { ...야수들[8], target: { x: 39_000, y: 0, z: 8_000 } }
     const 왼쪽 = { ...야수들[8], target: { x: 1_000, y: 0, z: 8_000 } }
 
-    const 동작 = (fielder: typeof 홈쪽) =>
-      viewStateOf({ ...기본(), fielders: [fielder] }).fielders[0].action
+    const 동작 = (fielder: typeof 홈쪽) => viewStateOf({ ...기본(), fielders: [fielder] }).fielders[0].action
 
     expect(동작(홈쪽)).toBe(FIELDER_ACTION.runDown)
     expect(동작(외야쪽)).toBe(FIELDER_ACTION.runUp)
@@ -63,8 +53,7 @@ describe('화면 스냅샷 만들기', () => {
   })
 
   it('포구 종류가 포구 동작으로 이어진다', () => {
-    const 포구 = (kind: number) =>
-      viewStateOf({ ...기본(), catchKind: kind, chaserSlot: 0 }).fielders[0].action
+    const 포구 = (kind: number) => viewStateOf({ ...기본(), catchKind: kind, chaserSlot: 0 }).fielders[0].action
 
     expect(포구(CATCH_KIND.LOW)).toBe(FIELDER_ACTION.catchLow)
     expect(포구(CATCH_KIND.GROUNDER)).toBe(FIELDER_ACTION.catchLow)
@@ -100,19 +89,13 @@ describe('화면 스냅샷 만들기', () => {
 
     expect(SLIDING_PROGRESS_RANGE).toEqual({ minimum: 71, maximum: 94 })
     // 그 루로 송구가 오고 있을 때만 슬라이딩한다
-    expect(viewStateOf({ ...기본(), runners: [주자], throwBase: 2 }).runners[0].action).toBe(
-      RUNNER_ACTION.slide,
-    )
-    expect(viewStateOf({ ...기본(), runners: [주자], throwBase: NONE }).runners[0].action).toBe(
-      RUNNER_ACTION.run,
-    )
+    expect(viewStateOf({ ...기본(), runners: [주자], throwBase: 2 }).runners[0].action).toBe(RUNNER_ACTION.slide)
+    expect(viewStateOf({ ...기본(), runners: [주자], throwBase: NONE }).runners[0].action).toBe(RUNNER_ACTION.run)
   })
 
   it('같은 동작이 이어지는 동안 actionTick 이 올라간다', () => {
     const memory: ActionMemory = new Map()
-    const 틱들 = [0, 1, 2].map(
-      (tick) => viewStateOf({ ...기본(memory), tick }).fielders[8].actionTick,
-    )
+    const 틱들 = [0, 1, 2].map((tick) => viewStateOf({ ...기본(memory), tick }).fielders[8].actionTick)
 
     expect(틱들).toEqual([0, 1, 2])
   })

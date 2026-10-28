@@ -68,8 +68,11 @@ const SOUND_LEVEL_MAX = 4
  * (⚠️ 웹 전용 배치 — 원본 키판에 해당 글쇠가 없다)
  */
 const SOUND_KEY_CODES: Readonly<Record<string, -13 | -14>> = {
-  AudioVolumeUp: -13, '+': -13, '=': -13,
-  AudioVolumeDown: -14, '-': -14,
+  AudioVolumeUp: -13,
+  '+': -13,
+  '=': -13,
+  AudioVolumeDown: -14,
+  '-': -14,
 }
 
 /**

@@ -147,9 +147,7 @@ export function lineScoreSlotsOf(game: GameState): {
   readonly totals: readonly [number, number]
 } {
   const inning = game.inning - 1
-  const offenseSide = game.isFinished && game.inningRuns?.finalOffenseSide !== undefined
-    ? game.inningRuns.finalOffenseSide
-    : halfSideOf(game.half)
+  const offenseSide = game.isFinished && game.inningRuns?.finalOffenseSide !== undefined ? game.inningRuns.finalOffenseSide : halfSideOf(game.half)
   const slotsOf = (side: 0 | 1) => {
     const slots = Array.from({ length: 9 }, () => 0)
     const row = game.inningRuns?.runs[side] ?? []
@@ -163,10 +161,7 @@ export function lineScoreSlotsOf(game: GameState): {
   return { inning, offenseSide, inningRuns: [slotsOf(0), slotsOf(1)], totals: [capped(away), capped(home)] }
 }
 
-export function createGame(
-  playerOrderIndex = PLAYER_BATTING_ORDER_INDEX,
-  playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT,
-): GameState {
+export function createGame(playerOrderIndex = PLAYER_BATTING_ORDER_INDEX, playerSide: PlayerSide = PLAYER_SIDE_LAST_BAT): GameState {
   return {
     inning: 1,
     half: '초',
@@ -202,11 +197,7 @@ function awayScoreOf(game: GameState): number {
 }
 
 export function isPlayerTurn(game: GameState): boolean {
-  return (
-    !game.isFinished &&
-    game.half === ourHalfOf(game) &&
-    game.battingOrderIndex === game.playerOrderIndex
-  )
+  return !game.isFinished && game.half === ourHalfOf(game) && game.battingOrderIndex === game.playerOrderIndex
 }
 
 /**
@@ -267,9 +258,7 @@ export function applyAtBatOutcome(
   // 콜드(7회 이후 홈 ≥ 원정 + 10)만 선다. 초 공격 중에는 원정이 10점 앞서도 끝나지 않는다(b696e) — 예전 웹은 공격 중인
   // 우리가 10점 앞서면 초에도 끝냈다. 3아웃이면 아래 반 이닝 넘김이 같은 판정을 아웃 3 으로 본다
   if (outs < OUTS_PER_HALF_INNING) {
-    return isGameOverAt(endSituationOf(afterAtBat))
-      ? withFinalOffenseSide({ ...afterAtBat, isFinished: true }, halfSideOf(game.half))
-      : afterAtBat
+    return isGameOverAt(endSituationOf(afterAtBat)) ? withFinalOffenseSide({ ...afterAtBat, isFinished: true }, halfSideOf(game.half)) : afterAtBat
   }
   return game.half === '초' ? endTopHalf(afterAtBat) : endBottomHalf(afterAtBat)
 }

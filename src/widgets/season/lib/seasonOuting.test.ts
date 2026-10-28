@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
-  SEASON_OUTING_ACTIVITIES, SEASON_OUTING_COSTS, SEASON_OUTING_EFFECTS, SEASON_OUTING_PLACES,
-  SEASON_OUTING_REQUIRED_POPULARITY, checkSeasonOuting, rollSeasonOuting,
-  seasonOutingConfirmTextOf, seasonOutingRefusalTextOf,
+  SEASON_OUTING_ACTIVITIES,
+  SEASON_OUTING_COSTS,
+  SEASON_OUTING_EFFECTS,
+  SEASON_OUTING_PLACES,
+  SEASON_OUTING_REQUIRED_POPULARITY,
+  checkSeasonOuting,
+  rollSeasonOuting,
+  seasonOutingConfirmTextOf,
+  seasonOutingRefusalTextOf,
 } from '@/widgets/season/lib/seasonOuting'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 
@@ -33,9 +39,7 @@ describe('시즌 외출 표 (P4 3절)', () => {
   })
 
   it('친선경기·야구교실만 사기 난수의 부호를 뒤집는다 (0xc8b0)', () => {
-    expect(SEASON_OUTING_EFFECTS.map((effect) => effect.negatesMorale)).toEqual([
-      true, false, false, true, false,
-    ])
+    expect(SEASON_OUTING_EFFECTS.map((effect) => effect.negatesMorale)).toEqual([true, false, false, true, false])
   })
 
   it('효과표의 난수 구간이 [a, b) 로 들어 있다', () => {
@@ -57,7 +61,10 @@ describe('시즌 외출 표 (P4 3절)', () => {
 describe('시즌 외출 가드 0xbd38', () => {
   it('친선경기는 인기도 200 미만이면 StrMODE[62] 로 막힌다', () => {
     expect(checkSeasonOuting(레코드({ popularity: 199 }), 50, 0)).toEqual({
-      ok: false, reason: '인기도부족', required: 200, cost: 0,
+      ok: false,
+      reason: '인기도부족',
+      required: 200,
+      cost: 0,
     })
     expect(checkSeasonOuting(레코드({ popularity: 200 }), 50, 0).ok).toBe(true)
   })
@@ -120,7 +127,10 @@ describe('외출 결과 0xc81c — 서브 아이템 보정 (점프표 0xcbe6c)',
   it('친선경기: 사기 굴림 → 소지금 굴림, 서브 아이템이면 소지금 +5 (사기 −m 은 그대로)', () => {
     const { random, 굴림 } = 차례난수([15, 9])
     const 결과 = rollSeasonOuting(레코드({ money: 10, outingSubItems: 서브아이템(0) }), 50, 0, random)!
-    expect(굴림).toEqual([[14, 19], [8, 11]])
+    expect(굴림).toEqual([
+      [14, 19],
+      [8, 11],
+    ])
     expect(결과.record.money).toBe(10 + 9 + 5)
     expect(결과.teamMorale).toBe(50 - 15)
   })
@@ -135,7 +145,10 @@ describe('외출 결과 0xc81c — 서브 아이템 보정 (점프표 0xcbe6c)',
   it('입원: 서브 아이템이면 소지금 +5(비용 상쇄) · 사기 +1, 그 뒤 치료를 굴린다', () => {
     const { random, 굴림 } = 차례난수([4, 0])
     const 결과 = rollSeasonOuting(레코드({ money: 10, illness: 2, illnessSlack: 3, outingSubItems: 서브아이템(2) }), 50, 2, random)!
-    expect(굴림).toEqual([[3, 6], [0, 101]])
+    expect(굴림).toEqual([
+      [3, 6],
+      [0, 101],
+    ])
     expect(결과.record.money).toBe(10)
     expect(결과.teamMorale).toBe(50 + 4 + 1)
     expect(결과.record.illness).toBe(0)
@@ -144,7 +157,11 @@ describe('외출 결과 0xc81c — 서브 아이템 보정 (점프표 0xcbe6c)',
   it('야구교실: 보정 인기도 +1 · 평판 +1 은 뒤집지 않고, 사기는 −m', () => {
     const { random, 굴림 } = 차례난수([9, 2, 4])
     const 결과 = rollSeasonOuting(레코드({ popularity: 100, reputation: 100, outingSubItems: 서브아이템(3) }), 50, 3, random)!
-    expect(굴림).toEqual([[8, 11], [1, 4], [3, 6]])
+    expect(굴림).toEqual([
+      [8, 11],
+      [1, 4],
+      [3, 6],
+    ])
     expect(결과.record.popularity).toBe(100 + 2 + 1)
     expect(결과.record.reputation).toBe(100 + 4 + 1)
     expect(결과.teamMorale).toBe(50 - 9)
@@ -166,12 +183,8 @@ describe('외출 결과 0xc81c — 서브 아이템 보정 (점프표 0xcbe6c)',
 
 describe('외출 팝업 글 원문 (0xbd38)', () => {
   it('확인 0x16 — "!C" 뒤 비용 줄 [162] + "!N" 이 먼저, 그 뒤 [161]', () => {
-    expect(seasonOutingConfirmTextOf(1)).toBe(
-      '!C!C!cFFFF00소지금 400!cFFFFFF이 소모됩니다!N[회식] 이벤트를!N진행하시겠습니까?',
-    )
-    expect(seasonOutingConfirmTextOf(4)).toBe(
-      '!C!C!cFFFF00소지금 1000!cFFFFFF이 소모됩니다!N[구단CF] 이벤트를!N진행하시겠습니까?',
-    )
+    expect(seasonOutingConfirmTextOf(1)).toBe('!C!C!cFFFF00소지금 400!cFFFFFF이 소모됩니다!N[회식] 이벤트를!N진행하시겠습니까?')
+    expect(seasonOutingConfirmTextOf(4)).toBe('!C!C!cFFFF00소지금 1000!cFFFFFF이 소모됩니다!N[구단CF] 이벤트를!N진행하시겠습니까?')
   })
 
   it('비용이 없으면 [161] 만', () => {
@@ -179,13 +192,9 @@ describe('외출 팝업 글 원문 (0xbd38)', () => {
   })
 
   it('거절 글은 StrMODE 원문 — [62] 에만 필요한 인기도를 넣는다', () => {
-    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ popularity: 0 }), 50, 4))).toBe(
-      '!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 400',
-    )
+    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ popularity: 0 }), 50, 4))).toBe('!C인기도가 부족합니다.!N!cFFFF00필요한 인기도 : 400')
     expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ popularity: 999, money: 0 }), 50, 4))).toBe('!C소지금이 부족합니다')
-    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ money: 50, illness: 0 }), 50, 2))).toBe(
-      '!C건강한 상태입니다!N입원할 필요가 없습니다',
-    )
+    expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ money: 50, illness: 0 }), 50, 2))).toBe('!C건강한 상태입니다!N입원할 필요가 없습니다')
     expect(seasonOutingRefusalTextOf(checkSeasonOuting(레코드({ money: 50 }), 100, 1))).toBe('!C사기 최고 상태입니다')
   })
 })
@@ -202,7 +211,7 @@ describe('외출 결과 팝업 0x17 글 (0xc9a8~0xcd76)', () => {
     const { random } = 차례난수([9, 2, 4])
     expect(rollSeasonOuting(레코드({ outingSubItems: 서브아이템(3) }), 50, 3, random)!.text).toBe(
       '!C인기도 3(+1) !c00CC00상승!cFFFFFF하였습니다!N평판 5(+1) !c00CC00상승!cFFFFFF하였습니다!N' +
-      '사기 9 !cFF0000하락!cFFFFFF하였습니다!N!N!cFFFF00야구교본 효과',
+        '사기 9 !cFF0000하락!cFFFFFF하였습니다!N!N!cFFFF00야구교본 효과',
     )
   })
 
@@ -210,8 +219,8 @@ describe('외출 결과 팝업 0x17 글 (0xc9a8~0xcd76)', () => {
     const { random } = 차례난수([4, 0])
     expect(rollSeasonOuting(레코드({ money: 10, illness: 3, illnessSlack: 2, outingSubItems: 서브아이템(2) }), 50, 2, random)!.text).toBe(
       '!C소지금 0만(+500) !cFF0000하락!cFFFFFF하였습니다!N사기 5(+1) !c00CC00상승!cFFFFFF하였습니다' +
-      '!N!N!C다음 질병이 치료되었습니다!N[!cFFFF00식중독!cFFFFFF]' +
-      '!N!N!cFFFF00보험증서 효과',
+        '!N!N!C다음 질병이 치료되었습니다!N[!cFFFF00식중독!cFFFFFF]' +
+        '!N!N!cFFFF00보험증서 효과',
     )
   })
 

@@ -96,9 +96,7 @@ export function recordLeagueResult(league: League, winner: number, loser: number
     streak: replaced(replaced(league.streak, winner, winnerStreak), loser, 0),
     bestStreak: replaced(league.bestStreak, winner, Math.max(league.bestStreak[winner], winnerStreak)),
     losingStreak: replaced(replaced(league.losingStreak, loser, league.losingStreak[loser] + 1), winner, 0),
-    headToHead: league.headToHead.map((row, team) =>
-      team === winner ? replaced(row, loser, row[loser] + 1) : row,
-    ),
+    headToHead: league.headToHead.map((row, team) => (team === winner ? replaced(row, loser, row[loser] + 1) : row)),
   }
 }
 
@@ -165,11 +163,7 @@ export function rankingOf(league: League): number[] {
       else if (wins[best] === wins[j] && losses[best] > losses[j]) best = j
       // 색인 버그(B-36): j·best 는 배열 위치인데 headToHead 는 팀 번호 표다 (원본 그대로).
       // 고침: 그 자리에 앉은 팀 번호(order)로 표를 읽는다
-      else if (
-        wins[best] === wins[j] &&
-        losses[best] === losses[j] &&
-        headToHeadBeats(league, order, j, best)
-      ) best = j
+      else if (wins[best] === wins[j] && losses[best] === losses[j] && headToHeadBeats(league, order, j, best)) best = j
     }
     ;[wins[i], wins[best]] = [wins[best], wins[i]]
     ;[losses[i], losses[best]] = [losses[best], losses[i]]
@@ -257,10 +251,7 @@ export function pitcherOrdersAfterPostseason(
 ): Readonly<Record<number, readonly number[]>> {
   const orders: Record<number, readonly number[]> = {}
   for (let team = 0; team < LEAGUE_TEAM_COUNT; team += 1) {
-    const base =
-      series.baseOrders?.[team] ??
-      regularSeasonOrders?.[team] ??
-      rotatedBy(UNSHUFFLED_PITCHER_ORDER, REGULAR_SEASON_DAYS - 1)
+    const base = series.baseOrders?.[team] ?? regularSeasonOrders?.[team] ?? rotatedBy(UNSHUFFLED_PITCHER_ORDER, REGULAR_SEASON_DAYS - 1)
     orders[team] = rotatedBy(base, series.rotations?.[team] ?? 0)
   }
   return orders
@@ -378,4 +369,3 @@ function inferredSemiPlayoffWinnerOf(series: PostseasonSeries): number | null {
   if (thirdTurns === fourthTurns) return null
   return thirdTurns > fourthTurns ? third : fourth
 }
-

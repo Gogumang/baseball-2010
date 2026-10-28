@@ -95,9 +95,4 @@ export const SEASON_MVP_LEADER_KINDS: readonly LeaderKind[] = [
  * `entities/awards/model/seasonAwards.ts` 의 `judgeTitles(records, '시즌투수')` 가 이 네 칸을 돌려준다
  * (나리 `'투수'` 는 세 칸이라 섞지 말 것). 여기에는 종류만 남겨 둔다.
  */
-export const SEASON_PITCHER_TITLE_KINDS: readonly LeaderKind[] = [
-  LEADER_KIND.승,
-  LEADER_KIND.탈삼진,
-  LEADER_KIND.방어율,
-  LEADER_KIND.세이브,
-]
+export const SEASON_PITCHER_TITLE_KINDS: readonly LeaderKind[] = [LEADER_KIND.승, LEADER_KIND.탈삼진, LEADER_KIND.방어율, LEADER_KIND.세이브]

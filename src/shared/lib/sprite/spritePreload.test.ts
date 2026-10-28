@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { animationFramesOf, createSpritePreloader, frameUrl, mergeSpritePreloads, preloadImageUrlsOf, sceneConcurrencyFor } from '@/shared/lib/sprite/spritePreload'
+import {
+  animationFramesOf,
+  createSpritePreloader,
+  frameUrl,
+  mergeSpritePreloads,
+  preloadImageUrlsOf,
+  sceneConcurrencyFor,
+} from '@/shared/lib/sprite/spritePreload'
 import type { SpritePreloadDeps } from '@/shared/lib/sprite/spritePreload'
 
 interface Pending {
@@ -90,18 +97,11 @@ describe('createSpritePreloader', () => {
   it('JSON 을 같이 받고, frames: all 이면 origins 의 칸을 모두 받는다', async () => {
     const h = harness()
     h.jsonValues.set('./sprites/a/frames/origins.json', { '000': {}, '002': {}, '010': {} })
-    void h.preloader.preload(
-      [{ folder: './sprites/a/frames', frames: 'all', json: ['origins.json', 'animations.json'] }],
-      'scene',
-    )
+    void h.preloader.preload([{ folder: './sprites/a/frames', frames: 'all', json: ['origins.json', 'animations.json'] }], 'scene')
     await h.flush()
     await h.finishAll()
     expect(h.jsonRequests).toContain('./sprites/a/frames/animations.json')
-    expect(h.started).toEqual([
-      './sprites/a/frames/000.png',
-      './sprites/a/frames/002.png',
-      './sprites/a/frames/010.png',
-    ])
+    expect(h.started).toEqual(['./sprites/a/frames/000.png', './sprites/a/frames/002.png', './sprites/a/frames/010.png'])
   })
 
   it('animations 는 animations.json 의 그 애니 칸 프레임을 받는다 — 번호 지도 폴더는 animationsIn 의 표를 본다', async () => {
@@ -175,7 +175,13 @@ describe('createSpritePreloader', () => {
     const h = harness({ sceneConcurrency: 1 })
     void h.preloader.preload([{ folder: './sprites/num', frames: [0, 1, 2] }], 'idle')
     await h.flush()
-    void h.preloader.preload([{ folder: './sprites/game', frames: [5] }, { folder: './sprites/num', frames: [2] }], 'scene')
+    void h.preloader.preload(
+      [
+        { folder: './sprites/game', frames: [5] },
+        { folder: './sprites/num', frames: [2] },
+      ],
+      'scene',
+    )
     await h.flush()
     expect(h.started).toEqual(['./sprites/game/005.png'])
 
@@ -199,7 +205,13 @@ describe('r124 — 유휴 줄 차례', () => {
   it('나중에 부른 유휴 묶음이 먼저다 — 묶음 안에서는 부른 차례대로', async () => {
     const h = harness({ idleConcurrency: 1 })
     void h.preloader.preload([{ folder: './sprites/num', frames: [0, 1] }], 'idle')
-    void h.preloader.preload([{ folder: './sprites/mode_ui', frames: [2, 3] }, { folder: './sprites/slt_frame', frames: [4] }], 'idle')
+    void h.preloader.preload(
+      [
+        { folder: './sprites/mode_ui', frames: [2, 3] },
+        { folder: './sprites/slt_frame', frames: [4] },
+      ],
+      'idle',
+    )
     await h.flush()
     for (let i = 0; i < 5; i += 1) {
       await h.runIdle()
@@ -218,7 +230,13 @@ describe('r124 — 유휴 줄 차례', () => {
   it('지난 묶음에 서 있던 그림을 새 묶음이 다시 부르면 새 묶음 차례로 앞당긴다', async () => {
     const h = harness({ idleConcurrency: 1 })
     void h.preloader.preload([{ folder: './sprites/num', frames: [0, 1, 2] }], 'idle')
-    void h.preloader.preload([{ folder: './sprites/num', frames: [2] }, { folder: './sprites/game', frames: [7] }], 'idle')
+    void h.preloader.preload(
+      [
+        { folder: './sprites/num', frames: [2] },
+        { folder: './sprites/game', frames: [7] },
+      ],
+      'idle',
+    )
     await h.flush()
     for (let i = 0; i < 4; i += 1) {
       await h.runIdle()
@@ -240,7 +258,13 @@ describe('r124 — 유휴 줄 차례', () => {
 describe('r111 — 마스크 · 이름 · 원점 표 거르기 · 합치기', () => {
   it('마스크 프레임은 ?mask 주소로, 이름 PNG 는 이름 그대로 받는다', async () => {
     const h = harness()
-    void h.preloader.preload([{ folder: './sprites/img_text/frames', frames: [6], masks: [6, 9] }, { folder: './sprites/management', frames: [], names: ['icon_selected_5'] }], 'scene')
+    void h.preloader.preload(
+      [
+        { folder: './sprites/img_text/frames', frames: [6], masks: [6, 9] },
+        { folder: './sprites/management', frames: [], names: ['icon_selected_5'] },
+      ],
+      'scene',
+    )
     await h.flush()
     expect(h.started).toEqual([
       './sprites/img_text/frames/006.png',
@@ -253,11 +277,14 @@ describe('r111 — 마스크 · 이름 · 원점 표 거르기 · 합치기', ()
   it('framesListedIn 이면 그 폴더 origins.json 에 있는 칸만 받는다 — 표를 못 받으면 목록대로', async () => {
     const h = harness()
     h.jsonValues.set('./sprites/pitcher/frames/origins.json', { '000': {}, '022': {} })
-    void h.preloader.preload([
-      { folder: './sprites/pitcher/frames', frames: [0, 22, 29], json: ['origins.json'], framesListedIn: './sprites/pitcher/frames' },
-      { folder: './sprites/pitcher/frames/index', frames: [0, 29], framesListedIn: './sprites/pitcher/frames' },
-      { folder: './sprites/x/frames', frames: [1], framesListedIn: './sprites/x/frames' },
-    ], 'scene')
+    void h.preloader.preload(
+      [
+        { folder: './sprites/pitcher/frames', frames: [0, 22, 29], json: ['origins.json'], framesListedIn: './sprites/pitcher/frames' },
+        { folder: './sprites/pitcher/frames/index', frames: [0, 29], framesListedIn: './sprites/pitcher/frames' },
+        { folder: './sprites/x/frames', frames: [1], framesListedIn: './sprites/x/frames' },
+      ],
+      'scene',
+    )
     await h.flush()
     expect(h.started.sort()).toEqual([
       './sprites/pitcher/frames/000.png',
@@ -269,8 +296,15 @@ describe('r111 — 마스크 · 이름 · 원점 표 거르기 · 합치기', ()
 
   it('mergeSpritePreloads 는 폴더별 합집합이고 all 이 이긴다', () => {
     const merged = mergeSpritePreloads(
-      [{ folder: 'a', frames: [3, 1], json: ['origins.json'] }, { folder: 'b', frames: 'all' }],
-      [{ folder: 'a', frames: [2, 1], masks: [5], framesListedIn: 'a' }, { folder: 'b', frames: [1] }, { folder: 'c', frames: [], names: ['z', 'y'] }],
+      [
+        { folder: 'a', frames: [3, 1], json: ['origins.json'] },
+        { folder: 'b', frames: 'all' },
+      ],
+      [
+        { folder: 'a', frames: [2, 1], masks: [5], framesListedIn: 'a' },
+        { folder: 'b', frames: [1] },
+        { folder: 'c', frames: [], names: ['z', 'y'] },
+      ],
     )
     expect(merged).toEqual([
       { folder: 'a', frames: [1, 2, 3], json: ['origins.json'], masks: [5], framesListedIn: 'a' },

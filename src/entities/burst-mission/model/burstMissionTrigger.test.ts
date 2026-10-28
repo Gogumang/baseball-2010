@@ -59,9 +59,7 @@ describe('b0 상황 검사 (0x8ee3c, 점프표 0xd51d8)', () => {
     // 9회(0-기준 8), 3점 차로 지는 중, 주자 셋 → 통과
     expect(matchesSituation(row, 상황({ inning: 8, ourScore: 1, opponentScore: 4, bases: 만루 }))).toBe(true)
     // 주자가 점수차보다 적으면 거른다
-    expect(
-      matchesSituation(row, 상황({ inning: 8, ourScore: 0, opponentScore: 4, bases: 만루 })),
-    ).toBe(false)
+    expect(matchesSituation(row, 상황({ inning: 8, ourScore: 0, opponentScore: 4, bases: 만루 }))).toBe(false)
     // 8회(0-기준 7)면 이르다
     expect(matchesSituation(row, 상황({ inning: 7, ourScore: 1, opponentScore: 2, bases: 만루 }))).toBe(false)
     // 이기는 중이면 역전찬스가 아니다

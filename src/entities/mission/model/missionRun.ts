@@ -34,12 +34,7 @@ import { lineupSlotOf, recordLineupPlay } from '@/entities/game/model/quickLineu
 import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
-import {
-  missionBoardFielderZeroOf,
-  missionRunnersAfterPlay,
-  missionRunnersOf,
-  missionStartRunnersOf,
-} from '@/entities/mission/model/missionRunners'
+import { missionBoardFielderZeroOf, missionRunnersAfterPlay, missionRunnersOf, missionStartRunnersOf } from '@/entities/mission/model/missionRunners'
 import type { MissionPlayAbilities } from '@/entities/mission/model/missionRunners'
 
 /**
@@ -176,12 +171,7 @@ export interface MissionPlay {
  * `missionAdvance` 와 **같은 길·같은 굴림**으로 돌리고 주자 운명까지 내준다.
  * 인플레이 타구는 진행기 결과의 `runnerFates`, 삼진·볼넷·사구·홈런은 `runnerFatesWithoutPlay` 다.
  */
-export function missionPlay(
-  bases: BaseState,
-  outs: number,
-  outcome: AtBatOutcome,
-  options: Parameters<typeof missionAdvance>[3] = {},
-): MissionPlay {
+export function missionPlay(bases: BaseState, outs: number, outcome: AtBatOutcome, options: Parameters<typeof missionAdvance>[3] = {}): MissionPlay {
   if (!isMissionPlayOutcome(outcome)) {
     return {
       advance: advanceRunners(bases, outcome, outs),
@@ -191,10 +181,7 @@ export function missionPlay(
     }
   }
   const played =
-    options.played ??
-    runDefensePlay(
-      missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode, undefined, options.abilities),
-    )
+    options.played ?? runDefensePlay(missionDefensePlayInputOf(bases, outs, outcome, options.random, options.gameMode, undefined, options.abilities))
   // 기록은 판 끝 정산 결과 — 묶인 패턴 없이 결과만 넘겨받은 호출(시험·옛 호출)만 넘겨받은 결과 그대로다
   const settled = contactOfOutcome(outcome) === undefined ? outcome : (played.outcome ?? outcome)
   return {
@@ -256,9 +243,7 @@ export function missionDefensePlayInputOf(
     gameMode: gameMode ?? MISSION_BATTER_MODE,
     defenseIsCpu: !isPitcherSide,
     offenseIsCpu: isPitcherSide,
-    ...(abilities === undefined
-      ? {}
-      : { defenseAbilities: abilities.defenseAbilities, runAbilities: abilities.runAbilities }),
+    ...(abilities === undefined ? {} : { defenseAbilities: abilities.defenseAbilities, runAbilities: abilities.runAbilities }),
     // 초감각(21) — 필살수비 0x66b30 · 레이저 0x66a8c 가 야수 +0xec 레코드에 묻는다 (`missionFielderSkillIdsOf`)
     ...(abilities?.fielderSkillIds === undefined ? {} : { fielderSkillIds: abilities.fielderSkillIds }),
     // 그림 전용 — 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10). 난수와 무관하다
@@ -376,7 +361,13 @@ export function missionFirstHalfIsHuman(run: Pick<MissionRun, 'mission' | 'game'
  * 사람 칸 팀 타석 하나가 끝났다 — 정산 0xa8024 가 그 타순 칸 기록을 올리고 0xaf020 이 타순을 (+1) mod 9 로 넘긴다.
  * 점수판 득점(0xa5c34)은 사람 칸 측, 3아웃이면 0x18 · 자동진행을 기다린다.
  */
-function afterHumanPlateAppearance(game: MissionGame, mission: OriginalMission, outcome: AtBatOutcome | null, runs: number, inningEnded: boolean): MissionGame {
+function afterHumanPlateAppearance(
+  game: MissionGame,
+  mission: OriginalMission,
+  outcome: AtBatOutcome | null,
+  runs: number,
+  inningEnded: boolean,
+): MissionGame {
   const batting = game.humanBatting
   const scored = withMissionScore(game, humanSideOf(mission), runs)
   return {
@@ -417,12 +408,7 @@ export function recordSwing<T extends MissionRun>(run: T): T {
  */
 const CHANCE_GOALS: readonly string[] = ['안타', '단타', '2루타', '3루타', '홈런', '만루홈런', '그라운드홈런', '번트', '도루']
 
-export function isOutOfGoalChances(
-  mission: OriginalMission,
-  progress: MissionProgress,
-  used: number,
-  limit: number | null,
-): boolean {
+export function isOutOfGoalChances(mission: OriginalMission, progress: MissionProgress, used: number, limit: number | null): boolean {
   if (limit === null || limit <= 0 || mission.side !== '타자') return false
   const remaining = limit - used
   let requiredSum = 0
@@ -465,38 +451,33 @@ export function checkSwingsExhausted<T extends MissionRun>(run: T): T {
  * `random` 을 주면 수비 진행기의 원본 확률 굴림이 돈다 — 안 주면 지금까지와 같은 결정론이다.
  * `played` 를 주면 **화면(상태 0x17)이 이미 돌린** 플레이의 결과를 그대로 먹인다.
  */
-export function applyOutcome(
-  run: MissionRun,
-  outcome: AtBatOutcome,
-  isBunt = false,
-  random?: RandomPort,
-  played?: DefensePlayResult,
-): MissionRun {
+export function applyOutcome(run: MissionRun, outcome: AtBatOutcome, isBunt = false, random?: RandomPort, played?: DefensePlayResult): MissionRun {
   if (run.status !== '진행중') return run
 
   const situation = advanceSituation(run, outcome, random, played)
   // 미션 타자가 아닌 사람 칸 타순(마스터 줄)의 타석은 목표 · 타석 칸에 안 든다 (0xa57f8 a5844 — `isMissionBatterUp`)
   const counts = isMissionBatterUp(run)
   // 목표는 판 끝 정산(0xa8024 → 미션 판정 0xaaa6c)이 낸 결과로 센다 — 넘겨받은 결과는 타석을 끝낸 임시 값이다
-  const progress = counts
-    ? recordOutcome(run.progress, situation.outcome, situation.runsScored, isBunt, situation.groundHomeRun)
-    : run.progress
+  const progress = counts ? recordOutcome(run.progress, situation.outcome, situation.runsScored, isBunt, situation.groundHomeRun) : run.progress
   const advanced: MissionRun = {
     ...run,
     bases: situation.bases,
     // 판의 살아남은 주자로 신원을 민다 — 지금 타자 칸은 판 앞 타순(정산 뒤 0xaf020 이 넘긴다)
-    runners: missionRunnersAfterPlay(run, { bases: situation.bases, inningOver: situation.inningEnded }, {
-      batterReached: isBatterReachedKind(situation.outcome.kind),
-      runsScored: situation.runsScored,
-      survivorsFromBase: survivorsFromBaseOfFates(situation.runnerFates),
-    }),
+    runners: missionRunnersAfterPlay(
+      run,
+      { bases: situation.bases, inningOver: situation.inningEnded },
+      {
+        batterReached: isBatterReachedKind(situation.outcome.kind),
+        runsScored: situation.runsScored,
+        survivorsFromBase: survivorsFromBaseOfFates(situation.runnerFates),
+      },
+    ),
     outs: situation.outs,
     // 점수판 득점 0xa5c34 → CPU 수비 투수의 실점 A·B, 3아웃이면 이닝 교대 0xa5b00 의 A = 0
     cpu: missionCpuAfterRuns(run.cpu, situation.runsScored, situation.inningEnded),
     game: afterHumanPlateAppearance(run.game, run.mission, situation.outcome, situation.runsScored, situation.inningEnded),
   }
-  const remaining =
-    run.remainingPlateAppearances === null || !counts ? run.remainingPlateAppearances : run.remainingPlateAppearances - 1
+  const remaining = run.remainingPlateAppearances === null || !counts ? run.remainingPlateAppearances : run.remainingPlateAppearances - 1
 
   if (isCleared(run.mission, progress)) {
     return { ...advanced, progress, remainingPlateAppearances: remaining, status: '성공' }
@@ -602,11 +583,15 @@ export function applyPickoff<T extends MissionRun>(
   const isInningOver = outs >= OUTS_PER_INNING
   const cpu = missionCpuAfterRuns(run.cpu, advance.runsScored, isInningOver)
   const game = afterHumanPlateAppearance(run.game, run.mission, null, advance.runsScored, isInningOver)
-  const runners = missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
-    batterReached: runnerFates?.some((fate) => fate.fromBase === 0 && !fate.retired) === true,
-    runsScored: advance.runsScored,
-    ...(runnerFates === undefined ? {} : { survivorsFromBase: survivorsFromBaseOfFates(runnerFates) }),
-  })
+  const runners = missionRunnersAfterPlay(
+    run,
+    { bases: advance.bases, inningOver: isInningOver },
+    {
+      batterReached: runnerFates?.some((fate) => fate.fromBase === 0 && !fate.retired) === true,
+      runsScored: advance.runsScored,
+      ...(runnerFates === undefined ? {} : { survivorsFromBase: survivorsFromBaseOfFates(runnerFates) }),
+    },
+  )
   const moved: T = isInningOver
     ? { ...run, bases: EMPTY_BASES, runners, outs: 0, cpu, game }
     : { ...run, bases: advance.bases, runners, outs, cpu, game }
@@ -652,11 +637,7 @@ const MAXIMUM_AUTO_HALVES = 200
  * 마선수를 안 고르므로 그 레코드가 다시 오를 길도 없다.
  * 난수: 자동진행 반 이닝마다 간이 엔진 굴림(타석마다 0xc1ba4 대타 · 투수 교체, 0xc262c 공 · 타구).
  */
-export function runBatterMissionAutoHalves(
-  run: MissionRun,
-  random: RandomPort,
-  aceLevels?: Readonly<Record<number, number>>,
-): MissionRun {
+export function runBatterMissionAutoHalves(run: MissionRun, random: RandomPort, aceLevels?: Readonly<Record<number, number>>): MissionRun {
   if (!run.game.halfEnded) return run
   const { steps, result } = drainMissionAutoTicks(batterMissionAutoTicks(run, random, aceLevels))
   // 자동진행이 돌았으면(반 이닝은 타석이 적어도 하나라 틱이 있다) 그 중계를 새 `serial` 로 싣는다
@@ -686,7 +667,12 @@ export function* batterMissionAutoTicks(
     // CPU 공격 반 이닝
     game = flipMissionHalf(game)
     const cpuHalf: MissionAutoHalf = yield* simulateMissionAutoHalfTicks(
-      game, game.cpuAutoBatting ?? cpuBatting, game.humanPitching ?? humanPitching, random, false, { pitcherChangeBlocked: blocked },
+      game,
+      game.cpuAutoBatting ?? cpuBatting,
+      game.humanPitching ?? humanPitching,
+      random,
+      false,
+      { pitcherChangeBlocked: blocked },
     )
     game = {
       ...withMissionScore(game, game.offenseSide, cpuHalf.runs),

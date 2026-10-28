@@ -2,11 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MenuItem } from '@/shared/ui'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
-import {
-  pitcherAbilityLimitsOf,
-  pitcherFormOfCareer,
-  setPitcherSkillEquipped,
-} from '@/entities/pitcher-career/model/pitcherCareer'
+import { pitcherAbilityLimitsOf, pitcherFormOfCareer, setPitcherSkillEquipped } from '@/entities/pitcher-career/model/pitcherCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
 import { restResultTextOf } from '@/entities/career/model/trainingText'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -24,10 +20,7 @@ import {
   runPitchTypeTraining,
   runPitcherTraining,
 } from '@/entities/pitcher-career/model/pitcherManagement'
-import type {
-  PitcherTrainingBlockReason,
-  PitcherTrainingMenu,
-} from '@/entities/pitcher-career/model/pitcherManagement'
+import type { PitcherTrainingBlockReason, PitcherTrainingMenu } from '@/entities/pitcher-career/model/pitcherManagement'
 import {
   magicNumberOfCell,
   magicSelectBlockReasonOf,
@@ -36,10 +29,7 @@ import {
   selectPitchCell,
 } from '@/entities/pitcher-career/model/pitchSelection'
 import { magicPitchNameOf } from '@/entities/pitcher-career/model/magicPitch'
-import {
-  PITCHER_MAGIC_TRAINING_SLOT,
-  pitcherTrainingPresentationOf,
-} from '@/pages/pitcher-league/lib/pitcherTrainingPresentation'
+import { PITCHER_MAGIC_TRAINING_SLOT, pitcherTrainingPresentationOf } from '@/pages/pitcher-league/lib/pitcherTrainingPresentation'
 import type { PitcherTrainingPresentation } from '@/pages/pitcher-league/lib/pitcherTrainingPresentation'
 import { equipPitcherTitle } from '@/entities/pitcher-career/model/pitcherTitles'
 import { ABILITY_DETAIL_VISIBLE_LINES, abilityDetailScrollKeyOf, scrollAbilityDetail } from '@/pages/management/lib/abilityDetail'
@@ -58,11 +48,7 @@ import {
   useQuestionOf,
 } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import type { PitcherManagementCommand } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
-import {
-  pitcherRestBlockReasonOf,
-  recoverAfterPitcherRest,
-  runPitcherRest,
-} from '@/pages/pitcher-league/model/pitcherRest'
+import { pitcherRestBlockReasonOf, recoverAfterPitcherRest, runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
 import { pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'
 import type { DetailRow } from '@/pages/management/lib/detailPopup'
 import { INJURY_FOLLOW_UP_NOTICE, rollTrainingInjury } from '@/entities/career/model/condition'
@@ -225,10 +211,13 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   const [entryCount, setEntryCount] = useState(0)
   const { onReenter: onSessionReenter } = input
   /** 105 진입 — 세션에 알리고(`onReenter`) 커맨드 줄이 칸을 처음 자리로 되돌려 다시 펼치게 센다(0x11910 11c26 → 0x7ff21) */
-  const onReenter = useCallback((from?: number) => {
-    setEntryCount((count) => count + 1)
-    onSessionReenter?.(from)
-  }, [onSessionReenter])
+  const onReenter = useCallback(
+    (from?: number) => {
+      setEntryCount((count) => count + 1)
+      onSessionReenter?.(from)
+    },
+    [onSessionReenter],
+  )
   const [subWindow, setSubWindow] = useState<PitcherMenuWindow>(null)
   /** 119 위에 뜨는 칭호 목록 창(129). 창을 여닫는 키는 `'*'` 다 — 아래 키 처리 주석 참고 */
   const [isTitleWindowOpen, setIsTitleWindowOpen] = useState(false)
@@ -636,14 +625,22 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [abilityDetailOffset, back, career, choice, confirmMagicTrainingCell, isTitleWindowOpen, magicTrainingCursor, notice,
-    question, restPhase, subWindow])
+  }, [
+    abilityDetailOffset,
+    back,
+    career,
+    choice,
+    confirmMagicTrainingCell,
+    isTitleWindowOpen,
+    magicTrainingCursor,
+    notice,
+    question,
+    restPhase,
+    subWindow,
+  ])
 
   /** 129 확인 — `선수+0x1c4 = sel` 뒤 곧바로 저장한다 (0x11f78 의 확인 갈래) */
-  const equipTitle = useCallback(
-    (title: string) => onSave(equipPitcherTitle(career, title)),
-    [career, onSave],
-  )
+  const equipTitle = useCallback((title: string) => onSave(equipPitcherTitle(career, title)), [career, onSave])
 
   const answerQuestion = useCallback(
     (isYes: boolean) => {
@@ -755,10 +752,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
   )
 
   /** 0xa4b04 켜기는 0xb663c 가 곧바로 저장(0x1f1e1)한다 — 웹은 `onSave` 가 저장이다 */
-  const equipSkill = useCallback(
-    (skillId: number, on: boolean) => onSave(setPitcherSkillEquipped(career, skillId, on)),
-    [career, onSave],
-  )
+  const equipSkill = useCallback((skillId: number, on: boolean) => onSave(setPitcherSkillEquipped(career, skillId, on)), [career, onSave])
 
   /** G 는 `career.gamePoint` 를 깎으면 세션의 지갑 다리가 전역 G 에 옮긴다 (`usePitcherLeagueSession`) */
   const expandPitcherSkillSlots = useCallback(() => {
@@ -770,7 +764,10 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
 
   // 터치 기기 — 120 글이 4줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건 → 0x8a044 스크롤). 원본 그림에는 막대뿐이다
   useTouchScrollKeys(
-    question === null && choice === null && notice === '' && abilityDetailOffset !== null &&
+    question === null &&
+      choice === null &&
+      notice === '' &&
+      abilityDetailOffset !== null &&
       pitcherAbilityDetailViewOf(career).messages.length > ABILITY_DETAIL_VISIBLE_LINES,
   )
 
@@ -807,9 +804,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
     confirmMagicTrainingCell,
     equipSkill,
     expandSkillSlots: expandPitcherSkillSlots,
-    trainingPresentation: training !== null && training.isPlaying
-      ? pitcherTrainingPresentationOf(training.slot, career.typeIndex)
-      : null,
+    trainingPresentation: training !== null && training.isPlaying ? pitcherTrainingPresentationOf(training.slot, career.typeIndex) : null,
     isTrainingState: training !== null,
     entryCount,
     finishTraining,
@@ -827,10 +822,7 @@ function itemsOf(kind: PitcherMenuKind, career: PitcherCareer): readonly MenuIte
     return PITCHER_TRAINING_MENUS.map((menu) => ({
       id: menu.id,
       label: menu.name,
-      detail:
-        menu.ability === null
-          ? `레벨 ${career.magicLevel}/${MAGIC_MAXIMUM_LEVEL}`
-          : `${career.ability[menu.ability]}/${limits[menu.ability]}`,
+      detail: menu.ability === null ? `레벨 ${career.magicLevel}/${MAGIC_MAXIMUM_LEVEL}` : `${career.ability[menu.ability]}/${limits[menu.ability]}`,
     }))
   }
   return PITCHER_COMMAND_SLOTS.map((slot) => ({ id: slot.id, label: slot.id }))

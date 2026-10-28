@@ -2,20 +2,9 @@ import { trackWeakCollectionForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
-import {
-  basePosition,
-  isSamePoint,
-  progressPercent,
-  SLIDING_PROGRESS_RANGE,
-  type WorldPoint,
-} from '@/entities/fielding/model/fieldGeometry'
+import { basePosition, isSamePoint, progressPercent, SLIDING_PROGRESS_RANGE, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import { NONE, type FielderState, type RunnerState } from '@/entities/fielding/model/fieldingState'
-import {
-  DUST_TRAIL_OFF,
-  slideDustDirectionOf,
-  stepDustTrail,
-  type DustTrailState,
-} from '@/features/defense-play/model/playerEffects'
+import { DUST_TRAIL_OFF, slideDustDirectionOf, stepDustTrail, type DustTrailState } from '@/features/defense-play/model/playerEffects'
 import {
   FIELDER_ACTION,
   HOLDER_MARK_ANIM,
@@ -150,10 +139,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       lockTicks: fielder.actionLockTicks,
       fumbleTicks: input.fumbleTicks?.[fielder.slot] ?? 0,
       throwErrorTicks: input.throwErrorTicks?.[fielder.slot] ?? 0,
-      dustTrail:
-        trail.mark === null
-          ? null
-          : { x: trail.mark.point.x, z: trail.mark.point.z - trail.mark.point.y, frame: trail.mark.frame },
+      dustTrail: trail.mark === null ? null : { x: trail.mark.point.x, z: trail.mark.point.z - trail.mark.point.y, frame: trail.mark.frame },
     }
   })
 
@@ -173,9 +159,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
       // +0x96 = 아웃 또는 홈 밟음 (`runnerFates` — 웹 isOut 은 아웃만이라 scored 를 더한다)
       isFinished: runner.isOut || runner.scored,
       // 0x43b0a: 주자 +0xb8(슬라이딩 중)이면 0x9ff40 방향
-      slideDirection: runner.sliding
-        ? slideDustDirectionOf(runner, input.previousTargetOf?.(runner.index) ?? runner.startBase)
-        : 0,
+      slideDirection: runner.sliding ? slideDustDirectionOf(runner, input.previousTargetOf?.(runner.index) ?? runner.startBase) : 0,
       // 0x43aa8 — 주자 +0x9c ≠ −1
       isAce: input.runnerAceIndexes?.[runner.index] != null,
     }
@@ -204,10 +188,7 @@ export function viewStateOf(input: ViewStateInput): DefensePlayView {
     poleHomeRunFlag: input.poleHomeRunFlag === true,
     cameraFrozen: input.cameraFrozen === true,
     runnerAceSprite: input.runnerAceSprite ?? null,
-    laserTrailFrom:
-      input.laserTrailFrom == null
-        ? null
-        : { x: input.laserTrailFrom.x, z: input.laserTrailFrom.z, height: input.laserTrailFrom.y },
+    laserTrailFrom: input.laserTrailFrom == null ? null : { x: input.laserTrailFrom.x, z: input.laserTrailFrom.z, height: input.laserTrailFrom.y },
     holderMark: input.holderMark ?? null,
     holderPlate: input.holderMark == null ? null : (input.holderPlate ?? null),
     ballParticles: input.ballParticles ?? null,
@@ -238,11 +219,7 @@ export function holderMarkOf(input: {
 }): HolderMark | null {
   if (!input.grabbed) return null
   if (!Number.isInteger(input.holderSlot) || input.holderSlot < 0 || input.holderSlot > 8) return null
-  const anim = input.isShining
-    ? HOLDER_MARK_ANIM.shining
-    : input.offenseIsCpu
-      ? HOLDER_MARK_ANIM.cpuOffense
-      : HOLDER_MARK_ANIM.humanOffense
+  const anim = input.isShining ? HOLDER_MARK_ANIM.shining : input.offenseIsCpu ? HOLDER_MARK_ANIM.cpuOffense : HOLDER_MARK_ANIM.humanOffense
   return { slot: input.holderSlot, anim }
 }
 
@@ -285,10 +262,7 @@ export function aceIndexesWithOriginalBug(
 }
 
 /** 수비 칸 → 마선수 번호. 표에 없거나 0~4 밖이면 보통 수비수 그림이다 */
-function aceIndexOf(
-  aces: readonly (number | null | undefined)[] | undefined,
-  slot: number,
-): number | null {
+function aceIndexOf(aces: readonly (number | null | undefined)[] | undefined, slot: number): number | null {
   const ace = aces?.[slot]
   if (ace == null || !Number.isInteger(ace) || ace < 0 || ace > 4) return null
   return ace
@@ -327,13 +301,8 @@ function runnerActionOf(runner: RunnerState, input: ViewStateInput): number {
   const target = basePosition(runner.targetBase)
   if (isSamePoint(runner.position, target)) return RUNNER_ACTION.stand
   const progress = progressPercent(runner.legStart, runner.position, target)
-  const playedOn =
-    input.throwBase !== NONE && ((input.throwBase % 4) + 4) % 4 === ((runner.targetBase % 4) + 4) % 4
-  if (
-    playedOn &&
-    progress >= SLIDING_PROGRESS_RANGE.minimum &&
-    progress <= SLIDING_PROGRESS_RANGE.maximum
-  ) {
+  const playedOn = input.throwBase !== NONE && ((input.throwBase % 4) + 4) % 4 === ((runner.targetBase % 4) + 4) % 4
+  if (playedOn && progress >= SLIDING_PROGRESS_RANGE.minimum && progress <= SLIDING_PROGRESS_RANGE.maximum) {
     return RUNNER_ACTION.slide
   }
   return RUNNER_ACTION.run
@@ -347,12 +316,7 @@ function directionIndexOf(from: WorldPoint, to: WorldPoint): number {
   return dz > 0 ? 0 : 1
 }
 
-function runActionOf(
-  position: WorldPoint,
-  target: WorldPoint,
-  standAction: number,
-  runActions: readonly [number, number, number, number],
-): number {
+function runActionOf(position: WorldPoint, target: WorldPoint, standAction: number, runActions: readonly [number, number, number, number]): number {
   if (position.x === target.x && position.z === target.z) return standAction
   return runActions[directionIndexOf(position, target)]
 }

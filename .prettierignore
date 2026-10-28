@@ -1,0 +1,24 @@
+# 빌드 결과 · 원본 · 정적 자원
+dist
+base
+public
+.yarn
+.pnp.cjs
+.pnp.loader.mjs
+yarn.lock
+*.json.gz
+
+# e2e 기준 그림 · 생성 픽스처(soakFixtures 로 다시 만든다)
+e2e/snapshots
+e2e/fixtures
+e2e/.run
+
+# 원본 패키지에서 생성한 데이터 표(tools/generate_game_data.py)
+src/shared/config/original/data
+
+# 작업 기록 문서 — 모양을 손으로 맞춘다
+*.md
+
+# 생성 · 녹화 데이터
+*.generated.json
+**/__fixtures__/*.json

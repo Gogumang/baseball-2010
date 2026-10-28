@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applySkillReward, createCareer, equippedPlusSkillCountOf, isMinusSkill, isSkillEquipped, MINUS_SKILL_IDS, plusSkillSlotLimitOf,
-  rebuildEquippedSkillIds, setSkillEquipped,
+  applySkillReward,
+  createCareer,
+  equippedPlusSkillCountOf,
+  isMinusSkill,
+  isSkillEquipped,
+  MINUS_SKILL_IDS,
+  plusSkillSlotLimitOf,
+  rebuildEquippedSkillIds,
+  setSkillEquipped,
 } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import {
-  equipSkill, expandSkillSlots, skillConfirmKindOf, skillSlotExpansionCostOf, unequipSkill,
-} from '@/entities/career/model/skillEquip'
+import { equipSkill, expandSkillSlots, skillConfirmKindOf, skillSlotExpansionCostOf, unequipSkill } from '@/entities/career/model/skillEquip'
 import { equippedAbilityOf, trainingInjuryChanceOf } from '@/entities/career/model/condition'
 import { illnessChanceOf } from '@/entities/story/model/storyScene'
 
@@ -88,11 +93,12 @@ describe('장착 동작 0xa4b04', () => {
 })
 
 describe('확인 키 0x13140 의 갈래', () => {
-  const 가득 = (skillSlotLevel: number) => 선수({
-    skillIds: [0, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    equippedSkillIds: [0, 1, 6, 7, 8, 9, 10, 11, 12, 13].slice(0, [6, 8, 10][skillSlotLevel]),
-    skillSlotLevel,
-  })
+  const 가득 = (skillSlotLevel: number) =>
+    선수({
+      skillIds: [0, 1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      equippedSkillIds: [0, 1, 6, 7, 8, 9, 10, 11, 12, 13].slice(0, [6, 8, 10][skillSlotLevel]),
+      skillSlotLevel,
+    })
 
   it('마이너스 → 해제불가([129]) · 장착 중 → 해제확인([131]) · 자리 있음 → 장착확인([130])', () => {
     const career = 선수({ skillIds: [3, 6, 7], equippedSkillIds: [3, 6] })

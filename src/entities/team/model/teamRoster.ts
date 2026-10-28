@@ -125,12 +125,8 @@ export function rollStartingPitcherIndex(random: RandomPort): number {
  * (`GameProgress` 가 그렇게 쓴다). 한 경기 안에서 보이는 동작은 같고, 다음 경기의 로테이션이
  * 이어지지 않는 것만 다르다.
  */
-export function startingPitcherOf(
-  teamId: number,
-  randomOrIndex: RandomPort | number = 0,
-): QuickAtBatPitcher {
+export function startingPitcherOf(teamId: number, randomOrIndex: RandomPort | number = 0): QuickAtBatPitcher {
   const roster = teamPitchers(teamId)
-  const index =
-    typeof randomOrIndex === 'number' ? randomOrIndex : rollStartingPitcherIndex(randomOrIndex)
+  const index = typeof randomOrIndex === 'number' ? randomOrIndex : rollStartingPitcherIndex(randomOrIndex)
   return quickPitcherOf(roster[index % roster.length])
 }

@@ -15,8 +15,7 @@ describe('경기정보 화면 바탕', () => {
       <MatchInfoStadiumBackdrop stage={{ stadium: 0, fieldPalette: null, skyRow: 0, side0TeamId: 0, side1TeamId: 1, gameMode: 1 }} />,
     )
     const visible = getByTestId('경기정보-구장')
-    const visibleCalls = getContext.mock.contexts.flatMap((canvas, index) =>
-      (canvas === visible ? [getContext.mock.calls[index]] : []))
+    const visibleCalls = getContext.mock.contexts.flatMap((canvas, index) => (canvas === visible ? [getContext.mock.calls[index]] : []))
     expect(visibleCalls.length).toBeGreaterThan(0)
     for (const call of visibleCalls) expect(call).toEqual(['2d', TARGET_CONTEXT_OPTIONS])
     expect(TARGET_CONTEXT_OPTIONS.willReadFrequently).toBe(true)

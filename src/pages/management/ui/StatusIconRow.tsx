@@ -96,10 +96,16 @@ export function StatusIconRow({ state, originX = 0, originY = 0 }: StatusIconRow
         return (
           <Fragment key={frame}>
             <img className={styles.layer} src={iconImageOf(frame)} alt="" style={{ left: slot.x, top: slot.y }} />
-            {frame === EAGLE_EYE_FRAME && eagleEyeDigitsOf(state.eagleEyeGamesRemaining, slot).map((digit, digitIndex) => (
-              <img key={digitIndex} className={styles.layer} src={assetUrl(`./sprites/num/${String(digit.frame).padStart(3, '0')}.png`)}
-                alt="" style={{ left: digit.left, top: digit.top }} />
-            ))}
+            {frame === EAGLE_EYE_FRAME &&
+              eagleEyeDigitsOf(state.eagleEyeGamesRemaining, slot).map((digit, digitIndex) => (
+                <img
+                  key={digitIndex}
+                  className={styles.layer}
+                  src={assetUrl(`./sprites/num/${String(digit.frame).padStart(3, '0')}.png`)}
+                  alt=""
+                  style={{ left: digit.left, top: digit.top }}
+                />
+              ))}
           </Fragment>
         )
       })}

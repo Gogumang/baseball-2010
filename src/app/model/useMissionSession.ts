@@ -76,11 +76,7 @@ import {
 } from '@/features/defense-play/model/pitchArrivalPlay'
 import { runLiveRunnerPlayWithoutKeys, type LiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
-import {
-  SCENE_RESULT_CODE_START,
-  sceneResultCodeAfterPitch,
-  sceneResultCodeOfThrown,
-} from '@/features/defense-play/model/sceneResultCode'
+import { SCENE_RESULT_CODE_START, sceneResultCodeAfterPitch, sceneResultCodeOfThrown } from '@/features/defense-play/model/sceneResultCode'
 import { baserunnerAllowedOfFates, chargedRunsOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import { arrivalPlaySettles } from '@/features/defense-play/model/settlementEvents'
 import {
@@ -93,9 +89,7 @@ import {
 } from '@/entities/mission/model/missionRunners'
 import type { MissionPlayAbilities, MissionSpecialRunners } from '@/entities/mission/model/missionRunners'
 import { ACE_BATTERS, missionOpponentOf, pitcherAbilityOf } from '@/entities/game/model/aceOpponent'
-import {
-  FULL_STAMINA, consumeStamina, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf,
-} from '@/entities/pitcher-career/model/pitcherStamina'
+import { FULL_STAMINA, consumeStamina, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { cpuSwingPoseOf, pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import type { CpuSwingSkillSituation } from '@/entities/pitching/model/simulateBatter'
@@ -115,9 +109,7 @@ import { buildHumanPitch, fatiguedStatsOf, mistakeHumanPitchOf, pitchGradeOf } f
 import { aimTickOf } from '@/features/play-pitcher-game/model/pitchAim'
 import type { AimDirection } from '@/features/play-pitcher-game/model/pitchAim'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
-import {
-  isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame,
-} from '@/app/model/modePitcher'
+import { isModeMagicPitchType, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame } from '@/app/model/modePitcher'
 import { hallOfFameModeBatterOf, type ModeBatterLook } from '@/app/model/modeBatter'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
@@ -143,11 +135,7 @@ import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { contactOutcomeOfDetail } from '@/features/play-at-bat/model/resolvePitch'
-import {
-  deepHitCheerSoundIdOf,
-  inPlayCallSoundIdOf,
-  pitchCallSoundIdOf,
-} from '@/features/play-at-bat/model/atBatSounds'
+import { deepHitCheerSoundIdOf, inPlayCallSoundIdOf, pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import { playSoundIds } from '@/app/model/useSound'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { LOSE_SOUND, WIN_SOUND } from '@/features/play-game/model/gameSounds'
@@ -169,9 +157,7 @@ import { aceAbilityAtLevel, aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel,
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
-import {
-  BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks, scheduleSceneFrameUpdate,
-} from '@/features/play-game/model/sceneTickSounds'
+import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks, scheduleSceneFrameUpdate } from '@/features/play-game/model/sceneTickSounds'
 import { enterSceneConfirm } from '@/features/play-game/model/sceneConfirm'
 import { substitutionEntrySoundIdOf, type SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { aceCutInSlotOf } from '@/features/play-game/model/aceCutIn'
@@ -348,10 +334,7 @@ export function missionOpponent(mission: OriginalMission): AcePlayer | null {
  * (b6438~b646a — 모드·플래그·칸을 가리지 않는다). 레벨 = `mgr[0x13a + 순번(+5 타자)]`.
  * 그 뒤 장비·스킬(플래그 1) → 0xb570c 의 0..999 자르기 순서다.
  */
-export function missionOpponentAbility(
-  mission: OriginalMission,
-  aceLevels?: Readonly<Record<number, number>>,
-): BatterAbility | null {
+export function missionOpponentAbility(mission: OriginalMission, aceLevels?: Readonly<Record<number, number>>): BatterAbility | null {
   const opponent = missionOpponent(mission)
   if (opponent === null) return null
   const level = aceLevelOf(aceLevels, aceLevelSlotOf(opponent.role, mission.opponentAce))
@@ -440,11 +423,7 @@ export function missionMoundOpponent(run: MissionRun): AcePlayer | null {
  * 사람 타석은 수비 팀 지금 투수 0xae83c 가 던진다 — 마투수가 아닌 미션(선발 칸 = 레코드 +6 아래 4비트)도, 마투수가 교체로
  * 내려간 뒤(0xac428)도 그 줄이다. CPU 팀이 없을 때만(웹에 그런 미션은 없다) 예전 기본값.
  */
-export function missionMoundPitcherAbility(
-  run: MissionRun,
-  aceLevels?: Readonly<Record<number, number>>,
-  staminaPercent?: number,
-): PitcherAbility {
+export function missionMoundPitcherAbility(run: MissionRun, aceLevels?: Readonly<Record<number, number>>, staminaPercent?: number): PitcherAbility {
   // 0xb570c 스킬 14 갈래 — 마운드 레코드 +0x14 비트 14 ∧ 지금 판의 경기 상태(CPU 팀 레코드 +0) (`withPitcherFightingSpirit`)
   const situation = missionFightingSpiritOf(run, missionTeamIdsOf(run).cpu)
   if (isMissionCpuMoundAce(run.cpu)) {
@@ -684,10 +663,13 @@ export function useMissionSession({
     cancelPitcherResultEntryRef.current?.()
     cancelPitcherResultEntryRef.current = null
   }
-  useEffect(() => () => {
-    cancelPitcherResultEntryRef.current?.()
-    cancelPitcherResultEntryRef.current = null
-  }, [])
+  useEffect(
+    () => () => {
+      cancelPitcherResultEntryRef.current?.()
+      cancelPitcherResultEntryRef.current = null
+    },
+    [],
+  )
   /**
    * **타자 미션: 이번 투구에 출발한 주자들의 루** — state[0x14 + 루]. 공이 나는 동안 키 '3'·'2'·'1' 로 쌓이고
    * (`actions.steal`, 난수 없음) 공이 도착하면(0x3dfac) 도루 판이 읽는다. 키와 같은 틱에 공이 도착할 수 있어
@@ -791,9 +773,11 @@ export function useMissionSession({
    * `'new'` 는 새 타석(0xd → 0xe 확인 뒤), `'same'` 은 같은 타석 다음 공(판정 A 의 "그 밖" · 파울로 닫힌 판 · 주자 판 끝 ae592).
    * 진행이 다 먹인 뒤의 판을 봐야 해서 아래 효과가 그린 뒤에 돈다.
    */
-  const [pitchSelectionEntry, setPitchSelectionEntry] = useState<
-    { readonly serial: number; readonly kind: 'new' | 'same'; readonly delayTicks: number } | null
-  >(null)
+  const [pitchSelectionEntry, setPitchSelectionEntry] = useState<{
+    readonly serial: number
+    readonly kind: 'new' | 'same'
+    readonly delayTicks: number
+  } | null>(null)
   const handledPitchSelectionRef = useRef(0)
   /**
    * `delayTicks` — 0xf 진입 틀까지 남은 장면 틱. 투수 미션은 공을 놓는 걸음에 판정까지 다 내므로(`handlePitcherThrow`) 같은 타석 다음 공의
@@ -916,13 +900,7 @@ export function useMissionSession({
     }
   }
   /** 공 도착 판에 얹는 그림 전용 두 칸 (능력치 칸은 부르는 쪽이 따로 넣는다) */
-  const pitchArrivalPlatesOf = ({
-    fielderPlates,
-    fielderSkillIds,
-    runnerAces,
-    defenseTeamIndex,
-    offenseTeamIndex,
-  }: MissionPlayAbilities) => ({
+  const pitchArrivalPlatesOf = ({ fielderPlates, fielderSkillIds, runnerAces, defenseTeamIndex, offenseTeamIndex }: MissionPlayAbilities) => ({
     ...(fielderPlates === undefined ? {} : { fielderPlates }),
     // 초감각(21) — 레이저 0x66a8c 가 야수 +0xec 레코드에 묻는다(그림 전용 칸은 아니지만 같은 레코드 고르기다)
     ...(fielderSkillIds === undefined ? {} : { fielderSkillIds }),
@@ -941,7 +919,10 @@ export function useMissionSession({
   const [clearCounts, setClearCounts] = useState<MissionClearCounts>(() => missionRecord.load())
   /** 한 번이라도 깬 미션 키 — 잠금 판정과 컬렉션이 쓴다 */
   const clearedKeys = useMemo(
-    () => Object.entries(clearCounts).filter(([, count]) => count > 0).map(([key]) => key),
+    () =>
+      Object.entries(clearCounts)
+        .filter(([, count]) => count > 0)
+        .map(([key]) => key),
     [clearCounts],
   )
 
@@ -951,8 +932,7 @@ export function useMissionSession({
   // 진행이 서는 때 적는다. 남은 초 1 에서 실패(0xaa940)
   const isLoading = loadingTip !== null
   const isBatterRunning = !isLoading && (screen.kind === '미션진행' || screen.kind === '마선수대결') && missionRun?.status === '진행중'
-  const isPitcherRunning =
-    !isLoading && (screen.kind === '투수미션' || pitcherAceMatchMission !== null) && pitcherRun?.status === '진행중'
+  const isPitcherRunning = !isLoading && (screen.kind === '투수미션' || pitcherAceMatchMission !== null) && pitcherRun?.status === '진행중'
   useEffect(() => {
     if (!isBatterRunning && !isPitcherRunning) return
     // [st+0xac] — 0xa5bb0 이 적은 벽시계 시각. 벽시계는 공용 창과 무관하게 흐른다(0x14005c8)
@@ -988,9 +968,7 @@ export function useMissionSession({
   const askPitchSelection = (kind: 'new' | 'same') => {
     // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 교체 묻기(3da3e · 3da70)보다 앞이다
     clearStealDisplay()
-    setPitcherStealDisplay((previous) =>
-      previous === null || previous.selectionEntered ? previous : { ...previous, selectionEntered: true },
-    )
+    setPitcherStealDisplay((previous) => (previous === null || previous.selectionEntered ? previous : { ...previous, selectionEntered: true }))
     const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
     const run = isPitcherSide ? pitcherRun : missionRun
     if (run === null || run.status !== '진행중') return
@@ -1160,12 +1138,7 @@ export function useMissionSession({
       setMissionRun((previous) =>
         previous === null
           ? previous
-          : settleBatterRun(
-              withMissionRunnerPlay(
-                interrupted && hasSwung ? checkSwingsExhausted(recordSwing(previous)) : previous,
-                play,
-              ),
-            ),
+          : settleBatterRun(withMissionRunnerPlay(interrupted && hasSwung ? checkSwingsExhausted(recordSwing(previous)) : previous, play)),
       )
       if (play.result.ticks.length > 0 && play.shownLive !== true) setPickoffReplay(play.result)
       if (interrupted) {
@@ -1177,9 +1150,7 @@ export function useMissionSession({
 
     if (outcome === null) {
       if (hasSwung) {
-        setMissionRun((previous) =>
-          previous === null ? previous : checkSwingsExhausted(recordSwing(previous)),
-        )
+        setMissionRun((previous) => (previous === null ? previous : checkSwingsExhausted(recordSwing(previous))))
       }
       // 판정 A 0xae24c 의 "그 밖" — 같은 타석 다음 공(0xf)
       signalPitchSelection('same')
@@ -1212,10 +1183,7 @@ export function useMissionSession({
     // 결과 연출 뒤 새 타석 — 0xd → 0xe
     enterNewAtBatConfirm()
     // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
-    runner.pauseWithBanner(
-      describeOutcomeBanner(outcome, runnersOnBase),
-      Math.max(0, atBatEndFramesOf(outcome, play) - elapsedFrames),
-    )
+    runner.pauseWithBanner(describeOutcomeBanner(outcome, runnersOnBase), Math.max(0, atBatEndFramesOf(outcome, play) - elapsedFrames))
   }
 
   /**
@@ -1259,9 +1227,7 @@ export function useMissionSession({
         // 0xa5e14 — state[0xd] · state[0xe] 내림 · 마운드 투수 투구 수 · 스태미나 (`missionCpuAfterPitch`). 마투수면 그 레코드 +0x2c 를
         // 세션 셈(`missionOpponentStaminaAfterPitch`)으로 깎아 마운드에 든다 — 내려가면 마스터 줄 소모를 CPU 팀이 든다
         setMissionRun((previous) =>
-          previous === null
-            ? previous
-            : { ...previous, cpu: missionCpuAfterThrow(previous, pitchTypeNumber, batterSkillIds, aceLevels) },
+          previous === null ? previous : { ...previous, cpu: missionCpuAfterThrow(previous, pitchTypeNumber, batterSkillIds, aceLevels) },
         )
       }
       const hasSwung = detail.hasSwung
@@ -1269,12 +1235,7 @@ export function useMissionSession({
       // 파울 콜 25(51c5c)는 판이 파울로 닫힐 때(`finishDefensePlay`)다 — 여기서는 타구음만 낸다. 공 도착 판(0x3dfac)은 못 맞힌
       // 공만이라 열지 않는다. 필살타법 성공 굴림(0x517e6)도 판 시작이 한다(`foulContact` 의 재료)
       const foulRun = missionRunRef.current
-      if (
-        detail.resolution.kind === '파울' &&
-        detail.foulContact !== undefined &&
-        foulRun !== null &&
-        foulRun.status === '진행중'
-      ) {
+      if (detail.resolution.kind === '파울' && detail.foulContact !== undefined && foulRun !== null && foulRun.status === '진행중') {
         const foulOutcome = registerContact(FOUL_PLAY_OUTCOME, detail.foulContact)
         const foulStealing = takeStealingFrom()
         // 타구 판(종류 1) 시작 0x3d7b8 3d8d2 — 도루 주자의 표시 칸을 지운다
@@ -1365,14 +1326,17 @@ export function useMissionSession({
       // (`continueMissionArrival` → `setPickoffReplay`), 재생하지 않는 판만 연 자리에서 낸다(근사).
       // 삼진·볼넷·홈런은 수비가 개입할 것이 없어 아웃 콜도 여기서 같이 난다 (0xae24c 갈래)
       playSoundIds(audio, [detail.contactSoundId])
-      playSoundIdsAfterSceneTicks(audio, [
-        pitchCallSoundIdOf(detail.resolution, nextAtBat),
-        play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
-        outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
-      ], BATTER_PITCH_RESULT_ENTRY_TICKS)
+      playSoundIdsAfterSceneTicks(
+        audio,
+        [
+          pitchCallSoundIdOf(detail.resolution, nextAtBat),
+          play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
+          outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
+        ],
+        BATTER_PITCH_RESULT_ENTRY_TICKS,
+      )
 
-      const context: MissionArrivalContext | null =
-        current === null ? null : { current, hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase }
+      const context: MissionArrivalContext | null = current === null ? null : { current, hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase }
       if (context !== null ? continueMissionArrival(play, context) : outcome === null) {
         // 판이 없는 판(`current` 없음)의 같은 타석 다음 공 — 아래 `continueMissionArrival` 과 같은 길
         if (context === null) signalPitchSelection('same')
@@ -1448,9 +1412,11 @@ export function useMissionSession({
    * 그래서 웹도 존 좌표 근사(`pitchCommand.buildPitch`) 대신 진행기의 월드 좌표 투구를 쓴다.
    */
   const missionConditionCode =
-    pitcherRun !== null && pitcherRun.status === '진행중' ? pitcherRun.mission.conditionCode
-    : missionRun !== null && missionRun.status === '진행중' ? missionRun.mission.conditionCode
-    : 0
+    pitcherRun !== null && pitcherRun.status === '진행중'
+      ? pitcherRun.mission.conditionCode
+      : missionRun !== null && missionRun.status === '진행중'
+        ? missionRun.mission.conditionCode
+        : 0
 
   /**
    * **조준(상태 0x10)의 틱 하나 `0x39c5c`** — 화면(`AimCursor`)이 0x10 에 있는 동안 매 틱 부른다.
@@ -1462,9 +1428,7 @@ export function useMissionSession({
       aim,
       direction,
       MISSION_STAGE_SIDE,
-      pitcherRun !== null && pitcherRun.status === '진행중'
-        ? { conditionCode: pitcherRun.mission.conditionCode, random }
-        : undefined,
+      pitcherRun !== null && pitcherRun.status === '진행중' ? { conditionCode: pitcherRun.mission.conditionCode, random } : undefined,
     )
 
   /** 붙든 볼넷 · 사구 · 삼진의 판정 A 0xae24c 보통 길 — 밀어내기 판(종류 2, 0x17)을 재생하고 정산한다. 진루는 보통 길과 같다 */
@@ -1601,9 +1565,7 @@ export function useMissionSession({
 
     // 원본 구질 번호 1~21, 메뉴의 마구 칸은 22 (0xb6d6a). 표에 없는 이름이면 1(FASTBALL)로 둔다
     const isMagic = isModeMagicPitchType(type)
-    const typeNumber = isMagic
-      ? MAGIC_PITCH_TYPE_NUMBER
-      : Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
+    const typeNumber = isMagic ? MAGIC_PITCH_TYPE_NUMBER : Math.max(1, PITCH_TYPES.findIndex((candidate) => candidate.name === type.name) + 1)
     // 0x50db8 — 구질 22 는 남은 마구(0xaea10) > 0 일 때만 받는다. 아니면 무시 (난수 없음)
     if (isMagic && pitcherMagicRemaining <= 0) return
     // 스태미나 소모 0xa5e14 — 0x11 진입 0x3de10 의 0x3dec6(모드 갈래 없음)이라 놓기 0x4dc78 의 등급 0x4dbac · 피로 0x34968 과
@@ -1611,9 +1573,7 @@ export function useMissionSession({
     // 선다 — 0xb8820 이 투수를 넣으며 team+0x26 · +0x33 을 함께 +1 해 `+0x26 − +0x33 == 1` 그대로다(b884a~b885a)
     // 공격 팀 지금 타자의 압도 22 — 0xa5e14(×2) · 실투 0x33cbc(+5)가 `0xb62b4(타자, 22)` 로 레코드 +0x14 를 본다(모드 갈래 없음).
     // 마스터 줄은 Xls 행 사본, 마타자는 XlsACE_BAT 행 그대로(킹타이거 22 — `missionCpuBatterSkillIdsOf`)
-    const cpuBatterIntimidates = missionCpuBatterSkillIdsOf(pitcherRun, missionCpuBatterOf(pitcherRun.cpu)).includes(
-      INTIMIDATE_SKILL_ID,
-    )
+    const cpuBatterIntimidates = missionCpuBatterSkillIdsOf(pitcherRun, missionCpuBatterOf(pitcherRun.cpu)).includes(INTIMIDATE_SKILL_ID)
     const pitcherStamina = consumeStamina(
       pitcherStaminaStored ?? pitcher.stamina,
       pitchStaminaCostOf({
@@ -1681,9 +1641,7 @@ export function useMissionSession({
         grade,
         // 0xb570d(ctx, 1, 투수, 1, 90, 1) — 칸 1 구속. 모드 5 는 0xb6414 를 0..999 로 자른 값 (`modePitcherOf`).
         // 스킬 14 갈래가 서면 자르기 앞 값에 v/10 을 얹고 자른다
-        effectiveVelocity: pitcherFightingSpirit
-          ? Math.min(999, Math.max(0, withFightingSpirit(pitcher.ability.velocity)))
-          : pitcher.stats.velocity,
+        effectiveVelocity: pitcherFightingSpirit ? Math.min(999, Math.max(0, withFightingSpirit(pitcher.ability.velocity))) : pitcher.stats.velocity,
         runnerCount: runnerCountOf(pitcherRun.bases),
         hasSecondBaseRunner: pitcherRun.bases.second,
         // 지금 CPU 타자의 압도 22 (+5) — 위 소모와 같은 값
@@ -1711,8 +1669,7 @@ export function useMissionSession({
     const cpuBatter = missionCpuBatterOf(pitcherRun.cpu)
     const isAceBatter = cpuBatter?.isAce === true
     const rawBatter =
-      (isAceBatter ? missionOpponentAbility(pitcherRun.mission, aceLevels) : missionCpuBatterAbilityOf(pitcherRun.cpu)) ??
-      ROOKIE_BATTER_ABILITY
+      (isAceBatter ? missionOpponentAbility(pitcherRun.mission, aceLevels) : missionCpuBatterAbilityOf(pitcherRun.cpu)) ?? ROOKIE_BATTER_ABILITY
     // CPU 타자 결정 0x34334 의 h 는 **경기용 히트** 0xb570d(ctx, 0, 타자, 1, 90, 1) 다 (ce462ce).
     // 미션 모드 5 에서 0xb570c 는 나만의리그 갈래(모드 3·4)도 시즌 갈래(2)도 안 타고, 체력 인자 90 은
     // 감소가 없고, 팀 능력치 마스크 {1,2,8,9} 에도 없다 → 0xb6414 값을 0..999 로 자른 것이다.
@@ -1732,11 +1689,7 @@ export function useMissionSession({
     // 마타자 필살 0x34468~0x34488 — 남은 칸(0xaea30)이 0 이 아니면 휘두를 때마다 필살이다 (난수 없음).
     // 일반 CPU 타자(마스터 줄)는 S+0x10 을 쓰지 않는다 (Q1 5절)
     const specialSwing = isAceBatter
-      ? missionOpponentSpecialSwingOf(
-          pitcherRun.mission,
-          pitcherRun.cpu.batting?.specialSwing[batterOrderSlot] ?? UNFILLED_SPECIAL_SWING,
-          aceLevels,
-        )
+      ? missionOpponentSpecialSwingOf(pitcherRun.mission, pitcherRun.cpu.batting?.specialSwing[batterOrderSlot] ?? UNFILLED_SPECIAL_SWING, aceLevels)
       : null
     // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 실투 판정(0x4dea0) 뒤, CPU 타자 결정
     // (11번째 틱 0x34334) **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`).
@@ -1877,14 +1830,12 @@ export function useMissionSession({
       if (play !== null) missionSceneRef.current = play.result.scene
       // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c).
       // MAX게이지(R+0x158)는 공 도착 0x3dfac 의 스트라이크 · 삼진 갈래만 센다 — 낫아웃 판(종류 9 · 타자주자)은 v 를 0 으로 지워 건너뛴다
-      let nextRun = recordPitch(
+      const nextRun = recordPitch(
         { ...pitcherRun, cpu: missionCpuAfterPitch(cpuAfterSwing, { pitchTypeNumber: typeNumber, batterIntimidates: cpuBatterIntimidates }) },
         grade === MAX_GAUGE_GRADE &&
           countsTopGradePitch(
             resolution.kind === '스트라이크',
-            held !== null
-              ? held.kind === 9 && held.strikeout === 'batterRuns'
-              : play !== null && arrivalApplicationOf(play) === 'batterRuns',
+            held !== null ? held.kind === 9 && held.strikeout === 'batterRuns' : play !== null && arrivalApplicationOf(play) === 'batterRuns',
           ),
       )
       // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때) — 이 틀(놓는 틀). 심판 콜은 0x12 진입 틀: 0x3dfac 가 판정
@@ -1900,13 +1851,17 @@ export function useMissionSession({
         if (entryDelayTicks > 0) setGameSceneTickTimeout(() => vibrate(strikeoutMs, isStrikeoutVibrationOn), entryDelayTicks)
         else vibrate(strikeoutMs, isStrikeoutVibrationOn)
       }
-      playSoundIdsAfterSceneTicks(audio, [
-        pitchCallSoundIdOf(resolution, nextAtBat),
-        // 공 도착 판의 판정 콜 — 붙든 도루 · 폭투 판은 화면이 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 낸다.
-        // 여기 오는 것은 밀어내기(콜 없음)뿐이다. 재생 칸에 넣는 판이면 재생 화면이 기록된 틱에 낸다
-        play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
-        outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
-      ], entryDelayTicks)
+      playSoundIdsAfterSceneTicks(
+        audio,
+        [
+          pitchCallSoundIdOf(resolution, nextAtBat),
+          // 공 도착 판의 판정 콜 — 붙든 도루 · 폭투 판은 화면이 판 안의 그 틱(결과 메시지 0xbba → 0x51a56)에 낸다.
+          // 여기 오는 것은 밀어내기(콜 없음)뿐이다. 재생 칸에 넣는 판이면 재생 화면이 기록된 틱에 낸다
+          play === null || missionArrivalReplayed(play) ? null : play.callSoundId,
+          outcome === null || runsDefense ? null : inPlayCallSoundIdOf(outcome),
+        ],
+        entryDelayTicks,
+      )
 
       if (held !== null) {
         // 판이 도는 동안(상태 0x17) 다음 공은 없다 — 판 끝(`actions.finishRunnerPlay`)이 `finishPitcherMissionArrival` 로 잇는다
@@ -1985,8 +1940,7 @@ export function useMissionSession({
         return
       }
       // 같은 타석 다음 공이면 0xf 진입 0x3d954(CPU 대타 · "Time!" 22)는 0x12 문턱 갱신 0x4e6d4 가 예약한 다음 틀이다
-      finishPitcherMissionArrival(nextRun, play, { outcome, pitcherStamina },
-        Math.max(0, pitchSelectionTicks - (resultEntryTicks - entryDelayTicks)))
+      finishPitcherMissionArrival(nextRun, play, { outcome, pitcherStamina }, Math.max(0, pitchSelectionTicks - (resultEntryTicks - entryDelayTicks)))
     }
     // 투구 순간 소리 (0x3f378 — 투수 단계가 공을 놓는 칸에 닿을 때) — 이 틀(놓는 틀).
     // 0x3f378 3f46a — 구질 22 면 28. 미션 투수는 육성·명예 투수(비트7)라 0xb633d 가 거짓이어서
@@ -2052,11 +2006,7 @@ export function useMissionSession({
 
       if (pending.side === '투수') {
         // `played.runnerFates`(주자별 +0x95·+0x96)로 실점 R+0x128 · 출루 허용 R+0x130 을 원본대로 센다
-        setPitcherRun((previous) =>
-          previous === null
-            ? previous
-            : settlePitcherRun(applyPitcherOutcome(previous, pending.outcome, { played })),
-        )
+        setPitcherRun((previous) => (previous === null ? previous : settlePitcherRun(applyPitcherOutcome(previous, pending.outcome, { played }))))
         resetAtBatWithConfirm()
         runner.setIsPaused(false)
         return
@@ -2064,8 +2014,8 @@ export function useMissionSession({
       setMissionRun((previous) =>
         previous === null
           ? previous
-          // 판은 이미 돌았다(`played`) — 갱신 함수는 난수를 안 넘겨 순수하게 둔다(StrictMode 가 두 번 불러도 같다)
-          : settleBatterRun(applyMissionOutcome(previous, pending.outcome, pending.isBunt, undefined, played)),
+          : // 판은 이미 돌았다(`played`) — 갱신 함수는 난수를 안 넘겨 순수하게 둔다(StrictMode 가 두 번 불러도 같다)
+            settleBatterRun(applyMissionOutcome(previous, pending.outcome, pending.isBunt, undefined, played)),
       )
       // 결과 연출 뒤 새 타석 — 0xd → 0xe
       enterNewAtBatConfirm()
@@ -2229,7 +2179,9 @@ export function useMissionSession({
       }
       dropAutoRelay()
       const finished = next.value
-      setPitcherRun((previous) => (previous === null || previous.status !== '진행중' ? previous : { ...finished, remainingSeconds: previous.remainingSeconds }))
+      setPitcherRun((previous) =>
+        previous === null || previous.status !== '진행중' ? previous : { ...finished, remainingSeconds: previous.remainingSeconds },
+      )
       return
     }
     const next = current.ticks.next()
@@ -2241,7 +2193,9 @@ export function useMissionSession({
     }
     dropAutoRelay()
     const finished = next.value
-    setMissionRun((previous) => (previous === null || previous.status !== '진행중' ? previous : { ...finished, remainingSeconds: previous.remainingSeconds }))
+    setMissionRun((previous) =>
+      previous === null || previous.status !== '진행중' ? previous : { ...finished, remainingSeconds: previous.remainingSeconds },
+    )
   }
 
   /** 새 경기 — 필살·마구 남은 칸은 0xaebe4 가 다시 채운다 (팀 new 0xb891c 가 −1), 공 객체도 새것 */
@@ -2397,7 +2351,7 @@ export function useMissionSession({
         return
       }
       // 0xaa57c aa7b0 — 미션 타자(0x1fc20: 명예 타자 또는 나리 타자편 저장 선수)가 드는 레코드 칸 k = +0xa & 0x1f
-      const nariRecordSlot = hallOfFameBatter !== null ? hallOfFameBatter.recordSlot ?? HALL_OF_FAME_BATTER_RECORD_SLOT : nariBatterRecordSlot
+      const nariRecordSlot = hallOfFameBatter !== null ? (hallOfFameBatter.recordSlot ?? HALL_OF_FAME_BATTER_RECORD_SLOT) : nariBatterRecordSlot
       const started = startMission(mission, { ...heldSetup, ...(nariRecordSlot === undefined ? {} : { nariRecordSlot }) })
       setMissionRun(started)
       openFirstHalfBoard(started)
@@ -2596,10 +2550,7 @@ export function useMissionSession({
       if (context === null) return
       const play = finishPitchArrivalPlay(pending.opened, played as RunnerPlayEngineResult, true)
       // 판정 콜(도루 17 · 62/20, 폭투 17)은 판 안의 그 틱에 났다(화면이 결과를 못 넘긴 판만 여기서) · 타석이 끝났으면 그 콜
-      playSoundIds(audio, [
-        callShown ? null : play.callSoundId,
-        context.outcome === null ? null : inPlayCallSoundIdOf(context.outcome),
-      ])
+      playSoundIds(audio, [callShown ? null : play.callSoundId, context.outcome === null ? null : inPlayCallSoundIdOf(context.outcome)])
       if (continueMissionArrival(play, context)) return
       if (context.outcome === null) return
       finishMissionArrivalAtBat(play, { ...context, outcome: context.outcome })
@@ -2639,9 +2590,7 @@ export function useMissionSession({
       // 공이 날거나 0x12 진입 전(0x12 진입 틀 시계)도 0xf 가 아니다
       if (cancelPitcherResultEntryRef.current !== null) return
       const { bases } = pitcherRun
-      const play = pickoffPlayForKey(webKey, (base) =>
-        base === 1 ? bases.first : base === 2 ? bases.second : bases.third,
-      )
+      const play = pickoffPlayForKey(webKey, (base) => (base === 1 ? bases.first : base === 2 ? bases.second : bases.third))
       if (play === null) return
       const input: PickoffPlayInput = {
         targetBase: play.targetBase,
@@ -2778,15 +2727,14 @@ export function useMissionSession({
    * 돌려준다(그 뒤 횟수가 올라 다시 재면 다음 보상이 나온다).
    */
   const resultEarnedGamePointOf = (mission: OriginalMission, status: string, isAceMatch: boolean): number =>
-    settledEarned ?? missionResultEarnedOf(
-      status === '성공',
-      isAceMatch,
-      missionRewardOf(mission.stage, clearCounts[missionKeyOf(mission)] ?? 0),
-    )
+    settledEarned ?? missionResultEarnedOf(status === '성공', isAceMatch, missionRewardOf(mission.stage, clearCounts[missionKeyOf(mission)] ?? 0))
 
   /** 타자 미션에서 지금 출발시킬 수 있는 루 — `canStartSteal`(0xa9924 앞길 검사). 이번 공에 이미 출발한 주자는 빠진다 */
   const stealableBases: readonly StealBase[] =
-    missionRun === null || missionRun.status !== '진행중' || pendingDefensePlay !== null || pendingRunnerPlay !== null ||
+    missionRun === null ||
+    missionRun.status !== '진행중' ||
+    pendingDefensePlay !== null ||
+    pendingRunnerPlay !== null ||
     pendingBenchClearing !== null
       ? []
       : ([1, 2, 3] as const).filter((base) => startHumanSteal(missionRun.bases, stealingFrom, base) !== stealingFrom)
@@ -2806,15 +2754,30 @@ export function useMissionSession({
           bases: announcingRun.bases,
         })
   if (sceneConfirm !== null && atBatEntrySoundId !== null) atBatEntrySoundOf.set(sceneConfirm, atBatEntrySoundId)
-  const announcedSceneConfirm =
-    sceneConfirm !== null && freshAtBatWaits.has(sceneConfirm) ? announcedWaitOf(sceneConfirm) : sceneConfirm
+  const announcedSceneConfirm = sceneConfirm !== null && freshAtBatWaits.has(sceneConfirm) ? announcedWaitOf(sceneConfirm) : sceneConfirm
 
   return {
-    missionRun, pitcherRun, pitcherAceMatchMission, clearedKeys, clearCounts, lastSide, aceLevels, pitcher,
+    missionRun,
+    pitcherRun,
+    pitcherAceMatchMission,
+    clearedKeys,
+    clearCounts,
+    lastSide,
+    aceLevels,
+    pitcher,
     /** 지금 대기 칸 (g[0x11f] · g[0x176] · g[0xf6]) — 결과 판이 대결 꼴인지 본다 */
     aceMatchHold: hold,
-    player, hallOfFameBatter,
-    missionConditionCode, pendingDefensePlay, pendingBenchClearing, pickoffReplay, pendingRunnerPlay, handleMissionPitch, preRollContact, handleThrow, actions,
+    player,
+    hallOfFameBatter,
+    missionConditionCode,
+    pendingDefensePlay,
+    pendingBenchClearing,
+    pickoffReplay,
+    pendingRunnerPlay,
+    handleMissionPitch,
+    preRollContact,
+    handleThrow,
+    actions,
     lastPitchJudgementCleared,
     /** 투수 미션의 마지막 공 — 타석 장면이 그림으로만 다시 날린다 */
     lastPitcherThrow,
@@ -2822,7 +2785,10 @@ export function useMissionSession({
     aimTick,
     /** 조준(0x10)의 CLR — 0xf 로 돌아가 0xf 진입 0x3d954 가 CPU 대타를 다시 묻는다 */
     returnToPitchSelection: () => askPitchSelection('same'),
-    batterSpecialSwingStored, pitcherMagicRemaining, stealableBases, resultEarnedGamePointOf,
+    batterSpecialSwingStored,
+    pitcherMagicRemaining,
+    stealableBases,
+    resultEarnedGamePointOf,
     /** 타자 미션: 이번 공에 출발한 주자의 루 (st[0x14 + 루]) — 타석 화면이 그 주자를 루에 안 그린다 */
     stealingFrom,
     /**
@@ -2834,8 +2800,7 @@ export function useMissionSession({
      * 타자 미션 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74 `0xb570d(ctx, 3, 주자, 1, 90, 1)`).
      * 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로다 (`missionRunnerRunAbilitiesOf`)
      */
-    missionRunnerRunAbilities:
-      missionRun === null ? {} : missionRunnerRunAbilitiesOf(missionRun, specialRunnersRef.current(missionRun.mission)),
+    missionRunnerRunAbilities: missionRun === null ? {} : missionRunnerRunAbilitiesOf(missionRun, specialRunnersRef.current(missionRun.mission)),
     /**
      * 타자 미션 타석 화면의 타자 · 루 주자 마선수 번호 — 루상 주자 0x35b94 가 주자 +0x9c ≠ −1 이면 타석 교대 0x483a0 이 +0x1c 에 실은
      * ace/defender 그림으로 그린다. 수비 판(`playAbilitiesOf` 의 `runnerAces`)과 같은 값이다 (`missionRunnerAcesOf`)
@@ -2867,9 +2832,7 @@ export function useMissionSession({
      * 마운드가 비면(CPU 팀 없음) 10000 이다
      */
     opponentStaminaPercentAfterPitch: (run: MissionRun, pitchTypeNumber: number) =>
-      staminaPercentOf(
-        missionCpuAfterThrow(run, pitchTypeNumber, batterSkillIds, aceLevels).pitching?.mound.stamina ?? FULL_STAMINA,
-      ),
+      staminaPercentOf(missionCpuAfterThrow(run, pitchTypeNumber, batterSkillIds, aceLevels).pitching?.mound.stamina ?? FULL_STAMINA),
     /** 자동진행 0x21 의 마지막 중계 칸 — 중계 화면이 그린다 (`stepAutoRelay`) */
     autoRelayStep,
     /** 자동진행 0x21 의 틱 하나를 굴린다 — 중계 화면이 틱마다 부른다 */
@@ -3044,10 +3007,7 @@ export function missionCpuMagicStateOf(
 }
 
 /** 투수 미션 지금 CPU 타자의 0xab214 스킬 번호 — 마타자 칸이면 미션 마선수 행(`aceSkillIdsOf`), 아니면 마스터 줄 +0x14 */
-function missionCpuBatterSkillIdsOf(
-  run: MissionRun,
-  cpuBatter: ReturnType<typeof missionCpuBatterOf>,
-): readonly number[] {
+function missionCpuBatterSkillIdsOf(run: MissionRun, cpuBatter: ReturnType<typeof missionCpuBatterOf>): readonly number[] {
   if (cpuBatter === null) return []
   if (cpuBatter.isAce) {
     const ace = missionOpponent(run.mission)
@@ -3092,10 +3052,7 @@ function missionCpuBatterRecordSlotOf(run: MissionRun, cpuBatter: ReturnType<typ
  * 투수 미션 CPU 타자 스윙 0xab214 의 스킬 갈래가 보는 상황 — 이닝(`st[0x6b]` + 1) · 공격(CPU) 팀이 지는가(ab966: 수비 점수 >
  * 공격 점수) · 주자 · 2루 · 이 타순 칸의 오늘 타석 결과 링
  */
-function missionCpuSwingSituationOf(
-  run: MissionRun,
-  cpuBatter: ReturnType<typeof missionCpuBatterOf>,
-): CpuSwingSkillSituation {
+function missionCpuSwingSituationOf(run: MissionRun, cpuBatter: ReturnType<typeof missionCpuBatterOf>): CpuSwingSkillSituation {
   const offense = run.game.offenseSide
   const batting = run.cpu.batting
   return {
@@ -3106,7 +3063,7 @@ function missionCpuSwingSituationOf(
     isLosing: run.game.scores[offense === 0 ? 1 : 0] > run.game.scores[offense],
     runnerCount: runnerCountOf(run.bases),
     hasSecondBaseRunner: run.bases.second,
-    recentAtBatCodes: batting === null ? [] : batting.lineup.records[lineupSlotOf(batting.order)]?.results ?? [],
+    recentAtBatCodes: batting === null ? [] : (batting.lineup.records[lineupSlotOf(batting.order)]?.results ?? []),
   }
 }
 
@@ -3152,11 +3109,15 @@ function withPitcherMissionRunnerResult(run: PitcherRun, result: DefensePlayResu
       progress: withOutCalls(run.progress, outCallsOf(run, advance.outsAdded)),
       bases: isInningOver ? EMPTY_BASES : advance.bases,
       // 판의 살아남은 주자로 CPU 타선 신원을 민다 (주자만 움직인 판 — 타순은 그대로)
-      runners: missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
-        batterReached: false,
-        runsScored: advance.runsScored,
-        survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates),
-      }),
+      runners: missionRunnersAfterPlay(
+        run,
+        { bases: advance.bases, inningOver: isInningOver },
+        {
+          batterReached: false,
+          runsScored: advance.runsScored,
+          survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates),
+        },
+      ),
       outs: isInningOver ? 0 : outs,
       totalOuts: run.totalOuts + advance.outsAdded,
       allowed: {
@@ -3221,11 +3182,15 @@ export function withPitcherNotOut(run: PitcherRun, outcome: AtBatOutcome, play: 
     progress: withOutCalls(struck.progress, outCallsOf(run, advance.outsAdded) - struckOuts),
     bases: isInningOver ? EMPTY_BASES : advance.bases,
     // 낫아웃 판의 살아남은 주자(타자주자 0 포함)로 신원을 민다 — 지금 타자 칸은 판 앞 타순
-    runners: missionRunnersAfterPlay(run, { bases: advance.bases, inningOver: isInningOver }, {
-      batterReached: false,
-      runsScored: advance.runsScored,
-      survivorsFromBase: survivorsFromBaseOfFates(play.result.runnerFates),
-    }),
+    runners: missionRunnersAfterPlay(
+      run,
+      { bases: advance.bases, inningOver: isInningOver },
+      {
+        batterReached: false,
+        runsScored: advance.runsScored,
+        survivorsFromBase: survivorsFromBaseOfFates(play.result.runnerFates),
+      },
+    ),
     outs: isInningOver ? 0 : outs,
     totalOuts: run.totalOuts + advance.outsAdded,
     allowed: { ...struck.allowed, runs: run.allowed.runs + charged },
@@ -3242,17 +3207,13 @@ export function withPitcherNotOut(run: PitcherRun, outcome: AtBatOutcome, play: 
 function judgedAfterRunnerPlay(run: PitcherRun, outs: number): PitcherRun {
   const limit = run.mission.failLimits.runs
   if (limit > 0 && run.allowed.runs >= limit) {
-    const broken = run.progress.brokenConditions.includes('무실점')
-      ? run.progress.brokenConditions
-      : [...run.progress.brokenConditions, '무실점']
+    const broken = run.progress.brokenConditions.includes('무실점') ? run.progress.brokenConditions : [...run.progress.brokenConditions, '무실점']
     return { ...run, progress: { ...run.progress, brokenConditions: broken }, status: '실패' }
   }
   // 출루 허용 한도(+0xa3 ↔ R+0x130) — 정산하는 주자 판이 R+0x130 을 덮어쓴 값으로 같은 실패 한도 비교(0xaa940)를 지난다
   const baserunnerLimit = run.mission.failLimits.baserunners
   if (baserunnerLimit > 0 && run.allowed.baserunner >= baserunnerLimit) {
-    const broken = run.progress.brokenConditions.includes('무출루')
-      ? run.progress.brokenConditions
-      : [...run.progress.brokenConditions, '무출루']
+    const broken = run.progress.brokenConditions.includes('무출루') ? run.progress.brokenConditions : [...run.progress.brokenConditions, '무출루']
     return { ...run, progress: { ...run.progress, brokenConditions: broken }, status: '실패' }
   }
   // 나머지는 판 끝 판정 그대로 — 경기 끝(0xb68fc) · 노히트노런 · 퍼펙트게임 · 목표 칸 · 남은 기회 (`judgePitcherRun`)

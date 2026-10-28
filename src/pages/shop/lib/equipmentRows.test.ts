@@ -2,12 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { batterEquipmentRowsOf, pitcherEquipmentRowsOf } from '@/pages/shop/lib/equipmentRows'
-import {
-  EQUIPMENT_VISIBLE_ROWS, LOCKED_NAME,
-} from '@/pages/shop/lib/equipmentWindowLayout'
-import {
-  INITIAL_EQUIPMENT_WINDOW, equipmentKeyOf, equipmentWindowKeyOf, previewLevelOf,
-} from '@/pages/shop/lib/equipmentWindowState'
+import { EQUIPMENT_VISIBLE_ROWS, LOCKED_NAME } from '@/pages/shop/lib/equipmentWindowLayout'
+import { INITIAL_EQUIPMENT_WINDOW, equipmentKeyOf, equipmentWindowKeyOf, previewLevelOf } from '@/pages/shop/lib/equipmentWindowState'
 
 describe('장비 줄 (0x8146c · 0x83378)', () => {
   it('상점은 열한 레벨 전부 — 잠긴 히든은 "????", 보너스는 표 0xd41ae', () => {

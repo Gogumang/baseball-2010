@@ -114,9 +114,7 @@ export function normalizeAceLevelSave(raw: unknown): AceLevelSave {
   const saved = (raw as Partial<AceLevelSave> | null | undefined)?.levels
   const levels = Array.from({ length: ACE_LEVEL_SLOT_COUNT }, (_unused, slot) => {
     const value: unknown = Array.isArray(saved) ? saved[slot] : undefined
-    return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= ACE_MAX_LEVEL
-      ? value
-      : INITIAL_ACE_LEVEL
+    return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= ACE_MAX_LEVEL ? value : INITIAL_ACE_LEVEL
   })
   return { levels }
 }
@@ -170,11 +168,7 @@ const ACE_PITCHER_ROW_LABELS = ['제구', '구속', '변화', '체력', '마구'
  * (0xca7b5 = 0 쪽 버림). 줄 4 는 횟수 표 `[lv]`·`[lv+1]` 이다.
  * `level` 은 최고 레벨 검사를 지난 0~3 이어야 한다 (원본도 Lv5 창은 열지 않는다).
  */
-export function aceLevelUpRowsOf(
-  role: '타자' | '투수',
-  ability: BatterAbility,
-  level: number,
-): readonly AceLevelUpRow[] {
+export function aceLevelUpRowsOf(role: '타자' | '투수', ability: BatterAbility, level: number): readonly AceLevelUpRow[] {
   const labels = role === '타자' ? ACE_BATTER_ROW_LABELS : ACE_PITCHER_ROW_LABELS
   const counts = role === '타자' ? ACE_BURST_COUNT_BY_LEVEL : ACE_MAGIC_COUNT_BY_LEVEL
   const values = [ability.hit, ability.power, ability.defense, ability.run]
@@ -195,9 +189,7 @@ export function aceLevelUpRowsOf(
  *     +0x314 = 1 (0x5fbe8 → 0x5fcb0). **레벨도 G도 그대로**이고 레벨업 창도 안 닫힌다.
  *   - `레벨업` — 가격과 G가 같아도 오른다. 실제 쓰기는 `levelUpAceSave` + G 빼기.
  */
-export type AceLevelUpOutcome =
-  | { readonly kind: '레벨업'; readonly cost: number }
-  | { readonly kind: 'G부족'; readonly cost: number }
+export type AceLevelUpOutcome = { readonly kind: '레벨업'; readonly cost: number } | { readonly kind: 'G부족'; readonly cost: number }
 
 export function aceLevelUpOutcomeOf(level: number, gamePoint: number): AceLevelUpOutcome {
   const cost = aceLevelUpCostOf(level)
@@ -242,10 +234,7 @@ export function aceSkillIdsOf(ace: Pick<AcePlayer, 'role' | 'skillBits'>): reado
  * 걸리는 것은 **발렌타인(+0x14 = 0x410000)의 냉정 22: 제구 += 제구 / 10**(b64e6, 자르지 않는다) 하나뿐이다.
  * (킹타이거도 비트 22 가 있으나 타자라 0xb6278 이 거짓이다.)
  */
-export function aceRecordAbilityAtLevel(
-  ace: Pick<AcePlayer, 'role' | 'ability' | 'skillBits'>,
-  level: number,
-): BatterAbility {
+export function aceRecordAbilityAtLevel(ace: Pick<AcePlayer, 'role' | 'ability' | 'skillBits'>, level: number): BatterAbility {
   const scaled = aceAbilityAtLevel(ace.ability, level)
   const [hit, power, defense, run] = recordAbilityOf(
     { ability: [scaled.hit, scaled.power, scaled.defense, scaled.run], skillBits: ace.skillBits, equipment: [] },

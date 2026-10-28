@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  screenEffectCommandOf,
-  screenEffectFrameAt,
-  screenEffectsIn,
-  SHAKE_OFFSETS,
-} from '@/entities/story/model/screenEffect'
+import { screenEffectCommandOf, screenEffectFrameAt, screenEffectsIn, SHAKE_OFFSETS } from '@/entities/story/model/screenEffect'
 
 describe('명령 5 화면효과 id (0x8ceac · 점프표 0xd4ea4)', () => {
   it('1 진동만 · 2 진동 + 흔들기 · 3 흔들기 · 4 어두워짐 · 5 흰 덮개 · 6 검정에서 밝아짐 · 7 흰색에서 밝아짐', () => {

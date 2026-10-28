@@ -12,8 +12,14 @@ afterEach(cleanup)
 
 const 목록: EntryLists<EntryBatterRow & EntryFace, EntryPitcherRow & EntryFace> = {
   batters: [
-    { name: '김타자', isAce: false, position: 2, ability: [500, 400, 300, 200], profileLow: 1,
-      batterLine: { atBats: 100, hits: 31, doubles: 0, triples: 0, homeRuns: 7, runsBattedIn: 20, steals: 0, errors: 0 } },
+    {
+      name: '김타자',
+      isAce: false,
+      position: 2,
+      ability: [500, 400, 300, 200],
+      profileLow: 1,
+      batterLine: { atBats: 100, hits: 31, doubles: 0, triples: 0, homeRuns: 7, runsBattedIn: 20, steals: 0, errors: 0 },
+    },
   ],
   pitchers: [
     { name: '박투수', isAce: false, ability: [600, 500, 400, 300], profileLow: 0 },
@@ -86,7 +92,7 @@ describe('엔트리 편집 화면', () => {
     expect(marks()).toEqual([2, 1])
   })
 
-  it('"#" 표시지만 탭은 \'*\' 로 바꾼다 — \'#\' 는 넘기지 않는다 (0x558c4 cmp 0x2a)', () => {
+  it("\"#\" 표시지만 탭은 '*' 로 바꾼다 — '#' 는 넘기지 않는다 (0x558c4 cmp 0x2a)", () => {
     const onKey = 띄우기()
     fireEvent.keyDown(window, { key: '#' })
     expect(onKey).not.toHaveBeenCalled()
@@ -95,13 +101,21 @@ describe('엔트리 편집 화면', () => {
   it("'0' 상세 창은 원본 선수 정보 창 0x5b798 — 엔트리 '0' 0x55920 자리 (212, 64) 에서 열리고 레코드 칸을 글로 적는다", () => {
     const lists = {
       ...목록,
-      pitchers: [{
-        ...목록.pitchers[0]!,
-        detailSource: {
-          isPitcher: true, abilities: [600, 500, 400, 300], aceIndex: -1, profile: 0, skillBits: 0, grade: 5,
-          repertoire: { form: 2, magicNumber: 0, pitchMask: 1 },
+      pitchers: [
+        {
+          ...목록.pitchers[0]!,
+          detailSource: {
+            isPitcher: true,
+            abilities: [600, 500, 400, 300],
+            aceIndex: -1,
+            profile: 0,
+            skillBits: 0,
+            grade: 5,
+            repertoire: { form: 2, magicNumber: 0, pitchMask: 1 },
+          },
         },
-      }, 목록.pitchers[1]!],
+        목록.pitchers[1]!,
+      ],
     }
     띄우기({ lists })
     expect(screen.queryByTestId('선수 정보 창')).toBeNull()

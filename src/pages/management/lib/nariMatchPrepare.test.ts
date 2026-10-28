@@ -3,7 +3,13 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import {
   cupMatchInfoOf,
-  NO_NARI_ACE, batterMatchInfoOf, nariGameMatchOfSave, nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage, rollNariMatchStadium,
+  NO_NARI_ACE,
+  batterMatchInfoOf,
+  nariGameMatchOfSave,
+  nariMatchCancelTargetOf,
+  rollNariMatchAces,
+  rollNariMatchInfoStage,
+  rollNariMatchStadium,
 } from '@/pages/management/lib/nariMatchPrepare'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createNationalCup } from '@/entities/national-cup/model/nationalCup'
@@ -33,14 +39,24 @@ describe('142 진입 0x1c46c 의 마선수 굴림 넷 (1c60c · 1c61a · 1c640 �
     // 상대 마투수 bfa55(0,5) → 0 (내 4 와 다르다) · 상대 마타자 → 1
     expect(aces.opponentPitcher).toBe(0)
     expect(aces.opponentBatter).toBe(1)
-    expect(calls).toEqual([[0, 2], [0, 3], [0, 5], [0, 5]])
+    expect(calls).toEqual([
+      [0, 2],
+      [0, 3],
+      [0, 5],
+      [0, 5],
+    ])
   })
 
   it('열린 마선수가 없어도 bfa55(0, 0) 을 불러 난수를 쓰고 −1 이다 — 상대는 ldrb 라 −1 과 안 겹친다', () => {
     const { random, calls } = 차례난수([0.7, 0.7, 0.0, 0.99])
     const aces = rollNariMatchAces(random, { pitcherIds: [], batterIds: [] })
     expect(aces).toEqual({ myBatter: NO_NARI_ACE, myPitcher: NO_NARI_ACE, opponentPitcher: 0, opponentBatter: 4 })
-    expect(calls).toEqual([[0, 0], [0, 0], [0, 5], [0, 5]])
+    expect(calls).toEqual([
+      [0, 0],
+      [0, 0],
+      [0, 5],
+      [0, 5],
+    ])
   })
 
   it('상대 마선수가 내 번호와 겹치면 하나 내린다(0 이면 4) — 0x6697c~0x66988', () => {
@@ -93,18 +109,34 @@ describe('142 구장 0x78664 — 홈 팀 > 9 일 때만 rand(0, 10)', () => {
 describe('142 경기정보 바탕 무대 — 0x78664 · 0x78688 · 0x783b0', () => {
   it('정규 — 홈(측 1) 팀이 구장 · 줄은 표 0xd377c · 하늘 줄은 나리 저장 +0xb2 mod 6 · 굴림 없음', () => {
     let calls = 0
-    const random: RandomPort = { rand: (min) => { calls += 1; return min }, rand9d: () => 0 }
+    const random: RandomPort = {
+      rand: (min) => {
+        calls += 1
+        return min
+      },
+      rand9d: () => 0,
+    }
     const stage = rollNariMatchInfoStage(random, { mode: 4, myTeamId: 3, opponentTeamId: 7, mySide: 1, dayCounter: 8 })
     expect(stage).toEqual({ stadium: 3, fieldPalette: 2, skyRow: 2, side0TeamId: 7, side1TeamId: 3, gameMode: 4 })
     expect(calls).toBe(0)
     // 원정이면 상대 홈 — 표[7] = 0
-    expect(rollNariMatchInfoStage(random, { mode: 3, myTeamId: 3, opponentTeamId: 7, mySide: 0, dayCounter: 0 }))
-      .toMatchObject({ stadium: 7, fieldPalette: 0, side0TeamId: 3, side1TeamId: 7 })
+    expect(rollNariMatchInfoStage(random, { mode: 3, myTeamId: 3, opponentTeamId: 7, mySide: 0, dayCounter: 0 })).toMatchObject({
+      stadium: 7,
+      fieldPalette: 0,
+      side0TeamId: 3,
+      side1TeamId: 7,
+    })
   })
 
   it('대회 — 대표팀 홈이라 rand(0, 10) 한 번, 그 구장으로 줄을 읽는다', () => {
     const calls: [number, number][] = []
-    const random: RandomPort = { rand: (min, max) => { calls.push([min, max]); return 6 }, rand9d: () => 0 }
+    const random: RandomPort = {
+      rand: (min, max) => {
+        calls.push([min, max])
+        return 6
+      },
+      rand9d: () => 0,
+    }
     const stage = rollNariMatchInfoStage(random, { mode: 4, myTeamId: 10, opponentTeamId: 11, mySide: 1, dayCounter: 0 })
     expect(calls).toEqual([[0, 10]])
     expect(stage).toMatchObject({ stadium: 6, fieldPalette: null, side1TeamId: 10 })
@@ -121,8 +153,10 @@ describe('nariGameMatchOfSave — 142 확인이 모드 저장 칸에 남긴 명�
   it('꼴이 안 맞으면 마선수 없이 — 칸 자체가 없으면 null', () => {
     expect(nariGameMatchOfSave(null)).toBeNull()
     expect(nariGameMatchOfSave('x')).toBeNull()
-    expect(nariGameMatchOfSave({ aces: { myBatter: 9, myPitcher: 0, opponentPitcher: 0, opponentBatter: 0 } }))
-      .toEqual({ aces: null, isNationalCup: false })
+    expect(nariGameMatchOfSave({ aces: { myBatter: 9, myPitcher: 0, opponentPitcher: 0, opponentBatter: 0 } })).toEqual({
+      aces: null,
+      isNationalCup: false,
+    })
   })
 })
 

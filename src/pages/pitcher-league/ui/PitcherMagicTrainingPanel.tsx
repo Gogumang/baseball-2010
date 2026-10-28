@@ -20,12 +20,19 @@ interface PitcherMagicTrainingPanelProps {
 export function PitcherMagicTrainingPanel({ career, cursor, onMoveCursor, onConfirm }: PitcherMagicTrainingPanelProps) {
   return (
     <div data-testid="마구훈련-창">
-      <SpecialTrainingFigure side="투수" state="훈련" cursor={cursor} learnedCount={career.magicLevel}
-        sessions={career.magicSessions} inUseNumber={career.selectedMagicNumber} typeIndex={career.typeIndex}
+      <SpecialTrainingFigure
+        side="투수"
+        state="훈련"
+        cursor={cursor}
+        learnedCount={career.magicLevel}
+        sessions={career.magicSessions}
+        inUseNumber={career.selectedMagicNumber}
+        typeIndex={career.typeIndex}
         onPressSlot={(slot) => {
           onMoveCursor(slot)
           onConfirm(slot)
-        }} />
+        }}
+      />
     </div>
   )
 }

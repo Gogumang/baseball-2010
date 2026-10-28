@@ -6,9 +6,7 @@ import { rollTeamSetup, startTeamGame } from '@/features/play-team-game/model/te
 import { teamPitchers } from '@/entities/team/model/teamRoster'
 import { swapWithStarter } from '@/entities/pitcher-career/model/pitcherRotation'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import {
-  QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart,
-} from '@/pages/general-mode/lib/quickStart'
+import { QUICK_RESPIN_TICKS, finishQuickRespin, rollQuickRespinTeams, rollQuickStart } from '@/pages/general-mode/lib/quickStart'
 import { useGeneralMode } from '@/pages/general-mode/model/useGeneralMode'
 import { liveGameInningIndex, setLiveGameInningIndex } from '@/shared/lib/liveGameState/liveGameState'
 import { readSetupRecord, resetSetupRecord } from '@/pages/general-mode/model/setupRecord'
@@ -83,7 +81,10 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
     act(() => result.current.actions.openEntry(false))
     const { flow, gameOptions, entryEdit } = result.current
     const k = gameOptions.startingPitcherSlots?.opponent ?? 0
-    const 표 = swapWithStarter(teamPitchers(flow.setup.aiTeamId).map((pitcher) => pitcher.name), k)
+    const 표 = swapWithStarter(
+      teamPitchers(flow.setup.aiTeamId).map((pitcher) => pitcher.name),
+      k,
+    )
     expect(entryEdit?.lists.pitchers.slice(0, 8).map((row) => row.name)).toEqual(표)
     expect(entryEdit?.lists.pitchers[8]?.isAce).toBe(true)
     expect(entryEdit?.lists.batters[9]?.isAce).toBe(true)
@@ -115,7 +116,9 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
 
       for (let 틱 = 1; 틱 < QUICK_RESPIN_TICKS; 틱 += 1) {
         const 팀 = rollQuickRespinTeams(따로, 열림)
-        act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+        act(() => {
+          vi.advanceTimersByTime(millisecondsPerFrame())
+        })
         // 기록 +0 · +4 만 바뀐다 — 선공·구장·마선수와 0x30f20 이 세운 선발 줄은 그대로
         expect(result.current.flow.setup).toEqual({ ...처음, ...팀 })
         expect(result.current.userStarterName).toBe(처음선발)
@@ -123,7 +126,9 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
       }
       const setup = finishQuickRespin(따로, result.current.flow.setup, 열림)
       const 굴림 = rollTeamSetup(setup.acePitcherId, setup.aceBatterId, 따로)
-      act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
 
       expect(result.current.isRespinning).toBe(false)
       expect(result.current.flow.setup).toEqual(setup)
@@ -141,7 +146,9 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
     try {
       const { result } = 빠른실행()
       act(() => result.current.actions.respin())
-      act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame())
+      })
       act(() => {
         result.current.actions.start()
         result.current.actions.openSettings()
@@ -151,9 +158,14 @@ describe('일반모드 0x30f20 굴림 넷은 상태 22 진입에서 돈다', () 
       expect(result.current.isSettingsOpen).toBe(false)
       expect(result.current.entryEdit).toBeNull()
       let 처리됨 = false
-      act(() => { 처리됨 = result.current.actions.back() })
+      act(() => {
+        처리됨 = result.current.actions.back()
+      })
       expect(처리됨).toBe(true)
-      for (let 틱 = 2; 틱 <= QUICK_RESPIN_TICKS; 틱 += 1) act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+      for (let 틱 = 2; 틱 <= QUICK_RESPIN_TICKS; 틱 += 1)
+        act(() => {
+          vi.advanceTimersByTime(millisecondsPerFrame())
+        })
       expect(result.current.isRespinning).toBe(false)
     } finally {
       vi.useRealTimers()
@@ -218,7 +230,12 @@ describe('경기정보 OK 없이도 모드 1 블록이 새 경기로 바뀐다 �
 describe('경기진행 설정 — 전역 m = 0 칸 · +0x11e (G2 · G4)', () => {
   const 칸 = (처음값: boolean) => {
     let seen = 처음값
-    return { read: () => seen, markSeen: vi.fn(() => { seen = true }) }
+    return {
+      read: () => seen,
+      markSeen: vi.fn(() => {
+        seen = true
+      }),
+    }
   }
 
   it('+0x11e 가 0 이면 22 에 들어오며 설정 창을 저절로 열고 1 을 쓴다 (0x3163c~0x31688)', () => {
@@ -348,7 +365,12 @@ describe('22 진입 0x314b0 의 무대 구장 0x78664(무대, st+0x30) — 구�
     const side0 = setup.playerSide === 0 ? setup.userTeamId : setup.aiTeamId
     const side1 = setup.playerSide === 0 ? setup.aiTeamId : setup.userTeamId
     expect(result.current.matchInfoStage).toEqual({
-      stadium: 3, fieldPalette: 2, skyRow: side0 % 6, side0TeamId: side0, side1TeamId: side1, gameMode: 1,
+      stadium: 3,
+      fieldPalette: 2,
+      skyRow: side0 % 6,
+      side0TeamId: side0,
+      side1TeamId: side1,
+      gameMode: 1,
     })
   })
 

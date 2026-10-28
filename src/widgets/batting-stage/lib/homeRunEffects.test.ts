@@ -3,16 +3,28 @@ import { createParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FIREWORK_PARTICLES } from '@/entities/batting/model/homeRunFireworks'
-import {
-  derbyHomeRunTextOn,
-  HOME_RUN_TEXT_SCENE_START,
-  type HomeRunTextWindow,
-} from '@/widgets/batting-stage/lib/homeRunBanner'
+import { derbyHomeRunTextOn, HOME_RUN_TEXT_SCENE_START, type HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import { NO_STAGE_EFFECTS, stepStageFrame, type StageEffects } from '@/widgets/batting-stage/lib/homeRunEffects'
 
 const 설정: ParticleConfig = {
-  ang: 0, spread: 0, spd: 0, spdR: 0, emit: 1, emitR: 0, life: 3, lifeR: 0,
-  a0: 0, a0R: 0, a1: 0, a1R: 0, ax: 0, ay: 0, w: 0, h: 0, total: 1, mode: 2,
+  ang: 0,
+  spread: 0,
+  spd: 0,
+  spdR: 0,
+  emit: 1,
+  emitR: 0,
+  life: 3,
+  lifeR: 0,
+  a0: 0,
+  a0R: 0,
+  a1: 0,
+  a1R: 0,
+  ax: 0,
+  ay: 0,
+  w: 0,
+  h: 0,
+  total: 1,
+  mode: 2,
 }
 
 function 세는난수(): RandomPort & { calls: number } {

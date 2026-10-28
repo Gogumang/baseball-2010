@@ -213,18 +213,10 @@ export function withCpuGameRecordAces(
  * 142 진입 0x1c46c 의 넣기 (1c62e~1c660) — `0xb88c8(내 팀, p)` · `0xb8870(내 팀, b)` · `0xb88c8(상대, …)` ·
  * `0xb8870(상대, …)`. 레코드에서 마선수를 빼는 코드가 없어 다음 장면의 142 가 같은 칸을 덮을 때까지 남는다.
  */
-export function seatNariMatchAces(
-  records: NariTeamRecords,
-  myTeamId: number,
-  opponentTeamId: number,
-  aces: NariRecordAces,
-): NariTeamRecords {
+export function seatNariMatchAces(records: NariTeamRecords, myTeamId: number, opponentTeamId: number, aces: NariRecordAces): NariTeamRecords {
   const mine = seatAceBatter(seatAcePitcher(nariTeamRecordOf(records, myTeamId), aces.myPitcher), aces.myBatter)
   const withMine = withNariTeamRecord(records, myTeamId, mine)
-  const theirs = seatAceBatter(
-    seatAcePitcher(nariTeamRecordOf(withMine, opponentTeamId), aces.opponentPitcher),
-    aces.opponentBatter,
-  )
+  const theirs = seatAceBatter(seatAcePitcher(nariTeamRecordOf(withMine, opponentTeamId), aces.opponentPitcher), aces.opponentBatter)
   return withNariTeamRecord(withMine, opponentTeamId, theirs)
 }
 
@@ -286,8 +278,7 @@ export function nariFieldersAfterPinchHits(
     positions[row] = fielders[order].position
     positions[order] = fielders[row].position
   }
-  return fielders.map((fielder, index) =>
-    positions[index] === fielder.position ? fielder : { ...fielder, position: positions[index] })
+  return fielders.map((fielder, index) => (positions[index] === fielder.position ? fielder : { ...fielder, position: positions[index] }))
 }
 
 /** 내 선수 줄의 첨자 — 없으면 −1 */
@@ -329,7 +320,7 @@ export function moveMyBatter(record: NariTeamRecord, newIndex: number): NariTeam
   }
   const i = found < 0 ? 0 : found
   // 못 찾으면 C 는 빈 레코드(0xb8de5) — 웹은 표 칸 a 로 둔다
-  const rowC = found < 0 ? { slot: a, position: 0 } : record.batters[i] ?? { slot: a, position: 0 }
+  const rowC = found < 0 ? { slot: a, position: 0 } : (record.batters[i] ?? { slot: a, position: 0 })
   const batters = [...record.batters]
   batters[b] = { ...rowA, position: positionB }
   batters[i] = { ...rowB, position: 0 }
@@ -382,7 +373,7 @@ export function applyBattingOrderRewards(
   const moved = values.reduce((record, value) => moveMyBatter(record, value - 1), nariTeamRecordOf(records, before.teamId))
   const index = myBatterIndexOf(moved)
   return {
-    battingOrder: index < 0 ? values[values.length - 1] ?? before.battingOrder : index + 1,
+    battingOrder: index < 0 ? (values[values.length - 1] ?? before.battingOrder) : index + 1,
     nariTeams: withNariTeamRecord(records, before.teamId, moved),
   }
 }
@@ -408,15 +399,9 @@ export function recordTeamAcesOf(record: NariTeamRecord): NariRecordTeamAces {
 }
 
 /** 레코드에 든 마선수 넷 — 142 경기정보 마투수·마타자 줄 · 곧장 경기가 읽는다. 아무도 없으면 null */
-export function recordMatchAcesOf(
-  records: NariTeamRecords,
-  myTeamId: number,
-  opponentTeamId: number,
-): NariRecordAces | null {
+export function recordMatchAcesOf(records: NariTeamRecords, myTeamId: number, opponentTeamId: number): NariRecordAces | null {
   const mine = recordTeamAcesOf(nariTeamRecordOf(records, myTeamId))
   const theirs = recordTeamAcesOf(nariTeamRecordOf(records, opponentTeamId))
   const none = [mine.batter, mine.pitcher, theirs.batter, theirs.pitcher].every((index) => index === NO_RECORD_ACE)
-  return none
-    ? null
-    : { myBatter: mine.batter, myPitcher: mine.pitcher, opponentPitcher: theirs.pitcher, opponentBatter: theirs.batter }
+  return none ? null : { myBatter: mine.batter, myPitcher: mine.pitcher, opponentPitcher: theirs.pitcher, opponentBatter: theirs.batter }
 }

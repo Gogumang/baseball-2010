@@ -40,8 +40,7 @@ export function inGameMenuOf(mode: number): readonly InGameMenuAction[] {
 }
 
 /** StrGAME[0] — 모드 1~4·8·9 의 나가기 확인 문구 */
-export const QUIT_CONFIRM_WITH_LOSS =
-  '!C!cFFFFFF현재 이닝의 기록과 획득한!N!cFF0000G포인트가 사라집니다!cFFFFFF!N메인메뉴로 나가시겠습니까?'
+export const QUIT_CONFIRM_WITH_LOSS = '!C!cFFFFFF현재 이닝의 기록과 획득한!N!cFF0000G포인트가 사라집니다!cFFFFFF!N메인메뉴로 나가시겠습니까?'
 
 /** StrGAME[1] — 그 밖(미션 5·6 · 홈런더비 7)의 나가기 확인 문구 (`base/extracted/StrGAME.json` [1] 원문 그대로) */
 export const QUIT_CONFIRM_PLAIN = '!C!cFFFFFF진행 중인 게임을 그만하고!N메인메뉴로 나가시겠습니까?'

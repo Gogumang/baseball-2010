@@ -59,13 +59,10 @@ export function atBatRecordCodeOf(outcome: AtBatOutcome): number {
 const HOT_STREAK_MINIMUM = 3
 const COLD_STREAK_MINIMUM = 2
 
-const oldestTwo = (codes: readonly number[], minimumCount: number) =>
-  codes.length > minimumCount ? codes.slice(0, 2) : null
+const oldestTwo = (codes: readonly number[], minimumCount: number) => (codes.length > minimumCount ? codes.slice(0, 2) : null)
 
-const isHotStreak = (s: SwingSituation) =>
-  oldestTwo(s.recentAtBatCodes, HOT_STREAK_MINIMUM)?.every((code) => code > 0 && code < 5) ?? false
-const isColdStreak = (s: SwingSituation) =>
-  oldestTwo(s.recentAtBatCodes, COLD_STREAK_MINIMUM)?.every((code) => code > 4 && code < 8) ?? false
+const isHotStreak = (s: SwingSituation) => oldestTwo(s.recentAtBatCodes, HOT_STREAK_MINIMUM)?.every((code) => code > 0 && code < 5) ?? false
+const isColdStreak = (s: SwingSituation) => oldestTwo(s.recentAtBatCodes, COLD_STREAK_MINIMUM)?.every((code) => code > 4 && code < 8) ?? false
 
 export interface SwingWeights {
   /** B(잘 맞음) */

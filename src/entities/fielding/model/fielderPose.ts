@@ -128,9 +128,7 @@ export function withThrowMotion<F extends PoseFields>(fielder: F): F {
  * AI 0xb 도 목표를 위치로 덮는다 — 담장 앞 점은 +0x90(`FielderState.pickUpPoint`)에 따로 있어 다음 AI 고리 b4b5c 가 vt14 로 다시 적는다
  * (r214 — 예전 웹은 목표 칸에 +0x90 을 담아 두어 여기서 AI 0xb 를 건너뛰었다).
  */
-export function withPoseCleared<
-  F extends PoseFields & Pick<FielderState, 'actionLockTicks' | 'position' | 'target' | 'aiState'>,
->(fielder: F): F {
+export function withPoseCleared<F extends PoseFields & Pick<FielderState, 'actionLockTicks' | 'position' | 'target' | 'aiState'>>(fielder: F): F {
   return {
     ...fielder,
     target: fielder.position,
@@ -141,16 +139,12 @@ export function withPoseCleared<
 }
 
 /** vtC4 `0xa20ec` — 던질 준비: 워드 0 · 잠금 +0xb4 ≤ 0 · 준비 틱 +0xc8 ≤ 0 */
-export function isReadyToThrow(
-  fielder: Pick<FielderState, 'pose' | 'actionLockTicks' | 'actionRemainingTicks'>,
-): boolean {
+export function isReadyToThrow(fielder: Pick<FielderState, 'pose' | 'actionLockTicks' | 'actionRemainingTicks'>): boolean {
   return fielder.pose === 0 && fielder.actionLockTicks <= 0 && fielder.actionRemainingTicks <= 0
 }
 
 /** vtcc `0xa2138` — 워드 0 · 잠금 +0xb4 ≤ 0 · +0xcc ≤ 0 */
-export function isFreeToRetarget(
-  fielder: Pick<FielderState, 'pose' | 'actionLockTicks' | 'arrivalSlackTicks'>,
-): boolean {
+export function isFreeToRetarget(fielder: Pick<FielderState, 'pose' | 'actionLockTicks' | 'arrivalSlackTicks'>): boolean {
   return fielder.pose === 0 && fielder.actionLockTicks <= 0 && fielder.arrivalSlackTicks <= 0
 }
 
@@ -164,9 +158,7 @@ export function isFreeToStep(fielder: Pick<FielderState, 'pose' | 'arrivalSlackT
  * 프레임은 그 틱 머리(a128e)에서 하나 오른 값이다. `0xa0f7c`(+0xb0 바이트 == 0 || 프레임 ∈ {1, 2}) && vtc8 && +0xb4 ≤ 0.
  * vtc8 의 +0xcc 도 그 틱 a1330 에서 하나 줄인 값이다(a1346 이 뒤다 — AI 0xf 의 vt8c(5) 뒤 4 라 닫힌다, r190).
  */
-export function canStepNextListTick(
-  fielder: Pick<FielderState, 'pose' | 'actionFrame' | 'actionLockTicks' | 'arrivalSlackTicks'>,
-): boolean {
+export function canStepNextListTick(fielder: Pick<FielderState, 'pose' | 'actionFrame' | 'actionLockTicks' | 'arrivalSlackTicks'>): boolean {
   const slack = Math.max(0, fielder.arrivalSlackTicks - 1)
   return (
     isFreezeOpen(fielder.pose, fielder.actionFrame + 1) &&
@@ -229,9 +221,7 @@ export const RETURN_SLACK_TICKS = 5
 export function withReturnToStartTick(fielder: FielderState): FielderState {
   const home = FIELDER_START_POSITIONS[fielder.slot]
   const accepts =
-    home !== undefined &&
-    acceptsTargetVt14(fielder) &&
-    (fielder.target.x !== home.x || fielder.target.y !== home.y || fielder.target.z !== home.z)
+    home !== undefined && acceptsTargetVt14(fielder) && (fielder.target.x !== home.x || fielder.target.y !== home.y || fielder.target.z !== home.z)
   return { ...fielder, target: accepts ? home : fielder.target, arrivalSlackTicks: RETURN_SLACK_TICKS }
 }
 
@@ -266,9 +256,7 @@ export function listTickFielder(fielder: FielderState): FielderState {
     ...fielder,
     actionFrame: frame,
     actionRemainingTicks:
-      fielder.holdingBall && fielder.actionRemainingTicks > 0
-        ? Math.max(0, fielder.actionRemainingTicks - 1)
-        : fielder.actionRemainingTicks,
+      fielder.holdingBall && fielder.actionRemainingTicks > 0 ? Math.max(0, fielder.actionRemainingTicks - 1) : fielder.actionRemainingTicks,
     arrivalSlackTicks: Math.max(0, fielder.arrivalSlackTicks - 1),
   }
   if (shouldClearPose(next)) next = withPoseCleared(next)

@@ -3,8 +3,14 @@ import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCare
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { DEFAULT_PITCHER_ROOKIE_PROFILE } from '@/entities/pitcher-career/model/pitcherRegistration'
 import {
-  PITCH_TRAINING_START, cellLookOf, pitchTrainingKeyOutcomeOf, pitchTrainingWindowCostOf, pitchTrainingWindowProgressOf,
-  PITCH_TRAINING_CELL_BOXES, statusLabelOf, tabMarkTopLeftOf,
+  PITCH_TRAINING_START,
+  cellLookOf,
+  pitchTrainingKeyOutcomeOf,
+  pitchTrainingWindowCostOf,
+  pitchTrainingWindowProgressOf,
+  PITCH_TRAINING_CELL_BOXES,
+  statusLabelOf,
+  tabMarkTopLeftOf,
 } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 
@@ -75,8 +81,10 @@ describe('키 0x17828 · 0x80268', () => {
   })
 
   it('칸 초점 취소는 탭 줄로, 탭 줄 취소는 닫기', () => {
-    expect(pitchTrainingKeyOutcomeOf({ isCellFocus: true, tab: 0, cell: 2 }, 'clr'))
-      .toEqual({ kind: 'move', cursor: { isCellFocus: false, tab: 0, cell: 2 } })
+    expect(pitchTrainingKeyOutcomeOf({ isCellFocus: true, tab: 0, cell: 2 }, 'clr')).toEqual({
+      kind: 'move',
+      cursor: { isCellFocus: false, tab: 0, cell: 2 },
+    })
     expect(pitchTrainingKeyOutcomeOf(PITCH_TRAINING_START, 'clr')).toEqual({ kind: 'close' })
   })
 })
@@ -90,7 +98,7 @@ describe('구질훈련 창 — 칸 누름과 상자 단추가 겹친다', () => 
   const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
     a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
 
-  it('\'???\' 칸이 알림 확인 · 예 · 아니오 단추와 겹치므로 상자 겹은 누름 칸보다 위다', () => {
+  it("'???' 칸이 알림 확인 · 예 · 아니오 단추와 겹치므로 상자 겹은 누름 칸보다 위다", () => {
     const cell = PITCH_TRAINING_CELL_BOXES[4]
     expect(overlaps(cell, { x: 100, y: 177, width: 41, height: 15 })).toBe(true)
     expect(overlaps(cell, { x: 59, y: 177, width: 41, height: 15 })).toBe(true)

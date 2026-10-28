@@ -1,10 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import {
-  createEmitter,
-  createParticlePool,
-  releaseEmitter,
-  tickEmitter,
-} from '@/entities/particle/model/particleEmitter'
+import { createEmitter, createParticlePool, releaseEmitter, tickEmitter } from '@/entities/particle/model/particleEmitter'
 import type { EmitterState, ParticleConfig, ParticleEmitter, ParticlePool } from '@/entities/particle/model/particleEmitter'
 
 /**
@@ -58,13 +53,7 @@ const blockOfEmitter = new WeakMap<ParticleEmitter, number>()
  * 설정이 없으면(아직 안 불러왔거나 쓸 수 없는 번호) 아무것도 하지 않는다.
  * 만들었으면 이미터가 받은 **블록 번호**를, 못 만들었으면 null 을 돌려준다(0xbbc84 의 되돌림 — 홈런 효과 칸 +0x14 가 붙잡는다).
  */
-export function emitParticles(
-  scene: ParticleScene,
-  config: ParticleConfig | null,
-  x: number,
-  y: number,
-  img: number,
-): number | null {
+export function emitParticles(scene: ParticleScene, config: ParticleConfig | null, x: number, y: number, img: number): number | null {
   if (config === null) return null
   if (scene.emitters.length >= MAX_EMITTERS) return null
   const emitter = createEmitter(config, x, y, img, -1, scene.pool)

@@ -14,7 +14,9 @@ vi.mock('@/pages/team-game/ui/TeamGameScreen', () => ({
   TeamGameScreen: (props: { gamePoint?: number; onSpendGamePoint?: (cost: number) => void }) => (
     <div data-testid="팀경기" data-game-point={props.gamePoint ?? ''}>
       {props.onSpendGamePoint !== undefined && (
-        <button type="button" onClick={() => props.onSpendGamePoint?.(30)}>자동진행</button>
+        <button type="button" onClick={() => props.onSpendGamePoint?.(30)}>
+          자동진행
+        </button>
       )}
     </div>
   ),
@@ -57,9 +59,7 @@ describe('일반모드 → 팀 경기 화면의 보유 G', () => {
   it('자동진행 G 소비(0x3c83a~0x3c84e) — 받은 손잡이를 팀 경기 화면에 그대로 넘긴다, 없으면 넘기지 않아 칸이 잠긴다', () => {
     const resumeGame = { options: { mode: 1 } } as unknown as TeamGameProgress
     const onSpendGamePoint = vi.fn()
-    const { unmount } = render(
-      <GeneralModeScreen {...base} resumeGame={resumeGame} gamePoint={77} onSpendGamePoint={onSpendGamePoint} />,
-    )
+    const { unmount } = render(<GeneralModeScreen {...base} resumeGame={resumeGame} gamePoint={77} onSpendGamePoint={onSpendGamePoint} />)
     fireEvent.click(screen.getByRole('button', { name: '자동진행' }))
     expect(onSpendGamePoint).toHaveBeenCalledWith(30)
     unmount()

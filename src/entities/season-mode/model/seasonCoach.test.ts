@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { NO_COACH, startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
-  COACH_CONTRACT_TABLE, COACH_COUNT, COACH_REQUIRED_POPULARITY, checkCoachHire, coachEffectTextOf,
-  coachFeeOf, coachNameOf, coachRequiredPopularityOf, hasCoach, hireCoach,
+  COACH_CONTRACT_TABLE,
+  COACH_COUNT,
+  COACH_REQUIRED_POPULARITY,
+  checkCoachHire,
+  coachEffectTextOf,
+  coachFeeOf,
+  coachNameOf,
+  coachRequiredPopularityOf,
+  hasCoach,
+  hireCoach,
 } from '@/entities/season-mode/model/seasonCoach'
 
 /**
@@ -64,14 +72,18 @@ describe('가드 순서 (0xa79c~) — ① 이미 이 코치 ② 소지금 ③ �
   it('소지금이 인기도보다 **먼저** 걸린다 (둘 다 모자랄 때)', () => {
     const record = 레코드({ money: 0, popularity: 0 })
     expect(checkCoachHire(record, record.popularity, 4)).toEqual({
-      ok: false, reason: '소지금부족', required: 350,
+      ok: false,
+      reason: '소지금부족',
+      required: 350,
     })
   })
 
   it('소지금이 되면 인기도를 본다 — 필요한 값을 함께 준다 (StrMODE[62] "%d")', () => {
     const record = 레코드({ money: 9999, popularity: 99 })
     expect(checkCoachHire(record, record.popularity, 1)).toEqual({
-      ok: false, reason: '인기도부족', required: 100,
+      ok: false,
+      reason: '인기도부족',
+      required: 100,
     })
   })
 

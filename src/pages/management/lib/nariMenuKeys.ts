@@ -30,12 +30,7 @@ export function isNariMenuOkKey(key: string): boolean {
 /**
  * vt+8 0x6c445 — `step` 만큼 감아 돌며 꺼진 칸(`isOff`)을 건너뛴 커서. 한 줄 메뉴라 0x6be71 은 늘 움직인다(가로 감기).
  */
-export function nariMenuCursorAfterStep(
-  cursor: number,
-  step: -1 | 1,
-  slotCount: number,
-  isOff: (index: number) => boolean,
-): number {
+export function nariMenuCursorAfterStep(cursor: number, step: -1 | 1, slotCount: number, isOff: (index: number) => boolean): number {
   let onCount = 0
   for (let index = 0; index < slotCount; index += 1) if (!isOff(index)) onCount += 1
   if (onCount <= (isOff(cursor) ? 0 : 1)) return cursor

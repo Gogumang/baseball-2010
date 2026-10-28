@@ -58,10 +58,14 @@ export async function openScene(page, scene, { fixture, query = '', timeout = 20
   const extra = query.replace(/^[?&]/, '')
   const url = `${BASE_URL}?${params}${extra === '' ? '' : `&${extra}`}`
   await page.goto(url)
-  await page.waitForFunction(() => {
-    const state = document.documentElement.dataset.scene
-    return state === 'ready' || state === 'error'
-  }, null, { timeout })
+  await page.waitForFunction(
+    () => {
+      const state = document.documentElement.dataset.scene
+      return state === 'ready' || state === 'error'
+    },
+    null,
+    { timeout },
+  )
   const status = await page.evaluate(() => window.__scene)
   if (status?.status !== 'ready') throw new Error(`장면 ${scene} 실패: ${status?.error ?? '?'} (단계 ${status?.steps?.join(' → ')})`)
   return status
@@ -103,14 +107,17 @@ export async function tapPage(page, x, y) {
 /** 원본 좌표의 맨 위 요소 (elementsFromPoint 위 몇 겹) — 겹침 확인용 */
 export async function topElementAt(page, x, y, depth = 4) {
   const point = await toPagePoint(page, x, y)
-  return page.evaluate(({ px, py, n }) => {
-    const nameOf = (element) => {
-      const cls = typeof element.className === 'string' && element.className !== '' ? `.${element.className.split(' ')[0]}` : ''
-      const label = element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 12) ?? ''
-      return `${element.tagName.toLowerCase()}${element.id === '' ? '' : `#${element.id}`}${cls}${label === '' ? '' : ` "${label}"`}`
-    }
-    return document.elementsFromPoint(px, py).slice(0, n).map(nameOf)
-  }, { px: point.x, py: point.y, n: depth })
+  return page.evaluate(
+    ({ px, py, n }) => {
+      const nameOf = (element) => {
+        const cls = typeof element.className === 'string' && element.className !== '' ? `.${element.className.split(' ')[0]}` : ''
+        const label = element.getAttribute('aria-label') ?? element.textContent?.trim().slice(0, 12) ?? ''
+        return `${element.tagName.toLowerCase()}${element.id === '' ? '' : `#${element.id}`}${cls}${label === '' ? '' : ` "${label}"`}`
+      }
+      return document.elementsFromPoint(px, py).slice(0, n).map(nameOf)
+    },
+    { px: point.x, py: point.y, n: depth },
+  )
 }
 
 /** 키 누르고 떼기 — 앱 키 문이 다음 앱 틱에 처리하므로 조금 기다린다 */

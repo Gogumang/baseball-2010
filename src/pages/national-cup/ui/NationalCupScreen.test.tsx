@@ -184,8 +184,15 @@ describe('나리 머리띠 제목 (0x169ea~0x16a00: 장면+0xcc == 4 ? 8 : 9)', 
 
   it('투수편(모드 3)은 제목 9 — "나만의리그" 9 + "투수편" 11 (134 대진 · 135 순위 모두)', () => {
     const { container } = render(
-      <NationalCupScreen mode="나만의리그" edition="투수편" cup={createNationalCup()} yearIndex={2} random={고정난수(0)}
-        onStartGame={vi.fn()} onFinish={vi.fn()} />,
+      <NationalCupScreen
+        mode="나만의리그"
+        edition="투수편"
+        cup={createNationalCup()}
+        yearIndex={2}
+        random={고정난수(0)}
+        onStartGame={vi.fn()}
+        onFinish={vi.fn()}
+      />,
     )
     expect(그림들(container).some((src) => src.endsWith('game_frame/011.png'))).toBe(true)
     expect(그림들(container).some((src) => src.endsWith('game_frame/010.png'))).toBe(false)
@@ -206,10 +213,19 @@ describe('나리 134 진입 — 히든 팀 오픈(0x19f30 → 0x65de4) · 칭호
     },
   ) =>
     render(
-      <NationalCupScreen mode="나만의리그" cup={cup} yearIndex={2} random={고정난수(0)} onStartGame={vi.fn()} onFinish={vi.fn()}
-        openedHiddenIds={props.openedHiddenIds ?? []} onOpenHiddenTeams={props.onOpenHiddenTeams ?? vi.fn()}
-        entryTitle={props.entryTitle ?? null} onConfirmEntryTitle={props.onConfirmEntryTitle ?? vi.fn()}
-        initialStep={props.initialStep} />,
+      <NationalCupScreen
+        mode="나만의리그"
+        cup={cup}
+        yearIndex={2}
+        random={고정난수(0)}
+        onStartGame={vi.fn()}
+        onFinish={vi.fn()}
+        openedHiddenIds={props.openedHiddenIds ?? []}
+        onOpenHiddenTeams={props.onOpenHiddenTeams ?? vi.fn()}
+        entryTitle={props.entryTitle ?? null}
+        onConfirmEntryTitle={props.onConfirmEntryTitle ?? vi.fn()}
+        initialStep={props.initialStep}
+      />,
     )
   const 대진판확인 = () => screen.queryByRole('button', { name: '확인' })
 
@@ -230,7 +246,9 @@ describe('나리 134 진입 — 히든 팀 오픈(0x19f30 → 0x65de4) · 칭호
       // 칭호 창 — img_text 합성 프레임 369 · 조건 StrNICKNAME[8 + 64] · 노란 "이름"
       const 창 = screen.getByTestId('칭호-창')
       expect(창.querySelector('img')?.getAttribute('src')).toBe('./sprites/img_text/frames/369.png')
-      act(() => { vi.advanceTimersByTime(1000) })
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
       expect(창.querySelector('[data-part="조건"]')?.textContent).toBe('국가대표 첫 선발 ') // 원문 StrNICKNAME[72] 끝 빈칸(r223 생성기가 보존)
       expect(창.querySelector('[data-part="이름"]')?.textContent).toBe('"국가 대표"')
       expect(onConfirmEntryTitle).not.toHaveBeenCalled()
@@ -284,8 +302,15 @@ describe('나리 142 취소로 돌아왔을 때 (0x13c72 의 S+0x12c 갈래 → 
   it('initialStep 순위면 135 순위표부터 그리고, 확인하면 다시 142 로 넘긴다', () => {
     const onStartGame = vi.fn()
     render(
-      <NationalCupScreen mode="나만의리그" cup={createNationalCup()} yearIndex={2} random={고정난수(0)}
-        onStartGame={onStartGame} onFinish={vi.fn()} initialStep="순위" />,
+      <NationalCupScreen
+        mode="나만의리그"
+        cup={createNationalCup()}
+        yearIndex={2}
+        random={고정난수(0)}
+        onStartGame={onStartGame}
+        onFinish={vi.fn()}
+        initialStep="순위"
+      />,
     )
     expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()
     확인()
@@ -296,7 +321,7 @@ describe('나리 142 취소로 돌아왔을 때 (0x13c72 의 S+0x12c 갈래 → 
 describe('키 길 (대진 0xe6f8 · 0x19fdc · 순위 0x4a18 · 0x10680 — 직접 떴다)', () => {
   const 키 = (key: string) => fireEvent.keyDown(window, { key })
 
-  it('OK(Enter) · \'5\' 가 대진판 → 순위표 → 경기로 넘긴다 — 그 밖의 키는 아무 일이 없다', () => {
+  it("OK(Enter) · '5' 가 대진판 → 순위표 → 경기로 넘긴다 — 그 밖의 키는 아무 일이 없다", () => {
     const onStartGame = vi.fn()
     띄우기(createNationalCup(), { onStartGame })
 
@@ -316,11 +341,18 @@ describe('키 길 (대진 0xe6f8 · 0x19fdc · 순위 0x4a18 · 0x10680 — 직�
     expect(screen.getByRole('group', { name: '국가대항전 대진' })).toBeTruthy()
   })
 
-  it('나리 135 순위표는 CLR 을 안 받는다 (0x10680 은 OK · \'5\' 만)', () => {
+  it("나리 135 순위표는 CLR 을 안 받는다 (0x10680 은 OK · '5' 만)", () => {
     const onStartGame = vi.fn()
     render(
-      <NationalCupScreen mode="나만의리그" cup={createNationalCup()} yearIndex={2} random={고정난수(0)}
-        onStartGame={onStartGame} onFinish={vi.fn()} initialStep="순위" />,
+      <NationalCupScreen
+        mode="나만의리그"
+        cup={createNationalCup()}
+        yearIndex={2}
+        random={고정난수(0)}
+        onStartGame={onStartGame}
+        onFinish={vi.fn()}
+        initialStep="순위"
+      />,
     )
     키('Escape')
     expect(screen.getByRole('group', { name: '국가대항전 순위' })).toBeTruthy()

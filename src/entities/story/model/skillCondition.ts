@@ -127,8 +127,7 @@ export function withGameSkillCounters(career: PlayerCareer, summary: Pick<GameSu
 function batterCareerTotalOf(career: PlayerCareer): Pick<SeasonStats, 'hits' | 'doubles' | 'triples' | 'runsBattedIn'> {
   const years = yearlyStatsOf(career)
   const rows = years.length >= career.season - 1 ? [...years.slice(0, career.season - 1), career.stats] : [career.careerStats]
-  const sum = (key: 'hits' | 'doubles' | 'triples' | 'runsBattedIn') =>
-    toInt16(rows.reduce((total, row) => total + toInt16(row[key]), 0))
+  const sum = (key: 'hits' | 'doubles' | 'triples' | 'runsBattedIn') => toInt16(rows.reduce((total, row) => total + toInt16(row[key]), 0))
   return { hits: sum('hits'), doubles: sum('doubles'), triples: sum('triples'), runsBattedIn: sum('runsBattedIn') }
 }
 
@@ -168,8 +167,7 @@ const ACQUIRE_RULES: Readonly<Record<number, (career: PlayerCareer, random: Rand
   },
   // 5 무력감 — 0xa4f31 불발 → 사기 ≤ 20, 연차 ≥ 3, rand(0,100) > 69 (30%, 0xad46c `cmp r0, #0x45 ; ble`) (0xad43a — 앞이 막히면 안 굴린다)
   5: (career, random) =>
-    !wasRemoved(career, 5) &&
-    career.morale <= 20 && yearIndexOf(career) >= 3 && random !== undefined && random.rand(0, 100) > 69,
+    !wasRemoved(career, 5) && career.morale <= 20 && yearIndexOf(career) >= 3 && random !== undefined && random.rand(0, 100) > 69,
   // 7 전설 — s8 +0x7a(정규시즌 1위 횟수) ≥ 8 이고 0xa4d51(+0x1ca MVP 비트 수) > 6 (0xad474, 모드 갈림 없음)
   7: (career) => toInt8(career.regularSeasonFirstCount) >= 8 && mvpSeasonCountOf(career.mvpSeasonBits) > 6,
   // 10 해결사 — u16 +0x1f0[6](만루 홈런 수) > 5 (0xad494 모드 4)
@@ -232,8 +230,7 @@ const RELEASE_RULES: Readonly<Record<number, (career: PlayerCareer) => boolean>>
   // 2 먹튀 — s8 +0x1cd(먹튀를 가진 뒤 경기 수) > 4 이고 s16 +0x1c0(그동안 인기도 변화 합) / +0x1cd > 3 (0xad9ce — ldrsb ·
   // ldrsh, 0 쪽 버림 나눗셈 0xca7b5). 칸이 넘치면 음수로 읽힌다(원본 그대로)
   2: (career) =>
-    toInt8(career.moneyGrubberGames) > 4 &&
-    Math.trunc(toInt16(career.moneyGrubberPopularityGain) / toInt8(career.moneyGrubberGames)) > 3,
+    toInt8(career.moneyGrubberGames) > 4 && Math.trunc(toInt16(career.moneyGrubberPopularityGain) / toInt8(career.moneyGrubberGames)) > 3,
   // 5 무력감 — 경기 뒤 사기 ≥ 90 인 경기가 연속 6회 (+0x1c7 > 5)
   5: (career) => career.highMoraleStreak > 5,
   // 3 몹쓸몸 — 몹쓸몸을 가진 채로 훈련 6회 (+0x75 > 5)
@@ -247,11 +244,7 @@ const RELEASE_RULES: Readonly<Record<number, (career: PlayerCareer) => boolean>>
 }
 
 /** 조건 20 — 스킬을 아직 안 가졌고 하위 조건을 통과하면 획득 이벤트가 뜬다 */
-export function meetsSkillAcquireCondition(
-  career: PlayerCareer,
-  value: number,
-  random: RandomPort | undefined,
-): boolean {
+export function meetsSkillAcquireCondition(career: PlayerCareer, value: number, random: RandomPort | undefined): boolean {
   const skillId = value - 1
   if (hasSkill(career, skillId)) return false
   // 하위 표 0xd8408 은 스킬 2~20 — 밖이면 통과 (0xad298 `v − 3 > 18`)

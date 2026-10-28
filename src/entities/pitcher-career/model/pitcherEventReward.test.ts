@@ -63,10 +63,15 @@ describe('투수편 이벤트 보상 (0x8c460 모드 3 갈래)', () => {
   })
 
   it('393~396 은 연차 보정 (0x8d508) — 3년차 393 인기도 +3·2 · 평판 −2·2', () => {
-    const 뒤 = applyPitcherEventRewards(투수({ season: 3, popularity: 100, reputation: 100 }), [
-      { kind: 0, value: 30 },
-      { kind: 1, value: 44 },
-    ], undefined, 393)
+    const 뒤 = applyPitcherEventRewards(
+      투수({ season: 3, popularity: 100, reputation: 100 }),
+      [
+        { kind: 0, value: 30 },
+        { kind: 1, value: 44 },
+      ],
+      undefined,
+      393,
+    )
     expect(뒤).toMatchObject({ popularity: 136, reputation: 140 })
   })
 

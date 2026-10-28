@@ -51,10 +51,7 @@ export function canUseHiddenTeams(mode: number): boolean {
  * 지금 이 모드에서 이 팀을 고를 수 있는가.
  * 히든 팀은 ① 열려 있고 ② 일반모드일 때만 고를 수 있다.
  */
-export function canSelectTeam(
-  teamId: number,
-  options: { readonly openedHiddenIds: readonly number[]; readonly mode: number },
-): boolean {
+export function canSelectTeam(teamId: number, options: { readonly openedHiddenIds: readonly number[]; readonly mode: number }): boolean {
   if (!isHiddenTeam(teamId)) return true
   return isTeamOpened(teamId, options.openedHiddenIds) && canUseHiddenTeams(options.mode)
 }

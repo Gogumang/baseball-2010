@@ -27,10 +27,22 @@ export function InfoTable({ values, battingOrder }: { readonly values: readonly 
           const value = isBattingOrder ? String(battingOrder) : values[valueIndex++]
           return (
             <div key={frame}>
-              <img className={styles.layer} alt="" src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
-                style={{ left: column.label.x + column.label.width - widthOf(frame), top: top + 3 }} />
-              <div className={styles.infoValue}
-                style={{ left: column.value.x, top, width: column.value.width, height: INFO_ROW_HEIGHT, color: isBattingOrder ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text }}>
+              <img
+                className={styles.layer}
+                alt=""
+                src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
+                style={{ left: column.label.x + column.label.width - widthOf(frame), top: top + 3 }}
+              />
+              <div
+                className={styles.infoValue}
+                style={{
+                  left: column.value.x,
+                  top,
+                  width: column.value.width,
+                  height: INFO_ROW_HEIGHT,
+                  color: isBattingOrder ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text,
+                }}
+              >
                 {value}
               </div>
             </div>

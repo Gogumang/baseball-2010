@@ -1,9 +1,5 @@
-import {
-  hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitSourceOf, recruitsPitcher,
-} from '@/entities/season-mode/model/playerRecruit'
-import type {
-  RecruitRefusal, RecruitSourceKind, SeasonPlayer, SeasonTeamRoster,
-} from '@/entities/season-mode/model/playerRecruit'
+import { hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitSourceOf, recruitsPitcher } from '@/entities/season-mode/model/playerRecruit'
+import type { RecruitRefusal, RecruitSourceKind, SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 
 /**
  * 선수영입 목록 만들기 — 칸 배치와 중복 검사는 `entities/season-mode/model/playerRecruit.ts` 가 가진다
@@ -49,10 +45,7 @@ export interface RecruitListEntry {
   readonly refusal: RecruitRefusal | null
 }
 
-const padded = (
-  list: readonly (RecruitCandidate | null)[],
-  length: number,
-): readonly (RecruitCandidate | null)[] =>
+const padded = (list: readonly (RecruitCandidate | null)[], length: number): readonly (RecruitCandidate | null)[] =>
   Array.from({ length }, (_, index) => list[index] ?? null)
 
 /**

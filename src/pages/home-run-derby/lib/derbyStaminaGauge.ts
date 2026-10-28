@@ -25,10 +25,7 @@ const DERBY_STAMINA_PERCENT = 100
  * - % = 100 → 막대는 늘 용량만큼 가득이다.
  * 상대 팀 v 를 모르면(예전 시험 길) 막대를 비운다.
  */
-export function derbyStaminaGaugeOf(
-  pitcher: Pick<DerbyPitcher, 'staminaAbility'>,
-  opponentTeamId: number | undefined,
-): StaminaGauge | undefined {
+export function derbyStaminaGaugeOf(pitcher: Pick<DerbyPitcher, 'staminaAbility'>, opponentTeamId: number | undefined): StaminaGauge | undefined {
   if (pitcher.staminaAbility === undefined || opponentTeamId === undefined) return undefined
   return staminaGaugeOf({
     staminaAbility: pitcher.staminaAbility,

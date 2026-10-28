@@ -94,12 +94,14 @@ export function writeAssetPacks(outDir: string): { version: string; packs: Built
     size += bytes.length
   }
   const all = createHash('sha256')
-  const built = groups.filter((group) => group.length > 0).map((group, index) => {
-    const { raw, gz } = buildPack(group)
-    const hash = createHash('sha256').update(gz).digest('hex').slice(0, 10)
-    all.update(gz)
-    return { file: `${index}-${hash}.bin`, bytes: gz.length, raw: raw.length, body: gz }
-  })
+  const built = groups
+    .filter((group) => group.length > 0)
+    .map((group, index) => {
+      const { raw, gz } = buildPack(group)
+      const hash = createHash('sha256').update(gz).digest('hex').slice(0, 10)
+      all.update(gz)
+      return { file: `${index}-${hash}.bin`, bytes: gz.length, raw: raw.length, body: gz }
+    })
   const version = all.digest('hex').slice(0, 12)
   mkdirSync(join(outDir, ASSET_PACK_DIR), { recursive: true })
   for (const pack of built) writeFileSync(join(outDir, ASSET_PACK_DIR, pack.file), pack.body)
@@ -123,10 +125,7 @@ export function assetPacks(): Plugin {
       sequential: true,
       handler() {
         const { version, packs } = writeAssetPacks(outDir)
-        copyFileSync(
-          join(dirname(fileURLToPath(import.meta.url)), 'assetPackServiceWorker.js'),
-          join(outDir, ASSET_PACK_SERVICE_WORKER),
-        )
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'assetPackServiceWorker.js'), join(outDir, ASSET_PACK_SERVICE_WORKER))
         const megabytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(2)
         const raw = packs.reduce((sum, pack) => sum + pack.raw, 0)
         const sent = packs.reduce((sum, pack) => sum + pack.bytes, 0)

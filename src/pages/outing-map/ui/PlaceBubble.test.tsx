@@ -15,15 +15,7 @@ afterEach(cleanup)
 const 경기장 = OUTING_PLACES[0]
 
 const 띄우기 = (overrides: Partial<Parameters<typeof PlaceBubble>[0]> = {}) =>
-  render(
-    <PlaceBubble
-      place={경기장}
-      onEnter={vi.fn()}
-      onRun={vi.fn()}
-      onClose={vi.fn()}
-      {...overrides}
-    />,
-  )
+  render(<PlaceBubble place={경기장} onEnter={vi.fn()} onRun={vi.fn()} onClose={vi.fn()} {...overrides} />)
 
 describe('장소 기능 말풍선', () => {
   it('칸은 [들어가기] 와 장소 기능 둘뿐이다 — 비용·설명 줄이 없다', () => {

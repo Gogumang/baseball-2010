@@ -108,9 +108,13 @@ export function defenseSpritePreloadsOf(aces: DefenseAces = {}): SpriteFolderPre
     const folder = ACE_PITCHER_DEFENDER_FRAMES[order]
     // 투수 마선수 그림은 38장(000~037)뿐이다 — 투수 자리 동작이 안 내는 뒤 칸은 받지 않는다
     if (folder !== undefined) {
-      requests.push({ folder, frames: fielderRawFramesOf().filter((frame) => frame < ACE_PITCHER_DEFENDER_FRAME_COUNT), json: ['origins.json'], framesListedIn: folder })
+      requests.push({
+        folder,
+        frames: fielderRawFramesOf().filter((frame) => frame < ACE_PITCHER_DEFENDER_FRAME_COUNT),
+        json: ['origins.json'],
+        framesListedIn: folder,
+      })
     }
   }
   return mergeSpritePreloads(requests)
 }
-

@@ -97,4 +97,3 @@ describe('0x13 타구 공 경로 0x33e34 — unicorn 대조 (r274)', () => {
     expect(ballShadowOfPoint(near, 9, 0, true, 3)).not.toBeNull()
   })
 })
-

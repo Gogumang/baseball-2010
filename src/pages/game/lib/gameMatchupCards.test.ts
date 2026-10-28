@@ -42,7 +42,13 @@ describe('나리 타자편 상태 0xe 소개 판 값 (0x44944)', () => {
         ...base.leaguePlayerStats,
         pitchers: {
           [leaguePitcherIdOf(progress.opponentTeamId, slot)]: {
-            outs: 27, runsAllowed: 3, saves: 0, strikeouts: 7, pitches: 100, wins: 1, losses: 0,
+            outs: 27,
+            runsAllowed: 3,
+            saves: 0,
+            strikeouts: 7,
+            pitches: 100,
+            wins: 1,
+            losses: 0,
           },
         },
       },

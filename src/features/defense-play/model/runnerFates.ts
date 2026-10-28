@@ -84,9 +84,7 @@ export function runnerFatesWithoutPlay(bases: BaseState, outcome: AtBatOutcome):
       const forcedHome = bases.first && bases.second && bases.third
       return [
         { fromBase: 0, scored: false, retired: false },
-        ...onBase.map((fate) =>
-          forcedHome && fate.fromBase === 3 ? { ...fate, scored: true, retired: true } : fate,
-        ),
+        ...onBase.map((fate) => (forcedHome && fate.fromBase === 3 ? { ...fate, scored: true, retired: true } : fate)),
       ]
     }
     case '안타':
@@ -176,9 +174,7 @@ export function survivorsFromBaseOfFates(fates: readonly RunnerFate[]): readonly
  * 찾은 주자가 타자주자가 아니다. 파울(`0xb68dc`)과 번트(`state[0x13]`)는 `burstResultBitsOf` 가 본다.
  * 이닝 · 경기 끝은 안 본다 — 3아웃으로 끝나도 루에 남은 주자는 +0x96 이 없어 걸린다(원본 그대로).
  */
-export function scoringBaseRunnerAfterOf(
-  runners: readonly Pick<RunnerState, 'startBase' | 'isOut' | 'scored' | 'isBatterRunner'>[],
-): boolean {
+export function scoringBaseRunnerAfterOf(runners: readonly Pick<RunnerState, 'startBase' | 'isOut' | 'scored' | 'isBatterRunner'>[]): boolean {
   return [2, 3].some((base) => {
     const found = runners.find((runner) => !(runner.isOut || runner.scored) && runner.startBase === base)
     return found !== undefined && !found.isBatterRunner

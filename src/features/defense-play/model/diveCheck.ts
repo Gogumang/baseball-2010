@@ -52,8 +52,7 @@ export function diveCheckOf(input: DiveCheckInput): DiveCheck | null {
   const { fielder } = input
   if (fielder === undefined) return null
   const state = fielder.aiState
-  const unneededCover =
-    state >= AI_STATE.COVER_HOME && state <= AI_STATE.COVER_THIRD && !input.coverNeeded(state - AI_STATE.COVER_HOME)
+  const unneededCover = state >= AI_STATE.COVER_HOME && state <= AI_STATE.COVER_THIRD && !input.coverNeeded(state - AI_STATE.COVER_HOME)
   if (state !== AI_STATE.IDLE && state !== AI_STATE.BUSY && state !== AI_STATE.DIVE && !unneededCover) return null
   const n = input.diveTick
   if (n === DIVE_TICK_NONE) return null
@@ -72,13 +71,7 @@ export function diveCheckOf(input: DiveCheckInput): DiveCheck | null {
 }
 
 /** 기록 줄 — 몸을 날린 틱 · AI 0xd 에 들고 나는 틱만 (키스톤 자리 잡기가 매 틱 AI 0xa 로 되돌리는 칸은 안 적는다) */
-export function logDiveCheck(
-  log: string[],
-  tick: number,
-  slot: number,
-  before: FielderState | undefined,
-  dive: DiveCheck,
-): void {
+export function logDiveCheck(log: string[], tick: number, slot: number, before: FielderState | undefined, dive: DiveCheck): void {
   if (dive.dove) log.push(`${tick}틱 ${slot}번 야수가 몸을 날린다 (b4714 vt60 — 다이빙)`)
   const was = before?.aiState
   if (was === dive.fielder.aiState) return

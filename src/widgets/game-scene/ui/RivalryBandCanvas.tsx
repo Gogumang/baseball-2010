@@ -1,11 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { linePixels, scanlineSpans } from '@/features/play-game/model/aceCutIn'
-import {
-  RIVALRY_LOGO_FRAME,
-  type RivalryColor,
-  type RivalryDraw,
-  rivalryDrawsOf,
-} from '@/widgets/game-scene/lib/rivalryBand'
+import { RIVALRY_LOGO_FRAME, type RivalryColor, type RivalryDraw, rivalryDrawsOf } from '@/widgets/game-scene/lib/rivalryBand'
 import { brightenedImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -81,7 +76,14 @@ export function RivalryBandCanvas({ step }: { readonly step: number }) {
     for (const draw of rivalryDrawsOf(step)) drawOne(context, draw)
   })
   return (
-    <canvas ref={canvasRef} width={SCREEN_WIDTH} height={SCREEN_HEIGHT} aria-hidden data-testid="라이벌전-띠" data-step={step}
-      style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} />
+    <canvas
+      ref={canvasRef}
+      width={SCREEN_WIDTH}
+      height={SCREEN_HEIGHT}
+      aria-hidden
+      data-testid="라이벌전-띠"
+      data-step={step}
+      style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
+    />
   )
 }

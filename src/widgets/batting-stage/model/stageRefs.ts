@@ -223,7 +223,11 @@ export interface StageLatest {
   readonly batterRecordSlot: number
   /** 세 번째 인자는 **필살타법이 성공한 타구인가** (0x51800) */
   readonly onPitchResolved: (
-    detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable?: boolean, buntKind?: number, sceneTick?: number,
+    detail: PitchOutcomeDetail,
+    pitch: Pitch,
+    isUncatchable?: boolean,
+    buntKind?: number,
+    sceneTick?: number,
   ) => PitchResolvedReply | void
   /** 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린 쏜 공 (`BattingStage` 의 같은 이름 props 주석 참고) */
   readonly onContact?: (detail: PitchOutcomeDetail, buntKind: number) => LaunchedShot | null | undefined

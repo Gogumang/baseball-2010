@@ -2,9 +2,7 @@ import { trackWeakCollectionForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
-import {
-  clearGameSceneTimeout, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { clearGameSceneTimeout, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { SCENE_STATE, lastSceneStateEntry, markSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
@@ -123,7 +121,11 @@ export function isSceneConfirmAwaiting(wait: SceneConfirmWait | null | undefined
  * OK 는 화면의 `useSceneConfirm` 이 받는다.
  */
 export function useIsSceneConfirmAwaiting(wait: SceneConfirmWait | null | undefined): boolean {
-  return useSyncExternalStore(subscribeConfirm, () => isSceneConfirmAwaiting(wait), () => isSceneConfirmAwaiting(wait))
+  return useSyncExternalStore(
+    subscribeConfirm,
+    () => isSceneConfirmAwaiting(wait),
+    () => isSceneConfirmAwaiting(wait),
+  )
 }
 
 export interface SceneConfirm {
@@ -180,8 +182,7 @@ export function useSceneConfirm(
   const suspendedRef = useRef<{ readonly wait: SceneConfirmWait; readonly confirmed: number; readonly startTick: number } | null>(null)
   const [sceneDEntryMark, setSceneDEntryMark] = useState(0)
   const [enteredKey, setEnteredKey] = useState<{ readonly wait: SceneConfirmWait; readonly confirmed: number } | null>(null)
-  const isInConfirmState =
-    isAwaiting && enteredKey !== null && enteredKey.wait === wait && enteredKey.confirmed === confirmed
+  const isInConfirmState = isAwaiting && enteredKey !== null && enteredKey.wait === wait && enteredKey.confirmed === confirmed
   // 대기 한 번(객체 · 받은 OK 수)마다 0xd 두 그림 → 0xe → 잠금 세 그림을 새로 센다 — 같은 걸음의 두 번째 0xe 도
   // 0x16 → 0xd 를 지나 다시 센다
   useEffect(() => {
@@ -215,24 +216,31 @@ export function useSceneConfirm(
     if (elapsed >= 0) enterSceneD()
     // 상태 경계(`sceneStateEntries`) — 0xd 첫 그림이 0xd 틱 0, 0x39e14 가 틱 1 에 0xe 를 예약해 두 그림 뒤가 0xe 틱 0. 교체 창 0xb 에서
     // 곧장 선 0xe(`skipsSceneD`)는 0xd 가 없다(웹은 그때도 두 그림을 센다 — 0xe 칸만 그 자리에 적는다)
-    markSceneStateEntries(
-      ...(wait.skipsSceneD === true ? [] : [{ tick: startTick, state: SCENE_STATE.준비 }]),
-      { tick: startTick + SCENE_PREPARE_FRAMES, state: SCENE_STATE.확인 },
-    )
+    markSceneStateEntries(...(wait.skipsSceneD === true ? [] : [{ tick: startTick, state: SCENE_STATE.준비 }]), {
+      tick: startTick + SCENE_PREPARE_FRAMES,
+      state: SCENE_STATE.확인,
+    })
     const enteredDelay = SCENE_PREPARE_FRAMES - elapsed
     const unlockedDelay = SCENE_CONFIRM_READY_FRAMES - elapsed
     const entered = enteredDelay <= 0 ? null : setGameSceneTickTimeout(() => setEnteredKey({ wait, confirmed }), enteredDelay)
     if (enteredDelay <= 0) setEnteredKey((key) => (key?.wait === wait && key.confirmed === confirmed ? key : { wait, confirmed }))
     // 강판 지나감 — 0xe 를 한 그림 그린 뒤 끝난다(OK 잠금은 안 푼다). 끝나면 강판 창 0x23 이 선다
-    const unlocked = wait.hooksAtEntry === true
-      ? setGameSceneTickTimeout(() => {
-          passedHookWaits.add(wait)
-          setVersion((version) => version + 1)
-          for (const listener of confirmListeners) listener()
-        }, Math.max(0, SCENE_PREPARE_FRAMES + HOOK_PASSAGE_CONFIRM_FRAMES - elapsed))
-      : setGameSceneTickTimeout(() => {
-          isUnlockedRef.current = true
-        }, Math.max(0, unlockedDelay))
+    const unlocked =
+      wait.hooksAtEntry === true
+        ? setGameSceneTickTimeout(
+            () => {
+              passedHookWaits.add(wait)
+              setVersion((version) => version + 1)
+              for (const listener of confirmListeners) listener()
+            },
+            Math.max(0, SCENE_PREPARE_FRAMES + HOOK_PASSAGE_CONFIRM_FRAMES - elapsed),
+          )
+        : setGameSceneTickTimeout(
+            () => {
+              isUnlockedRef.current = true
+            },
+            Math.max(0, unlockedDelay),
+          )
     return () => {
       clearGameSceneTimeout(sceneDEntered)
       clearGameSceneTimeout(entered)

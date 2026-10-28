@@ -146,10 +146,7 @@ function trajectoryOf(flight: BallFlight, launchBody: BallBody, from: WorldPoint
 }
 
 /** 원본 패턴 [a, b, c, 플래그] → 궤적. 플래그 비트0 이면 높이 부호를 뒤집는다 (0xb07b4) */
-export function battedBallTrajectory(
-  pattern: BattedBallPattern,
-  options: BattedBallFlightOptions = {},
-): BallTrajectory {
+export function battedBallTrajectory(pattern: BattedBallPattern, options: BattedBallFlightOptions = {}): BallTrajectory {
   const [angle, speed, height, flags] = pattern
   const trajectory = launchTrajectory({
     from: options.origin ?? BATTING_POINT,
@@ -175,10 +172,7 @@ export function isBallTrajectory(trajectory: BattedBallTrajectory): trajectory i
  * 난수를 받아 폴 충돌 굴림까지 원본대로 다시 깐다. 굴림이 없던 궤적은 **그대로 돌려준다**(난수를 안 쓴다).
  * 원본 굴림 자리는 쏜 순간(메시지 0x11 · 0x12) 세계 0xbfed0 안이다.
  */
-export function trajectoryWithRandom(
-  trajectory: BattedBallTrajectory,
-  random: RandomPort | undefined,
-): BattedBallTrajectory {
+export function trajectoryWithRandom(trajectory: BattedBallTrajectory, random: RandomPort | undefined): BattedBallTrajectory {
   if (random === undefined || !isBallTrajectory(trajectory)) return trajectory
   if (trajectory.flight.randomRolls === 0) return trajectory
   const body = cloneBallBody(trajectory.launchBody)
@@ -195,11 +189,7 @@ export function trajectoryWithRandom(
  * - 사건 틱 aa4 · ab0 · aa8 은 새 궤적의 것(state[0x20] · [0x80] 은 0xb3148 b3282 · b328a 가 새 값으로 다시 적는다)
  * - 낙구 aa0 은 앞 궤적이 이미 땅에 닿았으면 그 틱 그대로(state[0x1e] · +0x112 는 한 번 서면 판 끝까지 남는다), 아니면 새 궤적의 것
  */
-export function spliceTrajectory(
-  base: BattedBallTrajectory,
-  atTick: number,
-  next: BallTrajectory,
-): BallTrajectory {
+export function spliceTrajectory(base: BattedBallTrajectory, atTick: number, next: BallTrajectory): BallTrajectory {
   const shift = (tick: number) => (tick < 0 ? -1 : tick + atTick)
   const landedBefore = base.landingTick >= 0 && base.landingTick < atTick
   return {
@@ -210,8 +200,7 @@ export function spliceTrajectory(
       const point = base.pointAt(tick)
       return { ...point, speed: 0, verticalSpeed: 0, angle: 0, bounceMark: 0, ...base.pointDetailAt?.(tick) }
     },
-    isStoppedAt: (tick: number) =>
-      tick < atTick ? base.isStoppedAt?.(tick) === true : next.isStoppedAt(tick - atTick),
+    isStoppedAt: (tick: number) => (tick < atTick ? base.isStoppedAt?.(tick) === true : next.isStoppedAt(tick - atTick)),
     landingTick: landedBefore ? base.landingTick : shift(next.landingTick),
     fenceTick: shift(next.fenceTick),
     wallTick: shift(next.wallTick),

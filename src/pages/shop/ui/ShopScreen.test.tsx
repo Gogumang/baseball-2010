@@ -12,13 +12,7 @@ const pressKey = (key: string) => fireEvent.keyDown(window, { key })
 
 function renderShop(onPurchase = vi.fn()) {
   render(
-    <ShopScreen
-      initialTab="GP"
-      career={{ ...createCareer('테스터'), gamePoint: 9999 }}
-      noticeText=""
-      onPurchase={onPurchase}
-      onBack={vi.fn()}
-    />,
+    <ShopScreen initialTab="GP" career={{ ...createCareer('테스터'), gamePoint: 9999 }} noticeText="" onPurchase={onPurchase} onBack={vi.fn()} />,
   )
   return onPurchase
 }
@@ -50,8 +44,15 @@ describe('상점 구매 확인', () => {
 describe('CLR 로 110 에 돌아간다 — 0x13460 종류 1(13722) · 2(13b16) → 13b1e 0xbcb49(0x6e)', () => {
   it.each(['서브', 'GP'])('%s 창에서 Escape 는 onBack', (initialTab) => {
     const onBack = vi.fn()
-    render(<ShopScreen initialTab={initialTab} career={{ ...createCareer('테스터'), gamePoint: 9999 }} noticeText=""
-      onPurchase={vi.fn()} onBack={onBack} />)
+    render(
+      <ShopScreen
+        initialTab={initialTab}
+        career={{ ...createCareer('테스터'), gamePoint: 9999 }}
+        noticeText=""
+        onPurchase={vi.fn()}
+        onBack={onBack}
+      />,
+    )
 
     pressKey('Escape')
 
@@ -60,8 +61,7 @@ describe('CLR 로 110 에 돌아간다 — 0x13460 종류 1(13722) · 2(13b16) �
 
   it('확인 창이 떠 있으면 Escape 는 창만 닫는다 — 상점은 그대로', () => {
     const onBack = vi.fn()
-    render(<ShopScreen initialTab="GP" career={{ ...createCareer('테스터'), gamePoint: 9999 }} noticeText=""
-      onPurchase={vi.fn()} onBack={onBack} />)
+    render(<ShopScreen initialTab="GP" career={{ ...createCareer('테스터'), gamePoint: 9999 }} noticeText="" onPurchase={vi.fn()} onBack={onBack} />)
 
     pressKey('Enter')
     pressKey('Escape')
@@ -99,12 +99,14 @@ describe('GP 결과 창 (0x872a1)', () => {
 })
 
 describe('그리기 0x167cc — 창 종류 1 · 2 는 상태판 0x7d34c · 커맨드 줄 0x7e418 을 먼저 그린다', () => {
-  const draw = (initialTab: string) => render(
-    <ShopScreen initialTab={initialTab} career={createCareer('테스터')} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />,
-  )
+  const draw = (initialTab: string) =>
+    render(<ShopScreen initialTab={initialTab} career={createCareer('테스터')} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />)
 
   it('서브 · GP 는 아이템 하위 메뉴 세 칸(110 그대로)에 그 칸이 커서다', () => {
-    for (const [tab, cursorId] of [['서브', '서브'], ['GP', 'GP']] as const) {
+    for (const [tab, cursorId] of [
+      ['서브', '서브'],
+      ['GP', 'GP'],
+    ] as const) {
       const { container, unmount } = draw(tab)
       const bar = screen.getByTestId('command-bar')
       expect([...bar.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual(['장착', '서브', 'GP'])

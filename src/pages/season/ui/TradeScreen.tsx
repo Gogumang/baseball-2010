@@ -4,8 +4,13 @@ import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import {
-  TRADE_BOOST_COUNT, markTradeUsed, rollTradeSuccess,
-  tradeBoostCostOf, tradeMoneyChangeOf, tradeSuccessRate, withTradeMoney,
+  TRADE_BOOST_COUNT,
+  markTradeUsed,
+  rollTradeSuccess,
+  tradeBoostCostOf,
+  tradeMoneyChangeOf,
+  tradeSuccessRate,
+  withTradeMoney,
 } from '@/entities/season-mode/model/playerTrade'
 import { SEASON_ENTRY_CELL_SOURCE, seasonRecordEntryListsOf, tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
@@ -163,13 +168,23 @@ export interface TradeScreenProps {
  * 곧 커서가 안 움직일 뿐이다(`lockedCursor` 주석).
  */
 export function TradeScreen({
-  state, roster, opponentRosterOf = tableRosterOf, gamePoints, random, request = null, onTrade, onFinish, onCancelRequest,
-  onBack, openedHiddenIds = [], entryCellSourceOf, onEnterAcquired,
+  state,
+  roster,
+  opponentRosterOf = tableRosterOf,
+  gamePoints,
+  random,
+  request = null,
+  onTrade,
+  onFinish,
+  onCancelRequest,
+  onBack,
+  openedHiddenIds = [],
+  entryCellSourceOf,
+  onEnterAcquired,
 }: TradeScreenProps) {
   const { record } = state
   const forced = request !== null && request.isRequested ? request : null
-  const [step, setStep] = useState<TradeStep>(() =>
-    forced === null ? { kind: '팀' } : { kind: '영입', teamId: forced.opponentTeamId })
+  const [step, setStep] = useState<TradeStep>(() => (forced === null ? { kind: '팀' } : { kind: '영입', teamId: forced.opponentTeamId }))
   // this+0x154 — 0xe4 진입이 0 으로 지운다(투수). 요청이면 요청 칸의 탭
   const [tradeTab, setTradeTab] = useState<number>(() => forced?.tab ?? TRADE_REQUEST_TAB.투수)
   // ed+0x33f — 목록이 보여 주는 탭. 0xe5·0xe6 진입마다 this+0x154 로 다시 선다
@@ -206,28 +221,27 @@ export function TradeScreen({
 
   const opponentRoster = step.kind === '팀' ? null : opponentRosterOf(step.teamId)
   /** 트레이드 탭(this+0x154)의 두 명단 — 고른 칸이 가리키는 선수 */
-  const opponentEntries = step.kind === '팀' || opponentRoster === null
-    ? []
-    : opponentTradeEntriesOf(step.teamId, opponentRoster, isPitcher)
+  const opponentEntries = step.kind === '팀' || opponentRoster === null ? [] : opponentTradeEntriesOf(step.teamId, opponentRoster, isPitcher)
   const myEntries = step.kind === '팀' ? [] : myTradeEntriesOf(record.teamId, roster, isPitcher)
   /** 목록이 보여 주는 탭(ed+0x33f)의 명단 */
-  const shownEntries = step.kind === '영입' && opponentRoster !== null
-    ? opponentTradeEntriesOf(step.teamId, opponentRoster, isListPitcher)
-    : step.kind === '보상' ? myTradeEntriesOf(record.teamId, roster, isListPitcher) : []
+  const shownEntries =
+    step.kind === '영입' && opponentRoster !== null
+      ? opponentTradeEntriesOf(step.teamId, opponentRoster, isListPitcher)
+      : step.kind === '보상'
+        ? myTradeEntriesOf(record.teamId, roster, isListPitcher)
+        : []
 
-  const acquiredEntry = step.kind === '보상' || step.kind === '확인'
-    ? opponentEntries[step.acquired] ?? null
-    : null
-  const givenEntry = step.kind === '확인' ? myEntries[step.given] ?? null : null
+  const acquiredEntry = step.kind === '보상' || step.kind === '확인' ? (opponentEntries[step.acquired] ?? null) : null
+  const givenEntry = step.kind === '확인' ? (myEntries[step.given] ?? null) : null
 
-  const rateOf = (which: number) => tradeSuccessRate({
-    myGrade: givenEntry?.grade ?? 0,
-    opponentGrade: acquiredEntry?.grade ?? 0,
-    myPenalty: givenEntry?.penalty ?? 0,
-    opponentPenalty: acquiredEntry?.penalty ?? 0,
-    boost: which,
-  })
-
+  const rateOf = (which: number) =>
+    tradeSuccessRate({
+      myGrade: givenEntry?.grade ?? 0,
+      opponentGrade: acquiredEntry?.grade ?? 0,
+      myPenalty: givenEntry?.penalty ?? 0,
+      opponentPenalty: acquiredEntry?.penalty ?? 0,
+      boost: which,
+    })
 
   /** 요청이면 단계에 들어갈 때마다 진입 알림 [204]/[205] 를 다시 띄운다 (0x5cd0·0x5b28 은 진입 함수다) */
   const enterStep = (next: TradeStep) => {
@@ -321,14 +335,16 @@ export function TradeScreen({
       // 비용은 성공·실패와 상관없이 나간다 (0xcf24 는 굴리기 전에 깎는다)
       gamePointCost: tradeBoostCostOf(boost),
       isSuccess,
-      ...(isSuccess ? {
-        swap: {
-          opponentTeamId: step.teamId,
-          tab: tradeTab,
-          myIndex: step.given,
-          opponentIndex: step.acquired,
-        },
-      } : {}),
+      ...(isSuccess
+        ? {
+            swap: {
+              opponentTeamId: step.teamId,
+              tab: tradeTab,
+              myIndex: step.given,
+              opponentIndex: step.acquired,
+            },
+          }
+        : {}),
     })
     setProgress(isSuccess ? '성공' : '실패')
   }
@@ -374,9 +390,7 @@ export function TradeScreen({
    * 적는다 — 0x7104·0x727c 는 그 칸을 읽지 않으므로 보이는 일은 없다(커서가 안 움직일 뿐이다).
    * 0xe7(0xc66c)은 비용 칸 이동 키를 안 받는다(0xc756).
    */
-  const lockedCursor = forced === null
-    ? null
-    : step.kind === '영입' ? forced.opponentIndex : step.kind === '보상' ? forced.myIndex : 0
+  const lockedCursor = forced === null ? null : step.kind === '영입' ? forced.opponentIndex : step.kind === '보상' ? forced.myIndex : 0
 
   const { cursor, moveTo } = useSeasonCursor({
     count: listCount,
@@ -471,20 +485,26 @@ export function TradeScreen({
   const isListStep = step.kind === '영입' || step.kind === '보상'
   const listTeamId = step.kind === '영입' ? step.teamId : record.teamId
   const listRoster = step.kind === '영입' ? opponentRoster : roster
-  const lists = isListStep && listRoster !== null
-    ? seasonRecordEntryListsOf(listTeamId, listRoster, entryCellSourceOf?.(listTeamId) ?? SEASON_ENTRY_CELL_SOURCE)
-    : null
+  const lists =
+    isListStep && listRoster !== null
+      ? seasonRecordEntryListsOf(listTeamId, listRoster, entryCellSourceOf?.(listTeamId) ?? SEASON_ENTRY_CELL_SOURCE)
+      : null
   const listRows = lists === null ? [] : isListPitcher ? lists.pitchers : lists.batters
   /** 목록 윗줄 [목록+0x30] — 커서가 보이는 10 줄 밖으로 나갈 때만 옮긴다 (0x6c2bd) */
   const top = useListTop(shownCursor, listRows.length)
   if (step.kind === '팀' && notice === null) {
     return (
-      <TeamSelectScreen title="시즌모드" gamePoint={gamePoints} openedHiddenIds={openedHiddenIds}
+      <TeamSelectScreen
+        title="시즌모드"
+        gamePoint={gamePoints}
+        openedHiddenIds={openedHiddenIds}
         // 그림 0xa14c — 공용 목록 0x63b15 의 마지막 인자 (s8)[[this+0xa0]+1] = 내 팀: 그 칸 로고를 검정 덮기 단계 7 로 어둡게
         coveredTeamId={record.teamId}
-        onSelect={chooseTeam} onSelectLocked={chooseTeam} onCancel={onBack}
-        overlay={hiddenHint !== null
-          && <MessageBox text={hiddenHint} buttons={['확인']} onAnswer={() => setHiddenHint(null)} />} />
+        onSelect={chooseTeam}
+        onSelectLocked={chooseTeam}
+        onCancel={onBack}
+        overlay={hiddenHint !== null && <MessageBox text={hiddenHint} buttons={['확인']} onAnswer={() => setHiddenHint(null)} />}
+      />
     )
   }
 
@@ -494,12 +514,24 @@ export function TradeScreen({
    */
   const footer = step.kind === '영입' ? (forced !== null ? 7 : isListPitcher ? 0xf : 0x17) : step.kind === '보상' ? 7 : 5
   const title = isListStep ? (isListPitcher ? '투수엔트리' : '타자엔트리') : '시즌모드'
-  const acquiredRow = acquiredEntry === null || step.kind === '팀' ? null : {
-    name: acquiredEntry.name, teamId: step.teamId, profileLow: acquiredEntry.profileLow ?? -1, grade: acquiredEntry.grade,
-  }
-  const givenRow = givenEntry === null ? null : {
-    name: givenEntry.name, teamId: record.teamId, profileLow: givenEntry.profileLow ?? -1, grade: givenEntry.grade,
-  }
+  const acquiredRow =
+    acquiredEntry === null || step.kind === '팀'
+      ? null
+      : {
+          name: acquiredEntry.name,
+          teamId: step.teamId,
+          profileLow: acquiredEntry.profileLow ?? -1,
+          grade: acquiredEntry.grade,
+        }
+  const givenRow =
+    givenEntry === null
+      ? null
+      : {
+          name: givenEntry.name,
+          teamId: record.teamId,
+          profileLow: givenEntry.profileLow ?? -1,
+          grade: givenEntry.grade,
+        }
 
   return (
     <RawScreen>
@@ -519,16 +551,24 @@ export function TradeScreen({
           picked={-1}
           showsNameBars
           // 웹 전용: 줄을 누르면 그 줄을 고른다(예전 목록과 같다) — 원본은 위·아래 · 확인 키뿐이다
-          onPressRow={isBusy ? undefined : (index) => {
-            moveCursor(index)
-            listSelect(lockedCursor ?? index)
-          }}
-          onPressArrow={isBusy ? undefined : (direction) => {
-            if (direction === '위' || direction === '아래') {
-              const count = listRows.length
-              if (count > 0) moveCursor((shownCursor + (direction === '위' ? -1 : 1) + count) % count)
-            }
-          }}
+          onPressRow={
+            isBusy
+              ? undefined
+              : (index) => {
+                  moveCursor(index)
+                  listSelect(lockedCursor ?? index)
+                }
+          }
+          onPressArrow={
+            isBusy
+              ? undefined
+              : (direction) => {
+                  if (direction === '위' || direction === '아래') {
+                    const count = listRows.length
+                    if (count > 0) moveCursor((shownCursor + (direction === '위' ? -1 : 1) + count) % count)
+                  }
+                }
+          }
         />
       )}
       {isListStep && (
@@ -543,10 +583,14 @@ export function TradeScreen({
           showsChoices={progress === null}
           cursor={shownCursor}
           rateOf={rateOf}
-          onPressRow={isBusy ? undefined : (index) => {
-            moveCursor(index)
-            chooseBoost(index)
-          }}
+          onPressRow={
+            isBusy
+              ? undefined
+              : (index) => {
+                  moveCursor(index)
+                  chooseBoost(index)
+                }
+          }
         />
       )}
 
@@ -558,21 +602,31 @@ export function TradeScreen({
         />
       )}
       {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={closeNotice} />}
-      {progress !== null && (
-        <TradeProgress stage={progress} onComplete={runTrade} onFinish={onFinish} />
-      )}
+      {progress !== null && <TradeProgress stage={progress} onComplete={runTrade} onFinish={onFinish} />}
 
       {/* 머리띠·바닥띠 (P6 1-1) — 바닥띠의 되돌아가기가 원본 취소 키(−16) 자리, "*투수" · "*타자" 표시가 '*' 자리다 */}
       {/* 진행 판이 서 있으면 되돌아가기는 그 판의 CLR(건너뛰기 · 끝) 그대로 — 키와 같은 길(r186). 예전엔 판 밑 단계를 되돌렸다 */}
-      <ScreenFrame title={title} gamePoint={gamePoints} onBack={progress !== null ? () => tapKey('Escape') : backOneStep} footer={footer} slides={false}
-        footerPresses={countsKeys ? {
-          ...(canFlip ? {
-            [FOOTER_BITS.batter]: { label: '* 타자', onPress: flipListTab },
-            [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: flipListTab },
-          } : {}),
-          // 바닥띠 "0상세정보" 표시(0xf · 0x17 · 7 모두 비트 2) — '0' 자리
-          [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: toggleDetail },
-        } : undefined} />
+      <ScreenFrame
+        title={title}
+        gamePoint={gamePoints}
+        onBack={progress !== null ? () => tapKey('Escape') : backOneStep}
+        footer={footer}
+        slides={false}
+        footerPresses={
+          countsKeys
+            ? {
+                ...(canFlip
+                  ? {
+                      [FOOTER_BITS.batter]: { label: '* 타자', onPress: flipListTab },
+                      [FOOTER_BITS.pitcher]: { label: '* 투수', onPress: flipListTab },
+                    }
+                  : {}),
+                // 바닥띠 "0상세정보" 표시(0xf · 0x17 · 7 모두 비트 2) — '0' 자리
+                [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: toggleDetail },
+              }
+            : undefined
+        }
+      />
     </RawScreen>
   )
 }
@@ -623,9 +677,7 @@ function TradeProgress({ stage, onComplete, onFinish }: TradeProgressProps) {
   const update = useUpdateCounter(stage === '진행')
   const [isSkipped, setSkipped] = useState(false)
   const isCompleted = useRef(false)
-  const gauge = stage !== '진행' || isSkipped
-    ? PROGRESS_BOX.width
-    : Math.min((update + 1) * PROGRESS_STEP, PROGRESS_BOX.width)
+  const gauge = stage !== '진행' || isSkipped ? PROGRESS_BOX.width : Math.min((update + 1) * PROGRESS_STEP, PROGRESS_BOX.width)
 
   // 다 찬 틀에 한 번만 굴린다 — 건너뛰기면 그다음 틀
   const latest = useRef(onComplete)
@@ -658,19 +710,24 @@ function TradeProgress({ stage, onComplete, onFinish }: TradeProgressProps) {
   }, [stage, update, onFinish])
 
   const dots = '.'.repeat(Math.floor(update / 4) % 4)
-  const text = stage === '진행'
-    ? `!C!cFFFFFF${TRADE_PROGRESS}${dots}`
-    : stage === '성공' ? `!C!c00FF00${TRADE_SUCCESS}` : `!C!cFF0000${TRADE_FAILURE}`
+  const text =
+    stage === '진행' ? `!C!cFFFFFF${TRADE_PROGRESS}${dots}` : stage === '성공' ? `!C!c00FF00${TRADE_SUCCESS}` : `!C!cFF0000${TRADE_FAILURE}`
   const box = PROGRESS_BOX
   return (
-    <div role="status" aria-label="트레이드 진행" onClick={() => (stage === '진행' ? skip() : onFinish())}
-      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}>
+    <div
+      role="status"
+      aria-label="트레이드 진행"
+      onClick={() => (stage === '진행' ? skip() : onFinish())}
+      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}
+    >
       <div style={{ position: 'absolute', left: box.x, top: box.y - 22, width: box.width }}>
         <MarkupText raw={text} />
       </div>
       <div style={{ position: 'absolute', left: box.x, top: box.y, width: box.width, height: box.height, background: 'rgb(24, 52, 124)' }} />
-      <div data-testid="트레이드-게이지"
-        style={{ position: 'absolute', left: box.x, top: box.y, width: gauge, height: box.height, background: 'rgb(71, 219, 0)' }} />
+      <div
+        data-testid="트레이드-게이지"
+        style={{ position: 'absolute', left: box.x, top: box.y, width: gauge, height: box.height, background: 'rgb(71, 219, 0)' }}
+      />
       <div style={{ position: 'absolute', left: box.x, top: box.y + box.height - 1, width: gauge, height: 1, background: 'rgb(58, 197, 0)' }} />
       {gauge > 2 && (
         <div style={{ position: 'absolute', left: box.x + 1, top: box.y + 1, width: gauge - 2, height: 5, background: 'rgb(133, 233, 28)' }} />

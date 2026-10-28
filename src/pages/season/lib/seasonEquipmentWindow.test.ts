@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import fixture from '@/pages/season/lib/__fixtures__/tabPanel0x7c110.json'
 import {
-  descriptionBoxRectsOf, divisionsOf, effectOffsetsOf, equipmentDescriptionOf, equipmentEffectBonusOf, equipmentItemNameOf,
-  equipmentPriceTenThousandsOf, moveEquipmentLevel, moveEquipmentPart, partMarkerBoxOf, partSeparatorRectsOf,
-  scrollThumbRectsOf, scrolledEquipmentTopOf, tabPanelRectsOf,
+  descriptionBoxRectsOf,
+  divisionsOf,
+  effectOffsetsOf,
+  equipmentDescriptionOf,
+  equipmentEffectBonusOf,
+  equipmentItemNameOf,
+  equipmentPriceTenThousandsOf,
+  moveEquipmentLevel,
+  moveEquipmentPart,
+  partMarkerBoxOf,
+  partSeparatorRectsOf,
+  scrollThumbRectsOf,
+  scrolledEquipmentTopOf,
+  tabPanelRectsOf,
 } from '@/pages/season/lib/seasonEquipmentWindow'
 import type { WindowRect } from '@/pages/season/lib/seasonEquipmentWindow'
 

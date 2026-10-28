@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-import {
-  SCENE_RESULT_CODE_START,
-  sceneResultCodeAfterPitch,
-  sceneResultCodeOfThrown,
-} from '@/features/defense-play/model/sceneResultCode'
+import { SCENE_RESULT_CODE_START, sceneResultCodeAfterPitch, sceneResultCodeOfThrown } from '@/features/defense-play/model/sceneResultCode'
 
 describe('경기 +0xfd4 — 0x11 진입(3deea)이 공마다 0, 휘두른 공만 스윙 판정(5130e)이 덮는다', () => {
   it('안 휘두른 공(볼 · 루킹 · 사구)은 0', () => {

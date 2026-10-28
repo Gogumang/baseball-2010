@@ -1,12 +1,4 @@
-import {
-  ASCII_ATLAS,
-  DRAWABLE_SYLLABLES,
-  FIRST_COMPAT_JAMO,
-  HANGUL_ATLAS,
-  JAMO_SLOTS,
-  LAST_COMPAT_JAMO,
-  TABLE_QUIRKS,
-} from '@/shared/lib/font/atlas'
+import { ASCII_ATLAS, DRAWABLE_SYLLABLES, FIRST_COMPAT_JAMO, HANGUL_ATLAS, JAMO_SLOTS, LAST_COMPAT_JAMO, TABLE_QUIRKS } from '@/shared/lib/font/atlas'
 
 /**
  * 원본 비트맵 글꼴의 글자 합성 — 해독 문서 R5-font-particles.md 3·6 절을 그대로 옮긴 순수 함수다.
@@ -118,11 +110,7 @@ export function chooseSets({ cho, jung, jong }: JamoIndices): JamoSets {
   if (horizontal && jong >= 0) {
     const choStroke = HANGUL_ATLAS.choStroke[Math.max(cho, 0)]
     const jongStroke = HANGUL_ATLAS.jongStroke[jong]
-    const rowIndex =
-      choStroke + jongStroke > 4 ? 0
-        : choStroke === 1 && jongStroke === 3 ? 1
-          : choStroke === 3 && jongStroke === 1 ? 2
-            : 3
+    const rowIndex = choStroke + jongStroke > 4 ? 0 : choStroke === 1 && jongStroke === 3 ? 1 : choStroke === 3 && jongStroke === 1 ? 2 : 3
     const row = SET_ROWS[rowIndex]
     return {
       choSet: row[0] + (IS_COMPLEX_VOWEL[vowel] === 1 ? 1 : 0),
@@ -201,12 +189,14 @@ export function glyphOf(character: string): Glyph {
       return {
         kind: 'draw',
         advance: ASCII_ATLAS.glyphWidth,
-        pieces: [{
-          atlas: 'ascii',
-          column: index % ASCII_ATLAS.columns,
-          row: Math.trunc(index / ASCII_ATLAS.columns),
-          shiftX: 0,
-        }],
+        pieces: [
+          {
+            atlas: 'ascii',
+            column: index % ASCII_ATLAS.columns,
+            row: Math.trunc(index / ASCII_ATLAS.columns),
+            shiftX: 0,
+          },
+        ],
       }
     }
     // 0x7F 을 포함한 제어문자와 공백. 그림은 없어도 전진은 한다.

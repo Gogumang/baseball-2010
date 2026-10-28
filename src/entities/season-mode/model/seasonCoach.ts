@@ -29,8 +29,7 @@ export const COACH_CONTRACT_TABLE: readonly number[] = [10, 15, 20, 25, 35, 10, 
 /** 실제 차감은 `소지금(100만 단위) −= 표값 × 10` 이다 (0xa29e~0xa2be) — 표시 금액과 같은 값 */
 export const COACH_FEE_SCALE = 10
 /** 필요 인기도 표 `0xcbc10` s16 **[0, 100, 300, 500, 1000] × 2** (StrMODE[160]) */
-export const COACH_REQUIRED_POPULARITY: readonly number[] =
-  [0, 100, 300, 500, 1000, 0, 100, 300, 500, 1000]
+export const COACH_REQUIRED_POPULARITY: readonly number[] = [0, 100, 300, 500, 1000, 0, 100, 300, 500, 1000]
 
 /** StrMODE[149]~[158] — 코치 칸별 보너스 설명 (표 0xd884c 의 값이 그대로 문구에 적혀 있다) */
 const COACH_EFFECT_FIRST_TEXT = 149
@@ -75,8 +74,7 @@ export function coachEffectTextOf(slot: number): string {
 export type CoachHireRefusal = '없는칸' | '이미채용' | '소지금부족' | '인기도부족'
 
 export type CoachHireCheck =
-  | { readonly ok: true; readonly fee: number }
-  | { readonly ok: false; readonly reason: CoachHireRefusal; readonly required?: number }
+  { readonly ok: true; readonly fee: number } | { readonly ok: false; readonly reason: CoachHireRefusal; readonly required?: number }
 
 /**
  * 채용 가드 — 원본 `0xa79c~` 의 **순서 그대로** (J 4-3 확정):
@@ -87,11 +85,7 @@ export type CoachHireCheck =
  * StrCOMMON[42] 알림, 그 밖은 [43] G 오픈 팝업 0x1f 다 — 화면(`CoachHireScreen` → `AceSelectScreen` 코치 모드)이 맡는다.
  * StrHOWTO[23] "현재 오픈된 마선수만 코치로 채용할 수 있다" 가 그 검사다.
  */
-export function checkCoachHire(
-  record: SeasonRecord,
-  popularity: number,
-  slot: number,
-): CoachHireCheck {
+export function checkCoachHire(record: SeasonRecord, popularity: number, slot: number): CoachHireCheck {
   const fee = coachFeeOf(slot)
   const required = coachRequiredPopularityOf(slot)
   if (fee === null || required === null) return { ok: false, reason: '없는칸' }

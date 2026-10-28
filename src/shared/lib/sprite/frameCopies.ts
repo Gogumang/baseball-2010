@@ -29,8 +29,7 @@ export function hasFrameCopies(framesFolder: string): boolean {
 }
 
 export const frameCopiesUrl = (framesFolder: string) => `${framesFolder}/copy.json`
-export const frameCopyUrl = (framesFolder: string, frame: number) =>
-  `${framesFolder}/copy/${String(frame).padStart(3, '0')}.png`
+export const frameCopyUrl = (framesFolder: string, frame: number) => `${framesFolder}/copy/${String(frame).padStart(3, '0')}.png`
 
 /** 받은 `copy.json`(모양이 틀리면 빈 목록)에 그 프레임이 있는가 */
 export function isCopiedFrame(listing: unknown, frame: number): boolean {

@@ -83,7 +83,13 @@ async function openPage(browser, browserName, device) {
     if (message.type() !== 'error') return
     const text = message.text()
     // 웹폰트 CDN 을 일부러 끊어 생기는 줄
-    if (/ERR_FAILED|ERR_CONNECTION_REFUSED|ERR_NAME|cdn\.jsdelivr|Failed to load resource: (net::|The network connection)|access control checks/.test(text) && !/sprites\//.test(text)) return
+    if (
+      /ERR_FAILED|ERR_CONNECTION_REFUSED|ERR_NAME|cdn\.jsdelivr|Failed to load resource: (net::|The network connection)|access control checks/.test(
+        text,
+      ) &&
+      !/sprites\//.test(text)
+    )
+      return
     stats.consoleErrors.push(text.slice(0, 200))
   })
   page.on('request', (request) => {
@@ -92,7 +98,9 @@ async function openPage(browser, browserName, device) {
     if (/\/sprites\/sprite-json\.bundle\.json/.test(url)) stats.bundle += 1
     else if (/\/sprites\/.+\.json(\?|$)/.test(url)) stats.spriteJson += 1
   })
-  const settle = () => { stats.inFlight -= 1 }
+  const settle = () => {
+    stats.inFlight -= 1
+  }
   page.on('requestfinished', async (request) => {
     settle()
     const response = await request.response().catch(() => null)
@@ -117,11 +125,16 @@ async function waitQuiet(page, stats) {
   }
   // 받은 그림의 onload · JSON 풀기 같은 실제 시간 일이 돌 틈
   // (쪽의 setTimeout 은 가짜 시계에 묶여 있으니 MessageChannel 로 한 바퀴)
-  await page.evaluate(() => new Promise((resolve) => {
-    const channel = new MessageChannel()
-    channel.port1.onmessage = () => resolve(null)
-    channel.port2.postMessage(0)
-  })).catch(() => {})
+  await page
+    .evaluate(
+      () =>
+        new Promise((resolve) => {
+          const channel = new MessageChannel()
+          channel.port1.onmessage = () => resolve(null)
+          channel.port2.postMessage(0)
+        }),
+    )
+    .catch(() => {})
 }
 
 /** 첫 화면을 열어 자산 묶음 받기 문이 끝날 때까지 (가짜 시계가 멈춰 있어 쪽 타이머로 기다리지 않는다) */
@@ -195,10 +208,14 @@ async function capture(browser, browserName, device, base, scene, label, target 
     pngs.push(await page.screenshot({ path: shotPath, animations: 'disabled' }).catch(() => null))
   }
   const png = pngs[0]
-  const images = await page.evaluate(() => ({
-    errors: window.__imageProbe?.errors ?? [],
-    broken: [...document.images].filter((image) => image.getAttribute('src') && image.complete && image.naturalWidth === 0).map((image) => image.src.slice(0, 160)),
-  })).catch(() => ({ errors: ['쪽을 못 읽음'], broken: [] }))
+  const images = await page
+    .evaluate(() => ({
+      errors: window.__imageProbe?.errors ?? [],
+      broken: [...document.images]
+        .filter((image) => image.getAttribute('src') && image.complete && image.naturalWidth === 0)
+        .map((image) => image.src.slice(0, 160)),
+    }))
+    .catch(() => ({ errors: ['쪽을 못 읽음'], broken: [] }))
   await context.close()
   return { png, pngs, zoom, error, virtual, stats, images }
 }
@@ -207,27 +224,31 @@ async function capture(browser, browserName, device, base, scene, label, target 
 async function diffPixels(helper, a, b) {
   if (a === null || b === null) return -1
   if (Buffer.compare(a, b) === 0) return 0
-  return helper.evaluate(async ([left, right]) => {
-    const load = async (base64) => {
-      const image = new Image()
-      image.src = `data:image/png;base64,${base64}`
-      await image.decode()
-      const canvas = document.createElement('canvas')
-      canvas.width = image.naturalWidth
-      canvas.height = image.naturalHeight
-      const context = canvas.getContext('2d', { willReadFrequently: true })
-      context.drawImage(image, 0, 0)
-      return context.getImageData(0, 0, canvas.width, canvas.height)
-    }
-    const x = await load(left)
-    const y = await load(right)
-    if (x.width !== y.width || x.height !== y.height) return -2
-    let count = 0
-    for (let at = 0; at < x.data.length; at += 4) {
-      if (x.data[at] !== y.data[at] || x.data[at + 1] !== y.data[at + 1] || x.data[at + 2] !== y.data[at + 2] || x.data[at + 3] !== y.data[at + 3]) count += 1
-    }
-    return count
-  }, [a.toString('base64'), b.toString('base64')])
+  return helper.evaluate(
+    async ([left, right]) => {
+      const load = async (base64) => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${base64}`
+        await image.decode()
+        const canvas = document.createElement('canvas')
+        canvas.width = image.naturalWidth
+        canvas.height = image.naturalHeight
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+        context.drawImage(image, 0, 0)
+        return context.getImageData(0, 0, canvas.width, canvas.height)
+      }
+      const x = await load(left)
+      const y = await load(right)
+      if (x.width !== y.width || x.height !== y.height) return -2
+      let count = 0
+      for (let at = 0; at < x.data.length; at += 4) {
+        if (x.data[at] !== y.data[at] || x.data[at + 1] !== y.data[at + 1] || x.data[at + 2] !== y.data[at + 2] || x.data[at + 3] !== y.data[at + 3])
+          count += 1
+      }
+      return count
+    },
+    [a.toString('base64'), b.toString('base64')],
+  )
 }
 
 /**
@@ -235,10 +256,16 @@ async function diffPixels(helper, a, b) {
  * 쪽 오류 · 콘솔 오류는 글로. "Failed to load resource" 콘솔 줄은 주소가 없어 경로 쪽과 겹치므로 뺀다.
  */
 function problemsOf(side, base) {
-  const strip = (url) => url.replace(/^\S+\s/, '').replace(base, '').replace(/^https?:\/\/[^/]+\//, '')
+  const strip = (url) =>
+    url
+      .replace(/^\S+\s/, '')
+      .replace(base, '')
+      .replace(/^https?:\/\/[^/]+\//, '')
   const paths = new Set([
-    ...side.stats.badResponses.map(strip), ...side.stats.failed.map(strip),
-    ...side.images.errors.map(strip), ...side.images.broken.map(strip),
+    ...side.stats.badResponses.map(strip),
+    ...side.stats.failed.map(strip),
+    ...side.images.errors.map(strip),
+    ...side.images.broken.map(strip),
   ])
   const messages = new Set([...side.stats.pageErrors, ...side.stats.consoleErrors.filter((text) => !text.startsWith('Failed to load resource'))])
   return { paths: [...paths].sort(), messages: [...messages] }
@@ -248,10 +275,13 @@ const isOk = (row) => row.diff === 0 && row.errorA === null && row.errorB === nu
 
 const asked = process.argv.slice(2)
 const names = asked.length > 0 ? asked : sceneNames()
-const RUNS = (process.env.PIXELS_RUNS ?? 'chromium:desktop,webkit:iphone').split(',').map((pair) => {
-  const [browserName, device] = pair.split(':')
-  return { browserName, device }
-}).filter((run) => ONLY === undefined || run.browserName === ONLY)
+const RUNS = (process.env.PIXELS_RUNS ?? 'chromium:desktop,webkit:iphone')
+  .split(',')
+  .map((pair) => {
+    const [browserName, device] = pair.split(':')
+    return { browserName, device }
+  })
+  .filter((run) => ONLY === undefined || run.browserName === ONLY)
 
 const rows = []
 const started = Date.now()
@@ -318,10 +348,25 @@ for (const { browserName, device } of RUNS) {
       differingShots = shots
     }
     const row = {
-      browserName, device, zoom: a.zoom, shots: SHOTS, differingShots, selfNoise, scene, diff, aligned, virtualA: a.virtual, virtualB: b.virtual,
-      errorA: a.error, errorB: b.error,
-      jsonA: a.stats.spriteJson, jsonB: b.stats.spriteJson, bundleA: a.stats.bundle, bundleB: b.stats.bundle,
-      problemsA: problemsOf(a, A), problemsB: problemsOf(b, B),
+      browserName,
+      device,
+      zoom: a.zoom,
+      shots: SHOTS,
+      differingShots,
+      selfNoise,
+      scene,
+      diff,
+      aligned,
+      virtualA: a.virtual,
+      virtualB: b.virtual,
+      errorA: a.error,
+      errorB: b.error,
+      jsonA: a.stats.spriteJson,
+      jsonB: b.stats.spriteJson,
+      bundleA: a.stats.bundle,
+      bundleB: b.stats.bundle,
+      problemsA: problemsOf(a, A),
+      problemsB: problemsOf(b, B),
     }
     // B 에만 있는 문제 — 이번 바꿈이 새로 낸 것
     row.newPaths = row.problemsB.paths.filter((path) => !row.problemsA.paths.includes(path))
@@ -329,12 +374,14 @@ for (const { browserName, device } of RUNS) {
     rows.push(row)
     const ok = isOk(row)
     const known = row.problemsA.paths.length + row.problemsA.messages.length
-    console.log(`${ok ? 'ok  ' : 'DIFF'} ${browserName.padEnd(8)} ${device}(×${a.zoom}) ${scene.padEnd(28)} 다른 픽셀 ${String(diff).padStart(6)}` +
-      `${SHOTS > 1 ? ` (찍은 ${SHOTS} 장 중 다른 ${differingShots})` : ''}${selfNoise > 0 ? ` · A 끼리 흔들린 장 ${selfNoise}` : ''} · 가상 ${a.virtual}/${b.virtual}ms${aligned ? '(맞춤)' : ''}` +
-      ` · 새 문제 ${row.newPaths.length + row.newMessages.length} (둘 다 있던 것 ${known}) · JSON 낱개 A ${row.jsonA} B ${row.jsonB} · 묶음 A ${row.bundleA} B ${row.bundleB}` +
-      `${row.errorA ? ` · A: ${row.errorA}` : ''}${row.errorB ? ` · B: ${row.errorB}` : ''}` +
-      `${row.newPaths.length + row.newMessages.length > 0 ? ` · B 에만: ${[...row.newPaths, ...row.newMessages].slice(0, 5).join(' | ')}` : ''}` +
-      `${known > 0 ? ` · 둘 다: ${[...row.problemsA.paths, ...row.problemsA.messages].slice(0, 5).join(' | ')}` : ''}`)
+    console.log(
+      `${ok ? 'ok  ' : 'DIFF'} ${browserName.padEnd(8)} ${device}(×${a.zoom}) ${scene.padEnd(28)} 다른 픽셀 ${String(diff).padStart(6)}` +
+        `${SHOTS > 1 ? ` (찍은 ${SHOTS} 장 중 다른 ${differingShots})` : ''}${selfNoise > 0 ? ` · A 끼리 흔들린 장 ${selfNoise}` : ''} · 가상 ${a.virtual}/${b.virtual}ms${aligned ? '(맞춤)' : ''}` +
+        ` · 새 문제 ${row.newPaths.length + row.newMessages.length} (둘 다 있던 것 ${known}) · JSON 낱개 A ${row.jsonA} B ${row.jsonB} · 묶음 A ${row.bundleA} B ${row.bundleB}` +
+        `${row.errorA ? ` · A: ${row.errorA}` : ''}${row.errorB ? ` · B: ${row.errorB}` : ''}` +
+        `${row.newPaths.length + row.newMessages.length > 0 ? ` · B 에만: ${[...row.newPaths, ...row.newMessages].slice(0, 5).join(' | ')}` : ''}` +
+        `${known > 0 ? ` · 둘 다: ${[...row.problemsA.paths, ...row.problemsA.messages].slice(0, 5).join(' | ')}` : ''}`,
+    )
   }
   await browser.close()
 }

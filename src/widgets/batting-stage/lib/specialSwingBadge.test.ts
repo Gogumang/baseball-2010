@@ -33,9 +33,7 @@ describe('필살 남은 횟수 표시 — 0x38a30', () => {
 
   it('애니 5 는 62~68 · 62 — 0xe · 0xf 에 들어선 뒤 그림마다 한 칸, 끝 칸 62 에 멈춘다', () => {
     expect(entries.map((entry) => entry.frame)).toEqual([62, 63, 64, 65, 66, 67, 68, 62])
-    const frames = [0, 1, 2, 3, 4, 5, 6, 7, 8, 20].map((tick) =>
-      specialSwingBadgeFrameOf(entries, { kind: '대기', tick, isPaused: false }),
-    )
+    const frames = [0, 1, 2, 3, 4, 5, 6, 7, 8, 20].map((tick) => specialSwingBadgeFrameOf(entries, { kind: '대기', tick, isPaused: false }))
     expect(frames).toEqual([62, 63, 64, 65, 66, 67, 68, 62, 62, 62])
     expect(specialSwingBadgeFrameOf(entries, { kind: '투구중', tick: 2, isPaused: false })).toBe(62)
   })

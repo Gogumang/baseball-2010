@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  quickEngineSteal,
-  quickStealBaseOf,
-  stealChanceOf,
-} from '@/entities/game/model/steal'
+import { quickEngineSteal, quickStealBaseOf, stealChanceOf } from '@/entities/game/model/steal'
 import type { BatterAbility } from '@/entities/batting/model/batter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'

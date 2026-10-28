@@ -105,9 +105,7 @@ const OK: TrainingCheckResult = { ok: true }
 export function checkSeasonTraining(input: TrainingCheckInput, slot: number): TrainingCheckResult {
   if (input.teamMorale === 0) return { ok: false, reason: '사기없음' }
 
-  const maxed = TEAM_ABILITY_LABELS.filter(
-    (_, index) => (input.abilities[index] ?? 0) > TRAINING_GUARD_CEILING,
-  )
+  const maxed = TEAM_ABILITY_LABELS.filter((_, index) => (input.abilities[index] ?? 0) > TRAINING_GUARD_CEILING)
 
   if (slot === HELL_TRAINING_INDEX) {
     if (input.gamePoints < HELL_TRAINING_GAME_POINT) return { ok: false, reason: 'G부족' }

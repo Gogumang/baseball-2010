@@ -6,8 +6,18 @@ import { createCareer, MAXIMUM_MORALE } from '@/entities/career/model/playerCare
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
 import { SUB_ITEMS } from '@/entities/career/model/subItems'
 import {
-  DESCRIPTION_BOX, MONEY_BAR_OFFSET, NAME_BOX, RIGHT_TAB_BOX, SLOT_COUNT, SLOT_SIZE, SLOT_XS, SLOT_YS, VALUE_BOX, WINDOW_BOX,
-  slotPositionOf, valueBarPositionOf,
+  DESCRIPTION_BOX,
+  MONEY_BAR_OFFSET,
+  NAME_BOX,
+  RIGHT_TAB_BOX,
+  SLOT_COUNT,
+  SLOT_SIZE,
+  SLOT_XS,
+  SLOT_YS,
+  VALUE_BOX,
+  WINDOW_BOX,
+  slotPositionOf,
+  valueBarPositionOf,
 } from '@/pages/shop/lib/shopLayout'
 
 /**
@@ -21,9 +31,7 @@ afterEach(cleanup)
 const 소지금많은선수 = { ...createCareer('테스터'), gamePoint: 9999, money: 9999 }
 
 const 띄우기 = (tab: string, career = 소지금많은선수, onPurchase = vi.fn()) => {
-  render(
-    <ShopScreen initialTab={tab} career={career} noticeText="" onPurchase={onPurchase} onBack={vi.fn()} />,
-  )
+  render(<ShopScreen initialTab={tab} career={career} noticeText="" onPurchase={onPurchase} onBack={vi.fn()} />)
   return onPurchase
 }
 
@@ -84,9 +92,7 @@ describe('아이템 창 박스 (mode_ui 프레임 33)', () => {
   })
 
   it('판은 (24,48) 192×212 공용 판 0x55e60 이다 (81e66 — 제목 탭 1)', () => {
-    render(
-      <ShopScreen initialTab="GP" career={소지금많은선수} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />,
-    )
+    render(<ShopScreen initialTab="GP" career={소지금많은선수} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />)
     const panel = screen.getByTestId('상점-판')
 
     expect(panel.style.left).toBe(`${WINDOW_BOX.x}px`)
@@ -107,9 +113,7 @@ describe('아이템 창 박스 (mode_ui 프레임 33)', () => {
   })
 
   it('이름 딱지는 박스 3, 값 칸은 박스 5 자리다', () => {
-    const { container } = render(
-      <ShopScreen initialTab="GP" career={소지금많은선수} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />,
-    )
+    const { container } = render(<ShopScreen initialTab="GP" career={소지금많은선수} noticeText="" onPurchase={vi.fn()} onBack={vi.fn()} />)
     const names = screen.getAllByText(BATTER_GP_ITEMS[0].name)
     // 이름은 검정 그림자 + 흰 글 두 장이다
     expect(names.length).toBe(2)
@@ -199,4 +203,3 @@ describe('격자 커서 감김 (0x81618 목록 꼴 0x30)', () => {
     expect(칸(BATTER_GP_ITEMS[5]!.name).getAttribute('aria-selected')).toBe('true')
   })
 })
-

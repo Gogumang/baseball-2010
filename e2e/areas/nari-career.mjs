@@ -1,7 +1,14 @@
 // 도메인 nari-career — 나리 타자편 포스트시즌 · 국가대항전 · 엔딩 · 명예의 전당 (장면 표 `src/app/dev/scenes/nariCareer.ts`, soak 픽스처).
 export const sources = [
-  'src/pages/ending/', 'src/pages/national-cup/', 'src/entities/national-cup/', 'src/entities/awards/', 'src/app/model/careerPostseason',
-  'src/app/model/useCareerSession', 'src/entities/career/', 'src/pages/management/lib/nariYearCover', 'e2e/fixtures/nari-',
+  'src/pages/ending/',
+  'src/pages/national-cup/',
+  'src/entities/national-cup/',
+  'src/entities/awards/',
+  'src/app/model/careerPostseason',
+  'src/app/model/useCareerSession',
+  'src/entities/career/',
+  'src/pages/management/lib/nariYearCover',
+  'e2e/fixtures/nari-',
 ]
 export const representative = 'nari-postseason'
 
@@ -28,9 +35,7 @@ export const actions = {
     { name: '등록 질문 예 → 등록 목록', steps: ['@예', 'w800'], expect: '1번 슬롯' },
   ],
   // r254 — 사람 팀 포스트시즌 시리즈 · 한국시리즈 우승 팝업
-  'nari-postseason-game': [
-    { name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] },
-  ],
+  'nari-postseason-game': [{ name: "경기 중 메뉴 '*'", steps: ['@메뉴'], expect: '계속하기', undo: ['@닫기'] }],
   'nari-postseason-next': [
     // 키 0x13da0 — 다음 라운드 대진에 내 팀이 있어 142 경기 준비
     { name: '대진판 다음 → 다음 라운드 142 경기 준비', steps: ['@다음', 'w1500'], expect: '경기 시작' },

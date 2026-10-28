@@ -79,7 +79,11 @@ export interface PopupWindowMotion {
  * `skipsMotion` 이 참이면(레이아웃이 없는 시험 환경 따위) 다 펼친 채로 시작하고 `'줄임'` 도 바로 닫는다 — `MessageBox` 와 같은 약속.
  */
 export function usePopupWindowMotion({
-  targetHeight, skipsMotion = false, expands = true, opensAtOnce = false, isCommonWindow = true,
+  targetHeight,
+  skipsMotion = false,
+  expands = true,
+  opensAtOnce = false,
+  isCommonWindow = true,
 }: {
   /** [창+0x20e] — 0x741a0 의 둘째 인자 */
   readonly targetHeight: number
@@ -161,23 +165,26 @@ export function usePopupWindowMotion({
     [],
   )
 
-  const close = useCallback((kind: PopupCloseKind, onClosed?: () => void, onNextUpdate?: () => void) => {
-    if (!acceptsKeys()) return false
-    onClosedRef.current = onClosed
-    if (kind === '바로' || skipsMotionRef.current) {
-      onNextUpdate?.()
-      finish()
+  const close = useCallback(
+    (kind: PopupCloseKind, onClosed?: () => void, onNextUpdate?: () => void) => {
+      if (!acceptsKeys()) return false
+      onClosedRef.current = onClosed
+      if (kind === '바로' || skipsMotionRef.current) {
+        onNextUpdate?.()
+        finish()
+        return true
+      }
+      onNextUpdateRef.current = onNextUpdate
+      // [+0x290] == 0 이면 다음 갱신의 첫 갈래가 줄임 없이 닫는다 — 폭 0 은 다음 갱신에 닫히는 값이다
+      const width = expandsRef.current ? POPUP_CLOSE_START_WIDTH : 0
+      openingRef.current = null
+      setOpeningHeight(null)
+      closingRef.current = width
+      setClosingWidth(width)
       return true
-    }
-    onNextUpdateRef.current = onNextUpdate
-    // [+0x290] == 0 이면 다음 갱신의 첫 갈래가 줄임 없이 닫는다 — 폭 0 은 다음 갱신에 닫히는 값이다
-    const width = expandsRef.current ? POPUP_CLOSE_START_WIDTH : 0
-    openingRef.current = null
-    setOpeningHeight(null)
-    closingRef.current = width
-    setClosingWidth(width)
-    return true
-  }, [acceptsKeys, finish])
+    },
+    [acceptsKeys, finish],
+  )
 
   return { openingHeight, closingWidth, isClosed, acceptsKeys, close }
 }

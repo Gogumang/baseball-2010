@@ -58,8 +58,7 @@ export function InputModeBox({ nameBox }: { readonly nameBox: Box }) {
     <>
       <PaintedRects x={box.x} y={box.y} width={box.width + 1} height={box.height + 1} paints={paints} testId="입력방식칸" />
       <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={origins} x={arrows.left.x} y={arrows.left.y} />
-      <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={origins} x={arrows.right.x} y={arrows.right.y}
-        style={{ transform: 'scaleX(-1)' }} />
+      <FrameSprite folder={MODE_UI} frame={ARROW_FRAME} origins={origins} x={arrows.right.x} y={arrows.right.y} style={{ transform: 'scaleX(-1)' }} />
     </>
   )
 }

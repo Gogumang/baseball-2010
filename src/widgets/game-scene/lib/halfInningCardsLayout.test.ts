@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  HALF_INNING_CARDS_Y, HALF_INNING_CARD_X, dueUpCardPlacementOf, dueUpLineupSlotOf, dueUpOrderOf, halfInningCardsAt,
+  HALF_INNING_CARDS_Y,
+  HALF_INNING_CARD_X,
+  dueUpCardPlacementOf,
+  dueUpLineupSlotOf,
+  dueUpOrderOf,
+  halfInningCardsAt,
   pitcherCardPlacementOf,
 } from '@/widgets/game-scene/lib/halfInningCardsLayout'
 
@@ -24,7 +29,10 @@ describe('PITCHER 판 0x420dc', () => {
       { x: 150, y: 168, width: 0x4d, height: 0x36 },
     ])
     expect(placed.title).toEqual({ frame: 186, x: 155, y: 162 })
-    expect(placed.frames).toEqual([{ frame: 31, x: 153, y: 171 }, { frame: 17, x: 137, y: 18 }])
+    expect(placed.frames).toEqual([
+      { frame: 31, x: 153, y: 171 },
+      { frame: 17, x: 137, y: 18 },
+    ])
     expect(placed.images).toEqual([{ image: 0, x: 159, y: 174 }])
     expect(placed.name).toEqual({ x: 171, y: 173, width: 0x34, height: 0 })
   })
@@ -32,9 +40,15 @@ describe('PITCHER 판 0x420dc', () => {
   it('S·B·O 점은 min(st[4], 2) · min(st[5], 3) · min(st[6], 2) 개, 9px 간격', () => {
     const placed = pitcherCardPlacementOf(14, 158, { strikes: 2, balls: 4, outs: 3 })
     const dots = placed.images.slice(1)
-    expect(dots.filter((dot) => dot.image === 13).map((dot) => [dot.x, dot.y])).toEqual([[36, 190], [45, 190]])
+    expect(dots.filter((dot) => dot.image === 13).map((dot) => [dot.x, dot.y])).toEqual([
+      [36, 190],
+      [45, 190],
+    ])
     expect(dots.filter((dot) => dot.image === 14).map((dot) => dot.x)).toEqual([36, 45, 54])
-    expect(dots.filter((dot) => dot.image === 15).map((dot) => [dot.x, dot.y])).toEqual([[36, 210], [45, 210]])
+    expect(dots.filter((dot) => dot.image === 15).map((dot) => [dot.x, dot.y])).toEqual([
+      [36, 210],
+      [45, 210],
+    ])
   })
 })
 

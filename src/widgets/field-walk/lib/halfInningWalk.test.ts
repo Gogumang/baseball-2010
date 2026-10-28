@@ -14,7 +14,10 @@ import { nameTagBoxOf, nameTagPiecesOf } from '@/widgets/field-walk/lib/nameTag'
 
 const BOUNDS = cameraBoundsOf(240, 320)
 const rolls = Array.from({ length: 9 }, (_unused, i) => ({
-  offenseSpeed: 300 + i, scatterX: 10 * i, scatterZ: 100 + i, fielderSpeed: 200 + i,
+  offenseSpeed: 300 + i,
+  scatterX: 10 * i,
+  scatterZ: 100 + i,
+  fielderSpeed: 200 + i,
 }))
 
 describe('공수 교대 판 0x3fac4 — 18명 세우기', () => {
@@ -67,8 +70,11 @@ describe('공수 교대 판 0x4f7ac — 매 틱', () => {
     const one = stepHalfInningWalk(start, 0)
     expect(one.fielders[0].actionTick).toBe(start.fielders[0].actionTick + 1)
     const late = halfInningWalkAt(input, 300)
-    expect(late.fielders.every((walker, i) =>
-      walker.x === FIELDER_START_POSITIONS[i].x && walker.z === FIELDER_START_POSITIONS[i].z && walker.action === 0)).toBe(true)
+    expect(
+      late.fielders.every(
+        (walker, i) => walker.x === FIELDER_START_POSITIONS[i].x && walker.z === FIELDER_START_POSITIONS[i].z && walker.action === 0,
+      ),
+    ).toBe(true)
   })
 
   it('틱 100 뒤 카메라가 멈춘 틱마다 다음 야수를 비춘다 — 표 0xd044c, 이름표는 그 칸', () => {
@@ -93,7 +99,11 @@ describe('운동장 전경 이름표 (4fbf6~4fe26)', () => {
     const pieces = nameTagPiecesOf(box)
     expect(pieces[0]).toEqual({ x: 95, y: 196, width: 52, height: 14, color: 'rgb(24, 36, 90)' })
     expect(pieces.filter((piece) => piece.color === 'rgb(41, 60, 140)')[0]).toEqual({
-      x: 97, y: 198, width: 48, height: 5, color: 'rgb(41, 60, 140)',
+      x: 97,
+      y: 198,
+      width: 48,
+      height: 5,
+      color: 'rgb(41, 60, 140)',
     })
   })
 })

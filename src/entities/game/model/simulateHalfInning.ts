@@ -7,10 +7,7 @@ import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { playQuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { QuickAtBatBatter, QuickAtBatPitcher, QuickAtBatSituation } from '@/entities/game/model/quickAtBat'
 import { runnerCountOf } from '@/entities/game/model/baseState'
-import {
-  judgePitcherChange,
-  replacementPitcherSlotOf,
-} from '@/entities/pitching/model/pitcherChange'
+import { judgePitcherChange, replacementPitcherSlotOf } from '@/entities/pitching/model/pitcherChange'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import {
@@ -24,13 +21,7 @@ import {
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
 import { strikeoutRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
-import {
-  lineupSlotOf,
-  recordLineupPlay,
-  rosterSlotAt,
-  tryQuickCpuPinchHit,
-  withLineupRecordSlot,
-} from '@/entities/game/model/quickLineup'
+import { lineupSlotOf, recordLineupPlay, rosterSlotAt, tryQuickCpuPinchHit, withLineupRecordSlot } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 
@@ -350,11 +341,9 @@ export function facingPitcherOf(
 ): QuickAtBatPitcher {
   const fightingSpirit = defense.fightingSpiritAt?.(runsThisHalf) === true
   const fresh = defense.pitcherAt(pitcherSlot, fightingSpirit)
-  const tired = defense.tiredPitcherAt?.(pitcherSlot, staminaPercent, fightingSpirit) ?? tiredWithoutBonusOf(
-    fightingSpirit ? defense.pitcherAt(pitcherSlot, false) : fresh,
-    staminaPercent,
-    fightingSpirit,
-  )
+  const tired =
+    defense.tiredPitcherAt?.(pitcherSlot, staminaPercent, fightingSpirit) ??
+    tiredWithoutBonusOf(fightingSpirit ? defense.pitcherAt(pitcherSlot, false) : fresh, staminaPercent, fightingSpirit)
   return { ...fresh, stamina: staminaPercent, tired }
 }
 
@@ -649,9 +638,7 @@ export function* simulateHalfInningTicks(
      * (P1 3-3). 그래서 마운드가 있으면 능력치 칸 3 대신 살아 있는 체력%를 넘긴다.
      */
     const facing =
-      defense !== undefined && mound !== undefined
-        ? facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(mound.stamina), runs)
-        : pitcher
+      defense !== undefined && mound !== undefined ? facingPitcherOf(defense, mound.pitcherSlot, staminaPercentOf(mound.stamina), runs) : pitcher
     /** 이 타석 동안 공마다 깎이는 스태미나 — 0xc262c 는 공을 던지기 **앞에** 0xa5e14 로 깎는다(c26c8) */
     let pitchStamina = mound?.stamina
     let thrownThisAtBat = 0
@@ -882,9 +869,7 @@ export function changePitcherIfNeeded(
     readonly moundRole?: PitcherRole
   },
 ): HalfInningMound {
-  const bench = defense.pitcherSlots.filter(
-    (slot) => slot !== mound.pitcherSlot && !mound.usedSlots.includes(slot),
-  )
+  const bench = defense.pitcherSlots.filter((slot) => slot !== mound.pitcherSlot && !mound.usedSlots.includes(slot))
   // `[sp+4]` = (모드 == 3) — 투수편만 `isOwnPlayerAt` 을 넘긴다
   const skipsOwn = defense.isOwnPlayerAt !== undefined
   const isOwn = defense.isOwnPlayerAt ?? (() => false)
@@ -1024,11 +1009,7 @@ export function drainPitcherForPitch(
   pitchTypeNumber: number,
   batterIntimidates: boolean,
 ): number {
-  const capacity = staminaCapacityOf(
-    defense.staminaAbilityAt(mound.pitcherSlot),
-    drainMoraleOf(defense, mound),
-    mound.usedSlots.length === 0,
-  )
+  const capacity = staminaCapacityOf(defense.staminaAbilityAt(mound.pitcherSlot), drainMoraleOf(defense, mound), mound.usedSlots.length === 0)
   const skillBits = defense.skillBitsAt?.(mound.pitcherSlot) ?? 0
   const cost = pitchStaminaCostOf({
     pitchTypeNumber,

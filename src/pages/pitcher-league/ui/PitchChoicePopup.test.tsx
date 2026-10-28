@@ -41,7 +41,7 @@ describe('투수 구질 두 갈래 팝업 0x78 (그리기 0x190f8 · 키 0x19398
     expect(screen.getByRole('button', { name: '마구' }).getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('창 그림 0x190f8 에 CLR 글자 자리가 없어 \'취소\' 상황 버튼(Escape)을 낸다 — 누르면 CLR 과 같이 상태를 안 바꾸고 닫는다 (r194)', () => {
+  it("창 그림 0x190f8 에 CLR 글자 자리가 없어 '취소' 상황 버튼(Escape)을 낸다 — 누르면 CLR 과 같이 상태를 안 바꾸고 닫는다 (r194)", () => {
     const onChoose = vi.fn()
     const onClosed = vi.fn()
     render(<PitchChoicePopup selected={0} onMove={() => {}} onChoose={onChoose} onClosed={onClosed} />)

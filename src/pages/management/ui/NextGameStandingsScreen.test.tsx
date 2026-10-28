@@ -9,10 +9,7 @@ import { EMPTY_LEAGUE } from '@/entities/league/model/league'
 afterEach(cleanup)
 
 const 띄우기 = (isFromManagement: boolean, handlers = { onConfirm: vi.fn(), onCancel: vi.fn() }) => ({
-  ...render(
-    <NextGameStandingsScreen league={EMPTY_LEAGUE} edition="타자편" gamePoint={0}
-      isFromManagement={isFromManagement} {...handlers} />,
-  ),
+  ...render(<NextGameStandingsScreen league={EMPTY_LEAGUE} edition="타자편" gamePoint={0} isFromManagement={isFromManagement} {...handlers} />),
   ...handlers,
 })
 

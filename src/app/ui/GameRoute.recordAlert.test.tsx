@@ -31,12 +31,14 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const tick = (count = 1) => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame() * count)
-})
+const tick = (count = 1) =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * count)
+  })
 
 const BALL: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '볼' },
+  batterHand: 0,
+  resolution: { kind: '볼' },
   hasSwung: false,
   isBunt: false,
   resultCode: null,
@@ -65,7 +67,15 @@ describe('나리 타자편 기록 달성 알림 — 칸 채우기 0x4e600 은 �
       session: {
         loadingTip: null,
         handlePitchResolved: noop,
-        actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop, attachRelayHost: () => noop, finishRelay: noop },
+        actions: {
+          finishLoading: noop,
+          finishDefensePlay: noop,
+          closeBurstResult: noop,
+          attachReplayHost: () => noop,
+          finishReplay: noop,
+          attachRelayHost: () => noop,
+          finishRelay: noop,
+        },
       } as never,
       progress,
       runner: { atBat: { ...createAtBat(), balls }, isPaused: false, bannerText: '' } as never,

@@ -5,7 +5,15 @@ import { ballDepthAt, ballFrameIndexAt, ballPixelAt, ballShadowAt, ballShadowOfP
 import { hitBallPointAt, hitBallSizeOf, type HitBallPath } from '@/widgets/batting-stage/lib/hitBallPath'
 import { HIT_BALL_TRAIL, PITCH_BALL_TRAIL, ballTrailLinesOf, trailsAt, type BallTrailLine } from '@/widgets/batting-stage/lib/ballTrail'
 import { ballShadowPiecesAt } from '@/shared/lib/ballShadow/ballShadowPieces'
-import { drawFrameAt, frameAnimations, GAME_EFFECT_FRAMES, JUDGE_FRAMES, placedFrame, sprite, warmRecoloredFrames } from '@/widgets/batting-stage/lib/spriteLoader'
+import {
+  drawFrameAt,
+  frameAnimations,
+  GAME_EFFECT_FRAMES,
+  JUDGE_FRAMES,
+  placedFrame,
+  sprite,
+  warmRecoloredFrames,
+} from '@/widgets/batting-stage/lib/spriteLoader'
 import type { RecolorFrame, StageAnimationEntry } from '@/widgets/batting-stage/lib/spriteLoader'
 import { drawScenery } from '@/widgets/batting-stage/lib/renderScenery'
 import type { SceneryState } from '@/widgets/batting-stage/lib/renderScenery'
@@ -32,12 +40,7 @@ import {
   effectPitcherFrameAt,
   type AcePitcherEffectInput,
 } from '@/widgets/batting-stage/lib/acePitcherEffect'
-import {
-  FASTBALL_FLAME_ANIMATION,
-  fastballFlameBallTickOf,
-  fastballFlameFrameAt,
-  hasFastballFlame,
-} from '@/widgets/batting-stage/lib/fastballFlame'
+import { FASTBALL_FLAME_ANIMATION, fastballFlameBallTickOf, fastballFlameFrameAt, hasFastballFlame } from '@/widgets/batting-stage/lib/fastballFlame'
 import { drawParticles } from '@/widgets/particles/lib/renderParticles'
 import { rainDrawingOf, type SceneRain } from '@/entities/batting/model/settlementEffect'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
@@ -66,7 +69,16 @@ import { drawPitchSpeedReadout } from '@/widgets/batting-stage/lib/pitchSpeedRea
 import { drawDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { drawHomeRunBanner, drawHomeRunTextFrame } from '@/widgets/batting-stage/lib/renderHomeRunBanner'
 import type { HomeRunTextFrame } from '@/widgets/batting-stage/lib/homeRunBanner'
-import { aceBatterLayersOf, batterLayersOf, batterPoseFramesOf, isAceBatterOrder, layerPaletteIndexOf, NO_PITCHER_EQUIPMENT, pitcherLayerPaletteIndexOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import {
+  aceBatterLayersOf,
+  batterLayersOf,
+  batterPoseFramesOf,
+  isAceBatterOrder,
+  layerPaletteIndexOf,
+  NO_PITCHER_EQUIPMENT,
+  pitcherLayerPaletteIndexOf,
+  pitcherLayersOf,
+} from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, BatterLayer, PitcherEquipment } from '@/widgets/batting-stage/lib/batterLayers'
 
 import type { HudState } from '@/widgets/batting-stage/lib/renderHud'
@@ -75,11 +87,7 @@ import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOv
 import { BATTER_SIDE, STAGE_HEIGHT, STAGE_SIDE, STAGE_WIDTH, stageLayoutOf } from '@/widgets/batting-stage/lib/stageLayout'
 import { specialSwingEffectFrameAt } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import { drawCallWithRedraws, redrawsBetween, redrawsUpTo } from '@/widgets/batting-stage/lib/stageRedraws'
-import {
-  HIT_BY_PITCH_MARK_ANIMATION,
-  HIT_BY_PITCH_MARK_OFFSET_Y,
-  onceAnimationStepAt,
-} from '@/widgets/batting-stage/lib/batterOverlayMarks'
+import { HIT_BY_PITCH_MARK_ANIMATION, HIT_BY_PITCH_MARK_OFFSET_Y, onceAnimationStepAt } from '@/widgets/batting-stage/lib/batterOverlayMarks'
 import {
   MISTAKE_MARK_ANIMATION,
   MISTAKE_MARK_OFFSET_Y,
@@ -369,7 +377,7 @@ export interface StageWarmCast {
 
 /** 생김새 목록 → 겹치는 것을 걷은 미리 칠하기 묶음 (리그 팀은 피부 셋 · 몸통 둘 · 맨몸이라 몇 벌 안 된다) */
 export function stageWarmCastOf(batters: readonly StageBatterLook[], pitchers: readonly StagePitcherLook[]): StageWarmCast {
-  const unique = <T,>(looks: readonly T[]): T[] => [...new Map(looks.map((look) => [JSON.stringify(look), look])).values()]
+  const unique = <T>(looks: readonly T[]): T[] => [...new Map(looks.map((look) => [JSON.stringify(look), look])).values()]
   return { batters: unique(batters), pitchers: unique(pitchers) }
 }
 
@@ -389,10 +397,7 @@ export function warmStageCast(cast: StageWarmCast | null | undefined): boolean {
   return isAllWarmed
 }
 
-export function renderBattingStage(
-  context: CanvasRenderingContext2D,
-  scene: StageScene,
-): void {
+export function renderBattingStage(context: CanvasRenderingContext2D, scene: StageScene): void {
   // 결과 배경만 그리는 때(타석 사이)도 건다 — 다음 타자가 서기 전이 미리 칠할 때다
   warmStageCast(scene.warmCast)
   if (scene.isFieldPlay === true) {
@@ -460,7 +465,16 @@ export function renderBattingStage(
   // 0x38d1c(38dc2) · 0x49e64(49f76)가 0x38b64 에 넘기는 그림 자리 — 교체 등판 파티클이 쓴다(`substitutionEntryParticle`)
   recordStageEntryPoints(side, scene.pitcherHand ?? 0, scene.shift)
   drawList.add(DRAW_DEPTH.투수, () =>
-    drawPitcher(context, scene.acePitcher, pitcherAnimation, side, scene.pitcherEquipment, scene.pitcherForm ?? 0, scene.pitcherHand ?? 0, pitcherOutfitOf(scene)),
+    drawPitcher(
+      context,
+      scene.acePitcher,
+      pitcherAnimation,
+      side,
+      scene.pitcherEquipment,
+      scene.pitcherForm ?? 0,
+      scene.pitcherHand ?? 0,
+      pitcherOutfitOf(scene),
+    ),
   )
   // 0x38d1c 의 실투 "!"(38ee0) · 체력 그림(38f42) · 홈런 갈래(0x3908a) — 같은 깊이(24500)로 투수 다음에 이 차례로 들어간다
   drawList.add(DRAW_DEPTH.투수, () => {
@@ -472,17 +486,35 @@ export function renderBattingStage(
   drawList.add(DRAW_DEPTH.마투수마법, () => drawAceMagicAnimation(context, aceEffect, side))
   const tickSpecial = scene.specialSwingEffect ?? null
   // 49d50 애니 0 은 그림마다 한 칸 — 부르는 쪽은 장면 틱으로 센 수를 넘기고 창 첫 그림은 여기서 더한다(`stageRedraws`)
-  const special =
-    tickSpecial === null ? null : { ...tickSpecial, drawCall: drawCallWithRedraws(tickSpecial.drawCall, scene.tick, scene.redrawTicks) }
+  const special = tickSpecial === null ? null : { ...tickSpecial, drawCall: drawCallWithRedraws(tickSpecial.drawCall, scene.tick, scene.redrawTicks) }
   // 0x49aec 의 그림은 그리기 목록 깊이로 줄 선다 — 깊이 29704(플레임 · 어거지죠)는 타자(29705) 아래
   if (special !== null && special.isBehindBatter) drawList.add(DRAW_DEPTH.타자 - 1, () => drawSpecialSwingPicture(context, special))
   drawList.add(DRAW_DEPTH.타자, () =>
-    drawBatter(context, scene.swingFrame, scene.shift, scene.bodyType, side, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment, scene.aceBatterOrder),
+    drawBatter(
+      context,
+      scene.swingFrame,
+      scene.shift,
+      scene.bodyType,
+      side,
+      scene.batterSkinIndex,
+      scene.batterTeamIndex,
+      scene.batterEquipment,
+      scene.aceBatterOrder,
+    ),
   )
   // 미라지(49c9c~49d40) — 같은 타자 그림을 반대쪽 타석 앵커(0xcfb34 / 0xcfb2c)에 반대 손 자세로, 좌우 이동(+0xfe4) 없이 한 장 더
   if (special !== null && special.showsMirage) {
     drawList.add(DRAW_DEPTH.타자, () =>
-      drawBatter(context, scene.swingFrame, 0, scene.bodyType, side === BATTER_SIDE.우타 ? BATTER_SIDE.좌타 : BATTER_SIDE.우타, scene.batterSkinIndex, scene.batterTeamIndex, scene.batterEquipment),
+      drawBatter(
+        context,
+        scene.swingFrame,
+        0,
+        scene.bodyType,
+        side === BATTER_SIDE.우타 ? BATTER_SIDE.좌타 : BATTER_SIDE.우타,
+        scene.batterSkinIndex,
+        scene.batterTeamIndex,
+        scene.batterEquipment,
+      ),
     )
   }
   if (special !== null && !special.isBehindBatter) drawList.add(DRAW_DEPTH.타자, () => drawSpecialSwingPicture(context, special))
@@ -566,10 +598,13 @@ export interface StageMissionStrip {
 
 /** 미션 HUD 띠 — 효과 1 로 화면을 읽어 섞는다(`drawImagesWithEffect`). 그림이 아직 안 왔으면 그 장은 건너뛴다(오면 다시 그린다) */
 function drawMissionStrips(context: CanvasRenderingContext2D, strips: readonly StageMissionStrip[]): void {
-  drawImagesWithEffect(context, strips.flatMap((strip) => {
-    const image = sprite(strip.src)
-    return image === null ? [] : [{ image, x: strip.x, y: strip.y, effect: DRAW_EFFECT.TRANSLUCENT, argument: strip.level }]
-  }))
+  drawImagesWithEffect(
+    context,
+    strips.flatMap((strip) => {
+      const image = sprite(strip.src)
+      return image === null ? [] : [{ image, x: strip.x, y: strip.y, effect: DRAW_EFFECT.TRANSLUCENT, argument: strip.level }]
+    }),
+  )
 }
 
 /**
@@ -618,10 +653,7 @@ function warmRunnerRecolors(paletteIndex: number | null): void {
 }
 
 /** 주자 애니 0 · 1 · 2(1 · 2 · 3루)의 칸 전부를 공격 팀 벌로 — 같은 칸은 한 번 */
-export function runnerRecolorFramesOf(
-  animations: readonly (readonly StageAnimationEntry[])[],
-  paletteIndex: number,
-): RecolorFrame[] {
+export function runnerRecolorFramesOf(animations: readonly (readonly StageAnimationEntry[])[], paletteIndex: number): RecolorFrame[] {
   const frames = new Set(RUNNER_BASE_OF_ANIMATION.flatMap((_, animation) => (animations[animation] ?? []).map((entry) => entry.frame)))
   return [...frames].map((frame) => ({ folder: RUNNER_FRAMES, frame, paletteIndex }))
 }
@@ -816,7 +848,8 @@ function pitcherPaletteOf(layer: BatterLayer, outfit: PitcherOutfit | null): num
  */
 export function warmPitcherRecolors(equipment: PitcherEquipment, outfit: PitcherOutfit | null): boolean {
   return warmRecoloredFrames(`pitcher|${JSON.stringify(equipment)}|${outfit?.skinIndex ?? ''}|${outfit?.teamIndex ?? ''}`, () =>
-    pitcherRecolorFramesOf(equipment, outfit))
+    pitcherRecolorFramesOf(equipment, outfit),
+  )
 }
 
 /** 평범한 투수 자세 전부의 겹 — 벌은 `drawPitcher` 와 같은 `pitcherPaletteOf` */
@@ -914,12 +947,7 @@ function drawPitchWind(context: CanvasRenderingContext2D, scene: StageScene, sid
 }
 
 /** 홈런 갈래(0x3908a)를 `pitcherHomeRunMarksOf` 로 보고 애니 12(평범한 투수) · 13 "!"(감상 플래그)를 그린다 */
-function drawPitcherHomeRunMarks(
-  context: CanvasRenderingContext2D,
-  scene: StageScene,
-  side: number,
-  animation: PitcherAnimation,
-): void {
+function drawPitcherHomeRunMarks(context: CanvasRenderingContext2D, scene: StageScene, side: number, animation: PitcherAnimation): void {
   const mark = scene.pitcherHitMark ?? null
   const marks =
     mark === null || scene.pitcherTick === null
@@ -964,10 +992,7 @@ function drawPitcherHomeRunMarks(
 /**
  * 필살 그림 애니 0 의 지금 칸 (0xbe8a5 종류 2 → 0x93c45). 효과 0x11 · b 0 은 점 x 를 축으로 거울(R6 3b — x' = X − (dx + 폭))
  */
-function drawSpecialSwingPicture(
-  context: CanvasRenderingContext2D,
-  special: NonNullable<StageScene['specialSwingEffect']>,
-): void {
+function drawSpecialSwingPicture(context: CanvasRenderingContext2D, special: NonNullable<StageScene['specialSwingEffect']>): void {
   const entries = frameAnimations(special.folder)?.[0]
   const frameIndex = entries === undefined ? null : specialSwingEffectFrameAt(entries, special.drawCall)
   if (frameIndex === null) return
@@ -1007,11 +1032,7 @@ function drawHitByPitchMark(context: CanvasRenderingContext2D, scene: StageScene
   if (step === null || placed === null) return
   const anchor = stageLayoutOf(side).batterAnchor
   // 49f3e r7 = 타자 앵커 x + 카메라 + 좌우 이동(+0xfe4) ± 흔들기(웹은 카메라 · 흔들기 0 — `drawBatter` 와 같다)
-  context.drawImage(
-    placed.image,
-    anchor.x + scene.shift + step.dx + placed.offsetX,
-    anchor.y + HIT_BY_PITCH_MARK_OFFSET_Y + step.dy + placed.offsetY,
-  )
+  context.drawImage(placed.image, anchor.x + scene.shift + step.dx + placed.offsetX, anchor.y + HIT_BY_PITCH_MARK_OFFSET_Y + step.dy + placed.offsetY)
 }
 
 /**
@@ -1022,7 +1043,9 @@ function warmBatterRecolors(bodyType: number, skinIndex: number, teamIndex: numb
   return warmRecoloredFrames(`batter|${bodyType}|${skinIndex}|${teamIndex}|${JSON.stringify(equipment)}`, () =>
     batterPoseFramesOf(bodyType).flatMap((pose) =>
       batterLayersOf(pose, bodyType, equipment).map((layer) => ({
-        folder: layer.folder, frame: layer.frame, paletteIndex: layerPaletteIndexOf(layer, skinIndex, teamIndex),
+        folder: layer.folder,
+        frame: layer.frame,
+        paletteIndex: layerPaletteIndexOf(layer, skinIndex, teamIndex),
       })),
     ),
   )
@@ -1152,7 +1175,11 @@ function drawAceMagicAnimation(context: CanvasRenderingContext2D, input: AcePitc
 
 /** 0x4703a 레오니 — 고친 길(B-82)의 0xbe8d5 몫을 투수 앵커 기준으로 목록에 넣는다 */
 function addLeonyEffectDraws(
-  context: CanvasRenderingContext2D, drawList: StageDrawList, input: AcePitcherEffectInput, side: number, pose: number,
+  context: CanvasRenderingContext2D,
+  drawList: StageDrawList,
+  input: AcePitcherEffectInput,
+  side: number,
+  pose: number,
 ): void {
   const boxOf = (frame: number) => {
     const placed = placedFrame(LEONY_EFFECT_FRAMES, frame)
@@ -1274,7 +1301,10 @@ function addHitBallDraws(
   }
   const count = path.points.length
   if (showsTrail && trailsAt(ballTick, count)) {
-    drawBallTrail(context, ballTrailLinesOf(HIT_BALL_TRAIL, ballTick, count, (index) => projectToScreen(path.points[index], side)))
+    drawBallTrail(
+      context,
+      ballTrailLinesOf(HIT_BALL_TRAIL, ballTick, count, (index) => projectToScreen(path.points[index], side)),
+    )
   }
   const position = projectToScreen(point, side)
   drawList.add(point.z, () => drawBallSprite(context, position, size))
@@ -1372,9 +1402,7 @@ function drawBigHitScreen(
     const entries = frameAnimations(GAME_EFFECT_FRAMES)?.[BIG_HIT_FOLLOW_ANIMATION]
     const frameIndex = entries === undefined ? null : judgeFrameAt(entries, effect.drawCall)
     if (frameIndex !== null && effect.point !== null) {
-      drawFrameAt(
-        context, GAME_EFFECT_FRAMES, frameIndex, Math.round(effect.point.x) + cameraShift.dx, Math.round(effect.point.y) + cameraShift.dy,
-      )
+      drawFrameAt(context, GAME_EFFECT_FRAMES, frameIndex, Math.round(effect.point.x) + cameraShift.dx, Math.round(effect.point.y) + cameraShift.dy)
     }
     return
   }
@@ -1403,12 +1431,7 @@ function drawBigHitScreen(
 }
 
 /** 강속구 불꽃 (R2 3-1) — game_effect 애니 1 을 공 화면 자리(마지막 점으로 잘린 0x35820)에 */
-function drawFastballFlame(
-  context: CanvasRenderingContext2D,
-  pitch: Pitch,
-  frame: number,
-  phase: StagePhaseSnapshot | undefined,
-): void {
+function drawFastballFlame(context: CanvasRenderingContext2D, pitch: Pitch, frame: number, phase: StagePhaseSnapshot | undefined): void {
   const ballTick = fastballFlameBallTickOf(phase, frame, pitch.frameCount)
   if (ballTick === null || !hasFastballFlame(pitch)) return
   const entries = frameAnimations(GAME_EFFECT_FRAMES)?.[FASTBALL_FLAME_ANIMATION]
@@ -1468,4 +1491,3 @@ function drawRain(context: CanvasRenderingContext2D, rain: SceneRain): void {
   for (const dot of dots) context.fillRect(dot.x, dot.y, 1, 1)
   context.restore()
 }
-

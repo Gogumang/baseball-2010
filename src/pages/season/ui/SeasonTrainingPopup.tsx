@@ -10,7 +10,11 @@ import { layerRecolorRequestsOf, pitcherLayersOf } from '@/widgets/batting-stage
 import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
-  SEASON_TRAINING_BATTER_FORM, SEASON_TRAINING_BATTER_MIRROR_FLAG, SEASON_TRAINING_PRESENTATIONS, SEASON_TRAINING_SKIN, isSeasonTrainingSkipKey,
+  SEASON_TRAINING_BATTER_FORM,
+  SEASON_TRAINING_BATTER_MIRROR_FLAG,
+  SEASON_TRAINING_PRESENTATIONS,
+  SEASON_TRAINING_SKIN,
+  isSeasonTrainingSkipKey,
 } from '@/pages/season/lib/seasonTrainingPopup'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
@@ -94,26 +98,46 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
   const { figure } = presentation
 
   return (
-    <div data-testid="시즌-훈련팝업" data-slot={slot} style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}
-      onClick={() => skipRef.current()}>
+    <div
+      data-testid="시즌-훈련팝업"
+      data-slot={slot}
+      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}
+      onClick={() => skipRef.current()}
+    >
       <div className={styles.windowClip}>
         {windowOrigin !== undefined && (
-          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-            src={windowSprite.src} alt="" />
+          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
         )}
       </div>
       <div className={styles.animationClip}>
         {origin !== undefined && step !== null && (
-          <img className={styles.sprite} style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
-            src={`${folder}/${frameKey}.png`} alt="" />
+          <img
+            className={styles.sprite}
+            style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
+            src={`${folder}/${frameKey}.png`}
+            alt=""
+          />
         )}
         {figure !== null && step !== null && figure.kind === '타자' && (
-          <TrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} warmPoses={figure.poses} skinIndex={SEASON_TRAINING_SKIN} teamIndex={teamIndex}
-            form={SEASON_TRAINING_BATTER_FORM} mirrorFlag={SEASON_TRAINING_BATTER_MIRROR_FLAG} x={ANCHOR.x + figure.dx} y={ANCHOR.y + figure.dy} />
+          <TrainingFigure
+            pose={figurePoseAt(figure.poses, step.entryIndex)}
+            warmPoses={figure.poses}
+            skinIndex={SEASON_TRAINING_SKIN}
+            teamIndex={teamIndex}
+            form={SEASON_TRAINING_BATTER_FORM}
+            mirrorFlag={SEASON_TRAINING_BATTER_MIRROR_FLAG}
+            x={ANCHOR.x + figure.dx}
+            y={ANCHOR.y + figure.dy}
+          />
         )}
         {figure !== null && step !== null && figure.kind === '투수' && (
-          <PitcherTrainingFigure pose={figurePoseAt(figure.poses, step.entryIndex)} poses={figure.poses} teamIndex={teamIndex}
-            x={ANCHOR.x + figure.dx} y={ANCHOR.y + figure.dy} />
+          <PitcherTrainingFigure
+            pose={figurePoseAt(figure.poses, step.entryIndex)}
+            poses={figure.poses}
+            teamIndex={teamIndex}
+            x={ANCHOR.x + figure.dx}
+            y={ANCHOR.y + figure.dy}
+          />
         )}
       </div>
       <TrainingGauge filled={update} />
@@ -125,7 +149,13 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
  * 단일 PZX 투수 그림 0x79525 — 동작 번호 = pitcher.pzx 프레임 번호(0x795f6), +0x3d < 0(마투수 아님) 갈래의 겹 여섯 칸
  * (`pitcherLayersOf` — 새로 만든 객체라 장비 칸은 비어 있다). +0x3c = 0 이라 안 뒤집는다. 바탕 팔레트 = 피부 0 × 15 + 팀.
  */
-function PitcherTrainingFigure({ pose, poses, teamIndex, x, y }: {
+function PitcherTrainingFigure({
+  pose,
+  poses,
+  teamIndex,
+  x,
+  y,
+}: {
   readonly pose: number
   /** 이 애니가 낼 자세들 — 그 겹을 미리 칠해 둔다(자세가 넘어가는 그림에 구운 벌이 비치지 않게) */
   readonly poses: readonly number[]
@@ -135,7 +165,12 @@ function PitcherTrainingFigure({ pose, poses, teamIndex, x, y }: {
 }) {
   const paletteOf = (layer: BatterLayer) =>
     layer.gradePaletteRow ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(SEASON_TRAINING_SKIN, teamIndex) : null)
-  useWarmRecoloredSprites(layerRecolorRequestsOf([...new Set(poses)].flatMap((shown) => pitcherLayersOf(shown)), paletteOf))
+  useWarmRecoloredSprites(
+    layerRecolorRequestsOf(
+      [...new Set(poses)].flatMap((shown) => pitcherLayersOf(shown)),
+      paletteOf,
+    ),
+  )
   return (
     <div data-testid="시즌-훈련-투수" style={{ position: 'absolute', left: x, top: 0 }}>
       {pitcherLayersOf(pose).map((layer, index) => (

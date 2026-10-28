@@ -9,8 +9,9 @@ export { ACTIONS, SCENE_EXPECT }
 
 function markTarget(name) {
   for (const old of document.querySelectorAll('[data-hits-target]')) old.removeAttribute('data-hits-target')
-  const target = [...document.querySelectorAll('button, [role="button"], [role="option"], [role="menuitem"]')]
-    .find((element) => !element.matches(':disabled') && (element.getAttribute('aria-label') === name || element.textContent?.trim() === name))
+  const target = [...document.querySelectorAll('button, [role="button"], [role="option"], [role="menuitem"]')].find(
+    (element) => !element.matches(':disabled') && (element.getAttribute('aria-label') === name || element.textContent?.trim() === name),
+  )
   if (target === undefined) return false
   target.setAttribute('data-hits-target', '')
   return true
@@ -35,10 +36,14 @@ export async function runSteps(page, steps) {
 }
 
 export async function hasLabel(page, label) {
-  return page.evaluate((name) => [...document.querySelectorAll('[aria-label], button, [role="dialog"]')]
-    .some((element) => element.getAttribute('aria-label') === name || element.textContent?.trim() === name), label)
+  return page.evaluate(
+    (name) =>
+      [...document.querySelectorAll('[aria-label], button, [role="dialog"]')].some(
+        (element) => element.getAttribute('aria-label') === name || element.textContent?.trim() === name,
+      ),
+    label,
+  )
 }
-
 
 /**
  * 장면 `scene` 을 `page` 에서 열고 기본 상태 · 연 상태마다 누름 칸을 훑는다. 돌려주는 `results` 한 줄이 상태 하나다

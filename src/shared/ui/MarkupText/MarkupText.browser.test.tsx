@@ -72,7 +72,11 @@ describe('가운데 맞춤이 끝 빈칸을 센다 (0x9c52c 처럼)', () => {
     const raw = ORIGINAL_MODE_TEXT[122] ?? ''
     expect(raw.endsWith(' ')).toBe(true)
     const leftOf = (text: string) => {
-      const { container, unmount } = render(<div className={boxStyles.text}><MarkupText raw={text} /></div>)
+      const { container, unmount } = render(
+        <div className={boxStyles.text}>
+          <MarkupText raw={text} />
+        </div>,
+      )
       const span = container.querySelector('p span')
       const left = span?.getBoundingClientRect().left ?? Number.NaN
       unmount()

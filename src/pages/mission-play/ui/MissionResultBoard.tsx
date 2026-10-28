@@ -6,13 +6,23 @@ import { CommonPanel, FrameSprite, InsetBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
+import { SETTLEMENT_BAND, SETTLEMENT_LOSE_DIM_STEP, SETTLEMENT_RESULT_SPRITE, SETTLEMENT_TITLE_BAR } from '@/pages/team-game/lib/settlementBoard'
 import {
-  SETTLEMENT_BAND, SETTLEMENT_LOSE_DIM_STEP, SETTLEMENT_RESULT_SPRITE, SETTLEMENT_TITLE_BAR,
-} from '@/pages/team-game/lib/settlementBoard'
-import {
-  MISSION_GP_FRAME, MISSION_POINT_BOX, MISSION_POINT_GP_X, MISSION_POINT_LABEL_X, MISSION_POINT_ROWS,
-  MISSION_POINT_VALUE, MISSION_RESULT_TITLE, MISSION_RESULT_WINDOW, MISSION_RETRY_BOX, MISSION_RETRY_BUTTONS,
-  MISSION_RETRY_DEFAULT_ANSWER, MISSION_RETRY_QUESTION, MISSION_RETRY_TEXT, missionResultKeyActionOf, missionResultStepOf,
+  MISSION_GP_FRAME,
+  MISSION_POINT_BOX,
+  MISSION_POINT_GP_X,
+  MISSION_POINT_LABEL_X,
+  MISSION_POINT_ROWS,
+  MISSION_POINT_VALUE,
+  MISSION_RESULT_TITLE,
+  MISSION_RESULT_WINDOW,
+  MISSION_RETRY_BOX,
+  MISSION_RETRY_BUTTONS,
+  MISSION_RETRY_DEFAULT_ANSWER,
+  MISSION_RETRY_QUESTION,
+  MISSION_RETRY_TEXT,
+  missionResultKeyActionOf,
+  missionResultStepOf,
 } from '@/pages/mission-play/lib/missionResultBoard'
 import type { MissionResultExit, MissionResultKeyAction } from '@/pages/mission-play/lib/missionResultBoard'
 import * as styles from '@/pages/mission-play/ui/MissionResultBoard.css'
@@ -62,9 +72,7 @@ const ACE_DUEL_END_OFFER: TouchKeyOffer = { key: 'Escape', label: '대결 끝' }
  * 배경(0x4a384 첫머리의 구름 0x78448 · 0x40ff0(장면, +0x17e2))은 밑에 깔린 타석 캔버스가 결과 배경으로 그린다 — 판은 그 위
  * 240×320 에 겹친다.
  */
-export function MissionResultBoard({
-  isSuccess, aceMatch, earnedGamePoint, heldGamePoint, onExit, effectLayers,
-}: MissionResultBoardProps) {
+export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldGamePoint, onExit, effectLayers }: MissionResultBoardProps) {
   const [answer, setAnswer] = useState(MISSION_RETRY_DEFAULT_ANSWER)
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const resultOrigins = useFrameOrigins(RESULT_FRAMES)
@@ -113,33 +121,55 @@ export function MissionResultBoard({
   return (
     <div className={styles.layer} data-testid="미션-결과-판">
       {/* 4a404 실패 — 색 덮기 검정 단계 8 */}
-      {!isSuccess && (
-        <div className={styles.fill}
-          style={{ background: '#000000', opacity: colorStepCoverOpacityOf(SETTLEMENT_LOSE_DIM_STEP) }} />
-      )}
+      {!isSuccess && <div className={styles.fill} style={{ background: '#000000', opacity: colorStepCoverOpacityOf(SETTLEMENT_LOSE_DIM_STEP) }} />}
       {/* 4a452 효과 틱 0x901a0 — 정산 비(종류 0)를 덮개 위 · 띠 아래에 그린다 */}
       {effectLayers !== undefined && <SettlementEffectCanvas canvasRef={effectLayers.rain} />}
       {/* 4a448 — 띠 · game_ui 프레임 8 · result 0 "YOU WIN" / 1 "YOU LOSE" */}
-      <div className={styles.block} style={{
-        left: SETTLEMENT_BAND.x, top: SETTLEMENT_BAND.y, width: SETTLEMENT_BAND.width, height: SETTLEMENT_BAND.height,
-        background: SETTLEMENT_BAND.color,
-      }} />
-      <FrameSprite folder={GAME_UI_FRAMES} frame={SETTLEMENT_TITLE_BAR.frame} origins={gameUiOrigins}
-        x={SETTLEMENT_TITLE_BAR.centerX - (SETTLEMENT_TITLE_BAR.width >> 1)} y={SETTLEMENT_TITLE_BAR.y} />
+      <div
+        className={styles.block}
+        style={{
+          left: SETTLEMENT_BAND.x,
+          top: SETTLEMENT_BAND.y,
+          width: SETTLEMENT_BAND.width,
+          height: SETTLEMENT_BAND.height,
+          background: SETTLEMENT_BAND.color,
+        }}
+      />
+      <FrameSprite
+        folder={GAME_UI_FRAMES}
+        frame={SETTLEMENT_TITLE_BAR.frame}
+        origins={gameUiOrigins}
+        x={SETTLEMENT_TITLE_BAR.centerX - (SETTLEMENT_TITLE_BAR.width >> 1)}
+        y={SETTLEMENT_TITLE_BAR.y}
+      />
       <span data-testid="미션-결과-그림" data-frame={isSuccess ? SETTLEMENT_RESULT_SPRITE.winFrame : SETTLEMENT_RESULT_SPRITE.loseFrame}>
-        <FrameSprite folder={RESULT_FRAMES}
+        <FrameSprite
+          folder={RESULT_FRAMES}
           frame={isSuccess ? SETTLEMENT_RESULT_SPRITE.winFrame : SETTLEMENT_RESULT_SPRITE.loseFrame}
-          origins={resultOrigins} x={SETTLEMENT_RESULT_SPRITE.x} y={SETTLEMENT_RESULT_SPRITE.y} />
+          origins={resultOrigins}
+          x={SETTLEMENT_RESULT_SPRITE.x}
+          y={SETTLEMENT_RESULT_SPRITE.y}
+        />
       </span>
 
       {/* 4a576 마선수 대결(g[0x11f] · g[0x176])은 여기서 끝 */}
       {!isAce && (
         <>
           {/* 4a5f4 공용 판 0x55e61(skin, W/2, H/2, 176, 152, 0, 0x22, 위 띠 0x10, 0, 0, 0) */}
-          <CommonPanel x={MISSION_RESULT_WINDOW.x} y={MISSION_RESULT_WINDOW.y}
-            width={MISSION_RESULT_WINDOW.width} height={MISSION_RESULT_WINDOW.height} topBand={0x10} testId="미션-결과-창" />
-          <img className={styles.sprite} alt="RESULT" src={imageSrc(GAME_UI, MISSION_RESULT_TITLE.image)}
-            style={{ left: MISSION_RESULT_TITLE.x, top: MISSION_RESULT_TITLE.y }} />
+          <CommonPanel
+            x={MISSION_RESULT_WINDOW.x}
+            y={MISSION_RESULT_WINDOW.y}
+            width={MISSION_RESULT_WINDOW.width}
+            height={MISSION_RESULT_WINDOW.height}
+            topBand={0x10}
+            testId="미션-결과-창"
+          />
+          <img
+            className={styles.sprite}
+            alt="RESULT"
+            src={imageSrc(GAME_UI, MISSION_RESULT_TITLE.image)}
+            style={{ left: MISSION_RESULT_TITLE.x, top: MISSION_RESULT_TITLE.y }}
+          />
 
           {/* 4a67e 칸 0xbb28d(W/2, H/2 − 0x33, 162, 0x3d, 정렬 2) */}
           <InsetBox x={MISSION_POINT_BOX.x} y={MISSION_POINT_BOX.y} width={MISSION_POINT_BOX.width} height={MISSION_POINT_BOX.height} />
@@ -147,14 +177,19 @@ export function MissionResultBoard({
             const value = index === 0 ? earnedGamePoint : heldGamePoint
             return (
               <div key={row.name}>
-                <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.label} origins={textOrigins}
-                  x={MISSION_POINT_LABEL_X} y={row.labelY} />
-                <FrameSprite folder={IMG_TEXT_FRAMES} frame={MISSION_GP_FRAME} origins={textOrigins}
-                  x={MISSION_POINT_GP_X} y={row.labelY} />
+                <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.label} origins={textOrigins} x={MISSION_POINT_LABEL_X} y={row.labelY} />
+                <FrameSprite folder={IMG_TEXT_FRAMES} frame={MISSION_GP_FRAME} origins={textOrigins} x={MISSION_POINT_GP_X} y={row.labelY} />
                 {value !== undefined && (
-                  <GamePointBadge testId={`미션-${row.name}-G`} value={value} x={MISSION_POINT_VALUE.x} y={row.valueY}
-                    width={MISSION_POINT_VALUE.width} align={MISSION_POINT_VALUE.align} plus={row.plus}
-                    plate={MISSION_POINT_VALUE.plate} />
+                  <GamePointBadge
+                    testId={`미션-${row.name}-G`}
+                    value={value}
+                    x={MISSION_POINT_VALUE.x}
+                    y={row.valueY}
+                    width={MISSION_POINT_VALUE.width}
+                    align={MISSION_POINT_VALUE.align}
+                    plus={row.plus}
+                    plate={MISSION_POINT_VALUE.plate}
+                  />
                 )}
               </div>
             )
@@ -163,18 +198,25 @@ export function MissionResultBoard({
           {/* 4a69c 칸 0xbb28d(W/2, H/2 + 0x10, 162, 0x31, 정렬 2) */}
           <InsetBox x={MISSION_RETRY_BOX.x} y={MISSION_RETRY_BOX.y} width={MISSION_RETRY_BOX.width} height={MISSION_RETRY_BOX.height} />
           {question !== undefined && (
-            <span className={styles.text} data-testid="미션-재도전-글" style={{
-              left: MISSION_RETRY_TEXT.x, top: MISSION_RETRY_TEXT.y, width: MISSION_RETRY_TEXT.width,
-              textAlign: question.isCentered ? 'center' : 'left',
-            }}>
+            <span
+              className={styles.text}
+              data-testid="미션-재도전-글"
+              style={{
+                left: MISSION_RETRY_TEXT.x,
+                top: MISSION_RETRY_TEXT.y,
+                width: MISSION_RETRY_TEXT.width,
+                textAlign: question.isCentered ? 'center' : 'left',
+              }}
+            >
               {question.segments.map((segment, index) => (
-                <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+                <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>
+                  {segment.text}
+                </span>
               ))}
             </span>
           )}
           {MISSION_RETRY_BUTTONS.map((button) => (
-            <FrameSprite key={button.name} folder={POPUP_FRAMES} frame={button.frame} origins={popupOrigins}
-              x={button.x} y={button.y} />
+            <FrameSprite key={button.name} folder={POPUP_FRAMES} frame={button.frame} origins={popupOrigins} x={button.x} y={button.y} />
           ))}
           {MISSION_RETRY_BUTTONS.filter((button) => button.answer === answer).map((button) => (
             <span key={button.name} data-testid="미션-재도전-커서" data-answer={button.name}>
@@ -183,16 +225,26 @@ export function MissionResultBoard({
           ))}
           {/* 원본에 없는 웹 단추 — 누르면 그 쪽으로 옮겨 OK 와 같다 */}
           {MISSION_RETRY_BUTTONS.map((button) => (
-            <button key={button.name} type="button" className={styles.hitArea} aria-label={button.name}
+            <button
+              key={button.name}
+              type="button"
+              className={styles.hitArea}
+              aria-label={button.name}
               style={{ left: button.x, top: button.y, width: 41, height: 15 }}
-              onClick={() => act('확인', button.answer)} />
+              onClick={() => act('확인', button.answer)}
+            />
           ))}
         </>
       )}
       {isAce && (
         // 원본에 없는 웹 단추 — OK 와 같다
-        <button type="button" className={styles.hitArea} aria-label="확인"
-          style={{ left: 0, top: 0, width: 240, height: 320 }} onClick={() => act('확인', answer)} />
+        <button
+          type="button"
+          className={styles.hitArea}
+          aria-label="확인"
+          style={{ left: 0, top: 0, width: 240, height: 320 }}
+          onClick={() => act('확인', answer)}
+        />
       )}
       {/* 프레임 끝 0x6dd69 — 파티클(밤 성공 불꽃)은 판까지 다 그린 뒤 맨 위 (누르기는 밑의 단추로 흘린다) */}
       {effectLayers !== undefined && <SettlementEffectCanvas canvasRef={effectLayers.particles} />}

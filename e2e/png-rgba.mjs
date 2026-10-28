@@ -78,7 +78,10 @@ const blobs = await baseBlobs(changed)
 const dataUrl = (bytes) => `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
 console.log(`기준 ${BASE} 와 다른 PNG ${changed.length}장`)
 let failed = 0
-for (const [name, type] of [['chromium', chromium], ['webkit', webkit]]) {
+for (const [name, type] of [
+  ['chromium', chromium],
+  ['webkit', webkit],
+]) {
   if (ONLY !== undefined && ONLY !== name) continue
   const executablePath = name === 'chromium' ? chromiumExecutable() : undefined
   const browser = await type.launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })

@@ -17,15 +17,49 @@ import { SETTINGS_TEXT } from '@/shared/config/settingsMenu'
 import { MODE_RESET_TEXT } from '@/entities/settings/model/modeReset'
 import type { CareerResetEdition } from '@/entities/settings/model/modeReset'
 import {
-  DETAIL_CHOICES, DETAIL_COLORS, DETAIL_ROW, DETAIL_ROWS, DETAIL_ROW_COUNT, DETAIL_TITLE, detailRowTopOf,
+  DETAIL_CHOICES,
+  DETAIL_COLORS,
+  DETAIL_ROW,
+  DETAIL_ROWS,
+  DETAIL_ROW_COUNT,
+  DETAIL_TITLE,
+  detailRowTopOf,
   detailValueOutlineOf,
-  FIRST_MENU_ROW, IN_GAME_PANEL, IN_GAME_ROW_COUNT, MENU_ROW, MODE_RESET_ROW, MODE_RESET_ROW_COUNT, MODE_RESET_TITLE,
-  OK_BUTTON, OK_SELECTED_FRAME, OK_SELECTED_OVERFLOW, PANEL, ROW_ICONS,
-  SETTINGS_FRAME, SOUND_BARS, SOUND_OFF_ICON, SPEED_MARKS, TITLE, VALUE_ROW, VIBRATION, VIBRATION_ON_ICON,
-  okButtonTopOf, soundBarAt, speedMarkAt,
-  MAIN_MENU_CURSOR_COUNT, SCREEN, SETTINGS_DESCRIPTIONS, DETAIL_DESCRIPTIONS,
-  closingFold, iconCenterOffsetOf, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold,
-  openingFold, panelClipOf, rowTopOf,
+  FIRST_MENU_ROW,
+  IN_GAME_PANEL,
+  IN_GAME_ROW_COUNT,
+  MENU_ROW,
+  MODE_RESET_ROW,
+  MODE_RESET_ROW_COUNT,
+  MODE_RESET_TITLE,
+  OK_BUTTON,
+  OK_SELECTED_FRAME,
+  OK_SELECTED_OVERFLOW,
+  PANEL,
+  ROW_ICONS,
+  SETTINGS_FRAME,
+  SOUND_BARS,
+  SOUND_OFF_ICON,
+  SPEED_MARKS,
+  TITLE,
+  VALUE_ROW,
+  VIBRATION,
+  VIBRATION_ON_ICON,
+  okButtonTopOf,
+  soundBarAt,
+  speedMarkAt,
+  MAIN_MENU_CURSOR_COUNT,
+  SCREEN,
+  SETTINGS_DESCRIPTIONS,
+  DETAIL_DESCRIPTIONS,
+  closingFold,
+  iconCenterOffsetOf,
+  isSelectedOutlineShown,
+  modeResetRowTopOf,
+  nextPanelFold,
+  openingFold,
+  panelClipOf,
+  rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import type { PanelFold } from '@/pages/settings/lib/settingsLayout'
 import * as styles from '@/pages/settings/ui/SettingsScreen.css'
@@ -51,7 +85,11 @@ const NO_SHIFT = { dx: 0, dy: 0 } as const
  * 가르고 0x5550d 에도 그 키를 넘긴다 — 그래서 숫자키도 화살표와 같이 까딱인다. 8 · 32 는 '4'(0x34) · '6'(0x36) 도 따로 견준다(같은 갈래).
  */
 const GRID_NUMERIC_KEYS: Readonly<Record<string, string>> = {
-  '2': 'ArrowUp', '8': 'ArrowDown', '4': 'ArrowLeft', '6': 'ArrowRight', '5': 'Enter',
+  '2': 'ArrowUp',
+  '8': 'ArrowDown',
+  '4': 'ArrowLeft',
+  '6': 'ArrowRight',
+  '5': 'Enter',
 }
 const gridKeyOf = (key: string): string => GRID_NUMERIC_KEYS[key] ?? key
 
@@ -100,16 +138,17 @@ interface SettingsScreenProps {
  * 0x20 진입 0x2421c · 0x21 진입 0x242a4 가 skin+0x84 = 1 을 세운다. 하위 페이지에서 **돌아온** 첫 화면은
  * 0x259fc 가 커서만 (0, 3/4/5) 로 두고 0x84 를 안 세워(0x25a28~0x25a4e) 다 내려온 그대로다.
  */
-function SettingsFrame({ mainMenu, onBack, slides = true }: {
+function SettingsFrame({
+  mainMenu,
+  onBack,
+  slides = true,
+}: {
   readonly mainMenu: { readonly gamePoint: number } | undefined
   readonly onBack: () => void
   readonly slides?: boolean
 }) {
   if (mainMenu === undefined) return null
-  return (
-    <ScreenFrame title={SETTINGS_FRAME.title} gamePoint={mainMenu.gamePoint} footer={SETTINGS_FRAME.footer}
-      onBack={onBack} slides={slides} />
-  )
+  return <ScreenFrame title={SETTINGS_FRAME.title} gamePoint={mainMenu.gamePoint} footer={SETTINGS_FRAME.footer} onBack={onBack} slides={slides} />
 }
 
 /**
@@ -126,7 +165,15 @@ function SettingsFrame({ mainMenu, onBack, slides = true }: {
  * 상세 설정에는 웹이 실제로 쓰는 항목(투구 게이지)을 둔다.
  */
 export function SettingsScreen({
-  settings, onChange, onSave, onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, onBack,
+  settings,
+  onChange,
+  onSave,
+  onResetCareer,
+  careerResetBlockOf,
+  onResetEditedNames,
+  onResetSeason,
+  mainMenu,
+  onBack,
 }: SettingsScreenProps) {
   // 경기 중 [설정] — 경기 중 메뉴 0x3c326 갈래가 판을 세우며 [skin+0x84] = 0 을 쓴다(3c3b0~3c3ba). 머리띠는 없지만 전역 칸이라
   // 끊어 둔다(r168). 들어옴은 첫 그림보다 앞이다
@@ -170,8 +217,12 @@ export function SettingsScreen({
   /** 판·제목·줄·OK 가 y0 를 따라 내려가는 만큼 */
   const panelDy = panel.y - PANEL.y
   const allNames = [
-    SETTINGS_TEXT.sound, SETTINGS_TEXT.speed, SETTINGS_TEXT.vibration,
-    SETTINGS_TEXT.detail, SETTINGS_TEXT.modeReset, SETTINGS_TEXT.dataManagement,
+    SETTINGS_TEXT.sound,
+    SETTINGS_TEXT.speed,
+    SETTINGS_TEXT.vibration,
+    SETTINGS_TEXT.detail,
+    SETTINGS_TEXT.modeReset,
+    SETTINGS_TEXT.dataManagement,
   ]
   const names = isInGame ? allNames.slice(0, IN_GAME_ROW_COUNT) : allNames
   /**
@@ -305,9 +356,18 @@ export function SettingsScreen({
   // 상세 설정은 팝업이 아니라 **딴 페이지**다 (원본 장면 상태 0x20 · 페이지 32)
   if (isDetailOpen) {
     return (
-      <DetailSettings settings={settings} onChange={onChange} mainMenu={mainMenu} panelHeight={Math.min(fold.height, PANEL.height)}
+      <DetailSettings
+        settings={settings}
+        onChange={onChange}
+        mainMenu={mainMenu}
+        panelHeight={Math.min(fold.height, PANEL.height)}
         isPageShown={isPageShown}
-        onBack={() => { setHasReturned(true); setPageSlideStart(null); setDetailOpen(false) }} />
+        onBack={() => {
+          setHasReturned(true)
+          setPageSlideStart(null)
+          setDetailOpen(false)
+        }}
+      />
     )
   }
   // 모드 초기화도 딴 페이지다 (장면 상태 0x21 · 페이지 33, 갱신 0x2c6d8 · 그리기 0x2dc00)
@@ -321,7 +381,11 @@ export function SettingsScreen({
         mainMenu={mainMenu}
         panelHeight={Math.min(fold.height, PANEL.height)}
         isPageShown={isPageShown}
-        onBack={() => { setHasReturned(true); setPageSlideStart(null); setModeResetOpen(false) }}
+        onBack={() => {
+          setHasReturned(true)
+          setPageSlideStart(null)
+          setModeResetOpen(false)
+        }}
       />
     )
   }
@@ -337,151 +401,232 @@ export function SettingsScreen({
 
   return (
     <RawScreen>
-      {isPageShown && (<>
-      {titlePalette.definition}
-      <CommonPanel x={panel.x} y={SCREEN.height / 2 - Math.trunc(drawnHeight / 2)} width={panel.width} height={drawnHeight}
-        titleTab />
-      <PanelClip x={panel.x} y={clip.y} width={panel.width} height={clip.height}>
-      {/* 제목 img_text 289 — 팔레트 3(#2949A5 · #10246B) 으로 그린다 (0x59572~0x595cc: 0x913e5(img_text, 3) 뒤 0xba759) */}
-      <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y + panelDy}
-        style={titlePalette.style} />
+      {isPageShown && (
+        <>
+          {titlePalette.definition}
+          <CommonPanel x={panel.x} y={SCREEN.height / 2 - Math.trunc(drawnHeight / 2)} width={panel.width} height={drawnHeight} titleTab />
+          <PanelClip x={panel.x} y={clip.y} width={panel.width} height={clip.height}>
+            {/* 제목 img_text 289 — 팔레트 3(#2949A5 · #10246B) 으로 그린다 (0x59572~0x595cc: 0x913e5(img_text, 3) 뒤 0xba759) */}
+            <FrameSprite folder={IMG_TEXT} frame={TITLE.frame} origins={titleFrames} x={TITLE.x} y={TITLE.y + panelDy} style={titlePalette.style} />
 
-      {names.map((name, index) => {
-        const top = rowTopOf(index) + panelDy
-        const isValueRow = index < FIRST_MENU_ROW
-        const bar = isValueRow ? VALUE_ROW.bar : MENU_ROW.bar
-        const bullet = isValueRow ? VALUE_ROW : MENU_ROW
-        const isSelected = index === cursor
-        // 화살·흰 테두리는 고른 줄이 깜빡일 때만 — 펴는 동안은 0x59548 이 끈다
-        const isBlinkOn = isSelected && isOutlineShown && isUnfolded
-        const barFrame = isValueRow ? (index === 2 ? VALUE_ROW.vibrationBarFrame : VALUE_ROW.barFrame) : MENU_ROW.barFrame
-        const icon = index === 0 && settings.soundLevel === 0 ? SOUND_OFF_ICON
-          : index === 2 && settings.isVibrationOn ? VIBRATION_ON_ICON : ROW_ICONS[index]
-        // 까딱임은 줄 루프(0x59644~0x598f2)의 그림에만 — 아이콘 · 값 그림(0x59902~)과 진동 값 테두리는 제자리다
-        const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
-        return (
-          <div key={name}>
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, isSelected ? bullet.selectedBulletImage : bullet.bulletImage)}
-              style={{ left: bullet.bullet.x + dx, top: top + bullet.bullet.dy + dy }} />
-            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={barFrame}
-              origins={frames} x={bar.x + dx} y={top + bar.dy + dy} />
+            {names.map((name, index) => {
+              const top = rowTopOf(index) + panelDy
+              const isValueRow = index < FIRST_MENU_ROW
+              const bar = isValueRow ? VALUE_ROW.bar : MENU_ROW.bar
+              const bullet = isValueRow ? VALUE_ROW : MENU_ROW
+              const isSelected = index === cursor
+              // 화살·흰 테두리는 고른 줄이 깜빡일 때만 — 펴는 동안은 0x59548 이 끈다
+              const isBlinkOn = isSelected && isOutlineShown && isUnfolded
+              const barFrame = isValueRow ? (index === 2 ? VALUE_ROW.vibrationBarFrame : VALUE_ROW.barFrame) : MENU_ROW.barFrame
+              const icon =
+                index === 0 && settings.soundLevel === 0
+                  ? SOUND_OFF_ICON
+                  : index === 2 && settings.isVibrationOn
+                    ? VIBRATION_ON_ICON
+                    : ROW_ICONS[index]
+              // 까딱임은 줄 루프(0x59644~0x598f2)의 그림에만 — 아이콘 · 값 그림(0x59902~)과 진동 값 테두리는 제자리다
+              const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
+              return (
+                <div key={name}>
+                  <img
+                    className={styles.sprite}
+                    alt=""
+                    src={imageSrc(SLT_FRAME, isSelected ? bullet.selectedBulletImage : bullet.bulletImage)}
+                    style={{ left: bullet.bullet.x + dx, top: top + bullet.bullet.dy + dy }}
+                  />
+                  <FrameSprite folder={`${SLT_FRAME}/frames`} frame={barFrame} origins={frames} x={bar.x + dx} y={top + bar.dy + dy} />
 
-            {isValueRow && icon !== undefined ? (
-              <>
-                <div className={styles.valueName} style={{ left: VALUE_ROW.name.x + dx, top: top + VALUE_ROW.name.dy + dy }}>
-                  {name}
-                </div>
-                <img className={styles.sprite} alt=""
-                  src={imageSrc(SLT_FRAME, VALUE_ROW.iconBackImage)}
-                  style={{ left: VALUE_ROW.iconBack.x + dx, top: top + VALUE_ROW.iconBack.dy + dy }} />
-                <img className={styles.sprite} alt="" data-testid={`설정아이콘-${index}`}
-                  src={imageSrc(SLT_FRAME, icon.image)}
-                  style={{
-                    left: VALUE_ROW.iconBack.x + iconCenterOffsetOf(icon).dx,
-                    top: top + VALUE_ROW.iconBack.dy + iconCenterOffsetOf(icon).dy,
-                  }} />
-                {isBlinkOn && (
-                  <>
-                    <img className={styles.sprite} alt=""
-                      src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
-                      style={{ left: VALUE_ROW.leftArrow.x + dx, top: top + VALUE_ROW.leftArrow.dy + dy }} />
-                    <img className={styles.sprite} alt=""
-                      src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
-                      style={{ left: VALUE_ROW.rightArrow.x + dx, top: top + VALUE_ROW.rightArrow.dy + dy, transform: 'scaleX(-1)' }} />
-                  </>
-                )}
-                {/* 소리 막대 — 아래 맞춤, 기준은 막대 높이 18 (밑변 Y + 53). 0 이면 "OFF" */}
-                {index === 0 && Array.from({ length: settings.soundLevel }, (_unused, k) => (
-                  <img key={k} className={styles.sprite} alt="" data-testid={`소리막대-${k}`}
-                    src={imageSrc(SLT_FRAME, SOUND_BARS.firstImage + k)}
-                    style={{ left: soundBarAt(k).x, top: top + soundBarAt(k).dy }} />
-                ))}
-                {index === 0 && settings.soundLevel === 0 && (
-                  <div className={styles.vibrationLabel}
-                    style={{ left: VALUE_ROW.bar.x, top: top + VALUE_ROW.name.dy, width: VALUE_ROW.bar.width, color: DETAIL_COLORS.unselected }}>
-                    {SETTINGS_TEXT.vibrationOff}
-                  </div>
-                )}
-                {/* 속도 꺾쇠 — 틈 없이 붙이고 막대 안 세로 가운데 */}
-                {index === 1 && Array.from({ length: settings.speedLevel + 1 }, (_unused, k) => (
-                  <img key={k} className={styles.sprite} alt="" data-testid={`속도꺾쇠-${k}`}
-                    src={imageSrc(SLT_FRAME, SPEED_MARKS.firstImage + k)}
-                    style={{ left: speedMarkAt(k).x, top: top + speedMarkAt(k).dy }} />
-                ))}
-                {index === 2 && (
-                  <>
-                    <div className={styles.vibrationLabel}
+                  {isValueRow && icon !== undefined ? (
+                    <>
+                      <div className={styles.valueName} style={{ left: VALUE_ROW.name.x + dx, top: top + VALUE_ROW.name.dy + dy }}>
+                        {name}
+                      </div>
+                      <img
+                        className={styles.sprite}
+                        alt=""
+                        src={imageSrc(SLT_FRAME, VALUE_ROW.iconBackImage)}
+                        style={{ left: VALUE_ROW.iconBack.x + dx, top: top + VALUE_ROW.iconBack.dy + dy }}
+                      />
+                      <img
+                        className={styles.sprite}
+                        alt=""
+                        data-testid={`설정아이콘-${index}`}
+                        src={imageSrc(SLT_FRAME, icon.image)}
+                        style={{
+                          left: VALUE_ROW.iconBack.x + iconCenterOffsetOf(icon).dx,
+                          top: top + VALUE_ROW.iconBack.dy + iconCenterOffsetOf(icon).dy,
+                        }}
+                      />
+                      {isBlinkOn && (
+                        <>
+                          <img
+                            className={styles.sprite}
+                            alt=""
+                            src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
+                            style={{ left: VALUE_ROW.leftArrow.x + dx, top: top + VALUE_ROW.leftArrow.dy + dy }}
+                          />
+                          <img
+                            className={styles.sprite}
+                            alt=""
+                            src={imageSrc(SLT_FRAME, VALUE_ROW.arrowImage)}
+                            style={{ left: VALUE_ROW.rightArrow.x + dx, top: top + VALUE_ROW.rightArrow.dy + dy, transform: 'scaleX(-1)' }}
+                          />
+                        </>
+                      )}
+                      {/* 소리 막대 — 아래 맞춤, 기준은 막대 높이 18 (밑변 Y + 53). 0 이면 "OFF" */}
+                      {index === 0 &&
+                        Array.from({ length: settings.soundLevel }, (_unused, k) => (
+                          <img
+                            key={k}
+                            className={styles.sprite}
+                            alt=""
+                            data-testid={`소리막대-${k}`}
+                            src={imageSrc(SLT_FRAME, SOUND_BARS.firstImage + k)}
+                            style={{ left: soundBarAt(k).x, top: top + soundBarAt(k).dy }}
+                          />
+                        ))}
+                      {index === 0 && settings.soundLevel === 0 && (
+                        <div
+                          className={styles.vibrationLabel}
+                          style={{ left: VALUE_ROW.bar.x, top: top + VALUE_ROW.name.dy, width: VALUE_ROW.bar.width, color: DETAIL_COLORS.unselected }}
+                        >
+                          {SETTINGS_TEXT.vibrationOff}
+                        </div>
+                      )}
+                      {/* 속도 꺾쇠 — 틈 없이 붙이고 막대 안 세로 가운데 */}
+                      {index === 1 &&
+                        Array.from({ length: settings.speedLevel + 1 }, (_unused, k) => (
+                          <img
+                            key={k}
+                            className={styles.sprite}
+                            alt=""
+                            data-testid={`속도꺾쇠-${k}`}
+                            src={imageSrc(SLT_FRAME, SPEED_MARKS.firstImage + k)}
+                            style={{ left: speedMarkAt(k).x, top: top + speedMarkAt(k).dy }}
+                          />
+                        ))}
+                      {index === 2 && (
+                        <>
+                          <div
+                            className={styles.vibrationLabel}
+                            style={{
+                              left: VIBRATION.off.x,
+                              top: top + VIBRATION.off.dy,
+                              width: VIBRATION.off.width,
+                              color: settings.isVibrationOn ? DETAIL_COLORS.unselected : DETAIL_COLORS.selected,
+                            }}
+                          >
+                            {SETTINGS_TEXT.vibrationOff}
+                          </div>
+                          <div
+                            className={styles.vibrationLabel}
+                            style={{
+                              left: VIBRATION.on.x,
+                              top: top + VIBRATION.on.dy,
+                              width: VIBRATION.on.width,
+                              color: settings.isVibrationOn ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
+                            }}
+                          >
+                            {SETTINGS_TEXT.vibrationOn}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <div
+                      className={styles.menuName}
                       style={{
-                        left: VIBRATION.off.x, top: top + VIBRATION.off.dy, width: VIBRATION.off.width,
-                        color: settings.isVibrationOn ? DETAIL_COLORS.unselected : DETAIL_COLORS.selected,
-                      }}>
-                      {SETTINGS_TEXT.vibrationOff}
+                        left: MENU_ROW.name.x + dx,
+                        top: top + MENU_ROW.name.dy + dy,
+                        width: MENU_ROW.name.width,
+                        color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
+                      }}
+                    >
+                      {name}
                     </div>
-                    <div className={styles.vibrationLabel}
-                      style={{
-                        left: VIBRATION.on.x, top: top + VIBRATION.on.dy, width: VIBRATION.on.width,
-                        color: settings.isVibrationOn ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
-                      }}>
-                      {SETTINGS_TEXT.vibrationOn}
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <div className={styles.menuName}
-                style={{
-                  left: MENU_ROW.name.x + dx, top: top + MENU_ROW.name.dy + dy, width: MENU_ROW.name.width,
-                  color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
-                }}>
-                {name}
-              </div>
-            )}
+                  )}
 
-            {isBlinkOn && (
-              <div className={styles.selectedOutline}
-                style={{ left: bar.x + dx, top: top + bar.dy + dy, width: bar.width, height: bar.height }} />
-            )}
+                  {isBlinkOn && (
+                    <div
+                      className={styles.selectedOutline}
+                      style={{ left: bar.x + dx, top: top + bar.dy + dy, width: bar.width, height: bar.height }}
+                    />
+                  )}
 
-            <button type="button" className={styles.row} aria-label={name}
-              style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
-              onClick={() => { setCursor(index); openRow(index) }} />
-            {/* 터치 −1 (웹 껍데기): 원본 왼 화살(이미지 20, 5×8) 자리의 투명 칸 — 왼 키(−3)와 같이 값을 하나 내린다.
+                  <button
+                    type="button"
+                    className={styles.row}
+                    aria-label={name}
+                    style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
+                    onClick={() => {
+                      setCursor(index)
+                      openRow(index)
+                    }}
+                  />
+                  {/* 터치 −1 (웹 껍데기): 원본 왼 화살(이미지 20, 5×8) 자리의 투명 칸 — 왼 키(−3)와 같이 값을 하나 내린다.
                 줄을 누르면 +1(오른 키 · OK 와 같은 갈래)이라 내리는 길이 없었다 */}
-            {isValueRow && (
-              <PressArea label={`${name} 내리기`} testId={`설정내리기-${index}`}
-                rect={{
-                  x: VALUE_ROW.leftArrow.x - VALUE_ARROW_TOUCH_PAD, y: top + bar.dy,
-                  width: bar.x - VALUE_ROW.leftArrow.x + VALUE_ARROW_TOUCH_PAD, height: bar.height,
+                  {isValueRow && (
+                    <PressArea
+                      label={`${name} 내리기`}
+                      testId={`설정내리기-${index}`}
+                      rect={{
+                        x: VALUE_ROW.leftArrow.x - VALUE_ARROW_TOUCH_PAD,
+                        y: top + bar.dy,
+                        width: bar.x - VALUE_ROW.leftArrow.x + VALUE_ARROW_TOUCH_PAD,
+                        height: bar.height,
+                      }}
+                      onPress={() => {
+                        setCursor(index)
+                        changeValue(-1, index)
+                      }}
+                    />
+                  )}
+                </div>
+              )
+            })}
+
+            {/* 진동 지금 값 칸 노랑 테두리 — 줄 루프 뒤 (0x59d70) */}
+            {names.length > 2 && (
+              <div
+                className={styles.valueOutline}
+                data-testid="진동값테두리"
+                style={{
+                  left: VIBRATION.outline.x + VIBRATION.outline.step * (settings.isVibrationOn ? 1 : 0),
+                  top: rowTopOf(2) + panelDy + VIBRATION.outline.dy,
+                  width: VIBRATION.outline.width,
+                  height: VIBRATION.outline.height,
                 }}
-                onPress={() => { setCursor(index); changeValue(-1, index) }} />
+              />
             )}
-          </div>
-        )
-      })}
 
-      {/* 진동 지금 값 칸 노랑 테두리 — 줄 루프 뒤 (0x59d70) */}
-      {names.length > 2 && (
-        <div className={styles.valueOutline} data-testid="진동값테두리"
-          style={{
-            left: VIBRATION.outline.x + VIBRATION.outline.step * (settings.isVibrationOn ? 1 : 0),
-            top: rowTopOf(2) + panelDy + VIBRATION.outline.dy,
-            width: VIBRATION.outline.width, height: VIBRATION.outline.height,
-          }} />
+            <button
+              type="button"
+              className={styles.row}
+              aria-label="확인"
+              style={{
+                left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x,
+                top: okButtonTopOf(panel.height),
+                width: OK_BUTTON.width,
+                height: OK_BUTTON.height,
+              }}
+              onClick={() => {
+                setCursor(okCell)
+                leave()
+              }}
+            >
+              <img
+                className={styles.sprite}
+                alt=""
+                src={imageSrc(POPUP, isOkSelected ? OK_SELECTED_FRAME : OK_BUTTON.frame)}
+                style={isOkSelected ? { left: -OK_SELECTED_OVERFLOW, top: -OK_SELECTED_OVERFLOW } : { left: 0, top: 0 }}
+              />
+            </button>
+          </PanelClip>
+
+          {/* 설명 띠 0x55544 — StrMAINMENU[0x20 + 커서]. OK 칸이거나 경기 중이면 안 그린다 (0x59e64 앞 갈래) */}
+          {!isInGame && !isOkSelected && <DescriptionBand text={SETTINGS_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />}
+        </>
       )}
-
-      <button type="button" className={styles.row} aria-label="확인"
-        style={{ left: (PANEL.width - OK_BUTTON.width) / 2 + PANEL.x, top: okButtonTopOf(panel.height), width: OK_BUTTON.width, height: OK_BUTTON.height }}
-        onClick={() => { setCursor(okCell); leave() }}>
-        <img className={styles.sprite} alt=""
-          src={imageSrc(POPUP, isOkSelected ? OK_SELECTED_FRAME : OK_BUTTON.frame)}
-          style={isOkSelected ? { left: -OK_SELECTED_OVERFLOW, top: -OK_SELECTED_OVERFLOW } : { left: 0, top: 0 }} />
-      </button>
-      </PanelClip>
-
-      {/* 설명 띠 0x55544 — StrMAINMENU[0x20 + 커서]. OK 칸이거나 경기 중이면 안 그린다 (0x59e64 앞 갈래) */}
-      {!isInGame && !isOkSelected && <DescriptionBand text={SETTINGS_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />}
-      </>)}
 
       {/* 머리띠 되돌아가기 = CLR (0x295e2) */}
       <SettingsFrame mainMenu={mainMenu} onBack={leave} slides={!hasReturned} />
@@ -503,7 +648,13 @@ function UnfoldingPanel({ height }: { readonly height: number }) {
 /**
  * 잘라내기 0xbae25 사각형 — 안의 그림은 화면 좌표 그대로 두고 바깥만 가린다.
  */
-function PanelClip({ x, y, width, height, children }: {
+function PanelClip({
+  x,
+  y,
+  width,
+  height,
+  children,
+}: {
   readonly x: number
   readonly y: number
   readonly width: number
@@ -512,9 +663,7 @@ function PanelClip({ x, y, width, height, children }: {
 }) {
   return (
     <div style={{ position: 'absolute', left: x, top: y, width, height: Math.max(0, height), overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', left: -x, top: -y, width: SCREEN.width, height: SCREEN.height }}>
-        {children}
-      </div>
+      <div style={{ position: 'absolute', left: -x, top: -y, width: SCREEN.width, height: SCREEN.height }}>{children}</div>
     </div>
   )
 }
@@ -553,7 +702,14 @@ function toggleDetail(settings: GameSettings, row: number): GameSettings {
  * 배치는 그리기 0x59e82~0x5a2f4 를 직접 뜬 값이다 (`settingsLayout.ts` 의 `DETAIL_*` 주석) — 아래 OK 단추는 없다.
  * 웹판에 배선이 없는 값(송구·전광판)도 **원본에 줄이 있으므로 그대로 보여 주고 저장한다.**
  */
-function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown, onBack }: {
+function DetailSettings({
+  settings,
+  onChange,
+  mainMenu,
+  panelHeight,
+  isPageShown,
+  onBack,
+}: {
   readonly settings: GameSettings
   readonly onChange: (settings: GameSettings) => void
   readonly mainMenu: { readonly gamePoint: number } | undefined
@@ -589,8 +745,7 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
       // 갱신 0x288ac 가 OK(−5) · 좌우(−3 · −4) · '4'(0x34) · '6'(0x36) 을 모두 같은 갈래 0x28920(칸 값 ^= 1)으로 보낸다 — 확정.
       // '5' 는 격자가 −5 로 바꿔 돌려주므로 같은 갈래다 (`gridKeyOf`)
       // CLR(−16)은 판·키 상태와 상관없이 곧바로 상태 8 (0xbcb49(…, 8)) — 펴는 도중에도 키를 받는다
-      const isToggle = key === 'Enter' || key === ' '
-        || key === 'ArrowLeft' || key === 'ArrowRight'
+      const isToggle = key === 'Enter' || key === ' ' || key === 'ArrowLeft' || key === 'ArrowRight'
       if (isToggle) {
         event.preventDefault()
         return onChange(toggleDetail(settings, cursor))
@@ -608,86 +763,133 @@ function DetailSettings({ settings, onChange, mainMenu, panelHeight, isPageShown
   const clip = panelClipOf(panelHeight, PANEL.height)
   return (
     <RawScreen>
-      {isPageShown && (<>
-      {titlePalette.definition}
-      <UnfoldingPanel height={panelHeight} />
-      <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
-      {/* 제목 img_text 290 — 팔레트 3 (0x59e82~0x59eae `0x913e5(img_text, 3)`) */}
-      <FrameSprite folder={IMG_TEXT} frame={DETAIL_TITLE.frame} origins={titleFrames}
-        x={DETAIL_TITLE.x} y={DETAIL_TITLE.y} style={titlePalette.style} />
+      {isPageShown && (
+        <>
+          {titlePalette.definition}
+          <UnfoldingPanel height={panelHeight} />
+          <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
+            {/* 제목 img_text 290 — 팔레트 3 (0x59e82~0x59eae `0x913e5(img_text, 3)`) */}
+            <FrameSprite
+              folder={IMG_TEXT}
+              frame={DETAIL_TITLE.frame}
+              origins={titleFrames}
+              x={DETAIL_TITLE.x}
+              y={DETAIL_TITLE.y}
+              style={titlePalette.style}
+            />
 
-      {DETAIL_ROWS.map((row, index) => {
-        const top = detailRowTopOf(index)
-        const icon = iconCenterOffsetOf(row.icon)
-        const isSelected = index === cursor
-        // 화살·흰 테두리는 깜빡일 때만([sp+0x9c]) — 펴는 동안은 0x59548 이 끈다
-        const isBlinkOn = isSelected && isOutlineShown && isUnfolded
-        const valueOutline = detailValueOutlineOf(values[index])
-        // 까딱임은 줄 루프(0x59f4a~0x5a224) 그림 모두 — 줄 뒤 값 칸 노랑 테두리(0x5a226~)는 제자리다
-        const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
-        return (
-          <div key={row.name}>
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, isSelected ? DETAIL_ROW.selectedBulletImage : DETAIL_ROW.bulletImage)}
-              style={{ left: DETAIL_ROW.bullet.x + dx, top: top + DETAIL_ROW.bullet.dy + dy }} />
-            <div className={styles.valueName} style={{ left: DETAIL_ROW.name.x + dx, top: top + DETAIL_ROW.name.dy + dy }}>
-              {row.name}
-            </div>
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, DETAIL_ROW.iconBackImage)}
-              style={{ left: DETAIL_ROW.iconBack.x + dx, top: top + DETAIL_ROW.iconBack.dy + dy }} />
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, row.icon.image)}
-              style={{ left: DETAIL_ROW.iconBack.x + icon.dx + dx, top: top + DETAIL_ROW.iconBack.dy + icon.dy + dy }} />
-            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={DETAIL_ROW.barFrame}
-              origins={frames} x={DETAIL_ROW.bar.x + dx} y={top + DETAIL_ROW.bar.dy + dy} />
+            {DETAIL_ROWS.map((row, index) => {
+              const top = detailRowTopOf(index)
+              const icon = iconCenterOffsetOf(row.icon)
+              const isSelected = index === cursor
+              // 화살·흰 테두리는 깜빡일 때만([sp+0x9c]) — 펴는 동안은 0x59548 이 끈다
+              const isBlinkOn = isSelected && isOutlineShown && isUnfolded
+              const valueOutline = detailValueOutlineOf(values[index])
+              // 까딱임은 줄 루프(0x59f4a~0x5a224) 그림 모두 — 줄 뒤 값 칸 노랑 테두리(0x5a226~)는 제자리다
+              const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
+              return (
+                <div key={row.name}>
+                  <img
+                    className={styles.sprite}
+                    alt=""
+                    src={imageSrc(SLT_FRAME, isSelected ? DETAIL_ROW.selectedBulletImage : DETAIL_ROW.bulletImage)}
+                    style={{ left: DETAIL_ROW.bullet.x + dx, top: top + DETAIL_ROW.bullet.dy + dy }}
+                  />
+                  <div className={styles.valueName} style={{ left: DETAIL_ROW.name.x + dx, top: top + DETAIL_ROW.name.dy + dy }}>
+                    {row.name}
+                  </div>
+                  <img
+                    className={styles.sprite}
+                    alt=""
+                    src={imageSrc(SLT_FRAME, DETAIL_ROW.iconBackImage)}
+                    style={{ left: DETAIL_ROW.iconBack.x + dx, top: top + DETAIL_ROW.iconBack.dy + dy }}
+                  />
+                  <img
+                    className={styles.sprite}
+                    alt=""
+                    src={imageSrc(SLT_FRAME, row.icon.image)}
+                    style={{ left: DETAIL_ROW.iconBack.x + icon.dx + dx, top: top + DETAIL_ROW.iconBack.dy + icon.dy + dy }}
+                  />
+                  <FrameSprite
+                    folder={`${SLT_FRAME}/frames`}
+                    frame={DETAIL_ROW.barFrame}
+                    origins={frames}
+                    x={DETAIL_ROW.bar.x + dx}
+                    y={top + DETAIL_ROW.bar.dy + dy}
+                  />
 
-            {row.labels.map((label, choice) => (
-              <div key={label} className={styles.vibrationLabel}
-                style={{
-                  left: DETAIL_CHOICES[choice].x + dx,
-                  top: top + DETAIL_CHOICES[choice].dy + dy,
-                  width: DETAIL_CHOICES[choice].width,
-                  color: values[index] === choice ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
-                }}>
-                {label}
-              </div>
-            ))}
+                  {row.labels.map((label, choice) => (
+                    <div
+                      key={label}
+                      className={styles.vibrationLabel}
+                      style={{
+                        left: DETAIL_CHOICES[choice].x + dx,
+                        top: top + DETAIL_CHOICES[choice].dy + dy,
+                        width: DETAIL_CHOICES[choice].width,
+                        color: values[index] === choice ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
+                      }}
+                    >
+                      {label}
+                    </div>
+                  ))}
 
-            {isBlinkOn && (
-              <>
-                <img className={styles.sprite} alt=""
-                  src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
-                  style={{ left: DETAIL_ROW.leftArrow.x + dx, top: top + DETAIL_ROW.leftArrow.dy + dy }} />
-                <img className={styles.sprite} alt=""
-                  src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
-                  style={{ left: DETAIL_ROW.rightArrow.x + dx, top: top + DETAIL_ROW.rightArrow.dy + dy, transform: 'scaleX(-1)' }} />
-                <div className={styles.selectedOutline}
-                  style={{
-                    left: DETAIL_ROW.outline.x + dx, top: top + DETAIL_ROW.outline.dy + dy,
-                    width: DETAIL_ROW.outline.width, height: DETAIL_ROW.outline.height,
-                  }} />
-              </>
-            )}
+                  {isBlinkOn && (
+                    <>
+                      <img
+                        className={styles.sprite}
+                        alt=""
+                        src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
+                        style={{ left: DETAIL_ROW.leftArrow.x + dx, top: top + DETAIL_ROW.leftArrow.dy + dy }}
+                      />
+                      <img
+                        className={styles.sprite}
+                        alt=""
+                        src={imageSrc(SLT_FRAME, DETAIL_ROW.arrowImage)}
+                        style={{ left: DETAIL_ROW.rightArrow.x + dx, top: top + DETAIL_ROW.rightArrow.dy + dy, transform: 'scaleX(-1)' }}
+                      />
+                      <div
+                        className={styles.selectedOutline}
+                        style={{
+                          left: DETAIL_ROW.outline.x + dx,
+                          top: top + DETAIL_ROW.outline.dy + dy,
+                          width: DETAIL_ROW.outline.width,
+                          height: DETAIL_ROW.outline.height,
+                        }}
+                      />
+                    </>
+                  )}
 
-            {/* 줄 루프 뒤 지금 값 칸 노랑 테두리 (0x5a226~) — 줄마다 늘 */}
-            <div className={styles.valueOutline} data-testid={`상세값테두리-${index}`}
-              style={{ left: valueOutline.x, top: top + valueOutline.dy, width: valueOutline.width, height: valueOutline.height }} />
+                  {/* 줄 루프 뒤 지금 값 칸 노랑 테두리 (0x5a226~) — 줄마다 늘 */}
+                  <div
+                    className={styles.valueOutline}
+                    data-testid={`상세값테두리-${index}`}
+                    style={{ left: valueOutline.x, top: top + valueOutline.dy, width: valueOutline.width, height: valueOutline.height }}
+                  />
 
-            <button type="button" className={styles.row} aria-label={row.name}
-              style={{
-                left: DETAIL_ROW.outline.x, top: top + DETAIL_ROW.outline.dy,
-                width: DETAIL_ROW.outline.width, height: DETAIL_ROW.outline.height,
-              }}
-              onClick={() => { setCursor(index); onChange(toggleDetail(settings, index)) }} />
-          </div>
-        )
-      })}
-      {/* 이 페이지에는 아래 OK 단추가 없다 — 나가는 길은 CLR(머리띠 되돌아가기)뿐이다 */}
-      </PanelClip>
-      {/* 설명 띠 0x5a310 — StrMAINMENU[0x26 + 커서], 조건 없이 */}
-      <DescriptionBand text={DETAIL_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />
-      </>)}
+                  <button
+                    type="button"
+                    className={styles.row}
+                    aria-label={row.name}
+                    style={{
+                      left: DETAIL_ROW.outline.x,
+                      top: top + DETAIL_ROW.outline.dy,
+                      width: DETAIL_ROW.outline.width,
+                      height: DETAIL_ROW.outline.height,
+                    }}
+                    onClick={() => {
+                      setCursor(index)
+                      onChange(toggleDetail(settings, index))
+                    }}
+                  />
+                </div>
+              )
+            })}
+            {/* 이 페이지에는 아래 OK 단추가 없다 — 나가는 길은 CLR(머리띠 되돌아가기)뿐이다 */}
+          </PanelClip>
+          {/* 설명 띠 0x5a310 — StrMAINMENU[0x26 + 커서], 조건 없이 */}
+          <DescriptionBand text={DETAIL_DESCRIPTIONS[cursor] ?? ''} seed={cursor} />
+        </>
+      )}
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
     </RawScreen>
   )
@@ -713,7 +915,10 @@ const CONFIRM_FIRST_CURSOR = 1
  * 처음 커서 0x749d5 를 안 불러 타자편에서 시작한다. CLR → −1 → 하위 0.
  */
 const CAREER_CHOOSE_BUTTONS = ['타자편', '투수편'] as const
-const CAREER_CHOOSE_FRAMES = [{ normal: 11, selected: 13 }, { normal: 12, selected: 14 }] as const
+const CAREER_CHOOSE_FRAMES = [
+  { normal: 11, selected: 13 },
+  { normal: 12, selected: 14 },
+] as const
 const CAREER_CHOOSE_GRID = { columns: 2, gapX: 0x3c, gapY: 0 } as const
 const CAREER_CHOOSE_CANCEL = -1
 
@@ -741,7 +946,14 @@ const MODE_RESET_NAMES = [SETTINGS_TEXT.careerReset, SETTINGS_TEXT.seasonReset, 
  * 칸 1 시즌모드: 앱은 늘 `onResetSeason` 을 넘긴다(App.tsx → EntryRoutes) — 안 받는 시험 등에서만 OK 가 아무 일도 안 한다.
  */
 function ModeResetPage({
-  onResetCareer, careerResetBlockOf, onResetEditedNames, onResetSeason, mainMenu, panelHeight, isPageShown, onBack,
+  onResetCareer,
+  careerResetBlockOf,
+  onResetEditedNames,
+  onResetSeason,
+  mainMenu,
+  panelHeight,
+  isPageShown,
+  onBack,
 }: {
   readonly onResetCareer: (edition: CareerResetEdition) => void
   readonly careerResetBlockOf?: (edition: CareerResetEdition) => string | null
@@ -817,44 +1029,67 @@ function ModeResetPage({
   const clip = panelClipOf(panelHeight, PANEL.height)
   return (
     <RawScreen>
-      {isPageShown && (<>
-      {titlePalette.definition}
-      <UnfoldingPanel height={panelHeight} />
-      <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
-      {/* 제목 img_text 291 — 팔레트 3 (0x5a316~0x5a340 `0x913e5(img_text, 3)`) */}
-      <FrameSprite folder={IMG_TEXT} frame={MODE_RESET_TITLE.frame} origins={titleFrames}
-        x={MODE_RESET_TITLE.x} y={MODE_RESET_TITLE.y} style={titlePalette.style} />
+      {isPageShown && (
+        <>
+          {titlePalette.definition}
+          <UnfoldingPanel height={panelHeight} />
+          <PanelClip x={PANEL.x} y={clip.y} width={PANEL.width} height={clip.height}>
+            {/* 제목 img_text 291 — 팔레트 3 (0x5a316~0x5a340 `0x913e5(img_text, 3)`) */}
+            <FrameSprite
+              folder={IMG_TEXT}
+              frame={MODE_RESET_TITLE.frame}
+              origins={titleFrames}
+              x={MODE_RESET_TITLE.x}
+              y={MODE_RESET_TITLE.y}
+              style={titlePalette.style}
+            />
 
-      {MODE_RESET_NAMES.map((name, index) => {
-        const top = modeResetRowTopOf(index)
-        const isSelected = index === cursor
-        const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
-        return (
-          <div key={name}>
-            <img className={styles.sprite} alt=""
-              src={imageSrc(SLT_FRAME, isSelected ? MODE_RESET_ROW.selectedBulletImage : MODE_RESET_ROW.bulletImage)}
-              style={{ left: bullet.x + dx, top: top + bullet.dy + dy }} />
-            <FrameSprite folder={`${SLT_FRAME}/frames`} frame={MODE_RESET_ROW.barFrame}
-              origins={frames} x={bar.x + dx} y={top + bar.dy + dy} />
-            <div className={styles.menuName}
-              style={{
-                left: nameBox.x + dx, top: top + nameBox.dy + dy, width: nameBox.width,
-                color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
-              }}>
-              {name}
-            </div>
-            {isSelected && isOutlineShown && isUnfolded && (
-              <div className={styles.selectedOutline}
-                style={{ left: bar.x + dx, top: top + bar.dy + dy, width: bar.width, height: bar.height }} />
-            )}
-            <button type="button" className={styles.row} aria-label={name}
-              style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
-              onClick={() => { setCursor(index); openRow(index) }} />
-          </div>
-        )
-      })}
-      </PanelClip>
-      </>)}
+            {MODE_RESET_NAMES.map((name, index) => {
+              const top = modeResetRowTopOf(index)
+              const isSelected = index === cursor
+              const { dx, dy } = isSelected ? rowShake.offset : NO_SHIFT
+              return (
+                <div key={name}>
+                  <img
+                    className={styles.sprite}
+                    alt=""
+                    src={imageSrc(SLT_FRAME, isSelected ? MODE_RESET_ROW.selectedBulletImage : MODE_RESET_ROW.bulletImage)}
+                    style={{ left: bullet.x + dx, top: top + bullet.dy + dy }}
+                  />
+                  <FrameSprite folder={`${SLT_FRAME}/frames`} frame={MODE_RESET_ROW.barFrame} origins={frames} x={bar.x + dx} y={top + bar.dy + dy} />
+                  <div
+                    className={styles.menuName}
+                    style={{
+                      left: nameBox.x + dx,
+                      top: top + nameBox.dy + dy,
+                      width: nameBox.width,
+                      color: isSelected ? DETAIL_COLORS.selected : DETAIL_COLORS.unselected,
+                    }}
+                  >
+                    {name}
+                  </div>
+                  {isSelected && isOutlineShown && isUnfolded && (
+                    <div
+                      className={styles.selectedOutline}
+                      style={{ left: bar.x + dx, top: top + bar.dy + dy, width: bar.width, height: bar.height }}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className={styles.row}
+                    aria-label={name}
+                    style={{ left: bar.x, top: top + bar.dy, width: bar.width, height: bar.height }}
+                    onClick={() => {
+                      setCursor(index)
+                      openRow(index)
+                    }}
+                  />
+                </div>
+              )
+            })}
+          </PanelClip>
+        </>
+      )}
 
       <SettingsFrame mainMenu={mainMenu} onBack={onBack} />
 
@@ -868,26 +1103,32 @@ function ModeResetPage({
           onAnswer={answerCareerChoose}
         />
       )}
-      {popup?.kind === '나리막힘' && (
-        <MessageBox text={popup.text} buttons={['확인']} onAnswer={() => setPopup(null)} />
-      )}
+      {popup?.kind === '나리막힘' && <MessageBox text={popup.text} buttons={['확인']} onAnswer={() => setPopup(null)} />}
       {popup?.kind === '나리확인' && (
         <MessageBox
           text={popup.edition === '타자편' ? MODE_RESET_TEXT.careerBatterConfirm : MODE_RESET_TEXT.careerPitcherConfirm}
-          buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
-          onAnswer={answerConfirm(() => onResetCareer(popup.edition))} />
+          buttons={['예', '아니오']}
+          initialSelected={CONFIRM_FIRST_CURSOR}
+          onAnswer={answerConfirm(() => onResetCareer(popup.edition))}
+        />
       )}
       {popup?.kind === '시즌확인' && onResetSeason !== undefined && (
-        <MessageBox text={SETTINGS_TEXT.seasonResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
-          onAnswer={answerConfirm(onResetSeason)} />
+        <MessageBox
+          text={SETTINGS_TEXT.seasonResetConfirm}
+          buttons={['예', '아니오']}
+          initialSelected={CONFIRM_FIRST_CURSOR}
+          onAnswer={answerConfirm(onResetSeason)}
+        />
       )}
       {popup?.kind === '에디트확인' && (
-        <MessageBox text={SETTINGS_TEXT.editResetConfirm} buttons={['예', '아니오']} initialSelected={CONFIRM_FIRST_CURSOR}
-          onAnswer={answerConfirm(onResetEditedNames)} />
+        <MessageBox
+          text={SETTINGS_TEXT.editResetConfirm}
+          buttons={['예', '아니오']}
+          initialSelected={CONFIRM_FIRST_CURSOR}
+          onAnswer={answerConfirm(onResetEditedNames)}
+        />
       )}
-      {popup?.kind === '완료' && (
-        <MessageBox text={SETTINGS_TEXT.resetDone} buttons={['확인']} onAnswer={() => setPopup(null)} />
-      )}
+      {popup?.kind === '완료' && <MessageBox text={SETTINGS_TEXT.resetDone} buttons={['확인']} onAnswer={() => setPopup(null)} />}
     </RawScreen>
   )
 }

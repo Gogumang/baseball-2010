@@ -53,8 +53,14 @@ export interface SeasonCursorOptions {
 const PLAIN_STEPS: Readonly<Record<string, number>> = { ArrowUp: -1, ArrowDown: 1 }
 /** 커맨드 줄 하위 메뉴 (n × 1 · 꼴 0x330 · 숫자키 꼴 1) — ↑ ← '2' '4' 는 −1, ↓ → '8' '6' 은 +1 */
 const COMMAND_BAR_STEPS: Readonly<Record<string, number>> = {
-  ArrowUp: -1, ArrowLeft: -1, '2': -1, '4': -1,
-  ArrowDown: 1, ArrowRight: 1, '8': 1, '6': 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
+  '2': -1,
+  '4': -1,
+  ArrowDown: 1,
+  ArrowRight: 1,
+  '8': 1,
+  '6': 1,
 }
 
 export interface SeasonCursor {
@@ -63,7 +69,14 @@ export interface SeasonCursor {
 }
 
 export function useSeasonCursor({
-  count, onSelect, onCancel, isEnabled = true, cursor: heldCursor, onCursorChange, disabled = [], isCommandBar = false,
+  count,
+  onSelect,
+  onCancel,
+  isEnabled = true,
+  cursor: heldCursor,
+  onCursorChange,
+  disabled = [],
+  isCommandBar = false,
 }: SeasonCursorOptions): SeasonCursor {
   const [ownCursor, setOwnCursor] = useState(0)
   const cursor = heldCursor ?? ownCursor

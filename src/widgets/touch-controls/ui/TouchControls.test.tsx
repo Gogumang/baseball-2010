@@ -20,7 +20,12 @@ if (typeof window.PointerEvent === 'undefined') {
   Object.assign(window, { PointerEvent: TestPointerEvent })
 }
 
-interface Seen { readonly type: string; readonly key: string; readonly code: string; readonly repeat: boolean }
+interface Seen {
+  readonly type: string
+  readonly key: string
+  readonly code: string
+  readonly repeat: boolean
+}
 
 let seen: Seen[] = []
 const record = (event: KeyboardEvent) => {
@@ -73,7 +78,10 @@ describe('TouchControls — 늘 있던 확인 · 뒤로는 걷었다 (r186), 숫
     press(back)
     lift(back)
     expect(seen.map((event) => `${event.type}:${event.key}:${event.code}`)).toEqual([
-      'keydown:Enter:Enter', 'keyup:Enter:Enter', 'keydown:Escape:Escape', 'keyup:Escape:Escape',
+      'keydown:Enter:Enter',
+      'keyup:Enter:Enter',
+      'keydown:Escape:Escape',
+      'keyup:Escape:Escape',
     ])
   })
 })
@@ -135,9 +143,19 @@ describe('상황 버튼 — 화면이 알린 키만, 같은 키 사건으로', (
       useTouchKeyOffer(offer)
       return null
     }
-    const { rerender } = render(<><TouchControls layout="below" /><Offer offer={null} /></>)
+    const { rerender } = render(
+      <>
+        <TouchControls layout="below" />
+        <Offer offer={null} />
+      </>,
+    )
     expect(screen.queryAllByRole('button')).toHaveLength(0)
-    rerender(<><TouchControls layout="below" /><Offer offer={{ key: '0', label: '마구' }} /></>)
+    rerender(
+      <>
+        <TouchControls layout="below" />
+        <Offer offer={{ key: '0', label: '마구' }} />
+      </>,
+    )
     expect(screen.getByRole('button', { name: '마구' })).toBeTruthy()
   })
 })
@@ -205,7 +223,12 @@ describe('넘기기 · 차례 · 누름 칸 키', () => {
       useTouchScrollKeys(true)
       return null
     }
-    render(<><TouchControls layout="below" /><Scroll /></>)
+    render(
+      <>
+        <TouchControls layout="below" />
+        <Scroll />
+      </>,
+    )
     const down = screen.getByRole('button', { name: '▼ 아래' })
     press(down)
     lift(down)
@@ -217,7 +240,6 @@ describe('넘기기 · 차례 · 누름 칸 키', () => {
     expect(seen.map((event) => `${event.type}:${event.key}:${event.code}`)).toEqual(['keydown:7:Digit7', 'keyup:7:Digit7'])
   })
 })
-
 
 describe('TouchControls — pointer 사건이 안 오는 기기(iOS Safari 사건 추적 영역 밖)에서도 탭이 닿는다 (r208)', () => {
   it('pointerdown 없이 click 만 오면 키를 한 번 누르고 뗀다', () => {

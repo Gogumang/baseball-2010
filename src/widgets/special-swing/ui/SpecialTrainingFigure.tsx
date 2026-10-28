@@ -10,13 +10,39 @@ import { DRAW_EFFECT, css565, grayPixel565 } from '@/shared/lib/pixelEffect/pixe
 import { useEffectSpriteUrl } from '@/shared/lib/pixelEffect/useEffectSpriteUrl'
 import { rgbTo565 } from '@/shared/lib/screen565/screen565'
 import {
-  LEVEL_LABEL_FRAME, LEVEL_LABEL_OFFSET, SPECIAL_TRAINING_COST_BOX, SPECIAL_TRAINING_COUNT_BOX, SPECIAL_TRAINING_CURSOR_COLOR,
-  SPECIAL_TRAINING_DESCRIPTION_BOX, SPECIAL_TRAINING_INNER, SPECIAL_TRAINING_INNER_COLORS,
-  SPECIAL_TRAINING_LAYOUT_FRAME, SPECIAL_TRAINING_NAME_BOX, SPECIAL_TRAINING_NAME_COLOR, SPECIAL_TRAINING_PANEL,
-  SPECIAL_TRAINING_SLASH_IMAGE, SPECIAL_TRAINING_SLOT_BOXES, SPECIAL_TRAINING_STATUS_BOX, SPECIAL_TRAINING_TIMES_LABEL,
-  SPECIAL_TRAINING_TITLE_BOX, SPECIAL_TRAINING_TITLE_COLOR, SPECIAL_TRAINING_TITLE_OX, cursorBoxOf, isSlotIconInUse,
-  isSlotInUse, isSlotLocked, isSpecialTrainingBlinkOn, levelDigitOffsetOf, lockRegionOf, slotCostOf, slotDescriptionOf,
-  slotNameOf, slotProgressOf, specialTrainingIconFrameOf, specialTrainingTitleFrameOf, statusLabelOf,
+  LEVEL_LABEL_FRAME,
+  LEVEL_LABEL_OFFSET,
+  SPECIAL_TRAINING_COST_BOX,
+  SPECIAL_TRAINING_COUNT_BOX,
+  SPECIAL_TRAINING_CURSOR_COLOR,
+  SPECIAL_TRAINING_DESCRIPTION_BOX,
+  SPECIAL_TRAINING_INNER,
+  SPECIAL_TRAINING_INNER_COLORS,
+  SPECIAL_TRAINING_LAYOUT_FRAME,
+  SPECIAL_TRAINING_NAME_BOX,
+  SPECIAL_TRAINING_NAME_COLOR,
+  SPECIAL_TRAINING_PANEL,
+  SPECIAL_TRAINING_SLASH_IMAGE,
+  SPECIAL_TRAINING_SLOT_BOXES,
+  SPECIAL_TRAINING_STATUS_BOX,
+  SPECIAL_TRAINING_TIMES_LABEL,
+  SPECIAL_TRAINING_TITLE_BOX,
+  SPECIAL_TRAINING_TITLE_COLOR,
+  SPECIAL_TRAINING_TITLE_OX,
+  cursorBoxOf,
+  isSlotIconInUse,
+  isSlotInUse,
+  isSlotLocked,
+  isSpecialTrainingBlinkOn,
+  levelDigitOffsetOf,
+  lockRegionOf,
+  slotCostOf,
+  slotDescriptionOf,
+  slotNameOf,
+  slotProgressOf,
+  specialTrainingIconFrameOf,
+  specialTrainingTitleFrameOf,
+  statusLabelOf,
 } from '@/widgets/special-swing/lib/specialTrainingWindow'
 import type { SpecialTrainingSide, SpecialTrainingState, TrainingBox } from '@/widgets/special-swing/lib/specialTrainingWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
@@ -69,7 +95,15 @@ function SlotImage({ src, left, top, gray }: { readonly src: string; readonly le
 }
 
 /** 칸 그림 셋 — 아이콘 · "LV" · 칸 번호 (0x80620~0x80724). `gray` 는 0xc37a8 흑백 칸에 다시 그릴 때 */
-function SlotArt({ slot, dx, dy, iconFrame, inUseNumber, textOrigins, gray }: {
+function SlotArt({
+  slot,
+  dx,
+  dy,
+  iconFrame,
+  inUseNumber,
+  textOrigins,
+  gray,
+}: {
   readonly slot: number
   readonly dx: number
   readonly dy: number
@@ -129,7 +163,14 @@ export interface SpecialTrainingFigureProps {
  * 타자 108 탭 0 · 123, 투수 108 탭 1 이 같은 그림을 쓴다.
  */
 export function SpecialTrainingFigure({
-  side, state, cursor, learnedCount, sessions, inUseNumber, typeIndex, onPressSlot,
+  side,
+  state,
+  cursor,
+  learnedCount,
+  sessions,
+  inUseNumber,
+  typeIndex,
+  onPressSlot,
 }: SpecialTrainingFigureProps) {
   const uiOrigins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
@@ -163,8 +204,15 @@ export function SpecialTrainingFigure({
   return (
     <div data-testid="필살타법-그림" data-side={side} data-state={state}>
       {/* 8046c 공용 판 0x55e61(skin, 박스 0, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0) — 제목 탭이 서서 위 띠는 안 본다 */}
-      <CommonPanel x={SPECIAL_TRAINING_PANEL.x} y={SPECIAL_TRAINING_PANEL.y} width={SPECIAL_TRAINING_PANEL.width}
-        height={SPECIAL_TRAINING_PANEL.height} topBand={0x10} titleTab testId="필살타법-판" />
+      <CommonPanel
+        x={SPECIAL_TRAINING_PANEL.x}
+        y={SPECIAL_TRAINING_PANEL.y}
+        width={SPECIAL_TRAINING_PANEL.width}
+        height={SPECIAL_TRAINING_PANEL.height}
+        topBand={0x10}
+        titleTab
+        testId="필살타법-판"
+      />
       {/* 0x802dc — 박스 2 칠 · 위(x..x+w−1, y) · 왼(x, y..y+h) #0A266F · 아래(x+1..x+w−1, y+h) · 오른(x+w−1, y+1..y+h) #5683F5 */}
       <svg style={layer} width={SCREEN.width} height={SCREEN.height} viewBox="0 0 240 320" shapeRendering="crispEdges" aria-hidden>
         <rect x={inner.x} y={inner.y} width={inner.width} height={inner.height} fill={SPECIAL_TRAINING_INNER_COLORS.fill} />
@@ -176,8 +224,7 @@ export function SpecialTrainingFigure({
       <FrameSprite folder={MODE_UI} frame={SPECIAL_TRAINING_LAYOUT_FRAME} origins={uiOrigins} x={0} y={0} />
       {titleAt !== null && (
         <div data-testid="필살타법-제목" data-frame={titleFrame}>
-          <SolidStamp folder={IMG_TEXT} frame={titleFrame} origins={textOrigins} x={titleAt.x} y={titleAt.y}
-            color={SPECIAL_TRAINING_TITLE_COLOR} />
+          <SolidStamp folder={IMG_TEXT} frame={titleFrame} origins={textOrigins} x={titleAt.x} y={titleAt.y} color={SPECIAL_TRAINING_TITLE_COLOR} />
         </div>
       )}
       {isTraining && <img alt="" src={G_COIN.src} style={{ position: 'absolute', left: G_COIN.x, top: G_COIN.y }} />}
@@ -190,15 +237,30 @@ export function SpecialTrainingFigure({
           <div key={slot} data-testid={`필살칸-${slot}`} data-locked={isLocked} data-in-use={isSlotIconInUse(slot, inUseNumber)}>
             {slotArt(slot, 0, 0)}
             {isCursorDrawn && (
-              <PaintedRects x={cursorBox.x} y={cursorBox.y} width={cursorBox.width + 1} height={cursorBox.height + 1}
-                paints={cursorPaints} testId="필살칸-커서" />
+              <PaintedRects
+                x={cursorBox.x}
+                y={cursorBox.y}
+                width={cursorBox.width + 1}
+                height={cursorBox.height + 1}
+                paints={cursorPaints}
+                testId="필살칸-커서"
+              />
             )}
             {/* 0xc37a9 흑백 — 화면에 이미 그린 자리를 바꾼다. 같은 자리(안쪽 칠 + 칸 그림)를 원본 회색 식으로 칠해 다시 그린다 */}
             {isLocked && (
-              <div data-testid={`필살칸-흑백-${slot}`} style={{
-                position: 'absolute', left: region.x, top: region.y, width: region.width, height: region.height,
-                overflow: 'hidden', pointerEvents: 'none', background: GRAY_INNER_FILL,
-              }}>
+              <div
+                data-testid={`필살칸-흑백-${slot}`}
+                style={{
+                  position: 'absolute',
+                  left: region.x,
+                  top: region.y,
+                  width: region.width,
+                  height: region.height,
+                  overflow: 'hidden',
+                  pointerEvents: 'none',
+                  background: GRAY_INNER_FILL,
+                }}
+              >
                 {slotArt(slot, -region.x, -region.y, true)}
               </div>
             )}
@@ -206,21 +268,44 @@ export function SpecialTrainingFigure({
         )
       })}
 
-      <div data-testid="필살타법-이름" style={{
-        position: 'absolute', left: SPECIAL_TRAINING_NAME_BOX.x, top: SPECIAL_TRAINING_NAME_BOX.y, width: SPECIAL_TRAINING_NAME_BOX.width,
-        height: SPECIAL_TRAINING_NAME_BOX.height, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: SPECIAL_TRAINING_NAME_COLOR, fontSize: '11px', lineHeight: '13px', whiteSpace: 'nowrap', pointerEvents: 'none',
-      }}>
+      <div
+        data-testid="필살타법-이름"
+        style={{
+          position: 'absolute',
+          left: SPECIAL_TRAINING_NAME_BOX.x,
+          top: SPECIAL_TRAINING_NAME_BOX.y,
+          width: SPECIAL_TRAINING_NAME_BOX.width,
+          height: SPECIAL_TRAINING_NAME_BOX.height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: SPECIAL_TRAINING_NAME_COLOR,
+          fontSize: '11px',
+          lineHeight: '13px',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+        }}
+      >
         {slotNameOf(side, cursor, typeIndex)}
       </div>
-      <div data-testid="필살타법-설명" style={{
-        position: 'absolute', left: SPECIAL_TRAINING_DESCRIPTION_BOX.x, top: SPECIAL_TRAINING_DESCRIPTION_BOX.y,
-        color: '#FFFFFF', fontSize: '11px', lineHeight: '13px', pointerEvents: 'none',
-      }}>
+      <div
+        data-testid="필살타법-설명"
+        style={{
+          position: 'absolute',
+          left: SPECIAL_TRAINING_DESCRIPTION_BOX.x,
+          top: SPECIAL_TRAINING_DESCRIPTION_BOX.y,
+          color: '#FFFFFF',
+          fontSize: '11px',
+          lineHeight: '13px',
+          pointerEvents: 'none',
+        }}
+      >
         {descriptionLines.map((line, index) => (
           <p key={index} style={{ margin: 0, whiteSpace: 'pre' }}>
             {line.segments.map((segment, segmentIndex) => (
-              <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+              <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
+                {segment.text}
+              </span>
             ))}
           </p>
         ))}
@@ -228,9 +313,12 @@ export function SpecialTrainingFigure({
 
       {isTraining && (
         <div data-testid="필살타법-비용-횟수" data-cost={slotCostOf(cursor)} data-progress={`${progress.count}/${progress.required}`}>
-          <SpriteNumber glyphs={numberGlyphsOf(slotCostOf(cursor))}
+          <SpriteNumber
+            glyphs={numberGlyphsOf(slotCostOf(cursor))}
             right={SPECIAL_TRAINING_COST_BOX.x + SPECIAL_TRAINING_COST_BOX.width - 4}
-            boxTop={SPECIAL_TRAINING_COST_BOX.y} boxHeight={SPECIAL_TRAINING_COST_BOX.height} />
+            boxTop={SPECIAL_TRAINING_COST_BOX.y}
+            boxHeight={SPECIAL_TRAINING_COST_BOX.height}
+          />
           <img alt="" src={`${NUM}/${pad3(progress.count)}.png`} style={{ position: 'absolute', ...countAt }} />
           <img alt="" src={`${NUM}/${pad3(SPECIAL_TRAINING_SLASH_IMAGE)}.png`} style={{ position: 'absolute', ...slashAt }} />
           <img alt="" src={`${NUM}/${pad3(progress.required)}.png`} style={{ position: 'absolute', ...requiredAt }} />
@@ -247,8 +335,13 @@ export function SpecialTrainingFigure({
 
       {/* 마우스 길 — 칸 자리 투명 누름 칸. 누르면 그 칸으로 커서를 옮기고 확인한다 */}
       {SPECIAL_TRAINING_SLOT_BOXES.map((box, slot) => (
-        <PressArea key={`칸${slot}`} label={slotNameOf(side, slot, typeIndex)} rect={box}
-          option={{ isSelected: slot === cursor }} onPress={() => onPressSlot(slot)} />
+        <PressArea
+          key={`칸${slot}`}
+          label={slotNameOf(side, slot, typeIndex)}
+          rect={box}
+          option={{ isSelected: slot === cursor }}
+          onPress={() => onPressSlot(slot)}
+        />
       ))}
     </div>
   )

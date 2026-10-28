@@ -1,8 +1,22 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
-  MATCH_INFO_STADIUM_MIRRORED, RIGHT_HANDED_CROWD_SHIFT, STADIUM_PREVIEW_ICON_TEAM, STADIUM_PREVIEW_MIRRORED, drawStadiumPreview, RIGHT_HANDED_MIRROR_X, rightHandedBoxShiftOf,
-  drawMatchInfoStadium, drawScenery, scoreboardScrollX, seasonScoreboardRewindXOf, stepSeasonScoreboardX, seasonBoardFrameOf, seasonFenceFramesOf, seasonScoreboardBoxOf, seasonTeamIconBoxesOf,
+  MATCH_INFO_STADIUM_MIRRORED,
+  RIGHT_HANDED_CROWD_SHIFT,
+  STADIUM_PREVIEW_ICON_TEAM,
+  STADIUM_PREVIEW_MIRRORED,
+  drawStadiumPreview,
+  RIGHT_HANDED_MIRROR_X,
+  rightHandedBoxShiftOf,
+  drawMatchInfoStadium,
+  drawScenery,
+  scoreboardScrollX,
+  seasonScoreboardRewindXOf,
+  stepSeasonScoreboardX,
+  seasonBoardFrameOf,
+  seasonFenceFramesOf,
+  seasonScoreboardBoxOf,
+  seasonTeamIconBoxesOf,
 } from '@/widgets/batting-stage/lib/renderScenery'
 
 // 전광판 흐르는 글자 (0x77fb4, R2-game-effects.md 6절): 상자 폭+2 에서 시작해 틱당 1px 씩
@@ -92,7 +106,10 @@ describe('seasonScoreboardBoxOf — 전광판 화면이 들어가는 상자', ()
 
   it('칸 3 만 박스 2 다 — 0·1 은 팀 아이콘이 쓴다', () => {
     expect(seasonScoreboardBoxOf(3)).toEqual([154, 143, 48, 20])
-    expect(seasonTeamIconBoxesOf(3).slice(0, 2)).toEqual([[133, 141, 18, 24], [205, 141, 18, 24]])
+    expect(seasonTeamIconBoxesOf(3).slice(0, 2)).toEqual([
+      [133, 141, 18, 24],
+      [205, 141, 18, 24],
+    ])
   })
 
   it('칸 3 이 아니면 팀 아이콘 자리가 없다', () => {
@@ -286,6 +303,9 @@ describe('drawStadiumPreview — 구장관리 미리보기', () => {
   it('구장 묶음은 카메라 (−165, −80) 만큼, 바닥은 가로 dx 만 옮겨 그린다', () => {
     const { context, translates } = 기록컨텍스트()
     drawStadiumPreview(context, { skyRow: 0, skyColumn: 0, scoreboardX: 0, seasonStadium: { stand: 0, crowd: 0, board: 3, grassPalette: null } })
-    expect(translates).toEqual([[-45, -10], [-45, 0]])
+    expect(translates).toEqual([
+      [-45, -10],
+      [-45, 0],
+    ])
   })
 })

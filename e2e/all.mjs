@@ -89,6 +89,7 @@ const lastMatch = (text, pattern) => [...text.matchAll(pattern)].at(-1)?.[0] ?? 
 
 /** 단계마다 요약 한 줄 */
 function summarize(step) {
+  // eslint-disable-next-line no-control-regex -- ANSI 색 코드를 지운다
   const out = step.output.replace(/\x1b\[[0-9;]*m/g, '')
   if (step.kind === 'smoke') return lastMatch(out, /\d+\/\d+ 통과[^\n]*/g) ?? '요약 줄 없음'
   if (step.kind === 'hits') {
@@ -96,13 +97,28 @@ function summarize(step) {
     const verdict = lastMatch(out, /(겹침 없음[^\n]*|실패 \d+[^\n]*)/g)
     return [verdict, allowed].filter(Boolean).join(' · ') || '요약 줄 없음'
   }
-  if (step.kind === 'png') return out.split('\n').filter((line) => /같음|다름/.test(line) && !line.startsWith('기준')).join(' · ') || '요약 줄 없음'
+  if (step.kind === 'png')
+    return (
+      out
+        .split('\n')
+        .filter((line) => /같음|다름/.test(line) && !line.startsWith('기준'))
+        .join(' · ') || '요약 줄 없음'
+    )
   if (step.kind === 'browser' || step.kind === 'fixtures') {
     const files = lastMatch(out, /Test Files[^\n]*/g)
     const tests = lastMatch(out, /Tests {2}[^\n]*/g)
-    return [files, tests].filter(Boolean).map((line) => line.replace(/\s+/g, ' ').trim()).join(' · ') || '요약 줄 없음'
+    return (
+      [files, tests]
+        .filter(Boolean)
+        .map((line) => line.replace(/\s+/g, ' ').trim())
+        .join(' · ') || '요약 줄 없음'
+    )
   }
-  if (step.kind === 'perf') return out.split('\n').filter((line) => line.startsWith('|')).join('\n')
+  if (step.kind === 'perf')
+    return out
+      .split('\n')
+      .filter((line) => line.startsWith('|'))
+      .join('\n')
   if (step.kind === 'leak') return step.code === 0 ? 'clean' : step.output.trim()
   return ''
 }
@@ -130,7 +146,9 @@ try {
   if (!SKIP.has('perf') || !SKIP.has('leak')) deployDir = await serveDeploy()
 
   if (!SKIP.has('smoke')) {
-    const smokes = await Promise.all(TARGETS.map((target) => run(`smoke:${target}`, 'yarn', ['node', 'e2e/smoke.mjs'], { E2E_PORT: String(PORTS[target]) })))
+    const smokes = await Promise.all(
+      TARGETS.map((target) => run(`smoke:${target}`, 'yarn', ['node', 'e2e/smoke.mjs'], { E2E_PORT: String(PORTS[target]) })),
+    )
     steps.push(...smokes.map((step) => ({ ...step, kind: 'smoke' })))
   }
   if (!SKIP.has('hits')) {
@@ -161,12 +179,24 @@ try {
   }
 }
 
-const report = steps.map((step) => ({ name: step.name, ok: step.code === 0, code: step.code, seconds: Math.round(step.ms / 100) / 10, summary: summarize(step) }))
+const report = steps.map((step) => ({
+  name: step.name,
+  ok: step.code === 0,
+  code: step.code,
+  seconds: Math.round(step.ms / 100) / 10,
+  summary: summarize(step),
+}))
 writeFileSync(join(RUN, 'all-report.json'), `${JSON.stringify({ seconds: Math.round((Date.now() - started) / 1000), steps: report }, null, 2)}\n`)
 console.log(`\n전체 회귀 — ${((Date.now() - started) / 60000).toFixed(1)}분 (대상 ${TARGETS.join(' · ')})`)
 for (const row of report) {
   const head = `  ${row.ok ? 'ok  ' : 'FAIL'} ${row.name.padEnd(10)} ${String(row.seconds).padStart(6)}s`
-  if (row.summary.includes('\n')) console.log(`${head}\n${row.summary.split('\n').map((line) => `       ${line}`).join('\n')}`)
+  if (row.summary.includes('\n'))
+    console.log(
+      `${head}\n${row.summary
+        .split('\n')
+        .map((line) => `       ${line}`)
+        .join('\n')}`,
+    )
   else console.log(`${head}  ${row.summary}`)
 }
 process.exit(report.every((row) => row.ok) ? 0 : 1)

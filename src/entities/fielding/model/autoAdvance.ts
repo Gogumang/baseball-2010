@@ -1,10 +1,5 @@
 import { basePosition, isSamePoint, ticksToReach } from '@/entities/fielding/model/fieldGeometry'
-import {
-  isRunnerStopped,
-  NONE,
-  type DefenseContext,
-  type RunnerState,
-} from '@/entities/fielding/model/fieldingState'
+import { isRunnerStopped, NONE, type DefenseContext, type RunnerState } from '@/entities/fielding/model/fieldingState'
 import { defenseArrivalTicks } from '@/entities/fielding/model/throwArrival'
 
 /**
@@ -134,8 +129,7 @@ export function isHeadingBack(runner: RunnerState, previousTarget: number): bool
 export function isPathClear(
   runner: RunnerState,
   runners: readonly RunnerState[],
-  previousTargetOf: (runnerIndex: number) => number = (index) =>
-    runners.find((candidate) => candidate.index === index)?.startBase ?? NONE,
+  previousTargetOf: (runnerIndex: number) => number = (index) => runners.find((candidate) => candidate.index === index)?.startBase ?? NONE,
 ): boolean {
   const mine = runner.startBase
   // 0xa97d4 — 목록 번호 i+1 부터 오름차순으로 처음 만나는 산(+0x96 == 0) 주자. 득점도 +0x96 을 세운다(0xaa0a8 → aa1da 0xa9520)
@@ -167,9 +161,7 @@ export function isPathClear(
  */
 export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdvanceDecision[] {
   const { play, runners } = input
-  const pathClear =
-    input.isPathClear ??
-    ((runner: RunnerState, all: readonly RunnerState[]) => isPathClear(runner, all, input.previousTargetOf))
+  const pathClear = input.isPathClear ?? ((runner: RunnerState, all: readonly RunnerState[]) => isPathClear(runner, all, input.previousTargetOf))
   const decisions: AutoAdvanceDecision[] = []
   for (let index = runners.length - 1; index >= 0; index -= 1) {
     const runner = runners[index]

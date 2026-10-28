@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { ballFrameIndexAt, ballKindAt, ballPixelAt, eagleEyePixelOf, platePixelOf, RELEASE_PIXEL, sceneBallPathPixelAt } from '@/widgets/batting-stage/lib/trajectory'
+import {
+  ballFrameIndexAt,
+  ballKindAt,
+  ballPixelAt,
+  eagleEyePixelOf,
+  platePixelOf,
+  RELEASE_PIXEL,
+  sceneBallPathPixelAt,
+} from '@/widgets/batting-stage/lib/trajectory'
 import { projectToScreen } from '@/entities/pitching/model/pitchCurve'
 import { toPixel } from '@/widgets/batting-stage/lib/stageLayout'
 import type { Pitch } from '@/entities/pitching/model/pitch'

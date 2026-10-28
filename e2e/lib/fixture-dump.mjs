@@ -6,9 +6,14 @@ import { writeFileSync } from 'node:fs'
  * 값은 저장 모듈이 `JSON.stringify` 로 쓴 것이라 풀어 둔다(JSON 이 아닌 글은 `{ "$raw": 글 }`).
  */
 export async function dumpFixture(page, path, { note = '', seed } = {}) {
-  const raw = await page.evaluate(() => Object.fromEntries(
-    Object.keys(localStorage).filter((key) => key.startsWith('compus-baseball/')).sort().map((key) => [key, localStorage.getItem(key)]),
-  ))
+  const raw = await page.evaluate(() =>
+    Object.fromEntries(
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('compus-baseball/'))
+        .sort()
+        .map((key) => [key, localStorage.getItem(key)]),
+    ),
+  )
   const storage = {}
   for (const [key, value] of Object.entries(raw)) {
     try {

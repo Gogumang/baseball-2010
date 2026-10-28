@@ -38,11 +38,7 @@ export interface RecoveryRoll<TCareer extends RecoverableCareer> {
   readonly recoveries: readonly string[]
 }
 
-export function rollRecovery<TCareer extends RecoverableCareer>(
-  career: TCareer,
-  chance: RecoveryChance,
-  random: RandomPort,
-): RecoveryRoll<TCareer> {
+export function rollRecovery<TCareer extends RecoverableCareer>(career: TCareer, chance: RecoveryChance, random: RandomPort): RecoveryRoll<TCareer> {
   let next = career
   const recoveries: string[] = []
   if (next.isSick) {

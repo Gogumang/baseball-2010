@@ -2,7 +2,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import {
-  addSkinStepCounter, resetSkinStepCounter, skinStepCounterValue, useMirrorSkinStepCounter, useSkinStepCounterValue,
+  addSkinStepCounter,
+  resetSkinStepCounter,
+  skinStepCounterValue,
+  useMirrorSkinStepCounter,
+  useSkinStepCounterValue,
   useSkinStepDrawCounter,
 } from '@/shared/lib/skinStepCounter/skinStepCounter'
 

@@ -58,7 +58,6 @@ function subEntriesOf(career: PlayerCareer): readonly ShopEntry[] {
   })
 }
 
-
 /** GP아이템 상점 — 창 종류 2 (R12 1b-다: G부족이 가장 먼저, 그 다음 아이템별 가드 여섯) */
 function gpEntriesOf(career: PlayerCareer): readonly ShopEntry[] {
   return BATTER_GP_ITEMS.map((item, index) => ({

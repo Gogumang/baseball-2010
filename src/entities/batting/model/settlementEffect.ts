@@ -110,8 +110,7 @@ export interface SceneRain {
 
 /** 정산이 켠 효과 — 없으면 null(끔) */
 export type SettlementEffect =
-  | { readonly kind: 'fireworks'; fireworks: HomeRunFireworks<number> }
-  | { readonly kind: 'rain'; readonly rain: SceneRain }
+  { readonly kind: 'fireworks'; fireworks: HomeRunFireworks<number> } | { readonly kind: 'rain'; readonly rain: SceneRain }
 
 export interface SettlementEffectInput {
   /** 0x4a350 — 사람 팀이 이겼나 */
@@ -176,12 +175,7 @@ function placeDrop(rain: SceneRain, random: RandomPort): void {
 /** 0x8f63c 종류 0 — 굴림 6 번 (x · y · 길이 · 땅 · 짙기 걸음 · 기다림) */
 function spawnDrop(wind: number, random: RandomPort): RainDrop {
   const reach = 30 * Math.abs(wind)
-  const x =
-    wind < 0
-      ? random.rand(0, SCREEN_WIDTH + reach)
-      : wind > 0
-        ? random.rand(-reach, SCREEN_WIDTH)
-        : random.rand(-30, SCREEN_WIDTH + 30)
+  const x = wind < 0 ? random.rand(0, SCREEN_WIDTH + reach) : wind > 0 ? random.rand(-reach, SCREEN_WIDTH) : random.rand(-30, SCREEN_WIDTH + 30)
   const y = random.rand(-60, 20)
   const length = random.rand(20, 40)
   const ground = random.rand(SCREEN_HEIGHT - 50, SCREEN_HEIGHT + 20) & 0xffff
@@ -240,11 +234,7 @@ function tickRain(rain: SceneRain, random: RandomPort): void {
 }
 
 /** 결과 그림 0x4a384 의 0x901a0 한 번 */
-export function tickSettlementEffect(
-  effect: SettlementEffect,
-  port: FireworksParticlePort<number>,
-  random: RandomPort,
-): void {
+export function tickSettlementEffect(effect: SettlementEffect, port: FireworksParticlePort<number>, random: RandomPort): void {
   if (effect.kind === 'fireworks') {
     effect.fireworks = tickHomeRunFireworks(effect.fireworks, port, random)
     return
@@ -254,10 +244,41 @@ export function tickSettlementEffect(
 
 /** 0x8fb08 — 튐 수명(줄인 뒤)별 흰 점 자리. 3 은 가로선 (x − 2, y) ~ (x + 2, y) 도 긋는다 */
 export const SPLASH_DOTS: Readonly<Record<number, readonly (readonly [number, number])[]>> = {
-  3: [[-1, -1], [-2, -2], [1, -1], [2, -2]],
-  2: [[-4, 0], [-3, 0], [-2, -2], [-3, -3], [4, 0], [3, 0], [2, -2], [3, -3]],
-  1: [[-6, 0], [-5, 0], [-4, -2], [-5, -3], [6, 0], [5, 0], [4, -2], [5, -3]],
-  0: [[-7, 0], [-8, -2], [-5, -4], [7, 0], [8, -2], [5, -4], [0, 0]],
+  3: [
+    [-1, -1],
+    [-2, -2],
+    [1, -1],
+    [2, -2],
+  ],
+  2: [
+    [-4, 0],
+    [-3, 0],
+    [-2, -2],
+    [-3, -3],
+    [4, 0],
+    [3, 0],
+    [2, -2],
+    [3, -3],
+  ],
+  1: [
+    [-6, 0],
+    [-5, 0],
+    [-4, -2],
+    [-5, -3],
+    [6, 0],
+    [5, 0],
+    [4, -2],
+    [5, -3],
+  ],
+  0: [
+    [-7, 0],
+    [-8, -2],
+    [-5, -4],
+    [7, 0],
+    [8, -2],
+    [5, -4],
+    [0, 0],
+  ],
 }
 
 /** 비 그리기 0x8f8ec · 0x8fb08 — 빗방울 선과 튐 점 */

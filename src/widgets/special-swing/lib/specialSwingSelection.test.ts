@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  NO_SPECIAL_SWING_NUMBER, specialSwingNameOf, specialSwingNumberOf, specialSwingPickOf,
+  NO_SPECIAL_SWING_NUMBER,
+  specialSwingNameOf,
+  specialSwingNumberOf,
+  specialSwingPickOf,
   specialSwingStoredNumberOf,
 } from '@/widgets/special-swing/lib/specialSwingSelection'
 
@@ -18,8 +21,7 @@ describe('칸 → 기술 번호', () => {
   })
 
   it('이름은 StrCOMMON[24 + 번호] 다', () => {
-    expect([1, 2, 3, 4, 5].map(specialSwingNameOf))
-      .toEqual(['파워 스윙', '플레임 스윙', '토네이도스윙', '미라지 스윙', '메테오 스윙'])
+    expect([1, 2, 3, 4, 5].map(specialSwingNameOf)).toEqual(['파워 스윙', '플레임 스윙', '토네이도스윙', '미라지 스윙', '메테오 스윙'])
   })
 })
 

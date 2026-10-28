@@ -38,7 +38,9 @@ export const POSTSEASON_GAME_START = (isPrepare: (h: SceneHandles) => boolean, i
 export const POSTSEASON_CHAMPION = (korean: boolean): readonly SceneStep[] => [
   wait(600),
   keyUntil('Enter', '우승 팀 발표 팝업 7 (StrMODE[137])', (h) => postseasonPopupOf(h) === '우승발표', 700, 10000),
-  ...(korean ? [wait(700), keyUntil('Enter', '한국시리즈 우승 팝업 8 (StrMODE[190])', (h) => postseasonPopupOf(h) === '한국시리즈우승', 700, 10000)] : []),
+  ...(korean
+    ? [wait(700), keyUntil('Enter', '한국시리즈 우승 팝업 8 (StrMODE[190])', (h) => postseasonPopupOf(h) === '한국시리즈우승', 700, 10000)]
+    : []),
   wait(900),
 ]
 

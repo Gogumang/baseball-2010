@@ -7,11 +7,7 @@ import {
   BURST_TEXT_LINE,
   judgeBurstGoal,
 } from '@/entities/burst-mission/model/burstMissionJudge'
-import {
-  BURST_RESULT_BIT as B,
-  HUMAN_WIN_END_BITS,
-  burstResultBitsOf,
-} from '@/entities/burst-mission/model/burstResultBits'
+import { BURST_RESULT_BIT as B, HUMAN_WIN_END_BITS, burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import { goalNamesFor, pitcherGoalNamesFor } from '@/entities/mission/model/missionGoal'
 
 const 단타 = { kind: '안타', bases: 1 } as const
