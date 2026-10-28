@@ -68,8 +68,15 @@ async function openPage(browser, device, { inject } = {}) {
   const page = await context.newPage()
   // 걸린 요청 — 끝(`requestfinished` · `requestfailed`)이 안 오는 요청이 있어도 그 주소를 알리게 Set 으로 든다. data: 주소(칠한 그림)는
   // 망을 안 타고 웹킷에서는 끝 알림이 안 올 때가 있어 뺀다 (r355)
-  const stats = { pending: new Set(), pageErrors: [] }
-  await page.route(CDN, (route) => route.abort())
+  const stats = { pending: new Set(), held: [], isHolding: false, pageErrors: [] }
+  // 망 대답을 가짜 시계의 걸음 사이에만 들인다 (r355) — 가짜 시계를 미는 동안(`runFor`) 시작한 요청은 붙들었다가 시계가 선 뒤
+  // (`waitQuiet`) 놓는다. 안 그러면 대답(지연 화면 묶음 · JSON)이 `runFor` 안 아무 가짜 시각에나 닿아 실제 진행이 판마다 몇 틱 갈렸다
+  // (웹킷 돌발 결과 뜬 틱 1389 · 1392). 문서를 여는 동안(`isHolding` 거짓)은 바로 놓는다 — goto 가 대답을 기다린다
+  await page.route('**/*', (route) => {
+    if (CDN.test(route.request().url())) return route.abort()
+    if (!stats.isHolding) return route.continue().catch(() => {})
+    stats.held.push(route)
+  })
   page.on('pageerror', (error) => stats.pageErrors.push(error.message.slice(0, 300)))
   // 쪽이 죽으면 걸린 Playwright 호출이 안 풀릴 수 있다 — 알리고 맥락을 닫아 풀어 준다(r355)
   page.on('crash', () => {
@@ -116,8 +123,9 @@ async function waitQuiet(page, stats) {
   let quiet = 0
   const until = Date.now() + QUIET_LIMIT_MS
   while (quiet < 3 && Date.now() < until) {
+    for (const route of stats.held.splice(0)) route.continue().catch(() => {})
     await new Promise((resolve) => setTimeout(resolve, 10))
-    quiet = stats.pending.size === 0 ? quiet + 1 : 0
+    quiet = stats.pending.size === 0 && stats.held.length === 0 ? quiet + 1 : 0
   }
   if (quiet < 3) {
     stats.quietTimeouts = (stats.quietTimeouts ?? 0) + 1
@@ -225,6 +233,7 @@ async function captureScene(browser, base, scene) {
   try {
     const started = Date.now()
     await page.goto(`${base}?scene=${scene}&real=1&capture=1`, { waitUntil: 'commit' })
+    stats.isHolding = true
     const virtual = await driveToReady(page, stats)
     const snapshot = await page.evaluate(() => window.__capturedSnapshot ?? null)
     if (snapshot === null) throw new Error('뜬 스냅샷이 없다 (window.__capturedSnapshot)')
@@ -373,6 +382,7 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
   try {
     // A — 실제로 진행해 닿은 순간을 그 자리에서 뜬다
     await a.page.goto(`${base}?scene=${scene}&real=1&capture=1`, { waitUntil: 'commit' })
+    a.stats.isHolding = true
     const virtualA = await driveToReady(a.page, a.stats)
     const snapshot = await a.page.evaluate(() => window.__capturedSnapshot)
     // 파일이 지금 뜬 것과 같은가 — 다르면 낡은 파일 (값만)
@@ -401,6 +411,7 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
     watch.sides.push(['B', b.stats])
     const openedB = Date.now()
     await b.page.goto(`${base}?scene=${scene}&snapshot=inject`, { waitUntil: 'commit' })
+    b.stats.isHolding = true
     const virtualB = await driveToReady(b.page, b.stats)
     const restore = await b.page.evaluate(() => window.__scene?.restore ?? null)
     log(

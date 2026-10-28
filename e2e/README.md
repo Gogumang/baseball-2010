@@ -417,6 +417,9 @@ E2E_SNAPSHOT_RUNS=webkit:iphone pnpm e2e:snapshot verify mission-result
   - **빈 포트**(`e2e/lib/preview.mjs`): 바란 포트(4920 · 4910 · 4930)를 다른 워크트리 · 에이전트가 쓰면 빈 포트에 띄운다. 예전엔
     `--strictPort` 로 우리 preview 는 죽고 남의 서버가 대답해 "떴다" 로 보고 남의 빌드를 시험하다, 그쪽이 꺼지면 "Could not connect to
     the server" 가 났다. 이제 우리 preview 가 자기 주소를 알린 뒤에만 뜬 것으로 본다.
+  - **망 대답은 가짜 시계 걸음 사이에만**: 모든 요청을 `page.route` 로 붙들었다가 시계가 선 동안(`waitQuiet`) 놓는다. 대답(지연 화면
+    묶음 · JSON)이 `runFor` 안 아무 가짜 시각에나 닿으면 실제 진행이 판마다 갈렸다 — 웹킷 돌발 결과를 뜬 틱이 1389 · 1391 · 1392 로
+    흔들려, 드물게 걸음 4 의 파티클 틱이 한 틱 갈렸다. 이제 웹킷도 크로미움과 같은 틱(1392)에 닿는다.
   - **뜨기 앞에 같은 시각 타이머를 비운다**(`sceneRunner` — 두 틀 뒤 `setTimeout(0)` 세 바퀴): 그림 틀이 틱 머리와 같은 ms 면 그 틱 머리
     타이머(`setAppTickInterval`)가 안 돈 채 떠서, 되살린 쪽은 그 틱을 이미 센 것으로 보고 한 번 덜 셌다(돌발 결과 창 그린 수 53 ≠ 54).
   - **다른 부품 자리에 이름**: `verify` 의 참고 줄에 부품 이름(`window.__snapshot.fiberNameAt`)을 붙인다(e2e 빌드는 줄인 이름).
