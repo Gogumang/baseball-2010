@@ -75,7 +75,7 @@ export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, 
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 칸은 부품마다 하나 · 처리는 ref 만 본다
+    // 칸은 부품마다 하나 · 처리는 ref 만 본다
   }, [keyLatch])
 
   return (

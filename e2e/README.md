@@ -473,3 +473,15 @@ PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5712/ yarn node e2e/sc
 
 `PERF_REVISIT` 는 같은 맥락(같은 HTTP 캐시)에서 장면을 한 번 열어 다 받은 뒤 다시 열어 두 번째를 잰다(크로미움만). 표의 "그중 304" 가
 재검증 왕복 수다. `PERF_NET=rtt` 는 왕복 150ms 만 늦춘다(대역 제한 없음 — r306 다시 방문 표와 같은 조건).
+
+## 린트 · 포맷 · 150줄 규칙 (r343)
+
+- `yarn lint` — ESLint(타입 정보 없는 가벼운 판: js · typescript-eslint recommended + react-hooks + react-refresh). 에러 0 이어야 한다. `yarn lint:fix` 는 안전한 자동 수정만 하므로 고친 뒤 시험을 돌린다.
+- `yarn format` / `yarn format:check` — Prettier (`.prettierrc.json`: 세미콜론 없음 · 홑따옴표 · 끝 쉼표 all · printWidth 150). 생성 데이터 · 픽스처 · 문서는 `.prettierignore`.
+- 파일 길이: 코드만(빈 줄 · 주석 빼고) **150줄** — `max-lines` 에러. 시험 파일(`*.test.ts(x)`)은 빠진다.
+  넘는 옛 파일은 `eslint.max-lines-baseline.js` 예외 목록(줄 수 내림차순 · 주석이 줄 수, 도입 때 243개). 새 파일은 넣지 말고 처음부터 쪼갠다.
+  파일을 쪼개 150 이하가 되면 `yarn check:lines` 가 실패하며 알려 준다 — 목록에서 빼거나 `yarn check:lines --update` 로 다시 쓴다.
+- `yarn verify` 에 lint · format:check · check:lines 가 들어 있다.
+- 경고로 낮춘 규칙(도입 때 개수): react-hooks/refs 842 · react-hooks/exhaustive-deps 50 · react-refresh/only-export-components 47 ·
+  react-hooks/set-state-in-effect 43 · react-hooks/immutability 30 · react-hooks/rules-of-hooks 27(26개는 시험 파일) · no-useless-assignment 24 ·
+  react-hooks/globals 2 · react-hooks/preserve-manual-memoization 2. 고치면 동작이 바뀔 수 있어 따로 손본다.

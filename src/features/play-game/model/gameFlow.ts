@@ -751,7 +751,7 @@ export function applyPlayerOutcome(
   random: RandomPort,
   options: PlayerOutcomeOptions = {},
 ): GameProgress {
-  let started = startPlayerOutcome(progress, outcome, random, options)
+  const started = startPlayerOutcome(progress, outcome, random, options)
   // 벤치 클리어링도 끼어들 사람이 없으면 100틱을 다 본 것으로 친다 — 틱 10 의 굴림 8 번까지 나간다
   if (started.pendingBenchClearing !== null) {
     return resolveBenchClearing(started, { reachedTargetTick: true }, random)

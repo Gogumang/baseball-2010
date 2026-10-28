@@ -1830,7 +1830,7 @@ export function useMissionSession({
       if (play !== null) missionSceneRef.current = play.result.scene
       // 0xa5e14 — 사람이 던져도 공마다 state[0xd] · state[0xe](CPU 대타 막음)를 내린다 (a5e72 · a5e7c).
       // MAX게이지(R+0x158)는 공 도착 0x3dfac 의 스트라이크 · 삼진 갈래만 센다 — 낫아웃 판(종류 9 · 타자주자)은 v 를 0 으로 지워 건너뛴다
-      let nextRun = recordPitch(
+      const nextRun = recordPitch(
         { ...pitcherRun, cpu: missionCpuAfterPitch(cpuAfterSwing, { pitchTypeNumber: typeNumber, batterIntimidates: cpuBatterIntimidates }) },
         grade === MAX_GAUGE_GRADE &&
           countsTopGradePitch(

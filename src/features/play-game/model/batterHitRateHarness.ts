@@ -51,7 +51,7 @@ export function playCareerGames(options: HitRateOptions): HitRateTally {
     let progress: GameProgress = startGame(random)
     let deck = createPatternDeck(random)
     for (let guard = 0; !progress.game.isFinished && guard < 200; guard += 1) {
-      let balls = 0
+      const balls = 0
       let strikes = 0
       let outcome: AtBatOutcome | null = null
       let pattern: BattedBallPattern | undefined

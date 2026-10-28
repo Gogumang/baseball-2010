@@ -89,6 +89,7 @@ const lastMatch = (text, pattern) => [...text.matchAll(pattern)].at(-1)?.[0] ?? 
 
 /** 단계마다 요약 한 줄 */
 function summarize(step) {
+  // eslint-disable-next-line no-control-regex -- ANSI 색 코드를 지운다
   const out = step.output.replace(/\x1b\[[0-9;]*m/g, '')
   if (step.kind === 'smoke') return lastMatch(out, /\d+\/\d+ 통과[^\n]*/g) ?? '요약 줄 없음'
   if (step.kind === 'hits') {

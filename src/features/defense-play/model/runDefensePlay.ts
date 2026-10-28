@@ -1246,7 +1246,7 @@ export function startDefensePlay(input: DefensePlayInput): DefensePlayState {
   leadRunnersForBattedBall(runners, input)
 
   const chaserSlot = forecast.choice.slot
-  let catchTick = Math.max(0, Math.min(forecast.choice.catchTick, maximumTicks))
+  const catchTick = Math.max(0, Math.min(forecast.choice.catchTick, maximumTicks))
   // 추적야수 AI 1(b4aca~b4b5a, 직접 뜬 것): b4b40 0xa25b0(공, +0x174 포구 틱)의 점 → b4b50~b4b5a 0xa100c(야수, x, **0**, z) —
   // 야수 목표는 늘 땅 위다. 포구 틱 다리(6b 절 쥐기)도 이 점에 세운다(r162 — 예전 웹은 높이째 포구 지점이었다)
   const catchPoint = groundPointOf(trajectory.pointAt(catchTick))

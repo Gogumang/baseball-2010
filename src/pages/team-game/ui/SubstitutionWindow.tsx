@@ -103,7 +103,6 @@ export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
     // 키 처리는 stateRef · latest 로 지금 값을 읽는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const gameUi = useFrameOrigins(GAME_UI_FRAMES)
