@@ -8,6 +8,7 @@ import {
   arrivesUnhit,
   clearsPitchJudgement,
   openPitchArrivalPlay,
+  type PitchArrivalPlay,
   pitchJudgementOf,
   runOpenedPitchArrivalPlay,
 } from '@/features/defense-play/model/pitchArrivalPlay'
@@ -18,14 +19,8 @@ import { holdsUntilResultWaitEnd } from '@/features/play-game/model/benchClearin
 import { enterPitchSelection } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/pitchSelection'
 import { advance } from '@/features/play-pitcher-game/model/pitcherGameFlow/auto/advance'
 import { defensePlayInputOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/fielding/defensePlayInput'
-import {
-  myDefenseAbilitiesOf,
-  myFielderPlatesOf,
-  myFielderRecordsOf,
-  myFielderSkillIdsOf,
-  opponentRunnerAcesOf,
-  runAbilitiesOnBaseOf,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow/fielding/fielderInputs'
+import { runAbilitiesOnBaseOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/fielding/fielderInputs'
+import { myDefenseFieldsOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/fielding/myDefenseFields'
 import { applyPitcherArrival } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/applyPitcherArrival'
 import type { PitcherPitchArrival } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/pitchArrivalTypes'
 import { withoutSteal, withoutStealDisplay } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/stealDisplay'
@@ -67,41 +62,72 @@ export function afterMyPitchArrival(arrival: PitcherPitchArrival, resume: { read
   const outcome = arrived.atBat.outcome
   // 볼·스트라이크·파울 — 판정 A 0xae24c 의 "그 밖 → 0xf" 라 다음 공을 고르기 전에 0xf 진입 0x3d954 를 다시 지난다
   if (outcome === null) return enterPitchSelection(arrived, random)
-  // 맞은 공은 쏜 패턴(`simulateBatter` 가 결과 객체에 묶어 둔 것)으로 판을 돈다 — 홈런도 판 안에서 끝난다.
-  // 판정 11(2스트라이크 번트 파울 아웃)은 묶인 패턴이 없어 판 없이 아웃이다
-  const contact = contactOfOutcome(outcome)
-  if (contact !== undefined ? isBattedBallKind(outcome) : isBattedBallInPlay(outcome)) {
-    // 여기서 멈춘다 — 화면이 이 타구를 실시간으로 돌리고 결과를 `resolveDefensePlay` 에 넘긴다.
-    // `atBat` 은 아직 안 비웠으므로 끝난 타석의 결과 코드·볼 카운트가 그대로 남아 있다.
-    // 출발 칸은 타구 판 입력(리드 0x3d7b8)이 읽고 나면 비운다
-    return {
-      // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
-      ...withoutStealDisplay(arrived),
-      // 진행기 입력의 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
-      pendingDefensePlay: withPredictedOutcome({
-        ...defensePlayInputOf(arrived, outcome, random),
-        // 장면 +0xfdc — CPU 타자의 번트 종류. 페어 번트 판도 판 시작 리드(0x3d7b8 +3 틱) · 필살수비 관문(50fc8) · 정산이 본다
-        buntKind: resume.buntKind,
-      }),
-    }
-  }
+  if (isBattedBallPlayOutcome(outcome)) return withPendingDefensePlay(arrived, outcome, resume, random)
   // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a]).
   // 삼진 기록(0xa7c4c)은 그대로 남는다 — `applyDefensivePlay` 의 보통 삼진 길을 판의 결과로 지난다.
   // 실시간으로 이미 보여 준 판(`shownLive`)은 재생 칸에 다시 안 넣는다
   const play = arrival.play
   if (play !== null && arrivalApplicationOf(play) === 'batterRuns') {
-    return advance(applyDefensivePlay(arrived, outcome, true, arrived.atBat.balls, play.result, play.shownLive === true ? null : play.result), random)
+    return advance(
+      applyDefensivePlay(arrived, outcome, true, arrived.atBat.balls, {
+        defensePlay: play.result,
+        playback: play.shownLive === true ? null : play.result,
+      }),
+      random,
+    )
   }
   // 볼넷 · 사구 · 판 없는 삼진 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기
   // 주루(0x17)·정산(삼진은 0xd · 0x18 과 0xa8024)은 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 —
   // `judgeHitByPitch`, A-22 · r295 · r298)
-  if (holdsUntilResultWaitEnd(outcome, play)) {
-    return {
-      ...arrived,
-      pendingBenchClearing: play === null ? { phase: 'wait', outcome } : { phase: 'wait', outcome, arrivalPlay: play },
-    }
-  }
+  if (holdsUntilResultWaitEnd(outcome, play)) return { ...arrived, pendingBenchClearing: heldResultWaitOf(outcome, play) }
   return finishNonPlayOutcome(arrived, outcome, random, play)
+}
+
+/**
+ * 맞은 공은 쏜 패턴(`simulateBatter` 가 결과 객체에 묶어 둔 것)으로 판을 돈다 — 홈런도 판 안에서 끝난다.
+ * 판정 11(2스트라이크 번트 파울 아웃)은 묶인 패턴이 없어 판 없이 아웃이다
+ */
+function isBattedBallPlayOutcome(outcome: AtBatOutcome): boolean {
+  return contactOfOutcome(outcome) !== undefined ? isBattedBallKind(outcome) : isBattedBallInPlay(outcome)
+}
+
+/**
+ * 여기서 멈춘다 — 화면이 이 타구를 실시간으로 돌리고 결과를 `resolveDefensePlay` 에 넘긴다.
+ * `atBat` 은 아직 안 비웠으므로 끝난 타석의 결과 코드·볼 카운트가 그대로 남아 있다. 출발 칸은 타구 판 입력(리드 0x3d7b8)이 읽고 나면 비운다
+ */
+function withPendingDefensePlay(
+  arrived: PitcherGameProgress,
+  outcome: AtBatOutcome,
+  resume: { readonly buntKind: number },
+  random: RandomPort,
+): PitcherGameProgress {
+  return {
+    // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
+    ...withoutStealDisplay(arrived),
+    // 진행기 입력의 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
+    pendingDefensePlay: withPredictedOutcome({
+      ...defensePlayInputOf(arrived, outcome, random),
+      // 장면 +0xfdc — CPU 타자의 번트 종류. 페어 번트 판도 판 시작 리드(0x3d7b8 +3 틱) · 필살수비 관문(50fc8) · 정산이 본다
+      buntKind: resume.buntKind,
+    }),
+  }
+}
+
+/** 0x12 대기로 붙든 타석 끝 — 밀어내기 판(종류 2)이 열렸으면 함께 붙든다 */
+function heldResultWaitOf(outcome: AtBatOutcome, play: PitchArrivalPlay | null): PitcherGameProgress['pendingBenchClearing'] {
+  return play === null ? { phase: 'wait', outcome } : { phase: 'wait', outcome, arrivalPlay: play }
+}
+
+/** 공 도착 0x3dfac 에 실어 가는 이 공의 값 */
+interface ArrivingPitch {
+  readonly resolution: PitchResolution
+  readonly outcomeAfter: AtBatOutcome | null
+  /** 장면 +0xfdc — 이 공 뒤의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
+  readonly buntKind?: number
+  /** 이 공의 등급 t (scene+0x17c0) — 결과 코드 스위치의 R+0x158(`recordPitchGrade`)이 본다 */
+  readonly grade: number
+  /** 지금 타자의 손 0xb63c0(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884, `PitchArrivalPlayInput.batterHand`) */
+  readonly batterHand: number
 }
 
 /**
@@ -131,16 +157,7 @@ export function afterMyPitchArrival(arrival: PitcherPitchArrival, resume: { read
  */
 function arrivePitcherPitch(
   progress: PitcherGameProgress,
-  pitch: {
-    readonly resolution: PitchResolution
-    readonly outcomeAfter: AtBatOutcome | null
-    /** 장면 +0xfdc — 이 공 뒤의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
-    readonly buntKind?: number
-    /** 이 공의 등급 t (scene+0x17c0) — 결과 코드 스위치의 R+0x158(`recordPitchGrade`)이 본다 */
-    readonly grade: number
-    /** 지금 타자의 손 0xb63c0(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884, `PitchArrivalPlayInput.batterHand`) */
-    readonly batterHand: number
-  },
+  pitch: ArrivingPitch,
   random: RandomPort,
   /** 화면이 도는 갈래면 도루 · 폭투 판을 붙든다 — `afterMyPitchArrival` 이 쓸 값 */
   live?: PitcherPendingRunnerPlay['resume'],
@@ -149,54 +166,40 @@ function arrivePitcherPitch(
     const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
     return { progress: next, play: null, interrupted: false }
   }
-  const before = progress.game
-  const opened = openPitchArrivalPlay(
-    {
-      gameMode: PITCHER_EDITION_MODE,
-      pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
-      stealingFrom: progress.stealingFrom,
-      bases: before.bases,
-      outs: before.outs,
-      batterHand: pitch.batterHand,
-      // 수비 아홉 칸은 우리 팀 — 칸 0(나)은 진행기가 선수 없는 칸으로 둔다(0xb0fb4 b1032, `myDefenseAbilitiesOf`)
-      defenseAbilities: myDefenseAbilitiesOf(progress),
-      // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10)
-      fielderPlates: myFielderPlatesOf(progress),
-      fielderSkillIds: myFielderSkillIdsOf(progress),
-      // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
-      defenseTeamIndex: progress.options.ourTeamId,
-      fielderRecords: myFielderRecordsOf(progress),
-      offenseTeamIndex: progress.options.opponentTeamId,
-      runnerAces: opponentRunnerAcesOf(progress),
-      runAbilities: runAbilitiesOnBaseOf(progress),
-      defenseIsCpu: false,
-      // 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓) — 원본 기본값은 수동
-      offenseIsCpu: true,
-      throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
-      buntKind: pitch.buntKind ?? 0,
-      scene: progress.defenseScene,
-      // 경기 +0xfd4 — 이 공의 값 (`startPitch` 가 이미 적었다)
-      sceneResultCode: progress.sceneResultCode,
-    },
-    random,
-  )
-  // 3e0aa — 낫아웃 갈래가 판정 칸을 지웠나. 같은 진입이 적고 0x12 틱 0 그림이 읽는다 (바뀔 때만 새 객체)
-  const judgementCleared = clearsPitchJudgement(opened)
-  const judged: PitcherGameProgress =
-    (progress.lastPitchJudgementCleared === true) === judgementCleared ? progress : { ...progress, lastPitchJudgementCleared: judgementCleared }
-  // R+0x158 — 판 종류를 정한 같은 진입이 결과 코드 스위치(0x3e11a, 표 0xcffb4)로 간다 (`countsTopGradePitch`)
-  const graded = countsTopGradePitch(pitch.resolution.kind === '스트라이크', judgementCleared)
-    ? { ...judged, pitcherRecord: recordPitchGrade(judged.pitcherRecord, pitch.grade) }
-    : judged
+  const opened = openPitchArrivalPlay(arrivalPlayInputOf(progress, pitch), random)
+  const graded = withPitchJudgement(progress, pitch, clearsPitchJudgement(opened))
   if (opened === null) return { progress: withoutSteal(graded), play: null, interrupted: false }
   // 도루 · 폭투 판 — 키(+0x160)로 던지므로 화면이 실시간으로 돌린다 (`liveRunnerPlay`). 밀어내기(종류 2)는 미리 돌린다
   if (live !== undefined && opened.kind !== 2) {
-    return {
-      progress: { ...graded, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } },
-      play: null,
-      interrupted: false,
-      deferred: true,
-    }
+    const held: PitcherGameProgress = { ...graded, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } }
+    return { progress: held, play: null, interrupted: false, deferred: true }
   }
   return applyPitcherArrival(graded, runOpenedPitchArrivalPlay(opened))
+}
+
+function arrivalPlayInputOf(progress: PitcherGameProgress, pitch: ArrivingPitch) {
+  return {
+    gameMode: PITCHER_EDITION_MODE,
+    pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
+    stealingFrom: progress.stealingFrom,
+    bases: progress.game.bases,
+    outs: progress.game.outs,
+    batterHand: pitch.batterHand,
+    ...myDefenseFieldsOf(progress),
+    runAbilities: runAbilitiesOnBaseOf(progress),
+    buntKind: pitch.buntKind ?? 0,
+    // 경기 +0xfd4 — 이 공의 값 (`startPitch` 가 이미 적었다)
+    sceneResultCode: progress.sceneResultCode,
+  }
+}
+
+/**
+ * 3e0aa — 낫아웃 갈래가 판정 칸을 지웠나. 같은 진입이 적고 0x12 틱 0 그림이 읽는다 (바뀔 때만 새 객체).
+ * R+0x158 — 판 종류를 정한 같은 진입이 결과 코드 스위치(0x3e11a, 표 0xcffb4)로 간다 (`countsTopGradePitch`)
+ */
+function withPitchJudgement(progress: PitcherGameProgress, pitch: ArrivingPitch, judgementCleared: boolean): PitcherGameProgress {
+  const judged: PitcherGameProgress =
+    (progress.lastPitchJudgementCleared === true) === judgementCleared ? progress : { ...progress, lastPitchJudgementCleared: judgementCleared }
+  if (!countsTopGradePitch(pitch.resolution.kind === '스트라이크', judgementCleared)) return judged
+  return { ...judged, pitcherRecord: recordPitchGrade(judged.pitcherRecord, pitch.grade) }
 }

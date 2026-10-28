@@ -23,37 +23,31 @@ export function advance(progress: PitcherGameProgress, random: RandomPort): Pitc
     relay.length === 0 ? next : { ...next, autoRelay: { serial: (progress.autoRelay?.serial ?? 0) + 1, ticks: relay } }
   let current = progress
   for (let step = 0; step < MAXIMUM_AUTO_STEPS; step += 1) {
-    if (current.game.isFinished) return settle(current)
-    if (current.managerHookText !== null) return settle(current)
-
+    if (current.game.isFinished || current.managerHookText !== null) return settle(current)
     if (current.game.half === ourHalfOf(current.game)) {
       // 우리 공격은 모드 3 에서 늘 자동진행(0x21, 0xc1eac) — 진입 0x3abf0 이 남은 돌발을 내린다 (0x8f628)
       // 간이 타석의 공마다 c1446 · c1852 가 수비(상대) 레코드 +2 를 덮는다
       current = withOpponentRecordTouched(markAuto(playTeammateAtBat(withoutPendingBurst(current), random, relay)))
       continue
     }
-
     // 구원 등판 — 8회(0-기준 7) 우리 팀 수비 첫 타석에 벤치의 내 투수로 교체한다 (0xc1ba4)
-    if (!current.onMound && !current.simpleEngineRunning && shouldEnterNow(current)) {
-      current = enterAsRelief(current)
-    }
-
-    if (current.onMound) {
-      if (current.atBatPrepared) return settle(current)
-      // 상태 0x18(1회초 판) → 0xd → 0xe(강판 판정 · OK 대기) 차례 — 판의 굴림이 타석 준비보다 앞이다.
-      // 새 타석의 0xd 진입 0x48d50 은 state[0xe](CPU 대타 막음)를 내린다 (48eb6).
-      // 돌발(0x8f158)·0xf 진입 0x3d954 는 OK 뒤다 (`confirmScene`) — 강판(0x23)이면 0xf 에 안 간다
-      const prepared = prepareAtBat(withHalfInningBoard({ ...current, pinchHitUsed: false }, random), random)
-      return settle({
-        ...prepared,
-        lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half },
-        autoSinceHuman: false,
-      })
-    }
+    if (isReliefEntryNow(current)) current = enterAsRelief(current)
+    if (current.onMound) return settle(current.atBatPrepared ? current : rollHumanAtBatStart(current, random))
     // 내가 마운드에 없는 수비 타석도 자동진행(0x21) — 같은 진입이 남은 돌발을 내린다
     current = markAuto(playDefensiveAtBat(withoutPendingBurst(current), random, relay))
   }
   throw new Error('투수편 경기 자동 진행이 끝나지 않았습니다 — 진행 규칙을 확인하세요')
+}
+
+/**
+ * 사람 수비 타석 — 상태 0x18(1회초 판) → 0xd → 0xe(강판 판정 · OK 대기) 차례라 판의 굴림이 타석 준비보다 앞이다.
+ * 새 타석의 0xd 진입 0x48d50 은 state[0xe](CPU 대타 막음)를 내린다 (48eb6).
+ * 돌발(0x8f158)·0xf 진입 0x3d954 는 OK 뒤다 (`confirmScene`) — 강판(0x23)이면 0xf 에 안 간다
+ */
+function rollHumanAtBatStart(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  const boarded = rollHalfInningBoard({ ...progress, pinchHitUsed: false }, random)
+  const prepared = prepareAtBat(boarded, random)
+  return { ...prepared, lastHumanHalf: { inning: prepared.game.inning, half: prepared.game.half }, autoSinceHuman: false }
 }
 
 function markAuto(progress: PitcherGameProgress): PitcherGameProgress {
@@ -80,30 +74,38 @@ function markAuto(progress: PitcherGameProgress): PitcherGameProgress {
  * 웹은 "앞서 자동 타석이 없었고(`autoSinceHuman`) 반 이닝이 바뀌었다(`lastHumanHalf`)" 로 같은 자리를 잡는다 —
  * 모드 3 에서 이것이 참인 때는 위 1회초 판뿐이다.
  */
-function withHalfInningBoard(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
-  if (progress.autoSinceHuman) return progress
+function rollHalfInningBoard(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  if (!isNewHumanHalf(progress)) return progress
   const { game } = progress
-  const last = progress.lastHumanHalf
-  if (last !== null && last.inning === game.inning && last.half === game.half) return progress
   const fielderRolls = rollHalfInningFielders(random)
   // 같은 틱의 0x3fac4 3fe0a~3fe4c — 판의 수비 팀 레코드 차례로 야수 아홉의 +0xec 를 적는다(칸 0 은 그 팀 지명타자).
   // 모드 3 의 판은 내 수비 반 이닝에만 선다
-  const ourOffense = (game.half === '초' ? 0 : 1) === game.playerSide
-  const defenseTeamId = ourOffense ? progress.options.opponentTeamId : progress.options.ourTeamId
+  const defenseTeamId = defenseTeamIdOf(progress)
   return {
     ...progress,
-    halfInningBoard: {
-      fielderRolls,
-      serial: (progress.halfInningBoard?.serial ?? 0) + 1,
-      inning: game.inning,
-      half: game.half,
-    },
+    halfInningBoard: { fielderRolls, serial: (progress.halfInningBoard?.serial ?? 0) + 1, inning: game.inning, half: game.half },
     fielderRecords: fielderRecordsAfterBoard(progress.fielderRecords, teamBatters(defenseTeamId), (index) => fielderSeatOf(defenseTeamId, index)),
   }
 }
 
-function shouldEnterNow(progress: PitcherGameProgress): boolean {
+/** 앞서 자동 타석이 없었고 사람 반 이닝이 바뀌었다 */
+function isNewHumanHalf(progress: PitcherGameProgress): boolean {
+  if (progress.autoSinceHuman) return false
+  const last = progress.lastHumanHalf
+  return last === null || last.inning !== progress.game.inning || last.half !== progress.game.half
+}
+
+function defenseTeamIdOf(progress: PitcherGameProgress): number {
+  const { game, options } = progress
+  const ourOffense = (game.half === '초' ? 0 : 1) === game.playerSide
+  return ourOffense ? options.opponentTeamId : options.ourTeamId
+}
+
+/** 구원 보직인 내 투수가 벤치에서 8회 수비 첫 타석을 맞았다 — 간이 엔진(강판 뒤)이 아닐 때만 */
+function isReliefEntryNow(progress: PitcherGameProgress): boolean {
   return (
+    !progress.onMound &&
+    !progress.simpleEngineRunning &&
     progress.options.role === PITCHER_ROLE.relief &&
     !progress.hasEntered &&
     progress.game.inning - 1 === RELIEF_ENTRY_INNING_INDEX &&

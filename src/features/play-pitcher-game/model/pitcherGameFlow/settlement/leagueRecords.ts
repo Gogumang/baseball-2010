@@ -1,16 +1,21 @@
 import type { LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { ACE_BATTER_ROSTER_SLOT } from '@/features/play-game/model/gameAces'
-import { rosterSlotAt } from '@/entities/game/model/quickLineup'
+import { type QuickLineup, rosterSlotAt } from '@/entities/game/model/quickLineup'
 import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/progressTypes'
+
+/** 한쪽 타선 — 우리 · 상대 명단과 팀 번호 */
+function battingTeamOf(progress: PitcherGameProgress, ours: boolean): { readonly lineup: QuickLineup; readonly teamId: number } {
+  if (ours) return { lineup: progress.ourLineup, teamId: progress.options.ourTeamId }
+  return { lineup: progress.opponentLineup, teamId: progress.options.opponentTeamId }
+}
 
 /**
  * 도루한 주자(타순 칸)들을 리그 기록 재료로 얹는다 — 0xa56dc 모드 3 갈래는 마선수(0xb633d)만 거른다(마타자 칸 빼기).
  * 주자의 선수는 그 타순 칸에 지금 선 명단 선수다.
  */
 export function withLeagueSteals(progress: PitcherGameProgress, ours: boolean, runners: readonly number[]): PitcherGameProgress {
-  const lineup = ours ? progress.ourLineup : progress.opponentLineup
-  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
+  const { lineup, teamId } = battingTeamOf(progress, ours)
   const steals: LeagueStolenBase[] = []
   for (const runner of runners) {
     const rosterSlot = rosterSlotAt(lineup, runner)
@@ -31,9 +36,9 @@ export function withLeaguePlateAppearance(
   outcome: AtBatOutcome,
   runsBattedIn: number,
 ): Pick<PitcherGameProgress, 'leaguePlateAppearances'> {
-  const rosterSlot = rosterSlotAt(ours ? progress.ourLineup : progress.opponentLineup, orderSlot)
+  const { lineup, teamId } = battingTeamOf(progress, ours)
+  const rosterSlot = rosterSlotAt(lineup, orderSlot)
   if (rosterSlot === ACE_BATTER_ROSTER_SLOT) return { leaguePlateAppearances: progress.leaguePlateAppearances }
-  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
   return {
     leaguePlateAppearances: [...(progress.leaguePlateAppearances ?? []), { teamId, battingOrderIndex: rosterSlot, outcome, runsBattedIn }],
   }

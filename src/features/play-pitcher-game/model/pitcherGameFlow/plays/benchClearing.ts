@@ -8,7 +8,7 @@ import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pit
 
 /**
  * **볼넷 · 사구 · 삼진의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림
- * (`withPitcherBenchClearing` — 사구만. 볼넷 · 삼진은 굴림 없이 4e78c 판정 A — 삼진은 0xd/0x18 · 정산 0xa8024, r298).
+ * (`rollPitcherBenchClearing` — 사구만. 볼넷 · 삼진은 굴림 없이 4e78c 판정 A — 삼진은 0xd/0x18 · 정산 0xa8024, r298).
  * 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀 `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의
  * 보통 길(밀어내기 판 재생 · 정산 · 다음 사람 차례까지) — 예전 공 도착 걸음에 하던 그대로다. 대기 중인 사구가 없으면 그대로 돌려준다.
  */
@@ -16,7 +16,7 @@ export function judgeHitByPitch(progress: PitcherGameProgress, random: RandomPor
   const pending = progress.pendingBenchClearing
   if (pending === null || pending.phase !== 'wait') return progress
   const held: PitcherGameProgress = { ...progress, pendingBenchClearing: null }
-  const settled = withPitcherBenchClearing(held, pending.outcome, random)
+  const settled = rollPitcherBenchClearing(held, pending.outcome, random)
   if (settled !== held) return { ...settled, pendingBenchClearing: { ...pending, phase: 'entry' } }
   return finishNonPlayOutcome(held, pending.outcome, random, pending.arrivalPlay ?? null)
 }
@@ -62,7 +62,7 @@ export function resolveBenchClearing(
  * 아무것도 안 남는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
  * 0x12 대기 끝(`judgeHitByPitch`)이 부른다 — 들어가면 연출(상태 0x1e)을 붙든다(`enterBenchClearing` · `resolveBenchClearing`).
  */
-function withPitcherBenchClearing(progress: PitcherGameProgress, outcome: AtBatOutcome, random: RandomPort): PitcherGameProgress {
+function rollPitcherBenchClearing(progress: PitcherGameProgress, outcome: AtBatOutcome, random: RandomPort): PitcherGameProgress {
   const entered = rollsIntoBenchClearing(
     {
       isHitByPitch: outcome.kind === '사구',

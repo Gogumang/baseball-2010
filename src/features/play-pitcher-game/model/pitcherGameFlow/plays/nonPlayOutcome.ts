@@ -1,4 +1,5 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { arrivalApplicationOf, type PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -14,20 +15,29 @@ export function finishNonPlayOutcome(
   /** 이 공이 연 판 — 볼넷 · 사구 밀어내기 판(종류 2)이면 재생 칸에 넣는다(진루는 아래 보통 길과 같다) */
   arrival: PitchArrivalPlay | null = null,
 ): PitcherGameProgress {
-  // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 아래 길이 그대로 정한다
-  const playback =
-    homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs }) ??
-    (arrival !== null && arrivalApplicationOf(arrival) === 'freePass' ? arrival.result : null)
-  // 삼진 + 도루 판(종류 5) — 판정 B 가 정산 0xa8024 를 종류 5 로 한 번 부른다(`stealPlaySettlement`)
-  const stealPlaySettlement = arrival !== null && arrival.kind === 5 && outcome.kind === '삼진'
-  // 삼진과 한 정산인 주자 판 — 도루(종류 5) · 삼진 그대로인 폭투·포일(종류 9, ae596 → ae5a6). 그 판의 아웃 사건 · 필살송구 표시도
-  // 이 정산이 센다
-  const settledRunnerPlay =
-    arrival !== null && outcome.kind === '삼진' && (arrival.kind === 5 || (arrival.kind === 9 && arrival.strikeout === 'strikeoutStands'))
-      ? arrival.result
-      : undefined
-  return advance(
-    applyDefensivePlay(progress, outcome, true, progress.atBat.balls, null, playback, undefined, undefined, stealPlaySettlement, settledRunnerPlay),
-    random,
-  )
+  const sources = {
+    defensePlay: null,
+    playback: nonPlayPlaybackOf(progress, outcome, arrival),
+    // 삼진 + 도루 판(종류 5) — 판정 B 가 정산 0xa8024 를 종류 5 로 한 번 부른다(`stealPlaySettlement`)
+    stealPlaySettlement: arrival !== null && arrival.kind === 5 && outcome.kind === '삼진',
+    settledRunnerPlay: strikeoutRunnerPlayOf(outcome, arrival),
+  }
+  return advance(applyDefensivePlay(progress, outcome, true, progress.atBat.balls, sources), random)
+}
+
+/** 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 — 득점·주자는 보통 길이 그대로 정한다. 아니면 밀어내기 판 */
+function nonPlayPlaybackOf(progress: PitcherGameProgress, outcome: AtBatOutcome, arrival: PitchArrivalPlay | null): DefensePlayResult | null {
+  const homeRun = homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs })
+  if (homeRun !== null) return homeRun
+  return arrival !== null && arrivalApplicationOf(arrival) === 'freePass' ? arrival.result : null
+}
+
+/**
+ * 삼진과 한 정산인 주자 판 — 도루(종류 5) · 삼진 그대로인 폭투·포일(종류 9, ae596 → ae5a6). 그 판의 아웃 사건 · 필살송구 표시도
+ * 이 정산이 센다
+ */
+function strikeoutRunnerPlayOf(outcome: AtBatOutcome, arrival: PitchArrivalPlay | null): DefensePlayResult | undefined {
+  if (arrival === null || outcome.kind !== '삼진') return undefined
+  if (arrival.kind === 5) return arrival.result
+  return arrival.kind === 9 && arrival.strikeout === 'strikeoutStands' ? arrival.result : undefined
 }

@@ -36,7 +36,7 @@ export function ourBenchPitcherCountOf(progress: PitcherGameProgress): number {
 }
 
 /** 우리 수비 자동 타석의 `0xac428`(0xc1ce2) — 우리 CPU 투수를 바꿀지 본다 */
-export function changeOurPitcher(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+export function rollOurPitcherChange(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
   // c1c8c — 내 투수가 마운드에 있으면 건너뛴다 (그때는 사람 장면이라 여기 오지 않는다)
   if (progress.game.isFinished || progress.ourMound.pitcherSlot === MY_PITCHER_SLOT) return progress
   const game = progress.game
@@ -52,11 +52,11 @@ export function changeOurPitcher(progress: PitcherGameProgress, random: RandomPo
     minimumBench: Math.max(myBenchIndexOf(progress), 0),
   })
   if (after === before) return progress
-  return appendLog(withPitcherChanged(progress, true, after), `${game.inning}회${game.half} 우리 투수 교체`, false)
+  return appendLog(withOurPitcherChanged(progress, after), `${game.inning}회${game.half} 우리 투수 교체`, false)
 }
 
 /** 우리 공격 자동 타석의 `0xac428`(0xc1ce2) — 상대 투수를 바꿀지 본다 */
-export function changeOpponentPitcher(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+export function rollOpponentPitcherChange(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
   if (progress.game.isFinished) return progress
   const game = progress.game
   const before = progress.opponentMound
@@ -70,7 +70,7 @@ export function changeOpponentPitcher(progress: PitcherGameProgress, random: Ran
     minimumBench: 0,
   })
   if (after === before) return progress
-  return appendLog(withPitcherChanged(progress, false, after), `${game.inning}회${game.half} 상대 투수 교체`, false)
+  return appendLog(withOpponentPitcherChanged(progress, after), `${game.inning}회${game.half} 상대 투수 교체`, false)
 }
 
 /**
@@ -81,42 +81,34 @@ export function changeOpponentPitcher(progress: PitcherGameProgress, random: Ran
  * 교체(우리 CPU 투수 · 상대 투수 · 강판)는 모두 간이 엔진 몫이라 후보가 안 잡힌다. 장면 쪽 후보는 0xe 그림 0x38b64 → 메시지 0xbc0 →
  * 0x5227c 뿐이고, 웹에서 후보를 잡는 곳은 내 구원 등판 `enterAsRelief` 하나다. 세이브는 어차피 `state+0x64` 가 안 지워져 기록되지 않으므로(S1 4-1) 결과 판 글자는 같다.
  */
-function withPitcherChanged(progress: PitcherGameProgress, isOurs: boolean, mound: HalfInningMound): PitcherGameProgress {
-  const game = progress.game
-  const decision = progress.decision
-  // 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다. 그 투수의 투구 수(+0x27c)는 줄에 얹는다
-  const outgoing = isOurs ? progress.ourMound : progress.opponentMound
-  const pitcherLines = chargeCpuPitcherLine(
-    progress.pitcherLines,
-    isOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
-    outgoing.pitcherSlot,
-    { pitches: outgoing.pitches },
-  )
-  // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
-  const runnerPitchers = freezeRunnerPitchers(
-    progress.runnerPitchers,
-    isOurs ? runnersOfGame(game, progress.opponentOrderIndex) : runnersOfGame(game),
-    outgoing.pitcherSlot,
-  )
-  return isOurs
-    ? {
-        ...progress,
-        decision,
-        runnerPitchers,
-        ourMound: mound,
-        ourInningRunsAllowed: 0,
-        ourPitcherStaminas: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
-        pitcherLines,
-      }
-    : {
-        ...progress,
-        decision,
-        runnerPitchers,
-        opponentMound: mound,
-        opponentInningRunsAllowed: 0,
-        opponentPitcherStaminas: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
-        pitcherLines,
-      }
+function withOurPitcherChanged(progress: PitcherGameProgress, mound: HalfInningMound): PitcherGameProgress {
+  const outgoing = progress.ourMound
+  return {
+    ...progress,
+    // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
+    runnerPitchers: freezeRunnerPitchers(progress.runnerPitchers, runnersOfGame(progress.game, progress.opponentOrderIndex), outgoing.pitcherSlot),
+    ourMound: mound,
+    ourInningRunsAllowed: 0,
+    ourPitcherStaminas: withOutgoingStamina(progress.ourPitcherStaminas, outgoing),
+    pitcherLines: outgoingPitcherLinesOf(progress, progress.options.ourTeamId, outgoing),
+  }
+}
+
+function withOpponentPitcherChanged(progress: PitcherGameProgress, mound: HalfInningMound): PitcherGameProgress {
+  const outgoing = progress.opponentMound
+  return {
+    ...progress,
+    runnerPitchers: freezeRunnerPitchers(progress.runnerPitchers, runnersOfGame(progress.game), outgoing.pitcherSlot),
+    opponentMound: mound,
+    opponentInningRunsAllowed: 0,
+    opponentPitcherStaminas: withOutgoingStamina(progress.opponentPitcherStaminas, outgoing),
+    pitcherLines: outgoingPitcherLinesOf(progress, progress.options.opponentTeamId, outgoing),
+  }
+}
+
+/** 내려간 투수의 +0x2c 는 레코드에 남는다 — 다음 경기(리그 표)로 이어진다. 그 투수의 투구 수(+0x27c)는 줄에 얹는다 */
+function outgoingPitcherLinesOf(progress: PitcherGameProgress, teamId: number, outgoing: HalfInningMound): PitcherGameProgress['pitcherLines'] {
+  return chargeCpuPitcherLine(progress.pitcherLines, teamId, outgoing.pitcherSlot, { pitches: outgoing.pitches })
 }
 
 /**
@@ -129,7 +121,7 @@ function withPitcherChanged(progress: PitcherGameProgress, isOurs: boolean, moun
  * **굴림이 하나 이상 든다**. 내 투수(`[sp+4]`)는 고르지 않는다. 판정이 보는 지금 투수는 나다 — 보직(0xb6ded)·
  * 체력·이 이닝 실점이 마무리 상황 표시를 가른다.
  */
-export function replaceMyPitcher(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+export function rollMyPitcherReplacement(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
   const game = progress.game
   const me: HalfInningMound = {
     ...progress.ourMound,
@@ -150,5 +142,5 @@ export function replaceMyPitcher(progress: PitcherGameProgress, random: RandomPo
   })
   // 벤치가 비어 못 바꾸면 원본은 내 투수가 마운드에 남은 채 간이 엔진이 돈다 — 그 칸을 그대로 둔다
   if (after === me) return { ...progress, ourMound: me }
-  return withPitcherChanged(progress, true, after)
+  return withOurPitcherChanged(progress, after)
 }

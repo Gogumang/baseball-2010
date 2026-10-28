@@ -40,5 +40,8 @@ export function resolveDefensePlay(
   if (atBatOutcome === null) return { ...progress, pendingDefensePlay: null, defenseScene: result.scene }
   // 기록은 판 끝 정산(0xa8024)이 낸 결과다 — 타석에 실린 결과는 타석을 끝낸 임시 값이다(`battedContact`)
   const outcome = recordedOutcomeOf(progress.pendingDefensePlay, result)
-  return advance(applyDefensivePlay({ ...progress, pendingDefensePlay: null }, outcome, true, progress.atBat.balls, result, playback), random)
+  return advance(
+    applyDefensivePlay({ ...progress, pendingDefensePlay: null }, outcome, true, progress.atBat.balls, { defensePlay: result, playback }),
+    random,
+  )
 }

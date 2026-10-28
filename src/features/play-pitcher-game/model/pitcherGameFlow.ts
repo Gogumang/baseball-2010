@@ -20,6 +20,7 @@
  * 0x23 감독 대사 창 → 닫으면 0x21
  * ```
  */
+// 상수 · 옵션 · 진행 상태 꼴
 export {
   MY_PITCHER_NUMBER,
   MY_PITCHER_SLOT,
@@ -39,9 +40,11 @@ export type {
   PitcherStealDisplay,
   PitcherPendingRunnerPlay,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/pitchStateTypes'
+// 로스터 · 투수 차례
 export { startsToday, ourPitcherOrderOf, opponentPitcherOrderOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/pitcherOrder'
 export { opponentBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/opponentBatters'
 export { myMoundStaminaOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/pitcherLines'
+// 경기 시작 · 투구 (상태 0xe → 0xf → 0x10 → 0x11 → 0x12)
 export { startPitcherGame } from '@/features/play-pitcher-game/model/pitcherGameFlow/start/startPitcherGame'
 export { isPitchTurn, pitchSlotsFor } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/pitchTurn'
 export { throwPitch } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/throwPitch'
@@ -50,6 +53,7 @@ export { enterPitchResult } from '@/features/play-pitcher-game/model/pitcherGame
 export { withStealPlayLeagueSteals } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/applyPitcherArrival'
 export { hiddenStealBasesOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/stealDisplay'
 export { resolveRunnerPlay } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/runnerPlay'
+// 수비 판 · 견제 · 벤치 클리어링 (상태 0x17 · 0x1e)
 export {
   recordDrawnPitcherFieldingErrors,
   myFielderPlatesOf,
@@ -58,6 +62,7 @@ export {
 export { judgeHitByPitch, enterBenchClearing, resolveBenchClearing } from '@/features/play-pitcher-game/model/pitcherGameFlow/plays/benchClearing'
 export { resolveDefensePlay } from '@/features/play-pitcher-game/model/pitcherGameFlow/plays/resolveDefensePlay'
 export { pickoff } from '@/features/play-pitcher-game/model/pitcherGameFlow/plays/pickoff'
+// 돌발 · 장면 확인 · 강판 (0x1b · 0xe · 0x23)
 export { withPitcherGameMorale } from '@/features/play-pitcher-game/model/pitcherGameFlow/burst/burstResult'
 export { closeBurstWindow } from '@/features/play-pitcher-game/model/pitcherGameFlow/burst/burstTrigger'
 export {
@@ -67,6 +72,7 @@ export {
 } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/pitchSelection'
 export { giveUpPitching, closeManagerHookWindow } from '@/features/play-pitcher-game/model/pitcherGameFlow/manager/managerHook'
 export { ourBenchPitcherCountOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/manager/pitcherChange'
+// 화면 · 경기 끝 재료
 export { batterNameAt, moundPitcherNameOf, pitchersOfRecordOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/summary/names'
 export type { PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow/summary/summaryTypes'
 export { earnedRunAverageOf, summaryOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/summary/summary'

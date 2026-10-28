@@ -1,11 +1,12 @@
-import { type GameState, runnersOfGame } from '@/entities/game/model/gameState'
+import { runnersOfGame } from '@/entities/game/model/gameState'
 import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import { chargedRunsByPitcher, type RunnerPitcherSettlement, scoredFromBasesOf, settleRunnerPitchers } from '@/entities/game/model/runnerPitchers'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { chargedFromBasesOfFates, runnerFatesWithoutPlay } from '@/features/defense-play/model/runnerFates'
-import type { OpponentAtBatResult } from '@/features/play-pitcher-game/model/pitcherGameState'
+import type { DefensivePlayFacts } from '@/features/play-pitcher-game/model/pitcherGameFlow/settlement/defensivePlayFacts'
+import { isHalfInningChanged } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/halfInning'
 import { chargeCpuPitcherLine } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/pitcherLines'
 import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/progressTypes'
 
@@ -38,28 +39,31 @@ import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pit
  */
 export function runnerSettlementOf(
   progress: PitcherGameProgress,
-  before: GameState,
-  applied: OpponentAtBatResult,
+  facts: DefensivePlayFacts,
   outcome: AtBatOutcome,
-  mine: boolean,
   defensePlay: DefensePlayResult | null,
 ): RunnerPitcherSettlement {
+  const { before, applied } = facts
   const runnersAtPitch = runnersOfGame(before, progress.opponentOrderIndex)
-  const halfChangedByPlay = applied.game.half !== before.half || applied.game.inning !== before.inning
-  const runnersAfterPlay = halfChangedByPlay ? EMPTY_BASE_RUNNERS : runnersOfGame(applied.game, applied.opponentOrderIndex)
-  const runnerSettlement = settleRunnerPitchers({
+  const runnersAfterPlay = isHalfInningChanged(before, applied.game) ? EMPTY_BASE_RUNNERS : runnersOfGame(applied.game, applied.opponentOrderIndex)
+  const scoredFromBases = isChargedByFates(outcome, facts.mine, defensePlay)
+    ? chargedFromBasesOfFates(defensePlay?.runnerFates ?? runnerFatesWithoutPlay(before.bases, outcome), before.outs + applied.outsAdded)
+    : scoredFromBasesOf(runnersAtPitch, runnersAfterPlay, applied.runsScored)
+  return settleRunnerPitchers({
     tags: progress.runnerPitchers,
     before: runnersAtPitch,
     after: runnersAfterPlay,
     batter: lineupSlotOf(progress.opponentOrderIndex),
     // 새로 나간 타자주자의 책임 투수 = 지금 우리 마운드 (내가 서 있으면 `MY_PITCHER_SLOT`)
     pitcher: progress.ourMound.pitcherSlot,
-    scoredFromBases:
-      defensePlay !== null || (mine && outcome.kind !== '안타' && outcome.kind !== '아웃')
-        ? chargedFromBasesOfFates(defensePlay?.runnerFates ?? runnerFatesWithoutPlay(before.bases, outcome), before.outs + applied.outsAdded)
-        : scoredFromBasesOf(runnersAtPitch, runnersAfterPlay, applied.runsScored),
+    scoredFromBases,
   })
-  return runnerSettlement
+}
+
+/** 실점을 주자 운명으로 세는 타석인가 — 판이 있거나, 내가 던진 삼진·볼넷·사구·홈런 (`runnerFatesWithoutPlay`) */
+function isChargedByFates(outcome: AtBatOutcome, mine: boolean, defensePlay: DefensePlayResult | null): boolean {
+  if (defensePlay !== null) return true
+  return mine && outcome.kind !== '안타' && outcome.kind !== '아웃'
 }
 
 /** 동료 투수가 내보낸 주자의 실점을 그 동료 줄(+0x22)에 — `applyDefensivePlay` 의 `pitcherLines` */

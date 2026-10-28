@@ -94,7 +94,6 @@ export const readabilityBaseline = [
   'src/features/defense-play/model/playOutcome.ts', // 3
   'src/features/play-at-bat/model/atBatSounds.ts', // 3
   'src/features/play-pitcher-game/model/pitchAim.ts', // 3
-  'src/features/play-pitcher-game/model/pitcherGameFlow/auto/advance.ts', // 3
   'src/features/play-team-game/model/gameAbilities.ts', // 3
   'src/pages/create-player/ui/CreatePlayerScreen.tsx', // 3
   'src/pages/create-player/ui/TeamSelectScreen.tsx', // 3
@@ -169,7 +168,6 @@ export const readabilityBaseline = [
   'src/features/play-game/model/gameFlow/roster/teamPlayers.ts', // 2
   'src/features/play-game/model/useSceneConfirm.ts', // 2
   'src/features/play-game/ui/AceCutInCanvas.tsx', // 2
-  'src/features/play-pitcher-game/model/pitcherGameFlow/pitch/pitchArrival.ts', // 2
   'src/features/shop/model/pitcherShopSelection.ts', // 2
   'src/features/shop/model/shopSelection.ts', // 2
   'src/pages/create-player/lib/registerKeys.ts', // 2
@@ -317,20 +315,6 @@ export const readabilityBaseline = [
   'src/features/play-game/model/gameFlow/roster/opponentMound.ts', // 1
   'src/features/play-game/model/gameFlow/setup/startGame.ts', // 1
   'src/features/play-game/model/useSubstitutionScene.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/atBat/cpuPinchHit.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/auto/quickDefense.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/auto/quickDefensiveAtBat.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/auto/quickTeammateAtBat.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/burst/burstResult.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/pitch/applyPitcherArrival.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/pitch/startPitch.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/plays/nonPlayOutcome.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/plays/pickoff.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/settlement/defensivePlay.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/settlement/defensivePlayRecords.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/settlement/myRunnerPlay.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/settlement/runnerSettlement.ts', // 1
-  'src/features/play-pitcher-game/model/pitcherGameFlow/summary/summary.ts', // 1
   'src/features/play-pitcher-game/model/pitcherPitch.ts', // 1
   'src/pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx', // 1
   'src/pages/defense/lib/ballParticles.ts', // 1
