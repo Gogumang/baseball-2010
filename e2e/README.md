@@ -420,6 +420,9 @@ E2E_SNAPSHOT_RUNS=webkit:iphone pnpm e2e:snapshot verify mission-result
   - **뜨기 앞에 같은 시각 타이머를 비운다**(`sceneRunner` — 두 틀 뒤 `setTimeout(0)` 세 바퀴): 그림 틀이 틱 머리와 같은 ms 면 그 틱 머리
     타이머(`setAppTickInterval`)가 안 돈 채 떠서, 되살린 쪽은 그 틱을 이미 센 것으로 보고 한 번 덜 셌다(돌발 결과 창 그린 수 53 ≠ 54).
   - **다른 부품 자리에 이름**: `verify` 의 참고 줄에 부품 이름(`window.__snapshot.fiberNameAt`)을 붙인다(e2e 빌드는 줄인 이름).
+  - **멈추지 않게**: 장면마다 시간 제한(`E2E_SNAPSHOT_SCENE_LIMIT_MS`, 기본 10분 — 웹킷 돌발 결과가 약 3분)을 넘기면 그 장면 맥락을 닫고
+    「단계 ○○ 에서 멈췄다」로 실패한다. 망 조용함 · 재료 기다리기는 각 5초에서 끊고(끝 알림이 안 온 요청은 참고 줄로), 쪽이 죽으면
+    (crash) 알리고 맥락을 닫는다. 요청은 Set 으로 세고 data: 주소(칠한 그림)는 뺀다 — 예전 셈은 끝 알림이 빠지면 영영 0 이 안 됐다.
   - **엔딩 둘을 스냅샷으로**: `useUpdateCounter` 의 시작 틱을 ref 에 둬(값 · 틀 그대로 — `useUpdateCounter.test.tsx`) 되살린 틀 수가
     이어 센다. `nari-ending` · `pitcher-ending` 이 스냅샷으로 곧장 열린다(약 11s → 1s 안팎).
 - **뜨기 · 확인은 하나씩** (r342): 뜨기는 장면을 차례로 맥락 하나로, `verify` 는 브라우저를 차례로(맥락 셋 — A · B · 픽셀 견주기).
