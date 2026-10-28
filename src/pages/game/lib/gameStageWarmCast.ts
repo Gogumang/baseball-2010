@@ -13,12 +13,13 @@ import type { StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingSta
  */
 export function gameStageWarmCastOf(
   progress: GameProgress,
-  career: Pick<PlayerCareer, 'battingTypeIndex' | 'battingSide' | 'skinIndex' | 'teamId' | 'equipmentLevels'>,
+  career: Pick<PlayerCareer, 'battingTypeIndex' | 'battingSide' | 'skinIndex' | 'equipmentLevels'>,
 ): StageWarmCast {
   const batter = {
     bodyType: bodyTypeOf(career.battingTypeIndex * 2 + career.battingSide),
     skinIndex: career.skinIndex,
-    teamIndex: career.teamId,
+    // 타자 몸통 팀 = 경기[0x28 + 공격 측](0x47d00 0xb6bf9) — 국가대항전이면 대한민국(10)이라 경기의 내 팀 번호다
+    teamIndex: progress.ourTeamId,
     equipment: batterEquipmentOf(career.equipmentLevels),
   }
   const teamId = progress.opponentTeamId
