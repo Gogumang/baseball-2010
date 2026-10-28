@@ -1,15 +1,14 @@
 #!/usr/bin/env node
-// 150줄 예외 목록 검사 — `eslint.max-lines-baseline.js` 의 파일이 아직 150줄(코드만)을 넘는지 본다.
+// 150줄 예외 목록 검사 — `lint.max-lines-baseline.js` 의 파일이 아직 150줄(코드만)을 넘는지 본다.
 //   pnpm check:lines           목록에서 빠져야 할 파일(150 이하 · 없는 파일)이 있으면 실패, 줄 수 주석이 틀리면 알림
 //   pnpm check:lines --update  목록을 지금 줄 수로 다시 쓴다(150 이하 · 없는 파일은 빼고, 새 파일은 넣지 않는다)
-// 줄 수는 ESLint max-lines 와 같은 셈(빈 줄 · 주석 빼고) — 그 규칙을 그대로 돌려 메시지에서 읽는다.
-// 읽기 좋은 코드 규칙 예외 목록(`eslint.readability-baseline.js`)도 같은 명령에서 본다 (`check-readability-baseline.mjs`).
+// 줄 수는 oxlint max-lines 와 같은 셈(빈 줄 · 주석 빼고) — 그 규칙을 그대로 돌려 메시지에서 읽는다.
+// 읽기 좋은 코드 규칙 예외 목록(`lint.readability-baseline.js`)도 같은 명령에서 본다 (`check-readability-baseline.mjs`).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { ESLint } from 'eslint'
-import tseslint from 'typescript-eslint'
 import { checkReadabilityBaseline } from './check-readability-baseline.mjs'
+import { oxlintDiagnostics } from './lint/oxlintCounts.mjs'
 
-const BASELINE = 'eslint.max-lines-baseline.js'
+const BASELINE = 'lint.max-lines-baseline.js'
 const MAX = 150
 const update = process.argv.includes('--update')
 
@@ -21,22 +20,14 @@ const present = listed.filter(({ file }) => existsSync(file))
 const missing = listed.filter(({ file }) => !existsSync(file))
 
 // 0 을 넘으면 늘 보고되게 해서 정확한 줄 수를 받는다
-const eslint = new ESLint({
-  overrideConfigFile: true,
-  overrideConfig: [
-    {
-      files: ['**/*.{ts,tsx,js,mjs}'],
-      languageOptions: { parser: tseslint.parser, ecmaVersion: 'latest', sourceType: 'module' },
-      rules: { 'max-lines': ['error', { max: 0, skipBlankLines: true, skipComments: true }] },
-    },
-  ],
-})
-const results = await eslint.lintFiles(present.map(({ file }) => file))
+const diagnostics = oxlintDiagnostics(
+  { 'max-lines': ['error', { max: 0, skipBlankLines: true, skipComments: true }] },
+  present.map(({ file }) => file),
+)
 const countOf = new Map(
-  results.map((result) => {
-    const message = result.messages.find((m) => m.ruleId === 'max-lines')
-    const lines = Number(message?.message.match(/\((\d+)\)/)?.[1] ?? 0)
-    return [result.filePath.slice(process.cwd().length + 1), lines]
+  [...diagnostics].map(([file, list]) => {
+    const message = list.find(({ rule }) => rule === 'max-lines')
+    return [file, Number(message?.message.match(/\((\d+)\)/)?.[1] ?? 0)]
   }),
 )
 const rows = present.map((row) => ({ ...row, lines: countOf.get(row.file) ?? 0 }))

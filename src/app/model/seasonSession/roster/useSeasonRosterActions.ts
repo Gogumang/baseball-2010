@@ -33,7 +33,6 @@ export function useSeasonRosterActions(ctx: SceneEntryEffectContext) {
       }
       commit(next)
       // 0xcc → 0xcb: 새 시즌 초기화에서 왔으니 새 선수 플래그가 선다 — 관리 메뉴 첫 폴링이 400 을 튼다
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       newPlayerFlag.current = true
       setScene(SEASON_SCENE_STATE.관리메뉴)
     },
@@ -79,15 +78,11 @@ export function useSeasonRosterActions(ctx: SceneEntryEffectContext) {
    * 견준다). 경기진행 설정(+0x12c+1)·창 본 표시(+0x11e)는 이 함수가 안 건드리는 전역 칸이라 **남긴다** — 시즌 없는 덩어리에
    * 그 두 칸만 쓴다(`SeasonGlobalCarry`).
    */
-  // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
   const resetSeason = useCallback(() => {
     const current = latestSave.current
     const carry = seasonGlobalCarryOf(current ?? carriedGlobals.current)
-    // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
     carriedGlobals.current = carry
-    // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
     latestSave.current = null
-    // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
     persistedSave.current = null
     setSave(null)
     store.save({ ...carry, ...globalsRef.current })

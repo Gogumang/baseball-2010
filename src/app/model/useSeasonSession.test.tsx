@@ -2828,6 +2828,7 @@ describe('시즌 경기 중간 저장 — 전역기록 +0x4e 와 모드 2 블록
     const 저장 = store.load() as 경기저장모양
     expect(저장.isGameInProgress).toBe(true)
     expect(저장.gameSave?.kind).toBe('정규')
+    // oxlint-disable-next-line no-unsafe-optional-chaining -- 시험: 값이 없으면 여기서 실패하는 게 맞다
     expect((저장.gameSave?.progress as { options: { mode: number } }).options.mode).toBe(2)
   })
 

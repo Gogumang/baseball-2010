@@ -82,11 +82,8 @@ export function useSettleGame(ctx: EntryEditActionsContext) {
           lastGameConceded: (summary.opponentScore << 24) >> 24,
         }),
       )
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       eventCursor.current = START_SEASON_EVENT_CURSOR
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       newPlayerFlag.current = false
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       freshScene.current = true
 
       // 승패는 원본 셈 `0xb69c8`·`0x4f072` 로 다시 낸다 — 이긴 칸 = R(1) > R(0) ? 1 : 0 이라

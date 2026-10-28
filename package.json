@@ -23,8 +23,8 @@
     "e2e:fixtures": "SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "check:lines": "node tools/check-lines-baseline.mjs"
   },
   "dependencies": {
@@ -32,7 +32,6 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.20.2",
@@ -43,16 +42,11 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/browser": "5.0.1",
     "@vitest/browser-playwright": "5.0.1",
-    "eslint": "10.13.0",
-    "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-react-hooks": "7.1.1",
-    "eslint-plugin-react-refresh": "0.5.7",
-    "globals": "17.13.0",
     "jsdom": "^25.0.1",
+    "oxlint": "1.90.0",
     "playwright": "1.56.1",
     "prettier": "3.9.10",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "8.72.1",
+    "typescript": "7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
   },

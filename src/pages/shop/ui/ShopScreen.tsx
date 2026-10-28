@@ -69,6 +69,7 @@ export function ShopScreen({ initialTab, career, noticeText, gpDetail = null, on
       kind={windowKindNameOf(tab)}
       entriesOf={() => (tab === '서브' || tab === 'GP' ? shopEntriesOf({ tab, career }) : [])}
       // 0x7d34c(gfx, 0) — 둘째 인자 0 이라 전 경기 표시 없음
+      // oxlint-disable-next-line react/purity -- 원본처럼 그릴 때마다 지금 시각(시)을 읽는다 (ESLint react-hooks/purity 는 못 잡던 자리)
       statusPanel={<ManagementBoard career={career} titleName={currentTitleOf(career)} hour={new Date().getHours()} />}
       equipment={
         isEquipment

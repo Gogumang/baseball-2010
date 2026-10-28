@@ -100,6 +100,7 @@ describe('홈런더비 진입 — 하위 16 선수 고르기 (0x25e6c · 0x29ac8
     띄우기(나리, vi.fn(), true)
     fireEvent.click(view.getByRole('button', { name: '7번 슬롯' }))
     expect(받은것.at(-1)).toMatchObject({ ability: modeBatterOf(나리).ability, batterForm: 2, batterSkinIndex: 2 })
+    // oxlint-disable-next-line no-unsafe-optional-chaining -- 시험: 값이 없으면 여기서 실패하는 게 맞다
     expect((받은것.at(-1)?.['matchupBatter'] as { name: string }).name).toBe('나리')
   })
 
