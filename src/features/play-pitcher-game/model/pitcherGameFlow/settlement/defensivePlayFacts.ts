@@ -117,8 +117,12 @@ export function defensivePlayFactsOf(
     droppedThirdStrike,
     homeRunCounted: homeRunCountedOf(progress, outcome, defensePlay),
     stealPlaySettlement: sources.stealPlaySettlement ?? false,
-    settledOuts: applied.outsAdded + (sources.settledRunnerPlay?.advance.outsAdded ?? 0) + (droppedThirdStrike ? 1 : 0),
+    settledOuts: settledOutsOf(applied, sources, droppedThirdStrike),
   }
+}
+
+function settledOutsOf(applied: OpponentAtBatResult, sources: DefensivePlaySources, droppedThirdStrike: boolean): number {
+  return applied.outsAdded + (sources.settledRunnerPlay?.advance.outsAdded ?? 0) + (droppedThirdStrike ? 1 : 0)
 }
 
 /** 진루 — 판이 있으면 판, 간이 타석이면 그 진루, 아니면 간이 엔진 규칙(**원본 간이 엔진에는 희생플라이가 없다** — E-2 확정) */

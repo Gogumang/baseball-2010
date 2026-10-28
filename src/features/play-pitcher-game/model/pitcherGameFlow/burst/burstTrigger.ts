@@ -21,7 +21,7 @@ import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pit
  * ⚠️ 예전 웹은 K 4절 1-6 "매 타석 시작 때" 를 동료·수비 자동 타석까지로 읽어 거기서도 굴렸다 — 원본에 없는 굴림이었다.
  * 남은 돌발은 자동 타석 앞(0x21 진입 0x3abf0 · 0x18 진입 0x3ac90 의 0x8f628)에서 내린다 (`withoutPendingBurst`).
  */
-export function triggerBurstAtPrep(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+export function rollBurstAtPrep(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
   const session = progress.burst
   if (session === null || progress.simpleEngineRunning) return progress
   const log = progress.opponentBatterLogs[progress.opponentOrderIndex] ?? { hits: 0, homeRuns: 0 }
@@ -40,10 +40,7 @@ export function triggerBurstAtPrep(progress: PitcherGameProgress, random: Random
       opponentBattingSlot: progress.opponentOrderIndex,
       // b0 마타자 행(0xae89d → 0xb633d) — 142 가 상대 명단에 넣은 마타자가 대타로 지금 타석에 섰으면 그 선수.
       // 마투수 행(0xae83d)은 마운드 투수를 보는데, 내가 던지는 타석의 마운드는 나라 걸리지 않는다
-      opponentAceBatterId:
-        opponentRosterSlotOf(progress) === ACE_BATTER_ROSTER_SLOT
-          ? (aceBatterPlayerOf(teamAcesOf(progress.options, false).batter)?.id ?? null)
-          : null,
+      opponentAceBatterId: opponentAceBatterIdOf(progress),
       opponentAcePitcherId: null,
       hitsInGame: log.hits,
       homeRunsInGame: log.homeRuns,
@@ -52,6 +49,12 @@ export function triggerBurstAtPrep(progress: PitcherGameProgress, random: Random
     random,
   )
   return next === session ? progress : { ...progress, burst: next }
+}
+
+/** 지금 타석에 선 상대 마타자 번호 — 142 가 넣은 마타자가 대타로 섰을 때만 */
+function opponentAceBatterIdOf(progress: PitcherGameProgress): string | null {
+  if (opponentRosterSlotOf(progress) !== ACE_BATTER_ROSTER_SLOT) return null
+  return aceBatterPlayerOf(teamAcesOf(progress.options, false).batter)?.id ?? null
 }
 
 /** 돌발 결과 창을 닫는다 (보상은 판정 때 `burstRewardDeltas` 에 쌓였고 앱이 경기 끝에 커리어에 얹는다) */

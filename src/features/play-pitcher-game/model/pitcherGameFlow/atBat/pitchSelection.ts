@@ -1,8 +1,8 @@
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { applyOpponentCpuPinchHit } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/cpuPinchHit'
+import { rollOpponentCpuPinchHit } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/cpuPinchHit'
 import { prepareAtBat } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/prepareAtBat'
-import { triggerBurstAtPrep } from '@/features/play-pitcher-game/model/pitcherGameFlow/burst/burstTrigger'
+import { rollBurstAtPrep } from '@/features/play-pitcher-game/model/pitcherGameFlow/burst/burstTrigger'
 import { isPitchTurn } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/pitchTurn'
 import { withStealDisplayCleared } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/stealDisplay'
 import { opponentQuickBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/opponentBatters'
@@ -17,7 +17,7 @@ export function confirmScene(progress: PitcherGameProgress, random: RandomPort):
   if (progress.sceneConfirmPending !== true) return progress
   const confirmed = { ...progress, sceneConfirmPending: false }
   if (confirmed.game.isFinished || !isPitchTurn(confirmed)) return confirmed
-  return enterPitchSelection(triggerBurstAtPrep(confirmed, random), random)
+  return enterPitchSelection(rollBurstAtPrep(confirmed, random), random)
 }
 
 /**
@@ -60,7 +60,7 @@ export function enterPitchSelection(entering: PitcherGameProgress, random: Rando
   // 3d966~3d976 — st[0x14..0x17] · st[0xa4..0xa7] = 0 (도루 출발 표시). 돌발 · 대타 묻기(3d9e4~)보다 앞이다
   const progress = withStealDisplayCleared(entering)
   if (progress.burst !== null && progress.burst.current !== null) return progress
-  const pinched = applyOpponentCpuPinchHit(progress, random, true)
+  const pinched = rollOpponentCpuPinchHit(progress, random, true)
   if (pinched === progress) return progress
   // 0x16 → 0xd(지우기 건너뜀 · 0xbc1 등장음 없음) → 0xe(강판 판정 · OK 대기) → OK 뒤 메시지 1(돌발 굴림) → 0xf 진입 (`confirmScene`)
   return prepareAtBat(pinched, random, true)

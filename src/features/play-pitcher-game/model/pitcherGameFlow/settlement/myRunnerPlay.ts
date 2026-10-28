@@ -6,7 +6,12 @@ import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { baserunnerAllowedOfFates, chargedFromBasesOfFates, survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
-import { addInningRuns, applyOpponentRunnerPlay, clearInningRuns, type OpponentAtBatResult } from '@/features/play-pitcher-game/model/pitcherGameState'
+import {
+  addInningRuns,
+  applyOpponentRunnerPlay,
+  clearInningRuns,
+  type OpponentAtBatResult,
+} from '@/features/play-pitcher-game/model/pitcherGameState'
 import { decisionAfterRunsOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/settlement/runScored'
 import { pitcherLinesChargedOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/settlement/runnerSettlement'
 import { MY_PITCHER_SLOT, OUTS_PER_INNING } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/constants'
@@ -76,7 +81,9 @@ interface RunnerPlayFacts {
 function runnerPlayFactsOf(progress: PitcherGameProgress, result: DefensePlayResult, settles: boolean): RunnerPlayFacts {
   const before = progress.game
   const advance = result.advance
-  const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advance, { survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates) })
+  const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advance, {
+    survivorsFromBase: survivorsFromBaseOfFates(result.runnerFates),
+  })
   const halfChanged = isHalfInningChanged(before, applied.game)
   // 들어온 주자마다 그 주자를 내보낸 투수(주자+0x30)에게 — 정산을 지나는 판만(a8ea4). 루별 책임 투수 장부는 정산과 무관하게 판 뒤로 옮긴다
   const runnerSettlement = settleRunnerPitchers({
@@ -106,8 +113,7 @@ function runnerPlayFactsOf(progress: PitcherGameProgress, result: DefensePlayRes
  * ```
  */
 function withRunnerPlaySettlement(shown: PitcherGameProgress, progress: PitcherGameProgress, facts: RunnerPlayFacts): PitcherGameProgress {
-  const { applied, settles, inningEnded, chargedToMe } = facts
-  const threePitchInning = inningEnded ? threePitchInningRecordIdsOf(progress.halfInningPitches, OUTS_PER_INNING) : []
+  const { applied, settles, chargedToMe } = facts
   return {
     ...shown,
     game: applied.game,
@@ -117,18 +123,36 @@ function withRunnerPlaySettlement(shown: PitcherGameProgress, progress: PitcherG
     runnerPitchers: facts.runnerSettlement.tags,
     // 동료가 내보낸 주자의 실점은 그 동료 줄에 (내 줄은 커리어가 센다)
     pitcherLines: pitcherLinesChargedOf(progress, facts.runnerSettlement.charged),
-    record: {
-      ...progress.record,
-      runsAllowedField: progress.record.runsAllowedField + chargedToMe,
-      outsRecorded: progress.record.outsRecorded + (countsMyPitcherRecord(progress) ? applied.outsAdded : 0),
-      perfectInnings: progress.record.perfectInnings + (inningEnded && progress.perfectInningFlag ? 1 : 0),
-    },
+    record: runnerPlayRecordOf(progress, facts),
     // state[0x8a] — 정산 a8dd0 이 이 판 득점을 더한다. 정산을 건너뛰는 판은 안 센다
     teamRunsAllowed: progress.teamRunsAllowed + (settles ? applied.runsScored : 0),
-    // R[3] · +0x20 은 정산이 센다 — 정산을 건너뛰는 판의 아웃은 아웃 콜(R+0x13c)에만 든다
-    ...(settles || applied.outsAdded === 0 ? {} : { settledOutsExtra: (progress.settledOutsExtra ?? 0) - applied.outsAdded }),
-    ...(threePitchInning.length > 0 && recordsAllowed(progress) ? { recordIds: [...progress.recordIds, ...threePitchInning] } : {}),
+    ...unsettledOutsOf(progress, facts),
+    ...threePitchInningOf(progress, facts),
   }
+}
+
+function runnerPlayRecordOf(progress: PitcherGameProgress, facts: RunnerPlayFacts): PitcherGameProgress['record'] {
+  const { record } = progress
+  return {
+    ...record,
+    runsAllowedField: record.runsAllowedField + facts.chargedToMe,
+    outsRecorded: record.outsRecorded + (countsMyPitcherRecord(progress) ? facts.applied.outsAdded : 0),
+    perfectInnings: record.perfectInnings + (facts.inningEnded && progress.perfectInningFlag ? 1 : 0),
+  }
+}
+
+/** R[3] · +0x20 은 정산이 센다 — 정산을 건너뛰는 판의 아웃은 아웃 콜(R+0x13c)에만 든다 */
+function unsettledOutsOf(progress: PitcherGameProgress, facts: RunnerPlayFacts): Pick<PitcherGameProgress, 'settledOutsExtra'> {
+  const outs = facts.applied.outsAdded
+  if (facts.settles || outs === 0) return {}
+  return { settledOutsExtra: (progress.settledOutsExtra ?? 0) - outs }
+}
+
+/** 25 삼구 삼자범퇴 — 셋째 아웃을 판에서 잡았을 때 (a7d78) */
+function threePitchInningOf(progress: PitcherGameProgress, facts: RunnerPlayFacts): Partial<Pick<PitcherGameProgress, 'recordIds'>> {
+  const threePitchInning = facts.inningEnded ? threePitchInningRecordIdsOf(progress.halfInningPitches, OUTS_PER_INNING) : []
+  if (threePitchInning.length === 0 || !recordsAllowed(progress)) return {}
+  return { recordIds: [...progress.recordIds, ...threePitchInning] }
 }
 
 /** 판에서 반 이닝이 넘어갔다 — 이닝 칸 · 삼자범퇴 표시 · 반 이닝 투구 수 · 볼카운트 · 타석 준비를 내린다 */

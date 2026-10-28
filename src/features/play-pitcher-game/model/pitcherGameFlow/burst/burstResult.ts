@@ -29,20 +29,17 @@ export function resolveBurstFor(
       runsBattedIn: runsScored,
       outsBefore,
       outsAdded,
-      // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
-      batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
-      // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
-      isBunt: defensePlay?.buntBall === true,
-      runnersAdvanced: defensePlay?.sacrifice === true,
-      // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
-      foulBall: defensePlay?.buntFoulOut === true,
-      runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
+      ...defensePlayBitsOf(defensePlay),
       homeRunCounted,
       strikeoutWhileRunning,
       // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
       humanTeamWalkOff: progress.game.isFinished && progress.game.ourScore > progress.game.opponentScore,
     }),
   )
+  return withBurstResolution(progress, resolution)
+}
+
+function withBurstResolution(progress: PitcherGameProgress, resolution: ReturnType<typeof resolveBurst>): PitcherGameProgress {
   const resolved: PitcherGameProgress = {
     ...progress,
     burst: resolution.session,
@@ -54,6 +51,20 @@ export function resolveBurstFor(
   return {
     ...withPitcherGameMorale(resolved, morale),
     burstRewardDeltas: [...(progress.burstRewardDeltas ?? []), ...resolution.deltas],
+  }
+}
+
+/** 판이 켜는 결과비트 재료 — 판 없는 타석(삼진 · 볼넷 · 간이 엔진)은 모두 거짓 */
+function defensePlayBitsOf(defensePlay: DefensePlayResult | null) {
+  return {
+    // B5 — 안타 없이 살아 나간 타자주자(야수 선택)도 출루다 (0xa87ba r5)
+    batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
+    // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
+    isBunt: defensePlay?.buntBall === true,
+    runnersAdvanced: defensePlay?.sacrifice === true,
+    // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+    foulBall: defensePlay?.buntFoulOut === true,
+    runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
   }
 }
 

@@ -5,10 +5,7 @@ import type { DefensePlayResult } from '@/features/defense-play/model/runDefense
 import { baserunnerAllowedOfFates, baserunnerAllowedOfPlay } from '@/features/defense-play/model/runnerFates'
 import { type PitcherGameRecord, recordBatterFaced, recordHitByPitch } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import type { PitcherEvaluationRecord } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
-import type {
-  DefensivePlayFacts,
-  DefensivePlaySources,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow/settlement/defensivePlayFacts'
+import type { DefensivePlayFacts, DefensivePlaySources } from '@/features/play-pitcher-game/model/pitcherGameFlow/settlement/defensivePlayFacts'
 import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/progressTypes'
 
 /** state[0x88] — 이 정산의 주자 목록 마지막 원소가 안 끝났으면 (a8c5c). 삼진과 한 정산인 주자 판은 그 판의 목록이다 */

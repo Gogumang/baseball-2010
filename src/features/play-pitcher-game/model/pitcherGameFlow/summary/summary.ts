@@ -21,26 +21,52 @@ export function earnedRunAverageOf(runsAllowed: number, outsRecorded: number): n
 }
 
 export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
-  const { options } = progress
   const decision = gameEndDecisionOf(progress.decision)
-  /*
-   * 경기 끝 0xa7de8 이 승 +0x2e(a7e2a) · 패 +0x2f(a7e70) · 세이브 +0x24(a7ec6)를 `0xa56dc(R, 그 투수, 0)` 이 참일 때만 올리고,
-   * 내 투수 칸 R+0x124(1 승 · 2 패 · 3 세이브)는 이어서 `0xa56dc(R, 그 투수, 1)`(a7e46 · a7e8c · a7ede)이 참일 때만 쓴다.
-   * 모드 3 갈래 0xa571c 는 포스트시즌 · 국가대항전이면 플래그와 상관없이 거짓 → 그 경기는 승패 · 세이브도 R+0x124 도 안 남는다.
-   * (투구 수 +0x28 은 0xa5e14 a5e30 이 게이트 없이 올린다)
-   */
-  const decisionCode = countsMyPitcherRecord(progress)
-    ? decisionCodeForMine(decision, {
-        side: progress.game.playerSide,
-        number: MY_PITCHER_NUMBER,
-      })
-    : PITCHER_DECISION_CODE.none
-  const record: PitcherEvaluationRecord = {
-    ...progress.record,
-    hitByPitch: progress.pitcherRecord.hitByPitch,
+  const decisionCode = myDecisionCodeOf(progress, decision)
+  const record: PitcherEvaluationRecord = { ...progress.record, hitByPitch: progress.pitcherRecord.hitByPitch, decisionCode }
+  return {
+    result: resultOf(progress.game),
+    ourScore: progress.game.ourScore,
+    opponentScore: progress.game.opponentScore,
+    record,
+    pitcherRecord: progress.pitcherRecord,
+    pitchCount: progress.pitchCount,
+    evaluation: evaluationOf(progress, record),
+    decision,
     decisionCode,
+    earnedRunAverage: earnedRunAverageOf(progress.runsAllowedByMe, record.outsRecorded),
+    seasonDelta: seasonDeltaOf(progress, record, decisionCode),
+    stamina: progress.stamina,
+    recordIds: gameEndRecordIdsFor(progress),
+    hasEntered: progress.hasEntered,
+    endedInningIndex: progress.endedInningIndex,
+    pitcherStaminas: {
+      ours: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
+      opponent: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
+    },
+    leagueStolenBases: progress.leagueStolenBases ?? [],
+    leagueErrors: progress.leagueErrors ?? [],
+    leaguePlateAppearances: progress.leaguePlateAppearances ?? [],
+    burstRewardDeltas: progress.burstRewardDeltas ?? [],
+    ...(progress.opponentRecordMorale === undefined ? {} : { opponentRecordMorale: progress.opponentRecordMorale }),
+    leaguePitchers: leaguePitchersOf(progress, decision),
   }
-  const evaluation = evaluatePitcherGame(record, {
+}
+
+/**
+ * 경기 끝 0xa7de8 이 승 +0x2e(a7e2a) · 패 +0x2f(a7e70) · 세이브 +0x24(a7ec6)를 `0xa56dc(R, 그 투수, 0)` 이 참일 때만 올리고,
+ * 내 투수 칸 R+0x124(1 승 · 2 패 · 3 세이브)는 이어서 `0xa56dc(R, 그 투수, 1)`(a7e46 · a7e8c · a7ede)이 참일 때만 쓴다.
+ * 모드 3 갈래 0xa571c 는 포스트시즌 · 국가대항전이면 플래그와 상관없이 거짓 → 그 경기는 승패 · 세이브도 R+0x124 도 안 남는다.
+ * (투구 수 +0x28 은 0xa5e14 a5e30 이 게이트 없이 올린다)
+ */
+function myDecisionCodeOf(progress: PitcherGameProgress, decision: ReturnType<typeof gameEndDecisionOf>): number {
+  if (!countsMyPitcherRecord(progress)) return PITCHER_DECISION_CODE.none
+  return decisionCodeForMine(decision, { side: progress.game.playerSide, number: MY_PITCHER_NUMBER })
+}
+
+function evaluationOf(progress: PitcherGameProgress, record: PitcherEvaluationRecord) {
+  const { options } = progress
+  return evaluatePitcherGame(record, {
     positionCode: options.positionCode,
     role: options.role,
     won: progress.game.ourScore > progress.game.opponentScore,
@@ -57,60 +83,37 @@ export function summaryOf(progress: PitcherGameProgress): PitcherGameSummary {
     isRivalGame: options.isRivalGame,
     hasLuckSkill: options.hasLuckSkill,
   })
+}
+
+function seasonDeltaOf(progress: PitcherGameProgress, record: PitcherEvaluationRecord, decisionCode: number): PitcherGameSummary['seasonDelta'] {
   return {
-    result: resultOf(progress.game),
-    ourScore: progress.game.ourScore,
-    opponentScore: progress.game.opponentScore,
-    record,
-    pitcherRecord: progress.pitcherRecord,
-    pitchCount: progress.pitchCount,
-    evaluation,
-    decision,
-    decisionCode,
-    earnedRunAverage: earnedRunAverageOf(progress.runsAllowedByMe, record.outsRecorded),
-    seasonDelta: {
-      // 레코드 +0x20 — 정산 a8cb0 이 사건 목록의 아웃으로 센다 (`settledOutsExtra`)
-      outs: record.outsRecorded + (progress.settledOutsExtra ?? 0) + (progress.seasonOutsExtra ?? 0),
-      runsAllowed: progress.runsAllowedByMe,
-      // 레코드 +0x26 — R+0x134 에 삼진 + 도루 판(종류 5)의 삼진을 더한 값 (`stealPlayStrikeouts`)
-      strikeouts: record.strikeouts + (progress.stealPlayStrikeouts ?? 0),
-      pitches: progress.pitchCount,
-      wins: decisionCode === 1 ? 1 : 0,
-      losses: decisionCode === 2 ? 1 : 0,
-      saves: decisionCode === 3 ? 1 : 0,
-      walks: progress.freePassesByMe,
-    },
-    stamina: progress.stamina,
-    recordIds: gameEndRecordIdsFor(progress),
-    hasEntered: progress.hasEntered,
-    endedInningIndex: progress.endedInningIndex,
-    pitcherStaminas: {
-      ours: withOutgoingStamina(progress.ourPitcherStaminas, progress.ourMound),
-      opponent: withOutgoingStamina(progress.opponentPitcherStaminas, progress.opponentMound),
-    },
-    leagueStolenBases: progress.leagueStolenBases ?? [],
-    leagueErrors: progress.leagueErrors ?? [],
-    leaguePlateAppearances: progress.leaguePlateAppearances ?? [],
-    burstRewardDeltas: progress.burstRewardDeltas ?? [],
-    ...(progress.opponentRecordMorale === undefined ? {} : { opponentRecordMorale: progress.opponentRecordMorale }),
-    leaguePitchers: {
-      lines: chargeCpuPitcherLine(
-        chargeCpuPitcherLine(progress.pitcherLines, options.ourTeamId, progress.ourMound.pitcherSlot, {
-          pitches: progress.ourMound.pitches,
-        }),
-        options.opponentTeamId,
-        progress.opponentMound.pitcherSlot,
-        { pitches: progress.opponentMound.pitches },
-      ),
-      decision: {
-        // 판정의 등번호 자리는 표지(`teammatePitcherNumberOf`·`opponentPitcherNumberOf`)라 붙박이 표 칸으로 되돌린다.
-        // 내 투수 표지는 표 밖 칸(`MY_PITCHER_SLOT`)이 된다
-        winner: recordSlotOf(decision.winner, progress.game.playerSide),
-        loser: recordSlotOf(decision.loser, progress.game.playerSide),
-        save: recordSlotOf(decision.save, progress.game.playerSide),
-      },
-      sideTeams: progress.game.playerSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId],
-    },
+    // 레코드 +0x20 — 정산 a8cb0 이 사건 목록의 아웃으로 센다 (`settledOutsExtra`)
+    outs: record.outsRecorded + (progress.settledOutsExtra ?? 0) + (progress.seasonOutsExtra ?? 0),
+    runsAllowed: progress.runsAllowedByMe,
+    // 레코드 +0x26 — R+0x134 에 삼진 + 도루 판(종류 5)의 삼진을 더한 값 (`stealPlayStrikeouts`)
+    strikeouts: record.strikeouts + (progress.stealPlayStrikeouts ?? 0),
+    pitches: progress.pitchCount,
+    wins: decisionCode === PITCHER_DECISION_CODE.win ? 1 : 0,
+    losses: decisionCode === PITCHER_DECISION_CODE.loss ? 1 : 0,
+    saves: decisionCode === PITCHER_DECISION_CODE.save ? 1 : 0,
+    walks: progress.freePassesByMe,
+  }
+}
+
+function leaguePitchersOf(progress: PitcherGameProgress, decision: ReturnType<typeof gameEndDecisionOf>): PitcherGameSummary['leaguePitchers'] {
+  const { options } = progress
+  const side = progress.game.playerSide
+  const withOurMound = chargeCpuPitcherLine(progress.pitcherLines, options.ourTeamId, progress.ourMound.pitcherSlot, {
+    pitches: progress.ourMound.pitches,
+  })
+  return {
+    lines: chargeCpuPitcherLine(withOurMound, options.opponentTeamId, progress.opponentMound.pitcherSlot, {
+      pitches: progress.opponentMound.pitches,
+    }),
+    // 판정의 등번호 자리는 표지(`teammatePitcherNumberOf`·`opponentPitcherNumberOf`)라 붙박이 표 칸으로 되돌린다.
+    // 내 투수 표지는 표 밖 칸(`MY_PITCHER_SLOT`)이 된다
+    decision: { winner: recordSlotOf(decision.winner, side), loser: recordSlotOf(decision.loser, side), save: recordSlotOf(decision.save, side) },
+    sideTeams: side === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId],
   }
 }
 

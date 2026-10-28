@@ -1,15 +1,33 @@
 import type { GameState } from '@/entities/game/model/gameState'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { drainQuickPitcher, facingPitcherOf, type HalfInningDefense, type HalfInningMound } from '@/entities/game/model/simulateHalfInning'
+import type { QuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
-import { applyOpponentCpuPinchHit, applyTeammateCpuPinchHit } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/cpuPinchHit'
-import { changeOpponentPitcher, changeOurPitcher } from '@/features/play-pitcher-game/model/pitcherGameFlow/manager/pitcherChange'
+import { rollOpponentCpuPinchHit, rollTeammateCpuPinchHit } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/cpuPinchHit'
+import { rollOpponentPitcherChange, rollOurPitcherChange } from '@/features/play-pitcher-game/model/pitcherGameFlow/manager/pitcherChange'
 import type { PitcherAutoRelayTick, PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/progressTypes'
 
 /** 그 틱 뒤 경기를 중계 칸에 싣는다 — 사본에는 중계 칸을 안 남긴다 */
 export function relayTickOf(after: PitcherGameProgress, before: GameState, atBat: PitcherAutoRelayTick['atBat']): PitcherAutoRelayTick {
   return { progress: { ...after, autoRelay: null }, before, atBat }
+}
+
+/** 간이 타석 한 틱 — 친 타자(그 팀 타순 칸)와 타석 끝 카운트를 함께 싣는다 */
+export function quickAtBatRelayTickOf(
+  after: PitcherGameProgress,
+  before: GameState,
+  batter: { readonly ours: boolean; readonly orderIndex: number },
+  play: QuickPlateAppearance['play'],
+): PitcherAutoRelayTick {
+  return relayTickOf(after, before, {
+    ...batter,
+    outcome: play.outcome,
+    fouled: play.fouled === true,
+    swingingStrikeOutLost: play.swingingStrikeOutLost === true,
+    strikes: play.strikes,
+    balls: play.balls,
+  })
 }
 
 /** 타자 스킬 22 압도 — 간이 타석 0xa5e14 소모 ×2 */
@@ -66,7 +84,7 @@ export function withMoundsPitched(progress: PitcherGameProgress): Pick<PitcherGa
  * ```
  * 1 을 돌려주면 `0xc262c` 가 공 없이 돌아가(c266c) 다음 부름에서 **같은 타석**으로 다시 지난다 — 바뀐 쪽은 `state[0xe]`·
  * `state[0xd]` 로 곧장 빠지고 안 바뀐 쪽은 다시 판정(굴림 포함)한다. 그래서 고리로 옮긴다(많아야 세 번 — 팀 경기
- * `runQuickSubstitutions` 와 같은 차례). 8회 구원 갈래는 `advance` 가 이 앞에서 먼저 본다(`shouldEnterNow`).
+ * `runQuickSubstitutions` 와 같은 차례). 8회 구원 갈래는 `advance` 가 이 앞에서 먼저 본다(`isReliefEntryNow`).
  * 간이 엔진 쪽 교체는 연출(0x16)이 없어 소리도 없다.
  */
 export function runQuickSubstitutions(
@@ -78,11 +96,22 @@ export function runQuickSubstitutions(
 ): PitcherGameProgress {
   let current = progress
   for (let call = 0; call < MAXIMUM_QUICK_SUBSTITUTION_CALLS; call += 1) {
-    const pinched = battingIsOurs ? applyTeammateCpuPinchHit(current, random) : applyOpponentCpuPinchHit(current, random, false)
-    const changed = battingIsOurs ? changeOpponentPitcher(pinched, random) : changeOurPitcher(pinched, random)
+    const changed = battingIsOurs ? rollOurOffenseSubstitution(current, random) : rollOpponentOffenseSubstitution(current, random)
     if (changed === current) return current
     onSubstitutionTick?.(changed, current.game)
     current = changed
   }
   return current
+}
+
+/** 우리 공격 타석 앞 — 우리 CPU 대타 0xac228(0xc1c50) → 상대 투수 교체 0xac428(0xc1ce2) */
+function rollOurOffenseSubstitution(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  const pinched = rollTeammateCpuPinchHit(progress, random)
+  return rollOpponentPitcherChange(pinched, random)
+}
+
+/** 상대 공격 타석 앞 — 상대 CPU 대타 → 우리 CPU 투수 교체 */
+function rollOpponentOffenseSubstitution(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+  const pinched = rollOpponentCpuPinchHit(progress, random, false)
+  return rollOurPitcherChange(pinched, random)
 }

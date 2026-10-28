@@ -19,7 +19,7 @@ import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pit
  * 타석 타자가 마선수(ac23e~ac26e: 0xae89c → 0xb633c)면 굴림 없이 안 낸다 — 웹에서 마선수 타자는 142 가 넣은 마타자 칸
  * (`ACE_BATTER_ROSTER_SLOT`)뿐이다. 장비 레벨 니블(+0x19·+0x1a)은 웹 리그 로스터에 없다 — 늘 0 이라 결과가 같다.
  */
-export function applyOpponentCpuPinchHit(
+export function rollOpponentCpuPinchHit(
   progress: PitcherGameProgress,
   random: RandomPort,
   /**
@@ -43,50 +43,44 @@ export function applyOpponentCpuPinchHit(
     random,
   )
   if (pinch === null) return progress
-  // 0x16 진입 3d562 0x668cc(스킨, 공격 팀, 0) — 확정 0xaebe4(3d56c) 앞이라 나가는 타자의 레코드 칸이다 (`cheerRestore`)
-  const outgoingRecordSlot = opponentQuickBatterOf(progress).recordSlot
   const opponentBatterLogs = { ...progress.opponentBatterLogs }
   delete opponentBatterLogs[slot]
-  return appendLog(
-    {
-      ...progress,
-      opponentLineup: pinch.lineup,
-      // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14 a5e7c)이 나갈 때까지 다시 묻지 않는다
-      pinchHitUsed: true,
-      opponentBatterLogs,
-      // 들어온 타자가 142 가 넣은 마타자면 등판음 0x38b64 의 마선수 가지 (0xb633c)
-      scenePinchHit: inScene
-        ? {
-            serial: (progress.scenePinchHit?.serial ?? 0) + 1,
-            by: 'CPU',
-            incomingIsAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
-          }
-        : progress.scenePinchHit,
-      // 3da94 → 0x16 진입 0x3d458 이 대타 예약을 보고 +0x195c 비트0(마선수면 5) → 0xd → 0xe 타자 등판음
-      substitutionScene: inScene
-        ? {
-            serial: (progress.substitutionScene?.serial ?? 0) + 1,
-            // 대타 예약 갈래 — 0xe 첫 그림의 0x38b64 타자 가지(ptc/003)
-            entryKind: '타자',
-            incomingIsAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
-            entrySoundId: substitutionEntrySoundIdOf({
-              isAce: rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT,
-              bases: progress.game.bases,
-            }),
-            // 0x473f0 컷인 번호 — 142 가 넣은 마타자 0xb63a1 + 5
-            ...(rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT
-              ? { aceSlot: aceCutInSlotOf('타자', teamAcesOf(progress.options, false).batter) }
-              : {}),
-            // 공격 측(st[9]) = 상대(CPU) 측
-            ...(outgoingRecordSlot === undefined
-              ? {}
-              : { cheerRestore: { attackSide: progress.game.playerSide === 0 ? 1 : 0, recordSlot: outgoingRecordSlot } }),
-          }
-        : progress.substitutionScene,
+  const pinched: PitcherGameProgress = {
+    ...progress,
+    opponentLineup: pinch.lineup,
+    // state[0xe] = 1 (ac33e) — 다음 공(0xa5e14 a5e7c)이 나갈 때까지 다시 묻지 않는다
+    pinchHitUsed: true,
+    opponentBatterLogs,
+    // 간이 엔진 `0xc1ba4`(0xc1c50) 대타는 연출이 없다 — 앞 장면 칸 그대로
+    ...(inScene
+      ? scenePinchHitOf(progress, rosterSlotAt(pinch.lineup, slot) === ACE_BATTER_ROSTER_SLOT)
+      : { scenePinchHit: progress.scenePinchHit, substitutionScene: progress.substitutionScene }),
+  }
+  return appendLog(pinched, `${progress.game.inning}회${progress.game.half} 상대 ${(slot % BATTING_ORDER_SIZE) + 1}번 CPU 대타`, inScene)
+}
+
+/** 사람 장면 0xf 진입의 대타 연출 — "Time!" 22(3da88) → 교체 연출 0x16 → 0xe 등판음 */
+function scenePinchHitOf(progress: PitcherGameProgress, incomingIsAce: boolean): Pick<PitcherGameProgress, 'scenePinchHit' | 'substitutionScene'> {
+  // 0x16 진입 3d562 0x668cc(스킨, 공격 팀, 0) — 확정 0xaebe4(3d56c) 앞이라 나가는 타자의 레코드 칸이다 (`cheerRestore`)
+  const outgoingRecordSlot = opponentQuickBatterOf(progress).recordSlot
+  return {
+    // 들어온 타자가 142 가 넣은 마타자면 등판음 0x38b64 의 마선수 가지 (0xb633c)
+    scenePinchHit: { serial: (progress.scenePinchHit?.serial ?? 0) + 1, by: 'CPU', incomingIsAce },
+    // 3da94 → 0x16 진입 0x3d458 이 대타 예약을 보고 +0x195c 비트0(마선수면 5) → 0xd → 0xe 타자 등판음
+    substitutionScene: {
+      serial: (progress.substitutionScene?.serial ?? 0) + 1,
+      // 대타 예약 갈래 — 0xe 첫 그림의 0x38b64 타자 가지(ptc/003)
+      entryKind: '타자',
+      incomingIsAce,
+      entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: progress.game.bases }),
+      // 0x473f0 컷인 번호 — 142 가 넣은 마타자 0xb63a1 + 5
+      ...(incomingIsAce ? { aceSlot: aceCutInSlotOf('타자', teamAcesOf(progress.options, false).batter) } : {}),
+      // 공격 측(st[9]) = 상대(CPU) 측
+      ...(outgoingRecordSlot === undefined
+        ? {}
+        : { cheerRestore: { attackSide: progress.game.playerSide === 0 ? 1 : 0, recordSlot: outgoingRecordSlot } }),
     },
-    `${progress.game.inning}회${progress.game.half} 상대 ${(slot % BATTING_ORDER_SIZE) + 1}번 CPU 대타`,
-    inScene,
-  )
+  }
 }
 
 /**
@@ -94,7 +88,7 @@ export function applyOpponentCpuPinchHit(
  * 투수편 주인공은 타석에 안 서므로 우리 아홉 칸이 다 대상이다. 대타가 나면 그 칸의 이 경기 기록 24바이트(타격 기록
  * `teammateLogs` 자리)도 들어온 선수 것(빈 기록)이 된다 (aed02~aed16 — 타자편 `gameFlow` 의 동료 대타와 같다).
  */
-export function applyTeammateCpuPinchHit(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
+export function rollTeammateCpuPinchHit(progress: PitcherGameProgress, random: RandomPort): PitcherGameProgress {
   const slot = progress.game.battingOrderIndex
   const pinch = tryQuickCpuPinchHit(
     progress.ourLineup,

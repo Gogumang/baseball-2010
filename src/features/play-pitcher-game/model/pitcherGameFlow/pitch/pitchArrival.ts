@@ -68,7 +68,13 @@ export function afterMyPitchArrival(arrival: PitcherPitchArrival, resume: { read
   // 실시간으로 이미 보여 준 판(`shownLive`)은 재생 칸에 다시 안 넣는다
   const play = arrival.play
   if (play !== null && arrivalApplicationOf(play) === 'batterRuns') {
-    return advance(applyDefensivePlay(arrived, outcome, true, arrived.atBat.balls, { defensePlay: play.result, playback: play.shownLive === true ? null : play.result }), random)
+    return advance(
+      applyDefensivePlay(arrived, outcome, true, arrived.atBat.balls, {
+        defensePlay: play.result,
+        playback: play.shownLive === true ? null : play.result,
+      }),
+      random,
+    )
   }
   // 볼넷 · 사구 · 판 없는 삼진 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기
   // 주루(0x17)·정산(삼진은 0xd · 0x18 과 0xa8024)은 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 —

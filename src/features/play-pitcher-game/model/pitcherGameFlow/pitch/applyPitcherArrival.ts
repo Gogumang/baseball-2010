@@ -50,7 +50,10 @@ export function applyPitcherArrival(progress: PitcherGameProgress, play: PitchAr
 }
 
 /** 판의 진루 — 판정 B 가 정산을 부르는가: 도루는 늘, 폭투·포일은 삼진이 섰거나 반 이닝 · 경기가 끝난 판만 (`arrivalPlaySettles`) */
-function withArrivalRunnerPlay(opened: PitcherGameProgress, play: PitchArrivalPlay): { readonly progress: PitcherGameProgress; readonly settles: boolean } {
+function withArrivalRunnerPlay(
+  opened: PitcherGameProgress,
+  play: PitchArrivalPlay,
+): { readonly progress: PitcherGameProgress; readonly settles: boolean } {
   const shownLive = play.shownLive === true
   const settledApply = withMyRunnerPlay(opened, play.result, true, shownLive).progress
   const settles = arrivalPlaySettles(play, { halfOrGameEnded: isHalfInningOrGameEnded(opened.game, settledApply.game) })
@@ -59,7 +62,12 @@ function withArrivalRunnerPlay(opened: PitcherGameProgress, play: PitchArrivalPl
 }
 
 /** 판 정산 0xa8024 의 판 종류별 칸 · 다음 견제 정산이 함께 셀 사건 목록 */
-function withArrivalSettlement(moved: PitcherGameProgress, progress: PitcherGameProgress, play: PitchArrivalPlay, settles: boolean): PitcherGameProgress {
+function withArrivalSettlement(
+  moved: PitcherGameProgress,
+  progress: PitcherGameProgress,
+  play: PitchArrivalPlay,
+  settles: boolean,
+): PitcherGameProgress {
   const events = settlementEventsOfPlay(play.result)
   let next = withStealPlayLeagueSteals(moved, progress, play)
   // 삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9) — 거르기가 없는 정산이라 상대 타석 칸 · 결과 링 · 타자 수까지 오른다.

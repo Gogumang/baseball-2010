@@ -85,5 +85,12 @@ function rollCpuBatterDecision(progress: PitcherGameProgress, mine: MyRolledPitc
     hasRunner: runnerCountOf(progress.game.bases) > 0,
   }
   const traits = cpuBatterTraitsOf(progress, mine.isMistake, mine.staminaPercent, mine.opponentBatter)
-  return pitchAgainstBatterDetailed(mine.pitch, batter, random, { control: mine.fatigued.control, velocity: mine.fatigued.velocity }, situation, traits)
+  return pitchAgainstBatterDetailed(
+    mine.pitch,
+    batter,
+    random,
+    { control: mine.fatigued.control, velocity: mine.fatigued.velocity },
+    situation,
+    traits,
+  )
 }

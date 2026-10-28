@@ -30,12 +30,22 @@ import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pit
 /* ── 시작 ────────────────────────────────────────────────────────────────────── */
 
 export function startPitcherGame(options: PitcherGameOptions, random: RandomPort): PitcherGameProgress {
+  const initial = initialProgressOf(options)
+  // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
+  // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
+  openScenePatternDeck(random)
+  rollSimulatorInit(random)
+  return advance(initial, random)
+}
+
+/** 경기 시작 칸 — 굴림 없음 */
+function initialProgressOf(options: PitcherGameOptions): PitcherGameProgress {
   const onMound = startsToday(options)
   const ourStarter = ourPitcherOrderOf(options)[0]
   const opponentStarter = opponentPitcherOrderOf(options)[0] ?? 0
   const ourStaminas = staminaTableOf(options.ourPitcherStaminas)
   const opponentStaminas = staminaTableOf(options.opponentPitcherStaminas)
-  const initial: PitcherGameProgress = {
+  return {
     options,
     // 투수편 주인공은 타석에 서지 않는다 — 타순 칸을 절대 맞히지 못하는 값으로 둔다
     game: createGame(-1, options.playerSide),
@@ -101,9 +111,4 @@ export function startPitcherGame(options: PitcherGameOptions, random: RandomPort
     nextLogId: 1,
     endedInningIndex: 0,
   }
-  // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
-  // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
-  openScenePatternDeck(random)
-  rollSimulatorInit(random)
-  return advance(initial, random)
 }
