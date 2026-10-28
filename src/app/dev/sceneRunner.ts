@@ -5,8 +5,9 @@ import { SCENES } from '@/app/dev/scenes'
 import { battingLogNow, scenePeeksNow, setSceneFastForward } from '@/shared/lib/scenePeek/scenePeek'
 import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { appTickNow, appTickStartTime } from '@/shared/lib/frameClock/frameClock'
+import { assetLoadCount } from '@/shared/lib/sprite/assetLoadVersion'
 import type { SceneStep } from '@/app/dev/scenes'
-import { captureSnapshot, fiberValuesAt, prepareSnapshot, restoreSnapshot, snapshotDigest } from '@/app/dev/sessionSnapshot'
+import { captureSnapshot, fiberNameAt, fiberValuesAt, prepareSnapshot, restoreSnapshot, snapshotDigest } from '@/app/dev/sessionSnapshot'
 import type { SessionSnapshotFile, SnapshotRestoreReport } from '@/app/dev/sessionSnapshot'
 import { tryOrElseAsync, withFinallyAsync } from '@/shared/lib/safe/tryOr'
 
@@ -71,10 +72,13 @@ declare global {
       readonly capture: (note?: string) => SessionSnapshotFile
       readonly digest: () => unknown
       readonly fiberValuesAt: (path: string) => unknown
+      readonly fiberNameAt: (path: string) => string | null
       /** 지금 앱 틱 · 틱 `tick` 이 시작하는 `performance.now()` 시각 — 도구가 두 쪽을 같은 틱에 맞춘다 */
       readonly tick: () => number
       readonly tickStart: (tick: number) => number
       readonly now: () => number
+      /** 지금까지 도착한 재료(그림 · 칠하기 · 글꼴) 수 — 도구가 늦게 온 그림이 다 그려진 뒤에 화면을 견준다(r355) */
+      readonly assets: () => number
     }
     /** `&capture=1` — 단계를 다 밟은 순간 뜬 스냅샷 */
     __capturedSnapshot?: SessionSnapshotFile
@@ -121,9 +125,11 @@ export async function bootSceneShortcut(): Promise<void> {
     capture: (note) => captureSnapshot({ note: note ?? '', scene: status.scene, fixture: status.fixture }),
     digest: snapshotDigest,
     fiberValuesAt,
+    fiberNameAt,
     tick: appTickNow,
     tickStart: appTickStartTime,
     now: () => performance.now(),
+    assets: assetLoadCount,
   }
   window.__batting = () => ({ probe: scenePeeksNow().battingStage?.probe() ?? null, log: battingLogNow() })
   window.__sceneProbe = () => {
@@ -177,6 +183,8 @@ function reportError(error: unknown): void {
 }
 
 const POLL_MS = 16
+/** 뜨기 앞에 같은 시각의 타이머를 비우는 바퀴 — 틱 머리 타이머 → React 커밋 → 그 effect 가 건 타이머 */
+const SETTLE_ROUNDS = 3
 const DEFAULT_UNTIL_MS = 8000
 
 function sleep(ms: number): Promise<void> {
@@ -265,6 +273,9 @@ export async function runSceneShortcut(): Promise<void> {
         }
         // 마지막 그림이 화면에 닿게 두 틀 기다린다
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        // 그 시각에 걸린 일(틱 머리 타이머 · 그것이 미룬 React 커밋)을 마저 돌린 뒤 뜬다 — 그림 틀이 틱 머리와 같은 ms 면 틱 머리 타이머가
+        // 아직 안 돈 채 떠서, 되살린 쪽(그 틱을 이미 센 것으로 본다)이 한 번 덜 셌다(돌발 결과 창 그린 수 53 ≠ 54, r355)
+        for (let round = 0; round < SETTLE_ROUNDS; round += 1) await sleep(0)
         // `&capture=1` — 이 순간(ready 와 같은 틱)을 뜬다
         if (new URLSearchParams(window.location.search).has('capture')) {
           window.__capturedSnapshot = captureSnapshot({ note: scene.description, scene: status.scene, fixture: status.fixture })

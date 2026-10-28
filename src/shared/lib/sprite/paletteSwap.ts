@@ -116,10 +116,21 @@ const recolored = new Map<string, Promise<string>>()
 /** 다 칠한 그림 — 같은 (그림, 벌) 이 다시 오면 기다리지 않고 바로 쓴다 (프레임마다 구운 색이 한 번 비치던 깜박임을 막는다) */
 const painted = new Map<string, string>()
 
+/**
+ * 그림을 받아 **풀기(decode)까지** 마친다 — 웹킷은 `onload` 직후 캔버스에 그려 픽셀을 읽으면 아직 안 풀린 그림이 빈 칸(알파 0)으로
+ * 읽힐 때가 있다. 그러면 칠한 그림이 통째로 비거나(그림) 구운 색 그대로 남고(번호 지도) 그 결과가 캐시에 박힌다 — 경기 중간
+ * 스냅샷으로 많은 그림을 한꺼번에 받던 웹킷에서 타자 몸통 · 팔이 빠져 보였다(r355). 픽셀 값은 같다
+ */
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
-    image.onload = () => resolve(image)
+    image.onload = () => {
+      if (typeof image.decode !== 'function') return resolve(image)
+      image.decode().then(
+        () => resolve(image),
+        () => resolve(image),
+      )
+    }
     image.onerror = () => reject(new Error(`그림을 불러오지 못했습니다: ${url}`))
     image.src = url
   })

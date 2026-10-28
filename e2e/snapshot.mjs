@@ -66,33 +66,73 @@ const CDN = /cdn\.jsdelivr\.net/
 async function openPage(browser, device, { inject } = {}) {
   const context = await browser.newContext(DEVICES[device])
   const page = await context.newPage()
-  const stats = { inFlight: 0, pageErrors: [] }
-  await page.route(CDN, (route) => route.abort())
+  // 걸린 요청 — 끝(`requestfinished` · `requestfailed`)이 안 오는 요청이 있어도 그 주소를 알리게 Set 으로 든다. data: 주소(칠한 그림)는
+  // 망을 안 타고 웹킷에서는 끝 알림이 안 올 때가 있어 뺀다 (r355)
+  const stats = { pending: new Set(), held: [], isHolding: false, pageErrors: [] }
+  // 망 대답을 가짜 시계의 걸음 사이에만 들인다 (r355) — 가짜 시계를 미는 동안(`runFor`) 시작한 요청은 붙들었다가 시계가 선 뒤
+  // (`waitQuiet`) 놓는다. 안 그러면 대답(지연 화면 묶음 · JSON)이 `runFor` 안 아무 가짜 시각에나 닿아 실제 진행이 판마다 몇 틱 갈렸다
+  // (웹킷 돌발 결과 뜬 틱 1389 · 1392). 문서를 여는 동안(`isHolding` 거짓)은 바로 놓는다 — goto 가 대답을 기다린다
+  await page.route('**/*', (route) => {
+    if (CDN.test(route.request().url())) return route.abort()
+    if (!stats.isHolding) return route.continue().catch(() => {})
+    stats.held.push(route)
+  })
   page.on('pageerror', (error) => stats.pageErrors.push(error.message.slice(0, 300)))
-  page.on('request', () => {
-    stats.inFlight += 1
+  // 쪽이 죽으면 걸린 Playwright 호출이 안 풀릴 수 있다 — 알리고 맥락을 닫아 풀어 준다(r355)
+  page.on('crash', () => {
+    stats.pageErrors.push('쪽이 죽었다(crash)')
+    context.close().catch(() => {})
   })
-  page.on('requestfinished', () => {
-    stats.inFlight -= 1
+  page.on('request', (request) => {
+    if (!request.url().startsWith('data:')) stats.pending.add(request)
   })
-  page.on('requestfailed', () => {
-    stats.inFlight -= 1
-  })
+  page.on('requestfinished', (request) => stats.pending.delete(request))
+  page.on('requestfailed', (request) => stats.pending.delete(request))
+  context.on('close', () => stats.pending.clear())
   if (inject !== undefined)
     await page.addInitScript((text) => {
       window.__snapshotOverride = JSON.parse(text)
     }, JSON.stringify(inject))
+  // React 스케줄러를 가짜 시계 위로 (r355) — 스케줄러는 `setImmediate` 가 있으면 그것으로, 없으면 MessageChannel(실제 시간)로 일을 미룬다.
+  // MessageChannel 이면 React 커밋 · effect 가 가짜 시계의 타이머 사이 어느 틈에 도느냐가 실제 시간에 따라 갈려, 그 안에서 읽는
+  // `performance.now()`(창이 선 시각 → 멈춘 ms 합 따위)가 쪽마다 수십 ms 달라졌다. 가짜 setTimeout(0) 이면 가짜 시각 · 차례가 늘 같다.
+  // 시험 브라우저에만 넣는 것이라 게임 코드 · 틱 시계는 그대로다
+  await page.addInitScript(() => {
+    window.setImmediate = (callback, ...args) => setTimeout(callback, 0, ...args)
+  })
   await page.clock.install({ time: new Date('2026-10-27T00:00:00Z') })
   await page.clock.pauseAt(new Date('2026-10-27T00:00:01Z'))
   return { context, page, stats }
 }
 
-/** 망 요청이 다 끝나고 잠깐 조용할 때까지 (실제 시간) — `scene-pixels.mjs` 와 같다 */
+/** 띄운 preview 주소 — 망 기다리기가 끊기면 서버가 살아 있는지 본다 */
+let serverUrl = null
+
+async function isServerAlive() {
+  if (serverUrl === null) return true
+  return fetch(serverUrl, { signal: AbortSignal.timeout(3000) })
+    .then((response) => response.ok)
+    .catch(() => false)
+}
+
+/** 망이 이만큼(실제 ms) 안 조용하면 끝 알림이 안 오는 요청으로 보고 넘어간다 — 그 주소는 `stats.stuck` 에 남긴다 */
+const QUIET_LIMIT_MS = 5000
+
+/** 망 요청이 다 끝나고 잠깐 조용할 때까지 (실제 시간, 많아야 `QUIET_LIMIT_MS`) — `scene-pixels.mjs` 와 같다 */
 async function waitQuiet(page, stats) {
   let quiet = 0
-  for (let tries = 0; tries < 2000 && quiet < 3; tries += 1) {
+  const until = Date.now() + QUIET_LIMIT_MS
+  while (quiet < 3 && Date.now() < until) {
+    for (const route of stats.held.splice(0)) route.continue().catch(() => {})
     await new Promise((resolve) => setTimeout(resolve, 10))
-    quiet = stats.inFlight <= 0 ? quiet + 1 : 0
+    quiet = stats.pending.size === 0 && stats.held.length === 0 ? quiet + 1 : 0
+  }
+  if (quiet < 3) {
+    stats.quietTimeouts = (stats.quietTimeouts ?? 0) + 1
+    stats.stuck = [...stats.pending].map((request) => request.url().slice(-80))
+    stats.pending.clear()
+    // 끝 알림이 안 오는 까닭이 서버면(멈춤 · 꺼짐 · 남이 포트를 가져감) 기다리지 말고 실패로 — 예전 "Could not connect" 를 가리던 길
+    if (!(await isServerAlive())) throw new Error(`preview 서버가 대답하지 않는다 (${serverUrl}) — 걸린 요청 ${stats.stuck.slice(0, 2).join(' | ')}`)
   }
   await page
     .evaluate(
@@ -121,20 +161,70 @@ async function driveToReady(page, stats) {
   throw new Error(`장면이 안 섰다 (가상 ${virtual}ms): ${status?.error ?? status?.status ?? '?'} · 단계 ${status?.steps?.slice(-3).join(' → ')}`)
 }
 
-/** 앱 틱 `tick` 머리 + 1ms 까지 민다 (틱마다 망 조용함을 기다리며) */
-async function advanceToTick(page, stats, tick) {
+/** 앱 틱 `tick` 머리 + `offset` ms 까지 민다 (틱마다 망 조용함을 기다리며) */
+async function advanceToTick(page, stats, tick, offset = 1) {
   for (;;) {
     const { now, start } = await page.evaluate((target) => ({ now: window.__snapshot.now(), start: window.__snapshot.tickStart(target) }), tick)
-    const ms = Math.ceil(start - now) + 1
+    const ms = Math.ceil(start - now) + offset
     if (ms <= 0) return
     await page.clock.runFor(Math.min(ms, STEP))
     await waitQuiet(page, stats)
   }
 }
 
+/**
+ * 늦게 오는 재료(그림 받기 · 칠하기 · 글꼴)가 다 올 때까지 (실제 시간) — 도착 수(`window.__snapshot.assets`)가 잠깐 그대로고 망이
+ * 조용하면 끝. 재료는 실제 시간에 오고 그림은 가짜 시계의 그림 틀에서만 다시 그려지므로, 견주기 전에 기다려야 두 쪽 그림이 같은
+ * 재료로 그려진다(r355 — 실제 진행 쪽은 오래 돌며 이미 받아 둔 그림을, 되살린 쪽은 그 틱에 처음 청한다)
+ */
+async function settleAssets(page, stats) {
+  let last = -1
+  let still = 0
+  const until = Date.now() + SETTLE_LIMIT_MS
+  while (still < 3 && Date.now() < until) {
+    await waitQuiet(page, stats)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const count = await page.evaluate(() => window.__snapshot.assets())
+    still = count === last ? still + 1 : 0
+    last = count
+  }
+}
+
+/** 재료 기다리기의 끝(실제 ms) — 늘 오는 유휴 미리 받기 탓에 멎지 않아도 넘어간다 */
+const SETTLE_LIMIT_MS = 5000
+
+/** Playwright 가짜 시계의 그림 틀(rAF) 간격 */
+const FRAME_MS = 16
+
+/**
+ * 두 쪽을 틱 `tick` 에 맞춘다 — 그 틱 첫 그림 틀 뒤까지 민 뒤 재료를 기다리고, 그 틱 끝 2ms 앞까지 더 민다(그 사이 그림 틀이 셋 넘게 돌아
+ * 늦게 온 재료로 다시 그린다 — 틱 안에서 게임 상태는 안 바뀐다). 뒤로 늘 오는 유휴 미리 받기는 지금 그림과 상관없다
+ */
+async function alignAtTick(sides, tick) {
+  const length = await sides[0].page.evaluate((at) => window.__snapshot.tickStart(at + 1) - window.__snapshot.tickStart(at), tick)
+  // 그 틱의 첫 그림 틀(가짜 시계의 그림 틀은 16ms 격자)이 돈 뒤 — 그 그림이 처음 청한 재료까지 기다린다
+  await Promise.all(sides.map((side) => advanceToTick(side.page, side.stats, tick, Math.min(FRAME_MS + 1, Math.floor(length / 2)))))
+  await Promise.all(sides.map((side) => settleAssets(side.page, side.stats)))
+  await Promise.all(sides.map((side) => advanceToTick(side.page, side.stats, tick, Math.max(1, Math.floor(length) - 2))))
+}
+
 const tickOf = (page) => page.evaluate(() => window.__snapshot.tick())
 const digestOf = (page) => page.evaluate(() => window.__snapshot.digest())
-const shotOf = (page, path) => page.locator('[data-original-screen]').first().screenshot({ path, animations: 'disabled' })
+/**
+ * 화면 판 스크린샷 — 찍기 전에 판을 새 층으로 올려(`will-change: transform`) 통째로 다시 그리게 한다(r355). 크로미움은 바뀌지 않은 자리를
+ * 다시 칠하지 않아, 실제 진행 쪽에만 지나간 그림(글꼴이 바뀌기 전 글자 따위)의 잔상 점이 남았다 — DOM 은 두 쪽이 같은데 픽셀 6 개가
+ * 갈렸다(엔딩). 찍은 뒤 되돌린다 — 게임 상태는 안 건드린다
+ */
+const shotOf = async (page, path) => {
+  const setLayer = (value) =>
+    page.evaluate((willChange) => {
+      document.querySelector('[data-original-screen]').style.willChange = willChange
+    }, value)
+  await setLayer('transform')
+  const shot = await page.locator('[data-original-screen]').first().screenshot({ path, animations: 'disabled' })
+  await setLayer('')
+  return shot
+}
 
 // ─── 뜨기 ───
 
@@ -143,6 +233,7 @@ async function captureScene(browser, base, scene) {
   try {
     const started = Date.now()
     await page.goto(`${base}?scene=${scene}&real=1&capture=1`, { waitUntil: 'commit' })
+    stats.isHolding = true
     const virtual = await driveToReady(page, stats)
     const snapshot = await page.evaluate(() => window.__capturedSnapshot ?? null)
     if (snapshot === null) throw new Error('뜬 스냅샷이 없다 (window.__capturedSnapshot)')
@@ -200,8 +291,9 @@ async function compareDigests(log, label, a, b, pageA, pageB) {
   const notes = []
   for (const path of fiberDiffs.slice(0, 4)) {
     const [valuesA, valuesB] = await Promise.all([pageA, pageB].map((page) => page.evaluate((at) => window.__snapshot.fiberValuesAt(at), path)))
+    const name = await pageA.evaluate((at) => window.__snapshot.fiberNameAt(at), path)
     notes.push(
-      `  · ${path.split('/').slice(-3).join('/')} (${a.fibers[path] === undefined ? 'A 에 없음' : b.fibers[path] === undefined ? 'B 에 없음' : '다름'}): ${firstDiffs(valuesA, valuesB, '', [], 3).join(' · ')}`,
+      `  · ${name ?? '?'} ${path.split('/').slice(-3).join('/')} (${a.fibers[path] === undefined ? 'A 에 없음' : b.fibers[path] === undefined ? 'B 에 없음' : '다름'}): ${firstDiffs(valuesA, valuesB, '', [], 3).join(' · ')}`,
     )
   }
   log(
@@ -252,14 +344,45 @@ async function diffPixels(helper, a, b) {
   )
 }
 
-async function verifyScene(log, browser, helper, browserName, device, base, scene) {
+/** 장면 하나의 같음 확인 시간 제한(실제 ms) — 넘기면 그 장면을 실패로 하고 다음으로 간다(멈춘 채 남지 않게, r355) */
+const SCENE_LIMIT_MS = Number(process.env.E2E_SNAPSHOT_SCENE_LIMIT_MS ?? 10 * 60 * 1000)
+
+/**
+ * `verifyScene` 에 시간 제한을 건다 — 넘기면 그 장면의 맥락을 닫아(걸려 있던 Playwright 호출이 오류로 풀린다) 어느 단계에서 멈췄는지
+ * 알린다. 맥락을 닫아도 30초 안에 안 풀리면 기다리지 않고 실패로 넘어간다(브라우저는 그 브라우저 차례 끝에 닫힌다)
+ */
+async function verifySceneWithin(log, ...args) {
+  const watch = { stage: '시작', contexts: [], sides: [] }
+  let timer = null
+  const timedOut = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      watch.timedOut = true
+      log(`    ✗ 시간 제한 ${SCENE_LIMIT_MS / 1000}s 넘김 — 단계 「${watch.stage}」에서 멈췄다`)
+      for (const [name, stats] of watch.sides)
+        log(
+          `    · ${name} 망 기다리기 끊김 ${stats.quietTimeouts ?? 0}번 · 지금 걸린 요청 ${stats.pending.size} · 끝 알림 없던 것: ${(stats.stuck ?? []).slice(0, 3).join(' | ')}`,
+        )
+      for (const context of watch.contexts) context.close().catch(() => {})
+      setTimeout(() => resolve(false), 30000)
+    }, SCENE_LIMIT_MS)
+  })
+  const ok = await Promise.race([verifyScene(log, ...args, watch), timedOut])
+  clearTimeout(timer)
+  return ok && !watch.timedOut
+}
+
+async function verifyScene(log, browser, helper, browserName, device, base, scene, watch) {
   const label = `${browserName}-${device}-${scene}`
   let ok = true
+  watch.stage = 'A 실제 진행'
   const a = await openPage(browser, device)
+  watch.contexts.push(a.context)
+  watch.sides.push(['A', a.stats])
   let b = null
   try {
     // A — 실제로 진행해 닿은 순간을 그 자리에서 뜬다
     await a.page.goto(`${base}?scene=${scene}&real=1&capture=1`, { waitUntil: 'commit' })
+    a.stats.isHolding = true
     const virtualA = await driveToReady(a.page, a.stats)
     const snapshot = await a.page.evaluate(() => window.__capturedSnapshot)
     // 파일이 지금 뜬 것과 같은가 — 다르면 낡은 파일 (값만)
@@ -282,9 +405,13 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
       log(`  없음 파일 ${filePath}`)
     }
     // B — 그 스냅샷을 넣고 바로 연다
+    watch.stage = 'B 되살리기'
     b = await openPage(browser, device, { inject: snapshot })
+    watch.contexts.push(b.context)
+    watch.sides.push(['B', b.stats])
     const openedB = Date.now()
     await b.page.goto(`${base}?scene=${scene}&snapshot=inject`, { waitUntil: 'commit' })
+    b.stats.isHolding = true
     const virtualB = await driveToReady(b.page, b.stats)
     const restore = await b.page.evaluate(() => window.__scene?.restore ?? null)
     log(
@@ -293,7 +420,8 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
     // 같은 틱에 맞춘다
     let tick = Math.max(await tickOf(a.page), await tickOf(b.page)) + 2
     const check = async (stepLabel) => {
-      await Promise.all([advanceToTick(a.page, a.stats, tick), advanceToTick(b.page, b.stats, tick)])
+      watch.stage = stepLabel
+      await alignAtTick([a, b], tick)
       const [digestA, digestB] = await Promise.all([digestOf(a.page), digestOf(b.page)])
       const compared = await compareDigests(log, stepLabel, digestA, digestB, a.page, b.page)
       const [shotA, shotB] = await Promise.all([
@@ -317,6 +445,12 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
       tick += step.ticks
       await check(`걸음 ${index + 1} ${step.key}+${step.ticks}틱`)
     }
+    for (const [name, side] of [
+      ['A', a],
+      ['B', b],
+    ])
+      if (side.stats.stuck !== undefined)
+        log(`    · ${name} 끝 알림이 안 온 요청(참고, 끊김 ${side.stats.quietTimeouts}번): ${side.stats.stuck.slice(0, 3).join(' | ')}`)
     for (const side of [a, b])
       if (side.stats.pageErrors.length > 0) {
         ok = false
@@ -346,6 +480,7 @@ const server =
   process.env.E2E_SNAPSHOT_URL === undefined
     ? await startE2ePreview({ port: PORT, dir: 'dist-snapshot' })
     : { url: process.env.E2E_SNAPSHOT_URL, stop: () => {}, buildMs: 0 }
+serverUrl = server.url
 let failed = false
 try {
   if (!isVerify) {
@@ -366,21 +501,22 @@ try {
     if (!failed) console.log('뜬 파일은 다음 e2e 빌드에 실린다 (`e2e:quick` · `e2e:only` 는 스냅샷이 바뀌면 다시 묶는다)')
   } else {
     const runs = (process.env.E2E_SNAPSHOT_RUNS ?? 'chromium:desktop,webkit:iphone').split(',').map((pair) => pair.split(':'))
-    // 브라우저는 하나씩 (맥락 셋: 실제 진행 · 되살리기 · 픽셀 견주기, r342)
+    // 브라우저는 하나씩 (맥락 셋: 실제 진행 · 되살리기 · 픽셀 견주기, r342). 장면마다 브라우저를 새로 띄운다(r355, 1~2초) — 한 웹킷으로
+    // 장면을 이어 돌린 전체 run 에서만 뒤 장면의 실제 진행이 망 기다림에 걸려 멈췄다. 앞 장면의 연결 · 메모리가 뒤로 넘어가지 않게
     for (const [browserName, device] of runs) {
       const type = browserName === 'webkit' ? webkit : chromium
       const executablePath = browserName === 'webkit' ? undefined : chromiumExecutable()
-      const browser = await type.launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })
-      const helper = await (await browser.newContext()).newPage()
-      try {
-        for (const scene of scenes) {
+      for (const scene of scenes) {
+        const browser = await type.launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })
+        try {
+          const helper = await (await browser.newContext()).newPage()
           const lines = []
-          const ok = await verifyScene((line) => lines.push(line), browser, helper, browserName, device, server.url, scene)
+          const ok = await verifySceneWithin((line) => lines.push(line), browser, helper, browserName, device, server.url, scene)
           console.log(`${ok ? 'ok  ' : 'FAIL'} ${browserName}:${device} ${scene}\n${lines.join('\n')}`)
           if (!ok) failed = true
+        } finally {
+          await browser.close()
         }
-      } finally {
-        await browser.close()
       }
     }
   }

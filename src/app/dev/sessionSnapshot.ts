@@ -374,6 +374,18 @@ class Decoder {
     }
   }
 
+  /**
+   * 이미 푼 객체마다 내용을 뜬 값으로 되돌린다(같은 객체 그대로) — 되살리는 동안 도는 그림 루프가 넣어 둔 객체(장면 칸 ref 따위)를
+   * 고쳐 쓰면 다시 `get` 해도 고친 객체가 나온다. 끝에 한 번 불러 뜬 순간의 내용으로 맞춘다(r355). 구멍(함수 · DOM) 자리는 채운 값을 둔다
+   */
+  rewind(): void {
+    const decodeItem = (item: EncodedNode) => this.decode(item, [], [], null, null)
+    for (const [id, object] of this.objects) {
+      const node = this.definitions.get(id)
+      if (typeof node === 'object' && node !== null) rewindObject(object, node, decodeItem)
+    }
+  }
+
   /** 칸 `at` 의 구멍을 새로 그린 쪽 값 `fresh` 의 같은 자리로 채운다 */
   fill(at: number, fresh: unknown): void {
     for (const hole of this.holes.get(at) ?? []) {
@@ -398,6 +410,41 @@ class Decoder {
       if (hole.holder[hole.key!] !== counterpart) hole.holder[hole.key!] = counterpart
     }
   }
+}
+
+/** 적은 꼴 하나를 푼 값 (`Decoder` 의 풀기 — 이미 푼 객체는 그 객체) */
+type Decode = (item: EncodedNode) => unknown
+
+/** 객체 `object` 의 내용을 적은 꼴 `node` 로 되돌린다(같은 객체 그대로) — 구멍(함수 · DOM) 자리는 채운 값을 둔다 (`Decoder.rewind`) */
+function rewindObject(object: object, node: Exclude<EncodedNode, null | number | string | boolean>, decodeItem: Decode): void {
+  if ('a' in node) return rewindArray(object as unknown[], node.a, decodeItem)
+  if ('o' in node) return rewindRecord(object as Record<string, unknown>, node.o, decodeItem)
+  if ('m' in node) return rewindMap(object as Map<unknown, unknown>, node.m, decodeItem)
+  if ('s' in node) return rewindSet(object as Set<unknown>, node.s, decodeItem)
+  if ('t' in node) return (object as unknown as { set: (values: readonly number[]) => void }).set(node.v)
+  if ('d' in node) (object as Date).setTime(node.d)
+}
+
+function rewindArray(array: unknown[], items: readonly EncodedNode[], decodeItem: Decode): void {
+  array.length = items.length
+  items.forEach((item, index) => {
+    if (!isWholeHole(item)) array[index] = decodeItem(item)
+  })
+}
+
+function rewindRecord(target: Record<string, unknown>, fields: Readonly<Record<string, EncodedNode>>, decodeItem: Decode): void {
+  for (const field of Object.keys(target)) if (!(field in fields)) delete target[field]
+  for (const [field, item] of Object.entries(fields)) if (!isWholeHole(item)) target[field] = decodeItem(item)
+}
+
+function rewindMap(target: Map<unknown, unknown>, entries: readonly (readonly [EncodedNode, EncodedNode])[], decodeItem: Decode): void {
+  target.clear()
+  for (const [key, value] of entries) target.set(decodeItem(key), decodeItem(value))
+}
+
+function rewindSet(target: Set<unknown>, items: readonly EncodedNode[], decodeItem: Decode): void {
+  target.clear()
+  for (const item of items) target.add(decodeItem(item))
 }
 
 /** 칸 값 자체가 구멍(함수 · DOM)인가 — 그러면 새로 그린 값을 그대로 둔다 */
@@ -639,6 +686,8 @@ export async function restoreSnapshot(file: SessionSnapshotFile, { maxPasses = 8
         await frame()
         if (!changed) break
       }
+      // 그동안 그림 루프가 고쳐 쓴 객체(장면 칸 ref 의 스킬 판 따위)를 뜬 내용으로 — 이 뒤로는 그림 틀이 없다(r355)
+      decoder.rewind()
       for (const { path, fiber } of hookFibers()) {
         const entry = byPath.get(path)
         if (entry !== undefined && isApplied(fiber)) applyFiber(fiber, entry, { refsOnly: true })
@@ -730,6 +779,12 @@ function missionCoreOf(mission: unknown): unknown {
     if (key !== 'actions' && typeof value !== 'function') data[key] = value
   }
   return data
+}
+
+/** 부품 자리의 부품 이름 — 같음 확인 도구가 다른 자리를 알릴 때(r355) */
+export function fiberNameAt(path: string): string | null {
+  const type = hookFibers().find((entry) => entry.path === path)?.fiber.type as { name?: string; displayName?: string } | undefined
+  return type?.displayName ?? type?.name ?? null
 }
 
 /** 부품 자리 하나의 훅 칸 값 (같음 확인 도구가 다른 자리를 자세히 볼 때) */

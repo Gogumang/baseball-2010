@@ -28,6 +28,7 @@ export const NARI_CAREER_SCENES: Readonly<Record<string, SceneDefinition>> = {
     description: '나리 타자편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 연말 · 은퇴 이벤트 114 로 가고 OK 로 넘겨 141 (soak 픽스처)',
     fixture: 'nari-ending',
     seed: 1,
+    snapshot: 'nari-ending',
     steps: [...toNariResume('이벤트'), ...EVENT_TO_ENDING((h) => h.screen.kind === '엔딩')],
   },
   'nari-hall-of-fame': {

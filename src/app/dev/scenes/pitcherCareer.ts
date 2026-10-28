@@ -27,6 +27,7 @@ export const PITCHER_CAREER_SCENES: Readonly<Record<string, SceneDefinition>> = 
     description: '나리 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장으로 들어서 은퇴 이벤트 114 를 OK 로 넘겨 141 (soak 픽스처)',
     fixture: 'pitcher-ending',
     seed: 1,
+    snapshot: 'pitcher-ending',
     steps: [...toPitcherResume('이벤트'), ...EVENT_TO_ENDING((h) => h.screen.kind === '투수편' && h.pitcher.scene === '엔딩')],
   },
   'pitcher-hall-of-fame': {

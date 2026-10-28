@@ -17,8 +17,10 @@
 // - 일감은 지난 실행에서 오래 걸린 차례로(`e2e/.run/quick-times.json`) 꺼낸다.
 // - 실패: 장면이 안 열림 · 쪽 오류(pageerror) · 허용 목록에 없는 누름 칸 겹침 · 연 상태 동작 실패. 하나라도 있으면 끝 코드 1.
 // - 끝에 자원(CPU 초 합 · 최대 RSS · 동시 브라우저 · 맥락)을 찍는다. 보고: `e2e/.run/quick-report.json`.
-const PORT = Number(process.env.E2E_QUICK_PORT ?? 4910)
 const URL_GIVEN = process.env.E2E_QUICK_URL
+// 바란 포트가 쓰이고 있으면(다른 워크트리 · 에이전트) 빈 포트 — 주소를 굳히기 전에 고른다 (r355)
+const { choosePreviewPort } = await import('./lib/preview.mjs')
+const PORT = URL_GIVEN === undefined ? await choosePreviewPort(Number(process.env.E2E_QUICK_PORT ?? 4910)) : 0
 process.env.E2E_URL = URL_GIVEN ?? `http://127.0.0.1:${PORT}/`
 
 // E2E_URL 을 정한 뒤에 읽는다 — scene.mjs 가 읽을 때 주소를 굳힌다
@@ -45,7 +47,8 @@ const jobs = scenes
 
 const started = Date.now()
 const meter = startUsageMeter()
-const server = URL_GIVEN === undefined ? await startE2ePreview({ port: PORT, dir: 'dist-quick' }) : { stop: () => {}, buildMs: 0, reused: true }
+const server =
+  URL_GIVEN === undefined ? await startE2ePreview({ port: PORT, dir: 'dist-quick', exactPort: true }) : { stop: () => {}, buildMs: 0, reused: true }
 const runStarted = Date.now()
 let run
 try {
