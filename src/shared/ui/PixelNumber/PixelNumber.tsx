@@ -15,6 +15,7 @@ interface PixelNumberProps {
 }
 
 export function PixelNumber({ value, color = '흰색', minimumDigits = 1 }: PixelNumberProps) {
+  'use memo'
   const start = DIGIT_SET_START[color] ?? 0
   const digits = String(Math.max(0, Math.trunc(value))).padStart(minimumDigits, '0')
 
@@ -45,6 +46,7 @@ export const HEADING_SPRITE = {
 } as const
 
 export function HeadingSprite({ name }: { readonly name: keyof typeof HEADING_SPRITE }) {
+  'use memo'
   return <img className={styles.headingSprite} src={assetUrl(`./sprites/game_frame/${HEADING_SPRITE[name]}.png`)} alt={name} />
 }
 
@@ -61,6 +63,7 @@ export const POPUP_LABEL = {
 } as const
 
 export function PopupLabel({ name }: { readonly name: keyof typeof POPUP_LABEL }) {
+  'use memo'
   return <img className={styles.popupLabel} src={assetUrl(`./sprites/popup/${POPUP_LABEL[name]}.png`)} alt={name} />
 }
 

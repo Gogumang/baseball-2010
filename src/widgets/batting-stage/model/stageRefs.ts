@@ -299,12 +299,12 @@ export interface SettlementEffectSource {
 
 /** 정산 효과 층 — `rain` 은 진 판 덮개 바로 위, `particles` 는 판 맨 위에 판이 까는 240×320 캔버스 */
 export interface SettlementEffectLayers {
-  readonly rain: RefObject<HTMLCanvasElement>
-  readonly particles: RefObject<HTMLCanvasElement>
+  readonly rain: RefObject<HTMLCanvasElement | null>
+  readonly particles: RefObject<HTMLCanvasElement | null>
 }
 
 export interface StageRefs {
-  readonly canvasRef: RefObject<HTMLCanvasElement>
+  readonly canvasRef: RefObject<HTMLCanvasElement | null>
   readonly pitchRef: MutableRefObject<Pitch | null>
   /** 지금 날아가는 공의 구질 번호 1~22 (`game+0xfc8`) — `pitchRef` 와 함께 세운다. 판정 detail 에 실어 보낸다 */
   readonly pitchTypeNumberRef: MutableRefObject<number | null>

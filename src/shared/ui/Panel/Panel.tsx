@@ -10,6 +10,7 @@ interface PanelProps {
 
 /** 화면 안의 테두리 상자 한 칸. 원작의 패널과 같은 2px 테두리·배경을 쓴다. */
 export function Panel({ heading, children }: PanelProps) {
+  'use memo'
   return (
     <div className={styles.panel}>
       {heading !== undefined && <h2 className={styles.heading}>{heading}</h2>}

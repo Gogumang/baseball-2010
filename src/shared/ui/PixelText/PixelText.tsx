@@ -102,6 +102,7 @@ export function PixelText({
   className,
   style,
 }: PixelTextProps) {
+  'use memo'
   const gaps = FONT_SPACING[spacing]
   const layout = useMemo(
     () =>
