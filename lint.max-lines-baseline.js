@@ -49,6 +49,7 @@ export const maxLinesBaseline = [
   'src/pages/mission-play/ui/MissionPlayScreen.tsx', // 427
   'src/pages/season/ui/SeasonEquipmentScreen.tsx', // 420
   'src/pages/special/ui/SkinBackdrops.tsx', // 419
+  'e2e/snapshot.mjs', // 418
   'src/pages/general-mode/ui/AceSelectScreen.tsx', // 418
   'src/pages/game/ui/GameScreen.tsx', // 414
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx', // 411
@@ -67,7 +68,6 @@ export const maxLinesBaseline = [
   'src/app/ui/GameRoute.tsx', // 362
   'src/pages/general-mode/ui/GeneralModeScreen.tsx', // 360
   'src/app/ui/EntryRoutes.tsx', // 359
-  'e2e/snapshot.mjs', // 358
   'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx', // 353
   'src/pages/team-game/ui/TeamAutoRelay.tsx', // 342
   'src/widgets/matchup-cards/lib/matchupCardsLayout.ts', // 339
