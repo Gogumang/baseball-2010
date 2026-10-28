@@ -12,6 +12,7 @@ interface StatGridProps {
 
 /** 타율·안타처럼 이름과 숫자가 짝인 성적을 3열로 늘어놓는다. */
 export function StatGrid({ entries }: StatGridProps) {
+  'use memo'
   return (
     <div className={styles.grid}>
       {entries.map((entry) => (

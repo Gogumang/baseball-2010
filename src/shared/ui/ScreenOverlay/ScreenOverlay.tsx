@@ -15,6 +15,7 @@ export function ScreenOverlay({
   /** 겹 차례 — 주면 덮개 전체가 그 차례로 화면 겹들 위에 선다(`SCREEN_LAYERS`). 안 주면 안쪽 겹이 제 값으로 화면 겹과 겨룬다 */
   readonly zIndex?: number
 }) {
+  'use memo'
   return (
     <div className={styles.layer} style={zIndex === undefined ? undefined : { zIndex }}>
       <div className={styles.column}>{children}</div>

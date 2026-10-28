@@ -5,13 +5,22 @@ import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin'
 import { spriteJsonBundle } from './tools/viteSpriteJsonBundle.ts'
 import { versionedAssets } from './tools/viteVersionedAssets.ts'
 import { assetPacks } from './tools/viteAssetPacks.ts'
+import { reactCompiler } from './tools/viteReactCompiler.ts'
 
 export default defineConfig({
   base: './',
   // 스프라이트 JSON 265개를 한 파일로 — `sprites/sprite-json.bundle.json` (r311 A5, `shared/lib/sprite/spriteJsonBundle`)
   // 빌드 산출물의 `public/` 을 `v/<내용 해시>/` 로 — 호스트가 오래 캐시해도 배포 뒤 옛 그림이 안 섞인다 (r318 A2, `shared/lib/assetUrl`)
   // 빌드 산출물 자산을 gzip 묶음 몇 개 + 서비스 워커로 — 첫 진입에 한꺼번에 받는다 (r322, `app/assetPacks`). 맨 끝에 둔다(산출물을 다 쓴 뒤 훑는다)
-  plugins: [react(), vanillaExtractPlugin(), spriteJsonBundle(), versionedAssets(), assetPacks()],
+  // 화면 부품(`ui/`) 가운데 `'use memo'` 를 단 것만 React Compiler 로 자동 메모 — 게임 진행 훅은 뺀다 (r353, `tools/viteReactCompiler.ts`)
+  plugins: [
+    react(),
+    reactCompiler(process.env['REACT_COMPILER_LOG'], process.env['REACT_COMPILER_MODE']),
+    vanillaExtractPlugin(),
+    spriteJsonBundle(),
+    versionedAssets(),
+    assetPacks(),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
