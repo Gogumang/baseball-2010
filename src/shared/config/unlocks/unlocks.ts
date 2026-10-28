@@ -13,7 +13,15 @@ import rawConfig from '@/shared/config/unlocks/unlocks.json'
  * 각 잠금 판정 코드는 원본 조건 판정을 지우지 않고 `isUnlocked(id, () => 원본판정)` 으로 감싼다.
  */
 export type UnlockKind =
-  'acePlayer' | 'hiddenTeam' | 'stadiumItem' | 'pitcherEquipment' | 'batterEquipment' | 'hiddenPitch' | 'mission' | 'hallOfFameSlot' | 'annalsPage'
+  | 'acePlayer'
+  | 'hiddenTeam'
+  | 'stadiumItem'
+  | 'pitcherEquipment'
+  | 'batterEquipment'
+  | 'hiddenPitch'
+  | 'mission'
+  | 'hallOfFameSlot'
+  | 'annalsPage'
 
 export const UNLOCK_KINDS: readonly UnlockKind[] = [
   'acePlayer',

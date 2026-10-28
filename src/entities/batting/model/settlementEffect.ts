@@ -110,7 +110,8 @@ export interface SceneRain {
 
 /** 정산이 켠 효과 — 없으면 null(끔) */
 export type SettlementEffect =
-  { readonly kind: 'fireworks'; fireworks: HomeRunFireworks<number> } | { readonly kind: 'rain'; readonly rain: SceneRain }
+  | { readonly kind: 'fireworks'; fireworks: HomeRunFireworks<number> }
+  | { readonly kind: 'rain'; readonly rain: SceneRain }
 
 export interface SettlementEffectInput {
   /** 0x4a350 — 사람 팀이 이겼나 */

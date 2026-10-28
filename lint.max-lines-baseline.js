@@ -3,7 +3,7 @@
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
   'src/shared/config/original/pitchRecords.ts', // 4253
-  'src/features/defense-play/model/runDefensePlay.ts', // 2188
+  'src/features/defense-play/model/runDefensePlay.ts', // 2190
   'src/app/model/useMissionSession.ts', // 2038
   'src/app/model/useCareerSession.ts', // 1864
   'src/app/model/usePitcherLeagueSession.ts', // 1604
@@ -81,8 +81,8 @@ export const maxLinesBaseline = [
   'src/widgets/matchup-cards/ui/MatchupCards.tsx', // 321
   'src/pages/nari-record-room/lib/nariRecordRoom.ts', // 319
   'e2e/perf.mjs', // 316
+  'src/entities/career/model/gpItems.ts', // 310
   'src/widgets/special-swing/ui/SpecialTrainingFigure.tsx', // 310
-  'src/entities/career/model/gpItems.ts', // 309
   'src/pages/general-mode/ui/MatchInfoScreen.tsx', // 308
   'src/pages/team-game/ui/SubstitutionWindow.tsx', // 305
   'src/shared/lib/commonWindow/commonWindow.ts', // 304
@@ -91,8 +91,8 @@ export const maxLinesBaseline = [
   'src/pages/create-player/ui/TeamSelectScreen.tsx', // 293
   'src/pages/season/ui/SeasonMatchInfoScreen.tsx', // 290
   'src/entities/game/model/quickAtBat.ts', // 287
+  'src/shared/ui/MessageBox/MessageBox.tsx', // 286
   'src/entities/pitching/model/simulateBatter.ts', // 285
-  'src/shared/ui/MessageBox/MessageBox.tsx', // 284
   'src/pages/create-player/ui/CreatePlayerScreen.tsx', // 283
   'src/pages/story/ui/StoryScreen.tsx', // 283
   'src/entities/league/model/leaguePlayerStats.ts', // 282
@@ -152,7 +152,7 @@ export const maxLinesBaseline = [
   'src/entities/story/model/storyScene.ts', // 216
   'src/entities/career/model/nariTeamRecord.ts', // 215
   'src/pages/mission-play/ui/MissionResultBoard.tsx', // 214
-  'src/entities/batting/model/settlementEffect.ts', // 212
+  'src/entities/batting/model/settlementEffect.ts', // 213
   'src/features/play-pitcher-game/model/pitcherPitch.ts', // 211
   'src/features/defense-play/model/defenseScene.ts', // 209
   'src/entities/pitching/model/selectPitch.ts', // 208
@@ -204,7 +204,6 @@ export const maxLinesBaseline = [
   'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts', // 170
   'src/pages/season/ui/SeasonTeamSelectScreen.tsx', // 169
   'src/pages/mission-play/ui/MissionHud.tsx', // 168
-  'e2e/all.mjs', // 164
   'src/features/play-game/model/useSceneConfirm.ts', // 167
   'src/widgets/batting-stage/lib/spriteLoader.ts', // 167
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts', // 167
@@ -214,6 +213,7 @@ export const maxLinesBaseline = [
   'src/entities/batting/model/battedBallOutcome.ts', // 165
   'src/entities/particle/model/particleEmitter.ts', // 165
   'src/shared/config/bugfixes/bugfixes.ts', // 165
+  'e2e/all.mjs', // 164
   'src/pages/season/ui/SeasonTrainingPopup.tsx', // 164
   'src/widgets/season/lib/seasonOuting.ts', // 164
   'src/pages/season/ui/SeasonOutingPopup.tsx', // 163

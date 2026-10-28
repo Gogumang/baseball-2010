@@ -862,17 +862,8 @@ describe('CPU 팀 레코드가 트레이드로 바뀌면 그 레코드로 선다
   it('playLeagueDay 는 recordOf 가 준 팀만 레코드로 세운다', () => {
     const day = 4
     const plain = playLeagueDay(EMPTY_LEAGUE, day, 0, createSeededRandom(9))
-    const withRecord = playLeagueDay(
-      EMPTY_LEAGUE,
-      day,
-      0,
-      createSeededRandom(9),
-      EMPTY_LEAGUE_PLAYER_STATS,
-      {},
-      undefined,
-      true,
-      undefined,
-      (team) => (team === 1 ? traded() : undefined),
+    const withRecord = playLeagueDay(EMPTY_LEAGUE, day, 0, createSeededRandom(9), EMPTY_LEAGUE_PLAYER_STATS, {}, undefined, true, undefined, (team) =>
+      team === 1 ? traded() : undefined,
     )
     expect(withRecord.playerStats.batters[leagueBatterIdOf(1, 0)]).toBeUndefined()
     expect(plain.playerStats.batters[leagueBatterIdOf(1, 0)]).toBeDefined()

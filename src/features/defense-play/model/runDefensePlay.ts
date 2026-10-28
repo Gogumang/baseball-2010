@@ -188,7 +188,9 @@ const DEEP_LANDING_DISTANCE = 10_274
  * [경기+0xfd4] 의 0x357e0 을 보므로 화면이 고른다), 깊은 낙구 함성 60 의 후보(0x357e0 은 화면이 본다)
  */
 export type DefenseTickSound =
-  { readonly kind: 'sound'; readonly soundId: number } | { readonly kind: 'runIn'; readonly slot: number } | { readonly kind: 'deepLanding' }
+  | { readonly kind: 'sound'; readonly soundId: number }
+  | { readonly kind: 'runIn'; readonly slot: number }
+  | { readonly kind: 'deepLanding' }
 /** 홈을 가리키는 루 번호 — 원본 루 표의 [4] 가 홈의 사본이라 진루는 4 로 센다 */
 const HOME_BASE = 4
 
