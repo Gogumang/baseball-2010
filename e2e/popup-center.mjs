@@ -3,8 +3,8 @@
 // r251 이 나리 포스트시즌 대진 위 팝업(우승 팀 발표 StrMODE[137] · 한국시리즈 우승 StrMODE[190])을 판 안으로 옮겼고, 이 스크립트가
 // 그것을 장면으로 띄워 잰다. 좌표는 Playwright `boundingBox`(화면 좌표 — 웹킷 zoom 도 옮겨 준다)로 잰다.
 //
-//   E2E_PORT=5670 yarn node e2e/popup-center.mjs                      # 아래 장면 × 기기 셋
-//   E2E_PORT=5670 yarn node e2e/popup-center.mjs nari-korean-series   # 장면만 골라
+//   E2E_PORT=5670 node e2e/popup-center.mjs                      # 아래 장면 × 기기 셋
+//   E2E_PORT=5670 node e2e/popup-center.mjs nari-korean-series   # 장면만 골라
 //
 // 스크린샷은 `e2e/.run/popup-<장면>-<기기>.png`(쪽 전체). 중심이 판 중심에서 원본 1px 넘게 벗어나거나 폭이 240 이 아니면 끝 코드 1.
 import { mkdirSync } from 'node:fs'

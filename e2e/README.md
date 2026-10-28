@@ -1,7 +1,7 @@
 # 화면 확인 (e2e)
 
 빌드하고 타이틀부터 선수를 만들어 메뉴를 타고 들어가지 말고, 장면 바로가기로 곧바로 들어간다.
-실행은 모두 PnP 로 한다(`yarn node …`).
+실행은 `node e2e/<스크립트>.mjs` 로 한다(pnpm 의 node_modules 에서 playwright 를 찾는다).
 
 ## 1. 서버 (한 번 띄워 재사용)
 
@@ -73,10 +73,10 @@ G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/
 `launchScene` · `openScene` · `tap(원본 240×320 좌표)` · `tapPage` · `topElementAt` · `pressKey` · `screenState` · `shot` · `dumpFixture` 를 쓸 수 있다.
 
 ```sh
-yarn node e2e/smoke.mjs                  # 장면 49개 × chromium · webkit 아이폰 (약 5분, 실패면 끝 코드 1)
-yarn node e2e/smoke.mjs general-bat      # 몇 개만
-yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
-yarn node e2e/outing-gray-tap.mjs         # 회귀: 외출 다녀온 뒤 흑백 외출 칸 터치 · 방향키가 막히는가 (타자편 · 투수편, webkit 아이폰, r341)
+node e2e/smoke.mjs                  # 장면 49개 × chromium · webkit 아이폰 (약 5분, 실패면 끝 코드 1)
+node e2e/smoke.mjs general-bat      # 몇 개만
+node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
+node e2e/outing-gray-tap.mjs         # 회귀: 외출 다녀온 뒤 흑백 외출 칸 터치 · 방향키가 막히는가 (타자편 · 투수편, webkit 아이폰, r341)
 ```
 
 경기 결과 → 116 평가 대사(키 · 탭) · 대회 끝 134 위 효과기 → 137 → 105 는 `e2e/year-cover-evaluation.mjs` 로 본다(r287, chromium 키 · webkit 아이폰 탭).
@@ -86,16 +86,16 @@ Enter 만 되풀이하며(`E2E_FULL_EVERY` 번째 경기만 끝까지, 나머지
 다시 들어간다. 기본 목표는 2년차 3경기(`E2E_STOP_SEASON` · `E2E_STOP_GAMES`). 쪽 오류나 90초 넘게 그대로인 화면이 있으면 끝 코드 1.
 
 ```sh
-E2E_PORT=5731 yarn node e2e/pitcher-season-play.mjs                                   # chromium · 1년차 첫날부터 (약 1시간 반)
-E2E_PORT=5731 E2E_BROWSER=webkit E2E_DEVICE=iphone E2E_SCENE=pitcher-postseason yarn node e2e/pitcher-season-play.mjs   # 포스트시즌 · 대회 → 2년차
+E2E_PORT=5731 node e2e/pitcher-season-play.mjs                                   # chromium · 1년차 첫날부터 (약 1시간 반)
+E2E_PORT=5731 E2E_BROWSER=webkit E2E_DEVICE=iphone E2E_SCENE=pitcher-postseason node e2e/pitcher-season-play.mjs   # 포스트시즌 · 대회 → 2년차
 ```
 
 타석 탭 타이밍은 `e2e/swing-timing.mjs` 로 잰다(r242). `nari-bat` 에서 공마다 최적 틱(보이는 공 그림 N − 3)에 `touchscreen.tap` 하고,
 쪽 안 기록(`window.__batting` — 공 그림 · 틱 격자와 스윙 · 판정 줄)으로 탭 → 받은 틱 → 키 틱 F → 판정을 표로 낸다.
 
 ```sh
-yarn node e2e/swing-timing.mjs                                  # webkit · chromium 아이폰, 공 40개씩
-E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 yarn node e2e/swing-timing.mjs webkit   # 탭 x = 화면 폭 비율
+node e2e/swing-timing.mjs                                  # webkit · chromium 아이폰, 공 40개씩
+E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 node e2e/swing-timing.mjs webkit   # 탭 x = 화면 폭 비율
 ```
 
 홈런더비 단계 상승 · 난입 마투수는 `e2e/derby-stage.mjs` 로 실제로 쳐서 닿는다(r261). `derby-start` 에서 공마다 판정 오차(`probe.plateError`)에
@@ -106,8 +106,8 @@ E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 yarn node e2e/swing-timing.mjs webkit   # �
 `hit<n>-13` · `hit<n>-field` · `hit<n>-field2` 로 찍고, 이벤트 존이 선 판은 `pitch<n>-zone` 으로 찍는다.
 
 ```sh
-E2E_PORT=5710 E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=10 yarn node e2e/derby-stage.mjs   # 그림: e2e/.run/derby-<브라우저>-stage1.png · result.png
-E2E_PORT=5710 E2E_DERBY_START_STAGE=2 E2E_DERBY_FIXTURE=nari-ending yarn node e2e/derby-stage.mjs   # 단계 2 시작(장면 derby-stage2)에서 — 단계 3 · 4 까지
+E2E_PORT=5710 E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=10 node e2e/derby-stage.mjs   # 그림: e2e/.run/derby-<브라우저>-stage1.png · result.png
+E2E_PORT=5710 E2E_DERBY_START_STAGE=2 E2E_DERBY_FIXTURE=nari-ending node e2e/derby-stage.mjs   # 단계 2 시작(장면 derby-stage2)에서 — 단계 3 · 4 까지
 ```
 
 단계 2 이상은 `E2E_DERBY_START_STAGE=<2~4>` 로 장면 `derby-stage<N>` 에서 연다(r294 — 단계 0 부터 쳐서는 15구째에야 단계 2 에 닿았다).
@@ -118,7 +118,7 @@ E2E_PORT=5710 E2E_DERBY_START_STAGE=2 E2E_DERBY_FIXTURE=nari-ending yarn node e2
 브라우저를 띄워 둔 채 여러 번 들여다볼 때는 `e2e/drive.mjs` 를 쓴다. 명령은 파일 머리에 적혀 있다.
 
 ```sh
-yarn node e2e/drive.mjs &                 # 포트 5411, pid 는 e2e/.run/drive.pid
+node e2e/drive.mjs &                 # 포트 5411, pid 는 e2e/.run/drive.pid
 e2e/d.sh '[{"launch":"webkit","device":"iphone"},{"scene":"nari-outing"},{"top":[220,310]},{"shot":"a","full":true}]'
 kill "$(cat e2e/.run/drive.pid)"
 ```
@@ -144,8 +144,8 @@ r254 가 같은 판에서 사람 팀 포스트시즌 자리 셋(`*-postseason-ga
 저장 꼴이 바뀌어 장면이 깨지면 다시 뜬다 (약 30초, 같은 씨앗이면 같은 파일):
 
 ```sh
-yarn e2e:fixtures                        # = SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx
-SOAK_FIXTURE=1 SOAK_FIXTURE_DRY=1 yarn vitest run src/app/model/soak/soakFixtures.test.tsx   # 쓰지 않고 닿는지만
+pnpm e2e:fixtures                        # = SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx
+SOAK_FIXTURE=1 SOAK_FIXTURE_DRY=1 pnpm vitest run src/app/model/soak/soakFixtures.test.tsx   # 쓰지 않고 닿는지만
 ```
 
 나리 타자편도 134 에 선 저장을 이어하면 134 로 돌아온다 — 이어하기 0x1c154 의 그 밖 갈래는 S+0x12c(대회 칸)를 S+0xb4(끝난 포스트시즌)보다
@@ -154,12 +154,12 @@ SOAK_FIXTURE=1 SOAK_FIXTURE_DRY=1 yarn vitest run src/app/model/soak/soakFixture
 r249 — 저장 꼴이 늘었다(타자편 `midSeasonEvaluatedYears` · 두 편 `salaryRecordGrade`, r244). 다시 뜨자 씨앗 1 은 엔진 변경으로 판이
 갈라져 정규시즌 1위가 아니고(128 진입 팝업 없음) 4년차 부상 엔딩 0(보너스 없음)으로 끝나, hits 의 `nari-postseason` · `nari-ending` ·
 `nari-hall-of-fame` 동작이 서지 않았다. 타자편 기본 씨앗을 **4**(1위 진입 팝업 · 13년차 엔딩 4)로 옮겨 다섯 개를 다시 떴다.
-다시 뜬 뒤에는 `smoke` 뿐 아니라 `yarn e2e:hits <그 장면들>` 로 연 상태 동작까지 서는지 본다 — 닿는 자리는 같아도 판 내용(순위 · 엔딩 번호)이 달라질 수 있다.
+다시 뜬 뒤에는 `smoke` 뿐 아니라 `pnpm e2e:hits <그 장면들>` 로 연 상태 동작까지 서는지 본다 — 닿는 자리는 같아도 판 내용(순위 · 엔딩 번호)이 달라질 수 있다.
 개발 서버가 떠 있는 동안 픽스처를 다시 뜨면 HMR 로 쪽이 다시 실려 그때 돌던 hits 가 엉뚱하게 깨진다. `--mode e2e` 빌드는 빌드 때의 픽스처를 굳혀 두므로 다시 빌드한다.
 
 r259 — r257(투수편 이벤트 보상) · r258(홈런 건너뛰기 득점) 뒤 판이 갈렸다. 투수편 씨앗 2 는 국가대항전 한국 우승(`pitcher-cup-win`)에 못 닿아
 기본 씨앗을 **1** 로 옮겼다(1 · 4 · 5 · 6 · 7 은 아홉 자리 다 닿음). 타자편 씨앗 4 는 이제 한국 우승에도 닿지만 `nari-cup-win` 은 그대로 씨앗 5 판에서 뜬다.
-다시 뜬 것 15개(타자편 `nari-postseason` · `nari-postseason-game` · `nari-cup-win` · `season-ending` 은 그대로), `yarn e2e:all` 초록.
+다시 뜬 것 15개(타자편 `nari-postseason` · `nari-postseason-game` · `nari-cup-win` · `season-ending` 은 그대로), `pnpm e2e:all` 초록.
 
 r297 · r315 — `nari-cup-win` 씨앗(`SOAK_FIXTURE_NARI_CUP_WIN_SEED` 기본값)은 r297 에 5 → 1, r315 에 1 → 2 로 옮겼다. r315 는 경기 마지막 내 타석의
 돌발 결과 창 · 보상(0x1d 진입 0x8e34c)을 정산 앞에 세운 고침(위 「씨앗 기록」)이 판을 갈라 씨앗 1 이 한국 우승에 못 닿았다(2~12 가운데 2 · 4 · 11 이 닿음).
@@ -169,7 +169,7 @@ r297 · r315 — `nari-cup-win` 씨앗(`SOAK_FIXTURE_NARI_CUP_WIN_SEED` 기본�
 ### 팝업이 판 가운데인지 (r254)
 
 ```sh
-E2E_PORT=5670 yarn node e2e/popup-center.mjs        # 우승 팀 발표 · 한국시리즈 우승 · 국가대항전 우승 팝업 × chromium · webkit 아이폰 세로 · 가로
+E2E_PORT=5670 node e2e/popup-center.mjs        # 우승 팀 발표 · 한국시리즈 우승 · 국가대항전 우승 팝업 × chromium · webkit 아이폰 세로 · 가로
 ```
 
 알림 상자(role dialog '알림')의 중심을 원본 판 중심과 Playwright `boundingBox`(화면 좌표)로 견준다. 원본 1px 넘게 벗어나거나 폭이 240 이 아니면 끝 코드 1.
@@ -178,26 +178,26 @@ E2E_PORT=5670 yarn node e2e/popup-center.mjs        # 우승 팀 발표 · 한�
 ## 4. 브라우저 시험 (실제 CSS · z-index · zoom)
 
 ```sh
-yarn test:browser        # src/**/*.browser.test.tsx — chromium(데스크톱) · webkit(아이폰 13)
+pnpm test:browser        # src/**/*.browser.test.tsx — chromium(데스크톱) · webkit(아이폰 13)
 ```
 
-jsdom 시험(`yarn test`)은 이 파일들을 줍지 않는다.
+jsdom 시험(`pnpm test`)은 이 파일들을 줍지 않는다.
 설정은 `vitest.browser.config.ts` 에 있다. 앱과 같은 vite 플러그인을 써서 vanilla-extract CSS 가 실린다.
 진짜 손가락 탭은 `commands.touchTap(x, y)` 로 한다.
 시험이 닿는 바깥 꾸러미(react · react-dom/client · @testing-library/react 등)는 설정의 `optimizeDeps.include` 에 미리 적어 둔다 —
 빠지면 캐시가 빈 첫 실행에서 vite 가 도중에 다시 묶고 페이지를 다시 불러 react 가 두 벌 실리고 `reading 'useState'` 로 여러 개가 실패한다(r304).
 실행 기록에 `optimized dependencies changed. reloading` 이 뜨면 빠진 꾸러미를 더한다.
 
-## 5. 누름 칸 맞음 검사 (`yarn e2e:hits`)
+## 5. 누름 칸 맞음 검사 (`pnpm e2e:hits`)
 
 화면에 보이는 단추 · 창 위를 다른 누름 칸(꺼진 칸 포함)이 덮어 클릭 · 탭이 엉뚱한 곳에 먹히는 일(r195 · r203 · r207 · r212)을 훑는다.
 
 ```sh
-yarn e2e:hits                                   # 장면 46개 × 기기 넷, 약 9분 (서버가 없으면 띄우고 끝에 끈다)
-yarn e2e:hits general-bat derby-start           # 장면만 골라
-E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits    # 기기만 골라 (쉼표로 여럿)
-E2E_HITS_JOBS=1 yarn e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)
-E2E_HITS_VERBOSE=1 yarn e2e:hits                # 동작 뒤 장면을 다시 열 때 알린다
+pnpm e2e:hits                                   # 장면 46개 × 기기 넷, 약 9분 (서버가 없으면 띄우고 끝에 끈다)
+pnpm e2e:hits general-bat derby-start           # 장면만 골라
+E2E_HITS_DEVICES=webkit-iphone pnpm e2e:hits    # 기기만 골라 (쉼표로 여럿)
+E2E_HITS_JOBS=1 pnpm e2e:hits                   # 기기를 몇 개씩 같이 돌릴지 (기본 4 — 넷을 한꺼번에)
+E2E_HITS_VERBOSE=1 pnpm e2e:hits                # 동작 뒤 장면을 다시 열 때 알린다
 ```
 
 - 기기: `chromium-desktop`(1000×800 가로 · 마우스) · `chromium-iphone`(아이폰 13 세로 · 터치) · `webkit-iphone`(Safari 엔진 세로) ·
@@ -220,9 +220,9 @@ E2E_HITS_VERBOSE=1 yarn e2e:hits                # 동작 뒤 장면을 다시 �
 ## 첫 진입 성능 (느린 4G)
 
 ```sh
-yarn build && yarn vite preview --outDir dist --port 5441 --strictPort --host 127.0.0.1 &   # 배포 빌드 — 켤 때 길
+pnpm build && pnpm vite preview --outDir dist --port 5441 --strictPort --host 127.0.0.1 &   # 배포 빌드 — 켤 때 길
 E2E_PORT=5440 e2e/serve.sh e2e                                                              # e2e 빌드 — 장면 바로가기
-E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
+E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ node e2e/perf.mjs
 ```
 
 느린 4G(왕복 150ms · 1.6Mbps)를 흉내 내어 이용안내 · 타이틀 · 메인 메뉴 · 나리 관리(키로 · 바로가기) · 첫 타석(바로가기)까지
@@ -233,32 +233,32 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 ## 배포 빌드에 안 들어가는지
 
 ```sh
-yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK|devSnapshot|stageAnimation|sceneCloudClock|snapshotOverride|rebaseAppTick|경기 중간 스냅샷' dist || echo clean
+pnpm build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK|devSnapshot|stageAnimation|sceneCloudClock|snapshotOverride|rebaseAppTick|경기 중간 스냅샷' dist || echo clean
 ```
 
-## 골라 시험하기 (`yarn e2e:only` · `yarn test:area`, r342)
+## 골라 시험하기 (`pnpm e2e:only` · `pnpm test:area`, r342)
 
 상황 하나를 **적은 CPU 로 곧장** 본다. 전부를 보는 `e2e:quick` 은 머지 전에만. 기본은 크로미움 데스크톱 하나 · 맥락 2 이고, 끝에
 **CPU 초 합 · 최대 RSS · 동시 브라우저 수 · 동시 맥락 수**를 찍는다(`e2e/lib/usage.mjs` — `ps` 를 0.5초마다 떠서 이 나무를 잰다).
 
 ```sh
-yarn e2e:only --list                              # 도메인 · 장면 · 상태 이름 목록 ([스냅샷] = 경기 중간 스냅샷으로 곧장 연다)
-yarn e2e:only nari-outing                         # 장면 하나 (기본 상태 + 연 상태 전부)
-yarn e2e:only nari-outing --state "번화가 말풍선"   # 상태 하나 (이름 일부여도 된다 · 여러 번 · 기본 상태는 '기본')
-yarn e2e:only 'general-*'                         # 이름 무늬
-yarn e2e:only --area nari                         # 도메인 하나 (쉼표로 여럿)
-yarn e2e:only --changed                           # main 과 갈라진 뒤 바뀐 파일 + 커밋 안 한 것과 관련된 장면만 (--changed=<기준>)
-yarn e2e:only nari-outing --webkit                # 웹킷 아이폰 더하기 (--all-devices 는 기기 넷, --device <이름,…>)
-yarn e2e:only general-relay --real                # 스냅샷 대신 실제 진행 길로
-yarn e2e:only nari-outing --jobs 1                # 맥락 수 (기본 2 — 브라우저마다. 모두 4 넘으면 알린다)
-yarn e2e:only nari-outing --url http://127.0.0.1:5410/   # 이미 띄운 서버 (개발 서버도 된다)
+pnpm e2e:only --list                              # 도메인 · 장면 · 상태 이름 목록 ([스냅샷] = 경기 중간 스냅샷으로 곧장 연다)
+pnpm e2e:only nari-outing                         # 장면 하나 (기본 상태 + 연 상태 전부)
+pnpm e2e:only nari-outing --state "번화가 말풍선"   # 상태 하나 (이름 일부여도 된다 · 여러 번 · 기본 상태는 '기본')
+pnpm e2e:only 'general-*'                         # 이름 무늬
+pnpm e2e:only --area nari                         # 도메인 하나 (쉼표로 여럿)
+pnpm e2e:only --changed                           # main 과 갈라진 뒤 바뀐 파일 + 커밋 안 한 것과 관련된 장면만 (--changed=<기준>)
+pnpm e2e:only nari-outing --webkit                # 웹킷 아이폰 더하기 (--all-devices 는 기기 넷, --device <이름,…>)
+pnpm e2e:only general-relay --real                # 스냅샷 대신 실제 진행 길로
+pnpm e2e:only nari-outing --jobs 1                # 맥락 수 (기본 2 — 브라우저마다. 모두 4 넘으면 알린다)
+pnpm e2e:only nari-outing --url http://127.0.0.1:5410/   # 이미 띄운 서버 (개발 서버도 된다)
 
-yarn test:area nari                               # 단위 시험 — 도메인의 경로 머리(sources)에 든 vitest 파일만, 워커 2
-yarn test:area --changed                          # 바뀐 src 파일의 폴더에 있는 시험만
-yarn test:area --list                             # 도메인과 경로 머리
-yarn test:area nari -- -t '휴식'                  # `--` 뒤는 vitest 에 그대로
+pnpm test:area nari                               # 단위 시험 — 도메인의 경로 머리(sources)에 든 vitest 파일만, 워커 2
+pnpm test:area --changed                          # 바뀐 src 파일의 폴더에 있는 시험만
+pnpm test:area --list                             # 도메인과 경로 머리
+pnpm test:area nari -- -t '휴식'                  # `--` 뒤는 vitest 에 그대로
 
-yarn e2e:measure <명령 …>                         # 아무 명령이나 같은 자로 잰다 (옛 길 · 새 길 견주기)
+pnpm e2e:measure <명령 …>                         # 아무 명령이나 같은 자로 잰다 (옛 길 · 새 길 견주기)
 ```
 
 **도메인** — 장면 표 파일 이름이 도메인이다(`nariCareer.ts` → `nari-career`):
@@ -299,7 +299,7 @@ yarn e2e:measure <명령 …>                         # 아무 명령이나 같�
 | 도메인 general — 후 (`e2e:only --area general`, 빌드 포함) | 크로미움 하나 · 2 | 11 | 24.9s | 28 | 1.62GB | 1 |
 | 전부 크로미움 하나 (`e2e:only '*'`) | 크로미움 하나 · 2 | 92 | 130.8s | 137 | 1.75GB | 1 |
 
-## 빠른 확인 (`yarn e2e:quick`, r328)
+## 빠른 확인 (`pnpm e2e:quick`, r328)
 
 머지 전 전체 확인용이다(상황 하나 · 도메인 하나는 위 「골라 시험하기」). 장면 표의 **장면 전부(49) × 기기 넷**에서 장면을 열고(smoke) 그 자리 · 연 상태(hits `ACTIONS`) **전부(368 상태)** 의
 누름 칸을 훑는다 — `e2e/quick.mjs`. `e2e:all` 의 smoke 와 hits 는 같은 장면을 따로 두 번(대상마다 또 두 번) 열었는데, quick 은 한 번 열어
@@ -309,12 +309,12 @@ yarn e2e:measure <명령 …>                         # 아무 명령이나 같�
 (CPU 99%). 이제 목표는 시간이 아니라 자원이다. 끝에 CPU 초 합 · 최대 RSS · 동시 브라우저 · 맥락을 찍는다.
 
 ```sh
-yarn e2e:quick                                                     # e2e 빌드(낡았을 때만, 약 5초) → preview :4910 → 장면 전부 × 기기 넷 (약 4분 반)
-yarn e2e:quick season-management general-bat                       # 장면만 골라
-E2E_QUICK_DEVICES=chromium-desktop,webkit-iphone yarn e2e:quick    # 기기만 골라 (smoke 와 같은 둘)
-E2E_QUICK_SKIP=general-defense yarn e2e:quick                      # 장면 빼기
-E2E_QUICK_JOBS=chromium:2,webkit:2 yarn e2e:quick                  # 브라우저마다 함께 여는 맥락 수 (기본 2 · 2 — 기계를 같이 쓰면 늘리지 않는다)
-E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄운 서버로(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
+pnpm e2e:quick                                                     # e2e 빌드(낡았을 때만, 약 5초) → preview :4910 → 장면 전부 × 기기 넷 (약 4분 반)
+pnpm e2e:quick season-management general-bat                       # 장면만 골라
+E2E_QUICK_DEVICES=chromium-desktop,webkit-iphone pnpm e2e:quick    # 기기만 골라 (smoke 와 같은 둘)
+E2E_QUICK_SKIP=general-defense pnpm e2e:quick                      # 장면 빼기
+E2E_QUICK_JOBS=chromium:2,webkit:2 pnpm e2e:quick                  # 브라우저마다 함께 여는 맥락 수 (기본 2 · 2 — 기계를 같이 쓰면 늘리지 않는다)
+E2E_QUICK_URL=http://127.0.0.1:4910/ pnpm e2e:quick                # 이미 띄운 서버로(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
 ```
 
 - 서버: `vite build --mode e2e`(`e2e/.run/dist-quick`)를 preview 로 띄우고 끝에 pid 로 끈다(포트 `E2E_QUICK_PORT`, 기본 4910).
@@ -363,16 +363,16 @@ E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄�
 부하가 있으면 바닥은 이제 보통 장면(관리 · 외출 화면 30~40초 — 맥락 44개가 14코어를 나눠 씀)이다. r328 의 「긴 장면 둘 빼고 54초」 판과
 같은 일감 꼴이라 한가한 기계면 1분 안이다.
 
-### 경기 중간 스냅샷 (`yarn e2e:snapshot`, r329)
+### 경기 중간 스냅샷 (`pnpm e2e:snapshot`, r329)
 
 장면 표에 `snapshot: '<이름>'` 이 있고 `e2e/snapshots/<이름>.json.gz` 가 있으면 `?scene=` 바로가기가 단계를 밟지 않고 그 순간을 되살린다
 (`src/app/dev/sessionSnapshot.ts`). `&real=1` 이면 예전처럼 단계를 밟는다.
 
 ```sh
-yarn e2e:snapshot                          # 뜨기 — snapshot 장면 전부, 하나씩 · 크로미움 데스크톱 · 가짜 시계로 실제 진행 (preview :4920)
-yarn e2e:snapshot nari-burst-result        # 하나만
-yarn e2e:snapshot verify                   # 같음 확인 — 실제 진행(A) vs 그 순간을 되살린 쪽(B) + 그 뒤 몇 걸음, 크로미움 · 웹킷
-E2E_SNAPSHOT_RUNS=webkit:iphone yarn e2e:snapshot verify mission-result
+pnpm e2e:snapshot                          # 뜨기 — snapshot 장면 전부, 하나씩 · 크로미움 데스크톱 · 가짜 시계로 실제 진행 (preview :4920)
+pnpm e2e:snapshot nari-burst-result        # 하나만
+pnpm e2e:snapshot verify                   # 같음 확인 — 실제 진행(A) vs 그 순간을 되살린 쪽(B) + 그 뒤 몇 걸음, 크로미움 · 웹킷
+E2E_SNAPSHOT_RUNS=webkit:iphone pnpm e2e:snapshot verify mission-result
 ```
 
 - **뜨는 것**: React 나무(앱 갈래 — `ViewportShell` 은 기기 꼴이라 뺀다)의 함수 부품마다 훅 칸(useState · useReducer 값, useRef current,
@@ -405,19 +405,19 @@ E2E_SNAPSHOT_RUNS=webkit:iphone yarn e2e:snapshot verify mission-result
 **잡아내는지** (r328): `NextGameScreen` 의 `되돌아가기 칸`(r186)을 지운 판은 4 기기 모두 `season-management · 다음경기 순위표` 동작 실패,
 `확인` 칸 앞으로 옮긴 판은 `되돌아가기 칸 ← 확인` 겹침으로 끝 코드 1 이었다(되돌림).
 
-## 전체 회귀 (`yarn e2e:all`)
+## 전체 회귀 (`pnpm e2e:all`)
 
 위 넷과 픽스처 · 바로가기 새는지까지 한 번에 돌리고 요약을 낸다 — `e2e/all.mjs`.
 
 ```sh
-yarn e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (r249 에 16.7분, 끝 코드 1 이면 실패)
-E2E_ALL_TARGETS=e2e yarn e2e:all          # 한쪽만 (dev · e2e)
-E2E_ALL_SKIP=perf,hits yarn e2e:all       # 빼기 (smoke · hits · browser · fixtures · png · perf · leak)
-E2E_ALL_PORT=5640 yarn e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드 preview +2
+pnpm e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (r249 에 16.7분, 끝 코드 1 이면 실패)
+E2E_ALL_TARGETS=e2e pnpm e2e:all          # 한쪽만 (dev · e2e)
+E2E_ALL_SKIP=perf,hits pnpm e2e:all       # 빼기 (smoke · hits · browser · fixtures · png · perf · leak)
+E2E_ALL_PORT=5640 pnpm e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드 preview +2
 ```
 
-차례: smoke(대상끼리 함께) → hits(대상마다 차례로, 보고는 `e2e/.run/hits-report-<대상>.json`) → `yarn test:browser` →
-`SOAK_FIXTURE_DRY=1 yarn e2e:fixtures` → png(팔레트 PNG RGBA 대조) → perf(느린 4G 한 번, 숫자만 — 표를 요약에 붙인다) → 배포 빌드 grep(아래 「배포 빌드에 안 들어가는지」 낱말).
+차례: smoke(대상끼리 함께) → hits(대상마다 차례로, 보고는 `e2e/.run/hits-report-<대상>.json`) → `pnpm test:browser` →
+`SOAK_FIXTURE_DRY=1 pnpm e2e:fixtures` → png(팔레트 PNG RGBA 대조) → perf(느린 4G 한 번, 숫자만 — 표를 요약에 붙인다) → 배포 빌드 grep(아래 「배포 빌드에 안 들어가는지」 낱말).
 서버는 떠 있으면 그대로 쓰고 제가 띄운 것만 끈다. 그런데 이미 떠 있는 e2e 빌드는 **그때 픽스처 · 코드로 굳은 것**이라, 고친 뒤에는 그 포트를
 `e2e/serve.sh stop` 으로 끄고 돌린다. 요약은 `e2e/.run/all-report.json` 에도 남는다.
 
@@ -445,8 +445,8 @@ E2E_ALL_PORT=5640 yarn e2e:all            # 포트 바닥 — 개발 서버 +0 �
 받게 한 판이 화면을 바꾸지 않았는지 본다.
 
 ```sh
-yarn node e2e/png-rgba.mjs                      # 기준 판(PNG_RGBA_BASE, 기본 afd0770e)과 다른 PNG 전부를 chromium · webkit 에서 풀어 RGBA 바이트 대조
-PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ yarn node e2e/scene-pixels.mjs   # 두 서버의 장면 전부 × 두 브라우저 화면 픽셀 대조
+node e2e/png-rgba.mjs                      # 기준 판(PNG_RGBA_BASE, 기본 afd0770e)과 다른 PNG 전부를 chromium · webkit 에서 풀어 RGBA 바이트 대조
+PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ node e2e/scene-pixels.mjs   # 두 서버의 장면 전부 × 두 브라우저 화면 픽셀 대조
 ```
 
 `scene-pixels.mjs` 는 Playwright 가짜 시계를 멈춰 두고 망 요청이 다 끝난 뒤에만 50ms 씩 밀어, 두 서버를 같은 틱에서 찍는다.
@@ -463,12 +463,12 @@ PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ yarn node e2e/sc
 `e2e/serve-vercel.mjs` 는 산출물을 `vercel.json` 머리 그대로(ETag · 304 · gzip) 내주는 로컬 서버다.
 
 ```sh
-yarn vite build --mode e2e --outDir /tmp/old   # 견줄 옛 판 (다른 커밋에서)
-yarn vite build --mode e2e --outDir /tmp/new
-yarn node e2e/serve-vercel.mjs /tmp/old 5711 none   # vercel.json 없이 — 모든 파일이 Vercel 기본 머리(max-age=0, must-revalidate)
-yarn node e2e/serve-vercel.mjs /tmp/new 5712        # vercel.json 머리
-E2E_PORT=5712 PERF_ONLY=chromium PERF_NET=rtt PERF_REVISIT=nari-management,general-bat PERF_REVISIT_ONLY=1 yarn node e2e/perf.mjs   # 다시 방문
-PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5712/ yarn node e2e/scene-pixels.mjs
+pnpm vite build --mode e2e --outDir /tmp/old   # 견줄 옛 판 (다른 커밋에서)
+pnpm vite build --mode e2e --outDir /tmp/new
+node e2e/serve-vercel.mjs /tmp/old 5711 none   # vercel.json 없이 — 모든 파일이 Vercel 기본 머리(max-age=0, must-revalidate)
+node e2e/serve-vercel.mjs /tmp/new 5712        # vercel.json 머리
+E2E_PORT=5712 PERF_ONLY=chromium PERF_NET=rtt PERF_REVISIT=nari-management,general-bat PERF_REVISIT_ONLY=1 node e2e/perf.mjs   # 다시 방문
+PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5712/ node e2e/scene-pixels.mjs
 ```
 
 `PERF_REVISIT` 는 같은 맥락(같은 HTTP 캐시)에서 장면을 한 번 열어 다 받은 뒤 다시 열어 두 번째를 잰다(크로미움만). 표의 "그중 304" 가
@@ -476,12 +476,12 @@ PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5712/ yarn node e2e/sc
 
 ## 린트 · 포맷 · 150줄 규칙 (r343)
 
-- `yarn lint` — ESLint(타입 정보 없는 가벼운 판: js · typescript-eslint recommended + react-hooks + react-refresh). 에러 0 이어야 한다. `yarn lint:fix` 는 안전한 자동 수정만 하므로 고친 뒤 시험을 돌린다.
-- `yarn format` / `yarn format:check` — Prettier (`.prettierrc.json`: 세미콜론 없음 · 홑따옴표 · 끝 쉼표 all · printWidth 150). 생성 데이터 · 픽스처 · 문서는 `.prettierignore`.
+- `pnpm lint` — ESLint(타입 정보 없는 가벼운 판: js · typescript-eslint recommended + react-hooks + react-refresh). 에러 0 이어야 한다. `pnpm lint:fix` 는 안전한 자동 수정만 하므로 고친 뒤 시험을 돌린다.
+- `pnpm format` / `pnpm format:check` — Prettier (`.prettierrc.json`: 세미콜론 없음 · 홑따옴표 · 끝 쉼표 all · printWidth 150). 생성 데이터 · 픽스처 · 문서는 `.prettierignore`.
 - 파일 길이: 코드만(빈 줄 · 주석 빼고) **150줄** — `max-lines` 에러. 시험 파일(`*.test.ts(x)`)은 빠진다.
   넘는 옛 파일은 `eslint.max-lines-baseline.js` 예외 목록(줄 수 내림차순 · 주석이 줄 수, 도입 때 243개). 새 파일은 넣지 말고 처음부터 쪼갠다.
-  파일을 쪼개 150 이하가 되면 `yarn check:lines` 가 실패하며 알려 준다 — 목록에서 빼거나 `yarn check:lines --update` 로 다시 쓴다.
-- `yarn verify` 에 lint · format:check · check:lines 가 들어 있다.
+  파일을 쪼개 150 이하가 되면 `pnpm check:lines` 가 실패하며 알려 준다 — 목록에서 빼거나 `pnpm check:lines --update` 로 다시 쓴다.
+- `pnpm verify` 에 lint · format:check · check:lines 가 들어 있다.
 - 경고로 낮춘 규칙(도입 때 개수): react-hooks/refs 842 · react-hooks/exhaustive-deps 50 · react-refresh/only-export-components 47 ·
   react-hooks/set-state-in-effect 43 · react-hooks/immutability 30 · react-hooks/rules-of-hooks 27(26개는 시험 파일) · no-useless-assignment 24 ·
   react-hooks/globals 2 · react-hooks/preserve-manual-memoization 2. 고치면 동작이 바뀔 수 있어 따로 손본다.

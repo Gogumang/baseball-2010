@@ -33,8 +33,8 @@
 
 | 기준 | 장치 |
 |---|---|
-| 파일 길이 | eslint `max-lines` 150(코드만) — 옛 파일은 `eslint.max-lines-baseline.js`, `yarn check:lines` |
-| 포맷 | prettier — `yarn format:check` |
+| 파일 길이 | eslint `max-lines` 150(코드만) — 옛 파일은 `eslint.max-lines-baseline.js`, `pnpm check:lines` |
+| 포맷 | prettier — `pnpm format:check` |
 | try/catch | `src/shared/lib/safe` 도우미로만 |
 | 중첩 · 복잡도 | eslint `max-depth` 2 · `complexity` 8 |
 

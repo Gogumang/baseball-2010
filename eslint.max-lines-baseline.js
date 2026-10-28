@@ -1,5 +1,5 @@
 // 150줄(코드만 · 빈 줄 · 주석 빼고) 을 넘는 옛 파일 — eslint max-lines 예외 목록 (r343 도입 때 243개).
-// 줄 수 내림차순, 주석은 코드 줄 수. 파일을 쪼개 150 이하가 되면 목록에서 뺀다 — `yarn check:lines` 가 빠질 파일을 알려 준다.
+// 줄 수 내림차순, 주석은 코드 줄 수. 파일을 쪼개 150 이하가 되면 목록에서 뺀다 — `pnpm check:lines` 가 빠질 파일을 알려 준다.
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
   'src/shared/config/original/pitchRecords.ts', // 4253
@@ -204,7 +204,7 @@ export const maxLinesBaseline = [
   'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts', // 170
   'src/pages/season/ui/SeasonTeamSelectScreen.tsx', // 169
   'src/pages/mission-play/ui/MissionHud.tsx', // 168
-  'e2e/all.mjs', // 167
+  'e2e/all.mjs', // 164
   'src/features/play-game/model/useSceneConfirm.ts', // 167
   'src/widgets/batting-stage/lib/spriteLoader.ts', // 167
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts', // 167

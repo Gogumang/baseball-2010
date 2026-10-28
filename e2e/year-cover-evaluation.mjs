@@ -1,6 +1,6 @@
 // 확인 — r287 (Q-04 ③ · ⑦): 경기 결과와 116 평가가 따로 서고 평가 대사가 키 · 탭으로 넘어가는가, 국가대항전 끝에 134 대진판이 선 채
 // 아홉 틀 어두워진 뒤(그동안 키는 버린다) 137 "N년차" 표지 → 105 로 가는가.
-//   E2E_PORT=5410 e2e/serve.sh && E2E_PORT=5410 yarn node e2e/year-cover-evaluation.mjs [chromium|webkit ...]
+//   E2E_PORT=5410 e2e/serve.sh && E2E_PORT=5410 node e2e/year-cover-evaluation.mjs [chromium|webkit ...]
 // 기본은 chromium(데스크톱 · 키) · webkit(아이폰 13 · 탭) 둘 다.
 import { launch, openScene, pressKey, screenRect, shot, tapPage } from './lib/scene.mjs'
 

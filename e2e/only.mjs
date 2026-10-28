@@ -1,12 +1,12 @@
-// **골라 시험하기** (`yarn e2e:only`) — 장면 하나 · 상태 하나 · 도메인 하나 · 바뀐 파일과 관련된 장면만 열어 누름 칸을 훑는다.
+// **골라 시험하기** (`pnpm e2e:only`) — 장면 하나 · 상태 하나 · 도메인 하나 · 바뀐 파일과 관련된 장면만 열어 누름 칸을 훑는다.
 // 기본은 가볍게: 크로미움 데스크톱 하나, 맥락 2. 웹킷 · 기기 넷은 옵션으로만. 끝에 CPU 초 합 · 최대 RSS · 동시 브라우저 수를 찍는다.
 //
-//   yarn e2e:only nari-outing                         # 장면 하나 (기본 상태 + 연 상태 전부)
-//   yarn e2e:only nari-outing --state "번화가 말풍선"   # 상태 하나 (이름 일부여도 된다 · 여러 번 줄 수 있다 · 기본 상태는 '기본')
-//   yarn e2e:only 'general-*'                         # 이름 무늬
-//   yarn e2e:only --area nari                         # 도메인 하나 (쉼표로 여럿) — 도메인 = src/app/dev/scenes/<도메인>.ts
-//   yarn e2e:only --changed                           # main 과 갈라진 뒤 바뀐 파일(+ 커밋 안 한 것)과 관련된 장면만 (--changed=<기준>)
-//   yarn e2e:only --list                              # 도메인 · 장면 · 상태 목록만 찍고 끝 (--dry: 고른 장면만 찍고 끝)
+//   pnpm e2e:only nari-outing                         # 장면 하나 (기본 상태 + 연 상태 전부)
+//   pnpm e2e:only nari-outing --state "번화가 말풍선"   # 상태 하나 (이름 일부여도 된다 · 여러 번 줄 수 있다 · 기본 상태는 '기본')
+//   pnpm e2e:only 'general-*'                         # 이름 무늬
+//   pnpm e2e:only --area nari                         # 도메인 하나 (쉼표로 여럿) — 도메인 = src/app/dev/scenes/<도메인>.ts
+//   pnpm e2e:only --changed                           # main 과 갈라진 뒤 바뀐 파일(+ 커밋 안 한 것)과 관련된 장면만 (--changed=<기준>)
+//   pnpm e2e:only --list                              # 도메인 · 장면 · 상태 목록만 찍고 끝 (--dry: 고른 장면만 찍고 끝)
 //   --webkit (웹킷 아이폰 더하기) · --all-devices (기기 넷) · --device <이름,…> · --jobs <맥락 수, 기본 2> · --real (스냅샷 대신 실제 진행)
 //   --url <이미 띄운 서버> · E2E_ONLY_PORT (제가 띄우는 preview 포트, 기본 4930) · E2E_REBUILD=1 (산출물이 새것이어도 다시 묶기)
 const argv = process.argv.slice(2)
@@ -37,7 +37,7 @@ const areaNames = [...new Set(catalog.map((scene) => scene.area))]
 
 if (flags.list) {
   for (const area of areaNames) {
-    console.log(`\n${area}  (yarn e2e:only --area ${area})`)
+    console.log(`\n${area}  (pnpm e2e:only --area ${area})`)
     for (const scene of catalog.filter((row) => row.area === area)) {
       console.log(`  ${scene.name}${scene.snapshot === null ? '' : '  [스냅샷]'}`)
       for (const action of ACTIONS[scene.name] ?? []) console.log(`      --state "${action.name}"`)
@@ -51,7 +51,7 @@ const picked = new Set()
 const pattern = (text) => new RegExp(`^${text.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`)
 for (const name of flags.names) {
   const hits = catalog.filter((scene) => pattern(name).test(scene.name))
-  if (hits.length === 0) throw new Error(`장면이 없다: ${name} (yarn e2e:only --list)`)
+  if (hits.length === 0) throw new Error(`장면이 없다: ${name} (pnpm e2e:only --list)`)
   for (const scene of hits) picked.add(scene.name)
 }
 for (const area of flags.areas) {
@@ -75,7 +75,7 @@ if (picked.size === 0) {
   console.log(
     flags.changed !== null
       ? '관련 장면 없음 — 볼 것이 없다'
-      : '쓰는 법: yarn e2e:only <장면|무늬…> [--state <이름>] [--area <도메인>] [--changed] [--list]',
+      : '쓰는 법: pnpm e2e:only <장면|무늬…> [--state <이름>] [--area <도메인>] [--changed] [--list]',
   )
   process.exit(flags.changed !== null ? 0 : 2)
 }
@@ -87,7 +87,7 @@ if (flags.states.length > 0) {
   const matches = (name) => flags.states.some((wanted) => name === wanted || (wanted !== '기본' && name.includes(wanted)))
   states = matches
   const any = scenes.some((scene) => matches('기본') || (ACTIONS[scene] ?? []).some((action) => matches(action.name)))
-  if (!any) throw new Error(`고른 장면에 그 상태가 없다: ${flags.states.join(' · ')} (yarn e2e:only --list)`)
+  if (!any) throw new Error(`고른 장면에 그 상태가 없다: ${flags.states.join(' · ')} (pnpm e2e:only --list)`)
 }
 
 if (flags.dry) {

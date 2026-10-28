@@ -1,7 +1,7 @@
 // 시즌모드 한 해를 실제로 플레이해 정규시즌 뒤 저장을 뜬다 — 픽스처 season-postseason · season-cup 을 이렇게 떴다(r227).
 //
 //   E2E_PORT=5471 e2e/serve.sh e2e                 # 배포 꼴 빌드 서버 — 개발 서버는 소스를 고치면 쪽이 다시 떠 플레이가 날아간다
-//   E2E_PORT=5471 yarn node e2e/season-play.mjs     # 약 13분 (chromium · 경기 45개)
+//   E2E_PORT=5471 node e2e/season-play.mjs     # 약 13분 (chromium · 경기 45개)
 //
 // season-management 장면(season-y1)에서 시작해, 경기는 첫 사람 타석에서 경기 중 메뉴 [자동진행] 예 · 중계 속도 최대,
 // 관리 메뉴 0xc9 는 [다음경기] 단추, 그 밖 창 · 이벤트는 Enter(오래 그대로면 Escape 도). 45경기 뒤에는 화면이 바뀔 때마다

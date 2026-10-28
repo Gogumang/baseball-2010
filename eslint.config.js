@@ -9,12 +9,12 @@ import { defineConfig } from 'eslint/config'
 import { maxLinesBaseline } from './eslint.max-lines-baseline.js'
 import { readabilityBaseline, readabilityRules } from './eslint.readability-baseline.js'
 
-/** 코드만(주석 · 빈 줄 빼고) 150줄. 넘는 옛 파일은 `eslint.max-lines-baseline.js` 예외 목록 — 쪼개면 목록에서 뺀다 (`yarn check:lines`). */
+/** 코드만(주석 · 빈 줄 빼고) 150줄. 넘는 옛 파일은 `eslint.max-lines-baseline.js` 예외 목록 — 쪼개면 목록에서 뺀다 (`pnpm check:lines`). */
 const MAX_LINES = ['error', { max: 150, skipBlankLines: true, skipComments: true }]
 const TEST_FILES = ['**/*.test.ts', '**/*.test.tsx']
 
 export default defineConfig(
-  { ignores: ['dist', 'base', 'public', '.yarn', '.pnp.cjs', '.pnp.loader.mjs', 'e2e/snapshots', 'e2e/fixtures', 'e2e/.run'] },
+  { ignores: ['dist', 'base', 'public', 'e2e/snapshots', 'e2e/fixtures', 'e2e/.run'] },
   {
     files: [
       'src/**/*.{ts,tsx}',

@@ -1,5 +1,5 @@
 // 브라우저 하나를 띄워 두고 명령을 받는 작은 서버 — 화면을 여러 번 들여다볼 때 브라우저를 매번 새로 띄우지 않는다.
-//   yarn node e2e/drive.mjs &            (포트 E2E_DRIVE_PORT, 기본 5411 · pid 는 e2e/.run/drive.pid)
+//   node e2e/drive.mjs &            (포트 E2E_DRIVE_PORT, 기본 5411 · pid 는 e2e/.run/drive.pid)
 //   e2e/d.sh '[{"launch":"webkit","device":"iphone"},{"scene":"nari-outing"},{"shot":"a"}]'
 // 명령(배열 차례대로):
 //   {"launch":"chromium|webkit","device":"desktop|iphone|iphone-land"}  {"scene":"<장면>","fixture":"<픽스처>"}

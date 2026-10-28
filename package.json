@@ -11,7 +11,7 @@
     "test:quick": "vitest run --exclude src/app/model/soak/careerSoak.test.tsx --exclude src/app/model/soak/pitcherLeagueSoak.test.tsx",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify": "yarn typecheck && yarn lint && yarn format:check && yarn check:lines && yarn test && yarn build",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm check:lines && pnpm test && pnpm build",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "e2e:hits": "node e2e/hits.mjs",
     "e2e:all": "node e2e/all.mjs",
@@ -56,5 +56,8 @@
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
   },
-  "packageManager": "yarn@4.18.0"
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=22.18 <25"
+  }
 }

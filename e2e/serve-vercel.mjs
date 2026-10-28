@@ -5,7 +5,7 @@
 //  - 글(js · css · json · html · svg · txt)은 `Accept-Encoding` 에 gzip 이 있으면 gzip 으로 보낸다(Vercel 은 br 도 준다 — 크기만 조금 다르다)
 //  - `/` 는 `index.html`, 없는 파일은 404
 //
-//   yarn node e2e/serve-vercel.mjs <산출물 폴더> <포트> [vercel.json | none]
+//   node e2e/serve-vercel.mjs <산출물 폴더> <포트> [vercel.json | none]
 //   none 이면 `vercel.json` 없이(모든 파일이 기본 머리 — r318 전 배포와 같은 꼴) 내준다.
 import { createServer } from 'node:http'
 import { createHash } from 'node:crypto'

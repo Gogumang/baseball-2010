@@ -1,8 +1,8 @@
 // 나리 투수편을 실제 브라우저로 길게 플레이한다 — A-06(r303) 투수편 실화면 긴 판 검증.
 //
 //   E2E_PORT=5731 e2e/serve.sh e2e                                     # 배포 꼴 빌드 서버(개발 서버는 소스를 고치면 쪽이 다시 뜬다)
-//   E2E_PORT=5731 yarn node e2e/pitcher-season-play.mjs                 # chromium 데스크톱 · pitcher-management(1년차 첫날)부터
-//   E2E_PORT=5731 E2E_BROWSER=webkit E2E_DEVICE=iphone E2E_SCENE=pitcher-postseason yarn node e2e/pitcher-season-play.mjs
+//   E2E_PORT=5731 node e2e/pitcher-season-play.mjs                 # chromium 데스크톱 · pitcher-management(1년차 첫날)부터
+//   E2E_PORT=5731 E2E_BROWSER=webkit E2E_DEVICE=iphone E2E_SCENE=pitcher-postseason node e2e/pitcher-season-play.mjs
 //
 // 정책: 관리 화면은 [다음경기] → [경기시작] 단추를 실제로 누르고(탭/클릭), 경기는 Enter 만 되풀이한다(구질 · 코스 · 게이지 OK).
 // `E2E_FULL_EVERY` 번째 경기마다 끝까지 던지고, 나머지는 `E2E_GIVE_UP` 번 누른 뒤 '#' 강판 → 예로 넘긴다(빨리 감기). 그 밖 창 ·

@@ -1,8 +1,8 @@
 // **타석 탭 타이밍 재기** (r242 — "나만의 타자에서 안타가 잘 안 되는 것 같다", 아이폰 Safari 터치).
 //
-//   yarn node e2e/swing-timing.mjs                       # webkit 아이폰 · chromium 아이폰, 공 40개씩
+//   node e2e/swing-timing.mjs                       # webkit 아이폰 · chromium 아이폰, 공 40개씩
 //   (경기가 끝나면 씨앗을 하나씩 올려 첫 경기를 다시 연다)
-//   E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 yarn node e2e/swing-timing.mjs webkit
+//   E2E_SWING_PITCHES=80 E2E_SWING_X=0.5 node e2e/swing-timing.mjs webkit
 //
 // 나리 타석 장면(`nari-bat`)에서 공마다 **최적 틱**(보이는 공 그림 = N − 3 → 키 틱 F = N − 2, r209)의 가운데를 노려
 // `touchscreen.tap` 한다. 탭 x 는 화면 폭의 `E2E_SWING_X`(기본 0.5 = 가운데). 쪽 안의 기록(`window.__batting`)으로

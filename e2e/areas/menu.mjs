@@ -1,5 +1,5 @@
 // 도메인 menu — 타이틀 · 메인 메뉴 · 새로 시작 (장면 표 `src/app/dev/scenes/menu.ts`).
-// `sources` 는 바뀐 파일 → 이 도메인(`--changed`) · 단위 시험 묶음(`yarn test:area menu`)을 고르는 경로 머리.
+// `sources` 는 바뀐 파일 → 이 도메인(`--changed`) · 단위 시험 묶음(`pnpm test:area menu`)을 고르는 경로 머리.
 export const sources = [
   'src/pages/title/',
   'src/pages/main-menu/',

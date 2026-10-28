@@ -1,0 +1,17 @@
+# pnpm 설정 (pnpm 11 부터 .npmrc 는 인증 · 레지스트리만, 나머지는 여기). 이유는 docs 대신 줄마다 짧게.
+# node_modules 는 pnpm 기본(isolated · 숨은 의존 없음 · shamefullyHoist 안 씀) 그대로 둔다.
+
+# 설치 스크립트는 여기 적은 것만 돈다. 목록 밖 패키지가 스크립트를 원하면 설치가 실패한다(strictDepBuilds) — 살펴보고 더한다.
+allowBuilds:
+  esbuild: true # 플랫폼 바이너리를 bin 에 놓는 postinstall
+strictDepBuilds: true
+
+# `pnpm add` 는 범위 없이 정확한 판으로 적는다
+saveExact: true
+savePrefix: ''
+
+# `pnpm run` · `pnpm exec` 전에 node_modules 가 lockfile 과 맞는지 본다 — 워크트리에서 설치를 잊으면 멈춘다
+verifyDepsBeforeRun: error
+
+# package.json engines.node 에 안 맞는 Node 로는 설치하지 않는다
+engineStrict: true

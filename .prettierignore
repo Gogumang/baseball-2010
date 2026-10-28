@@ -2,10 +2,7 @@
 dist
 base
 public
-.yarn
-.pnp.cjs
-.pnp.loader.mjs
-yarn.lock
+pnpm-lock.yaml
 *.json.gz
 
 # e2e 기준 그림 · 생성 픽스처(soakFixtures 로 다시 만든다)

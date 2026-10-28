@@ -1,15 +1,15 @@
-// **전체 회귀** — 화면 확인을 한 번에 돌리고 요약을 낸다 (`yarn e2e:all`).
+// **전체 회귀** — 화면 확인을 한 번에 돌리고 요약을 낸다 (`pnpm e2e:all`).
 //
-//   yarn e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (약 30분)
-//   E2E_ALL_TARGETS=e2e yarn e2e:all          # 한쪽만 (dev · e2e, 쉼표)
-//   E2E_ALL_SKIP=perf,hits yarn e2e:all       # 빼기 (smoke · hits · browser · fixtures · png · perf · leak)
-//   E2E_ALL_PORT=5640 yarn e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드(perf 켤 때 길) +2
+//   pnpm e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (약 30분)
+//   E2E_ALL_TARGETS=e2e pnpm e2e:all          # 한쪽만 (dev · e2e, 쉼표)
+//   E2E_ALL_SKIP=perf,hits pnpm e2e:all       # 빼기 (smoke · hits · browser · fixtures · png · perf · leak)
+//   E2E_ALL_PORT=5640 pnpm e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드(perf 켤 때 길) +2
 //
 // 차례:
 //  1. smoke — 장면 표 전부 × chromium · webkit (`e2e/smoke.mjs`), 대상마다. 대상끼리는 함께 돈다
 //  2. hits — 누름 칸 맞음 검사 (`e2e/hits.mjs`), 대상마다 차례로(보고 파일이 하나라서). 보고는 `e2e/.run/hits-report-<대상>.json`
-//  3. browser — `yarn test:browser`
-//  4. fixtures — `SOAK_FIXTURE_DRY=1 yarn e2e:fixtures` (soak 픽스처가 지금 저장 꼴로 여전히 같은 자리에 닿는지, 안 쓴다)
+//  3. browser — `pnpm test:browser`
+//  4. fixtures — `SOAK_FIXTURE_DRY=1 pnpm e2e:fixtures` (soak 픽스처가 지금 저장 꼴로 여전히 같은 자리에 닿는지, 안 쓴다)
 //  5. png — 팔레트로 다시 쓴 스프라이트 PNG 가 chromium · webkit 에서 원본과 RGBA 가 같은지 (`e2e/png-rgba.mjs`, r311)
 //  6. perf — 느린 4G 첫 진입 (`e2e/perf.mjs`, 실행 1번). 숫자만 — 실패로 치지 않는다(쪽 오류 · 끝 코드만 본다)
 //  7. leak — 배포 빌드(`vite build`)에 장면 바로가기가 안 들어갔는지 grep
@@ -49,8 +49,7 @@ function serve(port, mode) {
 /** 배포 빌드(바로가기 없음) + preview — perf 의 켤 때 길 · leak 검사에 쓴다 */
 async function serveDeploy() {
   const outDir = join(RUN, 'dist-deploy')
-  const vite = execFileSync('yarn', ['bin', 'vite'], { cwd: ROOT, encoding: 'utf8' }).trim()
-  const node = ['--require', './.pnp.cjs', '--loader', './.pnp.loader.mjs', '--no-warnings', vite]
+  const node = [join(ROOT, 'node_modules/vite/bin/vite.js')]
   execFileSync('node', [...node, 'build', '--outDir', outDir, '--emptyOutDir', '--logLevel', 'warn'], { cwd: ROOT, stdio: 'inherit' })
   if (SKIP.has('perf')) return outDir
   const child = spawn('node', [...node, 'preview', '--outDir', outDir, '--host', '127.0.0.1', '--port', String(PORTS.deploy), '--strictPort'], {
@@ -146,24 +145,22 @@ try {
   if (!SKIP.has('perf') || !SKIP.has('leak')) deployDir = await serveDeploy()
 
   if (!SKIP.has('smoke')) {
-    const smokes = await Promise.all(
-      TARGETS.map((target) => run(`smoke:${target}`, 'yarn', ['node', 'e2e/smoke.mjs'], { E2E_PORT: String(PORTS[target]) })),
-    )
+    const smokes = await Promise.all(TARGETS.map((target) => run(`smoke:${target}`, 'node', ['e2e/smoke.mjs'], { E2E_PORT: String(PORTS[target]) })))
     steps.push(...smokes.map((step) => ({ ...step, kind: 'smoke' })))
   }
   if (!SKIP.has('hits')) {
     for (const target of TARGETS) {
-      const step = await run(`hits:${target}`, 'yarn', ['node', 'e2e/hits.mjs'], { E2E_PORT: String(PORTS[target]) })
+      const step = await run(`hits:${target}`, 'node', ['e2e/hits.mjs'], { E2E_PORT: String(PORTS[target]) })
       if (existsSync(join(RUN, 'hits-report.json'))) copyFileSync(join(RUN, 'hits-report.json'), join(RUN, `hits-report-${target}.json`))
       steps.push({ ...step, kind: 'hits' })
     }
   }
-  if (!SKIP.has('browser')) steps.push({ ...(await run('browser', 'yarn', ['test:browser'])), kind: 'browser' })
-  if (!SKIP.has('fixtures')) steps.push({ ...(await run('fixtures', 'yarn', ['e2e:fixtures'], { SOAK_FIXTURE_DRY: '1' })), kind: 'fixtures' })
-  if (!SKIP.has('png')) steps.push({ ...(await run('png', 'yarn', ['node', 'e2e/png-rgba.mjs'])), kind: 'png' })
+  if (!SKIP.has('browser')) steps.push({ ...(await run('browser', 'pnpm', ['test:browser'])), kind: 'browser' })
+  if (!SKIP.has('fixtures')) steps.push({ ...(await run('fixtures', 'pnpm', ['e2e:fixtures'], { SOAK_FIXTURE_DRY: '1' })), kind: 'fixtures' })
+  if (!SKIP.has('png')) steps.push({ ...(await run('png', 'node', ['e2e/png-rgba.mjs'])), kind: 'png' })
   if (!SKIP.has('perf')) {
     const port = TARGETS.includes('e2e') ? PORTS.e2e : PORTS.dev
-    const step = await run('perf', 'yarn', ['node', 'e2e/perf.mjs'], {
+    const step = await run('perf', 'node', ['e2e/perf.mjs'], {
       E2E_PORT: String(port),
       PERF_BOOT_URL: `http://127.0.0.1:${PORTS.deploy}/`,
       PERF_RUNS: process.env.PERF_RUNS ?? '1',
