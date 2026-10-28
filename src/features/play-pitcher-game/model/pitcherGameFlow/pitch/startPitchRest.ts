@@ -105,17 +105,20 @@ export function cpuBatterTraitsOf(
   }
 }
 
-/** `startPitch` 의 나머지 — 공을 놓은 뒤 파울 각 공 판 · 공 도착 0x3dfac */
-export function startedPitchRestOf(
+/** `startPitch` 의 나머지 — 공을 놓은 뒤 파울 각 공 판 · 공 도착 0x3dfac (판이 열리면 그 굴림) */
+export function rollReleasedPitchRest(
   progress: PitcherGameProgress,
   afterPitch: PitcherGameProgress,
-  thrown: CpuPitchOutcome,
-  pitch: Pitch,
-  grade: number,
-  live: boolean,
-  holdsArrival: boolean,
+  released: {
+    readonly thrown: CpuPitchOutcome
+    readonly pitch: Pitch
+    readonly grade: number
+    readonly live: boolean
+    readonly holdsArrival: boolean
+  },
   random: RandomPort,
 ): PitcherGameProgress {
+  const { thrown, pitch, grade, live, holdsArrival } = released
   const resolution = thrown.resolution
   const foulContact = thrown.foulContact
 
@@ -150,9 +153,5 @@ export function startedPitchRestOf(
   return arrivePitcherPitchThenRest(afterPitch, arrivalPitch, random)
 }
 
-/**
- * 내가 던진 인플레이 타구를 진행기에 넘길 꼴로 만든다 — 능력치·난수·모드·수비 주체까지 다 여기서 채운다.
- * 이 객체를 만드는 데는 난수를 **한 번도 쓰지 않는다** (굴림은 전부 진행기 안에서 돈다).
- */
 /** 파울 각 공 판의 임시 결과 칸 — 판이 파울로 닫히면 쓰지 않고, 잡히면 판 끝 정산(뜬공 아웃)이 갈아 끼운다 */
 const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃' }

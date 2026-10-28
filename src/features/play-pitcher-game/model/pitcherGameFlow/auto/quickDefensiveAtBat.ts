@@ -81,10 +81,7 @@ export function playDefensiveAtBat(
     false,
     play.balls,
     // 내가 마운드에 없는 타석은 간이 엔진이라 수비 시뮬레이션도 재생거리도 없다
-    null,
-    null,
-    appearance.advance,
-    appearance.runners,
+    { defensePlay: null, playback: null, quick: appearance },
   )
   const runs = played.game.opponentScore - before.opponentScore
   const halfChanged = played.game.half !== before.half || played.game.inning !== before.inning

@@ -5,20 +5,14 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { recordBatterFaced } from '@/entities/pitcher-career/model/pitcherGameRecord'
 import { enterPitchSelection } from '@/features/play-pitcher-game/model/pitcherGameFlow/atBat/pitchSelection'
 import { advance } from '@/features/play-pitcher-game/model/pitcherGameFlow/auto/advance'
-import {
-  myDefenseAbilitiesOf,
-  myFielderPlatesOf,
-  myFielderRecordsOf,
-  myFielderSkillIdsOf,
-  opponentRunnerAcesOf,
-  runAbilitiesOnBaseOf,
-  runnerRunsOnBaseOf,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow/fielding/fielderInputs'
+import { runAbilitiesOnBaseOf, runnerRunsOnBaseOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/fielding/fielderInputs'
+import { myDefenseFieldsOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/fielding/myDefenseFields'
 import { isPitchTurn } from '@/features/play-pitcher-game/model/pitcherGameFlow/pitch/pitchTurn'
 import { opponentBatterAbility, opponentRosterSlotOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/opponentBatters'
 import { withMyRunnerPlay } from '@/features/play-pitcher-game/model/pitcherGameFlow/settlement/myRunnerPlay'
 import { withMyRunnerPlaySettlement } from '@/features/play-pitcher-game/model/pitcherGameFlow/settlement/runnerPlaySettlement'
 import { appendLog } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/gameLog'
+import { isHalfInningOrGameEnded } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/halfInning'
 import type { PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/progressTypes'
 import { countsMyPitcherRecord } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/recordGates'
 
@@ -50,36 +44,30 @@ export function pickoff(
   // 공이 날거나 0x12 인 동안(붙든 공)은 0xf 키가 없다
   if (!isPitchTurn(progress) || !progress.atBatPrepared || progress.pendingPitchArrival != null) return progress
   const bases = progress.game.bases
-  const play = pickoffPlayForKey(webKey, (base) => (base === 1 ? bases.first : base === 2 ? bases.second : bases.third))
+  const play = pickoffPlayForKey(webKey, (base) => bases[BASE_KEY[base]])
   if (play === null) return progress
+  const input = pickoffPlayInputOf(progress, play.targetBase, random)
+  if (live) return { ...progress, pendingRunnerPlay: { kind: 'pickoff', input } }
+  return applyPickoffResult(progress, play.targetBase, runPickoffPlay(input), random, false)
+}
 
-  const input: PickoffPlayInput = {
-    targetBase: play.targetBase,
-    bases,
+/** 견제 루 → 루 칸 */
+const BASE_KEY = { 1: 'first', 2: 'second', 3: 'third' } as const
+
+function pickoffPlayInputOf(progress: PitcherGameProgress, targetBase: PickoffPlayInput['targetBase'], random: RandomPort): PickoffPlayInput {
+  return {
+    targetBase,
+    bases: progress.game.bases,
     outs: progress.game.outs,
-    // 수비 아홉 칸은 우리 팀 — 칸 0(나)은 진행기가 선수 없는 칸으로 둔다(0xb0fb4 b1032)
-    defenseAbilities: myDefenseAbilitiesOf(progress),
-    fielderPlates: myFielderPlatesOf(progress),
-    fielderSkillIds: myFielderSkillIdsOf(progress),
-    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
-    defenseTeamIndex: progress.options.ourTeamId,
-    fielderRecords: myFielderRecordsOf(progress),
-    offenseTeamIndex: progress.options.opponentTeamId,
-    runnerAces: opponentRunnerAcesOf(progress),
+    // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
+    ...myDefenseFieldsOf(progress),
     runAbility: opponentBatterAbility(progress.options, opponentRosterSlotOf(progress)).run,
     // 루별 주자 주루 — 루에 선 주자는 제 타석 0xa93ac 가 적은 주자+0xa4 를 든다 (타자는 견제 판에 안 뛴다)
     runAbilities: runnerRunsOnBaseOf(runAbilitiesOnBaseOf(progress)),
     random,
-    offenseIsCpu: true,
-    // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
-    defenseIsCpu: false,
-    throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
-    scene: progress.defenseScene,
     // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
     sceneResultCode: progress.sceneResultCode,
   }
-  if (live) return { ...progress, pendingRunnerPlay: { kind: 'pickoff', input } }
-  return applyPickoffResult(progress, play.targetBase, runPickoffPlay(input), random, false)
 }
 
 /** 다 돈 견제 판을 경기에 먹인다 — `pickoff` 의 뒷부분. 실시간으로 보여 준 판은 재생 칸에 다시 안 넣는다 */
@@ -97,23 +85,24 @@ export function applyPickoffResult(
   }
   // 견제도 정산 0xa8024 를 지난다(I 4a-3, ae576 → ae5a8) — 들어온 주자는 주자 운명으로 센다
   const applied = withMyRunnerPlay(faced, result, true, shownLive)
-  const { changed } = applied
-  const advanceResult = result.advance
-  const before = progress.game
-  // 종류 4 정산의 거르지 않는 칸 — 사건 목록은 0x11 을 안 지나 같은 투구 틈 앞 판의 몫이 함께 든다
-  const events = withSettlementEvents(progress.pendingSettlementEvents, settlementEventsOfPlay(result))
-  let next = withMyRunnerPlaySettlement(applied.progress, result, events)
-  const ended = next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
-  next = { ...next, pendingSettlementEvents: ended ? undefined : events }
-  const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
-  next = appendLog(
-    next,
-    `${before.inning}회${before.half} ${targetBase}루 견제 — ${call}${advanceResult.runsScored > 0 ? ` (${advanceResult.runsScored}실점)` : ''}`,
-    true,
-  )
+  const settled = withPickoffSettlement(applied.progress, progress, result)
+  const runs = result.advance.runsScored > 0 ? ` (${result.advance.runsScored}실점)` : ''
+  const next = appendLog(settled, `${progress.game.inning}회${progress.game.half} ${targetBase}루 견제 — ${pickoffCallOf(result)}${runs}`, true)
   // 반 이닝이 끝났으면(위에서 atBatPrepared 를 내렸다) 다음 사람 타석은 `advance` 가 새로 준비한다 —
   // 0xf 진입도 그 안에서 한 번 돈다
   if (!next.atBatPrepared) return advance(next, random)
   // 같은 타석이 이어지면 견제 판 끝(판정 B 0xae3e8 의 ae592)도 0xf 로 간다 — 0xf 진입 0x3d954 를 지난다
-  return enterPitchSelection(changed ? advance(next, random) : next, random)
+  return enterPitchSelection(applied.changed ? advance(next, random) : next, random)
+}
+
+/** 종류 4 정산의 거르지 않는 칸 — 사건 목록은 0x11 을 안 지나 같은 투구 틈 앞 판의 몫이 함께 든다 */
+function withPickoffSettlement(moved: PitcherGameProgress, progress: PitcherGameProgress, result: PickoffPlayResult): PitcherGameProgress {
+  const events = withSettlementEvents(progress.pendingSettlementEvents, settlementEventsOfPlay(result))
+  const next = withMyRunnerPlaySettlement(moved, result, events)
+  return { ...next, pendingSettlementEvents: isHalfInningOrGameEnded(progress.game, next.game) ? undefined : events }
+}
+
+function pickoffCallOf(result: PickoffPlayResult): string {
+  if (result.resultCode === PICKOFF_RESULT.OUT) return '견제사'
+  return result.errantThrow ? '악송구' : '세이프'
 }
