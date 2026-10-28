@@ -27,7 +27,7 @@ export const maxLinesBaseline = [
   'src/entities/career/model/playerCareer.ts', // 681
   'src/widgets/batting-stage/ui/PitcherSideStage.tsx', // 668
   'src/pages/home-run-derby/model/useHomeRunDerby.ts', // 626
-  'src/app/dev/sessionSnapshot.ts', // 618
+  'src/app/dev/sessionSnapshot.ts', // 622
   'src/entities/game/model/simulateHalfInning.ts', // 614
   'src/pages/pitching/ui/PitchingScreen.tsx', // 587
   'src/pages/pitcher-league/model/usePitcherManagementMenu.ts', // 571
@@ -47,8 +47,8 @@ export const maxLinesBaseline = [
   'src/entities/mission/model/missionRun.ts', // 431
   'src/widgets/entry-editor/ui/EntryListWindow.tsx', // 428
   'src/pages/mission-play/ui/MissionPlayScreen.tsx', // 427
-  'src/pages/special/ui/SkinBackdrops.tsx', // 423
   'src/pages/season/ui/SeasonEquipmentScreen.tsx', // 420
+  'src/pages/special/ui/SkinBackdrops.tsx', // 419
   'src/pages/general-mode/ui/AceSelectScreen.tsx', // 418
   'src/pages/game/ui/GameScreen.tsx', // 414
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx', // 411
@@ -141,13 +141,13 @@ export const maxLinesBaseline = [
   'src/entities/mission/model/pitcherRun.ts', // 220
   'src/pages/season/ui/SeasonTeamInfoScreen.tsx', // 220
   'src/shared/lib/sprite/spritePreload.ts', // 220
+  'src/app/dev/sceneRunner.ts', // 219
   'src/pages/season/lib/seasonEquipmentWindow.ts', // 219
   'src/features/defense-play/model/stealPlay.ts', // 218
   'src/pages/management/ui/ManagementScreen.tsx', // 218
   'e2e/derby-stage.mjs', // 217
   'src/features/defense-play/model/defensePlayView.ts', // 217
   'src/widgets/batting-stage/lib/stageScenery.ts', // 217
-  'src/app/dev/sceneRunner.ts', // 216
   'src/entities/season-mode/model/seasonRecord.ts', // 216
   'src/entities/story/model/storyScene.ts', // 216
   'src/entities/career/model/nariTeamRecord.ts', // 215
@@ -167,9 +167,9 @@ export const maxLinesBaseline = [
   'src/entities/league/model/league.ts', // 202
   'src/pages/pitcher-league/ui/PitchWindowFigure.tsx', // 201
   'src/entities/season-mode/model/seasonStateMachine.ts', // 198
+  'src/app/assetPacks/assetPackGate.ts', // 197
   'src/pages/special/lib/hallOfFameFigure.ts', // 196
   'src/widgets/batting-stage/lib/homeRunBanner.ts', // 196
-  'src/app/assetPacks/assetPackGate.ts', // 195
   'src/widgets/batting-stage/lib/pitcherSideStage.ts', // 195
   'src/widgets/record-pick-popup/ui/RecordPickPopup.tsx', // 195
   'src/features/play-team-game/model/gameAbilities.ts', // 193
@@ -199,9 +199,9 @@ export const maxLinesBaseline = [
   'src/entities/fielding/model/catchPrediction.ts', // 172
   'src/entities/mission/model/missionGoal.ts', // 172
   'src/pages/national-cup/ui/NationalCupScreen.tsx', // 172
-  'src/shared/api/audio/webAudioSound.ts', // 172
   'src/pages/home-run-derby/ui/DerbyResultWindow.tsx', // 171
   'src/pages/shop/lib/equipmentWindowLayout.ts', // 171
+  'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts', // 170
   'src/pages/season/ui/SeasonTeamSelectScreen.tsx', // 169
   'src/pages/mission-play/ui/MissionHud.tsx', // 168
   'e2e/all.mjs', // 167
@@ -211,7 +211,6 @@ export const maxLinesBaseline = [
   'src/app/model/modePitcher.ts', // 166
   'src/entities/batting/model/battedBallFlight.ts', // 166
   'src/pages/management/ui/RadarChart.tsx', // 166
-  'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts', // 166
   'src/entities/batting/model/battedBallOutcome.ts', // 165
   'src/entities/particle/model/particleEmitter.ts', // 165
   'src/shared/config/bugfixes/bugfixes.ts', // 165
@@ -230,6 +229,7 @@ export const maxLinesBaseline = [
   'src/entities/career/model/training.ts', // 157
   'src/pages/management/lib/detailPopup.ts', // 157
   'src/pages/pitching/ui/PitchGradeGauge.tsx', // 156
+  'src/shared/api/audio/webAudioSound.ts', // 156
   'src/entities/season-mode/model/seasonItemShop.ts', // 155
   'src/pages/pitcher-league/lib/pitchTrainingWindow.ts', // 154
   'src/widgets/season/lib/postseasonBracketLayout.ts', // 154

@@ -4,6 +4,7 @@ import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { finishSkinBackdropOnCanvas } from '@/shared/lib/screen565/screen565'
+import { tryOr } from '@/shared/lib/safe/tryOr'
 
 /** 그림이 다 실렸는지 가늠하는 표본 간격 — 날 그림이 바뀌었을 때만 흐리기를 다시 한다 */
 const SAMPLE_STEP = 97
@@ -38,15 +39,12 @@ export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoS
     let lastChecksum: number | null = null
     /** 날 그림은 값 · 실린 그림이 바뀐 틀에서만 다시 뜬다(`createDrawMemo`) — 화소 읽기(`checksumOf`)도 그때만 */
     const drawMemo = createDrawMemo()
-    let raw: CanvasRenderingContext2D | null = null
-    try {
+    const raw = tryOr(() => {
       const offscreen = document.createElement('canvas')
       offscreen.width = STAGE_WIDTH
       offscreen.height = STAGE_HEIGHT
-      raw = offscreen.getContext('2d', { willReadFrequently: true })
-    } catch {
-      raw = null
-    }
+      return offscreen.getContext('2d', { willReadFrequently: true })
+    }, null)
     const draw = () => {
       // 흐리기가 이 캔버스를 그림이 실릴 때마다 다시 읽는다 — CPU 버퍼로 열어야 Chrome 의
       // "Multiple readback operations using getImageData" 경고가 안 난다(픽셀 값은 같다)

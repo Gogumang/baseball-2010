@@ -28,6 +28,7 @@ import { loadSpriteImage } from '@/shared/lib/sprite/spriteCache'
 import type { ScreenGrayRect } from '@/shared/lib/pixelEffect/screenGrayRects'
 import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { tryOr } from '@/shared/lib/safe/tryOr'
 
 const MAIN_TITLE = assetUrl('./sprites/main_title')
 const GPOINT_FRAMES = assetUrl('./sprites/gpoint/frames')
@@ -131,12 +132,7 @@ function buildMainTitleBuffer(): Promise<string | null> {
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
-    let context: CanvasRenderingContext2D | null = null
-    try {
-      context = effectContextOf(canvas)
-    } catch {
-      context = null
-    }
+    const context = tryOr(() => effectContextOf(canvas), null)
     if (context === null) return null
     const [frame, badge, layers] = await Promise.all([loadImage(MAIN_TITLE_FRAME_SRC), loadImage(MAIN_TITLE_BADGE_SRC), loadMainTitleLayers()])
     if (frame === null || badge === null) return null

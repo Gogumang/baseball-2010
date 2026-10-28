@@ -1,6 +1,7 @@
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { soundFileUrl } from '@/shared/config/original/sounds'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { ignoreErrors, tryOr, tryOrAsync } from '@/shared/lib/safe/tryOr'
 
 /**
  * WebAudio 로 `public/sounds/%03d.mp3` 를 트는 포트 구현.
@@ -9,7 +10,7 @@ import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
  * 브라우저는 SMAF 를 직접 못 읽어서 미리 굽는 길을 골랐다 (docs/re/L-sound-effects.md 1-D).
  *
  * `AudioContext` 가 없는 환경(jsdom·서버 렌더)에서는 **아무 소리도 내지 않고 조용히 넘어간다**.
- * 소리가 안 나는 것 때문에 게임이 멈추면 안 되므로 모든 접근을 try/catch 로 감쌌다.
+ * 소리가 안 나는 것 때문에 게임이 멈추면 안 되므로 모든 접근을 예외 삼키기(`shared/lib/safe`)로 감쌌다.
  *
  * 효과음은 배경음을 끊고 **끝나도 배경음으로 돌아오지 않는다** — 원본 그대로다 (`SoundPort` 머리 주석:
  * 틱 0x6eb18 의 되돌리기 갈래는 0x6eb30 `[+0x4c] == 0` 으로 죽어 있고, `resumeBgm` 0x6eaf0 은 통신 화면만 부른다).
@@ -31,16 +32,13 @@ export interface WebAudioSoundOptions {
 
 type MaybeAudioContextCtor = { AudioContext?: new () => AudioContext; webkitAudioContext?: new () => AudioContext }
 
-const defaultCreateContext: AudioContextFactory = () => {
-  try {
+// jsdom 에는 AudioContext 가 없다. 못 열면 소리 없이 계속 간다.
+const defaultCreateContext: AudioContextFactory = () =>
+  tryOr(() => {
     const global = globalThis as unknown as MaybeAudioContextCtor
     const Ctor = global.AudioContext ?? global.webkitAudioContext
     return Ctor ? new Ctor() : null
-  } catch {
-    // jsdom 에는 AudioContext 가 없다. 소리 없이 계속 간다.
-    return null
-  }
-}
+  }, null)
 
 const defaultFetchAudio = async (url: string): Promise<ArrayBuffer> => {
   const response = await fetch(url)
@@ -86,20 +84,16 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
   const openContext = (): AudioContext | null => {
     if (contextOpened) return context
     contextOpened = true
-    try {
-      context = createContext()
-    } catch {
-      context = null
-    }
+    context = tryOr(createContext, null)
     if (context) {
-      try {
-        master = context.createGain()
-        master.gain.value = volume / 100
-        master.connect(context.destination)
-      } catch {
-        context = null
-        master = null
-      }
+      const opened = context
+      master = tryOr(() => {
+        const gain = opened.createGain()
+        gain.gain.value = volume / 100
+        gain.connect(opened.destination)
+        return gain
+      }, null)
+      if (master === null) context = null
     }
     return context
   }
@@ -107,26 +101,20 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
   const loadBuffer = (id: number, ctx: AudioContext): Promise<AudioBuffer | null> => {
     const cached = buffers.get(id)
     if (cached) return cached
-    const loading = (async () => {
-      try {
-        const bytes = await fetchAudio(soundFileUrl(id, baseUrl))
-        return await ctx.decodeAudioData(bytes)
-      } catch {
-        // 파일이 없거나 브라우저가 못 읽는다 — 그 소리만 조용히 빠진다.
-        return null
-      }
-    })()
+    // 파일이 없거나 브라우저가 못 읽는다 — 그 소리만 조용히 빠진다.
+    const loading = tryOrAsync(async () => {
+      const bytes = await fetchAudio(soundFileUrl(id, baseUrl))
+      return await ctx.decodeAudioData(bytes)
+    }, null)
     buffers.set(id, loading)
     return loading
   }
 
   const stopActive = () => {
     if (!activeSource) return
-    try {
-      activeSource.stop()
-    } catch {
-      // 아직 시작 전이면 stop 이 던질 수 있다.
-    }
+    const source = activeSource
+    // 아직 시작 전이면 stop 이 던질 수 있다.
+    ignoreErrors(() => source.stop())
     activeSource = null
   }
 
@@ -147,12 +135,14 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
     stopActive()
     void loadBuffer(id, ctx).then((buffer) => {
       if (!buffer || token !== playToken || !master) return
-      try {
+      const output = master
+      // 재생 실패는 진행을 막지 않는다.
+      ignoreErrors(() => {
         if (ctx.state === 'suspended') void ctx.resume()
         const source = ctx.createBufferSource()
         source.buffer = buffer
         source.loop = loop
-        source.connect(master)
+        source.connect(output)
         // 효과음이 끝나면 통로가 비기만 한다 — 기억한 배경음을 스스로 되돌리지 않는다 (머리 주석)
         source.onended = () => {
           if (token !== playToken) return
@@ -160,9 +150,7 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
         }
         source.start()
         activeSource = source
-      } catch {
-        // 재생 실패는 진행을 막지 않는다.
-      }
+      })
     })
   }
 
@@ -214,13 +202,9 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
 
     setVolume: (next) => {
       volume = clampVolume(next)
-      if (master) {
-        try {
-          master.gain.value = volume / 100
-        } catch {
-          // 통로가 닫혔을 수 있다.
-        }
-      }
+      const output = master
+      // 통로가 닫혔을 수 있다.
+      if (output) ignoreErrors(() => (output.gain.value = volume / 100))
       if (volume === 0) {
         stopActive()
         playingBgmId = null

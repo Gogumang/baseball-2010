@@ -11,6 +11,7 @@ import {
   sceneCloudFrameOf,
   sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
+import { tryOr } from '@/shared/lib/safe/tryOr'
 
 /** 배경 고르기 `0x40ff0` 이 쓰는 구장 값 — 틱(구름 · 전광판 흐름)과 세로 밀기는 부르는 쪽이 따로 준다 */
 export type SceneryBackdropStage = Omit<SceneryState, 'tick' | 'offsetY' | 'cloudCalls'>
@@ -65,13 +66,8 @@ export function SceneryBackdrop({ stage, offsetY, overlay }: SceneryBackdropProp
     const paint = (rawNow: number) => {
       // 그림 번호는 경기 장면 시계라 공용 창이 서 있는 동안(52cc6 — 0x3f060 도 안 돈다)은 안 올라 세지 않는다
       const cloudCalls = observeSceneCloudFrame(sceneCloudFrameOf(rawNow), true, cloudCursor)
-      let context: CanvasRenderingContext2D | null = null
-      try {
-        // 하늘 조명(0x67 더하기 겹)이 화면 칸을 읽는다 — 읽기 잦은 캔버스로 연다(`effectContextOf`)
-        context = effectContextOf(canvasRef.current)
-      } catch {
-        context = null
-      }
+      // 하늘 조명(0x67 더하기 겹)이 화면 칸을 읽는다 — 읽기 잦은 캔버스로 연다(`effectContextOf`)
+      const context = tryOr(() => effectContextOf(canvasRef.current), null)
       if (context !== null) {
         const { stage: current, offsetY: y, overlay: over } = latestRef.current
         const sceneTick = gameSceneTickOf(gameSceneTimeOf(rawNow))

@@ -1,3 +1,5 @@
+import { ignoreErrors } from '@/shared/lib/safe/tryOr'
+
 /**
  * **그림 재료가 늦게 도착한 횟수** — 캔버스 그리기 재료(스프라이트 PNG · origins/animations/palette/boxes json · 칠한 그림 · 글꼴)는
  * 비동기로 받아 두고 도착 전에는 빈 칸으로 그린다. 그리기 루프가 그림 입력이 바뀐 틀에서만 다시 그리므로(`createDrawMemo`)
@@ -26,10 +28,9 @@ export function noteAssetLoaded(): void {
 function watchFonts(): void {
   if (isWatchingFonts) return
   isWatchingFonts = true
-  try {
+  // 글꼴 목록이 없는 자리(시험 등)는 그냥 둔다
+  ignoreErrors(() => {
     const fonts = typeof document === 'undefined' ? undefined : document.fonts
     fonts?.addEventListener?.('loadingdone', noteAssetLoaded)
-  } catch {
-    // 글꼴 목록이 없는 자리(시험 등)는 그냥 둔다
-  }
+  })
 }

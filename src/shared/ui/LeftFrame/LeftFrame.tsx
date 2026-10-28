@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react'
 import { takeLeftFrames } from '@/shared/lib/leftFrame/leftFrame'
 import * as styles from '@/shared/ui/LeftFrame/LeftFrame.css'
+import { ignoreErrors } from '@/shared/lib/safe/tryOr'
 
 interface LeftFrameProps {
   /** 시험 · 그림 갈래 표시 (`data-part`) */
@@ -25,11 +26,8 @@ function copyCanvasPixels(from: HTMLElement, to: HTMLElement): void {
   sources.forEach((source, index) => {
     const target = targets[index]
     if (target === undefined || source.width === 0 || source.height === 0) return
-    try {
-      target.getContext('2d')?.drawImage(source, 0, 0)
-    } catch {
-      // 그림을 못 읽는 캔버스 — 빈 채로 둔다
-    }
+    // 그림을 못 읽는 캔버스 — 빈 채로 둔다
+    ignoreErrors(() => target.getContext('2d')?.drawImage(source, 0, 0))
   })
 }
 

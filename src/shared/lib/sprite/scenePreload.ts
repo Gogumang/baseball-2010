@@ -8,6 +8,7 @@ import type { SpriteSceneKey } from '@/shared/config/spritePreloadScenes'
 import { loadSpriteImage, loadSpriteJson, retainDisplayedSprites } from '@/shared/lib/sprite/spriteCache'
 import { createSpritePreloader, sceneConcurrencyFor } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteFolderPreload, SpritePreloadPriority } from '@/shared/lib/sprite/spritePreload'
+import { tryOr } from '@/shared/lib/safe/tryOr'
 
 /**
  * 시험(vitest)에서는 받지 않는다 — 가짜 fetch·가짜 타이머로 도는 화면 시험에 요청을 끼워 넣지 않게.
@@ -23,12 +24,10 @@ function scheduleIdle(callback: () => void): void {
 
 /** 문서를 받은 HTTP 판 — `h2` · `h3` · `http/1.1`. 모르면 undefined */
 function documentProtocol(): string | undefined {
-  try {
+  return tryOr(() => {
     const entry = typeof performance === 'undefined' ? undefined : performance.getEntriesByType?.('navigation')[0]
     return entry !== undefined && 'nextHopProtocol' in entry ? String(entry.nextHopProtocol) : undefined
-  } catch {
-    return undefined
-  }
+  }, undefined)
 }
 
 const preloader = createSpritePreloader({

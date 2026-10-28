@@ -1,4 +1,5 @@
 import type { MissionClearCounts, MissionRecordPort } from '@/shared/api/save/missionRecordPort'
+import { ignoreErrors, tryOr } from '@/shared/lib/safe/tryOr'
 
 const STORAGE_KEY = 'compus-baseball/mission-cleared'
 
@@ -13,29 +14,23 @@ const MAXIMUM_CLEARS = 99
  */
 export function createLocalStorageMissionRecord(): MissionRecordPort {
   return {
-    load: () => {
-      try {
-        const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
-        if (Array.isArray(parsed)) {
-          return Object.fromEntries(parsed.filter((key): key is string => typeof key === 'string').map((key) => [key, 1]))
-        }
-        if (parsed === null || typeof parsed !== 'object') return {}
-        return Object.fromEntries(
-          Object.entries(parsed as Record<string, unknown>)
-            .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && count > 0)
-            .map(([key, count]) => [key, Math.min(MAXIMUM_CLEARS, Math.trunc(count as number))]),
-        )
-      } catch {
-        return {}
-      }
-    },
+    load: () => tryOr(readCounts, {}),
 
-    save: (counts: MissionClearCounts) => {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(counts))
-      } catch {
-        // 저장 실패는 진행을 막지 않는다.
-      }
-    },
+    // 저장 실패는 진행을 막지 않는다.
+    save: (counts: MissionClearCounts) => ignoreErrors(() => window.localStorage.setItem(STORAGE_KEY, JSON.stringify(counts))),
   }
+}
+
+/** 저장된 클리어 횟수 — 저장소 · JSON 이 깨지면 던진다(`load` 가 빈 기록으로 받는다) */
+function readCounts(): MissionClearCounts {
+  const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+  if (Array.isArray(parsed)) {
+    return Object.fromEntries(parsed.filter((key): key is string => typeof key === 'string').map((key) => [key, 1]))
+  }
+  if (parsed === null || typeof parsed !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(parsed as Record<string, unknown>)
+      .filter(([, count]) => typeof count === 'number' && Number.isFinite(count) && count > 0)
+      .map(([key, count]) => [key, Math.min(MAXIMUM_CLEARS, Math.trunc(count as number))]),
+  )
 }

@@ -9,6 +9,7 @@ import { spriteImage, spriteJsonNow } from '@/shared/lib/sprite/spriteCache'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as styles from '@/pages/title/ui/TitleScreen.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { tryOr } from '@/shared/lib/safe/tryOr'
 
 const SPRITE = assetUrl('./sprites/main_title')
 /** 판 번호는 main_title 이 아니라 ui/num.pzx 의 131 번 그림이다 (0x2cd2a: 기준 0x81 = 129 + 값 2) */
@@ -58,12 +59,7 @@ export function TitleScreen({ onStart }: TitleScreenProps) {
 
   // 그림이 늦게 와도 다음 그리기(매 rAF 다시 그린다)부터 보인다
   useEffect(() => {
-    let context: CanvasRenderingContext2D | null = null
-    try {
-      context = effectContextOf(canvasRef.current)
-    } catch {
-      context = null
-    }
+    const context = tryOr(() => effectContextOf(canvasRef.current), null)
     if (context === null) return
     // 2cbbc 0x6a735(화면, 0) — 검정
     context.fillStyle = '#000'
