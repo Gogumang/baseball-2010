@@ -379,31 +379,10 @@ class Decoder {
    * 고쳐 쓰면 다시 `get` 해도 고친 객체가 나온다. 끝에 한 번 불러 뜬 순간의 내용으로 맞춘다(r355). 구멍(함수 · DOM) 자리는 채운 값을 둔다
    */
   rewind(): void {
-    const isHole = (item: EncodedNode) => item !== null && typeof item === 'object' && ('f' in item || 'x' in item)
-    const valueOf = (item: EncodedNode) => this.decode(item, [], [], null, null)
+    const decodeItem = (item: EncodedNode) => this.decode(item, [], [], null, null)
     for (const [id, object] of this.objects) {
       const node = this.definitions.get(id)
-      if (node === undefined || node === null || typeof node !== 'object') continue
-      if ('a' in node && Array.isArray(object)) {
-        object.length = node.a.length
-        node.a.forEach((item, index) => {
-          if (!isHole(item)) object[index] = valueOf(item)
-        })
-      } else if ('o' in node) {
-        const target = object as Record<string, unknown>
-        for (const field of Object.keys(target)) if (!(field in node.o)) delete target[field]
-        for (const [field, item] of Object.entries(node.o)) if (!isHole(item)) target[field] = valueOf(item)
-      } else if ('m' in node && object instanceof Map) {
-        object.clear()
-        for (const [entryKey, item] of node.m) object.set(valueOf(entryKey), valueOf(item))
-      } else if ('s' in node && object instanceof Set) {
-        object.clear()
-        for (const item of node.s) object.add(valueOf(item))
-      } else if ('t' in node) {
-        ;(object as unknown as { set: (values: readonly number[]) => void }).set(node.v)
-      } else if ('d' in node && object instanceof Date) {
-        object.setTime(node.d)
-      }
+      if (typeof node === 'object' && node !== null) rewindObject(object, node, decodeItem)
     }
   }
 
@@ -431,6 +410,41 @@ class Decoder {
       if (hole.holder[hole.key!] !== counterpart) hole.holder[hole.key!] = counterpart
     }
   }
+}
+
+/** 적은 꼴 하나를 푼 값 (`Decoder` 의 풀기 — 이미 푼 객체는 그 객체) */
+type Decode = (item: EncodedNode) => unknown
+
+/** 객체 `object` 의 내용을 적은 꼴 `node` 로 되돌린다(같은 객체 그대로) — 구멍(함수 · DOM) 자리는 채운 값을 둔다 (`Decoder.rewind`) */
+function rewindObject(object: object, node: Exclude<EncodedNode, null | number | string | boolean>, decodeItem: Decode): void {
+  if ('a' in node) return rewindArray(object as unknown[], node.a, decodeItem)
+  if ('o' in node) return rewindRecord(object as Record<string, unknown>, node.o, decodeItem)
+  if ('m' in node) return rewindMap(object as Map<unknown, unknown>, node.m, decodeItem)
+  if ('s' in node) return rewindSet(object as Set<unknown>, node.s, decodeItem)
+  if ('t' in node) return (object as unknown as { set: (values: readonly number[]) => void }).set(node.v)
+  if ('d' in node) (object as Date).setTime(node.d)
+}
+
+function rewindArray(array: unknown[], items: readonly EncodedNode[], decodeItem: Decode): void {
+  array.length = items.length
+  items.forEach((item, index) => {
+    if (!isWholeHole(item)) array[index] = decodeItem(item)
+  })
+}
+
+function rewindRecord(target: Record<string, unknown>, fields: Readonly<Record<string, EncodedNode>>, decodeItem: Decode): void {
+  for (const field of Object.keys(target)) if (!(field in fields)) delete target[field]
+  for (const [field, item] of Object.entries(fields)) if (!isWholeHole(item)) target[field] = decodeItem(item)
+}
+
+function rewindMap(target: Map<unknown, unknown>, entries: readonly (readonly [EncodedNode, EncodedNode])[], decodeItem: Decode): void {
+  target.clear()
+  for (const [key, value] of entries) target.set(decodeItem(key), decodeItem(value))
+}
+
+function rewindSet(target: Set<unknown>, items: readonly EncodedNode[], decodeItem: Decode): void {
+  target.clear()
+  for (const item of items) target.add(decodeItem(item))
 }
 
 /** 칸 값 자체가 구멍(함수 · DOM)인가 — 그러면 새로 그린 값을 그대로 둔다 */

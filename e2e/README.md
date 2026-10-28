@@ -39,7 +39,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `nari-postseason` · `pitcher-postseason` | 나리 타자편 · 투수편 포스트시즌 128 시작 — 1년차 45경기 뒤 준플레이오프 대진, 진입 팝업이 뜬 자리 (약 2초) | `nari-postseason` · `pitcher-postseason` |
 | `nari-cup` · `nari-cup-result` | 나리 타자편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) — 134 에 선 저장의 이어하기가 134 로 돌아온다 | `nari-cup` · `nari-cup-result` |
 | `pitcher-cup` · `pitcher-cup-result` | 나리 투수편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) | `pitcher-cup` · `pitcher-cup-result` |
-| `nari-ending` · `pitcher-ending` | 나리 타자편 · 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 은퇴 이벤트 114 로 가고 OK 로 넘긴다 (약 11초) | `nari-ending` · `pitcher-ending` |
+| `nari-ending` · `pitcher-ending` | 나리 타자편 · 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 은퇴 이벤트 114 로 가고 OK 로 넘긴다 (실제 진행 약 11초 — 바로가기는 스냅샷으로 곧장, r355) | `nari-ending` · `pitcher-ending` |
 | `nari-hall-of-fame` · `pitcher-hall-of-fame` | 명예의 전당 등록 질문 0x2d — 보너스를 받은 저장으로 141 에 곧장 들어가 키로 제작진 → 질문 (약 3초) | `nari-hall-of-fame` · `pitcher-hall-of-fame` |
 | `nari-postseason-game` · `pitcher-postseason-game` | 사람 팀 포스트시즌 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기(타자편 첫 내 타석 · 투수편 첫 구질 고르기, 약 6초 — 투수편은 경기 중간 스냅샷으로 곧장, r342) | `nari-postseason-game` · `pitcher-postseason-game` |
 | `nari-postseason-next` · `pitcher-postseason-next` | 내 시리즈(준플레이오프)를 이기고 116 → 114 → 128 로 돌아온 다음 라운드(플레이오프) 대진 — [다음]이 142 | `nari-postseason-next` · `pitcher-postseason-next` |
@@ -317,7 +317,8 @@ E2E_QUICK_JOBS=chromium:2,webkit:2 pnpm e2e:quick                  # 브라우�
 E2E_QUICK_URL=http://127.0.0.1:4910/ pnpm e2e:quick                # 이미 띄운 서버로(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
 ```
 
-- 서버: `vite build --mode e2e`(`e2e/.run/dist-quick`)를 preview 로 띄우고 끝에 pid 로 끈다(포트 `E2E_QUICK_PORT`, 기본 4910).
+- 서버: `vite build --mode e2e`(`e2e/.run/dist-quick`)를 preview 로 띄우고 끝에 pid 로 끈다(포트 `E2E_QUICK_PORT`, 기본 4910 — 쓰이고
+  있으면 빈 포트, r355).
   산출물이 입력보다 새것이면 다시 묶지 않는다(r342 — `E2E_REBUILD=1` 이면 늘). 빌드 시간은 따로 찍는다.
 - 브라우저는 크로미움 · 웹킷 프로세스 하나씩, 일감마다 새 맥락(빈 localStorage). 일감은 지난 실행에서 오래 걸린 차례로 꺼낸다
   (`e2e/.run/quick-times.json`) — 긴 장면이 끝에 남지 않게.
@@ -388,7 +389,7 @@ E2E_SNAPSHOT_RUNS=webkit:iphone pnpm e2e:snapshot verify mission-result
 - **같음 확인**(`verify`)이 보는 것: 화면 · 커리어 · 진행 칸 · 투수편 커리어 · 시즌 장면 · 미션 세션 · 난수 칸 · 저장 · 모듈 칸(다르면 실패),
   같은 앱 틱에 맞춘 화면 판 스크린샷(픽셀), 그 뒤 걸음(Enter 를 같은 틱에 누르고 60~90틱 민 뒤 위 둘) — 돌발 결과 창은 정산 · 관리
   화면까지 넷, 미션 결과 판은 셋. 부품 자리 해시 차이는 참고(그림 캐시 따위). ms 로 세는 모듈 칸(멈춘 시간 합 · 결과 배경 시계 · 플레이
-  시계)이 몇십 ms 갈리는 것은 참고로만 찍는다 — 가짜 시계의 그림 틀(rAF 16ms 격자) 위상이 쪽마다 달라서다(틱 · 난수 · 화면은 같다).
+  시계)이 갈리는 것은 참고로만 찍는다 — r355 부터는 아래 「흔들림을 없앤 것」 덕에 0 이어야 한다. 갈리면 시험 쪽 비결정이 새로 생긴 것이다.
 - r329 결과: 크로미움 데스크톱 두 장면 모두 처음 · 걸음마다 핵심 다름 0 · 다른 픽셀 0. 웹킷 아이폰도 핵심 · 화면 같음(돌발 장면은 걸음 2
   부터 ms 칸 27ms 차이만).
 - **r342 넓힘** — 가벼운 맥락(크로미움 2)에서 연 시간을 재 길이 긴 장면부터 떠 보고 `verify` 로 크로미움 · 웹킷 모두 화면 · 핵심이
@@ -398,6 +399,26 @@ E2E_SNAPSHOT_RUNS=webkit:iphone pnpm e2e:snapshot verify mission-result
   `pitcher-defense`(수비 판 부품 자리가 되살린 뒤 안 섬 — "낡았다"), `general-pitch`(SKILL 칸이 안 섬), `general-bat` · `nari-bat`
   (타자 그림 다름), `nari-postseason-game`(`stageAnimation` 칸 `arrowEntry` 다름), `nari-cup-cover`(픽셀 다름), `pitcher-pitch`(크로미움은
   같으나 웹킷 아이폰에서 타자 그림 틀 다름).
+- **흔들림을 없앤 것** (r355 — 그전엔 웹킷에서 자주 실패해 "원래 흔들림" 으로 넘겼다. 재시도 · 허용 오차는 늘리지 않았다):
+  - **React 스케줄러를 가짜 시계 위로**: 쪽마다 `setImmediate = (f) => setTimeout(f, 0)` 를 먼저 넣는다(시험 브라우저에만). 스케줄러는
+    `setImmediate` 가 있으면 그것을 쓰고 없으면 MessageChannel(실제 시간)을 쓴다 — 그러면 커밋 · effect 가 가짜 시계 타이머 사이 어느
+    틈에 도느냐가 실제 시간에 따라 갈려, 그 안에서 읽는 `performance.now()`(창이 선 시각)가 쪽마다 수십 ms 달라 멈춘 ms 합이 갈리고
+    돌발 결과 장면 걸음 4 의 파티클 틱이 한 틱 갈렸다. 이제 뜨기 · 확인 모두 가상 시각 · 차례가 늘 같다.
+  - **되살리는 동안 고쳐 쓴 객체를 되돌린다**(`Decoder.rewind`): 되살리기 바퀴 사이에도 그림 루프가 돈다. 장면 칸 ref(스킬 판)가 이미
+    푼 객체를 쥐면 루프가 그 객체를 고쳐 쓰고, 끝의 덮기는 같은(고친) 객체를 다시 넣었다 — 스킬 판 tick 이 한 틱 앞섰다(13 ≠ 14).
+    끝에 푼 객체마다 뜬 내용으로 되돌린 뒤 ref · 모듈 칸을 덮는다. 투수편 루프(`PitcherSideStage`)도 `useStageAnimation` 처럼 칸을 단다.
+  - **웹킷 칠하기 빈 픽셀**(게임 코드 — 실제 사파리에도 있던 일): `paletteSwap` 이 `onload` 직후 그림을 캔버스에 그려 픽셀을 읽으면
+    웹킷은 아직 안 풀린 그림을 알파 0 으로 읽을 때가 있었다 → 칠한 타자 몸통 · 팔이 통째로 비거나 구운 색 그대로 캐시에 박혔다(되살린
+    쪽처럼 그림을 한꺼번에 받을 때). 이제 `decode()` 를 기다린 뒤 읽는다(픽셀 값은 같다).
+  - **재료를 기다리고 틱 끝에서 찍는다**: 틱 첫 그림 틀 뒤 늦게 오는 그림 · 칠하기(`window.__snapshot.assets` 도착 수)가 멎을 때까지
+    기다리고 그 틱 끝 2ms 앞까지 민 뒤 견준다(틱 안에서 게임 상태는 안 바뀐다).
+  - **찍기 전 다시 그리기**: 판을 `will-change: transform` 으로 새 층에 올려 찍는다 — 크로미움이 안 바뀐 자리를 다시 칠하지 않아 실제
+    진행 쪽에만 지나간 그림의 잔상 점이 남았다(엔딩, DOM 은 같고 픽셀 6 개).
+  - **빈 포트**(`e2e/lib/preview.mjs`): 바란 포트(4920 · 4910 · 4930)를 다른 워크트리 · 에이전트가 쓰면 빈 포트에 띄운다. 예전엔
+    `--strictPort` 로 우리 preview 는 죽고 남의 서버가 대답해 "떴다" 로 보고 남의 빌드를 시험하다, 그쪽이 꺼지면 "Could not connect to
+    the server" 가 났다. 이제 우리 preview 가 자기 주소를 알린 뒤에만 뜬 것으로 본다.
+  - **엔딩 둘을 스냅샷으로**: `useUpdateCounter` 의 시작 틱을 ref 에 둬(값 · 틀 그대로 — `useUpdateCounter.test.tsx`) 되살린 틀 수가
+    이어 센다. `nari-ending` · `pitcher-ending` 이 스냅샷으로 곧장 열린다(약 11s → 1s 안팎).
 - **뜨기 · 확인은 하나씩** (r342): 뜨기는 장면을 차례로 맥락 하나로, `verify` 는 브라우저를 차례로(맥락 셋 — A · B · 픽셀 견주기).
 - **루프에 상태를 더하면**: effect 안 그림 루프의 `let` 은 나무에 없다. `useStageAnimation` 처럼 칸을 단 루프에 변수를 더하면 그 칸에도
   더한다 — 빠지면 `verify` 가 다름을 찾는다. 새 장면을 스냅샷으로 열려면 장면 표에 `snapshot` 을 달고 뜬 뒤 `verify` 로 확인한다.

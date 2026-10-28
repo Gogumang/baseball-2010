@@ -82,6 +82,13 @@ async function openPage(browser, device, { inject } = {}) {
     await page.addInitScript((text) => {
       window.__snapshotOverride = JSON.parse(text)
     }, JSON.stringify(inject))
+  // React 스케줄러를 가짜 시계 위로 (r355) — 스케줄러는 `setImmediate` 가 있으면 그것으로, 없으면 MessageChannel(실제 시간)로 일을 미룬다.
+  // MessageChannel 이면 React 커밋 · effect 가 가짜 시계의 타이머 사이 어느 틈에 도느냐가 실제 시간에 따라 갈려, 그 안에서 읽는
+  // `performance.now()`(창이 선 시각 → 멈춘 ms 합 따위)가 쪽마다 수십 ms 달라졌다. 가짜 setTimeout(0) 이면 가짜 시각 · 차례가 늘 같다.
+  // 시험 브라우저에만 넣는 것이라 게임 코드 · 틱 시계는 그대로다
+  await page.addInitScript(() => {
+    window.setImmediate = (callback, ...args) => setTimeout(callback, 0, ...args)
+  })
   await page.clock.install({ time: new Date('2026-10-27T00:00:00Z') })
   await page.clock.pauseAt(new Date('2026-10-27T00:00:01Z'))
   return { context, page, stats }
@@ -166,7 +173,21 @@ async function alignAtTick(sides, tick) {
 
 const tickOf = (page) => page.evaluate(() => window.__snapshot.tick())
 const digestOf = (page) => page.evaluate(() => window.__snapshot.digest())
-const shotOf = (page, path) => page.locator('[data-original-screen]').first().screenshot({ path, animations: 'disabled' })
+/**
+ * 화면 판 스크린샷 — 찍기 전에 판을 새 층으로 올려(`will-change: transform`) 통째로 다시 그리게 한다(r355). 크로미움은 바뀌지 않은 자리를
+ * 다시 칠하지 않아, 실제 진행 쪽에만 지나간 그림(글꼴이 바뀌기 전 글자 따위)의 잔상 점이 남았다 — DOM 은 두 쪽이 같은데 픽셀 6 개가
+ * 갈렸다(엔딩). 찍은 뒤 되돌린다 — 게임 상태는 안 건드린다
+ */
+const shotOf = async (page, path) => {
+  const setLayer = (value) =>
+    page.evaluate((willChange) => {
+      document.querySelector('[data-original-screen]').style.willChange = willChange
+    }, value)
+  await setLayer('transform')
+  const shot = await page.locator('[data-original-screen]').first().screenshot({ path, animations: 'disabled' })
+  await setLayer('')
+  return shot
+}
 
 // ─── 뜨기 ───
 
