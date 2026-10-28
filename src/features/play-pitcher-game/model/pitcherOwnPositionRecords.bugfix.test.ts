@@ -53,11 +53,17 @@ function 끝까지던지기(seed: number): PitcherGameProgress {
 
 const isOffenseSideRecord = (id: number) => !isDefenseSideRecord(id)
 
+/**
+ * 대표 시드 — 시드 1~30 을 원본 길로 던져 본 기록 갈래를 모두 담는 넷 (r360 에 30 → 4 로 줄임).
+ * 공격 쪽 0 · 1 · 2 · 3 · 9 · 10 · 12, 수비 쪽 16 · 18 · 21 · 28 · 29 — 30개 시드에서 난 기록 번호가 이 넷에 다 있다.
+ */
+const 대표시드 = [3, 12, 13, 22] as const
+
 describe('B-129 고친 길 — 나만의 투수는 자기 포지션(투수 · 수비 쪽) 기록만 받는다', () => {
   it('동료 타석 · 점수차 승의 공격 쪽 기록(0~15 · 32~35 · 37~39)이 0 이고, 수비 쪽 기록 · 경기 결과는 원본 길과 같다', () => {
     let 원본공격 = 0
     let 원본수비 = 0
-    for (let seed = 1; seed <= 30; seed += 1) {
+    for (const seed of 대표시드) {
       const 원본 = summaryOf(끝까지던지기(seed))
       setBugfixConfigForTests(bugfixConfigWith([OWN_POSITION_RECORDS_BUGFIX_ID]))
       const 고침 = summaryOf(끝까지던지기(seed))

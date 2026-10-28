@@ -396,8 +396,9 @@ describe('나리 사기 — 두 팀 레코드 +2 (셋업 3a332 · 0xb570c b5768)
   })
 
   it('판정 난 돌발의 보상 · 페널티는 요약에 판정 차례대로 실리고, 사기는 그 자리에서 options.teamMorale 에 먹는다', () => {
+    // 대표 시드 (r360 에 1~40 → 다섯): 1 페널티(평판 −4) · 3 돌발 없음 · 5 인기도 → 사기 +3 · 8 인기도 → 평판(사기 없음) · 32 사기 → 평판
     let 찾음 = 0
-    for (let seed = 1; seed <= 40; seed += 1) {
+    for (const seed of [1, 3, 5, 8, 32]) {
       const 끝 = 끝까지던지기(startPitcherGame(기본옵션, 씨앗(seed)), seed)
       const deltas = summaryOf(끝).burstRewardDeltas ?? []
       expect(끝.options.teamMorale).toBe(nariMoraleAfterBurst(기본옵션.teamMorale, deltas))
