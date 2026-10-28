@@ -3,7 +3,6 @@
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
   'src/shared/config/original/pitchRecords.ts', // 4253
-  'src/app/model/useSeasonSession.ts', // 2450
   'src/features/defense-play/model/runDefensePlay.ts', // 2188
   'src/app/model/useMissionSession.ts', // 2038
   'src/app/model/useCareerSession.ts', // 1864
