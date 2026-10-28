@@ -5,6 +5,7 @@ import { SCENES } from '@/app/dev/scenes'
 import { battingLogNow, scenePeeksNow, setSceneFastForward } from '@/shared/lib/scenePeek/scenePeek'
 import { touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { appTickNow, appTickStartTime } from '@/shared/lib/frameClock/frameClock'
+import { assetLoadCount } from '@/shared/lib/sprite/assetLoadVersion'
 import type { SceneStep } from '@/app/dev/scenes'
 import { captureSnapshot, fiberValuesAt, prepareSnapshot, restoreSnapshot, snapshotDigest } from '@/app/dev/sessionSnapshot'
 import type { SessionSnapshotFile, SnapshotRestoreReport } from '@/app/dev/sessionSnapshot'
@@ -75,6 +76,8 @@ declare global {
       readonly tick: () => number
       readonly tickStart: (tick: number) => number
       readonly now: () => number
+      /** 지금까지 도착한 재료(그림 · 칠하기 · 글꼴) 수 — 도구가 늦게 온 그림이 다 그려진 뒤에 화면을 견준다(r355) */
+      readonly assets: () => number
     }
     /** `&capture=1` — 단계를 다 밟은 순간 뜬 스냅샷 */
     __capturedSnapshot?: SessionSnapshotFile
@@ -124,6 +127,7 @@ export async function bootSceneShortcut(): Promise<void> {
     tick: appTickNow,
     tickStart: appTickStartTime,
     now: () => performance.now(),
+    assets: assetLoadCount,
   }
   window.__batting = () => ({ probe: scenePeeksNow().battingStage?.probe() ?? null, log: battingLogNow() })
   window.__sceneProbe = () => {

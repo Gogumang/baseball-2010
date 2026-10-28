@@ -121,15 +121,47 @@ async function driveToReady(page, stats) {
   throw new Error(`장면이 안 섰다 (가상 ${virtual}ms): ${status?.error ?? status?.status ?? '?'} · 단계 ${status?.steps?.slice(-3).join(' → ')}`)
 }
 
-/** 앱 틱 `tick` 머리 + 1ms 까지 민다 (틱마다 망 조용함을 기다리며) */
-async function advanceToTick(page, stats, tick) {
+/** 앱 틱 `tick` 머리 + `offset` ms 까지 민다 (틱마다 망 조용함을 기다리며) */
+async function advanceToTick(page, stats, tick, offset = 1) {
   for (;;) {
     const { now, start } = await page.evaluate((target) => ({ now: window.__snapshot.now(), start: window.__snapshot.tickStart(target) }), tick)
-    const ms = Math.ceil(start - now) + 1
+    const ms = Math.ceil(start - now) + offset
     if (ms <= 0) return
     await page.clock.runFor(Math.min(ms, STEP))
     await waitQuiet(page, stats)
   }
+}
+
+/**
+ * 늦게 오는 재료(그림 받기 · 칠하기 · 글꼴)가 다 올 때까지 (실제 시간) — 도착 수(`window.__snapshot.assets`)가 잠깐 그대로고 망이
+ * 조용하면 끝. 재료는 실제 시간에 오고 그림은 가짜 시계의 그림 틀에서만 다시 그려지므로, 견주기 전에 기다려야 두 쪽 그림이 같은
+ * 재료로 그려진다(r355 — 실제 진행 쪽은 오래 돌며 이미 받아 둔 그림을, 되살린 쪽은 그 틱에 처음 청한다)
+ */
+async function settleAssets(page, stats) {
+  let last = -1
+  let still = 0
+  for (let tries = 0; tries < 300 && still < 3; tries += 1) {
+    await waitQuiet(page, stats)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const count = await page.evaluate(() => window.__snapshot.assets())
+    still = count === last ? still + 1 : 0
+    last = count
+  }
+}
+
+/** Playwright 가짜 시계의 그림 틀(rAF) 간격 */
+const FRAME_MS = 16
+
+/**
+ * 두 쪽을 틱 `tick` 에 맞춘다 — 그 틱 첫 그림 틀 뒤까지 민 뒤 재료를 기다리고, 그 틱 끝 2ms 앞까지 더 민다(그 사이 그림 틀이 셋 넘게 돌아
+ * 늦게 온 재료로 다시 그린다 — 틱 안에서 게임 상태는 안 바뀐다). 뒤로 늘 오는 유휴 미리 받기는 지금 그림과 상관없다
+ */
+async function alignAtTick(sides, tick) {
+  const length = await sides[0].page.evaluate((at) => window.__snapshot.tickStart(at + 1) - window.__snapshot.tickStart(at), tick)
+  // 그 틱의 첫 그림 틀(가짜 시계의 그림 틀은 16ms 격자)이 돈 뒤 — 그 그림이 처음 청한 재료까지 기다린다
+  await Promise.all(sides.map((side) => advanceToTick(side.page, side.stats, tick, Math.min(FRAME_MS + 1, Math.floor(length / 2)))))
+  await Promise.all(sides.map((side) => settleAssets(side.page, side.stats)))
+  await Promise.all(sides.map((side) => advanceToTick(side.page, side.stats, tick, Math.max(1, Math.floor(length) - 2))))
 }
 
 const tickOf = (page) => page.evaluate(() => window.__snapshot.tick())
@@ -293,7 +325,7 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
     // 같은 틱에 맞춘다
     let tick = Math.max(await tickOf(a.page), await tickOf(b.page)) + 2
     const check = async (stepLabel) => {
-      await Promise.all([advanceToTick(a.page, a.stats, tick), advanceToTick(b.page, b.stats, tick)])
+      await alignAtTick([a, b], tick)
       const [digestA, digestB] = await Promise.all([digestOf(a.page), digestOf(b.page)])
       const compared = await compareDigests(log, stepLabel, digestA, digestB, a.page, b.page)
       const [shotA, shotB] = await Promise.all([

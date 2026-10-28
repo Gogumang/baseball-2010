@@ -28,7 +28,9 @@ for (let index = 0; index < argv.length; index++) {
   else if (arg.startsWith('--')) throw new Error(`모르는 옵션: ${arg}`)
   else flags.names.push(arg)
 }
-const PORT = Number(process.env.E2E_ONLY_PORT ?? 4930)
+// 바란 포트가 쓰이고 있으면(다른 워크트리 · 에이전트) 빈 포트 — 주소를 굳히기 전에 고른다 (r355)
+const { choosePreviewPort } = await import('./lib/preview.mjs')
+const PORT = flags.url === undefined ? await choosePreviewPort(Number(process.env.E2E_ONLY_PORT ?? 4930)) : 0
 process.env.E2E_URL = flags.url ?? `http://127.0.0.1:${PORT}/`
 
 const { ACTIONS, AREAS, sceneCatalog } = await import('./lib/catalog.mjs')
@@ -114,7 +116,8 @@ console.log(
 
 const started = Date.now()
 const meter = startUsageMeter()
-const server = flags.url === undefined ? await startE2ePreview({ port: PORT, dir: 'dist-quick' }) : { stop: () => {}, buildMs: 0, reused: true }
+const server =
+  flags.url === undefined ? await startE2ePreview({ port: PORT, dir: 'dist-quick', exactPort: true }) : { stop: () => {}, buildMs: 0, reused: true }
 const runStarted = Date.now()
 let run
 try {

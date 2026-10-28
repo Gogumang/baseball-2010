@@ -374,6 +374,39 @@ class Decoder {
     }
   }
 
+  /**
+   * 이미 푼 객체마다 내용을 뜬 값으로 되돌린다(같은 객체 그대로) — 되살리는 동안 도는 그림 루프가 넣어 둔 객체(장면 칸 ref 따위)를
+   * 고쳐 쓰면 다시 `get` 해도 고친 객체가 나온다. 끝에 한 번 불러 뜬 순간의 내용으로 맞춘다(r355). 구멍(함수 · DOM) 자리는 채운 값을 둔다
+   */
+  rewind(): void {
+    const isHole = (item: EncodedNode) => item !== null && typeof item === 'object' && ('f' in item || 'x' in item)
+    const valueOf = (item: EncodedNode) => this.decode(item, [], [], null, null)
+    for (const [id, object] of this.objects) {
+      const node = this.definitions.get(id)
+      if (node === undefined || node === null || typeof node !== 'object') continue
+      if ('a' in node && Array.isArray(object)) {
+        object.length = node.a.length
+        node.a.forEach((item, index) => {
+          if (!isHole(item)) object[index] = valueOf(item)
+        })
+      } else if ('o' in node) {
+        const target = object as Record<string, unknown>
+        for (const field of Object.keys(target)) if (!(field in node.o)) delete target[field]
+        for (const [field, item] of Object.entries(node.o)) if (!isHole(item)) target[field] = valueOf(item)
+      } else if ('m' in node && object instanceof Map) {
+        object.clear()
+        for (const [entryKey, item] of node.m) object.set(valueOf(entryKey), valueOf(item))
+      } else if ('s' in node && object instanceof Set) {
+        object.clear()
+        for (const item of node.s) object.add(valueOf(item))
+      } else if ('t' in node) {
+        ;(object as unknown as { set: (values: readonly number[]) => void }).set(node.v)
+      } else if ('d' in node && object instanceof Date) {
+        object.setTime(node.d)
+      }
+    }
+  }
+
   /** 칸 `at` 의 구멍을 새로 그린 쪽 값 `fresh` 의 같은 자리로 채운다 */
   fill(at: number, fresh: unknown): void {
     for (const hole of this.holes.get(at) ?? []) {
@@ -639,6 +672,8 @@ export async function restoreSnapshot(file: SessionSnapshotFile, { maxPasses = 8
         await frame()
         if (!changed) break
       }
+      // 그동안 그림 루프가 고쳐 쓴 객체(장면 칸 ref 의 스킬 판 따위)를 뜬 내용으로 — 이 뒤로는 그림 틀이 없다(r355)
+      decoder.rewind()
       for (const { path, fiber } of hookFibers()) {
         const entry = byPath.get(path)
         if (entry !== undefined && isApplied(fiber)) applyFiber(fiber, entry, { refsOnly: true })
