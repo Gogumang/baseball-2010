@@ -98,6 +98,16 @@ async function openPage(browser, device, { inject } = {}) {
   return { context, page, stats }
 }
 
+/** 띄운 preview 주소 — 망 기다리기가 끊기면 서버가 살아 있는지 본다 */
+let serverUrl = null
+
+async function isServerAlive() {
+  if (serverUrl === null) return true
+  return fetch(serverUrl, { signal: AbortSignal.timeout(3000) })
+    .then((response) => response.ok)
+    .catch(() => false)
+}
+
 /** 망이 이만큼(실제 ms) 안 조용하면 끝 알림이 안 오는 요청으로 보고 넘어간다 — 그 주소는 `stats.stuck` 에 남긴다 */
 const QUIET_LIMIT_MS = 5000
 
@@ -110,8 +120,11 @@ async function waitQuiet(page, stats) {
     quiet = stats.pending.size === 0 ? quiet + 1 : 0
   }
   if (quiet < 3) {
+    stats.quietTimeouts = (stats.quietTimeouts ?? 0) + 1
     stats.stuck = [...stats.pending].map((request) => request.url().slice(-80))
     stats.pending.clear()
+    // 끝 알림이 안 오는 까닭이 서버면(멈춤 · 꺼짐 · 남이 포트를 가져감) 기다리지 말고 실패로 — 예전 "Could not connect" 를 가리던 길
+    if (!(await isServerAlive())) throw new Error(`preview 서버가 대답하지 않는다 (${serverUrl}) — 걸린 요청 ${stats.stuck.slice(0, 2).join(' | ')}`)
   }
   await page
     .evaluate(
@@ -330,12 +343,16 @@ const SCENE_LIMIT_MS = Number(process.env.E2E_SNAPSHOT_SCENE_LIMIT_MS ?? 10 * 60
  * 알린다. 맥락을 닫아도 30초 안에 안 풀리면 기다리지 않고 실패로 넘어간다(브라우저는 그 브라우저 차례 끝에 닫힌다)
  */
 async function verifySceneWithin(log, ...args) {
-  const watch = { stage: '시작', contexts: [] }
+  const watch = { stage: '시작', contexts: [], sides: [] }
   let timer = null
   const timedOut = new Promise((resolve) => {
     timer = setTimeout(() => {
       watch.timedOut = true
       log(`    ✗ 시간 제한 ${SCENE_LIMIT_MS / 1000}s 넘김 — 단계 「${watch.stage}」에서 멈췄다`)
+      for (const [name, stats] of watch.sides)
+        log(
+          `    · ${name} 망 기다리기 끊김 ${stats.quietTimeouts ?? 0}번 · 지금 걸린 요청 ${stats.pending.size} · 끝 알림 없던 것: ${(stats.stuck ?? []).slice(0, 3).join(' | ')}`,
+        )
       for (const context of watch.contexts) context.close().catch(() => {})
       setTimeout(() => resolve(false), 30000)
     }, SCENE_LIMIT_MS)
@@ -351,6 +368,7 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
   watch.stage = 'A 실제 진행'
   const a = await openPage(browser, device)
   watch.contexts.push(a.context)
+  watch.sides.push(['A', a.stats])
   let b = null
   try {
     // A — 실제로 진행해 닿은 순간을 그 자리에서 뜬다
@@ -380,6 +398,7 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
     watch.stage = 'B 되살리기'
     b = await openPage(browser, device, { inject: snapshot })
     watch.contexts.push(b.context)
+    watch.sides.push(['B', b.stats])
     const openedB = Date.now()
     await b.page.goto(`${base}?scene=${scene}&snapshot=inject`, { waitUntil: 'commit' })
     const virtualB = await driveToReady(b.page, b.stats)
@@ -419,7 +438,8 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
       ['A', a],
       ['B', b],
     ])
-      if (side.stats.stuck !== undefined) log(`    · ${name} 끝 알림이 안 온 요청(참고): ${side.stats.stuck.slice(0, 3).join(' | ')}`)
+      if (side.stats.stuck !== undefined)
+        log(`    · ${name} 끝 알림이 안 온 요청(참고, 끊김 ${side.stats.quietTimeouts}번): ${side.stats.stuck.slice(0, 3).join(' | ')}`)
     for (const side of [a, b])
       if (side.stats.pageErrors.length > 0) {
         ok = false
@@ -449,6 +469,7 @@ const server =
   process.env.E2E_SNAPSHOT_URL === undefined
     ? await startE2ePreview({ port: PORT, dir: 'dist-snapshot' })
     : { url: process.env.E2E_SNAPSHOT_URL, stop: () => {}, buildMs: 0 }
+serverUrl = server.url
 let failed = false
 try {
   if (!isVerify) {
@@ -469,21 +490,22 @@ try {
     if (!failed) console.log('뜬 파일은 다음 e2e 빌드에 실린다 (`e2e:quick` · `e2e:only` 는 스냅샷이 바뀌면 다시 묶는다)')
   } else {
     const runs = (process.env.E2E_SNAPSHOT_RUNS ?? 'chromium:desktop,webkit:iphone').split(',').map((pair) => pair.split(':'))
-    // 브라우저는 하나씩 (맥락 셋: 실제 진행 · 되살리기 · 픽셀 견주기, r342)
+    // 브라우저는 하나씩 (맥락 셋: 실제 진행 · 되살리기 · 픽셀 견주기, r342). 장면마다 브라우저를 새로 띄운다(r355, 1~2초) — 한 웹킷으로
+    // 장면을 이어 돌린 전체 run 에서만 뒤 장면의 실제 진행이 망 기다림에 걸려 멈췄다. 앞 장면의 연결 · 메모리가 뒤로 넘어가지 않게
     for (const [browserName, device] of runs) {
       const type = browserName === 'webkit' ? webkit : chromium
       const executablePath = browserName === 'webkit' ? undefined : chromiumExecutable()
-      const browser = await type.launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })
-      const helper = await (await browser.newContext()).newPage()
-      try {
-        for (const scene of scenes) {
+      for (const scene of scenes) {
+        const browser = await type.launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })
+        try {
+          const helper = await (await browser.newContext()).newPage()
           const lines = []
           const ok = await verifySceneWithin((line) => lines.push(line), browser, helper, browserName, device, server.url, scene)
           console.log(`${ok ? 'ok  ' : 'FAIL'} ${browserName}:${device} ${scene}\n${lines.join('\n')}`)
           if (!ok) failed = true
+        } finally {
+          await browser.close()
         }
-      } finally {
-        await browser.close()
       }
     }
   }
