@@ -14,14 +14,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { launch } from './lib/scene.mjs'
 import { checkSceneHits } from './lib/hits-scene.mjs'
-
-/** 기기 꼴 — 이름: [브라우저, scene.mjs 의 DEVICES 이름, 방향] */
-const DEVICE_SETS = {
-  'chromium-desktop': ['chromium', 'desktop', '가로'],
-  'chromium-iphone': ['chromium', 'iphone', '세로'],
-  'webkit-iphone': ['webkit', 'iphone', '세로'],
-  'webkit-iphone-land': ['webkit', 'iphone-land', '가로'],
-}
+import { DEVICE_SETS } from './lib/devices.mjs'
 
 const SCENE_NAMES = [
   'title', 'main-menu', 'nari-new', 'pitcher-new', 'season-new', 'nari-management', 'nari-outing', 'pitcher-management',

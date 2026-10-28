@@ -17,7 +17,7 @@
 // 장면마다 센다: 다른 픽셀 수(바이트가 같으면 0) · 쪽 오류 · 콘솔 오류 · 4xx/5xx 응답 · 실패한 요청(웹폰트 CDN 제외) ·
 // 그림 오류(`Image` · `<img>` error 사건, 다 받았는데 naturalWidth 0 인 `<img>`) · 스프라이트 JSON 낱개 요청 수 · 묶음 요청 수.
 // 다른 픽셀 · 오류가 하나라도 있으면 끝 코드 1. 찍은 그림은 `e2e/.run/pixels/` 에 둔다.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium, webkit } from 'playwright'
 import { DEVICES } from './lib/scene.mjs'
 import { chromiumExecutable } from './lib/browsers.mjs'
@@ -49,12 +49,8 @@ const LIMIT = { 'nari-burst-result': 240000, 'mission-result': 240000 }
 const OUT = new URL('./.run/pixels/', import.meta.url).pathname
 mkdirSync(OUT, { recursive: true })
 
-const SCENES_FILE = new URL('../src/app/dev/scenes.ts', import.meta.url)
-function sceneNames() {
-  const source = readFileSync(SCENES_FILE, 'utf8')
-  const table = source.slice(source.indexOf('export const SCENES'))
-  return [...table.matchAll(/^ {2}'?([a-z][a-z0-9-]*)'?: \{/gm)].map((match) => match[1])
-}
+const { sceneCatalog } = await import('./lib/catalog.mjs')
+const sceneNames = () => sceneCatalog().map((scene) => scene.name)
 
 const CDN = /cdn\.jsdelivr\.net/
 

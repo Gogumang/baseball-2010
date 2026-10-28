@@ -15,7 +15,8 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 ## 2. 장면 열기
 
 주소는 `?scene=<장면>&fixture=<픽스처>` 이다. 픽스처를 안 주면 장면의 기본 픽스처를 쓴다.
-바로가기는 개발 서버와 `--mode e2e` 빌드에서만 켜진다. 장면 표는 `src/app/dev/scenes.ts` 에 있다.
+바로가기는 개발 서버와 `--mode e2e` 빌드에서만 켜진다. 장면 표는 도메인마다 `src/app/dev/scenes/<도메인>.ts` 에 있다(모으는 곳은 `index.ts`,
+걸음 도우미는 `steps.ts`, 여러 도메인이 같이 밟는 길은 `routes.ts` · `careerRoutes.ts`). 아래 「골라 시험하기」의 도메인이 이 파일 이름이다.
 
 | 장면 | 화면 | 기본 픽스처 |
 |---|---|---|
@@ -29,7 +30,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `general-quick` | 일반모드 빠른실행 경기정보 (경기설정 창) | `general-bat` |
 | `general-bat` · `general-pitch` · `general-defense` | 일반모드 1회 타석 · 구질 고르기 · 타구 수비 (약 5~10초) | `general-bat` · `general-pitch` |
 | `pitcher-pitch` · `pitcher-defense` | 나리 투수편 첫 경기 — 첫 수비 타석 구질 고르기 · 던진 공이 맞은 내 수비 판 (관리 [다음경기] → 경기시작, 약 5~7초) | `pitcher-y1` |
-| `general-relay` | 일반모드 자동진행 중계 0x21 — 첫 타석에서 경기 중 메뉴 '*' [자동진행] 예 (약 8초) | `general-bat` |
+| `general-relay` | 일반모드 자동진행 중계 0x21 — 첫 타석에서 경기 중 메뉴 '*' [자동진행] 예 (실제 진행 약 8초 — 바로가기는 경기 중간 스냅샷으로 곧장, r342) | `general-bat` |
 | `mission-bat` · `mission-pitch` | 타자 미션 1 첫 타석 0xe · 투수 미션 3 구질 고르기 (미션 선수 고르기 → 나리 선수 → [61] 예, 약 2초) | `nari-y1` · `pitcher-y1` |
 | `mission-result` | 투수 미션 3 결과 판 0x19 — 10구 제한까지 OK 만 되풀이 (실제 진행 약 55초 — 바로가기는 경기 중간 스냅샷으로 곧장, `&real=1` 이면 실제 진행) | `pitcher-y1` |
 | `derby-pick` · `derby-start` | 홈런더비 선수 고르기 · 첫 공 앞 | `nari-y1` |
@@ -40,7 +41,7 @@ E2E_PORT=5412 e2e/serve.sh e2e   # 배포 꼴 산출물(vite build --mode e2e) +
 | `pitcher-cup` · `pitcher-cup-result` | 나리 투수편 국가대항전 134 진입 대진판 + 히든 팀 팝업 · 대회가 끝난 대진판(OK 가 결과 팝업) | `pitcher-cup` · `pitcher-cup-result` |
 | `nari-ending` · `pitcher-ending` | 나리 타자편 · 투수편 13년차 은퇴 엔딩 141 — 엔딩 직전 저장의 이어하기가 은퇴 이벤트 114 로 가고 OK 로 넘긴다 (약 11초) | `nari-ending` · `pitcher-ending` |
 | `nari-hall-of-fame` · `pitcher-hall-of-fame` | 명예의 전당 등록 질문 0x2d — 보너스를 받은 저장으로 141 에 곧장 들어가 키로 제작진 → 질문 (약 3초) | `nari-hall-of-fame` · `pitcher-hall-of-fame` |
-| `nari-postseason-game` · `pitcher-postseason-game` | 사람 팀 포스트시즌 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기(타자편 첫 내 타석 · 투수편 첫 구질 고르기, 약 6초) | `nari-postseason-game` · `pitcher-postseason-game` |
+| `nari-postseason-game` · `pitcher-postseason-game` | 사람 팀 포스트시즌 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기(타자편 첫 내 타석 · 투수편 첫 구질 고르기, 약 6초 — 투수편은 경기 중간 스냅샷으로 곧장, r342) | `nari-postseason-game` · `pitcher-postseason-game` |
 | `nari-postseason-next` · `pitcher-postseason-next` | 내 시리즈(준플레이오프)를 이기고 116 → 114 → 128 로 돌아온 다음 라운드(플레이오프) 대진 — [다음]이 142 | `nari-postseason-next` · `pitcher-postseason-next` |
 | `nari-postseason-champion` · `pitcher-postseason-champion` | 내 팀이 한국시리즈를 이긴 끝난 대진 [다음] → 우승 팀 발표 StrMODE[137] 팝업 7 | `nari-postseason-champion` · `pitcher-postseason-champion` |
 | `nari-korean-series` · `pitcher-korean-series` | 팝업 7 을 OK 로 닫아 내 팀 한국시리즈 우승 StrMODE[190] 팝업 8 | `nari-postseason-champion` · `pitcher-postseason-champion` |
@@ -206,10 +207,11 @@ E2E_HITS_VERBOSE=1 yarn e2e:hits                # 동작 뒤 장면을 다시 �
 - 점: 가운데 + 네 모서리 안쪽(최대 8px 안). `elementFromPoint` 가 그 요소나 그 자손이 아니면 덮인 것이다.
   웹킷은 CSS `zoom` 안 요소의 `getBoundingClientRect` 를 zoom 뺀 좌표로 내서 조상 zoom 곱을 곱해 화면 좌표로 옮긴다.
 - 창 아래: 덮은 것이 열린 창(`[role=dialog]`) 안이고 덮인 것은 그 창 밖이면 실패가 아니다(원본도 창이 키를 가져간다). 수만 센다.
-- 연 상태: `e2e/hits.mjs` 의 `ACTIONS` — 메뉴 '*' · 교체 '#' · 투수편 강판 '#' · 자동진행 중단 질문 · 질문 · 알림 상자 · 칭호 창 · 기록실 · 외출 말풍선. 걸음은
+- 연 상태: 도메인 파일 `e2e/areas/<도메인>.mjs` 의 `actions` (모은 것은 `e2e/lib/catalog.mjs` 의 `ACTIONS`) — 메뉴 '*' · 교체 '#' · 투수편 강판 '#' · 자동진행 중단 질문 · 질문 · 알림 상자 · 칭호 창 · 기록실 · 외출 말풍선. 걸음은
   키 이름 · `@이름`(그 이름의 단추를 실제로 탭/클릭) · `w밀리초`이고, `expect` 가 안 서면 동작 실패로 친다.
-- 허용 목록: `e2e/lib/hits.mjs` 의 `ALLOWED_OVERLAPS` — 의도된 겹침을 `why` 와 함께 둔다(외출 건물 모서리 · 외출 말풍선 아래 건물 ·
-  판 전체 확인 칸 위 소프트키 · 시즌 다음경기 되돌아가기 r186 · 구질 고리 칸 0 과 "OK" 글자 칸 r219).
+- 허용 목록: 여러 도메인에 걸친 것은 `e2e/lib/hits.mjs` 의 `ALLOWED_OVERLAPS`(판 전체 확인 칸 위 소프트키 · 구질 고리 칸 0 과 "OK" 글자 칸
+  r219), 한 도메인 것은 그 도메인 파일의 `allowed`(외출 건물 모서리 · 외출 말풍선 아래 건물 — `outing.mjs`, 시즌 다음경기 되돌아가기 r186
+  — `season.mjs`). 의도된 겹침을 `why` 와 함께 둔다.
 - 결과: 화면에 기기별 요약 · 허용된 겹침 · 실패 줄(장면 · 상태 · 덮인 것 z ← 덮은 것 z · 못 맞은 점). 전부는 `e2e/.run/hits-report.json`.
   실패가 있으면 끝 코드 1.
 
@@ -234,32 +236,109 @@ E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs
 yarn build && grep -rlE '__sceneProbe|sceneRunner|nari-y1|nari-burst|PTEST|pitcher-defense|mission-result|general-relay|isPitchSlotPickerShown|isAutoRelay|season-cup|STEST|season-ending|nari-hall-of-fame|pitcher-cup-result|nari-korean-series|pitcher-cup-win|postseason-champion|soakFixtures|SOAK|devSnapshot|stageAnimation|sceneCloudClock|snapshotOverride|rebaseAppTick|경기 중간 스냅샷' dist || echo clean
 ```
 
-## 빠른 확인 (`yarn e2e:quick`, r328)
+## 골라 시험하기 (`yarn e2e:only` · `yarn test:area`, r342)
 
-평소 머지 확인용이다. 장면 표의 **장면 전부(49) × 기기 넷**에서 장면을 열고(smoke) 그 자리 · 연 상태(hits `ACTIONS`) **전부(368 상태)** 의
-누름 칸을 훑는다 — `e2e/quick.mjs`. `e2e:all` 의 smoke 와 hits 는 같은 장면을 따로 두 번(대상마다 또 두 번) 열었는데, quick 은 한 번 열어
-둘 다 보고, 장면 × 기기 일감 196개를 맥락 여러 개로 함께 돌린다.
+상황 하나를 **적은 CPU 로 곧장** 본다. 전부를 보는 `e2e:quick` 은 머지 전에만. 기본은 크로미움 데스크톱 하나 · 맥락 2 이고, 끝에
+**CPU 초 합 · 최대 RSS · 동시 브라우저 수 · 동시 맥락 수**를 찍는다(`e2e/lib/usage.mjs` — `ps` 를 0.5초마다 떠서 이 나무를 잰다).
 
 ```sh
-yarn e2e:quick                                                     # e2e 빌드(약 5초) → preview :4910 → 장면 전부 × 기기 넷 (약 1분)
+yarn e2e:only --list                              # 도메인 · 장면 · 상태 이름 목록 ([스냅샷] = 경기 중간 스냅샷으로 곧장 연다)
+yarn e2e:only nari-outing                         # 장면 하나 (기본 상태 + 연 상태 전부)
+yarn e2e:only nari-outing --state "번화가 말풍선"   # 상태 하나 (이름 일부여도 된다 · 여러 번 · 기본 상태는 '기본')
+yarn e2e:only 'general-*'                         # 이름 무늬
+yarn e2e:only --area nari                         # 도메인 하나 (쉼표로 여럿)
+yarn e2e:only --changed                           # main 과 갈라진 뒤 바뀐 파일 + 커밋 안 한 것과 관련된 장면만 (--changed=<기준>)
+yarn e2e:only nari-outing --webkit                # 웹킷 아이폰 더하기 (--all-devices 는 기기 넷, --device <이름,…>)
+yarn e2e:only general-relay --real                # 스냅샷 대신 실제 진행 길로
+yarn e2e:only nari-outing --jobs 1                # 맥락 수 (기본 2 — 브라우저마다. 모두 4 넘으면 알린다)
+yarn e2e:only nari-outing --url http://127.0.0.1:5410/   # 이미 띄운 서버 (개발 서버도 된다)
+
+yarn test:area nari                               # 단위 시험 — 도메인의 경로 머리(sources)에 든 vitest 파일만, 워커 2
+yarn test:area --changed                          # 바뀐 src 파일의 폴더에 있는 시험만
+yarn test:area --list                             # 도메인과 경로 머리
+yarn test:area nari -- -t '휴식'                  # `--` 뒤는 vitest 에 그대로
+
+yarn e2e:measure <명령 …>                         # 아무 명령이나 같은 자로 잰다 (옛 길 · 새 길 견주기)
+```
+
+**도메인** — 장면 표 파일 이름이 도메인이다(`nariCareer.ts` → `nari-career`):
+
+| 도메인 | 장면 | 시험 쪽 파일 |
+|---|---|---|
+| `menu` | 타이틀 · 메인 메뉴 · 새로 시작 셋 | `e2e/areas/menu.mjs` |
+| `nari` | 나리 관리 105 · 경기 뒤 평가 · 첫 타석 · 돌발미션 결과 | `nari.mjs` |
+| `outing` | 나리 외출 112 · 시즌 외출 0xd1 | `outing.mjs` |
+| `pitcher` | 투수편 관리 · 구질 고르기 · 수비 판 | `pitcher.mjs` |
+| `season` | 시즌 관리 0xc9 · 포스트시즌 · 국가대항전 · 엔딩 | `season.mjs` |
+| `general` | 일반모드 빠른실행 · 타석 · 구질 고르기 · 수비 · 자동진행 중계 | `general.mjs` |
+| `mission` | 미션 타석 · 구질 고르기 · 결과 판 | `mission.mjs` |
+| `derby` | 홈런더비 선수 고르기 · 첫 공 앞 | `derby.mjs` |
+| `nari-career` · `pitcher-career` | 포스트시즌 · 국가대항전 · 엔딩 · 명예의 전당 (soak 픽스처) | `nari-career.mjs` · `pitcher-career.mjs` |
+
+**나눈 꼴** — 한 상황을 고치거나 더할 때 다른 도메인 파일을 건드리지 않는다:
+
+- 장면 열기 걸음: `src/app/dev/scenes/<도메인>.ts`. 연 상태(`actions`) · 기본 상태 표지(`expect`) · 그 도메인 허용 겹침(`allowed`) ·
+  바뀐 파일 → 도메인 경로 머리(`sources`) · 대표 장면(`representative`): `e2e/areas/<도메인>.mjs`. 새 도메인은 이 두 파일을 더하면
+  `e2e/lib/catalog.mjs` 가 폴더를 훑어 잡는다.
+- 바뀐 파일 → 도메인: 장면 표 · 시험 도메인 파일 자신은 그 도메인, 그 밖은 `sources` 경로 머리로(`e2e/lib/changed.mjs`). 도메인이 없는
+  앱 · 시험 바탕 파일(`src/shared` · `src/app/ui/App.tsx` · `e2e/lib` · 빌드 설정 …)이 바뀌었으면 도메인마다 대표 장면 하나씩을 더 본다.
+  `sources` 는 넓게 잡은 것이라 빠진 경로가 있을 수 있다 — 고친 곳의 장면이 안 골리면 그 도메인 파일에 경로를 더한다.
+- 돌리는 몫: `e2e/lib/run-scenes.mjs`(장면 × 기기 일감을 맥락 몇 개로 · 낡은 스냅샷이면 실제 진행 길로 다시) · `e2e/lib/run-report.mjs`
+  (요약 · 실패 줄 · 보고 JSON) · `e2e/lib/devices.mjs`(기기 넷). `e2e:quick` 과 `e2e:only` 가 같이 쓴다.
+- 빌드: `e2e/.run/dist-quick` 이 입력(src · public · 픽스처 · 스냅샷 · tools · 설정)보다 새것이면 다시 묶지 않는다(`E2E_REBUILD=1` 이면 늘).
+  `e2e:only` · `e2e:quick` 이 같은 산출물을 쓴다. 보고는 `e2e/.run/only-report.json`.
+
+**잰 것** (r342, 14코어 · 48GB, 다른 에이전트 하나가 함께 돎):
+
+| 판 | 기기 · 맥락 | 상태 | 모두 | CPU 초 | 최대 RSS | 동시 브라우저 |
+|---|---|---:|---:|---:|---:|---:|
+| 장면 하나 `nari-outing` — 전 (`e2e:quick nari-outing`) | 넷 · 크롬 2 · 웹킷 2 | 16 | 14.5s | 35 | 3.0GB | 2 |
+| 장면 하나 — 후 (`e2e:only nari-outing`, 빌드 다시 씀) | 크로미움 하나 · 1 | 4 | 8.6s | 11 | 0.90GB | 1 |
+| 상태 하나 — 후 (`--state "번화가 말풍선"`, 빌드 포함) | 크로미움 하나 · 1 | 1 | 8.5s | 15 | 1.14GB | 1 |
+| 도메인 general — 전 (`e2e:quick` 장면 다섯, 맥락 2 · 2) | 넷 · 4 | 44 | 48.0s | 86 | 2.53GB | 2 |
+| 도메인 general — 후 (`e2e:only --area general`, 빌드 포함) | 크로미움 하나 · 2 | 11 | 24.9s | 28 | 1.62GB | 1 |
+| 전부 크로미움 하나 (`e2e:only '*'`) | 크로미움 하나 · 2 | 92 | 130.8s | 137 | 1.75GB | 1 |
+
+## 빠른 확인 (`yarn e2e:quick`, r328)
+
+머지 전 전체 확인용이다(상황 하나 · 도메인 하나는 위 「골라 시험하기」). 장면 표의 **장면 전부(49) × 기기 넷**에서 장면을 열고(smoke) 그 자리 · 연 상태(hits `ACTIONS`) **전부(368 상태)** 의
+누름 칸을 훑는다 — `e2e/quick.mjs`. `e2e:all` 의 smoke 와 hits 는 같은 장면을 따로 두 번(대상마다 또 두 번) 열었는데, quick 은 한 번 열어
+둘 다 보고, 장면 × 기기 일감 196개를 맥락 몇 개로 함께 돌린다.
+
+**기본 맥락은 크로미움 2 · 웹킷 2** (r342) — r328 의 24 · 20 은 60초에 맞췄지만 14코어 · 약 11GB 를 다 써 기계를 같이 쓰는 일이 멈췄다
+(CPU 99%). 이제 목표는 시간이 아니라 자원이다. 끝에 CPU 초 합 · 최대 RSS · 동시 브라우저 · 맥락을 찍는다.
+
+```sh
+yarn e2e:quick                                                     # e2e 빌드(낡았을 때만, 약 5초) → preview :4910 → 장면 전부 × 기기 넷 (약 4분 반)
 yarn e2e:quick season-management general-bat                       # 장면만 골라
 E2E_QUICK_DEVICES=chromium-desktop,webkit-iphone yarn e2e:quick    # 기기만 골라 (smoke 와 같은 둘)
 E2E_QUICK_SKIP=general-defense yarn e2e:quick                      # 장면 빼기
-E2E_QUICK_JOBS=chromium:12,webkit:10 yarn e2e:quick                # 브라우저마다 함께 여는 맥락 수 (기본 24 · 20 — 메모리가 빠듯하면 줄인다)
+E2E_QUICK_JOBS=chromium:2,webkit:2 yarn e2e:quick                  # 브라우저마다 함께 여는 맥락 수 (기본 2 · 2 — 기계를 같이 쓰면 늘리지 않는다)
 E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄운 서버로(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
 ```
 
-- 서버: 기본은 늘 `vite build --mode e2e`(`e2e/.run/dist-quick`)를 새로 묶어 preview 로 띄우고 끝에 pid 로 끈다(포트 `E2E_QUICK_PORT`, 기본 4910).
-  빌드는 4~5초라 낡은 산출물로 도는 일을 막으려고 매번 한다. 빌드 시간은 따로 찍는다.
+- 서버: `vite build --mode e2e`(`e2e/.run/dist-quick`)를 preview 로 띄우고 끝에 pid 로 끈다(포트 `E2E_QUICK_PORT`, 기본 4910).
+  산출물이 입력보다 새것이면 다시 묶지 않는다(r342 — `E2E_REBUILD=1` 이면 늘). 빌드 시간은 따로 찍는다.
 - 브라우저는 크로미움 · 웹킷 프로세스 하나씩, 일감마다 새 맥락(빈 localStorage). 일감은 지난 실행에서 오래 걸린 차례로 꺼낸다
   (`e2e/.run/quick-times.json`) — 긴 장면이 끝에 남지 않게.
 - 실패: 장면이 안 열림 · 쪽 오류 · 허용 목록에 없는 겹침 · 연 상태 동작 실패(`expect` 안 섬). 끝 코드 1, 보고는 `e2e/.run/quick-report.json`
-  (빌드 · 돌리기 · 일감 합 · 장면 열기 합 · 브라우저 RSS 최고 · 쓸 수 있는 메모리 최저 · 오래 걸린 일감).
-- 장면 하나의 누름 칸 검사(`checkSceneHits`)와 `ACTIONS` 는 `e2e/lib/hits-scene.mjs` 에 있고 `e2e/hits.mjs` 와 같이 쓴다.
+  (빌드 · 돌리기 · 일감 합 · 장면 열기 합 · 자원 `usage` · 오래 걸린 일감).
+- 장면 하나의 누름 칸 검사(`checkSceneHits`)는 `e2e/lib/hits-scene.mjs`, 연 상태는 도메인 파일 `e2e/areas/<도메인>.mjs` 에 있고
+  `e2e/hits.mjs` · `e2e/only.mjs` 와 같이 쓴다.
 
 **언제 quick, 언제 all** — 화면 · 흐름을 바꾼 머지는 quick 으로 본다. 아래는 quick 이 안 보므로 `e2e:all` 을 돌린다:
 개발 서버(HMR · StrictMode 두 번 그림) 판, `test:browser`, 픽스처가 아직 닿는지(`e2e:fixtures` dry), 팔레트 PNG RGBA, 느린 4G 성능,
 배포 빌드에 바로가기가 새는지. 픽스처 · 씨앗을 다시 떴거나 저장 꼴 · 난수 차례가 바뀐 판, 자산 · 빌드 설정을 바꾼 판, 큰 묶음 머지 앞에도 all.
+
+**잰 것 r342** — 기본 맥락 2 · 2 로 낮춘 뒤 한 번(14코어 · 48GB, 다른 에이전트 하나가 함께 돎):
+
+| 판 | 일감 · 상태 | 모두 (빌드 다시 씀) | 일감 합 (그중 장면 열기) | CPU 초 | 최대 RSS | 동시 브라우저 · 맥락 |
+|---|---|---:|---:|---:|---:|---:|
+| 장면 49 × 기기 4, 맥락 2 · 2 (기본) | 196 · 368 | 260s | 1012s (666s) | 618 | 4.96GB | 2 · 4 |
+| 견줌: 맥락 24 · 20 (r328 기본 · 오늘 사고 보고) | 196 · 368 | 약 60s | 약 2500s | 14코어를 다 씀(약 840 이하, 잰 것 아님) | 약 11GB | 2 · 44 |
+
+맥락이 서로 다투지 않으니 일감 합이 2500s → 1012s 로 줄었다(장면 열기 1812s → 666s). 벽시계는 길어졌지만 CPU 를 넷까지만 쓴다.
+최대 RSS 는 프로세스마다 RSS 를 더한 것이라 나눠 쓰는 메모리를 겹쳐 센다(크게 나온다).
 
 **잰 것** (r328, 14코어 · 48GB, 다른 브라우저 일 없을 때):
 
@@ -290,7 +369,7 @@ E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄�
 (`src/app/dev/sessionSnapshot.ts`). `&real=1` 이면 예전처럼 단계를 밟는다.
 
 ```sh
-yarn e2e:snapshot                          # 뜨기 — snapshot 장면 전부, 크로미움 데스크톱 · 가짜 시계로 실제 진행 (약 1분 반, preview :4920)
+yarn e2e:snapshot                          # 뜨기 — snapshot 장면 전부, 하나씩 · 크로미움 데스크톱 · 가짜 시계로 실제 진행 (preview :4920)
 yarn e2e:snapshot nari-burst-result        # 하나만
 yarn e2e:snapshot verify                   # 같음 확인 — 실제 진행(A) vs 그 순간을 되살린 쪽(B) + 그 뒤 몇 걸음, 크로미움 · 웹킷
 E2E_SNAPSHOT_RUNS=webkit:iphone yarn e2e:snapshot verify mission-result
@@ -312,6 +391,14 @@ E2E_SNAPSHOT_RUNS=webkit:iphone yarn e2e:snapshot verify mission-result
   시계)이 몇십 ms 갈리는 것은 참고로만 찍는다 — 가짜 시계의 그림 틀(rAF 16ms 격자) 위상이 쪽마다 달라서다(틱 · 난수 · 화면은 같다).
 - r329 결과: 크로미움 데스크톱 두 장면 모두 처음 · 걸음마다 핵심 다름 0 · 다른 픽셀 0. 웹킷 아이폰도 핵심 · 화면 같음(돌발 장면은 걸음 2
   부터 ms 칸 27ms 차이만).
+- **r342 넓힘** — 가벼운 맥락(크로미움 2)에서 연 시간을 재 길이 긴 장면부터 떠 보고 `verify` 로 크로미움 · 웹킷 모두 화면 · 핵심이
+  같은 것만 남겼다: `general-relay`(열기 7.5s → 0.75s) · `pitcher-postseason-game`(4.7s → 약 1s). 안 맞아 뺀 것:
+  `nari-ending` · `pitcher-ending`(10~11s — 유일하게 10초 넘음) — 엔딩 틀 수 `useUpdateCounter` 가 시작 틱을 effect 클로저에 쥐어
+  되살린 상태(29)를 첫 틀부터 다시 센다(2) → 화면이 검정. 훅을 ref 로 바꾸는 일은 게임 코드라 따로. `general-defense` ·
+  `pitcher-defense`(수비 판 부품 자리가 되살린 뒤 안 섬 — "낡았다"), `general-pitch`(SKILL 칸이 안 섬), `general-bat` · `nari-bat`
+  (타자 그림 다름), `nari-postseason-game`(`stageAnimation` 칸 `arrowEntry` 다름), `nari-cup-cover`(픽셀 다름), `pitcher-pitch`(크로미움은
+  같으나 웹킷 아이폰에서 타자 그림 틀 다름).
+- **뜨기 · 확인은 하나씩** (r342): 뜨기는 장면을 차례로 맥락 하나로, `verify` 는 브라우저를 차례로(맥락 셋 — A · B · 픽셀 견주기).
 - **루프에 상태를 더하면**: effect 안 그림 루프의 `let` 은 나무에 없다. `useStageAnimation` 처럼 칸을 단 루프에 변수를 더하면 그 칸에도
   더한다 — 빠지면 `verify` 가 다름을 찾는다. 새 장면을 스냅샷으로 열려면 장면 표에 `snapshot` 을 달고 뜬 뒤 `verify` 로 확인한다.
 

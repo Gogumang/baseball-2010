@@ -1,4 +1,4 @@
-// 장면 바로가기 스모크 — 장면 표(src/app/dev/scenes.ts)의 장면을 모두 chromium(데스크톱) · webkit(아이폰 13)에서 연다.
+// 장면 바로가기 스모크 — 장면 표(src/app/dev/scenes/<도메인>.ts)의 장면을 모두 chromium(데스크톱) · webkit(아이폰 13)에서 연다.
 //
 //   E2E_PORT=5430 e2e/serve.sh            # 서버 먼저
 //   E2E_PORT=5430 yarn node e2e/smoke.mjs  # 모두
@@ -6,25 +6,19 @@
 //
 // 장면마다 새 맥락(빈 localStorage)에서 연다. 진행기가 `ready` 를 적고 쪽 오류(pageerror)가 없으면 통과다.
 // 두 브라우저는 함께 돈다. 하나라도 실패하면 끝 코드 1.
-import { readFileSync } from 'node:fs'
 import { DEVICES, openScene, screenState } from './lib/scene.mjs'
 import { chromiumExecutable } from './lib/browsers.mjs'
 import { chromium, webkit } from 'playwright'
 
-const SCENES_FILE = new URL('../src/app/dev/scenes.ts', import.meta.url)
-
-/** 장면 표의 이름들 — `export const SCENES` 아래 맨 앞 칸 열쇠 */
-function sceneNames() {
-  const source = readFileSync(SCENES_FILE, 'utf8')
-  const table = source.slice(source.indexOf('export const SCENES'))
-  return [...table.matchAll(/^ {2}'?([a-z][a-z0-9-]*)'?: \{/gm)].map((match) => match[1])
-}
+const { sceneCatalog } = await import('./lib/catalog.mjs')
+/** 장면 표의 이름들 (`e2e/lib/catalog.mjs`) */
+const sceneNames = () => sceneCatalog().map((scene) => scene.name)
 
 /**
- * 공을 여러 번 보내야 닿는 장면 — 넉넉히 기다린다. 이 장면들은 바로가기가 기본으로 경기 중간 스냅샷(`e2e/snapshots`)을 열지만
+ * 경기 중간 스냅샷이 있는 장면(장면 표의 `snapshot`) — 넉넉히 기다린다. 바로가기가 기본으로 스냅샷(`e2e/snapshots`)을 열지만
  * smoke 는 **실제 진행 길**(`&real=1`)로 연다 — 그 순간까지 가는 길의 부작용(난수 차례 · 저장 · 쪽 오류)을 보는 것이 smoke 몫이다
  */
-const LONG_SCENES = new Set(['nari-burst-result', 'mission-result'])
+const LONG_SCENES = new Set(sceneCatalog().filter((scene) => scene.snapshot !== null).map((scene) => scene.name))
 
 const RUNS = [
   { browserName: 'chromium', device: 'desktop' },

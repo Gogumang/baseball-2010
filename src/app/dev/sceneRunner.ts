@@ -14,7 +14,7 @@ import type { SessionSnapshotFile, SnapshotRestoreReport } from '@/app/dev/sessi
  *
  * 1. 앱을 그리기 전 — `?fixture=<이름>` 이면 `e2e/fixtures/<이름>.json` 의 저장 칸을 localStorage 에 깐다(세션 훅들이 첫 그림에서
  *    저장을 읽으므로 그 전이어야 한다). 픽스처에 `seed` 가 있으면 부팅 씨앗으로 쓴다.
- * 2. 앱을 그린 뒤 — `?scene=<이름>` 이면 `scenes.ts` 의 단계(세션 훅의 진입 함수 · 키 · 기다림)를 차례로 밟는다.
+ * 2. 앱을 그린 뒤 — `?scene=<이름>` 이면 `scenes/<도메인>.ts` 의 단계(세션 훅의 진입 함수 · 키 · 기다림)를 차례로 밟는다.
  *
  * 진행 상태는 `<html data-scene="loading|ready|error">` 와 `window.__scene` 에 적는다 — e2e 도우미(`e2e/lib/scene.mjs`)가 기다린다.
  *
