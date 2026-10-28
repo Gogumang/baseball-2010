@@ -4,6 +4,7 @@ import { useTouchKeyOffers } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { startTouchKeyPress, touchKeyOf } from '@/widgets/touch-controls/model/keyDispatch'
 import type { KeyPressHandle, TouchKey } from '@/widgets/touch-controls/model/keyDispatch'
 import * as styles from '@/widgets/touch-controls/ui/TouchControls.css'
+import { ignoreErrors } from '@/shared/lib/safe/tryOr'
 
 export type TouchControlsLayout = 'below' | 'sides'
 
@@ -59,11 +60,9 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
         if (event.button > 0) return
         pressesRef.current.get(event.pointerId)?.release()
         // 손가락(마우스)이 버튼 밖으로 나가도 떼기 전까지는 누름이다(번트 '8')
-        try {
-          event.currentTarget.setPointerCapture(event.pointerId)
-        } catch {
-          // 잡기를 못 해도(시험 환경 따위) 누름은 그대로다
-        }
+        // 잡기를 못 해도(시험 환경 따위) 누름은 그대로다
+        const button = event.currentTarget
+        ignoreErrors(() => button.setPointerCapture(event.pointerId))
         event.currentTarget.dataset.pressed = ''
         pointerPressedKeysRef.current.add(touchKey.key)
         // 손가락이 닿은 시각을 키에 붙인다 — 타석 스윙은 그때 보이던 그림의 틱으로 센다(`shownSceneTicks`)

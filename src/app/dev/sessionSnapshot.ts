@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { devRandomCellOf, sceneHandlesNow } from '@/app/dev/sceneShortcut'
+import { withFinallyAsync } from '@/shared/lib/safe/tryOr'
 import { appTickNow, appTickStartTime, rebaseAppTickForDev } from '@/shared/lib/frameClock/frameClock'
 import { snapshotSlots } from '@/shared/lib/dev/snapshotSlots'
 import type { SnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
@@ -602,53 +603,56 @@ export async function restoreSnapshot(file: SessionSnapshotFile, { maxPasses = 8
   restoreModules()
   const isApplied = (fiber: Fiber) => applied.has(fiber) || (fiber.alternate !== null && applied.has(fiber.alternate))
   let passes = 0
-  try {
-    let quietPasses = 0
-    for (; passes < maxPasses && quietPasses < 3; passes += 1) {
-      let didApply = false
-      /** 이번 바퀴에 넣은(또는 아직 못 넣은) 자리 — 그 아래는 부모가 다시 그린 뒤 다음 바퀴에 본다 */
-      const settled = new Set<string>()
-      for (const { path, fiber, parent } of hookFibers()) {
-        if (parent !== null && !settled.has(parent)) continue
-        const entry = byPath.get(path)
-        if (entry === undefined) continue
-        if (isApplied(fiber)) {
-          settled.add(path)
-          continue
+  await withFinallyAsync(
+    async () => {
+      let quietPasses = 0
+      for (; passes < maxPasses && quietPasses < 3; passes += 1) {
+        let didApply = false
+        /** 이번 바퀴에 넣은(또는 아직 못 넣은) 자리 — 그 아래는 부모가 다시 그린 뒤 다음 바퀴에 본다 */
+        const settled = new Set<string>()
+        for (const { path, fiber, parent } of hookFibers()) {
+          if (parent !== null && !settled.has(parent)) continue
+          const entry = byPath.get(path)
+          if (entry === undefined) continue
+          if (isApplied(fiber)) {
+            settled.add(path)
+            continue
+          }
+          const changed = applyFiber(fiber, entry)
+          if (changed === null) continue
+          applied.add(fiber)
+          appliedPaths.add(path)
+          didApply = true
+          if (!changed) settled.add(path)
         }
-        const changed = applyFiber(fiber, entry)
-        if (changed === null) continue
-        applied.add(fiber)
-        appliedPaths.add(path)
-        didApply = true
-        if (!changed) settled.add(path)
+        quietPasses = didApply ? 0 : quietPasses + 1
+        await frame()
+        await sleep(0)
       }
-      quietPasses = didApply ? 0 : quietPasses + 1
-      await frame()
-      await sleep(0)
-    }
-    // 마지막 — 새로 선 부품의 effect 가 건드린 칸을 덮는다(상태 · ref 모두), 그다음 모듈 칸 · 난수 · 틱
-    for (let round = 0; round < 3; round += 1) {
-      let changed = false
+      // 마지막 — 새로 선 부품의 effect 가 건드린 칸을 덮는다(상태 · ref 모두), 그다음 모듈 칸 · 난수 · 틱
+      for (let round = 0; round < 3; round += 1) {
+        let changed = false
+        for (const { path, fiber } of hookFibers()) {
+          const entry = byPath.get(path)
+          if (entry !== undefined && isApplied(fiber)) changed = applyFiber(fiber, entry) === true || changed
+        }
+        await frame()
+        if (!changed) break
+      }
       for (const { path, fiber } of hookFibers()) {
         const entry = byPath.get(path)
-        if (entry !== undefined && isApplied(fiber)) changed = applyFiber(fiber, entry) === true || changed
+        if (entry !== undefined && isApplied(fiber)) applyFiber(fiber, entry, { refsOnly: true })
       }
-      await frame()
-      if (!changed) break
-    }
-    for (const { path, fiber } of hookFibers()) {
-      const entry = byPath.get(path)
-      if (entry !== undefined && isApplied(fiber)) applyFiber(fiber, entry, { refsOnly: true })
-    }
-    restoreModules()
-    const handles = sceneHandlesNow()
-    const cell = handles === null ? null : devRandomCellOf(handles.random)
-    if (cell !== null && file.random !== null) cell.state = file.random
-  } finally {
-    isHolding = false
-    rebaseAppTickForDev(file.appTick, performance.now() - (file.tickPhase ?? 0))
-  }
+      restoreModules()
+      const handles = sceneHandlesNow()
+      const cell = handles === null ? null : devRandomCellOf(handles.random)
+      if (cell !== null && file.random !== null) cell.state = file.random
+    },
+    () => {
+      isHolding = false
+      rebaseAppTickForDev(file.appTick, performance.now() - (file.tickPhase ?? 0))
+    },
+  )
   const missing = file.fibers.map((entry) => entry.path).filter((path) => !appliedPaths.has(path))
   if (missing.length > 0) {
     const first = byPath.get(missing[0]!)!

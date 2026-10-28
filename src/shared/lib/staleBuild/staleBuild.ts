@@ -1,4 +1,5 @@
 import { ASSET_ROOT } from '@/shared/lib/assetUrl/assetUrl'
+import { ignoreErrors, tryOr } from '@/shared/lib/safe/tryOr'
 
 /**
  * **새 배포 뒤 열려 있던 탭 다시 불러오기** (웹 전용 — 원본에 없다, r318 · OPTIMIZATION-2026-10-27 A2).
@@ -59,21 +60,16 @@ const state: StaleBuildState = {
 }
 
 function recentlyReloaded(): boolean {
-  try {
+  return tryOr(() => {
     const at = Number(window.sessionStorage.getItem(RELOAD_GUARD_KEY))
     return Number.isFinite(at) && at > 0 && state.now() - at < RELOAD_GUARD_MS
-  } catch {
-    return false
-  }
+  }, false)
 }
 
 function reloadOnce(): void {
   if (recentlyReloaded()) return
-  try {
-    window.sessionStorage.setItem(RELOAD_GUARD_KEY, String(state.now()))
-  } catch {
-    // 저장소가 막혀도 다시 부른다
-  }
+  // 저장소가 막혀도 다시 부른다
+  ignoreErrors(() => window.sessionStorage.setItem(RELOAD_GUARD_KEY, String(state.now())))
   state.reload()
 }
 

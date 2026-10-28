@@ -1,3 +1,5 @@
+import { ignoreErrors } from '@/shared/lib/safe/tryOr'
+
 /**
  * 웹판 **테스트용 스위치**. 원본에는 없는 것이다.
  *
@@ -21,14 +23,13 @@ const IS_INFINITE_GAME_POINT_DEFAULT = (import.meta as { readonly env?: { readon
 
 function readFlags(): ReadonlySet<string> {
   const flags = new Set<string>()
-  try {
+  // 주소·저장을 못 읽는 환경(테스트·비공개 창)에서는 스위치가 꺼진 것으로 본다
+  ignoreErrors(() => {
     const query = new URLSearchParams(window.location.search)
     for (const [key] of query) flags.add(key)
     const saved = window.localStorage.getItem(STORAGE_KEY)
     if (saved !== null) for (const name of saved.split(',')) flags.add(name.trim())
-  } catch {
-    // 주소·저장을 못 읽는 환경(테스트·비공개 창)에서는 스위치가 꺼진 것으로 본다
-  }
+  })
   return flags
 }
 

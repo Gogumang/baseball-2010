@@ -3,6 +3,7 @@ import { linePixels, scanlineSpans } from '@/features/play-game/model/aceCutIn'
 import { RIVALRY_LOGO_FRAME, type RivalryColor, type RivalryDraw, rivalryDrawsOf } from '@/widgets/game-scene/lib/rivalryBand'
 import { brightenedImageOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { tryOr } from '@/shared/lib/safe/tryOr'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
@@ -64,12 +65,7 @@ function drawOne(context: CanvasRenderingContext2D, draw: RivalryDraw): void {
 export function RivalryBandCanvas({ step }: { readonly step: number }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   useEffect(() => {
-    let context: CanvasRenderingContext2D | null = null
-    try {
-      context = canvasRef.current?.getContext('2d') ?? null
-    } catch {
-      context = null
-    }
+    const context = tryOr(() => canvasRef.current?.getContext('2d') ?? null, null)
     if (context === null) return
     context.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
     context.imageSmoothingEnabled = false

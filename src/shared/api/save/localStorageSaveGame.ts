@@ -1,4 +1,6 @@
 import type { SaveGamePort } from '@/shared/api/save/saveGamePort'
+import { ignoreErrors, tryOr } from '@/shared/lib/safe/tryOr'
+import { safeLocalStorage } from '@/shared/lib/safe/safeStorage'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { createCareer, rebuildEquippedSkillIds } from '@/entities/career/model/playerCareer'
 import { MID_SEASON_GAME } from '@/entities/career/model/seasonFlow'
@@ -23,45 +25,27 @@ interface SaveFile {
 export function createLocalStorageSaveGame(): SaveGamePort {
   return {
     load: () => {
-      const raw = readRaw()
+      const raw = safeLocalStorage.get(STORAGE_KEY)
       if (raw === null) return null
-
-      try {
-        const parsed = JSON.parse(raw) as Partial<SaveFile>
-        if (parsed.career === undefined) return null
-        if (parsed.version === LEGACY_ABILITY_VERSION) return normalizeCareer(scaleLegacyAbility(parsed.career))
-        if (parsed.version !== SAVE_FORMAT_VERSION) return null
-        return normalizeCareer(parsed.career)
-      } catch {
-        return null
-      }
+      return tryOr(() => careerOf(JSON.parse(raw) as Partial<SaveFile>), null)
     },
 
     save: (career) => {
       const payload: SaveFile = { version: SAVE_FORMAT_VERSION, career }
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-      } catch {
-        // 저장 실패는 진행을 막지 않는다.
-      }
+      // 저장 실패(직렬화 실패 포함)는 진행을 막지 않는다.
+      ignoreErrors(() => window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)))
     },
 
-    clear: () => {
-      try {
-        window.localStorage.removeItem(STORAGE_KEY)
-      } catch {
-        // 무시
-      }
-    },
+    clear: () => safeLocalStorage.remove(STORAGE_KEY),
   }
 }
 
-function readRaw(): string | null {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY)
-  } catch {
-    return null
-  }
+/** 읽은 저장 파일 → 커리어. 형식이 안 맞으면 null (예전 능력치 눈금은 10배로 옮긴다) */
+function careerOf(parsed: Partial<SaveFile>): PlayerCareer | null {
+  if (parsed.career === undefined) return null
+  if (parsed.version === LEGACY_ABILITY_VERSION) return normalizeCareer(scaleLegacyAbility(parsed.career))
+  if (parsed.version !== SAVE_FORMAT_VERSION) return null
+  return normalizeCareer(parsed.career)
 }
 
 function scaleLegacyAbility(saved: PlayerCareer): PlayerCareer {

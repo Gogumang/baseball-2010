@@ -50,6 +50,17 @@ export default defineConfig(
       'react-refresh/only-export-components': 'warn',
     },
   },
+  {
+    // 예외 처리는 `src/shared/lib/safe` 도우미(tryOr · tryOrElse · ignoreErrors · withFinally …)로 — 삼키는 자리가 이름으로 드러난다
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/shared/lib/safe/**', ...TEST_FILES],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'TryStatement', message: 'try/catch 는 shared/lib/safe 도우미로 (tryOr · tryOrElse · ignoreErrors · withFinally …)' },
+      ],
+    },
+  },
   { files: TEST_FILES, rules: { 'max-lines': 'off' } },
   { files: [...maxLinesBaseline, 'eslint.max-lines-baseline.js'], rules: { 'max-lines': 'off' } },
   prettier,

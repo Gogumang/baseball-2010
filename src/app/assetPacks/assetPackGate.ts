@@ -15,6 +15,7 @@
  * 결과는 `<html data-asset-packs="…">` 에 적는다(e2e 가 기다린다).
  */
 import { hideAssetLoadingScreen, showAssetLoadingScreen } from '@/app/assetPacks/loadingScreen'
+import { tryOrAsync, tryOrElseAsync } from '@/shared/lib/safe/tryOr'
 
 export const ASSET_PACK_MANIFEST = './asset-packs/manifest.json'
 export const ASSET_PACK_SERVICE_WORKER = './asset-sw.js'
@@ -100,25 +101,23 @@ const absolute = (path: string) => new URL(path, document.baseURI).href
 
 async function fetchManifest(): Promise<AssetPackManifest | null> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
+    // 던지면 undefined — 한 번 더
+    const manifest = await tryOrAsync(async () => {
       const response = await fetch(ASSET_PACK_MANIFEST, { cache: 'no-store' })
       if (!response.ok) return null
       return parseAssetPackManifest(await response.json())
-    } catch {
-      // 한 번 더
-    }
+    }, undefined)
+    if (manifest !== undefined) return manifest
   }
   return null
 }
 
 async function storedPacks(cache: Cache): Promise<string[]> {
-  try {
+  return tryOrAsync(async () => {
     const response = await cache.match(absolute(ASSET_PACK_STORED))
     const value: unknown = response === undefined ? [] : await response.json()
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
-  } catch {
-    return []
-  }
+  }, [])
 }
 
 /** 묶음 하나를 받아 풀고(gzip) 캐시에 넣는다. 받은(gzip) 바이트를 알린다 */
@@ -181,71 +180,74 @@ export interface AssetPackGateOptions {
 export async function runAssetPackGate({ isShortcut }: AssetPackGateOptions): Promise<AssetPackGateResult> {
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') return 'skipped'
   if (!isSupported()) return setResult('unsupported')
-  try {
-    if (isShortcut) {
-      // 바로가기 — 이 맥락에서 이미 받은 판이 있고 워커가 맡고 있을 때만 쓴다(받지 않는다)
-      const controller = navigator.serviceWorker.controller
-      const version = controller === null ? null : new URL(controller.scriptURL).searchParams.get('v')
-      if (version === null || (await storedPacks(await caches.open(`${ASSET_PACK_CACHE_PREFIX}${version}`))).length === 0) {
-        return setResult('skipped')
-      }
-      return setResult('cached')
-    }
-    const manifest = await fetchManifest()
-    if (manifest === null) {
-      // 오프라인(또는 묶음 없는 빌드) — 넣어 둔 판이 있으면 그 판 워커로
-      const version = await storedVersion()
-      if (version === null) return setResult('failed')
-      await navigator.serviceWorker.register(`${ASSET_PACK_SERVICE_WORKER}?v=${version}`)
-      await waitForController(version, 3000)
-      return setResult('offline')
-    }
-    const registering = navigator.serviceWorker.register(`${ASSET_PACK_SERVICE_WORKER}?v=${manifest.version}`)
-    for (const name of await caches.keys()) {
-      const version = versionOfCacheName(name)
-      if (version !== null && version !== manifest.version) await caches.delete(name)
-    }
-    const cache = await caches.open(`${ASSET_PACK_CACHE_PREFIX}${manifest.version}`)
-    const stored = await storedPacks(cache)
-    const missing = missingPacks(manifest, stored)
-    let result: AssetPackGateResult = 'cached'
-    if (missing.length > 0) {
-      const total = missing.reduce((sum, pack) => sum + pack.bytes, 0)
-      let received = 0
-      const screen = showAssetLoadingScreen()
-      screen.update(0, total)
-      const failed: string[] = []
-      await inPool(missing, PARALLEL, async (pack) => {
-        let counted = 0
-        for (let attempt = 0; attempt < RETRIES; attempt += 1) {
-          try {
-            received -= counted
-            counted = 0
-            await downloadPack(cache, pack, (bytes) => {
-              counted += bytes
-              received += bytes
-              screen.update(received, total)
-            })
-            stored.push(pack.file)
-            await cache.put(absolute(ASSET_PACK_STORED), new Response(JSON.stringify(stored), { headers: { 'Content-Type': 'application/json' } }))
-            return
-          } catch {
-            // 다시 받는다
-          }
+  return tryOrElseAsync(
+    async () => {
+      if (isShortcut) {
+        // 바로가기 — 이 맥락에서 이미 받은 판이 있고 워커가 맡고 있을 때만 쓴다(받지 않는다)
+        const controller = navigator.serviceWorker.controller
+        const version = controller === null ? null : new URL(controller.scriptURL).searchParams.get('v')
+        if (version === null || (await storedPacks(await caches.open(`${ASSET_PACK_CACHE_PREFIX}${version}`))).length === 0) {
+          return setResult('skipped')
         }
-        failed.push(pack.file)
-      })
+        return setResult('cached')
+      }
+      const manifest = await fetchManifest()
+      if (manifest === null) {
+        // 오프라인(또는 묶음 없는 빌드) — 넣어 둔 판이 있으면 그 판 워커로
+        const version = await storedVersion()
+        if (version === null) return setResult('failed')
+        await navigator.serviceWorker.register(`${ASSET_PACK_SERVICE_WORKER}?v=${version}`)
+        await waitForController(version, 3000)
+        return setResult('offline')
+      }
+      const registering = navigator.serviceWorker.register(`${ASSET_PACK_SERVICE_WORKER}?v=${manifest.version}`)
+      for (const name of await caches.keys()) {
+        const version = versionOfCacheName(name)
+        if (version !== null && version !== manifest.version) await caches.delete(name)
+      }
+      const cache = await caches.open(`${ASSET_PACK_CACHE_PREFIX}${manifest.version}`)
+      const stored = await storedPacks(cache)
+      const missing = missingPacks(manifest, stored)
+      let result: AssetPackGateResult = 'cached'
+      if (missing.length > 0) {
+        const total = missing.reduce((sum, pack) => sum + pack.bytes, 0)
+        let received = 0
+        const screen = showAssetLoadingScreen()
+        screen.update(0, total)
+        const failed: string[] = []
+        await inPool(missing, PARALLEL, async (pack) => {
+          let counted = 0
+          for (let attempt = 0; attempt < RETRIES; attempt += 1) {
+            // 던지면 다시 받는다
+            const isDone = await tryOrAsync(async () => {
+              received -= counted
+              counted = 0
+              await downloadPack(cache, pack, (bytes) => {
+                counted += bytes
+                received += bytes
+                screen.update(received, total)
+              })
+              stored.push(pack.file)
+              await cache.put(absolute(ASSET_PACK_STORED), new Response(JSON.stringify(stored), { headers: { 'Content-Type': 'application/json' } }))
+              return true
+            }, false)
+            if (isDone) return
+          }
+          failed.push(pack.file)
+        })
+        hideAssetLoadingScreen()
+        result = failed.length === 0 ? 'downloaded' : failed.length < missing.length ? 'partial' : 'failed'
+      }
+      await registering
+      if (stored.length > 0) {
+        await waitForController(manifest.version, 10000)
+        notifyWorker()
+      }
+      return setResult(result)
+    },
+    () => {
       hideAssetLoadingScreen()
-      result = failed.length === 0 ? 'downloaded' : failed.length < missing.length ? 'partial' : 'failed'
-    }
-    await registering
-    if (stored.length > 0) {
-      await waitForController(manifest.version, 10000)
-      notifyWorker()
-    }
-    return setResult(result)
-  } catch {
-    hideAssetLoadingScreen()
-    return setResult('failed')
-  }
+      return setResult('failed')
+    },
+  )
 }

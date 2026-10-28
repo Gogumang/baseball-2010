@@ -8,6 +8,7 @@ import { appTickNow, appTickStartTime } from '@/shared/lib/frameClock/frameClock
 import type { SceneStep } from '@/app/dev/scenes'
 import { captureSnapshot, fiberValuesAt, prepareSnapshot, restoreSnapshot, snapshotDigest } from '@/app/dev/sessionSnapshot'
 import type { SessionSnapshotFile, SnapshotRestoreReport } from '@/app/dev/sessionSnapshot'
+import { tryOrElseAsync, withFinallyAsync } from '@/shared/lib/safe/tryOr'
 
 /**
  * **장면 바로가기 진행기** (개발 · e2e 전용 — `sceneShortcut.ts` 머리말). `main.tsx` 가 켜졌을 때만 동적으로 읽는다.
@@ -145,7 +146,7 @@ export async function bootSceneShortcut(): Promise<void> {
   const fixture = params.get('fixture') ?? (scene === null ? null : (SCENES[scene]?.fixture ?? null))
   if (scene === null && fixture === null) return
   report({ scene, fixture, status: 'loading' })
-  try {
+  await tryOrElseAsync(async () => {
     if (scene !== null && SCENES[scene] === undefined) {
       throw new Error(`장면이 없다: ${scene} (있는 것: ${Object.keys(SCENES).join(', ')})`)
     }
@@ -167,9 +168,12 @@ export async function bootSceneShortcut(): Promise<void> {
       report({ snapshot: snapshotName })
     }
     if (scene === null && loadedSnapshot === null) report({ status: 'ready' })
-  } catch (error) {
-    report({ status: 'error', error: String(error) })
-  }
+  }, reportError)
+}
+
+/** 장면 진행이 던진 예외를 `error` 상태로 알린다 */
+function reportError(error: unknown): void {
+  report({ status: 'error', error: String(error) })
 }
 
 const POLL_MS = 16
@@ -232,17 +236,18 @@ async function runStep(step: SceneStep): Promise<void> {
 export async function runSceneShortcut(): Promise<void> {
   if (status.status === 'error') return
   if (loadedSnapshot !== null) {
+    const snapshot = loadedSnapshot
     setSceneFastForward(true)
-    try {
-      await handlesReady()
-      status.steps.push(`스냅샷 ${status.snapshot ?? ''}`)
-      const restored = await restoreSnapshot(loadedSnapshot)
-      report({ status: 'ready', restore: restored })
-    } catch (error) {
-      report({ status: 'error', error: String(error) })
-    } finally {
-      setSceneFastForward(false)
-    }
+    await withFinallyAsync(
+      () =>
+        tryOrElseAsync(async () => {
+          await handlesReady()
+          status.steps.push(`스냅샷 ${status.snapshot ?? ''}`)
+          const restored = await restoreSnapshot(snapshot)
+          report({ status: 'ready', restore: restored })
+        }, reportError),
+      () => setSceneFastForward(false),
+    )
     return
   }
   if (status.scene === null) return
@@ -250,22 +255,22 @@ export async function runSceneShortcut(): Promise<void> {
   if (scene === undefined) return
   // 단계를 밟는 동안만 연출 판(로딩)을 건너뛴다 — 장면에 닿으면 끈다(그 뒤 손으로 하는 플레이는 원래대로)
   setSceneFastForward(true)
-  try {
-    for (const step of scene.steps) {
-      status.steps.push(step.kind === 'key' ? `key ${step.key}` : step.kind === 'wait' ? `wait ${step.ms}` : step.label)
-      report({ steps: status.steps })
-      await runStep(step)
-    }
-    // 마지막 그림이 화면에 닿게 두 틀 기다린다
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    // `&capture=1` — 이 순간(ready 와 같은 틱)을 뜬다
-    if (new URLSearchParams(window.location.search).has('capture')) {
-      window.__capturedSnapshot = captureSnapshot({ note: scene.description, scene: status.scene, fixture: status.fixture })
-    }
-    report({ status: 'ready' })
-  } catch (error) {
-    report({ status: 'error', error: String(error) })
-  } finally {
-    setSceneFastForward(false)
-  }
+  await withFinallyAsync(
+    () =>
+      tryOrElseAsync(async () => {
+        for (const step of scene.steps) {
+          status.steps.push(step.kind === 'key' ? `key ${step.key}` : step.kind === 'wait' ? `wait ${step.ms}` : step.label)
+          report({ steps: status.steps })
+          await runStep(step)
+        }
+        // 마지막 그림이 화면에 닿게 두 틀 기다린다
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        // `&capture=1` — 이 순간(ready 와 같은 틱)을 뜬다
+        if (new URLSearchParams(window.location.search).has('capture')) {
+          window.__capturedSnapshot = captureSnapshot({ note: scene.description, scene: status.scene, fixture: status.fixture })
+        }
+        report({ status: 'ready' })
+      }, reportError),
+    () => setSceneFastForward(false),
+  )
 }

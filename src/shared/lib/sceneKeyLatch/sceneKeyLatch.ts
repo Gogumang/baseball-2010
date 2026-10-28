@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { gameSceneTickNow, isGameSceneFrozen } from '@/shared/lib/commonWindow/commonWindow'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
+import { withFinally } from '@/shared/lib/safe/tryOr'
 
 /**
  * **키 사건 칸 — 받은 키는 다음 틀의 키 처리가 읽는다** (2026-10-24 직접 떴다, r160 · r167).
@@ -141,11 +142,14 @@ export function runSceneKeys(latch: SceneKeyLatch, tick: number, stateTick: numb
   const applies = latch.take(tick)
   if (applies.length === 0) return
   runningDepth += 1
-  try {
-    for (const apply of applies) apply(stateTick)
-  } finally {
-    runningDepth -= 1
-  }
+  withFinally(
+    () => {
+      for (const apply of applies) apply(stateTick)
+    },
+    () => {
+      runningDepth -= 1
+    },
+  )
 }
 
 /**

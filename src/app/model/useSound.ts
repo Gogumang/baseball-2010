@@ -3,6 +3,7 @@ import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { createWebAudioSound } from '@/shared/api/audio/webAudioSound'
 import { rearmGameSceneFirstDraw } from '@/shared/lib/commonWindow/commonWindow'
+import { tryOrElse } from '@/shared/lib/safe/tryOr'
 
 /** 환경설정 칸(0~4) → 원본 소리 크기 (옵션 +0x2e × 25, 0x2963e) */
 const VOLUME_PER_LEVEL = 25
@@ -18,12 +19,11 @@ const VOLUME_PER_LEVEL = 25
  */
 export function useSound(soundLevel: number): SoundPort {
   const sound = useMemo<SoundPort>(() => {
-    try {
-      return createWebAudioSound({ volume: soundLevel * VOLUME_PER_LEVEL })
-    } catch {
-      // 통로를 못 만드는 환경에서는 게임이 멈추지 않게 조용한 포트로 간다
-      return createSilentSound()
-    }
+    // 통로를 못 만드는 환경에서는 게임이 멈추지 않게 조용한 포트로 간다
+    return tryOrElse(
+      () => createWebAudioSound({ volume: soundLevel * VOLUME_PER_LEVEL }),
+      () => createSilentSound(),
+    )
     // 통로는 앱이 사는 동안 하나다 — 소리 크기는 아래 effect 가 따라간다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
