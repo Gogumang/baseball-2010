@@ -3,7 +3,9 @@ import { type AtBatOutcome, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { quickAtBatResultCodeOf, atBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import { PICKOFF_PLAY_KIND } from '@/entities/defense-controls/model/pickoff'
 import type { LeaguePlateAppearance } from '@/entities/league/model/leaguePlayerStats'
-import { type TeamEntryBatter, NO_ROSTER_SLOT, NO_ACE_BATTER } from '@/features/play-team-game/model/teamGameRoster'
+import { type TeamEntryBatter, NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
+import { leagueRecordKeyOf } from '@/features/play-team-game/model/teamGameFlow/records/leagueRecordKey'
+import { isAcePlayer } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
 
 /** 우리 타순 칸 하나의 루타 목록에 이번 루타를 얹는다 (`0xa86e0`) */
 export function withHitBases(lists: readonly (readonly number[])[], slot: number, hitBases: readonly number[]): readonly (readonly number[])[] {
@@ -59,14 +61,10 @@ export function withLeaguePlateAppearance(
   outcome: AtBatOutcome,
   runsBattedIn: number,
 ): readonly LeaguePlateAppearance[] {
-  const rosterSlot = entry[slot]?.rosterSlot ?? slot
-  if (rosterSlot === NO_ROSTER_SLOT) {
-    // 기록을 실어 선 표 밖 선수(영입한 명전·나리)는 제 레코드에 쌓인다 — 원본 id 로 넘긴다. 마타자는 넘기지 않는다
-    const recordId = entry[slot]?.recordId
-    if (recordId === undefined || (entry[slot]?.aceIndex ?? NO_ACE_BATTER) >= 0) return appearances
-    return [...appearances, { teamId, battingOrderIndex: NO_ROSTER_SLOT, outcome, runsBattedIn, recordId }]
-  }
-  // 트레이드로 옮겨 온 선수는 옛 팀 표 자리(원본 id)로 쌓는다 — 레코드 +0x20~ 가 선수를 따라간다
-  const tableTeamId = entry[slot]?.tableTeamId ?? teamId
-  return [...appearances, { teamId: tableTeamId, battingOrderIndex: rosterSlot, outcome, runsBattedIn }]
+  const player = entry[slot]
+  // 마타자는 표 밖 선수라도 넘기지 않는다 — 기록을 실어 선 표 밖 선수(영입한 명전·나리)만 제 레코드(원본 id)로 쌓인다
+  if (isAcePlayer(player) && player?.rosterSlot === NO_ROSTER_SLOT) return appearances
+  const key = leagueRecordKeyOf(player, teamId, slot)
+  if (key === null) return appearances
+  return [...appearances, { ...key, outcome, runsBattedIn }]
 }

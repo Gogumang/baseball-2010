@@ -1,5 +1,7 @@
 import type { GameState } from '@/entities/game/model/gameState'
-import { withoutPendingBurst } from '@/features/play-team-game/model/teamGameFlow/burst/burst'
+import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { QuickPlateAppearance } from '@/entities/game/model/quickPlateAppearance'
+import { withoutPendingBurst } from '@/features/play-team-game/model/teamGameFlow/burst/dropBurst'
 import type { TeamAutoRelayTick, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**
@@ -16,6 +18,29 @@ export function enterAutoRelay(progress: TeamGameProgress): TeamGameProgress {
 /** 그 틱 뒤 진행을 중계 칸에 싣는다 — 사본에는 중계 칸을 안 남긴다 */
 export function relayTickOf(after: TeamGameProgress, before: GameState, atBat: TeamAutoRelayTick['atBat']): TeamAutoRelayTick {
   return { progress: { ...after, autoRelay: null }, before, halfFlipped: false, atBat }
+}
+
+/** 간이 타석 하나의 중계 틱 — 공 수 · 볼카운트 · 끝 루를 싣는다 */
+export function quickAtBatRelayTickOf(
+  after: TeamGameProgress,
+  before: GameState,
+  ours: boolean,
+  orderIndex: number,
+  outcome: AtBatOutcome,
+  appearance: QuickPlateAppearance,
+): TeamAutoRelayTick {
+  const { play } = appearance
+  return relayTickOf(after, before, {
+    ours,
+    orderIndex,
+    outcome,
+    fouled: play.fouled === true,
+    swingingStrikeOutLost: play.swingingStrikeOutLost === true,
+    strikes: play.strikes,
+    balls: play.balls,
+    basesAtEnd: appearance.advance.bases,
+    runnersAtEnd: appearance.runners,
+  })
 }
 
 /**

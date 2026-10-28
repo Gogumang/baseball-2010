@@ -8,7 +8,7 @@ import {
   entryQuickTiredOf,
   quickPitcherDrainOf,
 } from '@/features/play-team-game/model/teamGameFlow/autoPlay/quickEntries'
-import { relayTickOf } from '@/features/play-team-game/model/teamGameFlow/autoProgress/relayTick'
+import { quickAtBatRelayTickOf } from '@/features/play-team-game/model/teamGameFlow/autoProgress/relayTick'
 import { ourTeamMoraleOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
 import { finishDefensiveAtBat } from '@/features/play-team-game/model/teamGameFlow/defense/finishDefensiveAtBat'
 import { withHalfInningPitches } from '@/features/play-team-game/model/teamGameFlow/records/atBatRecords'
@@ -86,18 +86,6 @@ export function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomP
     null,
     { advance: appearance.advance, runners: appearance.runners, stolenRunners: appearance.stolenRunners },
   )
-  relay?.push(
-    relayTickOf(result, before, {
-      ours: false,
-      orderIndex,
-      outcome: play.outcome,
-      fouled: play.fouled === true,
-      swingingStrikeOutLost: play.swingingStrikeOutLost === true,
-      strikes: play.strikes,
-      balls: play.balls,
-      basesAtEnd: appearance.advance.bases,
-      runnersAtEnd: appearance.runners,
-    }),
-  )
+  relay?.push(quickAtBatRelayTickOf(result, before, false, orderIndex, play.outcome, appearance))
   return result
 }

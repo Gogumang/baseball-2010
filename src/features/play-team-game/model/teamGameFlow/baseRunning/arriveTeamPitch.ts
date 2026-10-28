@@ -9,19 +9,12 @@ import {
   clearsPitchJudgement,
   runOpenedPitchArrivalPlay,
 } from '@/features/defense-play/model/pitchArrivalPlay'
-import { defenseTeamBonusFor } from '@/features/play-team-game/model/teamGameRoster'
 import { applyTeamArrival } from '@/features/play-team-game/model/teamGameFlow/baseRunning/applyTeamArrival'
 import { offenseRunnerTeamGradeOf, runAbilitiesOnBaseOf, withoutSteal } from '@/features/play-team-game/model/teamGameFlow/baseRunning/runners'
-import { abilityContextOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
-import {
-  defenseAbilitiesFor,
-  fielderPlatesFor,
-  fielderRecordsFor,
-  fielderSkillIdsFor,
-  runnerAcesFor,
-} from '@/features/play-team-game/model/teamGameFlow/defense/fielders'
+import { cpuDefenseFieldsOf, humanDefenseFieldsOf } from '@/features/play-team-game/model/teamGameFlow/defense/defenseFields'
+import { runnerAcesFor } from '@/features/play-team-game/model/teamGameFlow/defense/fielders'
 import type { TeamPitchArrival } from '@/features/play-team-game/model/teamGameFlow/types/pitchArrival'
-import type { TeamPendingRunnerPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
+import { ARRIVAL_PLAY_KIND, type TeamPendingRunnerPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**
@@ -74,51 +67,21 @@ export function arriveTeamPitch(
     const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
     return { progress: next, play: null, interrupted: false }
   }
-  const { options } = progress
-  const before = progress.game
   const humanOffense = humanSide === '공격'
   const opened = openPitchArrivalPlay(
     {
-      gameMode: options.mode,
+      gameMode: progress.options.mode,
       pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
       stealingFrom: progress.stealingFrom,
-      bases: before.bases,
-      outs: before.outs,
+      bases: progress.game.bases,
+      outs: progress.game.outs,
       batterHand: pitch.batterHand,
       runAbilities: runAbilitiesOnBaseOf(progress, humanSide),
       // 주자 속도의 팀 등급(0xa93ac a9488) — 공격 팀 근성
       runnerTeamGrade: offenseRunnerTeamGradeOf(progress, humanOffense),
       // 마선수 주자 그림(0x79d10) — 공격 팀 타자 · 루 위 주자
       runnerAces: runnerAcesFor(progress, humanOffense),
-      ...(humanOffense
-        ? {
-            // 우리 공격이니 수비는 상대(CPU) — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690 의 둘째 항)
-            defenseAbilities: defenseAbilitiesFor(progress, options.opponentTeamId),
-            defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), options.opponentTeamId),
-            fielderPlates: fielderPlatesFor(progress, options.opponentTeamId, progress.opponentPitcherIndex),
-            fielderSkillIds: fielderSkillIdsFor(progress, options.opponentTeamId),
-            // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
-            defenseTeamIndex: options.opponentTeamId,
-            fielderRecords: fielderRecordsFor(progress, options.opponentTeamId),
-            offenseTeamIndex: options.ourTeamId,
-            defenseIsCpu: true,
-            offenseIsCpu: false,
-            runningMode: options.runningModeManual === true ? ('수동' as const) : ('자동' as const),
-          }
-        : {
-            // 우리 수비 — 공격이 CPU 라 늘 자동 진루, 송구만 환경설정이 먹는다 (0xae6c8 의 첫 항이 거짓)
-            defenseAbilities: defenseAbilitiesFor(progress, options.ourTeamId),
-            defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), options.ourTeamId),
-            fielderPlates: fielderPlatesFor(progress, options.ourTeamId, progress.ourPitcherIndex),
-            fielderSkillIds: fielderSkillIdsFor(progress, options.ourTeamId),
-            // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
-            defenseTeamIndex: options.ourTeamId,
-            fielderRecords: fielderRecordsFor(progress, options.ourTeamId),
-            offenseTeamIndex: options.opponentTeamId,
-            defenseIsCpu: false,
-            offenseIsCpu: true,
-            throwMode: options.throwModeManual === false ? ('자동' as const) : ('수동' as const),
-          }),
+      ...(humanOffense ? cpuDefenseFieldsOf(progress) : humanDefenseFieldsOf(progress)),
       // 장면 +0xfdc — 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱 (안 휘두른 공은 0 — 0x11 진입의 memset)
       buntKind: pitch.buntKind ?? 0,
       scene: progress.defenseScene,
@@ -127,31 +90,37 @@ export function arriveTeamPitch(
     },
     random,
   )
-  // 3e0aa — 낫아웃 갈래가 판정 칸을 지웠나. 같은 진입이 적고 0x12 틱 0 그림이 읽는다 (바뀔 때만 새 객체)
-  const judgementCleared = clearsPitchJudgement(opened)
-  if ((progress.lastPitchJudgementCleared === true) !== judgementCleared) {
-    progress = { ...progress, lastPitchJudgementCleared: judgementCleared }
+  const judged = withPitchJudgementCleared(progress, clearsPitchJudgement(opened))
+  if (opened === null) return { progress: withoutSteal(judged), play: null, interrupted: false }
+  const held = heldRunnerPlayOf(judged, opened, humanSide, live, batterLive)
+  if (held !== null) return { progress: held, play: null, interrupted: false, deferred: true }
+  return applyTeamArrival(judged, runOpenedPitchArrivalPlay(opened), humanSide)
+}
+
+type OpenedArrivalPlay = NonNullable<ReturnType<typeof openPitchArrivalPlay>>
+
+/** 3e0aa — 낫아웃 갈래가 판정 칸을 지웠나. 같은 진입이 적고 0x12 틱 0 그림이 읽는다 (바뀔 때만 새 객체) */
+function withPitchJudgementCleared(progress: TeamGameProgress, cleared: boolean): TeamGameProgress {
+  if ((progress.lastPitchJudgementCleared === true) === cleared) return progress
+  return { ...progress, lastPitchJudgementCleared: cleared }
+}
+
+/**
+ * 화면이 실시간으로 돌릴 판이면 붙든 진행(`pendingRunnerPlay`), 아니면 null. 밀어내기(종류 2)는 늘 미리 돌린다.
+ * - 사람 수비의 도루 · 폭투 판 — 키(+0x160)로 던지므로 화면이 돌린다 (`liveRunnerPlay`). 밀어내기는 vt4c 가 안 돌아 키 송구가 없다.
+ * - 사람 공격의 도루 · 폭투 판 — 주루 키(0x582 · 0x584)와 OK 슬라이딩(0x585)을 받는다. 밀어내기는 0xae794 · 0x518da 가 둘 다 막아 키가 할 일이 없다.
+ */
+function heldRunnerPlayOf(
+  progress: TeamGameProgress,
+  opened: OpenedArrivalPlay,
+  humanSide: ControlSide,
+  live: TeamPendingRunnerPlay['resume'] | undefined,
+  batterLive: TeamPendingRunnerPlay['batter'] | undefined,
+): TeamGameProgress | null {
+  if (opened.kind === ARRIVAL_PLAY_KIND.밀어내기) return null
+  if (live !== undefined && humanSide === '수비') return { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } }
+  if (batterLive !== undefined && humanSide === '공격') {
+    return { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, side: '공격', batter: batterLive } }
   }
-  if (opened === null) return { progress: withoutSteal(progress), play: null, interrupted: false }
-  // 사람 수비의 도루 · 폭투 판 — 키(+0x160)로 던지므로 화면이 실시간으로 돌린다 (`liveRunnerPlay`). 밀어내기(종류 2)는 vt4c 가
-  // 안 돌아 키 송구가 없으니 미리 돌린다
-  if (live !== undefined && humanSide === '수비' && opened.kind !== 2) {
-    return {
-      progress: { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, resume: live } },
-      play: null,
-      interrupted: false,
-      deferred: true,
-    }
-  }
-  // 사람 공격의 도루 · 폭투 판 — 주루 키(0x582 · 0x584)와 OK 슬라이딩(0x585)을 받으므로 화면이 실시간으로 돌린다. 밀어내기(종류 2)는
-  // 0xae794 · 0x518da 가 둘 다 막아 키가 할 일이 없으니 미리 돌린다
-  if (batterLive !== undefined && humanSide === '공격' && opened.kind !== 2) {
-    return {
-      progress: { ...progress, pendingRunnerPlay: { kind: 'arrival', opened, side: '공격', batter: batterLive } },
-      play: null,
-      interrupted: false,
-      deferred: true,
-    }
-  }
-  return applyTeamArrival(progress, runOpenedPitchArrivalPlay(opened), humanSide)
+  return null
 }

@@ -1,17 +1,10 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { pickoffPlayForKey, type PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { type PickoffPlayInput, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
-import { defenseTeamBonusFor } from '@/features/play-team-game/model/teamGameRoster'
 import { applyPickoffPlay } from '@/features/play-team-game/model/teamGameFlow/baseRunning/applyPickoffPlay'
 import { hasRunnerOn, offenseRunnerTeamGradeOf } from '@/features/play-team-game/model/teamGameFlow/baseRunning/runners'
-import { abilityContextOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
-import {
-  defenseAbilitiesFor,
-  fielderPlatesFor,
-  fielderRecordsFor,
-  fielderSkillIdsFor,
-  runnerAcesFor,
-} from '@/features/play-team-game/model/teamGameFlow/defense/fielders'
+import { cpuDefenseFieldsOf, humanDefenseFieldsOf } from '@/features/play-team-game/model/teamGameFlow/defense/defenseFields'
+import { runnerAcesFor } from '@/features/play-team-game/model/teamGameFlow/defense/fielders'
 import { runAbilityFor } from '@/features/play-team-game/model/teamGameFlow/roster/batters'
 import { isBatterTurn, isPitchTurn } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
@@ -42,31 +35,13 @@ export function pickoff(
   const play = pickoffPlayForKey(webKey, (base) => hasRunnerOn(bases, base))
   if (play === null) return progress
   const input: PickoffPlayInput = {
-    targetBase: play.targetBase,
-    bases,
-    outs: progress.game.outs,
+    ...pickoffFieldsOf(progress, play.targetBase, random),
     // 우리가 수비 중이다 — 아홉 칸은 우리 팀, 주자는 상대 (타구 진행기 `defensiveDefenseInputOf` 와 같은 근사:
-    // 주자 모두가 지금 타자의 주루를 쓴다)
-    defenseAbilities: defenseAbilitiesFor(progress, progress.options.ourTeamId),
-    defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.ourTeamId),
+    // 주자 모두가 지금 타자의 주루를 쓴다). 사람이 수비해 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다
+    ...humanDefenseFieldsOf(progress),
     runnerTeamGrade: offenseRunnerTeamGradeOf(progress, false),
-    // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
-    sceneResultCode: progress.sceneResultCode,
-    fielderPlates: fielderPlatesFor(progress, progress.options.ourTeamId, progress.ourPitcherIndex),
-    fielderSkillIds: fielderSkillIdsFor(progress, progress.options.ourTeamId),
-    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
-    defenseTeamIndex: progress.options.ourTeamId,
-    fielderRecords: fielderRecordsFor(progress, progress.options.ourTeamId),
-    offenseTeamIndex: progress.options.opponentTeamId,
     runnerAces: runnerAcesFor(progress, false),
     runAbility: runAbilityFor(progress, progress.options.opponentTeamId, progress.opponentOrderIndex),
-    random,
-    // 공격이 CPU 라 자동 진루 제어기(0xaf918)가 돈다 (0xae690 첫 항)
-    offenseIsCpu: true,
-    // 사람이 수비한다 — 0xae6c8 은 환경설정 "송구"(+0xf4) 혼자가 받은 야수의 0xafa60 을 켠다 (타구 진행기와 같은 배선)
-    defenseIsCpu: false,
-    throwMode: progress.options.throwModeManual === false ? '자동' : '수동',
-    scene: progress.defenseScene,
   }
   if (live) return { ...progress, pendingRunnerPlay: { kind: 'pickoff', input } }
   return applyPickoffPlay(progress, runPickoffPlay(input), '수비', random)
@@ -99,31 +74,25 @@ export function cpuPickoff(
   const bases = progress.game.bases
   if (!hasRunnerOn(bases, base)) return progress
   const input: PickoffPlayInput = {
-    targetBase: base,
-    bases,
-    outs: progress.game.outs,
-    // 우리 공격이니 수비는 상대 팀이다
-    defenseAbilities: defenseAbilitiesFor(progress, progress.options.opponentTeamId),
-    defenseTeamBonus: defenseTeamBonusFor(abilityContextOf(progress.options), progress.options.opponentTeamId),
+    ...pickoffFieldsOf(progress, base, random),
+    // 우리 공격이니 수비는 상대 팀(CPU)이다 — 환경설정 "주루" 가 먹는다 (0xae690 의 둘째 항)
+    ...cpuDefenseFieldsOf(progress),
     runnerTeamGrade: offenseRunnerTeamGradeOf(progress, true),
-    // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값이 남는다
-    sceneResultCode: progress.sceneResultCode,
-    fielderPlates: fielderPlatesFor(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
-    fielderSkillIds: fielderSkillIdsFor(progress, progress.options.opponentTeamId),
-    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
-    defenseTeamIndex: progress.options.opponentTeamId,
-    fielderRecords: fielderRecordsFor(progress, progress.options.opponentTeamId),
-    offenseTeamIndex: progress.options.ourTeamId,
     runnerAces: runnerAcesFor(progress, true),
     runAbility: runAbilityFor(progress, progress.options.ourTeamId, progress.game.battingOrderIndex),
-    random,
-    // 우리가 공격이다 — 환경설정 "주루" 가 먹는다 (0xae690 의 둘째 항)
-    offenseIsCpu: false,
-    runningMode: progress.options.runningModeManual === true ? '수동' : '자동',
-    // 수비는 CPU 다 — 0xae6c8 첫 항이 서서 받은 야수의 0xafa60 이 매 틱 돈다 (d80918a)
-    defenseIsCpu: true,
-    scene: progress.defenseScene,
   }
   if (live) return { ...progress, pendingRunnerPlay: { kind: 'pickoff', input, side: '공격' } }
   return applyPickoffPlay(progress, runPickoffPlay(input), '공격', random)
+}
+
+/** 견제 판 공통 칸 — 노리는 루 · 판 앞 루 · 경기 +0xfd4(견제는 0x11 을 안 지나 앞 공의 값이 남는다) · 난수 · 앞 판의 장면 */
+function pickoffFieldsOf(progress: TeamGameProgress, targetBase: PickoffBase, random: RandomPort) {
+  return {
+    targetBase,
+    bases: progress.game.bases,
+    outs: progress.game.outs,
+    sceneResultCode: progress.sceneResultCode,
+    random,
+    scene: progress.defenseScene,
+  }
 }

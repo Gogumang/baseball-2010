@@ -1,9 +1,8 @@
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
-import { NO_ACE_BATTER } from '@/features/play-team-game/model/teamGameRoster'
 import { type AtBatOutcome, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { SEASON_RECORD_CODE } from '@/entities/season-mode/model/seasonReputation'
-import { BATTING_ORDER_SIZE } from '@/features/play-team-game/model/teamGameFlow/types/constants'
+import { battingSideOf, isAcePlayer } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /** 사이클 판정 `0xa7610` — 그 타순 칸의 루타 목록에 1·2·3·4 가 다 들어 있는가 */
@@ -39,10 +38,8 @@ function settlementBatterGateOf(progress: TeamGameProgress, ourOffense: boolean)
   const { options } = progress
   if (options.mode !== TEAM_GAME_MODE.시즌) return false
   if (options.isPostseason === true || options.nationalCupStage !== undefined) return false
-  const entry = ourOffense ? progress.ourEntry : progress.opponentEntry
-  const order = ourOffense ? progress.game.battingOrderIndex : progress.opponentOrderIndex
-  const slot = ((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE
-  return (entry[slot]?.aceIndex ?? NO_ACE_BATTER) < 0
+  const side = battingSideOf(progress, ourOffense)
+  return !isAcePlayer(side.entry[side.slot])
 }
 
 /**
@@ -66,23 +63,42 @@ export function offenseRecordOf(
   /** 정산 [sp+0x24] > 0 — 홈런 갈래의 시즌 코드 (`homeRunCountedOf`). 안 넘기면 홈런이면 참 */
   homeRunCounted = outcome.kind === '홈런',
 ): { readonly codes: readonly number[]; readonly hitBases: readonly number[] } {
-  const codes: number[] = []
-  let hitBases = hitBasesBefore
-  if (isHit(outcome)) {
-    const bases: number = outcome.kind === '안타' ? outcome.bases : 4
-    const cycleBefore = hasCycle(hitBases)
-    hitBases = [...hitBases, bases]
-    codes.push(SEASON_RECORD_CODE.안타)
-    if (bases === 2) codes.push(SEASON_RECORD_CODE.이루타)
-    if (bases === 3) codes.push(SEASON_RECORD_CODE.삼루타)
-    // 홈런 네 칸은 **타점**이 가른다 — 원본도 득점이 1~4 가 아니면 아무 칸도 안 올린다
-    if (homeRunCounted && runsBattedIn >= 1 && runsBattedIn <= 4) {
-      codes.push(SEASON_RECORD_CODE.솔로홈런 + runsBattedIn - 1)
-    }
-    if (!cycleBefore && hasCycle(hitBases)) codes.push(SEASON_RECORD_CODE.사이클)
+  // a8490 — 안타가 아니면 안타 가지를 통째로 건너뛴다. 남는 것은 a8a46 의 삼진(6)뿐이다
+  if (!isHit(outcome)) {
+    return { codes: outcome.kind === '삼진' ? [SEASON_RECORD_CODE.내타자삼진] : [], hitBases: hitBasesBefore }
   }
-  if (outcome.kind === '삼진') codes.push(SEASON_RECORD_CODE.내타자삼진)
+  const bases = hitBasesOf(outcome)
+  // a86e0 — 루타 값을 타순 칸 기록 목록에 민다
+  const hitBases = [...hitBasesBefore, bases]
+  const codes = [
+    SEASON_RECORD_CODE.안타,
+    ...extraBaseHitCodesOf(bases),
+    ...(homeRunCounted ? homeRunCodesOf(runsBattedIn) : []),
+    // a878a — 플레이 **전** 판정이 거짓인데 지금 참이면
+    ...(!hasCycle(hitBasesBefore) && hasCycle(hitBases) ? [SEASON_RECORD_CODE.사이클] : []),
+  ]
   return { codes, hitBases }
+}
+
+/** 안타의 루타 — 홈런은 4 */
+function hitBasesOf(outcome: AtBatOutcome): number {
+  return outcome.kind === '안타' ? outcome.bases : 4
+}
+
+/** a856e · a85b8 — 루타를 가르기 전의 k=7 뒤에 붙는 2루타(8) · 3루타(9) */
+const EXTRA_BASE_HIT_CODES: Readonly<Record<number, readonly number[]>> = {
+  2: [SEASON_RECORD_CODE.이루타],
+  3: [SEASON_RECORD_CODE.삼루타],
+}
+
+function extraBaseHitCodesOf(bases: number): readonly number[] {
+  return EXTRA_BASE_HIT_CODES[bases] ?? []
+}
+
+/** a8648~ — 홈런 네 칸은 **타점**이 가른다. 원본도 득점이 1~4 가 아니면 아무 칸도 안 올린다 */
+function homeRunCodesOf(runsBattedIn: number): readonly number[] {
+  if (runsBattedIn < 1 || runsBattedIn > 4) return []
+  return [SEASON_RECORD_CODE.솔로홈런 + runsBattedIn - 1]
 }
 
 /**
@@ -106,12 +122,19 @@ export function defenseRecordCodesOf(
   /** state[0x1a] 낫아웃 — a8e5e 가 [sp+0x30] == 2 의 병살 갈래(26 · 코드 5)를 막는다. 삼중살은 막지 않는다 */
   strikeoutWhileRunning = false,
 ): readonly number[] {
-  const codes: number[] = []
   // outcome null = 삼진 없는 도루 판의 정산 — 아웃 칸만 본다
-  if (outcome !== null && outcome.kind === '삼진' && !runnerPlay) codes.push(SEASON_RECORD_CODE.탈삼진)
-  if (outcome !== null && isHit(outcome)) codes.push(SEASON_RECORD_CODE.피안타)
-  if (outsAdded === 2) {
-    if (!strikeoutWhileRunning) codes.push(SEASON_RECORD_CODE.병살)
-  } else if (outsAdded === 3) codes.push(SEASON_RECORD_CODE.삼중살)
-  return codes
+  const strikeout = outcome?.kind === '삼진' && !runnerPlay
+  const hit = outcome !== null && isHit(outcome)
+  return [
+    ...(strikeout ? [SEASON_RECORD_CODE.탈삼진] : []),
+    ...(hit ? [SEASON_RECORD_CODE.피안타] : []),
+    ...multiOutPlayCodesOf(outsAdded, strikeoutWhileRunning),
+  ]
+}
+
+/** a8e58 — 이 플레이 아웃 [sp+0x30] 이 2 면 병살(낫아웃이면 막힌다), 3 이면 삼중살 */
+function multiOutPlayCodesOf(outsAdded: number, strikeoutWhileRunning: boolean): readonly number[] {
+  if (outsAdded === 3) return [SEASON_RECORD_CODE.삼중살]
+  if (outsAdded === 2 && !strikeoutWhileRunning) return [SEASON_RECORD_CODE.병살]
+  return []
 }

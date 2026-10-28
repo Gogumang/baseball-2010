@@ -8,6 +8,8 @@ import { advance } from '@/features/play-team-game/model/teamGameFlow/inningChan
 import { appendLog } from '@/features/play-team-game/model/teamGameFlow/log/appendLog'
 import { withPlateAppearance } from '@/features/play-team-game/model/teamGameFlow/records/plateAppearances'
 import { enterPitchSelection } from '@/features/play-team-game/model/teamGameFlow/scene/enterPitchSelection'
+import { isAtBatInterrupted } from '@/features/play-team-game/model/teamGameFlow/inningChange/halfInning'
+import { battingSideOf, withEntryRecords } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**
@@ -41,39 +43,43 @@ export function applyPickoffPlay(
 ): TeamGameProgress {
   const before = progress.game
   const humanDefends = humanSide === '수비'
-  const recorded: TeamGameProgress = humanDefends
-    ? {
-        ...progress,
-        defenseScene: result.scene,
-        lastDefensePlay: shownLive ? progress.lastDefensePlay : result,
-        opponentEntryRecords: withPlateAppearance(progress.opponentEntryRecords, progress.opponentOrderIndex, null),
-      }
-    : {
-        ...progress,
-        defenseScene: result.scene,
-        lastDefensePlay: shownLive ? progress.lastDefensePlay : result,
-        ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, before.battingOrderIndex, null),
-      }
-  const applied = withRunnerOnlyAdvance(recorded, result.advance, humanSide, result.runnerFates)
-  const { changed, runs } = applied
+  const applied = withRunnerOnlyAdvance(withPickoffShown(progress, result, humanDefends, shownLive), result.advance, humanSide, result.runnerFates)
   // 견제 판도 정산 0xa8024 를 지난다(ae5a8) — 종류 4 라 거르지 않는 칸만(`withRunnerPlaySettlement`). 사건 목록은 0x11 을
   // 안 지나 같은 투구 틈에 앞서 돈 판의 몫이 함께 든다
-  const playEvents = settlementEventsOfPlay(result)
-  const events = withSettlementEvents(progress.pendingSettlementEvents, playEvents)
-  let next = withRunnerPlaySettlement(applied.progress, progress, result, !humanDefends, events)
-  const ended = next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
-  next = { ...next, pendingSettlementEvents: ended ? undefined : events }
+  const events = withSettlementEvents(progress.pendingSettlementEvents, settlementEventsOfPlay(result))
+  const settled = withRunnerPlaySettlement(applied.progress, progress, result, !humanDefends, events)
+  const pending = { ...settled, pendingSettlementEvents: isAtBatInterrupted(before, settled.game) ? undefined : events }
+  const next = appendLog(pending, pickoffLogOf(before, result, humanDefends, applied.runs), true)
+  return continueAfterPickoff(next, applied.changed, random)
+}
 
-  const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
-  next = appendLog(
-    next,
-    `${before.inning}회${before.half} ${humanDefends ? '' : '상대 '}${result.targetBase}루 견제 — ${call}${
-      runs > 0 ? ` (${runs}${humanDefends ? '실점' : '점'})` : ''
-    }`,
-    true,
-  )
-  // 아웃 ≤ 2 면 같은 타석 다음 공 0xf (ae592) — 0xf 진입 0x3d954 가 교체를 다시 묻는다.
-  // 반 이닝이 넘어갔으면 advance 가 새 타석(prepareAtBat)을 세운다
+/**
+ * 판을 재생 칸에 넣고 타석에 선 타자(사람 수비면 상대 타순 칸, 사람 공격이면 우리 타순 칸)의 칸에 판 하나를 얹는다 —
+ * 종류 4 라 타석 칸(+0x14)은 안 오른다(`withPlateAppearance` 에 결과 null)
+ */
+function withPickoffShown(progress: TeamGameProgress, result: PickoffPlayResult, humanDefends: boolean, shownLive: boolean): TeamGameProgress {
+  const shown = { ...progress, defenseScene: result.scene, lastDefensePlay: shownLive ? progress.lastDefensePlay : result }
+  const batting = battingSideOf(progress, !humanDefends)
+  return withEntryRecords(shown, batting.ours, withPlateAppearance(batting.records, batting.order, null))
+}
+
+/** 견제 판 판정 글 */
+function pickoffCallOf(result: PickoffPlayResult): string {
+  if (result.resultCode === PICKOFF_RESULT.OUT) return '견제사'
+  return result.errantThrow ? '악송구' : '세이프'
+}
+
+function pickoffLogOf(before: TeamGameProgress['game'], result: PickoffPlayResult, humanDefends: boolean, runs: number): string {
+  const who = humanDefends ? '' : '상대 '
+  const runsText = runs > 0 ? ` (${runs}${humanDefends ? '실점' : '점'})` : ''
+  return `${before.inning}회${before.half} ${who}${result.targetBase}루 견제 — ${pickoffCallOf(result)}${runsText}`
+}
+
+/**
+ * 아웃 ≤ 2 면 같은 타석 다음 공 0xf (ae592) — 0xf 진입 0x3d954 가 교체를 다시 묻는다.
+ * 반 이닝이 넘어갔으면 advance 가 새 타석(prepareAtBat)을 세운다
+ */
+function continueAfterPickoff(next: TeamGameProgress, changed: boolean, random: RandomPort): TeamGameProgress {
   if (!changed) return enterPitchSelection(next, random)
   const advanced = advance(next, random)
   return advanced === next ? enterPitchSelection(next, random) : advanced

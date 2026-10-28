@@ -4,8 +4,8 @@ import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissi
 import type { PendingDefensePlay, TeamGameLogEntry, TeamPitchingLine } from '@/features/play-team-game/model/teamGameFlow/types/records'
 
 /**
- * `TeamGameProgress` 의 뒤쪽 칸 — 수비 진행 중 타구 · 투구 줄 · 리그 기록 · 돌발 · 로그.
- * 파일 줄 수(150) 때문에 떼어 낸 묶음일 뿐 `TeamGameProgress` 의 모양은 그대로다(r344).
+ * **경기 장부** — `TeamGameProgress` 가운데 경기가 쌓아 가는 칸: 수비 진행 중 타구 · 팀 투구 줄 · 리그 기록표 재료 · 돌발 · 로그.
+ * 경기 끝 요약(`summaryOf`)과 시즌 세션이 읽는 칸들이라 한데 둔다 — `TeamGameProgress` 가 이것을 그대로 넓힌다.
  */
 export interface TeamGameProgressLedger {
   /**

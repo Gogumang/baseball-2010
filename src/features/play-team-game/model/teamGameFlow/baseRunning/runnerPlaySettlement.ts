@@ -2,14 +2,16 @@ import type { DefensePlayResult } from '@/features/defense-play/model/runDefense
 import type { PendingSettlementEvents } from '@/features/defense-play/model/settlementEvents'
 import { baserunnerAllowedOfFates, batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
 import { laserThrowOutRecordOf, multiOutPlayRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
-import { recordPlateAppearance, EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
+import { type BatterGameRecord, recordPlateAppearance, EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
 import { RUNNER_PLAY_OUTCOME_PLACEHOLDER } from '@/features/play-team-game/model/teamGameFlow/baseRunning/runnerOnlyAdvance'
-import { resolveBurstFor } from '@/features/play-team-game/model/teamGameFlow/burst/burst'
+import { resolveBurstFor } from '@/features/play-team-game/model/teamGameFlow/burst/resolveBurst'
 import { halfInningPitchesOf, withGameRecords } from '@/features/play-team-game/model/teamGameFlow/records/atBatRecords'
 import { withSeasonRecord } from '@/features/play-team-game/model/teamGameFlow/records/gameEndRecords'
 import { withLeaguePlateAppearance } from '@/features/play-team-game/model/teamGameFlow/records/plateAppearances'
 import { defenseRecordCodesOf } from '@/features/play-team-game/model/teamGameFlow/records/settlementRecords'
 import { chargeMoundLine } from '@/features/play-team-game/model/teamGameFlow/settlement/pitcherLines'
+import { battingSideOf, withEntryRecords } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
+import type { TeamPitchingLine } from '@/features/play-team-game/model/teamGameFlow/types/records'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**
@@ -40,34 +42,37 @@ export function withRunnerPlaySettlement(
   /** 이 정산이 훑는 사건 — 판의 것에 같은 투구 틈 앞 판의 몫을 더한 값 */
   events: PendingSettlementEvents,
 ): TeamGameProgress {
-  const playOuts = result.advance.outsAdded
-  const earlierOuts = events.outs - playOuts
+  // 같은 투구 틈 앞 판의 몫 — 사건 목록에서 이 판의 것을 뺀 나머지
+  const earlierOuts = events.outs - result.advance.outsAdded
   const earlierRuns = events.runs - result.advance.runsScored
   const lines = earlierOuts > 0 ? chargeMoundLine(next, !humanOffense, { outs: earlierOuts }) : next.pitcherLines
   if (humanOffense) return lines === next.pitcherLines ? next : { ...next, pitcherLines: lines }
   const outsInPlay = events.outs
-  const allowed = next.pitching.allowedBaserunner || baserunnerAllowedOfFates(result.runnerFates)
-  const pitching =
-    allowed === next.pitching.allowedBaserunner && earlierRuns === 0
-      ? next.pitching
-      : { ...next.pitching, allowedBaserunner: allowed, runsAllowed: next.pitching.runsAllowed + earlierRuns }
-  const tally = next.recordTally
   const settled: TeamGameProgress = {
     ...next,
     pitcherLines: lines,
-    pitching,
-    recordTally: outsInPlay === 0 ? tally : { ...tally, moundOuts: tally.moundOuts + outsInPlay },
+    pitching: pitchingAfterRunnerPlay(next.pitching, result, earlierRuns),
+    recordTally: outsInPlay === 0 ? next.recordTally : { ...next.recordTally, moundOuts: next.recordTally.moundOuts + outsInPlay },
     gameRecord: withSeasonRecord(next, '수비', defenseRecordCodesOf(null, outsInPlay, true)),
   }
-  return withGameRecords(
-    settled,
-    [
-      ...laserThrowOutRecordOf({ laserThrowFlag: result.laserOutFlag, outsInPlay }).recordIds,
-      ...multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: false }),
-      ...(playOuts > 0 ? threePitchInningRecordIdsOf(halfInningPitchesOf(before.recordTally, before.game), before.game.outs + playOuts) : []),
-    ],
-    false,
-  )
+  return withGameRecords(settled, runnerPlayRecordIdsOf(before, result, outsInPlay), false)
+}
+
+/** state[0x88] 출루 허용(a8c5c) · state[0x8a] 실점(a8dd0) — 바뀐 것이 없으면 같은 객체 */
+function pitchingAfterRunnerPlay(pitching: TeamPitchingLine, result: DefensePlayResult, earlierRuns: number): TeamPitchingLine {
+  const allowed = pitching.allowedBaserunner || baserunnerAllowedOfFates(result.runnerFates)
+  if (allowed === pitching.allowedBaserunner && earlierRuns === 0) return pitching
+  return { ...pitching, allowedBaserunner: allowed, runsAllowed: pitching.runsAllowed + earlierRuns }
+}
+
+/** 36(a80f8) · 26/27(a8e58) · 25(판의 아웃 콜 — 판의 아웃만 본다) */
+function runnerPlayRecordIdsOf(before: TeamGameProgress, result: DefensePlayResult, outsInPlay: number): readonly number[] {
+  const playOuts = result.advance.outsAdded
+  return [
+    ...laserThrowOutRecordOf({ laserThrowFlag: result.laserOutFlag, outsInPlay }).recordIds,
+    ...multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: false }),
+    ...(playOuts > 0 ? threePitchInningRecordIdsOf(halfInningPitchesOf(before.recordTally, before.game), before.game.outs + playOuts) : []),
+  ]
 }
 
 /**
@@ -88,30 +93,14 @@ export function withTeamWildPitchSettlement(
   humanOffense: boolean,
 ): TeamGameProgress {
   const outs = result.advance.outsAdded
-  const runs = result.advance.runsScored
-  const slot = humanOffense ? before.game.battingOrderIndex : before.opponentOrderIndex
-  const recordsBefore = humanOffense ? next.ourEntryRecords : next.opponentEntryRecords
-  const records = [...recordsBefore]
-  records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
-    isHit: false,
-    isHomeRun: false,
-    ...(outs > 0 ? { resultCode: WILD_PITCH_OUT_RESULT_CODE } : {}),
-  })
+  const slot = battingSideOf(before, humanOffense).order
+  const nextSide = battingSideOf(next, humanOffense)
   const tally = next.recordTally
   const settled: TeamGameProgress = {
-    ...next,
-    ...(humanOffense ? { ourEntryRecords: records } : { opponentEntryRecords: records }),
-    leaguePlateAppearances:
-      outs > 0 && runs === 0
-        ? withLeaguePlateAppearance(
-            next.leaguePlateAppearances,
-            humanOffense ? next.options.ourTeamId : next.options.opponentTeamId,
-            humanOffense ? next.ourEntry : next.opponentEntry,
-            slot,
-            RUNNER_PLAY_OUTCOME_PLACEHOLDER,
-            0,
-          )
-        : next.leaguePlateAppearances,
+    ...withEntryRecords(next, humanOffense, withWildPitchAppearance(nextSide.records, slot, outs)),
+    leaguePlateAppearances: isWildPitchAtBat(result)
+      ? withLeaguePlateAppearance(next.leaguePlateAppearances, nextSide.teamId, nextSide.entry, slot, RUNNER_PLAY_OUTCOME_PLACEHOLDER, 0)
+      : next.leaguePlateAppearances,
     recordTally: {
       ...tally,
       homeRunStreak: outs > 0 ? 0 : tally.homeRunStreak,
@@ -129,6 +118,22 @@ export function withTeamWildPitchSettlement(
     // B5 의 r5 — 목록 0번(가장 뒤 주자)이 들어왔는가
     batterRunnerSafe: batterRunnerSafeOfFates(result.runnerFates),
   })
+}
+
+/** a8ac8 타석 +0x14 (아웃이 없는 끝내기 판도) · a89f4 아웃 > 0 이면 결과 링 ← 5 */
+function withWildPitchAppearance(recordsBefore: readonly BatterGameRecord[], slot: number, outs: number): readonly BatterGameRecord[] {
+  const records = [...recordsBefore]
+  records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
+    isHit: false,
+    isHomeRun: false,
+    ...(outs > 0 ? { resultCode: WILD_PITCH_OUT_RESULT_CODE } : {}),
+  })
+  return records
+}
+
+/** a882e/a8852 — 아웃 > 0 이고 득점이 없으면 지금 타자 타수 +0x20 (득점 · 아웃이 함께면 건너뜀) */
+function isWildPitchAtBat(result: DefensePlayResult): boolean {
+  return result.advance.outsAdded > 0 && result.advance.runsScored === 0
 }
 
 /** 종류 9 판 정산의 결과 링 코드 5(그 밖의 아웃, a8a9e) — 판에 공 잡은 뜬공이 없다 */

@@ -1,6 +1,7 @@
 import { type DrawnFieldingError, fieldingErrorRecordsOf, fielderRecordIndexOf } from '@/features/defense-play/model/fieldingErrors'
-import { NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
 import { SEASON_RECORD_CODE } from '@/entities/season-mode/model/seasonReputation'
+import { type LeagueRecordKey, leagueRecordKeyOf } from '@/features/play-team-game/model/teamGameFlow/records/leagueRecordKey'
+import { isAcePlayer } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
 import { withSeasonRecord } from '@/features/play-team-game/model/teamGameFlow/records/gameEndRecords'
 import { entryBattersOf } from '@/features/play-team-game/model/teamGameFlow/roster/batters'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
@@ -13,19 +14,7 @@ import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameF
  */
 export function recordDrawnTeamFieldingErrors(progress: TeamGameProgress, drawn: readonly DrawnFieldingError[]): TeamGameProgress {
   const gameDrawn = drawn.filter((error) => error.teamIndex === progress.options.ourTeamId || error.teamIndex === progress.options.opponentTeamId)
-  const errors = fieldingErrorRecordsOf(gameDrawn, (error) => {
-    const teamId = error.teamIndex
-    if (teamId === null) return null
-    const entry = entryBattersOf(progress, teamId)
-    const index = fielderRecordIndexOf(entry, error.slot)
-    const player = entry[index]
-    if (player === undefined || player.aceIndex >= 0) return null
-    const rosterSlot = player.rosterSlot
-    if (rosterSlot === NO_ROSTER_SLOT) {
-      return player.recordId === undefined ? null : { teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId: player.recordId }
-    }
-    return { teamId: player.tableTeamId ?? teamId, battingOrderIndex: rosterSlot }
-  })
+  const errors = fieldingErrorRecordsOf(gameDrawn, (error) => fieldingErrorKeyOf(progress, error))
   /*
    * 펌블 갈래는 +0x2e 뒤 0xa755d(ctx, 3) — 시즌 평판 코드 3(수비실수, 43854~43862). [+0xec] != 0 일 때만이라 레코드를 찾은 야수만
    * (마선수도 레코드가 있어 센다 — 기록표 칸이 없을 뿐). 게이트 0xa755c 는 코드 ≤ 5 를 공격측이 CPU 일 때만 적으므로 우리 팀 수비 그림만 남는다
@@ -43,4 +32,14 @@ export function recordDrawnTeamFieldingErrors(progress: TeamGameProgress, drawn:
     ...(errors.length === 0 ? {} : { leagueErrors: [...(progress.leagueErrors ?? []), ...errors] }),
     gameRecord,
   }
+}
+
+/** 실책을 올린 야수의 기록표 열쇠 — 팀을 모르는 그림 · 칸이 빈 야수 · 마선수는 없다(null) */
+function fieldingErrorKeyOf(progress: TeamGameProgress, error: DrawnFieldingError): LeagueRecordKey | null {
+  const teamId = error.teamIndex
+  if (teamId === null) return null
+  const entry = entryBattersOf(progress, teamId)
+  const player = entry[fielderRecordIndexOf(entry, error.slot)]
+  if (player === undefined || isAcePlayer(player)) return null
+  return leagueRecordKeyOf(player, teamId, player.rosterSlot)
 }

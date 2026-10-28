@@ -1,16 +1,17 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { runDefensePlay, recordedOutcomeOf, isBattedBallInPlay, withPredictedOutcome } from '@/features/defense-play/model/runDefensePlay'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
+import { runDefensePlay, recordedOutcomeOf, withPredictedOutcome } from '@/features/defense-play/model/runDefensePlay'
 import { holdsUntilResultWaitEnd } from '@/features/play-game/model/benchClearingScene'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
-import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
-import { arrivalApplicationOf } from '@/features/defense-play/model/pitchArrivalPlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
-import { stealPlayWithStrikeoutOf } from '@/features/play-team-game/model/teamGameFlow/baseRunning/arrivalPlays'
+import { droppedThirdStrikeArrivalOf, stealPlayWithStrikeoutOf } from '@/features/play-team-game/model/teamGameFlow/baseRunning/arrivalPlays'
 import { withoutSteal, withoutStealDisplay } from '@/features/play-team-game/model/teamGameFlow/baseRunning/runners'
 import { finishBatterOutcome } from '@/features/play-team-game/model/teamGameFlow/batting/finishBatterOutcome'
 import { resolveBenchClearing } from '@/features/play-team-game/model/teamGameFlow/benchClearing/benchClearing'
+import { withResultWaitHold } from '@/features/play-team-game/model/teamGameFlow/benchClearing/resultWaitHold'
+import { isBattedIntoPlay } from '@/features/play-team-game/model/teamGameFlow/defense/battedIntoPlay'
 import { batterDefenseInputOf } from '@/features/play-team-game/model/teamGameFlow/defense/defenseInputs'
 import type { BatterOutcomeOptions } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
@@ -62,41 +63,50 @@ export function startBatterOutcome(
 ): TeamGameProgress {
   if (progress.game.isFinished) return progress
   // 출발 칸은 이 공 하나의 것이다 — 타구 판 입력이 읽고 나면 비운다
-  const stealing = progress
-  progress = withoutSteal(progress)
-  // 볼넷 · 사구 · 판 없는 삼진 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기
-  // 주루 · 정산(삼진은 0xd · 0x18 과 0xa8024)은 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 —
-  // `judgeHitByPitch`, A-22 · r295 · r298)
-  if (holdsUntilResultWaitEnd(outcome, options.arrivalPlay)) {
-    const arrivalPlay = options.arrivalPlay ?? null
-    return {
-      ...progress,
-      pendingBenchClearing: arrivalPlay === null ? { phase: 'wait', side: '공격', outcome } : { phase: 'wait', side: '공격', outcome, arrivalPlay },
-    }
-  }
+  const cleared = withoutSteal(progress)
+  // 볼넷 · 사구 · 판 없는 삼진 — 0x12 대기 끝까지 붙든다 (`withResultWaitHold`)
+  if (holdsUntilResultWaitEnd(outcome, options.arrivalPlay)) return withResultWaitHold(cleared, '공격', outcome, options.arrivalPlay ?? null)
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
   const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
-  // 판정 11(2스트라이크 번트 파울 아웃)도 파울 각 공 판이 낸다 — 여기 오는 맞은 공은 모두 판을 돈다
-  const inPlay = pattern !== undefined ? isBattedBallKind(outcome) : isBattedBallInPlay(outcome)
-  if (!inPlay) {
-    const arrival = options.arrivalPlay ?? null
-    // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a])
-    if (arrival !== null && arrivalApplicationOf(arrival) === 'batterRuns') {
-      return finishBatterOutcome(progress, outcome, random, arrival.result, arrival.result)
-    }
-    // ⚠️ 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다.
-    // 이 공이 연 도루·폭투 판이 있으면 그 판을 재생 칸에 남긴다
-    const playback =
-      homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs, pattern: options.pattern }) ?? arrival?.result ?? null
-    return finishBatterOutcome(progress, outcome, random, null, playback, stealPlayWithStrikeoutOf(arrival, outcome))
-  }
-  // ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
-  // 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
-  const input = withPredictedOutcome(
-    pattern !== undefined
-      ? batterDefenseInputOf(stealing, outcome, pattern, random, options)
-      : { ...batterDefenseInputOf(stealing, outcome, fixturePatternFor(outcome), random, options), outcomeIsGiven: true },
-  )
+  if (!isBattedIntoPlay(outcome, pattern)) return finishUnplayedOurAtBat(cleared, outcome, random, options)
+  return startOurInPlayDefense(progress, cleared, outcome, pattern, random, options)
+}
+
+/**
+ * 인플레이 타구 — 진행기에 넘길 판 입력만 만들어 `pendingDefensePlay` 에 얹는다. 판 입력은 출발 칸이 남은 진행(`stealing`)으로 만든다.
+ * ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
+ * 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
+ */
+function startOurInPlayDefense(
+  stealing: TeamGameProgress,
+  cleared: TeamGameProgress,
+  outcome: AtBatOutcome,
+  pattern: BattedBallPattern | undefined,
+  random: RandomPort,
+  options: BatterOutcomeOptions,
+): TeamGameProgress {
+  const input = withPredictedOutcome({
+    ...batterDefenseInputOf(stealing, outcome, pattern ?? fixturePatternFor(outcome), random, options),
+    ...(pattern === undefined ? { outcomeIsGiven: true } : {}),
+  })
   // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
-  return { ...withoutStealDisplay(progress), pendingDefensePlay: { side: '공격', input, outcome: input.outcome } }
+  return { ...withoutStealDisplay(cleared), pendingDefensePlay: { side: '공격', input, outcome: input.outcome } }
+}
+
+/** 판을 안 도는 사람 타석 — 낫아웃 판 · 홈런 · 판 없이 끝난 공 */
+function finishUnplayedOurAtBat(
+  progress: TeamGameProgress,
+  outcome: AtBatOutcome,
+  random: RandomPort,
+  options: BatterOutcomeOptions,
+): TeamGameProgress {
+  const arrival = options.arrivalPlay ?? null
+  // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a])
+  const droppedThirdStrike = droppedThirdStrikeArrivalOf(arrival)
+  if (droppedThirdStrike !== undefined) return finishBatterOutcome(progress, outcome, random, droppedThirdStrike.result, droppedThirdStrike.result)
+  // ⚠️ 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다.
+  // 이 공이 연 도루·폭투 판이 있으면 그 판을 재생 칸에 남긴다
+  const playback =
+    homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs, pattern: options.pattern }) ?? arrival?.result ?? null
+  return finishBatterOutcome(progress, outcome, random, null, playback, stealPlayWithStrikeoutOf(arrival, outcome))
 }

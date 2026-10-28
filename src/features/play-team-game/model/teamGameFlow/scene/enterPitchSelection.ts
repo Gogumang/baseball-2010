@@ -4,8 +4,8 @@ import { runnerCountOf } from '@/entities/game/model/baseState'
 import { withoutStealDisplay } from '@/features/play-team-game/model/teamGameFlow/baseRunning/runners'
 import { pitcherRepertoireAt } from '@/features/play-team-game/model/teamGameFlow/roster/pitchers'
 import { enterConfirmWait } from '@/features/play-team-game/model/teamGameFlow/scene/sceneConfirm'
-import { judgeAutoPitcherChange } from '@/features/play-team-game/model/teamGameFlow/substitution/autoPitcherChange'
-import { applyCpuPinchHit } from '@/features/play-team-game/model/teamGameFlow/substitution/cpuPinchHit'
+import { rollAutoPitcherChange } from '@/features/play-team-game/model/teamGameFlow/substitution/autoPitcherChange'
+import { rollCpuPinchHit } from '@/features/play-team-game/model/teamGameFlow/substitution/cpuPinchHit'
 import { isHumanTurn, isOurOffense, isPitchTurn } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
@@ -30,7 +30,7 @@ import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameF
  * 서 있어 같은 판정이 곧장 빠진다. 이 함수 안에 다른 굴림은 없다(3d954~3ddd6 의 호출을 다 봤다).
  *
  * 0xac428 의 인자는 간이 엔진(0xc1ba4 의 0xc1ce2)과 같다 — 팀 경기 모드(1·2·8·9)에서 `[sp+4]`(모드 3)·`[sp+0xc]`
- * (최소 벤치)가 둘 다 0 이다 — 그래서 `judgeAutoPitcherChange` 를 그대로 쓴다.
+ * (최소 벤치)가 둘 다 0 이다 — 그래서 `rollAutoPitcherChange` 를 그대로 쓴다.
  */
 export function enterPitchSelection(entering: TeamGameProgress, random: RandomPort): TeamGameProgress {
   if (entering.game.isFinished || !isHumanTurn(entering)) return entering
@@ -38,24 +38,34 @@ export function enterPitchSelection(entering: TeamGameProgress, random: RandomPo
   const progress = withoutStealDisplay(entering)
   // 3d9fc · 3da44 — 돌발 진행 중(0x8eb94 = obj+0xc ≠ −1)이면 두 판정 모두 건너뛴다
   if (progress.burst !== null && progress.burst.current !== null) return progress
-  const changed = isOurOffense(progress) ? judgeAutoPitcherChange(progress, false, random, true) : applyCpuPinchHit(progress, false, random, true)
+  // 3d9e4 — 수비 팀이 CPU(우리 공격)면 투수 교체, 사람(우리 수비)이면 CPU 대타를 묻는다
+  return isOurOffense(progress) ? rollCpuPitcherChangeAtSelection(progress, random) : rollCpuPinchHitAtSelection(progress, random)
+}
+
+/** 3da3e — 우리 공격: 상대 CPU 투수 교체 0xac428 */
+function rollCpuPitcherChangeAtSelection(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  const changed = rollAutoPitcherChange(progress, false, random, true)
   if (changed === progress) return progress
   // 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 수비가 CPU 일 때만,
   // 내려가는 투수의 구질 목록 · 남은 마구로 (`rollCpuPitchTypeOnPitcherChangeTick`)
-  if (isOurOffense(progress)) {
-    rollCpuPitchTypeOnPitcherChangeTick(
-      {
-        repertoire: pitcherRepertoireAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
-        magicRemaining: progress.opponentMagicRemaining,
-        runnerCount: runnerCountOf(progress.game.bases),
-        strikes: progress.atBat.strikes,
-        balls: progress.atBat.balls,
-      },
-      random,
-    )
-  }
+  rollCpuPitchTypeOnPitcherChangeTick(
+    {
+      repertoire: pitcherRepertoireAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex),
+      magicRemaining: progress.opponentMagicRemaining,
+      runnerCount: runnerCountOf(progress.game.bases),
+      strikes: progress.atBat.strikes,
+      balls: progress.atBat.balls,
+    },
+    random,
+  )
   // 22 → 0x16 → 0xd(지우기 건너뜀) → 0xe(OK 를 다시 기다린다) → OK 뒤 0xf
   return enterConfirmWait(changed)
+}
+
+/** 3da70 — 우리 수비: 상대 CPU 대타 0xac228 */
+function rollCpuPinchHitAtSelection(progress: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  const changed = rollCpuPinchHit(progress, false, random, true)
+  return changed === progress ? progress : enterConfirmWait(changed)
 }
 
 /**

@@ -1,8 +1,8 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { NO_ACE_BATTER } from '@/features/play-team-game/model/teamGameRoster'
 import { appendLog } from '@/features/play-team-game/model/teamGameFlow/log/appendLog'
-import { UNFILLED_SPECIAL_SWING, withSpecialSwingSlot } from '@/features/play-team-game/model/teamGameFlow/roster/specialSwing'
 import { enterConfirmWait, substitutionSceneAfter, withCheerRestore } from '@/features/play-team-game/model/teamGameFlow/scene/sceneConfirm'
+import { withOurPinchHitter } from '@/features/play-team-game/model/teamGameFlow/substitution/pinchHitterSwap'
 import { substituteBatter } from '@/features/play-team-game/model/teamGameFlow/substitution/substituteBatter'
 import { isBatterTurn } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
 import { BATTING_ORDER_SIZE } from '@/features/play-team-game/model/teamGameFlow/types/constants'
@@ -78,15 +78,8 @@ export function pinchHit(
 
   const changed = appendLog(
     {
-      ...progress,
-      ourEntry: swapped.entry,
-      ourEntryRecords: swapped.records,
-      ourHitBases: swapped.hitBases ?? progress.ourHitBases,
-      ourBatterLogs: swapped.logs ?? progress.ourBatterLogs,
-      // 4. 벤치 타자 수 −1
-      ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
-      // 0xaede0 — 그 타순의 필살 남은 칸을 −1 로 되돌려 들어온 선수가 자기 횟수를 새로 받는다 (H2 1-2)
-      ourSpecialSwingRemaining: withSpecialSwingSlot(progress.ourSpecialSwingRemaining, progress.game.battingOrderIndex, UNFILLED_SPECIAL_SWING),
+      // 4. 벤치 타자 수 −1 · 필살 남은 칸 되돌림 (`withOurPinchHitter`)
+      ...withOurPinchHitter(progress, swapped, progress.game.battingOrderIndex),
       // 상태 0x16 → 0xd: 이전 상태가 0x16 이라 0xb6764·0xa5bcc 를 건너뛴다 — 카운트를 그대로 둔다
       atBat: progress.atBat,
       // 0x3d458 → 0xa5bf0(ctx, 0): 사람 공격이라 ctx+0x160 = 1

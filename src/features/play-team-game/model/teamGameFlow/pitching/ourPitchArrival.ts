@@ -2,19 +2,21 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { holdsUntilResultWaitEnd } from '@/features/play-game/model/benchClearingScene'
 import { runDefensePlay, recordedOutcomeOf, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
-import { finishPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import { type PitchArrivalPlay, finishPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import { applyPickoffPlay } from '@/features/play-team-game/model/teamGameFlow/baseRunning/applyPickoffPlay'
 import { applyTeamArrival } from '@/features/play-team-game/model/teamGameFlow/baseRunning/applyTeamArrival'
 import { arriveTeamPitch } from '@/features/play-team-game/model/teamGameFlow/baseRunning/arriveTeamPitch'
+import { continueOurAtBatAfterArrival } from '@/features/play-team-game/model/teamGameFlow/batting/afterBatterArrival'
 import { startBatterOutcome } from '@/features/play-team-game/model/teamGameFlow/batting/batterOutcome'
 import { resolveBenchClearing } from '@/features/play-team-game/model/teamGameFlow/benchClearing/benchClearing'
+import { withResultWaitHold } from '@/features/play-team-game/model/teamGameFlow/benchClearing/resultWaitHold'
 import { startDefensiveAtBat } from '@/features/play-team-game/model/teamGameFlow/defense/defensiveAtBat'
 import { finishDefensiveAtBat } from '@/features/play-team-game/model/teamGameFlow/defense/finishDefensiveAtBat'
 import { advance } from '@/features/play-team-game/model/teamGameFlow/inningChange/advance'
 import { enterPitchSelection } from '@/features/play-team-game/model/teamGameFlow/scene/enterPitchSelection'
 import type { TeamPitchArrival } from '@/features/play-team-game/model/teamGameFlow/types/pitchArrival'
-import type { TeamPendingPitchArrival } from '@/features/play-team-game/model/teamGameFlow/types/plays'
+import type { TeamPendingPitchArrival, TeamPendingRunnerPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**
@@ -68,11 +70,7 @@ function afterOurPitchArrival(
   // 주루(0x17)·정산(삼진은 0xd · 0x18 과 0xa8024)으로 보낸다 — 그동안 붙든다(`judgeHitByPitch`, A-22 · r295 · r298).
   // 끼어들 사람이 없는 갈래는 대기 · 연출을 끝까지 본 것으로
   if (holdsUntilResultWaitEnd(outcome, arrival.play)) {
-    const held: TeamGameProgress = {
-      ...arrived,
-      pendingBenchClearing:
-        arrival.play === null ? { phase: 'wait', side: '수비', outcome } : { phase: 'wait', side: '수비', outcome, arrivalPlay: arrival.play },
-    }
+    const held = withResultWaitHold(arrived, '수비', outcome, arrival.play)
     return defer ? held : resolveBenchClearing(held, { reachedTargetTick: true }, random)
   }
   // 0x517e6 — CPU 마타자 필살이 성공한 타구는 "송구공" 비트(0xaf180)가 서서 야수가 쥐지 못한다
@@ -99,18 +97,19 @@ export function resolveRunnerPlay(progress: TeamGameProgress, result: DefensePla
   if (pending == null) return progress
   const cleared: TeamGameProgress = { ...progress, pendingRunnerPlay: null }
   const side = pending.side ?? '수비'
-  if (pending.kind === 'pickoff') {
-    if (!isPickoffPlayResult(result)) return cleared
-    return applyPickoffPlay(cleared, result, side, random, true)
-  }
+  if (pending.kind === 'pickoff') return isPickoffPlayResult(result) ? applyPickoffPlay(cleared, result, side, random, true) : cleared
   const play = finishPitchArrivalPlay(pending.opened, result as RunnerPlayEngineResult, true)
-  if (side === '공격') {
-    // 사람 공격 — `batterPitch` 의 나머지(판에서 끊김 → 다음 타석 · 같은 타석 → 0xf · 타석 끝 → 타석 결과)
-    const arrival = applyTeamArrival(cleared, play, '공격')
-    if (arrival.interrupted) return advance(arrival.progress, random)
-    const batter = pending.batter
-    if (batter === undefined || batter.outcome === null) return enterPitchSelection(arrival.progress, random)
-    return startBatterOutcome(arrival.progress, batter.outcome, random, { ...batter.options, arrivalPlay: arrival.play })
-  }
+  if (side === '공격') return continueOurAtBatAfterRunnerPlay(cleared, play, pending.batter, random)
   return afterOurPitchArrival(applyTeamArrival(cleared, play, '수비'), pending.resume ?? { buntKind: 0 }, random, true)
+}
+
+/** 사람 공격 — `batterPitch` 의 나머지(판에서 끊김 → 다음 타석 · 같은 타석 → 0xf · 타석 끝 → 타석 결과) */
+function continueOurAtBatAfterRunnerPlay(
+  cleared: TeamGameProgress,
+  play: PitchArrivalPlay,
+  batter: TeamPendingRunnerPlay['batter'],
+  random: RandomPort,
+): TeamGameProgress {
+  const arrival = applyTeamArrival(cleared, play, '공격')
+  return continueOurAtBatAfterArrival(arrival, batter?.outcome ?? null, random, batter?.options ?? {}, startBatterOutcome)
 }

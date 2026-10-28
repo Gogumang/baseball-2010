@@ -2,6 +2,7 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { strikeoutRecordIdsOf, laserThrowOutRecordOf, multiOutPlayRecordIdsOf, threePitchInningRecordIdsOf } from '@/entities/game/model/gameRecords'
 import { withGameRecords } from '@/features/play-team-game/model/teamGameFlow/records/atBatRecords'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
+import type { TeamRecordTally } from '@/features/play-team-game/model/teamGameFlow/types/records'
 
 /**
  * **우리 수비 타석 하나의 기록달성** — 사람 장면·간이 엔진 공통.
@@ -58,60 +59,98 @@ export function withOurDefenseRecords(
     readonly droppedThirdStrike?: boolean
   },
 ): TeamGameProgress {
-  const tally = progress.recordTally
+  const facts = defenseSettlementFactsOf(progress.recordTally, play)
+  return withGameRecords({ ...progress, recordTally: tallyAfterDefense(progress.recordTally, facts) }, defenseRecordIdsOf(play, facts), false)
+}
+
+type DefensePlayRecord = Parameters<typeof withOurDefenseRecords>[1]
+
+/** 정산 한 번이 보는 사실들 — 판정만 모은다 */
+interface DefenseSettlementFacts {
+  readonly strikeout: boolean
+  /** 삼진 + 도루 판(종류 5)과 한 정산 */
+  readonly runnerPlay: boolean
+  readonly wildPitchOuts: number
+  readonly droppedThirdStrike: boolean
+  /** 이 정산의 아웃 [sp+0x30] — 삼진 이벤트 5 와 판의 아웃 이벤트 0xd 를 함께 센다 (낫아웃은 삼진 콜의 5 가 하나 더) */
+  readonly outsInPlay: number
+  /** 낫아웃이면 삼진 콜이 넣은 사건 5 하나 — 아웃 콜(0xa7d0c)이 아니라 state[6] 을 안 올린다 */
+  readonly strikeoutCallEvent: number
+  readonly moundStrikeouts: number
+  /** 0xa7c4c 가 올린 R[1] — 18~23 판정 0xa7998 이 보는 값 */
+  readonly comboAtCall: number
+  /** 셋째 아웃 판정의 아웃 — 아웃 콜(0xa7d0c)이 센 판의 아웃까지다 */
+  readonly outsAfter: number
+}
+
+function defenseSettlementFactsOf(tally: TeamRecordTally, play: DefensePlayRecord): DefenseSettlementFacts {
   const strikeout = play.outcome.kind === '삼진'
   const runnerPlay = play.stealPlayOuts !== undefined
   const wildPitchOuts = play.wildPitchPlayOuts ?? 0
   const droppedThirdStrike = play.droppedThirdStrike === true
-  // 이 정산의 아웃 [sp+0x30] — 삼진 이벤트 5 와 판의 아웃 이벤트 0xd 를 함께 센다 (낫아웃은 삼진 콜의 5 가 하나 더)
-  const outsInPlay = play.outsAdded + (play.stealPlayOuts ?? 0) + wildPitchOuts + (droppedThirdStrike ? 1 : 0)
-  const moundStrikeouts = tally.moundStrikeouts + (strikeout ? 1 : 0)
-  // 0xa7c4c 가 R[1] 을 올리고(18~23 판정 0xa7998 은 이 값을 본다), 지우기(a8fb6~a8ff8)는 종류 4·5 를 건너뛰고
-  // `[sp+0x20] > 0 && !state[0x1a]` 가 아니면 지운다 — 낫아웃 삼진은 판정 뒤 콤보를 끊는다
-  const comboAtCall = strikeout ? tally.moundStrikeoutCombo + 1 : runnerPlay ? tally.moundStrikeoutCombo : 0
-  const moundStrikeoutCombo = droppedThirdStrike ? 0 : comboAtCall
-  // 셋째 아웃은 아웃 콜(0xa7d0c)이 센 판의 아웃까지다 — 낫아웃의 삼진 사건은 state[6] 을 안 올린다
-  const outs = play.outsBefore + outsInPlay - (droppedThirdStrike ? 1 : 0)
-  const recordIds = [
+  const strikeoutCallEvent = droppedThirdStrike ? 1 : 0
+  const outsInPlay = play.outsAdded + (play.stealPlayOuts ?? 0) + wildPitchOuts + strikeoutCallEvent
+  return {
+    strikeout,
+    runnerPlay,
+    wildPitchOuts,
+    droppedThirdStrike,
+    outsInPlay,
+    strikeoutCallEvent,
+    moundStrikeouts: tally.moundStrikeouts + (strikeout ? 1 : 0),
+    comboAtCall: strikeoutComboAtCall(tally, strikeout, runnerPlay),
+    outsAfter: play.outsBefore + outsInPlay - strikeoutCallEvent,
+  }
+}
+
+/**
+ * 0xa7c4c 가 R[1] 을 올리고(18~23 판정 0xa7998 은 이 값을 본다), 지우기(a8fb6~a8ff8)는 종류 4·5 를 건너뛰고
+ * `[sp+0x20] > 0 && !state[0x1a]` 가 아니면 지운다 — 낫아웃 삼진은 판정 뒤 콤보를 끊는다(`tallyAfterDefense`)
+ */
+function strikeoutComboAtCall(tally: TeamRecordTally, strikeout: boolean, runnerPlay: boolean): number {
+  if (strikeout) return tally.moundStrikeoutCombo + 1
+  if (runnerPlay) return tally.moundStrikeoutCombo
+  return 0
+}
+
+function defenseRecordIdsOf(play: DefensePlayRecord, facts: DefenseSettlementFacts): readonly number[] {
+  const { outsInPlay } = facts
+  return [
     // 종류 5 정산은 0xa7998(18~23)을 안 부르고(a8d38), 16/17(삼진 콜)은 판 정산보다 먼저라 판을 먹일 때(`applyTeamArrival`)
     // 24 앞에 이미 줬다
-    ...(strikeout && !runnerPlay
+    ...(facts.strikeout && !facts.runnerPlay
       ? strikeoutRecordIdsOf({
           pitches: play.atBatPitches,
           balls: play.balls,
-          comboCount: comboAtCall,
-          pitcherStrikeouts: moundStrikeouts,
+          comboCount: facts.comboAtCall,
+          pitcherStrikeouts: facts.moundStrikeouts,
         })
       : []),
-    // 삼진 + 도루 판의 36 은 판을 먹일 때(`applyTeamArrival`) 24 앞에 이미 줬다
-    ...(runnerPlay
-      ? []
-      : laserThrowOutRecordOf({
-          // state[0x8b] — 결과 판 0x46844 가 레이저 연출 뒤 코드 13(그 판의 아웃 판정) 결과 판에서 세운 표시
-          laserThrowFlag: play.laserOutFlag,
-          outsInPlay,
-        }).recordIds),
-    ...multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: droppedThirdStrike }),
-    // 25 는 아웃 콜 0xa7d0c 몫이라 삼진(0xa7c4c)이 낸 아웃에는 없다 — 삼진 + 도루 판의 셋째 아웃은 늘 판의 도루 저지 콜이다.
-    // 낫아웃은 판의 아웃(타자주자 · 주자)이 아웃 콜이다
-    ...(strikeout && !runnerPlay && wildPitchOuts === 0 && !(droppedThirdStrike && play.outsAdded > 0)
-      ? []
-      : threePitchInningRecordIdsOf(play.halfInningPitches, outs)),
+    // 삼진 + 도루 판의 36 은 판을 먹일 때(`applyTeamArrival`) 24 앞에 이미 줬다.
+    // state[0x8b] — 결과 판 0x46844 가 레이저 연출 뒤 코드 13(그 판의 아웃 판정) 결과 판에서 세운 표시
+    ...(facts.runnerPlay ? [] : laserThrowOutRecordOf({ laserThrowFlag: play.laserOutFlag, outsInPlay }).recordIds),
+    ...multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: facts.droppedThirdStrike }),
+    ...(isThirdOutByOutCall(play, facts) ? threePitchInningRecordIdsOf(play.halfInningPitches, facts.outsAfter) : []),
   ]
-  return withGameRecords(
-    {
-      ...progress,
-      recordTally: {
-        ...tally,
-        // a8ab2 ctx+0x162 = 0 은 범타·삼진 갈래 안이라 종류 5 정산은 안 지운다
-        homeRunStreak: runnerPlay ? tally.homeRunStreak : 0,
-        moundStrikeouts,
-        moundStrikeoutCombo,
-        // a8f8c R[3] += [sp+0x30] · a8fa8 낫아웃이면 −1
-        moundOuts: tally.moundOuts + outsInPlay - (droppedThirdStrike ? 1 : 0),
-      },
-    },
-    recordIds,
-    false,
-  )
+}
+
+/**
+ * 25 는 아웃 콜 0xa7d0c 몫이라 삼진(0xa7c4c)이 낸 아웃에는 없다 — 삼진 + 도루 판의 셋째 아웃은 늘 판의 도루 저지 콜이다.
+ * 낫아웃은 판의 아웃(타자주자 · 주자)이 아웃 콜이다
+ */
+function isThirdOutByOutCall(play: DefensePlayRecord, facts: DefenseSettlementFacts): boolean {
+  if (!facts.strikeout || facts.runnerPlay || facts.wildPitchOuts !== 0) return true
+  return facts.droppedThirdStrike && play.outsAdded > 0
+}
+
+function tallyAfterDefense(tally: TeamRecordTally, facts: DefenseSettlementFacts): TeamRecordTally {
+  return {
+    ...tally,
+    // a8ab2 ctx+0x162 = 0 은 범타·삼진 갈래 안이라 종류 5 정산은 안 지운다
+    homeRunStreak: facts.runnerPlay ? tally.homeRunStreak : 0,
+    moundStrikeouts: facts.moundStrikeouts,
+    moundStrikeoutCombo: facts.droppedThirdStrike ? 0 : facts.comboAtCall,
+    // a8f8c R[3] += [sp+0x30] · a8fa8 낫아웃이면 −1
+    moundOuts: tally.moundOuts + facts.outsInPlay - facts.strikeoutCallEvent,
+  }
 }

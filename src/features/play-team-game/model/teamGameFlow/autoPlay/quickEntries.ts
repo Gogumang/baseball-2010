@@ -1,9 +1,8 @@
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
-import { NO_ACE_BATTER, NO_ROSTER_SLOT, entryPitcherGameAbilityParts } from '@/features/play-team-game/model/teamGameRoster'
+import { type TeamEntryBatter, NO_ROSTER_SLOT, entryPitcherGameAbilityParts } from '@/features/play-team-game/model/teamGameRoster'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { pitcherGameStatsOf } from '@/entities/pitching/model/pitcherGameStats'
-import type { LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import { staminaCapacityOf, pitchStaminaCostOf, consumeStamina, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitcherAbilityContextOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
 import {
@@ -12,6 +11,7 @@ import {
   entryBattersOf,
   entryPitcherSkillIdsOf,
 } from '@/features/play-team-game/model/teamGameFlow/roster/batters'
+import { isAcePlayer } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
 import { pitcherAbilitiesAt, pitcherEntryAt } from '@/features/play-team-game/model/teamGameFlow/roster/pitchers'
 import { aceBatterLevelOf } from '@/features/play-team-game/model/teamGameFlow/roster/specialSwing'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
@@ -20,19 +20,26 @@ import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameF
 export function entryQuickBatterOf(progress: TeamGameProgress, teamId: number, slot: number): QuickAtBatBatter {
   const ability = entryAbilitiesAt(progress, teamId, slot)
   const entry = entryBattersOf(progress, teamId)[slot]
-  const aceIndex = entry?.aceIndex ?? NO_ACE_BATTER
   return {
     hit: ability[0],
     power: ability[1],
     run: ability[3],
     // 장착 스킬 — 0xab214 ab91c~ 가 `0xb62b4(타자, n)` 로 레코드 +0x14 를 모드 검사 없이 읽는다 (마타자는 제 행)
     skillIds: entryBatterSkillIdsOf(entry),
+    ...(entry === undefined ? {} : quickBatterRecordOf(progress, entry)),
+  }
+}
+
+/** 명단 칸 레코드에서 읽는 칸 — 레코드 첨자 · 내 선수 비트 · 마타자 보정 */
+function quickBatterRecordOf(progress: TeamGameProgress, entry: TeamEntryBatter): Partial<QuickAtBatBatter> {
+  const isAce = isAcePlayer(entry)
+  return {
     // 레코드 칸 0xb6394 — 경기 시작 명단 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`, 사람 타석 투수 스킬 31 과 같은 값)
-    ...(entry?.recordSlot === undefined ? {} : { recordSlot: entry.recordSlot }),
+    ...(entry.recordSlot === undefined ? {} : { recordSlot: entry.recordSlot }),
     // 기록으로 선 표 밖 타자(영입한 명전 · 나리)는 레코드 +0xa 비트7(0xb6389) — 0xab214 의 내 선수 갈래가 레코드를 직접 읽는다
-    ...(entry !== undefined && aceIndex < 0 && entry.rosterSlot === NO_ROSTER_SLOT ? { isOwnPlayer: true } : {}),
+    ...(!isAce && entry.rosterSlot === NO_ROSTER_SLOT ? { isOwnPlayer: true } : {}),
     // 0xc11f0 c1226 — 마타자면 보정 구조체 out+0 · +2 에 D[0x100/0x132 + 2k] (k = 레벨·5 + 순번, `quickSwingBoostOf`)
-    ...(aceIndex >= 0 ? { ace: { order: aceIndex, level: aceBatterLevelOf(progress, aceIndex) } } : {}),
+    ...(isAce ? { ace: { order: entry.aceIndex, level: aceBatterLevelOf(progress, entry.aceIndex) } } : {}),
   }
 }
 
@@ -71,38 +78,6 @@ export function entryQuickTiredOf(
   if (entry === undefined) return undefined
   const stats = pitcherGameStatsOf(entryPitcherGameAbilityParts(pitcherAbilityContextOf(progress), teamId, entry), staminaPercent)
   return { control: stats.control, velocity: stats.velocity }
-}
-
-/**
- * 간이 타석 도루(0xc1818 끝 c1a42~c1a98)의 리그 기록 — 루를 옮긴 주자마다 `0xa56dc(ctx, 주자, 0)` 이 참이면 그 레코드 +0x2c.
- * 게이트가 **주자 자신**을 본다(사람 판 도루와 다르다) — 마선수 주자만 빠진다. 모드 · 포스트시즌 거르기는 기록표에 넣는 쪽이 맡는다.
- * 주자는 신원(타순 칸, `playQuickPlateAppearance` 의 `stolenRunners`)대로다.
- */
-function quickLeagueStolenBasesOf(progress: TeamGameProgress, ours: boolean, stolenRunners: readonly number[]): readonly LeagueStolenBase[] {
-  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
-  const entry = ours ? progress.ourEntry : progress.opponentEntry
-  const stolen: LeagueStolenBase[] = []
-  for (const slot of stolenRunners) {
-    if ((entry[slot]?.aceIndex ?? NO_ACE_BATTER) >= 0) continue
-    const rosterSlot = entry[slot]?.rosterSlot ?? slot
-    if (rosterSlot === NO_ROSTER_SLOT) {
-      const recordId = entry[slot]?.recordId
-      if (recordId !== undefined) stolen.push({ teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId })
-      continue
-    }
-    stolen.push({ teamId: entry[slot]?.tableTeamId ?? teamId, battingOrderIndex: rosterSlot })
-  }
-  return stolen
-}
-
-/** 간이 타석 도루의 리그 기록을 진행에 얹을 칸 — 없으면 빈 것 */
-export function withQuickSteals(
-  progress: TeamGameProgress,
-  ours: boolean,
-  stolenRunners: readonly number[],
-): { readonly leagueStolenBases?: readonly LeagueStolenBase[] } {
-  const stolen = quickLeagueStolenBasesOf(progress, ours, stolenRunners)
-  return stolen.length === 0 ? {} : { leagueStolenBases: [...(progress.leagueStolenBases ?? []), ...stolen] }
 }
 
 /**

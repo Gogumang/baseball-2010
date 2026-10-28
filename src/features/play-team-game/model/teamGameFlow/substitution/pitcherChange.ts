@@ -81,34 +81,44 @@ export function applyPitcherChange(
    */
   inScene: boolean,
 ): TeamGameProgress {
-  // 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측의 새 투수, 그 순간 이닝·아웃·주자) — 장면 교체만
-  const decisions = inScene
-    ? decisionsAfterPitcherChange(progress.decisions, progress.game, {
-        our: ours ? nextIndex : progress.ourPitcherIndex,
-        opponent: ours ? progress.opponentPitcherIndex : nextIndex,
-      })
-    : progress.decisions
-  // 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다
-  const runnerPitchers = freezeRunnerPitchers(
-    progress.runnerPitchers,
-    ours ? runnersOfGame(progress.game, progress.opponentOrderIndex) : runnersOfGame(progress.game),
-    ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex,
-  )
-  const base = { ...progress, pitcherJustChanged: true, decisions, runnerPitchers }
-  if (ours) {
-    return {
-      ...base,
-      ourUsedPitchers: [...progress.ourUsedPitchers, progress.ourPitcherIndex],
-      ourPitcherIndex: nextIndex,
-      ourPitcherStaminas: withValueAt(progress.ourPitcherStaminas, progress.ourPitcherIndex, progress.stamina),
-      stamina: progress.ourPitcherStaminas[nextIndex] ?? FULL_STAMINA,
-      magicRemaining: magicCountOfPitcher(pitcherEntryAt(progress, progress.options.ourTeamId, nextIndex), progress.options.aceLevels),
-      ourPitcherCounters: EMPTY_MOUND_COUNTERS,
-      pitchCount: 0,
-      // 기록달성이 보는 R 은 **새 투수의** 경기 기록이다(0xb8cec = team+0x244+4·team[0]) — 이 경기에 처음 서니 0
-      recordTally: { ...progress.recordTally, moundStrikeouts: 0, moundStrikeoutCombo: 0, moundOuts: 0 },
-    }
+  const base: TeamGameProgress = {
+    ...progress,
+    pitcherJustChanged: true,
+    decisions: inScene ? decisionsAtSceneChange(progress, ours, nextIndex) : progress.decisions,
+    runnerPitchers: frozenRunnerPitchersOf(progress, ours),
   }
+  return ours ? withOurPitcherChanged(base, progress, nextIndex) : withOpponentPitcherChanged(base, progress, nextIndex)
+}
+
+/** 교체 자리에서 세이브 후보를 잡는다 (0xa60c0 — 수비 측의 새 투수, 그 순간 이닝·아웃·주자) — 장면 교체만 */
+function decisionsAtSceneChange(progress: TeamGameProgress, ours: boolean, nextIndex: number): TeamGameProgress['decisions'] {
+  const mounds = ours ? { our: nextIndex, opponent: progress.opponentPitcherIndex } : { our: progress.ourPitcherIndex, opponent: nextIndex }
+  return decisionsAfterPitcherChange(progress.decisions, progress.game, mounds)
+}
+
+/** 루에 남은 주자는 책임 투수(주자+0x30)를 그대로 든다 — 모르는 루는 내려가는 투수 몫으로 굳힌다 */
+function frozenRunnerPitchersOf(progress: TeamGameProgress, ours: boolean): TeamGameProgress['runnerPitchers'] {
+  // 우리 투수가 바뀌면 우리가 수비 중이라 루 위 주자는 상대 타순으로 읽는다
+  const runners = ours ? runnersOfGame(progress.game, progress.opponentOrderIndex) : runnersOfGame(progress.game)
+  return freezeRunnerPitchers(progress.runnerPitchers, runners, ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex)
+}
+
+function withOurPitcherChanged(base: TeamGameProgress, progress: TeamGameProgress, nextIndex: number): TeamGameProgress {
+  return {
+    ...base,
+    ourUsedPitchers: [...progress.ourUsedPitchers, progress.ourPitcherIndex],
+    ourPitcherIndex: nextIndex,
+    ourPitcherStaminas: withValueAt(progress.ourPitcherStaminas, progress.ourPitcherIndex, progress.stamina),
+    stamina: progress.ourPitcherStaminas[nextIndex] ?? FULL_STAMINA,
+    magicRemaining: magicCountOfPitcher(pitcherEntryAt(progress, progress.options.ourTeamId, nextIndex), progress.options.aceLevels),
+    ourPitcherCounters: EMPTY_MOUND_COUNTERS,
+    pitchCount: 0,
+    // 기록달성이 보는 R 은 **새 투수의** 경기 기록이다(0xb8cec = team+0x244+4·team[0]) — 이 경기에 처음 서니 0
+    recordTally: { ...progress.recordTally, moundStrikeouts: 0, moundStrikeoutCombo: 0, moundOuts: 0 },
+  }
+}
+
+function withOpponentPitcherChanged(base: TeamGameProgress, progress: TeamGameProgress, nextIndex: number): TeamGameProgress {
   return {
     ...base,
     opponentUsedPitchers: [...progress.opponentUsedPitchers, progress.opponentPitcherIndex],

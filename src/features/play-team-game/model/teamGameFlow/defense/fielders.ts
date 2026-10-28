@@ -1,12 +1,14 @@
 import { defenseAbilitiesOf, defenseSkillIdsOf, defenseFielderPlatesOf } from '@/features/defense-play/model/runDefensePlay'
-import { entryBatterGameAbilities, NO_ROSTER_SLOT, NO_ACE_BATTER } from '@/features/play-team-game/model/teamGameRoster'
+import { type TeamEntryPitcher, entryBatterGameAbilities } from '@/features/play-team-game/model/teamGameRoster'
+import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import { fielderRecordsAtPlayStart } from '@/entities/fielding/model/fielderRecords'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { runnersOfGame } from '@/entities/game/model/gameState'
 import { runnerOnBase } from '@/entities/game/model/baseRunners'
+import { leagueRecordKeyOf } from '@/features/play-team-game/model/teamGameFlow/records/leagueRecordKey'
+import { battingSideOf, isAcePlayer } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
 import { abilityContextOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
 import { entryBatterSkillIdsOf, entryBattersOf } from '@/features/play-team-game/model/teamGameFlow/roster/batters'
-import { BATTING_ORDER_SIZE } from '@/features/play-team-game/model/teamGameFlow/types/constants'
 import type { TeamFielderSeat } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
@@ -38,14 +40,7 @@ const NO_LINEUP_SLOT = -1
  */
 export function teamFielderSeatOf(progress: TeamGameProgress, teamId: number, index: number): TeamFielderSeat {
   const player = entryBattersOf(progress, teamId)[index]!
-  const errorKey =
-    player.aceIndex >= 0
-      ? null
-      : player.rosterSlot === NO_ROSTER_SLOT
-        ? player.recordId === undefined
-          ? null
-          : { teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId: player.recordId }
-        : { teamId: player.tableTeamId ?? teamId, battingOrderIndex: player.rosterSlot }
+  const errorKey = isAcePlayer(player) ? null : leagueRecordKeyOf(player, teamId, player.rosterSlot)
   return { teamId, index, errorKey, player }
 }
 
@@ -77,15 +72,14 @@ export function fielderSkillIdsFor(progress: TeamGameProgress, teamId: number): 
  */
 export function fielderPlatesFor(progress: TeamGameProgress, teamId: number, pitcherIndex: number) {
   const pitchers = teamId === progress.options.ourTeamId ? progress.ourPitcherEntry : progress.opponentPitcherEntry
-  const pitcher = pitchers[pitcherIndex]
-  return defenseFielderPlatesOf(
-    entryBattersOf(progress, teamId),
-    pitcher === undefined
-      ? undefined
-      : pitcher.aceIndex >= 0 || pitcher.role === undefined
-        ? { name: pitcher.name }
-        : { name: pitcher.name, role: pitcher.role },
-  )
+  return defenseFielderPlatesOf(entryBattersOf(progress, teamId), moundPlateOf(pitchers[pitcherIndex]))
+}
+
+/** 칸 0 판 — 마투수 · 보직 없는 투수는 보직을 안 넘긴다. 칸이 비었으면 undefined */
+function moundPlateOf(pitcher: TeamEntryPitcher | undefined): { readonly name: string; readonly role?: PitcherRole } | undefined {
+  if (pitcher === undefined) return undefined
+  if (isAcePlayer(pitcher) || pitcher.role === undefined) return { name: pitcher.name }
+  return { name: pitcher.name, role: pitcher.role }
 }
 
 /**
@@ -93,18 +87,21 @@ export function fielderPlatesFor(progress: TeamGameProgress, teamId: number, pit
  * `ours` 면 우리 공격(타순 = 경기 타순), 아니면 상대 공격(상대 타순).
  */
 export function runnerAcesFor(progress: TeamGameProgress, ours: boolean): RunnerAces {
-  const entry = ours ? progress.ourEntry : progress.opponentEntry
-  const order = ours ? progress.game.battingOrderIndex : progress.opponentOrderIndex
-  const runners = runnersOfGame(progress.game, order)
-  const aceOf = (slot: number | null) => {
-    if (slot === null) return null
-    const ace = entry[slot]?.aceIndex ?? NO_ACE_BATTER
-    return ace >= 0 ? ace : null
-  }
+  const side = battingSideOf(progress, ours)
+  const runners = runnersOfGame(progress.game, side.order)
+  const aceOf = (slot: number | null) => aceIndexAt(side.entry, slot)
   return {
-    batter: aceOf(((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE),
+    batter: aceOf(side.slot),
     first: aceOf(runnerOnBase(runners, 1)),
     second: aceOf(runnerOnBase(runners, 2)),
     third: aceOf(runnerOnBase(runners, 3)),
   }
+}
+
+/** 명단 칸의 마선수 번호 — 빈 칸 · 마선수가 아니면 null */
+function aceIndexAt(entry: TeamGameProgress['ourEntry'], slot: number | null): number | null {
+  if (slot === null) return null
+  const player = entry[slot]
+  if (player === undefined || !isAcePlayer(player)) return null
+  return player.aceIndex
 }

@@ -1,58 +1,10 @@
-import { type PitchArrivalPlay, startHumanSteal, stealStartSceneOf } from '@/features/defense-play/model/pitchArrivalPlay'
-import { runnersOfGame } from '@/entities/game/model/gameState'
-import { NO_ACE_BATTER, NO_ROSTER_SLOT } from '@/features/play-team-game/model/teamGameRoster'
-import { isBugFixed } from '@/shared/config/bugfixes'
-import type { LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
-import { runnerOnBase } from '@/entities/game/model/baseRunners'
+import { startHumanSteal, stealStartSceneOf } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { offenseRunnerTeamGradeOf, runAbilitiesOnBaseOf } from '@/features/play-team-game/model/teamGameFlow/baseRunning/runners'
 import { defenseAbilitiesFor } from '@/features/play-team-game/model/teamGameFlow/defense/fielders'
 import { isBatterTurn } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
-import { BATTING_ORDER_SIZE } from '@/features/play-team-game/model/teamGameFlow/types/constants'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
-
-/**
- * 도루 판(종류 5) 정산의 리그 기록 — 0xa8024 의 0xa8340~0xa83c0 (R8 5-2, 직접 떴다).
- * ```
- * sp+0x34 = 0xa56dc(ctx, 지금 타자, 0)                 ; 시즌 모드 2: 국가대항전·포스트시즌 아님 && 타자가 마선수 아님
- * (가) 잡힌 도루 주자가 하나라도 있으면 아무도 안 쌓는다
- * (나) 루를 옮긴 도루 주자 r 마다: p = 0xb8b99(공격팀, r) ; sp+0x34 && p && !마선수(p) → p+0x2c += 1
- * ```
- * ⚠️ 원본 버그(B-61): 게이트가 **주자가 아니라 지금 타자**를 본다 — 마타자 타석에 한 도루는 아무도 안 쌓인다(0xa8058~0xa8070 · a8362).
- * 고침(bugfixes.json B-61, 기본 켬): 지금 타자 게이트를 건너뛰고 주자마다의 마선수 거르기만 본다(간이 엔진 0xc1a42 와 같은 꼴). 굴림 없음.
- * 국가대항전·포스트시즌 거르기는 기록표에 넣는 쪽(시즌 세션의 정규시즌 갈래)이 맡는다.
- * 주자는 판 앞 루의 신원(`GameState.runners`, 원본 주자 목록)대로다.
- */
-export function withLeagueStolenBases(
-  next: TeamGameProgress,
-  before: TeamGameProgress,
-  play: PitchArrivalPlay,
-  humanOffense: boolean,
-): TeamGameProgress {
-  if (play.kind !== 5 || play.result.caughtFrom.length > 0 || play.result.stolenFrom.length === 0) return next
-  const teamId = humanOffense ? before.options.ourTeamId : before.options.opponentTeamId
-  const entry = humanOffense ? before.ourEntry : before.opponentEntry
-  const order = humanOffense ? before.game.battingOrderIndex : before.opponentOrderIndex
-  const runners = runnersOfGame(before.game, order)
-  const isAce = (slot: number) => (entry[slot]?.aceIndex ?? NO_ACE_BATTER) >= 0
-  if (!isBugFixed('B-61') && isAce(((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE)) return next
-  const stolen: LeagueStolenBase[] = []
-  for (const from of play.result.stolenFrom) {
-    const slot = runnerOnBase(runners, from as 1 | 2 | 3)
-    if (slot === null) continue
-    if (isAce(slot)) continue
-    const rosterSlot = entry[slot]?.rosterSlot ?? slot
-    if (rosterSlot === NO_ROSTER_SLOT) {
-      const recordId = entry[slot]?.recordId
-      if (recordId !== undefined) stolen.push({ teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId })
-      continue
-    }
-    stolen.push({ teamId: entry[slot]?.tableTeamId ?? teamId, battingOrderIndex: rosterSlot })
-  }
-  if (stolen.length === 0) return next
-  return { ...next, leagueStolenBases: [...(next.leagueStolenBases ?? []), ...stolen] }
-}
 
 /* ── 도루 출발 (상태 0x11 공격, 0x53610 → 메시지 0x583 → 0xa9bd4) ─────────────────── */
 
