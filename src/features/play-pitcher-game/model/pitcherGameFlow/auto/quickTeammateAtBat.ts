@@ -6,6 +6,7 @@ import { playQuickPlateAppearance, type QuickPlateAppearance } from '@/entities/
 import { facingPitcherOf } from '@/entities/game/model/simulateHalfInning'
 import { lineupSlotOf, recordLineupPlay, rosterSlotAt, withLineupRecordSlot } from '@/entities/game/model/quickLineup'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
+import { ownPositionRecordIdsOf } from '@/entities/game/model/ownPositionRecords'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { clearInningRuns } from '@/features/play-pitcher-game/model/pitcherGameState'
@@ -122,7 +123,7 @@ function teammateAtBatFactsOf(progress: PitcherGameProgress, appearance: QuickPl
 
 /**
  * 모드 3 은 내 팀 전체가 사람 팀이라 **공격 게이트도 열린다** (0x3a20a) — 간이 엔진이 돌린 동료 타석도 같은 0xa8024 를 지나
- * 타격 기록(0~15·34·35)이 된다 (R8 1절·8절).
+ * 타격 기록(0~15·34·35)이 된다 (R8 1절·8절). B-129 고친 길은 투수에게 이 공격 쪽 기록을 안 준다.
  */
 function withTeammateAtBatSettlement(progress: PitcherGameProgress, facts: TeammateAtBatFacts, opponentStamina: number): PitcherGameProgress {
   const { before, game, slot, runs, halfChanged } = facts
@@ -138,7 +139,7 @@ function withTeammateAtBatSettlement(progress: PitcherGameProgress, facts: Teamm
     ourLineup: recordLineupPlay(progress.ourLineup, slot, play.outcome, { quickEngine: true }),
     pitcherLines: opponentPitcherLinesAfterOf(progress, facts),
     runnerPitchers: facts.runnerSettlement.tags,
-    recordIds: recordsAllowed(progress) ? [...progress.recordIds, ...recorded.recordIds] : progress.recordIds,
+    recordIds: recordsAllowed(progress) ? [...progress.recordIds, ...ownPositionRecordIdsOf(recorded.recordIds, 'pitcher')] : progress.recordIds,
     perfectInningFlag: halfChanged ? true : progress.perfectInningFlag,
     inningRuns: halfChanged ? clearInningRuns(progress.inningRuns, game.inning) : progress.inningRuns,
     // 우리 공격이 끝나면 다음 수비 반 이닝의 투구 수를 0 부터 센다

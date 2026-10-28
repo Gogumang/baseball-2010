@@ -1,5 +1,6 @@
 import { resultOf } from '@/entities/game/model/gameState'
 import { completeGameRecordIdsOf, gameEndRecordIdsOf } from '@/entities/game/model/gameRecords'
+import { ownPositionRecordIdsOf } from '@/entities/game/model/ownPositionRecords'
 import { PITCHER_EDITION_MODE, reliefNeverEnteredOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { decisionCodeForMine, gameEndDecisionOf, PITCHER_DECISION_CODE, type PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import { evaluatePitcherGame, type PitcherEvaluationRecord } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
@@ -141,7 +142,8 @@ function gameEndRecordIdsFor(progress: PitcherGameProgress): readonly number[] {
   if (!recordsAllowed(progress)) return progress.recordIds
   return [
     ...progress.recordIds,
-    ...gameEndRecordIdsOf(progress.game.ourScore - progress.game.opponentScore),
+    // 37~39 점수차 승은 공격 쪽 — B-129 고친 길은 투수에게 안 준다
+    ...ownPositionRecordIdsOf(gameEndRecordIdsOf(progress.game.ourScore - progress.game.opponentScore), 'pitcher'),
     ...completeGameRecordIdsOf({
       mode: PITCHER_EDITION_MODE,
       won: progress.game.ourScore > progress.game.opponentScore,

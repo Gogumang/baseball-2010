@@ -212,7 +212,7 @@ export const maxLinesBaseline = [
   'src/pages/management/ui/RadarChart.tsx', // 166
   'src/entities/batting/model/battedBallOutcome.ts', // 165
   'src/entities/particle/model/particleEmitter.ts', // 165
-  'src/shared/config/bugfixes/bugfixes.ts', // 165
+  'src/shared/config/bugfixes/bugfixes.ts', // 166
   'e2e/all.mjs', // 164
   'src/pages/season/ui/SeasonTrainingPopup.tsx', // 164
   'src/widgets/season/lib/seasonOuting.ts', // 164
