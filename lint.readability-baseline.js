@@ -45,7 +45,6 @@ export const readabilityBaseline = [
   'src/shared/lib/sprite/originalScale.ts', // 6
   'src/widgets/batting-stage/ui/BattingStage.tsx', // 6
   'src/app/model/screenBgm.ts', // 5
-  'src/app/model/soak/soakInvariants.ts', // 5
   'src/entities/collection/model/collection.ts', // 5
   'src/entities/pitching/model/pitcherChange.ts', // 5
   'src/entities/season-mode/model/seasonEntry.ts', // 5

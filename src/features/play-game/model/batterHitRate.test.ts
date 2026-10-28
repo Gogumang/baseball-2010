@@ -14,10 +14,20 @@ import type { HitRateTally } from '@/features/play-game/model/batterHitRateHarne
  * 기준값(2026-10-25 측정, 10-16 r140 · r150 · r170 · r184 · r187 · r205 · main 모두 같은 범위): 최적(F = N − 2) 헛스윙 약 30% ·
  * 타율 약 .25, ±1 틱이면 헛스윙 약 45%. 이 범위를 크게 벗어나면 판정 · 투구 · 수비 판 어딘가가 바뀐 것이다.
  */
+/**
+ * 경기 수 (r360 에 200 · 120×3 → 80 · 40×2 로 줄임) — 판은 시드로 정해져 같은 경기 수면 늘 같은 값이다.
+ * 80경기 측정: 최적 헛스윙 .281 · 맞힌 공 안타율 .325 · 타율 .310, 40경기 ±1 틱 헛스윙 .447 · .400 (200경기 .291 · .343 · .319 / .453 · .433).
+ * 최적 판은 두 시험이 같이 쓴다 — 예전에는 둘째 시험이 첫째의 앞 120경기를 다시 쳤다.
+ */
+const EXACT_GAMES = 80
+const OFF_TIMING_GAMES = 40
+let exactTally: HitRateTally | null = null
+const exactTimingTally = (): HitRateTally => (exactTally ??= playCareerGames({ offsets: [0], games: EXACT_GAMES }))
+
 describe('나리 타자편 안타율 — 판정 길 회귀 (r209)', () => {
   it('최적 타이밍(F = N − 2) 신인 타자는 헛스윙 약 30% · 맞힌 공 안타율 약 .27 · 타율 약 .25', () => {
-    const tally = playCareerGames({ offsets: [0], games: 200 })
-    expect(tally.atBats).toBeGreaterThan(700)
+    const tally = exactTimingTally()
+    expect(tally.atBats).toBeGreaterThan(280)
     const whiffRate = tally.whiffs / tally.swings
     expect(whiffRate).toBeGreaterThan(0.24)
     expect(whiffRate).toBeLessThan(0.37)
@@ -28,11 +38,10 @@ describe('나리 타자편 안타율 — 판정 길 회귀 (r209)', () => {
   })
 
   it('한 틱 빠르거나 늦으면 헛스윙이 는다 — 타이밍 0x34be0 폭 24 · 나눔 N − 1', () => {
-    const exact = playCareerGames({ offsets: [0], games: 120 })
-    const early = playCareerGames({ offsets: [-1], games: 120 })
-    const late = playCareerGames({ offsets: [1], games: 120 })
+    const early = playCareerGames({ offsets: [-1], games: OFF_TIMING_GAMES })
+    const late = playCareerGames({ offsets: [1], games: OFF_TIMING_GAMES })
     const rate = (tally: HitRateTally) => tally.whiffs / tally.swings
-    expect(rate(early)).toBeGreaterThan(rate(exact) + 0.05)
-    expect(rate(late)).toBeGreaterThan(rate(exact) + 0.05)
+    expect(rate(early)).toBeGreaterThan(rate(exactTimingTally()) + 0.05)
+    expect(rate(late)).toBeGreaterThan(rate(exactTimingTally()) + 0.05)
   })
 })

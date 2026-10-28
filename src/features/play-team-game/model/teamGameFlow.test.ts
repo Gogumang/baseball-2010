@@ -792,8 +792,8 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
   })
 
   it('우리 수비 삼진 + CPU 도루 — 상대 타석 칸 · 리그 타수가 안 오르고, 출루 허용 state[0x88] 은 판의 주자 목록대로다', () => {
-    let found = 0
-    for (let seed = 1; seed <= 3000 && found < 3; seed += 1) {
+    // 1..3000 을 훑어 처음 난 삼진 + 도루 판 셋 (r360 — 2482 까지 훑느라 2.7초였다). 판정이 바뀌어 안 맞으면 다시 찾는다
+    for (const seed of [260, 1286, 2482]) {
       const { progress } = 시작({}, seed)
       const 일루 = {
         ...progress,
@@ -803,8 +803,9 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
       const pitch = { typeNumber: 첫구질(일루), aim: aimAfterTicks(1, { dx: -1, dy: 1 }, 11), gaugeCell: 0 }
       const next = throwPitch(일루, pitch, createSeededRandom(seed * 7919))
       const play = next.lastArrivalPlay
-      if (play?.kind !== 5 || next.game.outs !== 일루.game.outs + 1 || next.opponentOrderIndex === 일루.opponentOrderIndex) continue
-      found += 1
+      const isStrikeoutSteal = play?.kind === 5 && next.game.outs === 일루.game.outs + 1 && next.opponentOrderIndex !== 일루.opponentOrderIndex
+      expect(isStrikeoutSteal, `시드 ${seed} 가 삼진 + 도루 판이 아니다`).toBe(true)
+      if (play?.kind !== 5) continue
       const slot = 일루.opponentOrderIndex
       expect(next.opponentEntryRecords[slot]).toEqual(일루.opponentEntryRecords[slot])
       expect(next.leaguePlateAppearances).toEqual(일루.leaguePlateAppearances)
@@ -813,7 +814,6 @@ describe('삼진 + 도루 판(종류 5)은 정산 0xa8024 를 종류 5 로 한 �
       expect(next.recordTally.moundOuts).toBe(일루.recordTally.moundOuts + 1)
       expect(next.recordTally.moundStrikeouts).toBe(일루.recordTally.moundStrikeouts + 1)
     }
-    expect(found).toBeGreaterThan(0)
   })
 
   it('기록 알림 차례 — 삼진 콜 0xa7c4c 의 16/17 → 정산 머리 a80f8 의 36 → a83de 의 24, 18~23 은 없다 (a8d38)', () => {

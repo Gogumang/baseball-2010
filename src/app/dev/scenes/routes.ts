@@ -131,7 +131,7 @@ export const TO_GENERAL_GAME: readonly SceneStep[] = [
 
 /**
  * 나리 타자편 이어하기 — [14] 타자편 답(`onNewGame('타자편')`)의 `continueSaved`(0x1c154)가 저장의 S+0x50 · 대회 칸 · 엔딩 칸으로
- * 고른 자리까지 (soak 픽스처 — `src/app/model/soak/soakFixtures.test.tsx`)
+ * 고른 자리까지 (장기 진행 하네스로 뜬 픽스처 — 하네스는 r360 에 지움, `e2e/README.md` 「3. 픽스처」)
  */
 export const toNariResume = (kind: SceneHandles['screen']['kind']): readonly SceneStep[] => [
   call('타자편 이어하기 (onNewGame 타자편)', (h) => {

@@ -182,13 +182,16 @@ function runBoth(seed: number, backdrop: Backdrop, rounding: Rounding, clustered
 
 afterEach(() => vi.restoreAllMocks())
 
+/** 경우마다 굴리는 시드 수 — 12경우 × 100 = 1200판 (r360 에 400 → 100: 판마다 효과 1~14개 · 8갈래라 100판이면 갈래가 다 나온다) */
+const SEEDS_PER_CASE = 100
+
 describe('drawRgbasWithEffect — 하나씩 그린 것과 바이트 단위로 같다', () => {
   const cases: [Backdrop, Rounding, boolean][] = []
   for (const backdrop of ['opaque', 'clear', 'mixed'] as const) {
     for (const rounding of ['round', 'floor'] as const) for (const clustered of [true, false]) cases.push([backdrop, rounding, clustered])
   }
-  it.each(cases)('화면 %s · 왕복 %s · 모임 %s — 시드 400개', (backdrop, rounding, clustered) => {
-    for (let seed = 1; seed <= 400; seed += 1) {
+  it.each(cases)(`화면 %s · 왕복 %s · 모임 %s — 시드 ${SEEDS_PER_CASE}개`, (backdrop, rounding, clustered) => {
+    for (let seed = 1; seed <= SEEDS_PER_CASE; seed += 1) {
       const { before, after } = runBoth(seed * 7919 + (clustered ? 1 : 0), backdrop, rounding, clustered)
       // 실패하면 시드를 알 수 있게 바이트를 그대로 비교한다
       expect({ seed, bytes: Array.from(after.stored) }).toEqual({ seed, bytes: Array.from(before.stored) })
@@ -211,7 +214,7 @@ describe('drawRgbasWithEffect — 하나씩 그린 것과 바이트 단위로 �
   })
 
   it('하나만 그리면 drawRgbaWithEffect 와 같다', () => {
-    for (let seed = 1; seed <= 200; seed += 1) {
+    for (let seed = 1; seed <= SEEDS_PER_CASE; seed += 1) {
       const random = seeded(seed)
       const pixels = Array.from({ length: 20 * 20 }, () => backdropPixel('mixed', random))
       const [draw] = randomDraws(random, 20, 20, true)

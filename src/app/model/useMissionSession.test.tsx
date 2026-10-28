@@ -860,9 +860,10 @@ function seededAfterStart(seed: number): RandomPort {
 describe('투수 미션 CPU 도루 출발 표시 — st[0x15 + i] (0x520de → 0xa9bd4), 화면이 그 루 주자를 안 그린다', () => {
   it('CPU 가 공이 나는 동안 출발시킨 주자의 루가 표시 칸에 서고, 같은 타석 다음 공의 0xf 진입은 `selectionEntered` 로만 적는다', () => {
     // 미션 12 "최강의 챔피언" — 1사 1·3루. 1루 주자 출발은 rand(0, 1000) ≤ 5(표 0xd047c 첫 줄 · 주력 칸 0)라 드물다 —
-    // 씨앗을 넘겨 가며 CPU 도루가 나는 공을 찾는다
+    // 씨앗을 넘겨 가며 CPU 도루가 나는 공을 찾는다. 1 부터 훑으면 처음 나는 씨앗이 626(첫 공)이라 거기서 시작한다
+    // (r360 — 625 판을 다시 세우느라 1.5초였다). 판정이 바뀌어 626 이 안 맞으면 뒤로 더 훑는다
     let found = false
-    for (let seed = 1; seed < 3000 && !found; seed += 1) {
+    for (let seed = 626; seed < 3000 && !found; seed += 1) {
       const rendered = setUpPitcherMission(12, seed)
       for (let pitch = 0; pitch < 40 && !found; pitch += 1) {
         const session = rendered.result.current.session
