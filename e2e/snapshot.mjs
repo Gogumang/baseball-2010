@@ -253,8 +253,9 @@ async function compareDigests(log, label, a, b, pageA, pageB) {
   const notes = []
   for (const path of fiberDiffs.slice(0, 4)) {
     const [valuesA, valuesB] = await Promise.all([pageA, pageB].map((page) => page.evaluate((at) => window.__snapshot.fiberValuesAt(at), path)))
+    const name = await pageA.evaluate((at) => window.__snapshot.fiberNameAt(at), path)
     notes.push(
-      `  · ${path.split('/').slice(-3).join('/')} (${a.fibers[path] === undefined ? 'A 에 없음' : b.fibers[path] === undefined ? 'B 에 없음' : '다름'}): ${firstDiffs(valuesA, valuesB, '', [], 3).join(' · ')}`,
+      `  · ${name ?? '?'} ${path.split('/').slice(-3).join('/')} (${a.fibers[path] === undefined ? 'A 에 없음' : b.fibers[path] === undefined ? 'B 에 없음' : '다름'}): ${firstDiffs(valuesA, valuesB, '', [], 3).join(' · ')}`,
     )
   }
   log(

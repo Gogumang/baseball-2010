@@ -26,7 +26,7 @@ export const maxLinesBaseline = [
   'src/app/ui/App.tsx', // 688
   'src/app/ui/MissionRoutes.tsx', // 686
   'src/entities/career/model/playerCareer.ts', // 681
-  'src/app/dev/sessionSnapshot.ts', // 657
+  'src/app/dev/sessionSnapshot.ts', // 661
   'src/pages/home-run-derby/model/useHomeRunDerby.ts', // 626
   'src/entities/game/model/simulateHalfInning.ts', // 614
   'src/pages/pitching/ui/PitchingScreen.tsx', // 587
@@ -67,7 +67,7 @@ export const maxLinesBaseline = [
   'src/app/ui/GameRoute.tsx', // 362
   'src/pages/general-mode/ui/GeneralModeScreen.tsx', // 360
   'src/app/ui/EntryRoutes.tsx', // 359
-  'e2e/snapshot.mjs', // 357
+  'e2e/snapshot.mjs', // 358
   'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx', // 353
   'src/pages/team-game/ui/TeamAutoRelay.tsx', // 342
   'src/widgets/matchup-cards/lib/matchupCardsLayout.ts', // 339
@@ -134,10 +134,10 @@ export const maxLinesBaseline = [
   'src/app/model/screenBgm.ts', // 228
   'src/entities/fielding/model/throwPlan.ts', // 228
   'src/entities/collection/model/annalsStats.ts', // 227
+  'src/app/dev/sceneRunner.ts', // 226
   'src/app/model/useCollection.ts', // 226
   'src/shared/lib/commonPanel/commonPanel.ts', // 226
   'src/shared/config/original/pitchPatterns.ts', // 225
-  'src/app/dev/sceneRunner.ts', // 222
   'src/pages/shop/ui/ShopScreen.tsx', // 222
   'src/entities/mission/model/pitcherRun.ts', // 220
   'src/pages/season/ui/SeasonTeamInfoScreen.tsx', // 220

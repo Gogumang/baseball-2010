@@ -781,6 +781,12 @@ function missionCoreOf(mission: unknown): unknown {
   return data
 }
 
+/** 부품 자리의 부품 이름 — 같음 확인 도구가 다른 자리를 알릴 때(r355) */
+export function fiberNameAt(path: string): string | null {
+  const type = hookFibers().find((entry) => entry.path === path)?.fiber.type as { name?: string; displayName?: string } | undefined
+  return type?.displayName ?? type?.name ?? null
+}
+
 /** 부품 자리 하나의 훅 칸 값 (같음 확인 도구가 다른 자리를 자세히 볼 때) */
 export function fiberValuesAt(path: string): unknown {
   for (const entry of hookFibers()) {
