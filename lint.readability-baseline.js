@@ -96,8 +96,6 @@ export const readabilityBaseline = [
   'src/features/play-pitcher-game/model/pitchAim.ts', // 3
   'src/features/play-pitcher-game/model/pitcherGameFlow/auto/advance.ts', // 3
   'src/features/play-team-game/model/gameAbilities.ts', // 3
-  'src/features/play-team-game/model/teamGameFlow/autoPlay/quickEntries.ts', // 3
-  'src/features/play-team-game/model/teamGameFlow/inningChange/advance.ts', // 3
   'src/pages/create-player/ui/CreatePlayerScreen.tsx', // 3
   'src/pages/create-player/ui/TeamSelectScreen.tsx', // 3
   'src/pages/game/ui/GameScreen.tsx', // 3
@@ -172,9 +170,6 @@ export const readabilityBaseline = [
   'src/features/play-game/model/useSceneConfirm.ts', // 2
   'src/features/play-game/ui/AceCutInCanvas.tsx', // 2
   'src/features/play-pitcher-game/model/pitcherGameFlow/pitch/pitchArrival.ts', // 2
-  'src/features/play-team-game/model/teamGameFlow/baseRunning/runnerPlaySettlement.ts', // 2
-  'src/features/play-team-game/model/teamGameFlow/baseRunning/steals.ts', // 2
-  'src/features/play-team-game/model/teamGameFlow/records/settlementRecords.ts', // 2
   'src/features/shop/model/pitcherShopSelection.ts', // 2
   'src/features/shop/model/shopSelection.ts', // 2
   'src/pages/create-player/lib/registerKeys.ts', // 2
@@ -337,27 +332,6 @@ export const readabilityBaseline = [
   'src/features/play-pitcher-game/model/pitcherGameFlow/settlement/runnerSettlement.ts', // 1
   'src/features/play-pitcher-game/model/pitcherGameFlow/summary/summary.ts', // 1
   'src/features/play-pitcher-game/model/pitcherPitch.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/autoProgress/autoOffenseAtBat.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/baseRunning/applyPickoffPlay.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/baseRunning/applyTeamArrival.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/baseRunning/arriveTeamPitch.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/baseRunning/runnerOnlyAdvance.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/batting/batterOutcome.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/batting/batterPitch.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/batting/finishBatterOutcome.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/burst/burst.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/defense/defensiveAtBat.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/defense/finishDefensiveAtBat.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/pitching/ourPitchArrival.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/pitching/pitchOnce.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/records/defenseRecords.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/records/plateAppearances.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/setup/startPoint.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/substitution/autoPitcherChange.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/substitution/cpuPinchHit.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/substitution/pitcherChange.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/substitution/substituteBatter.ts', // 1
-  'src/features/play-team-game/model/teamGameFlow/turn/turns.ts', // 1
   'src/pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx', // 1
   'src/pages/defense/lib/ballParticles.ts', // 1
   'src/pages/defense/lib/defenseView.ts', // 1
