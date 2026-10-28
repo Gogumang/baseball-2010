@@ -124,7 +124,12 @@ describe('스페셜 에디트 화면', () => {
 
   it('고친 이름이 경기 명단(공용 이름 0xb62c0)에 그대로 쓰인다', () => {
     let saved: unknown = null
-    const store: JsonStorePort = { load: () => saved, save: (value) => { saved = value } }
+    const store: JsonStorePort = {
+      load: () => saved,
+      save: (value) => {
+        saved = value
+      },
+    }
     const { result } = renderHook(() => useEditedNames(store))
     render(<SpecialEditScreen gamePoint={0} onRename={(...args) => result.current.rename(...args)} onBack={vi.fn()} />)
     key('Enter')

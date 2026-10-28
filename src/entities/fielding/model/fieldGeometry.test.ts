@@ -45,9 +45,7 @@ describe('수비 좌표계 — 0xd856c · 0xd86ec · cfg', () => {
   it('야수 시작 좌표 0xd86ec 는 9칸이고 칸 6·7·8 이 외야다', () => {
     expect(FIELDER_START_POSITIONS).toHaveLength(9)
     expect(FIELDER_START_POSITIONS[0]).toEqual({ x: 20_000, y: 0, z: 24_500 })
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map(isOutfieldSlot)).toEqual([
-      false, false, false, false, false, false, true, true, true,
-    ])
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map(isOutfieldSlot)).toEqual([false, false, false, false, false, false, true, true, true])
   })
 
   it('루 담당 기본 야수 0xd85a8 = [1,2,3,4], 루 기본 점수 0xd85ac = [4000,1000,2000,3000]', () => {

@@ -104,19 +104,41 @@ export function entryColumnKindOf(word: number): EntryColumnKind {
 
 /** 기록 열 머리 글 0x56dd4 — 기록 비트 → img_text */
 const STAT_HEADER_FRAMES: Readonly<Record<number, number>> = {
-  0: 172, 1: 207, 2: 208, 4: 209, 8: 210, 0x10: 61, 0x20: 62, 0x40: 211, 0x80: 212,
-  0x100: 171, 0x200: 213, 0x400: 214, 0x800: 215, 0x1000: 216, 0x2000: 217, 0x4000: 181, 0x8000: 218, 0x10000: 219,
+  0: 172,
+  1: 207,
+  2: 208,
+  4: 209,
+  8: 210,
+  0x10: 61,
+  0x20: 62,
+  0x40: 211,
+  0x80: 212,
+  0x100: 171,
+  0x200: 213,
+  0x400: 214,
+  0x800: 215,
+  0x1000: 216,
+  0x2000: 217,
+  0x4000: 181,
+  0x8000: 218,
+  0x10000: 219,
 }
 
 export function entryColumnOf(word: number): EntryColumn {
   const kind = entryColumnKindOf(word)
   switch (kind) {
-    case '타순': return { word, kind, width: 25, headerFrame: 36, cellFrame: 0x1b }
-    case '등판순서': return { word, kind, width: 25, headerFrame: 202, cellFrame: 0x1b }
-    case '연차': return { word, kind, width: 25, headerFrame: 391, cellFrame: 0x1b }
-    case '이름': return { word, kind, width: 54, headerFrame: 27, cellFrame: 0x1c }
-    case '딱지': return { word, kind, width: 36, headerFrame: 28, cellFrame: 0x23 }
-    case '기록': return { word, kind, width: 36, headerFrame: STAT_HEADER_FRAMES[word] ?? 0, cellFrame: 0x23 }
+    case '타순':
+      return { word, kind, width: 25, headerFrame: 36, cellFrame: 0x1b }
+    case '등판순서':
+      return { word, kind, width: 25, headerFrame: 202, cellFrame: 0x1b }
+    case '연차':
+      return { word, kind, width: 25, headerFrame: 391, cellFrame: 0x1b }
+    case '이름':
+      return { word, kind, width: 54, headerFrame: 27, cellFrame: 0x1c }
+    case '딱지':
+      return { word, kind, width: 36, headerFrame: 28, cellFrame: 0x23 }
+    case '기록':
+      return { word, kind, width: 36, headerFrame: STAT_HEADER_FRAMES[word] ?? 0, cellFrame: 0x23 }
   }
 }
 
@@ -150,10 +172,10 @@ export const ENTRY_LIST_LAYOUT = {
 } as const
 
 /** ▲▼ · 옆 화살 깜빡 — [ed+0x40c] % 8 ≤ 4 ? 2 : 0 (5ca52~5ca6c) */
-export const entryArrowBlinkOf = (keyPresses: number) => ((((keyPresses % 8) + 8) % 8) <= 4 ? 2 : 0)
+export const entryArrowBlinkOf = (keyPresses: number) => (((keyPresses % 8) + 8) % 8 <= 4 ? 2 : 0)
 
 /** 커서 꼴 — [ed+0x40c] % 8 ≤ 3 이면 안쪽 반투명 (0x56316~0x56332) */
-export const entryCursorIsInsetOf = (keyPresses: number) => ((((keyPresses % 8) + 8) % 8) <= 3)
+export const entryCursorIsInsetOf = (keyPresses: number) => ((keyPresses % 8) + 8) % 8 <= 3
 
 /** 놓인 열 */
 export interface PlacedEntryColumn {
@@ -222,9 +244,8 @@ export function entryListGeometryOf(input: EntryListGeometryInput): EntryListGeo
     scroll,
     clip: { x: clipX, y: L.headerY, width, height: L.clipHeight },
     leftArrow: isScrollable && first !== 0 ? { x: clipX - blink - L.sideArrowWidth, y: L.sideArrowY } : null,
-    rightArrow: isScrollable && first + ENTRY_VISIBLE_COLUMNS !== columns.length
-      ? { x: clipX + width + blink - L.sideArrowWidth, y: L.sideArrowY }
-      : null,
+    rightArrow:
+      isScrollable && first + ENTRY_VISIBLE_COLUMNS !== columns.length ? { x: clipX + width + blink - L.sideArrowWidth, y: L.sideArrowY } : null,
     nameColumn: fixed.find((placed) => placed.column.kind === '이름') ?? null,
   }
 }
@@ -286,11 +307,12 @@ export function entryPickedFillOf(input: {
 }): EntryRect | null {
   if (input.subTab === -1) return null
   const name = input.geometry.nameColumn
-  const rect = input.subTab === 1
-    ? { x: input.badgeX, y: input.rowY, width: ENTRY_BADGE_WIDTH, height: ENTRY_LIST_LAYOUT.cellHeight }
-    : name === null
-      ? null
-      : { x: name.x, y: input.rowY, width: name.column.width + ENTRY_BADGE_WIDTH + ENTRY_COLUMN_GAP, height: ENTRY_LIST_LAYOUT.cellHeight }
+  const rect =
+    input.subTab === 1
+      ? { x: input.badgeX, y: input.rowY, width: ENTRY_BADGE_WIDTH, height: ENTRY_LIST_LAYOUT.cellHeight }
+      : name === null
+        ? null
+        : { x: name.x, y: input.rowY, width: name.column.width + ENTRY_BADGE_WIDTH + ENTRY_COLUMN_GAP, height: ENTRY_LIST_LAYOUT.cellHeight }
   if (rect === null) return null
   return { x: rect.x + 1, y: rect.y + 1, width: rect.width - 2, height: rect.height - 2 }
 }
@@ -316,13 +338,8 @@ export function entryEarnedRunAverageOf(line: Pick<EntryPitcherLine, 'outs' | 'r
  * 방어율 0xb6ce9 소수((v > 100 ? v × 10 : v), 3) · 이닝 0xca7b5(+0x20, 3) · 그 밖 그 칸 값(자릿수 −1).
  * 타자 비트는 [팀+0x18] 배열, 투수 비트는 [팀+0x14] 배열의 같은 줄을 읽는다.
  */
-export function entryStatCellOf(
-  word: number,
-  batter: EntryBatterLine | undefined,
-  pitcher: EntryPitcherLine | undefined,
-): YearCellNumber | null {
-  const plain = (value: number | undefined): YearCellNumber | null =>
-    value === undefined ? null : { value, digits: -1, isDecimal: false }
+export function entryStatCellOf(word: number, batter: EntryBatterLine | undefined, pitcher: EntryPitcherLine | undefined): YearCellNumber | null {
+  const plain = (value: number | undefined): YearCellNumber | null => (value === undefined ? null : { value, digits: -1, isDecimal: false })
   if (word <= 0x80) {
     if (batter === undefined) return null
     switch (word) {
@@ -330,15 +347,24 @@ export function entryStatCellOf(
         const average = entryBattingAverageOf(batter)
         return { value: average, digits: average > 999 ? 3 : 0, isDecimal: true }
       }
-      case 1: return plain(batter.atBats)
-      case 2: return plain(batter.hits)
-      case 4: return plain(batter.doubles)
-      case 8: return plain(batter.triples)
-      case 0x10: return plain(batter.homeRuns)
-      case 0x20: return plain(batter.runsBattedIn)
-      case 0x40: return plain(batter.steals)
-      case 0x80: return plain(batter.errors)
-      default: return null
+      case 1:
+        return plain(batter.atBats)
+      case 2:
+        return plain(batter.hits)
+      case 4:
+        return plain(batter.doubles)
+      case 8:
+        return plain(batter.triples)
+      case 0x10:
+        return plain(batter.homeRuns)
+      case 0x20:
+        return plain(batter.runsBattedIn)
+      case 0x40:
+        return plain(batter.steals)
+      case 0x80:
+        return plain(batter.errors)
+      default:
+        return null
     }
   }
   if (pitcher === undefined) return null
@@ -347,15 +373,24 @@ export function entryStatCellOf(
       const average = entryEarnedRunAverageOf(pitcher)
       return { value: average > 100 ? average * 10 : average, digits: 3, isDecimal: true }
     }
-    case 0x200: return plain(Math.trunc(pitcher.outs / 3))
-    case 0x400: return plain(pitcher.runsAllowed)
-    case 0x800: return plain(pitcher.wins)
-    case 0x1000: return plain(pitcher.losses)
-    case 0x2000: return plain(pitcher.saves)
-    case 0x4000: return plain(pitcher.strikeouts)
-    case 0x8000: return plain(pitcher.pitches)
-    case 0x10000: return plain(pitcher.walks)
-    default: return null
+    case 0x200:
+      return plain(Math.trunc(pitcher.outs / 3))
+    case 0x400:
+      return plain(pitcher.runsAllowed)
+    case 0x800:
+      return plain(pitcher.wins)
+    case 0x1000:
+      return plain(pitcher.losses)
+    case 0x2000:
+      return plain(pitcher.saves)
+    case 0x4000:
+      return plain(pitcher.strikeouts)
+    case 0x8000:
+      return plain(pitcher.pitches)
+    case 0x10000:
+      return plain(pitcher.walks)
+    default:
+      return null
   }
 }
 

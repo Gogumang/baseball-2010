@@ -39,7 +39,8 @@ const { hints, hintOf } = loadHints()
 const asked = process.argv.slice(2)
 const skipped = new Set((process.env.E2E_QUICK_SKIP ?? '').split(',').filter(Boolean))
 const scenes = (asked.length > 0 ? asked : sceneCatalog().map((scene) => scene.name)).filter((scene) => !skipped.has(scene))
-const jobs = scenes.flatMap((scene) => devices.map((device) => ({ scene, device })))
+const jobs = scenes
+  .flatMap((scene) => devices.map((device) => ({ scene, device })))
   .sort((a, b) => hintOf(b.scene, b.device) - hintOf(a.scene, a.device))
 
 const started = Date.now()

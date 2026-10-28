@@ -4,14 +4,17 @@ import { ORIGINAL_MONEY_UNIT } from '@/entities/career/model/playerCareer'
 import { GAMES_PER_SEASON, hasSkill, isSkillEquipped } from '@/entities/career/model/playerCareer'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
-  MESSAGE_COLORS, SLASH_FRAME, STATUS_BOXES,
-  messageGameNumberOf, messageLineLayoutOf, moneyGlyphsOf, numberGlyphsOf,
+  MESSAGE_COLORS,
+  SLASH_FRAME,
+  STATUS_BOXES,
+  messageGameNumberOf,
+  messageLineLayoutOf,
+  moneyGlyphsOf,
+  numberGlyphsOf,
 } from '@/pages/management/lib/managementLayout'
 import type { Box } from '@/pages/management/lib/managementLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
-import {
-  HELPLESSNESS_SKILL_ID, LUCK_SKILL_ID, StatusIconRow, statusIconFramesFrom,
-} from '@/pages/management/ui/StatusIconRow'
+import { HELPLESSNESS_SKILL_ID, LUCK_SKILL_ID, StatusIconRow, statusIconFramesFrom } from '@/pages/management/ui/StatusIconRow'
 import type { StatusIconState } from '@/pages/management/ui/StatusIconRow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -51,8 +54,13 @@ export function StatusLabels({ lastLabelFrame = NARI_LAST_LABEL_FRAME }: { reado
       {STATUS_BOXES.labels.map((label, index) => {
         const frame = index === STATUS_BOXES.labels.length - 1 ? lastLabelFrame : label.frame
         return (
-          <img key={index} className={styles.layer} src={imageOf(frame)} alt=""
-            style={{ right: SCREEN_WIDTH - (label.x + label.width), top: label.y + Math.trunc((label.height - LABEL_HEIGHT + 1) / 2) }} />
+          <img
+            key={index}
+            className={styles.layer}
+            src={imageOf(frame)}
+            alt=""
+            style={{ right: SCREEN_WIDTH - (label.x + label.width), top: label.y + Math.trunc((label.height - LABEL_HEIGHT + 1) / 2) }}
+          />
         )
       })}
     </>
@@ -87,12 +95,26 @@ export function MessageLineText({ year, game, box }: { readonly year: number; re
   const layout = messageLineLayoutOf(game, box)
   return (
     <>
-      <img className={styles.layer} src={assetUrl("./sprites/management/label_yellow_335.png")} alt="" style={{ left: layout.gameLabelLeft, top: layout.labelTop }} />
+      <img
+        className={styles.layer}
+        src={assetUrl('./sprites/management/label_yellow_335.png')}
+        alt=""
+        style={{ left: layout.gameLabelLeft, top: layout.labelTop }}
+      />
       <SpriteNumber glyphs={numberGlyphsOf(GAMES_PER_SEASON)} right={layout.totalRight} boxTop={box.y} boxHeight={box.height} />
-      <img className={styles.layer} src={assetUrl(`./sprites/num/${String(SLASH_FRAME).padStart(3, '0')}.png`)} alt=""
-        style={{ left: layout.slashLeft, top: layout.slashTop }} />
+      <img
+        className={styles.layer}
+        src={assetUrl(`./sprites/num/${String(SLASH_FRAME).padStart(3, '0')}.png`)}
+        alt=""
+        style={{ left: layout.slashLeft, top: layout.slashTop }}
+      />
       <SpriteNumber glyphs={numberGlyphsOf(game)} right={layout.gameRight} boxTop={box.y} boxHeight={box.height} />
-      <img className={styles.layer} src={assetUrl("./sprites/management/label_yellow_334.png")} alt="" style={{ left: layout.yearLabelLeft, top: layout.labelTop }} />
+      <img
+        className={styles.layer}
+        src={assetUrl('./sprites/management/label_yellow_334.png')}
+        alt=""
+        style={{ left: layout.yearLabelLeft, top: layout.labelTop }}
+      />
       <SpriteNumber glyphs={numberGlyphsOf(year)} right={layout.yearRight} boxTop={box.y} boxHeight={box.height} />
     </>
   )
@@ -126,7 +148,12 @@ export function NariStatusValues({ fields, isPreviousGame = false }: { readonly 
       <SpriteNumber glyphs={numberGlyphsOf(fields.popularity)} right={valueRightOf(popularity)} boxTop={popularity.y} boxHeight={popularity.height} />
       <SpriteNumber glyphs={moneyGlyphsOf(fields.money)} right={valueRightOf(money)} boxTop={money.y} boxHeight={money.height} />
       <SpriteNumber glyphs={numberGlyphsOf(fields.reputation)} right={valueRightOf(reputation)} boxTop={reputation.y} boxHeight={reputation.height} />
-      <SpriteNumber glyphs={moneyGlyphsOf(fields.salary * ORIGINAL_MONEY_UNIT)} right={valueRightOf(salary)} boxTop={salary.y} boxHeight={salary.height} />
+      <SpriteNumber
+        glyphs={moneyGlyphsOf(fields.salary * ORIGINAL_MONEY_UNIT)}
+        right={valueRightOf(salary)}
+        boxTop={salary.y}
+        boxHeight={salary.height}
+      />
       <MessageLine year={fields.season} game={game} />
       <StatusIconRow state={fields.icons} />
     </>
@@ -140,15 +167,18 @@ export function NariStatusValues({ fields, isPreviousGame = false }: { readonly 
  */
 export function StatusValues({ career, isPreviousGame = false }: { readonly career: PlayerCareer; readonly isPreviousGame?: boolean }) {
   return (
-    <NariStatusValues isPreviousGame={isPreviousGame} fields={{
-      popularity: career.popularity,
-      money: career.money,
-      reputation: career.reputation,
-      salary: career.salary,
-      season: career.season,
-      dayCounter: leagueDayCounterOf(career),
-      isPostseason: career.postseason !== null,
-      icons: statusIconStateOf(career),
-    }} />
+    <NariStatusValues
+      isPreviousGame={isPreviousGame}
+      fields={{
+        popularity: career.popularity,
+        money: career.money,
+        reputation: career.reputation,
+        salary: career.salary,
+        season: career.season,
+        dayCounter: leagueDayCounterOf(career),
+        isPostseason: career.postseason !== null,
+        icons: statusIconStateOf(career),
+      }}
+    />
   )
 }

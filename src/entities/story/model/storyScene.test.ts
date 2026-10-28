@@ -27,8 +27,7 @@ function 선수(overrides: Partial<PlayerCareer> = {}): PlayerCareer {
   return { ...createCareer('테스트'), ...overrides }
 }
 
-const 오프닝을본선수 = (overrides: Partial<PlayerCareer> = {}) =>
-  선수({ seenEventIds: [String(OPENING_EVENT_ID)], ...overrides })
+const 오프닝을본선수 = (overrides: Partial<PlayerCareer> = {}) => 선수({ seenEventIds: [String(OPENING_EVENT_ID)], ...overrides })
 
 const 고정난수 = (value: number): RandomPort => createConstantRandom(value)
 
@@ -39,9 +38,7 @@ describe('원본 r_event 이벤트 데이터', () => {
   })
 
   it('첫 이벤트는 원작 오프닝 꿈 장면이다', () => {
-    const 대사 = ORIGINAL_EVENTS[0].commands
-      .flatMap((command) => (command.op === 'say' ? [stripGameMarkup(command.text)] : []))
-      .join(' ')
+    const 대사 = ORIGINAL_EVENTS[0].commands.flatMap((command) => (command.op === 'say' ? [stripGameMarkup(command.text)] : [])).join(' ')
     expect(ORIGINAL_EVENTS[0].id).toBe(OPENING_EVENT_ID)
     expect(대사).toContain('더 크게 불러줘')
   })
@@ -100,9 +97,7 @@ describe('nextEventFor — 원본 이벤트 일정', () => {
     const seenAllButPrerequisite = 오프닝을본선수({
       season: 13,
       gamesPlayed: 44,
-      seenEventIds: ORIGINAL_EVENTS.filter((event) => event.id !== chained.requiresEvent && event.id !== chained.id).map(
-        (event) => String(event.id),
-      ),
+      seenEventIds: ORIGINAL_EVENTS.filter((event) => event.id !== chained.requiresEvent && event.id !== chained.id).map((event) => String(event.id)),
     })
 
     expect(nextEventFor(seenAllButPrerequisite, ORIGINAL_EVENTS, chained.trigger)?.id).not.toBe(chained.id)
@@ -152,8 +147,7 @@ describe('scanEventFrom — 커서 이어 쓰기 (0xadc70)', () => {
     const career = 오프닝을본선수()
     const 처음 = scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0)
 
-    expect(scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 처음.cursor + 1).event?.id)
-      .not.toBe(처음.event?.id)
+    expect(scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 처음.cursor + 1).event?.id).not.toBe(처음.event?.id)
   })
 
   it('끝까지 없으면 커서를 0 으로 되감고 그 호출은 "없음" 이다', () => {
@@ -173,8 +167,9 @@ describe('scanEventFrom — 커서 이어 쓰기 (0xadc70)', () => {
   it('nextEventFor 는 늘 처음부터 훑는다 — 장소 [!] 배정 0x8cdc0 갈래', () => {
     const career = 오프닝을본선수()
 
-    expect(nextEventFor(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리)?.id)
-      .toBe(scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0).event?.id)
+    expect(nextEventFor(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리)?.id).toBe(
+      scanEventFrom(career, ORIGINAL_EVENTS, EVENT_TRIGGER.관리, 0).event?.id,
+    )
   })
 })
 
@@ -262,7 +257,13 @@ describe('질병 조건 22 — 사기 구간 확률 (0xadb32)', () => {
 
   it('이미 본 490 에는 굴리지 않는다 — 판정 0xacfbc 가 본 이벤트(0xad07e)를 조건보다 먼저 본다', () => {
     let rolls = 0
-    const 세는난수: RandomPort = { ...고정난수(0), rand: (lo, hi) => { rolls += 1; return 고정난수(0).rand(lo, hi) } }
+    const 세는난수: RandomPort = {
+      ...고정난수(0),
+      rand: (lo, hi) => {
+        rolls += 1
+        return 고정난수(0).rand(lo, hi)
+      },
+    }
     const 본선수 = 오프닝을본선수({
       morale: 5,
       season: 2,
@@ -327,8 +328,9 @@ describe('rewardResumePatchOf — 0x8c460 끝 8cc2e 의 이벤트별 S+0x50', ()
   })
 
   it('시즌 갈래 — 372·373 0xd · 374·375 0xe · 378·379 0x10 · 393~396 0xc · 401~403 0xf, 463·464 는 안 본다', () => {
-    expect([372, 373, 374, 375, 378, 379, 393, 396, 401, 403].map((id) => rewardResumePatchOf(id, '시즌')?.resumeCode))
-      .toEqual([0xd, 0xd, 0xe, 0xe, 0x10, 0x10, 0xc, 0xc, 0xf, 0xf])
+    expect([372, 373, 374, 375, 378, 379, 393, 396, 401, 403].map((id) => rewardResumePatchOf(id, '시즌')?.resumeCode)).toEqual([
+      0xd, 0xd, 0xe, 0xe, 0x10, 0x10, 0xc, 0xc, 0xf, 0xf,
+    ])
     expect(rewardResumePatchOf(371, '시즌')).toBeNull()
     expect(rewardResumePatchOf(377, '시즌')).toBeNull()
     expect(rewardResumePatchOf(463, '시즌')).toBeNull()

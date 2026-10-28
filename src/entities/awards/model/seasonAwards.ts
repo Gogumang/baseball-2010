@@ -1,19 +1,9 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { yearGoalsOf } from '@/entities/career/model/seasonFlow'
-import {
-  BATTING_AVERAGE_SCALE,
-  EMPTY_LEAGUE_RECORD,
-  LEADER_KIND,
-  leaderOf,
-} from '@/entities/awards/model/leaderboard'
+import { BATTING_AVERAGE_SCALE, EMPTY_LEAGUE_RECORD, LEADER_KIND, leaderOf } from '@/entities/awards/model/leaderboard'
 import type { LeaderKind, LeagueRecord } from '@/entities/awards/model/leaderboard'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
-import {
-  leagueBatterIdOf,
-  leagueBatterLineOf,
-  leaguePitcherIdOf,
-  leaguePitcherLineOf,
-} from '@/entities/league/model/leaguePlayerStats'
+import { leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf } from '@/entities/league/model/leaguePlayerStats'
 import type { LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 
@@ -101,10 +91,7 @@ export interface TitleSlot {
 export const NO_TEAM = 10
 
 /** 개인 타이틀 (0x8dad4) — 나리는 세 칸, 시즌모드 투수는 네 칸이다. 순위표 1위를 그대로 옮겨 적는다 */
-export function judgeTitles(
-  records: readonly LeagueRecord[],
-  role: AwardRole = '타자',
-): readonly TitleSlot[] {
+export function judgeTitles(records: readonly LeagueRecord[], role: AwardRole = '타자'): readonly TitleSlot[] {
   return TITLE_SPECS[role].map((spec) => {
     const leader = leaderOf(records, spec.kind)
     return {
@@ -134,9 +121,7 @@ export function achievedGoalCountForMvp(career: PlayerCareer): number {
   const { stats } = career
   const checks = [
     // 원본 타율 = min(1000, trunc(안타 × 1000 / 타수)) — 버림 (0xb8e3d)
-    stats.atBats > 0 &&
-      Math.min(BATTING_AVERAGE_SCALE, Math.trunc((stats.hits * BATTING_AVERAGE_SCALE) / stats.atBats)) >=
-        average,
+    stats.atBats > 0 && Math.min(BATTING_AVERAGE_SCALE, Math.trunc((stats.hits * BATTING_AVERAGE_SCALE) / stats.atBats)) >= average,
     stats.hits >= hits,
     stats.homeRuns >= homeRuns,
     stats.runsBattedIn >= runsBattedIn,
@@ -191,15 +176,10 @@ export interface AwardSubject {
  * 0x8de58 이 세 칸을 한 번에 보고 모두 0 이면 바로 탈락시키므로, 목표를 다 채워도
  * **타이틀이 하나도 없으면 MVP 가 아니다**.
  */
-export function judgeAwards(
-  subject: AwardSubject,
-  records: readonly LeagueRecord[],
-  role: AwardRole = '타자',
-): SeasonAwards {
+export function judgeAwards(subject: AwardSubject, records: readonly LeagueRecord[], role: AwardRole = '타자'): SeasonAwards {
   const titles = judgeTitles(records, role)
   const wonCount = titles.filter((title) => title.isMine).length
-  const isMostValuablePlayer =
-    wonCount >= 1 && (wonCount === titles.length || subject.achievedGoalCount >= MVP_GOAL_COUNT)
+  const isMostValuablePlayer = wonCount >= 1 && (wonCount === titles.length || subject.achievedGoalCount >= MVP_GOAL_COUNT)
 
   if (isMostValuablePlayer) {
     return {
@@ -225,16 +205,8 @@ export function judgeAwards(
 }
 
 /** 타자편(모드 4) 입구 — 커리어에서 목표 달성 수를 세어 `judgeAwards` 에 넘긴다 */
-export function judgeSeasonAwards(
-  career: PlayerCareer,
-  records: readonly LeagueRecord[],
-  role: AwardRole = '타자',
-): SeasonAwards {
-  return judgeAwards(
-    { teamId: career.teamId, name: career.name, achievedGoalCount: achievedGoalCountForMvp(career) },
-    records,
-    role,
-  )
+export function judgeSeasonAwards(career: PlayerCareer, records: readonly LeagueRecord[], role: AwardRole = '타자'): SeasonAwards {
+  return judgeAwards({ teamId: career.teamId, name: career.name, achievedGoalCount: achievedGoalCountForMvp(career) }, records, role)
 }
 
 // ─── 이벤트 번호와 보상 ────────────────────────────────────────────────────────
@@ -393,10 +365,7 @@ export function myLeagueRecordOf(career: PlayerCareer): LeagueRecord {
  * 몇 번째인지는 모른다 — 선수 생성(0x1762e)이 명단에 더하는 모양이라 끝으로 두었다 (**추정**).
  * 동점일 때만 차이가 나고, 그때는 같은 팀 로스터 타자가 앞선다.
  */
-export function leagueRecordsOf(
-  stats: LeaguePlayerStats,
-  myRecord: LeagueRecord | null = null,
-): readonly LeagueRecord[] {
+export function leagueRecordsOf(stats: LeaguePlayerStats, myRecord: LeagueRecord | null = null): readonly LeagueRecord[] {
   const records: LeagueRecord[] = []
   for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
     teamBatters(teamId).forEach((player, slot) => {
@@ -432,10 +401,7 @@ export function careerLeagueRecordsOf(career: PlayerCareer): readonly LeagueReco
  * (자책 구분이 없어 같은 칸이다), `saves` = +0x24, `strikeouts` = +0x26, `wins` = +0x2e,
  * `losses` = +0x2f.
  */
-export function leaguePitcherRecordsOf(
-  stats: LeaguePlayerStats,
-  myRecord: LeagueRecord | null = null,
-): readonly LeagueRecord[] {
+export function leaguePitcherRecordsOf(stats: LeaguePlayerStats, myRecord: LeagueRecord | null = null): readonly LeagueRecord[] {
   const records: LeagueRecord[] = []
   for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
     teamPitchers(teamId).forEach((player, slot) => {

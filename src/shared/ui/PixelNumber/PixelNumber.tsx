@@ -21,11 +21,7 @@ export function PixelNumber({ value, color = '흰색', minimumDigits = 1 }: Pixe
   return (
     <span className={styles.number}>
       {[...digits].map((digit, index) => (
-        <img
-          key={index}
-          src={assetUrl(`./sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`)}
-          alt={digit}
-        />
+        <img key={index} src={assetUrl(`./sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`)} alt={digit} />
       ))}
     </span>
   )
@@ -49,13 +45,7 @@ export const HEADING_SPRITE = {
 } as const
 
 export function HeadingSprite({ name }: { readonly name: keyof typeof HEADING_SPRITE }) {
-  return (
-    <img
-      className={styles.headingSprite}
-      src={assetUrl(`./sprites/game_frame/${HEADING_SPRITE[name]}.png`)}
-      alt={name}
-    />
-  )
+  return <img className={styles.headingSprite} src={assetUrl(`./sprites/game_frame/${HEADING_SPRITE[name]}.png`)} alt={name} />
 }
 
 /** 원본 ui/popup.pzx 의 버튼 라벨 그림. 시트를 눈으로 확인해 매긴 번호다. */
@@ -71,9 +61,7 @@ export const POPUP_LABEL = {
 } as const
 
 export function PopupLabel({ name }: { readonly name: keyof typeof POPUP_LABEL }) {
-  return (
-    <img className={styles.popupLabel} src={assetUrl(`./sprites/popup/${POPUP_LABEL[name]}.png`)} alt={name} />
-  )
+  return <img className={styles.popupLabel} src={assetUrl(`./sprites/popup/${POPUP_LABEL[name]}.png`)} alt={name} />
 }
 
 /**

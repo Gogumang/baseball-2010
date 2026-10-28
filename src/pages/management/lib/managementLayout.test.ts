@@ -23,7 +23,11 @@ import {
 describe('하위 메뉴 · 등장 애니메이션 — 0x7e84c · 0x7ff8c (layout-re 2차)', () => {
   it('선수정보·트레이닝·아이템 하위 메뉴는 표 0xd4758 칸에 놓인다', () => {
     expect(COMMAND_MENUS.트레이닝.map((item) => [item.x, item.y, item.icon, item.labelFrame])).toEqual([
-      [44, 245, 11, 98], [82, 245, 12, 103], [122, 236, 13, 108], [161, 236, 14, 113], [199, 236, 15, 115],
+      [44, 245, 11, 98],
+      [82, 245, 12, 103],
+      [122, 236, 13, 108],
+      [161, 236, 14, 113],
+      [199, 236, 15, 115],
     ])
     expect(COMMAND_MENUS.아이템.map((item) => item.id)).toEqual(['장착', '서브', 'GP'])
     expect(COMMAND_MENUS.선수정보.map((item) => item.labelFrame)).toEqual([96, 228, 101, 115, 297])
@@ -53,10 +57,20 @@ describe('하위 메뉴 · 등장 애니메이션 — 0x7e84c · 0x7ff8c (layout
 describe('관리 화면 배치 — 0x7d34c · 0x7e418', () => {
   it('커맨드 6칸은 왼쪽 셋이 y245, 오른쪽 셋이 y236 인 계단형이다 (표 0xd4740)', () => {
     expect(COMMAND_SLOTS.map((slot) => [slot.x, slot.y])).toEqual([
-      [6, 245], [44, 245], [82, 245], [122, 236], [161, 236], [199, 236],
+      [6, 245],
+      [44, 245],
+      [82, 245],
+      [122, 236],
+      [161, 236],
+      [199, 236],
     ])
     expect(COMMAND_SLOTS.map((slot) => [slot.id, slot.icon, slot.labelFrame])).toEqual([
-      ['선수정보', 0, 90], ['트레이닝', 1, 91], ['휴식', 2, 92], ['외출', 3, 93], ['아이템', 4, 94], ['다음경기', 5, 89],
+      ['선수정보', 0, 90],
+      ['트레이닝', 1, 91],
+      ['휴식', 2, 92],
+      ['외출', 3, 93],
+      ['아이템', 4, 94],
+      ['다음경기', 5, 89],
     ])
   })
 
@@ -103,8 +117,14 @@ describe('관리 화면 배치 — 0x7d34c · 0x7e418', () => {
 
   it('메시지줄 "/" 는 0xb9d35 oy 1 · 세로 가운데 내림이라 y 210 — 나머지 자리는 dx 를 줄여 간다', () => {
     expect(messageLineLayoutOf(12)).toEqual({
-      gameLabelLeft: 81, totalRight: 79, slashLeft: 58, slashTop: 210, gameRight: 56,
-      yearLabelLeft: 28, yearRight: 26, labelTop: 209,
+      gameLabelLeft: 81,
+      totalRight: 79,
+      slashLeft: 58,
+      slashTop: 210,
+      gameRight: 56,
+      yearLabelLeft: 28,
+      yearRight: 26,
+      labelTop: 209,
     })
   })
 

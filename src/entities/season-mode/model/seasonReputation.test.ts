@@ -56,9 +56,7 @@ describe('점프표 0xd7d7c — ⚠️ 코드 4·5 만 뒤집혀 있다 (원본 
     // 병살 3개 → S[4] = 3 → − 2×(S[4]/3) = −2
     expect(seasonReputationScoreOf(병살칸, 기본맥락)).toBe(패배기본 - 2)
     // 부호가 반대다 — 잡을수록 깎이고 삼진이 올려 준다
-    expect(seasonReputationScoreOf(탈삼진칸, 기본맥락)).toBeGreaterThan(
-      seasonReputationScoreOf(병살칸, 기본맥락),
-    )
+    expect(seasonReputationScoreOf(탈삼진칸, 기본맥락)).toBeGreaterThan(seasonReputationScoreOf(병살칸, 기본맥락))
   })
 })
 
@@ -107,8 +105,7 @@ describe('평판식 0xa6f1c', () => {
   })
 
   it('승리 완투 보너스 — 퍼펙트 7 · 노히트 6 · 완봉 4 · 완투 3', () => {
-    const 점수 = (kind: SeasonGameContext['completeGame']) =>
-      seasonReputationScoreOf(빈칸(), { ...기본맥락, won: true, completeGame: kind })
+    const 점수 = (kind: SeasonGameContext['completeGame']) => seasonReputationScoreOf(빈칸(), { ...기본맥락, won: true, completeGame: kind })
     expect(점수('퍼펙트')).toBe(2 + 7)
     expect(점수('노히트')).toBe(2 + 6)
     expect(점수('완봉')).toBe(2 + 4)

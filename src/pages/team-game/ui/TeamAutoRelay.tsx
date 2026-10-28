@@ -135,7 +135,15 @@ interface TeamAutoRelayProps {
  *
  */
 export function TeamAutoRelay({
-  progress, onStep, onStop, sideTeams, humanSide, grassPalette = null, entryLoadedRunnerAce, recordAlert = null, onAskingChange,
+  progress,
+  onStep,
+  onStop,
+  sideTeams,
+  humanSide,
+  grassPalette = null,
+  entryLoadedRunnerAce,
+  recordAlert = null,
+  onAskingChange,
 }: TeamAutoRelayProps) {
   const [shown, setShown] = useState<MissionAutoRelayStep>(() => teamAutoRelayEntryStepOf(progress))
   // 0x18 길은 4faf8 0x47cc8 이 주자 그림판에 마선수 그림을 다시 싣는다(타자 → 가장 앞선 마선수 주자) · 메뉴 길은 타석 0xd 때 그림
@@ -271,69 +279,136 @@ export function TeamAutoRelay({
     { kind: 'image', src: fieldUrl, x: fieldAt.mirroredX, y: fieldAt.y, flipX: true },
   ]
   const plateX = SCREEN_WIDTH / 2 - Math.trunc((plate?.width ?? 0) / 2)
-  const plateOps = frameComposeOps(GAME_UI_FRAMES, SPEED_PLATE_FRAME, gameUiOrigins, plateX, SPEED_PLATE_Y,
-    DRAW_EFFECT.TRANSLUCENT, SPEED_PLATE_EFFECT_LEVEL)
+  const plateOps = frameComposeOps(
+    GAME_UI_FRAMES,
+    SPEED_PLATE_FRAME,
+    gameUiOrigins,
+    plateX,
+    SPEED_PLATE_Y,
+    DRAW_EFFECT.TRANSLUCENT,
+    SPEED_PLATE_EFFECT_LEVEL,
+  )
   const markSrc = `${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`
   const dimMarkOps: readonly ComposeImageOp[] = [0, 1, 2].map((index) => ({
-    kind: 'image', src: markSrc, x: marksX + index * (ARROW_SIZE.width + 1), y: SPEED_MARKS_Y,
-    effect: DRAW_EFFECT.TRANSLUCENT, argument: SPEED_MARK_DIM_EFFECT_LEVEL,
+    kind: 'image',
+    src: markSrc,
+    x: marksX + index * (ARROW_SIZE.width + 1),
+    y: SPEED_MARKS_Y,
+    effect: DRAW_EFFECT.TRANSLUCENT,
+    argument: SPEED_MARK_DIM_EFFECT_LEVEL,
   }))
   const overlay = (
     <>
       {/* 모드 ∈ {1,2,8,9} 면 속도와 상관없이 (42ab2 · 42bbe) */}
       <div data-testid="중계-속도" data-speed={speed}>
         {guide !== undefined && (
-          <FrameSprite folder={GAME_UI_FRAMES} frame={GUIDE_FRAME} origins={gameUiOrigins}
-            x={SCREEN_WIDTH / 2 - Math.trunc(guide.width / 2)} y={SCREEN_HEIGHT - guide.height - 1} />
+          <FrameSprite
+            folder={GAME_UI_FRAMES}
+            frame={GUIDE_FRAME}
+            origins={gameUiOrigins}
+            x={SCREEN_WIDTH / 2 - Math.trunc(guide.width / 2)}
+            y={SCREEN_HEIGHT - guide.height - 1}
+          />
         )}
         {plate !== undefined && plateOps[0] !== undefined && (
-          <ComposedOverlay testId="중계-속도칸" rect={{ x: plateOps[0].x, y: plateOps[0].y, width: plate.width, height: plate.height }}
-            underOps={fieldUnderOps} ops={plateOps}
+          <ComposedOverlay
+            testId="중계-속도칸"
+            rect={{ x: plateOps[0].x, y: plateOps[0].y, width: plate.width, height: plate.height }}
+            underOps={fieldUnderOps}
+            ops={plateOps}
             fallback={
-              <FrameSprite folder={GAME_UI_FRAMES} frame={SPEED_PLATE_FRAME} origins={gameUiOrigins}
-                x={plateX} y={SPEED_PLATE_Y} style={{ opacity: effectOpacityOf(SPEED_PLATE_EFFECT_LEVEL) }} />
-            } />
+              <FrameSprite
+                folder={GAME_UI_FRAMES}
+                frame={SPEED_PLATE_FRAME}
+                origins={gameUiOrigins}
+                x={plateX}
+                y={SPEED_PLATE_Y}
+                style={{ opacity: effectOpacityOf(SPEED_PLATE_EFFECT_LEVEL) }}
+              />
+            }
+          />
         )}
         {label !== undefined && (
-          <FrameSprite folder={IMG_TEXT_FRAMES} frame={SPEED_LABEL_FRAME} origins={textOrigins}
-            x={SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2)} y={SPEED_LABEL_Y} />
+          <FrameSprite
+            folder={IMG_TEXT_FRAMES}
+            frame={SPEED_LABEL_FRAME}
+            origins={textOrigins}
+            x={SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2)}
+            y={SPEED_LABEL_Y}
+          />
         )}
         {sceneTick % 8 <= 4 && (
           <>
-            <img alt="" src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
-              style={imageStyle(SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 8, ARROW_Y, { transform: 'scaleX(-1)' })} />
-            <img alt="" src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
-              style={imageStyle(SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) + 3, ARROW_Y)} />
+            <img
+              alt=""
+              src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
+              style={imageStyle(SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 8, ARROW_Y, { transform: 'scaleX(-1)' })}
+            />
+            <img
+              alt=""
+              src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
+              style={imageStyle(SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) + 3, ARROW_Y)}
+            />
           </>
         )}
         {/* 웹 덧붙임 — 속도 화살(5×8, 깜박임) 위 투명 칸: 원본 ← · → 키 한 번(속도 −1 · +1). 같은 키를 상황 버튼으로 또 내지 않는다(필요한 버튼만) */}
         {!isAsking && (
           <>
-            <PressArea label="속도 느리게" onPress={() => tapKey('ArrowLeft')}
-              rect={{ x: SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 13, y: ARROW_Y - 4, width: 14, height: 16 }} />
-            <PressArea label="속도 빠르게" onPress={() => tapKey('ArrowRight')}
-              rect={{ x: SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) - 1, y: ARROW_Y - 4, width: 14, height: 16 }} />
+            <PressArea
+              label="속도 느리게"
+              onPress={() => tapKey('ArrowLeft')}
+              rect={{ x: SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 13, y: ARROW_Y - 4, width: 14, height: 16 }}
+            />
+            <PressArea
+              label="속도 빠르게"
+              onPress={() => tapKey('ArrowRight')}
+              rect={{ x: SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) - 1, y: ARROW_Y - 4, width: 14, height: 16 }}
+            />
             {/* "CLR 중단" 글자(game_ui 92, 위 안내 그림) 자리 — 원본 CLR 키 한 번(중단 질문). r186 — 늘 있던 뒤로 버튼을 걷었다 */}
             {guide !== undefined && (
-              <PressArea label="CLR 중단" onPress={() => tapKey('Escape')}
-                rect={{ x: SCREEN_WIDTH / 2 - Math.trunc(guide.width / 2), y: SCREEN_HEIGHT - guide.height - 1, width: guide.width, height: guide.height }} />
+              <PressArea
+                label="CLR 중단"
+                onPress={() => tapKey('Escape')}
+                rect={{
+                  x: SCREEN_WIDTH / 2 - Math.trunc(guide.width / 2),
+                  y: SCREEN_HEIGHT - guide.height - 1,
+                  width: guide.width,
+                  height: guide.height,
+                }}
+              />
             )}
           </>
         )}
         {/* 42e7c~42efa — 세 개를 효과 (1, 6) 으로 깐 뒤 i ≤ v 만 효과 0 으로 한 번 더 */}
-        <ComposedOverlay testId="중계-속도세모" rect={{ x: marksX, y: SPEED_MARKS_Y, width: 3 * ARROW_SIZE.width + 2, height: ARROW_SIZE.height }}
-          underOps={fieldUnderOps} ops={dimMarkOps}
-          fallback={[0, 1, 2].filter((index) => index > speed).map((index) => (
-            <img key={index} alt="" src={markSrc}
-              style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y, { opacity: effectOpacityOf(SPEED_MARK_DIM_EFFECT_LEVEL) })} />
-          ))} />
-        {[0, 1, 2].filter((index) => index <= speed).map((index) => (
-          <img key={index} alt="" data-lit src={markSrc} style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y)} />
-        ))}
+        <ComposedOverlay
+          testId="중계-속도세모"
+          rect={{ x: marksX, y: SPEED_MARKS_Y, width: 3 * ARROW_SIZE.width + 2, height: ARROW_SIZE.height }}
+          underOps={fieldUnderOps}
+          ops={dimMarkOps}
+          fallback={[0, 1, 2]
+            .filter((index) => index > speed)
+            .map((index) => (
+              <img
+                key={index}
+                alt=""
+                src={markSrc}
+                style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y, { opacity: effectOpacityOf(SPEED_MARK_DIM_EFFECT_LEVEL) })}
+              />
+            ))}
+        />
+        {[0, 1, 2]
+          .filter((index) => index <= speed)
+          .map((index) => (
+            <img key={index} alt="" data-lit src={markSrc} style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y)} />
+          ))}
       </div>
       {isChangeShown && (
-        <img alt="CHANGE" data-testid="중계-CHANGE" src={`${GAME_UI}/${String(CHANGE_IMAGE).padStart(3, '0')}.png`}
-          style={imageStyle(changeImagePosition.x, changeImagePosition.y)} />
+        <img
+          alt="CHANGE"
+          data-testid="중계-CHANGE"
+          src={`${GAME_UI}/${String(CHANGE_IMAGE).padStart(3, '0')}.png`}
+          style={imageStyle(changeImagePosition.x, changeImagePosition.y)}
+        />
       )}
       {recordAlert}
       {isAsking && (
@@ -353,9 +428,17 @@ export function TeamAutoRelay({
   )
 
   return (
-    <AutoPlayRelayScreen step={shown} onTick={onTick} isPaused={isAsking} keyLatch={keyLatch} sideTeams={sideTeams} humanSide={humanSide}
-      overlay={overlay} grassPalette={grassPalette}
+    <AutoPlayRelayScreen
+      step={shown}
+      onTick={onTick}
+      isPaused={isAsking}
+      keyLatch={keyLatch}
+      sideTeams={sideTeams}
+      humanSide={humanSide}
+      overlay={overlay}
+      grassPalette={grassPalette}
       // 운동장 그림은 v ≠ 2 일 때만 (`[sp+0x5c]`)
-      field={fast ? null : <TeamRelayFigures figures={figures} />} />
+      field={fast ? null : <TeamRelayFigures figures={figures} />}
+    />
   )
 }

@@ -52,7 +52,7 @@ const WHOLE_SCREEN: PressRect = { x: 0, y: 0, width: 240, height: 320 }
  * 원본 그림 자리(소프트키 글자 "*MENU" 따위) 위에 투명하게 얹는다. 눌림이 아래 캔버스(스윙)로 내려가지 않게 막는다.
  */
 export function PressArea({ label, rect = WHOLE_SCREEN, onPress, isDisabled = false, option, testId, touchKey }: PressAreaProps) {
-  useTouchKeyOffer(isDisabled ? null : touchKey ?? null)
+  useTouchKeyOffer(isDisabled ? null : (touchKey ?? null))
   /**
    * 이 칸에 손가락 · 마우스가 닿은 사건 시각(`event.timeStamp`) — 누름(onPress)은 떼는 click 에 나가지만, 키패드 키가 누를 때 keydown 이듯
    * 사람이 누른 때는 닿은 때다. click 사건에 이 시각을 붙여(`stampInputTime`) 받는 쪽이 `inputTimeOf` 로 "그때 본 그림의 틱"을 센다(r222)

@@ -29,8 +29,7 @@ describe('기술 고르기 — 상태 0x7b · 0x17cec', () => {
 
   it('배운 칸을 고르면 StrMODE[70] 로 묻고, "예" 가 고른 번호를 바꾼다', () => {
     const onSelectNumber = vi.fn()
-    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={0}
-      selectedNumber={1} onSelectNumber={onSelectNumber} onClose={vi.fn()} />)
+    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={0} selectedNumber={1} onSelectNumber={onSelectNumber} onClose={vi.fn()} />)
 
     칸누르기('토네이도스윙')
     expect(알림글()).toContain('토네이도스윙')
@@ -41,8 +40,7 @@ describe('기술 고르기 — 상태 0x7b · 0x17cec', () => {
 
   it('장타형이 메테오 스윙을 고르면 +0x18 에는 5 가 아니라 칸 + 1 = 4 가 들어간다 (0x17c64)', () => {
     const onSelectNumber = vi.fn()
-    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={1}
-      selectedNumber={1} onSelectNumber={onSelectNumber} onClose={vi.fn()} />)
+    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={1} selectedNumber={1} onSelectNumber={onSelectNumber} onClose={vi.fn()} />)
 
     칸누르기('메테오 스윙')
     fireEvent.click(screen.getByRole('button', { name: '예' }))
@@ -51,8 +49,7 @@ describe('기술 고르기 — 상태 0x7b · 0x17cec', () => {
   })
 
   it('"사용 중" 비교값은 0xa43c4 의 4 + 타입이다 — 장타형 넷째 칸은 5 와 견준다', () => {
-    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={1}
-      selectedNumber={5} onClose={vi.fn()} />)
+    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={1} selectedNumber={5} onClose={vi.fn()} />)
 
     칸누르기('메테오 스윙')
 
@@ -61,8 +58,7 @@ describe('기술 고르기 — 상태 0x7b · 0x17cec', () => {
 
   it('"아니오" 면 고른 번호를 바꾸지 않는다', () => {
     const onSelectNumber = vi.fn()
-    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={0}
-      selectedNumber={1} onSelectNumber={onSelectNumber} onClose={vi.fn()} />)
+    render(<SpecialSwingWindow level={4} sessions={0} battingTypeIndex={0} selectedNumber={1} onSelectNumber={onSelectNumber} onClose={vi.fn()} />)
 
     칸누르기('플레임 스윙')
     fireEvent.click(screen.getByRole('button', { name: '아니오' }))
@@ -74,8 +70,19 @@ describe('기술 고르기 — 상태 0x7b · 0x17cec', () => {
 describe('배우기 — 상태 0x6c · 0x17828', () => {
   const 훈련창 = (overrides: Partial<Parameters<typeof SpecialSwingWindow>[0]> = {}) => {
     const onTrain = vi.fn()
-    render(<SpecialSwingWindow mode="훈련" level={0} sessions={0} battingTypeIndex={0}
-      popularity={9999} gamePoint={9999} onTrain={onTrain} onClose={vi.fn()} {...overrides} />)
+    render(
+      <SpecialSwingWindow
+        mode="훈련"
+        level={0}
+        sessions={0}
+        battingTypeIndex={0}
+        popularity={9999}
+        gamePoint={9999}
+        onTrain={onTrain}
+        onClose={vi.fn()}
+        {...overrides}
+      />,
+    )
     return { onTrain }
   }
 
@@ -177,16 +184,25 @@ describe('그림 · 키 — 0x803d4 탭 0 · 창 키 0x80268', () => {
   })
 
   it('장타형이 메테오(저장 4)를 쓰면 넷째 칸 아이콘은 주황이지만 "사용중" 글은 안 뜬다', () => {
-    render(<SpecialSwingWindow mode="훈련" level={4} sessions={0} battingTypeIndex={1} selectedNumber={4}
-      popularity={9999} gamePoint={9999} onClose={vi.fn()} />)
+    render(
+      <SpecialSwingWindow
+        mode="훈련"
+        level={4}
+        sessions={0}
+        battingTypeIndex={1}
+        selectedNumber={4}
+        popularity={9999}
+        gamePoint={9999}
+        onClose={vi.fn()}
+      />,
+    )
 
     expect(screen.getByTestId('필살칸-3').getAttribute('data-in-use')).toBe('true')
     expect(screen.queryByTestId('필살타법-글')).toBeNull()
   })
 
   it('훈련 창 — 비용 · 횟수 · 이름 · 설명 · 잠김은 배운 수 L ≤ i 인 칸', () => {
-    render(<SpecialSwingWindow mode="훈련" level={1} sessions={2} battingTypeIndex={0}
-      popularity={9999} gamePoint={9999} onClose={vi.fn()} />)
+    render(<SpecialSwingWindow mode="훈련" level={1} sessions={2} battingTypeIndex={0} popularity={9999} gamePoint={9999} onClose={vi.fn()} />)
 
     const figures = screen.getByTestId('필살타법-비용-횟수')
     expect(figures.getAttribute('data-cost')).toBe('700')

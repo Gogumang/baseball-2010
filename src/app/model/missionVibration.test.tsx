@@ -99,11 +99,7 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number, ac
   const mission = aceMatch ? aceMatchMissionOf(16, '투수') : MISSIONS.find((row) => row.side === '투수' && row.id === 1)
   if (mission === null || mission === undefined) throw new Error('투수 미션이 없다')
   const begin = () =>
-    act(() =>
-      aceMatch
-        ? rendered.result.current.actions.beginPitcherAceMatch(mission)
-        : rendered.result.current.actions.begin(mission),
-    )
+    act(() => (aceMatch ? rendered.result.current.actions.beginPitcherAceMatch(mission) : rendered.result.current.actions.begin(mission)))
   begin()
   const 기록: 공기록[] = []
   for (let step = 0; step < 200; step += 1) {
@@ -155,9 +151,7 @@ describe('투수 미션(모드 5) — 내가 잡은 삼진도 100ms 울린다 (�
     const 켬 = 던지며모으기(true, 7)
     const 끔 = 던지며모으기(false, 7)
     expect(켬.drawn).toBe(끔.drawn)
-    expect(켬.기록.map(({ strikesBefore, kind }) => [strikesBefore, kind])).toEqual(
-      끔.기록.map(({ strikesBefore, kind }) => [strikesBefore, kind]),
-    )
+    expect(켬.기록.map(({ strikesBefore, kind }) => [strikesBefore, kind])).toEqual(끔.기록.map(({ strikesBefore, kind }) => [strikesBefore, kind]))
   })
 })
 

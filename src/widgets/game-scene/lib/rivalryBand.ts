@@ -46,7 +46,13 @@ export type RivalryDraw =
   | { readonly kind: 'logo'; readonly x: number; readonly y: number; readonly scale: number; readonly brighten: number }
 
 /** 표 0xd8a90 — 라이벌 짝 (순서 무관, 0xb8f68) */
-export const RIVALRY_PAIRS: readonly (readonly [number, number])[] = [[0, 1], [2, 7], [3, 6], [4, 5], [8, 9]]
+export const RIVALRY_PAIRS: readonly (readonly [number, number])[] = [
+  [0, 1],
+  [2, 7],
+  [3, 6],
+  [4, 5],
+  [8, 9],
+]
 
 /** 적재 상태 8 의 489b6 `0xb8f68(팀 A, 팀 B)` — 두 팀이 표 0xd8a90 의 짝이면 라이벌전(+0x194a) */
 export function isRivalryMatch(teamA: number, teamB: number): boolean {

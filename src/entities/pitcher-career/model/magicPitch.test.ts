@@ -72,9 +72,7 @@ describe('한 경기 횟수 (표 0xd84ff · 0xd8509)', () => {
   })
 
   it('마투수는 레벨별 3·4·5·6·7 이다', () => {
-    const counts = [0, 1, 2, 3, 4].map((aceLevel) =>
-      magicPitchCountOf({ number: 5, isAce: true, aceLevel, hasSpiritSkill: false }),
-    )
+    const counts = [0, 1, 2, 3, 4].map((aceLevel) => magicPitchCountOf({ number: 5, isAce: true, aceLevel, hasSpiritSkill: false }))
     expect(counts).toEqual([3, 4, 5, 6, 7])
   })
 
@@ -85,9 +83,7 @@ describe('한 경기 횟수 (표 0xd84ff · 0xd8509)', () => {
 
 describe('타격 보정 (0x34d6c)', () => {
   it('육성 마구 1~4 는 구속·제구 +150·180·200·220 이다', () => {
-    const bonuses = [1, 2, 3, 4].map(
-      (number) => magicPitchCorrectionOf({ number, isAce: false, aceLevel: 0 }).velocityBonus,
-    )
+    const bonuses = [1, 2, 3, 4].map((number) => magicPitchCorrectionOf({ number, isAce: false, aceLevel: 0 }).velocityBonus)
     expect(bonuses).toEqual([150, 180, 200, 220])
   })
 

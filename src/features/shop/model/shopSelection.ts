@@ -1,6 +1,11 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
-  equipmentBlockReasonOf, equipmentItemOf, EQUIPMENT_PARTS, equipOwned, ownsEquipment, purchaseEquipment,
+  equipmentBlockReasonOf,
+  equipmentItemOf,
+  EQUIPMENT_PARTS,
+  equipOwned,
+  ownsEquipment,
+  purchaseEquipment,
 } from '@/entities/career/model/equipment'
 import type { EquipmentBlockReason } from '@/entities/career/model/equipment'
 import { purchaseSubItem, SUB_ITEM_BLOCK_TEXT, SUB_ITEMS, subItemBlockReasonOf } from '@/entities/career/model/subItems'
@@ -121,8 +126,7 @@ export function formatOriginalMoney(amount: number): string {
   return rest === 0 ? `${hundredMillions}억` : `${hundredMillions}억${String(rest).padStart(isBugFixed('B-99') ? 4 : 3, '0')}`
 }
 
-const moneyQuestion = (amount: number) =>
-  `!C!cFFFF00소지금 ${formatOriginalMoney(amount)}!cFFFFFF이 소모됩니다!N구매하겠습니까?` // StrMODE[79]
+const moneyQuestion = (amount: number) => `!C!cFFFF00소지금 ${formatOriginalMoney(amount)}!cFFFFFF이 소모됩니다!N구매하겠습니까?` // StrMODE[79]
 
 /** 살 수 있는 칸이면 구매 확인 문구(원문 마크업), 아니면 null (막힘 알림·다시 끼기는 묻지 않는다) */
 export function purchaseQuestionOf(career: PlayerCareer, itemId: string): string | null {

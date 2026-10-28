@@ -3,8 +3,15 @@ import { BATTER_MISSIONS, createProgress } from '@/entities/mission/model/missio
 import { goalTickerFrameAt } from '@/entities/mission/model/goalTicker'
 import { missionHudIconOf, missionStageStripsOf, pitcherGoalCountOf } from '@/pages/mission-play/lib/missionHudLayout'
 import {
-  COUNTER_BASE, COUNTER_CLIP, MISSION_HUD_BASE, TEXT_CLIP,
-  goalCountOf, goalLineDrawsOf, limitStripsOf, slashCounterGlyphsOf, timerGlyphsOf,
+  COUNTER_BASE,
+  COUNTER_CLIP,
+  MISSION_HUD_BASE,
+  TEXT_CLIP,
+  goalCountOf,
+  goalLineDrawsOf,
+  limitStripsOf,
+  slashCounterGlyphsOf,
+  timerGlyphsOf,
 } from '@/pages/mission-play/lib/missionHudLayout'
 
 const missionNamed = (name: string) => {
@@ -64,7 +71,9 @@ describe('타자 미션 HUD 0x36714', () => {
     expect(strips[0].glyphs.map((glyph) => glyph.src)).toEqual(['./sprites/num/001.png', './sprites/num/101.png', './sprites/num/001.png'])
     // 스윙은 더하지도 자르지도 않는다
     expect(strips[1].glyphs.map((glyph) => [glyph.src, glyph.top])).toEqual([
-      ['./sprites/num/002.png', 82], ['./sprites/num/101.png', 82], ['./sprites/num/003.png', 82],
+      ['./sprites/num/002.png', 82],
+      ['./sprites/num/101.png', 82],
+      ['./sprites/num/003.png', 82],
     ])
   })
 
@@ -127,4 +136,3 @@ describe('모드 5 투수 미션 갈래 (0x369b2 · 0x36b04 · 0x36466)', () => 
     expect(missionStageStripsOf({ plateAppearanceLimit: 0, plateAppearancesUsed: 0, swingLimit: 0, swingsUsed: 0 }, null)).toEqual([])
   })
 })
-

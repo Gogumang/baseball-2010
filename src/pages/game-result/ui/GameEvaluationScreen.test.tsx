@@ -20,19 +20,25 @@ afterEach(() => {
 
 const 평가 = { popularityChange: 1, reputationChange: 0, moraleChange: 2, commentIndex: 40 } as const
 
-const 프레임 = (count: number) => act(() => {
-  vi.advanceTimersByTime(count * millisecondsPerFrame())
-})
+const 프레임 = (count: number) =>
+  act(() => {
+    vi.advanceTimersByTime(count * millisecondsPerFrame())
+  })
 
 describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
   it('116 이 선 틀은 116 그림뿐 — 114 는 다음 틀: 대사(기록 줄 + 감독 글) → 변화 창 → 114 끝에 다음', () => {
     vi.useFakeTimers()
     const onContinue = vi.fn()
     render(
-      <GameEvaluationScreen newTitles={[]} evaluation={평가}
+      <GameEvaluationScreen
+        newTitles={[]}
+        evaluation={평가}
         recordLine={{ atBats: 4, hits: 2, runsBattedIn: 3, homeRuns: 1 }}
-        career={createCareer('선수')} onContinue={onContinue} underlay={<div data-testid="밑그림" />}
-        entryUnderlay={<div data-testid="116-그림" />} />,
+        career={createCareer('선수')}
+        onContinue={onContinue}
+        underlay={<div data-testid="밑그림" />}
+        entryUnderlay={<div data-testid="116-그림" />}
+      />,
     )
     expect(screen.getByTestId('116-그림')).toBeTruthy()
     expect(screen.queryByTestId('대사-상자')).toBeNull()
@@ -43,7 +49,9 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     프레임(200)
     const 줄 = [...screen.getByTestId('대사-상자').querySelectorAll('[data-part="글줄"]')].map((line) => line.textContent)
     expect(줄[0]).toBe('4타수 2안타 3타점 1홈런')
-    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toContain((ORIGINAL_USER_EVENTS[40] ?? '').replace(/!c[0-9A-Fa-f]{6}|!N/g, '').slice(0, 4))
+    expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toContain(
+      (ORIGINAL_USER_EVENTS[40] ?? '').replace(/!c[0-9A-Fa-f]{6}|!N/g, '').slice(0, 4),
+    )
     for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
       fireEvent.keyDown(window, { key: 'Enter' })
       프레임(200)
@@ -60,12 +68,16 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     vi.useFakeTimers()
     const onContinue = vi.fn()
     render(
-      <GameEvaluationScreen newTitles={[]} evaluation={평가}
+      <GameEvaluationScreen
+        newTitles={[]}
+        evaluation={평가}
         streakNotices={[
           { labelIndex: 100, count: 5, commentIndex: 108, reputationChange: 10 },
           { labelIndex: 101, count: 5, commentIndex: 108, reputationChange: 10 },
         ]}
-        career={createCareer('선수')} onContinue={onContinue} />,
+        career={createCareer('선수')}
+        onContinue={onContinue}
+      />,
     )
     for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
       프레임(200)
@@ -88,10 +100,19 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     const 밑그림 = vi.fn((career: { readonly reputation: number }) => <div data-testid="밑그림" data-reputation={career.reputation} />)
     const career = { ...createCareer('선수'), reputation: 100 }
     render(
-      <GameEvaluationScreen newTitles={[]} evaluation={평가}
+      <GameEvaluationScreen
+        newTitles={[]}
+        evaluation={평가}
         streakNotices={[{ labelIndex: 102, count: 4, commentIndex: 111, reputationChange: -10 }]}
-        streakRewards={[{ kind: 1, value: -10 }, { kind: 4, value: 18 }]}
-        career={career} onContinue={onContinue} rewardUnderlay={밑그림} onRewardsGiven={onRewardsGiven} />,
+        streakRewards={[
+          { kind: 1, value: -10 },
+          { kind: 4, value: 18 },
+        ]}
+        career={career}
+        onContinue={onContinue}
+        rewardUnderlay={밑그림}
+        onRewardsGiven={onRewardsGiven}
+      />,
     )
     for (let page = 0; page < 5 && screen.queryByRole('dialog', { name: '경기 평가 변화' }) === null; page += 1) {
       프레임(200)
@@ -125,8 +146,13 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
 
   it('경기 결과 판(점수판 틀 · 정산 판 · 결과 배경)은 그리지 않는다 — 그것은 경기 장면의 상태다', () => {
     const { container } = render(
-      <GameEvaluationScreen newTitles={[]} evaluation={평가}
-        career={createCareer('선수')} onContinue={vi.fn()} underlay={<div data-testid="밑그림" />} />,
+      <GameEvaluationScreen
+        newTitles={[]}
+        evaluation={평가}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+        underlay={<div data-testid="밑그림" />}
+      />,
     )
     expect(screen.getByTestId('밑그림')).toBeTruthy()
     expect(screen.queryByTestId('정산-판')).toBeNull()
@@ -138,8 +164,13 @@ describe('116 평가 (114 내장 이벤트 0x8a6fc)', () => {
     vi.useFakeTimers()
     const onConfirmTitle = vi.fn()
     render(
-      <GameEvaluationScreen newTitles={['다이너마이트 배트']} evaluation={평가}
-        career={createCareer('선수')} onContinue={vi.fn()} onConfirmTitle={onConfirmTitle} />,
+      <GameEvaluationScreen
+        newTitles={['다이너마이트 배트']}
+        evaluation={평가}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+        onConfirmTitle={onConfirmTitle}
+      />,
     )
     expect(screen.getByTestId('칭호-창').querySelector('[data-part="이름"]')?.textContent).toBe('"다이너마이트 배트"')
     // 116 이 선 틀은 116 그림과 팝업뿐 — 114 진입은 116 진입 끝(12bb6~12bbe)의 0xbcb49 로 다음 틀이다

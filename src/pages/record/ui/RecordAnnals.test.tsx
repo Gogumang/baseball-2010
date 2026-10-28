@@ -7,8 +7,21 @@ import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { ORIGINAL_SKILLS } from '@/shared/config/original/skills'
 import { TITLE_NAMES } from '@/entities/career/model/titles'
 import {
-  CELL_GRID, ENDING_CELL_NAMES, PANEL, PROGRESS_ROW, TAB_CURSOR, TOTAL_ROW, TAB_NAME_Y, TAB_SELECTED_WIDTH, TAB_SLOT_WIDTH,
-  cellPositionOf, endingCellFrameOf, endingProgressOf, tabIconXOf, tabNameXOf, tabSlotXOf,
+  CELL_GRID,
+  ENDING_CELL_NAMES,
+  PANEL,
+  PROGRESS_ROW,
+  TAB_CURSOR,
+  TOTAL_ROW,
+  TAB_NAME_Y,
+  TAB_SELECTED_WIDTH,
+  TAB_SLOT_WIDTH,
+  cellPositionOf,
+  endingCellFrameOf,
+  endingProgressOf,
+  tabIconXOf,
+  tabNameXOf,
+  tabSlotXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
@@ -201,8 +214,7 @@ describe('기록연감 칸 격자', () => {
 
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'ArrowRight' })
-    expect(Array.from(screen.getByTestId('스킬-설명').children).map((line) => line.textContent))
-      .toEqual(['아직 획득하지 못한', '스킬입니다.'])
+    expect(Array.from(screen.getByTestId('스킬-설명').children).map((line) => line.textContent)).toEqual(['아직 획득하지 못한', '스킬입니다.'])
   })
 
   it('스킬 탭에는 아래 합계 줄이 없다 — 프레임 15 합계는 탭 3 · 4 뿐 (0x2f834 · 0x2fa60)', () => {

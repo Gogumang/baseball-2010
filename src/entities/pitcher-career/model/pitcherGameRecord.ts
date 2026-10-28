@@ -69,10 +69,7 @@ export const EMPTY_PITCHER_GAME_RECORD: PitcherGameRecord = {
  *
  * @param runnersOut 주자 목록의 "아웃 표시"(주자+0x96) 를 순서대로 담은 배열
  */
-export function recordAllowedBaserunner(
-  record: PitcherGameRecord,
-  runnersOut: readonly boolean[],
-): PitcherGameRecord {
+export function recordAllowedBaserunner(record: PitcherGameRecord, runnersOut: readonly boolean[]): PitcherGameRecord {
   // 고침(B-37): 목록 전체에서 안 끝난 주자가 하나라도 있으면 선다
   if (isBugFixed('B-37')) return { ...record, allowedBaserunner: runnersOut.some((out) => !out) }
   const last = runnersOut.length === 0 ? undefined : runnersOut[runnersOut.length - 1]

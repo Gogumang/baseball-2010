@@ -208,10 +208,15 @@ describe('엔딩 뒤 — 0x1220c', () => {
 
   describe('방출 이어하기의 +0x6b 사본 · +0x1c2 — 연말 132 꼬리 10d08~10d28 을 안 지났다 (B-128)', () => {
     afterEach(() => setBugfixConfigForTests(null))
-    const 방출 = () => 선수({
-      gamePoint: 6000, endingIndex: 1, season: 7,
-      trainingCounts: { '0': 30, '1': 12 }, seasonStartTrainingCounts: { '0': 20, '1': 4 }, seasonPopularityGain: 9,
-    })
+    const 방출 = () =>
+      선수({
+        gamePoint: 6000,
+        endingIndex: 1,
+        season: 7,
+        trainingCounts: { '0': 30, '1': 12 },
+        seasonStartTrainingCounts: { '0': 20, '1': 4 },
+        seasonPopularityGain: 9,
+      })
 
     it('원본: 사본은 앞 해 132 것 · 인기도 합은 그 해 합 그대로 다음 해로 넘어간다', () => {
       const continued = continueAfterEnding(방출(), createConstantRandom(0))
@@ -238,7 +243,10 @@ describe('엔딩 뒤 — 0x1220c', () => {
   })
 
   it('부상 엔딩을 이어하면 같은 시즌 그 자리에서 부상만 풀고 계속한다', () => {
-    const continued = continueAfterEnding(선수({ gamePoint: 5000, endingIndex: 0, season: 3, gamesPlayed: 20, isInjured: true }), createConstantRandom(0))
+    const continued = continueAfterEnding(
+      선수({ gamePoint: 5000, endingIndex: 0, season: 3, gamesPlayed: 20, isInjured: true }),
+      createConstantRandom(0),
+    )
 
     expect([continued.season, continued.gamesPlayed, continued.isInjured]).toEqual([3, 20, false])
   })

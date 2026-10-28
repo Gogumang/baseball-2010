@@ -210,7 +210,11 @@ describe('피로(0xb58e6) 앞뒤로 쪼갠 재료 — 사람 타석 CPU 투수',
   it('피로 없는(체력 인자 90) 값은 gameAbilityOf 와 같다', () => {
     const input = { mode: 2, isMyTeam: false, season: { illness: 0, morale: 100, coach: 4 }, teamAbilities: [450, 0, 520, 0] }
     const parts = pitcherGameAbilityPartsOf([510, 620, 330, 400], input)
-    for (const [slot, key] of [[0, 'control'], [1, 'velocity'], [2, 'breaking']] as const) {
+    for (const [slot, key] of [
+      [0, 'control'],
+      [1, 'velocity'],
+      [2, 'breaking'],
+    ] as const) {
       const whole = gameAbilityOf({ ...input, base: [510, 620, 330][slot]!, isPitcher: true, slot })
       expect(Math.min(ABILITY_LIMIT, parts.beforeFatigue[key] + (parts.bonusAfterFatigue?.[key] ?? 0))).toBe(whole)
     }

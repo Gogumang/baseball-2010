@@ -47,10 +47,7 @@ export const MATCH_INFO_BANNER_OFFSETS: readonly number[] = (() => {
   return offsets
 })()
 
-export type MatchInfoEntryPhase =
-  | { readonly kind: '숨김' }
-  | { readonly kind: '배너'; readonly offset: number }
-  | { readonly kind: '본문' }
+export type MatchInfoEntryPhase = { readonly kind: '숨김' } | { readonly kind: '배너'; readonly offset: number } | { readonly kind: '본문' }
 
 /** 들어온 뒤 그림 수 → 무엇을 그리나. 넷째 인자가 0(143 에서 돌아옴)이면 처음부터 본문이다 */
 export function matchInfoEntryPhaseOf(draws: number, isAnimated: boolean): MatchInfoEntryPhase {
@@ -192,11 +189,23 @@ function topLinesOf(points: readonly CutInPoint[]): readonly MatchInfoBannerLine
 export function matchInfoBannersOf(offset: number, baseY = MATCH_INFO_BANNER_Y): readonly MatchInfoBanner[] {
   const r = (baseY - 20) & 0xff
   const half = SCREEN_WIDTH / 2
-  const left = shifted([
-    { x: -50, y: r }, { x: half + 20, y: r }, { x: half - 20, y: r + 40 }, { x: -50, y: r + 40 },
-  ], -offset)
-  const right = shifted([
-    { x: half + 20, y: r - 19 }, { x: SCREEN_WIDTH + 50, y: r - 19 }, { x: SCREEN_WIDTH + 50, y: r + 21 }, { x: half - 20, y: r + 21 },
-  ], offset)
+  const left = shifted(
+    [
+      { x: -50, y: r },
+      { x: half + 20, y: r },
+      { x: half - 20, y: r + 40 },
+      { x: -50, y: r + 40 },
+    ],
+    -offset,
+  )
+  const right = shifted(
+    [
+      { x: half + 20, y: r - 19 },
+      { x: SCREEN_WIDTH + 50, y: r - 19 },
+      { x: SCREEN_WIDTH + 50, y: r + 21 },
+      { x: half - 20, y: r + 21 },
+    ],
+    offset,
+  )
   return [left, right].map((points) => ({ points, lines: topLinesOf(points) }))
 }

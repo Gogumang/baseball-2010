@@ -21,9 +21,10 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const 다찍기 = () => act(() => {
-  vi.advanceTimersByTime(200 * millisecondsPerFrame())
-})
+const 다찍기 = () =>
+  act(() => {
+    vi.advanceTimersByTime(200 * millisecondsPerFrame())
+  })
 
 const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
   ...startNewSeason(0, '테스터').record,
@@ -44,8 +45,15 @@ const 목표: YearGoalWindowSource = {
 const 띄우기 = (record: SeasonRecord, storeExpired = false) => {
   const onDone = vi.fn()
   render(
-    <GameIncomeScreen record={record} teamMorale={80} gamePoint={0} line={seasonGameEvaluationLineOf(record)}
-      storeExpired={storeExpired} goals={목표} onDone={onDone} />,
+    <GameIncomeScreen
+      record={record}
+      teamMorale={80}
+      gamePoint={0}
+      line={seasonGameEvaluationLineOf(record)}
+      storeExpired={storeExpired}
+      goals={목표}
+      onDone={onDone}
+    />,
   )
   return onDone
 }

@@ -1,7 +1,11 @@
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import {
-  SEASON_EQUIPMENT_LEVEL_COUNT, SEASON_FIRST_HIDDEN_LEVEL, seasonEquipmentHiddenIdOf, seasonEquipmentNameOf,
-  seasonEquipmentPriceOf, seasonEquipmentRequiredPopularityOf,
+  SEASON_EQUIPMENT_LEVEL_COUNT,
+  SEASON_FIRST_HIDDEN_LEVEL,
+  seasonEquipmentHiddenIdOf,
+  seasonEquipmentNameOf,
+  seasonEquipmentPriceOf,
+  seasonEquipmentRequiredPopularityOf,
 } from '@/entities/season-mode/model/seasonEquipment'
 import { isHiddenUnlocked } from '@/shared/config/unlocks'
 
@@ -95,10 +99,20 @@ export interface WindowRect {
   readonly color: string
 }
 
-const hline = (x1: number, x2: number, y: number, color: string): WindowRect =>
-  ({ x: Math.min(x1, x2), y, width: Math.abs(x2 - x1) + 1, height: 1, color })
-const vline = (x: number, y1: number, y2: number, color: string): WindowRect =>
-  ({ x, y: Math.min(y1, y2), width: 1, height: Math.abs(y2 - y1) + 1, color })
+const hline = (x1: number, x2: number, y: number, color: string): WindowRect => ({
+  x: Math.min(x1, x2),
+  y,
+  width: Math.abs(x2 - x1) + 1,
+  height: 1,
+  color,
+})
+const vline = (x: number, y1: number, y2: number, color: string): WindowRect => ({
+  x,
+  y: Math.min(y1, y2),
+  width: 1,
+  height: Math.abs(y2 - y1) + 1,
+  color,
+})
 const pixel = (x: number, y: number, color: string): WindowRect => ({ x, y, width: 1, height: 1, color })
 
 const PANEL_COLORS = { fill: '#335fcd', light: '#4f7ef3', edge: '#244cae', tab: '#1d44a8' } as const
@@ -292,9 +306,7 @@ const NO_POPULARITY_LIMIT = 184
 const POPULARITY_LIMIT_FORMAT = 185
 
 /** 설명 상자 글 — 없으면 null (열린 히든 칸) */
-export function equipmentDescriptionOf(
-  isBatter: boolean, part: number, level: number, isHiddenOpen: (id: number) => boolean,
-): string | null {
+export function equipmentDescriptionOf(isBatter: boolean, part: number, level: number, isHiddenOpen: (id: number) => boolean): string | null {
   if (level >= SEASON_FIRST_HIDDEN_LEVEL) {
     if (!isLockedLevel(isBatter, part, level, isHiddenOpen)) return null
     const base = HIDDEN_HINT_BASE[isBatter ? '타자' : '투수']

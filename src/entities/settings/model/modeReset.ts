@@ -114,8 +114,7 @@ export function judgeModeReset(target: ModeResetTarget, context: ModeResetContex
       canReset: false,
       blockReason: 'season-game-in-progress',
       // ⚠️ 원본 버그(B-62): 투수편은 [213] "삭제 하실 수 없습니다"(0x2c950). 고침(bugfixes.json B-62, 기본 켬): 두 편 모두 [212] "초기화 하실 수 없습니다"
-      blockText:
-        target === 'career-batter' || isBugFixed('B-62') ? MODE_RESET_TEXT.blockedReset : MODE_RESET_TEXT.blockedDelete,
+      blockText: target === 'career-batter' || isBugFixed('B-62') ? MODE_RESET_TEXT.blockedReset : MODE_RESET_TEXT.blockedDelete,
     }
   }
   return { canReset: true, blockReason: null, blockText: null }

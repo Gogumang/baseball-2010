@@ -119,12 +119,20 @@ async function throttleByCdp(page, tally) {
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Network.enable')
   await cdp.send('Network.setCacheDisabled', { cacheDisabled: false })
-  if (NET === 'rtt') await cdp.send('Network.emulateNetworkConditions', {
-    offline: false, latency: RTT_MS, downloadThroughput: -1, uploadThroughput: -1,
-  })
-  else if (NET !== 'off') await cdp.send('Network.emulateNetworkConditions', {
-    offline: false, latency: RTT_MS, downloadThroughput: DOWN_BPS, uploadThroughput: UP_BPS,
-  })
+  if (NET === 'rtt')
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: RTT_MS,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    })
+  else if (NET !== 'off')
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: RTT_MS,
+      downloadThroughput: DOWN_BPS,
+      uploadThroughput: UP_BPS,
+    })
   const urls = new Map()
   const cached = new Set()
   cdp.on('Network.requestWillBeSent', (event) => urls.set(event.requestId, event.request.url))
@@ -182,11 +190,10 @@ function resetTally(tally) {
 
 /** 이용안내 글이 보일 때 — 글줄이 서고 웹폰트(display: block — 오기 전에는 글자가 안 보인다)까지 왔을 때 */
 async function waitNoticeVisible(page) {
-  await page.waitForFunction(
-    () => document.querySelector('[data-part="글줄"]') !== null && document.fonts.status === 'loaded',
-    null,
-    { timeout: 120000, polling: 50 },
-  )
+  await page.waitForFunction(() => document.querySelector('[data-part="글줄"]') !== null && document.fonts.status === 'loaded', null, {
+    timeout: 120000,
+    polling: 50,
+  })
 }
 
 /** 켤 때 길 — 이용안내 · 메인 메뉴 */
@@ -270,10 +277,14 @@ async function measureScene(browser, browserName, device, scene, fixture) {
   const { context, page, tally, errors } = await openPage(browser, browserName, device)
   const started = Date.now()
   await page.goto(`${BASE_URL}?scene=${scene}${fixture === undefined ? '' : `&fixture=${fixture}`}`, { waitUntil: 'commit' })
-  await page.waitForFunction(() => {
-    const state = document.documentElement.dataset.scene
-    return state === 'ready' || state === 'error'
-  }, null, { timeout: 180000, polling: 50 })
+  await page.waitForFunction(
+    () => {
+      const state = document.documentElement.dataset.scene
+      return state === 'ready' || state === 'error'
+    },
+    null,
+    { timeout: 180000, polling: 50 },
+  )
   const status = await page.evaluate(() => window.__scene)
   const result = await snapshot(page, tally, started)
   await context.close()
@@ -283,10 +294,14 @@ async function measureScene(browser, browserName, device, scene, fixture) {
 
 /** 장면이 ready(또는 error)를 적을 때까지 */
 async function waitScene(page) {
-  await page.waitForFunction(() => {
-    const state = document.documentElement.dataset.scene
-    return state === 'ready' || state === 'error'
-  }, null, { timeout: 180000, polling: 50 })
+  await page.waitForFunction(
+    () => {
+      const state = document.documentElement.dataset.scene
+      return state === 'ready' || state === 'error'
+    },
+    null,
+    { timeout: 180000, polling: 50 },
+  )
   return page.evaluate(() => window.__scene)
 }
 
@@ -305,7 +320,10 @@ async function measureRevisit(browser, browserName, device, scene) {
   resetTally(tally)
   const started = Date.now()
   await page.goto(url, { waitUntil: 'commit' })
-  await page.evaluate(() => { window.__perfBlock.blocked = 0; window.__perfBlock.longest = 0 })
+  await page.evaluate(() => {
+    window.__perfBlock.blocked = 0
+    window.__perfBlock.longest = 0
+  })
   const status = await waitScene(page)
   const result = await snapshot(page, tally, started)
   await context.close()
@@ -341,7 +359,9 @@ for (const { browserName, device } of BROWSERS) {
     // 장면 바로가기 — 기본은 나리 관리 · 첫 타석. general-bat 은 장면의 기본 픽스처라 개발 · 빌드가 같은 씨앗에서 같은 선공이다(r231).
     // PERF_BAT_FIXTURE 로 general-bat 의 픽스처를, PERF_SCENES(쉼표)로 잴 장면을 바꿀 수 있다
     const scenes = []
-    if (!REVISIT_ONLY) for (const scene of SCENES) scenes.push(await measureScene(browser, browserName, device, scene, scene === 'general-bat' ? process.env.PERF_BAT_FIXTURE : undefined))
+    if (!REVISIT_ONLY)
+      for (const scene of SCENES)
+        scenes.push(await measureScene(browser, browserName, device, scene, scene === 'general-bat' ? process.env.PERF_BAT_FIXTURE : undefined))
     if (browserName === 'chromium') for (const scene of REVISIT) scenes.push(await measureRevisit(browser, browserName, device, scene))
     const errors = [...boot.errors, ...nari.errors, ...scenes.flatMap((scene) => scene.errors)]
     if (errors.length > 0) console.log(`  ! ${browserName} 실행 ${index + 1}: ${errors.slice(0, 3).join(' / ')}`)
@@ -352,15 +372,26 @@ for (const { browserName, device } of BROWSERS) {
   results[browserName] = mergeRuns(runs)
 }
 
-console.log(`\n${NET === 'off' ? '망 그대로' : NET === 'rtt' ? `왕복 ${RTT_MS}ms (대역 제한 없음)` : `느린 4G (왕복 ${RTT_MS}ms · ${DOWN_BPS * 8 / 1e6}Mbps)`}${CPU > 1 ? ` · 크로미움 CPU ×${CPU}` : ''}${CDN ? ' · CDN 받음' : ''} · ${BASE_URL} · 실행 ${RUNS}번의 가운데 값`)
+console.log(
+  `\n${NET === 'off' ? '망 그대로' : NET === 'rtt' ? `왕복 ${RTT_MS}ms (대역 제한 없음)` : `느린 4G (왕복 ${RTT_MS}ms · ${(DOWN_BPS * 8) / 1e6}Mbps)`}${CPU > 1 ? ` · 크로미움 CPU ×${CPU}` : ''}${CDN ? ' · CDN 받음' : ''} · ${BASE_URL} · 실행 ${RUNS}번의 가운데 값`,
+)
 console.log('요청: chromium = 망 요청(캐시 켬, 캐시에서 꺼낸 것 뺌) · webkit = 라우트로 늦춤(캐시 꺼짐 — 다시 받은 것도 셈)')
 console.log('| 브라우저 | 지점 | 시간 ms | 요청 | 그중 304 | 받은 KB | 그중 JS KB | 막힘 ms | 가장 긴 틈 ms |')
 console.log('|---|---|---:|---:|---:|---:|---:|---:|---:|')
 const LABELS = {
-  packs: '자산 묶음 받기 끝', notice: '이용안내', title: '타이틀 PRESS', menu: '메인 메뉴', menuIdle: '메뉴 +3초', nariByKeys: '나리 관리(키로)', 'nari-management': '나리 관리(바로가기)', 'general-bat': '첫 타석(바로가기)',
+  packs: '자산 묶음 받기 끝',
+  notice: '이용안내',
+  title: '타이틀 PRESS',
+  menu: '메인 메뉴',
+  menuIdle: '메뉴 +3초',
+  nariByKeys: '나리 관리(키로)',
+  'nari-management': '나리 관리(바로가기)',
+  'general-bat': '첫 타석(바로가기)',
 }
 for (const [browserName, points] of Object.entries(results)) {
   for (const [key, value] of Object.entries(points)) {
-    console.log(`| ${browserName === 'webkit' ? 'webkit(캐시 꺼짐)' : browserName} | ${LABELS[key] ?? key} | ${value.ms} | ${value.requests} | ${value.notModified} | ${value.kb} | ${value.js} | ${value.blocked} | ${value.longest} |`)
+    console.log(
+      `| ${browserName === 'webkit' ? 'webkit(캐시 꺼짐)' : browserName} | ${LABELS[key] ?? key} | ${value.ms} | ${value.requests} | ${value.notModified} | ${value.kb} | ${value.js} | ${value.blocked} | ${value.longest} |`,
+    )
   }
 }

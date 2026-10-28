@@ -8,21 +8,38 @@ import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
  */
 export function MatchInfoEntryBanners({ offset, testId }: { readonly offset: number; readonly testId: string }) {
   return (
-    <svg className={styles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
-      data-testid={testId} data-offset={offset} style={{ left: 0, top: 0 }}>
+    <svg
+      className={styles.layer}
+      viewBox="0 0 240 320"
+      width={240}
+      height={320}
+      shapeRendering="crispEdges"
+      data-testid={testId}
+      data-offset={offset}
+      style={{ left: 0, top: 0 }}
+    >
       {matchInfoBannersOf(offset).map((banner, index) => (
         <g key={index}>
           {scanlineSpans(banner.points).map((span) => (
-            <rect key={`f${span.y}-${span.x0}`} x={span.x0} y={span.y} width={span.x1 - span.x0 + 1} height={1}
-              fill={MATCH_INFO_BANNER_COLORS.fill} />
+            <rect
+              key={`f${span.y}-${span.x0}`}
+              x={span.x0}
+              y={span.y}
+              width={span.x1 - span.x0 + 1}
+              height={1}
+              fill={MATCH_INFO_BANNER_COLORS.fill}
+            />
           ))}
-          {banner.points.flatMap((point, corner) => linePixels(point, banner.points[(corner + 1) % banner.points.length]))
+          {banner.points
+            .flatMap((point, corner) => linePixels(point, banner.points[(corner + 1) % banner.points.length]))
             .map((pixel, pixelIndex) => (
               <rect key={`b${pixelIndex}`} x={pixel.x} y={pixel.y} width={1} height={1} fill={MATCH_INFO_BANNER_COLORS.border} />
             ))}
-          {banner.lines.flatMap((line, lineIndex) => linePixels(line.from, line.to).map((pixel, pixelIndex) => (
-            <rect key={`l${lineIndex}-${pixelIndex}`} x={pixel.x} y={pixel.y} width={1} height={1} fill={line.color} />
-          )))}
+          {banner.lines.flatMap((line, lineIndex) =>
+            linePixels(line.from, line.to).map((pixel, pixelIndex) => (
+              <rect key={`l${lineIndex}-${pixelIndex}`} x={pixel.x} y={pixel.y} width={1} height={1} fill={line.color} />
+            )),
+          )}
         </g>
       ))}
     </svg>

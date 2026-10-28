@@ -108,10 +108,7 @@ describe('applyAtBatOutcome', () => {
   })
 
   it('경기가 끝난 뒤의 타석은 상태를 바꾸지 않는다', () => {
-    const 종료됨 = applyAtBatOutcome(
-      우리공격상태({ inning: INNINGS_PER_GAME, outs: 2, opponentScore: 1 }),
-      땅볼아웃,
-    )
+    const 종료됨 = applyAtBatOutcome(우리공격상태({ inning: INNINGS_PER_GAME, outs: 2, opponentScore: 1 }), 땅볼아웃)
 
     expect(applyAtBatOutcome(종료됨, { kind: '홈런' })).toBe(종료됨)
   })
@@ -139,7 +136,9 @@ describe('resultOf', () => {
 
 describe('경기 종료 규칙 — 0xb68fc (누락 탐색 9차)', () => {
   it('9회말 이후 앞서는 순간 끝난다 (끝내기)', () => {
-    const game = applyAtBatOutcome(우리공격상태({ inning: 9, outs: 0, opponentScore: 1, bases: { first: true, second: false, third: false } }), { kind: '홈런' })
+    const game = applyAtBatOutcome(우리공격상태({ inning: 9, outs: 0, opponentScore: 1, bases: { first: true, second: false, third: false } }), {
+      kind: '홈런',
+    })
 
     expect([game.isFinished, game.ourScore]).toEqual([true, 2])
   })

@@ -39,12 +39,19 @@ export interface SeasonRecordPickPopupProps {
  */
 export function SeasonRecordPickPopup({ side, onToggle, onConfirm, onCancel }: SeasonRecordPickPopupProps) {
   return (
-    <RecordPickPopup ariaLabel="기록순위" testIdPrefix="기록순위" selected={side === '타자' ? 0 : 1} closeKind="바로"
+    <RecordPickPopup
+      ariaLabel="기록순위"
+      testIdPrefix="기록순위"
+      selected={side === '타자' ? 0 : 1}
+      closeKind="바로"
       cells={[
         { label: '타자기록', labelFrame: PICK_LABEL_FRAMES.타자 },
         { label: '투수기록', labelFrame: PICK_LABEL_FRAMES.투수 },
       ]}
-      onToggle={onToggle} onConfirm={onConfirm} onCancel={onCancel} />
+      onToggle={onToggle}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
   )
 }
 
@@ -67,9 +74,7 @@ export interface SeasonRecordRankScreenProps {
  * **기록순위 목록 0xdb** — 그리기 0xafa8 = 순위 판 0x5796d([장면+0xa8]) · 머리띠 0x7f4ed. 판은 나리 124 순위와 같은 함수라
  * `RankingBoard`(배치 `pages/nari-record-room/lib/rankingBoard.ts` 머리말 — 칸 폭은 game_ui 프레임 25 · 54 · 75 · 36)를 같이 쓴다.
  */
-export function SeasonRecordRankScreen({
-  side, page, entries, myTeamId, gamePoint = 0, onMovePage, onBack,
-}: SeasonRecordRankScreenProps) {
+export function SeasonRecordRankScreen({ side, page, entries, myTeamId, gamePoint = 0, onMovePage, onBack }: SeasonRecordRankScreenProps) {
   const latest = useRef({ onMovePage, onBack })
   latest.current = { onMovePage, onBack }
   useEffect(() => {
@@ -98,8 +103,15 @@ export function SeasonRecordRankScreen({
       {/* 공통 앞그림 0xb810 — 0xdb 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`기록순위 ${side} ${category.label}`}>
-        <RankingBoard kind={category.kind} kindLabelFrame={category.labelFrame} entries={entries} myTeamId={myTeamId}
-          hasPreviousPage={page > 0} hasNextPage={page < categories.length - 1} testIdPrefix="기록순위" />
+        <RankingBoard
+          kind={category.kind}
+          kindLabelFrame={category.labelFrame}
+          entries={entries}
+          myTeamId={myTeamId}
+          hasPreviousPage={page > 0}
+          hasNextPage={page < categories.length - 1}
+          testIdPrefix="기록순위"
+        />
       </div>
       <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={onBack} footer={5} slides={false} />
     </RawScreen>

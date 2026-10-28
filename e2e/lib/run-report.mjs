@@ -50,9 +50,12 @@ export function finishRun({ reportName, scenes, devices, concurrency, run, serve
 
   console.log(`\n장면 ${scenes.length} × 기기 ${devices.length} = 일감 ${done.length} · 상태 ${results.length} · 허용된 겹침 ${report.allowed}건`)
   const build = server.reused ? '빌드 다시 씀' : `빌드 ${(server.buildMs / 1000).toFixed(1)}s`
-  console.log(`${build} · 돌리기 ${(runMs / 1000).toFixed(1)}s (일감 합 ${(report.workMs / 1000).toFixed(0)}s, 그중 장면 열기 ${(report.openMs / 1000).toFixed(0)}s · 맥락 ${JSON.stringify(concurrency)}) · 모두 ${(report.totalMs / 1000).toFixed(1)}s`)
+  console.log(
+    `${build} · 돌리기 ${(runMs / 1000).toFixed(1)}s (일감 합 ${(report.workMs / 1000).toFixed(0)}s, 그중 장면 열기 ${(report.openMs / 1000).toFixed(0)}s · 맥락 ${JSON.stringify(concurrency)}) · 모두 ${(report.totalMs / 1000).toFixed(1)}s`,
+  )
   console.log(formatUsage(usage, { peakContexts }))
-  if (staleSnapshots.length > 0) console.log(`⚠️ 낡은 스냅샷 ${staleSnapshots.join(' · ')} — 실제 진행 길로 열었다. yarn e2e:snapshot 으로 다시 뜰 것`)
+  if (staleSnapshots.length > 0)
+    console.log(`⚠️ 낡은 스냅샷 ${staleSnapshots.join(' · ')} — 실제 진행 길로 열었다. yarn e2e:snapshot 으로 다시 뜰 것`)
   if (done.length > 1) console.log(`오래 걸린 일감: ${slowest.map((job) => `${job.scene}@${job.device} ${(job.ms / 1000).toFixed(1)}s`).join(' · ')}`)
   if (failures.length === 0) {
     console.log('통과')
@@ -62,7 +65,9 @@ export function finishRun({ reportName, scenes, devices, concurrency, run, serve
   for (const result of failures) {
     if (result.error !== null) console.log(`  ✗ [${result.device}] ${result.scene} · ${result.state}: ${result.error}`)
     for (const row of result.failures) {
-      console.log(`  ✗ [${result.device}] ${result.scene} · ${result.state}: ${row.label} (z ${row.z}) ← ${row.by} (z ${row.byZ}${row.byDisabled ? ' · 꺼짐' : ''}) 점 ${row.points.join('·')}`)
+      console.log(
+        `  ✗ [${result.device}] ${result.scene} · ${result.state}: ${row.label} (z ${row.z}) ← ${row.by} (z ${row.byZ}${row.byDisabled ? ' · 꺼짐' : ''}) 점 ${row.points.join('·')}`,
+      )
     }
   }
   return 1

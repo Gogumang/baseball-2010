@@ -326,9 +326,7 @@ describe('넷째 실패 한도 +0xa3 ↔ R+0x130 출루 허용 (정산 0xa8c86 �
 
 /** 진행기가 돌린 결과에서 진루·운명만 바꿔 끼운 플레이 — 원본 목록 순서의 운명을 그대로 먹인다 */
 function playedWith(advance: AdvanceResult, runnerFates: readonly RunnerFate[]): DefensePlayResult {
-  const base = runDefensePlay(
-    missionDefensePlayInputOf({ first: false, second: false, third: false }, 0, { kind: '안타', bases: 1 }),
-  )
+  const base = runDefensePlay(missionDefensePlayInputOf({ first: false, second: false, third: false }, 0, { kind: '안타', bases: 1 }))
   return { ...base, advance, runnerFates }
 }
 const fate = (fromBase: number, scored: boolean, retired: boolean): RunnerFate => ({ fromBase, scored, retired })
@@ -351,35 +349,25 @@ describe('R+0x130 — 주자 목록 마지막 원소의 +0x96 (0xa8c5c~0xa8c86)'
 
   it('삼진과 한 정산인 도루 · 폭투 판이면 그 판의 주자 목록대로다 — 잡힌 도루 주자가 마지막이면 0 (ae576 · ae596 → a8c5c)', () => {
     expect(applyPitcherOutcome(withBases(FIRST), { kind: '삼진' }).allowed.baserunner).toBe(1)
-    expect(
-      applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }, { settledRunnerFates: [fate(1, false, true)] }).allowed.baserunner,
-    ).toBe(0)
-    expect(
-      applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }, { settledRunnerFates: [fate(1, false, false)] }).allowed.baserunner,
-    ).toBe(1)
+    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }, { settledRunnerFates: [fate(1, false, true)] }).allowed.baserunner).toBe(0)
+    expect(applyPitcherOutcome(withBases(EMPTY), { kind: '삼진' }, { settledRunnerFates: [fate(1, false, false)] }).allowed.baserunner).toBe(1)
   })
 
   it('주자가 있으면 맨 앞 주자를 본다 — 삼진으로 남은 1루 주자는 1, 득점하면 0', () => {
     expect(applyPitcherOutcome(withBases(FIRST), { kind: '삼진' }).allowed.baserunner).toBe(1)
-    const 득점 = playedWith(
-      { bases: FIRST, runsScored: 1, outsAdded: 0 },
-      [fate(0, false, false), fate(3, true, true)],
-    )
+    const 득점 = playedWith({ bases: FIRST, runsScored: 1, outsAdded: 0 }, [fate(0, false, false), fate(3, true, true)])
     const run = applyPitcherOutcome(withBases({ ...EMPTY, third: true }), { kind: '안타', bases: 1 }, { played: 득점 })
     expect(run.allowed.baserunner).toBe(0)
   })
 
   it('앞 주자가 잡히고 뒤 주자가 그 루까지 간 플레이는 0 이다 — 예전 근사("가장 높은 찬 루 ≥ 출발 루")는 1 이었다', () => {
     // 1·2루, 2루 주자가 3루에서 잡히고 1루 주자는 2루, 타자는 1루
-    const 앞주자아웃 = playedWith(
-      { bases: { first: true, second: true, third: false }, runsScored: 0, outsAdded: 1 },
-      [fate(0, false, false), fate(1, false, false), fate(2, false, true)],
-    )
-    const run = applyPitcherOutcome(
-      withBases({ first: true, second: true, third: false }),
-      { kind: '안타', bases: 1 },
-      { played: 앞주자아웃 },
-    )
+    const 앞주자아웃 = playedWith({ bases: { first: true, second: true, third: false }, runsScored: 0, outsAdded: 1 }, [
+      fate(0, false, false),
+      fate(1, false, false),
+      fate(2, false, true),
+    ])
+    const run = applyPitcherOutcome(withBases({ first: true, second: true, third: false }), { kind: '안타', bases: 1 }, { played: 앞주자아웃 })
     expect(run.allowed.baserunner).toBe(0)
   })
 })
@@ -393,20 +381,22 @@ describe('R+0x128 3아웃 갈래 — 목록 0번이 끝났으면 0, 살았으면
   })
 
   it('타자주자는 살고 다른 주자가 셋째 아웃 — 날아간 보류 득점도 실점이다', () => {
-    const played = playedWith(
-      { bases: { first: true, second: false, third: false }, runsScored: 0, outsAdded: 1 },
-      [fate(0, false, false), fate(1, false, true), fate(3, true, true)],
-    )
+    const played = playedWith({ bases: { first: true, second: false, third: false }, runsScored: 0, outsAdded: 1 }, [
+      fate(0, false, false),
+      fate(1, false, true),
+      fate(3, true, true),
+    ])
     const run = applyPitcherOutcome(두아웃(), { kind: '안타', bases: 1 }, { played })
     expect(run.allowed.runs).toBe(1)
     expect(run.progress.brokenConditions).toContain('무실점')
   })
 
   it('타자주자가 셋째 아웃이면 그 플레이 득점은 하나도 안 센다', () => {
-    const played = playedWith(
-      { bases: { first: false, second: true, third: false }, runsScored: 0, outsAdded: 1 },
-      [fate(0, false, true), fate(1, false, false), fate(3, true, true)],
-    )
+    const played = playedWith({ bases: { first: false, second: true, third: false }, runsScored: 0, outsAdded: 1 }, [
+      fate(0, false, true),
+      fate(1, false, false),
+      fate(3, true, true),
+    ])
     const run = applyPitcherOutcome(두아웃(), { kind: '아웃', detail: '땅볼아웃' }, { played })
     expect(run.allowed.runs).toBe(0)
   })
@@ -434,10 +424,11 @@ describe("'아웃'(R+0x13c)은 아웃 콜마다 1 — 삼진 0xa7c4c · 아웃 �
   })
 
   it('병살 플레이는 아웃 2 — 결과 하나당 1 이 아니다', () => {
-    const 병살 = playedWith(
-      { bases: { first: false, second: false, third: true }, runsScored: 0, outsAdded: 2 },
-      [fate(0, false, true), fate(1, false, true), fate(2, false, false)],
-    )
+    const 병살 = playedWith({ bases: { first: false, second: false, third: true }, runsScored: 0, outsAdded: 2 }, [
+      fate(0, false, true),
+      fate(1, false, true),
+      fate(2, false, false),
+    ])
     const run = applyPitcherOutcome(일이루(0), { kind: '아웃', detail: '땅볼아웃' }, { played: 병살 })
     expect(run.progress.counts['아웃']).toBe(2)
     expect(run.totalOuts).toBe(2)
@@ -445,29 +436,32 @@ describe("'아웃'(R+0x13c)은 아웃 콜마다 1 — 삼진 0xa7c4c · 아웃 �
   })
 
   it('삼중살이면 3 — 목표 3 을 한 판에 채워 성공이다', () => {
-    const 삼중살 = playedWith(
-      { bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 3 },
-      [fate(0, false, true), fate(1, false, true), fate(2, false, true)],
-    )
+    const 삼중살 = playedWith({ bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 3 }, [
+      fate(0, false, true),
+      fate(1, false, true),
+      fate(2, false, true),
+    ])
     const run = applyPitcherOutcome(일이루(0), { kind: '아웃', detail: '땅볼아웃' }, { played: 삼중살 })
     expect(run.progress.counts['아웃']).toBe(3)
     expect(run.status).toBe('성공')
   })
 
   it('안타 판에서 주자가 잡혀도 아웃 콜이 나 1 이 든다', () => {
-    const 주자아웃 = playedWith(
-      { bases: { first: true, second: true, third: false }, runsScored: 0, outsAdded: 1 },
-      [fate(0, false, false), fate(1, false, false), fate(2, false, true)],
-    )
+    const 주자아웃 = playedWith({ bases: { first: true, second: true, third: false }, runsScored: 0, outsAdded: 1 }, [
+      fate(0, false, false),
+      fate(1, false, false),
+      fate(2, false, true),
+    ])
     const run = applyPitcherOutcome(일이루(0), { kind: '안타', bases: 1 }, { played: 주자아웃 })
     expect(run.progress.counts['아웃']).toBe(1)
   })
 
   it('판은 셋째 아웃에서 끝난다 — 2아웃 병살은 1 만 든다', () => {
-    const 병살 = playedWith(
-      { bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 2 },
-      [fate(0, false, true), fate(1, false, true), fate(2, false, false)],
-    )
+    const 병살 = playedWith({ bases: { first: false, second: false, third: false }, runsScored: 0, outsAdded: 2 }, [
+      fate(0, false, true),
+      fate(1, false, true),
+      fate(2, false, false),
+    ])
     const run = applyPitcherOutcome(일이루(2), { kind: '아웃', detail: '땅볼아웃' }, { played: 병살 })
     expect(run.progress.counts['아웃']).toBe(1)
   })

@@ -108,11 +108,7 @@ export function isPitcherEventEligible(
  * **비어 있을 때만** 넣는다 → 장소마다 파일 순서 첫 이벤트. [들어가기] 는 `0x8ce58` 이 이 번호를 부른다.
  * 무작위를 굴리지 않는다(장소 이벤트에는 질병 조건이 없다 — 판정이 trigger 를 조건보다 먼저 본다).
  */
-export function pitcherPlaceEventOf(
-  career: PitcherCareer,
-  events: readonly OriginalEvent[],
-  placeFrame: number,
-): OriginalEvent | null {
+export function pitcherPlaceEventOf(career: PitcherCareer, events: readonly OriginalEvent[], placeFrame: number): OriginalEvent | null {
   const trigger = placeTriggerOf(placeFrame)
   return events.find((event) => isPitcherEventEligible(event, career, trigger)) ?? null
 }
@@ -337,12 +333,7 @@ function releasesPitcherSkill(career: PitcherCareer, skill: number): boolean {
  * 하위 표 안의 갈림은 `[r6+8]`(모드) == 4 로 타자·투수가 갈린다 — 여기 식은 모두 모드 3 쪽이다 (직접 재역어셈).
  * 하위 표 투수 갈래는 모두 옮겼다(7 · 12 · 13 · 14 포함).
  */
-export function meetsPitcherSkillCondition(
-  career: PitcherCareer,
-  kind: 'acquire' | 'release',
-  value: number,
-  random?: RandomPort,
-): boolean {
+export function meetsPitcherSkillCondition(career: PitcherCareer, kind: 'acquire' | 'release', value: number, random?: RandomPort): boolean {
   const skill = value - 1
   const owns = career.skillIds.includes(skill)
   if (kind === 'acquire' ? owns : !owns) return false

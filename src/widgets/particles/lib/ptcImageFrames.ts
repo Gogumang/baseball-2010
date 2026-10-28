@@ -23,11 +23,27 @@ export interface PtcPart {
 }
 
 export const PTC_IMAGE_FRAMES: readonly (readonly PtcPart[])[] = [
-  [{ image: 20, dx: -5, dy: -6 }, { image: 19, dx: -10, dy: -10 }, { image: 18, dx: -12, dy: -14 }],
+  [
+    { image: 20, dx: -5, dy: -6 },
+    { image: 19, dx: -10, dy: -10 },
+    { image: 18, dx: -12, dy: -14 },
+  ],
   [{ image: 21, dx: -5, dy: -5 }],
-  [{ image: 22, dx: -9, dy: -8 }, { image: 23, dx: -9, dy: -8 }, { image: 24, dx: -9, dy: -8 }],
-  [{ image: 25, dx: -10, dy: -14 }, { image: 26, dx: -16, dy: -16 }, { image: 27, dx: -12, dy: -15 }],
-  [{ image: 42, dx: -6, dy: -6 }, { image: 43, dx: -6, dy: -6 }, { image: 44, dx: -5, dy: -5 }],
+  [
+    { image: 22, dx: -9, dy: -8 },
+    { image: 23, dx: -9, dy: -8 },
+    { image: 24, dx: -9, dy: -8 },
+  ],
+  [
+    { image: 25, dx: -10, dy: -14 },
+    { image: 26, dx: -16, dy: -16 },
+    { image: 27, dx: -12, dy: -15 },
+  ],
+  [
+    { image: 42, dx: -6, dy: -6 },
+    { image: 43, dx: -6, dy: -6 },
+    { image: 44, dx: -5, dy: -5 },
+  ],
   [
     { image: 13, dx: -12, dy: -12 },
     { image: 12, dx: -11, dy: -12 },
@@ -35,7 +51,11 @@ export const PTC_IMAGE_FRAMES: readonly (readonly PtcPart[])[] = [
     { image: 10, dx: -9, dy: -8 },
     { image: 9, dx: -6, dy: -6 },
   ],
-  [{ image: 1, dx: -9, dy: -9 }, { image: 2, dx: -9, dy: -9 }, { image: 3, dx: -8, dy: -9 }],
+  [
+    { image: 1, dx: -9, dy: -9 },
+    { image: 2, dx: -9, dy: -9 },
+    { image: 3, dx: -8, dy: -9 },
+  ],
   [
     { image: 8, dx: -18, dy: -14 },
     { image: 7, dx: -19, dy: -13 },
@@ -49,8 +69,16 @@ export const PTC_IMAGE_FRAMES: readonly (readonly PtcPart[])[] = [
     { image: 15, dx: -7, dy: -4 },
     { image: 14, dx: -6, dy: -4 },
   ],
-  [{ image: 45, dx: -3, dy: -3 }, { image: 46, dx: -3, dy: -3 }, { image: 47, dx: -3, dy: -3 }],
-  [{ image: 48, dx: -7, dy: -7 }, { image: 49, dx: -3, dy: -3 }, { image: 50, dx: -3, dy: -3 }],
+  [
+    { image: 45, dx: -3, dy: -3 },
+    { image: 46, dx: -3, dy: -3 },
+    { image: 47, dx: -3, dy: -3 },
+  ],
+  [
+    { image: 48, dx: -7, dy: -7 },
+    { image: 49, dx: -3, dy: -3 },
+    { image: 50, dx: -3, dy: -3 },
+  ],
   [{ image: 28, dx: -39, dy: -14 }],
   [{ image: 28, dx: -21, dy: -14, flip: true }],
   [{ image: 29, dx: -5, dy: -4 }],

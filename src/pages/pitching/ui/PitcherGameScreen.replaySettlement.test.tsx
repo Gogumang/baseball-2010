@@ -41,7 +41,11 @@ vi.mock('@/pages/defense/ui/DefensePlayback', async () => {
   const { useEffect } = await import('react')
   const { drawnReplayFieldingErrorsOf } = await import('@/features/defense-play/model/fieldingErrors')
   return {
-    DefensePlayback: ({ ticks, onDone, onFieldingErrors }: {
+    DefensePlayback: ({
+      ticks,
+      onDone,
+      onFieldingErrors,
+    }: {
       ticks?: readonly { readonly fielders: readonly { readonly slot: number }[] }[]
       onDone: () => void
       onFieldingErrors?: (errors: readonly unknown[]) => void

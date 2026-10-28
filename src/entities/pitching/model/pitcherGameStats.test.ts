@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  cpuPitchStatsOf,
-  pitcherGameStatOf,
-  pitcherGameStatsOf,
-} from '@/entities/pitching/model/pitcherGameStats'
+import { cpuPitchStatsOf, pitcherGameStatOf, pitcherGameStatsOf } from '@/entities/pitching/model/pitcherGameStats'
 import { selectPitch } from '@/entities/pitching/model/selectPitch'
 import type { PitchSituation } from '@/entities/pitching/model/selectPitch'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'

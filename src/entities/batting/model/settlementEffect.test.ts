@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import {
-  enterSettlementEffect,
-  rainDrawingOf,
-  tickSettlementEffect,
-  type SettlementEffect,
-} from '@/entities/batting/model/settlementEffect'
+import { enterSettlementEffect, rainDrawingOf, tickSettlementEffect, type SettlementEffect } from '@/entities/batting/model/settlementEffect'
 import type { FireworksParticlePort } from '@/entities/batting/model/homeRunFireworks'
 
 function 세는난수(seed = 1): RandomPort & { calls: number } {

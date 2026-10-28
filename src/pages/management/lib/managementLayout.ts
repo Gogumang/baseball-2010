@@ -17,7 +17,13 @@ export interface MenuSlot {
 }
 
 /** 하위 메뉴 칸 (표 0xd4758) */
-const SUB_SLOT_POSITIONS: readonly (readonly [number, number])[] = [[44, 245], [82, 245], [122, 236], [161, 236], [199, 236]]
+const SUB_SLOT_POSITIONS: readonly (readonly [number, number])[] = [
+  [44, 245],
+  [82, 245],
+  [122, 236],
+  [161, 236],
+  [199, 236],
+]
 
 function subMenu(entries: readonly (readonly [string, number, number])[]): readonly MenuSlot[] {
   return entries.map(([id, icon, labelFrame], index) => ({
@@ -33,17 +39,32 @@ export type SubMenuKind = '선수정보' | '트레이닝' | '아이템'
 
 /** 하위 메뉴 (0x7e84c — 아이콘 표 +0x178, 이름표 표 +0x17c) */
 export const COMMAND_MENUS: Readonly<Record<SubMenuKind, readonly MenuSlot[]>> = {
-  선수정보: subMenu([['기본정보', 6, 96], ['장비착용', 7, 228], ['아이템/스킬', 8, 101], ['필살타법', 15, 115], ['기록실', 9, 297]]),
-  트레이닝: subMenu([['히트', 11, 98], ['파워', 12, 103], ['수비', 13, 108], ['주루', 14, 113], ['필살타법', 15, 115]]),
-  아이템: subMenu([['장착', 7, 100], ['서브', 8, 105], ['GP', 20, 110]]),
+  선수정보: subMenu([
+    ['기본정보', 6, 96],
+    ['장비착용', 7, 228],
+    ['아이템/스킬', 8, 101],
+    ['필살타법', 15, 115],
+    ['기록실', 9, 297],
+  ]),
+  트레이닝: subMenu([
+    ['히트', 11, 98],
+    ['파워', 12, 103],
+    ['수비', 13, 108],
+    ['주루', 14, 113],
+    ['필살타법', 15, 115],
+  ]),
+  아이템: subMenu([
+    ['장착', 7, 100],
+    ['서브', 8, 105],
+    ['GP', 20, 110],
+  ]),
 }
 
 /** 사인표 0xd310c — round(100·sin θ), θ = 0~90 */
 const SINE_TABLE = [
-  0, 2, 3, 5, 7, 9, 10, 12, 14, 16, 17, 19, 21, 22, 24, 26, 28, 29, 31, 33, 34, 36, 37, 39, 41, 42, 44, 45, 47, 48,
-  50, 52, 53, 54, 56, 57, 59, 60, 62, 63, 64, 66, 67, 68, 69, 71, 72, 73, 74, 75, 77, 78, 79, 80, 81, 82, 83, 84,
-  85, 86, 87, 87, 88, 89, 90, 91, 91, 92, 93, 93, 94, 95, 95, 96, 96, 97, 97, 97, 98, 98, 98, 99, 99, 99, 99, 100,
-  100, 100, 100, 100, 100,
+  0, 2, 3, 5, 7, 9, 10, 12, 14, 16, 17, 19, 21, 22, 24, 26, 28, 29, 31, 33, 34, 36, 37, 39, 41, 42, 44, 45, 47, 48, 50, 52, 53, 54, 56, 57, 59, 60,
+  62, 63, 64, 66, 67, 68, 69, 71, 72, 73, 74, 75, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 87, 88, 89, 90, 91, 91, 92, 93, 93, 94, 95, 95, 96, 96,
+  97, 97, 97, 98, 98, 98, 99, 99, 99, 99, 100, 100, 100, 100, 100, 100,
 ]
 
 /** 0x6c6a8 — 음수면 +360, 180 초과면 −sin(θ−180), 90 초과면 sin(180−θ) */
@@ -176,7 +197,6 @@ export function moraleGaugeFrameOf(morale: number): number {
 /** 숫자 글자 배치는 공용 모듈을 쓴다 (shared/lib/pixelNumber) */
 export type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
 export { GLYPH_SPACING, SLASH_FRAME, glyphsWidthOf, moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
-
 
 /** 이름 띠가 꺾이는 x — 0x7d43c: 시즌(모드 2)이면 W/2 − 0x1c, 아니면 W/2 − 0x2d */
 export function nameBandSplitOf(isSeasonMode: boolean): number {

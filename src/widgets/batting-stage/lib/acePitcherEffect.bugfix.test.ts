@@ -13,7 +13,11 @@ const 레오니: AcePitcherEffectInput = {
 }
 /** origins.json 의 폭 · 높이 (000 69×78 · 001 71×65 · 002~004 높이 47) */
 const BOXES: Record<number, { width: number; height: number }> = {
-  0: { width: 69, height: 78 }, 1: { width: 71, height: 65 }, 2: { width: 57, height: 47 }, 3: { width: 113, height: 47 }, 4: { width: 121, height: 47 },
+  0: { width: 69, height: 78 },
+  1: { width: 71, height: 65 },
+  2: { width: 57, height: 47 },
+  3: { width: 113, height: 47 },
+  4: { width: 121, height: 47 },
 }
 const boxOf = (frame: number) => BOXES[frame] ?? null
 

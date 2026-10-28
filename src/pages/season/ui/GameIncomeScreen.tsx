@@ -1,9 +1,7 @@
 import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_USER_EVENTS } from '@/shared/config/original/userEvents'
 import { STORE_EXPIRED_USER_EVENT } from '@/entities/season-mode/model/seasonAttendance'
-import {
-  SEASON_EVALUATION_GAUGE_DIVISOR, seasonGameEvaluationExpressionOf,
-} from '@/entities/season-mode/model/seasonGameEvaluation'
+import { SEASON_EVALUATION_GAUGE_DIVISOR, seasonGameEvaluationExpressionOf } from '@/entities/season-mode/model/seasonGameEvaluation'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { EvaluationEventPlayer } from '@/pages/story/ui/EvaluationEventPlayer'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
@@ -58,7 +56,7 @@ export function GameIncomeScreen({ record, teamMorale, gamePoint, line, storeExp
         streakExpression={0}
         gauge={{ popularityChange: record.lastPopularityChange, divisor: SEASON_EVALUATION_GAUGE_DIVISOR }}
         // [113] 창은 재생기 안에서 띄운다 — 0x8b5ac 가 그 밑에 마지막 say 상자(0x7fbc4)를 계속 그린다
-        finalNotice={storeExpired ? ORIGINAL_USER_EVENTS[STORE_EXPIRED_USER_EVENT] ?? '' : null}
+        finalNotice={storeExpired ? (ORIGINAL_USER_EVENTS[STORE_EXPIRED_USER_EVENT] ?? '') : null}
         onDone={onDone}
       />
     </RawScreen>

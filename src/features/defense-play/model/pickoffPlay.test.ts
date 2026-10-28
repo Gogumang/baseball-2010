@@ -4,12 +4,7 @@ import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { basePosition } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
-import {
-  isPickoffPlayResult,
-  pickoffCallSoundIdOf,
-  PICKOFF_RESULT,
-  runPickoffPlay,
-} from '@/features/defense-play/model/pickoffPlay'
+import { isPickoffPlayResult, pickoffCallSoundIdOf, PICKOFF_RESULT, runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
 
 /** 굴림 수를 세는 난수 — 값은 늘 같은 비율 */
 function 세는난수(ratio: number): RandomPort & { readonly count: () => number } {
@@ -150,10 +145,7 @@ describe('견제를 받은 야수의 CPU 송구 결정 — 슬롯 2 의 0xafa60 
     expect(CPU.ticks).toHaveLength(26)
     expect(CPU.advance).toEqual(사람.advance)
     // 송구 설정이 자동이면 사람 수비도 같다
-    expect(
-      runPickoffPlay({ targetBase: 1, bases: { first: true, second: false, third: false }, outs: 0, throwMode: '자동' })
-        .ticks,
-    ).toHaveLength(26)
+    expect(runPickoffPlay({ targetBase: 1, bases: { first: true, second: false, third: false }, outs: 0, throwMode: '자동' }).ticks).toHaveLength(26)
   })
 
   it('표본 — CPU 갈래가 돌아도 견제 판의 결과·굴림은 그대로다 (점수식이 던질 루를 못 찾는다)', () => {

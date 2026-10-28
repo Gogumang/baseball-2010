@@ -47,7 +47,11 @@ function messagesOf(item: GpItem): string[] {
 export function batterGpDetailViewOf({ itemIndex, before, after }: GpDetailOf<PlayerCareer>): DetailView | null {
   const limits = abilityLimitOf(before.battingTypeIndex)
   const limitSlots = BATTER_ABILITY_KEYS.map((key) => limits[key])
-  const change = gpItemDetailChangesOf(itemIndex, BATTER_ABILITY_KEYS.map((key) => before.ability[key]), limitSlots)
+  const change = gpItemDetailChangesOf(
+    itemIndex,
+    BATTER_ABILITY_KEYS.map((key) => before.ability[key]),
+    limitSlots,
+  )
   if (change === null) return null
   const current = equippedAbilityOf(after)
   return {
@@ -64,7 +68,11 @@ export function batterGpDetailViewOf({ itemIndex, before, after }: GpDetailOf<Pl
 export function pitcherGpDetailViewOf({ itemIndex, before, after }: GpDetailOf<PitcherCareer>): DetailView | null {
   const limits = pitcherAbilityLimitsOf(before)
   const limitSlots = PITCHER_ABILITY_ORDER.map((key) => limits[key])
-  const change = gpItemDetailChangesOf(itemIndex, PITCHER_ABILITY_ORDER.map((key) => before.ability[key]), limitSlots)
+  const change = gpItemDetailChangesOf(
+    itemIndex,
+    PITCHER_ABILITY_ORDER.map((key) => before.ability[key]),
+    limitSlots,
+  )
   if (change === null) return null
   const current = equippedPitcherAbilityOf(after)
   return {

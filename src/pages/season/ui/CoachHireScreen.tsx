@@ -58,7 +58,14 @@ export interface CoachHireScreenProps {
  * 넘기고(0xa578~0xa586) 돌려받은 키로: −5 → OK(0xa734) · −16 → 0xce(0xa974) · '0' → 버림(0xa656) · 그 밖('*' '#' 따위) 없음.
  */
 export function CoachHireScreen({
-  state, gamePoints = 0, openedAcePitcherIds, openedAceBatterIds, levels, onOpenAce, onHire, onBack,
+  state,
+  gamePoints = 0,
+  openedAcePitcherIds,
+  openedAceBatterIds,
+  levels,
+  onOpenAce,
+  onHire,
+  onBack,
 }: CoachHireScreenProps) {
   const { record } = state
   const [notice, setNotice] = useState<string | null>(null)
@@ -108,15 +115,13 @@ export function CoachHireScreen({
       underlay={<SkinBackdrop kind="공무늬" />}
       // 0xaa24 의 코치채용 갈래(0xaa6c~0xad78) — 오른쪽 위 정보 상자: 커서 칸 코치의 효과 · 계약금 · 필요 인기도
       panel={(cursor) => <CoachInfoBox slot={cursor} />}
-      overlay={question !== null ? (
-        <MessageBox
-          text={question.text}
-          buttons={['예', '아니오']}
-          onAnswer={(answer) => (answer === 0 ? hire() : setQuestion(null))}
-        />
-      ) : notice !== null ? (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
-      ) : null}
+      overlay={
+        question !== null ? (
+          <MessageBox text={question.text} buttons={['예', '아니오']} onAnswer={(answer) => (answer === 0 ? hire() : setQuestion(null))} />
+        ) : notice !== null ? (
+          <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
+        ) : null
+      }
     />
   )
 }

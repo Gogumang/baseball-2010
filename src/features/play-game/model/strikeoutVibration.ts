@@ -26,10 +26,7 @@ const STRIKEOUT_STRIKES_BEFORE = 2
  *
  * @param strikesBefore 이 공 **전** 스트라이크 수
  */
-export function strikeoutVibrationMillisecondsOf(
-  resolution: PitchResolution | null,
-  strikesBefore: number,
-): number {
+export function strikeoutVibrationMillisecondsOf(resolution: PitchResolution | null, strikesBefore: number): number {
   if (resolution?.kind !== '스트라이크') return 0
   return strikesBefore >= STRIKEOUT_STRIKES_BEFORE ? STRIKEOUT_VIBRATION_MILLISECONDS : 0
 }

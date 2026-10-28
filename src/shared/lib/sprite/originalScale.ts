@@ -122,8 +122,8 @@ export function affineBlitPixels(
     const sourceRow = (region.y + row) * sourceWidth + region.x
     for (let column = 0; column < W; column += 1) {
       const pixel = source[sourceRow + column] ?? 0
-      const x = (((Math.imul(column, a) + rowB) | 0) + tx >> FIXED_SHIFT) - minX
-      const y = (((Math.imul(column, c) + rowD) | 0) + ty >> FIXED_SHIFT) - minY
+      const x = ((((Math.imul(column, a) + rowB) | 0) + tx) >> FIXED_SHIFT) - minX
+      const y = ((((Math.imul(column, c) + rowD) | 0) + ty) >> FIXED_SHIFT) - minY
       const left = Math.min(lastColumn, x)
       for (let k = 0; k <= fy; k += 1) {
         const at = width * Math.min(height - 1, y + k) + left
@@ -162,7 +162,10 @@ export function scalePixelsLikeOriginal(
   const a = Math.trunc((boxWidth << FIXED_SHIFT) / sourceWidth)
   const d = Math.trunc((boxHeight << FIXED_SHIFT) / sourceHeight)
   return affineBlitPixels(source, sourceWidth, sourceHeight, [a, 0, 0, 0, d, 0], {
-    x: 0, y: 0, width: sourceWidth, height: sourceHeight,
+    x: 0,
+    y: 0,
+    width: sourceWidth,
+    height: sourceHeight,
   })
 }
 
@@ -178,9 +181,7 @@ export function packedPixelsOf(rgba: Uint8ClampedArray): Uint32Array {
   for (let index = 0; index < packed.length; index += 1) {
     const at = index << 2
     const alpha = rgba[at + 3] ?? 0
-    packed[index] = alpha === 0
-      ? 0
-      : (((alpha << 24) | ((rgba[at + 2] ?? 0) << 16) | ((rgba[at + 1] ?? 0) << 8) | (rgba[at] ?? 0)) >>> 0)
+    packed[index] = alpha === 0 ? 0 : ((alpha << 24) | ((rgba[at + 2] ?? 0) << 16) | ((rgba[at + 1] ?? 0) << 8) | (rgba[at] ?? 0)) >>> 0
   }
   return packed
 }

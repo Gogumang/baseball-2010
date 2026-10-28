@@ -56,10 +56,7 @@ function layerPreloadsOf(layers: readonly BatterLayer[], isRecolored: (layer: Ba
   for (const layer of layers) {
     requests.push({ folder: layer.folder, frames: [layer.frame], json: ['origins.json'], framesListedIn: layer.folder })
     if (isRecolored(layer)) {
-      requests.push(
-        { folder: indexFolderOf(layer.folder), frames: [layer.frame], framesListedIn: layer.folder },
-        paletteRequestOf(layer.folder),
-      )
+      requests.push({ folder: indexFolderOf(layer.folder), frames: [layer.frame], framesListedIn: layer.folder }, paletteRequestOf(layer.folder))
     }
   }
   return mergeSpritePreloads(requests)
@@ -89,7 +86,10 @@ export function batterSpritePreloadsOf(bodyType: number, equipment: BatterEquipm
 export function batterStanceSpritePreloadsOf(bodyType: number): SpriteFolderPreload[] {
   const frames = new Set<number>()
   for (let tick = 0; tick < IDLE_CYCLE_TICKS; tick += 1) frames.add(batterFrameAt({ tick, swingTick: null, isBunting: false, bodyType }))
-  return layerPreloadsOf([...frames].flatMap((frame) => batterLayersOf(frame, bodyType)), isBatterLayerRecolored)
+  return layerPreloadsOf(
+    [...frames].flatMap((frame) => batterLayersOf(frame, bodyType)),
+    isBatterLayerRecolored,
+  )
 }
 
 /** 대기 자세 한 바퀴를 넉넉히 덮는 틱 (칸마다 4틱 × 최대 5칸) */
@@ -108,7 +108,10 @@ export function stageEntrySpritePreloadsOf(): SpriteFolderPreload[] {
 export function aceBatterSpritePreloadsOf(aceOrder: number): SpriteFolderPreload[] {
   const layers = aceBatterPoseFramesOf(aceOrder).flatMap((frame) => aceBatterLayersOf(frame, aceOrder))
   const still = ACE_BATTERS[aceOrder]?.stillUrl
-  return mergeSpritePreloads(layerPreloadsOf(layers, () => false), still === undefined ? [] : [stillRequestOf(still)])
+  return mergeSpritePreloads(
+    layerPreloadsOf(layers, () => false),
+    still === undefined ? [] : [stillRequestOf(still)],
+  )
 }
 
 /** 평범한 투수 — 투구 · 대기 프레임과 덧그림(+0x16), 장비 겹 */

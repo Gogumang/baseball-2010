@@ -27,7 +27,10 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 /** 0xb08e8 덱 섞기 — 코드 0~26 의 패턴 수 합(21~23 은 0장) */
 const DECK_ROLLS = 1275
 
-interface Roll { readonly lo: number; readonly hi: number }
+interface Roll {
+  readonly lo: number
+  readonly hi: number
+}
 
 /** 시드 난수를 그대로 굴리며 부른 차례를 남긴다 */
 const recordingRandom = (seed: number): { random: RandomPort; rolls: Roll[] } => {
@@ -73,10 +76,11 @@ beforeEach(() => {
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
   // 그라디언트 같은 돌려받는 붓 객체도 아무 일도 안 하는 붓이다
-  const noopBrush = (target: object): object => new Proxy(target, {
-    get: (held, key) => (key in held ? (held as Record<string | symbol, unknown>)[key] : () => noopBrush({})),
-    set: () => true,
-  })
+  const noopBrush = (target: object): object =>
+    new Proxy(target, {
+      get: (held, key) => (key in held ? (held as Record<string | symbol, unknown>)[key] : () => noopBrush({})),
+      set: () => true,
+    })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
     return noopBrush({ canvas: this }) as never
   })
@@ -100,18 +104,14 @@ const HEAD = 1 + DECK_ROLLS + SCENE_EFFECT_INIT_ROLL_COUNT
 describe('경기 장면 진입 굴림 차례 — 화면째로 (r232)', () => {
   it('홈런더비(모드 7): 팁 → 덱 1275 → 효과 1202 → 상대 팀 rand(0, 9) → rand(0, 2) → 하늘 줄 rand(0, 6), 그 앞에 다른 굴림이 없다', () => {
     const { random, rolls } = recordingRandom(1)
-    render(
-      <HomeRunDerbyScreen
-        ability={ROOKIE_BATTER_ABILITY}
-        random={random}
-        bestDistance={0}
-        gamePoint={0}
-        onExit={vi.fn()}
-      />,
-    )
+    render(<HomeRunDerbyScreen ability={ROOKIE_BATTER_ABILITY} random={random} bestDistance={0} gamePoint={0} onExit={vi.fn()} />)
     expectSceneHead(rolls)
     // 내 팀(저장 없음 0)은 9 이하라 구장 굴림이 없다
-    expect(rolls.slice(HEAD, HEAD + 3)).toEqual([{ lo: 0, hi: 9 }, { lo: 0, hi: 2 }, { lo: 0, hi: 6 }])
+    expect(rolls.slice(HEAD, HEAD + 3)).toEqual([
+      { lo: 0, hi: 9 },
+      { lo: 0, hi: 2 },
+      { lo: 0, hi: 6 },
+    ])
     // 첫 공 앞(0xe 대기) — 붙는 그림이 더 굴리지 않는다
     expect(rolls).toHaveLength(HEAD + 3)
   })
@@ -126,7 +126,14 @@ describe('경기 장면 진입 굴림 차례 — 화면째로 (r232)', () => {
     const { random, rolls } = recordingRandom(20100901)
     render(
       <TeamGameScreen
-        options={{ mode, ourTeamId: 0, opponentTeamId: 1, playerSide: PLAYER_SIDE_LAST_BAT, season: { illness: 0, morale: 100, coach: -1 }, ...setup }}
+        options={{
+          mode,
+          ourTeamId: 0,
+          opponentTeamId: 1,
+          playerSide: PLAYER_SIDE_LAST_BAT,
+          season: { illness: 0, morale: 100, coach: -1 },
+          ...setup,
+        }}
         random={random}
         onFinish={vi.fn()}
         onQuit={vi.fn()}

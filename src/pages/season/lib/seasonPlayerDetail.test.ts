@@ -12,13 +12,21 @@ import { nariRecruitPlayerOf } from '@/entities/season-mode/model/playerRecruit'
  */
 
 const 타자 = (patch: Partial<SeasonPlayerRecordView> = {}): SeasonPlayerRecordView => ({
-  name: '시험타자', isPitcher: false, base: [500, 500, 500, 500], profile: 0, skillBits: 0,
-  equipment: [0, 0, 0, 0], fieldPosition: 3, isComplete: true, ...patch,
+  name: '시험타자',
+  isPitcher: false,
+  base: [500, 500, 500, 500],
+  profile: 0,
+  skillBits: 0,
+  equipment: [0, 0, 0, 0],
+  fieldPosition: 3,
+  isComplete: true,
+  ...patch,
 })
 const 투수 = (patch: Partial<SeasonPlayerRecordView> = {}) => 타자({ name: '시험투수', isPitcher: true, fieldPosition: 0, ...patch })
 
 const 건강 = (patch: Partial<SeasonPlayerDetailContext['record']> = {}, teamMorale = 100): SeasonPlayerDetailContext => ({
-  record: { illness: 0, illnessSlack: 0, coach: -1, teamId: 0, ...patch }, teamMorale,
+  record: { illness: 0, illnessSlack: 0, coach: -1, teamId: 0, ...patch },
+  teamMorale,
 })
 
 describe('표 다섯 줄 (0x872a0)', () => {
@@ -51,9 +59,7 @@ describe('글 줄 차례 (0x897e8)', () => {
       '[!cFFFF00라이트 헬멧!cFFFFFF] 히트 +50',
       '[!cFFFF00스피릿 배트!cFFFFFF] 파워 +110',
     ])
-    expect(seasonPlayerDetailViewOf(투수({ equipment: [3, 0, 0, 0] }), 건강()).messages).toEqual([
-      '[!cFFFF00스킬풀 모자!cFFFFFF] 제구 +70',
-    ])
+    expect(seasonPlayerDetailViewOf(투수({ equipment: [3, 0, 0, 0] }), 건강()).messages).toEqual(['[!cFFFF00스킬풀 모자!cFFFFFF] 제구 +70'])
   })
 
   it('스킬 5 · 7 → 질병(SR+5) → 사기 ≤ 50 → 포지션 → 코치', () => {
@@ -134,17 +140,29 @@ describe('정보 칸 0x7c450 시즌 · 0xd9 갈래 — seasonCardInfoOf', () => 
   })
 
   it('영입한 나리 타자 — 기록 사본의 +0xb · +0x18 을 읽는다 (장타형 · 좌타 · 흑인 · 외야, 필살 4 + 타입 = 메테오 스윙)', () => {
-    const player = nariRecruitPlayerOf({
-      name: '나리', ability: [600, 600, 600, 600], profile: seasonRecordProfileOf(1, 1, 2, 1), specialNumber: 4,
-    }, false)
+    const player = nariRecruitPlayerOf(
+      {
+        name: '나리',
+        ability: [600, 600, 600, 600],
+        profile: seasonRecordProfileOf(1, 1, 2, 1),
+        specialNumber: 4,
+      },
+      false,
+    )
     const view = seasonPlayerRecordOf(0, player, false, 0)
     expect(seasonCardInfoOf(view, 'T', player.kindByte).values).toEqual(['T', '나리', '장타형', '메테오 스윙', '외야', '좌타', '흑인'])
   })
 
   it('영입한 투수 — +0x18 은 고른 마구, 옛 사본(+0xb 칸 없음)은 보직만', () => {
-    const player = nariRecruitPlayerOf({
-      name: '철완', ability: [1, 1, 1, 1], repertoire: { name: '철완', form: 0, magicId: 2, pitchMask: 1 }, role: 2,
-    }, true)
+    const player = nariRecruitPlayerOf(
+      {
+        name: '철완',
+        ability: [1, 1, 1, 1],
+        repertoire: { name: '철완', form: 0, magicId: 2, pitchMask: 1 },
+        role: 2,
+      },
+      true,
+    )
     const view = seasonPlayerRecordOf(0, player, true, 0)
     expect(seasonCardInfoOf(view, 'T', player.kindByte).values).toEqual(['T', '철완', '오버핸드', '웨이브 볼', '구원', '우완', '황인'])
   })

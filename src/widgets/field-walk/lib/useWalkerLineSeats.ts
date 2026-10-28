@@ -1,14 +1,6 @@
 import { useRef } from 'react'
-import {
-  type BenchClearingOffenseAces,
-  seatsAfterBenchClearing,
-} from '@/widgets/field-walk/lib/benchClearingFieldInput'
-import {
-  NEW_WALKER_LINE_SEATS,
-  type WalkerLineSeats,
-  seatsAfterDefensePlay,
-  seatsAfterHalfInningBoard,
-} from '@/widgets/field-walk/lib/walkerAces'
+import { type BenchClearingOffenseAces, seatsAfterBenchClearing } from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { NEW_WALKER_LINE_SEATS, type WalkerLineSeats, seatsAfterDefensePlay, seatsAfterHalfInningBoard } from '@/widgets/field-walk/lib/walkerAces'
 
 type SeatRecords = readonly { readonly position: number; readonly ace: number | null }[]
 

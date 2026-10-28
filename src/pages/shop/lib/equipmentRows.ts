@@ -1,10 +1,19 @@
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
-  EQUIPMENT_LEVEL_COUNT, EQUIPMENT_PARTS, FIRST_HIDDEN_LEVEL, equipmentBonusOf, equipmentItemOf, isHiddenOpen, ownsEquipment,
+  EQUIPMENT_LEVEL_COUNT,
+  EQUIPMENT_PARTS,
+  FIRST_HIDDEN_LEVEL,
+  equipmentBonusOf,
+  equipmentItemOf,
+  isHiddenOpen,
+  ownsEquipment,
 } from '@/entities/career/model/equipment'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import {
-  isPitcherEquipmentEquipped, isPitcherHiddenOpen, ownsPitcherEquipment, pitcherEquipmentItemOf,
+  isPitcherEquipmentEquipped,
+  isPitcherHiddenOpen,
+  ownsPitcherEquipment,
+  pitcherEquipmentItemOf,
 } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { shopItemId } from '@/features/shop/model/shopSelection'
@@ -45,7 +54,7 @@ function descriptionOf(level: number, requiredPopularity: number, isOpen: boolea
   if (level < FIRST_HIDDEN_LEVEL) {
     return requiredPopularity === 0 ? NO_POPULARITY_TEXT : POPULARITY_TEXT.replace('%d', String(requiredPopularity))
   }
-  return isOpen ? '' : hint ?? ''
+  return isOpen ? '' : (hint ?? '')
 }
 
 /** 0x8146c — 상점이면 열한 레벨 전부, 장비착용이면 가진 레벨만 */

@@ -7,8 +7,16 @@ import { HallOfFameScreen, SpecialScreen } from '@/pages/special/ui/SpecialScree
 import type { HallOfFameDeletion } from '@/pages/special/ui/SpecialScreen'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import {
-  HALL_OF_FAME_BUBBLE, HALL_OF_FAME_GRID, HALL_OF_FAME_SLOTS,
-  SPECIAL_ITEMS, hallOfFameCellImagesOf, isHallOfFameCellDimmed, hallOfFameBubblePositionOf, hallOfFameCellOf, hallOfFameChartVerticesOf, HOME_RUN_DERBY_FIRST_ROW_Y,
+  HALL_OF_FAME_BUBBLE,
+  HALL_OF_FAME_GRID,
+  HALL_OF_FAME_SLOTS,
+  SPECIAL_ITEMS,
+  hallOfFameCellImagesOf,
+  isHallOfFameCellDimmed,
+  hallOfFameBubblePositionOf,
+  hallOfFameCellOf,
+  hallOfFameChartVerticesOf,
+  HOME_RUN_DERBY_FIRST_ROW_Y,
 } from '@/pages/special/lib/specialLayout'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
@@ -39,7 +47,9 @@ afterEach(() => {
 })
 const 릴키 = (key: string) => {
   fireEvent.keyDown(window, { key })
-  act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 6) })
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * 6)
+  })
 }
 
 /** 띠가 다 자란 목록 — 자라는 동안은 키를 버린다(0x28ba0~0x28bb4). 자라는 것은 아래 '바탕 띠' 묶음이 따로 본다 */
@@ -55,10 +65,15 @@ const 항목열기 = (name: string) => {
 
 /** 명예의 전당 격자 커서를 키패드로 옮긴다 — ↓ 로 줄을 맞추고 → 로 칸을 맞춘다(마우스 올리기로는 안 옮겨진다) */
 const 슬롯으로 = (target: number) => {
-  const 지금 = () => Number(screen.getAllByRole('button').find((button) => /번 슬롯$/.test(button.getAttribute('aria-label') ?? '')
-    && button.getAttribute('aria-current') === 'true')?.dataset.slot)
+  const 지금 = () =>
+    Number(
+      screen
+        .getAllByRole('button')
+        .find((button) => /번 슬롯$/.test(button.getAttribute('aria-label') ?? '') && button.getAttribute('aria-current') === 'true')?.dataset.slot,
+    )
   const columns = HALL_OF_FAME_GRID.columns
-  for (let guard = 0; guard < 10 && Math.trunc(지금() / columns) < Math.trunc(target / columns); guard += 1) fireEvent.keyDown(window, { key: 'ArrowDown' })
+  for (let guard = 0; guard < 10 && Math.trunc(지금() / columns) < Math.trunc(target / columns); guard += 1)
+    fireEvent.keyDown(window, { key: 'ArrowDown' })
   for (let guard = 0; guard < 10 && 지금() !== target; guard += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
   expect(지금()).toBe(target)
 }
@@ -80,7 +95,10 @@ describe('스페셜 목록 = 세로 릴 0x2524c(this, 6) — 메인 메뉴 아�
     try {
       const { container } = 띄우기()
       const 띠지남 = () => {
-        for (let step = 0; step < 6; step += 1) act(() => { vi.advanceTimersByTime(200) })
+        for (let step = 0; step < 6; step += 1)
+          act(() => {
+            vi.advanceTimersByTime(200)
+          })
       }
       띠지남()
       expect(container.textContent).toContain('G포인트를 충전')
@@ -101,7 +119,10 @@ describe('스페셜 목록 = 세로 릴 0x2524c(this, 6) — 메인 메뉴 아�
       expect(container.querySelector('canvas')?.getAttribute('data-band-spread')).toBe('1')
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(screen.queryByRole('dialog')).toBeNull()
-      for (let step = 0; step < 6; step += 1) act(() => { vi.advanceTimersByTime(200) })
+      for (let step = 0; step < 6; step += 1)
+        act(() => {
+          vi.advanceTimersByTime(200)
+        })
       expect(container.querySelector('canvas')?.getAttribute('data-band-spread')).toBe('160')
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(screen.getByRole('dialog')).toBeTruthy()
@@ -113,10 +134,11 @@ describe('스페셜 목록 = 세로 릴 0x2524c(this, 6) — 메인 메뉴 아�
 
 describe('반원 바퀴 칸 글자 (0x24f9e~ — 메인 메뉴 wheelLabels 와 같은 꼴)', () => {
   it('[스페셜] 을 고른 배열 그대로 — [스페셜] 은 0° 라 안 그리고 나머지 다섯 칸 글자가 선다', async () => {
-    const origins = Object.fromEntries(
-      [0, 2, 3, 4, 26].map((frame) => [String(frame).padStart(3, '0'), { x: 0, y: 0, width: 40, height: 10 }]),
+    const origins = Object.fromEntries([0, 2, 3, 4, 26].map((frame) => [String(frame).padStart(3, '0'), { x: 0, y: 0, width: 40, height: 10 }]))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => origins })),
     )
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => origins })))
     const { container } = 띄우기()
     await vi.waitFor(() => expect(container.querySelectorAll('[data-wheel-label]').length).toBe(5))
     const ids = [...container.querySelectorAll('[data-wheel-label]')].map((node) => node.getAttribute('data-wheel-label'))
@@ -142,7 +164,9 @@ describe('스페셜 칸 고르기', () => {
 
   it('에디트 칸은 앱이 꽂은 상태 29 화면으로 가고, 그 화면의 CLR 은 목록으로 온다 (0x2b432)', () => {
     const renderEdit = vi.fn((onBack: () => void) => (
-      <button type="button" onClick={onBack}>에디트-화면</button>
+      <button type="button" onClick={onBack}>
+        에디트-화면
+      </button>
     ))
     띄우기({ renderEdit })
 
@@ -155,7 +179,9 @@ describe('스페셜 칸 고르기', () => {
 
   it('마선수선택 칸은 앱이 꽂은 상태 28 화면으로 가고, 그 화면의 되돌아가기는 목록으로 온다', () => {
     const renderAceSelect = vi.fn((onBack: () => void) => (
-      <button type="button" onClick={onBack}>마선수-화면</button>
+      <button type="button" onClick={onBack}>
+        마선수-화면
+      </button>
     ))
     띄우기({ renderAceSelect })
 
@@ -188,16 +214,16 @@ describe('스페셜 칸 고르기', () => {
   it('↑↓ 로 커서를 옮기고 Enter 로 연다', () => {
     띄우기()
 
-    릴키('ArrowUp')  // 위로 한 칸 = 마지막 칸 선물받기
+    릴키('ArrowUp') // 위로 한 칸 = 마지막 칸 선물받기
     fireEvent.keyDown(window, { key: 'Enter' })
 
     expect(screen.getByText(/통신이 필요합니다/)).toBeTruthy()
   })
 
-  it('날 키 0x28b9c — \'2\' · \'4\' · ← 는 앞 칸, \'6\' · \'8\' · → 는 뒤 칸, \'5\' 로 연다', () => {
+  it("날 키 0x28b9c — '2' · '4' · ← 는 앞 칸, '6' · '8' · → 는 뒤 칸, '5' 로 연다", () => {
     띄우기()
 
-    릴키('4')  // 앞 칸 = 마지막 칸 선물받기
+    릴키('4') // 앞 칸 = 마지막 칸 선물받기
     릴키('8')
     릴키('ArrowLeft')
     fireEvent.keyDown(window, { key: '5' })
@@ -226,8 +252,13 @@ describe('명예의 전당 격자 5×3', () => {
   }
   /** 명예 투수 0번(칸 1)이 찬 스페셜 명예의 전당 — 말풍선은 결과 3·4(찬 칸)에서만 뜬다 (0x2ac00) */
   const 찬투수 = {
-    name: '철완', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
-    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 0,
+    name: '철완',
+    ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    endingIndex: 5,
+    season: 10,
+    titleIds: [],
+    slot: 0,
     look: { typeIndex: 0, handIndex: 0, skinIndex: 0, teamId: 1 },
   }
   const 찬칸열기 = (deletion?: HallOfFameDeletion) => {
@@ -294,8 +325,12 @@ describe('명예의 전당 격자 5×3', () => {
 
   it('칸 배치 0x5eb8c — 0·5·10 은 빈 자물쇠(상태 0), 투수 1~2·타자 6~9 가 열리고 나머지는 LOCK', () => {
     const famer = {
-      name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 },
-      endingIndex: 6, season: 13, titleIds: [], slot: 1,
+      name: '전설',
+      ability: { hit: 1, power: 2, defense: 3, run: 4 },
+      endingIndex: 6,
+      season: 13,
+      titleIds: [],
+      slot: 1,
     }
     render(<SpecialScreen collection={{ ...EMPTY_COLLECTION, hallOfFame: [famer] }} onBack={vi.fn()} isBandGrown />)
     항목열기('명예의전당')
@@ -348,7 +383,7 @@ describe('명예의 전당 격자 5×3', () => {
     expect(screen.getByRole('button', { name: '2번 슬롯' })).toBeTruthy()
   })
 
-  it('말풍선은 숫자키도 받는다 — 0x2ac00 2ac76: \'2\' · \'8\' 은 ↑ ↓, \'5\' 는 OK, \'4\' · \'6\' 은 아무 일 없음', () => {
+  it("말풍선은 숫자키도 받는다 — 0x2ac00 2ac76: '2' · '8' 은 ↑ ↓, '5' 는 OK, '4' · '6' 은 아무 일 없음", () => {
     찬칸열기()
     fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
     const 지금 = (name: string) => screen.getByRole('menuitem', { name }).getAttribute('aria-current')
@@ -419,8 +454,7 @@ describe('명예의 전당 격자 5×3', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '2번 슬롯' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '슬롯에서 삭제' }))
-    expect(screen.getByRole('button', { name: '아니오' }).querySelector('img')?.getAttribute('src'))
-      .toContain('popup/frames/007.png')
+    expect(screen.getByRole('button', { name: '아니오' }).querySelector('img')?.getAttribute('src')).toContain('popup/frames/007.png')
     fireEvent.keyDown(window, { key: 'Enter' })
 
     expect(onDelete).not.toHaveBeenCalled()
@@ -502,7 +536,12 @@ describe('명예의 전당 등록 목록 — 나리 상태 145 (0x62568 목록 �
       <HallOfFameScreen
         collection={EMPTY_COLLECTION}
         mode={{
-          kind: '등록', edition: '타자', nari: { 투수: null, 타자: 나리 }, onRegister: () => '등록', onDone, onLater: vi.fn(),
+          kind: '등록',
+          edition: '타자',
+          nari: { 투수: null, 타자: 나리 },
+          onRegister: () => '등록',
+          onDone,
+          onLater: vi.fn(),
           openRegisteredHidden: () => false,
         }}
         onBack={vi.fn()}
@@ -558,8 +597,13 @@ describe('명예의 전당 등록 목록 — 나리 상태 145 (0x62568 목록 �
 describe('미션 선수 고르기 — 메인 메뉴 하위 17 (0x2613c 목록 종류 0 · 키 0x627d4)', () => {
   const 나리 = { name: '홍길동', equippedAbility: [999, 800, 400, 0] }
   const 명예투수 = {
-    name: '철완', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
-    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 1,
+    name: '철완',
+    ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    endingIndex: 5,
+    season: 10,
+    titleIds: [],
+    slot: 1,
     look: { typeIndex: 0, handIndex: 0, skinIndex: 0, teamId: 1 },
   }
   const 명예타자 = { name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot: 2 }
@@ -667,8 +711,7 @@ describe('홈런더비 선수 고르기 — 하위 16 (0x25e6c 목록 종류 1 �
     expect(first.style.left).toBe(`${hallOfFameCellOf(0).x}px`)
     // k 7 은 cy = H/2 + 0x18 = 184 (0x65152~0x65158) — 아랫줄 끝 칸 = 184 + 40 − 열 보정 13
     expect(hallOfFameCellOf(9, HOME_RUN_DERBY_FIRST_ROW_Y).y).toBe(211)
-    expect(screen.getByRole('button', { name: '15번 슬롯' }).style.top)
-      .toBe(`${hallOfFameCellOf(9, HOME_RUN_DERBY_FIRST_ROW_Y).y}px`)
+    expect(screen.getByRole('button', { name: '15번 슬롯' }).style.top).toBe(`${hallOfFameCellOf(9, HOME_RUN_DERBY_FIRST_ROW_Y).y}px`)
   })
 
   it('나리 타자 → 코드 2 · 명예 타자 → 코드 4 (+0xa6 = 명전 번호)', () => {
@@ -737,21 +780,28 @@ describe('머리띠 0x54d95 — 제목이 있으면 G포인트도 그린다 (0x5
 
 describe('A 자리 고른 선수 몸 그림 — 0x63b14 찬 칸 갈래 · 0x669c0 → 0x65e80', () => {
   const 나리타자 = {
-    name: '홍길동', equippedAbility: [1, 2, 3, 4],
+    name: '홍길동',
+    equippedAbility: [1, 2, 3, 4],
     figure: { form: 1, skin: 1, team: 4, equipment: [0, 0, 0, 0] as [number, number, number, number] },
   }
   const 명예투수 = {
-    name: '철완', ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
-    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 }, endingIndex: 5, season: 10, titleIds: [], slot: 0,
+    name: '철완',
+    ability: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    equippedAbility: { control: 1, velocity: 2, breaking: 3, stamina: 4 },
+    endingIndex: 5,
+    season: 10,
+    titleIds: [],
+    slot: 0,
     look: { typeIndex: 0, handIndex: 1, skinIndex: 0, teamId: 1 },
   }
-  const 열기 = () => render(
-    <HallOfFameScreen
-      collection={{ ...EMPTY_COLLECTION, hallOfFamePitchers: [명예투수] }}
-      mode={{ kind: '선수고르기', nari: { 투수: null, 타자: 나리타자 }, onPick: vi.fn(), onCancel: vi.fn() }}
-      onBack={vi.fn()}
-    />,
-  )
+  const 열기 = () =>
+    render(
+      <HallOfFameScreen
+        collection={{ ...EMPTY_COLLECTION, hallOfFamePitchers: [명예투수] }}
+        mode={{ kind: '선수고르기', nari: { 투수: null, 타자: 나리타자 }, onPick: vi.fn(), onCancel: vi.fn() }}
+        onBack={vi.fn()}
+      />,
+    )
 
   it('빈 칸은 원 두 개, 찬 칸은 원 없이 몸 그림 (0x6535a 갈래만 원을 깐다)', () => {
     const { container } = 열기()

@@ -56,9 +56,7 @@ describe('투구 등급 t (0x50e08 · 0x4dbac)', () => {
   const 바탕 = { gaugeSettingOn: true, typeNumber: 1, effectiveControl: 500, staminaPercent: 100 }
 
   it('게이지를 켜면 누른 칸 g → max(g − 4, 1) 이고 안 누르면 0 이다', () => {
-    const 등급 = [0, 1, 5, 6, 7, 8, 9].map((cell) =>
-      pitchGradeOf({ ...바탕, gaugeCell: cell }, 고정),
-    )
+    const 등급 = [0, 1, 5, 6, 7, 8, 9].map((cell) => pitchGradeOf({ ...바탕, gaugeCell: cell }, 고정))
 
     expect(등급).toEqual([0, 1, 1, 2, 3, 4, 5])
   })
@@ -68,19 +66,13 @@ describe('투구 등급 t (0x50e08 · 0x4dbac)', () => {
   })
 
   it('마구는 게이지를 쓰지 않고 늘 5 다 (0x4dbae)', () => {
-    const 등급 = pitchGradeOf(
-      { ...바탕, typeNumber: MAGIC_PITCH_TYPE_NUMBER, gaugeCell: 0 },
-      고정,
-    )
+    const 등급 = pitchGradeOf({ ...바탕, typeNumber: MAGIC_PITCH_TYPE_NUMBER, gaugeCell: 0 }, 고정)
 
     expect(등급).toBe(5)
   })
 
   it('게이지를 끄면 제구·체력 확률표로 뽑는다 — 칸을 눌러도 무시된다', () => {
-    const 등급 = pitchGradeOf(
-      { ...바탕, gaugeSettingOn: false, gaugeCell: 9 },
-      씨앗(20100901),
-    )
+    const 등급 = pitchGradeOf({ ...바탕, gaugeSettingOn: false, gaugeCell: 9 }, 씨앗(20100901))
 
     expect(등급).toBeGreaterThanOrEqual(0)
     expect(등급).toBeLessThanOrEqual(5)
@@ -224,15 +216,10 @@ describe('사람 투구 만들기', () => {
     for (let magicNumber = 1; magicNumber <= 4; magicNumber += 1) {
       for (let form = 0; form <= 5; form += 1) {
         const repertoire = { ...레퍼토리, magicNumber, form }
-        const 공 = buildHumanPitch(
-          { typeNumber: MAGIC_PITCH_TYPE_NUMBER, grade: 5, gaugeCell: 0, stats: 능력, repertoire, side: 1 },
-          씨앗(11),
-        )
+        const 공 = buildHumanPitch({ typeNumber: MAGIC_PITCH_TYPE_NUMBER, grade: 5, gaugeCell: 0, stats: 능력, repertoire, side: 1 }, 씨앗(11))
         const path = 공.worldPath ?? []
         const recordIndex = magicPitchRecordIndexOf(magicNumber, form) ?? -1
-        expect(path).toEqual(
-          pitchPathOf({ typeNumber: MAGIC_PITCH_TYPE_NUMBER, form, speedStage: 0, recordIndex, target: path[path.length - 1] }),
-        )
+        expect(path).toEqual(pitchPathOf({ typeNumber: MAGIC_PITCH_TYPE_NUMBER, form, speedStage: 0, recordIndex, target: path[path.length - 1] }))
       }
     }
   })

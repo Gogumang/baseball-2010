@@ -9,7 +9,9 @@ describe('모드 초기화 판정 (0x2c6d8 하위 1 — StrMAINMENU 210·211·21
     })
 
     expect(judgement).toEqual({
-      canReset: false, blockReason: 'season-game-in-progress', blockText: MODE_RESET_TEXT.blockedReset,
+      canReset: false,
+      blockReason: 'season-game-in-progress',
+      blockText: MODE_RESET_TEXT.blockedReset,
     })
   })
 

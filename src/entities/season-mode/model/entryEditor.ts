@@ -132,10 +132,24 @@ export interface PlayerDetailSource {
 }
 
 export const EMPTY_ENTRY_BATTER_LINE: EntryBatterLine = {
-  atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, runsBattedIn: 0, steals: 0, errors: 0,
+  atBats: 0,
+  hits: 0,
+  doubles: 0,
+  triples: 0,
+  homeRuns: 0,
+  runsBattedIn: 0,
+  steals: 0,
+  errors: 0,
 }
 export const EMPTY_ENTRY_PITCHER_LINE: EntryPitcherLine = {
-  outs: 0, runsAllowed: 0, saves: 0, strikeouts: 0, pitches: 0, walks: 0, wins: 0, losses: 0,
+  outs: 0,
+  runsAllowed: 0,
+  saves: 0,
+  strikeouts: 0,
+  pitches: 0,
+  walks: 0,
+  wins: 0,
+  losses: 0,
 }
 
 /**
@@ -208,10 +222,7 @@ export const ENTRY_BASIC_SCROLL_COLUMNS = 3
  * ```
  * 이어 `0x55798(ed, 3, 10)` 이 `0x55724(ed, +0x33f)` 로 목록을 채우며 커서를 (0,0) 에 둔다.
  */
-export function openEntryEditor(
-  isEditable: boolean,
-  scrollColumnCount: number = ENTRY_BASIC_SCROLL_COLUMNS,
-): EntryEditorState {
+export function openEntryEditor(isEditable: boolean, scrollColumnCount: number = ENTRY_BASIC_SCROLL_COLUMNS): EntryEditorState {
   return {
     tab: ENTRY_TAB.투수,
     subTab: isEditable ? ENTRY_SUB_TAB.타순 : ENTRY_SUB_TAB.보기전용,
@@ -240,9 +251,7 @@ export function tickEntryEditor(state: EntryEditorState): EntryEditorState {
 
 /** 0x5ccea~0x5cd1e — 다음 열: 첫 열 + 보이는 열 < 열 수 · 앞 열: 첫 열 > 0 */
 function canSlide(state: EntryEditorState, slide: EntryColumnSlide): boolean {
-  return slide.direction === 'next'
-    ? state.firstColumn + ENTRY_VISIBLE_SCROLL_COLUMNS < state.scrollColumnCount
-    : state.firstColumn > 0
+  return slide.direction === 'next' ? state.firstColumn + ENTRY_VISIBLE_SCROLL_COLUMNS < state.scrollColumnCount : state.firstColumn > 0
 }
 
 /**
@@ -343,7 +352,9 @@ export function pressEntryKey<B extends EntryBatterRow, P extends EntryPitcherRo
 ): EntryKeyOutcome<B, P> {
   const counted = { ...state, keyPresses: state.keyPresses + 1 }
   const same = (next: EntryEditorState, nextLists: EntryLists<B, P> = lists): EntryKeyOutcome<B, P> => ({
-    state: next, lists: nextLists, isAceLocked: false,
+    state: next,
+    lists: nextLists,
+    isAceLocked: false,
   })
   // 5587c: 미는 동안은 셈만 하고 끝난다
   if (state.slide !== null) return same(counted)
@@ -402,10 +413,7 @@ function movedEntryCursor(state: EntryEditorState, rowCount: number, dy: number)
   return { ...state, cursor, top }
 }
 
-function confirmEntry<B extends EntryBatterRow, P extends EntryPitcherRow>(
-  state: EntryEditorState,
-  lists: EntryLists<B, P>,
-): EntryKeyOutcome<B, P> {
+function confirmEntry<B extends EntryBatterRow, P extends EntryPitcherRow>(state: EntryEditorState, lists: EntryLists<B, P>): EntryKeyOutcome<B, P> {
   const unchanged: EntryKeyOutcome<B, P> = { state, lists, isAceLocked: false }
   if (state.subTab === ENTRY_SUB_TAB.보기전용) return unchanged
   const { cursor, first } = state
@@ -446,20 +454,14 @@ export function leavesEntryEditor(result: EntryResult, isUserTeam: boolean): boo
 }
 
 /** 수비 위치 코드 → 글자 (레코드 `+0x1c & 0xf`). 원본은 아이콘 `0x54591`(그림 번호 미해독)이라 웹은 글자로 적는다 */
-export const FIELD_POSITION_LABELS: readonly string[] = [
-  '후보', '지명', '포수', '1루', '2루', '3루', '유격', '우익', '좌익', '중견',
-]
+export const FIELD_POSITION_LABELS: readonly string[] = ['후보', '지명', '포수', '1루', '2루', '3루', '유격', '우익', '좌익', '중견']
 
 export function fieldPositionLabelOf(position: number): string {
   return FIELD_POSITION_LABELS[position & 0xf] ?? '-'
 }
 
 /** 웹 전용 — 줄을 눌러 커서를 옮긴다 (원본은 위·아래 키뿐이다). 목록 밖이면 그대로 */
-export function pointEntryCursor(
-  state: EntryEditorState,
-  lists: EntryLists<EntryBatterRow, EntryPitcherRow>,
-  index: number,
-): EntryEditorState {
+export function pointEntryCursor(state: EntryEditorState, lists: EntryLists<EntryBatterRow, EntryPitcherRow>, index: number): EntryEditorState {
   if (index < 0 || index >= rowCountOf(state, lists)) return state
   return { ...state, cursor: index }
 }

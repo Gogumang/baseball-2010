@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  CHOICES, INFO_CELLS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt,
-} from '@/pages/create-player/lib/createPlayerLayout'
+import { CHOICES, INFO_CELLS, ROW_ORDER, choiceStepped, cursorRectOf, isCursorVisibleAt } from '@/pages/create-player/lib/createPlayerLayout'
 import { DEFAULT_ROOKIE_PROFILE } from '@/entities/career/model/playerCareer'
 
 /** 선수 등록 배치 (0x15f34 · C-6) — 커서 표가 원본 값과 같아야 한다 */
@@ -29,9 +27,7 @@ describe('선수 등록 커서 (0x16038)', () => {
 
 describe('선수 등록 정보 칸 (0x7c450)', () => {
   it('칸 여덟은 1열 팀명·이름·타입·필살 / 2열 포지션·손·피부·타순 이다', () => {
-    expect(INFO_CELLS.map((cell) => cell.id)).toEqual([
-      '팀명', '이름', '타입', '필살', '포지션', '손', '피부', '타순',
-    ])
+    expect(INFO_CELLS.map((cell) => cell.id)).toEqual(['팀명', '이름', '타입', '필살', '포지션', '손', '피부', '타순'])
   })
 
   it('팀명·필살·타순 칸에는 커서가 가지 않는다 (타순은 보여 주기만 하는 칸)', () => {

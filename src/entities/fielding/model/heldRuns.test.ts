@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import { createRunner } from '@/entities/fielding/model/fieldingState'
-import {
-  EMPTY_HELD_RUNS,
-  onRunnerReachesHome,
-  releaseHeldRuns,
-  resetHeldRuns,
-  shouldHoldRun,
-} from '@/entities/fielding/model/heldRuns'
+import { EMPTY_HELD_RUNS, onRunnerReachesHome, releaseHeldRuns, resetHeldRuns, shouldHoldRun } from '@/entities/fielding/model/heldRuns'
 
 const 주력500 = runnerSpeedOf(500)
 /** 1루로 살아서 뛰고 있는 타자주자 */

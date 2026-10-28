@@ -1,7 +1,5 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import {
-  equippedPitcherAbilityOf, hasPitcherSkill, isPitcherSkillEquipped,
-} from '@/entities/pitcher-career/model/pitcherCareer'
+import { equippedPitcherAbilityOf, hasPitcherSkill, isPitcherSkillEquipped } from '@/entities/pitcher-career/model/pitcherCareer'
 import { FULL_STAMINA, staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
@@ -54,11 +52,11 @@ export function staminaBarLayoutOf(career: PitcherCareer) {
   const inner = { x: outer.x + 1, y: outer.y + 1, width: outer.width - 2, height: outer.height - 2 }
   const capacity = staminaCapacityOf(
     // 7d904 `0x1f988(저장, R[1])` + 2 — 나리 사기 0xa3a24 와 같은 칸이라 커리어 사기
-    equippedPitcherAbilityOf(career).stamina, career.morale, career.role === PITCHER_ROLE.starter,
+    equippedPitcherAbilityOf(career).stamina,
+    career.morale,
+    career.role === PITCHER_ROLE.starter,
   )
-  const filled = capacity <= 0
-    ? 0
-    : Math.trunc((Math.trunc((career.stamina * capacity) / FULL_STAMINA) * inner.width) / capacity)
+  const filled = capacity <= 0 ? 0 : Math.trunc((Math.trunc((career.stamina * capacity) / FULL_STAMINA) * inner.width) / capacity)
   const labelDifference = outer.height - STAMINA_LABEL.height
   return {
     outer,
@@ -93,14 +91,22 @@ export function PitcherStatusBoard({ career, hour, isPreviousGame = false }: Pit
   const bar = staminaBarLayoutOf(career)
   return (
     <div role="group" aria-label="상태판">
-      <StatusBoardBase hour={hour} nameBandSplit={nameBandSplitOf(false)} morale={career.morale}
+      <StatusBoardBase
+        hour={hour}
+        nameBandSplit={nameBandSplitOf(false)}
+        morale={career.morale}
         moraleOffsetY={PITCHER_MORALE_OFFSET_Y}
-        nameContent={(
+        nameContent={
           <>
-            <div className={styles.nameText} style={{ left: band.nameBox.x, top: band.top, width: band.nameBox.width }}>{career.name}</div>
-            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>{titleDisplayNameOf(pitcherTitleNameOf(career))}</div>
+            <div className={styles.nameText} style={{ left: band.nameBox.x, top: band.top, width: band.nameBox.width }}>
+              {career.name}
+            </div>
+            <div className={styles.nameText} style={{ left: band.titleBox.x, top: band.top, width: band.titleBox.width }}>
+              {titleDisplayNameOf(pitcherTitleNameOf(career))}
+            </div>
           </>
-        )} />
+        }
+      />
       <svg className={styles.board} viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid="스태미나막대">
         <rect x={bar.outer.x} y={bar.outer.y} width={bar.outer.width} height={bar.outer.height} fill={GAUGE_FILL} />
         {bar.filled > 0 && (
@@ -111,18 +117,25 @@ export function PitcherStatusBoard({ career, hour, isPreviousGame = false }: Pit
           </>
         )}
       </svg>
-      <img className={styles.layer} src={assetUrl(`./sprites/img_text/frames/${STAMINA_LABEL_FRAME}.png`)} alt=""
-        style={{ left: bar.label.left, top: bar.label.top }} />
-      <NariStatusValues isPreviousGame={isPreviousGame} fields={{
-        popularity: career.popularity,
-        money: career.money,
-        reputation: career.reputation,
-        salary: career.salary,
-        season: career.season,
-        dayCounter: leagueDayCounterOf(career),
-        isPostseason: career.postseason !== null,
-        icons: pitcherStatusIconStateOf(career),
-      }} />
+      <img
+        className={styles.layer}
+        src={assetUrl(`./sprites/img_text/frames/${STAMINA_LABEL_FRAME}.png`)}
+        alt=""
+        style={{ left: bar.label.left, top: bar.label.top }}
+      />
+      <NariStatusValues
+        isPreviousGame={isPreviousGame}
+        fields={{
+          popularity: career.popularity,
+          money: career.money,
+          reputation: career.reputation,
+          salary: career.salary,
+          season: career.season,
+          dayCounter: leagueDayCounterOf(career),
+          isPostseason: career.postseason !== null,
+          icons: pitcherStatusIconStateOf(career),
+        }}
+      />
     </div>
   )
 }

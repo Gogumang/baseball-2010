@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  benchClearingEffectOf,
-  rollsIntoBenchClearing,
-  staminaAfterBenchClearing,
-} from '@/entities/game/model/benchClearing'
+import { benchClearingEffectOf, rollsIntoBenchClearing, staminaAfterBenchClearing } from '@/entities/game/model/benchClearing'
 import { recordSeasonGameEvent, clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'

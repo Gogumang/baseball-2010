@@ -19,11 +19,21 @@ describe('나리 타자편 경기 시작 인트로(0xc) — 점수판 틀 0x4144
     const noop = () => {}
     render(
       <GameRoute
-        session={{
-          loadingTip: null,
-          handlePitchResolved: noop,
-          actions: { finishLoading: noop, finishDefensePlay: noop, closeBurstResult: noop, attachReplayHost: () => noop, finishReplay: noop, attachRelayHost: () => noop, finishRelay: noop },
-        } as never}
+        session={
+          {
+            loadingTip: null,
+            handlePitchResolved: noop,
+            actions: {
+              finishLoading: noop,
+              finishDefensePlay: noop,
+              closeBurstResult: noop,
+              attachReplayHost: () => noop,
+              finishReplay: noop,
+              attachRelayHost: () => noop,
+              finishRelay: noop,
+            },
+          } as never
+        }
         progress={progress}
         runner={{ atBat: createAtBat(), isPaused: false, bannerText: '' } as never}
         random={createSeededRandom(1)}

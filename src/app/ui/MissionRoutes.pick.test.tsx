@@ -31,13 +31,31 @@ describe('미션 모드 진입 — 하위 17 선수 고르기를 먼저 띄운�
       const random = createSeededRandom(1)
       const gameSettings = useGameSettings({ load: () => null, save: () => {} })
       const session = useMissionSession({
-        runner, random, missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen, hallOfFame: EMPTY_COLLECTION,
+        runner,
+        random,
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen,
+        setScreen,
+        hallOfFame: EMPTY_COLLECTION,
       })
-      const go = (next: Screen) => { setScreenSpy(next); setScreen(next) }
+      const go = (next: Screen) => {
+        setScreenSpy(next)
+        setScreen(next)
+      }
       return (
-        <MissionRoutes screen={screen} setScreen={go} session={session} runner={runner} random={random}
-          batter={modeBatterOf(null)} hallOfFame={EMPTY_COLLECTION} nari={nari}
-          pitchControl="게이지" gameSettings={gameSettings} {...(gamePoint === undefined ? {} : { gamePoint })} />
+        <MissionRoutes
+          screen={screen}
+          setScreen={go}
+          session={session}
+          runner={runner}
+          random={random}
+          batter={modeBatterOf(null)}
+          hallOfFame={EMPTY_COLLECTION}
+          nari={nari}
+          pitchControl="게이지"
+          gameSettings={gameSettings}
+          {...(gamePoint === undefined ? {} : { gamePoint })}
+        />
       )
     }
     render(<Harness />)

@@ -25,8 +25,7 @@ const ANCIENT_SAVE = {
 
 beforeEach(() => window.localStorage.clear())
 
-const writeSave = (version: number, career: unknown) =>
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version, career }))
+const writeSave = (version: number, career: unknown) => window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version, career }))
 
 describe('세이브 불러오기', () => {
   it('형식 1 은 능력치를 10배 눈금으로 옮긴다', () => {
@@ -35,7 +34,10 @@ describe('세이브 불러오기', () => {
     const loaded = createLocalStorageSaveGame().load()
 
     expect(loaded?.ability, `ability: ${JSON.stringify(loaded?.ability)}`).toEqual({
-      hit: 420, power: 380, defense: 310, run: 250,
+      hit: 420,
+      power: 380,
+      defense: 310,
+      run: 250,
     })
     // 10배가 안 된 결과와 구분한다 — 형식 2 로 읽어 버리면 42 그대로다
     expect(loaded?.ability.hit).not.toBe(ANCIENT_SAVE.ability.hit)

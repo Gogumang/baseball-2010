@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  fielderRecordsAfterBoard,
-  fielderRecordsAtPlayStart,
-  NEW_FIELDER_RECORDS,
-} from '@/entities/fielding/model/fielderRecords'
+import { fielderRecordsAfterBoard, fielderRecordsAtPlayStart, NEW_FIELDER_RECORDS } from '@/entities/fielding/model/fielderRecords'
 
 /** 자리 니블 1..9 를 차례로 가진 아홉 명 + 벤치(니블 0) 하나 */
 const lineupOf = (team: string) => [

@@ -44,7 +44,13 @@ const IMG_TEXT_PALETTE_COLORS: readonly (readonly [string, string])[] = [
  * 그런 곳은 `useImgTextPalettes().styleOf(프레임, 팔레트)` 로 바꿔 칠한다.
  */
 export const IMG_TEXT_BAKED_PALETTE: Readonly<Record<number, ImgTextPaletteIndex>> = {
-  47: 3, 48: 3, 49: 3, 50: 3, 51: 3, 157: 4, 158: 4,
+  47: 3,
+  48: 3,
+  49: 3,
+  50: 3,
+  51: 3,
+  157: 4,
+  158: 4,
 }
 
 /** 프레임이 구워진 팔레트 */
@@ -63,7 +69,10 @@ export function imgTextPaletteMatrix(from: ImgTextPaletteIndex, to: ImgTextPalet
   const rows = [0, 1, 2].map((channel) => {
     const slope = (toFirst[channel] - toSecond[channel]) / (fromFirst[channel] - fromSecond[channel])
     const offset = toFirst[channel] - slope * fromFirst[channel]
-    return [0, 1, 2].map((column) => (column === channel ? round5(slope) : 0)).concat([0, round5(offset)]).join(' ')
+    return [0, 1, 2]
+      .map((column) => (column === channel ? round5(slope) : 0))
+      .concat([0, round5(offset)])
+      .join(' ')
   })
   return [...rows, '0 0 0 1 0'].join('  ')
 }

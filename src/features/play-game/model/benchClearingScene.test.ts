@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import {
-  holdsUntilResultWaitEnd, opensArrivalPlayAtOnce, outsShownDuringResultWait, rollBenchClearingEntry, rollBenchClearingTargets,
+  holdsUntilResultWaitEnd,
+  opensArrivalPlayAtOnce,
+  outsShownDuringResultWait,
+  rollBenchClearingEntry,
+  rollBenchClearingTargets,
 } from '@/features/play-game/model/benchClearingScene'
 
 const 세는난수 = () => {

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  LOADING_BAR, LOADING_BOX, LOADING_FILL_STRIPES, LOADING_TIP_TEXT, loadingFillWidthOf, loadingRunnerAnchorOf, tipNumberGlyphsOf,
+  LOADING_BAR,
+  LOADING_BOX,
+  LOADING_FILL_STRIPES,
+  LOADING_TIP_TEXT,
+  loadingFillWidthOf,
+  loadingRunnerAnchorOf,
+  tipNumberGlyphsOf,
 } from '@/widgets/loading-tip/lib/loadingTipLayout'
 
 describe('로딩 판 배치 — 0x53e04', () => {
@@ -11,7 +17,12 @@ describe('로딩 판 배치 — 0x53e04', () => {
   it('팁 글은 상자 안 (10, 30) 폭 150, 막대는 (10, 112) 150×10', () => {
     expect(LOADING_TIP_TEXT).toEqual({ x: 10, y: 30, width: 150 })
     expect([LOADING_BAR.x, LOADING_BAR.y, LOADING_BAR.width, LOADING_BAR.height]).toEqual([10, 112, 150, 10])
-    expect(LOADING_FILL_STRIPES.map((stripe) => [stripe.y, stripe.height])).toEqual([[1, 1], [2, 4], [6, 2], [8, 1]])
+    expect(LOADING_FILL_STRIPES.map((stripe) => [stripe.y, stripe.height])).toEqual([
+      [1, 1],
+      [2, 4],
+      [6, 2],
+      [8, 1],
+    ])
   })
 
   it('채움 = 150 − (끝 − 지금) · (150 / 끝) — 0x24 칸이면 한 칸 4px, 첫 그림 10px, 다 차면 150', () => {

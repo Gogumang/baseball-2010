@@ -46,11 +46,27 @@ describe('balance.json 모양', () => {
       return offset
     }
     const u16Ids = [
-      'timing.floor', 'timing.scale', 'swing.ownBatterBonusBase', 'swing.ownBatterBonusPerYear', 'swing.ownPitcherBonusBase',
-      'swing.ownPitcherBonusPerYear', 'swing.normalContactFactor', 'swing.aceContactFactor', 'swing.normalHitBase',
-      'swing.normalHitCoefficient', 'swing.normalExtraBase', 'swing.normalExtraCoefficient', 'swing.aceHitBase',
-      'swing.aceHitCoefficient', 'swing.aceExtraBase', 'swing.aceExtraCoefficient', 'pitching.wildPitchPermyriad',
-      'fielding.throwSpeedBase', 'fielding.throwSpeedPerGrade', 'running.baseSpeed', 'running.speedPerRun',
+      'timing.floor',
+      'timing.scale',
+      'swing.ownBatterBonusBase',
+      'swing.ownBatterBonusPerYear',
+      'swing.ownPitcherBonusBase',
+      'swing.ownPitcherBonusPerYear',
+      'swing.normalContactFactor',
+      'swing.aceContactFactor',
+      'swing.normalHitBase',
+      'swing.normalHitCoefficient',
+      'swing.normalExtraBase',
+      'swing.normalExtraCoefficient',
+      'swing.aceHitBase',
+      'swing.aceHitCoefficient',
+      'swing.aceExtraBase',
+      'swing.aceExtraCoefficient',
+      'pitching.wildPitchPermyriad',
+      'fielding.throwSpeedBase',
+      'fielding.throwSpeedPerGrade',
+      'running.baseSpeed',
+      'running.speedPerRun',
     ] as const
     for (const id of u16Ids) expect(u16(fileValueOf(id)), id).toBe(ORIGINAL_BALANCE_VALUES[id])
     for (const id of ['swing.hitWeight', 'swing.extraWeight', 'swing.timingPivot', 'swing.foulPercent', 'swing.outPercent'] as const) {
@@ -83,20 +99,25 @@ describe('balance.json 모양', () => {
 
   it('범주별 항목 수', () => {
     const counts = BALANCE_CONFIG.entries.reduce<Partial<Record<BalanceCategory, number>>>(
-      (acc, entry) => ({ ...acc, [entry.category]: (acc[entry.category] ?? 0) + 1 }), {},
+      (acc, entry) => ({ ...acc, [entry.category]: (acc[entry.category] ?? 0) + 1 }),
+      {},
     )
     expect(counts).toEqual({ timing: 6, swing: 32, skill: 2, ability: 6, pitching: 12, fielding: 5, running: 2 })
   })
 
   it('틀린 모양은 막는다', () => {
     const entryOf = (patch: Record<string, unknown>) => ({
-      id: 'timing.width', category: 'timing', name: 'n', value: 24, source: '0x1', effect: 'e', range: { min: 1, max: 200 }, ...patch,
+      id: 'timing.width',
+      category: 'timing',
+      name: 'n',
+      value: 24,
+      source: '0x1',
+      effect: 'e',
+      range: { min: 1, max: 200 },
+      ...patch,
     })
     const configOf = (patch: Record<string, unknown>) => ({
-      entries: [
-        ...(rawConfig.entries as unknown[]).filter((entry) => (entry as { id: string }).id !== 'timing.width'),
-        entryOf(patch),
-      ],
+      entries: [...(rawConfig.entries as unknown[]).filter((entry) => (entry as { id: string }).id !== 'timing.width'), entryOf(patch)],
     })
     expect(() => parseBalanceConfig(configOf({}))).not.toThrow()
     expect(() => parseBalanceConfig(null)).toThrow()
@@ -105,9 +126,7 @@ describe('balance.json 모양', () => {
     expect(() => parseBalanceConfig(configOf({ value: 0 }))).toThrow(/범위/)
     expect(() => parseBalanceConfig(configOf({ category: 'luck' }))).toThrow(/category/)
     expect(() => parseBalanceConfig({ entries: [entryOf({})] })).toThrow(/빠졌다/)
-    const list = rawConfig.entries.map((entry) =>
-      entry.id === 'fielding.fumblePermyriad' ? { ...entry, value: [200, 180] } : entry,
-    )
+    const list = rawConfig.entries.map((entry) => (entry.id === 'fielding.fumblePermyriad' ? { ...entry, value: [200, 180] } : entry))
     expect(() => parseBalanceConfig({ entries: list })).toThrow(/칸 8 개/)
   })
 })
@@ -117,7 +136,11 @@ describe('읽기', () => {
     expect(activeBalanceValues()).toEqual(ORIGINAL_BALANCE_VALUES)
     expect(balanceNumber('swing.contactBase')).toBe(1200)
     expect(balanceList('fielding.fumblePermyriad')).toEqual([200, 180, 160, 140, 120, 100, 80, 50])
-    expect(balanceGrid('ability.moraleCuts')).toEqual([[10, 50], [30, 20], [50, 10]])
+    expect(balanceGrid('ability.moraleCuts')).toEqual([
+      [10, 50],
+      [30, 20],
+      [50, 10],
+    ])
   })
 
   it('일부만 넘기면 원본 위에 덮고, null 이면 JSON 으로 돌아간다', () => {

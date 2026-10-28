@@ -19,9 +19,11 @@ describe('B-03 사람이 마선수 "없음"이어도 CPU 가 마선수를 받음
     expect(고침.opponentAces).toEqual({ pitcher: -1, batter: 원본.opponentAces.batter })
     expect(고침.startingPitcherSlots).toEqual(원본.startingPitcherSlots)
     // 둘 다 고르면 원본과 같다
-    expect(rollOpponentAces(1, 3, createSeededRandom(9))).toEqual((() => {
-      setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG)
-      return rollOpponentAces(1, 3, createSeededRandom(9))
-    })())
+    expect(rollOpponentAces(1, 3, createSeededRandom(9))).toEqual(
+      (() => {
+        setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG)
+        return rollOpponentAces(1, 3, createSeededRandom(9))
+      })(),
+    )
   })
 })

@@ -141,9 +141,7 @@ describe('selectPitch 마구 — CPU 상대 투수 (0x344dc · 0x345fc · 0x3de1
 
   it('마구 번호가 0 인 일반 투수는 마구를 절대 던지지 않는다 (레코드 +0x18 = 0)', () => {
     const random = createSeededRandom(2010)
-    const names = new Set(
-      Array.from({ length: 500 }, () => selectPitch(투수(60), 마구상황, random).type),
-    )
+    const names = new Set(Array.from({ length: 500 }, () => selectPitch(투수(60), 마구상황, random).type))
     expect([...names].every((name) => PITCH_TYPES.some((type) => type.name === name))).toBe(true)
   })
 
@@ -166,9 +164,7 @@ describe('selectPitch 마구 — CPU 상대 투수 (0x344dc · 0x345fc · 0x3de1
 
     const expected = createSeededRandom(11)
     const repertoire = ACE_PITCHER_REPERTOIRES[0]
-    expect(
-      computerPitchTypeOf({ list: pitchListOf(repertoire.pitchMask, true), magicCount: 3, ...마구상황 }, expected),
-    ).toBe(22)
+    expect(computerPitchTypeOf({ list: pitchListOf(repertoire.pitchMask, true), magicCount: 3, ...마구상황 }, expected)).toBe(22)
     const kind = targetKindOf('hard', 마구상황, expected)
     const target = pitchTargetOf(kind, 마구상황, expected)
     // 표시 구속 0x34968 — 마구는 표 0xcfda8 에서 rand(하한, 상한 + 1) 한 번 (흩어짐 앞)
@@ -434,8 +430,13 @@ describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {
       const inner = createSeededRandom(7)
       let count = 0
       return {
-        get count() { return count },
-        rand: (lo: number, hi: number) => { count += 1; return inner.rand(lo, hi) },
+        get count() {
+          return count
+        },
+        rand: (lo: number, hi: number) => {
+          count += 1
+          return inner.rand(lo, hi)
+        },
         rand9d: inner.rand9d,
       }
     }
@@ -460,8 +461,16 @@ describe('홈런더비 목표점 (0x345fc 의 0x3460e 모드 7 갈래)', () => {
   it('주자가 있어도 견제하지 않는다', () => {
     const 주자상황 = { ...상황, runnerCount: 1 }
     for (let seed = 0; seed < 50; seed += 1) {
-      const choice = selectChoice(투수(60), 주자상황, createSeededRandom(seed), 'hard', undefined,
-        { hasRunnerOnBase: (base) => base === 1 }, false, 1)
+      const choice = selectChoice(
+        투수(60),
+        주자상황,
+        createSeededRandom(seed),
+        'hard',
+        undefined,
+        { hasRunnerOnBase: (base) => base === 1 },
+        false,
+        1,
+      )
       expect(choice.kind).toBe('투구')
     }
   })
@@ -473,8 +482,13 @@ describe('홈런더비 구질 (0x344dc 의 0x344ea 모드 7 갈래)', () => {
     const inner = createSeededRandom(seed)
     let count = 0
     return {
-      get count() { return count },
-      rand: (lo: number, hi: number) => { count += 1; return inner.rand(lo, hi) },
+      get count() {
+        return count
+      },
+      rand: (lo: number, hi: number) => {
+        count += 1
+        return inner.rand(lo, hi)
+      },
       rand9d: inner.rand9d,
     }
   }
@@ -534,7 +548,13 @@ describe('CPU 투수 교체 틱의 구질 굴림 — 0x3d954 가 0x16 을 예약
     const inner = createSeededRandom(5)
     return {
       calls,
-      random: { rand: (lo: number, hi: number) => { calls.push([lo, hi]); return inner.rand(lo, hi) }, rand9d: inner.rand9d },
+      random: {
+        rand: (lo: number, hi: number) => {
+          calls.push([lo, hi])
+          return inner.rand(lo, hi)
+        },
+        rand9d: inner.rand9d,
+      },
     }
   }
   const 보통 = { pitchMask: 0x1143, magicId: 0 }

@@ -43,46 +43,82 @@ export interface SpecialItem {
  */
 export const SPECIAL_ITEMS: readonly SpecialItem[] = [
   {
-    id: 'G포인트 충전', labelFrame: 15, labelWidth: 124, labelHeight: 27, state: 24,
+    id: 'G포인트 충전',
+    labelFrame: 15,
+    labelWidth: 124,
+    labelHeight: 27,
+    state: 24,
     description: ORIGINAL_MAIN_MENU_TEXT[16] ?? '', // [16]
-    availability: '통신', blockedText: 'G포인트 충전은!N통신이 필요합니다',
+    availability: '통신',
+    blockedText: 'G포인트 충전은!N통신이 필요합니다',
   },
   {
-    id: 'G포인트 선물', labelFrame: 16, labelWidth: 125, labelHeight: 27, state: 25,
+    id: 'G포인트 선물',
+    labelFrame: 16,
+    labelWidth: 125,
+    labelHeight: 27,
+    state: 25,
     description: ORIGINAL_MAIN_MENU_TEXT[17] ?? '', // [17]
-    availability: '통신', blockedText: 'G포인트 선물은!N통신이 필요합니다',
+    availability: '통신',
+    blockedText: 'G포인트 선물은!N통신이 필요합니다',
   },
   {
-    id: '친구추천', labelFrame: 17, labelWidth: 97, labelHeight: 27, state: 26,
+    id: '친구추천',
+    labelFrame: 17,
+    labelWidth: 97,
+    labelHeight: 27,
+    state: 26,
     description: ORIGINAL_MAIN_MENU_TEXT[18] ?? '', // [18]
-    availability: '통신', blockedText: '친구추천은!N통신이 필요합니다',
+    availability: '통신',
+    blockedText: '친구추천은!N통신이 필요합니다',
   },
   {
-    id: '명예의전당', labelFrame: 18, labelWidth: 115, labelHeight: 27, state: 27,
+    id: '명예의전당',
+    labelFrame: 18,
+    labelWidth: 115,
+    labelHeight: 27,
+    state: 27,
     description: ORIGINAL_MAIN_MENU_TEXT[19] ?? '', // [19]
     availability: '됨',
   },
   {
-    id: '마선수선택', labelFrame: 19, labelWidth: 118, labelHeight: 27, state: 28,
+    id: '마선수선택',
+    labelFrame: 19,
+    labelWidth: 118,
+    labelHeight: 27,
+    state: 28,
     description: ORIGINAL_MAIN_MENU_TEXT[20] ?? '', // [20]
     // 상태 28 (그리기 0x2df78 · 갱신 0x2af20) — 화면은 앱이 `renderAceSelect` 로 꽂는다 (pages 끼리 import 금지)
     availability: '됨',
   },
   {
-    id: '에디트', labelFrame: 20, labelWidth: 73, labelHeight: 27, state: 29,
+    id: '에디트',
+    labelFrame: 20,
+    labelWidth: 73,
+    labelHeight: 27,
+    state: 29,
     description: ORIGINAL_MAIN_MENU_TEXT[21] ?? '', // [21]
     // 상태 29 (진입 0x24804 · 갱신 0x2b2e0 · 그리기 0x2e1e0) — 화면은 앱이 `renderEdit` 으로 꽂는다 (pages 끼리 import 금지)
     availability: '됨',
   },
   {
-    id: '기록연감', labelFrame: 21, labelWidth: 97, labelHeight: 27, state: 30,
+    id: '기록연감',
+    labelFrame: 21,
+    labelWidth: 97,
+    labelHeight: 27,
+    state: 30,
     description: ORIGINAL_MAIN_MENU_TEXT[22] ?? '', // [22]
     availability: '됨',
   },
   {
-    id: '선물받기', labelFrame: 28, labelWidth: 90, labelHeight: 25, state: 31,
+    id: '선물받기',
+    labelFrame: 28,
+    labelWidth: 90,
+    labelHeight: 25,
+    state: 31,
     description: ORIGINAL_MAIN_MENU_TEXT[23] ?? '', // [23]
-    availability: '통신', blockedText: '선물받기는!N통신이 필요합니다',
+    availability: '통신',
+    blockedText: '선물받기는!N통신이 필요합니다',
   },
 ]
 
@@ -133,7 +169,11 @@ export const HEADBAND = {
   /** 선 y = 6·7 RGB(33,51,160) */
   line: { y: 6, height: 2, color: '#2133A0' },
   /** 이미지 0 (49×30 파란 막대) 을 x = −10, 39, 88 · 이미지 1 (30×30 사선 끝) 을 x = 135, y = 3 */
-  tileImage: 0, tileXs: [-10, 39, 88], cornerImage: 1, cornerX: 135, tileY: 3,
+  tileImage: 0,
+  tileXs: [-10, 39, 88],
+  cornerImage: 1,
+  cornerX: 135,
+  tileY: 3,
   /** 제목 이미지 3 "2010프로야구" (123×21) 를 (8, 7) */
   title: { image: 3, x: 8, y: 7 },
 } as const
@@ -143,7 +183,11 @@ export const FOOTER = {
   band: { y: 315, height: 5, color: '#4074FB' },
   line: { y: 315, color: '#18347C' },
   /** 오른쪽 탭: 이미지 20(7×16) 을 x = 233…198, 이미지 19(16×16 사선) 를 x = 182, y = 300 */
-  tileImage: 20, tileXs: [233, 226, 219, 212, 205, 198], cornerImage: 19, cornerX: 182, tileY: 300,
+  tileImage: 20,
+  tileXs: [233, 226, 219, 212, 205, 198],
+  cornerImage: 19,
+  cornerX: 182,
+  tileY: 300,
   /** 바닥 비트 0x4 = 되돌아가기 이미지 21 (19×13) 을 (W − 19 − 15 = 206, 304) */
   backIcon: { image: 21, x: SCREEN.width - 19 - 15, y: 304, width: 19, height: 13 },
 } as const
@@ -205,9 +249,15 @@ export const HALL_OF_FAME_CELL_ART = {
   cursor: { image: 1, dx: -2, dy: -2 },
   none: { image: 115, width: 19, height: 19 },
   /** 찬 칸 — [투수 칸, 타자 칸] */
-  filled: [{ image: 23, width: 25, height: 27 }, { image: 24, width: 31, height: 31 }],
+  filled: [
+    { image: 23, width: 25, height: 27 },
+    { image: 24, width: 31, height: 31 },
+  ],
   /** 빈 칸 — [투수 칸, 타자 칸] */
-  empty: [{ image: 21, width: 27, height: 29 }, { image: 22, width: 33, height: 33 }],
+  empty: [
+    { image: 21, width: 27, height: 29 },
+    { image: 22, width: 33, height: 33 },
+  ],
   locked: { image: 31, width: 21, height: 25 },
   /** 딱지 표 0xd40a0 — 타자 타입 0 · 1 · 2, 투수 타입 0 · 1 · 2 (+3) */
   typeLabels: [
@@ -262,10 +312,7 @@ export const HALL_OF_FAME_SLOTS = HALL_OF_FAME_GRID.columns * HALL_OF_FAME_GRID.
 /** 격자 왼쪽 x = cx − (Σ칸너비 + (열−1)·가로틈)/2 (S9 3-2) */
 export const HALL_OF_FAME_GRID_LEFT =
   HALL_OF_FAME_GRID.centerX -
-  Math.trunc(
-    (HALL_OF_FAME_GRID.cellWidth * HALL_OF_FAME_GRID.columns +
-      (HALL_OF_FAME_GRID.columns - 1) * HALL_OF_FAME_GRID.horizontalGap) / 2,
-  )
+  Math.trunc((HALL_OF_FAME_GRID.cellWidth * HALL_OF_FAME_GRID.columns + (HALL_OF_FAME_GRID.columns - 1) * HALL_OF_FAME_GRID.horizontalGap) / 2)
 
 export interface GridCell {
   readonly x: number
@@ -288,10 +335,7 @@ export function hallOfFameCellOf(index: number, firstRowY: number = HALL_OF_FAME
   const row = Math.trunc(index / HALL_OF_FAME_GRID.columns)
   return {
     x: HALL_OF_FAME_GRID_LEFT + column * (HALL_OF_FAME_GRID.cellWidth + HALL_OF_FAME_GRID.horizontalGap),
-    y:
-      firstRowY +
-      row * (HALL_OF_FAME_GRID.rowHeight + HALL_OF_FAME_GRID.verticalGap) -
-      HALL_OF_FAME_GRID.columnYAdjust[column],
+    y: firstRowY + row * (HALL_OF_FAME_GRID.rowHeight + HALL_OF_FAME_GRID.verticalGap) - HALL_OF_FAME_GRID.columnYAdjust[column],
     width: HALL_OF_FAME_GRID.cellWidth,
     height: HALL_OF_FAME_GRID.rowHeight,
     column,
@@ -360,8 +404,7 @@ export const HALL_OF_FAME_CHART_MAXIMUM_LENGTH = Math.trunc((HALL_OF_FAME_CHART.
 /** 네 값의 꼭짓점 — 축 각도·꼭짓점 식은 팀 도형(`teamSelectLayout`)과 같고 축 최대치만 800 이다 */
 export function hallOfFameChartVerticesOf(center: ChartPoint, values: readonly number[]): readonly ChartPoint[] {
   const maximum = HALL_OF_FAME_CHART_MAXIMUM_LENGTH
-  return ABILITY_AXIS_ANGLES.map((angle, axis) =>
-    abilityVertexOf(center, Math.trunc((maximum * (values[axis] ?? 0)) / ORIGINAL_AXIS_SCALE), angle))
+  return ABILITY_AXIS_ANGLES.map((angle, axis) => abilityVertexOf(center, Math.trunc((maximum * (values[axis] ?? 0)) / ORIGINAL_AXIS_SCALE), angle))
 }
 
 /**

@@ -102,8 +102,9 @@ export function PitcherGameEvaluationScreen({ career: liveCareer, lastGame, onCo
         gauge={{ popularityChange: changes.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'pitcher', role: career.role }) }}
         // 보상 명령(종류 7 — 평판 합 · 집중/새가슴/더티볼 ±n)마다 0x8beb8 글 → 창 (모드 3 — 스킬 이름 0x8457c 의 +16 갈래).
         // 평가 이벤트 보상은 평판 · 스킬뿐이라 0x8beb8 이 굴리지 않는다
-        rewardNotices={streakEvent.rewards.map((reward) =>
-          rewardNoticeOf([reward], EVALUATION_EVENT_ID, rewardNoticeContextOf(career, PITCHER_REWARD_MODE, NO_ROLL_RANDOM)).notice)}
+        rewardNotices={streakEvent.rewards.map(
+          (reward) => rewardNoticeOf([reward], EVALUATION_EVENT_ID, rewardNoticeContextOf(career, PITCHER_REWARD_MODE, NO_ROLL_RANDOM)).notice,
+        )}
         // 0x8c460 이 창을 띄운 갱신에 보상을 준다 — 상태판(0x7d34c)의 평판이 그 창부터 새 값
         underlayAfterRewards={(given) => (
           <PitcherEventUnderlay career={applyPitcherEventRewards(career, streakEvent.rewards.slice(0, given))} isPreviousGame />

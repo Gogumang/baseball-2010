@@ -1,8 +1,12 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
-  equipOwnedPitcherEquipment, isPitcherEquipmentEquipped, ownsPitcherEquipment, pitcherEquipmentBlockReasonOf,
-  pitcherEquipmentItemOf, purchasePitcherEquipment,
+  equipOwnedPitcherEquipment,
+  isPitcherEquipmentEquipped,
+  ownsPitcherEquipment,
+  pitcherEquipmentBlockReasonOf,
+  pitcherEquipmentItemOf,
+  purchasePitcherEquipment,
 } from '@/entities/pitcher-career/model/pitcherEquipment'
 import type { PitcherEquipmentBlockReason } from '@/entities/pitcher-career/model/pitcherEquipment'
 // StrMODE[92] — 서브아이템(kind 1)만 띄운다 (0x14d28). 장비(kind 3)는 구매 완료 창이 없다 (창 차례는 `shopSelection` 의 `selectEquipment` 머리말)
@@ -61,8 +65,7 @@ export function pitcherEquipmentBlockNoticeOf(career: PitcherCareer, part: numbe
 }
 
 /** StrMODE[79] — %s = 0x55cf4(가격 × 1000 만원) */
-const moneyQuestion = (amount: number) =>
-  `!C!cFFFF00소지금 ${formatOriginalMoney(amount)}!cFFFFFF이 소모됩니다!N구매하겠습니까?`
+const moneyQuestion = (amount: number) => `!C!cFFFF00소지금 ${formatOriginalMoney(amount)}!cFFFFFF이 소모됩니다!N구매하겠습니까?`
 
 /**
  * G 부족 StrMODE[65] 원문 — 타자편 상점과 같은 글 (`shopEntries` 의 칸 막힘 글과 같아야 두 길의 팝업이 안 갈린다).

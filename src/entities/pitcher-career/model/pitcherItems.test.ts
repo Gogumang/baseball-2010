@@ -27,8 +27,12 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
 
 const 고정 = (position: number): RandomPort => createConstantRandom(position)
 const 안씀: RandomPort = {
-  rand: () => { throw new Error('난수를 쓰면 안 된다') },
-  rand9d: () => { throw new Error('난수를 쓰면 안 된다') },
+  rand: () => {
+    throw new Error('난수를 쓰면 안 된다')
+  },
+  rand9d: () => {
+    throw new Error('난수를 쓰면 안 된다')
+  },
 }
 
 describe('투수 서브 아이템 (창 종류 1 — 0x1364e · 0x14c8c 모드 갈림 없음)', () => {
@@ -36,7 +40,10 @@ describe('투수 서브 아이템 (창 종류 1 — 0x1364e · 0x14c8c 모드 �
     expect(PITCHER_SUB_ITEMS.map((item) => item.price)).toEqual(SUB_ITEMS.map((item) => item.price))
     expect(PITCHER_SUB_ITEMS.map((item) => item.name)).toEqual(SUB_ITEMS.map((item) => item.name))
     expect(PITCHER_SUB_ITEMS.slice(0, 4).map((item) => item.effectText)).toEqual([
-      '제구 훈련 시 +2', '구속 훈련 시 +2', '변화 훈련 시 +2', '체력 훈련 시 +2',
+      '제구 훈련 시 +2',
+      '구속 훈련 시 +2',
+      '변화 훈련 시 +2',
+      '체력 훈련 시 +2',
     ])
     expect(PITCHER_SUB_ITEMS[4].effectText).toBe('훈련 시 사기 감소량 -1')
   })
@@ -58,7 +65,10 @@ describe('투수 GP 아이템 (창 종류 2)', () => {
     expect(applyPitcherGpItem(구원, 1, 안씀).career.ability.velocity).toBe(850)
     expect(applyPitcherGpItem(구원, 3, 안씀).career.ability.stamina).toBe(600)
     expect(applyPitcherGpItem(구원, 4, 안씀).career.ability).toEqual({
-      control: 110, velocity: 850, breaking: 110, stamina: 600,
+      control: 110,
+      velocity: 850,
+      breaking: 110,
+      stamina: 600,
     })
   })
 
@@ -90,7 +100,9 @@ describe('투수 GP 아이템 (창 종류 2)', () => {
     expect(결과.lotteryPrize).toBe('아차상')
     expect(결과.prizeItemId).toBe(3)
     expect(결과.career.ability.stamina).toBe(투수().ability.stamina + 10)
-    expect(stripGameMarkup(pitcherGpItemNoticeOf(5, 결과.lotteryPrize, 결과.prizeItemId))).toBe('아차상 당첨!!\n[고려인삼] 획득!\n체력 10  상승하였습니다')
+    expect(stripGameMarkup(pitcherGpItemNoticeOf(5, 결과.lotteryPrize, 결과.prizeItemId))).toBe(
+      '아차상 당첨!!\n[고려인삼] 획득!\n체력 10  상승하였습니다',
+    )
   })
 
   it('사면 G 를 먼저 뺀다 — 모자라면 거절', () => {

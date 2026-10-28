@@ -11,7 +11,10 @@ describe('미션 득점 점수판 0x41a64 — 0xaa57c 가 레코드 +2 · +3 으
     expect(mission.sideTeams).toEqual([14, 1])
     expect(mission.start).toMatchObject({ inning: 9, ourScore: 4, opponentScore: 7 })
     expect(missionRunScoreBoardOf(mission, { ours: 4, opponents: 7 })).toEqual({
-      sides: [{ team: 14, isComputer: true }, { team: 1, isComputer: false }],
+      sides: [
+        { team: 14, isComputer: true },
+        { team: 1, isComputer: false },
+      ],
       scores: [7, 4],
       battingSide: 1,
     })
@@ -23,7 +26,10 @@ describe('미션 득점 점수판 0x41a64 — 0xaa57c 가 레코드 +2 · +3 으
     expect(mission.sideTeams).toEqual([1, 5])
     expect(mission.start).toMatchObject({ ourScore: 7, opponentScore: 5 })
     expect(missionRunScoreBoardOf(mission, { ours: 7, opponents: 5 })).toEqual({
-      sides: [{ team: 1, isComputer: false }, { team: 5, isComputer: true }],
+      sides: [
+        { team: 1, isComputer: false },
+        { team: 5, isComputer: true },
+      ],
       scores: [7, 5],
       battingSide: 1,
     })

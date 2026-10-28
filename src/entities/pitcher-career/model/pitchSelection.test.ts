@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import {
-  magicInUseNumberOfCell,
-  magicSelectBlockReasonOf,
-  selectMagicPitch,
-} from '@/entities/pitcher-career/model/pitchSelection'
+import { magicInUseNumberOfCell, magicSelectBlockReasonOf, selectMagicPitch } from '@/entities/pitcher-career/model/pitchSelection'
 
 const careerOf = (typeIndex: number) => ({ ...createPitcherCareer('투수'), typeIndex, magicLevel: 4 })
 

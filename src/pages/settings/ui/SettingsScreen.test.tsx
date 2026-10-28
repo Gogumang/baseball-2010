@@ -4,8 +4,23 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
 import { DEFAULT_SETTINGS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 import {
-  IN_GAME_PANEL, MENU_ROW, MODE_RESET_ROW, MODE_RESET_TITLE, PANEL, SOUND_BARS, SPEED_MARKS, VALUE_ROW,
-  closingFold, okButtonTopOf, soundBarAt, speedMarkAt, isSelectedOutlineShown, modeResetRowTopOf, nextPanelFold, openingFold, panelClipOf,
+  IN_GAME_PANEL,
+  MENU_ROW,
+  MODE_RESET_ROW,
+  MODE_RESET_TITLE,
+  PANEL,
+  SOUND_BARS,
+  SPEED_MARKS,
+  VALUE_ROW,
+  closingFold,
+  okButtonTopOf,
+  soundBarAt,
+  speedMarkAt,
+  isSelectedOutlineShown,
+  modeResetRowTopOf,
+  nextPanelFold,
+  openingFold,
+  panelClipOf,
   rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -111,7 +126,7 @@ describe('환경설정 값 바꾸기', () => {
     const onChange = vi.fn()
     띄우기({ onChange })
 
-    fireEvent.keyDown(window, { key: 'ArrowDown' })  // 속도 줄로
+    fireEvent.keyDown(window, { key: 'ArrowDown' }) // 속도 줄로
     fireEvent.keyDown(window, { key: 'ArrowRight' })
 
     expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, speedLevel: DEFAULT_SETTINGS.speedLevel + 1 })
@@ -137,10 +152,7 @@ describe('환경설정 값 바꾸기', () => {
       expect(vibrateSpy).toHaveBeenCalledWith(100)
 
       vibrateSpy.mockClear()
-      rerender(
-        <SettingsScreen settings={{ ...DEFAULT_SETTINGS, isVibrationOn: true }}
-          onChange={vi.fn()} onResetCareer={vi.fn()} onBack={vi.fn()} />,
-      )
+      rerender(<SettingsScreen settings={{ ...DEFAULT_SETTINGS, isVibrationOn: true }} onChange={vi.fn()} onResetCareer={vi.fn()} onBack={vi.fn()} />)
       fireEvent.click(줄('진동'))
       expect(vibrateSpy).not.toHaveBeenCalled()
     } finally {
@@ -148,7 +160,7 @@ describe('환경설정 값 바꾸기', () => {
     }
   })
 
-  it('숫자키 꼴 1 격자 — \'8\' ↓ · \'6\' → 로 값을 돌린다 (0x6c031 표 0xd2e7c)', () => {
+  it("숫자키 꼴 1 격자 — '8' ↓ · '6' → 로 값을 돌린다 (0x6c031 표 0xd2e7c)", () => {
     const onChange = vi.fn()
     띄우기({ onChange })
 
@@ -158,7 +170,7 @@ describe('환경설정 값 바꾸기', () => {
     expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_SETTINGS, speedLevel: DEFAULT_SETTINGS.speedLevel + 1 })
   })
 
-  it('\'5\' 로 상세 설정(32)에 들어가 \'4\' 가 칸 값을 뒤집는다 (0x288ac 의 0x34 갈래)', () => {
+  it("'5' 로 상세 설정(32)에 들어가 '4' 가 칸 값을 뒤집는다 (0x288ac 의 0x34 갈래)", () => {
     const onChange = vi.fn()
     띄우기({ onChange })
 
@@ -304,8 +316,7 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
       fireEvent.click(줄(name))
       // 나리 칸은 고르기 창이 먼저 — 타자편을 고르면 [210]
       if (name === '나만의리그 초기화') fireEvent.click(screen.getByRole('button', { name: '타자편' }))
-      expect(screen.getByRole('button', { name: '아니오' }).querySelector('img')?.getAttribute('src'))
-        .toContain('popup/frames/007.png')
+      expect(screen.getByRole('button', { name: '아니오' }).querySelector('img')?.getAttribute('src')).toContain('popup/frames/007.png')
       // 바로 OK 를 누르면 [아니오] — 아무것도 안 지운다
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(screen.queryByRole('dialog')).toBeNull()
@@ -333,10 +344,8 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
 
     fireEvent.click(줄('나만의리그 초기화'))
     expect(screen.getByRole('dialog').textContent).toContain('초기화할 데이터를 선택하세요')
-    expect(screen.getByRole('button', { name: '타자편' }).querySelector('img')?.getAttribute('src'))
-      .toContain('popup/frames/013.png')
-    expect(screen.getByRole('button', { name: '투수편' }).querySelector('img')?.getAttribute('src'))
-      .toContain('popup/frames/012.png')
+    expect(screen.getByRole('button', { name: '타자편' }).querySelector('img')?.getAttribute('src')).toContain('popup/frames/013.png')
+    expect(screen.getByRole('button', { name: '투수편' }).querySelector('img')?.getAttribute('src')).toContain('popup/frames/012.png')
   })
 
   it('나만의리그: 타자편 → [210] 예 → 0x224ec(4) · 0xcf900 / 투수편 → [211] 예 → 0x224ec(3)', () => {
@@ -373,7 +382,8 @@ describe('환경설정 → 모드 초기화 (원본 상태 0x21, 세 줄)', () =
   it('나만의리그: 시즌 중 막기면 그 글(종류 1)만 띄우고 확인 창 없이 목록으로 — 투수편은 [213] 글이다', () => {
     const onResetCareer = vi.fn()
     const careerResetBlockOf = vi.fn((edition: '타자편' | '투수편') =>
-      (edition === '투수편' ? '시즌모드 경기 진행 중에는!N삭제 하실 수 없습니다' : null))
+      edition === '투수편' ? '시즌모드 경기 진행 중에는!N삭제 하실 수 없습니다' : null,
+    )
     모드초기화열기({ onResetCareer, careerResetBlockOf })
 
     fireEvent.click(줄('나만의리그 초기화'))
@@ -505,11 +515,11 @@ describe('환경설정 머리띠와 흰 테두리 깜빡임', () => {
  * 판 펼침·접힘은 0x593c8 끝 0x5a6fe — 걸음 ×4.
  */
 describe('환경설정 첫 화면 — OK 칸과 판 펼침·접힘', () => {
-  const 판높이 = (container: HTMLElement) =>
-    (container.querySelector('[data-testid="공용판"]') as HTMLElement).style.height
-  const 한틱 = () => act(() => {
-    vi.advanceTimersByTime(millisecondsPerFrame())
-  })
+  const 판높이 = (container: HTMLElement) => (container.querySelector('[data-testid="공용판"]') as HTMLElement).style.height
+  const 한틱 = () =>
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame())
+    })
   const OK그림 = () => 줄('확인').querySelector('img')?.getAttribute('src') ?? ''
 
   it('펼침은 0x20 에서 걸음 ×4 — 그려지는 높이 32 · 36 · 52 · 116 · 212 (경기 중은 130 에서 멈춘다)', () => {

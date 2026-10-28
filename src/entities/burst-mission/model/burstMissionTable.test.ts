@@ -10,12 +10,7 @@ import {
 import { BURST_GOAL, judgeBurstGoal } from '@/entities/burst-mission/model/burstMissionJudge'
 import { BURST_RESULT_BIT } from '@/entities/burst-mission/model/burstResultBits'
 import type { BurstTriggerContext } from '@/entities/burst-mission/model/burstMissionTrigger'
-import {
-  ACE_BATTER_SITUATIONS,
-  ACE_PITCHER_SITUATIONS,
-  BURST_SITUATION,
-  isRowEligible,
-} from '@/entities/burst-mission/model/burstMissionTrigger'
+import { ACE_BATTER_SITUATIONS, ACE_PITCHER_SITUATIONS, BURST_SITUATION, isRowEligible } from '@/entities/burst-mission/model/burstMissionTrigger'
 import { createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import { ORIGINAL_BURST_TABLES } from '@/shared/config/original/burstMissions'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -54,7 +49,10 @@ describe('원본 돌발미션 표 검산', () => {
 
       expect(table.rowBytes, name).toHaveLength(count)
       expect(table.lines, name).toHaveLength(count)
-      expect(table.rowBytes.every((bytes) => bytes.length === 16), name).toBe(true)
+      expect(
+        table.rowBytes.every((bytes) => bytes.length === 16),
+        name,
+      ).toBe(true)
     }
   })
 
@@ -78,7 +76,10 @@ describe('원본 돌발미션 표 검산', () => {
 
   it('조건 칸이 원본이 읽는 범위 안이다 — 주자 −1·0·1, 아웃 −1~2, 확률 1~100%', () => {
     for (const row of 모든행) {
-      expect(row.bases.every((want) => want >= -1 && want <= 1), `주자 ${row.bases}`).toBe(true)
+      expect(
+        row.bases.every((want) => want >= -1 && want <= 1),
+        `주자 ${row.bases}`,
+      ).toBe(true)
       expect(row.outs, `아웃 ${row.outs}`).toBeGreaterThanOrEqual(-1)
       expect(row.outs, `아웃 ${row.outs}`).toBeLessThanOrEqual(2)
       expect(row.chancePercent, `확률 ${row.chancePercent}`).toBeGreaterThan(0)
@@ -88,11 +89,7 @@ describe('원본 돌발미션 표 검산', () => {
   })
 
   it('보상·페널티 종류는 1 사기·2 인기도·3 평판·4 소지금 아니면 0(없음)이다', () => {
-    const kinds = 모든행.flatMap((row) => [
-      row.successRewards[0].kind,
-      row.successRewards[1].kind,
-      row.failurePenalty.kind,
-    ])
+    const kinds = 모든행.flatMap((row) => [row.successRewards[0].kind, row.successRewards[1].kind, row.failurePenalty.kind])
 
     expect([...new Set(kinds)].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4])
   })

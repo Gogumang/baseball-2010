@@ -35,12 +35,17 @@ export function LayeredFrameSprite({ folder, frame, origins, x, y }: LayeredFram
     <>
       {entries.map((entry, order) =>
         entry.effect === DRAW_EFFECT.ADDITIVE ? (
-          <EffectImage key={order} className={styles.sprite} src={frameLayerUrl(folder, entry)} effect={DRAW_EFFECT.ADDITIVE}
-            argument={entry.argument ?? 0} backdrop={ADDITIVE_BACKDROP}
-            style={{ left: x + entry.x, top: y + entry.y, mixBlendMode: 'plus-lighter' }} />
+          <EffectImage
+            key={order}
+            className={styles.sprite}
+            src={frameLayerUrl(folder, entry)}
+            effect={DRAW_EFFECT.ADDITIVE}
+            argument={entry.argument ?? 0}
+            backdrop={ADDITIVE_BACKDROP}
+            style={{ left: x + entry.x, top: y + entry.y, mixBlendMode: 'plus-lighter' }}
+          />
         ) : (
-          <img key={order} className={styles.sprite} src={frameLayerUrl(folder, entry)} alt=""
-            style={{ left: x + entry.x, top: y + entry.y }} />
+          <img key={order} className={styles.sprite} src={frameLayerUrl(folder, entry)} alt="" style={{ left: x + entry.x, top: y + entry.y }} />
         ),
       )}
     </>

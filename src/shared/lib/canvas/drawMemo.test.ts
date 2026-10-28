@@ -18,7 +18,12 @@ describe('sameDrawInput — 그림 입력을 값으로 견준다', () => {
   })
   it('NaN 은 NaN 과 같고, 함수 · 클래스 객체는 같은 것만 같다', () => {
     expect(sameDrawInput(NaN, NaN)).toBe(true)
-    expect(sameDrawInput(() => 1, () => 1)).toBe(false)
+    expect(
+      sameDrawInput(
+        () => 1,
+        () => 1,
+      ),
+    ).toBe(false)
     expect(sameDrawInput(new Map(), new Map())).toBe(false)
     const image = new Map()
     expect(sameDrawInput({ image }, { image })).toBe(true)

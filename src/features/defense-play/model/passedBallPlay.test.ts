@@ -146,7 +146,8 @@ describe('판 시작 리드 0x3d7b8 — 종류 9 도 돈다 (0x46418 4657e)', ()
 
   it('도루 주자는 rand(0,9) 한 번 · 목표는 다음 루 그대로 (0xcffa8 + 덧틱)', () => {
     const 난수 = 세는난수(0)
-    const 시작 = passedBallPlayEngineInputOf({ batterHand: 0,
+    const 시작 = passedBallPlayEngineInputOf({
+      batterHand: 0,
       shot: 가운데,
       bases: { ...EMPTY_BASES, first: true },
       outs: 0,
@@ -158,7 +159,8 @@ describe('판 시작 리드 0x3d7b8 — 종류 9 도 돈다 (0x46418 4657e)', ()
   })
 
   it('낫아웃이면 0xa9e44 가 돌아 타자주자에 밀리는 1루 주자는 2루가 목표다 (2아웃)', () => {
-    const 시작 = passedBallPlayEngineInputOf({ batterHand: 0,
+    const 시작 = passedBallPlayEngineInputOf({
+      batterHand: 0,
       shot: 가운데,
       bases: { ...EMPTY_BASES, first: true, third: true },
       outs: 2,
@@ -183,4 +185,3 @@ describe('낫아웃 타자주자는 타석 자리에서 뛴다 — 0x4650e 0xa93
     expect(JSON.stringify(판(1).ticks)).toBe(JSON.stringify(판(0).ticks))
   })
 })
-

@@ -92,11 +92,7 @@ function browserVibrate(): VibrateFunction | null {
  * 게임 쪽 진동 0x3a44 — 환경설정 진동(저장 +0x3b)이 켜졌고 길이가 0 보다 클 때만 울린다
  * (0x6e538 의 `ms > 0` 거름). 시험은 `device` 로 받는 쪽을 바꿔 끼운다.
  */
-export function vibrate(
-  milliseconds: number,
-  isVibrationOn: boolean,
-  device: VibrateFunction | null = browserVibrate(),
-): void {
+export function vibrate(milliseconds: number, isVibrationOn: boolean, device: VibrateFunction | null = browserVibrate()): void {
   if (!isVibrationOn || milliseconds <= 0 || device === null) return
   device(milliseconds)
 }

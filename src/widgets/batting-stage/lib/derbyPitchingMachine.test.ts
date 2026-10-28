@@ -1,10 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import {
-  DERBY_MACHINE_FRAME,
-  derbyMachinePlacementOf,
-  drawsDerbyPitchingMachine,
-} from '@/widgets/batting-stage/lib/derbyPitchingMachine'
+import { DERBY_MACHINE_FRAME, derbyMachinePlacementOf, drawsDerbyPitchingMachine } from '@/widgets/batting-stage/lib/derbyPitchingMachine'
 import { BATTER_SIDE } from '@/widgets/batting-stage/lib/stageLayout'
 
 const origins = JSON.parse(readFileSync('public/sprites/trainning/frames/origins.json', 'utf8')) as Record<

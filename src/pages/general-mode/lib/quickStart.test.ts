@@ -66,7 +66,10 @@ describe('빠른실행 굴림', () => {
 
   it('열린 마선수가 하나도 없어도 bfa55(0, 0) 이 난수 하나씩을 쓴다 — 늘 다섯 번 굴린다', () => {
     let 쓴수 = 0
-    const 세기: RandomPort = createFractionRandom(() => { 쓴수 += 1; return 0 })
+    const 세기: RandomPort = createFractionRandom(() => {
+      쓴수 += 1
+      return 0
+    })
     rollQuickStart(세기)
     expect(쓴수).toBe(5)
   })

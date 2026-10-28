@@ -27,6 +27,5 @@ export const SETTINGS_TEXT = {
   editResetConfirm: '!C!cffffff선수 이름을 초기화!N하시겠습니까?',
   /** 초기화 뒤 알림 — 0xcf900 (0x2c9d0 · 0x2ca28) */
   resetDone: '!C초기화 되었습니다',
-  careerResetConfirm:
-    ORIGINAL_MAIN_MENU_TEXT[210] ?? '', // [210]
+  careerResetConfirm: ORIGINAL_MAIN_MENU_TEXT[210] ?? '', // [210]
 } as const

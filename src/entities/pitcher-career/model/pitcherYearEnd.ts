@@ -26,12 +26,7 @@ import {
   SALARY_POLITE_EVENT_ID,
   salaryResultEventId,
 } from '@/entities/career/model/seasonFlow'
-import {
-  MVP_INTRO_EVENT_ID,
-  mvpResultEventId,
-  TITLE_INTRO_EVENT_ID,
-  titleResultEventId,
-} from '@/entities/awards/model/seasonAwards'
+import { MVP_INTRO_EVENT_ID, mvpResultEventId, TITLE_INTRO_EVENT_ID, titleResultEventId } from '@/entities/awards/model/seasonAwards'
 import { rewardsIn } from '@/entities/story/model/eventReward'
 import type { EventReward } from '@/entities/story/model/eventReward'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
@@ -279,10 +274,6 @@ export function pitcherYearEndRewardsOf(eventId: number, events: readonly Origin
  * 보상 실행은 `applyPitcherEventRewards`(0x8c460 모드 3 갈래)에 맡긴다. 연말 사슬에 나오는 종류는
  * 0 인기도 · 1 평판 · 3 소지금 · 20 연봉 · 21 엔딩 진입(무시 — 세션이 엔딩으로 넘긴다) 뿐이라 무작위가 들지 않는다.
  */
-export function finishPitcherYearEndEvent(
-  career: PitcherCareer,
-  eventId: number,
-  rewards: readonly EventReward[],
-): PitcherCareer {
+export function finishPitcherYearEndEvent(career: PitcherCareer, eventId: number, rewards: readonly EventReward[]): PitcherCareer {
   return applyPitcherEventRewards(career, rewards, undefined, eventId)
 }

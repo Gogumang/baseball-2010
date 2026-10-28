@@ -2,9 +2,25 @@ import { useSkinBlinkCounter } from '@/shared/lib/skinBlink/skinBlink'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import {
-  BACK_ICON_X, FOOTER_BITS, FOOTER_CENTER_MARKS, FOOTER_CENTER_X, FOOTER_CORNER_X, FOOTER_LEFT_MARKS, FOOTER_LEFT_X,
-  FOOTER_MARK_HEIGHT, FOOTER_MARK_WIDTH, FOOTER_TILE_XS, FRAME_COLORS, HEADER_CORNER_X, HEADER_GAME_POINT, HEADER_TILE_XS,
-  TITLE_IMAGES, footerBottomOf, footerMarkTopOf, headerTopOf, isGameSettingsMarkShown,
+  BACK_ICON_X,
+  FOOTER_BITS,
+  FOOTER_CENTER_MARKS,
+  FOOTER_CENTER_X,
+  FOOTER_CORNER_X,
+  FOOTER_LEFT_MARKS,
+  FOOTER_LEFT_X,
+  FOOTER_MARK_HEIGHT,
+  FOOTER_MARK_WIDTH,
+  FOOTER_TILE_XS,
+  FRAME_COLORS,
+  HEADER_CORNER_X,
+  HEADER_GAME_POINT,
+  HEADER_TILE_XS,
+  TITLE_IMAGES,
+  footerBottomOf,
+  footerMarkTopOf,
+  headerTopOf,
+  isGameSettingsMarkShown,
 } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
@@ -81,43 +97,86 @@ export function ScreenFrame({ title, gamePoint, onBack, footer = onBack === null
         <rect x={0} y={bottom - 5} width={240} height={5} fill={FRAME_COLORS.footerBand} />
         <rect x={0} y={bottom - 5} width={240} height={1} fill={FRAME_COLORS.footerLine} />
       </svg>
-      {HEADER_TILE_XS.map((x) => <img key={x} className={styles.layer} style={{ left: x, top: top + 11 }} src={frameImage(0)} alt="" />)}
+      {HEADER_TILE_XS.map((x) => (
+        <img key={x} className={styles.layer} style={{ left: x, top: top + 11 }} src={frameImage(0)} alt="" />
+      ))}
       <img className={styles.layer} style={{ left: HEADER_CORNER_X, top: top + 11 }} src={frameImage(1)} alt="" />
       {TITLE_IMAGES[title].map((part) => (
         <img key={part.image} className={styles.layer} style={{ left: part.x, top: top + part.dy }} src={frameImage(part.image)} alt="" />
       ))}
       {/* G포인트 0x54a60 — 둥근 판 (x+9, y+1, 60, 13) · 동전 (x, y−1) · 숫자 오른끝 x + 0x41 + 2 */}
-      <GamePointBadge testId="머리띠-G" value={gamePoint} x={HEADER_GAME_POINT.x} y={top + HEADER_GAME_POINT.dy}
-        width={HEADER_GAME_POINT.width} align={HEADER_GAME_POINT.align} plus={HEADER_GAME_POINT.plus}
-        plate={HEADER_GAME_POINT.plate} />
-      {FOOTER_TILE_XS.map((x) => <img key={x} className={styles.layer} style={{ left: x, top: bottom - 20 }} src={frameImage(20)} alt="" />)}
+      <GamePointBadge
+        testId="머리띠-G"
+        value={gamePoint}
+        x={HEADER_GAME_POINT.x}
+        y={top + HEADER_GAME_POINT.dy}
+        width={HEADER_GAME_POINT.width}
+        align={HEADER_GAME_POINT.align}
+        plus={HEADER_GAME_POINT.plus}
+        plate={HEADER_GAME_POINT.plate}
+      />
+      {FOOTER_TILE_XS.map((x) => (
+        <img key={x} className={styles.layer} style={{ left: x, top: bottom - 20 }} src={frameImage(20)} alt="" />
+      ))}
       <img className={styles.layer} style={{ left: FOOTER_CORNER_X, top: bottom - 20 }} src={frameImage(19)} alt="" />
-      {(footer & FOOTER_BITS.back) !== 0 && (onBack === null
-        ? <img className={styles.layer} style={{ left: BACK_ICON_X, top: bottom - 16 }} src={frameImage(21)} alt="" />
-        : (
-          <button type="button" aria-label="되돌아가기" className={styles.backButton} style={{ left: BACK_ICON_X, top: bottom - 16 }} onClick={onBack}>
+      {(footer & FOOTER_BITS.back) !== 0 &&
+        (onBack === null ? (
+          <img className={styles.layer} style={{ left: BACK_ICON_X, top: bottom - 16 }} src={frameImage(21)} alt="" />
+        ) : (
+          <button
+            type="button"
+            aria-label="되돌아가기"
+            className={styles.backButton}
+            style={{ left: BACK_ICON_X, top: bottom - 16 }}
+            onClick={onBack}
+          >
             <img src={frameImage(21)} alt="" />
           </button>
         ))}
-      {FOOTER_LEFT_MARKS.map(([bit, frame]) => (footer & bit) !== 0 && (
-        <img key={frame} className={styles.layer} data-footer-mark={frame} style={{ left: FOOTER_LEFT_X, top: footerMarkTopOf(bottom) }} src={markImage(frame)} alt="" />
-      ))}
-      {FOOTER_CENTER_MARKS.map(([bit, frame]) => (footer & bit) !== 0
-        // "0경기설정" 은 [skin+0x410] 카운터로 깜박인다 — 바닥비트 0x40 일 때만 그릴 때마다 올린다(0x553ec, 앱에 하나 — U-90)
-        && (bit !== FOOTER_BITS.gameSettings || isGameSettingsMarkShown(blinkCounter)) && (
-        <img key={frame} className={styles.layer} data-footer-mark={frame} style={{ left: FOOTER_CENTER_X, top: footerMarkTopOf(bottom) }} src={markImage(frame)} alt="" />
-      ))}
-      {footerPresses !== undefined && [
-        ...FOOTER_LEFT_MARKS.map(([bit]) => [bit, FOOTER_LEFT_X] as const),
-        ...FOOTER_CENTER_MARKS.map(([bit]) => [bit, FOOTER_CENTER_X] as const),
-      ].map(([bit, x]) => {
-        const press = footerPresses[bit]
-        if (press === undefined || (footer & bit) === 0) return null
-        return (
-          <PressArea key={`press-${bit}`} label={press.label} onPress={press.onPress}
-            rect={{ x, y: footerMarkTopOf(bottom), width: FOOTER_MARK_WIDTH, height: FOOTER_MARK_HEIGHT }} />
-        )
-      })}
+      {FOOTER_LEFT_MARKS.map(
+        ([bit, frame]) =>
+          (footer & bit) !== 0 && (
+            <img
+              key={frame}
+              className={styles.layer}
+              data-footer-mark={frame}
+              style={{ left: FOOTER_LEFT_X, top: footerMarkTopOf(bottom) }}
+              src={markImage(frame)}
+              alt=""
+            />
+          ),
+      )}
+      {FOOTER_CENTER_MARKS.map(
+        ([bit, frame]) =>
+          (footer & bit) !== 0 &&
+          // "0경기설정" 은 [skin+0x410] 카운터로 깜박인다 — 바닥비트 0x40 일 때만 그릴 때마다 올린다(0x553ec, 앱에 하나 — U-90)
+          (bit !== FOOTER_BITS.gameSettings || isGameSettingsMarkShown(blinkCounter)) && (
+            <img
+              key={frame}
+              className={styles.layer}
+              data-footer-mark={frame}
+              style={{ left: FOOTER_CENTER_X, top: footerMarkTopOf(bottom) }}
+              src={markImage(frame)}
+              alt=""
+            />
+          ),
+      )}
+      {footerPresses !== undefined &&
+        [
+          ...FOOTER_LEFT_MARKS.map(([bit]) => [bit, FOOTER_LEFT_X] as const),
+          ...FOOTER_CENTER_MARKS.map(([bit]) => [bit, FOOTER_CENTER_X] as const),
+        ].map(([bit, x]) => {
+          const press = footerPresses[bit]
+          if (press === undefined || (footer & bit) === 0) return null
+          return (
+            <PressArea
+              key={`press-${bit}`}
+              label={press.label}
+              onPress={press.onPress}
+              rect={{ x, y: footerMarkTopOf(bottom), width: FOOTER_MARK_WIDTH, height: FOOTER_MARK_HEIGHT }}
+            />
+          )
+        })}
     </>
   )
 }

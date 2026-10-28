@@ -22,11 +22,7 @@ describe('B-46 영지버섯 창의 사기 현재값이 먹기 전 값', () => {
     setBugfixConfigForTests(bugfixConfigWith(['B-46']))
     const bought = 영지버섯()
     expect(batterGpDetailViewOf(bought.detail!)!.rows[4]).toMatchObject({ current: 70, change: 40 })
-    const pitcher = selectPitcherShopItem(
-      { ...createPitcherCareer('투수'), gamePoint: 9999, morale: 30 },
-      shopItemId('GP', 6),
-      createSeededRandom(1),
-    )
+    const pitcher = selectPitcherShopItem({ ...createPitcherCareer('투수'), gamePoint: 9999, morale: 30 }, shopItemId('GP', 6), createSeededRandom(1))
     expect(pitcherGpDetailViewOf(pitcher.detail!)!.rows[4]).toMatchObject({ current: pitcher.career.morale, change: 40 })
   })
 })

@@ -19,11 +19,7 @@ describe('경기 장면 상태가 선 장면 틱 (0xbc9c8 — 예약 다음 틀�
   })
 
   it('새로 적으면 그 틱 이후의 예약을 바꾼다 — 견제(0x10 틱 6)는 0x11 대신 0x17', () => {
-    markSceneStateEntries(
-      { tick: 10, state: SCENE_STATE.선택 },
-      { tick: 19, state: SCENE_STATE.조준 },
-      { tick: 26, state: SCENE_STATE.투구 },
-    )
+    markSceneStateEntries({ tick: 10, state: SCENE_STATE.선택 }, { tick: 19, state: SCENE_STATE.조준 }, { tick: 26, state: SCENE_STATE.투구 })
     markSceneStateEntries({ tick: 26, state: SCENE_STATE.인플레이 })
     expect(sceneStateEntryAt(30)?.state).toBe(0x17)
     expect(sceneStateEntryAt(20)?.state).toBe(0x10)

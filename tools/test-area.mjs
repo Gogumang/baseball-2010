@@ -18,7 +18,8 @@ const own = passIndex === -1 ? argv : argv.slice(0, passIndex)
 const passThrough = passIndex === -1 ? [] : argv.slice(passIndex + 1)
 
 if (own.includes('--list') || own.length === 0) {
-  for (const [name, area] of Object.entries(AREAS)) console.log(`${name.padEnd(15)} ${area.sources.filter((path) => path.startsWith('src/')).join(' ')}`)
+  for (const [name, area] of Object.entries(AREAS))
+    console.log(`${name.padEnd(15)} ${area.sources.filter((path) => path.startsWith('src/')).join(' ')}`)
   if (own.length === 0) console.log('\n쓰는 법: yarn test:area <도메인[,도메인]> | --changed[=<기준>] [-- <vitest 인자>]')
   process.exit(own.length === 0 ? 2 : 0)
 }
@@ -44,8 +45,18 @@ if (filters.size === 0) {
 }
 
 const workers = Math.min(2, Number(process.env.TEST_AREA_WORKERS ?? 2))
-const args = ['vitest', 'run', `--maxWorkers=${workers}`, '--passWithNoTests',
-  '--exclude', 'src/app/model/soak/careerSoak.test.tsx', '--exclude', 'src/app/model/soak/pitcherLeagueSoak.test.tsx', ...passThrough, ...filters]
+const args = [
+  'vitest',
+  'run',
+  `--maxWorkers=${workers}`,
+  '--passWithNoTests',
+  '--exclude',
+  'src/app/model/soak/careerSoak.test.tsx',
+  '--exclude',
+  'src/app/model/soak/pitcherLeagueSoak.test.tsx',
+  ...passThrough,
+  ...filters,
+]
 console.log(`yarn ${args.join(' ')}`)
 const started = Date.now()
 const meter = startUsageMeter()

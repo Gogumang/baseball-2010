@@ -2,9 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import {
-  FOOTER_CENTER_X, FOOTER_LEFT_X, footerMarkTopOf, isGameSettingsMarkShown,
-} from '@/widgets/screen-frame/lib/screenFrameLayout'
+import { FOOTER_CENTER_X, FOOTER_LEFT_X, footerMarkTopOf, isGameSettingsMarkShown } from '@/widgets/screen-frame/lib/screenFrameLayout'
 
 /** 바닥비트 (0x54d95 셋째 인자, 0x55220~0x554f4) */
 
@@ -72,4 +70,3 @@ describe('ScreenFrame 머리띠 G (0x54a60)', () => {
     expect(container.querySelector('[data-badge-plus]')).toBeNull()
   })
 })
-

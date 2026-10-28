@@ -15,10 +15,7 @@ import {
   popularityChangeOf,
   reputationPartsOf,
 } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
-import type {
-  PitcherEvaluationContext,
-  PitcherEvaluationRecord,
-} from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
+import type { PitcherEvaluationContext, PitcherEvaluationRecord } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
 
 const 선발: PitcherEvaluationContext = {
   positionCode: 0,
@@ -76,9 +73,7 @@ describe('인기도 변화 p (0xa690c)', () => {
   })
 
   it('지면 선발형 점수가 −1 에서 시작한다 — 같은 기록이라도 p 가 줄어든다', () => {
-    expect(popularityChangeOf(완투기록, { ...선발, won: false })).toBeLessThan(
-      popularityChangeOf(완투기록, 선발),
-    )
+    expect(popularityChangeOf(완투기록, { ...선발, won: false })).toBeLessThan(popularityChangeOf(완투기록, 선발))
   })
 
   it('구원형 눈금은 −2 … 6 이다', () => {
@@ -184,9 +179,7 @@ describe('감독 평가 글 (0x1278c)', () => {
   })
 
   it('선발에는 38 이 나오지 않는다', () => {
-    expect(managerCommentIndexOf({ ...선발, neverEntered: true }, 0)).not.toBe(
-      NO_ENTRY_USER_EVENT_INDEX,
-    )
+    expect(managerCommentIndexOf({ ...선발, neverEntered: true }, 0)).not.toBe(NO_ENTRY_USER_EVENT_INDEX)
   })
 
   it('고른 글 번호가 StrUSER_EVT 안에 있다', () => {

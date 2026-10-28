@@ -52,7 +52,10 @@ describe('applyEventRewards — 원작 이벤트 보상', () => {
   })
 
   it('종류 19 는 타순, 18 은 목표 경로(0 → 4번, 1 → 1번)', () => {
-    const after = applyEventRewards(선수(), [{ kind: 19, value: 8 }, { kind: 18, value: 1 }])
+    const after = applyEventRewards(선수(), [
+      { kind: 19, value: 8 },
+      { kind: 18, value: 1 },
+    ])
 
     expect(after).toMatchObject({ battingOrder: 8, battingOrderPath: '1번' })
   })
@@ -102,9 +105,20 @@ describe('applyEventRewards — 원작 이벤트 보상', () => {
   })
 
   it('연차 보정 — 이벤트 393 은 인기도 +3y · 평판 −2y (0x8d508)', () => {
-    const 삼년차 = { ...선수(), season: 3 }  // y = 2
-    const 보정없음 = applyEventRewards(삼년차, [{ kind: 0, value: 10 }, { kind: 1, value: 10 }])
-    const 보정 = applyEventRewards(삼년차, [{ kind: 0, value: 10 }, { kind: 1, value: 10 }], undefined, 393)
+    const 삼년차 = { ...선수(), season: 3 } // y = 2
+    const 보정없음 = applyEventRewards(삼년차, [
+      { kind: 0, value: 10 },
+      { kind: 1, value: 10 },
+    ])
+    const 보정 = applyEventRewards(
+      삼년차,
+      [
+        { kind: 0, value: 10 },
+        { kind: 1, value: 10 },
+      ],
+      undefined,
+      393,
+    )
 
     expect(보정.popularity - 보정없음.popularity).toBe(3 * 2)
     expect(보정.reputation - 보정없음.reputation).toBe(-2 * 2)
@@ -128,7 +142,13 @@ describe('rewardsIn', () => {
     const commands: EventCommand[] = [
       { op: 'sound', id: 1 },
       { op: 'reward', items: [{ kind: 0, value: 5 }] },
-      { op: 'reward', items: [{ kind: 2, value: 3 }, { kind: 10, value: 500 }] },
+      {
+        op: 'reward',
+        items: [
+          { kind: 2, value: 3 },
+          { kind: 10, value: 500 },
+        ],
+      },
     ]
 
     expect(rewardsIn(commands)).toEqual([

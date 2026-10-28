@@ -60,7 +60,12 @@ describe('기록연감 통계 기록 [mgr+0xc8]', () => {
 describe('전부 수집 보상 0x28e98 → 0x292f8 (메인 메뉴 하위 4)', () => {
   const 지갑 = () => {
     const gains: number[] = []
-    return { gains, gain: (amount: number) => { gains.push(amount) } }
+    return {
+      gains,
+      gain: (amount: number) => {
+        gains.push(amount)
+      },
+    }
   }
 
   it('줄 것이 없으면 null — 아무것도 안 바꾼다', () => {
@@ -68,7 +73,9 @@ describe('전부 수집 보상 0x28e98 → 0x292f8 (메인 메뉴 하위 4)', ()
     const wallet = 지갑()
     const { result } = renderHook(() => useCollection(메모리저장(), null))
     let text: string | null = 'x'
-    act(() => { text = result.current.claimCollectionReward(rewards, false, wallet) })
+    act(() => {
+      text = result.current.claimCollectionReward(rewards, false, wallet)
+    })
     expect(text).toBeNull()
     expect(rewards.saved).toBeNull()
     expect(wallet.gains).toEqual([])
@@ -80,7 +87,9 @@ describe('전부 수집 보상 0x28e98 → 0x292f8 (메인 메뉴 하위 4)', ()
     const wallet = 지갑()
     const { result } = renderHook(() => useCollection(메모리저장(), null))
     let text: string | null = null
-    act(() => { text = result.current.claimCollectionReward(rewards, true, wallet) })
+    act(() => {
+      text = result.current.claimCollectionReward(rewards, true, wallet)
+    })
 
     expect(text).toBe('미션모드 모두 성공달성!N[!cFFFF0030000 G포인트!cFFFFFF] 지급')
     expect(rewards.saved).toEqual({ awardedBits: 0b1001 })
@@ -88,7 +97,9 @@ describe('전부 수집 보상 0x28e98 → 0x292f8 (메인 메뉴 하위 4)', ()
     expect(result.current.collection.stats.achievementMarks[3]).toBe(1)
     expect(result.current.collection.stats.gamePointEarned[5]).toBe(30000)
 
-    act(() => { text = result.current.claimCollectionReward(rewards, true, wallet) })
+    act(() => {
+      text = result.current.claimCollectionReward(rewards, true, wallet)
+    })
     expect(text).toBeNull()
   })
 
@@ -104,7 +115,9 @@ describe('전부 수집 보상 0x28e98 → 0x292f8 (메인 메뉴 하위 4)', ()
     expect(result.current.collection.titles).toHaveLength(64)
     expect(result.current.collection.seasonEndings).toEqual([2])
     let text: string | null = null
-    act(() => { text = result.current.claimCollectionReward(rewards, false, wallet) })
+    act(() => {
+      text = result.current.claimCollectionReward(rewards, false, wallet)
+    })
     expect(text).toBe('닉네임 모두 수집 달성!N[!cFFFF0060000 G포인트!cFFFFFF] 지급')
     expect(result.current.collection.stats.gamePointEarned[2]).toBe(60000)
   })
@@ -127,7 +140,10 @@ describe('0x62368(ui, k, 0) — 열기 + 알림 창', () => {
   it('플레이 시간 칸이 10시간(/ 3600000 > 9)에 닿은 그 누계에서 47 을 열고 창을 한 번만 띄운다 (0x4e8b0 끝)', () => {
     const announced: number[][] = []
     const { result } = renderHook(() =>
-      useCollection(메모리저장(), null, [], null, [], null, (ids) => { announced.push([...ids]) }))
+      useCollection(메모리저장(), null, [], null, [], null, (ids) => {
+        announced.push([...ids])
+      }),
+    )
 
     act(() => result.current.recordStat({ kind: '플레이시간', mode: 4, elapsed: 10 * 시간 - 1 }))
     expect(result.current.collection.openedHiddenIds).toEqual([])
@@ -147,10 +163,15 @@ describe('0x62368(ui, k, 0) — 열기 + 알림 창', () => {
     const store = 메모리저장()
     store.saved = { ...normalizeCollection(null), openedHiddenIds: [21] }
     const { result } = renderHook(() =>
-      useCollection(store, null, [], null, [], null, (ids) => { announced.push([...ids]) }))
+      useCollection(store, null, [], null, [], null, (ids) => {
+        announced.push([...ids])
+      }),
+    )
 
     let opened: boolean[] = []
-    act(() => { opened = [result.current.openHidden(21), result.current.openHidden(37), result.current.openHidden(37)] })
+    act(() => {
+      opened = [result.current.openHidden(21), result.current.openHidden(37), result.current.openHidden(37)]
+    })
     expect(opened).toEqual([false, true, false])
     expect(result.current.collection.openedHiddenIds).toEqual([21, 37])
     expect(announced).toEqual([[37]])

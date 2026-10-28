@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { TEAM_ABILITY_LIMIT } from '@/entities/season-mode/model/seasonRecord'
 import {
-  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX,
-  HELL_TRAINING_MORALE_LOSS_RANGE, MASSAGER_MORALE_RELIEF, TRAINING_GAIN_RANGE,
-  TRAINING_GUARD_CEILING, TRAINING_MORALE_LOSS_RANGE, TRAINING_SLOTS, TRAINING_SUB_ITEM_GAIN,
+  HELL_TRAINING_GAIN_RANGE,
+  HELL_TRAINING_GAME_POINT,
+  HELL_TRAINING_INDEX,
+  HELL_TRAINING_MORALE_LOSS_RANGE,
+  MASSAGER_MORALE_RELIEF,
+  TRAINING_GAIN_RANGE,
+  TRAINING_GUARD_CEILING,
+  TRAINING_MORALE_LOSS_RANGE,
+  TRAINING_SLOTS,
+  TRAINING_SUB_ITEM_GAIN,
   checkSeasonTraining,
 } from '@/widgets/season/lib/seasonTraining'
 
@@ -52,8 +59,7 @@ describe('시즌 트레이닝 가드 0x9108', () => {
   })
 
   it('사기 검사가 G 검사보다 먼저다', () => {
-    expect(checkSeasonTraining(입력({ teamMorale: 0, gamePoints: 0 }), HELL_TRAINING_INDEX).reason)
-      .toBe('사기없음')
+    expect(checkSeasonTraining(입력({ teamMorale: 0, gamePoints: 0 }), HELL_TRAINING_INDEX).reason).toBe('사기없음')
   })
 
   it('지옥훈련은 G 가 500 미만이면 막힌다 (StrMODE[65])', () => {

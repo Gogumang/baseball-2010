@@ -1,11 +1,6 @@
 import type { GameState } from '@/entities/game/model/gameState'
 import { runnerCountOf } from '@/entities/game/model/baseState'
-import {
-  applyPitcherChange,
-  applyRunScored,
-  NO_SIDE,
-  REGULATION_LAST_INNING_INDEX,
-} from '@/entities/game/model/winLossSave'
+import { applyPitcherChange, applyRunScored, NO_SIDE, REGULATION_LAST_INNING_INDEX } from '@/entities/game/model/winLossSave'
 import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
 
 /**
@@ -50,12 +45,7 @@ function moundPitcherOf(game: GameState, mound: MoundBySide) {
  * 한 점씩 올려 가며 그때마다 판정한다 (원본도 한 점 들어올 때마다 부른다).
  * 마운드는 그 플레이 동안 바뀌지 않는다고 본다 — 교체는 타석 앞(0xc1ba4 · 0x3da3e)에서만 난다.
  */
-export function decisionsAfterRuns(
-  decisions: DecisionState,
-  before: GameState,
-  runs: number,
-  mound: MoundBySide,
-): DecisionState {
+export function decisionsAfterRuns(decisions: DecisionState, before: GameState, runs: number, mound: MoundBySide): DecisionState {
   if (runs <= 0) return decisions
   const offenseSide = offenseSideOf(before)
   const defenseSide = 1 - offenseSide
@@ -79,12 +69,7 @@ export function decisionsAfterRuns(
  * 두 경기 상태 사이에 공격 측이 낸 점수만큼 먹인다 — 한 타석·한 플레이 단위로 부른다.
  * 반 이닝이 넘어가도 점수는 넘어가기 전 공격 측이 낸 것이다 (3아웃 플레이의 득점).
  */
-export function decisionsAfterPlay(
-  decisions: DecisionState,
-  before: GameState,
-  after: GameState,
-  mound: MoundBySide,
-): DecisionState {
+export function decisionsAfterPlay(decisions: DecisionState, before: GameState, after: GameState, mound: MoundBySide): DecisionState {
   const offenseSide = offenseSideOf(before)
   const runs = sideScoreOf(after, offenseSide) - sideScoreOf(before, offenseSide)
   return decisionsAfterRuns(decisions, before, runs, mound)
@@ -133,8 +118,7 @@ export function pitcherOfRecordNamesOf(
   playerSide: number,
   nameOf: (isOurTeam: boolean, pitcherNumber: number) => string | undefined,
 ): PitcherOfRecordNames {
-  const name = (record: PitcherOfRecord) =>
-    record.side === NO_SIDE ? null : (nameOf(record.side === playerSide, record.number) ?? null)
+  const name = (record: PitcherOfRecord) => (record.side === NO_SIDE ? null : (nameOf(record.side === playerSide, record.number) ?? null))
   const save = decisions.save.number === decisions.winner.number ? null : name(decisions.save)
   return { win: name(decisions.winner), loss: name(decisions.loser), save }
 }

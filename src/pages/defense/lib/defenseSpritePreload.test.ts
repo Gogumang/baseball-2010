@@ -9,18 +9,25 @@ import type { DefenseFielder } from '@/pages/defense/lib/defenseView'
 import { frameUrl } from '@/shared/lib/sprite/spritePreload'
 
 const PUBLIC = resolve(__dirname, '../../../../public')
-const fetched = (requests: readonly SpriteFolderPreload[]) => preloadImageUrlsOf(requests.map((request) => {
-  if (request.framesListedIn === undefined || request.frames === 'all') return request
-  const origins = JSON.parse(readFileSync(resolve(PUBLIC, `${request.framesListedIn.slice(2)}/origins.json`), 'utf8')) as Record<string, unknown>
-  return { ...request, frames: request.frames.filter((frame) => String(frame).padStart(3, '0') in origins) }
-}))
+const fetched = (requests: readonly SpriteFolderPreload[]) =>
+  preloadImageUrlsOf(
+    requests.map((request) => {
+      if (request.framesListedIn === undefined || request.frames === 'all') return request
+      const origins = JSON.parse(readFileSync(resolve(PUBLIC, `${request.framesListedIn.slice(2)}/origins.json`), 'utf8')) as Record<string, unknown>
+      return { ...request, frames: request.frames.filter((frame) => String(frame).padStart(3, '0') in origins) }
+    }),
+  )
 
 describe('defenseSpritePreload — 수비 화면 그림 목록(동작 표에서 계산)', () => {
   it('야수가 어떤 동작 · 틱에 그리는 칸이든(파일이 있는 칸) 목록에 있다 (보통 야수 · 마선수 둘 다)', () => {
     const urls = new Set(preloadImageUrlsOf(defenseSpritePreloadsOf({ batters: [1], pitchers: [3] })))
     for (const action of Object.values(FIELDER_ACTION)) {
       for (let tick = 0; tick < 30; tick += 1) {
-        for (const [slot, aceIndex] of [[3, null], [3, 1], [0, 3]] as const) {
+        for (const [slot, aceIndex] of [
+          [3, null],
+          [3, 1],
+          [0, 3],
+        ] as const) {
           const sprite = fielderSpriteOf({ action, actionTick: tick, slot, aceIndex } as unknown as DefenseFielder)
           const url = frameUrl(sprite.folder, sprite.frame)
           // 파일이 없는 칸(투수 마선수 38장 밖)은 그리기도 원점이 없어 안 받는다
@@ -49,6 +56,8 @@ describe('defenseSpritePreload — 수비 화면 그림 목록(동작 표에서 
     expect(urls).toContain('./sprites/defender_psyker/frames/000.png')
     expect(urls).toContain('./sprites/defense/index/000.png')
     // 125장을 통째로 받지 않는다
-    expect(urls.filter((url) => url.startsWith('./sprites/defender/frames/0') || url.startsWith('./sprites/defender/frames/1')).length).toBeLessThan(125)
+    expect(urls.filter((url) => url.startsWith('./sprites/defender/frames/0') || url.startsWith('./sprites/defender/frames/1')).length).toBeLessThan(
+      125,
+    )
   })
 })

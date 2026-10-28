@@ -41,10 +41,7 @@ const PITCHER_SLOT = 0
 export const PICKOFF_COVER_OF_BASE: readonly number[] = [1, 2, 3, 4]
 
 export interface PickoffStart {
-  readonly play: Pick<
-    PlayView,
-    'kind' | 'coverOfBase' | 'ballHolderSlot' | 'everHeld' | 'held' | 'manualThrowBase'
-  >
+  readonly play: Pick<PlayView, 'kind' | 'coverOfBase' | 'ballHolderSlot' | 'everHeld' | 'held' | 'manualThrowBase'>
   /** 각 커버 야수가 달려갈 루 좌표 (야수 번호 → 목표점) */
   readonly coverTargets: ReadonlyMap<number, ReturnType<typeof basePosition>>
   /** 투수에게 세울 AI 상태 */
@@ -97,5 +94,5 @@ export const RUNNER_LEAD_DISTANCE = 0
 
 /** 견제로 루를 지키는 야수인가 */
 export function isPickoffCover(fielder: FielderState, base: number): boolean {
-  return PICKOFF_COVER_OF_BASE[(((base % 4) + 4) % 4)] === fielder.slot
+  return PICKOFF_COVER_OF_BASE[((base % 4) + 4) % 4] === fielder.slot
 }

@@ -127,9 +127,7 @@ export function retargetRunner(
   // 구간 출발점(`legStart`)은 웹 진행기들의 `startLeg` 관례대로 목표가 바뀐 자리에서 새로 잡는다(웹 진행률이 이 칸을 본다).
   // 원본 +0x14 는 vt48 이 아니라 주자 틱 0xbf094 의 vt28(0xbf240)이 움직인 틱마다 위치로 적는다 — 주자는 늘 땅(+0x24 = +0x18 + 0)이라
   // 늘 선다(r276 직접 뜸). 그 값을 읽는 협살 대상 0xb398c 의 0xbf01c 는 `legTotalTicksOf` 가 위치로 잰다
-  next = changed
-    ? { ...next, targetBase: base, settled: false, legStart: next.position }
-    : { ...next, targetBase: base, settled: false }
+  next = changed ? { ...next, targetBase: base, settled: false, legStart: next.position } : { ...next, targetBase: base, settled: false }
   return { runner: next, previousTarget: nextPrevious }
 }
 
@@ -137,11 +135,7 @@ export function retargetRunner(
  * 메시지 0x582 / 0x584 한 번 (0x5209e / 0x5222a → 0xa9b04). 같은 메시지 안에서 앞 주자의 vt48 이 뒤 주자의 검사에 보인다
  * (전원 갈래의 차례가 그래서 뜻이 있다).
  */
-export function applyBaserunningKey(
-  input: BaserunningKeyInput,
-  kind: BaserunningKeyKind,
-  target: BaserunningKeyTarget,
-): BaserunningKeyResult {
+export function applyBaserunningKey(input: BaserunningKeyInput, kind: BaserunningKeyKind, target: BaserunningKeyTarget): BaserunningKeyResult {
   const runners = [...input.runners]
   const previousTargets = runners.map((runner, index) => input.previousTargets[index] ?? runner.startBase)
   const retargeted: number[] = []

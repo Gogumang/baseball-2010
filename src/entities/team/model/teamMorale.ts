@@ -49,8 +49,5 @@ interface MoraleDelta {
  * (시즌 8e3f0~8e404 · 8e4f0~8e506, 나리 8e410~8e422 · 8e512~8e524 의 0xa3a44). 다른 종류는 건너뛴다
  */
 export function teamRecordMoraleAfterBurst(start: number, deltas: readonly MoraleDelta[]): number {
-  return deltas.reduce(
-    (morale, delta) => (delta.name === '사기' ? Math.min(MORALE_MAXIMUM, Math.max(0, morale + delta.amount)) : morale),
-    start,
-  )
+  return deltas.reduce((morale, delta) => (delta.name === '사기' ? Math.min(MORALE_MAXIMUM, Math.max(0, morale + delta.amount)) : morale), start)
 }

@@ -38,9 +38,12 @@ describe('구단정보 0xd5 숫자 값 칸 — numBox 0xba51c (0x7c8ea · 0x7cdc
     const cell = screen.getByTestId('구단정보-값-2')
     expect(cell.textContent).toBe('')
     const digits = [...cell.querySelectorAll('img')].filter((image) => image.getAttribute('src')?.startsWith('./sprites/num/'))
-    expect(digits.map((image) => image.getAttribute('src'))).toEqual(
-      ['./sprites/num/025.png', './sprites/num/020.png', './sprites/num/020.png', './sprites/num/020.png'],
-    )
+    expect(digits.map((image) => image.getAttribute('src'))).toEqual([
+      './sprites/num/025.png',
+      './sprites/num/020.png',
+      './sprites/num/020.png',
+      './sprites/num/020.png',
+    ])
     expect(digits[0].style.left).toBe('86px')
     // 세로 ceil((15 − 10) / 2) = 3 — 줄 2 의 칸 y = 184 + 2 × 17
     expect(digits[0].style.top).toBe('221px')
@@ -57,9 +60,8 @@ describe('구단정보 0xd5 숫자 값 칸 — numBox 0xba51c (0x7c8ea · 0x7cdc
 
 /** 구단정보 0xd5 — 카드 0x7ba44 의 0xd5 갈래 */
 
-const 띄우기 = (hasCardBadge?: boolean) => render(
-  <SeasonTeamInfoScreen teamId={2} teamAbilities={[50, 50, 50, 50]} rows={[]} onBack={vi.fn()} hasCardBadge={hasCardBadge} />,
-)
+const 띄우기 = (hasCardBadge?: boolean) =>
+  render(<SeasonTeamInfoScreen teamId={2} teamAbilities={[50, 50, 50, 50]} rows={[]} onBack={vi.fn()} hasCardBadge={hasCardBadge} />)
 
 describe('구단정보 0xd5 카드', () => {
   it('계단형 판(0x76725) 을 깔고 로고를 (20, 72) 에 효과 없이 그린다', () => {
@@ -87,7 +89,10 @@ describe('구단정보 0xd5 ABILITY 판 — 카드 팀 갈래 0x7bf9c → 0x5aef
     const 판 = screen.getByTestId('능력치 도형')
     const 그림들 = Array.from(판.querySelectorAll('img'))
     const 바탕 = 그림들.filter((image) => image.getAttribute('src') === './sprites/slt_frame/003.png')
-    expect(바탕.map((image) => [image.style.left, image.style.top])).toEqual([['147px', '73px'], ['177px', '73px']])
+    expect(바탕.map((image) => [image.style.left, image.style.top])).toEqual([
+      ['147px', '73px'],
+      ['177px', '73px'],
+    ])
     expect(그림들.filter((image) => image.getAttribute('src') === './sprites/slt_frame/017.png')).toHaveLength(4)
     for (const frame of ['046', '045', '204', '205']) {
       expect(그림들.map((image) => image.getAttribute('src'))).toContain(`./sprites/img_text/frames/${frame}.png`)

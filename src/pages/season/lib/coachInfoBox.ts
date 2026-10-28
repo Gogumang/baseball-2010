@@ -41,8 +41,7 @@ export function coachInfoBoxPaintsOf(): PanelPaint[] {
   const iy = inner.y - box.y
   const bottom = iy + inner.height
   const right = ix + inner.width
-  const line = (x1: number, x2: number, y: number, color: string): PanelPaint =>
-    ({ x: x1, y, width: x2 - x1 + 1, height: 1, color })
+  const line = (x1: number, x2: number, y: number, color: string): PanelPaint => ({ x: x1, y, width: x2 - x1 + 1, height: 1, color })
   const paints: PanelPaint[] = [
     ...roundFillPaintsOf(box.width, box.height, colors.outer),
     { x: ix, y: iy, width: inner.width, height: inner.height, color: colors.inner },

@@ -58,8 +58,7 @@ describe('미션 주자 주력 — 0xb570d(ctx, 3, 주자, 1, 90, 1)', () => {
     const batting = run.game.humanBatting
     for (let slot = 0; slot < 9; slot += 1) {
       const row = battingRecordAt(batting, slot)
-      const expected =
-        row === MISSION_NARI_RECORD ? 777 : masterGameAbilityOf(teamBatters(batting.teamId)[row]!, false, 3)
+      const expected = row === MISSION_NARI_RECORD ? 777 : masterGameAbilityOf(teamBatters(batting.teamId)[row]!, false, 3)
       expect(missionRunnerRunAt(run, slot, { missionBatterRun: 777 })).toBe(expected)
     }
     const pitcherMission = MISSIONS.find((m) => m.side === '투수' && m.opponentAce > 0)!
@@ -166,9 +165,7 @@ describe('미션 수비 판 아홉 칸 수비 — 0xb0fb4 (수비 팀 레코드�
     const abilities = missionDefenseAbilitiesOf(swapped)
     if (slot >= 0) expect(abilities[slot]).toBe(masterGameAbilityOf(roster[9]!, false, 2))
     // 나머지 칸은 그대로
-    expect(abilities.filter((_v, index) => index !== slot)).toEqual(
-      expectedOf(batting.teamId).filter((_v, index) => index !== slot),
-    )
+    expect(abilities.filter((_v, index) => index !== slot)).toEqual(expectedOf(batting.teamId).filter((_v, index) => index !== slot))
   })
 
   it('칸 0 은 첫 0x18 판(0x3fac4)이 적은 지명타자 레코드 — 그 뒤 대타로 지명 자리가 옮겨도 그대로, 판이 없으면 null', () => {

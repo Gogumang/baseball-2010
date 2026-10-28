@@ -56,10 +56,7 @@ export interface SlidingRunner {
 /** 0xa9690 한 주자 판정 — 아웃이 아니고 진행률이 71~94% 면 슬라이딩이 걸린다 */
 export function canSlide(runner: SlidingRunner): boolean {
   if (runner.isOut) return false
-  return (
-    runner.progressPercent >= SLIDING_PROGRESS_MINIMUM &&
-    runner.progressPercent <= SLIDING_PROGRESS_MAXIMUM
-  )
+  return runner.progressPercent >= SLIDING_PROGRESS_MINIMUM && runner.progressPercent <= SLIDING_PROGRESS_MAXIMUM
 }
 
 export interface SlideKeyInput {
@@ -102,9 +99,7 @@ export function slideOnKey(input: SlideKeyInput): SlideKeyResult {
   if (input.isFoulBattedBall) return 없음
   if (input.runners.some((runner) => runner.isLeavingField)) return 없음
 
-  const slidRunnerIndexes = input.runners
-    .map((runner, index) => (canSlide(runner) ? index : -1))
-    .filter((index) => index >= 0)
+  const slidRunnerIndexes = input.runners.map((runner, index) => (canSlide(runner) ? index : -1)).filter((index) => index >= 0)
   if (slidRunnerIndexes.length === 0) return 없음
 
   const playsSound = !input.isSoundPlaying && !input.hasPlayedSoundThisPlay

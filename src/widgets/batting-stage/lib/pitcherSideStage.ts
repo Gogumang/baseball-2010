@@ -10,7 +10,14 @@ import { hitBallPathOf, type HitBallPath } from '@/widgets/batting-stage/lib/hit
 import { hitCameraAngleOf } from '@/widgets/batting-stage/lib/hitCamera'
 import { bigHitEndTickOf, bigHitReleaseTickOf } from '@/widgets/batting-stage/lib/bigHitScreen'
 import type { HitPauseInput } from '@/widgets/batting-stage/lib/hitPause'
-import { HIT_PARTICLE_IMAGE, hitParticleIdOf, hitParticleInputOf, isHomeRunHitResult, isStrongHit, specialSwingParticlesOf } from '@/widgets/batting-stage/lib/hitParticles'
+import {
+  HIT_PARTICLE_IMAGE,
+  hitParticleIdOf,
+  hitParticleInputOf,
+  isHomeRunHitResult,
+  isStrongHit,
+  specialSwingParticlesOf,
+} from '@/widgets/batting-stage/lib/hitParticles'
 import { specialSwingStageEffectOf } from '@/widgets/batting-stage/lib/specialSwingEffect'
 import type { SpecialSwingStageEffect } from '@/widgets/batting-stage/lib/specialSwingEffect'
 
@@ -182,10 +189,7 @@ export function pitcherSideStateEntriesOf(
   if (hit !== undefined && hit !== null) {
     // 판정 틀 J 의 메시지 0x6aa(0x51408)가 0x13 을 예약 — 다음 틀이 0x13 틱 0. 0x13 틱 `hitEndTickOf` 의 갱신 0x406e8 이 0x17 을 예약
     const hitEntry = flightEntry + pitcherReleaseTicksOf(aceOrder) + hit.judgeBallTick + 1
-    entries.push(
-      { tick: hitEntry, state: SCENE_STATE.타격 },
-      { tick: hitEntry + hitEndTickOf(hit) + 1, state: SCENE_STATE.인플레이 },
-    )
+    entries.push({ tick: hitEntry, state: SCENE_STATE.타격 }, { tick: hitEntry + hitEndTickOf(hit) + 1, state: SCENE_STATE.인플레이 })
     return entries
   }
   if (resultTicks <= 0) return entries
@@ -344,8 +348,7 @@ export function pitcherHitSceneOf(
     // 0x13 진입 0x33e34 — 같은 [경기+0xf2c] 공의 점으로 타석 공 경로를 다시 채운다 (+0x17e1 = 친 타자의 손)
     hitPath: hitBallPathOf(earlyPassTrajectory, hitSide),
     hitAngle: hitCameraAngleOf(pattern[0]),
-    showsHitTrail:
-      isHomeRunHitResult(resultCode) || (!isBunt && isStrongHit(hitParticleInputOf(pattern, resultCode, watchesBigHit))),
+    showsHitTrail: isHomeRunHitResult(resultCode) || (!isBunt && isStrongHit(hitParticleInputOf(pattern, resultCode, watchesBigHit))),
   }
 }
 

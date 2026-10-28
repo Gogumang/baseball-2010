@@ -17,4 +17,3 @@ export const input = style({
     '&::selection': { background: 'transparent' },
   },
 })
-

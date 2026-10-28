@@ -8,7 +8,11 @@ import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
 import { useEventSounds } from '@/pages/story/model/useEventSounds'
 import type {
-  EventChoiceConfirmHandler, EventCompleteHandler, EventRewardHandler, MatchCommand, SystemCommand,
+  EventChoiceConfirmHandler,
+  EventCompleteHandler,
+  EventRewardHandler,
+  MatchCommand,
+  SystemCommand,
 } from '@/pages/story/model/useEventPlayback'
 import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
@@ -21,9 +25,7 @@ import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
 import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 import { EVENT_WINDOW_DIM_OPACITY, SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
-import {
-  INITIAL_EVENT_BACKDROP, clearsDialogueBeforeMatch, drawEventBackdrop, portraitBaseYOf,
-} from '@/pages/story/lib/eventBackdrop'
+import { INITIAL_EVENT_BACKDROP, clearsDialogueBeforeMatch, drawEventBackdrop, portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
 import type { EventBackdropState } from '@/pages/story/lib/eventBackdrop'
 import { useWholeScreenOffset } from '@/shared/lib/screenShake/useWholeScreenOffset'
 
@@ -131,21 +133,55 @@ interface StoryScreenProps {
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
 export function StoryScreen({
-  events, event, playerName, teamName, skinIndex, battingTypeIndex, onComplete, onMatch, carried, replacementsFor,
-  systemWindowTextOf, yearGoalWindowOf, isVibrationOn = true, isSeasonMode = false, isOverOutingMap = false,
-  rewardNoticeContext, onSystemWindowConfirm, onReward, onChoiceConfirm, isInputLocked = false,
+  events,
+  event,
+  playerName,
+  teamName,
+  skinIndex,
+  battingTypeIndex,
+  onComplete,
+  onMatch,
+  carried,
+  replacementsFor,
+  systemWindowTextOf,
+  yearGoalWindowOf,
+  isVibrationOn = true,
+  isSeasonMode = false,
+  isOverOutingMap = false,
+  rewardNoticeContext,
+  onSystemWindowConfirm,
+  onReward,
+  onChoiceConfirm,
+  isInputLocked = false,
 }: StoryScreenProps) {
   // 대본이 적어 둔 표정 전부 — 주인공 초상화의 표정 애니를 미리 칠한다(`eventPortraitCastOf`)
   const upcomingPortraits = useMemo(() => eventPortraitCastOf(events, event), [events, event])
   // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
-  const windowTextOf = systemWindowTextOf === undefined && yearGoalWindowOf === undefined
-    ? undefined
-    : (command: SystemCommand) =>
-      command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
+  const windowTextOf =
+    systemWindowTextOf === undefined && yearGoalWindowOf === undefined
+      ? undefined
+      : (command: SystemCommand) =>
+          command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
   /** 막는 효과(id 4~7)를 다 기다린 걸음 — 그 걸음의 멈출 명령이 돈다 (0x8b564) */
   const [releasedKey, setReleasedKey] = useState<string | null>(null)
-  const { step, isReleased, rewardNotice, portraits, next, skip, jump: jumpToEvent, clearPortraits, leftEventIds } = useEventPlayback(
-    events, event, onComplete, onMatch, carried, windowTextOf, (current) => isStepHeld(current, releasedKey),
+  const {
+    step,
+    isReleased,
+    rewardNotice,
+    portraits,
+    next,
+    skip,
+    jump: jumpToEvent,
+    clearPortraits,
+    leftEventIds,
+  } = useEventPlayback(
+    events,
+    event,
+    onComplete,
+    onMatch,
+    carried,
+    windowTextOf,
+    (current) => isStepHeld(current, releasedKey),
     rewardNoticeContext === undefined ? undefined : (items, eventId) => rewardNoticeOf(items, eventId, rewardNoticeContext()),
     () => closeSystemWindow(),
     onReward,
@@ -195,9 +231,7 @@ export function StoryScreen({
     if (passedEffectId !== null) setBackdrop((previous) => ({ ...previous, effectId: passedEffectId }))
   }, [passedEffectId, step])
   // '끝' 의 바뀐 색은 위에서 이미 들였으니 이 그리기는 '없음' 처럼 남은 색만 본다
-  const backdropDraw = drawEventBackdrop(
-    { effectId, fill: backdrop.fill }, screenEffect.phase === '끝' ? '없음' : screenEffect.phase,
-  )
+  const backdropDraw = drawEventBackdrop({ effectId, fill: backdrop.fill }, screenEffect.phase === '끝' ? '없음' : screenEffect.phase)
   const portraitBaseY = portraitBaseYOf(isOverOutingMap, backdropDraw.isEffectFill)
 
   // 0x8bab8 — 말하는 이 [명령+0x20]: 1 은 선수 이름(시즌모드면 빈 머리말) · 2~24 는 StrMODE[말하는 이 + 91] · 그 밖 없음
@@ -205,11 +239,12 @@ export function StoryScreen({
     command?.op !== 'say' || command.speaker === 0
       ? null
       : command.speaker === PLAYER_SPEAKER
-        ? (isSeasonMode ? null : playerName)
+        ? isSeasonMode
+          ? null
+          : playerName
         : (SPEAKER_NAMES[command.speaker] ?? null)
   const replacements =
-    replacementsFor?.(step.cursor.eventId) ??
-    (command?.op === 'say' && command.format === TEAM_NAME_FORMAT ? [teamName] : [playerName, teamName])
+    replacementsFor?.(step.cursor.eventId) ?? (command?.op === 'say' && command.format === TEAM_NAME_FORMAT ? [teamName] : [playerName, teamName])
   // say · 선택지 명령이 도는 틀 — 상자 글 칸을 쓴다. system · 예아니오는 대사 상자의 글을 건드리지 않는다 — 0x8b924 는 관리자
   // 버퍼 [mgr+0xba] 에 쓰고(say 글은 0x7b818 이 돌려주는 상자 쪽 글 0xbc965), 0x8b5ac 는 창이 떠 있는 동안에도 틀마다
   // 0x7fbc4 로 앞 상자를 그린다 — 선택지 뒤라면 선택지 줄과 고른 줄 테두리가 그대로 남는다.
@@ -251,10 +286,10 @@ export function StoryScreen({
    * 넘긴 뒤에도 다 닫힐 때까지 이 칸에 남겨 그린다. 다음 명령이 또 보상 창이면 공용 창이 새로 서므로 그쪽이 덮는다.
    */
   const [closingReward, setClosingReward] = useState<{ readonly key: string; readonly notice: RewardNotice } | null>(null)
-  const currentReward = command?.op === 'reward' && rewardNotice !== null &&
-    (rewardNotice.kind === '알림' || rewardNotice.kind === '스킬')
-    ? { key: commandKey, notice: rewardNotice }
-    : null
+  const currentReward =
+    command?.op === 'reward' && rewardNotice !== null && (rewardNotice.kind === '알림' || rewardNotice.kind === '스킬')
+      ? { key: commandKey, notice: rewardNotice }
+      : null
   const shownReward = currentReward ?? closingReward
   /** 키를 받은 그 갱신 — 닫히는 창을 남겨 두고 다음 명령으로 (0x8daa0 · 0x8e054) */
   const answerReward = () => {
@@ -275,23 +310,35 @@ export function StoryScreen({
     <div className={styles.overlay}>
       {backdropDraw.fill !== null && (
         // 0x6a734 — 밑그림 위 · 상자와 초상화 아래에 화면 전체를 칠한다 ([mgr+0x2c8])
-        <div className={styles.backdropFill} data-testid="event-backdrop-fill"
-          style={{ background: backdropDraw.fill === '흰색' ? '#FFFFFF' : '#000000' }} />
+        <div
+          className={styles.backdropFill}
+          data-testid="event-backdrop-fill"
+          style={{ background: backdropDraw.fill === '흰색' ? '#FFFFFF' : '#000000' }}
+        />
       )}
 
       {/* 초상화 바닥 y — 0x7fbc4 끝 0x7fdee (외출 지도 · 효과 칠 252, 그 밖 135) */}
-      <div className={styles.portraitLayer} data-testid="event-portrait-layer"
-        style={{ bottom: SCREEN_HEIGHT - portraitBaseY }}>
-        <EventPortraits portraits={portraits} height={styles.PORTRAIT_HEIGHT}
-          skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} upcomingPortraits={upcomingPortraits} />
+      <div className={styles.portraitLayer} data-testid="event-portrait-layer" style={{ bottom: SCREEN_HEIGHT - portraitBaseY }}>
+        <EventPortraits
+          portraits={portraits}
+          height={styles.PORTRAIT_HEIGHT}
+          skinIndex={skinIndex}
+          battingTypeIndex={battingTypeIndex}
+          upcomingPortraits={upcomingPortraits}
+        />
       </div>
 
       {box !== null && (
         // 상자 객체는 재생 내내 하나다 — 재생은 늘 높이 0 에서 시작한다(앞 재생 끝 0x8d4e2 의 0x7f7cc · 글 칸 비우기)
-        <EventDialogueBox raw={isBoxCleared ? '' : (box.slots[0] ?? '')} replacements={box.replacements}
+        <EventDialogueBox
+          raw={isBoxCleared ? '' : (box.slots[0] ?? '')}
+          replacements={box.replacements}
           choices={box.isChoice ? { lines: box.slots, selected: selectedChoice } : null}
-          textKey={box.key} lowerKey={lowerCount} slideIn
-          onAdvance={next} isActive={isBoxActive && !isInputLocked}
+          textKey={box.key}
+          lowerKey={lowerCount}
+          slideIn
+          onAdvance={next}
+          isActive={isBoxActive && !isInputLocked}
           // 0x8b7b0 — say 중 취소는 다음 보상 · system · 선택지 · 예아니오 · 4 · 경기 명령까지 say · 효과 · 소리를 건너뛴다
           onCancel={command?.op === 'say' ? skip : undefined}
           onChoiceMove={setSelectedChoice}
@@ -301,7 +348,8 @@ export function StoryScreen({
             // 8b8d8 0x8b0e4 — 고른 이벤트를 싣기(다음 틀 0x8be20) 앞에 떠나온 줄 본 표시 · S+4 · 저장
             onChoiceConfirm?.(step.cursor.eventId, leftEventIds())
             if (choice !== undefined) jump(choice.gotoEvent)
-          }} />
+          }}
+        />
       )}
 
       {/*
@@ -313,40 +361,61 @@ export function StoryScreen({
 
         {noticeText !== null && (
           // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
-          <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-            text={noticeText} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY} onAnswer={closeSystemWindow} />
+          <MessageBox
+            key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+            text={noticeText}
+            buttons={NOTICE_BUTTONS}
+            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
+            onAnswer={closeSystemWindow}
+          />
         )}
 
         {shownReward?.notice.kind === '알림' && (
           // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)을 받은 그 갱신에 다음 명령
-          <MessageBox key={shownReward.key}
-            text={shownReward.notice.text} buttons={NOTICE_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-            onAnswerKey={answerReward} onAnswer={() => finishRewardWindow(shownReward.key)} />
+          <MessageBox
+            key={shownReward.key}
+            text={shownReward.notice.text}
+            buttons={NOTICE_BUTTONS}
+            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
+            onAnswerKey={answerReward}
+            onAnswer={() => finishRewardWindow(shownReward.key)}
+          />
         )}
 
         {shownReward?.notice.kind === '스킬' && (
           // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a0 (그리기 0x87108 · 키 0x8e054 — 받은 그 갱신에 다음 명령)
-          <RewardSkillWindow key={shownReward.key}
-            text={shownReward.notice.text} gained={shownReward.notice.gained}
-            onKey={answerReward} onClose={() => finishRewardWindow(shownReward.key)} />
+          <RewardSkillWindow
+            key={shownReward.key}
+            text={shownReward.notice.text}
+            gained={shownReward.notice.gained}
+            onKey={answerReward}
+            onClose={() => finishRewardWindow(shownReward.key)}
+          />
         )}
 
         {command?.op === 'yesno' && (
           // 0x74ef4 종류 2 — 0x749d5 를 안 불러 처음 커서는 [예]. CLR 은 1 [아니오](0x7514a~0x75174: 키 −16 → 1).
           // 답 0 → [mgr+0x2bc] = 예 이벤트([명령+8]) · 1 → 아니오 이벤트([명령+0xa]) (0x8d954~0x8d9a2)
-          <MessageBox key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-            text={command.text} buttons={YES_NO_BUTTONS} dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-            onAnswer={(answer) => jump(answer === 0 ? command.yesEvent : command.noEvent)} />
+          <MessageBox
+            key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
+            text={command.text}
+            buttons={YES_NO_BUTTONS}
+            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
+            onAnswer={(answer) => jump(answer === 0 ? command.yesEvent : command.noEvent)}
+          />
         )}
       </div>
 
       {effect?.overlay != null && (
         // 화면 전체 덮개 — 검정 덮기 (16 − 단계)/16 · 색 덮기 (단계 + 1)/16 (`screenEffect` 머리말)
-        <div className={styles.effectCover} data-testid="screen-effect-cover"
+        <div
+          className={styles.effectCover}
+          data-testid="screen-effect-cover"
           style={{
             background: effect.overlay.color === '흰색' ? '#FFFFFF' : '#000000',
             opacity: effect.overlay.opacity,
-          }} />
+          }}
+        />
       )}
     </div>
   )

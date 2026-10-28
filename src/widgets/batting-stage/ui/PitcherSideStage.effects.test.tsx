@@ -148,8 +148,16 @@ describe('사람 투구 장면의 0x11 · 0x13 연출 (타자편과 같은 부�
     resetSceneBallPath()
     const 상태틱 = { current: -1 }
     const 게이지: PitchGaugeOverlay = {
-      kind: '게이지', aim: { x: 0, y: 0, z: 0 }, aimSide: 1, showsGauge: false, gaugeSettingOn: true, cursor: 0, pressed: 0,
-      decidedTicks: 0, isMagicPitch: true, stateTickRef: 상태틱,
+      kind: '게이지',
+      aim: { x: 0, y: 0, z: 0 },
+      aimSide: 1,
+      showsGauge: false,
+      gaugeSettingOn: true,
+      cursor: 0,
+      pressed: 0,
+      decidedTicks: 0,
+      isMagicPitch: true,
+      stateTickRef: 상태틱,
     }
     const inputOverlayRef = { current: 게이지 as PitchInputOverlay | null }
     const 마구투수 = { ...기본, pitcherMagicNumber: 2 }
@@ -164,9 +172,7 @@ describe('사람 투구 장면의 0x11 · 0x13 연출 (타자편과 같은 부�
     // 틱 10 에 놓았다 — 장면이 못 본 틱 7~9 를 마저 쏘고, 놓은 뒤는 공 경로로
     상태틱.current = 10
     inputOverlayRef.current = null
-    rerender(
-      <PitcherSideStage {...마구투수} pitch={공} resolution={{ kind: '볼' }} inputOverlayRef={inputOverlayRef} />,
-    )
+    rerender(<PitcherSideStage {...마구투수} pitch={공} resolution={{ kind: '볼' }} inputOverlayRef={inputOverlayRef} />)
     for (let index = 0; index < 300; index += 1) 그림()
     expect(쏜것.filter((call) => call.callId === 0x15)).toHaveLength(
       HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS - HUMAN_PITCH_RELEASE_STATE_TICK + 공.frameCount + 2,
@@ -176,14 +182,21 @@ describe('사람 투구 장면의 0x11 · 0x13 연출 (타자편과 같은 부�
   it('마구가 아닌 게이지 · 마구 번호 0 투수는 놓기 전 그림에 안 쏜다', () => {
     const 상태틱 = { current: 9 }
     const 게이지: PitchGaugeOverlay = {
-      kind: '게이지', aim: { x: 0, y: 0, z: 0 }, aimSide: 1, showsGauge: true, gaugeSettingOn: true, cursor: 0, pressed: 0,
-      decidedTicks: 0, stateTickRef: 상태틱,
+      kind: '게이지',
+      aim: { x: 0, y: 0, z: 0 },
+      aimSide: 1,
+      showsGauge: true,
+      gaugeSettingOn: true,
+      cursor: 0,
+      pressed: 0,
+      decidedTicks: 0,
+      stateTickRef: 상태틱,
     }
-    const { rerender } = render(<PitcherSideStage {...기본} pitcherMagicNumber={2} pitch={null} resolution={null} inputOverlayRef={{ current: 게이지 }} />)
-    그림()
-    rerender(
-      <PitcherSideStage {...기본} pitch={null} resolution={null} inputOverlayRef={{ current: { ...게이지, isMagicPitch: true } }} />,
+    const { rerender } = render(
+      <PitcherSideStage {...기본} pitcherMagicNumber={2} pitch={null} resolution={null} inputOverlayRef={{ current: 게이지 }} />,
     )
+    그림()
+    rerender(<PitcherSideStage {...기본} pitch={null} resolution={null} inputOverlayRef={{ current: { ...게이지, isMagicPitch: true } }} />)
     그림()
     expect(쏜것).toEqual([])
   })

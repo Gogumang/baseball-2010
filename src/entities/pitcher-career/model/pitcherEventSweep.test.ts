@@ -185,15 +185,27 @@ describe('나리 투수편 이벤트 전수 — 보상 (0x8c460 모드 3)', () =
     for (const event of 보상이벤트) {
       it(`보직 ${role} · 이벤트 ${event.id} 보상 ${JSON.stringify(rewardsIn(event.commands))} 이 원본 식과 같다`, () => {
         const career: PitcherCareer = {
-          ...createPitcherCareer('보상'), role, morale: 50, popularity: 100, reputation: 100, money: 1000,
+          ...createPitcherCareer('보상'),
+          role,
+          morale: 50,
+          popularity: 100,
+          reputation: 100,
+          money: 1000,
           ability: { control: 795, velocity: 845, breaking: 300, stamina: 595 },
         }
         const web = applyPitcherEventRewards(career, rewardsIn(event.commands), createConstantRandom(0.5), event.id)
         const original = 원본보상(career, event)
         const pick = (c: PitcherCareer) => ({
-          popularity: c.popularity, reputation: c.reputation, morale: c.morale, money: c.money, ability: c.ability,
-          skillIds: [...c.skillIds].sort((a, b) => a - b), equippedSkillIds: [...c.equippedSkillIds].sort((a, b) => a - b),
-          removedMinusSkillIds: c.removedMinusSkillIds, hiddenPitchRows: c.hiddenPitchRows, openedHiddenIds: c.openedHiddenIds,
+          popularity: c.popularity,
+          reputation: c.reputation,
+          morale: c.morale,
+          money: c.money,
+          ability: c.ability,
+          skillIds: [...c.skillIds].sort((a, b) => a - b),
+          equippedSkillIds: [...c.equippedSkillIds].sort((a, b) => a - b),
+          removedMinusSkillIds: c.removedMinusSkillIds,
+          hiddenPitchRows: c.hiddenPitchRows,
+          openedHiddenIds: c.openedHiddenIds,
         })
         expect(pick(web)).toEqual(pick(original))
       })

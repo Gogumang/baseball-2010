@@ -48,9 +48,7 @@ export const NO_SPECIAL_SWING_NUMBER = 0
  * `'묻기'` 의 `number` 는 **저장할 번호**(1~4)이고 `name` 은 `4 + 타입` 으로 고른 이름이다.
  */
 export type SpecialSwingPick =
-  | { readonly kind: '사용중' }
-  | { readonly kind: '미습득' }
-  | { readonly kind: '묻기'; readonly number: number; readonly name: string }
+  { readonly kind: '사용중' } | { readonly kind: '미습득' } | { readonly kind: '묻기'; readonly number: number; readonly name: string }
 
 /**
  * 기술 고르기 키 처리 `0x17cec` (확인 키 −5 / '5', 탭 0·1, H-4 확정):
@@ -65,12 +63,7 @@ export type SpecialSwingPick =
  * 다시 골라도 "사용 중" 이 안 뜨고 아래 글 "사용중"(0x80be8 도 같은 0xa43c4)도 안 붙는다 (B-77).
  * **고침(bugfixes.json B-77, 기본 켬)**: 비교값을 저장 번호(`칸 + 1`, 1~4)로 — 메테오 스윙도 "사용 중". 굴림 없음.
  */
-export function specialSwingPickOf(
-  slot: number,
-  battingTypeIndex: number,
-  learnedCount: number,
-  selectedNumber: number,
-): SpecialSwingPick {
+export function specialSwingPickOf(slot: number, battingTypeIndex: number, learnedCount: number, selectedNumber: number): SpecialSwingPick {
   const number = specialSwingNumberOf(slot, battingTypeIndex)
   // 고침(B-77): 저장 번호(1~4)와 견준다 — 원본 0xa43c4 는 넷째 칸에 타입을 더한 `number` 와 견준다
   if ((isBugFixed('B-77') ? specialSwingStoredNumberOf(slot) : number) === selectedNumber) return { kind: '사용중' }

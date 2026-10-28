@@ -19,9 +19,7 @@ export { INITIAL_STADIUM_PREVIEW_SCENE } from '@/pages/season/lib/stadiumPreview
 export type { StadiumPreviewScene } from '@/pages/season/lib/stadiumPreviewScene'
 
 export { PlayerRecruitScreen } from '@/pages/season/ui/PlayerRecruitScreen'
-export type {
-  PlayerRecruitScreenProps, RecruitCandidateActions, RecruitChoice,
-} from '@/pages/season/ui/PlayerRecruitScreen'
+export type { PlayerRecruitScreenProps, RecruitCandidateActions, RecruitChoice } from '@/pages/season/ui/PlayerRecruitScreen'
 
 /** 트레이드 네 칸 0xe4 → 0xe5 → 0xe6 → 0xe7 (J 4-4) */
 export { TradeScreen } from '@/pages/season/ui/TradeScreen'
@@ -41,7 +39,11 @@ export type { SeasonInfoAction, SeasonInfoMenuEntry } from '@/widgets/season/lib
 export { SeasonTeamInfoScreen } from '@/pages/season/ui/SeasonTeamInfoScreen'
 export type { SeasonTeamInfoScreenProps } from '@/pages/season/ui/SeasonTeamInfoScreen'
 export {
-  FRESH_SEASON_INFO_RECORD, seasonNameInfoRowsOf, seasonTeamInfoRowsOf, teamTypeFrameOf, stadiumLineOf,
+  FRESH_SEASON_INFO_RECORD,
+  seasonNameInfoRowsOf,
+  seasonTeamInfoRowsOf,
+  teamTypeFrameOf,
+  stadiumLineOf,
 } from '@/pages/season/lib/seasonTeamInfo'
 export type { TeamInfoRow, TeamInfoValue } from '@/pages/season/lib/seasonTeamInfo'
 
@@ -62,9 +64,7 @@ export { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen
 export type { SeasonPlayerPickScreenProps } from '@/pages/season/ui/SeasonPlayerPickScreen'
 export { SeasonPlayerCardScreen } from '@/pages/season/ui/SeasonPlayerCardScreen'
 export type { SeasonPlayerCardScreenProps } from '@/pages/season/ui/SeasonPlayerCardScreen'
-export {
-  seasonCardAbilitiesOf, seasonCardInfoOf, seasonDetailEffectiveOf, seasonPlayerDetailViewOf,
-} from '@/pages/season/lib/seasonPlayerDetail'
+export { seasonCardAbilitiesOf, seasonCardInfoOf, seasonDetailEffectiveOf, seasonPlayerDetailViewOf } from '@/pages/season/lib/seasonPlayerDetail'
 export type { SeasonCardAbility, SeasonCardInfo, SeasonPlayerDetailContext } from '@/pages/season/lib/seasonPlayerDetail'
 
 /** 경기 뒤 마무리 0xf1 — 같은 날 다른 네 경기 결과판 (그림 0xb400) */
@@ -102,7 +102,6 @@ export type { SeasonItemMenuScreenProps } from '@/pages/season/ui/SeasonItemMenu
 export { SeasonChainFrameScreen } from '@/pages/season/ui/SeasonChainFrameScreen'
 export type { SeasonChainFrameScreenProps } from '@/pages/season/ui/SeasonChainFrameScreen'
 
-
 export { SeasonSummaryScreen } from '@/pages/season/ui/SeasonSummaryScreen'
 export type { SeasonSummaryScreenProps } from '@/pages/season/ui/SeasonSummaryScreen'
 
@@ -116,44 +115,54 @@ export type { PostseasonBracketWindowProps } from '@/widgets/season/ui/Postseaso
 
 /** 시즌모드 전용 시상 이벤트 번호·보상 (P4 2a 확정) — ⚠️ 나리(371+개수·376/377)와 다르다 */
 export {
-  SEASON_AWARD_INTRO_EVENT_ID, SEASON_AWARD_REWARDS, SEASON_MVP_LEADER_KINDS,
-  SEASON_MVP_RESULT_EVENT_ID, SEASON_PITCHER_TITLE_KINDS, SEASON_TITLE_RESULT_EVENT_ID,
-  seasonAwardRewardOf, seasonMvpResultEventId, seasonTitleResultEventId,
+  SEASON_AWARD_INTRO_EVENT_ID,
+  SEASON_AWARD_REWARDS,
+  SEASON_MVP_LEADER_KINDS,
+  SEASON_MVP_RESULT_EVENT_ID,
+  SEASON_PITCHER_TITLE_KINDS,
+  SEASON_TITLE_RESULT_EVENT_ID,
+  seasonAwardRewardOf,
+  seasonMvpResultEventId,
+  seasonTitleResultEventId,
 } from '@/widgets/season/lib/seasonAwardEvents'
 export type { SeasonAwardReward, SeasonAwardRole } from '@/widgets/season/lib/seasonAwardEvents'
 
 /** 트레이닝 칸·가드·굴림 표 (J 4-6) — 굴림·적용은 부르는 쪽이 한다 */
 export {
-  TEAM_ABILITY_LABELS, TRAINING_SLOTS, HELL_TRAINING_INDEX, HELL_TRAINING_GAME_POINT,
-  TRAINING_GUARD_CEILING, TRAINING_GAIN_RANGE, TRAINING_MORALE_LOSS_RANGE,
-  HELL_TRAINING_GAIN_RANGE, HELL_TRAINING_MORALE_LOSS_RANGE,
-  TRAINING_SUB_ITEM_GAIN, MASSAGER_MORALE_RELIEF, checkSeasonTraining,
+  TEAM_ABILITY_LABELS,
+  TRAINING_SLOTS,
+  HELL_TRAINING_INDEX,
+  HELL_TRAINING_GAME_POINT,
+  TRAINING_GUARD_CEILING,
+  TRAINING_GAIN_RANGE,
+  TRAINING_MORALE_LOSS_RANGE,
+  HELL_TRAINING_GAIN_RANGE,
+  HELL_TRAINING_MORALE_LOSS_RANGE,
+  TRAINING_SUB_ITEM_GAIN,
+  MASSAGER_MORALE_RELIEF,
+  checkSeasonTraining,
 } from '@/widgets/season/lib/seasonTraining'
-export type {
-  TrainingSlot, TrainingRefusal, TrainingCheckInput, TrainingCheckResult,
-} from '@/widgets/season/lib/seasonTraining'
+export type { TrainingSlot, TrainingRefusal, TrainingCheckInput, TrainingCheckResult } from '@/widgets/season/lib/seasonTraining'
 
 /** 시즌 외출 5종의 표·가드 (P4 3절) — ⚠️ 나리 외출표와 섞어 쓰면 안 된다 */
 export {
-  SEASON_OUTING_PLACES, SEASON_OUTING_ACTIVITIES, SEASON_OUTING_COSTS,
-  SEASON_OUTING_REQUIRED_POPULARITY, SEASON_OUTING_EFFECTS, SEASON_OUTING_SUB_ITEMS,
+  SEASON_OUTING_PLACES,
+  SEASON_OUTING_ACTIVITIES,
+  SEASON_OUTING_COSTS,
+  SEASON_OUTING_REQUIRED_POPULARITY,
+  SEASON_OUTING_EFFECTS,
+  SEASON_OUTING_SUB_ITEMS,
   checkSeasonOuting,
 } from '@/widgets/season/lib/seasonOuting'
-export type {
-  SeasonOutingPlace, SeasonOutingRefusal, SeasonOutingEffect, SeasonOutingCheckResult,
-} from '@/widgets/season/lib/seasonOuting'
+export type { SeasonOutingPlace, SeasonOutingRefusal, SeasonOutingEffect, SeasonOutingCheckResult } from '@/widgets/season/lib/seasonOuting'
 
 /** 아이템 메뉴 칸과 아이템 창 종류 `[win+0x1a4]` */
 export { SEASON_ITEM_MENU, ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 export type { SeasonItemMenuEntry, ItemWindowKind } from '@/widgets/season/lib/seasonItemMenu'
 
 /** 영입 목록을 만들 때 쓰는 입력 타입 (`widgets/season` 이 가진다) */
-export type {
-  RecruitCandidate, RecruitListInput,
-} from '@/widgets/season/lib/recruitList'
-export {
-  HALL_OF_FAME_BATTER_SLOTS, HALL_OF_FAME_PITCHER_SLOTS,
-} from '@/widgets/season/lib/recruitList'
+export type { RecruitCandidate, RecruitListInput } from '@/widgets/season/lib/recruitList'
+export { HALL_OF_FAME_BATTER_SLOTS, HALL_OF_FAME_PITCHER_SLOTS } from '@/widgets/season/lib/recruitList'
 
 /** 다음경기 0xd8 — 순위표 한 장 (그림 0xae24 · 키 0x48d0) */
 export { NextGameScreen } from '@/pages/season/ui/NextGameScreen'

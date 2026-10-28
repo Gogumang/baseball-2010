@@ -84,19 +84,30 @@ export function seasonRankingValueOf(record: LeagueRecord, kind: number, games: 
   if (record.isOutOfRanking || record.atBatsOrOuts <= 0) return null
   const qualified = seasonQualificationOf(games)
   switch (kind) {
-    case 1: return record.wins
-    case 2: return record.losses
-    case 3: return record.saves
+    case 1:
+      return record.wins
+    case 2:
+      return record.losses
+    case 3:
+      return record.saves
     case 4:
       return Math.trunc(record.atBatsOrOuts / OUTS_PER_INNING) >= qualified.innings ? earnedRunAverageOf(record) : null
-    case 5: return record.hits // 투수 +0x22 실점
-    case 6: return record.strikeouts
-    case 8: return record.hits
-    case 9: return record.homeRuns
-    case 10: return record.batterExtra
-    case 11: return record.runsBattedIn
-    case 12: return record.atBatsOrOuts >= qualified.atBats ? battingAverageOf(record) : null
-    default: return null
+    case 5:
+      return record.hits // 투수 +0x22 실점
+    case 6:
+      return record.strikeouts
+    case 8:
+      return record.hits
+    case 9:
+      return record.homeRuns
+    case 10:
+      return record.batterExtra
+    case 11:
+      return record.runsBattedIn
+    case 12:
+      return record.atBatsOrOuts >= qualified.atBats ? battingAverageOf(record) : null
+    default:
+      return null
   }
 }
 

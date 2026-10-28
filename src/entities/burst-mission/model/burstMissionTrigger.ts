@@ -79,9 +79,7 @@ export function matchesSituation(row: BurstMissionRow, context: BurstTriggerCont
   if (situation === BURST_SITUATION.클린업) return CLEANUP_SLOTS.includes(context.opponentBattingSlot)
   if (situation === BURST_SITUATION.역전찬스) {
     const deficit = context.opponentScore - context.ourScore
-    return (
-      context.inning > COMEBACK_INNING && deficit > 0 && runnerCountOf(context.bases) >= deficit
-    )
+    return context.inning > COMEBACK_INNING && deficit > 0 && runnerCountOf(context.bases) >= deficit
   }
   const aceBatter = ACE_BATTER_SITUATIONS[situation]
   if (aceBatter !== undefined) return context.opponentAceBatterId === aceBatter
@@ -151,14 +149,8 @@ export function rollChance(chancePercent: number, random: RandomPort): boolean {
  * 후보를 모으고 하나를 뽑는다 (0x8f000). 조건을 통과한 **행마다** 주사위를 굴리므로
  * 난수를 뽑는 횟수가 행 순서에 달려 있다 — 표 순서를 바꾸면 안 된다.
  */
-export function rollBurstRow(
-  rows: readonly BurstMissionRow[],
-  context: BurstTriggerContext,
-  random: RandomPort,
-): BurstMissionRow | null {
-  const candidates = rows.filter(
-    (row) => isRowEligible(row, context) && rollChance(row.chancePercent, random),
-  )
+export function rollBurstRow(rows: readonly BurstMissionRow[], context: BurstTriggerContext, random: RandomPort): BurstMissionRow | null {
+  const candidates = rows.filter((row) => isRowEligible(row, context) && rollChance(row.chancePercent, random))
   if (candidates.length === 0) return null
   return candidates[random.rand(0, candidates.length)] ?? null
 }

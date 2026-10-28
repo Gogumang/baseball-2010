@@ -74,7 +74,12 @@ function drawCutIn(context: CanvasRenderingContext2D, draw: AceCutInDraw, uiOrig
   if (draw.speedLines !== null) {
     // 474f0 0xba759(game_ui, 0x55 + 단계 mod 5, 종류 1, cx, cy − 39, 효과 0, …) — 칸 85~88 의 파트는 모두 0x67(b = 240 · 230)이라
     // 프레임 0xc9f98 이 화면에 더한다(ca198 · `frameLayers`). 겹이 아직이면 구운 근사(알파 b/255)
-    const layers = placedFrameLayersOf(GAME_UI_FRAMES, draw.speedLines.frame, spriteJsonNow<FrameLayerListing>(frameLayersUrl(GAME_UI_FRAMES)), imageAt)
+    const layers = placedFrameLayersOf(
+      GAME_UI_FRAMES,
+      draw.speedLines.frame,
+      spriteJsonNow<FrameLayerListing>(frameLayersUrl(GAME_UI_FRAMES)),
+      imageAt,
+    )
     const origin = uiOrigins?.[pad(draw.speedLines.frame)]
     const image = layers !== null || origin === undefined ? null : imageAt(`${GAME_UI_FRAMES}/${pad(draw.speedLines.frame)}.png`)
     if (layers !== null) drawFrameLayers(context, layers, draw.speedLines.x, draw.speedLines.y)
@@ -148,14 +153,5 @@ export function AceCutInCanvas({ draw, aceSlot }: AceCutInCanvasProps) {
     })
   })
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className={styles.stage}
-      width={SCREEN_WIDTH}
-      height={SCREEN_HEIGHT}
-      data-testid="마선수컷인"
-      data-draw={draw}
-    />
-  )
+  return <canvas ref={canvasRef} className={styles.stage} width={SCREEN_WIDTH} height={SCREEN_HEIGHT} data-testid="마선수컷인" data-draw={draw} />
 }

@@ -114,7 +114,9 @@ export function recordPlateAppearance(
     plateAppearances: record.plateAppearances + (countsAsPlateAppearance ? 1 : 0),
     ...(pushesResult
       ? { results: withAtBatResult(record.results, play.resultCode!) }
-      : record.results === undefined ? {} : { results: record.results }),
+      : record.results === undefined
+        ? {}
+        : { results: record.results }),
   }
 }
 

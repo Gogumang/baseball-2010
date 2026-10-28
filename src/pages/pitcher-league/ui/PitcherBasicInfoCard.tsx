@@ -38,13 +38,24 @@ export function PitcherBasicInfoCard({ career, figureEquipment, appliesCondition
     <div data-testid="pitcher-basic-info-card">
       <CardPlate teamId={career.teamId} />
       {/* 0x15e20 차례 — 카드 0x7ba45(레이더) 뒤에 그림 */}
-      <AbilityRadar base={PITCHER_ABILITY_ORDER.map((key) => career.ability[key])}
-        shown={PITCHER_ABILITY_ORDER.map((key) => shown[key])} labelFrames={PITCHER_RADAR_LABEL_FRAMES} />
-      <div className={specialStyles.hofFigureImage} data-testid="투수카드-그림"
+      <AbilityRadar
+        base={PITCHER_ABILITY_ORDER.map((key) => career.ability[key])}
+        shown={PITCHER_ABILITY_ORDER.map((key) => shown[key])}
+        labelFrames={PITCHER_RADAR_LABEL_FRAMES}
+      />
+      <div
+        className={specialStyles.hofFigureImage}
+        data-testid="투수카드-그림"
         style={{
-          left: PITCHER_CARD_IMAGE.x, top: PITCHER_CARD_IMAGE.y, width: image.width, height: image.height,
-          transform: `scale(${PITCHER_CARD_IMAGE.scale})`, transformOrigin: '0 0', imageRendering: 'pixelated',
-        }}>
+          left: PITCHER_CARD_IMAGE.x,
+          top: PITCHER_CARD_IMAGE.y,
+          width: image.width,
+          height: image.height,
+          transform: `scale(${PITCHER_CARD_IMAGE.scale})`,
+          transformOrigin: '0 0',
+          imageRendering: 'pixelated',
+        }}
+      >
         <PitcherFigure look={look} pose={pitcherCardPoseAt(look.form, tick)} />
       </div>
     </div>

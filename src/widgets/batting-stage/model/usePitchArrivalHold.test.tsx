@@ -22,8 +22,7 @@ describe('공 도착 판(도루 · 폭투)은 0x12 진입 다음 그림에 선�
   it('판을 받은 그림부터 그 틱 수만큼 붙들고, 팝업 동안은 세지 않는다', () => {
     const 판 = { kind: 'arrival' }
     const { result, rerender } = renderHook(
-      ({ play, isFrozen }: { play: object | null; isFrozen: boolean }) =>
-        usePitchArrivalHold({ play, isFrozen }),
+      ({ play, isFrozen }: { play: object | null; isFrozen: boolean }) => usePitchArrivalHold({ play, isFrozen }),
       { initialProps: { play: null as object | null, isFrozen: false } },
     )
     expect(result.current).toBe(false)

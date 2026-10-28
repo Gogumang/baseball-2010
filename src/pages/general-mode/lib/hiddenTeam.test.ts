@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAM_GAME_MODE } from '@/features/play-team-game/model/gameAbilities'
-import {
-  canSelectTeam, canUseHiddenTeams, hiddenTeamHintMessage, isHiddenTeam, isTeamOpened,
-} from '@/pages/general-mode/lib/hiddenTeam'
+import { canSelectTeam, canUseHiddenTeams, hiddenTeamHintMessage, isHiddenTeam, isTeamOpened } from '@/pages/general-mode/lib/hiddenTeam'
 
 /** 히든 팀 잠금 (J-1 확정) — 열려 있어도 **일반모드에서만** 고를 수 있다 */
 
@@ -46,9 +44,7 @@ describe('힌트 팝업 글', () => {
     const message = hiddenTeamHintMessage(13, { openedHiddenIds: [], mode: TEAM_GAME_MODE.일반 })
 
     // 0xcc1ec "%s!N%s!N!N%s" — StrMODE[225] · [216+13 = 229 "메이저를 넘어서라!"] · [0]
-    expect(message).toBe(
-      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[229]}!N!N${ORIGINAL_MODE_TEXT[0]}`,
-    )
+    expect(message).toBe(`${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[229]}!N!N${ORIGINAL_MODE_TEXT[0]}`)
   })
 
   it('나리 101(0x14114)에서 열린 팀은 0xcc1ec "%s!N%s!N!N%s" — [225] · [226+k] · [1]', () => {
@@ -60,9 +56,7 @@ describe('힌트 팝업 글', () => {
   it('나리 101(0x14114)에서 잠긴 팀은 0xcc1fc "%s!N%s!N!N%s!N%s" — [225] · [226+k] · [0] · [1]', () => {
     const message = hiddenTeamHintMessage(14, { openedHiddenIds: [], mode: TEAM_GAME_MODE.시즌 })
 
-    expect(message).toBe(
-      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[230]}!N!N${ORIGINAL_MODE_TEXT[0]}!N${ORIGINAL_MODE_TEXT[1]}`,
-    )
+    expect(message).toBe(`${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[230]}!N!N${ORIGINAL_MODE_TEXT[0]}!N${ORIGINAL_MODE_TEXT[1]}`)
   })
 
   it('고를 수 있으면 팝업이 없다', () => {

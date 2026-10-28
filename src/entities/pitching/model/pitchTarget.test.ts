@@ -28,7 +28,11 @@ describe('목표점 — 0x345fc', () => {
   })
 
   it('종류 2 는 dx 282~331 · dy 280~329', () => {
-    expect(pitchTargetOf(2, { side: 1, batterSide: 1, runnerCount: 0 }, 차례난수([0.999, 0.999, 0.5, 0]))).toEqual({ x: C.x - 331, y: C.y + 329, z: 29705 })
+    expect(pitchTargetOf(2, { side: 1, batterSide: 1, runnerCount: 0 }, 차례난수([0.999, 0.999, 0.5, 0]))).toEqual({
+      x: C.x - 331,
+      y: C.y + 329,
+      z: 29705,
+    })
   })
 
   it('종류 3 은 존 밖 — 타자 쪽(side0 +, 그 밖 −)이고 rand(0,3) == 0 이면 뒤집는다', () => {

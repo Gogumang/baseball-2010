@@ -10,9 +10,17 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
-  RECORD_PICK_CELL_SIZE, RECORD_PICK_CELLS, RECORD_PICK_DIM_LABEL_COLOR, RECORD_PICK_LABEL_GAP, RECORD_PICK_POPUP_HEIGHT,
-  RECORD_PICK_TITLE_ID, RECORD_PICK_TITLE_X, RECORD_PICK_TITLE_Y, recordPickIconOffsetOf,
-  recordPickLabelXOf, recordPickPopupTopOf,
+  RECORD_PICK_CELL_SIZE,
+  RECORD_PICK_CELLS,
+  RECORD_PICK_DIM_LABEL_COLOR,
+  RECORD_PICK_LABEL_GAP,
+  RECORD_PICK_POPUP_HEIGHT,
+  RECORD_PICK_TITLE_ID,
+  RECORD_PICK_TITLE_X,
+  RECORD_PICK_TITLE_Y,
+  recordPickIconOffsetOf,
+  recordPickLabelXOf,
+  recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
@@ -79,7 +87,15 @@ export interface RecordPickPopupProps {
  * 나리 확인은 원본 차례대로 키를 받은 다음 갱신에 `onConfirm`(124 가 들어선다)이고 창은 그 위에서 줄어든 뒤 `onClosed`.
  */
 export function RecordPickPopup({
-  ariaLabel, testIdPrefix, cells, selected, closeKind, onToggle, onConfirm, onCancel, onClosed,
+  ariaLabel,
+  testIdPrefix,
+  cells,
+  selected,
+  closeKind,
+  onToggle,
+  onConfirm,
+  onCancel,
+  onClosed,
 }: RecordPickPopupProps) {
   const latest = useRef({ onToggle, onConfirm, onCancel, onClosed })
   latest.current = { onToggle, onConfirm, onCancel, onClosed }
@@ -95,7 +111,11 @@ export function RecordPickPopup({
   /** 확인 — `'바로'` 는 치운 자리에서, `'줄임'` 은 다음 갱신에 `onConfirm` · 다 닫히면 `onClosed` */
   const confirm = () => {
     if (closeKindRef.current === '바로') return motion.close('바로', () => latest.current.onConfirm())
-    return motion.close('줄임', () => latest.current.onClosed?.(), () => latest.current.onConfirm())
+    return motion.close(
+      '줄임',
+      () => latest.current.onClosed?.(),
+      () => latest.current.onConfirm(),
+    )
   }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -134,53 +154,86 @@ export function RecordPickPopup({
     <div role="dialog" aria-label={ariaLabel}>
       {/* 0x746cc — 뒤 어둡게(단계 5) 뒤 판 0x744c4 (0, (H − 높이) >> 1, 240, 높이) */}
       <div style={{ ...pixel, left: 0, top: 0, width: 240, height: 320, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
-      <div className={boxStyles.box} data-testid={`${testIdPrefix}-판`} ref={boxRef}
-        style={{ ...box, top: recordPickPopupTopOf(box.height), bottom: 'auto', padding: 0 }} />
-      {motion.openingHeight === null && (<>
-      {/* "!C보고 싶은 기록을!N선택해주세요" — 0xba269 폭 −1: 날 글 전체를 잰 폭(서식 넉 자 포함, 165)의 반을 두 줄 모두의 가운데로
+      <div
+        className={boxStyles.box}
+        data-testid={`${testIdPrefix}-판`}
+        ref={boxRef}
+        style={{ ...box, top: recordPickPopupTopOf(box.height), bottom: 'auto', padding: 0 }}
+      />
+      {motion.openingHeight === null && (
+        <>
+          {/* "!C보고 싶은 기록을!N선택해주세요" — 0xba269 폭 −1: 날 글 전체를 잰 폭(서식 넉 자 포함, 165)의 반을 두 줄 모두의 가운데로
           (`measuredTitleCenterXOf`) — 가운데 x = 0x24 + 82 = 118 이라 화면 가운데보다 2px 왼쪽이다 */}
-      <div className={styles.title} style={{ left: TITLE_CENTER_X - 120, top: RECORD_PICK_TITLE_Y, width: 240, whiteSpace: 'nowrap' }}>
-        <MarkupText raw={TITLE_RAW} />
-      </div>
-      {cells.map((cell, index) => {
-        const geometry = RECORD_PICK_CELLS[index]
-        const isOn = index === selected
-        const labelSrc = frameSrc(cell.labelFrame)
-        const labelSize = labelOrigins?.[String(cell.labelFrame).padStart(3, '0')]
-        const labelX = labelSize === undefined ? 0 : recordPickLabelXOf(labelSize.width)
-        return (
-          <button key={cell.label} type="button" aria-pressed={isOn} aria-label={cell.label}
-            className={windowStyles.layer}
-            style={{
-              left: geometry.x, top: geometry.y, width: RECORD_PICK_CELL_SIZE, height: labelTop + (labelSize?.height ?? 0),
-              background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', pointerEvents: 'auto', overflow: 'visible',
-            }}
-            onClick={() => {
-              if (!motion.acceptsKeys()) return
-              if (isOn) confirm()
-              else onToggle()
-            }}>
-            <img alt="" data-testid={`${testIdPrefix}-칸-${index}`}
-              src={isOn ? selectedModeIconOf(geometry.iconFrame) : modeIconOf(geometry.iconFrame)}
-              style={{ ...pixel, left: icon.x, top: icon.y }} />
-            {isOn || labelSize === undefined
-              ? <img alt="" src={labelSrc} style={{ ...pixel, left: labelX, top: labelTop }} />
-              : (
-                // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
-                <span style={{
-                  ...pixel, left: labelX, top: labelTop, width: labelSize.width, height: labelSize.height,
-                  background: solidColorCss(RECORD_PICK_DIM_LABEL_COLOR), maskImage: spriteMaskImage(labelSrc), WebkitMaskImage: spriteMaskImage(labelSrc),
-                  maskSize: '100% 100%', WebkitMaskSize: '100% 100%', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
-                }} />
-              )}
-          </button>
-        )
-      })}
-      {/* CLR — 창 아래 106 화면이 그대로 그리는 바닥띠 되돌아가기 표시 자리(웹 전용 누름 칸, r186). 키와 같은 길(위 듣는 곳) */}
-      <div style={{ pointerEvents: 'auto' }}>
-        <PressArea label="취소" rect={FOOTER_BACK_PRESS_RECT} onPress={() => tapKey('Escape')} />
-      </div>
-      </>)}
+          <div className={styles.title} style={{ left: TITLE_CENTER_X - 120, top: RECORD_PICK_TITLE_Y, width: 240, whiteSpace: 'nowrap' }}>
+            <MarkupText raw={TITLE_RAW} />
+          </div>
+          {cells.map((cell, index) => {
+            const geometry = RECORD_PICK_CELLS[index]
+            const isOn = index === selected
+            const labelSrc = frameSrc(cell.labelFrame)
+            const labelSize = labelOrigins?.[String(cell.labelFrame).padStart(3, '0')]
+            const labelX = labelSize === undefined ? 0 : recordPickLabelXOf(labelSize.width)
+            return (
+              <button
+                key={cell.label}
+                type="button"
+                aria-pressed={isOn}
+                aria-label={cell.label}
+                className={windowStyles.layer}
+                style={{
+                  left: geometry.x,
+                  top: geometry.y,
+                  width: RECORD_PICK_CELL_SIZE,
+                  height: labelTop + (labelSize?.height ?? 0),
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                  overflow: 'visible',
+                }}
+                onClick={() => {
+                  if (!motion.acceptsKeys()) return
+                  if (isOn) confirm()
+                  else onToggle()
+                }}
+              >
+                <img
+                  alt=""
+                  data-testid={`${testIdPrefix}-칸-${index}`}
+                  src={isOn ? selectedModeIconOf(geometry.iconFrame) : modeIconOf(geometry.iconFrame)}
+                  style={{ ...pixel, left: icon.x, top: icon.y }}
+                />
+                {isOn || labelSize === undefined ? (
+                  <img alt="" src={labelSrc} style={{ ...pixel, left: labelX, top: labelTop }} />
+                ) : (
+                  // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
+                  <span
+                    style={{
+                      ...pixel,
+                      left: labelX,
+                      top: labelTop,
+                      width: labelSize.width,
+                      height: labelSize.height,
+                      background: solidColorCss(RECORD_PICK_DIM_LABEL_COLOR),
+                      maskImage: spriteMaskImage(labelSrc),
+                      WebkitMaskImage: spriteMaskImage(labelSrc),
+                      maskSize: '100% 100%',
+                      WebkitMaskSize: '100% 100%',
+                      maskRepeat: 'no-repeat',
+                      WebkitMaskRepeat: 'no-repeat',
+                    }}
+                  />
+                )}
+              </button>
+            )
+          })}
+          {/* CLR — 창 아래 106 화면이 그대로 그리는 바닥띠 되돌아가기 표시 자리(웹 전용 누름 칸, r186). 키와 같은 길(위 듣는 곳) */}
+          <div style={{ pointerEvents: 'auto' }}>
+            <PressArea label="취소" rect={FOOTER_BACK_PRESS_RECT} onPress={() => tapKey('Escape')} />
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -92,14 +92,10 @@ describe('발동 (0x8f158)', () => {
 })
 
 describe('판정 (0x8f414) — 타석이 끝날 때', () => {
-  const 발동된세션 = () =>
-    tryTriggerBurst(createBurstSession(BURST_MODE.나리타자)!, 상황, 언제나통과(), [안타미션])
+  const 발동된세션 = () => tryTriggerBurst(createBurstSession(BURST_MODE.나리타자)!, 상황, 언제나통과(), [안타미션])
 
   it('단타를 치면 성공하고 보상 두 개가 나온다', () => {
-    const 결과 = resolveBurst(
-      발동된세션(),
-      burstResultBitsOf({ outcome: { kind: '안타', bases: 1 }, runsBattedIn: 0, outsBefore: 0, outsAdded: 0 }),
-    )
+    const 결과 = resolveBurst(발동된세션(), burstResultBitsOf({ outcome: { kind: '안타', bases: 1 }, runsBattedIn: 0, outsBefore: 0, outsAdded: 0 }))
 
     expect(결과.judgement).toBe('성공')
     expect(결과.deltas).toEqual([
@@ -111,10 +107,7 @@ describe('판정 (0x8f414) — 타석이 끝날 때', () => {
   })
 
   it('삼진이면 실패하고 페널티가 붙는다', () => {
-    const 결과 = resolveBurst(
-      발동된세션(),
-      burstResultBitsOf({ outcome: { kind: '삼진' }, runsBattedIn: 0, outsBefore: 0, outsAdded: 1 }),
-    )
+    const 결과 = resolveBurst(발동된세션(), burstResultBitsOf({ outcome: { kind: '삼진' }, runsBattedIn: 0, outsBefore: 0, outsAdded: 1 }))
 
     expect(결과.judgement).toBe('실패')
     expect(결과.deltas).toEqual([{ name: '평판', amount: -3 }])
@@ -143,8 +136,7 @@ describe('판정 (0x8f414) — 타석이 끝날 때', () => {
 })
 
 describe('판정 없이 내리기 (0x8f628) — 자동진행 진입·반 이닝 교대', () => {
-  const 발동된세션 = () =>
-    tryTriggerBurst(createBurstSession(BURST_MODE.나리타자)!, 상황, 언제나통과(), [안타미션])
+  const 발동된세션 = () => tryTriggerBurst(createBurstSession(BURST_MODE.나리타자)!, 상황, 언제나통과(), [안타미션])
 
   it('현재 행과 결과 상태만 비운다 — 발동 횟수는 그대로라 이 경기에서는 다시 안 뜬다', () => {
     const 내림 = cancelBurst(발동된세션())

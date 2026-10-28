@@ -94,10 +94,28 @@ describe('사구의 0x12 대기 → 판정 → 진입 (A-22)', () => {
     emitParticles(
       sceneParticleScene(),
       {
-        ang: 0, spread: 0, spd: 0, spdR: 0, emit: 1, emitR: 0, life: 40, lifeR: 0, a0: 0, a0R: 0, a1: 0, a1R: 0,
-        ax: 0, ay: 0, w: 0, h: 0, total: 50, mode: 2,
+        ang: 0,
+        spread: 0,
+        spd: 0,
+        spdR: 0,
+        emit: 1,
+        emitR: 0,
+        life: 40,
+        lifeR: 0,
+        a0: 0,
+        a0R: 0,
+        a1: 0,
+        a1R: 0,
+        ax: 0,
+        ay: 0,
+        w: 0,
+        h: 0,
+        total: 50,
+        mode: 2,
       },
-      0, 0, 0,
+      0,
+      0,
+      0,
     )
     const 세운 = 세우기(3, random, 판.차례)
     세운.틱(2)

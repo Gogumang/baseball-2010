@@ -137,22 +137,33 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
 
   it('기록을 통째로 복사한다(0x1f680 · 0x1f654 memcpy 0x30) — 장비 니블·장착 비트 +0x14·번호 +0x18·구질 마스크 +0x1c', () => {
     const 타자 = 선수({
-      endingIndex: 4, equipmentLevels: { hit: 3, power: 0, defense: 1, run: 0 }, equippedSkillIds: [5, 22], specialSwingNumber: 2,
+      endingIndex: 4,
+      equipmentLevels: { hit: 3, power: 0, defense: 1, run: 0 },
+      equippedSkillIds: [5, 22],
+      specialSwingNumber: 2,
     })
     const batter = registerHallOfFame(EMPTY_COLLECTION, 타자, 넉넉)
     if (batter.kind !== '등록') throw new Error('등록 실패')
     expect(batter.collection.hallOfFame[0]).toMatchObject({
-      equipmentLevels: { hit: 3, power: 0, defense: 1, run: 0 }, equippedSkillIds: [5, 22], specialSwingNumber: 2,
+      equipmentLevels: { hit: 3, power: 0, defense: 1, run: 0 },
+      equippedSkillIds: [5, 22],
+      specialSwingNumber: 2,
     })
 
     const 투수 = {
-      ...createPitcherCareer('철완'), endingIndex: 5, pitchMask: 0b1011, selectedMagicNumber: 3,
-      equippedSkillIds: [16, 22], equipmentLevels: { control: 2, velocity: 0, breaking: 0, stamina: 4 },
+      ...createPitcherCareer('철완'),
+      endingIndex: 5,
+      pitchMask: 0b1011,
+      selectedMagicNumber: 3,
+      equippedSkillIds: [16, 22],
+      equipmentLevels: { control: 2, velocity: 0, breaking: 0, stamina: 4 },
     }
     const pitcher = registerHallOfFamePitcher(EMPTY_COLLECTION, 투수, 넉넉)
     if (pitcher.kind !== '등록') throw new Error('등록 실패')
     expect(pitcher.collection.hallOfFamePitchers[0]).toMatchObject({
-      pitchMask: 0b1011, selectedMagicNumber: 3, equippedSkillIds: [16, 22],
+      pitchMask: 0b1011,
+      selectedMagicNumber: 3,
+      equippedSkillIds: [16, 22],
       equipmentLevels: { control: 2, velocity: 0, breaking: 0, stamina: 4 },
       // +0x1b — 등록 0x10fb4 의 연봉 50 을 0xa4fd8 가 1/10 로 둔 값
       salaryGrade: 5,
@@ -179,7 +190,10 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
   it('기록 칸이 없는 옛 저장도 읽고, 칸 형식이 깨진 선수만 버린다', () => {
     const famer = { name: '전설', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [] }
     const loaded = normalizeCollection({
-      titles: [], skills: [], endings: [], hallOfFame: [famer, { ...famer, equippedSkillIds: 'x' }, { ...famer, specialSwingNumber: '1' }],
+      titles: [],
+      skills: [],
+      endings: [],
+      hallOfFame: [famer, { ...famer, equippedSkillIds: 'x' }, { ...famer, specialSwingNumber: '1' }],
     })
     expect(loaded.hallOfFame).toEqual([{ ...famer, slot: 0, salaryGrade: 0 }])
   })
@@ -198,7 +212,12 @@ describe('명예의 전당 — 등록 0x62cea (K 4-2 · Q2 4절)', () => {
 
 describe('명예의 전당 칸 삭제 — 0x22371 · 0x22339 (R11 3-2)', () => {
   const famer = (slot: number) => ({
-    name: `타자${slot}`, ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot,
+    name: `타자${slot}`,
+    ability: { hit: 1, power: 2, defense: 3, run: 4 },
+    endingIndex: 6,
+    season: 13,
+    titleIds: [],
+    slot,
   })
 
   it('그 칸만 빈 칸이 되고 다른 칸 번호는 그대로다 — 없는 칸이면 같은 객체', () => {
@@ -219,7 +238,12 @@ describe('명예의 전당 칸 삭제 — 0x22371 · 0x22339 (R11 3-2)', () => {
 
 describe('0x2328c — 시즌에서 명예 선수가 산 장비 니블을 명전 기록에도', () => {
   const famer = (slot: number) => ({
-    name: `타자${slot}`, ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot,
+    name: `타자${slot}`,
+    ability: { hit: 1, power: 2, defense: 3, run: 4 },
+    endingIndex: 6,
+    season: 13,
+    titleIds: [],
+    slot,
     equipmentLevels: { hit: 2, power: 0, defense: 0, run: 5 },
   })
 
@@ -240,7 +264,12 @@ describe('0x2328c — 시즌에서 명예 선수가 산 장비 니블을 명전 
 
 describe('0xc554 c578 0xb6605 — 시즌 영입이 명전 기록 +0xa 아랫 5비트를 고른 자리로 (전역 블록째 저장)', () => {
   const famer = (slot: number) => ({
-    name: `타자${slot}`, ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot,
+    name: `타자${slot}`,
+    ability: { hit: 1, power: 2, defense: 3, run: 4 },
+    endingIndex: 6,
+    season: 13,
+    titleIds: [],
+    slot,
   })
 
   it('영입한 적 없으면 0 (등록 0x1f680 의 0x20 & 0x1f) · 영입하면 그 칸만 j', () => {
@@ -321,10 +350,20 @@ describe('r278 Q-05 — 명전 기록 +0x2c 와 시즌 영입이 지우는 줄 (
     const recruited = withHallOfFameRecordSlot(withLine, '투수', 0xb4, 6)
     expect(recruited.hallOfFamePitchers[0]).toMatchObject({ recordSlot: 6, recordLine: [0, 0, 0, 0, 0, 0], stamina: 10000 })
     expect(withHallOfFameRecordSlot(recruited, '투수', 0xb4, 6)).toBe(recruited)
-    const batter = { ...EMPTY_COLLECTION, hallOfFame: [{
-      name: '타', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [], slot: 0,
-      recordLine: [100, 30, 5, 1, 7, 20],
-    }] }
+    const batter = {
+      ...EMPTY_COLLECTION,
+      hallOfFame: [
+        {
+          name: '타',
+          ability: { hit: 1, power: 2, defense: 3, run: 4 },
+          endingIndex: 6,
+          season: 13,
+          titleIds: [],
+          slot: 0,
+          recordLine: [100, 30, 5, 1, 7, 20],
+        },
+      ],
+    }
     expect(withHallOfFameRecordSlot(batter, '타자', 0xc8, 2).hallOfFame[0]).toMatchObject({ recordSlot: 2, recordLine: [0, 0, 0, 0, 0, 0] })
   })
 

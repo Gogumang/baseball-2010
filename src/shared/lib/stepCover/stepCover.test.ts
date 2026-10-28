@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  blackStepCoverOpacityOf, blackStepCoverPixel565, colorStepCoverOpacityOf, colorStepCoverPixel565,
-} from '@/shared/lib/stepCover/stepCover'
+import { blackStepCoverOpacityOf, blackStepCoverPixel565, colorStepCoverOpacityOf, colorStepCoverPixel565 } from '@/shared/lib/stepCover/stepCover'
 
 describe('단계 덮기 [0x15605d4] · [0x15605d0]', () => {
   it('검정 0x9aac4 는 화면을 단계/16 만큼 남긴다 — 단계 0 은 완전 검정', () => {
@@ -30,13 +28,64 @@ describe('단계 덮기 몸통 픽셀 — 0x9aac4 · 0x9a52c 갈래를 직접 �
   // 0x9a52c 표 0xd5f48 의 갈래 0x9a54c · 0x9a598 · 0x9a5dc · 0x9a628 · 0x9a664 · 0x9a6b0 · 0x9a6f4 · 0x9a740 · 0x9a774 · 0x9a7c0 ·
   // 0x9a804 · 0x9a864 · 0x9a8a0 · 0x9a8ea · 0x9a92c (단계 15 = 0x9a976 색 그대로)
   const COLOR_CASES: readonly (readonly [screen: readonly number[], color: readonly number[]])[] = [
-    [[1, 2, 3, 4], [4]], [[1, 2, 3], [3]], [[1, 2, 4], [3, 4]], [[1, 2], [2]], [[1, 3, 4], [2, 4]], [[1, 3], [2, 3]],
-    [[1, 4], [2, 3, 4]], [[1], [1]], [[2, 3, 4], [1, 4]], [[2, 3], [1, 3]], [[2, 4], [1, 3, 4]], [[2], [1, 2]],
-    [[3, 4], [1, 2, 4]], [[3], [1, 2, 3]], [[4], [1, 2, 3, 4]],
+    [[1, 2, 3, 4], [4]],
+    [[1, 2, 3], [3]],
+    [
+      [1, 2, 4],
+      [3, 4],
+    ],
+    [[1, 2], [2]],
+    [
+      [1, 3, 4],
+      [2, 4],
+    ],
+    [
+      [1, 3],
+      [2, 3],
+    ],
+    [
+      [1, 4],
+      [2, 3, 4],
+    ],
+    [[1], [1]],
+    [
+      [2, 3, 4],
+      [1, 4],
+    ],
+    [
+      [2, 3],
+      [1, 3],
+    ],
+    [
+      [2, 4],
+      [1, 3, 4],
+    ],
+    [[2], [1, 2]],
+    [
+      [3, 4],
+      [1, 2, 4],
+    ],
+    [[3], [1, 2, 3]],
+    [[4], [1, 2, 3, 4]],
   ]
   // 0x9aac4 표 0xd5f88 의 갈래 0x9aae2(0 검정) · 0x9ab06 · … · 0x9add0
   const BLACK_CASES: readonly (readonly number[])[] = [
-    [], [4], [3], [3, 4], [2], [2, 4], [2, 3], [2, 3, 4], [1], [1, 4], [1, 3], [1, 3, 4], [1, 2], [1, 2, 4], [1, 2, 3], [1, 2, 3, 4],
+    [],
+    [4],
+    [3],
+    [3, 4],
+    [2],
+    [2, 4],
+    [2, 3],
+    [2, 3, 4],
+    [1],
+    [1, 4],
+    [1, 3],
+    [1, 3, 4],
+    [1, 2],
+    [1, 2, 4],
+    [1, 2, 3],
+    [1, 2, 3, 4],
   ]
   const terms = (pixel: number, shifts: readonly number[]) => shifts.reduce((sum, shift) => sum + ((pixel & MASK_OF[shift]) >> shift), 0)
   const samples = [0, 0xffff, 0x0841, 0xf800, 0x07e0, 0x001f, 0x8410, 0x1234, 0xabcd, 0x7bef, 0x39e7, 0xc618]

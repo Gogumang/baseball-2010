@@ -1,13 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
-import { aceBatterLayersOf, batterEquipmentOf, batterFrameAt, batterLayersOf, bodyTypeOf, equipmentGradeOf, layerPaletteIndexOf, pitcherEquipmentOf, pitcherLayerPaletteIndexOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
+import {
+  aceBatterLayersOf,
+  batterEquipmentOf,
+  batterFrameAt,
+  batterLayersOf,
+  bodyTypeOf,
+  equipmentGradeOf,
+  layerPaletteIndexOf,
+  pitcherEquipmentOf,
+  pitcherLayerPaletteIndexOf,
+  pitcherLayersOf,
+} from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 
 const 파일 = (layers: ReturnType<typeof batterLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
 describe('타자 자세 프레임 f — 0xb905c', () => {
   it('대기는 [0,1,2,3] 을 칸마다 4틱씩 반복한다 (balancer)', () => {
-    expect([0, 3, 4, 8, 12, 15, 16].map((tick) => batterFrameAt({ tick, swingTick: null, isBunting: false, bodyType: 0 }))).toEqual([0, 0, 1, 2, 3, 3, 0])
+    expect([0, 3, 4, 8, 12, 15, 16].map((tick) => batterFrameAt({ tick, swingTick: null, isBunting: false, bodyType: 0 }))).toEqual([
+      0, 0, 1, 2, 3, 3, 0,
+    ])
   })
 
   it('스윙은 6~12 를 매 틱 한 칸씩, 끝나면 마지막 칸 12 에 머문다 (0xb9168 은 k = 칸 수 − 1 에 서고 0xb928c 의 되돌림은 안 선다)', () => {
@@ -29,9 +42,7 @@ describe('타자 자세 프레임 f — 0xb905c', () => {
 
 describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
   it('규칙 0 (f=4): 그림자·몸통·헬멧·배트·몸통 앞(f+14) 순서 — 맨몸이면 다리 레이어가 없다', () => {
-    expect(파일(batterLayersOf(4, 0))).toEqual([
-      'batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'batter_batter:4', 'batter_balancer:18',
-    ])
+    expect(파일(batterLayersOf(4, 0))).toEqual(['batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'batter_batter:4', 'batter_balancer:18'])
   })
 
   it('규칙 1 (f=0): 배트와 몸통 앞을 맞바꾼다', () => {
@@ -39,16 +50,15 @@ describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
   })
 
   it('규칙 2 (f=13): 배트가 몸통 뒤로 간다 — 몸통 앞 27 은 원본 PZX 에서 파트가 없는 빈 칸이라 겹에서 뺀다 (r319)', () => {
-    expect(파일(batterLayersOf(13, 0))).toEqual([
-      'batter_shadow:13', 'batter_batter:13', 'batter_balancer:13', 'batter_helmet:13',
-    ])
+    expect(파일(batterLayersOf(13, 0))).toEqual(['batter_shadow:13', 'batter_batter:13', 'batter_balancer:13', 'batter_helmet:13'])
   })
 
   it('빈 몸통 앞 칸(balancer 23 · 27, sluger 22)은 그리지 않는다 — 자세표 0~13 의 겹 그림은 모두 뽑은 파일이 있다 (r319)', () => {
     expect(파일(batterLayersOf(9, 0))).not.toContain('batter_balancer:23')
     expect(파일(batterLayersOf(9, 1))).not.toContain('batter_sluger:22')
     // 폼마다 자세표가 낼 수 있는 자세 — balancer 0 ~ 13 · sluger 0 ~ 12 (0xb905c, `figureBatterPosesOf`)
-    const missing = [0, 1].flatMap((bodyType) => Array.from({ length: bodyType === 1 ? 13 : 14 }, (_, pose) => batterLayersOf(pose, bodyType)).flat())
+    const missing = [0, 1]
+      .flatMap((bodyType) => Array.from({ length: bodyType === 1 ? 13 : 14 }, (_, pose) => batterLayersOf(pose, bodyType)).flat())
       .map((layer) => `public/${layer.folder.replace(/^\.\//, '')}/${String(layer.frame).padStart(3, '0')}.png`)
       .filter((path) => !existsSync(path))
     expect([...new Set(missing)]).toEqual([])
@@ -62,14 +72,13 @@ describe('타자 레이어 — 0x78cfc (겹침 표 0xd3a54)', () => {
   it('fig+0x48 (0x78dc6): false 면 그림자 슬롯만 비우고, 기본값은 그림자를 낸다', () => {
     expect(파일(batterLayersOf(4, 0))).toContain('batter_shadow:4')
     expect(파일(batterLayersOf(4, 0, { head: 1, hand: 0, leg: 3 }, false)).some((name) => name.startsWith('batter_shadow'))).toBe(false)
-    expect(파일(batterLayersOf(13, 1, { head: 1, hand: 0, leg: 3 }, false)))
-      .toEqual(파일(batterLayersOf(13, 1, { head: 1, hand: 0, leg: 3 })).slice(1))
+    expect(파일(batterLayersOf(13, 1, { head: 1, hand: 0, leg: 3 }, false))).toEqual(
+      파일(batterLayersOf(13, 1, { head: 1, hand: 0, leg: 3 })).slice(1),
+    )
   })
 
   it('sluger 는 몸통 외 레이어가 +14, 몸통 앞이 +13 이다', () => {
-    expect(파일(batterLayersOf(0, 1))).toEqual([
-      'batter_shadow:14', 'batter_sluger:0', 'batter_helmet:14', 'batter_batter:14', 'batter_sluger:13',
-    ])
+    expect(파일(batterLayersOf(0, 1))).toEqual(['batter_shadow:14', 'batter_sluger:0', 'batter_helmet:14', 'batter_batter:14', 'batter_sluger:13'])
   })
 })
 
@@ -81,34 +90,46 @@ describe('장비 외형 레이어 — 0x78fd8 적재 · 0x78cfc 슬롯', () => {
 
   it('머리·손·다리 장비가 슬롯 3·4·8 에 들어간다 (규칙 0, f=4)', () => {
     expect(파일(batterLayersOf(4, 0, { head: 1, hand: 0, leg: 3 }))).toEqual([
-      'batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'item_bat_head_1:4', 'item_bat_hand:4',
-      'batter_balancer:18', 'item_bat_hand_014_0:4', 'item_bat_leg_0:4',
+      'batter_shadow:4',
+      'batter_balancer:4',
+      'batter_helmet:4',
+      'item_bat_head_1:4',
+      'item_bat_hand:4',
+      'batter_balancer:18',
+      'item_bat_hand_014_0:4',
+      'item_bat_leg_0:4',
     ])
   })
 
   it('머리 장비 등급 2 이상이면 헬멧을 안 그린다 (0x78df4)', () => {
     expect(파일(batterLayersOf(4, 0, { head: 2, hand: -1, leg: -1 }))).toEqual([
-      'batter_shadow:4', 'batter_balancer:4', 'item_bat_head_2:4', 'batter_batter:4', 'batter_balancer:18',
+      'batter_shadow:4',
+      'batter_balancer:4',
+      'item_bat_head_2:4',
+      'batter_batter:4',
+      'batter_balancer:18',
     ])
   })
 
   it('손 등급 1·4·5 는 셋째 겹(_1)이 붙고, 덧그림 이름은 2_0·35_0·6_0·014_0 이다', () => {
-    expect(파일(batterLayersOf(4, 0, { head: -1, hand: 5, leg: -1 })).slice(5)).toEqual([
-      'item_bat_hand_35_0:4', 'item_bat_hand_5_1:4',
-    ])
+    expect(파일(batterLayersOf(4, 0, { head: -1, hand: 5, leg: -1 })).slice(5)).toEqual(['item_bat_hand_35_0:4', 'item_bat_hand_5_1:4'])
     expect(파일(batterLayersOf(4, 0, { head: -1, hand: 2, leg: -1 })).slice(5)).toEqual(['item_bat_hand_2_0:4'])
     expect(파일(batterLayersOf(4, 0, { head: -1, hand: 6, leg: -1 })).slice(5)).toEqual(['item_bat_hand_6_0:4'])
   })
 
   it('히든 등급(7~10)은 손이 item_bat_hand_{n} 한 장이고 덧그림이 없다', () => {
     expect(파일(batterLayersOf(4, 0, { head: -1, hand: 9, leg: 10 }))).toEqual([
-      'batter_shadow:4', 'batter_balancer:4', 'batter_helmet:4', 'item_bat_hand_9:4', 'batter_balancer:18', 'item_bat_leg_7:4',
+      'batter_shadow:4',
+      'batter_balancer:4',
+      'batter_helmet:4',
+      'item_bat_hand_9:4',
+      'batter_balancer:18',
+      'item_bat_leg_7:4',
     ])
   })
 
   it('등급 색 .mpl 줄 — 손 n≤1·다리 0·7 은 기본색, 나머지는 n−2 · n−1 · n−8', () => {
-    const 줄 = (layers: ReturnType<typeof batterLayersOf>, folder: string) =>
-      layers.find((layer) => layer.folder.includes(folder))?.gradePaletteRow
+    const 줄 = (layers: ReturnType<typeof batterLayersOf>, folder: string) => layers.find((layer) => layer.folder.includes(folder))?.gradePaletteRow
     expect(줄(batterLayersOf(4, 0, { head: -1, hand: 1, leg: -1 }), 'item_bat_hand/')).toBeUndefined()
     expect(줄(batterLayersOf(4, 0, { head: -1, hand: 4, leg: -1 }), 'item_bat_hand/')).toBe(2)
     expect(줄(batterLayersOf(4, 0, { head: -1, hand: -1, leg: 0 }), 'item_bat_leg_0')).toBeUndefined()
@@ -119,8 +140,7 @@ describe('장비 외형 레이어 — 0x78fd8 적재 · 0x78cfc 슬롯', () => {
 })
 
 describe('레이어 한 겹이 칠할 팔레트 번호 — layerPaletteIndexOf', () => {
-  const 겹 = (layers: ReturnType<typeof batterLayersOf>, folder: string) =>
-    layers.find((layer) => layer.folder.includes(folder))!
+  const 겹 = (layers: ReturnType<typeof batterLayersOf>, folder: string) => layers.find((layer) => layer.folder.includes(folder))!
 
   it('장비 손·다리는 등급 줄을 그대로 쓴다 (팀·피부와 무관)', () => {
     const 손4 = 겹(batterLayersOf(4, 0, { head: -1, hand: 4, leg: -1 }), 'item_bat_hand/')
@@ -176,8 +196,7 @@ describe('타자 폼 → 몸통 종류 t = 폼 >> 1 (0x78ab0)', () => {
 })
 
 describe('투수 장비 레이어 — 0x79790 적재 · 0x79524 여섯 칸', () => {
-  const 투수파일 = (layers: ReturnType<typeof pitcherLayersOf>) =>
-    layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
+  const 투수파일 = (layers: ReturnType<typeof pitcherLayersOf>) => layers.map((layer) => `${layer.folder.split('/')[2]}:${layer.frame}`)
 
   it('맨몸이면 바탕 f 와 f+22 두 겹뿐이다 (3번 칸은 조건 없이 늘 쌓인다)', () => {
     expect(투수파일(pitcherLayersOf(4))).toEqual(['pitcher:4', 'pitcher:26'])
@@ -185,7 +204,12 @@ describe('투수 장비 레이어 — 0x79790 적재 · 0x79524 여섯 칸', () 
 
   it('칸 차례는 바탕 f · 머리 · 몸 · 바탕 f+22 · 손 · 다리 이고 아이템은 프레임 보정이 없다', () => {
     expect(투수파일(pitcherLayersOf(4, { head: 0, hand: 0, body: 7, leg: 0 }))).toEqual([
-      'pitcher:4', 'item_pit_head_0:4', 'item_pit_body_7:4', 'pitcher:26', 'item_pit_hand_0:4', 'item_pit_leg_0:4',
+      'pitcher:4',
+      'item_pit_head_0:4',
+      'item_pit_body_7:4',
+      'pitcher:26',
+      'item_pit_hand_0:4',
+      'item_pit_leg_0:4',
     ])
   })
 
@@ -210,7 +234,10 @@ describe('투수 장비 레이어 — 0x79790 적재 · 0x79524 여섯 칸', () 
 
   it('니블 묶음은 제구·구속·변화·체력 차례로 모자·글러브·아대·신발이 된다 (추정)', () => {
     expect(pitcherEquipmentOf({ control: 3, velocity: 1, breaking: 0, stamina: 11 })).toEqual({
-      head: 2, hand: 0, body: -1, leg: 10,
+      head: 2,
+      hand: 0,
+      body: -1,
+      leg: 10,
     })
   })
 })

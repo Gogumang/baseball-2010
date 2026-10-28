@@ -123,17 +123,18 @@ export function retainDisplayedSprites(target: Document): () => void {
     if (node instanceof HTMLImageElement) retain(node.getAttribute('src'))
     else if (node.firstElementChild !== null) for (const image of node.getElementsByTagName('img')) retain(image.getAttribute('src'))
   }
-  const observer = typeof MutationObserver === 'undefined'
-    ? null
-    : new MutationObserver((records) => {
-        for (const record of records) {
-          if (record.type === 'attributes') {
-            if (record.target instanceof HTMLImageElement) retain(record.target.getAttribute('src'))
-          } else {
-            for (const node of record.addedNodes) retainTree(node)
+  const observer =
+    typeof MutationObserver === 'undefined'
+      ? null
+      : new MutationObserver((records) => {
+          for (const record of records) {
+            if (record.type === 'attributes') {
+              if (record.target instanceof HTMLImageElement) retain(record.target.getAttribute('src'))
+            } else {
+              for (const node of record.addedNodes) retainTree(node)
+            }
           }
-        }
-      })
+        })
   observer?.observe(target, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] })
   return () => {
     target.removeEventListener('load', onLoad, true)
@@ -158,19 +159,18 @@ function startJson(url: string): JsonEntry {
     status: 'loading',
     value: null,
     // 묶음(`sprites/sprite-json.bundle.json`)에 있으면 거기서 꺼내고, 없으면 낱개 파일 — 값은 같다 (r311 A5)
-    request: fetchSpriteJson(url)
-      .then(
-        (value) => {
-          entry.status = 'ready'
-          entry.value = value
-          noteAssetLoaded()
-          return value
-        },
-        (error: unknown) => {
-          entry.status = 'failed'
-          throw error
-        },
-      ),
+    request: fetchSpriteJson(url).then(
+      (value) => {
+        entry.status = 'ready'
+        entry.value = value
+        noteAssetLoaded()
+        return value
+      },
+      (error: unknown) => {
+        entry.status = 'failed'
+        throw error
+      },
+    ),
   }
   // 거부를 아무도 안 받아도 경고가 뜨지 않게
   entry.request.catch(() => {})

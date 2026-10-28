@@ -15,9 +15,10 @@ afterEach(() => {
 })
 
 /** 재생기 틀 n 번 (0x7fbc4 가 그릴 때마다 상자가 오르고 글자가 찍힌다) */
-const 틀 = (n = 1) => act(() => {
-  vi.advanceTimersByTime(n * millisecondsPerFrame())
-})
+const 틀 = (n = 1) =>
+  act(() => {
+    vi.advanceTimersByTime(n * millisecondsPerFrame())
+  })
 const 대사글 = () => screen.getByTestId('대사-상자').textContent ?? ''
 /** 상자가 다 오르고 글을 끝까지 찍은 뒤 확인 — 글 끝(단계 4)이면 다음 명령 */
 const 대사넘기기 = () => {
@@ -40,14 +41,7 @@ const 이벤트: OriginalEvent = {
 describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
   it('자기 배경을 칠하지 않는다 — 뒤 화면이 비쳐야 원본과 같다', () => {
     const { container } = render(
-      <StoryScreen
-        events={[이벤트]}
-        event={이벤트}
-        playerName="테스트"
-        teamName="드래곤즈"
-        onComplete={() => {}}
-        onMatch={() => {}}
-      />,
+      <StoryScreen events={[이벤트]} event={이벤트} playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}} />,
     )
 
     // 예전에는 PixelScreen 제목줄("이벤트")과 소프트키를 스스로 그려 화면을 통째로 덮었다
@@ -59,18 +53,20 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
   it('선택지는 대사 상자 안 글줄이다 — 줄 k 는 y + k × 14, 고른 줄은 노랑 테두리 (0x7fd22 · 0x6a978)', () => {
     const 선택지이벤트 = {
       ...이벤트,
-      commands: [{ op: 'choice', portraits: [], choices: [{ text: '예', gotoEvent: 2 }, { text: '아니오', gotoEvent: 3 }] }],
+      commands: [
+        {
+          op: 'choice',
+          portraits: [],
+          choices: [
+            { text: '예', gotoEvent: 2 },
+            { text: '아니오', gotoEvent: 3 },
+          ],
+        },
+      ],
     } as unknown as OriginalEvent
 
     render(
-      <StoryScreen
-        events={[선택지이벤트]}
-        event={선택지이벤트}
-        playerName="테스트"
-        teamName="드래곤즈"
-        onComplete={() => {}}
-        onMatch={() => {}}
-      />,
+      <StoryScreen events={[선택지이벤트]} event={선택지이벤트} playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}} />,
     )
 
     // 재생은 높이 0 에서 시작한다 — 다 올라온(55) 틀부터 줄을 그린다
@@ -84,23 +80,40 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
     expect(screen.getByTestId('대사-상자').textContent).not.toContain('▶')
     const 테두리 = screen.getByTestId('대사-상자').querySelector('[data-part="고른줄"] rect') as SVGRectElement
     expect(테두리.getAttribute('stroke')).toBe('#FFFF00')
-    expect([테두리.getAttribute('x'), 테두리.getAttribute('y'), 테두리.getAttribute('width'), 테두리.getAttribute('height')])
-      .toEqual(['3.5', '269.5', '210', '12'])
+    expect([테두리.getAttribute('x'), 테두리.getAttribute('y'), 테두리.getAttribute('width'), 테두리.getAttribute('height')]).toEqual([
+      '3.5',
+      '269.5',
+      '210',
+      '12',
+    ])
   })
 
   it('선택지 키 — 위 · 아래는 갈래 수로 돌고, 확인은 상자가 오르는 중에도 그 줄의 이벤트로 간다 (0x8b804)', () => {
     const 선택지이벤트 = {
       ...이벤트,
-      commands: [{
-        op: 'choice', portraits: [],
-        choices: [{ text: '하나', gotoEvent: 2 }, { text: '둘', gotoEvent: 3 }, { text: '셋', gotoEvent: 4 }],
-      }],
+      commands: [
+        {
+          op: 'choice',
+          portraits: [],
+          choices: [
+            { text: '하나', gotoEvent: 2 },
+            { text: '둘', gotoEvent: 3 },
+            { text: '셋', gotoEvent: 4 },
+          ],
+        },
+      ],
     } as unknown as OriginalEvent
     const 갈래 = (id: number, text: string) =>
       ({ ...이벤트, id, commands: [{ op: 'say', text, speaker: 0, format: 0, portraits: [] }] }) as unknown as OriginalEvent
     render(
-      <StoryScreen events={[선택지이벤트, 갈래(2, '첫째'), 갈래(3, '둘째'), 갈래(4, '셋째')]} event={선택지이벤트}
-        playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}} />,
+      <StoryScreen
+        events={[선택지이벤트, 갈래(2, '첫째'), 갈래(3, '둘째'), 갈래(4, '셋째')]}
+        event={선택지이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+      />,
     )
     // 위(−1) — (0 + 3 − 1) % 3 = 2 · 아래 '8' — (2 + 1) % 3 = 0 · '2' 다시 위 — 2
     fireEvent.keyDown(window, { key: 'ArrowUp' })
@@ -119,15 +132,24 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
     const 끝 = { ...이벤트, id: 3, commands: [{ op: 'say', text: '끝', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
     const 알림: Array<[number, readonly number[]]> = []
     render(
-      <StoryScreen events={[선택지(1, 2), 선택지(2, 3), 끝]} event={선택지(1, 2)}
-        playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}}
-        onChoiceConfirm={(eventId, left) => 알림.push([eventId, left])} />,
+      <StoryScreen
+        events={[선택지(1, 2), 선택지(2, 3), 끝]}
+        event={선택지(1, 2)}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+        onChoiceConfirm={(eventId, left) => 알림.push([eventId, left])}
+      />,
     )
     fireEvent.keyDown(window, { key: 'Enter' })
     틀(200)
     fireEvent.keyDown(window, { key: 'Enter' })
     틀(200)
-    expect(알림).toEqual([[1, []], [2, [1]]])
+    expect(알림).toEqual([
+      [1, []],
+      [2, [1]],
+    ])
     expect(대사글()).toContain('끝')
   })
 
@@ -137,33 +159,59 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
     const 끝 = { ...이벤트, id: 4, commands: [{ op: 'say', text: '끝', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
     const 알림: Array<[number, readonly number[]]> = []
     render(
-      <StoryScreen events={[선택지(1, 2), 선택지(2, 3), 선택지(3, 4), 끝]} event={선택지(1, 2)}
-        playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}}
+      <StoryScreen
+        events={[선택지(1, 2), 선택지(2, 3), 선택지(3, 4), 끝]}
+        event={선택지(1, 2)}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
         carried={{ rewards: [], viewedEventIds: [113, 123] }}
-        onChoiceConfirm={(eventId, left) => 알림.push([eventId, left])} />,
+        onChoiceConfirm={(eventId, left) => 알림.push([eventId, left])}
+      />,
     )
     for (let i = 0; i < 3; i += 1) {
       fireEvent.keyDown(window, { key: 'Enter' })
       틀(200)
     }
-    expect(알림).toEqual([[1, []], [2, [1]], [3, [2]]])
+    expect(알림).toEqual([
+      [1, []],
+      [2, [1]],
+      [3, [2]],
+    ])
   })
 
   it('고른 이벤트가 say 없이 창을 띄우면 밑의 상자에는 선택지 줄과 고른 줄 테두리가 남는다 (0x8ba2c · 0x8b924)', () => {
     const 선택지이벤트 = {
       ...이벤트,
-      commands: [{ op: 'choice', portraits: [], choices: [{ text: '갈래 하나', gotoEvent: 2 }, { text: '갈래 둘', gotoEvent: 3 }] }],
+      commands: [
+        {
+          op: 'choice',
+          portraits: [],
+          choices: [
+            { text: '갈래 하나', gotoEvent: 2 },
+            { text: '갈래 둘', gotoEvent: 3 },
+          ],
+        },
+      ],
     } as unknown as OriginalEvent
     const 알림 = {
-      ...이벤트, id: 3,
+      ...이벤트,
+      id: 3,
       commands: [
         { op: 'system', sub: 0, arg: 1, text: '알림 글' },
         { op: 'say', text: '다음 대사', speaker: 0, format: 0, portraits: [] },
       ],
     } as unknown as OriginalEvent
     render(
-      <StoryScreen events={[선택지이벤트, 알림]} event={선택지이벤트} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => {}} onMatch={() => {}} />,
+      <StoryScreen
+        events={[선택지이벤트, 알림]}
+        event={선택지이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+      />,
     )
     틀(3)
     fireEvent.keyDown(window, { key: 'ArrowDown' })
@@ -183,16 +231,7 @@ describe('StoryScreen — 관리 화면 위에 겹치는 덮개다', () => {
   })
 
   it('대사는 그대로 보여 준다', () => {
-    render(
-      <StoryScreen
-        events={[이벤트]}
-        event={이벤트}
-        playerName="테스트"
-        teamName="드래곤즈"
-        onComplete={() => {}}
-        onMatch={() => {}}
-      />,
-    )
+    render(<StoryScreen events={[이벤트]} event={이벤트} playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}} />)
 
     틀(200)
     expect(대사글()).toContain('안녕')
@@ -305,10 +344,7 @@ describe('StoryScreen — system 3·4 발표 창 (0x8cf64 → 0x8b3bc · 0x8b23c
 describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8d426)', () => {
   const 띄우기 = (events: readonly OriginalEvent[]) => {
     const 끝: number[] = []
-    render(
-      <StoryScreen events={events} event={events[0]} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => 끝.push(1)} onMatch={() => {}} />,
-    )
+    render(<StoryScreen events={events} event={events[0]} playerName="테스트" teamName="드래곤즈" onComplete={() => 끝.push(1)} onMatch={() => {}} />)
     return 끝
   }
 
@@ -330,7 +366,11 @@ describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8
     expect(창.textContent).toContain('아이템')
     // 이벤트 장면은 [창+0x24f] = 0 — 떠 있는 그리기마다 검정 (5 + 1)/16 로 덮는다 (0x746cc)
     expect(창.style.background).toBe('rgba(0, 0, 0, 0.375)')
-    expect(within(창).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['OK'])
+    expect(
+      within(창)
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual(['OK'])
     // 0x8b5ac 는 창이 떠 있어도 0x7fbc4 로 앞 say 를 그린다 — 다시 오르지도, 글을 다시 찍지도 않는다
     expect(대사글()).toContain('아이템을 볼까?')
     expect(screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')).toBe('55')
@@ -353,7 +393,11 @@ describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8
       ],
     } as unknown as OriginalEvent
     const 예 = { ...이벤트, id: 2, commands: [{ op: 'say', text: '예를 골랐다', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
-    const 아니오 = { ...이벤트, id: 3, commands: [{ op: 'say', text: '아니오를 골랐다', speaker: 0, format: 0, portraits: [] }] } as unknown as OriginalEvent
+    const 아니오 = {
+      ...이벤트,
+      id: 3,
+      commands: [{ op: 'say', text: '아니오를 골랐다', speaker: 0, format: 0, portraits: [] }],
+    } as unknown as OriginalEvent
     띄우기([질문, 예, 아니오])
     대사넘기기()
     const 창 = screen.getByRole('dialog')
@@ -389,19 +433,13 @@ describe('StoryScreen — 명령 5 화면효과', () => {
   it('id 4(효과기 종류 2)는 검정 덮기 단계 0 — 완전 검정부터 띄운다 (0x9aac4 단계 0 = 0)', () => {
     const 효과이벤트 = {
       ...이벤트,
-      commands: [{ op: 'effect', id: 4 }, { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }],
+      commands: [
+        { op: 'effect', id: 4 },
+        { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] },
+      ],
     } as unknown as OriginalEvent
 
-    render(
-      <StoryScreen
-        events={[효과이벤트]}
-        event={효과이벤트}
-        playerName="테스트"
-        teamName="드래곤즈"
-        onComplete={() => {}}
-        onMatch={() => {}}
-      />,
-    )
+    render(<StoryScreen events={[효과이벤트]} event={효과이벤트} playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}} />)
 
     const 덮개 = screen.getByTestId('screen-effect-cover')
     expect(덮개.style.opacity).toBe('1')
@@ -423,8 +461,17 @@ describe('system 1 — 올해의 목표 창 (0x8d304 → 0x741a1 · 그리기 0x
   it('대사 뒤 창에서 멈추고, 누르면 닫혀 이벤트가 끝난다', () => {
     let 끝 = 0
     render(
-      <StoryScreen events={[연초]} event={연초} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => { 끝 += 1 }} onMatch={() => {}} yearGoalWindowOf={() => 값} />,
+      <StoryScreen
+        events={[연초]}
+        event={연초}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {
+          끝 += 1
+        }}
+        onMatch={() => {}}
+        yearGoalWindowOf={() => 값}
+      />,
     )
     대사넘기기()
     const 창 = screen.getByTestId('올해의-목표-창')
@@ -439,8 +486,16 @@ describe('system 1 — 올해의 목표 창 (0x8d304 → 0x741a1 · 그리기 0x
   it('값을 안 넘기면 예전처럼 지나간다', () => {
     let 끝 = 0
     render(
-      <StoryScreen events={[연초]} event={연초} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => { 끝 += 1 }} onMatch={() => {}} />,
+      <StoryScreen
+        events={[연초]}
+        event={연초}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {
+          끝 += 1
+        }}
+        onMatch={() => {}}
+      />,
     )
     대사넘기기()
     expect(screen.queryByTestId('올해의-목표-창')).toBeNull()
@@ -455,8 +510,17 @@ describe('say 대사 상자 — 0x7fbc4 · 0x7fad0 · 키 0x8b804', () => {
     const 이벤트들 = { ...이벤트, commands } as unknown as OriginalEvent
     let 끝 = 0
     render(
-      <StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => { 끝 += 1 }} onMatch={() => {}} {...props} />,
+      <StoryScreen
+        events={[이벤트들]}
+        event={이벤트들}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {
+          끝 += 1
+        }}
+        onMatch={() => {}}
+        {...props}
+      />,
     )
     return { 끝: () => 끝 }
   }
@@ -553,21 +617,26 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
   beforeEach(() => {
     vi.useRealTimers()
     vi.useFakeTimers({
-      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame',
-        'performance', 'Date'],
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'Date'],
     })
   })
   const 띄우기 = (commands: readonly unknown[], props: Partial<Parameters<typeof StoryScreen>[0]> = {}) => {
     const 이벤트들 = { ...이벤트, commands } as unknown as OriginalEvent
     render(
-      <StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => {}} onMatch={() => {}} {...props} />,
+      <StoryScreen
+        events={[이벤트들]}
+        event={이벤트들}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+        {...props}
+      />,
     )
   }
   const 초상화판 = () => screen.getByTestId('event-portrait-layer')
   const 칠 = () => screen.queryByTestId('event-backdrop-fill')
-  const 본체높이 = () =>
-    screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')
+  const 본체높이 = () => screen.getByTestId('대사-상자').querySelector('[data-part="본체"]')?.getAttribute('height')
   const 말 = { op: 'say', text: '안녕', speaker: 0, format: 0, portraits: [] }
   /** 한 틀씩 — act 한 번 안에서는 효과기(rAF)가 푼 걸음을 끝에야 그리므로, 풀린 뒤 상자가 도는 것을 보려면 나눠 돌린다 */
   const 틀씩 = (n: number) => {
@@ -670,10 +739,7 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
         { op: 'match', team: 1, resultEvents: [] },
       ],
     } as unknown as OriginalEvent
-    render(
-      <StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => {}} onMatch={경기} />,
-    )
+    render(<StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={경기} />)
     틀(200)
     fireEvent.click(screen.getByRole('button', { name: '대사 넘기기' }))
     for (let index = 0; index < 20 && 칠() === null; index += 1) 틀씩(1)
@@ -687,11 +753,14 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
 
   it('id 6 뒤 경기 명령은 효과가 끝난 뒤에 나간다', () => {
     const 경기 = vi.fn()
-    const 이벤트들 = { ...이벤트, commands: [{ op: 'effect', id: 6 }, { op: 'match', team: 1, resultEvents: [] }] } as unknown as OriginalEvent
-    render(
-      <StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => {}} onMatch={경기} />,
-    )
+    const 이벤트들 = {
+      ...이벤트,
+      commands: [
+        { op: 'effect', id: 6 },
+        { op: 'match', team: 1, resultEvents: [] },
+      ],
+    } as unknown as OriginalEvent
+    render(<StoryScreen events={[이벤트들]} event={이벤트들} playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={경기} />)
     틀(5)
     expect(경기).not.toHaveBeenCalled()
     틀(10)
@@ -738,8 +807,9 @@ describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
 
   it('Escape 는 say · 소리를 건너뛰어 다음 system 에 선다 — 상자가 오르는 중에도 먹는다', () => {
     const onComplete = vi.fn()
-    render(<StoryScreen events={[취소이벤트]} event={취소이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} />)
+    render(
+      <StoryScreen events={[취소이벤트]} event={취소이벤트} playerName="테스트" teamName="드래곤즈" onComplete={onComplete} onMatch={() => {}} />,
+    )
     틀(1)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('알림 글')
@@ -748,8 +818,7 @@ describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
   })
 
   it('"CLR:SKIP" 장식 자리 투명 칸을 누르면 Escape 와 같다', () => {
-    render(<StoryScreen events={[취소이벤트]} event={취소이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={vi.fn()} onMatch={() => {}} />)
+    render(<StoryScreen events={[취소이벤트]} event={취소이벤트} playerName="테스트" teamName="드래곤즈" onComplete={vi.fn()} onMatch={() => {}} />)
     틀(1)
     fireEvent.click(screen.getByRole('button', { name: 'CLR 건너뛰기' }))
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('알림 글')
@@ -758,8 +827,7 @@ describe('StoryScreen — say 중 취소(−16) 0x8b7b0', () => {
   it('뒤에 멈출 명령이 없으면 이벤트가 끝난다', () => {
     const onComplete = vi.fn()
     const 끝이벤트 = { ...이벤트, commands: [취소이벤트.commands[0], 취소이벤트.commands[1], { op: 'effect', id: 1 }] } as unknown as OriginalEvent
-    render(<StoryScreen events={[끝이벤트]} event={끝이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} />)
+    render(<StoryScreen events={[끝이벤트]} event={끝이벤트} playerName="테스트" teamName="드래곤즈" onComplete={onComplete} onMatch={() => {}} />)
     fireEvent.keyDown(window, { key: 'Backspace' })
     틀(1)
     expect(onComplete).toHaveBeenCalledWith([], [1], null)
@@ -771,7 +839,13 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
   const 보상이벤트 = {
     ...이벤트,
     commands: [
-      { op: 'reward', items: [{ kind: 0, value: 5 }, { kind: 2, value: -3 }] },
+      {
+        op: 'reward',
+        items: [
+          { kind: 0, value: 5 },
+          { kind: 2, value: -3 },
+        ],
+      },
       { op: 'reward', items: [{ kind: 4, value: 7 }] },
       { op: 'say', text: '끝 대사', speaker: 0, format: 0, portraits: [] },
     ],
@@ -779,8 +853,17 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
 
   it('보통 보상은 공용 알림(OK)을 띄우고 확인까지 기다린다 — 첫 종류 4 는 스킬 창', () => {
     const onComplete = vi.fn()
-    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} rewardNoticeContext={맥락} />)
+    render(
+      <StoryScreen
+        events={[보상이벤트]}
+        event={보상이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={onComplete}
+        onMatch={() => {}}
+        rewardNoticeContext={맥락}
+      />,
+    )
     const 알림 = screen.getByRole('dialog', { name: '알림' })
     expect(알림.textContent).toContain('인기도 + 5')
     expect(알림.textContent).toContain('사기 -3')
@@ -805,7 +888,13 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
     대사넘기기()
     틀(1)
     expect(onComplete).toHaveBeenCalledWith(
-      [{ kind: 0, value: 5 }, { kind: 2, value: -3 }, { kind: 4, value: 7 }], [1], null,
+      [
+        { kind: 0, value: 5 },
+        { kind: 2, value: -3 },
+        { kind: 4, value: 7 },
+      ],
+      [1],
+      null,
     )
   })
 
@@ -820,14 +909,26 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
           { op: 'say', text: '끝 대사', speaker: 0, format: 0, portraits: [] },
         ],
       } as unknown as OriginalEvent
-      render(<StoryScreen events={[알림이벤트]} event={알림이벤트} playerName="테스트" teamName="드래곤즈"
-        onComplete={() => {}} onMatch={() => {}} rewardNoticeContext={맥락} />)
+      render(
+        <StoryScreen
+          events={[알림이벤트]}
+          event={알림이벤트}
+          playerName="테스트"
+          teamName="드래곤즈"
+          onComplete={() => {}}
+          onMatch={() => {}}
+          rewardNoticeContext={맥락}
+        />,
+      )
       // 열림 10 → 20 → 40 → 79 (틀마다 따로)
-      틀(1); 틀(1); 틀(1)
+      틀(1)
+      틀(1)
+      틀(1)
       fireEvent.keyDown(window, { key: 'Enter' })
       expect(screen.getByRole('dialog', { name: '알림' })).toBeTruthy()
       expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
-      틀(1); 틀(1)
+      틀(1)
+      틀(1)
       expect(screen.queryByRole('dialog', { name: '알림' })).toBeNull()
       expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
     } finally {
@@ -837,8 +938,7 @@ describe('StoryScreen — 보상 명령 7 의 알림 창 (0x8d4c4 · 0x8daa0)', 
   })
 
   it('맥락을 안 주면 예전처럼 창 없이 지나간다', () => {
-    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={() => {}} onMatch={() => {}} />)
+    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈" onComplete={() => {}} onMatch={() => {}} />)
     expect(screen.queryByRole('dialog')).toBeNull()
     틀(2)
     expect(screen.getByTestId('대사-상자').getAttribute('data-text')).toBe('끝 대사')
@@ -858,13 +958,25 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     } as unknown as OriginalEvent
     const onReward = vi.fn()
     const onComplete = vi.fn()
-    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} onReward={onReward}
-      rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase: 10, random: 고정난수 })} />)
+    render(
+      <StoryScreen
+        events={[보상이벤트]}
+        event={보상이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={onComplete}
+        onMatch={() => {}}
+        onReward={onReward}
+        rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase: 10, random: 고정난수 })}
+      />,
+    )
     // 셋째 값은 이 재생에서 거친 이벤트 — 0x8c460 끝이 본 표시를 한다(0xacf49 · 0x8b0e4)
     expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1, [1]]])
     fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
-    expect(onReward.mock.calls).toEqual([[[{ kind: 0, value: 5 }], 1, [1]], [[{ kind: 1, value: 2 }], 1, [1]]])
+    expect(onReward.mock.calls).toEqual([
+      [[{ kind: 0, value: 5 }], 1, [1]],
+      [[{ kind: 1, value: 2 }], 1, [1]],
+    ])
     fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
     expect(onReward).toHaveBeenCalledTimes(2)
     expect(onComplete).toHaveBeenCalledWith([], [1], null)
@@ -884,9 +996,18 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
       if (items[0]?.kind === 7) salaryBase = 100
     })
     const onComplete = vi.fn()
-    render(<StoryScreen events={[보상이벤트]} event={보상이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} onReward={onReward}
-      rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase, random: 고정난수 })} />)
+    render(
+      <StoryScreen
+        events={[보상이벤트]}
+        event={보상이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={onComplete}
+        onMatch={() => {}}
+        onReward={onReward}
+        rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase, random: 고정난수 })}
+      />,
+    )
     // 0x8c60e → 0x62368(전역, 19, 1) — 이미 열렸는지 안 보고 늘 공용 창(종류 1). id 19 는 투수편 글이다(모드와 상관없이)
     expect(onReward.mock.calls.map(([items]) => items)).toEqual([[{ kind: 7, value: 19 }]])
     const 히든창 = screen.getByRole('dialog', { name: '알림' })
@@ -904,15 +1025,30 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     const 엔딩이벤트 = {
       ...이벤트,
       commands: [
-        { op: 'reward', items: [{ kind: 21, value: 0 }, { kind: 0, value: 10 }] },
+        {
+          op: 'reward',
+          items: [
+            { kind: 21, value: 0 },
+            { kind: 0, value: 10 },
+          ],
+        },
         { op: 'say', text: '뒤 대사', speaker: 0, format: 0, portraits: [] },
       ],
     } as unknown as OriginalEvent
     const onReward = vi.fn()
     const onComplete = vi.fn()
-    render(<StoryScreen events={[엔딩이벤트]} event={엔딩이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} onReward={onReward}
-      rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase: 10, random: 고정난수 })} />)
+    render(
+      <StoryScreen
+        events={[엔딩이벤트]}
+        event={엔딩이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={onComplete}
+        onMatch={() => {}}
+        onReward={onReward}
+        rewardNoticeContext={() => ({ mode: 4, years: 0, illness: 0, salaryBase: 10, random: 고정난수 })}
+      />,
+    )
     expect(onReward).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(onComplete).toHaveBeenCalledTimes(1)
@@ -925,13 +1061,20 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
       ...이벤트,
       commands: [
         { op: 'reward', items: [{ kind: 0, value: 5 }] },
-        { op: 'reward', items: [{ kind: 21, value: 0 }, { kind: 0, value: 10 }] },
+        {
+          op: 'reward',
+          items: [
+            { kind: 21, value: 0 },
+            { kind: 0, value: 10 },
+          ],
+        },
         { op: 'say', text: '뒤 대사', speaker: 0, format: 0, portraits: [] },
       ],
     } as unknown as OriginalEvent
     const onComplete = vi.fn()
-    render(<StoryScreen events={[엔딩이벤트]} event={엔딩이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} />)
+    render(
+      <StoryScreen events={[엔딩이벤트]} event={엔딩이벤트} playerName="테스트" teamName="드래곤즈" onComplete={onComplete} onMatch={() => {}} />,
+    )
     // 지나온 명령(앞 보상)을 한 틀씩 돌린 뒤 그 명령이 돈다
     틀(2)
     expect(onComplete).toHaveBeenCalledTimes(1)
@@ -948,8 +1091,17 @@ describe('StoryScreen — 보상은 명령마다 그 자리에서 준다 (0x8d4c
     } as unknown as OriginalEvent
     const onReward = vi.fn()
     const onMatch = vi.fn()
-    render(<StoryScreen events={[경기이벤트]} event={경기이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={() => {}} onMatch={onMatch} onReward={onReward} />)
+    render(
+      <StoryScreen
+        events={[경기이벤트]}
+        event={경기이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={onMatch}
+        onReward={onReward}
+      />,
+    )
     expect(onReward).toHaveBeenCalledTimes(1)
     expect(onMatch).toHaveBeenCalledTimes(1)
     expect(onMatch.mock.calls[0][1]).toEqual({ rewards: [], viewedEventIds: [1] })
@@ -967,8 +1119,17 @@ describe('StoryScreen — system 창 답 0 은 0x7fe90 (목표 창 봤음 · 저
 
   it('알림을 OK 로 닫으면 부르고, 예아니오는 안 부른다', () => {
     const onSystemWindowConfirm = vi.fn()
-    render(<StoryScreen events={[창이벤트]} event={창이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={() => {}} onMatch={() => {}} onSystemWindowConfirm={onSystemWindowConfirm} />)
+    render(
+      <StoryScreen
+        events={[창이벤트]}
+        event={창이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+        onSystemWindowConfirm={onSystemWindowConfirm}
+      />,
+    )
     fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: 'OK' }))
     expect(onSystemWindowConfirm).toHaveBeenCalledTimes(1)
     fireEvent.click(within(screen.getByRole('dialog', { name: '알림' })).getByRole('button', { name: '예' }))
@@ -977,8 +1138,17 @@ describe('StoryScreen — system 창 답 0 은 0x7fe90 (목표 창 봤음 · 저
 
   it('알림을 CLR 로 닫아도 답 0 이다 (0x751c2~0x751ec)', () => {
     const onSystemWindowConfirm = vi.fn()
-    render(<StoryScreen events={[창이벤트]} event={창이벤트} playerName="테스트" teamName="드래곤즈"
-      onComplete={() => {}} onMatch={() => {}} onSystemWindowConfirm={onSystemWindowConfirm} />)
+    render(
+      <StoryScreen
+        events={[창이벤트]}
+        event={창이벤트}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={() => {}}
+        onMatch={() => {}}
+        onSystemWindowConfirm={onSystemWindowConfirm}
+      />,
+    )
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onSystemWindowConfirm).toHaveBeenCalledTimes(1)
   })
@@ -987,9 +1157,18 @@ describe('StoryScreen — system 창 답 0 은 0x7fe90 (목표 창 봤음 · 저
     const onSystemWindowConfirm = vi.fn()
     const onComplete = vi.fn()
     const 목표 = { ...이벤트, commands: [{ op: 'system', sub: 1, arg: 0 }] } as unknown as OriginalEvent
-    render(<StoryScreen events={[목표]} event={목표} playerName="테스트" teamName="드래곤즈"
-      onComplete={onComplete} onMatch={() => {}} onSystemWindowConfirm={onSystemWindowConfirm}
-      yearGoalWindowOf={() => ({ labelSet: 0 as const, current: [0, 0, 0, 0, 0], goals: [260, 44, 3, 22, 50] })} />)
+    render(
+      <StoryScreen
+        events={[목표]}
+        event={목표}
+        playerName="테스트"
+        teamName="드래곤즈"
+        onComplete={onComplete}
+        onMatch={() => {}}
+        onSystemWindowConfirm={onSystemWindowConfirm}
+        yearGoalWindowOf={() => ({ labelSet: 0 as const, current: [0, 0, 0, 0, 0], goals: [260, 44, 3, 22, 50] })}
+      />,
+    )
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(onSystemWindowConfirm).toHaveBeenCalledTimes(1)
     expect(onComplete).toHaveBeenCalledTimes(1)

@@ -82,9 +82,10 @@ export function modeBatterOf(career: PlayerCareer | null): ModeBatter {
  */
 export function modeBatterOfHallOfFame(famer: HallOfFamer): ModeBatter {
   const skillIds = famer.equippedSkillIds ?? []
-  const ability = famer.equipmentLevels === undefined
-    ? (famer.equippedAbility ?? famer.ability)
-    : equippedAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds: skillIds })
+  const ability =
+    famer.equipmentLevels === undefined
+      ? (famer.equippedAbility ?? famer.ability)
+      : equippedAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds: skillIds })
   return {
     ability,
     skillIds,
@@ -93,9 +94,7 @@ export function modeBatterOfHallOfFame(famer: HallOfFamer): ModeBatter {
     // +0xa 아랫 5비트 — 등록 0x1f680 의 0x20 → 0, 시즌 영입이 고친 자리 j (전역 블록째 저장)
     recordSlot: hallOfFameRecordSlotOf(famer),
     // 등록이 옮긴 +0xb — 옛 기록(생김새 칸을 남기기 전)은 모른다
-    ...(famer.look === undefined
-      ? {}
-      : { look: { form: famer.look.typeIndex * 2 + famer.look.handIndex, skinIndex: famer.look.skinIndex } }),
+    ...(famer.look === undefined ? {} : { look: { form: famer.look.typeIndex * 2 + famer.look.handIndex, skinIndex: famer.look.skinIndex } }),
   }
 }
 

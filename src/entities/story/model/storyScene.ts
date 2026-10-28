@@ -52,17 +52,10 @@ const LUCK_SKILL = 6
  * 유리몸(스킬 4) +10 · 행운(스킬 6) −20, 0 미만은 0 으로 자른다.
  * 앞서 웹은 사기 구간만 보고 보정을 빼먹고 있었다.
  */
-export function illnessChanceOf(
-  morale: number,
-  skillIds: readonly number[] = [],
-  equippedSkillIds: readonly number[] = skillIds,
-): number {
+export function illnessChanceOf(morale: number, skillIds: readonly number[] = [], equippedSkillIds: readonly number[] = skillIds): number {
   const base = morale > 70 ? 0 : morale > 50 ? 2 : morale > 30 ? 4 : morale > 10 ? 7 : 14
   // 유리몸은 보유(0xa3a74, 0xadba8) · 행운은 **장착**(0xa4bf8, 0xadbba)으로 본다
-  const adjusted =
-    base +
-    (skillIds.includes(FRAGILE_SKILL) ? 10 : 0) -
-    (equippedSkillIds.includes(LUCK_SKILL) ? 20 : 0)
+  const adjusted = base + (skillIds.includes(FRAGILE_SKILL) ? 10 : 0) - (equippedSkillIds.includes(LUCK_SKILL) ? 20 : 0)
   return Math.max(0, adjusted)
 }
 
@@ -82,17 +75,8 @@ const ILLNESS_COOLDOWN_AUDIENCES: ReadonlySet<number> = new Set([1, 4])
  * **1** 로 두고, 관리 메뉴 확인 키(나리 105 0x12654 · 시즌 0xc9 0x8f82 — −5 · '5')만 0 으로 내린다. 그래서 장면이 새로 선 뒤
  * 관리 메뉴에서 아무것도 고르기 전의 훑기에서는 쿨다운이 490 을 막지 않는다(원본 그대로). `isFreshScene` 이 mgr+0x304 다.
  */
-export function isIllnessCooldownBlocked(
-  event: Pick<OriginalEvent, 'id' | 'audience'>,
-  illnessCooldown: number,
-  isFreshScene: boolean,
-): boolean {
-  return (
-    !isFreshScene &&
-    ((illnessCooldown << 24) >> 24) > 0 &&
-    event.id === ILLNESS_EVENT_ID &&
-    ILLNESS_COOLDOWN_AUDIENCES.has(event.audience)
-  )
+export function isIllnessCooldownBlocked(event: Pick<OriginalEvent, 'id' | 'audience'>, illnessCooldown: number, isFreshScene: boolean): boolean {
+  return !isFreshScene && (illnessCooldown << 24) >> 24 > 0 && event.id === ILLNESS_EVENT_ID && ILLNESS_COOLDOWN_AUDIENCES.has(event.audience)
 }
 
 const branchOnlyCache = new WeakMap<readonly OriginalEvent[], ReadonlySet<number>>()
@@ -272,12 +256,7 @@ export function openingScanOf(events: readonly OriginalEvent[], cursor: number):
  * **"분기 전용 이벤트 제외" 규칙은 원본에 없다** (A-1 확정). 원본은 분기로만 닿는 이벤트를
  * **대상(audience) 0** 으로 막는데, 그 검사는 `isEligible` 의 `BATTER_AUDIENCES` 가 이미 하고 있다.
  */
-export function nextEventFor(
-  career: PlayerCareer,
-  events: readonly OriginalEvent[],
-  trigger: number,
-  random?: RandomPort,
-): OriginalEvent | null {
+export function nextEventFor(career: PlayerCareer, events: readonly OriginalEvent[], trigger: number, random?: RandomPort): OriginalEvent | null {
   return scanEventFrom(career, events, trigger, 0, random).event
 }
 
@@ -286,10 +265,7 @@ export function nextEventFor(
  * (레코드마다 반복(+5 == 1)이고 본 표시가 서 있으면 `0xacf48(…, 0)` · 커서 reader+0x28 = 0). 장면은 이어하기와 **경기 뒤마다**
  * (경기 장면 0x104 를 지나 0x106 이 다시 선다) · 마선수 대결 뒤에 선다. 나리 두 편 공용.
  */
-export function forgetRepeatableEvents<C extends { readonly seenEventIds: readonly string[] }>(
-  career: C,
-  events: readonly OriginalEvent[],
-): C {
+export function forgetRepeatableEvents<C extends { readonly seenEventIds: readonly string[] }>(career: C, events: readonly OriginalEvent[]): C {
   const repeatable = new Set(events.filter((event) => event.repeatable).map((event) => String(event.id)))
   return { ...career, seenEventIds: career.seenEventIds.filter((id) => !repeatable.has(id)) }
 }
@@ -342,11 +318,7 @@ export function markRewardedEvent<C extends RewardedEventHolder>(
  * 저장된다. 113 끝 처리(1c03a~1c076 — +0x167 == 0 이면 S+4 · 외출 수 · 105)와 달리 **112 에서 연 이벤트(외출 진입)도 켠다.**
  * 시즌모드 상태 번호(0xc9~)는 0x70 · 0x71 이 아니라 시즌에는 닿지 않는다.
  */
-export function withOutingEventActed<C extends { readonly hasActedThisCycle: boolean }>(
-  career: C,
-  isOpenedFromOuting: boolean,
-  eventId: number,
-): C {
+export function withOutingEventActed<C extends { readonly hasActedThisCycle: boolean }>(career: C, isOpenedFromOuting: boolean, eventId: number): C {
   if (!isOpenedFromOuting || isEmptyPlaceEventId(eventId) || career.hasActedThisCycle) return career
   return { ...career, hasActedThisCycle: true }
 }

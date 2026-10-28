@@ -48,12 +48,13 @@ interface FieldWalkViewProps {
 export function FieldWalkView({ offset, grassPalette = null, rows, children }: FieldWalkViewProps) {
   const backgroundUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
   // 걷는 칸마다 그림이 바뀐다 — 줄(팀) 벌로 defender 칸 전부를 미리 칠해 처음 딛는 칸에 구운 벌이 비치지 않게
-  useWarmRecoloredFolder(DEFENDER_FRAMES, rows.map((row) => defenderPaletteIndexOf(row.teamIndex)))
+  useWarmRecoloredFolder(
+    DEFENDER_FRAMES,
+    rows.map((row) => defenderPaletteIndexOf(row.teamIndex)),
+  )
   const size = { width: DEFENSE_BACKGROUND_WIDTH, height: DEFENSE_BACKGROUND_HEIGHT }
   const actors = rows
-    .flatMap((row, rowIndex) =>
-      [...row.walkers.keys()].reverse().map((slot) => ({ row, rowIndex, slot, walker: row.walkers[slot] })),
-    )
+    .flatMap((row, rowIndex) => [...row.walkers.keys()].reverse().map((slot) => ({ row, rowIndex, slot, walker: row.walkers[slot] })))
     .filter((entry) => entry.walker !== undefined)
     .map((entry, order) => ({ ...entry, order }))
     .sort((a, b) => a.walker.z - b.walker.z || a.order - b.order)
@@ -61,17 +62,27 @@ export function FieldWalkView({ offset, grassPalette = null, rows, children }: F
   return (
     <div className={styles.field} data-testid="운동장-전경">
       <img className={styles.background} style={{ left: offset.x, top: offset.y, ...size }} src={backgroundUrl} alt="" />
-      <img className={styles.backgroundMirrored}
-        style={{ left: offset.x + DEFENSE_BACKGROUND_WIDTH - 1, top: offset.y, ...size }} src={backgroundUrl} alt="" />
+      <img
+        className={styles.backgroundMirrored}
+        style={{ left: offset.x + DEFENSE_BACKGROUND_WIDTH - 1, top: offset.y, ...size }}
+        src={backgroundUrl}
+        alt=""
+      />
       {actors.map(({ row, rowIndex, slot, walker }) => {
         const ace = row.aceSprites?.[slot] ?? null
         const sprite = walkerSpriteOf(walker, ace)
         return (
-          <div key={`${rowIndex}-${slot}`} className={styles.actor}
+          <div
+            key={`${rowIndex}-${slot}`}
+            className={styles.actor}
             style={{ left: toScreenX(walker.x) + offset.x, top: toScreenY(walker.z) + offset.y }}
-            data-testid={`운동장-선수-${rowIndex}-${slot}`} data-frame={sprite.frame} data-ace={ace === null ? undefined : `${ace.kind}-${ace.index}`} data-x={walker.x} data-z={walker.z}>
-            <WalkerSprite folder={sprite.folder} frame={sprite.frame}
-              paletteIndex={ace === null ? defenderPaletteIndexOf(row.teamIndex) : null} />
+            data-testid={`운동장-선수-${rowIndex}-${slot}`}
+            data-frame={sprite.frame}
+            data-ace={ace === null ? undefined : `${ace.kind}-${ace.index}`}
+            data-x={walker.x}
+            data-z={walker.z}
+          >
+            <WalkerSprite folder={sprite.folder} frame={sprite.frame} paletteIndex={ace === null ? defenderPaletteIndexOf(row.teamIndex) : null} />
           </div>
         )
       })}
@@ -81,11 +92,7 @@ export function FieldWalkView({ offset, grassPalette = null, rows, children }: F
 }
 
 /** 그림 한 장 — 원점은 폴더마다 읽고, 칠한 그림은 프레임마다 새로 마운트한다(`DefenseScreen` 의 `PaintedSprite` 와 같은 까닭) */
-function WalkerSprite({ folder, frame, paletteIndex }: {
-  readonly folder: string
-  readonly frame: number
-  readonly paletteIndex: number | null
-}) {
+function WalkerSprite({ folder, frame, paletteIndex }: { readonly folder: string; readonly frame: number; readonly paletteIndex: number | null }) {
   const origins = useFrameOrigins(folder)
   const key = String(frame).padStart(3, '0')
   const origin = origins?.[key]
@@ -93,7 +100,12 @@ function WalkerSprite({ folder, frame, paletteIndex }: {
   return <PaintedFrame key={key} url={`${folder}/${key}.png`} paletteIndex={paletteIndex} left={origin.x} top={origin.y} />
 }
 
-function PaintedFrame({ url, paletteIndex, left, top }: {
+function PaintedFrame({
+  url,
+  paletteIndex,
+  left,
+  top,
+}: {
   readonly url: string
   readonly paletteIndex: number | null
   readonly left: number

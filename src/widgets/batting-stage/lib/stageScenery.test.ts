@@ -145,26 +145,34 @@ describe('판정 글자 — game_judge 애니 (0x39504)', () => {
     ).toBe('')
     // 사구 판정 문구가 애니 7 로 이어진다 (판정 v4)
     expect(
-      judgeAnimationOf(
-        describeResolution({ batterHand: 0, resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null }),
-      ),
+      judgeAnimationOf(describeResolution({ batterHand: 0, resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null })),
     ).toBe(7)
   })
 })
 
 describe('판정 글자 재생 — 한 번만 돈다', () => {
-  const 표 = [{ frame: 18, delay: 2 }, { frame: 19, delay: 1 }, { frame: 39, delay: 0 }]
+  const 표 = [
+    { frame: 18, delay: 2 },
+    { frame: 19, delay: 1 },
+    { frame: 39, delay: 0 },
+  ]
 
   it('지연만큼 머물고 끝나면 마지막(빈 그림 39)에 멈춘다', () => {
     expect([0, 1, 2, 3, 50].map((tick) => judgeFrameAt(표, tick))).toEqual([18, 18, 19, 39, 39])
   })
 
   it('칸 길이는 max(1, 지연 + 보정) 이다 — 보정이 없으면 0 으로 본다 (0x93d90)', () => {
-    const 보정있음 = [{ frame: 18, delay: 2, correction: 3 }, { frame: 39, delay: 0 }]
+    const 보정있음 = [
+      { frame: 18, delay: 2, correction: 3 },
+      { frame: 39, delay: 0 },
+    ]
     // 첫 칸 길이 = max(1, 2+3) = 5 → 틱 0~4 는 18, 틱 5 부터 39
     expect([0, 4, 5].map((tick) => judgeFrameAt(보정있음, tick))).toEqual([18, 18, 39])
 
-    const 음의보정 = [{ frame: 18, delay: 2, correction: -5 }, { frame: 39, delay: 0 }]
+    const 음의보정 = [
+      { frame: 18, delay: 2, correction: -5 },
+      { frame: 39, delay: 0 },
+    ]
     // 첫 칸 길이 = max(1, 2-5) = 1 (0 밑으로는 못 내려간다) → 틱 0 만 18, 틱 1 부터 39
     expect([0, 1].map((tick) => judgeFrameAt(음의보정, tick))).toEqual([18, 39])
   })

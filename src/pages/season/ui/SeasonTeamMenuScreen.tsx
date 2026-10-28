@@ -45,17 +45,16 @@ export interface SeasonTeamMenuScreenProps {
  * ⚠️ 미확인(남김 — 원본 정의 밖 · 힙 이웃 값): 원본 그대로의 어긋남 — this+0x78 은 0x28 바이트짜리 0xd2e60 객체(0xf704 · 0x6bd7d)라 +0x28 은 객체 **밖**이다 —
  * 진입이 쓰는 칸 1 말고 칸 0 · 2 · 3 의 값은 힙 이웃에 달려 정할 수 없어 켠 것으로 둔다.
  */
-export function SeasonTeamMenuScreen({
-  state, onSelect, onBack, cursor: heldCursor, onCursorChange, gamePoint = 0,
-}: SeasonTeamMenuScreenProps) {
-
+export function SeasonTeamMenuScreen({ state, onSelect, onBack, cursor: heldCursor, onCursorChange, gamePoint = 0 }: SeasonTeamMenuScreenProps) {
   const select = (index: number) => {
     const target = teamMenuTarget(index)
     if (target === null) return
     onSelect(TEAM_MENU[index], target)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: TEAM_MENU.length, onSelect: select, onCancel: onBack,
+    count: TEAM_MENU.length,
+    onSelect: select,
+    onCancel: onBack,
     // 4열 × 1줄 (0x3b14 의 [this+0x78] vt+0x1c(4, 1, 1, 0x330), 0x3bce~0x3be0) — ← → 도 칸을 옮긴다
     isCommandBar: true,
     ...(state.record.tradeUsed === 1 ? { disabled: TRADE_USED_DISABLED } : {}),
@@ -66,13 +65,20 @@ export function SeasonTeamMenuScreen({
   return (
     <RawScreen>
       <div role="group" aria-label="구단관리">
-        <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={onBack}
+        <SeasonCommonFrame
+          record={state.record}
+          teamMorale={state.teamMorale}
+          gamePoint={gamePoint}
+          onBack={onBack}
           commandBar={{
-            slots: SEASON_SUB_COMMAND_SLOTS.구단관리, cursor, parent: seasonParentSlotOf('구단관리'),
+            slots: SEASON_SUB_COMMAND_SLOTS.구단관리,
+            cursor,
+            parent: seasonParentSlotOf('구단관리'),
             grayedIds: state.record.tradeUsed === 1 ? TRADE_USED_GRAY : undefined,
             onHover: moveTo,
             onSelect: (id) => select(TEAM_MENU.findIndex((label) => label === id)),
-          }} />
+          }}
+        />
       </div>
     </RawScreen>
   )

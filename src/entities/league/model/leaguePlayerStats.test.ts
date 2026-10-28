@@ -11,10 +11,7 @@ import {
   recordLeaguePlateAppearances,
   recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
-import type {
-  LeaguePitcherAppearance,
-  LeaguePlayerStats,
-} from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePitcherAppearance, LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { PITCHERS_PER_TEAM } from '@/entities/team/model/teamRoster'
 
 const 등판 = (덮기: Partial<LeaguePitcherAppearance> = {}): LeaguePitcherAppearance => ({
@@ -51,10 +48,7 @@ describe('리그 투수 줄 (선수 레코드 +0x20~+0x2f, P1 6절)', () => {
   })
 
   it('투구 수는 원본처럼 9999 에서 자른다 (+0x28)', () => {
-    const 쌓음 = recordLeaguePitcherAppearances(EMPTY_LEAGUE_PLAYER_STATS, [
-      등판({ pitches: 9000 }),
-      등판({ pitches: 9000 }),
-    ])
+    const 쌓음 = recordLeaguePitcherAppearances(EMPTY_LEAGUE_PLAYER_STATS, [등판({ pitches: 9000 }), 등판({ pitches: 9000 })])
 
     expect(leaguePitcherLineOf(쌓음, leaguePitcherIdOf(2, 1)).pitches).toBe(9999)
   })
@@ -185,9 +179,7 @@ describe('recordLeagueStolenBases — 도루 +0x2c (0xa8380 · 0xc1a98)', () => 
     expect(쌓음.batters[14]?.atBats).toBe(0)
     expect(쌓음.recordBatters?.[0xb4]?.steals).toBe(1)
     // 다음 타석이 와도 도루는 남는다
-    const 이어 = recordLeaguePlateAppearances(쌓음, [
-      { teamId: 1, battingOrderIndex: 2, outcome: { kind: '볼넷' }, runsBattedIn: 0 },
-    ])
+    const 이어 = recordLeaguePlateAppearances(쌓음, [{ teamId: 1, battingOrderIndex: 2, outcome: { kind: '볼넷' }, runsBattedIn: 0 }])
     expect(이어.batters[14]?.steals).toBe(2)
   })
 })

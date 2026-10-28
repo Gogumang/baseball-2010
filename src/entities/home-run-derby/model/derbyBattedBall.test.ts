@@ -177,17 +177,25 @@ describe('[경기+0xf2c] 공의 폴 굴림 — 0x51408 5174c · 517ce (판 공 �
   const countingRandom = () => {
     let count = 0
     const random = {
-      rand: (lo: number, _hi: number) => { count += 1; return lo },
-      rand9d: (_n: number) => { count += 1; return 0 },
+      rand: (lo: number, _hi: number) => {
+        count += 1
+        return lo
+      },
+      rand9d: (_n: number) => {
+        count += 1
+        return 0
+      },
     }
     return { random, rolls: () => count }
   }
   // 판 공은 폴에 안 맞고 d 를 더한 공만 폴에 맞는 패턴을 원본 표에서 찾는다
-  const found = Object.values(BATTED_BALL_PATTERNS).flat().flatMap((pattern) =>
-    [0, 1].map((hand) => ({ pattern, hand })),
-  ).find(({ pattern, hand }) =>
-    battedBallTrajectory(pattern).flight.randomRolls === 0 &&
-    battedBallTrajectory(earlyPassPatternOf(pattern, hand)).flight.randomRolls > 0)
+  const found = Object.values(BATTED_BALL_PATTERNS)
+    .flat()
+    .flatMap((pattern) => [0, 1].map((hand) => ({ pattern, hand })))
+    .find(
+      ({ pattern, hand }) =>
+        battedBallTrajectory(pattern).flight.randomRolls === 0 && battedBallTrajectory(earlyPassPatternOf(pattern, hand)).flight.randomRolls > 0,
+    )
 
   it('손을 주면 d 를 더한 공이 폴에 맞을 때 굴림이 하나 더 돈다 · 안 주면 안 돈다', () => {
     expect(found).toBeDefined()

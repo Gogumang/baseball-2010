@@ -241,9 +241,7 @@ describe('판 진행 관문 0xb0d28', () => {
       expect(passPlayGate({ ...닫힘없음, foulFlag: true, foulBall: { ...넘은공, currentTick: 19 } }).open).toBe(true)
       expect(passPlayGate({ ...닫힘없음, foulFlag: true, foulBall: { ...넘은공, currentTick: 20 } }).open).toBe(false)
       // 먼저 떨어진 공(aa0 ≤ aa4)은 이 갈래가 아니다
-      expect(
-        passPlayGate({ ...닫힘없음, foulFlag: true, foulBall: { ...공, fenceTick: 20, landingTick: 20, currentTick: 20 } }).open,
-      ).toBe(true)
+      expect(passPlayGate({ ...닫힘없음, foulFlag: true, foulBall: { ...공, fenceTick: 20, landingTick: 20, currentTick: 20 } }).open).toBe(true)
     })
     it('홈 뒤(z > 32599)로 −315 < 각 < −225 방향이면 닫는다', () => {
       expect(passPlayGate({ ...닫힘없음, foulFlag: true, foulBall: { ...공, z: 32_600, angle: -270 } }).open).toBe(false)
@@ -276,9 +274,7 @@ describe('0xaa05c · 0xa990c (주자관리)', () => {
   })
 
   it('안 끝난 주자 수 = 아웃·득점 아닌 주자', () => {
-    expect(
-      liveRunnerCountOf([루에선주자(1), 루에선주자(2, { isOut: true }), 루에선주자(3, { scored: true })]),
-    ).toBe(1)
+    expect(liveRunnerCountOf([루에선주자(1), 루에선주자(2, { isOut: true }), 루에선주자(3, { scored: true })])).toBe(1)
   })
 })
 

@@ -125,8 +125,10 @@ describe('128 틀 0x15984 — 팝업 닫힘', () => {
   it('0x29 가 열려도 끝내지 않고 0x15c54 의 자기 모드 해금으로 이어간다 — 0x29 가 먼저다', () => {
     const 투수 = { ...createCareer('일위'), regularSeasonFirstCount: 5 }
     const 모두 = { otherLeagueFirstCount: 3, seasonModeFirstCount: 1, globalOpenedHiddenIds: [] }
-    expect(applyRegularSeasonReward(투수, REGULAR_SEASON_HIDDEN_ID.투수편, 모두).openedHiddenIds)
-      .toEqual([AUTOBOT_BAT_HIDDEN_ID, REGULAR_SEASON_HIDDEN_ID.투수편])
+    expect(applyRegularSeasonReward(투수, REGULAR_SEASON_HIDDEN_ID.투수편, 모두).openedHiddenIds).toEqual([
+      AUTOBOT_BAT_HIDDEN_ID,
+      REGULAR_SEASON_HIDDEN_ID.투수편,
+    ])
   })
 
   it('알림 창에 넣을 새로 연 k — 0x29 먼저 · 자기 모드, 전역 표에 있던 k 는 창이 없다 (0x62368 강제 0)', () => {
@@ -136,8 +138,9 @@ describe('128 틀 0x15984 — 팝업 닫힘', () => {
     expect(regularSeasonOpenedHiddenIds(투수, rewarded, 모두)).toEqual([AUTOBOT_BAT_HIDDEN_ID, 0x32])
     // 자기 모드 k 가 이미 전역 표에 있었다 — 커리어에는 새로 붙어도 창은 없다
     const 전역 = { ...모두, globalOpenedHiddenIds: [0x32] }
-    expect(regularSeasonOpenedHiddenIds(투수, applyRegularSeasonReward(투수, REGULAR_SEASON_HIDDEN_ID.투수편, 전역), 전역))
-      .toEqual([AUTOBOT_BAT_HIDDEN_ID])
+    expect(regularSeasonOpenedHiddenIds(투수, applyRegularSeasonReward(투수, REGULAR_SEASON_HIDDEN_ID.투수편, 전역), 전역)).toEqual([
+      AUTOBOT_BAT_HIDDEN_ID,
+    ])
     // 다른 저장을 못 읽어도 자기 모드 k 는 연다
     expect(regularSeasonOpenedHiddenIds(투수, applyRegularSeasonReward(투수, REGULAR_SEASON_HIDDEN_ID.투수편))).toEqual([0x32])
   })

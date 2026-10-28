@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { atBatRecordIdsOf, gameEndRecordIdsOf, recordGamePointsOf, RECORD_NAMES, completeGameRecordIdsOf, strikeoutRecordIdsOf, strikeoutCallRecordIdsOf, strikeoutTallyRecordIdsOf, threePitchInningRecordIdsOf, pinchHitHomeRunRecordIdsOf, backToBackRecordOf, stealPlayRecordIdsOf, multiOutPlayRecordIdsOf, foulRecordOf, laserThrowOutRecordOf, passesRecordTeamGate } from '@/entities/game/model/gameRecords'
+import {
+  atBatRecordIdsOf,
+  gameEndRecordIdsOf,
+  recordGamePointsOf,
+  RECORD_NAMES,
+  completeGameRecordIdsOf,
+  strikeoutRecordIdsOf,
+  strikeoutCallRecordIdsOf,
+  strikeoutTallyRecordIdsOf,
+  threePitchInningRecordIdsOf,
+  pinchHitHomeRunRecordIdsOf,
+  backToBackRecordOf,
+  stealPlayRecordIdsOf,
+  multiOutPlayRecordIdsOf,
+  foulRecordOf,
+  laserThrowOutRecordOf,
+  passesRecordTeamGate,
+} from '@/entities/game/model/gameRecords'
 import type { CompleteGameInput, StrikeoutRecordInput, StealPlayRunner } from '@/entities/game/model/gameRecords'
 
 const 타석 = (overrides = {}) => ({

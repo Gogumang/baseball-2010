@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
-import {
-  MY_RECORD_SLOT, insertMyBatter, moveMyBatter, myBatterIndexOf, tableNariTeamRecord,
-} from '@/entities/career/model/nariTeamRecord'
+import { MY_RECORD_SLOT, insertMyBatter, moveMyBatter, myBatterIndexOf, tableNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 
 afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 

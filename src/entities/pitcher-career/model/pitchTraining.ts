@@ -278,11 +278,7 @@ export function openableHiddenPitchEventOf(career: PitcherCareer): (typeof HIDDE
       const from = (event.dateFrom[0] - 1) * GAMES_PER_SEASON + event.dateFrom[1]
       const to = (event.dateTo[0] - 1) * GAMES_PER_SEASON + event.dateTo[1]
       if (now < from || now > to) return false
-      return (
-        career.ability.control >= event.control &&
-        career.ability.velocity >= event.velocity &&
-        career.ability.breaking >= event.breaking
-      )
+      return career.ability.control >= event.control && career.ability.velocity >= event.velocity && career.ability.breaking >= event.breaking
     }) ?? null
   )
 }

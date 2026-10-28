@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { SEASON_FIRST_NOTICE } from '@/shared/config/original/mainMenu'
 import {
-  MODE_ENTRIES, RANKING_ENTRIES, RANKING_SERVER_NOTICE, RESTART_MODE_STATE, TOP_ENTRIES, generalModeEntryCursorOf, initialMainMenu, isEntryDimmed, isEntryEnabled,
-  reduceMainMenu, selectedIdOf,
+  MODE_ENTRIES,
+  RANKING_ENTRIES,
+  RANKING_SERVER_NOTICE,
+  RESTART_MODE_STATE,
+  TOP_ENTRIES,
+  generalModeEntryCursorOf,
+  initialMainMenu,
+  isEntryDimmed,
+  isEntryEnabled,
+  reduceMainMenu,
+  selectedIdOf,
 } from '@/pages/main-menu/model/mainMenu'
 import type { MainMenuState } from '@/pages/main-menu/model/mainMenu'
 
@@ -23,9 +32,7 @@ function 고르기(state: MainMenuState, id: string, hasSavedGame: boolean): Mai
 
 describe('처음 메뉴 (하위 상태 4) — 원작의 윗단', () => {
   it('여섯 칸이 순서대로 있다 — StrMAINMENU [0]~[4]·[209]', () => {
-    expect(TOP_ENTRIES.map((entry) => entry.id)).toEqual([
-      '게임시작', '스페셜', '도움말', '환경설정', '랭킹', '게임문의',
-    ])
+    expect(TOP_ENTRIES.map((entry) => entry.id)).toEqual(['게임시작', '스페셜', '도움말', '환경설정', '랭킹', '게임문의'])
   })
 
   it('게임시작을 고르면 아랫단(상태 5)으로 내려가고 커서는 0(최근게임)이다 — 진입 0x25b88', () => {
@@ -217,8 +224,7 @@ describe('reduceMainMenu — 원본 글자 목록에서 모드를 고르는 메�
   it('[14] 답도 0x327b8 모드 3·4 갈래를 지난다 — 그 편 경기 중간 저장이 있으면 곧장 경기 (0x328b4)', () => {
     const 고름 = 고르기(게임시작목록(true), '나만의리그', true)
     const 창 = reduceMainMenu(고름, { type: '시작' }, true).state
-    const 답 = (answer: number, ready: { 투수편: boolean; 타자편: boolean }) =>
-      reduceMainMenu(창, { type: '창답', answer }, true, false, 4, ready)
+    const 답 = (answer: number, ready: { 투수편: boolean; 타자편: boolean }) => reduceMainMenu(창, { type: '창답', answer }, true, false, 4, ready)
     expect(답(0, { 투수편: false, 타자편: true }).effect).toBe('나리타자편경기')
     expect(답(1, { 투수편: true, 타자편: false }).effect).toBe('나리투수편경기')
     expect(답(1, { 투수편: false, 타자편: true }).effect).toBe('나리투수편')
@@ -269,8 +275,7 @@ describe('일반모드 (모드 1) — 하위 12 진입 창 [13]·[15] (0x296f0)'
     expect(고름.selectedModeId).toBe('일반모드')
     return reduceMainMenu(고름, { type: '시작' }, true, inProgress)
   }
-  const 답 = (state: MainMenuState, answer: number, inProgress: boolean) =>
-    reduceMainMenu(state, { type: '창답', answer }, true, inProgress)
+  const 답 = (state: MainMenuState, answer: number, inProgress: boolean) => reduceMainMenu(state, { type: '창답', answer }, true, inProgress)
 
   it('고르면 곧바로 들어가지 않고 [13] 창이 뜬다 — 저장(+0x4d)이 없으면 처음 커서는 1(새로하기)', () => {
     const 시작 = 일반모드시작(false)

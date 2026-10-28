@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BURST_RESULT_BIT as B,
-  HUMAN_WIN_END_BITS,
-  burstResultBitsOf,
-  hasBit,
-} from '@/entities/burst-mission/model/burstResultBits'
+import { BURST_RESULT_BIT as B, HUMAN_WIN_END_BITS, burstResultBitsOf, hasBit } from '@/entities/burst-mission/model/burstResultBits'
 
 const 단타 = { kind: '안타', bases: 1 } as const
 const 이루타 = { kind: '안타', bases: 2 } as const
@@ -16,9 +11,7 @@ const 땅볼아웃 = { kind: '아웃', detail: '땅볼아웃' } as const
 
 describe('결과비트 값 (타석 결과 +0x188)', () => {
   it('12개 비트가 0x1 부터 0x800 까지다', () => {
-    expect(Object.values(B)).toEqual([
-      0x001, 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x200, 0x400, 0x800,
-    ])
+    expect(Object.values(B)).toEqual([0x001, 0x002, 0x004, 0x008, 0x010, 0x020, 0x040, 0x080, 0x100, 0x200, 0x400, 0x800])
     expect(HUMAN_WIN_END_BITS).toBe(0x801)
   })
 })

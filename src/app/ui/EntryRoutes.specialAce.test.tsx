@@ -8,8 +8,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 /** 스페셜 화면 대신 — 마선수선택 칸을 곧장 연 꼴로 `renderAceSelect` 를 그린다 */
 vi.mock('@/pages/special/ui/SpecialScreen', () => ({
-  SpecialScreen: ({ renderAceSelect }: { renderAceSelect?: (onBack: () => void) => ReactNode }) =>
-    <>{renderAceSelect?.(() => undefined)}</>,
+  SpecialScreen: ({ renderAceSelect }: { renderAceSelect?: (onBack: () => void) => ReactNode }) => <>{renderAceSelect?.(() => undefined)}</>,
   HallOfFameScreen: () => null,
 }))
 
@@ -37,7 +36,11 @@ describe('스페셜 마선수선택 (메인 메뉴 하위 28)', () => {
       random: createSeededRandom(1),
       wallet: { balance: 0 } as unknown as Props['wallet'],
       aceSelect: {
-        openedAcePitcherIds: [], openedAceBatterIds: [], levels: {}, onOpenAce: vi.fn(), onLevelUp: vi.fn(),
+        openedAcePitcherIds: [],
+        openedAceBatterIds: [],
+        levels: {},
+        onOpenAce: vi.fn(),
+        onLevelUp: vi.fn(),
       } as unknown as Props['aceSelect'],
     }
     render(<EntryRoutes {...props} />)

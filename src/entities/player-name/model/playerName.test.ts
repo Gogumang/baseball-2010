@@ -2,8 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import {
-  EDITED_BATTER_SLOTS, EDITED_PITCHER_SLOTS, EMPTY_EDITED_NAMES, clearEditedNames, clipEditedName,
-  editedNameOf, normalizeEditedNames, withEditedName,
+  EDITED_BATTER_SLOTS,
+  EDITED_PITCHER_SLOTS,
+  EMPTY_EDITED_NAMES,
+  clearEditedNames,
+  clipEditedName,
+  editedNameOf,
+  normalizeEditedNames,
+  withEditedName,
 } from '@/entities/player-name/model/editedNames'
 import { originalNameOf, playerNameOf, setActiveEditedNames } from '@/entities/player-name/model/playerName'
 
@@ -59,9 +65,7 @@ describe('선수 이름 0xb62c0 — 고친 이름 있으면 그것, 없으면 �
     const batter = teamBatters(9)[11]
     const pitcherOriginal = pitcher.name
     const batterOriginal = batter.name
-    setActiveEditedNames(
-      withEditedName(withEditedName(EMPTY_EDITED_NAMES, pitcher.id, true, '투수새'), batter.id, false, '타자새'),
-    )
+    setActiveEditedNames(withEditedName(withEditedName(EMPTY_EDITED_NAMES, pitcher.id, true, '투수새'), batter.id, false, '타자새'))
     expect(PITCHERS[pitcher.id].name).toBe('투수새')
     expect(teamBatters(9)[11].name).toBe('타자새')
     expect(originalNameOf(pitcher)).toBe(pitcherOriginal)

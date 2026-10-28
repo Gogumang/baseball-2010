@@ -4,15 +4,22 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { ACE_OPEN_TABLE } from '@/shared/config/original/aceOpen'
 import { emitMenuSparkle } from '@/widgets/particles/model/sceneParticles'
+import { ACE_LEVEL_UP_TEXT, aceLevelUpOutcomeOf, aceLevelUpRowsOf } from '@/entities/mission/model/aceLevel'
 import {
-  ACE_LEVEL_UP_TEXT,
-  aceLevelUpOutcomeOf,
-  aceLevelUpRowsOf,
-} from '@/entities/mission/model/aceLevel'
-import {
-  ACE_BATTER_ROW_LABEL_FRAMES, ACE_LEVEL_UP_ARROW_IMAGE, ACE_LEVEL_UP_BAR_FRAME, ACE_LEVEL_UP_BUTTONS, ACE_LEVEL_UP_BUTTON_SIZE,
-  ACE_LEVEL_UP_COST_BOX, ACE_LEVEL_UP_COST_TEXT, ACE_LEVEL_UP_HEAD, ACE_LEVEL_UP_PANEL, ACE_LEVEL_UP_TIMES_FRAME, ACE_LEVEL_UP_TITLE,
-  ACE_PITCHER_ROW_LABEL_FRAMES, aceLevelUpNumberOf, aceLevelUpRowOf,
+  ACE_BATTER_ROW_LABEL_FRAMES,
+  ACE_LEVEL_UP_ARROW_IMAGE,
+  ACE_LEVEL_UP_BAR_FRAME,
+  ACE_LEVEL_UP_BUTTONS,
+  ACE_LEVEL_UP_BUTTON_SIZE,
+  ACE_LEVEL_UP_COST_BOX,
+  ACE_LEVEL_UP_COST_TEXT,
+  ACE_LEVEL_UP_HEAD,
+  ACE_LEVEL_UP_PANEL,
+  ACE_LEVEL_UP_TIMES_FRAME,
+  ACE_LEVEL_UP_TITLE,
+  ACE_PITCHER_ROW_LABEL_FRAMES,
+  aceLevelUpNumberOf,
+  aceLevelUpRowOf,
 } from '@/widgets/ace-level-up/lib/aceLevelUpLayout'
 import type { AceLevelUpGlyph } from '@/widgets/ace-level-up/lib/aceLevelUpLayout'
 import * as styles from '@/widgets/ace-level-up/ui/AceLevelUpWindow.css'
@@ -121,10 +128,10 @@ export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }:
   const palette3 = useImgTextPalette3()
   const widthOf = (frame: number) => textOrigins?.[pad(frame)]?.width ?? 0
   const labelFrames = role === '투수' ? ACE_PITCHER_ROW_LABEL_FRAMES : ACE_BATTER_ROW_LABEL_FRAMES
-  const numberImages = (glyphs: readonly AceLevelUpGlyph[], key: string) => glyphs.map((glyph, index) => (
-    <img key={`${key}-${index}`} className={styles.layer} alt="" src={`${NUM}/${pad(glyph.image)}.png`}
-      style={{ left: glyph.x, top: glyph.y }} />
-  ))
+  const numberImages = (glyphs: readonly AceLevelUpGlyph[], key: string) =>
+    glyphs.map((glyph, index) => (
+      <img key={`${key}-${index}`} className={styles.layer} alt="" src={`${NUM}/${pad(glyph.image)}.png`} style={{ left: glyph.x, top: glyph.y }} />
+    ))
   const textLine = (frame: number, left: number, top: number, key?: string) => (
     <img key={key} className={styles.layer} alt="" src={`${IMG_TEXT}/${pad(frame)}.png`} style={{ left, top }} />
   )
@@ -136,15 +143,30 @@ export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }:
       <div role="dialog" aria-label="마선수 레벨업" data-cell={cell}>
         {palette3.definition}
         {/* 5f424 공용 판 0x55e60(skin, W/2, H/2, 0xc0, 0xd4, 0, 0x22, 0, 0, 제목 탭 1, 어둡게 1) */}
-        <CommonPanel x={ACE_LEVEL_UP_PANEL.x} y={ACE_LEVEL_UP_PANEL.y} width={ACE_LEVEL_UP_PANEL.width}
-          height={ACE_LEVEL_UP_PANEL.height} titleTab dim testId="레벨업-판" />
-        <img className={styles.layer} alt="레벨업" src={`${IMG_TEXT}/${pad(ACE_LEVEL_UP_TITLE.frame)}.png`}
-          style={{ left: ACE_LEVEL_UP_TITLE.centerX - (widthOf(ACE_LEVEL_UP_TITLE.frame) >> 1), top: ACE_LEVEL_UP_TITLE.y, ...palette3.style }} />
+        <CommonPanel
+          x={ACE_LEVEL_UP_PANEL.x}
+          y={ACE_LEVEL_UP_PANEL.y}
+          width={ACE_LEVEL_UP_PANEL.width}
+          height={ACE_LEVEL_UP_PANEL.height}
+          titleTab
+          dim
+          testId="레벨업-판"
+        />
+        <img
+          className={styles.layer}
+          alt="레벨업"
+          src={`${IMG_TEXT}/${pad(ACE_LEVEL_UP_TITLE.frame)}.png`}
+          style={{ left: ACE_LEVEL_UP_TITLE.centerX - (widthOf(ACE_LEVEL_UP_TITLE.frame) >> 1), top: ACE_LEVEL_UP_TITLE.y, ...palette3.style }}
+        />
 
         {/* 머리 줄 — LV 지금 → 다음 */}
         <FrameSprite folder={SLT_FRAME} frame={ACE_LEVEL_UP_BAR_FRAME} origins={sltOrigins} x={head.bar.x} y={head.bar.y} />
-        <img className={styles.layer} alt="" src={`${SLT_IMAGE}/${pad(ACE_LEVEL_UP_ARROW_IMAGE)}.png`}
-          style={{ left: head.arrow.x, top: head.arrow.y }} />
+        <img
+          className={styles.layer}
+          alt=""
+          src={`${SLT_IMAGE}/${pad(ACE_LEVEL_UP_ARROW_IMAGE)}.png`}
+          style={{ left: head.arrow.x, top: head.arrow.y }}
+        />
         {textLine(head.labelFrame, head.labelRight - widthOf(head.labelFrame), head.labelY)}
         <span data-testid="레벨업-레벨" aria-label={`LV ${level + 1} → ${level + 2}`}>
           {numberImages(aceLevelUpNumberOf(level + 1, head.currentCenterX, head.numberY, 2), 'lv-now')}
@@ -157,8 +179,12 @@ export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }:
           return (
             <div key={row.label} data-testid="레벨업-줄" aria-label={`${row.label} ${row.current} → ${row.next}`}>
               <FrameSprite folder={SLT_FRAME} frame={ACE_LEVEL_UP_BAR_FRAME} origins={sltOrigins} x={place.currentBar.x} y={place.currentBar.y} />
-              <img className={styles.layer} alt="" src={`${SLT_IMAGE}/${pad(ACE_LEVEL_UP_ARROW_IMAGE)}.png`}
-                style={{ left: place.arrow.x, top: place.arrow.y }} />
+              <img
+                className={styles.layer}
+                alt=""
+                src={`${SLT_IMAGE}/${pad(ACE_LEVEL_UP_ARROW_IMAGE)}.png`}
+                style={{ left: place.arrow.x, top: place.arrow.y }}
+              />
               <FrameSprite folder={SLT_FRAME} frame={ACE_LEVEL_UP_BAR_FRAME} origins={sltOrigins} x={place.nextBar.x} y={place.nextBar.y} />
               {textLine(labelFrame, place.labelRight - widthOf(labelFrame), place.labelY)}
               {place.times.map((spot, spotIndex) => textLine(ACE_LEVEL_UP_TIMES_FRAME, spot.x, spot.y, `times-${spotIndex}`))}
@@ -169,14 +195,24 @@ export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }:
         })}
 
         {/* 5f878 안쪽 칸 · 5f8de 비용 줄 0xba269(…, (38, 196), 폭 164) */}
-        <InsetBox x={ACE_LEVEL_UP_COST_BOX.x} y={ACE_LEVEL_UP_COST_BOX.y} width={ACE_LEVEL_UP_COST_BOX.width}
-          height={ACE_LEVEL_UP_COST_BOX.height} testId="레벨업-비용-칸" />
-        <div className={styles.cost} data-testid="레벨업-비용"
-          style={{ left: ACE_LEVEL_UP_COST_TEXT.x, top: ACE_LEVEL_UP_COST_TEXT.y, width: ACE_LEVEL_UP_COST_TEXT.width }}>
+        <InsetBox
+          x={ACE_LEVEL_UP_COST_BOX.x}
+          y={ACE_LEVEL_UP_COST_BOX.y}
+          width={ACE_LEVEL_UP_COST_BOX.width}
+          height={ACE_LEVEL_UP_COST_BOX.height}
+          testId="레벨업-비용-칸"
+        />
+        <div
+          className={styles.cost}
+          data-testid="레벨업-비용"
+          style={{ left: ACE_LEVEL_UP_COST_TEXT.x, top: ACE_LEVEL_UP_COST_TEXT.y, width: ACE_LEVEL_UP_COST_TEXT.width }}
+        >
           {costLines.map((line, lineIndex) => (
             <div key={lineIndex} style={{ textAlign: line.isCentered ? 'center' : 'left' }}>
               {line.segments.map((segment, segmentIndex) => (
-                <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>{segment.text}</span>
+                <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
+                  {segment.text}
+                </span>
               ))}
             </div>
           ))}
@@ -188,23 +224,20 @@ export function AceLevelUpWindow({ cell, level, gamePoint, onLevelUp, onClose }:
           return (
             <span key={button.label}>
               <FrameSprite folder={POPUP} frame={button.frame} origins={popupOrigins} x={button.x} y={button.y} />
-              {isSelected && (
-                <FrameSprite folder={POPUP} frame={button.selectedFrame} origins={popupOrigins} x={button.x} y={button.y} />
-              )}
-              <button type="button" className={styles.hitArea} aria-label={button.label} aria-pressed={isSelected}
+              {isSelected && <FrameSprite folder={POPUP} frame={button.selectedFrame} origins={popupOrigins} x={button.x} y={button.y} />}
+              <button
+                type="button"
+                className={styles.hitArea}
+                aria-label={button.label}
+                aria-pressed={isSelected}
                 style={{ left: button.x, top: button.y, width: ACE_LEVEL_UP_BUTTON_SIZE.width, height: ACE_LEVEL_UP_BUTTON_SIZE.height }}
-                onClick={() => (index === 0 ? (isYes ? confirm() : setIsYes(true)) : onClose())} />
+                onClick={() => (index === 0 ? (isYes ? confirm() : setIsYes(true)) : onClose())}
+              />
             </span>
           )
         })}
       </div>
-      {isShortageOpen && (
-        <MessageBox
-          text={ACE_LEVEL_UP_TEXT.shortage}
-          buttons={['예', '아니오']}
-          onAnswer={() => setIsShortageOpen(false)}
-        />
-      )}
+      {isShortageOpen && <MessageBox text={ACE_LEVEL_UP_TEXT.shortage} buttons={['예', '아니오']} onAnswer={() => setIsShortageOpen(false)} />}
     </>
   )
 }

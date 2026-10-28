@@ -73,8 +73,14 @@ function expectSameDraws<T>(hook: (random: RandomPort) => T, pick: (result: T) =
 }
 
 const silentSound = {
-  play: () => {}, playBgm: () => {}, stopBgm: () => {}, resumeBgm: () => {}, stop: () => {},
-  currentBgm: () => null, setVolume: () => {}, getVolume: () => 100,
+  play: () => {},
+  playBgm: () => {},
+  stopBgm: () => {},
+  resumeBgm: () => {},
+  stop: () => {},
+  currentBgm: () => null,
+  setVolume: () => {},
+  getVolume: () => 100,
 }
 beforeEach(() => {
   setActiveSound(silentSound)

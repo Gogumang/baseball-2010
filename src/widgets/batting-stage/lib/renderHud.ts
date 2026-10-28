@@ -238,13 +238,7 @@ export function hudRowsOf(hud: HudState): { readonly top: HudRow; readonly botto
 }
 
 /** 정수 배 확대 — 자리 `(x − ((z−1)·w >> 1), y − ((z−1)·h >> 1))` 는 상자 w·h 로(0x37828~0x3784c), 크기 `w·z × h·z` (0x944b5) */
-function drawZoomedLamp(
-  context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  scale: number,
-): void {
+function drawZoomedLamp(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, scale: number): void {
   const wasSmoothing = context.imageSmoothingEnabled
   context.imageSmoothingEnabled = false
   context.drawImage(
@@ -319,9 +313,18 @@ function drawTeamRow(
   const logo = sprite(logoUrl)
   if (logo !== null) context.drawImage(logo, row.x + LOGO_OFFSET.x, row.y + LOGO_OFFSET.y)
   const box = { x: row.x + SCORE_BOX_SHIFT_X, y: row.y + scoreOffsetY, width: row.width, height: row.height }
-  const glyphs = alignedNumberGlyphsOf(score, box, {
-    spacing: SCORE_LETTER_SPACING, start: SCORE_DIGITS_START, align: scoreAlign, offsetX: SCORE_OFFSET_X, offsetY: 0,
-  }, numGlyphSizeOf)
+  const glyphs = alignedNumberGlyphsOf(
+    score,
+    box,
+    {
+      spacing: SCORE_LETTER_SPACING,
+      start: SCORE_DIGITS_START,
+      align: scoreAlign,
+      offsetX: SCORE_OFFSET_X,
+      offsetY: 0,
+    },
+    numGlyphSizeOf,
+  )
   if (glyphs === null) return
   for (const glyph of glyphs) {
     const image = sprite(numGlyphUrl(glyph.index))

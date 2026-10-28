@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
 import {
-  BATTER_RANKING_CATEGORIES, PITCHER_RANKING_CATEGORIES, moveRankingPage, originalDecimalTextOf, rankSeasonRecords,
-  seasonQualificationOf, seasonRankingValueTextOf,
+  BATTER_RANKING_CATEGORIES,
+  PITCHER_RANKING_CATEGORIES,
+  moveRankingPage,
+  originalDecimalTextOf,
+  rankSeasonRecords,
+  seasonQualificationOf,
+  seasonRankingValueTextOf,
 } from '@/entities/season-mode/model/seasonRecordRanking'
 
 const 줄 = (덮어쓰기: Partial<LeagueRecord>): LeagueRecord => ({ ...EMPTY_LEAGUE_RECORD, ...덮어쓰기 })

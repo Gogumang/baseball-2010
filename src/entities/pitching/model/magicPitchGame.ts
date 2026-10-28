@@ -50,10 +50,7 @@ export interface MagicPitchGameOptions {
  * 경기 시작 때 한 번 만든다 (0xaebe4 가 남은 횟수를 채우는 자리).
  * 공 객체는 갓 만들어진 상태라 +0x10 = 0 이다 (0x1239 new 의 0 채움은 원본 미확인 — H2 3-4).
  */
-export function createMagicPitchGameState(
-  repertoire: PitcherRepertoireInfo,
-  options: MagicPitchGameOptions = {},
-): MagicPitchGameState {
+export function createMagicPitchGameState(repertoire: PitcherRepertoireInfo, options: MagicPitchGameOptions = {}): MagicPitchGameState {
   return {
     remaining: magicPitchCountOf({
       number: repertoire.magicId,
@@ -79,12 +76,7 @@ export function createMagicPitchGameState(
  * 복사한 뒤 0x48ddc 에서 부른다), 일반 투수(+0x18 = 0)일 때는 0xae9c4 가 안 써서 팀+0x28 이 −1 로 남았다가
  * 마투수가 오른 첫 타석에 0xd8509[레벨] 로 찬다 — 그 뒤 줄지 않으니 **마투수의 마구는 늘 공+0x10 에 번호가 실린다**.
  */
-export function advanceMagicPitchGameState(
-  state: MagicPitchGameState,
-  typeNumber: number,
-  pitcherMagicNumber: number,
-  isHomeRunDerby = false,
-): void {
+export function advanceMagicPitchGameState(state: MagicPitchGameState, typeNumber: number, pitcherMagicNumber: number, isHomeRunDerby = false): void {
   const isMagic = typeNumber === MAGIC_PITCH_TYPE_NUMBER
   const remainingBefore = state.remaining
   // 고침(B-08, `bugfixes.json`): 첫 마구도 횟수를 깎는다 — 한 경기 마구는 표 값만큼이다. 원본은 `공+0x10 != 0` 일 때만 깎는다
@@ -126,10 +118,7 @@ export const FRESH_HELD_CPU_MAGIC: HeldCpuMagic = { remaining: UNFILLED_MAGIC_RE
  * 0xaebe4 가 마운드 투수로 채우는 횟수 (aeea8~aef24): 마투수(0xb633d)면 `0xd8509[mgr[0x13a + 순번(0xb63a1)]]`,
  * 아니면 `0xd84ff[+0x18]` 에 혼신(스킬 23) +2. 마구가 없는 투수(+0x18 = 0)는 0xae9c4 가 안 쓴다(0 과 같다).
  */
-export function magicCountOfPitcherAbility(
-  pitcher: PitcherAbility,
-  aceLevels: Readonly<Record<number, number>> | undefined,
-): number {
+export function magicCountOfPitcherAbility(pitcher: PitcherAbility, aceLevels: Readonly<Record<number, number>> | undefined): number {
   const magicId = pitcher.repertoire?.magicId ?? 0
   const order = aceOrderOfMagicNumber(magicId)
   return magicPitchCountOf({

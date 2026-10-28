@@ -14,10 +14,7 @@ const origins = JSON.parse(readFileSync('public/sprites/game_ui/frames/origins.j
   string,
   { x: number; y: number; width: number; height: number }
 >
-const boxes = JSON.parse(readFileSync('public/sprites/game_ui/frames/boxes.json', 'utf8')) as Record<
-  string,
-  [number, number, number, number][]
->
+const boxes = JSON.parse(readFileSync('public/sprites/game_ui/frames/boxes.json', 'utf8')) as Record<string, [number, number, number, number][]>
 
 describe('표시 구속 "Km" 판 — 0x4c4bc 의 0x4c9fc~0x4cac8', () => {
   it('판은 game_ui 프레임 20(원점 (−21, −18))을 (W/2, H/2) 에, 일의 자리는 상자 0 (−2, −15) + (120, 160) = (118, 145)', () => {
@@ -43,7 +40,7 @@ describe('표시 구속 "Km" 판 — 0x4c4bc 의 0x4c9fc~0x4cac8', () => {
     expect([0, 1, 2, 3, 4, 5, 15].map(showsPitchSpeedDigits)).toEqual([false, true, false, true, true, true, true])
   })
 
-  it('상태 0x12 만 — 맞은 공 뒤 인플레이(0x17) 자리의 웹 \'결과\' 와 다른 단계는 안 그린다', () => {
+  it("상태 0x12 만 — 맞은 공 뒤 인플레이(0x17) 자리의 웹 '결과' 와 다른 단계는 안 그린다", () => {
     expect(isPitchSpeedState({ kind: '결과', tick: 0, isPaused: false })).toBe(true)
     expect(isPitchSpeedState({ kind: '결과', tick: 0, isPaused: false, isInPlay: false })).toBe(true)
     expect(isPitchSpeedState({ kind: '결과', tick: 0, isPaused: false, isInPlay: true })).toBe(false)

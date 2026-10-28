@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  isSlotIconInUse, isSlotInUse, lockRegionOf, moveSpecialTrainingCursor, slotCostOf, slotDescriptionOf, slotNameOf,
-  slotProgressOf, specialTrainingIconFrameOf, specialTrainingTitleFrameOf, statusLabelOf,
+  isSlotIconInUse,
+  isSlotInUse,
+  lockRegionOf,
+  moveSpecialTrainingCursor,
+  slotCostOf,
+  slotDescriptionOf,
+  slotNameOf,
+  slotProgressOf,
+  specialTrainingIconFrameOf,
+  specialTrainingTitleFrameOf,
+  statusLabelOf,
 } from '@/widgets/special-swing/lib/specialTrainingWindow'
 
 /** 0x803d4 탭 0 · 1 — unicorn 으로 돌려 받은 그리기 호출과 맞춘다 */

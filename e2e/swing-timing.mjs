@@ -103,14 +103,23 @@ async function run(browserName) {
     const downsLength = await page.evaluate(() => window.__downs.length)
     await page.touchscreen.tap(point.x, point.y)
     // 판정 · 공 끝까지
-    await page.waitForFunction(() => {
-      const probe = window.__batting?.().probe
-      return probe === null || probe === undefined || probe.phase !== '투구중'
-    }, null, { timeout: 8000 }).catch(() => {})
-    const after = await page.evaluate(([from, downFrom]) => ({
-      log: window.__batting().log.slice(from),
-      downs: window.__downs.slice(downFrom),
-    }), [logLength, downsLength])
+    await page
+      .waitForFunction(
+        () => {
+          const probe = window.__batting?.().probe
+          return probe === null || probe === undefined || probe.phase !== '투구중'
+        },
+        null,
+        { timeout: 8000 },
+      )
+      .catch(() => {})
+    const after = await page.evaluate(
+      ([from, downFrom]) => ({
+        log: window.__batting().log.slice(from),
+        downs: window.__downs.slice(downFrom),
+      }),
+      [logLength, downsLength],
+    )
     const down = after.downs[0] ?? null
     const swing = after.log.find((entry) => entry.kind === '스윙') ?? null
     const judge = after.log.find((entry) => entry.kind === '판정') ?? null
@@ -119,7 +128,10 @@ async function run(browserName) {
     rows.push({
       downMinusTarget: down === null ? null : Math.round(down.ts - moment.target),
       handlerLag: down === null ? null : Math.round(down.now - down.ts),
-      seenMinusTapTick: swing === null || down === null ? null : swing.tick - (moment.shownTick + Math.floor((down.ts - moment.target + moment.msPerTick / 2) / moment.msPerTick)),
+      seenMinusTapTick:
+        swing === null || down === null
+          ? null
+          : swing.tick - (moment.shownTick + Math.floor((down.ts - moment.target + moment.msPerTick / 2) / moment.msPerTick)),
       keyOffset: swing === null ? null : swing.keyTick - (moment.frameCount - 2),
       judgeLag: swing === null || judge === null ? null : judge.tick - swing.tick,
       result: judge?.result ?? (swing === null ? '스윙없음' : '?'),
@@ -142,17 +154,19 @@ for (const browserName of browsers) {
   }
   const swung = count(rows, (row) => row.keyOffset !== null)
   const whiffs = count(rows, (row) => row.result === '헛스윙' || row.result === '판정없음')
-  console.log(JSON.stringify({
-    browser: browserName,
-    tapX: TAP_X,
-    pitches: rows.length,
-    swung,
-    whiffRate: swung === 0 ? null : (whiffs / swung).toFixed(3),
-    keyOffsetFromOptimal: offsets,
-    results,
-    avgDownMinusTargetMs: avg('downMinusTarget'),
-    avgHandlerLagMs: avg('handlerLag'),
-    avgSeenMinusTapTick: avg('seenMinusTapTick'),
-    avgJudgeLagTicks: avg('judgeLag'),
-  }))
+  console.log(
+    JSON.stringify({
+      browser: browserName,
+      tapX: TAP_X,
+      pitches: rows.length,
+      swung,
+      whiffRate: swung === 0 ? null : (whiffs / swung).toFixed(3),
+      keyOffsetFromOptimal: offsets,
+      results,
+      avgDownMinusTargetMs: avg('downMinusTarget'),
+      avgHandlerLagMs: avg('handlerLag'),
+      avgSeenMinusTapTick: avg('seenMinusTapTick'),
+      avgJudgeLagTicks: avg('judgeLag'),
+    }),
+  )
 }

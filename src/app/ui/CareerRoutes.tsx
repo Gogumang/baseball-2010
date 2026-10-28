@@ -113,18 +113,7 @@ export function CareerRoutes(props: CareerRoutesProps) {
   )
 }
 
-function CareerScreens({
-  screen,
-  setScreen,
-  session,
-  runner,
-  random,
-  career,
-  hallOfFame,
-  onAceMatch,
-  gameSettings,
-  aceLevels,
-}: CareerRoutesProps) {
+function CareerScreens({ screen, setScreen, session, runner, random, career, hallOfFame, onAceMatch, gameSettings, aceLevels }: CareerRoutesProps) {
   const { actions } = session
   const backToManagement = () => setScreen({ kind: '관리' })
   /** 114 재생이 끝난 한 틀 — 대화창 없이 0x19da4 를 그린 뒤 넘긴다 (`useEventEndFrame`) */
@@ -149,8 +138,7 @@ function CareerScreens({
   const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '143'
   const mainCursor = useRef(createNariMainMenuCursor()).current
   const entryTrail = useRef<string | null>(null)
-  const entryKey = screen.kind === '관리' ? '관리'
-    : screen.kind === '이벤트' && screen.context === '관리' ? `이벤트:${screen.eventId}` : null
+  const entryKey = screen.kind === '관리' ? '관리' : screen.kind === '이벤트' && screen.context === '관리' ? `이벤트:${screen.eventId}` : null
   if (entryKey !== entryTrail.current) {
     const isFromManagementFrame = screen.kind === '이벤트' && entryTrail.current === '관리'
     if (entryKey !== null && !isFromManagementFrame) {
@@ -195,10 +183,13 @@ function CareerScreens({
    * 키가 비트·장착·저장(`confirmTitle`)과 함께 창을 그 자리에서 치우고([창+9] = 0, 닫힘 애니 없음), 다음 갱신 0x1aec4 가
    * +0x274 == 1 이라 다시 판정해 다음 칭호를 새 창(높이 6 에서 펼침)으로 띄운다 — `key` 가 칭호마다 새 창을 세운다.
    */
-  const titlePopup = session.pendingTitle !== null && session.managementNotice === '' && session.managementDetail === null
-    // 관리 화면(RawScreen)의 형제라 240×320 기둥(ScreenOverlay)에 가둔다 — 안 가두면 창 판(left 0 · 폭 240)이 창 전체 왼쪽에 붙어 그려졌다
-    ? <ScreenOverlay><TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} /></ScreenOverlay>
-    : null
+  const titlePopup =
+    session.pendingTitle !== null && session.managementNotice === '' && session.managementDetail === null ? (
+      // 관리 화면(RawScreen)의 형제라 240×320 기둥(ScreenOverlay)에 가둔다 — 안 가두면 창 판(left 0 · 폭 240)이 창 전체 왼쪽에 붙어 그려졌다
+      <ScreenOverlay>
+        <TitleWindow key={session.pendingTitle} title={session.pendingTitle} onKey={actions.confirmTitle} />
+      </ScreenOverlay>
+    ) : null
   const managementWithTitle = (
     <>
       {management}
@@ -236,16 +227,16 @@ function CareerScreens({
           {...(screen.settlementInning === undefined
             ? {}
             : {
-              settlement: {
-                inning: screen.settlementInning,
-                playerSide: screen.settlementPlayerSide ?? 1,
-                random,
-                // 경기 중 구장 하늘 줄 그대로 (0x783b0 — 경기를 세울 때 한 번)
-                ...(screen.settlementSkyRow === undefined ? {} : { skyRow: screen.settlementSkyRow }),
-                // 구장 객체도 방금 끝난 경기 장면의 것 그대로 (다음 경기를 세울 때까지 세션이 든다)
-                stadium: session.sceneStadium,
-              },
-            })}
+                settlement: {
+                  inning: screen.settlementInning,
+                  playerSide: screen.settlementPlayerSide ?? 1,
+                  random,
+                  // 경기 중 구장 하늘 줄 그대로 (0x783b0 — 경기를 세울 때 한 번)
+                  ...(screen.settlementSkyRow === undefined ? {} : { skyRow: screen.settlementSkyRow }),
+                  // 구장 객체도 방금 끝난 경기 장면의 것 그대로 (다음 경기를 세울 때까지 세션이 든다)
+                  stadium: session.sceneStadium,
+                },
+              })}
         />
       )
 
@@ -284,7 +275,10 @@ function CareerScreens({
           onSettlementEnter={actions.enterGameSettlement}
           // 대회 경기도 정산 0x4ea0c 꼬리를 지난다 — 결과 그림 0x4a384 의 배경 · 정산 효과(경기 난수)
           settlement={{
-            inning: screen.settlementInning, playerSide: screen.settlementPlayerSide, random, skyRow: screen.settlementSkyRow,
+            inning: screen.settlementInning,
+            playerSide: screen.settlementPlayerSide,
+            random,
+            skyRow: screen.settlementSkyRow,
             stadium: session.sceneStadium,
           }}
         />
@@ -307,12 +301,16 @@ function CareerScreens({
           // 126 효과 팝업 → [확인] → 105 (입원 회복 글은 관리 화면 알림으로)
           resultText={session.outingResult?.effectText ?? null}
           onCloseResult={actions.closeOutingResult}
-          presentation={session.outingPresentation === null ? null : (
-            <SeasonOutingPopup place={session.outingPresentation.place}
-              presentation={nariOutingPresentationOf(session.outingPresentation.place, { isSlugger: career.battingTypeIndex === 1 })}
-              char0Palette={portraitPaletteIndex(career.skinIndex)}
-              onFinished={actions.finishOutingPresentation} />
-          )}
+          presentation={
+            session.outingPresentation === null ? null : (
+              <SeasonOutingPopup
+                place={session.outingPresentation.place}
+                presentation={nariOutingPresentationOf(session.outingPresentation.place, { isSlugger: career.battingTypeIndex === 1 })}
+                char0Palette={portraitPaletteIndex(career.skinIndex)}
+                onFinished={actions.finishOutingPresentation}
+              />
+            )
+          }
         />
       )
 
@@ -345,12 +343,18 @@ function CareerScreens({
       // (0x7e84c(0x69) 의 관리 6칸 — '관리' 갈래, 138 을 거친 타순 이벤트는 빼고), 그 밖은 칸 수 0 이라 안 그린다
       if (eventEnd.isEnding) {
         if (screen.context === '외출진입' || screen.context === '장소') {
-          return <RawScreen><OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} /></RawScreen>
+          return (
+            <RawScreen>
+              <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
+            </RawScreen>
+          )
         }
         return (
           <RawScreen>
             <NariEventUnderlay career={career}>
-              {screen.context === '관리' && !isBattingOrderEventId(screen.eventId) && <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />}
+              {screen.context === '관리' && !isBattingOrderEventId(screen.eventId) && (
+                <NariMainCommandBar menuEnable={career} cursor={mainCursor.current} />
+              )}
             </NariEventUnderlay>
           </RawScreen>
         )
@@ -360,41 +364,37 @@ function CareerScreens({
         <>
           <RawScreen>
             {(screen.context === '관리' || screen.context === '연초' || screen.context === '시즌') && <NariEventUnderlay career={career} />}
-            {isOverOutingMap && (
-              <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />
-            )}
+            {isOverOutingMap && <OutingMapUnderlay eventPlaceIds={session.eventPlaceIds} />}
             {/* 대사창은 화면 **위에 얹히는 덮개**다 — 안 감싸면 창 전체로 퍼져 구석에 그려진다 */}
           </RawScreen>
           <ScreenOverlay>
-          <StoryScreen
-            // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
-            isVibrationOn={gameSettings.settings.isVibrationOn}
-            isOverOutingMap={isOverOutingMap}
-            key={event.id}
-            events={session.storyEvents}
-            event={event}
-            playerName={career.name}
-            teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
-            skinIndex={career.skinIndex}
-            battingTypeIndex={career.battingTypeIndex}
-            onComplete={eventEnd.end}
-            carried={screen.carried}
-            onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}
-            // 370·375 의 system 3·4 — 타이틀(0x8b3bc)·MVP(0x8b23c) 발표 창. 130·131 과 같은 판정(0x8dad4 타자 · 0x8dd60)이다
-            systemWindowTextOf={(command) =>
-              awardWindowTextOf(command.sub, () => judgeSeasonAwards(career, careerLeagueRecordsOf(career), '타자'))
-            }
-            // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
-            yearGoalWindowOf={() => yearGoalWindowValuesOf(career)}
-            // 보상 명령 7 의 알림 창 — 0x8beb8 글 → 0x74ef4 종류 1 · 첫 종류 4 는 스킬 창 0x741a0 (모드 4 타자편)
-            rewardNoticeContext={() => rewardNoticeContextOf(career, BATTER_LEAGUE_MODE, random)}
-            // system 창 답 0 → 0x7fe90 (S+0x1b7 = 1 · 저장)
-            onSystemWindowConfirm={actions.confirmEventSystemWindow}
-            // 보상 명령 7 은 창을 세운 그 갱신에 준다 (0x8c460)
-            onReward={actions.giveEventReward}
-            // 선택지 OK → 0x8b0e4 (떠나온 줄 본 표시 · 저장)
-            onChoiceConfirm={actions.confirmEventChoice}
-          />
+            <StoryScreen
+              // 명령 5 의 500ms 진동(0x3a44)은 환경설정 진동(옵션 +0x3b)이 켜졌을 때만
+              isVibrationOn={gameSettings.settings.isVibrationOn}
+              isOverOutingMap={isOverOutingMap}
+              key={event.id}
+              events={session.storyEvents}
+              event={event}
+              playerName={career.name}
+              teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
+              skinIndex={career.skinIndex}
+              battingTypeIndex={career.battingTypeIndex}
+              onComplete={eventEnd.end}
+              carried={screen.carried}
+              onMatch={(command, carried) => onAceMatch(command, carried, screen.context)}
+              // 370·375 의 system 3·4 — 타이틀(0x8b3bc)·MVP(0x8b23c) 발표 창. 130·131 과 같은 판정(0x8dad4 타자 · 0x8dd60)이다
+              systemWindowTextOf={(command) => awardWindowTextOf(command.sub, () => judgeSeasonAwards(career, careerLeagueRecordsOf(career), '타자'))}
+              // system 1 올해의 목표 창 — 연초 115 · 392 (0x8d304 → 0x86fdc)
+              yearGoalWindowOf={() => yearGoalWindowValuesOf(career)}
+              // 보상 명령 7 의 알림 창 — 0x8beb8 글 → 0x74ef4 종류 1 · 첫 종류 4 는 스킬 창 0x741a0 (모드 4 타자편)
+              rewardNoticeContext={() => rewardNoticeContextOf(career, BATTER_LEAGUE_MODE, random)}
+              // system 창 답 0 → 0x7fe90 (S+0x1b7 = 1 · 저장)
+              onSystemWindowConfirm={actions.confirmEventSystemWindow}
+              // 보상 명령 7 은 창을 세운 그 갱신에 준다 (0x8c460)
+              onReward={actions.giveEventReward}
+              // 선택지 OK → 0x8b0e4 (떠나온 줄 본 표시 · 저장)
+              onChoiceConfirm={actions.confirmEventChoice}
+            />
           </ScreenOverlay>
         </>
       )
@@ -408,35 +408,59 @@ function CareerScreens({
        * 134 대진판 · 141 엔딩은 그 화면이 선 채 아홉 틀을 돌고(`YearCoverHoldLayer`) 표지는 그다음 틀부터 선다(`afterHold`)
        */
       const statusBoard = <NariEventUnderlay career={career} />
-      const previousScreenAt = screen.fromResume === true
-        ? (frame: number) => {
-          const underlay = resumeCoverUnderlayAt(frame)
-          if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
-          if (underlay === '관리') return <NariResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} />
-          if (underlay === '상태판') return statusBoard
-          // 연초 114 — 0x19e64 밑그림 위에 대화창 0x8b5ac(내장 이벤트 0x8a681 의 첫 say). 키는 장면 키 문이 버린다
-          return (
-            <>
-              {statusBoard}
-              <StoryScreen events={YEAR_START_EVENTS} event={NARI_YEAR_START_EVENT} playerName={career.name}
-                teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name} skinIndex={career.skinIndex} battingTypeIndex={career.battingTypeIndex}
-                isVibrationOn={gameSettings.settings.isVibrationOn} onComplete={ignoreEventEnd} onMatch={ignoreEventEnd} isInputLocked />
-            </>
-          )
-        }
-        : previousKind === '이벤트' ? () => statusBoard : undefined
+      const previousScreenAt =
+        screen.fromResume === true
+          ? (frame: number) => {
+              const underlay = resumeCoverUnderlayAt(frame)
+              if (underlay === '앞판') return <YearCoverResumeLeftFrame frame={frame} />
+              if (underlay === '관리')
+                return (
+                  <NariResumeManagementFrame career={career} cursor={nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)} />
+                )
+              if (underlay === '상태판') return statusBoard
+              // 연초 114 — 0x19e64 밑그림 위에 대화창 0x8b5ac(내장 이벤트 0x8a681 의 첫 say). 키는 장면 키 문이 버린다
+              return (
+                <>
+                  {statusBoard}
+                  <StoryScreen
+                    events={YEAR_START_EVENTS}
+                    event={NARI_YEAR_START_EVENT}
+                    playerName={career.name}
+                    teamName={(TEAMS[career.teamId] ?? TEAMS[0]).name}
+                    skinIndex={career.skinIndex}
+                    battingTypeIndex={career.battingTypeIndex}
+                    isVibrationOn={gameSettings.settings.isVibrationOn}
+                    onComplete={ignoreEventEnd}
+                    onMatch={ignoreEventEnd}
+                    isInputLocked
+                  />
+                </>
+              )
+            }
+          : previousKind === '이벤트'
+            ? () => statusBoard
+            : undefined
       // 새 시즌 처리 뒤라 S+0xb3(= season − 1)은 이미 새 연차 idx 다
       return (
-        <NariYearCoverScreen yearIndex={career.season - 1} onDone={backToManagement} previousScreenAt={previousScreenAt}
-          {...(screen.afterHold === true ? { startFrame: YEAR_COVER_ENTRY_FRAMES } : {})} />
+        <NariYearCoverScreen
+          yearIndex={career.season - 1}
+          onDone={backToManagement}
+          previousScreenAt={previousScreenAt}
+          {...(screen.afterHold === true ? { startFrame: YEAR_COVER_ENTRY_FRAMES } : {})}
+        />
       )
     }
 
     case '다음경기순위':
       return (
-        <NextGameStandingsScreen league={career.league} edition="타자편" gamePoint={career.gamePoint}
+        <NextGameStandingsScreen
+          league={career.league}
+          edition="타자편"
+          gamePoint={career.gamePoint}
           isFromManagement={screen.fromManagement}
-          onConfirm={actions.confirmNextGameStandings} onCancel={actions.cancelNextGameStandings} />
+          onConfirm={actions.confirmNextGameStandings}
+          onCancel={actions.cancelNextGameStandings}
+        />
       )
 
     case '경기준비': {
@@ -447,25 +471,41 @@ function CareerScreens({
       if (entryView !== null) {
         return (
           <NariScreenPush view={pushView}>
-            <EntryEditorScreen editor={entryView.editor} lists={entryView.lists}
-              teamName={TEAMS[entryView.teamId]?.name ?? ''} isAceLocked={false} gamePoint={career.gamePoint}
-              onKey={actions.pressEntryViewKey} onMoveCursor={actions.pointEntryViewCursor} onCloseAceLocked={() => {}}
+            <EntryEditorScreen
+              editor={entryView.editor}
+              lists={entryView.lists}
+              teamName={TEAMS[entryView.teamId]?.name ?? ''}
+              isAceLocked={false}
+              gamePoint={career.gamePoint}
+              onKey={actions.pressEntryViewKey}
+              onMoveCursor={actions.pointEntryViewCursor}
+              onCloseAceLocked={() => {}}
               // 나리 틀 0x16928 은 142~144 면 142 진입이 떠 둔 구장 바탕(0x581dc)을 깐다
-              underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />} slides={false} />
+              underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
+              slides={false}
+            />
           </NariScreenPush>
         )
       }
       // 142 경기 준비 — 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98
       // 국가대항전(135 에서 옴)이면 대회 표 · 마선수 "-" (1c5fe)
-      const match = screen.cup === undefined
-        ? batterMatchInfoOf(career, session.matchAces)
-        : cupMatchInfoOf(career, screen.cup.matchup, screen.cup.cup)
+      const match =
+        screen.cup === undefined ? batterMatchInfoOf(career, session.matchAces) : cupMatchInfoOf(career, screen.cup.matchup, screen.cup.cup)
       return (
         <NariScreenPush view={pushView}>
-          <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-            playerSide={match.playerSide} edition="타자편" gamePoint={career.gamePoint} stage={session.matchInfoStage}
-            onStart={actions.confirmMatchPrepare} onCancel={actions.cancelMatchPrepare} onEntry={actions.openEntryView}
-            isEntryAnimated={isMatchInfoEntryAnimated} />
+          <NariMatchInfoScreen
+            lines={match.lines}
+            myTeamId={match.myTeamId}
+            opponentTeamId={match.opponentTeamId}
+            playerSide={match.playerSide}
+            edition="타자편"
+            gamePoint={career.gamePoint}
+            stage={session.matchInfoStage}
+            onStart={actions.confirmMatchPrepare}
+            onCancel={actions.cancelMatchPrepare}
+            onEntry={actions.openEntryView}
+            isEntryAnimated={isMatchInfoEntryAnimated}
+          />
         </NariScreenPush>
       )
     }
@@ -507,13 +547,18 @@ function CareerScreens({
 
     case '엔딩':
       return (
-        <EndingScreen playerName={career.name} endingIndex={screen.endingIndex} seenEventIds={career.seenEventIds}
+        <EndingScreen
+          playerName={career.name}
+          endingIndex={screen.endingIndex}
+          seenEventIds={career.seenEventIds}
           isResumed={screen.fromResume === true}
           // 선수 생김새 +0xb — 타입(bit5~7)·손(bit4)·피부(bit2~3). 걸어 들어오는 그림·제작진 선수 애니와 팔레트 (0x63a5c)
           walkInLook={{ mode: 4, typeIndex: career.battingTypeIndex, handIndex: career.battingSide, skinIndex: career.skinIndex }}
-          bonusGamePoint={endingBonusOf(screen.endingIndex)} isContinuable={isContinuableEnding(screen.endingIndex)}
+          bonusGamePoint={endingBonusOf(screen.endingIndex)}
+          isContinuable={isContinuableEnding(screen.endingIndex)}
           // S+0x7b — 141 로 이어하기한 엔딩은 보너스를 이미 받았다. 팝업 0x2b 를 닫을 때 보너스 · S+0x7b · 저장 (1bbf4~1bc70)
-          isBonusReceived={career.endingBonusReceived === true} onBonusReceived={actions.receiveEndingBonus}
+          isBonusReceived={career.endingBonusReceived === true}
+          onBonusReceived={actions.receiveEndingBonus}
           hallOfFame={{
             collection: hallOfFame.collection,
             edition: '타자',
@@ -531,7 +576,8 @@ function CareerScreens({
             ...(hallOfFame.openRegisteredHidden === undefined ? {} : { openRegisteredHidden: hallOfFame.openRegisteredHidden }),
           }}
           onContinue={actions.continueAfterEnding}
-          onFinish={actions.finishEnding} />
+          onFinish={actions.finishEnding}
+        />
       )
 
     default:

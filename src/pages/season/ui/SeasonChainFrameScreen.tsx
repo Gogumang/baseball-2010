@@ -36,9 +36,14 @@ export interface SeasonChainFrameScreenProps {
 export function SeasonChainFrameScreen({ state, gamePoint, cursor, showsCenterStage = true }: SeasonChainFrameScreenProps) {
   return (
     <RawScreen>
-      <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={null}
+      <SeasonCommonFrame
+        record={state.record}
+        teamMorale={state.teamMorale}
+        gamePoint={gamePoint}
+        onBack={null}
         showsCenterStage={showsCenterStage}
-        commandBar={{ slots: NO_SLOTS, cursor, parent: null }} />
+        commandBar={{ slots: NO_SLOTS, cursor, parent: null }}
+      />
     </RawScreen>
   )
 }

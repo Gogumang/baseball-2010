@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
-import {
-  LOADING_STEPS_BATTER_CAREER, LOADING_STEPS_DEFAULT, LoadingTip,
-} from '@/widgets/loading-tip/ui/LoadingTip'
+import { LOADING_STEPS_BATTER_CAREER, LOADING_STEPS_DEFAULT, LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { LOADING_TIPS } from '@/shared/config/loadingTips'
 

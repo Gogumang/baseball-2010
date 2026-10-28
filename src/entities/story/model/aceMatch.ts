@@ -17,10 +17,7 @@ import type { EventReward } from '@/entities/story/model/eventReward'
  * 단계 0 "OO 공략" 다섯 개에 그대로 떨어진다.
  * 결과는 `resultEvents[0]` 승리 · `[1]` 패배로 이어 간다 (`0x10e40`, 확정).
  */
-export function aceMatchMissionOf(
-  team: number,
-  side: OriginalMission['side'] = '타자',
-): OriginalMission | null {
+export function aceMatchMissionOf(team: number, side: OriginalMission['side'] = '타자'): OriginalMission | null {
   // 원본은 편별 미션 표의 **레코드 번호**(0부터)를 그대로 쓴다 — 범위 검사도 재배열도 없다.
   // 웹의 `mission.id` 는 레코드가 들고 있는 1부터의 번호라 `레코드 번호 + 1 = team` 이 된다.
   // (배열 자리로 세면 안 된다 — 생성기가 이름 없는 빈 레코드[타자 15번]를 빼고 담았다.)
@@ -50,10 +47,7 @@ export const EMPTY_STORY_CARRY: StoryCarry = { rewards: [], viewedEventIds: [] }
  * 앞 이벤트가 들고 온 것 + 이번 재생에서 지나온 칸(키 "이벤트번호:명령번호")별 보상을 합친다.
  * 본 이벤트는 겹치지 않게 한 번씩만 남긴다.
  */
-export function mergeStoryCarry(
-  carried: StoryCarry,
-  rewardsByCursor: ReadonlyMap<string, readonly EventReward[]>,
-): StoryCarry {
+export function mergeStoryCarry(carried: StoryCarry, rewardsByCursor: ReadonlyMap<string, readonly EventReward[]>): StoryCarry {
   const viewed = [...rewardsByCursor.keys()].map((key) => Number(key.split(':')[0]))
   return {
     rewards: [...carried.rewards, ...[...rewardsByCursor.values()].flat()],

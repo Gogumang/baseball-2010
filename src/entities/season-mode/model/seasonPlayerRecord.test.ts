@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  equippedSeasonAbilityOf, hasSeasonSkill, seasonAbilityLimitsOf, seasonPlayerEquipmentOf, seasonPlayerRecordOf,
+  equippedSeasonAbilityOf,
+  hasSeasonSkill,
+  seasonAbilityLimitsOf,
+  seasonPlayerEquipmentOf,
+  seasonPlayerRecordOf,
 } from '@/entities/season-mode/model/seasonPlayerRecord'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
@@ -11,8 +15,15 @@ import { BATTERS, PITCHERS } from '@/shared/config/original/roster'
  */
 
 const 보기 = (patch: Partial<SeasonPlayerRecordView>): SeasonPlayerRecordView => ({
-  name: '시험', isPitcher: false, base: [500, 500, 500, 500], profile: 0, skillBits: 0,
-  equipment: [0, 0, 0, 0], fieldPosition: 0, isComplete: true, ...patch,
+  name: '시험',
+  isPitcher: false,
+  base: [500, 500, 500, 500],
+  profile: 0,
+  skillBits: 0,
+  equipment: [0, 0, 0, 0],
+  fieldPosition: 0,
+  isComplete: true,
+  ...patch,
 })
 
 describe('붙박이 표의 새 칸 (생성기 — Xls 행 +0xb · +0x14 · +0x19/+0x1a)', () => {
@@ -33,7 +44,12 @@ describe('시즌 명단 선수 → 레코드 칸', () => {
     const roster = tableRosterOf(0)
     const view = seasonPlayerRecordOf(0, roster.batters[3]!, false, 3)
     expect(view).toMatchObject({
-      name: '페드로', isPitcher: false, base: [550, 560, 540, 340], profile: 0x34, fieldPosition: 1, isComplete: true,
+      name: '페드로',
+      isPitcher: false,
+      base: [550, 560, 540, 340],
+      profile: 0x34,
+      fieldPosition: 1,
+      isComplete: true,
     })
   })
 
@@ -50,10 +66,18 @@ describe('시즌 명단 선수 → 레코드 칸', () => {
   })
 
   it('영입한 나리 선수는 기록 사본뿐이라 isComplete 가 거짓이다 (보직만 +0xb & 3 로 싣는다)', () => {
-    const view = seasonPlayerRecordOf(0, {
-      id: 0xfe, kindByte: 0x80, fieldPosition: 0, stamina: 10000,
-      record: { name: '나리투수', ability: [700, 650, 600, 640], repertoire: { name: '', form: 0, magicId: 0, pitchMask: 1 }, role: 1 },
-    }, true, 8)
+    const view = seasonPlayerRecordOf(
+      0,
+      {
+        id: 0xfe,
+        kindByte: 0x80,
+        fieldPosition: 0,
+        stamina: 10000,
+        record: { name: '나리투수', ability: [700, 650, 600, 640], repertoire: { name: '', form: 0, magicId: 0, pitchMask: 1 }, role: 1 },
+      },
+      true,
+      8,
+    )
     expect(view).toMatchObject({ name: '나리투수', base: [700, 650, 600, 640], profile: 1, skillBits: 0, isComplete: false })
   })
 })

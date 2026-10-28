@@ -16,7 +16,11 @@ afterEach(cleanup)
 
 describe('화면 덮개 층', () => {
   it('바깥 층과 안쪽 기둥 두 겹으로 그린다', () => {
-    const { container } = render(<ScreenOverlay><span>대사</span></ScreenOverlay>)
+    const { container } = render(
+      <ScreenOverlay>
+        <span>대사</span>
+      </ScreenOverlay>,
+    )
 
     const layer = container.firstElementChild as HTMLElement
     expect(layer.className).toContain(styles.layer)
@@ -33,7 +37,9 @@ describe('화면 덮개 층', () => {
    */
   it('덮개는 층이 아니라 **기둥 안에** 들어간다', () => {
     const { container } = render(
-      <ScreenOverlay><span data-testid="덮개">대사</span></ScreenOverlay>,
+      <ScreenOverlay>
+        <span data-testid="덮개">대사</span>
+      </ScreenOverlay>,
     )
     const column = container.querySelector(`.${styles.column}`) as HTMLElement
 
@@ -41,14 +47,22 @@ describe('화면 덮개 층', () => {
   })
 
   it('겹 차례를 주면 덮개 전체가 그 차례로 선다 — 공용 창은 화면 누름 칸보다 위 (r195)', () => {
-    const { container } = render(<ScreenOverlay zIndex={SCREEN_LAYERS.COMMON_WINDOW}><span>알림</span></ScreenOverlay>)
+    const { container } = render(
+      <ScreenOverlay zIndex={SCREEN_LAYERS.COMMON_WINDOW}>
+        <span>알림</span>
+      </ScreenOverlay>,
+    )
     const layer = container.firstElementChild as HTMLElement
     expect(Number(layer.style.zIndex)).toBe(SCREEN_LAYERS.COMMON_WINDOW)
     expect(SCREEN_LAYERS.COMMON_WINDOW).toBeGreaterThan(SCREEN_LAYERS.PRESS_AREA)
   })
 
   it('겹 차례를 안 주면 층에 z-index 를 달지 않는다 — 안쪽 겹이 제 값으로 겨룬다', () => {
-    const { container } = render(<ScreenOverlay><span>대사</span></ScreenOverlay>)
+    const { container } = render(
+      <ScreenOverlay>
+        <span>대사</span>
+      </ScreenOverlay>,
+    )
     expect((container.firstElementChild as HTMLElement).style.zIndex).toBe('')
   })
 })

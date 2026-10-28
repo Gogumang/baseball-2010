@@ -12,7 +12,8 @@ export const NARI_CAREER_SCENES: Readonly<Record<string, SceneDefinition>> = {
     steps: [...toNariResume('포스트시즌'), wait(900)],
   },
   'nari-cup': {
-    description: '나리 타자편 국가대항전 134 진입 대진판 — 134 가 처음 선 순간(463 끝) 저장의 이어하기가 134 로 돌아와 히든 팀 · 칭호 8 팝업 (soak 픽스처)',
+    description:
+      '나리 타자편 국가대항전 134 진입 대진판 — 134 가 처음 선 순간(463 끝) 저장의 이어하기가 134 로 돌아와 히든 팀 · 칭호 8 팝업 (soak 픽스처)',
     fixture: 'nari-cup',
     seed: 1,
     steps: [...toNariResume('국가대항전'), wait(900)],
@@ -33,11 +34,7 @@ export const NARI_CAREER_SCENES: Readonly<Record<string, SceneDefinition>> = {
     description: '나리 타자편 명예의 전당 등록 질문 0x2d — 보너스 뒤 저장의 이어하기가 141 로 곧장, 키로 제작진 → 등록 질문 (soak 픽스처)',
     fixture: 'nari-hall-of-fame',
     seed: 1,
-    steps: [
-      ...toNariResume('엔딩'),
-      keyUntil('Enter', '명예의 전당 등록 질문', messageBoxHas('예'), 600, 30000),
-      wait(600),
-    ],
+    steps: [...toNariResume('엔딩'), keyUntil('Enter', '명예의 전당 등록 질문', messageBoxHas('예'), 600, 30000), wait(600)],
   },
   // r254 — 사람 팀이 포스트시즌 시리즈를 직접 치르는 길 · 한국시리즈 우승 팝업 · 국가대항전 한국 우승 (soak 픽스처)
   'nari-postseason-game': {
@@ -47,11 +44,15 @@ export const NARI_CAREER_SCENES: Readonly<Record<string, SceneDefinition>> = {
     steps: [
       ...toNariResume('포스트시즌'),
       // 타자편 경기 화면(`GameRoute`)은 들여다보기 칸이 없다 — 내 타석(터치 상황 버튼 번트 '8')이 서면 멈춘다(돌발미션 장면과 같은 표지)
-      ...POSTSEASON_GAME_START((h) => h.screen.kind === '경기준비', (h) => h.screen.kind === '경기' && offersHave('번트')()),
+      ...POSTSEASON_GAME_START(
+        (h) => h.screen.kind === '경기준비',
+        (h) => h.screen.kind === '경기' && offersHave('번트')(),
+      ),
     ],
   },
   'nari-postseason-next': {
-    description: '나리 타자편 포스트시즌 내 시리즈가 끝나고 다음 라운드 — 7년차 준플레이오프를 이기고 116 → 114 → 128 로 돌아온 플레이오프 대진 (soak 픽스처)',
+    description:
+      '나리 타자편 포스트시즌 내 시리즈가 끝나고 다음 라운드 — 7년차 준플레이오프를 이기고 116 → 114 → 128 로 돌아온 플레이오프 대진 (soak 픽스처)',
     fixture: 'nari-postseason-next',
     seed: 1,
     steps: [...toNariResume('포스트시즌'), wait(900)],
@@ -78,10 +79,6 @@ export const NARI_CAREER_SCENES: Readonly<Record<string, SceneDefinition>> = {
     description: '나리 타자편 국가대항전 끝 → 새 시즌 — 결과 · 보상 팝업을 닫으면 134 대진판이 선 채 아홉 틀 어두워지고 137 "N년차" 표지 (r287)',
     fixture: 'nari-cup-win',
     seed: 1,
-    steps: [
-      ...toNariResume('국가대항전'),
-      ...CUP_RESULT_POPUP,
-      keyUntil('Enter', '137 표지', (h) => h.screen.kind === '연차표지', 700, 15000),
-    ],
+    steps: [...toNariResume('국가대항전'), ...CUP_RESULT_POPUP, keyUntil('Enter', '137 표지', (h) => h.screen.kind === '연차표지', 700, 15000)],
   },
 }

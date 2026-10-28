@@ -45,11 +45,20 @@ export function PostseasonScreen({
 }) {
   // 팝업은 대진 판(`RawScreen`) 안에 둔다 — 판 밖이면 zoom · 240 폭 기준을 잃어 상자가 왼쪽으로 쏠린다(r251)
   return (
-    <PostseasonBracket series={series} nextLabel="다음" onNext={popup === null ? onConfirm : undefined}
-      frame={<ScreenFrame title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'} gamePoint={gamePoint}
-        onBack={null} footer={1} slides={false} />}
-      overlay={popup !== null && (
-        <MessageBox text={postseasonPopupTextOf(popup)} buttons={['OK']} onAnswer={onClosePopup} />
-      )} />
+    <PostseasonBracket
+      series={series}
+      nextLabel="다음"
+      onNext={popup === null ? onConfirm : undefined}
+      frame={
+        <ScreenFrame
+          title={edition === '타자편' ? '나만의리그타자편' : '나만의리그투수편'}
+          gamePoint={gamePoint}
+          onBack={null}
+          footer={1}
+          slides={false}
+        />
+      }
+      overlay={popup !== null && <MessageBox text={postseasonPopupTextOf(popup)} buttons={['OK']} onAnswer={onClosePopup} />}
+    />
   )
 }

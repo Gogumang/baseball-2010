@@ -56,12 +56,7 @@ export function isSwingJudgeable(keyTick: number, frameCount: number): boolean {
  * 깊이 문턱 3000(4e1e4 의 0xbb8)은 숨은 판정값 표 `timing.reachDepth` 에서 읽는다.
  * 경로가 없는 공(사용자 투구)은 웹 전용이라 늘 닿는 것으로 본다.
  */
-export function isBallInSwingReach(
-  path: readonly { readonly z: number }[] | null,
-  frameCount: number,
-  tick: number,
-  zoneDepth: number,
-): boolean {
+export function isBallInSwingReach(path: readonly { readonly z: number }[] | null, frameCount: number, tick: number, zoneDepth: number): boolean {
   if (path === null || path.length === 0) return true
   const index = Math.max(0, Math.min(tick, frameCount - 1, path.length - 1))
   return Math.abs(zoneDepth - path[index].z) <= balanceNumber('timing.reachDepth')

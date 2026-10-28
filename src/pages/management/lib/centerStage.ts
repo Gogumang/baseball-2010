@@ -112,12 +112,14 @@ export function nariStageCharactersOf(input: {
   readonly isSlugger: boolean
   readonly skinIndex: number
 }): readonly StageCharacter[] {
-  return [{
-    file: 'event_char_0',
-    animation: (input.isSlugger ? SLUGGER_ANIMATION_BASE : 0) + leadExpressionOf(input.morale, input.isSick || input.isInjured),
-    palette: portraitPaletteIndex(input.skinIndex),
-    x: CENTER_STAGE.soloLeadX,
-  }]
+  return [
+    {
+      file: 'event_char_0',
+      animation: (input.isSlugger ? SLUGGER_ANIMATION_BASE : 0) + leadExpressionOf(input.morale, input.isSick || input.isInjured),
+      palette: portraitPaletteIndex(input.skinIndex),
+      x: CENTER_STAGE.soloLeadX,
+    },
+  ]
 }
 
 /**

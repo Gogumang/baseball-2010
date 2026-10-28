@@ -8,7 +8,11 @@ export const DEVICE_SETS = {
 
 /** 쉼표 목록 → 기기 이름들 (없는 이름이면 던진다) */
 export function deviceList(text) {
-  const names = text.split(',').map((name) => name.trim()).filter(Boolean)
-  for (const name of names) if (DEVICE_SETS[name] === undefined) throw new Error(`기기가 없다: ${name} (있는 것: ${Object.keys(DEVICE_SETS).join(', ')})`)
+  const names = text
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  for (const name of names)
+    if (DEVICE_SETS[name] === undefined) throw new Error(`기기가 없다: ${name} (있는 것: ${Object.keys(DEVICE_SETS).join(', ')})`)
   return names
 }

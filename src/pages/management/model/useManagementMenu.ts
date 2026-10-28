@@ -7,11 +7,12 @@ import { COMMAND_MENUS, COMMAND_SLOTS } from '@/pages/management/lib/managementL
 import type { ManagementCommand, MenuSlot, SubMenuKind } from '@/pages/management/lib/managementLayout'
 import type { ManagementScreenProps } from '@/pages/management/ui/ManagementScreen'
 import {
-  ABILITY_DETAIL_VISIBLE_LINES, abilityDetailScrollKeyOf, batterAbilityDetailViewOf, scrollAbilityDetail,
+  ABILITY_DETAIL_VISIBLE_LINES,
+  abilityDetailScrollKeyOf,
+  batterAbilityDetailViewOf,
+  scrollAbilityDetail,
 } from '@/pages/management/lib/abilityDetail'
-import {
-  createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf,
-} from '@/pages/management/model/nariMainMenuCursor'
+import { createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf } from '@/pages/management/model/nariMainMenuCursor'
 import { isNariMenuOkKey, nariMenuCursorAfterStep, nariMenuStepOfKey } from '@/pages/management/lib/nariMenuKeys'
 import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 
@@ -58,8 +59,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
   const [returned] = useState(() => nariReturnSubMenuOf(mainCursor))
   const [kind, setKind] = useState<MenuKind>(returned?.kind ?? 'main')
   const [cursor, setCursor] = useState(() => returned?.cursor ?? mainCursor.current)
-  const [parent, setParent] = useState<MenuSlot | null>(
-    () => (returned === null ? null : COMMAND_SLOTS.find((slot) => slot.id === returned.kind) ?? null),
+  const [parent, setParent] = useState<MenuSlot | null>(() =>
+    returned === null ? null : (COMMAND_SLOTS.find((slot) => slot.id === returned.kind) ?? null),
   )
   const [movedAt, setMovedAt] = useState<number | null>(null)
   const [openedAt, setOpenedAt] = useState(returned === null ? 0 : -SETTLED_UPDATES)
@@ -140,8 +141,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
   const mainOffIds = nariMainMenuOffIdsOf(props.career)
   const isOffSlot = (index: number) => kind === 'main' && mainOffIds.has(slots[index]?.id ?? '')
   /** 119 기본정보 카드 · 하위 창이 떠 있으면 그 상태의 키만 돈다(119 는 0x1056c 의 취소 · '*' · '0') — 커맨드 줄은 키를 안 받는다 */
-  const isCommandBarIdle = () =>
-    !isShowingBasicInfo && overlay === null && abilityDetailOffset === null && !isTrainingState && restPhase === null
+  const isCommandBarIdle = () => !isShowingBasicInfo && overlay === null && abilityDetailOffset === null && !isTrainingState && restPhase === null
   /** [gfx+0x99] · [+0x9a] — 칸이 펼쳐지는 중이면 커맨드 줄 키(취소 포함) · 누름을 버린다 */
   const isSliding = () => isCommandBarIdle() && update - openedAt < SLIDE_KEY_LOCK_UPDATES
   const moveCursor = (index: number) => {
@@ -173,8 +173,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
    */
   const wasActed = useRef(props.career.hasActedThisCycle)
   const [awaitingEntry, setAwaitingEntry] = useState(false)
-  const isIdleMain = kind === 'main' && !isTrainingState && restPhase === null && props.detail === null
-    && question === null && overlay === null && !isShowingBasicInfo
+  const isIdleMain =
+    kind === 'main' && !isTrainingState && restPhase === null && props.detail === null && question === null && overlay === null && !isShowingBasicInfo
   useLayoutEffect(() => {
     if (props.career.hasActedThisCycle && !wasActed.current) setAwaitingEntry(true)
     wasActed.current = props.career.hasActedThisCycle
@@ -220,7 +220,11 @@ export function useManagementMenu(props: ManagementScreenProps) {
     }
     // 110 확인 → 111 상점(키 0x11478) — 상점 취소는 110 으로 돌아온다(0x13460 의 13b1e), 커서는 고른 칸 그대로
     if (kind === '아이템') {
-      leaveNariSubMenu(mainCursor, '아이템', slots.findIndex((slot) => slot.id === id))
+      leaveNariSubMenu(
+        mainCursor,
+        '아이템',
+        slots.findIndex((slot) => slot.id === id),
+      )
       return props.onOpenShop(id)
     }
     if (id === '기본정보') return setIsShowingBasicInfo(true)
@@ -230,7 +234,12 @@ export function useManagementMenu(props: ManagementScreenProps) {
     if (id === '아이템/스킬' && props.onEquipSkill !== undefined) return setOverlay(id)
     // 106 칸 1 → 121 장비착용(키 0x13010) — 그 취소는 106 으로 돌아온다(0x17ad0 의 17aee → 0x6a). 106 진입 0x11530 은 이전이 105 가
     // 아니라 커서를 안 건드린다 — 장비착용 칸 그대로
-    if (id === '장비착용') leaveNariSubMenu(mainCursor, '선수정보', slots.findIndex((slot) => slot.id === id))
+    if (id === '장비착용')
+      leaveNariSubMenu(
+        mainCursor,
+        '선수정보',
+        slots.findIndex((slot) => slot.id === id),
+      )
     props.onOpenPlayerInfo(id)
   }
 
@@ -286,9 +295,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
 
   // 터치 기기 — 120 글이 4줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건 → 위 0x8a044 스크롤). 원본 그림에는 막대뿐이다
   useTouchScrollKeys(
-    props.detail === null &&
-      abilityDetailOffset !== null &&
-      batterAbilityDetailViewOf(props.career).messages.length > ABILITY_DETAIL_VISIBLE_LINES,
+    props.detail === null && abilityDetailOffset !== null && batterAbilityDetailViewOf(props.career).messages.length > ABILITY_DETAIL_VISIBLE_LINES,
   )
 
   return {

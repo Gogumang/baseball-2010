@@ -26,7 +26,13 @@ describe('versionOfCacheName · missingPacks', () => {
   })
 
   it('캐시에 없는 묶음만', () => {
-    const manifest = { version: 'a', packs: [{ file: '0.bin', bytes: 1, raw: 1 }, { file: '1.bin', bytes: 1, raw: 1 }] }
+    const manifest = {
+      version: 'a',
+      packs: [
+        { file: '0.bin', bytes: 1, raw: 1 },
+        { file: '1.bin', bytes: 1, raw: 1 },
+      ],
+    }
     expect(missingPacks(manifest, ['0.bin']).map((pack) => pack.file)).toEqual(['1.bin'])
   })
 })
@@ -41,12 +47,18 @@ describe('묶음 꼴 (tools/viteAssetPacks)', () => {
   it('머리 길이 · 머리 JSON · 바이트 그대로 — 워커가 자리로 잘라 낸 바이트가 원래 파일과 같다', () => {
     const a = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
     const b = Buffer.from('console.log(1)')
-    const { raw, gz } = buildPack([['sprites/a/001.png', a], ['assets/x.js', b]])
+    const { raw, gz } = buildPack([
+      ['sprites/a/001.png', a],
+      ['assets/x.js', b],
+    ])
     expect(gunzipSync(gz).equals(raw)).toBe(true)
     const headLength = raw.readUInt32LE(0)
     const head = JSON.parse(raw.subarray(4, 4 + headLength).toString('utf8')) as { entries: [string, number, number][] }
     const data = raw.subarray(4 + headLength)
-    expect(head.entries).toEqual([['sprites/a/001.png', 0, a.length], ['assets/x.js', a.length, b.length]])
+    expect(head.entries).toEqual([
+      ['sprites/a/001.png', 0, a.length],
+      ['assets/x.js', a.length, b.length],
+    ])
     for (const [path, offset, length] of head.entries) {
       expect(data.subarray(offset, offset + length).equals(path.endsWith('.png') ? a : b)).toBe(true)
     }

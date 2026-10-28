@@ -33,11 +33,7 @@ import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PitcherLastGame } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { reliefNeverEnteredOf } from '@/entities/pitcher-career/model/pitcherRotation'
-import {
-  advancePitcherStreaks,
-  EMPTY_PITCHER_STREAKS,
-  pitcherStreakEventOfCareer,
-} from '@/entities/pitcher-career/model/pitcherStreaks'
+import { advancePitcherStreaks, EMPTY_PITCHER_STREAKS, pitcherStreakEventOfCareer } from '@/entities/pitcher-career/model/pitcherStreaks'
 import { managerCommentIndexOf } from '@/features/play-pitcher-game/model/pitcherGameEvaluation'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import {
@@ -84,25 +80,20 @@ import {
   NATIONAL_CUP_EVENT,
 } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
-import {
-  KOREA_TEAM_ID,
-  createNationalCup,
-  nationalCupMatchupOf,
-  nationalCupSideOf,
-} from '@/entities/national-cup/model/nationalCup'
+import { KOREA_TEAM_ID, createNationalCup, nationalCupMatchupOf, nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup, NationalCupMatchup } from '@/entities/national-cup/model/nationalCup'
 import { advanceNationalCupDay } from '@/entities/national-cup/model/nationalCupPlay'
 import { nariCupRecordOf, nextNariCupDayTeams, recordNariCupGame } from '@/entities/career/model/nariCupTeams'
 import type { NariCupTeams } from '@/entities/career/model/nariCupTeams'
 import { nariCupGameResultOf, settleNariCupGame } from '@/entities/career/model/nariCupGame'
 import {
-  liveGameInningIndex, liveGameSidesOf, resetLiveGameState, setLiveGameInningIndex, setLiveGameSides,
+  liveGameInningIndex,
+  liveGameSidesOf,
+  resetLiveGameState,
+  setLiveGameInningIndex,
+  setLiveGameSides,
 } from '@/shared/lib/liveGameState/liveGameState'
-import {
-  createPitcherCupTeams,
-  pitcherCupPositionCodeOf,
-  preparePitcherCupMatch,
-} from '@/entities/pitcher-career/model/pitcherCupTeams'
+import { createPitcherCupTeams, pitcherCupPositionCodeOf, preparePitcherCupMatch } from '@/entities/pitcher-career/model/pitcherCupTeams'
 import { gameMyPitcherOrderOf } from '@/entities/pitcher-career/model/myPitcherRecord'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PlayerSide } from '@/entities/game/model/gameState'
@@ -136,22 +127,14 @@ import {
   pitcherEndingBonusOf,
   pitcherInjuryEndingOf,
 } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
-import {
-  awardPitcherTitles,
-  nextPitcherTitleOf,
-} from '@/entities/pitcher-career/model/pitcherTitles'
+import { awardPitcherTitles, nextPitcherTitleOf } from '@/entities/pitcher-career/model/pitcherTitles'
 import type { PitcherRookieProfile } from '@/entities/pitcher-career/model/pitcherRegistration'
-import {
-  pitcherGameOptionsOf,
-  pitcherGameOutcomeOf,
-} from '@/pages/pitcher-league/model/pitcherGameOptions'
+import { pitcherGameOptionsOf, pitcherGameOutcomeOf } from '@/pages/pitcher-league/model/pitcherGameOptions'
 import { nariMoraleAfterBurst, nariMoraleOf, withNariTeamRecordMorales } from '@/entities/career/model/nariMorale'
 import { applyPitcherBurstRewards } from '@/entities/pitcher-career/model/pitcherBurstReward'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { recordGamePointsOf } from '@/entities/game/model/gameRecords'
-import {
-  MAXIMUM_GAME_POINT, rebuildEquippedSkillIds, withNariSceneSetupOutings,
-} from '@/entities/career/model/playerCareer'
+import { MAXIMUM_GAME_POINT, rebuildEquippedSkillIds, withNariSceneSetupOutings } from '@/entities/career/model/playerCareer'
 import { nationalCupStandingsTitleOf } from '@/entities/career/model/titles'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePointWallet'
@@ -159,9 +142,7 @@ import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { selectPitcherShopItem } from '@/features/shop/model/pitcherShopSelection'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
-import {
-  leagueUsageOf, PITCHER_LEAGUE_MODE, skillEquipStatEventsOf,
-} from '@/entities/collection/model/annalsStats'
+import { leagueUsageOf, PITCHER_LEAGUE_MODE, skillEquipStatEventsOf } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { lapPlayClock } from '@/entities/collection/model/playClock'
 import type { GpDetailOf } from '@/features/shop/model/shopSelection'
@@ -173,9 +154,7 @@ import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } fr
 import type { OutingPlace } from '@/shared/config/outingPlaces'
 import { nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage } from '@/pages/management/lib/nariMatchPrepare'
 import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderScenery'
-import {
-  nariTeamRecordOf, nariTeamsOf, recordMatchAcesOf, recordTeamAcesOf, seatNariMatchAces,
-} from '@/entities/career/model/nariTeamRecord'
+import { nariTeamRecordOf, nariTeamsOf, recordMatchAcesOf, recordTeamAcesOf, seatNariMatchAces } from '@/entities/career/model/nariTeamRecord'
 import { pointNariEntryCursor, pressNariEntryKey } from '@/pages/management/lib/nariEntryView'
 import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
 import { pitcherNariEntryViewOf } from '@/pages/pitcher-league/lib/pitcherEntryView'
@@ -203,7 +182,15 @@ const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
  *   이벤트(114 이벤트 재생 — 무엇을 틀었는지는 `story`) · 포스트시즌(128 대진 — 팝업은 `postseasonPopup`)
  */
 export type PitcherScene =
-  | '등록' | '관리' | '경기' | '엔딩' | '상점' | '외출' | '이벤트' | '마선수대결' | '포스트시즌'
+  | '등록'
+  | '관리'
+  | '경기'
+  | '엔딩'
+  | '상점'
+  | '외출'
+  | '이벤트'
+  | '마선수대결'
+  | '포스트시즌'
   /** 다음경기 앞 순위표 (상태 109) — 타자편과 같은 진입 0x10d8c · 키 0x105f0 · 그림 0x168a4 */
   | '다음경기순위'
   /** 경기 준비(매치업, 상태 142) — 타자편과 같은 진입 0x1c46c · 키 0x13c30 · 그림 0x15d98 */
@@ -475,10 +462,13 @@ function normalizePitcherCareer(raw: unknown): PitcherCareer | null {
      * 컬렉터 해금(20·24·28·32)은 구매 확정 0x14a74 가 전역 표에 켜 둔 것이다 — 그보다 앞서 산 옛 저장은 칸이 비어 있을 수 있어
      * 보유에서 다시 센다(`pitcherCollectorHiddenIdsOf`). `isPitcherHiddenOpen` 은 이 표만 본다.
      */
-    openedHiddenIds: withCollectorIds(saved.openedHiddenIds ?? base.openedHiddenIds, pitcherCollectorHiddenIdsOf({
-      ...base,
-      ...saved,
-    } as PitcherCareer)),
+    openedHiddenIds: withCollectorIds(
+      saved.openedHiddenIds ?? base.openedHiddenIds,
+      pitcherCollectorHiddenIdsOf({
+        ...base,
+        ...saved,
+      } as PitcherCareer),
+    ),
   })
 }
 
@@ -500,10 +490,11 @@ const NO_STAT = () => {}
 function resumedPitcherLastGameOf(career: PitcherCareer): PitcherCareer {
   const { lastGame } = career
   if (lastGame === undefined) return career
-  const neverEntered = career.role !== PITCHER_ROLE.starter
+  const neverEntered =
+    career.role !== PITCHER_ROLE.starter &&
     // 전역 경기 상태 +0x6b 의 지금 값 — 앱을 새로 켰으면 0, 아니면 마지막으로 돈 경기(모드 불문)의 이닝 (`liveGameState`)
-    && reliefNeverEnteredOf(liveGameInningIndex())
-    && ((lastGame.pitches ?? 0) & 0xff) === 0
+    reliefNeverEnteredOf(liveGameInningIndex()) &&
+    ((lastGame.pitches ?? 0) & 0xff) === 0
   const managerCommentIndex = managerCommentIndexOf(
     { role: career.role, neverEntered, reputation: career.reputation, positionCode: career.positionCode },
     (career.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange,
@@ -618,9 +609,7 @@ function hiddenOpenRewardIdsOf(rewards: readonly EventReward[]): number[] {
  * S+0x6a(외출 수)++ · 105 · 저장을 한다. match 는 빈 장소 이벤트(440~444)에 없다. 장소가 아니면 그대로.
  */
 function settlePlaceForAceMatch(current: PitcherCareer, context: PitcherStoryContext): PitcherCareer {
-  return context === '장소'
-    ? spendPitcherCycleAction({ ...current, outingsThisSeason: current.outingsThisSeason + 1 })
-    : current
+  return context === '장소' ? spendPitcherCycleAction({ ...current, outingsThisSeason: current.outingsThisSeason + 1 }) : current
 }
 
 /** 연봉 칸 한 단위(100만원)를 금액 서식(만원 단위)으로 — 0x8bc4c 의 ×100 */
@@ -635,16 +624,19 @@ interface PitcherResume {
 function pitcherResumeOf(saved: PitcherCareer | null): PitcherResume {
   const point: PitcherResumePoint = saved === null ? { kind: '관리' } : pitcherResumePointOf(saved)
   return {
-    career: saved !== null && point.kind === '이벤트'
-      ? enterPitcherYearEndEvent(saved, point.eventId)
-      // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137(연초 114 틀이 남은 +0x289 를 받는다 —
-      // `nariYearCover` 의 이어하기 길)은 **투수편에 들어설 때** 돈다(`resumedNewSeasonRef` 고리) — 띄울 때는 저장 그대로다
-      // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
-      // S+0x50 == 2 → 116 진입 0x1278c 다시 — 원본은 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임, B-28). 정산(0x4ea0c)은 다시 안 돈다.
-      // 고친 길(기본)은 첫 진입이 센 저장 그대로 — 감독 글(`resumedPitcherLastGameOf`)만 다시 고른다
-      : saved !== null && point.kind === '경기결과'
-        ? (isBugFixed('B-28') ? resumedPitcherLastGameOf(saved) : enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved)))
-        : saved,
+    career:
+      saved !== null && point.kind === '이벤트'
+        ? enterPitcherYearEndEvent(saved, point.eventId)
+        : // 1c25e — S+0x50 == 0x11(464 거절 보상 뒤 끊김) → 새 시즌 처리 0x1b768 → 137(연초 114 틀이 남은 +0x289 를 받는다 —
+          // `nariYearCover` 의 이어하기 길)은 **투수편에 들어설 때** 돈다(`resumedNewSeasonRef` 고리) — 띄울 때는 저장 그대로다
+          // 국가대항전(134)은 저장 그대로 — 첫 틀 0x1b92c 의 칭호 8 팝업 · 진입 0x19f30 의 히든 팀 열기는 화면 몫이다
+          // S+0x50 == 2 → 116 진입 0x1278c 다시 — 원본은 경기 뒤 카운터를 한 번 더 쓴다(겹쳐 쌓임, B-28). 정산(0x4ea0c)은 다시 안 돈다.
+          // 고친 길(기본)은 첫 진입이 센 저장 그대로 — 감독 글(`resumedPitcherLastGameOf`)만 다시 고른다
+          saved !== null && point.kind === '경기결과'
+          ? isBugFixed('B-28')
+            ? resumedPitcherLastGameOf(saved)
+            : enterPitcherGameEvaluation(resumedPitcherLastGameOf(saved))
+          : saved,
     point,
   }
 }
@@ -804,7 +796,6 @@ export function usePitcherLeagueSession(
   const yearEndViewedRef = useRef<readonly number[]>([])
   const [postseasonPopup, setPostseasonPopup] = useState<PostseasonPopup | null>(() => postseasonPopupOfResume(career, resumePoint))
 
-
   /** 이벤트 재생(114)으로 — 뒤 상태는 `story.context` 가 정한다 */
   const openStory = useCallback((next: PitcherStory) => {
     setStory(next)
@@ -827,10 +818,7 @@ export function usePitcherLeagueSession(
     }
   }, [career, fileEvents])
   /** 재생기에 넘기는 목록 — 파일 이벤트 뒤에 연초 115 내장 이벤트를 붙인다 (훑기·배정은 파일 것만 본다) */
-  const storyEvents = useMemo(
-    () => (fileEvents === null ? null : [...fileEvents, PITCHER_YEAR_START_EVENT]),
-    [fileEvents],
-  )
+  const storyEvents = useMemo(() => (fileEvents === null ? null : [...fileEvents, PITCHER_YEAR_START_EVENT]), [fileEvents])
 
   /**
    * 이벤트 레코드 커서 (0xadc70 의 reader+0x28) — 105·112 자동 발동이 함께 쓴다. 원본 reader 는 장면이 들고 저장에 없다 —
@@ -950,11 +938,8 @@ export function usePitcherLeagueSession(
     const replayed = resumed.current?.career
     if (replayed === null || replayed === undefined) return
     store.save(replayed)
-    playSoundIds(activeSound(), [
-      pitcherEvaluationJingleIdOf((replayed.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange),
-    ])
+    playSoundIds(activeSound(), [pitcherEvaluationJingleIdOf((replayed.lastEvaluation ?? NO_LAST_EVALUATION).popularityChange)])
   }, [resumePoint, store])
-
 
   /**
    * 이어하기가 시즌 끝 사슬의 상태(136 · 130 · 131 · 132)로 들어갔으면 그 진입처럼 저장한다 — 한 번만. 136 진입 0x10bb0 은
@@ -1012,7 +997,6 @@ export function usePitcherLeagueSession(
     if (carried !== 0) wallet.gain(carried)
   }, [mergeStore, wallet])
 
-
   /**
    * 관리 장면 +0x270 — 117 진입 0x11e84(11ee6~11f4a)가 칭호 1 · 9 를 주지 않고 넣어 두는 칸. 서 있으면 105 둘째 틀에 판정 0x1a1c0
    * 대신 그 칭호의 팝업이 선다(`pendingTitle`). 확인 0x1b1e4 가 비트 · 장착 · 저장 뒤 −1 로 둔다
@@ -1033,15 +1017,12 @@ export function usePitcherLeagueSession(
    * 훑기는 상태가 바뀐 틀에만 돌아(0x1cdec 1ce02) 다음 틀에 처음부터 다시 훑는 일은 없다 — 다음 진입이 0 부터 본다(타자편과 같다).
    * 105 · 112 의 자동 발동 둘만 부른다 — 대결 대기(어느 편이든)가 서 있으면 커서를 안 건드리고 건너뛴다(1cfe4~1d008, B-124 원본 길).
    */
-  const scanAuto = useCallback(
-    (current: PitcherCareer, events: readonly OriginalEvent[], trigger: number, rolling: RandomPort | undefined) => {
-      if (isAutoScanHeldByAceMatch(aceMatchHoldRef.current)) return null
-      const scan = scanPitcherEventFrom(current, events, trigger, cursorRef.current, rolling, freshSceneRef.current)
-      cursorRef.current = scan.cursor
-      return scan.event
-    },
-    [],
-  )
+  const scanAuto = useCallback((current: PitcherCareer, events: readonly OriginalEvent[], trigger: number, rolling: RandomPort | undefined) => {
+    if (isAutoScanHeldByAceMatch(aceMatchHoldRef.current)) return null
+    const scan = scanPitcherEventFrom(current, events, trigger, cursorRef.current, rolling, freshSceneRef.current)
+    cursorRef.current = scan.cursor
+    return scan.event
+  }, [])
 
   /**
    * **관리 화면(105)의 이벤트** — 원본은 한 틀 안에서 두 자리가 차례로 돈다 (R9 2절 · A 3절):
@@ -1096,8 +1077,7 @@ export function usePitcherLeagueSession(
   const enterOutingMapRef = useRef<() => void>(() => {})
   useEffect(() => {
     // 셋업의 반복 이벤트 지우기가 아직이면 그 뒤에 훑는다 — 원본은 셋업 0xf684 가 105 진입보다 먼저다
-    const isIdle = isOnScreen && career !== null && scene === '관리' && story === null && fileEvents !== null &&
-      !shouldForgetRepeatable
+    const isIdle = isOnScreen && career !== null && scene === '관리' && story === null && fileEvents !== null && !shouldForgetRepeatable
     if (!isIdle) {
       wasIdleAtManagementRef.current = false
       return
@@ -1157,9 +1137,7 @@ export function usePitcherLeagueSession(
       commitWith((current) => ({ ...current, lastMidSeasonGoalCount: achieved }))
       openStory({ eventId: midSeasonEventId(achieved), context: '중간평가', viewed: [] })
     }
-  }, [
-    career, commitWith, fileEvents, isOnScreen, managementReentryCount, openStory, random, scanAuto, scene, shouldForgetRepeatable, story,
-  ])
+  }, [career, commitWith, fileEvents, isOnScreen, managementReentryCount, openStory, random, scanAuto, scene, shouldForgetRepeatable, story])
 
   /**
    * **커리어 칸 ↔ 지갑 다리** — 타자편(`useCareerSession`)과 같은 모양이다.
@@ -1236,14 +1214,16 @@ export function usePitcherLeagueSession(
       const options = leagueGameOptionsOf(current, { gaugeSettingOn, throwModeManual })
       const records = nariTeamsOf(current)
       const recordAces = recordMatchAcesOf(records, current.teamId, options.opponentTeamId)
-      return recordAces === null ? options : {
-        ...options,
-        aces: {
-          ours: recordTeamAcesOf(nariTeamRecordOf(records, current.teamId)),
-          opponent: recordTeamAcesOf(nariTeamRecordOf(records, options.opponentTeamId)),
-          ...(aceLevels === undefined ? {} : { levels: aceLevels }),
-        },
-      }
+      return recordAces === null
+        ? options
+        : {
+            ...options,
+            aces: {
+              ours: recordTeamAcesOf(nariTeamRecordOf(records, current.teamId)),
+              opponent: recordTeamAcesOf(nariTeamRecordOf(records, options.opponentTeamId)),
+              ...(aceLevels === undefined ? {} : { levels: aceLevels }),
+            },
+          }
     },
     [aceLevels, gaugeSettingOn, throwModeManual],
   )
@@ -1304,13 +1284,15 @@ export function usePitcherLeagueSession(
     // 1c7ae~1c87c — 무대 · 구장 0x78664(무대, 홈 팀) · 0x5fd04. 리그 팀은 0~9 라 굴리지 않는다(마선수 굴림 뒤 자리)
     if (career !== null) {
       const options = pitcherGameOptionsOf(career, { gaugeSettingOn, throwModeManual })
-      setMatchInfoStage(rollNariMatchInfoStage(random, {
-        mode: PITCHER_LEAGUE_MODE,
-        myTeamId: career.teamId,
-        opponentTeamId: options.opponentTeamId,
-        mySide: options.playerSide,
-        dayCounter: options.dayCounter,
-      }))
+      setMatchInfoStage(
+        rollNariMatchInfoStage(random, {
+          mode: PITCHER_LEAGUE_MODE,
+          myTeamId: career.teamId,
+          opponentTeamId: options.opponentTeamId,
+          mySide: options.playerSide,
+          dayCounter: options.dayCounter,
+        }),
+      )
     }
     setEntryView(null)
     setScene('경기준비')
@@ -1371,18 +1353,18 @@ export function usePitcherLeagueSession(
         ...(current.nariCupTeams === undefined
           ? {}
           : {
-            // 대표팀 칸(+0xbc4)에 남는 것 먼저 (r221): +2 사기 — 0xb570c b5762 가 마지막으로 덮은 나리 사기(대회 중이라 상대국 칸 값,
-            // 상대 칸 덮기와 같은 공), +0x2e 실책 — 사람 수비 그림 0x43278 이 대표팀 야수에 올린 것, +0x2a 사사구 — 내 투수 사본
-            // (a8b04~a8bee). 그 뒤 하루 끝 b8216 이 상대국 칸만 새로 복사한다
-            nariCupTeams: nextNariCupDayTeams(
-              recordNariCupGame(current.nariCupTeams, {
-                morale: summary.opponentRecordMorale ?? nariMoraleAfterBurst(options.teamMorale, burstDeltas),
-                errors: summary.leagueErrors,
-                myWalks: summary.seasonDelta.walks,
-              }),
-              nationalCupMatchupOf(next)?.opponent ?? null,
-            ),
-          }),
+              // 대표팀 칸(+0xbc4)에 남는 것 먼저 (r221): +2 사기 — 0xb570c b5762 가 마지막으로 덮은 나리 사기(대회 중이라 상대국 칸 값,
+              // 상대 칸 덮기와 같은 공), +0x2e 실책 — 사람 수비 그림 0x43278 이 대표팀 야수에 올린 것, +0x2a 사사구 — 내 투수 사본
+              // (a8b04~a8bee). 그 뒤 하루 끝 b8216 이 상대국 칸만 새로 복사한다
+              nariCupTeams: nextNariCupDayTeams(
+                recordNariCupGame(current.nariCupTeams, {
+                  morale: summary.opponentRecordMorale ?? nariMoraleAfterBurst(options.teamMorale, burstDeltas),
+                  errors: summary.leagueErrors,
+                  myWalks: summary.seasonDelta.walks,
+                }),
+                nationalCupMatchupOf(next)?.opponent ?? null,
+              ),
+            }),
       }))
       setGameOptions(null)
       setCupMatch(null)
@@ -1437,9 +1419,8 @@ export function usePitcherLeagueSession(
       recordStat({ kind: '플레이시간', mode: PITCHER_LEAGUE_MODE, elapsed: lapPlayClock() })
       // CPU 경기 0xc2a48(4f296)는 평가 0xa719c(4f274)가 사기를 바꾼 **뒤**다 — 간이 엔진 0xb570c b5768 이 두 팀 레코드 +2 에 그 사기를
       // 쓴다. 평가는 정규시즌 경기만(아래 `isEvaluated`)
-      const moraleAtCpuGames = played.postseason === null
-        ? nariMoraleOf(gainPitcherMorale(recorded, summary.evaluation.moraleChange))
-        : nariMoraleOf(recorded)
+      const moraleAtCpuGames =
+        played.postseason === null ? nariMoraleOf(gainPitcherMorale(recorded, summary.evaluation.moraleChange)) : nariMoraleOf(recorded)
       // 사람 경기 상대의 리그 레코드 +2 는 이 경기에서 0xb570c 가 그 칸을 마지막으로 덮을 때의 나리 사기로 남는다 (`teamRecordMorales`, r101).
       // 마지막 타석의 돌발 보상이 사기를 바꾸면 그 뒤로는 안 덮여 **바뀌기 전 값**이다 (`PitcherGameSummary.opponentRecordMorale`, r104)
       const day = withNariTeamRecordMorales(
@@ -1464,10 +1445,7 @@ export function usePitcherLeagueSession(
       const isEvaluated = played.postseason === null
       const evaluated = isEvaluated
         ? gainPitcherMorale(
-            gainPitcherReputation(
-              gainPitcherPopularity(seasoned, summary.evaluation.popularityChange),
-              summary.evaluation.reputationChange,
-            ),
+            gainPitcherReputation(gainPitcherPopularity(seasoned, summary.evaluation.popularityChange), summary.evaluation.reputationChange),
             summary.evaluation.moraleChange,
           )
         : seasoned
@@ -1476,13 +1454,13 @@ export function usePitcherLeagueSession(
       // 평가가 돈 경기만 S+0x4a · +0x64 · +7 을 덮는다 — 포스트시즌 경기 뒤 116 은 앞 경기 값을 다시 읽는다
       const withEvaluation: PitcherCareer = isEvaluated
         ? {
-          ...completed,
-          lastEvaluation: {
-            popularityChange: summary.evaluation.popularityChange,
-            reputationChange: summary.evaluation.reputationChange,
-            moraleChange: summary.evaluation.moraleChange,
-          },
-        }
+            ...completed,
+            lastEvaluation: {
+              popularityChange: summary.evaluation.popularityChange,
+              reputationChange: summary.evaluation.reputationChange,
+              moraleChange: summary.evaluation.moraleChange,
+            },
+          }
         : completed
       const lastEvaluation = withEvaluation.lastEvaluation ?? NO_LAST_EVALUATION
       /*
@@ -1506,9 +1484,8 @@ export function usePitcherLeagueSession(
        * (평가 뒤 값) 구간(0x128d2) · 38 은 보직(0xb6705) ≠ 0 && state+0x6a == state+0x6b(이 경기) && S+0x1d8[6](투구 수) == 0
        * (12ac4~12afe). 기록 줄은 S+0x1d8 (12a3c~12ac0).
        */
-      const neverEntered = gameOptions.role !== PITCHER_ROLE.starter
-        && reliefNeverEnteredOf(summary.endedInningIndex)
-        && ((line.pitches ?? 0) & 0xff) === 0
+      const neverEntered =
+        gameOptions.role !== PITCHER_ROLE.starter && reliefNeverEnteredOf(summary.endedInningIndex) && ((line.pitches ?? 0) & 0xff) === 0
       const lastGame: PitcherLastGame = {
         decisionCode: line.decisionCode,
         outs: line.outs,
@@ -1530,12 +1507,12 @@ export function usePitcherLeagueSession(
       // 연속 기록 +0x1bc — 0xa719c 모드 3 갈래라 평가가 도는 정규시즌 경기만 잇는다 (`advancePitcherStreaks`)
       const streaks = isEvaluated
         ? advancePitcherStreaks(played.streaks ?? EMPTY_PITCHER_STREAKS, {
-          role: played.role,
-          dayCounter: leagueDayCounterOf(played),
-          endedInningIndex: summary.endedInningIndex,
-          decisionCode: summary.decisionCode,
-          strikeouts: summary.record.strikeouts,
-        })
+            role: played.role,
+            dayCounter: leagueDayCounterOf(played),
+            endedInningIndex: summary.endedInningIndex,
+            decisionCode: summary.decisionCode,
+            strikeouts: summary.record.strikeouts,
+          })
         : withEvaluation.streaks
       // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다 (이어하기 116 의 감독 글 38 판정이 본다) — 측별 팀 +0x28 · 점수 +0x7e 도
       // 남아 120 상세 창의 스킬 14 갈래(0xb5a28~)가 본다 (`isLiveGameFightingSpiritSituation`)
@@ -1549,7 +1526,6 @@ export function usePitcherLeagueSession(
     },
     [aceLevels, career, commit, finishCupGame, gameOptions, random, recordStat, setUpPitcherScene],
   )
-
 
   /** 새 시즌 0x1b768 을 부른 134 · 141 이 효과기 끝을 기다리는 아홉 틀 (`PitcherLeagueSession.isYearCoverHeld`) */
   const [isYearCoverHeld, setYearCoverHeld] = useState(false)
@@ -1701,77 +1677,75 @@ export function usePitcherLeagueSession(
     },
     [career, commit, scene],
   )
-  const confirmGameResult = useCallback(
-    () => {
-      if (career === null) return
-      // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 연속 기록 보상 명령(평판 · 집중/새가슴/더티볼)을 먹는다 —
-      // 이어하기로 116 을 다시 띄웠으면 또 먹는다(원본 그대로, 타자편 `streakEventOf` 와 같은 자리). 창이 선 명령은 이미 줬다
-      // (`giveEvaluationRewards`) — 남은 몫만
-      const held = evaluationRewardsRef.current
-      evaluationRewardsRef.current = null
-      const rewarded = held !== null
+  const confirmGameResult = useCallback(() => {
+    if (career === null) return
+    // 116 → 114: 0x8a6fc 가 쌓은 내장 이벤트를 114 가 틀며 연속 기록 보상 명령(평판 · 집중/새가슴/더티볼)을 먹는다 —
+    // 이어하기로 116 을 다시 띄웠으면 또 먹는다(원본 그대로, 타자편 `streakEventOf` 와 같은 자리). 창이 선 명령은 이미 줬다
+    // (`giveEvaluationRewards`) — 남은 몫만
+    const held = evaluationRewardsRef.current
+    evaluationRewardsRef.current = null
+    const rewarded =
+      held !== null
         ? applyPitcherEventRewards(career, held.rewards.slice(held.given))
         : career.seasonEndState === 116
           ? applyPitcherEventRewards(career, pitcherStreakEventOfCareer(career).rewards)
           : career
-      const counted: PitcherCareer = { ...rewarded, seasonEndState: null }
+    const counted: PitcherCareer = { ...rewarded, seasonEndState: null }
 
-      /*
-       * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74~0x12b94)이 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
-       * 아니면 [114 → 128]** (R9 116절, 모드 갈림 없음). 관리 주기·부상 엔딩·중간평가를 타지 않는다.
-       * 내 시리즈가 끝난 경기는 0xb7724 가 L+0x32 = −1(b777a), 하루 끝 0xb818c(0x4f29c)가 +1 → 0 이라 136 부터 사슬을
-       * **다시 돈다** — 136 진입 0x10bb0 이 0x8bdc9(392) 를 본 표시 없이 다시 튼다(0x8bdc8 → 0xae170). 원본 그대로다.
-       * 45번째 경기는 경기 전 대진이 없어 아래 갈래로 간다(그때도 L+0x32 = 0 → 136 이다).
-       */
-      if (counted.postseason !== null) {
-        // B-05 고침이면 시리즈 끝(대진이 막 열린 때 말고)은 사슬을 다시 안 틀고 128 로 (`entersYearEndChainInPostseason`)
-        if (leagueDayCounterOf(counted) === 0 && entersYearEndChainInPostseason(counted.postseason)) {
-          // 114 진입 0x11d00 이 2 → 0xb(포스트시즌 g == 0) — 136 진입이 다시 쓴다. 116 끝은 [114 → 136] 을 곧장 예약한다
-          // (0xbcb49(0x88) · 0xbcb49(0x72), 12b8c~12bbe) — 사이에 시즌 요약 화면이 없다(웹 전용 '시즌종료' 화면은 r71 에서 걷음)
-          return continueYearEnd(counted, [])
-        }
-        // 128 진입 0x120a4 — S+0x50 = 0xf · 저장
-        commit({ ...counted, seasonEndState: 128 })
-        setPostseasonPopup(regularSeasonPopupOnEnter(counted))
-        return setScene('포스트시즌')
+    /*
+     * 포스트시즌 경기 뒤 — 116 의 끝(0x12b74~0x12b94)이 S+0xb4 ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
+     * 아니면 [114 → 128]** (R9 116절, 모드 갈림 없음). 관리 주기·부상 엔딩·중간평가를 타지 않는다.
+     * 내 시리즈가 끝난 경기는 0xb7724 가 L+0x32 = −1(b777a), 하루 끝 0xb818c(0x4f29c)가 +1 → 0 이라 136 부터 사슬을
+     * **다시 돈다** — 136 진입 0x10bb0 이 0x8bdc9(392) 를 본 표시 없이 다시 튼다(0x8bdc8 → 0xae170). 원본 그대로다.
+     * 45번째 경기는 경기 전 대진이 없어 아래 갈래로 간다(그때도 L+0x32 = 0 → 136 이다).
+     */
+    if (counted.postseason !== null) {
+      // B-05 고침이면 시리즈 끝(대진이 막 열린 때 말고)은 사슬을 다시 안 틀고 128 로 (`entersYearEndChainInPostseason`)
+      if (leagueDayCounterOf(counted) === 0 && entersYearEndChainInPostseason(counted.postseason)) {
+        // 114 진입 0x11d00 이 2 → 0xb(포스트시즌 g == 0) — 136 진입이 다시 쓴다. 116 끝은 [114 → 136] 을 곧장 예약한다
+        // (0xbcb49(0x88) · 0xbcb49(0x72), 12b8c~12bbe) — 사이에 시즌 요약 화면이 없다(웹 전용 '시즌종료' 화면은 r71 에서 걷음)
+        return continueYearEnd(counted, [])
       }
-      // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.
-      // 45경기를 다 치렀는지는 `isPitcherSeasonFinished`(0xb818c) 가 본다.
-      // 45번째 경기는 하루 끝 0xb818c 가 대진 0xb80a8 을 열며 L+0x32 = 0 이라 위와 같은 [114 → 136] 이다.
-      if (isPitcherSeasonFinished(counted)) return continueYearEnd(counted, [])
-      /*
-       * **2경기 주기** — 상태 116 의 끝(0x12b74~0x12bb2)이 `S+0xb2`(경기 수)의 **비트0** 을 본다:
-       * ```
-       *   12b98: ldrb r3,[r2]        ; r2 = S+0xb2 = 경기 수 g
-       *   12b9a: movs r1,#0
-       *   12b9c: lsls r5,r3,#0x1f    ; 비트0 을 부호 자리로
-       *   12b9e: bmi  0x12ba2        ; 홀수면 건너뜀
-       *   12ba0: movs r1,#1          ; 짝수
-       *   12ba8: cmp  r1,#0 ; beq 0x12bb0
-       *   12bac: movs r1,#0x69       ; 105 관리 화면
-       *   12bb0: movs r1,#0x6d       ; 109 순위표
-       * ```
-       * 이 함수에는 **모드 갈림이 없다** — 장면 0x106 은 모드 3(투수편)·4(타자편)가 함께 쓰므로
-       * 투수편도 타자편과 **똑같이 2경기 주기**다 (재진입 분기 0x1c38e~0x1c3b8 도 같은 판정).
-       * 홀수 경기 뒤는 109 순위표로 간다 — 타자편(`useCareerSession.confirmGameResult`)과 같다
-       * (원본 109 → 142 → 144 → 경기 장면. 웹은 142·144 없이 109 확인이 곧바로 경기).
-       *
-       * ⚠️ **부상 엔딩 판정보다 앞에 둔다** — 부상 엔딩은 관리 화면 **진입**(105, 0x11910 → 0x11b32)의
-       *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
-       */
-      if (!isPitcherManagementCycleOpen(counted)) {
-        // 116 → [114 → 109] 순위표 (이전 상태가 105 가 아니라 취소가 안 먹는다). 109 진입 0x10d8c 가 S+0x50 = 4 · 저장
-        commit({ ...counted, seasonEndState: 109 })
-        setNextGameFromManagement(false)
-        return setScene('다음경기순위')
-      }
-      // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7). 그 검사는 105 에
-      // 들어올 때마다 도는 진입 곁가지라 관리 화면 도착 고리(아래 '관리 화면(105)의 이벤트')가 한다
-      commit(counted)
-      setScene('관리')
-    },
-    [career, commit, continueYearEnd],
-  )
+      // 128 진입 0x120a4 — S+0x50 = 0xf · 저장
+      commit({ ...counted, seasonEndState: 128 })
+      setPostseasonPopup(regularSeasonPopupOnEnter(counted))
+      return setScene('포스트시즌')
+    }
+    // 경기 뒤 평가 116 의 끝 — 정규시즌이 닫혔으면 시즌 끝 사슬(136→…→132)로 간다.
+    // 45경기를 다 치렀는지는 `isPitcherSeasonFinished`(0xb818c) 가 본다.
+    // 45번째 경기는 하루 끝 0xb818c 가 대진 0xb80a8 을 열며 L+0x32 = 0 이라 위와 같은 [114 → 136] 이다.
+    if (isPitcherSeasonFinished(counted)) return continueYearEnd(counted, [])
+    /*
+     * **2경기 주기** — 상태 116 의 끝(0x12b74~0x12bb2)이 `S+0xb2`(경기 수)의 **비트0** 을 본다:
+     * ```
+     *   12b98: ldrb r3,[r2]        ; r2 = S+0xb2 = 경기 수 g
+     *   12b9a: movs r1,#0
+     *   12b9c: lsls r5,r3,#0x1f    ; 비트0 을 부호 자리로
+     *   12b9e: bmi  0x12ba2        ; 홀수면 건너뜀
+     *   12ba0: movs r1,#1          ; 짝수
+     *   12ba8: cmp  r1,#0 ; beq 0x12bb0
+     *   12bac: movs r1,#0x69       ; 105 관리 화면
+     *   12bb0: movs r1,#0x6d       ; 109 순위표
+     * ```
+     * 이 함수에는 **모드 갈림이 없다** — 장면 0x106 은 모드 3(투수편)·4(타자편)가 함께 쓰므로
+     * 투수편도 타자편과 **똑같이 2경기 주기**다 (재진입 분기 0x1c38e~0x1c3b8 도 같은 판정).
+     * 홀수 경기 뒤는 109 순위표로 간다 — 타자편(`useCareerSession.confirmGameResult`)과 같다
+     * (원본 109 → 142 → 144 → 경기 장면. 웹은 142·144 없이 109 확인이 곧바로 경기).
+     *
+     * ⚠️ **부상 엔딩 판정보다 앞에 둔다** — 부상 엔딩은 관리 화면 **진입**(105, 0x11910 → 0x11b32)의
+     *    첫 줄이라, 홀수 경기 뒤에는 105 에 들르지 않아 원본에서도 굴러가지 않는다.
+     */
+    if (!isPitcherManagementCycleOpen(counted)) {
+      // 116 → [114 → 109] 순위표 (이전 상태가 105 가 아니라 취소가 안 먹는다). 109 진입 0x10d8c 가 S+0x50 = 4 · 저장
+      commit({ ...counted, seasonEndState: 109 })
+      setNextGameFromManagement(false)
+      return setScene('다음경기순위')
+    }
+    // 관리 화면 진입 105(0x11910 → 0x11b32)의 첫 줄 — 부상 누적 20경기면 이벤트 500 → 엔딩 141 (B-7). 그 검사는 105 에
+    // 들어올 때마다 도는 진입 곁가지라 관리 화면 도착 고리(아래 '관리 화면(105)의 이벤트')가 한다
+    commit(counted)
+    setScene('관리')
+  }, [career, commit, continueYearEnd])
 
   /** 엔딩 141 의 팝업 0x32 — 5000 G포인트로 이어하기 */
   const continueAfterEnding = useCallback(() => {
@@ -1812,35 +1786,38 @@ export function usePitcherLeagueSession(
     store.save({})
   }, [store])
 
-  const finishEnding = useCallback((isRegistered: boolean) => {
-    setGameOptions(null)
-    if (isRegistered) {
-      // 저장은 등록하는 순간 지웠다 (`eraseSaveForHallOfFame`)
-      isSaveErasedRef.current = false
-      setCareer(null)
-      setScene('등록')
-      return
-    }
-    /*
-     * 등록 없이 떠남 — 141 끝 1bfa2~1bfe2 는 화면 전환 · 0x375d · [0x140006c] = 5 · 장면 0x103 뿐(저장 없음)이고, 다음에 투수편으로
-     * 들어오면 장면 0x106 이 새로 서며 100 → 0x1c154 가 그 저장으로 이어한다. 웹 세션은 앱 동안 살아 있어 여기서 미리 같은 저장으로
-     * 고른다 — 그 사이 투수 저장을 쓰는 곳은 이 세션뿐이고(지갑 다리는 같은 커리어를 다시 쓸 뿐), 이 자리의 이어할 자리(엔딩 141 ·
-     * 연말 사슬 이벤트)는 굴림 · 저장 · 소리가 없다. 105 진입 곁가지(부상 엔딩 · 나간 대결 140 · 115 · 훑기 굴림)는 들어와 관리 장면에
-     * 닿을 때 도는 도착 고리(`isOnScreen` — 투수편 화면일 때만)라 원본 진입 때와 같은 차례다.
-     */
-    const next = pitcherResumeOf(normalizePitcherCareer(store.load()))
-    resumed.current = next
-    replayedEvaluationRef.current = false
-    resumedNewSeasonRef.current = false
-    setResumePoint(next.point)
-    setCareer(next.career)
-    setScene(pitcherSceneOfResume(next.career, next.point))
-    setYearCoverFromResume(next.point.kind === '새시즌')
-    setEndingFromResume(next.point.kind === '엔딩')
-    setStory(pitcherStoryOfResume(next.point))
-    setPostseasonPopup(postseasonPopupOfResume(next.career, next.point))
-    setCupView(cupViewOfResume(next.point))
-  }, [random, store])
+  const finishEnding = useCallback(
+    (isRegistered: boolean) => {
+      setGameOptions(null)
+      if (isRegistered) {
+        // 저장은 등록하는 순간 지웠다 (`eraseSaveForHallOfFame`)
+        isSaveErasedRef.current = false
+        setCareer(null)
+        setScene('등록')
+        return
+      }
+      /*
+       * 등록 없이 떠남 — 141 끝 1bfa2~1bfe2 는 화면 전환 · 0x375d · [0x140006c] = 5 · 장면 0x103 뿐(저장 없음)이고, 다음에 투수편으로
+       * 들어오면 장면 0x106 이 새로 서며 100 → 0x1c154 가 그 저장으로 이어한다. 웹 세션은 앱 동안 살아 있어 여기서 미리 같은 저장으로
+       * 고른다 — 그 사이 투수 저장을 쓰는 곳은 이 세션뿐이고(지갑 다리는 같은 커리어를 다시 쓸 뿐), 이 자리의 이어할 자리(엔딩 141 ·
+       * 연말 사슬 이벤트)는 굴림 · 저장 · 소리가 없다. 105 진입 곁가지(부상 엔딩 · 나간 대결 140 · 115 · 훑기 굴림)는 들어와 관리 장면에
+       * 닿을 때 도는 도착 고리(`isOnScreen` — 투수편 화면일 때만)라 원본 진입 때와 같은 차례다.
+       */
+      const next = pitcherResumeOf(normalizePitcherCareer(store.load()))
+      resumed.current = next
+      replayedEvaluationRef.current = false
+      resumedNewSeasonRef.current = false
+      setResumePoint(next.point)
+      setCareer(next.career)
+      setScene(pitcherSceneOfResume(next.career, next.point))
+      setYearCoverFromResume(next.point.kind === '새시즌')
+      setEndingFromResume(next.point.kind === '엔딩')
+      setStory(pitcherStoryOfResume(next.point))
+      setPostseasonPopup(postseasonPopupOfResume(next.career, next.point))
+      setCupView(cupViewOfResume(next.point))
+    },
+    [random, store],
+  )
 
   const goto = useCallback((next: PitcherScene) => setScene(next), [])
 
@@ -2017,9 +1994,7 @@ export function usePitcherLeagueSession(
   const runOutingFunction = useCallback(
     (functionId: string) => {
       if (career === null) return
-      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
-        (candidate) => candidate.id === functionId,
-      )
+      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find((candidate) => candidate.id === functionId)
       if (outingFunction === undefined) return
       const reason = outingBlockReasonOf(career, outingFunction)
       if (reason !== null) return setOutingNotice(outingBlockTextOf(reason, outingFunction))
@@ -2032,9 +2007,7 @@ export function usePitcherLeagueSession(
   )
   const finishOutingPresentation = useCallback(() => {
     if (career === null || outingPresentation === null || outingResult !== null) return
-    const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
-      (candidate) => candidate.id === outingPresentation.functionId,
-    )
+    const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find((candidate) => candidate.id === outingPresentation.functionId)
     if (outingFunction === undefined) return
     const outcome = performOuting(career, outingFunction, random)
     commit(outcome.career)
@@ -2074,8 +2047,7 @@ export function usePitcherLeagueSession(
   const scannedOutingEntryRef = useRef(0)
   useEffect(() => {
     const isIdle =
-      career !== null && scene === '외출' && story === null && outingResult === null && outingPresentation === null
-      && fileEvents !== null
+      career !== null && scene === '외출' && story === null && outingResult === null && outingPresentation === null && fileEvents !== null
     if (!isIdle || scannedOutingEntryRef.current === outingEntryCount) return
     scannedOutingEntryRef.current = outingEntryCount
     const event = scanAuto(career, fileEvents, EVENT_TRIGGER.외출, random)
@@ -2127,10 +2099,7 @@ export function usePitcherLeagueSession(
         story.context === '연말'
           ? finishPitcherYearEndEvent(career, story.eventId, rewards)
           : applyPitcherEventRewards(career, rewards, random, story.eventId)
-      const viewed = finishPitcherEvent(
-        rewarded,
-        endingEventId === null ? viewedEventIds : viewedEventIds.filter((id) => id !== endingEventId),
-      )
+      const viewed = finishPitcherEvent(rewarded, endingEventId === null ? viewedEventIds : viewedEventIds.filter((id) => id !== endingEventId))
       rewards
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
@@ -2192,9 +2161,8 @@ export function usePitcherLeagueSession(
   const giveStoryReward = useCallback(
     (items: readonly EventReward[], eventId: number, viewedEventIds: readonly number[] = [eventId]) => {
       if (career === null || story === null) return
-      const rewarded = story.context === '연말'
-        ? finishPitcherYearEndEvent(career, eventId, items)
-        : applyPitcherEventRewards(career, items, random, eventId)
+      const rewarded =
+        story.context === '연말' ? finishPitcherYearEndEvent(career, eventId, items) : applyPitcherEventRewards(career, items, random, eventId)
       items
         .filter((reward) => reward.kind === EVENT_REWARD_KIND.G포인트)
         .forEach((reward) => recordStat({ kind: 'G획득', mode: PITCHER_LEAGUE_MODE, amount: reward.value }))
@@ -2350,10 +2318,10 @@ export function usePitcherLeagueSession(
    * 훈련 · 휴식 결과 창은 원본에서 125 · 127 상태라(창이 닫혀야 105 로 돌아온다) 그동안은 판정하지 않는다(`isResultWindowOpen`).
    * 117 이 넣어 둔 +0x270(`heldTitle` — 칭호 1 · 9)이 서 있으면 판정 대신 그것이다(0x1af9c~0x1afa8 — +0x270 ≥ 0 이면 0x1a1c0 을 건너뛴다).
    */
-  const pendingTitle = career !== null && scene === '관리' && story === null && fileEvents !== null
-    && outingRecoveryNotice === '' && !isResultWindowOpen
-    ? heldTitle ?? nextPitcherTitleOf(career)
-    : null
+  const pendingTitle =
+    career !== null && scene === '관리' && story === null && fileEvents !== null && outingRecoveryNotice === '' && !isResultWindowOpen
+      ? (heldTitle ?? nextPitcherTitleOf(career))
+      : null
 
   return {
     career: shown,
@@ -2414,12 +2382,13 @@ export function usePitcherLeagueSession(
           return setScene('경기')
         }
         // 마선수는 저장의 나리 팀 레코드에 있다. 레코드가 없던 옛 저장이면 모드 저장 칸에 남겨 둔 그림자를 넣는다
-        const loaded = career.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
-          ? {
-            ...career,
-            nariTeams: seatNariMatchAces(nariTeamsOf(career), career.teamId, nextPitcherOpponentOf(career), match.aces),
-          }
-          : career
+        const loaded =
+          career.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
+            ? {
+                ...career,
+                nariTeams: seatNariMatchAces(nariTeamsOf(career), career.teamId, nextPitcherOpponentOf(career), match.aces),
+              }
+            : career
         if (loaded !== career) commit(loaded)
         setMatchAces(recordMatchAcesOf(nariTeamsOf(loaded), loaded.teamId, nextPitcherOpponentOf(loaded)))
         beginGame(loaded)
@@ -2454,9 +2423,7 @@ export function usePitcherLeagueSession(
         if (career === null || scene !== '경기준비') return
         if (cupMatch !== null) {
           const options = cupGameOptionsOf(career, cupMatch.matchup, cupMatch.cup, { gaugeSettingOn, throwModeManual })
-          return setEntryView(pitcherNariEntryViewOf(
-            career, options, isMyTeam, pitcherCupTeamsOf(career, cupMatch.matchup.opponent),
-          ))
+          return setEntryView(pitcherNariEntryViewOf(career, options, isMyTeam, pitcherCupTeamsOf(career, cupMatch.matchup.opponent)))
         }
         setEntryView(pitcherNariEntryViewOf(career, recordGameOptionsOf(career), isMyTeam))
       },
@@ -2515,14 +2482,16 @@ export function usePitcherLeagueSession(
           }))
         }
         matchPreparedRef.current = true
-        setMatchInfoStage(rollNariMatchInfoStage(random, {
-          mode: PITCHER_LEAGUE_MODE,
-          myTeamId: matchup.myTeam,
-          opponentTeamId: matchup.opponent,
-          mySide: nationalCupSideOf(cup, matchup.myTeam),
-          // 대회 중 나리 저장 +0xb2 = L+0x32 = 대회 날짜
-          dayCounter: cup.day,
-        }))
+        setMatchInfoStage(
+          rollNariMatchInfoStage(random, {
+            mode: PITCHER_LEAGUE_MODE,
+            myTeamId: matchup.myTeam,
+            opponentTeamId: matchup.opponent,
+            mySide: nationalCupSideOf(cup, matchup.myTeam),
+            // 대회 중 나리 저장 +0xb2 = L+0x32 = 대회 날짜
+            dayCounter: cup.day,
+          }),
+        )
         setEntryView(null)
         setMatchAces(null)
         setCupView(null)

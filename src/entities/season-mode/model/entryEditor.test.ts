@@ -1,15 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ENTRY_RESULT, ENTRY_SUB_TAB, ENTRY_TAB, NO_ENTRY_PICK, advanceEntrySlide, leavesEntryEditor, openEntryEditor, pressEntryKey,
+  ENTRY_RESULT,
+  ENTRY_SUB_TAB,
+  ENTRY_TAB,
+  NO_ENTRY_PICK,
+  advanceEntrySlide,
+  leavesEntryEditor,
+  openEntryEditor,
+  pressEntryKey,
   tickEntryEditor,
-  swapEntryBatters, swapEntryPitchers, swapFieldPositions,
+  swapEntryBatters,
+  swapEntryPitchers,
+  swapFieldPositions,
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey, EntryLists } from '@/entities/season-mode/model/entryEditor'
 
 /** 엔트리 편집기 0x55864 — R4 2a 를 다시 떠서 옮겼다 */
 
-interface 타자 { readonly name: string; readonly isAce: boolean; readonly position: number }
-interface 투수 { readonly name: string; readonly isAce: boolean }
+interface 타자 {
+  readonly name: string
+  readonly isAce: boolean
+  readonly position: number
+}
+interface 투수 {
+  readonly name: string
+  readonly isAce: boolean
+}
 
 const 타자들: readonly 타자[] = [
   ...[8, 9, 5, 1, 7, 3, 4, 2, 6].map((position, i) => ({ name: `선발${i}`, isAce: false, position })),

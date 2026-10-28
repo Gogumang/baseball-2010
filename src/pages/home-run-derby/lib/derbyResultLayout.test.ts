@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
-  POINT_BOX, POINT_ROWS, POINT_VALUE_BOX, RESULT_TITLE, RESULT_WINDOW, RETRY_BOX, RETRY_BUTTONS,
-  STAT_BOX, STAT_BOX_TITLE, STAT_ROWS, STAT_VALUE_BOX,
-  statLabelTopOf, statValueTopOf,
+  POINT_BOX,
+  POINT_ROWS,
+  POINT_VALUE_BOX,
+  RESULT_TITLE,
+  RESULT_WINDOW,
+  RETRY_BOX,
+  RETRY_BUTTONS,
+  STAT_BOX,
+  STAT_BOX_TITLE,
+  STAT_ROWS,
+  STAT_VALUE_BOX,
+  statLabelTopOf,
+  statValueTopOf,
 } from '@/pages/home-run-derby/lib/derbyResultLayout'
 
 /**

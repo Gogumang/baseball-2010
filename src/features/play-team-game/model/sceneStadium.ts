@@ -60,9 +60,7 @@ export interface SceneStadium {
 export function rollSceneStadium(random: RandomPort, stadiumId: number): SceneStadium {
   const stadium = rollStadiumNumber(random, stadiumId)
   const defenseStadium = rollStadiumNumber(random, stadiumId)
-  const paletteRow = isBugFixed('B-64')
-    ? (GENERAL_MATCH_INFO_PALETTE_ROWS[stadiumId] ?? -1)
-    : (STADIUM_PALETTE_ROWS[stadiumId] ?? -1)
+  const paletteRow = isBugFixed('B-64') ? (GENERAL_MATCH_INFO_PALETTE_ROWS[stadiumId] ?? -1) : (STADIUM_PALETTE_ROWS[stadiumId] ?? -1)
   return { stadium, defenseStadium, paletteRow }
 }
 
@@ -189,9 +187,6 @@ export function placedMatchInfoStadium(stadium: number): { readonly stadium: num
 const GENERAL_MATCH_INFO_PALETTE_ROWS: readonly number[] = [-1, 0, 1, 2, 0, -1, -1, 0, 1, 2, -1, -1, 9, 12, 15]
 
 /** 일반모드 22 의 무대 — 구장 +0x70 = 0x78664(무대, st+0x30)(굴린 값) · +0xc = 표 0xce9d8[st+0x30] */
-export function generalMatchInfoStage(
-  rolledStadium: number,
-  stadiumId: number,
-): { readonly stadium: number; readonly paletteRow: number } {
+export function generalMatchInfoStage(rolledStadium: number, stadiumId: number): { readonly stadium: number; readonly paletteRow: number } {
   return { stadium: rolledStadium, paletteRow: GENERAL_MATCH_INFO_PALETTE_ROWS[stadiumId] ?? -1 }
 }

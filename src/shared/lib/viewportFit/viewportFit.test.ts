@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CONTROLS_MIN_HEIGHT, CONTROLS_MIN_SIDE_WIDTH, desktopZoomOf, fittedZoomOf, touchControlsWantedOf, viewportFitOf,
+  CONTROLS_MIN_HEIGHT,
+  CONTROLS_MIN_SIDE_WIDTH,
+  desktopZoomOf,
+  fittedZoomOf,
+  touchControlsWantedOf,
+  viewportFitOf,
 } from '@/shared/lib/viewportFit/viewportFit'
 
 describe('fittedZoomOf — 240×320 을 칸에 꽉 차게', () => {
@@ -21,7 +26,12 @@ describe('fittedZoomOf — 240×320 을 칸에 꽉 차게', () => {
   })
 
   it('칸을 넘지 않는다', () => {
-    for (const [w, h] of [[360, 428], [412, 700], [844, 369], [1000, 300]] as const) {
+    for (const [w, h] of [
+      [360, 428],
+      [412, 700],
+      [844, 369],
+      [1000, 300],
+    ] as const) {
       const zoom = fittedZoomOf(w, h)
       expect(240 * zoom).toBeLessThanOrEqual(w)
       expect(320 * zoom).toBeLessThanOrEqual(h)
@@ -44,8 +54,12 @@ describe('desktopZoomOf — 예전 미디어 쿼리 그대로', () => {
 
 describe('viewportFitOf — 배치', () => {
   it('데스크톱(마우스 · 키패드 없음)은 예전 정수배 · 화면 칸은 창 전체', () => {
-    expect(viewportFitOf({ width: 480, height: 800, isTouch: false, showControls: false }))
-      .toEqual({ layout: 'plain', zoom: 1, gameWidth: 480, gameHeight: 800 })
+    expect(viewportFitOf({ width: 480, height: 800, isTouch: false, showControls: false })).toEqual({
+      layout: 'plain',
+      zoom: 1,
+      gameWidth: 480,
+      gameHeight: 800,
+    })
   })
 
   it('세로 폰은 버튼 아래 — 판 폭을 꽉 채우고 남은 높이는 버튼', () => {

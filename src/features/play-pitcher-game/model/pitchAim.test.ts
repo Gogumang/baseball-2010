@@ -55,11 +55,28 @@ describe('조준 키 — 메시지 8 0x50e3a', () => {
       const action = aimKeyActionOf(key)
       return action?.kind === 'move' ? [action.direction.dx, action.direction.dy] : action?.kind
     }
-    expect([방향('2'), 방향('ArrowUp')]).toEqual([[0, 1], [0, 1]])
-    expect([방향('8'), 방향('ArrowDown')]).toEqual([[0, -1], [0, -1]])
-    expect([방향('4'), 방향('ArrowLeft')]).toEqual([[-1, 0], [-1, 0]])
-    expect([방향('6'), 방향('ArrowRight')]).toEqual([[1, 0], [1, 0]])
-    expect([방향('1'), 방향('3'), 방향('7'), 방향('9')]).toEqual([[-1, 1], [1, 1], [-1, -1], [1, -1]])
+    expect([방향('2'), 방향('ArrowUp')]).toEqual([
+      [0, 1],
+      [0, 1],
+    ])
+    expect([방향('8'), 방향('ArrowDown')]).toEqual([
+      [0, -1],
+      [0, -1],
+    ])
+    expect([방향('4'), 방향('ArrowLeft')]).toEqual([
+      [-1, 0],
+      [-1, 0],
+    ])
+    expect([방향('6'), 방향('ArrowRight')]).toEqual([
+      [1, 0],
+      [1, 0],
+    ])
+    expect([방향('1'), 방향('3'), 방향('7'), 방향('9')]).toEqual([
+      [-1, 1],
+      [1, 1],
+      [-1, -1],
+      [1, -1],
+    ])
   })
 
   it('OK·5 는 확정, CLR 은 0xf 로, 그 밖 키(0 등)는 멈춤(dx = dy = 0)', () => {

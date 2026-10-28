@@ -2,9 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
-import {
-  ACE_PHASE, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
-} from '@/pages/general-mode/lib/generalModeSetup'
+import { ACE_PHASE, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import { AceSelectScreen, acePlayerOfCell } from '@/pages/general-mode/ui/AceSelectScreen'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
@@ -35,10 +33,7 @@ const 띄우기 = (overrides: Partial<Props> = {}) =>
  * 격자 칸은 40px 정사각이다 — 아래 버튼들과 이것으로 갈린다.
  * (jest-dom 이 없어 `toBeDisabled` 대신 `.disabled` 를 직접 본다)
  */
-const 칸들 = () =>
-  screen
-    .getAllByRole('button')
-    .filter((button): button is HTMLButtonElement => button.style.width === '40px')
+const 칸들 = () => screen.getAllByRole('button').filter((button): button is HTMLButtonElement => button.style.width === '40px')
 
 describe('격자', () => {
   it('밑그림은 넘긴 것만 맨 밑에 깐다 — 시즌 0xd7 이 공 무늬를 넘기고 일반모드 상태 21 은 안 넘긴다', () => {
@@ -141,14 +136,17 @@ describe('App.tsx 기본 개방(DEFAULT_OPENED_ACE_*)을 넘기면', () => {
   /** 칸마다 두 번(커서 옮기고 OK) 누르고 매번 팝업을 닫는다 — 고른 칸 번호만 모은다 */
   const 다눌러보기 = (cellsToTry: readonly number[]) => {
     const onSelect = vi.fn()
-    return { onSelect, run: () => {
-      for (const index of cellsToTry) {
-        fireEvent.click(칸들()[index])
-        fireEvent.click(칸들()[index])
-        const 닫기 = screen.queryByRole('button', { name: '아니오' }) ?? screen.queryByRole('button', { name: 'OK' })
-        if (닫기 !== null) fireEvent.click(닫기)
-      }
-    } }
+    return {
+      onSelect,
+      run: () => {
+        for (const index of cellsToTry) {
+          fireEvent.click(칸들()[index])
+          fireEvent.click(칸들()[index])
+          const 닫기 = screen.queryByRole('button', { name: '아니오' }) ?? screen.queryByRole('button', { name: 'OK' })
+          if (닫기 !== null) fireEvent.click(닫기)
+        }
+      },
+    }
   }
 
   it('마투수 로컬 0(싸이커)만 고를 수 있다', () => {

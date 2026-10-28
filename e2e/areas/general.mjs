@@ -1,10 +1,27 @@
 // 도메인 general — 일반모드 경기: 빠른실행 · 타석 · 구질 고르기 · 수비 · 자동진행 중계 (장면 표 `src/app/dev/scenes/general.ts`).
 export const sources = [
-  'src/pages/general-mode/', 'src/pages/team-game/', 'src/features/play-team-game/', 'src/features/play-game/', 'src/pages/match-settings/',
-  'src/pages/auto-play-relay/', 'src/entities/game/', 'src/entities/team/', 'src/entities/league/', 'src/widgets/game-scene/',
-  'src/widgets/line-score/', 'src/widgets/scoreboard-frame/', 'src/widgets/matchup-cards/', 'src/widgets/field-walk/',
-  'src/features/defense-play/', 'src/pages/defense/', 'src/entities/fielding/', 'src/entities/defense-controls/', 'src/pages/pitching/',
-  'src/entities/pitching/', 'src/widgets/entry-editor/', 'src/app/model/useAtBatRunner',
+  'src/pages/general-mode/',
+  'src/pages/team-game/',
+  'src/features/play-team-game/',
+  'src/features/play-game/',
+  'src/pages/match-settings/',
+  'src/pages/auto-play-relay/',
+  'src/entities/game/',
+  'src/entities/team/',
+  'src/entities/league/',
+  'src/widgets/game-scene/',
+  'src/widgets/line-score/',
+  'src/widgets/scoreboard-frame/',
+  'src/widgets/matchup-cards/',
+  'src/widgets/field-walk/',
+  'src/features/defense-play/',
+  'src/pages/defense/',
+  'src/entities/fielding/',
+  'src/entities/defense-controls/',
+  'src/pages/pitching/',
+  'src/entities/pitching/',
+  'src/widgets/entry-editor/',
+  'src/app/model/useAtBatRunner',
 ]
 export const representative = 'general-bat'
 

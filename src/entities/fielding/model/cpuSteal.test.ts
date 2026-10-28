@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
-import {
-  CPU_STEAL_TABLE,
-  cpuStealSpeedColumnOf,
-  cpuStealTargetOf,
-  rollCpuSteal,
-} from '@/entities/fielding/model/cpuSteal'
+import { CPU_STEAL_TABLE, cpuStealSpeedColumnOf, cpuStealTargetOf, rollCpuSteal } from '@/entities/fielding/model/cpuSteal'
 import { runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 
 /** 정해진 rand(0,1000) 값을 내고 굴림 수를 센다 */
@@ -69,9 +64,7 @@ describe('CPU 도루 0x520de — 표 0xd047c', () => {
     const random = 고정난수(0)
     expect(rollCpuSteal({ bases: EMPTY_BASES, offenseIsCpu: true, runAbilityOf: () => 500 }, random)).toBeNull()
     expect(rollCpuSteal({ bases: 일루, offenseIsCpu: false, runAbilityOf: () => 500 }, random)).toBeNull()
-    expect(
-      rollCpuSteal({ bases: 일루, offenseIsCpu: true, playFinished: true, runAbilityOf: () => 500 }, random),
-    ).toBeNull()
+    expect(rollCpuSteal({ bases: 일루, offenseIsCpu: true, playFinished: true, runAbilityOf: () => 500 }, random)).toBeNull()
     expect(random.count()).toBe(0)
     rollCpuSteal({ bases: 일루, offenseIsCpu: true, runAbilityOf: () => 500 }, random)
     expect(random.count()).toBe(1)

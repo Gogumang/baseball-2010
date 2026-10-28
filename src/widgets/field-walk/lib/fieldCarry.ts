@@ -1,10 +1,5 @@
 import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
-import {
-  type CameraState,
-  cameraBoundsOf,
-  centerOn,
-  stepCamera,
-} from '@/pages/defense/lib/defenseCamera'
+import { type CameraState, cameraBoundsOf, centerOn, stepCamera } from '@/pages/defense/lib/defenseCamera'
 import { type DefenseViewState, cameraTargetOf } from '@/pages/defense/lib/defenseView'
 import type { BenchClearingWalkState } from '@/widgets/field-walk/lib/benchClearingWalk'
 import type { HalfInningWalkState } from '@/widgets/field-walk/lib/halfInningWalk'
@@ -75,9 +70,7 @@ export function fieldCarryAfterPlay(ticks: readonly DefenseViewState[], previous
     const fielder = last.fielders.find((candidate) => candidate.slot === slot)
     // 판이 그 칸을 안 들고 오면(웹 판 일부) 판 시작 0xb0fb4 가 세운 제자리 그대로로 본다
     const home = FIELDER_START_POSITIONS[slot]
-    return fielder === undefined
-      ? { x: home.x, y: 0, z: home.z }
-      : { x: fielder.x, y: fielder.y ?? 0, z: fielder.z }
+    return fielder === undefined ? { x: home.x, y: 0, z: home.z } : { x: fielder.x, y: fielder.y ?? 0, z: fielder.z }
   })
   return { fielders, camera }
 }

@@ -5,11 +5,30 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import type { DerbyResult } from '@/entities/home-run-derby/model/derbyRun'
 import {
-  POINT_BOX, POINT_GP_FRAME, POINT_GP_X, POINT_LABEL_X,
-  POINT_ROWS, POINT_VALUE_BOX, RESULT_TITLE, RESULT_WINDOW, RETRY_BOX, RETRY_BUTTONS,
-  RETRY_DEFAULT_ANSWER, RETRY_QUESTION, RETRY_TEXT, STAT_BOX, STAT_BOX_TITLE, STAT_LABEL_X,
-  STAT_ROWS, STAT_UNIT_X, STAT_VALUE_BOX, STAT_VALUE_GLYPH_HEIGHT, STAT_VALUE_PLATE,
-  statLabelTopOf, statPlateTopOf, statValueTopOf,
+  POINT_BOX,
+  POINT_GP_FRAME,
+  POINT_GP_X,
+  POINT_LABEL_X,
+  POINT_ROWS,
+  POINT_VALUE_BOX,
+  RESULT_TITLE,
+  RESULT_WINDOW,
+  RETRY_BOX,
+  RETRY_BUTTONS,
+  RETRY_DEFAULT_ANSWER,
+  RETRY_QUESTION,
+  RETRY_TEXT,
+  STAT_BOX,
+  STAT_BOX_TITLE,
+  STAT_LABEL_X,
+  STAT_ROWS,
+  STAT_UNIT_X,
+  STAT_VALUE_BOX,
+  STAT_VALUE_GLYPH_HEIGHT,
+  STAT_VALUE_PLATE,
+  statLabelTopOf,
+  statPlateTopOf,
+  statValueTopOf,
 } from '@/pages/home-run-derby/lib/derbyResultLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyResultWindow.css'
 import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
@@ -97,8 +116,14 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
   return (
     <div className={styles.layer}>
       {/* 45d24 공용 판 0x55e60(skin, W/2, H/2, 176, 213, 0, 0x22, 위 띠 0x10, 0, 0, 0) */}
-      <CommonPanel x={RESULT_WINDOW.x} y={RESULT_WINDOW.y} width={RESULT_WINDOW.width} height={RESULT_WINDOW.height}
-        topBand={0x10} testId="더비-결과-창" />
+      <CommonPanel
+        x={RESULT_WINDOW.x}
+        y={RESULT_WINDOW.y}
+        width={RESULT_WINDOW.width}
+        height={RESULT_WINDOW.height}
+        topBand={0x10}
+        testId="더비-결과-창"
+      />
 
       {/* game_ui 이미지 30 = "RESULT" (56×7) */}
       <img className={styles.sprite} style={{ left: RESULT_TITLE.x, top: RESULT_TITLE.y }} src={RESULT_TITLE_IMAGE} alt="RESULT" />
@@ -107,8 +132,14 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
       <RoundBox x={STAT_BOX.x} y={STAT_BOX.y} width={STAT_BOX.width} height={STAT_BOX.height} {...ROUND_BOX} shine testId="더비-칸-A" />
       {/* 칸 제목 "홈런더비" 는 img_text 팔레트 3 — 45db2 0x913e5(img_text, 3) → 253 → 45de8 0x913e5(img_text, 0) 뒤 줄 이름들 */}
       {titlePalette.definition}
-      <FrameSprite folder={IMG_TEXT_FRAMES} frame={STAT_BOX_TITLE.frame} origins={textOrigins} x={STAT_BOX_TITLE.x} y={STAT_BOX_TITLE.y}
-        style={titlePalette.style} />
+      <FrameSprite
+        folder={IMG_TEXT_FRAMES}
+        frame={STAT_BOX_TITLE.frame}
+        origins={textOrigins}
+        x={STAT_BOX_TITLE.x}
+        y={STAT_BOX_TITLE.y}
+        style={titlePalette.style}
+      />
 
       {STAT_ROWS.map((row, index) => (
         <div key={row.name}>
@@ -137,8 +168,16 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.label} origins={textOrigins} x={POINT_LABEL_X} y={row.labelY} />
           <FrameSprite folder={IMG_TEXT_FRAMES} frame={POINT_GP_FRAME} origins={textOrigins} x={POINT_GP_X} y={row.labelY} />
           {/* G 숫자 0x54a60 — 동전 · ("+") · 숫자 (0x46174 · 0x461f2) */}
-          <GamePointBadge testId={`더비-${row.name}-G`} value={pointValues[index]!} x={POINT_VALUE_BOX.x} y={row.valueY}
-            width={POINT_VALUE_BOX.width} align={POINT_VALUE_BOX.align} plus={row.plus} plate={POINT_VALUE_BOX.plate} />
+          <GamePointBadge
+            testId={`더비-${row.name}-G`}
+            value={pointValues[index]!}
+            x={POINT_VALUE_BOX.x}
+            y={row.valueY}
+            width={POINT_VALUE_BOX.width}
+            align={POINT_VALUE_BOX.align}
+            plus={row.plus}
+            plate={POINT_VALUE_BOX.plate}
+          />
         </div>
       ))}
 
@@ -166,7 +205,6 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
           />
         </button>
       ))}
-
     </div>
   )
 }

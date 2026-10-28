@@ -39,16 +39,19 @@ async function openedButton(name: string): Promise<HTMLElement> {
   await waitFor(() => expect(button.getBoundingClientRect().width).toBeGreaterThan(10), { timeout: 3000 })
   // 여는 연출(커지기)이 끝나 크기가 멈출 때까지
   let last = ''
-  await waitFor(() => {
-    const now = JSON.stringify(button.getBoundingClientRect())
-    const isStill = now === last
-    last = now
-    expect(isStill).toBe(true)
-  }, { timeout: 3000, interval: 50 })
+  await waitFor(
+    () => {
+      const now = JSON.stringify(button.getBoundingClientRect())
+      const isStill = now === last
+      last = now
+      expect(isStill).toBe(true)
+    },
+    { timeout: 3000, interval: 50 },
+  )
   return button
 }
 
-describe('구질훈련 창 — \'???\' 칸 위에 뜬 예 · 아니오 상자 (r203)', () => {
+describe("구질훈련 창 — '???' 칸 위에 뜬 예 · 아니오 상자 (r203)", () => {
   const 띄우기 = () => {
     const onCell = vi.fn()
     const onAnswer = vi.fn()
@@ -68,7 +71,7 @@ describe('구질훈련 창 — \'???\' 칸 위에 뜬 예 · 아니오 상자 (r
     expect(Number(getComputedStyle(dialog).zIndex)).toBeGreaterThan(SCREEN_LAYERS.PRESS_AREA)
   })
 
-  it.each(['예', '아니오'])('\'%s\' 단추는 칸과 겹치지만 겹친 자리의 맨 위 요소는 그 단추다', async (name) => {
+  it.each(['예', '아니오'])("'%s' 단추는 칸과 겹치지만 겹친 자리의 맨 위 요소는 그 단추다", async (name) => {
     const { cell } = 띄우기()
     const button = await openedButton(name)
     const box = boxOf(button)
@@ -80,7 +83,7 @@ describe('구질훈련 창 — \'???\' 칸 위에 뜬 예 · 아니오 상자 (r
   })
 
   /** 이 시험이 r203 을 잡는다는 확인 — 덮개를 예전 겹 5 로 되돌리면 단추 가운데의 맨 위 요소가 '???' 칸이 된다 */
-  it('예전 겹(덮개 z 5)이면 \'???\' 칸이 \'예\' 단추를 덮는다 — r203 재현', async () => {
+  it("예전 겹(덮개 z 5)이면 '???' 칸이 '예' 단추를 덮는다 — r203 재현", async () => {
     const old = document.createElement('style')
     old.textContent = '[role="dialog"][aria-label="알림"] { z-index: 5 !important; }'
     document.head.append(old)

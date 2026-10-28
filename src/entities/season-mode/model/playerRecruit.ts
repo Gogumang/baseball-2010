@@ -183,11 +183,7 @@ export const RECRUIT_PITCHER_STAMINA = 10_000
  * **같은 `+0xa` 하위 5비트**를 갖는다. 배열 접근은 첨자로만 하므로 경기에는 영향이 없고
  * 표시용 칸 번호만 어긋난다.
  */
-export function insertPitcher(
-  pitchers: readonly SeasonPlayer[],
-  player: SeasonPlayer,
-  slot: number,
-): SeasonPlayer[] {
+export function insertPitcher(pitchers: readonly SeasonPlayer[], player: SeasonPlayer, slot: number): SeasonPlayer[] {
   const next = [...pitchers]
   const pushed = next[slot]
   if (pushed === undefined) return next
@@ -208,11 +204,7 @@ export function insertPitcher(
  * 0xb8e85(새선수, pos, 0)                          ; 새 선수 수비 위치 = 밀려난 선수의 자리
  * ```
  */
-export function insertBatter(
-  batters: readonly SeasonPlayer[],
-  player: SeasonPlayer,
-  slot: number,
-): SeasonPlayer[] {
+export function insertBatter(batters: readonly SeasonPlayer[], player: SeasonPlayer, slot: number): SeasonPlayer[] {
   const next = [...batters]
   const pushed = next[slot]
   if (pushed === undefined) return next
@@ -346,12 +338,7 @@ export function isHallOfFameRecord(player: SeasonPlayer): boolean {
  * 웹 시즌 저장의 명단은 내 팀 하나뿐이다 — 명전 선수는 영입(내 팀)으로만 들어가고 트레이드가 막혀(StrMODE[166])
  * 다른 팀에 있을 수 없으니 열 팀을 도는 것과 결과가 같다. 없으면 같은 객체.
  */
-export function removeHallOfFamerFromRoster(
-  roster: SeasonTeamRoster,
-  id: number,
-  isPitcher: boolean,
-  recordAceSlot?: number,
-): SeasonTeamRoster {
+export function removeHallOfFamerFromRoster(roster: SeasonTeamRoster, id: number, isPitcher: boolean, recordAceSlot?: number): SeasonTeamRoster {
   const players = isPitcher ? roster.pitchers : roster.batters
   const found = players.findIndex((player) => isHallOfFameRecord(player) && player.id === id)
   if (found < 0) return roster
@@ -368,12 +355,7 @@ export function removeHallOfFamerFromRoster(
  * 예) 투수 n 줄 · j < 8 이면 j 에 옛 8번, 8번에 옛 n−1번 (마선수 없으면 j 에 n−1번, 8번 그대로). 원본 그대로다.
  * 레코드에 남은 마선수는 그대로 남는다(0xdf · 0xe5 가 뺄 때 이 모양이 된다).
  */
-function recordLineRemoved(
-  players: readonly SeasonPlayer[],
-  found: number,
-  isPitcher: boolean,
-  recordAceSlot: number | undefined,
-): SeasonPlayer[] {
+function recordLineRemoved(players: readonly SeasonPlayer[], found: number, isPitcher: boolean, recordAceSlot: number | undefined): SeasonPlayer[] {
   const ACE = 'ace' as const
   type Line = SeasonPlayer | typeof ACE
   const lines: Line[] = [...players]
@@ -389,9 +371,7 @@ function recordLineRemoved(
   const last = lines[lines.length - 1]
   const next = lines.slice(0, -1)
   if (j < next.length && last !== undefined && removed !== undefined && removed !== ACE) {
-    next[j] = isPitcher || last === ACE
-      ? last
-      : withSlot({ ...last, fieldPosition: removed.fieldPosition & 0xf }, j)
+    next[j] = isPitcher || last === ACE ? last : withSlot({ ...last, fieldPosition: removed.fieldPosition & 0xf }, j)
   }
   if (recordAceSlot !== undefined && next[recordAceSlot] === ACE) {
     // 0xb512c — 그 칸이 마선수면 맨 끝 줄을 그 칸에 베끼고 끝 줄을 지운다
@@ -413,11 +393,7 @@ function recordLineRemoved(
  * ```
  * 명전 삭제 `0x221dc` 와 같은 꼴이다(투수는 칸 번호 정리가 없다). 첫 하나만 뺀다. 없으면 같은 객체.
  */
-export function removeCareerPlayerFromRoster(
-  roster: SeasonTeamRoster,
-  isPitcher: boolean,
-  recordAceSlot?: number,
-): SeasonTeamRoster {
+export function removeCareerPlayerFromRoster(roster: SeasonTeamRoster, isPitcher: boolean, recordAceSlot?: number): SeasonTeamRoster {
   const players = isPitcher ? roster.pitchers : roster.batters
   const found = players.findIndex((player) => (player.kindByte & PLAYER_OWN_BIT) !== 0)
   if (found < 0) return roster
@@ -439,12 +415,7 @@ export function hasCareerPlayerInSeasonTeam(roster: SeasonTeamRoster | null, isP
  * `0xb50ad(내 팀, 타자?1:0, 칸)` — 그 명전 기록 번호가 내 팀 명단에 있고 — && 전역기록 `+0x4e`(시즌모드 경기 진행 중) ≠ 0.
  * 시즌 저장이 없으면(`roster` null) 명단에 있을 수 없다.
  */
-export function isHallOfFameDeleteBlocked(
-  roster: SeasonTeamRoster | null,
-  id: number,
-  isPitcher: boolean,
-  isSeasonGameInProgress: boolean,
-): boolean {
+export function isHallOfFameDeleteBlocked(roster: SeasonTeamRoster | null, id: number, isPitcher: boolean, isSeasonGameInProgress: boolean): boolean {
   if (roster === null || !isSeasonGameInProgress) return false
   return hasRecruitedHallOfFamePlayer(isPitcher ? roster.pitchers : roster.batters, id)
 }

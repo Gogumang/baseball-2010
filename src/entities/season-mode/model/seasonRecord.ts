@@ -447,9 +447,7 @@ export function normalizeSeasonState(saved: SavedSeasonState | null | undefined)
     record,
     teamMorale: typeof saved?.teamMorale === 'number' ? saved.teamMorale : MORALE_LIMIT,
     teamAbilities:
-      Array.isArray(abilities) && abilities.length > 0
-        ? abilities.map((row) => (Array.isArray(row) ? [...row] : []))
-        : initialTeamAbilities(),
+      Array.isArray(abilities) && abilities.length > 0 ? abilities.map((row) => (Array.isArray(row) ? [...row] : [])) : initialTeamAbilities(),
   }
 }
 

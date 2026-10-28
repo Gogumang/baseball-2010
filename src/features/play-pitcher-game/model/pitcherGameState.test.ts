@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  PLAYER_SIDE_FIRST_BAT,
-  PLAYER_SIDE_LAST_BAT,
-  createGame,
-  opponentHalfOf,
-} from '@/entities/game/model/gameState'
+import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT, createGame, opponentHalfOf } from '@/entities/game/model/gameState'
 import type { GameState } from '@/entities/game/model/gameState'
 import {
   INNING_RUN_SLOTS,

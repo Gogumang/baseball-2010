@@ -7,12 +7,8 @@ import type { AcePlayer } from '@/shared/config/original/acePlayers'
 import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import {
-  entryBatterLineOfRecord, entryPitcherLineOfRecord,
-} from '@/entities/season-mode/model/entryEditor'
-import type {
-  EntryBatterLine, EntryBatterRow, EntryLists, EntryPitcherLine, EntryPitcherRow,
-} from '@/entities/season-mode/model/entryEditor'
+import { entryBatterLineOfRecord, entryPitcherLineOfRecord } from '@/entities/season-mode/model/entryEditor'
+import type { EntryBatterLine, EntryBatterRow, EntryLists, EntryPitcherLine, EntryPitcherRow } from '@/entities/season-mode/model/entryEditor'
 import { staminaCapacityOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { PlayerDetailSource } from '@/entities/season-mode/model/entryEditor'
 import { PITCHERS } from '@/shared/config/original/roster'
@@ -96,20 +92,35 @@ export function seasonDetailSourceOf(
   if (record === undefined) return undefined
   if ('repertoire' in record) {
     return {
-      isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0,
-      grade: record.salaryGrade ?? null, repertoire: detailRepertoireOf(record.repertoire),
+      isPitcher,
+      abilities: ability,
+      aceIndex: -1,
+      profile: record.profile ?? 0,
+      skillBits: record.skillBits ?? 0,
+      grade: record.salaryGrade ?? null,
+      repertoire: detailRepertoireOf(record.repertoire),
     }
   }
   return {
-    isPitcher, abilities: ability, aceIndex: -1, profile: record.profile ?? 0, skillBits: record.skillBits ?? 0,
-    grade: record.salaryGrade ?? null, specialNumber: record.specialNumber ?? 0,
+    isPitcher,
+    abilities: ability,
+    aceIndex: -1,
+    profile: record.profile ?? 0,
+    skillBits: record.skillBits ?? 0,
+    grade: record.salaryGrade ?? null,
+    specialNumber: record.specialNumber ?? 0,
   }
 }
 
 /** 붙박이 표 행(Xls 0x30 바이트) 레코드의 상세 창 칸 — +0xb · +0x14 · +0x1b · 레퍼토리(`PITCHERS` 와 같은 차례) · +0x18 = 0 */
 export function tableDetailSourceOf(table: RosterPlayer, isPitcher: boolean, ability: readonly number[]): PlayerDetailSource {
   return {
-    isPitcher, abilities: ability, aceIndex: -1, profile: table.profile, skillBits: table.skillBits, grade: table.grade,
+    isPitcher,
+    abilities: ability,
+    aceIndex: -1,
+    profile: table.profile,
+    skillBits: table.skillBits,
+    grade: table.grade,
     ...(isPitcher ? { repertoire: detailRepertoireOf(ROSTER_PITCHER_REPERTOIRES[PITCHERS.indexOf(table)]) } : { specialNumber: 0 }),
   }
 }
@@ -117,7 +128,12 @@ export function tableDetailSourceOf(table: RosterPlayer, isPitcher: boolean, abi
 /** 마선수 줄 — XlsACE 행을 통째 베낀 레코드 (+0xb · +0x14 · 마투수 레퍼토리 `ACE_PITCHER_REPERTOIRES`) */
 export function aceDetailSourceOf(ace: AcePlayer, aceIndex: number, ability: readonly number[], isPitcher: boolean): PlayerDetailSource {
   return {
-    isPitcher, abilities: ability, aceIndex, profile: ace.profile, skillBits: ace.skillBits, grade: null,
+    isPitcher,
+    abilities: ability,
+    aceIndex,
+    profile: ace.profile,
+    skillBits: ace.skillBits,
+    grade: null,
     ...(isPitcher ? { repertoire: detailRepertoireOf(ACE_PITCHER_REPERTOIRES[aceIndex]) } : {}),
   }
 }
@@ -244,7 +260,10 @@ export function tableRosterOf(teamId: number): SeasonTeamRoster {
   return {
     pitchers: teamPitchers(teamId).map((_player, slot) => ({ id: slot, kindByte: slot, fieldPosition: 0, stamina: 0 })),
     batters: teamBatters(teamId).map((player, slot) => ({
-      id: slot, kindByte: slot, fieldPosition: player.position ?? 0, stamina: 0,
+      id: slot,
+      kindByte: slot,
+      fieldPosition: player.position ?? 0,
+      stamina: 0,
     })),
   }
 }
@@ -340,11 +359,7 @@ export interface SeasonEntryInput {
  * 0xb521c · 0xb53f0 이 XlsACE 행을 통째 베낀 것이라 레벨 배율 → 장비 니블(모두 0) → 장착 스킬(+0x14) 단계를 먹는다
  * (`aceRecordAbilityAtLevel`)
  */
-function aceFaceAbilityOf(
-  ace: AcePlayer,
-  order: number,
-  levels: Readonly<Record<number, number>> | undefined,
-): readonly number[] {
+function aceFaceAbilityOf(ace: AcePlayer, order: number, levels: Readonly<Record<number, number>> | undefined): readonly number[] {
   const { hit, power, defense, run } = aceRecordAbilityAtLevel(ace, aceLevelOf(levels, aceLevelSlotOf(ace.role, order + 1)))
   return [hit, power, defense, run]
 }
@@ -447,8 +462,11 @@ export function seasonRecordEntryListsOf(
   let batters = roster.batters.map((player, index): SeasonEntryBatter => {
     const face = faceOf(player, false, index)
     return {
-      ...face, ...seasonEntryCellsOf(teamId, player, false, index, face.ability, cells),
-      isAce: false, position: player.fieldPosition & 0xf, rosterIndex: index,
+      ...face,
+      ...seasonEntryCellsOf(teamId, player, false, index, face.ability, cells),
+      isAce: false,
+      position: player.fieldPosition & 0xf,
+      rosterIndex: index,
     }
   })
   let pitchers = roster.pitchers.map((player, index): SeasonEntryPitcher => {
@@ -488,11 +506,7 @@ export const SEASON_ENTRY_CELL_SOURCE: SeasonEntryCellSource = { staminaMode: 2,
  * 고친 편집기 목록을 시즌 명단으로 되적는다 — 마선수 줄을 빼고(움직일 수 없으니 남은 순서가 곧 명단 순서다)
  * 투수는 로테이션을 되돌린다. 타자는 편집기가 고친 수비 위치를 `+0x1c` 에 적는다.
  */
-export function seasonRosterOfEntry(
-  roster: SeasonTeamRoster,
-  lists: SeasonEntryLists,
-  dayCounter: number,
-): SeasonTeamRoster {
+export function seasonRosterOfEntry(roster: SeasonTeamRoster, lists: SeasonEntryLists, dayCounter: number): SeasonTeamRoster {
   const batters: SeasonPlayer[] = []
   for (const row of lists.batters) {
     const player = roster.batters[row.rosterIndex]
@@ -633,10 +647,7 @@ export interface SeasonEntryTablePitcher {
  * ⚠️ 이사 못 함: 1514e8c 앞에 영입한 나리 사본은 영입 순간의 니블을 남기지 않았고 지금 나리 저장은 그 뒤에 바뀌었을 수 있어
  *    되찾을 길이 없다(지어내지 않는다). 니블 없는 옛 명전 기록도 같다
  */
-function recordNibblesOf(
-  player: SeasonPlayer,
-  record: Pick<SeasonEntryBatterRecord, 'equipment'>,
-): { readonly equipment?: readonly number[] } {
+function recordNibblesOf(player: SeasonPlayer, record: Pick<SeasonEntryBatterRecord, 'equipment'>): { readonly equipment?: readonly number[] } {
   const equipment = player.equipment ?? record.equipment
   return equipment === undefined ? {} : { equipment }
 }

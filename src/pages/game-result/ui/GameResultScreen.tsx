@@ -117,8 +117,7 @@ export function GameResultScreen({
   const settlementLayers = useSettlementEffectLayers()
   // 진행기가 요약에 실어 보낸 이름이 기본이다 (`gameFlow.pitchersOfRecordOf` — 득점 0xa5c34·교체 0xa60c0 로 센 칸)
   const names = pitcherNames ?? summary.pitchersOfRecord
-  const rowNames =
-    names === undefined ? EMPTY_PITCHER_NAMES : [names.win, names.loss, names.save]
+  const rowNames = names === undefined ? EMPTY_PITCHER_NAMES : [names.win, names.loss, names.save]
   // 0x4a350 — 사람 팀이 앞섰나. 비기면 거짓(진 판 · 비)
   const isWin = summary.result === '승'
   // 0xb69b0(st, 0/1) — 측 0(선공)이 왼쪽. 사람 팀은 `playerSide` 측 (이어하기처럼 재료가 없으면 원래 웹 배치대로 측 1)
@@ -132,24 +131,24 @@ export function GameResultScreen({
     // 경기 끝 판(상태 0x18 경기 끝 가지 0x4fe9c) — 10틱 뒤 OK → 정산 0x19 진입 0x4ea0c
     return (
       <>
-      {/* 경기 끝 판 0x18 · 정산 0x19 는 아직 경기 장면 0x104 — 공용 창이 줄임 없이 닫힌다([창+0x24f] = 1) */}
-      <GameSceneMark />
-      <GameEndBoard
-        side0Score={side0Score}
-        side1Score={side1Score}
-        names={rowNames}
-        scoreboardSides={scoreboardSides}
-        // 503d8 — 이닝별 점수판 0x41c18 을 (14, 252) 에 (작은 로고는 측 0 · 측 1 팀)
-        lineScore={
-          summary.lineScore === undefined
-            ? undefined
-            : {
-                ...summary.lineScore,
-                sideTeams: playerSide === 0 ? [summary.ourTeamId, summary.opponentTeamId] : [summary.opponentTeamId, summary.ourTeamId],
-              }
-        }
-        onConfirm={() => setPhase('정산')}
-      />
+        {/* 경기 끝 판 0x18 · 정산 0x19 는 아직 경기 장면 0x104 — 공용 창이 줄임 없이 닫힌다([창+0x24f] = 1) */}
+        <GameSceneMark />
+        <GameEndBoard
+          side0Score={side0Score}
+          side1Score={side1Score}
+          names={rowNames}
+          scoreboardSides={scoreboardSides}
+          // 503d8 — 이닝별 점수판 0x41c18 을 (14, 252) 에 (작은 로고는 측 0 · 측 1 팀)
+          lineScore={
+            summary.lineScore === undefined
+              ? undefined
+              : {
+                  ...summary.lineScore,
+                  sideTeams: playerSide === 0 ? [summary.ourTeamId, summary.opponentTeamId] : [summary.opponentTeamId, summary.ourTeamId],
+                }
+          }
+          onConfirm={() => setPhase('정산')}
+        />
       </>
     )
   }

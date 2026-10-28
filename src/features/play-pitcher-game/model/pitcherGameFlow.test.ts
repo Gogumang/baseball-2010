@@ -44,10 +44,7 @@ import {
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
-import type {
-  PitcherGameOptions,
-  PitcherGameProgress,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import type { PitcherGameOptions, PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { BATTED_BALL_PATTERNS } from '@/shared/config/original/battedBallPatterns'
 import { SCENE_EFFECT_INIT_ROLL_COUNT } from '@/entities/batting/model/battedBallOutcome'
 import { aimAfterTicks } from '@/features/play-pitcher-game/model/pitchAim'
@@ -131,8 +128,7 @@ describe('리그 투수 차례·레코드 스태미나', () => {
   it('리그 투수 줄 — 내 투수는 빼고 양 팀 CPU 투수 실점 합이 점수와 같다 (구원 날, 전부 간이)', () => {
     const 끝 = startPitcherGame({ ...기본옵션, dayCounter: 3, role: PITCHER_ROLE.starter }, 씨앗(11))
     const 재료 = summaryOf(끝).leaguePitchers
-    const 실점 = (teamId: number) =>
-      재료.lines.filter((line) => line.teamId === teamId).reduce((total, line) => total + line.runsAllowed, 0)
+    const 실점 = (teamId: number) => 재료.lines.filter((line) => line.teamId === teamId).reduce((total, line) => total + line.runsAllowed, 0)
     expect(실점(기본옵션.ourTeamId)).toBe(끝.game.opponentScore)
     expect(실점(기본옵션.opponentTeamId)).toBe(끝.game.ourScore)
     expect(재료.lines.every((line) => line.pitcherSlot >= 0 && line.pitcherSlot < 8)).toBe(true)
@@ -204,16 +200,10 @@ describe('등판', () => {
   })
 
   it('구원은 8회(0-기준 7) 우리 팀 수비 첫 타석에 올라온다 (0xc1ba4)', () => {
-    let progress = startPitcherGame(
-      { ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3 },
-      씨앗(20100902),
-    )
+    let progress = startPitcherGame({ ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3 }, 씨앗(20100902))
     // 8회 전에 콜드게임으로 끝나지 않은 씨앗을 찾는다
     for (let seed = 1; !progress.hasEntered && seed <= 40; seed += 1) {
-      progress = startPitcherGame(
-        { ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3 },
-        씨앗(seed),
-      )
+      progress = startPitcherGame({ ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3 }, 씨앗(seed))
     }
 
     expect(progress.hasEntered).toBe(true)
@@ -338,10 +328,7 @@ describe('강판', () => {
   })
 
   it('감독 강판 — 체력 0% 에서 평판이 낮으면 반드시 내려간다 (표 0xcfa58 행 1 칸 0 = 100%)', () => {
-    const progress = startPitcherGame(
-      { ...기본옵션, stamina: 0, reputation: 0 },
-      씨앗(20100901),
-    )
+    const progress = startPitcherGame({ ...기본옵션, stamina: 0, reputation: 0 }, 씨앗(20100901))
 
     expect(progress.managerHookText).not.toBeNull()
     // 체력 0% 사유의 글은 88~90 이다
@@ -375,10 +362,7 @@ describe('강판', () => {
       씨앗(20100902),
     )
     for (let seed = 1; !progress.hasEntered && seed <= 40; seed += 1) {
-      progress = startPitcherGame(
-        { ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3, stamina: 0, reputation: 0 },
-        씨앗(seed),
-      )
+      progress = startPitcherGame({ ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3, stamina: 0, reputation: 0 }, 씨앗(seed))
     }
 
     expect(progress.hasEntered).toBe(true)
@@ -395,11 +379,14 @@ describe('나리 사기 — 두 팀 레코드 +2 (셋업 3a332 · 0xb570c b5768)
   })
 
   it('경기 중 사기가 바뀌면 용량 사기와 내 능력치(사기 감소 앞 값에서 다시 깎음)가 함께 바뀐다', () => {
-    const 시작 = startPitcherGame({
-      ...기본옵션,
-      teamMorale: 60,
-      statsBeforeMoraleCut: { control: 500, velocity: 500, breaking: 500, stamina: 400 },
-    }, 씨앗(1))
+    const 시작 = startPitcherGame(
+      {
+        ...기본옵션,
+        teamMorale: 60,
+        statsBeforeMoraleCut: { control: 500, velocity: 500, breaking: 500, stamina: 400 },
+      },
+      씨앗(1),
+    )
     expect(withPitcherGameMorale(시작, 60)).toBe(시작)
     const 낮아짐 = withPitcherGameMorale(시작, 25)
     expect(낮아짐.options.teamMorale).toBe(25)
@@ -442,9 +429,7 @@ describe('돌발미션', () => {
 
     const 행 = 뜬경기?.burst?.current
     expect(BURST_TABLES.PITCHER).toContain(행)
-    expect([BURST_GOAL.아웃, BURST_GOAL.삼진, BURST_GOAL.병살, BURST_GOAL.고의사구]).toContain(
-      행?.goal,
-    )
+    expect([BURST_GOAL.아웃, BURST_GOAL.삼진, BURST_GOAL.병살, BURST_GOAL.고의사구]).toContain(행?.goal)
   })
 
   it('한 경기를 끝까지 치르면 발동은 많아야 한 번이다 (obj+0x229 == 1)', () => {
@@ -519,10 +504,7 @@ describe('경기 뒤', () => {
     // 7회 콜드게임으로 끝나 8회가 오지 않은 경기를 찾는다
     let 끝: PitcherGameProgress | null = null
     for (let seed = 1; seed <= 200 && 끝 === null; seed += 1) {
-      const progress = startPitcherGame(
-        { ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3 },
-        씨앗(seed),
-      )
+      const progress = startPitcherGame({ ...기본옵션, role: PITCHER_ROLE.relief, positionCode: 5, dayCounter: 3 }, 씨앗(seed))
       if (progress.game.isFinished && !progress.hasEntered && progress.endedInningIndex === 6) {
         끝 = progress
       }
@@ -611,9 +593,11 @@ describe('수비 진루 (0xaf918 자동 주루)', () => {
   it('간이 엔진이 돌린 타석에는 희생플라이가 없다 (E-2 확정)', () => {
     // 등판일이 아니면 경기 전체가 간이 엔진이다 — 뜬공아웃으로 점수가 나면 안 된다
     const 뜬공아웃 = { kind: '아웃', detail: '뜬공아웃' } as const
-    expect(
-      advanceRunners({ first: false, second: false, third: true }, 뜬공아웃, 0, { quickEngine: true }),
-    ).toEqual({ bases: { first: false, second: false, third: true }, runsScored: 0, outsAdded: 1 })
+    expect(advanceRunners({ first: false, second: false, third: true }, 뜬공아웃, 0, { quickEngine: true })).toEqual({
+      bases: { first: false, second: false, third: true },
+      runsScored: 0,
+      outsAdded: 1,
+    })
   })
 })
 
@@ -1003,9 +987,7 @@ describe('R+0x128 · 레코드 +0x22 — 득점 주자를 내보낸 투수에게
       expect(끝.runsAllowedByMe).toBeLessThanOrEqual(3)
       expect(끝.record.runsAllowedField).toBe(끝.runsAllowedByMe)
       // 내가 남긴 주자의 실점은 동료 투수 줄(+0x22)에 다시 안 든다 — 우리 팀 실점은 내 몫 + 동료 줄 몫이다
-      const 동료실점 = 끝.pitcherLines
-        .filter((line) => line.teamId === 끝.options.ourTeamId)
-        .reduce((sum, line) => sum + line.runsAllowed, 0)
+      const 동료실점 = 끝.pitcherLines.filter((line) => line.teamId === 끝.options.ourTeamId).reduce((sum, line) => sum + line.runsAllowed, 0)
       expect(동료실점 + 끝.runsAllowedByMe).toBe(끝.game.opponentScore)
     }
 
@@ -1096,8 +1078,7 @@ describe('공수 교대 판 (상태 0x18) — 모드 3 은 1회초 판만', () =
 
   it('판이 서면 0x3fac4 의 걸음 굴림 36 개가 첫 타석 준비(0xe 강판·0xf 돌발)보다 앞에 끼어든다', () => {
     /** 장면 덱 섞기(0x3e340 → 0xb08e8, 코드마다 패턴 수만큼 rand) · 효과 객체(3ef6e, 1202) 다음 n 개는 고정값, 나머지는 씨앗 77 */
-    const 장면덱굴림 =
-      Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
+    const 장면덱굴림 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
     const 앞값 = (n: number, value: number): RandomPort => {
       const rest = 씨앗(77)
       const 고정 = createConstantRandom(value)
@@ -1144,8 +1125,7 @@ describe('투수 쪽 보정 0x34d6c — 공+0x10 (0x3de10) · 내 투수 보너�
   const 마구 = { typeNumber: 22, gaugeCell: 0 }
 
   /** 타석이 이어지는 동안(사람 차례) 한 공을 던진다 — 인플레이면 수비까지 미리 돌린다 */
-  const 한공 = (progress: PitcherGameProgress, input: typeof 마구, random: RandomPort) =>
-    throwPitch(progress, input, random)
+  const 한공 = (progress: PitcherGameProgress, input: typeof 마구, random: RandomPort) => throwPitch(progress, input, random)
 
   it('마구를 던지면 공에 번호가 실리고, 그 뒤 직구에도 남는다 (되돌리는 곳이 없다)', () => {
     const random = 씨앗(3)
@@ -1478,9 +1458,7 @@ describe('CPU 도루 0x520de · 공 도착 판 0x3dfac — 투수편은 늘 CPU 
     const pending = 붙듦.pendingRunnerPlay
     expect(pending?.kind).toBe('pickoff')
     if (pending?.kind !== 'pickoff') return
-    expect(pending.input.fielderPlates?.[0]).toEqual(
-      일루.onMound ? { name: '나투수', pitcherRole: 기본옵션.role } : null,
-    )
+    expect(pending.input.fielderPlates?.[0]).toEqual(일루.onMound ? { name: '나투수', pitcherRole: 기본옵션.role } : null)
     expect(pending.input.runnerAces?.first ?? null).toBeNull()
   })
 
@@ -1573,8 +1551,7 @@ describe('경기 시작 — 상태 9 갱신 0x3f584 의 시뮬 초기화 0xc0dac
     }
     startPitcherGame(기본옵션, random)
     // 앞은 장면 덱 섞기(0x3e340 → 0xb08e8) · 효과 객체(3ef6e, 1202) — 그 바로 다음 굴림이 시뮬 초기화다
-    const 장면덱굴림 =
-      Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
+    const 장면덱굴림 = Object.values(BATTED_BALL_PATTERNS).reduce((sum, patterns) => sum + patterns.length, 0) + SCENE_EFFECT_INIT_ROLL_COUNT
     expect(ranges[장면덱굴림]).toEqual([0, 2])
   })
 })
@@ -1651,9 +1628,7 @@ describe('파울 각 공도 수비 판을 돈다 — 낙구 전에 잡히면 파
           뜬공아웃 += 1
           // 태그업 득점이 난 뜬공 아웃은 정산 a882e(득점 > 0 && 아웃 > 0 && 안타 아님)가 타수를 안 센다
           expect(판.outcome).toEqual(
-            판.advance.runsScored > 0
-              ? { kind: '아웃', detail: '뜬공아웃', noAtBat: true }
-              : { kind: '아웃', detail: '뜬공아웃' },
+            판.advance.runsScored > 0 ? { kind: '아웃', detail: '뜬공아웃', noAtBat: true } : { kind: '아웃', detail: '뜬공아웃' },
           )
         } else {
           expect(판.specialDefense.jumpUnlocked || 판.specialDefense.slideUnlocked).toBe(true)
@@ -1683,10 +1658,9 @@ describe('투수편 간이 타석(동료 · 내가 없는 수비)은 원본 간�
 describe('"#TIME" 의 벤치 투수 수 — 팀[+0x33] (b896c 명부 − 1, 마운드를 밟으면 −1)', () => {
   it('경기 시작 — 명단에서 마운드의 투수를 뺀 수', () => {
     const progress = startPitcherGame(기본옵션, 씨앗(20100901))
-    const expected =
-      ourPitcherOrderOf(progress.options).filter(
-        (slot) => slot !== progress.ourMound.pitcherSlot && !progress.ourMound.usedSlots.includes(slot),
-      ).length
+    const expected = ourPitcherOrderOf(progress.options).filter(
+      (slot) => slot !== progress.ourMound.pitcherSlot && !progress.ourMound.usedSlots.includes(slot),
+    ).length
     expect(ourBenchPitcherCountOf(progress)).toBe(expected)
     expect(ourBenchPitcherCountOf(progress)).toBe(ourPitcherOrderOf(progress.options).length - 1 - progress.ourMound.usedSlots.length)
   })

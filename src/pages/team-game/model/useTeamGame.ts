@@ -60,28 +60,22 @@ import { replayCallsOnScreen } from '@/features/defense-play/model/judgeCall'
 import { runLiveRunnerPlayWithoutKeys } from '@/features/defense-play/model/liveRunnerPlay'
 import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
-import {
-  deepHitCheerSoundIdOf,
-  inPlayCallSoundIdOf,
-  pitchCallSoundIdOf,
-  walkCheerSoundIdOf,
-} from '@/features/play-at-bat/model/atBatSounds'
+import { deepHitCheerSoundIdOf, inPlayCallSoundIdOf, pitchCallSoundIdOf, walkCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import { pitchReleaseSoundIdOf } from '@/widgets/batting-stage/lib/pitchReleaseSound'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
 import { hasGameIntro } from '@/widgets/game-scene/lib/introSchedule'
 import { GAME_INTRO_SOUND, gameResultSoundIdOf } from '@/features/play-game/model/gameSounds'
-import {
-  pinchHitSoundIdsOf,
-  scenePitcherChangeSoundIdsOf,
-  stepSoundIdsOf,
-} from '@/pages/team-game/model/teamGameSounds'
+import { pinchHitSoundIdsOf, scenePitcherChangeSoundIdsOf, stepSoundIdsOf } from '@/pages/team-game/model/teamGameSounds'
 import { activeSound, playSoundIds } from '@/shared/api/audio/soundPort'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
 import { strikeoutVibrationMillisecondsOf } from '@/features/play-game/model/strikeoutVibration'
 import { pitchResultEntryDelayTicksOf, pitchSelectionEntryDelayTicksOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import {
-  BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks, resultEntryStepTimingOf, scheduleSceneFrameUpdate,
+  BATTER_PITCH_RESULT_ENTRY_TICKS,
+  playSoundIdsAfterSceneTicks,
+  resultEntryStepTimingOf,
+  scheduleSceneFrameUpdate,
   type PitchStepSoundTiming,
 } from '@/features/play-game/model/sceneTickSounds'
 import { setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
@@ -228,27 +222,29 @@ export function useTeamGame(
   // 경기 장면 시작마다 한 번, 갱신 0x3e340 의 덱 1275 보다 먼저다 (`rollSceneLoadingTip`). 이 칸이 아래 진행 칸보다 먼저 선다
   // 두 초기화는 마운트에 한 번 — 개발 StrictMode 의 두 번째 그림이 난수를 더 굴리지 않게(`mountOnce`)
   const [loadingTip, setLoadingTip] = useState<string | null>(() =>
-    mountOnce('teamGame.loadingTip', () => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null))
-  const [progress, setProgress] = useState<TeamGameProgress>(() => mountOnce('teamGame.progress', () => {
-    // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다. 그리는 자리라
-    // 자식 화면(자동진행 중계 0x21 의 33 · 인트로 61)의 효과보다 먼저다
-    activeSound().stop()
-    // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다 (이어하기도 장면을 새로 세운다)
-    startPlayClock()
-    // 자동진행 중계(0x21)는 화면이 한 틱씩 돌린다 — 그 사이 CLR 중단 · 속도 키를 받는다
-    const live: TeamGameOptions = { ...options, liveAutoRelay: true }
-    const record = autoRelayRecordPort()
-    const slot = autoRelayModeSlotOf(options.mode)
-    if (resumeFrom === undefined) {
-      // 새 경기 — 경기를 여는 키(일반 · 대전 경기정보 OK +0x14d · +0x14f, 시즌 0x847e +0x14e)가 그 모드 칸을 0 으로 쓴 뒤
-      // 장면 초기화 0xc0e60 이 그 0 을 sim+0x9f 로 읽는다
-      record.setStopped(slot, false)
-      return startTeamGame(live, random)
-    }
-    // 이어하기 — 0xc0e60 이 전역기록 +0x14d + m 에서 sim+0x9f 를 되살린다
-    return resumeTeamGame({ ...resumeFrom, options: { ...resumeFrom.options, liveAutoRelay: true } }, random,
-      record.read().stopped[slot])
-  }))
+    mountOnce('teamGame.loadingTip', () => LOADING_TIPS[rollSceneLoadingTip(random)] ?? null),
+  )
+  const [progress, setProgress] = useState<TeamGameProgress>(() =>
+    mountOnce('teamGame.progress', () => {
+      // 상태 7 갱신 0x3e340 의 맨 앞 0x3e350 이 울리던 소리를 끊는다(0x6e418) — 경기 장면은 배경음 없이 시작한다. 그리는 자리라
+      // 자식 화면(자동진행 중계 0x21 의 33 · 인트로 61)의 효과보다 먼저다
+      activeSound().stop()
+      // 경기 장면 적재 0x3f584 의 0x3fa3e `0x3f554` — 플레이 시간 시계를 이때부터 잰다 (이어하기도 장면을 새로 세운다)
+      startPlayClock()
+      // 자동진행 중계(0x21)는 화면이 한 틱씩 돌린다 — 그 사이 CLR 중단 · 속도 키를 받는다
+      const live: TeamGameOptions = { ...options, liveAutoRelay: true }
+      const record = autoRelayRecordPort()
+      const slot = autoRelayModeSlotOf(options.mode)
+      if (resumeFrom === undefined) {
+        // 새 경기 — 경기를 여는 키(일반 · 대전 경기정보 OK +0x14d · +0x14f, 시즌 0x847e +0x14e)가 그 모드 칸을 0 으로 쓴 뒤
+        // 장면 초기화 0xc0e60 이 그 0 을 sim+0x9f 로 읽는다
+        record.setStopped(slot, false)
+        return startTeamGame(live, random)
+      }
+      // 이어하기 — 0xc0e60 이 전역기록 +0x14d + m 에서 sim+0x9f 를 되살린다
+      return resumeTeamGame({ ...resumeFrom, options: { ...resumeFrom.options, liveAutoRelay: true } }, random, record.read().stopped[slot])
+    }),
+  )
 
   /**
    * 최신 진행 상태. 소리는 **업데이터 밖에서** 골라야 한다 — 업데이터 안에서 소리를 내면
@@ -277,16 +273,21 @@ export function useTeamGame(
       setProgress(after)
       const timing = timingOf?.(current, after) ?? null
       if (timing !== null) playSoundIds(audio, [timing.releaseSoundId])
-      playSoundIdsAfterSceneTicks(audio, [
-        ...(soundsOf === undefined ? [] : soundsOf(current, after)),
-        ...stepSoundIdsOf(current, after),
-      ], timing?.resultEntryTicks ?? 0)
-      playSoundIdsAfterSceneTicks(audio, [
-        // 대타 교체 연출(상태 0x16)을 지났으면 — CPU 대타는 다음 타석 준비(0xf 진입)에서 서므로 걸음 끝에 둔다
-        ...pinchHitSoundIdsOf(current, after),
-        // 사람 장면 CPU 투수 교체(0x3d954 → 0xac428)도 같은 0x16 연출 — 22 뒤 올라온 투수 등판음
-        ...scenePitcherChangeSoundIdsOf(current, after),
-      ], timing?.pitchSelectionTicks ?? 0)
+      playSoundIdsAfterSceneTicks(
+        audio,
+        [...(soundsOf === undefined ? [] : soundsOf(current, after)), ...stepSoundIdsOf(current, after)],
+        timing?.resultEntryTicks ?? 0,
+      )
+      playSoundIdsAfterSceneTicks(
+        audio,
+        [
+          // 대타 교체 연출(상태 0x16)을 지났으면 — CPU 대타는 다음 타석 준비(0xf 진입)에서 서므로 걸음 끝에 둔다
+          ...pinchHitSoundIdsOf(current, after),
+          // 사람 장면 CPU 투수 교체(0x3d954 → 0xac428)도 같은 0x16 연출 — 22 뒤 올라온 투수 등판음
+          ...scenePitcherChangeSoundIdsOf(current, after),
+        ],
+        timing?.pitchSelectionTicks ?? 0,
+      )
       return after
     }
   }, [audio])
@@ -296,10 +297,13 @@ export function useTeamGame(
    * 창이 서 있으면 함께 선다
    */
   const cancelResultEntryRef = useRef<(() => void) | null>(null)
-  useEffect(() => () => {
-    cancelResultEntryRef.current?.()
-    cancelResultEntryRef.current = null
-  }, [])
+  useEffect(
+    () => () => {
+      cancelResultEntryRef.current?.()
+      cancelResultEntryRef.current = null
+    },
+    [],
+  )
 
   // 경기 시작 인트로 예약음 61 (상태 0xc 진입 0x3b148) — 적재 상태 8 끝(48b20)에서 0xc 로 오는 자리, 곧 로딩 판이 끝나는 자리다.
   // 인트로는 모드 1~4 만 선다 — 대전(8·9)은 0xc 를 안 지나 이 소리도 없다
@@ -336,9 +340,7 @@ export function useTeamGame(
               // 공 도착 0x3dfac 가 연 도루·폭투 판의 판정 콜(도루 17 · 62/20, 폭투 17) — 원본은 판 안의 그 틱에 낸다.
               // 재생할 판은 재생 화면이 기록된 틱에, 재생하지 않는 판만 판을 연 이 자리에서 낸다 (`arrivalCallSoundIdOf`)
               arrivalCallSoundIdOf(before, after),
-              after.pendingDefensePlay !== null || nextAtBat.outcome === null
-                ? null
-                : inPlayCallSoundIdOf(nextAtBat.outcome),
+              after.pendingDefensePlay !== null || nextAtBat.outcome === null ? null : inPlayCallSoundIdOf(nextAtBat.outcome),
             ]
           },
           // 같은 타석 다음 공이면 진행기가 이 걸음에 0xf 진입 0x3d954(CPU 투수 교체 22)까지 돈다 — 원본은 0x12 틱 0 에서
@@ -347,8 +349,7 @@ export function useTeamGame(
             releaseSoundId: detail.contactSoundId ?? null,
             resultEntryTicks: BATTER_PITCH_RESULT_ENTRY_TICKS,
             pitchSelectionTicks:
-              BATTER_PITCH_RESULT_ENTRY_TICKS +
-              resultWaitTicksOf(applyPitchResolution(before.atBat, detail.resolution).outcome) + 1,
+              BATTER_PITCH_RESULT_ENTRY_TICKS + resultWaitTicksOf(applyPitchResolution(before.atBat, detail.resolution).outcome) + 1,
           }),
         ),
       applyOutcome: (outcome: AtBatOutcome) =>
@@ -406,9 +407,7 @@ export function useTeamGame(
               // 이 자리는 사람이 던지는 타석이라 **타석에 선 쪽이 언제나 상대(CPU) 팀**이다.
               // 우리 공격 반쪽에서는 공격이 사람이라 원본에서도 안 난다 — 그래서 여기에만 있다.
               walkCheerSoundIdOf(nextAtBat.outcome, true),
-              after.pendingDefensePlay !== null || nextAtBat.outcome === null
-                ? null
-                : inPlayCallSoundIdOf(nextAtBat.outcome),
+              after.pendingDefensePlay !== null || nextAtBat.outcome === null ? null : inPlayCallSoundIdOf(nextAtBat.outcome),
             ]
           },
           releaseTimingOf,
@@ -432,8 +431,7 @@ export function useTeamGame(
       // 판은 재생 화면이 기록된 틱에 낸다. 재생하지 않는 판만 판을 연 자리에서 낸다(`pickoffCallSoundsOf`)
       pickoff: (key: string) => step((current) => pickoff(current, key, random, true), pickoffCallSoundsOf),
       // CPU 견제(사람 공격) — 판을 붙들고 수비 화면이 실시간으로 돌린다(사람 주루 키 0x5331c · OK 슬라이딩 0x585). 콜은 판 끝에 낸다
-      cpuPickoff: (base: PickoffBase) =>
-        step((current) => cpuPickoff(current, base, random, true), pickoffCallSoundsOf),
+      cpuPickoff: (base: PickoffBase) => step((current) => cpuPickoff(current, base, random, true), pickoffCallSoundsOf),
       closeBurst: () => step((current) => closeBurstWindow(current)),
       specialSwingUsed: (remaining: number) => step((current) => spendOurSpecialSwing(current, remaining)),
       // 교체 연출(상태 0x16)을 지나 상태 0xe 로 오면 등판음이 예약된다 (0x38b64 → 0x38c34) — 화면이 "CHANGE" 애니를 다 그린 뒤
@@ -461,8 +459,7 @@ export function useTeamGame(
       },
       judgeHitByPitch: () => step((current) => judgeHitByPitch(current, random)),
       enterBenchClearing: () => step((current) => enterBenchClearing(current, random)),
-      finishBenchClearing: (reachedTargetTick: boolean) =>
-        step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
+      finishBenchClearing: (reachedTargetTick: boolean) => step((current) => resolveBenchClearing(current, { reachedTargetTick }, random)),
       finishRunnerPlay: (result?: DefensePlayResult) => {
         const pending = progressRef.current.pendingRunnerPlay
         if (pending == null) return
@@ -498,17 +495,20 @@ export function useTeamGame(
           // 판정 콜(결과 메시지 0xbba → 0x51a56: 7 → 25 · 8/12 → 11 · 9 → 17 · 11 → 62 · 13 → 62/20)과 깊은 낙구 함성 60(52b62)은
           // 원본처럼 판 안의 그 틱에 화면이 냈다(`DefensePlayback` 의 `tickSounds`). 화면이 결과를 못 넘겨 여기서 돌린 판만 판 끝에
           // 근사로 낸다 — **수비 결과를 함께 넘겨야** 원본이 보는 칸(state[0x1f])과 세이프 갈래가 열린다(`inPlayCallSoundIdOf` 둘째 인자)
-          () => result !== undefined ? [] : [
-            deepHitCheerSoundIdOf({
-              outcome: pending.outcome,
-              carryDistance: carryDistanceOf(pending.input.trajectory),
-              caughtOnTheFly: played.caughtOnTheFly,
-              // 파울로 닫힌 판에는 60 이 없다 — 콜은 결과 코드 7 메시지 51c5c 의 25 하나(`inPlayCallSoundIdOf` 의 `foulEnded`)
-              foulEnded: played.foulEnded,
-            }),
-            // 판정 11(2스트라이크 번트 파울) — 판 끝 결과 코드가 낸다(`played.buntFoulOut`). 아웃 콜은 조건 없이 62 (0x51b20)
-            inPlayCallSoundIdOf(pending.outcome, played),
-          ],
+          () =>
+            result !== undefined
+              ? []
+              : [
+                  deepHitCheerSoundIdOf({
+                    outcome: pending.outcome,
+                    carryDistance: carryDistanceOf(pending.input.trajectory),
+                    caughtOnTheFly: played.caughtOnTheFly,
+                    // 파울로 닫힌 판에는 60 이 없다 — 콜은 결과 코드 7 메시지 51c5c 의 25 하나(`inPlayCallSoundIdOf` 의 `foulEnded`)
+                    foulEnded: played.foulEnded,
+                  }),
+                  // 판정 11(2스트라이크 번트 파울) — 판 끝 결과 코드가 낸다(`played.buntFoulOut`). 아웃 콜은 조건 없이 62 (0x51b20)
+                  inPlayCallSoundIdOf(pending.outcome, played),
+                ],
         )
       },
       enterSettlement: () => {
@@ -521,10 +521,7 @@ export function useTeamGame(
     [audio, random, step],
   )
 
-  const summary = useMemo(
-    () => (progress.game.isFinished ? summaryOf(progress) : null),
-    [progress],
-  )
+  const summary = useMemo(() => (progress.game.isFinished ? summaryOf(progress) : null), [progress])
 
   return {
     progress,
@@ -562,12 +559,4 @@ function pickoffCallSoundsOf(before: TeamGameProgress, after: TeamGameProgress):
     : []
 }
 
-export type {
-  PendingDefensePlay,
-  StealBase,
-  TeamAutoRelay,
-  TeamGameOptions,
-  TeamGameProgress,
-  TeamGameSummary,
-  TeamPitchInput,
-}
+export type { PendingDefensePlay, StealBase, TeamAutoRelay, TeamGameOptions, TeamGameProgress, TeamGameSummary, TeamPitchInput }

@@ -20,13 +20,9 @@ import { recordAbilityOf } from '@/entities/team/model/recordAbility'
  * (앞서 "행 순서 = 메모리 순서" 로 적혀 있던 **가정이 확정으로 바뀌었다**.)
  */
 
-export const ACE_PITCHERS: readonly AcePlayer[] = ACE_PLAYERS.filter(
-  (ace) => ace.role === '투수',
-)
+export const ACE_PITCHERS: readonly AcePlayer[] = ACE_PLAYERS.filter((ace) => ace.role === '투수')
 
-export const ACE_BATTERS: readonly AcePlayer[] = ACE_PLAYERS.filter(
-  (ace) => ace.role === '타자',
-)
+export const ACE_BATTERS: readonly AcePlayer[] = ACE_PLAYERS.filter((ace) => ace.role === '타자')
 
 /**
  * 홈런더비 마투수 난입 표 (`0xcfce8` = `[1, 2, 3, 4]`, 읽는 곳 `0x48daa`) — **확정**.
@@ -42,7 +38,7 @@ export const DERBY_ACE_PITCHER_INDEXES: readonly number[] = [1, 2, 3, 4]
 export function derbyAcePitcherOf(stage: number): AcePlayer | null {
   if (stage <= 0) return null
   const index = DERBY_ACE_PITCHER_INDEXES[stage - 1]
-  return index === undefined ? null : ACE_PITCHERS[index] ?? null
+  return index === undefined ? null : (ACE_PITCHERS[index] ?? null)
 }
 
 /** 마투수 5 · 마타자 5 — `0x1f824`·`0x1f84c` 가 번호를 `[0,4]` 로 자른다 (`1f826~1f832`) */
@@ -123,9 +119,7 @@ export function pitcherAbilityOf(
   const repertoire = ACE_PITCHER_REPERTOIRES.find((candidate) => candidate.name === ace.name)
   const order = ACE_PITCHERS.findIndex((candidate) => candidate.id === ace.id)
   const ability =
-    aceLevels === undefined || order < 0
-      ? ace.ability
-      : aceAbilityAtLevel(ace.ability, aceLevelOf(aceLevels, aceLevelSlotOf('투수', order + 1)))
+    aceLevels === undefined || order < 0 ? ace.ability : aceAbilityAtLevel(ace.ability, aceLevelOf(aceLevels, aceLevelSlotOf('투수', order + 1)))
   const record = recordAbilityOf(
     { ability: [ability.hit, ability.power, ability.defense, ability.run], skillBits: ace.skillBits, equipment: [] },
     true,

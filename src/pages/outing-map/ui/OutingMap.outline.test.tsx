@@ -14,13 +14,14 @@ afterEach(cleanup)
 
 describe('외출 지도 고른 건물 (0x7ec04~0x7ecc0)', () => {
   it('효과 0xb · 흰색으로 (x−1,y)(x,y−1)(x+1,y)(x,y+1) 네 번 찍은 뒤 건물을 그린다 — 고르지 않은 건물은 테두리가 없다', () => {
-    const { container } = render(
-      <OutingMap selectedPlaceId="hospital" eventPlaceIds={new Set()} onOpen={vi.fn()} onBack={vi.fn()} hour={10} />,
-    )
+    const { container } = render(<OutingMap selectedPlaceId="hospital" eventPlaceIds={new Set()} onOpen={vi.fn()} onBack={vi.fn()} hour={10} />)
     const stamps = Array.from(container.querySelectorAll<HTMLElement>('[data-solid-stamp="#FFFFFF"]'))
     // 지도 원점 (0, 11) + 프레임 원점 (10, 20)
     expect(stamps.map((stamp) => [stamp.style.left, stamp.style.top])).toEqual([
-      ['9px', '31px'], ['10px', '30px'], ['11px', '31px'], ['10px', '32px'],
+      ['9px', '31px'],
+      ['10px', '30px'],
+      ['11px', '31px'],
+      ['10px', '32px'],
     ])
     expect(stamps[0]?.style.maskImage).toContain('event_map/frames/')
     // 건물 그림은 테두리 뒤(위)에 온다

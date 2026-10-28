@@ -21,15 +21,9 @@ import {
 const 주력500 = runnerSpeedOf(500)
 const 기본야수 = createFielders(Array.from({ length: 9 }, () => 500))
 /** 유격수(5)가 공을 쥐고 있다 */
-const 유격수보유 = 기본야수.map((fielder, slot) =>
-  slot === 5 ? { ...fielder, holdingBall: true } : fielder,
-)
+const 유격수보유 = 기본야수.map((fielder, slot) => (slot === 5 ? { ...fielder, holdingBall: true } : fielder))
 
-const 입력 = (
-  play: Partial<PlayView>,
-  runners: readonly RunnerState[],
-  overrides: Partial<ThrowTargetInput> = {},
-): ThrowTargetInput => ({
+const 입력 = (play: Partial<PlayView>, runners: readonly RunnerState[], overrides: Partial<ThrowTargetInput> = {}): ThrowTargetInput => ({
   play: { ...initialPlayView(1), ...play },
   fielders: 유격수보유,
   runners,
@@ -53,27 +47,15 @@ const 만루플레이: Partial<PlayView> = {
 
 describe('안 던지는 두 경우 (0xafb7e · 0xb02e4)', () => {
   it('주자가 없고 내야수가 잡았으면 −1', () => {
-    expect(
-      chooseThrowTargetBase(
-        입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 0 }),
-      ),
-    ).toBe(NONE)
+    expect(chooseThrowTargetBase(입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 0 }))).toBe(NONE)
   })
 
   it('주자가 없어도 외야수가 잡았으면 −1 대신 2루로 던진다', () => {
-    expect(
-      chooseThrowTargetBase(
-        입력({ ballHolderSlot: 8, catchFielderSlot: 8 }, [], { activeRunnerCount: 0 }),
-      ),
-    ).toBe(2)
+    expect(chooseThrowTargetBase(입력({ ballHolderSlot: 8, catchFielderSlot: 8 }, [], { activeRunnerCount: 0 }))).toBe(2)
   })
 
   it('어떤 루도 점수를 못 얻었고 내야수가 잡았으면 −1', () => {
-    expect(
-      chooseThrowTargetBase(
-        입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 1 }),
-      ),
-    ).toBe(NONE)
+    expect(chooseThrowTargetBase(입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 1 }))).toBe(NONE)
   })
 })
 
@@ -140,9 +122,7 @@ describe('점수식 0xafb24 — 후보표와 최종 점수 (0아웃 = 점수식)
   })
 
   it('인자가 3 이상이면 확실한 후보가 없어도 늘 "여유 최대" 로 간다', () => {
-    const 후보없음 = describeThrowTarget(
-      입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 1, outs: 3 }),
-    )
+    const 후보없음 = describeThrowTarget(입력({ ballHolderSlot: 3, catchFielderSlot: 3 }, [], { activeRunnerCount: 1, outs: 3 }))
     expect(후보없음.sure).toBe(true)
   })
 })
@@ -152,11 +132,11 @@ describe('도루 주자 — 떠난 루가 아니라 달려가는 루로 던진�
     const 포수보유 = 기본야수.map((fielder, slot) => (slot === 1 ? { ...fielder, holdingBall: true } : fielder))
     const 도루주자 = createRunner(1, 1, 주력500, { targetBase: 2 })
     const 결과 = describeThrowTarget(
-      입력(
-        { ...initialPlayView(5), coverOfBase: [1, 2, 3, 4], ballHolderSlot: 1, catchFielderSlot: 1, everHeld: true, held: true },
-        [도루주자],
-        { fielders: 포수보유, landingTick: 0, outs: 2 },
-      ),
+      입력({ ...initialPlayView(5), coverOfBase: [1, 2, 3, 4], ballHolderSlot: 1, catchFielderSlot: 1, everHeld: true, held: true }, [도루주자], {
+        fielders: 포수보유,
+        landingTick: 0,
+        outs: 2,
+      }),
     )
     // 1루→2루 맨해튼 10951 ÷ 335 = 32
     expect(결과.candidates.map((candidate) => candidate.runTick)).toEqual([NONE, NONE, 32, NONE])
@@ -193,9 +173,7 @@ describe('1루 커버가 없을 때의 예외 (2-6)', () => {
   })
 
   it('1루선에서 멀면 예외가 안 걸린다', () => {
-    const 먼야수 = 기본야수.map((fielder, slot) =>
-      slot === 3 ? { ...fielder, holdingBall: true } : fielder,
-    )
+    const 먼야수 = 기본야수.map((fielder, slot) => (slot === 3 ? { ...fielder, holdingBall: true } : fielder))
     const 결과 = describeThrowTarget(
       입력({ ballHolderSlot: 3, catchFielderSlot: 3, everHeld: true, held: true }, [느린타자주자], {
         fielders: 먼야수,

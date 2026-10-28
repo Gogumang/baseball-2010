@@ -2,7 +2,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import {
-  SKIN_TICKER_STEP, resetSkinTickerCounter, skinTickerCounterValue, skinTickerTextXOf, useSkinTickerCounter,
+  SKIN_TICKER_STEP,
+  resetSkinTickerCounter,
+  skinTickerCounterValue,
+  skinTickerTextXOf,
+  useSkinTickerCounter,
 } from '@/shared/lib/skinTicker/skinTicker'
 
 afterEach(cleanup)

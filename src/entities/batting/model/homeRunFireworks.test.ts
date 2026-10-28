@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  FIREWORK_PARTICLES,
-  initHomeRunFireworks,
-  tickHomeRunFireworks,
-  type FireworksParticlePort,
-} from '@/entities/batting/model/homeRunFireworks'
+import { FIREWORK_PARTICLES, initHomeRunFireworks, tickHomeRunFireworks, type FireworksParticlePort } from '@/entities/batting/model/homeRunFireworks'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 

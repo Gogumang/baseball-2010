@@ -76,13 +76,22 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
-        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen: vi.fn(),
+        runner,
+        random: createSeededRandom(1),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen,
+        setScreen: vi.fn(),
       })
       세션 = session
       return (
         <PitcherAceMatchRoute
-          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
-          onFinish={onFinish} onQuit={vi.fn()}
+          mission={mission!}
+          session={session}
+          runner={runner}
+          pitchControl="게이지"
+          gameSettings={설정 as never}
+          onFinish={onFinish}
+          onQuit={vi.fn()}
         />
       )
     }
@@ -120,13 +129,22 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
-        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen,
+        runner,
+        random: createSeededRandom(1),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen,
+        setScreen,
       })
       세션 = session
       return (
         <PitcherAceMatchRoute
-          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
-          onFinish={onFinish} onQuit={onQuit}
+          mission={mission!}
+          session={session}
+          runner={runner}
+          pitchControl="게이지"
+          gameSettings={설정 as never}
+          onFinish={onFinish}
+          onQuit={onQuit}
         />
       )
     }
@@ -150,13 +168,22 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
-        runner, random, missionRecord: { load: () => ({}), save: vi.fn() }, screen, setScreen: vi.fn(),
+        runner,
+        random,
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen,
+        setScreen: vi.fn(),
       })
       세션 = session
       return (
         <PitcherAceMatchRoute
-          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
-          onFinish={onFinish} onQuit={vi.fn()}
+          mission={mission!}
+          session={session}
+          runner={runner}
+          pitchControl="게이지"
+          gameSettings={설정 as never}
+          onFinish={onFinish}
+          onQuit={vi.fn()}
         />
       )
     }
@@ -167,7 +194,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     expect(view.getByTestId(/^교대-판-/)).toBeTruthy()
     act(() => view.getByText('확인').click())
     // 판 OK 는 받은 다음 틀의 키 0x498d4 가 처리한다(`sceneKeyLatch`)
-    act(() => { vi.advanceTimersByTime(millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame())
+    })
 
     const shown = 받은것.at(-1)
     expect(shown?.run.mission).toMatchObject({ side: '투수', id: 18, name: '로제' })
@@ -186,14 +215,22 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
-        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        runner,
+        random: createSeededRandom(1),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
       세션 = session
       return (
         <PitcherAceMatchRoute
-          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
-          onFinish={vi.fn()} onQuit={vi.fn()}
+          mission={mission!}
+          session={session}
+          runner={runner}
+          pitchControl="게이지"
+          gameSettings={설정 as never}
+          onFinish={vi.fn()}
+          onQuit={vi.fn()}
         />
       )
     }
@@ -215,13 +252,22 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
-        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        runner,
+        random: createSeededRandom(1),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
       return (
         <PitcherAceMatchRoute
-          mission={mission!} session={session} runner={runner} pitchControl="게이지" gameSettings={설정 as never}
-          onFinish={vi.fn()} onQuit={vi.fn()} pitcherName="판투수"
+          mission={mission!}
+          session={session}
+          runner={runner}
+          pitchControl="게이지"
+          gameSettings={설정 as never}
+          onFinish={vi.fn()}
+          onQuit={vi.fn()}
+          pitcherName="판투수"
         />
       )
     }
@@ -245,22 +291,34 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
-        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        runner,
+        random: createSeededRandom(1),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
       세션 = session
       return (
         <PitcherAceMatchRoute
-          mission={mission!} session={{ ...session, pickoffReplay: 밀어내기 }} runner={runner} pitchControl="게이지"
-          gameSettings={설정 as never} onFinish={vi.fn()} onQuit={vi.fn()}
+          mission={mission!}
+          session={{ ...session, pickoffReplay: 밀어내기 }}
+          runner={runner}
+          pitchControl="게이지"
+          gameSettings={설정 as never}
+          onFinish={vi.fn()}
+          onQuit={vi.fn()}
         />
       )
     }
     render(<Harness />)
     act(() => 세션!.actions.confirmHalfInningBoard())
-    act(() => { vi.advanceTimersByTime(30 * millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(30 * millisecondsPerFrame())
+    })
     expect(재생).not.toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(2 * millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(2 * millisecondsPerFrame())
+    })
     expect(재생).toHaveBeenCalled()
     expect(재생.mock.lastCall?.[0]).toMatchObject({ freePassPlay: true })
   })
@@ -275,27 +333,43 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
-        runner, random: createSeededRandom(1), missionRecord: { load: () => ({}), save: vi.fn() }, screen: { kind: '투수편' },
+        runner,
+        random: createSeededRandom(1),
+        missionRecord: { load: () => ({}), save: vi.fn() },
+        screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
       세션 = session
       return (
         <PitcherAceMatchRoute
-          mission={mission!} session={{ ...session, pickoffReplay: 밀어내기 }} runner={runner} pitchControl="게이지"
-          gameSettings={설정 as never} onFinish={vi.fn()} onQuit={vi.fn()}
+          mission={mission!}
+          session={{ ...session, pickoffReplay: 밀어내기 }}
+          runner={runner}
+          pitchControl="게이지"
+          gameSettings={설정 as never}
+          onFinish={vi.fn()}
+          onQuit={vi.fn()}
         />
       )
     }
     render(<Harness />)
     act(() => 세션!.actions.confirmHalfInningBoard())
-    act(() => { vi.advanceTimersByTime(10 * millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(10 * millisecondsPerFrame())
+    })
     act(() => 받은것.at(-1)?.onPopupFrozenChange?.(true))
-    act(() => { vi.advanceTimersByTime(40 * millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(40 * millisecondsPerFrame())
+    })
     expect(재생).not.toHaveBeenCalled()
     act(() => 받은것.at(-1)?.onPopupFrozenChange?.(false))
-    act(() => { vi.advanceTimersByTime(19 * millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(19 * millisecondsPerFrame())
+    })
     expect(재생).not.toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(3 * millisecondsPerFrame()) })
+    act(() => {
+      vi.advanceTimersByTime(3 * millisecondsPerFrame())
+    })
     expect(재생).toHaveBeenCalled()
   })
 })

@@ -128,9 +128,7 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
 
   it('던진 야수(+0xb1)의 복제는 첫 복제 틱 하나만 판정 없이 지나 잠금을 푼다 — 4틱 건너뜀 + 1 이라 11틱에 닿는다 (a1406 · a143e, U-78)', () => {
     // 야수 틱 0xa1284 는 동작 14~18 이 아니면 vtc8 거짓에 곧장 a143e 로 가 +0xb0~+0xb3 을 지운다 — +0xac == 2(a13ae)를 기다리지 않는다
-    expect(
-      forecastCatch(멈춘공, 야수들, 전구간, { onlySlot: 8, initialChaserSlot: 8, thrownSlot: 8 }).table.low,
-    ).toEqual({ tick: 11, slot: 8 })
+    expect(forecastCatch(멈춘공, 야수들, 전구간, { onlySlot: 8, initialChaserSlot: 8, thrownSlot: 8 }).table.low).toEqual({ tick: 11, slot: 8 })
   })
 
   it('동작 잠금 +0xb4 를 복제가 물려받는다 — 잠긴 틱은 판정 없이 n 을 되돌리고(b148e) 복제 틱이 잠금을 하나씩 푼다', () => {
@@ -157,8 +155,7 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
   it('잠긴 복제는 낙구 달리기 vt14 도 안 받는다 — 잠금이 풀린 다음 판정 틱부터 낙구 지점으로 간다 (b1416 · 0xa14c8)', () => {
     const 공 = {
       length: 20,
-      pointAt: (tick: number) =>
-        tick <= 10 ? { x: 중견.x, y: tick === 10 ? 0 : 3000, z: 중견.z + 5000 } : { x: 중견.x + 600, y: 0, z: 중견.z },
+      pointAt: (tick: number) => (tick <= 10 ? { x: 중견.x, y: tick === 10 ? 0 : 3000, z: 중견.z + 5000 } : { x: 중견.x + 600, y: 0, z: 중견.z }),
       landingTick: 10,
       fenceTick: -1,
       poleTick: -1,
@@ -167,17 +164,17 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
     const 잠긴 = 야수들.map((야수) => (야수.slot === 8 ? { ...야수, actionLockTicks: 4 } : 야수))
     // 잠금 4틱(1~4)은 제자리 · 5~10틱 6걸음(1320)을 낙구 쪽으로 — 거리 600 + 1320 = 1920(맨해튼 0xbfa2c) · n 은 11틱에 1 →
     // 1920 − 220n ≤ 300 은 n = 8 인 18틱
-    expect(
-      forecastCatch(공, 잠긴, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low,
-    ).toEqual({ tick: 18, slot: 8 })
+    expect(forecastCatch(공, 잠긴, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low).toEqual({
+      tick: 18,
+      slot: 8,
+    })
   })
 
   it('+0x127 이면 낙구 틱까지 복제가 낙구 지점으로 실제로 달리고(b1416 vt14) n 은 낙구 뒤부터 센다', () => {
     // 10틱까지 중견수 뒤 5000 위로 높이 3000(못 잡음) · 낙구 뒤엔 중견수 옆 600 에 멈춘 공
     const 공 = {
       length: 20,
-      pointAt: (tick: number) =>
-        tick <= 10 ? { x: 중견.x, y: tick === 10 ? 0 : 3000, z: 중견.z + 5000 } : { x: 중견.x + 600, y: 0, z: 중견.z },
+      pointAt: (tick: number) => (tick <= 10 ? { x: 중견.x, y: tick === 10 ? 0 : 3000, z: 중견.z + 5000 } : { x: 중견.x + 600, y: 0, z: 중견.z }),
       landingTick: 10,
       fenceTick: -1,
       poleTick: -1,
@@ -187,14 +184,18 @@ describe('예보 복제의 n — 판정받은 틱만 센다 (0xb12d0 직접 뜸)
     expect(forecastCatch(공, 야수들, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8 }).table.low).toEqual({ tick: 11, slot: 8 })
     // +0x127: 10틱 동안 2200 을 낙구 지점 쪽으로 달려 거리 600 + 2200 = 2800(맨해튼 0xbfa2c) · n 은 11틱에 1 →
     // 2800 − 220n ≤ 300 은 n = 12
-    expect(
-      forecastCatch(공, 야수들, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low,
-    ).toEqual({ tick: 22, slot: 8 })
+    expect(forecastCatch(공, 야수들, { from: 11, to: Number.POSITIVE_INFINITY }, { onlySlot: 8, chaseToLanding: true }).table.low).toEqual({
+      tick: 22,
+      slot: 8,
+    })
   })
 })
 
 describe('고르기 0xb3b38 의 백업 갈래 b3ebe~b3f62 (r180)', () => {
-  const 야수 = createFielders(Array.from({ length: 9 }, () => 500), 0)
+  const 야수 = createFielders(
+    Array.from({ length: 9 }, () => 500),
+    0,
+  )
   it('외야 추적야수면 곁의 가장 가까운 외야수 하나가 백업 — 내야 추적야수면 없다', () => {
     const 외야 = forecastCatch(battedBallTrajectory([92, 895, 1017, 0]), 야수, { from: 0, to: Number.POSITIVE_INFINITY })
     expect(외야.choice.slot).toBe(8)

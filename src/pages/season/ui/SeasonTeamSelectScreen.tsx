@@ -77,9 +77,7 @@ export interface SeasonTeamSelectScreenProps {
  * `50d2~50e0 [this+0x98]->vt+0x14(0, 0)` — vt+0x14 = `0x6c00c`(범위 안이면 +0xc = x · +0x10 = y) — 로 커서를 (0, 0) 에 놓는다.
  * 웹은 격자 화면이 새로 서며 0 이라 같다.
  */
-export function SeasonTeamSelectScreen({
-  openedHiddenIds = [], onChoose, onExit, gamePoint, nameInfoRowsOf,
-}: SeasonTeamSelectScreenProps) {
+export function SeasonTeamSelectScreen({ openedHiddenIds = [], onChoose, onExit, gamePoint, nameInfoRowsOf }: SeasonTeamSelectScreenProps) {
   const [hint, setHint] = useState<string | null>(null)
   /** 0xc8 에 들어선 팀 — null 이면 0xca */
   const [namingTeamId, setNamingTeamId] = useState<number | null>(null)
@@ -91,16 +89,26 @@ export function SeasonTeamSelectScreen({
 
   if (namingTeamId !== null) {
     return (
-      <SeasonTeamNameScreen teamId={namingTeamId} gamePoint={gamePoint ?? 0} infoRows={nameInfoRowsOf?.(namingTeamId) ?? []}
-        onConfirm={(name) => onChoose(namingTeamId, name)} onBack={() => setNamingTeamId(null)} />
+      <SeasonTeamNameScreen
+        teamId={namingTeamId}
+        gamePoint={gamePoint ?? 0}
+        infoRows={nameInfoRowsOf?.(namingTeamId) ?? []}
+        onConfirm={(name) => onChoose(namingTeamId, name)}
+        onBack={() => setNamingTeamId(null)}
+      />
     )
   }
 
   return (
-    <TeamSelectScreen title="시즌모드" openedHiddenIds={openedHiddenIds}
+    <TeamSelectScreen
+      title="시즌모드"
+      openedHiddenIds={openedHiddenIds}
       {...(gamePoint === undefined ? {} : { gamePoint })}
-      onSelect={pick} onSelectLocked={pick} onCancel={onExit}
-      overlay={hint !== null && <MessageBox text={hint} buttons={['확인']} onAnswer={() => setHint(null)} />} />
+      onSelect={pick}
+      onSelectLocked={pick}
+      onCancel={onExit}
+      overlay={hint !== null && <MessageBox text={hint} buttons={['확인']} onAnswer={() => setHint(null)} />}
+    />
   )
 }
 
@@ -211,38 +219,61 @@ function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint, infoRows }
       {/* 정보 칸 0x7c450 — 판 mode_ui 프레임 3 박스 0 과 일곱 줄 (구단정보 0xd5 와 같다). 카드 뒤 창+0x28 = 1 로 그린다(ba4c~ba5a) */}
       <SeasonTeamInfoPanel rows={infoRows} testIdPrefix="이름" />
       {/* 0xba015 — 박스 1 ∪ 박스 2 를 1 넓힌 노랑 테두리 (둥글기 1) */}
-      <div data-testid="이름-테두리" style={{
-        position: 'absolute', left: NAME_FRAME.x, top: NAME_FRAME.y, width: NAME_FRAME.width, height: NAME_FRAME.height,
-        boxSizing: 'border-box', border: `1px solid ${NAME_COLOR}`, borderRadius: 1,
-      }} />
+      <div
+        data-testid="이름-테두리"
+        style={{
+          position: 'absolute',
+          left: NAME_FRAME.x,
+          top: NAME_FRAME.y,
+          width: NAME_FRAME.width,
+          height: NAME_FRAME.height,
+          boxSizing: 'border-box',
+          border: `1px solid ${NAME_COLOR}`,
+          borderRadius: 1,
+        }}
+      />
       {/* 0xba0bd 입력 방식 칸 (박스 2 오른쪽 끝 − 20, +1, 14 × 14) 남색 칠 · mode_ui 24 좌우 화살 (bb32~bbd6) */}
       <InputModeBox nameBox={NAME_BOX} />
       <form onSubmit={(event) => event.preventDefault()}>
         {/* 0x677d5(입력기, 박스 2 의 x + 2, y + 3, 앱 글꼴, 노랑, 커서 켬 1, 정렬 0x11, 0) — 0xbafc~0xbb2a. 누름 칸은 입력 방식 칸 앞까지 */}
-        <InputMethodText value={name} autoFocus aria-label="이름"
-          x={NAME_TEXT.x} y={NAME_TEXT.y} color={NAME_COLOR} isCursorOn
+        <InputMethodText
+          value={name}
+          autoFocus
+          aria-label="이름"
+          x={NAME_TEXT.x}
+          y={NAME_TEXT.y}
+          color={NAME_COLOR}
+          isCursorOn
           inputRect={{ x: NAME_TEXT.x, y: NAME_TEXT.y, width: MODE_BOX.x - NAME_TEXT.x, height: 12 }}
           onChange={(event) => {
             if (nameByteLengthOf(event.target.value) <= MAXIMUM_NAME_BYTES) setName(event.target.value)
-          }} />
+          }}
+        />
       </form>
       {/* 설명 띠 0x55545([this+0xa8], StrMODE[3]) — bbda~bbf2. 진입 0xb8fc 가 띠를 다시 편다 */}
       <DescriptionBand text={NAME_LIMIT_GUIDE} seed={0} />
-      <ScreenFrame title="시즌모드" gamePoint={gamePoint} onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))} slides={false} />
+      <ScreenFrame
+        title="시즌모드"
+        gamePoint={gamePoint}
+        onBack={() => (name === '' ? onBack() : setName(nameWithoutLastChar(name)))}
+        slides={false}
+      />
       {/*
         ⚠️ 웹 자리: OK — 원본 이름 입력 그림 0xba28 에는 OK 그림 자리가 없다(키 0xbc44 의 확인만). 마우스 · 터치로 끝낼 길이 없어
         바닥띠 왼쪽 표시 자리(선수 등록 0x66 의 OK 와 같은 자리)를 투명 누름 칸으로 빌려 OK 키를 보낸다
       */}
       {!isAsking && (
-        <PressArea label="OK" rect={NAME_OK_PRESS_RECT}
-          onPress={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))} />
+        <PressArea label="OK" rect={NAME_OK_PRESS_RECT} onPress={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))} />
       )}
       {isAsking && (
-        <MessageBox text={DECIDE_QUESTION} buttons={['예', '아니오']}
+        <MessageBox
+          text={DECIDE_QUESTION}
+          buttons={['예', '아니오']}
           onAnswer={(answer) => {
             setAsking(false)
             if (answer === 0) onConfirm(name)
-          }} />
+          }}
+        />
       )}
     </RawScreen>
   )

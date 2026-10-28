@@ -98,11 +98,7 @@ export function hitParticleIdOf(input: HitParticleInput): number | null {
 }
 
 /** 타구 패턴에서 판정에 쓸 a·b·c 를 꺼낸다 — 높이는 플래그 비트0 으로 부호를 붙인다 (0xb0614) */
-export function hitParticleInputOf(
-  pattern: BattedBallPattern,
-  resultCode: number | null,
-  isBigHit: boolean,
-): HitParticleInput {
+export function hitParticleInputOf(pattern: BattedBallPattern, resultCode: number | null, isBigHit: boolean): HitParticleInput {
   const [angle, speed, height, flags] = pattern
   return { resultCode, angle, speed, height: (flags & 1) !== 0 ? -height : height, isBigHit }
 }
@@ -171,8 +167,14 @@ const MIRAGE_CONTACT_PARTICLE: SpecialSwingParticle = { id: 20, img: 1, offsetY:
 /** 마타자 순번(0~4) → 쏘는 파티클. 점프표 0xd01e4 순서 그대로다 */
 export const ACE_BATTER_SPECIAL_PARTICLES: readonly (readonly SpecialSwingParticle[])[] = [
   [{ id: 9, img: 2, offsetY: 0 }],
-  [{ id: 18, img: 1, offsetY: 0 }, { id: 19, img: 1, offsetY: 0 }],
-  [{ id: 13, img: 1, offsetY: 0 }, { id: 1, img: 6, offsetY: 0 }],
+  [
+    { id: 18, img: 1, offsetY: 0 },
+    { id: 19, img: 1, offsetY: 0 },
+  ],
+  [
+    { id: 13, img: 1, offsetY: 0 },
+    { id: 1, img: 6, offsetY: 0 },
+  ],
   [{ id: 20, img: 5, offsetY: 25 }],
   [{ id: 17, img: 13, offsetY: 0 }],
 ]
@@ -183,14 +185,10 @@ export const ACE_BATTER_SPECIAL_PARTICLES: readonly (readonly SpecialSwingPartic
  * - `aceBatterIndex` 가 0 이상이면 마타자 점프표를 탄다 (필살 번호는 안 본다).
  * - 아니면 필살 번호로 고른다. 모르는 번호면 빈 배열이다.
  */
-export function specialSwingParticlesOf(
-  swingNumber: number,
-  batterForm: number,
-  aceBatterIndex = -1,
-): readonly SpecialSwingParticle[] {
+export function specialSwingParticlesOf(swingNumber: number, batterForm: number, aceBatterIndex = -1): readonly SpecialSwingParticle[] {
   if (aceBatterIndex >= 0) return ACE_BATTER_SPECIAL_PARTICLES[aceBatterIndex] ?? []
   if (swingNumber === 4) {
-    return [(batterForm >> 1) === 1 ? MIRAGE_SLUGGER_PARTICLE : MIRAGE_CONTACT_PARTICLE]
+    return [batterForm >> 1 === 1 ? MIRAGE_SLUGGER_PARTICLE : MIRAGE_CONTACT_PARTICLE]
   }
   const single = SPECIAL_SWING_PARTICLES[swingNumber]
   return single === undefined ? [] : [single]

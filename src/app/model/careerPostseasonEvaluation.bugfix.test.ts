@@ -16,7 +16,8 @@ const 이경기기록 = { atBats: 5, hits: 4, runsBattedIn: 6, homeRuns: 4 }
 describe('B-73 포스트시즌 경기 뒤 116 이 앞 정규 경기 값을 보인다', () => {
   it('원본: 앞 경기 평가 · 기록 줄', () => {
     expect(shownGameEvaluationOf(false, 이경기평가, 앞경기, 이경기기록)).toEqual({
-      evaluation: 앞경기평가, recordLine: 앞경기.recordLine,
+      evaluation: 앞경기평가,
+      recordLine: 앞경기.recordLine,
     })
   })
 

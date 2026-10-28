@@ -24,29 +24,69 @@ import type { MenuSlot } from '@/pages/management/lib/managementLayout'
 
 /** 0xd47f4 · 0xd4800 — 관리 메뉴 여섯 칸 (자리는 0xd4740) */
 const SEASON_MAIN: readonly (readonly [string, number, number])[] = [
-  ['시즌정보', 21, 117], ['구단관리', 22, 226], ['트레이닝', 1, 91], ['외출', 3, 93], ['아이템', 4, 94], ['다음경기', 5, 89],
+  ['시즌정보', 21, 117],
+  ['구단관리', 22, 226],
+  ['트레이닝', 1, 91],
+  ['외출', 3, 93],
+  ['아이템', 4, 94],
+  ['다음경기', 5, 89],
 ]
 
 export const SEASON_COMMAND_SLOTS: readonly MenuSlot[] = SEASON_MAIN.map(([id, icon, labelFrame], index) => ({
-  id, x: COMMAND_SLOTS[index].x, y: COMMAND_SLOTS[index].y, icon, labelFrame,
+  id,
+  x: COMMAND_SLOTS[index].x,
+  y: COMMAND_SLOTS[index].y,
+  icon,
+  labelFrame,
 }))
 
 /** 하위 메뉴 칸 (표 0xd4758) */
-const SUB_SLOT_POSITIONS: readonly (readonly [number, number])[] = [[44, 245], [82, 245], [122, 236], [161, 236], [199, 236]]
+const SUB_SLOT_POSITIONS: readonly (readonly [number, number])[] = [
+  [44, 245],
+  [82, 245],
+  [122, 236],
+  [161, 236],
+  [199, 236],
+]
 
 function subMenu(entries: readonly (readonly [string, number, number])[]): readonly MenuSlot[] {
   return entries.map(([id, icon, labelFrame], index) => ({
-    id, x: SUB_SLOT_POSITIONS[index][0], y: SUB_SLOT_POSITIONS[index][1], icon, labelFrame,
+    id,
+    x: SUB_SLOT_POSITIONS[index][0],
+    y: SUB_SLOT_POSITIONS[index][1],
+    icon,
+    labelFrame,
   }))
 }
 
 export type SeasonSubMenuKind = '시즌정보' | '구단관리' | '트레이닝' | '아이템'
 
 export const SEASON_SUB_COMMAND_SLOTS: Readonly<Record<SeasonSubMenuKind, readonly MenuSlot[]>> = {
-  시즌정보: subMenu([['구단정보', 23, 283], ['아이템', 8, 94], ['선수정보', 9, 90], ['기록순위', 10, 111]]),
-  구단관리: subMenu([['구장관리', 26, 284], ['트레이드', 24, 118], ['선수영입', 27, 351], ['코치채용', 25, 285]]),
-  트레이닝: subMenu([['투구', 17, 254], ['타격', 11, 119], ['집중', 13, 286], ['근성', 14, 287], ['지옥훈련', 19, 121]]),
-  아이템: subMenu([['장착아이템', 7, 100], ['구장아이템', 26, 288], ['서브아이템', 8, 105], ['GP아이템', 20, 110]]),
+  시즌정보: subMenu([
+    ['구단정보', 23, 283],
+    ['아이템', 8, 94],
+    ['선수정보', 9, 90],
+    ['기록순위', 10, 111],
+  ]),
+  구단관리: subMenu([
+    ['구장관리', 26, 284],
+    ['트레이드', 24, 118],
+    ['선수영입', 27, 351],
+    ['코치채용', 25, 285],
+  ]),
+  트레이닝: subMenu([
+    ['투구', 17, 254],
+    ['타격', 11, 119],
+    ['집중', 13, 286],
+    ['근성', 14, 287],
+    ['지옥훈련', 19, 121],
+  ]),
+  아이템: subMenu([
+    ['장착아이템', 7, 100],
+    ['구장아이템', 26, 288],
+    ['서브아이템', 8, 105],
+    ['GP아이템', 20, 110],
+  ]),
 }
 
 /** 하위 메뉴의 부모 칸 — 관리 메뉴에서 그 하위 메뉴를 여는 칸 */

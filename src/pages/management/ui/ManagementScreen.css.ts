@@ -60,10 +60,7 @@ export const trainingPopup = style({
   zIndex: 1,
 })
 
-export const infoValue = style([
-  layer,
-  { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' },
-])
+export const infoValue = style([layer, { fontSize: '11px', lineHeight: '15px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }])
 
 /**
  * 레이더 숫자를 단색으로 찍는다 — 원본 0x5ad94 가 색이 있으면 0x6aff8 에 효과 0xb(단색)를 넘긴다.

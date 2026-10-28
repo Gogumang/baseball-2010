@@ -32,9 +32,9 @@ for (const browserName of browsers) {
   try {
     // ③ — 경기 결과(0x19) → OK → 116 평가 → 대사를 넘기면 다음 화면
     await openScene(page, 'nari-evaluation')
-    if (await screenOf(page) !== '경기평가') throw new Error(`평가 화면이 아니다: ${await screenOf(page)}`)
+    if ((await screenOf(page)) !== '경기평가') throw new Error(`평가 화면이 아니다: ${await screenOf(page)}`)
     await page.waitForSelector('[data-testid="대사-상자"]', { timeout: 5000 })
-    if (await page.$('[data-testid="정산-판"]') !== null) throw new Error('평가 화면에 정산 판이 남았다')
+    if ((await page.$('[data-testid="정산-판"]')) !== null) throw new Error('평가 화면에 정산 판이 남았다')
     await shot(page, `e2e/.run/r287-evaluation-${browserName}.png`)
     const after = await advanceEvaluation(page, browserName)
     if (after === '경기평가') throw new Error('평가 대사가 넘어가지 않는다')
@@ -46,19 +46,19 @@ for (const browserName of browsers) {
     for (let i = 0; i < 30 && !sawHold; i += 1) {
       if (browserName === 'webkit') {
         const button = page.locator('[role="dialog"] button[aria-label="확인"]').first()
-        if (await button.count() > 0) await button.tap().catch(() => {})
+        if ((await button.count()) > 0) await button.tap().catch(() => {})
       } else {
         await pressKey(page, 'Enter')
       }
       for (let k = 0; k < 6 && !sawHold; k += 1) {
-        sawHold = await page.$('[data-testid="연차표지-앞화면-효과기"]') !== null
+        sawHold = (await page.$('[data-testid="연차표지-앞화면-효과기"]')) !== null
         if (!sawHold) await page.waitForTimeout(50)
       }
     }
     if (!sawHold) throw new Error(`앞 화면 효과기 겹이 안 섰다: ${await screenOf(page)}`)
     const holdScreen = await screenOf(page)
     if (holdScreen !== '국가대항전') throw new Error(`효과기 동안 화면 ${holdScreen}`)
-    if (await page.$('[role="dialog"]') !== null) throw new Error('효과기 동안 팝업이 남았다')
+    if ((await page.$('[role="dialog"]')) !== null) throw new Error('효과기 동안 팝업이 남았다')
     await shot(page, `e2e/.run/r287-cup-hold-${browserName}.png`)
     // 그동안 키는 버린다 — 대진판 확인(Enter)이 아무 일도 안 한다
     await pressKey(page, 'Enter')
@@ -66,7 +66,7 @@ for (const browserName of browsers) {
     await page.waitForTimeout(500)
     await shot(page, `e2e/.run/r287-cover-${browserName}.png`)
     // 표지 — 아무 키(탭)면 곧 105
-    for (let i = 0; i < 20 && await screenOf(page) === '연차표지'; i += 1) {
+    for (let i = 0; i < 20 && (await screenOf(page)) === '연차표지'; i += 1) {
       if (browserName === 'webkit') {
         const rect = await screenRect(page)
         await tapPage(page, rect.x + rect.width / 2, rect.y + rect.height / 2)

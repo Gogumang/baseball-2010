@@ -15,10 +15,7 @@ import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import { pitcherHandOfPitch } from '@/entities/pitching/model/pitcherHand'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { Coordinate } from '@/shared/lib/geometry/coordinate'
-import {
-  battingPatternChoiceOf,
-  battingPatternOdds,
-} from '@/shared/config/original/battingPatterns'
+import { battingPatternChoiceOf, battingPatternOdds } from '@/shared/config/original/battingPatterns'
 
 /**
  * 투수편에서 상대 타자를 대신 판단한다.
@@ -105,12 +102,7 @@ export function cpuSwingChoiceOf(
   situation: BatterSituation = UNWIRED_SITUATION,
   isMistakePitch = false,
 ): CpuSwingChoice | null {
-  const odds = battingPatternOdds(
-    situation.strikes,
-    situation.balls,
-    situation.outs,
-    situation.hasRunner,
-  )
+  const odds = battingPatternOdds(situation.strikes, situation.balls, situation.outs, situation.hasRunner)
   // 0x9f224 — rand(0,100), 위끝 제외
   const drawn = battingPatternChoiceOf(odds, random.rand(0, 100))
   // 0x34376 — 실투면 뽑은 것을 버리고 0(치기)
@@ -443,8 +435,7 @@ export function pitchAgainstBatterDetailed(
         })
   const isSpecialSwing = specialNumber !== 0
   // 0x4e136 — 스윙 틱에 소모 (결과와 무관)
-  const remainingAfter =
-    remainingBefore === null ? null : isSpecialSwing ? remainingAfterSpecialSwing(remainingBefore) : remainingBefore
+  const remainingAfter = remainingBefore === null ? null : isSpecialSwing ? remainingAfterSpecialSwing(remainingBefore) : remainingBefore
   // 0x34d6c — 타자 쪽은 S+0x10, 투수 쪽은 공+0x10 (사람 투수 공에 마구가 실렸을 때만)
   const boost = swingBoostOf(
     {

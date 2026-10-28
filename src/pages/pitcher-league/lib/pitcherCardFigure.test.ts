@@ -21,7 +21,8 @@ describe('투수편 카드 그림 (0x15e20 · 틀 0x142b4)', () => {
   })
 
   it('폼 = 2 × 타입 + 손 · 팀 = 내 팀 · 니블은 제구 · 구속 · 변화 · 체력 차례', () => {
-    expect(pitcherCardLookOf({ typeIndex: 2, handIndex: 1, skinIndex: 1, teamId: 6 },
-      { control: 3, velocity: 0, breaking: 11, stamina: 1 })).toEqual({ form: 5, skin: 1, team: 6, equipment: [3, 0, 11, 1] })
+    expect(pitcherCardLookOf({ typeIndex: 2, handIndex: 1, skinIndex: 1, teamId: 6 }, { control: 3, velocity: 0, breaking: 11, stamina: 1 })).toEqual(
+      { form: 5, skin: 1, team: 6, equipment: [3, 0, 11, 1] },
+    )
   })
 })

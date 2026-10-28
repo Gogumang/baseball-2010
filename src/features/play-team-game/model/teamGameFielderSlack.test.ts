@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { DEFENSE_SCENE_START } from '@/features/defense-play/model/defenseScene'
-import {
-  pickoff,
-  resumeTeamGame,
-  startTeamGame,
-  type TeamGameOptions,
-  type TeamGameProgress,
-} from '@/features/play-team-game/model/teamGameFlow'
+import { pickoff, resumeTeamGame, startTeamGame, type TeamGameOptions, type TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 const 기본옵션: TeamGameOptions = {

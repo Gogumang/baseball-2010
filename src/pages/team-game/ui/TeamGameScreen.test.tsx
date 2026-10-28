@@ -59,7 +59,6 @@ const OK통과 = () => {
   }
 }
 
-
 /** 투구 단계 · 타석 — 웹 글자 대신 누름 칸 판(testid) · 타석 캔버스가 보이는지로 가른다. 그림은 장면이 그린다 */
 const 보임 = (testId: string) => {
   const element = screen.queryByTestId(testId)
@@ -115,12 +114,7 @@ const 기본옵션: TeamGameOptions = {
 const 띄우기 = (options: Partial<TeamGameOptions> = {}, seed = 20100901) => {
   vi.useFakeTimers()
   const rendered = render(
-    <TeamGameScreen
-      options={{ ...기본옵션, ...options }}
-      random={createSeededRandom(seed)}
-      onFinish={vi.fn()}
-      onQuit={vi.fn()}
-    />,
+    <TeamGameScreen options={{ ...기본옵션, ...options }} random={createSeededRandom(seed)} onFinish={vi.fn()} onQuit={vi.fn()} />,
   )
   판닫기()
   OK통과()
@@ -262,8 +256,12 @@ describe('팀 경기 화면 — 공격(타석) 차례', () => {
   it('선공이면 1회초가 우리 공격이라 타석이 뜬다', () => {
     vi.useFakeTimers()
     render(
-      <TeamGameScreen options={{ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }} random={createSeededRandom(20100901)}
-        onFinish={vi.fn()} onQuit={vi.fn()} />,
+      <TeamGameScreen
+        options={{ ...기본옵션, playerSide: PLAYER_SIDE_FIRST_BAT }}
+        random={createSeededRandom(20100901)}
+        onFinish={vi.fn()}
+        onQuit={vi.fn()}
+      />,
     )
     판닫기()
 
@@ -483,9 +481,7 @@ describe('투수 교체 (#)', () => {
 describe('경기 시작 인트로 (상태 0xc)', () => {
   it('시즌(모드 2)은 인트로가 54틱 서고 다 지나면 1회초 판으로 넘어간다', () => {
     vi.useFakeTimers()
-    render(
-      <TeamGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={vi.fn()} onQuit={vi.fn()} />,
-    )
+    render(<TeamGameScreen options={기본옵션} random={createSeededRandom(20100901)} onFinish={vi.fn()} onQuit={vi.fn()} />)
     expect(screen.getByTestId('인트로-띠')).toBeTruthy()
     act(() => vi.advanceTimersByTime(millisecondsPerFrame() * 53))
     expect(screen.queryByTestId('인트로-띠')).toBeTruthy()
@@ -497,14 +493,7 @@ describe('경기 시작 인트로 (상태 0xc)', () => {
   })
 
   it('대전(모드 8)은 0xc 를 안 지난다 — 인트로가 없다 (0x48b20)', () => {
-    render(
-      <TeamGameScreen
-        options={{ ...기본옵션, mode: 8 }}
-        random={createSeededRandom(20100901)}
-        onFinish={vi.fn()}
-        onQuit={vi.fn()}
-      />,
-    )
+    render(<TeamGameScreen options={{ ...기본옵션, mode: 8 }} random={createSeededRandom(20100901)} onFinish={vi.fn()} onQuit={vi.fn()} />)
     expect(screen.queryByTestId('인트로-띠')).toBeNull()
   })
 })
@@ -512,14 +501,7 @@ describe('경기 시작 인트로 (상태 0xc)', () => {
 describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 → 0x532b0)', () => {
   const 판까지 = (options: Partial<TeamGameOptions> = {}) => {
     vi.useFakeTimers()
-    render(
-      <TeamGameScreen
-        options={{ ...기본옵션, ...options }}
-        random={createSeededRandom(20100901)}
-        onFinish={vi.fn()}
-        onQuit={vi.fn()}
-      />,
-    )
+    render(<TeamGameScreen options={{ ...기본옵션, ...options }} random={createSeededRandom(20100901)} onFinish={vi.fn()} onQuit={vi.fn()} />)
     판닫기()
   }
 
@@ -591,9 +573,12 @@ describe('상태 0xe — 새 타석마다 사람 OK 를 기다린다 (0x39e14 �
 })
 
 describe('로딩 판 (상태 7 · 9 · 8 — 생성자 0x3301c 33100 이 모드 갈래 없이 상태 7)', () => {
-  it.each([1, 2, 8])('모드 %i 도 경기 화면보다 먼저 로딩 판이 선다 — 팁은 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n] · 진행 칸 끝 0x24(기본)', (mode) => {
-    로딩판.length = 0
-    띄우기({ mode }, 7)
-    expect(로딩판).toEqual([{ tip: LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(7))], steps: undefined }])
-  })
+  it.each([1, 2, 8])(
+    '모드 %i 도 경기 화면보다 먼저 로딩 판이 선다 — 팁은 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n] · 진행 칸 끝 0x24(기본)',
+    (mode) => {
+      로딩판.length = 0
+      띄우기({ mode }, 7)
+      expect(로딩판).toEqual([{ tip: LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(7))], steps: undefined }])
+    },
+  )
 })

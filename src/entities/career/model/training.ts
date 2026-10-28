@@ -167,9 +167,7 @@ export function blockReasonOf(career: PlayerCareer, menu: TrainingMenu): Trainin
 export function runTraining(career: PlayerCareer, menu: TrainingMenu, random: RandomPort): TrainingOutcome {
   const blockReason = blockReasonOf(career, menu)
   if (blockReason !== null) throw new Error(`훈련을 실행할 수 없습니다 (${blockReason}): ${menu.name}`)
-  const outcome = isSpecialSwingMenu(menu)
-    ? runSpecialSwingTraining(career, menu, random)
-    : runAbilityTraining(career, menu, random)
+  const outcome = isSpecialSwingMenu(menu) ? runSpecialSwingTraining(career, menu, random) : runAbilityTraining(career, menu, random)
   // 훈련 횟수는 칭호 23·24 의 조건이라 능력 훈련·필살타법 양쪽 모두 센다
   return { ...outcome, career: countTraining(outcome.career, menu.id) }
 }
@@ -196,9 +194,16 @@ function runAbilityTraining(career: PlayerCareer, menu: TrainingMenu, random: Ra
   const moraleLoss = rolledMoraleLoss + trainingMoraleAdjustmentOf(modifiers)
   const spent = spendCycleAction(gainMorale(career, -moraleLoss))
   return {
-    menuId: menu.id, gains, typeBonus, moraleLoss, rolledGain: rolled, rolledMoraleLoss,
-    modifiers, hasSubItemBonus: subItemGain > 0,
-    specialSwing: null, career: gainAbility(spent, gains),
+    menuId: menu.id,
+    gains,
+    typeBonus,
+    moraleLoss,
+    rolledGain: rolled,
+    rolledMoraleLoss,
+    modifiers,
+    hasSubItemBonus: subItemGain > 0,
+    specialSwing: null,
+    career: gainAbility(spent, gains),
   }
 }
 
@@ -231,7 +236,9 @@ function runSpecialSwingTraining(career: PlayerCareer, menu: TrainingMenu, rando
     modifiers,
     hasSubItemBonus: false,
     specialSwing: {
-      sessions, required, isLevelUp,
+      sessions,
+      required,
+      isLevelUp,
       name: BATTER_BURSTS[number - 1 + (number === 4 ? career.battingTypeIndex : 0)] ?? '',
     },
     career: trained,

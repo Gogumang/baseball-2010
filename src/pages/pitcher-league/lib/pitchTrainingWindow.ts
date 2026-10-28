@@ -50,7 +50,12 @@ export const PITCH_TRAINING_COUNT_BOX = { x: 155, y: 200, width: 56, height: 18 
 /** 탭 줄 mode_ui 39 — 박스 1 (24,72) 에 oy −2 로 놓는다(정렬 0x11 은 0xb9d74 가 안 본다) */
 export const PITCH_TRAINING_TAB_STRIP = { frame: 39, x: 24, y: 72 - 2 } as const
 /** mode_ui 39 박스 — 프레임 기준 탭 칸 넷 */
-const TAB_BOXES: readonly (readonly [number, number])[] = [[2, 3], [50, 3], [98, 3], [145, 3]]
+const TAB_BOXES: readonly (readonly [number, number])[] = [
+  [2, 3],
+  [50, 3],
+  [98, 3],
+  [145, 3],
+]
 /** 고른 탭 꺾쇠 mode_ui 40 (45×13) — (박스 1.x + 탭칸.x, 박스 1.y + 탭칸.y − 2) */
 export const PITCH_TRAINING_TAB_MARK_FRAME = 40
 export function tabMarkTopLeftOf(tab: number): { readonly x: number; readonly y: number } {
@@ -120,12 +125,11 @@ export function cellLookOf(career: PitcherCareer, row: number, column: number): 
     return { plate: PITCH_TRAINING_WHITE_PLATE, nameFrame: HIDDEN_PITCH_NAME_FRAME, nameColor: '#000000' }
   }
   if (isInPitchList(career, typeNumber)) return { plate: PITCH_TRAINING_ORANGE_PLATE, nameFrame, nameColor: '#000000' }
-  const isLearned = column === HIDDEN_PITCH_COLUMN
-    ? stageOf(career, hiddenProgressCellOf(career, row)) > 2
-    : stageOf(career, row * 2 + (column % 2)) > Math.trunc(column / 2)
-  return isLearned
-    ? { plate: null, nameFrame, nameColor: '#FFFFFF' }
-    : { plate: PITCH_TRAINING_WHITE_PLATE, nameFrame, nameColor: '#000000' }
+  const isLearned =
+    column === HIDDEN_PITCH_COLUMN
+      ? stageOf(career, hiddenProgressCellOf(career, row)) > 2
+      : stageOf(career, row * 2 + (column % 2)) > Math.trunc(column / 2)
+  return isLearned ? { plate: null, nameFrame, nameColor: '#FFFFFF' } : { plate: PITCH_TRAINING_WHITE_PLATE, nameFrame, nameColor: '#000000' }
 }
 
 const stageOf = (career: PitcherCareer, cell: number) => career.pitchTrainingStages[cell] ?? 0
@@ -144,7 +148,11 @@ export type PitchWindowState = '훈련' | '장착'
  * 초점이 탭 줄이면 처음 값 그대로 선다(원본 그대로).
  */
 export function statusLabelOf(
-  career: PitcherCareer, row: number, column: number, isCellFocus: boolean, state: PitchWindowState = '훈련',
+  career: PitcherCareer,
+  row: number,
+  column: number,
+  isCellFocus: boolean,
+  state: PitchWindowState = '훈련',
 ): number | null {
   const initial = state === '장착' ? PITCH_WINDOW_EQUIP_LABEL : PITCH_TRAINING_LEARN_LABEL
   if (!isCellFocus) return initial
@@ -165,7 +173,11 @@ export function pitchTrainingWindowCostOf(cellIndex: number): number {
  * 횟수 "n / 필요" (0x81224~0x8134e) — c = min(칸, 4), 칸 = 행·2 + c%2(c 가 4 면 히든 보정), 필요 = 0xd469e[c/2] = [2, 4, 5].
  * 목록에 든 구질이거나 단계 > c/2 면 "필요/필요", 단계 == c/2 면 그 칸 횟수, 그보다 낮으면 0.
  */
-export function pitchTrainingWindowProgressOf(career: PitcherCareer, row: number, column: number): { readonly count: number; readonly required: number } {
+export function pitchTrainingWindowProgressOf(
+  career: PitcherCareer,
+  row: number,
+  column: number,
+): { readonly count: number; readonly required: number } {
   const required = pitchTrainingRequiredSessionsOf(column)
   const cell = column === HIDDEN_PITCH_COLUMN ? hiddenProgressCellOf(career, row) : row * 2 + (column % 2)
   const stage = stageOf(career, cell)
@@ -185,7 +197,12 @@ export const isPitchTrainingBlinkOn = (tick: number) => tick % 10 !== 0
  * 칸 [gfx+0x194] = new(0x3c) 0x6c219 vt+0x1c(2, 3, 1, 0x30). 칸 번호 = 줄 × 2 + 칸 — 4 · 5 는 아래 가운데 칸 하나(min 4).
  */
 export const PITCH_TRAINING_TAB_GRID: AnnalsGridShape = {
-  columns: 4, rows: 1, wrapsColumns: true, wrapsRows: true, carriesRowOnColumnWrap: true, carriesColumnOnRowWrap: true,
+  columns: 4,
+  rows: 1,
+  wrapsColumns: true,
+  wrapsRows: true,
+  carriesRowOnColumnWrap: true,
+  carriesColumnOnRowWrap: true,
 }
 export const PITCH_TRAINING_CELL_GRID: AnnalsGridShape = { columns: 2, rows: 3, wrapsColumns: true, wrapsRows: true }
 

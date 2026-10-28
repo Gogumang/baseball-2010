@@ -2,9 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import {
-  hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitPlayer,
-} from '@/entities/season-mode/model/playerRecruit'
+import { hasRecruitedCareerPlayer, hasRecruitedHallOfFamePlayer, recruitPlayer } from '@/entities/season-mode/model/playerRecruit'
 import { ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import { SeasonPlayerPickScreen } from '@/pages/season/ui/SeasonPlayerPickScreen'
 import type { RecruitResult, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
@@ -94,7 +92,16 @@ export interface RecruitCandidateActions {
  * 목록(원본 0xa10c 의 공용 목록 0x63b15 k 6)을 꽂아 이 길이 원본 화면으로 나오지 않는다(r165 전수 — 부르는 곳 하나).
  */
 export function PlayerRecruitScreen({
-  teamId, roster, pitcherRecordOrder, list, gamePoint = 0, onRecruit, onDone, onBack, renderCandidates, cells,
+  teamId,
+  roster,
+  pitcherRecordOrder,
+  list,
+  gamePoint = 0,
+  onRecruit,
+  onDone,
+  onBack,
+  renderCandidates,
+  cells,
 }: PlayerRecruitScreenProps) {
   const [step, setStep] = useState<{ readonly candidate: RecruitCandidate; readonly isPitcher: boolean } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -144,9 +151,10 @@ export function PlayerRecruitScreen({
    */
   const chooseCandidate = (choice: RecruitChoice): string | undefined => {
     const players = choice.isPitcher ? roster.pitchers : roster.batters
-    const duplicated = choice.source === '나리'
-      ? hasRecruitedCareerPlayer(players)
-      : choice.candidate !== null && hasRecruitedHallOfFamePlayer(players, choice.candidate.player.id)
+    const duplicated =
+      choice.source === '나리'
+        ? hasRecruitedCareerPlayer(players)
+        : choice.candidate !== null && hasRecruitedHallOfFamePlayer(players, choice.candidate.player.id)
     if (duplicated) return ALREADY_RECRUITED
     if (choice.candidate !== null) enterSlotStep({ candidate: choice.candidate, isPitcher: choice.isPitcher })
     return undefined
@@ -170,13 +178,18 @@ export function PlayerRecruitScreen({
     isEnabled: step === null && notice === null && renderCandidates === undefined,
   })
 
-  const noticeBox = notice === null ? null : (
-    <MessageBox text={notice} buttons={['확인']} onAnswer={() => {
-      setNotice(null)
-      // 0x6fe0 — 팝업 0x19 가 닫히면 0xce
-      if (isRecruited) onDone()
-    }} />
-  )
+  const noticeBox =
+    notice === null ? null : (
+      <MessageBox
+        text={notice}
+        buttons={['확인']}
+        onAnswer={() => {
+          setNotice(null)
+          // 0x6fe0 — 팝업 0x19 가 닫히면 0xce
+          if (isRecruited) onDone()
+        }}
+      />
+    )
 
   // 2단계 — 공용 선수 고르기 0xdf 목적 3: 탭은 후보 종류로 고정(0x5980), '*' 막힘 · 바닥 7 (0x6fe0 · 0xb010)
   if (chosen !== null) {

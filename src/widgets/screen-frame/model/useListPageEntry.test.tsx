@@ -19,7 +19,11 @@ function KeyCounter({ slides, grid }: { readonly slides: boolean; readonly grid:
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [keyLock])
-  return <output data-testid="count" data-body={isBodyShown}>{count}</output>
+  return (
+    <output data-testid="count" data-body={isBodyShown}>
+      {count}
+    </output>
+  )
 }
 
 afterEach(() => {
@@ -27,9 +31,10 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const advance = (draws: number) => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame() * draws + 20)
-})
+const advance = (draws: number) =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * draws + 20)
+  })
 
 describe('공용 목록 0x63b14 — 머리띠 다섯 그림 + 격자 열림 애니 동안 키를 안 받는다 ([skin+0xe4])', () => {
   it('마선수 격자: 본문은 그림 5 부터, 키는 그림 9(본문 다섯째 그림의 0x7a571 이 1)부터', () => {

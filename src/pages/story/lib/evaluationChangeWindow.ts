@@ -90,10 +90,7 @@ export interface EvaluationChangeWindowLayout {
 
 const rowOf = (area: CardBox, row: number): CardBox => ({ ...area, y: area.y + row * (area.height + ROW_GAP) })
 
-export function evaluationChangeWindowLayoutOf(
-  values: EvaluationChangeValues,
-  goals: YearGoalWindowSource,
-): EvaluationChangeWindowLayout {
+export function evaluationChangeWindowLayoutOf(values: EvaluationChangeValues, goals: YearGoalWindowSource): EvaluationChangeWindowLayout {
   const B = EVALUATION_CHANGE_BOXES
   const table = goalTableLayoutOf(goals, { labels: B.goalLabels, current: B.goalCurrent, goals: B.goals })
   const arrows: EvaluationChangeArrow[] = []
@@ -101,7 +98,11 @@ export function evaluationChangeWindowLayoutOf(
   const changeNumbers = values.changes.flatMap((change, row) => {
     const area = rowOf(B.change, row)
     if (change !== 0) {
-      arrows.push({ animation: change > 0 ? EVALUATION_CHANGE_ARROW_ANIMATIONS.up : EVALUATION_CHANGE_ARROW_ANIMATIONS.down, x: area.x + 1, y: area.y + 2 })
+      arrows.push({
+        animation: change > 0 ? EVALUATION_CHANGE_ARROW_ANIMATIONS.up : EVALUATION_CHANGE_ARROW_ANIMATIONS.down,
+        x: area.x + 1,
+        y: area.y + 2,
+      })
     } else {
       dashes.push({ x: area.x + 1, y: area.y + Math.trunc(area.height / 2), width: Math.trunc(area.width / 2) - 4, height: 2 })
     }

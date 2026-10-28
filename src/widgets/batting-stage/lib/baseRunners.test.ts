@@ -41,7 +41,10 @@ describe('타석 화면 루상 주자 0x35b94', () => {
   })
 
   it('애니는 칸 길이 max(1, 지연) 로 돌고 끝나면 처음으로 — (dx, dy) 를 같이 낸다', () => {
-    const entries = [{ frame: 0, delay: 3, dx: 1, dy: 0 }, { frame: 1, delay: 0, dx: 2, dy: -1 }]
+    const entries = [
+      { frame: 0, delay: 3, dx: 1, dy: 0 },
+      { frame: 1, delay: 0, dx: 2, dy: -1 },
+    ]
     expect(loopingAnimationStepAt(entries, 0)).toEqual({ frame: 0, dx: 1, dy: 0 })
     expect(loopingAnimationStepAt(entries, 2)).toEqual({ frame: 0, dx: 1, dy: 0 })
     expect(loopingAnimationStepAt(entries, 3)).toEqual({ frame: 1, dx: 2, dy: -1 })
@@ -91,7 +94,6 @@ describe('상태 0xe 주루 칸 — 0x35b94 의 35f4e~3604c', () => {
     expect(grayRunPipPixel(255, 0, 0)).toEqual({ r: 82, g: 81, b: 82 })
   })
 })
-
 
 describe('루상 주자 애니 시계 — 장면 +0xf24 애니 0~2 (0x35b94 의 0x93d91 진행 뒤 0x93cfd 켜기)', () => {
   it('첫 부름은 칸 0 을 그리고, 그 뒤 부를 때마다 한 칸씩 — 주자가 없는 루 · 숨긴 루는 안 나아간다', () => {

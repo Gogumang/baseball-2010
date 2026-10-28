@@ -29,7 +29,12 @@ describe('전역기록 자동진행 칸 — +0xbc 속도 · +0x14d + m 중단 �
 
   it('손잡이는 고칠 때마다 곧바로 저장소에 쓴다 (0x1f1b8) — 다시 열어도 남는다', () => {
     let saved: unknown = null
-    const store = { load: () => saved, save: (value: object) => { saved = value } }
+    const store = {
+      load: () => saved,
+      save: (value: object) => {
+        saved = value
+      },
+    }
     const port = createAutoRelayRecordPort(store)
     port.setSpeed(0)
     port.setStopped(2, true)

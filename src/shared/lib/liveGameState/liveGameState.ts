@@ -71,9 +71,7 @@ export function setLiveGameSides(sides: LiveGameSides): void {
   const capped = (score: number) => Math.max(0, Math.min(SCORE_LIMIT, Math.trunc(score)))
   const ourSide = sides.playerSide
   sideTeamIds = ourSide === 0 ? [sides.ourTeamId, sides.opponentTeamId] : [sides.opponentTeamId, sides.ourTeamId]
-  sideScores = ourSide === 0
-    ? [capped(sides.ourScore), capped(sides.opponentScore)]
-    : [capped(sides.opponentScore), capped(sides.ourScore)]
+  sideScores = ourSide === 0 ? [capped(sides.ourScore), capped(sides.opponentScore)] : [capped(sides.opponentScore), capped(sides.ourScore)]
 }
 
 /**

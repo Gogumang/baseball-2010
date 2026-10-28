@@ -2,8 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import { ENTRY_SUB_TAB, ENTRY_TAB } from '@/entities/season-mode/model/entryEditor'
 import {
-  EDIT_TEAM_COUNT, SPECIAL_EDIT_STEP, chooseEditTeam, closeEditName, createSpecialEditState,
-  editEntryListsOf, editTargetOf, moveEditGrid, pointEditGrid, pressEditEntryKey,
+  EDIT_TEAM_COUNT,
+  SPECIAL_EDIT_STEP,
+  chooseEditTeam,
+  closeEditName,
+  createSpecialEditState,
+  editEntryListsOf,
+  editTargetOf,
+  moveEditGrid,
+  pointEditGrid,
+  pressEditEntryKey,
 } from '@/pages/special-edit/lib/specialEditFlow'
 
 describe('스페셜 에디트 흐름 (상태 29, 0x2b2e0)', () => {

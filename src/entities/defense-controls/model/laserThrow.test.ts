@@ -56,9 +56,7 @@ describe('필살수비 확률 — 표 0xd25b0 [1,2,3,3,4,4,5,6]', () => {
   it('등급별 한 번 굴림 기준은 표값 × 10 이다', () => {
     expect(SPECIAL_DEFENSE_TABLE).toEqual([1, 2, 3, 3, 4, 4, 5, 6])
     등급능력치.forEach((defenseAbility, grade) => {
-      expect(specialDefenseChanceOf({ defenseAbility, skillIds: [], gameMode: 1 }), `등급 ${grade}`).toBe(
-        SPECIAL_DEFENSE_TABLE[grade] * 10,
-      )
+      expect(specialDefenseChanceOf({ defenseAbility, skillIds: [], gameMode: 1 }), `등급 ${grade}`).toBe(SPECIAL_DEFENSE_TABLE[grade] * 10)
     })
   })
 
@@ -97,9 +95,7 @@ describe('레이저 송구 확률 — 표 0xd2590 [3,4,5,6,7,8,9,10]', () => {
   it('등급별 기준은 표값 × 10 이고 모드 4 반감이 없다', () => {
     expect(LASER_THROW_TABLE).toEqual([3, 4, 5, 6, 7, 8, 9, 10])
     등급능력치.forEach((defenseAbility, grade) => {
-      expect(laserThrowChanceOf({ defenseAbility, skillIds: [] }), `등급 ${grade}`).toBe(
-        LASER_THROW_TABLE[grade] * 10,
-      )
+      expect(laserThrowChanceOf({ defenseAbility, skillIds: [] }), `등급 ${grade}`).toBe(LASER_THROW_TABLE[grade] * 10)
     })
     expect(laserThrowChanceOf({ defenseAbility: 100, skillIds: [21] })).toBe(60)
   })
@@ -149,9 +145,7 @@ describe('"반짝이는 순간" 창 — 0xb2648 (포구 −10 ~ +8틱)', () => {
   it('이미 목표를 고르고 공을 쥔 채 던질 준비가 끝났으면 창이 닫힌다', () => {
     expect(isLaserWindowOpen({ ...기본, ticksSinceCatch: 5, hasChosenThrowTarget: true })).toBe(false)
     // 셋 중 하나라도 빠지면 창은 그대로 열려 있다
-    expect(
-      isLaserWindowOpen({ ...기본, ticksSinceCatch: 5, hasChosenThrowTarget: true, isThrowerReady: false }),
-    ).toBe(true)
+    expect(isLaserWindowOpen({ ...기본, ticksSinceCatch: 5, hasChosenThrowTarget: true, isThrowerReady: false })).toBe(true)
   })
 })
 

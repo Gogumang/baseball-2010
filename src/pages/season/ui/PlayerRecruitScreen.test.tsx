@@ -15,7 +15,10 @@ import type { RecruitListInput } from '@/widgets/season/lib/recruitList'
 afterEach(cleanup)
 
 const 선수 = (id: number, kindByte: number): SeasonPlayer => ({
-  id, kindByte, fieldPosition: 0, stamina: 0,
+  id,
+  kindByte,
+  fieldPosition: 0,
+  stamina: 0,
 })
 
 /** 팀 투수 3명·타자 3명 (전부 일반 선수) */
@@ -128,8 +131,17 @@ describe('자리 고르기와 확정 (0xdf 목적 3 → 0xc554)', () => {
   it('자리는 레코드 차례(로테이션으로 섞인 투수 차례)의 칸 k 다 — 명단에는 그 칸의 첨자로 끼운다', () => {
     const onRecruit = vi.fn()
     // 레코드 칸 0·1·2 = 명단 첨자 1·2·0
-    render(<PlayerRecruitScreen teamId={0} roster={로스터()} pitcherRecordOrder={[1, 2, 0]} list={후보()}
-      onRecruit={onRecruit} onDone={vi.fn()} onBack={vi.fn()} />)
+    render(
+      <PlayerRecruitScreen
+        teamId={0}
+        roster={로스터()}
+        pitcherRecordOrder={[1, 2, 0]}
+        list={후보()}
+        onRecruit={onRecruit}
+        onDone={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    )
     자리로('나리투수 나리투수')
     고르기(0)
 
@@ -213,8 +225,17 @@ describe('원본 후보 목록을 꽂으면 (0xe1dc 목록 종류 0 → 키 0xe3
         onBack={vi.fn()}
         renderCandidates={({ choose }) => (
           <>
-            <button type="button" onClick={() => answers.push(choose({ source: '명예', isPitcher: true, candidate: 명예 }))}>중복</button>
-            <button type="button" onClick={() => answers.push(choose({ source: '명예', isPitcher: false, candidate: { name: '명예타자A', player: 선수(0xc8, PLAYER_KIND.일반타자) } }))}>새선수</button>
+            <button type="button" onClick={() => answers.push(choose({ source: '명예', isPitcher: true, candidate: 명예 }))}>
+              중복
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                answers.push(choose({ source: '명예', isPitcher: false, candidate: { name: '명예타자A', player: 선수(0xc8, PLAYER_KIND.일반타자) } }))
+              }
+            >
+              새선수
+            </button>
           </>
         )}
       />,

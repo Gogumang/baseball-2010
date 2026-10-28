@@ -46,7 +46,10 @@ describe('볼넷 · 사구 밀어내기 판 — 종류 2 (0xb288c · 0x46418 · 
     expect('opensAtArrival' in 보통).toBe(false)
     // 진루는 같다 — 판이 서는 때만 다르다
     expect(도루.advance).toEqual(보통.advance)
-    const 판 = runPitchArrivalPlay({ batterHand: 0, gameMode: 4, pitchJudgement: 3, stealingFrom: [1], bases: 루(true, false, false), outs: 2 }, 세는난수())
+    const 판 = runPitchArrivalPlay(
+      { batterHand: 0, gameMode: 4, pitchJudgement: 3, stealingFrom: [1], bases: 루(true, false, false), outs: 2 },
+      세는난수(),
+    )
     expect(판?.kind).toBe(2)
     expect(판 !== null && opensWalkPlayAtArrival(판.result)).toBe(true)
   })
@@ -54,7 +57,16 @@ describe('볼넷 · 사구 밀어내기 판 — 종류 2 (0xb288c · 0x46418 · 
   it('판 안에서 난수를 하나도 안 쓴다 — 종류 2 의 도루 주자 리드는 틱 0(rand(0,9) 없음) · 포수가 손에 안 쥐어 CPU 송구가 없다', () => {
     const random = 세는난수()
     const play = runPitchArrivalPlay(
-      { batterHand: 0, gameMode: 4, pitchJudgement: 3, stealingFrom: [1], bases: 루(true, false, true), outs: 1, defenseIsCpu: true, offenseIsCpu: false },
+      {
+        batterHand: 0,
+        gameMode: 4,
+        pitchJudgement: 3,
+        stealingFrom: [1],
+        bases: 루(true, false, true),
+        outs: 1,
+        defenseIsCpu: true,
+        offenseIsCpu: false,
+      },
       random,
     )
     // rollPassedBall 한 번뿐

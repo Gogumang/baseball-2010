@@ -86,24 +86,16 @@ describe('방어율 (0xb6ce9 — 식은 추정, 순서만 쓴다)', () => {
 })
 
 describe('순위 매기기', () => {
-  const 홈런타자 = (teamId: number, name: string, homeRuns: number) =>
-    기록({ teamId, name, atBatsOrOuts: 300, homeRuns })
+  const 홈런타자 = (teamId: number, name: string, homeRuns: number) => 기록({ teamId, name, atBatsOrOuts: 300, homeRuns })
 
   it('큰 값이 1위다', () => {
     const 표 = [홈런타자(0, '가', 10), 홈런타자(1, '나', 30), 홈런타자(2, '다', 20)]
 
-    expect(rankLeaders(표, LEADER_KIND.홈런).map((entry) => entry.record.name)).toEqual([
-      '나',
-      '다',
-      '가',
-    ])
+    expect(rankLeaders(표, LEADER_KIND.홈런).map((entry) => entry.record.name)).toEqual(['나', '다', '가'])
   })
 
   it('방어율만 작은 쪽이 1위다', () => {
-    const 표 = [
-      기록({ name: '가', atBatsOrOuts: 450, earnedRuns: 90 }),
-      기록({ name: '나', atBatsOrOuts: 450, earnedRuns: 30 }),
-    ]
+    const 표 = [기록({ name: '가', atBatsOrOuts: 450, earnedRuns: 90 }), 기록({ name: '나', atBatsOrOuts: 450, earnedRuns: 30 })]
 
     expect(leaderOf(표, LEADER_KIND.방어율)?.record.name).toBe('나')
   })

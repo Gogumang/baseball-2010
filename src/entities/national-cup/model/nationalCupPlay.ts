@@ -3,12 +3,7 @@ import type { LeagueAbilityContext } from '@/entities/league/model/leagueDay'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import {
-  endNationalCupDay,
-  nationalCupMatchupOf,
-  otherMatchOf,
-  recordNationalCupResult,
-} from '@/entities/national-cup/model/nationalCup'
+import { endNationalCupDay, nationalCupMatchupOf, otherMatchOf, recordNationalCupResult } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 
 /**

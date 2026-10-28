@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createPitcherCupTeams,
-  pitcherCupPositionCodeOf,
-  preparePitcherCupMatch,
-} from '@/entities/pitcher-career/model/pitcherCupTeams'
+import { createPitcherCupTeams, pitcherCupPositionCodeOf, preparePitcherCupMatch } from '@/entities/pitcher-career/model/pitcherCupTeams'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 
 const 나 = -1

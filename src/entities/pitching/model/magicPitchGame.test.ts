@@ -4,7 +4,11 @@ import {
   advanceMagicPitchGameState,
   createMagicPitchGameState,
   isAceMagicNumber,
-  FRESH_HELD_CPU_MAGIC, UNFILLED_MAGIC_REMAINING, cpuMagicStateOf, heldCpuMagicAfterPitch, heldCpuMagicAfterPitcherChange,
+  FRESH_HELD_CPU_MAGIC,
+  UNFILLED_MAGIC_REMAINING,
+  cpuMagicStateOf,
+  heldCpuMagicAfterPitch,
+  heldCpuMagicAfterPitcherChange,
   magicCountOfPitcherAbility,
 } from '@/entities/pitching/model/magicPitchGame'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
@@ -39,9 +43,7 @@ describe('magicPitchGame — 한 경기 마구 상태 (0xaebe4 · 0x345fc · 0x3
   })
 
   it('레벨별 마구 횟수는 0xd8509 = [3, 4, 5, 6, 7]', () => {
-    expect([0, 1, 2, 3, 4].map((aceLevel) => createMagicPitchGameState(ACE_PITCHER_REPERTOIRES[2], { aceLevel }).remaining)).toEqual([
-      3, 4, 5, 6, 7,
-    ])
+    expect([0, 1, 2, 3, 4].map((aceLevel) => createMagicPitchGameState(ACE_PITCHER_REPERTOIRES[2], { aceLevel }).remaining)).toEqual([3, 4, 5, 6, 7])
   })
 
   it('첫 마구는 공짜다 — 소모 조건이 `공+0x10 != 0` 인 원본 버그 그대로', () => {
@@ -86,7 +88,10 @@ describe('magicPitchGame — 한 경기 마구 상태 (0xaebe4 · 0x345fc · 0x3
 
 describe('진행기가 드는 CPU 마구 두 칸 — 팀+0x28 (−1 = 안 채움) · 공+0x10 (0xaebe4 aeea8 · aec7a)', () => {
   const 마투수 = (magicId: number, skillBits = 0): PitcherAbility => ({
-    control: 60, velocity: 60, repertoire: { form: 0, pitchMask: 0, magicId }, skillBits,
+    control: 60,
+    velocity: 60,
+    repertoire: { form: 0, pitchMask: 0, magicId },
+    skillBits,
   })
 
   it('안 채웠으면 지금 마운드 투수로 채운다 — 마투수는 0xd8509[레벨], 일반은 0xd84ff[번호], 혼신(비트 23) +2', () => {

@@ -1,7 +1,5 @@
 import { useEffect, useRef } from 'react'
-import {
-  MENU_BAND_COLOR, MENU_BAND_LEFT, MENU_BAND_RIGHT, SCREEN_HEIGHT, SCREEN_WIDTH, menuBandLinesOf,
-} from '@/pages/main-menu/lib/mainMenuLayout'
+import { MENU_BAND_COLOR, MENU_BAND_LEFT, MENU_BAND_RIGHT, SCREEN_HEIGHT, SCREEN_WIDTH, menuBandLinesOf } from '@/pages/main-menu/lib/mainMenuLayout'
 import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
 
 /**

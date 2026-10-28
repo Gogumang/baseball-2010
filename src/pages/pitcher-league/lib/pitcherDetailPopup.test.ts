@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { PITCHER_TRAINING_MENUS, runPitcherTraining } from '@/entities/pitcher-career/model/pitcherManagement'
-import {
-  createPitcherCareer, equippedPitcherAbilityOf, pitcherAbilityLimitsOf,
-} from '@/entities/pitcher-career/model/pitcherCareer'
+import { createPitcherCareer, equippedPitcherAbilityOf, pitcherAbilityLimitsOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
 import { pitcherAbilityDetailViewOf, pitcherRestDetailRowsOf, pitcherTrainingDetailRowsOf } from '@/pages/pitcher-league/lib/pitcherDetailPopup'

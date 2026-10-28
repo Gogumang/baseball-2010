@@ -59,30 +59,30 @@ export function pitcherMatchupCardsOf(
   // 기록 게이트 0xa56dc 모드 3 갈래 0xa571c — 국가대항전(+0x12c) · 포스트시즌(+0xb4)이면 거짓 (진행기 `countsMyPitcherRecord` 와 같은 조건)
   const countsThisGame = !options.isPostseason && options.isNationalCup !== true
   const batter = opponentBatterOf(progress)
-  const batterHand =
-    batter.aceIndex !== undefined ? batterHandOf(0, batter.aceIndex) : batterHandOf(batter.profile ?? 0)
+  const batterHand = batter.aceIndex !== undefined ? batterHandOf(0, batter.aceIndex) : batterHandOf(batter.profile ?? 0)
   const slot = lineupSlotOf(progress.opponentOrderIndex)
   const results = progress.opponentLineup.records[slot]?.results ?? []
 
-  const myLine = records === undefined
-    ? null
-    : countsThisGame
-      ? sumPitcherLines(records.mySeason, {
-          outs: progress.record.outsRecorded,
-          runsAllowed: progress.runsAllowedByMe,
-          strikeouts: progress.record.strikeouts,
-        })
-      : records.mySeason
+  const myLine =
+    records === undefined
+      ? null
+      : countsThisGame
+        ? sumPitcherLines(records.mySeason, {
+            outs: progress.record.outsRecorded,
+            runsAllowed: progress.runsAllowedByMe,
+            strikeouts: progress.record.strikeouts,
+          })
+        : records.mySeason
   // 마타자는 저장 레코드(XlsACE_BAT 행)를 통째 베낀 칸 — 게이트 0xa571c 가 마선수(0xb633d)를 늘 걸러 표의 줄 그대로다
   const aceBatter = batter.aceIndex === undefined ? undefined : ACE_BATTERS[batter.aceIndex]
-  const batterBase = aceBatter !== undefined
-    ? batterLineOfRecord(aceBatter.recordLine)
-    : records === undefined || batter.rosterSlot === null
-      ? null
-      : leagueBatterLineOf(records.stats, leagueBatterIdOf(options.opponentTeamId, batter.rosterSlot))
-  const batterLine = batterBase === null
-    ? null
-    : countsThisGame && aceBatter === undefined ? sumBatterLines(batterBase, gameLineFromResults(results)) : batterBase
+  const batterBase =
+    aceBatter !== undefined
+      ? batterLineOfRecord(aceBatter.recordLine)
+      : records === undefined || batter.rosterSlot === null
+        ? null
+        : leagueBatterLineOf(records.stats, leagueBatterIdOf(options.opponentTeamId, batter.rosterSlot))
+  const batterLine =
+    batterBase === null ? null : countsThisGame && aceBatter === undefined ? sumBatterLines(batterBase, gameLineFromResults(results)) : batterBase
 
   return {
     batterHand,

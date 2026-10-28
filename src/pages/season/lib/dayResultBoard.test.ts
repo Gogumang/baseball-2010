@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BOARD_FRAME, boardRowsOf, imageCenterOf, isWinA, isWinB, logoPanelRectsOf, rowPanelRectsOf, scoreRightOf, shifted,
+  BOARD_FRAME,
+  boardRowsOf,
+  imageCenterOf,
+  isWinA,
+  isWinB,
+  logoPanelRectsOf,
+  rowPanelRectsOf,
+  scoreRightOf,
+  shifted,
 } from '@/pages/season/lib/dayResultBoard'
 
 /** 경기 뒤 마무리 판 0xb400 — 줄 고르기 b5a0 · 판 색 b44e · 로고 칸 0x860dc · WIN/LOSE b676/b6c4 */
@@ -16,7 +24,12 @@ describe('줄 고르기 (b5a0~b5d6)', () => {
   it('내 경기 줄(scoreA −1)을 건너뛰고 나머지 넷을 차례대로', () => {
     const rows = boardRowsOf(표([3, 1, -1, 0, 7], [2, 5, -1, 0, 4]))
     expect(rows.map((row) => row.teamA)).toEqual([1, 3, 7, 9])
-    expect(rows.map((row) => [row.scoreA, row.scoreB])).toEqual([[3, 2], [1, 5], [0, 0], [7, 4]])
+    expect(rows.map((row) => [row.scoreA, row.scoreB])).toEqual([
+      [3, 2],
+      [1, 5],
+      [0, 0],
+      [7, 4],
+    ])
   })
 
   it('내 경기가 마지막 줄이면 앞 넷이다', () => {
@@ -26,10 +39,8 @@ describe('줄 고르기 (b5a0~b5d6)', () => {
 
 describe('WIN · LOSE (b676 · b6c4)', () => {
   it('더 낸 쪽이 WIN — 동점이면 ⚠️ 둘 다 LOSE (원본 그대로)', () => {
-    expect([isWinA({ teamA: 0, teamB: 1, scoreA: 3, scoreB: 2 }), isWinB({ teamA: 0, teamB: 1, scoreA: 3, scoreB: 2 })])
-      .toEqual([true, false])
-    expect([isWinA({ teamA: 0, teamB: 1, scoreA: 2, scoreB: 2 }), isWinB({ teamA: 0, teamB: 1, scoreA: 2, scoreB: 2 })])
-      .toEqual([false, false])
+    expect([isWinA({ teamA: 0, teamB: 1, scoreA: 3, scoreB: 2 }), isWinB({ teamA: 0, teamB: 1, scoreA: 3, scoreB: 2 })]).toEqual([true, false])
+    expect([isWinA({ teamA: 0, teamB: 1, scoreA: 2, scoreB: 2 }), isWinB({ teamA: 0, teamB: 1, scoreA: 2, scoreB: 2 })]).toEqual([false, false])
   })
 })
 

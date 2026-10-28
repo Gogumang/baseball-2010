@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MISSION_POINT_BOX, MISSION_POINT_ROWS, MISSION_RESULT_TITLE, MISSION_RESULT_WINDOW, MISSION_RETRY_BOX,
-  MISSION_RETRY_BUTTONS, MISSION_RETRY_TEXT, missionResultEarnedOf, missionResultHeldOf, missionResultKeyActionOf,
-  missionResultLeaveOf, missionResultStepOf,
+  MISSION_POINT_BOX,
+  MISSION_POINT_ROWS,
+  MISSION_RESULT_TITLE,
+  MISSION_RESULT_WINDOW,
+  MISSION_RETRY_BOX,
+  MISSION_RETRY_BUTTONS,
+  MISSION_RETRY_TEXT,
+  missionResultEarnedOf,
+  missionResultHeldOf,
+  missionResultKeyActionOf,
+  missionResultLeaveOf,
+  missionResultStepOf,
 } from '@/pages/mission-play/lib/missionResultBoard'
 
 const 보통 = { flag11f: false, flag176: false }
@@ -16,12 +25,18 @@ describe('미션 결과 판 0x4a384 (모드 5·6 갈래)', () => {
   })
 
   it('획득 · 보유 줄 — 글 y 124 · 144, G 숫자 y 121 · 141, 재도전 글 (39, 183)', () => {
-    expect(MISSION_POINT_ROWS.map((row) => [row.labelY, row.valueY, row.plus])).toEqual([[124, 121, true], [144, 141, false]])
+    expect(MISSION_POINT_ROWS.map((row) => [row.labelY, row.valueY, row.plus])).toEqual([
+      [124, 121, true],
+      [144, 141, false],
+    ])
     expect(MISSION_RETRY_TEXT).toEqual({ x: 39, y: 183, width: 162 })
   })
 
   it('예 · 아니오 단추 — popup 1 · 2 를 (67, 204) · (133, 204), 고르면 6 · 7', () => {
-    expect(MISSION_RETRY_BUTTONS.map((b) => [b.frame, b.selectedFrame, b.x, b.y])).toEqual([[1, 6, 67, 204], [2, 7, 133, 204]])
+    expect(MISSION_RETRY_BUTTONS.map((b) => [b.frame, b.selectedFrame, b.x, b.y])).toEqual([
+      [1, 6, 67, 204],
+      [2, 7, 133, 204],
+    ])
   })
 
   it('번 G — 성공이고 대결이 아닐 때만 보상, 보유는 0..99999', () => {

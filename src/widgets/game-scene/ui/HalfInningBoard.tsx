@@ -81,12 +81,12 @@ export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, 
   return (
     <RawScreen>
       <div data-testid={`교대-판-${inning}회${half}`} data-tick={tick}>
-      {/* 0x4fef8 0x4fb8c — 늘 바탕 */}
-      {field !== undefined && <HalfInningField {...field} tick={tick} />}
-      {scoreboardSides !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && (
-        <ScoreboardFrame {...SCOREBOARD_AT.halfInning} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
-      )}
-      {cards !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && <HalfInningCards data={cards} />}
+        {/* 0x4fef8 0x4fb8c — 늘 바탕 */}
+        {field !== undefined && <HalfInningField {...field} tick={tick} />}
+        {scoreboardSides !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && (
+          <ScoreboardFrame {...SCOREBOARD_AT.halfInning} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
+        )}
+        {cards !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && <HalfInningCards data={cards} />}
       </div>
       <OkTapArea onTap={confirm} />
     </RawScreen>

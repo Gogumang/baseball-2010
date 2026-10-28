@@ -48,10 +48,10 @@ export function autoRelayModeSlotOf(mode: number): AutoRelayModeSlot {
 export function normalizeAutoRelayRecord(raw: unknown): AutoRelayRecord {
   if (raw === null || typeof raw !== 'object') return NEW_AUTO_RELAY_RECORD
   const value = raw as Partial<Record<keyof AutoRelayRecord, unknown>>
-  const speed = typeof value.speed === 'number' && Number.isInteger(value.speed) && value.speed >= 0
-    && value.speed <= AUTO_RELAY_SPEED_MAX
-    ? value.speed
-    : NEW_AUTO_RELAY_RECORD.speed
+  const speed =
+    typeof value.speed === 'number' && Number.isInteger(value.speed) && value.speed >= 0 && value.speed <= AUTO_RELAY_SPEED_MAX
+      ? value.speed
+      : NEW_AUTO_RELAY_RECORD.speed
   const stopped = Array.isArray(value.stopped) ? value.stopped : []
   return { speed, stopped: [stopped[0] === true, stopped[1] === true, stopped[2] === true] }
 }
@@ -115,5 +115,10 @@ export function setAutoRelayRecordPort(port: AutoRelayRecordPort | null): void {
 /** 메모리에만 드는 손잡이 (시험) */
 export function createMemoryAutoRelayRecordPort(initial: AutoRelayRecord = NEW_AUTO_RELAY_RECORD): AutoRelayRecordPort {
   let saved: object = initial
-  return createAutoRelayRecordPort({ load: () => saved, save: (value) => { saved = value } })
+  return createAutoRelayRecordPort({
+    load: () => saved,
+    save: (value) => {
+      saved = value
+    },
+  })
 }

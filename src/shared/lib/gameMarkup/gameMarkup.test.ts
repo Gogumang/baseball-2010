@@ -5,9 +5,7 @@ describe('parseGameMarkup', () => {
   it('마크업이 없으면 한 줄 한 조각이다', () => {
     const lines = parseGameMarkup('막둥아, 준비됐제?')
 
-    expect(lines).toEqual([
-      { segments: [{ text: '막둥아, 준비됐제?', color: null }], isCentered: false },
-    ])
+    expect(lines).toEqual([{ segments: [{ text: '막둥아, 준비됐제?', color: null }], isCentered: false }])
   })
 
   it('!N에서 줄을 나눈다', () => {

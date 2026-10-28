@@ -45,7 +45,10 @@ describe('명단 능력치는 레코드의 0xb6414(rec, k, 1) — 장비 니블 
 
   it('명단 차례가 실은 니블(시즌 저장 명단)로 타자·투수 모두 보너스를 먹는다', () => {
     const order: TeamEntryOrder = {
-      batters: [{ rosterSlot: 2, position: 3, equipment: [1, 0, 0, 4] }, { rosterSlot: 0, position: 2 }],
+      batters: [
+        { rosterSlot: 2, position: 3, equipment: [1, 0, 0, 4] },
+        { rosterSlot: 0, position: 2 },
+      ],
       pitchers: [{ tableSlot: 1, equipment: [0, 3, 0, 0] }, 0],
     }
     const batters = entryBattersOfOrder(0, order)
@@ -99,7 +102,10 @@ describe('기록으로 선 영입 선수의 니블 · +0xb — 영입 0xc554 가
   }
   const 타자기록 = { name: '나리타', ability: [500, 500, 500, 500] as const, recordId: 0xfe, equipment: [0, 3, 0, 0], profile: 0x34 }
   const order: TeamEntryOrder = {
-    batters: [{ rosterSlot: -1, position: 3, record: 타자기록 }, ...Array.from({ length: 8 }, (_, slot) => ({ rosterSlot: slot, position: slot + 1 }))],
+    batters: [
+      { rosterSlot: -1, position: 3, record: 타자기록 },
+      ...Array.from({ length: 8 }, (_, slot) => ({ rosterSlot: slot, position: slot + 1 })),
+    ],
     pitchers: [투수기록, 1, 2, 3, 4],
   }
 
@@ -129,7 +135,10 @@ describe('기록으로 선 영입 선수의 +0x1b(연봉 칸) — 교체 창 상
   }
   const 타자기록 = { name: '나리타', ability: [500, 500, 500, 500] as const, recordId: 0xfe, salaryGrade: 255 }
   const order: TeamEntryOrder = {
-    batters: [{ rosterSlot: -1, position: 3, record: 타자기록 }, ...Array.from({ length: 8 }, (_, slot) => ({ rosterSlot: slot, position: slot + 1 }))],
+    batters: [
+      { rosterSlot: -1, position: 3, record: 타자기록 },
+      ...Array.from({ length: 8 }, (_, slot) => ({ rosterSlot: slot, position: slot + 1 })),
+    ],
     pitchers: [투수기록, 1, 2, 3, 4],
   }
 

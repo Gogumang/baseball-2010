@@ -20,7 +20,10 @@ import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
  * ```
  * 다음 틀은 115 라 이 그림은 한 틀만 선다(효과기 어두워짐이 위에 겹친다).
  */
-export function NariResumeManagementFrame({ career, cursor }: {
+export function NariResumeManagementFrame({
+  career,
+  cursor,
+}: {
   readonly career: PlayerCareer
   /** 관리 메뉴 커서 칸 (`NariMainMenuCursor`) */
   readonly cursor: number
@@ -30,13 +33,16 @@ export function NariResumeManagementFrame({ career, cursor }: {
       <SkinBackdrop kind="공무늬" />
       <NariMainCommandBar menuEnable={career} cursor={cursor} slideUpdates={0} />
       <ManagementBoard career={career} titleName={currentTitleOf(career)} />
-      <CenterStage slidesIn characters={nariStageCharactersOf({
-        morale: career.morale,
-        isSick: career.isSick,
-        isInjured: career.isInjured,
-        isSlugger: career.battingTypeIndex >= 1,
-        skinIndex: career.skinIndex,
-      })} />
+      <CenterStage
+        slidesIn
+        characters={nariStageCharactersOf({
+          morale: career.morale,
+          isSick: career.isSick,
+          isInjured: career.isInjured,
+          isSlugger: career.battingTypeIndex >= 1,
+          skinIndex: career.skinIndex,
+        })}
+      />
       <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={null} slides={false} />
     </>
   )

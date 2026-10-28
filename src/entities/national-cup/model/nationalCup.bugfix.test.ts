@@ -18,7 +18,13 @@ const 켜기 = (id: string) => setBugfixConfigForTests(bugfixConfigWith([id]))
 /** rand 를 몇 번 불렀는지 세고 늘 lo 를 준다 */
 const 세는난수 = () => {
   const 기록 = { calls: 0 }
-  const random: RandomPort = { rand: (lo) => { 기록.calls += 1; return lo }, rand9d: () => 0 }
+  const random: RandomPort = {
+    rand: (lo) => {
+      기록.calls += 1
+      return lo
+    },
+    rand9d: () => 0,
+  }
   return { random, 기록 }
 }
 

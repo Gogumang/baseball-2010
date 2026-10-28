@@ -45,15 +45,7 @@ const chapterIndexes = (chapter: number): number[] => {
 }
 
 /** 장 이름 — 원본에는 장 제목 문자열이 따로 없어 각 장 첫 쪽의 "<…에 대하여>" 를 따랐다 */
-const CHAPTER_TITLES: readonly string[] = [
-  '기본 조작',
-  '일반모드',
-  '나만의리그',
-  '시즌모드',
-  '대전모드',
-  '홈런더비·미션·스페셜·환경설정',
-  '게임문의',
-]
+const CHAPTER_TITLES: readonly string[] = ['기본 조작', '일반모드', '나만의리그', '시즌모드', '대전모드', '홈런더비·미션·스페셜·환경설정', '게임문의']
 
 export const HELP_SECTIONS: readonly HelpSection[] = CHAPTER_TITLES.map((title, chapter) => ({
   title,

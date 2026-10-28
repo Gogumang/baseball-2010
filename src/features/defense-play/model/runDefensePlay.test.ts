@@ -5,13 +5,7 @@ import { displayPatternListOf, openScenePatternDeck, scenePatternDeckOf } from '
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { AUTO_ADVANCE_TICK_MARGIN, beatsThrow } from '@/entities/fielding/model/autoAdvance'
-import {
-  BASE_POSITIONS,
-  FIELDER_COUNT,
-  FIELDER_START_POSITIONS,
-  basePosition,
-  runnerSpeedOf,
-} from '@/entities/fielding/model/fieldGeometry'
+import { BASE_POSITIONS, FIELDER_COUNT, FIELDER_START_POSITIONS, basePosition, runnerSpeedOf } from '@/entities/fielding/model/fieldGeometry'
 import { EMPTY_BASES, type BaseState } from '@/entities/game/model/baseState'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { DEFENSE_SCENE_START } from '@/features/defense-play/model/defenseScene'
@@ -31,12 +25,7 @@ import {
   startDefensePlay,
   stepDefensePlay,
 } from '@/features/defense-play/model/runDefensePlay'
-import type {
-  DefensePlayControls,
-  DefensePlayInput,
-  DefensePlayResult,
-  DefensePlayState,
-} from '@/features/defense-play/model/runDefensePlay'
+import type { DefensePlayControls, DefensePlayInput, DefensePlayResult, DefensePlayState } from '@/features/defense-play/model/runDefensePlay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -264,7 +253,10 @@ describe('희생플라이는 "보장" 이 아니라 자동 진루 규칙(0xaf918
   it('태그업은 포구 뒤에 시작한다 — 잡힐 뜬공이면 그 전에는 아무도 안 뛴다', () => {
     const 결과 = play(뜬공아웃, 주자3루, 0, 태그업뜬공)
     // 첫 포구 틱 — `catchTick` 은 뒤에 송구를 받은 틱으로 바뀐다
-    const 첫포구 = Number.parseInt(결과.log.find((줄) => 줄.includes('잡았다'))!, 10)
+    const 첫포구 = Number.parseInt(
+      결과.log.find((줄) => 줄.includes('잡았다'))!,
+      10,
+    )
     expect(첫포구).toBe(30)
     const 포구순간 = 결과.ticks[첫포구].runners.find((runner) => runner.index === 1)
 
@@ -816,15 +808,13 @@ describe('필살타법 성공 타구는 야수가 잡지 못한다 — 공 비�
 
 describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (0xb103e~0xb105e)', () => {
   it('자리 코드 2~9 가 칸 1~8 로 가고, 칸 0 은 지명타자(니블 1)다 — 공수 교대 판 0x3fac4 의 +0xec (b1032 는 송구 쪽만)', () => {
-    const 능력치 = defenseAbilitiesOf(
-      [
-        { position: 2, defense: 610 }, // 포수 → 칸 1
-        { position: 3, defense: 620 }, // 1루수 → 칸 2
-        { position: 9, defense: 690 }, // 중견 → 칸 8
-        { position: 1, defense: 999 }, // 지명 — 칸 0 의 +0xec(펌블 · 레이저)
-        { position: 0, defense: 999 }, // 후보 — 자리 없음
-      ],
-    )
+    const 능력치 = defenseAbilitiesOf([
+      { position: 2, defense: 610 }, // 포수 → 칸 1
+      { position: 3, defense: 620 }, // 1루수 → 칸 2
+      { position: 9, defense: 690 }, // 중견 → 칸 8
+      { position: 1, defense: 999 }, // 지명 — 칸 0 의 +0xec(펌블 · 레이저)
+      { position: 0, defense: 999 }, // 후보 — 자리 없음
+    ])
 
     expect(능력치).toHaveLength(FIELDER_COUNT)
     // 칸 0 은 송구 쪽(g · 악송구 보정)은 안 읽고 펌블 · 레이저만 본다(`recordPlayerAbilityOf`)
@@ -837,7 +827,12 @@ describe('수비 아홉 칸 능력치 — 자리 코드 −1 이 칸 번호다 (
   })
 
   it('같은 자리가 두 번 나오면 앞 선수가 이긴다 — 뒤는 후보다', () => {
-    expect(defenseAbilitiesOf([{ position: 4, defense: 700 }, { position: 4, defense: 100 }])[3]).toBe(700)
+    expect(
+      defenseAbilitiesOf([
+        { position: 4, defense: 700 },
+        { position: 4, defense: 100 },
+      ])[3],
+    ).toBe(700)
   })
 
   it('안 주면 아홉 칸 모두 500 이다 — 지금까지의 기본값 그대로', () => {
@@ -1513,8 +1508,7 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
   //   526ac: 0 이면 건너뛴다 ; 526ae: 0xaf8e0 = 제어기.vt0xc = 0xafa60 CPU 송구 결정 → 점수식 0xafb24
   // 곧 사람이 수비하면서 설정이 수동이면 점수식이 아예 안 돈다. 그때 목표는 플레이 vt0x30 =
   // 0xb1c90 이 고른다 — 사람이 누른 목표(+0x160)가 먼저고, 안 눌렀으면 "앞선 주자부터 잡히는 첫 루".
-  const 송구줄 = (result: DefensePlayResult) =>
-    result.log.find((line) => line.includes('루로') && line.includes('송구')) ?? '(송구 없음)'
+  const 송구줄 = (result: DefensePlayResult) => result.log.find((line) => line.includes('루로') && line.includes('송구')) ?? '(송구 없음)'
 
   const 만루단타 = (extra: Partial<DefensePlayInput> = {}): DefensePlayResult =>
     runDefensePlay({
@@ -1674,9 +1668,7 @@ describe('송구 수동/자동 — 환경설정 +0xf4 (0x5269c → 0xae6c8 → 0
   })
 
   it('수비가 CPU 면 설정이 수동이어도 점수식이 돈다 — 0xae6c8 의 앞 항', () => {
-    expect(만루단타({ throwMode: '수동', defenseIsCpu: true }).throwBase).toBe(
-      만루단타({ throwMode: '자동' }).throwBase,
-    )
+    expect(만루단타({ throwMode: '수동', defenseIsCpu: true }).throwBase).toBe(만루단타({ throwMode: '자동' }).throwBase)
   })
 
   it('수동이어도 사람이 송구 키를 누르면 그 루가 먼저다 — 0xb1c90 의 사람 가지(+0x160)', () => {
@@ -1779,9 +1771,7 @@ describe('슬라이딩 효과음 10 — 사람 키 0x5199c · 자동 0x5268c', (
 
   it('자동 슬라이딩은 슬라이딩 중인 주자를 다시 세지 않아 주자마다 한 번이다', () => {
     const { log } = 소리틱(땅볼1루)
-    const 주자들 = log
-      .filter((line) => line.includes('자동 슬라이딩'))
-      .flatMap((line) => line.split('주자 ')[1].split('·'))
+    const 주자들 = log.filter((line) => line.includes('자동 슬라이딩')).flatMap((line) => line.split('주자 ')[1].split('·'))
     expect(new Set(주자들).size).toBe(주자들.length)
   })
 })
@@ -1845,8 +1835,7 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       if (isSamePointXZ(state.fielders[7].target, FIELDER_START_POSITIONS[7])) 고친틱 = state.tick
     }
     expect(고친틱).toBeGreaterThan(0)
-    const 거리 = (point: { x: number; z: number }) =>
-      Math.hypot(point.x - FIELDER_START_POSITIONS[7].x, point.z - FIELDER_START_POSITIONS[7].z)
+    const 거리 = (point: { x: number; z: number }) => Math.hypot(point.x - FIELDER_START_POSITIONS[7].x, point.z - FIELDER_START_POSITIONS[7].z)
     const 전 = 거리(state.fielders[7].position)
     stepDefensePlay(state)
     expect(거리(state.fielders[7].position)).toBeLessThan(전)
@@ -1866,9 +1855,7 @@ describe('송구 0xb2e38 — 중계 b4616 · AI 9 미루기 · 던진 야수 AI 
       const 기록: { tick: number; ai: number; target: { x: number; z: number } }[] = []
       while (!isDefensePlayFinished(state)) {
         if (state.tick === state.catchTick + 1) {
-          state.fielders = state.fielders.map((fielder) =>
-            fielder.slot === 2 ? { ...fielder, position: { x: 25_946, y: 0, z } } : fielder,
-          )
+          state.fielders = state.fielders.map((fielder) => (fielder.slot === 2 ? { ...fielder, position: { x: 25_946, y: 0, z } } : fielder))
         }
         state = stepDefensePlay(state, state.tick === 0 ? { key: '6', isRepeat: false } : null)
         const holder = state.fielders[4]
@@ -2309,7 +2296,8 @@ describe('필살수비가 열리면 표시 패턴으로 바꿔 쏜다 — 5107c 
 describe('맞은 판정 틀에 미리 굴린 메시지 0x11 묶음 — 판 시작이 쏜 공에서 되찾는다 (A-37)', () => {
   // 코드 15 [49, 802, 799] — 필살수비 굴림 둘(점프 · 슬라이딩) · 필살타법 하나가 돈다. 폴에 안 닿는다
   const 입력 = (random: RandomPort): DefensePlayInput => ({
-    outcome: registerContact(땅볼아웃, { batterHand: 0,
+    outcome: registerContact(땅볼아웃, {
+      batterHand: 0,
       pattern: [49, 802, 799, 0],
       resultCode: 15,
       specialSwing: { number: 1, isAceBatter: false },
@@ -2419,9 +2407,7 @@ describe('파울 판 — 쏜 공의 파울 각(511b8 state[0x1c])이면 낙구 �
       })
       let 받음 = false
       for (let step = 0; step < 40 && !isDefensePlayFinished(state); step += 1) {
-        받음 ||= state.fielders.some(
-          (fielder) => fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD,
-        )
+        받음 ||= state.fielders.some((fielder) => fielder.aiState >= AI_STATE.COVER_HOME && fielder.aiState <= AI_STATE.COVER_THIRD)
         state = stepDefensePlay(state, null)
       }
       return 받음
@@ -2499,8 +2485,7 @@ describe('루별 주자 주루 — 주자마다 제 레코드의 속도 (0xa93ac
 
 describe('수비 화면 부착 효과 칸 — 공 가진 야수 고리(0x43cb0) · "!"(+0xb8 · +0xc0) (그림만, 난수 차례 그대로)', () => {
   const 틱 = (결과: DefensePlayResult, tick: number) => 결과.ticks.find((view) => view.tick === tick)
-  const 야수 = (결과: DefensePlayResult, tick: number, slot: number) =>
-    틱(결과, tick)?.fielders.find((fielder) => fielder.slot === slot)
+  const 야수 = (결과: DefensePlayResult, tick: number, slot: number) => 틱(결과, tick)?.fielders.find((fielder) => fielder.slot === slot)
 
   it('쥐기 전에는 고리가 없고, 투수가 쥔 틱(11)부터 공 가진 야수 칸에 뜬다 — 사람 공격이면 애니 3', () => {
     // 대표 땅볼 [113, 500, 300] 은 투수가 11틱에 쥔다
@@ -2811,7 +2796,8 @@ describe('야수 자세 워드 +0xb0 · 판을 넘는 플레이 +0xf0 (r171)', (
 
   it('밀어내기(종류 2)는 +0xf0 을 안 건드린다 — vt1c 0xb0edc 도 안 지운다', () => {
     const 남은커버 = [1, 2, 3, 4]
-    const result = runWalkPlay({ batterHand: 0,
+    const result = runWalkPlay({
+      batterHand: 0,
       bases: EMPTY_BASES,
       outs: 0,
       pitchJudgement: 4,

@@ -11,12 +11,7 @@ import {
 } from '@/entities/career/model/playerCareer'
 import { EMPTY_LEAGUE_PLAYER_STATS } from '@/entities/league/model/leaguePlayerStats'
 import { LEADER_KIND, QUALIFIED_AT_BATS, leaderOf } from '@/entities/awards/model/leaderboard'
-import {
-  MAXIMUM_SALARY_RANK,
-  careerLeagueRecordsOf,
-  judgeSeasonAwards,
-  salaryNegotiationRankOf,
-} from '@/entities/awards/model/seasonAwards'
+import { MAXIMUM_SALARY_RANK, careerLeagueRecordsOf, judgeSeasonAwards, salaryNegotiationRankOf } from '@/entities/awards/model/seasonAwards'
 import { SALARY_FIRM_EVENT_ID, salaryResultEventId } from '@/entities/career/model/seasonFlow'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { LEAGUE_TEAM_COUNT, rankingOf } from '@/entities/league/model/league'

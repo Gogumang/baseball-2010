@@ -5,22 +5,11 @@ import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome
 import { describeOutcome, isFreePass, isHit } from '@/entities/at-bat/model/atBatOutcome'
 import { applyPitchResolution, createAtBat } from '@/entities/at-bat/model/atBatState'
 import type { AtBatState, PitchResolution } from '@/entities/at-bat/model/atBatState'
-import {
-  applyAtBatOutcome,
-  createGame,
-  ourHalfOf,
-  PLAYER_SIDE_LAST_BAT,
-  resultOf,
-} from '@/entities/game/model/gameState'
+import { applyAtBatOutcome, createGame, ourHalfOf, PLAYER_SIDE_LAST_BAT, resultOf } from '@/entities/game/model/gameState'
 import type { GameState, PlayerSide } from '@/entities/game/model/gameState'
 import { runnersOfGame } from '@/entities/game/model/gameState'
 import { EMPTY_BASE_RUNNERS, runnerOnBase } from '@/entities/game/model/baseRunners'
-import {
-  chargedRunsByPitcher,
-  freezeRunnerPitchers,
-  scoredFromBasesOf,
-  settleRunnerPitchers,
-} from '@/entities/game/model/runnerPitchers'
+import { chargedRunsByPitcher, freezeRunnerPitchers, scoredFromBasesOf, settleRunnerPitchers } from '@/entities/game/model/runnerPitchers'
 import type { RunnerPitcherTags } from '@/entities/game/model/runnerPitchers'
 import { lineupSlotOf } from '@/entities/game/model/quickLineup'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
@@ -88,40 +77,24 @@ import type { PickoffBase } from '@/entities/defense-controls/model/pickoff'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
 import { contactOfOutcome, registerContact, type BattedContact } from '@/entities/batting/model/battedContact'
-import {
-  SCENE_RESULT_CODE_START,
-  sceneResultCodeAfterPitch,
-  sceneResultCodeOfThrown,
-} from '@/features/defense-play/model/sceneResultCode'
+import { SCENE_RESULT_CODE_START, sceneResultCodeAfterPitch, sceneResultCodeOfThrown } from '@/features/defense-play/model/sceneResultCode'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { LeagueFieldingError, LeaguePlateAppearance, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
-import {
-  fielderRecordIndexOf,
-  fieldingErrorRecordsOf,
-  type DrawnFieldingError,
-} from '@/features/defense-play/model/fieldingErrors'
+import { fielderRecordIndexOf, fieldingErrorRecordsOf, type DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
 import {
   popularityCompleteGameOf,
   reputationCompleteGameOf,
   reputationCompleteGameInningIndexOf,
 } from '@/entities/season-mode/model/seasonEvaluation'
 import type { CompleteGameFlags } from '@/entities/season-mode/model/seasonEvaluation'
-import {
-  clearSeasonGameRecord,
-  recordSeasonGameEvent,
-  SEASON_RECORD_CODE,
-} from '@/entities/season-mode/model/seasonReputation'
+import { clearSeasonGameRecord, recordSeasonGameEvent, SEASON_RECORD_CODE } from '@/entities/season-mode/model/seasonReputation'
 import type { CompleteGameKind, MySide } from '@/entities/season-mode/model/seasonReputation'
 import { cancelBurst, createBurstSession, resolveBurst, tryTriggerBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
 import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import { batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
-import {
-  benchClearingEffectOf,
-  rollsIntoBenchClearing,
-  staminaAfterBenchClearing,
-} from '@/entities/game/model/benchClearing'
+import { benchClearingEffectOf, rollsIntoBenchClearing, staminaAfterBenchClearing } from '@/entities/game/model/benchClearing'
 import { cpuSwingPoseOf, pitchAgainstBatterDetailed } from '@/entities/pitching/model/simulateBatter'
 import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { specialSwingCountOf } from '@/entities/batting/model/specialSwing'
@@ -131,26 +104,11 @@ import type { Pitch } from '@/entities/pitching/model/pitch'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
-import {
-  MAGIC_PITCH_TYPE_NUMBER,
-  ballMagicNumberOfPitch,
-  magicPitchCountOf,
-} from '@/entities/pitcher-career/model/magicPitch'
-import {
-  consumeStamina,
-  FULL_STAMINA,
-  pitchStaminaCostOf,
-  staminaCapacityOf,
-  staminaPercentOf,
-} from '@/entities/pitcher-career/model/pitcherStamina'
+import { MAGIC_PITCH_TYPE_NUMBER, ballMagicNumberOfPitch, magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
+import { consumeStamina, FULL_STAMINA, pitchStaminaCostOf, staminaCapacityOf, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
-import {
-  EMPTY_MOUND_COUNTERS,
-  judgePitcherChange,
-  pitcherAbilitySumOf,
-  replacementPitcherSlotOf,
-} from '@/entities/pitching/model/pitcherChange'
+import { EMPTY_MOUND_COUNTERS, judgePitcherChange, pitcherAbilitySumOf, replacementPitcherSlotOf } from '@/entities/pitching/model/pitcherChange'
 import type { MoundPitcherCounters } from '@/entities/pitching/model/pitcherChange'
 import { runnerCountOf } from '@/entities/game/model/baseState'
 import { rollCpuPitchTypeOnPitcherChangeTick } from '@/entities/pitching/model/selectPitch'
@@ -168,21 +126,13 @@ import type { FieldingAssignment, SeasonTeamCondition } from '@/features/play-te
 import { holdsUntilResultWaitEnd, rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { BenchClearingEntryRoll, HitByPitchHoldPhase } from '@/features/play-game/model/benchClearingScene'
 import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-game/model/halfInningBoard'
-import {
-  type FielderRecordSeat,
-  fielderRecordsAfterBoard,
-  fielderRecordsAtPlayStart,
-} from '@/entities/fielding/model/fielderRecords'
+import { type FielderRecordSeat, fielderRecordsAfterBoard, fielderRecordsAtPlayStart } from '@/entities/fielding/model/fielderRecords'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import { EMPTY_DECISION_STATE, gameEndDecisionOf } from '@/entities/game/model/winLossSave'
 import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import { chargePitcherLine, outsAddedBetween } from '@/entities/game/model/gamePitcherLines'
 import type { GameLeaguePitchers, GamePitcherLine } from '@/entities/game/model/gamePitcherLines'
-import {
-  decisionsAfterPitcherChange,
-  decisionsAfterPlay,
-  pitcherOfRecordNamesOf,
-} from '@/features/play-game/model/gameDecisions'
+import { decisionsAfterPitcherChange, decisionsAfterPlay, pitcherOfRecordNamesOf } from '@/features/play-game/model/gameDecisions'
 import type { MoundBySide, PitcherOfRecordNames } from '@/features/play-game/model/gameDecisions'
 import { FULL_PLAY_SETTINGS, isHumanControlled } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
@@ -204,12 +154,7 @@ import {
   withAcePitcher,
   teamPitcherSkinIndexOf,
 } from '@/features/play-team-game/model/teamGameRoster'
-import type {
-  TeamEntryBatter,
-  TeamEntryOrder,
-  TeamEntryPitcher,
-  TeamGameAbilityContext,
-} from '@/features/play-team-game/model/teamGameRoster'
+import type { TeamEntryBatter, TeamEntryOrder, TeamEntryPitcher, TeamGameAbilityContext } from '@/features/play-team-game/model/teamGameRoster'
 import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import {
@@ -228,11 +173,7 @@ import {
 } from '@/entities/game/model/gameRecords'
 import { EMPTY_BATTER_GAME_LOG, recordBatterAtBat } from '@/entities/game/model/batterGameLog'
 import type { BatterGameLog } from '@/entities/game/model/batterGameLog'
-import {
-  EMPTY_BATTER_GAME_RECORD,
-  judgeCpuPinchHit,
-  recordPlateAppearance,
-} from '@/entities/batting/model/pinchHitAi'
+import { EMPTY_BATTER_GAME_RECORD, judgeCpuPinchHit, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
 import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
 import { contactOutcomeOfDetail } from '@/features/play-at-bat/model/resolvePitch'
@@ -1149,10 +1090,7 @@ export function resumeTeamGame(
  *
  * 로테이션 쪽은 붙박이 로스터를 섞을 수 없어 칸 번호로 셈한다 — `rotationSlotOf` 주석(**근사다**).
  */
-function startingPitcherSlotsOf(
-  options: TeamGameOptions,
-  random: RandomPort,
-): { readonly opponent: number; readonly ours: number } {
+function startingPitcherSlotsOf(options: TeamGameOptions, random: RandomPort): { readonly opponent: number; readonly ours: number } {
   if (options.mode === TEAM_GAME_MODE.시즌) {
     const day = options.dayCounter ?? 0
     // 리그 차례를 받았으면 상대 명단이 그 차례라 선발은 명단 0번이다 (`opponentPitcherEntryOf`)
@@ -1206,11 +1144,7 @@ export interface TeamSetupRolls {
  * 사람 선발(31090). 원본은 이것을 **상태 22 진입**(`0x314b0` 3158c · 재굴림 끝 31290)에서 한다 — 그래서
  * 경기정보·엔트리 편집(상태 23)이 이미 굴린 팀을 본다. 결과는 옵션 `opponentAces` · `startingPitcherSlots` 로 넘긴다.
  */
-export function rollTeamSetup(
-  acePitcherId: number,
-  aceBatterId: number,
-  random: RandomPort,
-): TeamSetupRolls {
+export function rollTeamSetup(acePitcherId: number, aceBatterId: number, random: RandomPort): TeamSetupRolls {
   const opponentAces = rollOpponentAces(acePitcherId, aceBatterId, random)
   // 3107a: 0xb8c94(AI팀, 0, rand(0,4)) → 31090: 0xb8c94(사람팀, 0, rand(0,4))
   const opponent = rollStartingPitcherIndex(random)
@@ -1227,10 +1161,7 @@ export function rollTeamSetup(
  * 시즌(모드 2)은 `0x30f20` 을 타지 않는다 — `seasonOpponentAces` 가 서 있을 때만 0xdd 진입 `0x6548` 의
  * 굴림 둘을 여기서 한다 (국가대항전은 안 굴린다).
  */
-function opponentAceIndexesOf(
-  options: TeamGameOptions,
-  random: RandomPort,
-): { readonly pitcher: number; readonly batter: number } {
+function opponentAceIndexesOf(options: TeamGameOptions, random: RandomPort): { readonly pitcher: number; readonly batter: number } {
   if (options.opponentAces !== undefined) return options.opponentAces
   if (options.mode === TEAM_GAME_MODE.시즌 && options.seasonOpponentAces !== true) return { pitcher: -1, batter: -1 }
   return rollOpponentAces(options.acePitcherId ?? NO_ACE_BATTER, options.aceBatterId ?? NO_ACE_BATTER, random)
@@ -1241,9 +1172,10 @@ function opponentAceIndexesOf(
  * `orderIndex` · 보직을 그대로 든다 — 로테이션 0xb5ca8 은 레코드째 옮긴다). 그 밖은 표 차례 그대로.
  */
 function opponentPitcherEntryOf(options: TeamGameOptions): readonly TeamEntryPitcher[] {
-  const table = options.opponentEntryOrder === undefined
-    ? rosterEntryPitchersOf(options.opponentTeamId)
-    : entryPitchersOfOrder(options.opponentTeamId, options.opponentEntryOrder)
+  const table =
+    options.opponentEntryOrder === undefined
+      ? rosterEntryPitchersOf(options.opponentTeamId)
+      : entryPitchersOfOrder(options.opponentTeamId, options.opponentEntryOrder)
   const order = options.mode === TEAM_GAME_MODE.시즌 ? options.opponentPitcherOrder : undefined
   if (order === undefined) return table
   return order.flatMap((slot) => {
@@ -1253,10 +1185,7 @@ function opponentPitcherEntryOf(options: TeamGameOptions): readonly TeamEntryPit
 }
 
 /** 시작 스태미나 배열을 명단 칸으로 — 명단 차례(`orderIndex`)로 찾고, 없는 칸·마투수는 10000 */
-function pitcherStaminasOf(
-  entry: readonly TeamEntryPitcher[],
-  given: readonly number[] | undefined,
-): readonly number[] {
+function pitcherStaminasOf(entry: readonly TeamEntryPitcher[], given: readonly number[] | undefined): readonly number[] {
   return entry.map((pitcher) => {
     const value = pitcher.orderIndex >= 0 ? given?.[pitcher.orderIndex] : undefined
     return value === undefined ? FULL_STAMINA : Math.max(0, Math.min(FULL_STAMINA, value))
@@ -1275,22 +1204,24 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
   // 엔트리 편집기가 고친 차례가 있으면 그 차례가 곧 팀 레코드다 (0xb891c 는 첨자만 든다)
   const ourOrder = options.ourEntryOrder
   // 경기 장면 셋업 0x39fdc 가 두 팀 레코드 +0xa 를 첨자로 다시 매긴다(0xb8768 → 0xb603c) — `withEntryRecordSlots`
-  const ourEntry = withEntryRecordSlots(withAceBatter(
-    ourOrder === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, ourOrder),
-    options.aceBatterId ?? NO_ACE_BATTER,
-  ))
+  const ourEntry = withEntryRecordSlots(
+    withAceBatter(
+      ourOrder === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, ourOrder),
+      options.aceBatterId ?? NO_ACE_BATTER,
+    ),
+  )
   // 상대 팀도 그 팀 레코드 차례로 선다 (0xb8680 → 0x1f570 — 트레이드로 바뀐 CPU 팀이면 바뀐 레코드)
-  const opponentEntry = withEntryRecordSlots(withAceBatter(
-    options.opponentEntryOrder === undefined
-      ? rosterEntryBattersOf(options.opponentTeamId)
-      : entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder),
-    opponentAces.batter,
-  ))
+  const opponentEntry = withEntryRecordSlots(
+    withAceBatter(
+      options.opponentEntryOrder === undefined
+        ? rosterEntryBattersOf(options.opponentTeamId)
+        : entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder),
+      opponentAces.batter,
+    ),
+  )
   // 0x31042 · 0x31064 — 마타자와 **같은 자리에서** 마투수도 양 팀에 들어간다 (0xb88c8)
   const ourPitcherEntry = withAcePitcher(
-    ourOrder === undefined
-      ? rosterEntryPitchersOf(options.ourTeamId)
-      : entryPitchersOfOrder(options.ourTeamId, ourOrder),
+    ourOrder === undefined ? rosterEntryPitchersOf(options.ourTeamId) : entryPitchersOfOrder(options.ourTeamId, ourOrder),
     options.acePitcherId ?? NO_ACE_BATTER,
   )
   const opponentPitcherEntry = withAcePitcher(opponentPitcherEntryOf(options), opponentAces.pitcher)
@@ -1346,10 +1277,7 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
     stamina: ourPitcherStaminas[startingSlots.ours] ?? FULL_STAMINA,
     // 팀 new 0xb891c 가 팀+0x28 을 −1 로 두고(b89b4~b89ba) 첫 타석 준비(상태 0xd 0x48d50 → 0xaebe4)가 선발로 채운다
     magicRemaining: magicCountOfPitcher(ourPitcherEntry[startingSlots.ours] ?? ourPitcherEntry[0], options.aceLevels),
-    opponentMagicRemaining: magicCountOfPitcher(
-      opponentPitcherEntry[startingSlots.opponent] ?? opponentPitcherEntry[0],
-      options.aceLevels,
-    ),
+    opponentMagicRemaining: magicCountOfPitcher(opponentPitcherEntry[startingSlots.opponent] ?? opponentPitcherEntry[0], options.aceLevels),
     // 공 객체 new — +0x10 = 0 (0x1239 new 의 0 채움은 원본 미확인 — H2 3-4)
     ballMagicNumber: 0,
     ourSpecialSwingRemaining: UNFILLED_SPECIAL_SWINGS,
@@ -1567,15 +1495,9 @@ function entryBattersOf(progress: TeamGameProgress, teamId: number): readonly Te
  * a77f2 게이트(`[ctx+0x24]`, 투수편 강판 뒤)는 팀 경기에서 늘 열려 있고, 번호마다 방향(a7818·a785e·a78bc)을 본다 — 팀 경기에서 사람 팀은 우리 팀 하나라
  * 우리 공격이면 공격 팀이, 우리 수비면 수비 팀이 사람이다. 모드 5·6·7 갈래(a780a)는 팀 경기에 없다.
  */
-function withGameRecords(
-  progress: TeamGameProgress,
-  recordIds: readonly number[],
-  humanOffense: boolean,
-): TeamGameProgress {
+function withGameRecords(progress: TeamGameProgress, recordIds: readonly number[], humanOffense: boolean): TeamGameProgress {
   if (recordIds.length === 0) return progress
-  const passed = recordIds.filter((id) =>
-    passesRecordTeamGate(id, { offenseIsHuman: humanOffense, defenseIsHuman: !humanOffense }),
-  )
+  const passed = recordIds.filter((id) => passesRecordTeamGate(id, { offenseIsHuman: humanOffense, defenseIsHuman: !humanOffense }))
   return passed.length === 0 ? progress : { ...progress, recordIds: [...progress.recordIds, ...passed] }
 }
 
@@ -1767,9 +1689,7 @@ function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number[] {
   if (!progress.game.isFinished) return []
   const game = progress.game
   // 고침(B-40): 동점은 이긴 경기가 아니다 (원본은 선공이면 이긴 경기 — `seasonHumanWonOf`)
-  const won =
-    game.ourScore > game.opponentScore ||
-    (!isBugFixed('B-40') && game.ourScore === game.opponentScore && ourHalfOf(game) === '초')
+  const won = game.ourScore > game.opponentScore || (!isBugFixed('B-40') && game.ourScore === game.opponentScore && ourHalfOf(game) === '초')
   if (!won) return []
   return [
     ...gameEndRecordIdsOf(game.ourScore - game.opponentScore),
@@ -1797,16 +1717,9 @@ function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number[] {
  * ≥ 6 이면 수비측이 **CPU** 일 때만 적는다. (2)는 부르는 쪽(시즌 세션)이 보장하고,
  * (3)은 `recordSeasonGameEvent` 가 `mySide` 로 가른다 — 여기서는 (1)만 본다.
  */
-function withSeasonRecord(
-  progress: TeamGameProgress,
-  mySide: MySide,
-  codes: readonly number[],
-): readonly number[] {
+function withSeasonRecord(progress: TeamGameProgress, mySide: MySide, codes: readonly number[]): readonly number[] {
   if (progress.options.mode !== TEAM_GAME_MODE.시즌) return progress.gameRecord
-  return codes.reduce(
-    (slots, code) => recordSeasonGameEvent(slots, code, mySide),
-    progress.gameRecord,
-  )
+  return codes.reduce((slots, code) => recordSeasonGameEvent(slots, code, mySide), progress.gameRecord)
 }
 
 /** 사이클 판정 `0xa7610` — 그 타순 칸의 루타 목록에 1·2·3·4 가 다 들어 있는가 */
@@ -1853,12 +1766,7 @@ function settlementBatterGateOf(progress: TeamGameProgress, ourOffense: boolean)
  * 루타 4 안타로만 적혀 홈런 갈래 a85be~a86b4(기록 1~4 · 백투백 0xa794c · 시즌 코드 · B0)와 a8728 의 타순 칸 홈런 +0x13 ·
  * 0xa7b00(12~14) · a8764 대타 홈런(5)을 건너뛰고, a86b4 가 ctx+0x162 를 0 으로 둔다. 결과 링은 루타 4(a8704) 그대로다.
  */
-function homeRunCountedOf(
-  progress: TeamGameProgress,
-  outcome: AtBatOutcome,
-  defensePlay: DefensePlayResult | null,
-  ourOffense: boolean,
-): boolean {
+function homeRunCountedOf(progress: TeamGameProgress, outcome: AtBatOutcome, defensePlay: DefensePlayResult | null, ourOffense: boolean): boolean {
   return outcome.kind === '홈런' && !(defensePlay?.groundHomeRun === true && !settlementBatterGateOf(progress, ourOffense))
 }
 
@@ -1920,11 +1828,7 @@ function defenseRecordCodesOf(
 }
 
 /** 우리 타순 칸 하나의 루타 목록에 이번 루타를 얹는다 (`0xa86e0`) */
-function withHitBases(
-  lists: readonly (readonly number[])[],
-  slot: number,
-  hitBases: readonly number[],
-): readonly (readonly number[])[] {
+function withHitBases(lists: readonly (readonly number[])[], slot: number, hitBases: readonly number[]): readonly (readonly number[])[] {
   const next = [...lists]
   next[slot] = hitBases
   return next
@@ -2055,22 +1959,14 @@ export function spendOurSpecialSwing(progress: TeamGameProgress, remaining: numb
 }
 
 /** 명단 한 칸의 경기용 능력치 네 칸 — 없는 칸이면 0 이다 */
-function entryAbilitiesAt(
-  progress: TeamGameProgress,
-  teamId: number,
-  slot: number,
-): readonly number[] {
+function entryAbilitiesAt(progress: TeamGameProgress, teamId: number, slot: number): readonly number[] {
   const entry = entryBattersOf(progress, teamId)[slot]
   if (entry === undefined) return [0, 0, 0, 0]
   return entryBatterGameAbilities(abilityContextOf(progress.options), teamId, entry, slot)
 }
 
 /** 타석 화면이 보는 능력치 (0~999 그대로) */
-function entryStageAbilityOf(
-  progress: TeamGameProgress,
-  teamId: number,
-  slot: number,
-): BatterAbility {
+function entryStageAbilityOf(progress: TeamGameProgress, teamId: number, slot: number): BatterAbility {
   const ability = entryAbilitiesAt(progress, teamId, slot)
   return { hit: ability[0], power: ability[1], defense: ability[2], run: ability[3] }
 }
@@ -2124,11 +2020,7 @@ export function humanDefenseSkillPanelOf(progress: TeamGameProgress): {
 }
 
 /** 간이 타석 엔진이 보는 타자 — 히트·파워·주루만 쓴다 */
-function entryQuickBatterOf(
-  progress: TeamGameProgress,
-  teamId: number,
-  slot: number,
-): QuickAtBatBatter {
+function entryQuickBatterOf(progress: TeamGameProgress, teamId: number, slot: number): QuickAtBatBatter {
   const ability = entryAbilitiesAt(progress, teamId, slot)
   const entry = entryBattersOf(progress, teamId)[slot]
   const aceIndex = entry?.aceIndex ?? NO_ACE_BATTER
@@ -2148,11 +2040,7 @@ function entryQuickBatterOf(
 }
 
 /** 간이 타석 엔진이 보는 투수 — 제구·구속·체력만 쓴다 */
-function entryQuickPitcherOf(
-  progress: TeamGameProgress,
-  teamId: number,
-  slot: number,
-): QuickAtBatPitcher {
+function entryQuickPitcherOf(progress: TeamGameProgress, teamId: number, slot: number): QuickAtBatPitcher {
   const ability = pitcherAbilitiesAt(progress, teamId, slot)
   const entry = pitcherEntryAt(progress, teamId, slot)
   return {
@@ -2193,11 +2081,7 @@ function entryQuickTiredOf(
  * 게이트가 **주자 자신**을 본다(사람 판 도루와 다르다) — 마선수 주자만 빠진다. 모드 · 포스트시즌 거르기는 기록표에 넣는 쪽이 맡는다.
  * 주자는 신원(타순 칸, `playQuickPlateAppearance` 의 `stolenRunners`)대로다.
  */
-function quickLeagueStolenBasesOf(
-  progress: TeamGameProgress,
-  ours: boolean,
-  stolenRunners: readonly number[],
-): readonly LeagueStolenBase[] {
+function quickLeagueStolenBasesOf(progress: TeamGameProgress, ours: boolean, stolenRunners: readonly number[]): readonly LeagueStolenBase[] {
   const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
   const entry = ours ? progress.ourEntry : progress.opponentEntry
   const stolen: LeagueStolenBase[] = []
@@ -2220,13 +2104,8 @@ function quickLeagueStolenBasesOf(
  * 칸 + 1 인 첫 타자, 칸 0 은 마지막 교대 판의 수비 팀 지명타자(판 없이 지난 반 이닝이면 상대 팀 지명타자에게 붙는다 — 원본 그대로).
  * 열쇠는 도루와 같다 — 표 밖 선수는 원본 id, 마타자는 웹 기록표에 칸이 없다.
  */
-export function recordDrawnTeamFieldingErrors(
-  progress: TeamGameProgress,
-  drawn: readonly DrawnFieldingError[],
-): TeamGameProgress {
-  const gameDrawn = drawn.filter(
-    (error) => error.teamIndex === progress.options.ourTeamId || error.teamIndex === progress.options.opponentTeamId,
-  )
+export function recordDrawnTeamFieldingErrors(progress: TeamGameProgress, drawn: readonly DrawnFieldingError[]): TeamGameProgress {
+  const gameDrawn = drawn.filter((error) => error.teamIndex === progress.options.ourTeamId || error.teamIndex === progress.options.opponentTeamId)
   const errors = fieldingErrorRecordsOf(gameDrawn, (error) => {
     const teamId = error.teamIndex
     if (teamId === null) return null
@@ -2247,11 +2126,7 @@ export function recordDrawnTeamFieldingErrors(
   const fumbleCodes = drawn
     .filter((error) => error.isFumble === true && error.teamIndex === progress.options.ourTeamId)
     // 그림이 레코드를 실었으면 이미 [+0xec] != 0 인 것만 왔다(`drawnFieldingErrorsOf`) — 옛 입구만 명단으로 찾는다
-    .filter(
-      (error) =>
-        error.record !== undefined ||
-        fielderRecordIndexOf(entryBattersOf(progress, progress.options.ourTeamId), error.slot) >= 0,
-    )
+    .filter((error) => error.record !== undefined || fielderRecordIndexOf(entryBattersOf(progress, progress.options.ourTeamId), error.slot) >= 0)
     .map(() => SEASON_RECORD_CODE.수비실수)
   // 시즌(모드 2)이 아니면 `withSeasonRecord` 가 칸을 그대로 돌려준다
   const gameRecord = fumbleCodes.length === 0 ? progress.gameRecord : withSeasonRecord(progress, '수비', fumbleCodes)
@@ -2283,17 +2158,11 @@ export function currentBatterAbility(progress: TeamGameProgress) {
  * 0번이 선발, 1번부터가 벤치이고, 마투수가 있으면 8번에 앉아 있다 (`PITCHER_ENTRY_ACE_SLOT`).
  */
 function pitcherEntriesOf(progress: TeamGameProgress, teamId: number): readonly TeamEntryPitcher[] {
-  return teamId === progress.options.ourTeamId
-    ? progress.ourPitcherEntry
-    : progress.opponentPitcherEntry
+  return teamId === progress.options.ourTeamId ? progress.ourPitcherEntry : progress.opponentPitcherEntry
 }
 
 /** 투수 명단 한 칸 — 없는 칸이면 0번(선발)으로 떨어진다 */
-function pitcherEntryAt(
-  progress: TeamGameProgress,
-  teamId: number,
-  slot: number,
-): TeamEntryPitcher | undefined {
+function pitcherEntryAt(progress: TeamGameProgress, teamId: number, slot: number): TeamEntryPitcher | undefined {
   const entry = pitcherEntriesOf(progress, teamId)
   return entry[slot] ?? entry[0]
 }
@@ -2333,22 +2202,14 @@ function mistakeSkillFlagsOf(bits: number): {
 }
 
 /** 투수 명단 한 칸의 경기용 능력치 네 칸 (제구·구속·변화·체력) */
-function pitcherAbilitiesAt(
-  progress: TeamGameProgress,
-  teamId: number,
-  slot: number,
-): readonly number[] {
+function pitcherAbilitiesAt(progress: TeamGameProgress, teamId: number, slot: number): readonly number[] {
   const entry = pitcherEntryAt(progress, teamId, slot)
   if (entry === undefined) return [0, 0, 0, 0]
   return entryPitcherGameAbilities(pitcherAbilityContextOf(progress), teamId, entry)
 }
 
 /** 투수 명단 한 칸의 구질 표 (폼·마구·보유 구질) */
-function pitcherRepertoireAt(
-  progress: TeamGameProgress,
-  teamId: number,
-  slot: number,
-): PitcherRepertoire {
+function pitcherRepertoireAt(progress: TeamGameProgress, teamId: number, slot: number): PitcherRepertoire {
   return (
     pitcherEntryAt(progress, teamId, slot)?.repertoire ?? {
       name: '',
@@ -2379,9 +2240,7 @@ export function currentPitcherAbility(progress: TeamGameProgress): PitcherAbilit
     control: Math.round(ability[0] / STAGE_PITCHER_DIVISOR),
     velocity: Math.round(ability[1] / STAGE_PITCHER_DIVISOR),
     breaking: Math.round(ability[2] / STAGE_PITCHER_DIVISOR),
-    ...(entry === undefined
-      ? {}
-      : { gameAbility: entryPitcherGameAbilityParts(pitcherAbilityContextOf(progress), teamId, entry) }),
+    ...(entry === undefined ? {} : { gameAbility: entryPitcherGameAbilityParts(pitcherAbilityContextOf(progress), teamId, entry) }),
     staminaPercent: staminaPercentOf(progress.opponentStamina),
     // 공이 손을 떠나는 0x11 진입(0x3dec6 → 0xa5e14)에서 깎은 뒤 체력을 놓기 0x4dc78 · 스윙 0xab214 가 본다 — 깎는 셈은
     // 진행기(`throwOpponentPitch`)와 같은 것이고, 화면이 판정된 공을 넘기면 진행기가 같은 값으로 깎는다
@@ -2411,10 +2270,7 @@ export function opponentMagicStateOf(progress: TeamGameProgress): {
 
 /** 지금 마운드에 선 상대 투수가 마투수면 `ACE_PITCHERS` 칸 0~4, 아니면 −1 */
 export function currentPitcherAceIndex(progress: TeamGameProgress): number {
-  return (
-    pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)
-      ?.aceIndex ?? NO_ACE_BATTER
-  )
+  return pitcherEntryAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)?.aceIndex ?? NO_ACE_BATTER
 }
 
 /**
@@ -2541,9 +2397,7 @@ function teamFielderSeatOf(progress: TeamGameProgress, teamId: number, index: nu
  * (`fielderRecords` — 마지막 교대 판 0x3fac4 가 적은 것, `entities/fielding/model/fielderRecords`).
  */
 function fielderRecordsFor(progress: TeamGameProgress, teamId: number): readonly (TeamFielderSeat | null)[] {
-  return fielderRecordsAtPlayStart(progress.fielderRecords, entryBattersOf(progress, teamId), (index) =>
-    teamFielderSeatOf(progress, teamId, index),
-  )
+  return fielderRecordsAtPlayStart(progress.fielderRecords, entryBattersOf(progress, teamId), (index) => teamFielderSeatOf(progress, teamId, index))
 }
 
 /**
@@ -2605,11 +2459,7 @@ function runAbilityFor(progress: TeamGameProgress, teamId: number, battingOrderI
 
 /** 고를 수 있는 구질 칸 여섯 (0xb6d2c) */
 export function pitchSlotsFor(progress: TeamGameProgress): readonly PitchSlot[] {
-  const repertoire = pitcherRepertoireAt(
-    progress,
-    progress.options.ourTeamId,
-    progress.ourPitcherIndex,
-  )
+  const repertoire = pitcherRepertoireAt(progress, progress.options.ourTeamId, progress.ourPitcherIndex)
   return pitchSlotsOf({
     pitchMask: repertoire.pitchMask,
     form: repertoire.form,
@@ -2671,12 +2521,7 @@ function batterPitch(
   detail: PitchOutcomeDetail,
   random: RandomPort,
   options: BatterOutcomeOptions,
-  applyOutcome: (
-    progress: TeamGameProgress,
-    outcome: AtBatOutcome,
-    random: RandomPort,
-    options: BatterOutcomeOptions,
-  ) => TeamGameProgress,
+  applyOutcome: (progress: TeamGameProgress, outcome: AtBatOutcome, random: RandomPort, options: BatterOutcomeOptions) => TeamGameProgress,
 ): TeamGameProgress {
   if (!isBatterTurn(progress)) return progress
   progress = throwOpponentPitch(progress, detail.pitchTypeNumber)
@@ -2728,16 +2573,10 @@ function batterPitch(
  */
 function withFoulRecords(progress: TeamGameProgress, isFoul: boolean): TeamGameProgress {
   if (!isFoul) {
-    return progress.recordTally.foulStreak === 0
-      ? progress
-      : { ...progress, recordTally: { ...progress.recordTally, foulStreak: 0 } }
+    return progress.recordTally.foulStreak === 0 ? progress : { ...progress, recordTally: { ...progress.recordTally, foulStreak: 0 } }
   }
   const fouled = foulRecordOf(progress.recordTally.foulStreak)
-  return withGameRecords(
-    { ...progress, recordTally: { ...progress.recordTally, foulStreak: fouled.foulStreak } },
-    fouled.recordIds,
-    true,
-  )
+  return withGameRecords({ ...progress, recordTally: { ...progress.recordTally, foulStreak: fouled.foulStreak } }, fouled.recordIds, true)
 }
 
 /**
@@ -2864,8 +2703,7 @@ export function startBatterOutcome(
     const arrivalPlay = options.arrivalPlay ?? null
     return {
       ...progress,
-      pendingBenchClearing:
-        arrivalPlay === null ? { phase: 'wait', side: '공격', outcome } : { phase: 'wait', side: '공격', outcome, arrivalPlay },
+      pendingBenchClearing: arrivalPlay === null ? { phase: 'wait', side: '공격', outcome } : { phase: 'wait', side: '공격', outcome, arrivalPlay },
     }
   }
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
@@ -2929,9 +2767,7 @@ export function judgeHitByPitch(progress: TeamGameProgress, random: RandomPort):
   if (pending === null || pending.phase !== 'wait') return progress
   const held: TeamGameProgress = { ...progress, pendingBenchClearing: null }
   const cleared =
-    pending.side === '공격'
-      ? withBatterBenchClearing(held, pending.outcome, random)
-      : withPitcherBenchClearing(held, pending.outcome, random)
+    pending.side === '공격' ? withBatterBenchClearing(held, pending.outcome, random) : withPitcherBenchClearing(held, pending.outcome, random)
   if (cleared !== held) return { ...cleared, pendingBenchClearing: { ...pending, phase: 'entry' } }
   return finishHeldHitByPitch(held, pending, random)
 }
@@ -2957,10 +2793,7 @@ function finishHeldHitByPitch(
 ): TeamGameProgress {
   const arrival = pending.arrivalPlay ?? null
   if (pending.side === '공격') {
-    const playback =
-      homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs }) ??
-      arrival?.result ??
-      null
+    const playback = homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs }) ?? arrival?.result ?? null
     return finishBatterOutcome(cleared, pending.outcome, random, null, playback)
   }
   // 볼넷 · 사구 · 삼진은 인플레이가 아니라 타구 판 없이 곧장 끝난다 — 밀어내기 판(종류 2)만 재생한다
@@ -2975,11 +2808,7 @@ function finishHeldHitByPitch(
  * 0x12 대기 끝(`judgeHitByPitch`)이 부른다 — 들어가면 연출(상태 0x1e)을 붙든다(`enterBenchClearing` · `resolveBenchClearing`).
  * 우리가 던진 공에 CPU 타자가 맞는 쪽(코드 1 이 S[1] 에 남고 우리 투수 스태미나 −1000)은 `withPitcherBenchClearing`.
  */
-function withBatterBenchClearing(
-  progress: TeamGameProgress,
-  outcome: AtBatOutcome,
-  random: RandomPort,
-): TeamGameProgress {
+function withBatterBenchClearing(progress: TeamGameProgress, outcome: AtBatOutcome, random: RandomPort): TeamGameProgress {
   const entered = rollsIntoBenchClearing(
     {
       isHitByPitch: outcome.kind === '사구',
@@ -2993,12 +2822,7 @@ function withBatterBenchClearing(
   return appendLog(
     {
       ...progress,
-      opponentPitcherCounters: addRunsToCounters(
-        progress.opponentPitcherCounters,
-        0,
-        effect.defensePitchCountGain,
-        false,
-      ),
+      opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, 0, effect.defensePitchCountGain, false),
       gameRecord: withSeasonRecord(progress, '공격', [effect.seasonRecordCode]),
     },
     `${progress.game.inning}회${progress.game.half} 벤치 클리어링`,
@@ -3085,8 +2909,7 @@ function finishBatterOutcome(
   )
   const runsBattedIn = game.ourScore - before.ourScore
   // 아웃 수는 반 이닝이 넘어가면 0 으로 되돌아가므로 진행 결과에서 직접 읽는다 (`gameFlow` 와 같은 길)
-  const outsAdded =
-    defensePlay?.advance.outsAdded ?? advanceRunners(before.bases, outcome, before.outs).outsAdded
+  const outsAdded = defensePlay?.advance.outsAdded ?? advanceRunners(before.bases, outcome, before.outs).outsAdded
   const slot = before.battingOrderIndex
   const isWalkOff = game.isFinished && runsBattedIn > 0 && game.ourScore > game.opponentScore
   const runnerPlay = stealPlay !== undefined
@@ -3101,9 +2924,7 @@ function finishBatterOutcome(
     : offenseRecordOf(outcome, runsBattedIn, progress.ourHitBases[slot] ?? [], homeRunCounted)
   // 기록달성 (0xa8024 → 0xa77f0) — 사람 공격이라 공격 계열이 게이트를 지난다. 5 대타 홈런은 ctx+0x160 을 본다.
   // 종류 5 정산은 타석 결과 목록(0xa908d)도 백투백 카운터 지우기(a8ab2)도 안 지난다
-  const recorded = runnerPlay
-    ? progress
-    : withOurAtBatRecords(progress, slot, outcome, runsBattedIn, isPinchHitAtBat(progress), homeRunCounted)
+  const recorded = runnerPlay ? progress : withOurAtBatRecords(progress, slot, outcome, runsBattedIn, isPinchHitAtBat(progress), homeRunCounted)
 
   const next: TeamGameProgress = {
     ...recorded,
@@ -3154,35 +2975,30 @@ function finishBatterOutcome(
     ourEntryRecords: withPlateAppearance(progress.ourEntryRecords, slot, runnerPlay ? null : outcome, false, homeRunCounted),
     leaguePlateAppearances: runnerPlay
       ? progress.leaguePlateAppearances
-      : withLeaguePlateAppearance(
-          progress.leaguePlateAppearances,
-          progress.options.ourTeamId,
-          progress.ourEntry,
-          slot,
-          outcome,
-          runsBattedIn,
-        ),
+      : withLeaguePlateAppearance(progress.leaguePlateAppearances, progress.options.ourTeamId, progress.ourEntry, slot, outcome, runsBattedIn),
   }
 
   // 돌발 결과 비트 0xa599c 는 종류 4·5 정산이면 안 켠다 — 0x12 끝 · 0x17 끝의 0x8f414 가 비트 0 으로 돌아 판정이 없다
   // (`finishDefensiveAtBat` 의 같은 자리 주석)
-  const resolved = runnerPlay ? next : resolveBurstFor(next, {
-    outcome,
-    runsBattedIn,
-    outsBefore: before.outs,
-    // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
-    outsAdded: outsAdded + (droppedThirdStrike ? 1 : 0),
-    strikeoutWhileRunning: droppedThirdStrike,
-    humanTeamWalkOff: isWalkOff,
-    batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
-    // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
-    isBunt: defensePlay?.buntBall === true,
-    runnersAdvanced: defensePlay?.sacrifice === true,
-    // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
-    foulBall: defensePlay?.buntFoulOut === true,
-    runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
-    homeRunCounted,
-  })
+  const resolved = runnerPlay
+    ? next
+    : resolveBurstFor(next, {
+        outcome,
+        runsBattedIn,
+        outsBefore: before.outs,
+        // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
+        outsAdded: outsAdded + (droppedThirdStrike ? 1 : 0),
+        strikeoutWhileRunning: droppedThirdStrike,
+        humanTeamWalkOff: isWalkOff,
+        batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
+        // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
+        isBunt: defensePlay?.buntBall === true,
+        runnersAdvanced: defensePlay?.sacrifice === true,
+        // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+        foulBall: defensePlay?.buntFoulOut === true,
+        runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
+        homeRunCounted,
+      })
 
   return advance(
     appendLog(
@@ -3216,11 +3032,7 @@ export interface TeamPitchInput {
  *
  * ⚠️ 수비 화면을 띄우는 화면은 `startThrowPitch` 를 쓴다 — 이쪽은 타구까지 미리 다 돌려 버린다.
  */
-export function throwPitch(
-  progress: TeamGameProgress,
-  input: TeamPitchInput,
-  random: RandomPort,
-): TeamGameProgress {
+export function throwPitch(progress: TeamGameProgress, input: TeamPitchInput, random: RandomPort): TeamGameProgress {
   return pitchOnce(progress, input, random, false)
 }
 
@@ -3266,12 +3078,7 @@ export interface TeamPendingPitchArrival {
 }
 
 /** 우리 공의 0x3dfac 과 그 뒤 — `pitchOnce` · `enterPitchResult` 의 꼬리 */
-function arriveOurPitchThenRest(
-  progress: TeamGameProgress,
-  pitch: TeamPendingPitchArrival,
-  random: RandomPort,
-  defer: boolean,
-): TeamGameProgress {
+function arriveOurPitchThenRest(progress: TeamGameProgress, pitch: TeamPendingPitchArrival, random: RandomPort, defer: boolean): TeamGameProgress {
   const resume = { isUncatchable: pitch.isUncatchable, buntKind: pitch.buntKind }
   const arrival = arriveTeamPitch(
     progress,
@@ -3297,13 +3104,7 @@ function ourFatiguedStatsOf(progress: TeamGameProgress, stats: PitcherStats, sta
 }
 
 /** `defer` 가 참이면 인플레이 타구에서 멈춘다 — 그 밖은 예전처럼 타구까지 한 번에 돌린다 */
-function pitchOnce(
-  progress: TeamGameProgress,
-  input: TeamPitchInput,
-  random: RandomPort,
-  defer: boolean,
-  holdsArrival = false,
-): TeamGameProgress {
+function pitchOnce(progress: TeamGameProgress, input: TeamPitchInput, random: RandomPort, defer: boolean, holdsArrival = false): TeamGameProgress {
   if (!isPitchTurn(progress) || progress.pendingPitchArrival != null) return progress
   const { options } = progress
   const isMagic = input.typeNumber === MAGIC_PITCH_TYPE_NUMBER
@@ -3400,8 +3201,7 @@ function pitchOnce(
 
   const batter = entryStageAbilityOf(progress, options.opponentTeamId, progress.opponentOrderIndex)
   // 0xb633d(타자) — 레코드 +0xa 비트 6. 명단에 끼운 마타자(`withAceBatter`)만 참이다
-  const aceBatterIndex =
-    entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]?.aceIndex ?? NO_ACE_BATTER
+  const aceBatterIndex = entryBattersOf(progress, options.opponentTeamId)[progress.opponentOrderIndex]?.aceIndex ?? NO_ACE_BATTER
   const isMagicBatter = aceBatterIndex >= 0
   const ourRepertoireAce = repertoire.magicId >= ACE_SPECIAL_NUMBER_OFFSET
   // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 CPU 타자 결정(11번째 틱 0x34334)
@@ -3501,11 +3301,7 @@ function pitchOnce(
     opponentSpecialSwingRemaining:
       thrown.specialSwingRemaining === null
         ? progress.opponentSpecialSwingRemaining
-        : withSpecialSwingSlot(
-            progress.opponentSpecialSwingRemaining,
-            progress.opponentOrderIndex,
-            thrown.specialSwingRemaining,
-          ),
+        : withSpecialSwingSlot(progress.opponentSpecialSwingRemaining, progress.opponentOrderIndex, thrown.specialSwingRemaining),
     pitchCount: progress.pitchCount + 1,
     // 투구마다 state[0xd] 가 내려간다 (0xa5e72) — 그 뒤라야 다시 교체를 볼 수 있다
     pitcherJustChanged: false,
@@ -3593,9 +3389,7 @@ function afterOurPitchArrival(
     const held: TeamGameProgress = {
       ...arrived,
       pendingBenchClearing:
-        arrival.play === null
-          ? { phase: 'wait', side: '수비', outcome }
-          : { phase: 'wait', side: '수비', outcome, arrivalPlay: arrival.play },
+        arrival.play === null ? { phase: 'wait', side: '수비', outcome } : { phase: 'wait', side: '수비', outcome, arrivalPlay: arrival.play },
     }
     return defer ? held : resolveBenchClearing(held, { reachedTargetTick: true }, random)
   }
@@ -3636,12 +3430,7 @@ export function resolveRunnerPlay(progress: TeamGameProgress, result: DefensePla
     if (batter === undefined || batter.outcome === null) return enterPitchSelection(arrival.progress, random)
     return startBatterOutcome(arrival.progress, batter.outcome, random, { ...batter.options, arrivalPlay: arrival.play })
   }
-  return afterOurPitchArrival(
-    applyTeamArrival(cleared, play, '수비'),
-    pending.resume ?? { buntKind: 0 },
-    random,
-    true,
-  )
+  return afterOurPitchArrival(applyTeamArrival(cleared, play, '수비'), pending.resume ?? { buntKind: 0 }, random, true)
 }
 
 /**
@@ -3651,11 +3440,7 @@ export function resolveRunnerPlay(progress: TeamGameProgress, result: DefensePla
  * 시즌 팀 경기(모드 2)일 때만 적는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
  * 0x12 대기 끝(`judgeHitByPitch`)이 부른다 — 들어가면 연출(상태 0x1e)을 붙든다(`enterBenchClearing` · `resolveBenchClearing`).
  */
-function withPitcherBenchClearing(
-  progress: TeamGameProgress,
-  outcome: AtBatOutcome,
-  random: RandomPort,
-): TeamGameProgress {
+function withPitcherBenchClearing(progress: TeamGameProgress, outcome: AtBatOutcome, random: RandomPort): TeamGameProgress {
   const entered = rollsIntoBenchClearing(
     {
       isHitByPitch: outcome.kind === '사구',
@@ -3713,9 +3498,7 @@ function startDefensiveAtBat(
     // 내가 던진 타석이면 홈런도 날아가는 그림을 보여 준다 (자동으로 넘긴 타석은 재생 자체가 없다).
     // 볼넷 · 사구면 이 공이 연 밀어내기 판(종류 2)을 재생한다 — 진루는 보통 길과 같다
     const walkPlayback = arrival !== null && arrivalApplicationOf(arrival) === 'freePass' ? arrival.result : null
-    const playback = mine
-      ? homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs }) ?? walkPlayback
-      : null
+    const playback = mine ? (homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs }) ?? walkPlayback) : null
     return finishDefensiveAtBat(
       progress,
       outcome,
@@ -3749,12 +3532,7 @@ const FOUL_PLAY_OUTCOME: AtBatOutcome = { kind: '아웃', detail: '뜬공아웃'
  * **사람이 던진 타석의 파울 각 공 판** — 맞은 공이라 판을 돈다(타석은 아직 안 끝났다). 판이 파울로 닫히면(`foulEnded`)
  * `resolveDefensePlay` 가 스트라이크를 올리고 같은 타석 다음 공으로, 낙구 전에 잡히면 파울 뜬공 아웃으로 타석을 끝낸다.
  */
-function startDefensiveFoulPlay(
-  progress: TeamGameProgress,
-  contact: BattedContact,
-  random: RandomPort,
-  buntKind: number,
-): TeamGameProgress {
+function startDefensiveFoulPlay(progress: TeamGameProgress, contact: BattedContact, random: RandomPort, buntKind: number): TeamGameProgress {
   const stealing = progress
   // 파울 각 공 판도 타구 판(종류 1)이다 — 시작 리드 0x3d7b8 이 출발 표시를 지운다
   const cleared = withoutStealDisplay(progress)
@@ -3965,10 +3743,7 @@ function finishDefensiveAtBat(
       '수비',
       defenseRecordCodesOf(
         outcome,
-        applied.outsAdded +
-          (stealPlayOuts ?? 0) +
-          (wildPitchPlay?.result.advance.outsAdded ?? 0) +
-          (droppedThirdStrike ? 1 : 0),
+        applied.outsAdded + (stealPlayOuts ?? 0) + (wildPitchPlay?.result.advance.outsAdded ?? 0) + (droppedThirdStrike ? 1 : 0),
         stealPlay !== undefined,
         droppedThirdStrike,
       ),
@@ -4016,27 +3791,27 @@ function finishDefensiveAtBat(
   // ctx+0x188 을 지우는 곳은 타석 초기화 0xa5bcc(a5be0) 하나뿐이라 그 사이 다른 비트가 없다 → 8f41e 에서 그냥 돌아간다(판정 없음,
   // 돌발은 남는다). 웹도 판정을 건너뛰어 같은 결과다 — 남은 돌발은 다음 사람 타석 끝에 그 타석의 비트로 판정된다
   // (0x21 진입 · 0x18 뒤집힘이 먼저면 0x8f628 이 내린다)
-  const resolved = mine && stealPlay === undefined
-    ? resolveBurstFor(recorded, {
-        outcome,
-        runsBattedIn: applied.runsScored,
-        outsBefore: before.outs,
-        // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
-        outsAdded: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
-        strikeoutWhileRunning: droppedThirdStrike,
-        // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
-        humanTeamWalkOff:
-          applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
-        batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
-        // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
-        isBunt: defensePlay?.buntBall === true,
-        runnersAdvanced: defensePlay?.sacrifice === true,
-        // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
-        foulBall: defensePlay?.buntFoulOut === true,
-        runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
-        homeRunCounted,
-      })
-    : recorded
+  const resolved =
+    mine && stealPlay === undefined
+      ? resolveBurstFor(recorded, {
+          outcome,
+          runsBattedIn: applied.runsScored,
+          outsBefore: before.outs,
+          // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
+          outsAdded: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
+          strikeoutWhileRunning: droppedThirdStrike,
+          // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
+          humanTeamWalkOff: applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
+          batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
+          // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
+          isBunt: defensePlay?.buntBall === true,
+          runnersAdvanced: defensePlay?.sacrifice === true,
+          // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+          foulBall: defensePlay?.buntFoulOut === true,
+          runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
+          homeRunCounted,
+        })
+      : recorded
 
   return appendLog(
     resolved,
@@ -4058,11 +3833,7 @@ function finishDefensiveAtBat(
  * 공격이었으면 우리 타석 길로, 수비였으면 상대 타석 길로 간다 — 붙들 때 적어 둔 `side` 가 가른다.
  * 이미 눈으로 다 본 플레이라 재생거리(`lastDefensePlay`)로는 남기지 않는다.
  */
-export function resolveDefensePlay(
-  progress: TeamGameProgress,
-  result: DefensePlayResult,
-  random: RandomPort,
-): TeamGameProgress {
+export function resolveDefensePlay(progress: TeamGameProgress, result: DefensePlayResult, random: RandomPort): TeamGameProgress {
   const pending = progress.pendingDefensePlay
   if (pending === null) return progress
   // 판이 남긴 수비 장면 연출 칸은 다음 판으로 (`defenseScene`)
@@ -4253,11 +4024,7 @@ function withRunnerOnlyAdvance(
       runnerFates === undefined
         ? scoredFromBasesOf(
             humanDefends ? runnersOfGame(before, progress.opponentOrderIndex) : runnersOfGame(before),
-            halfChanged
-              ? EMPTY_BASE_RUNNERS
-              : humanDefends
-                ? runnersOfGame(game, progress.opponentOrderIndex)
-                : runnersOfGame(game),
+            halfChanged ? EMPTY_BASE_RUNNERS : humanDefends ? runnersOfGame(game, progress.opponentOrderIndex) : runnersOfGame(game),
             runs,
           )
         : chargedFromBasesOfFates(runnerFates, before.outs + advanceResult.outsAdded),
@@ -4376,9 +4143,7 @@ function stealPlayWithStrikeoutOf(arrival: PitchArrivalPlay | null | undefined, 
  * → 0xd · 정산). 낫아웃(`batterRuns`)은 그 판이 곧 타석의 진루라 따로 간다.
  */
 function wildPitchWithStrikeoutOf(arrival: PitchArrivalPlay | null | undefined, outcome: AtBatOutcome): PitchArrivalPlay | undefined {
-  return arrival != null && arrival.kind === 9 && arrival.strikeout === 'strikeoutStands' && outcome.kind === '삼진'
-    ? arrival
-    : undefined
+  return arrival != null && arrival.kind === 9 && arrival.strikeout === 'strikeoutStands' && outcome.kind === '삼진' ? arrival : undefined
 }
 
 /** 공 도착 한 걸음의 결과 */
@@ -4538,26 +4303,19 @@ function applyTeamArrival(progress: TeamGameProgress, play: PitchArrivalPlay, hu
   const base = play.shownLive === true ? opened : { ...opened, lastDefensePlay: play.result }
   const settledApply = withRunnerOnlyAdvance(base, play.result.advance, humanSide, play.result.runnerFates)
   const ended =
-    settledApply.progress.game.isFinished ||
-    settledApply.progress.game.inning !== before.inning ||
-    settledApply.progress.game.half !== before.half
+    settledApply.progress.game.isFinished || settledApply.progress.game.inning !== before.inning || settledApply.progress.game.half !== before.half
   // 판정 B 가 정산을 건너뛰는 판(삼진 없이 이어지는 폭투·포일 — ae596 → ae5a2)은 정산 칸을 안 센다
   const settles = arrivalPlaySettles(play, { halfOrGameEnded: ended })
-  let next = settles
-    ? settledApply.progress
-    : withRunnerOnlyAdvance(base, play.result.advance, humanSide, play.result.runnerFates, false).progress
+  let next = settles ? settledApply.progress : withRunnerOnlyAdvance(base, play.result.advance, humanSide, play.result.runnerFates, false).progress
   // 삼진 + 도루 판(종류 5) — 삼진 콜 0xa7c4c(16 삼구 · 17 풀카운트)는 정산 0xa8024 보다 **먼저** 났다(정산이 그 콜이 넣은 사건 5 를
   // 세어 [sp+0x20] 으로 쓴다, a8d00). 그래서 알림 차례는 16/17 → 36 → 24(a83de)다 — 타석 결과 쪽(`withOurDefenseRecords` 의
   // `stealPlayOuts`)은 다시 안 준다. 16/17 은 수비 계열이라 사람 수비에서만 게이트를 지난다
   const strikeoutSteal = play.kind === 5 && progress.atBat.outcome?.kind === '삼진'
-  const strikeoutCall = strikeoutSteal
-    ? strikeoutCallRecordIdsOf({ pitches: progress.recordTally.atBatPitches, balls: progress.atBat.balls })
-    : []
+  const strikeoutCall = strikeoutSteal ? strikeoutCallRecordIdsOf({ pitches: progress.recordTally.atBatPitches, balls: progress.atBat.balls }) : []
   // 그 한 정산 안에서는 머리의 36(a80f8 — [sp+0x30] > 0 && state[0x8b])이 도루 루프의 24(a83de)보다 먼저다. [sp+0x30] 에는 삼진
   // 사건 5 가 들어 늘 0 보다 크다 — 타석 결과 쪽(`withOurDefenseRecords` 의 `stealPlayOuts`)은 36 을 다시 안 준다
   const laserThrow = strikeoutSteal
-    ? laserThrowOutRecordOf({ laserThrowFlag: play.result.laserOutFlag, outsInPlay: play.result.advance.outsAdded + 1 })
-        .recordIds
+    ? laserThrowOutRecordOf({ laserThrowFlag: play.result.laserOutFlag, outsInPlay: play.result.advance.outsAdded + 1 }).recordIds
     : []
   next = withGameRecords(next, [...strikeoutCall, ...laserThrow, ...play.recordIds], humanOffense)
   next = withLeagueStolenBases(next, progress, play, humanOffense)
@@ -4574,11 +4332,7 @@ function applyTeamArrival(progress: TeamGameProgress, play: PitchArrivalPlay, hu
   // 같은 타석이 이어지면 이 판의 사건이 목록에 남아 다음 견제 정산이 함께 센다 — 다음 공의 0xa5e14 가 비운다
   next = {
     ...next,
-    pendingSettlementEvents: pendingSettlementEventsAfter(
-      undefined,
-      settlementEventsOfPlay(play.result),
-      progress.atBat.outcome === null && !ended,
-    ),
+    pendingSettlementEvents: pendingSettlementEventsAfter(undefined, settlementEventsOfPlay(play.result), progress.atBat.outcome === null && !ended),
   }
   next = appendLog(next, `${before.inning}회${before.half} ${describeArrivalPlay(play, humanOffense)}`, true)
   return { progress: next, play, interrupted: ended }
@@ -4678,9 +4432,7 @@ function withRunnerPlaySettlement(
     [
       ...laserThrowOutRecordOf({ laserThrowFlag: result.laserOutFlag, outsInPlay }).recordIds,
       ...multiOutPlayRecordIdsOf({ outsInPlay, strikeoutWhileRunning: false }),
-      ...(playOuts > 0
-        ? threePitchInningRecordIdsOf(halfInningPitchesOf(before.recordTally, before.game), before.game.outs + playOuts)
-        : []),
+      ...(playOuts > 0 ? threePitchInningRecordIdsOf(halfInningPitchesOf(before.recordTally, before.game), before.game.outs + playOuts) : []),
     ],
     false,
   )
@@ -4786,10 +4538,7 @@ function offenseRunnerTeamGradeOf(progress: TeamGameProgress, ourOffense: boolea
   return runnerTeamGradeFor(abilityContextOf(options), ourOffense ? options.ourTeamId : options.opponentTeamId)
 }
 
-function runAbilitiesOnBaseOf(
-  progress: TeamGameProgress,
-  humanSide: ControlSide,
-): Partial<Record<0 | 1 | 2 | 3, number>> {
+function runAbilitiesOnBaseOf(progress: TeamGameProgress, humanSide: ControlSide): Partial<Record<0 | 1 | 2 | 3, number>> {
   const ours = humanSide === '공격'
   const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
   const order = ours ? progress.game.battingOrderIndex : progress.opponentOrderIndex
@@ -4872,11 +4621,7 @@ function substitutionSceneAfter(
 }
 
 /** 0x3d458 3d562 `0x668cc(스킨, 공격 팀, 0)` 재료 — 나가는 타자의 레코드 칸 (`SubstitutionScene.cheerRestore`) */
-function withCheerRestore(
-  scene: SubstitutionScene,
-  attackSide: number,
-  outgoing: TeamEntryBatter | undefined,
-): SubstitutionScene {
+function withCheerRestore(scene: SubstitutionScene, attackSide: number, outgoing: TeamEntryBatter | undefined): SubstitutionScene {
   if (outgoing?.recordSlot === undefined) return scene
   return { ...scene, cheerRestore: { attackSide, recordSlot: outgoing.recordSlot } }
 }
@@ -4969,14 +4714,12 @@ export function burstGameRecordOf(
       entry?.tableSlot === undefined || entry.aceIndex >= 0
         ? undefined
         : progress.pitcherLines.find(
-            (candidate) =>
-              candidate.teamId === (entry.tableTeamId ?? progress.options.opponentTeamId)
-              && candidate.pitcherSlot === entry.tableSlot,
+            (candidate) => candidate.teamId === (entry.tableTeamId ?? progress.options.opponentTeamId) && candidate.pitcherSlot === entry.tableSlot,
           )
     return {
       hitsInGame: progress.ourEntryRecords[slot]?.hits ?? 0,
       homeRunsInGame: progress.ourEntryRecords[slot]?.homeRuns ?? 0,
-      strikeoutsInGame: entry !== undefined && entry.aceIndex >= 0 ? progress.opponentAceStrikeouts : line?.strikeouts ?? 0,
+      strikeoutsInGame: entry !== undefined && entry.aceIndex >= 0 ? progress.opponentAceStrikeouts : (line?.strikeouts ?? 0),
     }
   }
   return {
@@ -5015,9 +4758,7 @@ function enterPitchSelection(entering: TeamGameProgress, random: RandomPort): Te
   const progress = withoutStealDisplay(entering)
   // 3d9fc · 3da44 — 돌발 진행 중(0x8eb94 = obj+0xc ≠ −1)이면 두 판정 모두 건너뛴다
   if (progress.burst !== null && progress.burst.current !== null) return progress
-  const changed = isOurOffense(progress)
-    ? judgeAutoPitcherChange(progress, false, random, true)
-    : applyCpuPinchHit(progress, false, random, true)
+  const changed = isOurOffense(progress) ? judgeAutoPitcherChange(progress, false, random, true) : applyCpuPinchHit(progress, false, random, true)
   if (changed === progress) return progress
   // 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 수비가 CPU 일 때만,
   // 내려가는 투수의 구질 목록 · 남은 마구로 (`rollCpuPitchTypeOnPitcherChangeTick`)
@@ -5072,8 +4813,7 @@ function resolveBurstFor(
     ...(options === progress.options ? {} : { options }),
     burst: resolution.session,
     lastBurstResolution: resolution.judgement !== null ? resolution : null,
-    burstRewardDeltas:
-      resolution.deltas.length === 0 ? progress.burstRewardDeltas : [...progress.burstRewardDeltas, ...resolution.deltas],
+    burstRewardDeltas: resolution.deltas.length === 0 ? progress.burstRewardDeltas : [...progress.burstRewardDeltas, ...resolution.deltas],
   }
 }
 
@@ -5111,16 +4851,12 @@ function judgeAutoPitcherChange(
   const bench = benchIndexesOf(
     current,
     used,
-    pitcherEntriesOf(progress, defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId)
-      .length,
+    pitcherEntriesOf(progress, defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId).length,
   )
   const defenseScore = defendingIsOurs ? game.ourScore : game.opponentScore
   const offenseScore = defendingIsOurs ? game.opponentScore : game.ourScore
 
-  const entries = pitcherEntriesOf(
-    progress,
-    defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
-  )
+  const entries = pitcherEntriesOf(progress, defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId)
   const decision = judgePitcherChange({
     ...counters,
     // ac4a0 0xb6ded(마운드 투수) — 명단 칸의 보직(로스터 칸 표), 모르면 선발
@@ -5160,13 +4896,7 @@ function judgeAutoPitcherChange(
       benchRoleOf: (index) => entries[index]?.role,
       // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 경기용 능력치(체력 인자 90) 네 칸 합 — 시즌 내 팀 보정·팀 능력치·코치까지
       benchAbilitySumOf: (index) =>
-        pitcherAbilitySumOf(
-          pitcherAbilitiesAt(
-            progress,
-            defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
-            index,
-          ),
-        ),
+        pitcherAbilitySumOf(pitcherAbilitiesAt(progress, defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId, index)),
     },
     random,
   )
@@ -5181,18 +4911,12 @@ function judgeAutoPitcherChange(
           scenePitcherChange: {
             serial: (progress.scenePitcherChange?.serial ?? 0) + 1,
             incomingIsAce:
-              (pitcherEntriesOf(
-                progress,
-                defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
-              )[next]?.aceIndex ?? -1) >= 0,
+              (pitcherEntriesOf(progress, defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId)[next]?.aceIndex ?? -1) >= 0,
           },
           substitutionScene: substitutionSceneAfter(
             changed,
             '투수',
-            pitcherEntriesOf(
-              progress,
-              defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId,
-            )[next]?.aceIndex ?? -1,
+            pitcherEntriesOf(progress, defendingIsOurs ? progress.options.ourTeamId : progress.options.opponentTeamId)[next]?.aceIndex ?? -1,
           ),
         }
       : changed,
@@ -5229,11 +4953,7 @@ export interface ReplacementPickInput {
  * 올린다. 마무리 상황이거나 벤치에 마투수가 없으면 난수 없이 0xabfcc 로 가고, 0xabfcc 는 마선수를 고르지 않는다.
  * 팀 경기는 한 팀을 사람이 잡으므로 "두 팀 다 CPU"(0xb6c20)가 아니고, 모드 3 이 아니라 내 선수 거르기도 없다.
  */
-export function replacementPitcherIndexOf(
-  bench: readonly number[],
-  input: ReplacementPickInput,
-  random: RandomPort,
-): number {
+export function replacementPitcherIndexOf(bench: readonly number[], input: ReplacementPickInput, random: RandomPort): number {
   return replacementPitcherSlotOf(
     bench.map((index) => ({
       index,
@@ -5260,11 +4980,7 @@ export function replacementPitcherIndexOf(
  * 칸 수는 **투수 명단 길이**다. 원본도 `team+0x33 = 명부[0xc] − 1` 로 명부 길이에서 셈하므로
  * (0xb896c), 마투수가 들어와 명부가 8 → 9 로 늘면 벤치 투수도 7 → 8 로 는다.
  */
-function benchIndexesOf(
-  current: number,
-  used: readonly number[],
-  entryLength: number,
-): readonly number[] {
+function benchIndexesOf(current: number, used: readonly number[], entryLength: number): readonly number[] {
   const out: number[] = []
   for (let index = 0; index < entryLength; index += 1) {
     if (index === current || used.includes(index)) continue
@@ -5288,10 +5004,7 @@ function benchIndexesOf(
  *
  * 스킬 23 혼신(+2)은 `0xb62b4(P, 0x17)` — 명단 줄 레코드 +0x14(`TeamEntryPitcher.skillBits`, 마투수는 XlsACE_PIT 행)로 본다.
  */
-function magicCountOfPitcher(
-  pitcher: TeamEntryPitcher | undefined,
-  aceLevels: TeamGameOptions['aceLevels'],
-): number {
+function magicCountOfPitcher(pitcher: TeamEntryPitcher | undefined, aceLevels: TeamGameOptions['aceLevels']): number {
   if (pitcher === undefined) return 0
   const isAce = pitcher.aceIndex >= 0
   return magicPitchCountOf({
@@ -5347,10 +5060,7 @@ function applyPitcherChange(
       ourPitcherIndex: nextIndex,
       ourPitcherStaminas: withValueAt(progress.ourPitcherStaminas, progress.ourPitcherIndex, progress.stamina),
       stamina: progress.ourPitcherStaminas[nextIndex] ?? FULL_STAMINA,
-      magicRemaining: magicCountOfPitcher(
-        pitcherEntryAt(progress, progress.options.ourTeamId, nextIndex),
-        progress.options.aceLevels,
-      ),
+      magicRemaining: magicCountOfPitcher(pitcherEntryAt(progress, progress.options.ourTeamId, nextIndex), progress.options.aceLevels),
       ourPitcherCounters: EMPTY_MOUND_COUNTERS,
       pitchCount: 0,
       // 기록달성이 보는 R 은 **새 투수의** 경기 기록이다(0xb8cec = team+0x244+4·team[0]) — 이 경기에 처음 서니 0
@@ -5361,16 +5071,9 @@ function applyPitcherChange(
     ...base,
     opponentUsedPitchers: [...progress.opponentUsedPitchers, progress.opponentPitcherIndex],
     opponentPitcherIndex: nextIndex,
-    opponentPitcherStaminas: withValueAt(
-      progress.opponentPitcherStaminas,
-      progress.opponentPitcherIndex,
-      progress.opponentStamina,
-    ),
+    opponentPitcherStaminas: withValueAt(progress.opponentPitcherStaminas, progress.opponentPitcherIndex, progress.opponentStamina),
     opponentStamina: progress.opponentPitcherStaminas[nextIndex] ?? FULL_STAMINA,
-    opponentMagicRemaining: magicCountOfPitcher(
-      pitcherEntryAt(progress, progress.options.opponentTeamId, nextIndex),
-      progress.options.aceLevels,
-    ),
+    opponentMagicRemaining: magicCountOfPitcher(pitcherEntryAt(progress, progress.options.opponentTeamId, nextIndex), progress.options.aceLevels),
     opponentPitcherCounters: EMPTY_MOUND_COUNTERS,
     // 새 투수의 경기 기록 R 은 이 경기에 처음 서니 0 이다 (우리 쪽 `recordTally.moundStrikeouts` 와 같다)
     opponentAceStrikeouts: 0,
@@ -5445,11 +5148,7 @@ export function returnToPitchSelection(progress: TeamGameProgress, random: Rando
 
 /** 지금 바꿔 넣을 수 있는 우리 팀 투수 칸 — 화면의 투수 교체 목록이 쓴다 */
 export function availablePitchers(progress: TeamGameProgress): readonly number[] {
-  return benchIndexesOf(
-    progress.ourPitcherIndex,
-    progress.ourUsedPitchers,
-    progress.ourPitcherEntry.length,
-  )
+  return benchIndexesOf(progress.ourPitcherIndex, progress.ourUsedPitchers, progress.ourPitcherEntry.length)
 }
 
 /**
@@ -5546,11 +5245,7 @@ export function pinchHit(
       // 4. 벤치 타자 수 −1
       ourBenchBatters: Math.max(0, progress.ourBenchBatters - 1),
       // 0xaede0 — 그 타순의 필살 남은 칸을 −1 로 되돌려 들어온 선수가 자기 횟수를 새로 받는다 (H2 1-2)
-      ourSpecialSwingRemaining: withSpecialSwingSlot(
-        progress.ourSpecialSwingRemaining,
-        progress.game.battingOrderIndex,
-        UNFILLED_SPECIAL_SWING,
-      ),
+      ourSpecialSwingRemaining: withSpecialSwingSlot(progress.ourSpecialSwingRemaining, progress.game.battingOrderIndex, UNFILLED_SPECIAL_SWING),
       // 상태 0x16 → 0xd: 이전 상태가 0x16 이라 0xb6764·0xa5bcc 를 건너뛴다 — 카운트를 그대로 둔다
       atBat: progress.atBat,
       // 0x3d458 → 0xa5bf0(ctx, 0): 사람 공격이라 ctx+0x160 = 1
@@ -5707,11 +5402,7 @@ function applyCpuPinchHit(
         opponentEntry: swapped.entry,
         opponentEntryRecords: swapped.records,
         opponentBenchBatters: Math.max(0, progress.opponentBenchBatters - 1),
-        opponentSpecialSwingRemaining: withSpecialSwingSlot(
-          progress.opponentSpecialSwingRemaining,
-          slot,
-          UNFILLED_SPECIAL_SWING,
-        ),
+        opponentSpecialSwingRemaining: withSpecialSwingSlot(progress.opponentSpecialSwingRemaining, slot, UNFILLED_SPECIAL_SWING),
       }
 
   return appendLog(
@@ -5755,9 +5446,7 @@ const AUTO_PROGRESS_LAST_INNING_INDEX = 5
 
 /** 이 모드의 자동진행 G포인트 비용 */
 export function autoProgressCostOf(mode: number): number {
-  return mode === TEAM_GAME_MODE.대전 || mode === TEAM_GAME_MODE.대전이벤트
-    ? AUTO_PROGRESS_COST_VERSUS
-    : AUTO_PROGRESS_COST
+  return mode === TEAM_GAME_MODE.대전 || mode === TEAM_GAME_MODE.대전이벤트 ? AUTO_PROGRESS_COST_VERSUS : AUTO_PROGRESS_COST
 }
 
 /** 대전모드인가 — 6회 제한과 100G 가 붙는 두 모드 */
@@ -5843,9 +5532,7 @@ export function runAutoProgress(progress: TeamGameProgress, random: RandomPort):
  */
 export function stealableBases(progress: TeamGameProgress): readonly StealBase[] {
   if (!isBatterTurn(progress)) return []
-  return ([1, 2, 3] as const).filter(
-    (base) => startHumanSteal(progress.game.bases, progress.stealingFrom, base) !== progress.stealingFrom,
-  )
+  return ([1, 2, 3] as const).filter((base) => startHumanSteal(progress.game.bases, progress.stealingFrom, base) !== progress.stealingFrom)
 }
 
 /** 도루 대상 주자가 선 루 */
@@ -6016,11 +5703,7 @@ export function stepAutoRelay(progress: TeamGameProgress, random: RandomPort): T
 }
 
 /** 그 틱 뒤 진행을 중계 칸에 싣는다 — 사본에는 중계 칸을 안 남긴다 */
-function relayTickOf(
-  after: TeamGameProgress,
-  before: GameState,
-  atBat: TeamAutoRelayTick['atBat'],
-): TeamAutoRelayTick {
+function relayTickOf(after: TeamGameProgress, before: GameState, atBat: TeamAutoRelayTick['atBat']): TeamAutoRelayTick {
   return { progress: { ...after, autoRelay: null }, before, halfFlipped: false, atBat }
 }
 
@@ -6164,11 +5847,7 @@ const MAXIMUM_QUICK_SUBSTITUTION_CALLS = 3
  * 자동으로 넘기는 우리 타석 — 원본도 같은 간이 엔진을 쓴다 (0xc11f0). 0xc262c 머리의 교체 판정 0xc1ba4(우리가 공격 중이면
  * **상대 투수**를 본다)는 부르는 쪽이 먼저 다 지났다(`playAutoAtBat` · `playAutoTick`).
  */
-function playAutoOffenseAtBat(
-  progress: TeamGameProgress,
-  random: RandomPort,
-  relay?: TeamAutoRelayTick[],
-): TeamGameProgress {
+function playAutoOffenseAtBat(progress: TeamGameProgress, random: RandomPort, relay?: TeamAutoRelayTick[]): TeamGameProgress {
   // 이어 c26b6 0xa5bcc 가 대타 홈런 칸 ctx+0x160 을 지운다 — 간이 엔진 타석은 기록 5 를 못 낸다
   if (progress.pinchHitHomeRunHalf !== null) progress = { ...progress, pinchHitHomeRunHalf: null }
   const { options } = progress
@@ -6298,11 +5977,7 @@ function playAutoOffenseAtBat(
 }
 
 /** 자동으로 넘기는 상대 타석 */
-function playAutoDefenseAtBat(
-  progress: TeamGameProgress,
-  random: RandomPort,
-  relay?: TeamAutoRelayTick[],
-): TeamGameProgress {
+function playAutoDefenseAtBat(progress: TeamGameProgress, random: RandomPort, relay?: TeamAutoRelayTick[]): TeamGameProgress {
   // 0xc1ba4(CPU 대타 = 상대 팀 · **우리 투수** 교체 판정)는 부르는 쪽이 먼저 다 지났다
   const { options } = progress
   const pitcherSlot = progress.ourPitcherIndex
@@ -6352,11 +6027,7 @@ function playAutoDefenseAtBat(
       ...progress,
       // 간이 엔진도 공마다 0xa5e14 가 이 타석·반 이닝 투구 수(ctx+0x161·+0x16c)를 올리고, 0xc1818 이 볼카운트
       // state[4]·[5] 를 쓴다 — 삼진(0xa7c4c)·아웃(0xa7d0c) 기록 판정이 그 값을 본다
-      recordTally: withHalfInningPitches(
-        { ...progress.recordTally, atBatPitches: play.pitches },
-        progress.game,
-        play.pitches,
-      ),
+      recordTally: withHalfInningPitches({ ...progress.recordTally, atBatPitches: play.pitches }, progress.game, play.pitches),
       atBat: createAtBat({ balls: play.balls, strikes: 0 }),
       // 투구마다 state[0xd]·state[0xe] 가 내려간다 (0xa5e14 의 a5e72·a5e7c, c26ca)
       pitcherJustChanged: false,
@@ -6394,7 +6065,10 @@ function playAutoDefenseAtBat(
  * (`drainStamina` · `quickPitcherDrainOf`)이 쓰는 값 그대로다 — 상태 0xe 의 소개 판 체력 막대(0x44ea0~)가 읽는다.
  * 사기는 두 쪽 다 던지는 팀의 팀 레코드 +2 다 (`ourTeamMoraleOf` · `opponentTeamMoraleOf`).
  */
-export function moundStaminaOf(progress: TeamGameProgress, ours: boolean): {
+export function moundStaminaOf(
+  progress: TeamGameProgress,
+  ours: boolean,
+): {
   readonly staminaAbility: number
   readonly teamMorale: number
   readonly isFirstPitcher: boolean
@@ -6417,23 +6091,14 @@ export function moundStaminaOf(progress: TeamGameProgress, ours: boolean): {
 
 /** 상대 투수의 체력 능력치 (칸 3) — 스태미나 용량 X 의 바탕 */
 function opponentPitcherStaminaAbility(progress: TeamGameProgress): number {
-  return pitcherAbilitiesAt(
-    progress,
-    progress.options.opponentTeamId,
-    progress.opponentPitcherIndex,
-  )[3]
+  return pitcherAbilitiesAt(progress, progress.options.opponentTeamId, progress.opponentPitcherIndex)[3]
 }
 
 /**
  * 실점 카운터 A·B 와 투구 수를 올린다 (P7 E1).
  * A(`+0x284`)는 **이닝 교대(0xa5b00)에서 0** 이 되고, B(`+0x280`)는 투수 교체 때만 0 이 된다.
  */
-function addRunsToCounters(
-  counters: MoundPitcherCounters,
-  runs: number,
-  pitches: number,
-  halfChanged: boolean,
-): MoundPitcherCounters {
+function addRunsToCounters(counters: MoundPitcherCounters, runs: number, pitches: number, halfChanged: boolean): MoundPitcherCounters {
   return {
     runsAllowed: Math.min(99, counters.runsAllowed + runs),
     inningRunsAllowed: halfChanged ? 0 : Math.min(99, counters.inningRunsAllowed + runs),
@@ -6462,18 +6127,8 @@ export function migrateTeamGameProgress(progress: TeamGameProgress): TeamGamePro
   return typeof raw.opponentAceStrikeouts === 'number' ? progress : { ...progress, opponentAceStrikeouts: 0 }
 }
 
-function chargeMoundLine(
-  progress: TeamGameProgress,
-  ours: boolean,
-  delta: Parameters<typeof chargePitcherLine>[3],
-): readonly GamePitcherLine[] {
-  return chargeEntryLine(
-    progress,
-    progress.pitcherLines,
-    ours,
-    ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex,
-    delta,
-  )
+function chargeMoundLine(progress: TeamGameProgress, ours: boolean, delta: Parameters<typeof chargePitcherLine>[3]): readonly GamePitcherLine[] {
+  return chargeEntryLine(progress, progress.pitcherLines, ours, ours ? progress.ourPitcherIndex : progress.opponentPitcherIndex, delta)
 }
 
 /** 투수 명단 `index` 번 투수의 줄에 더한다 (`chargeMoundLine` 의 몸통 — 책임 투수 실점이 지금 마운드가 아닐 때도 쓴다) */
@@ -6489,9 +6144,7 @@ function chargeEntryLine(
   if (entry === undefined || entry.aceIndex >= 0) return lines
   // 기록을 실어 선 표 밖 투수(영입한 명전·나리)는 원본 id 로 줄을 가른다 (칸 −1)
   if (entry.tableSlot === undefined) {
-    return entry.recordId === undefined
-      ? lines
-      : chargePitcherLine(lines, teamId, NO_ROSTER_SLOT, delta, entry.recordId)
+    return entry.recordId === undefined ? lines : chargePitcherLine(lines, teamId, NO_ROSTER_SLOT, delta, entry.recordId)
   }
   // 줄은 그 투수의 붙박이 표 자리로 — 트레이드로 옮겨 온 투수는 옛 팀이다 (`TeamEntryPitcher.tableTeamId`)
   return chargePitcherLine(lines, entry.tableTeamId ?? teamId, entry.tableSlot, delta)
@@ -6535,8 +6188,7 @@ function chargeRunsToResponsible(
 ): Pick<TeamGameProgress, 'pitcherLines' | 'runnerPitchers'> {
   const before = progress.game
   const sameHalf = after.inning === before.inning && after.half === before.half
-  const runnersOf = (game: GameState, order: number) =>
-    oursDefending ? runnersOfGame(game, order) : runnersOfGame(game)
+  const runnersOf = (game: GameState, order: number) => (oursDefending ? runnersOfGame(game, order) : runnersOfGame(game))
   const settled = settleRunnerPitchers({
     tags: progress.runnerPitchers,
     before: runnersOf(before, progress.opponentOrderIndex),
@@ -6618,8 +6270,10 @@ function moundsOf(progress: TeamGameProgress): MoundBySide {
  * 거르지 않고 그대로 읽는다(`0xb62c0(0xb8b60(팀[측], 번호))`). 측 2(없음)면 그 줄은 빈다.
  */
 export function pitchersOfRecordOf(progress: TeamGameProgress): PitcherOfRecordNames {
-  return pitcherOfRecordNamesOf(progress.decisions, progress.game.playerSide, (isOurTeam, index) =>
-    (isOurTeam ? progress.ourPitcherEntry : progress.opponentPitcherEntry)[index]?.name,
+  return pitcherOfRecordNamesOf(
+    progress.decisions,
+    progress.game.playerSide,
+    (isOurTeam, index) => (isOurTeam ? progress.ourPitcherEntry : progress.opponentPitcherEntry)[index]?.name,
   )
 }
 
@@ -6747,20 +6401,11 @@ export function summaryOf(progress: TeamGameProgress): TeamGameSummary {
     //    그래서 **연장 완투는 인기도만 보너스를 받는다** (P4 "원본 버그·이상" 3번)
     popularityCompleteGame: popularityCompleteGameOf(outs, game.inning - 1, flags),
     //    고침(B-38): 평판도 지금 이닝으로 본다 (`reputationCompleteGameInningIndexOf`)
-    reputationCompleteGame: reputationCompleteGameOf(
-      outs,
-      reputationCompleteGameInningIndexOf(game.inning - 1, REGULATION_LAST_INNING_INDEX),
-      flags,
-    ),
+    reputationCompleteGame: reputationCompleteGameOf(outs, reputationCompleteGameInningIndexOf(game.inning - 1, REGULATION_LAST_INNING_INDEX), flags),
     gameRecord: progress.gameRecord,
     recordIds,
     gamePoints: recordGamePointsOf(recordIds),
-    ourPitcherStaminas: orderedPitcherStaminasOf(
-      progress.ourPitcherEntry,
-      progress.ourPitcherStaminas,
-      progress.ourPitcherIndex,
-      progress.stamina,
-    ),
+    ourPitcherStaminas: orderedPitcherStaminasOf(progress.ourPitcherEntry, progress.ourPitcherStaminas, progress.ourPitcherIndex, progress.stamina),
     opponentPitcherStaminas: orderedPitcherStaminasOf(
       progress.opponentPitcherEntry,
       progress.opponentPitcherStaminas,

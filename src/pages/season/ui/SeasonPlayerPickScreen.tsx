@@ -3,9 +3,7 @@ import type { ReactNode } from 'react'
 import { ENTRY_TABLES_WIDE, EntryEditorScreen } from '@/widgets/entry-editor'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { TEAMS } from '@/shared/config/original/teams'
-import {
-  ENTRY_TAB, advanceEntrySlide, openEntryEditor, pointEntryCursor, pressEntryKey,
-} from '@/entities/season-mode/model/entryEditor'
+import { ENTRY_TAB, advanceEntrySlide, openEntryEditor, pointEntryCursor, pressEntryKey } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey, EntryTab } from '@/entities/season-mode/model/entryEditor'
 import { SEASON_ENTRY_CELL_SOURCE, seasonRecordEntryListsOf } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonEntryCellSource } from '@/entities/season-mode/model/seasonEntry'
@@ -37,7 +35,6 @@ export interface SeasonPlayerPickScreenProps {
   readonly cells?: SeasonEntryCellSource
 }
 
-
 /** 0xb010 — 목적 3 의 바닥 7 (되돌아가기 + "0상세정보") */
 const RECRUIT_SLOT_FOOTER = 7
 
@@ -68,27 +65,39 @@ const RECRUIT_SLOT_FOOTER = 7
  * 키는 장면 0xe9ac 가 키가 들어온 틀에만 넘겨 키 셈 [ed+0x40c] 은 키마다 오른다.
  */
 export function SeasonPlayerPickScreen({
-  teamId, roster, initialTab, onPick, onBack, gamePoint = 0, overlay, isRecruitSlot = false, cells = SEASON_ENTRY_CELL_SOURCE,
+  teamId,
+  roster,
+  initialTab,
+  onPick,
+  onBack,
+  gamePoint = 0,
+  overlay,
+  isRecruitSlot = false,
+  cells = SEASON_ENTRY_CELL_SOURCE,
 }: SeasonPlayerPickScreenProps) {
   const [editor, setEditor] = useState<EntryEditorState>(() => ({
-    ...openEntryEditor(false, ENTRY_TABLES_WIDE.batter.scroll.length), tab: initialTab,
+    ...openEntryEditor(false, ENTRY_TABLES_WIDE.batter.scroll.length),
+    tab: initialTab,
   }))
   const lists = seasonRecordEntryListsOf(teamId, roster, cells)
   const onFrame = useCallback(() => setEditor((current) => advanceEntrySlide(current)), [])
 
-  const onKey = useCallback((key: EntryKey) => {
-    if (overlay !== undefined && overlay !== null) return
-    // 0xc3e8 이 확인·취소를 먼저 받는다 — 보기 전용 목록은 확인을 안 먹고, 취소는 끝 코드만 세운다(읽는 쪽 없음)
-    if (key === '확인') {
-      const count = editor.tab === ENTRY_TAB.투수 ? lists.pitchers.length : lists.batters.length
-      if (editor.cursor < count) onPick(editor.tab, editor.cursor)
-      return
-    }
-    if (key === '취소') return onBack()
-    // 0x6fe0 — 목적 3 이면 '*' 는 목록에 안 간다
-    if (isRecruitSlot && key === '별') return
-    setEditor((current) => pressEntryKey(current, lists, key).state)
-  }, [editor, isRecruitSlot, lists, onBack, onPick, overlay])
+  const onKey = useCallback(
+    (key: EntryKey) => {
+      if (overlay !== undefined && overlay !== null) return
+      // 0xc3e8 이 확인·취소를 먼저 받는다 — 보기 전용 목록은 확인을 안 먹고, 취소는 끝 코드만 세운다(읽는 쪽 없음)
+      if (key === '확인') {
+        const count = editor.tab === ENTRY_TAB.투수 ? lists.pitchers.length : lists.batters.length
+        if (editor.cursor < count) onPick(editor.tab, editor.cursor)
+        return
+      }
+      if (key === '취소') return onBack()
+      // 0x6fe0 — 목적 3 이면 '*' 는 목록에 안 간다
+      if (isRecruitSlot && key === '별') return
+      setEditor((current) => pressEntryKey(current, lists, key).state)
+    },
+    [editor, isRecruitSlot, lists, onBack, onPick, overlay],
+  )
 
   return (
     <EntryEditorScreen

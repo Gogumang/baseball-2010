@@ -49,8 +49,7 @@ function createFakeAudio() {
       }
       return source
     },
-    decodeAudioData: async (bytes: ArrayBuffer) =>
-      ({ url: new TextDecoder().decode(bytes) }) as unknown as AudioBuffer,
+    decodeAudioData: async (bytes: ArrayBuffer) => ({ url: new TextDecoder().decode(bytes) }) as unknown as AudioBuffer,
     resume: () => Promise.resolve(),
   }
 

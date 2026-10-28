@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCH_WINDOW_TABS } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
-import {
-  PITCH_TRAINING_START, pitchTrainingKeyOf, pitchTrainingKeyOutcomeOf,
-} from '@/pages/pitcher-league/lib/pitchTrainingWindow'
+import { PITCH_TRAINING_START, pitchTrainingKeyOf, pitchTrainingKeyOutcomeOf } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import type { PitchTrainingCursor } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
 import { moveSpecialTrainingCursor, specialTrainingKeyOf } from '@/widgets/special-swing/lib/specialTrainingWindow'
 import { SpecialTrainingFigure } from '@/widgets/special-swing/ui/SpecialTrainingFigure'
@@ -44,9 +42,7 @@ interface PitcherRepertoirePanelProps {
   readonly onClose: () => void
 }
 
-export function PitcherRepertoirePanel({
-  career, tab, isKeyEnabled, onSelectMagic, onSelectPitch, onClose,
-}: PitcherRepertoirePanelProps) {
+export function PitcherRepertoirePanel({ career, tab, isKeyEnabled, onSelectMagic, onSelectPitch, onClose }: PitcherRepertoirePanelProps) {
   const isMagic = tab !== PITCH_WINDOW_TABS.구질
   /** 탭 1 — 탭 격자 [gfx+0x190] 칸 0~3 */
   const [magicCursor, setMagicCursor] = useState(0)
@@ -82,19 +78,30 @@ export function PitcherRepertoirePanel({
   return (
     <div data-testid="구질목록-창" data-tab={tab}>
       {isMagic ? (
-        <SpecialTrainingFigure side="투수" state="사용" cursor={magicCursor} learnedCount={career.magicLevel}
-          sessions={career.magicSessions} inUseNumber={career.selectedMagicNumber} typeIndex={career.typeIndex}
+        <SpecialTrainingFigure
+          side="투수"
+          state="사용"
+          cursor={magicCursor}
+          learnedCount={career.magicLevel}
+          sessions={career.magicSessions}
+          inUseNumber={career.selectedMagicNumber}
+          typeIndex={career.typeIndex}
           onPressSlot={(slot) => {
             setMagicCursor(slot)
             onSelectMagic(slot)
-          }} />
+          }}
+        />
       ) : (
-        <PitchWindowFigure career={career} cursor={pitchCursor} state="장착"
+        <PitchWindowFigure
+          career={career}
+          cursor={pitchCursor}
+          state="장착"
           onPressTab={(row) => setPitchCursor({ ...pitchCursor, tab: row, isCellFocus: false })}
           onPressCell={(cellColumn) => {
             setPitchCursor({ ...pitchCursor, isCellFocus: true, cell: cellColumn })
             onSelectPitch(pitchCursor.tab, cellColumn)
-          }} />
+          }}
+        />
       )}
     </div>
   )

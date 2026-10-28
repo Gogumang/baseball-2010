@@ -80,7 +80,7 @@ export function pitchPathOf({ typeNumber, form, speedStage, target, recordIndex,
   const record =
     recordIndex === undefined
       ? pitchRecordOf(typeNumber, form, speedStage)
-      : PITCH_RECORDS[typeNumber - 1]?.[recordIndex] ?? pitchRecordOf(typeNumber, form, speedStage)
+      : (PITCH_RECORDS[typeNumber - 1]?.[recordIndex] ?? pitchRecordOf(typeNumber, form, speedStage))
   const mirror = isMirroredForm(form) ? -1 : 1
   const controlPoints = record.points.map(([x, y, z]) => ({
     x: x * mirror + RELEASE_ORIGIN.x,

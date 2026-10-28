@@ -15,7 +15,9 @@ const kebab = (name) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCas
 /** 장면 표의 장면 — `[{ name, area, snapshot }]` (장면 표 차례). `derby-stage<N>` 처럼 함수로 짓는 장면은 빠진다 */
 export function sceneCatalog() {
   const scenes = []
-  for (const file of readdirSync(SCENE_DIR).filter((name) => name.endsWith('.ts') && !NOT_AREAS.has(name)).sort()) {
+  for (const file of readdirSync(SCENE_DIR)
+    .filter((name) => name.endsWith('.ts') && !NOT_AREAS.has(name))
+    .sort()) {
     const area = kebab(file.replace(/\.ts$/, ''))
     const source = readFileSync(join(SCENE_DIR, file), 'utf8')
     for (const match of source.matchAll(/^ {2}'?([a-z][a-z0-9-]*)'?: \{([\s\S]*?)^ {2}\},?$/gm)) {
@@ -27,18 +29,26 @@ export function sceneCatalog() {
 }
 
 /** 시험 쪽 도메인 — `{ <도메인>: { actions, expect, allowed, sources, representative } }` */
-export const AREAS = Object.fromEntries(await Promise.all(
-  readdirSync(AREA_DIR).filter((name) => name.endsWith('.mjs')).sort().map(async (file) => {
-    const module = await import(join(AREA_DIR, file))
-    return [file.replace(/\.mjs$/, ''), {
-      actions: module.actions ?? {},
-      expect: module.expect ?? {},
-      allowed: module.allowed ?? [],
-      sources: module.sources ?? [],
-      representative: module.representative ?? null,
-    }]
-  }),
-))
+export const AREAS = Object.fromEntries(
+  await Promise.all(
+    readdirSync(AREA_DIR)
+      .filter((name) => name.endsWith('.mjs'))
+      .sort()
+      .map(async (file) => {
+        const module = await import(join(AREA_DIR, file))
+        return [
+          file.replace(/\.mjs$/, ''),
+          {
+            actions: module.actions ?? {},
+            expect: module.expect ?? {},
+            allowed: module.allowed ?? [],
+            sources: module.sources ?? [],
+            representative: module.representative ?? null,
+          },
+        ]
+      }),
+  ),
+)
 
 /** 장면 → 연 상태 표 · 기본 상태 표지 · 허용 겹침 (도메인 파일을 모은 것) */
 export const ACTIONS = Object.assign({}, ...Object.values(AREAS).map((area) => area.actions))
@@ -49,5 +59,7 @@ export const AREA_ALLOWED = Object.values(AREAS).flatMap((area) => area.allowed)
 export function areasOfFile(file) {
   const own = /^src\/app\/dev\/scenes\/(\w+)\.ts$/.exec(file) ?? /^e2e\/areas\/([\w-]+)\.mjs$/.exec(file)
   if (own !== null && !NOT_AREAS.has(`${own[1]}.ts`)) return [kebab(own[1])]
-  return Object.entries(AREAS).filter(([, area]) => area.sources.some((prefix) => file.startsWith(prefix))).map(([name]) => name)
+  return Object.entries(AREAS)
+    .filter(([, area]) => area.sources.some((prefix) => file.startsWith(prefix)))
+    .map(([name]) => name)
 }

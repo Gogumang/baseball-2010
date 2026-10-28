@@ -5,9 +5,7 @@ import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import { MessageLineText } from '@/pages/management/ui/StatusValues'
-import {
-  EVALUATION_CHANGE_BOXES, EVALUATION_CHANGE_MODE_UI_FRAME, evaluationChangeWindowLayoutOf,
-} from '@/pages/story/lib/evaluationChangeWindow'
+import { EVALUATION_CHANGE_BOXES, EVALUATION_CHANGE_MODE_UI_FRAME, evaluationChangeWindowLayoutOf } from '@/pages/story/lib/evaluationChangeWindow'
 import type { EvaluationChangeValues } from '@/pages/story/lib/evaluationChangeWindow'
 import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 import { EVENT_WINDOW_DIM_OPACITY } from '@/pages/story/lib/eventDialogue'
@@ -82,39 +80,57 @@ export function EvaluationChangeWindow({ values, goals, year, game, onClose }: E
 
   return (
     // 뒤 어둡게 — 이벤트 장면의 창은 떠 있는 그리기마다 검정 6/16 (0x746cc, `EVENT_WINDOW_DIM_OPACITY`)
-    <div className={windowStyles.overlay} data-testid="경기-평가-변화-창" role="dialog" aria-label="경기 평가 변화" onClick={close}
-      ref={overlayRef} style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}>
+    <div
+      className={windowStyles.overlay}
+      data-testid="경기-평가-변화-창"
+      role="dialog"
+      aria-label="경기 평가 변화"
+      onClick={close}
+      ref={overlayRef}
+      style={{ background: `rgba(0, 0, 0, ${EVENT_WINDOW_DIM_OPACITY})` }}
+    >
       <div style={{ visibility: isOpening ? 'hidden' : undefined }}>
-      <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
-        <filter id={navyFilterId} colorInterpolationFilters="sRGB">
-          {/* 흰 글자(R=G=B) → img_text 팔레트 3 두 색 — 올해의 목표 창과 같은 1차식 */}
-          <feColorMatrix type="matrix"
-            values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
-        </filter>
-      </svg>
-      <CommonPanel x={area.x} y={area.y} width={area.width} height={area.height} titleTab />
-      <FrameSprite folder={MODE_UI} frame={EVALUATION_CHANGE_MODE_UI_FRAME} origins={modeUiOrigins} x={0} y={0} />
-      <MessageLineText year={year} game={game} box={layout.messageBox} />
-      {layout.texts.map((piece, index) => (
-        <img key={`t${index}`} className={windowStyles.layer} src={`${IMG_TEXT}/${pad(piece.frame)}.png`} alt=""
-          data-frame={piece.frame}
-          style={{ left: piece.x, top: piece.y, filter: piece.palette === 3 ? `url(#${navyFilterId})` : undefined }} />
-      ))}
-      {layout.arrows.map((arrow, index) => {
-        const animation = ARROW_ANIMATIONS[arrow.animation]
-        const dy = update % (animation.still + animation.moved) < animation.still ? 0 : animation.dy
-        return (
-          <FrameSprite key={`a${index}`} folder={MODE_UI} frame={animation.frame} origins={modeUiOrigins} x={arrow.x} y={arrow.y + dy} />
-        )
-      })}
-      {layout.dashes.map((dash, index) => (
-        <div key={`d${index}`} className={windowStyles.layer} data-part="변화없음"
-          style={{ left: dash.x, top: dash.y, width: dash.width, height: dash.height, background: '#FFFFFF' }} />
-      ))}
-      {layout.numbers.map((piece, index) => (
-        <img key={`n${index}`} className={windowStyles.layer} src={`${NUM}/${pad(piece.frame)}.png`} alt=""
-          style={{ left: piece.x, top: piece.y }} />
-      ))}
+        <svg width={0} height={0} style={{ position: 'absolute' }} aria-hidden>
+          <filter id={navyFilterId} colorInterpolationFilters="sRGB">
+            {/* 흰 글자(R=G=B) → img_text 팔레트 3 두 색 — 올해의 목표 창과 같은 1차식 */}
+            <feColorMatrix type="matrix" values={'1.5625 0 0 0 -1.40172  0 2.3125 0 0 -2.02623  0 0 3.625 0 -2.97794  0 0 0 1 0'} />
+          </filter>
+        </svg>
+        <CommonPanel x={area.x} y={area.y} width={area.width} height={area.height} titleTab />
+        <FrameSprite folder={MODE_UI} frame={EVALUATION_CHANGE_MODE_UI_FRAME} origins={modeUiOrigins} x={0} y={0} />
+        <MessageLineText year={year} game={game} box={layout.messageBox} />
+        {layout.texts.map((piece, index) => (
+          <img
+            key={`t${index}`}
+            className={windowStyles.layer}
+            src={`${IMG_TEXT}/${pad(piece.frame)}.png`}
+            alt=""
+            data-frame={piece.frame}
+            style={{ left: piece.x, top: piece.y, filter: piece.palette === 3 ? `url(#${navyFilterId})` : undefined }}
+          />
+        ))}
+        {layout.arrows.map((arrow, index) => {
+          const animation = ARROW_ANIMATIONS[arrow.animation]
+          const dy = update % (animation.still + animation.moved) < animation.still ? 0 : animation.dy
+          return <FrameSprite key={`a${index}`} folder={MODE_UI} frame={animation.frame} origins={modeUiOrigins} x={arrow.x} y={arrow.y + dy} />
+        })}
+        {layout.dashes.map((dash, index) => (
+          <div
+            key={`d${index}`}
+            className={windowStyles.layer}
+            data-part="변화없음"
+            style={{ left: dash.x, top: dash.y, width: dash.width, height: dash.height, background: '#FFFFFF' }}
+          />
+        ))}
+        {layout.numbers.map((piece, index) => (
+          <img
+            key={`n${index}`}
+            className={windowStyles.layer}
+            src={`${NUM}/${pad(piece.frame)}.png`}
+            alt=""
+            style={{ left: piece.x, top: piece.y }}
+          />
+        ))}
       </div>
     </div>
   )

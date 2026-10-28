@@ -16,12 +16,10 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
  * 번호는 `shared/config/original/sounds` 의 표, 분기는 docs/re/R2-game-effects.md 3-3·8절이다.
  */
 
-const 카운트 = (balls: number, strikes: number, outcome: AtBatState['outcome'] = null): AtBatState =>
-  ({ balls, strikes, outcome })
+const 카운트 = (balls: number, strikes: number, outcome: AtBatState['outcome'] = null): AtBatState => ({ balls, strikes, outcome })
 
 /** [수평각, 세기, 높이, 플래그] */
-const 패턴 = (angle: number, speed: number, height: number, flags = 0): BattedBallPattern =>
-  [angle, speed, height, flags] as BattedBallPattern
+const 패턴 = (angle: number, speed: number, height: number, flags = 0): BattedBallPattern => [angle, speed, height, flags] as BattedBallPattern
 
 describe('타구 순간 소리 (0x515de~0x5164a)', () => {
   it('배트를 내지 않았으면 아무 소리도 없다 — 타구음 갈래를 지나지 않는다', () => {
@@ -38,15 +36,29 @@ describe('타구 순간 소리 (0x515de~0x5164a)', () => {
   })
 
   it('필살타법을 실은 헛스윙은 27 이다 — 스윙 객체 +0x10 ≠ 0 (0x5132e)', () => {
-    expect(contactSoundIdOf({
-      hasSwung: true, hasHit: false, buntKind: 0, isSpecialSwing: true, resultCode: null, pattern: null,
-    })).toBe(27)
+    expect(
+      contactSoundIdOf({
+        hasSwung: true,
+        hasHit: false,
+        buntKind: 0,
+        isSpecialSwing: true,
+        resultCode: null,
+        pattern: null,
+      }),
+    ).toBe(27)
   })
 
   it('필살이어도 번트 자세 헛스윙은 소리가 없다 — +8 검사가 +0x10 보다 먼저다 (0x51328)', () => {
-    expect(contactSoundIdOf({
-      hasSwung: true, hasHit: false, buntKind: 1, isSpecialSwing: true, resultCode: null, pattern: null,
-    })).toBeNull()
+    expect(
+      contactSoundIdOf({
+        hasSwung: true,
+        hasHit: false,
+        buntKind: 1,
+        isSpecialSwing: true,
+        resultCode: null,
+        pattern: null,
+      }),
+    ).toBeNull()
   })
 
   it('번트 자세로 못 맞히면 바람 소리도 안 난다 — 원본 조건이 스윙 +8 == 0 이다', () => {
@@ -165,9 +177,7 @@ describe('플레이가 끝난 뒤의 콜', () => {
   })
 
   it('파울 각 공을 낙구 전에 잡은 판(파울 뜬공 아웃 13)은 25 가 아니라 잡은 아웃 콜 62 다', () => {
-    expect(
-      inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { outcome: { kind: '아웃', detail: '뜬공아웃' }, caughtOnTheFly: true }),
-    ).toBe(62)
+    expect(inPlayCallSoundIdOf({ kind: '안타', bases: 1 }, { outcome: { kind: '아웃', detail: '뜬공아웃' }, caughtOnTheFly: true })).toBe(62)
   })
 
   it('삼진·볼넷은 심판 콜 쪽이 이미 냈으므로 여기서 또 내지 않는다', () => {

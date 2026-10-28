@@ -9,27 +9,73 @@ import { wrapHelpText } from '@/pages/help/lib/helpPages'
 import { MATCH_SETTING_KIND, confirmedMatchSettings } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
-  CHANCE_VALUE_COUNT, DETAIL_ROW, INNING_VALUE_COUNT, KIND_COUNT,
-  SETTINGS_STAGE, answerMatchSettingsPopup, detailBitsOf, detailCellCountOf,
-  openMatchSettings, pressMatchSettingsKey,
+  CHANCE_VALUE_COUNT,
+  DETAIL_ROW,
+  INNING_VALUE_COUNT,
+  KIND_COUNT,
+  SETTINGS_STAGE,
+  answerMatchSettingsPopup,
+  detailBitsOf,
+  detailCellCountOf,
+  openMatchSettings,
+  pressMatchSettingsKey,
 } from '@/pages/match-settings/lib/matchSettingsMenu'
-import type {
-  MatchSettingsAction, MatchSettingsKey, MatchSettingsWindowState,
-} from '@/pages/match-settings/lib/matchSettingsMenu'
+import type { MatchSettingsAction, MatchSettingsKey, MatchSettingsWindowState } from '@/pages/match-settings/lib/matchSettingsMenu'
 import {
-  BASE_LABEL_FRAME, CHANCE_SLOTS, CHANCE_SLOT_SIZE, DESCRIPTION_LINE_HEIGHT, DETAIL_ARROWS, DETAIL_CELL_SHAPES,
-  DETAIL_DESCRIPTION, DETAIL_LABEL, DETAIL_LABEL_FRAMES, DETAIL_MARK, DETAIL_NUMBER, DETAIL_NUMBER_COLOR,
-  DETAIL_OK, DETAIL_ROW_Y, DETAIL_WINDOW, IMG_TEXT_PALETTE, LIST_ROW, OUTLINE_COLOR, SMALL_DESCRIPTION,
-  SMALL_WINDOW, TAB, TAB_LABEL_FRAMES, TITLE,
-  backButtonOf, baseLabelPointOf, centeredLeftOf, detailCellBoxOf, detailCellOutlineOf, detailDigitWidthOf,
-  detailDownArrowYOf, detailNumberCenterOf, detailUpArrowYOf, isSettingsBlinkOn, listCursorOf, listRowTopOf,
+  BASE_LABEL_FRAME,
+  CHANCE_SLOTS,
+  CHANCE_SLOT_SIZE,
+  DESCRIPTION_LINE_HEIGHT,
+  DETAIL_ARROWS,
+  DETAIL_CELL_SHAPES,
+  DETAIL_DESCRIPTION,
+  DETAIL_LABEL,
+  DETAIL_LABEL_FRAMES,
+  DETAIL_MARK,
+  DETAIL_NUMBER,
+  DETAIL_NUMBER_COLOR,
+  DETAIL_OK,
+  DETAIL_ROW_Y,
+  DETAIL_WINDOW,
+  IMG_TEXT_PALETTE,
+  LIST_ROW,
+  OUTLINE_COLOR,
+  SMALL_DESCRIPTION,
+  SMALL_WINDOW,
+  TAB,
+  TAB_LABEL_FRAMES,
+  TITLE,
+  backButtonOf,
+  baseLabelPointOf,
+  centeredLeftOf,
+  detailCellBoxOf,
+  detailCellOutlineOf,
+  detailDigitWidthOf,
+  detailDownArrowYOf,
+  detailNumberCenterOf,
+  detailUpArrowYOf,
+  isSettingsBlinkOn,
+  listCursorOf,
+  listRowTopOf,
 } from '@/pages/match-settings/lib/matchSettingsLayout'
 import type { DescriptionLayout, RoundOutline, SettingsBox } from '@/pages/match-settings/lib/matchSettingsLayout'
 import {
-  CHANCE_DESCRIPTIONS, CHANCE_LABELS, CONFIRM_BUTTONS, CONFIRM_TEXT, DETAIL_CONFIRM_LABEL,
-  DETAIL_ROW_DESCRIPTIONS, DETAIL_ROW_LABELS, IMG_TEXT, INNING_DESCRIPTIONS,
-  INNING_LABELS, INNING_LABEL_FRAMES, KIND_DESCRIPTIONS, KIND_LABELS, KIND_LABEL_FRAMES,
-  NOTICE_BUTTONS, NO_DETAIL_TEXT,
+  CHANCE_DESCRIPTIONS,
+  CHANCE_LABELS,
+  CONFIRM_BUTTONS,
+  CONFIRM_TEXT,
+  DETAIL_CONFIRM_LABEL,
+  DETAIL_ROW_DESCRIPTIONS,
+  DETAIL_ROW_LABELS,
+  IMG_TEXT,
+  INNING_DESCRIPTIONS,
+  INNING_LABELS,
+  INNING_LABEL_FRAMES,
+  KIND_DESCRIPTIONS,
+  KIND_LABELS,
+  KIND_LABEL_FRAMES,
+  NOTICE_BUTTONS,
+  NO_DETAIL_TEXT,
 } from '@/pages/match-settings/lib/matchSettingsText'
 import * as styles from '@/pages/match-settings/ui/MatchSettingsWindow.css'
 import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -107,8 +153,15 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
 
   /** img_text 프레임 — 팔레트는 흰 그림에 색 행렬을 씌운다 */
   const text = (frame: number, x: number, y: number, palette: number = IMG_TEXT_PALETTE.흰, key?: string) => (
-    <OriginSprite key={key ?? `t${frame}-${x}-${y}`} folder={IMG_TEXT} frame={frame} origins={textOrigins} x={x} y={y}
-      style={palette === IMG_TEXT_PALETTE.흰 ? undefined : { filter: `url(#${filterId}-p${palette})` }} />
+    <OriginSprite
+      key={key ?? `t${frame}-${x}-${y}`}
+      folder={IMG_TEXT}
+      frame={frame}
+      origins={textOrigins}
+      x={x}
+      y={y}
+      style={palette === IMG_TEXT_PALETTE.흰 ? undefined : { filter: `url(#${filterId}-p${palette})` }}
+    />
   )
   /** 가운데 x 에 놓는 img_text — 원본 `cx − (w >> 1)` */
   const centeredText = (frame: number, centerX: number, y: number, palette: number = IMG_TEXT_PALETTE.흰) =>
@@ -119,24 +172,32 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
   /** 꼬리 탭 — 이미지 40 좌우 뒤집기 + 종류 이름(팔레트 1) */
   const tab = (
     <>
-      <img className={`${styles.layer} ${styles.mirrored}`} alt="" src={pngOf(SLT_IMAGES, TAB.image)}
-        style={{ left: TAB.x, top: isDetail ? TAB.detailY : TAB.smallY }} />
+      <img
+        className={`${styles.layer} ${styles.mirrored}`}
+        alt=""
+        src={pngOf(SLT_IMAGES, TAB.image)}
+        style={{ left: TAB.x, top: isDetail ? TAB.detailY : TAB.smallY }}
+      />
       {text(TAB_LABEL_FRAMES[kind] ?? 0, TAB.labelX, isDetail ? TAB.detailLabelY : TAB.smallLabelY, IMG_TEXT_PALETTE.노랑)}
     </>
   )
 
   /** 종류 줄 · 이닝 값 줄 — slt_frame 프레임 15 위에 이름 그림, 깜빡이면 노랑 커서 */
-  const listRows = (frames: readonly number[], labels: readonly string[], selected: number,
-    moved: (index: number) => MatchSettingsWindowState) => (
+  const listRows = (frames: readonly number[], labels: readonly string[], selected: number, moved: (index: number) => MatchSettingsWindowState) => (
     <>
       {frames.map((frame, index) => (
         <span key={`row-${frame}`}>
           <OriginSprite folder={SLT_FRAMES} frame={LIST_ROW.frame} origins={sltOrigins} x={LIST_ROW.x} y={listRowTopOf(index)} />
           {centeredText(frame, LIST_ROW.x + (LIST_ROW.width >> 1), listRowTopOf(index) + LIST_ROW.labelDy)}
-          <button type="button" className={styles.hitArea} aria-label={labels[index]} aria-current={index === selected}
+          <button
+            type="button"
+            className={styles.hitArea}
+            aria-label={labels[index]}
+            aria-current={index === selected}
             data-frame={frame}
             style={{ left: LIST_ROW.x, top: listRowTopOf(index), width: LIST_ROW.width, height: LIST_ROW.height }}
-            onClick={() => pressAt(moved(index))} />
+            onClick={() => pressAt(moved(index))}
+          />
         </span>
       ))}
       {isBlinkOn && <Outline outline={listCursorOf(selected)} />}
@@ -158,15 +219,19 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
           <span key={slot.frame}>
             <OriginSprite folder={POPUP_FRAMES} frame={slot.frame} origins={popupOrigins} x={slot.x} y={slot.y} />
             {text(slot.label, slot.labelX, slot.labelY)}
-            <button type="button" className={styles.hitArea} aria-label={CHANCE_LABELS[index]}
-              aria-current={index === value} data-frame={slot.frame}
+            <button
+              type="button"
+              className={styles.hitArea}
+              aria-label={CHANCE_LABELS[index]}
+              aria-current={index === value}
+              data-frame={slot.frame}
               style={{ left: slot.x, top: slot.y, width: CHANCE_SLOT_SIZE, height: CHANCE_SLOT_SIZE }}
-              onClick={() => pressAt(withValue(index))} />
+              onClick={() => pressAt(withValue(index))}
+            />
           </span>
         ))}
         {isBlinkOn && selectedSlot !== undefined && (
-          <OriginSprite folder={POPUP_FRAMES} frame={selectedSlot.selectedFrame} origins={popupOrigins}
-            x={selectedSlot.x} y={selectedSlot.y} />
+          <OriginSprite folder={POPUP_FRAMES} frame={selectedSlot.selectedFrame} origins={popupOrigins} x={selectedSlot.x} y={selectedSlot.y} />
         )}
       </>
     )
@@ -182,22 +247,45 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
     body = (
       <>
         {tab}
-        <img className={styles.layer} alt="" src={pngOf(SLT_IMAGES, DETAIL_ARROWS.up)}
-          style={{ left: DETAIL_ARROWS.x, top: detailUpArrowYOf(bob) }} />
-        <img className={styles.layer} alt="" src={pngOf(SLT_IMAGES, DETAIL_ARROWS.down)}
-          style={{ left: DETAIL_ARROWS.x, top: detailDownArrowYOf(bob) }} />
+        <img
+          className={styles.layer}
+          alt=""
+          src={pngOf(SLT_IMAGES, DETAIL_ARROWS.up)}
+          style={{ left: DETAIL_ARROWS.x, top: detailUpArrowYOf(bob) }}
+        />
+        <img
+          className={styles.layer}
+          alt=""
+          src={pngOf(SLT_IMAGES, DETAIL_ARROWS.down)}
+          style={{ left: DETAIL_ARROWS.x, top: detailDownArrowYOf(bob) }}
+        />
         {DETAIL_ROW_LABELS.map((label, row) => (
-          <DetailRow key={label} row={row} label={label} state={state} isBlinkOn={isBlinkOn}
-            text={text} sltOrigins={sltOrigins}
-            onPress={(cell) => pressAt({ ...state, detailRow: row, detailCell: cell })} />
+          <DetailRow
+            key={label}
+            row={row}
+            label={label}
+            state={state}
+            isBlinkOn={isBlinkOn}
+            text={text}
+            sltOrigins={sltOrigins}
+            onPress={(cell) => pressAt({ ...state, detailRow: row, detailCell: cell })}
+          />
         ))}
-        <OriginSprite folder={POPUP_FRAMES} origins={popupOrigins}
+        <OriginSprite
+          folder={POPUP_FRAMES}
+          origins={popupOrigins}
           frame={state.detailRow === DETAIL_ROW.확인 ? DETAIL_OK.selectedFrame : DETAIL_OK.frame}
-          x={DETAIL_OK.x} y={DETAIL_OK.y} />
-        <button type="button" className={styles.hitArea} aria-label={DETAIL_CONFIRM_LABEL}
+          x={DETAIL_OK.x}
+          y={DETAIL_OK.y}
+        />
+        <button
+          type="button"
+          className={styles.hitArea}
+          aria-label={DETAIL_CONFIRM_LABEL}
           aria-current={state.detailRow === DETAIL_ROW.확인}
           style={{ left: DETAIL_OK.x, top: DETAIL_OK.y, width: DETAIL_OK.width, height: DETAIL_OK.height }}
-          onClick={() => pressAt({ ...state, detailRow: DETAIL_ROW.확인 })} />
+          onClick={() => pressAt({ ...state, detailRow: DETAIL_ROW.확인 })}
+        />
       </>
     )
   }
@@ -212,25 +300,20 @@ export function MatchSettingsWindow({ settings, onConfirm, onClose }: MatchSetti
       {body}
       <Description layout={isDetail ? DETAIL_DESCRIPTION : SMALL_DESCRIPTION} raw={descriptionOf(state)} />
 
-      <button type="button" className={styles.backButton}
+      <button
+        type="button"
+        className={styles.backButton}
         style={{ left: back.x, top: back.y, width: back.width, height: back.height }}
-        onClick={() => press('취소')}>
+        onClick={() => press('취소')}
+      >
         되돌아가기
       </button>
 
       {state.popup === '확인' && (
-        <MessageBox
-          text={CONFIRM_TEXT}
-          buttons={CONFIRM_BUTTONS}
-          onAnswer={(index) => apply(answerMatchSettingsPopup(state, index === 0))}
-        />
+        <MessageBox text={CONFIRM_TEXT} buttons={CONFIRM_BUTTONS} onAnswer={(index) => apply(answerMatchSettingsPopup(state, index === 0))} />
       )}
       {state.popup === '상세없음' && (
-        <MessageBox
-          text={NO_DETAIL_TEXT}
-          buttons={NOTICE_BUTTONS}
-          onAnswer={() => apply(answerMatchSettingsPopup(state, false))}
-        />
+        <MessageBox text={NO_DETAIL_TEXT} buttons={NOTICE_BUTTONS} onAnswer={() => apply(answerMatchSettingsPopup(state, false))} />
       )}
     </div>
   )
@@ -256,8 +339,12 @@ function DetailRow({ row, label, state, isBlinkOn, text, sltOrigins, onPress }: 
   if (shape === undefined) return null
   return (
     <>
-      <img className={styles.layer} alt="" src={pngOf(SLT_IMAGES, isCurrentRow ? DETAIL_MARK.current : DETAIL_MARK.other)}
-        style={{ left: DETAIL_MARK.x, top: rowY + DETAIL_MARK.dy }} />
+      <img
+        className={styles.layer}
+        alt=""
+        src={pngOf(SLT_IMAGES, isCurrentRow ? DETAIL_MARK.current : DETAIL_MARK.other)}
+        style={{ left: DETAIL_MARK.x, top: rowY + DETAIL_MARK.dy }}
+      />
       {frames.map((frame, index) => text(frame, DETAIL_LABEL.x[index] ?? 0, rowY + DETAIL_LABEL.dy, IMG_TEXT_PALETTE.흰, `l${row}-${index}`))}
       {Array.from({ length: detailCellCountOf(row) }, (_unused, cell) => {
         const isOn = ((bits >> cell) & 1) !== 0
@@ -267,18 +354,20 @@ function DetailRow({ row, label, state, isBlinkOn, text, sltOrigins, onPress }: 
         const isCursor = isCurrentRow && cell === state.detailCell
         return (
           <span key={cell}>
-            <OriginSprite folder={SLT_FRAMES} frame={isOn ? shape.onFrame : shape.offFrame} origins={sltOrigins}
-              x={box.x} y={box.y} />
-            <TintedDigit digit={cell + 1} centerX={center.x} centerY={center.y}
-              color={isOn ? DETAIL_NUMBER_COLOR.on : DETAIL_NUMBER_COLOR.off} />
-            {shape.hasBaseLabel
-              && text(BASE_LABEL_FRAME, base.x, base.y, isOn ? IMG_TEXT_PALETTE.흰 : IMG_TEXT_PALETTE.회색, `b${row}-${cell}`)}
+            <OriginSprite folder={SLT_FRAMES} frame={isOn ? shape.onFrame : shape.offFrame} origins={sltOrigins} x={box.x} y={box.y} />
+            <TintedDigit digit={cell + 1} centerX={center.x} centerY={center.y} color={isOn ? DETAIL_NUMBER_COLOR.on : DETAIL_NUMBER_COLOR.off} />
+            {shape.hasBaseLabel && text(BASE_LABEL_FRAME, base.x, base.y, isOn ? IMG_TEXT_PALETTE.흰 : IMG_TEXT_PALETTE.회색, `b${row}-${cell}`)}
             {/* 61158: 켜진 칸은 하늘 테 — 지금 줄의 지금 칸만 건너뛴다(그 칸은 노랑 커서 자리) */}
             {isOn && !isCursor && <Outline outline={detailCellOutlineOf(row, cell, OUTLINE_COLOR.켜짐)} />}
-            <button type="button" className={styles.hitArea} aria-label={`${label} ${cellLabelOf(row, cell)}`}
-              aria-pressed={isOn} data-frame={isOn ? shape.onFrame : shape.offFrame}
+            <button
+              type="button"
+              className={styles.hitArea}
+              aria-label={`${label} ${cellLabelOf(row, cell)}`}
+              aria-pressed={isOn}
+              data-frame={isOn ? shape.onFrame : shape.offFrame}
               style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
-              onClick={() => onPress(cell)} />
+              onClick={() => onPress(cell)}
+            />
           </span>
         )
       })}
@@ -290,7 +379,14 @@ function DetailRow({ row, label, state, isBlinkOn, text, sltOrigins, onPress }: 
 }
 
 /** 합성 프레임 한 장 — 원점(origins)만큼 옮겨 놓는다. 원점을 아직 못 읽었으면 그리지 않는다 */
-function OriginSprite({ folder, frame, origins, x, y, style }: {
+function OriginSprite({
+  folder,
+  frame,
+  origins,
+  x,
+  y,
+  style,
+}: {
   readonly folder: string
   readonly frame: number
   readonly origins: FrameOrigins | null
@@ -301,16 +397,19 @@ function OriginSprite({ folder, frame, origins, x, y, style }: {
   const origin = origins?.[String(frame).padStart(3, '0')]
   if (origin === undefined) return null
   return (
-    <img className={styles.layer} alt="" data-frame={frame} src={pngOf(folder, frame)}
-      style={{ left: x + origin.x, top: y + origin.y, ...style }} />
+    <img className={styles.layer} alt="" data-frame={frame} src={pngOf(folder, frame)} style={{ left: x + origin.x, top: y + origin.y, ...style }} />
   )
 }
 
-const widthOf = (origins: FrameOrigins | null, frame: number): number =>
-  origins?.[String(frame).padStart(3, '0')]?.width ?? 0
+const widthOf = (origins: FrameOrigins | null, frame: number): number => origins?.[String(frame).padStart(3, '0')]?.width ?? 0
 
 /** 0x585ac 한 자리 — 정렬 0x22(가운데 · 가운데)이고 효과 0xb 로 한 색만 칠한다 */
-function TintedDigit({ digit, centerX, centerY, color }: {
+function TintedDigit({
+  digit,
+  centerX,
+  centerY,
+  color,
+}: {
   readonly digit: number
   readonly centerX: number
   readonly centerY: number
@@ -319,15 +418,20 @@ function TintedDigit({ digit, centerX, centerY, color }: {
   const width = detailDigitWidthOf(digit)
   const image = spriteMaskImage(pngOf(NUM_IMAGES, DETAIL_NUMBER.base + digit))
   return (
-    <span className={styles.tintedDigit} data-digit={digit} data-color={color} style={{
-      left: centerX - (width >> 1),
-      top: centerY - (DETAIL_NUMBER.height >> 1),
-      width,
-      height: DETAIL_NUMBER.height,
-      background: solidColorCss(color),
-      maskImage: image,
-      WebkitMaskImage: image,
-    }} />
+    <span
+      className={styles.tintedDigit}
+      data-digit={digit}
+      data-color={color}
+      style={{
+        left: centerX - (width >> 1),
+        top: centerY - (DETAIL_NUMBER.height >> 1),
+        width,
+        height: DETAIL_NUMBER.height,
+        background: solidColorCss(color),
+        maskImage: image,
+        WebkitMaskImage: image,
+      }}
+    />
   )
 }
 
@@ -343,8 +447,11 @@ function Outline({ outline }: { readonly outline: RoundOutline }) {
   return (
     <span data-outline={color} data-x={x} data-y={y}>
       {lines.map((line, index) => (
-        <span key={index} className={styles.outlineLine}
-          style={{ left: line.x, top: line.y, width: line.width, height: line.height, background: color }} />
+        <span
+          key={index}
+          className={styles.outlineLine}
+          style={{ left: line.x, top: line.y, width: line.width, height: line.height, background: color }}
+        />
       ))}
     </span>
   )
@@ -355,15 +462,18 @@ function Description({ layout, raw }: { readonly layout: DescriptionLayout; read
   const lines = raw === '' ? [] : wrapHelpText(raw, layout.text.width)
   return (
     <>
-      <div className={styles.descriptionBox}
-        style={{ left: layout.box.x, top: layout.box.y, width: layout.box.width, height: layout.box.height }} />
+      <div className={styles.descriptionBox} style={{ left: layout.box.x, top: layout.box.y, width: layout.box.width, height: layout.box.height }} />
       {lines.map((line, index) => (
-        <div key={index} className={styles.descriptionLine} style={{
-          left: layout.text.x,
-          top: layout.text.y + index * DESCRIPTION_LINE_HEIGHT,
-          width: layout.text.width,
-          textAlign: line.align === '가운데' ? 'center' : line.align === '오른' ? 'right' : 'left',
-        }}>
+        <div
+          key={index}
+          className={styles.descriptionLine}
+          style={{
+            left: layout.text.x,
+            top: layout.text.y + index * DESCRIPTION_LINE_HEIGHT,
+            width: layout.text.width,
+            textAlign: line.align === '가운데' ? 'center' : line.align === '오른' ? 'right' : 'left',
+          }}
+        >
           {line.segments.map((segment, segmentIndex) => (
             <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
               {segment.text}

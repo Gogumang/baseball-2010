@@ -71,9 +71,7 @@ export function chargePitcherLine(
   const strikeouts = delta.strikeouts ?? 0
   const pitches = delta.pitches ?? 0
   const walks = delta.walks ?? 0
-  const index = lines.findIndex(
-    (line) => line.teamId === teamId && line.pitcherSlot === pitcherSlot && line.recordId === recordId,
-  )
+  const index = lines.findIndex((line) => line.teamId === teamId && line.pitcherSlot === pitcherSlot && line.recordId === recordId)
   if (index < 0) {
     return [
       ...lines,

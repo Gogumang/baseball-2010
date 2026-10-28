@@ -14,7 +14,8 @@ describe('이벤트 존 보상 "200G" — trainning 애니 3 (0x36dfc 3730e · 3
 
   it('21~23 은 0x67 겹(더하기 b = 200)이 든 프레임이다 — layers.json', () => {
     const listing = JSON.parse(readFileSync('public/sprites/trainning/frames/layers.json', 'utf8')) as Record<
-      string, { effect: number; argument?: number }[]
+      string,
+      { effect: number; argument?: number }[]
     >
     expect(Object.keys(listing).sort()).toEqual(['021', '022', '023'])
     for (const entries of Object.values(listing)) {

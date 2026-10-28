@@ -46,17 +46,36 @@ export function OutingMapUnderlay({ eventPlaceIds, hour }: OutingMapUnderlayProp
   const layout = outingMapUnderlayLayoutOf(hour ?? sceneHour)
   const markerStep = animationStepAt(animations?.[EVENT_MARKER_ANIMATION] ?? [], update)
   return (
-    <div data-testid="외출지도-밑그림" style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320, background: '#000', overflow: 'hidden', pointerEvents: 'none' }}>
-      <ComposedScreen testId="외출지도-합성" ops={outingMapComposeOps({
-        origins, mapX: layout.mapX, mapY: layout.mapY, selected: -1, isNight: layout.isNight,
-        labelOf: (index) => [{ kind: 'image', src: mapLabelSrc(layout.labels[index].frame), x: layout.labels[index].left, y: layout.labels[index].top }],
-      })} />
-      {markerStep !== null && layout.markers
-        .filter((marker) => eventPlaceIds.has(marker.placeId))
-        .map((marker) => (
-          <FrameSprite key={marker.placeId} folder={MAP_FRAMES} frame={markerStep.frame} origins={origins}
-            x={marker.x + markerStep.dx} y={marker.y + markerStep.dy} />
-        ))}
+    <div
+      data-testid="외출지도-밑그림"
+      style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320, background: '#000', overflow: 'hidden', pointerEvents: 'none' }}
+    >
+      <ComposedScreen
+        testId="외출지도-합성"
+        ops={outingMapComposeOps({
+          origins,
+          mapX: layout.mapX,
+          mapY: layout.mapY,
+          selected: -1,
+          isNight: layout.isNight,
+          labelOf: (index) => [
+            { kind: 'image', src: mapLabelSrc(layout.labels[index].frame), x: layout.labels[index].left, y: layout.labels[index].top },
+          ],
+        })}
+      />
+      {markerStep !== null &&
+        layout.markers
+          .filter((marker) => eventPlaceIds.has(marker.placeId))
+          .map((marker) => (
+            <FrameSprite
+              key={marker.placeId}
+              folder={MAP_FRAMES}
+              frame={markerStep.frame}
+              origins={origins}
+              x={marker.x + markerStep.dx}
+              y={marker.y + markerStep.dy}
+            />
+          ))}
     </div>
   )
 }

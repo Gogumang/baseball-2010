@@ -23,8 +23,13 @@ const pad = (frame: number) => String(frame).padStart(3, '0')
 
 function ImageText({ image, paletteStyle }: { readonly image: PlacedImage; readonly paletteStyle?: CSSProperties }) {
   return (
-    <img className={styles.layer} src={`${IMG_TEXT}/${pad(image.frame)}.png`} alt="" data-frame={image.frame}
-      style={{ left: image.left, top: image.top, ...paletteStyle }} />
+    <img
+      className={styles.layer}
+      src={`${IMG_TEXT}/${pad(image.frame)}.png`}
+      alt=""
+      data-frame={image.frame}
+      style={{ left: image.left, top: image.top, ...paletteStyle }}
+    />
   )
 }
 
@@ -45,9 +50,7 @@ export interface SeasonStatusPanelProps {
  * 시즌모드 상태판 — 공용 상태판 0x7d34c 의 모드 2 갈래 (`lib/seasonStatusPanel` 머리 주석).
  * 화면 원점에 그리고 그 위에 다른 것(커맨드 줄·가운데 판·창)이 덮인다 — 부르는 쪽은 맨 먼저 둔다.
  */
-export function SeasonStatusPanel({
-  record, teamMorale, hour, isPreviousGame = false,
-}: SeasonStatusPanelProps) {
+export function SeasonStatusPanel({ record, teamMorale, hour, isPreviousGame = false }: SeasonStatusPanelProps) {
   const layout = seasonStatusPanelLayoutOf(record, isPreviousGame)
   const { popularity, money, reputation, salary } = STATUS_BOXES
   const digit = layout.goalRankDigit
@@ -58,21 +61,38 @@ export function SeasonStatusPanel({
   return (
     <div role="group" aria-label="상태판">
       {palettes.definition}
-      <StatusBoardBase hour={hour} nameBandSplit={layout.nameBandSplit} morale={teamMorale}
-        nameContent={(
+      <StatusBoardBase
+        hour={hour}
+        nameBandSplit={layout.nameBandSplit}
+        morale={teamMorale}
+        nameContent={
           <>
             <ImageText image={layout.teamName} />
             <ImageText image={layout.goalText} />
             {/* 효과 0xb(단색) 흰색 — 그림을 마스크로 쓰고 흰색을 칠한다 */}
-            <div className={styles.tintedGlyph} style={{
-              left: digit.left, top: digit.top, width: digit.frame % 10 === 1 ? 4 : 6, height: DIGIT_HEIGHT,
-              background: solidColorCss(ORIGINAL_COLORS.text), maskImage: spriteMaskImage(digitSource), WebkitMaskImage: spriteMaskImage(digitSource),
-            }} />
+            <div
+              className={styles.tintedGlyph}
+              style={{
+                left: digit.left,
+                top: digit.top,
+                width: digit.frame % 10 === 1 ? 4 : 6,
+                height: DIGIT_HEIGHT,
+                background: solidColorCss(ORIGINAL_COLORS.text),
+                maskImage: spriteMaskImage(digitSource),
+                WebkitMaskImage: spriteMaskImage(digitSource),
+              }}
+            />
           </>
-        )} />
+        }
+      />
       <StatusLabels lastLabelFrame={ATTENDANCE_LABEL_FRAME} />
       <SpriteNumber glyphs={numberGlyphsOf(record.popularity)} right={valueRightOf(popularity)} boxTop={popularity.y} boxHeight={popularity.height} />
-      <SpriteNumber glyphs={moneyGlyphsOf(record.money * MONEY_TO_TEN_THOUSAND)} right={valueRightOf(money)} boxTop={money.y} boxHeight={money.height} />
+      <SpriteNumber
+        glyphs={moneyGlyphsOf(record.money * MONEY_TO_TEN_THOUSAND)}
+        right={valueRightOf(money)}
+        boxTop={money.y}
+        boxHeight={money.height}
+      />
       <SpriteNumber glyphs={numberGlyphsOf(record.reputation)} right={valueRightOf(reputation)} boxTop={reputation.y} boxHeight={reputation.height} />
       <SpriteNumber glyphs={numberGlyphsOf(record.lastAttendance)} right={layout.attendanceRight} boxTop={salary.y} boxHeight={salary.height} />
       <ImageText image={layout.attendanceUnit} paletteStyle={palettes.styleOf(layout.attendanceUnit.frame, 1)} />

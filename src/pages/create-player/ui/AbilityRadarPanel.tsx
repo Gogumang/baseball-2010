@@ -6,9 +6,7 @@ import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import { yearCellDrawingOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import { abilityChartFrameOf, abilityGrowthVerticesOf } from '@/pages/create-player/lib/teamSelectLayout'
 import type { ChartPoint } from '@/pages/create-player/lib/teamSelectLayout'
-import {
-  ABILITY_RADAR_BACK, ABILITY_RADAR_BOX, ABILITY_RADAR_EMPTY, abilityRadarAxesOf,
-} from '@/pages/create-player/lib/abilityRadarPanel'
+import { ABILITY_RADAR_BACK, ABILITY_RADAR_BOX, ABILITY_RADAR_EMPTY, abilityRadarAxesOf } from '@/pages/create-player/lib/abilityRadarPanel'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const SLT_FRAME = assetUrl('./sprites/slt_frame')
@@ -33,7 +31,16 @@ export const ABILITY_FILL_ALPHA = 0xb4 / 0xff
  * 한 걸음 0x760e8 을 굴린 뒤 그린다. 들어옴이 +0xad = 0 으로 두므로 붙을 때 0 에서 자라고, `restartKey` 가 바뀐 그림에서
  * 지난 목표값부터 다시 오르내린다.
  */
-export function AbilityRadarPanel({ center, radius, maximumLength, labelFrames, targets, restartKey, showsNumbers = true, fromZero = true }: {
+export function AbilityRadarPanel({
+  center,
+  radius,
+  maximumLength,
+  labelFrames,
+  targets,
+  restartKey,
+  showsNumbers = true,
+  fromZero = true,
+}: {
   readonly center: ChartPoint
   /** [anim+0x1d8] — 마선수 · 명전 목록 30 */
   readonly radius: number
@@ -61,23 +68,38 @@ export function AbilityRadarPanel({ center, radius, maximumLength, labelFrames, 
   return (
     <div data-testid="능력치 도형" aria-label="능력치 도형">
       <img alt="" src={back} style={{ ...pixel, left: center.x - ABILITY_RADAR_BACK.width, top: center.y - ABILITY_RADAR_BACK.width }} />
-      <img alt="" src={back}
-        style={{ ...pixel, left: center.x - 1, top: center.y - ABILITY_RADAR_BACK.width, transform: 'scaleX(-1)' }} />
-      <svg style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }} width={240} height={320} viewBox="0 0 240 320"
-        shapeRendering="crispEdges">
+      <img alt="" src={back} style={{ ...pixel, left: center.x - 1, top: center.y - ABILITY_RADAR_BACK.width, transform: 'scaleX(-1)' }} />
+      <svg
+        style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
+        width={240}
+        height={320}
+        viewBox="0 0 240 320"
+        shapeRendering="crispEdges"
+      >
         <polygon points={points(abilityChartFrameOf(center))} fill="none" stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
         {!isAllZero && (
-          <polygon data-part="values" points={points(vertices)}
-            fill={ORIGINAL_COLORS.radarFill} fillOpacity={ABILITY_FILL_ALPHA} stroke={ORIGINAL_COLORS.radarEdge} strokeWidth={1} />
+          <polygon
+            data-part="values"
+            points={points(vertices)}
+            fill={ORIGINAL_COLORS.radarFill}
+            fillOpacity={ABILITY_FILL_ALPHA}
+            stroke={ORIGINAL_COLORS.radarEdge}
+            strokeWidth={1}
+          />
         )}
         {axes.map((axis, index) => (
-          <line key={index} x1={axis.end.x} y1={axis.end.y} x2={vertices[index]?.x} y2={vertices[index]?.y}
-            stroke={ORIGINAL_COLORS.radarAxis} strokeWidth={1} />
+          <line
+            key={index}
+            x1={axis.end.x}
+            y1={axis.end.y}
+            x2={vertices[index]?.x}
+            y2={vertices[index]?.y}
+            stroke={ORIGINAL_COLORS.radarAxis}
+            strokeWidth={1}
+          />
         ))}
         {/* 넷 다 0 — 채우기는 없고(0x75c88) 길이 0 흰 테두리 넷 뒤 축 선 넷의 끝이 가운데 한 점을 #6B92F4 로 덮는다 (lib 머리말) */}
-        {isAllZero && (
-          <rect data-part="center" x={center.x} y={center.y} width={1} height={1} fill={ORIGINAL_COLORS.radarAxis} />
-        )}
+        {isAllZero && <rect data-part="center" x={center.x} y={center.y} width={1} height={1} fill={ORIGINAL_COLORS.radarAxis} />}
       </svg>
       {axes.map((axis, index) => {
         const { box } = axis
@@ -87,24 +109,38 @@ export function AbilityRadarPanel({ center, radius, maximumLength, labelFrames, 
           <div key={index} data-part="axis">
             <img alt="" src={`${SLT_FRAME}/${pad(ABILITY_RADAR_BOX.image)}.png`} style={{ ...pixel, left: box.x, top: box.y }} />
             {label !== undefined && (
-              <img alt="" src={`${IMG_TEXT_FRAMES}/${pad(label)}.png`}
-                style={{ ...pixel, left: box.x + ABILITY_RADAR_BOX.labelInset, top: box.y + ABILITY_RADAR_BOX.labelInset }} />
+              <img
+                alt=""
+                src={`${IMG_TEXT_FRAMES}/${pad(label)}.png`}
+                style={{ ...pixel, left: box.x + ABILITY_RADAR_BOX.labelInset, top: box.y + ABILITY_RADAR_BOX.labelInset }}
+              />
             )}
             {showsNumbers && value > 0
               ? yearCellDrawingOf({ value, digits: -1, isDecimal: false }).glyphs.map((glyph, glyphIndex) => (
-                  <img key={glyphIndex} alt="" src={`${NUM}/${pad(glyph.frame)}.png`} data-part="value"
+                  <img
+                    key={glyphIndex}
+                    alt=""
+                    src={`${NUM}/${pad(glyph.frame)}.png`}
+                    data-part="value"
                     style={{
                       ...pixel,
                       left: box.x + ABILITY_RADAR_BOX.numberDx - CELL_DIGIT_X + glyph.x,
                       top: box.y + ABILITY_RADAR_BOX.numberDy,
-                    }} />
+                    }}
+                  />
                 ))
               : [0, 1].map((dx) => (
-                  <PixelText key={dx}
+                  <PixelText
+                    key={dx}
                     style={{
-                      position: 'absolute', pointerEvents: 'none', color: ABILITY_RADAR_EMPTY.color, whiteSpace: 'nowrap',
-                      left: box.x + ((ABILITY_RADAR_BOX.width - emptyWidth) >> 1) + dx, top: box.y + ABILITY_RADAR_BOX.numberDy,
-                    }}>
+                      position: 'absolute',
+                      pointerEvents: 'none',
+                      color: ABILITY_RADAR_EMPTY.color,
+                      whiteSpace: 'nowrap',
+                      left: box.x + ((ABILITY_RADAR_BOX.width - emptyWidth) >> 1) + dx,
+                      top: box.y + ABILITY_RADAR_BOX.numberDy,
+                    }}
+                  >
                     {ABILITY_RADAR_EMPTY.text}
                   </PixelText>
                 ))}

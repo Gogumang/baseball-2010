@@ -91,11 +91,7 @@ const RESUME_STATE_ONE_REMAINING = 4 / 16
  * 직전 틀(메인 메뉴 쪽 화면 — 웹은 같은 커밋에 내려간 앞 화면 판, `LeftFrame`)이다.
  * `effectorOpacityAt(k)` = 효과기 종류 1 의 k 틀 덮개 불투명도.
  */
-export function endingStageZeroCoverOpacityAt(
-  tick: number,
-  isResumed: boolean,
-  effectorOpacityAt: (frame: number) => number,
-): number {
+export function endingStageZeroCoverOpacityAt(tick: number, isResumed: boolean, effectorOpacityAt: (frame: number) => number): number {
   let remaining = isResumed ? RESUME_STATE_ONE_REMAINING : 1
   for (let k = 0; k < tick; k += 1) remaining *= 1 - effectorOpacityAt(k)
   return 1 - remaining

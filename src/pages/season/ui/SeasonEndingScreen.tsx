@@ -4,8 +4,13 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 import { ENDING_BONUS_GAME_POINTS } from '@/entities/season-mode/model/seasonRewards'
 import {
-  ENDING_BACKDROP_COLOR, ENDING_IRIS, ENDING_SCREEN,
-  SEASON_ENDING_TEXT, isSeasonEndingTextShown, seasonEndingIrisOf, seasonEndingTextIndexOf,
+  ENDING_BACKDROP_COLOR,
+  ENDING_IRIS,
+  ENDING_SCREEN,
+  SEASON_ENDING_TEXT,
+  isSeasonEndingTextShown,
+  seasonEndingIrisOf,
+  seasonEndingTextIndexOf,
 } from '@/widgets/season/lib/seasonEndingLayout'
 import * as styles from '@/widgets/season/ui/SeasonEndWindow.css'
 import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
@@ -144,19 +149,18 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
           <path
             fillRule="evenodd"
             fill={ENDING_IRIS.cover}
-            d={`M0,0H${ENDING_SCREEN.width}V${ENDING_SCREEN.height}H0Z`
-              + `M${circle.x},${circle.y + circle.diameter / 2}`
-              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0`
-              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`}
+            d={
+              `M0,0H${ENDING_SCREEN.width}V${ENDING_SCREEN.height}H0Z` +
+              `M${circle.x},${circle.y + circle.diameter / 2}` +
+              `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0` +
+              `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`
+            }
           />
         )}
       </svg>
 
       {isSeasonEndingTextShown(tick) && (
-        <div
-          className={styles.endingText}
-          style={{ left: SEASON_ENDING_TEXT.x, top: SEASON_ENDING_TEXT.y, width: SEASON_ENDING_TEXT.width }}
-        >
+        <div className={styles.endingText} style={{ left: SEASON_ENDING_TEXT.x, top: SEASON_ENDING_TEXT.y, width: SEASON_ENDING_TEXT.width }}>
           <MarkupText raw={text} />
         </div>
       )}
@@ -171,10 +175,12 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
         />
       )}
 
-      {leaveStage > 0
+      {leaveStage > 0 ? (
         // 단계 1 의 종류 1 끝만 넘긴다(0x8bd8 8cdc `cmp r1, #1`) — 단계 2 부터는 끝나도 아무 일이 없다
-        ? <SeasonScreenFade key={`종류1:${leaveStage}`} kind="검정에서밝아짐" {...(leaveStage === 1 ? { onEnd: onFinish } : {})} />
-        : <SeasonScreenFade key="종류2" kind="검게어두워짐" />}
+        <SeasonScreenFade key={`종류1:${leaveStage}`} kind="검정에서밝아짐" {...(leaveStage === 1 ? { onEnd: onFinish } : {})} />
+      ) : (
+        <SeasonScreenFade key="종류2" kind="검게어두워짐" />
+      )}
 
       {phase === '보너스' && (
         <MessageBox

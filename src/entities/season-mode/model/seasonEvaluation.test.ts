@@ -135,10 +135,7 @@ describe('경기 뒤 평가 묶음', () => {
   })
 
   it('사기는 0 아래로 내려가지 않는다', () => {
-    const 뒤 = applySeasonGameEvaluation(
-      { ...상태(), teamMorale: 5 },
-      { popularityChange: 0, reputationChange: 0, moraleChange: -20 },
-    )
+    const 뒤 = applySeasonGameEvaluation({ ...상태(), teamMorale: 5 }, { popularityChange: 0, reputationChange: 0, moraleChange: -20 })
     expect(뒤.teamMorale).toBe(0)
   })
 })
@@ -174,7 +171,11 @@ describe('사람 팀 승리 0xb69c8 — 이긴 칸 = R(1) > R(0) ? 1 : 0', () =>
 
   it('동점 평가 — 선공은 인기도·사기를 승리로 받고 평판은 −2·+2 가 함께 붙는다', () => {
     const 맥락 = {
-      myRuns: 2, opponentRuns: 2, popularityCompleteGame: null, reputationCompleteGame: null, opponentTeamId: 3,
+      myRuns: 2,
+      opponentRuns: 2,
+      popularityCompleteGame: null,
+      reputationCompleteGame: null,
+      opponentTeamId: 3,
     } as const
     const 선공 = evaluateSeasonGame(상태().record, { ...맥락, won: true, tied: true })
     expect(선공.popularityChange).toBe(popularityChangeOf(true, 2, 2, null))

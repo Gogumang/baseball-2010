@@ -2,7 +2,11 @@ import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { roundPlateRectsOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import {
-  CARD_PLATE_COLOR, HALF_INNING_CARDS_Y, dueUpCardPlacementOf, halfInningCardsAt, pitcherCardPlacementOf,
+  CARD_PLATE_COLOR,
+  HALF_INNING_CARDS_Y,
+  dueUpCardPlacementOf,
+  halfInningCardsAt,
+  pitcherCardPlacementOf,
 } from '@/widgets/game-scene/lib/halfInningCardsLayout'
 import type { CardBox, PitcherCount } from '@/widgets/game-scene/lib/halfInningCardsLayout'
 import * as styles from '@/widgets/game-scene/ui/GameScene.css'
@@ -32,9 +36,17 @@ function Plate({ box }: { readonly box: CardBox }) {
   return (
     <>
       {roundPlateRectsOf(box).map((rect, part) => (
-        <span key={part} className={styles.block} style={{
-          left: rect.x, top: rect.y, width: rect.width, height: rect.height, background: CARD_PLATE_COLOR,
-        }} />
+        <span
+          key={part}
+          className={styles.block}
+          style={{
+            left: rect.x,
+            top: rect.y,
+            width: rect.width,
+            height: rect.height,
+            background: CARD_PLATE_COLOR,
+          }}
+        />
       ))}
     </>
   )
@@ -64,7 +76,11 @@ export interface HalfInningCardsAt {
  * 점수판 틀 0x41440 뒤에 그린다(0x4ff16). `at` 을 주면 그 자리에 PITCHER → DUE UP 차례로 그린다(0x21 중계).
  * `isGameOver`(0xb68fc) 면 0x420dc 는 점을(42252), 0x42364 는 세 줄을(42450) 안 그린다.
  */
-export function HalfInningCards({ data, at: fixedAt, isGameOver = false }: {
+export function HalfInningCards({
+  data,
+  at: fixedAt,
+  isGameOver = false,
+}: {
   readonly data: HalfInningCardsData
   readonly at?: HalfInningCardsAt
   readonly isGameOver?: boolean
@@ -78,32 +94,37 @@ export function HalfInningCards({ data, at: fixedAt, isGameOver = false }: {
   // 그리는 차례: 초면 0x42364 → 0x420dc, 말이면 0x420dc → 0x42364 (왼쪽 먼저)
   const pitcherCard = (
     <div key="pitcher" data-testid="교대판-투수" data-x={at.pitcherX}>
-      {pitcher.plates.map((box, index) => <Plate key={index} box={box} />)}
-      <FrameSprite folder={IMG_TEXT_FRAMES} frame={pitcher.title.frame} origins={textOrigins}
-        x={pitcher.title.x} y={pitcher.title.y} />
+      {pitcher.plates.map((box, index) => (
+        <Plate key={index} box={box} />
+      ))}
+      <FrameSprite folder={IMG_TEXT_FRAMES} frame={pitcher.title.frame} origins={textOrigins} x={pitcher.title.x} y={pitcher.title.y} />
       {pitcher.frames.map((frame) => (
-        <FrameSprite key={frame.frame} folder={GAME_UI_FRAMES} frame={frame.frame} origins={gameUiOrigins}
-          x={frame.x} y={frame.y} />
+        <FrameSprite key={frame.frame} folder={GAME_UI_FRAMES} frame={frame.frame} origins={gameUiOrigins} x={frame.x} y={frame.y} />
       ))}
       {pitcher.images.map((image, index) => (
-        <img key={index} className={styles.sprite} alt="" data-image={image.image}
-          src={`${GAME_UI}/${pad(image.image)}.png`} style={{ left: image.x, top: image.y }} />
+        <img
+          key={index}
+          className={styles.sprite}
+          alt=""
+          data-image={image.image}
+          src={`${GAME_UI}/${pad(image.image)}.png`}
+          style={{ left: image.x, top: image.y }}
+        />
       ))}
       <NameText box={pitcher.name} name={data.pitcherName} testId="교대판-투수이름" />
     </div>
   )
   const dueUpCard = (
     <div key="dueUp" data-testid="교대판-타자" data-x={at.dueUpX}>
-      {dueUp.plates.map((box, index) => <Plate key={index} box={box} />)}
-      <FrameSprite folder={IMG_TEXT_FRAMES} frame={dueUp.title.frame} origins={textOrigins}
-        x={dueUp.title.x} y={dueUp.title.y} />
-      <FrameSprite folder={GAME_UI_FRAMES} frame={dueUp.frame.frame} origins={gameUiOrigins}
-        x={dueUp.frame.x} y={dueUp.frame.y} />
+      {dueUp.plates.map((box, index) => (
+        <Plate key={index} box={box} />
+      ))}
+      <FrameSprite folder={IMG_TEXT_FRAMES} frame={dueUp.title.frame} origins={textOrigins} x={dueUp.title.x} y={dueUp.title.y} />
+      <FrameSprite folder={GAME_UI_FRAMES} frame={dueUp.frame.frame} origins={gameUiOrigins} x={dueUp.frame.x} y={dueUp.frame.y} />
       {dueUpRows.map((row, index) => (
         <span key={index} data-testid={`교대판-타순-${index}`} data-order={row.order}>
           {row.digits.map((digit, part) => (
-            <img key={part} className={styles.sprite} alt="" src={`${NUM}/${pad(digit.image)}.png`}
-              style={{ left: digit.x, top: digit.y }} />
+            <img key={part} className={styles.sprite} alt="" src={`${NUM}/${pad(digit.image)}.png`} style={{ left: digit.x, top: digit.y }} />
           ))}
           <NameText box={row.name} name={data.dueUpNames[index] ?? null} testId={`교대판-타자이름-${index}`} />
         </span>
@@ -111,8 +132,6 @@ export function HalfInningCards({ data, at: fixedAt, isGameOver = false }: {
     </div>
   )
   return (
-    <div className={styles.cardLayer}>
-      {fixedAt === undefined && data.battingSide === 0 ? [dueUpCard, pitcherCard] : [pitcherCard, dueUpCard]}
-    </div>
+    <div className={styles.cardLayer}>{fixedAt === undefined && data.battingSide === 0 ? [dueUpCard, pitcherCard] : [pitcherCard, dueUpCard]}</div>
   )
 }

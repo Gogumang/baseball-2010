@@ -7,8 +7,8 @@ import * as styles from '@/pages/title/ui/BootScreen.css'
 
 /** 0xce904 — 원문 그대로 (CP949) */
 export const USAGE_NOTICE_TEXT =
-  '!C !cFF0000<이용안내>!N!N이 게임은 게임 이용 시!N별도의 비용이 발생하지!N않는 단독형 게임입니다.!N안심하고 이용하세요.!N!N'
-  + '단, 서버 접속 시 통화료!N와 G포인트, 명예의전당!N슬롯 구매 시 정보이용료!N가 발생합니다.'
+  '!C !cFF0000<이용안내>!N!N이 게임은 게임 이용 시!N별도의 비용이 발생하지!N않는 단독형 게임입니다.!N안심하고 이용하세요.!N!N' +
+  '단, 서버 접속 시 통화료!N와 G포인트, 명예의전당!N슬롯 구매 시 정보이용료!N가 발생합니다.'
 /** 0xce8e4 — 원문 그대로 */
 export const USAGE_NOTICE_PROMPT = '!C !cFF0000아무키나 누르세요!!'
 
@@ -80,15 +80,21 @@ function LaidOutText({ raw, top, testId }: { readonly raw: string; readonly top:
   return (
     <div data-testid={testId}>
       {lines.map((line, index) => (
-        <div key={index} className={styles.textLine} data-part="글줄"
+        <div
+          key={index}
+          className={styles.textLine}
+          data-part="글줄"
           style={{
             left: TEXT_X,
             top: top + index * LINE_HEIGHT,
             textAlign: line.align === '가운데' ? 'center' : line.align === '오른' ? 'right' : 'left',
-          }}>
+          }}
+        >
           {runsOf(line.glyphs).map((run) => (
             // 기본 글색은 0xba269 의 검정 — `layoutDialogue` 는 !cFFFFFF 도 기본(null)으로 돌려주지만 이 글에는 없다
-            <span key={run.start} style={run.color === null ? undefined : { color: run.color }}>{run.text}</span>
+            <span key={run.start} style={run.color === null ? undefined : { color: run.color }}>
+              {run.text}
+            </span>
           ))}
         </div>
       ))}

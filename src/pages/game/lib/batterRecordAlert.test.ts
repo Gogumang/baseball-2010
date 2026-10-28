@@ -3,7 +3,11 @@ import { startGame } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import {
-  RESULT_WAIT_TICKS, RESULT_WAIT_TICKS_AT_BAT_END, batterHumanRecordCountOf, myAtBatRecordCountOf, resultWaitTicksOf,
+  RESULT_WAIT_TICKS,
+  RESULT_WAIT_TICKS_AT_BAT_END,
+  batterHumanRecordCountOf,
+  myAtBatRecordCountOf,
+  resultWaitTicksOf,
 } from '@/pages/game/lib/batterRecordAlert'
 
 const base = startGame(createSeededRandom(20101007))
@@ -32,25 +36,33 @@ describe('타자편 공 끝 몫 — 내 공 몫만 이번에, 자동 타석 몫�
   })
 
   it('3루타 타석은 기록 0 하나 — 그 뒤 동료 타석 몫은 남긴다', () => {
-    const after = withStats(base, {
-      plateAppearances: base.myStats.plateAppearances + 1,
-      atBats: base.myStats.atBats + 1,
-      hits: base.myStats.hits + 1,
-      triples: base.myStats.triples + 1,
-    }, { consecutiveHits: base.consecutiveHits + 1 })
+    const after = withStats(
+      base,
+      {
+        plateAppearances: base.myStats.plateAppearances + 1,
+        atBats: base.myStats.atBats + 1,
+        hits: base.myStats.hits + 1,
+        triples: base.myStats.triples + 1,
+      },
+      { consecutiveHits: base.consecutiveHits + 1 },
+    )
     expect(myAtBatRecordCountOf(base, after)).toBe(1)
     expect(batterHumanRecordCountOf(base, after, [32, 0, 0, 1])).toBe(2)
   })
 
   it('만루 홈런 + 앞 타석 홈런이면 홈런 단계 · 백투백까지 내 몫이다', () => {
     const before = { ...base, homeRunStreak: 1 }
-    const after = withStats(before, {
-      plateAppearances: base.myStats.plateAppearances + 1,
-      atBats: base.myStats.atBats + 1,
-      hits: base.myStats.hits + 1,
-      homeRuns: base.myStats.homeRuns + 1,
-      runsBattedIn: base.myStats.runsBattedIn + 4,
-    }, { consecutiveHits: base.consecutiveHits + 1, homeRunStreak: 2 })
+    const after = withStats(
+      before,
+      {
+        plateAppearances: base.myStats.plateAppearances + 1,
+        atBats: base.myStats.atBats + 1,
+        hits: base.myStats.hits + 1,
+        homeRuns: base.myStats.homeRuns + 1,
+        runsBattedIn: base.myStats.runsBattedIn + 4,
+      },
+      { consecutiveHits: base.consecutiveHits + 1, homeRunStreak: 2 },
+    )
     // 만루 홈런(4) · 백투백(6)
     expect(myAtBatRecordCountOf(before, after)).toBe(2)
   })
@@ -83,8 +95,7 @@ describe('진행기와 맞춰 보기 — 내 타석 몫이 recordIds 앞쪽에 �
       const rbi = progress.myStats.runsBattedIn - before.myStats.runsBattedIn
       const mine = [
         ...recordBatterAtBat({ stats: before.myStats, consecutiveHits: before.consecutiveHits }, outcome, rbi).recordIds,
-        ...backToBackRecordOf({ streak: before.homeRunStreak, humanOffense: true, isHomeRun: outcome.kind === '홈런' })
-          .recordIds,
+        ...backToBackRecordOf({ streak: before.homeRunStreak, humanOffense: true, isHomeRun: outcome.kind === '홈런' }).recordIds,
       ]
       const count = batterHumanRecordCountOf(before, progress, added)
       expect(count).toBe(mine.length)

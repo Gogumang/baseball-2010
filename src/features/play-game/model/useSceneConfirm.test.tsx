@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import {
-  SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, noteSceneDEntryTick, useSceneConfirm,
-} from '@/features/play-game/model/useSceneConfirm'
+import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, noteSceneDEntryTick, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'
 import { SCENE_STATE, markSceneStateEntries, resetSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import {
-  chainSceneConfirm, enterSceneConfirm, enterSceneConfirmFromSubstitutionWindow, enterSceneHookPassage,
+  chainSceneConfirm,
+  enterSceneConfirm,
+  enterSceneConfirmFromSubstitutionWindow,
+  enterSceneHookPassage,
 } from '@/features/play-game/model/sceneConfirm'
 import { resetSceneParticleManagerForTest, sceneParticleScene } from '@/entities/particle/model/sceneParticleManager'
 import { emitParticles } from '@/entities/particle/model/particleScene'
@@ -14,9 +15,7 @@ import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
-import {
-  gameSceneTickNow, markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { gameSceneTickNow, markCommonWindowShown, markGameSceneUp, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -178,7 +177,12 @@ describe('상태 0xe 의 OK 대기 (0x532b0 · 0x49a26)', () => {
 describe('타석 등장음 — 0xd 진입 메시지 0xbc1 → 0x522d2 (마타자 26 · 2·3루 주자 15 · 그 밖 14)', () => {
   const 통로 = () => {
     const played: number[] = []
-    setActiveSound({ ...createSilentSound(), play: (id: number) => { played.push(id) } })
+    setActiveSound({
+      ...createSilentSound(),
+      play: (id: number) => {
+        played.push(id)
+      },
+    })
     return played
   }
   afterEach(() => setActiveSound(null))
@@ -222,8 +226,24 @@ describe('0xd 진입 0x48d50 — 투수 그림 객체 되돌리기(48ee4) · 파
 
   /** 51 바이트 설정 — 값은 상관없다(지우기만 본다) */
   const config = {
-    ang: 0, spread: 0, spd: 0, spdR: 0, emit: 1, emitR: 0, life: 5, lifeR: 0,
-    a0: 0, a0R: 0, a1: 0, a1R: 0, ax: 0, ay: 0, w: 0, h: 0, total: 5, mode: 2,
+    ang: 0,
+    spread: 0,
+    spd: 0,
+    spdR: 0,
+    emit: 1,
+    emitR: 0,
+    life: 5,
+    lifeR: 0,
+    a0: 0,
+    a0R: 0,
+    a1: 0,
+    a1R: 0,
+    ax: 0,
+    ay: 0,
+    w: 0,
+    h: 0,
+    total: 5,
+    mode: 2,
   } as unknown as ParticleConfig
 
   it('0x16 을 안 거친 0xd(등장음이 실린 대기)는 첫 그림에 앱 전역 파티클 관리자를 비운다 — 메뉴에서 남은 이미터도', () => {
@@ -260,7 +280,12 @@ describe('0xe 진입의 감독 강판 지나감 (0x50674 506ea 0x504cc → 0x23)
 
   it('등장음을 내고 0xd 두 그림 · 0xe 한 그림을 센 뒤 끝난다 — OK 는 안 받는다', () => {
     const played: number[] = []
-    setActiveSound({ ...createSilentSound(), play: (id: number) => { played.push(id) } })
+    setActiveSound({
+      ...createSilentSound(),
+      play: (id: number) => {
+        played.push(id)
+      },
+    })
     const wait = enterSceneHookPassage(14)
     const { result } = renderHook(() => useSceneConfirm(wait, true))
     expect(played).toEqual([14])
@@ -296,7 +321,12 @@ describe('0xd 진입 틱 — 원본은 0xd 를 예약한 다음 틀이 0xd 틱 0
 
   it('타석 장면이 앞날에 적은 0xd(0x12 문턱 다음 틀)가 있으면 덮개가 문턱 틀에 걷혀도 그 틱부터 센다 — 등장음도 그 틱', () => {
     const played: number[] = []
-    setActiveSound({ ...createSilentSound(), play: (id: number) => { played.push(id) } })
+    setActiveSound({
+      ...createSilentSound(),
+      play: (id: number) => {
+        played.push(id)
+      },
+    })
     // 0x12 문턱 갱신이 이 틀에 판정 A → 0xd 예약 — 0xd 틱 0 은 다음 틀 (`BattingStage.showResult` 가 적는 칸)
     markSceneStateEntries({ tick: gameSceneTickNow() + 1, state: SCENE_STATE.준비 })
     const wait = enterSceneConfirm(14)

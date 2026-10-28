@@ -35,7 +35,10 @@ export interface ListPageEntry {
  * (0x64022~0x640a2 · 0x647c0~0x6483c · 0x65130~0x651ea). 시작 둘째 인자(애니)는 k 0·1·9 · 6~8 이 [skin+0xe8](틱 0 에
  * 넷째 인자 ≠ 0 이면 1, 0x63bd4 · 0x63be0), k 2·10·11 은 늘 1 이다(0x64834).
  */
-export function useListPageEntry({ slides = true, grid = null }: {
+export function useListPageEntry({
+  slides = true,
+  grid = null,
+}: {
   readonly slides?: boolean
   readonly grid?: ListPageGrid | null
 } = {}): ListPageEntry {

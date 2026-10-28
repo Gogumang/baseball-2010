@@ -147,10 +147,7 @@ export function magicTrainingCellCostOf(cell: number): number {
  * 마구 칸은 **창이 막는다** — 레벨 i 칸은 `i == 배운 수` 일 때만 열리고(StrMODE[63]/[64]),
  * 인기도 조건과 G포인트 부족([65])도 창에 있다 (R7 4절).
  */
-export function pitcherTrainingBlockReasonOf(
-  career: PitcherCareer,
-  menu: PitcherTrainingMenu,
-): PitcherTrainingBlockReason | null {
+export function pitcherTrainingBlockReasonOf(career: PitcherCareer, menu: PitcherTrainingMenu): PitcherTrainingBlockReason | null {
   // 행동함(S+4)은 보지 않는다 — 107 키 0x12d48 확인(12d8a~)은 사기 0xa3a25 만 본다
   if (career.morale <= 0) return '사기부족'
   if (menu.ability === null) {
@@ -198,16 +195,10 @@ function roll(random: RandomPort, range: IntegerRange): number {
 }
 
 /** 훈련 한 번 (0x17f5c → 0xa3bad). 범위·타입 보너스 갈림은 위 모듈 주석 (디스어셈 확정) */
-export function runPitcherTraining(
-  career: PitcherCareer,
-  menu: PitcherTrainingMenu,
-  random: RandomPort,
-): PitcherTrainingOutcome {
+export function runPitcherTraining(career: PitcherCareer, menu: PitcherTrainingMenu, random: RandomPort): PitcherTrainingOutcome {
   const blockReason = pitcherTrainingBlockReasonOf(career, menu)
   if (blockReason !== null) throw new Error(`훈련을 실행할 수 없습니다 (${blockReason}): ${menu.name}`)
-  return menu.ability === null
-    ? runMagicTraining(career, menu, random)
-    : runAbilityTraining(career, menu, menu.ability, random)
+  return menu.ability === null ? runMagicTraining(career, menu, random) : runAbilityTraining(career, menu, menu.ability, random)
 }
 
 /**
@@ -233,8 +224,7 @@ function runAbilityTraining(
   const rolledMoraleLoss = roll(random, MORALE_LOSS_RANGE)
   const rolled = roll(random, slot === STAMINA_SLOT ? SLOW_GAIN_RANGE : GAIN_RANGE)
   const typeBonus = PITCHER_TYPE_BONUS_ABILITY[career.typeIndex] === ability ? TYPE_BONUS : 0
-  const skillGain =
-    (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
+  const skillGain = (isPitcherSkillEquipped(career, ROOKIE_SKILL) ? 1 : 0) - (isPitcherSkillEquipped(career, WEAK_BODY_SKILL) ? 2 : 0)
   // 서브 아이템 0~3 은 훈련 칸 k 로 `기록[0x58+k]` 를 본다 (0x187f6, 모드 공용) — 표적판 = 제구 … 하드타이어 = 체력
   const subItemGain = subItemSlotTrainingBonus(career, slot)
   const gains: Partial<PitcherAbility> = { [ability]: rolled + typeBonus + skillGain + subItemGain }
@@ -255,11 +245,7 @@ function runAbilityTraining(
   }
 }
 
-function runMagicTraining(
-  career: PitcherCareer,
-  menu: PitcherTrainingMenu,
-  random: RandomPort,
-): PitcherTrainingOutcome {
+function runMagicTraining(career: PitcherCareer, menu: PitcherTrainingMenu, random: RandomPort): PitcherTrainingOutcome {
   const level = career.magicLevel
   const required = MAGIC_REQUIRED_SESSIONS[level]
   const sessions = career.magicSessions + 1
@@ -288,7 +274,9 @@ function runMagicTraining(
     modifiers,
     hasSubItemBonus: false,
     magic: {
-      sessions, required, isLevelUp,
+      sessions,
+      required,
+      isLevelUp,
       name: PITCHER_BURSTS[number - 1 + (number === 4 ? career.typeIndex : 0)] ?? '',
     },
     // 0x18a5c 칸 4 — 해제 카운터 짝(칸 0 · 2 · 3)에 안 맞아 0x18b70 이 다섯 칸을 0 으로
@@ -324,12 +312,7 @@ export interface PitchTypeTrainingOutcome {
  * 18bd8  칸 4 → 알림 창 0xbbef9(코드 4) → 18d66 S+4 = 1(행동함) · 저장 → 창이 닫히면 125 틀 0x18dd8 이 105
  * ```
  */
-export function runPitchTypeTraining(
-  career: PitcherCareer,
-  row: number,
-  column: number,
-  random: RandomPort,
-): PitchTypeTrainingOutcome {
+export function runPitchTypeTraining(career: PitcherCareer, row: number, column: number, random: RandomPort): PitchTypeTrainingOutcome {
   const rolledMoraleLoss = roll(random, PITCH_TYPE_MORALE_RANGE)
   const modifiers = trainingModifiersOf(career)
   const moraleLoss = rolledMoraleLoss + trainingMoraleAdjustmentOf(modifiers)
@@ -442,9 +425,7 @@ const toInt8 = (value: number) => ((value & 0xff) << 24) >> 24
 export function countReleaseTrainingStreak(career: PitcherCareer, slot: number): PitcherCareer {
   const counts = career.releaseTrainingStreaks ?? new Array<number>(RELEASE_STREAK_SLOTS).fill(0)
   const matches = RELEASE_STREAK_PAIRS.some(([skill, pairSlot]) => pairSlot === slot && career.skillIds.includes(skill))
-  const next = matches
-    ? counts.map((count, index) => (index === slot ? toInt8(count + 1) : count))
-    : new Array<number>(RELEASE_STREAK_SLOTS).fill(0)
+  const next = matches ? counts.map((count, index) => (index === slot ? toInt8(count + 1) : count)) : new Array<number>(RELEASE_STREAK_SLOTS).fill(0)
   return { ...career, releaseTrainingStreaks: next }
 }
 

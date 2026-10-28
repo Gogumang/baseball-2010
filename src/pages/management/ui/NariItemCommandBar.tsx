@@ -15,18 +15,27 @@ const ITEM_SLOT = COMMAND_SLOTS.find((slot) => slot.id === '아이템') ?? null
  * [100 장착 · 105 서브 · 110 GP])로 두고, 하위 메뉴 [gfx+0x15c] 는 110 진입 0x107e0 이 넣은 [this+0x98](아이템 하위 메뉴)
  * 그대로다 — 부모 칸(아이템)이 (6,245) 에 서고 커서는 110 에서 고른 칸이다. 타자편 · 투수편 같은 표.
  */
-export function NariItemCommandBar({ cursor }: {
+export function NariItemCommandBar({
+  cursor,
+}: {
   /** 110 아이템 하위 메뉴 [this+0x98] 의 커서 칸 — 0 장착 · 1 서브 · 2 GP */
   readonly cursor: number
 }) {
   const slots = COMMAND_MENUS.아이템
   const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
-  const labelWidths = Object.fromEntries(
-    slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
-  )
+  const labelWidths = Object.fromEntries(slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]))
   return (
-    <CommandBar slots={slots} cursor={cursor} bounce={0} slideUpdates={SETTLED_SLIDE_UPDATES}
-      disabledIds={NO_IDS} labelWidths={labelWidths} parent={ITEM_SLOT} isSubMenu
-      onHover={NOOP} onSelect={NOOP} />
+    <CommandBar
+      slots={slots}
+      cursor={cursor}
+      bounce={0}
+      slideUpdates={SETTLED_SLIDE_UPDATES}
+      disabledIds={NO_IDS}
+      labelWidths={labelWidths}
+      parent={ITEM_SLOT}
+      isSubMenu
+      onHover={NOOP}
+      onSelect={NOOP}
+    />
   )
 }

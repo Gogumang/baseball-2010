@@ -63,9 +63,7 @@ export function titleNumberOf(title: string): number {
  * `#` 키 고르기 화면(하위 상태 129)과 기록연감이 이 순서를 쓴다 (P3 10-1).
  */
 export function titleListOf(titles: readonly string[]): readonly string[] {
-  return [...new Set(titles)]
-    .filter((title) => titleNumberOf(title) >= 0)
-    .sort((left, right) => titleNumberOf(left) - titleNumberOf(right))
+  return [...new Set(titles)].filter((title) => titleNumberOf(title) >= 0).sort((left, right) => titleNumberOf(left) - titleNumberOf(right))
 }
 
 /**
@@ -152,8 +150,7 @@ const isSeasonStart = (subject: TitleSubject) => subject.gamesPlayed === SEASON_
 
 const hasSeenEvent = (subject: TitleSubject, eventId: number) => subject.seenEventIds.includes(String(eventId))
 
-const romanceCountOf = (subject: TitleSubject) =>
-  Object.values(ROMANCE_EVENT_IDS).filter((eventId) => hasSeenEvent(subject, eventId)).length
+const romanceCountOf = (subject: TitleSubject) => Object.values(ROMANCE_EVENT_IDS).filter((eventId) => hasSeenEvent(subject, eventId)).length
 
 /** `s8` 로 읽기 — +0x184 는 u8 로 세지만 칭호 30 은 `ldrsb` 로 읽어 128 이상이면 음수가 된다 (0x1a680) */
 const signedByteOf = (value: number) => ((value & 0xff) << 24) >> 24
@@ -225,8 +222,7 @@ export function isSixthYearCheckPoint(subject: TitleSubject): boolean {
   return subject.season === SIXTH_YEAR && subject.gamesPlayed === FOUR_TENTHS_CHECK_GAME
 }
 
-const trainingTotalOf = (career: PlayerCareer) =>
-  Object.values(career.trainingCounts).reduce((total, count) => total + count, 0)
+const trainingTotalOf = (career: PlayerCareer) => Object.values(career.trainingCounts).reduce((total, count) => total + count, 0)
 
 /** 타자 커리어를 공통 판정이 보는 값으로 옮긴다 */
 export function titleSubjectOfBatter(career: PlayerCareer): TitleSubject {
@@ -314,8 +310,7 @@ const BATTER_RULES: Readonly<Record<number, BatterRule>> = {
   41: (career) => career.careerStats.homeRuns >= 200,
   42: (career) => career.careerStats.homeRuns >= 300,
   // 원본은 **6년차 18경기째 딱 한 순간**만 본다 (P3 9절) — `>=` 면 그 뒤로 계속 판정한다
-  43: (career) =>
-    isSixthYearCheckPoint(titleSubjectOfBatter(career)) && (battingAverageOf(career.careerStats) ?? 0) >= FOUR_TENTHS,
+  43: (career) => isSixthYearCheckPoint(titleSubjectOfBatter(career)) && (battingAverageOf(career.careerStats) ?? 0) >= FOUR_TENTHS,
   // 44 바람의 아들 — 실효 주루 `0xb6415(기록, 3, 1) > 799`(0x1ad14~0x1ad22) && 통산 도루 ≥ 200 (0x1acf2)
   44: (career) => equippedAbilityOf(career).run > 799 && (career.careerStats.stolenBases ?? 0) >= 200,
   // 45 5툴 플레이어 — 모드 4 갈래(0x1ad94 `cmp #4`)는 k = 0~3 넷 모두 `0xb6415(기록, k, 1) > 998` (0x1ad9a~0x1adfc).

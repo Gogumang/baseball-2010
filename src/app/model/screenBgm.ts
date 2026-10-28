@@ -227,10 +227,7 @@ export function usePitcherLeagueBgmRestart(
   const current = isActive ? scene : null
   if (current !== previousScene) {
     setPreviousScene(current)
-    if (
-      current !== null &&
-      (restartsManagementBgm(previousScene, current) || restartsNextGameStandingsBgm(previousScene, current))
-    ) {
+    if (current !== null && (restartsManagementBgm(previousScene, current) || restartsNextGameStandingsBgm(previousScene, current))) {
       setRestartSerial((serial) => serial + 1)
     }
   }
@@ -278,8 +275,10 @@ export function useScreenBgm(
     setEnteredFrom(previousKind)
     setYearCoverCarry(carriesYearCoverBgm(isYearCoverCarry, previousKind, screen.kind))
     if (
-      restartsMenuBgm(previousKind, screen) || restartsManagementBgm(previousKind, screen.kind) ||
-      restartsTeamSelectBgm(previousKind, screen.kind) || restartsNextGameStandingsBgm(previousKind, screen.kind)
+      restartsMenuBgm(previousKind, screen) ||
+      restartsManagementBgm(previousKind, screen.kind) ||
+      restartsTeamSelectBgm(previousKind, screen.kind) ||
+      restartsNextGameStandingsBgm(previousKind, screen.kind)
     ) {
       setRestartSerial((serial) => serial + 1)
     }

@@ -26,20 +26,19 @@ const SHELL_STYLE = {
   '--game-height': '600px',
 } as CSSProperties
 
-const POPUPS: readonly PostseasonPopup[] = [
-  { kind: '한국시리즈우승' },
-  { kind: '우승발표', champion: 3 },
-  { kind: '정규시즌우승' },
-]
+const POPUPS: readonly PostseasonPopup[] = [{ kind: '한국시리즈우승' }, { kind: '우승발표', champion: 3 }, { kind: '정규시즌우승' }]
 
 async function stableRect(element: Element): Promise<DOMRect> {
   let last = ''
-  await waitFor(() => {
-    const now = JSON.stringify(element.getBoundingClientRect())
-    const isStill = now === last && element.getBoundingClientRect().height > 20
-    last = now
-    expect(isStill).toBe(true)
-  }, { timeout: 3000, interval: 50 })
+  await waitFor(
+    () => {
+      const now = JSON.stringify(element.getBoundingClientRect())
+      const isStill = now === last && element.getBoundingClientRect().height > 20
+      last = now
+      expect(isStill).toBe(true)
+    },
+    { timeout: 3000, interval: 50 },
+  )
   return element.getBoundingClientRect()
 }
 
@@ -48,8 +47,14 @@ describe('나리 포스트시즌 대진 위 팝업 — 판 가운데 (r251)', ()
     for (const popup of POPUPS) {
       render(
         <div style={SHELL_STYLE}>
-          <PostseasonScreen edition={edition} gamePoint={0} series={startPostseason([0, 1, 2, 3])} popup={popup}
-            onConfirm={() => {}} onClosePopup={() => {}} />
+          <PostseasonScreen
+            edition={edition}
+            gamePoint={0}
+            series={startPostseason([0, 1, 2, 3])}
+            popup={popup}
+            onConfirm={() => {}}
+            onClosePopup={() => {}}
+          />
         </div>,
       )
       const stage = document.querySelector('[data-original-screen]')

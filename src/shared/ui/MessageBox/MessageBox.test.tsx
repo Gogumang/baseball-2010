@@ -54,7 +54,7 @@ describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
     expect(onAnswer).toHaveBeenCalledWith(0)
   })
 
-  it('\'5\' 도 OK 다 — 0x754f8 75634~7563e `키 + 5 == 0 || 키 == 0x35`', () => {
+  it("'5' 도 OK 다 — 0x754f8 75634~7563e `키 + 5 == 0 || 키 == 0x35`", () => {
     const onAnswer = vi.fn()
     render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
 
@@ -62,7 +62,7 @@ describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
     expect(onAnswer).toHaveBeenCalledWith(0)
   })
 
-  it('숫자키 \'6\' · \'4\' 는 → ← 처럼 칸을 옮긴다 — 창 격자는 숫자키 꼴 1 (0x753f4 vt+0x10(…, 1, 0x330, 0))', () => {
+  it("숫자키 '6' · '4' 는 → ← 처럼 칸을 옮긴다 — 창 격자는 숫자키 꼴 1 (0x753f4 vt+0x10(…, 1, 0x330, 0))", () => {
     const onAnswer = vi.fn()
     render(<MessageBox text="질문" buttons={['예', '아니오']} onAnswer={onAnswer} />)
 
@@ -173,9 +173,19 @@ describe('메시지 상자 애니메이션', () => {
   it('그림·격자·취소 값을 자리가 줄 수 있다 — 종류 0x10 창 (0x74ea9 · 0x74805 · 창 키 표)', () => {
     const onAnswer = vi.fn()
     render(
-      <MessageBox text="질문" buttons={['가', '나', '다']}
-        buttonFrames={[{ normal: 4, selected: 9 }, { normal: 3, selected: 8 }, { normal: 5, selected: 10 }]}
-        grid={{ columns: 1, gapX: 0, gapY: 5 }} cancelAnswer={-1} initialSelected={1} onAnswer={onAnswer} />,
+      <MessageBox
+        text="질문"
+        buttons={['가', '나', '다']}
+        buttonFrames={[
+          { normal: 4, selected: 9 },
+          { normal: 3, selected: 8 },
+          { normal: 5, selected: 10 },
+        ]}
+        grid={{ columns: 1, gapX: 0, gapY: 5 }}
+        cancelAnswer={-1}
+        initialSelected={1}
+        onAnswer={onAnswer}
+      />,
     )
 
     expect(그림('가')?.getAttribute('src')).toContain('popup/frames/004.png')

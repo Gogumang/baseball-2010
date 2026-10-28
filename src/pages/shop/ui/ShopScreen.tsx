@@ -61,9 +61,7 @@ function centeredNoticeOf(text: string): string {
  * 종류 3 이면 창 → 기본정보 카드 0x15e20(선수 그림 · 레이더, 정보 칸은 건너뜀) → 머리띠,
  * 그 밖이면 상태판 0x7d34c(gfx, 0) → 커맨드 줄 0x7e418(gfx, 틱) → 창 → 머리띠 (`statusPanel` · `NariItemCommandBar`).
  */
-export function ShopScreen({
-  initialTab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack,
-}: ShopScreenProps) {
+export function ShopScreen({ initialTab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack }: ShopScreenProps) {
   const tab = TABS.find((candidate) => candidate === initialTab) ?? '장착'
   const isEquipment = tab === '장착' || tab === '착용'
   return (
@@ -72,17 +70,29 @@ export function ShopScreen({
       entriesOf={() => (tab === '서브' || tab === 'GP' ? shopEntriesOf({ tab, career }) : [])}
       // 0x7d34c(gfx, 0) — 둘째 인자 0 이라 전 경기 표시 없음
       statusPanel={<ManagementBoard career={career} titleName={currentTitleOf(career)} hour={new Date().getHours()} />}
-      equipment={isEquipment ? {
-        edition: '타자',
-        rowsOf: (part) => batterEquipmentRowsOf(career, part, tab === '착용'),
-        // 0x15e20 의 타자 갈래 — 그림 객체를 (박스 가운데, 박스 아래 − 10) 에 그린다. 줄을 훑으면 그 장비를 끼워 보인다(0x81938)
-        preview: (part, level) => (
-          <BasicInfoCard career={career} showsInfoTable={false}
-            figureEquipment={level === null ? undefined : {
-              ...career.equipmentLevels, [EQUIPMENT_PARTS[part].ability]: level + 1,
-            }} />
-        ),
-      } : undefined}
+      equipment={
+        isEquipment
+          ? {
+              edition: '타자',
+              rowsOf: (part) => batterEquipmentRowsOf(career, part, tab === '착용'),
+              // 0x15e20 의 타자 갈래 — 그림 객체를 (박스 가운데, 박스 아래 − 10) 에 그린다. 줄을 훑으면 그 장비를 끼워 보인다(0x81938)
+              preview: (part, level) => (
+                <BasicInfoCard
+                  career={career}
+                  showsInfoTable={false}
+                  figureEquipment={
+                    level === null
+                      ? undefined
+                      : {
+                          ...career.equipmentLevels,
+                          [EQUIPMENT_PARTS[part].ability]: level + 1,
+                        }
+                  }
+                />
+              ),
+            }
+          : undefined
+      }
       questionOf={(itemId) => purchaseQuestionOf(career, itemId)}
       money={career.money}
       gamePoint={career.gamePoint}
@@ -135,7 +145,18 @@ export interface ShopScreenViewProps {
  * 원본도 키 처리 0x13460 · 구매 확정 0x14a74 · 창 0x81dc0 이 한 벌이고 모드로 표만 갈린다 (R12 1a).
  */
 export function ShopScreenView({
-  kind, entriesOf, statusPanel, equipment, questionOf, money, gamePoint, title, noticeText, detail = null, onCloseDetail, onPurchase,
+  kind,
+  entriesOf,
+  statusPanel,
+  equipment,
+  questionOf,
+  money,
+  gamePoint,
+  title,
+  noticeText,
+  detail = null,
+  onCloseDetail,
+  onPurchase,
   onBack,
 }: ShopScreenViewProps) {
   const [cursor, setCursor] = useState(0)
@@ -223,21 +244,30 @@ export function ShopScreenView({
           />
           {equipment.preview?.(
             equipmentState.part,
-            previewLevelOf(equipmentState, equipmentRows.map((row) => row.level)),
+            previewLevelOf(
+              equipmentState,
+              equipmentRows.map((row) => row.level),
+            ),
           )}
         </>
       )}
       <ScreenFrame title={title} gamePoint={gamePoint} onBack={onBack} slides={false} />
       {pending !== null && (
-        <MessageBox text={pending.question} buttons={['예', '아니오']}
+        <MessageBox
+          text={pending.question}
+          buttons={['예', '아니오']}
           onAnswer={(index) => {
             if (index === 0) onPurchase(pending.itemId)
             setPending(null)
-          }} />
+          }}
+        />
       )}
       {pending === null && blockNotice !== null && (
-        <MessageBox text={centeredNoticeOf(blockNotice.text)} buttons={blockNotice.asks ? ['예', '아니오'] : ['확인']}
-          onAnswer={() => setBlockNotice(null)} />
+        <MessageBox
+          text={centeredNoticeOf(blockNotice.text)}
+          buttons={blockNotice.asks ? ['예', '아니오'] : ['확인']}
+          onAnswer={() => setBlockNotice(null)}
+        />
       )}
       {detail !== null && (
         // 장비 구매 확정 0x14a74(0x15084) — 0x741a0(높이 0), 키 0x1d648 이 0x742a9 로 바로 치운다

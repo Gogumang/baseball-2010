@@ -1,17 +1,43 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ANNALS_GRID_SHAPES, DIRECTION_CODES, PANEL_ANIMATION_DRAWS, PANEL_OPEN_START_HEIGHT, closingPanelHeightOf, cursorShakeOf,
-  hasDownMark, isBlinkOn, isListCursorBlinkOn, moveGridCursor, nicknameScrollDirectionOf, openingPanelHeightOf, panelTopOf, scrollNicknames,
-  scrollTopAfter, startNicknameScroll,
+  ANNALS_GRID_SHAPES,
+  DIRECTION_CODES,
+  PANEL_ANIMATION_DRAWS,
+  PANEL_OPEN_START_HEIGHT,
+  closingPanelHeightOf,
+  cursorShakeOf,
+  hasDownMark,
+  isBlinkOn,
+  isListCursorBlinkOn,
+  moveGridCursor,
+  nicknameScrollDirectionOf,
+  openingPanelHeightOf,
+  panelTopOf,
+  scrollNicknames,
+  scrollTopAfter,
+  startNicknameScroll,
 } from '@/pages/record/lib/annalsGrid'
 import {
-  DESCRIPTION_BAR, DESCRIPTION_TICKER, LIST_CURSOR, LIST_GRID, LIST_ROW_FRAME_DY, listFirstYOf, listRowFrameOf, tickerTextXOf,
+  DESCRIPTION_BAR,
+  DESCRIPTION_TICKER,
+  LIST_CURSOR,
+  LIST_GRID,
+  LIST_ROW_FRAME_DY,
+  listFirstYOf,
+  listRowFrameOf,
+  tickerTextXOf,
 } from '@/pages/record/lib/recordAnnalsLayout'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 
 describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () => {
   it('탭별 격자 — 0 · 3 · 4 는 1열 8줄(세로 감기), 1 은 4×5 · 2 는 4×10(가로 감기)', () => {
-    expect(ANNALS_GRID_SHAPES.map((shape) => [shape.columns, shape.rows])).toEqual([[1, 8], [4, 5], [4, 10], [1, 8], [1, 8]])
+    expect(ANNALS_GRID_SHAPES.map((shape) => [shape.columns, shape.rows])).toEqual([
+      [1, 8],
+      [4, 5],
+      [4, 10],
+      [1, 8],
+      [1, 8],
+    ])
   })
 
   it('진행 탭 — 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다', () => {
@@ -49,12 +75,27 @@ describe('기록연감 격자 키 처리 (0x2b7a0 · 0x2b640 · 0x6bead)', () =>
   })
 
   it('고른 칸 흔들림 — 방향마다 두 틱 (표 0xce8bc[2·방향 + t] · 0xce88c[3·방향 + t]), 그 뒤는 멈춘다', () => {
-    const shakeOf = (direction: keyof typeof DIRECTION_CODES) =>
-      [0, 1, 2].map((tick) => cursorShakeOf(DIRECTION_CODES[direction], tick))
-    expect(shakeOf('left')).toEqual([{ dx: -2, dy: 0 }, { dx: 2, dy: 0 }, { dx: 0, dy: 0 }])
-    expect(shakeOf('right')).toEqual([{ dx: 2, dy: 0 }, { dx: -2, dy: 0 }, { dx: 0, dy: 0 }])
-    expect(shakeOf('up')).toEqual([{ dx: 0, dy: -2 }, { dx: 0, dy: 2 }, { dx: 0, dy: 0 }])
-    expect(shakeOf('down')).toEqual([{ dx: 0, dy: 2 }, { dx: 0, dy: -2 }, { dx: 0, dy: 0 }])
+    const shakeOf = (direction: keyof typeof DIRECTION_CODES) => [0, 1, 2].map((tick) => cursorShakeOf(DIRECTION_CODES[direction], tick))
+    expect(shakeOf('left')).toEqual([
+      { dx: -2, dy: 0 },
+      { dx: 2, dy: 0 },
+      { dx: 0, dy: 0 },
+    ])
+    expect(shakeOf('right')).toEqual([
+      { dx: 2, dy: 0 },
+      { dx: -2, dy: 0 },
+      { dx: 0, dy: 0 },
+    ])
+    expect(shakeOf('up')).toEqual([
+      { dx: 0, dy: -2 },
+      { dx: 0, dy: 2 },
+      { dx: 0, dy: 0 },
+    ])
+    expect(shakeOf('down')).toEqual([
+      { dx: 0, dy: 2 },
+      { dx: 0, dy: -2 },
+      { dx: 0, dy: 0 },
+    ])
   })
 })
 
@@ -125,7 +166,17 @@ describe('탭 0·4 목록 격자 그림 (0x7a571 — 0x7a916 · 0x7a9cc · 0x7b3
 
   it('줄 커서 — 프레임 25 를 (칸 x − 1, 칸 y − 2), 지은 뒤 다섯 그림 켜짐 · 세 그림 꺼짐', () => {
     expect(LIST_CURSOR).toEqual({ frame: 25, dy: -2 })
-    expect(Array.from({ length: 10 }, (_, draw) => isListCursorBlinkOn(draw)))
-      .toEqual([true, true, true, true, true, false, false, false, true, true])
+    expect(Array.from({ length: 10 }, (_, draw) => isListCursorBlinkOn(draw))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+    ])
   })
 })

@@ -75,10 +75,7 @@ export interface GameAcePitcher {
   readonly staminaAbility: number
 }
 
-export function gameAcePitcherOf(
-  index: number,
-  levels: Readonly<Record<number, number>> | undefined,
-): GameAcePitcher | undefined {
+export function gameAcePitcherOf(index: number, levels: Readonly<Record<number, number>> | undefined): GameAcePitcher | undefined {
   const player = acePitcherPlayerOf(index)
   if (player === undefined) return undefined
   const level = aceLevelOf(levels, aceLevelSlotOf('투수', index + 1))
@@ -96,10 +93,7 @@ export function gameAcePitcherOf(
 }
 
 /** 마타자의 간이 타석 능력 — 레벨 배율을 먹는다 (0xb6414 첫 단계) */
-export function gameAceBatterOf(
-  index: number,
-  levels: Readonly<Record<number, number>> | undefined,
-): QuickAtBatBatter | undefined {
+export function gameAceBatterOf(index: number, levels: Readonly<Record<number, number>> | undefined): QuickAtBatBatter | undefined {
   const player = aceBatterPlayerOf(index)
   if (player === undefined) return undefined
   const level = aceLevelOf(levels, aceLevelSlotOf('타자', index + 1))

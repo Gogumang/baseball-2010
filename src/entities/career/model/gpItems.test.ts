@@ -14,7 +14,16 @@ const 보통 = 고정난수(0)
 describe('GP 아이템 (타자, 0xa4488)', () => {
   it('타자편 목록은 StrITEM[98~106]·[108] 순서다', () => {
     expect(BATTER_GP_ITEMS.map((item) => item.name)).toEqual([
-      '장어구이', '붕붕드링크', '빌리언XZ', '고려인삼', '엄마의도시락', '또또상품권', '영지버섯', '종합건강진단', '최면요법', '이글아이',
+      '장어구이',
+      '붕붕드링크',
+      '빌리언XZ',
+      '고려인삼',
+      '엄마의도시락',
+      '또또상품권',
+      '영지버섯',
+      '종합건강진단',
+      '최면요법',
+      '이글아이',
     ])
   })
 
@@ -59,13 +68,21 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
   })
 
   it('한계 비교는 장비·스킬을 뺀 기본값으로 한다 — 장비가 있어도 기본값을 깎지 않는다 (0xa4488)', () => {
-    const 장비 = 선수({ skillIds: [], ability: { hit: 700, power: 100, defense: 100, run: 100 }, equipmentLevels: { hit: 5, power: 0, defense: 0, run: 0 } })
+    const 장비 = 선수({
+      skillIds: [],
+      ability: { hit: 700, power: 100, defense: 100, run: 100 },
+      equipmentLevels: { hit: 5, power: 0, defense: 0, run: 0 },
+    })
     // 기본값 700 + 10 = 710 은 한계 800 아래라 그대로 오른다 (앞서는 장비 보너스 탓에 800 으로 깎였다)
     expect(applyGpItem(장비, 0, 보통).career.ability.hit).toBe(710)
   })
 
   it('기본값이 한계를 넘으면 한계로 내린다', () => {
-    const 한계초과 = 선수({ skillIds: [], ability: { hit: 795, power: 100, defense: 100, run: 100 }, equipmentLevels: { hit: 0, power: 0, defense: 0, run: 0 } })
+    const 한계초과 = 선수({
+      skillIds: [],
+      ability: { hit: 795, power: 100, defense: 100, run: 100 },
+      equipmentLevels: { hit: 0, power: 0, defense: 0, run: 0 },
+    })
     expect(applyGpItem(한계초과, 0, 보통).career.ability.hit).toBe(800)
   })
 
@@ -78,7 +95,13 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
         보통,
       ).career,
     ).toMatchObject({
-      isInjured: false, injuryRemaining: 0, injuredGamesPlayed: 0, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: 20,
+      isInjured: false,
+      injuryRemaining: 0,
+      injuredGamesPlayed: 0,
+      isSick: false,
+      illnessName: null,
+      illnessRemaining: 0,
+      illnessCooldown: 20,
     })
     expect(applyGpItem(선수({ eagleEyeGamesRemaining: 90 }), 9, 보통).career.eagleEyeGamesRemaining).toBe(99)
   })
@@ -97,7 +120,14 @@ describe('GP 아이템 (타자, 0xa4488)', () => {
   it('또또상품권은 누적 2·5·10·20·40·70% 로 1~6등, 그 뒤 엄마상·메디카상·우정상·아차상 (표 0xd80b1)', () => {
     expect([0, 199, 200, 499, 999, 1999, 3999, 6999].map(lotteryPrizeOf)).toEqual([1, 1, 2, 2, 3, 4, 5, 6])
     expect([7000, 7099, 7100, 7499, 7500, 8499, 8500, 9999].map(lotteryPrizeOf)).toEqual([
-      '엄마상', '엄마상', '메디카상', '메디카상', '우정상', '우정상', '아차상', '아차상',
+      '엄마상',
+      '엄마상',
+      '메디카상',
+      '메디카상',
+      '우정상',
+      '우정상',
+      '아차상',
+      '아차상',
     ])
   })
 

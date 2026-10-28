@@ -111,9 +111,7 @@ describe('타자 미션 CPU 투수 교체 — 0xf 진입 0x3d954 → 0xac428 (3d
     // 0x16 → 0xd → 0xe → 0xf 재진입 — state[0xd] 가 서 있어 다시 안 묻는다
     expect(enterMissionPitchSelection(team, 상황(mission), 굴림금지).substitution).toBeNull()
     // 공 하나(0xa5e14 a5e72)가 내린다
-    expect(missionCpuAfterPitch(team, { pitchTypeNumber: 1, batterIntimidates: false }).pitching?.mound.justChanged).toBe(
-      false,
-    )
+    expect(missionCpuAfterPitch(team, { pitchTypeNumber: 1, batterIntimidates: false }).pitching?.mound.justChanged).toBe(false)
   })
 
   it('마구 두 칸 — 공마다 고쳐 미션 한 판 내내 이어 들고, 교체가 +0x28 만 −1 로 비운다 (0xaebe4 aeea8 · aec7a)', () => {
@@ -163,9 +161,7 @@ describe('타자 미션 CPU 투수 교체 — 0xf 진입 0x3d954 → 0xac428 (3d
     expect(thrown.pitching?.mound.pitches).toBe(1)
 
     const ace = startMissionCpuTeam(missionOf('타자', 12))
-    expect(missionCpuAfterPitch(ace, { pitchTypeNumber: 1, batterIntimidates: false }).pitching?.mound.stamina).toBe(
-      FULL_STAMINA,
-    )
+    expect(missionCpuAfterPitch(ace, { pitchTypeNumber: 1, batterIntimidates: false }).pitching?.mound.stamina).toBe(FULL_STAMINA)
   })
 })
 

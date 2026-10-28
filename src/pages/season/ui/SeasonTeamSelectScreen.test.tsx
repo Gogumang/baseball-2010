@@ -73,7 +73,8 @@ describe('시즌 팀 고르기 0xca', () => {
   it('힌트 글 서식 — 열림 "%s!N%s!N!N%s" · 잠김 "%s!N%s!N!N%s!N%s" (0xcc1ec · 0xcc1fc)', () => {
     expect(hiddenTeamHintOf(14, [14])).toBe(`${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[230]}!N!N${ORIGINAL_MODE_TEXT[1]}`)
     expect(hiddenTeamHintOf(11, [])).toBe(
-      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[227]}!N!N${ORIGINAL_MODE_TEXT[0]}!N${ORIGINAL_MODE_TEXT[1]}`)
+      `${ORIGINAL_MODE_TEXT[225]}!N${ORIGINAL_MODE_TEXT[227]}!N!N${ORIGINAL_MODE_TEXT[0]}!N${ORIGINAL_MODE_TEXT[1]}`,
+    )
   })
 
   it('취소(−16)는 메인 메뉴로 나간다', () => {

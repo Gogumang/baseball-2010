@@ -55,7 +55,7 @@ export const SUBSTITUTION_WINDOW = {
 export const HEADER_TEXT_FRAMES = { pitcher: [27, 28, 171, 181], batter: [27, 28, 172, 61] } as const
 
 /** 틱 [장면+0x2c] % 8 ≤ 3 — 화살이 2px 바깥 · 커서 상자는 노란 안쪽 (0x384b8 · 0x37dd4) */
-export const isBlinkOut = (tick: number) => (((tick % 8) + 8) % 8) <= 3
+export const isBlinkOut = (tick: number) => ((tick % 8) + 8) % 8 <= 3
 
 /**
  * 커서 상자 0x37dd4 — 틱 % 8 ≤ 3 이면 둥근 테두리 0x6aa64(x + 1, y + 1, w − 2, h − 2, 1, 0x80FFFF00 반투명 노랑),
@@ -151,7 +151,9 @@ function batterRowOf(progress: TeamGameProgress, records: TeamMatchupRecords | u
   // 지금 타자 칸은 수비 위치 0x54590(+0x1c & 0xf), 벤치 줄은 +0xb & 3 (0x38240) — 두 함수가 다른 칸을 읽는다
   const position = entry === undefined ? null : batterPositionBadgeOf(entry.position, -1, -1)
   const badge = isCurrent
-    ? (position === null || position.chip < 0 ? null : { chipFrame: 0x20 + position.chip, label: position.label })
+    ? position === null || position.chip < 0
+      ? null
+      : { chipFrame: 0x20 + position.chip, label: position.label }
     : benchBadgeOfFielderType(fielderType)
   return {
     index,

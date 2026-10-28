@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  isModeMagicPitchType,
-  modePitchMenuOf,
-  modePitcherMagicRemainingOf,
-  modePitcherOf,
-  modePitcherOfHallOfFame,
-} from '@/app/model/modePitcher'
+import { isModeMagicPitchType, modePitchMenuOf, modePitcherMagicRemainingOf, modePitcherOf, modePitcherOfHallOfFame } from '@/app/model/modePitcher'
 import { registerHallOfFamePitcher, EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { createPitcherCareer, equippedPitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherCareer'
 import { rookiePitcherAbilityOf } from '@/entities/pitcher-career/model/pitcherRegistration'

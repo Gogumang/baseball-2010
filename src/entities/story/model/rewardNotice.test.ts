@@ -18,12 +18,25 @@ const 난수 = (values: readonly number[]) => {
 }
 
 const 맥락 = (patch: Partial<RewardNoticeContext> = {}): RewardNoticeContext => ({
-  mode: 4, years: 0, illness: 0, salaryBase: 100, random: 난수([]), ...patch,
+  mode: 4,
+  years: 0,
+  illness: 0,
+  salaryBase: 100,
+  random: 난수([]),
+  ...patch,
 })
 
 describe('rewardNoticeOf — 보상 알림 글 0x8beb8', () => {
   it('보통 종류는 "!C" + 이름 + (값 ≥ 0 이면 " +") + " " + 값, 둘째부터 "!N" 으로 잇는다', () => {
-    const { notice } = rewardNoticeOf([{ kind: 0, value: 5 }, { kind: 1, value: -3 }, { kind: 10, value: 100 }], 1, 맥락())
+    const { notice } = rewardNoticeOf(
+      [
+        { kind: 0, value: 5 },
+        { kind: 1, value: -3 },
+        { kind: 10, value: 100 },
+      ],
+      1,
+      맥락(),
+    )
     expect(notice).toEqual({ kind: '알림', text: '!C인기도 + 5!N!C평판 -3!N!CG포인트 + 100' })
   })
 
@@ -41,7 +54,16 @@ describe('rewardNoticeOf — 보상 알림 글 0x8beb8', () => {
   })
 
   it('타순 18 · 19 는 StrMODE[182] · [183] 만 — 앞 "!N" · "!C" 가 없다', () => {
-    expect(rewardNoticeOf([{ kind: 1, value: 2 }, { kind: 19, value: 3 }], 1, 맥락()).notice).toMatchObject({
+    expect(
+      rewardNoticeOf(
+        [
+          { kind: 1, value: 2 },
+          { kind: 19, value: 3 },
+        ],
+        1,
+        맥락(),
+      ).notice,
+    ).toMatchObject({
       text: '!C평판 + 2!C[!cFFFF003번 타자!cFFFFFF]가 되었습니다',
     })
     expect(rewardNoticeOf([{ kind: 18, value: 0 }], 1, 맥락()).notice).toMatchObject({
@@ -50,33 +72,47 @@ describe('rewardNoticeOf — 보상 알림 글 0x8beb8', () => {
   })
 
   it('연봉 20 은 기준 r 에 값별 비율 — "연봉 (r × 100)만 결정!"', () => {
-    expect(rewardNoticeOf([{ kind: 20, value: 0 }], 1, 맥락({ salaryBase: 33 })).notice)
-      .toMatchObject({ text: '!C연봉 4200만 결정!' })
-    expect(rewardNoticeOf([{ kind: 20, value: 3 }, { kind: 1, value: -30 }], 387, 맥락({ salaryBase: 33 })).notice)
-      .toMatchObject({ text: '!C연봉 2700만 결정!!N!C평판 -30' })
+    expect(rewardNoticeOf([{ kind: 20, value: 0 }], 1, 맥락({ salaryBase: 33 })).notice).toMatchObject({ text: '!C연봉 4200만 결정!' })
+    expect(
+      rewardNoticeOf(
+        [
+          { kind: 20, value: 3 },
+          { kind: 1, value: -30 },
+        ],
+        387,
+        맥락({ salaryBase: 33 }),
+      ).notice,
+    ).toMatchObject({ text: '!C연봉 2700만 결정!!N!C평판 -30' })
   })
 
   it('첫 종류 4 는 스킬 창 — 스킬 이름(0x8457c) 과 획득 · 제거', () => {
     expect(rewardNoticeOf([{ kind: 4, value: 7 }], 1, 맥락()).notice).toEqual({
-      kind: '스킬', gained: true, text: '!C!cFFFF00"행운"!cFFFFFF!N !N스킬을 획득하였습니다.',
+      kind: '스킬',
+      gained: true,
+      text: '!C!cFFFF00"행운"!cFFFFFF!N !N스킬을 획득하였습니다.',
     })
     expect(rewardNoticeOf([{ kind: 4, value: -5 }], 1, 맥락()).notice).toEqual({
-      kind: '스킬', gained: false, text: '!C!cFFFF00"유리몸"!cFFFFFF!N !N스킬이 제거되었습니다.',
+      kind: '스킬',
+      gained: false,
+      text: '!C!cFFFF00"유리몸"!cFFFFFF!N !N스킬이 제거되었습니다.',
     })
     // 스킬 > 7 은 모드 4 가 아니면 +16 (StrCOMMON[71 + s])
     expect(rewardNoticeOf([{ kind: 4, value: 9 }], 1, 맥락({ mode: 3 })).notice).toMatchObject({ text: expect.stringContaining('"신선함"') })
   })
 
   it('GP 아이템 9 — 타자편 값 10 은 이글아이, 투수편은 십전대보탕', () => {
-    expect(rewardNoticeOf([{ kind: 9, value: 10 }], 36, 맥락({ mode: 4 })).notice)
-      .toMatchObject({ text: '!C아이템 획득!N[!cFFFF00이글아이!cFFFFFF]' })
-    expect(rewardNoticeOf([{ kind: 9, value: 10 }], 36, 맥락({ mode: 3 })).notice)
-      .toMatchObject({ text: '!C아이템 획득!N[!cFFFF00십전대보탕!cFFFFFF]' })
+    expect(rewardNoticeOf([{ kind: 9, value: 10 }], 36, 맥락({ mode: 4 })).notice).toMatchObject({
+      text: '!C아이템 획득!N[!cFFFF00이글아이!cFFFFFF]',
+    })
+    expect(rewardNoticeOf([{ kind: 9, value: 10 }], 36, 맥락({ mode: 3 })).notice).toMatchObject({
+      text: '!C아이템 획득!N[!cFFFF00십전대보탕!cFFFFFF]',
+    })
   })
 
   it('구질 6 은 StrMODE[222] 에 [0x140026c] 이름 — 값 0 GYRO · 1 P.SINKER', () => {
-    expect(rewardNoticeOf([{ kind: 6, value: 1 }], 30, 맥락({ mode: 3 })).notice)
-      .toMatchObject({ text: expect.stringContaining('[!cFFFF00P.SINKER!cFFFFFF]') })
+    expect(rewardNoticeOf([{ kind: 6, value: 1 }], 30, 맥락({ mode: 3 })).notice).toMatchObject({
+      text: expect.stringContaining('[!cFFFF00P.SINKER!cFFFFFF]'),
+    })
   })
 
   it('질병 11 값 ≥ 0 은 글에서 굴리고(0xbfa55(0, 4)) 값을 r + 1 로 고친다 — 주는 쪽은 다시 안 굴린다', () => {
@@ -92,13 +128,18 @@ describe('rewardNoticeOf — 보상 알림 글 0x8beb8', () => {
 
   it('질병 11 음수는 지금 질병 이름으로 치료 글 (굴림 없음)', () => {
     const random = 난수([])
-    expect(rewardNoticeOf([{ kind: 11, value: -1 }], 1, 맥락({ illness: 4, random })).notice)
-      .toMatchObject({ text: '!C!C다음 질병이 치료되었습니다!N[!cFFFF00배탈!cFFFFFF]' })
+    expect(rewardNoticeOf([{ kind: 11, value: -1 }], 1, 맥락({ illness: 4, random })).notice).toMatchObject({
+      text: '!C!C다음 질병이 치료되었습니다!N[!cFFFF00배탈!cFFFFFF]',
+    })
     expect(random.calls()).toBe(0)
   })
 
   it('연차 보정(393~396)은 글에만 — 돌려주는 항목은 그대로 (applyEventRewards 가 다시 보정)', () => {
-    const items = [{ kind: 0, value: 10 }, { kind: 1, value: 10 }, { kind: 3, value: 1 }]
+    const items = [
+      { kind: 0, value: 10 },
+      { kind: 1, value: 10 },
+      { kind: 3, value: 1 },
+    ]
     const result = rewardNoticeOf(items, 393, 맥락({ years: 2 }))
     expect(result.notice).toMatchObject({ text: '!C인기도 + 16!N!C평판 + 6!N!C소지금 + 300만' })
     expect(result.items).toEqual(items)
@@ -108,14 +149,17 @@ describe('rewardNoticeOf — 보상 알림 글 0x8beb8', () => {
   it('첫 종류 7 은 0x62368 의 히든 오픈 알림 창 · 21 은 엔딩 (0x8d4c4 · 0x8d70e · 0x8c60e)', () => {
     // 0x62368(전역, |값|, 1) — 원문 마크업 StrCOMMON[139] + "!N!N" + 쓰는 곳 줄. k 로 갈린다(모드와 상관없이): 19~34 투수편 · 35~50 타자편
     expect(rewardNoticeOf([{ kind: 7, value: 43 }], 304, 맥락()).notice).toEqual({
-      kind: '알림', text: '!C히든 아이템 오픈!!!N[!cFFFF00바이커 밴드!cFFFFFF]!N!N나만의리그 타자편!N에서 사용가능합니다',
+      kind: '알림',
+      text: '!C히든 아이템 오픈!!!N[!cFFFF00바이커 밴드!cFFFFFF]!N!N나만의리그 타자편!N에서 사용가능합니다',
     })
     expect(rewardNoticeOf([{ kind: 7, value: 29 }], 307, 맥락({ mode: 3 })).notice).toEqual({
-      kind: '알림', text: '!C히든 아이템 오픈!!!N[!cFFFF00사신의 눈!cFFFFFF]!N!N나만의리그 투수편!N에서 사용가능합니다',
+      kind: '알림',
+      text: '!C히든 아이템 오픈!!!N[!cFFFF00사신의 눈!cFFFFFF]!N!N나만의리그 투수편!N에서 사용가능합니다',
     })
     // k ≤ 12 도 0x62368 이 글을 짓는다 — 마선수 StrCOMMON[140] 한 줄(데이터에는 없다)
     expect(rewardNoticeOf([{ kind: 7, value: 3 }], 1, 맥락()).notice).toEqual({
-      kind: '알림', text: '!C마선수 오픈!!N[!cFFFF00드래고나!cFFFFFF]',
+      kind: '알림',
+      text: '!C마선수 오픈!!N[!cFFFF00드래고나!cFFFFFF]',
     })
     // 웹이 글을 못 짓는 k(51 이상)는 창 없이 지나간다
     expect(rewardNoticeOf([{ kind: 7, value: 51 }], 1, 맥락()).notice).toEqual({ kind: '없음' })
@@ -125,7 +169,15 @@ describe('rewardNoticeOf — 보상 알림 글 0x8beb8', () => {
 
 describe('rewardNoticeContextOf — 나리 선수 칸', () => {
   it('연차 y = 연차 − 1 · 지금 질병 번호 · 연봉 기준 0xa39fc + 연봉', () => {
-    const career = { ...createCareer('테스트'), season: 3, isSick: true, illnessName: '몸살', salary: 30, popularity: 50, popularityAtSeasonStart: 10 }
+    const career = {
+      ...createCareer('테스트'),
+      season: 3,
+      isSick: true,
+      illnessName: '몸살',
+      salary: 30,
+      popularity: 50,
+      popularityAtSeasonStart: 10,
+    }
     const context = rewardNoticeContextOf(career, 4, createSeededRandom(1))
     expect(context).toMatchObject({ mode: 4, years: 2, illness: 2, salaryBase: 40 })
   })
@@ -135,9 +187,19 @@ describe('seasonRewardNoticeContextOf — 시즌모드(모드 2) 알림 맥락',
   it('393 은 모드 2 연차 보정(+5y)을 글에 얹고 항목은 그대로 돌려준다 (0x8d508)', () => {
     const ctx = seasonRewardNoticeContextOf({ yearIndex: 2, illness: 0 }, 난수([]))
     expect(ctx.mode).toBe(2)
-    const result = rewardNoticeOf([{ kind: 0, value: 25 }, { kind: 3, value: 35 }], 393, ctx)
+    const result = rewardNoticeOf(
+      [
+        { kind: 0, value: 25 },
+        { kind: 3, value: 35 },
+      ],
+      393,
+      ctx,
+    )
     expect(result.notice).toEqual({ kind: '알림', text: '!C인기도 + 35!N!C소지금 + 4500만' })
-    expect(result.items).toEqual([{ kind: 0, value: 25 }, { kind: 3, value: 35 }])
+    expect(result.items).toEqual([
+      { kind: 0, value: 25 },
+      { kind: 3, value: 35 },
+    ])
   })
 
   it('490 질병은 글이 0xbfa55(0, 4) 를 한 번 굴려 값 r + 1 로 고친다 — 음수는 지금 질병 SR+5 이름', () => {
@@ -147,4 +209,3 @@ describe('seasonRewardNoticeContextOf — 시즌모드(모드 2) 알림 맥락',
     expect(random.calls()).toBe(1)
   })
 })
-

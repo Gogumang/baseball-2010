@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
-  NO_PRE_GAME_ACE, PRE_GAME_ACES_START, PRE_GAME_ACE_PHASE,
-  cancelPreGameAce, choosePreGameAce, matchInfoCancelScene,
+  NO_PRE_GAME_ACE,
+  PRE_GAME_ACES_START,
+  PRE_GAME_ACE_PHASE,
+  cancelPreGameAce,
+  choosePreGameAce,
+  matchInfoCancelScene,
 } from '@/entities/season-mode/model/preGameFlow'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 
 describe('경기 전 마선수 고르기 0xd7 (this+0x11c = 1, 키 0xa248)', () => {
   it('들어올 때마다 마투수 단계부터다 — 0x5268 이 메뉴+0xd0 = 1 을 쓴다', () => {
     expect(PRE_GAME_ACES_START).toEqual({
-      phase: PRE_GAME_ACE_PHASE.마투수, pitcher: NO_PRE_GAME_ACE, batter: NO_PRE_GAME_ACE,
+      phase: PRE_GAME_ACE_PHASE.마투수,
+      pitcher: NO_PRE_GAME_ACE,
+      batter: NO_PRE_GAME_ACE,
     })
   })
 

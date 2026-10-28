@@ -80,12 +80,15 @@ function writePreview(path: string, grid: readonly (readonly number[])[], scale:
   header.writeUInt32BE(height * scale, 4)
   header[8] = 8
   header[9] = 2
-  writeFileSync(path, Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.from(body))),
-    chunk('IEND', Buffer.alloc(0)),
-  ]))
+  writeFileSync(
+    path,
+    Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', header),
+      chunk('IDAT', deflateSync(Buffer.from(body))),
+      chunk('IEND', Buffer.alloc(0)),
+    ]),
+  )
 }
 
 describe('아틀라스로 실제 찍어 보기', () => {

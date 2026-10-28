@@ -116,28 +116,31 @@ export function GameEvaluationScreen({
     <RawScreen>
       {/* 116 이 선 틀 — 116 그림 0x11e0c 만(평가 이벤트 114 는 다음 틀부터) */}
       {!isEvaluationEntered && (entryUnderlay ?? underlay)}
-      {isEvaluationEntered && <EvaluationEventPlayer
-        underlay={underlay}
-        // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
-        dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
-        dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
-        changeValues={changeValues}
-        goals={yearGoalWindowValuesOf(career)}
-        year={career.season}
-        // 0x7d120(…, 1) — 막 치른 경기 번호
-        game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
-        streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
-        streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
-        gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
-        // 보상 명령마다 0x8beb8 글 → 창 (모드 4 — 스킬 이름 0x8457c 갈래). 평가 이벤트 보상은 평판 · 스킬뿐이라 굴림이 없다
-        rewardNotices={streakRewards.map((reward) =>
-          rewardNoticeOf([reward], EVALUATION_EVENT_ID, rewardNoticeContextOf(career, BATTER_REWARD_MODE, NO_ROLL_RANDOM)).notice)}
-        {...(rewardUnderlay === undefined
-          ? {}
-          : { underlayAfterRewards: (given: number) => rewardUnderlay(applyEventRewards(career, streakRewards.slice(0, given))) })}
-        {...(onRewardsGiven === undefined ? {} : { onRewardsGiven })}
-        onDone={onContinue}
-      />}
+      {isEvaluationEntered && (
+        <EvaluationEventPlayer
+          underlay={underlay}
+          // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
+          dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
+          dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
+          changeValues={changeValues}
+          goals={yearGoalWindowValuesOf(career)}
+          year={career.season}
+          // 0x7d120(…, 1) — 막 치른 경기 번호
+          game={messageGameNumberOf(leagueDayCounterOf(career), career.postseason !== null, true)}
+          streak={nariStreakSayOf(streakNotices, ORIGINAL_USER_EVENTS)}
+          streakExpression={streakSayExpressionOf(hasHitlessStreak(streakNotices))}
+          gauge={{ popularityChange: evaluation.popularityChange, divisor: evaluationGaugeDivisorOf({ kind: 'batter' }) }}
+          // 보상 명령마다 0x8beb8 글 → 창 (모드 4 — 스킬 이름 0x8457c 갈래). 평가 이벤트 보상은 평판 · 스킬뿐이라 굴림이 없다
+          rewardNotices={streakRewards.map(
+            (reward) => rewardNoticeOf([reward], EVALUATION_EVENT_ID, rewardNoticeContextOf(career, BATTER_REWARD_MODE, NO_ROLL_RANDOM)).notice,
+          )}
+          {...(rewardUnderlay === undefined
+            ? {}
+            : { underlayAfterRewards: (given: number) => rewardUnderlay(applyEventRewards(career, streakRewards.slice(0, given))) })}
+          {...(onRewardsGiven === undefined ? {} : { onRewardsGiven })}
+          onDone={onContinue}
+        />
+      )}
       {isTitlePopupOpen && title !== undefined && (
         /*
           116 진입 1299e~129c8 — 칭호 39 가 없고 이 경기 홈런 > 3 이면 +0x270 = 39 로 칭호 팝업 0x1274c(종류 0x78)를 건다.

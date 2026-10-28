@@ -37,9 +37,7 @@ export function nariCupGameResultOf(score: NariCupGameScore): NariCupGameResult 
   const firstBatScore = iAmLastBat ? score.opponentScore : score.myScore
   const lastBatTeam = iAmLastBat ? score.myTeam : score.opponentTeam
   const firstBatTeam = iAmLastBat ? score.opponentTeam : score.myTeam
-  return lastBatScore > firstBatScore
-    ? { winner: lastBatTeam, loser: firstBatTeam }
-    : { winner: firstBatTeam, loser: lastBatTeam }
+  return lastBatScore > firstBatScore ? { winner: lastBatTeam, loser: firstBatTeam } : { winner: firstBatTeam, loser: lastBatTeam }
 }
 
 /** 대회 경기 정산이 고치는 커리어 칸 — 타자편 `PlayerCareer` · 투수편 `PitcherCareer` 공용 */
@@ -74,8 +72,6 @@ export function settleNariCupGame<T extends NariCupGameCareerFields>(career: T, 
     hasActedThisCycle: false,
     injuredGamesPlayed: career.injuredGamesPlayed + (career.isInjured ? 1 : 0),
     illnessCooldown: Math.max(0, career.illnessCooldown - 1),
-    ...(career.eagleEyeGamesRemaining === undefined
-      ? {}
-      : { eagleEyeGamesRemaining: Math.max(0, career.eagleEyeGamesRemaining - 1) }),
+    ...(career.eagleEyeGamesRemaining === undefined ? {} : { eagleEyeGamesRemaining: Math.max(0, career.eagleEyeGamesRemaining - 1) }),
   }
 }

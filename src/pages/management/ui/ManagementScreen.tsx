@@ -116,9 +116,7 @@ export function ManagementScreen(props: ManagementScreenProps) {
   const [swingTrainingEntry, setSwingTrainingEntry] = useState(0)
   const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   const slots = menu.kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[menu.kind]
-  const labelWidths = Object.fromEntries(
-    slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]),
-  )
+  const labelWidths = Object.fromEntries(slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]))
   /** 124 — 팝업 0x80 에서 고른 [장면+0x164]. null 이면 124 가 아니다 */
   const [recordPick, setRecordPick] = useState<RecordRoomPick | null>(null)
   /** 기록실 팝업이 124 위에서 다 줄어들었다 — 다시 [기록실] 을 열 때 내린다 */
@@ -135,119 +133,163 @@ export function ManagementScreen(props: ManagementScreenProps) {
   const recordPopup = menu.overlay === '기록실' && !isRecordPopupGone && (
     <NariRecordPickPopup onChoose={setRecordPick} onCancel={closeRecordRoom} onClosed={() => setRecordPopupGone(true)} />
   )
-  return <>{managementBodyOf()}{recordPopup}</>
+  return (
+    <>
+      {managementBodyOf()}
+      {recordPopup}
+    </>
+  )
 
   function managementBodyOf() {
-  // 124 그림 0x16778 은 목록 판과 머리띠만 그린다 — 관리 화면(상태판 · 커맨드 줄)은 없다. 취소 → 106
-  if (menu.overlay === '기록실' && recordPick !== null) {
-    return <NariRecordView edition="타자" career={career} pick={recordPick} gamePoint={career.gamePoint}
-      onBack={closeRecordRoom} />
-  }
+    // 124 그림 0x16778 은 목록 판과 머리띠만 그린다 — 관리 화면(상태판 · 커맨드 줄)은 없다. 취소 → 106
+    if (menu.overlay === '기록실' && recordPick !== null) {
+      return <NariRecordView edition="타자" career={career} pick={recordPick} gamePoint={career.gamePoint} onBack={closeRecordRoom} />
+    }
 
-  return (
-    <RawScreen>
-      <SkinBackdrop kind="공무늬" />
-      {!menu.isShowingBasicInfo && (
-        <ManagementBoard career={career} titleName={currentTitleOf(career)} />
-      )}
-      {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc) · 훈련(125 — 연출과 결과 창) · 휴식(127 — 연출과 결과 창)에는 없다 */}
-      {!menu.isShowingBasicInfo && !menu.isTrainingState && menu.restPhase === null && (
-        <CenterStage slidesIn={props.centerSlidesIn ?? false} characters={nariStageCharactersOf({
-          morale: career.morale,
-          isSick: career.isSick,
-          isInjured: career.isInjured,
-          isSlugger: career.battingTypeIndex >= 1,
-          skinIndex: career.skinIndex,
-        })} />
-      )}
-      {menu.playingMenuId !== null && (
-        <div className={styles.trainingPopup}>
-          <TrainingScene presentation={TRAINING_PRESENTATION_OF[menu.playingMenuId] ?? null}
-            // 장타형은 동작표가 따로다 (0xd4a18·0xd4a6c — F-6). 0 만 타격형이고 그 밖은 장타형이다
-            battingTypeIndex={career.battingTypeIndex}
-            // 손은 넘기지 않는다 — 0x10810 이 +0x3c 에 넣은 손을 진입 0x11744 가 1 로 덮어써 안 뒤집는다(11802~1181e)
-            // 훈련 팝업 캐릭터도 0x10810 이 세운 그림 객체 그대로라 장착 장비를 입고 나온다
-            equipmentLevels={career.equipmentLevels}
-            // 몸통 = 피부 × 15 + 팀 · 헬멧 = 팀 (기본정보 카드와 같은 0x10810 → 0x78be8·0x78c14)
-            skinIndex={career.skinIndex}
-            teamIndex={career.teamId}
-            onFinished={menu.finishTraining} />
-        </div>
-      )}
-      {/* 127 그리기 0x19e08 → 0x8532c = 0x848d0(gfx, 0, 0) — 캐릭터 없는 훈련 팝업 (`RestScene`) */}
-      {menu.restPhase === 'playing' && (
-        <RestScene presentation={nariRestPresentationOf({ isBatter: true, battingTypeIndex: career.battingTypeIndex })}
-          char0Palette={portraitPaletteIndex(career.skinIndex)} onFinished={menu.finishRest} />
-      )}
-      <CommandBar slots={slots} cursor={menu.cursor} bounce={menu.bounce} slideUpdates={menu.slideUpdates}
-        disabledIds={menu.disabledIds} labelWidths={labelWidths} parent={menu.parent}
-        // 켬 표 0 칸은 흑백 — 105 진입 0x11910(첫 해 10경기 전 외출 포함). 0x7e418 은 하위 메뉴가 없을 때만 본다
-        grayedIds={menu.parent === null ? nariMainMenuOffIdsOf(career) : undefined}
-        // 흑백 칸에는 커서가 서지 못한다(vt+8 0x6c445) — 눌러도 고르지 않는다
-        onHover={menu.hoverSlot} onSelect={menu.tapSlot} />
-      {/* 125 연출 중 화면 탭 = 확인 키 — 0x105a4 가 게이지를 끝으로 보낸다(`TrainingScene` 이 키로 받는다) */}
-      {menu.playingMenuId !== null && (
-        <PressArea label="훈련 연출 건너뛰기" testId="훈련연출-건너뛰기" onPress={() => pressKey('5')} />
-      )}
-      {/*
+    return (
+      <RawScreen>
+        <SkinBackdrop kind="공무늬" />
+        {!menu.isShowingBasicInfo && <ManagementBoard career={career} titleName={currentTitleOf(career)} />}
+        {/* 가운데 판 0x7f814 — 기본정보(119, 그림 0x166cc) · 훈련(125 — 연출과 결과 창) · 휴식(127 — 연출과 결과 창)에는 없다 */}
+        {!menu.isShowingBasicInfo && !menu.isTrainingState && menu.restPhase === null && (
+          <CenterStage
+            slidesIn={props.centerSlidesIn ?? false}
+            characters={nariStageCharactersOf({
+              morale: career.morale,
+              isSick: career.isSick,
+              isInjured: career.isInjured,
+              isSlugger: career.battingTypeIndex >= 1,
+              skinIndex: career.skinIndex,
+            })}
+          />
+        )}
+        {menu.playingMenuId !== null && (
+          <div className={styles.trainingPopup}>
+            <TrainingScene
+              presentation={TRAINING_PRESENTATION_OF[menu.playingMenuId] ?? null}
+              // 장타형은 동작표가 따로다 (0xd4a18·0xd4a6c — F-6). 0 만 타격형이고 그 밖은 장타형이다
+              battingTypeIndex={career.battingTypeIndex}
+              // 손은 넘기지 않는다 — 0x10810 이 +0x3c 에 넣은 손을 진입 0x11744 가 1 로 덮어써 안 뒤집는다(11802~1181e)
+              // 훈련 팝업 캐릭터도 0x10810 이 세운 그림 객체 그대로라 장착 장비를 입고 나온다
+              equipmentLevels={career.equipmentLevels}
+              // 몸통 = 피부 × 15 + 팀 · 헬멧 = 팀 (기본정보 카드와 같은 0x10810 → 0x78be8·0x78c14)
+              skinIndex={career.skinIndex}
+              teamIndex={career.teamId}
+              onFinished={menu.finishTraining}
+            />
+          </div>
+        )}
+        {/* 127 그리기 0x19e08 → 0x8532c = 0x848d0(gfx, 0, 0) — 캐릭터 없는 훈련 팝업 (`RestScene`) */}
+        {menu.restPhase === 'playing' && (
+          <RestScene
+            presentation={nariRestPresentationOf({ isBatter: true, battingTypeIndex: career.battingTypeIndex })}
+            char0Palette={portraitPaletteIndex(career.skinIndex)}
+            onFinished={menu.finishRest}
+          />
+        )}
+        <CommandBar
+          slots={slots}
+          cursor={menu.cursor}
+          bounce={menu.bounce}
+          slideUpdates={menu.slideUpdates}
+          disabledIds={menu.disabledIds}
+          labelWidths={labelWidths}
+          parent={menu.parent}
+          // 켬 표 0 칸은 흑백 — 105 진입 0x11910(첫 해 10경기 전 외출 포함). 0x7e418 은 하위 메뉴가 없을 때만 본다
+          grayedIds={menu.parent === null ? nariMainMenuOffIdsOf(career) : undefined}
+          // 흑백 칸에는 커서가 서지 못한다(vt+8 0x6c445) — 눌러도 고르지 않는다
+          onHover={menu.hoverSlot}
+          onSelect={menu.tapSlot}
+        />
+        {/* 125 연출 중 화면 탭 = 확인 키 — 0x105a4 가 게이지를 끝으로 보낸다(`TrainingScene` 이 키로 받는다) */}
+        {menu.playingMenuId !== null && <PressArea label="훈련 연출 건너뛰기" testId="훈련연출-건너뛰기" onPress={() => pressKey('5')} />}
+        {/*
         기본정보 카드는 커맨드 줄 **뒤에** 그린다. 원본 그리기 순서(0x167cc)도 상태판 → 커맨드 줄 →
         덮개(훈련 팝업 0x7f814) 순이라 덮개가 커맨드 줄을 가린다.
         커맨드 줄보다 먼저 그리면 정보 칸 넷째 줄("필살"·"타순")이 아이콘에 덮여 사라진다.
       */}
-      {menu.isShowingBasicInfo && <BasicInfoCard career={career} />}
-      {/* 능력치 상세(120) — 그림 0x1b2e4 = 기본정보 카드 → 창 0x8a0a4 → 머리띠(0x7f4ed). 표·글은 0x88fe8 */}
-      {menu.abilityDetailOffset !== null && (() => {
-        const view = batterAbilityDetailViewOf(career)
-        return <DetailWindow rows={view.rows} messages={view.messages} scrollOffset={menu.abilityDetailOffset}
-          onClose={menu.closeAbilityDetail} />
-      })()}
-      {/* 기본정보(119)·칭호(129 — 0x198fc 가 0x166cc 를 먼저 그린다)는 바닥 0x87 "#닉네임"·"0상세정보"·되돌아가기 (0x166f2).
+        {menu.isShowingBasicInfo && <BasicInfoCard career={career} />}
+        {/* 능력치 상세(120) — 그림 0x1b2e4 = 기본정보 카드 → 창 0x8a0a4 → 머리띠(0x7f4ed). 표·글은 0x88fe8 */}
+        {menu.abilityDetailOffset !== null &&
+          (() => {
+            const view = batterAbilityDetailViewOf(career)
+            return (
+              <DetailWindow rows={view.rows} messages={view.messages} scrollOffset={menu.abilityDetailOffset} onClose={menu.closeAbilityDetail} />
+            )
+          })()}
+        {/* 기본정보(119)·칭호(129 — 0x198fc 가 0x166cc 를 먼저 그린다)는 바닥 0x87 "#닉네임"·"0상세정보"·되돌아가기 (0x166f2).
           표시는 "#" 지만 칭호 키는 '*'(0x1056c) — 원본 그대로. 120 은 0x16928 "그 밖"이라 5, 그 밖 상태도 5 */}
-      <ScreenFrame title="나만의리그타자편" gamePoint={career.gamePoint} onBack={menu.back}
-        footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined} slides={false}
-        // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸.
-        // 칭호 목록(129)이 떠 있으면 '0' 칸은 걷는다 — 129 키 0x11f78 은 −5 · '5'(장착) · −16 · '*'(→ 119) 밖의 키를 목록
-        // vt+0x18(0x6c298 → 0x6c520 → 0x6c030)에 넘기고, 숫자키 꼴 1 목록은 '0' 을 방향 없는 한 걸음(0x6be70 — dx = dy = 0)으로
-        // 버린다. 칸이 남으면 칭호 창 덮개(4)보다 위(7)라 누름만 먹는다(r212). '*' 칸은 129 에서도 119 로 돌아가는 키라 둔다
-        footerPresses={{
-          [FOOTER_BITS.nickname]: { label: '* 칭호', onPress: () => pressKey('*') },
-          ...(menu.overlay === '칭호' ? {} : { [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') } }),
-        }} />
-      {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
-      {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (
-        <TitleListWindow career={career} onEquip={props.onEquipTitle} onClose={menu.closeOverlay}
-          initialTop={titleHolder.titleListTop ?? 0} onTopChange={(top) => { titleHolder.titleListTop = top }} />
-      )}
-      {menu.overlay === '필살타법' && (
-        <SpecialSwingWindow level={career.specialSwingLevel} sessions={career.specialSwingSessions} battingTypeIndex={career.battingTypeIndex}
-          selectedNumber={props.onSelectSpecialSwing === undefined ? undefined : career.specialSwingNumber}
-          onSelectNumber={props.onSelectSpecialSwing}
-          onClose={menu.closeOverlay} />
-      )}
-      {menu.overlay === '아이템/스킬' && props.onEquipSkill !== undefined && (
-        <SkillWindow career={career} onEquip={props.onEquipSkill}
-          onExpandSlots={props.onExpandSkillSlots ?? (() => {})} onClose={menu.closeOverlay} />
-      )}
-      {menu.overlay === '필살타법훈련' && (
-        /*
-         * G 부족([65])의 "예" → 틀 0x106bc → 139 G포인트 충전(실제 현금 결제 0x65a65 / 0x65b01). 웹에는 결제가 없어 **결제하지
-         * 않고 139 를 떠난 길**(목록 CLR → 틀 0x15954 가 뒤 상태 108 로)만 옮긴다 — G 는 그대로이고 108 진입 0x17730 이 다시 돈다
-         * (창을 새로 마운트한다). 자세한 139 흐름은 투수편 `usePitcherManagementMenu` 의 `confirmMagicTrainingCell` 주석.
-         */
-        <SpecialSwingWindow key={swingTrainingEntry} onBuyGamePoint={() => setSwingTrainingEntry((entry) => entry + 1)}
-          mode="훈련" level={career.specialSwingLevel} sessions={career.specialSwingSessions}
-          battingTypeIndex={career.battingTypeIndex} selectedNumber={career.specialSwingNumber}
-          popularity={career.popularity} gamePoint={career.gamePoint}
-          onTrain={menu.startSpecialSwingTraining} onClose={menu.closeOverlay} />
-      )}
-      {props.detail !== null && <DetailPopup result={props.detail} onClose={props.onCloseDetail} />}
-      {menu.question !== null && (
-        <MessageBox text={menu.question.text} buttons={['예', '아니오']} onAnswer={(index) => menu.answer(index === 0)} />
-      )}
-      {props.detail === null && menu.question === null && noticeText !== '' && (
-        <MessageBox text={`!C${noticeText}`} buttons={['확인']} onAnswer={props.onDismissNotice} />
-      )}
-    </RawScreen>
-  )
+        <ScreenFrame
+          title="나만의리그타자편"
+          gamePoint={career.gamePoint}
+          onBack={menu.back}
+          footer={menu.isShowingBasicInfo && menu.abilityDetailOffset === null ? BASIC_INFO_FOOTER : undefined}
+          slides={false}
+          // 기본정보(119) 바닥띠 "*닉네임" · "0상세정보" 표시 = '*'(129 칭호) · '0'(120 능력치 상세) 키 — 그 표시 위 투명 누름 칸.
+          // 칭호 목록(129)이 떠 있으면 '0' 칸은 걷는다 — 129 키 0x11f78 은 −5 · '5'(장착) · −16 · '*'(→ 119) 밖의 키를 목록
+          // vt+0x18(0x6c298 → 0x6c520 → 0x6c030)에 넘기고, 숫자키 꼴 1 목록은 '0' 을 방향 없는 한 걸음(0x6be70 — dx = dy = 0)으로
+          // 버린다. 칸이 남으면 칭호 창 덮개(4)보다 위(7)라 누름만 먹는다(r212). '*' 칸은 129 에서도 119 로 돌아가는 키라 둔다
+          footerPresses={{
+            [FOOTER_BITS.nickname]: { label: '* 칭호', onPress: () => pressKey('*') },
+            ...(menu.overlay === '칭호' ? {} : { [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: () => pressKey('0') } }),
+          }}
+        />
+        {/* 칭호 목록(상태 129) — 기본정보 카드 위에 뜨고, 취소하면 그 카드(119)로 돌아간다 */}
+        {menu.overlay === '칭호' && props.onEquipTitle !== undefined && (
+          <TitleListWindow
+            career={career}
+            onEquip={props.onEquipTitle}
+            onClose={menu.closeOverlay}
+            initialTop={titleHolder.titleListTop ?? 0}
+            onTopChange={(top) => {
+              titleHolder.titleListTop = top
+            }}
+          />
+        )}
+        {menu.overlay === '필살타법' && (
+          <SpecialSwingWindow
+            level={career.specialSwingLevel}
+            sessions={career.specialSwingSessions}
+            battingTypeIndex={career.battingTypeIndex}
+            selectedNumber={props.onSelectSpecialSwing === undefined ? undefined : career.specialSwingNumber}
+            onSelectNumber={props.onSelectSpecialSwing}
+            onClose={menu.closeOverlay}
+          />
+        )}
+        {menu.overlay === '아이템/스킬' && props.onEquipSkill !== undefined && (
+          <SkillWindow
+            career={career}
+            onEquip={props.onEquipSkill}
+            onExpandSlots={props.onExpandSkillSlots ?? (() => {})}
+            onClose={menu.closeOverlay}
+          />
+        )}
+        {menu.overlay === '필살타법훈련' && (
+          /*
+           * G 부족([65])의 "예" → 틀 0x106bc → 139 G포인트 충전(실제 현금 결제 0x65a65 / 0x65b01). 웹에는 결제가 없어 **결제하지
+           * 않고 139 를 떠난 길**(목록 CLR → 틀 0x15954 가 뒤 상태 108 로)만 옮긴다 — G 는 그대로이고 108 진입 0x17730 이 다시 돈다
+           * (창을 새로 마운트한다). 자세한 139 흐름은 투수편 `usePitcherManagementMenu` 의 `confirmMagicTrainingCell` 주석.
+           */
+          <SpecialSwingWindow
+            key={swingTrainingEntry}
+            onBuyGamePoint={() => setSwingTrainingEntry((entry) => entry + 1)}
+            mode="훈련"
+            level={career.specialSwingLevel}
+            sessions={career.specialSwingSessions}
+            battingTypeIndex={career.battingTypeIndex}
+            selectedNumber={career.specialSwingNumber}
+            popularity={career.popularity}
+            gamePoint={career.gamePoint}
+            onTrain={menu.startSpecialSwingTraining}
+            onClose={menu.closeOverlay}
+          />
+        )}
+        {props.detail !== null && <DetailPopup result={props.detail} onClose={props.onCloseDetail} />}
+        {menu.question !== null && <MessageBox text={menu.question.text} buttons={['예', '아니오']} onAnswer={(index) => menu.answer(index === 0)} />}
+        {props.detail === null && menu.question === null && noticeText !== '' && (
+          <MessageBox text={`!C${noticeText}`} buttons={['확인']} onAnswer={props.onDismissNotice} />
+        )}
+      </RawScreen>
+    )
   }
 }

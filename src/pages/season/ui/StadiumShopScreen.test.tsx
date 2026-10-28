@@ -6,9 +6,7 @@ import { resetLiveGameState, setLiveGameInningIndex } from '@/shared/lib/liveGam
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { seasonScoreboardRewindXOf } from '@/widgets/batting-stage/lib/renderScenery'
-import {
-  boardBonusOf, standCapacityOf, stadiumOwnedIndexOf,
-} from '@/entities/season-mode/model/stadiumItems'
+import { boardBonusOf, standCapacityOf, stadiumOwnedIndexOf } from '@/entities/season-mode/model/stadiumItems'
 
 /**
  * 구장 아이템 상점(0x957c · 0x7d90)과 구장관리 교체(0x7958) — S3 확정.
@@ -24,21 +22,12 @@ const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
 
 const 보유하게 = (record: SeasonRecord, kind: '관중석' | '전광판' | '잔디', slot: number): SeasonRecord => ({
   ...record,
-  stadiumOwned: record.stadiumOwned.map((owned, index) =>
-    index === stadiumOwnedIndexOf(kind, slot) ? true : owned,
-  ),
+  stadiumOwned: record.stadiumOwned.map((owned, index) => (index === stadiumOwnedIndexOf(kind, slot) ? true : owned)),
 })
 
 const 띄우기 = (record: SeasonRecord, 나머지: Partial<Parameters<typeof StadiumShopScreen>[0]> = {}) => {
   const onChange = vi.fn()
-  render(
-    <StadiumShopScreen
-      record={record}
-      onChange={onChange}
-      onBack={vi.fn()}
-      {...나머지}
-    />,
-  )
+  render(<StadiumShopScreen record={record} onChange={onChange} onBack={vi.fn()} {...나머지} />)
   return onChange
 }
 
@@ -127,7 +116,8 @@ describe('구장 아이템 상점 — 구매 확정 (0x812c)', () => {
 
     expect(알림글()).toContain('[구단관리]-[구장관리]')
     const 노랑 = [...screen.getByRole('dialog', { name: '알림' }).querySelectorAll('span')]
-      .filter((node) => node.style.color === 'rgb(255, 255, 0)').map((node) => node.textContent)
+      .filter((node) => node.style.color === 'rgb(255, 255, 0)')
+      .map((node) => node.textContent)
     expect(노랑).toEqual(expect.arrayContaining(['구단관리', '구장관리']))
   })
 
@@ -211,8 +201,13 @@ describe('구장관리 교체 (0x7958)', () => {
     const record = { ...레코드(), stadiumEquipped: [0, 2, 0] }
     const onPreviewSceneChange = vi.fn()
     const { unmount } = render(
-      <StadiumShopScreen record={record} onChange={vi.fn()} onBack={vi.fn()}
-        previewScene={{ skyRow: 0, skyColumn: 0, scoreboardX: -40 }} onPreviewSceneChange={onPreviewSceneChange} />,
+      <StadiumShopScreen
+        record={record}
+        onChange={vi.fn()}
+        onBack={vi.fn()}
+        previewScene={{ skyRow: 0, skyColumn: 0, scoreboardX: -40 }}
+        onPreviewSceneChange={onPreviewSceneChange}
+      />,
     )
     const rewound = seasonScoreboardRewindXOf(2)
     expect(rewound).not.toBeNull()
@@ -241,8 +236,8 @@ describe('구장관리 교체 (0x7958)', () => {
     expect(바뀐.money).toBe(0)
     // StrMODE[185] `!C[!cFFFF00%s!cFFFFFF]!N아이템을 적용합니다` — 이름은 노랑, 안내는 둘째 줄
     expect(알림글()).toContain('[4단 관중석]아이템을 적용합니다')
-    const 이름 = [...screen.getByRole('dialog', { name: '알림' }).querySelectorAll('span')]
-      .find((node) => node.textContent === '4단 관중석') as HTMLElement | undefined
+    const 이름 = [...screen.getByRole('dialog', { name: '알림' }).querySelectorAll('span')].find((node) => node.textContent === '4단 관중석') as
+      HTMLElement | undefined
     expect(이름?.style.color).toBe('rgb(255, 255, 0)')
   })
 })
@@ -283,9 +278,7 @@ describe('키 조작 (0x957c · 창 키 0x819ac)', () => {
 
   it('취소(−16)로 되돌아간다', () => {
     const onBack = vi.fn()
-    render(
-      <StadiumShopScreen record={레코드()} onChange={vi.fn()} onBack={onBack} />,
-    )
+    render(<StadiumShopScreen record={레코드()} onChange={vi.fn()} onBack={onBack} />)
 
     fireEvent.keyDown(window, { key: 'Escape' })
 

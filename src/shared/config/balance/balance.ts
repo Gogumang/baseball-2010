@@ -1,13 +1,6 @@
 import rawConfig from '@/shared/config/balance/balance.json'
 import { ORIGINAL_BALANCE_VALUES } from '@/shared/config/balance/originalBalance'
-import type {
-  BalanceGridId,
-  BalanceId,
-  BalanceListId,
-  BalanceNumberId,
-  BalanceValue,
-  BalanceValues,
-} from '@/shared/config/balance/originalBalance'
+import type { BalanceGridId, BalanceId, BalanceListId, BalanceNumberId, BalanceValue, BalanceValues } from '@/shared/config/balance/originalBalance'
 
 /**
  * **숨은 판정값 표** — 화면의 능력치(히트·파워·수비·주루 · 제구·구속·변화) 말고 안타 · 삼진 · 홈런 · 실책 확률을 정하는
@@ -23,9 +16,7 @@ import type {
  */
 export type BalanceCategory = 'timing' | 'swing' | 'skill' | 'ability' | 'pitching' | 'fielding' | 'running'
 
-export const BALANCE_CATEGORIES: readonly BalanceCategory[] = [
-  'timing', 'swing', 'skill', 'ability', 'pitching', 'fielding', 'running',
-]
+export const BALANCE_CATEGORIES: readonly BalanceCategory[] = ['timing', 'swing', 'skill', 'ability', 'pitching', 'fielding', 'running']
 
 export interface BalanceRange {
   readonly min: number
@@ -118,9 +109,7 @@ export function parseBalanceConfig(raw: unknown): BalanceConfig {
 export const BALANCE_CONFIG: BalanceConfig = parseBalanceConfig(rawConfig)
 
 /** `balance.json` 의 값 */
-export const BALANCE_JSON_VALUES: BalanceValues = Object.fromEntries(
-  BALANCE_CONFIG.entries.map((entry) => [entry.id, entry.value]),
-) as BalanceValues
+export const BALANCE_JSON_VALUES: BalanceValues = Object.fromEntries(BALANCE_CONFIG.entries.map((entry) => [entry.id, entry.value])) as BalanceValues
 
 let activeValues: BalanceValues = BALANCE_JSON_VALUES
 

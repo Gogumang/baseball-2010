@@ -60,11 +60,7 @@ export interface QuickStealResult {
  *
  * 성공하면 **모든 주자가 한 루씩** 간다. 가장 앞선 주자가 3루가 아닌 것이 조건이라 득점은 나오지 않는다.
  */
-export function quickEngineSteal(
-  bases: BaseState,
-  leadRunner: BatterAbility,
-  random: RandomPort,
-): QuickStealResult {
+export function quickEngineSteal(bases: BaseState, leadRunner: BatterAbility, random: RandomPort): QuickStealResult {
   const base = quickStealBaseOf(bases)
   if (base === null) return { bases, stolen: 0 }
   if (random.rand(0, RANDOM_LIMIT) >= stealChanceOf(leadRunner)) {

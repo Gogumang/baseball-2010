@@ -57,7 +57,9 @@ function 결과틀까지기다리기(frameCount: number, aceOrder?: number | nul
 function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
   const { result } = renderHook(() => usePitcherGame(기본옵션, createSeededRandom(seed), isVibrationOn))
   // 마구를 뺀 구질을 돌려 가며 아홉 코스에 던진다
-  const 구질 = pitchSlotsFor(result.current.progress).map((slot) => slot.typeNumber).filter((type) => type !== 22)
+  const 구질 = pitchSlotsFor(result.current.progress)
+    .map((slot) => slot.typeNumber)
+    .filter((type) => type !== 22)
   const 기록: { strikesBefore: number; kind: string | undefined; calls: unknown[] }[] = []
   for (let step = 0; step < 300; step += 1) {
     if (result.current.progress.pendingDefensePlay !== null) {
@@ -72,7 +74,13 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number) {
     if (!result.current.canPitch) break
     const strikesBefore = result.current.progress.atBat.strikes
     진동.mockClear()
-    act(() => result.current.actions.throwPitch({ typeNumber: 구질[step % 구질.length] ?? 1, aim: aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11), gaugeCell: 0 }))
+    act(() =>
+      result.current.actions.throwPitch({
+        typeNumber: 구질[step % 구질.length] ?? 1,
+        aim: aimAfterTicks(1, { dx: (step % 3) - 1, dy: 1 - Math.floor((step % 9) / 3) }, 11),
+        gaugeCell: 0,
+      }),
+    )
     결과틀까지기다리기(result.current.progress.lastPitch?.frameCount ?? 0)
     기록.push({
       strikesBefore,

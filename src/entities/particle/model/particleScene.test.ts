@@ -102,4 +102,3 @@ describe('이미터 블록 — 자체 힙 등급 3 의 가장 낮은 빈 자리 
     expect(scene.pool.free).toBe(0)
   })
 })
-

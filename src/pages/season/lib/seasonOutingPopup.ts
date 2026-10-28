@@ -37,7 +37,9 @@ export const EVENT_CHAR_1 = assetUrl('./sprites/event_char_1/frames')
 export const EVENT_CHAR_0 = assetUrl('./sprites/event_char_0/frames')
 
 const eventPresentationOf = (k: number): SeasonOutingPresentation => ({
-  folder: EVENT_ANI, animation: k, overlays: { char1: k + 30, char0: k + 0x5d },
+  folder: EVENT_ANI,
+  animation: k,
+  overlays: { char1: k + 30, char0: k + 0x5d },
 })
 
 /** 장소 p → 연출 (점프표 0xd4a90, 시즌 갈래) */

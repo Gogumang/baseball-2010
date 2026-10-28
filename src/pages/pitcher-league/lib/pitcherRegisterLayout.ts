@@ -133,6 +133,11 @@ export const BREAKING_CHOSEN_PLATE = 7
 /** OK 칸 mode_ui 5 파랑 · 6 주황(커서) — 박스 9 (92,263) 에 ox 28 · oy −2 */
 export const BREAKING_OK = { blue: 5, orange: 6, x: 92 + 28, y: 263 - 2, width: 66, height: 12 } as const
 /** 이름 테두리 — 효과 0xb 검정을 네 방향 1px (0x16446~0x16548) */
-export const BREAKING_NAME_OUTLINE: readonly (readonly [number, number])[] = [[-1, 0], [0, -1], [1, 0], [0, 1]]
+export const BREAKING_NAME_OUTLINE: readonly (readonly [number, number])[] = [
+  [-1, 0],
+  [0, -1],
+  [1, 0],
+  [0, 1],
+]
 /** StrMODE[12] — 상태 틱 ≤ 0x31 (0x16690) */
 export const BREAKING_HINT = 12

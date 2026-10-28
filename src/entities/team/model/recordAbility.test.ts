@@ -5,25 +5,29 @@ import { equippedSeasonAbilityOf } from '@/entities/season-mode/model/seasonPlay
 
 describe('레코드 실효 능력치 0xb6414(rec, k, 1) — 장비 니블 · 장착 스킬', () => {
   it('니블 n 은 0xd8890[n − 1] 을 더하고 999 에서 자른다 — 칸 k 의 니블이 칸 k 에만', () => {
-    expect(recordAbilityOf({ ability: [500, 500, 990, 500], skillBits: 0, equipment: [1, 0, 2, 11] }, false))
-      .toEqual([530, 500, 999, 750])
+    expect(recordAbilityOf({ ability: [500, 500, 990, 500], skillBits: 0, equipment: [1, 0, 2, 11] }, false)).toEqual([530, 500, 999, 750])
   })
 
   it('스킬 5 −100 · 7 +50 은 네 칸 모두, 20 은 타자 수비만 −100, 22 는 투수 제구만 +10% (자르지 않는다)', () => {
     const bits = (1 << 5) | (1 << 7) | (1 << 20) | (1 << 22)
-    expect(recordAbilityOf({ ability: [100, 50, 120, 300], skillBits: bits, equipment: [0, 0, 0, 0] }, false))
-      .toEqual([50, 50, 0, 250])
-    expect(recordAbilityOf({ ability: [990, 50, 120, 300], skillBits: 1 << 22, equipment: [11, 0, 0, 0] }, true)[0])
-      .toBe(999 + 99)
+    expect(recordAbilityOf({ ability: [100, 50, 120, 300], skillBits: bits, equipment: [0, 0, 0, 0] }, false)).toEqual([50, 50, 0, 250])
+    expect(recordAbilityOf({ ability: [990, 50, 120, 300], skillBits: 1 << 22, equipment: [11, 0, 0, 0] }, true)[0]).toBe(999 + 99)
   })
 
   it('시즌 카드 equippedSeasonAbilityOf 와 같은 함수다', () => {
     const view = {
-      name: '', isPitcher: false, base: [400, 450, 500, 550], profile: 0, skillBits: (1 << 7) | (1 << 20),
-      equipment: [3, 0, 1, 0], fieldPosition: 0, isComplete: true,
+      name: '',
+      isPitcher: false,
+      base: [400, 450, 500, 550],
+      profile: 0,
+      skillBits: (1 << 7) | (1 << 20),
+      equipment: [3, 0, 1, 0],
+      fieldPosition: 0,
+      isComplete: true,
     }
-    expect(recordAbilityOf({ ability: view.base, skillBits: view.skillBits, equipment: view.equipment }, false))
-      .toEqual([0, 1, 2, 3].map((slot) => equippedSeasonAbilityOf(view, slot)))
+    expect(recordAbilityOf({ ability: view.base, skillBits: view.skillBits, equipment: view.equipment }, false)).toEqual(
+      [0, 1, 2, 3].map((slot) => equippedSeasonAbilityOf(view, slot)),
+    )
   })
 })
 

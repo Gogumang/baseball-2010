@@ -9,7 +9,12 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import {
-  FIRST_BAT_LAYOUT, TAG, TEAM_LOGO_HALF, firstBatTagPlacementOf, isPrepareBobOn, stadiumArrowsOf,
+  FIRST_BAT_LAYOUT,
+  TAG,
+  TEAM_LOGO_HALF,
+  firstBatTagPlacementOf,
+  isPrepareBobOn,
+  stadiumArrowsOf,
   stadiumInfoValuesOf,
 } from '@/pages/general-mode/lib/prepareLayout'
 import { FIRST_BAT_PHASE, STADIUM_COUNT, stadiumCursorAfter, stadiumInfoOf } from '@/pages/general-mode/lib/generalModeSetup'
@@ -60,7 +65,14 @@ export interface FirstBatStadiumScreenProps {
  */
 /** 숫자키 꼴 1 격자가 방향으로 바꾸는 키 (표 0xd2e7c) */
 const GRID_NUMERIC_DIRECTIONS: Readonly<Record<string, 'left' | 'right' | 'up' | 'down'>> = {
-  ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', 4: 'left', 6: 'right', 2: 'up', 8: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  4: 'left',
+  6: 'right',
+  2: 'up',
+  8: 'down',
 }
 
 /** 키 0x2896c 가 하는 일 — 'none' 은 아무것도 안 한다 */
@@ -96,8 +108,17 @@ export function firstBatStadiumKeyActionOf(isStadiumPhase: boolean, key: string)
 }
 
 export function FirstBatStadiumScreen({
-  userTeamId, aiTeamId, phase, playerSide, stadiumId, gamePoint = 0,
-  onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel,
+  userTeamId,
+  aiTeamId,
+  phase,
+  playerSide,
+  stadiumId,
+  gamePoint = 0,
+  onMoveFirstBat,
+  onChooseFirstBat,
+  onChooseStadium,
+  onMoveStadium,
+  onCancel,
 }: FirstBatStadiumScreenProps) {
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAME)
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
@@ -125,25 +146,25 @@ export function FirstBatStadiumScreen({
       event.preventDefault()
       switch (action) {
         // 단계 0 CLR → 19 · 단계 1 CLR · ↑ · '2' → 단계 0 (구장 커서는 rec+0xc 에 남는다 — 커서가 곧 rec+0xc 다)
-        case 'back': return onCancel()
+        case 'back':
+          return onCancel()
         // 단계 0 — 좌·우가 선공 커서(skin+0x74)를 뒤집는다
-        case 'flip': return onMoveFirstBat(
-          playerSide === PLAYER_SIDE_FIRST_BAT ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT,
-        )
+        case 'flip':
+          return onMoveFirstBat(playerSide === PLAYER_SIDE_FIRST_BAT ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT)
         // 구장 목록은 꼴 0x10 — 끝에서 감는다 (0x6bead)
-        case 'previous': return onMoveStadium(stadiumCursorAfter(stadiumId, -1))
-        case 'next': return onMoveStadium(stadiumCursorAfter(stadiumId, 1))
+        case 'previous':
+          return onMoveStadium(stadiumCursorAfter(stadiumId, -1))
+        case 'next':
+          return onMoveStadium(stadiumCursorAfter(stadiumId, 1))
         // 단계 0 OK 는 rec+8 에 적으며 단계 1 로, 단계 1 OK 는 rec+0xc 에 적고 21 로
-        case 'ok': return isStadiumPhase ? onChooseStadium(stadiumId) : onChooseFirstBat(playerSide)
+        case 'ok':
+          return isStadiumPhase ? onChooseStadium(stadiumId) : onChooseFirstBat(playerSide)
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [
-    isStadiumPhase, playerSide, stadiumId,
-    onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel,
-  ])
+  }, [isStadiumPhase, playerSide, stadiumId, onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel])
 
   const { anchorA, anchorB, firstBatTag } = FIRST_BAT_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT
@@ -164,44 +185,61 @@ export function FirstBatStadiumScreen({
         { anchor: anchorB, frame: 158, dy: TAG.bDyMatchScreens },
       ].map(({ anchor, frame, dy }) => (
         <span key={frame}>
-          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)}
-            style={{ left: anchor.x + TAG.dx, top: anchor.y + dy }} />
+          <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, TAG.whiteBar)} style={{ left: anchor.x + TAG.dx, top: anchor.y + dy }} />
           {/* 둘 다 흰 막대(116) 위 글자라 공용 보정을 쓴다 — 팔레트를 이식하면 이 style 을 뗀다 */}
-          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} centerX
-            x={anchor.x} y={anchor.y + dy + TAG.textDdy} />
+          <FrameSprite folder={IMG_TEXT_FRAME} frame={frame} origins={imgTextOrigins} centerX x={anchor.x} y={anchor.y + dy + TAG.textDdy} />
         </span>
       ))}
 
       {/* 단계 0 · 깜빡일 때 커서 쪽 엠블럼 뒤 반투명 노랑 원 0x6b7b9(기준 − 41, 82×82, 0x80FFFF00) — 엠블럼보다 먼저 (0x6413c) */}
       {!isStadiumPhase && isBob && (
-        <span className={styles.lockedCircle} data-testid="선공-커서-원" style={{
-          left: tagAnchor.x - FIRST_BAT_LAYOUT.sideCircle.radius,
-          top: tagAnchor.y - FIRST_BAT_LAYOUT.sideCircle.radius,
-          width: FIRST_BAT_LAYOUT.sideCircle.radius * 2,
-          height: FIRST_BAT_LAYOUT.sideCircle.radius * 2,
-          background: FIRST_BAT_LAYOUT.sideCircle.color,
-        }} />
+        <span
+          className={styles.lockedCircle}
+          data-testid="선공-커서-원"
+          style={{
+            left: tagAnchor.x - FIRST_BAT_LAYOUT.sideCircle.radius,
+            top: tagAnchor.y - FIRST_BAT_LAYOUT.sideCircle.radius,
+            width: FIRST_BAT_LAYOUT.sideCircle.radius * 2,
+            height: FIRST_BAT_LAYOUT.sideCircle.radius * 2,
+            background: FIRST_BAT_LAYOUT.sideCircle.color,
+          }}
+        />
       )}
 
       {/* 두 팀 엠블럼 0x5a7b9 — A 유저 · B CPU */}
-      <img className={styles.layer} alt={TEAMS[userTeamId]?.name ?? ''} src={TEAMS[userTeamId]?.logoUrl}
-        style={{ left: anchorA.x - TEAM_LOGO_HALF.width, top: anchorA.y - TEAM_LOGO_HALF.height }} />
-      <img className={styles.layer} alt={TEAMS[aiTeamId]?.name ?? ''} src={TEAMS[aiTeamId]?.logoUrl}
-        style={{ left: anchorB.x - TEAM_LOGO_HALF.width, top: anchorB.y - TEAM_LOGO_HALF.height }} />
+      <img
+        className={styles.layer}
+        alt={TEAMS[userTeamId]?.name ?? ''}
+        src={TEAMS[userTeamId]?.logoUrl}
+        style={{ left: anchorA.x - TEAM_LOGO_HALF.width, top: anchorA.y - TEAM_LOGO_HALF.height }}
+      />
+      <img
+        className={styles.layer}
+        alt={TEAMS[aiTeamId]?.name ?? ''}
+        src={TEAMS[aiTeamId]?.logoUrl}
+        style={{ left: anchorB.x - TEAM_LOGO_HALF.width, top: anchorB.y - TEAM_LOGO_HALF.height }}
+      />
 
       {/* VS (slt_frame 이미지 122) */}
-      <img className={styles.layer} alt="VS" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.vs.image)}
-        style={{ left: FIRST_BAT_LAYOUT.vs.x, top: FIRST_BAT_LAYOUT.vs.y }} />
+      <img
+        className={styles.layer}
+        alt="VS"
+        src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.vs.image)}
+        style={{ left: FIRST_BAT_LAYOUT.vs.x, top: FIRST_BAT_LAYOUT.vs.y }}
+      />
 
       {/* 선공 꼬리표 — 선공을 잡은 쪽에만 붙는다 */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, firstBatTag.image)}
+      <img
+        className={styles.layer}
+        alt=""
+        src={imageSrc(SLT_IMAGE, firstBatTag.image)}
         style={{
           left: tagPlace.tag.x,
           top: tagPlace.tag.y,
           transform: isUserFirstBat ? 'scaleX(-1)' : undefined,
-        }} />
-      <FrameSprite folder={IMG_TEXT_FRAME} frame={firstBatTag.textFrame} origins={imgTextOrigins}
-        x={tagPlace.text.x} y={tagPlace.text.y} />
+        }}
+      />
+      <FrameSprite folder={IMG_TEXT_FRAME} frame={firstBatTag.textFrame} origins={imgTextOrigins} x={tagPlace.text.x} y={tagPlace.text.y} />
 
       {/* 단계 0 — 선공/후공 고르기. 원본은 좌·우 키로 꼬리표를 옮기고 OK 로 확정한다 */}
       {!isStadiumPhase && (
@@ -211,68 +249,110 @@ export function FirstBatStadiumScreen({
             { side: PLAYER_SIDE_LAST_BAT, anchor: anchorB, label: 'CPU 선공' },
           ].map(({ side, anchor, label }) => (
             // 원본은 좌·우 키로 커서를 옮기고 OK 로 정한다 — 마우스는 엠블럼 원 자리(82×82)를 누른다 (웹판)
-            <PressArea key={label} label={label}
+            <PressArea
+              key={label}
+              label={label}
               rect={{ x: anchor.x - 41, y: anchor.y - 41, width: 82, height: 82 }}
-              onPress={() => onChooseFirstBat(side)} />
+              onPress={() => onChooseFirstBat(side)}
+            />
           ))}
         </>
       )}
 
       {/* 아래 판 0x5461d */}
-      <span className={styles.fillPanel}
+      <span
+        className={styles.fillPanel}
         style={{
-          left: FIRST_BAT_LAYOUT.panel.x, top: FIRST_BAT_LAYOUT.panel.y,
-          width: FIRST_BAT_LAYOUT.panel.width, height: FIRST_BAT_LAYOUT.panel.height,
+          left: FIRST_BAT_LAYOUT.panel.x,
+          top: FIRST_BAT_LAYOUT.panel.y,
+          width: FIRST_BAT_LAYOUT.panel.width,
+          height: FIRST_BAT_LAYOUT.panel.height,
           background: 'rgba(29, 68, 168, 0.85)',
-        }} />
+        }}
+      />
 
       {/* 단계 1 · 깜빡일 때 구장 막대 자리 반투명 노랑 둥근 칠 0x6b7d5(26, 197, 188, 16, 둥글기 1) (0x6432e) */}
       {isStadiumPhase && isBob && (
-        <span className={styles.fillPanel} data-testid="구장-커서-칠" style={{
-          left: FIRST_BAT_LAYOUT.stadiumHighlight.x, top: FIRST_BAT_LAYOUT.stadiumHighlight.y,
-          width: FIRST_BAT_LAYOUT.stadiumHighlight.width + 1, height: FIRST_BAT_LAYOUT.stadiumHighlight.height + 1,
-          background: FIRST_BAT_LAYOUT.stadiumHighlight.color, borderRadius: 1,
-        }} />
+        <span
+          className={styles.fillPanel}
+          data-testid="구장-커서-칠"
+          style={{
+            left: FIRST_BAT_LAYOUT.stadiumHighlight.x,
+            top: FIRST_BAT_LAYOUT.stadiumHighlight.y,
+            width: FIRST_BAT_LAYOUT.stadiumHighlight.width + 1,
+            height: FIRST_BAT_LAYOUT.stadiumHighlight.height + 1,
+            background: FIRST_BAT_LAYOUT.stadiumHighlight.color,
+            borderRadius: 1,
+          }}
+        />
       )}
 
       {/* 구장 줄 — 막대 + 이름 그림 + 좌우 화살 */}
-      <FrameSprite folder={GAME_UI_FRAME} frame={FIRST_BAT_LAYOUT.stadiumBar.frame} origins={gameUiOrigins}
-        x={FIRST_BAT_LAYOUT.stadiumBar.x} y={FIRST_BAT_LAYOUT.stadiumBar.y} />
-      <FrameSprite folder={IMG_TEXT_FRAME} frame={FIRST_BAT_LAYOUT.stadiumNameFrame + stadiumId}
+      <FrameSprite
+        folder={GAME_UI_FRAME}
+        frame={FIRST_BAT_LAYOUT.stadiumBar.frame}
+        origins={gameUiOrigins}
+        x={FIRST_BAT_LAYOUT.stadiumBar.x}
+        y={FIRST_BAT_LAYOUT.stadiumBar.y}
+      />
+      <FrameSprite
+        folder={IMG_TEXT_FRAME}
+        frame={FIRST_BAT_LAYOUT.stadiumNameFrame + stadiumId}
         origins={imgTextOrigins}
         x={FIRST_BAT_LAYOUT.stadiumNameCenterX - (nameWidth >> 1)}
-        y={FIRST_BAT_LAYOUT.stadiumNameY} />
+        y={FIRST_BAT_LAYOUT.stadiumNameY}
+      />
       {/* 좌우 화살 — 단계와 상관없이 늘 그린다 (0x644ac~0x64576). 누르는 칸은 구장 단계에서만 (웹판) */}
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
-        style={{ left: arrows.leftX, top: FIRST_BAT_LAYOUT.arrow.y }} />
-      <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
-        style={{ left: arrows.rightX, top: FIRST_BAT_LAYOUT.arrow.y, transform: 'scaleX(-1)' }} />
+      <img
+        className={styles.layer}
+        alt=""
+        src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
+        style={{ left: arrows.leftX, top: FIRST_BAT_LAYOUT.arrow.y }}
+      />
+      <img
+        className={styles.layer}
+        alt=""
+        src={imageSrc(SLT_IMAGE, FIRST_BAT_LAYOUT.arrow.image)}
+        style={{ left: arrows.rightX, top: FIRST_BAT_LAYOUT.arrow.y, transform: 'scaleX(-1)' }}
+      />
       {isStadiumPhase && (
         <>
-          <PressArea label="이전 구장" onPress={() => onMoveStadium(stadiumCursorAfter(stadiumId, -1))}
-            rect={{ x: FIRST_BAT_LAYOUT.arrow.leftX - 2, y: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }} />
-          <PressArea label="다음 구장" onPress={() => onMoveStadium(stadiumCursorAfter(stadiumId, 1))}
-            rect={{ x: FIRST_BAT_LAYOUT.arrow.rightX - 2, y: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }} />
+          <PressArea
+            label="이전 구장"
+            onPress={() => onMoveStadium(stadiumCursorAfter(stadiumId, -1))}
+            rect={{ x: FIRST_BAT_LAYOUT.arrow.leftX - 2, y: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }}
+          />
+          <PressArea
+            label="다음 구장"
+            onPress={() => onMoveStadium(stadiumCursorAfter(stadiumId, 1))}
+            rect={{ x: FIRST_BAT_LAYOUT.arrow.rightX - 2, y: FIRST_BAT_LAYOUT.arrow.y - 1, width: 9, height: 10 }}
+          />
         </>
       )}
 
       {/* 구장 그림 (stadium_symbol 이미지 = 구장 번호) */}
-      <img className={styles.layer} alt={`구장 ${stadiumId}`} src={imageSrc(STADIUM_SYMBOL, stadiumId)}
-        style={{ left: FIRST_BAT_LAYOUT.stadiumSymbol.x, top: FIRST_BAT_LAYOUT.stadiumSymbol.y }} />
+      <img
+        className={styles.layer}
+        alt={`구장 ${stadiumId}`}
+        src={imageSrc(STADIUM_SYMBOL, stadiumId)}
+        style={{ left: FIRST_BAT_LAYOUT.stadiumSymbol.x, top: FIRST_BAT_LAYOUT.stadiumSymbol.y }}
+      />
 
       {/* 오른쪽 정보 두 줄 — 연고지 · 좌석 */}
       {FIRST_BAT_LAYOUT.infoBars.map((bar) => (
-        <FrameSprite key={bar.y} folder={GAME_UI_FRAME} frame={bar.frame} origins={gameUiOrigins}
-          x={bar.x} y={bar.y} />
+        <FrameSprite key={bar.y} folder={GAME_UI_FRAME} frame={bar.frame} origins={gameUiOrigins} x={bar.x} y={bar.y} />
       ))}
       {FIRST_BAT_LAYOUT.infoLabels.map((label) => (
-        <FrameSprite key={label.frame} folder={IMG_TEXT_FRAME} frame={label.frame} origins={imgTextOrigins}
-          x={label.x} y={label.y} />
+        <FrameSprite key={label.frame} folder={IMG_TEXT_FRAME} frame={label.frame} origins={imgTextOrigins} x={label.x} y={label.y} />
       ))}
       {/* 값 두 줄 — 0xba269 폭 −1: 가운데 = x + (날 글 폭 >> 1) (`FIRST_BAT_LAYOUT.infoValues`, 0x646ca · 0x6472c) */}
       {stadiumInfoValuesOf(stadium).map((value, index) => (
-        <span key={index} className={styles.centeredText} data-testid={index === 0 ? '구장-연고지' : '구장-좌석'}
-          style={{ left: value.centerX - SCREEN_HALF_WIDTH, top: FIRST_BAT_LAYOUT.infoValues[index].y, width: SCREEN_HALF_WIDTH * 2 }}>
+        <span
+          key={index}
+          className={styles.centeredText}
+          data-testid={index === 0 ? '구장-연고지' : '구장-좌석'}
+          style={{ left: value.centerX - SCREEN_HALF_WIDTH, top: FIRST_BAT_LAYOUT.infoValues[index].y, width: SCREEN_HALF_WIDTH * 2 }}
+        >
           {value.text}
         </span>
       ))}
@@ -283,12 +363,26 @@ export function FirstBatStadiumScreen({
       */}
       {isStadiumPhase && (
         <>
-          <PressArea label="구장 그림 — 이 구장으로" onPress={() => onChooseStadium(stadiumId)}
-            rect={{ x: FIRST_BAT_LAYOUT.stadiumSymbol.x, y: FIRST_BAT_LAYOUT.stadiumSymbol.y,
-              width: FIRST_BAT_LAYOUT.stadiumSymbol.width, height: FIRST_BAT_LAYOUT.stadiumSymbol.height }} />
-          <PressArea label="이 구장으로" onPress={() => onChooseStadium(stadiumId)}
-            rect={{ x: FIRST_BAT_LAYOUT.arrow.leftX + 7, y: FIRST_BAT_LAYOUT.stadiumHighlight.y,
-              width: FIRST_BAT_LAYOUT.arrow.rightX - FIRST_BAT_LAYOUT.arrow.leftX - 9, height: FIRST_BAT_LAYOUT.stadiumHighlight.height }} />
+          <PressArea
+            label="구장 그림 — 이 구장으로"
+            onPress={() => onChooseStadium(stadiumId)}
+            rect={{
+              x: FIRST_BAT_LAYOUT.stadiumSymbol.x,
+              y: FIRST_BAT_LAYOUT.stadiumSymbol.y,
+              width: FIRST_BAT_LAYOUT.stadiumSymbol.width,
+              height: FIRST_BAT_LAYOUT.stadiumSymbol.height,
+            }}
+          />
+          <PressArea
+            label="이 구장으로"
+            onPress={() => onChooseStadium(stadiumId)}
+            rect={{
+              x: FIRST_BAT_LAYOUT.arrow.leftX + 7,
+              y: FIRST_BAT_LAYOUT.stadiumHighlight.y,
+              width: FIRST_BAT_LAYOUT.arrow.rightX - FIRST_BAT_LAYOUT.arrow.leftX - 9,
+              height: FIRST_BAT_LAYOUT.stadiumHighlight.height,
+            }}
+          />
         </>
       )}
 

@@ -44,9 +44,12 @@ export const SCOREBOARD_FRAME = 16
 
 /** game_ui 프레임 16 박스 0~5 (`public/sprites/game_ui/frames/boxes.json` "016") */
 export const SCOREBOARD_BOXES: readonly ScoreboardBox[] = [
-  box(28, 21, 49, 15), box(162, 21, 49, 15),
-  box(22, 43, 66, 68), box(153, 43, 66, 68),
-  box(14, 120, 82, 15), box(144, 119, 82, 15),
+  box(28, 21, 49, 15),
+  box(162, 21, 49, 15),
+  box(22, 43, 66, 68),
+  box(153, 43, 66, 68),
+  box(14, 120, 82, 15),
+  box(144, 119, 82, 15),
 ]
 
 /** img_text 157 "PLAYER" · 158 "COM" — `0xb6c21(st, 측) == 1` 이면 COM (0x41496 `movs r7, #0x9d` · 0x414a0 `#0x9e`) */
@@ -62,16 +65,46 @@ export const INTRO_SCENE_STATE = 0xc
 
 /** img_text 프레임 크기 (원점은 모두 (0, 0)) — `img_text/frames/origins.json` */
 const IMG_TEXT_SIZES: Readonly<Record<number, readonly [number, number]>> = {
-  157: [39, 5], 158: [20, 5],
-  65: [65, 10], 66: [53, 10], 67: [53, 10], 68: [54, 10], 69: [64, 10], 70: [63, 10], 71: [54, 10], 72: [64, 10],
-  73: [62, 10], 74: [65, 10], 75: [43, 10], 76: [20, 10], 77: [21, 10], 78: [20, 10], 79: [41, 10], 80: [22, 10],
+  157: [39, 5],
+  158: [20, 5],
+  65: [65, 10],
+  66: [53, 10],
+  67: [53, 10],
+  68: [54, 10],
+  69: [64, 10],
+  70: [63, 10],
+  71: [54, 10],
+  72: [64, 10],
+  73: [62, 10],
+  74: [65, 10],
+  75: [43, 10],
+  76: [20, 10],
+  77: [21, 10],
+  78: [20, 10],
+  79: [41, 10],
+  80: [22, 10],
   81: [19, 10],
 }
 
 /** team_logo 그림 크기 (PNG 를 읽었다) — 0..16 */
 const TEAM_LOGO_SIZES: readonly (readonly [number, number])[] = [
-  [77, 76], [76, 77], [76, 77], [78, 76], [76, 78], [75, 76], [77, 76], [76, 77], [76, 76], [76, 76],
-  [76, 76], [76, 77], [76, 77], [77, 76], [77, 76], [32, 48], [73, 33],
+  [77, 76],
+  [76, 77],
+  [76, 77],
+  [78, 76],
+  [76, 78],
+  [75, 76],
+  [77, 76],
+  [76, 77],
+  [76, 76],
+  [76, 76],
+  [76, 76],
+  [76, 77],
+  [76, 77],
+  [77, 76],
+  [77, 76],
+  [32, 48],
+  [73, 33],
 ]
 
 export const imgTextSizeOf = (frame: number) => IMG_TEXT_SIZES[frame] ?? null
@@ -155,10 +188,7 @@ export function namePlateOpacityOf(introAlpha: number | null): number {
 
 /** 둥근 칠 0x6b7d4(x, y, w, h, 둥글기 ≤ 3) — (w+1)×(h+1) 에서 네 모서리 점이 빠진 꼴. 두 직사각형으로 */
 export function roundPlateRectsOf(target: ScoreboardBox): readonly ScoreboardBox[] {
-  return [
-    box(target.x + 1, target.y, target.width - 1, target.height + 1),
-    box(target.x, target.y + 1, target.width + 1, target.height - 1),
-  ]
+  return [box(target.x + 1, target.y, target.width - 1, target.height + 1), box(target.x, target.y + 1, target.width + 1, target.height - 1)]
 }
 
 /**
@@ -179,9 +209,7 @@ export const HALF_INNING_SCOREBOARD_FROM_TICK = 0x46
  * 사람 팀이 한 측, CPU 가 다른 측인 경기의 두 측 — st[0x31 + 측] 은 사람 칸이 0 이다
  * (팀경기·나리 모두 내 팀 PLAYER · 상대 COM — `teamMatchupCards` · `gameMatchupCards` 와 같다).
  */
-export function humanVsComputerSidesOf(
-  playerSide: number, ourTeam: number, opponentTeam: number,
-): readonly [ScoreboardSide, ScoreboardSide] {
+export function humanVsComputerSidesOf(playerSide: number, ourTeam: number, opponentTeam: number): readonly [ScoreboardSide, ScoreboardSide] {
   const our: ScoreboardSide = { team: ourTeam, isComputer: false }
   const opponent: ScoreboardSide = { team: opponentTeam, isComputer: true }
   return playerSide === 0 ? [our, opponent] : [opponent, our]

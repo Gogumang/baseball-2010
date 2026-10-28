@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
 import { useGameSceneRedrawCount } from '@/shared/lib/commonWindow/useGameSceneRedrawCount'
 import {
-  appTickOfGameSceneTick, gameSceneTickNow, isCommonWindowShown, isGameSceneFrozen, useMarksGameScene,
+  appTickOfGameSceneTick,
+  gameSceneTickNow,
+  isCommonWindowShown,
+  isGameSceneFrozen,
+  useMarksGameScene,
 } from '@/shared/lib/commonWindow/commonWindow'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import { createKeyHold, HOLD_STAGE_MASK, type KeyHold } from '@/shared/lib/sceneKeyLatch/keyHold'
@@ -20,12 +24,7 @@ import {
   startDefensePlay,
   stepDefensePlay,
 } from '@/features/defense-play/model/runDefensePlay'
-import type {
-  DefenseKeyPress,
-  DefensePlayInput,
-  DefensePlayResult,
-  DefensePlayState,
-} from '@/features/defense-play/model/runDefensePlay'
+import type { DefenseKeyPress, DefensePlayInput, DefensePlayResult, DefensePlayState } from '@/features/defense-play/model/runDefensePlay'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import {
   drawnFieldingErrorsOf,
@@ -37,7 +36,11 @@ import {
 import { deepLandingCheerSoundIdOf, runInCheerSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import {
-  EMPTY_HOME_RUN_SCORE_BOARD, closesDefenseScene, drawRunScoreBoardScene, isHomeRunHitCode, runScoreBoardHiddenScoresOf,
+  EMPTY_HOME_RUN_SCORE_BOARD,
+  closesDefenseScene,
+  drawRunScoreBoardScene,
+  isHomeRunHitCode,
+  runScoreBoardHiddenScoresOf,
   runScoreBoardRunIn,
 } from '@/pages/defense/lib/runScoreBoard'
 import type { HomeRunScoreBoard } from '@/pages/defense/lib/runScoreBoard'
@@ -167,9 +170,7 @@ const UPDATES_PER_TICK = 1
  * 받은 칸 [+0x20] 은 하나라(누름 0x39f4c 가 덮어쓰기만 한다, r167) 한 틀에 둘이 오면 뒤 키만 남는다 — 같은 틱에 받은 키는 마지막
  * 하나만 먹이고 앞 키는 버린다. 틱이 다른 키는 한 갱신에 하나씩 먹인다.
  */
-function takePressFor(
-  presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null, hold?: DefenseKeyHold,
-): DefenseKeyPress | null {
+function takePressFor(presses: DefenseKeyPress[], ticks: number[], sceneTick: number | null, hold?: DefenseKeyHold): DefenseKeyPress | null {
   const press = takeArrivedPress(presses, ticks, sceneTick)
   if (hold === undefined || sceneTick === null || (hold.lastTick !== null && sceneTick <= hold.lastTick)) return press
   // 틀마다 한 번 — 키 처리가 안 돈 틀(건너뛰기 · 따라잡기)도 0xbca05 는 틀 머리마다 돈다
@@ -178,7 +179,7 @@ function takePressFor(
   for (let tick = from; tick <= sceneTick; tick += 1) {
     const hasRelease = hold.releaseTicks.some((at) => at < tick)
     if (hasRelease) hold.releaseTicks = hold.releaseTicks.filter((at) => at >= tick)
-    const out = hold.hold.frame(tick === sceneTick ? press?.key ?? null : null, hasRelease)
+    const out = hold.hold.frame(tick === sceneTick ? (press?.key ?? null) : null, hasRelease)
     // 길게 누른 뒤 뗌(비트 8 만)은 0x536bc 가 상태 0x11 로만 보낸다 — 0x17 에 오는 것은 단계 비트 4~7 이 선 되풀이뿐
     repeat = tick === sceneTick && (out.flags & HOLD_STAGE_MASK) !== 0 ? out.repeat : null
   }
@@ -324,10 +325,7 @@ function ballShotsAt(
   const offset =
     cameraOffset ??
     screenOffsetOf(
-      centerOn(
-        cameraBoundsOf(screenStyles.SCREEN_WIDTH, screenStyles.SCREEN_HEIGHT),
-        drawn.cameraTarget ?? { x: drawn.ball.x, z: drawn.ball.z },
-      ),
+      centerOn(cameraBoundsOf(screenStyles.SCREEN_WIDTH, screenStyles.SCREEN_HEIGHT), drawn.cameraTarget ?? { x: drawn.ball.x, z: drawn.ball.z }),
     )
   return ballParticleShotsOf(drawn, offset)
 }
@@ -457,8 +455,7 @@ interface RecordedPlaybackProps {
 
 /** 홈 자리 — 주자가 여기 닿은 틱이 메시지 0x13(주자 하나 홈인)이다 */
 const HOME_PLATE = basePosition(0)
-const isAtHome = (runner: { readonly x: number; readonly z: number }) =>
-  runner.x === HOME_PLATE.x && runner.z === HOME_PLATE.z
+const isAtHome = (runner: { readonly x: number; readonly z: number }) => runner.x === HOME_PLATE.x && runner.z === HOME_PLATE.z
 
 /** 재생 갈래 득점 점수판의 셈 — 다음에 볼 갱신 · 주자별 홈을 떠났나/밟았나 · 들어온 수 · 점수판 칸 · 닫힌 셈 */
 interface RecordedBoardTally {
@@ -480,8 +477,16 @@ interface RecordedBoardTally {
 }
 
 const EMPTY_RECORDED_TALLY: RecordedBoardTally = {
-  nextIndex: 0, leftHome: new Set(), scored: new Set(), runs: 0, board: EMPTY_HOME_RUN_SCORE_BOARD, closedCount: 0,
-  ended: false, visible: false, hidden: 0, runIns: [],
+  nextIndex: 0,
+  leftHome: new Set(),
+  scored: new Set(),
+  runs: 0,
+  board: EMPTY_HOME_RUN_SCORE_BOARD,
+  closedCount: 0,
+  ended: false,
+  visible: false,
+  hidden: 0,
+  runIns: [],
 }
 
 /**
@@ -516,9 +521,7 @@ function playRunnerTickSounds(view: DefenseViewState, withEngineSounds: boolean,
  * 1점(메시지 0x13, 홈런 재생은 그 주자 칸으로 홈런 갈래). 마지막 틱 뒤는 닫힌 갱신(+0x1094 — `closesDefenseScene`).
  * 끝나지 않았으면 그 갱신 그리기 한 번까지 돌린다.
  */
-function stepRecordedBoard(
-  tally: RecordedBoardTally, view: DefenseViewState, isHomeRun: boolean, isClosed: boolean,
-): RecordedBoardTally {
+function stepRecordedBoard(tally: RecordedBoardTally, view: DefenseViewState, isHomeRun: boolean, isClosed: boolean): RecordedBoardTally {
   const leftHome = new Set(tally.leftHome)
   const scored = new Set(tally.scored)
   let { runs, board, closedCount } = tally
@@ -545,8 +548,16 @@ function stepRecordedBoard(
   }
   const drawn = drawRunScoreBoardScene(board, isHomeRun)
   return {
-    nextIndex: tally.nextIndex + 1, leftHome, scored, runs, board: drawn.next, closedCount, ended: false,
-    visible: drawn.visible, hidden: drawn.hidden, runIns,
+    nextIndex: tally.nextIndex + 1,
+    leftHome,
+    scored,
+    runs,
+    board: drawn.next,
+    closedCount,
+    ended: false,
+    visible: drawn.visible,
+    hidden: drawn.hidden,
+    runIns,
   }
 }
 
@@ -599,7 +610,14 @@ function redrawPlaybackPicture(
  * "타자주자가 달리는 재생 = 홈런 비행" 으로 읽는다.
  */
 function RecordedPlayback({
-  ticks, onDone, onFieldingErrors, grassPalette, runScoreBoard, freePassPlay, children, burstWindow,
+  ticks,
+  onDone,
+  onFieldingErrors,
+  grassPalette,
+  runScoreBoard,
+  freePassPlay,
+  children,
+  burstWindow,
 }: RecordedPlaybackProps) {
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
@@ -747,9 +765,7 @@ interface LiveRunnerPlaybackProps {
  * 0x582 · 0x584 와 OK 슬라이딩 0x585 — 어느 쪽인지는 판의 `side`), 관문이 닫힌 뒤로는 재생 갈래와
  * 같은 닫힌 갱신(+0x1094 가 11 이 되는 갱신에 0x35108)과 득점 점수판 셈(`stepRecordedBoard`)을 지난다.
  */
-function LiveRunnerPlayback({
-  play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children, burstWindow,
-}: LiveRunnerPlaybackProps) {
+function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runScoreBoard, children, burstWindow }: LiveRunnerPlaybackProps) {
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(true, updateStartTickRef)
@@ -761,9 +777,7 @@ function LiveRunnerPlayback({
   /** 창이 선 첫 그림([창+0x250])의 수 — 다시 그린 수는 판마다 센다 */
   const redraws = useGameSceneRedrawCount()
   const redrawnRef = useRef<{ readonly play: LiveRunnerPlay; count: number } | null>(null)
-  const stepperRef = useRef<{ readonly play: LiveRunnerPlay; readonly stepper: LiveRunnerStepper; readonly startedAt: number } | null>(
-    null,
-  )
+  const stepperRef = useRef<{ readonly play: LiveRunnerPlay; readonly stepper: LiveRunnerStepper; readonly startedAt: number } | null>(null)
   if (stepperRef.current === null || stepperRef.current.play !== play) {
     stepperRef.current = { play, stepper: startLiveRunnerPlay(play), startedAt: update }
   }
@@ -823,7 +837,10 @@ function LiveRunnerPlayback({
     const updateStartTick = updateStartTickRef.current
     stepper.step(
       takePressFor(
-        pressesRef.current, pressTicksRef.current, updateStartTick === null ? null : updateStartTick + startedAt + stepper.tick, holdRef.current,
+        pressesRef.current,
+        pressTicksRef.current,
+        updateStartTick === null ? null : updateStartTick + startedAt + stepper.tick,
+        holdRef.current,
       ),
     )
     // 그 틱의 소리(슬라이딩 10 · 판정 콜)는 진행기가 그림에 실었다(`tickSoundIds`) — 아래 그림 셈이 그 그림을 지날 때 득점 함성과
@@ -861,7 +878,15 @@ function LiveRunnerPlayback({
   if (redrawnRef.current === null || redrawnRef.current.play !== play) redrawnRef.current = { play, count: redraws }
   while (redrawnRef.current.count < redraws) {
     redrawnRef.current.count += 1
-    redrawPlaybackPicture(holder, ticks, (drawn) => isHomeRunHitCode(drawn.sceneResultCode), particles.run, cameraOffsetRef.current, random, drawnErrors)
+    redrawPlaybackPicture(
+      holder,
+      ticks,
+      (drawn) => isHomeRunHitCode(drawn.sceneResultCode),
+      particles.run,
+      cameraOffsetRef.current,
+      random,
+      drawnErrors,
+    )
   }
   const isFinished = stepper.finished && holder.tally.ended
   // 0x1c — 판이 끝난 뒤 돌발 창 아래 그림 (`burstWindowHoldOf`)
@@ -943,9 +968,7 @@ interface RunScoreBoardView {
  * 여기서는 `keydown` 을 줄 세워 두고 **한 틱에 한 개씩** 진행기에 먹인다.
  * 키 → 뜻은 진행기 안에서 `inPlayCommandOf` 가 한다 — 표를 여기서 다시 만들지 않는다.
  */
-function LivePlayback({
-  input, side, onDone, onFieldingErrors, grassPalette, runScoreBoard, sceneMemory, children, burstWindow,
-}: LivePlaybackProps) {
+function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, runScoreBoard, sceneMemory, children, burstWindow }: LivePlaybackProps) {
   /** 갱신 0 이 든 장면 틱 — 갱신 u 의 장면 틱은 이 값 + u */
   const updateStartTickRef = useRef<number | null>(null)
   const update = useGameSceneUpdateCounter(true, updateStartTickRef)
@@ -1095,8 +1118,7 @@ function LivePlayback({
     }
 
     /** 이 그림의 공 그리기 0x36dfc 가 쏠 파티클 (`ballShotsAt`) */
-    const ballShotsOf = (drawn: DefenseViewState | undefined): readonly BallParticleShot[] =>
-      ballShotsAt(drawn, cameraOffsetRef.current)
+    const ballShotsOf = (drawn: DefenseViewState | undefined): readonly BallParticleShot[] => ballShotsAt(drawn, cameraOffsetRef.current)
 
     // 한 갱신 = 한 틱. 프레임을 건너뛴 만큼은 따라잡는다
     const wanted = Math.floor((update - startedAtRef.current) / UPDATES_PER_TICK) + 1
@@ -1190,9 +1212,12 @@ function LivePlayback({
     stateRef.current = running
     if (side === '공격') {
       const situation: InPlayRunnerSituation = {
-        runners: running.runners.map((runner) => runner.state), homeRunFlag: running.homeRunFlag,
+        runners: running.runners.map((runner) => runner.state),
+        homeRunFlag: running.homeRunFlag,
       }
-      const situationKey = offenseOffersFor(situation).map((offer) => offer.key).join(',')
+      const situationKey = offenseOffersFor(situation)
+        .map((offer) => offer.key)
+        .join(',')
       if (situationKey !== runnerSituationKeyRef.current) {
         runnerSituationKeyRef.current = situationKey
         setRunnerSituation(situation)
@@ -1208,7 +1233,10 @@ function LivePlayback({
     const arrivedPresses: DefenseKeyPress[] = []
     while (!moved && finished) {
       const press = takePressFor(
-        pressesRef.current, pressTicksRef.current, updateStartTickNow === null ? null : updateStartTickNow + update, holdRef.current,
+        pressesRef.current,
+        pressTicksRef.current,
+        updateStartTickNow === null ? null : updateStartTickNow + update,
+        holdRef.current,
       )
       if (press === null) break
       arrivedPresses.push(press)
@@ -1397,14 +1425,10 @@ function LivePlayback({
       grassPalette={grassPalette}
       cameraOffsetRef={cameraOffsetRef}
       drawRedraws={redraws}
-      underActors={
-        effectsView.distanceBoard !== null ? <DefenseDistanceBoard value={effectsView.distanceBoard} /> : undefined
-      }
+      underActors={effectsView.distanceBoard !== null ? <DefenseDistanceBoard value={effectsView.distanceBoard} /> : undefined}
     >
       {effectsView.text !== null && <DefenseHomeRunText frame={effectsView.text} />}
-      {runScoreBoard !== undefined && runBoard !== null && !ended && (
-        <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />
-      )}
+      {runScoreBoard !== undefined && runBoard !== null && !ended && <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />}
       <DefenseParticles scene={particlesRef.current} version={effectsView.version} />
       {children}
       {holdsUnderBurst && burstWindow}

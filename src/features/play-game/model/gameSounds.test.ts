@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BURST_START_SOUND,
-  gameResultSoundIdOf,
-  gameStepSoundIdsOf,
-  HALF_INNING_SOUND,
-} from '@/features/play-game/model/gameSounds'
+import { BURST_START_SOUND, gameResultSoundIdOf, gameStepSoundIdsOf, HALF_INNING_SOUND } from '@/features/play-game/model/gameSounds'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import type { BurstResolution, BurstSession } from '@/entities/burst-mission/model/burstMissionSession'
@@ -30,8 +25,7 @@ const 진행 = ({ half = '초', inning = 1, isFinished = false, burstCurrent = n
   }) as unknown as GameProgress
 
 const 돌발행 = { goal: 0 } as unknown as BurstMissionRow
-const 판정 = (judgement: BurstResolution['judgement']): BurstResolution =>
-  ({ session: {} as BurstSession, row: 돌발행, judgement, deltas: [] })
+const 판정 = (judgement: BurstResolution['judgement']): BurstResolution => ({ session: {} as BurstSession, row: 돌발행, judgement, deltas: [] })
 
 describe('공수 교대 징글 13 (경기 상태 0x18, 0x4f7ac)', () => {
   it('타자편은 반 이닝이 바뀌어도 진행 걸음에서 내지 않는다 — 0x18 이 판 없이 0x21 로 빠진다 (4facc·4fb08)', () => {

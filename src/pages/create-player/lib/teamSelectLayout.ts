@@ -102,7 +102,10 @@ export const gridRowCountOf = (count: number) => Math.ceil(count / GRID.columns)
  * 팀 격자는 0x10 만이라 `AnnalsGridShape`(0x10 · 0x20)로 그대로 옮겨진다. 대전(통신) 팀 고르기는 웹에 화면이 없다.
  */
 export const TEAM_GRID_SHAPE: AnnalsGridShape = {
-  columns: GRID.columns, rows: TEAM_COUNT / GRID.columns, wrapsColumns: true, wrapsRows: false,
+  columns: GRID.columns,
+  rows: TEAM_COUNT / GRID.columns,
+  wrapsColumns: true,
+  wrapsRows: false,
 }
 
 /** 나만의리그 팀 고르기 [this+0x70] — `TEAM_GRID_SHAPE` 와 같다 (0xf6c2~0xf6e6) */
@@ -141,7 +144,11 @@ export const teamGridRowGapOf = (count: number) => (count === EDIT_GRID_TEAM_COU
  * (0x64060~0x64090): 줄높이 40 · 가속 시프트 1. 시작 `0x7a005(격자, [skin+0xe8], 1, 1)`(0x64094~0x640a2) — 애니는 넷째 인자를 따른다.
  */
 export const teamGridOpenShapeOf = (count = TEAM_COUNT): GridOpenShape => ({
-  rows: gridRowCountOf(count), columns: GRID.columns, rowHeight: GRID.cell, rowGap: teamGridRowGapOf(count), shift: 1,
+  rows: gridRowCountOf(count),
+  columns: GRID.columns,
+  rowHeight: GRID.cell,
+  rowGap: teamGridRowGapOf(count),
+  shift: 1,
 })
 
 /** 팀이 열려 있는가 — 0~9 는 늘 열려 있고, 10~14 히든은 해금 기록이 있어야 한다 */
@@ -238,13 +245,8 @@ export function abilityVertexOf(center: ChartPoint, length: number, angle: numbe
 }
 
 /** 값 네 개의 꼭짓점. 값이 없으면(잠긴 팀, idx = −1) 원본도 네 값을 0 으로 채운다 (0x5b008~0x5b026) */
-export function abilityChartVerticesOf(
-  center: ChartPoint,
-  values: readonly number[],
-  radius: number = ABILITY_CHART.radius,
-): readonly ChartPoint[] {
-  return ABILITY_AXIS_ANGLES.map((angle, axis) =>
-    abilityVertexOf(center, abilityAxisLengthOf(values[axis] ?? 0, radius), angle))
+export function abilityChartVerticesOf(center: ChartPoint, values: readonly number[], radius: number = ABILITY_CHART.radius): readonly ChartPoint[] {
+  return ABILITY_AXIS_ANGLES.map((angle, axis) => abilityVertexOf(center, abilityAxisLengthOf(values[axis] ?? 0, radius), angle))
 }
 
 /**

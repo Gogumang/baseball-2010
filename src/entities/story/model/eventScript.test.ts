@@ -4,17 +4,38 @@ import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 
 const 이벤트: OriginalEvent[] = [
   {
-    id: 451, audience: 0, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions: [],
+    id: 451,
+    audience: 0,
+    repeatable: false,
+    trigger: 0,
+    requiresEvent: 0,
+    dateFrom: [0, 0],
+    dateTo: [0, 0],
+    conditions: [],
     commands: [
       { op: 'sound', id: 31 },
       { op: 'effect', id: 6 },
       { op: 'say', text: '첫 대사', speaker: 2, format: 0, portraits: [{ file: 'event_char_0', animation: 19, side: 'left' }] },
       { op: 'reward', items: [{ kind: 3, value: 5 }] },
-      { op: 'choice', portraits: [], choices: [{ text: '간다', gotoEvent: 500 }, { text: '안 간다', gotoEvent: 501 }] },
+      {
+        op: 'choice',
+        portraits: [],
+        choices: [
+          { text: '간다', gotoEvent: 500 },
+          { text: '안 간다', gotoEvent: 501 },
+        ],
+      },
     ],
   },
   {
-    id: 500, audience: 0, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions: [],
+    id: 500,
+    audience: 0,
+    repeatable: false,
+    trigger: 0,
+    requiresEvent: 0,
+    dateFrom: [0, 0],
+    dateTo: [0, 0],
+    conditions: [],
     commands: [{ op: 'say', text: '분기 대사', speaker: 1, format: 1, portraits: [] }],
   },
 ]
@@ -49,13 +70,22 @@ describe('stepFrom — 원작 이벤트 스크립트 진행', () => {
   })
 
   it('예아니오는 하위 0 일 때만 멈춘다 — ≠ 0 이면 건너뛴다 (0x8d426 · 0x8d432)', () => {
-    const 질문: OriginalEvent[] = [{
-      id: 1, audience: 0, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions: [],
-      commands: [
-        { op: 'yesno', sub: 1, text: '건너뛴다', yesEvent: 2, noEvent: 3 },
-        { op: 'yesno', sub: 0, text: '묻는다', yesEvent: 2, noEvent: 3 },
-      ],
-    }]
+    const 질문: OriginalEvent[] = [
+      {
+        id: 1,
+        audience: 0,
+        repeatable: false,
+        trigger: 0,
+        requiresEvent: 0,
+        dateFrom: [0, 0],
+        dateTo: [0, 0],
+        conditions: [],
+        commands: [
+          { op: 'yesno', sub: 1, text: '건너뛴다', yesEvent: 2, noEvent: 3 },
+          { op: 'yesno', sub: 0, text: '묻는다', yesEvent: 2, noEvent: 3 },
+        ],
+      },
+    ]
     const step = stepFrom(질문, jumpToEvent(1))
     expect(step.command).toMatchObject({ op: 'yesno', text: '묻는다' })
     expect(step.passed.map((command) => command.op)).toEqual(['yesno'])
@@ -65,7 +95,14 @@ describe('stepFrom — 원작 이벤트 스크립트 진행', () => {
 describe('match — 마선수 대결 명령 (누락 탐색 8차)', () => {
   const 대결: OriginalEvent[] = [
     {
-      id: 112, audience: 0, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions: [],
+      id: 112,
+      audience: 0,
+      repeatable: false,
+      trigger: 0,
+      requiresEvent: 0,
+      dateFrom: [0, 0],
+      dateTo: [0, 0],
+      conditions: [],
       commands: [
         { op: 'say', text: '한판 붙자', speaker: 2, format: 0, portraits: [] },
         { op: 'reward', items: [{ kind: 0, value: 1 }] },
@@ -83,20 +120,28 @@ describe('match — 마선수 대결 명령 (누락 탐색 8차)', () => {
   })
 })
 
-
 describe('skipSayCursor — say 중 취소 0x8b7b0', () => {
-  const 대본: OriginalEvent[] = [{
-    id: 7, audience: 0, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions: [],
-    commands: [
-      { op: 'say', text: '하나', speaker: 2, format: 0, portraits: [] },
-      { op: 'sound', id: 3 },
-      { op: 'effect', id: 6 },
-      { op: 'say', text: '둘', speaker: 2, format: 0, portraits: [] },
-      { op: 'reward', items: [{ kind: 0, value: 5 }] },
-      { op: 'say', text: '셋', speaker: 2, format: 0, portraits: [] },
-      { op: 'effect', id: 1 },
-    ],
-  }]
+  const 대본: OriginalEvent[] = [
+    {
+      id: 7,
+      audience: 0,
+      repeatable: false,
+      trigger: 0,
+      requiresEvent: 0,
+      dateFrom: [0, 0],
+      dateTo: [0, 0],
+      conditions: [],
+      commands: [
+        { op: 'say', text: '하나', speaker: 2, format: 0, portraits: [] },
+        { op: 'sound', id: 3 },
+        { op: 'effect', id: 6 },
+        { op: 'say', text: '둘', speaker: 2, format: 0, portraits: [] },
+        { op: 'reward', items: [{ kind: 0, value: 5 }] },
+        { op: 'say', text: '셋', speaker: 2, format: 0, portraits: [] },
+        { op: 'effect', id: 1 },
+      ],
+    },
+  ]
 
   it('say · 소리 · 효과를 건너뛰어 다음 보상(종류 7)에 선다', () => {
     expect(skipSayCursor(대본, { eventId: 7, commandIndex: 0 })).toEqual({ eventId: 7, commandIndex: 4 })

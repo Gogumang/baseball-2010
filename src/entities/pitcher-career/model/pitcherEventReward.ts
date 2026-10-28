@@ -91,9 +91,12 @@ function applyReward(career: PitcherCareer, reward: EventReward, random: RandomP
         isSick: true,
         illnessRemaining: ILLNESS_DURATION,
         // 값 > 0 은 알림 글 0x8beb8 이 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 다시 안 굴린다
-        illnessName: reward.value > 0
-          ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
-          : random === undefined ? ILLNESS_NAMES[0] : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)],
+        illnessName:
+          reward.value > 0
+            ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
+            : random === undefined
+              ? ILLNESS_NAMES[0]
+              : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)],
       }
     case EVENT_REWARD_KIND.모든능력치:
       return PITCHER_ABILITY_ORDER.reduce((current, key) => raisePitcherAbility(current, key, reward.value), career)
@@ -115,11 +118,7 @@ const YEAR_ADJUSTED_EVENTS: Readonly<Record<number, Readonly<Record<number, numb
   396: { 0: -4, 1: -3 },
 }
 
-export function yearAdjustedPitcherRewards(
-  rewards: readonly EventReward[],
-  eventId: number | undefined,
-  season: number,
-): readonly EventReward[] {
+export function yearAdjustedPitcherRewards(rewards: readonly EventReward[], eventId: number | undefined, season: number): readonly EventReward[] {
   const table = eventId === undefined ? undefined : YEAR_ADJUSTED_EVENTS[eventId]
   const years = Math.max(0, season - 1)
   if (table === undefined || years === 0) return rewards

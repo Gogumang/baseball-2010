@@ -40,7 +40,11 @@ export const GRID = {
 
 /** 격자 열림 애니의 꼴 (`shared/lib/gridOpen`) */
 export const MISSION_GRID_OPEN: GridOpenShape = {
-  rows: GRID.rows, columns: GRID.columns, rowHeight: GRID.cell, rowGap: GRID.vGap, shift: 2,
+  rows: GRID.rows,
+  columns: GRID.columns,
+  rowHeight: GRID.cell,
+  rowGap: GRID.vGap,
+  shift: 2,
 }
 
 export const GRID_LEFT = GRID.centerX - Math.trunc((GRID.columns * GRID.cellWidth + (GRID.columns - 1) * GRID.hGap) / 2)
@@ -114,8 +118,12 @@ export const NO_MISSION_TEXT = ORIGINAL_MAIN_MENU_TEXT[57] ?? ''
  * 칸 14 는 이벤트(다운로드) 미션 칸이다 — `EVENT_MISSION_CELL`.
  */
 export const MISSION_GRID_SHAPE = {
-  columns: GRID.columns, rows: GRID.rows,
-  wrapsColumns: true, wrapsRows: true, carriesRowOnColumnWrap: true, carriesColumnOnRowWrap: true,
+  columns: GRID.columns,
+  rows: GRID.rows,
+  wrapsColumns: true,
+  wrapsRows: true,
+  carriesRowOnColumnWrap: true,
+  carriesColumnOnRowWrap: true,
 } as const
 
 /** 이벤트 미션 칸 — 키 0x1daa4 의 0x1db06 `칸 == 14` */
@@ -132,7 +140,9 @@ export const EVENT_MISSION_WINDOW = {
   /** StrMAINMENU[56] — (W/2 − 0x58, H/2 − 0x23, 폭 0xb0) */
   text: {
     raw: ORIGINAL_MAIN_MENU_TEXT[56] ?? '',
-    x: SCREEN_WIDTH / 2 - 0x58, y: 320 / 2 - 0x23, width: 0xb0,
+    x: SCREEN_WIDTH / 2 - 0x58,
+    y: 320 / 2 - 0x23,
+    width: 0xb0,
   },
   /** 0xcd6f0 / 고름 0xcd718 — (W/2 − 0x50, H/2 + 0x14, 폭 0x50) */
   run: { raw: '!C!cFFFFFF미션실행', selectedRaw: '!C!cFFFF00미션실행', x: SCREEN_WIDTH / 2 - 0x50, y: 320 / 2 + 0x14, width: 0x50 },

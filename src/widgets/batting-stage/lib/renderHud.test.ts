@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
-import { INITIAL_LAMP_ZOOM, alignedNumberGlyphsOf, hudRowsOf, inningGlyphsOf, lampCountOf, roundFillRectsOf, stepLampZoom, type HudState, type LampZoomMemory } from '@/widgets/batting-stage/lib/renderHud'
+import {
+  INITIAL_LAMP_ZOOM,
+  alignedNumberGlyphsOf,
+  hudRowsOf,
+  inningGlyphsOf,
+  lampCountOf,
+  roundFillRectsOf,
+  stepLampZoom,
+  type HudState,
+  type LampZoomMemory,
+} from '@/widgets/batting-stage/lib/renderHud'
 
 const HUD: HudState = {
   inning: 1,
@@ -78,21 +88,26 @@ describe('alignedNumberGlyphsOf — HUD 점수 0xba719 → 0xba51c', () => {
   const options = (align: number) => ({ spacing: 1, start: 20, align, offsetX: -3, offsetY: 0 })
 
   it('위 줄 (박스 = 줄 상자 x + 3, 정렬 0x24): x = 줄x + 36 − Σ(폭 + 1), y = 줄y + 2', () => {
-    expect(alignedNumberGlyphsOf(3, { x: 11, y: 21, width: 36, height: 14 }, options(0x24), sizeOf))
-      .toEqual([{ index: 23, x: 37, y: 23 }])
-    expect(alignedNumberGlyphsOf(10, { x: 11, y: 21, width: 36, height: 14 }, options(0x24), sizeOf))
-      .toEqual([{ index: 21, x: 32, y: 23 }, { index: 20, x: 37, y: 23 }])
+    expect(alignedNumberGlyphsOf(3, { x: 11, y: 21, width: 36, height: 14 }, options(0x24), sizeOf)).toEqual([{ index: 23, x: 37, y: 23 }])
+    expect(alignedNumberGlyphsOf(10, { x: 11, y: 21, width: 36, height: 14 }, options(0x24), sizeOf)).toEqual([
+      { index: 21, x: 32, y: 23 },
+      { index: 20, x: 37, y: 23 },
+    ])
   })
 
   it('아래 줄 (박스 y + 3, 정렬 4): 세로 맞춤 없이 y = 41', () => {
-    expect(alignedNumberGlyphsOf(12, { x: 11, y: 41, width: 36, height: 14 }, options(0x4), sizeOf))
-      .toEqual([{ index: 21, x: 32, y: 41 }, { index: 22, x: 37, y: 41 }])
+    expect(alignedNumberGlyphsOf(12, { x: 11, y: 41, width: 36, height: 14 }, options(0x4), sizeOf)).toEqual([
+      { index: 21, x: 32, y: 41 },
+      { index: 22, x: 37, y: 41 },
+    ])
   })
 
   it('세로 가운데는 나머지를 아래로 — (h − 최대높이) 홀수면 올림, 글자는 아래 맞춤', () => {
     const tall = (index: number) => ({ width: 6, height: index === 21 ? 9 : 10 })
-    expect(alignedNumberGlyphsOf(12, { x: 0, y: 0, width: 20, height: 15 }, { ...options(0x20), offsetX: 0 }, tall))
-      .toEqual([{ index: 21, x: 0, y: 4 }, { index: 22, x: 7, y: 3 }])
+    expect(alignedNumberGlyphsOf(12, { x: 0, y: 0, width: 20, height: 15 }, { ...options(0x20), offsetX: 0 }, tall)).toEqual([
+      { index: 21, x: 0, y: 4 },
+      { index: 22, x: 7, y: 3 },
+    ])
   })
 
   it('그림이 아직 없으면 null', () => {
@@ -132,12 +147,18 @@ describe('inningGlyphsOf — HUD 이닝 0xba689 → 0xba51c', () => {
   it('상자 0 (9,2,10,9) + (6,6) 의 오른끝 x = 25 에 자간 0 으로 오른쪽 맞춤, y = 8', () => {
     expect(inningGlyphsOf(3, sizeOf)).toEqual([{ index: 3, x: 17, y: 8 }])
     expect(inningGlyphsOf(1, sizeOf)).toEqual([{ index: 1, x: 21, y: 8 }])
-    expect(inningGlyphsOf(12, sizeOf)).toEqual([{ index: 1, x: 13, y: 8 }, { index: 2, x: 17, y: 8 }])
+    expect(inningGlyphsOf(12, sizeOf)).toEqual([
+      { index: 1, x: 13, y: 8 },
+      { index: 2, x: 17, y: 8 },
+    ])
   })
 
   it('글자는 아래 맞춤 — 키 다른 숫자는 최대 높이에 바닥을 맞춘다', () => {
     const tall = (index: number) => ({ width: 8, height: index === 1 ? 9 : 10 })
-    expect(inningGlyphsOf(12, tall)).toEqual([{ index: 1, x: 9, y: 9 }, { index: 2, x: 17, y: 8 }])
+    expect(inningGlyphsOf(12, tall)).toEqual([
+      { index: 1, x: 9, y: 9 },
+      { index: 2, x: 17, y: 8 },
+    ])
   })
 })
 

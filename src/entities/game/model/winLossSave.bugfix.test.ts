@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
-import {
-  EMPTY_DECISION_STATE,
-  NO_SIDE,
-  applyPitcherChange,
-  gameEndDecisionOf,
-  type SaveChanceInput,
-} from '@/entities/game/model/winLossSave'
+import { EMPTY_DECISION_STATE, NO_SIDE, applyPitcherChange, gameEndDecisionOf, type SaveChanceInput } from '@/entities/game/model/winLossSave'
 
 afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 

@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
-import {
-  meetsSkillAcquireCondition, meetsSkillReleaseCondition, withGameSkillCounters,
-} from '@/entities/story/model/skillCondition'
+import { meetsSkillAcquireCondition, meetsSkillReleaseCondition, withGameSkillCounters } from '@/entities/story/model/skillCondition'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import { EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
 
@@ -19,9 +17,7 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
 
   it('추가 조건이 없는 스킬(6 행운·8 의외성·9 베테랑·17 하락세)은 안 가졌으면 통과한다', () => {
     const career = 선수({ skillIds: [] })
-    expect([6, 8, 9, 17].map((id) => meetsSkillAcquireCondition(career, 값(id), undefined))).toEqual([
-      true, true, true, true,
-    ])
+    expect([6, 8, 9, 17].map((id) => meetsSkillAcquireCondition(career, 값(id), undefined))).toEqual([true, true, true, true])
   })
 
   it('그 해 해제한 마이너스 스킬(+0x1d0, 0xa4f31)은 2·3·4·5·18·19·20 의 하위 조건이 맨 앞에서 막는다', () => {
@@ -50,17 +46,17 @@ describe('조건 20 — 스킬 획득 (0xad1ba)', () => {
   it('3 몹쓸몸의 T 는 u8 통산 − s8 시즌 사본이다 — 사본이 128 을 넘으면 음수로 읽혀 T 가 커진다 (0xad334)', () => {
     const 기본 = { skillIds: [], gamesPlayed: 12, ability: { hit: 400, power: 400, defense: 400, run: 400 } }
     // 통산 = 사본 = 100 → T = 0
-    expect(meetsSkillAcquireCondition(
-      선수({ ...기본, trainingCounts: { 히트: 100 }, seasonStartTrainingCounts: { 히트: 100 } }), 값(3), undefined,
-    )).toBe(true)
+    expect(
+      meetsSkillAcquireCondition(선수({ ...기본, trainingCounts: { 히트: 100 }, seasonStartTrainingCounts: { 히트: 100 } }), 값(3), undefined),
+    ).toBe(true)
     // 통산 = 사본 = 200 → u8 200 − s8(−56) = 256 ≠ 0
-    expect(meetsSkillAcquireCondition(
-      선수({ ...기본, trainingCounts: { 히트: 200 }, seasonStartTrainingCounts: { 히트: 200 } }), 값(3), undefined,
-    )).toBe(false)
+    expect(
+      meetsSkillAcquireCondition(선수({ ...기본, trainingCounts: { 히트: 200 }, seasonStartTrainingCounts: { 히트: 200 } }), 값(3), undefined),
+    ).toBe(false)
     // 통산 256(u8 0) · 사본 256(s8 0) → T = 0
-    expect(meetsSkillAcquireCondition(
-      선수({ ...기본, trainingCounts: { 히트: 256 }, seasonStartTrainingCounts: { 히트: 256 } }), 값(3), undefined,
-    )).toBe(true)
+    expect(
+      meetsSkillAcquireCondition(선수({ ...기본, trainingCounts: { 히트: 256 }, seasonStartTrainingCounts: { 히트: 256 } }), 값(3), undefined),
+    ).toBe(true)
   })
 
   it('5 무력감은 사기 ≤ 20 · 연차 인덱스 ≥ 3 · 30% 를 본다', () => {

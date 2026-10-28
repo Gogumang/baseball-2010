@@ -43,8 +43,7 @@ export function EventPortraits({ portraits, height, skinIndex = 0, battingTypeIn
   return (
     <div className={styles.stage} style={{ height }}>
       {placed.map((item) => (
-        <PortraitSprite key={item.key} placed={item} baseline={height}
-          skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
+        <PortraitSprite key={item.key} placed={item} baseline={height} skinIndex={skinIndex} battingTypeIndex={battingTypeIndex} />
       ))}
     </div>
   )
@@ -63,7 +62,11 @@ function useWarmPortraitExpressions(portraits: readonly EventPortrait[], skinInd
     const palette = portraitPaletteOf(portrait, skinIndex)
     if (palette === null || assetUrl(`./sprites/${portrait.file}/frames`) !== HERO_FOLDER) return []
     const entries = animations?.[portraitAnimationOf(portrait, battingTypeIndex)] ?? []
-    return recolorRequestsOf(HERO_FOLDER, entries.map((entry) => entry.frame), palette)
+    return recolorRequestsOf(
+      HERO_FOLDER,
+      entries.map((entry) => entry.frame),
+      palette,
+    )
   })
   useWarmRecoloredSprites(requests)
 }
@@ -89,7 +92,13 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
   const entries = animations?.[portraitAnimationOf(placed.portrait, battingTypeIndex)]
   const palette = portraitPaletteOf(placed.portrait, skinIndex)
   // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
-  useWarmRecoloredSprites(recolorRequestsOf(folder, (entries ?? []).map((entry) => entry.frame), palette))
+  useWarmRecoloredSprites(
+    recolorRequestsOf(
+      folder,
+      (entries ?? []).map((entry) => entry.frame),
+      palette,
+    ),
+  )
   const step = entries === undefined ? null : animationStepAt(entries, update)
   const key = step === null ? '' : String(step.frame).padStart(3, '0')
   // 빈 자리 프레임은 그림도 원점도 없다 — 원작도 아무것도 그리지 않는다.
@@ -100,8 +109,7 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
   const y = baseline + origin.y + step.dy
   return (
     // 주인공이면 피부 .mpl 로 다시 칠한다 (`key` = 프레임 — 아래 주석 참고).
-    <PaintedFrame key={key} url={`${folder}/${key}.png`} style={{ left: x, top: y }}
-      palette={palette} />
+    <PaintedFrame key={key} url={`${folder}/${key}.png`} style={{ left: x, top: y }} palette={palette} />
   )
 }
 
@@ -115,13 +123,7 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
  *   (남김, Q-13: 앱 길에서도 지난다 — 팔레트 JSON · 그림을 비동기로 받아 칠하는 동안의 첫 그림들. 원본은 팔레트를 적재 때 다 들고 있어
  *   대응이 없는 웹 적재 몫이다. 칠한 그림은 `useRecoloredSprite` 가 모아 두어 두 번째부터는 곧장 쓴다)
  */
-function PaintedFrame({
-  url, palette, style,
-}: {
-  readonly url: string
-  readonly palette: number | null
-  readonly style: CSSProperties
-}) {
+function PaintedFrame({ url, palette, style }: { readonly url: string; readonly palette: number | null; readonly style: CSSProperties }) {
   return <img className={styles.sprite} style={style} src={useRecoloredSprite(url, palette)} alt="" />
 }
 

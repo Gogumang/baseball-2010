@@ -5,10 +5,7 @@ import { startPitcherMission } from '@/entities/mission/model/pitcherRun'
 import { MISSION_CPU_START } from '@/entities/mission/model/missionCpuTeam'
 import { missionOpponentOf } from '@/entities/game/model/aceOpponent'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
-import {
-  missionBatterMatchupCardsOf,
-  missionPitcherMatchupCardsOf,
-} from '@/pages/mission-play/lib/missionMatchupCards'
+import { missionBatterMatchupCardsOf, missionPitcherMatchupCardsOf } from '@/pages/mission-play/lib/missionMatchupCards'
 
 const missionOf = (side: '타자' | '투수', id: number) => MISSIONS.find((m) => m.side === side && m.id === id)!
 const cpuTeamOf = (mission: ReturnType<typeof missionOf>) => mission.sideTeams[mission.humanSide === 0 ? 1 : 0]

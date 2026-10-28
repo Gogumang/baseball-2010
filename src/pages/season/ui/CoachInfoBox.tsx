@@ -18,8 +18,10 @@ export function CoachInfoBox({ slot }: { readonly slot: number }) {
       <FrameSprite folder={MODE_UI} frame={tab.frame} origins={modeUiOrigins} x={tab.x} y={tab.y} />
       <FrameSprite folder={IMG_TEXT} frame={title.frame} origins={imgTextOrigins} x={title.x} y={title.y} />
       <PaintedRects x={box.x} y={box.y} width={box.width + 1} height={box.height + 1} paints={paints} testId="코치-정보상자" />
-      <div data-testid="코치-정보글"
-        style={{ position: 'absolute', left: text.x, top: text.y, width: text.width, color: '#FFFFFF', pointerEvents: 'none' }}>
+      <div
+        data-testid="코치-정보글"
+        style={{ position: 'absolute', left: text.x, top: text.y, width: text.width, color: '#FFFFFF', pointerEvents: 'none' }}
+      >
         <MarkupText raw={coachInfoTextOf(slot)} />
       </div>
     </>

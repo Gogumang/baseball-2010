@@ -8,7 +8,11 @@ import { MORALE_LIMIT } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { illnessPenaltyFieldOf } from '@/entities/season-mode/model/seasonEventFlow'
 import {
-  SEASON_RECORD_SKILL, equippedSeasonAbilityOf, hasSeasonSkill, seasonAbilityLimitsOf, seasonPositionBarOf,
+  SEASON_RECORD_SKILL,
+  equippedSeasonAbilityOf,
+  hasSeasonSkill,
+  seasonAbilityLimitsOf,
+  seasonPositionBarOf,
 } from '@/entities/season-mode/model/seasonPlayerRecord'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
 import { TEAM_GAME_MODE, gameAbilityOf, hasPositionMismatch } from '@/features/play-team-game/model/gameAbilities'
@@ -160,7 +164,7 @@ export function seasonPlayerDetailViewOf(view: SeasonPlayerRecordView, context: 
     messages.push('[!cFFFF00포지션!cFFFFFF]불일치: 수비 20% 감소')
   }
   const coach = context.record.coach
-  if (coach >= 0 && (coach <= LAST_PITCHER_COACH) === view.isPitcher) {
+  if (coach >= 0 && coach <= LAST_PITCHER_COACH === view.isPitcher) {
     messages.push(`${highlighted('코치')}${ORIGINAL_MODE_TEXT[COACH_TEXT_BASE + coach] ?? ''}`)
   }
   return { rows, messages }
@@ -245,4 +249,3 @@ function specialNameOf(view: SeasonPlayerRecordView): string {
   const shifted = number - 1 + (number === SPECIAL_TYPED_NUMBER ? view.profile >> 5 : 0)
   return (view.isPitcher ? PITCHER_BURSTS : BATTER_BURSTS)[shifted] ?? ''
 }
-

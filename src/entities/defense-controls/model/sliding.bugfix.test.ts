@@ -26,8 +26,6 @@ describe('B-57 홈 송구에는 자동 슬라이딩이 안 걸린다', () => {
   it('고침: 주자의 홈(4)을 0 으로 읽어 걸린다 — 다른 루 송구에는 여전히 안 걸린다', () => {
     setBugfixConfigForTests(bugfixConfigWith(['B-57']))
     expect(홈송구([홈주자])).toEqual([0])
-    expect(
-      autoSlideRunnerIndexes({ isThrowInFlight: true, throwTargetBase: 3, throwArrivalTicks: 5, runners: [홈주자] }),
-    ).toEqual([])
+    expect(autoSlideRunnerIndexes({ isThrowInFlight: true, throwTargetBase: 3, throwArrivalTicks: 5, runners: [홈주자] })).toEqual([])
   })
 })

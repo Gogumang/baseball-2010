@@ -60,7 +60,6 @@ export const TITLE_IMAGES = {
 } as const
 export type ScreenFrameTitle = keyof typeof TITLE_IMAGES
 
-
 /**
  * **바닥비트** (0x54d95 의 [sp+0x3c], 0x55220~0x554f4 — 직접 떴다). 비트 0 은 아무 데서도 안 본다.
  * ```

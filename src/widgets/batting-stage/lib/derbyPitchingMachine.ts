@@ -26,7 +26,10 @@ export const HOME_RUN_DERBY_MODE = 7
 const LEFT_HANDED_PITCHER = 1
 
 /** 기계 자리 — 투수 그림 객체 (+4, +8) = 투수 앵커(좌투면 x + 1) · 뒤집기 */
-export function derbyMachinePlacementOf(side: number, pitcherHand: number): {
+export function derbyMachinePlacementOf(
+  side: number,
+  pitcherHand: number,
+): {
   readonly x: number
   readonly y: number
   readonly isMirrored: boolean
@@ -41,12 +44,7 @@ export function drawsDerbyPitchingMachine(gameMode: number | undefined): boolean
   return gameMode === HOME_RUN_DERBY_MODE
 }
 
-export function drawDerbyPitchingMachine(
-  context: CanvasRenderingContext2D,
-  gameMode: number | undefined,
-  side: number,
-  pitcherHand: number,
-): void {
+export function drawDerbyPitchingMachine(context: CanvasRenderingContext2D, gameMode: number | undefined, side: number, pitcherHand: number): void {
   if (!drawsDerbyPitchingMachine(gameMode)) return
   const frame = placedFrame(TRAINING_FRAMES, DERBY_MACHINE_FRAME)
   if (frame === null) return

@@ -5,9 +5,7 @@ import { equipmentBlockReasonOf, isHiddenOpen } from '@/entities/career/model/eq
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { isPitcherHiddenOpen } from '@/entities/pitcher-career/model/pitcherEquipment'
 import { isHiddenPitchRowOpen } from '@/entities/pitcher-career/model/pitchTraining'
-import {
-  EMPTY_COLLECTION, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS, isHallOfFameSlotOpen,
-} from '@/entities/collection/model/collection'
+import { EMPTY_COLLECTION, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS, isHallOfFameSlotOpen } from '@/entities/collection/model/collection'
 import { hiddenNameOf } from '@/entities/collection/model/hiddenOpenNotice'
 import { BATTER_MISSIONS, PITCHER_MISSIONS } from '@/entities/mission/model/missionGoal'
 import { checkSeasonEquipment } from '@/entities/season-mode/model/seasonEquipment'
@@ -19,9 +17,7 @@ import { hiddenTeamHintOf } from '@/pages/season/ui/SeasonTeamSelectScreen'
 import { isTeamOpen } from '@/pages/create-player/lib/teamSelectLayout'
 import { isTeamOpened } from '@/pages/general-mode/lib/hiddenTeam'
 import { quickStartTeamCandidates } from '@/pages/general-mode/lib/quickStart'
-import {
-  INITIAL_ACE_OPEN_SAVE, aceBatterIdsOf, aceOpenAnswerOf, acePitcherIdsOf, isAceCellOpen, isAceCellUnlocked,
-} from '@/pages/general-mode'
+import { INITIAL_ACE_OPEN_SAVE, aceBatterIdsOf, aceOpenAnswerOf, acePitcherIdsOf, isAceCellOpen, isAceCellUnlocked } from '@/pages/general-mode'
 
 /**
  * 해금 표(`unlocks.json`)가 각 잠금 판정 자리에 닿는가 — 표를 켜면 풀리고, 원본 표(시험 기본)면 원본 판정 그대로다.

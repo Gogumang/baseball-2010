@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  applyPlayerOutcome,
-  resolveDefensePlay,
-  startGame,
-  startPlayerOutcome,
-  summaryOf,
-} from '@/features/play-game/model/gameFlow'
+import { applyPlayerOutcome, resolveDefensePlay, startGame, startPlayerOutcome, summaryOf } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { nariRecordLineOf } from '@/entities/career/model/playerCareer'
@@ -40,7 +34,12 @@ import type { BattedBallPattern } from '@/shared/config/original/battedBallPatte
 const 기록줄 = (progress: GameProgress) => nariRecordLineOf(summaryOf(progress).stats)
 
 /** 9회말 · 내 타석 · 후공 — 루 · 아웃 · 점수만 갈아 끼운다 */
-function 끝내기판(options: { readonly bases: BaseState; readonly outs: number; readonly ourScore: number; readonly opponentScore: number }): GameProgress {
+function 끝내기판(options: {
+  readonly bases: BaseState
+  readonly outs: number
+  readonly ourScore: number
+  readonly opponentScore: number
+}): GameProgress {
   const progress = startGame(createSeededRandom(7))
   const { first, second, third } = options.bases
   return {

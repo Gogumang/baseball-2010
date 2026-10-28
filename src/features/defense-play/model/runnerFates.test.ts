@@ -103,11 +103,7 @@ describe('진행기를 안 도는 결과 — runnerFatesWithoutPlay', () => {
   })
 
   it('볼넷·사구는 타자주자가 맨 앞에 들고, 만루면 3루 주자만 득점한다 (종류 2)', () => {
-    expect(runnerFatesWithoutPlay(주자13루, { kind: '볼넷' })).toEqual([
-      fate(0, false, false),
-      fate(1, false, false),
-      fate(3, false, false),
-    ])
+    expect(runnerFatesWithoutPlay(주자13루, { kind: '볼넷' })).toEqual([fate(0, false, false), fate(1, false, false), fate(3, false, false)])
     expect(runnerFatesWithoutPlay(만루, { kind: '사구' })).toEqual([
       fate(0, false, false),
       fate(1, false, false),
@@ -154,8 +150,7 @@ describe('타자주자 생존 r5 (0xa87ba~0xa87fa) — 결과비트 B5 출루', 
 })
 
 describe('결과비트 B7 루프의 주자 조건 (0xa88fc · 0xa97a0)', () => {
-  const runner = (startBase: number, isBatterRunner = false, isOut = false, scored = false) =>
-    ({ startBase, isBatterRunner, isOut, scored })
+  const runner = (startBase: number, isBatterRunner = false, isOut = false, scored = false) => ({ startBase, isBatterRunner, isOut, scored })
 
   it('2루나 3루에 처리 끝이 아닌 앞 주자가 있으면 참 — 이닝이 끝났는지는 안 본다', () => {
     expect(scoringBaseRunnerAfterOf([runner(1, true, true), runner(2)])).toBe(true)

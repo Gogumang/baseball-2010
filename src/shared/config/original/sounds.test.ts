@@ -1,13 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import {
-  LOOPING_SOUND_IDS,
-  ORIGINAL_SOUNDS,
-  findOriginalSound,
-  isLoopingSound,
-  soundFileUrl,
-} from '@/shared/config/original/sounds'
+import { LOOPING_SOUND_IDS, ORIGINAL_SOUNDS, findOriginalSound, isLoopingSound, soundFileUrl } from '@/shared/config/original/sounds'
 
 /**
  * 번호 표가 원본 파일 목록과 어긋나지 않는지 본다.
@@ -17,7 +11,18 @@ import {
 const ORIGINAL_FILE_IDS = [
   ...Array.from({ length: 19 }, (_, i) => i), // 0~18
   ...Array.from({ length: 21 }, (_, i) => 20 + i), // 20~40
-  42, 44, 46, 48, 50, 51, 52, 53, 59, 60, 61, 62,
+  42,
+  44,
+  46,
+  48,
+  50,
+  51,
+  52,
+  53,
+  59,
+  60,
+  61,
+  62,
 ]
 
 describe('원본 소리 번호 표', () => {
@@ -25,8 +30,7 @@ describe('원본 소리 번호 표', () => {
     const ids = ORIGINAL_SOUNDS.map((sound) => sound.id).sort((a, b) => a - b)
 
     expect(ids).toHaveLength(52)
-    expect(ids, `표에 없는 번호: ${ORIGINAL_FILE_IDS.filter((id) => !ids.includes(id))}`)
-      .toEqual(ORIGINAL_FILE_IDS)
+    expect(ids, `표에 없는 번호: ${ORIGINAL_FILE_IDS.filter((id) => !ids.includes(id))}`).toEqual(ORIGINAL_FILE_IDS)
   })
 
   it('번호가 겹치지 않는다', () => {
@@ -42,9 +46,7 @@ describe('원본 소리 번호 표', () => {
   })
 
   it('트는 곳이 있는 배경음은 전부 loop 목록에 든다', () => {
-    const bgmIds = ORIGINAL_SOUNDS
-      .filter((sound) => sound.role === 'bgm' && !sound.unused)
-      .map((sound) => sound.id)
+    const bgmIds = ORIGINAL_SOUNDS.filter((sound) => sound.role === 'bgm' && !sound.unused).map((sound) => sound.id)
 
     for (const id of bgmIds) {
       expect(isLoopingSound(id), `${id} 번은 배경음인데 loop 목록에 없다`).toBe(true)

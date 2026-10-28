@@ -64,17 +64,16 @@ describe('runCpuPostseason — 내 차례까지 자동 소화 (0x13da0)', () => 
   })
 
   it('같은 씨앗이면 같은 포스트시즌이 나온다', () => {
-    expect(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)))
-      .toEqual(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)))
+    expect(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77))).toEqual(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)))
   })
 })
 
 describe('스태미나 +0x2c 를 잇는다 (0xc2760 — 하루 끝 0xb818c 포스트시즌 갈래는 회복 없음)', () => {
   it('표를 안 넘기면 예전과 같은 경기가 나온다 (모두 10000)', () => {
-    expect(playCpuSeriesGameWithStamina(startPostseason(순위), 씨앗난수(7)).series)
-      .toEqual(playCpuSeriesGame(startPostseason(순위), 씨앗난수(7)))
-    expect(runCpuPostseasonWithStamina(startPostseason(순위), 9, 씨앗난수(77)).series)
-      .toEqual(runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)))
+    expect(playCpuSeriesGameWithStamina(startPostseason(순위), 씨앗난수(7)).series).toEqual(playCpuSeriesGame(startPostseason(순위), 씨앗난수(7)))
+    expect(runCpuPostseasonWithStamina(startPostseason(순위), 9, 씨앗난수(77)).series).toEqual(
+      runCpuPostseason(startPostseason(순위), 9, 씨앗난수(77)),
+    )
   })
 
   it('한 경기는 두 팀 표만 고치고 다른 팀 표는 그대로 둔다', () => {
@@ -134,11 +133,12 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     const 시작 = startPostseason(순위)
     // 1승 1패 뒤 셋째 경기 = g 2
     const 둘째뒤 = advancePostseason(advancePostseason(시작, 시작.teams[0]), 시작.teams[1])
-    for (const [series, g] of [[시작, 0], [둘째뒤, 2]] as const) {
+    for (const [series, g] of [
+      [시작, 0],
+      [둘째뒤, 2],
+    ] as const) {
       for (const seed of [31, 32, 33]) {
-        expect(playCpuSeriesGame(series, createSeededRandom(seed))).toEqual(
-          advancePostseason(series, 기대승자(series, seed, g)),
-        )
+        expect(playCpuSeriesGame(series, createSeededRandom(seed))).toEqual(advancePostseason(series, 기대승자(series, seed, g)))
       }
     }
   })
@@ -153,7 +153,14 @@ describe('선발은 0xc239c 의 로테이션이다 — 시리즈 안 경기 수 
     simulateLeagueGame({ away: 시작.teams[0], home: 시작.teams[1] }, 그대로.port, 0, undefined, {
       aces: { away: rolls.teamA, home: rolls.teamB },
     })
-    expect(세기.범위.slice(0, 6)).toEqual([[0, 2], [0, 4], [0, 5], [0, 5], [0, 5], [0, 5]])
+    expect(세기.범위.slice(0, 6)).toEqual([
+      [0, 2],
+      [0, 4],
+      [0, 5],
+      [0, 5],
+      [0, 5],
+      [0, 5],
+    ])
     expect(세기.범위).toEqual(그대로.범위)
   })
 

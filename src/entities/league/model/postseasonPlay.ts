@@ -1,12 +1,7 @@
 import { LEAGUE_SIDE_HOME, advancePostseason, postseasonPitcherOrderOf } from '@/entities/league/model/league'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import type { PostseasonSeries } from '@/entities/league/model/league'
-import {
-  cpuGameAcesOf,
-  cpuGameSidesOf,
-  rollCpuGamePrep,
-  simulateLeagueGame,
-} from '@/entities/league/model/leagueDay'
+import { cpuGameAcesOf, cpuGameSidesOf, rollCpuGamePrep, simulateLeagueGame } from '@/entities/league/model/leagueDay'
 import type { LeagueAbilityContext, LeagueGameAces, LeagueTeamRecord } from '@/entities/league/model/leagueDay'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -116,9 +111,7 @@ export function playCpuSeriesGameWithStamina(
   // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그(B-04) (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다).
   // 고침(`bugfixes.json` B-04, 기본 켬): 칸이 아니라 **명단**으로 견준다 — 칸 0(away)은 Y 의 명단, 칸 1(home)은 X 의 명단이라
   // X 의 득점(homeRuns)이 더 많으면 X 승, 그 밖(동점 포함)은 원본처럼 Y(윗 시드) 승. 굴림 수는 같다(승자만 바뀐다)
-  const winner = isBugFixed('B-04')
-    ? (score.homeRuns > score.awayRuns ? x : y)
-    : (score.awayRuns > score.homeRuns ? x : y)
+  const winner = isBugFixed('B-04') ? (score.homeRuns > score.awayRuns ? x : y) : score.awayRuns > score.homeRuns ? x : y
   const away = sides.away
   const home = sides.home
   return {
@@ -164,9 +157,7 @@ export function runCpuPostseasonWithStamina(
   for (let game = 0; game < MAXIMUM_GAMES; game += 1) {
     if (current.series.round === '종료' || isMyTurn(current.series, myTeamId)) return withMorales(current)
     const teams = current.series.teams
-    const played = playCpuSeriesGameWithStamina(
-      current.series, random, current.pitcherStaminas, aceLevels, context, recordOf,
-    )
+    const played = playCpuSeriesGameWithStamina(current.series, random, current.pitcherStaminas, aceLevels, context, recordOf)
     current = { ...played, recordAces: { ...current.recordAces, ...played.recordAces } }
     // 한 경기를 치른 두 팀 레코드 +2 는 0xb570c(b5768)가 나리 사기로 덮었다 — 다음 경기 첫 공의 앞 값이 그 값이다
     const morale = context?.nariMorale

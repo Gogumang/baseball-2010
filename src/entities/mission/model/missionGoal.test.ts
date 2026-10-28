@@ -180,9 +180,7 @@ describe('투수편 목표 판정', () => {
   })
 
   it('PERFECT 게이지는 MAX게이지 목표에 잡힌다', () => {
-    expect(pitcherGoalNamesFor({ kind: '아웃', detail: '땅볼아웃' }, 'PERFECT')).toContain(
-      'MAX게이지',
-    )
+    expect(pitcherGoalNamesFor({ kind: '아웃', detail: '땅볼아웃' }, 'PERFECT')).toContain('MAX게이지')
   })
 
   it('안타는 아무 목표에도 잡히지 않는다', () => {

@@ -78,7 +78,13 @@ describe('팀경기 상태 0xe 소개 판 값 (0x44944)', () => {
       batters: { [leagueBatterIdOf(1, batterEntry.rosterSlot)]: { atBats: 40, hits: 13, homeRuns: 2, runsBattedIn: 9 } },
       pitchers: {
         [leaguePitcherIdOf(0, entry.tableSlot!)]: {
-          outs: 81, runsAllowed: 10, saves: 0, strikeouts: 22, pitches: 300, wins: 2, losses: 1,
+          outs: 81,
+          runsAllowed: 10,
+          saves: 0,
+          strikeouts: 22,
+          pitches: 300,
+          wins: 2,
+          losses: 1,
         },
       },
     }
@@ -109,10 +115,7 @@ describe('팀경기 상태 0xe 소개 판 값 (0x44944)', () => {
   it('마투수는 기록표에 칸이 없어도 XlsACE_PIT 행의 줄 — 게이트가 마선수를 늘 거른다', () => {
     const started = startTeamGame({ ...기본옵션, acePitcherId: 1 }, createSeededRandom(1))
     const aceSlot = started.ourPitcherEntry.findIndex((pitcher) => pitcher.aceIndex >= 0)
-    const { pitcher } = teamMatchupCardsOf(
-      { ...started, ourPitcherIndex: aceSlot },
-      { stats: { batters: {}, pitchers: {} }, countsThisGame: true },
-    )
+    const { pitcher } = teamMatchupCardsOf({ ...started, ourPitcherIndex: aceSlot }, { stats: { batters: {}, pitchers: {} }, countsThisGame: true })
     const ace = ACE_PITCHERS[1]!
     expect(pitcher.earnedRunAverage).toBe(Math.trunc((ace.recordLine[1]! * 2700) / ace.recordLine[0]!))
     expect(pitcher.strikeouts).toBe(ace.recordLine[3])
@@ -172,8 +175,7 @@ describe('사람 타석 마운드의 상대 투수 장비 겹 — 타석 교대 
 describe('사람 타석 타자 폼 · 피부 · 손 — 타석 교대 0x47d58~0x47dd6 (팀 경기도 넘긴다)', () => {
   it('붙박이 표 타자는 Xls 행 +0xb — 폼 >> 4 · 피부 (>> 2) & 3 · 손 = 폼 & 1', () => {
     const started = startTeamGame(기본옵션, createSeededRandom(1))
-    const at = (battingOrderIndex: number) =>
-      teamBattingStageBatterOf({ ...started, game: { ...started.game, battingOrderIndex } })
+    const at = (battingOrderIndex: number) => teamBattingStageBatterOf({ ...started, game: { ...started.game, battingOrderIndex } })
     const 칸 = started.ourEntry.findIndex((batter) => batter.rosterSlot === 3)
     // 팀 0 의 칸 3 = +0xb 0x34 → 폼 3(장타형 · 좌타) · 피부 1
     expect(at(칸)).toEqual({ batterForm: 3, batterSkinIndex: 1, batterHand: 1 })
@@ -190,7 +192,8 @@ describe('사람 타석 타자 폼 · 피부 · 손 — 타석 교대 0x47d58~0x
   it('기록으로 선 영입 타자는 기록 사본의 +0xb', () => {
     const started = startTeamGame(기본옵션, createSeededRandom(1))
     const ourEntry = started.ourEntry.map((batter, index) =>
-      index === 0 ? { ...batter, rosterSlot: NO_ROSTER_SLOT, recordId: 0xfe, profile: 0x34 } : batter)
+      index === 0 ? { ...batter, rosterSlot: NO_ROSTER_SLOT, recordId: 0xfe, profile: 0x34 } : batter,
+    )
     const stage = teamBattingStageBatterOf({ ...started, ourEntry, game: { ...started.game, battingOrderIndex: 0 } })
     expect(stage).toEqual({ batterForm: 3, batterSkinIndex: 1, batterHand: 1 })
   })

@@ -46,8 +46,7 @@ export function savePointsOf(career: PitcherCareer): number {
 const isRelief = (career: PitcherCareer) => career.role !== PITCHER_ROLE.starter
 const isStarter = (career: PitcherCareer) => career.role === PITCHER_ROLE.starter
 
-const trainingTotalOf = (career: PitcherCareer) =>
-  Object.values(career.trainingCounts).reduce((total, count) => total + count, 0)
+const trainingTotalOf = (career: PitcherCareer) => Object.values(career.trainingCounts).reduce((total, count) => total + count, 0)
 
 /**
  * 투수 커리어를 공통 판정이 보는 값으로 옮긴다.
@@ -108,9 +107,7 @@ const PITCHER_RULES: Readonly<Record<number, PitcherRule>> = {
   58: (career) => isStarter(career) && career.careerStats.wins >= 200, // 그라운드의 지배자
   // 59 미스터 제로 — 타자편 43 과 같은 시점(6년차 18경기째)에서 통산 방어율 0.99 이하 (0x1ac60).
   // 통산 아웃이 0 이면 실점도 0 일 때만 준다 — `seasonEarnedRunAverageOf` 가 그 식 그대로다
-  59: (career) =>
-    isSixthYearCheckPoint(titleSubjectOfPitcher(career)) &&
-    seasonEarnedRunAverageOf(career.careerStats) <= ZERO_ERA_LIMIT,
+  59: (career) => isSixthYearCheckPoint(titleSubjectOfPitcher(career)) && seasonEarnedRunAverageOf(career.careerStats) <= ZERO_ERA_LIMIT,
   // 61 초음속 폭격기 — 제구·구속·변화가 모두 999 (0x1ad7e). 체력은 보지 않는다.
   // 원본은 경기용 0xb570c 가 아니라 `0xb6415(P, k, 1)` 을 바로 부른다(0x1add2~0x1adfc) — 장비·장착 스킬까지,
   // 부상·질병·사기 감소는 빼고. 냉정 22 로 999 를 넘은 제구도 그대로 `> 998` 이다
@@ -121,9 +118,7 @@ const PITCHER_RULES: Readonly<Record<number, PitcherRule>> = {
   // 62 마탄의 투수 — 마구 4단계 모두 훈련 (0x1ae04, `s8 +0x201 > 3`). **근사다** — 필드 뜻이 유력이다
   // 60 철완 28호 — 실효 체력 > 799 이고 완투 계열(퍼펙트·노히트·완봉·완투) 합 20 이상.
   // 체력은 제구·구속·변화(61)와 같은 `0xb6415(P, 3, 1)` — 장비·장착 스킬까지, 부상·질병·사기 감소는 빼고
-  60: (career) =>
-    equippedPitcherAbilityOf(career).stamina > IRON_ARM_STAMINA &&
-    completeGameTotalOf(career) >= IRON_ARM_COMPLETE_GAMES,
+  60: (career) => equippedPitcherAbilityOf(career).stamina > IRON_ARM_STAMINA && completeGameTotalOf(career) >= IRON_ARM_COMPLETE_GAMES,
   62: (career) => career.magicLevel > ALL_MAGIC_LEVELS,
   // 63 퍼펙트 플레이어 — 퍼펙트 2회 (+0x1f0[0], 타자편 47 사이클 횟수와 같은 칸·같은 식)
   63: (career) => career.completeGameCounts.perfect > PERFECT_PLAYER_MINIMUM,

@@ -24,7 +24,12 @@ describe('공수 교대 판 틱 0 의 야수 걸음 (0x3fac4)', () => {
     } as unknown as RandomPort
     const rolls = rollHalfInningFielders(random)
     // 칸 8 이 먼저 — i > 5 라 빠른 걸음 rand(300, 400)
-    expect(asked.slice(0, 4)).toEqual([[300, 400], [0, 200], [100, 300], [300, 400]])
+    expect(asked.slice(0, 4)).toEqual([
+      [300, 400],
+      [0, 200],
+      [100, 300],
+      [300, 400],
+    ])
     expect(rolls[8]).toEqual({ offenseSpeed: 301, scatterX: 2, scatterZ: 103, fielderSpeed: 304 })
     // 칸 5 부터 느린 걸음 rand(160, 240)
     expect(asked[12]).toEqual([160, 240])

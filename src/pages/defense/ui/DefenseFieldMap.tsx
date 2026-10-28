@@ -1,8 +1,6 @@
 import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import {
-  DOT_IMAGE, MAP_ANCHOR, MAP_FRAME, MAP_FRAMES, MAP_OPACITY, type MapRunner, runnerDotsOf,
-} from '@/pages/defense/lib/fieldMap'
+import { DOT_IMAGE, MAP_ANCHOR, MAP_FRAME, MAP_FRAMES, MAP_OPACITY, type MapRunner, runnerDotsOf } from '@/pages/defense/lib/fieldMap'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 
 /**
@@ -13,11 +11,16 @@ export function DefenseFieldMap({ runners }: { readonly runners: readonly MapRun
   const origins = useFrameOrigins(MAP_FRAMES)
   return (
     <div className={styles.fieldMap} data-testid="defense-field-map">
-      <FrameSprite folder={MAP_FRAMES} frame={MAP_FRAME} origins={origins} x={MAP_ANCHOR.x} y={MAP_ANCHOR.y}
-        style={{ opacity: MAP_OPACITY }} />
+      <FrameSprite folder={MAP_FRAMES} frame={MAP_FRAME} origins={origins} x={MAP_ANCHOR.x} y={MAP_ANCHOR.y} style={{ opacity: MAP_OPACITY }} />
       {runnerDotsOf(runners).map((dot, index) => (
-        <img key={index} className={styles.fieldMapDot} style={{ left: dot.x, top: dot.y, opacity: MAP_OPACITY }} src={DOT_IMAGE} alt=""
-          data-testid="defense-field-map-dot" />
+        <img
+          key={index}
+          className={styles.fieldMapDot}
+          style={{ left: dot.x, top: dot.y, opacity: MAP_OPACITY }}
+          src={DOT_IMAGE}
+          alt=""
+          data-testid="defense-field-map-dot"
+        />
       ))}
     </div>
   )

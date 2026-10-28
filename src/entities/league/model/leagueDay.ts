@@ -11,22 +11,13 @@ import type { League } from '@/entities/league/model/league'
 import { simulateHalfInning, startingMoundOf } from '@/entities/game/model/simulateHalfInning'
 import { rollSimulatorInit } from '@/entities/game/model/simulatorInit'
 import { isGameOverAt } from '@/entities/game/model/gameState'
-import type {
-  HalfInningDefense,
-  HalfInningMound,
-  HalfInningResult,
-} from '@/entities/game/model/simulateHalfInning'
+import type { HalfInningDefense, HalfInningMound, HalfInningResult } from '@/entities/game/model/simulateHalfInning'
 import { renumberedRecordSlotsOf, rosterLineupOf } from '@/entities/game/model/quickLineup'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
 import type { QuickAtBatBatter, QuickAtBatPitcher } from '@/entities/game/model/quickAtBat'
 import { ACE_BATTERS, ACE_PITCHERS, rollOpponentAceIndex } from '@/entities/game/model/aceOpponent'
 import { EMPTY_BATTER_GAME_RECORD } from '@/entities/batting/model/pinchHitAi'
-import {
-  aceLevelOf,
-  aceLevelSlotOf,
-  aceRecordAbilityAtLevel,
-  aceSkillIdsOf,
-} from '@/entities/mission/model/aceLevel'
+import { aceLevelOf, aceLevelSlotOf, aceRecordAbilityAtLevel, aceSkillIdsOf } from '@/entities/mission/model/aceLevel'
 import {
   BATTERS_PER_TEAM,
   PITCHERS_PER_TEAM,
@@ -57,20 +48,11 @@ import {
   gameEndDecisionOf,
 } from '@/entities/game/model/winLossSave'
 import type { DecisionState, PitcherOfRecord } from '@/entities/game/model/winLossSave'
-import type {
-  LeaguePitcherAppearance,
-  LeaguePlateAppearance,
-  LeaguePlayerStats,
-  LeagueStolenBase,
-} from '@/entities/league/model/leaguePlayerStats'
+import type { LeaguePitcherAppearance, LeaguePlateAppearance, LeaguePlayerStats, LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { hasFightingSpiritBit, withFightingSpirit } from '@/entities/pitching/model/pitcherGameStats'
-import {
-  isFightingSpiritSituationOf,
-  isLiveGameFightingSpiritSituation,
-  sideFightingSpiritStateOf,
-} from '@/shared/lib/liveGameState/liveGameState'
+import { isFightingSpiritSituationOf, isLiveGameFightingSpiritSituation, sideFightingSpiritStateOf } from '@/shared/lib/liveGameState/liveGameState'
 
 /**
  * 하루치 리그 경기 (binary.mod 0xc2a48).
@@ -121,11 +103,7 @@ export function matchupsOf(day: number): readonly LeagueMatchup[] {
     const opponent = opponentOf(day, team)
     scheduled.add(team)
     scheduled.add(opponent)
-    matchups.push(
-      leagueSideOf(day, team) === LEAGUE_SIDE_HOME
-        ? { away: opponent, home: team }
-        : { away: team, home: opponent },
-    )
+    matchups.push(leagueSideOf(day, team) === LEAGUE_SIDE_HOME ? { away: opponent, home: team } : { away: team, home: opponent })
   }
   return matchups
 }
@@ -274,12 +252,7 @@ export interface LeagueTeamRecord {
 }
 
 /** 레코드 칸 k 의 붙박이 표 자리 — 레코드가 없거나 그 칸이 없으면 그 팀 표 칸 k 그대로 */
-function recordPlayerAt(
-  record: LeagueTeamRecord | undefined,
-  teamId: number,
-  isPitcher: boolean,
-  slot: number,
-): LeagueRecordPlayer {
+function recordPlayerAt(record: LeagueTeamRecord | undefined, teamId: number, isPitcher: boolean, slot: number): LeagueRecordPlayer {
   const found = (isPitcher ? record?.pitchers : record?.batters)?.[slot]
   return found ?? { tableTeamId: teamId, tableSlot: slot }
 }
@@ -387,7 +360,8 @@ export function cpuPitcherGameAbilityOf(
   }
   if (fightingSpirit && slot !== FIGHTING_SPIRIT_EXCLUDED_SLOT) value = withFightingSpirit(value)
   const coach = context?.coach ?? -1
-  if (mode === 2 && coach >= 0 && coachAppliesTo(teamId, context) && (COACH_PITCHER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
+  if (mode === 2 && coach >= 0 && coachAppliesTo(teamId, context) && (COACH_PITCHER_SLOTS[coach]?.includes(slot) ?? false))
+    value += COACH_BONUS[coach] ?? 0
   return Math.min(999, Math.max(0, value))
 }
 
@@ -409,12 +383,7 @@ const COACH_BATTER_SLOTS: Readonly<Record<number, readonly number[]>> = {
  * CPU 타자 한 칸의 경기용 능력치 — `cpuPitcherGameAbilityOf` 와 같은 `0xb570c(팀, k, B, 1, 90, 1)` 차례의 타자 쪽.
  * 간이 타석의 스윙 0xab214 가 타자 능력을 이 인자로 읽는다(`0xb570d(…, 1, 0x5a, 1)`, quickAtBat 머리말).
  */
-export function cpuBatterGameAbilityOf(
-  base: number,
-  slot: number,
-  teamId: number,
-  context: LeagueAbilityContext | undefined,
-): number {
+export function cpuBatterGameAbilityOf(base: number, slot: number, teamId: number, context: LeagueAbilityContext | undefined): number {
   let value = base
   const mode = context?.mode ?? -1
   if (mode >= 0 && mode <= 9 && ((1 << mode) & TEAM_ABILITY_MODE_MASK) !== 0) {
@@ -423,7 +392,8 @@ export function cpuBatterGameAbilityOf(
     if (teamAbility !== 0) value += Math.trunc((17 * teamAbility - 5100) / 100)
   }
   const coach = context?.coach ?? -1
-  if (mode === 2 && coach >= 0 && coachAppliesTo(teamId, context) && (COACH_BATTER_SLOTS[coach]?.includes(slot) ?? false)) value += COACH_BONUS[coach] ?? 0
+  if (mode === 2 && coach >= 0 && coachAppliesTo(teamId, context) && (COACH_BATTER_SLOTS[coach]?.includes(slot) ?? false))
+    value += COACH_BONUS[coach] ?? 0
   return Math.min(999, Math.max(0, value))
 }
 
@@ -541,13 +511,8 @@ export function rollCpuGamePrep(random: RandomPort): CpuGamePrepRolls {
  * 굴림을 명단 쪽(`cpuGameSidesOf` 의 away·home)으로 — 팀 A 는 **칸 sX 의 객체**다.
  * `sideOfX` 가 홈(1)이면 A 는 말 공격 명단, 원정(0)이면 초 공격 명단이다.
  */
-export function cpuGameAcesOf(
-  rolls: CpuGamePrepRolls,
-  sideOfX: number = LEAGUE_SIDE_HOME,
-): NonNullable<LeagueGameExtras['aces']> {
-  return sideOfX === LEAGUE_SIDE_HOME
-    ? { away: rolls.teamB, home: rolls.teamA }
-    : { away: rolls.teamA, home: rolls.teamB }
+export function cpuGameAcesOf(rolls: CpuGamePrepRolls, sideOfX: number = LEAGUE_SIDE_HOME): NonNullable<LeagueGameExtras['aces']> {
+  return sideOfX === LEAGUE_SIDE_HOME ? { away: rolls.teamB, home: rolls.teamA } : { away: rolls.teamA, home: rolls.teamB }
 }
 
 /**
@@ -644,9 +609,7 @@ function defenseOf(
       ownGame === undefined ? isLiveGameFightingSpiritSituation(teamId) : leagueFightingSpiritOf(ownGame, runsThisHalf, teamId),
     // 투수 능력치 순서는 제구·구속·변화·**체력** (칸 3) — 용량 0x66e44 는 `0xb6415(P, 3, 1)` 이라 장비 니블을 먹는다
     staminaAbilityAt: (slot) =>
-      slot === ACE_PITCHER_SLOT && acePitcher !== undefined
-        ? acePitcher.staminaAbility
-        : recordPitcherAbilityAt(record, teamId, slot)[3] ?? 0,
+      slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.staminaAbility : (recordPitcherAbilityAt(record, teamId, slot)[3] ?? 0),
     // 벤치 투수는 제 레코드 값으로 올라온다 — 경기 사이에 이어진 값
     staminaAt: (slot) => staminas[slot] ?? FULL_STAMINA,
     lead,
@@ -661,18 +624,12 @@ function defenseOf(
     // 마무리 굴림 0xac360 을 지나고(CPU 끼리라 0xb6c20 이 늘 거짓), 0xabfcc 는 고르지 않는다(ac084)
     isSpecialPitcherAt: (slot) => slot === ACE_PITCHER_SLOT && acePitcher !== undefined,
     // 공 하나 소모 0xa5e14 의 비겁자(비트 18) · 끈기(비트 10) — 레코드 +0x14. 마투수 다섯 줄은 두 비트가 모두 0 이다(XlsACE_PIT_DATA 행 바이트 0x14~0x17)
-    skillBitsAt: (slot) =>
-      slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.skillBits : rowAt(slot).skillBits,
+    skillBitsAt: (slot) => (slot === ACE_PITCHER_SLOT && acePitcher !== undefined ? acePitcher.skillBits : rowAt(slot).skillBits),
     // 마무리 갈래(ac0be)의 정렬 열쇠 0xb5b50 = 경기용 능력치(체력 인자 90) 네 칸 합. 마투수는 0xabfcc 가 거르므로
     // 그 칸 값은 쓰이지 않는다 — 레벨 배율 먹은 네 칸을 그대로 둔다
     abilitySumAt: (slot, fightingSpirit) =>
       slot === ACE_PITCHER_SLOT && acePitcher !== undefined
-        ? pitcherAbilitySumOf([
-            acePitcher.quick.control,
-            acePitcher.quick.velocity,
-            acePitcher.breaking,
-            acePitcher.staminaAbility,
-          ])
+        ? pitcherAbilitySumOf([acePitcher.quick.control, acePitcher.quick.velocity, acePitcher.breaking, acePitcher.staminaAbility])
         : pitcherAbilitySumOf(
             recordPitcherAbilityAt(record, teamId, slot).map((base, k) =>
               cpuPitcherGameAbilityOf(base, k, teamId, abilityContext, spiritAt(slot, fightingSpirit)),
@@ -811,31 +768,24 @@ export function simulateLeagueGame(
     return quickBatterOf(roster[at.tableSlot % roster.length], at.equipment)
   }
   // 간이 타석의 타자 능력은 `0xb570c(…, 1, 90, 1)` — 밑값 위에 팀 능력치 정액 · 코치 (`cpuBatterGameAbilityOf`)
-  const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined, record: LeagueTeamRecord | undefined) =>
-    (slot: number) =>
-      gameQuickBatterOf(
-        slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : recordBatterAt(teamId, record, slot),
-        teamId,
-        extras?.abilityContext,
-      )
+  const batterOfTeam = (teamId: number, ace: QuickAtBatBatter | undefined, record: LeagueTeamRecord | undefined) => (slot: number) =>
+    gameQuickBatterOf(
+      slot === ACE_BATTER_ROSTER_SLOT && ace !== undefined ? ace : recordBatterAt(teamId, record, slot),
+      teamId,
+      extras?.abilityContext,
+    )
   // CPU 대타 0xac228 은 타석 타자가 마선수(0xb633c)면 안 낸다 — 대타로 들어선 마타자는 다시 안 바뀐다.
   // 마타자 칸(12)은 마선수를 넣은 명단에만 있다
   const isAceRosterSlot = (slot: number) => slot === ACE_BATTER_ROSTER_SLOT
   // 선발은 경기를 세울 때 로스터 앞 4명 중 하나로 정해진다 (0x3107a·0x31090, S13 1-4b)
   // 칸 번호를 먼저 정해 두는 것은 **투수 기록을 그 칸에 쌓아야** 하기 때문이다.
   // 난수를 부르는 횟수·순서는 예전과 같다(팀마다 한 번씩).
-  const awaySlot =
-    typeof startingPitcherSlot === 'object' ? startingPitcherSlot.away : startingPitcherSlot ?? rollStartingPitcherIndex(random)
-  const homeSlot =
-    typeof startingPitcherSlot === 'object' ? startingPitcherSlot.home : startingPitcherSlot ?? rollStartingPitcherIndex(random)
+  const awaySlot = typeof startingPitcherSlot === 'object' ? startingPitcherSlot.away : (startingPitcherSlot ?? rollStartingPitcherIndex(random))
+  const homeSlot = typeof startingPitcherSlot === 'object' ? startingPitcherSlot.home : (startingPitcherSlot ?? rollStartingPitcherIndex(random))
   // 선발 능력은 아래 `defenseOf` 가 마운드 칸으로 다시 집으므로, 이 둘은 수비 쪽을 넘기지 않는
   // 길(포스트시즌 한 경기 등)에서 쓰는 기본값이다
-  const awayPitcher = awayRecord === undefined
-    ? startingPitcherOf(matchup.away, awaySlot)
-    : recordQuickPitcherAt(awayRecord, matchup.away, awaySlot)
-  const homePitcher = homeRecord === undefined
-    ? startingPitcherOf(matchup.home, homeSlot)
-    : recordQuickPitcherAt(homeRecord, matchup.home, homeSlot)
+  const awayPitcher = awayRecord === undefined ? startingPitcherOf(matchup.away, awaySlot) : recordQuickPitcherAt(awayRecord, matchup.away, awaySlot)
+  const homePitcher = homeRecord === undefined ? startingPitcherOf(matchup.home, homeSlot) : recordQuickPitcherAt(homeRecord, matchup.home, homeSlot)
   let awayRuns = 0
   let homeRuns = 0
   let awayOrder = 0
@@ -887,7 +837,7 @@ export function simulateLeagueGame(
 
   const sharedRoster = extras?.sharedRoster === true
   const awayPitcherOrder = extras?.pitcherOrders?.away ?? ALL_PITCHER_SLOTS
-  const homePitcherOrder = sharedRoster ? awayPitcherOrder : extras?.pitcherOrders?.home ?? ALL_PITCHER_SLOTS
+  const homePitcherOrder = sharedRoster ? awayPitcherOrder : (extras?.pitcherOrders?.home ?? ALL_PITCHER_SLOTS)
   const awayStaminas = staminaTableOf(startingStaminas?.away)
   const homeStaminas = sharedRoster ? awayStaminas : staminaTableOf(startingStaminas?.home)
   // 마투수는 팀 레코드 8번 칸에 레코드째 들어온다 — 그 +0x2c 로 선다 (0xb521c)
@@ -929,8 +879,7 @@ export function simulateLeagueGame(
       undefined,
       // 0xc2198 c21d6 — 타석마다 경기 끝 판정 0xb68fc
       {
-        endsGame: ({ runs, outs }) =>
-          isGameOverAt({ inning, half: '초', outs, awayScore: awayRuns + runs, homeScore: homeRuns }),
+        endsGame: ({ runs, outs }) => isGameOverAt({ inning, half: '초', outs, awayScore: awayRuns + runs, homeScore: homeRuns }),
       },
       withStaleMorale(
         defenseOf(matchup.home, homeMound, homeRuns - awayRuns, homeStaminas, homeAcePitcher, homePitcherOrder, extras?.abilityContext, homeRecord, {
@@ -974,8 +923,7 @@ export function simulateLeagueGame(
       random,
       undefined,
       {
-        endsGame: ({ runs, outs }) =>
-          isGameOverAt({ inning, half: '말', outs, awayScore: awayRuns, homeScore: homeRuns + runs }),
+        endsGame: ({ runs, outs }) => isGameOverAt({ inning, half: '말', outs, awayScore: awayRuns, homeScore: homeRuns + runs }),
       },
       // 원정 팀 첫 투수 첫 공도 앞 값일 수 있다 — 1회초에 그 팀(공격)을 0xb570c 가 한 번도 안 덮었으면(스윙 경로 0xab214 · 주자 있는
       // 판정 경로 c19ec 가 없던 반 이닝) 1회말 첫 공의 소모 c26cc 가 c1446 · c1852 보다 먼저라 레코드에 남은 값을 본다 (r104).
@@ -1203,9 +1151,7 @@ export function playLeagueDay(
   const rotates = cpuGameRotationAdvances(SEASON_MODE, day)
   const humanGame = matchupsOf(day).find((matchup) => matchup.away === myTeamId || matchup.home === myTeamId)
   const rotated =
-    rotates && rotatesHumanGameTeams && humanGame !== undefined
-      ? rotateLeaguePitchers(league, [humanGame.away, humanGame.home])
-      : league
+    rotates && rotatesHumanGameTeams && humanGame !== undefined ? rotateLeaguePitchers(league, [humanGame.away, humanGame.home]) : league
   const played = matchups.reduce((before, matchup, slot) => {
     if (matchup.away === myTeamId || matchup.home === myTeamId) return before
     // ⚠️ 칸과 명단이 엇갈린다 (0xc239c, 직접 떴다 — `cpuGameSidesOf` 주석): 홈 팀(A목록 X)의 **선수**가 칸 0

@@ -12,11 +12,21 @@ import type { MenuSlot } from '@/pages/management/lib/managementLayout'
  * (타자편 모드 4 는 0xd4854/0xd485e · 0xd482c/0xd4836 을 쓴다.) 이름표 0x7e300 은 모드 3 이고 상태 0x6b·0x6c 에서
  * 이름표 116(0x74) 이면 칸 x 를 −6 한다 — 트레이닝 하위 메뉴의 칸 4.
  */
-const SUB_SLOT_POSITIONS: readonly (readonly [number, number])[] = [[44, 245], [82, 245], [122, 236], [161, 236], [199, 236]]
+const SUB_SLOT_POSITIONS: readonly (readonly [number, number])[] = [
+  [44, 245],
+  [82, 245],
+  [122, 236],
+  [161, 236],
+  [199, 236],
+]
 
 function subMenu(entries: readonly (readonly [string, number, number])[]): readonly MenuSlot[] {
   return entries.map(([id, icon, labelFrame], index) => ({
-    id, x: SUB_SLOT_POSITIONS[index][0], y: SUB_SLOT_POSITIONS[index][1], icon, labelFrame,
+    id,
+    x: SUB_SLOT_POSITIONS[index][0],
+    y: SUB_SLOT_POSITIONS[index][1],
+    icon,
+    labelFrame,
   }))
 }
 
@@ -24,8 +34,20 @@ export type PitcherCommandKind = '관리' | '선수정보' | '트레이닝' | '�
 
 export const PITCHER_COMMAND_BAR: Readonly<Record<PitcherCommandKind, readonly MenuSlot[]>> = {
   관리: COMMAND_SLOTS,
-  선수정보: subMenu([['기본정보', 6, 96], ['장비착용', 7, 228], ['아이템/스킬', 8, 101], ['구질', 19, 298], ['기록실', 9, 297]]),
-  트레이닝: subMenu([['제구', 16, 97], ['구속', 17, 102], ['변화', 18, 107], ['체력', 12, 112], ['마구', 19, 116]]),
+  선수정보: subMenu([
+    ['기본정보', 6, 96],
+    ['장비착용', 7, 228],
+    ['아이템/스킬', 8, 101],
+    ['구질', 19, 298],
+    ['기록실', 9, 297],
+  ]),
+  트레이닝: subMenu([
+    ['제구', 16, 97],
+    ['구속', 17, 102],
+    ['변화', 18, 107],
+    ['체력', 12, 112],
+    ['마구', 19, 116],
+  ]),
   아이템: COMMAND_MENUS.아이템,
 }
 

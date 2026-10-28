@@ -1,15 +1,9 @@
 import { useEffect, useState } from 'react'
 import { MessageBox } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import {
-  SPECIAL_SWING_REQUIRED_POPULARITY, specialSwingSlotBlockOf, specialSwingSlotCostOf,
-} from '@/entities/career/model/training'
-import {
-  NO_SPECIAL_SWING_NUMBER, specialSwingPickOf,
-} from '@/widgets/special-swing/lib/specialSwingSelection'
-import {
-  SPECIAL_TRAINING_SLOT_COUNT, moveSpecialTrainingCursor, specialTrainingKeyOf,
-} from '@/widgets/special-swing/lib/specialTrainingWindow'
+import { SPECIAL_SWING_REQUIRED_POPULARITY, specialSwingSlotBlockOf, specialSwingSlotCostOf } from '@/entities/career/model/training'
+import { NO_SPECIAL_SWING_NUMBER, specialSwingPickOf } from '@/widgets/special-swing/lib/specialSwingSelection'
+import { SPECIAL_TRAINING_SLOT_COUNT, moveSpecialTrainingCursor, specialTrainingKeyOf } from '@/widgets/special-swing/lib/specialTrainingWindow'
 import { SpecialTrainingFigure } from '@/widgets/special-swing/ui/SpecialTrainingFigure'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
 
@@ -72,8 +66,17 @@ interface SpecialSwingWindowProps {
  * 확인 키(Enter)는 모드에 따라 `0x17cec`(고르기) 또는 `0x17828`(배우기) 규칙을 탄다.
  */
 export function SpecialSwingWindow({
-  level, sessions, battingTypeIndex, mode = '사용', selectedNumber, onSelectNumber,
-  popularity = 0, gamePoint = 0, onTrain, onBuyGamePoint, onClose,
+  level,
+  sessions,
+  battingTypeIndex,
+  mode = '사용',
+  selectedNumber,
+  onSelectNumber,
+  popularity = 0,
+  gamePoint = 0,
+  onTrain,
+  onBuyGamePoint,
+  onClose,
 }: SpecialSwingWindowProps) {
   // 처음 커서 — '훈련'(108 진입 0x17730 177b6~17806)은 min(s8 [저장+0x201], 3) = min(L, 3) 칸.
   // '사용'(123 진입 0x17690)은 0x80235 가 탭 격자를 vt+0x14(0, 0) 으로 되감고 더 건드리지 않는다 — 칸 0
@@ -138,20 +141,40 @@ export function SpecialSwingWindow({
   })
 
   return (
-    <div className={notice !== null || question !== null ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay} role="dialog" aria-label="필살타법" onClick={onClose}>
-      <SpecialTrainingFigure side="타자" state={mode} cursor={cursor} learnedCount={level} sessions={sessions}
-        inUseNumber={inUseNumber} typeIndex={battingTypeIndex}
-        onPressSlot={(slot) => { setCursor(slot); confirm(slot) }} />
+    <div
+      className={notice !== null || question !== null ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay}
+      role="dialog"
+      aria-label="필살타법"
+      onClick={onClose}
+    >
+      <SpecialTrainingFigure
+        side="타자"
+        state={mode}
+        cursor={cursor}
+        learnedCount={level}
+        sessions={sessions}
+        inUseNumber={inUseNumber}
+        typeIndex={battingTypeIndex}
+        onPressSlot={(slot) => {
+          setCursor(slot)
+          confirm(slot)
+        }}
+      />
 
       {/* 상자 클릭이 덮개(onClick = onClose)로 올라가 창째 닫히지 않게 여기서 멈춘다 — 원본은 상자가 키를 다 가져간다 */}
       <div onClick={(event) => event.stopPropagation()}>
-      {question !== null && (
-        <MessageBox text={question.text} buttons={['예', '아니오']}
-          onAnswer={(index) => { const pending = question; setQuestion(null); if (index === 0) pending.onYes() }} />
-      )}
-      {question === null && notice !== null && (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
-      )}
+        {question !== null && (
+          <MessageBox
+            text={question.text}
+            buttons={['예', '아니오']}
+            onAnswer={(index) => {
+              const pending = question
+              setQuestion(null)
+              if (index === 0) pending.onYes()
+            }}
+          />
+        )}
+        {question === null && notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
       </div>
     </div>
   )

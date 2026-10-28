@@ -26,7 +26,14 @@ describe('투수편 내 팀 투수 배열 — 등록 0x10fb4 · 0xb521c · 142 �
   })
 
   it('새 구원 투수의 포지션 코드는 7 — 116 평가가 구원형(> 3)으로 본다', () => {
-    const career = createPitcherCareer('구원', { role: PITCHER_ROLE.relief, typeIndex: 0, handIndex: 0, skinIndex: 0, breakingPitchSlots: [], teamId: 2 })
+    const career = createPitcherCareer('구원', {
+      role: PITCHER_ROLE.relief,
+      typeIndex: 0,
+      handIndex: 0,
+      skinIndex: 0,
+      breakingPitchSlots: [],
+      teamId: 2,
+    })
     expect(career.positionCode).toBe(7)
     expect(career.nariTeams?.[2]?.pitchers).toEqual([0, 1, 2, 3, 4, 5, 6, 나, 7])
     expect(career.nariTeams?.[1]?.pitchers).toBeUndefined()
@@ -61,7 +68,14 @@ describe('투수편 내 팀 투수 배열 — 등록 0x10fb4 · 0xb521c · 142 �
   })
 
   it('142 준비가 레코드·포지션 코드를 고치고, g == 0 이면 내 스태미나 10000 (0x1c8a8)', () => {
-    const base = createPitcherCareer('구원', { role: PITCHER_ROLE.relief, typeIndex: 0, handIndex: 0, skinIndex: 0, breakingPitchSlots: [], teamId: 0 })
+    const base = createPitcherCareer('구원', {
+      role: PITCHER_ROLE.relief,
+      typeIndex: 0,
+      handIndex: 0,
+      skinIndex: 0,
+      breakingPitchSlots: [],
+      teamId: 0,
+    })
     const tired = { ...base, stamina: 3000, gamesPlayed: 0 }
     const prepared = prepareMyPitcherMatch(tired)
     expect(prepared.stamina).toBe(FULL_STAMINA)
@@ -79,7 +93,10 @@ describe('투수편 내 팀 투수 배열 — 등록 0x10fb4 · 0xb521c · 142 �
 
   it('새 시즌 0x1b684 — 선발은 내 투수를 0번으로', () => {
     const base = createPitcherCareer('선발')
-    const swapped = { ...base, nariTeams: base.nariTeams?.map((record, team) => team === base.teamId ? { ...record, pitchers: [1, 나, 2, 3, 4, 5, 6, 7, 0] } : record) }
+    const swapped = {
+      ...base,
+      nariTeams: base.nariTeams?.map((record, team) => (team === base.teamId ? { ...record, pitchers: [1, 나, 2, 3, 4, 5, 6, 7, 0] } : record)),
+    }
     expect(startNextPitcherSeason(swapped, createConstantRandom(0)).nariTeams?.[base.teamId]?.pitchers?.[0]).toBe(나)
   })
 })

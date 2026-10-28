@@ -11,7 +11,7 @@ function scanInPage() {
     const tag = element.tagName.toLowerCase()
     const role = element.getAttribute('role')
     const interactive = element.matches(SELECTOR) || role === 'dialog'
-    const text = interactive ? element.textContent?.trim().slice(0, 16) ?? '' : ''
+    const text = interactive ? (element.textContent?.trim().slice(0, 16) ?? '') : ''
     const own = element.getAttribute('aria-label') ?? element.getAttribute('data-testid') ?? text
     // 누를 수 없는 덮개는 글 대신 모듈 이름(vanilla-extract 클래스 머리 `Screen_part__hash` → `Screen_part`)
     const cls = typeof element.className === 'string' && element.className !== '' ? element.className.split(' ')[0].replace(/__[a-z0-9]+$/, '') : ''
@@ -35,7 +35,14 @@ function scanInPage() {
     const rect = element.getBoundingClientRect()
     if (!legacyZoom) return rect
     const zoom = zoomOf(element)
-    return { left: rect.left * zoom, top: rect.top * zoom, right: rect.right * zoom, bottom: rect.bottom * zoom, width: rect.width * zoom, height: rect.height * zoom }
+    return {
+      left: rect.left * zoom,
+      top: rect.top * zoom,
+      right: rect.right * zoom,
+      bottom: rect.bottom * zoom,
+      width: rect.width * zoom,
+      height: rect.height * zoom,
+    }
   }
   /** 조상의 overflow 가 자른 뒤 보이는 사각형 (화면 좌표) */
   const clippedRectOf = (element) => {
@@ -105,8 +112,13 @@ function scanInPage() {
     // 모서리 점은 안쪽으로 — 둥근 모서리(border-radius)는 칠한 곳만 맞는다
     const insetX = Math.min(8, (right - left) / 4)
     const insetY = Math.min(8, (bottom - top) / 4)
-    const points = [['가운데', (left + right) / 2, (top + bottom) / 2], ['왼위', left + insetX, top + insetY],
-      ['오위', right - insetX, top + insetY], ['왼아래', left + insetX, bottom - insetY], ['오아래', right - insetX, bottom - insetY]]
+    const points = [
+      ['가운데', (left + right) / 2, (top + bottom) / 2],
+      ['왼위', left + insetX, top + insetY],
+      ['오위', right - insetX, top + insetY],
+      ['왼아래', left + insetX, bottom - insetY],
+      ['오아래', right - insetX, bottom - insetY],
+    ]
     const misses = new Map()
     for (const [name, x, y] of points) {
       const hit = document.elementFromPoint(x, y)
@@ -127,8 +139,12 @@ function scanInPage() {
         byHit: hit === owner ? null : labelOf(hit),
         byZ: zChainOf(owner),
         byPath: pathOf(owner),
-        full: stageRect !== null && Math.abs(left - stageRect.left) < 1 && Math.abs(top - stageRect.top) < 1
-          && Math.abs(right - stageRect.right) < 1 && Math.abs(bottom - stageRect.bottom) < 1,
+        full:
+          stageRect !== null &&
+          Math.abs(left - stageRect.left) < 1 &&
+          Math.abs(top - stageRect.top) < 1 &&
+          Math.abs(right - stageRect.right) < 1 &&
+          Math.abs(bottom - stageRect.bottom) < 1,
         byDisabled: owner !== null && owner.matches?.(':disabled') === true,
         byWindow: coverWindow === null ? null : labelOf(coverWindow),
         points: missed,

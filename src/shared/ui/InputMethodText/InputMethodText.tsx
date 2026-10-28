@@ -84,9 +84,13 @@ export function InputMethodText({ value, x, y, inputRect, color, isCursorOn, ...
       <PixelText style={{ position: 'absolute', left: x, top: y, color, pointerEvents: 'none' }}>
         {inputBufferTextOf(value, isCursorOn, counter)}
       </PixelText>
-      <input type="text" className={styles.input} value={value}
+      <input
+        type="text"
+        className={styles.input}
+        value={value}
         style={{ left: inputRect.x, top: inputRect.y, width: inputRect.width, height: inputRect.height }}
-        {...inputProps} />
+        {...inputProps}
+      />
     </>
   )
 }

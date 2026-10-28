@@ -90,8 +90,11 @@ describe('시즌모드 s_event 전수 — 보상 (0x8c460 모드 2)', () => {
         const state: SeasonState = { ...base, teamMorale: 50, record: { ...base.record, yearIndex, popularity: 100, reputation: 100, money: 100 } }
         const web = applySeasonEventRewards(state, seasonRewardsIn(event.commands), event.id, createConstantRandom(0.5))
         expect({
-          popularity: web.state.record.popularity, reputation: web.state.record.reputation, money: web.state.record.money,
-          teamMorale: web.state.teamMorale, gamePoint: web.gamePoint,
+          popularity: web.state.record.popularity,
+          reputation: web.state.record.reputation,
+          money: web.state.record.money,
+          teamMorale: web.state.teamMorale,
+          gamePoint: web.gamePoint,
         }).toEqual(원본보상(state, event))
         expect(web.entersEnding).toBe(seasonRewardsIn(event.commands)[0]?.kind === 21)
       })
@@ -99,8 +102,18 @@ describe('시즌모드 s_event 전수 — 보상 (0x8c460 모드 2)', () => {
   }
 
   it('연차 보정은 명령에 있는 항목만 고친다 (394 는 평판 항목이 없다)', () => {
-    expect(withSeasonYearAdjust([{ kind: 0, value: 20 }, { kind: 3, value: 20 }], 394, 2)).toEqual([
-      { kind: 0, value: 30 }, { kind: 3, value: 30 },
+    expect(
+      withSeasonYearAdjust(
+        [
+          { kind: 0, value: 20 },
+          { kind: 3, value: 20 },
+        ],
+        394,
+        2,
+      ),
+    ).toEqual([
+      { kind: 0, value: 30 },
+      { kind: 3, value: 30 },
     ])
   })
 })

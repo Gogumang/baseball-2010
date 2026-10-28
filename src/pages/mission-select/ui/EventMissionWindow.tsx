@@ -34,7 +34,12 @@ export type EventMissionAnswer = '미션실행' | '미션다운' | '취소'
  * 뒤 어둡게: 미션 장면 생성자 0x1d784(0x1d786~0x1d79e)가 [창+0x24f] = 0 · [창+0x24c] = 1 이라 0x741a0 이 [창+0x24e] = 0 을
  * 옮겨 0x746cc 가 떠 있는 그리기마다 검정 단계 5 = 6/16 으로 덮는다 (`POPUP_DIM_OPACITY`).
  */
-export function EventMissionWindow({ isRunSelected, onToggle, onKey, onClosed }: {
+export function EventMissionWindow({
+  isRunSelected,
+  onToggle,
+  onKey,
+  onClosed,
+}: {
   /** [this+0xa0] ≠ 0 — 미션실행 쪽 */
   readonly isRunSelected: boolean
   readonly onToggle: () => void
@@ -78,32 +83,50 @@ export function EventMissionWindow({ isRunSelected, onToggle, onKey, onClosed }:
   const { text, run, download } = EVENT_MISSION_WINDOW
 
   return (
-    <div className={boxStyles.dim} role="dialog" aria-label="이벤트 미션" data-testid="이벤트-미션-창"
-      style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }}>
-      <div className={boxStyles.box}
-        style={{ ...popupBoxStyleOf(motion, EVENT_MISSION_WINDOW.height), padding: 0, overflow: 'hidden' }} />
+    <div
+      className={boxStyles.dim}
+      role="dialog"
+      aria-label="이벤트 미션"
+      data-testid="이벤트-미션-창"
+      style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }}
+    >
+      <div className={boxStyles.box} style={{ ...popupBoxStyleOf(motion, EVENT_MISSION_WINDOW.height), padding: 0, overflow: 'hidden' }} />
       {/* 글은 판 밖 화면 좌표로 그린다 — 0x1dd58 은 판과 상관없이 그리고, 판이 줄어도(0x744c4) 글은 안 잘린다 */}
       <div style={{ position: 'absolute', left: 0, top: boxTop, width: SCREEN_WIDTH }}>
         {/* 펼치는 동안에는 안을 안 그린다 (0x7479c) */}
         <div style={{ visibility: isOpening ? 'hidden' : undefined }}>
-          <div className={boxStyles.text} data-part="글"
-            style={{ position: 'absolute', left: text.x, top: text.y - boxTop, marginLeft: 0, width: text.width }}>
+          <div
+            className={boxStyles.text}
+            data-part="글"
+            style={{ position: 'absolute', left: text.x, top: text.y - boxTop, marginLeft: 0, width: text.width }}
+          >
             <MarkupText raw={text.raw} />
           </div>
           {[run, download].map((label) => {
             const isSelected = (label === run) === isRunSelected
             return (
-              <button key={label.raw} type="button" className={boxStyles.text} data-selected={isSelected}
+              <button
+                key={label.raw}
+                type="button"
+                className={boxStyles.text}
+                data-selected={isSelected}
                 aria-label={label === run ? '미션실행' : '미션다운'}
                 style={{
-                  position: 'absolute', left: label.x, top: label.y - boxTop, marginLeft: 0, width: label.width,
-                  padding: 0, border: 0, background: 'none',
+                  position: 'absolute',
+                  left: label.x,
+                  top: label.y - boxTop,
+                  marginLeft: 0,
+                  width: label.width,
+                  padding: 0,
+                  border: 0,
+                  background: 'none',
                 }}
                 onClick={() => {
                   if (!motion.acceptsKeys()) return
                   if (isSelected) close(label === run ? '미션실행' : '미션다운')
                   else onToggle()
-                }}>
+                }}
+              >
                 <MarkupText raw={isSelected ? label.selectedRaw : label.raw} />
               </button>
             )

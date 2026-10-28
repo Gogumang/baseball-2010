@@ -52,17 +52,19 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
 
       // 격자라서 좌우는 한 칸, 위아래는 한 줄만큼 움직인다.
       const step =
-        event.key === 'ArrowRight' ? 1
-        : event.key === 'ArrowLeft' ? -1
-        : event.key === 'ArrowDown' ? columnsRef.current
-        : event.key === 'ArrowUp' ? -columnsRef.current
-        : 0
+        event.key === 'ArrowRight'
+          ? 1
+          : event.key === 'ArrowLeft'
+            ? -1
+            : event.key === 'ArrowDown'
+              ? columnsRef.current
+              : event.key === 'ArrowUp'
+                ? -columnsRef.current
+                : 0
 
       if (step !== 0) {
         event.preventDefault()
-        setSelectedIndex(
-          (previous) => (previous + step + current.length) % current.length,
-        )
+        setSelectedIndex((previous) => (previous + step + current.length) % current.length)
         return
       }
       if (event.key === 'Enter' || event.key === ' ') {
@@ -97,12 +99,12 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
             <img className={styles.slotBack} src={SLOT_BACKGROUND} alt="" aria-hidden />
             {/* 못 고르는 칸 아이콘 — 회색은 원본 효과 0xa 식(`EffectImage`) 하나다. 웹이 더하던 반 어둡게(brightness 0.5)는 원본에
                 없는 표시라 걷었다(r181 — 이 격자 부품은 지금 어느 화면도 안 쓴다) */}
-            {item.isDisabled === true
-              ? <EffectImage className={styles.slotIcon} src={item.iconUrl} effect={DRAW_EFFECT.GRAY} />
-              : <img className={styles.slotIcon} src={item.iconUrl} alt="" aria-hidden />}
-            {index === selectedIndex && (
-              <img className={styles.slotFrame} src={SELECTION_FRAME} alt="" aria-hidden />
+            {item.isDisabled === true ? (
+              <EffectImage className={styles.slotIcon} src={item.iconUrl} effect={DRAW_EFFECT.GRAY} />
+            ) : (
+              <img className={styles.slotIcon} src={item.iconUrl} alt="" aria-hidden />
             )}
+            {index === selectedIndex && <img className={styles.slotFrame} src={SELECTION_FRAME} alt="" aria-hidden />}
           </button>
         ))}
       </div>

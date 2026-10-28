@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { type WalkerLineSeatsEvents, useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 
-const recordsWith = (aceAt: number | null) =>
-  [2, 3, 4, 5, 6, 7, 8, 9, 1].map((position, index) => ({ position, ace: index === aceAt ? 2 : null }))
+const recordsWith = (aceAt: number | null) => [2, 3, 4, 5, 6, 7, 8, 9, 1].map((position, index) => ({ position, ace: index === aceAt ? 2 : null }))
 
 describe('useWalkerLineSeats — 장면 두 줄 +0xec', () => {
   it('벤치 클리어링 수비 줄은 마지막 수비 판 시작(그 판 앞 그림의 수비 팀)이 적은 값이다 — 그 뒤 수비 팀 니블이 바뀌어도 남는다', () => {
@@ -38,7 +37,12 @@ describe('useWalkerLineSeats — 장면 두 줄 +0xec', () => {
     expect(result.current.boardBefore.defense.every((seat) => seat === null)).toBe(true)
     rerender({ ...base, board: { key: 2, defense: recordsWith(null), offense: recordsWith(null) } })
     expect(result.current.boardBefore.defense[4]).toEqual({ ace: 2 })
-    rerender({ ...base, sceneKey: 3, board: { key: 2, defense: recordsWith(null), offense: recordsWith(null) }, benchClearing: { key: 'x', offense: null } })
+    rerender({
+      ...base,
+      sceneKey: 3,
+      board: { key: 2, defense: recordsWith(null), offense: recordsWith(null) },
+      benchClearing: { key: 'x', offense: null },
+    })
     expect(result.current.benchDefense.every((seat) => seat === null)).toBe(false)
   })
 })

@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DIALOGUE_CURSOR, EVENT_DIALOGUE, EVENT_DIALOGUE_CHOICE, layoutDialogue, lowerDialogueBox, pageEndOf, pressDialogue,
-  restartDialogueText, speakerPrefixOf, startDialogue, tickDialogue,
+  DIALOGUE_CURSOR,
+  EVENT_DIALOGUE,
+  EVENT_DIALOGUE_CHOICE,
+  layoutDialogue,
+  lowerDialogueBox,
+  pageEndOf,
+  pressDialogue,
+  restartDialogueText,
+  speakerPrefixOf,
+  startDialogue,
+  tickDialogue,
 } from '@/pages/story/lib/eventDialogue'
 import {
-  batterEvaluationExpressionOf, evaluationReputationTierOf, pitcherEvaluationExpressionOf, streakSayExpressionOf,
+  batterEvaluationExpressionOf,
+  evaluationReputationTierOf,
+  pitcherEvaluationExpressionOf,
+  streakSayExpressionOf,
 } from '@/pages/story/lib/evaluationDialogue'
 
 describe('say 대사 상자 배치 0x7fbc4 · 0x6ef4c', () => {

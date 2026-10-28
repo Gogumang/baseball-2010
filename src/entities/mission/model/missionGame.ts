@@ -23,11 +23,7 @@ import type { MissionAcePitcher, MissionCpuPitching } from '@/entities/mission/m
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { drainMissionAutoTicks, missionAutoRelayStepOfTick } from '@/entities/mission/model/missionAutoRelay'
 import type { MissionAutoRelay, MissionAutoRelayCards, MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
-import {
-  clearMissionInningRuns,
-  missionStartInningRunsOf,
-  scoreMissionRuns,
-} from '@/entities/mission/model/missionScoreboard'
+import { clearMissionInningRuns, missionStartInningRunsOf, scoreMissionRuns } from '@/entities/mission/model/missionScoreboard'
 import type { MissionInningRuns, MissionScoreboard } from '@/entities/mission/model/missionScoreboard'
 
 /**
@@ -148,9 +144,7 @@ function slotRunnersOf(runners: BaseRunners): BaseRunners {
 
 /** 미션 타자가 드는 레코드 칸 k — 0..12 밖이면 끝 칸 12 (`humanRecordsOf`) */
 function missionRecordSlotOf(nariRecordSlot: number = MISSION_NARI_RECORD_FALLBACK): number {
-  return Number.isInteger(nariRecordSlot) && nariRecordSlot >= 0 && nariRecordSlot <= BATTERS_PER_TEAM
-    ? nariRecordSlot
-    : MISSION_NARI_RECORD_FALLBACK
+  return Number.isInteger(nariRecordSlot) && nariRecordSlot >= 0 && nariRecordSlot <= BATTERS_PER_TEAM ? nariRecordSlot : MISSION_NARI_RECORD_FALLBACK
 }
 
 /**
@@ -176,12 +170,44 @@ const PITCHERS_PER_TEAM = 8
  * 줄 바이트 7)에서 옮겨 적었다 — 생성기가 싣지 않는 칸. 열쇠는 `missionKeyOf`.
  */
 export const MISSION_HUMAN_START_ORDER: Readonly<Record<string, number>> = {
-  '타자:1': 2, '타자:2': 1, '타자:3': 3, '타자:4': 3, '타자:5': 1, '타자:6': 3, '타자:7': 1, '타자:8': 3, '타자:9': 3,
-  '타자:10': 3, '타자:11': 0, '타자:12': 3, '타자:13': 4, '타자:14': 3,
-  '타자:16': 3, '타자:17': 3, '타자:18': 3, '타자:19': 3, '타자:20': 3,
-  '투수:1': 3, '투수:2': 0, '투수:3': 0, '투수:4': 0, '투수:5': 0, '투수:6': 0, '투수:7': 0, '투수:8': 0, '투수:9': 0,
-  '투수:10': 2, '투수:11': 0, '투수:12': 0, '투수:13': 0, '투수:14': 0,
-  '투수:16': 3, '투수:17': 3, '투수:18': 3, '투수:19': 3, '투수:20': 3,
+  '타자:1': 2,
+  '타자:2': 1,
+  '타자:3': 3,
+  '타자:4': 3,
+  '타자:5': 1,
+  '타자:6': 3,
+  '타자:7': 1,
+  '타자:8': 3,
+  '타자:9': 3,
+  '타자:10': 3,
+  '타자:11': 0,
+  '타자:12': 3,
+  '타자:13': 4,
+  '타자:14': 3,
+  '타자:16': 3,
+  '타자:17': 3,
+  '타자:18': 3,
+  '타자:19': 3,
+  '타자:20': 3,
+  '투수:1': 3,
+  '투수:2': 0,
+  '투수:3': 0,
+  '투수:4': 0,
+  '투수:5': 0,
+  '투수:6': 0,
+  '투수:7': 0,
+  '투수:8': 0,
+  '투수:9': 0,
+  '투수:10': 2,
+  '투수:11': 0,
+  '투수:12': 0,
+  '투수:13': 0,
+  '투수:14': 0,
+  '투수:16': 3,
+  '투수:17': 3,
+  '투수:18': 3,
+  '투수:19': 3,
+  '투수:20': 3,
 }
 
 export function humanSideOf(mission: OriginalMission): 0 | 1 {
@@ -467,9 +493,7 @@ export function* simulateMissionAutoHalfTicks(
   while (next.done !== true) {
     const tick = next.value
     const step = missionAutoRelayStepOfTick({ inning: game.inning, offenseSide }, relayBoard.scores, tick, nameOf, cardsOf)
-    relayBoard = scoreMissionRuns(
-      relayBoard, game.inning, offenseSide, tick.kind === 'plateAppearance' ? tick.appearance.runsBattedIn : 0,
-    )
+    relayBoard = scoreMissionRuns(relayBoard, game.inning, offenseSide, tick.kind === 'plateAppearance' ? tick.appearance.runsBattedIn : 0)
     yield { ...step, scores: relayBoard.scores, inningRuns: relayBoard.inningRuns }
     next = ticks.next()
   }
@@ -486,9 +510,7 @@ export function* simulateMissionAutoHalfTicks(
       mound: result.mound ?? pitching.mound,
       inningRunsAllowed,
       // 간이 엔진 교체(0xc1ba4 → 0xac428 ac644 → 0xaf09c af0d4 → 0xaebe4 aec7a)도 +0x28 을 −1 로 비운다
-      ...((result.pitcherChanges?.length ?? 0) > 0
-        ? { magic: heldCpuMagicAfterPitcherChange(pitching.magic ?? FRESH_HELD_CPU_MAGIC) }
-        : {}),
+      ...((result.pitcherChanges?.length ?? 0) > 0 ? { magic: heldCpuMagicAfterPitcherChange(pitching.magic ?? FRESH_HELD_CPU_MAGIC) } : {}),
     },
     runs: result.runs,
     outs: result.outs,
@@ -553,9 +575,9 @@ export function missionFightingSpiritOf(
   return isFightingSpiritSituationOf(sideFightingSpiritStateOf(run.game.inning, sideTeams, run.game.scores), teamId)
 }
 
-export function missionTeamIdsOf(run: {
-  readonly mission: OriginalMission
-  readonly game: Pick<MissionGame, 'humanBatting'>
-}): { readonly human: number; readonly cpu: number } {
+export function missionTeamIdsOf(run: { readonly mission: OriginalMission; readonly game: Pick<MissionGame, 'humanBatting'> }): {
+  readonly human: number
+  readonly cpu: number
+} {
   return { human: run.game.humanBatting.teamId, cpu: run.mission.sideTeams[cpuSideOf(run.mission)] }
 }

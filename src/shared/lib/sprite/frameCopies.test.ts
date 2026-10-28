@@ -1,11 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import {
-  FRAME_COPY_FOLDERS,
-  flippedFrameUrlOf,
-  frameCopyUrlsOf,
-  hasFrameCopies,
-} from '@/shared/lib/sprite/frameCopies'
+import { FRAME_COPY_FOLDERS, flippedFrameUrlOf, frameCopyUrlsOf, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
 
 const pngSize = (path: string) => {
   const file = readFileSync(path)

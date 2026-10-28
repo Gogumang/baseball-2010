@@ -66,8 +66,14 @@ export function ManagerHookWindow({ userEventIndex, onConfirm }: ManagerHookWind
   )
   return (
     <div className={styles.overlay}>
-      <EventDialogueBox raw={raw} slideIn showsOrnament={false} tickInterval={tickInterval}
-        deferPress={(run) => keyLatch.push(run)} onAdvance={onConfirm} />
+      <EventDialogueBox
+        raw={raw}
+        slideIn
+        showsOrnament={false}
+        tickInterval={tickInterval}
+        deferPress={(run) => keyLatch.push(run)}
+        onAdvance={onConfirm}
+      />
       {/* 0x7fbc4 끝 0x7fdee — 상자 · 글 · 넘김 표시 다음에 초상화 0x7f998 */}
       <div className={styles.portraitLayer} style={{ bottom: 320 - PORTRAIT_BASE_Y, height: PORTRAIT_HEIGHT }}>
         <EventPortraits portraits={MANAGER_PORTRAIT} height={PORTRAIT_HEIGHT} />

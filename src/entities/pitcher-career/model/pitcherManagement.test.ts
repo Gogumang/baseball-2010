@@ -84,8 +84,7 @@ describe('능력 훈련 (0x17f5c → 0x186c4 · 0xa3bad, 모드 갈림은 디스
   it('타입 보너스 +1 — 타입 0 구속 · 타입 1 제구 · 타입 2 변화 (0x18786~0x187a6)', () => {
     const 칸 = ['제구', '구속', '변화', '체력'] as const
     const 키 = ['control', 'velocity', 'breaking', 'stamina'] as const
-    const 보너스 = (typeIndex: number) =>
-      칸.map((id) => runPitcherTraining(투수({ typeIndex }), 메뉴(id), 최소).typeBonus)
+    const 보너스 = (typeIndex: number) => 칸.map((id) => runPitcherTraining(투수({ typeIndex }), 메뉴(id), 최소).typeBonus)
     expect(보너스(0)).toEqual([0, 1, 0, 0])
     expect(보너스(1)).toEqual([1, 0, 0, 0])
     expect(보너스(2)).toEqual([0, 0, 1, 0])
@@ -148,9 +147,7 @@ describe('마구 훈련 (필살 창 0x17828 의 투수 탭)', () => {
     const first = runPitcherTraining(투수({ popularity: 200, gamePoint: 5000 }), 메뉴('마구'), 최소)
     expect(first.magic).toEqual({ sessions: 1, required: 4, isLevelUp: false, name: '파이어 볼' })
     expect(first.career.selectedMagicNumber).toBe(0)
-    const fourth = runPitcherTraining(
-      투수({ popularity: 5000, gamePoint: 5000, typeIndex: 2, magicLevel: 3 }), 메뉴('마구'), 최소,
-    )
+    const fourth = runPitcherTraining(투수({ popularity: 5000, gamePoint: 5000, typeIndex: 2, magicLevel: 3 }), 메뉴('마구'), 최소)
     expect(fourth.magic?.name).toBe('미라지 볼')
   })
 
@@ -162,8 +159,7 @@ describe('마구 훈련 (필살 창 0x17828 의 투수 탭)', () => {
 })
 
 describe('구질 훈련 (108 탭 2 → 0x17f5c 의 0x1836a 갈래)', () => {
-  const 구질투수 = (overrides: Partial<PitcherCareer> = {}) =>
-    투수({ gamePoint: 5000, pitchTrainingStages: [1, 1, 0, 0, 0, 0, 0, 0], ...overrides })
+  const 구질투수 = (overrides: Partial<PitcherCareer> = {}) => 투수({ gamePoint: 5000, pitchTrainingStages: [1, 1, 0, 0, 0, 0, 0, 0], ...overrides })
 
   it('사기는 bfa55(6,10) 만큼 — 병아리 −1 · 몹쓸몸 +2 를 더해 깎고, 행동함 · 훈련 칸 4 수를 남긴다 (0x18a5c · 0x18d70)', () => {
     const 최소결과 = runPitchTypeTraining(구질투수(), 0, 2, 최소)
@@ -183,7 +179,9 @@ describe('구질 훈련 (108 탭 2 → 0x17f5c 의 0x1836a 갈래)', () => {
     const 쌓인 = 구질투수({ skillIds: [20], releaseTrainingStreaks: [3, 0, 0, 0, 0] })
     expect(runPitchTypeTraining(쌓인, 0, 2, 최소).career.releaseTrainingStreaks).toEqual([0, 0, 0, 0, 0])
     const 마구 = runPitcherTraining(
-      투수({ skillIds: [20], releaseTrainingStreaks: [3, 0, 0, 0, 0], gamePoint: 5000, popularity: 5000 }), 메뉴('마구'), 최소,
+      투수({ skillIds: [20], releaseTrainingStreaks: [3, 0, 0, 0, 0], gamePoint: 5000, popularity: 5000 }),
+      메뉴('마구'),
+      최소,
     )
     expect(마구.career.releaseTrainingStreaks).toEqual([0, 0, 0, 0, 0])
   })

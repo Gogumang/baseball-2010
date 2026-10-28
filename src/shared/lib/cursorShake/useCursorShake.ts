@@ -10,7 +10,6 @@ import type { CursorShakeDirection } from '@/shared/lib/cursorShake/cursorShake'
 export function useCursorShake(tick: number) {
   const [shake, setShake] = useState<{ readonly directionCode: number; readonly startedAt: number } | null>(null)
   const offset = shake === null ? { dx: 0, dy: 0 } : cursorShakeOf(shake.directionCode, tick - shake.startedAt)
-  const start = (direction: CursorShakeDirection) =>
-    setShake({ directionCode: CURSOR_SHAKE_DIRECTION_CODES[direction], startedAt: tick })
+  const start = (direction: CursorShakeDirection) => setShake({ directionCode: CURSOR_SHAKE_DIRECTION_CODES[direction], startedAt: tick })
   return { offset, start }
 }

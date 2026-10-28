@@ -40,7 +40,6 @@ interface PitchSlotPickerProps {
 /** 빈 칸 키 표지의 차례 — 화면이 다시 서도 겹치지 않게 모듈에서 센다 */
 let idlePressSerial = 0
 
-
 /** 칸 → 키 (0x534d8) — 누름 칸 읽기 이름 */
 const SLOT_KEY_LABELS = ['OK', '2', '4', '6', '8', '0']
 

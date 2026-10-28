@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
-import {
-  SALARY_FIRM_EVENT_ID,
-  SALARY_POLITE_EVENT_ID,
-  salaryResultEventId,
-} from '@/entities/career/model/seasonFlow'
+import { SALARY_FIRM_EVENT_ID, SALARY_POLITE_EVENT_ID, salaryResultEventId } from '@/entities/career/model/seasonFlow'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
@@ -36,10 +32,7 @@ import {
   titleRewardMoneyUnitsOf,
 } from '@/entities/awards/model/seasonAwards'
 
-const 선수 = (
-  overrides: Partial<PlayerCareer> = {},
-  stats: Partial<typeof EMPTY_SEASON_STATS> = {},
-): PlayerCareer => ({
+const 선수 = (overrides: Partial<PlayerCareer> = {}, stats: Partial<typeof EMPTY_SEASON_STATS> = {}): PlayerCareer => ({
   ...createCareer('마선수'),
   ...overrides,
   stats: { ...EMPTY_SEASON_STATS, ...stats },
@@ -57,10 +50,7 @@ const 상대 = (overrides: Partial<LeagueRecord>): LeagueRecord => ({
 })
 
 /** 내 선수를 앞에 두고 CPU 를 뒤에 붙인 리그 기록표 */
-const 리그표 = (career: PlayerCareer, ...others: readonly LeagueRecord[]): LeagueRecord[] => [
-  myLeagueRecordOf(career),
-  ...others,
-]
+const 리그표 = (career: PlayerCareer, ...others: readonly LeagueRecord[]): LeagueRecord[] => [myLeagueRecordOf(career), ...others]
 
 describe('개인 타이틀 — binary.mod 0x8dad4 (B-2)', () => {
   it('타자는 홈런왕·타점왕·타율왕 세 칸이다 (표 0xd4f18 = [9, 11, 12])', () => {
@@ -69,11 +59,7 @@ describe('개인 타이틀 — binary.mod 0x8dad4 (B-2)', () => {
 
   it('투수는 다승왕·삼진왕·방어왕, 마무리는 첫째가 세이브왕이다 (표 0xd4f24)', () => {
     expect(judgeTitles([], '투수').map((title) => title.name)).toEqual(['다승왕', '삼진왕', '방어왕'])
-    expect(judgeTitles([], '마무리').map((title) => title.name)).toEqual([
-      '세이브왕',
-      '삼진왕',
-      '방어왕',
-    ])
+    expect(judgeTitles([], '마무리').map((title) => title.name)).toEqual(['세이브왕', '삼진왕', '방어왕'])
   })
 
   it('발표 문구는 StrUSER_EVT[76·77·78] · [79·80·81] · 세이브 82 다', () => {

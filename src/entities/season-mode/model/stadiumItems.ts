@@ -95,8 +95,7 @@ export function isHiddenStadiumSlot(kind: StadiumKind, slot: number): boolean {
 export type StadiumPurchaseRefusal = '없는칸' | '미오픈' | '이미보유' | '인기도부족' | '소지금부족'
 
 export type StadiumPurchaseCheck =
-  | { readonly ok: true; readonly price: number }
-  | { readonly ok: false; readonly reason: StadiumPurchaseRefusal; readonly required?: number }
+  { readonly ok: true; readonly price: number } | { readonly ok: false; readonly reason: StadiumPurchaseRefusal; readonly required?: number }
 
 /**
  * 구매 가드 — 원본 `0x9a84~0x9bd2` 의 **순서 그대로** (S3 4절).
@@ -149,9 +148,7 @@ export function buyStadiumItem(record: SeasonRecord, kind: StadiumKind, slot: nu
     ...record,
     money: clampTo(record.money - price, MONEY_LIMIT),
     stadiumOwned: record.stadiumOwned.map((owned, position) => (position === index ? true : owned)),
-    stadiumEquipped: record.stadiumEquipped.map((current, position) =>
-      position === kindIndexOf(kind) ? slot : current,
-    ),
+    stadiumEquipped: record.stadiumEquipped.map((current, position) => (position === kindIndexOf(kind) ? slot : current)),
   }
 }
 
@@ -173,9 +170,7 @@ export function equipStadiumItem(record: SeasonRecord, kind: StadiumKind, slot: 
   if (!canEquipStadiumItem(record, kind, slot)) return record
   return {
     ...record,
-    stadiumEquipped: record.stadiumEquipped.map((current, position) =>
-      position === kindIndexOf(kind) ? slot : current,
-    ),
+    stadiumEquipped: record.stadiumEquipped.map((current, position) => (position === kindIndexOf(kind) ? slot : current)),
   }
 }
 
@@ -316,10 +311,7 @@ export function seasonStadiumOf(record: SeasonRecord): SeasonStadiumScene {
  * ```
  * 관중 단계 +0x89 는 늘 0(빈 좌석)이다. `preview` 가 없으면 저장값 그대로다.
  */
-export function stadiumPreviewOf(
-  record: SeasonRecord,
-  preview?: { readonly kind: StadiumKind; readonly slot: number },
-): SeasonStadiumScene {
+export function stadiumPreviewOf(record: SeasonRecord, preview?: { readonly kind: StadiumKind; readonly slot: number }): SeasonStadiumScene {
   const slotOf = (kind: StadiumKind) =>
     preview !== undefined && preview.kind === kind ? preview.slot : (record.stadiumEquipped[STADIUM_KINDS.indexOf(kind)] ?? 0)
   return {

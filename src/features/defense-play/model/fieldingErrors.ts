@@ -82,9 +82,7 @@ export function drawnFieldingErrorsOf(fielders: readonly DrawnFielderCounters[])
  * 재생 판(`lastDefensePlay`) 하나를 건너뛰기 없이 끝까지 그렸을 때 올라가는 실책 — 판 틱마다 그림 한 번(`DefensePlayback` 재생 갈래의
  * 셈과 같다: 틱 0..끝을 한 번씩 그리고 닫힌 갱신의 다시 그리기는 안 센다). 화면 없는 하네스(soak)가 재생 화면 대신 쓴다
  */
-export function drawnReplayFieldingErrorsOf(
-  views: readonly { readonly fielders: readonly DrawnFielderCounters[] }[],
-): DrawnFieldingError[] {
+export function drawnReplayFieldingErrorsOf(views: readonly { readonly fielders: readonly DrawnFielderCounters[] }[]): DrawnFieldingError[] {
   return views.flatMap((view) => drawnFieldingErrorsOf(view.fielders))
 }
 
@@ -102,10 +100,7 @@ export function drawnFumbleCheerOf(fielders: readonly DrawnFielderCounters[]): b
  * 그림이 레코드를 안 실은 옛 입구(`DrawnFieldingError.record` 없음)만 쓴다 — 진행기는 판 입력 `fielderRecords` 로 +0xec 를 넘기고
  * 실책은 그 레코드에 붙는다(`entities/fielding/model/fielderRecords` — 칸 0 은 마지막 교대 판 0x3fac4 의 값, 판 없이는 0).
  */
-export function fielderRecordIndexOf(
-  lineup: readonly { readonly position?: number }[],
-  slot: number,
-): number {
+export function fielderRecordIndexOf(lineup: readonly { readonly position?: number }[], slot: number): number {
   return lineup.findIndex((player) => ((player.position ?? 0) & 0xf) === slot + 1)
 }
 

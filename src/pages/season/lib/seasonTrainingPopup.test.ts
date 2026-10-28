@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SEASON_TRAINING_BATTER_FORM, SEASON_TRAINING_BATTER_MIRROR_FLAG, SEASON_TRAINING_PRESENTATIONS, isSeasonTrainingSkipKey,
+  SEASON_TRAINING_BATTER_FORM,
+  SEASON_TRAINING_BATTER_MIRROR_FLAG,
+  SEASON_TRAINING_PRESENTATIONS,
+  isSeasonTrainingSkipKey,
 } from '@/pages/season/lib/seasonTrainingPopup'
 
 describe('시즌 0xde 훈련 팝업 — 0x84664 시즌 갈래 · 0x848d0 시즌 캐릭터', () => {
   it('점프표 0xd4968 — 칸마다 파일 · 애니', () => {
     expect(SEASON_TRAINING_PRESENTATIONS.map(({ file, animation }) => `${file}:${animation}`)).toEqual([
-      'raise_traning_ani:3', 'raise_traning_ani:0', 'team_traning_ani:0', 'team_traning_ani:1', 'team_traning_ani:2',
+      'raise_traning_ani:3',
+      'raise_traning_ani:0',
+      'team_traning_ani:0',
+      'team_traning_ani:1',
+      'team_traning_ani:2',
     ])
   })
 

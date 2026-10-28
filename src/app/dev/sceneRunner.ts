@@ -99,7 +99,11 @@ function storedValueOf(value: unknown): string {
 async function applyFixture(name: string): Promise<void> {
   const loader = fixtureLoaders[`../../../e2e/fixtures/${name}.json`]
   if (loader === undefined) {
-    throw new Error(`픽스처가 없다: ${name} (있는 것: ${Object.keys(fixtureLoaders).map((path) => path.replace(/^.*\/|\.json$/g, '')).join(', ')})`)
+    throw new Error(
+      `픽스처가 없다: ${name} (있는 것: ${Object.keys(fixtureLoaders)
+        .map((path) => path.replace(/^.*\/|\.json$/g, ''))
+        .join(', ')})`,
+    )
   }
   const fixture = await loader()
   const storage = window.localStorage
@@ -138,7 +142,7 @@ export async function bootSceneShortcut(): Promise<void> {
   }
   const params = new URLSearchParams(window.location.search)
   const scene = params.get('scene')
-  const fixture = params.get('fixture') ?? (scene === null ? null : SCENES[scene]?.fixture ?? null)
+  const fixture = params.get('fixture') ?? (scene === null ? null : (SCENES[scene]?.fixture ?? null))
   if (scene === null && fixture === null) return
   report({ scene, fixture, status: 'loading' })
   try {
@@ -150,12 +154,12 @@ export async function bootSceneShortcut(): Promise<void> {
     const seed = params.get('seed') ?? (scene === null ? undefined : SCENES[scene]?.seed?.toString())
     if (seed !== null && seed !== undefined && Number.isFinite(Number(seed))) setDevBootSeed(Number(seed))
     // 스냅샷 — 장면 표의 `snapshot` (또는 `&snapshot=<이름>`), `&real=1` 이면 안 쓴다. 파일이 없으면 단계를 밟는다
-    const snapshotName = params.has('real') ? null : (params.get('snapshot') ?? (scene === null ? null : SCENES[scene]?.snapshot ?? null))
+    const snapshotName = params.has('real') ? null : (params.get('snapshot') ?? (scene === null ? null : (SCENES[scene]?.snapshot ?? null)))
     const injected = snapshotName === 'inject' ? window.__snapshotOverride : undefined
     if (snapshotName === 'inject' && injected === undefined) throw new Error('넣은 스냅샷이 없다 (window.__snapshotOverride)')
     const urlLoader = snapshotName === null ? undefined : snapshotLoaders[`../../../e2e/snapshots/${snapshotName}.json.gz`]
-    const snapshotLoader = injected !== undefined ? () => Promise.resolve(injected)
-      : urlLoader === undefined ? undefined : async () => loadSnapshotFile(await urlLoader())
+    const snapshotLoader =
+      injected !== undefined ? () => Promise.resolve(injected) : urlLoader === undefined ? undefined : async () => loadSnapshotFile(await urlLoader())
     if (snapshotName !== null && snapshotLoader === undefined && params.has('snapshot')) throw new Error(`스냅샷이 없다: ${snapshotName}`)
     if (snapshotLoader !== undefined) {
       loadedSnapshot = await snapshotLoader()

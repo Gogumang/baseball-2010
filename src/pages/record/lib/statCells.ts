@@ -1,7 +1,12 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
 import type { AnnalsStats } from '@/entities/collection/model/annalsStats'
 import {
-  gamePointEarnedOf, gamePointUsageOf, itemPurchaseCountOf, leagueFirstCountOf, playTimeOf, totalPlayTimeOf,
+  gamePointEarnedOf,
+  gamePointUsageOf,
+  itemPurchaseCountOf,
+  leagueFirstCountOf,
+  playTimeOf,
+  totalPlayTimeOf,
 } from '@/entities/collection/model/annalsStats'
 import { STAT_NAME_FIRST_INDEX } from '@/pages/record/lib/statNames'
 
@@ -39,25 +44,55 @@ const STAT_CELLS: ReadonlyMap<number, StatCell> = new Map<number, StatCell>([
   // 모드별 플레이 시간 (0x4e8b0 → 0x22efc 가 쌓는다)
   ...range(0, 6).map((id): [number, StatCell] => [id, { nameIndex: 129 + id, valueKind: '시간', valueOf: (stats) => playTimeOf(stats, id) }]),
   // 나리 타자편 · 투수편 · 시즌 우승(정규시즌 1위, 0xb818c) · 친구 추천 · 이벤트 미션 다운(쓰는 곳 없음 — 늘 0회)
-  ...range(8, 12).map((id): [number, StatCell] => [id, {
-    nameIndex: 136 + id - 8, valueKind: '횟수', valueOf: (stats) => leagueFirstCountOf(stats, id - 8),
-  }]),
-  ...range(16, 25).map((id): [number, StatCell] => [id, {
-    nameIndex: 141 + id - 16, valueKind: '개수', valueOf: (stats) => itemPurchaseCountOf(stats, 4, id - 16),
-  }]),
-  ...range(32, 39).map((id): [number, StatCell] => [id, {
-    nameIndex: 151 + id - 32, valueKind: '개수', valueOf: (stats) => itemPurchaseCountOf(stats, 3, id - 32),
-  }]),
-  ...range(40, 46).map((id): [number, StatCell] => [id, {
-    nameIndex: 161 + id - 40, valueKind: '개수', valueOf: (stats) => itemPurchaseCountOf(stats, 2, id - 40),
-  }]),
+  ...range(8, 12).map((id): [number, StatCell] => [
+    id,
+    {
+      nameIndex: 136 + id - 8,
+      valueKind: '횟수',
+      valueOf: (stats) => leagueFirstCountOf(stats, id - 8),
+    },
+  ]),
+  ...range(16, 25).map((id): [number, StatCell] => [
+    id,
+    {
+      nameIndex: 141 + id - 16,
+      valueKind: '개수',
+      valueOf: (stats) => itemPurchaseCountOf(stats, 4, id - 16),
+    },
+  ]),
+  ...range(32, 39).map((id): [number, StatCell] => [
+    id,
+    {
+      nameIndex: 151 + id - 32,
+      valueKind: '개수',
+      valueOf: (stats) => itemPurchaseCountOf(stats, 3, id - 32),
+    },
+  ]),
+  ...range(40, 46).map((id): [number, StatCell] => [
+    id,
+    {
+      nameIndex: 161 + id - 40,
+      valueKind: '개수',
+      valueOf: (stats) => itemPurchaseCountOf(stats, 2, id - 40),
+    },
+  ]),
   // 모드별 획득 GP (0x22c7d 가 쌓는다)
-  ...range(48, 54).map((id): [number, StatCell] => [id, {
-    nameIndex: 168 + id - 48, valueKind: 'G', valueOf: (stats) => gamePointEarnedOf(stats, id - 48),
-  }]),
-  ...range(56, 63).map((id): [number, StatCell] => [id, {
-    nameIndex: 175 + id - 56, valueKind: 'G', valueOf: (stats) => gamePointUsageOf(stats, id - 56),
-  }]),
+  ...range(48, 54).map((id): [number, StatCell] => [
+    id,
+    {
+      nameIndex: 168 + id - 48,
+      valueKind: 'G',
+      valueOf: (stats) => gamePointEarnedOf(stats, id - 48),
+    },
+  ]),
+  ...range(56, 63).map((id): [number, StatCell] => [
+    id,
+    {
+      nameIndex: 175 + id - 56,
+      valueKind: 'G',
+      valueOf: (stats) => gamePointUsageOf(stats, id - 56),
+    },
+  ]),
 ])
 
 export const STAT_ROWS_PER_PAGE = 8
@@ -135,9 +170,10 @@ export function typeSecretDigit(state: SecretCodeState, digit: string): SecretCo
  */
 export function statTotalTextOf(page: number, stats?: AnnalsStats): string | null {
   if ((page === 6 || page === 7) && isBugFixed('B-66') && stats !== undefined) {
-    const total = page === 6
-      ? range(0, 6).reduce((sum, slot) => sum + gamePointEarnedOf(stats, slot), 0)
-      : range(0, 7).reduce((sum, kind) => sum + gamePointUsageOf(stats, kind), 0)
+    const total =
+      page === 6
+        ? range(0, 6).reduce((sum, slot) => sum + gamePointEarnedOf(stats, slot), 0)
+        : range(0, 7).reduce((sum, kind) => sum + gamePointUsageOf(stats, kind), 0)
     return `${total}G`
   }
   if (page === 6 || page === 7) return '0G'

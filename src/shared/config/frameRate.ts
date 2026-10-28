@@ -33,9 +33,7 @@ export function onGameSpeedChange(listener: () => void): () => void {
 
 export function setGameSpeedLevel(level: number): void {
   if (!Number.isInteger(level) || MILLISECONDS_PER_FRAME_BY_SPEED[level] === undefined) {
-    throw new Error(
-      `속도 단계는 0~${MILLISECONDS_PER_FRAME_BY_SPEED.length - 1} 정수여야 합니다 (입력값: ${level})`,
-    )
+    throw new Error(`속도 단계는 0~${MILLISECONDS_PER_FRAME_BY_SPEED.length - 1} 정수여야 합니다 (입력값: ${level})`)
   }
   if (level === currentSpeedLevel) return
   currentSpeedLevel = level

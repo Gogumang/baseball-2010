@@ -1,5 +1,11 @@
 import {
-  HALL_OF_FAME_FIRST_ID, PLAYER_OWN_BIT, PLAYER_SLOT_MASK, isHallOfFameRecord, tableTeamOf, withSlot, withTableTeam,
+  HALL_OF_FAME_FIRST_ID,
+  PLAYER_OWN_BIT,
+  PLAYER_SLOT_MASK,
+  isHallOfFameRecord,
+  tableTeamOf,
+  withSlot,
+  withTableTeam,
 } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
@@ -149,10 +155,7 @@ export function tradeSuccessRate(input: TradeRateInput): number {
   const difference = (input.myGrade - input.opponentGrade) * TRADE_GRADE_SCALE
   const weighted = difference < 0 ? difference * 2 : difference
   const counted = isBugFixed('B-19') ? Math.min(weighted, 0) : weighted
-  const raw = TRADE_RATE_BASE
-    - Math.trunc((Math.abs(counted) * 100) / TRADE_GRADE_DIVISOR)
-    - input.myPenalty
-    - input.opponentPenalty
+  const raw = TRADE_RATE_BASE - Math.trunc((Math.abs(counted) * 100) / TRADE_GRADE_DIVISOR) - input.myPenalty - input.opponentPenalty
   const floored = Math.max(raw, TRADE_RATE_FLOOR)
   return Math.min(floored + (TRADE_BOOST_RATE[input.boost] ?? 0), TRADE_RATE_LIMIT)
 }
@@ -285,11 +288,7 @@ export interface TradedRosters {
  *   칸이 없는(표 값 = 0) 선수는 그대로 둔다. 나리·명전 선수(장비가 있을 수 있다)는 트레이드에서 거절된다.
  * - 임시 레코드 생성자·소멸자(0xb6c81/0xb6cb5 · 0xb8de5/0xb8e19)는 버퍼 준비뿐이라 옮길 것이 없다.
  */
-export function swapTradedPlayers(
-  myTeamId: number,
-  rosters: TradedRosters,
-  swap: TradeSwap,
-): TradedRosters {
+export function swapTradedPlayers(myTeamId: number, rosters: TradedRosters, swap: TradeSwap): TradedRosters {
   const { mine, theirs } = rosters
   const { opponentTeamId, tab, myIndex, opponentIndex } = swap
   if (tab === TRADE_TAB.투수) {
@@ -314,10 +313,7 @@ export function swapTradedPlayers(
     const mineNext = [...mine.batters]
     const theirsNext = [...theirs.batters]
     // 0xb5649 — 들어온 선수는 그 자리의 수비 위치(+0x1c & 0xf)와 칸 번호 j 를 받는다
-    mineNext[myIndex] = withSlot(
-      { ...withTableTeam(taken, opponentTeamId, myTeamId), fieldPosition: given.fieldPosition & 0xf },
-      myIndex,
-    )
+    mineNext[myIndex] = withSlot({ ...withTableTeam(taken, opponentTeamId, myTeamId), fieldPosition: given.fieldPosition & 0xf }, myIndex)
     theirsNext[opponentIndex] = withSlot(
       { ...withTableTeam(given, myTeamId, opponentTeamId), fieldPosition: taken.fieldPosition & 0xf },
       opponentIndex,

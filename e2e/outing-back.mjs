@@ -25,7 +25,7 @@ for (const browserName of browsers) {
     const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
     const top = await page.evaluate(({ x, y }) => {
       const element = document.elementFromPoint(x, y)
-      return element === null ? null : element.closest('button[data-touch-key]')?.getAttribute('aria-label') ?? element.tagName
+      return element === null ? null : (element.closest('button[data-touch-key]')?.getAttribute('aria-label') ?? element.tagName)
     }, center)
     await tapPage(page, center.x, center.y)
     await page.waitForFunction(() => window.__sceneProbe?.()?.screen === '관리', null, { timeout: 5000 })

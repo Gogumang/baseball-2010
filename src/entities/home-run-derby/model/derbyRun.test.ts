@@ -20,8 +20,7 @@ const 홈런 = (distance: number): DerbyPitchOutcome => ({
 })
 const 존적중: DerbyPitchOutcome = { isHomeRun: false, distance: 0, isEventZoneHit: true }
 
-const 여러번 = (run: DerbyRun, outcomes: readonly DerbyPitchOutcome[]): DerbyRun =>
-  outcomes.reduce(applyDerbyPitch, run)
+const 여러번 = (run: DerbyRun, outcomes: readonly DerbyPitchOutcome[]): DerbyRun => outcomes.reduce(applyDerbyPitch, run)
 
 describe('초기화 0xb6814', () => {
   it('기회 10, 단계 0, 보너스 G 0 으로 시작한다', () => {
@@ -84,7 +83,10 @@ describe('콤보 — 직전 공과 이번 공이 모두 홈런일 때만 오른�
   })
 
   it('마지막(10번째) 공 홈런도 최대 콤보·보너스 G 를 올리고, 그 뒤 콤보만 지운다 (ae444 → ae470)', () => {
-    const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 홈런(90)))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 홈런(90)),
+    )
     expect(run.maxCombo).toBe(9)
     expect(run.bonusGamePoint).toBe(((9 * 10) / 2) * 5)
     expect(run.combo).toBe(0)
@@ -154,13 +156,19 @@ describe('이벤트 존 — 적중하면 보너스 G += 200', () => {
 
 describe('기회와 던진 공 수', () => {
   it('열 번 치면 남은 기회가 1 에서 멈추고 판이 끝난다 (콤보가 없을 때)', () => {
-    const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 헛스윙))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 헛스윙),
+    )
     expect(run.remainingPitches).toBe(1)
     expect(run.isFinished).toBe(true)
   })
 
   it('⚠️ 원본 그대로 — 던진 공 수(+0x68)는 마지막 공을 안 세어 9 에서 멈춘다', () => {
-    const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 헛스윙))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 헛스윙),
+    )
     expect(run.pitchesThrown).toBe(9)
   })
 
@@ -170,7 +178,10 @@ describe('기회와 던진 공 수', () => {
   })
 
   it('끝난 뒤에는 더 이상 바뀌지 않는다', () => {
-    const 끝난판 = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 헛스윙))
+    const 끝난판 = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 헛스윙),
+    )
     expect(applyDerbyPitch(끝난판, 홈런(160))).toBe(끝난판)
   })
 })
@@ -178,16 +189,16 @@ describe('기회와 던진 공 수', () => {
 describe('단계는 공이 끝날 때 누적 비거리로 오른다', () => {
   it('누적 800 을 넘기면 단계 1 이 된다', () => {
     // 100 씩 여덟 번 = 800
-    const run = 여러번(createDerbyRun(), Array.from({ length: 8 }, () => 홈런(100)))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 8 }, () => 홈런(100)),
+    )
     expect(run.totalDistance).toBe(800)
     expect(run.stage).toBe(1)
   })
 
   it('마지막 공에서 문턱을 넘으면 단계가 안 오른다 — 2번 항은 기회가 남았을 때만 돈다', () => {
-    const outcomes = [
-      ...Array.from({ length: 9 }, () => 홈런(100)),
-      홈런(100),
-    ]
+    const outcomes = [...Array.from({ length: 9 }, () => 홈런(100)), 홈런(100)]
     const run = 여러번(createDerbyRun(), outcomes)
     // 아홉 번째 공까지 누적 900 → 단계 1. 열 번째에서 1000 이 돼도 단계는 그대로다
     expect(run.totalDistance).toBe(1_000)
@@ -197,7 +208,10 @@ describe('단계는 공이 끝날 때 누적 비거리로 오른다', () => {
 
 describe('보너스 게임 — 최대 콤보 수만큼, 한 번만', () => {
   it('최대 콤보가 0 이면 그냥 끝난다', () => {
-    const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 헛스윙))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 헛스윙),
+    )
     expect(run.isBonusGame).toBe(false)
     expect(run.isFinished).toBe(true)
   })
@@ -240,7 +254,10 @@ describe('HUD 공 번호 = (보너스 중 ? 최대 콤보 : 10) − 남은 기�
 
 describe('결과 정산 (0x4f574)', () => {
   it('총 기회 = 10, 보너스를 했으면 10 + 최대 콤보', () => {
-    const 보너스없음 = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 헛스윙))
+    const 보너스없음 = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 헛스윙),
+    )
     expect(derbyResultOf(보너스없음, 0).pitchCount).toBe(10)
 
     const 열구 = [홈런(90), 홈런(90), 홈런(90), ...Array.from({ length: 7 }, () => 헛스윙)]
@@ -249,7 +266,10 @@ describe('결과 정산 (0x4f574)', () => {
   })
 
   it('누적이 최고 기록을 넘으면 갈아 끼우고 신기록이 된다', () => {
-    const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 홈런(50)))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 홈런(50)),
+    )
     const result = derbyResultOf(run, 300)
     expect(result.totalDistance).toBe(500)
     expect(result.isNewRecord).toBe(true)
@@ -257,14 +277,20 @@ describe('결과 정산 (0x4f574)', () => {
   })
 
   it('같거나 낮으면 기록이 그대로다', () => {
-    const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 홈런(50)))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 홈런(50)),
+    )
     const result = derbyResultOf(run, 500)
     expect(result.isNewRecord).toBe(false)
     expect(result.bestDistance).toBe(500)
   })
 
   it('획득 G 는 (누적/100) × 배율[단계] + 보너스 G 다', () => {
-    const run = 여러번(createDerbyRun(), Array.from({ length: 10 }, () => 홈런(100)))
+    const run = 여러번(
+      createDerbyRun(),
+      Array.from({ length: 10 }, () => 홈런(100)),
+    )
     // 누적 1000, 단계 1(누적 800 에서 올라감), 콤보 보너스 = 1+2+…+9 배 5 (마지막 공도 콤보를 올린다)
     const 콤보보너스 = ((9 * 10) / 2) * 5
     expect(run.stage).toBe(1)

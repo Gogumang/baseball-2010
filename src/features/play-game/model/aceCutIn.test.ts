@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ACE_CUT_IN_DRAWS,
-  aceCutInDraws,
-  aceCutInPortraitOf,
-  aceCutInSlotOf,
-  linePixels,
-  scanlineSpans,
-} from '@/features/play-game/model/aceCutIn'
+import { ACE_CUT_IN_DRAWS, aceCutInDraws, aceCutInPortraitOf, aceCutInSlotOf, linePixels, scanlineSpans } from '@/features/play-game/model/aceCutIn'
 import { SUBSTITUTION_SCENE_DRAWS } from '@/features/play-game/model/substitutionScene'
 
 describe('마선수 등장 컷인 0x473f0 — 단계 기계 (표 0xd0130 · 0xd0148 · 0xd0190)', () => {
@@ -36,7 +29,24 @@ describe('마선수 등장 컷인 0x473f0 — 단계 기계 (표 0xd0130 · 0xd0
     ])
     // 쓸기 알파: 단계 5~9 = 단계·10 + 50, 10~13 = 0x8c, 14~18 = 210 − 단계·5, 19~22 없음
     expect(draws.slice(9).map((draw) => draw.sweep?.fill.alpha ?? null)).toEqual([
-      100, 110, 120, 130, 140, 140, 140, 140, 140, 140, 135, 130, 125, 120, null, null, null, null,
+      100,
+      110,
+      120,
+      130,
+      140,
+      140,
+      140,
+      140,
+      140,
+      140,
+      135,
+      130,
+      125,
+      120,
+      null,
+      null,
+      null,
+      null,
     ])
     // 초상 x: 단계 6 · 7 은 W − 단계·5 + 25, 그 뒤 W − 폭/2 − 5
     expect(draws[9].portrait).toEqual({ x: 235, y: 173 })
@@ -44,7 +54,13 @@ describe('마선수 등장 컷인 0x473f0 — 단계 기계 (표 0xd0130 · 0xd0
     expect(draws[11].portrait).toEqual({ x: 'centered', y: 173 })
     // 이미지 93: 0 → 61 → 80(+200 밝게 ×3) → 71
     expect(draws.slice(9, 16).map((draw) => [draw.label?.x, draw.label?.brighten])).toEqual([
-      [0, 0], [61, 0], [80, 200], [80, 200], [80, 200], [71, 0], [71, 0],
+      [0, 0],
+      [61, 0],
+      [80, 200],
+      [80, 200],
+      [80, 200],
+      [71, 0],
+      [71, 0],
     ])
   })
 

@@ -47,7 +47,13 @@ export const TO_PITCHER_MANAGEMENT: readonly SceneStep[] = [
 export const TO_PITCHER_PITCH: readonly SceneStep[] = [
   ...TO_PITCHER_MANAGEMENT,
   call('관리 [다음경기] → 경기시작 (openNextGameStandings)', (h) => h.pitcher.actions.openNextGameStandings()),
-  keyUntil('Enter', '투수편 구질 고르기 0xf', pitcherGameIs((peek) => peek.isPitchSlotPickerShown), 400, 90000),
+  keyUntil(
+    'Enter',
+    '투수편 구질 고르기 0xf',
+    pitcherGameIs((peek) => peek.isPitchSlotPickerShown),
+    400,
+    90000,
+  ),
 ]
 
 /** 미션 하나 — 게임시작 목록 [미션] 답(하위 17 선수 고르기) → 나리 선수 → 미션 목록에서 고른 미션의 [61] 예(`actions.begin`) */
@@ -109,8 +115,18 @@ export const TO_GENERAL_GAME: readonly SceneStep[] = [
   key('Enter'),
   wait(1000),
   key('Enter'),
-  until('경기 화면(인트로)', teamGameIs(() => true), 15000),
-  keyUntil('Enter', '인트로 OK', teamGameIs((peek) => peek.isIntroDone), 300, 15000),
+  until(
+    '경기 화면(인트로)',
+    teamGameIs(() => true),
+    15000,
+  ),
+  keyUntil(
+    'Enter',
+    '인트로 OK',
+    teamGameIs((peek) => peek.isIntroDone),
+    300,
+    15000,
+  ),
 ]
 
 /**

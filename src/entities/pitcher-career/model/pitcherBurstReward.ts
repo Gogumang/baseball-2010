@@ -1,10 +1,6 @@
 import type { BurstRewardDelta } from '@/entities/burst-mission/model/burstMissionReward'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
-import {
-  ORIGINAL_MONEY_UNIT,
-  gainPitcherPopularity,
-  gainPitcherReputation,
-} from '@/entities/pitcher-career/model/pitcherCareer'
+import { ORIGINAL_MONEY_UNIT, gainPitcherPopularity, gainPitcherReputation } from '@/entities/pitcher-career/model/pitcherCareer'
 import { nariMoraleOf, withNariMorale } from '@/entities/career/model/nariMorale'
 import { BALANCE } from '@/shared/config/original/balance'
 
@@ -41,9 +37,6 @@ function applyOne(career: PitcherCareer, delta: BurstRewardDelta): PitcherCareer
 }
 
 /** 변화량 목록을 판정 차례대로 얹는다. 빈 목록이면 그대로 돌려준다 */
-export function applyPitcherBurstRewards(
-  career: PitcherCareer,
-  deltas: readonly BurstRewardDelta[],
-): PitcherCareer {
+export function applyPitcherBurstRewards(career: PitcherCareer, deltas: readonly BurstRewardDelta[]): PitcherCareer {
   return deltas.reduce(applyOne, career)
 }

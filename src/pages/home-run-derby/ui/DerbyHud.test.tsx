@@ -23,9 +23,7 @@ describe('홈런더비 HUD (0x45a54)', () => {
 
   it('판 머리에 "공 번호 / 공 수" 를 흰 글자로 쓴다 — 첫 공은 1/10 (0x3608c)', () => {
     띄우기(createDerbyRun())
-    expect(그림들('공번호')).toEqual([
-      './sprites/num/001.png', './sprites/num/101.png', './sprites/num/001.png', './sprites/num/000.png',
-    ])
+    expect(그림들('공번호')).toEqual(['./sprites/num/001.png', './sprites/num/101.png', './sprites/num/001.png', './sprites/num/000.png'])
   })
 
   it('공을 쓸수록 공 번호가 오른다 — 공 번호 = 10 − 남은 기회 + 1', () => {
@@ -65,9 +63,7 @@ describe('홈런더비 HUD (0x45a54)', () => {
 
   it('콤보 표시는 trainning.pzx "Combo" 가 미끄러져 온 뒤 셋째 갱신부터 숫자를 붙인다 (0x4585c — combo.pzx 는 안 그린다)', () => {
     const run = createDerbyRun()
-    const hud = (tick: number) => (
-      <DerbyHud run={run} bestDistance={0} tick={tick} shownCombo={2} batterSide={1} />
-    )
+    const hud = (tick: number) => <DerbyHud run={run} bestDistance={0} tick={tick} shownCombo={2} batterSide={1} />
     const { rerender } = render(hud(10))
     expect(screen.getByAltText('Combo').getAttribute('src')).toBe('./sprites/trainning/frames/003.png')
     expect(screen.queryAllByTestId('콤보숫자')).toHaveLength(0)

@@ -1,11 +1,5 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
-import {
-  BASE_POSITIONS,
-  BASE_SCORE,
-  horizontalDistance,
-  isOutfieldSlot,
-  isSamePoint,
-} from '@/entities/fielding/model/fieldGeometry'
+import { BASE_POSITIONS, BASE_SCORE, horizontalDistance, isOutfieldSlot, isSamePoint } from '@/entities/fielding/model/fieldGeometry'
 import {
   isRunnerStopped,
   NONE,
@@ -145,8 +139,7 @@ function buildCandidates(input: ThrowTargetInput): BaseCandidate[] {
       const requiredSlot = wrap(runner.requiredBase)
       table[requiredSlot].force = true
       // 되돌아가야 하면 "한 루 더 가는 총 틱"(vt0xa0), 앞으로 가면 남은 틱(0xbefec)
-      table[requiredSlot].runTick =
-        runner.targetBase > runner.requiredBase ? runnerOneMoreBaseTicks(runner) : runnerRemainingTicks(runner)
+      table[requiredSlot].runTick = runner.targetBase > runner.requiredBase ? runnerOneMoreBaseTicks(runner) : runnerRemainingTicks(runner)
     } else {
       table[slot].runTick = runnerRemainingTicks(runner)
     }
@@ -249,8 +242,7 @@ export function describeThrowTarget(input: ThrowTargetInput): ThrowTargetDebug {
   }
 
   // 공 가진 야수가 어느 루 위에도 안 서 있고 투수도 아니다 (3-2 의 "밖")
-  const outside =
-    !BASE_POSITIONS.some((point) => isSamePoint(holder.position, point)) && holder.slot !== 0
+  const outside = !BASE_POSITIONS.some((point) => isSamePoint(holder.position, point)) && holder.slot !== 0
 
   const margins = [NONE, NONE, NONE, NONE]
   const topScores = [0, 0, 0, 0]

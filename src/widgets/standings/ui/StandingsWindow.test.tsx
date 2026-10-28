@@ -80,10 +80,7 @@ type NumberColumn = 'rank' | 'wins' | 'losses' | 'winningPercent'
 function columnAt(left: number, isRank: boolean): NumberColumn | null {
   if (isRank) return 'rank'
   const columns: NumberColumn[] = ['wins', 'losses', 'winningPercent']
-  return (
-    columns.find((column) => left >= ROW_CELLS[column].x && left < ROW_CELLS[column].x + ROW_CELLS[column].width) ??
-    null
-  )
+  return columns.find((column) => left >= ROW_CELLS[column].x && left < ROW_CELLS[column].x + ROW_CELLS[column].width) ?? null
 }
 
 function summaryOf(result: GameResult, opponentTeamId: number): GameSummary {
@@ -104,10 +101,7 @@ function summaryOf(result: GameResult, opponentTeamId: number): GameSummary {
 
 /** 경기를 차례로 치른 커리어 */
 function afterGames(results: readonly GameResult[]): PlayerCareer {
-  return results.reduce(
-    (career, result) => applyGameResult(career, summaryOf(result, RIVAL_TEAM)),
-    createCareer('테스터'),
-  )
+  return results.reduce((career, result) => applyGameResult(career, summaryOf(result, RIVAL_TEAM)), createCareer('테스터'))
 }
 
 const rowOf = (rows: readonly StandingsRow[], teamId: number) => rows.find((row) => row.teamId === teamId)
@@ -129,7 +123,8 @@ describe('기록실 순위표', () => {
     const rows = readStandings()
 
     expect(rowOf(rows, OUR_TEAM), `우리 팀 줄: ${JSON.stringify(rowOf(rows, OUR_TEAM))}`).toMatchObject({
-      wins: 3, losses: 1,
+      wins: 3,
+      losses: 1,
     })
     expect(rowOf(rows, RIVAL_TEAM)).toMatchObject({ wins: 1, losses: 3 })
   })

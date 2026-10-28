@@ -150,8 +150,14 @@ export function aceMagicScaledDrawOf(input: AcePitcherEffectInput, pose: number)
   if (branch === null) return null
   // 472ce `subs r3, r0, #7 / cmp #1 / bls` · 472d8 s = p − 6 — 47386 `subs r3, #8 / cmp #1 / bls` · 4738e s = p − 7
   const scale =
-    branch.number === PSYKER_NUMBER ? (pose === 7 || pose === 8 ? pose - 6 : null)
-      : branch.number === DRAGONA_NUMBER ? (pose === 8 || pose === 9 ? pose - 7 : null)
+    branch.number === PSYKER_NUMBER
+      ? pose === 7 || pose === 8
+        ? pose - 6
+        : null
+      : branch.number === DRAGONA_NUMBER
+        ? pose === 8 || pose === 9
+          ? pose - 7
+          : null
         : null
   if (scale === null) return null
   return { imageUrl: `${branch.folder}/000.png`, scale }

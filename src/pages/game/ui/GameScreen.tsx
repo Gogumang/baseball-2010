@@ -220,10 +220,14 @@ export function GameScreen({
   /** `event` — 누름 칸의 사건(닿은 시각이 붙어 있다 — `PressArea`). 키는 창 잡기 단계가 이미 사건 시각으로 칸을 넣었다 */
   const stealIfFlying = (base: StealBase, event?: Event) => {
     // 도루 키는 장면 키 칸에 든다 — 다음 틀의 키 0x498d4 → 0x53670 → 0x53610 이 그 틀의 상태(0x11)를 보고 출발시킨다
-    pushSceneKey(() => {
-      if (flightProbeRef.current?.() !== true) return
-      onSteal?.(base)
-    }, 'press', event === undefined ? undefined : inputTimeOf(event))
+    pushSceneKey(
+      () => {
+        if (flightProbeRef.current?.() !== true) return
+        onSteal?.(base)
+      },
+      'press',
+      event === undefined ? undefined : inputTimeOf(event),
+    )
   }
 
   // 벤치 클리어링 연출(상태 0x1e) — 붙든 사구가 0x12 대기 · 진입 앞이면 아직 타석 화면이 0x12 를 그린다(A-22)
@@ -240,8 +244,7 @@ export function GameScreen({
    */
   /** 상태 0xe 소개 판 값 (0x44944) */
   const matchup = gameMatchupCardsOf(progress, career)
-  const isSceneUncovered =
-    !isPaused && bannerText === '' && !isMenuOpen && overlay === null && !isBenchClearing && !isHalfInningBoardOpen
+  const isSceneUncovered = !isPaused && bannerText === '' && !isMenuOpen && overlay === null && !isBenchClearing && !isHalfInningBoardOpen
   /**
    * **교체 연출 0x16** — 진행기가 0xe 확인 뒤 0xf 진입의 CPU 투수 교체를 실어 두면(`progress.substitutionScene`) 그 OK 를 받은 뒤
    * "CHANGE" 애니를 그린다. 그동안은 0xd · 0xe 가 아니라 다음 대기를 세지 않는다(0x16 → 0xd → 0xe).
@@ -501,9 +504,7 @@ export function GameScreen({
         */}
         {sceneConfirm.isAwaiting && sceneConfirm.isInConfirmState && <SceneMatchupCards {...matchup} />}
         {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
-        {substitution.isShown && (
-          <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />
-        )}
+        {substitution.isShown && <SubstitutionSceneOverlay key={substitution.serial} aceSlot={substitution.aceSlot} onDone={substitution.finish} />}
         {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음(53066), 팝업 0x746cd 앞. 겹 `RECORD_ALERT` 라 돌발 창(장면 창)
             위, 경기 중 메뉴가 떠 있으면 메뉴 층 아래 */}
         {recordAlert !== undefined && <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />}
@@ -517,7 +518,8 @@ export function GameScreen({
           // 0xe — OK 하나만 받는다 (0x532b0)
           <PressArea label="확인" onPress={sceneConfirm.confirm} isDisabled={!sceneConfirm.acceptsConfirm} />
         )}
-        {!sceneConfirm.isAwaiting && !isMenuOpen &&
+        {!sceneConfirm.isAwaiting &&
+          !isMenuOpen &&
           stealableBases.map((base) => (
             <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)} onPress={(event) => stealIfFlying(base, event)} />
           ))}

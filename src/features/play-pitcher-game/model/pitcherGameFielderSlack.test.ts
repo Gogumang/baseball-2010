@@ -3,12 +3,7 @@ import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { DEFENSE_SCENE_START } from '@/features/defense-play/model/defenseScene'
-import {
-  pickoff,
-  startPitcherGame,
-  type PitcherGameOptions,
-  type PitcherGameProgress,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { pickoff, startPitcherGame, type PitcherGameOptions, type PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 const 기본옵션: PitcherGameOptions = {

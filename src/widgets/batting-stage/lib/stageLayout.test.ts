@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BATTER_SIDE,
-  batterSideOfForm,
-  stageLayoutOf,
-  STAGE_LAYOUT,
-  toPixel,
-  toZoneCoordinate,
-} from '@/widgets/batting-stage/lib/stageLayout'
+import { BATTER_SIDE, batterSideOfForm, stageLayoutOf, STAGE_LAYOUT, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
 import { RELEASE_PIXEL } from '@/widgets/batting-stage/lib/trajectory'
 import { pitchSituationOf, situationOf } from '@/widgets/batting-stage/lib/stageText'
 

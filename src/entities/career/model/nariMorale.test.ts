@@ -39,12 +39,21 @@ describe('나리 사기 0xa3a24 · 0xa3a44 — 팀 레코드 +2 (대회 중이�
   })
 
   it('돌발 보상 사기(0x8e34c 종류 1)만 0..100 으로 잘라 차례로 먹인다', () => {
-    expect(nariMoraleAfterBurst(95, [{ name: '사기', amount: 10 }, { name: '인기도', amount: 5 }, { name: '사기', amount: -20 }])).toBe(80)
+    expect(
+      nariMoraleAfterBurst(95, [
+        { name: '사기', amount: 10 },
+        { name: '인기도', amount: 5 },
+        { name: '사기', amount: -20 },
+      ]),
+    ).toBe(80)
   })
 
   it('타자편 돌발 보상 — 대회 중 사기는 상대국 칸에 쌓이고 커리어 사기는 그대로 (8e408~8e422)', () => {
     const career = { ...createCareer('김'), morale: 40, nationalCup: createNationalCup(), nariCupTeams: createNariCupTeams(7, 11) }
-    const rewarded = applyBurstRewards(career, [{ name: '사기', amount: -30 }, { name: '평판', amount: 5 }])
+    const rewarded = applyBurstRewards(career, [
+      { name: '사기', amount: -30 },
+      { name: '평판', amount: 5 },
+    ])
     expect(rewarded.morale).toBe(40)
     expect(nariMoraleOf(rewarded)).toBe(70)
     expect(rewarded.reputation).toBe(career.reputation + 5)

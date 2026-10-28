@@ -215,17 +215,12 @@ export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = NEW_SAVE_
   if (raw === null || typeof raw !== 'object') return { ...EMPTY_MODE_SAVE, lastPlayedMode: legacyLastPlayedMode }
   const value = raw as Partial<Record<keyof ModeSave, unknown>>
   const mode = value.lastPlayedMode
-  const lastPlayedMode = typeof mode === 'number' && Number.isInteger(mode) && mode >= 0 && mode <= MODE_LIMIT
-    ? mode
-    : legacyLastPlayedMode
-  const generalGame = value.generalGame !== undefined && value.generalGame !== null && typeof value.generalGame === 'object'
-    ? value.generalGame
-    : null
+  const lastPlayedMode = typeof mode === 'number' && Number.isInteger(mode) && mode >= 0 && mode <= MODE_LIMIT ? mode : legacyLastPlayedMode
+  const generalGame =
+    value.generalGame !== undefined && value.generalGame !== null && typeof value.generalGame === 'object' ? value.generalGame : null
   // 블록 없이 표시만 서 있을 수는 없다 — 원본은 블록과 표시를 같은 OK 에서 함께 쓴다
   const isGeneralGameInProgress = value.isGeneralGameInProgress === true && generalGame !== null
-  const nari = value.nariGames !== null && typeof value.nariGames === 'object'
-    ? (value.nariGames as Partial<Record<string, unknown>>)
-    : {}
+  const nari = value.nariGames !== null && typeof value.nariGames === 'object' ? (value.nariGames as Partial<Record<string, unknown>>) : {}
   return {
     lastPlayedMode,
     isGeneralGameInProgress,
@@ -240,22 +235,20 @@ export function normalizeModeSave(raw: unknown, legacyLastPlayedMode = NEW_SAVE_
     // 옛 세이브(칸 없음)는 SYS 8 이 적은 0(짐) 그대로
     aceMatchWon: { 3: aceMatchWonOf(value.aceMatchWon, 3), 4: aceMatchWonOf(value.aceMatchWon, 4) },
     // 옛 세이브(칸 없음) — 대기가 하나면 그 편, 둘이면 알 수 없어 타자편(4)으로 둔다(웹 전용 메움)
-    aceMatchMode: typeof value.aceMatchMode === 'number' && Number.isInteger(value.aceMatchMode)
-      ? value.aceMatchMode
-      : legacyAceMatchModeOf(value.aceMatchPending),
+    aceMatchMode:
+      typeof value.aceMatchMode === 'number' && Number.isInteger(value.aceMatchMode)
+        ? value.aceMatchMode
+        : legacyAceMatchModeOf(value.aceMatchPending),
     // 옛 세이브(칸 없음)는 새 저장 값 — 일반모드 설정은 예전 웹이 저장하지 않았다
     generalMatchSettings: normalizeModeMatchSettings(value.generalMatchSettings),
     matchSettingsSeen: value.matchSettingsSeen === true,
     // 옛 세이브(칸 없음)는 null — 시즌 세션이 시즌 저장의 값을 옮겨 온다
-    seasonMatchSettings: value.seasonMatchSettings === null || value.seasonMatchSettings === undefined
-      ? null
-      : normalizeModeMatchSettings(value.seasonMatchSettings),
+    seasonMatchSettings:
+      value.seasonMatchSettings === null || value.seasonMatchSettings === undefined ? null : normalizeModeMatchSettings(value.seasonMatchSettings),
   }
 }
 
-const MATCH_SETTING_FIELDS = [
-  'kind', 'value', 'battingOrderBits', 'pitchingInningBits', 'offenseRunnerBits', 'defenseRunnerBits',
-] as const
+const MATCH_SETTING_FIELDS = ['kind', 'value', 'battingOrderBits', 'pitchingInningBits', 'offenseRunnerBits', 'defenseRunnerBits'] as const
 
 function normalizeModeMatchSettings(raw: unknown): ModeMatchSettings {
   if (raw === null || typeof raw !== 'object') return NEW_SAVE_MATCH_SETTINGS

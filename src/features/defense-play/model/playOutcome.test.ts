@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRunner, type RunnerState } from '@/entities/fielding/model/fieldingState'
 import { countsAsAtBat } from '@/entities/at-bat/model/atBatOutcome'
-import {
-  creditedBasesOf,
-  isBattedBallKind,
-  isSacrificeOf,
-  settledBatterOutcomeOf,
-} from '@/features/defense-play/model/playOutcome'
+import { creditedBasesOf, isBattedBallKind, isSacrificeOf, settledBatterOutcomeOf } from '@/features/defense-play/model/playOutcome'
 
 /** 판이 끝난 주자 — 출발 루 · 마지막으로 닿은 루(+0x8c) · 달려가던 루(+0x7c) · 아웃/득점 */
 const 주자 = (
@@ -35,9 +30,7 @@ describe('판 끝 정산 0xa8024 의 타자 갈래 (a8096 ~ a8266)', () => {
   })
 
   it('사건 8(담장 홈런 — 결과 코드 8 · 12)이 있으면 루타 4 다 (a8192)', () => {
-    expect(
-      settledBatterOutcomeOf({ ...기본, hitEvent: false, homeRunEvent: true, runners: [주자(0, 0, { reached: 0 })] }),
-    ).toEqual({ kind: '홈런' })
+    expect(settledBatterOutcomeOf({ ...기본, hitEvent: false, homeRunEvent: true, runners: [주자(0, 0, { reached: 0 })] })).toEqual({ kind: '홈런' })
   })
 
   it('사건 6 이 없으면(공이 땅·담장에 닿기 전에 잡힘) 안타가 아니다 — 뜬공 아웃', () => {
@@ -53,16 +46,15 @@ describe('판 끝 정산 0xa8024 의 타자 갈래 (a8096 ~ a8266)', () => {
   })
 
   it('1루를 넘보지 않은 타자주자가 죽고 아웃 사건이 있으면 안타가 아니다 (a81f8) — 땅볼 아웃', () => {
-    expect(
-      settledBatterOutcomeOf({ ...기본, outEvents: 1, runners: [주자(0, 0, { reached: 0, target: 1, out: true })] }),
-    ).toEqual({ kind: '아웃', detail: '땅볼아웃' })
+    expect(settledBatterOutcomeOf({ ...기본, outEvents: 1, runners: [주자(0, 0, { reached: 0, target: 1, out: true })] })).toEqual({
+      kind: '아웃',
+      detail: '땅볼아웃',
+    })
   })
 
   it('1루를 넘보다 죽은 타자주자는 안타로 센다 — 루타 = 마지막으로 닿은 루 (a81d2 · a8210)', () => {
     // 1루를 밟고 2루로 가다 죽었다: +0x8c = 1 · +0x7c = 2
-    expect(
-      creditedBasesOf({ ...기본, outEvents: 1, runners: [주자(0, 0, { reached: 1, target: 2, out: true })] }),
-    ).toBe(1)
+    expect(creditedBasesOf({ ...기본, outEvents: 1, runners: [주자(0, 0, { reached: 1, target: 2, out: true })] })).toBe(1)
     // 직전 목표(+0x84)가 2 였다가 1루로 되돌아온 판도 같다
     expect(
       creditedBasesOf({

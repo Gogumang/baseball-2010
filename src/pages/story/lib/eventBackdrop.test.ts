@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
-  INITIAL_EVENT_BACKDROP, MANAGEMENT_PORTRAIT_BASE_Y, OUTING_MAP_PORTRAIT_BASE_Y, drawEventBackdrop, effectTimelineOf,
-  clearsDialogueBeforeMatch, effectorPhaseAt, isBlockingEffectId, lastEffectIdIn, portraitBaseYOf, soundTimelineOf,
+  INITIAL_EVENT_BACKDROP,
+  MANAGEMENT_PORTRAIT_BASE_Y,
+  OUTING_MAP_PORTRAIT_BASE_Y,
+  drawEventBackdrop,
+  effectTimelineOf,
+  clearsDialogueBeforeMatch,
+  effectorPhaseAt,
+  isBlockingEffectId,
+  lastEffectIdIn,
+  portraitBaseYOf,
+  soundTimelineOf,
 } from '@/pages/story/lib/eventBackdrop'
 import type { EventCommand } from '@/shared/config/original/eventTypes'
 
@@ -31,7 +40,10 @@ describe('효과 칠 — 0x8b5ac 0x8b62e~0x8b714', () => {
   it('재생은 0x8a380 이 비운 값([+0x2c4] = 0xb · [+0x2c8] = −1)으로 시작해 칠하지 않는다', () => {
     expect(INITIAL_EVENT_BACKDROP).toEqual({ effectId: 0xb, fill: null })
     expect(drawEventBackdrop(INITIAL_EVENT_BACKDROP, '없음')).toEqual({
-      state: INITIAL_EVENT_BACKDROP, fill: null, isEffectFill: false, resetsDialogue: false,
+      state: INITIAL_EVENT_BACKDROP,
+      fill: null,
+      isEffectFill: false,
+      resetsDialogue: false,
     })
   })
 
@@ -46,7 +58,10 @@ describe('효과 칠 — 0x8b5ac 0x8b62e~0x8b714', () => {
 
   it('id 4 · 5 가 끝나면 색을 걷는다(−1)', () => {
     expect(drawEventBackdrop({ effectId: 4, fill: '검정' }, '끝')).toEqual({
-      state: { effectId: 4, fill: null }, fill: null, isEffectFill: false, resetsDialogue: false,
+      state: { effectId: 4, fill: null },
+      fill: null,
+      isEffectFill: false,
+      resetsDialogue: false,
     })
     expect(drawEventBackdrop({ effectId: 5, fill: '흰색' }, '끝').state.fill).toBeNull()
   })
@@ -78,18 +93,31 @@ describe('명령 5 기다림 0x8b564 — id 4~7 은 효과기 끝까지 다음 �
     const 명령 = (ids: readonly number[]) => ids.map((id) => ({ op: 'effect', id })) as unknown as EventCommand[]
     expect(effectTimelineOf(명령([6]))).toMatchObject({ releaseFrame: 10, entries: [{ id: 6, start: 0 }] })
     expect(effectTimelineOf(명령([6, 4]))).toMatchObject({
-      releaseFrame: 20, entries: [{ id: 6, start: 0, kind: '검정에서밝아짐' }, { id: 4, start: 10, kind: '검게어두워짐' }],
+      releaseFrame: 20,
+      entries: [
+        { id: 6, start: 0, kind: '검정에서밝아짐' },
+        { id: 4, start: 10, kind: '검게어두워짐' },
+      ],
     })
-    expect(effectTimelineOf(명령([1])).entries).toEqual([
-      { id: 1, kind: null, color: '검정', vibrationMilliseconds: 500, start: 0, commandIndex: 0 },
-    ])
+    expect(effectTimelineOf(명령([1])).entries).toEqual([{ id: 1, kind: null, color: '검정', vibrationMilliseconds: 500, start: 0, commandIndex: 0 }])
   })
 
   it('멈추지 않는 명령도 하나에 한 틀 — 다음 명령은 다음 틀에 돈다 (0x8dac2 → 다음 0x8cf64)', () => {
     const 명령 = (ids: readonly number[]) => ids.map((id) => ({ op: 'effect', id })) as unknown as EventCommand[]
-    expect(effectTimelineOf(명령([2, 3]))).toMatchObject({ releaseFrame: 2, entries: [{ id: 2, start: 0 }, { id: 3, start: 1 }] })
+    expect(effectTimelineOf(명령([2, 3]))).toMatchObject({
+      releaseFrame: 2,
+      entries: [
+        { id: 2, start: 0 },
+        { id: 3, start: 1 },
+      ],
+    })
     expect(effectTimelineOf([{ op: 'sound', id: 52 }] as unknown as EventCommand[])).toEqual({ entries: [], releaseFrame: 1 })
-    const 섞음 = [{ op: 'sound', id: 52 }, { op: 'reward', items: [] }, { op: 'effect', id: 6 }, { op: 'sound', id: 1 }]
+    const 섞음 = [
+      { op: 'sound', id: 52 },
+      { op: 'reward', items: [] },
+      { op: 'effect', id: 6 },
+      { op: 'sound', id: 1 },
+    ]
     expect(effectTimelineOf(섞음 as unknown as EventCommand[])).toMatchObject({ releaseFrame: 2 + 10 + 1, entries: [{ id: 6, start: 2 }] })
     expect(effectTimelineOf([])).toEqual({ entries: [], releaseFrame: 0 })
   })
@@ -107,13 +135,22 @@ describe('0x8d9c2 — id 6 이 끝나고 바로 뒤가 경기 명령이면 상�
 
 describe('소리 명령의 틀 — soundTimelineOf (명령 하나에 한 틀, 막는 효과는 끝까지)', () => {
   it('소리는 앞 명령 수만큼 뒤 틀에 돈다', () => {
-    expect(soundTimelineOf([{ op: 'sound', id: 41 }, { op: 'sound', id: 35 }])).toEqual([
-      { id: 41, start: 0 }, { id: 35, start: 1 },
+    expect(
+      soundTimelineOf([
+        { op: 'sound', id: 41 },
+        { op: 'sound', id: 35 },
+      ]),
+    ).toEqual([
+      { id: 41, start: 0 },
+      { id: 35, start: 1 },
     ])
   })
 
   it('막는 효과 뒤 소리는 효과 타임라인의 다음 틀과 같다', () => {
-    const commands: EventCommand[] = [{ op: 'effect', id: 4 }, { op: 'sound', id: 35 }]
+    const commands: EventCommand[] = [
+      { op: 'effect', id: 4 },
+      { op: 'sound', id: 35 },
+    ]
     expect(soundTimelineOf(commands)).toEqual([{ id: 35, start: effectTimelineOf(commands).releaseFrame - 1 }])
   })
 })

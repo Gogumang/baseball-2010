@@ -106,10 +106,11 @@ const LABELS = ['순위', '승패', '선발', '마투수', '마타자'] as const
 
 function rankTextOf(input: SeasonMatchInfoInput, team: number): string {
   if (input.inPostseason) return POSTSEASON_RANK_TEXT
-  const rank = input.cup !== null
-    ? nationalCupMatchInfoRankOf(input.cup, team)
-    // 0xb7aa0(L, 팀, 0) 은 L+0x34·L+0x36 이 모두 0 이면 정규 순위표 갈래(b7afc)다
-    : Math.max(0, rankingOf(input.league).indexOf(team))
+  const rank =
+    input.cup !== null
+      ? nationalCupMatchInfoRankOf(input.cup, team)
+      : // 0xb7aa0(L, 팀, 0) 은 L+0x34·L+0x36 이 모두 0 이면 정규 순위표 갈래(b7afc)다
+        Math.max(0, rankingOf(input.league).indexOf(team))
   return String(rank + 1)
 }
 
@@ -149,9 +150,10 @@ export function seasonMatchInfoLines(input: SeasonMatchInfoInput): readonly Matc
     [winLossTextOf(input, myTeamId), winLossTextOf(input, opponentTeamId)],
     [
       input.myStarterName ?? starterNameOf(myTeamId, input.dayCounter),
-      input.opponentStarterName ?? (input.opponentPitcherOrder === undefined
-        ? starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter)
-        : teamPitchers(opponentTeamId)[input.opponentPitcherOrder[0] ?? 0]?.name ?? EMPTY_VALUE),
+      input.opponentStarterName ??
+        (input.opponentPitcherOrder === undefined
+          ? starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter)
+          : (teamPitchers(opponentTeamId)[input.opponentPitcherOrder[0] ?? 0]?.name ?? EMPTY_VALUE)),
     ],
     [acePitcherNameOf(input.acePitcherId), acePitcherNameOf(input.opponentAces?.pitcher ?? -1)],
     [aceBatterNameOf(input.aceBatterId), aceBatterNameOf(input.opponentAces?.batter ?? -1)],

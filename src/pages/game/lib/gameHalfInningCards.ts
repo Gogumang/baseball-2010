@@ -20,11 +20,7 @@ const DUE_UP_ROWS = 3
  * - DUE UP = 공격 팀 타순 칸 `(팀[+0x32] + i) mod 9` 의 선수 `0xae914` — 내 선수 칸(`playerOrderIndex`)은 내 이름,
  *   142 가 넣은 마타자 칸은 마선수 이름, 나머지는 붙박이 표 행 이름(읽을 때 0xb62c0 을 거친다).
  */
-export function gameHalfInningCardsOf(
-  progress: GameProgress,
-  career: Pick<PlayerCareer, 'name'>,
-  half: '초' | '말',
-): HalfInningCardsData {
+export function gameHalfInningCardsOf(progress: GameProgress, career: Pick<PlayerCareer, 'name'>, half: '초' | '말'): HalfInningCardsData {
   const { game } = progress
   const currentOrder = lineupSlotOf(game.battingOrderIndex)
   const roster = teamBatters(progress.ourTeamId)
@@ -33,7 +29,7 @@ export function gameHalfInningCardsOf(
     const rosterSlot = rosterSlotAt(progress.ourLineup, slot)
     if (rosterSlot === ACE_BATTER_ROSTER_SLOT) {
       const index = progress.aces?.ours.batter
-      return index === undefined ? null : aceBatterPlayerOf(index)?.name ?? null
+      return index === undefined ? null : (aceBatterPlayerOf(index)?.name ?? null)
     }
     return roster[rosterSlot % roster.length]?.name ?? null
   }

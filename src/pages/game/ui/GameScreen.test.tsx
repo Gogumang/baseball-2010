@@ -26,10 +26,7 @@ const 받은진행 = (bases = { first: false, second: false, third: false }): Ga
   sceneConfirm: null,
 })
 
-const 띄우기 = (
-  props: Partial<Parameters<typeof GameScreen>[0]> = {},
-  bases?: { first: boolean; second: boolean; third: boolean },
-) =>
+const 띄우기 = (props: Partial<Parameters<typeof GameScreen>[0]> = {}, bases?: { first: boolean; second: boolean; third: boolean }) =>
   render(
     <GameScreen
       career={createCareer('테스트')}
@@ -238,7 +235,9 @@ describe('타석 중간 CPU 투수 교체 — 0xf 진입 0x3d954 → 0x16 → 0x
       burst: null,
       opponentMound: { ...시작.opponentMound, stamina: 0, justChanged: false },
     }
-    const { progress, play } = arrivePitch(지침, { batterHand: 0, resolution: { kind: '볼' }, outcomeAfter: null }, random, { countAfter: { strikes: 0, balls: 1 } })
+    const { progress, play } = arrivePitch(지침, { batterHand: 0, resolution: { kind: '볼' }, outcomeAfter: null }, random, {
+      countAfter: { strikes: 0, balls: 1 },
+    })
     // 씨앗 11 은 폭투·포일(0.1%)이 안 난다
     expect(play).toBeNull()
     expect(progress.substitutionScene?.confirmsBefore).toBe(0)

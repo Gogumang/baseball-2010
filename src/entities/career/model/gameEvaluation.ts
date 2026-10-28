@@ -159,7 +159,12 @@ export interface ReputationCounts {
 }
 
 export const EMPTY_REPUTATION_COUNTS: ReputationCounts = {
-  grandSlams: 0, walkOffs: 0, buntHits: 0, walks: 0, goAheadRuns: 0, tyingRuns: 0,
+  grandSlams: 0,
+  walkOffs: 0,
+  buntHits: 0,
+  walks: 0,
+  goAheadRuns: 0,
+  tyingRuns: 0,
 }
 
 /** 평판 구간 보정 — 가산 쪽 0xd82a0 (%) */
@@ -185,11 +190,7 @@ const REPUTATION_LOSS_TIERS = [-90, -70, -50, -30, -10, 0, 5, 10, 20, 30]
  * 볼넷·역전·동점·삼진)도 없었다. 평판이 낮을수록 가산이 크게 부풀고(최대 +90%),
  * 높을수록 깎이는(−20%) 구조라 없으면 성장 곡선이 통째로 달라진다.
  */
-function reputationChangeOf(
-  popularityChange: number,
-  game: GameEvaluationInput,
-  reputation: number,
-): number {
+function reputationChangeOf(popularityChange: number, game: GameEvaluationInput, reputation: number): number {
   const { stats } = game
   const counts = game.reputationCounts ?? EMPTY_REPUTATION_COUNTS
 
@@ -197,7 +198,9 @@ function reputationChangeOf(
   const fromHits = stats.hits === 0 ? 0 : Math.min(stats.hits, 4)
   const fromHomeRuns = stats.homeRuns === 0 ? 0 : stats.homeRuns === 1 ? 2 : stats.homeRuns <= 3 ? 3 : 4
   const gain =
-    fromPopularity + fromHits + fromHomeRuns +
+    fromPopularity +
+    fromHits +
+    fromHomeRuns +
     (counts.grandSlams > 0 ? 2 : 0) +
     (isCycle(stats) ? 3 : 0) +
     (counts.walks > 1 ? 1 : 0) +
@@ -212,10 +215,7 @@ function reputationChangeOf(
     (stats.strikeouts > 1 ? STRIKEOUT_REPUTATION : 0) +
     (game.scoringPositionOuts > 0 ? SCORING_POSITION_OUT_REPUTATION : 0)
 
-  const tier = Math.min(
-    REPUTATION_GAIN_TIERS.length - 1,
-    Math.max(0, Math.trunc((reputation - 1) / 100)),
-  )
+  const tier = Math.min(REPUTATION_GAIN_TIERS.length - 1, Math.max(0, Math.trunc((reputation - 1) / 100)))
   const adjustedGain = gain + Math.trunc((gain * REPUTATION_GAIN_TIERS[tier]) / 100)
   const adjustedLoss = loss - Math.trunc((Math.abs(loss) * REPUTATION_LOSS_TIERS[tier]) / 100)
   return adjustedGain + adjustedLoss
@@ -225,12 +225,17 @@ const WIN_MORALE = 5
 const NOT_WIN_MORALE = -7
 const LUCK_SKILL = 6
 /** 라이벌 팀 쌍 (0xb8f68) — 이 두 팀이 붙으면 사기 변화가 2배다 */
-const RIVAL_PAIRS: readonly (readonly [number, number])[] = [[0, 1], [2, 7], [3, 6], [4, 5], [8, 9]]
+const RIVAL_PAIRS: readonly (readonly [number, number])[] = [
+  [0, 1],
+  [2, 7],
+  [3, 6],
+  [4, 5],
+  [8, 9],
+]
 
 export function isRivalGame(ourTeamId: number, opponentTeamId: number): boolean {
   return RIVAL_PAIRS.some(
-    ([first, second]) =>
-      (first === ourTeamId && second === opponentTeamId) || (second === ourTeamId && first === opponentTeamId),
+    ([first, second]) => (first === ourTeamId && second === opponentTeamId) || (second === ourTeamId && first === opponentTeamId),
   )
 }
 

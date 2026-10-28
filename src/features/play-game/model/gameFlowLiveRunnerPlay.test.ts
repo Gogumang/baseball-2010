@@ -58,7 +58,9 @@ describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 
       // 판이 도는 동안 도루 · 견제 · 다음 공이 안 나간다
       expect(startSteal(step.progress, 1, createSeededRandom(0))).toBe(step.progress)
       expect(cpuPickoff(step.progress, 1, createSeededRandom(1), { count: { strikes: 0, balls: 0 } })).toBe(step.progress)
-      expect(arrivePitch(step.progress, 공({ kind: '볼' }, null), createSeededRandom(1), { countAfter: { strikes: 0, balls: 1 } }).progress).toBe(step.progress)
+      expect(arrivePitch(step.progress, 공({ kind: '볼' }, null), createSeededRandom(1), { countAfter: { strikes: 0, balls: 1 } }).progress).toBe(
+        step.progress,
+      )
     }
     expect(held).toBeGreaterThan(0)
   })

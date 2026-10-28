@@ -72,14 +72,7 @@ function 시즌화면({ store }: { readonly store: JsonStorePort }) {
   useEffect(() => {
     goto(SEASON_SCENE_STATE.다음경기)
   }, [goto])
-  return (
-    <SeasonRoute
-      session={session}
-      random={createSeededRandom(20100901)}
-      gameSettings={gameSettings}
-      onExit={vi.fn()}
-    />
-  )
+  return <SeasonRoute session={session} random={createSeededRandom(20100901)} gameSettings={gameSettings} onExit={vi.fn()} />
 }
 
 /** "다음경기" 확인 → 마선수 고르기 0xd7 → 경기정보 0xdd → 경기(0xe1 → 0x104)까지 간다 */
@@ -90,8 +83,8 @@ function 경기를연다(record: SeasonRecord) {
   // 다음경기 0xd8 의 확인 (키 0x48d0 −5) → 0xd7 경기 전 마선수 고르기
   fireEvent.click(screen.getByRole('button', { name: '확인' }))
   // 새 저장은 싸이커(칸 0)·메디카(칸 5)만 열려 있다 — 단계마다 누를 수 있는 격자 칸이 하나뿐이다
-  const 열린칸 = () => screen.getAllByRole('button')
-    .filter((button) => button.hasAttribute('aria-pressed') && !(button as HTMLButtonElement).disabled)[0]
+  const 열린칸 = () =>
+    screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed') && !(button as HTMLButtonElement).disabled)[0]
   fireEvent.click(열린칸())
   fireEvent.click(열린칸())
   // 0xdd 경기정보 — 처음이라 경기진행 설정 창이 저절로 열린다. CLR 로 닫고 경기 시작

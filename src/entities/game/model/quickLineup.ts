@@ -1,9 +1,5 @@
 import { atBatResultCodeOf, quickAtBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
-import {
-  EMPTY_BATTER_GAME_RECORD,
-  judgeCpuPinchHit,
-  recordPlateAppearance,
-} from '@/entities/batting/model/pinchHitAi'
+import { EMPTY_BATTER_GAME_RECORD, judgeCpuPinchHit, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
 import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -154,10 +150,7 @@ export function tryQuickCpuPinchHit(
       blockedUntilNextPitch: situation.alreadyUsedThisGame,
       batterIsAce: situation.batterIsAce ?? false,
       // 원본은 team+0x28c 만 보고 rand(0, n) 을 돌린다 — 명단 칸이 모자랄 일은 없지만 실제 칸 수로 자른다
-      benchBatters: Math.min(
-        lineup.benchBatters,
-        Math.max(0, lineup.rosterSlots.length - QUICK_LINEUP_SIZE),
-      ),
+      benchBatters: Math.min(lineup.benchBatters, Math.max(0, lineup.rosterSlots.length - QUICK_LINEUP_SIZE)),
       record: lineup.records[slot] ?? EMPTY_BATTER_GAME_RECORD,
       runnerCount: situation.runnerCount,
       strikes: situation.strikes ?? 0,

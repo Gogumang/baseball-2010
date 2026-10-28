@@ -18,10 +18,15 @@ function psRows() {
   return new Promise((resolve) => {
     execFile('ps', ['-axo', 'pid=,ppid=,rss=,time=,comm='], { maxBuffer: 16 * 2 ** 20 }, (error, stdout) => {
       if (error !== null) return resolve([])
-      resolve(stdout.split('\n').filter(Boolean).map((line) => {
-        const [pid, ppid, rss, time, ...comm] = line.trim().split(/\s+/)
-        return { pid: Number(pid), ppid: Number(ppid), rssKB: Number(rss), cpu: secondsOf(time), comm: comm.join(' ') }
-      }))
+      resolve(
+        stdout
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => {
+            const [pid, ppid, rss, time, ...comm] = line.trim().split(/\s+/)
+            return { pid: Number(pid), ppid: Number(ppid), rssKB: Number(rss), cpu: secondsOf(time), comm: comm.join(' ') }
+          }),
+      )
     })
   })
 }
@@ -86,7 +91,11 @@ export function startUsageMeter({ rootPid = process.pid, everyMs = 500 } = {}) {
 
 /** 한 줄 요약 */
 export function formatUsage(usage, { wallMs, peakContexts } = {}) {
-  const parts = [`CPU ${usage.cpuSeconds.toFixed(0)}초`, `최대 RSS ${(usage.peakRssMB / 1024).toFixed(2)}GB`, `동시 브라우저 최대 ${usage.peakBrowsers}`]
+  const parts = [
+    `CPU ${usage.cpuSeconds.toFixed(0)}초`,
+    `최대 RSS ${(usage.peakRssMB / 1024).toFixed(2)}GB`,
+    `동시 브라우저 최대 ${usage.peakBrowsers}`,
+  ]
   if (peakContexts !== undefined) parts.push(`동시 맥락 최대 ${peakContexts}`)
   if (wallMs !== undefined) parts.push(`벽시계 ${(wallMs / 1000).toFixed(1)}s`)
   return `자원: ${parts.join(' · ')}`

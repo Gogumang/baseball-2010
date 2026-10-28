@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  vibrate,
-  vibrationGradeOf,
-  vibrationMillisecondsOf,
-  VIBRATION_MILLISECONDS_BY_GRADE,
-} from '@/entities/defense-controls/model/vibration'
+import { vibrate, vibrationGradeOf, vibrationMillisecondsOf, VIBRATION_MILLISECONDS_BY_GRADE } from '@/entities/defense-controls/model/vibration'
 
 describe('스윙 타이밍 → 진동 길이 — 원본 0xac758 · 0x5228c', () => {
   it('등급 표 (span 100, span/3 = 33)', () => {

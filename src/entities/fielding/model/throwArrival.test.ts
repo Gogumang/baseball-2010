@@ -35,9 +35,7 @@ describe('0xaf284 — 커버가 없을 때는 "직접 뛰기 vs 루 담당 야�
   })
 
   it('루 담당 야수가 이미 그 루를 목표로 하고 있으면 더 뛰지 않는다', () => {
-    const 야수 = 야수들.map((fielder, slot) =>
-      slot === 2 ? { ...fielder, targetBase: 1, target: basePosition(1) } : fielder,
-    )
+    const 야수 = 야수들.map((fielder, slot) => (slot === 2 ? { ...fielder, targetBase: 1, target: basePosition(1) } : fielder))
     const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3 }, { fielders: 야수 })
     expect(defenseArrivalTicks(문, 1)).toBe(8)
   })
@@ -45,10 +43,7 @@ describe('0xaf284 — 커버가 없을 때는 "직접 뛰기 vs 루 담당 야�
 
 describe('0xaf284 — 커버가 있으면 "남은 틱 + max(송구 + 준비, 커버 도착 − 남은 틱)"', () => {
   it('아직 안 잡은 내야 송구: 남은 6 + (송구 5 + 준비 3) = 14', () => {
-    const 문 = 문맥(
-      { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, 2, NONE, NONE], catchTick: 10 },
-      { currentTick: 4 },
-    )
+    const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, 2, NONE, NONE], catchTick: 10 }, { currentTick: 4 })
     expect(defenseArrivalTicks(문, 1)).toBe(14)
   })
 
@@ -56,10 +51,7 @@ describe('0xaf284 — 커버가 있으면 "남은 틱 + max(송구 + 준비, 커
     const 야수: readonly FielderState[] = 야수들.map((fielder, slot) =>
       slot === 3 ? { ...fielder, holdingBall: true, actionRemainingTicks: 2 } : fielder,
     )
-    const 문 = 문맥(
-      { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, 2, NONE, NONE], catchTick: 10 },
-      { fielders: 야수, currentTick: 4 },
-    )
+    const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, 2, NONE, NONE], catchTick: 10 }, { fielders: 야수, currentTick: 4 })
     // 송구 5 + 동작 2 = 7 보다 커버(1루수)가 1루에 닿는 8틱(맨해튼 ÷ 220)이 늦다
     expect(defenseArrivalTicks(문, 1)).toBe(8)
   })
@@ -75,9 +67,7 @@ describe('0xaf284 — 커버가 있으면 "남은 틱 + max(송구 + 준비, 커
   })
 
   it('커버 야수가 루에서 멀면 그 도착 틱이 하한이 된다', () => {
-    const 야수 = 야수들.map((fielder, slot) =>
-      slot === 2 ? { ...fielder, position: { x: 25_068, y: 0, z: 8_000 } } : fielder,
-    )
+    const 야수 = 야수들.map((fielder, slot) => (slot === 2 ? { ...fielder, position: { x: 25_068, y: 0, z: 8_000 } } : fielder))
     const 문 = 문맥(
       {
         ballHolderSlot: 3,
@@ -116,20 +106,14 @@ describe('사람 쪽 자동 송구 목표 0xb1c90 — 앞선 주자부터', () =
 
   it('주자 도착 틱이 송구 시간보다 크거나 같은 첫 루를 고른다', () => {
     const 느린주자 = createRunner(1, 1, runnerSpeedOf(0), { targetBase: 2 })
-    const 문 = 문맥(
-      { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, NONE, 5, NONE] },
-      { runners: [느린주자] },
-    )
+    const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, NONE, 5, NONE] }, { runners: [느린주자] })
     expect(autoThrowTargetBase(문)).toBe(2)
   })
 
   it('고리에는 커버 검사가 없다 — 커버 없는 3루도 잡을 수 있으면 고른다 (b1f7a~b2038)', () => {
     const 이루주자 = createRunner(2, 2, runnerSpeedOf(0), { targetBase: 3 })
     const 일루주자 = createRunner(1, 1, runnerSpeedOf(0), { targetBase: 2 })
-    const 문 = 문맥(
-      { ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, NONE, 5, NONE] },
-      { runners: [일루주자, 이루주자] },
-    )
+    const 문 = 문맥({ ballHolderSlot: 3, catchFielderSlot: 3, coverOfBase: [NONE, NONE, 5, NONE] }, { runners: [일루주자, 이루주자] })
     expect(autoThrowTargetBase(문)).toBe(3)
   })
 
@@ -138,10 +122,7 @@ describe('사람 쪽 자동 송구 목표 0xb1c90 — 앞선 주자부터', () =
     const 삼루앞 = { x: 16_000, y: 0, z: 22_500 }
     const 이루주자 = createRunner(2, 2, runnerSpeedOf(500), { targetBase: 3, position: 삼루앞 })
     const 일루주자 = createRunner(1, 1, runnerSpeedOf(0), { targetBase: 2 })
-    const 문 = 문맥(
-      { ballHolderSlot: 8, catchFielderSlot: 8, coverOfBase: [1, 2, 3, 4] },
-      { runners: [일루주자, 이루주자] },
-    )
+    const 문 = 문맥({ ballHolderSlot: 8, catchFielderSlot: 8, coverOfBase: [1, 2, 3, 4] }, { runners: [일루주자, 이루주자] })
     expect(autoThrowTargetBase(문)).toBe(2)
   })
 
@@ -165,10 +146,7 @@ describe('0xb1c90 의 커버 배치 갈래 0xb203a — 2루 커버가 아닌 키
   const 주자 = [{ ...createRunner(1, 1, runnerSpeedOf(500)), targetBase: 2 }]
   const 배치 = (holderSlot: number, fielders: readonly FielderState[], extra: { relayFlag?: boolean; catchFielderSlot?: number } = {}) =>
     secondBaseHelperPlacement({
-      context: 문맥(
-        { ballHolderSlot: holderSlot, catchFielderSlot: extra.catchFielderSlot ?? holderSlot },
-        { fielders, runners: 주자 },
-      ),
+      context: 문맥({ ballHolderSlot: holderSlot, catchFielderSlot: extra.catchFielderSlot ?? holderSlot }, { fielders, runners: 주자 }),
       secondBaseCover: 3,
       ballToFirstSide: false,
       relayFlag: extra.relayFlag ?? true,
@@ -179,9 +157,7 @@ describe('0xb1c90 의 커버 배치 갈래 0xb203a — 2루 커버가 아닌 키
   })
 
   it('먼 외야수가 아직 안 잡았으면 공가진야수 목표점과 루의 가운데 근처 — 중계 자리, +0x126 을 지운다', () => {
-    const 깊은중견 = 야수들.map((fielder) =>
-      fielder.slot === 8 ? { ...fielder, target: { x: 20_000, y: 0, z: 0 } } : fielder,
-    )
+    const 깊은중견 = 야수들.map((fielder) => (fielder.slot === 8 ? { ...fielder, target: { x: 20_000, y: 0, z: 0 } } : fielder))
     const 답 = 배치(8, 깊은중견)
     expect(답.kind).toBe('자리')
     if (답.kind !== '자리') return
@@ -192,9 +168,7 @@ describe('0xb1c90 의 커버 배치 갈래 0xb203a — 2루 커버가 아닌 키
   })
 
   it('외야수가 이미 쥐었으면 +0x126 이 지워진 뒤엔 그 자리에 멈추고, 아니면 기본 자리다 (b2318)', () => {
-    const 쥔중견 = 야수들.map((fielder) =>
-      fielder.slot === 8 ? { ...fielder, target: { x: 20_000, y: 0, z: 0 }, holdingBall: true } : fielder,
-    )
+    const 쥔중견 = 야수들.map((fielder) => (fielder.slot === 8 ? { ...fielder, target: { x: 20_000, y: 0, z: 0 }, holdingBall: true } : fielder))
     expect(배치(8, 쥔중견, { relayFlag: false })).toMatchObject({ target: 쥔중견[5].position })
     expect(배치(8, 쥔중견, { relayFlag: true })).toMatchObject({ target: { x: 14_500, y: 0, z: 17_600 } })
   })

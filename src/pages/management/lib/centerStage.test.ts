@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CENTER_STAGE, coachPortraitIndexOf, leadExpressionOf, nariStageCharactersOf, seasonStageCharactersOf, stageSlideOffsetAt,
+  CENTER_STAGE,
+  coachPortraitIndexOf,
+  leadExpressionOf,
+  nariStageCharactersOf,
+  seasonStageCharactersOf,
+  stageSlideOffsetAt,
 } from '@/pages/management/lib/centerStage'
 
 describe('가운데 판 0x7f814 — 경기장 띠 위 인물', () => {
@@ -26,9 +31,12 @@ describe('가운데 판 0x7f814 — 경기장 띠 위 인물', () => {
       { file: 'event_char_1', animation: 7, palette: null, x: 85 },
       { file: 'event_char_0', animation: 22, palette: null, x: 155 },
     ])
-    expect(seasonStageCharactersOf({ teamMorale: 70, illness: 0, coach: 0 })[0]).toEqual(
-      { file: 'event_char_2', animation: 40, palette: null, x: 85 },
-    )
+    expect(seasonStageCharactersOf({ teamMorale: 70, illness: 0, coach: 0 })[0]).toEqual({
+      file: 'event_char_2',
+      animation: 40,
+      palette: null,
+      x: 85,
+    })
   })
 
   it('나리: 선수 하나(idx 1) — 장타형 +8 · 피부 팔레트(1 → 0 · 2 → 1 · 0 → 없음)', () => {

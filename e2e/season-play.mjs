@@ -33,8 +33,9 @@ await openScene(page, 'season-management')
 async function pressButton(name) {
   const found = await page.evaluate((label) => {
     for (const old of document.querySelectorAll('[data-season-play]')) old.removeAttribute('data-season-play')
-    const target = [...document.querySelectorAll('button, [role="button"]')]
-      .find((element) => !element.matches(':disabled') && (element.getAttribute('aria-label') === label || element.textContent?.trim() === label))
+    const target = [...document.querySelectorAll('button, [role="button"]')].find(
+      (element) => !element.matches(':disabled') && (element.getAttribute('aria-label') === label || element.textContent?.trim() === label),
+    )
     target?.setAttribute('data-season-play', '')
     return target !== undefined
   }, name)

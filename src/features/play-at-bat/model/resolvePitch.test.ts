@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isHitByPitch, isStrikeZonePitch, plateErrorOf, resolvePitch, STRIKE_ZONE_BOXES, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
+import {
+  isHitByPitch,
+  isStrikeZonePitch,
+  plateErrorOf,
+  resolvePitch,
+  STRIKE_ZONE_BOXES,
+  unjudgedSwingDetailOf,
+} from '@/features/play-at-bat/model/resolvePitch'
 import { projectToPlate } from '@/entities/pitching/model/pitchCurve'
 import type { BattingContext } from '@/features/play-at-bat/model/resolvePitch'
 import { createPatternDeck, lastDrawnPattern } from '@/entities/batting/model/battedBallOutcome'
@@ -26,7 +33,18 @@ const 상황: BattingContext = {
   pitcher: { control: 30, velocity: 30 },
   mode: '일반',
   batterSkillIds: [],
-  situation: { inning: 1, isLosing: false, runnerCount: 0, hasSecondBaseRunner: false, pitcherSide: 0, batterSide: 0, balls: 0, strikes: 0, batterOrderIndex: 0, recentAtBatCodes: [] },
+  situation: {
+    inning: 1,
+    isLosing: false,
+    runnerCount: 0,
+    hasSecondBaseRunner: false,
+    pitcherSide: 0,
+    batterSide: 0,
+    balls: 0,
+    strikes: 0,
+    batterOrderIndex: 0,
+    recentAtBatCodes: [],
+  },
 }
 
 const 고정 = (value: number): RandomPort => createConstantRandom(value)
@@ -60,7 +78,14 @@ describe('resolvePitch — 스윙하지 않은 경우', () => {
 
 describe('스트라이크 판정 — 0x3dfac 의 상자 0xcfb7c[side] (경계 포함)', () => {
   /** 판정 좌표 px 가 원하는 값이 되는 도착 x — side 1 존 중심(20585)에서 x 를 옮긴다 */
-  const 공 = (x: number) => 직구({ worldPath: [{ x: 19501, y: 1110, z: 24500 }, { x, y: 1202, z: 29705 }], stageSide: 1 })
+  const 공 = (x: number) =>
+    직구({
+      worldPath: [
+        { x: 19501, y: 1110, z: 24500 },
+        { x, y: 1202, z: 29705 },
+      ],
+      stageSide: 1,
+    })
 
   it('궤적 마지막 점의 투영이 상자 (221, 310, 33, 33) 안이면 스트라이크', () => {
     expect(isStrikeZonePitch(공(20585))).toBe(true)
@@ -102,7 +127,13 @@ describe('판정 없는 스윙 — 0x6aa 를 안 탄 스윙은 헛스윙 스트�
 
 /** 도착점 하나짜리 궤적 — 판정 좌표는 궤적 마지막 점의 `projectToPlate` 다 (scene+0x10dc/+0x10e0) */
 const 도착 = (x: number, y: number, stageSide: number) =>
-  직구({ worldPath: [{ x: 19501, y: 1110, z: 24500 }, { x, y, z: 29705 }], stageSide })
+  직구({
+    worldPath: [
+      { x: 19501, y: 1110, z: 24500 },
+      { x, y, z: 29705 },
+    ],
+    stageSide,
+  })
 const 안굴림: RandomPort = {
   rand: () => {
     throw new Error('사구 판정은 난수를 쓰지 않는다')

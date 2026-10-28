@@ -18,7 +18,6 @@ const WINDOW_FOLDER = assetUrl('./sprites/mode_back/frames')
 /** 창 배경은 mode_back 을 (1, 52) 에 그린다 — 잘라내기 틀이 (1, 66) 이라 틀 안에서는 y −14 */
 const WINDOW_OFFSET_Y = 52 - 66
 
-
 interface TrainingSceneProps {
   /** null 이면 연출 없이 창만 보인다 */
   readonly presentation: TrainingPresentation | null
@@ -114,12 +113,7 @@ export function TrainingScene({ presentation, battingTypeIndex = 0, equipmentLev
     <div className={styles.scene}>
       <div className={styles.windowClip}>
         {windowOrigin !== undefined && (
-          <img
-            className={styles.sprite}
-            style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-            src={windowSprite.src}
-            alt=""
-          />
+          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
         )}
       </div>
       <div className={styles.animationClip}>

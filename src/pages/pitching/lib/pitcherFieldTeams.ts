@@ -1,10 +1,6 @@
 import type { NariRecordFielder } from '@/entities/career/model/nariTeamRecord'
 import { ACE_PITCHER_SLOT } from '@/features/play-game/model/gameAces'
-import {
-  OUR_ACE_PITCHER_SLOT,
-  type PitcherGameOptions,
-  type PitcherGameProgress,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import { OUR_ACE_PITCHER_SLOT, type PitcherGameOptions, type PitcherGameProgress } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { WalkTeamAces } from '@/widgets/field-walk/lib/walkerAces'
 
 /** 투수편 두 팀의 레코드 타자 배열 차례 (`nariRecordFieldersOf` — 부르는 쪽이 커리어 레코드 · 대회 칸에서 읽는다) */

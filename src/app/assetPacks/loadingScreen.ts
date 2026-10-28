@@ -22,14 +22,27 @@ export function showAssetLoadingScreen(): AssetLoadingScreen {
   overlay.setAttribute('aria-valuemin', '0')
   overlay.setAttribute('aria-valuemax', '100')
   Object.assign(overlay.style, {
-    position: 'fixed', inset: '0', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#000', zIndex: '1000',
+    position: 'fixed',
+    inset: '0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#000',
+    zIndex: '1000',
   })
   const board = document.createElement('div')
   Object.assign(board.style, {
-    aspectRatio: '3 / 4', height: 'min(100%, calc(100vw * 4 / 3))', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: '12px', color: '#fff', background: '#000',
-    fontFamily: theme.font.body, fontSize: '16px',
+    aspectRatio: '3 / 4',
+    height: 'min(100%, calc(100vw * 4 / 3))',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    color: '#fff',
+    background: '#000',
+    fontFamily: theme.font.body,
+    fontSize: '16px',
   })
   const title = document.createElement('div')
   title.textContent = '게임 자료 받는 중'

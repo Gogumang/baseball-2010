@@ -92,24 +92,36 @@ export function PitcherTrainingScene({ presentation, look, onFinished }: Pitcher
   const { figure } = presentation
 
   return (
-    <div data-testid="투수-훈련팝업" data-slot={presentation.slot} data-file={presentation.file}
+    <div
+      data-testid="투수-훈련팝업"
+      data-slot={presentation.slot}
+      data-file={presentation.file}
       data-animation={presentation.animation}
       style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}
-      onClick={() => skipRef.current()}>
+      onClick={() => skipRef.current()}
+    >
       <div className={styles.windowClip}>
         {windowOrigin !== undefined && (
-          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }}
-            src={windowSprite.src} alt="" />
+          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
         )}
       </div>
       <div className={styles.animationClip}>
         {origin !== undefined && step !== null && (
-          <img className={styles.sprite} style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
-            src={`${folder}/${frameKey}.png`} alt="" />
+          <img
+            className={styles.sprite}
+            style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
+            src={`${folder}/${frameKey}.png`}
+            alt=""
+          />
         )}
         {figure !== null && step !== null && (
-          <PitcherTrainingFigure look={look} pose={figurePoseAt(figure.poses, step.entryIndex)} poses={figure.poses}
-            x={ANCHOR.x + figure.dx} y={ANCHOR.y + figure.dy} />
+          <PitcherTrainingFigure
+            look={look}
+            pose={figurePoseAt(figure.poses, step.entryIndex)}
+            poses={figure.poses}
+            x={ANCHOR.x + figure.dx}
+            y={ANCHOR.y + figure.dy}
+          />
         )}
       </div>
       <TrainingGauge filled={update} />
@@ -121,7 +133,13 @@ export function PitcherTrainingScene({ presentation, look, onFinished }: Pitcher
  * 단일 PZX 투수 그림 0x79525 — 동작 번호 = pitcher.pzx 프레임 번호(0x795f6). 겹 · 팔레트는 기본정보 카드와 같은 0x10810 값이고,
  * 0x11744 가 그 뒤 +0x3c 를 0 으로 둬 손과 상관없이 안 뒤집는다.
  */
-function PitcherTrainingFigure({ look, pose, poses, x, y }: {
+function PitcherTrainingFigure({
+  look,
+  pose,
+  poses,
+  x,
+  y,
+}: {
   readonly look: HallOfFameFigureLook
   readonly pose: number
   /** 이 애니가 낼 자세들 — 그 겹을 미리 칠해 둔다 */
@@ -134,7 +152,14 @@ function PitcherTrainingFigure({ look, pose, poses, x, y }: {
   const paletteOf = (layer: BatterLayer) =>
     layer.gradePaletteRow ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(look.skin, look.team) : null)
   return (
-    <FigureLayers layers={pitcherLayersOf(pose, equipment)} x={x} y={y} isMirrored={false} paletteOf={paletteOf}
-      testId="투수-훈련-투수" warmLayers={[...new Set(poses)].flatMap((shown) => pitcherLayersOf(shown, equipment))} />
+    <FigureLayers
+      layers={pitcherLayersOf(pose, equipment)}
+      x={x}
+      y={y}
+      isMirrored={false}
+      paletteOf={paletteOf}
+      testId="투수-훈련-투수"
+      warmLayers={[...new Set(poses)].flatMap((shown) => pitcherLayersOf(shown, equipment))}
+    />
   )
 }

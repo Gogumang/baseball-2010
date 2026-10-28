@@ -13,14 +13,7 @@ import {
   TAG_DISTANCE,
   type AutoAdvanceInput,
 } from '@/entities/fielding/model/autoAdvance'
-import {
-  createFielders,
-  createRunner,
-  initialPlayView,
-  NONE,
-  type PlayView,
-  type RunnerState,
-} from '@/entities/fielding/model/fieldingState'
+import { createFielders, createRunner, initialPlayView, NONE, type PlayView, type RunnerState } from '@/entities/fielding/model/fieldingState'
 
 const 야수들 = createFielders(Array.from({ length: 9 }, () => 500))
 const 주력500 = runnerSpeedOf(500)
@@ -32,11 +25,7 @@ const 끌려나간수비 = 야수들.map((fielder, slot) => {
   return fielder
 })
 
-const 문맥 = (
-  play: Partial<PlayView>,
-  runners: readonly RunnerState[],
-  overrides: Partial<AutoAdvanceInput> = {},
-): AutoAdvanceInput => ({
+const 문맥 = (play: Partial<PlayView>, runners: readonly RunnerState[], overrides: Partial<AutoAdvanceInput> = {}): AutoAdvanceInput => ({
   play: { ...initialPlayView(1), ...play },
   fielders: 야수들,
   runners,
@@ -63,17 +52,13 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     // **2루를 밟고 선** 주자. 3루수가 좌중간 깊이 끌려 나가 있어 3루 도착이 78틱 이나 된다.
     // (원본이 재는 루는 `b = ([주자+0x8c] + 1) % 4` — **마지막으로 닿은 루**에서 한 칸이다)
     const 주자 = createRunner(1, 2, 주력500)
-    const 결정 = autoAdvanceDecisions(
-      문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [주자], { fielders: 끌려나간수비 }),
-    )
+    const 결정 = autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [주자], { fielders: 끌려나간수비 }))
     expect(결정).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 
   it('죽은 주자(+0x96)도 거르지 않는다 — 루프 af93c~afa36 에 +0x96 검사가 없다', () => {
     const 죽은 = { ...createRunner(1, 2, 주력500), isOut: true }
-    const 결정 = autoAdvanceDecisions(
-      문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [죽은], { fielders: 끌려나간수비 }),
-    )
+    const 결정 = autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8 }, [죽은], { fielders: 끌려나간수비 }))
     expect(결정).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 
@@ -89,9 +74,7 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     })
     expect(autoAdvanceDecisions(문)).toEqual([])
     // 잡히고 나면(태그업 뒤) 다시 판단한다
-    expect(autoAdvanceDecisions({ ...문, play: { ...문.play, everHeld: true } })).toEqual([
-      { runnerIndex: 1, toBase: 3 },
-    ])
+    expect(autoAdvanceDecisions({ ...문, play: { ...문.play, everHeld: true } })).toEqual([{ runnerIndex: 1, toBase: 3 }])
   })
 
   it('플레이 종류 2·3(볼넷)·8 은 아예 보지 않는다', () => {
@@ -105,9 +88,7 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     const 주자 = createRunner(1, 2, 주력500, { targetBase: 2 })
     // 달리는 중인 주자는 force 없이는 원본도 건너뛴다 (0xaf950)
     const 달리는중 = createRunner(1, 2, 주력500, { targetBase: 3 })
-    expect(
-      autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8, finished: true }, [달리는중])),
-    ).toEqual([])
+    expect(autoAdvanceDecisions(문맥({ ballHolderSlot: 8, catchFielderSlot: 8, finished: true }, [달리는중]))).toEqual([])
     // 두 칸이 서면 **진루 자리(0xafa0e)로 곧장 뛴다**
     for (const play of [{ finished: true }, { suppressed: true }]) {
       expect(
@@ -132,10 +113,7 @@ describe('자동 추가 진루 0xaf918 — "수비보다 2틱 이상 빠를 때�
     // vt94(잡힐 뜬공) 이고 아직 안 잡혔어도 마찬가지다
     expect(
       autoAdvanceDecisions({
-        ...문맥(
-          { ballHolderSlot: 8, catchFielderSlot: 8, earliestCatchTick: 5, everHeld: false, suppressed: true },
-          [주자],
-        ),
+        ...문맥({ ballHolderSlot: 8, catchFielderSlot: 8, earliestCatchTick: 5, everHeld: false, suppressed: true }, [주자]),
         force: true,
       }),
     ).toEqual([{ runnerIndex: 1, toBase: 3 }])
@@ -208,10 +186,7 @@ describe('포스와 태그업 — 요구 루 세우기', () => {
 
   it('주자 번호는 빈 루를 건너뛴 **목록 번호**다 — 2루 주자만 있으면 번호 1 (0xa9a10·0xa93ac)', () => {
     // 원본 목록도 `[타자주자, 2루 주자]` 두 칸뿐이다. 2루 주자의 번호는 2 가 아니라 1.
-    const 주자들 = [
-      createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }),
-      createRunner(1, 2, 주력500, { targetBase: 2, pitchBase: 2 }),
-    ]
+    const 주자들 = [createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }), createRunner(1, 2, 주력500, { targetBase: 2, pitchBase: 2 })]
     // 타자주자: 닿은 루 0 ≤ 번호 0 → 요구 1루(타자주자는 언제나 포스다).
     // 2루 주자: 닿은 루 2 > 번호 1 → 요구 없음 — **1루가 비었으니 포스가 아니다**.
     expect(requiredBasesOnBounce(주자들)).toEqual([1, NONE])
@@ -226,10 +201,7 @@ describe('포스와 태그업 — 요구 루 세우기', () => {
   })
 
   it('뜬공을 잡으면 모두 원래 루로 돌아가 밟아야 한다 (0xa9620 태그업)', () => {
-    const 주자들 = [
-      createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }),
-      createRunner(1, 2, 주력500, { targetBase: 3, pitchBase: 2 }),
-    ]
+    const 주자들 = [createRunner(0, 0, 주력500, { targetBase: 1, pitchBase: 0 }), createRunner(1, 2, 주력500, { targetBase: 3, pitchBase: 2 })]
     expect(requiredBasesOnFlyCatch(주자들)).toEqual([0, 2])
   })
 
@@ -262,8 +234,7 @@ describe('주자 틱 a028c — 요구 루(+0x88)를 밟기 전에는 그 너머�
 
 describe('앞길 검사 0xa9924 · 방향 판정 0x9fe80 — 원본 갈래 그대로', () => {
   /** 루 from 에서 to 로 막 출발한 주자 (위치는 아직 출발 루) */
-  const 출발 = (index: number, from: number, to: number): RunnerState =>
-    createRunner(index, from, 주력500, { targetBase: to })
+  const 출발 = (index: number, from: number, to: number): RunnerState => createRunner(index, from, 주력500, { targetBase: to })
   /** 루 b 에 멈춰 선 주자 */
   const 선 = (index: number, b: number): RunnerState => createRunner(index, b, 주력500)
 

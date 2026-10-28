@@ -17,9 +17,28 @@ import { LeftFrame } from '@/shared/ui/LeftFrame/LeftFrame'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import type { ModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import {
-  BAND_BACKGROUND, BAND_WINDOW, BATTER_EDITION_MODE, CREDITS, ENDING_IMAGE, ENDING_STAGE, INJURY_ENDING, IRIS_COVER,
-  LAST_WALK_IN_ENDING, RISING_TEXT, SCREEN, SHORT_ENDING_TEXT_TOP, WALK_IN, creditsTopOf, creditsWalkersOf,
-  endingImageOffsetOf, endingStageZeroCoverOpacityAt, endingWalkInAnimationOf, endingWalkInPaletteOf, irisCircleOf, irisStartTickOf, risingTextTopOf,
+  BAND_BACKGROUND,
+  BAND_WINDOW,
+  BATTER_EDITION_MODE,
+  CREDITS,
+  ENDING_IMAGE,
+  ENDING_STAGE,
+  INJURY_ENDING,
+  IRIS_COVER,
+  LAST_WALK_IN_ENDING,
+  RISING_TEXT,
+  SCREEN,
+  SHORT_ENDING_TEXT_TOP,
+  WALK_IN,
+  creditsTopOf,
+  creditsWalkersOf,
+  endingImageOffsetOf,
+  endingStageZeroCoverOpacityAt,
+  endingWalkInAnimationOf,
+  endingWalkInPaletteOf,
+  irisCircleOf,
+  irisStartTickOf,
+  risingTextTopOf,
 } from '@/pages/ending/lib/endingLayout'
 import type { CreditsWalker, EndingWalkInLook } from '@/pages/ending/lib/endingLayout'
 import * as styles from '@/pages/ending/ui/EndingScreen.css'
@@ -219,25 +238,28 @@ export function EndingScreen(props: EndingScreenProps) {
           onLater: onFinish,
         }}
         onBack={onFinish}
-        {...(hallOfFame.gamePoint === undefined ? {} : {
-          frame: {
-            title: hallOfFame.edition === '타자' ? '나만의리그타자편' : '나만의리그투수편',
-            gamePoint: hallOfFame.gamePoint,
-          },
-        })}
+        {...(hallOfFame.gamePoint === undefined
+          ? {}
+          : {
+              frame: {
+                title: hallOfFame.edition === '타자' ? '나만의리그타자편' : '나만의리그투수편',
+                gamePoint: hallOfFame.gamePoint,
+              },
+            })}
       />
     )
   }
 
   /** 엔딩 → (부상·방출이면 이어하기 / 그 밖이면 단계 1 의 키만 단계 2 로 — 어둡게 덮은 뒤 제작진) → 보너스 → 등록 */
-  const onPress = phase === '엔딩'
-    ? () => {
-      if (isContinuable) return setPhase('이어하기질문')
-      if (stage === 1) setLeavingAt(tick)
-    }
-    : phase === '제작진'
-      ? () => setPhase(bonusGamePoint > 0 && props.isBonusReceived !== true ? '보너스' : '등록질문')
-      : undefined
+  const onPress =
+    phase === '엔딩'
+      ? () => {
+          if (isContinuable) return setPhase('이어하기질문')
+          if (stage === 1) setLeavingAt(tick)
+        }
+      : phase === '제작진'
+        ? () => setPhase(bonusGamePoint > 0 && props.isBonusReceived !== true ? '보너스' : '등록질문')
+        : undefined
   pressRef.current = onPress
 
   const romanceEndingIndex = romanceEndingIndexOf(endingIndex, seenEventIds)
@@ -248,43 +270,49 @@ export function EndingScreen(props: EndingScreenProps) {
    * 이 틀의 효과기 덮개 — 단계 0 은 진입 0x12300 이 건 종류 1(어두워짐)이 남은 앞 화면 위에, 단계 1 은 종류 2(밝아짐),
    * 단계 2 는 종류 1(어두워짐), 단계 3 은 n = 0 부터 다시 종류 2
    */
-  const stageZeroCover = stage === 0
-    ? endingStageZeroCoverOpacityAt(tick, props.isResumed === true,
-      (k) => screenEffectFrameAt('검정에서밝아짐', '검정', k)?.overlay?.opacity ?? 0)
-    : 0
-  const effect = stage === 0
-    ? screenEffectFrameAt('검정에서밝아짐', '검정', tick)
-    : stage === 1
-    ? screenEffectFrameAt('검게어두워짐', '검정', tick - ENDING_STAGE.firstStageAt)
-    : stage === 2 && leavingAt !== null
-      ? screenEffectFrameAt('검정에서밝아짐', '검정', tick - leavingAt)
-      : stage === 3 && creditsAt !== null
-        ? screenEffectFrameAt('검게어두워짐', '검정', tick - creditsAt)
-        : null
+  const stageZeroCover =
+    stage === 0
+      ? endingStageZeroCoverOpacityAt(tick, props.isResumed === true, (k) => screenEffectFrameAt('검정에서밝아짐', '검정', k)?.overlay?.opacity ?? 0)
+      : 0
+  const effect =
+    stage === 0
+      ? screenEffectFrameAt('검정에서밝아짐', '검정', tick)
+      : stage === 1
+        ? screenEffectFrameAt('검게어두워짐', '검정', tick - ENDING_STAGE.firstStageAt)
+        : stage === 2 && leavingAt !== null
+          ? screenEffectFrameAt('검정에서밝아짐', '검정', tick - leavingAt)
+          : stage === 3 && creditsAt !== null
+            ? screenEffectFrameAt('검게어두워짐', '검정', tick - creditsAt)
+            : null
 
   return (
     <RawScreen>
-      {stage === 0
+      {stage === 0 ? (
         // 단계 0 — 그리기 0x882c4 가 아무것도 안 그려 화면 버퍼에 앞 화면의 마지막 틀이 남고 효과기가 쌓인다 (`LeftFrame`)
-        ? (
-          <>
-            <LeftFrame part="stage-0" />
-            {stageZeroCover > 0 && (
-              <div data-part="stage-0-cover"
-                style={{ position: 'absolute', inset: 0, background: '#000000', opacity: stageZeroCover, pointerEvents: 'none' }} />
-            )}
-          </>
-        )
-        : isCredits && creditsAt !== null
-          ? <EndingCredits romanceEndingIndex={romanceEndingIndex} romanceEvents={romanceEventsSeenOf(seenEventIds)} look={walkInLook}
-            tick={Math.max(0, tick - creditsAt)} band={band} />
-          : endingIndex <= LAST_WALK_IN_ENDING
-            ? <ShortEnding endingIndex={endingIndex} look={walkInLook} tick={tick} band={band} />
-            : <RetirementEnding endingIndex={endingIndex} playerName={playerName} tick={tick} />}
-
-      {onPress !== undefined && (
-        <button type="button" className={styles.pressArea} aria-label="확인" onClick={onPress} />
+        <>
+          <LeftFrame part="stage-0" />
+          {stageZeroCover > 0 && (
+            <div
+              data-part="stage-0-cover"
+              style={{ position: 'absolute', inset: 0, background: '#000000', opacity: stageZeroCover, pointerEvents: 'none' }}
+            />
+          )}
+        </>
+      ) : isCredits && creditsAt !== null ? (
+        <EndingCredits
+          romanceEndingIndex={romanceEndingIndex}
+          romanceEvents={romanceEventsSeenOf(seenEventIds)}
+          look={walkInLook}
+          tick={Math.max(0, tick - creditsAt)}
+          band={band}
+        />
+      ) : endingIndex <= LAST_WALK_IN_ENDING ? (
+        <ShortEnding endingIndex={endingIndex} look={walkInLook} tick={tick} band={band} />
+      ) : (
+        <RetirementEnding endingIndex={endingIndex} playerName={playerName} tick={tick} />
       )}
+
+      {onPress !== undefined && <button type="button" className={styles.pressArea} aria-label="확인" onClick={onPress} />}
       {phase === '보너스' && (
         <MessageBox
           text={TEXT.bonus.replace('%d', String(bonusGamePoint))}
@@ -296,11 +324,7 @@ export function EndingScreen(props: EndingScreenProps) {
         />
       )}
       {question !== null && (
-        <MessageBox
-          text={question.text}
-          buttons={['예', '아니오']}
-          onAnswer={(index) => (index === 0 ? question.onYes() : question.onNo())}
-        />
+        <MessageBox text={question.text} buttons={['예', '아니오']} onAnswer={(index) => (index === 0 ? question.onYes() : question.onNo())} />
       )}
       {/* 효과기 0xbd844 는 장면 그리기 끝(창 0x746cd 뒤)에 칠한다 — 창까지 덮는다 */}
       {effect?.overlay != null && effect.overlay.opacity > 0 && (
@@ -388,7 +412,12 @@ function BandWindow({ band, children }: { readonly band: ModeBackSprite; readonl
 }
 
 /** 부상·방출 엔딩 (0x883b6 갈래) — 띠 창 + 걸어 들어오는 선수(+ 부상 아이콘) + StrENDING[e] */
-function ShortEnding({ endingIndex, look, tick, band }: {
+function ShortEnding({
+  endingIndex,
+  look,
+  tick,
+  band,
+}: {
   readonly endingIndex: number
   readonly look: EndingWalkInLook
   /** 141 에 들어와 돈 틀 수 n */
@@ -398,10 +427,7 @@ function ShortEnding({ endingIndex, look, tick, band }: {
   return (
     <BandWindow band={band}>
       <WalkIn tick={tick} look={look} hasInjuryIcon={endingIndex === INJURY_ENDING} />
-      <div
-        className={styles.endingText}
-        style={{ left: 0, top: SHORT_ENDING_TEXT_TOP, width: SCREEN.width }}
-      >
+      <div className={styles.endingText} style={{ left: 0, top: SHORT_ENDING_TEXT_TOP, width: SCREEN.width }}>
         <MarkupText raw={ORIGINAL_ENDINGS[endingIndex] ?? ''} />
       </div>
     </BandWindow>
@@ -412,7 +438,11 @@ function ShortEnding({ endingIndex, look, tick, band }: {
  * 은퇴 엔딩 2~9 (0x886ca 갈래) — ending.pzx 그림이 미끄러져 서고, 원형 전환이 e 의 자리로 닫히며,
  * StrENDING[20] 머리말 + 본 엔딩 글이 아래에서 올라온다.
  */
-function RetirementEnding({ endingIndex, playerName, tick }: {
+function RetirementEnding({
+  endingIndex,
+  playerName,
+  tick,
+}: {
   readonly endingIndex: number
   readonly playerName: string
   /** 141 에 들어와 돈 틀 수 n */
@@ -446,17 +476,16 @@ function RetirementEnding({ endingIndex, playerName, tick }: {
           <path
             fillRule="evenodd"
             fill={IRIS_COVER}
-            d={`M0,0H${SCREEN.width}V${SCREEN.height}H0Z`
-              + `M${circle.x},${circle.y + circle.diameter / 2}`
-              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0`
-              + `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`}
+            d={
+              `M0,0H${SCREEN.width}V${SCREEN.height}H0Z` +
+              `M${circle.x},${circle.y + circle.diameter / 2}` +
+              `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0` +
+              `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`
+            }
           />
         </svg>
       )}
-      <div
-        className={styles.endingText}
-        style={{ left: RISING_TEXT.x, top: risingTextTopOf(tick), width: RISING_TEXT.width }}
-      >
+      <div className={styles.endingText} style={{ left: RISING_TEXT.x, top: risingTextTopOf(tick), width: RISING_TEXT.width }}>
         <MarkupText raw={risingText} replacements={[playerName]} />
       </div>
     </>
@@ -464,7 +493,15 @@ function RetirementEnding({ endingIndex, playerName, tick }: {
 }
 
 /** 프레임 한 장 — 팔레트를 갈아 끼우고, 뒤집기 깃발이면 원점을 거울로 놓는다 */
-function FramePiece({ folder, frame, origins, x, y, palette = null, isFlipped = false }: {
+function FramePiece({
+  folder,
+  frame,
+  origins,
+  x,
+  y,
+  palette = null,
+  isFlipped = false,
+}: {
   readonly folder: string
   readonly frame: number
   readonly origins: FrameOrigins | null
@@ -490,11 +527,7 @@ function FramePiece({ folder, frame, origins, x, y, palette = null, isFlipped = 
  * 애니 번호는 육성 선수 레코드의 외모 비트가 고른다 — 타자 장타형이면 **8+2**, 그 밖 **0+2** (0x63a5c).
  * 팔레트는 `event_char_0.mpl` 의 `endingWalkInPaletteOf` 벌로 갈아 끼운다 (0x63a92).
  */
-function WalkIn({ tick, look, hasInjuryIcon }: {
-  readonly tick: number
-  readonly look: EndingWalkInLook
-  readonly hasInjuryIcon: boolean
-}) {
+function WalkIn({ tick, look, hasInjuryIcon }: { readonly tick: number; readonly look: EndingWalkInLook; readonly hasInjuryIcon: boolean }) {
   const origins = useFrameOrigins(WALK_IN.characterFolder)
   const animations = useAnimations(WALK_IN.characterFolder)
   const iconOrigins = useFrameOrigins(WALK_IN.iconFolder)
@@ -502,7 +535,13 @@ function WalkIn({ tick, look, hasInjuryIcon }: {
   const step = entries === undefined ? null : animationStepAt(entries, tick)
   const palette = endingWalkInPaletteOf(look)
   // 이 애니의 칸 전부를 미리 칠한다 — 넘어가는 칸마다 구운 벌이 한 박자 비치지 않게 (원본은 적재 때 팔레트를 갈아 끼운다)
-  useWarmRecoloredSprites(recolorRequestsOf(WALK_IN.characterFolder, (entries ?? []).map((entry) => entry.frame), palette))
+  useWarmRecoloredSprites(
+    recolorRequestsOf(
+      WALK_IN.characterFolder,
+      (entries ?? []).map((entry) => entry.frame),
+      palette,
+    ),
+  )
 
   return (
     <div data-palette={palette} data-animation={endingWalkInAnimationOf(look)}>
@@ -533,7 +572,11 @@ function WalkIn({ tick, look, hasInjuryIcon }: {
 const TURN_TICKS = 20
 
 /** 제작진 인물 하나 — 애니를 돌리며 띠 아래(196)에 선다 (0x88d8c~0x88e8a) */
-function CreditsWalkerSprite({ walker, tick, playerPalette }: {
+function CreditsWalkerSprite({
+  walker,
+  tick,
+  playerPalette,
+}: {
   readonly walker: CreditsWalker
   readonly tick: number
   readonly playerPalette: number
@@ -542,7 +585,13 @@ function CreditsWalkerSprite({ walker, tick, playerPalette }: {
   const animations = useAnimations(walker.folder)
   const entries = animations?.[walker.animation]
   // 선수 인물만 칠한다 — 그 애니의 칸 전부를 미리 칠해 넘어가는 칸에 구운 벌이 비치지 않게
-  useWarmRecoloredSprites(recolorRequestsOf(walker.folder, (entries ?? []).map((entry) => entry.frame), walker.isPlayer ? playerPalette : null))
+  useWarmRecoloredSprites(
+    recolorRequestsOf(
+      walker.folder,
+      (entries ?? []).map((entry) => entry.frame),
+      walker.isPlayer ? playerPalette : null,
+    ),
+  )
   const step = entries === undefined ? null : animationStepAt(entries, tick)
   if (step === null) return null
   const isFlipped = walker.turnsEvery20 ? Math.trunc(tick / TURN_TICKS) % 2 === 0 : walker.isFlipped
@@ -564,7 +613,13 @@ function CreditsWalkerSprite({ walker, tick, playerPalette }: {
  * `(0, H − n/2, W)` 로 올라온다. 띠 아래 20px 밑으로만 보인다 (0xbaf6d 잘라내기).
  * 인물은 나중 번호부터 그려 선수가 맨 앞이다.
  */
-function EndingCredits({ romanceEndingIndex, romanceEvents, look, tick, band }: {
+function EndingCredits({
+  romanceEndingIndex,
+  romanceEvents,
+  look,
+  tick,
+  band,
+}: {
   readonly romanceEndingIndex: number
   readonly romanceEvents: readonly number[]
   readonly look: EndingWalkInLook
@@ -582,14 +637,8 @@ function EndingCredits({ romanceEndingIndex, romanceEvents, look, tick, band }: 
           <CreditsWalkerSprite key={walkers.length - 1 - index} walker={walker} tick={tick} playerPalette={palette} />
         ))}
       </div>
-      <div
-        className={styles.creditsClip}
-        style={{ left: 0, top: CREDITS.clipTop, width: SCREEN.width, height: SCREEN.height - CREDITS.clipTop }}
-      >
-        <div
-          className={styles.creditsText}
-          style={{ left: CREDITS.x, top: creditsTopOf(tick) - CREDITS.clipTop, width: CREDITS.width }}
-        >
+      <div className={styles.creditsClip} style={{ left: 0, top: CREDITS.clipTop, width: SCREEN.width, height: SCREEN.height - CREDITS.clipTop }}>
+        <div className={styles.creditsText} style={{ left: CREDITS.x, top: creditsTopOf(tick) - CREDITS.clipTop, width: CREDITS.width }}>
           <MarkupText raw={credits} />
         </div>
       </div>

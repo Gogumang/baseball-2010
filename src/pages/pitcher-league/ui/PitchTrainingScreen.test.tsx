@@ -20,7 +20,10 @@ const 투수 = (overrides: Partial<PitcherCareer> = {}): PitcherCareer => ({
 const 화면 = (career: PitcherCareer, onTrain: (row: number, column: number) => void = () => {}, onClose: () => void = () => {}) =>
   render(<PitchTrainingScreen career={career} onTrain={onTrain} onClose={onClose} />)
 
-const 키 = (key: string) => act(() => { fireEvent.keyDown(window, { key }) })
+const 키 = (key: string) =>
+  act(() => {
+    fireEvent.keyDown(window, { key })
+  })
 const 판 = (column: number) => screen.getByTestId(`구질칸-${column}`).dataset.plate
 
 describe('구질 훈련 창 — 칸 그림 (0x80e1c~0x810ac)', () => {
@@ -76,7 +79,13 @@ describe('구질 훈련 창 — 키 (0x17828 · 0x80268)', () => {
 
   it('칸 첫 줄에서 ↑ 면 탭 줄로, 탭 줄에서 취소면 닫는다(107)', () => {
     let closed = false
-    화면(투수(), () => {}, () => { closed = true })
+    화면(
+      투수(),
+      () => {},
+      () => {
+        closed = true
+      },
+    )
 
     키('ArrowDown')
     키('ArrowUp')
@@ -100,7 +109,9 @@ describe('구질 훈련 창 — 키 (0x17828 · 0x80268)', () => {
 
   it('확인 [예] 면 그 칸을 한 번 훈련한다 — StrMODE[66] 600 G', () => {
     let chosen: readonly [number, number] | null = null
-    화면(투수(), (row, column) => { chosen = [row, column] })
+    화면(투수(), (row, column) => {
+      chosen = [row, column]
+    })
 
     fireEvent.click(screen.getByRole('option', { name: 'CUT FAST' }))
     expect(screen.getByText(/600 G포인트/)).toBeTruthy()

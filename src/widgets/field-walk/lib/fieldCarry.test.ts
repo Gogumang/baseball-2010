@@ -16,7 +16,10 @@ import { startBenchClearingWalk } from '@/widgets/field-walk/lib/benchClearingWa
 
 const BOUNDS = cameraBoundsOf(240, 320)
 const rolls = Array.from({ length: 9 }, (_unused, i) => ({
-  offenseSpeed: 300 + i, scatterX: 10 * i, scatterZ: 100 + i, fielderSpeed: 200 + i,
+  offenseSpeed: 300 + i,
+  scatterX: 10 * i,
+  scatterZ: 100 + i,
+  fielderSpeed: 200 + i,
 }))
 
 function viewAt(ball: { x: number; z: number; height?: number }, fielderX: number, extra: Partial<DefenseViewState> = {}) {
@@ -53,7 +56,12 @@ describe('경기 장면이 들고 다니는 수비 줄 자리 · 카메라 (fiel
   it('앞 판이 남긴 자리로 다음 판이 선다 — 앞 수비는 그 자리에서 공격 더그아웃으로, 카메라는 앞 카메라에서', () => {
     const carry = fieldCarryAfterPlay([viewAt({ x: 20000, z: 29000 }, 0)], NEW_FIELD_CARRY)
     const field = halfInningFieldOf({
-      rolls, half: '말', carry, playerSide: 0, ourTeamId: 1, opponentTeamId: 2,
+      rolls,
+      half: '말',
+      carry,
+      playerSide: 0,
+      ourTeamId: 1,
+      opponentTeamId: 2,
     })
     expect(field).toBeDefined()
     const state = startHalfInningWalk(field!.input)

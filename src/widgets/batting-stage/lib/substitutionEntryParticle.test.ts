@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  entryPointsOf,
-  SUBSTITUTION_ENTRY_PARTICLES,
-  substitutionEntryParticleOf,
-} from '@/widgets/batting-stage/lib/substitutionEntryParticle'
+import { entryPointsOf, SUBSTITUTION_ENTRY_PARTICLES, substitutionEntryParticleOf } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
 import { BATTER_SIDE } from '@/widgets/batting-stage/lib/stageLayout'
 
 describe('교체 등판 파티클 0x38b64', () => {

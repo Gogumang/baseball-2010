@@ -25,9 +25,15 @@ describe('훈련 알림 문구', () => {
     // 보정이 없으면 글 칸이 빈다 (18a34 길이 > 0 일 때만 0x1552af4 에 옮긴다)
     expect(trainingOutcomeLinesOf(결과({ typeBonus: 0 }))).toEqual([])
     // 차례: 타입 → 서브 아이템(StrITEM[0x58+k] + 능력치 이름 + "+2") → 자동안마기 "사기감소-1" → 병아리 [201] → 몹쓸몸 [202]
-    expect(trainingOutcomeLinesOf(결과({
-      hasSubItemBonus: true, modifiers: { rookie: true, weakBody: true, massage: true },
-    }), '타격형')).toEqual([
+    expect(
+      trainingOutcomeLinesOf(
+        결과({
+          hasSubItemBonus: true,
+          modifiers: { rookie: true, weakBody: true, massage: true },
+        }),
+        '타격형',
+      ),
+    ).toEqual([
       '!cFFFFFF[!cFFFF00타격형!cFFFFFF] 타입 보너스 +1',
       '!cFFFFFF[!cFFFF00표적판!cFFFFFF] 히트 +2',
       '!cFFFFFF[!cFFFF00자동안마기!cFFFFFF] 사기감소-1',
@@ -48,7 +54,9 @@ describe('훈련 알림 문구', () => {
     const 최대글자수 = 24
     const 모든줄 = [
       ...trainingOutcomeLinesOf(결과(), '타격형'),
-      ...trainingOutcomeLinesOf(결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true, name: '토네이도스윙' } })),
+      ...trainingOutcomeLinesOf(
+        결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true, name: '토네이도스윙' } }),
+      ),
     ]
 
     // 원문 글은 마크업("!N" 줄바꿈 · "!c" 색)을 품는다 — 화면에 그려지는 줄마다 잰다
@@ -58,20 +66,32 @@ describe('훈련 알림 문구', () => {
   })
 
   it('필살타법은 기술 이름(StrCOMMON[0x18 + n])으로 StrMODE[86] 횟수 또는 [87] 훈련 완료', () => {
-    const 진행 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 2, required: 4, isLevelUp: false, name: '파워 스윙' } })
+    const 진행 = 결과({
+      menuId: '필살타법',
+      gains: {},
+      typeBonus: 0,
+      specialSwing: { sessions: 2, required: 4, isLevelUp: false, name: '파워 스윙' },
+    })
     const 완료 = 결과({ menuId: '필살타법', gains: {}, typeBonus: 0, specialSwing: { sessions: 4, required: 4, isLevelUp: true, name: '파워 스윙' } })
     // StrMODE[86] sprintf · [87](앞 빈칸) 원문 그대로, 사기 줄은 [24] + " " + 수치 + " " + [84] (0x18196~0x1825e)
     // 사기 줄 끝 "!N"(0x18270) 이 늘 붙어 빈 줄이 하나 따른다
     expect(trainingOutcomeLinesOf(진행)).toEqual([
-      '[!cFFFF00파워 스윙!cFFFFFF] !cFFFF002/4회!cFFFFFF 훈련', '사기 6 !cFF0000하락!cFFFFFF하였습니다', '',
+      '[!cFFFF00파워 스윙!cFFFFFF] !cFFFF002/4회!cFFFFFF 훈련',
+      '사기 6 !cFF0000하락!cFFFFFF하였습니다',
+      '',
     ])
     expect(trainingOutcomeLinesOf(완료)).toEqual([
-      '파워 스윙 훈련 완료!!N[!cFFFF00선수정보!cFFFFFF]에서 사용!N여부 변경 가능', '사기 6 !cFF0000하락!cFFFFFF하였습니다', '',
+      '파워 스윙 훈련 완료!!N[!cFFFF00선수정보!cFFFFFF]에서 사용!N여부 변경 가능',
+      '사기 6 !cFF0000하락!cFFFFFF하였습니다',
+      '',
     ])
     // 보정이 있으면 괄호와 효과 줄 (0x18274~0x18368)
     expect(trainingOutcomeLinesOf({ ...진행, moraleLoss: 7, modifiers: { rookie: true, weakBody: false, massage: true } })).toEqual([
-      '[!cFFFF00파워 스윙!cFFFFFF] !cFFFF002/4회!cFFFFFF 훈련', '사기 7(-2) !cFF0000하락!cFFFFFF하였습니다', '',
-      '!cFFFF00병아리 스킬 효과', '!cFFFF00자동안마기 효과',
+      '[!cFFFF00파워 스윙!cFFFFFF] !cFFFF002/4회!cFFFFFF 훈련',
+      '사기 7(-2) !cFF0000하락!cFFFFFF하였습니다',
+      '',
+      '!cFFFF00병아리 스킬 효과',
+      '!cFFFF00자동안마기 효과',
     ])
   })
 

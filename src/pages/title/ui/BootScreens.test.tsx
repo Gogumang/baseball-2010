@@ -27,8 +27,17 @@ describe('켤 때 <이용안내> (하위 0x2a)', () => {
     render(<UsageNoticeScreen onNext={vi.fn()} />)
     const 줄 = [...screen.getByTestId('이용안내-본문').querySelectorAll<HTMLElement>('[data-part="글줄"]')]
     expect(줄.map((line) => line.textContent)).toEqual([
-      ' <이용안내>', '', '이 게임은 게임 이용 시', '별도의 비용이 발생하지', '않는 단독형 게임입니다.', '안심하고 이용하세요.', '',
-      '단, 서버 접속 시 통화료', '와 G포인트, 명예의전당', '슬롯 구매 시 정보이용료', '가 발생합니다.',
+      ' <이용안내>',
+      '',
+      '이 게임은 게임 이용 시',
+      '별도의 비용이 발생하지',
+      '않는 단독형 게임입니다.',
+      '안심하고 이용하세요.',
+      '',
+      '단, 서버 접속 시 통화료',
+      '와 G포인트, 명예의전당',
+      '슬롯 구매 시 정보이용료',
+      '가 발생합니다.',
     ])
     expect(줄.map((line) => line.style.top)).toEqual(Array.from({ length: 11 }, (_unused, index) => `${80 + index * 14}px`))
     expect(new Set(줄.map((line) => line.style.textAlign))).toEqual(new Set(['center']))

@@ -17,7 +17,10 @@ const 행 = (goal: number, kind: number, amount: number): BurstMissionRow => ({
   recordCount: 0,
   goal,
   chancePercent: 10,
-  successRewards: [{ kind, amount }, { kind: 2, amount: 9 }],
+  successRewards: [
+    { kind, amount },
+    { kind: 2, amount: 9 },
+  ],
   failurePenalty: { kind: 0, amount: 0 },
 })
 

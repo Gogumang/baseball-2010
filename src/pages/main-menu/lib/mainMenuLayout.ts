@@ -189,11 +189,7 @@ export function menuWheelStepOf(angle: number, direction: MenuTurnDirection): nu
  * dir −1 이면 표값 + 걸음×카운터, −2 면 −. 360 을 넘으면 360 으로 잘리고(0x24e2e),
  * 음수면 +360 한다(0x24e74). `direction` 이 null 이면 멈춰 있는 표값 그대로다.
  */
-export function menuWheelAngleAt(
-  slot: number,
-  direction: MenuTurnDirection | null,
-  counter: number,
-): number {
+export function menuWheelAngleAt(slot: number, direction: MenuTurnDirection | null, counter: number): number {
   const base = MENU_WHEEL_ANGLES[slot]
   if (direction === null || counter <= 0) return base
   const moved = menuWheelStepOf(base, direction) * Math.min(counter, MENU_WHEEL_TURN_TICKS)
@@ -287,11 +283,7 @@ export function menuWheelSlotDrawOf(angle: number): MenuWheelSlotDraw | null {
 }
 
 /** 칸 그림의 좌상단 — 기준점 가운데 맞춤 (0x24fc4: x − w/2, y − h/2) */
-export function menuWheelLabelTopLeftOf(
-  point: MenuWheelPoint,
-  width: number,
-  height: number,
-): MenuWheelPoint {
+export function menuWheelLabelTopLeftOf(point: MenuWheelPoint, width: number, height: number): MenuWheelPoint {
   return { x: point.x - Math.trunc(width / 2), y: point.y - Math.trunc(height / 2) }
 }
 
@@ -389,12 +381,7 @@ export function menuReelOrderOf(frames: readonly number[], cursor: number): numb
  * 화면 슬롯(1..7) → 그 칸에 놓인 항목 차례. 놓을 것이 없으면 null.
  * 슬롯 표 값이 −1 이거나, 배열의 그 자리가 −1 이면 없다.
  */
-export function menuReelEntryAtSlotOf(
-  frames: readonly number[],
-  slotRow: readonly number[],
-  cursor: number,
-  slot: number,
-): number | null {
+export function menuReelEntryAtSlotOf(frames: readonly number[], slotRow: readonly number[], cursor: number, slot: number): number | null {
   const arrayIndex = slotRow[slot]
   if (arrayIndex === undefined || arrayIndex === -1) return null
   const entry = menuReelOrderOf(frames, cursor)[arrayIndex]
@@ -449,16 +436,10 @@ export const MENU_REEL_SCROLL_STEPS: readonly number[] = [1, 4, 16]
  * (블릿 0x98974 가 `[그래픽+0x44]` 잘라내기 사각형과 대상 폭·높이를 견줘 **그냥 되돌아간다**).
  * 웹판은 240×320 뷰포트가 같은 일을 하므로 **옮길 거르개가 없다**.
  */
-export function menuReelTextTopLeftOf(
-  slot: number,
-  width: number,
-  scroll: number,
-): MenuWheelPoint | null {
+export function menuReelTextTopLeftOf(slot: number, width: number, scroll: number): MenuWheelPoint | null {
   if (slot < 1 || slot > 7 || slot === 4) return null
   const x = SCREEN_WIDTH - Math.trunc(width / 2) - 0x28
-  const y = slot <= 3
-    ? SCREEN_HEIGHT + (MENU_REEL_ROW_STEP * slot - 100) + scroll - 7
-    : SCREEN_HEIGHT + MENU_REEL_ROW_STEP * slot + scroll - 0x3c
+  const y = slot <= 3 ? SCREEN_HEIGHT + (MENU_REEL_ROW_STEP * slot - 100) + scroll - 7 : SCREEN_HEIGHT + MENU_REEL_ROW_STEP * slot + scroll - 0x3c
   return { x, y }
 }
 

@@ -41,7 +41,11 @@ vi.mock('@/pages/defense/ui/DefensePlayback', async () => {
   const { useEffect } = await import('react')
   const { drawnReplayFieldingErrorsOf } = await import('@/features/defense-play/model/fieldingErrors')
   return {
-    DefensePlayback: ({ ticks, onDone, onFieldingErrors }: {
+    DefensePlayback: ({
+      ticks,
+      onDone,
+      onFieldingErrors,
+    }: {
       ticks?: readonly { readonly fielders: readonly { readonly slot: number }[] }[]
       onDone: () => void
       onFieldingErrors?: (errors: readonly unknown[]) => void
@@ -121,13 +125,7 @@ describe('팀 경기 — 경기를 끝낸 재생 판은 다 그린 뒤 경기 �
     const onSettlementEnter = vi.fn<(summary: TeamGameSummary) => void>()
     const onFinish = vi.fn<(summary: TeamGameSummary) => void>()
     render(
-      <TeamGameScreen
-        options={기본옵션}
-        random={createSeededRandom(1)}
-        onFinish={onFinish}
-        onQuit={vi.fn()}
-        onSettlementEnter={onSettlementEnter}
-      />,
+      <TeamGameScreen options={기본옵션} random={createSeededRandom(1)} onFinish={onFinish} onQuit={vi.fn()} onSettlementEnter={onSettlementEnter} />,
     )
     // 인트로 OK → 중계로 경기 끝까지
     fireEvent.keyDown(window, { key: 'Enter' })

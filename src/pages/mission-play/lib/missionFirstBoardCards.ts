@@ -73,7 +73,8 @@ export function missionFirstBoardCardsOf(run: MissionRun, names: MissionBoardPla
       pitcherName: cpu.pitching === null ? null : cpuPitcherName(cpu.pitching, mission.opponentAce),
       currentOrder,
       dueUpNames: Array.from({ length: DUE_UP_ROWS }, (_unused, row) =>
-        humanBatterNameAt(batting, dueUpLineupSlotOf(currentOrder, row), names.missionBatter)),
+        humanBatterNameAt(batting, dueUpLineupSlotOf(currentOrder, row), names.missionBatter),
+      ),
     }
   }
   const batting = cpu.batting
@@ -84,6 +85,7 @@ export function missionFirstBoardCardsOf(run: MissionRun, names: MissionBoardPla
     pitcherName: names.missionPitcher,
     currentOrder,
     dueUpNames: Array.from({ length: DUE_UP_ROWS }, (_unused, row) =>
-      batting === null ? null : cpuBatterNameAt(batting, dueUpLineupSlotOf(currentOrder, row), mission.opponentAce)),
+      batting === null ? null : cpuBatterNameAt(batting, dueUpLineupSlotOf(currentOrder, row), mission.opponentAce),
+    ),
   }
 }

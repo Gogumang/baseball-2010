@@ -139,9 +139,36 @@ const LIGHT_SCALE = 32
 export const SPOTLIGHT_RAISE = 20
 /** ui/slt_pitch.raw 30×30 의 줄마다 [시작, 끝) — 값 31 인 칸 */
 const SPOT_MASK_SPANS: readonly (readonly [number, number])[] = [
-  [11, 19], [8, 22], [7, 23], [5, 25], [4, 26], [3, 27], [3, 27], [2, 28], [1, 29], [1, 29], [1, 29],
-  [0, 30], [0, 30], [0, 30], [0, 30], [0, 30], [0, 30], [0, 30], [0, 30],
-  [1, 29], [1, 29], [1, 29], [2, 28], [3, 27], [3, 27], [4, 26], [5, 25], [7, 23], [8, 22], [11, 19],
+  [11, 19],
+  [8, 22],
+  [7, 23],
+  [5, 25],
+  [4, 26],
+  [3, 27],
+  [3, 27],
+  [2, 28],
+  [1, 29],
+  [1, 29],
+  [1, 29],
+  [0, 30],
+  [0, 30],
+  [0, 30],
+  [0, 30],
+  [0, 30],
+  [0, 30],
+  [0, 30],
+  [0, 30],
+  [1, 29],
+  [1, 29],
+  [1, 29],
+  [2, 28],
+  [3, 27],
+  [3, 27],
+  [4, 26],
+  [5, 25],
+  [7, 23],
+  [8, 22],
+  [11, 19],
 ]
 const SPOT_MASK_SIZE = 30
 
@@ -185,9 +212,7 @@ export interface PitchMenuFrame {
 /** 0xf 에 든 뒤 그림 k 의 고리 · 칸 틀 (4c5d4~4c66a) */
 export function pitchMenuFrameOf(tick: number, typeNumbers: readonly number[]): PitchMenuFrame {
   const steps = Math.min(Math.max(0, tick), RING_LAST_FRAME - RING_FIRST_FRAME)
-  const slotFrames = [1, 2, 3, 4].map((slot) =>
-    (typeNumbers[slot] ?? 0) === 0 ? null : SLOT_FRAME_BASE + SLOT_FRAME_STEP * (slot - 1) + steps,
-  )
+  const slotFrames = [1, 2, 3, 4].map((slot) => ((typeNumbers[slot] ?? 0) === 0 ? null : SLOT_FRAME_BASE + SLOT_FRAME_STEP * (slot - 1) + steps))
   return { ring: RING_FIRST_FRAME + steps, slotFrames, showsSlots: tick >= RING_LAST_FRAME - RING_FIRST_FRAME }
 }
 
@@ -298,8 +323,14 @@ export function drawPitchInputSprites(context: CanvasRenderingContext2D, overlay
     // 효과 1 · 단계 L — 화면 칸을 읽어 원본 표 0xd5e58 · 0xd5de0 식으로 섞는다(공용 `drawImageWithEffect`)
     const placed = placedFrame(draw.folder, draw.frame)
     if (placed === null) continue
-    drawImageWithEffect(context, placed.image, Math.round(point.x) + placed.offsetX, Math.round(point.y + draw.dy) + placed.offsetY,
-      DRAW_EFFECT.TRANSLUCENT, Math.round(draw.alpha * EFFECT_LEVELS))
+    drawImageWithEffect(
+      context,
+      placed.image,
+      Math.round(point.x) + placed.offsetX,
+      Math.round(point.y + draw.dy) + placed.offsetY,
+      DRAW_EFFECT.TRANSLUCENT,
+      Math.round(draw.alpha * EFFECT_LEVELS),
+    )
   }
 }
 
@@ -374,9 +405,7 @@ export function gaugeDrawsOf(
   if (pressed < 1 || pressed > PERFECT_GRADE_CELL) {
     if (cursor > 8) return [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, dy: 0 }]
     const draws: GaugeDraw[] =
-      cursor === 0
-        ? [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, dy: 0 }]
-        : [{ folder: SLT_FRAMES, frame: GAUGE_BASE, dy: 0 }]
+      cursor === 0 ? [{ folder: SLT_FRAMES, frame: GAUGE_OUTLINE, dy: 0 }] : [{ folder: SLT_FRAMES, frame: GAUGE_BASE, dy: 0 }]
     if (cursor > 0) draws.push({ folder: SLT_FRAMES, frame: gaugeFrameOfCell(cursor), dy: 0 })
     draws.push({ folder: SLT_FRAMES, frame: GAUGE_TARGET_FRAME, dy: 0 })
     return draws

@@ -46,13 +46,31 @@ export const TITLE_FRAMES = assetUrl('./sprites/main_title/frames')
 
 /** 애니 0 — 인트로 (frames/animations.json [0], 테스트가 맞춰 본다) */
 export const INTRO_ANIMATION: readonly AnimationEntry[] = [
-  [0, 2], [1, 2], [2, 2], [3, 1], [4, 1], [5, 1], [7, 0], [6, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0],
-  [15, 0], [13, 0],
+  [0, 2],
+  [1, 2],
+  [2, 2],
+  [3, 1],
+  [4, 1],
+  [5, 1],
+  [7, 0],
+  [6, 0],
+  [8, 0],
+  [9, 0],
+  [10, 0],
+  [11, 0],
+  [12, 0],
+  [13, 0],
+  [14, 0],
+  [15, 0],
+  [13, 0],
 ].map(([frame, delay]) => ({ frame, delay }))
 
 /** 애니 1 — PRESS ANY KEY: 13(문구 없음) → 16(흐림) → 17(밝음) → 16 (frames/animations.json [1]) */
 export const PROMPT_ANIMATION: readonly AnimationEntry[] = [
-  [13, 2], [16, 1], [17, 4], [16, 1],
+  [13, 2],
+  [16, 1],
+  [17, 4],
+  [16, 1],
 ].map(([frame, delay]) => ({ frame, delay }))
 
 /** 애니 0 을 다 넘기는 데 드는 그리기 수 (지연 0 은 1) */

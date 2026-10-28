@@ -38,11 +38,19 @@ describe('unlocks.json 모양', () => {
 
   it('범주별 항목 수', () => {
     const counts = UNLOCK_CONFIG.entries.reduce<Partial<Record<UnlockKind, number>>>(
-      (acc, entry) => ({ ...acc, [entry.kind]: (acc[entry.kind] ?? 0) + 1 }), {},
+      (acc, entry) => ({ ...acc, [entry.kind]: (acc[entry.kind] ?? 0) + 1 }),
+      {},
     )
     expect(counts).toEqual({
-      acePlayer: 8, hiddenTeam: 5, stadiumItem: 6, pitcherEquipment: 16, batterEquipment: 16,
-      hiddenPitch: 4, mission: 26, hallOfFameSlot: 6, annalsPage: 1,
+      acePlayer: 8,
+      hiddenTeam: 5,
+      stadiumItem: 6,
+      pitcherEquipment: 16,
+      batterEquipment: 16,
+      hiddenPitch: 4,
+      mission: 26,
+      hallOfFameSlot: 6,
+      annalsPage: 1,
     })
   })
 

@@ -113,17 +113,25 @@ export type MainMenuAction =
 
 /** 메뉴 밖으로 나가야 하는 결과. null 이면 메뉴 안에서 끝난다. */
 export type MainMenuEffect =
-  | '미션' | '홈런더비' | '시즌모드' | '일반모드'
+  | '미션'
+  | '홈런더비'
+  | '시즌모드'
+  | '일반모드'
   /** 나만의리그 [14] 답 0 · 1 — 모드 4 타자편 · 모드 3 투수편 (0x2464c) → 0x327b8 모드 3·4 갈래의 장면 0x106 */
-  | '나리타자편' | '나리투수편'
+  | '나리타자편'
+  | '나리투수편'
   /** 같은 갈래의 "곧장 경기" — `+0x40+m && +0x4c+m` 이면 0x213c0(앱, m, 0) 으로 그 편 저장을 올려 장면 0x104 (0x328b4) */
-  | '나리타자편경기' | '나리투수편경기'
+  | '나리타자편경기'
+  | '나리투수편경기'
   /** 일반모드 빠른실행 — 하위 22(경기정보)로 곧바로, this+0x14c = 1 (0x299f8 · 0x2992a) */
   | '일반모드빠른실행'
   /** 일반모드 중간 저장 이어하기 — 상태 0x27 → 0x327b8 이 0x213c0(앱, 1, 0) 으로 올려 경기 장면으로 */
   | '일반모드경기이어하기'
   /** 처음 메뉴에서 갈라지는 화면들 — 원본 하위 상태 6 스페셜 · 7 도움말 · 8 환경설정 · 10 게임문의 (표 0xcebdc, 0x294a2) */
-  | '스페셜' | '도움말' | '환경설정' | '게임문의'
+  | '스페셜'
+  | '도움말'
+  | '환경설정'
+  | '게임문의'
   | null
 
 export interface MainMenuResult {
@@ -157,9 +165,7 @@ export type MainMenuOpenTier = MainMenuTier
  * 처음 메뉴 바퀴 커서 `[this+0xe8]`(장면 객체 바이트)는 진입 0x24a40 이 안 건드리고 0x237b6 · 0x24bfa 만 쓴다 — 장면을 새로 세우면
  * (memset 0) 0 이고, 같은 장면 안의 하위 6~10(스페셜·도움말·환경설정·랭킹·게임문의)을 다녀오면 떠난 그 칸이다. `topCursor` 가 그 값이다.
  */
-export function initialMainMenu(
-  _hasSavedGame: boolean, openTier: MainMenuOpenTier = 4, modeCursor = 0, topCursor = 0,
-): MainMenuState {
+export function initialMainMenu(_hasSavedGame: boolean, openTier: MainMenuOpenTier = 4, modeCursor = 0, topCursor = 0): MainMenuState {
   return {
     tier: openTier,
     selectedTopId: (TOP_ENTRIES[topCursor] ?? TOP_ENTRIES[0]).id,
@@ -183,12 +189,7 @@ export function generalModeEntryCursorOf(previousState: number, isGameInProgress
 }
 
 /** 하위 12 의 답 처리 (단계 1~3) — `isGameInProgress` 는 전역기록 +0x4c + 모드 1 = +0x4d */
-function answerGeneralModeWindow(
-  state: MainMenuState,
-  window: GeneralModeWindow,
-  answer: number,
-  isGameInProgress: boolean,
-): MainMenuResult {
+function answerGeneralModeWindow(state: MainMenuState, window: GeneralModeWindow, answer: number, isGameInProgress: boolean): MainMenuResult {
   const close = { ...state, generalModeWindow: null }
   if (window.kind === '새로하기확인') {
     return answer === 0 ? { state: close, effect: window.next } : { state: close, effect: null }
@@ -286,7 +287,10 @@ export function createGameStartCursor(): GameStartCursor {
 
 /** 게임시작 목록 커서 칸 번호 (`[0x1552d24]` 에 적는 값) */
 export function modeCursorOf(state: MainMenuState): number {
-  return Math.max(MODE_ENTRIES.findIndex((entry) => entry.id === state.selectedModeId), 0)
+  return Math.max(
+    MODE_ENTRIES.findIndex((entry) => entry.id === state.selectedModeId),
+    0,
+  )
 }
 
 /**
@@ -295,13 +299,20 @@ export function modeCursorOf(state: MainMenuState): number {
  */
 export function listCursorOf(state: MainMenuState): number | null {
   if (state.tier === 5) return modeCursorOf(state)
-  if (state.tier === 9) return Math.max(RANKING_ENTRIES.findIndex((entry) => entry.id === state.selectedRankingId), 0)
+  if (state.tier === 9)
+    return Math.max(
+      RANKING_ENTRIES.findIndex((entry) => entry.id === state.selectedRankingId),
+      0,
+    )
   return null
 }
 
 /** 처음 메뉴 바퀴 커서 `[this+0xe8]` 칸 번호 */
 export function topCursorOf(state: MainMenuState): number {
-  return Math.max(TOP_ENTRIES.findIndex((entry) => entry.id === state.selectedTopId), 0)
+  return Math.max(
+    TOP_ENTRIES.findIndex((entry) => entry.id === state.selectedTopId),
+    0,
+  )
 }
 
 /** 지금 단에서 커서가 있는 칸의 id */

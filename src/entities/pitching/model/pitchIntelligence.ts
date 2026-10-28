@@ -63,18 +63,10 @@ const TWO_OUTS = 2
 const RUNNER_COLUMN = { none: 3, twoOuts: 2, otherwise: 1 }
 
 export function targetKindOf(difficulty: PitchPatternDifficulty, situation: CountSituation, random: RandomPort): number {
-  const column =
-    situation.runnerCount === 0
-      ? RUNNER_COLUMN.none
-      : situation.outs === TWO_OUTS
-        ? RUNNER_COLUMN.twoOuts
-        : RUNNER_COLUMN.otherwise
+  const column = situation.runnerCount === 0 ? RUNNER_COLUMN.none : situation.outs === TWO_OUTS ? RUNNER_COLUMN.twoOuts : RUNNER_COLUMN.otherwise
   const row = PITCH_PATTERNS[difficulty].find(
     (candidate) =>
-      candidate[0] === situation.strikes &&
-      candidate[1] === situation.balls &&
-      candidate[2] === situation.outs &&
-      candidate[8] === column,
+      candidate[0] === situation.strikes && candidate[1] === situation.balls && candidate[2] === situation.outs && candidate[8] === column,
   )
   const roll = random.rand(0, 10_000)
   if (row === undefined) return 0

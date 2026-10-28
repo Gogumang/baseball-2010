@@ -1,11 +1,6 @@
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
-import {
-  applyGameResult,
-  createCareer,
-  isManagementCycleOpen,
-  startNextSeason,
-} from '@/entities/career/model/playerCareer'
+import { applyGameResult, createCareer, isManagementCycleOpen, startNextSeason } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { blockReasonOf, runTraining } from '@/entities/career/model/training'
 import { outingBlockReasonOf, restBlockReasonOf, runOuting, runRest } from '@/entities/career/model/outing'

@@ -29,7 +29,10 @@ import type { MatchupBatterCard, MatchupPitcherCard } from '@/widgets/matchup-ca
  * `career.stats` 도 포스트시즌 경기의 레코드 줄(+0x20~+0x2c)은 안 더한다(`applyGameResult` 의 `withoutRecordLine`) — 원본 레코드처럼
  * 정규시즌 줄만 든다.
  */
-export function gameMatchupCardsOf(progress: GameProgress, career: PlayerCareer): {
+export function gameMatchupCardsOf(
+  progress: GameProgress,
+  career: PlayerCareer,
+): {
   readonly batterHand: number
   readonly pitcher: MatchupPitcherCard
   readonly batter: MatchupBatterCard
@@ -37,30 +40,31 @@ export function gameMatchupCardsOf(progress: GameProgress, career: PlayerCareer)
   const countsThisGame = career.postseason === null
   const mound = opponentMoundOf(progress)
   // 마투수는 XlsACE_PIT 행의 줄 그대로 — 게이트 0xa571c 가 마선수를 걸러 이 경기 줄이 없다(칸이 null 이라 아래 이 경기 줄도 0)
-  const pitcherBase = mound.aceRecordLine !== undefined
-    ? pitcherLineOfRecord(mound.aceRecordLine)
-    : mound.pitcherSlot === null
+  const pitcherBase =
+    mound.aceRecordLine !== undefined
+      ? pitcherLineOfRecord(mound.aceRecordLine)
+      : mound.pitcherSlot === null
+        ? null
+        : leaguePitcherLineOf(career.leaguePlayerStats, leaguePitcherIdOf(progress.opponentTeamId, mound.pitcherSlot))
+  const pitcherGame =
+    mound.pitcherSlot === null
+      ? undefined
+      : progress.pitcherLines.find(
+          (line) => line.teamId === progress.opponentTeamId && line.pitcherSlot === mound.pitcherSlot && line.recordId === undefined,
+        )
+  const pitcherLine =
+    pitcherBase === null
       ? null
-      : leaguePitcherLineOf(career.leaguePlayerStats, leaguePitcherIdOf(progress.opponentTeamId, mound.pitcherSlot))
-  const pitcherGame = mound.pitcherSlot === null
-    ? undefined
-    : progress.pitcherLines.find(
-        (line) =>
-          line.teamId === progress.opponentTeamId && line.pitcherSlot === mound.pitcherSlot && line.recordId === undefined,
-      )
-  const pitcherLine = pitcherBase === null
-    ? null
-    : countsThisGame
-      ? sumPitcherLines(pitcherBase, {
-          outs: pitcherGame?.outs ?? 0,
-          runsAllowed: pitcherGame?.runsAllowed ?? 0,
-          strikeouts: pitcherGame?.strikeouts ?? 0,
-        })
-      : pitcherBase
+      : countsThisGame
+        ? sumPitcherLines(pitcherBase, {
+            outs: pitcherGame?.outs ?? 0,
+            runsAllowed: pitcherGame?.runsAllowed ?? 0,
+            strikeouts: pitcherGame?.strikeouts ?? 0,
+          })
+        : pitcherBase
 
   const myLine = countsThisGame ? sumBatterLines(career.stats, progress.myStats) : career.stats
-  const myPosition = nariTeamRecordOf(nariTeamsOf(career), progress.ourTeamId).batters
-    .find((batter) => batter.slot === MY_RECORD_SLOT)?.position
+  const myPosition = nariTeamRecordOf(nariTeamsOf(career), progress.ourTeamId).batters.find((batter) => batter.slot === MY_RECORD_SLOT)?.position
   const mySlot = lineupSlotOf(progress.game.battingOrderIndex)
 
   return {

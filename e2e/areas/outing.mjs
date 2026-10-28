@@ -1,7 +1,14 @@
 // 도메인 outing — 외출 지도: 나리 타자편 112 · 시즌모드 0xd1 (장면 표 `src/app/dev/scenes/outing.ts`).
 export const sources = [
-  'src/pages/outing-map/', 'src/pages/shop/', 'src/features/shop/', 'src/pages/special/', 'src/pages/special-edit/',
-  'src/pages/management/lib/outingMapUnderlay', 'src/entities/wallet/', 'src/entities/collection/', 'src/app/model/useCollection',
+  'src/pages/outing-map/',
+  'src/pages/shop/',
+  'src/features/shop/',
+  'src/pages/special/',
+  'src/pages/special-edit/',
+  'src/pages/management/lib/outingMapUnderlay',
+  'src/entities/wallet/',
+  'src/entities/collection/',
+  'src/app/model/useCollection',
 ]
 export const representative = 'nari-outing'
 

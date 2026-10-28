@@ -1,12 +1,6 @@
 import { createConstantRandom, createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
-import {
-  createEmitter,
-  createParticlePool,
-  drawStrengthOf,
-  particlePixelOf,
-  tickEmitter,
-} from '@/entities/particle/model/particleEmitter'
+import { createEmitter, createParticlePool, drawStrengthOf, particlePixelOf, tickEmitter } from '@/entities/particle/model/particleEmitter'
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'

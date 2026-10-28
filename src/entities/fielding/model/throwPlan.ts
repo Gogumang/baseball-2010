@@ -1,10 +1,4 @@
-import {
-  basePosition,
-  horizontalDistance,
-  isOutfieldSlot,
-  UNREACHABLE_TICKS,
-  type WorldPoint,
-} from '@/entities/fielding/model/fieldGeometry'
+import { basePosition, horizontalDistance, isOutfieldSlot, UNREACHABLE_TICKS, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import { AI_STATE, NONE, type FielderState } from '@/entities/fielding/model/fieldingState'
 import { SINE_HUNDRED_TABLE } from '@/shared/config/original/trigonometryTables'
 import { atan2Degrees, cosineSixteen, sineSixteen } from '@/shared/lib/math/originalTrigonometry'
@@ -210,12 +204,7 @@ const LONG_THROW_WOBBLE_PERCENT = 85
  * 원바운드(a17fc)와 악송구(a1908)는 a19d0 으로 바로 가 이 굴림이 없다. 레이저(0xa222c)도 없다.
  * 거리가 문턱 이하면 굴리지 않고 null, 굴렸는데 안 흔들리면 false.
  */
-export function rollLongThrowWobble(
-  fielder: FielderState,
-  point: WorldPoint,
-  special: boolean,
-  random: RandomPort,
-): boolean | null {
+export function rollLongThrowWobble(fielder: FielderState, point: WorldPoint, special: boolean, random: RandomPort): boolean | null {
   if (horizontalDistance(fielder.position, point) <= LONG_THROW_DISTANCE) return null
   return random.rand(0, 10_000) < (special ? 100 : 0) + LONG_THROW_WOBBLE_BASE
 }
@@ -293,9 +282,7 @@ export const SPECIAL_THROW_SPEED_PERCENT = 130
  * 던지는 순간의 +0xdc — 0xa1620 a16dc~a16ec: `+0xdc = 특수 ? +0xd8 : +0xd4`. 던진 뒤에도 그 판 동안 남는다.
  */
 export function thrownWith(fielder: FielderState, special: boolean): FielderState {
-  const speed = special
-    ? Math.trunc((fielder.baseThrowSpeed * SPECIAL_THROW_SPEED_PERCENT) / 100)
-    : fielder.baseThrowSpeed
+  const speed = special ? Math.trunc((fielder.baseThrowSpeed * SPECIAL_THROW_SPEED_PERCENT) / 100) : fielder.baseThrowSpeed
   return speed === fielder.throwSpeed ? fielder : { ...fielder, throwSpeed: speed }
 }
 
@@ -343,10 +330,7 @@ export function planThrow(input: ThrowPlanInput): ThrowPlan {
   const thrower = input.fielders[input.fromSlot]
   const receiver = input.fielders[input.finalSlot]
   const special = input.special === true
-  const needsRelay =
-    isOutfieldSlot(thrower.slot) &&
-    !special &&
-    horizontalDistance(thrower.position, receiver.target) >= RELAY_DISTANCE
+  const needsRelay = isOutfieldSlot(thrower.slot) && !special && horizontalDistance(thrower.position, receiver.target) >= RELAY_DISTANCE
 
   if (!needsRelay) {
     const ticks = throwTicksToFielder(thrower, receiver)
@@ -379,11 +363,7 @@ export function planThrow(input: ThrowPlanInput): ThrowPlan {
 }
 
 /** 중계맨 고르기 — 후보는 내야 칸 2~5, 기준은 두 구간 송구 틱의 합 (목표점 기준) */
-export function chooseRelaySlot(
-  fielders: readonly FielderState[],
-  thrower: FielderState,
-  receiver: FielderState,
-): number {
+export function chooseRelaySlot(fielders: readonly FielderState[], thrower: FielderState, receiver: FielderState): number {
   let best = NONE
   let bestTicks = Number.POSITIVE_INFINITY
   for (const slot of RELAY_SLOTS) {
@@ -397,28 +377,17 @@ export function chooseRelaySlot(
   }
   if (best !== NONE) return best
   // 원본: 못 고르면 유격수(5)의 AI 상태가 0xa 일 때만 5, 아니면 2루수(3) — 0xaf4f8
-  return fielders[RELAY_FALLBACK_SHORTSTOP]?.aiState === AI_STATE.BUSY
-    ? RELAY_FALLBACK_SHORTSTOP
-    : RELAY_FALLBACK_SECOND
+  return fielders[RELAY_FALLBACK_SHORTSTOP]?.aiState === AI_STATE.BUSY ? RELAY_FALLBACK_SHORTSTOP : RELAY_FALLBACK_SECOND
 }
 
 /**
  * 중계를 낀 홈 송구처럼 "루 좌표로 보내는" 2구간 송구 틱 — 0xaf284 의 중계 가지가 쓰는 형태.
  * `공야수.vtb4(중계맨) + 중계맨.vtb8(루 좌표) + 3`
  */
-export function relayTicksToBase(
-  fielders: readonly FielderState[],
-  thrower: FielderState,
-  receiver: FielderState,
-  base: number,
-): number {
+export function relayTicksToBase(fielders: readonly FielderState[], thrower: FielderState, receiver: FielderState, base: number): number {
   const relaySlot = chooseRelaySlot(fielders, thrower, receiver)
   const relayFielder = fielders[relaySlot]
-  return (
-    throwTicksToFielder(thrower, relayFielder) +
-    throwTicksTo(relayFielder, basePosition(base)) +
-    INFIELD_READY_TICKS
-  )
+  return throwTicksToFielder(thrower, relayFielder) + throwTicksTo(relayFielder, basePosition(base)) + INFIELD_READY_TICKS
 }
 
 /** 잡고 던지기까지의 준비 틱 — 내야 3 · 외야 6 (cfg+0x20 / cfg+0x22) */

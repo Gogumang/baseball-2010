@@ -39,7 +39,10 @@ describe('이닝별 점수판 0x41c18', () => {
 
   it('숫자 0x585ad 정렬 2 — x 에서 폭/2 를 뺀다 ("1" 폭 4 · 나머지 8)', () => {
     expect(centeredNumberGlyphsOf(1, 40, 5, 0x32)).toEqual([{ image: 0x33, x: 38, y: 5 }])
-    expect(centeredNumberGlyphsOf(12, 40, 5, 0)).toEqual([{ image: 1, x: 34, y: 5 }, { image: 2, x: 38, y: 5 }])
+    expect(centeredNumberGlyphsOf(12, 40, 5, 0)).toEqual([
+      { image: 1, x: 34, y: 5 },
+      { image: 2, x: 38, y: 5 },
+    ])
   })
 
   it('측 0 은 지금 이닝까지, 측 1 은 말일 때만 지금 이닝을 그린다', () => {
@@ -67,13 +70,14 @@ describe('이닝별 점수판 0x41c18', () => {
     expect(placement.runs.find((glyph) => glyph.y === 10 + 0x17 && glyph.x === lastCellCenter - 4)?.image).toBe(5)
     // 지금 칸 테도 마지막 칸
     expect(placement.images.find((image) => image.image === LINE_SCORE_IMAGES.cursor)).toEqual({
-      image: LINE_SCORE_IMAGES.cursor, x: 14 + 0x15 + 0x11 * 8, y: 10 + 0x12,
+      image: LINE_SCORE_IMAGES.cursor,
+      x: 14 + 0x15 + 0x11 * 8,
+      y: 10 + 0x12,
     })
   })
 
   it('깜빡임 — 경기 끝이면 합은 8틱에 5틱 · 지금 칸 테는 없다 · 경기 중 테는 10틱에 한 번 꺼진다', () => {
-    expect([0, 1, 2, 3, 4, 5, 6, 7].map((tick) => isLineScoreTotalShown(true, tick)))
-      .toEqual([true, true, true, true, true, false, false, false])
+    expect([0, 1, 2, 3, 4, 5, 6, 7].map((tick) => isLineScoreTotalShown(true, tick))).toEqual([true, true, true, true, true, false, false, false])
     expect(isLineScoreTotalShown(false, 6)).toBe(true)
     expect(isLineScoreCursorShown(true, 3)).toBe(false)
     expect(isLineScoreCursorShown(false, 10)).toBe(false)

@@ -22,7 +22,9 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 function setUp() {
   resetStaleBuildForTests({
-    reload: () => { reloads += 1 },
+    reload: () => {
+      reloads += 1
+    },
     now: () => clock,
     entrySrc: ENTRY,
     fetchDocument: () => {

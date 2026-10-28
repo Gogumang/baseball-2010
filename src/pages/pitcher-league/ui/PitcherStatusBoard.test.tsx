@@ -15,8 +15,7 @@ const iconsOf = (container: HTMLElement) =>
 describe('투수편 상태 아이콘 — 행운 91 · 질병 86 · 부상 87 · 무력감 88', () => {
   it('행운(6)은 장착 비트로, 무력감(5)은 보유 비트로 본다', () => {
     const base = createPitcherCareer('테스터')
-    const framesOf = (overrides: Partial<typeof base>) =>
-      statusIconFramesFrom(pitcherStatusIconStateOf({ ...base, ...overrides }))
+    const framesOf = (overrides: Partial<typeof base>) => statusIconFramesFrom(pitcherStatusIconStateOf({ ...base, ...overrides }))
     expect(framesOf({ skillIds: [6], equippedSkillIds: [] })).toEqual([])
     expect(framesOf({ skillIds: [6], equippedSkillIds: [6] })).toEqual([91])
     expect(framesOf({ skillIds: [5], equippedSkillIds: [] })).toEqual([88])
@@ -31,7 +30,10 @@ describe('투수편 상태 아이콘 — 행운 91 · 질병 86 · 부상 87 · 
     const career = { ...base, skillIds: [5, 6], equippedSkillIds: [6], isSick: true, isInjured: true }
     const { container } = render(<PitcherStatusBoard career={career} />)
     expect(iconsOf(container).map((img) => [img.src.slice(-7, -4), img.style.left])).toEqual([
-      ['091', '4px'], ['086', '26px'], ['087', '48px'], ['088', '70px'],
+      ['091', '4px'],
+      ['086', '26px'],
+      ['087', '48px'],
+      ['088', '70px'],
     ])
   })
 })
@@ -41,7 +43,8 @@ describe('스태미나 막대 0x7d80e~0x7d9c4 · 사기 y −3', () => {
     const career = { ...createPitcherCareer('테스터'), stamina: 4_250 }
     const bar = staminaBarLayoutOf(career)
     expect([bar.outer, bar.inner]).toEqual([
-      { x: 194, y: 54, width: 42, height: 7 }, { x: 195, y: 55, width: 40, height: 5 },
+      { x: 194, y: 54, width: 42, height: 7 },
+      { x: 195, y: 55, width: 40, height: 5 },
     ])
     expect(bar.label).toEqual({ left: 146, top: 55 })
     expect(bar.filled).toBe(16)

@@ -2,12 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { gameSceneTickSeenAt, inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { GAUGE_LAST_CELL } from '@/entities/pitcher-career/model/pitchGauge'
-import {
-  gaugePressedCellOf,
-  isPitchReleaseDue,
-  originalKeyCodeOf,
-  KEY_OK,
-} from '@/features/play-pitcher-game/model/pitchAim'
+import { gaugePressedCellOf, isPitchReleaseDue, originalKeyCodeOf, KEY_OK } from '@/features/play-pitcher-game/model/pitchAim'
 import { gaugeTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
 import { showsGaugeTargetFrameOf } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { PressArea } from '@/shared/ui'
@@ -15,9 +10,7 @@ import { PressLayer } from '@/pages/pitching/ui/PressLayer'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
-import {
-  createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 
 interface PitchGradeGaugeProps {
   /**
@@ -183,7 +176,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
         break
       }
     }
-    const seenCursor = seenIndex < 0 ? (drawn.length === 0 ? cursorRef.current : 0) : drawn[seenIndex]?.cursor ?? cursorRef.current
+    const seenCursor = seenIndex < 0 ? (drawn.length === 0 ? cursorRef.current : 0) : (drawn[seenIndex]?.cursor ?? cursorRef.current)
     const wasDecided = isDecidedCell(pressedRef.current)
     pressedRef.current = gaugePressedCellOf(pressedRef.current, seenCursor)
     setPressed(pressedRef.current)

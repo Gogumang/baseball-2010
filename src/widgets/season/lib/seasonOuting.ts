@@ -4,9 +4,7 @@ import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
-import {
-  MONEY_LIMIT, MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, clampTo,
-} from '@/entities/season-mode/model/seasonRecord'
+import { MONEY_LIMIT, MORALE_LIMIT, POPULARITY_LIMIT, REPUTATION_LIMIT, clampTo } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { cureIllnessAtHospital } from '@/entities/season-mode/model/seasonEventFlow'
 
@@ -147,11 +145,7 @@ const MORALE_FULL = 100
  * 미만이면 입원이 막힌다. 나리 쪽 같은 버그(보험증서, G 3-2 `0x16d42`)가 DECISIONS.md 의
  * "원본 버그도 그대로 이식" 목록에 올라가 있다.
  */
-export function checkSeasonOuting(
-  record: SeasonRecord,
-  teamMorale: number,
-  place: number,
-): SeasonOutingCheckResult {
+export function checkSeasonOuting(record: SeasonRecord, teamMorale: number, place: number): SeasonOutingCheckResult {
   const cost = SEASON_OUTING_COSTS[place] ?? 0
   const required = SEASON_OUTING_REQUIRED_POPULARITY[place] ?? 0
 
@@ -228,8 +222,7 @@ interface OutingLine {
 }
 
 /** 0xc9e4~0xca14 — "(" + ("+" | "-") + |보정| + ")" */
-const bonusTextOf = (bonus: number, scale: number): string =>
-  bonus === 0 ? '' : `(${bonus > 0 ? '+' : '-'}${Math.abs(bonus * scale)})`
+const bonusTextOf = (bonus: number, scale: number): string => (bonus === 0 ? '' : `(${bonus > 0 ? '+' : '-'}${Math.abs(bonus * scale)})`)
 
 /** [83] 상승 · [84] 하락 — 굴린 값의 부호로 고른다(보정을 더한 값이 아니다) */
 const riseTextOf = (rolled: number): string => ORIGINAL_MODE_TEXT[rolled >= 0 ? 83 : 84] ?? ''
@@ -291,12 +284,7 @@ function seasonOutingResultTextOf(
  * ```
  * 보유 플래그는 `SeasonRecord.outingSubItems[p]` (SR+0x5d+p).
  */
-export function rollSeasonOuting(
-  record: SeasonRecord,
-  teamMorale: number,
-  place: number,
-  random: RandomPort,
-): SeasonOutingOutcome | null {
+export function rollSeasonOuting(record: SeasonRecord, teamMorale: number, place: number, random: RandomPort): SeasonOutingOutcome | null {
   const effect = SEASON_OUTING_EFFECTS[place]
   if (effect === undefined) return null
   const bonus = record.outingSubItems[place] === true ? SEASON_OUTING_SUB_ITEMS[place] : undefined

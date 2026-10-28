@@ -1,7 +1,11 @@
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
-  BURST_BAND_FRAME_SRC, BURST_BAND_GOAL_TEXT, BURST_BAND_PANEL, BURST_BAND_REWARD_TEXT, burstBandOf,
+  BURST_BAND_FRAME_SRC,
+  BURST_BAND_GOAL_TEXT,
+  BURST_BAND_PANEL,
+  BURST_BAND_REWARD_TEXT,
+  burstBandOf,
 } from '@/widgets/burst-mission/lib/burstBandLayout'
 import type { BurstBandRole } from '@/widgets/burst-mission/lib/burstBandLayout'
 import * as styles from '@/widgets/burst-mission/ui/BurstBand.css'
@@ -26,23 +30,29 @@ export function BurstBand({ row, role, isDimmed = false }: BurstBandProps) {
   const draw = burstBandOf(row, role)
   if (draw === null) return null
   return (
-    <div
-      className={styles.band}
-      data-testid="돌발-띠"
-      {...(isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {})}
-    >
-      <img className={styles.sprite} src={BURST_BAND_FRAME_SRC} alt=""
-        style={{ left: BURST_BAND_PANEL.left, top: BURST_BAND_PANEL.top }} data-testid="돌발-띠-판" />
+    <div className={styles.band} data-testid="돌발-띠" {...(isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {})}>
+      <img
+        className={styles.sprite}
+        src={BURST_BAND_FRAME_SRC}
+        alt=""
+        style={{ left: BURST_BAND_PANEL.left, top: BURST_BAND_PANEL.top }}
+        data-testid="돌발-띠-판"
+      />
       {draw.icon !== null && (
-        <img className={styles.sprite} src={draw.icon.src} alt="" style={{ left: draw.icon.left, top: draw.icon.top }}
-          data-testid="돌발-띠-아이콘" />
+        <img className={styles.sprite} src={draw.icon.src} alt="" style={{ left: draw.icon.left, top: draw.icon.top }} data-testid="돌발-띠-아이콘" />
       )}
-      <span className={styles.text} data-testid="돌발-띠-목표"
-        style={{ left: BURST_BAND_GOAL_TEXT.left, top: BURST_BAND_GOAL_TEXT.top, width: BURST_BAND_GOAL_TEXT.width }}>
+      <span
+        className={styles.text}
+        data-testid="돌발-띠-목표"
+        style={{ left: BURST_BAND_GOAL_TEXT.left, top: BURST_BAND_GOAL_TEXT.top, width: BURST_BAND_GOAL_TEXT.width }}
+      >
         {stripGameMarkup(draw.goalText)}
       </span>
-      <span className={styles.text} data-testid="돌발-띠-보상"
-        style={{ left: BURST_BAND_REWARD_TEXT.left, top: BURST_BAND_REWARD_TEXT.top, width: BURST_BAND_REWARD_TEXT.width }}>
+      <span
+        className={styles.text}
+        data-testid="돌발-띠-보상"
+        style={{ left: BURST_BAND_REWARD_TEXT.left, top: BURST_BAND_REWARD_TEXT.top, width: BURST_BAND_REWARD_TEXT.width }}
+      >
         {stripGameMarkup(draw.rewardText)}
       </span>
     </div>

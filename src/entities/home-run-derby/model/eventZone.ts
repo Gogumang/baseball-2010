@@ -66,8 +66,7 @@ export const EVENT_ZONE_RECTS: readonly { readonly x: number; readonly y: number
 
 /** 공 자리가 존 그림 두 칸 중 하나 안에 드는가 (B-32 고친 길의 적중 판정) */
 export function isBallInEventZone(point: EventZonePoint): boolean {
-  return EVENT_ZONE_RECTS.some((rect) =>
-    point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height)
+  return EVENT_ZONE_RECTS.some((rect) => point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height)
 }
 
 /**

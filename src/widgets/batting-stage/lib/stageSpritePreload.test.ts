@@ -17,16 +17,20 @@ const PUBLIC = resolve(__dirname, '../../../../public')
 const onDisk = (url: string) => existsSync(resolve(PUBLIC, url.replace(/^\.\//, '')))
 /** 미리 받기가 실제로 받을 주소 — `framesListedIn` 은 디스크의 origins.json 으로 거른다(브라우저에서 하는 그대로) */
 function fetchedUrlsOf(requests: readonly SpriteFolderPreload[]): string[] {
-  return preloadImageUrlsOf(requests.map((request) => {
-    if (request.framesListedIn === undefined || request.frames === 'all') return request
-    const origins = JSON.parse(readFileSync(resolve(PUBLIC, `${request.framesListedIn.replace(/^\.\//, '')}/origins.json`), 'utf8')) as Record<string, unknown>
-    return { ...request, frames: request.frames.filter((frame) => String(frame).padStart(3, '0') in origins) }
-  }))
+  return preloadImageUrlsOf(
+    requests.map((request) => {
+      if (request.framesListedIn === undefined || request.frames === 'all') return request
+      const origins = JSON.parse(readFileSync(resolve(PUBLIC, `${request.framesListedIn.replace(/^\.\//, '')}/origins.json`), 'utf8')) as Record<
+        string,
+        unknown
+      >
+      return { ...request, frames: request.frames.filter((frame) => String(frame).padStart(3, '0') in origins) }
+    }),
+  )
 }
 const jsonUrlsOf = (requests: readonly SpriteFolderPreload[]) =>
   requests.flatMap((request) => (request.json ?? []).map((name) => `${request.folder}/${name}`))
-const folderFrames = (requests: readonly SpriteFolderPreload[], folder: string) =>
-  requests.find((request) => request.folder === folder)?.frames
+const folderFrames = (requests: readonly SpriteFolderPreload[], folder: string) => requests.find((request) => request.folder === folder)?.frames
 
 describe('stageSpritePreload — 그리기 코드에서 계산한 선수 그림 목록', () => {
   it('타격형 타자: 자세표가 낼 수 있는 모든 몸통 프레임과 그 겹(그림자 · 헬멧 · 배트 · 잔상)을 받는다', () => {
@@ -86,7 +90,11 @@ describe('stageSpritePreload — 그리기 코드에서 계산한 선수 그림 
   })
 
   it('한 경기 목록은 두 몸통 폼 · 실린 마선수 · 주자를 합친다 — 가리키는 파일이 모두 있다', () => {
-    const requests = stageCastSpritePreloadsOf({ aceBatters: [0, 4], acePitchers: [2], equippedBatters: [{ bodyType: 1, equipment: { head: 8, hand: 9, leg: 9 } }] })
+    const requests = stageCastSpritePreloadsOf({
+      aceBatters: [0, 4],
+      acePitchers: [2],
+      equippedBatters: [{ bodyType: 1, equipment: { head: 8, hand: 9, leg: 9 } }],
+    })
     const urls = fetchedUrlsOf(requests)
     expect(new Set(requests.map((request) => request.folder)).size).toBe(requests.length)
     expect(urls.filter((url) => !onDisk(url))).toEqual([])

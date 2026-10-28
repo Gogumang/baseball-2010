@@ -3,13 +3,21 @@ import { CommonPanel, MessageBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
-import {
-  currentTitleOf, equipTitleNoticeOf, titleDisplayNameOf, titleListOf, TITLE_ROWS_PER_PAGE,
-} from '@/entities/career/model/titles'
+import { currentTitleOf, equipTitleNoticeOf, titleDisplayNameOf, titleListOf, TITLE_ROWS_PER_PAGE } from '@/entities/career/model/titles'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import {
-  TITLE_CURSOR_BOX, TITLE_HEADER_FRAME, TITLE_HEADER_OX, TITLE_LIST_BOXES, TITLE_LIST_COLORS, TITLE_LIST_FRAME,
-  TITLE_NUMBER_HEIGHT, TITLE_ROW_STEP, centeredTopOf, titleListTopAfter, titleNumberLeftOf, titleNumberWidthOf,
+  TITLE_CURSOR_BOX,
+  TITLE_HEADER_FRAME,
+  TITLE_HEADER_OX,
+  TITLE_LIST_BOXES,
+  TITLE_LIST_COLORS,
+  TITLE_LIST_FRAME,
+  TITLE_NUMBER_HEIGHT,
+  TITLE_ROW_STEP,
+  centeredTopOf,
+  titleListTopAfter,
+  titleNumberLeftOf,
+  titleNumberWidthOf,
   titleScrollBarRectsOf,
 } from '@/widgets/management/lib/titleListLayout'
 import * as styles from '@/shared/ui/GameWindow/GameWindow.css'
@@ -108,20 +116,29 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
   const { window: windowBox, header: headerBox, scrollBar, number: numberBox, name: nameBox } = TITLE_LIST_BOXES
 
   return (
-    <div className={notice !== null ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay} role="dialog" aria-label="칭호" onClick={onClose}>
+    <div
+      className={notice !== null ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay}
+      role="dialog"
+      aria-label="칭호"
+      onClick={onClose}
+    >
       {/* 박스 0 — 19974 공용 판 0x55e61(skin, 박스 0 x · y · w · h, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)
           (1993a~19974 직접 뜸 — 박스 0 은 그림 자료 +0xfc = mode_ui 프레임 63). 제목 탭이 서서 위 띠는 안 본다 */}
-      <CommonPanel x={windowBox.x} y={windowBox.y} width={windowBox.width} height={windowBox.height}
-        topBand={0x10} titleTab testId="칭호-판" />
+      <CommonPanel x={windowBox.x} y={windowBox.y} width={windowBox.width} height={windowBox.height} topBand={0x10} titleTab testId="칭호-판" />
 
       {/* 박스 1 — img_text 279 "닉네임" 팔레트 3 · 정렬 0x21 · ox 28 */}
       {header !== undefined && (
-        <img className={styles.layer} alt="닉네임" data-testid="칭호-머리"
+        <img
+          className={styles.layer}
+          alt="닉네임"
+          data-testid="칭호-머리"
           src={`${IMG_TEXT}/${pad(TITLE_HEADER_FRAME)}.png`}
           style={{
-            left: headerBox.x + TITLE_HEADER_OX + header.x, top: centeredTopOf(headerBox, header.height) + header.y,
+            left: headerBox.x + TITLE_HEADER_OX + header.x,
+            top: centeredTopOf(headerBox, header.height) + header.y,
             filter: `url(#${headerFilterId})`,
-          }} />
+          }}
+        />
       )}
 
       {/* 박스 2 칠 · 프레임 63(▲▼) · 줄 막대 아홉 */}
@@ -129,17 +146,21 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
         <rect x={scrollBar.x} y={scrollBar.y} width={scrollBar.width} height={scrollBar.height} fill={TITLE_LIST_COLORS.scrollTrack} />
       </svg>
       {arrows !== undefined && (
-        <img className={styles.layer} alt="" src={`${MODE_UI}/${pad(TITLE_LIST_FRAME.arrows)}.png`}
-          style={{ left: arrows.x, top: arrows.y }} />
+        <img className={styles.layer} alt="" src={`${MODE_UI}/${pad(TITLE_LIST_FRAME.arrows)}.png`} style={{ left: arrows.x, top: arrows.y }} />
       )}
       {Array.from({ length: TITLE_ROWS_PER_PAGE }, (_unused, row) => {
         const title = page[row]
         const isEquipped = title !== undefined && title === equipped
         const frames = isEquipped ? [TITLE_LIST_FRAME.row, TITLE_LIST_FRAME.equippedRow] : [TITLE_LIST_FRAME.row]
         return frames.map((frame) => (
-          <img key={`${row}-${frame}`} className={styles.layer} alt="" data-testid={`칭호-막대-${row}-${frame}`}
+          <img
+            key={`${row}-${frame}`}
+            className={styles.layer}
+            alt=""
+            data-testid={`칭호-막대-${row}-${frame}`}
             src={`${MODE_UI}/${pad(frame)}.png`}
-            style={{ left: numberBox.x, top: numberBox.y + TITLE_ROW_STEP * row }} />
+            style={{ left: numberBox.x, top: numberBox.y + TITLE_ROW_STEP * row }}
+          />
         ))
       })}
 
@@ -158,27 +179,46 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
               const left = digitLeft
               digitLeft += titleNumberWidthOf(digit)
               return (
-                <img key={digitIndex} className={styles.layer} alt="" src={assetUrl(`./sprites/num/${pad(Number(digit))}.png`)}
-                  style={{ left, top: centeredTopOf(numberBox, TITLE_NUMBER_HEIGHT) + dy }} />
+                <img
+                  key={digitIndex}
+                  className={styles.layer}
+                  alt=""
+                  src={assetUrl(`./sprites/num/${pad(Number(digit))}.png`)}
+                  style={{ left, top: centeredTopOf(numberBox, TITLE_NUMBER_HEIGHT) + dy }}
+                />
               )
             })}
-            <button type="button"
+            <button
+              type="button"
               aria-current={isEquipped ? 'true' : undefined}
               className={local.row}
               style={{
-                left: nameBox.x, top: nameBox.y + dy, width: nameBox.width, height: nameBox.height,
+                left: nameBox.x,
+                top: nameBox.y + dy,
+                width: nameBox.width,
+                height: nameBox.height,
                 color: isEquipped ? TITLE_LIST_COLORS.equippedText : TITLE_LIST_COLORS.text,
               }}
-              onClick={(event) => { event.stopPropagation(); setCursor(index); confirm(index) }}>
+              onClick={(event) => {
+                event.stopPropagation()
+                setCursor(index)
+                confirm(index)
+              }}
+            >
               {titleDisplayNameOf(title)}
             </button>
             {index === cursor && isBlinkOn && (
-              <svg className={local.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges"
-                data-testid="칭호-커서">
+              <svg className={local.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges" data-testid="칭호-커서">
                 {/* 0xb9ed5 노랑 테두리 — 0x6a978 이 폭·높이에 1 을 더해 플랫폼 0x14006d8 에 넘겨 (w + 1) × (h + 1) 칸을 덮는다(U-113 확정) */}
-                <rect x={TITLE_CURSOR_BOX.x + 0.5} y={TITLE_CURSOR_BOX.y + dy + 0.5}
-                  width={TITLE_CURSOR_BOX.width} height={TITLE_CURSOR_BOX.height}
-                  fill="none" stroke={TITLE_LIST_COLORS.cursor} strokeWidth={1} />
+                <rect
+                  x={TITLE_CURSOR_BOX.x + 0.5}
+                  y={TITLE_CURSOR_BOX.y + dy + 0.5}
+                  width={TITLE_CURSOR_BOX.width}
+                  height={TITLE_CURSOR_BOX.height}
+                  fill="none"
+                  stroke={TITLE_LIST_COLORS.cursor}
+                  strokeWidth={1}
+                />
               </svg>
             )}
           </span>
@@ -198,9 +238,7 @@ export function TitleListWindow({ career, onEquip, onClose, initialTop = 0, onTo
 
       {/* 알림의 [확인] 클릭이 창 바깥 클릭(닫기)으로 번지지 않게 막는다 — 키(Enter)처럼 알림만 닫힌다 (SkillWindow 와 같다, r186) */}
       <div onClick={(event) => event.stopPropagation()}>
-        {notice !== null && (
-          <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
-        )}
+        {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
       </div>
     </div>
   )

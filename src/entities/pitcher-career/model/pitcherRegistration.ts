@@ -59,12 +59,7 @@ export const PITCHER_RECORD_BYTE_0X0A = 0x80
 
 /** 레코드 `+0xb` 를 등록 선택으로 조립한다 (bit0~1 보직 · bit2~3 피부 · bit4 손 · bit5~7 타입) */
 export function pitcherRecordByte0x0bOf(profile: PitcherRookieProfile): number {
-  return (
-    (profile.role & 3) |
-    ((profile.skinIndex & 3) << 2) |
-    ((profile.handIndex & 1) << 4) |
-    ((profile.typeIndex & 7) << 5)
-  )
+  return (profile.role & 3) | ((profile.skinIndex & 3) << 2) | ((profile.handIndex & 1) << 4) | ((profile.typeIndex & 7) << 5)
 }
 
 /**
@@ -163,10 +158,7 @@ export function canRegisterPitcher(profile: PitcherRookieProfile): boolean {
  * ```
  * 곧 세 번째를 켜면 **먼저 고른 것이 아니라 번호가 가장 낮은 칸**이 빠진다. 돌려주는 칸은 번호 순이다.
  */
-export function toggleBreakingPitchSlot(
-  slots: readonly number[],
-  slot: number,
-): readonly number[] {
+export function toggleBreakingPitchSlot(slots: readonly number[], slot: number): readonly number[] {
   const chosen = ROOKIE_BREAKING_PITCH_TYPES.map((_, index) => slots.includes(index))
   chosen[slot] = !chosen[slot]
   if (chosen[slot]) chosen[slot ^ 1] = false

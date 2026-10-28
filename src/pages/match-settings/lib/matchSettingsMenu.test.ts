@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import {
-  CHANCE_VALUE, INNING_VALUE, MATCH_SETTING_KIND, isHumanControlled,
-} from '@/features/play-team-game/model/matchSettings'
+import { CHANCE_VALUE, INNING_VALUE, MATCH_SETTING_KIND, isHumanControlled } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
-  DETAIL_CELL_COUNTS, DETAIL_ROW, SETTINGS_STAGE, answerMatchSettingsPopup,
-  detailCellCountOf, openMatchSettings, pressMatchSettingsKey,
+  DETAIL_CELL_COUNTS,
+  DETAIL_ROW,
+  SETTINGS_STAGE,
+  answerMatchSettingsPopup,
+  detailCellCountOf,
+  openMatchSettings,
+  pressMatchSettingsKey,
 } from '@/pages/match-settings/lib/matchSettingsMenu'
-import type {
-  MatchSettingsKey, MatchSettingsWindowState,
-} from '@/pages/match-settings/lib/matchSettingsMenu'
+import type { MatchSettingsKey, MatchSettingsWindowState } from '@/pages/match-settings/lib/matchSettingsMenu'
 
 /**
  * 경기진행 설정 창 키 처리 (원본 0x5ffcc — R4 4절 · J-3).

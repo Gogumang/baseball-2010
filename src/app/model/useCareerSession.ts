@@ -17,7 +17,27 @@ import { applyPitchResolution, isAtBatFinished } from '@/entities/at-bat/model/a
 import type { AtBatState } from '@/entities/at-bat/model/atBatState'
 import { describeOutcomeBanner } from '@/entities/at-bat/model/resolutionText'
 import type { DrawnFieldingError } from '@/features/defense-play/model/fieldingErrors'
-import { arrivePitch, contactDefensePlayInputOf, cpuPickoff, enterBenchClearing, judgeHitByPitch, recordDrawnFieldingErrors, recordMyBuntAttempt, resolveBenchClearing, resolveDefensePlay, resolveRunnerPlay, spendMySpecialSwing, startGame, startPlayerFoulPlay, startPlayerOutcome, stageOpponentPitcherAbilityOf, startSteal, summaryOf, throwOpponentPitch, withGameTeamMorale } from '@/features/play-game/model/gameFlow'
+import {
+  arrivePitch,
+  contactDefensePlayInputOf,
+  cpuPickoff,
+  enterBenchClearing,
+  judgeHitByPitch,
+  recordDrawnFieldingErrors,
+  recordMyBuntAttempt,
+  resolveBenchClearing,
+  resolveDefensePlay,
+  resolveRunnerPlay,
+  spendMySpecialSwing,
+  startGame,
+  startPlayerFoulPlay,
+  startPlayerOutcome,
+  stageOpponentPitcherAbilityOf,
+  startSteal,
+  summaryOf,
+  throwOpponentPitch,
+  withGameTeamMorale,
+} from '@/features/play-game/model/gameFlow'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { GameAutoRelay, GameProgress } from '@/features/play-game/model/gameFlow'
 import { BATTER_PITCH_RESULT_ENTRY_TICKS, playSoundIdsAfterSceneTicks } from '@/features/play-game/model/sceneTickSounds'
@@ -36,11 +56,7 @@ import { EMPTY_AT_BAT_PITCH_TALLY, tallyPitch } from '@/features/play-at-bat/mod
 import type { AtBatPitchTally } from '@/features/play-at-bat/model/atBatPitchTally'
 import { deepHitCheerSoundIdOf, inPlayCallSoundIdOf, pitchCallSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import { carryDistanceOf } from '@/entities/batting/model/battedBallFlight'
-import {
-  GAME_INTRO_SOUND,
-  gameResultSoundIdOf,
-  gameStepSoundIdsOf,
-} from '@/features/play-game/model/gameSounds'
+import { GAME_INTRO_SOUND, gameResultSoundIdOf, gameStepSoundIdsOf } from '@/features/play-game/model/gameSounds'
 import { playSoundIds } from '@/app/model/useSound'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
@@ -82,9 +98,7 @@ import { nariMoraleOf, nariTeamRecordMoraleOf, withNariGameMorale, withNariTeamR
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { selectSpecialSwingNumber, setSkillEquipped } from '@/entities/career/model/playerCareer'
 import { expandSkillSlots } from '@/entities/career/model/skillEquip'
-import {
-  awardTitles, equipTitle, gameResultTitleOf, nationalCupStandingsTitleOf, nextTitleOf,
-} from '@/entities/career/model/titles'
+import { awardTitles, equipTitle, gameResultTitleOf, nationalCupStandingsTitleOf, nextTitleOf } from '@/entities/career/model/titles'
 import { blockReasonOf, runTraining, specialSwingCostOf } from '@/entities/career/model/training'
 import { restResultTextOf, trainingBlockTextOf, trainingOutcomeLinesOf } from '@/entities/career/model/trainingText'
 import { BATTING_TYPE_NAMES } from '@/pages/management/lib/basicInfoLayout'
@@ -109,9 +123,7 @@ import {
 import { EMPTY_OUTING_PLACE_SLOTS, outingPlaceSlotsOf, outingSlotPlaceIdsOf } from '@/pages/outing-map/lib/outingPlaceSlots'
 import { selectShopItem } from '@/features/shop/model/shopSelection'
 import { BATTER_GP_ITEMS } from '@/entities/career/model/gpItems'
-import {
-  BATTER_LEAGUE_MODE, leagueUsageOf, skillEquipStatEventsOf,
-} from '@/entities/collection/model/annalsStats'
+import { BATTER_LEAGUE_MODE, leagueUsageOf, skillEquipStatEventsOf } from '@/entities/collection/model/annalsStats'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { lapPlayClock, startPlayClock } from '@/entities/collection/model/playClock'
 import { EVENT_REWARD_KIND } from '@/entities/story/model/eventReward'
@@ -121,9 +133,7 @@ import type { RookieProfile } from '@/entities/career/model/playerCareer'
 import { useStorySchedule } from '@/app/model/useStorySchedule'
 import { withGameSkillCounters } from '@/entities/story/model/skillCondition'
 import { enterSeasonEvent, nextSeasonStep, resumePointOf } from '@/app/model/seasonEvents'
-import {
-  nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage,
-} from '@/pages/management/lib/nariMatchPrepare'
+import { nariMatchCancelTargetOf, rollNariMatchAces, rollNariMatchInfoStage } from '@/pages/management/lib/nariMatchPrepare'
 import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import {
@@ -214,9 +224,7 @@ import {
   seatNariMatchAces,
 } from '@/entities/career/model/nariTeamRecord'
 import type { QuickLineup } from '@/entities/game/model/quickLineup'
-import {
-  batterNariEntryViewOf, pointNariEntryCursor, pressNariEntryKey,
-} from '@/pages/management/lib/nariEntryView'
+import { batterNariEntryViewOf, pointNariEntryCursor, pressNariEntryKey } from '@/pages/management/lib/nariEntryView'
 import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
@@ -439,10 +447,7 @@ export function applyGameEvaluation(
   isEvaluated: boolean,
 ): PlayerCareer {
   if (!isEvaluated) return career
-  return gainMorale(
-    gainReputation(gainPopularity(career, evaluation.popularityChange), evaluation.reputationChange),
-    evaluation.moraleChange,
-  )
+  return gainMorale(gainReputation(gainPopularity(career, evaluation.popularityChange), evaluation.reputationChange), evaluation.moraleChange)
 }
 
 /** 육성 모드 한 판 — 커리어·경기 진행·관리 커맨드를 한데 묶는다. */
@@ -753,17 +758,27 @@ export function useCareerSession({
       audio.stop()
       // 환경설정 "주루" 를 경기에 태운다 — 타자편은 사람이 늘 공격이라 설정이 그대로 먹는다 (0xae690)
       const started = startGame(
-        random, ourTeamId, battingOrder, opponentTeamId, playerSide, dayCounter, runningModeManualRef.current, pitchers, aces,
-        ourRecordLineup, myRunAbility,
-        teamMorale, opponentStaleMorale, opponentEquipment,
+        random,
+        ourTeamId,
+        battingOrder,
+        opponentTeamId,
+        playerSide,
+        dayCounter,
+        runningModeManualRef.current,
+        pitchers,
+        aces,
+        ourRecordLineup,
+        myRunAbility,
+        teamMorale,
+        opponentStaleMorale,
+        opponentEquipment,
       )
       progressRef.current = started
       setProgress(started)
       // 상태 9 의 0x39fdc 모드 4 갈래 — 홈(측 1) 팀 구장, 대회(S+0x12c)면 L+0xad > 1 ? 2 : 8. 리그 팀 0~9 · 상수라 굴림 없음
-      setSceneStadium(nariSceneStadium(
-        playerSide === PLAYER_SIDE_LAST_BAT ? started.ourTeamId : started.opponentTeamId,
-        cupGameRef.current?.stage ?? null,
-      ))
+      setSceneStadium(
+        nariSceneStadium(playerSide === PLAYER_SIDE_LAST_BAT ? started.ourTeamId : started.opponentTeamId, cupGameRef.current?.stage ?? null),
+      )
       // 적재(상태 8)의 구장 준비 0x352e8 → 0x783b0 — 이 경기 내내 같은 하늘 줄
       const skyRow = stadiumSkyRowOf({ mode: BATTER_LEAGUE_MODE, dayCounter: skyDayCounter }) ?? 0
       stadiumSkyRowRef.current = skyRow
@@ -784,56 +799,56 @@ export function useCareerSession({
    * 선수는 저장의 **나리 팀 레코드**에서 나온다(`nariTeamsOf`): 내 팀 타순·벤치는 레코드 타자 배열 차례, 142 가 넣은 마선수는
    * 두 팀 레코드의 9번(마타자)·8번(마투수) 칸이다. 투수 0~7 차례는 리그 칸(`leagueGamePitchersOf`)이다.
    */
-  const beginGame = useCallback((from?: PlayerCareer) => {
-    // `from` — 메인 메뉴의 "곧장 경기"(0x327b8 모드 4 갈래)는 저장을 올린 그 자리에서 세운다(아직 그려지기 전이라 ref 가 옛 값)
-    const current = from ?? careerRef.current
-    cupGameRef.current = null
-    const opponent = current === null || current === undefined ? undefined : nextOpponentOf(current)
-    const records = current === null || current === undefined ? undefined : nariTeamsOf(current)
-    const mine = records === undefined || current === null || current === undefined
-      ? undefined
-      : nariTeamRecordOf(records, current.teamId)
-    const theirs = records === undefined || opponent === undefined ? undefined : nariTeamRecordOf(records, opponent)
-    const recordAces = records === undefined || current === null || current === undefined || opponent === undefined
-      ? null
-      : recordMatchAcesOf(records, current.teamId, opponent)
-    startMatch(
-      current?.teamId ?? 0,
-      current === null || current === undefined ? undefined : renumberedBattingOrderOf(current),
-      // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
-      opponent,
-      // 날짜 카운터 g = S+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽고 0이 아니면 두 팀 로테이션을 돌린다.
-      // 정규시즌은 오늘까지 치른 경기 수, 포스트시즌은 **시리즈 안 경기 수**다 (`leagueDayCounterOf` — b811c · b777a · b819a).
-      // 커리어 `gamesPlayed` 는 내 경기만 세므로 포스트시즌 g 로 쓰지 않는다.
-      current === null || current === undefined ? 0 : leagueDayCounterOf(current),
-      // 내 팀의 측 — 경기 준비 0x1c46c(0x1c4f0)·장면 0x39fdc 모드 3·4 가지(0x3a164 → [sp+0x3c])가 정규시즌·포스트시즌
-      // 가리지 않고 `0xb7844(L, 내 팀)` 로 정한다: 정규시즌은 일정표 0xd89cb · 9일 주기 뒤집기(`leagueSideOf`),
-      // 포스트시즌은 대진 윗 시드(칸 0)가 홈·후공, 아랫 시드가 원정·선공 (`leagueGamePlayerSideOf`).
-      current === null || current === undefined ? PLAYER_SIDE_LAST_BAT : leagueGamePlayerSideOf(current),
-      // 0x1c46c 가 세운 두 팀 투수 — 리그가 들고 다니는 레코드 차례(g ≠ 0 이면 한 칸 돈 것 · 포스트시즌은 시리즈 이월)와
-      // 레코드 +0x2c (g == 0 이면 1c8a8 이 열 팀 10000)
-      current === null || current === undefined || opponent === undefined
-        ? undefined
-        : leagueGamePitchersOf(current, opponent),
-      // 142 진입 0x1c46c 가 두 팀 명부(저장의 나리 팀 레코드)에 넣은 마선수 — 경기 장면 0x39fdc 가 같은 명부로 팀을 세운다
-      recordAces === null || mine === undefined || theirs === undefined
-        ? undefined
-        : {
-          ours: recordTeamAcesOf(mine),
-          opponent: recordTeamAcesOf(theirs),
-          ...(aceLevels === undefined ? {} : { levels: aceLevels }),
-        },
-      mine === undefined ? undefined : nariQuickLineupOf(mine),
-      undefined,
-      current === null || current === undefined ? undefined : effectiveAbilityOf(withNariGameMorale(current)).run,
-      // 두 팀 레코드 +2 = 0xa3a24 — 대회가 아니라 커리어 사기
-      current === null || current === undefined ? undefined : nariMoraleOf(current),
-      // 상대 리그 팀 레코드 +2 에 남은 값 — 그 팀이 지난번 치른 경기 때의 나리 사기 (`nariTeamRecordMoraleOf`, r101)
-      current === null || current === undefined || opponent === undefined ? undefined : nariTeamRecordMoraleOf(current, opponent),
-      // 상대 팀 객체 0xb8680 → 0x1f989 가 읽는 저장 레코드의 장비 니블 (새 시즌 0x665e8 — `nariCpuEquipment`)
-      opponent === undefined ? undefined : nariTeamRecordEquipmentOf(records, opponent),
-    )
-  }, [aceLevels, startMatch])
+  const beginGame = useCallback(
+    (from?: PlayerCareer) => {
+      // `from` — 메인 메뉴의 "곧장 경기"(0x327b8 모드 4 갈래)는 저장을 올린 그 자리에서 세운다(아직 그려지기 전이라 ref 가 옛 값)
+      const current = from ?? careerRef.current
+      cupGameRef.current = null
+      const opponent = current === null || current === undefined ? undefined : nextOpponentOf(current)
+      const records = current === null || current === undefined ? undefined : nariTeamsOf(current)
+      const mine = records === undefined || current === null || current === undefined ? undefined : nariTeamRecordOf(records, current.teamId)
+      const theirs = records === undefined || opponent === undefined ? undefined : nariTeamRecordOf(records, opponent)
+      const recordAces =
+        records === undefined || current === null || current === undefined || opponent === undefined
+          ? null
+          : recordMatchAcesOf(records, current.teamId, opponent)
+      startMatch(
+        current?.teamId ?? 0,
+        current === null || current === undefined ? undefined : renumberedBattingOrderOf(current),
+        // 상대는 일정표(정규시즌)나 지금 시리즈(포스트시즌)가 정한다 — 무작위가 아니다
+        opponent,
+        // 날짜 카운터 g = S+0xb2(= L+0x32) — 경기 준비 0x1c46c 가 0x1c576 에서 읽고 0이 아니면 두 팀 로테이션을 돌린다.
+        // 정규시즌은 오늘까지 치른 경기 수, 포스트시즌은 **시리즈 안 경기 수**다 (`leagueDayCounterOf` — b811c · b777a · b819a).
+        // 커리어 `gamesPlayed` 는 내 경기만 세므로 포스트시즌 g 로 쓰지 않는다.
+        current === null || current === undefined ? 0 : leagueDayCounterOf(current),
+        // 내 팀의 측 — 경기 준비 0x1c46c(0x1c4f0)·장면 0x39fdc 모드 3·4 가지(0x3a164 → [sp+0x3c])가 정규시즌·포스트시즌
+        // 가리지 않고 `0xb7844(L, 내 팀)` 로 정한다: 정규시즌은 일정표 0xd89cb · 9일 주기 뒤집기(`leagueSideOf`),
+        // 포스트시즌은 대진 윗 시드(칸 0)가 홈·후공, 아랫 시드가 원정·선공 (`leagueGamePlayerSideOf`).
+        current === null || current === undefined ? PLAYER_SIDE_LAST_BAT : leagueGamePlayerSideOf(current),
+        // 0x1c46c 가 세운 두 팀 투수 — 리그가 들고 다니는 레코드 차례(g ≠ 0 이면 한 칸 돈 것 · 포스트시즌은 시리즈 이월)와
+        // 레코드 +0x2c (g == 0 이면 1c8a8 이 열 팀 10000)
+        current === null || current === undefined || opponent === undefined ? undefined : leagueGamePitchersOf(current, opponent),
+        // 142 진입 0x1c46c 가 두 팀 명부(저장의 나리 팀 레코드)에 넣은 마선수 — 경기 장면 0x39fdc 가 같은 명부로 팀을 세운다
+        recordAces === null || mine === undefined || theirs === undefined
+          ? undefined
+          : {
+              ours: recordTeamAcesOf(mine),
+              opponent: recordTeamAcesOf(theirs),
+              ...(aceLevels === undefined ? {} : { levels: aceLevels }),
+            },
+        mine === undefined ? undefined : nariQuickLineupOf(mine),
+        undefined,
+        current === null || current === undefined ? undefined : effectiveAbilityOf(withNariGameMorale(current)).run,
+        // 두 팀 레코드 +2 = 0xa3a24 — 대회가 아니라 커리어 사기
+        current === null || current === undefined ? undefined : nariMoraleOf(current),
+        // 상대 리그 팀 레코드 +2 에 남은 값 — 그 팀이 지난번 치른 경기 때의 나리 사기 (`nariTeamRecordMoraleOf`, r101)
+        current === null || current === undefined || opponent === undefined ? undefined : nariTeamRecordMoraleOf(current, opponent),
+        // 상대 팀 객체 0xb8680 → 0x1f989 가 읽는 저장 레코드의 장비 니블 (새 시즌 0x665e8 — `nariCpuEquipment`)
+        opponent === undefined ? undefined : nariTeamRecordEquipmentOf(records, opponent),
+      )
+    },
+    [aceLevels, startMatch],
+  )
 
   /**
    * 109 다음경기 앞 순위표에 들어선다 — 진입 0x10d8c: `S+0x50 = 4`(0x10db0) · 이전 ≠ 142 면 저장(0x1fded · 0x22755).
@@ -869,13 +884,15 @@ export function useCareerSession({
       // 1c7ae~1c87c — 무대 · 구장 0x78664(무대, 홈 팀) · 0x5fd04. 리그 팀은 0~9 라 굴리지 않는다(마선수 굴림 뒤 자리)
       const prepared = careerRef.current
       if (prepared !== null && prepared !== undefined) {
-        setMatchInfoStage(rollNariMatchInfoStage(random, {
-          mode: BATTER_LEAGUE_MODE,
-          myTeamId: prepared.teamId,
-          opponentTeamId: nextOpponentOf(prepared),
-          mySide: leagueGamePlayerSideOf(prepared),
-          dayCounter: leagueDayCounterOf(prepared),
-        }))
+        setMatchInfoStage(
+          rollNariMatchInfoStage(random, {
+            mode: BATTER_LEAGUE_MODE,
+            myTeamId: prepared.teamId,
+            opponentTeamId: nextOpponentOf(prepared),
+            mySide: leagueGamePlayerSideOf(prepared),
+            dayCounter: leagueDayCounterOf(prepared),
+          }),
+        )
       }
       // 0x1c54a — 두 팀 칸 번호를 다시 매긴다(0xb8768): 타순 = 레코드 안 내 줄 첨자 + 1
       setCareer((current) => {
@@ -939,9 +956,7 @@ export function useCareerSession({
        * 116 이 읽는 S+0x4a · +0x64 · +7 · S+0x1d8 은 평가 0xa719c(정규시즌만, 0x4f268)가 쓰는 칸이라 **포스트시즌 경기 뒤에는 앞 평가
        * 경기 값**이다 — 평가 창 숫자 · 감독 글 · 징글 · 경기 뒤 카운터(+0x1c2 · 먹튀) · 칭호 39 모두. 옛 저장에 앞 값이 없으면 이 경기 값.
        */
-      const { evaluation: staleEvaluation, recordLine } = shownGameEvaluationOf(
-        isEvaluated, thisEvaluation, currentCareer.lastGame, summary.stats,
-      )
+      const { evaluation: staleEvaluation, recordLine } = shownGameEvaluationOf(isEvaluated, thisEvaluation, currentCareer.lastGame, summary.stats)
       // 승리 31 · 패배 32 징글은 정산 0x19 진입(경기 끝 판 0x18 의 OK 뒤), 평가 징글 36 · 37 · 38 은 116 진입이 낸다 —
       // 정산은 결과 화면이 그 단계에 들어설 때(`enterGameSettlement`), 평가는 116 을 띄우는 자리(`enterGameEvaluationScreen`)가 낸다
       // 같은 날 나머지 네 경기도 원본대로 치러 순위표에 넣는다 (0xc2a48)
@@ -964,11 +979,7 @@ export function useCareerSession({
         recordStat({ kind: '리그1위', mode: BATTER_LEAGUE_MODE })
       }
       // 평가 0xa719c 안 0xa690c 가 경기 뒤 누적 카운터 S+0x1f0 을 더한다 — 정규시즌(평가하는 경기)만 (`withGameSkillCounters`)
-      const evaluated = applyGameEvaluation(
-        isEvaluated ? withGameSkillCounters(settled, summary) : settled,
-        thisEvaluation,
-        isEvaluated,
-      )
+      const evaluated = applyGameEvaluation(isEvaluated ? withGameSkillCounters(settled, summary) : settled, thisEvaluation, isEvaluated)
       // 116 감독 글은 진입이 +0x4a 와 **평가 뒤** 평판 +0x62 로 고른다 (0x128d2~0x12938 — 모드 4 표 39~74)
       const evaluation = {
         ...staleEvaluation,
@@ -1054,31 +1065,37 @@ export function useCareerSession({
       // 그 CPU 경기(0xc2dac)의 간이 엔진도 0xb570c b5768 로 두 나라 레코드 +2 에 나리 사기를 쓴다 — 대회 중이라 상대국 칸 +2, 곧 사람
       // 경기 끝의 그 칸(돌발 보상 사기가 쌓인 값, `GameProgress.teamMorale`)이다
       const next = advanceNationalCupDay(
-        cup, winner, loser, random, summary.pitcherStaminas?.opponent,
+        cup,
+        winner,
+        loser,
+        random,
+        summary.pitcherStaminas?.opponent,
         finished.teamMorale === undefined ? undefined : { mode: BATTER_LEAGUE_MODE, nariMorale: finished.teamMorale },
       )
       // 기록 달성 G (4ebaa~4ec7c — 사람 팀 공·수로 거른 기록이라 대회 경기도 쌓인다)
       const gamePointReward = gamePointRewardOf(summary)
       // 하루 끝 b8216 — 다음 날 사람 경기 상대를 +0xbe0 에 마스터에서 새로 복사. 대회 칸(L+0xa8~ · L+0x32)은 정산 끝 0x4f3c4 가 저장
-      setCareer((current) => current === null
-        ? current
-        : {
-          ...settleNariCupGame(current, gamePointReward),
-          nationalCup: next,
-          ...(current.nariCupTeams === undefined
-            ? {}
-            : {
-              // 대표팀 칸(+0xbc4)에 남는 것 먼저 — +2 사기는 0xb570c b5762 가 마지막으로 덮은 나리 사기(대회 중이라 상대국 칸 값, 상대 칸
-              // 덮기와 같은 공이라 `opponentRecordMorale` 과 같은 때). 실책 +0x2e 는 타자편 수비 그림이 상대 야수뿐이라 대표팀 몫이 없다
-              nariCupTeams: nextNariCupDayTeams(
-                recordNariCupGame(current.nariCupTeams, {
-                  morale: finished.opponentRecordMorale ?? finished.teamMorale,
-                  errors: summary.leagueErrors,
-                }),
-                nationalCupMatchupOf(next)?.opponent ?? null,
-              ),
-            }),
-        })
+      setCareer((current) =>
+        current === null
+          ? current
+          : {
+              ...settleNariCupGame(current, gamePointReward),
+              nationalCup: next,
+              ...(current.nariCupTeams === undefined
+                ? {}
+                : {
+                    // 대표팀 칸(+0xbc4)에 남는 것 먼저 — +2 사기는 0xb570c b5762 가 마지막으로 덮은 나리 사기(대회 중이라 상대국 칸 값, 상대 칸
+                    // 덮기와 같은 공이라 `opponentRecordMorale` 과 같은 때). 실책 +0x2e 는 타자편 수비 그림이 상대 야수뿐이라 대표팀 몫이 없다
+                    nariCupTeams: nextNariCupDayTeams(
+                      recordNariCupGame(current.nariCupTeams, {
+                        morale: finished.opponentRecordMorale ?? finished.teamMorale,
+                        errors: summary.leagueErrors,
+                      }),
+                      nationalCupMatchupOf(next)?.opponent ?? null,
+                    ),
+                  }),
+            },
+      )
       // 0x4ec82 `0x22c7d(G, 모드 4)` 획득 GP 통계 · 0x4ec8a `0x22e10` 기록 달성 횟수 — 모드를 가리지 않는다
       recordStat({ kind: 'G획득', mode: BATTER_LEAGUE_MODE, amount: gamePointReward })
       recordStat({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
@@ -1086,8 +1103,13 @@ export function useCareerSession({
       recordStat({ kind: '플레이시간', mode: BATTER_LEAGUE_MODE, elapsed: lapPlayClock() })
       // 승리 31 · 패배 32 징글 — 정규 경기와 같이 정산 0x19 진입에서(`enterGameSettlement`). 116 의 평가 징글은 없다
       setScreen({
-        kind: '대회경기결과', summary, gamePointReward, cup: next, settlementInning: finished.game.inning,
-        settlementPlayerSide: finished.game.playerSide, settlementSkyRow: stadiumSkyRowRef.current,
+        kind: '대회경기결과',
+        summary,
+        gamePointReward,
+        cup: next,
+        settlementInning: finished.game.inning,
+        settlementPlayerSide: finished.game.playerSide,
+        settlementSkyRow: stadiumSkyRowRef.current,
       })
     },
     [audio, random, recordStat, setCareer, setScreen, setUpNariScene],
@@ -1197,9 +1219,7 @@ export function useCareerSession({
         // 공 도착에서, 낫아웃 · 밀어내기 판은 타석 결과 `finishPlayerOutcome` 에서 넣는다)에 들어가 재생 화면이 기록된 틱에 낸다
         // (`DefensePlayback` 재생 갈래의 `tickSoundIds`). 그릴 틱이 없는 판만 여기서(근사) 낸다
         playSoundIds(audio, [
-          arrival.play == null || arrival.play.shownLive === true || arrival.play.result.ticks.length > 0
-            ? null
-            : arrival.play.callSoundId,
+          arrival.play == null || arrival.play.shownLive === true || arrival.play.result.ticks.length > 0 ? null : arrival.play.callSoundId,
           ...gameStepSoundIdsOf(beforeArrival, arrival.progress),
         ])
       }
@@ -1251,10 +1271,7 @@ export function useCareerSession({
         return
       }
       // 홈런·삼진·볼넷은 수비를 기다리지 않는다 — 홈런 함성(11)과 진행 소리를 여기서 낸다
-      playSoundIds(audio, [
-        inPlayCallSoundIdOf(context.nextAtBat.outcome),
-        ...gameStepSoundIdsOf(currentProgress, advanced),
-      ])
+      playSoundIds(audio, [inPlayCallSoundIdOf(context.nextAtBat.outcome), ...gameStepSoundIdsOf(currentProgress, advanced)])
       // 0x12 진입에서 끝난 타석 — 도루 · 폭투 판(종류 5 · 9)이 열렸으면 곧장 0x17 이라 판 끝에서, 아니면 0x12 대기 32 그림 뒤 0xd
       finishAtBat(advanced, context.nextAtBat.outcome, runnersOnBase, atBatEndFramesOf(context.nextAtBat.outcome, arrival?.play))
     },
@@ -1406,10 +1423,7 @@ export function useCareerSession({
   }, [outingEntryCount, story.events])
   const eventPlaceIds = useMemo(() => outingSlotPlaceIdsOf(outingSlots), [outingSlots])
   /** 재생기에 넘기는 목록 — 파일 이벤트 뒤에 연초 115 내장 이벤트를 붙인다 (훑기는 파일 것만 본다, 투수편과 같다) */
-  const storyEvents = useMemo(
-    () => (story.events === null ? null : [...story.events, NARI_YEAR_START_EVENT]),
-    [story.events],
-  )
+  const storyEvents = useMemo(() => (story.events === null ? null : [...story.events, NARI_YEAR_START_EVENT]), [story.events])
   /**
    * **105 진입 한 번** — 서 있으면 아래 고리가 진입 곁가지(0x11910)와 자동 훑기(0x1cf9c)를 한 번 돈다.
    * 상태 틀 0x1cdec 는 0xbc9c9(이번 틀에 상태가 바뀌었나)가 거짓이면 곧장 0x1d06a 로 가(0x1ce02~0x1ce0c) 진입 · 자동 훑기를
@@ -1463,7 +1477,7 @@ export function useCareerSession({
    * 머무는 둘째 틀에 0x1a1c0 대신 그 팝업이 서고(+0x270 ≥ 0 이라 판정을 건너뛴다) 확인이 비트 · 장착 · 저장을 한다.
    */
   const [heldTitle, setHeldTitle] = useState<string | null>(null)
-  const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? heldTitle ?? nextTitleOf(career) : null
+  const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? (heldTitle ?? nextTitleOf(career)) : null
   // 장면이 새로 서면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60, `setUpNariScene`) — 이벤트 본문이 도착한 뒤에.
   // ⚠️ 내보인 `career` 가 아니라 **지금 칸**(`current`)에서 지운다 (r245): 경기 끝(`finishGame`)은 셋업과 같은 그림에 기록 달성 G
   // (0x4ea0c)를 커리어 칸에 얹는데, 그 그림의 내보인 커리어는 아직 지갑 값(얹기 전 G)이라 그것으로 갈아 끼우면 지갑 다리가
@@ -1544,7 +1558,6 @@ export function useCareerSession({
     }
     if (orderEventId !== null) setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
   }, [isManagementEntry, managementReentryCount, career, story, random, setScreen, shouldForgetRepeatable])
-
 
   /*
    * 140 진입 0x10df8 — 결과 이벤트를 틀며 대기 칸(g[0xec] · g[0xee] · g[0x11f] · g[0x144])을 지우고 전역기록을 저장한다(10f72).
@@ -1717,10 +1730,7 @@ export function useCareerSession({
         runner.applyPitch({ kind: '파울' })
         pitchTallyRef.current = tallyPitch(pitchTallyRef.current, { kind: '파울' })
         // 파울 콜 25 는 결과 코드 7 메시지(51c5c)가 낸다 — 화면이 돌린 판이면 그 틱에 이미 났다(`DefensePlayback` 의 `tickSounds`)
-        playSoundIds(audio, [
-          result !== undefined ? null : inPlayCallSoundIdOf(pending.outcome, played),
-          ...gameStepSoundIdsOf(current, resolved),
-        ])
+        playSoundIds(audio, [result !== undefined ? null : inPlayCallSoundIdOf(pending.outcome, played), ...gameStepSoundIdsOf(current, resolved)])
         runner.setIsPaused(false)
         return
       }
@@ -1812,8 +1822,7 @@ export function useCareerSession({
       !callShown && !replayed && isPickoffPlayResult(play) ? pickoffCallSoundIdOf(play) : null,
       ...gameStepSoundIdsOf(current, next),
     ])
-    const interrupted =
-      next.game.isFinished || next.game.inning !== current.game.inning || next.game.half !== current.game.half
+    const interrupted = next.game.isFinished || next.game.inning !== current.game.inning || next.game.half !== current.game.half
     if (!interrupted) return
     // 견제 판에서 반 이닝이 끝났거나(3아웃) 경기가 끝났다(끝내기 득점) — 내 타석이 끊긴다.
     // 다음 내 타석은 새 볼카운트·새 파울 카운터로 (타석 초기화 0xa5bcc)
@@ -2000,9 +2009,10 @@ export function useCareerSession({
       // 내 주력 0xb570d(ctx, 3, 나, 1, 0x5a, 1)도 그 칸으로 사기 감소를 다시 먹는다
       const moraleChanged = withGameTeamMorale(cleared, nariMoraleOf(rewarded))
       const runAbility = effectiveAbilityOf(withNariGameMorale(rewarded)).run
-      const withMorale = moraleChanged === cleared || cleared.myRunAbility === undefined || cleared.myRunAbility === runAbility
-        ? moraleChanged
-        : { ...moraleChanged, myRunAbility: runAbility }
+      const withMorale =
+        moraleChanged === cleared || cleared.myRunAbility === undefined || cleared.myRunAbility === runAbility
+          ? moraleChanged
+          : { ...moraleChanged, myRunAbility: runAbility }
       if (withMorale !== cleared) {
         progressRef.current = withMorale
         setProgress(withMorale)
@@ -2077,9 +2087,7 @@ export function useCareerSession({
       if (savedCareer.seasonEndState === 116 && lastGame !== undefined) {
         // 116 진입 0x1278c 다시 — 원본은 카운터를 한 번 더 쓰고(겹쳐 쌓임, B-28) 평가 창을 다시 띄운다.
         // 고친 길(기본)은 첫 진입이 이미 센 저장 그대로 창만 다시 띄운다(굴림 없음 — 난수 차례 같음)
-        const counted = isBugFixed('B-28')
-          ? savedCareer
-          : countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
+        const counted = isBugFixed('B-28') ? savedCareer : countGameForSkills(savedCareer, lastGame.evaluation.popularityChange)
         // 1299e 도 다시 — 비트가 이미 섰으면 팝업을 안 건다. 주는 것은 키 0x1b1e4 (`confirmGameResultTitle`)
         const dynamite = gameResultTitleOf(counted.titleIds, (lastGame.recordLine ?? lastGame.summary.stats).homeRuns)
         // 116 진입 — 평가 징글(12c96)까지. 경기 결과(경기 장면 0x18 · 0x19)는 다시 안 선다
@@ -2135,12 +2143,13 @@ export function useCareerSession({
         return beginCupGame(savedCareer, matchup, cup)
       }
       // 마선수는 저장의 나리 팀 레코드에 있다(142 가 넣었다). 레코드가 없던 옛 저장이면 모드 저장 칸에 남겨 둔 그림자를 넣는다
-      const loaded = savedCareer.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
-        ? {
-          ...savedCareer,
-          nariTeams: seatNariMatchAces(nariTeamsOf(savedCareer), savedCareer.teamId, nextOpponentOf(savedCareer), match.aces),
-        }
-        : savedCareer
+      const loaded =
+        savedCareer.nariTeams === undefined && match?.aces !== null && match?.aces !== undefined
+          ? {
+              ...savedCareer,
+              nariTeams: seatNariMatchAces(nariTeamsOf(savedCareer), savedCareer.teamId, nextOpponentOf(savedCareer), match.aces),
+            }
+          : savedCareer
       setMatchAces(recordMatchAcesOf(nariTeamsOf(loaded), loaded.teamId, nextOpponentOf(loaded)))
       setCareer(loaded)
       beginGame(loaded)
@@ -2258,9 +2267,9 @@ export function useCareerSession({
     leaveGameSettlement: () => {
       if (screen.kind !== '경기결과') return
       const { newTitles, evaluation, streakNotices, streakRewards } = screen
-      enterGameEvaluationScreen(streakRewards === undefined
-        ? { newTitles, evaluation, streakNotices }
-        : { newTitles, evaluation, streakNotices, streakRewards })
+      enterGameEvaluationScreen(
+        streakRewards === undefined ? { newTitles, evaluation, streakNotices } : { newTitles, evaluation, streakNotices, streakRewards },
+      )
     },
 
     /** 116 의 칭호 39 팝업 키 0x1b1e4 — 비트 · 곧바로 장착(+0x1c4) · 저장 (관리 화면 `confirmTitle` 과 같은 콜백) */
@@ -2294,11 +2303,12 @@ export function useCareerSession({
       // (`giveEvaluationRewards`) — 남은 몫만
       const held = evaluationRewardsRef.current
       evaluationRewardsRef.current = null
-      const career = held !== null
-        ? { ...applyEventRewards(rawCareer, held.rewards.slice(held.given)), seasonEndState: null }
-        : rawCareer.seasonEndState === 116
-          ? { ...streakEventOf(rawCareer).apply(rawCareer), seasonEndState: null }
-          : rawCareer
+      const career =
+        held !== null
+          ? { ...applyEventRewards(rawCareer, held.rewards.slice(held.given)), seasonEndState: null }
+          : rawCareer.seasonEndState === 116
+            ? { ...streakEventOf(rawCareer).apply(rawCareer), seasonEndState: null }
+            : rawCareer
       setCareer(career)
       // 경기 뒤 평가 116 의 끝(0x12b74~0x12b94) — S+0xb4(포스트시즌 중) ≠ 0 이면 **S+0xb2(= L+0x32) == 0 → [114 → 136],
       // 아니면 [114 → 128]** 이다. 관리 주기·중간평가를 안 탄다 (R9 116절).
@@ -2506,9 +2516,7 @@ export function useCareerSession({
     },
 
     runOutingFunction: (functionId: string) => {
-      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
-        (candidate) => candidate.id === functionId,
-      )
+      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find((candidate) => candidate.id === functionId)
       if (career === null || outingFunction === undefined) return
       // 113 가드 0x16cf0 — 막히면 원문 팝업(StrMODE[62]·[77]·[196]·[91])만 띄우고 113 에 남는다 (굴림 없음).
       // 앞서 웹은 판정 없이 runOuting 을 불러 막힌 기능을 고르면 예외가 났다.
@@ -2525,9 +2533,7 @@ export function useCareerSession({
     /** 126 연출 끝(0x84e58 이 참인 틀) — 효과 0x15234 를 굴려 효과 팝업을 띄운다. 연출 동안 굴림은 없다 */
     finishOutingPresentation: () => {
       if (career === null || outingPresentation === null || outingResult !== null) return
-      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find(
-        (candidate) => candidate.id === outingPresentation.functionId,
-      )
+      const outingFunction = OUTING_PLACES.flatMap((place) => place.functions).find((candidate) => candidate.id === outingPresentation.functionId)
       if (outingFunction === undefined) return
       const outcome = performOuting(career, outingFunction, random)
       setOutingResult({ effectText: outcome.effectText, recoveryText: outcome.recoveryText })
@@ -2619,7 +2625,7 @@ export function useCareerSession({
       // 8d84a 전역기록 저장 — 대기 칸
       aceMatchPendingRef.current.hold(resultEvents)
       // 8d85c · 8d870 — 본 표시 · 커리어 저장
-      setCareer((current) => current === null ? current : markRewardedEvent(current, null, viewedEventIds))
+      setCareer((current) => (current === null ? current : markRewardedEvent(current, null, viewedEventIds)))
     },
 
     /**
@@ -2841,20 +2847,22 @@ export function useCareerSession({
       resetLiveGameState()
       if (!matchPreparedRef.current) {
         // 1c574 — 대회 날짜 g ≠ 0 이면 대표팀·상대국 칸 투수 0~3 을 한 칸씩 돌린다(영구, 같은 문 안이라 한 번만)
-        setCareer((current) => current === null
-          ? current
-          : { ...current, nariCupTeams: prepareNariCupMatch(cupTeamsOf(current, matchup.opponent), cup.day) })
+        setCareer((current) =>
+          current === null ? current : { ...current, nariCupTeams: prepareNariCupMatch(cupTeamsOf(current, matchup.opponent), cup.day) },
+        )
       }
       matchPreparedRef.current = true
       // 홈 팀 = 후공 측(0xb7844 L+0xac 갈래 — 대진 칸 0). 대회 팀은 모두 > 9 라 어느 쪽이든 한 번 굴린다
-      setMatchInfoStage(rollNariMatchInfoStage(random, {
-        mode: BATTER_LEAGUE_MODE,
-        myTeamId: matchup.myTeam,
-        opponentTeamId: matchup.opponent,
-        mySide: nationalCupSideOf(cup, matchup.myTeam),
-        // 대회 중 나리 저장 +0xb2 = L+0x32 = 대회 날짜
-        dayCounter: cup.day,
-      }))
+      setMatchInfoStage(
+        rollNariMatchInfoStage(random, {
+          mode: BATTER_LEAGUE_MODE,
+          myTeamId: matchup.myTeam,
+          opponentTeamId: matchup.opponent,
+          mySide: nationalCupSideOf(cup, matchup.myTeam),
+          // 대회 중 나리 저장 +0xb2 = L+0x32 = 대회 날짜
+          dayCounter: cup.day,
+        }),
+      )
       setEntryView(null)
       setScreen({ kind: '경기준비', cup: { matchup, cup } })
     },
@@ -2952,7 +2960,6 @@ export function useCareerSession({
       setSavedCareer(null)
     },
   }
-
 
   return {
     savedCareer,

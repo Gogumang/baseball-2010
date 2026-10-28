@@ -8,7 +8,10 @@ import { SETTLEMENT_INFO_BAR } from '@/pages/team-game/lib/settlementBoard'
  */
 export function SettlementPressArea() {
   return (
-    <PressArea label="확인" rect={{ x: 0, y: 0, width: 240, height: SETTLEMENT_INFO_BAR.y }}
-      onPress={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))} />
+    <PressArea
+      label="확인"
+      rect={{ x: 0, y: 0, width: 240, height: SETTLEMENT_INFO_BAR.y }}
+      onPress={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))}
+    />
   )
 }

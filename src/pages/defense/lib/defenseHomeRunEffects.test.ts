@@ -5,12 +5,7 @@ import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import { EMPTY_BASES } from '@/entities/game/model/baseState'
 import { derbyDistanceOf } from '@/entities/home-run-derby/model/derbyRules'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
-import {
-  isDefensePlayFinished,
-  startDefensePlay,
-  stepDefensePlay,
-  type DefensePlayInput,
-} from '@/features/defense-play/model/runDefensePlay'
+import { isDefensePlayFinished, startDefensePlay, stepDefensePlay, type DefensePlayInput } from '@/features/defense-play/model/runDefensePlay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import {
   DEFENSE_SCENE_START,
@@ -25,8 +20,24 @@ import {
 import { generalHomeRunTextOn, HOME_RUN_TEXT_SCENE_START } from '@/widgets/batting-stage/lib/homeRunBanner'
 
 const 설정: ParticleConfig = {
-  ang: 0, spread: 0, spd: 0, spdR: 0, emit: 1, emitR: 0, life: 3, lifeR: 0,
-  a0: 0, a0R: 0, a1: 0, a1R: 0, ax: 0, ay: 0, w: 0, h: 0, total: 1, mode: 2,
+  ang: 0,
+  spread: 0,
+  spd: 0,
+  spdR: 0,
+  emit: 1,
+  emitR: 0,
+  life: 3,
+  lifeR: 0,
+  a0: 0,
+  a0R: 0,
+  a1: 0,
+  a1R: 0,
+  ax: 0,
+  ay: 0,
+  w: 0,
+  h: 0,
+  total: 1,
+  mode: 2,
 }
 
 function 세는난수(): RandomPort & { calls: number } {

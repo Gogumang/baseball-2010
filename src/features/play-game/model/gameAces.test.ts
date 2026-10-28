@@ -6,12 +6,7 @@ import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
 import { opponentPitcherAbilityOf, startGame, summaryOf } from '@/features/play-game/model/gameFlow'
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
-import {
-  ACE_BATTER_ROSTER_SLOT,
-  ACE_PITCHER_SLOT,
-  gameAceBatterOf,
-  withAceBatterLineup,
-} from '@/features/play-game/model/gameAces'
+import { ACE_BATTER_ROSTER_SLOT, ACE_PITCHER_SLOT, gameAceBatterOf, withAceBatterLineup } from '@/features/play-game/model/gameAces'
 import type { GameAceSetup } from '@/features/play-game/model/gameAces'
 import { rosterLineupOf } from '@/entities/game/model/quickLineup'
 import {
@@ -41,8 +36,7 @@ describe('마타자 넣기 0xb8870 → 0xb53f0 (명단 9번, 옛 9번은 맨 끝
 })
 
 describe('타자편 경기에 142 마선수를 싣는다 (0x1c46c 1c62e~1c660)', () => {
-  const 시작 = (aces?: GameAceSetup): GameProgress =>
-    startGame(createSeededRandom(5), 0, 4, 1, PLAYER_SIDE_LAST_BAT, 3, false, undefined, aces)
+  const 시작 = (aces?: GameAceSetup): GameProgress => startGame(createSeededRandom(5), 0, 4, 1, PLAYER_SIDE_LAST_BAT, 3, false, undefined, aces)
 
   it('두 팀 투수 목록 끝(8번)에 마투수, 명단 9번에 마타자 — 마투수 칸은 레코드 +0x2c 10000 으로 선다', () => {
     const progress = 시작(마선수)

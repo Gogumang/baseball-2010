@@ -11,8 +11,12 @@ import { mkdirSync } from 'node:fs'
 import { launch, openScene } from './lib/scene.mjs'
 
 const SCENES = [
-  'nari-postseason-champion', 'nari-korean-series', 'pitcher-postseason-champion', 'pitcher-korean-series',
-  'nari-cup-win', 'pitcher-cup-win',
+  'nari-postseason-champion',
+  'nari-korean-series',
+  'pitcher-postseason-champion',
+  'pitcher-korean-series',
+  'nari-cup-win',
+  'pitcher-cup-win',
 ]
 
 const DEVICES = [
@@ -44,13 +48,22 @@ for (const [browserName, device] of DEVICES) {
         const text = (await dialog.innerText()).replace(/\s+/g, ' ').trim().slice(0, 40)
         const path = new URL(`popup-${scene}-${browserName}-${device}.png`, RUN_DIR).pathname
         await session.page.screenshot({ path })
-        row = { ...row, dx: Number(dx.toFixed(2)), dy: Number(dy.toFixed(2)), width: Number((box.width / scale).toFixed(1)), scale: Number(scale.toFixed(3)), text }
+        row = {
+          ...row,
+          dx: Number(dx.toFixed(2)),
+          dy: Number(dy.toFixed(2)),
+          width: Number((box.width / scale).toFixed(1)),
+          scale: Number(scale.toFixed(3)),
+          text,
+        }
         row.ok = Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && Math.abs(row.width - 240) <= 1
       } catch (error) {
         row = { ...row, ok: false, error: String(error).slice(0, 200) }
       }
       rows.push(row)
-      console.log(`${row.ok ? 'ok  ' : 'FAIL'} ${row.device.padEnd(20)} ${scene.padEnd(28)} ${row.error ?? `dx ${row.dx} · dy ${row.dy} · 폭 ${row.width} · 배율 ${row.scale} · "${row.text}"`}`)
+      console.log(
+        `${row.ok ? 'ok  ' : 'FAIL'} ${row.device.padEnd(20)} ${scene.padEnd(28)} ${row.error ?? `dx ${row.dx} · dy ${row.dy} · 폭 ${row.width} · 배율 ${row.scale} · "${row.text}"`}`,
+      )
     }
   } finally {
     await session.browser.close()

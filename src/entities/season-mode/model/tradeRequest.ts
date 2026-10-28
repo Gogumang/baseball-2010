@@ -1,9 +1,7 @@
 import { HALL_OF_FAME_FIRST_ID, tableTeamOf } from '@/entities/season-mode/model/playerRecruit'
 import type { SeasonPlayer, SeasonTeamRoster } from '@/entities/season-mode/model/playerRecruit'
 import { TRADE_TAB, tradeRefusalOf } from '@/entities/season-mode/model/playerTrade'
-import {
-  SEASON_RECORD_ACE_BATTER_SLOT, SEASON_RECORD_ACE_PITCHER_SLOT, seatAce, tableRosterOf,
-} from '@/entities/season-mode/model/seasonEntry'
+import { SEASON_RECORD_ACE_BATTER_SLOT, SEASON_RECORD_ACE_PITCHER_SLOT, seatAce, tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonRecordAces } from '@/entities/season-mode/model/seasonEntry'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
@@ -66,7 +64,11 @@ export interface TradeRequest {
 
 /** memset(req, 0, 0x14) 그대로 — 요청 없음 */
 export const NO_TRADE_REQUEST: TradeRequest = {
-  isRequested: false, myIndex: 0, opponentIndex: 0, tab: 0, opponentTeamId: 0,
+  isRequested: false,
+  myIndex: 0,
+  opponentIndex: 0,
+  tab: 0,
+  opponentTeamId: 0,
 }
 
 /** 요청 확률 — `bfa55(0, 10000) < 1000` (93da~93ec) */
@@ -88,9 +90,7 @@ export const ACE_BATTER_RECORD_GRADES: readonly number[] = [20, 30, 40, 50, 40]
 export const ACE_PITCHER_RECORD_GRADES: readonly number[] = [50, 40, 30, 20, 10]
 
 /** `0xb5695(팀, 탭, i)` 가 돌려주는 줄 — 명단 선수이거나 레코드에 남은 마선수 */
-export type TradeRecordRow =
-  | { readonly kind: '선수'; readonly player: SeasonPlayer }
-  | { readonly kind: '마선수'; readonly aceIndex: number }
+export type TradeRecordRow = { readonly kind: '선수'; readonly player: SeasonPlayer } | { readonly kind: '마선수'; readonly aceIndex: number }
 
 /**
  * 한 팀 레코드의 탭 배열 — 명단 차례(투수는 레코드 차례로 넘긴다)에 레코드에 남은 마선수를 원본 넣기(`0xb521c` 0x60 ·
@@ -101,11 +101,10 @@ export function tradeRecordRowsOf(roster: SeasonTeamRoster, tab: number, aces?: 
   const isPitcherTab = tab === TRADE_REQUEST_TAB.투수
   const ace = aces === undefined ? -1 : isPitcherTab ? aces.pitcher : aces.batter
   if (ace < 0) return rows
-  return seatAce<TradeRecordRow>(
-    rows,
-    isPitcherTab ? SEASON_RECORD_ACE_PITCHER_SLOT : SEASON_RECORD_ACE_BATTER_SLOT,
-    { kind: '마선수', aceIndex: ace },
-  )
+  return seatAce<TradeRecordRow>(rows, isPitcherTab ? SEASON_RECORD_ACE_PITCHER_SLOT : SEASON_RECORD_ACE_BATTER_SLOT, {
+    kind: '마선수',
+    aceIndex: ace,
+  })
 }
 
 /** 줄의 +0x1b 와 거절 여부(0xb6389 · 0xb6349) — 마선수는 둘 다 거짓 */
@@ -118,8 +117,7 @@ function rowGradeOf(teamId: number, tab: number, row: TradeRecordRow | undefined
   return { grade: playerGradeOf(teamId, tab, row.player), refused: tradeRefusalOf(row.player) !== null }
 }
 
-const rangeOf = (tab: number) =>
-  tab === TRADE_REQUEST_TAB.투수 ? TRADE_REQUEST_PITCHER_RANGE : TRADE_REQUEST_BATTER_RANGE
+const rangeOf = (tab: number) => (tab === TRADE_REQUEST_TAB.투수 ? TRADE_REQUEST_PITCHER_RANGE : TRADE_REQUEST_BATTER_RANGE)
 
 /**
  * 시즌 명단 선수의 레코드 +0x1b. 원본은 그 선수 레코드 바이트를 바로 읽는다 — 리그 선수(id < 0xb4)의 레코드는 Xls 행

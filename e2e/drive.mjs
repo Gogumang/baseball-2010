@@ -19,7 +19,9 @@ async function run(command) {
   if (command.launch) {
     if (session !== null) await session.browser.close()
     session = await launch(command.launch, { device: command.device ?? 'desktop' })
-    session.page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+    session.page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
     return 'launched'
   }
   if (session === null) session = await launch('chromium')
@@ -66,14 +68,16 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 
 mkdirSync('e2e/.run', { recursive: true })
 writeFileSync('e2e/.run/drive.pid', String(process.pid))
-http.createServer(async (request, response) => {
-  let body = ''
-  for await (const chunk of request) body += chunk
-  try {
-    const out = []
-    for (const command of JSON.parse(body)) out.push(await run(command))
-    response.end(`${JSON.stringify(out)}\n`)
-  } catch (error) {
-    response.end(`ERR ${error.message}\n`)
-  }
-}).listen(PORT, '127.0.0.1', () => console.log(`drive ready pid=${process.pid} port=${PORT}`))
+http
+  .createServer(async (request, response) => {
+    let body = ''
+    for await (const chunk of request) body += chunk
+    try {
+      const out = []
+      for (const command of JSON.parse(body)) out.push(await run(command))
+      response.end(`${JSON.stringify(out)}\n`)
+    } catch (error) {
+      response.end(`ERR ${error.message}\n`)
+    }
+  })
+  .listen(PORT, '127.0.0.1', () => console.log(`drive ready pid=${process.pid} port=${PORT}`))

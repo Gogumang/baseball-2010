@@ -21,7 +21,10 @@ export async function runScenes({ jobs, concurrency, states, real = false, verbo
   try {
     for (const browserName of new Set(jobs.map((job) => DEVICE_SETS[job.device][0]))) {
       const executablePath = browserName === 'webkit' ? undefined : chromiumExecutable()
-      browsers[browserName] = await (browserName === 'webkit' ? webkit : chromium).launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })
+      browsers[browserName] = await (browserName === 'webkit' ? webkit : chromium).launch({
+        headless: true,
+        ...(executablePath === undefined ? {} : { executablePath }),
+      })
     }
     /** 장면 하나를 새 맥락에서 — `query` 는 바로가기 주소에 더할 것 */
     const checkOnce = async (scene, device, query) => {
@@ -36,7 +39,23 @@ export async function runScenes({ jobs, concurrency, states, real = false, verbo
       try {
         checked = await checkSceneHits(page, scene, { device, orientation, query, states, verbose })
       } catch (error) {
-        checked = { results: [{ device, orientation, scene, state: '기본', checked: 0, underWindow: 0, dialogs: [], failures: [], allowed: [], error: String(error.message ?? error) }], reopened: 0 }
+        checked = {
+          results: [
+            {
+              device,
+              orientation,
+              scene,
+              state: '기본',
+              checked: 0,
+              underWindow: 0,
+              dialogs: [],
+              failures: [],
+              allowed: [],
+              error: String(error.message ?? error),
+            },
+          ],
+          reopened: 0,
+        }
       } finally {
         await context.close().catch(() => {})
         openContexts -= 1
@@ -55,16 +74,22 @@ export async function runScenes({ jobs, concurrency, states, real = false, verbo
       const ms = Date.now() - jobStarted
       if (pageErrors.length > 0 && checked.results[0] !== undefined) checked.results[0].error ??= `pageerror: ${pageErrors[0].slice(0, 200)}`
       const bad = checked.results.filter((result) => result.error !== null || result.failures.length > 0)
-      console.log(`${bad.length === 0 ? 'ok  ' : 'FAIL'} ${device.padEnd(18)} ${scene.padEnd(28)} 상태 ${checked.results.length} ${String(ms).padStart(6)}ms (열기 ${checked.openMs ?? '?'}ms)`)
+      console.log(
+        `${bad.length === 0 ? 'ok  ' : 'FAIL'} ${device.padEnd(18)} ${scene.padEnd(28)} 상태 ${checked.results.length} ${String(ms).padStart(6)}ms (열기 ${checked.openMs ?? '?'}ms)`,
+      )
       done.push({ scene, device, ms, openMs: checked.openMs ?? 0, results: checked.results, reopened: checked.reopened })
     }
     // 브라우저마다 따로 줄을 선다 — 맥락 수 한도가 브라우저마다라서
-    await Promise.all(Object.keys(browsers).map((browserName) => {
-      const queue = jobs.filter((job) => DEVICE_SETS[job.device][0] === browserName)
-      return Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency[browserName] ?? 1, queue.length)) }, async () => {
-        for (let job = queue.shift(); job !== undefined; job = queue.shift()) await runJob(job)
-      }))
-    }))
+    await Promise.all(
+      Object.keys(browsers).map((browserName) => {
+        const queue = jobs.filter((job) => DEVICE_SETS[job.device][0] === browserName)
+        return Promise.all(
+          Array.from({ length: Math.max(1, Math.min(concurrency[browserName] ?? 1, queue.length)) }, async () => {
+            for (let job = queue.shift(); job !== undefined; job = queue.shift()) await runJob(job)
+          }),
+        )
+      }),
+    )
   } finally {
     for (const browser of Object.values(browsers)) await browser.close().catch(() => {})
   }

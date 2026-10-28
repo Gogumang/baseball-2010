@@ -2,8 +2,12 @@ import { useState } from 'react'
 import { derbyBallCountOf, derbyBallNumberOf } from '@/entities/home-run-derby/model/derbyRun'
 import type { DerbyRun } from '@/entities/home-run-derby/model/derbyRun'
 import {
-  COMBO_DISPLAY, HUD_PANEL,
-  ballCounterGlyphsOf, bestDistanceGlyphsOf, comboDisplayPlacementOf, totalDistanceGlyphsOf,
+  COMBO_DISPLAY,
+  HUD_PANEL,
+  ballCounterGlyphsOf,
+  bestDistanceGlyphsOf,
+  comboDisplayPlacementOf,
+  totalDistanceGlyphsOf,
 } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import type { HudGlyph } from '@/pages/home-run-derby/lib/derbyHudLayout'
 import * as styles from '@/pages/home-run-derby/ui/DerbyHud.css'
@@ -35,14 +39,7 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; read
   return (
     <>
       {glyphs.map((glyph, index) => (
-        <img
-          key={index}
-          className={styles.sprite}
-          style={{ left: glyph.left, top: glyph.top }}
-          src={glyph.src}
-          alt=""
-          data-testid={testId}
-        />
+        <img key={index} className={styles.sprite} style={{ left: glyph.left, top: glyph.top }} src={glyph.src} alt="" data-testid={testId} />
       ))}
     </>
   )
@@ -53,15 +50,11 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; read
  * 판 머리에 "공 번호 / 공 수", 두 칸에 최고 기록과 누적 비거리를 쓴다. 좌표·글꼴·색은 전부 원본 값이다(`derbyHudLayout`).
  * 공 번호 = `(보너스 중 ? 최대 콤보 : 10) − 남은 기회 + 1`, 최고 칸은 누적이 넘으면 노란 글자로 바뀐다.
  */
-export function DerbyHud({
-  run, bestDistance, tick, shownCombo = null, batterSide = 0, isPlayShown = false,
-}: DerbyHudProps) {
+export function DerbyHud({ run, bestDistance, tick, shownCombo = null, batterSide = 0, isPlayShown = false }: DerbyHudProps) {
   // 콤보 표시를 켠 갱신 — 상태 0xf 가 +0x19ec = 0 · 두 애니를 첫 칸으로 돌린다(0x3db92~0x3dc14)
   const [comboShownAt, setComboShownAt] = useState<{ value: number | null; tick: number }>({ value: shownCombo, tick })
   if (comboShownAt.value !== shownCombo) setComboShownAt({ value: shownCombo, tick })
-  const comboPlacement = shownCombo !== null && shownCombo > 0
-    ? comboDisplayPlacementOf(shownCombo, batterSide, tick - comboShownAt.tick)
-    : null
+  const comboPlacement = shownCombo !== null && shownCombo > 0 ? comboDisplayPlacementOf(shownCombo, batterSide, tick - comboShownAt.tick) : null
 
   return (
     <div className={styles.hud}>

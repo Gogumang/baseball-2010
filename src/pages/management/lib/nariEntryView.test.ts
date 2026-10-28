@@ -16,7 +16,10 @@ const 선수 = () => {
   const career = createCareer('보기')
   const opponent = nextOpponentOf(career)
   const nariTeams = seatNariMatchAces(nariTeamsOf(career), career.teamId, opponent, {
-    myBatter: 1, myPitcher: 2, opponentPitcher: 3, opponentBatter: 4,
+    myBatter: 1,
+    myPitcher: 2,
+    opponentPitcher: 3,
+    opponentBatter: 4,
   })
   return { career: { ...career, nariTeams }, opponent }
 }

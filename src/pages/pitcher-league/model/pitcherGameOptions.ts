@@ -1,10 +1,7 @@
 import { DEFAULT_TEAM_MORALE, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { startsToday } from '@/features/play-pitcher-game/model/pitcherGameFlow'
-import type {
-  PitcherGameOptions,
-  PitcherGameSummary,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow'
+import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { leagueDayCounterOf, leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
 import { magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
 import { isMyStartDay } from '@/entities/pitcher-career/model/pitcherRotation'
@@ -24,10 +21,7 @@ import { nariTeamRecordEquipmentOf } from '@/entities/career/model/nariCpuEquipm
 import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
 
 /** 상대 리그 팀 레코드 장비 니블 (`PitcherGameOptions.opponentEquipment`) — 굴린 니블이 없으면 칸째 뺀다 */
-function opponentEquipmentOf(
-  career: PitcherCareer,
-  opponentTeamId: number,
-): { readonly opponentEquipment?: TeamRecordEquipment } {
+function opponentEquipmentOf(career: PitcherCareer, opponentTeamId: number): { readonly opponentEquipment?: TeamRecordEquipment } {
   const equipment = nariTeamRecordEquipmentOf(career.nariTeams, opponentTeamId)
   return equipment === undefined ? {} : { opponentEquipment: equipment }
 }
@@ -103,10 +97,7 @@ export interface PitcherGameSettings {
   readonly teamMorale?: number
 }
 
-export function pitcherGameOptionsOf(
-  career: PitcherCareer,
-  settings: PitcherGameSettings = {},
-): PitcherGameOptions {
+export function pitcherGameOptionsOf(career: PitcherCareer, settings: PitcherGameSettings = {}): PitcherGameOptions {
   // 0xb570c 의 사기 감소는 b5768 이 쓴 0xa3a24 값을 읽는다 — 대회 중이면 상대국 칸 +2 (원본 버그, `nariMorale`)
   const morale = nariMoraleOf(career)
   const beforeMorale = gamePitcherAbilityBeforeMoraleOf(career)
@@ -168,9 +159,7 @@ export function pitcherGameOptionsOf(
     teamMorale: settings.teamMorale ?? morale,
     // 상대 리그 팀 레코드에 남은 값 — 이 경기에서 그 칸이 아직 안 덮였을 때 상대 첫 공만 본다 (`opponentStaleMorale`, r101 · r104).
     // 대회 상대국 칸은 나리 사기 그 자체라 없다
-    ...(career.nationalCup !== undefined
-      ? {}
-      : { opponentStaleMorale: nariTeamRecordMoraleOf(career, opponentTeamId) }),
+    ...(career.nationalCup !== undefined ? {} : { opponentStaleMorale: nariTeamRecordMoraleOf(career, opponentTeamId) }),
     // 상대 팀 객체 0xb8680 → 0x1f989(모드 3 → 0x1f940)가 읽는 저장 레코드의 장비 니블 — 나리 새 시즌 CPU 장비 굴림 0x665e8 이 쓴 값.
     // 대회 상대국은 리그 레코드가 아니라 없다
     ...(career.nationalCup !== undefined ? {} : opponentEquipmentOf(career, opponentTeamId)),

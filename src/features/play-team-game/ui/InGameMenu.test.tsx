@@ -63,8 +63,13 @@ describe('경기 중 메뉴 판 — 그리기 0x3cdd0 (하위 0~3)', () => {
 describe('경기 중 메뉴 — 칸 (표 0xcfcfc)', () => {
   it('일반·시즌·대전 행 — 계속하기 · 자동진행 · 게임방법 · 환경설정 · 메인메뉴', () => {
     render(<InGameMenu mode={1} onContinue={vi.fn()} />)
-    expect(screen.getAllByRole('option').map((option) => option.getAttribute('aria-label')))
-      .toEqual(['계속하기', '자동진행', '게임방법', '환경설정', '메인메뉴'])
+    expect(screen.getAllByRole('option').map((option) => option.getAttribute('aria-label'))).toEqual([
+      '계속하기',
+      '자동진행',
+      '게임방법',
+      '환경설정',
+      '메인메뉴',
+    ])
   })
 
   it('미션·홈런더비 행에는 자동진행 대신 재도전이 있다', () => {
@@ -265,19 +270,39 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   const 판 = () => screen.queryByTestId('경기-메뉴-판')
 
   /** 여는 곳 흉내 — `useInGameMenuState` 를 그대로 쓴다 */
-  function 여는곳({ onQuit, onRestart, mode = 6, gamePoint }: {
-    readonly onQuit?: () => void; readonly onRestart?: () => void; readonly mode?: number; readonly gamePoint?: number
+  function 여는곳({
+    onQuit,
+    onRestart,
+    mode = 6,
+    gamePoint,
+  }: {
+    readonly onQuit?: () => void
+    readonly onRestart?: () => void
+    readonly mode?: number
+    readonly gamePoint?: number
   }) {
     const menu = useInGameMenuState()
     return (
       <>
-        <button type="button" onClick={menu.toggle}>별표</button>
+        <button type="button" onClick={menu.toggle}>
+          별표
+        </button>
         <span data-testid="열림">{String(menu.isOpen)}</span>
         {menu.isOpen && (
-          <InGameMenu mode={mode} cursor={menu.cursor} onAutoProgress={vi.fn()} autoProgressCost={30}
-            {...(gamePoint === undefined ? {} : { gamePoint })} onCursorChange={menu.setCursor} slidesIn={menu.slidesIn}
-            opening={menu.opening} bindCloser={menu.bindCloser} onContinue={menu.close}
-            {...(onQuit === undefined ? {} : { onQuit })} {...(onRestart === undefined ? {} : { onRestart })} />
+          <InGameMenu
+            mode={mode}
+            cursor={menu.cursor}
+            onAutoProgress={vi.fn()}
+            autoProgressCost={30}
+            {...(gamePoint === undefined ? {} : { gamePoint })}
+            onCursorChange={menu.setCursor}
+            slidesIn={menu.slidesIn}
+            opening={menu.opening}
+            bindCloser={menu.bindCloser}
+            onContinue={menu.close}
+            {...(onQuit === undefined ? {} : { onQuit })}
+            {...(onRestart === undefined ? {} : { onRestart })}
+          />
         )}
       </>
     )

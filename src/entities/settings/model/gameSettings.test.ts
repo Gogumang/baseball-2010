@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  DEFAULT_SETTINGS,
-  MANUAL_AUTO_MODES,
-  normalizeSettings,
-  PITCH_CONTROLS,
-  SPEED_LEVEL_COUNT,
-} from '@/entities/settings/model/gameSettings'
+import { DEFAULT_SETTINGS, MANUAL_AUTO_MODES, normalizeSettings, PITCH_CONTROLS, SPEED_LEVEL_COUNT } from '@/entities/settings/model/gameSettings'
 
 describe('환경설정 값', () => {
   it('속도는 원본 표 다섯 단계, 투구는 기본/게이지 두 가지다 (StrMAINMENU[74][75])', () => {

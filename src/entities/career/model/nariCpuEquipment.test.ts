@@ -123,9 +123,7 @@ describe('굴린 니블이 능력치 · 화면에 실린다 (0xb6414 니블 보�
     const equipment = nariTeamRecordEquipmentOf(rolledCareer().nariTeams, opponent)
     const pitchers = { ourOrder: UNSHUFFLED_PITCHER_ORDER, opponentOrder: [3, 0, 1, 2, 4, 5, 6, 7] }
     const plain = startGame(기록난수(), 3, 1, opponent, 1, 0, false, pitchers)
-    const equipped = startGame(
-      기록난수(), 3, 1, opponent, 1, 0, false, pitchers, undefined, undefined, undefined, undefined, undefined, equipment,
-    )
+    const equipped = startGame(기록난수(), 3, 1, opponent, 1, 0, false, pitchers, undefined, undefined, undefined, undefined, undefined, equipment)
     const bonus = equipmentBonusOf(1)
     const base = teamPitchers(opponent)[3].ability[0]
     expect(opponentPitcherAbilityOf(plain).gameAbility?.beforeFatigue.control).toBe(base)

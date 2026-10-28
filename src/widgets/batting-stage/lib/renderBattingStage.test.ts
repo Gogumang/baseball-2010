@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  acePitcherMirrorsOf, offenseTeamIdOf, pitcherMirrorOf, pitcherOutfitOf, pitcherRecolorFramesOf, runnerRecolorFramesOf, showsStrikeZone,
-  stageWarmCastOf, strikeZoneAnchorOf,
+  acePitcherMirrorsOf,
+  offenseTeamIdOf,
+  pitcherMirrorOf,
+  pitcherOutfitOf,
+  pitcherRecolorFramesOf,
+  runnerRecolorFramesOf,
+  showsStrikeZone,
+  stageWarmCastOf,
+  strikeZoneAnchorOf,
 } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { NO_EQUIPMENT, NO_PITCHER_EQUIPMENT, pitcherEquipmentOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
@@ -45,8 +52,18 @@ describe('존 표시 0x35ae8', () => {
 
 describe('루상 주자 팔레트 — 공격 팀', () => {
   const hud = {
-    inning: 1, half: '초', ourScore: 0, opponentScore: 0, balls: 0, strikes: 0, outs: 0,
-    bases: { first: true, second: false, third: false }, ourLogoUrl: '', opponentLogoUrl: '', ourTeamId: 3, opponentTeamId: 7,
+    inning: 1,
+    half: '초',
+    ourScore: 0,
+    opponentScore: 0,
+    balls: 0,
+    strikes: 0,
+    outs: 0,
+    bases: { first: true, second: false, third: false },
+    ourLogoUrl: '',
+    opponentLogoUrl: '',
+    ourTeamId: 3,
+    opponentTeamId: 7,
   }
 
   it('초 공격 = 측 0 — 사람이 후공(기본)이면 상대, 선공이면 우리 팀', () => {
@@ -84,7 +101,15 @@ describe('미리 칠하기 목록 (r189 — 첫 와인드업 · 첫 주자 그�
   })
 
   it('주자: 애니 0 · 1 · 2 의 칸을 한 번씩 공격 팀 벌로 (애니 3 부터는 루 주자가 아니다)', () => {
-    const animations = [[{ frame: 0, delay: 1 }, { frame: 1, delay: 1 }], [{ frame: 1, delay: 1 }], [{ frame: 2, delay: 1 }], [{ frame: 9, delay: 1 }]]
+    const animations = [
+      [
+        { frame: 0, delay: 1 },
+        { frame: 1, delay: 1 },
+      ],
+      [{ frame: 1, delay: 1 }],
+      [{ frame: 2, delay: 1 }],
+      [{ frame: 9, delay: 1 }],
+    ]
     expect(runnerRecolorFramesOf(animations, 4)).toEqual([0, 1, 2].map((frame) => ({ folder: RUNNER_FRAMES, frame, paletteIndex: 4 })))
   })
 })

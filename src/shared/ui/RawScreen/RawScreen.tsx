@@ -22,7 +22,9 @@ export function RawScreen({ children, onPress }: RawScreenProps) {
   return (
     <div className={styles.screen} onClick={onPress}>
       {/* 원작 240×320 화면 버퍼 자리 — 화면 전체 흔들기(`useWholeScreenOffset`)가 이 틀로 자른다 */}
-      <div ref={stageRef} className={styles.stage} data-original-screen="">{children}</div>
+      <div ref={stageRef} className={styles.stage} data-original-screen="">
+        {children}
+      </div>
     </div>
   )
 }

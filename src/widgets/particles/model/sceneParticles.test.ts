@@ -11,9 +11,8 @@ vi.mock('@/widgets/particles/lib/particleCatalog', () => ({
 }))
 vi.mock('@/widgets/particles/lib/renderParticles', () => ({ preloadPtcParts: () => {} }))
 
-const { emitMenuSparkle, resetSceneParticlesForTest, sceneParticleScene, tickSceneParticles } = await import(
-  '@/widgets/particles/model/sceneParticles'
-)
+const { emitMenuSparkle, resetSceneParticlesForTest, sceneParticleScene, tickSceneParticles } =
+  await import('@/widgets/particles/model/sceneParticles')
 
 describe('장면 파티클 관리자 [0x1400068] — 마선수 오픈 · 레벨업 반짝이', () => {
   afterEach(() => resetSceneParticlesForTest())

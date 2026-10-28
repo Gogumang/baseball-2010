@@ -95,8 +95,7 @@ const 이벤트보기 = (rendered: ReturnType<typeof 띄우기>, eventIds: reado
 }
 
 /** 연말 사슬의 마지막 이벤트(383 연봉 수락)를 본다 — 그 다음이 국가대표 선발 판정 자리다 */
-const 연봉사슬끝내기 = (rendered: ReturnType<typeof 띄우기>) =>
-  이벤트보기(rendered, [SALARY_ACCEPT_EVENT_ID])
+const 연봉사슬끝내기 = (rendered: ReturnType<typeof 띄우기>) => 이벤트보기(rendered, [SALARY_ACCEPT_EVENT_ID])
 
 describe('연말 국가대표 선발 판정 (상태 133 = 0x1a090)', () => {
   it('홀수 년차 연말에 목표를 4개 이상 이루면 선발 이벤트 461 이 뜬다', () => {
@@ -213,7 +212,12 @@ describe('보상 명령 뒤 이어하기 자리 (0x8c460 끝 8cc2e — S+0x50 �
     act(() => rendered.result.current.session.actions.continueSaved())
     return rendered
   }
-  const 보상받기 = (rendered: ReturnType<typeof 열기>, eventId: number, items: readonly { kind: number; value: number }[], viewed: readonly number[]) => {
+  const 보상받기 = (
+    rendered: ReturnType<typeof 열기>,
+    eventId: number,
+    items: readonly { kind: number; value: number }[],
+    viewed: readonly number[],
+  ) => {
     act(() => rendered.result.current.setScreen({ kind: '이벤트', eventId, context: '시즌' }))
     act(() => rendered.result.current.session.actions.giveEventReward(items, eventId, viewed))
   }
@@ -457,7 +461,13 @@ describe('첫 종류 21 로 끝난 재생 (0x8d4ce — [0x1552adc] = 1) → 114 
   })
 
   it('112 외출 지도 취소 → 105 는 행동함(S+4)을 0 으로 내린다 (키 0x13ba4 13bc8 — 원본 그대로)', async () => {
-    const rendered = 띄우기({ ...createCareer('외출취소'), season: 3, seenEventIds: [String(451)], hasSeenYearGoalWindow: true, hasActedThisCycle: true })
+    const rendered = 띄우기({
+      ...createCareer('외출취소'),
+      season: 3,
+      seenEventIds: [String(451)],
+      hasSeenYearGoalWindow: true,
+      hasActedThisCycle: true,
+    })
     await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
     act(() => rendered.result.current.setScreen({ kind: '외출' }))
     expect(rendered.result.current.session.career?.hasActedThisCycle).toBe(true)
@@ -493,7 +503,11 @@ describe('경기 장면 시작의 로딩 팁 — 상태 7 진입 0x39f88 → 0x5
     const rolls: { lo: number; hi: number; value: number }[] = []
     const random = {
       ...seeded,
-      rand: (lo: number, hi: number) => { const value = seeded.rand(lo, hi); rolls.push({ lo, hi, value }); return value },
+      rand: (lo: number, hi: number) => {
+        const value = seeded.rand(lo, hi)
+        rolls.push({ lo, hi, value })
+        return value
+      },
     }
     const saveGame = 메모리저장({ ...createCareer('팁'), gamesPlayed: 4 })
     const rendered = renderHook(() => {
@@ -710,7 +724,12 @@ describe('G 지갑 다리 (전역 mgr[+0x64])', () => {
       act(() => rendered.result.current.session.actions.confirmMatchPrepare())
       act(() => rendered.result.current.session.actions.finishLoading())
       const 헛스윙: PitchOutcomeDetail = {
-        batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+        batterHand: 0,
+        resolution: { kind: '스트라이크', isSwinging: true },
+        hasSwung: true,
+        isBunt: false,
+        resultCode: null,
+        contactSoundId: null,
       }
       for (let step = 0; step < 3000 && rendered.result.current.screen.kind === '경기'; step += 1) {
         const { session } = rendered.result.current
@@ -767,8 +786,7 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
     return rendered
   }
   /** 반 이닝 시뮬레이션이 남기는 수비 기록(16~)은 빼고 연속 파울 둘만 본다 */
-  const 파울기록 = (recordIds: readonly number[] | undefined) =>
-    (recordIds ?? []).filter((id) => id === 32 || id === 33)
+  const 파울기록 = (recordIds: readonly number[] | undefined) => (recordIds ?? []).filter((id) => id === 32 || id === 33)
   const 던지기 = (rendered: ReturnType<typeof 경기띄우기>, pitches: readonly PitchOutcomeDetail[]) => {
     for (const pitch of pitches) act(() => rendered.result.current.session.handlePitchResolved(pitch))
   }
@@ -852,7 +870,8 @@ describe('연속 파울 기록 32·33 (0xa7dbc) — 실제 타석에서 경기 �
 
 describe('공마다 상대 투수 투구 수·스태미나 (0x3dec6 → 0xa5e14(ctx, 구질))', () => {
   const 볼 = (pitchTypeNumber?: number): PitchOutcomeDetail => ({
-    batterHand: 0, resolution: { kind: '볼' },
+    batterHand: 0,
+    resolution: { kind: '볼' },
     hasSwung: false,
     isBunt: false,
     resultCode: null,
@@ -979,7 +998,8 @@ describe('부상 둘째 팝업 0x29 — 105 틀 0x1aec4 1af3c~1af7e (r197)', () 
 
 describe('CPU 견제 (0x345fc 종류 4 → 0x34848) — 타자편도 견제 판을 돌리고 같은 타석을 잇는다', () => {
   const 볼: PitchOutcomeDetail = {
-    batterHand: 0, resolution: { kind: '볼' },
+    batterHand: 0,
+    resolution: { kind: '볼' },
     hasSwung: false,
     isBunt: false,
     resultCode: null,
@@ -1305,7 +1325,10 @@ describe('기록연감 통계 고리 [mgr+0xc8] — 타자편 모드 4 (0x22e35 
     const { rendered, events } = 통계띄우기(createCareer('이전'))
     events.length = 0
     act(() => rendered.result.current.session.actions.startNewCareer('신인', DEFAULT_ROOKIE_PROFILE))
-    expect(events).toEqual([{ kind: '스킬장착', mode: 4, skillId: 0 }, { kind: '스킬장착', mode: 4, skillId: 8 }])
+    expect(events).toEqual([
+      { kind: '스킬장착', mode: 4, skillId: 0 },
+      { kind: '스킬장착', mode: 4, skillId: 8 },
+    ])
     act(() => rendered.unmount())
   })
 
@@ -1327,7 +1350,11 @@ describe('기록연감 통계 고리 [mgr+0xc8] — 타자편 모드 4 (0x22e35 
     이벤트보기(rendered, [461, 463])
     act(() =>
       rendered.result.current.session.actions.finishCup({
-        champion: 10, isKoreaChampion: true, koreaInFinal: true, reward: careerNationalCupRewardOf(10), openedTeams: [],
+        champion: 10,
+        isKoreaChampion: true,
+        koreaInFinal: true,
+        reward: careerNationalCupRewardOf(10),
+        openedTeams: [],
       }),
     )
     expect(events.filter((event) => event.kind === 'G획득')).toEqual([{ kind: 'G획득', mode: 4, amount: 1000 }])
@@ -1545,9 +1572,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     // 준PO 3위(2) 대 4위(3) 2승 1패에서 내가(2) 이겨 시리즈를 끝냈다 — 다음 라운드(PO)가 막 열려 g = 0
     const 끝난준PO = advancePostseason({ ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [2, 1] }, 2)
     expect(끝난준PO.round).toBe('플레이오프')
-    const rendered = 띄우기(
-      시즌끝선수({ teamId: 2, gamesPlayed: 49, postseason: 끝난준PO, regularSeasonRewardTaken: true, seasonEndState: 128 }),
-    )
+    const rendered = 띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 49, postseason: 끝난준PO, regularSeasonRewardTaken: true, seasonEndState: 128 }))
     // 이어하기는 128 — 경기 결과 화면에서 [확인] 했다 치고 116 의 끝을 밟는다
     act(() => rendered.result.current.session.actions.confirmGameResult())
     // 116 끝(12b8c~12bbe) [114 → 136] — 시즌 요약 화면 없이 136 진입이 392 를 튼다
@@ -1569,10 +1594,11 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     expect(사슬.screen).toEqual({ kind: '이벤트', eventId: 392, context: '시즌' })
     expect(사슬.session.career?.seasonEndState).toBe(136)
     const 진행중 = { ...startPostseason([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), wins: [1, 1] as [number, number] }
-    expect(
-      띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 47, postseason: 진행중, regularSeasonRewardTaken: true })).result.current
-        .screen,
-    ).toEqual({ kind: '포스트시즌', popup: null, fromReentry: true })
+    expect(띄우기(시즌끝선수({ teamId: 2, gamesPlayed: 47, postseason: 진행중, regularSeasonRewardTaken: true })).result.current.screen).toEqual({
+      kind: '포스트시즌',
+      popup: null,
+      fromReentry: true,
+    })
   })
 
   it('내 팀 우승 — 팝업 7 [137] → 팝업 8 [190] 보상 → 연말(132) 이벤트', () => {
@@ -1581,7 +1607,7 @@ describe('타자편 포스트시즌 대진 128 — 사람이 친다 (0x120a4 · 
     // 한국시리즈를 끝낸 경기 뒤 116 은 g == 0 → 136 사슬을 다시 돌아 131 뒤 128 로 온다
     이벤트보기(rendered, [376])
     act(() => rendered.result.current.session.actions.pressPostseason())
-    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '우승발표', champion: 0 } , fromReentry: false })
+    expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '우승발표', champion: 0 }, fromReentry: false })
 
     act(() => rendered.result.current.session.actions.closePostseasonPopup())
     expect(rendered.result.current.screen).toEqual({ kind: '포스트시즌', popup: { kind: '한국시리즈우승' }, fromReentry: false })
@@ -1655,7 +1681,9 @@ describe('연초 115 (0x16aac) — 105 진입이 S+0x1b7 == 0 이면 내장 이�
   it('목표 창을 아직 안 봤으면 해제 기록을 비우고 115 를 연다 — 끝나면 S+0x1b7 = 1 로 해마다 한 번', async () => {
     const rendered = 띄우기({ ...createCareer('연초'), season: 2, seenEventIds: ['451'], removedMinusSkillIds: [3, 17] })
     const 세션 = () => rendered.result.current.session
-    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' }), { timeout: 5000 })
+    await waitFor(() => expect(rendered.result.current.screen).toEqual({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' }), {
+      timeout: 5000,
+    })
     expect(세션().career?.removedMinusSkillIds).toEqual([])
     expect(세션().storyEvents?.some((event) => event.id === NARI_YEAR_START_EVENT_ID)).toBe(true)
     act(() => 세션().actions.completeScene([], [NARI_YEAR_START_EVENT_ID]))
@@ -1741,7 +1769,12 @@ describe('117 중간 성적표 — 105 진입 곁가지 11bda: S+0xb2 == 22 && �
 
   it('그 해 비트가 이미 켜져 있으면 22경기째여도 117 을 안 세운다', async () => {
     const rendered = 띄우기({
-      ...createCareer('절반'), season: 2, gamesPlayed: 22, seenEventIds: ['451'], hasSeenYearGoalWindow: true, midSeasonEvaluatedYears: [1],
+      ...createCareer('절반'),
+      season: 2,
+      gamesPlayed: 22,
+      seenEventIds: ['451'],
+      hasSeenYearGoalWindow: true,
+      midSeasonEvaluatedYears: [1],
     })
     await waitFor(() => expect(rendered.result.current.session.storyEvents).not.toBeNull(), { timeout: 5000 })
     expect(성적표까지(rendered)).toBeNull()
@@ -1750,15 +1783,26 @@ describe('117 중간 성적표 — 105 진입 곁가지 11bda: S+0xb2 == 22 && �
 
 describe('칭호는 관리 화면에서 하나씩 — 판정 0x1a1c0 (0x1afac) · 팝업 0x1274c · 확인 0x1b1e4', () => {
   it('들어온 관리 화면에서 처음 맞는 하나만 띄우고, 확인하면 주고 곧바로 장착한 뒤 다음 것을 띄운다', async () => {
-    const rendered = 띄우기({ ...createCareer('칭호'), season: 2, gamesPlayed: 10, popularity: 4500, seenEventIds: ['451'], titleIds: [TITLE_NAMES[0]], hasSeenYearGoalWindow: true })
+    const rendered = 띄우기({
+      ...createCareer('칭호'),
+      season: 2,
+      gamesPlayed: 10,
+      popularity: 4500,
+      seenEventIds: ['451'],
+      titleIds: [TITLE_NAMES[0]],
+      hasSeenYearGoalWindow: true,
+    })
     const 세션 = () => rendered.result.current.session
     // 관리 화면 진입 이벤트 검사(trigger 0)는 이벤트 본문이 도착한 뒤에 돈다 — 그 뒤 두 번째 틀이 판정이다.
     // 본문이 도착한 틀(storyEvents)과 판정 틀 사이에는 효과(검사 → managementCheck = null)와 다시 그리기가 한 번씩 더 끼어
     // 부하 때 waitFor 의 50ms 검사가 그 틈에 걸리면 판정 전 값(null)을 읽었다 — 판정이 선 틀까지 기다린다
-    await waitFor(() => {
-      expect(세션().storyEvents).not.toBeNull()
-      expect(세션().pendingTitle).not.toBeNull()
-    }, { timeout: 5000 })
+    await waitFor(
+      () => {
+        expect(세션().storyEvents).not.toBeNull()
+        expect(세션().pendingTitle).not.toBeNull()
+      },
+      { timeout: 5000 },
+    )
     // 경기 결과·훈련 같은 곳에서는 주지 않는다 — 관리 화면 갱신에서만
     expect(세션().career?.titleIds).toEqual([TITLE_NAMES[0]])
     expect(rendered.result.current.screen).toEqual({ kind: '관리' })
@@ -1921,11 +1965,17 @@ describe('143 경기 전 엔트리 보기 — 142 위에 선다 (0x16af8 · 0x14
 describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x1278c — 겹쳐 쌓인다)', () => {
   const 지난경기 = {
     summary: {
-      result: '승' as const, ourScore: 5, opponentScore: 2,
+      result: '승' as const,
+      ourScore: 5,
+      opponentScore: 2,
       stats: { ...createCareer('x').stats, atBats: 4, hits: 2 },
-      popularityPoints: 3, doublePlays: 0, scoringPositionOuts: 0,
+      popularityPoints: 3,
+      doublePlays: 0,
+      scoringPositionOuts: 0,
       reputationCounts: { grandSlams: 0, walkOffs: 0, walks: 0, goAheadRuns: 0 },
-      ourTeamId: 0, opponentTeamId: 1, recordIds: [],
+      ourTeamId: 0,
+      opponentTeamId: 1,
+      recordIds: [],
     },
     evaluation: { popularityChange: 2, reputationChange: 3, moraleChange: 1, commentIndex: 40 },
   }
@@ -2023,7 +2073,12 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
 
   it('116 진입이 평가 징글 36~38 을 낸다(12c96) — 이어하기 길도. 정산 판을 나간 길(0x3f3 → 100 → 116)은 경기 결과에서 평가로 넘긴다 (r287)', () => {
     const played: number[] = []
-    const sound = { ...createSilentSound(), play: (id: number) => { played.push(id) } }
+    const sound = {
+      ...createSilentSound(),
+      play: (id: number) => {
+        played.push(id)
+      },
+    }
     const saveGame = 메모리저장(평가중())
     const random = createSeededRandom(20100901)
     const rendered = renderHook(() => {
@@ -2038,10 +2093,19 @@ describe('이어하기 S+0x50 == 2 → 116 다시 띄우기 (0x1c154 1c26a · 0x
 
     // 경기 장면의 결과 화면(0x18 · 0x19)이 들고 있던 평가 재료를 116 에 넘긴다 — 징글은 이때 한 번
     played.length = 0
-    const 평가재료 = { newTitles: [], evaluation: { popularityChange: -1, reputationChange: 0, moraleChange: 0, commentIndex: 40 }, streakNotices: [] }
-    act(() => rendered.result.current.setScreen({
-      kind: '경기결과', summary: 지난경기.summary as unknown as Extract<Screen, { kind: '경기결과' }>['summary'], gamePointReward: 0, ...평가재료,
-    }))
+    const 평가재료 = {
+      newTitles: [],
+      evaluation: { popularityChange: -1, reputationChange: 0, moraleChange: 0, commentIndex: 40 },
+      streakNotices: [],
+    }
+    act(() =>
+      rendered.result.current.setScreen({
+        kind: '경기결과',
+        summary: 지난경기.summary as unknown as Extract<Screen, { kind: '경기결과' }>['summary'],
+        gamePointReward: 0,
+        ...평가재료,
+      }),
+    )
     expect(played).toEqual([])
     act(() => rendered.result.current.session.actions.leaveGameSettlement())
     expect(rendered.result.current.screen).toEqual({ kind: '경기평가', ...평가재료 })
@@ -2062,7 +2126,9 @@ describe('엔딩 141 의 5000 G 이어하기 (팝업 0x32 예 — 0x1bdc6~)', ()
     const 방출 = 띄우기({ ...createCareer('방출'), endingIndex: 1, gamePoint: 6000 })
     expect(방출.result.current.screen.kind).toBe('엔딩')
     let 이어함 = false
-    act(() => { 이어함 = 방출.result.current.session.actions.continueAfterEnding() })
+    act(() => {
+      이어함 = 방출.result.current.session.actions.continueAfterEnding()
+    })
     expect(이어함).toBe(true)
     expect(방출.result.current.session.career?.season).toBe(2)
     expect(방출.result.current.session.career?.endingIndex).toBeNull()
@@ -2072,7 +2138,9 @@ describe('엔딩 141 의 5000 G 이어하기 (팝업 0x32 예 — 0x1bdc6~)', ()
     expect(방출.result.current.screen).toEqual({ kind: '연차표지', afterHold: true })
 
     const 부상 = 띄우기({ ...createCareer('부상'), endingIndex: 0, gamePoint: 6000, isInjured: true, injuredGamesPlayed: 20 })
-    act(() => { 부상.result.current.session.actions.continueAfterEnding() })
+    act(() => {
+      부상.result.current.session.actions.continueAfterEnding()
+    })
     expect(부상.result.current.screen).toEqual({ kind: '관리' })
     expect(부상.result.current.session.isYearCoverHeld).toBe(false)
     expect(부상.result.current.session.career?.season).toBe(1)
@@ -2082,7 +2150,12 @@ describe('엔딩 141 의 5000 G 이어하기 (팝업 0x32 예 — 0x1bdc6~)', ()
 describe('이어하기 100 진입 0x1c154 머리 1c15e stopBgm (r163)', () => {
   it('어느 갈래로 이어도 먼저 배경음을 끊는다 — 국가대항전 134 는 제 배경음이 없어 소리 없이 선다', () => {
     const calls: string[] = []
-    const sound = { ...createSilentSound(), stopBgm: () => { calls.push('stopBgm') } }
+    const sound = {
+      ...createSilentSound(),
+      stopBgm: () => {
+        calls.push('stopBgm')
+      },
+    }
     for (const saved of [목표달성선수({ nationalCup: createNationalCup() }), { ...createCareer('관리'), gamesPlayed: 4 }]) {
       calls.length = 0
       const saveGame = 메모리저장(saved)
@@ -2123,7 +2196,12 @@ describe('돌발 결과 창 뒤의 경기 끝 (r315)', () => {
       act(() => rendered.result.current.session.actions.confirmMatchPrepare())
       act(() => rendered.result.current.session.actions.finishLoading())
       const 헛스윙: PitchOutcomeDetail = {
-        batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true }, hasSwung: true, isBunt: false, resultCode: null, contactSoundId: null,
+        batterHand: 0,
+        resolution: { kind: '스트라이크', isSwinging: true },
+        hasSwung: true,
+        isBunt: false,
+        resultCode: null,
+        contactSoundId: null,
       }
       for (let step = 0; step < 3000 && rendered.result.current.screen.kind === '경기'; step += 1) {
         const { session } = rendered.result.current

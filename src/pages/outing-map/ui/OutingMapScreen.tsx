@@ -49,12 +49,19 @@ interface OutingMapScreenProps {
  * [들어가기]/[기능] 두 칸만 띄운다 (0x7ee1a, F-2 2-7) — 전체 화면 목록이 아니다.
  */
 export function OutingMapScreen({
-  noticeText, onCloseNotice, onRun, onBack, eventPlaceIds, onEnter, resultText = null, onCloseResult, presentation = null,
-  initialOpenPlaceId = null, onCloseBubble,
+  noticeText,
+  onCloseNotice,
+  onRun,
+  onBack,
+  eventPlaceIds,
+  onEnter,
+  resultText = null,
+  onCloseResult,
+  presentation = null,
+  initialOpenPlaceId = null,
+  onCloseBubble,
 }: OutingMapScreenProps) {
-  const [openPlace, setOpenPlace] = useState<OutingPlace | null>(
-    () => OUTING_PLACES.find((place) => place.id === initialOpenPlaceId) ?? null,
-  )
+  const [openPlace, setOpenPlace] = useState<OutingPlace | null>(() => OUTING_PLACES.find((place) => place.id === initialOpenPlaceId) ?? null)
   const [selectedPlaceId, setSelectedPlaceId] = useState(openPlace?.id ?? OUTING_PLACES[0].id)
   /** 113 → 112 — 말풍선을 닫고 112 진입을 세션에 알린다 */
   const closeBubble = () => {
@@ -78,7 +85,10 @@ export function OutingMapScreen({
     if (!isMapKeyOn) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
-      const cursor = Math.max(OUTING_PLACES.findIndex((place) => place.id === current.selectedPlaceId), 0)
+      const cursor = Math.max(
+        OUTING_PLACES.findIndex((place) => place.id === current.selectedPlaceId),
+        0,
+      )
       if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
         return setOpenPlace(OUTING_PLACES[cursor])
@@ -117,19 +127,11 @@ export function OutingMapScreen({
         통과하면 126(연출 · 효과 팝업)이라 사라진다(0x16dd4~0x16ddc)
       */}
       {openPlace !== null && presentation === null && resultText === null && (
-        <PlaceBubble
-          place={openPlace}
-          isKeyEnabled={noticeText === ''}
-          onEnter={() => onEnter(openPlace)}
-          onRun={onRun}
-          onClose={closeBubble}
-        />
+        <PlaceBubble place={openPlace} isKeyEnabled={noticeText === ''} onEnter={() => onEnter(openPlace)} onRun={onRun} onClose={closeBubble} />
       )}
       {presentation}
       {noticeText !== '' && <MessageBox text={noticeText} buttons={['확인']} onAnswer={onCloseNotice} />}
-      {resultText !== null && (
-        <MessageBox text={resultText} buttons={['확인']} onAnswer={() => onCloseResult?.()} />
-      )}
+      {resultText !== null && <MessageBox text={resultText} buttons={['확인']} onAnswer={() => onCloseResult?.()} />}
     </OutingMap>
   )
 }

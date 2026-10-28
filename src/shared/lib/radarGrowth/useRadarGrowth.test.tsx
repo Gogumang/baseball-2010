@@ -5,7 +5,12 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
 import { radarObject } from '@/shared/lib/radarGrowth/radarGrowth'
 
-function Probe({ targets, cursor, fromZero, restartFromZero }: {
+function Probe({
+  targets,
+  cursor,
+  fromZero,
+  restartFromZero,
+}: {
   readonly targets: readonly number[]
   readonly cursor?: number
   readonly fromZero?: boolean
@@ -19,9 +24,10 @@ function Probe({ targets, cursor, fromZero, restartFromZero }: {
   return <output data-testid="current">{current.join(',')}</output>
 }
 
-const advance = (draws: number) => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame() * draws)
-})
+const advance = (draws: number) =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * draws)
+  })
 const current = () => screen.getByTestId('current').textContent
 
 afterEach(() => {

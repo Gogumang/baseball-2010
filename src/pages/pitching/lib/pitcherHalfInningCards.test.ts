@@ -33,9 +33,7 @@ describe('나리 투수편 교대 판 두 팀 판 값 (0x420dc · 0x42364)', () 
     expect(cards.battingSide).toBe(0)
     expect(cards.pitcherName).toBe('나투수')
     expect(cards.currentOrder).toBe(0)
-    expect(cards.dueUpNames).toEqual([0, 1, 2].map(
-      (slot) => opponentBatterOf({ ...progress, opponentOrderIndex: slot }).name,
-    ))
+    expect(cards.dueUpNames).toEqual([0, 1, 2].map((slot) => opponentBatterOf({ ...progress, opponentOrderIndex: slot }).name))
     expect(cards.dueUpNames.every((name) => typeof name === 'string')).toBe(true)
     expect(pitcherHalfInningCardsOf(progress, undefined, '초').pitcherName).toBeNull()
   })

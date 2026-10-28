@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { timingOf } from '@/entities/batting/model/swingTiming'
 
 /** 위치 분석 4차 표 — F = N−2 기준 −5..+3 프레임 */
-const 주변타이밍 = (frameCount: number) =>
-  Array.from({ length: 9 }, (_unused, index) => timingOf(frameCount - 2 + index - 5, frameCount, false))
+const 주변타이밍 = (frameCount: number) => Array.from({ length: 9 }, (_unused, index) => timingOf(frameCount - 2 + index - 5, frameCount, false))
 
 describe('timingOf — 0x34be0', () => {
   it('F = N−2 에서 100 이고 멀어질수록 떨어진다', () => {

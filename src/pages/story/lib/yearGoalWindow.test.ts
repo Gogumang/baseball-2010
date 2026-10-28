@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  averageGlyphsOf, earnedRunAverageGlyphsOf, SEASON_YEAR_GOAL_LABEL_SET, YEAR_GOAL_BOXES, YEAR_GOAL_PERCENT_FRAME,
+  averageGlyphsOf,
+  earnedRunAverageGlyphsOf,
+  SEASON_YEAR_GOAL_LABEL_SET,
+  YEAR_GOAL_BOXES,
+  YEAR_GOAL_PERCENT_FRAME,
   yearGoalWindowLayoutOf,
 } from '@/pages/story/lib/yearGoalWindow'
 import type { SeasonYearGoalWindowValues } from '@/pages/story/lib/yearGoalWindow'
@@ -23,13 +27,18 @@ describe('올해의 목표 창 배치 — 0x86fdc · 0x8656c', () => {
   it('숫자는 자간 1 · 주황(기준 20) · 오른끝 −4 — "12" 는 폭 (4+1)+(6+1)', () => {
     const { numbers } = yearGoalWindowLayoutOf({ labelSet: 0, current: [0, 12, 0, 0, 0], goals: [0, 0, 0, 0, 0] })
     const 안타 = numbers.filter((piece) => piece.y === 105 + 17 + 3 && piece.x < 140)
-    expect(안타).toEqual([{ frame: 21, x: 81 - 4 + 55 - 12, y: 125 }, { frame: 22, x: 81 - 4 + 55 - 7, y: 125 }])
+    expect(안타).toEqual([
+      { frame: 21, x: 81 - 4 + 55 - 12, y: 125 },
+      { frame: 22, x: 81 - 4 + 55 - 7, y: 125 },
+    ])
   })
 
   it('타율 0x8633c — 0.305: 세 자리 소수, 칸은 "0" 폭으로 잰다, 소수점은 −26 · oy 5', () => {
     const 조각 = averageGlyphsOf(305, 현재1)
     expect(조각).toEqual([
-      { frame: 23, x: 111, y: 108 }, { frame: 20, x: 118, y: 108 }, { frame: 25, x: 125, y: 108 },
+      { frame: 23, x: 111, y: 108 },
+      { frame: 20, x: 118, y: 108 },
+      { frame: 25, x: 125, y: 108 },
       // 소수점: 81 − 26 + 55 − 1, 105 + 5 + 6
       { frame: 103, x: 109, y: 116 },
       // 정수 0 을 −27 에: 81 − 27 + 55 − 7

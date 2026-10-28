@@ -17,7 +17,8 @@ import {
   stadiumCollectorUnlocks,
   seasonStadiumOf,
   stadiumPriceOf,
-  standCapacityOf, stadiumPreviewOf,
+  standCapacityOf,
+  stadiumPreviewOf,
 } from '@/entities/season-mode/model/stadiumItems'
 
 const 기본 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
@@ -202,8 +203,7 @@ describe('시즌 홈경기 구장 세 칸 — 경기 준비 0x353ac~0x353e6', ()
   })
 
   it('히든 칸(4~6)도 그대로 넘어간다 — 그리는 쪽이 hidden_* 로 가른다', () => {
-    expect(seasonStadiumOf(기본({ stadiumEquipped: [6, 4, 0] })))
-      .toEqual({ stand: 6, crowd: 1, board: 4, grassPalette: 2 })
+    expect(seasonStadiumOf(기본({ stadiumEquipped: [6, 4, 0] }))).toEqual({ stand: 6, crowd: 1, board: 4, grassPalette: 2 })
   })
 })
 
@@ -228,8 +228,7 @@ describe('잔디 = 바닥 그림 팔레트 — 0x786c8 (S3 6절)', () => {
 
 describe('구장관리 0xea 미리보기 — 진입 0xe4d0 · 키 0x7958', () => {
   it('저장값으로 세우고 관중 단계는 0(빈 좌석) — 0xe52e', () => {
-    expect(stadiumPreviewOf(기본({ stadiumEquipped: [2, 3, 1], crowdLevel: 2 })))
-      .toEqual({ stand: 2, crowd: 0, board: 3, grassPalette: 1 })
+    expect(stadiumPreviewOf(기본({ stadiumEquipped: [2, 3, 1], crowdLevel: 2 }))).toEqual({ stand: 2, crowd: 0, board: 3, grassPalette: 1 })
   })
 
   it('지금 종류의 커서 칸 한 칸만 갈아 끼운다 (0x7b22~0x7bae)', () => {

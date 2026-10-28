@@ -28,4 +28,3 @@ export function chromiumExecutable() {
   }
   return undefined
 }
-

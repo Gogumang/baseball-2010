@@ -6,11 +6,19 @@ import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { PITCHER_BURSTS } from '@/shared/config/original/bursts'
 import type { PitcherRole } from '@/entities/pitcher-career/model/pitcherRole'
 import {
-  PITCHER_HAND_LABELS, PITCHER_ROLE_LABELS, PITCHER_SKIN_LABELS, PITCHER_TYPE_LABELS,
+  PITCHER_HAND_LABELS,
+  PITCHER_ROLE_LABELS,
+  PITCHER_SKIN_LABELS,
+  PITCHER_TYPE_LABELS,
 } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { boardRectsOf } from '@/pages/shop/lib/equipmentWindowLayout'
 import {
-  REGISTER_INFO_BOARD, REGISTER_INFO_FRAME, REGISTER_LABELS, REGISTER_TEXT_BOXES, TEAM_NAME_BOX, teamNameFrameOf,
+  REGISTER_INFO_BOARD,
+  REGISTER_INFO_FRAME,
+  REGISTER_LABELS,
+  REGISTER_TEXT_BOXES,
+  TEAM_NAME_BOX,
+  teamNameFrameOf,
 } from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
 import type { RegisterBox } from '@/pages/pitcher-league/lib/pitcherRegisterLayout'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
@@ -90,8 +98,12 @@ export function PitcherInfoBoard({ values }: { readonly values: PitcherInfoBoard
         const box = REGISTER_TEXT_BOXES[id]
         if (texts[id] === '') return null
         return (
-          <div key={id} className={managementStyles.infoValue} data-testid={`정보칸-${id}`}
-            style={{ left: box.x, top: box.y, width: box.width, height: box.height, color: ORIGINAL_COLORS.text }}>
+          <div
+            key={id}
+            className={managementStyles.infoValue}
+            data-testid={`정보칸-${id}`}
+            style={{ left: box.x, top: box.y, width: box.width, height: box.height, color: ORIGINAL_COLORS.text }}
+          >
             {texts[id]}
           </div>
         )

@@ -141,18 +141,26 @@ export function nariGameMatchOfSave(raw: unknown): NariGameMatch | null {
   if (raw === null || typeof raw !== 'object') return null
   const value = raw as Partial<Record<keyof NariGameMatch, unknown>>
   const aces = value.aces as Partial<Record<keyof NariMatchAces, unknown>> | null | undefined
-  const validAces = aces !== null && aces !== undefined && typeof aces === 'object'
-    && isAceIndex(aces.myBatter) && isAceIndex(aces.myPitcher)
-    && isAceIndex(aces.opponentPitcher) && isAceIndex(aces.opponentBatter)
-    ? (aces as NariMatchAces)
-    : null
+  const validAces =
+    aces !== null &&
+    aces !== undefined &&
+    typeof aces === 'object' &&
+    isAceIndex(aces.myBatter) &&
+    isAceIndex(aces.myPitcher) &&
+    isAceIndex(aces.opponentPitcher) &&
+    isAceIndex(aces.opponentBatter)
+      ? (aces as NariMatchAces)
+      : null
   return {
-    aces: validAces === null ? null : {
-      myBatter: validAces.myBatter,
-      myPitcher: validAces.myPitcher,
-      opponentPitcher: validAces.opponentPitcher,
-      opponentBatter: validAces.opponentBatter,
-    },
+    aces:
+      validAces === null
+        ? null
+        : {
+            myBatter: validAces.myBatter,
+            myPitcher: validAces.myPitcher,
+            opponentPitcher: validAces.opponentPitcher,
+            opponentBatter: validAces.opponentBatter,
+          },
     isNationalCup: value.isNationalCup === true,
   }
 }
@@ -284,7 +292,7 @@ export function batterMatchInfoOf(career: PlayerCareer, aces: NariMatchAces | nu
  */
 export function cupMatchInfoOf(career: PlayerCareer, matchup: NationalCupMatchup, cup: NationalCup): NariMatchScreenData {
   const teams = career.nariCupTeams
-  const myOrder = teams === undefined ? [0] : nariCupRecordOf(teams, matchup.myTeam).pitchers ?? [0]
+  const myOrder = teams === undefined ? [0] : (nariCupRecordOf(teams, matchup.myTeam).pitchers ?? [0])
   return {
     lines: nariMatchInfoLines({
       league: career.league,
@@ -292,9 +300,10 @@ export function cupMatchInfoOf(career: PlayerCareer, matchup: NationalCupMatchup
       myTeamId: matchup.myTeam,
       opponentTeamId: matchup.opponent,
       myStarterName: teamPitchers(matchup.myTeam)[myOrder[0] ?? 0]?.name ?? EMPTY_VALUE,
-      opponentPitcherOrder: teams === undefined
-        ? teamPitchers(matchup.opponent).map((_pitcher, slot) => slot)
-        : nariCupRecordOf(teams, matchup.opponent).pitchers ?? [],
+      opponentPitcherOrder:
+        teams === undefined
+          ? teamPitchers(matchup.opponent).map((_pitcher, slot) => slot)
+          : (nariCupRecordOf(teams, matchup.opponent).pitchers ?? []),
       aces: null,
       cup,
     }),

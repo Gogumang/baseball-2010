@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  DRAWABLE_SYLLABLES,
-  HANGUL_ATLAS,
-  TABLE_QUIRKS,
-} from '@/shared/lib/font/atlas'
+import { DRAWABLE_SYLLABLES, HANGUL_ATLAS, TABLE_QUIRKS } from '@/shared/lib/font/atlas'
 import { chooseSets, composePieces, decomposeSyllable, glyphOf } from '@/shared/lib/font/compose'
 
 /**
@@ -15,13 +11,9 @@ import { chooseSets, composePieces, decomposeSyllable, glyphOf } from '@/shared/
  */
 describe('글꼴 조각 고르기', () => {
   it('글꼴 파일 끝의 획 복잡도 표가 문서와 같다', () => {
-    expect(HANGUL_ATLAS.jungStroke).toEqual(
-      [0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-    )
+    expect(HANGUL_ATLAS.jungStroke).toEqual([0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0])
     expect(HANGUL_ATLAS.choStroke).toEqual([1, 1, 1, 1, 1, 3, 1, 2, 2, 1, 1, 1, 1, 1, 2, 2, 3, 1, 3])
-    expect(HANGUL_ATLAS.jongStroke).toEqual(
-      [1, 1, 1, 1, 1, 3, 1, 3, 3, 3, 3, 3, 3, 3, 3, 1, 2, 2, 1, 1, 1, 1, 2, 2, 3, 1, 3],
-    )
+    expect(HANGUL_ATLAS.jongStroke).toEqual([1, 1, 1, 1, 1, 3, 1, 3, 3, 3, 3, 3, 3, 3, 3, 1, 2, 2, 1, 1, 1, 1, 2, 2, 3, 1, 3])
   })
 
   it('아틀라스 칸 수가 483조각 = 12x19 + 7x21 + 4x27 이다', () => {
@@ -85,15 +77,11 @@ describe('글꼴 조각 고르기', () => {
 
   it('모음이 홀로 있으면 중성 전용 벌 6 을 쓴다', () => {
     expect(chooseSets({ cho: -1, jung: 0, jong: -1 }).jungSet).toBe(6)
-    expect(composePieces({ cho: -1, jung: 0, jong: -1 })).toEqual([
-      { atlas: 'hangul', column: 0, row: HANGUL_ATLAS.jungRow + 6, shiftX: 0 },
-    ])
+    expect(composePieces({ cho: -1, jung: 0, jong: -1 })).toEqual([{ atlas: 'hangul', column: 0, row: HANGUL_ATLAS.jungRow + 6, shiftX: 0 }])
   })
 
   it('자음이 홀로 있으면 2픽셀 오른쪽으로 민다', () => {
-    expect(composePieces({ cho: 0, jung: -1, jong: -1 })).toEqual([
-      { atlas: 'hangul', column: 0, row: HANGUL_ATLAS.choRow, shiftX: 2 },
-    ])
+    expect(composePieces({ cho: 0, jung: -1, jong: -1 })).toEqual([{ atlas: 'hangul', column: 0, row: HANGUL_ATLAS.choRow, shiftX: 2 }])
   })
 
   it('ㅐㅒㅔㅖㅙㅞ 아래 받침은 1픽셀 오른쪽으로 민다', () => {

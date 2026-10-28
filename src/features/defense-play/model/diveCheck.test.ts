@@ -3,7 +3,10 @@ import { AI_STATE, createFielders } from '@/entities/fielding/model/fieldingStat
 import { POSE } from '@/entities/fielding/model/fielderPose'
 import { diveCheckOf } from '@/features/defense-play/model/diveCheck'
 
-const 야수들 = createFielders(Array.from({ length: 9 }, () => 500), 0)
+const 야수들 = createFielders(
+  Array.from({ length: 9 }, () => 500),
+  0,
+)
 const 공점 = (tick: number) => ({ x: 1000 * tick, y: 300, z: 20_000 })
 const 검사 = (overrides: Partial<Parameters<typeof diveCheckOf>[0]>) =>
   diveCheckOf({
@@ -43,9 +46,7 @@ describe('비필살 다이빙 검사 b46c2~b475a (r180)', () => {
     expect(검사({ catchTick: 25 })).toBeNull()
     expect(검사({ fielder: { ...야수들[5], aiState: AI_STATE.COVER_SECOND } })).toBeNull()
     expect(검사({ fielder: { ...야수들[5], aiState: AI_STATE.CHASE } })).toBeNull()
-    expect(검사({ fielder: { ...야수들[5], aiState: AI_STATE.COVER_SECOND }, coverNeeded: () => false })?.fielder.aiState).toBe(
-      AI_STATE.DIVE,
-    )
+    expect(검사({ fielder: { ...야수들[5], aiState: AI_STATE.COVER_SECOND }, coverNeeded: () => false })?.fielder.aiState).toBe(AI_STATE.DIVE)
   })
 
   it('+0x174 는 ldrsh — 빈 표의 100000 은 음수로 읽혀 닫힌다(원본 그대로)', () => {

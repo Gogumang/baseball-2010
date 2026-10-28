@@ -34,8 +34,7 @@ const 장내홈런: Partial<DefensePlayResult> = {
 }
 
 /** 내 타순 칸 기록(team+0x34+타순·0x18)의 홈런 +0x13 — 판을 먹인 뒤 동료 타석이 돌아도 내 칸은 그대로다 */
-const 내칸홈런 = (before: GameProgress, after: GameProgress) =>
-  after.ourLineup.records[lineupSlotOf(before.game.battingOrderIndex)]?.homeRuns ?? 0
+const 내칸홈런 = (before: GameProgress, after: GameProgress) => after.ourLineup.records[lineupSlotOf(before.game.battingOrderIndex)]?.homeRuns ?? 0
 
 /** 같은 씨앗으로 두 게이트를 다 돌린다 — 판 뒤 동료 · 상대 타석은 게이트와 무관해 같은 난수로 같게 돈다 */
 function 둘다(overrides: Partial<DefensePlayResult>, streak = 0) {

@@ -40,14 +40,20 @@ export const INSET_BOX_COLORS = {
 } as const
 
 const fill = (x: number, y: number, width: number, height: number, color: string): PanelPaint[] =>
-  (width > 0 && height > 0 ? [{ x, y, width, height, color }] : [])
+  width > 0 && height > 0 ? [{ x, y, width, height, color }] : []
 
 /** 기기 선 — 가로·세로면 한 칸, 그 밖(이 파일은 45° 만 쓴다)은 브레젠험 점들 */
 function line(x1: number, y1: number, x2: number, y2: number, color: string): PanelPaint[] {
   if (x1 === x2 || y1 === y2) {
-    return [{
-      x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1) + 1, height: Math.abs(y2 - y1) + 1, color,
-    }]
+    return [
+      {
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        width: Math.abs(x2 - x1) + 1,
+        height: Math.abs(y2 - y1) + 1,
+        color,
+      },
+    ]
   }
   const points: PanelPaint[] = []
   const dx = Math.abs(x2 - x1)
@@ -61,8 +67,14 @@ function line(x1: number, y1: number, x2: number, y2: number, color: string): Pa
     points.push({ x, y, width: 1, height: 1, color })
     if (x === x2 && y === y2) return points
     const doubled = 2 * error
-    if (doubled >= dy) { error += dy; x += sx }
-    if (doubled <= dx) { error += dx; y += sy }
+    if (doubled >= dy) {
+      error += dy
+      x += sx
+    }
+    if (doubled <= dx) {
+      error += dx
+      y += sy
+    }
   }
 }
 
@@ -79,8 +91,10 @@ function roundEdge(x: number, y: number, w: number, h: number, color: string): P
 }
 
 /** 둥근 칠 0x6b7d4 (둥글기 ≤ 3) — 칠 위에 같은 칸 테두리 선 넷 */
-const roundFill = (x: number, y: number, w: number, h: number, color: string): PanelPaint[] =>
-  [...fill(x + 1, y + 1, w - 1, h - 1, color), ...roundEdge(x, y, w, h, color)]
+const roundFill = (x: number, y: number, w: number, h: number, color: string): PanelPaint[] => [
+  ...fill(x + 1, y + 1, w - 1, h - 1, color),
+  ...roundEdge(x, y, w, h, color),
+]
 
 /**
  * 둥근 테두리 0x6aa64(x, y, w, h, 둥글기 ≤ 3, 색) 의 칠 목록 — 왼쪽 위 = (0, 0), (w + 1) × (h + 1) 을 덮는다.
@@ -125,9 +139,7 @@ export interface CommonPanelOptions {
  * 나눗셈은 모두 0 쪽으로 버린다(asr + 부호 보정). 어둡게([sp+0x90] ≠ 0)는 판 앞에 화면 전체를 [0x15605d0] 검정 단계 5 로
  * 덮는 것이라(0x55ea8~0x55ebe) 판 칠 목록에는 넣지 않고 `CommonPanel` 의 `dim` 이 판 뒤에 화면 전체 덮개로 깐다.
  */
-export function commonPanelPaintsOf({
-  width: w, height: h, topBand = 0, bottomBand = 0, titleTab = false,
-}: CommonPanelOptions): PanelPaint[] {
+export function commonPanelPaintsOf({ width: w, height: h, topBand = 0, bottomBand = 0, titleTab = false }: CommonPanelOptions): PanelPaint[] {
   const c = COMMON_PANEL_COLORS
   const paints: PanelPaint[] = [
     ...roundFill(0, 0, w - 1, h - 1, c.fill),
@@ -143,8 +155,12 @@ export function commonPanelPaintsOf({
     paints.push(...line(2, 2, w - 3, 2, c.light), ...line(2, 3, cx, 3, c.light))
     for (let i = 0; i <= 13; i += 1) paints.push(...line(2, 3 + i, cx - i, 3 + i, c.light))
     paints.push(
-      ...line(2, 17, cx - 14, 17, c.grey), ...line(cx - 14, 17, cx, 3, c.grey), ...line(cx + 1, 3, w - 3, 3, c.grey),
-      ...line(2, 18, cx - 14, 18, c.deep), ...line(cx - 14, 18, cx, 4, c.deep), ...line(cx + 1, 4, w - 3, 4, c.deep),
+      ...line(2, 17, cx - 14, 17, c.grey),
+      ...line(cx - 14, 17, cx, 3, c.grey),
+      ...line(cx + 1, 3, w - 3, 3, c.grey),
+      ...line(2, 18, cx - 14, 18, c.deep),
+      ...line(cx - 14, 18, cx, 4, c.deep),
+      ...line(cx + 1, 4, w - 3, 4, c.deep),
     )
     for (let i = 0; i <= 7; i += 1) paints.push(...line(3, 3 + i, cx - i - 2, 3 + i, c.white))
     return paints
@@ -152,16 +168,20 @@ export function commonPanelPaintsOf({
   if (topBand > 0) {
     const half = Math.trunc(topBand / 2)
     paints.push(
-      ...line(2, 2, w - 3, 2, c.grey), ...line(2, topBand + 2, w - 3, topBand + 2, c.grey),
-      ...fill(2, 3, w - 4, half, c.white), ...fill(2, 2 + half, w - 4, half, c.light),
+      ...line(2, 2, w - 3, 2, c.grey),
+      ...line(2, topBand + 2, w - 3, topBand + 2, c.grey),
+      ...fill(2, 3, w - 4, half, c.white),
+      ...fill(2, 2 + half, w - 4, half, c.light),
     )
   }
   if (bottomBand > 0) {
     const top = h - bottomBand - 3
     const half = Math.trunc(bottomBand / 2)
     paints.push(
-      ...line(2, top, w - 3, top, c.grey), ...line(2, top + bottomBand, w - 3, top + bottomBand, c.grey),
-      ...fill(2, top + 1, w - 4, half, c.white), ...fill(2, top + half, w - 4, half, c.light),
+      ...line(2, top, w - 3, top, c.grey),
+      ...line(2, top + bottomBand, w - 3, top + bottomBand, c.grey),
+      ...fill(2, top + 1, w - 4, half, c.white),
+      ...fill(2, top + half, w - 4, half, c.light),
     )
   }
   return paints
@@ -272,7 +292,15 @@ export interface RoundBoxOptions {
  * ```
  */
 export function roundBoxPaintsOf({
-  width: w, height: h, round: rawRound, shine = false, shineLength = 0, shineStep = 0, shortShine = false, fill: fillColor, edge,
+  width: w,
+  height: h,
+  round: rawRound,
+  shine = false,
+  shineLength = 0,
+  shineStep = 0,
+  shortShine = false,
+  fill: fillColor,
+  edge,
 }: RoundBoxOptions): PanelPaint[] {
   const round = rawRound <= 0 ? 1 : rawRound
   const paints: PanelPaint[] = [...roundFillOf(0, 0, w, h, round, fillColor), ...roundEdgeOf(0, 0, w, h, round, edge)]

@@ -62,7 +62,17 @@ describe('선수 정보 창 0x5b798', () => {
 
 describe('선수 정보 창 도형 축 칸 (0x5aefc 0x5b48c~0x5b532, 반지름 22)', () => {
   it('상자는 끝에서 바깥으로 26×29 를 편 뒤 d = |30 − 22| = 8 — x 는 안쪽, y 는 위 축 −8 · 아래 축 +8', () => {
-    expect(DETAIL_RADAR_AXES.map((axis) => axis.end)).toEqual([{ x: -29, y: -29 }, { x: 28, y: -29 }, { x: 28, y: 28 }, { x: -29, y: 28 }])
-    expect(DETAIL_RADAR_AXES.map((axis) => axis.box)).toEqual([{ x: -45, y: -38 }, { x: 19, y: -38 }, { x: 19, y: 9 }, { x: -45, y: 9 }])
+    expect(DETAIL_RADAR_AXES.map((axis) => axis.end)).toEqual([
+      { x: -29, y: -29 },
+      { x: 28, y: -29 },
+      { x: 28, y: 28 },
+      { x: -29, y: 28 },
+    ])
+    expect(DETAIL_RADAR_AXES.map((axis) => axis.box)).toEqual([
+      { x: -45, y: -38 },
+      { x: 19, y: -38 },
+      { x: 19, y: 9 },
+      { x: -45, y: 9 },
+    ])
   })
 })

@@ -3,10 +3,29 @@ import { describe, expect, it } from 'vitest'
 import {
   annalsSkillOfCell,
   isAnnalsSkillGained,
-  addGamePointEarned, addGamePointUsage, applyAnnalsStat, gamePointEarnedOf, skillEquipStatEventsOf, countItemPurchase, EMPTY_ANNALS_STATS, GAME_POINT_USAGE_LIMIT,
-  gamePointUsageOf, itemPurchaseCountOf, markSkillEquipped, normalizeAnnalsStats, markAchievement, achievementMarkOf,
-  addRecordCounts, recordCountOf, RECORD_COUNT_KINDS, addPlayTime, playTimeHiddenIdOf, totalPlayTimeOf, earnedGamePointHiddenIdOf,
-  countLeagueFirst, leagueFirstCountOf,
+  addGamePointEarned,
+  addGamePointUsage,
+  applyAnnalsStat,
+  gamePointEarnedOf,
+  skillEquipStatEventsOf,
+  countItemPurchase,
+  EMPTY_ANNALS_STATS,
+  GAME_POINT_USAGE_LIMIT,
+  gamePointUsageOf,
+  itemPurchaseCountOf,
+  markSkillEquipped,
+  normalizeAnnalsStats,
+  markAchievement,
+  achievementMarkOf,
+  addRecordCounts,
+  recordCountOf,
+  RECORD_COUNT_KINDS,
+  addPlayTime,
+  playTimeHiddenIdOf,
+  totalPlayTimeOf,
+  earnedGamePointHiddenIdOf,
+  countLeagueFirst,
+  leagueFirstCountOf,
 } from '@/entities/collection/model/annalsStats'
 
 /** 기록연감 통계 기록 `[mgr+0xc8]` — 0x22e35 · 0x22c29 · 0xb663c (디스어셈 확정) */
@@ -174,7 +193,10 @@ describe('기록달성 누계 0x22e10 → 0x22df0 (+4 + n, u8)', () => {
   })
 
   it('칸은 u8 — 255 다음은 0 이다 (0x22e06 adds · strb, 원본 그대로)', () => {
-    const full = addRecordCounts(EMPTY_ANNALS_STATS, Array.from({ length: 255 }, () => 3))
+    const full = addRecordCounts(
+      EMPTY_ANNALS_STATS,
+      Array.from({ length: 255 }, () => 3),
+    )
     expect(recordCountOf(full, 3)).toBe(255)
     expect(recordCountOf(addRecordCounts(full, [3]), 3)).toBe(0)
   })
@@ -183,8 +205,9 @@ describe('기록달성 누계 0x22e10 → 0x22df0 (+4 + n, u8)', () => {
     const saved = JSON.parse(JSON.stringify(addRecordCounts(EMPTY_ANNALS_STATS, [5]))) as Record<string, unknown>
     expect(normalizeAnnalsStats(saved).recordCounts[5]).toBe(1)
     expect(normalizeAnnalsStats({ ...saved, recordCounts: undefined }).recordCounts).toEqual(EMPTY_ANNALS_STATS.recordCounts)
-    expect(normalizeAnnalsStats({ ...saved, recordCounts: Array.from({ length: 40 }, () => 256) }).recordCounts)
-      .toEqual(EMPTY_ANNALS_STATS.recordCounts)
+    expect(normalizeAnnalsStats({ ...saved, recordCounts: Array.from({ length: 40 }, () => 256) }).recordCounts).toEqual(
+      EMPTY_ANNALS_STATS.recordCounts,
+    )
   })
 })
 

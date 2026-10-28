@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BURST_REWARD_KIND,
-  applyBurstRewards,
-  burstRewardDeltasOf,
-} from '@/entities/burst-mission/model/burstMissionReward'
+import { BURST_REWARD_KIND, applyBurstRewards, burstRewardDeltasOf } from '@/entities/burst-mission/model/burstMissionReward'
 import { 행 } from '@/entities/burst-mission/model/burstMissionTestRows'
 import { BALANCE } from '@/shared/config/original/balance'
 
@@ -90,7 +86,12 @@ describe('보상 붙이기', () => {
   })
 
   it('종류 0(없음)은 건너뛴다', () => {
-    const row = 행({ successRewards: [{ kind: 0, amount: 9 }, { kind: BURST_REWARD_KIND.사기, amount: 5 }] })
+    const row = 행({
+      successRewards: [
+        { kind: 0, amount: 9 },
+        { kind: BURST_REWARD_KIND.사기, amount: 5 },
+      ],
+    })
 
     expect(burstRewardDeltasOf(row, '성공')).toEqual([{ name: '사기', amount: 5 }])
   })

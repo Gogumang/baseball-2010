@@ -214,7 +214,9 @@ describe('웹 테두리 걷기 — 원본 240×320 판 한 장 · 목표는 HUD 
     expect(view.getByTestId('미션-판').getAttribute('src')).toBe('./sprites/trainning/frames/012.png')
     expect(view.getAllByTestId('미션-목표-글').map((node) => node.textContent)).toEqual(['안타'])
     expect(view.getAllByTestId('미션-목표-수').map((node) => node.getAttribute('data-src'))).toEqual([
-      './sprites/num/080.png', './sprites/num/100.png', './sprites/num/083.png',
+      './sprites/num/080.png',
+      './sprites/num/100.png',
+      './sprites/num/083.png',
     ])
     // 스윙 한도 3 만 있다 — 띠 하나, "0/3"
     expect(view.getAllByTestId('미션-한도-띠')).toHaveLength(1)
@@ -237,9 +239,13 @@ describe('웹 테두리 걷기 — 원본 240×320 판 한 장 · 목표는 HUD 
 
   it("키패드 '*' 로도 메뉴를 열고 닫는다 — 공용 키 0x498d4 의 '*' 는 모드를 안 본다(4991c, 미션도 경기 장면 0x104)", () => {
     const view = 띄우기('명품 타자의 첫 걸음')
-    act(() => { fireEvent.keyDown(window, { key: '*' }) })
+    act(() => {
+      fireEvent.keyDown(window, { key: '*' })
+    })
     expect(view.getByRole('option', { name: /계속/ })).toBeTruthy()
-    act(() => { fireEvent.keyDown(window, { key: '*' }) })
+    act(() => {
+      fireEvent.keyDown(window, { key: '*' })
+    })
     expect(view.queryByRole('option', { name: /계속/ })).toBeNull()
   })
 

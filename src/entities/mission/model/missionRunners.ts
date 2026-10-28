@@ -86,9 +86,7 @@ export function missionRunnersAfterPlay(
   },
 ): BaseRunners {
   if (next.inningOver) return EMPTY_BASE_RUNNERS
-  const survivors =
-    change.survivorsFromBase ??
-    (change.outcomeKind === undefined ? null : survivorsWithoutPlayOf(before.bases, change.outcomeKind))
+  const survivors = change.survivorsFromBase ?? (change.outcomeKind === undefined ? null : survivorsWithoutPlayOf(before.bases, change.outcomeKind))
   return runnersAfterPlay(missionRunnersOf(before), next.bases, {
     batter: missionBatterSlotOf(before),
     batterReached: change.batterReached,
@@ -305,22 +303,21 @@ export function missionPlayAbilitiesOf(
     defenseAbilities: missionDefenseAbilitiesOf(run),
     fielderSkillIds: missionFielderSkillIdsOf(run),
     runAbilities: missionRunAbilitiesOnBaseOf(run, special),
-    ...(plates === undefined
-      ? {}
-      : { fielderPlates: missionFielderPlatesOf(plates), runnerAces: missionRunnerAcesOf(plates) }),
+    ...(plates === undefined ? {} : { fielderPlates: missionFielderPlatesOf(plates), runnerAces: missionRunnerAcesOf(plates) }),
   }
 }
 
 /** 이름 판 · 마선수 주자를 고르는 데 쓰는 미션 경기 — 수비 팀 마운드(`cpu.pitching`) · 미션 투수 · 마선수 순번 */
-export type MissionPlateSituation = MissionRunnerSituation & MissionDefenseSituation & {
-  readonly mission: Pick<OriginalMission, 'side' | 'opponentAce'>
-  readonly cpu: Pick<MissionCpuTeam, 'batting' | 'pitching'>
-  /**
-   * 투수 미션(모드 5)의 미션 투수 — 이름 0xb62c0 · 보직 0xb6dec(레코드 +0xb & 3). 선수 게터 0x1fbd0 의 기록(나리 투수 · 명예 투수).
-   * 안 주면(대체 투수) 칸 0 판이 없다
-   */
-  readonly missionPitcher?: { readonly name: string; readonly role?: number }
-}
+export type MissionPlateSituation = MissionRunnerSituation &
+  MissionDefenseSituation & {
+    readonly mission: Pick<OriginalMission, 'side' | 'opponentAce'>
+    readonly cpu: Pick<MissionCpuTeam, 'batting' | 'pitching'>
+    /**
+     * 투수 미션(모드 5)의 미션 투수 — 이름 0xb62c0 · 보직 0xb6dec(레코드 +0xb & 3). 선수 게터 0x1fbd0 의 기록(나리 투수 · 명예 투수).
+     * 안 주면(대체 투수) 칸 0 판이 없다
+     */
+    readonly missionPitcher?: { readonly name: string; readonly role?: number }
+  }
 
 /**
  * **수비 아홉 칸의 이름 판 선수** (0x43cb0 — `defenseFielderPlatesOf`). 칸 1~8 은 판 시작 0xb0fb4 가 앉힌 야수 레코드(`missionDefenseFieldersOf`,
@@ -396,11 +393,7 @@ export interface MissionWalkTeam {
  * 공격만 하므로 이 니블을 읽는 수비 줄 이름표에 서지 않아 그림 · 결과가 같다.
  */
 export function missionWalkTeamOf(run: MissionPlateSituation, isDefense: boolean): MissionWalkTeam | null {
-  const team = isDefense
-    ? run.mission.side === '타자'
-      ? run.game.cpuAutoBatting
-      : run.game.humanBatting
-    : offenseOf(run)
+  const team = isDefense ? (run.mission.side === '타자' ? run.game.cpuAutoBatting : run.game.humanBatting) : offenseOf(run)
   if (team === null) return null
   const isCpuTeam = run.mission.side === '타자' ? isDefense : !isDefense
   const aceNumber = run.mission.opponentAce - 1
@@ -421,6 +414,6 @@ export function missionWalkTeamOf(run: MissionPlateSituation, isDefense: boolean
     }
   })
   const pitching = isCpuTeam ? run.cpu.pitching : null
-  const moundRow = pitching === null ? null : pitching.roster[pitching.mound.pitcherSlot] ?? pitching.mound.pitcherSlot
+  const moundRow = pitching === null ? null : (pitching.roster[pitching.mound.pitcherSlot] ?? pitching.mound.pitcherSlot)
   return { pitcherAce: moundRow === MISSION_ACE_ROSTER_SLOT && aceNumber >= 0 ? aceNumber : null, records }
 }

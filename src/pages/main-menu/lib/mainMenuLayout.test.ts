@@ -1,26 +1,60 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
-  MENU_DESCRIPTION_PANEL, MENU_DESCRIPTION_TEXT_BOX, MENU_LABEL_HEIGHT, MENU_REEL_ITEM_COUNT,
-  MENU_REEL_ITEM_FRAMES, MENU_REEL_ROW_STEP, MENU_REEL_SCROLL_STEPS, MENU_REEL_SHADOW_COLOR,
-  MENU_REEL_SLOTS, MENU_REEL_SLOT_TABLE, MENU_REEL_TEXT_CENTER_X, MENU_WHEEL_ANGLES,
-  MENU_WHEEL_CENTER, MENU_WHEEL_ITEM_FRAMES, MENU_WHEEL_ORDER, MENU_WHEEL_RINGS,
-  MENU_WHEEL_SELECTED_SLOT, MENU_WHEEL_TURN_TICKS, SCREEN_HEIGHT, SCREEN_WIDTH,
-  MENU_BAND_COLOR, MENU_BAND_FIRST_SPREAD, MENU_BAND_GROW_TICKS, MENU_BAND_LEFT,
-  MENU_BAND_MAX_SPREAD, MENU_BAND_PIVOT_Y, MENU_BAND_RIGHT,
-  isMenuWheelAngleDrawn, menuBandAlphaAt, menuBandLinesOf, menuBandStateAt, menuPanelHeadingFrameOf, menuPanelHeadingTopLeftOf,
-  menuPanelLabelTopLeftOf, menuReelEntryAtSlotOf, menuReelFrameListOf, menuReelOrderOf,
-  menuReelSlotRowOf, menuReelTextTopLeftOf, menuWheelAngleAt, menuWheelLabelTopLeftOf,
-  menuWheelOrderOf, menuWheelPointOf, menuWheelRestingLabelsOf, menuWheelSlotDrawOf, menuWheelStepOf, rotateMenuReel,
+  MENU_DESCRIPTION_PANEL,
+  MENU_DESCRIPTION_TEXT_BOX,
+  MENU_LABEL_HEIGHT,
+  MENU_REEL_ITEM_COUNT,
+  MENU_REEL_ITEM_FRAMES,
+  MENU_REEL_ROW_STEP,
+  MENU_REEL_SCROLL_STEPS,
+  MENU_REEL_SHADOW_COLOR,
+  MENU_REEL_SLOTS,
+  MENU_REEL_SLOT_TABLE,
+  MENU_REEL_TEXT_CENTER_X,
+  MENU_WHEEL_ANGLES,
+  MENU_WHEEL_CENTER,
+  MENU_WHEEL_ITEM_FRAMES,
+  MENU_WHEEL_ORDER,
+  MENU_WHEEL_RINGS,
+  MENU_WHEEL_SELECTED_SLOT,
+  MENU_WHEEL_TURN_TICKS,
+  SCREEN_HEIGHT,
+  SCREEN_WIDTH,
+  MENU_BAND_COLOR,
+  MENU_BAND_FIRST_SPREAD,
+  MENU_BAND_GROW_TICKS,
+  MENU_BAND_LEFT,
+  MENU_BAND_MAX_SPREAD,
+  MENU_BAND_PIVOT_Y,
+  MENU_BAND_RIGHT,
+  isMenuWheelAngleDrawn,
+  menuBandAlphaAt,
+  menuBandLinesOf,
+  menuBandStateAt,
+  menuPanelHeadingFrameOf,
+  menuPanelHeadingTopLeftOf,
+  menuPanelLabelTopLeftOf,
+  menuReelEntryAtSlotOf,
+  menuReelFrameListOf,
+  menuReelOrderOf,
+  menuReelSlotRowOf,
+  menuReelTextTopLeftOf,
+  menuWheelAngleAt,
+  menuWheelLabelTopLeftOf,
+  menuWheelOrderOf,
+  menuWheelPointOf,
+  menuWheelRestingLabelsOf,
+  menuWheelSlotDrawOf,
+  menuWheelStepOf,
+  rotateMenuReel,
 } from '@/pages/main-menu/lib/mainMenuLayout'
 
 describe('반원 바퀴 — 원본 값 (0x24b1c, 확정)', () => {
   it('중심은 (120,320) 이고 테두리 원은 93·95·97 세 겹이다', () => {
     expect(MENU_WHEEL_CENTER).toEqual({ x: 120, y: 320 })
     expect(MENU_WHEEL_RINGS.map((ring) => ring.radius)).toEqual([93, 95, 97])
-    expect(MENU_WHEEL_RINGS.map((ring) => ring.color)).toEqual([
-      'rgb(37, 55, 120)', 'rgb(138, 185, 235)', 'rgb(36, 55, 120)',
-    ])
+    expect(MENU_WHEEL_RINGS.map((ring) => ring.color)).toEqual(['rgb(37, 55, 120)', 'rgb(138, 185, 235)', 'rgb(36, 55, 120)'])
   })
 
   it('각도 표 0xcead4 · 순서 표 0xceae0 · 칸 글자 표 0xcea6c 를 그대로 쓴다', () => {
@@ -163,8 +197,7 @@ describe('릴 슬롯 배치', () => {
   it('랭킹(상태 9)은 다섯 칸이 슬롯 2·3·4·5·6 에만 놓인다', () => {
     const rankRow = menuReelSlotRowOf(9)
     const rankFrames = MENU_REEL_ITEM_FRAMES[9]
-    const filled = [1, 2, 3, 4, 5, 6, 7]
-      .filter((slot) => menuReelEntryAtSlotOf(rankFrames, rankRow, 0, slot) !== null)
+    const filled = [1, 2, 3, 4, 5, 6, 7].filter((slot) => menuReelEntryAtSlotOf(rankFrames, rankRow, 0, slot) !== null)
     expect(filled).toEqual([2, 3, 4, 5, 6])
   })
 })
@@ -264,8 +297,7 @@ describe('아랫단 바탕 띠 — 0x253e8~0x2548e · 0x254d4~0x25516 (확정)',
 
   it('한 틱에 ×4 로 자라 1 → 4 → 16 → 64 → 160 을 그린다', () => {
     expect(MENU_BAND_FIRST_SPREAD).toBe(1)
-    expect([0, 1, 2, 3, 4, 5].map((tick) => menuBandStateAt(tick).spread))
-      .toEqual([1, 4, 16, 64, 160, 160])
+    expect([0, 1, 2, 3, 4, 5].map((tick) => menuBandStateAt(tick).spread)).toEqual([1, 4, 16, 64, 160, 160])
   })
 
   it('다 자랄 때까지 넉 틱이고 그동안만 릴 줄을 안 그린다', () => {
@@ -277,9 +309,12 @@ describe('아랫단 바탕 띠 — 0x253e8~0x2548e · 0x254d4~0x25516 (확정)',
   it('선은 축 위아래로 대칭이고 같은 알파를 쓴다', () => {
     const lines = menuBandLinesOf(2)
     expect(lines).toEqual([
-      { y: 320, alpha: 254 }, { y: 320, alpha: 254 },
-      { y: 319, alpha: 252 }, { y: 321, alpha: 252 },
-      { y: 318, alpha: 250 }, { y: 322, alpha: 250 },
+      { y: 320, alpha: 254 },
+      { y: 320, alpha: 254 },
+      { y: 319, alpha: 252 },
+      { y: 321, alpha: 252 },
+      { y: 318, alpha: 250 },
+      { y: 322, alpha: 250 },
     ])
   })
 

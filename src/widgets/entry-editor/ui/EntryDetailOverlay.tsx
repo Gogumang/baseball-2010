@@ -51,7 +51,12 @@ export function EntryDetailOverlay({ isOpen, cursor, row, isPitcherTab }: EntryD
   }
   if (!isOpen || !clock.isOpen || row === undefined) return null
   return (
-    <PlayerDetailWindow detail={entryDetailOf(row, isPitcherTab)} origin={ENTRY_DETAIL_ORIGIN} draw={tick - clock.openedAt}
-      radarDraw={tick - clock.radarAt} radarKey={clock.radarAt} />
+    <PlayerDetailWindow
+      detail={entryDetailOf(row, isPitcherTab)}
+      origin={ENTRY_DETAIL_ORIGIN}
+      draw={tick - clock.openedAt}
+      radarDraw={tick - clock.radarAt}
+      radarKey={clock.radarAt}
+    />
   )
 }

@@ -93,7 +93,15 @@ export const FIRST_BAT_LAYOUT = {
    * 왼쪽 (W/2 − 막대폭/2 + 3 + dL, H/2 + 0x29) · 오른쪽 효과 0x11 (W/2 + 막대폭/2 − 8 + dR, H/2 + 0x29), 막대폭 = game_ui 프레임 22 의 187.
    * dL = −2 · dR = +2 는 단계 1([skin+0xcc] == 1) · 깜빡 [sp+0xd4] 이고 커서가 첫 칸 뒤 / 끝 칸 앞일 때만 (`stadiumArrowsOf`).
    */
-  arrow: { image: 20, width: 5, height: 8, y: SCREEN.height / 2 + 0x29, leftX: SCREEN.width / 2 - (187 >> 1) + 3, rightX: SCREEN.width / 2 + (187 >> 1) - 8, bob: 2 },
+  arrow: {
+    image: 20,
+    width: 5,
+    height: 8,
+    y: SCREEN.height / 2 + 0x29,
+    leftX: SCREEN.width / 2 - (187 >> 1) + 3,
+    rightX: SCREEN.width / 2 + (187 >> 1) - 8,
+    bob: 2,
+  },
   /**
    * 단계 1 이고 깜빡일 때 구장 막대 자리에 반투명 노랑 둥근 칠 0x6b7d5(gfx, 막대x − 1, 막대y − 1, 막대폭 + 1, 막대높이 + 1, 둥글기 1, 0x80FFFF00)
    * (0x6432e~0x6438e) → (26, 197, 188, 16).
@@ -186,7 +194,11 @@ export function aceCellPositionOf(index: number) {
  * 시작 `0x7a005(격자, 1, 1, 1)`(0x64832~0x6483c) — 넷째 인자와 상관없이 늘 돈다.
  */
 export const ACE_GRID_OPEN: GridOpenShape = {
-  rows: ACE_LAYOUT.grid.rows, columns: ACE_LAYOUT.grid.columns, rowHeight: ACE_LAYOUT.grid.cell, rowGap: ACE_LAYOUT.grid.vGap, shift: 1,
+  rows: ACE_LAYOUT.grid.rows,
+  columns: ACE_LAYOUT.grid.columns,
+  rowHeight: ACE_LAYOUT.grid.cell,
+  rowGap: ACE_LAYOUT.grid.vGap,
+  shift: 1,
 }
 
 /**
@@ -253,13 +265,18 @@ export const MATCH_INFO_LAYOUT = {
  * 공을 눌러도 경기가 안 열렸다 (r157)
  */
 export const MATCH_INFO_PLAY_BALL_PRESS_RECT = {
-  x: SCREEN.width / 2 - 23, y: MATCH_INFO_LAYOUT.playBall.y, width: 46, height: 46,
+  x: SCREEN.width / 2 - 23,
+  y: MATCH_INFO_LAYOUT.playBall.y,
+  width: 46,
+  height: 46,
 } as const
 
 /** 경기정보 투명 누름 칸 — 엠블럼(76×76) 자리 = ←/→ 엔트리 */
 export const matchInfoLogoPressRectOf = (anchor: { readonly x: number; readonly y: number }) => ({
-  x: anchor.x - TEAM_LOGO_HALF.width, y: anchor.y - TEAM_LOGO_HALF.height,
-  width: TEAM_LOGO_HALF.width * 2, height: TEAM_LOGO_HALF.height * 2,
+  x: anchor.x - TEAM_LOGO_HALF.width,
+  y: anchor.y - TEAM_LOGO_HALF.height,
+  width: TEAM_LOGO_HALF.width * 2,
+  height: TEAM_LOGO_HALF.height * 2,
 })
 
 /**
@@ -297,11 +314,13 @@ export function stadiumArrowsOf(isStadiumStage: boolean, isBob: boolean, cursor:
  * 구장 값 두 줄의 보이는 글과 가운데 x — `FIRST_BAT_LAYOUT.infoValues` 의 서식에 값을 넣은 **날 글**을 재서
  * x + (폭 >> 1) 를 가운데로 둔다 (0xba269 폭 −1, 0x646ca · 0x6472c). 값이 없으면(구장 표 미추출) 빈 글.
  */
-export function stadiumInfoValuesOf(
-  stadium: { readonly city: string | null; readonly capacity: number } | null | undefined,
-) {
+export function stadiumInfoValuesOf(stadium: { readonly city: string | null; readonly capacity: number } | null | undefined) {
   const [cityLine, seatLine] = FIRST_BAT_LAYOUT.infoValues
-  if (stadium === null || stadium === undefined) return [{ text: '', centerX: cityLine.x }, { text: '', centerX: seatLine.x }]
+  if (stadium === null || stadium === undefined)
+    return [
+      { text: '', centerX: cityLine.x },
+      { text: '', centerX: seatLine.x },
+    ]
   // 히든 번호(10~14)는 연고지 칸이 없다(`stadiumInfoOf` 의 city null) — 화면처럼 빈 글로 잰다
   const city = stadium.city ?? ''
   const seats = `${stadium.capacity}석`

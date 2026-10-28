@@ -52,11 +52,16 @@ export function SeasonScreenFade({ kind, onEnd, startFrame = 0 }: SeasonScreenFa
   if (effect === null || effect.overlay === null) return null
   return (
     <ScreenOverlay>
-      <div data-testid="화면-효과기"
+      <div
+        data-testid="화면-효과기"
         style={{
-          position: 'absolute', inset: 0, background: '#000000', opacity: effect.overlay.opacity,
+          position: 'absolute',
+          inset: 0,
+          background: '#000000',
+          opacity: effect.overlay.opacity,
           pointerEvents: isRunning ? 'auto' : 'none',
-        }} />
+        }}
+      />
     </ScreenOverlay>
   )
 }

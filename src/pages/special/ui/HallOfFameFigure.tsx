@@ -4,17 +4,27 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { outfitPaletteIndex, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
 import {
-  batterEquipmentOf, batterLayersOf, bodyTypeOf, layerPaletteIndexOf, layerRecolorRequestsOf, pitcherEquipmentOf, pitcherLayersOf,
+  batterEquipmentOf,
+  batterLayersOf,
+  bodyTypeOf,
+  layerPaletteIndexOf,
+  layerRecolorRequestsOf,
+  pitcherEquipmentOf,
+  pitcherLayersOf,
 } from '@/widgets/batting-stage/lib/batterLayers'
 import type { BatterEquipment, BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
 import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import { pitcherPoseFramesOf } from '@/widgets/batting-stage/lib/stageScenery'
 import {
-  figureBatterPosesOf, HALL_OF_FAME_FIGURE, INITIAL_FIGURE_ENTRY, INITIAL_FIGURE_LIST_MEMORY, drawListFigureTimes, figureHandOf, pitcherImageDxOf,
+  figureBatterPosesOf,
+  HALL_OF_FAME_FIGURE,
+  INITIAL_FIGURE_ENTRY,
+  INITIAL_FIGURE_LIST_MEMORY,
+  drawListFigureTimes,
+  figureHandOf,
+  pitcherImageDxOf,
 } from '@/pages/special/lib/hallOfFameFigure'
-import type {
-  FigureDrawing, FigureEntryState, FigureListMemory, FigureSlotInput, HallOfFameFigureLook,
-} from '@/pages/special/lib/hallOfFameFigure'
+import type { FigureDrawing, FigureEntryState, FigureListMemory, FigureSlotInput, HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 
 /**
@@ -26,30 +36,42 @@ import * as styles from '@/pages/special/ui/SpecialScreen.css'
  *   0x79525(바탕 pitcher.pzx 팔레트 피부 × 15 + 팀 0x794c2 · 장비 여섯 칸 `pitcherLayersOf`). 좌완(손 ≠ 0)이면 뒤집는다(0x79544).
  *   이미지 밖은 잘린다(54×75 만 떠 둔다). 마젠타 투명 키라 빈 곳은 비친다.
  */
-export function HallOfFameFigure({ drawing, ax, ay }: {
-  readonly drawing: FigureDrawing
-  readonly ax: number
-  readonly ay: number
-}) {
+export function HallOfFameFigure({ drawing, ax, ay }: { readonly drawing: FigureDrawing; readonly ax: number; readonly ay: number }) {
   if (drawing.kind === '타자') {
     const { look, pose } = drawing
     const [hit, power, , run] = look.equipment
     const bodyType = bodyTypeOf(look.form)
     const equipment = batterEquipmentOf({ hit, power, run })
     const layers = batterLayersOf(pose, bodyType, equipment, false)
-    return <FigureLayers layers={layers} x={ax} y={ay + HALL_OF_FAME_FIGURE.batterDy} isMirrored={figureHandOf(look) === 0}
-      paletteOf={(layer) => layerPaletteIndexOf(layer, look.skin, look.team)} testId="명전-타자그림"
-      warmLayers={figureBatterWarmLayersOf(bodyType, equipment)} />
+    return (
+      <FigureLayers
+        layers={layers}
+        x={ax}
+        y={ay + HALL_OF_FAME_FIGURE.batterDy}
+        isMirrored={figureHandOf(look) === 0}
+        paletteOf={(layer) => layerPaletteIndexOf(layer, look.skin, look.team)}
+        testId="명전-타자그림"
+        warmLayers={figureBatterWarmLayersOf(bodyType, equipment)}
+      />
+    )
   }
   if (drawing.kind === '투수') {
     const { image } = HALL_OF_FAME_FIGURE
     return (
-      <div className={styles.hofFigureImage} data-testid="명전-투수그림" data-hand={drawing.hand}
+      <div
+        className={styles.hofFigureImage}
+        data-testid="명전-투수그림"
+        data-hand={drawing.hand}
         style={{
-          left: ax + pitcherImageDxOf(drawing.hand), top: ay + HALL_OF_FAME_FIGURE.imageDy,
-          width: image.width, height: image.height,
-          transform: `scale(${HALL_OF_FAME_FIGURE.imageScale})`, transformOrigin: '0 0', imageRendering: 'pixelated',
-        }}>
+          left: ax + pitcherImageDxOf(drawing.hand),
+          top: ay + HALL_OF_FAME_FIGURE.imageDy,
+          width: image.width,
+          height: image.height,
+          transform: `scale(${HALL_OF_FAME_FIGURE.imageScale})`,
+          transformOrigin: '0 0',
+          imageRendering: 'pixelated',
+        }}
+      >
         {drawing.image !== null && <PitcherFigure look={drawing.image.look} pose={drawing.image.pose} />}
       </div>
     )
@@ -63,10 +85,17 @@ export function PitcherFigure({ look, pose }: { readonly look: HallOfFameFigureL
   const equipment = pitcherEquipmentOf({ control, velocity, breaking, stamina })
   const layers = pitcherLayersOf(pose, equipment)
   const { figureX, figureY } = HALL_OF_FAME_FIGURE.image
-  return <FigureLayers layers={layers} x={figureX} y={figureY} isMirrored={figureHandOf(look) !== 0}
-    paletteOf={(layer) => layer.gradePaletteRow
-      ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(look.skin, look.team) : null)} testId="명전-투수몸"
-    warmLayers={pitcherPoseFramesOf(null).flatMap((frame) => pitcherLayersOf(frame, equipment))} />
+  return (
+    <FigureLayers
+      layers={layers}
+      x={figureX}
+      y={figureY}
+      isMirrored={figureHandOf(look) !== 0}
+      paletteOf={(layer) => layer.gradePaletteRow ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(look.skin, look.team) : null)}
+      testId="명전-투수몸"
+      warmLayers={pitcherPoseFramesOf(null).flatMap((frame) => pitcherLayersOf(frame, equipment))}
+    />
+  )
 }
 
 /** 겹침 타자 그림이 낼 수 있는 자세(`figureBatterPosesOf`)의 겹 전부 — 그림자 끔 (미리 칠하기용) */
@@ -74,7 +103,15 @@ export function figureBatterWarmLayersOf(bodyType: number, equipment: BatterEqui
   return figureBatterPosesOf(bodyType).flatMap((pose) => batterLayersOf(pose, bodyType, equipment, false))
 }
 
-export function FigureLayers({ layers, x, y, isMirrored, paletteOf, testId, warmLayers = [] }: {
+export function FigureLayers({
+  layers,
+  x,
+  y,
+  isMirrored,
+  paletteOf,
+  testId,
+  warmLayers = [],
+}: {
   readonly layers: readonly BatterLayer[]
   readonly x: number
   readonly y: number
@@ -89,8 +126,12 @@ export function FigureLayers({ layers, x, y, isMirrored, paletteOf, testId, warm
 }) {
   useWarmRecoloredSprites(layerRecolorRequestsOf(warmLayers, paletteOf))
   return (
-    <div className={styles.hofFigureAxis} data-testid={testId} data-mirrored={isMirrored ? 'true' : undefined}
-      style={{ left: x, transform: isMirrored ? 'scaleX(-1)' : undefined }}>
+    <div
+      className={styles.hofFigureAxis}
+      data-testid={testId}
+      data-mirrored={isMirrored ? 'true' : undefined}
+      style={{ left: x, transform: isMirrored ? 'scaleX(-1)' : undefined }}
+    >
       {layers.map((layer, index) => (
         <FigureLayer key={`${layer.folder}#${index}`} layer={layer} y={y} paletteIndex={paletteOf(layer)} />
       ))}
@@ -98,11 +139,7 @@ export function FigureLayers({ layers, x, y, isMirrored, paletteOf, testId, warm
   )
 }
 
-function FigureLayer({ layer, y, paletteIndex }: {
-  readonly layer: BatterLayer
-  readonly y: number
-  readonly paletteIndex: number | null
-}) {
+function FigureLayer({ layer, y, paletteIndex }: { readonly layer: BatterLayer; readonly y: number; readonly paletteIndex: number | null }) {
   const key = String(layer.frame).padStart(3, '0')
   const src = useRecoloredSprite(`${layer.folder}/${key}.png`, paletteIndex)
   const origin = useFrameOrigins(layer.folder)?.[key]

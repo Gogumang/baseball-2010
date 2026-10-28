@@ -1,7 +1,13 @@
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
 import { describe, expect, it } from 'vitest'
 import {
-  YEAR_COVER_CLIP, YEAR_COVER_ORIGIN, resumeCoverUnderlayAt, resumeLeftFrameCoverOpacityAt, yearCoverDigitsOf, yearCoverRollOf, yearCoverStepAt,
+  YEAR_COVER_CLIP,
+  YEAR_COVER_ORIGIN,
+  resumeCoverUnderlayAt,
+  resumeLeftFrameCoverOpacityAt,
+  yearCoverDigitsOf,
+  yearCoverRollOf,
+  yearCoverStepAt,
 } from '@/pages/management/lib/nariYearCover'
 
 describe('137 "N년차" 표지 그리기 0x1cc4c', () => {
@@ -76,7 +82,16 @@ describe('137 틀 차례 — 0x1b768 효과기 → 137 → 0x12190 → 105', () 
 describe('이어하기 길의 137 — 100 · 1 · 100 · 1 · 105 · 115 · 114 를 지나 9 틀째 연초 114 틀이 +0x289 를 받는다', () => {
   it('앞 화면: 그리기가 없는 100 · 1 은 남은 앞 판(상태 1 의 검정 덮기가 쌓인다), 105 한 틀은 관리 판(0x19da4), 115 는 상태판 · 114 는 그 위에 대화창', () => {
     expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(resumeCoverUnderlayAt)).toEqual([
-      '앞판', '앞판', '앞판', '앞판', '관리', '상태판', '대화', '대화', '대화', '대화',
+      '앞판',
+      '앞판',
+      '앞판',
+      '앞판',
+      '관리',
+      '상태판',
+      '대화',
+      '대화',
+      '대화',
+      '대화',
     ])
   })
 
@@ -84,10 +99,8 @@ describe('이어하기 길의 137 — 100 · 1 · 100 · 1 · 105 · 115 · 114 
     const effectorAt = (k: number) => screenEffectFrameAt('검정에서밝아짐', '검정', k)?.overlay?.opacity ?? 0
     expect(resumeLeftFrameCoverOpacityAt(0)).toBe(0)
     expect(resumeLeftFrameCoverOpacityAt(1)).toBeCloseTo(1 - (1 - effectorAt(0)) / 4)
-    expect(resumeLeftFrameCoverOpacityAt(2)).toBeCloseTo(1 - (1 - effectorAt(0)) * (1 - effectorAt(1)) / 4)
-    expect(resumeLeftFrameCoverOpacityAt(3)).toBeCloseTo(
-      1 - (1 - effectorAt(0)) * (1 - effectorAt(1)) * (1 - effectorAt(2)) / 16,
-    )
+    expect(resumeLeftFrameCoverOpacityAt(2)).toBeCloseTo(1 - ((1 - effectorAt(0)) * (1 - effectorAt(1))) / 4)
+    expect(resumeLeftFrameCoverOpacityAt(3)).toBeCloseTo(1 - ((1 - effectorAt(0)) * (1 - effectorAt(1)) * (1 - effectorAt(2))) / 16)
   })
 
   it('표지 차례는 다른 길과 같다 — 아홉 틀 어두워진 뒤 9 틀째에 종류 2 를 새로 건다', () => {

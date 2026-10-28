@@ -34,7 +34,8 @@ const 홈런코드 = 24
 
 /** 강한 타구 타격음 5 가 붙은 홈런 하나 (번호는 `atBatSounds` 가 골라 둔 것을 그대로 받는다) */
 const 홈런: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '타구', outcome: { kind: '홈런' } },
+  batterHand: 0,
+  resolution: { kind: '타구', outcome: { kind: '홈런' } },
   hasSwung: true,
   isBunt: false,
   resultCode: 홈런코드,
@@ -44,7 +45,8 @@ const 홈런: PitchOutcomeDetail = {
 }
 
 const 헛스윙: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
+  batterHand: 0,
+  resolution: { kind: '스트라이크', isSwinging: true },
   hasSwung: true,
   isBunt: false,
   resultCode: null,
@@ -115,11 +117,14 @@ describe('홈런더비 소리', () => {
     })
 
     녹음.played.length = 0
-    const 파울패턴 = Object.values(BATTED_BALL_PATTERNS).flat().find((pattern) => !isFairAngle(pattern[0]))!
+    const 파울패턴 = Object.values(BATTED_BALL_PATTERNS)
+      .flat()
+      .find((pattern) => !isFairAngle(pattern[0]))!
     const 파울판 = derbyBattedBallOf(파울패턴)
     act(() =>
       rendered.result.current.onPitchResolved({
-        batterHand: 0, resolution: { kind: '파울' },
+        batterHand: 0,
+        resolution: { kind: '파울' },
         hasSwung: true,
         isBunt: false,
         resultCode: 0,

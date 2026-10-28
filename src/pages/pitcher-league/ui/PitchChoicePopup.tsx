@@ -9,7 +9,10 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
-  RECORD_PICK_CELL_SIZE, RECORD_PICK_LABEL_GAP, recordPickIconOffsetOf, recordPickLabelXOf,
+  RECORD_PICK_CELL_SIZE,
+  RECORD_PICK_LABEL_GAP,
+  recordPickIconOffsetOf,
+  recordPickLabelXOf,
   recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
 import { PITCH_WINDOW_CHOICES } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
@@ -134,63 +137,98 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
   return (
     <ScreenOverlay>
       {/* 240×320 화면 버퍼 자리 — 상태가 바뀌어 뒤 화면(108 · 123)이 갈려도 창은 그대로 줄어든다 */}
-      <div role="dialog" aria-label="구질 고르기"
-        style={{ position: 'absolute', left: 0, top: 'calc(50% - 160px)', width: 240, height: 320, pointerEvents: 'none' }}>
+      <div
+        role="dialog"
+        aria-label="구질 고르기"
+        style={{ position: 'absolute', left: 0, top: 'calc(50% - 160px)', width: 240, height: 320, pointerEvents: 'none' }}
+      >
         {/* 0x746cc — 뒤 어둡게(단계 5) 뒤 판 0x744c4 (0, (H − 높이) >> 1, 240, 높이) */}
         <div style={{ ...pixel, left: 0, top: 0, width: 240, height: 320, background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }} />
-        <div className={boxStyles.box} data-testid="구질고르기-판" ref={boxRef}
-          style={{ ...box, top: recordPickPopupTopOf(box.height), bottom: 'auto', padding: 0 }} />
+        <div
+          className={boxStyles.box}
+          data-testid="구질고르기-판"
+          ref={boxRef}
+          style={{ ...box, top: recordPickPopupTopOf(box.height), bottom: 'auto', padding: 0 }}
+        />
         {/* 펼치는 동안은 판만 긋는다(0x7479c) — 줄이는 동안은 그리기 0x190f8 이 그대로 돈다 */}
-        {motion.openingHeight === null && (<>
-          {/* 0xba269 넷째 인자 −1(폭) = **글 폭을 재서 쓴다**(직접 떴다): 0xba268 이 폭을 0x6ef4c 의 다섯째 인자로 넘기고, 6efb0 이
+        {motion.openingHeight === null && (
+          <>
+            {/* 0xba269 넷째 인자 −1(폭) = **글 폭을 재서 쓴다**(직접 떴다): 0xba268 이 폭을 0x6ef4c 의 다섯째 인자로 넘기고, 6efb0 이
               −1 이면 0x9c52c 로 날 글을 재 그 값을 폭으로 쓴다. 0x9c52c 는 '!' 서식을 거르지 않아 "!C" 두 자(12px)까지 들어간다(143) —
               그래서 글은 x 에서 시작하지 않고 가운데 x + (143 >> 1) 에 맞춘다(`measuredTitleCenterXOf`, r114 의 "x 에서 시작" 을 고친다) */}
-          <div className={styles.title}
-            style={{ left: TITLE_CENTER_X - 120, top: 160 - TITLE_RISE, width: 240, whiteSpace: 'nowrap' }}>
-            <MarkupText raw={TITLE_RAW} />
-          </div>
-          {PITCH_CHOICE_CELLS.map((cell, index) => {
-            const isOn = index === (selected === 0 ? 0 : 1)
-            const labelSrc = frameSrc(cell.labelFrame)
-            const labelSize = labelOrigins?.[String(cell.labelFrame).padStart(3, '0')]
-            const labelX = labelSize === undefined ? 0 : recordPickLabelXOf(labelSize.width)
-            const label = PITCH_WINDOW_CHOICES[index] ?? ''
-            return (
-              <button key={label} type="button" aria-pressed={isOn} aria-label={label}
-                className={windowStyles.layer}
-                style={{
-                  left: cell.x, top: cell.y, width: RECORD_PICK_CELL_SIZE, height: labelTop + (labelSize?.height ?? 0),
-                  background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', pointerEvents: 'auto', overflow: 'visible',
-                }}
-                // 웹판 마우스 길 — 칸을 누르면 그 칸으로 옮기고 확인한다
-                onClick={() => {
-                  if (!motion.acceptsKeys()) return
-                  if (!isOn) latest.current.onMove(index)
-                  confirm(index)
-                }}>
-                {/* 읽기 보조 — 칸 이름은 그림이다 */}
-                <span style={{ display: 'none' }}>{label}</span>
-                <img alt="" data-testid={`구질고르기-칸-${index}`}
-                  src={isOn ? selectedModeIconOf(cell.iconFrame) : modeIconOf(cell.iconFrame)}
-                  style={{ ...pixel, left: icon.x, top: icon.y }} />
-                {isOn || labelSize === undefined
-                  ? <img alt="" src={labelSrc} style={{ ...pixel, left: labelX, top: labelTop }} />
-                  : (
+            <div className={styles.title} style={{ left: TITLE_CENTER_X - 120, top: 160 - TITLE_RISE, width: 240, whiteSpace: 'nowrap' }}>
+              <MarkupText raw={TITLE_RAW} />
+            </div>
+            {PITCH_CHOICE_CELLS.map((cell, index) => {
+              const isOn = index === (selected === 0 ? 0 : 1)
+              const labelSrc = frameSrc(cell.labelFrame)
+              const labelSize = labelOrigins?.[String(cell.labelFrame).padStart(3, '0')]
+              const labelX = labelSize === undefined ? 0 : recordPickLabelXOf(labelSize.width)
+              const label = PITCH_WINDOW_CHOICES[index] ?? ''
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={isOn}
+                  aria-label={label}
+                  className={windowStyles.layer}
+                  style={{
+                    left: cell.x,
+                    top: cell.y,
+                    width: RECORD_PICK_CELL_SIZE,
+                    height: labelTop + (labelSize?.height ?? 0),
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    overflow: 'visible',
+                  }}
+                  // 웹판 마우스 길 — 칸을 누르면 그 칸으로 옮기고 확인한다
+                  onClick={() => {
+                    if (!motion.acceptsKeys()) return
+                    if (!isOn) latest.current.onMove(index)
+                    confirm(index)
+                  }}
+                >
+                  {/* 읽기 보조 — 칸 이름은 그림이다 */}
+                  <span style={{ display: 'none' }}>{label}</span>
+                  <img
+                    alt=""
+                    data-testid={`구질고르기-칸-${index}`}
+                    src={isOn ? selectedModeIconOf(cell.iconFrame) : modeIconOf(cell.iconFrame)}
+                    style={{ ...pixel, left: icon.x, top: icon.y }}
+                  />
+                  {isOn || labelSize === undefined ? (
+                    <img alt="" src={labelSrc} style={{ ...pixel, left: labelX, top: labelTop }} />
+                  ) : (
                     // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
-                    <span style={{
-                      ...pixel, left: labelX, top: labelTop, width: labelSize.width, height: labelSize.height,
-                      background: solidColorCss(PITCH_CHOICE_DIM_LABEL_COLOR), maskImage: spriteMaskImage(labelSrc), WebkitMaskImage: spriteMaskImage(labelSrc),
-                      maskSize: '100% 100%', WebkitMaskSize: '100% 100%', maskRepeat: 'no-repeat', WebkitMaskRepeat: 'no-repeat',
-                    }} />
+                    <span
+                      style={{
+                        ...pixel,
+                        left: labelX,
+                        top: labelTop,
+                        width: labelSize.width,
+                        height: labelSize.height,
+                        background: solidColorCss(PITCH_CHOICE_DIM_LABEL_COLOR),
+                        maskImage: spriteMaskImage(labelSrc),
+                        WebkitMaskImage: spriteMaskImage(labelSrc),
+                        maskSize: '100% 100%',
+                        WebkitMaskSize: '100% 100%',
+                        maskRepeat: 'no-repeat',
+                        WebkitMaskRepeat: 'no-repeat',
+                      }}
+                    />
                   )}
-              </button>
-            )
-          })}
-          {/* CLR — 창 아래 106 · 107 화면이 그대로 그리는 바닥띠 되돌아가기 표시 자리(웹 전용 누름 칸, r186). 키와 같은 길(위 듣는 곳) */}
-          <div style={{ pointerEvents: 'auto' }}>
-            <PressArea label="취소" rect={FOOTER_BACK_PRESS_RECT} onPress={() => tapKey('Escape')} />
-          </div>
-        </>)}
+                </button>
+              )
+            })}
+            {/* CLR — 창 아래 106 · 107 화면이 그대로 그리는 바닥띠 되돌아가기 표시 자리(웹 전용 누름 칸, r186). 키와 같은 길(위 듣는 곳) */}
+            <div style={{ pointerEvents: 'auto' }}>
+              <PressArea label="취소" rect={FOOTER_BACK_PRESS_RECT} onPress={() => tapKey('Escape')} />
+            </div>
+          </>
+        )}
       </div>
     </ScreenOverlay>
   )

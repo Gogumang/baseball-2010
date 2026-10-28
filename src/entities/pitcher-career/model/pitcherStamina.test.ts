@@ -33,9 +33,7 @@ describe('구질별 기본 소모 (표 0xd2624)', () => {
 
 describe('스킬 보정은 ×2 다음 −1 순서다 (0xa5f0e~0xa5f60)', () => {
   it('비겁자와 끈기를 함께 가지면 2c−1 이다', () => {
-    expect(pitchStaminaCostOf({ ...plainPitch, pitchTypeNumber: 1, pitcherIsCoward: true, pitcherEndures: true })).toBe(
-      17,
-    )
+    expect(pitchStaminaCostOf({ ...plainPitch, pitchTypeNumber: 1, pitcherIsCoward: true, pitcherEndures: true })).toBe(17)
   })
 
   it('타자 스킬 22 도 두 배로 만든다', () => {

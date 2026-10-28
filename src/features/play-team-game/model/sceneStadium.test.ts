@@ -3,8 +3,17 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import {
-  generalMatchInfoStage, nariSceneStadium, nationalCupStadiumOf, placedMatchInfoStadium, placedPaletteRowOf, rollDerbySceneStadium,
-  rollSceneStadium, rollStadiumNumber, sceneFieldPaletteOf, seasonNationalCupSceneStadium, versusStadiumIdOf,
+  generalMatchInfoStage,
+  nariSceneStadium,
+  nationalCupStadiumOf,
+  placedMatchInfoStadium,
+  placedPaletteRowOf,
+  rollDerbySceneStadium,
+  rollSceneStadium,
+  rollStadiumNumber,
+  sceneFieldPaletteOf,
+  seasonNationalCupSceneStadium,
+  versusStadiumIdOf,
 } from '@/features/play-team-game/model/sceneStadium'
 import { resumeTeamGame, startTeamGame } from '@/features/play-team-game/model/teamGameFlow'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow'
@@ -78,7 +87,10 @@ describe('장면 셋업 0x39fdc 모드 1 갈래 3a076 — 두 구장 객체를 s
     const { random, calls } = recorded(씨앗)
     const 구장 = rollSceneStadium(random, 12)
     const 따로 = createSeededRandom(씨앗)
-    expect(calls).toEqual([[0, 10], [0, 10]])
+    expect(calls).toEqual([
+      [0, 10],
+      [0, 10],
+    ])
     expect(구장.stadium).toBe(따로.rand(0, 10))
     expect(구장.defenseStadium).toBe(따로.rand(0, 10))
     expect(구장.paletteRow).toBe(0x211a1818)
@@ -103,7 +115,11 @@ describe('startTeamGame — 3f856 0x39fdc 는 상태 7(덱 · 효과) 뒤 · 3fa
     const { random, calls } = recorded(씨앗)
     const 경기 = startTeamGame(일반모드(12), random)
 
-    expect(calls.slice(k, k + 3)).toEqual([[0, 10], [0, 10], [0, 2]])
+    expect(calls.slice(k, k + 3)).toEqual([
+      [0, 10],
+      [0, 10],
+      [0, 2],
+    ])
     expect(경기.sceneStadium?.stadium).toBeGreaterThanOrEqual(0)
     expect(경기.sceneStadium?.stadium).toBeLessThan(10)
   })
@@ -121,8 +137,7 @@ describe('startTeamGame — 3f856 0x39fdc 는 상태 7(덱 · 효과) 뒤 · 3fa
     startTeamGame({ ...일반모드(undefined), mode: 2 }, 정규.random)
     expect(결승.sceneStadium).toEqual({ stadium: 8, defenseStadium: 0, paletteRow: 1 })
     expect(대회.calls).toEqual(정규.calls)
-    expect(startTeamGame({ ...일반모드(undefined), mode: 2, nationalCupStage: 3 }, recorded(씨앗).random).sceneStadium?.stadium)
-      .toBe(2)
+    expect(startTeamGame({ ...일반모드(undefined), mode: 2, nationalCupStage: 3 }, recorded(씨앗).random).sceneStadium?.stadium).toBe(2)
   })
 
   it('이어하기도 상태 9 를 다시 탄다 — 블록의 st+0x30 으로 또 굴린다', () => {
@@ -134,7 +149,11 @@ describe('startTeamGame — 3f856 0x39fdc 는 상태 7(덱 · 효과) 뒤 · 3fa
     if (저장 === null || 저장 === undefined) return
     const 이어 = resumeTeamGame(저장, random)
 
-    expect(calls.slice(k, k + 3)).toEqual([[0, 10], [0, 10], [0, 2]])
+    expect(calls.slice(k, k + 3)).toEqual([
+      [0, 10],
+      [0, 10],
+      [0, 2],
+    ])
     expect(이어.sceneStadium?.paletteRow).toBe(0x211a1818)
   })
 })
@@ -178,7 +197,10 @@ describe('홈런더비 0x39fdc 모드 7 갈래 — 내 팀으로 두 구장', ()
     const { random, calls } = recorded(씨앗)
     const 구장 = rollDerbySceneStadium(random, 12)
     const 따로 = createSeededRandom(씨앗)
-    expect(calls).toEqual([[0, 10], [0, 10]])
+    expect(calls).toEqual([
+      [0, 10],
+      [0, 10],
+    ])
     expect(구장.stadium).toBe(따로.rand(0, 10))
     expect(구장.defenseStadium).toBe(따로.rand(0, 10))
     expect(구장.paletteRow).toBe(placedPaletteRowOf(구장.stadium))

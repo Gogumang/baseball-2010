@@ -50,11 +50,10 @@ export interface ScoreGlyph {
 
 /** 0x585ad(…, 0x46, 값, x, y, 6, 0, 2) — 자리 0 이라 앞 0 을 채우지 않는다 */
 export function endScoreGlyphsOf(value: number, slot: { readonly x: number; readonly y: number }): ScoreGlyph[] {
-  const digits = String(Math.max(0, Math.trunc(value))).split('').map(Number)
-  const measured = digits.reduce(
-    (sum, digit, index) => sum + SCORE_DIGIT_WIDTHS[digit]! + (index > 1 ? SCORE_GAP : 0),
-    0,
-  )
+  const digits = String(Math.max(0, Math.trunc(value)))
+    .split('')
+    .map(Number)
+  const measured = digits.reduce((sum, digit, index) => sum + SCORE_DIGIT_WIDTHS[digit]! + (index > 1 ? SCORE_GAP : 0), 0)
   let left = slot.x - (measured >> 1)
   return digits.map((digit) => {
     const placed = { image: SCORE_DIGIT_BASE + digit, x: left, y: slot.y }

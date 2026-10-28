@@ -99,12 +99,7 @@ export function specialSwingCountImagesOf(remaining: number): readonly number[] 
  * 그린다 — `remaining` 은 0xaea30(공격 팀) 값(웹 `BattingStage.specialSwingRemaining`). null 이면 웹이 그 값을 안 든 화면이라 안 그린다.
  * 0x33fe4(수비 조작이 사람) 조건은 타석 캔버스가 늘 사람 타격이라 따로 보지 않는다.
  */
-export function drawSpecialSwingBadge(
-  context: CanvasRenderingContext2D,
-  phase: StagePhaseSnapshot,
-  remaining: number | null,
-  side: number,
-): void {
+export function drawSpecialSwingBadge(context: CanvasRenderingContext2D, phase: StagePhaseSnapshot, remaining: number | null, side: number): void {
   if (remaining === null || !showsSpecialSwingBadge(phase, remaining)) return
   const { plate, count } = specialSwingBadgeLayoutOf(side)
   const entries = frameAnimations(GAME_UI_FRAMES)?.[SPECIAL_SWING_BADGE_ANIMATION]

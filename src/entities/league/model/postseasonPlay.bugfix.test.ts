@@ -22,8 +22,7 @@ function 명단득점(series: PostseasonSeries, seed: number): { readonly upper:
   return { upper: score.awayRuns, lower: score.homeRuns }
 }
 
-const 이긴팀 = (before: PostseasonSeries, after: PostseasonSeries) =>
-  (after.wins[0] > before.wins[0] ? before.teams[0] : before.teams[1])
+const 이긴팀 = (before: PostseasonSeries, after: PostseasonSeries) => (after.wins[0] > before.wins[0] ? before.teams[0] : before.teams[1])
 
 describe('B-04 CPU 끼리 포스트시즌은 덜 낸 팀이 이김', () => {
   it('원본: 점수를 덜 낸 명단의 팀이 이긴다(동점은 윗 시드)', () => {

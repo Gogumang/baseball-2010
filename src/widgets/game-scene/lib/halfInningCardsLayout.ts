@@ -125,9 +125,7 @@ export function pitcherCardPlacementOf(x: number, y: number, count: PitcherCount
     [COUNT_DOT_IMAGE.ball, Math.min(count.balls, 3), 0x2a],
     [COUNT_DOT_IMAGE.out, Math.min(count.outs, 2), 0x34],
   ]
-  const dots = rows.flatMap(([image, n, dy]) =>
-    Array.from({ length: Math.max(0, n) }, (_, k) => ({ image, x: x + 0x16 + 9 * k, y: y + dy })),
-  )
+  const dots = rows.flatMap(([image, n, dy]) => Array.from({ length: Math.max(0, n) }, (_, k) => ({ image, x: x + 0x16 + 9 * k, y: y + dy })))
   return {
     plates: [
       { x, y, width: 0x35, height: 0xc },

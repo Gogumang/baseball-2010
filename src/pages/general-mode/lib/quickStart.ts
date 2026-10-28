@@ -20,11 +20,7 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import {
-  ACE_PER_ROLE,
-  NO_ACE,
-  type GeneralModeSetup,
-} from '@/pages/general-mode/lib/generalModeSetup'
+import { ACE_PER_ROLE, NO_ACE, type GeneralModeSetup } from '@/pages/general-mode/lib/generalModeSetup'
 import { HIDDEN_TEAM_COUNT, HIDDEN_TEAM_FIRST_ID, isTeamOpened } from '@/pages/general-mode/lib/hiddenTeam'
 
 /** 기본(히든이 아닌) 팀 열 개는 늘 후보다 */
@@ -60,8 +56,9 @@ function uniform(random: RandomPort, count: number): number {
  */
 export function quickStartTeamCandidates(openedHiddenTeamIds: readonly number[] = []): readonly number[] {
   // 해금 표(`unlocks.json`)가 푼 히든 팀도 열린 팀으로 본다 (표가 원본 그대로면 저장 칸 그대로)
-  const hidden = Array.from({ length: HIDDEN_TEAM_COUNT }, (_unused, index) => HIDDEN_TEAM_FIRST_ID + index)
-    .filter((id) => isTeamOpened(id, openedHiddenTeamIds))
+  const hidden = Array.from({ length: HIDDEN_TEAM_COUNT }, (_unused, index) => HIDDEN_TEAM_FIRST_ID + index).filter((id) =>
+    isTeamOpened(id, openedHiddenTeamIds),
+  )
   return [...Array.from({ length: OPEN_TEAM_COUNT }, (_unused, index) => index), ...hidden]
 }
 
@@ -83,9 +80,7 @@ function rollAiTeam(random: RandomPort, candidates: readonly number[], userTeamI
  * 씨앗부터 돌리므로(0xbfa5c~0xbfa68) 난수 하나를 쓰고 0 을 돌려준다 → 표 [0] = −1.
  */
 function rollAce(random: RandomPort, opened: readonly number[] = []): number {
-  const list = [...new Set(opened)]
-    .filter((id) => id >= 0 && id < ACE_PER_ROLE)
-    .sort((left, right) => left - right)
+  const list = [...new Set(opened)].filter((id) => id >= 0 && id < ACE_PER_ROLE).sort((left, right) => left - right)
   const index = uniform(random, list.length)
   return list.length === 0 ? NO_ACE : list[index]
 }
@@ -120,10 +115,7 @@ export const QUICK_RESPIN_TICKS = 20
  * 인 동안 매 틱 [메뉴+0x154]++ 하고 `0x9f5a0(저장)` 을 두 번 — 기록 +0(유저 팀) · +4(AI 팀)만 새로 적는다
  * (31296~312a4 가 나머지 +8 · +0xc 를 옛 값 그대로 되적는다). 그래서 화면은 두 엠블럼만 돈다.
  */
-export function rollQuickRespinTeams(
-  random: RandomPort,
-  open: QuickStartOpenState = {},
-): { readonly userTeamId: number; readonly aiTeamId: number } {
+export function rollQuickRespinTeams(random: RandomPort, open: QuickStartOpenState = {}): { readonly userTeamId: number; readonly aiTeamId: number } {
   const candidates = quickStartTeamCandidates(open.openedHiddenTeamIds)
   const userTeamId = candidates[uniform(random, candidates.length)]
   const aiTeamId = rollAiTeam(random, candidates, userTeamId)
@@ -138,11 +130,7 @@ export function rollQuickRespinTeams(
  * 옛 값으로 되적고 +0xd · +0xe 바이트만 고친다(31262 · 31272 → 31280 `ldr [sp+0x2c]`). 재굴림 뒤 구장은
  * 처음 유저 팀의 구장으로 남는다(B-100 — 고친 길은 새 유저 팀의 구장).
  */
-export function finishQuickRespin(
-  random: RandomPort,
-  previous: GeneralModeSetup,
-  open: QuickStartOpenState = {},
-): GeneralModeSetup {
+export function finishQuickRespin(random: RandomPort, previous: GeneralModeSetup, open: QuickStartOpenState = {}): GeneralModeSetup {
   const { userTeamId, aiTeamId } = rollQuickRespinTeams(random, open)
   const playerSide = uniform(random, 2) !== 0 ? PLAYER_SIDE_LAST_BAT : PLAYER_SIDE_FIRST_BAT
   const acePitcherId = rollAce(random, open.openedAcePitcherIds)

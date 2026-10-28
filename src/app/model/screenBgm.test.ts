@@ -1,7 +1,26 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { NARI_STATE, pitcherLeagueBgmOf, restartsManagementBgmFrom, restartsMenuBgm, screenBgmOf, stopsSoundOnEnter, useResumeCoverStop, useSceneEnterStop, seasonEndingBgmOf, seasonMenuBgmOf, seasonSceneBgmOf, restartsTeamSelectBgm, restartsNextGameStandingsBgm, playEndingContinueBgm, usePitcherLeagueBgm, usePitcherLeagueBgmRestart, useScreenBgm, useSeasonMenuBgm } from '@/app/model/screenBgm'
+import {
+  NARI_STATE,
+  pitcherLeagueBgmOf,
+  restartsManagementBgmFrom,
+  restartsMenuBgm,
+  screenBgmOf,
+  stopsSoundOnEnter,
+  useResumeCoverStop,
+  useSceneEnterStop,
+  seasonEndingBgmOf,
+  seasonMenuBgmOf,
+  seasonSceneBgmOf,
+  restartsTeamSelectBgm,
+  restartsNextGameStandingsBgm,
+  playEndingContinueBgm,
+  usePitcherLeagueBgm,
+  usePitcherLeagueBgmRestart,
+  useScreenBgm,
+  useSeasonMenuBgm,
+} from '@/app/model/screenBgm'
 import type { Screen } from '@/app/model/screen'
 import { createSilentSound } from '@/shared/api/audio/soundPort'
 import { useSceneBgm } from '@/app/model/useSound'
@@ -80,11 +99,15 @@ describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록�
   it('훅 — 시즌모드에 들어서며 0xc9 면 틀고, 목록 밖에서 돌아오면 안 튼다', () => {
     const sound = createSilentSound()
     const played: number[] = []
-    const port = { ...sound, playBgm: (id: number) => { played.push(id) } }
-    const { rerender } = renderHook(
-      ({ isActive, scene }: { isActive: boolean; scene: number }) => useSeasonMenuBgm(port, isActive, scene),
-      { initialProps: { isActive: false, scene: 0xc9 } },
-    )
+    const port = {
+      ...sound,
+      playBgm: (id: number) => {
+        played.push(id)
+      },
+    }
+    const { rerender } = renderHook(({ isActive, scene }: { isActive: boolean; scene: number }) => useSeasonMenuBgm(port, isActive, scene), {
+      initialProps: { isActive: false, scene: 0xc9 },
+    })
     expect(played).toEqual([])
     rerender({ isActive: true, scene: 0xc9 })
     expect(played).toEqual([4])
@@ -98,11 +121,15 @@ describe('시즌 관리 메뉴 0xc9 의 틀 0x73b8 — 이전 상태가 목록�
 
   it('트레이닝 0xcf — 결과 팝업이 섰으면(원본 0xde) 4 를 다시 틀고, 취소로 돌아오면 안 튼다', () => {
     const played: number[] = []
-    const port = { ...createSilentSound(), playBgm: (id: number) => { played.push(id) } }
-    const { rerender } = renderHook(
-      ({ scene, shown }: { scene: number; shown: boolean }) => useSeasonMenuBgm(port, true, scene, shown),
-      { initialProps: { scene: 0xc9, shown: false } },
-    )
+    const port = {
+      ...createSilentSound(),
+      playBgm: (id: number) => {
+        played.push(id)
+      },
+    }
+    const { rerender } = renderHook(({ scene, shown }: { scene: number; shown: boolean }) => useSeasonMenuBgm(port, true, scene, shown), {
+      initialProps: { scene: 0xc9, shown: false },
+    })
     expect(played).toEqual([4])
     rerender({ scene: 0xcf, shown: false })
     rerender({ scene: 0xc9, shown: false })
@@ -129,11 +156,15 @@ describe('안쪽 상태별 배경음 (r296 — 호출지 전수)', () => {
 
   it('훅 — 시즌모드에 0xca 로 들어서면 3, 관리 메뉴에서 0xca 로 가도 3 을 처음부터, 0xd8 로 들어서면 아무것도 안 튼다', () => {
     const played: number[] = []
-    const port = { ...createSilentSound(), playBgm: (id: number) => { played.push(id) } }
-    const { rerender } = renderHook(
-      ({ isActive, scene }: { isActive: boolean; scene: number }) => useSeasonMenuBgm(port, isActive, scene),
-      { initialProps: { isActive: true, scene: 0xca } },
-    )
+    const port = {
+      ...createSilentSound(),
+      playBgm: (id: number) => {
+        played.push(id)
+      },
+    }
+    const { rerender } = renderHook(({ isActive, scene }: { isActive: boolean; scene: number }) => useSeasonMenuBgm(port, isActive, scene), {
+      initialProps: { isActive: true, scene: 0xca },
+    })
     expect(played).toEqual([3])
     rerender({ isActive: true, scene: 0xc9 })
     rerender({ isActive: true, scene: 0xca })
@@ -167,8 +198,12 @@ describe('안쪽 상태별 배경음 (r296 — 호출지 전수)', () => {
     const calls: string[] = []
     const port = {
       ...createSilentSound(),
-      stop: () => { calls.push('stop') },
-      playBgm: (id: number) => { calls.push(`bgm ${id}`) },
+      stop: () => {
+        calls.push('stop')
+      },
+      playBgm: (id: number) => {
+        calls.push(`bgm ${id}`)
+      },
     }
     playEndingContinueBgm(port)
     expect(calls).toEqual(['stop', 'bgm 4'])
@@ -196,10 +231,9 @@ describe('109 진입 0x10d8c — 142 취소로 돌아오면(이전 ≠ 105) 4 �
   })
 
   it('투수편 — 경기준비 → 다음경기순위에 표가 오른다', () => {
-    const { result, rerender } = renderHook(
-      ({ scene }: { scene: '관리' | '다음경기순위' | '경기준비' }) => usePitcherLeagueBgmRestart(true, scene),
-      { initialProps: { scene: '관리' as '관리' | '다음경기순위' | '경기준비' } },
-    )
+    const { result, rerender } = renderHook(({ scene }: { scene: '관리' | '다음경기순위' | '경기준비' }) => usePitcherLeagueBgmRestart(true, scene), {
+      initialProps: { scene: '관리' as '관리' | '다음경기순위' | '경기준비' },
+    })
     rerender({ scene: '다음경기순위' })
     expect(result.current).toBe(0)
     rerender({ scene: '경기준비' })
@@ -224,10 +258,9 @@ describe('관리 화면 105 처리 0x1aec4 — 외출 지도(112)에서 돌아�
   })
 
   it('투수편 — 안쪽 장면 외출 → 관리에서 오른다', () => {
-    const { result, rerender } = renderHook(
-      ({ scene }: { scene: '관리' | '외출' | '상점' }) => usePitcherLeagueBgmRestart(true, scene),
-      { initialProps: { scene: '관리' as '관리' | '외출' | '상점' } },
-    )
+    const { result, rerender } = renderHook(({ scene }: { scene: '관리' | '외출' | '상점' }) => usePitcherLeagueBgmRestart(true, scene), {
+      initialProps: { scene: '관리' as '관리' | '외출' | '상점' },
+    })
     expect(result.current).toBe(0)
     rerender({ scene: '외출' })
     rerender({ scene: '관리' })
@@ -239,7 +272,13 @@ describe('관리 화면 105 처리 0x1aec4 — 외출 지도(112)에서 돌아�
 
   it('useSceneBgm — 표가 오르면 같은 4 도 처음부터 다시 튼다', () => {
     const played: number[] = []
-    const port = { ...createSilentSound(), playBgm: (id: number) => { played.push(id) } , currentBgm: () => 4 }
+    const port = {
+      ...createSilentSound(),
+      playBgm: (id: number) => {
+        played.push(id)
+      },
+      currentBgm: () => 4,
+    }
     const { rerender } = renderHook(({ serial }: { serial: number }) => useSceneBgm(port, 4, serial), {
       initialProps: { serial: 0 },
     })
@@ -351,10 +390,13 @@ describe('메인 메뉴 아래 화면 — 상태 7 · 8 · 13 · 하위 목록�
       },
       currentBgm: () => remembered,
     }
-    const { rerender } = renderHook(({ screen }: { screen: Screen }) => {
-      const bgm = useScreenBgm(screen)
-      useSceneBgm(port, bgm.bgm, bgm.restartSerial)
-    }, { initialProps: { screen: { kind: '메인메뉴' } as Screen } })
+    const { rerender } = renderHook(
+      ({ screen }: { screen: Screen }) => {
+        const bgm = useScreenBgm(screen)
+        useSceneBgm(port, bgm.bgm, bgm.restartSerial)
+      },
+      { initialProps: { screen: { kind: '메인메뉴' } as Screen } },
+    )
     expect(played).toEqual(['틀기 1'])
     rerender({ screen: { kind: '도움말' } })
     rerender({ screen: { kind: '메인메뉴' } })
@@ -380,10 +422,9 @@ describe('이벤트 재생 배경음 40 — 114 진입 0x11d00 · 0xd3 진입 0x
   it('경기 뒤 116 → 114 → 128 은 S+0x50 == 2 라 40 이 없다 — 131 뒤는 40', () => {
     expect(screenBgmOf({ kind: '포스트시즌', popup: null }, '경기평가')).toBeNull()
     expect(screenBgmOf({ kind: '포스트시즌', popup: null }, '이벤트')).toBe(40)
-    const { result, rerender } = renderHook(
-      ({ scene }: { scene: PitcherScene }) => usePitcherLeagueBgm(true, scene),
-      { initialProps: { scene: '경기결과' as PitcherScene } },
-    )
+    const { result, rerender } = renderHook(({ scene }: { scene: PitcherScene }) => usePitcherLeagueBgm(true, scene), {
+      initialProps: { scene: '경기결과' as PitcherScene },
+    })
     rerender({ scene: '포스트시즌' })
     expect(result.current).toBeNull()
     rerender({ scene: '경기준비' })
@@ -416,10 +457,9 @@ describe('137 "N년차" 표지 뒤 배경음 — 105 처리 0x1aec4 의 이전 �
   })
 
   it('투수편: 137 → 105 는 잇고, 이벤트를 지나면 다시 표대로', () => {
-    const { result, rerender } = renderHook(
-      ({ scene }: { scene: PitcherScene }) => usePitcherLeagueBgm(true, scene),
-      { initialProps: { scene: '연차표지' as PitcherScene } },
-    )
+    const { result, rerender } = renderHook(({ scene }: { scene: PitcherScene }) => usePitcherLeagueBgm(true, scene), {
+      initialProps: { scene: '연차표지' as PitcherScene },
+    })
     expect(result.current).toBeNull()
     rerender({ scene: '관리' })
     expect(result.current).toBeNull()
@@ -440,10 +480,9 @@ describe('화면이 관리인 채 105 로 다시 들어올 때 — 0x1aec4 목�
   })
 
   it('타자편: 125 → 105 수가 오르면 다시 틀기 표가 오르고, 137 뒤 잇던 배경음도 끝나 4', () => {
-    const { result, rerender } = renderHook(
-      ({ screen, restart }: { screen: Screen; restart: number }) => useScreenBgm(screen, restart),
-      { initialProps: { screen: { kind: '연차표지' } as Screen, restart: 0 } },
-    )
+    const { result, rerender } = renderHook(({ screen, restart }: { screen: Screen; restart: number }) => useScreenBgm(screen, restart), {
+      initialProps: { screen: { kind: '연차표지' } as Screen, restart: 0 },
+    })
     rerender({ screen: { kind: '관리' }, restart: 0 })
     expect(result.current.bgm).toBeNull()
     const before = result.current.restartSerial
@@ -456,14 +495,12 @@ describe('화면이 관리인 채 105 로 다시 들어올 때 — 0x1aec4 목�
   })
 
   it('투수편: 같은 수가 다시 틀기 표와 137 뒤 잇기를 함께 친다', () => {
-    const bgm = renderHook(
-      ({ restart }: { restart: number }) => usePitcherLeagueBgm(true, '관리', null, null, restart),
-      { initialProps: { restart: 0 } },
-    )
-    const serial = renderHook(
-      ({ restart }: { restart: number }) => usePitcherLeagueBgmRestart(true, '관리', restart),
-      { initialProps: { restart: 0 } },
-    )
+    const bgm = renderHook(({ restart }: { restart: number }) => usePitcherLeagueBgm(true, '관리', null, null, restart), {
+      initialProps: { restart: 0 },
+    })
+    const serial = renderHook(({ restart }: { restart: number }) => usePitcherLeagueBgmRestart(true, '관리', restart), {
+      initialProps: { restart: 0 },
+    })
     const before = serial.result.current
     bgm.rerender({ restart: 1 })
     serial.rerender({ restart: 1 })
@@ -476,7 +513,12 @@ describe('이어하기 길의 137 — 100 진입 1c15e stopBgm', () => {
   it('표지가 이어하기 길로 설 때 한 번 배경음을 멈춘다', () => {
     const sound = createSilentSound()
     let stops = 0
-    const counted = { ...sound, stopBgm: () => { stops += 1 } }
+    const counted = {
+      ...sound,
+      stopBgm: () => {
+        stops += 1
+      },
+    }
     const { rerender } = renderHook(({ on }: { on: boolean }) => useResumeCoverStop(counted, on), { initialProps: { on: false } })
     expect(stops).toBe(0)
     rerender({ on: true })

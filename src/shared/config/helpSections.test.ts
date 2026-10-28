@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  GAME_INQUIRY_CHAPTER, GAME_VERSION, HELP_CHAPTER_LENGTHS, HELP_LAST_BROWSABLE_CHAPTER, HELP_SECTIONS,
-} from '@/shared/config/helpSections'
+import { GAME_INQUIRY_CHAPTER, GAME_VERSION, HELP_CHAPTER_LENGTHS, HELP_LAST_BROWSABLE_CHAPTER, HELP_SECTIONS } from '@/shared/config/helpSections'
 import { ORIGINAL_HOWTO } from '@/shared/config/original/howto'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 
@@ -33,9 +31,7 @@ describe('도움말 — 원본 StrHOWTO', () => {
   })
 
   it('해석되지 않은 마크업(!L·!N·!c)이 화면 글자로 남지 않는다', () => {
-    const leftovers = HELP_SECTIONS.flatMap((section) =>
-      section.pages.filter((page) => /![LNCc]/.test(stripGameMarkup(page, [GAME_VERSION]))),
-    )
+    const leftovers = HELP_SECTIONS.flatMap((section) => section.pages.filter((page) => /![LNCc]/.test(stripGameMarkup(page, [GAME_VERSION]))))
 
     expect(leftovers.map((page) => page.slice(0, 20))).toEqual([])
   })

@@ -15,8 +15,6 @@ export function useShownSceneTicks(shownTick: number | null): (event: Event | nu
     if (shownTick !== null) shown.mark(shownTick, performance.now())
   }, [shown, shownTick])
   useEffect(() => () => shown.clear(), [shown])
-  const [tickSeenOf] = useState(
-    () => (event: Event | null | undefined) => shown.tickSeenAt(inputTimeOf(event), gameSceneTickNow()),
-  )
+  const [tickSeenOf] = useState(() => (event: Event | null | undefined) => shown.tickSeenAt(inputTimeOf(event), gameSceneTickNow()))
   return tickSeenOf
 }

@@ -30,8 +30,15 @@ const 다열림 = [0, 1, 2, 3, 4]
 const 띄우기 = (state: SeasonState, 열린투수 = 다열림, 열린타자 = 다열림, onOpenAce = vi.fn()) => {
   const onHire = vi.fn()
   render(
-    <CoachHireScreen state={state} openedAcePitcherIds={열린투수} openedAceBatterIds={열린타자} gamePoints={99999}
-      onOpenAce={onOpenAce} onHire={onHire} onBack={vi.fn()} />,
+    <CoachHireScreen
+      state={state}
+      openedAcePitcherIds={열린투수}
+      openedAceBatterIds={열린타자}
+      gamePoints={99999}
+      onOpenAce={onOpenAce}
+      onHire={onHire}
+      onBack={vi.fn()}
+    />,
   )
   return onHire
 }

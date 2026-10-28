@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SPEED_LEVEL, setGameSpeedLevel } from '@/shared/config/frameRate'
 import {
-  appTickNow, appTickOf, appTickStartTime, createTickClock, rebaseAppTickForDev, resetAppTickClockForTest,
+  appTickNow,
+  appTickOf,
+  appTickStartTime,
+  createTickClock,
+  rebaseAppTickForDev,
+  resetAppTickClockForTest,
 } from '@/shared/lib/frameClock/frameClock'
 
 describe('틱 시계 — 시각을 틀 길이(millisecondsPerFrame) 격자의 정수 틱으로', () => {

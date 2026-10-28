@@ -4,8 +4,16 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { GLYPH_SPACING, numberGlyphsOf, glyphsWidthOf } from '@/pages/management/lib/managementLayout'
 import type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
 import {
-  ABILITY_TITLE, RADAR_BACKGROUND_IMAGE, RADAR_CENTER, RADAR_COLORS, RADAR_LABEL_BOX_IMAGE, RADAR_LABEL_FRAMES,
-  abilityColorOf, radarAxisEndOf, radarLabelBoxOf, radarPointOf,
+  ABILITY_TITLE,
+  RADAR_BACKGROUND_IMAGE,
+  RADAR_CENTER,
+  RADAR_COLORS,
+  RADAR_LABEL_BOX_IMAGE,
+  RADAR_LABEL_FRAMES,
+  abilityColorOf,
+  radarAxisEndOf,
+  radarLabelBoxOf,
+  radarPointOf,
 } from '@/pages/management/lib/basicInfoLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
 import { useRadarGrowth } from '@/shared/lib/radarGrowth/useRadarGrowth'
@@ -28,8 +36,16 @@ const NUMBER_HEIGHT = 10
  * 0x5ad94 `ldr [색표 + k·4]` → 0 이 아니면 0x6aff8 에 [sp+0x18]=1·[sp+0x1c]=색 → 글자를 효과 0xb(단색)로 찍는다
  * (0x6b0fa~0x6b112 `movs r3,#0xb`, [sp]=색). 점·선·축 이름 상자는 색을 받지 않는다.
  */
-export function TintedNumber({ glyphs, right, top, color }: {
-  readonly glyphs: readonly Glyph[]; readonly right: number; readonly top: number; readonly color: string
+export function TintedNumber({
+  glyphs,
+  right,
+  top,
+  color,
+}: {
+  readonly glyphs: readonly Glyph[]
+  readonly right: number
+  readonly top: number
+  readonly color: string
 }) {
   let x = right - glyphsWidthOf(glyphs)
   return (
@@ -39,8 +55,19 @@ export function TintedNumber({ glyphs, right, top, color }: {
         x += glyph.width + (glyph.spacing ?? GLYPH_SPACING)
         const src = `${NUM_FOLDER}/${String(glyph.frame).padStart(3, '0')}.png`
         return (
-          <div key={index} className={styles.tintedGlyph}
-            style={{ left, top, width: glyph.width, height: NUMBER_HEIGHT, background: solidColorCss(color), maskImage: spriteMaskImage(src), WebkitMaskImage: spriteMaskImage(src) }} />
+          <div
+            key={index}
+            className={styles.tintedGlyph}
+            style={{
+              left,
+              top,
+              width: glyph.width,
+              height: NUMBER_HEIGHT,
+              background: solidColorCss(color),
+              maskImage: spriteMaskImage(src),
+              WebkitMaskImage: spriteMaskImage(src),
+            }}
+          />
         )
       })}
     </>
@@ -48,14 +75,24 @@ export function TintedNumber({ glyphs, right, top, color }: {
 }
 
 /** ABILITY 레이더 (0x5a990) — 타자 능력치 네 칸 (축 이름 41~44 히트 · 파워 · 수비 · 주루) */
-export function RadarChart({ base, shown, growth }: {
+export function RadarChart({
+  base,
+  shown,
+  growth,
+}: {
   readonly base: BatterAbility
   readonly shown: BatterAbility
   /** 자라는 애니를 다시 거는 때 (`useRadarGrowth` 옵션) — 안 주면 목표값이 바뀔 때 지난 값에서 */
   readonly growth?: RadarGrowthOptions
 }) {
-  return <AbilityRadar base={KEYS.map((key) => base[key])} shown={KEYS.map((key) => shown[key])} labelFrames={RADAR_LABEL_FRAMES}
-    {...(growth === undefined ? {} : { growth })} />
+  return (
+    <AbilityRadar
+      base={KEYS.map((key) => base[key])}
+      shown={KEYS.map((key) => shown[key])}
+      labelFrames={RADAR_LABEL_FRAMES}
+      {...(growth === undefined ? {} : { growth })}
+    />
+  )
 }
 
 /**
@@ -63,7 +100,12 @@ export function RadarChart({ base, shown, growth }: {
  * 2(타자) → 이름 번호 4~7 · 3(투수) → 0~3, img_text 프레임 = 37 + 번호(37 제구 · 38 구속 · 39 변화 · 40 체력 · 41 히트 …).
  * 나리 카드 0x7ba44 는 0x7b970(타자편)이면 2, 아니면 3 을 넘긴다(0x7c098~0x7c0aa).
  */
-export function AbilityRadar({ base, shown, labelFrames, growth }: {
+export function AbilityRadar({
+  base,
+  shown,
+  labelFrames,
+  growth,
+}: {
   readonly base: readonly number[]
   readonly shown: readonly number[]
   readonly labelFrames: readonly number[]
@@ -75,20 +117,41 @@ export function AbilityRadar({ base, shown, labelFrames, growth }: {
   const points = current.map((value, axis) => radarPointOf(axis, value))
   return (
     <>
-      <FrameSprite folder={assetUrl("./sprites/mode_ui/frames")} frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
-      <img className={styles.layer} alt="" src={`${IMG_TEXT}/${ABILITY_TITLE.frame}.png`}
-        style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }} />
+      <FrameSprite folder={assetUrl('./sprites/mode_ui/frames')} frame={8} origins={origins} x={ABILITY_TITLE.plate.x} y={ABILITY_TITLE.plate.y} />
+      <img
+        className={styles.layer}
+        alt=""
+        src={`${IMG_TEXT}/${ABILITY_TITLE.frame}.png`}
+        style={{ left: ABILITY_TITLE.centerX - 19, top: ABILITY_TITLE.y }}
+      />
       {/* 배경 원 = slt_frame 그림3(반원)을 좌우로 붙인다 */}
-      <img className={styles.layer} alt="" src={RADAR_BACKGROUND_IMAGE}
-        style={{ left: RADAR_CENTER.x - BACKGROUND_HALF.width, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2 }} />
-      <img className={styles.layer} alt="" src={RADAR_BACKGROUND_IMAGE}
-        style={{ left: RADAR_CENTER.x, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2, transform: 'scaleX(-1)' }} />
+      <img
+        className={styles.layer}
+        alt=""
+        src={RADAR_BACKGROUND_IMAGE}
+        style={{ left: RADAR_CENTER.x - BACKGROUND_HALF.width, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2 }}
+      />
+      <img
+        className={styles.layer}
+        alt=""
+        src={RADAR_BACKGROUND_IMAGE}
+        style={{ left: RADAR_CENTER.x, top: RADAR_CENTER.y - BACKGROUND_HALF.height / 2, transform: 'scaleX(-1)' }}
+      />
       {/* 0x764c8: 바탕 0x7633c(고정 29 마름모 #6B92F4) → 도형 0x75e30(채움 · 흰 테두리) → 축 이름 줄 0x5abe2~(기준점 → 지금 꼭짓점) */}
       <svg className={styles.board} viewBox="0 0 240 320">
-        <polygon points={abilityChartFrameOf(RADAR_CENTER).map((point) => `${point.x},${point.y}`).join(' ')}
-          fill="none" stroke={RADAR_COLORS.axis} />
-        <polygon points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-          fill={RADAR_COLORS.fill} fillOpacity={RADAR_COLORS.fillOpacity} stroke={RADAR_COLORS.edge} />
+        <polygon
+          points={abilityChartFrameOf(RADAR_CENTER)
+            .map((point) => `${point.x},${point.y}`)
+            .join(' ')}
+          fill="none"
+          stroke={RADAR_COLORS.axis}
+        />
+        <polygon
+          points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+          fill={RADAR_COLORS.fill}
+          fillOpacity={RADAR_COLORS.fillOpacity}
+          stroke={RADAR_COLORS.edge}
+        />
         {points.map((point, axis) => {
           const end = radarAxisEndOf(axis)
           return <line key={axis} x1={end.x} y1={end.y} x2={point.x} y2={point.y} stroke={RADAR_COLORS.axis} />
@@ -102,12 +165,18 @@ export function AbilityRadar({ base, shown, labelFrames, growth }: {
         return (
           <div key={axis}>
             <img className={styles.layer} alt="" src={RADAR_LABEL_BOX_IMAGE} style={{ left: box.x, top: box.y }} />
-            <img className={styles.layer} alt="" src={`${IMG_TEXT}/${String(labelFrames[axis]).padStart(3, '0')}.png`}
-              style={{ left: box.x + 3, top: box.y + 3 }} />
+            <img
+              className={styles.layer}
+              alt=""
+              src={`${IMG_TEXT}/${String(labelFrames[axis]).padStart(3, '0')}.png`}
+              style={{ left: box.x + 3, top: box.y + 3 }}
+            />
             {/* 숫자 (상자x+18, 상자y+17) — 가운데 기준은 추정 */}
-            {color === null
-              ? <SpriteNumber glyphs={glyphs} right={right} boxTop={box.y + 17} boxHeight={NUMBER_HEIGHT} />
-              : <TintedNumber glyphs={glyphs} right={right} top={box.y + 17} color={color} />}
+            {color === null ? (
+              <SpriteNumber glyphs={glyphs} right={right} boxTop={box.y + 17} boxHeight={NUMBER_HEIGHT} />
+            ) : (
+              <TintedNumber glyphs={glyphs} right={right} top={box.y + 17} color={color} />
+            )}
           </div>
         )
       })}

@@ -32,24 +32,34 @@ interface PitcherShopScreenProps {
  * 창 뒤에는 기본정보 카드 0x15e20 투수 갈래 — 54×75 이미지 [0x1552ae0] 를 (박스 0.x, 박스 0.y − 0x23) 에 0x98975 로 찍고
  * 레이더는 모드 3 축(제구 · 구속 · 변화 · 체력)이다 (`pitcher-league/ui/PitcherBasicInfoCard`). 줄을 훑으면 사본 니블로 입혀 보인다.
  */
-export function PitcherShopScreen({
-  tab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack,
-}: PitcherShopScreenProps) {
+export function PitcherShopScreen({ tab, career, noticeText, gpDetail = null, onCloseGpDetail, onPurchase, onBack }: PitcherShopScreenProps) {
   return (
     <ShopScreenView
       kind={tab}
       entriesOf={() => (tab === '서브' || tab === 'GP' ? pitcherShopEntriesOf(career, tab) : [])}
       // 0x7d34c(gfx, 0) 모드 3 갈래 — 창 종류 1 · 2 일 때만 그린다(0x167cc)
       statusPanel={<PitcherStatusBoard career={career} />}
-      equipment={tab === '장착' || tab === '착용' ? {
-        edition: '투수',
-        rowsOf: (part) => pitcherEquipmentRowsOf(career, part, tab === '착용'),
-        preview: (part, level) => (
-          <PitcherBasicInfoCard career={career} figureEquipment={level === null ? undefined : {
-            ...career.equipmentLevels, [PITCHER_EQUIPMENT_PARTS[part].ability]: level + 1,
-          }} />
-        ),
-      } : undefined}
+      equipment={
+        tab === '장착' || tab === '착용'
+          ? {
+              edition: '투수',
+              rowsOf: (part) => pitcherEquipmentRowsOf(career, part, tab === '착용'),
+              preview: (part, level) => (
+                <PitcherBasicInfoCard
+                  career={career}
+                  figureEquipment={
+                    level === null
+                      ? undefined
+                      : {
+                          ...career.equipmentLevels,
+                          [PITCHER_EQUIPMENT_PARTS[part].ability]: level + 1,
+                        }
+                  }
+                />
+              ),
+            }
+          : undefined
+      }
       questionOf={(itemId) => pitcherPurchaseQuestionOf(career, itemId)}
       money={career.money}
       gamePoint={career.gamePoint}

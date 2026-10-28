@@ -12,7 +12,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
   readonly hex: string
 }[] = [
   {
-    width: 77, height: 76, seed: 1, outWidth: 35, outHeight: 34,
+    width: 77,
+    height: 76,
+    seed: 1,
+    outWidth: 35,
+    outHeight: 34,
     hex:
       '0000ab8d8fe67400c3a8c7ca60f300a2000087c54f006b9fa95a4680cfa600aca0b700517b9493c3c661bd7cf1009b88d588' +
       '9f9f9345b2b250e1a44add61f8e1eaeadc486de0008787b39958bd7c50508a88d68500000000d7d7b0ed995177b1f8cadec6' +
@@ -40,7 +44,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
       '99005959cdc9e0db8500f98a72ba0000bc654600c900bc9775b400df7ede436b7000fd0059a1ebf6',
   },
   {
-    width: 75, height: 76, seed: 2, outWidth: 35, outHeight: 34,
+    width: 75,
+    height: 76,
+    seed: 2,
+    outWidth: 35,
+    outHeight: 34,
     hex:
       '007d00005e44b1bbbfe2bb5df9bfa8cd0051619d4b00a6004cf65d007de556c092d78390000097000000526fcc47a196cfbe' +
       'b75cf9cfd9cbb67ef792b0f6b1c0618dc0c20000999f9f66000077868c779f7a7a8087416989f2c69656a9734c80b0d6618d' +
@@ -68,7 +76,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
       '424cfe94a8d852000000009eebb8a70062b0db0063435bcf005a006c00009d00c8f96982db00ee00',
   },
   {
-    width: 76, height: 78, seed: 3, outWidth: 35, outHeight: 34,
+    width: 76,
+    height: 78,
+    seed: 3,
+    outWidth: 35,
+    outHeight: 34,
     hex:
       '68000000fad3900089b2a9a1b5f0a700008d0000d0a5f2e56b0062f059b3540000b78a637373b8e47c7cd2a541f5ad70d499' +
       '0000db94dab7dcc15ff3bd00b2ec7f40a800006bfd75b0537c58e2a5a75f5e5e67488b00c1487741e4c1bc8abfbfc96580f8' +
@@ -96,7 +108,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
       'ff5fe3669c00cfcc5caca5918c504f4300dab9d34700ccd67879aceb97f60000cc00585f6b734896',
   },
   {
-    width: 78, height: 76, seed: 4, outWidth: 35, outHeight: 34,
+    width: 78,
+    height: 76,
+    seed: 4,
+    outWidth: 35,
+    outHeight: 34,
     hex:
       '00c5b1d3655400aa9900aa0080efbfc2c7d7d8915bbab893e6ca96b06b00945ac28f00007b7bcedbe1549f9ff0d6429afa5e' +
       'fef0aeed677cf88585ef00d7b4f34d7200ab466c7b6363db50c275cc8c52460043d95669f878a9f1e2fb570000d7ad75b8fe' +
@@ -124,7 +140,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
       'e100a381ecb149dcc3f6d7de0000ffab787cdffaedb075a70000008a41b9549daefe7d00a381cde9',
   },
   {
-    width: 70, height: 68, seed: 5, outWidth: 36, outHeight: 35,
+    width: 70,
+    height: 68,
+    seed: 5,
+    outWidth: 36,
+    outHeight: 35,
     hex:
       '006f6b00d35d0044f6fd66af007ad851009b008eb046c8a751f8b1009f50a4c655834d0000f5d7979db94772997443505080' +
       'ffd5bcabe340abf6fdee72e7d6d67dc6ffe2b2b2ec00a542ab566bbc439974fb9fb6b6ff74c900e3efcef65f00ab9048f3de' +
@@ -154,7 +174,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
       '00000000000000000000',
   },
   {
-    width: 30, height: 20, seed: 6, outWidth: 35, outHeight: 34,
+    width: 30,
+    height: 20,
+    seed: 6,
+    outWidth: 35,
+    outHeight: 34,
     hex:
       'a6abf68c7249eded510084f5df5e5e006bced800000043b6b0e0418787d600b5759c9c5b0000acacc20000c2e7aad3d24040' +
       '40a5f80000b7b7b74d9494814848c7c7aaaaabab5b008cac00c200ecc2e7aad3d240409aa5f8004db7b7004d94df814848c7' +
@@ -182,7 +206,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
       '0000da000085d2ede8a50000009aaf8bf900787800000000a200004c00c200ae00006c0000da0000',
   },
   {
-    width: 10, height: 10, seed: 7, outWidth: 36, outHeight: 34,
+    width: 10,
+    height: 10,
+    seed: 7,
+    outWidth: 36,
+    outHeight: 34,
     hex:
       '6c6c6c4e4e4e4e747474929292920000000000000000000000000000000000a1a1a1a1006c6c6c4e4e4e4e74747492929292' +
       '0000000000000000000000000000000000a1a1a1a1006c6c6c4e4e4e4e747474929292920000000000000000000000000000' +
@@ -211,7 +239,11 @@ export const ORIGINAL_SCALE_CASES: readonly {
       '99995555555757575779797999999999bebebe7878787800',
   },
   {
-    width: 12, height: 17, seed: 8, outWidth: 35, outHeight: 35,
+    width: 12,
+    height: 17,
+    seed: 8,
+    outWidth: 35,
+    outHeight: 35,
     hex:
       '0000f0f0f0f2f2f2999999b4b4b4000000575757000000000000bdbdbda5a5a54646460000f0f0f0f2f2f2999999b4b4b400' +
       '00ad575757000000000042bdbdbda5a5a546464600000000006f6f6fb7b7b7fafafaadadad939393000000424242959595cd' +

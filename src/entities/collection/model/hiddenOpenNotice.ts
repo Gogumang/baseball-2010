@@ -32,9 +32,19 @@ const HIDDEN_TEAM_OPEN = (name: string) => `!C히든 팀 오픈!!!N[!cFFFF00${na
 const ACE_OPEN = (name: string) => `!C마선수 오픈!!N[!cFFFF00${name}!cFFFFFF]` // StrCOMMON[140]
 /** 0x61e8c 의 k ≤ 12 — StrCOMMON[16~19] · [21~24] 마선수 · [10~14] 히든 팀 (원문) */
 const LOW_NAMES: readonly string[] = [
-  '레오니', '붕붕머신', '발렌타인', '드래고나', // k 0~3 → StrCOMMON[16~19]
-  '어거지죠', '로제', '크라이져', '킹타이거', // k 4~7 → StrCOMMON[21~24]
-  '대한민국', '일본', '쿠바', '미국', '외인구단', // k 8~12 → StrCOMMON[10~14]
+  '레오니',
+  '붕붕머신',
+  '발렌타인',
+  '드래고나', // k 0~3 → StrCOMMON[16~19]
+  '어거지죠',
+  '로제',
+  '크라이져',
+  '킹타이거', // k 4~7 → StrCOMMON[21~24]
+  '대한민국',
+  '일본',
+  '쿠바',
+  '미국',
+  '외인구단', // k 8~12 → StrCOMMON[10~14]
 ]
 const LAST_ACE_ID = 7
 const LAST_TEAM_ID = 12
@@ -147,14 +157,8 @@ export interface HiddenOpenWindow {
 
 export const EMPTY_HIDDEN_OPEN_WINDOW: HiddenOpenWindow = { shown: null, pending: null }
 
-export function pushHiddenOpenWindow(
-  window: HiddenOpenWindow,
-  text: string,
-  then: (() => void) | null = null,
-): HiddenOpenWindow {
-  return window.shown === null
-    ? { shown: text, pending: null, shownThen: then, pendingThen: null }
-    : { ...window, pending: text, pendingThen: then }
+export function pushHiddenOpenWindow(window: HiddenOpenWindow, text: string, then: (() => void) | null = null): HiddenOpenWindow {
+  return window.shown === null ? { shown: text, pending: null, shownThen: then, pendingThen: null } : { ...window, pending: text, pendingThen: then }
 }
 
 /** 창을 닫는다 — 대기 글이 있으면 그것을 띄운다 (0x742a8 → 0x75440) */
@@ -165,11 +169,7 @@ export function closeHiddenOpenWindow(window: HiddenOpenWindow): HiddenOpenWindo
 }
 
 /** 새로 연 히든 k 들을 차례로 창에 넣는다 — 글을 못 짓는 k 는 건너뛴다. `then` 은 마지막 글의 창에 단다 */
-export function announceHiddenOpens(
-  window: HiddenOpenWindow,
-  ids: readonly number[],
-  then: (() => void) | null = null,
-): HiddenOpenWindow {
+export function announceHiddenOpens(window: HiddenOpenWindow, ids: readonly number[], then: (() => void) | null = null): HiddenOpenWindow {
   return ids.reduce((current, id, index) => {
     const text = hiddenOpenNoticeTextOf(id)
     return text === null ? current : pushHiddenOpenWindow(current, text, index === ids.length - 1 ? then : null)

@@ -1,7 +1,12 @@
 import { FrameSprite, useImgTextPalettes } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  NAME_PLATE_COLOR, SCOREBOARD_FRAME, effectOpacityOf, namePlateOpacityOf, roundPlateRectsOf, scoreboardPlacementOf,
+  NAME_PLATE_COLOR,
+  SCOREBOARD_FRAME,
+  effectOpacityOf,
+  namePlateOpacityOf,
+  roundPlateRectsOf,
+  scoreboardPlacementOf,
 } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import * as styles from '@/widgets/scoreboard-frame/ui/ScoreboardFrame.css'
@@ -44,37 +49,63 @@ export function ScoreboardFrame({ x, y, side0, side1, effectLevel = null, introA
     <div className={styles.group} data-testid="점수판-틀" data-x={x} data-y={y}>
       {palettes.definition}
       {imageOpacity > 0 && (
-        <FrameSprite folder={GAME_UI_FRAMES} frame={SCOREBOARD_FRAME} origins={gameUiOrigins}
-          x={placement.frame.x} y={placement.frame.y} style={imageStyle} />
+        <FrameSprite
+          folder={GAME_UI_FRAMES}
+          frame={SCOREBOARD_FRAME}
+          origins={gameUiOrigins}
+          x={placement.frame.x}
+          y={placement.frame.y}
+          style={imageStyle}
+        />
       )}
-      {imageOpacity > 0 && placement.labels.map((label, index) => (
-        <span key={`label-${index}`} data-testid={`점수판-측글자-${index}`} data-frame={label.frame}>
-          <FrameSprite folder={IMG_TEXT_FRAMES} frame={label.frame} origins={textOrigins} x={label.x} y={label.y}
-            style={{ ...palettes.styleOf(label.frame, 4), ...imageStyle }} />
-        </span>
-      ))}
-      {imageOpacity > 0 && placement.logos.map((logo, index) => (
-        <img key={`logo-${index}`} className={styles.sprite} alt="" data-testid={`점수판-로고-${index}`}
-          src={`${TEAM_LOGO}/${String(logo.team).padStart(3, '0')}.png`}
-          style={{ left: logo.x, top: logo.y, ...imageStyle }} />
-      ))}
+      {imageOpacity > 0 &&
+        placement.labels.map((label, index) => (
+          <span key={`label-${index}`} data-testid={`점수판-측글자-${index}`} data-frame={label.frame}>
+            <FrameSprite
+              folder={IMG_TEXT_FRAMES}
+              frame={label.frame}
+              origins={textOrigins}
+              x={label.x}
+              y={label.y}
+              style={{ ...palettes.styleOf(label.frame, 4), ...imageStyle }}
+            />
+          </span>
+        ))}
+      {imageOpacity > 0 &&
+        placement.logos.map((logo, index) => (
+          <img
+            key={`logo-${index}`}
+            className={styles.sprite}
+            alt=""
+            data-testid={`점수판-로고-${index}`}
+            src={`${TEAM_LOGO}/${String(logo.team).padStart(3, '0')}.png`}
+            style={{ left: logo.x, top: logo.y, ...imageStyle }}
+          />
+        ))}
       {placement.plates.map((plate, index) => (
         // 두 직사각형이 겹치는 자리가 두 번 섞이지 않게 불투명도는 칸 하나에 준다
-        <span key={`plate-${index}`} data-testid={`점수판-이름칸-${index}`}
-          style={plateOpacity === 1 ? undefined : { opacity: plateOpacity }}>
+        <span key={`plate-${index}`} data-testid={`점수판-이름칸-${index}`} style={plateOpacity === 1 ? undefined : { opacity: plateOpacity }}>
           {roundPlateRectsOf(plate).map((rect, part) => (
-            <span key={part} className={styles.block} style={{
-              left: rect.x, top: rect.y, width: rect.width, height: rect.height, background: NAME_PLATE_COLOR,
-            }} />
+            <span
+              key={part}
+              className={styles.block}
+              style={{
+                left: rect.x,
+                top: rect.y,
+                width: rect.width,
+                height: rect.height,
+                background: NAME_PLATE_COLOR,
+              }}
+            />
           ))}
         </span>
       ))}
-      {imageOpacity > 0 && placement.names.map((name, index) => (
-        <span key={`name-${index}`} data-testid={`점수판-팀이름-${index}`} data-frame={name.frame}>
-          <FrameSprite folder={IMG_TEXT_FRAMES} frame={name.frame} origins={textOrigins} x={name.x} y={name.y}
-            style={imageStyle} />
-        </span>
-      ))}
+      {imageOpacity > 0 &&
+        placement.names.map((name, index) => (
+          <span key={`name-${index}`} data-testid={`점수판-팀이름-${index}`} data-frame={name.frame}>
+            <FrameSprite folder={IMG_TEXT_FRAMES} frame={name.frame} origins={textOrigins} x={name.x} y={name.y} style={imageStyle} />
+          </span>
+        ))}
     </div>
   )
 }

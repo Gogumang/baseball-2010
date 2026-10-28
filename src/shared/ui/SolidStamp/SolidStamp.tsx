@@ -25,8 +25,16 @@ export function SolidStamp({ folder, frame, origins, x, y, color }: SolidStampPr
   if (origin === undefined) return null
   const mask = spriteMaskImage(`${folder}/${key}.png`)
   const style: CSSProperties = {
-    position: 'absolute', left: x + origin.x, top: y + origin.y, width: origin.width, height: origin.height,
-    background: solidColorCss(color), maskImage: mask, WebkitMaskImage: mask, maskSize: '100% 100%', WebkitMaskSize: '100% 100%',
+    position: 'absolute',
+    left: x + origin.x,
+    top: y + origin.y,
+    width: origin.width,
+    height: origin.height,
+    background: solidColorCss(color),
+    maskImage: mask,
+    WebkitMaskImage: mask,
+    maskSize: '100% 100%',
+    WebkitMaskSize: '100% 100%',
     pointerEvents: 'none',
   }
   return <div data-solid-stamp={color} style={style} />

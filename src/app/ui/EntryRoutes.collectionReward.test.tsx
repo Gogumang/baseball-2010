@@ -37,9 +37,13 @@ describe('메인 메뉴 전부 수집 보상 — 하위 4 열 번째 갱신에 0
   it('열 번째 갱신 전에는 판정하지 않는다', () => {
     const claim = vi.fn(() => null)
     띄우기(claim)
-    act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 10 - 1) })
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 10 - 1)
+    })
     expect(claim).not.toHaveBeenCalled()
-    act(() => { vi.advanceTimersByTime(1) })
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
     expect(claim).toHaveBeenCalledTimes(1)
     expect(view.queryByRole('dialog')).toBeNull()
   })
@@ -48,7 +52,9 @@ describe('메인 메뉴 전부 수집 보상 — 하위 4 열 번째 갱신에 0
     const texts = ['미션모드 모두 성공달성!N[!cFFFF0030000 G포인트!cFFFFFF] 지급', '기록달성 모두 성공 달성!N[!cFFFF0040000 G포인트!cFFFFFF] 지급']
     const claim = vi.fn(() => texts.shift() ?? null)
     띄우기(claim)
-    act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * 10) })
+    act(() => {
+      vi.advanceTimersByTime(millisecondsPerFrame() * 10)
+    })
     expect(view.getByRole('dialog').textContent).toContain('30000 G포인트')
 
     fireEvent.click(view.getByRole('button', { name: 'OK' }))

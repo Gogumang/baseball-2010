@@ -10,7 +10,15 @@ import {
 
 const 표 = {
   result: [54, 55, 56, 57, 72].map((frame) => ({ frame, delay: 0 })),
-  perfect: [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [21, 0]].map(([frame, delay]) => ({ frame, delay })),
+  perfect: [
+    [0, 1],
+    [1, 1],
+    [2, 1],
+    [3, 1],
+    [4, 1],
+    [5, 1],
+    [21, 0],
+  ].map(([frame, delay]) => ({ frame, delay })),
 }
 
 describe('0xf 구질 목록 (0x4c4bc 4c528~)', () => {
@@ -64,7 +72,11 @@ describe('0x11 게이지 (0x4d412~)', () => {
     ])
     // k = 5: 애니 1 이 이 그림에서 끝난다 — 누른 칸 보통 그림과 결과 원(15/16)이 같이
     const 끝 = gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 5 }, 표)
-    expect(끝.map((draw) => [draw.frame, draw.alpha])).toEqual([[0x41, 0.5], [0x41, undefined], [0x41, 15 / 16]])
+    expect(끝.map((draw) => [draw.frame, draw.alpha])).toEqual([
+      [0x41, 0.5],
+      [0x41, undefined],
+      [0x41, 15 / 16],
+    ])
     expect(gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 8 }, 표).at(-1)?.alpha).toBe(6 / 16)
     expect(gaugeDrawsOf({ cursor: 6, pressed: 6, decidedTicks: 9 }, 표)).toHaveLength(1)
   })

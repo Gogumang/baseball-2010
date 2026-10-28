@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import {
-  AutoPlayRelayScreen, OFFENSE_BAND, OFFENSE_TEAM_RIGHT, OFFENSE_TEXT_AT, RELAY_BOX, RELAY_CARDS_AT,
+  AutoPlayRelayScreen,
+  OFFENSE_BAND,
+  OFFENSE_TEAM_RIGHT,
+  OFFENSE_TEXT_AT,
+  RELAY_BOX,
+  RELAY_CARDS_AT,
 } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
@@ -102,14 +107,16 @@ describe('0x4258c 자리 — 기준 칸 game_ui 19 상자 4 (폭 212 · 높이 5
 
 describe('점수판 0x41c18 (14, 10) — 틱 꼴의 이닝별 칸', () => {
   it('이닝별 칸이 있으면 점수판을 (14, 10) 에 그리고, 측 1 은 말일 때만 지금 이닝을 그린다', () => {
-    const inningRuns = [[1, 0, 2, 0, 0, 0, 0, 0, 0], [0, 3, 0, 0, 0, 0, 0, 0, 0]] as const
+    const inningRuns = [
+      [1, 0, 2, 0, 0, 0, 0, 0, 0],
+      [0, 3, 0, 0, 0, 0, 0, 0, 0],
+    ] as const
     const step: MissionAutoRelayStep = { inning: 2, offenseSide: 0, scores: [3, 3], line: null, inningRuns }
     render(<AutoPlayRelayScreen step={step} onTick={() => {}} sideTeams={[3, 7]} humanSide={1} />)
     const board = screen.getByTestId('이닝별점수판')
     expect([board.getAttribute('data-x'), board.getAttribute('data-y')]).toEqual(['14', '10'])
     // 측 0: 1·0·2 세 칸, 측 1: 0·3 두 칸 (3회초라 측 1 의 3회는 안 그린다)
-    expect(screen.getAllByTestId('이닝별점수판-점수').map((glyph) => glyph.getAttribute('data-image')))
-      .toEqual(['1', '0', '2', '0', '3'])
+    expect(screen.getAllByTestId('이닝별점수판-점수').map((glyph) => glyph.getAttribute('data-image'))).toEqual(['1', '0', '2', '0', '3'])
     expect(screen.getByTestId('이닝별점수판-로고-1').getAttribute('src')).toBe('./sprites/team_logo_ini/007.png')
   })
 
@@ -122,8 +129,14 @@ describe('점수판 0x41c18 (14, 10) — 틱 꼴의 이닝별 칸', () => {
 describe('0x42364 DUE UP 의 미션 타자 줄', () => {
   it('미션 타자 칸이면 넘긴 미션 타자 이름을 그린다 (0xb62c0 → 기록 +1)', () => {
     const cards = {
-      pitcherName: '김투수', strikes: 0, balls: 0, outs: 0, currentOrder: 2,
-      dueUpNames: ['가', null, '다'], dueUpIsMissionBatter: [false, true, false], gameOver: false,
+      pitcherName: '김투수',
+      strikes: 0,
+      balls: 0,
+      outs: 0,
+      currentOrder: 2,
+      dueUpNames: ['가', null, '다'],
+      dueUpIsMissionBatter: [false, true, false],
+      gameOver: false,
     }
     const step: MissionAutoRelayStep = { inning: 2, offenseSide: 1, scores: [1, 0], line: null, cards }
     render(<AutoPlayRelayScreen step={step} onTick={() => {}} sideTeams={[3, 7]} humanSide={1} missionBatterName="나리" />)

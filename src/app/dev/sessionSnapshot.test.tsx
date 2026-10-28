@@ -57,7 +57,13 @@ let root: Root | null = null
 function mount(): void {
   const container = document.getElementById('root')!
   root = createRoot(container)
-  act(() => root!.render(<StrictMode><Outer /></StrictMode>))
+  act(() =>
+    root!.render(
+      <StrictMode>
+        <Outer />
+      </StrictMode>,
+    ),
+  )
 }
 
 describe('경기 중간 스냅샷 — 뜨기 · 되살리기 (r329)', () => {

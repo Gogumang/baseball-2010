@@ -66,7 +66,8 @@ describe('우리 팀 마구 횟수 팀+0x28 — 0xaebe4 가 마운드에 오른 
 
 describe('공 객체는 경기에 하나 — 사람 투구와 CPU 투구가 공+0x10 을 함께 쓴다 (경기+0xf98)', () => {
   const 공 = (pitchTypeNumber: number) => ({
-    batterHand: 0, resolution: { kind: '볼' } as const,
+    batterHand: 0,
+    resolution: { kind: '볼' } as const,
     hasSwung: false,
     isBunt: false,
     resultCode: null,
@@ -79,9 +80,7 @@ describe('공 객체는 경기에 하나 — 사람 투구와 CPU 투구가 공+
     return {
       ...base,
       opponentPitcherEntry: base.opponentPitcherEntry.map((pitcher, slot) =>
-        slot === base.opponentPitcherIndex
-          ? { ...pitcher, aceIndex: 1, repertoire: { ...pitcher.repertoire, magicId: 6 } }
-          : pitcher,
+        slot === base.opponentPitcherIndex ? { ...pitcher, aceIndex: 1, repertoire: { ...pitcher.repertoire, magicId: 6 } } : pitcher,
       ),
       opponentMagicRemaining: 3,
       ballMagicNumber,

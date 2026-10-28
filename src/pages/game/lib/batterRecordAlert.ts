@@ -38,11 +38,7 @@ export function myAtBatRecordCountOf(before: GameProgress, after: GameProgress):
           ? { kind: '볼넷' }
           : null
   if (outcome === null) return 0
-  const recorded = recordBatterAtBat(
-    { stats: was, consecutiveHits: before.consecutiveHits },
-    outcome,
-    now.runsBattedIn - was.runsBattedIn,
-  )
+  const recorded = recordBatterAtBat({ stats: was, consecutiveHits: before.consecutiveHits }, outcome, now.runsBattedIn - was.runsBattedIn)
   const backToBack = backToBackRecordOf({
     streak: before.homeRunStreak,
     humanOffense: true,
@@ -59,11 +55,7 @@ export function myAtBatRecordCountOf(before: GameProgress, after: GameProgress):
  * 을 안 지나 줄에 남았다가 다음 사람 공 끝에 뜬다 — 그래서 앞의 두 몫만 이번 공 끝 몫이다.
  * `before` 는 알림이 지난번에 본 진행, `after` 는 이번에 넘기는 진행이다.
  */
-export function batterHumanRecordCountOf(
-  before: GameProgress,
-  after: GameProgress,
-  added: readonly number[],
-): number {
+export function batterHumanRecordCountOf(before: GameProgress, after: GameProgress, added: readonly number[]): number {
   let leading = 0
   while (leading < added.length && HUMAN_PLAY_RECORD_IDS.has(added[leading]!)) leading += 1
   return Math.min(added.length, leading + myAtBatRecordCountOf(before, after))

@@ -13,10 +13,11 @@ describe('구단정보 0xd5 정보 칸 (0x7c450 시즌 갈래)', () => {
   })
 
   it('코치는 SR+0x185 ≥ 0 이면 그 마선수 이름, 아니면 "----"', () => {
-    expect(seasonTeamInfoRowsOf({ record: { ...레코드, coach: -1 }, teamAbilities: [], rank: 0 })[1].value)
-      .toEqual({ kind: '글', text: '----' })
-    expect(seasonTeamInfoRowsOf({ record: { ...레코드, coach: 6 }, teamAbilities: [], rank: 0 })[1].value)
-      .toEqual({ kind: '글', text: coachNameOf(6) })
+    expect(seasonTeamInfoRowsOf({ record: { ...레코드, coach: -1 }, teamAbilities: [], rank: 0 })[1].value).toEqual({ kind: '글', text: '----' })
+    expect(seasonTeamInfoRowsOf({ record: { ...레코드, coach: 6 }, teamAbilities: [], rank: 0 })[1].value).toEqual({
+      kind: '글',
+      text: coachNameOf(6),
+    })
   })
 
   it('좌석 = 0xd44f4[관중석] × 1000 + "석" · 구장 = 세 이름을 " / " 로', () => {

@@ -75,8 +75,7 @@ const CLOUD_STATES: ReadonlySet<number> = new Set([SCENE_STATE.준비, SCENE_STA
 function countedTickRangeBetween(from: number, fromCounts: boolean, to: number, counts: boolean): readonly [number, number] | null {
   if (fromCounts === counts) return counts && to > from ? [from + 1, to] : null
   const entry = sceneStateEntryAt(to)
-  const boundary =
-    entry !== null && entry.tick > from && entry.tick <= to && CLOUD_STATES.has(entry.state) === counts ? entry.tick : from + 1
+  const boundary = entry !== null && entry.tick > from && entry.tick <= to && CLOUD_STATES.has(entry.state) === counts ? entry.tick : from + 1
   // 경계 앞(from + 1 ~ boundary − 1)은 앞 단계, 경계부터 지금(boundary ~ to)은 지금 단계
   const range: readonly [number, number] = counts ? [boundary, to] : [from + 1, boundary - 1]
   return range[1] >= range[0] ? range : null
@@ -128,7 +127,10 @@ export function observeSceneCloudFrame(frame: number, counts: boolean, cursor: C
  * **덮개 셈** — 구름을 그리는 루프 밖에서 원본 세는 상태(0xb · 0x1b · 0x1d · 0x23)가 선다(머리말). 그 틱(`frame`)부터 센다.
  * `countThrough(틱)` 은 그 틱까지 세고, `end(틱)` 은 그 틱까지 센 뒤 덮개를 내린다
  */
-export function beginSceneCloudCountingSpan(frame: number): { readonly countThrough: (frame: number) => void; readonly end: (frame: number) => void } {
+export function beginSceneCloudCountingSpan(frame: number): {
+  readonly countThrough: (frame: number) => void
+  readonly end: (frame: number) => void
+} {
   const id = nextSpanId
   nextSpanId += 1
   countingSpans.set(id, frame)
@@ -160,7 +162,14 @@ export function resetSceneCloudClock(): void {
 // 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 구름 · 전광판 셈
 if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
   registerSnapshotSlot('sceneCloudClock', {
-    capture: () => ({ calls, lastFrame, countedThrough, countingSpans: [...countingSpans].map(([, frame]) => frame), scoreboardOrigin, scoreboardOriginFreezes }),
+    capture: () => ({
+      calls,
+      lastFrame,
+      countedThrough,
+      countingSpans: [...countingSpans].map(([, frame]) => frame),
+      scoreboardOrigin,
+      scoreboardOriginFreezes,
+    }),
     restore: (value) => {
       const saved = value as { countingSpans: number[] } & Record<string, unknown>
       ;({ calls, lastFrame, countedThrough, scoreboardOrigin, scoreboardOriginFreezes } = saved as never)

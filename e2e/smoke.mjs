@@ -18,7 +18,11 @@ const sceneNames = () => sceneCatalog().map((scene) => scene.name)
  * 경기 중간 스냅샷이 있는 장면(장면 표의 `snapshot`) — 넉넉히 기다린다. 바로가기가 기본으로 스냅샷(`e2e/snapshots`)을 열지만
  * smoke 는 **실제 진행 길**(`&real=1`)로 연다 — 그 순간까지 가는 길의 부작용(난수 차례 · 저장 · 쪽 오류)을 보는 것이 smoke 몫이다
  */
-const LONG_SCENES = new Set(sceneCatalog().filter((scene) => scene.snapshot !== null).map((scene) => scene.name))
+const LONG_SCENES = new Set(
+  sceneCatalog()
+    .filter((scene) => scene.snapshot !== null)
+    .map((scene) => scene.name),
+)
 
 const RUNS = [
   { browserName: 'chromium', device: 'desktop' },
@@ -50,7 +54,9 @@ async function runBrowser({ browserName, device }, names) {
       if (error === null && errors.length > 0) error = `pageerror: ${errors[0]}`
       const state = error === null ? null : await screenState(page).catch(() => null)
       results.push({ browserName, scene, ms, error, state })
-      console.log(`${error === null ? 'ok  ' : 'FAIL'} ${browserName.padEnd(8)} ${scene.padEnd(20)} ${String(ms).padStart(6)}ms${error === null ? '' : `  ${error}`}`)
+      console.log(
+        `${error === null ? 'ok  ' : 'FAIL'} ${browserName.padEnd(8)} ${scene.padEnd(20)} ${String(ms).padStart(6)}ms${error === null ? '' : `  ${error}`}`,
+      )
       await context.close()
     }
   } finally {
@@ -64,6 +70,8 @@ const names = asked.length > 0 ? asked : sceneNames()
 const started = Date.now()
 const all = (await Promise.all(RUNS.map((run) => runBrowser(run, names)))).flat()
 const failed = all.filter((result) => result.error !== null)
-console.log(`\n${all.length - failed.length}/${all.length} 통과 · ${((Date.now() - started) / 1000).toFixed(1)}초 (장면 ${names.length}개 × 브라우저 ${RUNS.length})`)
+console.log(
+  `\n${all.length - failed.length}/${all.length} 통과 · ${((Date.now() - started) / 1000).toFixed(1)}초 (장면 ${names.length}개 × 브라우저 ${RUNS.length})`,
+)
 for (const result of failed) console.log(`  실패 ${result.browserName} ${result.scene}: ${result.error} — 화면 ${JSON.stringify(result.state)}`)
 process.exit(failed.length === 0 ? 0 : 1)

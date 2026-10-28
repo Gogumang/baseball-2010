@@ -40,8 +40,7 @@ export interface WalkerAceSprite {
 const FIELDER_COUNT = 9
 const ACE_INDEX_MAXIMUM = 4
 
-const isAceIndex = (index: number | null | undefined): index is number =>
-  index != null && index >= 0 && index <= ACE_INDEX_MAXIMUM
+const isAceIndex = (index: number | null | undefined): index is number => index != null && index >= 0 && index <= ACE_INDEX_MAXIMUM
 
 /**
  * 칸 i 의 +0xec — 레코드 차례로 자리 니블이 i + 1 인 첫 레코드 (0x3fac4 · 0x40008 · 0xb0fb4 가 같은 훑기).
@@ -54,8 +53,10 @@ export function walkerRecordsOf<T extends { readonly position: number }, P = T>(
   records: readonly T[],
   previous?: readonly (P | null)[] | null,
 ): readonly (T | P | null)[] {
-  return Array.from({ length: FIELDER_COUNT }, (_unused, slot) =>
-    records.find((record) => (record.position & 0xf) === slot + 1) ?? previous?.[slot] ?? null)
+  return Array.from(
+    { length: FIELDER_COUNT },
+    (_unused, slot) => records.find((record) => (record.position & 0xf) === slot + 1) ?? previous?.[slot] ?? null,
+  )
 }
 
 /** 걷는 사람 하나의 +0xec 레코드 — 그림이 보는 것은 마타자 번호뿐이다(0xb633c). 없으면 null */
@@ -105,7 +106,7 @@ export function seatsAfterDefensePlay(
   defenseRecords: readonly { readonly position: number; readonly ace: number | null }[],
 ): WalkerLineSeats {
   const scanned = walkerRecordsOf(defenseRecords, previous.defense).map(seatOf)
-  return { defense: scanned.map((seat, slot) => (slot === 0 ? previous.defense[0] ?? null : seat)), offense: previous.offense }
+  return { defense: scanned.map((seat, slot) => (slot === 0 ? (previous.defense[0] ?? null) : seat)), offense: previous.offense }
 }
 
 /** 교대 판 한 줄의 칸별 마선수 그림 (a · b 갈래) — 없으면 null(보통 그림) */

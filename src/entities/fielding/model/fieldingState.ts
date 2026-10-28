@@ -241,11 +241,7 @@ export const NO_PLAYER_THROW_ERROR_BIAS = 8
  * 악송구(`rollThrowError` — 보정 +0xe4 는 b10a2 의 r5)가 `null` 을 "선수 없음"(보정 8)으로 읽는다.
  * 펌블 · 레이저는 +0xec 를 보므로 `recordPlayerAbilityOf` 를 쓴다.
  */
-export function fielderAbilityOf(
-  defenseAbilities: readonly (number | null)[],
-  slot: number,
-  fallback: number,
-): number | null {
+export function fielderAbilityOf(defenseAbilities: readonly (number | null)[], slot: number, fallback: number): number | null {
   if (slot === UNSEARCHED_FIELDER_SLOT) return null
   return defenseAbilities[slot] ?? fallback
 }
@@ -255,11 +251,7 @@ export function fielderAbilityOf(
  * 0x3fac4 가 넣은 지명타자다(`UNSEARCHED_FIELDER_SLOT` 머리말). 능력치 배열의 칸 0 은 진행기가 든 그 레코드의 값이고
  * **null 은 +0xec 가 0** 인 칸이다 — 펌블은 표 대신 0(b41e4 beq b4224), 레이저는 굴리지 않는다(66aa6). 칸이 아예 없으면 `fallback`.
  */
-export function recordPlayerAbilityOf(
-  defenseAbilities: readonly (number | null)[],
-  slot: number,
-  fallback: number,
-): number | null {
+export function recordPlayerAbilityOf(defenseAbilities: readonly (number | null)[], slot: number, fallback: number): number | null {
   const ability = defenseAbilities[slot]
   return ability === undefined ? fallback : ability
 }
@@ -311,8 +303,7 @@ export function runnerTeamGradeOf(mode: number, teamGrit: number): number {
 export function createFielders(defenseAbilities: readonly (number | null)[], teamBonus = 0): readonly FielderState[] {
   return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
     // 칸 0(투수)은 b1032 가 선수를 찾지 않아 g = 2 고정 — 등급으로는 g − 1 = 1 (입력 능력치를 안 읽는다)
-    const grade =
-      slot === UNSEARCHED_FIELDER_SLOT ? NO_PLAYER_THROW_G - 1 : abilityGradeOf(defenseAbilities[slot] ?? 0)
+    const grade = slot === UNSEARCHED_FIELDER_SLOT ? NO_PLAYER_THROW_G - 1 : abilityGradeOf(defenseAbilities[slot] ?? 0)
     const start = FIELDER_START_POSITIONS[slot]
     // 0xa0fc4(야수, v): +0xdc = +0xd4 = v · +0xd8 = v × 130 / 100
     const throwSpeed = throwSpeedOf(grade, teamBonus)
@@ -366,12 +357,7 @@ export function initialPlayView(kind = 1): PlayView {
  * 루 위에 있는 주자는 **루 좌표에 비트까지 정확히** 선다 (리드 폭이라는 값은 없다 — S8 6절).
  * 다만 수비 판이 열릴 때 `0x3d7b8` 이 주자 틱을 몇 번 몰아서 돌린다 — `runnerLead` (지금은 도루 판만 붙였다).
  */
-export function createRunner(
-  index: number,
-  fromBase: number,
-  speed: number,
-  overrides: Partial<RunnerState> = {},
-): RunnerState {
+export function createRunner(index: number, fromBase: number, speed: number, overrides: Partial<RunnerState> = {}): RunnerState {
   const start = basePosition(fromBase)
   return {
     index,

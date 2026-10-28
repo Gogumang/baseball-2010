@@ -1,22 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import {
-  SEASON_GAME_COUNT, isFinalYear, normalizeSeasonState, startNewSeason,
-} from '@/entities/season-mode/model/seasonRecord'
+import { SEASON_GAME_COUNT, isFinalYear, normalizeSeasonState, startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
-import {
-  SEASON_PHASE,
-  SEASON_SCENE_STATE,
-  afterGameNext,
-  enterSeasonScene,
-  seasonOpponentOf,
-} from '@/entities/season-mode/model/seasonStateMachine'
-import {
-  applySeasonGameEvaluation,
-  evaluateSeasonGame,
-  seasonGameIsEvaluated,
-  seasonHumanWonOf,
-} from '@/entities/season-mode/model/seasonEvaluation'
+import { SEASON_PHASE, SEASON_SCENE_STATE, afterGameNext, enterSeasonScene, seasonOpponentOf } from '@/entities/season-mode/model/seasonStateMachine'
+import { applySeasonGameEvaluation, evaluateSeasonGame, seasonGameIsEvaluated, seasonHumanWonOf } from '@/entities/season-mode/model/seasonEvaluation'
 import { clearSeasonGameRecord } from '@/entities/season-mode/model/seasonReputation'
 import { applyGameIncome, settleGameIncome } from '@/entities/season-mode/model/seasonAttendance'
 import { seasonGameEvaluationLineOf } from '@/entities/season-mode/model/seasonGameEvaluation'
@@ -26,8 +13,17 @@ import type { TradeSettlement, TradeSwap } from '@/entities/season-mode/model/pl
 import { NO_TRADE_REQUEST, rollTradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import type { TradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import {
-  EMPTY_LEAGUE, LEAGUE_SIDE_HOME, UNSHUFFLED_PITCHER_ORDER, leagueSideOf, nextSeasonLeague, pitcherOrderOf,
-  pitcherOrdersAfterPostseason, rankingOf, rotateLeaguePitchers, startPostseason, withSemiPlayoffWinner,
+  EMPTY_LEAGUE,
+  LEAGUE_SIDE_HOME,
+  UNSHUFFLED_PITCHER_ORDER,
+  leagueSideOf,
+  nextSeasonLeague,
+  pitcherOrderOf,
+  pitcherOrdersAfterPostseason,
+  rankingOf,
+  rotateLeaguePitchers,
+  startPostseason,
+  withSemiPlayoffWinner,
 } from '@/entities/league/model/league'
 import type { League } from '@/entities/league/model/league'
 import { recordLeagueResult } from '@/entities/league/model/league'
@@ -36,24 +32,36 @@ import type { LeagueAbilityContext, LeagueTeamRecord } from '@/entities/league/m
 import { finishRegularSeason } from '@/entities/league/model/seasonEnd'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
 import {
-  advancePostseason, postseasonGameOf, postseasonPitcherOrderOf, postseasonSideOf, postseasonStarterSlotOf,
+  advancePostseason,
+  postseasonGameOf,
+  postseasonPitcherOrderOf,
+  postseasonSideOf,
+  postseasonStarterSlotOf,
 } from '@/entities/league/model/league'
-import {
-  SEASON_MODE, advanceRotation, cpuGameRotationAdvances, rotationSlotOf,
-} from '@/entities/pitcher-career/model/pitcherRotation'
+import { SEASON_MODE, advanceRotation, cpuGameRotationAdvances, rotationSlotOf } from '@/entities/pitcher-career/model/pitcherRotation'
 import { recordHumanGamePitchers } from '@/entities/pitcher-career/model/leaguePitcherRecords'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import {
-  EMPTY_LEAGUE_BATTER_LINE, EMPTY_LEAGUE_PLAYER_STATS, leaguePitcherAppearancesOf, recordLeaguePitcherAppearances,
-  recordLeagueErrors, recordLeagueFreePasses, recordLeaguePlateAppearances, recordLeagueStolenBases,
+  EMPTY_LEAGUE_BATTER_LINE,
+  EMPTY_LEAGUE_PLAYER_STATS,
+  leaguePitcherAppearancesOf,
+  recordLeaguePitcherAppearances,
+  recordLeagueErrors,
+  recordLeagueFreePasses,
+  recordLeaguePlateAppearances,
+  recordLeagueStolenBases,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { GameLeaguePitchers } from '@/entities/game/model/gamePitcherLines'
 import type { PitcherOfRecord } from '@/entities/game/model/winLossSave'
 import type { LeagueFieldingError, LeaguePlayerStats } from '@/entities/league/model/leaguePlayerStats'
 import { startNextYear } from '@/entities/season-mode/model/seasonRecord'
 import {
-  STADIUM_HIDDEN_FIRST_SLOT, STADIUM_HIDDEN_UNLOCK_IDS, STADIUM_KINDS, ownsStadiumItem, stadiumCollectorUnlocks,
+  STADIUM_HIDDEN_FIRST_SLOT,
+  STADIUM_HIDDEN_UNLOCK_IDS,
+  STADIUM_KINDS,
+  ownsStadiumItem,
+  stadiumCollectorUnlocks,
 } from '@/entities/season-mode/model/stadiumItems'
 import { SEASON_END_CHAIN } from '@/entities/season-mode/model/seasonStateMachine'
 import { applyCpuEquipment, rollCpuEquipment } from '@/entities/season-mode/model/cpuEquipment'
@@ -65,22 +73,47 @@ import { migrateTeamGameProgress, rollOpponentAces } from '@/features/play-team-
 import { INNING_VALUE, MATCH_SETTING_KIND } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import {
-  PRE_GAME_ACES_START, SQUAD_PURPOSE, cancelPreGameAce, choosePreGameAce, matchInfoCancelScene,
+  PRE_GAME_ACES_START,
+  SQUAD_PURPOSE,
+  cancelPreGameAce,
+  choosePreGameAce,
+  matchInfoCancelScene,
 } from '@/entities/season-mode/model/preGameFlow'
 import type { PreGameAces, SquadPurpose } from '@/entities/season-mode/model/preGameFlow'
 import {
-  entryBatterLineOfRecord, entryPitcherLineOfRecord, leavesEntryEditor, openEntryEditor, pointEntryCursor, pressEntryKey,
+  entryBatterLineOfRecord,
+  entryPitcherLineOfRecord,
+  leavesEntryEditor,
+  openEntryEditor,
+  pointEntryCursor,
+  pressEntryKey,
 } from '@/entities/season-mode/model/entryEditor'
 import type { EntryEditorState, EntryKey } from '@/entities/season-mode/model/entryEditor'
 import {
-  SEASON_RECORD_ACE_BATTER_SLOT, SEASON_RECORD_ACE_PITCHER_SLOT, playerFaceOf, recordAceSeatOf, rotatedPitchersOf, seasonEntryListsOf, seasonEntryOrderOf, seasonRosterOfEntry, seasonStarterNameOf, tableRosterOf,
+  SEASON_RECORD_ACE_BATTER_SLOT,
+  SEASON_RECORD_ACE_PITCHER_SLOT,
+  playerFaceOf,
+  recordAceSeatOf,
+  rotatedPitchersOf,
+  seasonEntryListsOf,
+  seasonEntryOrderOf,
+  seasonRosterOfEntry,
+  seasonStarterNameOf,
+  tableRosterOf,
   unrotatedPitchersOf,
 } from '@/entities/season-mode/model/seasonEntry'
 import type {
-  SeasonEntryCellSource, SeasonEntryInput, SeasonEntryLists, SeasonEntryRecordSource, SeasonRecordAces,
+  SeasonEntryCellSource,
+  SeasonEntryInput,
+  SeasonEntryLists,
+  SeasonEntryRecordSource,
+  SeasonRecordAces,
 } from '@/entities/season-mode/model/seasonEntry'
 import {
-  HALL_OF_FAME_FIRST_ID, removeCareerPlayerFromRoster, removeHallOfFamerFromRoster, tableTeamOf,
+  HALL_OF_FAME_FIRST_ID,
+  removeCareerPlayerFromRoster,
+  removeHallOfFamerFromRoster,
+  tableTeamOf,
 } from '@/entities/season-mode/model/playerRecruit'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import { placedMatchInfoStadium, rollStadiumNumber } from '@/features/play-team-game/model/sceneStadium'
@@ -92,56 +125,94 @@ import { advanceNationalCupDay, nationalCupAbilityContextOf } from '@/entities/n
 import { isSeasonNationalCupYear } from '@/entities/national-cup/model/nationalCupFlow'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
 import {
-  SEASON_AUTOBOT_BAT_HIDDEN_ID, applySeasonBurstRewards, applySeasonReward, ENDING_BONUS_GAME_POINTS, GAME_POINT_LIMIT, judgeSeasonEnding,
+  SEASON_AUTOBOT_BAT_HIDDEN_ID,
+  applySeasonBurstRewards,
+  applySeasonReward,
+  ENDING_BONUS_GAME_POINTS,
+  GAME_POINT_LIMIT,
+  judgeSeasonEnding,
   opensSeasonAutobotBat,
 } from '@/entities/season-mode/model/seasonRewards'
 import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonRewards'
 import type { LeagueFirstAward, SeasonReward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
 import {
-  SEASON_AWARD_INTRO_EVENT_ID, SEASON_MVP_LEADER_KINDS, seasonMvpResultEventId, seasonTitleResultEventId,
+  SEASON_AWARD_INTRO_EVENT_ID,
+  SEASON_MVP_LEADER_KINDS,
+  seasonMvpResultEventId,
+  seasonTitleResultEventId,
 } from '@/widgets/season/lib/seasonAwardEvents'
 import { judgeTitles, NO_TEAM } from '@/entities/awards/model/seasonAwards'
 import { leaderOf } from '@/entities/awards/model/leaderboard'
 import type { LeaderKind } from '@/entities/awards/model/leaderboard'
-import {
-  SYSTEM_MVP_WINDOW, SYSTEM_TITLE_WINDOW, mvpWindowTextOf, titleWindowTextOf,
-} from '@/pages/story/lib/awardWindows'
+import { SYSTEM_MVP_WINDOW, SYSTEM_TITLE_WINDOW, mvpWindowTextOf, titleWindowTextOf } from '@/pages/story/lib/awardWindows'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { seasonEndingBgmOf } from '@/app/model/screenBgm'
 import { HELL_TRAINING_GAME_POINT, HELL_TRAINING_INDEX } from '@/widgets/season/lib/seasonTraining'
-import {
-  applySeasonTraining, rollSeasonTraining, seasonTrainingResultOf,
-} from '@/widgets/season/lib/seasonTrainingResult'
+import { applySeasonTraining, rollSeasonTraining, seasonTrainingResultOf } from '@/widgets/season/lib/seasonTrainingResult'
 import type { SeasonTrainingResult } from '@/widgets/season/lib/seasonTrainingResult'
 import { rollSeasonOuting } from '@/widgets/season/lib/seasonOuting'
 import {
-  NATIONAL_CUP_INTRO_EVENT_ID, OPENING_EVENT_ID, SEASON_FINAL_EVENT_ID, SEASON_GOAL_INTRO_EVENT_ID, START_SEASON_EVENT_CURSOR,
-  YEAR_GOAL_EVENT_ID, applySeasonEventRewards, clearRepeatableSeen, cursorAfterCalling,
-  illnessPenaltyFieldOf, markEventSeen, opensSeasonGoalWindow, pollSeasonEvents, seasonEventFollowUpOf,
+  NATIONAL_CUP_INTRO_EVENT_ID,
+  OPENING_EVENT_ID,
+  SEASON_FINAL_EVENT_ID,
+  SEASON_GOAL_INTRO_EVENT_ID,
+  START_SEASON_EVENT_CURSOR,
+  YEAR_GOAL_EVENT_ID,
+  applySeasonEventRewards,
+  clearRepeatableSeen,
+  cursorAfterCalling,
+  illnessPenaltyFieldOf,
+  markEventSeen,
+  opensSeasonGoalWindow,
+  pollSeasonEvents,
+  seasonEventFollowUpOf,
   tickAfterAnyGame,
 } from '@/entities/season-mode/model/seasonEventFlow'
 import type { SeasonEventCursor, SeasonEventReward } from '@/entities/season-mode/model/seasonEventFlow'
 import { rewardResumePatchOf } from '@/entities/story/model/storyScene'
 import {
-  achievedSeasonGoalCount, goalRankOf, seasonGoalResultEventId, seasonGoalWindowNumbersOf, seasonGoalWindowRankOf,
-  goalPitcherLinesWithAce, teamBattingAverageOf, teamEarnedRunAverageOf,
+  achievedSeasonGoalCount,
+  goalRankOf,
+  seasonGoalResultEventId,
+  seasonGoalWindowNumbersOf,
+  seasonGoalWindowRankOf,
+  goalPitcherLinesWithAce,
+  teamBattingAverageOf,
+  teamEarnedRunAverageOf,
 } from '@/entities/season-mode/model/seasonGoals'
 import type { GoalPostseasonBracket, SeasonGoalInput, SeasonGoalWindowNumbers } from '@/entities/season-mode/model/seasonGoals'
 import {
-  INITIAL_SEASON_MENU_CURSORS, TRADE_REQUEST_MENU_CURSOR, menuCursorsOnEnter, regularSeasonRankEventId,
+  INITIAL_SEASON_MENU_CURSORS,
+  TRADE_REQUEST_MENU_CURSOR,
+  menuCursorsOnEnter,
+  regularSeasonRankEventId,
 } from '@/entities/season-mode/model/seasonStateMachine'
 import type { SeasonMenuCursors } from '@/entities/season-mode/model/seasonStateMachine'
 import {
-  leagueBatterIdOf, leagueBatterLineOf, leaguePitcherIdOf, leaguePitcherLineOf, leagueRecordBatterLineOf,
+  leagueBatterIdOf,
+  leagueBatterLineOf,
+  leaguePitcherIdOf,
+  leaguePitcherLineOf,
+  leagueRecordBatterLineOf,
   leagueRecordPitcherLineOf,
 } from '@/entities/league/model/leaguePlayerStats'
 import type { LeagueBatterLine, LeaguePitcherLine } from '@/entities/league/model/leaguePlayerStats'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
 import type { LeagueRecord } from '@/entities/awards/model/leaderboard'
-import { NO_ROSTER_SLOT, entryBattersOfOrder, withBatterRecordNibbles, withPitcherRecordNibbles } from '@/features/play-team-game/model/teamGameRoster'
+import {
+  NO_ROSTER_SLOT,
+  entryBattersOfOrder,
+  withBatterRecordNibbles,
+  withPitcherRecordNibbles,
+} from '@/features/play-team-game/model/teamGameRoster'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 import {
-  FULL_PITCHER_STAMINA, SEASON_SHOP_TEXT, SEASON_STAMINA_ITEM, applySeasonGpItem, applySeasonSubItem, seasonGpItemPriceOf,
+  FULL_PITCHER_STAMINA,
+  SEASON_SHOP_TEXT,
+  SEASON_STAMINA_ITEM,
+  applySeasonGpItem,
+  applySeasonSubItem,
+  seasonGpItemPriceOf,
   seasonShopTextOf,
 } from '@/entities/season-mode/model/seasonItemShop'
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
@@ -149,9 +220,7 @@ import type { GamePointWalletSession } from '@/entities/wallet/model/useGamePoin
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import { seasonHallOfFameRecordSourceOf } from '@/app/model/seasonHallOfFameRecords'
 import type { SeasonHallOfFame } from '@/app/model/seasonHallOfFameRecords'
-import {
-  normalizeCollectionRewardRecord, withAwardedBit, withStoredAwardedBits,
-} from '@/entities/collection/model/collectionRewards'
+import { normalizeCollectionRewardRecord, withAwardedBit, withStoredAwardedBits } from '@/entities/collection/model/collectionRewards'
 import type { CollectionRewardRecord } from '@/entities/collection/model/collectionRewards'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
@@ -519,11 +588,7 @@ export interface SeasonActions {
    * 이벤트 재생 0xd3 이 끝났다 — 지나온 보상(명령 7)과 본 이벤트를 받아 적용하고, 392 면 목표 결과 393~396 을
    * 이어 틀고, 아니면 돌아갈 상태로 간다.
    */
-  readonly finishSeasonEvent: (
-    rewards: readonly SeasonEventReward[],
-    viewedEventIds: readonly number[],
-    endingEventId?: number | null,
-  ) => void
+  readonly finishSeasonEvent: (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[], endingEventId?: number | null) => void
   /**
    * 이벤트의 보상 명령 7 하나를 그 자리에서 준다 — 0x8d4c4 가 글 · 창을 세운 그 갱신의 0x8c460(모드 2 갈래). 그 끝이 본 표시
    * (지금 이벤트 · 떠나온 이벤트 0x8b0e4) · 이벤트별 phase(8ccc8)를 하고 저장한다. `StoryScreen.onReward` 로 잇는다.
@@ -663,10 +728,11 @@ function seasonGlobalSlotsOf(raw: unknown, legacy: SeasonSave | null): SeasonGlo
   const record = legacy?.state.record
   const openedStadiumIds = Array.isArray(value.openedStadiumIds)
     ? value.openedStadiumIds.filter((id, index, ids) => STADIUM_HIDDEN_IDS.includes(id) && ids.indexOf(id) === index)
-    : record === undefined ? [] : legacyOpenedStadiumIdsOf(record)
-  const event100Awarded = typeof value.event100Awarded === 'boolean'
-    ? value.event100Awarded
-    : record?.seenEvents.includes(SEASON_EVENT_100_ID) ?? false
+    : record === undefined
+      ? []
+      : legacyOpenedStadiumIdsOf(record)
+  const event100Awarded =
+    typeof value.event100Awarded === 'boolean' ? value.event100Awarded : (record?.seenEvents.includes(SEASON_EVENT_100_ID) ?? false)
   return { openedStadiumIds, event100Awarded }
 }
 
@@ -756,7 +822,7 @@ function withTablePositions(roster: SeasonTeamRoster, teamId: number): SeasonTea
     ...roster,
     batters: roster.batters.map((player) => {
       const table = teamBatters(tableTeamOf(player, teamId))
-      const position = player.id < HALL_OF_FAME_FIRST_ID ? table[player.id]?.position ?? 0 : 0
+      const position = player.id < HALL_OF_FAME_FIRST_ID ? (table[player.id]?.position ?? 0) : 0
       return { ...player, fieldPosition: (player.fieldPosition & ~0xf) | position }
     }),
   }
@@ -769,10 +835,7 @@ const EMPTY_ROSTER: SeasonTeamRoster = { pitchers: [], batters: [] }
  * 옮겨 온 투수면 그 붙박이 표 팀(요약 `decisionTableTeams`)으로 센다. 원본 경기 끝 0xa7de8 은 판정 투수의 레코드 +0x2e·+0x2f
  * 를 올리고 그 레코드의 id(+0)가 옛 팀 Xls 행이라 기록이 선수를 따라간다. 표 팀이 없으면 그 함수 그대로다.
  */
-function recordSeasonHumanGamePitchers(
-  stats: LeaguePlayerStats,
-  pitchers: GameLeaguePitchers | undefined,
-): LeaguePlayerStats {
+function recordSeasonHumanGamePitchers(stats: LeaguePlayerStats, pitchers: GameLeaguePitchers | undefined): LeaguePlayerStats {
   const tableTeams = pitchers?.decisionTableTeams
   const recordIds = pitchers?.decisionRecordIds
   if (pitchers === undefined || (tableTeams === undefined && recordIds === undefined)) {
@@ -792,8 +855,7 @@ function recordSeasonHumanGamePitchers(
       save: recordOf(pitchers.decision.save, tableTeams?.save, recordIds?.save),
     },
     (side) => pitchers.sideTeams[side] ?? pitchers.sideTeams[0],
-    (_teamId, pitcherSlot, recordId) =>
-      recordId === undefined && (pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM),
+    (_teamId, pitcherSlot, recordId) => recordId === undefined && (pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM),
   )
   return recordLeaguePitcherAppearances(stats, appearances)
 }
@@ -820,7 +882,10 @@ function recordCupUngatedRecords(
   summary: { readonly leaguePitchers?: GameLeaguePitchers; readonly leagueErrors?: readonly LeagueFieldingError[] },
 ): LeaguePlayerStats {
   return recordLeagueErrors(
-    recordLeagueFreePasses(stats, (summary.leaguePitchers?.lines ?? []).filter((line) => line.teamId === KOREA_TEAM_ID)),
+    recordLeagueFreePasses(
+      stats,
+      (summary.leaguePitchers?.lines ?? []).filter((line) => line.teamId === KOREA_TEAM_ID),
+    ),
     (summary.leagueErrors ?? []).filter((error) => error.teamId === KOREA_TEAM_ID),
   )
 }
@@ -861,9 +926,10 @@ function cpuLeagueRecordOf(save: SeasonSave, teamId: number): LeagueTeamRecord |
  */
 function recordPitcherOrderOf(save: SeasonSave, teamId: number, pitcherCount: number): readonly number[] {
   const order = pitcherOrderOf(save.league, teamId)
-  const valid = order.length <= pitcherCount
-    && order.every((index) => Number.isInteger(index) && index >= 0 && index < order.length)
-    && new Set(order).size === order.length
+  const valid =
+    order.length <= pitcherCount &&
+    order.every((index) => Number.isInteger(index) && index >= 0 && index < order.length) &&
+    new Set(order).size === order.length
   const head = valid ? order : []
   return [...head, ...Array.from({ length: pitcherCount - head.length }, (_unused, k) => head.length + k)]
 }
@@ -1034,22 +1100,21 @@ function withOwnRecordRotation(options: TeamGameOptions): { readonly options: Te
 
 function withGameEndStamina(save: SeasonSave, summary: TeamGameSummary, ownRotationShift: number): SeasonSave {
   // 진행기에는 0x6548 이 돌린 레코드 차례로 넘겼다(`withOwnRecordRotation`) — 웹 명단 차례로 되돌린다
-  const ours = summary.ourPitcherStaminas === undefined
-    ? undefined
-    : unrotatedPitchersOf(summary.ourPitcherStaminas, ownRotationShift)
+  const ours = summary.ourPitcherStaminas === undefined ? undefined : unrotatedPitchersOf(summary.ourPitcherStaminas, ownRotationShift)
   const theirs = summary.opponentPitcherStaminas
   return {
     ...save,
-    roster: ours === undefined ? save.roster : {
-      ...save.roster,
-      pitchers: save.roster.pitchers.map((player, index) => {
-        const stamina = ours[index]
-        return stamina === undefined ? player : { ...player, stamina }
-      }),
-    },
-    cpuPitcherStaminas: theirs === undefined
-      ? save.cpuPitcherStaminas
-      : { ...save.cpuPitcherStaminas, [summary.opponentTeamId]: theirs },
+    roster:
+      ours === undefined
+        ? save.roster
+        : {
+            ...save.roster,
+            pitchers: save.roster.pitchers.map((player, index) => {
+              const stamina = ours[index]
+              return stamina === undefined ? player : { ...player, stamina }
+            }),
+          },
+    cpuPitcherStaminas: theirs === undefined ? save.cpuPitcherStaminas : { ...save.cpuPitcherStaminas, [summary.opponentTeamId]: theirs },
   }
 }
 
@@ -1072,11 +1137,7 @@ export function seasonRecordAcesAfterGame(
  * 상대(66f8 · 670a — 굴린 `opponentAces`)의 **시즌 레코드**에 넣은 줄이다(0xb8680 모드 2 → 0x1f571). 내 마투수 +0x2c 는 경기 끝 값에
  * 하루 끝 4f2bc `0xb617c`(팀 투수 수 [+0xc] 만큼 — 8번 마투수 포함 +20%)를 먹인 값이다. 국가대항전은 넣지 않는다(66ae).
  */
-function humanGameRecordAcesOf(
-  options: TeamGameOptions | null,
-  summary: TeamGameSummary,
-  myTeamId: number,
-): Record<number, SeasonRecordAces> {
+function humanGameRecordAcesOf(options: TeamGameOptions | null, summary: TeamGameSummary, myTeamId: number): Record<number, SeasonRecordAces> {
   if (options === null) return {}
   const aces: Record<number, SeasonRecordAces> = {}
   const pitcher = options.acePitcherId ?? -1
@@ -1185,9 +1246,7 @@ function normalizeGameSave(raw: unknown): SeasonGameSaveBlock | null {
   if (progress === null) return null
   const kind = SEASON_GAME_KINDS.find((candidate) => candidate === value.kind)
   if (kind === undefined) return null
-  const shift = typeof value.ownRotationShift === 'number' && Number.isInteger(value.ownRotationShift)
-    ? value.ownRotationShift
-    : 0
+  const shift = typeof value.ownRotationShift === 'number' && Number.isInteger(value.ownRotationShift) ? value.ownRotationShift : 0
   return { progress, kind, ownRotationShift: shift }
 }
 
@@ -1205,9 +1264,7 @@ function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | nu
   // (`SeasonGlobalCarry`)를 덮어쓴다. 시즌은 없다
   if (saved.state === undefined) return null
   const state = normalizeSeasonState(saved.state)
-  const roster = saved.roster === undefined
-    ? rosterOf(state.record.teamId)
-    : withTablePositions(saved.roster, state.record.teamId)
+  const roster = saved.roster === undefined ? rosterOf(state.record.teamId) : withTablePositions(saved.roster, state.record.teamId)
   // 스태미나 표가 생기기 전 저장은 명단 투수를 0(표에서 만든 값)으로 적었고 경기는 늘 10000 으로 쳤다 —
   // 그 값 그대로 10000 으로 채운다
   const staminaKnown = saved.cpuPitcherStaminas !== undefined
@@ -1241,9 +1298,10 @@ export function withRecordSalaryGrades(roster: SeasonTeamRoster): SeasonTeamRost
   const fill = (players: readonly SeasonPlayer[]) =>
     players.some((player) => player.record !== undefined && player.record.salaryGrade === undefined)
       ? players.map((player) =>
-        player.record === undefined || player.record.salaryGrade !== undefined
-          ? player
-          : { ...player, record: { ...player.record, salaryGrade: 0 } })
+          player.record === undefined || player.record.salaryGrade !== undefined
+            ? player
+            : { ...player, record: { ...player.record, salaryGrade: 0 } },
+        )
       : players
   const pitchers = fill(roster.pitchers)
   const batters = fill(roster.batters)
@@ -1299,7 +1357,7 @@ function withSceneConstructed(save: SeasonSave | null): SeasonSave | null {
 /** 상태판 사기(`UseSeasonSession.statusBoardMorale`) — 대회 중이면 상대국 슬롯 +2 = 그날 상대국 표값, 아니면 리그 내 팀 사기 */
 function statusBoardMoraleOf(save: SeasonSave): number {
   if (!save.state.record.nationalCup) return save.state.teamMorale
-  const opponent = save.cup === undefined || save.cup === null ? null : nationalCupMatchupOf(save.cup)?.opponent ?? null
+  const opponent = save.cup === undefined || save.cup === null ? null : (nationalCupMatchupOf(save.cup)?.opponent ?? null)
   return opponent === null ? DEFAULT_TEAM_MORALE : teamRecordMoraleOf(opponent)
 }
 
@@ -1317,9 +1375,7 @@ function nextYearOf(save: SeasonSave, random: RandomPort): { readonly save: Seas
   // 투수 레코드 차례는 잇는다 — 리그 초기화 0xb7b34 는 L(SR+0x80)만 지우고 팀 저장 레코드(0x1f570)는 다시 짓지
   // 않으므로 0xb5ca8 로 섞인 차례(정규시즌 + 포스트시즌 시리즈에서 돈 칸)가 새 해로 남는다 (3eb7301)
   const series = save.series ?? null
-  const pitcherOrders = series === null
-    ? save.league.pitcherOrders
-    : pitcherOrdersAfterPostseason(series, save.league.pitcherOrders)
+  const pitcherOrders = series === null ? save.league.pitcherOrders : pitcherOrdersAfterPostseason(series, save.league.pitcherOrders)
   const started: SeasonSave = {
     ...save,
     state: startNextYear(save.state),
@@ -1424,10 +1480,7 @@ export function useSeasonSession(
     const hallOfFame = readHallOfFame?.()
     return hallOfFame === undefined ? undefined : seasonHallOfFameRecordSourceOf(hallOfFame)
   }, [readHallOfFame])
-  const entryOrderOf = useCallback(
-    (roster: SeasonTeamRoster) => seasonEntryOrderOf(roster, recordSourceNow()),
-    [recordSourceNow],
-  )
+  const entryOrderOf = useCallback((roster: SeasonTeamRoster) => seasonEntryOrderOf(roster, recordSourceNow()), [recordSourceNow])
   const loaded = useRef<SeasonSave | null>(null)
   if (loaded.current === null) loaded.current = withSceneConstructed(normalizeSeasonSave(store.load() as Partial<SeasonSave> | null))
   /** 시즌이 없을 때의 전역 칸 (`SeasonGlobalCarry`) — 시즌이 있으면 그 저장이 주인이다 */
@@ -1443,9 +1496,10 @@ export function useSeasonSession(
   const [globalMatchSettings, setGlobalMatchSettings] = useState<MatchProgressSettings | null>(
     () => matchSettingsSeenSlot?.readSeasonSettings?.() ?? null,
   )
-  const seasonMatchSettings = matchSettingsSeenSlot?.readSeasonSettings === undefined
-    ? (save ?? carriedGlobals.current)?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS
-    : globalMatchSettings ?? legacyMatchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS
+  const seasonMatchSettings =
+    matchSettingsSeenSlot?.readSeasonSettings === undefined
+      ? ((save ?? carriedGlobals.current)?.matchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS)
+      : (globalMatchSettings ?? legacyMatchSettings ?? SEASON_DEFAULT_MATCH_SETTINGS)
   const seasonMatchSettingsRef = useRef(seasonMatchSettings)
   seasonMatchSettingsRef.current = seasonMatchSettings
   useEffect(() => {
@@ -1461,11 +1515,11 @@ export function useSeasonSession(
   const [scene, setScene] = useState<SeasonSceneState>(() =>
     save === null
       ? SEASON_SCENE_STATE.팀고르기
-      // SR+0x1bc 가 서 있으면(엔딩까지 본 시즌) 진입 분기가 phase 를 보기 전에 관리 메뉴로 보낸다
-      : enterSeasonScene(save.state.record, {
-        hasSeasonSave: true,
-        forceManagementMenu: save.state.record.endingSeen,
-      }),
+      : // SR+0x1bc 가 서 있으면(엔딩까지 본 시즌) 진입 분기가 phase 를 보기 전에 관리 메뉴로 보낸다
+        enterSeasonScene(save.state.record, {
+          hasSeasonSave: true,
+          forceManagementMenu: save.state.record.endingSeen,
+        }),
   )
   const [notice, setNotice] = useState('')
   const [gameOptions, setGameOptions] = useState<TeamGameOptions | null>(null)
@@ -1476,9 +1530,7 @@ export function useSeasonSession(
   /** 지금 치르는 경기가 무엇인가 — 끝났을 때 어디로 정산할지 갈린다 */
   const [gameKind, setGameKind] = useState<SeasonGameKind>('정규')
   /** 전역 저장 +0x145 — 리그 1위 G 를 이미 받은 문턱 비트 (시즌을 새로 해도 남는다, `rewardStore` 에 둔다) */
-  const [rewardRecord, setRewardRecord] = useState<CollectionRewardRecord>(
-    () => normalizeCollectionRewardRecord(rewardStore?.load()),
-  )
+  const [rewardRecord, setRewardRecord] = useState<CollectionRewardRecord>(() => normalizeCollectionRewardRecord(rewardStore?.load()))
   const leagueFirstAwardedBits = rewardRecord.awardedBits
   useEffect(() => {
     rewardStore?.save(rewardRecord)
@@ -1567,9 +1619,7 @@ export function useSeasonSession(
    * 안 넘겼을 때만 예전처럼 여기서 보여 주는 값을 올린다 — 판정도 같은 값을 보므로
    * "99999 인데 G포인트 부족" 같은 어긋남은 어느 쪽에서도 나지 않는다.
    */
-  const gamePoints = wallet === null
-    ? (isInfiniteGamePointOn() ? GAME_POINT_LIMIT : ownGamePoints)
-    : wallet.balance
+  const gamePoints = wallet === null ? (isInfiniteGamePointOn() ? GAME_POINT_LIMIT : ownGamePoints) : wallet.balance
 
   /** G 보상을 쌓는다 (상한 99999 — 0xa3e4) */
   const gainGamePoint = useCallback(
@@ -1695,17 +1745,22 @@ export function useSeasonSession(
 
     if (scene === SEASON_SCENE_STATE.관리메뉴 || scene === SEASON_SCENE_STATE.외출지도) {
       // 0xc9 진입 0x4efc: SR+0x1bc == 0 이면 phase = 3 · 저장 (4f78~4f9c)
-      const entered = scene === SEASON_SCENE_STATE.관리메뉴 && !record.endingSeen && record.phase !== SEASON_PHASE.기본
-        ? { ...record, phase: SEASON_PHASE.기본 }
-        : record
-      const polled = pollSeasonEvents(eventCursor.current, {
-        scene,
-        record: entered,
-        teamMorale: save.state.teamMorale,
-        event100Awarded,
-        newPlayerFlag: newPlayerFlag.current,
-        isFreshScene: freshScene.current,
-      }, random)
+      const entered =
+        scene === SEASON_SCENE_STATE.관리메뉴 && !record.endingSeen && record.phase !== SEASON_PHASE.기본
+          ? { ...record, phase: SEASON_PHASE.기본 }
+          : record
+      const polled = pollSeasonEvents(
+        eventCursor.current,
+        {
+          scene,
+          record: entered,
+          teamMorale: save.state.teamMorale,
+          event100Awarded,
+          newPlayerFlag: newPlayerFlag.current,
+          isFreshScene: freshScene.current,
+        },
+        random,
+      )
       eventCursor.current = polled.cursor
       if (polled.record !== record) commit({ ...save, state: { ...save.state, record: polled.record } })
       const { poll } = polled
@@ -1737,10 +1792,12 @@ export function useSeasonSession(
       // 0xef 진입 0x6900 — SR+0x50 = 0xf · 저장 뒤 조건 없이 관리 화면 배경음 4 (6926~6934 `0x6ea6d(소리, 4, −1, 1)`)
       activeSound().playBgm(SEASON_MANAGEMENT_BGM)
       const input = autobotBatInputRef.current?.()
-      const opens = input !== undefined && opensSeasonAutobotBat(record, {
-        ...input,
-        globalOpenedHiddenIds: [...input.globalOpenedHiddenIds, ...openedHiddenIds],
-      })
+      const opens =
+        input !== undefined &&
+        opensSeasonAutobotBat(record, {
+          ...input,
+          globalOpenedHiddenIds: [...input.globalOpenedHiddenIds, ...openedHiddenIds],
+        })
       if (opens) setOpenedHiddenIds((opened) => [...opened, SEASON_AUTOBOT_BAT_HIDDEN_ID])
       summaryEntrySerial.current += 1
       setSummaryEntry({ serial: summaryEntrySerial.current, opensAutobotBat: opens })
@@ -1875,18 +1932,18 @@ export function useSeasonSession(
       const current = latestSave.current
       if (current === null) return
       const myTeamId = current.state.record.teamId
-      const rosterIndex = purchase.isPitcher
-        ? recordPitcherIndexOf(current, myTeamId, current.roster, purchase.recordIndex)
-        : purchase.recordIndex
+      const rosterIndex = purchase.isPitcher ? recordPitcherIndexOf(current, myTeamId, current.roster, purchase.recordIndex) : purchase.recordIndex
       const players = purchase.isPitcher ? current.roster.pitchers : current.roster.batters
       if (players[rosterIndex] === undefined) return
-      const replaced = players.map((player, index) => (index === rosterIndex
-        ? {
-          ...player,
-          equipment: purchase.equipment,
-          ...(purchase.ownedEquipment === undefined ? {} : { ownedEquipment: purchase.ownedEquipment }),
-        }
-        : player))
+      const replaced = players.map((player, index) =>
+        index === rosterIndex
+          ? {
+              ...player,
+              equipment: purchase.equipment,
+              ...(purchase.ownedEquipment === undefined ? {} : { ownedEquipment: purchase.ownedEquipment }),
+            }
+          : player,
+      )
       commit({
         ...current,
         state: { ...current.state, record: { ...current.state.record, money: purchase.money } },
@@ -1929,7 +1986,9 @@ export function useSeasonSession(
       // 0x5870 목록은 레코드 그대로라 남은 마투수가 8번 칸에 있고 옛 8번은 맨 끝이다(`SeasonRecordAces`) — 목록 칸을 레코드 줄로
       const myTeamId = current.state.record.teamId
       const aces = current.recordAces?.[myTeamId]
-      const seat = recordAceSeatOf(current.roster.pitchers.length, aces === undefined ? -1 : aces.pitcher, SEASON_RECORD_ACE_PITCHER_SLOT)[recordIndex]
+      const seat = recordAceSeatOf(current.roster.pitchers.length, aces === undefined ? -1 : aces.pitcher, SEASON_RECORD_ACE_PITCHER_SLOT)[
+        recordIndex
+      ]
       if (seat === 'ace' && aces !== undefined) {
         // 7c5c~7c64 — 마투수 레코드 +0x2c 도 같은 검사 · 같은 값(마선수 거름 없음). 다음 0xdd · CPU 경기 넣기가 줄을 통째 덮는다
         if ((aces.pitcherStamina ?? FULL_PITCHER_STAMINA) === FULL_PITCHER_STAMINA) {
@@ -1955,8 +2014,7 @@ export function useSeasonSession(
       // 대회 고리(0xf3 0xe6f8 → 0xf4 0x4a18 → 0xdd ⇄ 0xe0 → 경기)에는 0xc9 를 세우는 곳이 없어 대회 중엔 닿지 않는다 — 늘 리그 칸(R9 19-2)
       spendGamePoint(seasonGpItemPriceOf(SEASON_STAMINA_ITEM))
       recordStat?.({ kind: 'GP아이템수', mode: SEASON_STAT_MODE, index: SEASON_STAMINA_ITEM })
-      const pitchers = current.roster.pitchers.map((player, index) =>
-        (index === rosterIndex ? { ...player, stamina: FULL_PITCHER_STAMINA } : player))
+      const pitchers = current.roster.pitchers.map((player, index) => (index === rosterIndex ? { ...player, stamina: FULL_PITCHER_STAMINA } : player))
       commit({ ...current, roster: { ...current.roster, pitchers } })
       return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나회복), recovered: true }
     },
@@ -2020,9 +2078,7 @@ export function useSeasonSession(
         ourEntryOrder: entryOrderOf(save.roster),
         // 상대 팀도 시즌 저장의 그 팀 레코드로 선다 (0xb891c → 0xb8680 → 0x1f570). 트레이드로 바뀐 팀만 저장에 있고
         // 나머지는 붙박이 표라 넘기지 않는다(예전 길 그대로)
-        ...(save.cpuRosters?.[opponent] === undefined
-          ? {}
-          : { opponentEntryOrder: seasonEntryOrderOf(save.cpuRosters[opponent]) }),
+        ...(save.cpuRosters?.[opponent] === undefined ? {} : { opponentEntryOrder: seasonEntryOrderOf(save.cpuRosters[opponent]) }),
       }
     },
     [aceLevels, entryOrderOf, save],
@@ -2040,13 +2096,18 @@ export function useSeasonSession(
   const clearGameRecord = useCallback(
     (current: SeasonSave, opponentTeamId: number) => {
       // 0xdd OK 의 0xa3424 뒤 곧장 경기 장면 셋업 — 정규시즌이면 관중·수입 0xa34b8 이 돈다 (`withSceneSetupIncome`)
-      commit(withSceneSetupIncome({
-        ...current,
-        state: {
-          ...current.state,
-          record: { ...current.state.record, gameRecord: clearSeasonGameRecord() },
-        },
-      }, opponentTeamId))
+      commit(
+        withSceneSetupIncome(
+          {
+            ...current,
+            state: {
+              ...current.state,
+              record: { ...current.state.record, gameRecord: clearSeasonGameRecord() },
+            },
+          },
+          opponentTeamId,
+        ),
+      )
     },
     [commit],
   )
@@ -2058,10 +2119,7 @@ export function useSeasonSession(
   const playNextGame = useCallback(() => {
     if (save === null) return
     // 정규시즌 가지 — 0xb7844 가 일정표 0xd89cb 로 정한다 (리그 날짜 L+0x32 = SR+0xb2)
-    const options = optionsFor(
-      seasonOpponentOf(save.state.record),
-      leagueSideOf(save.state.record.games, save.state.record.teamId),
-    )
+    const options = optionsFor(seasonOpponentOf(save.state.record), leagueSideOf(save.state.record.games, save.state.record.teamId))
     if (options === null) return
     clearGameRecord(save, options.opponentTeamId)
     setGameKind('정규')
@@ -2171,10 +2229,7 @@ export function useSeasonSession(
     if (save === null) return
     if (save.state.record.inPostseason) return setScene(SEASON_SCENE_STATE.시즌결산)
     // 정규시즌 가지 — 0xb7844 가 일정표 0xd89cb 로 정한다 (리그 날짜 L+0x32 = SR+0xb2)
-    const options = optionsFor(
-      seasonOpponentOf(save.state.record),
-      leagueSideOf(save.state.record.games, save.state.record.teamId),
-    )
+    const options = optionsFor(seasonOpponentOf(save.state.record), leagueSideOf(save.state.record.games, save.state.record.teamId))
     if (options === null) return
     enterPreGameSquad({ kind: '정규', options })
   }, [enterPreGameSquad, optionsFor, save])
@@ -2210,13 +2265,11 @@ export function useSeasonSession(
    */
   const startPendingGame = useCallback(() => {
     if (save === null || pendingGame === null) return
-    const withAces = pendingGame.kind === '국가대항전'
-      ? {}
-      : { acePitcherId: preGameAces.pitcher, aceBatterId: preGameAces.batter }
+    const withAces = pendingGame.kind === '국가대항전' ? {} : { acePitcherId: preGameAces.pitcher, aceBatterId: preGameAces.batter }
     // 0xdd 에서 엔트리 편집(0xe0)을 다녀왔으면 명단이 바뀌었다 — 경기는 지금 저장 레코드 차례로 선다.
     // 국가대항전은 대표팀 슬롯(+0x918) 명단이다
     const isCup = pendingGame.kind === '국가대항전'
-    const roster = isCup ? save.cupRoster ?? tableRosterOf(pendingGame.options.ourTeamId) : save.roster
+    const roster = isCup ? (save.cupRoster ?? tableRosterOf(pendingGame.options.ourTeamId)) : save.roster
     clearGameRecord(save, pendingGame.options.opponentTeamId)
     setIsMatchSettingsOpen(false)
     setGameKind(pendingGame.kind)
@@ -2280,7 +2333,11 @@ export function useSeasonSession(
       if (pending.kind === '국가대항전') {
         const teamId = pending.options.ourTeamId
         return {
-          teamId, roster: current.cupRoster ?? tableRosterOf(teamId), dayCounter, acePitcherId: -1, aceBatterId: -1,
+          teamId,
+          roster: current.cupRoster ?? tableRosterOf(teamId),
+          dayCounter,
+          acePitcherId: -1,
+          aceBatterId: -1,
           cells: {
             ...seasonEntryCellSourceOf(current, teamId, true),
             // 대표팀 칸 +0x918 은 대회 초기화 b7c72 0x205c0 이 마스터 팀 10 으로 새로 채운 것이라 사기 +2 는 표값이다 —
@@ -2318,14 +2375,14 @@ export function useSeasonSession(
       const source: SeasonEntryInput = isUserTeam
         ? userEntrySourceOf(save, pendingGame)
         : {
-          teamId: options.opponentTeamId,
-          // CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것
-          roster: cpuRosterOf(save, options.opponentTeamId),
-          dayCounter: options.opponentDayCounter ?? options.dayCounter ?? 0,
-          acePitcherId: options.opponentAces?.pitcher ?? -1,
-          aceBatterId: options.opponentAces?.batter ?? -1,
-          cells: seasonEntryCellSourceOf(save, options.opponentTeamId, false),
-        }
+            teamId: options.opponentTeamId,
+            // CPU 팀 레코드 — 트레이드로 바뀌었으면 저장의 것
+            roster: cpuRosterOf(save, options.opponentTeamId),
+            dayCounter: options.opponentDayCounter ?? options.dayCounter ?? 0,
+            acePitcherId: options.opponentAces?.pitcher ?? -1,
+            aceBatterId: options.opponentAces?.batter ?? -1,
+            cells: seasonEntryCellSourceOf(save, options.opponentTeamId, false),
+          }
       setEntryEdit({
         isUserTeam,
         teamId: source.teamId,
@@ -2384,25 +2441,26 @@ export function useSeasonSession(
   }, [])
 
   /** 0xdd "선발" 줄 — 내 팀 명단(엔트리 편집 결과)의 투수 0번 */
-  const matchInfoStarterName = save !== null && pendingGame !== null
-    ? (() => {
-      const source = userEntrySourceOf(save, pendingGame)
-      return seasonStarterNameOf(source.teamId, source.roster, source.dayCounter)
-    })()
-    : null
+  const matchInfoStarterName =
+    save !== null && pendingGame !== null
+      ? (() => {
+          const source = userEntrySourceOf(save, pendingGame)
+          return seasonStarterNameOf(source.teamId, source.roster, source.dayCounter)
+        })()
+      : null
   /**
    * 0xdd 상대 "선발" 줄 — 0x5e0e8 이 상대 팀 레코드 0번을 읽는다. 레코드 0번 = 투수 차례(`opponentPitcherOrder`)의 0번 칸에
    * 앉은 선수라, 트레이드로 바뀐 CPU 팀은 저장 명단(`cpuRosterOf`)의 그 칸 선수 이름이다. 차례가 없는 길(국가대항전)은 null
    */
-  const matchInfoOpponentStarterName = save !== null && pendingGame !== null
-    && pendingGame.options.opponentPitcherOrder !== undefined
-    ? (() => {
-      const opponent = pendingGame.options.opponentTeamId
-      const index = pendingGame.options.opponentPitcherOrder?.[0] ?? 0
-      const player = cpuRosterOf(save, opponent).pitchers[index]
-      return player === undefined ? null : playerFaceOf(opponent, player, true, index).name
-    })()
-    : null
+  const matchInfoOpponentStarterName =
+    save !== null && pendingGame !== null && pendingGame.options.opponentPitcherOrder !== undefined
+      ? (() => {
+          const opponent = pendingGame.options.opponentTeamId
+          const index = pendingGame.options.opponentPitcherOrder?.[0] ?? 0
+          const player = cpuRosterOf(save, opponent).pitchers[index]
+          return player === undefined ? null : playerFaceOf(opponent, player, true, index).name
+        })()
+      : null
 
   /**
    * 취소 `0x48ea`: 이전 상태가 0xc9 일 때만 0xc9 로 돌아간다. 관리 메뉴 갱신이 phase 를 3 으로
@@ -2462,12 +2520,14 @@ export function useSeasonSession(
       // (커서)와 새 선수 플래그(this+0xf9)도 새로 선다.
       //
       // 4f15a~4f19a — 모드 2 경기마다 SR+0x1bd = 내 칸 점수 · SR+0x1be = 상대 칸 점수(바이트, 0xe9 기록 줄이 s8 로 읽는다)
-      const played: SeasonRecord = clearRepeatableSeen(tickAfterAnyGame({
-        ...record,
-        gameRecord: summary.gameRecord,
-        lastGameScore: (summary.ourScore << 24) >> 24,
-        lastGameConceded: (summary.opponentScore << 24) >> 24,
-      }))
+      const played: SeasonRecord = clearRepeatableSeen(
+        tickAfterAnyGame({
+          ...record,
+          gameRecord: summary.gameRecord,
+          lastGameScore: (summary.ourScore << 24) >> 24,
+          lastGameConceded: (summary.opponentScore << 24) >> 24,
+        }),
+      )
       eventCursor.current = START_SEASON_EVENT_CURSOR
       newPlayerFlag.current = false
       freshScene.current = true
@@ -2478,9 +2538,7 @@ export function useSeasonSession(
       // `seasonHumanWonOf` 주석). 웹 경기도 연장 상한이 없어(`gameState`) 같다 — 비교식만 원본 모양 그대로 둔다.
       // 사람 칸은 이 경기 옵션의 `playerSide` 다 (`state[0x31 + 칸] == 0`)
       const tied = summary.ourScore === summary.opponentScore
-      const won = gameOptions === null
-        ? summary.won
-        : seasonHumanWonOf(summary.ourScore, summary.opponentScore, gameOptions.playerSide)
+      const won = gameOptions === null ? summary.won : seasonHumanWonOf(summary.ourScore, summary.opponentScore, gameOptions.playerSide)
 
       // 포스트시즌·국가대항전은 리그 전적·수입 정산도, **평가 0xa719c 도** 타지 않는다.
       // 원본 경기 끝 0x4ea0c 가 L+0xac(4f216)·L+0x34(4f268)이면 0x4f274 의 평가 호출을 건너뛴다
@@ -2562,10 +2620,7 @@ export function useSeasonSession(
           recordSeasonHumanGamePitchers(
             // 도루 +0x2c 도 같은 정산 0xa8024 가 쌓는다(도루 판 종류 5) — 같은 정규시즌 갈래
             recordLeagueStolenBases(
-              recordLeaguePlateAppearances(
-                current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
-                summary.leaguePlateAppearances,
-              ),
+              recordLeaguePlateAppearances(current.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS, summary.leaguePlateAppearances),
               summary.leagueStolenBases ?? [],
             ),
             summary.leaguePitchers,
@@ -2594,10 +2649,7 @@ export function useSeasonSession(
         reputationCompleteGame: summary.reputationCompleteGame,
         opponentTeamId: opponent,
       })
-      const evaluated = applySeasonGameEvaluation(
-        { ...current.state, record: played },
-        evaluation,
-      )
+      const evaluated = applySeasonGameEvaluation({ ...current.state, record: played }, evaluation)
 
       commit({
         ...rested,
@@ -2812,9 +2864,8 @@ export function useSeasonSession(
       return enterPreGameSquad({ kind: '포스트시즌', options: postseasonOptions })
     }
     // 0xc2760 은 CPU 팀 투수 레코드 +0x2c 를 깎기만 한다 — 회복(0xb617c)은 다음 내 경기 끝 0x4ea0c 에서다
-    const cpu = runCpuPostseasonWithStamina(
-      series, myTeam, random, save.cpuPitcherStaminas, aceLevels, seasonAbilityContextOf(save.state),
-      (team) => cpuLeagueRecordOf(save, team),
+    const cpu = runCpuPostseasonWithStamina(series, myTeam, random, save.cpuPitcherStaminas, aceLevels, seasonAbilityContextOf(save.state), (team) =>
+      cpuLeagueRecordOf(save, team),
     )
     const advanced = cpu.series
     commit({
@@ -2866,18 +2917,22 @@ export function useSeasonSession(
       //   → 상대 칸만 `opponentDayCounter` 로 따로 넘긴다 (0 이면 0번, 1 이면 rotationSlotOf(1) = 1번)
       //
       // 대회는 0xd7 을 안 지나고 0xf4 → 0xdd 로 바로 간다 (키 0x4a18) — 마선수도 안 넣는다(0x6548 66ae)
-      enterMatchInfo(save, {
-        kind: '국가대항전',
-        options: {
-          ...options,
-          ourTeamId: myTeam,
-          dayCounter: cup.day,
-          opponentDayCounter: cup.day === 0 ? 0 : 1,
-          opponentPitcherOrder: nationalCupOpponentPitcherOrderOf(cup.day),
-          // L+0xad — 경기 준비 0x352e8 모드 2 갈래의 구장 2(풀리그) · 8(결승)
-          nationalCupStage: cup.stage,
+      enterMatchInfo(
+        save,
+        {
+          kind: '국가대항전',
+          options: {
+            ...options,
+            ourTeamId: myTeam,
+            dayCounter: cup.day,
+            opponentDayCounter: cup.day === 0 ? 0 : 1,
+            opponentPitcherOrder: nationalCupOpponentPitcherOrderOf(cup.day),
+            // L+0xad — 경기 준비 0x352e8 모드 2 갈래의 구장 2(풀리그) · 8(결승)
+            nationalCupStage: cup.stage,
+          },
         },
-      }, null)
+        null,
+      )
     },
     [enterMatchInfo, optionsFor, save],
   )
@@ -2896,13 +2951,16 @@ export function useSeasonSession(
         gainGamePoint(finish.reward.gamePoint)
         recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: finish.reward.gamePoint })
       }
-      const next = nextYearOf({
-        ...save,
-        state: { ...save.state, record: { ...record, nationalCupChampion: finish.champion } },
-        cup: null,
-        cupRoster: null,
-        cupPlayerStats: null,
-      }, random)
+      const next = nextYearOf(
+        {
+          ...save,
+          state: { ...save.state, record: { ...record, nationalCupChampion: finish.champion } },
+          cup: null,
+          cupRoster: null,
+          cupPlayerStats: null,
+        },
+        random,
+      )
       commit(next.save)
       // 히든 팀은 여기서 열지 않는다 — 0xf3 갱신 0xe684 가 대진판에 있는 동안 열었다(`openCupHiddenTeams`)
       // 대회 연차(짝수 idx)는 마지막 해(9)가 아니라 엔딩 갈래에 닿지 않지만, 같은 0x6e0c 라 같게 둔다
@@ -3012,31 +3070,33 @@ export function useSeasonSession(
    * 본 엔딩 표시(+0xa0+e)는 앱이 phase 6 레코드의 판정값을 기록연감 엔딩 칸에 켜 저장한다(`App` → `useCollection`
    * `mergeSeasonEndingIntoCollection`).
    */
-  const finishSeason = useCallback((reward?: SeasonReward | null) => {
-    if (save === null) return
-    // 0x85ec 꼬리표 9·10 — 보상 팝업이 닫힐 때 인기도·평판·소지금을 더하고(저장 없음) 곧장 0x87b4 (0x86dc~ · 0x8752~)
-    const rewarded = reward === undefined || reward === null
-      ? save
-      : { ...save, state: { ...save.state, record: applySeasonReward(save.state.record, reward) } }
-    const { record } = rewarded.state
-    if (isSeasonNationalCupYear(record.yearIndex)) {
-      commit({
-        ...rewarded,
-        state: { ...rewarded.state, record: { ...record, nationalCup: true } },
-        cup: createNationalCup(),
-        // b7c72 0x205c0 — 대표팀 슬롯 +0x918 을 마스터 팀 10 으로 새로 채운다 (마스터 행 +0x2a · +0x2e 는 그 표 값 — 쌓인 수 0)
-        cupRoster: tableRosterOf(KOREA_TEAM_ID),
-        cupPlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
-      })
-      // 0xf2 진입 0xe5f8: SR+0x12c = 1 · 461 을 틀고 · 대회 초기화 · 저장 · [다음 0xf3] (e600~e64c)
-      return startEvent(NATIONAL_CUP_INTRO_EVENT_ID, SEASON_SCENE_STATE.국가대항전)
-    }
-    const next = nextYearOf(rewarded, random)
-    commit(next.save)
-    // 엔딩 갈래는 500 을 틀고 [다음 0xf5] (6e54~6e76)
-    if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
-    setScene(next.scene)
-  }, [commit, random, save, startEvent])
+  const finishSeason = useCallback(
+    (reward?: SeasonReward | null) => {
+      if (save === null) return
+      // 0x85ec 꼬리표 9·10 — 보상 팝업이 닫힐 때 인기도·평판·소지금을 더하고(저장 없음) 곧장 0x87b4 (0x86dc~ · 0x8752~)
+      const rewarded =
+        reward === undefined || reward === null ? save : { ...save, state: { ...save.state, record: applySeasonReward(save.state.record, reward) } }
+      const { record } = rewarded.state
+      if (isSeasonNationalCupYear(record.yearIndex)) {
+        commit({
+          ...rewarded,
+          state: { ...rewarded.state, record: { ...record, nationalCup: true } },
+          cup: createNationalCup(),
+          // b7c72 0x205c0 — 대표팀 슬롯 +0x918 을 마스터 팀 10 으로 새로 채운다 (마스터 행 +0x2a · +0x2e 는 그 표 값 — 쌓인 수 0)
+          cupRoster: tableRosterOf(KOREA_TEAM_ID),
+          cupPlayerStats: EMPTY_LEAGUE_PLAYER_STATS,
+        })
+        // 0xf2 진입 0xe5f8: SR+0x12c = 1 · 461 을 틀고 · 대회 초기화 · 저장 · [다음 0xf3] (e600~e64c)
+        return startEvent(NATIONAL_CUP_INTRO_EVENT_ID, SEASON_SCENE_STATE.국가대항전)
+      }
+      const next = nextYearOf(rewarded, random)
+      commit(next.save)
+      // 엔딩 갈래는 500 을 틀고 [다음 0xf5] (6e54~6e76)
+      if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
+      setScene(next.scene)
+    },
+    [commit, random, save, startEvent],
+  )
 
   /**
    * 이벤트 재생 0xd3 이 끝났다 (실행기 0x8cf64 의 끝 → 이전 상태 `this+0x24`).
@@ -3076,19 +3136,22 @@ export function useSeasonSession(
       }
       const goalRecordOf = recordSourceNow()
       const followUp = seasonEventFollowUpOf(playback.eventId, () =>
-        seasonGoalResultEventId(achievedSeasonGoalCount(
-          applied.state.record.yearIndex,
-          seasonGoalInputOf({
-            state: applied.state,
-            league: next.league,
-            roster: next.roster,
-            playerStats: next.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
-            series: next.series ?? null,
-            ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
-            // 392 는 포스트시즌 첫날 — 마지막 정규 경기 날 넣은 마투수가 내 팀 레코드에 남아 있다 (0xa3764, U-105 r163)
-            recordAces: next.recordAces?.[applied.state.record.teamId],
-          }),
-        )))
+        seasonGoalResultEventId(
+          achievedSeasonGoalCount(
+            applied.state.record.yearIndex,
+            seasonGoalInputOf({
+              state: applied.state,
+              league: next.league,
+              roster: next.roster,
+              playerStats: next.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
+              series: next.series ?? null,
+              ...(goalRecordOf === undefined ? {} : { recordOf: goalRecordOf }),
+              // 392 는 포스트시즌 첫날 — 마지막 정규 경기 날 넣은 마투수가 내 팀 레코드에 남아 있다 (0xa3764, U-105 r163)
+              recordAces: next.recordAces?.[applied.state.record.teamId],
+            }),
+          ),
+        ),
+      )
       // 실행기 끝 0x8d134~0x8d19c: 370 · 371 은 0x8b04c, 376 은 0x8b370 이 결과 이벤트를 고른다(시즌 갈래)
       const awardFollowUp = seasonAwardFollowUpOf(playback.eventId, next, goalRecordOf, seasonMvpKind.current)
       if (awardFollowUp !== null) return startEvent(awardFollowUp, playback.returnScene)
@@ -3121,9 +3184,7 @@ export function useSeasonSession(
       const current = latestSave.current
       if (current === null) return
       const applied = applySeasonEventRewards(current.state, rewards, eventId, random)
-      const seen = [eventId, ...viewedEventIds]
-        .filter((id) => id !== YEAR_GOAL_EVENT_ID)
-        .reduce(markEventSeen, applied.state.record)
+      const seen = [eventId, ...viewedEventIds].filter((id) => id !== YEAR_GOAL_EVENT_ID).reduce(markEventSeen, applied.state.record)
       const patch = rewardResumePatchOf(eventId, '시즌')
       const record = patch === null || seen.phase === patch.resumeCode ? seen : { ...seen, phase: patch.resumeCode }
       commit({ ...current, state: { ...applied.state, record } })
@@ -3162,12 +3223,15 @@ export function useSeasonSession(
    * 원본 자리가 전역기록이라 시즌 레코드가 아니라 전역 칸(`SeasonGlobalSlots`)에 쌓고 곧바로 저장한다 (0x62368 → 0x1f1b9).
    * 해금 알림 창(`0x62368` → StrCOMMON[139] + [141])은 상점 화면이 완료 팝업을 닫을 때 띄운다(`StadiumShopScreen`).
    */
-  const openStadiumItems = useCallback((unlockIds: readonly number[]) => {
-    updateGlobals((slots) => {
-      const added = unlockIds.filter((id, index) => !slots.openedStadiumIds.includes(id) && unlockIds.indexOf(id) === index)
-      return added.length === 0 ? slots : { ...slots, openedStadiumIds: [...slots.openedStadiumIds, ...added] }
-    })
-  }, [updateGlobals])
+  const openStadiumItems = useCallback(
+    (unlockIds: readonly number[]) => {
+      updateGlobals((slots) => {
+        const added = unlockIds.filter((id, index) => !slots.openedStadiumIds.includes(id) && unlockIds.indexOf(id) === index)
+        return added.length === 0 ? slots : { ...slots, openedStadiumIds: [...slots.openedStadiumIds, ...added] }
+      })
+    },
+    [updateGlobals],
+  )
 
   /** 0xe684 → 0x65de4 — 전역 해금표(웹 `openedHiddenIds`, 팀은 10~14 그대로)에 쓴다. 앱이 전역 기록으로 모은다 */
   const openCupHiddenTeams = useCallback((teams: readonly number[]) => {
@@ -3294,12 +3358,15 @@ export function useSeasonSession(
     commit(rest)
   }, [commit])
 
-  const goto = useCallback((next: SeasonSceneState) => {
-    // 구단관리 칸 3 코치채용 → this+0x11c = 2, 0xd7 (키 0x4e40)
-    if (next === SEASON_SCENE_STATE.선수단) setSquadPurpose(SQUAD_PURPOSE.코치채용)
-    if (next === SEASON_SCENE_STATE.선수고르기) clearRecordAces()
-    setScene(next)
-  }, [clearRecordAces])
+  const goto = useCallback(
+    (next: SeasonSceneState) => {
+      // 구단관리 칸 3 코치채용 → this+0x11c = 2, 0xd7 (키 0x4e40)
+      if (next === SEASON_SCENE_STATE.선수단) setSquadPurpose(SQUAD_PURPOSE.코치채용)
+      if (next === SEASON_SCENE_STATE.선수고르기) clearRecordAces()
+      setScene(next)
+    },
+    [clearRecordAces],
+  )
   const clearNotice = useCallback(() => setNotice(''), [])
   const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [])
 
@@ -3309,14 +3376,12 @@ export function useSeasonSession(
     league: save?.league ?? EMPTY_LEAGUE,
     roster: save?.roster ?? EMPTY_ROSTER,
     cpuRosterOf: (teamId: number) => cpuRosterOf(save, teamId),
-    entryCellSourceOf: (teamId: number) =>
-      save === null ? undefined : seasonEntryCellSourceOf(save, teamId, teamId === save.state.record.teamId),
+    entryCellSourceOf: (teamId: number) => (save === null ? undefined : seasonEntryCellSourceOf(save, teamId, teamId === save.state.record.teamId)),
     recordSource: recordSourceNow,
     tradeRoster: save === null ? EMPTY_ROSTER : tradeRecordRosterOf(save, save.state.record.teamId, save.roster),
     myRecordAces: save?.recordAces?.[save.state.record.teamId],
     pitcherRecordOrder: save === null ? [] : recordPitcherOrderOf(save, save.state.record.teamId, save.roster.pitchers.length),
-    tradeRosterOf: (teamId: number) =>
-      save === null ? cpuRosterOf(save, teamId) : tradeRecordRosterOf(save, teamId, cpuRosterOf(save, teamId)),
+    tradeRosterOf: (teamId: number) => (save === null ? cpuRosterOf(save, teamId) : tradeRecordRosterOf(save, teamId, cpuRosterOf(save, teamId))),
     playerStats: save?.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     series: save?.series ?? null,
     ranking: save?.ranking ?? [],
@@ -3356,19 +3421,67 @@ export function useSeasonSession(
     menuCursors,
     notice,
     actions: {
-      chooseTeam, goto, clearRecordAces, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, equipSeasonPlayer,
-      buySeasonSubItem, buySeasonGpItem, recoverSeasonPitcherStamina,
+      chooseTeam,
+      goto,
+      clearRecordAces,
+      updateRecord,
+      updateRoster,
+      removeHallOfFamer,
+      removeCareerPlayer,
+      resetSeason,
+      finishTrade,
+      equipSeasonPlayer,
+      buySeasonSubItem,
+      buySeasonGpItem,
+      recoverSeasonPitcherStamina,
       playNextGame,
-      openNextGame, confirmNextGame, cancelNextGame, confirmIncome, confirmDayResults,
-      answerTradeRequest, cancelTradeRequest, closeTradeResult, moveMenuCursor,
-      choosePreGameAce: choosePreGameAceAction, cancelPreGameAce: cancelPreGameAceAction,
-      startPendingGame, cancelMatchInfo, toggleMatchSettings, applyMatchSettings,
-      openEntryEdit, pressEntryKey: pressEntryKeyAction, pointEntryCursor: pointEntryCursorAction,
+      openNextGame,
+      confirmNextGame,
+      cancelNextGame,
+      confirmIncome,
+      confirmDayResults,
+      answerTradeRequest,
+      cancelTradeRequest,
+      closeTradeResult,
+      moveMenuCursor,
+      choosePreGameAce: choosePreGameAceAction,
+      cancelPreGameAce: cancelPreGameAceAction,
+      startPendingGame,
+      cancelMatchInfo,
+      toggleMatchSettings,
+      applyMatchSettings,
+      openEntryEdit,
+      pressEntryKey: pressEntryKeyAction,
+      pointEntryCursor: pointEntryCursorAction,
       closeEntryAceLocked,
-      playCupGame, finishCup, finishGame, constructScene, pressManagementConfirm, saveGameProgress, enterGameSettlement, resumeSavedGame, leaveGame,
+      playCupGame,
+      finishCup,
+      finishGame,
+      constructScene,
+      pressManagementConfirm,
+      saveGameProgress,
+      enterGameSettlement,
+      resumeSavedGame,
+      leaveGame,
       continuePostseason,
-      runTraining, closeTrainingResult, enterOuting, runOuting, closeOutingResult, awardLeagueFirst, spendGamePoint, finishSeason,
-      openStadiumItems, openCupHiddenTeams, receiveEndingBonus, finishEnding, finishSeasonEvent, giveSeasonEventReward, confirmSeasonEventChoice, confirmEventSystemWindow, clearNotice, quit,
+      runTraining,
+      closeTrainingResult,
+      enterOuting,
+      runOuting,
+      closeOutingResult,
+      awardLeagueFirst,
+      spendGamePoint,
+      finishSeason,
+      openStadiumItems,
+      openCupHiddenTeams,
+      receiveEndingBonus,
+      finishEnding,
+      finishSeasonEvent,
+      giveSeasonEventReward,
+      confirmSeasonEventChoice,
+      confirmEventSystemWindow,
+      clearNotice,
+      quit,
     },
   }
 }
@@ -3444,15 +3557,27 @@ export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUser
     batterLineOf: (player) => {
       const line = seasonBatterLineOf(stats, teamId, player)
       return {
-        atBats: line.atBats, hits: line.hits, doubles: line.doubles ?? 0, triples: line.triples ?? 0, homeRuns: line.homeRuns,
-        runsBattedIn: line.runsBattedIn, steals: line.steals ?? 0, errors: line.errors ?? 0,
+        atBats: line.atBats,
+        hits: line.hits,
+        doubles: line.doubles ?? 0,
+        triples: line.triples ?? 0,
+        homeRuns: line.homeRuns,
+        runsBattedIn: line.runsBattedIn,
+        steals: line.steals ?? 0,
+        errors: line.errors ?? 0,
       }
     },
     pitcherLineOf: (player) => {
       const line = seasonPitcherLineOf(stats, teamId, player)
       return {
-        outs: line.outs, runsAllowed: line.runsAllowed, saves: line.saves, strikeouts: line.strikeouts, pitches: line.pitches,
-        walks: line.walks ?? 0, wins: line.wins, losses: line.losses,
+        outs: line.outs,
+        runsAllowed: line.runsAllowed,
+        saves: line.saves,
+        strikeouts: line.strikeouts,
+        pitches: line.pitches,
+        walks: line.walks ?? 0,
+        wins: line.wins,
+        losses: line.losses,
       }
     },
   }
@@ -3466,7 +3591,7 @@ export function seasonEntryCellSourceOf(save: SeasonSave, teamId: number, isUser
  * (`SeasonSave.cupPlayerStats`). 사기 · 스태미나는 부르는 쪽 몫 그대로다(대표팀은 `userEntrySourceOf` 가 덮는다).
  */
 function seasonCupEntryCellSourceOf(save: SeasonSave, teamId: number, isUserTeam: boolean): SeasonEntryCellSource {
-  const marks = teamId === KOREA_TEAM_ID ? save.cupPlayerStats ?? EMPTY_LEAGUE_PLAYER_STATS : EMPTY_LEAGUE_PLAYER_STATS
+  const marks = teamId === KOREA_TEAM_ID ? (save.cupPlayerStats ?? EMPTY_LEAGUE_PLAYER_STATS) : EMPTY_LEAGUE_PLAYER_STATS
   const isTablePlayer = (player: SeasonPlayer) => player.id < HALL_OF_FAME_FIRST_ID
   return {
     staminaMode: 2,
@@ -3496,13 +3621,7 @@ export function seasonPitcherLineOf(stats: LeaguePlayerStats, ownerTeamId: numbe
 }
 
 /** 순위표 줄의 이름 — 표 밖 명전 선수는 기록 이름(rec + 1)을 명전 칸에서 찾는다(`recordOf`), 그 밖은 `playerFaceOf` */
-function recordNameOf(
-  source: SeasonLeagueRecordSource,
-  team: number,
-  player: SeasonPlayer,
-  isPitcher: boolean,
-  index: number,
-): string {
+function recordNameOf(source: SeasonLeagueRecordSource, team: number, player: SeasonPlayer, isPitcher: boolean, index: number): string {
   if (player.id >= HALL_OF_FAME_FIRST_ID && player.record === undefined) {
     const found = isPitcher ? source.recordOf?.pitcher(player) : source.recordOf?.batter(player)
     if (found !== undefined) return found.name
@@ -3545,11 +3664,7 @@ function postseasonDayOf(series: PostseasonSeries): number {
  * 칸 수 0x9da19 가 0 이면(그 종류 1위가 없으면) **다시 굴린다**(8ddc8 고리). 빈 순위표마다 rand 한 번이 더 든다.
  * ⚠️ 근사(남김 — 원본 무한 고리 · 닿지 않는 길): 원본은 일곱 종류가 모두 비면 끝없이 돈다 — 웹은 그때만 첫 굴림 하나로 멈춘다(정규시즌을 치른 리그에선 닿지 않는다).
  */
-function rollSeasonMvpKind(
-  save: SeasonSave,
-  recordOf: SeasonEntryRecordSource | undefined,
-  random: RandomPort,
-): LeaderKind | null {
+function rollSeasonMvpKind(save: SeasonSave, recordOf: SeasonEntryRecordSource | undefined, random: RandomPort): LeaderKind | null {
   const source = seasonAwardSourceOf(save, recordOf)
   const hasLeader = (kind: LeaderKind) => leaderOf(seasonLeagueRecordsOf(source, isPitcherLeaderKind(kind)), kind) !== null
   const anyLeader = SEASON_MVP_LEADER_KINDS.some(hasLeader)
@@ -3561,9 +3676,7 @@ function rollSeasonMvpKind(
 
 /** 0x8dd60 — 고른 종류의 1위가 MVP 칸(evt+0x370 팀 · +0x374 이름), 그 팀이 내 팀이면 +0x388 */
 function seasonMvpOf(save: SeasonSave, recordOf: SeasonEntryRecordSource | undefined, kind: LeaderKind | null) {
-  const leader = kind === null
-    ? null
-    : leaderOf(seasonLeagueRecordsOf(seasonAwardSourceOf(save, recordOf), isPitcherLeaderKind(kind)), kind)
+  const leader = kind === null ? null : leaderOf(seasonLeagueRecordsOf(seasonAwardSourceOf(save, recordOf), isPitcherLeaderKind(kind)), kind)
   return {
     winner: leader === null ? { teamId: NO_TEAM, name: '' } : { teamId: leader.record.teamId, name: leader.record.name },
     isMine: leader !== null && leader.record.teamId === save.state.record.teamId,
@@ -3600,8 +3713,7 @@ function seasonAwardWindowTextOf(
   recordOf: SeasonEntryRecordSource | undefined,
   mvpKind: LeaderKind | null,
 ): string | null {
-  if (sub === SYSTEM_TITLE_WINDOW
-    && (eventId === SEASON_AWARD_INTRO_EVENT_ID.타자 || eventId === SEASON_AWARD_INTRO_EVENT_ID.투수)) {
+  if (sub === SYSTEM_TITLE_WINDOW && (eventId === SEASON_AWARD_INTRO_EVENT_ID.타자 || eventId === SEASON_AWARD_INTRO_EVENT_ID.투수)) {
     const titles = seasonTitlesOf(save, recordOf, eventId === SEASON_AWARD_INTRO_EVENT_ID.투수)
     return titleWindowTextOf({ titles, wonCount: 0, isMostValuablePlayer: false, mostValuablePlayer: { teamId: NO_TEAM, name: '' } })
   }
@@ -3723,9 +3835,7 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
   // 기록을 실은 칸(영입한 명전·나리 선수)은 그 레코드에 쌓인 표 밖 줄(원본 id)로 센다 — 기록을 못 찾은 칸은 빈 줄
   const batterLines = entryBattersOfOrder(team, order).map((batter) => {
     if (batter.rosterSlot === NO_ROSTER_SLOT) {
-      return batter.recordId === undefined
-        ? EMPTY_LEAGUE_BATTER_LINE
-        : leagueRecordBatterLineOf(source.playerStats, batter.recordId)
+      return batter.recordId === undefined ? EMPTY_LEAGUE_BATTER_LINE : leagueRecordBatterLineOf(source.playerStats, batter.recordId)
     }
     // 트레이드로 옮겨 온 선수는 옛 팀 표 자리(원본 id)로 쌓였다 — 같은 열쇠로 읽는다
     return leagueBatterLineOf(source.playerStats, leagueBatterIdOf(batter.tableTeamId ?? team, batter.rosterSlot))
@@ -3735,9 +3845,7 @@ export function seasonGoalInputOf(source: SeasonGoalSource): SeasonGoalInput {
       return slot >= 0 ? leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(team, slot)) : { outs: 0, runsAllowed: 0 }
     }
     if ('tableSlot' in slot) return leaguePitcherLineOf(source.playerStats, leaguePitcherIdOf(slot.tableTeamId ?? team, slot.tableSlot))
-    return slot.recordId === undefined
-      ? { outs: 0, runsAllowed: 0 }
-      : leagueRecordPitcherLineOf(source.playerStats, slot.recordId)
+    return slot.recordId === undefined ? { outs: 0, runsAllowed: 0 } : leagueRecordPitcherLineOf(source.playerStats, slot.recordId)
   })
   return {
     rank: seasonTeamRankOf(source, team),
@@ -3798,7 +3906,7 @@ function goalBracketOf(series: PostseasonSeries | null): GoalPostseasonBracket {
   const inKoreanSeries = series.round === '한국시리즈' || series.round === '종료'
   // 플레이오프 칸 1(L+0x3b) = 준PO 승자 — 준PO 가 끝나면 0xb7724 가 넣고 포스트시즌 끝까지 남는다(`semiPlayoffWinner`).
   // 옛 저장은 불러올 때 `withSemiPlayoffWinner` 가 채운다 — 그래도 모르면(로테이션 칸도 없는 저장) 빈 칸이다
-  const playoffLower = series.round === '준플레이오프' ? null : withSemiPlayoffWinner(series).semiPlayoffWinner ?? null
+  const playoffLower = series.round === '준플레이오프' ? null : (withSemiPlayoffWinner(series).semiPlayoffWinner ?? null)
   return {
     champion: series.champion,
     pairs: [

@@ -36,10 +36,7 @@ const HOME_X = 20000
 const HOME_Z = 30000
 
 /** 0x33e34 — `trajectory` 는 [경기+0xf2c] 공의 궤적, `side` 는 +0x17e1 (0 우타 · 1 좌타) */
-export function hitBallPathOf(
-  trajectory: { readonly length: number; pointAt(tick: number): WorldPoint },
-  side: number,
-): HitBallPath {
+export function hitBallPathOf(trajectory: { readonly length: number; pointAt(tick: number): WorldPoint }, side: number): HitBallPath {
   const points: WorldPoint[] = []
   let groundIndex = -1
   for (let index = 0; index < trajectory.length; index += 1) {

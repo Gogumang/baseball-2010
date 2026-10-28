@@ -4,9 +4,7 @@ import { BACK_KEY_OFFER, tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer
 import { MAP_FRAMES, OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import {
-  SEASON_OUTING_PLACES, checkSeasonOuting, seasonOutingConfirmTextOf, seasonOutingRefusalTextOf,
-} from '@/widgets/season/lib/seasonOuting'
+import { SEASON_OUTING_PLACES, checkSeasonOuting, seasonOutingConfirmTextOf, seasonOutingRefusalTextOf } from '@/widgets/season/lib/seasonOuting'
 import type { SeasonOutingPlace } from '@/widgets/season/lib/seasonOuting'
 import { moveOutingMapCursor, outingMapDirectionOf } from '@/pages/season/lib/seasonOutingMap'
 import { SeasonOutingMap } from '@/pages/season/ui/SeasonOutingMap'
@@ -91,17 +89,23 @@ export function SeasonOutingScreen({ state, cursor, onCursorChange, onRun, onBac
         {OUTING_PLACES.map((place, index) => {
           // 건물 프레임 자리(원점 = 지도 좌표, 지도 원점 (0, 11)) — 원점을 못 읽었으면 화살표 박스로
           const frame = origins?.[String(place.frame).padStart(3, '0')]
-          const area = frame === undefined
-            ? { left: place.cursorBox.x, top: place.cursorBox.y + MAP_TOP, width: place.cursorBox.width, height: place.cursorBox.height }
-            : { left: frame.x, top: frame.y + MAP_TOP, width: frame.width, height: frame.height }
+          const area =
+            frame === undefined
+              ? { left: place.cursorBox.x, top: place.cursorBox.y + MAP_TOP, width: place.cursorBox.width, height: place.cursorBox.height }
+              : { left: frame.x, top: frame.y + MAP_TOP, width: frame.width, height: frame.height }
           return (
-          <button key={place.id} type="button" aria-label={SEASON_OUTING_PLACES[index]} aria-pressed={index === cursor}
-            style={{ position: 'absolute', ...area, background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}
-            onClick={() => {
-              if (!isEnabled) return
-              onCursorChange(index)
-              select(index)
-            }} />
+            <button
+              key={place.id}
+              type="button"
+              aria-label={SEASON_OUTING_PLACES[index]}
+              aria-pressed={index === cursor}
+              style={{ position: 'absolute', ...area, background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}
+              onClick={() => {
+                if (!isEnabled) return
+                onCursorChange(index)
+                select(index)
+              }}
+            />
           )
         })}
       </div>
@@ -110,13 +114,9 @@ export function SeasonOutingScreen({ state, cursor, onCursorChange, onRun, onBac
         (198, 307, 41×12)에 웹 전용 누름 칸을 둔다(r186 — 늘 있던 뒤로 버튼을 걷었다). 키와 같은 길(위 듣는 곳).
         칸은 투명이라 터치 기기에는 '뒤로' 상황 버튼도 낸다(r194)
       */}
-      {isEnabled && (
-        <PressArea label="취소" rect={SEASON_OUTING_CANCEL_PRESS_RECT} touchKey={BACK_KEY_OFFER} onPress={() => tapKey('Escape')} />
-      )}
+      {isEnabled && <PressArea label="취소" rect={SEASON_OUTING_CANCEL_PRESS_RECT} touchKey={BACK_KEY_OFFER} onPress={() => tapKey('Escape')} />}
 
-      {notice !== null && (
-        <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />
-      )}
+      {notice !== null && <MessageBox text={notice} buttons={['확인']} onAnswer={() => setNotice(null)} />}
       {notice === null && question !== null && (
         <MessageBox
           // 0xbd38 의 0xbdf8~0xbf00 — 비용 줄 [162] 이 먼저, [161] 원문 안 !N 그대로

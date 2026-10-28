@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BASE_POINTS, DOT_OFFSET, MAP_ANCHOR, MAP_SCALE, PITCHER_PLATE, WORLD,
-  dotCenterOf, mapFrameTopLeftOf, runnerDotsOf, toMapPoint,
+  BASE_POINTS,
+  DOT_OFFSET,
+  MAP_ANCHOR,
+  MAP_SCALE,
+  PITCHER_PLATE,
+  WORLD,
+  dotCenterOf,
+  mapFrameTopLeftOf,
+  runnerDotsOf,
+  toMapPoint,
 } from '@/pages/defense/lib/fieldMap'
 
 /** 수비 화면 작은 지도 (0x395f4 — 부르는 곳 0x46e02, 앵커 (0x1e, 0x1e)) */
@@ -46,11 +54,7 @@ describe('주자 점 자리 — 투수판 기준 상대좌표 + (1, 4)', () => {
   })
 
   it('점 그림(13×11)은 중심에서 (6, 5) 당겨 놓고, 처리 끝(+0x96) 주자는 건너뛴다', () => {
-    expect(runnerDotsOf([
-      { ...BASE_POINTS.first },
-      { ...BASE_POINTS.second, isFinished: true },
-      { ...BASE_POINTS.home },
-    ])).toEqual([
+    expect(runnerDotsOf([{ ...BASE_POINTS.first }, { ...BASE_POINTS.second, isFinished: true }, { ...BASE_POINTS.home }])).toEqual([
       { x: 30 + 23 - 6, y: 30 + 2 - 5 },
       { x: 30 + 1 - 6, y: 30 + 25 - 5 },
     ])

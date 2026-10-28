@@ -1,9 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { loadSpriteImage } from '@/shared/lib/sprite/spriteCache'
-import {
-  composeOverlay565, rgbaOfScreen565, type ComposeImageOp, type ComposeOp,
-} from '@/shared/lib/pixelEffect/screenCompose'
+import { composeOverlay565, rgbaOfScreen565, type ComposeImageOp, type ComposeOp } from '@/shared/lib/pixelEffect/screenCompose'
 import { sprite565At } from '@/shared/lib/pixelEffect/sprite565Cache'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 
@@ -62,13 +60,18 @@ export function ComposedOverlay({ rect, underOps, ops, backdrop = 0, fallback, t
   }, [key, loadedVersion])
 
   const style: CSSProperties = {
-    position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, imageRendering: 'pixelated',
-    pointerEvents: 'none', visibility: isComposed ? 'visible' : 'hidden',
+    position: 'absolute',
+    left: rect.x,
+    top: rect.y,
+    width: rect.width,
+    height: rect.height,
+    imageRendering: 'pixelated',
+    pointerEvents: 'none',
+    visibility: isComposed ? 'visible' : 'hidden',
   }
   return (
     <>
-      <canvas ref={canvasRef} width={rect.width} height={rect.height} style={style} aria-hidden
-        data-testid={testId} data-composed={isComposed} />
+      <canvas ref={canvasRef} width={rect.width} height={rect.height} style={style} aria-hidden data-testid={testId} data-composed={isComposed} />
       {!isComposed && fallback}
     </>
   )

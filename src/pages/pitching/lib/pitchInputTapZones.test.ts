@@ -18,8 +18,7 @@ describe('투구 입력 누름 칸', () => {
   it('칸 0 의 "OK" 글자(고리 프레임 25 의 왼쪽 위 귀)도 누름 칸이다 — 좌타 (37, 134) · 다른 칸과 겹치지 않는다', () => {
     const badge = okBadgeTapRectOf(1)
     expect(badge).toEqual({ x: 37, y: 134, width: 24, height: 15 })
-    const overlaps = (a: typeof badge, b: typeof badge) =>
-      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    const overlaps = (a: typeof badge, b: typeof badge) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
     for (const slot of [1, 2, 3, 4, 5]) {
       const rect = slotTapRectOf(slot, 1)
       expect(rect).not.toBeNull()

@@ -72,17 +72,28 @@ export const BRACKET_FRAME = { 풀리그: 66, 결승: 67, 끝: 68 } as const
 /** 프레임 66 박스 — [0] 제목 · [1..4] 로고 · [5..8] 이름표 */
 export const BRACKET_LEAGUE_BOXES: readonly BracketBox[] = [
   [85, 41, 70, 18],
-  [20, 75, 76, 77], [146, 75, 76, 77], [21, 176, 76, 77], [146, 176, 76, 77],
-  [21, 154, 74, 18], [147, 154, 74, 18], [22, 255, 74, 18], [147, 255, 74, 18],
+  [20, 75, 76, 77],
+  [146, 75, 76, 77],
+  [21, 176, 76, 77],
+  [146, 176, 76, 77],
+  [21, 154, 74, 18],
+  [147, 154, 74, 18],
+  [22, 255, 74, 18],
+  [147, 255, 74, 18],
 ]
 /** 프레임 67 박스 — [0] 제목 · [1..2] 로고 · [3..4] 이름표 */
 export const BRACKET_FINAL_BOXES: readonly BracketBox[] = [
   [85, 41, 70, 18],
-  [20, 130, 76, 77], [146, 131, 76, 77],
-  [21, 212, 74, 18], [147, 212, 74, 18],
+  [20, 130, 76, 77],
+  [146, 131, 76, 77],
+  [21, 212, 74, 18],
+  [147, 212, 74, 18],
 ]
 /** 프레임 68 박스 — [0] 우승국 로고 · [1] 이름표 */
-export const BRACKET_END_BOXES: readonly BracketBox[] = [[82, 118, 76, 71], [83, 190, 74, 18]]
+export const BRACKET_END_BOXES: readonly BracketBox[] = [
+  [82, 118, 76, 71],
+  [83, 190, 74, 18],
+]
 
 /** 풀리그 제목 = img_text (314 − n) — n 4·3·2 → 310·311·312 (0x85b6e `movs #0x9d ; lsls #1 ; subs n`) */
 export const BRACKET_LEAGUE_TITLE_BASE = 314
@@ -94,7 +105,10 @@ export const BRACKET_FINAL_TITLE_FRAME = 313
  * 0x85bcc~0x85bd4: 그림 = `[[ui+0x384]+8]+8 [팀]` — 프레임이 아니라 **그림** 목록이다.
  */
 export const TEAM_LOGO_SIZES: Readonly<Record<number, readonly [width: number, height: number]>> = {
-  10: [76, 76], 11: [76, 77], 12: [76, 77], 13: [77, 76],
+  10: [76, 76],
+  11: [76, 77],
+  12: [76, 77],
+  13: [77, 76],
 }
 
 /**

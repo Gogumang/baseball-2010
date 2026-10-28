@@ -14,12 +14,7 @@ import { targetKindOf } from '@/entities/pitching/model/pitchIntelligence'
 import { applyControlError, cpuPickoffBaseOf, derbyPitchTargetOf, isCpuPickoff, pitchTargetOf } from '@/entities/pitching/model/pitchTarget'
 import { pitchPathOf, ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
-import {
-  MAGIC_PITCH_TYPE_NUMBER,
-  magicBallKindOf,
-  magicPitchNameOf,
-  magicPitchRecordIndexOf,
-} from '@/entities/pitcher-career/model/magicPitch'
+import { MAGIC_PITCH_TYPE_NUMBER, magicBallKindOf, magicPitchNameOf, magicPitchRecordIndexOf } from '@/entities/pitcher-career/model/magicPitch'
 import { advanceMagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
 import { isMistakePitch } from '@/entities/pitching/model/mistakePitch'
 import type { MagicPitchGameState } from '@/entities/pitching/model/magicPitchGame'
@@ -247,12 +242,7 @@ export function cpuPitchAimOf(args: CpuPitchArgs, random: RandomPort): CpuPitchA
  * **상태 0x11 틱 10 의 공 놓기 0x4dc78** (0x4e078) — 제구 등급 · 제구 오차 · 실투 · 곡선. `typeNumber` 는 0xf 의 마지막
  * 구질, `target` 은 0x10 의 목표점이다
  */
-export function releaseCpuPitch(
-  args: CpuPitchArgs,
-  typeNumber: number,
-  target: WorldPoint,
-  random: RandomPort,
-): CpuPitchThrow {
+export function releaseCpuPitch(args: CpuPitchArgs, typeNumber: number, target: WorldPoint, random: RandomPort): CpuPitchThrow {
   const { pitcher, situation, batterIntimidates } = args
   const repertoire = pitcher.repertoire ?? DEFAULT_REPERTOIRE
   const magicState = args.magic ?? { remaining: 0, ballMagicNumber: 0 }
@@ -267,20 +257,13 @@ export function releaseCpuPitch(
   // 0x4dbac: 구질(scene+0xfc8) == 22(마구)면 굴림 없이 5 를 돌려준다 (4dbb8 cmp #0x16 → 4dbbc movs r0,#5).
   // 마구가 아니면 0xb74bc(전역, 피로 먹인 제구, 체력%) 제구 등급을 굴린다 — 체력% 0 이면 지친 갈래.
   // 그 값이 scene+0x17c0 에 앉아 제구 오차(0xcfd60 행 5)에도 쓰인다
-  const controlTier = isMagic
-    ? MAGIC_PITCH_CONTROL_TIER
-    : controlTierOf(stats.control, gameStats.isNotExhausted, random)
+  const controlTier = isMagic ? MAGIC_PITCH_CONTROL_TIER : controlTierOf(stats.control, gameStats.isNotExhausted, random)
   // 0x34968(4dcc2) — 표시 구속 [+0x19a0] 을 등급 **뒤** · 흩어짐 **앞**에 한 번 굴린다 (`displaySpeed`)
-  const displaySpeedKmh = rollDisplaySpeedKmh(
-    { typeNumber, stats, controlTier, magicNumber: repertoire.magicId, form: repertoire.form },
-    random,
-  )
+  const displaySpeedKmh = rollDisplaySpeedKmh({ typeNumber, stats, controlTier, magicNumber: repertoire.magicId, form: repertoire.form }, random)
   // 4dcc6~4dcd2: 홈런더비(장면 [+0x1104] == 7)면 0x4de60 으로 뛰어 4dcd4~4de5e 를 통째로 건너뛴다 —
   // 그림 칸 [+0x17bc] = t + 3(4dce0) · 흩어짐 rand(0,100)(4dcf6) · 반지름 · 방향 굴림이 모두 없어 목표점(존 한가운데)
   // 그대로 던진다. 0x4de60 뒤(0xb6e25 · 궤적 준비 0x9e669 · 실투 0x33cbc · 곡선)는 더비에서도 그대로 돈다
-  const aimedTarget = isHomeRunDerby
-    ? target
-    : applyControlError(target, { tier: controlTier, isComputer: true }, random)
+  const aimedTarget = isHomeRunDerby ? target : applyControlError(target, { tier: controlTier, isComputer: true }, random)
   // 마구는 게이지를 쓰지 않고 등급이 늘 5 다 — 구속 단계 레코드가 없어 번호로 곧장 고른다 (H2 3-5·3-6)
   const speedStage = pitchSpeedStageOf(typeNumber - 1, stats, controlTier)
   const recordIndex = isMagic ? magicPitchRecordIndexOf(repertoire.magicId, repertoire.form) : null
@@ -316,15 +299,13 @@ export function releaseCpuPitch(
     speedStage,
     target: finalTarget,
     ...(recordIndex === null ? {} : { recordIndex }),
-    ...(isMistake
-      ? { frames: typeNumber === FASTBALL_TYPE_NUMBER ? MISTAKE_PITCH_FRAMES_FASTBALL : MISTAKE_PITCH_FRAMES }
-      : {}),
+    ...(isMistake ? { frames: typeNumber === FASTBALL_TYPE_NUMBER ? MISTAKE_PITCH_FRAMES_FASTBALL : MISTAKE_PITCH_FRAMES } : {}),
   })
 
   advanceMagicPitchGameState(magicState, typeNumber, repertoire.magicId, isHomeRunDerby)
 
   const pitch: Pitch = {
-    type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
+    type: isMagic ? (magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME) : type.name,
     plate: plateOf(finalTarget, situation.side),
     // 이글아이가 그리는 0x10 목표점(+0x10b8) — 오차 · 실투 바꾸기 전 점
     aimTarget: target,
@@ -344,9 +325,7 @@ export function releaseCpuPitch(
     pitcherMagicNumber: repertoire.magicId,
     pitcherForm: repertoire.form,
     // 깎은 뒤 체력% — 사람 스윙 판정 0xab214 가 같은 값을 본다
-    ...(pitcher.staminaPercentAfterPitch === undefined || staminaPercent === undefined
-      ? {}
-      : { pitcherStaminaPercent: staminaPercent }),
+    ...(pitcher.staminaPercentAfterPitch === undefined || staminaPercent === undefined ? {} : { pitcherStaminaPercent: staminaPercent }),
   }
   return { kind: '투구', pitch, pitchTypeNumber: typeNumber, isMistakePitch: isMistake }
 }
@@ -367,7 +346,7 @@ export function windUpCpuPitchOf(args: CpuPitchArgs, typeNumber: number, target:
   advanceMagicPitchGameState(magicPreview, typeNumber, repertoire.magicId, args.derbyPitchType !== undefined)
   const type = PITCH_TYPES[typeNumber - 1] ?? PITCH_TYPES[0]
   return {
-    type: isMagic ? magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME : type.name,
+    type: isMagic ? (magicPitchNameOf(repertoire.magicId, repertoire.form) ?? MAGIC_PITCH_NAME) : type.name,
     plate: plateOf(target, args.situation.side),
     // 0x4d2ac 이글아이가 와인드업 동안에도 투영하는 0x10 목표점(+0x10b8)
     aimTarget: target,
@@ -424,10 +403,7 @@ export function rollCpuPitchTypeOnPitcherChangeTick(input: PitcherChangeTickRoll
  * 구속으로 원본의 구속 단계를 골라 비행 시간을 낸다 — 사용자 투구(투수편) 전용.
  * 단계 사이는 보간한다. 양 끝값은 원본 그대로다.
  */
-export function flightMillisecondsOf(
-  flightSteps: readonly number[],
-  velocity: number,
-): number {
+export function flightMillisecondsOf(flightSteps: readonly number[], velocity: number): number {
   if (flightSteps.length === 0) return 18 * millisecondsPerFrame()
 
   const ratio = Math.min(1, Math.max(0, velocity / 100))

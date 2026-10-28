@@ -15,8 +15,10 @@ export function changedFiles(base) {
 }
 
 /** 앱 · 시험 바탕에 닿는 파일인데 도메인이 없는 것 — 넓은 변경으로 본다 */
-const isBroad = (file) => (/^src\//.test(file) && !/\.test\.tsx?$/.test(file)) || /^e2e\/lib\//.test(file)
-  || /^(vite\.config\.ts|package\.json|yarn\.lock|index\.html)$/.test(file)
+const isBroad = (file) =>
+  (/^src\//.test(file) && !/\.test\.tsx?$/.test(file)) ||
+  /^e2e\/lib\//.test(file) ||
+  /^(vite\.config\.ts|package\.json|yarn\.lock|index\.html)$/.test(file)
 
 /**
  * 바뀐 파일들 → `{ byFile: [[파일, 도메인들]], areas, broad }`. `broad` 는 도메인이 없는 앱 · 시험 바탕 파일 —

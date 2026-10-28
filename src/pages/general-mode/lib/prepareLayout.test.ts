@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ACE_LAYOUT, FIRST_BAT_LAYOUT, MATCH_INFO_LAYOUT, aceCellPositionOf, firstBatTagPlacementOf, isAceCellDimmed,
-  isAceGridCursorOn, isPrepareBobOn, stadiumArrowsOf, stadiumInfoValuesOf,
+  ACE_LAYOUT,
+  FIRST_BAT_LAYOUT,
+  MATCH_INFO_LAYOUT,
+  aceCellPositionOf,
+  firstBatTagPlacementOf,
+  isAceCellDimmed,
+  isAceGridCursorOn,
+  isPrepareBobOn,
+  stadiumArrowsOf,
+  stadiumInfoValuesOf,
 } from '@/pages/general-mode/lib/prepareLayout'
 
 /** 일반모드 준비 화면 배치 (공용 목록 페이지 0x63b15 — P6 2a) */

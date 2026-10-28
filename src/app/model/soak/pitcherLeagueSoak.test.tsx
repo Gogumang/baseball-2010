@@ -70,8 +70,13 @@ import { createMemoryAceMatchPendingPort } from '@/entities/mode-save/model/mode
 import type { NariGameMatch, NariGameSavePort } from '@/pages/management/lib/nariMatchPrepare'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import {
-  MAXIMUM_ABILITY, enterPitcherGameEvaluation, equippedPitcherAbilityOf, isPitcherSkillEquipped, pitcherAbilityLimitsOf,
-  migratePitcherYearlyStats, pitcherRecordLineOf,
+  MAXIMUM_ABILITY,
+  enterPitcherGameEvaluation,
+  equippedPitcherAbilityOf,
+  isPitcherSkillEquipped,
+  pitcherAbilityLimitsOf,
+  migratePitcherYearlyStats,
+  pitcherRecordLineOf,
 } from '@/entities/pitcher-career/model/pitcherCareer'
 import { MAGIC_PITCH_TYPE_NUMBER } from '@/entities/pitcher-career/model/magicPitch'
 import { magicTrainingCellBlockOf, magicTrainingCellCostOf } from '@/entities/pitcher-career/model/pitcherManagement'
@@ -85,12 +90,14 @@ import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { EMPTY_COLLECTION, HALL_OF_FAME_COST, registerHallOfFamePitcher } from '@/entities/collection/model/collection'
 import type { Collection } from '@/entities/collection/model/collection'
 import {
-  PITCH_TRAINING_ROW_COUNT, HIDDEN_PITCH_COLUMN, pitchTrainingCountOf, pitchTrainingGateOf, pitchTrainingProgressCellOf,
+  PITCH_TRAINING_ROW_COUNT,
+  HIDDEN_PITCH_COLUMN,
+  pitchTrainingCountOf,
+  pitchTrainingGateOf,
+  pitchTrainingProgressCellOf,
 } from '@/entities/pitcher-career/model/pitchTraining'
 import { runPitchTypeTraining } from '@/entities/pitcher-career/model/pitcherManagement'
-import {
-  PITCHER_CONTINUE_COST_GAME_POINT, isContinuablePitcherEnding, pitcherEndingBonusOf,
-} from '@/entities/pitcher-career/model/pitcherSeasonFlow'
+import { PITCHER_CONTINUE_COST_GAME_POINT, isContinuablePitcherEnding, pitcherEndingBonusOf } from '@/entities/pitcher-career/model/pitcherSeasonFlow'
 import type { AnnalsStatEvent } from '@/entities/collection/model/annalsStats'
 import { GAME_POINT_LIMIT } from '@/entities/wallet/model/gamePointWallet'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -105,8 +112,19 @@ import { PITCHER_TRAINING_MENUS, pitcherTrainingBlockReasonOf, runPitcherTrainin
 import { pitcherRestBlockReasonOf, recoverAfterPitcherRest, runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
 import { rollTrainingInjury } from '@/entities/career/model/condition'
 import {
-  closeBurstWindow, closeManagerHookWindow, confirmScene, isPitchTurn, pitchSlotsFor, resolveBenchClearing, resolveDefensePlay,
-  recordDrawnPitcherFieldingErrors, resolveRunnerPlay, startPitch, startPitcherGame, startsToday, summaryOf,
+  closeBurstWindow,
+  closeManagerHookWindow,
+  confirmScene,
+  isPitchTurn,
+  pitchSlotsFor,
+  resolveBenchClearing,
+  resolveDefensePlay,
+  recordDrawnPitcherFieldingErrors,
+  resolveRunnerPlay,
+  startPitch,
+  startPitcherGame,
+  startsToday,
+  summaryOf,
 } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { drawnReplayFieldingErrorsOf } from '@/features/defense-play/model/fieldingErrors'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
@@ -126,8 +144,17 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import {
-  SoakProblems, batterLineProblemsOf, firstDiffOf, isSoakEnabled, jsonRoundTripDiffOf, leagueTallyProblemsOf, outOfRangeOf,
-  rankingOrderProblemsOf, soakNumber, soakSeeds, unserializablePathsOf,
+  SoakProblems,
+  batterLineProblemsOf,
+  firstDiffOf,
+  isSoakEnabled,
+  jsonRoundTripDiffOf,
+  leagueTallyProblemsOf,
+  outOfRangeOf,
+  rankingOrderProblemsOf,
+  soakNumber,
+  soakSeeds,
+  unserializablePathsOf,
 } from '@/app/model/soak/soakInvariants'
 import { isBugFixed } from '@/shared/config/bugfixes'
 
@@ -287,7 +314,13 @@ function playPitcherGameHeadless(options: PitcherGameOptions, random: RandomPort
     const settled = JSON.stringify(summary.leagueErrors)
     const errorProblems = settled === JSON.stringify(drawnErrors) ? [] : [`정산 실책 ${settled} ≠ 그린 실책 ${JSON.stringify(drawnErrors)}`]
     return {
-      summary, pitches, magicThrown, magicCount: options.magicCount, magicRemaining: progress.magicRemaining, magicProblems, errorProblems,
+      summary,
+      pitches,
+      magicThrown,
+      magicCount: options.magicCount,
+      magicRemaining: progress.magicRemaining,
+      magicProblems,
+      errorProblems,
     }
   }
   for (let step = 0; step < 20_000; step += 1) {
@@ -364,9 +397,14 @@ interface PitcherSoakOptions {
    * 장비 · 장소 대결 이벤트(연차 4~)를 몇 초 안에 밟게 한다
    */
   readonly startPatch?: {
-    readonly season?: number; readonly popularity?: number; readonly money?: number; readonly seenEventIds?: readonly string[]
+    readonly season?: number
+    readonly popularity?: number
+    readonly money?: number
+    readonly seenEventIds?: readonly string[]
     /** 부상 경기 수 · 부상 — 20 이면 다음 105 진입이 부상 엔딩(0xa3a84 첫 줄)이다 */
-    readonly injuredGamesPlayed?: number; readonly isInjured?: boolean; readonly injuryRemaining?: number
+    readonly injuredGamesPlayed?: number
+    readonly isInjured?: boolean
+    readonly injuryRemaining?: number
   }
   /** 이어할 수 있는 엔딩을 만날 때마다 5000 G 로 이어한다 — 없으면 새 길에서 한 번만 */
   readonly continueEndings?: boolean
@@ -431,8 +469,22 @@ interface PathCounts {
 }
 
 const emptyPaths = (): PathCounts => ({
-  외출기능: 0, 장소: 0, 대결: 0, 대결이김: 0, 장비: 0, 착용: 0, 서브: 0, GP: 0, 복권: 0, 마구훈련: 0, 구질훈련: 0, 마구공: 0, 엔딩이어하기: 0,
-  보상명령: 0, 이어하기: {}, 명전: 0,
+  외출기능: 0,
+  장소: 0,
+  대결: 0,
+  대결이김: 0,
+  장비: 0,
+  착용: 0,
+  서브: 0,
+  GP: 0,
+  복권: 0,
+  마구훈련: 0,
+  구질훈련: 0,
+  마구공: 0,
+  엔딩이어하기: 0,
+  보상명령: 0,
+  이어하기: {},
+  명전: 0,
 })
 
 type Rendered = { readonly current: PitcherLeagueSession }
@@ -472,8 +524,17 @@ const STUCK_FRAMES = 6_000
 
 async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakResult> {
   const {
-    seed, role, teamId, maxGames, roundTripEvery = 5, boostAbility = false, extras = false, resumeEvery = 0, continueEndings = false,
-    stopAfterContinues, gameScreen = false,
+    seed,
+    role,
+    teamId,
+    maxGames,
+    roundTripEvery = 5,
+    boostAbility = false,
+    extras = false,
+    resumeEvery = 0,
+    continueEndings = false,
+    stopAfterContinues,
+    gameScreen = false,
   } = options
   const frameScenes: ReadonlySet<PitcherScene> = gameScreen ? new Set<PitcherScene>([...FRAME_SCENES, '경기']) : FRAME_SCENES
   const store = memoryStore()
@@ -484,7 +545,12 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   const nariGameSave = memoryNariGameSave()
   const aceMatchPending = createMemoryAceMatchPendingPort()
   let missionCounts: Readonly<Record<string, number>> = {}
-  const missionRecord = { load: () => missionCounts, save: (counts: Readonly<Record<string, number>>) => { missionCounts = counts } }
+  const missionRecord = {
+    load: () => missionCounts,
+    save: (counts: Readonly<Record<string, number>>) => {
+      missionCounts = counts
+    },
+  }
   /** 장면 0x106 이 서 있나 — 다시 세울 때는 메인 메뉴(거짓)로 띄우고 투수편으로 들어선다(참) */
   const onScreen = { value: true }
   const settingsStore = memoryStore()
@@ -514,7 +580,12 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
    * 0xa5368 은 +0xbd = team − 1 ≤ 15(team 16 메디카)일 때만 투수 15번 칸을 −1 에서 하나 올린다.
    */
   const aceWatch: {
-    opened: { readonly team: number; readonly resultEvents: readonly number[]; readonly gamePoint: number; readonly counts: Readonly<Record<string, number>> } | null
+    opened: {
+      readonly team: number
+      readonly resultEvents: readonly number[]
+      readonly gamePoint: number
+      readonly counts: Readonly<Record<string, number>>
+    } | null
     finished: { readonly isWin: boolean } | null
   } = { opened: null, finished: null }
 
@@ -551,7 +622,9 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     },
   })
   /** 화면 경기(`gameScreen`) — 경기를 세운 때의 커리어 · 옵션, 끝난 요약 */
-  const gameStart: { current: { readonly before: PitcherCareer; readonly options: PitcherGameOptions; readonly isCup: boolean } | null } = { current: null }
+  const gameStart: { current: { readonly before: PitcherCareer; readonly options: PitcherGameOptions; readonly isCup: boolean } | null } = {
+    current: null,
+  }
   const finishedGame: { current: Parameters<typeof checkFinishedGame>[0] | null } = { current: null }
 
   const holder: { current: HarnessHooks | null } = { current: null }
@@ -561,13 +634,30 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     const runner = useAtBatRunner()
     const gameSettings = useGameSettings(settingsStore)
     const session = usePitcherLeagueSession(
-      store, random, gameSettings.settings.pitchControl === '게이지', wallet, null, gameSettings.settings.throwMode === '수동', recordStat,
-      undefined, undefined, undefined, nariGameSave, aceMatchPending, onScreen.value,
+      store,
+      random,
+      gameSettings.settings.pitchControl === '게이지',
+      wallet,
+      null,
+      gameSettings.settings.throwMode === '수동',
+      recordStat,
+      undefined,
+      undefined,
+      undefined,
+      nariGameSave,
+      aceMatchPending,
+      onScreen.value,
     )
     // App 353 — 미션 세션의 투수는 투수편 커리어(`modePitcherOf`)
     const pitcher = useMemo(() => modePitcherOf(session.career), [session.career])
     const mission = useMissionSession({
-      runner, random, missionRecord, screen: PITCHER_EDITION_SCREEN, setScreen: NO_SET_SCREEN, pitcher, recordStat,
+      runner,
+      random,
+      missionRecord,
+      screen: PITCHER_EDITION_SCREEN,
+      setScreen: NO_SET_SCREEN,
+      pitcher,
+      recordStat,
       throwModeManual: gameSettings.settings.throwMode === '수동',
       runningModeManual: gameSettings.settings.runningMode === '수동',
       isVibrationOn: gameSettings.settings.isVibrationOn,
@@ -599,7 +689,11 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   }
   const mount = () => render(<Harness />)
   let rendered = mount()
-  const result: Rendered = { get current() { return holder.current!.session } }
+  const result: Rendered = {
+    get current() {
+      return holder.current!.session
+    },
+  }
   const hooks = () => holder.current!
   ledger.balance = hooks().wallet.balance
   const problems = new SoakProblems()
@@ -621,8 +715,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
 
   const where = () => {
     const career = result.current.career
-    return `씨앗 ${seed} · ${career === null ? '-' : `${career.season}년차 g${career.gamesPlayed}${career.postseason !== null ? '(PS)' : ''}`}`
-      + ` · ${result.current.scene} · 걸음 ${steps}`
+    return (
+      `씨앗 ${seed} · ${career === null ? '-' : `${career.season}년차 g${career.gamesPlayed}${career.postseason !== null ? '(PS)' : ''}`}` +
+      ` · ${result.current.scene} · 걸음 ${steps}`
+    )
   }
 
   /**
@@ -662,11 +758,16 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     if (hooks().wallet.balance !== opened.gamePoint) lines.push(`대결 G ${opened.gamePoint} → ${hooks().wallet.balance} (0x4ef3e 는 건너뛴다)`)
     const target = aceMatchMissionOf(opened.team, '투수')
     const key = target === null ? null : aceMatchClearKeyOf(target)
-    const expectedCounts = finished.isWin && key !== null ? { ...opened.counts, [key]: aceMatchClearCountAfterWin(opened.counts[key]) } : opened.counts
+    const expectedCounts =
+      finished.isWin && key !== null ? { ...opened.counts, [key]: aceMatchClearCountAfterWin(opened.counts[key]) } : opened.counts
     const firstDiff = firstDiffOf(expectedCounts, missionCounts)
     if (firstDiff !== null) lines.push(`클리어 칸 ${firstDiff}`)
-    problems.add(where(), lines.map((line) => `마선수 대결 team ${opened.team}: ${line}`))
-    if (process.env.SOAK_DEBUG === '1') process.stderr.write(`[대결 대조] team ${opened.team} ${finished.isWin ? '이김' : '짐'} 문제 ${lines.length}\n`)
+    problems.add(
+      where(),
+      lines.map((line) => `마선수 대결 team ${opened.team}: ${line}`),
+    )
+    if (process.env.SOAK_DEBUG === '1')
+      process.stderr.write(`[대결 대조] team ${opened.team} ${finished.isWin ? '이김' : '짐'} 문제 ${lines.length}\n`)
   }
 
   /** G 장부 = 지갑 — 어긋나면 그 걸음을 적고 장부를 지갑에 맞춘다(같은 어긋남이 걸음마다 쌓이지 않게) */
@@ -685,21 +786,57 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     if (career === null || career === lastCheckedCareer) return
     lastCheckedCareer = career
     const at = where()
-    problems.add(at, outOfRangeOf('career', {
-      gamePoint: career.gamePoint, season: career.season, gamesPlayed: career.gamesPlayed, popularity: career.popularity,
-      reputation: career.reputation, morale: career.morale, money: career.money, salary: career.salary, stamina: career.stamina,
-      magicLevel: career.magicLevel, injuryRemaining: career.injuryRemaining, illnessRemaining: career.illnessRemaining,
-      illnessCooldown: career.illnessCooldown, positionCode: career.positionCode, regularSeasonFirstCount: career.regularSeasonFirstCount,
-      wins: (career as { wins?: number }).wins, losses: (career as { losses?: number }).losses,
-    }, 0))
+    problems.add(
+      at,
+      outOfRangeOf(
+        'career',
+        {
+          gamePoint: career.gamePoint,
+          season: career.season,
+          gamesPlayed: career.gamesPlayed,
+          popularity: career.popularity,
+          reputation: career.reputation,
+          morale: career.morale,
+          money: career.money,
+          salary: career.salary,
+          stamina: career.stamina,
+          magicLevel: career.magicLevel,
+          injuryRemaining: career.injuryRemaining,
+          illnessRemaining: career.illnessRemaining,
+          illnessCooldown: career.illnessCooldown,
+          positionCode: career.positionCode,
+          regularSeasonFirstCount: career.regularSeasonFirstCount,
+          wins: (career as { wins?: number }).wins,
+          losses: (career as { losses?: number }).losses,
+        },
+        0,
+      ),
+    )
     problems.add(at, outOfRangeOf('career.ability', { ...career.ability }, 0))
     problems.add(at, outOfRangeOf('career.equipmentLevels', { ...career.equipmentLevels }, 0))
     problems.add(at, outOfRangeOf('career(상한)', { morale: career.morale }, 0, 100))
-    for (const [name, stats] of [['stats', career.stats], ['careerStats', career.careerStats]] as const) {
-      problems.add(at, outOfRangeOf(`career.${name}`, {
-        games: stats.games, outs: stats.outs, runsAllowed: stats.runsAllowed, saves: stats.saves, strikeouts: stats.strikeouts,
-        pitches: stats.pitches, wins: stats.wins, losses: stats.losses, walks: stats.walks,
-      }, 0))
+    for (const [name, stats] of [
+      ['stats', career.stats],
+      ['careerStats', career.careerStats],
+    ] as const) {
+      problems.add(
+        at,
+        outOfRangeOf(
+          `career.${name}`,
+          {
+            games: stats.games,
+            outs: stats.outs,
+            runsAllowed: stats.runsAllowed,
+            saves: stats.saves,
+            strikeouts: stats.strikeouts,
+            pitches: stats.pitches,
+            wins: stats.wins,
+            losses: stats.losses,
+            walks: stats.walks,
+          },
+          0,
+        ),
+      )
     }
     if (career.careerStats.outs < career.stats.outs) problems.add(at, [`통산 아웃 ${career.careerStats.outs} < 시즌 아웃 ${career.stats.outs}`])
     const { league } = career
@@ -711,9 +848,21 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     problems.add(at, rankingOrderProblemsOf('rankingOf', rankingOf(league), league.wins, league.losses))
     for (const [id, line] of Object.entries(career.leaguePlayerStats.batters)) problems.add(at, batterLineProblemsOf(`batters[${id}]`, line))
     for (const [id, line] of Object.entries(career.leaguePlayerStats.pitchers ?? {})) {
-      problems.add(at, outOfRangeOf(`pitchers[${id}]`, {
-        outs: line.outs, runsAllowed: line.runsAllowed, strikeouts: line.strikeouts, wins: line.wins, losses: line.losses, saves: line.saves,
-      }, 0))
+      problems.add(
+        at,
+        outOfRangeOf(
+          `pitchers[${id}]`,
+          {
+            outs: line.outs,
+            runsAllowed: line.runsAllowed,
+            strikeouts: line.strikeouts,
+            wins: line.wins,
+            losses: line.losses,
+            saves: line.saves,
+          },
+          0,
+        ),
+      )
     }
     const series = career.postseason
     if (series !== null) {
@@ -721,7 +870,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       if (series.teams[0] === series.teams[1]) problems.add(at, [`시리즈 두 칸이 같은 팀 ${series.teams[0]}`])
     }
     for (const [team, staminas] of Object.entries(career.leaguePitcherStaminas ?? {})) {
-      problems.add(at, outOfRangeOf(`leaguePitcherStaminas[${team}]`, Object.fromEntries((staminas as readonly number[]).map((v, i) => [i, v])), 0, 10_000))
+      problems.add(
+        at,
+        outOfRangeOf(`leaguePitcherStaminas[${team}]`, Object.fromEntries((staminas as readonly number[]).map((v, i) => [i, v])), 0, 10_000),
+      )
     }
     if (extras) checkExtras(career, at)
   }
@@ -738,7 +890,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
         problems.add(at, [`${part.name} 니블 ${nibble} 인데 그 장비(레벨 ${nibble - 1})가 보유에 없다`])
       }
     }
-    if (new Set(career.ownedEquipment).size !== career.ownedEquipment.length) problems.add(at, [`보유 장비가 겹친다 ${career.ownedEquipment.join(',')}`])
+    if (new Set(career.ownedEquipment).size !== career.ownedEquipment.length)
+      problems.add(at, [`보유 장비가 겹친다 ${career.ownedEquipment.join(',')}`])
     if (new Set(career.subItemIds).size !== career.subItemIds.length) problems.add(at, [`서브 아이템이 겹친다 ${career.subItemIds.join(',')}`])
     problems.add(at, abilitySumProblemsOf(career))
     problems.add(at, outOfRangeOf('career(마구)', { magicLevel: career.magicLevel }, 0, 4))
@@ -780,9 +933,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       // 116(경기결과)에서 끊고 이어하면 진입 0x1278c 가 다시 돌아 경기 뒤 카운터(12bc2~12c3c: 이번 시즌 인기도 합 +0x1c2 · 평판 0 연속 +0x184 ·
       // 무력감 · 먹튀)가 한 번 더 쌓인다 — 원본 그대로(`enterPitcherGameEvaluation` 머리말). 같은 재진입을 얹어 견준다
       // B-28 고친 길(`BUGFIXES=json`)이면 다시 쓰지 않는다 — 저장 그대로
-      const reentered = now !== null && result.current.scene === '경기결과' && now.seasonEndState === 116 && !isBugFixed('B-28')
-        ? enterPitcherGameEvaluation(now)
-        : now
+      const reentered =
+        now !== null && result.current.scene === '경기결과' && now.seasonEndState === 116 && !isBugFixed('B-28')
+          ? enterPitcherGameEvaluation(now)
+          : now
       // 다시 띄우면 나리 장면 0x106 이 새로 서며 셋업 0xf684 → 0x8ce94 → 0xacf60 이 반복 이벤트(452~454 · 490 …) 본 표시를 지운다 —
       // 메모리에서만 지우는 원본 그대로라(저장에는 다음 저장 때 같이 간다) 같은 지움을 얹어 견준다
       const events = result.current.storyEvents
@@ -821,11 +975,13 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
         problems.add(where(), [`마구 ${played.magicThrown}개를 던졌는데 횟수 ${played.magicCount} → ${played.magicRemaining}`])
       }
       // 고른 마구가 없으면 횟수 0 (+0x18 == 0 — 0xb6d6a 칸 5 가 빈다). 국가대항전은 대표팀 칸이라 뺀다
-      if (!isCup && before.selectedMagicNumber === 0 && played.magicCount !== 0) problems.add(where(), [`고른 마구가 없는데 횟수 ${played.magicCount}`])
+      if (!isCup && before.selectedMagicNumber === 0 && played.magicCount !== 0)
+        problems.add(where(), [`고른 마구가 없는데 횟수 ${played.magicCount}`])
       // 경기에 실린 체력 칸(용량 X 바탕 0xb6415(P, 3, 1))이 장비 니블을 탄 값인가
       if (![5, 7, 22].some((skillId) => isPitcherSkillEquipped(before, skillId))) {
         const expected = Math.min(MAXIMUM_ABILITY, before.ability.stamina + equipmentBonusOf(before.equipmentLevels.stamina))
-        if (!isCup && options.staminaAbility !== expected) problems.add(where(), [`경기 체력 칸 ${options.staminaAbility} ≠ 능력치 + 장비 ${expected}`])
+        if (!isCup && options.staminaAbility !== expected)
+          problems.add(where(), [`경기 체력 칸 ${options.staminaAbility} ≠ 능력치 + 장비 ${expected}`])
       }
     }
     act(() => result.current.actions.finishGame(summary))
@@ -834,14 +990,34 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   }
 
   /** 경기 요약 검사 — 끝난 경기의 요약 · 그 앞 커리어 · 지금(정산 뒤) 커리어 */
-  const checkFinishedGame = ({ before, options, summary, isCup }: {
-    readonly before: PitcherCareer; readonly options: PitcherGameOptions; readonly summary: PitcherGameSummary; readonly isCup: boolean
+  const checkFinishedGame = ({
+    before,
+    options,
+    summary,
+    isCup,
+  }: {
+    readonly before: PitcherCareer
+    readonly options: PitcherGameOptions
+    readonly summary: PitcherGameSummary
+    readonly isCup: boolean
   }) => {
     const isPostseason = before.postseason !== null && !isCup
-    problems.add(where(), outOfRangeOf('summary', {
-      ourScore: summary.ourScore, opponentScore: summary.opponentScore, pitchCount: summary.pitchCount, stamina: summary.stamina,
-      outs: summary.seasonDelta.outs, runsAllowed: summary.seasonDelta.runsAllowed, strikeouts: summary.seasonDelta.strikeouts,
-    }, 0))
+    problems.add(
+      where(),
+      outOfRangeOf(
+        'summary',
+        {
+          ourScore: summary.ourScore,
+          opponentScore: summary.opponentScore,
+          pitchCount: summary.pitchCount,
+          stamina: summary.stamina,
+          outs: summary.seasonDelta.outs,
+          runsAllowed: summary.seasonDelta.runsAllowed,
+          strikeouts: summary.seasonDelta.strikeouts,
+        },
+        0,
+      ),
+    )
     if (summary.ourScore === summary.opponentScore) problems.add(where(), [`무승부로 끝났다 ${summary.ourScore}-${summary.opponentScore}`])
     // 로테이션 — 선발 보직의 정규시즌 경기는 내 선발 날(0xa4f60)이면 등판한다
     if (!isCup && !isPostseason && role === PITCHER_ROLE.starter && startsToday(options) && !summary.hasEntered) {
@@ -908,7 +1084,9 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     let did = false
     const now = () => result.current.career!
     // 장비 — 살 수 있는(가드 0x13460 kind 3 를 지나는) 가장 싼 칸, 소지금 반은 남긴다
-    const equipment = PITCHER_EQUIPMENT_PARTS.flatMap((part) => Array.from({ length: 7 }, (_unused, level) => pitcherEquipmentItemOf(part.index, level)))
+    const equipment = PITCHER_EQUIPMENT_PARTS.flatMap((part) =>
+      Array.from({ length: 7 }, (_unused, level) => pitcherEquipmentItemOf(part.index, level)),
+    )
       .filter((item) => pitcherEquipmentBlockNoticeOf(now(), item.part, item.level) === null && item.price * 2 <= now().money)
       .sort((a, b) => a.price - b.price)[0]
     if (equipment !== undefined) {
@@ -917,7 +1095,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       const after = now()
       const ability = PITCHER_EQUIPMENT_PARTS[equipment.part]!.ability
       expectDelta(`장비 ${equipment.name}`, '소지금', before.money, after.money, -equipment.price)
-      if (after.equipmentLevels[ability] !== equipment.level + 1) problems.add(where(), [`장비 ${equipment.name} 를 샀는데 니블 ${after.equipmentLevels[ability]}`])
+      if (after.equipmentLevels[ability] !== equipment.level + 1)
+        problems.add(where(), [`장비 ${equipment.name} 를 샀는데 니블 ${after.equipmentLevels[ability]}`])
       if (!ownsPitcherEquipment(after, equipment.part, equipment.level)) problems.add(where(), [`장비 ${equipment.name} 를 샀는데 보유에 없다`])
       expectDelta(`장비 ${equipment.name}`, 'G', before.gamePoint, after.gamePoint, 0)
       paths.장비 += 1
@@ -925,14 +1104,16 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     }
     // 장비착용 121 — 한 부위에 두 레벨 이상 가졌으면 낮은 것으로 바꿔 끼었다가 높은 것으로 되돌린다 (0x17ad0, 소지금 · G 그대로)
     const swap = PITCHER_EQUIPMENT_PARTS.map((part) => ({
-      part, levels: Array.from({ length: 11 }, (_unused, level) => level).filter((level) => ownsPitcherEquipment(now(), part.index, level)),
+      part,
+      levels: Array.from({ length: 11 }, (_unused, level) => level).filter((level) => ownsPitcherEquipment(now(), part.index, level)),
     })).find((entry) => entry.levels.length >= 2)
     if (swap !== undefined && paths.착용 < 50) {
       const before = now()
       const top = before.equipmentLevels[swap.part.ability] - 1
       const low = swap.levels.find((level) => level !== top)!
       buy('착용', `착용:${swap.part.index}:${low}`)
-      if (now().equipmentLevels[swap.part.ability] !== low + 1) problems.add(where(), [`장비착용 ${swap.part.name} ${low} 인데 니블 ${now().equipmentLevels[swap.part.ability]}`])
+      if (now().equipmentLevels[swap.part.ability] !== low + 1)
+        problems.add(where(), [`장비착용 ${swap.part.name} ${low} 인데 니블 ${now().equipmentLevels[swap.part.ability]}`])
       if (top >= 0) buy('착용', `착용:${swap.part.index}:${top}`)
       expectDelta('장비착용', '소지금', before.money, now().money, 0)
       expectDelta('장비착용', 'G', before.gamePoint, now().gamePoint, 0)
@@ -940,8 +1121,9 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       did = true
     }
     // 서브 아이템 — 못 가진 가장 싼 칸(소지금 반은 남긴다)
-    const sub = PITCHER_SUB_ITEMS.filter((item) => pitcherItemBlockNoticeOf(now(), '서브', item.id) === null && item.price * 2 <= now().money)
-      .sort((a, b) => a.price - b.price)[0]
+    const sub = PITCHER_SUB_ITEMS.filter((item) => pitcherItemBlockNoticeOf(now(), '서브', item.id) === null && item.price * 2 <= now().money).sort(
+      (a, b) => a.price - b.price,
+    )[0]
     if (sub !== undefined) {
       const before = now()
       buy('서브', `서브:${sub.id}`)
@@ -964,7 +1146,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       if (id === 5) {
         // 또또상품권 0xa4604 — 구매 수 +1(상한 200) · 1~6등이면 상금(0xd80a7 × 100, 소지금 상한 999900), 그 밖은 아이템 효과
         const moneyGain = after.money - before.money
-        if (moneyGain !== 0 && !LOTTERY_MONEY.includes(moneyGain) && after.money !== 999_900) problems.add(where(), [`복권 상금 ${moneyGain} 가 표 밖`])
+        if (moneyGain !== 0 && !LOTTERY_MONEY.includes(moneyGain) && after.money !== 999_900)
+          problems.add(where(), [`복권 상금 ${moneyGain} 가 표 밖`])
         expectDelta('복권', '구매 수', before.lotteryPurchases, after.lotteryPurchases, before.lotteryPurchases >= 200 ? 0 : 1)
         paths.복권 += 1
       } else {
@@ -982,7 +1165,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   const runMagicTraining = (career: PitcherCareer): boolean => {
     const cell = career.magicLevel
     const menu = PITCHER_TRAINING_MENUS[PITCHER_TRAINING_MENUS.length - 1]!
-    if (cell >= 4 || career.morale <= 0 || magicTrainingCellBlockOf(career, cell) !== null || pitcherTrainingBlockReasonOf(career, menu) !== null) return false
+    if (cell >= 4 || career.morale <= 0 || magicTrainingCellBlockOf(career, cell) !== null || pitcherTrainingBlockReasonOf(career, menu) !== null)
+      return false
     const gBefore = walletBalance()
     act(() => result.current.actions.pressManagementConfirm())
     act(() => result.current.actions.setResultWindowOpen(true))
@@ -1057,8 +1241,12 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   const outingFunctionFor = (career: PitcherCareer) => {
     const all = OUTING_PLACES.flatMap((place) => place.functions)
     const order = [
-      career.isInjured || career.isSick ? '입원' : null, career.morale < 70 ? '외식' : null, career.money < 3_000 ? 'CF촬영' : null,
-      '팬미팅', '야구교실', 'CF촬영',
+      career.isInjured || career.isSick ? '입원' : null,
+      career.morale < 70 ? '외식' : null,
+      career.money < 3_000 ? 'CF촬영' : null,
+      '팬미팅',
+      '야구교실',
+      'CF촬영',
     ].filter((id): id is string => id !== null)
     return order.map((id) => all.find((fn) => fn.id === id)).find((fn) => fn !== undefined && outingBlockReasonOf(career, fn) === null) ?? null
   }
@@ -1082,7 +1270,11 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
         // 효과 0x15234 — 소지금은 굴리지 않는 표 값 0xcc344 에 서브 아이템 보정(보험증서 입원 0 · 명품정장 CF −400, 점프표 0xcc6c4),
         // 행동함 · 외출 수 +1
         const cost = applyOutingSubItems(before, fn.id, {
-          moneyCost: fn.effect.moneyCost, moraleGain: 0, popularityGain: 0, reputationGain: 0, healsInjury: fn.effect.healsInjury,
+          moneyCost: fn.effect.moneyCost,
+          moraleGain: 0,
+          popularityGain: 0,
+          reputationGain: 0,
+          healsInjury: fn.effect.healsInjury,
         }).moneyCost
         expectDelta(`외출 ${fn.name}`, '소지금', before.money, after.money, Math.max(0, before.money - cost) - before.money)
         expectDelta(`외출 ${fn.name}`, 'G', before.gamePoint, after.gamePoint, 0)
@@ -1106,7 +1298,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       placeEnteredAt.set(eventPlace.id, outingVisitCount)
       paths.장소 += 1
       act(() => actions.enterOutingPlace(eventPlace))
-      if (process.env.SOAK_DEBUG === '1') yearLog.push(`장소 ${eventPlace.id} → 이벤트 ${result.current.story?.eventId} (${career.season}년차 g${career.gamesPlayed}) 본적 ${career.seenEventIds.includes(String(result.current.story?.eventId))}`)
+      if (process.env.SOAK_DEBUG === '1')
+        yearLog.push(
+          `장소 ${eventPlace.id} → 이벤트 ${result.current.story?.eventId} (${career.season}년차 g${career.gamesPlayed}) 본적 ${career.seenEventIds.includes(String(result.current.story?.eventId))}`,
+        )
       return
     }
     if (!outingVisit.ran && !career.hasActedThisCycle) {
@@ -1143,9 +1338,15 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     const famer = collection.hallOfFamePitchers.at(-1)
     // 0x1f654 — 그때 선수 레코드를 통째로: 이름 · 능력치 · 장비 능력치 0xb6415 · 장비 니블 · 시즌 줄(+0x20~) · 엔딩 · 연차
     const expected = {
-      name: career.name, ability: career.ability, equippedAbility: equippedPitcherAbilityOf(career), equipmentLevels: career.equipmentLevels,
-      recordLine: pitcherRecordLineOf(career.stats), endingIndex: career.endingIndex, season: career.season,
-      selectedMagicNumber: career.selectedMagicNumber, pitchMask: career.pitchMask,
+      name: career.name,
+      ability: career.ability,
+      equippedAbility: equippedPitcherAbilityOf(career),
+      equipmentLevels: career.equipmentLevels,
+      recordLine: pitcherRecordLineOf(career.stats),
+      endingIndex: career.endingIndex,
+      season: career.season,
+      selectedMagicNumber: career.selectedMagicNumber,
+      pitchMask: career.pitchMask,
     }
     for (const [key, value] of Object.entries(expected)) {
       const diff = firstDiffOf(value, (famer as unknown as Record<string, unknown> | undefined)?.[key], `명전.${key}`)
@@ -1182,9 +1383,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     rendered = mount()
     await waitUntil(() => result.current.storyEvents !== null, '이벤트 본문')
     // 116 재진입 0x1278c · 반복 이벤트 지움 — `checkRoundTrip` 과 같은 근거. B-28 고친 길이면 재진입이 없다(저장 그대로)
-    const reentered = now !== null && scene === '경기결과' && now.seasonEndState === 116 && !isBugFixed('B-28')
-      ? enterPitcherGameEvaluation(now)
-      : now
+    const reentered =
+      now !== null && scene === '경기결과' && now.seasonEndState === 116 && !isBugFixed('B-28') ? enterPitcherGameEvaluation(now) : now
     const expected = reentered === null || events === null ? reentered : forgetRepeatableEvents(reentered, events)
     const d = firstDiffOf(expected, result.current.career, 'career')
     if (d !== null) problems.add(at, [`이어하기(${scene}) 뒤 커리어가 다르다: ${d}`])
@@ -1219,21 +1419,31 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     // 화면 경기 — 처음 선 틀에 경기 앞 커리어 · 옵션을 잡는다(요약 검사 재료)
     if (session.scene === '경기' && gameStart.current === null && session.gameOptions !== null && session.career !== null) {
       gameStart.current = {
-        before: session.career, options: session.gameOptions, isCup: session.cupMatch !== null || session.gameOptions.isNationalCup === true,
+        before: session.career,
+        options: session.gameOptions,
+        isCup: session.cupMatch !== null || session.gameOptions.isNationalCup === true,
       }
     }
-    const stage = session.scene !== '마선수대결' && session.scene !== '경기' ? '판'
-      : isShown('확인 누름 칸') ? '확인'
-        : isShown('구질 누름 칸') ? '구질'
-          : isShown('조준 영역') ? '조준'
-            : isShown('게이지 누름 칸') ? '게이지' : '판'
+    const stage =
+      session.scene !== '마선수대결' && session.scene !== '경기'
+        ? '판'
+        : isShown('확인 누름 칸')
+          ? '확인'
+          : isShown('구질 누름 칸')
+            ? '구질'
+            : isShown('조준 영역')
+              ? '조준'
+              : isShown('게이지 누름 칸')
+                ? '게이지'
+                : '판'
     if (stage !== lastStage) {
       // 마구 칸(5 — '0')을 골라 조준으로 넘어갔으면 마구 공 하나 (0x50db8 — 남은 횟수가 0 이면 키를 버린다)
       if (lastStage === '구질' && stage === '조준' && lastSlotKey === '0') paths.마구공 += 1
       lastStage = stage
       planned = null
       // 구질 — 정책 난수로 칸 0~4(가끔 마구 칸 5). 빈 칸이면 키가 안 먹어 아래 OK(칸 0)로 넘어간다
-      if (stage === '구질') planned = { frame: frames + 1 + Math.floor(policy() * 4), key: PITCH_SLOT_KEYS[policy() < 0.1 ? 5 : Math.floor(policy() * 5)]! }
+      if (stage === '구질')
+        planned = { frame: frames + 1 + Math.floor(policy() * 4), key: PITCH_SLOT_KEYS[policy() < 0.1 ? 5 : Math.floor(policy() * 5)]! }
       // 조준 — 흔들림(0x39c5c `aimTick`)이 도는 동안 몇 틱 뒤 OK. 가끔 한 칸 옮긴다
       else if (stage === '조준') {
         if (policy() < 0.5) pressKey(['2', '4', '6', '8'][Math.floor(policy() * 4)]!)
@@ -1247,9 +1457,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       if (stage === '구질') lastSlotKey = key
       pressKey(key)
     }
-    const signature = `${session.scene}:${session.story?.eventId}:${session.story?.context}:${stage}:${run?.status}:${run?.outs}`
-      + `:${run?.game.inning}:${run?.game.offenseSide}:${runner.atBat.balls}:${runner.atBat.strikes}:${mission.halfInningBoard === null}`
-      + `:${mission.loadingTip === null}:${mission.pendingDefensePlay === null}:${mission.pendingRunnerPlay == null}`
+    const signature =
+      `${session.scene}:${session.story?.eventId}:${session.story?.context}:${stage}:${run?.status}:${run?.outs}` +
+      `:${run?.game.inning}:${run?.game.offenseSide}:${runner.atBat.balls}:${runner.atBat.strikes}:${mission.halfInningBoard === null}` +
+      `:${mission.loadingTip === null}:${mission.pendingDefensePlay === null}:${mission.pendingRunnerPlay == null}`
     if (signature === lastSignature) idleFrames += 1
     else {
       idleFrames = 0
@@ -1270,9 +1481,16 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
   let sameKeySteps = 0
   try {
     await waitUntil(() => result.current.career === null, '빈 커리어')
-    act(() => result.current.actions.create('소크', {
-      role: role as PitcherCareer['role'], typeIndex: seed % 3, handIndex: seed % 2, skinIndex: seed % 3, breakingPitchSlots: [0, 1], teamId,
-    }))
+    act(() =>
+      result.current.actions.create('소크', {
+        role: role as PitcherCareer['role'],
+        typeIndex: seed % 3,
+        handIndex: seed % 2,
+        skinIndex: seed % 3,
+        breakingPitchSlots: [0, 1],
+        teamId,
+      }),
+    )
     await waitUntil(() => result.current.storyEvents !== null, '이벤트 본문')
     if (boostAbility && result.current.career !== null) {
       const created = result.current.career
@@ -1290,8 +1508,8 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     for (; steps < maxSteps; steps += 1) {
       // '이벤트' 는 연말 사슬(이어하기 100 진입 0x1c154 가 그 이벤트로 다시 서는 자리)에서만 끊는다 — 장소 · 관리 이벤트에서 끊으면
       // 원본도 105 로 이어 그 이벤트를 다시 고른다(본 표시는 재생 끝 0x1c014 에서야 선다)
-      const resumeMatches = pendingResume !== null && result.current.scene === pendingResume
-        && (pendingResume !== '이벤트' || result.current.story?.context === '연말')
+      const resumeMatches =
+        pendingResume !== null && result.current.scene === pendingResume && (pendingResume !== '이벤트' || result.current.story?.context === '연말')
       if (resumeMatches && result.current.career !== null) {
         if (process.env.SOAK_DEBUG === '1') yearLog.push(`이어하기 ${pendingResume} ${result.current.story?.eventId ?? ''}`)
         pendingResume = null
@@ -1314,9 +1532,10 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
       if (stopAfterContinues !== undefined && continuedAfterEnding >= stopAfterContinues && result.current.scene === '관리') break
       const session = result.current
       const { career, scene, actions } = session
-      const key = `${scene}:${career?.season}:${career?.gamesPlayed}:${session.story?.eventId}:${session.story?.context}`
-        + `:${games.리그 + games.포스트시즌 + games.대회}:${career?.postseason?.wins.join(',')}:${career?.nationalCup?.day}`
-        + `:${session.postseasonPopup?.kind ?? ''}:${career?.hasActedThisCycle}:${session.pendingTitle}`
+      const key =
+        `${scene}:${career?.season}:${career?.gamesPlayed}:${session.story?.eventId}:${session.story?.context}` +
+        `:${games.리그 + games.포스트시즌 + games.대회}:${career?.postseason?.wins.join(',')}:${career?.nationalCup?.day}` +
+        `:${session.postseasonPopup?.kind ?? ''}:${career?.hasActedThisCycle}:${session.pendingTitle}`
       if (key === lastKey) sameKeySteps += 1
       else sameKeySteps = 0
       lastKey = key
@@ -1460,7 +1679,12 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
           break
         }
         case '연차표지':
-          { const last = career.yearlyStats?.[career.yearlyStats.length - 1]; yearLog.push(`${career.season}년차 앞해(${last?.wins}승${last?.losses}패 ${last?.games}등판 아웃${last?.outs} 실점${last?.runsAllowed}) 인기${career.popularity} 능력${Object.values(career.ability).join('/')}`) }
+          {
+            const last = career.yearlyStats?.[career.yearlyStats.length - 1]
+            yearLog.push(
+              `${career.season}년차 앞해(${last?.wins}승${last?.losses}패 ${last?.games}등판 아웃${last?.outs} 실점${last?.runsAllowed}) 인기${career.popularity} 능력${Object.values(career.ability).join('/')}`,
+            )
+          }
           act(() => actions.goto('관리'))
           break
         case '엔딩': {
@@ -1469,7 +1693,14 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
           if (career.endingBonusReceived !== true) {
             const gBefore = walletBalance()
             act(() => actions.receiveEndingBonus())
-            if (ended !== null) expectDelta(`엔딩 ${ended} 보너스`, 'G', gBefore, walletBalance(), Math.min(GAME_POINT_LIMIT, gBefore + pitcherEndingBonusOf(ended)) - gBefore)
+            if (ended !== null)
+              expectDelta(
+                `엔딩 ${ended} 보너스`,
+                'G',
+                gBefore,
+                walletBalance(),
+                Math.min(GAME_POINT_LIMIT, gBefore + pitcherEndingBonusOf(ended)) - gBefore,
+              )
           }
           // 이어할 수 있는 엔딩(부상 0 · 방출 1)이면 5000 G 로 이어한다 (팝업 0x32 예 → 0x1bd36)
           const wantsContinue = continueEndings || (extras && continuedAfterEnding === 0)
@@ -1490,12 +1721,16 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
               if (after === null || after.endingIndex !== null) problems.add(where(), [`엔딩 이어하기 뒤 엔딩 칸 ${after?.endingIndex}`])
               // 부상 엔딩은 부상만 풀고 같은 시즌, 방출 엔딩은 새 시즌(0x1bddc · 0x1b768)
               if (after !== null && ended === 0 && (after.isInjured || after.injuredGamesPlayed !== 0 || after.season !== seasonBefore)) {
-                problems.add(where(), [`부상 엔딩 이어하기 뒤 부상 ${after.isInjured} · 부상 경기 ${after.injuredGamesPlayed} · ${seasonBefore} → ${after.season}년차`])
+                problems.add(where(), [
+                  `부상 엔딩 이어하기 뒤 부상 ${after.isInjured} · 부상 경기 ${after.injuredGamesPlayed} · ${seasonBefore} → ${after.season}년차`,
+                ])
               }
-              if (after !== null && ended === 1 && after.season !== seasonBefore + 1) problems.add(where(), [`방출 엔딩 이어하기 뒤 연차 ${seasonBefore} → ${after.season}`])
+              if (after !== null && ended === 1 && after.season !== seasonBefore + 1)
+                problems.add(where(), [`방출 엔딩 이어하기 뒤 연차 ${seasonBefore} → ${after.season}`])
               // 방출(새 시즌 0x1b768)은 141 이 엔딩 판을 그리며 효과기 끝을 기다린 아홉 틀 뒤 137(1beb4~1beea)
               if (ended !== 0) {
-                if (!result.current.isYearCoverHeld || result.current.scene !== '엔딩') problems.add(where(), [`방출 엔딩 이어하기 뒤 141 이 서 있지 않다 — ${result.current.scene}`])
+                if (!result.current.isYearCoverHeld || result.current.scene !== '엔딩')
+                  problems.add(where(), [`방출 엔딩 이어하기 뒤 141 이 서 있지 않다 — ${result.current.scene}`])
                 act(() => result.current.actions.enterHeldYearCover())
                 if (result.current.scene !== '연차표지') problems.add(where(), [`방출 엔딩 이어하기 뒤 장면 ${result.current.scene}`])
               }
@@ -1521,8 +1756,19 @@ async function runPitcherSoak(options: PitcherSoakOptions): Promise<PitcherSoakR
     rendered.unmount()
   }
   return {
-    problems, steps, games, seasons: holder.current?.session.career?.season ?? lastSeason, endingIndex, stoppedAt, yearLog, paths,
-    ledger: ledgerSums, frames, career: holder.current?.session.career ?? null, gamePoint: holder.current?.wallet.balance ?? 0, stoppedAtSeason,
+    problems,
+    steps,
+    games,
+    seasons: holder.current?.session.career?.season ?? lastSeason,
+    endingIndex,
+    stoppedAt,
+    yearLog,
+    paths,
+    ledger: ledgerSums,
+    frames,
+    career: holder.current?.session.career ?? null,
+    gamePoint: holder.current?.wallet.balance ?? 0,
+    stoppedAtSeason,
   }
 }
 
@@ -1548,17 +1794,19 @@ async function segmentOptions(): Promise<Pick<PitcherSoakOptions, 'startCareer' 
 async function writeSegment(result: PitcherSoakResult): Promise<void> {
   const output = process.env.SOAK_CAREER_OUT
   if (output === undefined || output === '') return
-  (await import('node:fs')).writeFileSync(output, JSON.stringify({ career: result.career, gamePoint: result.gamePoint }))
+  ;(await import('node:fs')).writeFileSync(output, JSON.stringify({ career: result.career, gamePoint: result.gamePoint }))
 }
 
 function report(result: PitcherSoakResult): string {
   const { games } = result
-  return `걸음 ${result.steps} · 경기 리그 ${games.리그} · PS ${games.포스트시즌} · 대회 ${games.대회} · 등판 ${games.등판} · 대결 ${games.대결}`
-    + ` · ${result.seasons}년차 · 엔딩 ${result.endingIndex} · [${result.yearLog.join(' / ')}]`
-    + ` · 새 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)} · 틀 ${result.frames}`
-    + (result.stoppedAtSeason ? ` · ${result.seasons}년차 관리에서 구간 끝` : '')
-    + (result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`)
-    + (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
+  return (
+    `걸음 ${result.steps} · 경기 리그 ${games.리그} · PS ${games.포스트시즌} · 대회 ${games.대회} · 등판 ${games.등판} · 대결 ${games.대결}` +
+    ` · ${result.seasons}년차 · 엔딩 ${result.endingIndex} · [${result.yearLog.join(' / ')}]` +
+    ` · 새 길 ${JSON.stringify(result.paths)} · G 장부 ${JSON.stringify(result.ledger)} · 틀 ${result.frames}` +
+    (result.stoppedAtSeason ? ` · ${result.seasons}년차 관리에서 구간 끝` : '') +
+    (result.stoppedAt === null ? '' : `\n멈춘 곳: ${result.stoppedAt}`) +
+    (result.problems.size === 0 ? '' : `\n문제 ${result.problems.size}가지:\n${result.problems.report()}`)
+  )
 }
 
 describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
@@ -1575,10 +1823,11 @@ describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
     }
     window.cancelAnimationFrame = (handle) => void frameCallbacks.delete(handle)
     // 아무 일도 안 하는 붓 — 그라디언트 같은 돌려받는 붓 객체도
-    const noopBrush = (target: object): object => new Proxy(target, {
-      get: (held, key) => (key in held ? (held as Record<string | symbol, unknown>)[key] : () => noopBrush({})),
-      set: () => true,
-    })
+    const noopBrush = (target: object): object =>
+      new Proxy(target, {
+        get: (held, key) => (key in held ? (held as Record<string | symbol, unknown>)[key] : () => noopBrush({})),
+        set: () => true,
+      })
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
       return noopBrush({ canvas: this }) as never
     })
@@ -1607,7 +1856,14 @@ describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
 
   it('짧은 판 (새 길) — 4년차 첫날에서 상점 · 복권 · 마구 훈련 · 마구 공 · 외출 · 장소 대결 · 이어하기를 밟아도 값 · 수지가 맞는다', async () => {
     const result = await runPitcherSoak({
-      seed: 2010, role: PITCHER_ROLE.starter, teamId: 3, maxGames: 50, roundTripEvery: 4, extras: true, resumeEvery: 3, outingEvery: 2,
+      seed: 2010,
+      role: PITCHER_ROLE.starter,
+      teamId: 3,
+      maxGames: 50,
+      roundTripEvery: 4,
+      extras: true,
+      resumeEvery: 3,
+      outingEvery: 2,
       // 방송국(trigger 6) 앞 이벤트 200~205(공통 · 1~4년차)를 이미 본 저장 — 4년차 g29 부터 [!] 가 투수 대결 207(팀 20)이 된다
       startPatch: { season: 4, popularity: 1_600, money: 40_000, seenEventIds: ['200', '201', '202', '203', '204', '205'] },
     })
@@ -1629,7 +1885,14 @@ describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
 
   it('짧은 판 (화면 경기) — 나만의리그 경기를 앱 화면(`PitcherGameScreen`)으로 키를 눌러 던져도 값 · 수지가 맞는다 (조준 흔들림 · 파티클 · 정산 효과)', async () => {
     const result = await runPitcherSoak({
-      seed: 2014, role: PITCHER_ROLE.starter, teamId: 6, maxGames: 6, roundTripEvery: 2, extras: true, gameScreen: true, resumeEvery: 2,
+      seed: 2014,
+      role: PITCHER_ROLE.starter,
+      teamId: 6,
+      maxGames: 6,
+      roundTripEvery: 2,
+      extras: true,
+      gameScreen: true,
+      resumeEvery: 2,
       startPatch: { season: 4, popularity: 1_600, money: 40_000 },
     })
     expect(result.stoppedAt, report(result)).toBeNull()
@@ -1641,7 +1904,13 @@ describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
   it('짧은 판 (엔딩 이어하기) — 부상 엔딩(0)을 5000 G 로 이어하고 같은 시즌 경기를 이어 던진다 (0x1bd36 → 0x1bddc)', async () => {
     // 부상 경기 수 20 (0xa3a84 첫 줄) — 105 진입 판정 0 → 부상 엔딩 500
     const result = await runPitcherSoak({
-      seed: 2012, role: PITCHER_ROLE.starter, teamId: 4, maxGames: 6, roundTripEvery: 3, continueEndings: true, startGamePoint: 30_000,
+      seed: 2012,
+      role: PITCHER_ROLE.starter,
+      teamId: 4,
+      maxGames: 6,
+      roundTripEvery: 3,
+      continueEndings: true,
+      startGamePoint: 30_000,
       startPatch: { injuredGamesPlayed: 20, isInjured: true, injuryRemaining: 5 },
     })
     expect(result.stoppedAt, report(result)).toBeNull()
@@ -1650,52 +1919,81 @@ describe('나만의리그 투수편 장기 진행 점검 (soak)', () => {
     expect(result.games.리그, report(result)).toBeGreaterThan(0)
   }, 120_000)
 
-  it.runIf(isSoakEnabled())('긴 판 (엔딩 이어하기) — 7년차 인기도 ≤ 499 방출 엔딩(1)을 5000 G 로 이어해 8년차로 간다 (0x1b768)', async () => {
-    const result = await runPitcherSoak({
-      seed: 2013, role: PITCHER_ROLE.starter, teamId: 5, roundTripEvery: 10, continueEndings: true, stopAfterContinues: 1,
-      startGamePoint: 30_000, startPatch: { season: 7, popularity: 100 },
-    })
-    expect(result.stoppedAt, report(result)).toBeNull()
-    expect(result.problems.size, report(result)).toBe(0)
-    expect(result.paths.엔딩이어하기, report(result)).toBe(1)
-  }, 3_600_000)
+  it.runIf(isSoakEnabled())(
+    '긴 판 (엔딩 이어하기) — 7년차 인기도 ≤ 499 방출 엔딩(1)을 5000 G 로 이어해 8년차로 간다 (0x1b768)',
+    async () => {
+      const result = await runPitcherSoak({
+        seed: 2013,
+        role: PITCHER_ROLE.starter,
+        teamId: 5,
+        roundTripEvery: 10,
+        continueEndings: true,
+        stopAfterContinues: 1,
+        startGamePoint: 30_000,
+        startPatch: { season: 7, popularity: 100 },
+      })
+      expect(result.stoppedAt, report(result)).toBeNull()
+      expect(result.problems.size, report(result)).toBe(0)
+      expect(result.paths.엔딩이어하기, report(result)).toBe(1)
+    },
+    3_600_000,
+  )
 
   for (const seed of soakSeeds([1, 2, 3])) {
-    it.runIf(isSoakEnabled())(`긴 판 (새 길) — 씨앗 ${seed}: 상점 · 외출 · 대결 · 마구 · 이어하기를 밟으며 엔딩 · 명예의 전당까지`, async () => {
-      const started = Date.now()
-      const role = seed % 2 === 0 ? PITCHER_ROLE.starter : 2
-      const result = await runPitcherSoak({
-        seed, role, boostAbility: true, teamId: seed % 10, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10), extras: true,
-        gameScreen: soakNumber('SOAK_GAME_SCREEN', 1) === 1,
-        resumeEvery: soakNumber('SOAK_RESUME_EVERY', 7), ...(await segmentOptions()),
-      })
-      await writeSegment(result)
-      const line = `[투수편 soak 새 길] 씨앗 ${seed} · 보직 ${role} · ${(Date.now() - started) / 1000}s · ${report(result)}`
-      process.stderr.write(`${line}\n`)
-      if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
-      expect(result.stoppedAt, report(result)).toBeNull()
-      if (!result.stoppedAtSeason) expect(result.endingIndex, report(result)).not.toBeNull()
-      expect(result.problems.size, report(result)).toBe(0)
-      if (process.env.SOAK_CAREER_IN === undefined && !result.stoppedAtSeason) expect(result.paths.대결, report(result)).toBeGreaterThan(0)
-    }, 3_600_000)
+    it.runIf(isSoakEnabled())(
+      `긴 판 (새 길) — 씨앗 ${seed}: 상점 · 외출 · 대결 · 마구 · 이어하기를 밟으며 엔딩 · 명예의 전당까지`,
+      async () => {
+        const started = Date.now()
+        const role = seed % 2 === 0 ? PITCHER_ROLE.starter : 2
+        const result = await runPitcherSoak({
+          seed,
+          role,
+          boostAbility: true,
+          teamId: seed % 10,
+          roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
+          extras: true,
+          gameScreen: soakNumber('SOAK_GAME_SCREEN', 1) === 1,
+          resumeEvery: soakNumber('SOAK_RESUME_EVERY', 7),
+          ...(await segmentOptions()),
+        })
+        await writeSegment(result)
+        const line = `[투수편 soak 새 길] 씨앗 ${seed} · 보직 ${role} · ${(Date.now() - started) / 1000}s · ${report(result)}`
+        process.stderr.write(`${line}\n`)
+        if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
+        expect(result.stoppedAt, report(result)).toBeNull()
+        if (!result.stoppedAtSeason) expect(result.endingIndex, report(result)).not.toBeNull()
+        expect(result.problems.size, report(result)).toBe(0)
+        if (process.env.SOAK_CAREER_IN === undefined && !result.stoppedAtSeason) expect(result.paths.대결, report(result)).toBeGreaterThan(0)
+      },
+      3_600_000,
+    )
   }
 
   for (const seed of soakSeeds([1, 2, 3])) {
-    it.runIf(isSoakEnabled())(`긴 판 — 씨앗 ${seed}: 등록부터 은퇴 · 엔딩까지`, async () => {
-      const started = Date.now()
-      const role = seed % 2 === 0 ? PITCHER_ROLE.starter : 2
-      const boostAbility = Math.floor(seed / 2) % 2 === 1
-      const result = await runPitcherSoak({
-        seed, role, boostAbility, teamId: seed % 10, roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
-        gameScreen: soakNumber('SOAK_GAME_SCREEN', 1) === 1, ...(await segmentOptions()),
-      })
-      await writeSegment(result)
-      const line = `[투수편 soak] 씨앗 ${seed} · 보직 ${role}${boostAbility ? '(상한)' : ''} · ${(Date.now() - started) / 1000}s · ${report(result)}`
-      console.info(line)
-      if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
-      expect(result.stoppedAt, report(result)).toBeNull()
-      if (!result.stoppedAtSeason) expect(result.endingIndex, report(result)).not.toBeNull()
-      expect(result.problems.size, report(result)).toBe(0)
-    }, 3_600_000)
+    it.runIf(isSoakEnabled())(
+      `긴 판 — 씨앗 ${seed}: 등록부터 은퇴 · 엔딩까지`,
+      async () => {
+        const started = Date.now()
+        const role = seed % 2 === 0 ? PITCHER_ROLE.starter : 2
+        const boostAbility = Math.floor(seed / 2) % 2 === 1
+        const result = await runPitcherSoak({
+          seed,
+          role,
+          boostAbility,
+          teamId: seed % 10,
+          roundTripEvery: soakNumber('SOAK_ROUND_TRIP_EVERY', 10),
+          gameScreen: soakNumber('SOAK_GAME_SCREEN', 1) === 1,
+          ...(await segmentOptions()),
+        })
+        await writeSegment(result)
+        const line = `[투수편 soak] 씨앗 ${seed} · 보직 ${role}${boostAbility ? '(상한)' : ''} · ${(Date.now() - started) / 1000}s · ${report(result)}`
+        console.info(line)
+        if (process.env.SOAK_REPORT !== undefined) (await import('node:fs')).appendFileSync(process.env.SOAK_REPORT, `${line}\n`)
+        expect(result.stoppedAt, report(result)).toBeNull()
+        if (!result.stoppedAtSeason) expect(result.endingIndex, report(result)).not.toBeNull()
+        expect(result.problems.size, report(result)).toBe(0)
+      },
+      3_600_000,
+    )
   }
 })

@@ -2,8 +2,19 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
-  BALL_PATTERN_COLUMNS, BALL_PATTERN_PERIOD, BALL_PATTERN_ROWS, MAIN_TITLE_BACKDROP, ballPatternCounterAfter, ballPatternRect565,
-  ballPatternTilesOf, blurScreen565, mainTitleLineYs, nextBallPatternCounter, rgbOf565, rgbTo565, whitenStep3Of565,
+  BALL_PATTERN_COLUMNS,
+  BALL_PATTERN_PERIOD,
+  BALL_PATTERN_ROWS,
+  MAIN_TITLE_BACKDROP,
+  ballPatternCounterAfter,
+  ballPatternRect565,
+  ballPatternTilesOf,
+  blurScreen565,
+  mainTitleLineYs,
+  nextBallPatternCounter,
+  rgbOf565,
+  rgbTo565,
+  whitenStep3Of565,
 } from '@/pages/special/lib/skinBackdrops'
 import { GPOINT_ANIMATION } from '@/pages/special/ui/SkinBackdrops'
 import { grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -33,7 +44,7 @@ describe('메뉴 바탕 16비트 연산 — 흐리기 0xbdc2c · 단계 덮기 0
     const pixels = Uint16Array.from([white, white, white, white, black, black, white, black, black])
     blurScreen565(pixels, 3, 3, 1)
     const r = ((0xf8 * 2) >> 2) >> 3
-    expect(pixels[4]).toBe(rgbTo565(((0xf8 * 2) >> 2), ((0xfc * 2) >> 2), ((0xf8 * 2) >> 2)))
+    expect(pixels[4]).toBe(rgbTo565((0xf8 * 2) >> 2, (0xfc * 2) >> 2, (0xf8 * 2) >> 2))
     expect((pixels[4] >> 11) & 0x1f).toBe(r)
     // 가장자리는 안쪽 값을 베낀다 — 줄 0 = 줄 1, 칸 0 = 칸 1
     expect(pixels[1]).toBe(pixels[4])
@@ -71,8 +82,10 @@ describe('공 무늬 바탕 0x5fd61', () => {
   })
 
   it('gpoint 애니 0 은 에셋 그대로 — 프레임 0~5 · 지연 3', () => {
-    const animations = JSON.parse(readFileSync('public/sprites/gpoint/frames/animations.json', 'utf8')) as
-      readonly (readonly { frame: number; delay: number }[])[]
+    const animations = JSON.parse(readFileSync('public/sprites/gpoint/frames/animations.json', 'utf8')) as readonly (readonly {
+      frame: number
+      delay: number
+    }[])[]
     expect(GPOINT_ANIMATION).toEqual(animations[0].map(({ frame, delay }) => ({ frame, delay })))
   })
 })
@@ -119,7 +132,10 @@ describe('B-91 고친 길 — 흐리기는 사본에서 읽고, 공 무늬 왼�
 describe('공 무늬 사각형 다시 그리기 (Q-03 r301 — 카드 로고 아래)', () => {
   // 23×23 칸 — 왼쪽 위 한 칸만 불투명
   const tile: Sprite565 = {
-    width: 23, height: 23, pixels: new Uint16Array(23 * 23).fill(0x1234), opaque: new Uint8Array(23 * 23).map((_, index) => (index === 0 ? 1 : 0)),
+    width: 23,
+    height: 23,
+    pixels: new Uint16Array(23 * 23).fill(0x1234),
+    opaque: new Uint8Array(23 * 23).map((_, index) => (index === 0 ? 1 : 0)),
   }
   const backdrop = rgbTo565(147, 199, 229)
 
@@ -136,4 +152,3 @@ describe('공 무늬 사각형 다시 그리기 (Q-03 r301 — 카드 로고 아
     expect(Array.from(out)).toEqual([backdrop, grayPixel565(backdrop)])
   })
 })
-

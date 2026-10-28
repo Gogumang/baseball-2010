@@ -39,8 +39,7 @@ const 장내홈런: Partial<DefensePlayResult> = {
   advance: { bases: EMPTY_BASES, runsScored: 1, outsAdded: 0 },
 }
 
-const 칸홈런 = (before: TeamGameProgress, after: TeamGameProgress) =>
-  after.ourEntryRecords[before.game.battingOrderIndex]?.homeRuns ?? 0
+const 칸홈런 = (before: TeamGameProgress, after: TeamGameProgress) => after.ourEntryRecords[before.game.battingOrderIndex]?.homeRuns ?? 0
 const 센수 = (ids: readonly number[], id: number) => ids.filter((x) => x === id).length
 
 function 풀기(options: Partial<TeamGameOptions>, overrides: Partial<DefensePlayResult>, streak = 0) {

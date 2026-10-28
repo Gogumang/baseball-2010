@@ -15,7 +15,9 @@ import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
  * 곧 이벤트가 끝나면 **한 틀** 동안 대화창 없는 그 그림이 서고, 다음 틀에 다음 상태로 넘어간다. 웹은 끝을 받으면 그 한 틀
  * (다음 앱 틱 머리까지 — `setAppTickTimeout`) 동안 `isEnding` 을 세우고, 그 뒤에 넘긴다.
  */
-export function useEventEndFrame<A extends readonly unknown[]>(complete: (...args: A) => void): {
+export function useEventEndFrame<A extends readonly unknown[]>(
+  complete: (...args: A) => void,
+): {
   readonly isEnding: boolean
   readonly end: (...args: A) => void
 } {

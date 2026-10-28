@@ -1,13 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
-import {
-  ASCII_WIDTH,
-  FONT_SPACING,
-  HANGUL_WIDTH,
-  LINE_HEIGHT,
-  layoutPixelText,
-  measurePixelTextWidth,
-} from '@/shared/lib/font/layout'
+import { ASCII_WIDTH, FONT_SPACING, HANGUL_WIDTH, LINE_HEIGHT, layoutPixelText, measurePixelTextWidth } from '@/shared/lib/font/layout'
 
 /** 원본 글자 그리기 0x9c068 의 전진·줄바꿈 규칙 (R5 5절) */
 describe('글자 배치', () => {
@@ -43,7 +36,10 @@ describe('글자 배치', () => {
 
   it('\\n 은 줄높이 11 + 줄간만큼 내린다', () => {
     const layout = layoutPixelText('A\nB', { letterGap: 1, lineGap: 3 })
-    expect(layout.pieces.map((piece) => [piece.x, piece.y])).toEqual([[0, 0], [0, 14]])
+    expect(layout.pieces.map((piece) => [piece.x, piece.y])).toEqual([
+      [0, 0],
+      [0, 14],
+    ])
     expect(layout.height).toBe(14 + 11)
     expect(layout.lineCount).toBe(2)
   })
@@ -51,7 +47,12 @@ describe('글자 배치', () => {
   it('한글은 글자마다 폭을 넘으면 줄을 바꾼다', () => {
     const layout = layoutPixelText('가나다', { letterGap: 1, lineGap: 3, maxWidth: 20 })
     expect(layout.pieces.map((piece) => [piece.x, piece.y])).toEqual([
-      [0, 0], [0, 0], [10, 0], [10, 0], [0, 14], [0, 14],
+      [0, 0],
+      [0, 0],
+      [10, 0],
+      [10, 0],
+      [0, 14],
+      [0, 14],
     ])
     expect(layout.lineCount).toBe(2)
   })
@@ -60,7 +61,13 @@ describe('글자 배치', () => {
     const layout = layoutPixelText('abc defg', { letterGap: 1, lineGap: 3, maxWidth: 30 })
     // abc 는 첫 줄, defg 는 통째로 다음 줄
     expect(layout.pieces.map((piece) => [piece.x, piece.y])).toEqual([
-      [0, 0], [6, 0], [12, 0], [0, 14], [6, 14], [12, 14], [18, 14],
+      [0, 0],
+      [6, 0],
+      [12, 0],
+      [0, 14],
+      [6, 14],
+      [12, 14],
+      [18, 14],
     ])
   })
 

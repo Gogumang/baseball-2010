@@ -43,7 +43,12 @@ export const DERBY_SCENES: Readonly<Record<string, SceneDefinition>> = {
   'derby-start': {
     description: '홈런더비 시작 — 나리 타자를 골라 첫 공 앞 (1/10)',
     fixture: 'nari-y1',
-    steps: [...TO_DERBY_PICK, key('Enter'), until('더비 타석 0xe (첫 공 앞)', () => scenePeeksNow().homeRunDerby?.acceptsConfirm === true, 15000), wait(500)],
+    steps: [
+      ...TO_DERBY_PICK,
+      key('Enter'),
+      until('더비 타석 0xe (첫 공 앞)', () => scenePeeksNow().homeRunDerby?.acceptsConfirm === true, 15000),
+      wait(500),
+    ],
   },
   ...derbyStageScenes([2, 3, 4]),
 }

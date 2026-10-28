@@ -31,7 +31,10 @@ describe('이닝별 점수 칸 st[0x6c..] — 0xaa57c aa608 · 0xb6a9c · 0xb6b6
 
   it('경기 세우기가 칸을 싣는다 — 타자 12 (측 0 7점 · 측 1 4점, 9회말)', () => {
     const game = startMissionGame(missionOf('타자', 12))
-    expect(game.inningRuns).toEqual([[0, 2, 1, 0, 0, 1, 0, 3, 0], [0, 0, 1, 0, 2, 0, 0, 1, 0]])
+    expect(game.inningRuns).toEqual([
+      [0, 2, 1, 0, 0, 1, 0, 3, 0],
+      [0, 0, 1, 0, 2, 0, 0, 1, 0],
+    ])
     expect(game.scores).toEqual([7, 4])
   })
 
@@ -55,6 +58,17 @@ describe('이닝별 점수 칸 st[0x6c..] — 0xaa57c aa608 · 0xb6a9c · 0xb6b6
     expect(next.inningRuns[1][1]).toBe(0)
     // 합은 건드리지 않는다 (원본 그대로)
     expect(next.scores).toEqual(start.scores)
-    expect(clearMissionInningRuns([[1, 2], [3, 4]], 10)).toEqual([[1, 0], [3, 0]])
+    expect(
+      clearMissionInningRuns(
+        [
+          [1, 2],
+          [3, 4],
+        ],
+        10,
+      ),
+    ).toEqual([
+      [1, 0],
+      [3, 0],
+    ])
   })
 })

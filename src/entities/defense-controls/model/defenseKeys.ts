@@ -20,22 +20,7 @@
  */
 
 /** 원본이 구분하는 키. 숫자 5 는 OK 와 같은 키라 따로 두지 않는다 */
-export type OriginalKey =
-  | '위'
-  | '아래'
-  | '왼'
-  | '오른'
-  | 'OK'
-  | 'CLR'
-  | '0'
-  | '1'
-  | '2'
-  | '3'
-  | '4'
-  | '6'
-  | '7'
-  | '8'
-  | '9'
+export type OriginalKey = '위' | '아래' | '왼' | '오른' | 'OK' | 'CLR' | '0' | '1' | '2' | '3' | '4' | '6' | '7' | '8' | '9'
 
 /** 웹 `KeyboardEvent.key` → 원본 키 */
 export const ORIGINAL_KEY_BY_WEB_KEY: Readonly<Record<string, OriginalKey>> = {
@@ -172,11 +157,7 @@ export interface InPlayKeyOptions {
  * 공격이면 주루 + OK 슬라이딩, 수비면 송구. 한 키가 공/수에 따라 다른 뜻인 것이 원본 그대로다
  * (예: '2' 는 공격이면 "1루 주자 진루", 수비면 "2루로 송구").
  */
-export function inPlayCommandOf(
-  webKey: string,
-  side: ControlSide,
-  options: InPlayKeyOptions = {},
-): InPlayCommand | null {
+export function inPlayCommandOf(webKey: string, side: ControlSide, options: InPlayKeyOptions = {}): InPlayCommand | null {
   const key = originalKeyOf(webKey)
   if (key === null) return null
 

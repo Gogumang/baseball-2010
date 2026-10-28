@@ -38,17 +38,18 @@ export interface SeasonItemMenuScreenProps {
  * 그리기는 공통 틀(`SeasonCommonFrame`) — 커맨드 줄 하위 칸(표 0xd47b0 · 0xd47b8: 100 장착아이템 · 288 구장아이템 ·
  * 105 서브아이템 · 110 GP아이템)과 부모 칸 아이템.
  */
-export function SeasonItemMenuScreen({
-  state, onSelect, onBack, gamePoint = 0, cursor: heldCursor, onCursorChange,
-}: SeasonItemMenuScreenProps) {
-
+export function SeasonItemMenuScreen({ state, onSelect, onBack, gamePoint = 0, cursor: heldCursor, onCursorChange }: SeasonItemMenuScreenProps) {
   const select = (index: number) => {
     const entry = SEASON_ITEM_MENU[index]
     if (entry === undefined) return
     onSelect(entry, entry.target, entry.windowKind)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: SEASON_ITEM_MENU.length, onSelect: select, onCancel: onBack, cursor: heldCursor, onCursorChange,
+    count: SEASON_ITEM_MENU.length,
+    onSelect: select,
+    onCancel: onBack,
+    cursor: heldCursor,
+    onCursorChange,
     // 4열 × 1줄 (0x3b14 의 [this+0x88] vt+0x1c(4, 1, 1, 0x330), 0x3c3e~0x3c50) — ← → 도 칸을 옮긴다
     isCommandBar: true,
   })
@@ -56,12 +57,19 @@ export function SeasonItemMenuScreen({
   return (
     <RawScreen>
       <div role="group" aria-label="아이템">
-        <SeasonCommonFrame record={state.record} teamMorale={state.teamMorale} gamePoint={gamePoint} onBack={onBack}
+        <SeasonCommonFrame
+          record={state.record}
+          teamMorale={state.teamMorale}
+          gamePoint={gamePoint}
+          onBack={onBack}
           commandBar={{
-            slots: SEASON_SUB_COMMAND_SLOTS.아이템, cursor, parent: seasonParentSlotOf('아이템'),
+            slots: SEASON_SUB_COMMAND_SLOTS.아이템,
+            cursor,
+            parent: seasonParentSlotOf('아이템'),
             onHover: moveTo,
             onSelect: (id) => select(SEASON_ITEM_MENU.findIndex((entry) => entry.label === id)),
-          }} />
+          }}
+        />
       </div>
     </RawScreen>
   )

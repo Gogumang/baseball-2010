@@ -43,9 +43,21 @@ const MASSAGER_SLOT = 4
 
 /** StrMODE 번호 */
 export const SEASON_SHOP_TEXT = {
-  이미보유: 78, 소지금부족: 77, 소지금확인: 79, 구매완료: 92,
-  G부족: 65, 트레이드: 176, 사기최고: 91, 이글아이최대: 210, 건강: 208, 매점사용중: 217, G확인: 82, 이글아이안내: 224,
-  스태미나선택: 177, 스태미나최대: 211, 스태미나회복: 178,
+  이미보유: 78,
+  소지금부족: 77,
+  소지금확인: 79,
+  구매완료: 92,
+  G부족: 65,
+  트레이드: 176,
+  사기최고: 91,
+  이글아이최대: 210,
+  건강: 208,
+  매점사용중: 217,
+  G확인: 82,
+  이글아이안내: 224,
+  스태미나선택: 177,
+  스태미나최대: 211,
+  스태미나회복: 178,
 } as const
 
 type SubRecord = Pick<SeasonRecord, 'money' | 'trainingSubItems' | 'massager' | 'outingSubItems'>
@@ -98,11 +110,12 @@ export function checkSeasonSubItem(record: SubRecord, slot: number): SeasonShopC
 export function applySeasonSubItem<R extends SubRecord>(record: R, slot: number): { readonly record: R; readonly notice: string } {
   const money = clampTo(record.money - seasonSubItemPriceOf(slot) * SUB_PRICE_SCALE, MONEY_LIMIT)
   const own = (flags: readonly boolean[], at: number) => flags.map((flag, index) => (index === at ? true : flag))
-  const next = slot < TRAINING_SLOTS
-    ? { ...record, money, trainingSubItems: own(record.trainingSubItems, slot) }
-    : slot === MASSAGER_SLOT
-      ? { ...record, money, massager: true }
-      : { ...record, money, outingSubItems: own(record.outingSubItems, slot - MASSAGER_SLOT - 1) }
+  const next =
+    slot < TRAINING_SLOTS
+      ? { ...record, money, trainingSubItems: own(record.trainingSubItems, slot) }
+      : slot === MASSAGER_SLOT
+        ? { ...record, money, massager: true }
+        : { ...record, money, outingSubItems: own(record.outingSubItems, slot - MASSAGER_SLOT - 1) }
   // 0x845f1(창, k) — 창이 그리는 이름(시즌 StrITEM[0x6d + k])
   const name = ORIGINAL_ITEMS[0x6d + slot] ?? ''
   return { record: next, notice: modeText(SEASON_SHOP_TEXT.구매완료).replace('%s', name) }
@@ -174,12 +187,7 @@ export interface SeasonGpEffect<R> {
  * 효과 0xa310c(SR, k, StrMODE, StrITEM) — 글은 "!C" 로 시작해 칸마다 덧붙인다.
  * 복권(k 0)만 `rand(0, 10000)` 을 한 번 굴린다.
  */
-export function applySeasonGpItem<R extends GpRecord>(
-  record: R,
-  teamMorale: number,
-  slot: number,
-  random: RandomPort,
-): SeasonGpEffect<R> {
+export function applySeasonGpItem<R extends GpRecord>(record: R, teamMorale: number, slot: number, random: RandomPort): SeasonGpEffect<R> {
   let text = '!C'
   const raiseMorale = () => clampTo(teamMorale + MORALE_GAIN, MORALE_LIMIT)
   switch (slot) {

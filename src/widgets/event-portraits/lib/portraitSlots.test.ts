@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  OTHER_PEOPLE_ANIMATIONS, isHeroPortrait, placePortraits, portraitAnimationOf, portraitPaletteOf, slideX,
+  OTHER_PEOPLE_ANIMATIONS,
+  isHeroPortrait,
+  placePortraits,
+  portraitAnimationOf,
+  portraitPaletteOf,
+  slideX,
 } from '@/widgets/event-portraits/lib/portraitSlots'
 
 describe('placePortraits — 원작 초상화 자리', () => {

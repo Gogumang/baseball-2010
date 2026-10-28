@@ -9,9 +9,7 @@ const srcs = (testId: string) => screen.queryAllByTestId(testId).map((node) => n
 
 describe('투수·타자 소개 판 (0x44944)', () => {
   it('틱 0 은 화면 밖, 틱 7 이면 우타 기준 투수 판 (−3, 90) · 타자 판 (103, 225)', () => {
-    const { rerender } = render(
-      <MatchupCards tick={0} batterHand={0} pitcher={{ isComputer: true }} batter={{ isComputer: false }} />,
-    )
+    const { rerender } = render(<MatchupCards tick={0} batterHand={0} pitcher={{ isComputer: true }} batter={{ isComputer: false }} />)
     expect(screen.getByTestId('투수판').dataset.x).toBe(String(-139 - 3))
     rerender(<MatchupCards tick={7} batterHand={0} pitcher={{ isComputer: true }} batter={{ isComputer: false }} />)
     expect([screen.getByTestId('투수판').dataset.x, screen.getByTestId('투수판').dataset.y]).toEqual(['-3', '90'])
@@ -56,8 +54,14 @@ describe('투수·타자 소개 판 (0x44944)', () => {
         batterHand={0}
         pitcher={{ isComputer: true, name: '레오니', role: 0, throwsLeft: true, earnedRunAverage: 345, strikeouts: 12 }}
         batter={{
-          isComputer: false, name: '나리', position: 6, battingAverage: 305, homeRuns: 3, runsBattedIn: 9,
-          battingOrder: 3, recentResults: [1, 7],
+          isComputer: false,
+          name: '나리',
+          position: 6,
+          battingAverage: 305,
+          homeRuns: 3,
+          runsBattedIn: 9,
+          battingOrder: 3,
+          recentResults: [1, 7],
         }}
       />,
     )

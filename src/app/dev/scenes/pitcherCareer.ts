@@ -33,14 +33,11 @@ export const PITCHER_CAREER_SCENES: Readonly<Record<string, SceneDefinition>> = 
     description: '나리 투수편 명예의 전당 등록 질문 0x2d — 보너스 뒤 저장으로 141 에 곧장, 키로 제작진 → 등록 질문 (soak 픽스처)',
     fixture: 'pitcher-hall-of-fame',
     seed: 1,
-    steps: [
-      ...toPitcherResume('엔딩'),
-      keyUntil('Enter', '명예의 전당 등록 질문', messageBoxHas('예'), 600, 30000),
-      wait(600),
-    ],
+    steps: [...toPitcherResume('엔딩'), keyUntil('Enter', '명예의 전당 등록 질문', messageBoxHas('예'), 600, 30000), wait(600)],
   },
   'pitcher-postseason-game': {
-    description: '나리 투수편 포스트시즌 내 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기 첫 구질 고르기 0xf (soak 픽스처)',
+    description:
+      '나리 투수편 포스트시즌 내 시리즈 경기 시작 — 1년차 한국시리즈 내 차례 대진 [다음] → 142 경기 준비 → 경기 첫 구질 고르기 0xf (soak 픽스처)',
     fixture: 'pitcher-postseason-game',
     seed: 1,
     snapshot: 'pitcher-postseason-game',

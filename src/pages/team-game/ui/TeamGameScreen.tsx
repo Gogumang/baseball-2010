@@ -57,11 +57,7 @@ import { isGameEndRecord, leadingRecordCountOf } from '@/widgets/game-scene/lib/
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
-import {
-  type BenchClearingOffenseAces,
-  aceRunnerBasesOf,
-  benchClearingFieldOf,
-} from '@/widgets/field-walk/lib/benchClearingFieldInput'
+import { type BenchClearingOffenseAces, aceRunnerBasesOf, benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import {
   type FieldCarry,
@@ -110,11 +106,7 @@ import { RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/li
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { TeamMatchupRecords } from '@/pages/team-game/lib/teamMatchupCards'
 import { ACE_BATTERS, ACE_PITCHERS } from '@/entities/game/model/aceOpponent'
-import type {
-  TeamGameOptions,
-  TeamGameProgress,
-  TeamGameSummary,
-} from '@/features/play-team-game/model/teamGameFlow'
+import type { TeamGameOptions, TeamGameProgress, TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { InGameMenu } from '@/features/play-team-game/ui/InGameMenu'
 import { useInGameMenuOpenOnHide, useInGameMenuState } from '@/features/play-team-game/model/useInGameMenuState'
 import { useTeamGame } from '@/pages/team-game/model/useTeamGame'
@@ -253,10 +245,14 @@ export function TeamGameScreen(props: TeamGameScreenProps) {
   const { opponentEntry } = session.progress
   const { opponentTeamId } = session.progress.options
   const loadingPreloads = useMemo(
-    () => mergeSpritePreloads(
-      GAME_LOADING_PRELOADS,
-      stageCastSpritePreloadsOf({ bodyTypes: [], equippedBatters: equippedBattersOfRecords(opponentBatterRecordsOf(opponentTeamId, opponentEntry)) }),
-    ),
+    () =>
+      mergeSpritePreloads(
+        GAME_LOADING_PRELOADS,
+        stageCastSpritePreloadsOf({
+          bodyTypes: [],
+          equippedBatters: equippedBattersOfRecords(opponentBatterRecordsOf(opponentTeamId, opponentEntry)),
+        }),
+      ),
     [opponentTeamId, opponentEntry],
   )
   if (session.loadingTip !== null) {
@@ -312,10 +308,12 @@ function TeamGameScene({
   // 타석 캔버스가 아직 안 선 동안(수비 판 · 반 이닝 판)은 경기 화면이 건다. 원본은 타석 교대 0x47cc8 의 적재 때 칠한다
   const ourBattingWarmCast = teamStageWarmCastOf(progress, true)
   const theirBattingWarmCast = teamStageWarmCastOf(progress, false)
-  useWarmStageCast(stageWarmCastOf(
-    [...ourBattingWarmCast.batters, ...theirBattingWarmCast.batters],
-    [...ourBattingWarmCast.pitchers, ...theirBattingWarmCast.pitchers],
-  ))
+  useWarmStageCast(
+    stageWarmCastOf(
+      [...ourBattingWarmCast.batters, ...theirBattingWarmCast.batters],
+      [...ourBattingWarmCast.pitchers, ...theirBattingWarmCast.pitchers],
+    ),
+  )
 
   const [phase, setPhase] = useState<PitchPhase>('구질')
   const [slot, setSlot] = useState<PitchSlot | null>(null)
@@ -360,14 +358,9 @@ function TeamGameScene({
     // 공 도착 판(도루 · 폭투) — 장면은 0x12 틱 0 까지 그리고(`usePitchArrivalHold`) 키 막음은 판이 맡는다
     if (progress.pendingRunnerPlay != null) return
     // 마투수가 던졌으면 공 틱이 오르는 단계가 0xcfbe4[순번]이라 0x11 이 그만큼 길다 (0x3f378)
-    setPitchBusyTicks(
-      pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks, teamPitcherSideStageOf(progress).acePitcher?.order),
-    )
+    setPitchBusyTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks, teamPitcherSideStageOf(progress).acePitcher?.order))
   }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, progress.pendingRunnerPlay])
-  useSceneTick(
-    () => setPitchBusyTicks((left) => Math.max(0, left - 1)),
-    pitchBusyTicks > 0 && !isMenuOpen && overlay !== '조작방법',
-  )
+  useSceneTick(() => setPitchBusyTicks((left) => Math.max(0, left - 1)), pitchBusyTicks > 0 && !isMenuOpen && overlay !== '조작방법')
   const isPitchSceneBusy = pitchBusyTicks > 0
   /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
   const [isEndBoardClosed, setEndBoardClosed] = useState(false)
@@ -409,9 +402,7 @@ function TeamGameScene({
   const atBatLoadRef = useRef<{ readonly key: readonly unknown[]; readonly loaded: number | null } | null>(null)
   if (progress.autoRelay == null && progress.pendingDefensePlay === null && progress.pendingRunnerPlay == null && !progress.game.isFinished) {
     const ourOffense = progress.game.half === (progress.game.playerSide === 0 ? '초' : '말')
-    const offenseEntry = ourOffense
-      ? progress.ourEntry[progress.game.battingOrderIndex]
-      : progress.opponentEntry[progress.opponentOrderIndex]
+    const offenseEntry = ourOffense ? progress.ourEntry[progress.game.battingOrderIndex] : progress.opponentEntry[progress.opponentOrderIndex]
     const key: readonly unknown[] = [
       progress.game.inning,
       progress.game.half,
@@ -635,15 +626,9 @@ function TeamGameScene({
   const resolution = progress.lastBurstResolution
   /** 판 끝에서 난 돌발 판정(상태 0x1c)이면 그 판을 창 아래에 이어 그린다 (`useDefenseUnderBurstWindow`) */
   const defenseUnderBurst = useDefenseUnderBurstWindow(resolution)
-  const proposal =
-    burst !== null && burst.current !== null && burst.current.index !== shownProposal
-      ? burst.current
-      : null
+  const proposal = burst !== null && burst.current !== null && burst.current.index !== shownProposal ? burst.current : null
   const burstRow = resolution?.row ?? proposal
-  const burstLines =
-    burst === null || burstRow == null
-      ? null
-      : (ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null)
+  const burstLines = burst === null || burstRow == null ? null : (ORIGINAL_BURST_TABLES[burst.table].lines[burstRow.index] ?? null)
 
   /**
    * **견제** — 구질 고르기(상태 0xf)에서 사람이 수비일 때만 '3' 1루 · '1' 2루 · '7' 3루 (0x53548).
@@ -666,8 +651,7 @@ function TeamGameScene({
   const heldHitByPitch = progress.pendingBenchClearing
   useHitByPitchWait({
     hold: heldHitByPitch,
-    waitTicks:
-      heldHitByPitch?.side === '수비' ? RESULT_WAIT_TICKS_AT_BAT_END - 1 : RESULT_WAIT_TICKS_AT_BAT_END,
+    waitTicks: heldHitByPitch?.side === '수비' ? RESULT_WAIT_TICKS_AT_BAT_END - 1 : RESULT_WAIT_TICKS_AT_BAT_END,
     isFrozen: isMenuOpen || overlay === '조작방법',
     random,
     onJudge: actions.judgeHitByPitch,
@@ -762,9 +746,7 @@ function TeamGameScene({
    * 팀 글자는 `0xb6c20(st, 측)`(사람 팀 PLAYER · CPU 팀 COM): 우리가 치면 타자가 PLAYER, 던지면 투수가 PLAYER.
    */
   const matchup = teamMatchupCardsOf(progress, matchupRecords)
-  const matchupCards = (
-    <SceneMatchupCards batterHand={matchup.batterHand} pitcher={matchup.pitcher} batter={matchup.batter} />
-  )
+  const matchupCards = <SceneMatchupCards batterHand={matchup.batterHand} pitcher={matchup.pitcher} batter={matchup.batter} />
   /**
    * 띄울 돌발 창 — 결과 창(0x1d)은 0xe 앞이라 늘 띄우고, 제안 창(0x1b)은 0xe 의 OK 뒤 메시지 1 이 0x8f158 을 굴려
    * 예약하므로(0x50c42) OK 를 받은 뒤에만 띄운다
@@ -866,18 +848,26 @@ function TeamGameScene({
   const isPitchSlotPickerShown = canPitch && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null
   // 경기가 끝나 요약 판(0x18 · 0x19)이 서면 중계가 아니다 — 아래 그림 갈래와 같은 차례
   const isAutoRelay = progress.autoRelay != null && summary === null && !isBurstResultHeld
-  const defensePlaySide = isPlayKeyBlocked ? session.pendingDefensePlay?.side ?? progress.pendingRunnerPlay?.side ?? null : null
+  const defensePlaySide = isPlayKeyBlocked ? (session.pendingDefensePlay?.side ?? progress.pendingRunnerPlay?.side ?? null) : null
   useEffect(() => {
     if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
     publishScenePeek('teamGame', {
-      isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown,
+      isIntroDone,
+      canBat,
+      canPitch,
+      isAwaitingConfirm,
+      acceptsChangeKey,
+      isPitchSlotPickerShown,
       defensePlaySide: defensePlaySide === '수비' || defensePlaySide === '공격' ? defensePlaySide : null,
       isAutoRelay,
     })
   }, [isIntroDone, canBat, canPitch, isAwaitingConfirm, acceptsChangeKey, isPitchSlotPickerShown, defensePlaySide, isAutoRelay])
-  useEffect(() => () => {
-    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('teamGame', null)
-  }, [])
+  useEffect(
+    () => () => {
+      if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('teamGame', null)
+    },
+    [],
+  )
 
   const game = progress.game
   // 점수판 틀 0x41440 의 두 측 — 사람 팀(우리) PLAYER · 상대 COM
@@ -925,7 +915,10 @@ function TeamGameScene({
         names={[names.win, names.loss, names.save]}
         scoreboardSides={scoreboardSides}
         // 503d8 — 이닝별 점수판 0x41c18 (득점 0xb6a9c 가 쌓은 칸)
-        lineScore={endBoardLineScoreOf(game, ourSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId])}
+        lineScore={endBoardLineScoreOf(
+          game,
+          ourSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId],
+        )}
         onConfirm={() => {
           setEndBoardClosed(true)
           // 정산 0x19 진입 — 승리 31 · 패배 32 징글 (0x4ea0c). 같은 진입이 +0x4c+모드 를 지운다(0x4f3d6)
@@ -1006,20 +999,17 @@ function TeamGameScene({
    * 팀 경기는 공수를 모두 사람이 맡으니 그 쪽이 이닝마다 갈린다 — 진행기가 붙들 때 적어 둔 값을 그대로 쓴다.
    * 다 돌면 `onDone` 이 그 결과를 경기 상태에 먹인다 — **주자 처리는 그때 처음 정해진다.**
    */
-  const burstWindow = visibleBurstLines === null ? null : (
-    <BurstMissionWindow
-      lines={visibleBurstLines}
-      judgement={resolution?.judgement ?? null}
-      row={resolution?.row ?? null}
-      // 0xb63c0(지금 타자) — 타석 소개 판과 같은 값
-      isBatterLeftHanded={matchup.batterHand !== 0}
-      onClose={
-        resolution !== null
-          ? actions.closeBurst
-          : () => setShownProposal(proposal?.index ?? null)
-      }
-    />
-  )
+  const burstWindow =
+    visibleBurstLines === null ? null : (
+      <BurstMissionWindow
+        lines={visibleBurstLines}
+        judgement={resolution?.judgement ?? null}
+        row={resolution?.row ?? null}
+        // 0xb63c0(지금 타자) — 타석 소개 판과 같은 값
+        isBatterLeftHanded={matchup.batterHand !== 0}
+        onClose={resolution !== null ? actions.closeBurst : () => setShownProposal(proposal?.index ?? null)}
+      />
+    )
   const pending = session.pendingDefensePlay
   if (pending !== null && !isHitSceneShowing) {
     return defenseUnderBurst.show((window) => (
@@ -1242,279 +1232,281 @@ function TeamGameScene({
         도루(점수판 루 그림) · 구질 · 조준 · 게이지(투구 부품 안) · 교체 창 줄
       */}
       <RawScreen>
-        {canBat ? (
-          <>
-            <div className={stageScreen.canvasSlot}>
-              <BattingStage
-                // 돌발 제안 창 0x1b 의 그리기 0x4a198 은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
-                isHudOmitted={visibleBurstLines !== null && resolution === null}
-                batterAbility={currentBatterAbility(progress)}
-                // 타자 폼 rec[0xb] >> 4 · 피부 · 손 0xb63c0 (타석 교대 0x47d58~0x47dd6) — 몸통 · 자세표 · 배치 side 와 스윙 판정 0xab214 ·
-                // CPU 투구의 타자 손. 마타자 손은 표 0xd88b0
-                {...teamBattingStageBatterOf(progress)}
-                // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
-                aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
-                // 타석 그림 0x10866 → 0x78fd8 — 선수 레코드 +0x19·+0x1a 장비 니블(부위 0~3 = 히트·파워·수비·주루 칸)로 장비 겹을
-                // 고른다. 명단 칸이 니블을 들 때만(붙박이 표 선수) 넘긴다 — 니블 0 이면 원본도 그 부위를 안 그린다
-                {...batterEquipmentPropsOf(currentBatterEntry(progress)?.equipment)}
-                // 장면 +0xfdc — CPU 타석(0x34436)과 사람 키가 같은 칸을 쓴다. 진행기가 공마다 든 값을 넘긴다
-                sceneBuntKind={progress.sceneBuntKind ?? 0}
-                runnerAnimationClock={runnerAnimationClockRef}
-                // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 사람 팀이 공격 측(st[9])
-                skillPanel={{ entryKey: progress.sceneConfirm ?? null, attackSide: game.playerSide, scene: skillPanelSceneRef }}
-                // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 마타자(0xb633c)면 위젯이 거른다
-                canBunt
-                // 팀 경기(모드 1·2·8·9)는 판정 묶음 '일반' — "내 선수" 보너스(모드 3·4)도 타자 미션 +100(모드 6)도 없다 (0xab214)
-                swingMode="일반"
-                // 타순 칸별 이 경기 남은 필살 횟수 s8 팀[+0x29 + 타순] (0xaea30) — 진행기가 든다. 0xaebe4 처럼 칸이 비면
-                // 그 타자로 채운 값이다: 마타자 0xd84fa[레벨], 그 밖은 +0x18 == 0 이라 0 ('0' 키 무시, 0x51e14)
-                specialSwingRemaining={specialSwingRemainingAt(progress, '우리')}
-                onSpecialSwingUsed={(remaining) => actions.specialSwingUsed(remaining)}
-                // "#TIME"(0x4c940) — 사람 공격이라 n = 벤치 타자 수 팀[+0x28c]. 팀 경기(모드 1·2·8·9)는 0x38984 가 통과한다
-                timeKeyCount={progress.ourBenchBatters}
-                // 교체 창(상태 0xb) 동안은 "*MENU" · "#TIME" 을 안 그린다(0x4c8e0 의 상태 문턱 0xd ~ 0x15)
-                isSubstitutionWindowOpen={changeWindow !== null}
-                // 지금 타자의 레코드 +0x14 장착 스킬(`TeamEntryBatter.skillBits` — 표 줄은 Xls 행, 영입 선수는 기록 사본, 마타자는 제 행)
-                batterSkillIds={entryBatterSkillIdsOf(currentBatterEntry(progress))}
-                // 투수 스킬 31 의 0xb6394 — 경기 시작 레코드 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`)
-                batterRecordSlot={currentBatterEntry(progress)?.recordSlot ?? 0}
-                // 그 타순 칸의 오늘 타석 결과 링 — 공격 팀 + 타순(팀+0x32)×0x18 + 0x34 (0x445cc 4477a~4478c · 0xab214 aba8e~abaac).
-                // 스윙 판정 0xab214 의 16 상승세 · 17 하락세와 스킬 판 비트 16 · 17 이 같은 링을 읽는다
-                recentAtBatCodes={progress.ourEntryRecords[game.battingOrderIndex]?.results ?? []}
-                gameMode={options.mode}
-                // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
-                isScoreboardOn={settings?.isScoreboardOn}
-                // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
-                isVibrationOn={settings?.isVibrationOn}
-                pitcherAbility={currentPitcherAbility(progress)}
-                hud={{
-                  inning: game.inning,
-                  half: game.half,
-                  ourScore: game.ourScore,
-                  opponentScore: game.opponentScore,
-                  balls: progress.atBat.balls,
-                  strikes: progress.atBat.strikes,
-                  // 붙든 삼진(0x12 대기)은 진입 3e1a6 이 이미 올린 아웃으로 그린다 (r298)
-                  outs: outsShownDuringResultWait(game.outs, progress.pendingBenchClearing),
-                  bases: game.bases,
-                  ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
-                  opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
-                  ourTeamId: options.ourTeamId,
-                  opponentTeamId: options.opponentTeamId,
-                  // 위 줄 = 측 0(선공) — 사람 팀이 앉은 측 (0x373d0)
-                  playerSide: game.playerSide,
-                  // 0x35b94 상태 0xe 주루 칸 — 루에 선 주자의 신원(원본 주자 목록)대로 그 주자의 경기용 주력
-                  runnerRunAbilities: runnerRunAbilitiesOf(progress),
-                  // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입 · 타구 판 시작이 지운다)
-                  hiddenRunnerBases: progress.stealDisplayFrom ?? [],
-                }}
-                // 루상 주자 0x35b94 — 주자 +0x9c ≠ −1(마선수)이면 타석 교대 0x483a0 이 +0x1c 에 실은 ace/defender 그림 (수비 판과 같은 값)
-                runnerAces={runnerAcesFor(progress, true)}
-                // 투수 그리기 0x38d1c — 상대 마운드 체력% ≤ 34 면 지친 눈(38f68). 38f56 이 마선수면 거른다 — 마투수가 서 있으면 null
-                pitcherStaminaPercent={opposingAcePitcher === null ? staminaPercentOf(progress.opponentStamina) : null}
-                isEagleEyeEnabled={false}
-                // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
-                pitcherEquipmentNibbles={currentPitcherEquipment(progress)}
-                // 마운드 바탕 벌 = 피부 × 15 + 수비 팀(482c0~482fc → 0x793b0 의 794c2) — 사람 타석의 수비 팀 = 상대
-                pitcherSkinIndex={currentPitcherSkinIndex(progress)}
-                pitcherTeamIndex={options.opponentTeamId}
-                // 다음 타자 · 대타 · 교체 투수를 미리 칠한다 — 원본은 타석 교대 0x47cc8 의 적재 때 칠해 첫 그림부터 제 색이다
-                warmCast={ourBattingWarmCast}
-                // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
-                acePitcher={opposingAcePitcher === null ? null : acePitcherFramesOf(opposingAcePitcher)}
-                // 시즌 홈경기에서만 차 있다 — 차 있으면 배경이 시즌 구장(0x77494)으로 갈린다
-                seasonStadium={seasonStadium}
-                {...sceneryProps}
-                // 상대 마투수의 마구 횟수 0xd8509[mgr[0x13a + 순번]] (0xaebe4) — 전역 마선수 레벨 칸
-                aceLevels={options.aceLevels}
-                // 상대 팀+0x28 과 공+0x10 은 진행기가 든다 — 공 객체는 경기에 하나라 사람 투구와 칸을 함께 쓴다
-                cpuMagic={opponentMagicStateOf(progress)}
-                // 0xe 에서는 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다. 일시정지 팝업(0x52cc6) · 교체 창(상태 0xb, 0x4db68 은
-                // 장면을 그리기만 한다) 동안도 멈춘 채 선다 — 내렸다 다시 올리면 타석이 새로 서며 굴림이 샌다
-                isPaused={visibleBurstLines !== null || isAwaitingConfirm || isPopupOpen || changeWindow !== null}
-                // 좌우 이동 +0xfe4 는 0xd 진입 48f88 에서만 지운다 — 같은 타석의 다음 공(0xf)과 결과 연출 동안은 남는다(A-02)
-                shiftResetSerial={sceneConfirm.sceneDEntryMark}
-                // 구장 하늘 줄 — 경기 하나에 한 번(0x783b0). 수비 재생으로 화면이 다시 서도 같은 줄이다
-                {...(stadiumSkyRow === null ? {} : { skyRow: stadiumSkyRow })}
-                random={random}
-                onPitchResolved={(detail, _pitch, isUncatchable, buntKind) => {
-                  // 타석 공 하나가 판정됐다 — 공 끝은 0x12 문턱 갱신 0x4e796(15/31 틱 뒤) · 인플레이면 0x17 끝(수비 판이 풀릴 때).
-                  // 판정 틀에 싣고(진행기에 넘기기 전) 대기 틱은 이 공으로 끝난 타석 결과로 정한다 (`GameRoute` 와 같다)
-                  const outcomeAfter = applyPitchResolution(progress.atBat, detail.resolution).outcome
-                  notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
-                  const after = actions.resolvePitch(detail, isUncatchable, buntKind)
-                  // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
-                  return { judgementCleared: after.lastPitchJudgementCleared === true }
-                }}
-                // 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린다 (A-37)
-                onContact={actions.preRollContact}
-                flightProbeRef={flightProbeRef}
-                // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
-                onPickoff={(base) => actions.cpuPickoff(base)}
-              />
-            </div>
-            {/* 타석 공용 그리기 0x4c4bc 4c510~4c524 — 점수판 바로 뒤 돌발 띠 0x8e858 (아이콘은 g[0x31 + 공격 측] 로 — 사람 공격이면 방망이 8) */}
-            <BurstBand row={burstBandRow} role={burstBandRole} />
-            {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 (일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛸 뿐이다) */}
-            {isMatchupShown && matchupCards}
-            {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
-            {substitutionOverlay}
-            {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음(53066) · 팝업 0x746cd 앞. 교체 창(0xb) · 돌발 창 위,
+        {
+          canBat ? (
+            <>
+              <div className={stageScreen.canvasSlot}>
+                <BattingStage
+                  // 돌발 제안 창 0x1b 의 그리기 0x4a198 은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
+                  isHudOmitted={visibleBurstLines !== null && resolution === null}
+                  batterAbility={currentBatterAbility(progress)}
+                  // 타자 폼 rec[0xb] >> 4 · 피부 · 손 0xb63c0 (타석 교대 0x47d58~0x47dd6) — 몸통 · 자세표 · 배치 side 와 스윙 판정 0xab214 ·
+                  // CPU 투구의 타자 손. 마타자 손은 표 0xd88b0
+                  {...teamBattingStageBatterOf(progress)}
+                  // 마타자가 대타로 올라오면 필살 연출 점프표(0xd01e4)가 이 순번을 본다
+                  aceBatterIndex={currentBatterEntry(progress)?.aceIndex ?? -1}
+                  // 타석 그림 0x10866 → 0x78fd8 — 선수 레코드 +0x19·+0x1a 장비 니블(부위 0~3 = 히트·파워·수비·주루 칸)로 장비 겹을
+                  // 고른다. 명단 칸이 니블을 들 때만(붙박이 표 선수) 넘긴다 — 니블 0 이면 원본도 그 부위를 안 그린다
+                  {...batterEquipmentPropsOf(currentBatterEntry(progress)?.equipment)}
+                  // 장면 +0xfdc — CPU 타석(0x34436)과 사람 키가 같은 칸을 쓴다. 진행기가 공마다 든 값을 넘긴다
+                  sceneBuntKind={progress.sceneBuntKind ?? 0}
+                  runnerAnimationClock={runnerAnimationClockRef}
+                  // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 0xd 진입마다 새 0xe 대기 객체 · 사람 팀이 공격 측(st[9])
+                  skillPanel={{ entryKey: progress.sceneConfirm ?? null, attackSide: game.playerSide, scene: skillPanelSceneRef }}
+                  // 번트 '7'/'8'/'9' — 0x535a4 → 0x6a7 → 0x51e48 은 모드를 안 본다. 마타자(0xb633c)면 위젯이 거른다
+                  canBunt
+                  // 팀 경기(모드 1·2·8·9)는 판정 묶음 '일반' — "내 선수" 보너스(모드 3·4)도 타자 미션 +100(모드 6)도 없다 (0xab214)
+                  swingMode="일반"
+                  // 타순 칸별 이 경기 남은 필살 횟수 s8 팀[+0x29 + 타순] (0xaea30) — 진행기가 든다. 0xaebe4 처럼 칸이 비면
+                  // 그 타자로 채운 값이다: 마타자 0xd84fa[레벨], 그 밖은 +0x18 == 0 이라 0 ('0' 키 무시, 0x51e14)
+                  specialSwingRemaining={specialSwingRemainingAt(progress, '우리')}
+                  onSpecialSwingUsed={(remaining) => actions.specialSwingUsed(remaining)}
+                  // "#TIME"(0x4c940) — 사람 공격이라 n = 벤치 타자 수 팀[+0x28c]. 팀 경기(모드 1·2·8·9)는 0x38984 가 통과한다
+                  timeKeyCount={progress.ourBenchBatters}
+                  // 교체 창(상태 0xb) 동안은 "*MENU" · "#TIME" 을 안 그린다(0x4c8e0 의 상태 문턱 0xd ~ 0x15)
+                  isSubstitutionWindowOpen={changeWindow !== null}
+                  // 지금 타자의 레코드 +0x14 장착 스킬(`TeamEntryBatter.skillBits` — 표 줄은 Xls 행, 영입 선수는 기록 사본, 마타자는 제 행)
+                  batterSkillIds={entryBatterSkillIdsOf(currentBatterEntry(progress))}
+                  // 투수 스킬 31 의 0xb6394 — 경기 시작 레코드 첨자 · 마타자 순번 (`TeamEntryBatter.recordSlot`)
+                  batterRecordSlot={currentBatterEntry(progress)?.recordSlot ?? 0}
+                  // 그 타순 칸의 오늘 타석 결과 링 — 공격 팀 + 타순(팀+0x32)×0x18 + 0x34 (0x445cc 4477a~4478c · 0xab214 aba8e~abaac).
+                  // 스윙 판정 0xab214 의 16 상승세 · 17 하락세와 스킬 판 비트 16 · 17 이 같은 링을 읽는다
+                  recentAtBatCodes={progress.ourEntryRecords[game.battingOrderIndex]?.results ?? []}
+                  gameMode={options.mode}
+                  // 환경설정 전광판(저장 +0x3a) — OFF 면 흐르는 글자를 안 그린다 (0x77726)
+                  isScoreboardOn={settings?.isScoreboardOn}
+                  // 환경설정 진동(저장 +0x3b) — 맞은 공·사구 진동 (0x3a44)
+                  isVibrationOn={settings?.isVibrationOn}
+                  pitcherAbility={currentPitcherAbility(progress)}
+                  hud={{
+                    inning: game.inning,
+                    half: game.half,
+                    ourScore: game.ourScore,
+                    opponentScore: game.opponentScore,
+                    balls: progress.atBat.balls,
+                    strikes: progress.atBat.strikes,
+                    // 붙든 삼진(0x12 대기)은 진입 3e1a6 이 이미 올린 아웃으로 그린다 (r298)
+                    outs: outsShownDuringResultWait(game.outs, progress.pendingBenchClearing),
+                    bases: game.bases,
+                    ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
+                    opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
+                    ourTeamId: options.ourTeamId,
+                    opponentTeamId: options.opponentTeamId,
+                    // 위 줄 = 측 0(선공) — 사람 팀이 앉은 측 (0x373d0)
+                    playerSide: game.playerSide,
+                    // 0x35b94 상태 0xe 주루 칸 — 루에 선 주자의 신원(원본 주자 목록)대로 그 주자의 경기용 주력
+                    runnerRunAbilities: runnerRunAbilitiesOf(progress),
+                    // st[0x15 + i] — 이번 공에 도루를 출발한 주자는 루에 안 그린다 (0xa9bd4 가 세우고 0xf 진입 · 타구 판 시작이 지운다)
+                    hiddenRunnerBases: progress.stealDisplayFrom ?? [],
+                  }}
+                  // 루상 주자 0x35b94 — 주자 +0x9c ≠ −1(마선수)이면 타석 교대 0x483a0 이 +0x1c 에 실은 ace/defender 그림 (수비 판과 같은 값)
+                  runnerAces={runnerAcesFor(progress, true)}
+                  // 투수 그리기 0x38d1c — 상대 마운드 체력% ≤ 34 면 지친 눈(38f68). 38f56 이 마선수면 거른다 — 마투수가 서 있으면 null
+                  pitcherStaminaPercent={opposingAcePitcher === null ? staminaPercentOf(progress.opponentStamina) : null}
+                  isEagleEyeEnabled={false}
+                  // 마운드 상대 투수 레코드 +0x19 · +0x1a 니블 → 장비 겹 (타석 교대 0x47cc8 의 48138~4816a, 마투수면 없음)
+                  pitcherEquipmentNibbles={currentPitcherEquipment(progress)}
+                  // 마운드 바탕 벌 = 피부 × 15 + 수비 팀(482c0~482fc → 0x793b0 의 794c2) — 사람 타석의 수비 팀 = 상대
+                  pitcherSkinIndex={currentPitcherSkinIndex(progress)}
+                  pitcherTeamIndex={options.opponentTeamId}
+                  // 다음 타자 · 대타 · 교체 투수를 미리 칠한다 — 원본은 타석 교대 0x47cc8 의 적재 때 칠해 첫 그림부터 제 색이다
+                  warmCast={ourBattingWarmCast}
+                  // 상대 팀 마투수(0xb88c8)가 교체로 올라오면 그림도 마선수 것이다
+                  acePitcher={opposingAcePitcher === null ? null : acePitcherFramesOf(opposingAcePitcher)}
+                  // 시즌 홈경기에서만 차 있다 — 차 있으면 배경이 시즌 구장(0x77494)으로 갈린다
+                  seasonStadium={seasonStadium}
+                  {...sceneryProps}
+                  // 상대 마투수의 마구 횟수 0xd8509[mgr[0x13a + 순번]] (0xaebe4) — 전역 마선수 레벨 칸
+                  aceLevels={options.aceLevels}
+                  // 상대 팀+0x28 과 공+0x10 은 진행기가 든다 — 공 객체는 경기에 하나라 사람 투구와 칸을 함께 쓴다
+                  cpuMagic={opponentMagicStateOf(progress)}
+                  // 0xe 에서는 공이 안 나간다 — 타석 장면(0xd 그리기)만 선다. 일시정지 팝업(0x52cc6) · 교체 창(상태 0xb, 0x4db68 은
+                  // 장면을 그리기만 한다) 동안도 멈춘 채 선다 — 내렸다 다시 올리면 타석이 새로 서며 굴림이 샌다
+                  isPaused={visibleBurstLines !== null || isAwaitingConfirm || isPopupOpen || changeWindow !== null}
+                  // 좌우 이동 +0xfe4 는 0xd 진입 48f88 에서만 지운다 — 같은 타석의 다음 공(0xf)과 결과 연출 동안은 남는다(A-02)
+                  shiftResetSerial={sceneConfirm.sceneDEntryMark}
+                  // 구장 하늘 줄 — 경기 하나에 한 번(0x783b0). 수비 재생으로 화면이 다시 서도 같은 줄이다
+                  {...(stadiumSkyRow === null ? {} : { skyRow: stadiumSkyRow })}
+                  random={random}
+                  onPitchResolved={(detail, _pitch, isUncatchable, buntKind) => {
+                    // 타석 공 하나가 판정됐다 — 공 끝은 0x12 문턱 갱신 0x4e796(15/31 틱 뒤) · 인플레이면 0x17 끝(수비 판이 풀릴 때).
+                    // 판정 틀에 싣고(진행기에 넘기기 전) 대기 틱은 이 공으로 끝난 타석 결과로 정한다 (`GameRoute` 와 같다)
+                    const outcomeAfter = applyPitchResolution(progress.atBat, detail.resolution).outcome
+                    notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
+                    const after = actions.resolvePitch(detail, isUncatchable, buntKind)
+                    // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
+                    return { judgementCleared: after.lastPitchJudgementCleared === true }
+                  }}
+                  // 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린다 (A-37)
+                  onContact={actions.preRollContact}
+                  flightProbeRef={flightProbeRef}
+                  // CPU 투수 견제 (0x345fc 종류 4 → 0x34848 → 메시지 0x10) — 루가 정해진 뒤는 진행기가 판을 돌린다
+                  onPickoff={(base) => actions.cpuPickoff(base)}
+                />
+              </div>
+              {/* 타석 공용 그리기 0x4c4bc 4c510~4c524 — 점수판 바로 뒤 돌발 띠 0x8e858 (아이콘은 g[0x31 + 공격 측] 로 — 사람 공격이면 방망이 8) */}
+              <BurstBand row={burstBandRow} role={burstBandRole} />
+              {/* 0xe 그리기 0x4d9ec — 타석 장면 위에 투수·타자 소개 판 0x44944 (일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛸 뿐이다) */}
+              {isMatchupShown && matchupCards}
+              {/* 교체 연출 0x16 — 그리기 0x4da30 이 타석 그림 위에 game_ui 애니 9 "CHANGE" 를 얹는다 */}
+              {substitutionOverlay}
+              {/* 경기 장면 프레임 0x52c50 의 덧그림 0x4e35c — 그리기 표 다음(53066) · 팝업 0x746cd 앞. 교체 창(0xb) · 돌발 창 위,
                 경기 중 메뉴 아래 */}
-            <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />
-          </>
-        ) : canPitch || isPitchSceneBeforePlay ? (
-          /*
+              <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />
+            </>
+          ) : canPitch || isPitchSceneBeforePlay ? (
+            /*
             사람 수비 타석 장면 — 원본은 누가 던지든 같은 프레임 0x52c50 · 그리기 표 0xd05a0 이 구장 · 투수 0x38d1c · 타자 0x49e64 ·
             주자 0x35b94 · HUD 0x4c4bc 를 그린다(`widgets/batting-stage/lib/pitcherSideStage`). 그 위에 0xe 소개 판 0x44944 ·
             0x16 "CHANGE" 가 얹히고, 구질 목록 · 조준 · 게이지는 장면 안에 그린다. 팝업(경기 중 메뉴 · 조작방법) 동안은 멈춘다 —
             단계 상태(0xf·0x10·0x11)와 조준점·게이지 틱은 그대로다 (0x52cc6, 투수편 `isPitchInputPaused` 와 같은 자리)
           */
-          <PitcherSideStage
-            // 돌발 제안 창 0x1b 의 그리기 0x4a198 은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
-            isHudOmitted={visibleBurstLines !== null && resolution === null}
-            // 0xd 진입마다 투수 그림 객체를 상태 0 으로 (48ee4 — '#' 교체 창에서 곧장 선 0xe 는 0xd 가 없다)
-            sceneDEntryMark={sceneConfirm.sceneDEntryMark}
-            pitch={progress.lastPitch}
-            resolution={progress.lastResolution}
-            resultTicks={heldResultTicks}
-            // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
-            isJudgementCleared={progress.lastPitchJudgementCleared === true}
-            cpuSwing={progress.lastCpuSwing ?? null}
-            // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다
-            hitScene={teamHitScene.hitScene}
-            onHitSceneEnd={teamHitScene.end}
-            // 판정 틀의 메시지 0x11 굴림 묶음 — 0x13 그림의 파티클 굴림보다 앞 (A-37)
-            onHitJudged={teamHitScene.judge}
-            hud={{
-              inning: game.inning,
-              half: game.half,
-              ourScore: game.ourScore,
-              opponentScore: game.opponentScore,
-              balls: progress.atBat.balls,
-              strikes: progress.atBat.strikes,
-              outs: outsShownDuringResultWait(game.outs, progress.pendingBenchClearing),
-              bases: game.bases,
-              ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
-              opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
-              ourTeamId: options.ourTeamId,
-              opponentTeamId: options.opponentTeamId,
-              playerSide: game.playerSide,
-              runnerRunAbilities: runnerRunAbilitiesOf(progress),
-              hiddenRunnerBases: progress.stealDisplayFrom ?? [],
-            }}
-            {...teamStage}
-            // 다음 CPU 타자 · 대타 · 우리 교체 투수를 미리 칠한다(0x47cc8 의 적재 때 칠하는 몫)
-            warmCast={theirBattingWarmCast}
-            stadium={sceneStadium?.stadium ?? 0}
-            fieldPalette={fieldPalette}
-            skyRow={stadiumSkyRow ?? 0}
-            {...(seasonStadium === undefined ? {} : { seasonStadium })}
-            gameMode={options.mode}
-            {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
-            isPaused={visibleBurstLines !== null || isAwaitingConfirm || changeWindow !== null}
-            isFrozen={isPopupOpen}
-            inputOverlayRef={inputOverlayRef}
-            // 0x38f68 — 우리 마운드 투수 체력% 로 지친 표시(player_effect 애니 9 · 10). 마투수면 38f56 이 거른다
-            pitcherStaminaPercent={ourMoundIsAce ? null : staminaPercentOf(progress.stamina)}
-            // 실투 "!" 0x38d1c 38ee0 — 놓기 0x4dc78 4deae
-            isMistakePitch={progress.lastPitchIsMistake === true}
-            // 루상 주자 0x35b94 — 공격 팀(상대) 주자의 마선수 그림
-            runnerAces={runnerAcesFor(progress, false)}
-            // "#TIME" 0x4c940 — 사람 수비라 n = 우리 팀[+0x33] 벤치 투수 수. 팀 경기는 0x38984 가 통과한다
-            timeKeyCount={session.benchPitchers.length}
-            // 교체 창(상태 0xb) 동안은 "*MENU" · "#TIME" 을 안 그린다(0x4c8e0 의 상태 문턱 0xd ~ 0x15)
-            isSubstitutionWindowOpen={changeWindow !== null}
-            // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 사람 타석과 같은 장면 칸 · 0xd 진입마다 새 0xe 대기 객체 ·
-            // 공격 측(st[9]) = 상대(CPU) 측
-            skillPanel={{
-              entryKey: progress.sceneConfirm ?? null,
-              attackSide: game.playerSide === 0 ? 1 : 0,
-              scene: skillPanelSceneRef,
-              ...humanDefenseSkillPanelOf(progress),
-            }}
-          >
-            {/* 돌발 띠 0x8e858 (0x4c4bc 4c522, 사람 수비 → 공 7) — 0xf 구질 목록이면 뒤의 빛 지도 4c5a6 이 같이 어둡게 한다 */}
-            <BurstBand
-              row={burstBandRow}
-              role={burstBandRole}
-              isDimmed={phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null}
-            />
-            {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 0xd 그리기 위에 투수·타자 소개 판 0x44944 (일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛸 뿐이다) */}
-            {isMatchupShown && matchupCards}
-            {/* 교체 연출 0x16 "CHANGE" (0x4da30) */}
-            {substitutionOverlay}
-            {/* 투구 입력 — 그림은 장면이 그린다. 부품은 키 · 틱과 그림 자리의 투명한 누름 칸만 낸다 (교체 창 0xb 동안은 내린다) */}
-            {canPitch && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null && (
-              <div hidden={isPopupOpen}>
-                <PitchSlotPicker
-                  choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
-                  isPaused={isPopupOpen}
-                  stageSide={teamStage.batterSide ?? teamStage.batterForm & 1}
-                  overlay={{
-                    ref: inputOverlayRef,
-                    typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
-                    magicRemaining: progress.magicRemaining,
-                  }}
-                  onDecide={(chosen) => {
-                    const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
-                    if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
-                    setSlot(found)
-                    setPhase('코스')
-                  }}
-                />
-              </div>
-            )}
-            {canPitch && phase === '코스' && (
-              <div hidden={isPopupOpen}>
-                <AimCursor
-                  side={options.stageSide ?? 1}
-                  isPaused={isPopupOpen}
-                  overlay={{ ref: inputOverlayRef, typeNumber: slot?.typeNumber ?? 0 }}
-                  onConfirm={(confirmed) => {
-                    // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
-                    // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
-                    setAim(confirmed)
-                    setPhase('게이지')
-                  }}
-                  // CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
-                  onCancel={() => {
-                    setPhase('구질')
-                    setSlot(null)
-                    actions.returnToPitchSelection()
-                  }}
-                />
-              </div>
-            )}
-            {canPitch && phase === '게이지' && (
-              <div hidden={isPopupOpen}>
-                <PitchGradeGauge
-                  isPaused={isPopupOpen}
-                  showsGauge={showsGauge}
-                  onRelease={(gaugeCell) => throwWith(gaugeCell)}
-                  {...(aim === null
-                    ? {}
-                    : {
-                        overlay: {
-                          ref: inputOverlayRef,
-                          aim,
-                          aimSide: options.stageSide ?? 1,
-                          gaugeSettingOn: options.gaugeSettingOn === true,
-                          gameMode: options.mode,
-                          // [경기+0xfc8] == 22 — 놓기 전 0x11 그림의 마구 공 파티클(Q-09)
-                          isMagicPitch: slot?.isMagic === true,
-                        },
-                      })}
-                />
-              </div>
-            )}
-          </PitcherSideStage>
-        ) : null
-        /*
+            <PitcherSideStage
+              // 돌발 제안 창 0x1b 의 그리기 0x4a198 은 HUD 0x4c4bc 를 안 부른다 — 결과 창 0x1d(0x4d1e0 → 0x4ce9c)는 부른다
+              isHudOmitted={visibleBurstLines !== null && resolution === null}
+              // 0xd 진입마다 투수 그림 객체를 상태 0 으로 (48ee4 — '#' 교체 창에서 곧장 선 0xe 는 0xd 가 없다)
+              sceneDEntryMark={sceneConfirm.sceneDEntryMark}
+              pitch={progress.lastPitch}
+              resolution={progress.lastResolution}
+              resultTicks={heldResultTicks}
+              // 0x3dfac 낫아웃 갈래(3e0aa)가 판정 칸을 지웠으면 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다
+              isJudgementCleared={progress.lastPitchJudgementCleared === true}
+              cpuSwing={progress.lastCpuSwing ?? null}
+              // CPU 타자가 맞힌 공 — 판정 틀까지 0x11, 이어 0x13 을 그리고 0x17 이 선 틀에 수비 판으로 넘긴다
+              hitScene={teamHitScene.hitScene}
+              onHitSceneEnd={teamHitScene.end}
+              // 판정 틀의 메시지 0x11 굴림 묶음 — 0x13 그림의 파티클 굴림보다 앞 (A-37)
+              onHitJudged={teamHitScene.judge}
+              hud={{
+                inning: game.inning,
+                half: game.half,
+                ourScore: game.ourScore,
+                opponentScore: game.opponentScore,
+                balls: progress.atBat.balls,
+                strikes: progress.atBat.strikes,
+                outs: outsShownDuringResultWait(game.outs, progress.pendingBenchClearing),
+                bases: game.bases,
+                ourLogoUrl: smallLogoUrlOf(options.ourTeamId),
+                opponentLogoUrl: smallLogoUrlOf(options.opponentTeamId),
+                ourTeamId: options.ourTeamId,
+                opponentTeamId: options.opponentTeamId,
+                playerSide: game.playerSide,
+                runnerRunAbilities: runnerRunAbilitiesOf(progress),
+                hiddenRunnerBases: progress.stealDisplayFrom ?? [],
+              }}
+              {...teamStage}
+              // 다음 CPU 타자 · 대타 · 우리 교체 투수를 미리 칠한다(0x47cc8 의 적재 때 칠하는 몫)
+              warmCast={theirBattingWarmCast}
+              stadium={sceneStadium?.stadium ?? 0}
+              fieldPalette={fieldPalette}
+              skyRow={stadiumSkyRow ?? 0}
+              {...(seasonStadium === undefined ? {} : { seasonStadium })}
+              gameMode={options.mode}
+              {...(settings === undefined ? {} : { isScoreboardOn: settings.isScoreboardOn })}
+              isPaused={visibleBurstLines !== null || isAwaitingConfirm || changeWindow !== null}
+              isFrozen={isPopupOpen}
+              inputOverlayRef={inputOverlayRef}
+              // 0x38f68 — 우리 마운드 투수 체력% 로 지친 표시(player_effect 애니 9 · 10). 마투수면 38f56 이 거른다
+              pitcherStaminaPercent={ourMoundIsAce ? null : staminaPercentOf(progress.stamina)}
+              // 실투 "!" 0x38d1c 38ee0 — 놓기 0x4dc78 4deae
+              isMistakePitch={progress.lastPitchIsMistake === true}
+              // 루상 주자 0x35b94 — 공격 팀(상대) 주자의 마선수 그림
+              runnerAces={runnerAcesFor(progress, false)}
+              // "#TIME" 0x4c940 — 사람 수비라 n = 우리 팀[+0x33] 벤치 투수 수. 팀 경기는 0x38984 가 통과한다
+              timeKeyCount={session.benchPitchers.length}
+              // 교체 창(상태 0xb) 동안은 "*MENU" · "#TIME" 을 안 그린다(0x4c8e0 의 상태 문턱 0xd ~ 0x15)
+              isSubstitutionWindowOpen={changeWindow !== null}
+              // 경기 스킬 표시 판(0xd 진입 48fa4 · 0x4b5b4) — 사람 타석과 같은 장면 칸 · 0xd 진입마다 새 0xe 대기 객체 ·
+              // 공격 측(st[9]) = 상대(CPU) 측
+              skillPanel={{
+                entryKey: progress.sceneConfirm ?? null,
+                attackSide: game.playerSide === 0 ? 1 : 0,
+                scene: skillPanelSceneRef,
+                ...humanDefenseSkillPanelOf(progress),
+              }}
+            >
+              {/* 돌발 띠 0x8e858 (0x4c4bc 4c522, 사람 수비 → 공 7) — 0xf 구질 목록이면 뒤의 빛 지도 4c5a6 이 같이 어둡게 한다 */}
+              <BurstBand
+                row={burstBandRow}
+                role={burstBandRole}
+                isDimmed={phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null}
+              />
+              {/* 0xe — 구질 고르기(0xf)는 OK 뒤다. 그 동안은 0xd 그리기 위에 투수·타자 소개 판 0x44944 (일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛸 뿐이다) */}
+              {isMatchupShown && matchupCards}
+              {/* 교체 연출 0x16 "CHANGE" (0x4da30) */}
+              {substitutionOverlay}
+              {/* 투구 입력 — 그림은 장면이 그린다. 부품은 키 · 틱과 그림 자리의 투명한 누름 칸만 낸다 (교체 창 0xb 동안은 내린다) */}
+              {canPitch && phase === '구질' && !isAwaitingConfirm && !isPitchSceneBusy && changeWindow === null && (
+                <div hidden={isPopupOpen}>
+                  <PitchSlotPicker
+                    choices={slotChoices(progress.magicRemaining, pitchSlotsFor(progress))}
+                    isPaused={isPopupOpen}
+                    stageSide={teamStage.batterSide ?? teamStage.batterForm & 1}
+                    overlay={{
+                      ref: inputOverlayRef,
+                      typeNumbers: slotTypeNumbersOf(pitchSlotsFor(progress)),
+                      magicRemaining: progress.magicRemaining,
+                    }}
+                    onDecide={(chosen) => {
+                      const found = pitchSlotsFor(progress).find((candidate) => candidate.slot === chosen)
+                      if (found === undefined || !canSelectSlot(found, progress.magicRemaining)) return
+                      setSlot(found)
+                      setPhase('코스')
+                    }}
+                  />
+                </div>
+              )}
+              {canPitch && phase === '코스' && (
+                <div hidden={isPopupOpen}>
+                  <AimCursor
+                    side={options.stageSide ?? 1}
+                    isPaused={isPopupOpen}
+                    overlay={{ ref: inputOverlayRef, typeNumber: slot?.typeNumber ?? 0 }}
+                    onConfirm={(confirmed) => {
+                      // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
+                      // 0x11 의 틱 10 에 놓는다(0x4e060). 게이지 그림만 0x4d3f8 에서 건너뛴다
+                      setAim(confirmed)
+                      setPhase('게이지')
+                    }}
+                    // CLR(−16)은 구질 고르기(0xf)로 되돌린다 (0x50ee0~0x50ee6) — 0xf 진입 0x3d954 가 다시 돈다
+                    onCancel={() => {
+                      setPhase('구질')
+                      setSlot(null)
+                      actions.returnToPitchSelection()
+                    }}
+                  />
+                </div>
+              )}
+              {canPitch && phase === '게이지' && (
+                <div hidden={isPopupOpen}>
+                  <PitchGradeGauge
+                    isPaused={isPopupOpen}
+                    showsGauge={showsGauge}
+                    onRelease={(gaugeCell) => throwWith(gaugeCell)}
+                    {...(aim === null
+                      ? {}
+                      : {
+                          overlay: {
+                            ref: inputOverlayRef,
+                            aim,
+                            aimSide: options.stageSide ?? 1,
+                            gaugeSettingOn: options.gaugeSettingOn === true,
+                            gameMode: options.mode,
+                            // [경기+0xfc8] == 22 — 놓기 전 0x11 그림의 마구 공 파티클(Q-09)
+                            isMagicPitch: slot?.isMagic === true,
+                          },
+                        })}
+                  />
+                </div>
+              )}
+            </PitcherSideStage>
+          ) : null
+          /*
           그 밖(사람 차례가 아닌 틈)은 원본이면 상태 0x21 자동진행 중계다 — 웹 진행기는 늘 `liveAutoRelay` 로 0x21 을 세워
           위에서 `TeamAutoRelay` 가 그린다. 여기에 남는 것은 경기가 끝나 요약이 서기 전 한 그림뿐이라 아무것도 그리지 않는다
           (예전 웹 안내 "자동 진행 중…" 은 원본에 없다)
-        */}
+        */
+        }
 
         {(canPitch || isPitchSceneBeforePlay) && !canBat && <RecordAlertStageOverlay frame={recordAlert} isUnderMenu={isMenuOpen} />}
 
@@ -1528,13 +1520,21 @@ function TeamGameScene({
         {canBat && !isAwaitingConfirm && !isPopupOpen && changeWindow === null && isStealable.length > 0 && (
           <PressLayer testId="도루 누름 칸">
             {isStealable.map((base) => (
-              <PressArea key={base} label={`도루 ${base}루`} rect={stealPressRectOf(base)}
+              <PressArea
+                key={base}
+                label={`도루 ${base}루`}
+                rect={stealPressRectOf(base)}
                 onPress={(event) => {
                   // 키와 같은 길 — 칸에 받은 틱은 손가락 · 마우스가 닿은 시각에 본 그림의 틱(`PressArea`, r222)
-                  pushSceneKey(() => {
-                    if (flightProbeRef.current?.() === true) actions.steal(base)
-                  }, 'press', inputTimeOf(event))
-                }} />
+                  pushSceneKey(
+                    () => {
+                      if (flightProbeRef.current?.() === true) actions.steal(base)
+                    },
+                    'press',
+                    inputTimeOf(event),
+                  )
+                }}
+              />
             ))}
           </PressLayer>
         )}
@@ -1564,11 +1564,18 @@ function TeamGameScene({
         */}
         {overlay !== '조작방법' && (
           <PressLayer testId="소프트키 누름 칸" isOnTop>
-            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar}
-              isDisabled={changeWindow !== null && !isMenuOpen} />
+            <PressArea
+              rect={MENU_PRESS_RECT}
+              label={isMenuOpen ? '닫기' : '메뉴'}
+              onPress={menu.pressStar}
+              isDisabled={changeWindow !== null && !isMenuOpen}
+            />
             {acceptsChangeKey && (
-              <PressArea rect={TIME_PRESS_RECT} label={session.canChangePitcher ? '# 교체' : '# 대타'}
-                onPress={() => setChangeWindow(session.canChangePitcher ? '투수' : '대타')} />
+              <PressArea
+                rect={TIME_PRESS_RECT}
+                label={session.canChangePitcher ? '# 교체' : '# 대타'}
+                onPress={() => setChangeWindow(session.canChangePitcher ? '투수' : '대타')}
+              />
             )}
           </PressLayer>
         )}
@@ -1639,9 +1646,7 @@ function slotChoices(magicRemaining: number, slots: readonly PitchSlot[]): Pitch
     .map((slot) => ({
       slot: slot.slot,
       name: slot.name,
-      ...(slot.isMagic
-        ? { detail: `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}` }
-        : {}),
+      ...(slot.isMagic ? { detail: `마구 · 남은 ${magicRemaining}회${magicRemaining === 0 ? ' (못 던짐)' : ''}` } : {}),
       isBlocked: !canSelectSlot(slot, magicRemaining),
     }))
 }
@@ -1667,12 +1672,12 @@ function teamRecordBattersOf(
 ): readonly { readonly name: string; readonly position: number; readonly ace: number | null }[] {
   const entry = ours ? progress.ourEntry : progress.opponentEntry
   const rows = entry.map((batter, index) => ({
-    index: batter.aceIndex >= 0 ? ACE_RECORD_INDEX : batter.recordSlot ?? index,
+    index: batter.aceIndex >= 0 ? ACE_RECORD_INDEX : (batter.recordSlot ?? index),
     name: batter.name,
     position: batter.position,
     ace: batter.aceIndex >= 0 ? batter.aceIndex : null,
   }))
-  const teamAce = ours ? progress.options.aceBatterId ?? -1 : progress.opponentAceBatterIndex
+  const teamAce = ours ? (progress.options.aceBatterId ?? -1) : progress.opponentAceBatterIndex
   if (teamAce >= 0 && !rows.some((row) => row.ace !== null)) {
     rows.push({ index: ACE_RECORD_INDEX, name: ACE_BATTERS[teamAce]?.name ?? '', position: 0, ace: teamAce })
   }

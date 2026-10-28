@@ -7,9 +7,20 @@ import { TEAMS } from '@/shared/config/original/teams'
 import { nationalCupRankingOf } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import {
-  HEADER_CELLS, HEADER_DIVIDER_COUNT, NATIONAL_CUP_ROW_COUNT, PERCENT_OFFSET, RANK_GLYPH_HEIGHT,
-  ROW_CELLS, ROW_FRAME, ROW_FRAME_ORIGIN, ROW_STEP, STANDINGS_WINDOW, TEAM_LABEL_BASE_FRAME,
-  rankGlyphsOf, valueGlyphsOf, winningPercentOf,
+  HEADER_CELLS,
+  HEADER_DIVIDER_COUNT,
+  NATIONAL_CUP_ROW_COUNT,
+  PERCENT_OFFSET,
+  RANK_GLYPH_HEIGHT,
+  ROW_CELLS,
+  ROW_FRAME,
+  ROW_FRAME_ORIGIN,
+  ROW_STEP,
+  STANDINGS_WINDOW,
+  TEAM_LABEL_BASE_FRAME,
+  rankGlyphsOf,
+  valueGlyphsOf,
+  winningPercentOf,
 } from '@/pages/national-cup/lib/nationalCupLayout'
 import type { StandingsBox } from '@/widgets/standings/lib/standingsLayout'
 import * as styles from '@/pages/national-cup/ui/NationalCupStandings.css'
@@ -66,13 +77,11 @@ export function NationalCupStandings({ cup, onConfirm, isConfirmable = true }: N
   return (
     <div role="group" aria-label="국가대항전 순위">
       {/* 순위표 0x7f070 의 판 0x55e60(skin, x, y, w, h, 0, 정렬 0x11, 위 띠 0x10, 0, 0, 0) (0x7f0b6~0x7f0e4) */}
-      <CommonPanel x={STANDINGS_WINDOW.x} y={STANDINGS_WINDOW.y} width={STANDINGS_WINDOW.width}
-        height={STANDINGS_WINDOW.height} topBand={0x10} />
+      <CommonPanel x={STANDINGS_WINDOW.x} y={STANDINGS_WINDOW.y} width={STANDINGS_WINDOW.width} height={STANDINGS_WINDOW.height} topBand={0x10} />
 
       <svg className={styles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
         {HEADER_CELLS.slice(0, HEADER_DIVIDER_COUNT).map((cell) => (
-          <rect key={cell.frame} x={cell.x + cell.width} y={cell.y} width={1} height={cell.height}
-            fill={ORIGINAL_COLORS.tableDivider} />
+          <rect key={cell.frame} x={cell.x + cell.width} y={cell.y} width={1} height={cell.height} fill={ORIGINAL_COLORS.tableDivider} />
         ))}
       </svg>
       {HEADER_CELLS.map((cell) => (
@@ -90,22 +99,50 @@ export function NationalCupStandings({ cup, onConfirm, isConfirmable = true }: N
         const percent = ROW_CELLS.winningPercent
         return (
           <div key={teamId} data-team={teamId} data-rank={index + 1}>
-            <img className={styles.layer} alt="" src={frameImage(MODE_UI, ROW_FRAME)}
-              style={{ left: ROW_FRAME_ORIGIN.x, top: ROW_FRAME_ORIGIN.y + dy }} />
-            <SpriteNumber glyphs={rankGlyphs} right={centerRight(rankGlyphs, ROW_CELLS.rank)}
-              boxTop={ROW_CELLS.rank.y + dy} boxHeight={ROW_CELLS.rank.height} glyphHeight={RANK_GLYPH_HEIGHT} />
-            <img className={styles.layer} alt={TEAMS[teamId].name}
+            <img
+              className={styles.layer}
+              alt=""
+              src={frameImage(MODE_UI, ROW_FRAME)}
+              style={{ left: ROW_FRAME_ORIGIN.x, top: ROW_FRAME_ORIGIN.y + dy }}
+            />
+            <SpriteNumber
+              glyphs={rankGlyphs}
+              right={centerRight(rankGlyphs, ROW_CELLS.rank)}
+              boxTop={ROW_CELLS.rank.y + dy}
+              boxHeight={ROW_CELLS.rank.height}
+              glyphHeight={RANK_GLYPH_HEIGHT}
+            />
+            <img
+              className={styles.layer}
+              alt={TEAMS[teamId].name}
               src={frameImage(IMG_TEXT, TEAM_LABEL_BASE_FRAME + teamId)}
-              style={centered(TEAM_LABEL_BASE_FRAME + teamId, ROW_CELLS.team, dy)} />
-            <SpriteNumber glyphs={winGlyphs} right={centerRight(winGlyphs, ROW_CELLS.wins)}
-              boxTop={ROW_CELLS.wins.y + dy} boxHeight={ROW_CELLS.wins.height} />
-            <SpriteNumber glyphs={lossGlyphs} right={centerRight(lossGlyphs, ROW_CELLS.losses)}
-              boxTop={ROW_CELLS.losses.y + dy} boxHeight={ROW_CELLS.losses.height} />
+              style={centered(TEAM_LABEL_BASE_FRAME + teamId, ROW_CELLS.team, dy)}
+            />
+            <SpriteNumber
+              glyphs={winGlyphs}
+              right={centerRight(winGlyphs, ROW_CELLS.wins)}
+              boxTop={ROW_CELLS.wins.y + dy}
+              boxHeight={ROW_CELLS.wins.height}
+            />
+            <SpriteNumber
+              glyphs={lossGlyphs}
+              right={centerRight(lossGlyphs, ROW_CELLS.losses)}
+              boxTop={ROW_CELLS.losses.y + dy}
+              boxHeight={ROW_CELLS.losses.height}
+            />
             {/* 승률만 오른쪽 정렬이고, 그 오른쪽에 "%" 가 따로 붙는다 */}
-            <SpriteNumber glyphs={valueGlyphsOf(winningPercentOf(wins, losses))} right={percent.x + percent.width}
-              boxTop={percent.y + dy} boxHeight={percent.height} />
-            <img className={styles.layer} alt="" src={frameImage(NUM, PERCENT_FRAME)}
-              style={{ left: percent.x + PERCENT_OFFSET.x, top: percent.y + dy + PERCENT_OFFSET.y }} />
+            <SpriteNumber
+              glyphs={valueGlyphsOf(winningPercentOf(wins, losses))}
+              right={percent.x + percent.width}
+              boxTop={percent.y + dy}
+              boxHeight={percent.height}
+            />
+            <img
+              className={styles.layer}
+              alt=""
+              src={frameImage(NUM, PERCENT_FRAME)}
+              style={{ left: percent.x + PERCENT_OFFSET.x, top: percent.y + dy + PERCENT_OFFSET.y }}
+            />
           </div>
         )
       })}

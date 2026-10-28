@@ -22,9 +22,7 @@ export function pickoffOfferOf(base: PickoffBase): TouchKeyOffer {
 /** 주자가 있는 루의 견제 상황 버튼 — 1루 · 2루 · 3루 차례. 빈 루는 원본도 키를 먹고 아무 일이 없으니(0x50f28) 버튼을 안 띄운다 */
 export function pickoffTouchOffersOf(bases: BaseOccupancy): readonly TouchKeyOffer[] {
   const occupied: Readonly<Record<PickoffBase, boolean>> = { 1: bases.first, 2: bases.second, 3: bases.third }
-  return ([1, 2, 3] as const)
-    .filter((base) => occupied[base])
-    .map(pickoffOfferOf)
+  return ([1, 2, 3] as const).filter((base) => occupied[base]).map(pickoffOfferOf)
 }
 
 /**

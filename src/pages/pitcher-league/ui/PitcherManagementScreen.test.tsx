@@ -77,8 +77,8 @@ const 연출넘기기 = () => fireEvent.click(screen.getByTestId('투수-훈련�
 function 누르기(name: string) {
   const candidates = [...screen.queryAllByRole('option'), ...screen.queryAllByRole('button')]
   // 바닥띠 되돌아가기(ScreenFrame)는 그림 단추라 이름표로 찾는다
-  const found = candidates.find((element) => 칸이름(element).startsWith(name))
-    ?? candidates.find((element) => element.getAttribute('aria-label') === name)
+  const found =
+    candidates.find((element) => 칸이름(element).startsWith(name)) ?? candidates.find((element) => element.getAttribute('aria-label') === name)
   if (found === undefined) throw new Error(`칸을 찾지 못했습니다: ${name}`)
   fireEvent.click(found)
 }
@@ -87,14 +87,7 @@ describe('커맨드 여섯 칸 (상태 105 · 점프표 0xcc540)', () => {
   it('투수편도 [선수정보][트레이닝][휴식][외출][아이템][다음경기] 여섯이다 (StrHOWTO[11])', () => {
     화면()
 
-    expect(칸이름들()).toEqual([
-      '선수정보',
-      '트레이닝',
-      '휴식',
-      '외출',
-      '아이템',
-      '다음경기',
-    ])
+    expect(칸이름들()).toEqual(['선수정보', '트레이닝', '휴식', '외출', '아이템', '다음경기'])
   })
 
   it('[다음경기] 는 경기로 넘긴다 (원본 109 → 142 → 144 → 장면 0x104)', () => {
@@ -161,8 +154,11 @@ describe('상태판 0x7d34c 모드 3 · 커맨드 줄 0x7e418 투수 표', () =>
 
     const 아이콘 = [...container.querySelectorAll('[data-testid="command-bar"] button img')].map((img) => img.getAttribute('src'))
     expect(아이콘).toEqual([
-      './sprites/mode_icon/016.png', './sprites/mode_icon/017.png', './sprites/mode_icon/018.png',
-      './sprites/mode_icon/012.png', './sprites/management/icon_selected_19.png',
+      './sprites/mode_icon/016.png',
+      './sprites/mode_icon/017.png',
+      './sprites/mode_icon/018.png',
+      './sprites/mode_icon/012.png',
+      './sprites/management/icon_selected_19.png',
     ])
     const 이름표 = container.querySelector('img[src$="command_label_116.png"]') as HTMLElement
     // 칸 4 (199, 236) 은 가운데 정렬 — 폭을 못 읽는 jsdom 에선 trunc(32/2) = 16 → 199 − 6 + 16 − 1
@@ -191,8 +187,15 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
   it('125 는 가운데 판을 빼고(0x19da4 19dc6) 취소를 안 받는다(0x105a4) — 결과 창이 닫히면 105 로 돌아와 다시 깐다', () => {
     const onExit = vi.fn()
     render(
-      <PitcherManagementScreen career={투수()} random={난수} onSave={() => {}} onNextGame={() => {}} onOuting={() => {}}
-        onOpenShop={() => {}} onExit={onExit} />,
+      <PitcherManagementScreen
+        career={투수()}
+        random={난수}
+        onSave={() => {}}
+        onNextGame={() => {}}
+        onOuting={() => {}}
+        onOpenShop={() => {}}
+        onExit={onExit}
+      />,
     )
     누르기('트레이닝')
     누르기('제구')
@@ -264,8 +267,9 @@ describe('트레이닝 하위 메뉴 (상태 107 · 키 0x12d48)', () => {
     fireEvent.click(칸('예'))
     연출넘기기()
 
-    const 그림들 = Array.from(screen.getByRole('dialog', { name: '상세정보' }).querySelectorAll('img'))
-      .map((image) => image.getAttribute('src') ?? '')
+    const 그림들 = Array.from(screen.getByRole('dialog', { name: '상세정보' }).querySelectorAll('img')).map(
+      (image) => image.getAttribute('src') ?? '',
+    )
     for (const frame of ['340', '341', '342', '343', '084']) {
       expect(그림들).toContain(`./sprites/img_text/frames/${frame}.png`)
     }
@@ -331,13 +335,7 @@ describe('선수정보 하위 메뉴 (상태 106 · 점프표 0xcc69c)', () => {
 
     누르기('선수정보')
 
-    expect(칸이름들()).toEqual([
-      '기본정보',
-      '장비착용',
-      '아이템/스킬',
-      '구질',
-      '기록실',
-    ])
+    expect(칸이름들()).toEqual(['기본정보', '장비착용', '아이템/스킬', '구질', '기록실'])
   })
 
   it('[아이템/스킬] 은 스킬 창(122)이다 — 비트 8 부터 투수 이름(비트+16)으로 늘어놓고, 해제하면 장착만 끈다 (0x8457c · 0xa4b04)', () => {
@@ -582,8 +580,16 @@ describe('휴식 (상태 105 칸 2 → 팝업 0x2a → 127)', () => {
   it('결과 창이 닫혀 105 에 다시 들면 칸을 처음 자리로 되돌려 다시 펼치고, 그동안 키를 버린다 (0x1b466 → 0x11910 11c26 0x7ff21)', () => {
     const onReenter = vi.fn()
     render(
-      <PitcherManagementScreen career={투수()} random={난수} onSave={() => {}} onNextGame={() => {}} onOuting={() => {}}
-        onOpenShop={() => {}} onExit={() => {}} onReenter={onReenter} />,
+      <PitcherManagementScreen
+        career={투수()}
+        random={난수}
+        onSave={() => {}}
+        onNextGame={() => {}}
+        onOuting={() => {}}
+        onOpenShop={() => {}}
+        onExit={() => {}}
+        onReenter={onReenter}
+      />,
     )
     const 칸위 = (name: string) => (screen.getByRole('button', { name }) as HTMLElement).style.top
 
@@ -653,10 +659,7 @@ describe('칭호 목록 창 (기본정보 119 → 129)', () => {
     fireEvent.keyDown(window, { key: '*' })
 
     const 창 = screen.getByRole('dialog', { name: '칭호' })
-    expect([...창.querySelectorAll('button')].map((칸) => 칸.textContent)).toEqual([
-      '이름 없는 신인',
-      '닥터 K',
-    ])
+    expect([...창.querySelectorAll('button')].map((칸) => 칸.textContent)).toEqual(['이름 없는 신인', '닥터 K'])
   })
 
   it("'*' 를 다시 누르면 119 로 돌아간다 (0x11f9a)", () => {
@@ -886,19 +889,37 @@ describe('[아이템] 110 하위 메뉴 → 111 장비 상점 · [장비착용] 
 describe('하위 메뉴로 돌아오기 — 111 → 110 · 121 → 106 · 하위 창 → 106 (0x107e0 · 0x11530 은 커서를 안 건드린다)', () => {
   const 다시띄우기 = (mainCursor: ReturnType<typeof createNariMainMenuCursor>, onOpenShop: (tab: PitcherShopTab) => void) =>
     render(
-      <PitcherManagementScreen career={투수({ hasActedThisCycle: true })} random={난수} onSave={() => {}} onNextGame={() => {}}
-        onOuting={() => {}} onOpenShop={onOpenShop} onExit={() => {}} mainCursor={mainCursor} />,
+      <PitcherManagementScreen
+        career={투수({ hasActedThisCycle: true })}
+        random={난수}
+        onSave={() => {}}
+        onNextGame={() => {}}
+        onOuting={() => {}}
+        onOpenShop={onOpenShop}
+        onExit={() => {}}
+        mainCursor={mainCursor}
+      />,
     )
-  const 커서칸 = () => [...document.querySelectorAll('[data-testid="command-bar"] button')]
-    .find((button) => button.getAttribute('aria-current') === 'true')?.getAttribute('aria-label')
+  const 커서칸 = () =>
+    [...document.querySelectorAll('[data-testid="command-bar"] button')]
+      .find((button) => button.getAttribute('aria-current') === 'true')
+      ?.getAttribute('aria-label')
 
   it('칸이 펼쳐지는 동안(그린 갱신 수 < 7)은 키 · 취소를 버린다 — 105 [gfx+0x99] · 하위 메뉴 [+0x9a] (A-50), 상점에서 돌아온 하위 메뉴는 펼침이 없다', () => {
     const mainCursor = createNariMainMenuCursor()
     const onExit = vi.fn()
     const onOpenShop = vi.fn()
     render(
-      <PitcherManagementScreen career={투수({ season: 2 })} random={난수} onSave={() => {}} onNextGame={() => {}}
-        onOuting={() => {}} onOpenShop={onOpenShop} onExit={onExit} mainCursor={mainCursor} />,
+      <PitcherManagementScreen
+        career={투수({ season: 2 })}
+        random={난수}
+        onSave={() => {}}
+        onNextGame={() => {}}
+        onOuting={() => {}}
+        onOpenShop={onOpenShop}
+        onExit={onExit}
+        mainCursor={mainCursor}
+      />,
     )
     rawFireEvent.keyDown(window, { key: '6' })
     rawFireEvent.keyDown(window, { key: 'Escape' })
@@ -919,8 +940,16 @@ describe('하위 메뉴로 돌아오기 — 111 → 110 · 121 → 106 · 하위
     cleanup()
 
     render(
-      <PitcherManagementScreen career={투수({ season: 2 })} random={난수} onSave={() => {}} onNextGame={() => {}}
-        onOuting={() => {}} onOpenShop={onOpenShop} onExit={onExit} mainCursor={mainCursor} />,
+      <PitcherManagementScreen
+        career={투수({ season: 2 })}
+        random={난수}
+        onSave={() => {}}
+        onNextGame={() => {}}
+        onOuting={() => {}}
+        onOpenShop={onOpenShop}
+        onExit={onExit}
+        mainCursor={mainCursor}
+      />,
     )
     rawFireEvent.keyDown(window, { key: '6' })
     expect(커서칸()).toBe('GP')
@@ -994,7 +1023,7 @@ describe('머리띠·바닥 (0x16928 · 0x166cc)', () => {
   })
 })
 
-describe('능력치 상세 창(120) — 기본정보에서 \'0\' (키 0x1056c · 0x1b654)', () => {
+describe("능력치 상세 창(120) — 기본정보에서 '0' (키 0x1056c · 0x1b654)", () => {
   it("'0' 으로 열면 투수 이름표 표와 글이 뜨고 바닥은 5, 되돌아가기는 119 로", () => {
     const { container } = 화면({ career: 투수({ morale: 20 }) })
     누르기('선수정보')
@@ -1019,8 +1048,11 @@ describe('108 마구 창(탭 1) — 진입 0x17730 · 확인 키 0x17828 (탭 0 
     누르기('마구')
     expect(screen.getByTestId('마구훈련-창')).toBeTruthy()
   }
-  const 커서칸 = () => screen.getAllByRole('button').filter((button) => button.getAttribute('aria-pressed') === 'true')
-    .map((button) => button.textContent)
+  const 커서칸 = () =>
+    screen
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('aria-pressed') === 'true')
+      .map((button) => button.textContent)
 
   it('처음 커서는 min(배운 수 L, 3) 칸이다 (177c8~17806)', () => {
     화면({ career: 투수({ magicLevel: 2, popularity: 2000, gamePoint: 5000 }) })

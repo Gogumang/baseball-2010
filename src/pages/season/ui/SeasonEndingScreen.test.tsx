@@ -4,9 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { SeasonEndingScreen } from '@/pages/season/ui/SeasonEndingScreen'
-import {
-  SEASON_ENDING_TEXT, isSeasonEndingTextShown, seasonEndingIrisOf, seasonEndingTextIndexOf,
-} from '@/widgets/season/lib/seasonEndingLayout'
+import { SEASON_ENDING_TEXT, isSeasonEndingTextShown, seasonEndingIrisOf, seasonEndingTextIndexOf } from '@/widgets/season/lib/seasonEndingLayout'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
 
 /**

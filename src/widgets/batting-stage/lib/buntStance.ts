@@ -41,12 +41,7 @@ export function isBuntStanceSet(stance: BuntStance, keyTick: number): boolean {
  * S+4 가 0 이라 여기 오지 않는다(`isBuntStanceSet`). 그래서 **누를 때마다 켜고 끄는 토글이 아니다** — 취소는 키를 뗄 때다
  * (`buntStanceAfterRelease`). 예약이 아직 안 풀린 같은 틱에 번트 키를 또 누르면 예약이 지워진다(51e98, 자세 없음).
  */
-export function buntStanceAfterBuntKey(
-  stance: BuntStance | null,
-  kind: number,
-  keyTick: number,
-  isAceBatter: boolean,
-): BuntStance | null {
+export function buntStanceAfterBuntKey(stance: BuntStance | null, kind: number, keyTick: number, isAceBatter: boolean): BuntStance | null {
   if (isAceBatter) return stance
   if (stance === null) return { kind, frame: keyTick }
   return isBuntStanceSet(stance, keyTick) ? stance : null
@@ -69,9 +64,7 @@ export function buntStanceAfterRelease(stance: BuntStance | null, keyTick: numbe
 
 /** 장면 +0xfdc 를 쓰는 사람 키 (상태 0x11 · S+4 — 부르는 쪽 `isFlying` 이 본다) */
 export type SceneBuntKey =
-  | { readonly kind: '스윙' }
-  | { readonly kind: '필살' }
-  | { readonly kind: '번트'; readonly buntKind: number; readonly isAceBatter: boolean }
+  { readonly kind: '스윙' } | { readonly kind: '필살' } | { readonly kind: '번트'; readonly buntKind: number; readonly isAceBatter: boolean }
 
 /**
  * **사람 키가 쓰는 장면 +0xfdc** (직접 뜸 — `BattingStage` 의 `sceneBuntKind` 주석):

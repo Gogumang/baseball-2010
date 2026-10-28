@@ -41,7 +41,9 @@ function forceCoarsePointer(): void {
       dispatchEvent: list.dispatchEvent.bind(list),
     } as MediaQueryList
   }) as typeof window.matchMedia
-  restoreMatchMedia = () => { window.matchMedia = original }
+  restoreMatchMedia = () => {
+    window.matchMedia = original
+  }
 }
 
 function host(id: string): HTMLElement {
@@ -79,14 +81,18 @@ async function 세우기() {
     { container: root },
   )
   render(<ViewportShell />, { container: host('shell') })
-  act(() => { withdraw = offerTouchKey(BACK) })
+  act(() => {
+    withdraw = offerTouchKey(BACK)
+  })
   const button = await waitFor(() => {
     const found = document.querySelector<HTMLButtonElement>('#keypad-root button[data-touch-key="Escape"]')
     expect(found).not.toBeNull()
     return found as HTMLButtonElement
   })
   const keys: string[] = []
-  const onKey = (event: KeyboardEvent) => { keys.push(`${event.type}:${event.key}`) }
+  const onKey = (event: KeyboardEvent) => {
+    keys.push(`${event.type}:${event.key}`)
+  }
   window.addEventListener('keydown', onKey)
   window.addEventListener('keyup', onKey)
   const stopListening = () => {

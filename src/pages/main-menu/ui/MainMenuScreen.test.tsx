@@ -40,18 +40,19 @@ const 누르기 = (key: string) => {
   틱지남()
 }
 
-const 띄우기 = (gamePoint?: number, headerSlides?: boolean) => render(
-  <MainMenuScreen
-    {...(headerSlides === undefined ? {} : { headerSlides })}
-    hasSavedGame={false}
-    onNewGame={vi.fn()}
-    onSelectMode={vi.fn()}
-    onHelp={vi.fn()}
-    onSettings={vi.fn()}
-    onSpecial={vi.fn()}
-    {...(gamePoint === undefined ? {} : { gamePoint })}
-  />,
-)
+const 띄우기 = (gamePoint?: number, headerSlides?: boolean) =>
+  render(
+    <MainMenuScreen
+      {...(headerSlides === undefined ? {} : { headerSlides })}
+      hasSavedGame={false}
+      onNewGame={vi.fn()}
+      onSelectMode={vi.fn()}
+      onHelp={vi.fn()}
+      onSettings={vi.fn()}
+      onSpecial={vi.fn()}
+      {...(gamePoint === undefined ? {} : { gamePoint })}
+    />,
+  )
 
 const 그림들 = (container: HTMLElement) => [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '')
 const G숫자 = (container: HTMLElement) => 그림들(container).filter((src) => /^\.\/sprites\/gpoint\/00\d\.png$/.test(src))
@@ -97,8 +98,12 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
   })
   /** 머리띠 판 윗변 y — 다 내려오면 30 − 38 = −8 (`headerTopOf`) */
   // 메뉴 바탕 0x58371(캔버스 없는 시험에서는 선 · 덮기 svg 근사)은 빼고 머리띠 첫 칸을 본다
-  const 머리띠y = (container: HTMLElement) => Number(Array.from(container.querySelectorAll('svg rect'))
-    .find((rect) => rect.closest('[data-testid="바탕-메뉴"]') === null)?.getAttribute('y'))
+  const 머리띠y = (container: HTMLElement) =>
+    Number(
+      Array.from(container.querySelectorAll('svg rect'))
+        .find((rect) => rect.closest('[data-testid="바탕-메뉴"]') === null)
+        ?.getAttribute('y'),
+    )
 
   it('바탕은 메뉴 바탕 0x58371 이다 (판 0x24b1c 첫 그림 0x24c9c) — mode_back 배너는 원본 메뉴에 없다', () => {
     const { container } = 띄우기(50)
@@ -123,9 +128,15 @@ describe('메인 메뉴 머리띠 0x54d95(skin, 0, 1|5)', () => {
 describe('일반모드 진입 창 [13] — 하위 12 0x296f0', () => {
   const 일반모드창 = (onSelectMode = vi.fn(), isGeneralGameInProgress = false) => {
     render(
-      <MainMenuScreen hasSavedGame={false} onNewGame={vi.fn()} onSelectMode={onSelectMode}
+      <MainMenuScreen
+        hasSavedGame={false}
+        onNewGame={vi.fn()}
+        onSelectMode={onSelectMode}
         isGeneralGameInProgress={isGeneralGameInProgress}
-        onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
+        onHelp={vi.fn()}
+        onSettings={vi.fn()}
+        onSpecial={vi.fn()}
+      />,
     )
     // 윗단 [게임시작] → 아랫단 최근게임 → ↓ 일반모드 → 시작
     for (const key of ['Enter', 'ArrowDown', 'Enter']) 누르기(key)
@@ -200,8 +211,14 @@ describe('일반모드 진입 창 [13] — 하위 12 0x296f0', () => {
 describe('나만의리그 편 고르기 창 [14] — 하위 13 (진입 0x25d78 · 갱신 0x2464c)', () => {
   const 나리창 = (hasSavedGame: boolean, onNewGame = vi.fn()) => {
     render(
-      <MainMenuScreen hasSavedGame={hasSavedGame} onNewGame={onNewGame} onSelectMode={vi.fn()}
-        onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
+      <MainMenuScreen
+        hasSavedGame={hasSavedGame}
+        onNewGame={onNewGame}
+        onSelectMode={vi.fn()}
+        onHelp={vi.fn()}
+        onSettings={vi.fn()}
+        onSpecial={vi.fn()}
+      />,
     )
     // 윗단 [게임시작] → 아랫단 최근게임 → ↓↓ 나만의리그 → 시작
     for (const key of ['Enter', 'ArrowDown', 'ArrowDown', 'Enter']) 누르기(key)
@@ -237,7 +254,6 @@ describe('나만의리그 편 고르기 창 [14] — 하위 13 (진입 0x25d78 �
     expect(onNewGame).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: '타자편' })).toBeNull()
   })
-
 })
 
 describe('최근게임 — 전역기록 +0x3c', () => {
@@ -245,9 +261,16 @@ describe('최근게임 — 전역기록 +0x3c', () => {
     const onSelectMode = vi.fn()
     const onNewGame = vi.fn()
     render(
-      <MainMenuScreen hasSavedGame={false} onNewGame={onNewGame} onSelectMode={onSelectMode}
-        isGeneralGameInProgress={isGeneralGameInProgress} lastPlayedMode={lastPlayedMode}
-        onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} />,
+      <MainMenuScreen
+        hasSavedGame={false}
+        onNewGame={onNewGame}
+        onSelectMode={onSelectMode}
+        isGeneralGameInProgress={isGeneralGameInProgress}
+        lastPlayedMode={lastPlayedMode}
+        onHelp={vi.fn()}
+        onSettings={vi.fn()}
+        onSpecial={vi.fn()}
+      />,
     )
     // 윗단 [게임시작] → 아랫단 커서 0(최근게임) → 시작
     for (const key of ['Enter', 'Enter']) 누르기(key)
@@ -266,9 +289,17 @@ describe('최근게임 — 전역기록 +0x3c', () => {
 describe('[0x140006c] = 5 — 관리 메뉴 취소가 메인 메뉴를 게임시작 목록으로 바로 연다 (생성자 0x234d4 23830 · 진입 0x25b88)', () => {
   const 바로열기 = (gameStartCursor: { current: number }, onNewGame = vi.fn()) => {
     const rendered = render(
-      <MainMenuScreen hasSavedGame={false} onNewGame={onNewGame} onSelectMode={vi.fn()}
-        onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} gamePoint={0}
-        openTier={5} gameStartCursor={gameStartCursor} />,
+      <MainMenuScreen
+        hasSavedGame={false}
+        onNewGame={onNewGame}
+        onSelectMode={vi.fn()}
+        onHelp={vi.fn()}
+        onSettings={vi.fn()}
+        onSpecial={vi.fn()}
+        gamePoint={0}
+        openTier={5}
+        gameStartCursor={gameStartCursor}
+      />,
     )
     // 생성자가 띠를 1 로 세웠다 — 다 자랄 때까지 키를 버린다
     틱지남()
@@ -303,10 +334,19 @@ describe('[0x140006c] = 5 — 관리 메뉴 취소가 메인 메뉴를 게임시
 })
 
 describe('바탕 띠 연출 [0xe2] · [0xe4] — 처음 메뉴 OK(0x294b8) · 생성자(0x2381c)가 1 로 세운다', () => {
-  const 메뉴 = (props: Partial<Parameters<typeof MainMenuScreen>[0]> = {}) => render(
-    <MainMenuScreen hasSavedGame={false} onNewGame={vi.fn()} onSelectMode={vi.fn()}
-      onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} gamePoint={0} {...props} />,
-  )
+  const 메뉴 = (props: Partial<Parameters<typeof MainMenuScreen>[0]> = {}) =>
+    render(
+      <MainMenuScreen
+        hasSavedGame={false}
+        onNewGame={vi.fn()}
+        onSelectMode={vi.fn()}
+        onHelp={vi.fn()}
+        onSettings={vi.fn()}
+        onSpecial={vi.fn()}
+        gamePoint={0}
+        {...props}
+      />,
+    )
   const 띠 = (container: HTMLElement) => container.querySelector('[data-band-spread]')?.getAttribute('data-band-spread')
 
   it('열린 채로 서면 1 에서 자라고, 다 펼쳐진 채로 서라 하면 160 이다', () => {
@@ -348,10 +388,18 @@ describe('바탕 띠 연출 [0xe2] · [0xe4] — 처음 메뉴 OK(0x294b8) · �
 })
 
 describe('처음 메뉴 키 (0x29454) — CLR 은 안 보고, ←→·숫자도 커서다', () => {
-  const 메뉴 = (props: Partial<Parameters<typeof MainMenuScreen>[0]> = {}) => render(
-    <MainMenuScreen hasSavedGame={false} onNewGame={vi.fn()} onSelectMode={vi.fn()}
-      onHelp={vi.fn()} onSettings={vi.fn()} onSpecial={vi.fn()} {...props} />,
-  )
+  const 메뉴 = (props: Partial<Parameters<typeof MainMenuScreen>[0]> = {}) =>
+    render(
+      <MainMenuScreen
+        hasSavedGame={false}
+        onNewGame={vi.fn()}
+        onSelectMode={vi.fn()}
+        onHelp={vi.fn()}
+        onSettings={vi.fn()}
+        onSpecial={vi.fn()}
+        {...props}
+      />,
+    )
 
   it('타이틀로 가는 단추가 없고 CLR 은 아무 일도 안 한다', () => {
     const onHelp = vi.fn()

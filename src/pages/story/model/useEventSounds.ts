@@ -18,12 +18,16 @@ export function useEventSounds(step: EventStep): void {
     const key = stepKeyOf(step)
     if (playedRef.current.key !== key) playedRef.current = { key, played: new Set() }
     const { played } = playedRef.current
-    const timers = soundTimelineOf(step.passed).flatMap(({ id, start }, index) => played.has(index)
-      ? []
-      : [setAppTickTimeout(() => {
-        played.add(index)
-        playEventSound(activeSound(), id)
-      }, start)])
+    const timers = soundTimelineOf(step.passed).flatMap(({ id, start }, index) =>
+      played.has(index)
+        ? []
+        : [
+            setAppTickTimeout(() => {
+              played.add(index)
+              playEventSound(activeSound(), id)
+            }, start),
+          ],
+    )
     return () => timers.forEach((clear) => clear())
   }, [step])
 }

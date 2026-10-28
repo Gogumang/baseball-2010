@@ -204,10 +204,13 @@ function syncGameSceneFreeze(now: number = performance.now()): void {
     }
     const pending = { appTick: appTick + 1, bumpsFirstDraw: false, handle: null as ReturnType<typeof setTimeout> | null }
     pendingFreeze = pending
-    pending.handle = setTimeout(() => {
-      pending.handle = null
-      settlePendingFreeze()
-    }, Math.max(0, appTickStartTime(appTick + 1) - now))
+    pending.handle = setTimeout(
+      () => {
+        pending.handle = null
+        settlePendingFreeze()
+      },
+      Math.max(0, appTickStartTime(appTick + 1) - now),
+    )
   } else if (!isFrozen && pendingFreeze !== null) {
     // 창이 그 틱 안에 다시 내려갔다 — 멈추지 않는다
     if (pendingFreeze.handle !== null) clearTimeout(pendingFreeze.handle)
@@ -389,7 +392,14 @@ export function createGameSceneDrawGate(): GameSceneDrawGate {
       return true
     },
     ...(import.meta.env.DEV || import.meta.env.MODE === 'e2e'
-      ? { devSnapshot: { capture: () => seenSerial, restore: (value: unknown) => { seenSerial = value as number } } }
+      ? {
+          devSnapshot: {
+            capture: () => seenSerial,
+            restore: (value: unknown) => {
+              seenSerial = value as number
+            },
+          },
+        }
       : {}),
   }
 }
@@ -493,11 +503,7 @@ export function setGameSceneTickTimeout(callback: () => void, ticks: number): nu
  * `isGameSceneFrozen` 으로 갱신을 거르고 창이 선 첫 그림(`createGameSceneDrawGate`)을 센다. 돌려준 함수로 거둔다.
  */
 export function setGameSceneTickInterval(callback: () => void): () => void {
-  return setTickInterval(
-    callback,
-    { now: gameSceneNow, tickOf: gameSceneTickOf, startTimeOf: gameSceneTickStartTime },
-    isGameSceneFrozen,
-  )
+  return setTickInterval(callback, { now: gameSceneNow, tickOf: gameSceneTickOf, startTimeOf: gameSceneTickStartTime }, isGameSceneFrozen)
 }
 
 /** 시험용 — 센 수를 되돌린다 */
@@ -520,7 +526,15 @@ export function resetCommonWindowShownForTest(): void {
 // 되살린 부품이 서며 다시 센다(옮기지 않는다). 실제 시각(ms) 칸은 지난 시간으로 적는다. 장면 시계(`sceneTimers`)는 부품이 다시 건다
 if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
   registerSnapshotSlot('commonWindow', {
-    capture: () => ({ frozenAgo: frozenSince === null ? null : performance.now() - frozenSince, frozenTotal, frozenSinceAppTick, frozenTicks, freezeSerial, backdropFreezeSerial, inSceneUpdateOpenAppTick }),
+    capture: () => ({
+      frozenAgo: frozenSince === null ? null : performance.now() - frozenSince,
+      frozenTotal,
+      frozenSinceAppTick,
+      frozenTicks,
+      freezeSerial,
+      backdropFreezeSerial,
+      inSceneUpdateOpenAppTick,
+    }),
     restore: (value) => {
       const saved = value as { frozenAgo: number | null } & Record<string, unknown>
       ;({ frozenTotal, frozenSinceAppTick, frozenTicks, freezeSerial, backdropFreezeSerial, inSceneUpdateOpenAppTick } = saved as never)

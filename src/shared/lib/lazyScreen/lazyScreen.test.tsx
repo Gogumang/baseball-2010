@@ -62,10 +62,11 @@ describe('lazyScreen — 화면 덩이 나눠 받기', () => {
 
   it('preloadLazyScreens 는 차례가 작은 것부터 하나씩 받는다', async () => {
     const order: string[] = []
-    const make = (name: string, rank: number) => lazyScreen(async () => {
-      order.push(name)
-      return Counter
-    }, rank)
+    const make = (name: string, rank: number) =>
+      lazyScreen(async () => {
+        order.push(name)
+        return Counter
+      }, rank)
     make('나중', 90)
     make('먼저', 5)
     make('가운데', 50)

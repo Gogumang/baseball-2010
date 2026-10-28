@@ -176,9 +176,7 @@ export const MONEY_DIGIT_OFFSET = { x: -2, y: 4 } as const
 export const VALUE_DIGIT_RIGHT_INSET = 2
 
 /** 막대 52 를 놓는 왼쪽 위 — 정렬 0x11 이면 박스 왼쪽 위, 0x14 면 박스 오른쪽 위에 (ox, oy) 를 더한다 */
-export function valueBarPositionOf(
-  box: ShopBox, align: 0x11 | 0x14, barWidth: number, ox = 0, oy = 0,
-): { readonly x: number; readonly y: number } {
+export function valueBarPositionOf(box: ShopBox, align: 0x11 | 0x14, barWidth: number, ox = 0, oy = 0): { readonly x: number; readonly y: number } {
   return { x: (align === 0x14 ? box.x + box.width - barWidth : box.x) + ox, y: box.y + oy }
 }
 

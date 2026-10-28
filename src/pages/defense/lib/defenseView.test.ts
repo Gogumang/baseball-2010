@@ -53,9 +53,7 @@ describe('야수 동작 번호', () => {
 
   it('포구 6·7 은 한 번만 돌고 마지막 칸에 멈춘다', () => {
     expect([0, 1, 2, 3].map((t) => fielderFrameOf(FIELDER_ACTION.catchLow, t))).toEqual([35, 32, 17, 17])
-    expect([0, 1, 2, 3, 4, 5, 6].map((t) => fielderFrameOf(FIELDER_ACTION.catchChest, t))).toEqual([
-      32, 33, 34, 35, 32, 17, 17,
-    ])
+    expect([0, 1, 2, 3, 4, 5, 6].map((t) => fielderFrameOf(FIELDER_ACTION.catchChest, t))).toEqual([32, 33, 34, 35, 32, 17, 17])
   })
 
   it('몸 날리기 8·9·a·b 는 방향별 한 장이다 — 42 / 45 / 39 / 36', () => {
@@ -93,7 +91,12 @@ describe('동작 지속 틱', () => {
 
   it('한 번짜리 동작 길이 — 송구 3 · 포구 3/6 · 몸날림 6 · 점프 16 · 슬라이딩 13 · 주자 슬라이딩 5', () => {
     expect(FIELDER_ACTION_TICKS).toEqual({
-      throw: 3, catchLow: 3, catchChest: 6, dive: 6, jumpCatch: 16, slideCatch: 13,
+      throw: 3,
+      catchLow: 3,
+      catchChest: 6,
+      dive: 6,
+      jumpCatch: 16,
+      slideCatch: 13,
     })
     expect(RUNNER_SLIDE_TICKS).toBe(5)
   })
@@ -144,9 +147,7 @@ describe('수비수 그림판 고르기', () => {
     })
     // 투수가 실제로 하는 동작은 펌블(날값 31~37)까지라 38장에 꼭 맞는다
     // — 점프·슬라이딩 캐치는 투수·포수 칸에서 굴리지 않는다(0x50faa, laserThrow.ts).
-    const 펌블 = fielderSpriteOf(
-      fielder({ slot: 0, aceIndex: 0, action: FIELDER_ACTION.fumble, actionTick: 99 }),
-    )
+    const 펌블 = fielderSpriteOf(fielder({ slot: 0, aceIndex: 0, action: FIELDER_ACTION.fumble, actionTick: 99 }))
     expect(펌블.folder).toBe(ACE_PITCHER_DEFENDER_FRAMES[0])
     expect(펌블.frame).toBe(37)
   })

@@ -348,9 +348,7 @@ export function PitchingScreen({
   if (busyThrow !== lastThrow) {
     setBusyThrow(lastThrow)
     setBusyTicks(
-      lastThrow !== null && passesHeldResult(lastThrow.resolution)
-        ? pitchSceneBusyTicksOf(lastThrow.pitch.frameCount, lastThrow.resultTicks)
-        : 0,
+      lastThrow !== null && passesHeldResult(lastThrow.resolution) ? pitchSceneBusyTicksOf(lastThrow.pitch.frameCount, lastThrow.resultTicks) : 0,
     )
   }
   useSceneTick(() => setBusyTicks((left) => Math.max(0, left - 1)), busyTicks > 0 && !isPopupOpen)
@@ -393,13 +391,7 @@ export function PitchingScreen({
   const isAwaitingConfirm = sceneConfirm.isAwaiting && run.status === '진행중'
 
   // 견제 — 구질 고르기(0xf)에서만. 끝난 미션(결과 화면)·0xe(OK 대기)는 키를 안 받는다
-  const acceptsPickoff =
-    onPickoffKey !== undefined &&
-    phase === '구질' &&
-    isRunning &&
-    !isAwaitingConfirm &&
-    !isPopupOpen &&
-    !isPitchSceneBusy
+  const acceptsPickoff = onPickoffKey !== undefined && phase === '구질' && isRunning && !isAwaitingConfirm && !isPopupOpen && !isPitchSceneBusy
   useEffect(() => {
     if (!acceptsPickoff || onPickoffKey === undefined) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -423,10 +415,12 @@ export function PitchingScreen({
   const sideCpuScore = run.game.scores[cpuSideOf(run.mission)]
   const sideOfHuman = humanSideOf(run.mission)
   useEffect(() => {
-    setLiveGameSides(liveGameSidesOf(
-      { ourTeamId: sideHumanTeam, opponentTeamId: sideCpuTeam },
-      { ourScore: sideHumanScore ?? 0, opponentScore: sideCpuScore ?? 0, playerSide: sideOfHuman },
-    ))
+    setLiveGameSides(
+      liveGameSidesOf(
+        { ourTeamId: sideHumanTeam, opponentTeamId: sideCpuTeam },
+        { ourScore: sideHumanScore ?? 0, opponentScore: sideCpuScore ?? 0, playerSide: sideOfHuman },
+      ),
+    )
   }, [sideHumanTeam, sideCpuTeam, sideHumanScore, sideCpuScore, sideOfHuman])
 
   // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
@@ -435,12 +429,18 @@ export function PitchingScreen({
   useEffect(() => {
     if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
     publishScenePeek('mission', {
-      side: '투수', isAwaitingConfirm, isPitchSlotPickerShown: peekPitchSlotPicker, isResultShown: peekResultShown,
+      side: '투수',
+      isAwaitingConfirm,
+      isPitchSlotPickerShown: peekPitchSlotPicker,
+      isResultShown: peekResultShown,
     })
   }, [isAwaitingConfirm, peekPitchSlotPicker, peekResultShown])
-  useEffect(() => () => {
-    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('mission', null)
-  }, [])
+  useEffect(
+    () => () => {
+      if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('mission', null)
+    },
+    [],
+  )
 
   if (run.status !== '진행중') {
     // [미션+0xbc] — 0x4ea0c 4ef2a · 0x4a384 4a3ea 의 "이겼나"
@@ -529,8 +529,7 @@ export function PitchingScreen({
   }
 
   /** 마구 칸인데 남은 횟수가 0 이하 — 0x50db8 이 키를 버린다 */
-  const isBlockedMagic = (type: PitchTypeInfo): boolean =>
-    magicRemaining !== undefined && isMagicType?.(type) === true && magicRemaining <= 0
+  const isBlockedMagic = (type: PitchTypeInfo): boolean => magicRemaining !== undefined && isMagicType?.(type) === true && magicRemaining <= 0
 
   /** 구질 번호 t (이름표 칸 + 1, 마구 22) — 장면 위 그림 재료 */
   const typeNumberOf = (type: PitchTypeInfo | null): number => {
@@ -550,9 +549,7 @@ export function PitchingScreen({
     detail:
       isMagicType?.(type) === true && magicRemaining !== undefined
         ? `마구 · 남은 ${magicRemaining}회${magicRemaining <= 0 ? ' (못 던짐)' : ''}`
-        : `구속 ${Math.round(type.speed * 100)} · 변화 ${Math.round(
-            (Math.abs(type.horizontalBreak) + Math.abs(type.verticalBreak)) * 100,
-          )}`,
+        : `구속 ${Math.round(type.speed * 100)} · 변화 ${Math.round((Math.abs(type.horizontalBreak) + Math.abs(type.verticalBreak)) * 100)}`,
     isBlocked: isBlockedMagic(type),
   }))
 
@@ -563,11 +560,11 @@ export function PitchingScreen({
 
   return (
     <div className={styles.frame}>
-    {/*
+      {/*
       원본은 240×320 경기 장면 한 장이다 — 웹 제목줄 · 남은 시간 배지 · 소프트키 막대 · 카운트 글자는 없다(카운트는 장면 HUD 0x373d0).
       목표는 HUD 꼬리의 미션 판 0x36714 가 장면 오른쪽 위에 그린다(`MissionGoalPanel`). 마우스 길은 장면 그림 자리의 투명한 누름 칸이다
     */}
-    <RawScreen>
+      <RawScreen>
         {(() => {
           const substitutionOverlay = isRunning && substitutionScene !== null && (
             <SubstitutionSceneOverlay
@@ -578,9 +575,7 @@ export function PitchingScreen({
           )
           // 일시정지 창 아래에도 남는다 — 0x52efe 가 장면 그리기를 건너뛰어 마지막 그림(소개 판 포함)이 그대로다
           const matchupCards = isAwaitingConfirm && sceneConfirm.isInConfirmState && (
-            <SceneMatchupCards
-              {...(matchupCardValues ?? { batterHand: 0, pitcher: { isComputer: false }, batter: { isComputer: true } })}
-            />
+            <SceneMatchupCards {...(matchupCardValues ?? { batterHand: 0, pitcher: { isComputer: false }, batter: { isComputer: true } })} />
           )
           if (stage === undefined) {
             return (
@@ -623,8 +618,7 @@ export function PitchingScreen({
                 opponentTeamId: teamIds.cpu,
                 playerSide: humanSideOf(run.mission),
                 // st[0x15 + i] — CPU 가 이번 공에 도루를 출발시킨 주자는 0xf 진입 전까지(공이 날거나 0x12 인 동안 포함) 루에 안 그린다
-                hiddenRunnerBases:
-                  stealDisplay !== null && (!stealDisplay.selectionEntered || isPitchSceneBusy) ? stealDisplay.bases : [],
+                hiddenRunnerBases: stealDisplay !== null && (!stealDisplay.selectionEntered || isPitchSceneBusy) ? stealDisplay.bases : [],
               }}
               batterForm={stage.batterForm}
               batterSkinIndex={stage.batterSkinIndex}
@@ -634,7 +628,7 @@ export function PitchingScreen({
               pitcherHand={stage.pitcherHand}
               {...(stage.pitcherEquipment === undefined ? {} : { pitcherEquipment: stage.pitcherEquipment })}
               {...(stage.pitcherSkinIndex === undefined ? {} : { pitcherSkinIndex: stage.pitcherSkinIndex })}
-            {...(stage.pitcherStaminaPercent === undefined ? {} : { pitcherStaminaPercent: stage.pitcherStaminaPercent })}
+              {...(stage.pitcherStaminaPercent === undefined ? {} : { pitcherStaminaPercent: stage.pitcherStaminaPercent })}
               {...(stage.batterSide === undefined ? {} : { batterSide: stage.batterSide })}
               {...(stage.aceBatterOrder === undefined ? {} : { aceBatterOrder: stage.aceBatterOrder })}
               {...(stage.batterEquipment === undefined ? {} : { batterEquipment: stage.batterEquipment })}
@@ -666,152 +660,148 @@ export function PitchingScreen({
           )
         })()}
 
-      {stage !== undefined && (
-        // 점수판 0x373d0 꼬리 0x378f0 → 0x36cb8(모드 5) → 0x36714 — 장면 오른쪽 위 미션 판 (타자 미션과 같은 그리기, 모드 5 갈래)
-        <MissionHud
-          mode={MISSION_PITCHER_MODE}
-          mission={run.mission}
-          progress={run.progress}
-          limits={missionHudLimitsOf(run)}
-          remainingSeconds={run.remainingSeconds}
-          stripsOnStage
-          allowedRuns={run.allowed.runs}
-          isFrozen={isPopupOpen}
-          isDimmed={isPitchMenuShown}
-        />
-      )}
-
-      {/* 0xe — OK 하나만 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
-      {isAwaitingConfirm && !isMenuOpen && (
-        <PressLayer testId="확인 누름 칸">
-          <PressArea
-            label="확인"
-            isDisabled={!sceneConfirm.acceptsConfirm}
-            onPress={sceneConfirm.confirm}
+        {stage !== undefined && (
+          // 점수판 0x373d0 꼬리 0x378f0 → 0x36cb8(모드 5) → 0x36714 — 장면 오른쪽 위 미션 판 (타자 미션과 같은 그리기, 모드 5 갈래)
+          <MissionHud
+            mode={MISSION_PITCHER_MODE}
+            mission={run.mission}
+            progress={run.progress}
+            limits={missionHudLimitsOf(run)}
+            remainingSeconds={run.remainingSeconds}
+            stripsOnStage
+            allowedRuns={run.allowed.runs}
+            isFrozen={isPopupOpen}
+            isDimmed={isPitchMenuShown}
           />
-        </PressLayer>
-      )}
+        )}
 
-      {/* 0xf 구질 — 그림은 장면(0x4c4bc 4c528~)이 그리고 여기는 키 · 틱 · 누름 칸만 */}
-      {isPitchMenuShown && (
-        <div hidden={isPopupOpen}>
-          <PitchSlotPicker
-            choices={slotChoices}
-            isPaused={isPopupOpen}
-            stageSide={stageSide}
-            {...(stage === undefined
-              ? {}
-              : { overlay: { ref: inputOverlayRef, typeNumbers: slotTypeNumbers, magicRemaining: magicRemaining ?? 0 } })}
-            onDecide={(chosen) => {
-              const index = slotChoices.findIndex((choice) => choice.slot === chosen)
-              const found = repertoire[index]
-              if (found === undefined || isBlockedMagic(found)) return
-              setPitchType(found)
-              setPhase('코스')
-            }}
-          />
-        </div>
-      )}
+        {/* 0xe — OK 하나만 받는다 (0x532b0). 원본 화면에 글자는 없다 — 마우스 길로 판 전체를 누름 칸으로 */}
+        {isAwaitingConfirm && !isMenuOpen && (
+          <PressLayer testId="확인 누름 칸">
+            <PressArea label="확인" isDisabled={!sceneConfirm.acceptsConfirm} onPress={sceneConfirm.confirm} />
+          </PressLayer>
+        )}
 
-      {/* 0x10 조준 — 그림은 장면 0x4d780 */}
-      {phase === '코스' && (
-        <div hidden={isPopupOpen}>
-          <AimCursor
-            side={aimSide}
-            isPaused={isPopupOpen}
-            {...(stage === undefined ? {} : { overlay: { ref: inputOverlayRef, typeNumber: typeNumberOf(pitchType) } })}
-            {...(onAimTick === undefined ? {} : { onTick: onAimTick })}
-            onConfirm={(confirmed) => {
-              // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
-              // 0x11 의 틱 10 에 놓는다(0x4e060). 그때 등급은 제구·체력 표로 뽑힌다 (0x4dbac)
-              if (pitchType !== null) {
-                setAim(confirmed)
-                setPhase('게이지')
-              }
-            }}
-            // CLR(0x50ee0) — 0xf 로 돌아가 0xf 진입 0x3d954 가 다시 돈다
-            onCancel={() => {
-              setPhase('구질')
-              setPitchType(null)
-              onReturnToPitchSelection?.()
-            }}
-          />
-        </div>
-      )}
+        {/* 0xf 구질 — 그림은 장면(0x4c4bc 4c528~)이 그리고 여기는 키 · 틱 · 누름 칸만 */}
+        {isPitchMenuShown && (
+          <div hidden={isPopupOpen}>
+            <PitchSlotPicker
+              choices={slotChoices}
+              isPaused={isPopupOpen}
+              stageSide={stageSide}
+              {...(stage === undefined
+                ? {}
+                : { overlay: { ref: inputOverlayRef, typeNumbers: slotTypeNumbers, magicRemaining: magicRemaining ?? 0 } })}
+              onDecide={(chosen) => {
+                const index = slotChoices.findIndex((choice) => choice.slot === chosen)
+                const found = repertoire[index]
+                if (found === undefined || isBlockedMagic(found)) return
+                setPitchType(found)
+                setPhase('코스')
+              }}
+            />
+          </div>
+        )}
 
-      {/* 0x11 게이지 — 그림은 장면 0x4d2ac. 원본에는 결과 글자가 없다 (S5 U-15) */}
-      {phase === '게이지' && (
-        <div hidden={isPopupOpen}>
-          <PitchGradeGauge
-            isPaused={isPopupOpen}
-            showsGauge={showsGauge}
-            onRelease={throwPitch}
-            {...(stage === undefined || aim === null
-              ? {}
-              : {
-                  overlay: {
-                    ref: inputOverlayRef,
-                    aim,
-                    aimSide,
-                    gaugeSettingOn: usesGauge,
-                    gameMode: MISSION_PITCHER_MODE,
-                    // [경기+0xfc8] == 22 — 놓기 전 0x11 그림의 마구 공 파티클(Q-09)
-                    isMagicPitch: pitchType !== null && isMagicType?.(pitchType) === true,
-                  },
-                })}
-          />
-        </div>
-      )}
+        {/* 0x10 조준 — 그림은 장면 0x4d780 */}
+        {phase === '코스' && (
+          <div hidden={isPopupOpen}>
+            <AimCursor
+              side={aimSide}
+              isPaused={isPopupOpen}
+              {...(stage === undefined ? {} : { overlay: { ref: inputOverlayRef, typeNumber: typeNumberOf(pitchType) } })}
+              {...(onAimTick === undefined ? {} : { onTick: onAimTick })}
+              onConfirm={(confirmed) => {
+                // OK(0x50e9c)는 늘 0x11 로 간다(0x50ed0) — 게이지를 안 쓰는 공(게이지 끔 · 마구 0x3f500 의 `구질 != 22`)도
+                // 0x11 의 틱 10 에 놓는다(0x4e060). 그때 등급은 제구·체력 표로 뽑힌다 (0x4dbac)
+                if (pitchType !== null) {
+                  setAim(confirmed)
+                  setPhase('게이지')
+                }
+              }}
+              // CLR(0x50ee0) — 0xf 로 돌아가 0xf 진입 0x3d954 가 다시 돈다
+              onCancel={() => {
+                setPhase('구질')
+                setPitchType(null)
+                onReturnToPitchSelection?.()
+              }}
+            />
+          </div>
+        )}
 
-      {/*
+        {/* 0x11 게이지 — 그림은 장면 0x4d2ac. 원본에는 결과 글자가 없다 (S5 U-15) */}
+        {phase === '게이지' && (
+          <div hidden={isPopupOpen}>
+            <PitchGradeGauge
+              isPaused={isPopupOpen}
+              showsGauge={showsGauge}
+              onRelease={throwPitch}
+              {...(stage === undefined || aim === null
+                ? {}
+                : {
+                    overlay: {
+                      ref: inputOverlayRef,
+                      aim,
+                      aimSide,
+                      gaugeSettingOn: usesGauge,
+                      gameMode: MISSION_PITCHER_MODE,
+                      // [경기+0xfc8] == 22 — 놓기 전 0x11 그림의 마구 공 파티클(Q-09)
+                      isMagicPitch: pitchType !== null && isMagicType?.(pitchType) === true,
+                    },
+                  })}
+            />
+          </div>
+        )}
+
+        {/*
         소프트키 — 장면이 그리는 "*MENU" 글자 자리(0x4c8e0)의 누름 칸. 소프트키1 도 0x498d4 가 '*' 로 읽는다(498e8) — 경기 중 메뉴.
         "#TIME" 은 없다 — '#' 교체 검사 0x38984 가 미션(모드 5 · 6)을 막는다
       */}
-      {overlay !== '조작방법' && (
-        <PressLayer testId="소프트키 누름 칸" isOnTop>
-          <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar} />
-        </PressLayer>
-      )}
+        {overlay !== '조작방법' && (
+          <PressLayer testId="소프트키 누름 칸" isOnTop>
+            <PressArea rect={MENU_PRESS_RECT} label={isMenuOpen ? '닫기' : '메뉴'} onPress={menu.pressStar} />
+          </PressLayer>
+        )}
 
-      {isMenuOpen && (
-        <div className={styles.popupLayer}>
-          <InGameMenu
-            // 미션 투수편 = 모드 5 — 표 0xcfcfc 행 1(계속·다시하기·조작방법·설정·나가기)
-            mode={MISSION_PITCHER_MODE}
-            cursor={menu.cursor}
-            slidesIn={menu.slidesIn}
-            opening={menu.opening}
-            bindCloser={menu.bindCloser}
-            onCursorChange={menu.setCursor}
-            onContinue={menu.close}
-            onQuit={onGiveUp}
-            onRestart={onRestart}
-            onOpenHelp={() => {
-              menu.close()
-              setOverlay('조작방법')
-            }}
-            onOpenSettings={
-              settings === undefined || onSettingsChange === undefined
-                ? undefined
-                : () => {
-                    menu.close()
-                    setOverlay('설정')
-                  }
-            }
-          />
-        </div>
+        {isMenuOpen && (
+          <div className={styles.popupLayer}>
+            <InGameMenu
+              // 미션 투수편 = 모드 5 — 표 0xcfcfc 행 1(계속·다시하기·조작방법·설정·나가기)
+              mode={MISSION_PITCHER_MODE}
+              cursor={menu.cursor}
+              slidesIn={menu.slidesIn}
+              opening={menu.opening}
+              bindCloser={menu.bindCloser}
+              onCursorChange={menu.setCursor}
+              onContinue={menu.close}
+              onQuit={onGiveUp}
+              onRestart={onRestart}
+              onOpenHelp={() => {
+                menu.close()
+                setOverlay('조작방법')
+              }}
+              onOpenSettings={
+                settings === undefined || onSettingsChange === undefined
+                  ? undefined
+                  : () => {
+                      menu.close()
+                      setOverlay('설정')
+                    }
+              }
+            />
+          </div>
+        )}
+      </RawScreen>
+      {overlay === '조작방법' && (
+        <HelpScreen
+          onBack={() => {
+            // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
+            // 메뉴 객체는 안 건드려 커서가 그대로다
+            setOverlay(null)
+            menu.reopen()
+          }}
+        />
       )}
-    </RawScreen>
-    {overlay === '조작방법' && (
-      <HelpScreen
-        onBack={() => {
-          // 뷰어를 닫으면(0x3ca36: 0x637d0 ≠ 0) 하위 0 으로 돌아가 일시정지 팝업 0x741a0 을 다시 띄운다 — 경기 중 메뉴로,
-          // 메뉴 객체는 안 건드려 커서가 그대로다
-          setOverlay(null)
-          menu.reopen()
-        }}
-      />
-    )}
     </div>
   )
 }

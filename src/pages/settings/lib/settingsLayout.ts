@@ -100,8 +100,10 @@ export const SOUND_BARS = {
   gap: 1,
   /** 이미지 98~101 의 폭·높이 (public/sprites/slt_frame/098~101.png) */
   sizes: [
-    { width: 12, height: 2 }, { width: 12, height: 5 },
-    { width: 12, height: 8 }, { width: 12, height: 11 },
+    { width: 12, height: 2 },
+    { width: 12, height: 5 },
+    { width: 12, height: 8 },
+    { width: 12, height: 11 },
   ],
 } as const
 
@@ -117,8 +119,10 @@ export const SPEED_MARKS = {
   baseHeight: 18,
   /** 이미지 102~106 의 폭·높이 (public/sprites/slt_frame/102~106.png) */
   sizes: [
-    { width: 11, height: 7 }, { width: 11, height: 7 },
-    { width: 12, height: 9 }, { width: 12, height: 9 },
+    { width: 11, height: 7 },
+    { width: 11, height: 7 },
+    { width: 12, height: 9 },
+    { width: 12, height: 9 },
     { width: 13, height: 11 },
   ],
 } as const
@@ -346,9 +350,7 @@ export function nextPanelFold(fold: PanelFold, fullHeight: number): PanelFold {
   if (fold.isDone) return { ...fold, height: 1 }
   const step = fold.step * FOLD_GROWTH
   const height = fold.height - step
-  return height <= FOLD_END_HEIGHT
-    ? { isOpening: false, height: FOLD_END_HEIGHT, step, isDone: true }
-    : { ...fold, height, step }
+  return height <= FOLD_END_HEIGHT ? { isOpening: false, height: FOLD_END_HEIGHT, step, isDone: true } : { ...fold, height, step }
 }
 
 /** 잘라내기 사각형 (0xbae25) — 펼치는 중이면 판 안쪽 5px, 다 펴졌으면 판 바깥 5px */

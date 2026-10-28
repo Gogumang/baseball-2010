@@ -63,9 +63,7 @@ describe('사람이 던지는 타석 장면 — 놓은 틱(0x11 틱 10)에서 �
   it('0x12 에도 투수 틱이 이어진다 — 다음 0xf 진입(대기)까지 투수 그림 객체가 상태 1 의 마지막 자세다', () => {
     const release = 50
     const atEntry = release - HUMAN_PITCH_RELEASE_STATE_TICK + PITCHER_RELEASE_TICKS + 22
-    expect(pitcherSideStageFrameOf(clock(atEntry + 3, release)).pitcherTick).toBe(
-      atEntry + 3 - release + HUMAN_PITCH_RELEASE_STATE_TICK,
-    )
+    expect(pitcherSideStageFrameOf(clock(atEntry + 3, release)).pitcherTick).toBe(atEntry + 3 - release + HUMAN_PITCH_RELEASE_STATE_TICK)
     expect(pitcherSideStageFrameOf(clock(atEntry + 16, release)).pitcherTick).toBeNull()
   })
 
@@ -215,9 +213,7 @@ describe('사람이 던진 공의 틀 셈 (`PitchStepSoundTiming`)', () => {
     for (const frameCount of [20, 26, 31]) {
       for (const resultTicks of [0xf, 0x1f]) {
         expect(pitchSelectionEntryDelayTicksOf(frameCount, resultTicks)).toBe(pitchSceneBusyTicksOf(frameCount, resultTicks))
-        expect(pitchSelectionEntryDelayTicksOf(frameCount, resultTicks)).toBe(
-          pitchResultEntryDelayTicksOf(frameCount) + resultTicks + 1,
-        )
+        expect(pitchSelectionEntryDelayTicksOf(frameCount, resultTicks)).toBe(pitchResultEntryDelayTicksOf(frameCount) + resultTicks + 1)
       }
     }
   })

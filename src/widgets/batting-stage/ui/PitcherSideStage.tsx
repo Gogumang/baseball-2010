@@ -15,7 +15,12 @@ import { batterSideOfForm } from '@/widgets/batting-stage/lib/stageLayout'
 import { judgeTextOf } from '@/widgets/batting-stage/lib/stageText'
 import { batterFrameAt } from '@/widgets/batting-stage/lib/batterLayers'
 import {
-  cpuSwingTickOf, hitEndTickOf, HUMAN_PITCH_RELEASE_STATE_TICK, passesHeldResult, pitcherHitContactOf, pitcherSideStageFrameOf,
+  cpuSwingTickOf,
+  hitEndTickOf,
+  HUMAN_PITCH_RELEASE_STATE_TICK,
+  passesHeldResult,
+  pitcherHitContactOf,
+  pitcherSideStageFrameOf,
   pitcherSideStateEntriesOf,
 } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
@@ -46,7 +51,10 @@ import type { AcePitcherFrames, PitcherSideSkillPanelSource } from '@/widgets/ba
 import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanelDriver'
 import type { SkillPanelFrame } from '@/widgets/batting-stage/model/skillPanelDriver'
 import {
-  createCloudFrameCursor, observeSceneCloudFrame, sceneCloudFrameOf, sceneScoreboardTickOf,
+  createCloudFrameCursor,
+  observeSceneCloudFrame,
+  sceneCloudFrameOf,
+  sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
 import { rememberSceneBallPath, sceneBallPathPitch } from '@/widgets/batting-stage/model/sceneBallPath'
 import { skillBitsOfIds } from '@/widgets/batting-stage/lib/skillPanel'
@@ -54,7 +62,11 @@ import type { SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import * as styles from '@/widgets/batting-stage/ui/PitcherSideStage.css'
 import type { PitchGaugeOverlay, PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import {
-  appTickOfGameSceneTick, createGameSceneDrawGate, gameSceneTickOf, gameSceneTimeOf, isGameSceneFrozen,
+  appTickOfGameSceneTick,
+  createGameSceneDrawGate,
+  gameSceneTickOf,
+  gameSceneTimeOf,
+  isGameSceneFrozen,
 } from '@/shared/lib/commonWindow/commonWindow'
 import { hasDueSceneFrameUpdate, runDueSceneFrameUpdates } from '@/entities/particle/model/sceneParticleManager'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -362,8 +374,12 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           let frozenBigHitScreen = frozenScene.bigHitScreen
           const frozenPitch = shownPitch
           if (
-            frozenPhase?.kind === '타격' && shownHit !== null && shownHit.watchesBigHit && !hitEndNotified &&
-            releaseTick !== null && frozenPitch !== null
+            frozenPhase?.kind === '타격' &&
+            shownHit !== null &&
+            shownHit.watchesBigHit &&
+            !hitEndNotified &&
+            releaseTick !== null &&
+            frozenPitch !== null
           ) {
             // 마지막 갱신 0x13 틱 + 1 자리의 그림으로 센다(`bigHitScreenOf` 머리말)
             const lastHeld = frozenPhase.tick
@@ -472,7 +488,13 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         hitBase === null || releaseTick === null
           ? null
           : pitcherSideStageFrameOf({
-              nowTick, releaseTick, frameCount: pitch?.frameCount ?? 0, resultTicks: 0, isPaused: false, pausedSinceTick: 0, aceOrder,
+              nowTick,
+              releaseTick,
+              frameCount: pitch?.frameCount ?? 0,
+              resultTicks: 0,
+              isPaused: false,
+              pausedSinceTick: 0,
+              aceOrder,
               hit: hitBase,
             }).phase
       keyHitTick = hitTickNow?.kind === '타격' ? hitTickNow.tick : null
@@ -529,9 +551,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         if (hitPath !== null) {
           const side = current.batterSide ?? batterSideOfForm(current.batterForm)
           for (let tick = (hitGroundEmittedTick ?? -1) + 1; tick <= Math.min(hitTickRaw, endTick); tick += 1) {
-            const ballTick = hitBallTickOf(
-              tick, hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < tick)) : null,
-            )
+            const ballTick = hitBallTickOf(tick, hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < tick)) : null)
             const point = hitBallPointAt(hitPath, ballTick)
             if (point === null || point.y !== 0) continue
             // [sp+0x4c] = 0x35854 — 투영 + (+0xff4, +0xff8): 그 그림의 0x13 카메라만큼 옮긴다(`hitCamera`)
@@ -540,12 +560,14 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
               hitBase.hitAngle === undefined
                 ? null
                 : hitCameraAt(
-                  {
-                    path: hitPath, side, angle: hitBase.hitAngle,
-                    releaseTick: hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < tick)) : null,
-                  },
-                  tick,
-                ),
+                    {
+                      path: hitPath,
+                      side,
+                      angle: hitBase.hitAngle,
+                      releaseTick: hitBase.watchesBigHit ? bigHitReleaseTickOf(hitFrozenDraws.filter((at) => at < tick)) : null,
+                    },
+                    tick,
+                  ),
             )
             emitParticles(sceneParticleScene(), particleConfigOf(HIT_GROUND_PARTICLE.id), at.x + shift.dx, at.y + shift.dy, HIT_GROUND_PARTICLE.img)
           }
@@ -557,8 +579,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           current.onHitSceneEnd?.()
         }
       }
-      const canSkipNow = hitBase !== null && keyHitTick !== null && !hitEndNotified && hitSkipTick === null &&
-        canSkipHitPause(hitBase.watchesBigHit)
+      const canSkipNow = hitBase !== null && keyHitTick !== null && !hitEndNotified && hitSkipTick === null && canSkipHitPause(hitBase.watchesBigHit)
       if (canSkipNow !== hitSkipOffered) {
         hitSkipOffered = canSkipNow
         setOffersHitSkipRef.current(canSkipNow)
@@ -571,15 +592,18 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         const from = magicEmittedTick === null ? releaseTick : magicEmittedTick + 1
         for (let tick = from; tick <= nowTick; tick += 1) {
           const at = pitcherSideStageFrameOf({
-            nowTick: tick, releaseTick, frameCount: pitch.frameCount,
+            nowTick: tick,
+            releaseTick,
+            frameCount: pitch.frameCount,
             resultTicks: resolution !== null && passesHeldResult(resolution) ? current.resultTicks : 0,
-            isPaused: false, pausedSinceTick: 0, aceOrder, hit,
+            isPaused: false,
+            pausedSinceTick: 0,
+            aceOrder,
+            hit,
           })
           if (at.phase.kind !== '투구중') continue
           const ballTick = Math.max(0, at.ballFrame)
-          const particles = magicBallParticlesOf(
-            { ...pitch, pitcherForm: pitch.pitcherForm ?? current.pitcherForm }, ballTick, pitch.frameCount,
-          )
+          const particles = magicBallParticlesOf({ ...pitch, pitcherForm: pitch.pitcherForm ?? current.pitcherForm }, ballTick, pitch.frameCount)
           if (particles.length === 0) continue
           const point = ballPixelAt(pitch, ballTick)
           for (const particle of particles) {
@@ -596,9 +620,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         const marked = `${releaseTick + (sceneTick - nowTick)}-${resultTicks}-${hit === null ? '' : hitEndTickOf(hit)}`
         if (marked !== markedStateEntries) {
           markedStateEntries = marked
-          markSceneStateEntries(
-            ...pitcherSideStateEntriesOf(releaseTick + (sceneTick - nowTick), pitch.frameCount, resultTicks, aceOrder, hit),
-          )
+          markSceneStateEntries(...pitcherSideStateEntriesOf(releaseTick + (sceneTick - nowTick), pitch.frameCount, resultTicks, aceOrder, hit))
         }
       }
       const bodyType = bodyTypeOf(current.batterForm)
@@ -621,7 +643,11 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
           ? swingTickRaw
           : swingTickRaw +
             bigHitSwingSkipsOf(
-              hitBase.watchesBigHit, hitStartTick, hitStartTick + hitEndTickOf(hit) + 1, nowTick, bigHitReleaseTickOf(hitFrozenDraws),
+              hitBase.watchesBigHit,
+              hitStartTick,
+              hitStartTick + hitEndTickOf(hit) + 1,
+              nowTick,
+              bigHitReleaseTickOf(hitFrozenDraws),
             )
       const pitchInput = isIdle ? (current.inputOverlayRef?.current ?? null) : null
       // 0x4b5b4 — 상태 0xf(구질 목록) · 0x10(조준) · 0x11(게이지 · 공이 나는 동안)만 그린다(4b5ca)
@@ -654,7 +680,10 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       // 0x12 틱 0 의 그림 — 판정 글자 0x393b4 가 삼진이면 양끝 파티클(394b2 · 394d2). 틀이 틱 0 을 건너뛰었으면 그 뒤 첫 그림에서 한 번
       if (isResult && resolution !== null && !strikeoutShot) {
         strikeoutShot = true
-        for (const shot of strikeoutJudgeParticlesOf(judgeTextOf(resolution, endsAtBatOf(current.resultTicks), current.isJudgementCleared === true), side)) {
+        for (const shot of strikeoutJudgeParticlesOf(
+          judgeTextOf(resolution, endsAtBatOf(current.resultTicks), current.isJudgementCleared === true),
+          side,
+        )) {
           emitParticles(sceneParticleScene(), particleConfigOf(shot.id), shot.x, shot.y, shot.img)
         }
       }
@@ -717,7 +746,8 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         tick: nowTick,
         redrawTicks,
         resultTick: isResult ? stage.phase.tick : 0,
-        resultText: isResult && resolution !== null ? judgeTextOf(resolution, endsAtBatOf(current.resultTicks), current.isJudgementCleared === true) : '',
+        resultText:
+          isResult && resolution !== null ? judgeTextOf(resolution, endsAtBatOf(current.resultTicks), current.isJudgementCleared === true) : '',
         // CPU 홈런도 판정 v = 8 · 12 → 0x51cd8 이 +0x1960 을 켜 HOMERUN 글자(0x40b18)가 나간다 — 판정 글자는 없다 (타자편 `BattingStage` 와 같은 길).
         // ⚠️ 맞은 공은 0x12 를 안 지나(`passesHeldResult`) 이 장면에서는 '결과' 가 서지 않는다 — 원본도 0x13 → 0x17(수비 판)이라
         //    글자는 수비 판 그리기 0x46c88 이 띄운다(`pages/defense` 의 `DefenseHomeRunText`). 여기서는 같은 판정이 '결과' 로 들어올 때만 탄다
@@ -739,7 +769,11 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         bigHitScreen:
           isHitState && hitBase !== null
             ? bigHitScreenOf(
-                hitBase.watchesBigHit, stage.phase.tick, current.batterSide ?? batterSideOfForm(current.batterForm), contactPoint, hitFrozenDraws,
+                hitBase.watchesBigHit,
+                stage.phase.tick,
+                current.batterSide ?? batterSideOfForm(current.batterForm),
+                contactPoint,
+                hitFrozenDraws,
               )
             : null,
         // 0x13 의 타구 공 — 0x33e34 가 채운 경로를 공 틱 [+0x1098] 로 (`hitBallPath` — 타자편과 같다)
@@ -803,8 +837,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
         hud: current.hud,
         pitcherStaminaPercent: current.pitcherStaminaPercent ?? null,
         // 실투 "!" — 놓은 틱(0x11 틱 10)의 그림이 첫 그림(1)이다. 그림 한 번 = 장면 틱 하나로 센다(타자편과 같다 — `pitcherFatigue`)
-        pitcherMistakeMarkDraw:
-          shownMistake && releaseTick !== null && stage.phase.kind === '투구중' ? nowTick - releaseTick + 1 : null,
+        pitcherMistakeMarkDraw: shownMistake && releaseTick !== null && stage.phase.kind === '투구중' ? nowTick - releaseTick + 1 : null,
         ...(current.runnerAces === undefined ? {} : { runnerAces: current.runnerAces }),
         acePitcher: current.acePitcher ?? null,
         pitcherEquipment: current.pitcherEquipment ?? NO_PITCHER_EQUIPMENT,

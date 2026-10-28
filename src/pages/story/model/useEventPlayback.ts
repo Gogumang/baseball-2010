@@ -73,9 +73,7 @@ function stopAtWindow(
     }
     passed.push(command)
   }
-  return passed.length === step.passed.length && passed.every((command, index) => command === step.passed[index])
-    ? step
-    : { ...step, passed }
+  return passed.length === step.passed.length && passed.every((command, index) => command === step.passed[index]) ? step : { ...step, passed }
 }
 
 /** 이 걸음이 주는 보상 — 지나온 보상 명령과, 알림 창에 멈춘 보상 명령 자신 (원본은 창을 띄운 그 갱신에 0x8c460 으로 준다) */
@@ -102,11 +100,7 @@ export type EventChoiceConfirmHandler = (eventId: number, leftEventIds: readonly
  * `endingEventId` 는 첫 종류 21 로 끝났을 때 그 이벤트다(0x8d4ce — [0x1552adc] = 1). 원본은 그 이벤트만 본 표시를 안 하고
  * 거친 다른 이벤트(선택지로 떠나온 줄)는 끝 0x8b0e4 가 본 표시한다. 보통 끝이면 null.
  */
-export type EventCompleteHandler = (
-  rewards: readonly EventReward[],
-  viewedEventIds: readonly number[],
-  endingEventId: number | null,
-) => void
+export type EventCompleteHandler = (rewards: readonly EventReward[], viewedEventIds: readonly number[], endingEventId: number | null) => void
 
 /**
  * 이벤트 한 편을 원본 명령 순서대로 재생한다.
@@ -177,19 +171,22 @@ export function useEventPlayback(
     const noticeOf = rewardNoticeOfRef.current
     const cached = noticeCacheRef.current.get(cursor) ?? new Map<number, RewardNoticeResult>()
     noticeCacheRef.current.set(cursor, cached)
-    return stopAtWindow(stepFrom(events, cursor), windowTextOfRef.current, noticeOf === undefined
-      ? undefined
-      : (command, commandIndex) => {
-        const known = cached.get(commandIndex)
-        if (known !== undefined) return known
-        const result = noticeOf(command.items, cursor.eventId)
-        cached.set(commandIndex, result)
-        return result
-      }, stopsAtEveryReward)
+    return stopAtWindow(
+      stepFrom(events, cursor),
+      windowTextOfRef.current,
+      noticeOf === undefined
+        ? undefined
+        : (command, commandIndex) => {
+            const known = cached.get(commandIndex)
+            if (known !== undefined) return known
+            const result = noticeOf(command.items, cursor.eventId)
+            cached.set(commandIndex, result)
+            return result
+          },
+      stopsAtEveryReward,
+    )
   }, [events, cursor, stopsAtEveryReward])
-  const rewardNotice = step.command?.op === 'reward'
-    ? (noticeCacheRef.current.get(cursor)?.get(step.cursor.commandIndex)?.notice ?? null)
-    : null
+  const rewardNotice = step.command?.op === 'reward' ? (noticeCacheRef.current.get(cursor)?.get(step.cursor.commandIndex)?.notice ?? null) : null
 
   const isReleased = isHeld === undefined || !isHeld(step)
 
@@ -276,8 +273,9 @@ export function useEventPlayback(
   const reportedLeftRef = useRef(new Set<number>())
   const leftEventIds = () => {
     const current = stepRef.current.cursor.eventId
-    const left = [...new Set([...rewardsByCursorRef.current.keys()].map((key) => Number(key.split(':')[0])))]
-      .filter((id) => id !== current && !reportedLeftRef.current.has(id))
+    const left = [...new Set([...rewardsByCursorRef.current.keys()].map((key) => Number(key.split(':')[0])))].filter(
+      (id) => id !== current && !reportedLeftRef.current.has(id),
+    )
     // 8b174~8b188 — 알린 줄을 비운다
     left.forEach((id) => reportedLeftRef.current.add(id))
     return left

@@ -11,17 +11,28 @@ afterEach(() => {
 })
 const 뒤로버튼 = () => touchKeyOffersNow().find((offer) => offer.key === 'Escape')
 
-const 띄우기 = (onBack = vi.fn()) => render(
-  <OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={onBack} eventPlaceIds={new Set()} onEnter={vi.fn()} />,
-)
-const 누르기 = (key: string) => act(() => { fireEvent.keyDown(window, { key }) })
+const 띄우기 = (onBack = vi.fn()) =>
+  render(<OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={onBack} eventPlaceIds={new Set()} onEnter={vi.fn()} />)
+const 누르기 = (key: string) =>
+  act(() => {
+    fireEvent.keyDown(window, { key })
+  })
 
 describe('나리 외출 지도 키 0x13ba4', () => {
   it('113 취소는 말풍선을 닫고 112 진입을 알린다 — 0x16c64 −16 → 0xbcb49(0x70) (Q-22)', () => {
     const onBack = vi.fn()
     const onCloseBubble = vi.fn()
-    render(<OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={onBack} eventPlaceIds={new Set()}
-      onEnter={vi.fn()} onCloseBubble={onCloseBubble} />)
+    render(
+      <OutingMapScreen
+        noticeText=""
+        onCloseNotice={vi.fn()}
+        onRun={vi.fn()}
+        onBack={onBack}
+        eventPlaceIds={new Set()}
+        onEnter={vi.fn()}
+        onCloseBubble={onCloseBubble}
+      />,
+    )
     누르기('Enter')
     누르기('Escape')
     expect(screen.queryByRole('button', { name: '들어가기' })).toBeNull()
@@ -30,8 +41,17 @@ describe('나리 외출 지도 키 0x13ba4', () => {
   })
 
   it('빈 장소 뒤는 그 장소 말풍선(113)으로 선다 — 0x1c014 1c07c (Q-22)', () => {
-    render(<OutingMapScreen noticeText="" onCloseNotice={vi.fn()} onRun={vi.fn()} onBack={vi.fn()} eventPlaceIds={new Set()}
-      onEnter={vi.fn()} initialOpenPlaceId={OUTING_PLACES[2].id} />)
+    render(
+      <OutingMapScreen
+        noticeText=""
+        onCloseNotice={vi.fn()}
+        onRun={vi.fn()}
+        onBack={vi.fn()}
+        eventPlaceIds={new Set()}
+        onEnter={vi.fn()}
+        initialOpenPlaceId={OUTING_PLACES[2].id}
+      />,
+    )
     expect(screen.getByRole('button', { name: '입원' })).toBeTruthy()
   })
 
@@ -69,7 +89,7 @@ describe('나리 외출 지도 키 0x13ba4', () => {
     expect(onRun).toHaveBeenCalledTimes(1)
   })
 
-  it('112 그리기 0x16854 에 CLR 글자 자리가 없어 지도가 키를 받는 동안 \'뒤로\' 상황 버튼(Escape)을 낸다 — 누르면 CLR 과 같은 길 (r194)', () => {
+  it("112 그리기 0x16854 에 CLR 글자 자리가 없어 지도가 키를 받는 동안 '뒤로' 상황 버튼(Escape)을 낸다 — 누르면 CLR 과 같은 길 (r194)", () => {
     const onBack = vi.fn()
     띄우기(onBack)
     expect(뒤로버튼()).toEqual({ key: 'Escape', label: '뒤로' })
@@ -80,7 +100,7 @@ describe('나리 외출 지도 키 0x13ba4', () => {
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 
-  it('말풍선(113)이 떠 있어도 \'뒤로\' 버튼(Escape)은 남아 말풍선을 닫고, 한 번 더 누르면 관리로 간다 — 터치 기기에서 건물을 누른 뒤 나갈 길 (r206)', () => {
+  it("말풍선(113)이 떠 있어도 '뒤로' 버튼(Escape)은 남아 말풍선을 닫고, 한 번 더 누르면 관리로 간다 — 터치 기기에서 건물을 누른 뒤 나갈 길 (r206)", () => {
     const onBack = vi.fn()
     띄우기(onBack)
     누르기('Enter')

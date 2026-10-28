@@ -205,23 +205,24 @@ export function lineScorePlacementOf(x: number, y: number, state: LineScoreState
       const inning = first + k
       const cellX = x + 0x18 + CELL_STEP * k
       rects.push({ x: cellX, y: rows[side], ...CELL, color: LINE_SCORE_COLORS.cell })
-      const shown = side === 0
-        ? inning <= state.inning
-        : inning < state.inning || (inning === state.inning && state.offenseSide === 1)
+      const shown = side === 0 ? inning <= state.inning : inning < state.inning || (inning === state.inning && state.offenseSide === 1)
       if (!shown) continue
-      runs.push(...centeredNumberGlyphsOf(
-        inningRunsAt(state.inningRuns, inning, side), cellX + (CELL.width >> 1), rows[side] + 2, LINE_SCORE_NUMBER_BASE.runs,
-      ))
+      runs.push(
+        ...centeredNumberGlyphsOf(
+          inningRunsAt(state.inningRuns, inning, side),
+          cellX + (CELL.width >> 1),
+          rows[side] + 2,
+          LINE_SCORE_NUMBER_BASE.runs,
+        ),
+      )
     }
   }
   const totalCell = { x: x + 0xb1, width: 0x1b, height: 0xe }
-  rects.push(
-    { ...totalCell, y: rows[0], color: LINE_SCORE_COLORS.cell },
-    { ...totalCell, y: rows[1], color: LINE_SCORE_COLORS.cell },
-  )
+  rects.push({ ...totalCell, y: rows[0], color: LINE_SCORE_COLORS.cell }, { ...totalCell, y: rows[1], color: LINE_SCORE_COLORS.cell })
   const totals = isLineScoreTotalShown(state.isGameOver, state.tick)
     ? ([0, 1] as const).flatMap((side) =>
-        centeredNumberGlyphsOf(state.totals[side], totalCell.x + (totalCell.width >> 1), rows[side] + 2, LINE_SCORE_NUMBER_BASE.runs))
+        centeredNumberGlyphsOf(state.totals[side], totalCell.x + (totalCell.width >> 1), rows[side] + 2, LINE_SCORE_NUMBER_BASE.runs),
+      )
     : []
   const images: LineScoreImage[] = [{ image: LINE_SCORE_IMAGES.runsHeader, x: x + 0xba, y: y + 8 }]
   if (isLineScoreCursorShown(state.isGameOver, state.tick)) {
@@ -234,7 +235,10 @@ export function lineScorePlacementOf(x: number, y: number, state: LineScoreState
   return {
     rects,
     images,
-    logos: [{ x: x + 8, y: y + 0x16 }, { x: x + 8, y: y + 0x25 }],
+    logos: [
+      { x: x + 8, y: y + 0x16 },
+      { x: x + 8, y: y + 0x25 },
+    ],
     inningNumbers,
     runs,
     totals,

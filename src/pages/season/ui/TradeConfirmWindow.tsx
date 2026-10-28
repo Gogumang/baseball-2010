@@ -9,7 +9,12 @@ import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { yearLabelOffsetOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 import {
-  TRADE_CONFIRM, teamNameFrameOf, tradeBadgeOf, tradeBoostTextOf, tradeCostBoxPaintsOf, tradeCostTextOf,
+  TRADE_CONFIRM,
+  teamNameFrameOf,
+  tradeBadgeOf,
+  tradeBoostTextOf,
+  tradeCostBoxPaintsOf,
+  tradeCostTextOf,
 } from '@/pages/season/lib/tradeConfirmLayout'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -59,11 +64,20 @@ export function TradeConfirmWindow({ isPitcherTab, given, acquired, showsChoices
 
   return (
     <div role="group" aria-label="트레이드 확인" data-testid="트레이드-확인">
-      <CommonPanel x={T.panel.x} y={T.panel.y} width={T.panel.width} height={T.panel.height} topBand={T.panel.topBand} titleTab
-        testId="시즌-목록-판" />
+      <CommonPanel
+        x={T.panel.x}
+        y={T.panel.y}
+        width={T.panel.width}
+        height={T.panel.height}
+        topBand={T.panel.topBand}
+        titleTab
+        testId="시즌-목록-판"
+      />
       <FrameSprite folder={MODE_UI_FRAMES} frame={T.cellsFrame} origins={modeUi} x={0} y={0} />
       <SolidStamp folder={IMG_TEXT_FRAMES} frame={T.title.frame} origins={imgText} x={T.title.x} y={T.title.y} color={T.title.color} />
-      {T.headers.map((header) => <CenteredImgText key={header.frame} origins={imgText} frame={header.frame} box={header.box} />)}
+      {T.headers.map((header) => (
+        <CenteredImgText key={header.frame} origins={imgText} frame={header.frame} box={header.box} />
+      ))}
       {step !== null && <FrameSprite folder={MODE_UI_FRAMES} frame={step.frame} origins={modeUi} x={step.dx} y={step.dy} />}
       <PlayerRow player={given} row={T.myRow} isPitcherTab={isPitcherTab} modeUi={modeUi} imgText={imgText} testId="트레이드-보상" />
       <PlayerRow player={acquired} row={T.opponentRow} isPitcherTab={isPitcherTab} modeUi={modeUi} imgText={imgText} testId="트레이드-영입" />
@@ -80,20 +94,34 @@ export function TradeConfirmWindow({ isPitcherTab, given, acquired, showsChoices
           {T.rows.map((box, index) => (
             <CenteredMarkup key={index} raw={tradeBoostTextOf(index)} box={box} color="#ffffff" testId={`트레이드-비용칸-${index}`} />
           ))}
-          {onPressRow !== undefined && T.rows.map((box, index) => (
-            <PressArea key={`p${index}`} label={`${tradeBoostLabelOf(index)}${rateOf === undefined ? '' : ` 성공률 ${rateOf(index)}%`}`}
-              rect={box}
-              onPress={() => onPressRow(index)} />
-          ))}
+          {onPressRow !== undefined &&
+            T.rows.map((box, index) => (
+              <PressArea
+                key={`p${index}`}
+                label={`${tradeBoostLabelOf(index)}${rateOf === undefined ? '' : ` 성공률 ${rateOf(index)}%`}`}
+                rect={box}
+                onPress={() => onPressRow(index)}
+              />
+            ))}
         </>
       )}
     </div>
   )
 }
 
-const tradeBoostLabelOf = (index: number) => parseGameMarkup(tradeBoostTextOf(index)).flatMap((line) => line.segments.map((s) => s.text)).join('')
+const tradeBoostLabelOf = (index: number) =>
+  parseGameMarkup(tradeBoostTextOf(index))
+    .flatMap((line) => line.segments.map((s) => s.text))
+    .join('')
 
-function PlayerRow({ player, row, isPitcherTab, modeUi, imgText, testId }: {
+function PlayerRow({
+  player,
+  row,
+  isPitcherTab,
+  modeUi,
+  imgText,
+  testId,
+}: {
   readonly player: TradeConfirmPlayer
   readonly row: { readonly name: Box; readonly team: Box; readonly badge: Box }
   readonly isPitcherTab: boolean
@@ -119,8 +147,11 @@ function CenteredImgText({ origins, frame, box }: { readonly origins: FrameOrigi
   const dy = box.height - origin.height
   const offset = yearLabelOffsetOf(box.width, origin.width, origin.height)
   return (
-    <img alt="" src={`${IMG_TEXT_FRAMES}/${pad(frame)}.png`}
-      style={{ ...pixel, left: box.x + offset.x + origin.x, top: box.y + (dy >> 1) + (dy & 1) + origin.y }} />
+    <img
+      alt=""
+      src={`${IMG_TEXT_FRAMES}/${pad(frame)}.png`}
+      style={{ ...pixel, left: box.x + offset.x + origin.x, top: box.y + (dy >> 1) + (dy & 1) + origin.y }}
+    />
   )
 }
 
@@ -135,9 +166,7 @@ function centeredTextDyOf(boxHeight: number): number {
   return d > 0 ? (d >> 1) + (d % 2) : d >> 1
 }
 
-function CenteredMarkup({ raw, box, color, testId }: {
-  readonly raw: string; readonly box: Box; readonly color: string; readonly testId?: string
-}) {
+function CenteredMarkup({ raw, box, color, testId }: { readonly raw: string; readonly box: Box; readonly color: string; readonly testId?: string }) {
   const segments = parseGameMarkup(raw).flatMap((line) => line.segments)
   const text = segments.map((segment) => segment.text).join('')
   const width = measurePixelTextWidth(text)
@@ -149,15 +178,27 @@ function CenteredMarkup({ raw, box, color, testId }: {
         const left = x
         x += measurePixelTextWidth(segment.text) + 1
         return (
-          <PixelText key={index} style={{ ...pixel, left, top, color: segment.color ?? color }}>{segment.text}</PixelText>
+          <PixelText key={index} style={{ ...pixel, left, top, color: segment.color ?? color }}>
+            {segment.text}
+          </PixelText>
         )
       })}
     </div>
   )
 }
 
-function RoundBorder({ x, y, width: w, height: h, color }: {
-  readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly color: string
+function RoundBorder({
+  x,
+  y,
+  width: w,
+  height: h,
+  color,
+}: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly color: string
 }) {
   const line = (left: number, top: number, width: number, height: number) => (
     <span style={{ ...pixel, left, top, width, height, background: color }} />

@@ -98,11 +98,7 @@ export function drawSoftKeyLabels(
  * 교체 창(경기 상태 0xb, `isSubstitutionState`)은 그리기 0x4db68 이 배경으로 0x4c4bc 를 부르지만 4c8e0 의 상태 문턱
  * (`subs #0xd; cmp #8; bhi` — 0xd ~ 0x15) 밖이라 둘 다 없다. 웹 단계는 그동안에도 쉬는 '대기'(0xe)라 따로 받는다(r212)
  */
-export function softKeyLabelFramesOf(
-  phase: StagePhaseSnapshot,
-  benchCount: number | null,
-  isSubstitutionState = false,
-): readonly number[] {
+export function softKeyLabelFramesOf(phase: StagePhaseSnapshot, benchCount: number | null, isSubstitutionState = false): readonly number[] {
   if (isSubstitutionState) return []
   if (phase.kind === '결과' && phase.isInPlay === true) return []
   return showsTimeLabel(phase, benchCount) ? [MENU_LABEL_FRAME, TIME_LABEL_FRAME] : [MENU_LABEL_FRAME]

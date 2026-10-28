@@ -37,8 +37,17 @@ describe('큰 타구 0x13 그리기 0x4cb1c 의 꼬리', () => {
 
   it('번쩍임 표 0xd0244 = 세모 16 개 · 테두리 4 줄', () => {
     expect(BIG_HIT_FLASH_TRIANGLES).toHaveLength(16)
-    expect(BIG_HIT_FLASH_TRIANGLES[0]).toEqual([{ x: 52, y: 0 }, { x: 56, y: 0 }, { x: 82, y: 108 }])
-    expect(bigHitBorderRectsOf(240, 320)).toEqual([[0, 0, 240, 4], [0, 0, 4, 320], [0, 316, 240, 4], [236, 0, 4, 320]])
+    expect(BIG_HIT_FLASH_TRIANGLES[0]).toEqual([
+      { x: 52, y: 0 },
+      { x: 56, y: 0 },
+      { x: 82, y: 108 },
+    ])
+    expect(bigHitBorderRectsOf(240, 320)).toEqual([
+      [0, 0, 240, 4],
+      [0, 0, 4, 320],
+      [0, 316, 240, 4],
+      [236, 0, 4, 320],
+    ])
   })
 })
 

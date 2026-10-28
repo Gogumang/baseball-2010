@@ -23,7 +23,12 @@ const 시즌 = (덮어쓰기: Partial<SeasonRecord> = {}, 사기 = 50): SeasonSt
   return { ...state, record: { ...state.record, ...덮어쓰기 }, teamMorale: 사기 }
 }
 
-function 지도({ state, onRun = vi.fn(), onBack = vi.fn(), 처음 = 0 }: {
+function 지도({
+  state,
+  onRun = vi.fn(),
+  onBack = vi.fn(),
+  처음 = 0,
+}: {
   readonly state: SeasonState
   readonly onRun?: (place: string, index: number) => void
   readonly onBack?: () => void
@@ -41,13 +46,26 @@ const 키 = (key: string) => fireEvent.keyDown(window, { key })
 describe('외출 지도 방향 이동 0x7f3e4 (표 0xd491c)', () => {
   it('표 그대로 — [위, 아래, 왼쪽, 오른쪽]', () => {
     expect(SEASON_OUTING_MAP_MOVES).toEqual([
-      [1, 4, 2, 3], [4, 0, 2, 3], [1, 4, 3, 0], [1, 4, 0, 2], [0, 1, 2, 3],
+      [1, 4, 2, 3],
+      [4, 0, 2, 3],
+      [1, 4, 3, 0],
+      [1, 4, 0, 2],
+      [0, 1, 2, 3],
     ])
   })
 
   it('키 −1·"2" 위 · −2·"8" 아래 · −3·"4" 왼쪽 · −4·"6" 오른쪽', () => {
-    expect(['ArrowUp', '2', 'ArrowDown', '8', 'ArrowLeft', '4', 'ArrowRight', '6', '5'].map(outingMapDirectionOf))
-      .toEqual([0, 0, 1, 1, 2, 2, 3, 3, null])
+    expect(['ArrowUp', '2', 'ArrowDown', '8', 'ArrowLeft', '4', 'ArrowRight', '6', '5'].map(outingMapDirectionOf)).toEqual([
+      0,
+      0,
+      1,
+      1,
+      2,
+      2,
+      3,
+      3,
+      null,
+    ])
     expect(moveOutingMapCursor(0, 0)).toBe(1)
     expect(moveOutingMapCursor(2, 3)).toBe(0)
   })
@@ -132,7 +150,7 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
     expect(onBack).toHaveBeenCalled()
   })
 
-  it('지도 그림 0xa04c 에 CLR 글자 자리가 없어 \'뒤로\' 상황 버튼(Escape)을 낸다 — 팝업이 뜨면 걷는다 (r194)', () => {
+  it("지도 그림 0xa04c 에 CLR 글자 자리가 없어 '뒤로' 상황 버튼(Escape)을 낸다 — 팝업이 뜨면 걷는다 (r194)", () => {
     const onBack = vi.fn()
     render(<지도 state={시즌({ money: 50, illness: 0 })} onBack={onBack} />)
     expect(touchKeyOffersNow()).toContainEqual({ key: 'Escape', label: '뒤로' })

@@ -27,8 +27,7 @@ export interface HitDirectionInput {
 export function hitDirectionOf(input: HitDirectionInput, random: RandomPort): number {
   if (!DIRECTED_CODES.has(input.code)) return 0
   // 곡선 점이 하나뿐이면 원본 식이 0 으로 나누게 된다 — 가운데(cls 0)로 본다
-  const lateness =
-    input.frameCount <= 1 ? 0 : Math.trunc(((input.frame - input.frameCount) * 1000 + 2000) / (input.frameCount - 1))
+  const lateness = input.frameCount <= 1 ? 0 : Math.trunc(((input.frame - input.frameCount) * 1000 + 2000) / (input.frameCount - 1))
   let timingClass = lateness < EARLY_LIMIT ? 1 : lateness > LATE_LIMIT ? 2 : 0
   if (timingClass !== 0 && input.batterSide === 1) timingClass = 3 - timingClass
   const [low, high] = DIRECTION_BOUNDS[timingClass]

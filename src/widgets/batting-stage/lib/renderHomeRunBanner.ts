@@ -30,13 +30,7 @@ export function drawHomeRunTextFrame(context: CanvasRenderingContext2D, frame: H
     const image = sprite(GAME_EFFECT_IMAGE(letter.image))
     if (image === null) continue
     const source = letter.brighten > 0 ? brightened(image, letter.brighten) : image
-    context.drawImage(
-      source,
-      letter.x,
-      letter.y,
-      image.width * letter.scale,
-      image.height * letter.scale,
-    )
+    context.drawImage(source, letter.x, letter.y, image.width * letter.scale, image.height * letter.scale)
   }
   context.imageSmoothingEnabled = smoothing
 

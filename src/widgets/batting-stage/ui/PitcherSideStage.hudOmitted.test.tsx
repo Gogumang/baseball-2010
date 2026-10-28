@@ -20,8 +20,9 @@ vi.mock('@/widgets/batting-stage/lib/renderBattingStage', async (importOriginal)
 })
 
 const { PitcherSideStage } = await import('@/widgets/batting-stage/ui/PitcherSideStage')
-const { renderBattingStage: 진짜그리기 } =
-  await vi.importActual<typeof import('@/widgets/batting-stage/lib/renderBattingStage')>('@/widgets/batting-stage/lib/renderBattingStage')
+const { renderBattingStage: 진짜그리기 } = await vi.importActual<typeof import('@/widgets/batting-stage/lib/renderBattingStage')>(
+  '@/widgets/batting-stage/lib/renderBattingStage',
+)
 
 let frames = new Map<number, FrameRequestCallback>()
 let nextHandle = 1
@@ -86,8 +87,18 @@ const 기본 = {
 } as const
 
 const HUD = {
-  inning: 3, half: '초', ourScore: 1, opponentScore: 2, balls: 1, strikes: 2, outs: 1,
-  bases: { first: true, second: false, third: false }, ourLogoUrl: '', opponentLogoUrl: '', ourTeamId: 3, opponentTeamId: 7,
+  inning: 3,
+  half: '초',
+  ourScore: 1,
+  opponentScore: 2,
+  balls: 1,
+  strikes: 2,
+  outs: 1,
+  bases: { first: true, second: false, third: false },
+  ourLogoUrl: '',
+  opponentLogoUrl: '',
+  ourTeamId: 3,
+  opponentTeamId: 7,
 } as const
 
 /** 그라디언트 · 글자 재기 따위가 돌려주는 값 — 무엇을 물어도 받아 준다 */

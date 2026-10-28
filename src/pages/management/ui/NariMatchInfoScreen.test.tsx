@@ -15,8 +15,17 @@ const 띄우기 = () => {
   const onCancel = vi.fn()
   const onEntry = vi.fn()
   render(
-    <NariMatchInfoScreen lines={match.lines} myTeamId={match.myTeamId} opponentTeamId={match.opponentTeamId}
-      playerSide={match.playerSide} edition="타자편" gamePoint={0} onStart={onStart} onCancel={onCancel} onEntry={onEntry} />,
+    <NariMatchInfoScreen
+      lines={match.lines}
+      myTeamId={match.myTeamId}
+      opponentTeamId={match.opponentTeamId}
+      playerSide={match.playerSide}
+      edition="타자편"
+      gamePoint={0}
+      onStart={onStart}
+      onCancel={onCancel}
+      onEntry={onEntry}
+    />,
   )
   return { onStart, onCancel, onEntry }
 }
@@ -50,7 +59,7 @@ describe('142 경기 준비', () => {
   })
 })
 
-describe('142 → 143 경기 전 엔트리 보기 (0x13c30 의 −3 · \'4\' / −4 · \'6\')', () => {
+describe("142 → 143 경기 전 엔트리 보기 (0x13c30 의 −3 · '4' / −4 · '6')", () => {
   it("'4'·왼 → 내 팀(장면+0x164 = 1) · '6'·오른 → 상대 팀(0)", () => {
     const { onEntry, onStart, onCancel } = 띄우기()
     fireEvent.keyDown(window, { key: '4' })
@@ -67,8 +76,14 @@ describe('142 들어올 때 연출 (0x63b15 넷째 인자)', () => {
   it('켜져 있으면 첫 그림은 머리띠가 내려오는 중이라 본문이 없다 — 143 에서 돌아온 것(꺼짐)이면 곧바로 본문', () => {
     const match = batterMatchInfoOf(createCareer('준비'), { myBatter: 0, myPitcher: 0, opponentPitcher: 1, opponentBatter: 1 })
     const props = {
-      lines: match.lines, myTeamId: match.myTeamId, opponentTeamId: match.opponentTeamId, playerSide: match.playerSide,
-      edition: '타자편' as const, gamePoint: 0, onStart: vi.fn(), onCancel: vi.fn(),
+      lines: match.lines,
+      myTeamId: match.myTeamId,
+      opponentTeamId: match.opponentTeamId,
+      playerSide: match.playerSide,
+      edition: '타자편' as const,
+      gamePoint: 0,
+      onStart: vi.fn(),
+      onCancel: vi.fn(),
     }
     const { unmount } = render(<NariMatchInfoScreen {...props} isEntryAnimated />)
     expect(screen.queryByTestId('나리경기정보-승패-유저')).toBeNull()

@@ -122,7 +122,12 @@ describe('나간 마선수 대결 대기 — 전역기록 g[0x11f](타자편) ·
 describe('일반모드 경기진행 설정(+0x12c+0 계열) · 설정 창 본 표시(+0x11e)', () => {
   it('새 저장은 이닝 · 전체 · 상세 비트 0 이고 창은 아직 안 봤다 — 생성자 0x9f26c 의 0x9f404~0x9f42c', () => {
     expect(EMPTY_MODE_SAVE.generalMatchSettings).toEqual({
-      kind: 1, value: 0, battingOrderBits: 0, pitchingInningBits: 0, offenseRunnerBits: 0, defenseRunnerBits: 0,
+      kind: 1,
+      value: 0,
+      battingOrderBits: 0,
+      pitchingInningBits: 0,
+      offenseRunnerBits: 0,
+      defenseRunnerBits: 0,
     })
     expect(EMPTY_MODE_SAVE.matchSettingsSeen).toBe(false)
   })

@@ -91,7 +91,10 @@ describe('수비 송구 키 — 그리기가 밀려도 본 그림의 틱으로 �
   const 단타: AtBatOutcome = { kind: '안타', bases: 1 }
   const 주자1루: BaseState = { first: true, second: false, third: false }
   const 타구 = (): DefensePlayInput => ({
-    outcome: 단타, trajectory: battedBallTrajectory(representativePatternOf(단타)), bases: 주자1루, outs: 0,
+    outcome: 단타,
+    trajectory: battedBallTrajectory(representativePatternOf(단타)),
+    bases: 주자1루,
+    outs: 0,
   })
   const 판 = (onDone: (result?: DefensePlayResult) => void) => <DefensePlayback input={타구()} side="수비" onDone={onDone} />
 
@@ -106,7 +109,8 @@ describe('주자 판 송구 키 — 그리기가 밀려도 본 그림의 틱으�
   /** 1루 주자가 도루를 건 볼 — 공 도착 판(종류 5) */
   const 도루판 = () => {
     const opened = openPitchArrivalPlay(
-      { batterHand: 0,
+      {
+        batterHand: 0,
         gameMode: 2,
         pitchJudgement: 2,
         stealingFrom: [1],

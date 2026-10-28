@@ -35,12 +35,46 @@ import { BALANCE } from '@/shared/config/original/balance'
  * 24 도루 저지는 팀 경기에 CPU 도루(우리 수비 중)가 아직 없어 나오지 않는다.
  */
 export const RECORD_NAMES: readonly string[] = [
-  '3루타', '솔로 홈런', '2점 홈런', '3점 홈런', '만루 홈런', '대타 홈런', '백투백 홈런', '백투백투백 홈런',
-  '도루 성공', '연타석 히트 x3', '연타석 히트 x4', '연타석 히트 x5', '한 타자 2홈런', '한 타자 3홈런',
-  '한 타자 4홈런', '사이클링 히트', '삼구 삼진', '풀카운트 삼진', '삼진 콤보 x3', '삼진 콤보 x6', '삼진 콤보 x9',
-  '한 투수 10삼진', '한 투수 15삼진', '한 투수 20삼진', '도루 저지', '삼구 삼자범퇴', '더블플레이', '트리플플레이',
-  '완투승', '완봉승', '노히트노런', '퍼펙트게임', '3연속 파울', '4연속 파울', '한 타자 2볼넷', '한 타자 3볼넷',
-  '필살송구 아웃', '10점차 이상 승', '20점차 이상 승', '30점차 이상 승',
+  '3루타',
+  '솔로 홈런',
+  '2점 홈런',
+  '3점 홈런',
+  '만루 홈런',
+  '대타 홈런',
+  '백투백 홈런',
+  '백투백투백 홈런',
+  '도루 성공',
+  '연타석 히트 x3',
+  '연타석 히트 x4',
+  '연타석 히트 x5',
+  '한 타자 2홈런',
+  '한 타자 3홈런',
+  '한 타자 4홈런',
+  '사이클링 히트',
+  '삼구 삼진',
+  '풀카운트 삼진',
+  '삼진 콤보 x3',
+  '삼진 콤보 x6',
+  '삼진 콤보 x9',
+  '한 투수 10삼진',
+  '한 투수 15삼진',
+  '한 투수 20삼진',
+  '도루 저지',
+  '삼구 삼자범퇴',
+  '더블플레이',
+  '트리플플레이',
+  '완투승',
+  '완봉승',
+  '노히트노런',
+  '퍼펙트게임',
+  '3연속 파울',
+  '4연속 파울',
+  '한 타자 2볼넷',
+  '한 타자 3볼넷',
+  '필살송구 아웃',
+  '10점차 이상 승',
+  '20점차 이상 승',
+  '30점차 이상 승',
 ]
 
 const RECORD_GAME_POINTS: readonly number[] = BALANCE.recordGamePoints
@@ -77,8 +111,7 @@ export interface AtBatRecordInput {
 }
 
 const TIERED_FROM = { consecutiveHits: 3, homeRuns: 2, walks: 2 }
-const tierOf = (count: number, from: number, tiers: number) =>
-  count >= from && count < from + tiers ? count - from : null
+const tierOf = (count: number, from: number, tiers: number) => (count >= from && count < from + tiers ? count - from : null)
 
 /** 사용자 타석 하나에서 달성한 기록 id (판정 함수 0xa8024 · 0xa7b90 · 0xa7b00 · 0xa7a7c) */
 export function atBatRecordIdsOf(input: AtBatRecordInput): number[] {
@@ -163,12 +196,7 @@ export function completeGameRecordIdsOf(input: CompleteGameInput): number[] {
   if (input.mode === NO_COMPLETE_GAME_MODE) return []
   if (!input.pitchCourseConfirmed) return []
   if (input.outsRecorded !== input.inningsPlayed * OUTS_PER_INNING) return []
-  if (
-    input.hitsAllowed === 0 &&
-    !input.baserunnerAllowed &&
-    input.runsAllowed === 0 &&
-    input.outsRecorded < PERFECT_GAME_OUT_LIMIT
-  ) {
+  if (input.hitsAllowed === 0 && !input.baserunnerAllowed && input.runsAllowed === 0 && input.outsRecorded < PERFECT_GAME_OUT_LIMIT) {
     return [COMPLETE_GAME.perfect]
   }
   if (input.hitsAllowed === 0 && input.runsAllowed === 0) return [COMPLETE_GAME.noHitter]
@@ -239,9 +267,7 @@ export function strikeoutTallyRecordIdsOf(input: Pick<StrikeoutRecordInput, 'com
 
 /** 삼구 삼자범퇴 (25) — 한 이닝을 공 셋으로 끝냈는가 */
 export function threePitchInningRecordIdsOf(pitchesInInning: number, outs: number): number[] {
-  return pitchesInInning === THREE_PITCH_INNING_PITCHES && outs >= OUTS_PER_INNING
-    ? [STRIKEOUT.threePitchInning]
-    : []
+  return pitchesInInning === THREE_PITCH_INNING_PITCHES && outs >= OUTS_PER_INNING ? [STRIKEOUT.threePitchInning] : []
 }
 
 export function recordGamePointsOf(recordIds: readonly number[]): number {
@@ -357,17 +383,9 @@ export function stealPlayRecordIdsOf(input: {
   readonly runners: readonly StealPlayRunner[]
 }): number[] {
   if (!input.isRunnerPlay) return []
-  const caught = input.runners.some(
-    (runner) =>
-      runner.stealStarted &&
-      runner.fromBase + 1 === runner.targetBase &&
-      runner.finished &&
-      !runner.safe,
-  )
+  const caught = input.runners.some((runner) => runner.stealStarted && runner.fromBase + 1 === runner.targetBase && runner.finished && !runner.safe)
   if (caught) return [PLAY_RECORD.caughtStealing]
-  return input.runners
-    .filter((runner) => runner.stealStarted && runner.fromBase !== runner.currentBase)
-    .map(() => PLAY_RECORD.stolenBase)
+  return input.runners.filter((runner) => runner.stealStarted && runner.fromBase !== runner.currentBase).map(() => PLAY_RECORD.stolenBase)
 }
 
 /**
@@ -448,10 +466,7 @@ const LAST_DEFENSE_RECORD = 31
  * 자동진행·모드 5~7 조건은 여기서 보지 않는다 — 모드 5~7 은 기록을 붙이는 흐름이 없고, a77f2 게이트(`[ctx+0x24]`)를
  * 1 로 만드는 곳은 투수편 강판 0xc1b48 뿐이라 팀 경기에서는 늘 열려 있다 — 30G 자동진행도 기록을 막지 않는다(R15 10-3).
  */
-export function passesRecordTeamGate(
-  recordId: number,
-  sides: { readonly offenseIsHuman: boolean; readonly defenseIsHuman: boolean },
-): boolean {
+export function passesRecordTeamGate(recordId: number, sides: { readonly offenseIsHuman: boolean; readonly defenseIsHuman: boolean }): boolean {
   const shifted = recordId - UNGATED_RECORD_FROM
   if (shifted >= 0 && shifted <= LAST_RECORD - UNGATED_RECORD_FROM && ((1 << shifted) & UNGATED_RECORD_MASK) !== 0) {
     return true
@@ -459,15 +474,11 @@ export function passesRecordTeamGate(
   if (sides.offenseIsHuman) {
     return (
       recordId !== PLAY_RECORD.laserThrowOut &&
-      ((recordId >= 0 && recordId <= LAST_OFFENSE_ONLY_RECORD) ||
-        (recordId >= FIRST_LATE_OFFENSE_RECORD && recordId <= LAST_RECORD))
+      ((recordId >= 0 && recordId <= LAST_OFFENSE_ONLY_RECORD) || (recordId >= FIRST_LATE_OFFENSE_RECORD && recordId <= LAST_RECORD))
     )
   }
   if (sides.defenseIsHuman) {
-    return (
-      (recordId >= FIRST_DEFENSE_RECORD && recordId <= LAST_DEFENSE_RECORD) ||
-      recordId === PLAY_RECORD.laserThrowOut
-    )
+    return (recordId >= FIRST_DEFENSE_RECORD && recordId <= LAST_DEFENSE_RECORD) || recordId === PLAY_RECORD.laserThrowOut
   }
   return false
 }

@@ -32,16 +32,14 @@ const TICKS_PER_SLOT_STEP = 2
 const BASE_Y = Math.floor(STAGE_HEIGHT / 2) - HOME_RUN_LETTER_HEIGHT
 
 /** 날아 들어오기(단계 0)가 끝나는 틱 — 마지막 N 의 칸 11 이 2틱마다 1씩 줄어 22틱 */
-export const HOME_RUN_FLY_IN_END_TICK =
-  (FIRST_SLOT + HOME_RUN_LETTER_IMAGES.length - 1) * TICKS_PER_SLOT_STEP
+export const HOME_RUN_FLY_IN_END_TICK = (FIRST_SLOT + HOME_RUN_LETTER_IMAGES.length - 1) * TICKS_PER_SLOT_STEP
 
 /** 흔들기 단계 1·2·3 은 2틱씩 */
 const SHAKE_PHASE_TICKS = 2
 const SHAKE_PHASE_COUNT = 3
 
 /** 유지(단계 4)가 시작하는 틱 */
-export const HOME_RUN_HOLD_START_TICK =
-  HOME_RUN_FLY_IN_END_TICK + SHAKE_PHASE_COUNT * SHAKE_PHASE_TICKS
+export const HOME_RUN_HOLD_START_TICK = HOME_RUN_FLY_IN_END_TICK + SHAKE_PHASE_COUNT * SHAKE_PHASE_TICKS
 
 /** 반짝임 주기 — (카운터 mod 14)/2 번째 글자가 번쩍인다 */
 export const HOME_RUN_FLASH_CYCLE_TICKS = 14
@@ -263,10 +261,7 @@ export function drawHomeRunTextOnce(state: HomeRunTextState): { readonly frame: 
     }
   }
 
-  const letters =
-    state.stage === 0
-      ? lettersFromSlots(state.slots)
-      : shakeLetters(state.stage)
+  const letters = state.stage === 0 ? lettersFromSlots(state.slots) : shakeLetters(state.stage)
   const frame = { letters, burstFrame: state.stage >= 1 ? 17 + state.stage : null }
   const counted = state.stepCounter + 1
   if (counted <= 1) return { frame, next: { ...state, stepCounter: counted } }

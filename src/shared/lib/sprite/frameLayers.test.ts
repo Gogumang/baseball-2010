@@ -11,8 +11,7 @@ import {
 } from '@/shared/lib/sprite/frameLayers'
 import { readPngRgba as readToolPng } from '@/shared/lib/sprite/readPngForTests'
 
-const listingOf = (name: string) =>
-  JSON.parse(readFileSync(`public/sprites/${name}/frames/layers.json`, 'utf8')) as FrameLayerListing
+const listingOf = (name: string) => JSON.parse(readFileSync(`public/sprites/${name}/frames/layers.json`, 'utf8')) as FrameLayerListing
 
 describe('0x67 겹 목록 (layers.json)', () => {
   it('목록을 청하는 폴더 = layers.json 을 둔 폴더', () => {
@@ -40,7 +39,8 @@ describe('0x67 겹 목록 (layers.json)', () => {
   it('하늘 조명 11 프레임은 같은 날 그림을 b = 200 ~ 100 으로 더하고, 구운 프레임은 같은 자리의 알파 b 근사다', () => {
     const listing = listingOf('sky_effect_light')
     const origins = JSON.parse(readFileSync('public/sprites/sky_effect_light/frames/origins.json', 'utf8')) as Record<
-      string, { x: number; y: number }
+      string,
+      { x: number; y: number }
     >
     const layer = readToolPng('public/sprites/sky_effect_light/frames/layers/000_0.png')
     for (let frame = 0; frame <= 10; frame += 1) {
@@ -59,13 +59,19 @@ describe('0x67 겹 목록 (layers.json)', () => {
   })
 
   it('미리 받기 주소 — 고른 프레임의 겹 그림을 한 번씩', () => {
-    expect(frameLayerUrlsOf('./sprites/sky_effect_light/frames', listingOf('sky_effect_light'), [0, 3, 10, 11]))
-      .toEqual(['./sprites/sky_effect_light/frames/layers/000_0.png'])
+    expect(frameLayerUrlsOf('./sprites/sky_effect_light/frames', listingOf('sky_effect_light'), [0, 3, 10, 11])).toEqual([
+      './sprites/sky_effect_light/frames/layers/000_0.png',
+    ])
     expect(frameLayerUrlsOf('./sprites/x/frames', null, [0])).toEqual([])
   })
 
   it('목록 · 그림이 하나라도 아직이면 null — 부르는 쪽이 구운 프레임을 그린다', () => {
-    const listing: FrameLayerListing = { '005': [{ png: '005_0.png', x: 1, y: 2, effect: 0 }, { png: '005_1.png', x: 3, y: 4, effect: 2, argument: 255 }] }
+    const listing: FrameLayerListing = {
+      '005': [
+        { png: '005_0.png', x: 1, y: 2, effect: 0 },
+        { png: '005_1.png', x: 3, y: 4, effect: 2, argument: 255 },
+      ],
+    }
     const image = {} as HTMLImageElement
     expect(placedFrameLayersOf('./f', 5, null, () => image)).toBeNull()
     expect(placedFrameLayersOf('./f', 6, listing, () => image)).toBeNull()
@@ -85,6 +91,9 @@ describe('0x67 겹 목록 (layers.json)', () => {
       { image, offsetX: 5, offsetY: -2, effect: 2, argument: 200 },
     ]
     drawFrameLayers(context, layers, 10, 20, false)
-    expect(drawImage.mock.calls).toEqual([[image, 7, 21], [image, 15, 18]])
+    expect(drawImage.mock.calls).toEqual([
+      [image, 7, 21],
+      [image, 15, 18],
+    ])
   })
 })

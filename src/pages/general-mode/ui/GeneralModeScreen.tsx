@@ -182,8 +182,21 @@ function withLiveGameInning(props: GeneralModeScreenProps): GeneralModeScreenPro
  */
 function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame: TeamGameProgress }) {
   const {
-    random, resumeGame, aceLevels, gaugeSettingOn, runningModeManual, throwModeManual, gamePoint, initialSettings,
-    onSpendGamePoint, settings, onSettingsChange, onFinish, onExit, onGameSave, onSettlementEnter,
+    random,
+    resumeGame,
+    aceLevels,
+    gaugeSettingOn,
+    runningModeManual,
+    throwModeManual,
+    gamePoint,
+    initialSettings,
+    onSpendGamePoint,
+    settings,
+    onSettingsChange,
+    onFinish,
+    onExit,
+    onGameSave,
+    onSettlementEnter,
   } = props
   const [resumeFrom] = useState<TeamGameProgress>(() => ({
     ...resumeGame,
@@ -219,20 +232,38 @@ function GeneralModeResume(props: GeneralModeScreenProps & { readonly resumeGame
 
 function GeneralModePrepare(props: GeneralModeScreenProps) {
   const {
-    random, isQuickStart = false, openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds,
-    aceLevels, onLevelUpAce, gamePoint, onOpenAce, onAllAcesOpen, initialSettings, onMatchSettingsConfirm, matchSettingsSeen,
-    gaugeSettingOn, runningModeManual, throwModeManual, onSpendGamePoint, settings, onSettingsChange, onFinish, onExit, onGameStart, onGameSave, onSettlementEnter,
+    random,
+    isQuickStart = false,
+    openedHiddenTeamIds,
+    openedAcePitcherIds,
+    openedAceBatterIds,
+    aceLevels,
+    onLevelUpAce,
+    gamePoint,
+    onOpenAce,
+    onAllAcesOpen,
+    initialSettings,
+    onMatchSettingsConfirm,
+    matchSettingsSeen,
+    gaugeSettingOn,
+    runningModeManual,
+    throwModeManual,
+    onSpendGamePoint,
+    settings,
+    onSettingsChange,
+    onFinish,
+    onExit,
+    onGameStart,
+    onGameSave,
+    onSettlementEnter,
   } = props
   /** 이 경기의 첫 저장인가 — 경기정보 OK 몫(0x3136e)이고 그 뒤는 반 이닝 저장(0x4f928)이다 */
   const isFirstSaveRef = useRef(true)
   /** 18 · 19 에서 잠긴 히든 팀 OK — 힌트 팝업 글 (팝업 0x74ef5). 없으면 null */
   const [hiddenHint, setHiddenHint] = useState<string | null>(null)
-  const showHiddenHint = (teamId: number) => setHiddenHint(
-    hiddenTeamHintMessage(teamId, { openedHiddenIds: openedHiddenTeamIds ?? [], mode: TEAM_GAME_MODE.일반 }),
-  )
-  const hiddenHintOverlay = hiddenHint !== null && (
-    <MessageBox text={hiddenHint} buttons={['확인']} onAnswer={() => setHiddenHint(null)} />
-  )
+  const showHiddenHint = (teamId: number) =>
+    setHiddenHint(hiddenTeamHintMessage(teamId, { openedHiddenIds: openedHiddenTeamIds ?? [], mode: TEAM_GAME_MODE.일반 }))
+  const hiddenHintOverlay = hiddenHint !== null && <MessageBox text={hiddenHint} buttons={['확인']} onAnswer={() => setHiddenHint(null)} />
 
   const session = useGeneralMode({
     random,
@@ -256,8 +287,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
    * 22 그림 0x2e0c4 의 0x63b15 넷째 인자 = `[메뉴+0x28] ≠ 0x17` — 이전 상태가 23(엔트리 편집)이 아니면 머리띠 미끄러짐 ·
    * 본문 숨김 · 배너 연출을 켠다 (모드 1 · 8 · 9 두 갈래 모두, 0x2e0ee~0x2e11a · 0x2e16a~). `pages/management/lib/matchInfoEntry`.
    */
-  const matchView = session.isPlaying || flow.step !== GENERAL_MODE_STEP.경기정보 ? null
-    : session.entryEdit !== null ? '23' : '22'
+  const matchView = session.isPlaying || flow.step !== GENERAL_MODE_STEP.경기정보 ? null : session.entryEdit !== null ? '23' : '22'
   const matchViewTrail = useRef<{ readonly view: string | null; readonly previous: string | null }>({ view: matchView, previous: null })
   if (matchViewTrail.current.view !== matchView) matchViewTrail.current = { view: matchView, previous: matchViewTrail.current.view }
   const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '23'
@@ -306,12 +336,22 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
    * 18 ↔ 19 · 22 ↔ 23 은 화면 밀기(효과기 종류 8)로 바뀐다 — 모든 단계를 같은 밀기 틀에 담아 앞 화면을 떠 둔다(A-68,
    * `lib/generalPrepPush`). 23 은 [메뉴+0xec](유저 팀 1 · CPU 팀 0)에 따라 방향이 갈린다
    */
-  const pushView: GeneralPrepPushView = flow.step === GENERAL_MODE_STEP.유저팀 ? '18'
-    : flow.step === GENERAL_MODE_STEP.AI팀 ? '19'
-      : flow.step === GENERAL_MODE_STEP.경기정보 ? (session.entryEdit === null ? '22' : session.entryEdit.isUserTeam ? '23:유저' : '23:CPU')
-        : '그밖'
+  const pushView: GeneralPrepPushView =
+    flow.step === GENERAL_MODE_STEP.유저팀
+      ? '18'
+      : flow.step === GENERAL_MODE_STEP.AI팀
+        ? '19'
+        : flow.step === GENERAL_MODE_STEP.경기정보
+          ? session.entryEdit === null
+            ? '22'
+            : session.entryEdit.isUserTeam
+              ? '23:유저'
+              : '23:CPU'
+          : '그밖'
   const wrap = (content: ReactNode) => (
-    <NariScreenPush view={pushView} directionOf={generalPrepPushDirectionOf}>{content}</NariScreenPush>
+    <NariScreenPush view={pushView} directionOf={generalPrepPushDirectionOf}>
+      {content}
+    </NariScreenPush>
   )
 
   switch (flow.step) {
@@ -331,7 +371,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           onSelectLocked={showHiddenHint}
           onCancel={cancelPrepare}
           overlay={hiddenHintOverlay}
-        />
+        />,
       )
     case GENERAL_MODE_STEP.AI팀:
       return wrap(
@@ -348,7 +388,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           onSelectLocked={showHiddenHint}
           onCancel={back}
           overlay={hiddenHintOverlay}
-        />
+        />,
       )
     case GENERAL_MODE_STEP.선공구장:
       return wrap(
@@ -365,7 +405,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           onMoveStadium={actions.moveStadium}
           onChooseStadium={actions.selectStadium}
           onCancel={back}
-        />
+        />,
       )
     case GENERAL_MODE_STEP.마선수:
       return wrap(
@@ -384,7 +424,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
           onCancel={back}
           // 그림 0x2dfe0 은 맨 앞(0x2e012)에서 공 무늬 바탕 0x5fd61(skin, 0, 0, W, H) 을 깐다
           underlay={<SkinBackdrop kind="공무늬" />}
-        />
+        />,
       )
     default:
       // 상태 23 엔트리 편집 — 그리기 0x2e070 (엔트리 목록 창 0x5cfec + 머리띠 6/7), 키 0x2a370 → 0x55864
@@ -407,7 +447,7 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
             underlay={<MatchInfoStadiumBackdrop stage={session.matchInfoStage} />}
             // 23 진입 0x2648c 는 [skin+0x84] 를 안 세우고 그림 0x2e070 도 공용 목록 0x63b14 를 안 부른다
             slides={false}
-          />
+          />,
         )
       }
       return wrap(
@@ -441,15 +481,13 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
               // 설정 창이 열려 있으면 키가 창으로 간다 (0x311a8 skin+0x2ba)
               if (!session.isSettingsOpen) actions.openEntry(isUserTeam)
             }}
-            settingsWindow={session.isSettingsOpen && (
-              <MatchSettingsWindow
-                settings={session.settings}
-                onConfirm={actions.applySettings}
-                onClose={actions.closeSettings}
-              />
-            )}
+            settingsWindow={
+              session.isSettingsOpen && (
+                <MatchSettingsWindow settings={session.settings} onConfirm={actions.applySettings} onClose={actions.closeSettings} />
+              )
+            }
           />
-        </>
+        </>,
       )
   }
 }

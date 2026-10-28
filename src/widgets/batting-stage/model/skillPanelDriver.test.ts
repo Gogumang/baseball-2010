@@ -28,8 +28,15 @@ afterEach(() => {
 })
 
 const 상황: SkillPanelSituation = {
-  inning: 1, attackScore: 0, defenseScore: 0, runnerCount: 0, hasSecondBaseRunner: false,
-  pitcherHand: 0, batterHand: 0, batterRecordSlot: 2, recentAtBatCodes: [],
+  inning: 1,
+  attackScore: 0,
+  defenseScore: 0,
+  runnerCount: 0,
+  hasSecondBaseRunner: false,
+  pitcherHand: 0,
+  batterHand: 0,
+  batterRecordSlot: 2,
+  recentAtBatCodes: [],
 }
 
 /** 사람이 던지는 타석 — CPU 타자가 전국구(1) · 먹튀(2), 수비 측 사람(투수 아이콘 칸 −0x4e) */

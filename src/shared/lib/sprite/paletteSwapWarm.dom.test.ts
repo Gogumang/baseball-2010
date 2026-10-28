@@ -48,12 +48,15 @@ beforeEach(() => {
   vi.stubGlobal('Image', FakeImage)
   // jsdom 은 캔버스가 없다 — 칠하기는 구운 주소로 끝난다(시끄러운 "Not implemented" 를 막는다)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-    const body = url.endsWith('origins.json')
-      ? { '000': { x: 0, y: 0, width: 1, height: 1 }, '003': { x: 0, y: 0, width: 1, height: 1 } }
-      : palettes
-    return { ok: true, json: async () => body }
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      const body = url.endsWith('origins.json')
+        ? { '000': { x: 0, y: 0, width: 1, height: 1 }, '003': { x: 0, y: 0, width: 1, height: 1 } }
+        : palettes
+      return { ok: true, json: async () => body }
+    }),
+  )
 })
 
 afterEach(() => {
@@ -75,7 +78,10 @@ describe('warmRecoloredSprites — 처음 그리기 전에 칠해 둔다 (r189: 
   it('팔레트를 받아 칠하기를 걸고, 끝나면 그리는 쪽이 기다리지 않고 바로 쓴다', async () => {
     const url = `${folder}/003.png`
     expect(readyRecoloredSpriteUrl(url, palettes, 1)).toBeNull()
-    warmRecoloredSprites([{ url, paletteIndex: 1 }, { url: `${folder}/000.png`, paletteIndex: null }])
+    warmRecoloredSprites([
+      { url, paletteIndex: 1 },
+      { url: `${folder}/000.png`, paletteIndex: null },
+    ])
     await flush()
     expect(readyRecoloredSpriteUrl(url, palettes, 1)).not.toBeNull()
     // 벌이 null 인 그림은 칠하지 않는다 — 번호 지도도 청하지 않는다

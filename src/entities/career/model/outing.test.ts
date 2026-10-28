@@ -1,13 +1,6 @@
 import { createConstantRandom } from '@/shared/api/random/fractionRandom'
 import { describe, expect, it } from 'vitest'
-import {
-  outingBlockReasonOf,
-  performOuting,
-  runOuting,
-  recoverAfterRest,
-  restBlockReasonOf,
-  runRest,
-} from '@/entities/career/model/outing'
+import { outingBlockReasonOf, performOuting, runOuting, recoverAfterRest, restBlockReasonOf, runRest } from '@/entities/career/model/outing'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
@@ -30,13 +23,7 @@ function 기능(name: string) {
 
 describe('외출 장소 데이터 — 원작 설명서와 일치해야 한다', () => {
   it('장소 5곳이다 (경기장·번화가·병원·학교·방송국)', () => {
-    expect(OUTING_PLACES.map((p) => p.name)).toEqual([
-      '경기장',
-      '번화가',
-      '병원',
-      '학교',
-      '방송국',
-    ])
+    expect(OUTING_PLACES.map((p) => p.name)).toEqual(['경기장', '번화가', '병원', '학교', '방송국'])
   })
 
   it('기능별 [a, b) 난수 표 — 인기도 0xcc358 · 평판 0xcc34e · 사기 0xcc33a (점검 10차)', () => {
@@ -51,13 +38,7 @@ describe('외출 장소 데이터 — 원작 설명서와 일치해야 한다', 
   })
 
   it('장소마다 기능은 하나다 — 친선경기·회식·구단CF는 시즌모드 기능이다 (StrHOWTO[17]~[22])', () => {
-    expect(OUTING_PLACES.flatMap((p) => p.functions).map((f) => f.name)).toEqual([
-      '팬미팅',
-      '외식',
-      '입원',
-      '야구교실',
-      'CF촬영',
-    ])
+    expect(OUTING_PLACES.flatMap((p) => p.functions).map((f) => f.name)).toEqual(['팬미팅', '외식', '입원', '야구교실', 'CF촬영'])
   })
 
   it('입원만 부상·질병을 낫게 한다', () => {
@@ -130,7 +111,10 @@ describe('runRest', () => {
   })
 
   it('부상·질병을 낫게 한다 — StrHOWTO[14] "휴식 커맨드 … 로 회복할 수 있습니다"', () => {
-    const rested = recoverAfterRest(runRest(선수({ isInjured: true, isSick: true, injuryRemaining: 2, illnessRemaining: 3 }), 최소).career, 최소).career
+    const rested = recoverAfterRest(
+      runRest(선수({ isInjured: true, isSick: true, injuryRemaining: 2, illnessRemaining: 3 }), 최소).career,
+      최소,
+    ).career
 
     expect(rested.isInjured).toBe(false)
     expect(rested.isSick).toBe(false)
@@ -169,9 +153,7 @@ describe('126 결과 팝업 글 — 효과 0x15234 · 입원 회복 0x1575c', ()
 
   it('서브 아이템 보정은 (부호 값) 으로 붙고, 끝에 노란 아이템 이름 + [195] "효과" 줄이 붙는다', () => {
     const outcome = performOuting(선수({ money: 9999, popularity: 9000, subItemIds: [5] }), 기능('팬미팅'), 최소)
-    expect(outcome.effectText).toBe(
-      `!C인기도 6(+2)${상승}!N소지금 500${하락}!N사기 2${상승}!N!N!cFFFF00화보집 효과`,
-    )
+    expect(outcome.effectText).toBe(`!C인기도 6(+2)${상승}!N소지금 500${하락}!N사기 2${상승}!N!N!cFFFF00화보집 효과`)
   })
 
   it('보험증서 입원은 소지금 0(+200) 상승 — 상승·하락은 굴림+보정 ≥ 0 으로 고른다 (원본 그대로)', () => {
@@ -180,9 +162,7 @@ describe('126 결과 팝업 글 — 효과 0x15234 · 입원 회복 0x1575c', ()
     expect(outcome.effectText).toBe(`!C소지금 0(+200)${상승}!N사기 4(+1)${상승}!N!N!cFFFF00보험증서 효과`)
     // 질병 [206] 뒤 부상은 "!N" 으로 잇는다 (질병 글이 없으면 "!C")
     expect(outcome.recoveryText).toBe('!C다음 질병이 치료되었습니다!N[!cFFFF00감기!cFFFFFF]!N부상에서 회복 되었습니다.')
-    expect(performOuting({ ...환자, isSick: false, illnessName: null }, 기능('입원'), 최소).recoveryText).toBe(
-      '!C부상에서 회복 되었습니다.',
-    )
+    expect(performOuting({ ...환자, isSick: false, illnessName: null }, 기능('입원'), 최소).recoveryText).toBe('!C부상에서 회복 되었습니다.')
   })
 
   it('낫지 않으면 회복 글이 없다', () => {

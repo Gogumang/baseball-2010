@@ -9,9 +9,15 @@ afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 const 영 = Array.from({ length: 10 }, () => [0, 0, 0, 0])
 
 // 코치 5 = 타자 히트 +8 · 코치 2 = 투수 제구 +10
-const 타자 = (isMyTeam: boolean) => gameAbilityOf({
-  mode: 2, base: 500, isPitcher: false, slot: BATTER_SLOT.히트, isMyTeam, season: { illness: 0, morale: 100, coach: 5 },
-})
+const 타자 = (isMyTeam: boolean) =>
+  gameAbilityOf({
+    mode: 2,
+    base: 500,
+    isPitcher: false,
+    slot: BATTER_SLOT.히트,
+    isMyTeam,
+    season: { illness: 0, morale: 100, coach: 5 },
+  })
 
 describe('B-21 코치 보너스가 상대 팀에도 붙음', () => {
   it('원본: 상대 팀 선수 · CPU 끼리 경기에도 붙는다', () => {

@@ -23,12 +23,7 @@ export interface PitcherAbility {
 }
 
 /** 칸 번호 순서. 아이템 번호 0~3 이 그대로 이 칸을 가리킨다 */
-export const PITCHER_ABILITY_ORDER: readonly (keyof PitcherAbility)[] = [
-  'control',
-  'velocity',
-  'breaking',
-  'stamina',
-]
+export const PITCHER_ABILITY_ORDER: readonly (keyof PitcherAbility)[] = ['control', 'velocity', 'breaking', 'stamina']
 
 /** 칸 이름 (StrMODE[40]~[43]) */
 export const PITCHER_ABILITY_NAMES: readonly string[] = ['제구', '구속', '변화', '체력']
@@ -68,18 +63,10 @@ export const PITCHER_ABILITY_ITEM_TEXT_INDEX = { firstSlot: 40, allSlots: 39 } a
  * `0xa4528` — 칸을 10 올려 999 로 자른 뒤, **기본 능력치가** 한계를 넘으면 한계로 내린다.
  * 비교에 쓰는 값이 `0xb6414(rec, k, 0)` = **장비·스킬을 뺀 기본값**이라는 점까지 타자편과 같다.
  */
-export function applyPitcherAbilityItem(
-  ability: PitcherAbility,
-  itemId: number,
-  role: PitcherRole,
-): PitcherAbility {
+export function applyPitcherAbilityItem(ability: PitcherAbility, itemId: number, role: PitcherRole): PitcherAbility {
   const isAbilitySlot = itemId >= 0 && itemId < PITCHER_ABILITY_ITEM_TARGETS.length
   const targets: readonly (keyof PitcherAbility)[] =
-    itemId === ALL_ABILITY_ITEM_ID
-      ? PITCHER_ABILITY_ITEM_TARGETS
-      : isAbilitySlot
-        ? [PITCHER_ABILITY_ITEM_TARGETS[itemId]]
-        : []
+    itemId === ALL_ABILITY_ITEM_ID ? PITCHER_ABILITY_ITEM_TARGETS : isAbilitySlot ? [PITCHER_ABILITY_ITEM_TARGETS[itemId]] : []
   const limits = pitcherAbilityLimitOf(role)
   let next = ability
   for (const key of targets) {

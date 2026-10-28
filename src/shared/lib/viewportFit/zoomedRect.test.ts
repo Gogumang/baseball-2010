@@ -9,13 +9,19 @@ describe('zoom 판 안 요소의 화면 좌표 사각형 (r242)', () => {
 
   it('웹킷은 zoom 을 뺀 사각형을 낸다 — 폭이 offsetWidth 와 같으면 zoom 곱을 곱한다 (아이폰 13 세로 · 배율 1.625)', () => {
     expect(screenRectFrom({ left: 0, top: 0, width: 240, height: 320 }, 240, 1.625)).toEqual({
-      left: 0, top: 0, width: 390, height: 520,
+      left: 0,
+      top: 0,
+      width: 390,
+      height: 520,
     })
   })
 
   it('크로미움 128+ 은 이미 화면 좌표다 — 그대로 둔다', () => {
     expect(screenRectFrom({ left: 0, top: 0, width: 390, height: 520 }, 240, 1.625)).toEqual({
-      left: 0, top: 0, width: 390, height: 520,
+      left: 0,
+      top: 0,
+      width: 390,
+      height: 520,
     })
   })
 

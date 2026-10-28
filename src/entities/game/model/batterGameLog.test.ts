@@ -33,13 +33,7 @@ describe('recordBatterAtBat — 타자 한 명의 기록달성 판정 (0xa77f0)'
   })
 
   it('단타·2루타·3루타·홈런이 다 모이면 사이클링 히트(15)를 한 번만 준다', () => {
-    const { ids } = 쌓기([
-      { kind: '안타', bases: 1 },
-      { kind: '안타', bases: 2 },
-      { kind: '안타', bases: 3 },
-      { kind: '홈런' },
-      { kind: '홈런' },
-    ])
+    const { ids } = 쌓기([{ kind: '안타', bases: 1 }, { kind: '안타', bases: 2 }, { kind: '안타', bases: 3 }, { kind: '홈런' }, { kind: '홈런' }])
 
     expect(ids.filter((id) => id === 15)).toHaveLength(1)
   })

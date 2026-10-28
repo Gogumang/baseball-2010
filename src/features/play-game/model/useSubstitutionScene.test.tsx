@@ -111,11 +111,14 @@ describe('0x16 끝의 0xd 진입 틱 (끝 비트 메시지 0xd → 다음 틀 0x
   it('다 그린 틀을 대기의 0xd 틱 0 으로 적는다 — 화면이 한 틱 늦게 받기 시작해도 등판음과 OK 잠금이 같은 0xd 에서 센다', () => {
     const scene: SubstitutionScene = { serial: 1, entryKind: '투수', incomingIsAce: false, entrySoundId: 15 }
     const wait = enterSceneConfirm()
-    const { result, rerender } = renderHook(({ cover }: { cover: boolean }) => {
-      const substitution = useSubstitutionScene(scene, wait, true)
-      const confirm = useSceneConfirm(wait, !substitution.isShown && !cover)
-      return { substitution, confirm }
-    }, { initialProps: { cover: true } })
+    const { result, rerender } = renderHook(
+      ({ cover }: { cover: boolean }) => {
+        const substitution = useSubstitutionScene(scene, wait, true)
+        const confirm = useSceneConfirm(wait, !substitution.isShown && !cover)
+        return { substitution, confirm }
+      },
+      { initialProps: { cover: true } },
+    )
     act(() => result.current.substitution.finish())
     프레임(1)
     rerender({ cover: false })

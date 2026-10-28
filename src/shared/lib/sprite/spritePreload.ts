@@ -95,10 +95,18 @@ export function preloadImageUrlsOf(requests: readonly SpriteFolderPreload[]): st
  * 계산으로 만든 목록(선수 그림)과 측정 목록을 겹쳐 쓸 때 같은 폴더가 두 번 나오지 않게 한다. 폴더는 처음 나온 차례다.
  */
 export function mergeSpritePreloads(...lists: readonly (readonly SpriteFolderPreload[])[]): SpriteFolderPreload[] {
-  const byFolder = new Map<string, {
-    frames: Set<number> | 'all'; json: Set<string>; masks: Set<number>; names: Set<string>; listedIn?: string
-    animations: Set<number>; animationsIn?: string
-  }>()
+  const byFolder = new Map<
+    string,
+    {
+      frames: Set<number> | 'all'
+      json: Set<string>
+      masks: Set<number>
+      names: Set<string>
+      listedIn?: string
+      animations: Set<number>
+      animationsIn?: string
+    }
+  >()
   for (const list of lists) {
     for (const request of list) {
       let entry = byFolder.get(request.folder)
@@ -261,13 +269,15 @@ export function createSpritePreloader(deps: SpritePreloadDeps): SpritePreloader 
       frames = [...new Set([...frames, ...animationFramesOf(table, request.animations)])]
     }
     // 0x67(더하기) 파트가 든 폴더면 받는 프레임의 겹 그림도 받는다 — 그리기(`drawFrameAt`)가 구운 프레임 대신 겹을 쓴다
-    const layerUrls = hasFrameLayers(request.folder) && frames.length > 0
-      ? frameLayerUrlsOf(request.folder, await deps.loadJson(frameLayersUrl(request.folder)).catch(() => null), frames)
-      : []
+    const layerUrls =
+      hasFrameLayers(request.folder) && frames.length > 0
+        ? frameLayerUrlsOf(request.folder, await deps.loadJson(frameLayersUrl(request.folder)).catch(() => null), frames)
+        : []
     // 반투명 파트를 뒤집어(0x11) 그리는 폴더면 복사판도 받는다 — 뒤집을지는 그릴 때 정해지므로 목록에 든 칸을 다 받는다(`frameCopies`)
-    const copyUrls = hasFrameCopies(request.folder) && frames.length > 0
-      ? frameCopyUrlsOf(request.folder, await deps.loadJson(frameCopiesUrl(request.folder)).catch(() => null), frames)
-      : []
+    const copyUrls =
+      hasFrameCopies(request.folder) && frames.length > 0
+        ? frameCopyUrlsOf(request.folder, await deps.loadJson(frameCopiesUrl(request.folder)).catch(() => null), frames)
+        : []
     const imageDone = [
       ...(request.names ?? []).map((name) => enqueue(`${request.folder}/${name}.png`, priority, generation)),
       ...frames.map((frame) => enqueue(frameUrl(request.folder, frame), priority, generation)),

@@ -181,12 +181,7 @@ export interface QuickPitch {
 }
 
 /** 한 번 던질 때 정해지는 코스 오차와 스윙 세기 (0xc11f0 앞부분) */
-export function quickPitchOf(
-  batter: QuickAtBatBatter,
-  pitcher: QuickAtBatPitcher,
-  situation: QuickAtBatSituation,
-  random: RandomPort,
-): QuickPitch {
+export function quickPitchOf(batter: QuickAtBatBatter, pitcher: QuickAtBatPitcher, situation: QuickAtBatSituation, random: RandomPort): QuickPitch {
   let spreadX = random.rand(SPREAD_RANGE.minimum, SPREAD_RANGE.maximumExclusive)
   let spreadY = random.rand(SPREAD_RANGE.minimum, SPREAD_RANGE.maximumExclusive)
   let power = BASE_POWER
@@ -243,12 +238,7 @@ export type PitchJudgement = '스트라이크' | '볼' | '포볼' | '삼진'
  * 간이 구역(0xc0d00~0xc2c00)에는 `strb …,#0x10` 이 없다. 0xc262c 는 타석 호출마다 머리에서 0xc0ee8 → 0xb68bc → 0xb67d0 을 불러
  * `state[0x10] = 0`(b67f0)으로 지운다.
  */
-export function judgePitchOf(
-  pitcher: QuickAtBatPitcher,
-  strikes: number,
-  balls: number,
-  random: RandomPort,
-): PitchJudgement {
+export function judgePitchOf(pitcher: QuickAtBatPitcher, strikes: number, balls: number, random: RandomPort): PitchJudgement {
   const ownBonus = pitcher.isOwnPlayer === true ? OWN_PLAYER_STRIKE_BONUS : 0
   // c1852·c1878 — 0xb570c 를 체력%(0xaebb0)로 부른다
   const tired = tiredStatsOf(pitcher)
@@ -261,8 +251,7 @@ export function judgePitchOf(
 
 const ACE_SLOT_COUNT = 5
 const aceKOf = (ace: QuickAceSlot) =>
-  Math.min(Math.max(Math.trunc(ace.level), 0), ACE_SLOT_COUNT - 1) * ACE_SLOT_COUNT +
-  Math.min(Math.max(Math.trunc(ace.order), 0), ACE_SLOT_COUNT - 1)
+  Math.min(Math.max(Math.trunc(ace.level), 0), ACE_SLOT_COUNT - 1) * ACE_SLOT_COUNT + Math.min(Math.max(Math.trunc(ace.order), 0), ACE_SLOT_COUNT - 1)
 
 /**
  * 간이 타석이 0xab214 에 넘기는 12바이트 보정 구조체 (0xc11f0 c11fe~c12c4, 디스어셈 대조 — 확정).
@@ -282,10 +271,10 @@ export function quickSwingBoostOf(batter: QuickAtBatBatter, pitcher: QuickAtBatP
   const batterK = batter.ace === undefined ? -1 : aceKOf(batter.ace)
   const pitcherK = pitcher.ace === undefined ? -1 : aceKOf(pitcher.ace)
   return {
-    batterHit: batterK < 0 ? 0 : table.aceBatterHit[batterK] ?? 0,
-    batterPower: batterK < 0 ? 0 : table.aceBatterPower[batterK] ?? 0,
-    pitcherVelocity: pitcherK < 0 ? 0 : table.acePitcherSpeed[pitcherK] ?? 0,
-    pitcherControl: pitcherK < 0 ? 0 : table.acePitcherControl[pitcherK] ?? 0,
+    batterHit: batterK < 0 ? 0 : (table.aceBatterHit[batterK] ?? 0),
+    batterPower: batterK < 0 ? 0 : (table.aceBatterPower[batterK] ?? 0),
+    pitcherVelocity: pitcherK < 0 ? 0 : (table.acePitcherSpeed[pitcherK] ?? 0),
+    pitcherControl: pitcherK < 0 ? 0 : (table.acePitcherControl[pitcherK] ?? 0),
     solidPercent: 0,
     homeRunPercent: 0,
   }
@@ -367,9 +356,7 @@ function verdictOf(
   if (swing.code === GROUND_BALL_CODE) {
     const rolled = random.rand(0, RANDOM_LIMIT)
     const speed = random.rand(0, batter.run)
-    return rolled < speed
-      ? { kind: '끝', outcome: { kind: '안타', bases: 1 } }
-      : { kind: '끝', outcome: { kind: '아웃', detail: '땅볼아웃' } }
+    return rolled < speed ? { kind: '끝', outcome: { kind: '안타', bases: 1 } } : { kind: '끝', outcome: { kind: '아웃', detail: '땅볼아웃' } }
   }
   if (swing.code === FOUL_CODE) return { kind: '파울' }
   // 원본은 뜬공·직선타를 구분하지 않는다 (확정, 2026-10 r87): 점프표 0xd9000[0] = c161c 가 아웃 기록 0xa7d0c(사건 0xd — 종류 칸 없음) ·
@@ -456,11 +443,14 @@ export function playQuickAtBat(
   // 파울이 이어지는 동안 끝나지 않는 것도 원본 그대로다(파울은 늘 확률이 1 보다 작아 결국 끝난다)
   for (let pitch = 1; ; pitch += 1) {
     const done = (outcome: AtBatOutcome): QuickAtBatPlay => ({
-      outcome, pitches: pitch, balls, strikes, ...(fouled ? { fouled: true as const } : {}),
+      outcome,
+      pitches: pitch,
+      balls,
+      strikes,
+      ...(fouled ? { fouled: true as const } : {}),
     })
     const pitcher = hooks.beforePitch?.() ?? startingPitcher
-    const isSwing =
-      random.rand(0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
+    const isSwing = random.rand(0, 100) <= SWING_PATH_LIMIT || situation.inning === FORCED_SWING_INNING
     if (isSwing) hooks.onSwingPath?.()
     if (!isSwing) {
       const judged = judgePitchOf(pitcher, strikes, balls, random)
@@ -509,11 +499,7 @@ export function playQuickAtBat(
  * 중계 글은 어느 쪽이든 5 "삼진 아웃" 이다(c17d8). 두 능력은 스윙 앞 겨루기(c12f8)와 같은 인자다 — `velocity`·`hit`.
  * 루킹 삼진(0xc1818 판정 길)과 점프표 나머지 코드(c170c)의 세 번째 스트라이크는 겨루지 않는다.
  */
-export function thirdStrikeContestOf(
-  batter: QuickAtBatBatter,
-  pitcher: QuickAtBatPitcher,
-  random: RandomPort,
-): boolean {
+export function thirdStrikeContestOf(batter: QuickAtBatBatter, pitcher: QuickAtBatPitcher, random: RandomPort): boolean {
   const pitcherRoll = random.rand(0, pitcher.velocity)
   const batterRoll = random.rand(0, batter.hit)
   return pitcherRoll > batterRoll

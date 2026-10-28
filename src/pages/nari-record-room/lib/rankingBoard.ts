@@ -111,11 +111,12 @@ const EARNED_RUN_AVERAGE_KIND = 4
 
 /** 값 칸 0x6aff8 — 칸 왼쪽 기준 숫자 그림 · 점 (`yearCellDrawingOf` 는 칸 x + 0x18 기준이라 1 옮긴다) */
 export function rankingValueDrawingOf(kind: number, value: number): YearCellDrawing {
-  const cell = kind === BATTING_AVERAGE_KIND
-    ? { value, digits: value > 999 ? 3 : 0, isDecimal: true }
-    : kind === EARNED_RUN_AVERAGE_KIND
-      ? { value: value > 100 ? value * 10 : value, digits: 3, isDecimal: true }
-      : { value, digits: -1, isDecimal: false }
+  const cell =
+    kind === BATTING_AVERAGE_KIND
+      ? { value, digits: value > 999 ? 3 : 0, isDecimal: true }
+      : kind === EARNED_RUN_AVERAGE_KIND
+        ? { value: value > 100 ? value * 10 : value, digits: 3, isDecimal: true }
+        : { value, digits: -1, isDecimal: false }
   const drawing = yearCellDrawingOf(cell)
   const shift = RANKING_BOARD.valueDx - 0x18
   return {

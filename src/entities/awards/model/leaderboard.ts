@@ -108,10 +108,7 @@ export const BATTING_AVERAGE_SCALE = 1000
 /** 타율 0xb8e3d = `min(1000, trunc(안타 × 1000 / 타수))`. 타수 0 이면 타율이 없다 */
 export function battingAverageOf(record: LeagueRecord): number | null {
   if (record.atBatsOrOuts <= 0) return null
-  return Math.min(
-    BATTING_AVERAGE_SCALE,
-    Math.trunc((record.hits * BATTING_AVERAGE_SCALE) / record.atBatsOrOuts),
-  )
+  return Math.min(BATTING_AVERAGE_SCALE, Math.trunc((record.hits * BATTING_AVERAGE_SCALE) / record.atBatsOrOuts))
 }
 
 /**
@@ -126,12 +123,7 @@ export const MAXIMUM_EARNED_RUN_AVERAGE = 9999
 
 export function earnedRunAverageOf(record: LeagueRecord): number | null {
   if (record.atBatsOrOuts <= 0) return null
-  return Math.min(
-    MAXIMUM_EARNED_RUN_AVERAGE,
-    Math.trunc(
-      (record.earnedRuns * OUTS_PER_INNING * 9 * EARNED_RUN_AVERAGE_SCALE) / record.atBatsOrOuts,
-    ),
-  )
+  return Math.min(MAXIMUM_EARNED_RUN_AVERAGE, Math.trunc((record.earnedRuns * OUTS_PER_INNING * 9 * EARNED_RUN_AVERAGE_SCALE) / record.atBatsOrOuts))
 }
 
 /** 방어율만 **작은 쪽이 1위**다 (0x9d789 의 오름차순 분기) */
@@ -156,9 +148,7 @@ export function leaderValueOf(record: LeagueRecord, kind: LeaderKind): number | 
       return record.saves
     case LEADER_KIND.방어율:
       // 규정 이닝 — 원본은 `아웃 / 3 ≥ 45` 로 본다 (버림)
-      return Math.trunc(record.atBatsOrOuts / OUTS_PER_INNING) >= QUALIFIED_INNINGS
-        ? earnedRunAverageOf(record)
-        : null
+      return Math.trunc(record.atBatsOrOuts / OUTS_PER_INNING) >= QUALIFIED_INNINGS ? earnedRunAverageOf(record) : null
     case LEADER_KIND.탈삼진:
       return record.strikeouts
     case LEADER_KIND.홈런:
@@ -185,13 +175,9 @@ export interface LeaderEntry {
  * 그래서 **동점이면 먼저 들어간 쪽(= 팀 번호·팀 안 선수 순서가 앞선 쪽)이 1위**다.
  * `records` 의 순서가 곧 그 순회 순서이므로, 부르는 쪽이 팀 0부터 명단 순서대로 넘겨야 한다.
  */
-export function rankLeaders(
-  records: readonly LeagueRecord[],
-  kind: LeaderKind,
-): readonly LeaderEntry[] {
+export function rankLeaders(records: readonly LeagueRecord[], kind: LeaderKind): readonly LeaderEntry[] {
   const ascending = isAscending(kind)
-  const better = (candidate: number, seated: number) =>
-    ascending ? candidate < seated : candidate > seated
+  const better = (candidate: number, seated: number) => (ascending ? candidate < seated : candidate > seated)
 
   const leaders: LeaderEntry[] = []
   for (const record of records) {
@@ -210,9 +196,6 @@ export function rankLeaders(
 }
 
 /** 1위 한 명. 자격을 갖춘 선수가 하나도 없으면 null */
-export function leaderOf(
-  records: readonly LeagueRecord[],
-  kind: LeaderKind,
-): LeaderEntry | null {
+export function leaderOf(records: readonly LeagueRecord[], kind: LeaderKind): LeaderEntry | null {
   return rankLeaders(records, kind)[0] ?? null
 }

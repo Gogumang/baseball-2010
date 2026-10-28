@@ -1,7 +1,5 @@
 import { translucentOpacityOf } from '@/shared/lib/pixelEffect/pixelEffect'
-import {
-  advanceBatterAnimation, advancePitcherAnimation, batterPoseOf, pitcherPoseOf,
-} from '@/pages/special/lib/hallOfFameFigure'
+import { advanceBatterAnimation, advancePitcherAnimation, batterPoseOf, pitcherPoseOf } from '@/pages/special/lib/hallOfFameFigure'
 import type { FigureAnimation, HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
 

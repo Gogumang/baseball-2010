@@ -35,23 +35,10 @@ export const MAGIC_PITCH_NAME_STRING_INDEX = {
 } as const
 
 /** 육성 투수가 쓰는 마구 여섯 이름 (번호 4 가 폼으로 셋으로 갈린다) */
-export const MAGIC_PITCH_NAMES: readonly string[] = [
-  '파이어 볼',
-  '웨이브 볼',
-  '썬더 볼',
-  '샤이닝 볼',
-  '캐넌 볼',
-  '미라지 볼',
-]
+export const MAGIC_PITCH_NAMES: readonly string[] = ['파이어 볼', '웨이브 볼', '썬더 볼', '샤이닝 볼', '캐넌 볼', '미라지 볼']
 
 /** 마투수 다섯 고유기 (StrCOMMON 95~99) */
-export const ACE_MAGIC_PITCH_NAMES: readonly string[] = [
-  '싸이킥 스타',
-  '트리플 크로우',
-  '홀로그램 레이저',
-  '다크 일루전',
-  '브레스 웨폰',
-]
+export const ACE_MAGIC_PITCH_NAMES: readonly string[] = ['싸이킥 스타', '트리플 크로우', '홀로그램 레이저', '다크 일루전', '브레스 웨폰']
 
 /**
  * 마구 이름.
@@ -148,11 +135,7 @@ export const NO_MAGIC_PITCH_CORRECTION: MagicPitchCorrection = {
  * 마구의 실제 억제력은 out+4/+6(구속·제구 +150~220)뿐이다 — 의도는 감소였을 것으로 보이지만
  * 표 그대로가 실행값이므로 그대로 옮긴다 (H2 2절). 고친 길(기본)은 `entities/batting/model/swingBoost` 가 부호를 뒤집는다.
  */
-export function magicPitchCorrectionOf(input: {
-  readonly number: number
-  readonly isAce: boolean
-  readonly aceLevel: number
-}): MagicPitchCorrection {
+export function magicPitchCorrectionOf(input: { readonly number: number; readonly isAce: boolean; readonly aceLevel: number }): MagicPitchCorrection {
   if (input.number === 0) return NO_MAGIC_PITCH_CORRECTION
   if (input.isAce) {
     return CORRECTION_BY_ACE_LEVEL[Math.min(Math.max(input.aceLevel, 0), CORRECTION_BY_ACE_LEVEL.length - 1)]
@@ -310,8 +293,7 @@ export function magicBallKindAtPath(input: {
 }): number {
   if (!input.isMagicPitch) return input.selectedBallKind
   const takesFireBranch =
-    input.magicNumber === FIRE_EFFECT_MAGIC_NUMBER ||
-    (input.magicNumber === SHINNING_EFFECT_MAGIC_NUMBER && input.pitcherForm >> 1 === 0)
+    input.magicNumber === FIRE_EFFECT_MAGIC_NUMBER || (input.magicNumber === SHINNING_EFFECT_MAGIC_NUMBER && input.pitcherForm >> 1 === 0)
   if (!takesFireBranch) return input.selectedBallKind
   return input.pathIndex >= FIRE_BALL_FIRST_PATH_INDEX ? FIRE_BALL_KIND : input.selectedBallKind
 }

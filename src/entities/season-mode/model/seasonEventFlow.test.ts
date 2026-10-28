@@ -42,7 +42,10 @@ const 고정난수 = (value: number): RandomPort => createFractionRandom(() => v
 /** 몇 번 불렸는지 세는 난수 */
 const 세는난수 = (value: number) => {
   let calls = 0
-  const random: RandomPort = createFractionRandom(() => { calls += 1; return value })
+  const random: RandomPort = createFractionRandom(() => {
+    calls += 1
+    return value
+  })
   return { random, calls: () => calls }
 }
 
@@ -58,8 +61,7 @@ const 이벤트 = (id: number) => ORIGINAL_SEASON_EVENTS.find((event) => event.i
 describe('s_event 30편 — 대상 4(시즌 자동)는 다섯 편', () => {
   it('파일 차례 그대로 400 · 490 · 1 · 5 · 100 이 대상 4 다', () => {
     expect(ORIGINAL_SEASON_EVENTS).toHaveLength(30)
-    expect(ORIGINAL_SEASON_EVENTS.filter((event) => event.audience === 4).map((event) => event.id))
-      .toEqual([400, 490, 1, 5, 100])
+    expect(ORIGINAL_SEASON_EVENTS.filter((event) => event.audience === 4).map((event) => event.id)).toEqual([400, 490, 1, 5, 100])
   })
 
   it('날짜 창: 1 은 now 1 · 5 는 now 3 · 100 은 now 21 · 490 은 1~585', () => {
@@ -142,14 +144,21 @@ describe('고르기 0xadc70 — 파일 차례로 처음 통과한 한 건, 커�
 })
 
 describe('관리 메뉴에 들어온 틀 (0x4efc 끝 + 폴링 eb7e)', () => {
-  const 폴링 = (record: SeasonRecord, 덮어쓰기: { newPlayerFlag?: boolean; scene?: typeof SEASON_SCENE_STATE.관리메뉴 | typeof SEASON_SCENE_STATE.외출지도 } = {}) =>
-    pollSeasonEvents(START_SEASON_EVENT_CURSOR, {
-      scene: 덮어쓰기.scene ?? SEASON_SCENE_STATE.관리메뉴,
-      record,
-      teamMorale: 100,
-      event100Awarded: false,
-      newPlayerFlag: 덮어쓰기.newPlayerFlag ?? false,
-    }, 고정난수(0.99))
+  const 폴링 = (
+    record: SeasonRecord,
+    덮어쓰기: { newPlayerFlag?: boolean; scene?: typeof SEASON_SCENE_STATE.관리메뉴 | typeof SEASON_SCENE_STATE.외출지도 } = {},
+  ) =>
+    pollSeasonEvents(
+      START_SEASON_EVENT_CURSOR,
+      {
+        scene: 덮어쓰기.scene ?? SEASON_SCENE_STATE.관리메뉴,
+        record,
+        teamMorale: 100,
+        event100Awarded: false,
+        newPlayerFlag: 덮어쓰기.newPlayerFlag ?? false,
+      },
+      고정난수(0.99),
+    )
 
   it('새 선수 플래그가 서 있으면 연초 목표보다도 먼저 오프닝 400', () => {
     expect(폴링(기본({ yearGoalShown: false }), { newPlayerFlag: true }).poll).toEqual({ kind: '오프닝' })
@@ -191,16 +200,48 @@ describe('보상 0x8c460 모드 2', () => {
   const 상태 = (record: SeasonRecord = 기본()) => ({ ...startNewSeason(0, 'T'), record })
 
   it('393~395 는 종류 0·1·3 에 +5y, 396 은 인기도 −10y · 평판 −2y (0x8d508)', () => {
-    expect(withSeasonYearAdjust([{ kind: 0, value: 25 }, { kind: 1, value: 30 }, { kind: 3, value: 35 }], 393, 2))
-      .toEqual([{ kind: 0, value: 35 }, { kind: 1, value: 40 }, { kind: 3, value: 45 }])
-    expect(withSeasonYearAdjust([{ kind: 0, value: -10 }, { kind: 1, value: -5 }], 396, 3))
-      .toEqual([{ kind: 0, value: -40 }, { kind: 1, value: -11 }])
+    expect(
+      withSeasonYearAdjust(
+        [
+          { kind: 0, value: 25 },
+          { kind: 1, value: 30 },
+          { kind: 3, value: 35 },
+        ],
+        393,
+        2,
+      ),
+    ).toEqual([
+      { kind: 0, value: 35 },
+      { kind: 1, value: 40 },
+      { kind: 3, value: 45 },
+    ])
+    expect(
+      withSeasonYearAdjust(
+        [
+          { kind: 0, value: -10 },
+          { kind: 1, value: -5 },
+        ],
+        396,
+        3,
+      ),
+    ).toEqual([
+      { kind: 0, value: -40 },
+      { kind: 1, value: -11 },
+    ])
     expect(withSeasonYearAdjust([{ kind: 0, value: 15 }], 401, 3)).toEqual([{ kind: 0, value: 15 }])
   })
 
   it('인기도·평판·소지금을 더하고 0..상한으로 자른다', () => {
-    const 적용 = applySeasonEventRewards(상태(기본({ popularity: 5, reputation: 990 })),
-      [{ kind: 0, value: -10 }, { kind: 1, value: 20 }, { kind: 3, value: 30 }], 403, 고정난수(0))
+    const 적용 = applySeasonEventRewards(
+      상태(기본({ popularity: 5, reputation: 990 })),
+      [
+        { kind: 0, value: -10 },
+        { kind: 1, value: 20 },
+        { kind: 3, value: 30 },
+      ],
+      403,
+      고정난수(0),
+    )
     expect(적용.state.record.popularity).toBe(0)
     expect(적용.state.record.reputation).toBe(999)
     expect(적용.state.record.money).toBe(80)
@@ -220,7 +261,9 @@ describe('보상 0x8c460 모드 2', () => {
   })
 
   it('질병 11 의 값 > 0 은 알림 글이 굴려 적은 번호 — 다시 안 굴린다 (0x8c718)', () => {
-    const 굴림 = createFractionRandom(() => { throw new Error('굴리면 안 된다') }) as unknown as Parameters<typeof applySeasonEventRewards>[3]
+    const 굴림 = createFractionRandom(() => {
+      throw new Error('굴리면 안 된다')
+    }) as unknown as Parameters<typeof applySeasonEventRewards>[3]
     expect(applySeasonEventRewards(상태(), [{ kind: 11, value: 2 }], 490, 굴림).state.record.illness).toBe(2)
   })
 

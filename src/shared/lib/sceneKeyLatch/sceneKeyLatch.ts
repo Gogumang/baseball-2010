@@ -81,8 +81,13 @@ export function createSceneKeyLatch(
       const tick = inputTime === undefined ? tickNow() : tickAt(inputTime)
       const current = armed
       // 같은 키 사건의 손잡이는 잡기 단계가 넣은 칸에 붙는다 — 그 칸은 사건 시각으로 센 틱이다(시각을 안 준 손잡이도 같은 사건이다)
-      if (current !== null && current.latch === latch && current.entry.kind === kind
-        && (inputTime === undefined || current.entry.tick === tick) && pending.includes(current.entry)) {
+      if (
+        current !== null &&
+        current.latch === latch &&
+        current.entry.kind === kind &&
+        (inputTime === undefined || current.entry.tick === tick) &&
+        pending.includes(current.entry)
+      ) {
         current.entry.applies.push(apply)
         return
       }
@@ -156,8 +161,27 @@ const owners: SceneKeyLatch[] = []
  * Shift(번트 1 '8'). 그 밖의 키보드 키는 폰에 없는 키라 칸을 덮지 않는다
  */
 const SLOT_KEYS: ReadonlySet<string> = new Set([
-  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '#',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' ', 'Escape', 'Backspace', 'Shift',
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  '*',
+  '#',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Enter',
+  ' ',
+  'Escape',
+  'Backspace',
+  'Shift',
 ])
 
 /** 받은 칸을 덮는 폰 키인가 (`SLOT_KEYS`) — 앱 키 문(`appKeyGate`)도 같은 키만 칸에 넣는다 */

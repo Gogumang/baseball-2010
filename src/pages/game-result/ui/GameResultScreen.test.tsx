@@ -30,7 +30,12 @@ const 요약 = (overrides: Partial<GameSummary> = {}): GameSummary => ({
   doublePlays: 0,
   scoringPositionOuts: 0,
   reputationCounts: {
-    grandSlams: 0, walkOffs: 0, buntHits: 0, walks: 0, goAheadRuns: 0, tyingRuns: 0,
+    grandSlams: 0,
+    walkOffs: 0,
+    buntHits: 0,
+    walks: 0,
+    goAheadRuns: 0,
+    tyingRuns: 0,
   },
   ourTeamId: 0,
   opponentTeamId: 1,
@@ -38,10 +43,10 @@ const 요약 = (overrides: Partial<GameSummary> = {}): GameSummary => ({
   ...overrides,
 })
 
-
-const 프레임 = (count: number) => act(() => {
-  vi.advanceTimersByTime(count * millisecondsPerFrame())
-})
+const 프레임 = (count: number) =>
+  act(() => {
+    vi.advanceTimersByTime(count * millisecondsPerFrame())
+  })
 
 /** 경기 끝 판을 10틱 기다려 OK — 정산 0x19 로 */
 const 끝판넘기기 = () => {
@@ -55,9 +60,13 @@ describe('경기 끝 판 (상태 0x18 · 0x4fe9c)', () => {
   it('정산을 지나 왔으면 먼저 경기 끝 판 — 점수판 틀 · 승리/패전/세이브 줄, 배경 · 정산 판은 아직 없다', () => {
     vi.useFakeTimers()
     const { container } = render(
-      <GameResultScreen summary={요약({ pitchersOfRecord: { win: '승투', loss: '패투', save: null } })}
-        gamePointReward={0} career={createCareer('선수')} onContinue={vi.fn()}
-        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }} />,
+      <GameResultScreen
+        summary={요약({ pitchersOfRecord: { win: '승투', loss: '패투', save: null } })}
+        gamePointReward={0}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }}
+      />,
     )
     for (const label of PITCHER_LABELS) expect(screen.getByAltText(label.name)).toBeTruthy()
     expect(screen.getByText('승투')).toBeTruthy()
@@ -76,8 +85,13 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
     const rand = vi.spyOn(random, 'rand')
     const rand9d = vi.spyOn(random, 'rand9d')
     const { container } = render(
-      <GameResultScreen summary={요약({ result: '패', ourScore: 1, opponentScore: 4 })} gamePointReward={0}
-        career={createCareer('선수')} onContinue={vi.fn()} settlement={{ inning: 9, playerSide: 1, random }} />,
+      <GameResultScreen
+        summary={요약({ result: '패', ourScore: 1, opponentScore: 4 })}
+        gamePointReward={0}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+        settlement={{ inning: 9, playerSide: 1, random }}
+      />,
     )
     끝판넘기기()
     const board = screen.getByTestId('정산-판')
@@ -97,9 +111,13 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
   it('점수는 측 0(선공)이 왼쪽 — 사람 팀이 선공이면 우리 점수가 왼쪽', () => {
     vi.useFakeTimers()
     render(
-      <GameResultScreen summary={요약({ ourScore: 7, opponentScore: 2 })} gamePointReward={0}
-        career={createCareer('선수')} onContinue={vi.fn()}
-        settlement={{ inning: 9, playerSide: 0, random: createSeededRandom(1) }} />,
+      <GameResultScreen
+        summary={요약({ ourScore: 7, opponentScore: 2 })}
+        gamePointReward={0}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+        settlement={{ inning: 9, playerSide: 0, random: createSeededRandom(1) }}
+      />,
     )
     끝판넘기기()
     expect(screen.getByTestId('정산-점수-0').dataset.value).toBe('7')
@@ -109,9 +127,13 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
   it("'0' 기록 판 — 기록 줄 · 획득 G · 보유 G(정산이 더한 선수 G)", () => {
     vi.useFakeTimers()
     render(
-      <GameResultScreen summary={요약({ recordIds: [3, 3] })} gamePointReward={120}
-        career={{ ...createCareer('선수'), gamePoint: 4321 }} onContinue={vi.fn()}
-        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }} />,
+      <GameResultScreen
+        summary={요약({ recordIds: [3, 3] })}
+        gamePointReward={120}
+        career={{ ...createCareer('선수'), gamePoint: 4321 }}
+        onContinue={vi.fn()}
+        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }}
+      />,
     )
     끝판넘기기()
     expect(screen.getByTestId('정산-번-G')).toBeTruthy()
@@ -127,8 +149,13 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
     vi.useFakeTimers()
     const onContinue = vi.fn()
     render(
-      <GameResultScreen summary={요약()} gamePointReward={30} career={createCareer('선수')}
-        onContinue={onContinue} settlement={{ inning: 9, playerSide: 0, random: createSeededRandom(1) }} />,
+      <GameResultScreen
+        summary={요약()}
+        gamePointReward={30}
+        career={createCareer('선수')}
+        onContinue={onContinue}
+        settlement={{ inning: 9, playerSide: 0, random: createSeededRandom(1) }}
+      />,
     )
     끝판넘기기()
     expect(onContinue).not.toHaveBeenCalled()
@@ -144,9 +171,14 @@ describe('징글 자리', () => {
     vi.useFakeTimers()
     const onSettlementEnter = vi.fn()
     render(
-      <GameResultScreen summary={요약()} gamePointReward={0}
-        career={createCareer('선수')} onContinue={vi.fn()} onSettlementEnter={onSettlementEnter}
-        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }} />,
+      <GameResultScreen
+        summary={요약()}
+        gamePointReward={0}
+        career={createCareer('선수')}
+        onContinue={vi.fn()}
+        onSettlementEnter={onSettlementEnter}
+        settlement={{ inning: 9, playerSide: 1, random: createSeededRandom(1) }}
+      />,
     )
     expect(onSettlementEnter).not.toHaveBeenCalled()
     끝판넘기기()

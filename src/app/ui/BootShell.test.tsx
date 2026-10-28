@@ -12,9 +12,10 @@ function FakeApp({ bootScreen }: { readonly bootScreen?: Screen }) {
 
 function deferredApp() {
   let resolve: () => void = () => {}
-  const loadApp = () => new Promise<typeof FakeApp>((done) => {
-    resolve = () => done(FakeApp)
-  })
+  const loadApp = () =>
+    new Promise<typeof FakeApp>((done) => {
+      resolve = () => done(FakeApp)
+    })
   return { loadApp, resolve: () => resolve() }
 }
 

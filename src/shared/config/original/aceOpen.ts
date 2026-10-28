@@ -43,16 +43,96 @@ export interface AceOpenEntry {
  * 나머지 여섯 칸은 가격만 내면 기록 달성 없이도 열 수 있다 (StrCOMMON[43] "오픈 조건을 달성하지 않고…").
  */
 export const ACE_OPEN_TABLE: readonly AceOpenEntry[] = [
-  { number: 1, cell: 0, aceId: 'psyker', name: '싸이커', ability: { hit: 670, power: 550, run: 300, defense: 820 }, openPriceGamePoint: 0, openHint: '기본 개방' },
-  { number: 2, cell: 1, aceId: 'leony', name: '레오니', ability: { hit: 580, power: 850, run: 330, defense: 580 }, openPriceGamePoint: 6000, openHint: '삼진 삼진 삼진!!' },
-  { number: 3, cell: 2, aceId: 'bbmachine', name: '붕붕머신', ability: { hit: 820, power: 620, run: 320, defense: 620 }, openPriceGamePoint: 9000, openHint: '풀카운트 승부!' },
-  { number: 4, cell: 3, aceId: 'ballantine', name: '발렌타인', ability: { hit: 700, power: 600, run: 280, defense: 800 }, openPriceGamePoint: 12000, openHint: '퍼펙트 트리플' },
-  { number: 5, cell: 4, aceId: 'dragona', name: '드래고나', ability: { hit: 650, power: 900, run: 300, defense: 650 }, openPriceGamePoint: 0, openHint: '2010.gamevil.com' },
-  { number: 6, cell: 5, aceId: 'medica', name: '메디카', ability: { hit: 620, power: 620, run: 450, defense: 620 }, openPriceGamePoint: 0, openHint: '기본 개방' },
-  { number: 7, cell: 6, aceId: 'kao', name: '어거지죠', ability: { hit: 700, power: 450, run: 650, defense: 600 }, openPriceGamePoint: 6000, openHint: '오오!! 스피드왕!' },
-  { number: 8, cell: 7, aceId: 'roze', name: '로제', ability: { hit: 580, power: 850, run: 320, defense: 600 }, openPriceGamePoint: 9000, openHint: '외로운 홈런타자' },
-  { number: 9, cell: 8, aceId: 'death', name: '크라이져', ability: { hit: 777, power: 555, run: 444, defense: 666 }, openPriceGamePoint: 12000, openHint: '사이클링 트리플' },
-  { number: 10, cell: 9, aceId: 'tiger', name: '킹타이거', ability: { hit: 650, power: 920, run: 380, defense: 450 }, openPriceGamePoint: 0, openHint: '오오!! 만루홈런!' },
+  {
+    number: 1,
+    cell: 0,
+    aceId: 'psyker',
+    name: '싸이커',
+    ability: { hit: 670, power: 550, run: 300, defense: 820 },
+    openPriceGamePoint: 0,
+    openHint: '기본 개방',
+  },
+  {
+    number: 2,
+    cell: 1,
+    aceId: 'leony',
+    name: '레오니',
+    ability: { hit: 580, power: 850, run: 330, defense: 580 },
+    openPriceGamePoint: 6000,
+    openHint: '삼진 삼진 삼진!!',
+  },
+  {
+    number: 3,
+    cell: 2,
+    aceId: 'bbmachine',
+    name: '붕붕머신',
+    ability: { hit: 820, power: 620, run: 320, defense: 620 },
+    openPriceGamePoint: 9000,
+    openHint: '풀카운트 승부!',
+  },
+  {
+    number: 4,
+    cell: 3,
+    aceId: 'ballantine',
+    name: '발렌타인',
+    ability: { hit: 700, power: 600, run: 280, defense: 800 },
+    openPriceGamePoint: 12000,
+    openHint: '퍼펙트 트리플',
+  },
+  {
+    number: 5,
+    cell: 4,
+    aceId: 'dragona',
+    name: '드래고나',
+    ability: { hit: 650, power: 900, run: 300, defense: 650 },
+    openPriceGamePoint: 0,
+    openHint: '2010.gamevil.com',
+  },
+  {
+    number: 6,
+    cell: 5,
+    aceId: 'medica',
+    name: '메디카',
+    ability: { hit: 620, power: 620, run: 450, defense: 620 },
+    openPriceGamePoint: 0,
+    openHint: '기본 개방',
+  },
+  {
+    number: 7,
+    cell: 6,
+    aceId: 'kao',
+    name: '어거지죠',
+    ability: { hit: 700, power: 450, run: 650, defense: 600 },
+    openPriceGamePoint: 6000,
+    openHint: '오오!! 스피드왕!',
+  },
+  {
+    number: 8,
+    cell: 7,
+    aceId: 'roze',
+    name: '로제',
+    ability: { hit: 580, power: 850, run: 320, defense: 600 },
+    openPriceGamePoint: 9000,
+    openHint: '외로운 홈런타자',
+  },
+  {
+    number: 9,
+    cell: 8,
+    aceId: 'death',
+    name: '크라이져',
+    ability: { hit: 777, power: 555, run: 444, defense: 666 },
+    openPriceGamePoint: 12000,
+    openHint: '사이클링 트리플',
+  },
+  {
+    number: 10,
+    cell: 9,
+    aceId: 'tiger',
+    name: '킹타이거',
+    ability: { hit: 650, power: 920, run: 380, defense: 450 },
+    openPriceGamePoint: 0,
+    openHint: '오오!! 만루홈런!',
+  },
 ]
 
 /**
@@ -74,7 +154,8 @@ export const ACE_OPEN_POPUP = {
   /** StrCOMMON[42] — G포인트로 못 여는 칸 (알림 하나) */
   blocked: '!C!cffffff<!c00FF00마선수 오픈 힌트!cffffff>!N!N!cFF6600%s!cFFFFFF!N!N!cFFFF00G포인트!cFFFFFF로 오픈할 수 없습니다',
   /** StrCOMMON[43] — 가격을 물어보는 칸 (예/아니오) */
-  confirm: '!C!cffffff<!c00FF00마선수 오픈 힌트!cffffff>!N!N!cFF6600%s!cFFFFFF!N!N오픈 조건을 달성하지 않고!N!cffff00%d G포인트!cffffff를 사용하여!N마선수를 오픈하시겠습니까?',
+  confirm:
+    '!C!cffffff<!c00FF00마선수 오픈 힌트!cffffff>!N!N!cFF6600%s!cFFFFFF!N!N오픈 조건을 달성하지 않고!N!cffff00%d G포인트!cffffff를 사용하여!N마선수를 오픈하시겠습니까?',
 } as const
 
 /**

@@ -1,10 +1,5 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import {
-  isLaserWindowOpen,
-  judgeLaserInput,
-  LASER_WINDOW_FIRST_TICK,
-  rollLaserThrow,
-} from '@/entities/defense-controls/model/laserThrow'
+import { isLaserWindowOpen, judgeLaserInput, LASER_WINDOW_FIRST_TICK, rollLaserThrow } from '@/entities/defense-controls/model/laserThrow'
 import { isReadyToThrow } from '@/entities/fielding/model/fielderPose'
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
 import type { DefenseKeyPress } from '@/features/defense-play/model/runDefensePlay'
@@ -99,12 +94,7 @@ export function laserWindowTick(input: LaserWindowTickInput): LaserWindowTickRes
   // P+0x130 = 1(포수)을 적어 여기서 끝난다 — `walkPlay` 가 `ballHolderSlot: CATCHER_SLOT` 으로 넘겨 같다(r309 직접 뜸).
   // holder 가 없는(undefined) 길은 진행기가 늘 공 가진 야수를 세워 오지 않는다
   const holderGate = input.holder !== undefined && isOutfieldSlot(input.holder.slot)
-  if (
-    !rolled &&
-    holderGate &&
-    windowOpen &&
-    input.ticksSinceCatch >= LASER_WINDOW_FIRST_TICK
-  ) {
+  if (!rolled && holderGate && windowOpen && input.ticksSinceCatch >= LASER_WINDOW_FIRST_TICK) {
     rolled = true
     rolledThisTick = true
     passed = rollLaserThrow({ defenseAbility: input.holderAbility, skillIds: input.holderSkillIds }, input.random)

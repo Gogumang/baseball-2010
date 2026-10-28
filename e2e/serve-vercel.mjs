@@ -35,13 +35,17 @@ const COMPRESSIBLE = /^(text\/|application\/json|image\/svg)/
 
 /** `vercel.json` 의 `source`(path-to-regexp 꼴 중 `(.*)` · 글자만 쓴다) → 정규식 */
 function sourcePattern(source) {
-  const escaped = source.split('(.*)').map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('(.*)')
+  const escaped = source
+    .split('(.*)')
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('(.*)')
   return new RegExp(`^${escaped}$`)
 }
 
-const rules = configArg === 'none'
-  ? []
-  : (JSON.parse(readFileSync(CONFIG, 'utf8')).headers ?? []).map((rule) => ({ pattern: sourcePattern(rule.source), headers: rule.headers }))
+const rules =
+  configArg === 'none'
+    ? []
+    : (JSON.parse(readFileSync(CONFIG, 'utf8')).headers ?? []).map((rule) => ({ pattern: sourcePattern(rule.source), headers: rule.headers }))
 
 const cache = new Map()
 function fileOf(path) {

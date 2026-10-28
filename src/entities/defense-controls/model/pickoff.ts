@@ -37,11 +37,7 @@
  */
 
 import { pickoffCommandOf } from '@/entities/defense-controls/model/defenseKeys'
-import {
-  PICKOFF_COVER_OF_BASE,
-  PICKOFF_PLAY_KIND,
-  RUNNER_LEAD_DISTANCE,
-} from '@/entities/fielding/model/pickoff'
+import { PICKOFF_COVER_OF_BASE, PICKOFF_PLAY_KIND, RUNNER_LEAD_DISTANCE } from '@/entities/fielding/model/pickoff'
 import { AI_STATE } from '@/entities/fielding/model/fieldingState'
 
 /**
@@ -107,10 +103,7 @@ export function pickoffPlayOf(input: PickoffInput): PickoffPlay | null {
  * 원본에는 별도 "견제 아웃 확률" 이 없고, 주자 귀루 대 송구의 시뮬레이션이 판정 전부다 (I-controls 4a).
  * 부르는 곳: `features/play-pitcher-game/model/pitcherGameFlow.pickoff` (나리 투수편 구질 고르기).
  */
-export function pickoffPlayForKey(
-  webKey: string,
-  hasRunnerOnBase: (base: PickoffBase) => boolean,
-): PickoffPlay | null {
+export function pickoffPlayForKey(webKey: string, hasRunnerOnBase: (base: PickoffBase) => boolean): PickoffPlay | null {
   const command = pickoffCommandOf(webKey)
   if (command === null) return null
   return pickoffPlayOf({ base: command.base, hasRunner: hasRunnerOnBase(command.base) })

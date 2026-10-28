@@ -6,11 +6,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { DefenseKeyPress, DefensePlayControls } from '@/features/defense-play/model/runDefensePlay'
 import { runStealPlay } from '@/features/defense-play/model/stealPlay'
 import { runPickoffPlay } from '@/features/defense-play/model/pickoffPlay'
-import {
-  openPitchArrivalPlay,
-  runPitchArrivalPlay,
-  type PitchArrivalPlayInput,
-} from '@/features/defense-play/model/pitchArrivalPlay'
+import { openPitchArrivalPlay, runPitchArrivalPlay, type PitchArrivalPlayInput } from '@/features/defense-play/model/pitchArrivalPlay'
 import { runLiveRunnerPlayWithoutKeys, startLiveRunnerPlay } from '@/features/defense-play/model/liveRunnerPlay'
 
 const 일루 = { ...EMPTY_BASES, first: true }
@@ -151,7 +147,17 @@ describe('판 안의 판정 콜 — 결과 메시지 0xbba(b4562) → 0x51a56 �
   it('도루 판: 키 2 로 2루에 던져 세이프 — 받은 야수가 쥐는 틱(결과 9)에 17 (종류 5 는 0x51c14 51c22 에서 곧장 17)', () => {
     // 발 빠른 주자(주루 999) — 한 틱 이동 0xbf158 이 맨해튼 거리로 나눠 대각선 1→2루가 느려 주루 500 은 2루 앞에서 잡힌다
     const opened = openPitchArrivalPlay(
-      { batterHand: 0, gameMode: 2, pitchJudgement: 2, stealingFrom: [1], bases: 일루, outs: 0, defenseIsCpu: false, offenseIsCpu: true, runAbility: 999 },
+      {
+        batterHand: 0,
+        gameMode: 2,
+        pitchJudgement: 2,
+        stealingFrom: [1],
+        bases: 일루,
+        outs: 0,
+        defenseIsCpu: false,
+        offenseIsCpu: true,
+        runAbility: 999,
+      },
       createSeededRandom(1),
     )
     if (opened === null || opened.kind === 2) throw new Error('도루 판이 안 열렸다')

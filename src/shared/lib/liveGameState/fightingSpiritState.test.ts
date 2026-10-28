@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  inGameFightingSpiritStateOf,
-  isFightingSpiritSituationOf,
-  sideFightingSpiritStateOf,
-} from '@/shared/lib/liveGameState/liveGameState'
+import { inGameFightingSpiritStateOf, isFightingSpiritSituationOf, sideFightingSpiritStateOf } from '@/shared/lib/liveGameState/liveGameState'
 
 describe('스킬 14(투지) 갈래의 경기 상태 — 0xb570c b5a4c~b5a66 (A-23)', () => {
   const teams = { ourTeamId: 3, opponentTeamId: 7 }

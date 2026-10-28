@@ -78,8 +78,7 @@ describe('2스트라이크 번트 파울 아웃 (0x9d5e2~0x9d600)', () => {
    * 길게 보면 표의 비율 그대로다.
    */
   it('번트 코드 패턴 표 실측 — 성공 코드는 7.4%, 실패 코드는 62.5% 가 파울이다', () => {
-    const 파울수 = (code: number) =>
-      BATTED_BALL_PATTERNS[code].filter((pattern) => contactOfPattern(code, pattern).kind === '파울').length
+    const 파울수 = (code: number) => BATTED_BALL_PATTERNS[code].filter((pattern) => contactOfPattern(code, pattern).kind === '파울').length
 
     expect([6, 7, 8].map(파울수)).toEqual([3, 2, 3])
     expect([6, 7, 8].map((code) => BATTED_BALL_PATTERNS[code].length)).toEqual([40, 35, 33])
@@ -153,8 +152,7 @@ describe('필살수비 표시 패턴 — 덱 목록 0xb086c(비트 2) · 0xb07ec
     expect(점프.every((pattern) => (pattern[3] & 4) !== 0)).toBe(true)
     expect(슬라이딩.every((pattern) => (pattern[3] & 8) !== 0)).toBe(true)
     // 차례는 섞인 자리를 따른다 — 같은 코드 안의 두 비트 2 패턴(코드 18 · 19)은 덱 order 의 앞뒤대로 놓인다
-    const 자리 = (code: number, pattern: readonly number[]) =>
-      덱.orders[code].findIndex((index) => BATTED_BALL_PATTERNS[code][index] === pattern)
+    const 자리 = (code: number, pattern: readonly number[]) => 덱.orders[code].findIndex((index) => BATTED_BALL_PATTERNS[code][index] === pattern)
     for (const code of [18, 19]) {
       const 이코드 = 점프.filter((pattern) => BATTED_BALL_PATTERNS[code].includes(pattern))
       expect(이코드).toHaveLength(2)
@@ -179,8 +177,14 @@ describe('장면 초기화 0x3e340 — 덱 섞기 3ed76 뒤 효과 객체 3ef6e 
     let 수 = 0
     const 씨 = createSeededRandom(5)
     const random: RandomPort = {
-      rand: (lo, hi) => { 수 += 1; return 씨.rand(lo, hi) },
-      rand9d: (n) => { 수 += 1; return 씨.rand9d(n) },
+      rand: (lo, hi) => {
+        수 += 1
+        return 씨.rand(lo, hi)
+      },
+      rand9d: (n) => {
+        수 += 1
+        return 씨.rand9d(n)
+      },
     }
     rollSceneEffectInit(random)
     expect(SCENE_EFFECT_INIT_ROLL_COUNT).toBe(1202)

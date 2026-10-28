@@ -1,16 +1,27 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import {
-  BOARD_COLORS, EQUIPMENT_BOXES, EQUIPMENT_COLORS, alignedPositionOf, boardRectsOf, descriptionPanelRectsOf, digitShiftOf,
-  effectOffsetsOf, rowBoxOf, scrollBarRectsOf, tabCursorBoxOf, tabSeparatorRectsOf,
+  BOARD_COLORS,
+  EQUIPMENT_BOXES,
+  EQUIPMENT_COLORS,
+  alignedPositionOf,
+  boardRectsOf,
+  descriptionPanelRectsOf,
+  digitShiftOf,
+  effectOffsetsOf,
+  rowBoxOf,
+  scrollBarRectsOf,
+  tabCursorBoxOf,
+  tabSeparatorRectsOf,
 } from '@/pages/shop/lib/equipmentWindowLayout'
 import type { PixelRect } from '@/pages/shop/lib/equipmentWindowLayout'
 
 /** 사각형들을 칠한 뒤 (x, y) 의 색 — 나중 것이 이긴다 */
 const colorAt = (rects: readonly PixelRect[], x: number, y: number): string | null =>
-  rects.reduce<string | null>((color, rect) => (
-    x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height ? rect.color : color
-  ), null)
+  rects.reduce<string | null>(
+    (color, rect) => (x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height ? rect.color : color),
+    null,
+  )
 
 describe('장비 창 배치 (mode_ui 프레임 30 · 31)', () => {
   it('박스는 boxes.json 의 "030" 그대로다', () => {

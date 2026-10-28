@@ -11,10 +11,7 @@ import {
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import { NO_EQUIPPED_TITLE, TITLE_NAMES } from '@/entities/career/model/titles'
 
-function 투수(
-  overrides: Partial<PitcherCareer> = {},
-  careerStats: Partial<PitcherSeasonStats> = {},
-): PitcherCareer {
+function 투수(overrides: Partial<PitcherCareer> = {}, careerStats: Partial<PitcherSeasonStats> = {}): PitcherCareer {
   return {
     ...createPitcherCareer('테스트'),
     ...overrides,
@@ -48,12 +45,8 @@ describe('투수편 칭호 — 이름은 48~63, 비트는 타자편 32~47 과 �
 
   it('승수 사다리는 선발 보직만 본다 (0x1aa8a~0x1abaa)', () => {
     expect(evaluateNewPitcherTitles(투수({ role: PITCHER_ROLE.starter }, { wins: 50 }))).toContain('떠오르는 에이스')
-    expect(evaluateNewPitcherTitles(투수({ role: PITCHER_ROLE.relief }, { wins: 200 }))).not.toContain(
-      '그라운드의 지배자',
-    )
-    expect(evaluateNewPitcherTitles(투수({ role: PITCHER_ROLE.starter }, { wins: 200 }))).toContain(
-      '그라운드의 지배자',
-    )
+    expect(evaluateNewPitcherTitles(투수({ role: PITCHER_ROLE.relief }, { wins: 200 }))).not.toContain('그라운드의 지배자')
+    expect(evaluateNewPitcherTitles(투수({ role: PITCHER_ROLE.starter }, { wins: 200 }))).toContain('그라운드의 지배자')
   })
 
   it('미스터 제로는 6년차 18경기째에만 통산 방어율 0.99 이하를 본다 (0x1ac60)', () => {
@@ -69,12 +62,8 @@ describe('투수편 칭호 — 이름은 48~63, 비트는 타자편 32~47 과 �
   })
 
   it('통산 아웃이 0 이면 실점도 0 일 때만 미스터 제로다 (0x1acd6)', () => {
-    expect(evaluateNewPitcherTitles(투수({ season: 6, gamesPlayed: 18 }, { outs: 0, runsAllowed: 0 }))).toContain(
-      '미스터 제로',
-    )
-    expect(evaluateNewPitcherTitles(투수({ season: 6, gamesPlayed: 18 }, { outs: 0, runsAllowed: 1 }))).not.toContain(
-      '미스터 제로',
-    )
+    expect(evaluateNewPitcherTitles(투수({ season: 6, gamesPlayed: 18 }, { outs: 0, runsAllowed: 0 }))).toContain('미스터 제로')
+    expect(evaluateNewPitcherTitles(투수({ season: 6, gamesPlayed: 18 }, { outs: 0, runsAllowed: 1 }))).not.toContain('미스터 제로')
   })
 
   it('닥터 K 는 스킬 비트 11 — 투수 스킬 비트는 표 번호 − 16 이라 표 27 "닥터K" 다', () => {
@@ -135,9 +124,7 @@ describe('투수편 칭호 — 이름은 48~63, 비트는 타자편 32~47 과 �
   })
 
   it('투수편 이름은 모두 표의 48~63 칸에서 온다', () => {
-    const 이름들 = evaluateNewPitcherTitles(
-      투수({ role: PITCHER_ROLE.starter, magicLevel: 4 }, { strikeouts: 1500, wins: 200 }),
-    )
+    const 이름들 = evaluateNewPitcherTitles(투수({ role: PITCHER_ROLE.starter, magicLevel: 4 }, { strikeouts: 1500, wins: 200 }))
     const 투수전용 = 이름들.filter((이름) => TITLE_NAMES.indexOf(이름) >= 32)
 
     expect(투수전용.length).toBeGreaterThan(0)

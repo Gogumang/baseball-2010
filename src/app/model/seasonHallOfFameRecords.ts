@@ -1,6 +1,10 @@
 import {
-  HALL_OF_FAME_BATTER_FIRST_RECORD_ID, HALL_OF_FAME_MAX_BATTERS, HALL_OF_FAME_MAX_PITCHERS,
-  HALL_OF_FAME_PITCHER_FIRST_RECORD_ID, hallOfFameBatterAt, hallOfFamePitcherAt,
+  HALL_OF_FAME_BATTER_FIRST_RECORD_ID,
+  HALL_OF_FAME_MAX_BATTERS,
+  HALL_OF_FAME_MAX_PITCHERS,
+  HALL_OF_FAME_PITCHER_FIRST_RECORD_ID,
+  hallOfFameBatterAt,
+  hallOfFamePitcherAt,
 } from '@/entities/collection/model/collection'
 import type { Collection } from '@/entities/collection/model/collection'
 import { equippedPitcherAbilityOf, pitcherFormOfCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -9,9 +13,7 @@ import { equippedAbilityOf } from '@/entities/career/model/condition'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { pitcherFormOf } from '@/entities/pitcher-career/model/pitcherRegistration'
 import { seasonRecordProfileOf } from '@/entities/season-mode/model/seasonEntry'
-import type {
-  SeasonEntryBatterRecord, SeasonEntryPitcherRecord, SeasonEntryRecordSource,
-} from '@/entities/season-mode/model/seasonEntry'
+import type { SeasonEntryBatterRecord, SeasonEntryPitcherRecord, SeasonEntryRecordSource } from '@/entities/season-mode/model/seasonEntry'
 import { modeBatterOfHallOfFame } from '@/app/model/modeBatter'
 import { skillBitsOfIds } from '@/entities/team/model/recordAbility'
 import { nariRecordSalaryGradeOfCareer } from '@/entities/career/model/seasonFlow'
@@ -60,9 +62,7 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
               equipment: [levels.hit, levels.power, levels.defense, levels.run],
             }),
         // +0xb · +0x18 — 등록이 0x30 바이트를 그대로 옮긴 칸 (내외야는 등록 때 남긴 칸, 옛 기록은 0)
-        profile: seasonRecordProfileOf(
-          famer.look?.typeIndex ?? 0, famer.look?.handIndex ?? 0, famer.look?.skinIndex ?? 0, famer.positionIndex ?? 0,
-        ),
+        profile: seasonRecordProfileOf(famer.look?.typeIndex ?? 0, famer.look?.handIndex ?? 0, famer.look?.skinIndex ?? 0, famer.positionIndex ?? 0),
         specialNumber: famer.specialSwingNumber ?? 0,
         // +0x1b — 등록 때 연봉의 1/10 (옛 기록엔 없다)
         ...(famer.salaryGrade === undefined ? {} : { salaryGrade: famer.salaryGrade }),
@@ -75,9 +75,10 @@ export function seasonHallOfFameRecordSourceOf(hallOfFame: SeasonHallOfFame): Se
       if (famer === null) return undefined
       const equippedSkillIds = famer.equippedSkillIds ?? []
       // 옛 저장(장비 니블이 없는 기록)은 등록 때 남긴 0xb6415 값 그대로 (`modePitcherOfHallOfFame` 과 같은 대체)
-      const ability = famer.equipmentLevels === undefined
-        ? famer.equippedAbility
-        : equippedPitcherAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds })
+      const ability =
+        famer.equipmentLevels === undefined
+          ? famer.equippedAbility
+          : equippedPitcherAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds })
       const levels = famer.equipmentLevels
       return {
         name: famer.name,

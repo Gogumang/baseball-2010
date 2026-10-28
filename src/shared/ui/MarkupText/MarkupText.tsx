@@ -14,16 +14,9 @@ export function MarkupText({ raw, replacements = [] }: MarkupTextProps) {
   return (
     <>
       {lines.map((line, lineIndex) => (
-        <p
-          key={lineIndex}
-          className={styles.dialogueText}
-          style={line.isCentered ? { textAlign: 'center' } : undefined}
-        >
+        <p key={lineIndex} className={styles.dialogueText} style={line.isCentered ? { textAlign: 'center' } : undefined}>
           {line.segments.map((segment, segmentIndex) => (
-            <span
-              key={segmentIndex}
-              style={segment.color === null ? undefined : { color: segment.color }}
-            >
+            <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
               {segment.text}
             </span>
           ))}

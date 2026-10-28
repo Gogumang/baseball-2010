@@ -27,9 +27,7 @@ describe('이벤트 대화창 0x8b5ac 의 지도 갈래 — 0x7ea64(gfx, −1, 0
 })
 
 describe('외출 지도 밑그림 겹 — 원본 화면 버퍼 차례 (`ComposedScreen`)', () => {
-  const origins = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((frame) => [
-    String(frame).padStart(3, '0'), { x: frame, y: 0, width: 1, height: 1 },
-  ]))
+  const origins = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((frame) => [String(frame).padStart(3, '0'), { x: frame, y: 0, width: 1, height: 1 }]))
 
   it('고른 칸이 있으면 고르지 않은 건물은 효과 1 · 7(0x9a449), 고른 건물은 빠진다', () => {
     const ops = outingMapComposeOps({ origins, mapX: 0, mapY: 11, selected: 1, labelOf: () => [], isNight: false })

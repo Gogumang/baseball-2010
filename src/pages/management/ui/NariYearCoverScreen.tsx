@@ -7,7 +7,12 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
 import {
-  YEAR_COVER_CLIP, YEAR_COVER_LABEL, YEAR_COVER_ORIGIN, YEAR_COVER_SCALE, resumeLeftFrameCoverOpacityAt, yearCoverDigitsOf,
+  YEAR_COVER_CLIP,
+  YEAR_COVER_LABEL,
+  YEAR_COVER_ORIGIN,
+  YEAR_COVER_SCALE,
+  resumeLeftFrameCoverOpacityAt,
+  yearCoverDigitsOf,
   yearCoverStepAt,
 } from '@/pages/management/lib/nariYearCover'
 import type { YearCoverStep } from '@/pages/management/lib/nariYearCover'
@@ -80,14 +85,18 @@ export function NariYearCoverScreen({ yearIndex, onDone, previousScreenAt, start
   const opacity = coverOpacityOf(step)
   return (
     <RawScreen>
-      {step.kind === '앞화면' ? (previousScreenAt?.(frame) ?? <LeftFrame part="year-cover-left" />) : (
+      {step.kind === '앞화면' ? (
+        (previousScreenAt?.(frame) ?? <LeftFrame part="year-cover-left" />)
+      ) : (
         <YearCover yearIndex={yearIndex} counter={step.kind === '표지' ? step.counter : 0} />
       )}
       {/* 효과기 0xbd844 — 장면 그리기 끝에 칠한다 */}
       {opacity > 0 && (
         // 앞 화면의 이벤트 판(대화창 겹 30)까지 덮는다
-        <div data-testid="연차표지-효과기"
-          style={{ position: 'absolute', inset: 0, background: '#000000', opacity, pointerEvents: 'none', zIndex: YEAR_COVER_EFFECTOR_LAYER }} />
+        <div
+          data-testid="연차표지-효과기"
+          style={{ position: 'absolute', inset: 0, background: '#000000', opacity, pointerEvents: 'none', zIndex: YEAR_COVER_EFFECTOR_LAYER }}
+        />
       )}
       <PressArea label="건너뛰기" onPress={press} />
     </RawScreen>
@@ -127,8 +136,11 @@ export function YearCoverHoldLayer({ onDone }: { readonly onDone: () => void }) 
   const opacity = isDone ? 1 : coverOpacityOf(step)
   return (
     <ScreenOverlay zIndex={YEAR_COVER_HOLD_LAYER}>
-      <div data-testid="연차표지-앞화면-효과기" data-frame={frame}
-        style={{ position: 'absolute', inset: 0, background: '#000000', opacity, pointerEvents: 'auto' }} />
+      <div
+        data-testid="연차표지-앞화면-효과기"
+        data-frame={frame}
+        style={{ position: 'absolute', inset: 0, background: '#000000', opacity, pointerEvents: 'auto' }}
+      />
     </ScreenOverlay>
   )
 }
@@ -146,8 +158,7 @@ export function YearCoverResumeLeftFrame({ frame }: { readonly frame: number }) 
     <>
       <LeftFrame part="year-cover-resume-left" />
       {opacity > 0 && (
-        <div data-part="year-cover-resume-cover"
-          style={{ position: 'absolute', inset: 0, background: '#000000', opacity, pointerEvents: 'none' }} />
+        <div data-part="year-cover-resume-cover" style={{ position: 'absolute', inset: 0, background: '#000000', opacity, pointerEvents: 'none' }} />
       )}
     </>
   )
@@ -162,25 +173,31 @@ function YearCover({ yearIndex, counter }: { readonly yearIndex: number; readonl
   const clip = YEAR_COVER_CLIP
   const scaled = { transform: `scale(${YEAR_COVER_SCALE})`, transformOrigin: '0 0', imageRendering: 'pixelated' } as const
   return (
-    <div data-part="year-cover" data-counter={counter}
-      style={{ position: 'absolute', inset: 0, background: '#000000', pointerEvents: 'none' }}>
+    <div data-part="year-cover" data-counter={counter} style={{ position: 'absolute', inset: 0, background: '#000000', pointerEvents: 'none' }}>
       {palettes.definition}
       <div style={{ position: 'absolute', left: clip.x, top: clip.y, width: clip.width, height: clip.height, overflow: 'hidden' }}>
         {labelOrigin !== undefined && (
           // 프레임 그리기 0x944b4 효과 0x10 · b 2 — 파트 자리 X + dx·2
-          <img src={`${IMG_TEXT_FRAMES}/${labelKey}.png`} alt="년차"
+          <img
+            src={`${IMG_TEXT_FRAMES}/${labelKey}.png`}
+            alt="년차"
             style={{
               position: 'absolute',
               left: YEAR_COVER_ORIGIN.x + labelOrigin.x * YEAR_COVER_SCALE - clip.x,
               top: YEAR_COVER_ORIGIN.y + labelOrigin.y * YEAR_COVER_SCALE - clip.y,
               ...scaled,
               ...palettes.styleOf(YEAR_COVER_LABEL.frame, YEAR_COVER_LABEL.palette),
-            }} />
+            }}
+          />
         )}
         {yearCoverDigitsOf(yearIndex, counter).map((digit, index) => (
-          <img key={index} src={`${NUM_IMAGES}/${String(digit.image).padStart(3, '0')}.png`} alt=""
+          <img
+            key={index}
+            src={`${NUM_IMAGES}/${String(digit.image).padStart(3, '0')}.png`}
+            alt=""
             data-digit={digit.image - 0x14}
-            style={{ position: 'absolute', left: digit.x - clip.x, top: digit.y - clip.y, ...scaled }} />
+            style={{ position: 'absolute', left: digit.x - clip.x, top: digit.y - clip.y, ...scaled }}
+          />
         ))}
       </div>
     </div>

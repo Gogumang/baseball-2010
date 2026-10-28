@@ -44,7 +44,10 @@ import { lazyScreen } from '@/shared/lib/lazyScreen/lazyScreen'
  */
 const HelpScreen = lazyScreen(() => import('@/pages/help/ui/HelpScreen').then((module) => module.HelpScreen), 60)
 const SettingsScreen = lazyScreen(() => import('@/pages/settings/ui/SettingsScreen').then((module) => module.SettingsScreen), 60)
-const MyLeagueTeamSelectScreen = lazyScreen(() => import('@/pages/create-player/ui/MyLeagueTeamSelectScreen').then((module) => module.MyLeagueTeamSelectScreen), 20)
+const MyLeagueTeamSelectScreen = lazyScreen(
+  () => import('@/pages/create-player/ui/MyLeagueTeamSelectScreen').then((module) => module.MyLeagueTeamSelectScreen),
+  20,
+)
 const CreatePlayerScreen = lazyScreen(() => import('@/pages/create-player/ui/CreatePlayerScreen').then((module) => module.CreatePlayerScreen), 20)
 const SpecialScreen = lazyScreen(() => import('@/pages/special/ui/SpecialScreen').then((module) => module.SpecialScreen), 50)
 const HallOfFameScreen = lazyScreen(() => import('@/pages/special/ui/SpecialScreen').then((module) => module.HallOfFameScreen), 40)
@@ -70,9 +73,7 @@ function derbyMatchupBatterOf(
   career: PlayerCareer | null | undefined,
 ): Omit<MatchupBatterCard, 'isComputer'> | undefined {
   if (famer !== null) {
-    return famer.recordLine === undefined
-      ? { name: famer.name }
-      : { name: famer.name, ...batterCardStatsOf(batterLineOfRecord(famer.recordLine)) }
+    return famer.recordLine === undefined ? { name: famer.name } : { name: famer.name, ...batterCardStatsOf(batterLineOfRecord(famer.recordLine)) }
   }
   if (career === null || career === undefined) return undefined
   return { name: career.name, ...batterCardStatsOf(career.stats) }
@@ -168,10 +169,33 @@ const HOME_RUN_DERBY_MODE = 7
 
 /** 커리어가 아직 없을 때의 화면 — 타이틀 → 메인 메뉴(도움말) → 선수 등록. */
 export function EntryRoutes({
-  screen, setScreen, session, gameSettings, collection, random, wallet, aceSelect, hallOfFameDeletion, claimCollectionReward,
-  onRenamePlayer, onResetEditedNames, onResetCareerEdition, careerResetBlockOf, onResetSeason, onStartGeneralMode,
-  isGeneralGameInProgress = false, lastPlayedMode = 1, onLastPlayedMode, onResumeGeneralGame,
-  nariGameReady, onResumeNariGame, recordStat, openHidden, aceMatchHold, gameStartCursor, onLogoVoice,
+  screen,
+  setScreen,
+  session,
+  gameSettings,
+  collection,
+  random,
+  wallet,
+  aceSelect,
+  hallOfFameDeletion,
+  claimCollectionReward,
+  onRenamePlayer,
+  onResetEditedNames,
+  onResetCareerEdition,
+  careerResetBlockOf,
+  onResetSeason,
+  onStartGeneralMode,
+  isGeneralGameInProgress = false,
+  lastPlayedMode = 1,
+  onLastPlayedMode,
+  onResumeGeneralGame,
+  nariGameReady,
+  onResumeNariGame,
+  recordStat,
+  openHidden,
+  aceMatchHold,
+  gameStartCursor,
+  onLogoVoice,
 }: EntryRoutesProps) {
   /**
    * 기록연감 비밀 번호의 센 수·열림 [skin+0x2d0] — 메뉴 객체 값이라 메뉴를 만들 때(0x234d4, 0x237f8)만 지운다.
@@ -218,9 +242,11 @@ export function EntryRoutes({
   if (screen.kind === '도움말') {
     // 도움말(상태 7)·게임문의(상태 10) 그리기 0x2fc8c: 판 0x58371 · 뷰어 0x639a5 · 머리띠 0x54d95(skin, 0, 5) — 제목 0 이라 G 도.
     // 게임문의 진입 0x2668c 는 뷰어를 장 6 쪽 보기로 열고 [뷰어+0x45c] = 1 로 장 이동을 잠근다 — 서버 없이 도는 화면이다
-    return screen.isInquiry === true
-      ? <HelpScreen chapter={6} isChapterLocked gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
-      : <HelpScreen gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
+    return screen.isInquiry === true ? (
+      <HelpScreen chapter={6} isChapterLocked gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
+    ) : (
+      <HelpScreen gamePoint={wallet.balance} onBack={() => setScreen({ kind: '메인메뉴' })} />
+    )
   }
 
   if (screen.kind === '스페셜') {
@@ -233,30 +259,32 @@ export function EntryRoutes({
         annalsSecretCode={annalsSecretCode}
         onAnnalsSecretCodeChange={setAnnalsSecretCode}
         // 상태 28 = 공용 목록 k 11 + 레벨업 창 0x5f395 — OK·`0` 이 오픈/레벨업, CLR 이 상태 6 으로 (0x2af20)
-        {...(aceSelect === undefined ? {} : {
-          renderAceSelect: (onBack: () => void) => (
-            <AceSelectScreen
-              mode="레벨업"
-              phase={ACE_PHASE.마투수}
-              openedAcePitcherIds={aceSelect.openedAcePitcherIds}
-              openedAceBatterIds={aceSelect.openedAceBatterIds}
-              levels={aceSelect.levels}
-              gamePoint={wallet.balance}
-              onOpenAce={aceSelect.onOpenAce}
-              onLevelUp={aceSelect.onLevelUp}
-              onSelect={() => undefined}
-              onCancel={onBack}
-              // 하위 28 그리기 0x2df78 도 맨 앞(0x2df8e)에 메뉴 바탕 0x58371(skin, [this+0x90], 0) 을 깐다
-              underlay={<SkinBackdrop kind="메뉴바탕" />}
-            />
-          ),
-        })}
+        {...(aceSelect === undefined
+          ? {}
+          : {
+              renderAceSelect: (onBack: () => void) => (
+                <AceSelectScreen
+                  mode="레벨업"
+                  phase={ACE_PHASE.마투수}
+                  openedAcePitcherIds={aceSelect.openedAcePitcherIds}
+                  openedAceBatterIds={aceSelect.openedAceBatterIds}
+                  levels={aceSelect.levels}
+                  gamePoint={wallet.balance}
+                  onOpenAce={aceSelect.onOpenAce}
+                  onLevelUp={aceSelect.onLevelUp}
+                  onSelect={() => undefined}
+                  onCancel={onBack}
+                  // 하위 28 그리기 0x2df78 도 맨 앞(0x2df8e)에 메뉴 바탕 0x58371(skin, [this+0x90], 0) 을 깐다
+                  underlay={<SkinBackdrop kind="메뉴바탕" />}
+                />
+              ),
+            })}
         // 상태 29 = 에디트 — 팀 고르기(목록 k 9) → 기본 명단 보기 → 이름 입력, CLR 이 상태 6 으로 (0x2b2e0)
-        {...(onRenamePlayer === undefined ? {} : {
-          renderEdit: (onBack: () => void) => (
-            <SpecialEditScreen gamePoint={wallet.balance} onRename={onRenamePlayer} onBack={onBack} />
-          ),
-        })}
+        {...(onRenamePlayer === undefined
+          ? {}
+          : {
+              renderEdit: (onBack: () => void) => <SpecialEditScreen gamePoint={wallet.balance} onRename={onRenamePlayer} onBack={onBack} />,
+            })}
         onBack={() => setScreen({ kind: '메인메뉴' })}
       />
     )
@@ -331,7 +359,9 @@ export function EntryRoutes({
           frame={{ title: '홈런더비', gamePoint: wallet.balance }}
           collection={collection}
           mode={{
-            kind: '선수고르기', purpose: '홈런더비', nari: { 투수: null, 타자: nariBatterOf(career) },
+            kind: '선수고르기',
+            purpose: '홈런더비',
+            nari: { 투수: null, 타자: nariBatterOf(career) },
             // 하위 16 의 답 2·4 → this+0x13c = 7 → 상태 0x27 → 0x327b8(this, 7) 이 +0x3c = 7
             onPick: (pick) => {
               onLastPlayedMode?.(HOME_RUN_DERBY_MODE)
@@ -350,15 +380,16 @@ export function EntryRoutes({
     if (famer === null && career === null) return null
     const derbyBatter = famer === null ? modeBatterOf(career) : modeBatterOfHallOfFame(famer)
     // 겉모습도 그 기록의 생김새(+0xb: 폼 = 2×타입 + 손 · 피부)와 장비 니블이다 — 옛 명전 기록에 없으면 기본 그림
-    const look = famer === null
-      ? career === null
-        ? null
-        : { form: career.battingTypeIndex * 2 + career.battingSide, skinIndex: career.skinIndex, equipmentLevels: career.equipmentLevels }
-      : {
-          form: famer.look === undefined ? undefined : famer.look.typeIndex * 2 + famer.look.handIndex,
-          skinIndex: famer.look?.skinIndex,
-          equipmentLevels: famer.equipmentLevels,
-        }
+    const look =
+      famer === null
+        ? career === null
+          ? null
+          : { form: career.battingTypeIndex * 2 + career.battingSide, skinIndex: career.skinIndex, equipmentLevels: career.equipmentLevels }
+        : {
+            form: famer.look === undefined ? undefined : famer.look.typeIndex * 2 + famer.look.handIndex,
+            skinIndex: famer.look?.skinIndex,
+            equipmentLevels: famer.equipmentLevels,
+          }
     return (
       <HomeRunDerbyScreen
         // 원본은 모드 7 로 들어갈 때 0x213c0(앱,4,0) 으로 나만의리그 타자편 저장을 올린다.
@@ -417,12 +448,14 @@ export function EntryRoutes({
       lastPlayedMode={lastPlayedMode}
       {...(nariGameReady === undefined ? {} : { nariGameReady })}
       // 0x327b8 모드 3·4 갈래의 곧장 경기(0x328b4) — 머리 327e8 이 먼저 +0x3c = m 을 적는다
-      {...(onResumeNariGame === undefined ? {} : {
-        onResumeNariGame: (edition: '타자편' | '투수편') => {
-          onLastPlayedMode?.(edition === '투수편' ? NARI_PITCHER_MODE : NARI_BATTER_MODE)
-          onResumeNariGame(edition)
-        },
-      })}
+      {...(onResumeNariGame === undefined
+        ? {}
+        : {
+            onResumeNariGame: (edition: '타자편' | '투수편') => {
+              onLastPlayedMode?.(edition === '투수편' ? NARI_PITCHER_MODE : NARI_BATTER_MODE)
+              onResumeNariGame(edition)
+            },
+          })}
       // 나만의리그 편 고르기 창 [14](하위 13)은 메인 메뉴 위에 뜬다. 고른 편 → 0x327b8(모드 4|3) → 장면 0x106 셋업 0xf684:
       // 그 편 커리어(전역기록 +0x40 + 모드)가 있으면 이어하기(100), 없으면 팀 고르기(101). 지울지 묻는 창은 없다.
       // 투수편은 PitcherLeagueRoute 가 커리어 유무로 등록/관리를 가른다.
@@ -462,9 +495,7 @@ export function EntryRoutes({
       onTopMenuTenthTick={claimReward}
       // 하위 4·5 그리기 0x2866c · 0x2863c 끝의 머리띠 0x54d95(skin, 0, 1|5) — 제목 0 이라 전역 G(mgr+0x64)도 그린다
       gamePoint={wallet.balance}
-      overlay={collectionRewardText !== null && (
-        <MessageBox text={collectionRewardText} buttons={['OK']} onAnswer={claimReward} />
-      )}
+      overlay={collectionRewardText !== null && <MessageBox text={collectionRewardText} buttons={['OK']} onAnswer={claimReward} />}
     />
   )
 }

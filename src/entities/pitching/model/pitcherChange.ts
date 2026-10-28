@@ -171,11 +171,7 @@ export function judgePitcherChange(input: PitcherChangeInput): PitcherChangeDeci
 export const CLOSER_ROLL_PERCENTS: readonly number[] = [45, 35, 50, 60, 60, 30]
 
 /** 굴림 칸 k — 9회 → 1 · 8회 → 2 · 지는 중 → 3 · 주자 2명 이상 → 4 · 1점 차 리드 → 5 · 그 밖 0 */
-export function closerRollIndexOf(input: {
-  readonly inningIndex: number
-  readonly lead: number
-  readonly runnerCount: number
-}): number {
+export function closerRollIndexOf(input: { readonly inningIndex: number; readonly lead: number; readonly runnerCount: number }): number {
   if (input.inningIndex === 8) return 1
   if (input.inningIndex === 7) return 2
   if (input.lead < 0) return 3
@@ -287,9 +283,7 @@ export function chooseReplacementPitcher(
   },
 ): number {
   const usable = candidates.filter(
-    (candidate) =>
-      candidate.isSpecialPitcher !== true &&
-      !(input.excludeOwnPlayers === true && candidate.isOwnPlayer === true),
+    (candidate) => candidate.isSpecialPitcher !== true && !(input.excludeOwnPlayers === true && candidate.isOwnPlayer === true),
   )
   if (usable.length === 0) return -1
   const staminaOf = (candidate: ReplacementCandidate) => candidate.stamina ?? FULL_STAMINA
@@ -297,9 +291,7 @@ export function chooseReplacementPitcher(
   const hasRoles = usable.some((candidate) => candidate.role !== undefined)
   if (!hasRoles) {
     // 보직을 모를 때의 갈래 — 스태미나 최고, 같으면 벤치 번호가 작은 쪽
-    return usable.reduce((best, candidate) =>
-      staminaOf(candidate) > staminaOf(best) ? candidate : best,
-    ).index
+    return usable.reduce((best, candidate) => (staminaOf(candidate) > staminaOf(best) ? candidate : best)).index
   }
 
   // 보직 0 선발 · **1 중간계투** · 2 마무리 (P7 E2 — `pitcherRole.ts` 가 1 을 "뜻 미상" 으로 둔 값이다)
@@ -317,9 +309,7 @@ export function chooseReplacementPitcher(
       const sorted = sums.every((sum) => sum !== undefined)
         ? [...pool].sort((left, right) => (right.abilitySum ?? 0) - (left.abilitySum ?? 0))
         : [...pool].sort((left, right) => staminaOf(right) - staminaOf(left))
-      const picked = sorted.find(
-        (candidate) => input.currentStamina <= 0 || staminaOf(candidate) > CLOSER_MINIMUM_STAMINA,
-      )
+      const picked = sorted.find((candidate) => input.currentStamina <= 0 || staminaOf(candidate) > CLOSER_MINIMUM_STAMINA)
       if (picked !== undefined) return picked.index
       continue
     }
@@ -381,11 +371,7 @@ const MAXIMUM_REPLACEMENT_PICKS = 1_000
  * ⚠️ E-defense-rules 4절 3c 가 이 방향을 **거꾸로**("마무리 상황이면 벤치 마지막") 적었던 것을
  * CORRECTIONS 2절이 정정했다 — "E: 새 투수는 … **방향이 반대**". 여기서는 정정 쪽이다.
  */
-export function replacementPitcherSlotOf(
-  bench: readonly ReplacementCandidate[],
-  input: ReplacementPickInput,
-  random: RandomPort,
-): number {
+export function replacementPitcherSlotOf(bench: readonly ReplacementCandidate[], input: ReplacementPickInput, random: RandomPort): number {
   const benchHasSpecialPitcher = bench.some((candidate) => candidate.isSpecialPitcher === true)
   const chooses = () =>
     chooseReplacementPitcher(bench, {

@@ -49,8 +49,7 @@ export function tabIconXOf(tab: number, selected: number): number {
   const base = TAB_BAR.x + TAB_ICON_STEP * tab
   return tab > selected ? base + TAB_SELECTED_GAP : base
 }
-export const tabIconWidthOf = (tab: number, selected: number) =>
-  (tab === selected ? TAB_SELECTED_WIDTH : TAB_ICON_WIDTH)
+export const tabIconWidthOf = (tab: number, selected: number) => (tab === selected ? TAB_SELECTED_WIDTH : TAB_ICON_WIDTH)
 
 /** 탭 커서 프레임 9 (72×17) — `x = 24 + 박스x`, `y = 54 + 박스y − 2 = 54` (0x2e5ca~0x2e618) */
 export const TAB_CURSOR = { frame: 9, width: TAB_SLOT_WIDTH, height: TAB_SLOT_HEIGHT, y: 54 } as const
@@ -60,8 +59,7 @@ export const TAB_CURSOR = { frame: 9, width: TAB_SLOT_WIDTH, height: TAB_SLOT_HE
  * (0x2e568~0x2e5ba). 원본은 **고른 탭의 이름 하나만** 그린다 — 안 고른 탭은 막대 그림의 아이콘이다.
  */
 export const TAB_NAME_Y = 58
-export const tabNameXOf = (tab: number, nameWidth: number) =>
-  tabSlotXOf(tab) + Math.trunc((TAB_SLOT_WIDTH - nameWidth) / 2)
+export const tabNameXOf = (tab: number, nameWidth: number) => tabSlotXOf(tab) + Math.trunc((TAB_SLOT_WIDTH - nameWidth) / 2)
 
 /** 쪽 수가 있는 탭 (표 0xce8dc s8) — 기록 6쪽 · 닉네임 3쪽 · 통계 2쪽 */
 export const TAB_PAGE_COUNTS = [6, 0, 0, 3, 2] as const
@@ -160,9 +158,26 @@ export const TOTAL_ROW = {
  * ```
  */
 export const ENDING_CELL_NAMES = [
-  ORIGINAL_MAIN_MENU_TEXT[189] ?? '', ORIGINAL_MAIN_MENU_TEXT[190] ?? '', ORIGINAL_MAIN_MENU_TEXT[191] ?? '', ORIGINAL_MAIN_MENU_TEXT[192] ?? '', ORIGINAL_MAIN_MENU_TEXT[193] ?? '', ORIGINAL_MAIN_MENU_TEXT[194] ?? '', ORIGINAL_MAIN_MENU_TEXT[195] ?? '', ORIGINAL_MAIN_MENU_TEXT[196] ?? '', ORIGINAL_MAIN_MENU_TEXT[197] ?? '', ORIGINAL_MAIN_MENU_TEXT[198] ?? '', // StrMAINMENU[189~198]
-  ORIGINAL_MAIN_MENU_TEXT[199] ?? '', ORIGINAL_MAIN_MENU_TEXT[200] ?? '', ORIGINAL_MAIN_MENU_TEXT[201] ?? '', ORIGINAL_MAIN_MENU_TEXT[202] ?? '', ORIGINAL_MAIN_MENU_TEXT[203] ?? '', // [199~203]
-  ORIGINAL_MAIN_MENU_TEXT[204] ?? '', ORIGINAL_MAIN_MENU_TEXT[205] ?? '', ORIGINAL_MAIN_MENU_TEXT[206] ?? '', ORIGINAL_MAIN_MENU_TEXT[207] ?? '', ORIGINAL_MAIN_MENU_TEXT[208] ?? '', // [204~208]
+  ORIGINAL_MAIN_MENU_TEXT[189] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[190] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[191] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[192] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[193] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[194] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[195] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[196] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[197] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[198] ?? '', // StrMAINMENU[189~198]
+  ORIGINAL_MAIN_MENU_TEXT[199] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[200] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[201] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[202] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[203] ?? '', // [199~203]
+  ORIGINAL_MAIN_MENU_TEXT[204] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[205] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[206] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[207] ?? '',
+  ORIGINAL_MAIN_MENU_TEXT[208] ?? '', // [204~208]
 ] as const
 /** 칸 0~14 = 나리 엔딩(전역기록 +0xa8 + i) — 그 뒤 15~19 = 시즌 엔딩(+0xa0 + (i − 15)) */
 export const NARI_ENDING_CELL_COUNT = 15
@@ -205,8 +220,7 @@ export const PROGRESS_ROW = {
 } as const
 
 /** 진행도 값 — 나리 줄 = 얻은 칸 수 × 100 / 15 (0xca7b5, 버림) · 시즌 줄 = 얻은 칸 수 × 20 */
-export const endingProgressOf = (row: number, gained: number) =>
-  (row === 0 ? Math.trunc((gained * 100) / NARI_ENDING_CELL_COUNT) : gained * 20)
+export const endingProgressOf = (row: number, gained: number) => (row === 0 ? Math.trunc((gained * 100) / NARI_ENDING_CELL_COUNT) : gained * 20)
 
 /**
  * slt_frame 프레임 2(꼬리 탭)의 높이 h — 0x2f300~0x2f318 이 `0xba815(slt_frame, 2, 종류 1)` 상자를 [sp+0x140] 에 두고
@@ -236,7 +250,6 @@ export const SKILL_DESCRIPTION = {
    */
   text: { x: SCREEN_WIDTH / 2 - 0x51, y: PANEL.y + 0x94 },
 } as const
-
 
 /**
  * **얻은 스킬 그림 두 장** (0x2f3b0~0x2f488, r136 직접 떴다) — 표 [+0x13c + 4i] ≠ −1(얻음)일 때만 상자 위에 그린다.
@@ -316,8 +329,14 @@ export const LIST_CURSOR = { frame: 0x19, dy: -2 } as const
  * (StrGAME[48~55] — 끝 공백도 원본 글 그대로)이다.
  */
 export const SPECIAL_RECORD_NAMES = [
-  '시즌모드 리그 1위 1회', '시즌모드 리그 1위 5회', '시즌모드 리그 1위 10회', '미션모드 모두 성공',
-  '기록달성 모두 성공 ', '스킬 모두 수집 ', '닉네임 모두 수집 ', '엔딩 모두 수집 ',
+  '시즌모드 리그 1위 1회',
+  '시즌모드 리그 1위 5회',
+  '시즌모드 리그 1위 10회',
+  '미션모드 모두 성공',
+  '기록달성 모두 성공 ',
+  '스킬 모두 수집 ',
+  '닉네임 모두 수집 ',
+  '엔딩 모두 수집 ',
 ] as const
 /** 달성 표시 칸이 시작하는 칸 번호 — 0x7a08c 의 `n > 0x27` 갈래 (`0x22db4(mgr, n − 0x28)`) */
 export const SPECIAL_RECORD_FIRST_CELL = 0x28

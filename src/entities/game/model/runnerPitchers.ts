@@ -35,12 +35,7 @@ export interface RunnerPitcherTags {
 export const EMPTY_RUNNER_PITCHER_TAGS: RunnerPitcherTags = { runners: EMPTY_BASE_RUNNERS, pitchers: EMPTY_BASE_RUNNERS }
 
 /** 루 b 의 주자를 내보낸 투수 — 모르면(적은 신원과 지금 신원이 다르면) `fallback` */
-export function pitcherOnBase(
-  tags: RunnerPitcherTags | undefined,
-  runners: BaseRunners,
-  base: BaseNumber,
-  fallback: number,
-): number {
+export function pitcherOnBase(tags: RunnerPitcherTags | undefined, runners: BaseRunners, base: BaseNumber, fallback: number): number {
   const runner = runnerOnBase(runners, base)
   if (tags === undefined || runner === null || runnerOnBase(tags.runners, base) !== runner) return fallback
   return runnerOnBase(tags.pitchers, base) ?? fallback
@@ -81,9 +76,7 @@ export function settleRunnerPitchers(step: RunnerPitcherStep): RunnerPitcherSett
     const from = BASES.find((candidate) => runnerOnBase(step.before, candidate) === runner)
     seats[base - 1] = from === undefined ? step.pitcher : ofBefore(from)
   }
-  const charged = step.scoredFromBases.map((fromBase) =>
-    fromBase >= 1 && fromBase <= 3 ? ofBefore(fromBase as BaseNumber) : step.pitcher,
-  )
+  const charged = step.scoredFromBases.map((fromBase) => (fromBase >= 1 && fromBase <= 3 ? ofBefore(fromBase as BaseNumber) : step.pitcher))
   return {
     tags: {
       runners: step.after,
@@ -120,11 +113,7 @@ export function chargedRunsByPitcher(charged: readonly number[]): readonly (read
  * **투수가 바뀔 때** — 루에 선 주자는 책임 투수를 그대로 든다(교체 0xaec64 · 0xaebe4 는 주자 목록을 안 건드린다). 웹이 모르는 루
  * (이 칸을 안 고친 길로 선 주자)는 내려가는 투수가 내보낸 것으로 굳혀, 뒤에 들어와도 새 투수 몫이 되지 않게 한다
  */
-export function freezeRunnerPitchers(
-  tags: RunnerPitcherTags | undefined,
-  runners: BaseRunners,
-  outgoing: number,
-): RunnerPitcherTags {
+export function freezeRunnerPitchers(tags: RunnerPitcherTags | undefined, runners: BaseRunners, outgoing: number): RunnerPitcherTags {
   const seat = (base: BaseNumber) => (runnerOnBase(runners, base) === null ? null : pitcherOnBase(tags, runners, base, outgoing))
   return { runners, pitchers: { first: seat(1), second: seat(2), third: seat(3) } }
 }

@@ -21,8 +21,7 @@ export function sprite(url: string): HTMLImageElement | null {
 export const JUDGE_FRAMES = assetUrl('./sprites/game_judge/frames')
 
 /** 경기 연출 그림 (game_effect.pzx, 게임+0x102c) — 홈런 글자는 이미지 54~60 (R2 3-2) */
-export const GAME_EFFECT_IMAGE = (index: number) =>
-  assetUrl(`./sprites/game_effect/${String(index).padStart(3, '0')}.png`)
+export const GAME_EFFECT_IMAGE = (index: number) => assetUrl(`./sprites/game_effect/${String(index).padStart(3, '0')}.png`)
 export const GAME_EFFECT_FRAMES = assetUrl('./sprites/game_effect/frames')
 
 export const FIELD_BACKGROUND = assetUrl('./sprites/attack/000.png')
@@ -34,9 +33,7 @@ const FIELD_FOLDER = assetUrl('./sprites/attack')
  * (= PZX 안 기본 팔레트) 그대로다. 시즌 구장 잔디가 이 줄을 고른다 (`0x786c8`, S3 6절).
  */
 export function fieldBackground(paletteIndex: number | null): HTMLImageElement | null {
-  return paletteIndex === null
-    ? sprite(FIELD_BACKGROUND)
-    : recoloredSprite(FIELD_FOLDER, FIELD_BACKGROUND, paletteIndex)
+  return paletteIndex === null ? sprite(FIELD_BACKGROUND) : recoloredSprite(FIELD_FOLDER, FIELD_BACKGROUND, paletteIndex)
 }
 
 /**
@@ -208,12 +205,7 @@ function loadSprite(url: string): Promise<HTMLImageElement | null> {
  * `paletteIndex` 를 주면 그 폴더의 대체 팔레트 벌로 칠한 그림을 쓴다 (C-1 — 몸통 피부×15+팀 · 헬멧 팀).
  * 칠하기 전에는 구운 그림이 나가므로 첫 몇 프레임은 구워진 벌(palette.json 의 baked)이 보인다.
  */
-export function placedFrame(
-  folder: string,
-  index: number,
-  paletteIndex: number | null = null,
-  isFlipped = false,
-): PlacedFrame | null {
+export function placedFrame(folder: string, index: number, paletteIndex: number | null = null, isFlipped = false): PlacedFrame | null {
   const origins = frameOrigins(folder)
   if (origins === null) return null
 
@@ -224,9 +216,10 @@ export function placedFrame(
   // 효과 0x11(뒤집기)로 부르면 0xc9f98 ca07c 갈래 — 0x66 반투명 파트도 섞지 않고 복사한 판(`frameCopies`)을 쓴다.
   // 목록이 아직이면 구운 프레임(예전 근사). 복사판에는 팔레트 번호 지도가 없어 다시 칠하는 그림은 구운 판 그대로다
   // (복사판 폴더 — 머리 장비 · player_effect · event_char — 는 타석에서 다시 칠하지 않는다)
-  const url = isFlipped && paletteIndex === null && hasFrameCopies(folder)
-    ? flippedFrameUrlOf(folder, index, spriteJsonNow<unknown>(frameCopiesUrl(folder)))
-    : `${folder}/${key}.png`
+  const url =
+    isFlipped && paletteIndex === null && hasFrameCopies(folder)
+      ? flippedFrameUrlOf(folder, index, spriteJsonNow<unknown>(frameCopiesUrl(folder)))
+      : `${folder}/${key}.png`
   const image = paletteIndex === null ? sprite(url) : recoloredSprite(folder, url, paletteIndex)
   if (image === null) return null
   return { image, offsetX: origin.x, offsetY: origin.y }
@@ -237,11 +230,7 @@ export function placedFrame(
  * 겹 목록 · 겹 그림이 아직 안 왔거나 그 프레임에 0x67 파트가 없으면 null 이라 부르는 쪽은 구운 프레임(`placedFrame`)을 그린다.
  * `paletteIndex` 는 `placedFrame` 과 같다 — 겹 번호 지도는 `frames/layers/index/` 에 있다.
  */
-export function placedFrameLayers(
-  folder: string,
-  index: number,
-  paletteIndex: number | null = null,
-): readonly PlacedFrameLayer[] | null {
+export function placedFrameLayers(folder: string, index: number, paletteIndex: number | null = null): readonly PlacedFrameLayer[] | null {
   if (!hasFrameLayers(folder)) return null
   return placedFrameLayersOf(folder, index, spriteJsonNow<FrameLayerListing>(frameLayersUrl(folder)), (url) =>
     paletteIndex === null ? sprite(url) : recoloredSprite(folder, url, paletteIndex),

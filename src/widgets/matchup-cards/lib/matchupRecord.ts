@@ -94,9 +94,7 @@ export function pitcherCardStatsOf(line: MatchupPitcherLine): { earnedRunAverage
 }
 
 /** 판에 넘길 타자 줄 값 — 타율(×1000) · 홈런 · 타점 */
-export function batterCardStatsOf(
-  line: MatchupBatterLine,
-): { battingAverage: number; homeRuns: number; runsBattedIn: number } {
+export function batterCardStatsOf(line: MatchupBatterLine): { battingAverage: number; homeRuns: number; runsBattedIn: number } {
   return { battingAverage: battingAverageValueOf(line), homeRuns: line.homeRuns, runsBattedIn: line.runsBattedIn }
 }
 

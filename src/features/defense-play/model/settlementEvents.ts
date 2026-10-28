@@ -32,10 +32,7 @@ export function settlementEventsOfPlay(result: Pick<DefensePlayResult, 'advance'
 }
 
 /** 남은 몫에 판 하나를 더한다 — 견제 정산이 보는 값이자, 같은 타석이 이어질 때 다음 견제로 넘길 몫이다 */
-export function withSettlementEvents(
-  pending: PendingSettlementEvents | undefined,
-  play: PendingSettlementEvents,
-): PendingSettlementEvents {
+export function withSettlementEvents(pending: PendingSettlementEvents | undefined, play: PendingSettlementEvents): PendingSettlementEvents {
   const base = pending ?? NO_PENDING_SETTLEMENT_EVENTS
   return { outs: base.outs + play.outs, runs: base.runs + play.runs }
 }
@@ -64,10 +61,7 @@ export function pendingSettlementEventsAfter(
  * ```
  * 낫아웃(`batterRuns`)도 state[0xc] == 5 라 정산한다 — 그 판은 타석 결과 쪽이 먹인다.
  */
-export function arrivalPlaySettles(
-  play: Pick<PitchArrivalPlay, 'kind' | 'strikeout'>,
-  ended: { readonly halfOrGameEnded: boolean },
-): boolean {
+export function arrivalPlaySettles(play: Pick<PitchArrivalPlay, 'kind' | 'strikeout'>, ended: { readonly halfOrGameEnded: boolean }): boolean {
   if (play.kind !== 9) return true
   return play.strikeout !== 'none' || ended.halfOrGameEnded
 }

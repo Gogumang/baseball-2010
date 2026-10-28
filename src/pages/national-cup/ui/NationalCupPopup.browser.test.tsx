@@ -45,12 +45,15 @@ async function offsetFromCenter(stage: HTMLElement, box: HTMLElement) {
   // 여는 연출(높이 10 → 두 배씩)이 끝나 안이 보이고 크기가 멈출 때까지 — 펼치는 동안은 글 · 단추가 숨는다
   await waitFor(() => expect(box.querySelector('[style*="visibility: hidden"]')).toBeNull(), { timeout: 3000 })
   let last = ''
-  await waitFor(() => {
-    const now = JSON.stringify(box.getBoundingClientRect())
-    const isStill = now === last && box.getBoundingClientRect().height > 30
-    last = now
-    expect(isStill).toBe(true)
-  }, { timeout: 3000, interval: 120 })
+  await waitFor(
+    () => {
+      const now = JSON.stringify(box.getBoundingClientRect())
+      const isStill = now === last && box.getBoundingClientRect().height > 30
+      last = now
+      expect(isStill).toBe(true)
+    },
+    { timeout: 3000, interval: 120 },
+  )
   const s = stage.getBoundingClientRect()
   const b = box.getBoundingClientRect()
   const scale = s.width / 240
@@ -84,8 +87,14 @@ describe.each([
   it('결과 상자 · 보상 상자 판의 가운데가 화면 판 가운데다', async () => {
     if (size !== null) await page.viewport(size[0], size[1])
     const stage = 세우기(
-      <NationalCupScreen mode="나만의리그" cup={우승} yearIndex={2} random={{ rand: () => 0, rand9d: () => 0 }}
-        onStartGame={vi.fn()} onFinish={vi.fn()} />,
+      <NationalCupScreen
+        mode="나만의리그"
+        cup={우승}
+        yearIndex={2}
+        random={{ rand: () => 0, rand9d: () => 0 }}
+        onStartGame={vi.fn()}
+        onFinish={vi.fn()}
+      />,
     )
     // 대진판(단계 0) 확인 → 결과 상자
     fireEvent.click(screen.getAllByRole('button', { name: '확인' })[0] as HTMLElement)
@@ -105,7 +114,11 @@ describe.each([
 
   it('칭호 창(134 진입 "국가 대표") 판도 화면 판 가운데다', async () => {
     if (size !== null) await page.viewport(size[0], size[1])
-    const stage = 세우기(<RawScreen><TitleWindow title={TITLE_NAMES[8] ?? ''} onKey={vi.fn()} onClose={vi.fn()} /></RawScreen>)
+    const stage = 세우기(
+      <RawScreen>
+        <TitleWindow title={TITLE_NAMES[8] ?? ''} onKey={vi.fn()} onClose={vi.fn()} />
+      </RawScreen>,
+    )
     const dialog = await screen.findByRole('dialog', { name: '칭호' })
     가운데(await offsetFromCenter(stage, dialog.firstElementChild as HTMLElement))
   })

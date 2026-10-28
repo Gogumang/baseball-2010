@@ -26,12 +26,7 @@ import { createFractionRandom } from '@/shared/api/random/fractionRandom'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { openPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { runStealPlay, stealCallSoundIdOf } from '@/features/defense-play/model/stealPlay'
-import {
-  GameSceneMarkContext,
-  markCommonWindowShown,
-  resetCommonWindowShownForTest,
-  useMarksGameScene,
-} from '@/shared/lib/commonWindow/commonWindow'
+import { GameSceneMarkContext, markCommonWindowShown, resetCommonWindowShownForTest, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 
 /**
  * 수비 한 플레이 재생 (원본 경기 장면 상태 0x17).
@@ -109,11 +104,7 @@ const 주자3루: BaseState = { first: false, second: false, third: true }
 /** 내야 뒤에 겨우 뜬 공 — 가만 두면 3루 주자가 태그업으로 못 들어온다 */
 const 얕은뜬공: BattedBallPattern = [90, 250, 700, 0]
 
-function 타구(
-  outcome: AtBatOutcome,
-  bases: BaseState,
-  pattern: BattedBallPattern = representativePatternOf(outcome),
-): DefensePlayInput {
+function 타구(outcome: AtBatOutcome, bases: BaseState, pattern: BattedBallPattern = representativePatternOf(outcome)): DefensePlayInput {
   return { outcome, trajectory: battedBallTrajectory(pattern), bases, outs: 0 }
 }
 
@@ -222,9 +213,7 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       const 결 = 결과(onDone)
       expect(결.fumbled).toBe(true)
       // 늘 0 이면 잡을 때마다 펌블이다 — 원본처럼 펌블 6 을 본 그림마다 한 번씩(한 판에 여럿이면 여럿)
-      const 펌블그림 = 결.ticks.filter((view) =>
-        view.fielders.some((fielder) => (fielder.lockTicks ?? 0) <= 0 && fielder.fumbleTicks === 6),
-      ).length
+      const 펌블그림 = 결.ticks.filter((view) => view.fielders.some((fielder) => (fielder.lockTicks ?? 0) <= 0 && fielder.fumbleTicks === 6)).length
       expect(펌블그림).toBeGreaterThan(0)
       expect(울린것.filter((id) => id === 29)).toHaveLength(펌블그림)
       expect(울린것).not.toContain(53)
@@ -245,11 +234,7 @@ describe('수비 재생 — 타구를 받아 실시간으로 돌리는 갈래 (�
       const onDone = vi.fn()
       const onFieldingErrors = vi.fn()
       render(
-        <DefensePlayback
-          input={{ ...타구(단타, 주자1루), random: 늘0, defenseTeamIndex: 3 }}
-          onDone={onDone}
-          onFieldingErrors={onFieldingErrors}
-        />,
+        <DefensePlayback input={{ ...타구(단타, 주자1루), random: 늘0, defenseTeamIndex: 3 }} onDone={onDone} onFieldingErrors={onFieldingErrors} />,
       )
       끝까지(onDone)
 
@@ -354,8 +339,18 @@ describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
     try {
       const onDone = vi.fn()
       const { queryByTestId } = render(
-        <DefensePlayback input={타구(단타, 주자3루)} onDone={onDone}
-          runScoreBoard={{ sides: [{ team: 1, isComputer: true }, { team: 4, isComputer: false }], scores: [2, 3], battingSide: 1 }} />,
+        <DefensePlayback
+          input={타구(단타, 주자3루)}
+          onDone={onDone}
+          runScoreBoard={{
+            sides: [
+              { team: 1, isComputer: true },
+              { team: 4, isComputer: false },
+            ],
+            scores: [2, 3],
+            battingSide: 1,
+          }}
+        />,
       )
       const shown: string[] = []
       for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
@@ -394,7 +389,10 @@ describe('수비 장면 득점 점수판 0x41a64 — 실시간 갈래', () => {
 })
 
 describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생 갈래 홈런 갈래', () => {
-  const 측 = [{ team: 1, isComputer: true }, { team: 4, isComputer: false }] as const
+  const 측 = [
+    { team: 1, isComputer: true },
+    { team: 4, isComputer: false },
+  ] as const
 
   it('실시간 갈래 — 관문이 닫힌 뒤 11 번째 갱신(+0x1094 > 10)에 0x35108 로 끝낸다 — 그때까지 득점 점수판은 타이머대로 그린다', () => {
     vi.useFakeTimers()
@@ -436,8 +434,7 @@ describe('수비 장면 득점 점수판 0x41a64 — 판이 끝난 뒤 · 재생
     try {
       const onDone = vi.fn()
       const { queryByTestId } = render(
-        <DefensePlayback ticks={ticks} onDone={onDone}
-          runScoreBoard={{ sides: 측, scores: [0, 0], battingSide: 0 }} />,
+        <DefensePlayback ticks={ticks} onDone={onDone} runScoreBoard={{ sides: 측, scores: [0, 0], battingSide: 0 }} />,
       )
       const shown: string[] = []
       for (let i = 0; i < 400 && onDone.mock.calls.length === 0; i += 1) {
@@ -470,7 +467,10 @@ describe('0x17 키 건너뛰기 0x519cc (+0xfe7) — 실시간 갈래', () => {
     return pattern
   }
   const 홈런 = (): DefensePlayInput => ({
-    outcome: { kind: '홈런' }, trajectory: battedBallTrajectory(홈런패턴()), bases: 주자1루, outs: 0,
+    outcome: { kind: '홈런' },
+    trajectory: battedBallTrajectory(홈런패턴()),
+    bases: 주자1루,
+    outs: 0,
   })
   /** 사건 8(state[0x1d])이 서는 틱 — 진행기로 미리 센다 */
   const 홈런틱 = (input: DefensePlayInput): number => {
@@ -558,7 +558,8 @@ describe('수비 재생 — 사람 수비의 주자 판을 실시간으로 돌�
   /** 1루 주자가 도루를 건 볼 — 공 도착 판(종류 5)을 판 시작까지 연다 */
   const 도루판 = () => {
     const opened = openPitchArrivalPlay(
-      { batterHand: 0,
+      {
+        batterHand: 0,
         gameMode: 2,
         pitchJudgement: 2,
         stealingFrom: [1],
@@ -689,7 +690,13 @@ describe('판정 콜은 판 안의 그 틱 (결과 메시지 0xbba)', () => {
     vi.useFakeTimers()
     // 판을 열 때 앞 판에서 남은 사람 송구 키 2(+0x160)가 있던 도루 판 — 포수가 2루로 던져 세이프(결과 9 → 17)
     // 발 빠른 주자(주루 999) — 맨해튼 걸음(0xbf158 → 0xbfa2c)이라 주루 500 은 2루에서 잡혀 콜이 62 다
-    const result = runStealPlay({ bases: { first: true, second: false, third: false }, stealingFrom: [1], outs: 0, runAbility: 999, manualThrowBase: 2 })
+    const result = runStealPlay({
+      bases: { first: true, second: false, third: false },
+      stealingFrom: [1],
+      outs: 0,
+      runAbility: 999,
+      manualThrowBase: 2,
+    })
     const play = { result, callSoundId: stealCallSoundIdOf(result) }
     expect(play.callSoundId).toBe(17)
     const 콜틱 = play.result.ticks.findIndex((view) => (view.tickSoundIds ?? []).includes(play.callSoundId!))
@@ -720,7 +727,7 @@ describe('판정 콜은 판 안의 그 틱 (결과 메시지 0xbba)', () => {
 describe('판이 닫힌 뒤 온 사람 송구 키는 다음 판으로 안 넘어간다 (+0x160 — vt1c 가 지운다)', () => {
   const 판끝까지 = (input: DefensePlayInput) => runDefensePlay(input).ticks.length + 2
 
-  it('사람 수비 — 닫힌 갱신에 누른 \'4\' 가 있어도 결과 · 장면 칸이 안 누른 판과 같다', () => {
+  it("사람 수비 — 닫힌 갱신에 누른 '4' 가 있어도 결과 · 장면 칸이 안 누른 판과 같다", () => {
     vi.useFakeTimers()
     try {
       const input = 타구(땅볼아웃, { first: false, second: false, third: false })
@@ -744,16 +751,17 @@ describe('판이 닫힌 뒤 온 사람 송구 키는 다음 판으로 안 넘어
 })
 
 describe('득점 메시지 0x13 의 함성 — 0x51fb8 머리 (홈런성이 아니면 60 · 홈런성이면 타자주자만 30)', () => {
-  const 소리받기 = (울린것: number[]) => setActiveSound({
-    play: (id) => void 울린것.push(id),
-    playBgm: () => {},
-    stopBgm: () => {},
-    resumeBgm: () => {},
-    stop: () => {},
-    currentBgm: () => null,
-    setVolume: () => {},
-    getVolume: () => 100,
-  })
+  const 소리받기 = (울린것: number[]) =>
+    setActiveSound({
+      play: (id) => void 울린것.push(id),
+      playBgm: () => {},
+      stopBgm: () => {},
+      resumeBgm: () => {},
+      stop: () => {},
+      currentBgm: () => null,
+      setVolume: () => {},
+      getVolume: () => 100,
+    })
 
   it('실시간 갈래 — 단타에 3루 주자가 들어오는 틱에 60 을 낸다(30 은 없다)', () => {
     vi.useFakeTimers()
@@ -802,7 +810,10 @@ describe('수비 재생 — 공용 창이 서면 판이 멈춘다 (경기 장면
   })
 
   /** 끝날 때까지 흘린 갱신 수 — `창` 을 주면 `창.at` 번째 갱신 뒤에 창을 세우고 `창.frames` 갱신 동안 둔다 */
-  function 끝난갱신(input: DefensePlayInput, 창?: { readonly at: number; readonly frames: number; readonly key?: string }): {
+  function 끝난갱신(
+    input: DefensePlayInput,
+    창?: { readonly at: number; readonly frames: number; readonly key?: string },
+  ): {
     readonly updates: number
     readonly onDone: ReturnType<typeof vi.fn>
   } {
@@ -906,7 +917,7 @@ describe('수비 재생 — 공용 창이 서면 판이 멈춘다 (경기 장면
     }
   })
 
-  it("창이 떠 있는 동안 누른 키는 판이 안 받는다 — 키는 창(0x754f9)이 가져가고 0x498d4 는 안 돈다", () => {
+  it('창이 떠 있는 동안 누른 키는 판이 안 받는다 — 키는 창(0x754f9)이 가져가고 0x498d4 는 안 돈다', () => {
     vi.useFakeTimers()
     try {
       const input = 타구(단타, 주자1루)
@@ -973,7 +984,13 @@ describe('주자 판 한 틱의 소리 차례 — 판정 콜 → 득점 함성 �
 
   it('재생 갈래 — 한 틱에 판정 콜 17 · 득점 · 자동 슬라이딩 10 이 함께 나면 17 → 함성 60 → 10 차례로 낸다', () => {
     // 1·3루 이중 도루 판의 그림에서 3루 주자가 홈에 닿는 그림에 소리를 몰아 싣는다(장면 틱 시계는 가짜 시계로 넘긴다)
-    const result = runStealPlay({ bases: { first: true, second: false, third: true }, stealingFrom: [1, 3], outs: 0, runAbility: 999, manualThrowBase: 2 })
+    const result = runStealPlay({
+      bases: { first: true, second: false, third: true },
+      stealingFrom: [1, 3],
+      outs: 0,
+      runAbility: 999,
+      manualThrowBase: 2,
+    })
     expect(result.advance.runsScored).toBe(1)
     const 홈 = basePosition(0)
     const 홈인틱 = result.ticks.findIndex((view) => view.runners.some((runner) => runner.x === 홈.x && runner.z === 홈.z))

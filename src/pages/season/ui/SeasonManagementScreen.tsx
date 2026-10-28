@@ -1,8 +1,6 @@
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
-import {
-  MANAGEMENT_MENU, managementMenuTarget,
-} from '@/entities/season-mode/model/seasonStateMachine'
+import { MANAGEMENT_MENU, managementMenuTarget } from '@/entities/season-mode/model/seasonStateMachine'
 import type { ManagementMenuItem, SeasonSceneState } from '@/entities/season-mode/model/seasonStateMachine'
 import { SEASON_COMMAND_SLOTS } from '@/pages/season/lib/seasonCommandBar'
 import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
@@ -79,7 +77,15 @@ export interface SeasonManagementScreenProps {
  * 배경음은 앱이 튼다 — `app/model/screenBgm` 의 `useSeasonMenuBgm`(App 이 시즌 장면 번호를 넘긴다).
  */
 export function SeasonManagementScreen({
-  state, onSelect, onExit, onConfirmKey, alert = null, cursor: heldCursor, onCursorChange, gamePoint = 0, centerSlidesIn = false,
+  state,
+  onSelect,
+  onExit,
+  onConfirmKey,
+  alert = null,
+  cursor: heldCursor,
+  onCursorChange,
+  gamePoint = 0,
+  centerSlidesIn = false,
 }: SeasonManagementScreenProps) {
   const { record } = state
   const isSliding = useUpdateCounter() < SLIDE_KEY_LOCK_UPDATES
@@ -94,7 +100,10 @@ export function SeasonManagementScreen({
     onSelect(MANAGEMENT_MENU[index], target)
   }
   const { cursor, moveTo } = useSeasonCursor({
-    count: MANAGEMENT_MENU.length, onSelect: select, onCancel: onExit, isEnabled: alert === null && !isSliding,
+    count: MANAGEMENT_MENU.length,
+    onSelect: select,
+    onCancel: onExit,
+    isEnabled: alert === null && !isSliding,
     // 6열 × 1줄 (0x3b14 의 vt+0x1c(6, 1, 1, 0x330)) — ← → 도 칸을 옮긴다
     isCommandBar: true,
     // 0x6c444 — 꺼진 칸(켬 표 0)은 위·아래가 건너뛴다
@@ -106,14 +115,25 @@ export function SeasonManagementScreen({
   return (
     <RawScreen>
       <div role="group" aria-label="관리 메뉴">
-        <SeasonCommonFrame record={record} teamMorale={state.teamMorale} gamePoint={gamePoint}
-          onBack={() => { if (!isSliding) onExit() }}
+        <SeasonCommonFrame
+          record={record}
+          teamMorale={state.teamMorale}
+          gamePoint={gamePoint}
+          onBack={() => {
+            if (!isSliding) onExit()
+          }}
           centerSlidesIn={centerSlidesIn}
           commandBar={{
-            slots: SEASON_COMMAND_SLOTS, cursor, parent: null, disabledIds,
-            onHover: (index) => { if (!isSliding) moveTo(index) },
+            slots: SEASON_COMMAND_SLOTS,
+            cursor,
+            parent: null,
+            disabledIds,
+            onHover: (index) => {
+              if (!isSliding) moveTo(index)
+            },
             onSelect: (id) => select(MANAGEMENT_MENU.findIndex((label) => label === id)),
-          }} />
+          }}
+        />
       </div>
       {alert !== null && (
         // 팝업 0x27 답: 0 예 · 1 아니오 · 0x14 취소 — 아니오·취소는 같은 갈래다 (7488~749e)

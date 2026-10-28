@@ -42,7 +42,11 @@ export const subscribeScreenGrayRects = subscribe
 
 /** 지금 화면에 걸린 흑백 사각형들 (아래 겹이 읽는다) */
 export function useScreenGrayRects(): readonly ScreenGrayRect[] {
-  return useSyncExternalStore(subscribe, () => snapshot, () => snapshot)
+  return useSyncExternalStore(
+    subscribe,
+    () => snapshot,
+    () => snapshot,
+  )
 }
 
 /** 흑백 사각형을 건다 — 그리는 동안(마운트된 동안)만. 그림 전에(레이아웃 단계) 올려 한 틀 늦지 않게 한다 */
@@ -54,8 +58,11 @@ export function usePublishScreenGrayRects(rects: readonly ScreenGrayRect[]): voi
     last.current = rects
     publish(owner, rects)
   })
-  useLayoutEffect(() => () => {
-    last.current = []
-    publish(owner, null)
-  }, [owner])
+  useLayoutEffect(
+    () => () => {
+      last.current = []
+      publish(owner, null)
+    },
+    [owner],
+  )
 }

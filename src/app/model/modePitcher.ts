@@ -202,9 +202,10 @@ const FASTBALL_ONLY_MASK = 1
  */
 export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
   const equippedSkillIds = famer.equippedSkillIds ?? []
-  const equippedAbility = famer.equipmentLevels === undefined
-    ? famer.equippedAbility
-    : equippedPitcherAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds })
+  const equippedAbility =
+    famer.equipmentLevels === undefined
+      ? famer.equippedAbility
+      : equippedPitcherAbilityOf({ ability: famer.ability, equipmentLevels: famer.equipmentLevels, equippedSkillIds })
   return modePitcherFromRecord(
     equippedAbility,
     {
@@ -222,7 +223,6 @@ export function modePitcherOfHallOfFame(famer: HallOfFamePitcher): ModePitcher {
     famer.recordLine,
   )
 }
-
 
 /**
  * **미션 투수의 한 경기 마구 횟수** — 팀+0x28 (0xaea10). 미션도 보통 경기 장면이라 팀 new 0xb891c 가 칸을 −1 로 두고

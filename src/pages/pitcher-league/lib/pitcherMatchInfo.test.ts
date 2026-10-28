@@ -8,7 +8,12 @@ import { teamPitchers } from '@/entities/team/model/teamRoster'
 /** 142 진입이 오늘 준비를 레코드에 넣은 뒤 — 지난날은 날짜 셈으로 밟는다(레코드 배열 없는 꼴에서) */
 const 투수 = (role: PitcherRole, gamesPlayed: number) => {
   const { nariTeams: _없음, ...career } = createPitcherCareer('나투수', {
-    role, typeIndex: 0, handIndex: 0, skinIndex: 0, breakingPitchSlots: [], teamId: 3,
+    role,
+    typeIndex: 0,
+    handIndex: 0,
+    skinIndex: 0,
+    breakingPitchSlots: [],
+    teamId: 3,
   })
   return prepareMyPitcherMatch({ ...career, gamesPlayed })
 }

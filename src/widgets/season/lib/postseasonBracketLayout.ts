@@ -63,24 +63,33 @@ export const RANK_TAGS: readonly BracketBox[] = [
  */
 export const LINE_FRAMES: Readonly<Record<54 | 55 | 56 | 57, readonly BracketBox[]>> = {
   54: [
-    { x: 44, y: 162, width: 2, height: 32 }, { x: 46, y: 162, width: 25, height: 2 },
-    { x: 69, y: 138, width: 2, height: 24 }, { x: 71, y: 138, width: 26, height: 2 },
-    { x: 95, y: 114, width: 2, height: 24 }, { x: 97, y: 114, width: 25, height: 2 },
+    { x: 44, y: 162, width: 2, height: 32 },
+    { x: 46, y: 162, width: 25, height: 2 },
+    { x: 69, y: 138, width: 2, height: 24 },
+    { x: 71, y: 138, width: 26, height: 2 },
+    { x: 95, y: 114, width: 2, height: 24 },
+    { x: 97, y: 114, width: 25, height: 2 },
     { x: 120, y: 87, width: 2, height: 29 },
   ],
   55: [
-    { x: 95, y: 162, width: 2, height: 32 }, { x: 70, y: 162, width: 25, height: 2 },
-    { x: 69, y: 138, width: 2, height: 24 }, { x: 71, y: 138, width: 26, height: 2 },
-    { x: 95, y: 114, width: 2, height: 24 }, { x: 97, y: 114, width: 25, height: 2 },
+    { x: 95, y: 162, width: 2, height: 32 },
+    { x: 70, y: 162, width: 25, height: 2 },
+    { x: 69, y: 138, width: 2, height: 24 },
+    { x: 71, y: 138, width: 26, height: 2 },
+    { x: 95, y: 114, width: 2, height: 24 },
+    { x: 97, y: 114, width: 25, height: 2 },
     { x: 120, y: 87, width: 2, height: 29 },
   ],
   56: [
-    { x: 145, y: 138, width: 2, height: 32 }, { x: 95, y: 138, width: 50, height: 2 },
-    { x: 95, y: 114, width: 2, height: 24 }, { x: 97, y: 114, width: 25, height: 2 },
+    { x: 145, y: 138, width: 2, height: 32 },
+    { x: 95, y: 138, width: 50, height: 2 },
+    { x: 95, y: 114, width: 2, height: 24 },
+    { x: 97, y: 114, width: 25, height: 2 },
     { x: 120, y: 87, width: 2, height: 29 },
   ],
   57: [
-    { x: 196, y: 114, width: 2, height: 31 }, { x: 120, y: 114, width: 76, height: 2 },
+    { x: 196, y: 114, width: 2, height: 31 },
+    { x: 120, y: 114, width: 76, height: 2 },
     { x: 120, y: 87, width: 2, height: 29 },
   ],
 }
@@ -153,8 +162,7 @@ export function darkCellBoxOf(cell: number): BracketBox {
   return { x: box.x, y: box.y, width: box.width, height: box.height + 1 }
 }
 
-const boxesOf = (frame: LineFrame, count: number): RedBox[] =>
-  Array.from({ length: count }, (_, box) => ({ frame, box }))
+const boxesOf = (frame: LineFrame, count: number): RedBox[] => Array.from({ length: count }, (_, box) => ({ frame, box }))
 
 /**
  * 진행 중인 시리즈에서 대진표 상태를 뽑는다 — 0x853ac 의 0x85536~0x8580e 를 직접 떴다.
@@ -182,8 +190,7 @@ export function bracketViewOf(series: PostseasonSeries | null): BracketView {
   const [d, c, b, a] = [team(0), team(1), team(2), team(3)]
   const cellTeams = CELL_QUALIFIER_INDEX.map(team)
 
-  const semiplayoffWinner =
-    series.round === '준플레이오프' ? UNDECIDED : withSemiPlayoffWinner(series).semiPlayoffWinner ?? UNDECIDED
+  const semiplayoffWinner = series.round === '준플레이오프' ? UNDECIDED : (withSemiPlayoffWinner(series).semiPlayoffWinner ?? UNDECIDED)
   const playoffWinner = series.round === '한국시리즈' || series.round === '종료' ? series.teams[1] : UNDECIDED
 
   const redBoxes: RedBox[] = []
@@ -194,8 +201,7 @@ export function bracketViewOf(series: PostseasonSeries | null): BracketView {
     darkCells[semiplayoffWinner === b ? 1 : 0] = true
   }
   if (playoffWinner !== UNDECIDED) {
-    const [frame, count]: [LineFrame, number] =
-      playoffWinner === b ? [54, 5] : playoffWinner === a ? [55, 5] : [56, 3]
+    const [frame, count]: [LineFrame, number] = playoffWinner === b ? [54, 5] : playoffWinner === a ? [55, 5] : [56, 3]
     redBoxes.push(...boxesOf(frame, count), { frame: 56, box: 0 }, { frame: 57, box: 0 })
     if (playoffWinner === c) {
       darkCells[0] = true

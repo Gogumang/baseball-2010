@@ -17,9 +17,7 @@ export function createLocalStorageMissionRecord(): MissionRecordPort {
       try {
         const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
         if (Array.isArray(parsed)) {
-          return Object.fromEntries(
-            parsed.filter((key): key is string => typeof key === 'string').map((key) => [key, 1]),
-          )
+          return Object.fromEntries(parsed.filter((key): key is string => typeof key === 'string').map((key) => [key, 1]))
         }
         if (parsed === null || typeof parsed !== 'object') return {}
         return Object.fromEntries(

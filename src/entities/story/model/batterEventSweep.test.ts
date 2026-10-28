@@ -162,8 +162,12 @@ describe('나리 타자편 이벤트 전수 — 보상 (0x8c460)', () => {
       const web = applyEventRewards(career, rewardsIn(event.commands), createConstantRandom(0.5), event.id)
       const original = 원본보상(career, event)
       const pick = (c: PlayerCareer) => ({
-        popularity: c.popularity, reputation: c.reputation, morale: c.morale, money: c.money,
-        ability: c.ability, skillIds: [...c.skillIds].sort((a, b) => a - b),
+        popularity: c.popularity,
+        reputation: c.reputation,
+        morale: c.morale,
+        money: c.money,
+        ability: c.ability,
+        skillIds: [...c.skillIds].sort((a, b) => a - b),
       })
       expect(pick(web)).toEqual(pick(original))
     })
@@ -189,7 +193,15 @@ describe('보상 4 — 해제 기록(+0x1d0)은 보상 실행기가 보지 않�
 
 describe('조건 switch 0xad1ba — 원본 데이터가 안 쓰는 갈래 (r253)', () => {
   const 가짜 = (conditions: OriginalEvent['conditions']): OriginalEvent => ({
-    id: 9001, audience: 2, repeatable: false, trigger: 0, requiresEvent: 0, dateFrom: [0, 0], dateTo: [0, 0], conditions, commands: [],
+    id: 9001,
+    audience: 2,
+    repeatable: false,
+    trigger: 0,
+    requiresEvent: 0,
+    dateFrom: [0, 0],
+    dateTo: [0, 0],
+    conditions,
+    commands: [],
   })
   const 선수 = (overrides: Partial<PlayerCareer> = {}): PlayerCareer => ({ ...createCareer('갈래'), seenEventIds: ['451'], ...overrides })
   const 뜨나 = (career: PlayerCareer, conditions: OriginalEvent['conditions'], random?: RandomPort) =>

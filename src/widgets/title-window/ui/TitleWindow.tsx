@@ -21,7 +21,11 @@ const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
  * 화면 전체가 투명한 누름 칸 "확인" 이다 — 마우스 · 터치로 OK 를 누르는 길.
  * 칭호가 여럿이면 부르는 쪽이 `key={칭호}` 로 새 창을 세운다 — 원본은 키 뒤 다음 갱신 0x1aec4 가 다시 판정해 새로 띄운다.
  */
-export function TitleWindow({ title, onKey, onClose }: {
+export function TitleWindow({
+  title,
+  onKey,
+  onClose,
+}: {
   readonly title: string
   /** 키 0x1b1e4 를 받은 그 자리 — 칭호 비트 · 장착 · 저장 */
   readonly onKey?: () => void
@@ -34,10 +38,11 @@ export function TitleWindow({ title, onKey, onClose }: {
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
-  const close = () => motion.close('바로', () => {
-    onKeyRef.current?.()
-    onCloseRef.current?.()
-  })
+  const close = () =>
+    motion.close('바로', () => {
+      onKeyRef.current?.()
+      onCloseRef.current?.()
+    })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -61,25 +66,36 @@ export function TitleWindow({ title, onKey, onClose }: {
   const isOpening = motion.openingHeight !== null
 
   return (
-    <div className={boxStyles.dim} role="dialog" aria-label="칭호" data-testid="칭호-창"
-      style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }}>
-      <div className={boxStyles.box}
+    <div
+      className={boxStyles.dim}
+      role="dialog"
+      aria-label="칭호"
+      data-testid="칭호-창"
+      style={{ background: `rgba(0, 0, 0, ${POPUP_DIM_OPACITY})` }}
+    >
+      <div
+        className={boxStyles.box}
         style={{
           height: motion.openingHeight ?? TITLE_WINDOW.height,
           padding: 0,
           left: 0,
           width: SCREEN_WIDTH,
           overflow: 'hidden',
-        }}>
+        }}
+      >
         {/* 펼치는 동안에는 안을 안 그린다 (0x7479c). 0x1afe8 은 판이 아니라 화면 기준 좌표로 그린다 */}
         <div style={{ visibility: isOpening ? 'hidden' : undefined, position: 'absolute', top: 0, left: 0, width: SCREEN_WIDTH }}>
-          <img src={`${IMG_TEXT_FRAMES}/${String(TITLE_WINDOW.headerFrame).padStart(3, '0')}.png`} alt="" data-frame={TITLE_WINDOW.headerFrame}
+          <img
+            src={`${IMG_TEXT_FRAMES}/${String(TITLE_WINDOW.headerFrame).padStart(3, '0')}.png`}
+            alt=""
+            data-frame={TITLE_WINDOW.headerFrame}
             style={{
               position: 'absolute',
               left: Math.trunc((SCREEN_WIDTH - TITLE_WINDOW.headerWidth) / 2),
               top: TITLE_WINDOW.headerTop - boxTop,
               imageRendering: 'pixelated',
-            }} />
+            }}
+          />
           {lines !== null && (
             <>
               <div className={boxStyles.text} data-part="조건" style={{ ...textStyle, top: TITLE_WINDOW.conditionTop - boxTop }}>
@@ -93,8 +109,12 @@ export function TitleWindow({ title, onKey, onClose }: {
         </div>
       </div>
       {/* 투명한 누름 칸 — OK */}
-      <button type="button" aria-label="확인" onClick={close}
-        style={{ position: 'absolute', inset: 0, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }} />
+      <button
+        type="button"
+        aria-label="확인"
+        onClick={close}
+        style={{ position: 'absolute', inset: 0, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+      />
     </div>
   )
 }

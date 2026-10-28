@@ -13,18 +13,17 @@ import rawConfig from '@/shared/config/unlocks/unlocks.json'
  * 각 잠금 판정 코드는 원본 조건 판정을 지우지 않고 `isUnlocked(id, () => 원본판정)` 으로 감싼다.
  */
 export type UnlockKind =
-  | 'acePlayer'
-  | 'hiddenTeam'
-  | 'stadiumItem'
-  | 'pitcherEquipment'
-  | 'batterEquipment'
-  | 'hiddenPitch'
-  | 'mission'
-  | 'hallOfFameSlot'
-  | 'annalsPage'
+  'acePlayer' | 'hiddenTeam' | 'stadiumItem' | 'pitcherEquipment' | 'batterEquipment' | 'hiddenPitch' | 'mission' | 'hallOfFameSlot' | 'annalsPage'
 
 export const UNLOCK_KINDS: readonly UnlockKind[] = [
-  'acePlayer', 'hiddenTeam', 'stadiumItem', 'pitcherEquipment', 'batterEquipment', 'hiddenPitch', 'mission', 'hallOfFameSlot',
+  'acePlayer',
+  'hiddenTeam',
+  'stadiumItem',
+  'pitcherEquipment',
+  'batterEquipment',
+  'hiddenPitch',
+  'mission',
+  'hallOfFameSlot',
   'annalsPage',
 ]
 
@@ -111,10 +110,21 @@ export function isUnlocked(id: string, originalCheck: () => boolean): boolean {
  * k 0~7 마선수 · 8~12 히든 팀 · 13~18 구장 · 19~34 투수 장비 · 35~50 타자 장비 (`entities/collection/model/hiddenOpenNotice`).
  */
 const ACE_UNLOCK_IDS: readonly string[] = [
-  'ace-leony', 'ace-bbmachine', 'ace-ballantine', 'ace-dragona', 'ace-kao', 'ace-roze', 'ace-death', 'ace-tiger',
+  'ace-leony',
+  'ace-bbmachine',
+  'ace-ballantine',
+  'ace-dragona',
+  'ace-kao',
+  'ace-roze',
+  'ace-death',
+  'ace-tiger',
 ]
 const HIDDEN_TEAM_UNLOCK_IDS: readonly string[] = [
-  'hidden-team-korea', 'hidden-team-japan', 'hidden-team-cuba', 'hidden-team-usa', 'hidden-team-outsiders',
+  'hidden-team-korea',
+  'hidden-team-japan',
+  'hidden-team-cuba',
+  'hidden-team-usa',
+  'hidden-team-outsiders',
 ]
 export const HIDDEN_UNLOCK_COUNT = 51
 const FIRST_HIDDEN_ITEM = ACE_UNLOCK_IDS.length + HIDDEN_TEAM_UNLOCK_IDS.length
@@ -147,7 +157,10 @@ export function hiddenTeamUnlockIdOf(teamId: number): string | null {
 
 /** 마구 계열 — 구질 훈련 표 행 0~3 (열 4 히든) */
 const HIDDEN_PITCH_UNLOCK_IDS: readonly string[] = [
-  'hidden-pitch-gyro', 'hidden-pitch-power-sinker', 'hidden-pitch-power-slider', 'hidden-pitch-knuckle',
+  'hidden-pitch-gyro',
+  'hidden-pitch-power-sinker',
+  'hidden-pitch-power-slider',
+  'hidden-pitch-knuckle',
 ]
 export function hiddenPitchUnlockIdOf(row: number): string | null {
   return HIDDEN_PITCH_UNLOCK_IDS[row] ?? null

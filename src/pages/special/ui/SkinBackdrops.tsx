@@ -5,9 +5,17 @@ import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
 import {
-  BALL_PATTERN_BACKDROP, BALL_PATTERN_GRID, MAIN_TITLE_BACKDROP, SKIN_SCREEN, ballPatternCounterAfter, ballPatternRect565,
+  BALL_PATTERN_BACKDROP,
+  BALL_PATTERN_GRID,
+  MAIN_TITLE_BACKDROP,
+  SKIN_SCREEN,
+  ballPatternCounterAfter,
+  ballPatternRect565,
   ballPatternStartOf,
-  finishMainTitleBackdrop565, mainTitleLineYs, rgbOf565, rgbTo565,
+  finishMainTitleBackdrop565,
+  mainTitleLineYs,
+  rgbOf565,
+  rgbTo565,
 } from '@/pages/special/lib/skinBackdrops'
 import * as styles from '@/pages/special/ui/SpecialScreen.css'
 import { DRAW_EFFECT, color565Of, css565, effectContextOf, effectSpriteUrl, grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -60,10 +68,20 @@ function MainTitleBackdrop() {
   return (
     <div className={styles.skinBackdrop} data-testid="바탕-메뉴" style={{ width, height, background: '#fff' }}>
       <img className={styles.sprite} alt="" src={MAIN_TITLE_FRAME_SRC} style={{ left: 0, top: 0 }} />
-      <img className={styles.sprite} alt="" src={MAIN_TITLE_BADGE_SRC}
-        style={{ left: MAIN_TITLE_BACKDROP.badgeX, top: MAIN_TITLE_BACKDROP.badgeY }} />
-      <svg className={styles.sprite} style={{ left: 0, top: 0 }} width={width} height={height}
-        viewBox={`0 0 ${width} ${height}`} shapeRendering="crispEdges">
+      <img
+        className={styles.sprite}
+        alt=""
+        src={MAIN_TITLE_BADGE_SRC}
+        style={{ left: MAIN_TITLE_BACKDROP.badgeX, top: MAIN_TITLE_BACKDROP.badgeY }}
+      />
+      <svg
+        className={styles.sprite}
+        style={{ left: 0, top: 0 }}
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        shapeRendering="crispEdges"
+      >
         {mainTitleLineYs().map((y) => (
           <rect key={y} x={0} y={y} width={width} height={1} fill="#000" fillOpacity={MAIN_TITLE_BACKDROP.lineOpacity} />
         ))}
@@ -120,9 +138,7 @@ function buildMainTitleBuffer(): Promise<string | null> {
       context = null
     }
     if (context === null) return null
-    const [frame, badge, layers] = await Promise.all([
-      loadImage(MAIN_TITLE_FRAME_SRC), loadImage(MAIN_TITLE_BADGE_SRC), loadMainTitleLayers(),
-    ])
+    const [frame, badge, layers] = await Promise.all([loadImage(MAIN_TITLE_FRAME_SRC), loadImage(MAIN_TITLE_BADGE_SRC), loadMainTitleLayers()])
     if (frame === null || badge === null) return null
     context.fillStyle = '#fff'
     context.fillRect(0, 0, width, height)
@@ -191,14 +207,24 @@ function BallPatternBackdrop() {
   // 3 틱마다 칸 200 개의 src 를 바꾸지(그림 다시 찾기) 않는다. 그리기 전(같은 틀)에 적으니 화면은 그대로다.
   // 자리 값은 예전과 같은 정수 하나(첫 칸 + 격자)다 — 감싸개를 옮기거나 calc 로 나누면 분수 배율에서 1px 반올림이 갈린다(r321)
   const layerRefs = useRef<(HTMLDivElement | null)[]>([])
-  const layers = useMemo(() => GPOINT_ANIMATION.map((entry, layer) => (
-    <div key={entry.frame} ref={(element) => { layerRefs.current[layer] = element }} data-frame-layer={entry.frame}
-      style={{ display: 'none' }}>
-      {BALL_PATTERN_GRID.map((_, index) => (
-        <img key={index} className={styles.sprite} alt="" src={`${GPOINT_FRAMES}/${pad(entry.frame)}.png`} />
-      ))}
-    </div>
-  )), [])
+  const layers = useMemo(
+    () =>
+      GPOINT_ANIMATION.map((entry, layer) => (
+        <div
+          key={entry.frame}
+          ref={(element) => {
+            layerRefs.current[layer] = element
+          }}
+          data-frame-layer={entry.frame}
+          style={{ display: 'none' }}
+        >
+          {BALL_PATTERN_GRID.map((_, index) => (
+            <img key={index} className={styles.sprite} alt="" src={`${GPOINT_FRAMES}/${pad(entry.frame)}.png`} />
+          ))}
+        </div>
+      )),
+    [],
+  )
   useLayoutEffect(() => {
     GPOINT_ANIMATION.forEach((entry, layer) => {
       const element = layerRefs.current[layer]
@@ -217,10 +243,17 @@ function BallPatternBackdrop() {
     })
   }, [start, frame])
   return (
-    <div className={styles.skinBackdrop} data-testid="바탕-공무늬" data-counter={counter} data-frame={frame}
-      style={{ width, height, background: BALL_PATTERN_BACKDROP.color }}>
+    <div
+      className={styles.skinBackdrop}
+      data-testid="바탕-공무늬"
+      data-counter={counter}
+      data-frame={frame}
+      style={{ width, height, background: BALL_PATTERN_BACKDROP.color }}
+    >
       {layers}
-      {grayRects.map((rect, index) => <BallPatternGrayRect key={index} rect={rect} start={start} src={src} />)}
+      {grayRects.map((rect, index) => (
+        <BallPatternGrayRect key={index} rect={rect} start={start} src={src} />
+      ))}
     </div>
   )
 }
@@ -234,7 +267,11 @@ const BALL_PATTERN_GRAY = css565(grayPixel565(color565Of(BALL_PATTERN_BACKDROP.c
  * 칸은 몇 개뿐이라 React 로 그대로 그린다. 열쇠를 칸 자리 대신 격자 번호로 둬 틱마다 다시 붙지 않는다(r316 P2 —
  * 다시 붙으면 칠한 주소를 다시 받아 틱마다 커밋이 한 번 더 났다. 칠한 주소는 미리 칠해 둬 바로 보이므로 화면은 그대로다).
  */
-function BallPatternGrayRect({ rect, start, src }: {
+function BallPatternGrayRect({
+  rect,
+  start,
+  src,
+}: {
   readonly rect: ScreenGrayRect
   /** 첫 칸 자리 (`ballPatternStartOf`) */
   readonly start: number
@@ -251,15 +288,31 @@ function BallPatternGrayRect({ rect, start, src }: {
     return x < rect.x + rect.width && x + tileWidth > rect.x && y < rect.y + rect.height && y + tileHeight > rect.y
   }
   return (
-    <div data-testid="바탕-공무늬-흑백" style={{
-      position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height, overflow: 'hidden',
-      background: BALL_PATTERN_GRAY, pointerEvents: 'none',
-    }}>
-      {BALL_PATTERN_GRID.map((tile, index) => (touches(tile)
-        // 자리는 예전처럼 정수 하나(첫 칸 + 격자 − 사각형)로 준다 — 나눠 더하면 분수 배율에서 1px 반올림이 갈린다
-        ? <EffectImage key={index} className={styles.sprite} src={src} effect={DRAW_EFFECT.GRAY}
-          style={{ left: start + tile.x - rect.x, top: start + tile.y - rect.y }} />
-        : null))}
+    <div
+      data-testid="바탕-공무늬-흑백"
+      style={{
+        position: 'absolute',
+        left: rect.x,
+        top: rect.y,
+        width: rect.width,
+        height: rect.height,
+        overflow: 'hidden',
+        background: BALL_PATTERN_GRAY,
+        pointerEvents: 'none',
+      }}
+    >
+      {BALL_PATTERN_GRID.map((tile, index) =>
+        touches(tile) ? (
+          // 자리는 예전처럼 정수 하나(첫 칸 + 격자 − 사각형)로 준다 — 나눠 더하면 분수 배율에서 1px 반올림이 갈린다
+          <EffectImage
+            key={index}
+            className={styles.sprite}
+            src={src}
+            effect={DRAW_EFFECT.GRAY}
+            style={{ left: start + tile.x - rect.x, top: start + tile.y - rect.y }}
+          />
+        ) : null,
+      )}
     </div>
   )
 }
@@ -327,7 +380,18 @@ interface BallPatternTranslucentImageProps {
  * 무늬가 없거나 그림을 아직 못 받았거나 캔버스가 없으면(jsdom) CSS 불투명도 L/16 근사(`translucentOpacityOf`)로 둔다.
  */
 export function BallPatternTranslucentImage({
-  src, x, y, width, height, level, rowOver, imagePlaceOf, fallbackRect, className, alt = '', testId,
+  src,
+  x,
+  y,
+  width,
+  height,
+  level,
+  rowOver,
+  imagePlaceOf,
+  fallbackRect,
+  className,
+  alt = '',
+  testId,
 }: BallPatternTranslucentImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isComposed, setComposed] = useState(false)
@@ -413,16 +477,30 @@ export function BallPatternTranslucentImage({
   const place: CSSProperties = { left: x, top: y, width, height }
   return (
     <>
-      <canvas ref={canvasRef} className={className} width={width} height={height} aria-hidden
+      <canvas
+        ref={canvasRef}
+        className={className}
+        width={width}
+        height={height}
+        aria-hidden
         style={{ ...place, visibility: isComposed ? 'visible' : 'hidden' }}
-        {...(isComposed && testId !== undefined ? { 'data-testid': testId } : {})} data-effect-level={level} data-composed={isComposed} />
+        {...(isComposed && testId !== undefined ? { 'data-testid': testId } : {})}
+        data-effect-level={level}
+        data-composed={isComposed}
+      />
       {!isComposed && (
-        <img className={className} alt={alt} src={src} data-testid={testId} style={{
-          ...(fallbackRect === undefined
-            ? place
-            : { left: fallbackRect.x, top: fallbackRect.y, width: fallbackRect.width, height: fallbackRect.height }),
-          opacity: translucentOpacityOf(level),
-        }} />
+        <img
+          className={className}
+          alt={alt}
+          src={src}
+          data-testid={testId}
+          style={{
+            ...(fallbackRect === undefined
+              ? place
+              : { left: fallbackRect.x, top: fallbackRect.y, width: fallbackRect.width, height: fallbackRect.height }),
+            opacity: translucentOpacityOf(level),
+          }}
+        />
       )}
     </>
   )

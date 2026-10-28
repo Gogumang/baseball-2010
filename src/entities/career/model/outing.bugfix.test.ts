@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
-import {
-  actedAfterOutingMapCancel,
-  outingBlockReasonOf,
-  performOuting,
-  restBlockReasonOf,
-  runRest,
-} from '@/entities/career/model/outing'
+import { actedAfterOutingMapCancel, outingBlockReasonOf, performOuting, restBlockReasonOf, runRest } from '@/entities/career/model/outing'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'

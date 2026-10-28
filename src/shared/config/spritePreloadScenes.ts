@@ -39,28 +39,23 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: assetUrl('./sprites/game_ui'), frames: [6, 13, 14, 15, 21, 22, 30, 75, 79, 81, 97] },
     {
       folder: assetUrl('./sprites/game_ui/frames'),
-      frames: [
-        0, 1, 2, 4, 5, 7, 8, 9, 10, 16, 20, 21, 22, 36, 37, 40, 46, 47, 48, 49,
-        50, 51, 52, 53, 54, 55, 58, 59, 61, 70, 77, 90, 91,
-      ],
+      frames: [0, 1, 2, 4, 5, 7, 8, 9, 10, 16, 20, 21, 22, 36, 37, 40, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 59, 61, 70, 77, 90, 91],
       json: ['animations.json', 'origins.json'],
     },
     {
       folder: assetUrl('./sprites/img_text/frames'),
       frames: [
-        6, 9, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 54, 55,
-        56, 57, 65, 157, 158, 159, 173, 174, 175, 176, 177, 178, 179, 180, 181, 183, 184, 185, 190, 191,
-        192, 204, 205, 243, 244, 247, 248, 249, 252, 253, 255, 256, 257, 260, 316, 317, 318, 319, 357, 361,
-        399, 400, 401, 403, 404, 405, 406,
+        6, 9, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 54, 55, 56, 57, 65, 157, 158, 159, 173, 174, 175, 176, 177, 178, 179,
+        180, 181, 183, 184, 185, 190, 191, 192, 204, 205, 243, 244, 247, 248, 249, 252, 253, 255, 256, 257, 260, 316, 317, 318, 319, 357, 361, 399,
+        400, 401, 403, 404, 405, 406,
       ],
       json: ['origins.json'],
     },
     {
       folder: assetUrl('./sprites/num'),
       frames: [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-        31, 32, 33, 34, 35, 36, 37, 38, 39, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 80,
-        81, 83, 84, 85, 86, 88, 89, 101,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 37, 38, 39, 60, 61, 62, 63, 64, 65, 66, 67, 68,
+        69, 80, 81, 83, 84, 85, 86, 88, 89, 101,
       ],
     },
     { folder: assetUrl('./sprites/popup/frames'), frames: [2, 4, 5, 6, 8], json: ['origins.json'] },
@@ -100,8 +95,8 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     {
       folder: assetUrl('./sprites/img_text/frames'),
       frames: [
-        37, 38, 39, 40, 41, 42, 43, 44, 47, 48, 49, 50, 51, 52, 55, 56, 65, 157, 158, 159,
-        177, 180, 185, 190, 191, 192, 316, 317, 318, 319, 357, 399, 400, 401, 403, 404, 405, 406,
+        37, 38, 39, 40, 41, 42, 43, 44, 47, 48, 49, 50, 51, 52, 55, 56, 65, 157, 158, 159, 177, 180, 185, 190, 191, 192, 316, 317, 318, 319, 357, 399,
+        400, 401, 403, 404, 405, 406,
       ],
       json: ['origins.json'],
     },
@@ -150,9 +145,7 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: assetUrl('./sprites/num'), frames: [22, 23, 24, 25, 26, 27, 28, 29, 32, 61, 62, 63, 64, 67, 68, 69] },
     {
       folder: assetUrl('./sprites/pitcher/frames'),
-      frames: [
-        3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 25, 26, 27, 28, 30, 31,
-      ],
+      frames: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 25, 26, 27, 28, 30, 31],
       json: ['origins.json'],
     },
     { folder: assetUrl('./sprites/player_effect/frames'), frames: [38, 39, 40, 41], json: ['animations.json', 'origins.json'] },
@@ -166,61 +159,43 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: assetUrl('./sprites/batter_balancer/frames/index'), frames: [6, 7, 8, 9, 10, 11, 12, 20, 21, 22, 24, 25, 26] },
     {
       folder: assetUrl('./sprites/batter_batter/frames'),
-      frames: [
-        6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25,
-      ],
+      frames: [6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25],
       json: ['origins.json'],
     },
     { folder: assetUrl('./sprites/batter_ghost/frames'), frames: [0, 1, 2, 3], json: ['origins.json'] },
     {
       folder: assetUrl('./sprites/batter_helmet/frames'),
-      frames: [
-        6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25,
-      ],
+      frames: [6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25],
       json: ['origins.json'],
     },
     {
       folder: assetUrl('./sprites/batter_helmet/frames/index'),
-      frames: [
-        6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25,
-      ],
+      frames: [6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25],
     },
     {
       folder: assetUrl('./sprites/batter_shadow/frames'),
-      frames: [
-        6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25,
-      ],
+      frames: [6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25],
       json: ['origins.json'],
     },
     { folder: assetUrl('./sprites/batter_sluger'), frames: [], json: ['palette.json'] },
     {
       folder: assetUrl('./sprites/batter_sluger/frames'),
-      frames: [
-        0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24,
-      ],
+      frames: [0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24],
       json: ['origins.json'],
     },
     {
       folder: assetUrl('./sprites/batter_sluger/frames/index'),
-      frames: [
-        0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24,
-      ],
+      frames: [0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 20, 21, 23, 24],
     },
     { folder: assetUrl('./sprites/defender'), frames: [], json: ['palette.json'] },
     {
       folder: assetUrl('./sprites/defender/frames'),
-      frames: [
-        0, 1, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-        35,
-      ],
+      frames: [0, 1, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35],
       json: ['animations.json', 'origins.json'],
     },
     {
       folder: assetUrl('./sprites/defender/frames/index'),
-      frames: [
-        0, 1, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-        35,
-      ],
+      frames: [0, 1, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35],
     },
     { folder: assetUrl('./sprites/defense'), frames: [0], json: ['palette.json'] },
     // 8 · 10 · 11 = 애니 5 — 수비 결과 판 판정 코드 9 → 표 0xcfe90 의 애니 5 (DOM 판정 글자 0x393b4, `laserPresentation`).
@@ -233,43 +208,36 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: assetUrl('./sprites/game_ui'), frames: [6, 21, 22, 75, 79, 81, 97] },
     {
       folder: assetUrl('./sprites/game_ui/frames'),
-      frames: [
-        1, 2, 4, 5, 7, 9, 10, 20, 22, 36, 37, 46, 47, 48, 49, 50, 51, 52, 53, 54,
-        55, 58, 59, 61, 70, 77,
-      ],
+      frames: [1, 2, 4, 5, 7, 9, 10, 20, 22, 36, 37, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 58, 59, 61, 70, 77],
       json: ['animations.json', 'origins.json'],
     },
     { folder: assetUrl('./sprites/gpoint'), frames: [2, 5, 11] },
     {
       folder: assetUrl('./sprites/img_text/frames'),
-      frames: [
-        49, 54, 55, 56, 57, 157, 158, 173, 174, 175, 176, 177, 178, 179, 180, 181, 183, 184, 255, 316,
-        317, 318, 319, 361,
-      ],
+      frames: [49, 54, 55, 56, 57, 157, 158, 173, 174, 175, 176, 177, 178, 179, 180, 181, 183, 184, 255, 316, 317, 318, 319, 361],
       json: ['origins.json'],
     },
     {
       folder: assetUrl('./sprites/num'),
-      frames: [
-        2, 3, 4, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 37, 38,
-        39, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-      ],
+      frames: [2, 3, 4, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 37, 38, 39, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69],
     },
     {
       folder: assetUrl('./sprites/pitcher/frames'),
-      frames: [
-        3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 25, 26, 27, 28, 30, 31,
-      ],
+      frames: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 25, 26, 27, 28, 30, 31],
       json: ['origins.json'],
     },
-    { folder: assetUrl('./sprites/player_effect/frames'), frames: [15, 16, 17, 18, 19, 20, 38, 39, 40, 41, 50], json: ['animations.json', 'origins.json'] },
+    {
+      folder: assetUrl('./sprites/player_effect/frames'),
+      frames: [15, 16, 17, 18, 19, 20, 38, 39, 40, 41, 50],
+      json: ['animations.json', 'origins.json'],
+    },
     { folder: assetUrl('./sprites/sky_effect_light/frames'), frames: [9, 10], json: ['origins.json'] },
     { folder: assetUrl('./sprites/slt_pitch'), frames: [22, 24, 26, 33] },
     {
       folder: assetUrl('./sprites/slt_pitch/frames'),
       frames: [
-        0, 1, 6, 7, 8, 12, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36,
-        37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 73,
+        0, 1, 6, 7, 8, 12, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+        73,
       ],
       json: ['animations.json', 'boxes.json', 'origins.json'],
     },
@@ -298,10 +266,7 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: assetUrl('./sprites/batter_balancer'), frames: [], json: ['palette.json'] },
     {
       folder: assetUrl('./sprites/batter_balancer/frames'),
-      frames: [
-        0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 20, 21, 22, 24, 25,
-        26,
-      ],
+      frames: [0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 20, 21, 22, 24, 25, 26],
       json: ['origins.json'],
     },
     { folder: assetUrl('./sprites/batter_balancer/frames/index'), frames: [6, 7, 8, 9, 10, 11, 12, 20, 21, 22, 24, 25, 26] },
@@ -319,25 +284,17 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
     { folder: assetUrl('./sprites/gpoint'), frames: [1, 9, 10, 11] },
     {
       folder: assetUrl('./sprites/img_text/frames'),
-      frames: [
-        49, 55, 57, 157, 158, 176, 180, 243, 244, 247, 248, 249, 252, 253, 256, 257, 260, 316, 317, 318,
-        319,
-      ],
+      frames: [49, 55, 57, 157, 158, 176, 180, 243, 244, 247, 248, 249, 252, 253, 256, 257, 260, 316, 317, 318, 319],
       json: ['origins.json'],
     },
     { folder: assetUrl('./sprites/loadingbar/frames'), frames: [0, 1, 2, 3, 4], json: ['animations.json', 'origins.json'] },
     {
       folder: assetUrl('./sprites/num'),
-      frames: [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 21, 23, 25, 26, 27, 28, 29, 38, 61,
-        64, 65, 66, 67, 68, 80, 81, 83, 84, 85, 86, 88, 89, 101,
-      ],
+      frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 21, 23, 25, 26, 27, 28, 29, 38, 61, 64, 65, 66, 67, 68, 80, 81, 83, 84, 85, 86, 88, 89, 101],
     },
     {
       folder: assetUrl('./sprites/pitcher/frames'),
-      frames: [
-        0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 22, 25, 26, 27, 28, 30, 31,
-      ],
+      frames: [0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 22, 25, 26, 27, 28, 30, 31],
       json: ['origins.json'],
     },
     { folder: assetUrl('./sprites/player_effect/frames'), frames: [38, 39, 40, 41], json: ['animations.json', 'origins.json'] },
@@ -366,9 +323,25 @@ export const SPRITE_PRELOAD_SCENES: Readonly<Record<SpriteSceneKey, readonly Spr
       folder: assetUrl('./sprites/management'),
       frames: [],
       names: [
-        'command_label_89', 'command_label_90', 'command_label_91', 'command_label_92', 'command_label_93', 'command_label_94',
-        'icon_selected_0', 'icon_selected_1', 'icon_selected_2', 'icon_selected_3', 'icon_selected_4', 'icon_selected_5',
-        'label_navy_136', 'label_navy_215', 'label_navy_216', 'label_navy_234', 'label_navy_235', 'label_yellow_334', 'label_yellow_335',
+        'command_label_89',
+        'command_label_90',
+        'command_label_91',
+        'command_label_92',
+        'command_label_93',
+        'command_label_94',
+        'icon_selected_0',
+        'icon_selected_1',
+        'icon_selected_2',
+        'icon_selected_3',
+        'icon_selected_4',
+        'icon_selected_5',
+        'label_navy_136',
+        'label_navy_215',
+        'label_navy_216',
+        'label_navy_234',
+        'label_navy_235',
+        'label_yellow_334',
+        'label_yellow_335',
       ],
     },
     { folder: assetUrl('./sprites/mode_back'), frames: [], json: ['palette.json'] },

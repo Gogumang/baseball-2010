@@ -33,10 +33,7 @@ export interface SoundStepProgress {
  * 공수 교대 징글 13(0x4f7ac)은 **판이 서서 OK 를 기다릴 때만** 틱 2 에 난다 — 반 이닝이 바뀔 때마다가
  * 아니다(자동진행 중계 0x21 로 빠지면 안 난다). 그래서 판을 띄우는 `TeamGameScreen` 이 낸다.
  */
-export function stepSoundIdsOf(
-  before: SoundStepProgress,
-  after: SoundStepProgress,
-): readonly number[] {
+export function stepSoundIdsOf(before: SoundStepProgress, after: SoundStepProgress): readonly number[] {
   const ids: number[] = []
 
   const resolution = after.lastBurstResolution
@@ -143,10 +140,7 @@ export interface PinchHitSoundProgress {
  * 만들기 0x76b14 가 0, 바꾸는 곳은 갱신 0x785a8 의 [+0x6c] 갈래뿐인데 +0x6c 에 들어가는 값은 0 · 2 뿐(R10 4절 전수)이고
  * 갈래 2 는 +0x64 −= +0x68(≥ 1) 뒤 ≤ 0 이면 같은 호출 안에서 0 으로 되돌린다(78602~7860c).
  */
-export function pinchHitSoundIdsOf(
-  before: PinchHitSoundProgress,
-  after: PinchHitSoundProgress,
-): readonly number[] {
+export function pinchHitSoundIdsOf(before: PinchHitSoundProgress, after: PinchHitSoundProgress): readonly number[] {
   const cue = after.scenePinchHit
   if (cue === null || cue === before.scenePinchHit) return []
   return cue.by === 'CPU' ? [PITCHER_CHANGE_SOUND] : []
@@ -178,10 +172,7 @@ export interface ScenePitcherChangeSoundProgress {
  *
  * 간이 엔진(0xc1ba4)의 CPU 교체는 연출이 없어 진행기가 `scenePitcherChange` 를 안 바꾼다 — 소리도 없다.
  */
-export function scenePitcherChangeSoundIdsOf(
-  before: ScenePitcherChangeSoundProgress,
-  after: ScenePitcherChangeSoundProgress,
-): readonly number[] {
+export function scenePitcherChangeSoundIdsOf(before: ScenePitcherChangeSoundProgress, after: ScenePitcherChangeSoundProgress): readonly number[] {
   const cue = after.scenePitcherChange
   if (cue === null || cue === before.scenePitcherChange) return []
   return [PITCHER_CHANGE_SOUND]

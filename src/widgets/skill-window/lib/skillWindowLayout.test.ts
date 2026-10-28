@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CELL_FRAME, SKILL_CELL_BOXES, ITEM_CELL_BOXES, moveGridCursor, scrolledTopRowOf, skillCellFrameOf, skillGridRowsOf,
+  CELL_FRAME,
+  SKILL_CELL_BOXES,
+  ITEM_CELL_BOXES,
+  moveGridCursor,
+  scrolledTopRowOf,
+  skillCellFrameOf,
+  skillGridRowsOf,
   skillListOf,
 } from '@/widgets/skill-window/lib/skillWindowLayout'
 
@@ -32,8 +38,13 @@ describe('격자 커서 — 깃발 0x30(같은 줄 안에서 감기) · 굴림 0
 
 describe('칸 그림 — 장착 안 됨 49, 장착이면 0x5f350 비트로 46·47·48', () => {
   it.each([
-    [0, true, CELL_FRAME.파랑], [12, true, CELL_FRAME.파랑], [3, true, CELL_FRAME.주황], [19, true, CELL_FRAME.주황],
-    [6, true, CELL_FRAME.보라], [22, true, CELL_FRAME.보라], [0, false, CELL_FRAME.회색],
+    [0, true, CELL_FRAME.파랑],
+    [12, true, CELL_FRAME.파랑],
+    [3, true, CELL_FRAME.주황],
+    [19, true, CELL_FRAME.주황],
+    [6, true, CELL_FRAME.보라],
+    [22, true, CELL_FRAME.보라],
+    [0, false, CELL_FRAME.회색],
   ])('스킬 %i 장착 %s → %i', (skillId, isEquipped, frame) => {
     expect(skillCellFrameOf(skillId, isEquipped)).toBe(frame)
   })

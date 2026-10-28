@@ -227,23 +227,22 @@ export function stealPlayEngineInputOf(input: StealPlayInput): RunnerPlayEngineI
 
   // ── b297a: 야수 1~4 를 제 루로(위치 · 목표 = 루 좌표) · 커버 = 루 + 1 — 홈은 b23a4 가 포수로 되돌려 표 그대로(머리말) ──
   // b295e vt20(0) — b1144 가 +0xcc 쓰기(b1156)를 건너뛰어 앞 판이 남긴 값을 들고 연다(`DefenseScene.fielderSlack`, r196)
-  const fielders: FielderState[] = withCarriedSlack(
-    createFielders(abilities, input.defenseTeamBonus ?? 0),
-    input.scene?.fielderSlack,
-  ).map((fielder) => {
-    const base = covers.indexOf(fielder.slot)
-    if (base < 0) return fielder
-    return {
-      // 0xbef58 = 0xbee60(위치 +0x20 · 구간 출발 +0x14 = 루 좌표) → vt14(루 좌표) — 판이 열리는 순간 **루 위에 서 있다**.
-      // 목표는 vt14 관문이 열릴 때만 루 좌표다(+0xcc 가 남은 판은 시작 자리 — `placedAt`, r196)
-      ...placedAt(fielder, basePosition(base), base),
-      // b2564 가 커버 1·2·3루 야수에게 AI 루 + 2 · 포수는 고르기 0xb3b38 의 b3e54 가 AI 1(쫓기 — 쥐고 있어 안 움직인다)
-      aiState: fielder.slot === CATCHER_SLOT ? AI_STATE.CHASE : AI_STATE.COVER_HOME + base,
-      // b29d4·b29de: 포수가 공을 쥐고(0xb2710 → 야수+0xe0 = 1) 준비 틱은 0 (vt88(0) → +0xc8 = 0)
-      holdingBall: fielder.slot === CATCHER_SLOT,
-      actionRemainingTicks: 0,
-    }
-  })
+  const fielders: FielderState[] = withCarriedSlack(createFielders(abilities, input.defenseTeamBonus ?? 0), input.scene?.fielderSlack).map(
+    (fielder) => {
+      const base = covers.indexOf(fielder.slot)
+      if (base < 0) return fielder
+      return {
+        // 0xbef58 = 0xbee60(위치 +0x20 · 구간 출발 +0x14 = 루 좌표) → vt14(루 좌표) — 판이 열리는 순간 **루 위에 서 있다**.
+        // 목표는 vt14 관문이 열릴 때만 루 좌표다(+0xcc 가 남은 판은 시작 자리 — `placedAt`, r196)
+        ...placedAt(fielder, basePosition(base), base),
+        // b2564 가 커버 1·2·3루 야수에게 AI 루 + 2 · 포수는 고르기 0xb3b38 의 b3e54 가 AI 1(쫓기 — 쥐고 있어 안 움직인다)
+        aiState: fielder.slot === CATCHER_SLOT ? AI_STATE.CHASE : AI_STATE.COVER_HOME + base,
+        // b29d4·b29de: 포수가 공을 쥐고(0xb2710 → 야수+0xe0 = 1) 준비 틱은 0 (vt88(0) → +0xc8 = 0)
+        holdingBall: fielder.slot === CATCHER_SLOT,
+        actionRemainingTicks: 0,
+      }
+    },
+  )
   const play: PlayView = {
     ...initialPlayView(STEAL_PLAY_KIND),
     coverOfBase: covers,

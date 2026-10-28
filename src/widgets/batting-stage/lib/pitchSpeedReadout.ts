@@ -67,11 +67,7 @@ export function pitchSpeedDigitsOf(speedKmh: number): readonly { readonly image:
  * 그린다 — 상태 0x12 가 아니면 아무것도 안 그린다. `speedKmh` 는 이번 공의 `displaySpeedKmh` 이고, 웹이 그 값을 안 든 공
  * (undefined)이면 판만 그린다.
  */
-export function drawPitchSpeedReadout(
-  context: CanvasRenderingContext2D,
-  phase: StagePhaseSnapshot,
-  speedKmh: number | undefined,
-): void {
+export function drawPitchSpeedReadout(context: CanvasRenderingContext2D, phase: StagePhaseSnapshot, speedKmh: number | undefined): void {
   if (!isPitchSpeedState(phase)) return
   const plate = placedFrame(GAME_UI_FRAMES, PITCH_SPEED_PLATE_FRAME)
   if (plate !== null) {

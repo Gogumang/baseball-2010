@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CHANCE_SLOTS, DETAIL_DESCRIPTION, DETAIL_OK, DETAIL_ROW_Y, SMALL_DESCRIPTION, TAB, TITLE,
-  baseLabelPointOf, centeredLeftOf, detailCellBoxOf, detailCellOutlineOf, detailDownArrowYOf,
-  detailNumberCenterOf, detailUpArrowYOf, isSettingsBlinkOn, listCursorOf, listRowTopOf, OUTLINE_COLOR,
+  CHANCE_SLOTS,
+  DETAIL_DESCRIPTION,
+  DETAIL_OK,
+  DETAIL_ROW_Y,
+  SMALL_DESCRIPTION,
+  TAB,
+  TITLE,
+  baseLabelPointOf,
+  centeredLeftOf,
+  detailCellBoxOf,
+  detailCellOutlineOf,
+  detailDownArrowYOf,
+  detailNumberCenterOf,
+  detailUpArrowYOf,
+  isSettingsBlinkOn,
+  listCursorOf,
+  listRowTopOf,
+  OUTLINE_COLOR,
 } from '@/pages/match-settings/lib/matchSettingsLayout'
 
 /** 그리기 0x6042c 를 그 함수만 돌려 받아 적은 인자와 맞춘다 (matchSettingsLayout 머리말) */
@@ -33,15 +48,15 @@ describe('종류 · 찬스 · 이닝 (판 24, 80, 192, 160)', () => {
   it('설명 칸 (29, 195, 182, 40) · 글 (24, 202, 폭 192) — 상세는 (29, 199) · (34, 206, 폭 172)', () => {
     expect(SMALL_DESCRIPTION.box).toEqual({ x: 29, y: 195, width: 182, height: 40 })
     expect([SMALL_DESCRIPTION.text.x, SMALL_DESCRIPTION.text.y, SMALL_DESCRIPTION.text.width]).toEqual([24, 202, 192])
-    expect([DETAIL_DESCRIPTION.box.y, DETAIL_DESCRIPTION.text.x, DETAIL_DESCRIPTION.text.y, DETAIL_DESCRIPTION.text.width])
-      .toEqual([199, 34, 206, 172])
+    expect([DETAIL_DESCRIPTION.box.y, DETAIL_DESCRIPTION.text.x, DETAIL_DESCRIPTION.text.y, DETAIL_DESCRIPTION.text.width]).toEqual([
+      199, 34, 206, 172,
+    ])
   })
 })
 
 describe('상세 (판 24, 54, 192, 212)', () => {
   it('화살 ▲ (114, 42 / 44) · ▼ (114, 270 / 268) — 깜빡이면 2px 바깥으로', () => {
-    expect([detailUpArrowYOf(2), detailUpArrowYOf(0), detailDownArrowYOf(2), detailDownArrowYOf(0)])
-      .toEqual([42, 44, 270, 268])
+    expect([detailUpArrowYOf(2), detailUpArrowYOf(0), detailDownArrowYOf(2), detailDownArrowYOf(0)]).toEqual([42, 44, 270, 268])
   })
 
   it('줄 Y 88 · 127 · 147 · 187 — 9칸 줄은 (29 + 20i, Y + 11), 3칸 줄은 (107 + 34i, Y − 6)', () => {

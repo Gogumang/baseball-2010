@@ -34,15 +34,7 @@ afterEach(() => {
 })
 
 const 띄우기 = () =>
-  render(
-    <HomeRunDerbyScreen
-      ability={ROOKIE_BATTER_ABILITY}
-      random={createSeededRandom(1)}
-      bestDistance={320}
-      gamePoint={1_000}
-      onExit={vi.fn()}
-    />,
-  )
+  render(<HomeRunDerbyScreen ability={ROOKIE_BATTER_ABILITY} random={createSeededRandom(1)} bestDistance={320} gamePoint={1_000} onExit={vi.fn()} />)
 
 describe('홈런더비 화면', () => {
   it('첫 그림은 로딩 판 — 팁은 상태 7 진입 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n]', () => {

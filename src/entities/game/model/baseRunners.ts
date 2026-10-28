@@ -29,22 +29,14 @@ export function runnerOnBase(runners: BaseRunners, base: BaseNumber): number | n
 /** 신원이 루 상황과 맞는가 — 찬 루마다 신원이 있고 빈 루에는 없다 */
 export function runnersFitBases(runners: BaseRunners | undefined, bases: BaseState): runners is BaseRunners {
   if (runners === undefined) return false
-  return (
-    (runners.first !== null) === bases.first &&
-    (runners.second !== null) === bases.second &&
-    (runners.third !== null) === bases.third
-  )
+  return (runners.first !== null) === bases.first && (runners.second !== null) === bases.second && (runners.third !== null) === bases.third
 }
 
 /**
  * 신원을 모르는 루(옛 저장 · 신원을 안 고친 길)의 **예전 근사** — 루 b 의 주자를 지금 타순 커서에서 거꾸로 b 번째로 본다.
  * 들고 있는 신원이 루 상황과 맞으면 그것을 쓴다.
  */
-export function effectiveRunnersOf(
-  bases: BaseState,
-  runners: BaseRunners | undefined,
-  orderBack: (ordersBack: number) => number,
-): BaseRunners {
+export function effectiveRunnersOf(bases: BaseState, runners: BaseRunners | undefined, orderBack: (ordersBack: number) => number): BaseRunners {
   if (runnersFitBases(runners, bases)) return runners
   return {
     first: bases.first ? orderBack(1) : null,

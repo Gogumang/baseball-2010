@@ -63,7 +63,11 @@ describe('한국시리즈 우승 보상', () => {
 
     확인()
     expect(onFinish).toHaveBeenCalledWith({
-      popularity: 25, reputation: 30, money: 40, gamePoint: 0, messageId: 197,
+      popularity: 25,
+      reputation: 30,
+      money: 40,
+      gamePoint: 0,
+      messageId: 197,
     })
   })
 
@@ -87,7 +91,11 @@ describe('한국시리즈 우승 보상', () => {
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain('1500만')
     확인()
     expect(onFinish).toHaveBeenCalledWith({
-      popularity: 15, reputation: 15, money: 15, gamePoint: 0, messageId: 198,
+      popularity: 15,
+      reputation: 15,
+      money: 15,
+      gamePoint: 0,
+      messageId: 198,
     })
   })
 
@@ -321,8 +329,15 @@ describe('아직 안 끝난 포스트시즌', () => {
 describe('머리띠·바닥 (0xef — 0x853ac 끝 0x7f4ec)', () => {
   it('시즌모드 제목(그림 22) · 바닥 1 — 되돌아가기가 없다', () => {
     const { container } = render(
-      <SeasonSummaryScreen record={기록()} series={우승시리즈()} postseasonRank={0} leagueFirstAwardedBits={0}
-        entry={null} onLeagueFirstAward={vi.fn()} onFinish={vi.fn()} />,
+      <SeasonSummaryScreen
+        record={기록()}
+        series={우승시리즈()}
+        postseasonRank={0}
+        leagueFirstAwardedBits={0}
+        entry={null}
+        onLeagueFirstAward={vi.fn()}
+        onFinish={vi.fn()}
+      />,
     )
     expect(container.querySelector('img[src*="game_frame/022"]')).not.toBeNull()
     expect(screen.queryByRole('button', { name: '되돌아가기' })).toBeNull()
@@ -330,19 +345,35 @@ describe('머리띠·바닥 (0xef — 0x853ac 끝 0x7f4ec)', () => {
 })
 
 describe('키 0x9dc8 — OK · \'5\' 가 "경기" · "결과"다', () => {
-  it('끝나지 않은 시리즈면 OK 로 다음 경기, 끝난 시리즈면 \'5\' 로 우승 문구 — 문구가 떠 있는 동안 OK 는 팝업 몫이다', () => {
+  it("끝나지 않은 시리즈면 OK 로 다음 경기, 끝난 시리즈면 '5' 로 우승 문구 — 문구가 떠 있는 동안 OK 는 팝업 몫이다", () => {
     const onContinuePostseason = vi.fn()
     const onFinish = vi.fn()
     const { rerender } = render(
-      <SeasonSummaryScreen record={기록()} series={startPostseason([0, 1, 2, 3])} postseasonRank={0} leagueFirstAwardedBits={0}
-        entry={null} onLeagueFirstAward={vi.fn()} onContinuePostseason={onContinuePostseason} onFinish={onFinish} />,
+      <SeasonSummaryScreen
+        record={기록()}
+        series={startPostseason([0, 1, 2, 3])}
+        postseasonRank={0}
+        leagueFirstAwardedBits={0}
+        entry={null}
+        onLeagueFirstAward={vi.fn()}
+        onContinuePostseason={onContinuePostseason}
+        onFinish={onFinish}
+      />,
     )
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(onContinuePostseason).toHaveBeenCalledTimes(1)
 
     rerender(
-      <SeasonSummaryScreen record={기록()} series={우승시리즈()} postseasonRank={0} leagueFirstAwardedBits={0}
-        entry={null} onLeagueFirstAward={vi.fn()} onContinuePostseason={onContinuePostseason} onFinish={onFinish} />,
+      <SeasonSummaryScreen
+        record={기록()}
+        series={우승시리즈()}
+        postseasonRank={0}
+        leagueFirstAwardedBits={0}
+        entry={null}
+        onLeagueFirstAward={vi.fn()}
+        onContinuePostseason={onContinuePostseason}
+        onFinish={onFinish}
+      />,
     )
     fireEvent.keyDown(window, { key: '5' })
     expect(screen.getByRole('dialog', { name: '알림' }).textContent).toContain(TEAMS[0].name)

@@ -1,8 +1,15 @@
 import { ORIGINAL_ITEMS } from '@/shared/config/original/items'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import {
-  BOARD_BONUS_TABLE, STADIUM_HIDDEN_FIRST_SLOT, STADIUM_HIDDEN_UNLOCK_IDS, STADIUM_KINDS, STADIUM_PRICE_TABLE,
-  STADIUM_SLOT_COUNTS, STAND_CAPACITY_TABLE, requiredPopularityOf, stadiumOwnedIndexOf,
+  BOARD_BONUS_TABLE,
+  STADIUM_HIDDEN_FIRST_SLOT,
+  STADIUM_HIDDEN_UNLOCK_IDS,
+  STADIUM_KINDS,
+  STADIUM_PRICE_TABLE,
+  STADIUM_SLOT_COUNTS,
+  STAND_CAPACITY_TABLE,
+  requiredPopularityOf,
+  stadiumOwnedIndexOf,
 } from '@/entities/season-mode/model/stadiumItems'
 import type { StadiumKind } from '@/entities/season-mode/model/stadiumItems'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
@@ -140,11 +147,11 @@ export function stadiumItemDescriptionOf(kind: StadiumKind, slot: number, isHidd
   }
   if (kind === '잔디') return ORIGINAL_ITEMS[GRASS_DESCRIPTION_BASE + slot] ?? ''
   const required = requiredPopularityOf(kind, slot) ?? 0
-  const popularity = required === 0
-    ? ORIGINAL_ITEMS[NO_POPULARITY_LIMIT] ?? ''
-    : (ORIGINAL_ITEMS[POPULARITY_LIMIT_FORMAT] ?? '').replace('%d', String(required))
-  const effect = kind === '관중석'
-    ? `${(STAND_CAPACITY_TABLE[slot] ?? 0) * 1000}명 수용!N가능`
-    : `${ORIGINAL_MODE_TEXT[CROWD_TEXT] ?? ''} +${(BOARD_BONUS_TABLE[slot] ?? 0) * 1000}`
+  const popularity =
+    required === 0 ? (ORIGINAL_ITEMS[NO_POPULARITY_LIMIT] ?? '') : (ORIGINAL_ITEMS[POPULARITY_LIMIT_FORMAT] ?? '').replace('%d', String(required))
+  const effect =
+    kind === '관중석'
+      ? `${(STAND_CAPACITY_TABLE[slot] ?? 0) * 1000}명 수용!N가능`
+      : `${ORIGINAL_MODE_TEXT[CROWD_TEXT] ?? ''} +${(BOARD_BONUS_TABLE[slot] ?? 0) * 1000}`
   return `${popularity}!N${effect}`
 }

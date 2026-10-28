@@ -4,7 +4,8 @@ import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePit
 
 const 공 = { frameCount: 18, type: 'FASTBALL' }
 const 타구: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '파울' },
+  batterHand: 0,
+  resolution: { kind: '파울' },
   hasSwung: true,
   isBunt: false,
   resultCode: 9,
@@ -20,11 +21,7 @@ describe('타석 진동 — 0xbc5(0x5228c) · 사구 0x51b0e', () => {
 
   it('사구는 200ms', () => {
     expect(
-      pitchVibrationMillisecondsOf(
-        { batterHand: 0, resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null },
-        null,
-        공,
-      ),
+      pitchVibrationMillisecondsOf({ batterHand: 0, resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null }, null, 공),
     ).toBe(200)
   })
 
@@ -44,7 +41,8 @@ describe('타석 진동 — 0xbc5(0x5228c) · 사구 0x51b0e', () => {
 
 describe('삼진 진동 — 상태 0x12 첫 그리기 0x4d0d6 (state[0xc] == 5)', () => {
   const 스트라이크 = (isSwinging: boolean): PitchOutcomeDetail => ({
-    batterHand: 0, resolution: { kind: '스트라이크', isSwinging },
+    batterHand: 0,
+    resolution: { kind: '스트라이크', isSwinging },
     hasSwung: isSwinging,
     isBunt: false,
     resultCode: null,

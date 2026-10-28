@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS, NO_ACE, teamGameOptionsOf,
-} from '@/pages/general-mode/lib/generalModeSetup'
+import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS, NO_ACE, teamGameOptionsOf } from '@/pages/general-mode/lib/generalModeSetup'
 import { changePitcher, ourPitcherStats, startTeamGame } from '@/features/play-team-game/model/teamGameFlow'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
@@ -23,7 +21,12 @@ describe('마선수 기본 개방', () => {
 
 describe('teamGameOptionsOf — 마선수 레벨 (전역 mgr[0x13a..0x143])', () => {
   const 준비 = {
-    userTeamId: 0, aiTeamId: 1, playerSide: 0, stadiumId: 0, aceBatterId: NO_ACE, acePitcherId: 1,
+    userTeamId: 0,
+    aiTeamId: 1,
+    playerSide: 0,
+    stadiumId: 0,
+    aceBatterId: NO_ACE,
+    acePitcherId: 1,
   } as const
 
   it('넘긴 레벨 칸을 경기 옵션 aceLevels 로 그대로 싣고, 안 넘기면 칸이 없다', () => {

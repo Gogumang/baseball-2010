@@ -44,8 +44,8 @@ interface ReactOwnerInternals {
 /** 지금 그리는 컴포넌트의 파이버 (개발 빌드 React 18 이 그리는 동안 채운다) — 없으면 null */
 function renderingFiber(): object | null {
   const namespace = React as unknown as Record<string, unknown> & { readonly default?: Record<string, unknown> }
-  const internals = (namespace.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED
-    ?? namespace.default?.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED) as ReactOwnerInternals | undefined
+  const internals = (namespace.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED ??
+    namespace.default?.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED) as ReactOwnerInternals | undefined
   const owner = internals?.ReactCurrentOwner?.current
   return typeof owner === 'object' && owner !== null ? owner : null
 }

@@ -1,12 +1,29 @@
 import {
-  BATTER_BOXES, BATTER_CARD_FRAME, CARD_COLORS, GAME_UI_FOLDER, GAME_UI_FRAMES, IMG_TEXT_FOLDER, IMG_TEXT_FRAMES, LABEL,
-  NUMBER_BASE, NUM_FOLDER, PITCHER_BOXES, PITCHER_CARD_FRAME,
-  batterPositionBadgeOf, battingAverageGlyphsOf, boxNumberGlyphsOf, cardBackgroundOf, cardOriginsAt,
-  earnedRunAverageGlyphsOf, framePlacementOf, pitcherRoleBadgeOf, recentResultChipsOf, roundFillRectsOf, staminaGaugeRectsOf,
+  BATTER_BOXES,
+  BATTER_CARD_FRAME,
+  CARD_COLORS,
+  GAME_UI_FOLDER,
+  GAME_UI_FRAMES,
+  IMG_TEXT_FOLDER,
+  IMG_TEXT_FRAMES,
+  LABEL,
+  NUMBER_BASE,
+  NUM_FOLDER,
+  PITCHER_BOXES,
+  PITCHER_CARD_FRAME,
+  batterPositionBadgeOf,
+  battingAverageGlyphsOf,
+  boxNumberGlyphsOf,
+  cardBackgroundOf,
+  cardOriginsAt,
+  earnedRunAverageGlyphsOf,
+  framePlacementOf,
+  pitcherRoleBadgeOf,
+  recentResultChipsOf,
+  roundFillRectsOf,
+  staminaGaugeRectsOf,
 } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
-import type {
-  CardBox, FillRect, FrameSize, NumberGlyph, Placed, StaminaGauge,
-} from '@/widgets/matchup-cards/lib/matchupCardsLayout'
+import type { CardBox, FillRect, FrameSize, NumberGlyph, Placed, StaminaGauge } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 import type { CSSProperties } from 'react'
 import { useImgTextPalettes } from '@/shared/ui'
 import * as styles from '@/widgets/matchup-cards/ui/MatchupCards.css'
@@ -73,7 +90,10 @@ function Fill({ rect }: { readonly rect: FillRect }) {
           key={index}
           className={styles.fill}
           style={{
-            left: part.x, top: part.y, width: Math.max(0, part.width), height: Math.max(0, part.height),
+            left: part.x,
+            top: part.y,
+            width: Math.max(0, part.width),
+            height: Math.max(0, part.height),
             background: rect.color,
           }}
           data-testid="판칠"
@@ -83,12 +103,21 @@ function Fill({ rect }: { readonly rect: FillRect }) {
   )
 }
 
-function FrameImage(
-  { folder, frame, size, at, testId, style }: {
-    readonly folder: string; readonly frame: number; readonly size: FrameSize; readonly at: Placed; readonly testId: string
-    readonly style?: CSSProperties
-  },
-) {
+function FrameImage({
+  folder,
+  frame,
+  size,
+  at,
+  testId,
+  style,
+}: {
+  readonly folder: string
+  readonly frame: number
+  readonly size: FrameSize
+  readonly at: Placed
+  readonly testId: string
+  readonly style?: CSSProperties
+}) {
   return (
     <img
       className={styles.sprite}
@@ -106,31 +135,50 @@ function FrameImage(
  * `paletteStyle` 은 그 자리의 img_text 팔레트(`useImgTextPalettes().styleOf`) — 박스 1 PLAYER/COM 은 팔레트 4
  * (0x44b26 · 0x451f8), 나머지는 0 이다(0x44bf0 · 0x452c8 에서 0 으로 돌린 뒤 보직 · 수비 글자를 찍는다).
  */
-function Label(
-  { frame, cardBox, anchor, origin, testId, paletteStyle }: {
-    readonly frame: number; readonly cardBox: CardBox; readonly anchor: number; readonly origin: Placed; readonly testId: string
-    readonly paletteStyle?: CSSProperties
-  },
-) {
+function Label({
+  frame,
+  cardBox,
+  anchor,
+  origin,
+  testId,
+  paletteStyle,
+}: {
+  readonly frame: number
+  readonly cardBox: CardBox
+  readonly anchor: number
+  readonly origin: Placed
+  readonly testId: string
+  readonly paletteStyle?: CSSProperties
+}) {
   const size = IMG_TEXT_FRAMES[frame]
   if (size === undefined) return null
   return (
-    <FrameImage folder={IMG_TEXT_FOLDER} frame={frame} size={size} at={framePlacementOf(cardBox, size, anchor, origin)} testId={testId}
-      style={paletteStyle} />
+    <FrameImage
+      folder={IMG_TEXT_FOLDER}
+      frame={frame}
+      size={size}
+      at={framePlacementOf(cardBox, size, anchor, origin)}
+      testId={testId}
+      style={paletteStyle}
+    />
   )
 }
 
 /** game_ui 칸을 박스에 (0xb9e8c, 정렬 0x11) */
-function Chip(
-  { frame, cardBox, origin, testId }: {
-    readonly frame: number; readonly cardBox: CardBox; readonly origin: Placed; readonly testId: string
-  },
-) {
+function Chip({
+  frame,
+  cardBox,
+  origin,
+  testId,
+}: {
+  readonly frame: number
+  readonly cardBox: CardBox
+  readonly origin: Placed
+  readonly testId: string
+}) {
   const size = GAME_UI_FRAMES[frame]
   if (size === undefined) return null
-  return (
-    <FrameImage folder={GAME_UI_FOLDER} frame={frame} size={size} at={framePlacementOf(cardBox, size, 0x11, origin)} testId={testId} />
-  )
+  return <FrameImage folder={GAME_UI_FOLDER} frame={frame} size={size} at={framePlacementOf(cardBox, size, 0x11, origin)} testId={testId} />
 }
 
 function Glyphs({ glyphs, testId }: { readonly glyphs: readonly NumberGlyph[]; readonly testId: string }) {
@@ -156,7 +204,10 @@ function NameText({ name, cardBox, origin }: { readonly name: string; readonly c
     <span
       className={styles.name}
       style={{
-        left: origin.x + cardBox.x, top: origin.y + cardBox.y, width: cardBox.width, height: cardBox.height,
+        left: origin.x + cardBox.x,
+        top: origin.y + cardBox.y,
+        width: cardBox.width,
+        height: cardBox.height,
         color: CARD_COLORS.name,
       }}
       data-testid="이름"
@@ -170,7 +221,9 @@ function NameText({ name, cardBox, origin }: { readonly name: string; readonly c
 function CardBase({ frame, origin }: { readonly frame: number; readonly origin: Placed }) {
   return (
     <>
-      {cardBackgroundOf(origin).map((rect, index) => <Fill key={index} rect={rect} />)}
+      {cardBackgroundOf(origin).map((rect, index) => (
+        <Fill key={index} rect={rect} />
+      ))}
       <FrameImage folder={GAME_UI_FOLDER} frame={frame} size={GAME_UI_FRAMES[frame]} at={origin} testId="판" />
     </>
   )
@@ -193,12 +246,13 @@ export function MatchupCards({ tick, batterHand, side, pitcher, batter }: Matchu
 
   const era = pitcher.earnedRunAverage === undefined ? null : earnedRunAverageGlyphsOf(pitcher.earnedRunAverage, p)
 
-  const positionBadge = batter.position === undefined
-    ? null
-    // 9 보다 크면 앞 판의 칸(0x545e8 이 안 넣었으면 0x44b9c 의 0)과 이 판 박스 1 글자가 남는다 — 앞 판 보직을 모르면 못 그린다
-    : batter.position > 9 && roleBadge === null
+  const positionBadge =
+    batter.position === undefined
       ? null
-      : batterPositionBadgeOf(batter.position, roleBadge?.chip ?? 0, batterLabel)
+      : // 9 보다 크면 앞 판의 칸(0x545e8 이 안 넣었으면 0x44b9c 의 0)과 이 판 박스 1 글자가 남는다 — 앞 판 보직을 모르면 못 그린다
+        batter.position > 9 && roleBadge === null
+        ? null
+        : batterPositionBadgeOf(batter.position, roleBadge?.chip ?? 0, batterLabel)
   const average = batter.battingAverage === undefined ? null : battingAverageGlyphsOf(batter.battingAverage, b)
 
   return (
@@ -207,20 +261,35 @@ export function MatchupCards({ tick, batterHand, side, pitcher, batter }: Matchu
       {/* ── 투수 판 (game_ui 프레임 1) ── */}
       <div data-testid="투수판" data-x={p.x} data-y={p.y}>
         <CardBase frame={PITCHER_CARD_FRAME} origin={p} />
-        <Label frame={pitcherLabel} cardBox={PITCHER_BOXES[1]} anchor={0x11} origin={p} testId="투수팀"
-          paletteStyle={palettes.styleOf(pitcherLabel, 4)} />
+        <Label
+          frame={pitcherLabel}
+          cardBox={PITCHER_BOXES[1]}
+          anchor={0x11}
+          origin={p}
+          testId="투수팀"
+          paletteStyle={palettes.styleOf(pitcherLabel, 4)}
+        />
         {pitcher.name !== undefined && <NameText name={pitcher.name} cardBox={PITCHER_BOXES[3]} origin={p} />}
         {roleBadge !== null && (
           <>
             <Chip frame={roleBadge.chip} cardBox={PITCHER_BOXES[7]} origin={p} testId="보직칸" />
-            <Label frame={roleBadge.label} cardBox={PITCHER_BOXES[7]} anchor={0x22} origin={p} testId="보직"
-              paletteStyle={palettes.styleOf(roleBadge.label, 0)} />
+            <Label
+              frame={roleBadge.label}
+              cardBox={PITCHER_BOXES[7]}
+              anchor={0x22}
+              origin={p}
+              testId="보직"
+              paletteStyle={palettes.styleOf(roleBadge.label, 0)}
+            />
           </>
         )}
         {pitcher.throwsLeft !== undefined && (
           <Label
             frame={pitcher.throwsLeft ? LABEL.leftPitcher : LABEL.rightPitcher}
-            cardBox={PITCHER_BOXES[8]} anchor={0x22} origin={p} testId="투수손"
+            cardBox={PITCHER_BOXES[8]}
+            anchor={0x22}
+            origin={p}
+            testId="투수손"
           />
         )}
         <Label frame={LABEL.earnedRun} cardBox={PITCHER_BOXES[4]} anchor={0x22} origin={p} testId="방어" />
@@ -234,31 +303,38 @@ export function MatchupCards({ tick, batterHand, side, pitcher, batter }: Matchu
         {pitcher.strikeouts !== undefined && (
           <Glyphs glyphs={boxNumberGlyphsOf(pitcher.strikeouts, PITCHER_BOXES[6], p, NUMBER_BASE.stat, 1, 0x24)} testId="탈삼진" />
         )}
-        {pitcher.stamina !== undefined && staminaGaugeRectsOf(pitcher.stamina, p).map((rect, index) => (
-          <Fill key={`stamina-${index}`} rect={rect} />
-        ))}
+        {pitcher.stamina !== undefined && staminaGaugeRectsOf(pitcher.stamina, p).map((rect, index) => <Fill key={`stamina-${index}`} rect={rect} />)}
       </div>
 
       {/* ── 타자 판 (game_ui 프레임 2) ── */}
       <div data-testid="타자판" data-x={b.x} data-y={b.y}>
         <CardBase frame={BATTER_CARD_FRAME} origin={b} />
-        <Label frame={batterLabel} cardBox={BATTER_BOXES[1]} anchor={0x11} origin={b} testId="타자팀"
-          paletteStyle={palettes.styleOf(batterLabel, 4)} />
+        <Label
+          frame={batterLabel}
+          cardBox={BATTER_BOXES[1]}
+          anchor={0x11}
+          origin={b}
+          testId="타자팀"
+          paletteStyle={palettes.styleOf(batterLabel, 4)}
+        />
         {batter.name !== undefined && <NameText name={batter.name} cardBox={BATTER_BOXES[3]} origin={b} />}
         {positionBadge !== null && (
           <>
             {positionBadge.chip >= 0 && <Chip frame={positionBadge.chip} cardBox={BATTER_BOXES[7]} origin={b} testId="수비칸" />}
             {/* 글자만 1px 아래 (0x452e8 `adds r2,#1`) */}
             {positionBadge.label >= 0 && (
-              <Label frame={positionBadge.label} cardBox={BATTER_BOXES[7]} anchor={0x22} origin={{ x: b.x, y: b.y + 1 }} testId="수비"
-                paletteStyle={palettes.styleOf(positionBadge.label, 0)} />
+              <Label
+                frame={positionBadge.label}
+                cardBox={BATTER_BOXES[7]}
+                anchor={0x22}
+                origin={{ x: b.x, y: b.y + 1 }}
+                testId="수비"
+                paletteStyle={palettes.styleOf(positionBadge.label, 0)}
+              />
             )}
           </>
         )}
-        <Label
-          frame={batterHand !== 0 ? LABEL.leftBatter : LABEL.rightBatter}
-          cardBox={BATTER_BOXES[8]} anchor={0x22} origin={b} testId="타자손"
-        />
+        <Label frame={batterHand !== 0 ? LABEL.leftBatter : LABEL.rightBatter} cardBox={BATTER_BOXES[8]} anchor={0x22} origin={b} testId="타자손" />
         <Label frame={LABEL.average} cardBox={BATTER_BOXES[4]} anchor={0x22} origin={b} testId="타율칸" />
         {average !== null && (
           <>
@@ -277,15 +353,19 @@ export function MatchupCards({ tick, batterHand, side, pitcher, batter }: Matchu
         {batter.battingOrder !== undefined && (
           <Glyphs glyphs={boxNumberGlyphsOf(batter.battingOrder + 1, BATTER_BOXES[2], b, NUMBER_BASE.order, 1, 0x2)} testId="타순" />
         )}
-        {batter.recentResults !== undefined && recentResultChipsOf(batter.recentResults, b).map((chip, index) => (
-          <span key={index} data-testid="타석기록" data-label={chip.label}>
-            <FrameImage folder={GAME_UI_FOLDER} frame={chip.frame} size={GAME_UI_FRAMES[chip.frame]} at={chip} testId="기록칸" />
-            <FrameImage
-              folder={IMG_TEXT_FOLDER} frame={chip.label} size={IMG_TEXT_FRAMES[chip.label]}
-              at={{ x: chip.labelX, y: chip.labelY }} testId="기록글자"
-            />
-          </span>
-        ))}
+        {batter.recentResults !== undefined &&
+          recentResultChipsOf(batter.recentResults, b).map((chip, index) => (
+            <span key={index} data-testid="타석기록" data-label={chip.label}>
+              <FrameImage folder={GAME_UI_FOLDER} frame={chip.frame} size={GAME_UI_FRAMES[chip.frame]} at={chip} testId="기록칸" />
+              <FrameImage
+                folder={IMG_TEXT_FOLDER}
+                frame={chip.label}
+                size={IMG_TEXT_FRAMES[chip.label]}
+                at={{ x: chip.labelX, y: chip.labelY }}
+                testId="기록글자"
+              />
+            </span>
+          ))}
       </div>
     </div>
   )

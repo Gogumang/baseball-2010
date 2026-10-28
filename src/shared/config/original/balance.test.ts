@@ -20,8 +20,7 @@ describe('balance.json — 원본 수치표', () => {
 
   it('모든 그룹이 근거(source)를 달고 있다 — 근거 없는 수치를 못 넣게 막는다', () => {
     const groups = Object.entries(balanceJson as Record<string, unknown>).filter(
-      ([key, value]) =>
-        typeof value === 'object' && value !== null && !Array.isArray(value) && key !== 'note',
+      ([key, value]) => typeof value === 'object' && value !== null && !Array.isArray(value) && key !== 'note',
     )
 
     expect(groups.length).toBeGreaterThan(5)

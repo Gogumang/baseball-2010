@@ -50,7 +50,8 @@ function 기록난수(value: (lo: number, hi: number) => number = (lo, hi) => Ma
 }
 
 const 홈런: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '타구', outcome: { kind: '홈런' } },
+  batterHand: 0,
+  resolution: { kind: '타구', outcome: { kind: '홈런' } },
   hasSwung: true,
   isBunt: false,
   resultCode: 24,
@@ -58,9 +59,17 @@ const 홈런: PitchOutcomeDetail = {
   contactSoundId: 5,
 }
 const 볼: PitchOutcomeDetail = { batterHand: 0, resolution: { kind: '볼' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null }
-const 사구: PitchOutcomeDetail = { batterHand: 0, resolution: { kind: '사구' }, hasSwung: false, isBunt: false, resultCode: null, contactSoundId: null }
+const 사구: PitchOutcomeDetail = {
+  batterHand: 0,
+  resolution: { kind: '사구' },
+  hasSwung: false,
+  isBunt: false,
+  resultCode: null,
+  contactSoundId: null,
+}
 const 헛스윙: PitchOutcomeDetail = {
-  batterHand: 0, resolution: { kind: '스트라이크', isSwinging: true },
+  batterHand: 0,
+  resolution: { kind: '스트라이크', isSwinging: true },
   hasSwung: true,
   isBunt: false,
   resultCode: null,
@@ -104,9 +113,7 @@ describe('단계 0 상대 투수 — 0x39fdc 모드 7 갈래 3a454 의 상대 �
   it('나리 타자편 저장이 없으면 r7 = 0 이라 0 이 나오면 9 다 (0x213c0 이 0 으로 세운 버퍼 · 0x20ac4 는 파일이 없으면 안 쓴다)', () => {
     expect(DERBY_NO_BATTER_SAVE_TEAM_ID).toBe(0)
     expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 0 : lo)).random).opponentTeamId).toBe(9)
-    expect(
-      rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 0 : lo)).random, DERBY_NO_BATTER_SAVE_TEAM_ID).opponentTeamId,
-    ).toBe(9)
+    expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 0 : lo)).random, DERBY_NO_BATTER_SAVE_TEAM_ID).opponentTeamId).toBe(9)
     expect(rollDerbySceneStart(기록난수((lo, hi) => (lo === 0 && hi === 9 ? 0 : lo)).random, 3).opponentTeamId).toBe(0)
   })
 

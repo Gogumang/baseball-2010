@@ -107,10 +107,9 @@ describe('관리 화면 알림 상자', () => {
     clickCommand('트레이닝')
     clickCommand('필살타법')
 
-    expect(
-      screen.queryByRole('dialog', { name: '알림' })?.textContent ?? '(창 없음)',
-      '필살타법에 StrMODE[85] 질문이 붙었다',
-    ).not.toContain('하시겠습니까')
+    expect(screen.queryByRole('dialog', { name: '알림' })?.textContent ?? '(창 없음)', '필살타법에 StrMODE[85] 질문이 붙었다').not.toContain(
+      '하시겠습니까',
+    )
   })
 
   it('필살타법 칸은 레벨 검사 없이 배우기 창(상태 0x6c)을 연다 — 연출로 곧장 넘어가지 않는다 (0x12e02)', () => {
@@ -252,10 +251,14 @@ describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 �
   const 칭호창 = () => screen.queryByRole('dialog', { name: '칭호' })
 
   it("기본정보 카드에서 '*' 를 누르면 칭호 목록이 열린다", () => {
-    render(<ManagementScreen {...propsWith({
-      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인', '안타제조기'] },
-      onEquipTitle: vi.fn(),
-    })} />)
+    render(
+      <ManagementScreen
+        {...propsWith({
+          career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인', '안타제조기'] },
+          onEquipTitle: vi.fn(),
+        })}
+      />,
+    )
     기본정보열기()
 
     fireEvent.keyDown(window, { key: '*' })
@@ -273,11 +276,15 @@ describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 �
 
   it('목록은 얻은 순서가 아니라 번호 오름차순이고, 고르면 장착을 알린다 (0x104cc·0x11f78)', () => {
     const onEquipTitle = vi.fn()
-    render(<ManagementScreen {...propsWith({
-      // 나중에 얻은 "이름 없는 신인"(0번)이 앞에 와야 한다
-      career: { ...createCareer('테스터'), titleIds: ['안타제조기', '이름 없는 신인'], equippedTitle: 35 },
-      onEquipTitle,
-    })} />)
+    render(
+      <ManagementScreen
+        {...propsWith({
+          // 나중에 얻은 "이름 없는 신인"(0번)이 앞에 와야 한다
+          career: { ...createCareer('테스터'), titleIds: ['안타제조기', '이름 없는 신인'], equippedTitle: 35 },
+          onEquipTitle,
+        })}
+      />,
+    )
     기본정보열기()
     fireEvent.keyDown(window, { key: '*' })
 
@@ -292,10 +299,14 @@ describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 �
 
   it('이미 장착한 줄을 고르면 아무 일도 없다 (0x11fd6 의 `!=` 검사)', () => {
     const onEquipTitle = vi.fn()
-    render(<ManagementScreen {...propsWith({
-      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'], equippedTitle: 0 },
-      onEquipTitle,
-    })} />)
+    render(
+      <ManagementScreen
+        {...propsWith({
+          career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'], equippedTitle: 0 },
+          onEquipTitle,
+        })}
+      />,
+    )
     기본정보열기()
     fireEvent.keyDown(window, { key: '*' })
 
@@ -305,10 +316,14 @@ describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 �
   })
 
   it("칭호 목록에서 '*' 를 다시 누르면 기본정보 카드로 돌아간다 (129 → 119)", () => {
-    const { container } = render(<ManagementScreen {...propsWith({
-      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] },
-      onEquipTitle: vi.fn(),
-    })} />)
+    const { container } = render(
+      <ManagementScreen
+        {...propsWith({
+          career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] },
+          onEquipTitle: vi.fn(),
+        })}
+      />,
+    )
     기본정보열기()
     fireEvent.keyDown(window, { key: '*' })
 
@@ -319,10 +334,14 @@ describe('칭호(닉네임) 목록 — 기본정보 카드에서 여는 하위 �
   })
 
   it("칭호 목록(129)이 떠 있으면 바닥 '0 상세정보' 칸을 걷는다 — 129 키 0x11f78 이 '0' 을 목록에 넘기고 목록이 버린다 (r212)", () => {
-    render(<ManagementScreen {...propsWith({
-      career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] },
-      onEquipTitle: vi.fn(),
-    })} />)
+    render(
+      <ManagementScreen
+        {...propsWith({
+          career: { ...createCareer('테스터'), titleIds: ['이름 없는 신인'] },
+          onEquipTitle: vi.fn(),
+        })}
+      />,
+    )
     기본정보열기()
     expect(screen.queryByRole('button', { name: '0 상세정보' })).not.toBeNull()
 
@@ -373,7 +392,7 @@ describe('기본정보 카드 바닥 (0x166cc)', () => {
   })
 })
 
-describe('능력치 상세 창 — 기본정보(119)에서 \'0\' → 120 (키 0x1056c · 0x1b654)', () => {
+describe("능력치 상세 창 — 기본정보(119)에서 '0' → 120 (키 0x1056c · 0x1b654)", () => {
   const 기본정보열기 = () => {
     fireEvent.click(screen.getByRole('button', { name: '선수정보' }))
     fireEvent.click(screen.getByRole('button', { name: '기본정보' }))
@@ -549,7 +568,10 @@ describe('106 칸 4 [기록실] — 팝업 0x80 → 124 (0x116d4 · 0x1463c · 0
       render(<ManagementScreen {...propsWith({})} />)
       clickCommand('선수정보')
       clickCommand('기록실')
-      const 틀 = (n = 1) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+      const 틀 = (n = 1) =>
+        act(() => {
+          vi.advanceTimersByTime(millisecondsPerFrame() * n)
+        })
       틀(6)
       fireEvent.keyDown(window, { key: 'Enter' })
       // 키를 받은 그림은 아직 106
@@ -620,16 +642,21 @@ describe('127 휴식 연출 (0x190e4 → 0x85230 · 키 0x10650 · 틀 0x19080 �
     function Harness() {
       const [held, setHeld] = useState<{ career: typeof career; detail: ManagementScreenProps['detail'] }>({ career, detail: null })
       return (
-        <ManagementScreen {...propsWith({
-          career: held.career,
-          detail: held.detail,
-          onSelect: () => setHeld({ career: acted, detail: { before: acted, after: acted, messages: ['사기 1 상승하였습니다'] } }),
-          onCloseDetail: () => setHeld((current) => ({ ...current, detail: null })),
-        })} />
+        <ManagementScreen
+          {...propsWith({
+            career: held.career,
+            detail: held.detail,
+            onSelect: () => setHeld({ career: acted, detail: { before: acted, after: acted, messages: ['사기 1 상승하였습니다'] } }),
+            onCloseDetail: () => setHeld((current) => ({ ...current, detail: null })),
+          })}
+        />
       )
     }
     render(<Harness />)
-    const 틀 = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+    const 틀 = (n: number) =>
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * n)
+      })
     const 칸위 = (name: string) => (screen.getByRole('button', { name }) as HTMLElement).style.top
     const current = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-current')
 
@@ -660,7 +687,7 @@ describe('125 훈련 연출 · 결과 창 (진입 0x11744 · 키 0x105a4 · 틀 
     fireEvent.click(screen.getByRole('button', { name: '예' }))
   }
 
-  it('확인 · \'5\' 는 게이지를 끝으로 보내 곧바로 훈련을 굴린다 — 취소 키는 없다', () => {
+  it("확인 · '5' 는 게이지를 끝으로 보내 곧바로 훈련을 굴린다 — 취소 키는 없다", () => {
     const onTraining = vi.fn()
     render(<ManagementScreen {...propsWith({ onTraining })} />)
     startHit()
@@ -690,8 +717,7 @@ describe('125 훈련 연출 · 결과 창 (진입 0x11744 · 키 0x105a4 · 틀 
     // 세션처럼 — 훈련을 굴린 그 갱신에 결과 창을 세운다(0x17f5c)
     function Harness() {
       const [detail, setDetail] = useState<typeof result | null>(null)
-      return <ManagementScreen {...propsWith({ career, detail, onTraining: () => setDetail(result),
-        onCloseDetail: () => setDetail(null) })} />
+      return <ManagementScreen {...propsWith({ career, detail, onTraining: () => setDetail(result), onCloseDetail: () => setDetail(null) })} />
     }
     render(<Harness />)
     startHit()
@@ -712,8 +738,9 @@ describe('125 훈련 연출 · 결과 창 (진입 0x11744 · 키 0x105a4 · 틀 
   it('결과가 알림 창이면(칸 4 갈래 0x18bd8 → 0xbbef8) 그 창이 닫힐 때까지 125 다 — 틀 0x18dd8 이 105 로', () => {
     function Harness() {
       const [notice, setNotice] = useState('')
-      return <ManagementScreen {...propsWith({ noticeText: notice, onTraining: () => setNotice('훈련 완료'),
-        onDismissNotice: () => setNotice('') })} />
+      return (
+        <ManagementScreen {...propsWith({ noticeText: notice, onTraining: () => setNotice('훈련 완료'), onDismissNotice: () => setNotice('') })} />
+      )
     }
     render(<Harness />)
     startHit()
@@ -731,7 +758,7 @@ describe('125 훈련 연출 · 결과 창 (진입 0x11744 · 키 0x105a4 · 틀 
 describe('관리 메뉴 이동 — 메뉴 객체 0x6c219(vtable 0xd2ea0) · 숫자키 꼴 1 · 이동 vt+8 0x6c445', () => {
   const current = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-current')
 
-  it("행동함이면 흑백 칸(트레이닝 · 휴식 · 외출)을 건너뛰고, 눌러도 고르지 않는다", () => {
+  it('행동함이면 흑백 칸(트레이닝 · 휴식 · 외출)을 건너뛰고, 눌러도 고르지 않는다', () => {
     const career = { ...createCareer('테스터'), season: 2, hasActedThisCycle: true }
     const onSelect = vi.fn()
     render(<ManagementScreen {...propsWith({ career, onSelect })} />)
@@ -776,7 +803,10 @@ describe('관리 메뉴 이동 — 메뉴 객체 0x6c219(vtable 0xd2ea0) · 숫�
   it('칸이 펼쳐지는 동안(그린 갱신 수 < 7)은 키 · 취소 · 누름을 버린다 — 105 [gfx+0x99] · 하위 메뉴 [+0x9a] (0x1261c · 0x13010 머리, A-50)', () => {
     const onExit = vi.fn()
     render(<ManagementScreen {...propsWith({ career: { ...createCareer('테스터'), season: 2 }, onExit })} />)
-    const 틀 = (n: number) => act(() => { vi.advanceTimersByTime(millisecondsPerFrame() * n) })
+    const 틀 = (n: number) =>
+      act(() => {
+        vi.advanceTimersByTime(millisecondsPerFrame() * n)
+      })
     const 누름 = (key: string) => rawFireEvent.keyDown(window, { key })
 
     누름('6')
@@ -804,7 +834,7 @@ describe('관리 메뉴 이동 — 메뉴 객체 0x6c219(vtable 0xd2ea0) · 숫�
     expect(current('파워')).toBe('true')
   })
 
-  it('119 기본정보 카드가 떠 있으면 106 커맨드 줄은 키를 안 받는다 — 119 키 0x1056c 는 취소 · \'*\' · \'0\' 뿐', () => {
+  it("119 기본정보 카드가 떠 있으면 106 커맨드 줄은 키를 안 받는다 — 119 키 0x1056c 는 취소 · '*' · '0' 뿐", () => {
     const onOpenPlayerInfo = vi.fn()
     render(<ManagementScreen {...propsWith({ onOpenPlayerInfo })} />)
     clickCommand('선수정보')

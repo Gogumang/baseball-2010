@@ -14,8 +14,7 @@ const running = (index: number, from: number, to: number): RunnerState => {
     position: { x: Math.trunc((a.x + b.x) / 2), y: 0, z: Math.trunc((a.z + b.z) / 2) },
   }
 }
-const labelsOf = (runners: readonly RunnerState[], homeRunFlag = false) =>
-  offenseOffersFor({ runners, homeRunFlag }).map((offer) => offer.label)
+const labelsOf = (runners: readonly RunnerState[], homeRunFlag = false) => offenseOffersFor({ runners, homeRunFlag }).map((offer) => offer.label)
 
 describe('수비 인플레이 터치 상황 버튼 — 원본 키 표 그대로', () => {
   it('수비: 1루 · 2루 · 3루 · 홈 송구', () => {
@@ -55,9 +54,7 @@ describe('공격 쪽은 그 순간 먹는 키만 (0xa9b04 — 주자 +0x8c · �
   })
 
   it('1루 주자가 2루로 달리면 1루주자 진루 · 귀루와 전원 진루 · 귀루 — 빈 루 키는 없다', () => {
-    expect(labelsOf([running(0, 0, 1), running(1, 1, 2)])).toEqual([
-      '1루주자 진루', '전원 진루', '슬라이딩', '1루주자 귀루', '전원 귀루',
-    ])
+    expect(labelsOf([running(0, 0, 1), running(1, 1, 2)])).toEqual(['1루주자 진루', '전원 진루', '슬라이딩', '1루주자 귀루', '전원 귀루'])
   })
 
   it('1루로 가는 주자(+0x7c ≤ 1)는 못 되돌린다 — 귀루 버튼이 없다', () => {

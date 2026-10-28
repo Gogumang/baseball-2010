@@ -11,7 +11,12 @@ afterEach(() => setActiveEditedNames(EMPTY_EDITED_NAMES))
 
 const memoryStore = (initial: unknown = null) => {
   let value = initial
-  const store: JsonStorePort = { load: () => value, save: (next) => { value = next } }
+  const store: JsonStorePort = {
+    load: () => value,
+    save: (next) => {
+      value = next
+    },
+  }
   return { store, read: () => value }
 }
 

@@ -10,9 +10,10 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const tick = (count = 1) => act(() => {
-  vi.advanceTimersByTime(millisecondsPerFrame() * count)
-})
+const tick = (count = 1) =>
+  act(() => {
+    vi.advanceTimersByTime(millisecondsPerFrame() * count)
+  })
 
 interface Props {
   readonly isPlayShown: boolean

@@ -5,13 +5,7 @@ import {
   type FireworksParticlePort,
   type HomeRunFireworks,
 } from '@/entities/batting/model/homeRunFireworks'
-import {
-  blockStateOf,
-  clearParticles,
-  emitParticles,
-  tickParticles,
-  type ParticleScene,
-} from '@/entities/particle/model/particleScene'
+import { blockStateOf, clearParticles, emitParticles, tickParticles, type ParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleConfig } from '@/entities/particle/model/particleEmitter'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { homeRunTextAfterDraws, type HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
@@ -75,10 +69,7 @@ export interface StageParticleShot {
 }
 
 /** 효과 객체가 파티클 장면에 닿는 자리 — 이미터 자리는 블록 번호다 (`emitParticles` · `blockStateOf`) */
-export function fireworksPortOf(
-  particles: ParticleScene,
-  configOf: (id: number) => ParticleConfig | null,
-): FireworksParticlePort<number> {
+export function fireworksPortOf(particles: ParticleScene, configOf: (id: number) => ParticleConfig | null): FireworksParticlePort<number> {
   return {
     emit: (id, x, y, image) => emitParticles(particles, configOf(id), x, y, image),
     isFinished: (block) => blockStateOf(particles, block) === 3,

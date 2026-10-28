@@ -3,7 +3,11 @@ import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import { tableRosterOf } from '@/entities/season-mode/model/seasonEntry'
 import { PLAYER_OWN_BIT } from '@/entities/season-mode/model/playerRecruit'
 import {
-  ACE_BATTER_RECORD_GRADES, TRADE_REQUEST_TAB, playerGradeOf, rollTradeRequest, tradeRecordRowsOf,
+  ACE_BATTER_RECORD_GRADES,
+  TRADE_REQUEST_TAB,
+  playerGradeOf,
+  rollTradeRequest,
+  tradeRecordRowsOf,
 } from '@/entities/season-mode/model/tradeRequest'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -69,7 +73,11 @@ describe('요청이 서면', () => {
     const { request, record } = rollTradeRequest(random, 레코드(), 명단())
 
     expect(request).toEqual({
-      isRequested: true, myIndex: 큰칸, opponentIndex: 0, tab: TRADE_REQUEST_TAB.타자, opponentTeamId: 상대팀,
+      isRequested: true,
+      myIndex: 큰칸,
+      opponentIndex: 0,
+      tab: TRADE_REQUEST_TAB.타자,
+      opponentTeamId: 상대팀,
     })
     expect(record.tradeRequestCount).toBe(1)
     expect(random.used()).toBe(7)
@@ -81,7 +89,10 @@ describe('요청이 서면', () => {
     const 나리명단 = { ...roster, batters: roster.batters.map((player, index) => (index === 큰칸 ? 나리 : player)) }
     const 다른큰칸 = teamBatters(MY_TEAM).findIndex((player, index) => index !== 큰칸 && player.grade >= 상대값)
     const random = 차례난수([
-      [0, 0, 10000], [상대팀, 0, 10], [TRADE_REQUEST_TAB.타자, 0, 2], [0, 0, 12],
+      [0, 0, 10000],
+      [상대팀, 0, 10],
+      [TRADE_REQUEST_TAB.타자, 0, 2],
+      [0, 0, 12],
       [큰칸, 0, 12],
       [다른큰칸, 0, 12],
     ])
@@ -101,13 +112,18 @@ describe('못 찾으면 요청이 사라진다 — 타자 13번 · 투수 9번 (
     const myGrades = table.slice(0, range).map((player) => player.grade)
     const 내최소칸 = myGrades.indexOf(Math.min(...myGrades))
     const opponentTable = tab === TRADE_REQUEST_TAB.투수 ? teamPitchers(상대팀) : teamBatters(상대팀)
-    const 상대칸 = opponentTable
-      .slice(0, range)
-      .findIndex((player) => player.grade > myGrades[내최소칸])
-    return { 내최소칸, 상대칸, draws: [
-      [0, 0, 10000], [상대팀, 0, 10], [tab, 0, 2], [상대칸, 0, range],
-      ...Array.from({ length: tries }, () => [내최소칸, 0, range] as const),
-    ] as const }
+    const 상대칸 = opponentTable.slice(0, range).findIndex((player) => player.grade > myGrades[내최소칸])
+    return {
+      내최소칸,
+      상대칸,
+      draws: [
+        [0, 0, 10000],
+        [상대팀, 0, 10],
+        [tab, 0, 2],
+        [상대칸, 0, range],
+        ...Array.from({ length: tries }, () => [내최소칸, 0, range] as const),
+      ] as const,
+    }
   }
 
   it('타자 탭은 13번 뽑고 끝 — 횟수는 그래도 +1', () => {
@@ -152,17 +168,21 @@ describe('상대 팀 레코드', () => {
   it('저장의 CPU 명단을 읽는다 — 거기 간 내 옛 선수의 +0x1b 로 견준다', () => {
     const 상대팀 = 3
     // 상대 0번 타자 자리에 0팀 표에서 가장 값이 큰 선수가 가 있다
-    const 큰선수칸 = teamBatters(MY_TEAM).reduce((best, player, index, all) =>
-      (player.grade > all[best]!.grade ? index : best), 0)
+    const 큰선수칸 = teamBatters(MY_TEAM).reduce((best, player, index, all) => (player.grade > all[best]!.grade ? index : best), 0)
     const 상대명단 = tableRosterOf(상대팀)
     const 바뀐상대 = {
       ...상대명단,
-      batters: 상대명단.batters.map((player, index) =>
-        (index === 0 ? { ...player, id: 큰선수칸, tableTeamId: MY_TEAM } : player)),
+      batters: 상대명단.batters.map((player, index) => (index === 0 ? { ...player, id: 큰선수칸, tableTeamId: MY_TEAM } : player)),
     }
     const 내값들 = teamBatters(MY_TEAM).map((player) => player.grade)
     const 넘는칸 = 내값들.findIndex((grade) => grade >= 내값들[큰선수칸]!)
-    const random = 차례난수([[0, 0, 10000], [상대팀, 0, 10], [TRADE_REQUEST_TAB.타자, 0, 2], [0, 0, 12], [넘는칸, 0, 12]])
+    const random = 차례난수([
+      [0, 0, 10000],
+      [상대팀, 0, 10],
+      [TRADE_REQUEST_TAB.타자, 0, 2],
+      [0, 0, 12],
+      [넘는칸, 0, 12],
+    ])
 
     const { request } = rollTradeRequest(random, 레코드(), 명단(), (team) => (team === 상대팀 ? 바뀐상대 : tableRosterOf(team)))
 
@@ -195,7 +215,10 @@ describe('레코드에 남은 마선수 (0xb53f0 0x40 · 0xb521c 0x60 갈래)', 
   it('상대 9번을 뽑으면 마타자(크라이져 50)와 견준다 — 표 9번(7)이면 섰을 내 칸이 모자라 더 뽑는다', () => {
     const 상대팀 = 3
     const draws = [
-      [0, 0, 10000], [상대팀, 0, 10], [TRADE_REQUEST_TAB.타자, 0, 2], [9, 0, 12],
+      [0, 0, 10000],
+      [상대팀, 0, 10],
+      [TRADE_REQUEST_TAB.타자, 0, 2],
+      [9, 0, 12],
       [1, 0, 12], // 내 1번 +0x1b 10 — 표 9번 7 은 넘고 크라이져 50 은 못 넘는다
       [3, 0, 12], // 내 3번 50 — 넘는다
     ] as const
@@ -209,8 +232,7 @@ describe('레코드에 남은 마선수 (0xb53f0 0x40 · 0xb521c 0x60 갈래)', 
     expect(마선수없음.used()).toBe(5)
 
     const random = 차례난수(draws)
-    const { request } = rollTradeRequest(random, 레코드(), 명단(), tableRosterOf,
-      (team) => (team === 상대팀 ? { pitcher: 0, batter: 3 } : undefined))
+    const { request } = rollTradeRequest(random, 레코드(), 명단(), tableRosterOf, (team) => (team === 상대팀 ? { pitcher: 0, batter: 3 } : undefined))
 
     expect(request).toMatchObject({ isRequested: true, myIndex: 3, opponentIndex: 9, tab: TRADE_REQUEST_TAB.타자 })
     expect(random.used()).toBe(6)
@@ -220,10 +242,17 @@ describe('레코드에 남은 마선수 (0xb53f0 0x40 · 0xb521c 0x60 갈래)', 
     const 상대팀 = 3
     expect(teamBatters(상대팀)[0]!.grade).toBe(25)
     expect(teamBatters(MY_TEAM)[9]!.grade).toBe(6)
-    const random = 차례난수([[0, 0, 10000], [상대팀, 0, 10], [TRADE_REQUEST_TAB.타자, 0, 2], [0, 0, 12], [9, 0, 12]])
+    const random = 차례난수([
+      [0, 0, 10000],
+      [상대팀, 0, 10],
+      [TRADE_REQUEST_TAB.타자, 0, 2],
+      [0, 0, 12],
+      [9, 0, 12],
+    ])
 
-    const { request } = rollTradeRequest(random, 레코드(), 명단(), tableRosterOf,
-      (team) => (team === MY_TEAM ? { pitcher: 2, batter: 3 } : undefined))
+    const { request } = rollTradeRequest(random, 레코드(), 명단(), tableRosterOf, (team) =>
+      team === MY_TEAM ? { pitcher: 2, batter: 3 } : undefined,
+    )
 
     expect(request).toMatchObject({ isRequested: true, myIndex: 9, opponentIndex: 0 })
     expect(random.used()).toBe(5)

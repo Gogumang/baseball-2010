@@ -32,11 +32,7 @@ import {
   type StealPlayInput,
   type StealPlayResult,
 } from '@/features/defense-play/model/stealPlay'
-import {
-  runRunnerPlay,
-  type RunnerPlayEngineInput,
-  type RunnerPlayEngineResult,
-} from '@/features/defense-play/model/runnerPlayEngine'
+import { runRunnerPlay, type RunnerPlayEngineInput, type RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import { runWalkPlay, type WalkPlayResult } from '@/features/defense-play/model/walkPlay'
 
 /**
@@ -128,18 +124,12 @@ export function pitchJudgementOf(resolution: PitchResolution, outcomeAfter: AtBa
  * 양끝 파티클(0x393b4 39498)도 없다. 판 종류 9 · 낫아웃 갈래 `'batterRuns'`(`passedBallStrikeoutOf`)가 그 경우다 — 열어 둔 판
  * (`OpenedPitchArrivalPlay`)이든 다 돈 판(`PitchArrivalPlay`)이든 같은 칸을 본다.
  */
-export function clearsPitchJudgement(
-  play: { readonly kind: number; readonly strikeout?: PassedBallStrikeout | 'none' } | null | undefined,
-): boolean {
+export function clearsPitchJudgement(play: { readonly kind: number; readonly strikeout?: PassedBallStrikeout | 'none' } | null | undefined): boolean {
   return play != null && play.kind === PASSED_BALL_PLAY_KIND && play.strikeout === 'batterRuns'
 }
 
 /** 사람 공격의 도루 키 — `canStartSteal` 이 받으면 넣는다. 난수 없음. 못 받으면 같은 배열을 돌려준다 */
-export function startHumanSteal(
-  bases: BaseState,
-  stealingFrom: readonly StealBase[],
-  base: StealBase,
-): readonly StealBase[] {
+export function startHumanSteal(bases: BaseState, stealingFrom: readonly StealBase[], base: StealBase): readonly StealBase[] {
   if (!canStartSteal({ bases, alreadyStealing: stealingFrom }, base)) return stealingFrom
   return [...stealingFrom, base]
 }
@@ -180,11 +170,7 @@ export interface StealStartDefenseInput {
  * - CPU 공격: 상태 0x11 의 10번째 틱 `0x537dc` → 0x583 — `rollCpuStealStart` 바로 뒤, 11번째 틱 CPU 타자 결정 `0x34334` 보다 먼저.
  * 판이 안 열리는 공(2아웃 삼진 · 맞힌 공)도 0xafa60 은 이미 돌았다 — 그 +0x128 = 0 · 던진 야수가 놓은 공이 장면에 남는다.
  */
-export function stealStartSceneOf(
-  input: StealStartDefenseInput,
-  stealingFrom: readonly StealBase[],
-  random: RandomPort,
-): DefenseScene | undefined {
+export function stealStartSceneOf(input: StealStartDefenseInput, stealingFrom: readonly StealBase[], random: RandomPort): DefenseScene | undefined {
   if (stealingFrom.length === 0) return input.scene
   const runAbilities = input.runAbilities
   return stealStartThrowDecision({
@@ -428,8 +414,7 @@ export function openPitchArrivalPlay(arrival: PitchArrivalPlayInput, random: Ran
     stealingFrom: input.stealingFrom,
     // 0x3d7b8 — 도루 안 한 주자의 리드 +3 틱(번트 종류가 서 있으면)
     buntKind: input.buntKind,
-    runAbilities:
-      runAbilities === undefined ? undefined : { 1: runAbilities[1], 2: runAbilities[2], 3: runAbilities[3] },
+    runAbilities: runAbilities === undefined ? undefined : { 1: runAbilities[1], 2: runAbilities[2], 3: runAbilities[3] },
   }
   // 리드 굴림(도루 주자마다 rand(0,9))은 판 시작 — 진행기 입력을 세울 때 돈다
   return { kind: 5, strikeout: 'none', playInput, engineInput: stealPlayEngineInputOf(playInput) }
@@ -486,10 +471,7 @@ export function stealRecordIdsOf(result: Pick<StealPlayResult, 'stolenFrom' | 'c
   })
   return stealPlayRecordIdsOf({
     isRunnerPlay: true,
-    runners: [
-      ...result.caughtFrom.map((from) => runner(from, false)),
-      ...result.stolenFrom.map((from) => runner(from, true)),
-    ],
+    runners: [...result.caughtFrom.map((from) => runner(from, false)), ...result.stolenFrom.map((from) => runner(from, true))],
   })
 }
 

@@ -100,7 +100,12 @@ export const SETTLEMENT_INFO_BAR = {
 
 /** 기본 화면의 이번에 번 G — 0x54a61(skin, 값, W/2 − 0x28, H − 12 − 0x13, 0x46, 0, …) */
 export const SETTLEMENT_INFO_POINT = {
-  x: CENTER_X - 0x28, y: SCREEN_HEIGHT - 12 - 0x13, width: 0x46, align: 2, plus: true, plate: true,
+  x: CENTER_X - 0x28,
+  y: SCREEN_HEIGHT - 12 - 0x13,
+  width: 0x46,
+  align: 2,
+  plus: true,
+  plate: true,
 } as const
 
 /** 대전모드(8·9) — 0x4aa88 `mode − 8 ≤ 1` */
@@ -197,8 +202,20 @@ export function settlementPanelLayoutOf(height: number, recordCount: number, has
   if (hasRewardLine) r7 += 0x14
   const okButton = { frame: 0, width: 41, x: CENTER_X - (41 >> 1), y: r7 }
   return {
-    window, title, recordBox, records, emptyText, pointBox, pointRows, pointLabelX, pointGpX, pointValue,
-    rewardBox, ticker, okButton, hasRecords: recordCount > 0,
+    window,
+    title,
+    recordBox,
+    records,
+    emptyText,
+    pointBox,
+    pointRows,
+    pointLabelX,
+    pointGpX,
+    pointValue,
+    rewardBox,
+    ticker,
+    okButton,
+    hasRecords: recordCount > 0,
   }
 }
 
@@ -262,8 +279,26 @@ export type SettlementKeyAction = '판열기' | '나가기' | '판닫기' | '위
 
 /** 원본 키패드에 있는 키만 본다 (방향·숫자·OK·CLR·'*'·'#') */
 const KEYPAD_KEYS = new Set([
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' ', 'Escape', 'Backspace', '*', '#',
-  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Enter',
+  ' ',
+  'Escape',
+  'Backspace',
+  '*',
+  '#',
+  '0',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
 ])
 
 export function settlementKeyActionOf(key: string, isPanelOpen: boolean): SettlementKeyAction {

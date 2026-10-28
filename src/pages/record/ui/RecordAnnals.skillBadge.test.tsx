@@ -88,5 +88,4 @@ describe('기록연감 탭 2 — 얻은 스킬 그림 두 장 (0x2f3b0~0x2f488)'
     틱(4)
     expect(탭커서()).not.toBeNull()
   })
-
 })

@@ -37,21 +37,24 @@ describe('자산 주소는 모두 assetUrl 을 거친다', () => {
     const { readdirSync, readFileSync, statSync } = await import('node:fs')
     const { join } = await import('node:path')
     const root = new URL('../../../', import.meta.url).pathname
-    const files = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
-      const path = join(dir, name)
-      if (statSync(path).isDirectory()) return files(path)
-      return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !name.endsWith('.css.ts') ? [path] : []
-    })
+    const files = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name)
+        if (statSync(path).isDirectory()) return files(path)
+        return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !name.endsWith('.css.ts') ? [path] : []
+      })
     const leftovers: string[] = []
     for (const path of files(root)) {
       if (path.endsWith('shared/lib/assetUrl/assetUrl.ts')) continue
-      readFileSync(path, 'utf8').split('\n').forEach((line, index) => {
-        if (/^\s*(\*|\/\/|\/\*)/.test(line)) return
-        const bare = line.replace(/assetUrl\((['"`])(\.\/)?(sprites|sounds|font)/g, '')
-        if (/(['"`])\.?\/?(sprites|sounds|font)(['"`/])/.test(bare) && !/includes\('sprites\/'\)/.test(bare)) {
-          leftovers.push(`${path.slice(root.length)}:${index + 1}: ${line.trim()}`)
-        }
-      })
+      readFileSync(path, 'utf8')
+        .split('\n')
+        .forEach((line, index) => {
+          if (/^\s*(\*|\/\/|\/\*)/.test(line)) return
+          const bare = line.replace(/assetUrl\((['"`])(\.\/)?(sprites|sounds|font)/g, '')
+          if (/(['"`])\.?\/?(sprites|sounds|font)(['"`/])/.test(bare) && !/includes\('sprites\/'\)/.test(bare)) {
+            leftovers.push(`${path.slice(root.length)}:${index + 1}: ${line.trim()}`)
+          }
+        })
     }
     expect(leftovers).toEqual([])
   })

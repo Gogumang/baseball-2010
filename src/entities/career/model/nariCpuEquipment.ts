@@ -3,10 +3,7 @@ import { LEAGUE_TEAM_COUNT } from '@/entities/league/model/league'
 import type { LeagueRecordPlayer, LeagueTeamRecord } from '@/entities/league/model/leagueDay'
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
-import {
-  NARI_CPU_EQUIPMENT_YEAR_LIMIT,
-  rollCpuEquipment,
-} from '@/entities/season-mode/model/cpuEquipment'
+import { NARI_CPU_EQUIPMENT_YEAR_LIMIT, rollCpuEquipment } from '@/entities/season-mode/model/cpuEquipment'
 import { MY_RECORD_SLOT, nariTeamRecordOf, withNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecord, NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 

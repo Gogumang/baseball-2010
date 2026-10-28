@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
 import { PLAYER_SIDE_FIRST_BAT, PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
+import { ACE_PHASE, FIRST_BAT_PHASE, GENERAL_MODE_STEP, NO_ACE } from '@/pages/general-mode/lib/generalModeSetup'
 import {
-  ACE_PHASE, FIRST_BAT_PHASE, GENERAL_MODE_STEP, NO_ACE,
-} from '@/pages/general-mode/lib/generalModeSetup'
-import {
-  chooseAce, chooseAiTeam, chooseFirstBat, chooseStadium, chooseUserTeam, createFlowState,
-  moveFirstBat, moveStadium, stepBack,
+  chooseAce,
+  chooseAiTeam,
+  chooseFirstBat,
+  chooseStadium,
+  chooseUserTeam,
+  createFlowState,
+  moveFirstBat,
+  moveStadium,
+  stepBack,
 } from '@/pages/general-mode/lib/generalModeFlow'
 
 /** 일반모드 준비 흐름 (하위 상태 18~22, StrHOWTO[6] · R4 3a/3b) */

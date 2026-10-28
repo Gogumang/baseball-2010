@@ -49,8 +49,24 @@ export const YEAR_GOAL_LABELS: readonly (readonly number[])[] = [
 
 /** img_text 프레임 크기 (PNG 를 읽어 적었다 — 높이는 모두 10) */
 const TEXT_WIDTH: Readonly<Record<number, number>> = {
-  47: 20, 330: 21, 359: 41, 84: 20, 331: 22,
-  358: 56, 87: 22, 148: 21, 318: 21, 58: 21, 180: 20, 319: 21, 327: 30, 316: 20, 328: 20, 124: 10, 317: 21, 407: 39,
+  47: 20,
+  330: 21,
+  359: 41,
+  84: 20,
+  331: 22,
+  358: 56,
+  87: 22,
+  148: 21,
+  318: 21,
+  58: 21,
+  180: 20,
+  319: 21,
+  327: 30,
+  316: 20,
+  328: 20,
+  124: 10,
+  317: 21,
+  407: 39,
 }
 const TEXT_HEIGHT = 10
 
@@ -138,13 +154,20 @@ function textPieceOf(frame: number, area: CardBox, align: number, palette: 0 | 3
 
 /** 0xba719 — 자간 1 · 주황 · 정렬 0x24 · ox (기본 −4) */
 function numberPiecesOf(value: number, area: CardBox, ox = NUMBER_OX): YearGoalNumberPiece[] {
-  return boxNumberGlyphsOf(value, area, { x: ox, y: 0 }, YEAR_GOAL_DIGIT_BASE, NUMBER_SPACING, NUMBER_ALIGN)
-    .map((glyph) => ({ frame: glyph.image, x: glyph.x, y: glyph.y }))
+  return boxNumberGlyphsOf(value, area, { x: ox, y: 0 }, YEAR_GOAL_DIGIT_BASE, NUMBER_SPACING, NUMBER_ALIGN).map((glyph) => ({
+    frame: glyph.image,
+    x: glyph.x,
+    y: glyph.y,
+  }))
 }
 
 /** num 한 장 0xb9d35(그림, 박스, 정렬 0x24, ox, oy) → 0xb9c5c: x += w − W · y += trunc((h − H)/2) */
 function imagePieceOf(
-  frame: number, size: { readonly width: number; readonly height: number }, area: CardBox, ox: number, oy: number,
+  frame: number,
+  size: { readonly width: number; readonly height: number },
+  area: CardBox,
+  ox: number,
+  oy: number,
 ): YearGoalNumberPiece {
   return {
     frame,
@@ -160,10 +183,7 @@ function dotPieceOf(area: CardBox, ox: number): YearGoalNumberPiece {
 
 /** 승률 — 숫자를 ox −10 에, "%"(num 106)를 ox −2 · oy 1 에 */
 function winRateGlyphsOf(value: number, area: CardBox): YearGoalNumberPiece[] {
-  return [
-    ...numberPiecesOf(value, area, WIN_RATE_OX),
-    imagePieceOf(YEAR_GOAL_PERCENT_FRAME, PERCENT_SIZE, area, PERCENT_OFFSET.x, PERCENT_OFFSET.y),
-  ]
+  return [...numberPiecesOf(value, area, WIN_RATE_OX), imagePieceOf(YEAR_GOAL_PERCENT_FRAME, PERCENT_SIZE, area, PERCENT_OFFSET.x, PERCENT_OFFSET.y)]
 }
 
 /** 한 자리 칸 = num 기준(0) 그림 폭 + 1 — 0x8633c · 0x86248 이 `[num+0x50]`(프레임 20)의 폭으로 잰다 */
@@ -242,9 +262,10 @@ export function goalTableLayoutOf(values: YearGoalWindowSource, boxes: GoalTable
     textPieceOf(YEAR_GOAL_TEXT.goal, boxes.goals, 0x22, 0),
   ]
   const firstGlyphsOf = values.labelSet === 0 ? averageGlyphsOf : earnedRunAverageGlyphsOf
-  const cellOf = values.labelSet === SEASON_YEAR_GOAL_LABEL_SET
-    ? seasonCellOf
-    : (value: number, area: CardBox, row: number) => row === 0 ? firstGlyphsOf(value, area) : numberPiecesOf(value, area)
+  const cellOf =
+    values.labelSet === SEASON_YEAR_GOAL_LABEL_SET
+      ? seasonCellOf
+      : (value: number, area: CardBox, row: number) => (row === 0 ? firstGlyphsOf(value, area) : numberPiecesOf(value, area))
   const columnOf = (column: readonly number[], area: CardBox) =>
     column.slice(0, ROWS).flatMap((value, row) => cellOf(value, rowOf(area, row + 1), row))
   return { texts, numbers: [...columnOf(values.current, boxes.current), ...columnOf(values.goals, boxes.goals)] }

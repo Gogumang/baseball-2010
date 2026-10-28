@@ -46,26 +46,49 @@ export type { GeneralModeSession, UseGeneralModeOptions } from '@/pages/general-
 export { useAceOpen } from '@/pages/general-mode/model/useAceOpen'
 export type { AceOpenSession } from '@/pages/general-mode/model/useAceOpen'
 export {
-  ACE_OPEN_CELL_COUNT, ACE_OPEN_SHORTAGE_POPUP, INITIAL_ACE_OPEN_SAVE,
-  aceBatterIdsOf, aceOpenAnswerOf, aceOpenPriceOf, acePitcherIdsOf,
-  isAceCellOpen, isAceCellUnlocked, normalizeAceOpenSave, openAceCell,
+  ACE_OPEN_CELL_COUNT,
+  ACE_OPEN_SHORTAGE_POPUP,
+  INITIAL_ACE_OPEN_SAVE,
+  aceBatterIdsOf,
+  aceOpenAnswerOf,
+  aceOpenPriceOf,
+  acePitcherIdsOf,
+  isAceCellOpen,
+  isAceCellUnlocked,
+  normalizeAceOpenSave,
+  openAceCell,
 } from '@/pages/general-mode/lib/aceOpenState'
 export type { AceOpenAnswer, AceOpenSave } from '@/pages/general-mode/lib/aceOpenState'
 
 /** 준비 기록(skin+0xbc)과 단계 번호 — 저장에 적거나 화면을 따로 몰 때 쓴다 */
 export {
-  ACE_PER_ROLE, ACE_PHASE, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS,
-  FIRST_BAT_PHASE, GENERAL_MODE_STEP, INITIAL_SETUP, NO_ACE, STADIUM_COUNT,
-  aceIndexOfCell, aceRoleOfCell, teamGameOptionsOf,
+  ACE_PER_ROLE,
+  ACE_PHASE,
+  DEFAULT_OPENED_ACE_BATTER_IDS,
+  DEFAULT_OPENED_ACE_PITCHER_IDS,
+  FIRST_BAT_PHASE,
+  GENERAL_MODE_STEP,
+  INITIAL_SETUP,
+  NO_ACE,
+  STADIUM_COUNT,
+  aceIndexOfCell,
+  aceRoleOfCell,
+  teamGameOptionsOf,
 } from '@/pages/general-mode/lib/generalModeSetup'
-export type {
-  AcePhase, FirstBatPhase, GeneralModeSetup, GeneralModeStep,
-} from '@/pages/general-mode/lib/generalModeSetup'
+export type { AcePhase, FirstBatPhase, GeneralModeSetup, GeneralModeStep } from '@/pages/general-mode/lib/generalModeSetup'
 
 /** 준비 흐름(18~22) 의 순수 함수 — 화면 없이도 단계를 몰 수 있다 */
 export {
-  chooseAce, chooseAiTeam, chooseFirstBat, chooseStadium, chooseUserTeam, createFlowState,
-  moveFirstBat, moveStadium, stepBack, withSetup,
+  chooseAce,
+  chooseAiTeam,
+  chooseFirstBat,
+  chooseStadium,
+  chooseUserTeam,
+  createFlowState,
+  moveFirstBat,
+  moveStadium,
+  stepBack,
+  withSetup,
 } from '@/pages/general-mode/lib/generalModeFlow'
 export type { GeneralModeFlowState } from '@/pages/general-mode/lib/generalModeFlow'
 
@@ -78,8 +101,13 @@ export type { QuickStartOpenState } from '@/pages/general-mode/lib/quickStart'
  * 다른 모드의 팀 고르기가 이 규칙을 쓰고 싶으면 여기서 꺼내 쓰면 된다.
  */
 export {
-  HIDDEN_TEAM_COUNT, HIDDEN_TEAM_FIRST_ID, canSelectTeam, canUseHiddenTeams,
-  hiddenTeamHintMessage, isHiddenTeam, isTeamOpened,
+  HIDDEN_TEAM_COUNT,
+  HIDDEN_TEAM_FIRST_ID,
+  canSelectTeam,
+  canUseHiddenTeams,
+  hiddenTeamHintMessage,
+  isHiddenTeam,
+  isTeamOpened,
 } from '@/pages/general-mode/lib/hiddenTeam'
 
 /** 경기정보 다섯 줄의 값 (R4 2d) */

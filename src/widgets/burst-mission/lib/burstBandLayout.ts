@@ -73,8 +73,16 @@ export const BURST_BAND_REWARD_TEXT = { left: BAND_X - 5 + 3, top: 0x28, width: 
  * ⚠️ 칸 10 의 자리 [0x1400304] 는 글이 아니라 0x94ae5 다 — 세 표에 b8 = 10 인 행이 없어 웹은 빈 글로 둔다.
  */
 export const BURST_GOAL_NAMES: readonly string[] = [
-  '!C!cffffff안타', '!C!cffffff장타', '!C!cffffff홈런', '!C!cffffff타점', '!C!cffffff번트',
-  '!C!cffffff주자진루', '!C!cffffff아웃', '!C!cffffff삼진', '!C!cffffff병살', '!C!cffffff고의사구',
+  '!C!cffffff안타',
+  '!C!cffffff장타',
+  '!C!cffffff홈런',
+  '!C!cffffff타점',
+  '!C!cffffff번트',
+  '!C!cffffff주자진루',
+  '!C!cffffff아웃',
+  '!C!cffffff삼진',
+  '!C!cffffff병살',
+  '!C!cffffff고의사구',
 ]
 
 /** 소지금(4) 보상은 표시 값 ×100 (0x8e994~0x8e9a0) */
