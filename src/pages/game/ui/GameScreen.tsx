@@ -307,7 +307,7 @@ export function GameScreen({
           entryRolls: progress.pendingBenchClearing.entryRolls,
           half: progress.game.half,
           playerSide: progress.game.playerSide,
-          ourTeamId: career.teamId,
+          ourTeamId: progress.ourTeamId,
           opponentTeamId: progress.opponentTeamId,
           batterHand: career.battingSide,
           bases: progress.game.bases,
@@ -342,7 +342,7 @@ export function GameScreen({
           if (tick === HALF_INNING_JINGLE_TICK) activeSound().play(HALF_INNING_SOUND)
         }}
         // 점수판 틀 0x41440 의 두 측 — 내 팀 PLAYER · 상대 COM
-        scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, career.teamId, progress.opponentTeamId)}
+        scoreboardSides={humanVsComputerSidesOf(progress.game.playerSide, progress.ourTeamId, progress.opponentTeamId)}
         // 두 팀 판 0x42364("DUE UP") · 0x420dc("PITCHER")
         cards={gameHalfInningCardsOf(progress, career, board.half)}
         // 운동장 전경 0x4fb8c — 타자편 판은 경기 첫 판(1회초 — 인트로 0xc 바로 뒤)뿐이라 장면이 수비 줄 · 카메라를 아직 안 옮겼다
@@ -352,7 +352,7 @@ export function GameScreen({
           half: board.half,
           carry: null,
           playerSide: progress.game.playerSide,
-          ourTeamId: career.teamId,
+          ourTeamId: progress.ourTeamId,
           opponentTeamId: progress.opponentTeamId,
           grassPalette: sceneFieldPaletteOf(sceneStadium),
           // 이름표 — 칸 0 은 상대 마운드, 1~8 은 0x40008: 상대 팀 레코드 타자 배열 차례(나리 팀 레코드 · 대회 칸)에서 자리 니블이 칸 + 1 인 첫 선수
@@ -440,10 +440,11 @@ export function GameScreen({
               // 붙든 삼진(0x12 대기)은 진입 3e1a6 이 이미 올린 아웃으로 그린다 (r298)
               outs: outsShownDuringResultWait(progress.game.outs, progress.pendingBenchClearing),
               bases: progress.game.bases,
-              // HUD 팀 아이콘은 작은 로고 ui/team_logo_ini (0x373d0)
-              ourLogoUrl: smallLogoUrlOf(career.teamId),
+              // HUD 팀 아이콘은 작은 로고 ui/team_logo_ini (0x373d0) — 적재 0x48a38 이 경기[0x28 + 측] 팀(0xb6bdd)으로 싣는다.
+              // 국가대항전이면 0x39fdc(3a148~3a22a)가 우리 측에 대한민국(10)을 앉히므로 시즌 팀(career.teamId)이 아니다
+              ourLogoUrl: smallLogoUrlOf(progress.ourTeamId),
               opponentLogoUrl: smallLogoUrlOf(progress.opponentTeamId),
-              ourTeamId: career.teamId,
+              ourTeamId: progress.ourTeamId,
               opponentTeamId: progress.opponentTeamId,
               // 위 줄 = 측 0(선공) — 사람 팀이 앉은 측 (0x373d0)
               playerSide: progress.game.playerSide,
