@@ -2,17 +2,16 @@
 //
 //   pnpm e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (약 30분)
 //   E2E_ALL_TARGETS=e2e pnpm e2e:all          # 한쪽만 (dev · e2e, 쉼표)
-//   E2E_ALL_SKIP=perf,hits pnpm e2e:all       # 빼기 (smoke · hits · browser · fixtures · png · perf · leak)
+//   E2E_ALL_SKIP=perf,hits pnpm e2e:all       # 빼기 (smoke · hits · browser · png · perf · leak)
 //   E2E_ALL_PORT=5640 pnpm e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드(perf 켤 때 길) +2
 //
 // 차례:
 //  1. smoke — 장면 표 전부 × chromium · webkit (`e2e/smoke.mjs`), 대상마다. 대상끼리는 함께 돈다
 //  2. hits — 누름 칸 맞음 검사 (`e2e/hits.mjs`), 대상마다 차례로(보고 파일이 하나라서). 보고는 `e2e/.run/hits-report-<대상>.json`
 //  3. browser — `pnpm test:browser`
-//  4. fixtures — `SOAK_FIXTURE_DRY=1 pnpm e2e:fixtures` (soak 픽스처가 지금 저장 꼴로 여전히 같은 자리에 닿는지, 안 쓴다)
-//  5. png — 팔레트로 다시 쓴 스프라이트 PNG 가 chromium · webkit 에서 원본과 RGBA 가 같은지 (`e2e/png-rgba.mjs`, r311)
-//  6. perf — 느린 4G 첫 진입 (`e2e/perf.mjs`, 실행 1번). 숫자만 — 실패로 치지 않는다(쪽 오류 · 끝 코드만 본다)
-//  7. leak — 배포 빌드(`vite build`)에 장면 바로가기가 안 들어갔는지 grep
+//  4. png — 팔레트로 다시 쓴 스프라이트 PNG 가 chromium · webkit 에서 원본과 RGBA 가 같은지 (`e2e/png-rgba.mjs`, r311)
+//  5. perf — 느린 4G 첫 진입 (`e2e/perf.mjs`, 실행 1번). 숫자만 — 실패로 치지 않는다(쪽 오류 · 끝 코드만 본다)
+//  6. leak — 배포 빌드(`vite build`)에 장면 바로가기가 안 들어갔는지 grep
 //
 // 서버는 이미 떠 있으면 그대로 쓰고, 이 스크립트가 띄운 것만 pid 로 끈다. 요약은 끝에 찍고 `e2e/.run/all-report.json` 에도 둔다.
 // 하나라도 실패하면 끝 코드 1.
@@ -103,7 +102,7 @@ function summarize(step) {
         .filter((line) => /같음|다름/.test(line) && !line.startsWith('기준'))
         .join(' · ') || '요약 줄 없음'
     )
-  if (step.kind === 'browser' || step.kind === 'fixtures') {
+  if (step.kind === 'browser') {
     const files = lastMatch(out, /Test Files[^\n]*/g)
     const tests = lastMatch(out, /Tests {2}[^\n]*/g)
     return (
@@ -156,7 +155,6 @@ try {
     }
   }
   if (!SKIP.has('browser')) steps.push({ ...(await run('browser', 'pnpm', ['test:browser'])), kind: 'browser' })
-  if (!SKIP.has('fixtures')) steps.push({ ...(await run('fixtures', 'pnpm', ['e2e:fixtures'], { SOAK_FIXTURE_DRY: '1' })), kind: 'fixtures' })
   if (!SKIP.has('png')) steps.push({ ...(await run('png', 'node', ['e2e/png-rgba.mjs'])), kind: 'png' })
   if (!SKIP.has('perf')) {
     const port = TARGETS.includes('e2e') ? PORTS.e2e : PORTS.dev

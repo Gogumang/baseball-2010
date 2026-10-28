@@ -187,7 +187,6 @@ export const maxLinesBaseline = [
   'src/entities/season-mode/model/playerRecruit.ts', // 182
   'src/pages/season/ui/SeasonTrainingScreen.tsx', // 180
   'src/widgets/burst-mission/ui/BurstMissionWindow.tsx', // 179
-  'src/app/model/soak/soakInvariants.ts', // 178
   'src/entities/career/model/seasonFlow.ts', // 178
   'src/entities/batting/model/swingResult.ts', // 177
   'src/pages/settings/lib/settingsLayout.ts', // 176
@@ -210,12 +209,12 @@ export const maxLinesBaseline = [
   'src/app/model/modePitcher.ts', // 166
   'src/entities/batting/model/battedBallFlight.ts', // 166
   'src/pages/management/ui/RadarChart.tsx', // 166
+  'src/shared/config/bugfixes/bugfixes.ts', // 166
   'src/entities/batting/model/battedBallOutcome.ts', // 165
   'src/entities/particle/model/particleEmitter.ts', // 165
-  'src/shared/config/bugfixes/bugfixes.ts', // 166
-  'e2e/all.mjs', // 164
   'src/pages/season/ui/SeasonTrainingPopup.tsx', // 164
   'src/widgets/season/lib/seasonOuting.ts', // 164
+  'e2e/all.mjs', // 163
   'src/pages/season/ui/SeasonOutingPopup.tsx', // 163
   'src/shared/config/original/sounds.ts', // 163
   'src/widgets/game-scene/ui/BenchClearingScene.tsx', // 163

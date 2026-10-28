@@ -134,41 +134,13 @@ kill "$(cat e2e/.run/drive.pid)"
 새로 뜨려면 drive 로 `{"scene":"nari-new"}` 부터 플레이한 뒤 `{"dump":"e2e/fixtures/<이름>.json","note":"…"}` 를 보낸다.
 손으로 짜지 않는다.
 
-### soak 로 뜬 픽스처 (r236 · r254)
+### 장기 진행 하네스로 뜬 픽스처 (r236 · r254 — 하네스는 r360 에 지움)
 
-브라우저로 몇 시간 쳐야 닿는 자리는 화면 없이 세션 훅을 돌려 뜬다 — `src/app/model/soak/soakFixtures.test.tsx`.
-`season-ending` · `nari-postseason` · `nari-cup` · `nari-cup-result` · `nari-ending` · `nari-hall-of-fame` · `pitcher-postseason` · `pitcher-cup` ·
-`pitcher-cup-result` · `pitcher-ending` · `pitcher-hall-of-fame` 이 그것이다. r233 soak 하네스의 사람 흉내 정책으로 새 선수(팀)부터
-돌리고, 그 자리에 닿은 순간 앱의 실제 저장 모듈(`createLocalStorageSaveGame` · `createLocalStorageJsonStore`)이 jsdom localStorage 에
-쓴 칸을 그대로 뜬다. 뜬 뒤에는 픽스처 칸만 깐 새 세션으로 이어하기가 기대한 자리(장면 · 이벤트)로 가는지 본다.
-r254 가 같은 판에서 사람 팀 포스트시즌 자리 셋(`*-postseason-game` 그해 내 경기를 아직 안 친 내 차례 대진 · `*-postseason-next` 내 시리즈를
-이기고 돌아온 다음 라운드 대진 · `*-postseason-champion` 내 팀이 한국시리즈를 이긴 끝난 대진)과 국가대항전 한국 우승 대진판(`*-cup-win`)을 더 떴다.
-세션 난수를 안 건드리고 뜨기만 해서 다른 픽스처는 그대로다. 타자편 씨앗 4 는 13년 내내 한국이 대회를 못 이겨 `nari-cup-win` 만 씨앗 5 로 한 판 더
-돌린다(`SOAK_FIXTURE_NARI_CUP_WIN_SEED`).
-저장 꼴이 바뀌어 장면이 깨지면 다시 뜬다 (약 30초, 같은 씨앗이면 같은 파일):
-
-```sh
-pnpm e2e:fixtures                        # = SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx
-SOAK_FIXTURE=1 SOAK_FIXTURE_DRY=1 pnpm vitest run src/app/model/soak/soakFixtures.test.tsx   # 쓰지 않고 닿는지만
-```
-
-나리 타자편도 134 에 선 저장을 이어하면 134 로 돌아온다 — 이어하기 0x1c154 의 그 밖 갈래는 S+0x12c(대회 칸)를 S+0xb4(끝난 포스트시즌)보다
-먼저 본다(1c346~1c364, 투수편과 같은 함수). r236 때는 타자편 `resumePointOf` 가 거꾸로 봐 392 로 갔고, r241 이 고쳐 `nari-cup` 을 134 저장으로 다시 떴다.
-
-r249 — 저장 꼴이 늘었다(타자편 `midSeasonEvaluatedYears` · 두 편 `salaryRecordGrade`, r244). 다시 뜨자 씨앗 1 은 엔진 변경으로 판이
-갈라져 정규시즌 1위가 아니고(128 진입 팝업 없음) 4년차 부상 엔딩 0(보너스 없음)으로 끝나, hits 의 `nari-postseason` · `nari-ending` ·
-`nari-hall-of-fame` 동작이 서지 않았다. 타자편 기본 씨앗을 **4**(1위 진입 팝업 · 13년차 엔딩 4)로 옮겨 다섯 개를 다시 떴다.
-다시 뜬 뒤에는 `smoke` 뿐 아니라 `pnpm e2e:hits <그 장면들>` 로 연 상태 동작까지 서는지 본다 — 닿는 자리는 같아도 판 내용(순위 · 엔딩 번호)이 달라질 수 있다.
-개발 서버가 떠 있는 동안 픽스처를 다시 뜨면 HMR 로 쪽이 다시 실려 그때 돌던 hits 가 엉뚱하게 깨진다. `--mode e2e` 빌드는 빌드 때의 픽스처를 굳혀 두므로 다시 빌드한다.
-
-r259 — r257(투수편 이벤트 보상) · r258(홈런 건너뛰기 득점) 뒤 판이 갈렸다. 투수편 씨앗 2 는 국가대항전 한국 우승(`pitcher-cup-win`)에 못 닿아
-기본 씨앗을 **1** 로 옮겼다(1 · 4 · 5 · 6 · 7 은 아홉 자리 다 닿음). 타자편 씨앗 4 는 이제 한국 우승에도 닿지만 `nari-cup-win` 은 그대로 씨앗 5 판에서 뜬다.
-다시 뜬 것 15개(타자편 `nari-postseason` · `nari-postseason-game` · `nari-cup-win` · `season-ending` 은 그대로), `pnpm e2e:all` 초록.
-
-r297 · r315 — `nari-cup-win` 씨앗(`SOAK_FIXTURE_NARI_CUP_WIN_SEED` 기본값)은 r297 에 5 → 1, r315 에 1 → 2 로 옮겼다. r315 는 경기 마지막 내 타석의
-돌발 결과 창 · 보상(0x1d 진입 0x8e34c)을 정산 앞에 세운 고침(위 「씨앗 기록」)이 판을 갈라 씨앗 1 이 한국 우승에 못 닿았다(2~12 가운데 2 · 4 · 11 이 닿음).
-저장된 픽스처 파일은 다시 뜨지 않았다(닿는지만 본 DRY 초록 · smoke 통과).
-10-27 r320 · r324 · r326(나리 끝 중계 · 타자주자 타석 자리 출발)이 판을 다시 갈라 씨앗 2 가 못 닿아 2 → 4 로 옮겼다(1 · 3 은 못 닿음).
+브라우저로 몇 시간 쳐야 닿는 자리 — `season-ending` · `nari-*`/`pitcher-*` 의 `postseason`(`-game` · `-next` · `-champion`) · `cup`(`-result` · `-win`) ·
+`ending` · `hall-of-fame` — 는 예전 장기 진행 하네스(soak, `src/app/model/soak/soakFixtures.test.tsx`)가 화면 없이 세션 훅을 돌려,
+그 자리에 닿은 순간 앱 저장 모듈이 쓴 localStorage 칸을 그대로 뜬 것이다. 각 파일의 `note` 에 씨앗 · 자리가 적혀 있다.
+**r360 에 하네스와 `pnpm e2e:fixtures` 를 지웠다(사용자 결정 — 시뮬레이션 전체를 돌리는 시험은 안 둔다). 이 파일들을 다시 뜨는 길은 이제 없다.**
+저장 꼴이 바뀌면 옛 저장 이사(불러올 때 고쳐 읽기)로 맞추고, 그래도 장면이 깨지면 drive 로 손수 플레이해 위 방법으로 다시 뜬다.
 
 ### 팝업이 판 가운데인지 (r254)
 
@@ -277,7 +249,7 @@ pnpm e2e:measure <명령 …>                         # 아무 명령이나 같�
 | `general` | 일반모드 빠른실행 · 타석 · 구질 고르기 · 수비 · 자동진행 중계 | `general.mjs` |
 | `mission` | 미션 타석 · 구질 고르기 · 결과 판 | `mission.mjs` |
 | `derby` | 홈런더비 선수 고르기 · 첫 공 앞 | `derby.mjs` |
-| `nari-career` · `pitcher-career` | 포스트시즌 · 국가대항전 · 엔딩 · 명예의 전당 (soak 픽스처) | `nari-career.mjs` · `pitcher-career.mjs` |
+| `nari-career` · `pitcher-career` | 포스트시즌 · 국가대항전 · 엔딩 · 명예의 전당 (장기 진행 하네스로 뜬 픽스처) | `nari-career.mjs` · `pitcher-career.mjs` |
 
 **나눈 꼴** — 한 상황을 고치거나 더할 때 다른 도메인 파일을 건드리지 않는다:
 
@@ -332,8 +304,8 @@ E2E_QUICK_URL=http://127.0.0.1:4910/ pnpm e2e:quick                # 이미 띄�
   `e2e/hits.mjs` · `e2e/only.mjs` 와 같이 쓴다.
 
 **언제 quick, 언제 all** — 화면 · 흐름을 바꾼 머지는 quick 으로 본다. 아래는 quick 이 안 보므로 `e2e:all` 을 돌린다:
-개발 서버(HMR · StrictMode 두 번 그림) 판, `test:browser`, 픽스처가 아직 닿는지(`e2e:fixtures` dry), 팔레트 PNG RGBA, 느린 4G 성능,
-배포 빌드에 바로가기가 새는지. 픽스처 · 씨앗을 다시 떴거나 저장 꼴 · 난수 차례가 바뀐 판, 자산 · 빌드 설정을 바꾼 판, 큰 묶음 머지 앞에도 all.
+개발 서버(HMR · StrictMode 두 번 그림) 판, `test:browser`, 팔레트 PNG RGBA, 느린 4G 성능,
+배포 빌드에 바로가기가 새는지. 픽스처를 다시 떴거나 저장 꼴 · 난수 차례가 바뀐 판, 자산 · 빌드 설정을 바꾼 판, 큰 묶음 머지 앞에도 all.
 
 **잰 것 r342** — 기본 맥락 2 · 2 로 낮춘 뒤 한 번(14코어 · 48GB, 다른 에이전트 하나가 함께 돎):
 
@@ -449,12 +421,12 @@ E2E_SNAPSHOT_RUNS=webkit:iphone pnpm e2e:snapshot verify mission-result
 ```sh
 pnpm e2e:all                              # 개발 서버 · `--mode e2e` 빌드 양쪽 (r249 에 16.7분, 끝 코드 1 이면 실패)
 E2E_ALL_TARGETS=e2e pnpm e2e:all          # 한쪽만 (dev · e2e)
-E2E_ALL_SKIP=perf,hits pnpm e2e:all       # 빼기 (smoke · hits · browser · fixtures · png · perf · leak)
+E2E_ALL_SKIP=perf,hits pnpm e2e:all       # 빼기 (smoke · hits · browser · png · perf · leak)
 E2E_ALL_PORT=5640 pnpm e2e:all            # 포트 바닥 — 개발 서버 +0 · e2e 빌드 +1 · 배포 빌드 preview +2
 ```
 
 차례: smoke(대상끼리 함께) → hits(대상마다 차례로, 보고는 `e2e/.run/hits-report-<대상>.json`) → `pnpm test:browser` →
-`SOAK_FIXTURE_DRY=1 pnpm e2e:fixtures` → png(팔레트 PNG RGBA 대조) → perf(느린 4G 한 번, 숫자만 — 표를 요약에 붙인다) → 배포 빌드 grep(아래 「배포 빌드에 안 들어가는지」 낱말).
+png(팔레트 PNG RGBA 대조) → perf(느린 4G 한 번, 숫자만 — 표를 요약에 붙인다) → 배포 빌드 grep(아래 「배포 빌드에 안 들어가는지」 낱말).
 서버는 떠 있으면 그대로 쓰고 제가 띄운 것만 끈다. 그런데 이미 떠 있는 e2e 빌드는 **그때 픽스처 · 코드로 굳은 것**이라, 고친 뒤에는 그 포트를
 `e2e/serve.sh stop` 으로 끄고 돌린다. 요약은 `e2e/.run/all-report.json` 에도 남는다.
 

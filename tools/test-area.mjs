@@ -1,5 +1,5 @@
 // **단위 시험 골라 돌리기** (`pnpm test:area`) — 도메인(`e2e/areas/<도메인>.mjs` 의 `sources` 경로 머리)이나 바뀐 파일로 vitest 파일을 고른다.
-// 워커 2 (기계를 나눠 쓴다). 긴 soak(careerSoak · pitcherLeagueSoak)는 `test:quick` 처럼 뺀다. 끝에 CPU 초 합 · 최대 RSS 를 찍는다.
+// 워커 2 (기계를 나눠 쓴다). 끝에 CPU 초 합 · 최대 RSS 를 찍는다.
 //
 //   pnpm test:area nari                 # 도메인 하나 (쉼표로 여럿)
 //   pnpm test:area --changed            # main 과 갈라진 뒤 바뀐 파일(+ 커밋 안 한 것)의 폴더에 있는 시험 (--changed=<기준>)
@@ -45,19 +45,7 @@ if (filters.size === 0) {
 }
 
 const workers = Math.min(2, Number(process.env.TEST_AREA_WORKERS ?? 2))
-const args = [
-  'exec',
-  'vitest',
-  'run',
-  `--maxWorkers=${workers}`,
-  '--passWithNoTests',
-  '--exclude',
-  'src/app/model/soak/careerSoak.test.tsx',
-  '--exclude',
-  'src/app/model/soak/pitcherLeagueSoak.test.tsx',
-  ...passThrough,
-  ...filters,
-]
+const args = ['exec', 'vitest', 'run', `--maxWorkers=${workers}`, '--passWithNoTests', ...passThrough, ...filters]
 console.log(`pnpm ${args.join(' ')}`)
 const started = Date.now()
 const meter = startUsageMeter()
