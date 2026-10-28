@@ -223,13 +223,13 @@ export const maxLinesBaseline = [
   'src/pages/defense/lib/defenseHomeRunEffects.ts', // 159
   'src/pages/general-mode/lib/prepareLayout.ts', // 159
   'src/pages/management/ui/NariYearCoverScreen.tsx', // 159
+  'src/shared/api/audio/webAudioSound.ts', // 159
   'src/pages/nari-record-room/ui/RankingBoard.tsx', // 158
   'src/shared/config/original/acePlayers.ts', // 158
   'src/shared/lib/pixelEffect/screenCompose.ts', // 158
   'src/entities/career/model/training.ts', // 157
   'src/pages/management/lib/detailPopup.ts', // 157
   'src/pages/pitching/ui/PitchGradeGauge.tsx', // 156
-  'src/shared/api/audio/webAudioSound.ts', // 156
   'src/entities/season-mode/model/seasonItemShop.ts', // 155
   'src/pages/pitcher-league/lib/pitchTrainingWindow.ts', // 154
   'src/widgets/season/lib/postseasonBracketLayout.ts', // 154
