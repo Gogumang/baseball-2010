@@ -68,7 +68,7 @@ export const maxLinesBaseline = [
   'src/app/ui/GameRoute.tsx', // 362
   'src/pages/general-mode/ui/GeneralModeScreen.tsx', // 360
   'src/app/ui/EntryRoutes.tsx', // 359
-  'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx', // 353
+  'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx', // 355
   'src/pages/team-game/ui/TeamAutoRelay.tsx', // 342
   'src/widgets/matchup-cards/lib/matchupCardsLayout.ts', // 339
   'src/widgets/batting-stage/lib/pitchInputOverlay.ts', // 338
@@ -93,7 +93,7 @@ export const maxLinesBaseline = [
   'src/entities/game/model/quickAtBat.ts', // 287
   'src/shared/ui/MessageBox/MessageBox.tsx', // 286
   'src/entities/pitching/model/simulateBatter.ts', // 285
-  'src/pages/create-player/ui/CreatePlayerScreen.tsx', // 283
+  'src/pages/create-player/ui/CreatePlayerScreen.tsx', // 285
   'src/pages/story/ui/StoryScreen.tsx', // 283
   'src/entities/league/model/leaguePlayerStats.ts', // 282
   'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts', // 281
@@ -210,9 +210,9 @@ export const maxLinesBaseline = [
   'src/app/model/modePitcher.ts', // 166
   'src/entities/batting/model/battedBallFlight.ts', // 166
   'src/pages/management/ui/RadarChart.tsx', // 166
+  'src/shared/config/bugfixes/bugfixes.ts', // 166
   'src/entities/batting/model/battedBallOutcome.ts', // 165
   'src/entities/particle/model/particleEmitter.ts', // 165
-  'src/shared/config/bugfixes/bugfixes.ts', // 166
   'e2e/all.mjs', // 164
   'src/pages/season/ui/SeasonTrainingPopup.tsx', // 164
   'src/widgets/season/lib/seasonOuting.ts', // 164

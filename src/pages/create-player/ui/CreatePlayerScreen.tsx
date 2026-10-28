@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
+import { OK_KEY_OFFER, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen } from '@/shared/ui'
 import { InputModeBox, inputModeLayoutOf } from '@/shared/ui/InputMethodText/InputModeBox'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -139,6 +140,9 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
     const timer = setAppTickInterval(() => setTick((previous) => previous + 1))
     return () => timer()
   }, [])
+
+  // 터치 기기 — 바닥띠 OK 누름 칸은 투명해 안 보인다. 상황 버튼으로 OK 를 띄운다(확인 상자가 떠 있으면 상자가 받는다)
+  useTouchKeyOffer(isConfirming ? null : OK_KEY_OFFER)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

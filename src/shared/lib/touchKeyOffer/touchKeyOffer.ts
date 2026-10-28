@@ -95,6 +95,8 @@ export const PAGE_NEXT_OFFER: TouchKeyOffer = { key: 'ArrowRight', label: '뒤 �
  * CLR(Escape) 상황 버튼 — 원본 그림에 CLR 글자 자리가 없어 투명 누름 칸만으로는 안 보이는 화면(외출 지도 · 구질 두 칸 팝업 따위, r194).
  * 버튼은 Escape 키 사건을 쏘아 키 CLR 과 같은 길을 탄다
  */
+/** OK(Enter) 상황 버튼 — 원본 그림에 OK 글자 자리가 없는 화면(선수 등록 · 변화구 고르기, 10-29 사용자 신고) */
+export const OK_KEY_OFFER: TouchKeyOffer = { key: 'Enter', label: 'OK' }
 export const BACK_KEY_OFFER: TouchKeyOffer = { key: 'Escape', label: '뒤로' }
 export const CANCEL_KEY_OFFER: TouchKeyOffer = { key: 'Escape', label: '취소' }
 

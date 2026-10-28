@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
+import { OK_KEY_OFFER, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp } from '@/shared/ui'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -219,6 +220,9 @@ export function PitcherRegisterScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0,
    * 키 — 0x66 줄 고르기는 타자편과 같은 갱신 0x16f28 이다. 0x67 은 키 0x12410 — OK 는 지금 칸 · 방향은
    * `breakingPitchCursorAfter` · CLR = 0x66.
    */
+  // 터치 기기 — 등록 줄 · 변화구 고르기 모두 OK 그림 자리가 없어 상황 버튼으로 OK 를 띄운다(상자가 떠 있으면 상자가 받는다)
+  useTouchKeyOffer(popup === null ? OK_KEY_OFFER : null)
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (popup !== null) return

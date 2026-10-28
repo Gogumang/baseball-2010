@@ -303,3 +303,20 @@ describe('만들기 흐름 — 0x65 팀 고르기 → 0x66 등록', () => {
     expect(created!.teamId).toBe(3)
   })
 })
+
+describe('터치 기기 OK 상황 버튼 (웹 — 원본 그림에 OK 자리가 없다)', () => {
+  it('등록 줄 · 변화구 고르기에서 OK 버튼을 띄우고, 확인 상자가 뜨면 거둔다', async () => {
+    const { touchKeyOffersNow } = await import('@/shared/lib/touchKeyOffer/touchKeyOffer')
+    const okOffered = () => touchKeyOffersNow().some((offer) => offer.key === 'Enter' && offer.label === 'OK')
+    화면()
+    expect(okOffered()).toBe(true)
+    이름넣기('투수')
+    변화구로()
+    expect(okOffered()).toBe(true)
+    구질('CURVE')
+    구질('FORK')
+    OK()
+    expect(screen.getByText(/이대로 결정/)).toBeTruthy()
+    expect(okOffered()).toBe(false)
+  })
+})
