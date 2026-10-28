@@ -75,6 +75,7 @@ G포인트는 장면이 아니라 **앱 기본값 무한G**(`src/shared/lib/dev/
 yarn node e2e/smoke.mjs                  # 장면 49개 × chromium · webkit 아이폰 (약 5분, 실패면 끝 코드 1)
 yarn node e2e/smoke.mjs general-bat      # 몇 개만
 yarn node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
+yarn node e2e/outing-gray-tap.mjs         # 회귀: 외출 다녀온 뒤 흑백 외출 칸 터치 · 방향키가 막히는가 (타자편 · 투수편, webkit 아이폰, r341)
 ```
 
 경기 결과 → 116 평가 대사(키 · 탭) · 대회 끝 134 위 효과기 → 137 → 105 는 `e2e/year-cover-evaluation.mjs` 로 본다(r287, chromium 키 · webkit 아이폰 탭).
