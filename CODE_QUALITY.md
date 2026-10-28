@@ -35,7 +35,7 @@
 |---|---|
 | 린트 | oxlint — `pnpm lint` (설정 `oxlint.config.ts`, 에러 0) |
 | 파일 길이 | oxlint `max-lines` 150(코드만) — 옛 파일은 `lint.max-lines-baseline.js`, `pnpm check:lines` |
-| 포맷 | prettier — `pnpm format:check` |
+| 포맷 | oxfmt — `pnpm format:check` (설정 `.oxfmtrc.json`) |
 | try/catch | `src/shared/lib/safe` 도우미로만 — oxlint `local/no-try-statement` (`tools/lint/localPlugin.mjs`) |
 | 중첩 · 복잡도 | oxlint `max-depth` 2 · `complexity` 8 · `no-else-return` · `no-lonely-if` · `max-nested-callbacks` 3 — 옛 파일은 `lint.readability-baseline.js` |
 

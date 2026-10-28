@@ -479,7 +479,8 @@ PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5712/ node e2e/scene-p
 - `pnpm lint` — Oxlint(`oxlint.config.ts`, 타입 정보 없는 가벼운 판 · 1초 안쪽). 옛 ESLint 설정(js · typescript-eslint recommended + react-hooks + react-refresh)을
   규칙 하나하나 옮겼다(r352). oxlint 에 없는 try 금지는 JS 플러그인 `tools/lint/localPlugin.mjs`. 에러 0 이어야 한다. `pnpm lint:fix` 는 안전한 자동 수정만 하므로 고친 뒤 시험을 돌린다.
   끄기 주석은 `// oxlint-disable-next-line <규칙> -- 까닭` (옛 `eslint-disable` 주석도 먹는다). 쓰이지 않는 끄기 주석은 에러다.
-- `pnpm format` / `pnpm format:check` — Prettier (`.prettierrc.json`: 세미콜론 없음 · 홑따옴표 · 끝 쉼표 all · printWidth 150). 생성 데이터 · 픽스처 · 문서는 `.prettierignore`.
+- `pnpm format` / `pnpm format:check` — Oxfmt (`.oxfmtrc.json`: 세미콜론 없음 · 홑따옴표 · 끝 쉼표 all · printWidth 150 · package.json 정렬 안 함 — 옛 Prettier 설정 그대로, r352).
+  생성 데이터 · 픽스처 · 문서는 `.oxfmtrc.json` 의 `ignorePatterns`(.gitignore 도 따른다). 한 자리만 그대로 두려면 `// prettier-ignore` (또는 `// oxfmt-ignore`).
 - 파일 길이: 코드만(빈 줄 · 주석 빼고) **150줄** — `max-lines` 에러. 시험 파일(`*.test.ts(x)`)은 빠진다.
   넘는 옛 파일은 `lint.max-lines-baseline.js` 예외 목록(줄 수 내림차순 · 주석이 줄 수, 도입 때 243개). 새 파일은 넣지 말고 처음부터 쪼갠다.
   파일을 쪼개 150 이하가 되면 `pnpm check:lines` 가 실패하며 알려 준다 — 목록에서 빼거나 `pnpm check:lines --update` 로 다시 쓴다.

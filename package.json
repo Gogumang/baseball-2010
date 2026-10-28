@@ -21,8 +21,8 @@
     "test:area": "node tools/test-area.mjs",
     "e2e:snapshot": "node e2e/snapshot.mjs",
     "e2e:fixtures": "SOAK_FIXTURE=1 vitest run src/app/model/soak/soakFixtures.test.tsx",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "check:lines": "node tools/check-lines-baseline.mjs"
@@ -43,9 +43,9 @@
     "@vitest/browser": "5.0.1",
     "@vitest/browser-playwright": "5.0.1",
     "jsdom": "^25.0.1",
+    "oxfmt": "0.75.0",
     "oxlint": "1.90.0",
     "playwright": "1.56.1",
-    "prettier": "3.9.10",
     "typescript": "7.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.0"
