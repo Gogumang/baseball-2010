@@ -1,21 +1,15 @@
 import { type AtBatOutcome, isHit, isFreePass, describeOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { type AdvanceResult, advanceRunners } from '@/entities/game/model/baseState'
-import { type BaseRunners, EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
+import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { applyOpponentAtBat } from '@/features/play-pitcher-game/model/pitcherGameState'
-import {
-  survivorsFromBaseOfFates,
-  baserunnerAllowedOfFates,
-  baserunnerAllowedOfPlay,
-  batterRunnerSafeOfFates,
-} from '@/features/defense-play/model/runnerFates'
+import { survivorsFromBaseOfFates, baserunnerAllowedOfFates, baserunnerAllowedOfPlay } from '@/features/defense-play/model/runnerFates'
 import { decisionsAfterPlay } from '@/features/play-game/model/gameDecisions'
-import { lineupSlotOf } from '@/entities/game/model/quickLineup'
-import { runnersOfGame } from '@/entities/game/model/gameState'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { withQuickSteals } from '@/features/play-team-game/model/teamGameFlow/autoPlay/quickEntries'
-import { resolveBurstFor } from '@/features/play-team-game/model/teamGameFlow/burst/burst'
+import { defensiveBurstPlayOf, resolveBurstFor } from '@/features/play-team-game/model/teamGameFlow/burst/burst'
+import { defensiveAtBatChargesOf } from '@/features/play-team-game/model/teamGameFlow/defense/defensiveAtBatCharges'
 import { appendLog } from '@/features/play-team-game/model/teamGameFlow/log/appendLog'
 import { halfInningPitchesOf } from '@/features/play-team-game/model/teamGameFlow/records/atBatRecords'
 import { withOurDefenseRecords } from '@/features/play-team-game/model/teamGameFlow/records/defenseRecords'
@@ -23,12 +17,7 @@ import { withSeasonRecord } from '@/features/play-team-game/model/teamGameFlow/r
 import { withLeaguePlateAppearance, withPlateAppearance } from '@/features/play-team-game/model/teamGameFlow/records/plateAppearances'
 import { defenseRecordCodesOf, homeRunCountedOf } from '@/features/play-team-game/model/teamGameFlow/records/settlementRecords'
 import { moundsOf } from '@/features/play-team-game/model/teamGameFlow/settlement/decisions'
-import {
-  addRunsToCounters,
-  chargeMoundLine,
-  chargeRunsToResponsible,
-  scoredFromBasesOfAtBat,
-} from '@/features/play-team-game/model/teamGameFlow/settlement/pitcherLines'
+import { addRunsToCounters } from '@/features/play-team-game/model/teamGameFlow/settlement/pitcherLines'
 import type { StealArrivalPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
@@ -95,32 +84,7 @@ export function finishDefensiveAtBat(
     decisions: decisionsAfterPlay(progress.decisions, before, applied.game, moundsOf(progress)),
     // 정산 0xa8024 — 우리 마운드 투수 레코드에 아웃·실점·탈삼진 (a8cb0 +0x20 · a8d14 +0x26 은 종류를 안 거른다)
     // 실점은 들어온 주자의 책임 투수(주자+0x30)에게 (a8ee4) — 승계 주자면 앞 투수 몫이다
-    ...chargeRunsToResponsible(
-      progress,
-      chargeMoundLine(progress, true, {
-        // 낫아웃은 a8cb0 이 삼진 사건까지 더하고 보정(−1)은 R+0x13c · R[3] 에만 건다 — +0x20 이 하나 많다(원본 그대로)
-        outs: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
-        strikeouts: outcome.kind === '삼진' ? 1 : 0,
-        // a8b04~a8bee — 사람 수비 타석의 볼넷 · 사구도 지금 마운드(우리) 투수 +0x2a. 간이 타석(`quick`)의 포볼 c1918 은 볼을
-        // 3 에서 안 올려(판정 0x9d57c · c18d4) `state[5] > 3` 이 서지 않는다 — 안 센다
-        walks: walk && quick === undefined ? 1 : 0,
-      }),
-      applied.game,
-      true,
-      lineupSlotOf(progress.opponentOrderIndex),
-      scoredFromBasesOfAtBat(
-        before,
-        runnersOfGame(before, progress.opponentOrderIndex),
-        applied.game.inning === before.inning && applied.game.half === before.half
-          ? runnersOfGame(applied.game, applied.opponentOrderIndex)
-          : EMPTY_BASE_RUNNERS,
-        outcome,
-        defensePlay,
-        quick !== undefined,
-        applied.outsAdded,
-        applied.runsScored,
-      ),
-    ),
+    ...defensiveAtBatChargesOf(progress, before, applied, outcome, defensePlay, quick, droppedThirdStrike, walk),
     opponentOrderIndex: applied.opponentOrderIndex,
     lastDefensePlay: playback ?? progress.lastDefensePlay,
     defenseScene: defensePlay?.scene ?? progress.defenseScene,
@@ -202,24 +166,7 @@ export function finishDefensiveAtBat(
   // (0x21 진입 · 0x18 뒤집힘이 먼저면 0x8f628 이 내린다)
   const resolved =
     mine && stealPlay === undefined
-      ? resolveBurstFor(recorded, {
-          outcome,
-          runsBattedIn: applied.runsScored,
-          outsBefore: before.outs,
-          // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
-          outsAdded: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
-          strikeoutWhileRunning: droppedThirdStrike,
-          // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
-          humanTeamWalkOff: applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
-          batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
-          // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
-          isBunt: defensePlay?.buntBall === true,
-          runnersAdvanced: defensePlay?.sacrifice === true,
-          // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
-          foulBall: defensePlay?.buntFoulOut === true,
-          runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
-          homeRunCounted,
-        })
+      ? resolveBurstFor(recorded, defensiveBurstPlayOf(before, applied, outcome, defensePlay, droppedThirdStrike, homeRunCounted))
       : recorded
 
   return appendLog(

@@ -23,8 +23,8 @@ import type { RunnerPitcherTags } from '@/entities/game/model/runnerPitchers'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow/types/options'
 import type { TeamFielderSeat, TeamPendingPitchArrival, TeamPendingRunnerPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
-import type { TeamRecordTally } from '@/features/play-team-game/model/teamGameFlow/types/records'
 import type { TeamGameProgressLedger } from '@/features/play-team-game/model/teamGameFlow/types/progressLedger'
+import type { TeamRecordTally } from '@/features/play-team-game/model/teamGameFlow/types/records'
 
 export interface TeamGameProgress extends TeamGameProgressLedger {
   readonly options: TeamGameOptions

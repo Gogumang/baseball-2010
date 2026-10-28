@@ -1,9 +1,42 @@
+import type { GameState } from '@/entities/game/model/gameState'
+import type { OpponentAtBatResult } from '@/features/play-pitcher-game/model/pitcherGameState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
+import { batterRunnerSafeOfFates } from '@/features/defense-play/model/runnerFates'
 import { resolveBurst, cancelBurst } from '@/entities/burst-mission/model/burstMissionSession'
 import { burstResultBitsOf } from '@/entities/burst-mission/model/burstResultBits'
 import { withSeasonBurstMorale } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
 import { pitcherEntryAt } from '@/features/play-team-game/model/teamGameFlow/roster/pitchers'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
+
+/** `finishDefensiveAtBat` 가 돌발 판정 0x8f414 에 넘기는 타석 — 몸통에서 그대로 떼어 냈다(r344) */
+export function defensiveBurstPlayOf(
+  before: GameState,
+  applied: OpponentAtBatResult,
+  outcome: AtBatOutcome,
+  defensePlay: DefensePlayResult | null,
+  droppedThirdStrike: boolean,
+  homeRunCounted: boolean,
+): Parameters<typeof resolveBurstFor>[1] {
+  return {
+    outcome,
+    runsBattedIn: applied.runsScored,
+    outsBefore: before.outs,
+    // [sp+0x30] — 낫아웃은 삼진 사건이 하나 더 들고 B9 를 안 켠다 (a8fc6)
+    outsAdded: applied.outsAdded + (droppedThirdStrike ? 1 : 0),
+    strikeoutWhileRunning: droppedThirdStrike,
+    // ⚠️ 0xa89f0 — 사람 팀 승리로 경기가 끝나면 홈런·볼넷 비트를 함께 켠다 (P7 K1)
+    humanTeamWalkOff: applied.game.isFinished && applied.game.ourScore > applied.game.opponentScore,
+    batterRunnerSafe: defensePlay === null ? undefined : batterRunnerSafeOfFates(defensePlay.runnerFates),
+    // B6 — 번트 타구(state[0x13]) && (희생 [sp+8] || 득점) (a88e0 · a88f8)
+    isBunt: defensePlay?.buntBall === true,
+    runnersAdvanced: defensePlay?.sacrifice === true,
+    // B7 — 루프 a88fc: !0xb68dc(파울 — 정산에 오는 판은 번트 파울 아웃뿐) && 2·3루 첫 산 주자가 타자 아님 && 번트
+    foulBall: defensePlay?.buntFoulOut === true,
+    runnerInScoringPositionAfter: defensePlay?.scoringBaseRunnerAfter === true,
+    homeRunCounted,
+  }
+}
 
 /**
  * 돌발 경기 기록 검사 `0x8ec9c`(b6·b7)가 보는 세 값 — 돌발 객체의 state(+0x22c)·팀 표(+0x230)로 읽는다:
