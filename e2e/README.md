@@ -77,7 +77,11 @@ node e2e/smoke.mjs                  # 장면 49개 × chromium · webkit 아이�
 node e2e/smoke.mjs general-bat      # 몇 개만
 node e2e/outing-back.mjs            # 시연: 외출 지도 → 터치 '뒤로' → 관리 (chromium · webkit 아이폰)
 node e2e/outing-gray-tap.mjs         # 회귀: 외출 다녀온 뒤 흑백 외출 칸 터치 · 방향키가 막히는가 (타자편 · 투수편, webkit 아이폰, r341)
+node e2e/touch-in-game.mjs           # 회귀: 경기 중 손가락 탭(화면 OK · 판 스윙 · 구질 칸 · 번트/송구 버튼)이 게임에 가는가 (webkit 아이폰 세로 · 가로, r356)
 ```
+
+`touch-in-game.mjs` 는 `E2E_PORT` 의 서버(`e2e/serve.sh e2e` 권장 — 배포 꼴)를 쓴다. 첫 인자로 기기(`webkit-iphone,webkit-iphone-land`),
+그 뒤로 장면을 골라 돌릴 수 있다. 데스크톱 웹킷은 iOS 의 사건 추적 영역(r208)을 흉내 내지 않으므로 통과가 실제 아이폰 통과를 뜻하지는 않는다.
 
 경기 결과 → 116 평가 대사(키 · 탭) · 대회 끝 134 위 효과기 → 137 → 105 는 `e2e/year-cover-evaluation.mjs` 로 본다(r287, chromium 키 · webkit 아이폰 탭).
 
