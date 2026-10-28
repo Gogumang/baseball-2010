@@ -43,7 +43,7 @@ export interface BugfixConfig {
  * B-101 ~ B-105 는 2절(고침 · 웹 다름)의 id 라 1절에 없다.
  */
 const NUMBERED_BUG_COUNT = 100
-const LATER_BUG_IDS: readonly string[] = ['B-106', 'B-107', 'B-124', 'B-128']
+const LATER_BUG_IDS: readonly string[] = ['B-106', 'B-107', 'B-124', 'B-128', 'B-129']
 export const ORIGINAL_BUG_IDS: readonly string[] = [
   ...Array.from({ length: NUMBERED_BUG_COUNT }, (_, index) => `B-${String(index + 1).padStart(2, '0')}`),
   ...LATER_BUG_IDS,
@@ -144,6 +144,7 @@ export const IMPLEMENTED_BUGFIX_IDS: readonly string[] = [
   'B-107',
   'B-124',
   'B-128',
+  'B-129',
 ]
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null

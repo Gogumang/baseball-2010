@@ -5,6 +5,7 @@ import { isGameOverAt, endSituationOf, withInningRuns, applyOpponentInning } fro
 import { ACE_BATTER_ROSTER_SLOT } from '@/features/play-game/model/gameAces'
 import { rosterSlotAt } from '@/entities/game/model/quickLineup'
 import { backToBackRecordOf } from '@/entities/game/model/gameRecords'
+import { ownPositionRecordIdsOf } from '@/entities/game/model/ownPositionRecords'
 import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { chargeHalfInningLines } from '@/entities/game/model/gamePitcherLines'
 import { gameFightingSpiritOf } from '@/features/play-game/model/gameFlow/context/fightingSpirit'
@@ -136,8 +137,8 @@ export function playOpponentInning(progress: GameProgress, random: RandomPort, r
         strikeouts: progress.pitching.strikeouts + half.strikeouts,
         strikeoutCombo: half.strikeoutCombo,
       },
-      // 삼진 계열 기록도 우리 팀 것이다 (0xa77f0 은 수비 팀이 사람 팀인지 본다)
-      recordIds: [...progress.recordIds, ...half.recordIds],
+      // 삼진 계열 기록도 우리 팀 것이다 (0xa77f0 은 수비 팀이 사람 팀인지 본다) — B-129 고친 길은 타자에게 수비 쪽 기록을 안 준다
+      recordIds: [...progress.recordIds, ...ownPositionRecordIdsOf(half.recordIds, 'batter')],
       // 상대 팀 타석도 원본은 같은 0xa8024 로 상대 선수 레코드에 쌓는다 (B-2)
       leaguePlateAppearances: [
         ...progress.leaguePlateAppearances,
