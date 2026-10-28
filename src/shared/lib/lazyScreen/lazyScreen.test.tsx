@@ -7,12 +7,12 @@ import { lazyScreen, preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScre
 afterEach(cleanup)
 
 /** 손으로 푸는 덩이 받기 */
-function deferredLoad<Props extends object>(component: (props: Props) => JSX.Element) {
+function deferredLoad<Props extends object>(component: (props: Props) => React.JSX.Element) {
   let resolve: () => void = () => {}
   let calls = 0
   const load = () => {
     calls += 1
-    return new Promise<(props: Props) => JSX.Element>((done) => {
+    return new Promise<(props: Props) => React.JSX.Element>((done) => {
       resolve = () => done(component)
     })
   }
