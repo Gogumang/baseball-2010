@@ -62,6 +62,7 @@ import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { SCENE_STATE, markSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
+import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { acceptsBattingKey, keyTickOf, swingReleaseTickOf } from '@/widgets/batting-stage/lib/swingWindow'
 import { RESULT_PHASE_TICKS, resultPhaseTicksOf } from '@/widgets/batting-stage/lib/stagePhaseTicks'
 import {
@@ -395,6 +396,11 @@ interface BattingStageProps {
 /** 터치 번트 '7' · '9' 의 버튼 차례 — `touchKeyOffer` 의 '8'(1) 과 '3'(2) 사이 */
 const BUNT_7_TOUCH_ORDER = 1.25
 const BUNT_9_TOUCH_ORDER = 1.5
+/**
+ * 터치 스윙 버튼 — 원본 스윙 키 OK · '5' (0x53670 → 메시지 0x6a5 → 0x51db6) 중 '5' 를 쏜다(Enter 는 OK 상황 버튼 · 창이 쓰는 키라 겹치지 않게).
+ * 차례는 맨 앞(-1 — 필살타 '0' 의 0 보다 앞): 늘 같은 자리라 손가락이 찾지 않는다 (10-29 사용자 결정 — 아이폰 Safari 에서 화면 탭이 안 먹는다는 신고)
+ */
+const SWING_TOUCH_OFFER: TouchKeyOffer = { key: '5', label: '스윙', order: -1 }
 
 /** 원작 타석 화면. 그리기는 lib, 루프와 조작은 model이 맡는다. */
 
@@ -928,6 +934,8 @@ export function BattingStage({
   // 필살타 '0' 은 0x51e14 가드(번호 · 남은 횟수 — `canSpecialSwing`)가 열려 있을 때, 번트 '8' 은 화면이 번트 키를 열었고(`canBunt`)
   // 마타자가 아닐 때(0x51e48 이 마선수면 예약하지 않는다). 공을 안 던지는 동안(결과 연출 `isPaused` · 결과 창 배경 · 공용 창)은 거둔다
   const takesStageKeys = !props.isPaused && props.isResultBackdrop !== true && !isCommonWindowOpen
+  // 스윙 '5' 는 타석이 키를 받는 동안 늘 — 공이 날기 전 · 큰 타구 감상(0x13 건너뛰기)에서도 키보드 '5' 와 같은 길이다
+  useTouchKeyOffer(takesStageKeys ? SWING_TOUCH_OFFER : null)
   useTouchKeyOffer(
     takesStageKeys && canSpecialSwing(specialSwingNumber, aceBatterIndex >= 0, specialSwingRemaining) ? { key: '0', label: '필살타' } : null,
   )

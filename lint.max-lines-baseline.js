@@ -1,243 +1,243 @@
 // 150줄(코드만 · 빈 줄 · 주석 빼고) 을 넘는 옛 파일 — oxlint max-lines 예외 목록 (r343 도입 때 243개).
-// 줄 수 내림차순, 주석은 코드 줄 수. 파일을 쪼개 150 이하가 되면 목록에서 뺀다 — `pnpm check:lines` 가 빠질 파일을 알려 준다.
+// 목록은 파일 이름만, 경로 알파벳 순(숫자 주석 없음). 파일을 쪼개 150 이하가 되면 목록에서 뺀다 — `pnpm check:lines` 가 빠질 파일을 알려 준다.
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
-  'src/shared/config/original/pitchRecords.ts', // 4253
-  'src/features/defense-play/model/runDefensePlay.ts', // 2190
-  'src/app/model/useMissionSession.ts', // 2038
-  'src/app/model/useCareerSession.ts', // 1864
-  'src/app/model/usePitcherLeagueSession.ts', // 1604
-  'src/shared/config/original/battedBallPatterns.ts', // 1333
-  'src/pages/team-game/ui/TeamGameScreen.tsx', // 1254
-  'src/features/defense-play/model/runnerPlayEngine.ts', // 1037
-  'src/pages/defense/ui/DefensePlayback.tsx', // 1028
-  'src/pages/pitching/ui/PitcherGameScreen.tsx', // 1026
-  'src/pages/special/ui/SpecialScreen.tsx', // 1009
-  'src/widgets/batting-stage/lib/renderBattingStage.ts', // 1004
-  'src/app/ui/SeasonRoute.tsx', // 932
-  'src/features/defense-play/model/pickoffPlay.ts', // 914
-  'src/pages/settings/ui/SettingsScreen.tsx', // 900
-  'src/widgets/batting-stage/model/useStageAnimation.ts', // 893
-  'src/pages/record/ui/RecordAnnals.tsx', // 825
-  'src/entities/pitcher-career/model/pitcherCareer.ts', // 771
-  'src/shared/config/original/missions.ts', // 769
-  'src/widgets/batting-stage/ui/PitcherSideStage.tsx', // 750
-  'src/entities/league/model/leagueDay.ts', // 706
-  'src/app/ui/App.tsx', // 688
-  'src/app/ui/MissionRoutes.tsx', // 686
-  'src/entities/career/model/playerCareer.ts', // 681
-  'src/app/dev/sessionSnapshot.ts', // 661
-  'src/pages/home-run-derby/model/useHomeRunDerby.ts', // 626
-  'src/entities/game/model/simulateHalfInning.ts', // 614
-  'src/pages/pitching/ui/PitchingScreen.tsx', // 587
-  'src/pages/pitcher-league/model/usePitcherManagementMenu.ts', // 571
-  'src/widgets/skill-window/ui/SkillWindow.tsx', // 568
-  'src/widgets/batting-stage/ui/BattingStage.tsx', // 562
-  'src/shared/lib/pixelEffect/pixelEffect.ts', // 537
-  'src/pages/season/ui/TradeScreen.tsx', // 487
-  'src/entities/batting/model/ballPhysics.ts', // 486
-  'src/features/play-team-game/model/teamGameRoster.ts', // 482
-  'src/pages/ending/ui/EndingScreen.tsx', // 481
-  'src/pages/match-settings/ui/MatchSettingsWindow.tsx', // 478
-  'src/app/ui/PitcherLeagueRoute.tsx', // 473
-  'src/app/ui/CareerRoutes.tsx', // 468
-  'src/entities/season-mode/model/seasonEntry.ts', // 468
-  'src/entities/mission/model/missionCpuTeam.ts', // 456
-  'src/features/play-team-game/ui/InGameMenu.tsx', // 448
-  'src/entities/mission/model/missionRun.ts', // 431
-  'src/widgets/entry-editor/ui/EntryListWindow.tsx', // 428
-  'src/pages/mission-play/ui/MissionPlayScreen.tsx', // 427
-  'src/pages/season/ui/SeasonEquipmentScreen.tsx', // 420
-  'src/pages/special/ui/SkinBackdrops.tsx', // 419
-  'e2e/snapshot.mjs', // 418
-  'src/pages/general-mode/ui/AceSelectScreen.tsx', // 418
-  'src/pages/game/ui/GameScreen.tsx', // 414
-  'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx', // 411
-  'src/pages/nari-record-room/ui/NariRecordRoom.tsx', // 406
-  'src/pages/special-edit/ui/SpecialEditScreen.tsx', // 406
-  'src/pages/team-game/ui/SettlementBoard.tsx', // 405
-  'src/widgets/batting-stage/lib/renderScenery.ts', // 399
-  'src/pages/general-mode/model/useGeneralMode.ts', // 396
-  'src/entities/collection/model/collection.ts', // 395
-  'src/pages/main-menu/ui/MainMenuScreen.tsx', // 391
-  'src/pages/defense/ui/DefenseScreen.tsx', // 390
-  'src/pages/help/ui/HelpScreen.tsx', // 384
-  'src/pages/pitcher-league/ui/PitcherManagementScreen.tsx', // 382
-  'src/entities/mission/model/missionGame.ts', // 380
-  'src/pages/team-game/model/useTeamGame.ts', // 377
-  'src/app/ui/GameRoute.tsx', // 362
-  'src/pages/general-mode/ui/GeneralModeScreen.tsx', // 360
-  'src/app/ui/EntryRoutes.tsx', // 359
-  'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx', // 355
-  'src/pages/team-game/ui/TeamAutoRelay.tsx', // 342
-  'src/widgets/matchup-cards/lib/matchupCardsLayout.ts', // 339
-  'src/widgets/batting-stage/lib/pitchInputOverlay.ts', // 338
-  'src/pages/shop/ui/EquipmentWindow.tsx', // 336
-  'src/entities/season-mode/model/seasonEventFlow.ts', // 335
-  'e2e/scene-pixels.mjs', // 334
-  'src/shared/config/spritePreloadScenes.ts', // 334
-  'src/pages/general-mode/ui/FirstBatStadiumScreen.tsx', // 322
-  'src/widgets/batting-stage/lib/skillPanel.ts', // 322
-  'src/widgets/matchup-cards/ui/MatchupCards.tsx', // 321
-  'src/pages/nari-record-room/lib/nariRecordRoom.ts', // 319
-  'e2e/perf.mjs', // 316
-  'src/entities/career/model/gpItems.ts', // 310
-  'src/widgets/special-swing/ui/SpecialTrainingFigure.tsx', // 310
-  'src/pages/general-mode/ui/MatchInfoScreen.tsx', // 308
-  'src/pages/team-game/ui/SubstitutionWindow.tsx', // 305
-  'src/shared/lib/commonWindow/commonWindow.ts', // 304
-  'src/widgets/entry-editor/lib/entryListWindow.ts', // 303
-  'src/features/defense-play/model/pitchArrivalPlay.ts', // 302
-  'src/pages/create-player/ui/TeamSelectScreen.tsx', // 293
-  'src/pages/season/ui/SeasonMatchInfoScreen.tsx', // 290
-  'src/entities/game/model/quickAtBat.ts', // 287
-  'src/shared/ui/MessageBox/MessageBox.tsx', // 286
-  'src/entities/pitching/model/simulateBatter.ts', // 285
-  'src/pages/create-player/ui/CreatePlayerScreen.tsx', // 285
-  'src/pages/story/ui/StoryScreen.tsx', // 283
-  'src/entities/league/model/leaguePlayerStats.ts', // 282
-  'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts', // 281
-  'src/pages/management/lib/nariEntryView.ts', // 281
-  'src/pages/team-game/lib/teamMatchupCards.ts', // 281
-  'src/pages/story/ui/EventDialogueBox.tsx', // 280
-  'src/entities/pitcher-career/model/pitcherManagement.ts', // 278
-  'src/pages/mission-select/ui/MissionSelectScreen.tsx', // 278
-  'src/widgets/player-detail-window/ui/PlayerDetailWindow.tsx', // 278
-  'src/pages/defense/lib/defenseView.ts', // 277
-  'src/entities/season-mode/model/entryEditor.ts', // 271
-  'src/shared/lib/sprite/originalScale.fixture.ts', // 269
-  'src/pages/management/ui/NariMatchInfoScreen.tsx', // 267
-  'src/pages/special/lib/specialLayout.ts', // 263
-  'src/entities/mission/model/missionRunners.ts', // 258
-  'src/features/defense-play/model/laserPresentation.ts', // 258
-  'src/pages/main-menu/lib/mainMenuLayout.ts', // 258
-  'src/widgets/batting-stage/lib/renderHud.ts', // 258
-  'src/entities/pitcher-career/model/pitcherStoryScene.ts', // 256
-  'src/features/play-game/model/aceCutIn.ts', // 256
-  'src/pages/pitching/model/usePitcherGame.ts', // 256
-  'src/entities/fielding/model/throwTargetBase.ts', // 250
-  'src/entities/game/model/gameRecords.ts', // 247
-  'src/pages/season/ui/SeasonPlayerCard.tsx', // 247
-  'src/pages/shop/ui/ShopWindow.tsx', // 244
-  'src/entities/career/model/gameEvaluation.ts', // 242
-  'src/pages/management/ui/DetailPopup.tsx', // 242
-  'src/entities/fielding/model/coverAssignment.ts', // 241
-  'src/pages/main-menu/model/mainMenu.ts', // 241
-  'src/entities/awards/model/seasonAwards.ts', // 239
-  'src/pages/season/ui/StadiumShopScreen.tsx', // 237
-  'src/widgets/batting-stage/lib/batterLayers.ts', // 237
-  'src/features/defense-play/model/catchForecast.ts', // 235
-  'src/features/play-at-bat/model/resolvePitch.ts', // 235
-  'src/pages/management/model/useManagementMenu.ts', // 234
-  'src/pages/mission-play/lib/missionHudLayout.ts', // 234
-  'src/widgets/batting-stage/model/stageRefs.ts', // 229
-  'src/app/model/screenBgm.ts', // 228
-  'src/entities/fielding/model/throwPlan.ts', // 228
-  'src/entities/collection/model/annalsStats.ts', // 227
-  'src/app/dev/sceneRunner.ts', // 226
-  'src/app/model/useCollection.ts', // 226
-  'src/shared/lib/commonPanel/commonPanel.ts', // 226
-  'src/shared/config/original/pitchPatterns.ts', // 225
-  'src/pages/shop/ui/ShopScreen.tsx', // 222
-  'src/entities/mission/model/pitcherRun.ts', // 220
-  'src/pages/season/ui/SeasonTeamInfoScreen.tsx', // 220
-  'src/shared/lib/sprite/spritePreload.ts', // 220
-  'src/pages/season/lib/seasonEquipmentWindow.ts', // 219
-  'src/features/defense-play/model/stealPlay.ts', // 218
-  'src/pages/management/ui/ManagementScreen.tsx', // 218
-  'e2e/derby-stage.mjs', // 217
-  'src/features/defense-play/model/defensePlayView.ts', // 217
-  'src/widgets/batting-stage/lib/stageScenery.ts', // 217
-  'src/entities/season-mode/model/seasonRecord.ts', // 216
-  'src/entities/story/model/storyScene.ts', // 216
-  'src/entities/career/model/nariTeamRecord.ts', // 215
-  'src/pages/mission-play/ui/MissionResultBoard.tsx', // 214
-  'src/shared/lib/sprite/paletteSwap.ts', // 214
-  'src/entities/batting/model/settlementEffect.ts', // 213
-  'src/features/play-pitcher-game/model/pitcherPitch.ts', // 211
-  'src/features/defense-play/model/defenseScene.ts', // 209
-  'src/entities/pitching/model/selectPitch.ts', // 208
-  'src/features/defense-play/model/passedBallPlay.ts', // 208
-  'src/entities/fielding/model/fieldingState.ts', // 207
-  'src/pages/mission-play/lib/missionMatchupCards.ts', // 207
-  'src/entities/game/model/gameState.ts', // 206
-  'src/widgets/management/ui/TitleListWindow.tsx', // 205
-  'src/entities/career/model/titles.ts', // 204
-  'src/entities/mode-save/model/modeSave.ts', // 204
-  'src/entities/league/model/league.ts', // 202
-  'src/pages/pitcher-league/ui/PitchWindowFigure.tsx', // 201
-  'src/entities/season-mode/model/seasonStateMachine.ts', // 198
-  'src/app/assetPacks/assetPackGate.ts', // 197
-  'src/pages/special/lib/hallOfFameFigure.ts', // 196
-  'src/widgets/batting-stage/lib/homeRunBanner.ts', // 196
-  'src/widgets/batting-stage/lib/pitcherSideStage.ts', // 195
-  'src/widgets/record-pick-popup/ui/RecordPickPopup.tsx', // 195
-  'src/features/play-team-game/model/gameAbilities.ts', // 193
-  'src/entities/story/model/rewardNotice.ts', // 192
-  'src/pages/management/lib/nariMatchPrepare.ts', // 192
-  'src/pages/season/ui/StadiumItemWindow.tsx', // 192
-  'src/entities/pitching/model/pitcherChange.ts', // 191
-  'src/pages/team-game/lib/substitutionWindow.ts', // 190
-  'src/widgets/ace-level-up/ui/AceLevelUpWindow.tsx', // 190
-  'src/pages/record/lib/recordAnnalsLayout.ts', // 188
-  'src/pages/management/lib/managementLayout.ts', // 186
-  'src/pages/story/model/useEventPlayback.ts', // 185
-  'src/pages/season/ui/TradeConfirmWindow.tsx', // 184
-  'src/pages/pitcher-league/ui/PitchChoicePopup.tsx', // 183
-  'src/entities/season-mode/model/playerRecruit.ts', // 182
-  'src/pages/season/ui/SeasonTrainingScreen.tsx', // 180
-  'src/widgets/burst-mission/ui/BurstMissionWindow.tsx', // 179
-  'src/entities/career/model/seasonFlow.ts', // 178
-  'src/entities/batting/model/swingResult.ts', // 177
-  'src/pages/settings/lib/settingsLayout.ts', // 176
-  'src/pages/story/lib/eventDialogue.ts', // 176
-  'src/pages/match-settings/lib/matchSettingsLayout.ts', // 174
-  'src/pages/story/lib/yearGoalWindow.ts', // 174
-  'src/pages/team-game/lib/settlementBoard.ts', // 173
-  'src/widgets/entry-editor/ui/EntryEditorScreen.tsx', // 173
-  'src/entities/fielding/model/catchPrediction.ts', // 172
-  'src/entities/mission/model/missionGoal.ts', // 172
-  'src/pages/national-cup/ui/NationalCupScreen.tsx', // 172
-  'src/pages/home-run-derby/ui/DerbyResultWindow.tsx', // 171
-  'src/pages/shop/lib/equipmentWindowLayout.ts', // 171
-  'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts', // 170
-  'src/pages/season/ui/SeasonTeamSelectScreen.tsx', // 169
-  'src/pages/mission-play/ui/MissionHud.tsx', // 168
-  'src/features/play-game/model/useSceneConfirm.ts', // 167
-  'src/widgets/batting-stage/lib/spriteLoader.ts', // 167
-  'src/widgets/player-detail-window/lib/playerDetailWindow.ts', // 167
-  'src/app/model/modePitcher.ts', // 166
-  'src/entities/batting/model/battedBallFlight.ts', // 166
-  'src/pages/management/ui/RadarChart.tsx', // 166
-  'src/shared/config/bugfixes/bugfixes.ts', // 166
-  'src/entities/batting/model/battedBallOutcome.ts', // 165
-  'src/entities/particle/model/particleEmitter.ts', // 165
-  'src/pages/season/ui/SeasonTrainingPopup.tsx', // 164
-  'src/widgets/season/lib/seasonOuting.ts', // 164
-  'e2e/all.mjs', // 163
-  'src/pages/season/ui/SeasonOutingPopup.tsx', // 163
-  'src/shared/config/original/sounds.ts', // 163
-  'src/widgets/game-scene/ui/BenchClearingScene.tsx', // 163
-  'src/entities/pitcher-career/model/magicPitch.ts', // 159
-  'src/pages/defense/lib/defenseHomeRunEffects.ts', // 159
-  'src/pages/general-mode/lib/prepareLayout.ts', // 159
-  'src/pages/management/ui/NariYearCoverScreen.tsx', // 159
-  'src/shared/api/audio/webAudioSound.ts', // 159
-  'src/pages/nari-record-room/ui/RankingBoard.tsx', // 158
-  'src/shared/config/original/acePlayers.ts', // 158
-  'src/shared/lib/pixelEffect/screenCompose.ts', // 158
-  'src/entities/career/model/training.ts', // 157
-  'src/pages/management/lib/detailPopup.ts', // 157
-  'src/pages/pitching/ui/PitchGradeGauge.tsx', // 156
-  'src/entities/season-mode/model/seasonItemShop.ts', // 155
-  'src/pages/pitcher-league/lib/pitchTrainingWindow.ts', // 154
-  'src/widgets/season/lib/postseasonBracketLayout.ts', // 154
-  'src/pages/ending/lib/endingLayout.ts', // 153
-  'src/pages/story/ui/EvaluationEventPlayer.tsx', // 153
-  'src/widgets/batting-stage/lib/bigHitScreen.ts', // 152
-  'src/widgets/line-score/lib/lineScoreLayout.ts', // 152
-  'src/pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx', // 151
-  'src/pages/season/ui/PlayerRecruitScreen.tsx', // 151
-  'src/shared/config/outingPlaces.ts', // 151
-  'src/shared/lib/screen565/screen565.ts', // 151
+  'e2e/all.mjs',
+  'e2e/derby-stage.mjs',
+  'e2e/perf.mjs',
+  'e2e/scene-pixels.mjs',
+  'e2e/snapshot.mjs',
+  'src/app/assetPacks/assetPackGate.ts',
+  'src/app/dev/sceneRunner.ts',
+  'src/app/dev/sessionSnapshot.ts',
+  'src/app/model/modePitcher.ts',
+  'src/app/model/screenBgm.ts',
+  'src/app/model/useCareerSession.ts',
+  'src/app/model/useCollection.ts',
+  'src/app/model/useMissionSession.ts',
+  'src/app/model/usePitcherLeagueSession.ts',
+  'src/app/ui/App.tsx',
+  'src/app/ui/CareerRoutes.tsx',
+  'src/app/ui/EntryRoutes.tsx',
+  'src/app/ui/GameRoute.tsx',
+  'src/app/ui/MissionRoutes.tsx',
+  'src/app/ui/PitcherLeagueRoute.tsx',
+  'src/app/ui/SeasonRoute.tsx',
+  'src/entities/awards/model/seasonAwards.ts',
+  'src/entities/batting/model/ballPhysics.ts',
+  'src/entities/batting/model/battedBallFlight.ts',
+  'src/entities/batting/model/battedBallOutcome.ts',
+  'src/entities/batting/model/settlementEffect.ts',
+  'src/entities/batting/model/swingResult.ts',
+  'src/entities/career/model/gameEvaluation.ts',
+  'src/entities/career/model/gpItems.ts',
+  'src/entities/career/model/nariTeamRecord.ts',
+  'src/entities/career/model/playerCareer.ts',
+  'src/entities/career/model/seasonFlow.ts',
+  'src/entities/career/model/titles.ts',
+  'src/entities/career/model/training.ts',
+  'src/entities/collection/model/annalsStats.ts',
+  'src/entities/collection/model/collection.ts',
+  'src/entities/fielding/model/catchPrediction.ts',
+  'src/entities/fielding/model/coverAssignment.ts',
+  'src/entities/fielding/model/fieldingState.ts',
+  'src/entities/fielding/model/throwPlan.ts',
+  'src/entities/fielding/model/throwTargetBase.ts',
+  'src/entities/game/model/gameRecords.ts',
+  'src/entities/game/model/gameState.ts',
+  'src/entities/game/model/quickAtBat.ts',
+  'src/entities/game/model/simulateHalfInning.ts',
+  'src/entities/league/model/league.ts',
+  'src/entities/league/model/leagueDay.ts',
+  'src/entities/league/model/leaguePlayerStats.ts',
+  'src/entities/mission/model/missionCpuTeam.ts',
+  'src/entities/mission/model/missionGame.ts',
+  'src/entities/mission/model/missionGoal.ts',
+  'src/entities/mission/model/missionRun.ts',
+  'src/entities/mission/model/missionRunners.ts',
+  'src/entities/mission/model/pitcherRun.ts',
+  'src/entities/mode-save/model/modeSave.ts',
+  'src/entities/particle/model/particleEmitter.ts',
+  'src/entities/pitcher-career/model/magicPitch.ts',
+  'src/entities/pitcher-career/model/pitcherCareer.ts',
+  'src/entities/pitcher-career/model/pitcherManagement.ts',
+  'src/entities/pitcher-career/model/pitcherStoryScene.ts',
+  'src/entities/pitching/model/pitcherChange.ts',
+  'src/entities/pitching/model/selectPitch.ts',
+  'src/entities/pitching/model/simulateBatter.ts',
+  'src/entities/season-mode/model/entryEditor.ts',
+  'src/entities/season-mode/model/playerRecruit.ts',
+  'src/entities/season-mode/model/seasonEntry.ts',
+  'src/entities/season-mode/model/seasonEventFlow.ts',
+  'src/entities/season-mode/model/seasonItemShop.ts',
+  'src/entities/season-mode/model/seasonRecord.ts',
+  'src/entities/season-mode/model/seasonStateMachine.ts',
+  'src/entities/story/model/rewardNotice.ts',
+  'src/entities/story/model/storyScene.ts',
+  'src/features/defense-play/model/catchForecast.ts',
+  'src/features/defense-play/model/defensePlayView.ts',
+  'src/features/defense-play/model/defenseScene.ts',
+  'src/features/defense-play/model/laserPresentation.ts',
+  'src/features/defense-play/model/passedBallPlay.ts',
+  'src/features/defense-play/model/pickoffPlay.ts',
+  'src/features/defense-play/model/pitchArrivalPlay.ts',
+  'src/features/defense-play/model/runDefensePlay.ts',
+  'src/features/defense-play/model/runnerPlayEngine.ts',
+  'src/features/defense-play/model/stealPlay.ts',
+  'src/features/play-at-bat/model/resolvePitch.ts',
+  'src/features/play-game/model/aceCutIn.ts',
+  'src/features/play-game/model/useSceneConfirm.ts',
+  'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts',
+  'src/features/play-pitcher-game/model/pitcherPitch.ts',
+  'src/features/play-team-game/model/gameAbilities.ts',
+  'src/features/play-team-game/model/teamGameRoster.ts',
+  'src/features/play-team-game/ui/InGameMenu.tsx',
+  'src/pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx',
+  'src/pages/create-player/ui/CreatePlayerScreen.tsx',
+  'src/pages/create-player/ui/TeamSelectScreen.tsx',
+  'src/pages/defense/lib/defenseHomeRunEffects.ts',
+  'src/pages/defense/lib/defenseView.ts',
+  'src/pages/defense/ui/DefensePlayback.tsx',
+  'src/pages/defense/ui/DefenseScreen.tsx',
+  'src/pages/ending/lib/endingLayout.ts',
+  'src/pages/ending/ui/EndingScreen.tsx',
+  'src/pages/game/ui/GameScreen.tsx',
+  'src/pages/general-mode/lib/prepareLayout.ts',
+  'src/pages/general-mode/model/useGeneralMode.ts',
+  'src/pages/general-mode/ui/AceSelectScreen.tsx',
+  'src/pages/general-mode/ui/FirstBatStadiumScreen.tsx',
+  'src/pages/general-mode/ui/GeneralModeScreen.tsx',
+  'src/pages/general-mode/ui/MatchInfoScreen.tsx',
+  'src/pages/help/ui/HelpScreen.tsx',
+  'src/pages/home-run-derby/model/useHomeRunDerby.ts',
+  'src/pages/home-run-derby/ui/DerbyResultWindow.tsx',
+  'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx',
+  'src/pages/main-menu/lib/mainMenuLayout.ts',
+  'src/pages/main-menu/model/mainMenu.ts',
+  'src/pages/main-menu/ui/MainMenuScreen.tsx',
+  'src/pages/management/lib/detailPopup.ts',
+  'src/pages/management/lib/managementLayout.ts',
+  'src/pages/management/lib/nariEntryView.ts',
+  'src/pages/management/lib/nariMatchPrepare.ts',
+  'src/pages/management/model/useManagementMenu.ts',
+  'src/pages/management/ui/DetailPopup.tsx',
+  'src/pages/management/ui/ManagementScreen.tsx',
+  'src/pages/management/ui/NariMatchInfoScreen.tsx',
+  'src/pages/management/ui/NariYearCoverScreen.tsx',
+  'src/pages/management/ui/RadarChart.tsx',
+  'src/pages/match-settings/lib/matchSettingsLayout.ts',
+  'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
+  'src/pages/mission-play/lib/missionHudLayout.ts',
+  'src/pages/mission-play/lib/missionMatchupCards.ts',
+  'src/pages/mission-play/ui/MissionHud.tsx',
+  'src/pages/mission-play/ui/MissionPlayScreen.tsx',
+  'src/pages/mission-play/ui/MissionResultBoard.tsx',
+  'src/pages/mission-select/ui/MissionSelectScreen.tsx',
+  'src/pages/nari-record-room/lib/nariRecordRoom.ts',
+  'src/pages/nari-record-room/ui/NariRecordRoom.tsx',
+  'src/pages/nari-record-room/ui/RankingBoard.tsx',
+  'src/pages/national-cup/ui/NationalCupScreen.tsx',
+  'src/pages/pitcher-league/lib/pitchTrainingWindow.ts',
+  'src/pages/pitcher-league/model/usePitcherManagementMenu.ts',
+  'src/pages/pitcher-league/ui/PitchChoicePopup.tsx',
+  'src/pages/pitcher-league/ui/PitchWindowFigure.tsx',
+  'src/pages/pitcher-league/ui/PitcherManagementScreen.tsx',
+  'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx',
+  'src/pages/pitching/model/usePitcherGame.ts',
+  'src/pages/pitching/ui/PitchGradeGauge.tsx',
+  'src/pages/pitching/ui/PitcherGameScreen.tsx',
+  'src/pages/pitching/ui/PitchingScreen.tsx',
+  'src/pages/record/lib/recordAnnalsLayout.ts',
+  'src/pages/record/ui/RecordAnnals.tsx',
+  'src/pages/season/lib/seasonEquipmentWindow.ts',
+  'src/pages/season/ui/PlayerRecruitScreen.tsx',
+  'src/pages/season/ui/SeasonEquipmentScreen.tsx',
+  'src/pages/season/ui/SeasonMatchInfoScreen.tsx',
+  'src/pages/season/ui/SeasonOutingPopup.tsx',
+  'src/pages/season/ui/SeasonPlayerCard.tsx',
+  'src/pages/season/ui/SeasonTeamInfoScreen.tsx',
+  'src/pages/season/ui/SeasonTeamSelectScreen.tsx',
+  'src/pages/season/ui/SeasonTrainingPopup.tsx',
+  'src/pages/season/ui/SeasonTrainingScreen.tsx',
+  'src/pages/season/ui/StadiumItemWindow.tsx',
+  'src/pages/season/ui/StadiumShopScreen.tsx',
+  'src/pages/season/ui/TradeConfirmWindow.tsx',
+  'src/pages/season/ui/TradeScreen.tsx',
+  'src/pages/settings/lib/settingsLayout.ts',
+  'src/pages/settings/ui/SettingsScreen.tsx',
+  'src/pages/shop/lib/equipmentWindowLayout.ts',
+  'src/pages/shop/ui/EquipmentWindow.tsx',
+  'src/pages/shop/ui/ShopScreen.tsx',
+  'src/pages/shop/ui/ShopWindow.tsx',
+  'src/pages/special-edit/ui/SpecialEditScreen.tsx',
+  'src/pages/special/lib/hallOfFameFigure.ts',
+  'src/pages/special/lib/specialLayout.ts',
+  'src/pages/special/ui/SkinBackdrops.tsx',
+  'src/pages/special/ui/SpecialScreen.tsx',
+  'src/pages/story/lib/eventDialogue.ts',
+  'src/pages/story/lib/yearGoalWindow.ts',
+  'src/pages/story/model/useEventPlayback.ts',
+  'src/pages/story/ui/EvaluationEventPlayer.tsx',
+  'src/pages/story/ui/EventDialogueBox.tsx',
+  'src/pages/story/ui/StoryScreen.tsx',
+  'src/pages/team-game/lib/settlementBoard.ts',
+  'src/pages/team-game/lib/substitutionWindow.ts',
+  'src/pages/team-game/lib/teamMatchupCards.ts',
+  'src/pages/team-game/model/useTeamGame.ts',
+  'src/pages/team-game/ui/SettlementBoard.tsx',
+  'src/pages/team-game/ui/SubstitutionWindow.tsx',
+  'src/pages/team-game/ui/TeamAutoRelay.tsx',
+  'src/pages/team-game/ui/TeamGameScreen.tsx',
+  'src/shared/api/audio/webAudioSound.ts',
+  'src/shared/config/bugfixes/bugfixes.ts',
+  'src/shared/config/original/acePlayers.ts',
+  'src/shared/config/original/battedBallPatterns.ts',
+  'src/shared/config/original/missions.ts',
+  'src/shared/config/original/pitchPatterns.ts',
+  'src/shared/config/original/pitchRecords.ts',
+  'src/shared/config/original/sounds.ts',
+  'src/shared/config/outingPlaces.ts',
+  'src/shared/config/spritePreloadScenes.ts',
+  'src/shared/lib/commonPanel/commonPanel.ts',
+  'src/shared/lib/commonWindow/commonWindow.ts',
+  'src/shared/lib/pixelEffect/pixelEffect.ts',
+  'src/shared/lib/pixelEffect/screenCompose.ts',
+  'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts',
+  'src/shared/lib/screen565/screen565.ts',
+  'src/shared/lib/sprite/originalScale.fixture.ts',
+  'src/shared/lib/sprite/paletteSwap.ts',
+  'src/shared/lib/sprite/spritePreload.ts',
+  'src/shared/ui/MessageBox/MessageBox.tsx',
+  'src/widgets/ace-level-up/ui/AceLevelUpWindow.tsx',
+  'src/widgets/batting-stage/lib/batterLayers.ts',
+  'src/widgets/batting-stage/lib/bigHitScreen.ts',
+  'src/widgets/batting-stage/lib/homeRunBanner.ts',
+  'src/widgets/batting-stage/lib/pitchInputOverlay.ts',
+  'src/widgets/batting-stage/lib/pitcherSideStage.ts',
+  'src/widgets/batting-stage/lib/renderBattingStage.ts',
+  'src/widgets/batting-stage/lib/renderHud.ts',
+  'src/widgets/batting-stage/lib/renderScenery.ts',
+  'src/widgets/batting-stage/lib/skillPanel.ts',
+  'src/widgets/batting-stage/lib/spriteLoader.ts',
+  'src/widgets/batting-stage/lib/stageScenery.ts',
+  'src/widgets/batting-stage/model/stageRefs.ts',
+  'src/widgets/batting-stage/model/useStageAnimation.ts',
+  'src/widgets/batting-stage/ui/BattingStage.tsx',
+  'src/widgets/batting-stage/ui/PitcherSideStage.tsx',
+  'src/widgets/burst-mission/ui/BurstMissionWindow.tsx',
+  'src/widgets/entry-editor/lib/entryListWindow.ts',
+  'src/widgets/entry-editor/ui/EntryEditorScreen.tsx',
+  'src/widgets/entry-editor/ui/EntryListWindow.tsx',
+  'src/widgets/game-scene/ui/BenchClearingScene.tsx',
+  'src/widgets/line-score/lib/lineScoreLayout.ts',
+  'src/widgets/management/ui/TitleListWindow.tsx',
+  'src/widgets/matchup-cards/lib/matchupCardsLayout.ts',
+  'src/widgets/matchup-cards/ui/MatchupCards.tsx',
+  'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
+  'src/widgets/player-detail-window/ui/PlayerDetailWindow.tsx',
+  'src/widgets/record-pick-popup/ui/RecordPickPopup.tsx',
+  'src/widgets/season/lib/postseasonBracketLayout.ts',
+  'src/widgets/season/lib/seasonOuting.ts',
+  'src/widgets/skill-window/ui/SkillWindow.tsx',
+  'src/widgets/special-swing/ui/SpecialTrainingFigure.tsx',
 ]

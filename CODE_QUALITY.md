@@ -40,3 +40,5 @@
 | 중첩 · 복잡도 | oxlint `max-depth` 2 · `complexity` 8 · `no-else-return` · `no-lonely-if` · `max-nested-callbacks` 3 — 옛 파일은 `lint.readability-baseline.js` |
 
 새 파일은 예외 목록에 넣지 않는다. 옛 파일을 고칠 때는 이 기준으로 고치고 목록에서 뺀다.
+
+예외 목록 두 개는 **파일 이름만, 경로 알파벳 순**으로 둔다(줄 수 · 위반 수 같은 숫자 주석을 달지 않는다 — 한 줄만 고쳐도 목록이 바뀌고 머지 충돌이 나서). `pnpm check:lines` 는 "목록에 있는데 이제 규칙을 지키는 파일"과 "없는 파일"만 잡고, `pnpm check:lines --update` 가 그런 파일을 빼고 이름 목록을 다시 쓴다.

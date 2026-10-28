@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 
 /**
  * **상황 버튼 알림판** (웹 껍데기 — 원본에 없음). 터치 기기에서는 숫자 키패드도, 늘 있던 확인 · 뒤로 버튼도
- * 없다(`widgets/touch-controls`, r186). 원본 키('0' 필살타 · 마구, '8' 번트, '3'/'2'/'1' 도루, '#' 교체, '*' 메뉴)는
+ * 없다(`widgets/touch-controls`, r186). 원본 키('5' 스윙, '0' 필살타 · 마구, '8' 번트, '3'/'2'/'1' 도루, '#' 교체, '*' 메뉴)는
  * **지금 그 키를 받는 화면 부품이 여기에 알리는 동안만** 버튼으로 뜬다.
  *
  * 버튼은 키보드와 같은 키 사건(keydown · keyup)을 쏜다 — 화면은 키보드 · 버튼을 가리지 않고, 받은 키는 화면이 늘 하던 대로
@@ -91,12 +91,12 @@ export const SCROLL_DOWN_OFFER: TouchKeyOffer = { key: 'ArrowDown', label: '▼ 
 export const PAGE_PREVIOUS_OFFER: TouchKeyOffer = { key: 'ArrowLeft', label: '◀ 앞' }
 export const PAGE_NEXT_OFFER: TouchKeyOffer = { key: 'ArrowRight', label: '뒤 ▶' }
 
+/** OK(Enter) 상황 버튼 — 원본 그림에 OK 글자 자리가 없는 화면(선수 등록 · 변화구 고르기, 10-29 사용자 신고) */
+export const OK_KEY_OFFER: TouchKeyOffer = { key: 'Enter', label: 'OK' }
 /**
  * CLR(Escape) 상황 버튼 — 원본 그림에 CLR 글자 자리가 없어 투명 누름 칸만으로는 안 보이는 화면(외출 지도 · 구질 두 칸 팝업 따위, r194).
  * 버튼은 Escape 키 사건을 쏘아 키 CLR 과 같은 길을 탄다
  */
-/** OK(Enter) 상황 버튼 — 원본 그림에 OK 글자 자리가 없는 화면(선수 등록 · 변화구 고르기, 10-29 사용자 신고) */
-export const OK_KEY_OFFER: TouchKeyOffer = { key: 'Enter', label: 'OK' }
 export const BACK_KEY_OFFER: TouchKeyOffer = { key: 'Escape', label: '뒤로' }
 export const CANCEL_KEY_OFFER: TouchKeyOffer = { key: 'Escape', label: '취소' }
 
