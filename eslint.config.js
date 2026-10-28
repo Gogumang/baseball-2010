@@ -7,6 +7,7 @@ import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 import { defineConfig } from 'eslint/config'
 import { maxLinesBaseline } from './eslint.max-lines-baseline.js'
+import { readabilityBaseline, readabilityRules } from './eslint.readability-baseline.js'
 
 /** 코드만(주석 · 빈 줄 빼고) 150줄. 넘는 옛 파일은 `eslint.max-lines-baseline.js` 예외 목록 — 쪼개면 목록에서 뺀다 (`yarn check:lines`). */
 const MAX_LINES = ['error', { max: 150, skipBlankLines: true, skipComments: true }]
@@ -15,7 +16,14 @@ const TEST_FILES = ['**/*.test.ts', '**/*.test.tsx']
 export default defineConfig(
   { ignores: ['dist', 'base', 'public', '.yarn', '.pnp.cjs', '.pnp.loader.mjs', 'e2e/snapshots', 'e2e/fixtures', 'e2e/.run'] },
   {
-    files: ['src/**/*.{ts,tsx}', 'e2e/**/*.{js,mjs,ts}', 'tools/**/*.{js,mjs,ts}', '*.config.{ts,js}', 'eslint.max-lines-baseline.js'],
+    files: [
+      'src/**/*.{ts,tsx}',
+      'e2e/**/*.{js,mjs,ts}',
+      'tools/**/*.{js,mjs,ts}',
+      '*.config.{ts,js}',
+      'eslint.max-lines-baseline.js',
+      'eslint.readability-baseline.js',
+    ],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: { ecmaVersion: 2023, sourceType: 'module' },
     linterOptions: { reportUnusedDisableDirectives: 'error' },
@@ -33,7 +41,7 @@ export default defineConfig(
   },
   { files: ['src/**/*.{ts,tsx}'], languageOptions: { globals: globals.browser } },
   {
-    files: ['e2e/**', 'tools/**', '*.config.{ts,js}', 'eslint.max-lines-baseline.js'],
+    files: ['e2e/**', 'tools/**', '*.config.{ts,js}', 'eslint.max-lines-baseline.js', 'eslint.readability-baseline.js'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
@@ -61,7 +69,13 @@ export default defineConfig(
       ],
     },
   },
+  {
+    // if 줄이기 — 갈래 8 · 블록 겹 2 · else-return · 외톨이 if · 콜백 겹 3. 어기는 옛 파일은 `eslint.readability-baseline.js` 예외 목록
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [...TEST_FILES, ...readabilityBaseline],
+    rules: readabilityRules,
+  },
   { files: TEST_FILES, rules: { 'max-lines': 'off' } },
-  { files: [...maxLinesBaseline, 'eslint.max-lines-baseline.js'], rules: { 'max-lines': 'off' } },
+  { files: [...maxLinesBaseline, 'eslint.max-lines-baseline.js', 'eslint.readability-baseline.js'], rules: { 'max-lines': 'off' } },
   prettier,
 )
