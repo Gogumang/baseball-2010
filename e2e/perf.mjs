@@ -2,8 +2,8 @@
 //
 //   E2E_PORT=5440 e2e/serve.sh e2e          # `vite build --mode e2e` + preview (압축 켜짐, 바로가기 켜짐)
 //   (vite preview --outDir dist --port 5441)  # 배포 빌드 — 켤 때 길용
-//   E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ yarn node e2e/perf.mjs    # chromium(데스크톱) · webkit(아이폰 13) 각 PERF_RUNS 번(기본 2) — 가운데 값
-//   PERF_RUNS=3 PERF_ONLY=webkit yarn node e2e/perf.mjs
+//   E2E_PORT=5440 PERF_BOOT_URL=http://127.0.0.1:5441/ node e2e/perf.mjs    # chromium(데스크톱) · webkit(아이폰 13) 각 PERF_RUNS 번(기본 2) — 가운데 값
+//   PERF_RUNS=3 PERF_ONLY=webkit node e2e/perf.mjs
 //   PERF_REVISIT=nari-management PERF_ONLY=chromium PERF_NET=rtt …   # 다시 방문 — 같은 맥락(같은 HTTP 캐시)에서 장면을 두 번 열고 두 번째를 잰다
 //                                                                       (r318 — `e2e/serve-vercel.mjs` 로 `vercel.json` 머리를 붙여 띄운 서버에)
 //

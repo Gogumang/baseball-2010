@@ -131,7 +131,6 @@ export function useNextGameStart(ctx: SeasonShopActionsContext) {
       }
       // 4cc8 — 이전 상태가 0xd7(경기 전 마선수 고르기 CLR)이면 phase 4 는 메모리에만 쓰고 저장하지 않는다
       if (fromSquad) {
-        // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
         latestSave.current = entered
         setSave(entered)
       } else {

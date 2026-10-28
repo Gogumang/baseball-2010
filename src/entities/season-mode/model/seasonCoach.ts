@@ -74,7 +74,8 @@ export function coachEffectTextOf(slot: number): string {
 export type CoachHireRefusal = '없는칸' | '이미채용' | '소지금부족' | '인기도부족'
 
 export type CoachHireCheck =
-  { readonly ok: true; readonly fee: number } | { readonly ok: false; readonly reason: CoachHireRefusal; readonly required?: number }
+  | { readonly ok: true; readonly fee: number }
+  | { readonly ok: false; readonly reason: CoachHireRefusal; readonly required?: number }
 
 /**
  * 채용 가드 — 원본 `0xa79c~` 의 **순서 그대로** (J 4-3 확정):

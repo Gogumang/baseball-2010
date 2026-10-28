@@ -1,7 +1,7 @@
 // **두 서버의 장면 화면을 픽셀 단위로 견준다** — 자산만 바꾼 판(예: r311 PNG 팔레트 다시 쓰기 · JSON 묶음)이 화면을 바꾸지 않았는지.
 //
-//   PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ yarn node e2e/scene-pixels.mjs              # 장면 표 전부 × chromium · webkit 아이폰
-//   PIXELS_A=… PIXELS_B=… yarn node e2e/scene-pixels.mjs general-bat derby-start                             # 몇 개만
+//   PIXELS_A=http://127.0.0.1:5711/ PIXELS_B=http://127.0.0.1:5641/ node e2e/scene-pixels.mjs              # 장면 표 전부 × chromium · webkit 아이폰
+//   PIXELS_A=… PIXELS_B=… node e2e/scene-pixels.mjs general-bat derby-start                             # 몇 개만
 //   PIXELS_ONLY=webkit PIXELS_SETTLE=2000 …                                                                   # 한 브라우저 · ready 뒤 더 돌릴 가상 ms
 //   PIXELS_RUNS=chromium:iphone,webkit:iphone-land …                                                         # 브라우저:기기 짝 (기본 chromium:desktop,webkit:iphone)
 //   PIXELS_SHOTS=48 PIXELS_SHOT_STEP=50 …                                                                     # ready + SETTLE 뒤 STEP ms 씩 밀며 여러 틱 위상을 찍어 다 견준다

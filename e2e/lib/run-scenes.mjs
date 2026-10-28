@@ -68,7 +68,7 @@ export async function runScenes({ jobs, concurrency, states, real = false, verbo
       // 낡은 스냅샷 — 그 장면만 실제 진행 길로 다시 (느리다)
       if (!real && /스냅샷이 낡았다/.test(checked.results[0]?.error ?? '')) {
         staleSnapshots.add(scene)
-        console.log(`낡은 스냅샷 ${scene} @${device} — 실제 진행 길로 다시 연다 (yarn e2e:snapshot ${scene} 으로 다시 뜰 것)`)
+        console.log(`낡은 스냅샷 ${scene} @${device} — 실제 진행 길로 다시 연다 (pnpm e2e:snapshot ${scene} 으로 다시 뜰 것)`)
         ;({ checked, pageErrors } = await checkOnce(scene, device, 'real=1'))
       }
       const ms = Date.now() - jobStarted

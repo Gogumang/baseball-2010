@@ -48,7 +48,9 @@ export const NO_SPECIAL_SWING_NUMBER = 0
  * `'묻기'` 의 `number` 는 **저장할 번호**(1~4)이고 `name` 은 `4 + 타입` 으로 고른 이름이다.
  */
 export type SpecialSwingPick =
-  { readonly kind: '사용중' } | { readonly kind: '미습득' } | { readonly kind: '묻기'; readonly number: number; readonly name: string }
+  | { readonly kind: '사용중' }
+  | { readonly kind: '미습득' }
+  | { readonly kind: '묻기'; readonly number: number; readonly name: string }
 
 /**
  * 기술 고르기 키 처리 `0x17cec` (확인 키 −5 / '5', 탭 0·1, H-4 확정):

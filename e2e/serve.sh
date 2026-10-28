@@ -30,8 +30,8 @@ esac
 if alive && ready; then echo "already running pid=$(cat "$PID") http://127.0.0.1:$PORT/"; exit 0; fi
 rm -f "$PID"
 
-# yarn 을 거치면 yarn 이 vite 를 자식으로 띄워 pid 로 못 끈다 — PnP 로 node 를 곧바로 띄운다
-VITE="node --require ./.pnp.cjs --loader ./.pnp.loader.mjs --no-warnings $(yarn bin vite)"
+# pnpm 을 거치면 pnpm 이 vite 를 자식으로 띄워 pid 로 못 끈다 — node 로 vite 를 곧바로 띄운다
+VITE="node node_modules/vite/bin/vite.js"
 if [ "${1:-dev}" = e2e ]; then
   $VITE build --mode e2e --outDir "$RUN/dist-$PORT" >"$LOG" 2>&1
   nohup $VITE preview --mode e2e --outDir "$RUN/dist-$PORT" --host 127.0.0.1 --port "$PORT" --strictPort >>"$LOG" 2>&1 &

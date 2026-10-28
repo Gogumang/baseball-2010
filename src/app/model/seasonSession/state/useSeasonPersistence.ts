@@ -106,11 +106,8 @@ export function useSeasonPersistence(ctx: SeasonUiStateContext) {
    * 번호로 이벤트를 틀고 0xd3 으로 — `0x8bdc8` 은 커서 +0x2c 를 그 레코드 다음으로 옮긴다(0xae170).
    * 연초 목표 내장 이벤트(0x8a680)는 커서를 건드리지 않는다.
    */
-  // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
   const startEvent = useCallback((eventId: number, returnScene: SeasonSceneState) => {
-    // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
     if (eventId !== YEAR_GOAL_EVENT_ID) eventCursor.current = cursorAfterCalling(eventCursor.current, eventId)
-    // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
     playbackSerial.current += 1
     setEventPlayback({ eventId, returnScene, serial: playbackSerial.current })
     setScene(SEASON_SCENE_STATE.이벤트재생)

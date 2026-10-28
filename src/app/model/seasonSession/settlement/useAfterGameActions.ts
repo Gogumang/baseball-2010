@@ -31,7 +31,6 @@ export function useAfterGameActions(ctx: SettleGameContext) {
   const enterGameSettlement = useCallback(
     (summary: TeamGameSummary) => {
       if (settledGame.current !== null) return
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       settledGame.current = settleGame(summary)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
@@ -51,21 +50,18 @@ export function useAfterGameActions(ctx: SettleGameContext) {
   }, [random])
   /** 들어와 장면 0x105 를 세운다 — 셋업 0x3b14 가 mgr+0x304 = 1, 이어서 상태 1 적재의 팁 굴림 */
   const constructScene = useCallback(() => {
-    // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
     freshScene.current = true
     rollSceneLoadTip()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
   }, [rollSceneLoadTip])
   /** 관리 메뉴 0xc9 확인 키(−5 · '5') — 0x8f82 가 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
   const pressManagementConfirm = useCallback(() => {
-    // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
     freshScene.current = false
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
   }, [])
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
       const settled = settledGame.current ?? settleGame(summary)
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       settledGame.current = null
       setResumeGame(null)
       // 경기 장면이 끝나면 장면 0x105 를 새로 세운다(0x3874 가 지운 뒤 0x3b14) — 상태 1 의 팁 굴림이 그 장면의 맨 앞이다

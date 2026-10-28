@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "printWidth": 150,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "dist",
+    "base",
+    "public",
+    "pnpm-lock.yaml",
+    "*.json.gz",
+    "e2e/snapshots",
+    "e2e/fixtures",
+    "e2e/.run",
+    "src/shared/config/original/data",
+    "*.md",
+    "*.generated.json",
+    "**/__fixtures__/*.json",
+    ".claude"
+  ]
+}

@@ -1,4 +1,4 @@
-// 바뀐 파일 → 도메인 — `yarn e2e:only --changed` · `yarn test:area --changed` 가 쓴다.
+// 바뀐 파일 → 도메인 — `pnpm e2e:only --changed` · `pnpm test:area --changed` 가 쓴다.
 // 바뀐 파일 = `<기준>...HEAD`(기준 기본: main 과 갈라진 곳) + 아직 커밋 안 한 것(추적 안 하는 새 파일 포함).
 import { execFileSync } from 'node:child_process'
 import { areasOfFile } from './catalog.mjs'
@@ -18,7 +18,7 @@ export function changedFiles(base) {
 const isBroad = (file) =>
   (/^src\//.test(file) && !/\.test\.tsx?$/.test(file)) ||
   /^e2e\/lib\//.test(file) ||
-  /^(vite\.config\.ts|package\.json|yarn\.lock|index\.html)$/.test(file)
+  /^(vite\.config\.ts|package\.json|pnpm-lock\.yaml|index\.html)$/.test(file)
 
 /**
  * 바뀐 파일들 → `{ byFile: [[파일, 도메인들]], areas, broad }`. `broad` 는 도메인이 없는 앱 · 시험 바탕 파일 —

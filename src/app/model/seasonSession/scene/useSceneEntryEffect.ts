@@ -30,7 +30,6 @@ export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
    * 같은 상태로 다시 가라고 해도(관리 메뉴 → 관리 메뉴) 바뀐 것이 아니라 돌지 않는다.
    */
   const enteredScene = useRef<SeasonSceneState | null>(null)
-  // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
   useEffect(() => {
     if (enteredScene.current === scene) return
     enteredScene.current = scene
@@ -74,12 +73,10 @@ export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
         },
         random,
       )
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       eventCursor.current = polled.cursor
       if (polled.record !== record) commit({ ...save, state: { ...save.state, record: polled.record } })
       const { poll } = polled
       if (poll.kind === '오프닝') {
-        // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
         newPlayerFlag.current = false
         return startEvent(OPENING_EVENT_ID, scene)
       }
@@ -114,7 +111,6 @@ export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
           globalOpenedHiddenIds: [...input.globalOpenedHiddenIds, ...openedHiddenIds],
         })
       if (opens) setOpenedHiddenIds((opened) => [...opened, SEASON_AUTOBOT_BAT_HIDDEN_ID])
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       summaryEntrySerial.current += 1
       setSummaryEntry({ serial: summaryEntrySerial.current, opensAutobotBat: opens })
       // 0x690e~0x6922 — 머리에서 SR+0x50 = 0xf 를 쓰고 0x1fded · 0x22755 로 저장한다(조건 없이, 포스트시즌 경기 뒤 다시 들어와도)
@@ -150,7 +146,6 @@ export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
     if (scene === SEASON_SCENE_STATE.투수시상) return startEvent(SEASON_AWARD_INTRO_EVENT_ID.투수, step.next)
     // 0xed 0xe7ac — 0x8dd61(evmgr) 가 표 0xd4f34 에서 rand(0..6) 으로 MVP 순위 종류를 고른 뒤(빈 순위표면 다시) 376 을 튼다
     if (scene === SEASON_SCENE_STATE.최우수선수) {
-      // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
       seasonMvpKind.current = rollSeasonMvpKind(save, recordSourceNow(), random)
       return startEvent(SEASON_AWARD_INTRO_EVENT_ID.MVP, step.next)
     }

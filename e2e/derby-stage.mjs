@@ -1,11 +1,11 @@
 // **홈런더비 단계 상승 · 난입 마투수까지 실제로 쳐서 닿기** (r261 — r226 은 조준을 안 움직여 비거리 0M 로 끝났다).
 //
-//   E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=10 yarn node e2e/derby-stage.mjs   # 단계 1 에 닿는 판 (chromium 데스크톱 · webkit 아이폰)
-//   yarn node e2e/derby-stage.mjs webkit                  # 하나만
-//   E2E_DERBY_SHIFT=-9 E2E_DERBY_FIXTURE=nari-ending yarn node e2e/derby-stage.mjs chromium
-//   E2E_DERBY_SWEEP=1 yarn node e2e/derby-stage.mjs chromium   # 좌우 이동마다 몇 M 나는지 훑기
-//   E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=1 E2E_DERBY_SKIP_UNTIL_STAGE=2 yarn node e2e/derby-stage.mjs chromium   # 단계 2 까지 건너뛰고 그 뒤 판을 찍기(A-07)
-//   E2E_DERBY_START_STAGE=2 E2E_DERBY_FIXTURE=nari-ending yarn node e2e/derby-stage.mjs   # 장면 `derby-stage2`(단계 2 시작 상태 — 누적 800 · 기회 10)에서 (A-07, r294)
+//   E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=10 node e2e/derby-stage.mjs   # 단계 1 에 닿는 판 (chromium 데스크톱 · webkit 아이폰)
+//   node e2e/derby-stage.mjs webkit                  # 하나만
+//   E2E_DERBY_SHIFT=-9 E2E_DERBY_FIXTURE=nari-ending node e2e/derby-stage.mjs chromium
+//   E2E_DERBY_SWEEP=1 node e2e/derby-stage.mjs chromium   # 좌우 이동마다 몇 M 나는지 훑기
+//   E2E_DERBY_FIXTURE=nari-ending E2E_DERBY_SEED=1 E2E_DERBY_SKIP_UNTIL_STAGE=2 node e2e/derby-stage.mjs chromium   # 단계 2 까지 건너뛰고 그 뒤 판을 찍기(A-07)
+//   E2E_DERBY_START_STAGE=2 E2E_DERBY_FIXTURE=nari-ending node e2e/derby-stage.mjs   # 장면 `derby-stage2`(단계 2 시작 상태 — 누적 800 · 기회 10)에서 (A-07, r294)
 //   E2E_DERBY_START_STAGE=3 E2E_DERBY_PITCHES=5 ...                                         # 남은 기회를 바꿔(`&derbyPitches=`)
 //
 // `derby-start`(첫 공 앞 0xe)에서 OK 로 시작해 공마다

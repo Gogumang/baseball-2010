@@ -1,15 +1,15 @@
 // **경기 중간 스냅샷** — 실제로 공을 보내야 닿는 장면(장면 표의 `snapshot`)을 그 순간 그대로 떠 두고(`e2e/snapshots/<장면>.json.gz`),
 // `?scene=` 바로가기가 단계를 밟지 않고 곧장 되살린다(`src/app/dev/sessionSnapshot.ts`).
 //
-//   yarn e2e:snapshot                          # 뜨기 — 장면 표의 snapshot 장면 전부 (e2e 빌드 → preview 4920, 가짜 시계로 실제 진행)
-//   yarn e2e:snapshot nari-burst-result        # 장면만 골라 뜨기
-//   yarn e2e:snapshot verify                   # 같음 확인 — 실제로 진행한 쪽(A) vs 그 순간을 되살린 쪽(B), 그 뒤 몇 걸음도
-//   yarn e2e:snapshot verify mission-result
+//   pnpm e2e:snapshot                          # 뜨기 — 장면 표의 snapshot 장면 전부 (e2e 빌드 → preview 4920, 가짜 시계로 실제 진행)
+//   pnpm e2e:snapshot nari-burst-result        # 장면만 골라 뜨기
+//   pnpm e2e:snapshot verify                   # 같음 확인 — 실제로 진행한 쪽(A) vs 그 순간을 되살린 쪽(B), 그 뒤 몇 걸음도
+//   pnpm e2e:snapshot verify mission-result
 //   E2E_SNAPSHOT_URL=http://127.0.0.1:4921/ …  # 이미 띄운 서버 (빌드 안 함)
-//   E2E_SNAPSHOT_RUNS=chromium:desktop,webkit:iphone yarn e2e:snapshot verify   # 같음 확인 브라우저:기기 (기본 이 둘)
+//   E2E_SNAPSHOT_RUNS=chromium:desktop,webkit:iphone pnpm e2e:snapshot verify   # 같음 확인 브라우저:기기 (기본 이 둘)
 //
 // 낡음: 씨앗 · 난수 차례 · 장면 단계 · 부품 훅 차례가 바뀌면 스냅샷이 낡는다. 훅 차례가 다르면 되살리기가 "낡았다" 로 실패하고
-// (`yarn e2e:quick` 은 그 장면을 실제 진행 길로 다시 연다), 값만 달라진 낡음은 `verify` 의 "파일 vs 지금 뜬 것" 줄이 알린다. 다시 뜬다.
+// (`pnpm e2e:quick` 은 그 장면을 실제 진행 길로 다시 연다), 값만 달라진 낡음은 `verify` 의 "파일 vs 지금 뜬 것" 줄이 알린다. 다시 뜬다.
 //
 // 가짜 시계: 두 쪽 모두 Playwright `page.clock` 을 멈춰 두고 망 요청이 다 끝난 뒤에만 STEP ms 씩 민다(`scene-pixels.mjs` 와 같은 꼴) —
 // 실제 진행이 판마다 같은 틱에 닿고, 같음 확인은 두 쪽을 **같은 앱 틱**에 맞춰 견준다.
@@ -276,7 +276,7 @@ async function verifyScene(log, browser, helper, browserName, device, base, scen
       const same =
         file.random === snapshot.random && file.appTick === snapshot.appTick && JSON.stringify(file.values) === JSON.stringify(snapshot.values)
       log(
-        `  ${same ? 'ok  ' : '낡음'} 파일 vs 지금 뜬 것 — 앱 틱 ${file.appTick}/${snapshot.appTick} · 난수 ${file.random}/${snapshot.random}${same ? '' : ' (yarn e2e:snapshot 으로 다시 뜰 것)'}`,
+        `  ${same ? 'ok  ' : '낡음'} 파일 vs 지금 뜬 것 — 앱 틱 ${file.appTick}/${snapshot.appTick} · 난수 ${file.random}/${snapshot.random}${same ? '' : ' (pnpm e2e:snapshot 으로 다시 뜰 것)'}`,
       )
     } else {
       log(`  없음 파일 ${filePath}`)

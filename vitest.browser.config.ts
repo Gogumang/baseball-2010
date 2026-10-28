@@ -6,7 +6,7 @@ import viteConfig from './vite.config.ts'
 import { chromiumExecutable } from './e2e/lib/browsers.mjs'
 
 /**
- * **브라우저 모드 시험** — `yarn test:browser`. 파일은 `src/**\/*.browser.test.tsx` 만 줍는다(jsdom 시험 `yarn test` 와 따로).
+ * **브라우저 모드 시험** — `pnpm test:browser`. 파일은 `src/**\/*.browser.test.tsx` 만 줍는다(jsdom 시험 `pnpm test` 와 따로).
  *
  * jsdom 에는 vanilla-extract CSS · z-index · zoom 이 안 실려 "창이 누름 칸 아래 깔림" · "아이폰 Safari 에서 버튼이 안 눌림" 을 못 잡는다.
  * 여기서는 앱과 같은 vite 플러그인(react · vanilla-extract)으로 진짜 CSS 를 싣고 chromium · webkit 에서 `elementFromPoint` 로 겹을 본다.
@@ -45,7 +45,7 @@ export default defineConfig({
    * 시험이 닿는 바깥 꾸러미를 **첫 실행 전에 미리 묶는다.** 빠지면 캐시(`node_modules/.vite/vitest/…/deps`)가 빈 첫 실행에서
    * vite 가 도중에 새 꾸러미(예: `src/app/main.tsx` 의 `react-dom/client`)를 찾아 다시 묶고 페이지를 다시 불러,
    * 묶음 해시(`?v=`)가 다른 react 가 두 벌 실린다 → 80 개 중 14~20 개가 `Cannot read properties of null (reading 'useState')`.
-   * 두 번째 실행부터는 캐시에 다 있어 통과했다. 이 칸은 시험 설정에만 있어 `yarn build` · dev 서버와는 무관하다.
+   * 두 번째 실행부터는 캐시에 다 있어 통과했다. 이 칸은 시험 설정에만 있어 `pnpm build` · dev 서버와는 무관하다.
    * 시험에서 새 바깥 꾸러미를 import 하면 여기에도 더할 것(실행 기록에 "optimized dependencies changed. reloading" 이 뜨면 빠진 것).
    */
   optimizeDeps: {

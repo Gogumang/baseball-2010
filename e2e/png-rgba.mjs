@@ -1,8 +1,8 @@
 // 스프라이트 PNG 를 다시 쓴 뒤 **브라우저가 푼 RGBA 가 원본과 바이트 단위로 같은지** 본다 (r311 A4 — `tools/repack_sprite_png.py`).
 //
-//   yarn node e2e/png-rgba.mjs                     # 기준 판(PNG_RGBA_BASE, 기본 afd0770e = 다시 쓰기 앞)과 다른 PNG 전부 × chromium · webkit
-//   PNG_RGBA_BASE=HEAD yarn node e2e/png-rgba.mjs   # 마지막 커밋과 비교 (자산을 다시 뽑은 뒤)
-//   PNG_RGBA_ONLY=webkit yarn node e2e/png-rgba.mjs
+//   node e2e/png-rgba.mjs                     # 기준 판(PNG_RGBA_BASE, 기본 afd0770e = 다시 쓰기 앞)과 다른 PNG 전부 × chromium · webkit
+//   PNG_RGBA_BASE=HEAD node e2e/png-rgba.mjs   # 마지막 커밋과 비교 (자산을 다시 뽑은 뒤)
+//   PNG_RGBA_ONLY=webkit node e2e/png-rgba.mjs
 //
 // 서버가 필요 없다. 두 판의 파일 바이트를 data URL 로 넘겨 `Image` → `drawImage` → `getImageData` 를 두 번 하고 견준다.
 // 크기 · 바이트가 하나라도 다르면 그 파일을 찍고 끝 코드 1.

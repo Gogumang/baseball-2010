@@ -1,17 +1,17 @@
-// **빠른 확인** (`yarn e2e:quick`) — 장면 표의 장면 **전부** × 기기 넷에서 장면을 열고(smoke) 그 자리 · 연 상태 **전부**의 누름 칸을
-// 훑는다(hits). 머지 전 전체 확인용이다 — 상황 하나 · 도메인 하나만 볼 때는 `yarn e2e:only`(크로미움 하나 · 맥락 2).
+// **빠른 확인** (`pnpm e2e:quick`) — 장면 표의 장면 **전부** × 기기 넷에서 장면을 열고(smoke) 그 자리 · 연 상태 **전부**의 누름 칸을
+// 훑는다(hits). 머지 전 전체 확인용이다 — 상황 하나 · 도메인 하나만 볼 때는 `pnpm e2e:only`(크로미움 하나 · 맥락 2).
 //
-//   yarn e2e:quick                                  # e2e 빌드(낡았을 때만) → preview → 장면 전부 × 기기 넷, 맥락 크로미움 2 · 웹킷 2
-//   yarn e2e:quick general-bat derby-start          # 장면만 골라
-//   E2E_QUICK_DEVICES=chromium-desktop,webkit-iphone yarn e2e:quick    # 기기만 골라
-//   E2E_QUICK_JOBS=chromium:2,webkit:2 yarn e2e:quick                  # 브라우저마다 함께 여는 맥락 수 (기본 2 · 2 — 기계를 나눠 쓴다)
-//   E2E_QUICK_URL=http://127.0.0.1:4910/ yarn e2e:quick                # 이미 띄운 서버(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
-//   E2E_QUICK_SKIP=general-defense yarn e2e:quick                      # 장면 빼기
+//   pnpm e2e:quick                                  # e2e 빌드(낡았을 때만) → preview → 장면 전부 × 기기 넷, 맥락 크로미움 2 · 웹킷 2
+//   pnpm e2e:quick general-bat derby-start          # 장면만 골라
+//   E2E_QUICK_DEVICES=chromium-desktop,webkit-iphone pnpm e2e:quick    # 기기만 골라
+//   E2E_QUICK_JOBS=chromium:2,webkit:2 pnpm e2e:quick                  # 브라우저마다 함께 여는 맥락 수 (기본 2 · 2 — 기계를 나눠 쓴다)
+//   E2E_QUICK_URL=http://127.0.0.1:4910/ pnpm e2e:quick                # 이미 띄운 서버(빌드 안 함 — 그 서버가 지금 코드인지는 내 몫)
+//   E2E_QUICK_SKIP=general-defense pnpm e2e:quick                      # 장면 빼기
 //   E2E_QUICK_PORT=4910                                                # 제가 띄우는 preview 포트 (기본 4910)
-//   E2E_REBUILD=1 yarn e2e:quick                                       # 산출물이 새것이어도 다시 묶기
+//   E2E_REBUILD=1 pnpm e2e:quick                                       # 산출물이 새것이어도 다시 묶기
 //
 // - 맥락 수: r328 은 크로미움 24 · 웹킷 20 으로 60초에 맞췄으나 14코어 · 약 11GB 를 다 써 CPU 99% 사고가 났다(r342). 시간보다 자원.
-// - 경기 중간 스냅샷(`e2e/snapshots/<장면>.json.gz`, `yarn e2e:snapshot`)이 있는 장면은 그 순간을 곧장 연다. 낡았으면(부품 훅 차례가
+// - 경기 중간 스냅샷(`e2e/snapshots/<장면>.json.gz`, `pnpm e2e:snapshot`)이 있는 장면은 그 순간을 곧장 연다. 낡았으면(부품 훅 차례가
 //   바뀜) 그 장면만 실제 진행 길로 다시 열고 "낡은 스냅샷" 으로 알린다. 실제 진행 길은 `e2e:all` 의 smoke 가 맡는다.
 // - 서버: `vite build --mode e2e`(`e2e/.run/dist-quick`, 입력보다 새것이면 다시 씀)를 preview 로 띄우고 끝에 끈다.
 // - 일감은 지난 실행에서 오래 걸린 차례로(`e2e/.run/quick-times.json`) 꺼낸다.

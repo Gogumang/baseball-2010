@@ -1,17 +1,15 @@
 // e2e 빌드(`vite build --mode e2e`) → preview 를 띄우고 끄는 도우미 — `e2e/quick.mjs` · `e2e/only.mjs` · `e2e/snapshot.mjs` 가 쓴다.
 // 빌드 산출물이 입력(src · public · 픽스처 · 스냅샷 · 설정)보다 새것이면 다시 묶지 않는다(`E2E_REBUILD=1` 이면 늘 묶는다).
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = new URL('../..', import.meta.url).pathname
 const INPUT_DIRS = ['src', 'public', 'e2e/fixtures', 'e2e/snapshots', 'tools']
-const INPUT_FILES = ['index.html', 'vite.config.ts', 'package.json', 'yarn.lock']
+const INPUT_FILES = ['index.html', 'vite.config.ts', 'package.json', 'pnpm-lock.yaml']
 
-const viteArgs = () => {
-  const bin = execFileSync('yarn', ['bin', 'vite'], { cwd: ROOT, encoding: 'utf8' }).trim()
-  return ['--require', './.pnp.cjs', '--loader', './.pnp.loader.mjs', '--no-warnings', bin]
-}
+// pnpm 을 거치면 pnpm 이 vite 를 자식으로 띄워 pid 로 못 끈다 — node 로 vite 를 곧바로 띄운다
+const viteArgs = () => [join(ROOT, 'node_modules/vite/bin/vite.js')]
 
 /** 입력 가운데 가장 늦게 바뀐 시각(ms) */
 function newestInput() {

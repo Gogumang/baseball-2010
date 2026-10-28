@@ -1,34 +1,22 @@
 #!/usr/bin/env node
-// 읽기 좋은 코드 규칙 예외 목록 검사 — `eslint.readability-baseline.js` 의 파일이 아직 규칙(complexity · max-depth …)을 어기는지 본다.
-//   yarn check:lines           목록에서 빠져야 할 파일(위반 0 · 없는 파일)이 있으면 실패, 위반 수 주석이 틀리면 알림
-//   yarn check:lines --update  목록을 지금 위반 수로 다시 쓴다(0 · 없는 파일은 빼고, 새 파일은 넣지 않는다)
+// 읽기 좋은 코드 규칙 예외 목록 검사 — `lint.readability-baseline.js` 의 파일이 아직 규칙(complexity · max-depth …)을 어기는지 본다.
+//   pnpm check:lines           목록에서 빠져야 할 파일(위반 0 · 없는 파일)이 있으면 실패, 위반 수 주석이 틀리면 알림
+//   pnpm check:lines --update  목록을 지금 위반 수로 다시 쓴다(0 · 없는 파일은 빼고, 새 파일은 넣지 않는다)
 // 혼자 돌려도 된다: `node tools/check-readability-baseline.mjs [--update]`.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { ESLint } from 'eslint'
-import tseslint from 'typescript-eslint'
-import { readabilityRules } from '../eslint.readability-baseline.js'
+import { readabilityRules } from '../lint.readability-baseline.js'
+import { oxlintDiagnostics } from './lint/oxlintCounts.mjs'
 
-const BASELINE = 'eslint.readability-baseline.js'
+const BASELINE = 'lint.readability-baseline.js'
 const RULES = new Set(Object.keys(readabilityRules))
 
 /** 파일마다 다섯 규칙 위반 수 — 0 인 파일은 빠진다 */
-export async function readabilityCounts(patterns) {
-  const eslint = new ESLint({
-    overrideConfigFile: true,
-    overrideConfig: [
-      {
-        files: ['**/*.{ts,tsx}'],
-        languageOptions: { parser: tseslint.parser, ecmaVersion: 'latest', sourceType: 'module', parserOptions: { ecmaFeatures: { jsx: true } } },
-        rules: readabilityRules,
-      },
-    ],
-  })
-  const results = await eslint.lintFiles(patterns)
+export async function readabilityCounts(files) {
   const counts = new Map()
-  for (const result of results) {
-    const count = result.messages.filter((message) => RULES.has(message.ruleId)).length
-    if (count > 0) counts.set(result.filePath.slice(process.cwd().length + 1), count)
+  for (const [file, list] of oxlintDiagnostics(readabilityRules, files)) {
+    const count = list.filter(({ rule }) => RULES.has(rule)).length
+    if (count > 0) counts.set(file, count)
   }
   return counts
 }
@@ -57,7 +45,7 @@ export async function checkReadabilityBaseline({ update }) {
   for (const { file, count, noted } of drifted) console.log(`위반 수 주석이 다르다(${noted} → ${count}): ${file}`)
   const failed = missing.length + clean.length
   console.log(
-    `읽기 규칙 예외 ${listed.length}개 · 뺄 것 ${failed}개 · 주석 다름 ${drifted.length}개${failed + drifted.length > 0 ? ' — `yarn check:lines --update` 로 맞춘다' : ''}`,
+    `읽기 규칙 예외 ${listed.length}개 · 뺄 것 ${failed}개 · 주석 다름 ${drifted.length}개${failed + drifted.length > 0 ? ' — `pnpm check:lines --update` 로 맞춘다' : ''}`,
   )
   return failed
 }

@@ -1,6 +1,6 @@
 // 회귀 — 나리 외출을 실제로 다녀온 뒤(외출 진입 이벤트 → 지도 → [!] 장소 이벤트 · 외식 → 105) 흑백 외출 칸을 **터치**해도 지도에
 // 들어가지 않는가 (r341, 사용자 보고 "외출 갔다가 비활성화 되었는데 들어가져").
-//   E2E_PORT=3841 e2e/serve.sh && E2E_PORT=3841 yarn node e2e/outing-gray-tap.mjs [nari|pitcher ...]
+//   E2E_PORT=3841 e2e/serve.sh && E2E_PORT=3841 node e2e/outing-gray-tap.mjs [nari|pitcher ...]
 // 기기는 webkit 아이폰 13 꼴(세로 · 터치 — 아이폰 Safari 엔진). 105 로 돌아온 그 틀(칸 펼침 중) · 펼친 뒤 두 때에 칸을 탭하고,
 // 방향키 →·← 가 흑백 칸을 건너뛰는지(vt+8 0x6c445)와 확인 키가 지도로 안 가는지도 본다.
 // 원본: 메뉴 객체(0x6c219, vtable 0xd2ea0)의 이동 vt+8 0x6c445 가 켬 표 0 칸을 건너뛰어 커서가 서지 못한다 — 고를 길이 없다.

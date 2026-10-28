@@ -259,7 +259,8 @@ export function applyGpItem(career: PlayerCareer, id: number, random: RandomPort
 }
 
 export type GpPurchaseOf<T> =
-  { readonly kind: '구입'; readonly result: GpItemResultOf<T> } | { readonly kind: '거절'; readonly reason: 'G포인트부족' }
+  | { readonly kind: '구입'; readonly result: GpItemResultOf<T> }
+  | { readonly kind: '거절'; readonly reason: 'G포인트부족' }
 export type GpPurchase = GpPurchaseOf<PlayerCareer>
 
 /** 사면 곧바로 쓴다 (0x14a74 탭 2 — 전역 G 차감, 0~99999) */

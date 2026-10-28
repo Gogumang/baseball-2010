@@ -55,7 +55,7 @@ export function finishRun({ reportName, scenes, devices, concurrency, run, serve
   )
   console.log(formatUsage(usage, { peakContexts }))
   if (staleSnapshots.length > 0)
-    console.log(`⚠️ 낡은 스냅샷 ${staleSnapshots.join(' · ')} — 실제 진행 길로 열었다. yarn e2e:snapshot 으로 다시 뜰 것`)
+    console.log(`⚠️ 낡은 스냅샷 ${staleSnapshots.join(' · ')} — 실제 진행 길로 열었다. pnpm e2e:snapshot 으로 다시 뜰 것`)
   if (done.length > 1) console.log(`오래 걸린 일감: ${slowest.map((job) => `${job.scene}@${job.device} ${(job.ms / 1000).toFixed(1)}s`).join(' · ')}`)
   if (failures.length === 0) {
     console.log('통과')

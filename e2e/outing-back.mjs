@@ -1,5 +1,5 @@
 // 시연 — 나리 외출 지도에 곧바로 들어가 터치 '뒤로' 상황 버튼을 탭하면 관리(105)로 돌아오는가.
-//   e2e/serve.sh && yarn node e2e/outing-back.mjs [chromium|webkit ...]
+//   e2e/serve.sh && node e2e/outing-back.mjs [chromium|webkit ...]
 // 기본은 chromium · webkit 둘 다, 기기는 아이폰 13 꼴(세로 · 터치). 끝나면 단계별 시간을 찍는다.
 import { launch, openScene, screenState, shot, tapPage } from './lib/scene.mjs'
 

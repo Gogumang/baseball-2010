@@ -138,7 +138,9 @@ const HANDLED_KEYS: ReadonlySet<string> = new Set([
 ])
 
 type BoxAnimation =
-  { readonly kind: '열림'; readonly height: number } | { readonly kind: '닫힘'; readonly width: number; readonly answer: number } | null
+  | { readonly kind: '열림'; readonly height: number }
+  | { readonly kind: '닫힘'; readonly width: number; readonly answer: number }
+  | null
 const POPUP = assetUrl('./sprites/popup/frames')
 /**
  * 버튼은 글자가 아니라 `ui/popup.pzx` 프레임 그림이다 (F-1 확정).

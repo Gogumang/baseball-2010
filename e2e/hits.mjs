@@ -1,10 +1,10 @@
 // **누름 칸 맞음 검사** — 장면마다 누를 수 있는 요소(button · PressArea · [role=button] · 터치 상황 버튼)의 가운데 · 네 모서리 안쪽 점이
 // 정말 그 요소에 닿는가(`elementFromPoint`). 창 · 상자를 연 상태(메뉴 '*' · 교체 '#' · 질문 상자 · 외출 말풍선)도 훑는다.
 //
-//   yarn e2e:hits                      # 장면 전부 × 기기 넷(chromium 가로 · chromium 세로 · webkit 아이폰 세로 · 가로)
-//   yarn e2e:hits general-bat derby-start          # 장면만 골라
-//   E2E_HITS_DEVICES=webkit-iphone yarn e2e:hits   # 기기만 골라 (쉼표)
-//   E2E_HITS_JOBS=1 yarn e2e:hits                  # 기기를 몇 개씩 같이 돌릴지 (기본 4)
+//   pnpm e2e:hits                      # 장면 전부 × 기기 넷(chromium 가로 · chromium 세로 · webkit 아이폰 세로 · 가로)
+//   pnpm e2e:hits general-bat derby-start          # 장면만 골라
+//   E2E_HITS_DEVICES=webkit-iphone pnpm e2e:hits   # 기기만 골라 (쉼표)
+//   E2E_HITS_JOBS=1 pnpm e2e:hits                  # 기기를 몇 개씩 같이 돌릴지 (기본 4)
 //
 // 서버가 안 떠 있으면 `e2e/serve.sh` 로 띄우고 끝나면 끈다. 결과 JSON 은 `e2e/.run/hits-report.json`.
 // 실패(허용 목록에 없는 겹침 · 장면/동작 실패)가 있으면 끝 코드 1.

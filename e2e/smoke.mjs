@@ -1,8 +1,8 @@
 // 장면 바로가기 스모크 — 장면 표(src/app/dev/scenes/<도메인>.ts)의 장면을 모두 chromium(데스크톱) · webkit(아이폰 13)에서 연다.
 //
 //   E2E_PORT=5430 e2e/serve.sh            # 서버 먼저
-//   E2E_PORT=5430 yarn node e2e/smoke.mjs  # 모두
-//   E2E_PORT=5430 yarn node e2e/smoke.mjs general-bat derby-start   # 몇 개만
+//   E2E_PORT=5430 node e2e/smoke.mjs  # 모두
+//   E2E_PORT=5430 node e2e/smoke.mjs general-bat derby-start   # 몇 개만
 //
 // 장면마다 새 맥락(빈 localStorage)에서 연다. 진행기가 `ready` 를 적고 쪽 오류(pageerror)가 없으면 통과다.
 // 두 브라우저는 함께 돈다. 하나라도 실패하면 끝 코드 1.

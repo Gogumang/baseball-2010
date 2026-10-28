@@ -6,7 +6,7 @@
 //   await tap(page, 220, 310)         // 원본 240×320 좌표
 //   await shot(page, 'e2e/.run/a.png')
 //
-// 실행은 PnP 로: `yarn node e2e/<스크립트>.mjs`
+// 실행: `node e2e/<스크립트>.mjs`
 import { chromium, devices, webkit } from 'playwright'
 import { chromiumExecutable } from './browsers.mjs'
 

@@ -119,7 +119,6 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       // 선택지가 번호로 부른 마지막 이벤트 다음부터 이어 훑는다 (0xae170)
       const lastCalled = viewedEventIds[viewedEventIds.length - 1]
       if (lastCalled !== undefined && lastCalled !== playback.eventId) {
-        // eslint-disable-next-line react-hooks/immutability -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
         eventCursor.current = cursorAfterCalling(eventCursor.current, lastCalled)
       }
       const goalRecordOf = recordSourceNow()

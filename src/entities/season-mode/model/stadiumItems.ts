@@ -95,7 +95,8 @@ export function isHiddenStadiumSlot(kind: StadiumKind, slot: number): boolean {
 export type StadiumPurchaseRefusal = '없는칸' | '미오픈' | '이미보유' | '인기도부족' | '소지금부족'
 
 export type StadiumPurchaseCheck =
-  { readonly ok: true; readonly price: number } | { readonly ok: false; readonly reason: StadiumPurchaseRefusal; readonly required?: number }
+  | { readonly ok: true; readonly price: number }
+  | { readonly ok: false; readonly reason: StadiumPurchaseRefusal; readonly required?: number }
 
 /**
  * 구매 가드 — 원본 `0x9a84~0x9bd2` 의 **순서 그대로** (S3 4절).

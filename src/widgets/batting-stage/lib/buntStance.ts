@@ -64,7 +64,9 @@ export function buntStanceAfterRelease(stance: BuntStance | null, keyTick: numbe
 
 /** 장면 +0xfdc 를 쓰는 사람 키 (상태 0x11 · S+4 — 부르는 쪽 `isFlying` 이 본다) */
 export type SceneBuntKey =
-  { readonly kind: '스윙' } | { readonly kind: '필살' } | { readonly kind: '번트'; readonly buntKind: number; readonly isAceBatter: boolean }
+  | { readonly kind: '스윙' }
+  | { readonly kind: '필살' }
+  | { readonly kind: '번트'; readonly buntKind: number; readonly isAceBatter: boolean }
 
 /**
  * **사람 키가 쓰는 장면 +0xfdc** (직접 뜸 — `BattingStage` 의 `sceneBuntKind` 주석):
