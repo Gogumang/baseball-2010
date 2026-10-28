@@ -19,8 +19,7 @@ export function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number
   // 0x4ea0c 는 경기가 끝나야 부른다 — 도중의 요약에는 안 붙인다
   if (!progress.game.isFinished) return []
   const game = progress.game
-  // 고침(B-40): 동점은 이긴 경기가 아니다 (원본은 선공이면 이긴 경기 — `seasonHumanWonOf`)
-  const won = game.ourScore > game.opponentScore || (!isBugFixed('B-40') && game.ourScore === game.opponentScore && ourHalfOf(game) === '초')
+  const won = isHumanTeamWinOf(game)
   if (!won) return []
   return [
     ...gameEndRecordIdsOf(game.ourScore - game.opponentScore),
@@ -37,6 +36,15 @@ export function gameEndRecordIdsFor(progress: TeamGameProgress): readonly number
       runsAllowed: progress.pitching.runsAllowed,
     }),
   ]
+}
+
+/**
+ * 이긴 팀 `0xb69c8` 이 사람 팀인가 — 팀 1 점수 > 팀 0 점수면 팀 1, 아니면(동점 포함) 팀 0(선공).
+ * 고침(B-40): 동점은 이긴 경기가 아니다 (원본은 선공이면 이긴 경기 — `seasonHumanWonOf`)
+ */
+function isHumanTeamWinOf(game: TeamGameProgress['game']): boolean {
+  if (game.ourScore !== game.opponentScore) return game.ourScore > game.opponentScore
+  return !isBugFixed('B-40') && ourHalfOf(game) === '초'
 }
 
 /* ── 시즌 평판 16칸 (0xa8024 → 0xa755c → 0xa3440) ─────────────────────────────── */

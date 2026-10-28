@@ -5,6 +5,8 @@ import {
   rosterEntryBattersOf,
   entryBattersOfOrder,
   NO_ACE_BATTER,
+  type TeamEntryBatter,
+  type TeamEntryPitcher,
   withAcePitcher,
   rosterEntryPitchersOf,
   entryPitchersOfOrder,
@@ -41,29 +43,11 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
   const opponentAces = opponentAceIndexesOf(options, random)
   const startingSlots = startingPitcherSlotsOf(options, random)
   // 0x30f20 의 순서 그대로 — 팀을 세운 뒤 고른 마타자를 벤치에 끼워 넣는다 (0xb8870).
-  // 엔트리 편집기가 고친 차례가 있으면 그 차례가 곧 팀 레코드다 (0xb891c 는 첨자만 든다)
-  const ourOrder = options.ourEntryOrder
   // 경기 장면 셋업 0x39fdc 가 두 팀 레코드 +0xa 를 첨자로 다시 매긴다(0xb8768 → 0xb603c) — `withEntryRecordSlots`
-  const ourEntry = withEntryRecordSlots(
-    withAceBatter(
-      ourOrder === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, ourOrder),
-      options.aceBatterId ?? NO_ACE_BATTER,
-    ),
-  )
-  // 상대 팀도 그 팀 레코드 차례로 선다 (0xb8680 → 0x1f570 — 트레이드로 바뀐 CPU 팀이면 바뀐 레코드)
-  const opponentEntry = withEntryRecordSlots(
-    withAceBatter(
-      options.opponentEntryOrder === undefined
-        ? rosterEntryBattersOf(options.opponentTeamId)
-        : entryBattersOfOrder(options.opponentTeamId, options.opponentEntryOrder),
-      opponentAces.batter,
-    ),
-  )
+  const ourEntry = withEntryRecordSlots(withAceBatter(ourTableBattersOf(options), options.aceBatterId ?? NO_ACE_BATTER))
+  const opponentEntry = withEntryRecordSlots(withAceBatter(opponentTableBattersOf(options), opponentAces.batter))
   // 0x31042 · 0x31064 — 마타자와 **같은 자리에서** 마투수도 양 팀에 들어간다 (0xb88c8)
-  const ourPitcherEntry = withAcePitcher(
-    ourOrder === undefined ? rosterEntryPitchersOf(options.ourTeamId) : entryPitchersOfOrder(options.ourTeamId, ourOrder),
-    options.acePitcherId ?? NO_ACE_BATTER,
-  )
+  const ourPitcherEntry = withAcePitcher(ourTablePitchersOf(options), options.acePitcherId ?? NO_ACE_BATTER)
   const opponentPitcherEntry = withAcePitcher(opponentPitcherEntryOf(options), opponentAces.pitcher)
   const ourPitcherStaminas = pitcherStaminasOf(ourPitcherEntry, options.ourPitcherStaminas)
   const opponentPitcherStaminas = pitcherStaminasOf(opponentPitcherEntry, options.opponentPitcherStaminas)
@@ -140,4 +124,22 @@ export function teamGameStartPointOf(options: TeamGameOptions, random: RandomPor
     nextLogId: 1,
   }
   return initial
+}
+
+/** 우리 팀 명단 — 엔트리 편집기가 고친 차례가 있으면 그 차례가 곧 팀 레코드다 (0xb891c 는 첨자만 든다) */
+function ourTableBattersOf(options: TeamGameOptions): readonly TeamEntryBatter[] {
+  const order = options.ourEntryOrder
+  return order === undefined ? rosterEntryBattersOf(options.ourTeamId) : entryBattersOfOrder(options.ourTeamId, order)
+}
+
+/** 상대 팀도 그 팀 레코드 차례로 선다 (0xb8680 → 0x1f570 — 트레이드로 바뀐 CPU 팀이면 바뀐 레코드) */
+function opponentTableBattersOf(options: TeamGameOptions): readonly TeamEntryBatter[] {
+  const order = options.opponentEntryOrder
+  return order === undefined ? rosterEntryBattersOf(options.opponentTeamId) : entryBattersOfOrder(options.opponentTeamId, order)
+}
+
+/** 우리 팀 투수 명단 — 엔트리 편집기 차례를 따른다 */
+function ourTablePitchersOf(options: TeamGameOptions): readonly TeamEntryPitcher[] {
+  const order = options.ourEntryOrder
+  return order === undefined ? rosterEntryPitchersOf(options.ourTeamId) : entryPitchersOfOrder(options.ourTeamId, order)
 }

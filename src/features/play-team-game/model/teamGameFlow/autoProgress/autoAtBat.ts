@@ -2,8 +2,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { playAutoDefenseAtBat } from '@/features/play-team-game/model/teamGameFlow/autoProgress/autoDefenseAtBat'
 import { playAutoOffenseAtBat } from '@/features/play-team-game/model/teamGameFlow/autoProgress/autoOffenseAtBat'
 import { relayTickOf } from '@/features/play-team-game/model/teamGameFlow/autoProgress/relayTick'
-import { judgeAutoPitcherChange } from '@/features/play-team-game/model/teamGameFlow/substitution/autoPitcherChange'
-import { applyCpuPinchHit } from '@/features/play-team-game/model/teamGameFlow/substitution/cpuPinchHit'
+import { rollAutoPitcherChange } from '@/features/play-team-game/model/teamGameFlow/substitution/autoPitcherChange'
+import { rollCpuPinchHit } from '@/features/play-team-game/model/teamGameFlow/substitution/cpuPinchHit'
 import { isOurOffense } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
 import type { TeamAutoRelayTick, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
@@ -56,8 +56,8 @@ function runQuickSubstitutions(progress: TeamGameProgress, battingIsOurs: boolea
 
 /** 0xc1ba4 한 번 — CPU 대타(공격 팀, 0xc1c50) 뒤 CPU 투수 교체(수비 팀, 0xc1ce2). 아무것도 안 바뀌면 같은 객체 */
 function quickSubstitutionCall(progress: TeamGameProgress, battingIsOurs: boolean, random: RandomPort): TeamGameProgress {
-  const pinched = applyCpuPinchHit(progress, battingIsOurs, random)
-  const changed = judgeAutoPitcherChange(pinched, !battingIsOurs, random)
+  const pinched = rollCpuPinchHit(progress, battingIsOurs, random)
+  const changed = rollAutoPitcherChange(pinched, !battingIsOurs, random)
   return changed === progress ? progress : changed
 }
 

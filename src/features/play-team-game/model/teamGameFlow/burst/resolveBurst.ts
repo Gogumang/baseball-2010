@@ -45,7 +45,6 @@ export function resolveBurstFor(
   }
 }
 
-
 export type BurstPlay = Parameters<typeof resolveBurstFor>[1]
 
 /**
@@ -85,4 +84,3 @@ export function settlementBurstPlayOf(settlement: {
 export function closeBurstWindow(progress: TeamGameProgress): TeamGameProgress {
   return progress.lastBurstResolution === null ? progress : { ...progress, lastBurstResolution: null }
 }
-

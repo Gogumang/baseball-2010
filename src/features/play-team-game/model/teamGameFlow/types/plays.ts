@@ -71,5 +71,8 @@ export type TeamPendingRunnerPlay = LiveRunnerPlay & {
   readonly batter?: { readonly outcome: AtBatOutcome | null; readonly options: BatterOutcomeOptions }
 }
 
+/** 공 도착 판의 종류 `state[0x26]` — 밀어내기 2 · 도루 5 · 폭투·포일 9 (견제는 4, `PICKOFF_PLAY_KIND`) */
+export const ARRIVAL_PLAY_KIND = { 밀어내기: 2, 도루: 5, 폭투포일: 9 } as const
+
 /** 도루 판(종류 5) — 정산 0xa8024 를 `state[0x26] = 5` 로 부르는 판 */
 export type StealArrivalPlay = Extract<PitchArrivalPlay, { readonly kind: 5 }>

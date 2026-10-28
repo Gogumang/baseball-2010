@@ -1,5 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { runDefensePlay, recordedOutcomeOf, withPredictedOutcome } from '@/features/defense-play/model/runDefensePlay'
 import { holdsUntilResultWaitEnd } from '@/features/play-game/model/benchClearingScene'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
@@ -68,10 +69,24 @@ export function startBatterOutcome(
   // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
   const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
   if (!isBattedIntoPlay(outcome, pattern)) return finishUnplayedOurAtBat(cleared, outcome, random, options)
-  // ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
-  // 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
+  return startOurInPlayDefense(progress, cleared, outcome, pattern, random, options)
+}
+
+/**
+ * 인플레이 타구 — 진행기에 넘길 판 입력만 만들어 `pendingDefensePlay` 에 얹는다. 판 입력은 출발 칸이 남은 진행(`stealing`)으로 만든다.
+ * ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
+ * 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
+ */
+function startOurInPlayDefense(
+  stealing: TeamGameProgress,
+  cleared: TeamGameProgress,
+  outcome: AtBatOutcome,
+  pattern: BattedBallPattern | undefined,
+  random: RandomPort,
+  options: BatterOutcomeOptions,
+): TeamGameProgress {
   const input = withPredictedOutcome({
-    ...batterDefenseInputOf(progress, outcome, pattern ?? fixturePatternFor(outcome), random, options),
+    ...batterDefenseInputOf(stealing, outcome, pattern ?? fixturePatternFor(outcome), random, options),
     ...(pattern === undefined ? { outcomeIsGiven: true } : {}),
   })
   // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)

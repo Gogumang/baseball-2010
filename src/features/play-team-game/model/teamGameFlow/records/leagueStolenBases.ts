@@ -5,7 +5,7 @@ import type { LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats
 import { runnerOnBase } from '@/entities/game/model/baseRunners'
 import { leagueRecordKeyOf } from '@/features/play-team-game/model/teamGameFlow/records/leagueRecordKey'
 import { type BattingSide, battingSideOf, isAcePlayer } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
-import type { StealArrivalPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
+import { ARRIVAL_PLAY_KIND, type StealArrivalPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**
@@ -39,7 +39,7 @@ export function withLeagueStolenBases(
 
 /** (가) — 도루 판이고, 잡힌 주자가 없고, 루를 옮긴 주자가 있다 */
 function isCleanStealPlay(play: PitchArrivalPlay): play is StealArrivalPlay {
-  return play.kind === 5 && play.result.caughtFrom.length === 0 && play.result.stolenFrom.length > 0
+  return play.kind === ARRIVAL_PLAY_KIND.도루 && play.result.caughtFrom.length === 0 && play.result.stolenFrom.length > 0
 }
 
 /** sp+0x34 의 마선수 거르기가 지금 타자를 본다(B-61 원본 길) — 마타자 타석이면 닫힌다 */

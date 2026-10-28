@@ -135,6 +135,13 @@ function opponentBattingRecordsOf(
     // 리그 타수 +0x20 (a8866~a8894)도 종류 4·5 를 건너뛴다(a8852) — 삼진이 리그 줄에 쌓는 칸은 타수뿐이다
     leaguePlateAppearances: runnerPlay
       ? progress.leaguePlateAppearances
-      : withLeaguePlateAppearance(progress.leaguePlateAppearances, progress.options.opponentTeamId, progress.opponentEntry, slot, outcome, applied.runsScored),
+      : withLeaguePlateAppearance(
+          progress.leaguePlateAppearances,
+          progress.options.opponentTeamId,
+          progress.opponentEntry,
+          slot,
+          outcome,
+          applied.runsScored,
+        ),
   }
 }

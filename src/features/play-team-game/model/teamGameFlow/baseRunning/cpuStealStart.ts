@@ -16,10 +16,7 @@ export interface CpuStealStart {
  * **우리 수비 공의 CPU 도루 출발 · 그 송구 결정을 굴린다** — 상태 0x11 의 10번째 틱(메시지 0x583). 사람 투수의 공 하나(`pitchOnce`)가
  * 실투 판정 뒤 · CPU 타자 결정 앞에 부른다. 굴림 차례: 도루 출발(후보가 있을 때만) → 송구 결정
  */
-export function rollCpuStealStartOnOurDefense(
-  progress: TeamGameProgress,
-  random: RandomPort,
-): CpuStealStart {
+export function rollCpuStealStartOnOurDefense(progress: TeamGameProgress, random: RandomPort): CpuStealStart {
   const { options } = progress
   // CPU 도루 0x520de — 상태 0x11 의 10번째 틱(0x537dc → 메시지 0x583)이라 CPU 타자 결정(11번째 틱 0x34334)
   // **바로 앞**이다. 후보가 있을 때만 rand(0,1000) 한 번 → 0xa9bd4 출발 (`rollCpuStealStart`)

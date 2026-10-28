@@ -14,6 +14,7 @@ export function withResultWaitHold(
   outcome: AtBatOutcome,
   arrivalPlay: PitchArrivalPlay | null,
 ): TeamGameProgress {
-  const pendingBenchClearing = arrivalPlay === null ? { phase: 'wait' as const, side, outcome } : { phase: 'wait' as const, side, outcome, arrivalPlay }
+  const pendingBenchClearing =
+    arrivalPlay === null ? { phase: 'wait' as const, side, outcome } : { phase: 'wait' as const, side, outcome, arrivalPlay }
   return { ...progress, pendingBenchClearing }
 }

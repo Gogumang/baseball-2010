@@ -2,7 +2,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { holdsUntilResultWaitEnd } from '@/features/play-game/model/benchClearingScene'
 import { runDefensePlay, recordedOutcomeOf, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isPickoffPlayResult } from '@/features/defense-play/model/pickoffPlay'
-import { finishPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import { type PitchArrivalPlay, finishPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import type { RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
 import { applyPickoffPlay } from '@/features/play-team-game/model/teamGameFlow/baseRunning/applyPickoffPlay'
 import { applyTeamArrival } from '@/features/play-team-game/model/teamGameFlow/baseRunning/applyTeamArrival'
@@ -16,7 +16,7 @@ import { finishDefensiveAtBat } from '@/features/play-team-game/model/teamGameFl
 import { advance } from '@/features/play-team-game/model/teamGameFlow/inningChange/advance'
 import { enterPitchSelection } from '@/features/play-team-game/model/teamGameFlow/scene/enterPitchSelection'
 import type { TeamPitchArrival } from '@/features/play-team-game/model/teamGameFlow/types/pitchArrival'
-import type { TeamPendingPitchArrival } from '@/features/play-team-game/model/teamGameFlow/types/plays'
+import type { TeamPendingPitchArrival, TeamPendingRunnerPlay } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**
@@ -99,11 +99,17 @@ export function resolveRunnerPlay(progress: TeamGameProgress, result: DefensePla
   const side = pending.side ?? '수비'
   if (pending.kind === 'pickoff') return isPickoffPlayResult(result) ? applyPickoffPlay(cleared, result, side, random, true) : cleared
   const play = finishPitchArrivalPlay(pending.opened, result as RunnerPlayEngineResult, true)
-  if (side === '공격') {
-    // 사람 공격 — `batterPitch` 의 나머지(판에서 끊김 → 다음 타석 · 같은 타석 → 0xf · 타석 끝 → 타석 결과)
-    const batter = pending.batter
-    const arrival = applyTeamArrival(cleared, play, '공격')
-    return continueOurAtBatAfterArrival(arrival, batter?.outcome ?? null, random, batter?.options ?? {}, startBatterOutcome)
-  }
+  if (side === '공격') return continueOurAtBatAfterRunnerPlay(cleared, play, pending.batter, random)
   return afterOurPitchArrival(applyTeamArrival(cleared, play, '수비'), pending.resume ?? { buntKind: 0 }, random, true)
+}
+
+/** 사람 공격 — `batterPitch` 의 나머지(판에서 끊김 → 다음 타석 · 같은 타석 → 0xf · 타석 끝 → 타석 결과) */
+function continueOurAtBatAfterRunnerPlay(
+  cleared: TeamGameProgress,
+  play: PitchArrivalPlay,
+  batter: TeamPendingRunnerPlay['batter'],
+  random: RandomPort,
+): TeamGameProgress {
+  const arrival = applyTeamArrival(cleared, play, '공격')
+  return continueOurAtBatAfterArrival(arrival, batter?.outcome ?? null, random, batter?.options ?? {}, startBatterOutcome)
 }

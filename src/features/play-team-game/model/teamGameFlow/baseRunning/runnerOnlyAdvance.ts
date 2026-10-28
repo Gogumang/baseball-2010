@@ -39,28 +39,13 @@ export function withRunnerOnlyAdvance(
   if (!changed) return { progress, changed, runs: 0 }
   const humanDefends = humanSide === '수비'
   const runnerHint = runnerFates === undefined ? undefined : { survivorsFromBase: survivorsFromBaseOfFates(runnerFates) }
-  const { game, runs } = humanDefends
-    ? opponentRunnerPlayOf(progress, advanceResult, runnerHint)
-    : ourRunnerPlayOf(before, advanceResult, runnerHint)
+  const { game, runs } = humanDefends ? opponentRunnerPlayOf(progress, advanceResult, runnerHint) : ourRunnerPlayOf(before, advanceResult, runnerHint)
   const halfChanged = !isSameHalfInning(before, game)
-  const scoredFromBases =
-    runnerFates === undefined
-      ? scoredFromBasesWithoutFates(progress, game, humanDefends, halfChanged, runs)
-      : chargedFromBasesOfFates(runnerFates, before.outs + advanceResult.outsAdded)
   const next: TeamGameProgress = {
     ...progress,
     game,
     decisions: decisionsAfterPlay(progress.decisions, before, game, moundsOf(progress)),
-    // 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃은 지금 수비 마운드 투수(a8cb0), 실점은 들어온 주자의 책임 투수(a8ee4)
-    ...chargeRunsToResponsible(
-      progress,
-      settles ? chargeMoundLine(progress, humanDefends, { outs: advanceResult.outsAdded }) : progress.pitcherLines,
-      game,
-      humanDefends,
-      null,
-      scoredFromBases,
-      settles,
-    ),
+    ...runnerPlayChargesOf(progress, game, advanceResult, humanDefends, runnerFates, runs, settles),
     // 득점 처리 0xa5c34 는 1점마다 수비 팀 A·B 를 올린다 (P7 E1)
     ...(humanDefends ? ourDefenseRunsAfter(progress, runs, halfChanged, settles) : opponentDefenseRunsAfter(progress, runs, halfChanged)),
     ...(halfChanged ? { atBat: createAtBat(), atBatPrepared: false } : {}),
@@ -98,6 +83,28 @@ function ourRunnerPlayOf(
     battingOrderIndex: before.battingOrderIndex,
   }
   return { game, runs: game.ourScore - before.ourScore }
+}
+
+/**
+ * 주자 판(견제·도루)도 정산 0xa8024 를 지난다 — 아웃은 지금 수비 마운드 투수(a8cb0), 실점은 들어온 주자의 책임 투수(a8ee4).
+ * 정산을 안 지나는 판은 투수 줄을 건드리지 않고 책임 투수 칸만 옮긴다
+ */
+function runnerPlayChargesOf(
+  progress: TeamGameProgress,
+  game: GameState,
+  advanceResult: DefensePlayResult['advance'],
+  humanDefends: boolean,
+  runnerFates: DefensePlayResult['runnerFates'] | undefined,
+  runs: number,
+  settles: boolean,
+): Pick<TeamGameProgress, 'pitcherLines' | 'runnerPitchers'> {
+  const halfChanged = !isSameHalfInning(progress.game, game)
+  const scoredFromBases =
+    runnerFates === undefined
+      ? scoredFromBasesWithoutFates(progress, game, humanDefends, halfChanged, runs)
+      : chargedFromBasesOfFates(runnerFates, progress.game.outs + advanceResult.outsAdded)
+  const lines = settles ? chargeMoundLine(progress, humanDefends, { outs: advanceResult.outsAdded }) : progress.pitcherLines
+  return chargeRunsToResponsible(progress, lines, game, humanDefends, null, scoredFromBases, settles)
 }
 
 /** 판 운명이 없는 옛 길 — 앞선 주자부터 점수판 득점만큼 (공격 팀 타순으로 루 위 신원을 읽는다) */

@@ -1,5 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { withPredictedOutcome } from '@/features/defense-play/model/runDefensePlay'
@@ -43,10 +44,25 @@ export function startDefensiveAtBat(
   // 사람이 던진 타석의 맞은 공은 쏜 패턴(`simulateBatter` 가 결과 객체에 묶어 둔 것)으로 판을 돈다
   const pattern = contactOfOutcome(outcome)?.pattern
   if (!mine || !isBattedIntoPlay(outcome, pattern)) return finishUnplayedOpponentAtBat(cleared, outcome, mine, arrival)
-  // ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
-  // 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
+  return startOpponentInPlayDefense(progress, cleared, outcome, pattern, random, isUncatchable, buntKind)
+}
+
+/**
+ * 사람이 던진 타석의 인플레이 타구 — 판 입력만 만들어 `pendingDefensePlay` 에 얹는다. 판 입력은 출발 칸이 남은 진행(`stealing`)으로 만든다.
+ * ⚠️ 패턴이 없으면(시험·옛 호출 — 원본에 없는 길) 결과에 맞는 패턴을 원본 표에서 골라 쓴다 (`fixturePatternFor`).
+ * 결과 칸은 판 앞 예측이다(`predictedOutcomeOf`) — 기록은 실제 판의 정산 결과다
+ */
+function startOpponentInPlayDefense(
+  stealing: TeamGameProgress,
+  cleared: TeamGameProgress,
+  outcome: AtBatOutcome,
+  pattern: BattedBallPattern | undefined,
+  random: RandomPort,
+  isUncatchable: boolean,
+  buntKind: number,
+): TeamGameProgress {
   const input = withPredictedOutcome({
-    ...defensiveDefenseInputOf(progress, outcome, pattern ?? fixturePatternFor(outcome), random, isUncatchable),
+    ...defensiveDefenseInputOf(stealing, outcome, pattern ?? fixturePatternFor(outcome), random, isUncatchable),
     buntKind,
     ...(pattern === undefined ? { outcomeIsGiven: true } : {}),
   })

@@ -12,9 +12,9 @@ import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameF
  * 공격측이 CPU 일 때만 적히므로 우리 공격에서는 게이트에서 버려진다 (`withSeasonRecord` 가 그대로 가른다).
  * 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
  * 0x12 대기 끝(`judgeHitByPitch`)이 부른다 — 들어가면 연출(상태 0x1e)을 붙든다(`enterBenchClearing` · `resolveBenchClearing`).
- * 우리가 던진 공에 CPU 타자가 맞는 쪽(코드 1 이 S[1] 에 남고 우리 투수 스태미나 −1000)은 `withPitcherBenchClearing`.
+ * 우리가 던진 공에 CPU 타자가 맞는 쪽(코드 1 이 S[1] 에 남고 우리 투수 스태미나 −1000)은 `rollPitcherBenchClearing`.
  */
-export function withBatterBenchClearing(progress: TeamGameProgress, outcome: AtBatOutcome, random: RandomPort): TeamGameProgress {
+export function rollBatterBenchClearing(progress: TeamGameProgress, outcome: AtBatOutcome, random: RandomPort): TeamGameProgress {
   const entered = rollsIntoBenchClearing(
     {
       isHitByPitch: outcome.kind === '사구',
@@ -43,7 +43,7 @@ export function withBatterBenchClearing(progress: TeamGameProgress, outcome: AtB
  * 시즌 팀 경기(모드 2)일 때만 적는다. 홈런더비가 아니라 사구면 늘 한 번 굴린다 — **사구 타석만 난수를 하나 더 쓴다.**
  * 0x12 대기 끝(`judgeHitByPitch`)이 부른다 — 들어가면 연출(상태 0x1e)을 붙든다(`enterBenchClearing` · `resolveBenchClearing`).
  */
-export function withPitcherBenchClearing(progress: TeamGameProgress, outcome: AtBatOutcome, random: RandomPort): TeamGameProgress {
+export function rollPitcherBenchClearing(progress: TeamGameProgress, outcome: AtBatOutcome, random: RandomPort): TeamGameProgress {
   const entered = rollsIntoBenchClearing(
     {
       isHitByPitch: outcome.kind === '사구',

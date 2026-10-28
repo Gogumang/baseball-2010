@@ -77,7 +77,16 @@ function opponentMoundChargesOf(
     walks: isFreePass(outcome) ? 1 : 0,
   })
   const runnersAfter = isSameHalfInning(game, before) ? runnersOfGame(game) : EMPTY_BASE_RUNNERS
-  const scoredFromBases = scoredFromBasesOfAtBat(before, runnersOfGame(before), runnersAfter, outcome, defensePlay, false, facts.outsAdded, facts.runsBattedIn)
+  const scoredFromBases = scoredFromBasesOfAtBat(
+    before,
+    runnersOfGame(before),
+    runnersAfter,
+    outcome,
+    defensePlay,
+    false,
+    facts.outsAdded,
+    facts.runsBattedIn,
+  )
   return chargeRunsToResponsible(progress, moundLine, game, false, lineupSlotOf(before.battingOrderIndex), scoredFromBases)
 }
 
@@ -90,9 +99,7 @@ function ourBattingRecordsOf(
   const { slot, runnerPlay, runsBattedIn } = facts
   const hitBasesBefore = progress.ourHitBases[slot] ?? []
   // 시즌 평판 16칸 — 우리 공격이라 **수비측(상대)이 CPU** 인 코드(≥ 6)만 선다. 종류 5 정산은 삼진 코드 6(a8a46)을 안 지난다
-  const offense = runnerPlay
-    ? { codes: [], hitBases: hitBasesBefore }
-    : offenseRecordOf(outcome, runsBattedIn, hitBasesBefore, facts.homeRunCounted)
+  const offense = runnerPlay ? { codes: [], hitBases: hitBasesBefore } : offenseRecordOf(outcome, runsBattedIn, hitBasesBefore, facts.homeRunCounted)
   return {
     gameRecord: withSeasonRecord(progress, '공격', offense.codes),
     ourHitBases: withHitBases(progress.ourHitBases, slot, offense.hitBases),

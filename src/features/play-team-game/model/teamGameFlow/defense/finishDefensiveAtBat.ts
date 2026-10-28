@@ -2,7 +2,11 @@ import { type AtBatOutcome, describeOutcome } from '@/entities/at-bat/model/atBa
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { resolveBurstFor, settlementBurstPlayOf } from '@/features/play-team-game/model/teamGameFlow/burst/resolveBurst'
-import { type OpponentAtBatFacts, type QuickAtBatPlay, opponentAtBatFactsOf } from '@/features/play-team-game/model/teamGameFlow/defense/opponentAtBatFacts'
+import {
+  type OpponentAtBatFacts,
+  type QuickAtBatPlay,
+  opponentAtBatFactsOf,
+} from '@/features/play-team-game/model/teamGameFlow/defense/opponentAtBatFacts'
 import { withOpponentAtBatSettlement } from '@/features/play-team-game/model/teamGameFlow/defense/opponentAtBatSettlement'
 import { appendLog } from '@/features/play-team-game/model/teamGameFlow/log/appendLog'
 import { halfInningPitchesOf } from '@/features/play-team-game/model/teamGameFlow/records/atBatRecords'

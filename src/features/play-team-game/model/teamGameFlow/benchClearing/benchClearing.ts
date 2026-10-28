@@ -2,7 +2,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { rollBenchClearingTargets, rollBenchClearingEntry } from '@/features/play-game/model/benchClearingScene'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { finishBatterOutcome } from '@/features/play-team-game/model/teamGameFlow/batting/finishBatterOutcome'
-import { withBatterBenchClearing, withPitcherBenchClearing } from '@/features/play-team-game/model/teamGameFlow/benchClearing/benchClearingEffects'
+import { rollBatterBenchClearing, rollPitcherBenchClearing } from '@/features/play-team-game/model/teamGameFlow/benchClearing/benchClearingEffects'
 import { startDefensiveAtBat } from '@/features/play-team-game/model/teamGameFlow/defense/defensiveAtBat'
 import { advance } from '@/features/play-team-game/model/teamGameFlow/inningChange/advance'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
@@ -32,7 +32,7 @@ export function resolveBenchClearing(
 
 /**
  * **볼넷 · 사구 · 삼진의 0x12 대기 끝** — 틱 31 갱신 0x4e6d4(4e72c `[+0x2c] ≥ 0x1f`)의 4e74c 벤치 클리어링 굴림(사구만 — 사람이 공격이면
- * `withBatterBenchClearing`, 수비면 `withPitcherBenchClearing`). 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀
+ * `rollBatterBenchClearing`, 수비면 `rollPitcherBenchClearing`). 들어갔으면 0x1e 를 예약만 하고(진입 굴림 45 번은 다음 틀
  * `enterBenchClearing`) 붙든 채 둔다. 안 들어갔으면 판정 A 0xae24c 의 보통 길 — 예전 공 도착 걸음에 하던 그대로다.
  * 대기 중인 사구가 없으면 그대로 돌려준다.
  */
@@ -41,7 +41,7 @@ export function judgeHitByPitch(progress: TeamGameProgress, random: RandomPort):
   if (pending === null || pending.phase !== 'wait') return progress
   const held: TeamGameProgress = { ...progress, pendingBenchClearing: null }
   const cleared =
-    pending.side === '공격' ? withBatterBenchClearing(held, pending.outcome, random) : withPitcherBenchClearing(held, pending.outcome, random)
+    pending.side === '공격' ? rollBatterBenchClearing(held, pending.outcome, random) : rollPitcherBenchClearing(held, pending.outcome, random)
   if (cleared !== held) return { ...cleared, pendingBenchClearing: { ...pending, phase: 'entry' } }
   return finishHeldHitByPitch(held, pending, random)
 }
