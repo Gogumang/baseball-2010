@@ -45,6 +45,12 @@ const defaultFetchAudio = async (url: string): Promise<ArrayBuffer> => {
   return await response.arrayBuffer()
 }
 
+/**
+ * 자동화 브라우저(Playwright 시험)에서는 소리를 내보내지 않는다 — 시험 중 음악이 나오지 않게.
+ * 재생 로직은 그대로 돌고 마지막 출력 크기만 0 이다. 테스트가 통로를 갈아 끼우면 적용하지 않는다.
+ */
+const isAutomatedBrowser = (): boolean => globalThis.navigator?.webdriver === true
+
 const clampVolume = (volume: number): number => {
   if (!Number.isFinite(volume)) return 0
   return Math.max(0, Math.min(100, Math.round(volume)))
@@ -54,6 +60,8 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
   const baseUrl = options.baseUrl ?? assetUrl('sounds')
   const createContext = options.createContext ?? defaultCreateContext
   const fetchAudio = options.fetchAudio ?? defaultFetchAudio
+  const silentOutput = options.createContext === undefined && isAutomatedBrowser()
+  const outputGainOf = (level: number): number => (silentOutput ? 0 : level / 100)
 
   let volume = clampVolume(options.volume ?? 100)
   let context: AudioContext | null = null
@@ -89,7 +97,7 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
       const opened = context
       master = tryOr(() => {
         const gain = opened.createGain()
-        gain.gain.value = volume / 100
+        gain.gain.value = outputGainOf(volume)
         gain.connect(opened.destination)
         return gain
       }, null)
@@ -204,7 +212,7 @@ export function createWebAudioSound(options: WebAudioSoundOptions = {}): SoundPo
       volume = clampVolume(next)
       const output = master
       // 통로가 닫혔을 수 있다.
-      if (output) ignoreErrors(() => (output.gain.value = volume / 100))
+      if (output) ignoreErrors(() => (output.gain.value = outputGainOf(volume)))
       if (volume === 0) {
         stopActive()
         playingBgmId = null

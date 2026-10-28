@@ -386,3 +386,24 @@ describe('소리 없는 포트', () => {
     expect(sound.getVolume()).toBe(0)
   })
 })
+
+describe('소리 포트 — 자동화 브라우저(시험)', () => {
+  it('navigator.webdriver 이면 재생은 그대로 돌고 출력 크기만 0 이다', async () => {
+    const fake = createFakeAudio()
+    const created = fake.options.createContext()
+    vi.stubGlobal('navigator', { webdriver: true })
+    vi.stubGlobal('AudioContext', function FakeAudioContext() {
+      return created
+    })
+    try {
+      const sound = createWebAudioSound({ fetchAudio: fake.options.fetchAudio })
+      sound.play(5)
+      await vi.waitFor(() => expect(fake.started).toHaveLength(1))
+      sound.setVolume(100)
+
+      expect(fake.gain.value).toBe(0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
