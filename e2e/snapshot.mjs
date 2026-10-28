@@ -37,16 +37,9 @@ const LIMIT_MS = 300000
 const { DEVICES } = await import('./lib/scene.mjs')
 const { chromiumExecutable } = await import('./lib/browsers.mjs')
 
-/** 장면 표에서 `snapshot:` 이 있는 장면 */
-function snapshotScenes() {
-  const source = readFileSync(join(ROOT, 'src/app/dev/scenes.ts'), 'utf8')
-  const table = source.slice(source.indexOf('export const SCENES'))
-  const names = []
-  for (const match of table.matchAll(/^ {2}'?([a-z][a-z0-9-]*)'?: \{([\s\S]*?)^ {2}\},?$/gm)) {
-    if (/^\s{4}snapshot: '/m.test(match[2])) names.push(match[1])
-  }
-  return names
-}
+/** 장면 표에서 `snapshot:` 이 있는 장면 (`src/app/dev/scenes/<도메인>.ts`) */
+const { sceneCatalog } = await import('./lib/catalog.mjs')
+const snapshotScenes = () => sceneCatalog().filter((scene) => scene.snapshot !== null).map((scene) => scene.name)
 
 /**
  * 같음 확인의 그 뒤 걸음 — `key` 를 같은 틱에 누르고 `ticks` 틱 민다. 결과 창 · 판을 닫고 정산 · 다음 화면까지
@@ -305,27 +298,29 @@ try {
   if (!isVerify) {
     const browser = await chromium.launch({ headless: true, executablePath: chromiumExecutable() })
     try {
-      const results = await Promise.allSettled(scenes.map((scene) => captureScene(browser, server.url, scene)))
-      for (const [index, result] of results.entries()) {
-        if (result.status === 'rejected') {
+      // 하나씩 — 맥락 하나로 (가짜 시계로 실제 진행해 CPU 를 오래 쓴다, r342)
+      for (const scene of scenes) {
+        try {
+          await captureScene(browser, server.url, scene)
+        } catch (error) {
           failed = true
-          console.log(`FAIL ${scenes[index]}: ${String(result.reason?.message ?? result.reason).slice(0, 400)}`)
+          console.log(`FAIL ${scene}: ${String(error?.message ?? error).slice(0, 400)}`)
         }
       }
     } finally {
       await browser.close()
     }
-    if (!failed) console.log('뜬 파일은 다음 e2e 빌드에 실린다 (`yarn e2e:quick` 은 빌드를 새로 한다)')
+    if (!failed) console.log('뜬 파일은 다음 e2e 빌드에 실린다 (`e2e:quick` · `e2e:only` 는 스냅샷이 바뀌면 다시 묶는다)')
   } else {
     const runs = (process.env.E2E_SNAPSHOT_RUNS ?? 'chromium:desktop,webkit:iphone').split(',').map((pair) => pair.split(':'))
-    await Promise.all(runs.map(async ([browserName, device]) => {
+    // 브라우저는 하나씩 (맥락 셋: 실제 진행 · 되살리기 · 픽셀 견주기, r342)
+    for (const [browserName, device] of runs) {
       const type = browserName === 'webkit' ? webkit : chromium
       const executablePath = browserName === 'webkit' ? undefined : chromiumExecutable()
       const browser = await type.launch({ headless: true, ...(executablePath === undefined ? {} : { executablePath }) })
       const helper = await (await browser.newContext()).newPage()
       try {
         for (const scene of scenes) {
-          // 브라우저 둘이 함께 돌아 줄이 섞이지 않게 장면마다 모아 찍는다
           const lines = []
           const ok = await verifyScene((line) => lines.push(line), browser, helper, browserName, device, server.url, scene)
           console.log(`${ok ? 'ok  ' : 'FAIL'} ${browserName}:${device} ${scene}\n${lines.join('\n')}`)
@@ -334,7 +329,7 @@ try {
       } finally {
         await browser.close()
       }
-    }))
+    }
   }
 } finally {
   server.stop()

@@ -17,7 +17,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
  * 그 덩이와 동적 import(진행기 · 장면 표 · 픽스처)가 통째로 빠진다. 이 파일에서 상수로 내보내 쓰면 rolldown 이 모듈 너머 상수를
  * 접지 않아 픽스처까지 배포 산출물에 실렸다(r210 에서 확인 — `e2e/README.md` 의 grep).
  *
- * 이 파일은 앱이 정적으로 부르는 작은 칸만 든다 — 장면 표와 진행기는 `sceneRunner.ts` · `scenes.ts` 에 있고 켜졌을 때만 동적으로 읽는다.
+ * 이 파일은 앱이 정적으로 부르는 작은 칸만 든다 — 장면 표와 진행기는 `sceneRunner.ts` · `scenes/` 에 있고 켜졌을 때만 동적으로 읽는다.
  */
 
 /** 바로가기가 부르는 진입 손잡이 — App 이 그릴 때마다 지금 값으로 갈아 끼운다(세션 훅의 액션은 그 그림의 상태를 쥔다) */

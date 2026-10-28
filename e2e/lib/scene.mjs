@@ -49,7 +49,7 @@ export async function launch(browserName = 'chromium', { device = 'desktop', hea
 
 /**
  * 장면에 곧바로 들어간다 — `?scene=<장면>&fixture=<픽스처>` (개발 서버 · e2e 빌드만). 진행기가 `<html data-scene="ready">` 를
- * 적을 때까지 기다린다. `fixture` 를 안 주면 장면 표(`src/app/dev/scenes.ts`)의 기본 픽스처.
+ * 적을 때까지 기다린다. `fixture` 를 안 주면 장면 표(`src/app/dev/scenes/<도메인>.ts`)의 기본 픽스처.
  */
 export async function openScene(page, scene, { fixture, query = '', timeout = 20000 } = {}) {
   const params = new URLSearchParams()
@@ -132,23 +132,5 @@ export async function shot(page, path, { full = false } = {}) {
   return page.locator(SCREEN_SELECTOR).first().screenshot({ path })
 }
 
-/**
- * 지금 쪽의 저장(localStorage `compus-baseball/` 칸)을 픽스처 파일로 뜬다 — `e2e/fixtures/<이름>.json`.
- * 값은 저장 모듈이 `JSON.stringify` 로 쓴 것이라 풀어 둔다(JSON 이 아닌 글은 `{ "$raw": 글 }`).
- */
-export async function dumpFixture(page, path, { note = '', seed } = {}) {
-  const raw = await page.evaluate(() => Object.fromEntries(
-    Object.keys(localStorage).filter((key) => key.startsWith('compus-baseball/')).sort().map((key) => [key, localStorage.getItem(key)]),
-  ))
-  const storage = {}
-  for (const [key, value] of Object.entries(raw)) {
-    try {
-      storage[key] = JSON.parse(value)
-    } catch {
-      storage[key] = { $raw: value }
-    }
-  }
-  const { writeFileSync } = await import('node:fs')
-  writeFileSync(path, `${JSON.stringify({ note, ...(seed === undefined ? {} : { seed }), localStorage: storage }, null, 2)}\n`)
-  return Object.keys(storage)
-}
+/** 지금 쪽의 저장을 픽스처 파일로 뜬다 — `fixture-dump.mjs` */
+export { dumpFixture } from './fixture-dump.mjs'

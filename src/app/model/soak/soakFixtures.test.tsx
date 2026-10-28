@@ -2,7 +2,7 @@
 /**
  * **soak 로 e2e 픽스처 뜨기** (r236) — 브라우저로 몇 시간 쳐야 닿는 자리(시즌 10년차 엔딩 · 나리 포스트시즌 128 · 국가대항전 134 ·
  * 은퇴 엔딩 141 · 명예의 전당 등록 앞)를 화면 없이 세션 훅으로 돌려 닿고, 그 순간의 localStorage `compus-baseball/` 칸을
- * `e2e/fixtures/<이름>.json` 으로 쓴다. 장면 바로가기(`src/app/dev/scenes.ts`)가 이 픽스처로 그 자리에 들어간다.
+ * `e2e/fixtures/<이름>.json` 으로 쓴다. 장면 바로가기(`src/app/dev/scenes/`)가 이 픽스처로 그 자리에 들어간다.
  *
  * - 저장 꼴은 앱의 **실제 저장 모듈** 그대로다 — 세션 훅에 `createLocalStorageSaveGame()` · `createLocalStorageJsonStore(키)` 를
  *   넘겨 jsdom localStorage 에 쓰게 하고 그 칸을 그대로 뜬다(손으로 짜지 않는다). 열쇠 글자는 `App.tsx` 의 그것과 같다.
