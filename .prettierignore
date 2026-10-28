@@ -22,3 +22,4 @@ src/shared/config/original/data
 # 생성 · 녹화 데이터
 *.generated.json
 **/__fixtures__/*.json
+.claude
