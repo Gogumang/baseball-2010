@@ -3,7 +3,6 @@ import { NO_ACE_BATTER, NO_ROSTER_SLOT, entryPitcherGameAbilityParts } from '@/f
 import { pitcherHandOf } from '@/entities/pitching/model/pitcherHand'
 import { aceLevelOf, aceLevelSlotOf } from '@/entities/mission/model/aceLevel'
 import { pitcherGameStatsOf } from '@/entities/pitching/model/pitcherGameStats'
-import type { LeagueStolenBase } from '@/entities/league/model/leaguePlayerStats'
 import { staminaCapacityOf, pitchStaminaCostOf, consumeStamina, staminaPercentOf } from '@/entities/pitcher-career/model/pitcherStamina'
 import { pitcherAbilityContextOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
 import {
@@ -71,38 +70,6 @@ export function entryQuickTiredOf(
   if (entry === undefined) return undefined
   const stats = pitcherGameStatsOf(entryPitcherGameAbilityParts(pitcherAbilityContextOf(progress), teamId, entry), staminaPercent)
   return { control: stats.control, velocity: stats.velocity }
-}
-
-/**
- * 간이 타석 도루(0xc1818 끝 c1a42~c1a98)의 리그 기록 — 루를 옮긴 주자마다 `0xa56dc(ctx, 주자, 0)` 이 참이면 그 레코드 +0x2c.
- * 게이트가 **주자 자신**을 본다(사람 판 도루와 다르다) — 마선수 주자만 빠진다. 모드 · 포스트시즌 거르기는 기록표에 넣는 쪽이 맡는다.
- * 주자는 신원(타순 칸, `playQuickPlateAppearance` 의 `stolenRunners`)대로다.
- */
-function quickLeagueStolenBasesOf(progress: TeamGameProgress, ours: boolean, stolenRunners: readonly number[]): readonly LeagueStolenBase[] {
-  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
-  const entry = ours ? progress.ourEntry : progress.opponentEntry
-  const stolen: LeagueStolenBase[] = []
-  for (const slot of stolenRunners) {
-    if ((entry[slot]?.aceIndex ?? NO_ACE_BATTER) >= 0) continue
-    const rosterSlot = entry[slot]?.rosterSlot ?? slot
-    if (rosterSlot === NO_ROSTER_SLOT) {
-      const recordId = entry[slot]?.recordId
-      if (recordId !== undefined) stolen.push({ teamId, battingOrderIndex: NO_ROSTER_SLOT, recordId })
-      continue
-    }
-    stolen.push({ teamId: entry[slot]?.tableTeamId ?? teamId, battingOrderIndex: rosterSlot })
-  }
-  return stolen
-}
-
-/** 간이 타석 도루의 리그 기록을 진행에 얹을 칸 — 없으면 빈 것 */
-export function withQuickSteals(
-  progress: TeamGameProgress,
-  ours: boolean,
-  stolenRunners: readonly number[],
-): { readonly leagueStolenBases?: readonly LeagueStolenBase[] } {
-  const stolen = quickLeagueStolenBasesOf(progress, ours, stolenRunners)
-  return stolen.length === 0 ? {} : { leagueStolenBases: [...(progress.leagueStolenBases ?? []), ...stolen] }
 }
 
 /**

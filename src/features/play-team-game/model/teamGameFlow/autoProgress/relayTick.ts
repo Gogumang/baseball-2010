@@ -1,5 +1,5 @@
 import type { GameState } from '@/entities/game/model/gameState'
-import { withoutPendingBurst } from '@/features/play-team-game/model/teamGameFlow/burst/burst'
+import { withoutPendingBurst } from '@/features/play-team-game/model/teamGameFlow/burst/dropBurst'
 import type { TeamAutoRelayTick, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /**

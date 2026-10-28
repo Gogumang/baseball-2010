@@ -3,13 +3,20 @@ import { runnerTeamGradeFor } from '@/features/play-team-game/model/teamGameRost
 import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import { runnerOnBase } from '@/entities/game/model/baseRunners'
 import { abilityContextOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
+import { battingSideOf } from '@/features/play-team-game/model/teamGameFlow/roster/battingSide'
 import { runAbilityFor } from '@/features/play-team-game/model/teamGameFlow/roster/batters'
 import { isOurOffense } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
-import { BATTING_ORDER_SIZE } from '@/features/play-team-game/model/teamGameFlow/types/constants'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
+/** 루 번호(1·2·3) → 그 루 칸 */
+const BASE_OCCUPIED: Readonly<Record<number, (bases: GameState['bases']) => boolean>> = {
+  1: (bases) => bases.first,
+  2: (bases) => bases.second,
+  3: (bases) => bases.third,
+}
+
 export function hasRunnerOn(bases: GameState['bases'], base: number): boolean {
-  return base === 1 ? bases.first : base === 2 ? bases.second : base === 3 ? bases.third : false
+  return BASE_OCCUPIED[base]?.(bases) ?? false
 }
 
 /** 판정 입력(st[0x14 + i])만 거둔다 — 표시(`stealDisplayFrom`)는 0xf 진입 · 타구 판 시작까지 남는다 */
@@ -24,10 +31,6 @@ export function withoutStealDisplay(progress: TeamGameProgress): TeamGameProgres
 }
 
 /**
- * 루별 주자 주루 (경기용 칸 3) — 0 은 지금 타자(낫아웃 타자주자). 루의 주자는 신원(`GameState.runners`, 원본 주자 목록 —
- * 공격 팀 타순 칸)대로다. 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(타순을 거꾸로 센다)로 본다.
- */
-/**
  * **주자 속도의 팀 등급** — 주자 만들기 0xa93ac a9488: 전역 모드 1·2·8 이면 `0xbbe98(s16 팀레코드+0xa)`.
  * 팀레코드는 주자의 팀(공격 팀)이다 — 루 위 주자 0xa9a10(a9a3e) · 타자주자 0x46418(4650e) 모두 공격 팀 `0xb8680(팀)`.
  * 모드 9(대전 이벤트)는 0 이다(수비 보너스 b10d0 과 다르다).
@@ -37,17 +40,17 @@ export function offenseRunnerTeamGradeOf(progress: TeamGameProgress, ourOffense:
   return runnerTeamGradeFor(abilityContextOf(options), ourOffense ? options.ourTeamId : options.opponentTeamId)
 }
 
+/**
+ * 루별 주자 주루 (경기용 칸 3) — 0 은 지금 타자(낫아웃 타자주자). 루의 주자는 신원(`GameState.runners`, 원본 주자 목록 —
+ * 공격 팀 타순 칸)대로다. 신원이 루 상황과 어긋나는 옛 상태만 예전 근사(타순을 거꾸로 센다)로 본다.
+ */
 export function runAbilitiesOnBaseOf(progress: TeamGameProgress, humanSide: ControlSide): Partial<Record<0 | 1 | 2 | 3, number>> {
-  const ours = humanSide === '공격'
-  const teamId = ours ? progress.options.ourTeamId : progress.options.opponentTeamId
-  const order = ours ? progress.game.battingOrderIndex : progress.opponentOrderIndex
-  const runners = runnersOfGame(progress.game, order)
-  const runs: Partial<Record<0 | 1 | 2 | 3, number>> = {
-    0: runAbilityFor(progress, teamId, ((order % BATTING_ORDER_SIZE) + BATTING_ORDER_SIZE) % BATTING_ORDER_SIZE),
-  }
+  const side = battingSideOf(progress, humanSide === '공격')
+  const runners = runnersOfGame(progress.game, side.order)
+  const runs: Partial<Record<0 | 1 | 2 | 3, number>> = { 0: runAbilityFor(progress, side.teamId, side.slot) }
   for (const base of [1, 2, 3] as const) {
     const runner = runnerOnBase(runners, base)
-    if (runner !== null) runs[base] = runAbilityFor(progress, teamId, runner)
+    if (runner !== null) runs[base] = runAbilityFor(progress, side.teamId, runner)
   }
   return runs
 }

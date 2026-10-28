@@ -10,6 +10,7 @@ import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import { createAtBat } from '@/entities/at-bat/model/atBatState'
 import { moundsOf } from '@/features/play-team-game/model/teamGameFlow/settlement/decisions'
 import { addRunsToCounters, chargeMoundLine, chargeRunsToResponsible } from '@/features/play-team-game/model/teamGameFlow/settlement/pitcherLines'
+import { isSameHalfInning } from '@/features/play-team-game/model/teamGameFlow/inningChange/halfInning'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
 /** `applyAtBatOutcome` 은 `precomputed` 를 받으면 결과 코드를 안 읽는다 — 주자 판에는 타석 결과가 없어 자리만 채운다 */
@@ -34,30 +35,18 @@ export function withRunnerOnlyAdvance(
   settles = true,
 ): { readonly progress: TeamGameProgress; readonly changed: boolean; readonly runs: number } {
   const before = progress.game
-  const humanDefends = humanSide === '수비'
-  const changed =
-    advanceResult.outsAdded > 0 ||
-    advanceResult.runsScored > 0 ||
-    advanceResult.bases.first !== before.bases.first ||
-    advanceResult.bases.second !== before.bases.second ||
-    advanceResult.bases.third !== before.bases.third
+  const changed = hasRunnerPlayMoved(before, advanceResult)
   if (!changed) return { progress, changed, runs: 0 }
-  let game: GameState
-  let runs: number
+  const humanDefends = humanSide === '수비'
   const runnerHint = runnerFates === undefined ? undefined : { survivorsFromBase: survivorsFromBaseOfFates(runnerFates) }
-  if (humanDefends) {
-    const applied = applyOpponentRunnerPlay(before, progress.opponentOrderIndex, advanceResult, runnerHint)
-    game = applied.game
-    runs = applied.runsScored
-  } else {
-    // 타석이 끝난 것이 아니라 타순 커서는 그대로 둔다
-    game = {
-      ...applyAtBatOutcome(before, RUNNER_PLAY_OUTCOME_PLACEHOLDER, advanceResult, runnerHint),
-      battingOrderIndex: before.battingOrderIndex,
-    }
-    runs = game.ourScore - before.ourScore
-  }
-  const halfChanged = game.half !== before.half || game.inning !== before.inning
+  const { game, runs } = humanDefends
+    ? opponentRunnerPlayOf(progress, advanceResult, runnerHint)
+    : ourRunnerPlayOf(before, advanceResult, runnerHint)
+  const halfChanged = !isSameHalfInning(before, game)
+  const scoredFromBases =
+    runnerFates === undefined
+      ? scoredFromBasesWithoutFates(progress, game, humanDefends, halfChanged, runs)
+      : chargedFromBasesOfFates(runnerFates, before.outs + advanceResult.outsAdded)
   const next: TeamGameProgress = {
     ...progress,
     game,
@@ -69,26 +58,74 @@ export function withRunnerOnlyAdvance(
       game,
       humanDefends,
       null,
-      runnerFates === undefined
-        ? scoredFromBasesOf(
-            humanDefends ? runnersOfGame(before, progress.opponentOrderIndex) : runnersOfGame(before),
-            halfChanged ? EMPTY_BASE_RUNNERS : humanDefends ? runnersOfGame(game, progress.opponentOrderIndex) : runnersOfGame(game),
-            runs,
-          )
-        : chargedFromBasesOfFates(runnerFates, before.outs + advanceResult.outsAdded),
+      scoredFromBases,
       settles,
     ),
     // 득점 처리 0xa5c34 는 1점마다 수비 팀 A·B 를 올린다 (P7 E1)
-    ...(humanDefends
-      ? {
-          ourPitcherCounters: addRunsToCounters(progress.ourPitcherCounters, runs, 0, halfChanged),
-          // state[0x8a] — 정산 a8dd0 이 이 판 득점 [sp+0x28] 을 더한다 (99 상한은 완봉 판정에 안 닿는다)
-          pitching: settles ? { ...progress.pitching, runsAllowed: progress.pitching.runsAllowed + runs } : progress.pitching,
-        }
-      : {
-          opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, runs, 0, halfChanged),
-        }),
+    ...(humanDefends ? ourDefenseRunsAfter(progress, runs, halfChanged, settles) : opponentDefenseRunsAfter(progress, runs, halfChanged)),
     ...(halfChanged ? { atBat: createAtBat(), atBatPrepared: false } : {}),
   }
   return { progress: next, changed, runs }
+}
+
+type RunnerHint = Parameters<typeof applyAtBatOutcome>[3]
+
+/** 판이 아웃 · 득점 · 루 중 하나라도 바꿨는가 — 안 바꿨으면 경기 상태를 건드리지 않는다 */
+function hasRunnerPlayMoved(before: GameState, advanceResult: DefensePlayResult['advance']): boolean {
+  if (advanceResult.outsAdded > 0 || advanceResult.runsScored > 0) return true
+  const { first, second, third } = advanceResult.bases
+  return first !== before.bases.first || second !== before.bases.second || third !== before.bases.third
+}
+
+/** 사람 수비 — 상대 공격 판. 타순 커서는 그대로다 (`applyOpponentRunnerPlay`) */
+function opponentRunnerPlayOf(
+  progress: TeamGameProgress,
+  advanceResult: DefensePlayResult['advance'],
+  runnerHint: RunnerHint,
+): { readonly game: GameState; readonly runs: number } {
+  const applied = applyOpponentRunnerPlay(progress.game, progress.opponentOrderIndex, advanceResult, runnerHint)
+  return { game: applied.game, runs: applied.runsScored }
+}
+
+/** 사람 공격 — 우리 공격 판. 타석이 끝난 것이 아니라 타순 커서는 그대로 둔다 */
+function ourRunnerPlayOf(
+  before: GameState,
+  advanceResult: DefensePlayResult['advance'],
+  runnerHint: RunnerHint,
+): { readonly game: GameState; readonly runs: number } {
+  const game = {
+    ...applyAtBatOutcome(before, RUNNER_PLAY_OUTCOME_PLACEHOLDER, advanceResult, runnerHint),
+    battingOrderIndex: before.battingOrderIndex,
+  }
+  return { game, runs: game.ourScore - before.ourScore }
+}
+
+/** 판 운명이 없는 옛 길 — 앞선 주자부터 점수판 득점만큼 (공격 팀 타순으로 루 위 신원을 읽는다) */
+function scoredFromBasesWithoutFates(
+  progress: TeamGameProgress,
+  game: GameState,
+  humanDefends: boolean,
+  halfChanged: boolean,
+  runs: number,
+): readonly number[] {
+  const runnersOf = (state: GameState) => (humanDefends ? runnersOfGame(state, progress.opponentOrderIndex) : runnersOfGame(state))
+  return scoredFromBasesOf(runnersOf(progress.game), halfChanged ? EMPTY_BASE_RUNNERS : runnersOf(game), runs)
+}
+
+/** 우리가 수비한 판의 실점 칸 — A·B 와, 정산을 지나면 state[0x8a] (정산 a8dd0 이 이 판 득점 [sp+0x28] 을 더한다 · 99 상한은 완봉 판정에 안 닿는다) */
+function ourDefenseRunsAfter(
+  progress: TeamGameProgress,
+  runs: number,
+  halfChanged: boolean,
+  settles: boolean,
+): Pick<TeamGameProgress, 'ourPitcherCounters' | 'pitching'> {
+  return {
+    ourPitcherCounters: addRunsToCounters(progress.ourPitcherCounters, runs, 0, halfChanged),
+    pitching: settles ? { ...progress.pitching, runsAllowed: progress.pitching.runsAllowed + runs } : progress.pitching,
+  }
+}
+
+/** 상대가 수비한 판의 실점 칸 — 상대 투수 A·B 만 */
+function opponentDefenseRunsAfter(progress: TeamGameProgress, runs: number, halfChanged: boolean): Pick<TeamGameProgress, 'opponentPitcherCounters'> {
+  return { opponentPitcherCounters: addRunsToCounters(progress.opponentPitcherCounters, runs, 0, halfChanged) }
 }

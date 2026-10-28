@@ -13,8 +13,8 @@ import {
   entryQuickPitcherOf,
   entryQuickTiredOf,
   quickPitcherDrainOf,
-  withQuickSteals,
 } from '@/features/play-team-game/model/teamGameFlow/autoPlay/quickEntries'
+import { withQuickSteals } from '@/features/play-team-game/model/teamGameFlow/records/leagueStolenBases'
 import { relayTickOf } from '@/features/play-team-game/model/teamGameFlow/autoProgress/relayTick'
 import { opponentTeamMoraleOf } from '@/features/play-team-game/model/teamGameFlow/context/abilityContext'
 import { appendLog } from '@/features/play-team-game/model/teamGameFlow/log/appendLog'

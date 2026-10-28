@@ -1,7 +1,7 @@
-import { type DefensePlayResult, recordedOutcomeOf } from '@/features/defense-play/model/runDefensePlay'
+import { type DefensePlayResult, recordedOutcomeOf, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { finishBatterOutcome } from '@/features/play-team-game/model/teamGameFlow/batting/finishBatterOutcome'
-import { afterFoulPlay } from '@/features/play-team-game/model/teamGameFlow/defense/defensiveAtBat'
+import { afterFoulPlay } from '@/features/play-team-game/model/teamGameFlow/defense/foulPlay'
 import { finishDefensiveAtBat } from '@/features/play-team-game/model/teamGameFlow/defense/finishDefensiveAtBat'
 import { advance } from '@/features/play-team-game/model/teamGameFlow/inningChange/advance'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
@@ -30,4 +30,16 @@ export function resolveDefensePlay(progress: TeamGameProgress, result: DefensePl
     return finishBatterOutcome(cleared, recordedOutcomeOf(pending.input, result), random, result, null)
   }
   return advance(finishDefensiveAtBat(cleared, recordedOutcomeOf(pending.input, result), true, result, null), random)
+}
+
+/**
+ * **붙든 판을 그 자리에서 끝까지 돌려 먹인다** — 끼어들 사람이 없는 갈래(`throwPitch` · `applyBatterPitch` · 시험)의 파울 각 공 판.
+ * `runDefensePlay` 는 스테퍼를 끝까지 도는 얇은 껍데기라 난수 차례가 화면 갈래와 같다. 아직 아무것도 안 보여 줬으므로
+ * 돌린 결과를 재생 칸(`lastDefensePlay`)에 둔다. 붙든 판이 없으면 그대로 돌려준다.
+ */
+export function runPendingDefensePlayNow(started: TeamGameProgress, random: RandomPort): TeamGameProgress {
+  const pending = started.pendingDefensePlay
+  if (pending === null) return started
+  const result = runDefensePlay(pending.input)
+  return resolveDefensePlay({ ...started, lastDefensePlay: result }, result, random)
 }

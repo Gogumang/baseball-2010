@@ -3,7 +3,7 @@ import { introSkipsFirstBoard, rollHalfInningFielders } from '@/features/play-ga
 import { fielderRecordsAfterBoard } from '@/entities/fielding/model/fielderRecords'
 import { playAutoAtBat } from '@/features/play-team-game/model/teamGameFlow/autoProgress/autoAtBat'
 import { enterAutoRelay } from '@/features/play-team-game/model/teamGameFlow/autoProgress/relayTick'
-import { withoutBurstOnHalfFlip, withoutPendingBurst } from '@/features/play-team-game/model/teamGameFlow/burst/burst'
+import { withoutBurstOnHalfFlip, withoutPendingBurst } from '@/features/play-team-game/model/teamGameFlow/burst/dropBurst'
 import { teamFielderSeatOf } from '@/features/play-team-game/model/teamGameFlow/defense/fielders'
 import { entryBattersOf } from '@/features/play-team-game/model/teamGameFlow/roster/batters'
 import { prepareAtBat } from '@/features/play-team-game/model/teamGameFlow/scene/prepareAtBat'

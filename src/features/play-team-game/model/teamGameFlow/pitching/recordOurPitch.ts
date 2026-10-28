@@ -1,32 +1,31 @@
 import { type CpuPitchOutcome, cpuSwingPoseOf } from '@/entities/pitching/model/simulateBatter'
-import type { Pitch } from '@/entities/pitching/model/pitch'
-import type { StealBase } from '@/entities/fielding/model/stealStart'
-import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import { applyPitchResolution } from '@/entities/at-bat/model/atBatState'
 import { sceneResultCodeOfThrown } from '@/features/defense-play/model/sceneResultCode'
+import type { CpuStealStart } from '@/features/play-team-game/model/teamGameFlow/baseRunning/cpuStealStart'
+import type { OurRolledPitch } from '@/features/play-team-game/model/teamGameFlow/pitching/rollOurPitch'
 import { withHalfInningPitches } from '@/features/play-team-game/model/teamGameFlow/records/atBatRecords'
 import { withSpecialSwingSlot } from '@/features/play-team-game/model/teamGameFlow/roster/specialSwing'
 import { chargeMoundLine } from '@/features/play-team-game/model/teamGameFlow/settlement/pitcherLines'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
 
-/** `pitchOnce` 의 공 하나를 던진 뒤 진행 — 몸통에서 그대로 떼어 냈다(r344) */
-export function ourAfterPitchOf(
+/**
+ * **사람 투수가 공 하나를 던진 뒤의 진행** — 상태 0x11 진입 0x3de10 · 소모 0xa5e14 · 코스 확정 0x50e9c 가 바꾸는 칸과
+ * CPU 타자 반응(0x34334) · CPU 도루 출발(0x520de)이 남긴 칸. 굴림은 없다(굴림은 부르는 쪽이 이미 했다)
+ */
+export function withOurPitchThrown(
   progress: TeamGameProgress,
   pitched: {
     readonly stamina: number
-    readonly magicRemainingAfter: number
-    readonly ballMagicNumber: number
+    readonly rolled: OurRolledPitch
     readonly thrown: CpuPitchOutcome
-    readonly resolution: CpuPitchOutcome['resolution']
-    readonly foulContact: CpuPitchOutcome['foulContact']
-    readonly pitch: Pitch
-    readonly isMistake: boolean
-    readonly stealingFrom: readonly StealBase[]
-    readonly stealScene: DefenseScene | undefined
+    readonly steal: CpuStealStart
   },
 ): TeamGameProgress {
-  const { stamina, magicRemainingAfter, ballMagicNumber, thrown, resolution, foulContact, pitch, isMistake, stealingFrom, stealScene } = pitched
-  const afterPitch: TeamGameProgress = {
+  const { stamina, thrown } = pitched
+  const { magicRemainingAfter, ballMagicNumber, pitch, isMistake } = pitched.rolled
+  const { stealingFrom, stealScene } = pitched.steal
+  const { resolution, foulContact } = thrown
+  return {
     ...progress,
     stamina,
     // ⚠️ 마구 횟수는 **코스 확정(OK)** 때 줄어든다 — 구질을 고른 순간이 아니다 (0x50e9c)
@@ -74,5 +73,4 @@ export function ourAfterPitchOf(
     // 경기 +0xfd4 — 0x11 진입이 지우고 CPU 타자가 휘두른 공이면 스윙 판정이 덮는다
     sceneResultCode: sceneResultCodeOfThrown(resolution, foulContact),
   }
-  return afterPitch
 }
