@@ -13,7 +13,7 @@ import babel from '@rolldown/plugin-babel'
  *   확인된 부품에만 단다. 달 때는 그 부품이 그리는 동안 모듈 칸 · ref · 시계를 읽지 않는지 본다.
  *
  * 재기: `REACT_COMPILER_LOG=<파일>` 이면 함수마다 컴파일 결과(성공 · 건너뜀 · 오류와 까닭)를 한 줄 JSON 으로 덧붙인다.
- * `REACT_COMPILER_MODE=infer` 면 폴더 안을 모두 컴파일한다(재기 전용 — 배포 · 시험은 `annotation`).
+ * `REACT_COMPILER_MODE=infer` 면 폴더 안을 모두 컴파일하고, `off` 면 컴파일러를 끈다(재기 · 원인 좁히기 전용 — 배포 · 시험은 `annotation`).
  */
 const COMPILED = ['**/src/pages/*/ui/**/*.tsx', '**/src/widgets/*/ui/**/*.tsx', '**/src/shared/ui/**/*.tsx']
 const NOT_COMPILED = ['**/*.test.tsx', '**/model/**', '**/node_modules/**']
@@ -38,6 +38,7 @@ function compilerLogger(logFile: string | undefined) {
 }
 
 export function reactCompiler(logFile: string | undefined, mode: string | undefined) {
+  if (mode === 'off') return null
   const logger = compilerLogger(logFile)
   const compilationMode = mode === 'infer' ? 'infer' : 'annotation'
   const preset = reactCompilerPreset({ compilationMode, ...(logger === undefined ? {} : { logger }) })

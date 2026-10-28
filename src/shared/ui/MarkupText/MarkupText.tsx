@@ -9,7 +9,6 @@ interface MarkupTextProps {
 
 /** 원본 텍스트 마크업을 그대로 화면에 그린다. */
 export function MarkupText({ raw, replacements = [] }: MarkupTextProps) {
-  'use memo'
   const lines = parseGameMarkup(raw, replacements)
 
   return (
