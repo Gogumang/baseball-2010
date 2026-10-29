@@ -15,10 +15,8 @@ import { useHallOfFameEdits } from '@/app/model/useCollection/useHallOfFameEdits
 import { useHiddenOpen } from '@/app/model/useCollection/useHiddenOpen'
 import { useAnnalsStats } from '@/app/model/useCollection/useAnnalsStats'
 
-export type { CollectionRewardWallet, HallOfFameWallet } from '@/app/model/useCollection/collectionTypes'
 export { mergeOpenedHiddenIds } from '@/app/model/useCollection/collectionTypes'
 export { nariBatterOf, nariPitcherOf } from '@/app/model/useCollection/nariHallOfFamePlayers'
-export type { NariHallOfFamePlayer } from '@/app/model/useCollection/nariHallOfFamePlayers'
 
 const NO_IDS: readonly number[] = []
 const NO_ANNOUNCE = () => {}
