@@ -12,10 +12,8 @@ export const readabilityRules = {
 }
 
 export const readabilityBaseline = [
-  'src/app/assetPacks/assetPackGate.ts',
   'src/app/model/afterGameEventPreload.ts',
   'src/app/model/commonWindowScene.ts',
-  'src/app/model/screenBgm.ts',
   'src/app/model/screenSpritePreload.ts',
   'src/app/model/seasonEvents.ts',
   'src/app/model/seasonHallOfFameRecords.ts',
@@ -30,15 +28,7 @@ export const readabilityBaseline = [
   'src/app/model/seasonSession/seasonEnd/useSeasonEndActions.ts',
   'src/app/model/seasonSession/settlement/useSettleGame.ts',
   'src/app/model/seasonSession/shop/useSeasonShopActions.ts',
-  'src/app/model/useCollection.ts',
   'src/app/model/useSound.ts',
-  'src/app/ui/App.tsx',
-  'src/app/ui/CareerRoutes.tsx',
-  'src/app/ui/EntryRoutes.tsx',
-  'src/app/ui/GameRoute.tsx',
-  'src/app/ui/MissionRoutes.tsx',
-  'src/app/ui/PitcherLeagueRoute.tsx',
-  'src/app/ui/SeasonRoute.tsx',
   'src/entities/at-bat/model/atBatState.ts',
   'src/entities/awards/model/leaderboard.ts',
   'src/entities/batting/model/hitDirection.ts',
