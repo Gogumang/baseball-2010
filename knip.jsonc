@@ -65,6 +65,7 @@
     // ── 원본 함수를 옮겨 두었지만 아직 부르는 곳이 없는 것 (원본 근거 주석이 붙어 있다)
     "src/entities/fielding/model/rundown.ts": ["exports"], // fielderRemainingTicks (0xbefec)
     "src/entities/fielding/model/throwTargetBase.ts": ["exports"], // baseAtPoint (0xb1268)
+    "src/entities/fielding/model/throwTargetBase/specialThrow.ts": ["exports"], // baseAtPoint (0xb1268, 위 모음이 다시 내보낸다)
     "src/entities/mission/model/missionGame.ts": ["exports"], // simulateMissionAutoHalf · simulateHumanTeamAutoHalf (틱 꼴을 끝까지 — 자동진행 0x21 설명)
     "src/entities/mission/model/missionGame/auto/autoHalf.ts": ["exports"], // simulateMissionAutoHalf (위 모음이 다시 내보낸다)
     "src/entities/mission/model/missionGame/auto/humanTeamAutoHalf.ts": ["exports"], // simulateHumanTeamAutoHalf (위 모음이 다시 내보낸다)
