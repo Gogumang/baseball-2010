@@ -41,7 +41,7 @@
     "src/entities/season-mode/model/seasonEventFlow/ids.ts": ["exports"], // SEASON_SCREEN_CODE (위 모음이 다시 내보낸다)
     "src/entities/season-mode/model/seasonEventFlow/illness.ts": ["exports"], // ILLNESS_ABILITY_PENALTY_PERCENT (b5824, 위 모음이 다시 내보낸다)
     "src/entities/season-mode/model/seasonGoals.ts": ["exports"], // SEASON_GOAL_INTRO_EVENT_ID
-    "src/entities/season-mode/model/seasonItemShop.ts": ["exports"], // SEASON_SHOP_SLOT_COUNT
+    "src/entities/season-mode/model/seasonItemShop/prices.ts": ["exports"], // SEASON_SHOP_SLOT_COUNT
     "src/entities/season-mode/model/seasonReputation.ts": ["exports"], // UNUSED_SLOT (S[15])
     "src/entities/season-mode/model/stadiumItems.ts": ["exports"], // GRASS_HAS_NO_EFFECT (없는 게 원본과 같다는 표시)
     "src/entities/settings/model/modeReset.ts": ["exports"], // MODE_RESET_SLOT (0x224ec)
