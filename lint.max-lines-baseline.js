@@ -44,7 +44,6 @@ export const maxLinesBaseline = [
   'src/pages/main-menu/ui/MainMenuScreen.tsx',
   'src/pages/management/lib/detailPopup.ts',
   'src/pages/management/lib/managementLayout.ts',
-  'src/pages/management/lib/nariEntryView.ts',
   'src/pages/management/lib/nariMatchPrepare.ts',
   'src/pages/management/model/useManagementMenu.ts',
   'src/pages/management/ui/DetailPopup.tsx',
