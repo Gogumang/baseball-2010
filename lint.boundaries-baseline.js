@@ -54,7 +54,7 @@ export const layerDirectionBaseline = [
 export const crossSliceBaseline = [
   'src/entities/awards/model/seasonAwards.ts',
   'src/entities/batting/model/atBatResultRing.ts',
-  'src/entities/batting/model/ballPhysics.ts',
+  'src/entities/batting/model/ballPhysics/otherSlices.ts',
   'src/entities/batting/model/battedBallFlight.ts',
   'src/entities/batting/model/battedContact.ts',
   'src/entities/batting/model/swingSkills.ts',

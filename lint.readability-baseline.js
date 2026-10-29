@@ -41,7 +41,6 @@ export const readabilityBaseline = [
   'src/app/ui/SeasonRoute.tsx',
   'src/entities/at-bat/model/atBatState.ts',
   'src/entities/awards/model/leaderboard.ts',
-  'src/entities/batting/model/ballPhysics.ts',
   'src/entities/batting/model/battedBallOutcome.ts',
   'src/entities/batting/model/hitDirection.ts',
   'src/entities/batting/model/homeRunFireworks.ts',

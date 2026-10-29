@@ -14,7 +14,6 @@ export const maxLinesBaseline = [
   'src/app/ui/PitcherLeagueRoute.tsx',
   'src/app/ui/SeasonRoute.tsx',
   'src/entities/awards/model/seasonAwards.ts',
-  'src/entities/batting/model/ballPhysics.ts',
   'src/entities/batting/model/battedBallFlight.ts',
   'src/entities/batting/model/battedBallOutcome.ts',
   'src/entities/batting/model/settlementEffect.ts',
