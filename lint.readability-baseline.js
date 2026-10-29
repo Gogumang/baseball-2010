@@ -354,7 +354,6 @@ export const readabilityBaseline = [
   'src/widgets/batting-stage/lib/magicBallEffect.ts',
   'src/widgets/batting-stage/lib/specialSwingBadge.ts',
   'src/widgets/batting-stage/lib/specialSwingEffect.ts',
-  'src/widgets/batting-stage/lib/spriteLoader.ts',
   'src/widgets/batting-stage/lib/stageText.ts',
   'src/widgets/batting-stage/lib/swingWindow.ts',
   'src/widgets/batting-stage/model/sceneCloudClock.ts',
