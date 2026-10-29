@@ -73,7 +73,6 @@ export const maxLinesBaseline = [
   'src/pages/season/ui/SeasonTeamSelectScreen.tsx',
   'src/pages/season/ui/SeasonTrainingPopup.tsx',
   'src/pages/season/ui/SeasonTrainingScreen.tsx',
-  'src/pages/season/ui/TradeConfirmWindow.tsx',
   'src/pages/settings/lib/settingsLayout.ts',
   'src/pages/settings/ui/SettingsScreen.tsx',
   'src/pages/shop/lib/equipmentWindowLayout.ts',
