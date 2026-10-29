@@ -366,7 +366,6 @@ export const readabilityBaseline = [
   'src/widgets/season/ui/SeasonListWindow.tsx',
   'src/widgets/special-swing/lib/specialTrainingWindow.ts',
   'src/widgets/special-swing/ui/SpecialSwingWindow.tsx',
-  'src/widgets/special-swing/ui/SpecialTrainingFigure.tsx',
   'src/widgets/touch-controls/ui/TouchControls.tsx',
   'src/widgets/training-scene/ui/TrainingScene.tsx',
 ]

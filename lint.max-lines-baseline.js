@@ -159,5 +159,4 @@ export const maxLinesBaseline = [
   'src/shared/lib/sprite/paletteSwap.ts',
   'src/shared/lib/sprite/spritePreload.ts',
   'src/shared/ui/MessageBox/MessageBox.tsx',
-  'src/widgets/special-swing/ui/SpecialTrainingFigure.tsx',
 ]
