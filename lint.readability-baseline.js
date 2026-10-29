@@ -245,7 +245,6 @@ export const readabilityBaseline = [
   'src/shared/lib/font/layout.ts',
   'src/shared/lib/gameMarkup/gameMarkup.ts',
   'src/shared/lib/outingMap/outingMapCursor.ts',
-  'src/shared/lib/pixelEffect/pixelEffect.ts',
   'src/shared/lib/radarGrowth/radarGrowth.ts',
   'src/shared/lib/sceneKeyLatch/appKeyGate.ts',
   'src/shared/lib/sceneKeyLatch/keyHold.ts',

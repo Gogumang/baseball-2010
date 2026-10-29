@@ -67,7 +67,6 @@ export const maxLinesBaseline = [
   'src/shared/config/spritePreloadScenes.ts',
   'src/shared/lib/commonPanel/commonPanel.ts',
   'src/shared/lib/commonWindow/commonWindow.ts',
-  'src/shared/lib/pixelEffect/pixelEffect.ts',
   'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts',
   'src/shared/lib/sprite/originalScale.fixture.ts',
   'src/shared/lib/sprite/paletteSwap.ts',
