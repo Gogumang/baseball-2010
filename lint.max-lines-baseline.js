@@ -21,7 +21,6 @@ export const maxLinesBaseline = [
   'src/entities/fielding/model/catchPrediction.ts',
   'src/entities/league/model/league.ts',
   'src/entities/mission/model/missionGoal.ts',
-  'src/entities/mode-save/model/modeSave.ts',
   'src/entities/particle/model/particleEmitter.ts',
   'src/entities/pitcher-career/model/magicPitch.ts',
   'src/entities/pitching/model/pitcherChange.ts',
