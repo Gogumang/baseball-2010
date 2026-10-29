@@ -248,7 +248,6 @@ export const readabilityBaseline = [
   'src/shared/lib/radarGrowth/radarGrowth.ts',
   'src/shared/lib/sceneKeyLatch/appKeyGate.ts',
   'src/shared/lib/sceneKeyLatch/keyHold.ts',
-  'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts',
   'src/shared/lib/sceneKeyLatch/shownSceneTicks.ts',
   'src/shared/lib/screenShake/useWholeScreenOffset.ts',
   'src/shared/lib/skinFrameSlide/skinFrameSlide.ts',
