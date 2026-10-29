@@ -56,6 +56,7 @@ import { RecordAlertScreenOverlay, RecordAlertStageOverlay } from '@/widgets/gam
 import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import { gameAutoRelayStepsOf } from '@/pages/game/lib/gameAutoRelay'
 import { SceneCloudCountingSpan } from '@/widgets/batting-stage/model/useSceneCloudCountingSpan'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 나리 타자편 — 전역 모드 [0x1552d10] = 4 */
 const BATTER_CAREER_MODE = 4
@@ -113,7 +114,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const play = progress.lastDefensePlay
   // 세션 액션은 그릴 때마다 새 함수라 붙이기는 처음 한 번 — 떼기 · 알리기는 세션 ref 로 늘 지금 것을 부른다
   const sessionActionsRef = useRef(session.actions)
-  sessionActionsRef.current = session.actions
+  useMirrorRef(sessionActionsRef, session.actions)
   // 재생 판으로 경기가 끝나면 세션이 정산을 재생 뒤로 미룬다 — 이 화면이 붙어 있는 동안만 (`attachReplayHost`)
   useEffect(() => sessionActionsRef.current.attachReplayHost(), [])
   /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않는다. 다 그리면 세션에 알린다(팀 경기 · 투수편과 같은 `useShownReplay`) */

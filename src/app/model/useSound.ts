@@ -4,6 +4,7 @@ import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { createWebAudioSound } from '@/shared/api/audio/webAudioSound'
 import { rearmGameSceneFirstDraw } from '@/shared/lib/commonWindow/commonWindow'
 import { tryOrElse } from '@/shared/lib/safe/tryOr'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 환경설정 칸(0~4) → 원본 소리 크기 (옵션 +0x2e × 25, 0x2963e) */
 const VOLUME_PER_LEVEL = 25
@@ -102,9 +103,9 @@ export function bgmToRestoreOnUnmute(lastPlayed: number | null): number | null {
  */
 export function useSoundLevelKeys(sound: SoundPort, soundLevel: number, onSoundLevelChange: (level: number) => void): void {
   const levelRef = useRef(soundLevel)
-  levelRef.current = soundLevel
+  useMirrorRef(levelRef, soundLevel)
   const changeRef = useRef(onSoundLevelChange)
-  changeRef.current = onSoundLevelChange
+  useMirrorRef(changeRef, onSoundLevelChange)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const code = SOUND_KEY_CODES[event.key]

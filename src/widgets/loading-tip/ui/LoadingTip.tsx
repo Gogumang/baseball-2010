@@ -22,6 +22,7 @@ import {
   tipNumberGlyphsOf,
 } from '@/widgets/loading-tip/lib/loadingTipLayout'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const rgbOf = ([red, green, blue]: readonly number[]) => `rgb(${red}, ${green}, ${blue})`
 
@@ -80,7 +81,7 @@ export function LoadingTip({ tip, onDone, steps = LOADING_STEPS_DEFAULT, preload
   const animations = useAnimations(FOLDER)
   const [update, setUpdate] = useState(0)
   const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
+  useMirrorRef(onDoneRef, onDone)
 
   // 로딩 판(상태 7 · 9 · 8)은 배경 0x41230 을 안 그린다(52f28~52f32) — 그 동안 선 창은 전광판 셈에 안 든다. 장면 표시보다 먼저 센다
   useMarksGameSceneLoading()

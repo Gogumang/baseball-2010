@@ -161,6 +161,7 @@ import { pitcherNariEntryViewOf } from '@/pages/pitcher-league/lib/pitcherEntryV
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 처음부터 열린 마선수 — 저장 +0x30 · +0x35 (`normalizeAceOpenSave` 가 늘 켠다) */
 const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
@@ -742,14 +743,14 @@ export function usePitcherLeagueSession(
 ): PitcherLeagueSession {
   /** 전역기록 +0x4f 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
-  nariGameSaveRef.current = nariGameSave
+  useMirrorRef(nariGameSaveRef, nariGameSave)
   /** 나간 마선수 대결 대기(전역기록) 손잡이 — 안 넘기면 세션 메모리 */
   const memoryAceMatchPending = useMemo(() => createMemoryAceMatchPendingPort(), [])
   const aceMatchPendingRef = useRef(aceMatchPending ?? memoryAceMatchPending)
-  aceMatchPendingRef.current = aceMatchPending ?? memoryAceMatchPending
+  useMirrorRef(aceMatchPendingRef, aceMatchPending ?? memoryAceMatchPending)
   /** 두 편 대결 대기(전역기록) — 자동 훑기 가드 1cfe4~1d008 (`isAutoScanHeldByAceMatch`) */
   const aceMatchHoldRef = useRef(aceMatchHold)
-  aceMatchHoldRef.current = aceMatchHold
+  useMirrorRef(aceMatchHoldRef, aceMatchHold)
   const loaded = useRef<PitcherCareer | null>(null)
   if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
   /** 띄울 때 저장에 들어 있던 G — 다리가 갈아 끼우기 전의 값이라 첫 렌더에서 떠 둔다 */
@@ -2029,7 +2030,7 @@ export function usePitcherLeagueSession(
    * 이벤트 본문이 아직 안 왔으면 오는 때 찍는다.
    */
   const careerForSlotsRef = useRef(career)
-  careerForSlotsRef.current = career
+  useMirrorRef(careerForSlotsRef, career)
   const outingSlots = useMemo(() => {
     const current = careerForSlotsRef.current
     if (outingEntryCount === 0 || current === null || fileEvents === null) return EMPTY_OUTING_PLACE_SLOTS

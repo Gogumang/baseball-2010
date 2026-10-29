@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as styles from '@/shared/ui/MenuList/MenuList.css'
 import { popupLabel } from '@/shared/ui/PixelNumber/PixelNumber.css'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 export interface MenuItem {
   readonly id: string
@@ -40,15 +41,15 @@ interface MenuListProps {
 export function MenuList({ items, onSelect, initialIndex = 0, onCursorChange, selectsByDigit = false }: MenuListProps) {
   const [selectedIndex, setSelectedIndex] = useState(() => (initialIndex >= 0 && initialIndex < items.length ? initialIndex : 0))
   const itemsRef = useRef(items)
-  itemsRef.current = items
+  useMirrorRef(itemsRef, items)
 
   const selectedIndexRef = useRef(selectedIndex)
-  selectedIndexRef.current = selectedIndex
+  useMirrorRef(selectedIndexRef, selectedIndex)
 
   const onSelectRef = useRef(onSelect)
-  onSelectRef.current = onSelect
+  useMirrorRef(onSelectRef, onSelect)
   const selectsByDigitRef = useRef(selectsByDigit)
-  selectsByDigitRef.current = selectsByDigit
+  useMirrorRef(selectsByDigitRef, selectsByDigit)
 
   /**
    * 메뉴 **구성이 바뀌면** 커서를 첫 항목으로 되돌린다.
@@ -67,7 +68,7 @@ export function MenuList({ items, onSelect, initialIndex = 0, onCursorChange, se
   }, [itemsKey])
 
   const onCursorChangeRef = useRef(onCursorChange)
-  onCursorChangeRef.current = onCursorChange
+  useMirrorRef(onCursorChangeRef, onCursorChange)
   useEffect(() => {
     onCursorChangeRef.current?.(selectedIndex)
   }, [selectedIndex])

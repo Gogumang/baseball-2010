@@ -11,6 +11,7 @@ import type { HalfInningCardsData } from '@/widgets/game-scene/ui/HalfInningCard
 import { HalfInningField } from '@/widgets/field-walk/ui/HalfInningField'
 import type { HalfInningFieldProps } from '@/widgets/field-walk/ui/HalfInningField'
 import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 interface HalfInningBoardProps {
   /** 판이 서는 반 이닝 — 그림에는 안 쓴다(시험 · 부르는 쪽이 판을 가려 보는 표시) */
@@ -58,7 +59,7 @@ export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, 
   const keyLatch = useSceneKeyLatchOwner()
   const tick = useSceneTick(onTick, true, false, keyLatch)
   const confirmRef = useRef(onConfirm)
-  confirmRef.current = onConfirm
+  useMirrorRef(confirmRef, onConfirm)
   const doneRef = useRef(false)
   const confirmNow = () => {
     if (doneRef.current) return

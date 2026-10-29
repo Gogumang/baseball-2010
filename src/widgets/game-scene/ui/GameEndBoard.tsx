@@ -11,6 +11,7 @@ import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFr
 import { LineScoreBoard } from '@/widgets/line-score/ui/LineScoreBoard'
 import { LINE_SCORE_AT } from '@/widgets/line-score/lib/lineScoreLayout'
 import type { GameEndLineScore } from '@/widgets/game-scene/lib/endBoardLineScore'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 interface GameEndBoardProps {
   readonly side0Score: number
@@ -64,7 +65,7 @@ export function GameEndBoard({ side0Score, side1Score, names, scoreboardSides, l
   const tick = useSceneTick(undefined, true, false, keyLatch)
   const isLocked = tick < GAME_END_INPUT_LOCK_TICKS
   const confirmRef = useRef(onConfirm)
-  confirmRef.current = onConfirm
+  useMirrorRef(confirmRef, onConfirm)
   const doneRef = useRef(false)
 
   const confirmAt = (stateTick: number) => {

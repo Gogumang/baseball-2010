@@ -74,6 +74,7 @@ import { lazyScreen, preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScre
 import { noteSafePoint } from '@/shared/lib/staleBuild/staleBuild'
 import { useScreenWakeLock } from '@/shared/lib/wakeLock/useScreenWakeLock'
 import { useDevPanel } from '@/app/devtools/useDevPanel'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /*
  * 모드 화면은 따로 받는다(`lazyScreen` — 첫 화면 덩이를 줄인다, r224). 켤 때 길에서 `preloadLazyScreens` 가 미리 받아 두므로
@@ -300,7 +301,7 @@ export function App({ bootScreen }: AppProps = {}) {
   const readBatterOtherModes = useCallback(() => otherModesRef.current.batter, [])
   const readPitcherOtherModes = useCallback(() => otherModesRef.current.pitcher, [])
   const seasonGameSettingsRef = useRef(gameSettings.settings)
-  seasonGameSettingsRef.current = gameSettings.settings
+  useMirrorRef(seasonGameSettingsRef, gameSettings.settings)
   const seasonGameSettingsNow = useCallback(
     () => ({
       gaugeSettingOn: seasonGameSettingsRef.current.pitchControl === '게이지',
@@ -583,7 +584,7 @@ export function App({ bootScreen }: AppProps = {}) {
    * 아무것도 안 한다. 켰으면 0x1f1b9 저장 뒤 공용 창 0x74ef5 에 StrCOMMON[140|138|139] 한 줄(쓰는 곳 줄 없음)
    */
   const aceOpenSaveRef = useRef(aceOpen.save)
-  aceOpenSaveRef.current = aceOpen.save
+  useMirrorRef(aceOpenSaveRef, aceOpen.save)
   const { readStats: readCollectionStats, openHiddenQuietly } = collection
   const { open: openAceCellFlag } = aceOpen
   const { announceText: announceHiddenText } = hiddenOpenNotice

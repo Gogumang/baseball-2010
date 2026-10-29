@@ -36,6 +36,7 @@ import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionW
 import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 import * as styles from '@/widgets/burst-mission/ui/BurstMissionWindow.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 interface BurstMissionWindowProps {
   /**
@@ -86,7 +87,7 @@ export function BurstMissionWindow({
   /** 그린 수 — 초상 애니는 그린 뒤 한 칸 나아간다(0x93d91) */
   const [draws, setDraws] = useState(0)
   const stateRef = useRef(state)
-  stateRef.current = state
+  useMirrorRef(stateRef, state)
 
   useEffect(() => {
     burstObjectTicks.value = stateRef.current.ticks

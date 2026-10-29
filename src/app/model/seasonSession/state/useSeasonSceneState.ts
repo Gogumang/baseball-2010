@@ -8,6 +8,7 @@ import type { SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewa
 import { type SeasonGlobalSlots, seasonGlobalSlotsOf } from '@/app/model/seasonSession/save/globals'
 import type { PendingSeasonGame, SeasonGameKind } from '@/app/model/seasonSession/types/session'
 import type { SeasonSaveStateContext } from '@/app/model/seasonSession/state/useSeasonSaveState'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** `useSeasonSession` 몸통 문장 14~37 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSeasonSceneState(ctx: SeasonSaveStateContext) {
@@ -64,7 +65,7 @@ export function useSeasonSceneState(ctx: SeasonSaveStateContext) {
   const [summaryEntry, setSummaryEntry] = useState<SeasonSummaryEntry | null>(null)
   const summaryEntrySerial = useRef(0)
   const autobotBatInputRef = useRef(autobotBatInput)
-  autobotBatInputRef.current = autobotBatInput
+  useMirrorRef(autobotBatInputRef, autobotBatInput)
   return {
     scene,
     setScene,

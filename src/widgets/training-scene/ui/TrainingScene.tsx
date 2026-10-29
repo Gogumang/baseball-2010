@@ -11,6 +11,7 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 연출 기준점 = 창 사각형 ((x + w) / 2, y + h) = (120, 137) (0x84954) */
 const ANCHOR = { x: 120, y: 137 }
@@ -63,7 +64,7 @@ export function TrainingScene({ presentation, battingTypeIndex = 0, equipmentLev
   const [update, setUpdate] = useState(-1)
 
   const onFinishedRef = useRef(onFinished)
-  onFinishedRef.current = onFinished
+  useMirrorRef(onFinishedRef, onFinished)
 
   useEffect(() => {
     if (presentation === null) {

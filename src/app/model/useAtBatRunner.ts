@@ -5,6 +5,7 @@ import { clearGameSceneTimeout, setGameSceneTickTimeout } from '@/shared/lib/com
 import { RESULT_WAIT_TICKS_AT_BAT_END, resultWaitTicksOf } from '@/pages/game/lib/batterRecordAlert'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { opensArrivalPlayAtOnce, type ArrivalPlayLike } from '@/features/play-game/model/benchClearingScene'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * **타석이 끝난 뒤 새 타석 0xd 까지 남은 그림 수** — 원본에는 따로 띄우는 "결과 띠" 상태가 없다. 타석을 끝내는 길은 둘뿐이다(R10 8절):
@@ -59,7 +60,7 @@ export function useAtBatRunner(): AtBatRunner {
   const [isPaused, setIsPaused] = useState(false)
 
   const atBatRef = useRef(atBat)
-  atBatRef.current = atBat
+  useMirrorRef(atBatRef, atBat)
 
   const bannerTimerRef = useRef<number | null>(null)
   useEffect(

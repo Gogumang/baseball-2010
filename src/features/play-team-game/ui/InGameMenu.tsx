@@ -21,6 +21,7 @@ import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import * as styles from '@/features/play-team-game/ui/InGameMenu.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 /** ui/num.pzx — 칸 번호 0xba689 의 글꼴 [[[장면+0x1014]+8]+8], 기준 그림 0 */
@@ -148,7 +149,7 @@ export function InGameMenu({
    */
   const handedOffRef = useRef(false)
   const isMessageShownRef = useRef(false)
-  isMessageShownRef.current = confirming !== null || notice !== null
+  useMirrorRef(isMessageShownRef, confirming !== null || notice !== null)
   /** 서 있는 창의 닫기 — 창이 키를 안 받으면 거짓 */
   const windowCloseRef = useRef<((onClosed: () => void) => boolean) | null>(null)
 
@@ -165,7 +166,7 @@ export function InGameMenu({
   }, [bindCloser])
 
   const onCursorChangeRef = useRef(onCursorChange)
-  onCursorChangeRef.current = onCursorChange
+  useMirrorRef(onCursorChangeRef, onCursorChange)
   const moveCursor = (next: number) => {
     setCursor(next)
     onCursorChangeRef.current?.(next)
@@ -352,7 +353,7 @@ function PauseWindow({
     skipsMotion: hasNoLayout,
   })
   const motionRef = useRef(motion)
-  motionRef.current = motion
+  useMirrorRef(motionRef, motion)
   // 창이 키를 받을 때만 닫는다 — 펼침 · 줄임 중이면 그 키는 버려지지만(0x75556 · 0x7558a) 닫기 요청은 받은 셈이다
   useLayoutEffect(() => {
     windowCloseRef.current = (onClosed) => {
@@ -376,7 +377,7 @@ function PauseWindow({
   }, [isShown, slide])
 
   const cursorRef = useRef(cursor)
-  cursorRef.current = cursor
+  useMirrorRef(cursorRef, cursor)
   const latest = useRef({ actions, onMoveCursor, onChoose, onRequestClose })
   latest.current = { actions, onMoveCursor, onChoose, onRequestClose }
   useEffect(() => {

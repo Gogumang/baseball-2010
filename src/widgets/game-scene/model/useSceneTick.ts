@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 import { runSceneKeys, type SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 경기 장면 상태의 **틱** (경기+0x2c) — 상태가 바뀐 틱이 0 이고 갱신마다 1 씩 오른다.
@@ -25,11 +26,11 @@ export function useSceneTick(onTick?: (tick: number) => void, isRunning = true, 
   // 굴림이 두 번 나간다
   const tickRef = useRef(0)
   const onTickRef = useRef(onTick)
-  onTickRef.current = onTick
+  useMirrorRef(onTickRef, onTick)
   const runsUnderCommonWindowRef = useRef(runsUnderCommonWindow)
-  runsUnderCommonWindowRef.current = runsUnderCommonWindow
+  useMirrorRef(runsUnderCommonWindowRef, runsUnderCommonWindow)
   const keyLatchRef = useRef(keyLatch)
-  keyLatchRef.current = keyLatch
+  useMirrorRef(keyLatchRef, keyLatch)
 
   useEffect(() => {
     if (!isRunning) return

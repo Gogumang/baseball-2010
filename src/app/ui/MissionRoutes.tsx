@@ -67,6 +67,7 @@ import { castOfRosterBatters, gameEntryCastPreloadsOf, stageSpritePreloadsOf } f
 import { mergeSpritePreloads } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteSceneKey } from '@/shared/lib/sprite/scenePreload'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 미션 경기 로딩 판 동안 받을 그림 — 미션은 로딩 판 뒤 곧바로 첫 판(0x18, 미션 목표 · 경기 끝 판과 같은 글자 칸)이라 `afterGame` 도,
@@ -751,7 +752,7 @@ export function PitcherAceMatchRoute({
   pitcherName,
 }: PitcherAceMatchRouteProps) {
   const beginRef = useRef(session.actions.beginPitcherAceMatch)
-  beginRef.current = session.actions.beginPitcherAceMatch
+  useMirrorRef(beginRef, session.actions.beginPitcherAceMatch)
   useEffect(() => {
     beginRef.current(mission)
   }, [mission])

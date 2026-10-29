@@ -26,6 +26,7 @@ import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -107,7 +108,7 @@ export function RecordPickPopup({
   }, [])
   const motion = usePopupWindowMotion({ targetHeight: RECORD_PICK_POPUP_HEIGHT, skipsMotion: hasNoLayout })
   const closeKindRef = useRef(closeKind)
-  closeKindRef.current = closeKind
+  useMirrorRef(closeKindRef, closeKind)
   /** 확인 — `'바로'` 는 치운 자리에서, `'줄임'` 은 다음 갱신에 `onConfirm` · 다 닫히면 `onClosed` */
   const confirm = () => {
     if (closeKindRef.current === '바로') return motion.close('바로', () => latest.current.onConfirm())

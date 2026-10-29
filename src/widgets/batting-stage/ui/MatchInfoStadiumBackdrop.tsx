@@ -5,6 +5,7 @@ import type { MatchInfoStadiumState } from '@/widgets/batting-stage/lib/renderSc
 import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 import { finishSkinBackdropOnCanvas } from '@/shared/lib/screen565/screen565'
 import { tryOr } from '@/shared/lib/safe/tryOr'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 그림이 다 실렸는지 가늠하는 표본 간격 — 날 그림이 바뀌었을 때만 흐리기를 다시 한다 */
 const SAMPLE_STEP = 97
@@ -29,7 +30,7 @@ function checksumOf(context: CanvasRenderingContext2D): number {
 export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoStadiumState | null | undefined }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef(stage)
-  stageRef.current = stage
+  useMirrorRef(stageRef, stage)
   /** 값이 같으면 같은 그림 — 부르는 쪽이 객체를 새로 만들어도 다시 뜨지 않는다 */
   const stageKey = stage === null || stage === undefined ? null : JSON.stringify(stage)
 

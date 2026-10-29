@@ -229,6 +229,7 @@ import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * **경기 뒤 평가 창의 좋음·보통·나쁨 징글** (36 · 37 · 38).
@@ -585,22 +586,22 @@ export function useCareerSession({
   }, [career?.gamesPlayed])
   /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
-  nariGameSaveRef.current = nariGameSave
+  useMirrorRef(nariGameSaveRef, nariGameSave)
   /** 나간 마선수 대결 대기(전역기록) 손잡이 — 안 넘기면 세션 메모리 */
   const memoryAceMatchPending = useMemo(() => createMemoryAceMatchPendingPort(), [])
   const aceMatchPendingRef = useRef(aceMatchPending ?? memoryAceMatchPending)
-  aceMatchPendingRef.current = aceMatchPending ?? memoryAceMatchPending
+  useMirrorRef(aceMatchPendingRef, aceMatchPending ?? memoryAceMatchPending)
   /** 두 편 대결 대기(전역기록) — 자동 훑기 가드 1cfe4~1d008 (`isAutoScanHeldByAceMatch`) */
   const aceMatchHoldRef = useRef(aceMatchHold)
-  aceMatchHoldRef.current = aceMatchHold
+  useMirrorRef(aceMatchHoldRef, aceMatchHold)
 
   // 캔버스 루프에서 최신 값을 읽어야 한다 — useAtBatRunner의 atBatRef와 같은 이유다.
   const progressRef = useRef(progress)
-  progressRef.current = progress
+  useMirrorRef(progressRef, progress)
   const careerRef = useRef(career)
-  careerRef.current = career
+  useMirrorRef(careerRef, career)
   const rawCareerRef = useRef(rawCareer)
-  rawCareerRef.current = rawCareer
+  useMirrorRef(rawCareerRef, rawCareer)
   /**
    * **메모리에만 있는 커리어** — 원본이 그 자리에서 모드 저장(0x22755)을 안 부르는 변경이 만든 값. 저장 고리가 이 값이면 쓰지 않는다
    * (그 뒤 다른 변경이 새 값을 만들면 원본의 다음 저장처럼 통째로 쓴다). 메인 메뉴를 다녀오면 원본은 0x213c0(앱, 4, 0) 으로
@@ -625,7 +626,7 @@ export function useCareerSession({
   const arrivalContextRef = useRef<ArrivalContext | null>(null)
   // 경기를 세우는 `startMatch` 가 읽는다 — 설정이 바뀔 때마다 콜백 신원이 흔들리지 않게 ref 로 둔다
   const runningModeManualRef = useRef(runningModeManual)
-  runningModeManualRef.current = runningModeManual
+  useMirrorRef(runningModeManualRef, runningModeManual)
 
   /**
    * 경기 중에 환경설정 "주루" 를 바꾸면 **그 자리에서** 먹게 잇는다 — 원본은 이 칸(설정 +0xbd)을
@@ -1174,7 +1175,7 @@ export function useCareerSession({
     [finishCupGame, finishGame],
   )
   const endGameRef = useRef(endGame)
-  endGameRef.current = endGame
+  useMirrorRef(endGameRef, endGame)
   // 돌발 결과 창을 닫아 판정이 치워졌다 — 보상이 든 커리어 · 진행이 그려진 뒤 미룬 정산을 한다
   useEffect(() => {
     if (!isGameEndHeldByBurst) return
@@ -1401,7 +1402,7 @@ export function useCareerSession({
    * 이벤트 본문이 아직 안 왔으면 오는 때 찍는다.
    */
   const careerForSlotsRef = useRef(career)
-  careerForSlotsRef.current = career
+  useMirrorRef(careerForSlotsRef, career)
   const outingEntryRef = useRef<{ readonly screen: Screen; readonly count: number }>({
     screen,
     count: isOutingMapEntry(null, screen) ? 1 : 0,
@@ -1439,7 +1440,7 @@ export function useCareerSession({
    */
   const [managementReentryCount, setManagementReentryCount] = useState(0)
   const managementBgmRestartRef = useRef(onManagementBgmRestart)
-  managementBgmRestartRef.current = onManagementBgmRestart
+  useMirrorRef(managementBgmRestartRef, onManagementBgmRestart)
   /**
    * `from` 은 105 로 다시 들어오는 원본 앞 상태 — 0x1aec4 의 배경음 4 목록에 들면(125 훈련 결과) 배경음 4 를 처음부터 다시 튼다
    * (`restartsManagementBgmFrom`). 하위 메뉴 106 · 107 · 110 취소 · 127 휴식은 목록 밖이다

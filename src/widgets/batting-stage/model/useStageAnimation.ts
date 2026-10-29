@@ -82,6 +82,7 @@ import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanel
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
@@ -145,7 +146,7 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
   } = refs
   // 고리는 남은 필살 횟수 같은 props 로 자주 바뀐다 — 루프를 다시 세우면 투구 시작 시각이 지워지므로 ref 로 읽는다
   const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
+  useMirrorRef(handlersRef, handlers)
   /**
    * 쉬기(`isPaused`)가 풀린 커밋의 장면 틱 — 쉬기를 푸는 쪽(견제 판 끝 `finishRunnerPlay` · 0xe 의 OK)은 원본에서 그 틀의 갱신이 다음
    * 상태를 예약하는 자리라(0xbcb48 → 다음 틀 0xbc9c8 이 틱 0) 다음 틀이 0xf 틱 0 이다. 루프가 쉬는 '대기' 를 본 뒤에만 쓴다

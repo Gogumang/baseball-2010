@@ -3,6 +3,7 @@ import * as styles from '@/shared/ui/IconMenu/IconMenu.css'
 import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
 import { EffectImage } from '@/shared/ui/EffectImage/EffectImage'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 원작 메뉴.
@@ -33,13 +34,13 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   const itemsRef = useRef(items)
-  itemsRef.current = items
+  useMirrorRef(itemsRef, items)
   const selectedRef = useRef(selectedIndex)
-  selectedRef.current = selectedIndex
+  useMirrorRef(selectedRef, selectedIndex)
   const onSelectRef = useRef(onSelect)
-  onSelectRef.current = onSelect
+  useMirrorRef(onSelectRef, onSelect)
   const columnsRef = useRef(columns)
-  columnsRef.current = columns
+  useMirrorRef(columnsRef, columns)
 
   useEffect(() => {
     setSelectedIndex(0)
