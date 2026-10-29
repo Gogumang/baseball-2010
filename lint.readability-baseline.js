@@ -381,7 +381,6 @@ export const readabilityBaseline = [
   'src/widgets/matchup-cards/ui/MatchupCards.tsx',
   'src/widgets/particles/lib/renderParticles.ts',
   'src/widgets/particles/ui/SceneParticleLayer.tsx',
-  'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
   'src/widgets/screen-frame/model/useListPageEntry.ts',
   'src/widgets/season/model/useSeasonCursor.ts',
   'src/widgets/season/ui/SeasonListWindow.tsx',
