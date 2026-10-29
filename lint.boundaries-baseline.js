@@ -397,7 +397,6 @@ export const crossSliceBaseline = [
   'src/widgets/batting-stage/ui/BattingStage.tsx',
   'src/widgets/batting-stage/ui/PitcherSideStage.tsx',
   'src/widgets/entry-editor/ui/EntryDetailOverlay.tsx',
-  'src/widgets/entry-editor/ui/EntryEditorScreen.tsx',
   'src/widgets/entry-editor/ui/entryListWindow/otherSlices.ts',
   'src/widgets/field-walk/lib/nameTag.ts',
   'src/widgets/game-scene/model/gameSceneObject.ts',

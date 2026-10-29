@@ -1,7 +1,10 @@
 /**
- * 엔트리 목록 창이 쓰는 **다른 조각**의 그림 셈 — 연도 칸 숫자 · 열 밀기 표 0xd1bbc(`pages/nari-record-room`) · 수비/보직 딱지와 둥근 칠(`widgets/matchup-cards`).
+ * 엔트리 화면이 쓰는 **다른 조각** — 머리띠 `ScreenFrame` · 바닥 칸 비트 · 제목 꼴(`widgets/screen-frame`) · 그림 셈 — 연도 칸 숫자 · 열 밀기 표 0xd1bbc(`pages/nari-record-room`) · 수비/보직 딱지와 둥근 칠(`widgets/matchup-cards`).
  * 조각 · 층 경계를 넘는 import 를 이 파일 한 곳에 모은다(`lint.boundaries-baseline.js` 의 예외는 이 파일 하나 — `lib/entryListWindow/` 도 여기서 읽는다)
  */
 export { YEAR_SLIDE_OFFSETS, yearCellDrawingOf, yearLabelOffsetOf, yearNumberGlyphsOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
 export type { YearCellNumber } from '@/pages/nari-record-room/lib/nariRecordRoom'
 export { batterPositionBadgeOf, pitcherRoleBadgeOf, roundFillRectsOf } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
+export { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
+export type { ScreenFrameTitle } from '@/widgets/screen-frame/lib/screenFrameLayout'
+export { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
