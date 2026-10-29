@@ -12,8 +12,8 @@ export const boundaryRules = {
 }
 
 export const layerDirectionBaseline = [
-  'src/entities/mission/model/missionRun.ts',
-  'src/entities/mission/model/missionRunners.ts',
+  'src/entities/mission/model/missionRun/otherSlices.ts',
+  'src/entities/mission/model/missionRunners/otherSlices.ts',
   'src/entities/mission/model/pitcherRun.ts',
   'src/features/play-game/model/stagePressAreas.ts',
   'src/pages/help/ui/HelpScreen.css.ts',
@@ -63,7 +63,7 @@ export const crossSliceBaseline = [
   'src/entities/career/model/condition.ts',
   'src/entities/career/model/equipment.ts',
   'src/entities/career/model/gameEvaluation.ts',
-  'src/entities/career/model/gpItems.ts',
+  'src/entities/career/model/gpItems/otherSlices.ts',
   'src/entities/career/model/leagueGameSetup.ts',
   'src/entities/career/model/nariCpuEquipment.ts',
   'src/entities/career/model/nariCupTeams.ts',
@@ -128,10 +128,10 @@ export const crossSliceBaseline = [
   'src/entities/mission/model/aceLevel.ts',
   'src/entities/mission/model/missionAutoRelay.ts',
   'src/entities/mission/model/missionCpuTeam/otherSlices.ts',
-  'src/entities/mission/model/missionGame.ts',
+  'src/entities/mission/model/missionGame/otherSlices.ts',
   'src/entities/mission/model/missionGoal.ts',
-  'src/entities/mission/model/missionRun.ts',
-  'src/entities/mission/model/missionRunners.ts',
+  'src/entities/mission/model/missionRun/otherSlices.ts',
+  'src/entities/mission/model/missionRunners/otherSlices.ts',
   'src/entities/mission/model/pitcherRun.ts',
   'src/entities/national-cup/model/nationalCup.ts',
   'src/entities/national-cup/model/nationalCupFlow.ts',

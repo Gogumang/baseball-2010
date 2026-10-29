@@ -19,6 +19,7 @@
     "src/entities/batting/model/batter.ts": ["exports"], // ABILITY_SCALE (generate_game_data.py 가 같은 눈금을 쓴다)
     "src/entities/career/model/battingOrder.ts": ["exports"], // START_BATTING_ORDER
     "src/entities/career/model/gpItems.ts": ["exports"], // EAGLE_EYE_NOTICE · EAGLE_EYE_ITEM_ID (StrMODE[224], 0x13ab4)
+    "src/entities/career/model/gpItems/guard/guard.ts": ["exports"], // EAGLE_EYE_NOTICE · EAGLE_EYE_ITEM_ID (위 모음이 다시 내보낸다)
     "src/entities/career/model/seasonFlow.ts": ["exports"], // ENDING_EVENT_IDS
     "src/entities/defense-controls/model/laserThrow.ts": ["exports"], // LASER_SPEED_PERCENT · LASER_RANGE_PERCENT · LASER_WILD_THROW_BONUS
     "src/entities/defense-controls/model/pickoff.ts": ["exports"], // PICKOFF_AI_STATE (0xb47da)
@@ -37,6 +38,8 @@
     "src/entities/pitcher-career/model/pitchTraining.ts": ["exports"], // PITCH_TRAINING_COLUMN_COUNT
     "src/entities/season-mode/model/seasonAttendance.ts": ["exports"], // STORE_GAMES_ON_PURCHASE
     "src/entities/season-mode/model/seasonEventFlow.ts": ["exports"], // SEASON_SCREEN_CODE · ILLNESS_ABILITY_PENALTY_PERCENT (b5824)
+    "src/entities/season-mode/model/seasonEventFlow/ids.ts": ["exports"], // SEASON_SCREEN_CODE (위 모음이 다시 내보낸다)
+    "src/entities/season-mode/model/seasonEventFlow/illness.ts": ["exports"], // ILLNESS_ABILITY_PENALTY_PERCENT (b5824, 위 모음이 다시 내보낸다)
     "src/entities/season-mode/model/seasonGoals.ts": ["exports"], // SEASON_GOAL_INTRO_EVENT_ID
     "src/entities/season-mode/model/seasonItemShop.ts": ["exports"], // SEASON_SHOP_SLOT_COUNT
     "src/entities/season-mode/model/seasonReputation.ts": ["exports"], // UNUSED_SLOT (S[15])
@@ -63,6 +66,8 @@
     "src/entities/fielding/model/rundown.ts": ["exports"], // fielderRemainingTicks (0xbefec)
     "src/entities/fielding/model/throwTargetBase.ts": ["exports"], // baseAtPoint (0xb1268)
     "src/entities/mission/model/missionGame.ts": ["exports"], // simulateMissionAutoHalf · simulateHumanTeamAutoHalf (틱 꼴을 끝까지 — 자동진행 0x21 설명)
+    "src/entities/mission/model/missionGame/auto/autoHalf.ts": ["exports"], // simulateMissionAutoHalf (위 모음이 다시 내보낸다)
+    "src/entities/mission/model/missionGame/auto/humanTeamAutoHalf.ts": ["exports"], // simulateHumanTeamAutoHalf (위 모음이 다시 내보낸다)
     "src/entities/pitcher-career/model/pitcherTitles.ts": ["exports"], // isPitcherOnlyTitleNumber
     "src/entities/season-mode/model/entryEditor.ts": ["exports"], // fieldPositionLabelOf (레코드 +0x1c 위치 코드)
     "src/features/defense-play/model/walkPlay.ts": ["exports"], // walkPitchJudgementOf (0x3e1ae)
