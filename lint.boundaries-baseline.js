@@ -129,7 +129,7 @@ export const crossSliceBaseline = [
   'src/entities/league/model/postseasonPlay.ts',
   'src/entities/mission/model/aceLevel.ts',
   'src/entities/mission/model/missionAutoRelay.ts',
-  'src/entities/mission/model/missionCpuTeam.ts',
+  'src/entities/mission/model/missionCpuTeam/otherSlices.ts',
   'src/entities/mission/model/missionGame.ts',
   'src/entities/mission/model/missionGoal.ts',
   'src/entities/mission/model/missionRun.ts',
