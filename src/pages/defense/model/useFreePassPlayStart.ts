@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { isWalkPlayResult, opensWalkPlayAtArrival, WALK_PLAY_WAIT_TICKS } from '@/features/defense-play/model/walkPlay'
@@ -31,28 +31,13 @@ export function useFreePassPlayStart(
   const isWalk = isWalkPlayResult(play) && !opensWalkPlayAtArrival(play)
   /** 대기를 다 채운(또는 안 기다리는) 판 */
   const [readyPlay, setReadyPlay] = useState<DefensePlayResult | null>(null)
-  /** 지난 판 뒤로 벤치 클리어링 연출이 섰나 — 섰으면 다음 밀어내기 판은 출구에서 곧장 0x17 */
-  const benchClearingSeenRef = useRef(false)
-  if (benchClearingPending) benchClearingSeenRef.current = true
-  /** 지금 기다리는 판과 지난 틱 수 */
-  const waitingRef = useRef<{ readonly play: DefensePlayResult; elapsed: number } | null>(null)
-  if (isWalk && play !== readyPlay && waitingRef.current?.play !== play) {
-    if (benchClearingSeenRef.current) {
-      benchClearingSeenRef.current = false
-      waitingRef.current = { play, elapsed: WALK_PLAY_WAIT_TICKS }
-    } else {
-      waitingRef.current = { play, elapsed: 0 }
-    }
-  }
-  const waiting = waitingRef.current
+  const [walkWait] = useState(createWalkPlayWait)
+  const waiting = walkWait.noteDraw(play, isWalk && play !== readyPlay, benchClearingPending)
   const due = isWalk && waiting !== null && waiting.play === play && waiting.elapsed >= WALK_PLAY_WAIT_TICKS
 
   useSceneTick(
     () => {
-      const current = waitingRef.current
-      if (current === null || current.play !== play) return
-      current.elapsed += 1
-      if (current.elapsed >= WALK_PLAY_WAIT_TICKS) setReadyPlay(play)
+      if (walkWait.tick(play)) setReadyPlay(play)
     },
     isWalk && play !== readyPlay && !due && !isFrozen,
   )
@@ -60,4 +45,35 @@ export function useFreePassPlayStart(
   if (!isWalk) return true
   if (isResultWindowShown) return false
   return play === readyPlay || due
+}
+
+interface WalkWaiting {
+  readonly play: DefensePlayResult
+  elapsed: number
+}
+
+/**
+ * 밀어내기 판 대기 칸 — 렌더가 그림마다 적고(벤치 클리어링을 봤나 · 새 판이면 세기 시작) 장면 틱이 센다. 세는 동안은 다시 그리지 않는다
+ * (예전 ref 두 칸 그대로 — 렌더 중에 고치는 것도 같다)
+ */
+function createWalkPlayWait() {
+  /** 지난 판 뒤로 벤치 클리어링 연출이 섰나 — 섰으면 다음 밀어내기 판은 출구에서 곧장 0x17 */
+  let benchClearingSeen = false
+  /** 지금 기다리는 판과 지난 틱 수 */
+  let waiting: WalkWaiting | null = null
+  return {
+    noteDraw(play: DefensePlayResult | null, isWaitingPlay: boolean, benchClearingPending: boolean): WalkWaiting | null {
+      if (benchClearingPending) benchClearingSeen = true
+      if (!isWaitingPlay || play === null || waiting?.play === play) return waiting
+      waiting = { play, elapsed: benchClearingSeen ? WALK_PLAY_WAIT_TICKS : 0 }
+      benchClearingSeen = false
+      return waiting
+    },
+    /** 장면 틱 하나 — 다 채웠으면 참 */
+    tick(play: DefensePlayResult | null): boolean {
+      if (waiting === null || waiting.play !== play) return false
+      waiting.elapsed += 1
+      return waiting.elapsed >= WALK_PLAY_WAIT_TICKS
+    },
+  }
 }

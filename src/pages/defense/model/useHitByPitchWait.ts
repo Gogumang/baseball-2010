@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { HitByPitchHoldPhase } from '@/features/play-game/model/benchClearingScene'
 import { claimSceneParticleTick, sceneParticleScene } from '@/entities/particle/model/sceneParticleManager'
@@ -48,13 +48,14 @@ export function useHitByPitchWait({
 }): void {
   /** 지금 세는 대기 칸과 지난 틱 수 */
   const waitingRef = useRef<{ readonly hold: object; elapsed: number } | null>(null)
-  if (hold !== null && hold.phase === 'wait' && waitingRef.current?.hold !== hold) {
-    waitingRef.current = { hold, elapsed: 0 }
-  }
   const holdRef = useRef(hold)
-  holdRef.current = hold
   const latestRef = useRef({ waitTicks, random, onJudge, onEnter })
-  latestRef.current = { waitTicks, random, onJudge, onEnter }
+  // 장면 틱이 볼 값 — 커밋 때 적는다(틱은 늘 커밋 뒤). 새로 붙든 대기 칸이면 그 그림부터 0 으로 센다
+  useLayoutEffect(() => {
+    if (hold !== null && hold.phase === 'wait' && waitingRef.current?.hold !== hold) waitingRef.current = { hold, elapsed: 0 }
+    holdRef.current = hold
+    latestRef.current = { waitTicks, random, onJudge, onEnter }
+  })
 
   useSceneTick(
     () => {

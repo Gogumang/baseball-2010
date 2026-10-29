@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGameSceneUpdateCounter } from '@/shared/lib/commonWindow/useGameSceneUpdateCounter'
 import { useGameSceneRedrawCount } from '@/shared/lib/commonWindow/useGameSceneRedrawCount'
 import {
@@ -710,7 +710,9 @@ function RecordedPlayback({
 
   // 넘길 곳은 늘 최신 것 — 부르는 쪽이 그릴 때마다 새 함수를 줘도 끝(onDone)을 다시 부르지 않게 의존에서 뺀다
   const onFieldingErrorsRef = useRef(onFieldingErrors)
-  onFieldingErrorsRef.current = onFieldingErrors
+  useLayoutEffect(() => {
+    onFieldingErrorsRef.current = onFieldingErrors
+  })
   /** `onDone` 을 부른 재생 묶음 — 판이 끝난 뒤에도 남는 그림(0x1c)이 다시 그려져도 한 번만 부른다 */
   const doneForRef = useRef<readonly DefenseViewState[] | null>(null)
   useEffect(() => {
@@ -898,7 +900,9 @@ function LiveRunnerPlayback({ play, onDone, onFieldingErrors, grassPalette, runS
   }
 
   const onFieldingErrorsRef = useRef(onFieldingErrors)
-  onFieldingErrorsRef.current = onFieldingErrors
+  useLayoutEffect(() => {
+    onFieldingErrorsRef.current = onFieldingErrors
+  })
   /** `onDone` 을 부른 판 — 판이 끝난 뒤에도 남는 그림(0x1c)이 다시 그려져도 한 번만 부른다 */
   const doneForRef = useRef<LiveRunnerStepper | null>(null)
   useEffect(() => {
@@ -987,7 +991,9 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
   const drawnErrorsRef = useRef<DrawnFieldingError[]>([])
   const seenTickCountRef = useRef(0)
   const onFieldingErrorsRef = useRef(onFieldingErrors)
-  onFieldingErrorsRef.current = onFieldingErrors
+  useLayoutEffect(() => {
+    onFieldingErrorsRef.current = onFieldingErrors
+  })
   /**
    * 득점 점수판 칸 — 타이머 [+0x10f8] · 수 [+0x10fc] · 간격 [+0x1101] · 홈런 판 [+0x1100] (`lib/runScoreBoard`).
    * 메시지 0x13(1점)마다 0x357e0 이면 홈런 갈래, 아니면 타이머 20 — 그릴 때마다 줄인다. 판이 닫힌 뒤에도 0x35108 까지 그린다.
@@ -1000,8 +1006,8 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
    * 화면에 낸 판 그림(`view`)의 장면 틱 — 키를 받은 틱은 키 사건이 난 때 화면에 있던 그림의 틱이다(r217, `useShownSceneTicks` — 원본은 키를
    * 받은 틀 = 마지막으로 그린 틀). 그리기가 밀려 갱신이 늦게 오면 지금 틱은 앞서도 진행기는 본 그림에 서 있다
    */
-  const viewTickRef = useRef<number | null>(null)
-  const tickSeenOf = useShownSceneTicks(view === null ? null : viewTickRef.current)
+  const [viewTick, setViewTick] = useState<number | null>(null)
+  const tickSeenOf = useShownSceneTicks(view === null ? null : viewTick)
   /**
    * 터치 기기 — 사람이 잡은 쪽의 송구 · 주루 상황 버튼 (자동 판은 없음). 공격 쪽은 진행기의 지금 주자 형편(주자 +0x8c · 플레이 +0x111)으로
    * 그 순간 먹는 키만(`offenseOffersFor`). 남는 키 묶음이 바뀔 때만 다시 그린다 — 판을 연 첫 그림 전에는 주루 버튼이 없다
@@ -1031,7 +1037,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
   const effectsRef = useRef<DefenseEffects>(defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START))
   // 앱 전역 파티클 관리자 [0x1400068] — 0x17 진입 0x46418 이 4673e 에서 비운다(0x6dee4, 아래 판 시작) — 타석 화면(0x11 · 0x13)의
   // 타격 불꽃 · 메뉴에서 남은 이미터는 여기로 안 이어진다
-  const particlesRef = useRef<ParticleScene>(sceneParticleScene())
+  const [particles] = useState<ParticleScene>(sceneParticleScene)
   /** 마지막으로 돈 갱신 — 판이 닫힌 뒤 건너뛴 갱신을 따라잡는다 */
   const closedUpdateRef = useRef<number | null>(null)
   /** 화면(`DefenseScreen`)이 마지막으로 그린 카메라 오프셋 (+0xfec, +0xff0) — 공 그리기 파티클의 화면 좌표 */
@@ -1089,7 +1095,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
       boardRef.current = EMPTY_HOME_RUN_SCORE_BOARD
       closedCountRef.current = 0
       effectsRef.current = defenseEffectsOf(sceneMemory?.current ?? DEFENSE_SCENE_START)
-      clearParticles(particlesRef.current)
+      clearParticles(particles)
       closedUpdateRef.current = null
       closingFrameRef.current = null
       cameraOffsetRef.current = null
@@ -1130,7 +1136,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
     // 갱신(52cc6)도 멈춘다 — 갱신 계수가 경기 장면 시계로 서므로(`useGameSceneUpdateCounter`) 창이 떠 있는 동안 진행기 틱이 안 돌고,
     // 창이 닫히면 건너뛴 틱을 따라잡지 않고 그 자리에서 이어 돈다
     const effectsPorts = {
-      particles: particlesRef.current,
+      particles: particles,
       random: isCommonWindowShown() ? undefined : input.random,
       configOf: particleConfigOf,
     }
@@ -1156,7 +1162,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
         // 0x519cc 는 이 틱 갱신보다 먼저 — 소리 끊기(0x519fe 0x6e418) · 글자 끄기 · 효과 칸 버리기 · 파티클 치우기 ·
         // 홈런 점수판 [+0x1100] = 0. 이 틱에 나는 소리(펌블 · 슬라이딩)는 끊은 뒤에 난다
         activeSound().stop()
-        effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
+        effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particles)
         boardRef.current = { ...boardRef.current, active: false }
       }
       // 득점 점수판 — 이 틱의 메시지 0x13 들(0x51fb8). 0x357e0 && +0xfe7 == 0 이면 홈런 갈래.
@@ -1247,7 +1253,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
       if (acceptsFastForwardKey(running)) {
         // 0x519fe — 소리 끊기(0x6e418)
         activeSound().stop()
-        effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particlesRef.current)
+        effectsRef.current = fastForwardDefenseEffects(effectsRef.current, particles)
         boardRef.current = { ...boardRef.current, active: false }
         skippedNow = true
       }
@@ -1292,7 +1298,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
       const last = running.ticks[running.ticks.length - 1] ?? null
       const shown = last?.closingListFrame === true ? (running.ticks[running.ticks.length - 2] ?? null) : last
       if (last?.closingListFrame === true) closingFrameRef.current = last
-      viewTickRef.current = updateStartTickNow === null ? null : updateStartTickNow + update
+      setViewTick(updateStartTickNow === null ? null : updateStartTickNow + update)
       setView(shown)
       // 건너뛰는 동안(+0xfe7)은 그림이 없다 — 창 첫 그림도 다시 그릴 판 그림이 없다
       lastPictureRef.current = shown === null || running.fastForward ? null : { view: shown, isPlay: true, drawsText: lastDrawsText }
@@ -1311,7 +1317,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
       const drawn = effectsFrame
       setEffectsView((previous) => ({ text: drawn.text, distanceBoard: drawn.distanceBoard, version: previous.version + 1 }))
     }
-  }, [update, input, side, ended, runScoreBoard, sceneMemory, homeRunHit])
+  }, [update, input, side, ended, runScoreBoard, sceneMemory, homeRunHit, particles])
 
   // 창이 선 첫 그림([창+0x250], 52efe) — 갱신 없이 그리기 0x46c88 을 한 번 더 돈다. 앞 그림과 같은 상태를 그리므로 (r183 직접 떴다):
   //   0x43278 야수 4381a~43904 — +0xb8 == 6(펌블) · +0xc0 == 4(악송구)를 다시 보고 [+0xec]+0x2e(실책)를 **한 번 더** 올린다 · 함성 29 예약
@@ -1345,7 +1351,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
       const frame = redrawDefenseEffects(
         effectsRef.current,
         picture.drawsText,
-        { particles: particlesRef.current, random: input.random, configOf: particleConfigOf },
+        { particles: particles, random: input.random, configOf: particleConfigOf },
         ballShotsAt(state.ticks[state.ticks.length - 1], cameraOffsetRef.current),
       )
       effectsRef.current = frame.effects
@@ -1364,7 +1370,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
         setRunBoard({ scores: runScoreBoardHiddenScoresOf(scores, runScoreBoard.battingSide, drawnBoard.hidden) })
       }
     }
-  }, [redraws, ended, input, runScoreBoard, homeRunHit])
+  }, [redraws, ended, input, runScoreBoard, homeRunHit, particles])
 
   // 0x1c 그림들 — 갱신 0x3afd4(창 0x8e5b8)는 판을 안 건드리고 그리기 0x46ee0 → 0x46c88 만 돈다: 마지막 판 그림의 공 0x36dfc 가 파티클을
   // 다시 쏘고 프레임 끝 0x6de85 가 굴린다(경기 난수 — 창은 공용 창이 아니라 53048 이 안 닫힌다). 글자 +0x1960 · 점수판 타이머는 0x35108 이
@@ -1387,7 +1393,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
         effectsRef.current,
         null,
         {
-          particles: particlesRef.current,
+          particles: particles,
           random: isCommonWindowShown() ? undefined : input.random,
           configOf: particleConfigOf,
           ...(sceneTick === null ? {} : { appTick: appTickOfGameSceneTick(sceneTick) }),
@@ -1396,7 +1402,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
       ).effects
     }
     setEffectsView((previous) => ({ text: null, distanceBoard: null, version: previous.version + 1 }))
-  }, [update, holdsUnderBurst, input])
+  }, [update, holdsUnderBurst, input, particles])
 
   /** `onDone` 을 부른 판 — 판이 끝난 뒤에도 남는 그림(0x1c)이 다시 그려져도 한 번만 부른다 */
   const doneForRef = useRef<DefensePlayState | null>(null)
@@ -1404,8 +1410,8 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
     if (!ended || doneForRef.current === stateRef.current) return
     doneForRef.current = stateRef.current
     // 0x17 끝 0x35108 — 글자를 끄고 파티클을 치운다. 장면에 남는 칸(글자 칸 · +0x36)은 부르는 쪽 ref 로 돌려준다
-    effectsRef.current = endDefenseEffects(effectsRef.current, particlesRef.current)
-    if (sceneMemory !== undefined) sceneMemory.current = sceneMemoryOf(effectsRef.current)
+    effectsRef.current = endDefenseEffects(effectsRef.current, particles)
+    if (sceneMemory !== undefined) storeDefenseSceneMemory(sceneMemory, sceneMemoryOf(effectsRef.current))
     const state = stateRef.current
     if (drawnErrorsRef.current.length > 0) onFieldingErrorsRef.current?.(drawnErrorsRef.current)
     if (state === null) {
@@ -1414,7 +1420,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
     }
     // 판이 닫힌 뒤에 온 사람 송구 키(+0x160)는 다음 판 시작 vt1c 0xb0edc 가 지워 넘어가지 않는다
     onDone(defensePlayResultOf(state))
-  }, [ended, onDone, sceneMemory])
+  }, [ended, onDone, sceneMemory, particles])
 
   if (view === null) return null
   // 0x46c88 차례 — 비거리 판(0x46cb6, 선수 아래 · 줌 안) → 선수 · 공 → … → HOMERUN 글자(0x46e5c) → 득점 점수판(0x46e62),
@@ -1429,7 +1435,7 @@ function LivePlayback({ input, side, onDone, onFieldingErrors, grassPalette, run
     >
       {effectsView.text !== null && <DefenseHomeRunText frame={effectsView.text} />}
       {runScoreBoard !== undefined && runBoard !== null && !ended && <RunScoreBoard sides={runScoreBoard.sides} scores={runBoard.scores} />}
-      <DefenseParticles scene={particlesRef.current} version={effectsView.version} />
+      <DefenseParticles scene={particles} version={effectsView.version} />
       {children}
       {holdsUnderBurst && burstWindow}
     </DefenseScreen>
@@ -1464,4 +1470,9 @@ function withSide(input: DefensePlayInput, side?: ControlSide): DefensePlayInput
     ...input,
     controls: { side, keyAt: () => null },
   }
+}
+
+/** 장면에 남는 칸(글자 칸 · +0x36)을 부르는 쪽 칸에 돌려준다 — 0x17 끝 0x35108 */
+function storeDefenseSceneMemory(sceneMemory: { current: DefenseSceneMemory }, memory: DefenseSceneMemory): void {
+  sceneMemory.current = memory
 }
