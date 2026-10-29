@@ -200,7 +200,7 @@ describe('도루 키 0x583 끝의 0xafa60 한 번 — 앞 판이 끝난 그대�
   it('+0x128 이 꺼져 있거나 앞 판이 없으면 아무것도 안 굴린다', () => {
     const random = 적는난수(() => 0)
     const 없음 = stealStartThrowDecision({ scene: DEFENSE_SCENE_START, bases: { ...EMPTY_BASES, second: true }, stealingFrom: [2], outs: 0, random })
-    expect(없음.decided).toBe(false)
+    expect(없음.log).toEqual([])
     const scene = 앞판()
     const playEnd = scene.playEnd!
     const 꺼짐 = stealStartThrowDecision({
@@ -210,7 +210,7 @@ describe('도루 키 0x583 끝의 0xafa60 한 번 — 앞 판이 끝난 그대�
       outs: 0,
       random,
     })
-    expect(꺼짐.decided).toBe(false)
+    expect(꺼짐.log).toEqual([])
     expect(random.calls).toEqual([])
   })
 
@@ -223,7 +223,7 @@ describe('도루 키 0x583 끝의 0xafa60 한 번 — 앞 판이 끝난 그대�
     expect(결과.scene?.playEnd?.play.wantsThrow).toBe(false)
     // 같은 투구의 다음 도루 키는 더 안 던진다(+0x128 = 0)
     const 다시 = stealStartThrowDecision({ scene: 결과.scene, bases: { ...EMPTY_BASES, second: true }, stealingFrom: [2], outs: 0, random })
-    expect(다시.decided).toBe(false)
+    expect(다시.log).toEqual([])
     expect(random.calls).toHaveLength(1)
   })
 

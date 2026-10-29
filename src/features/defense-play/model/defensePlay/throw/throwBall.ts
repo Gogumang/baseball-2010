@@ -12,6 +12,7 @@ import type { ThrowChooser } from '@/features/defense-play/model/defensePlay/thr
 import { throwLogOf } from '@/features/defense-play/model/defensePlay/throw/throwLog'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
 import { type ThrownBall, forecastOptionsOf } from '@/features/defense-play/model/throwLaunch'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **송구 0xb2e38**(플레이.vt5c, 인자 받을 야수 C · 특수) — 공 가진 야수가 C 에게 던진다. 던졌거나 미뤘으면(AI 9) 참.
@@ -77,7 +78,7 @@ function rollThrowNow(s: DefensePlayState, t: TickFrame, order: ThrowOrder, plan
     s.firstThrowArrivalTick = s.throwArrivalTick
   }
   const facts = { tick: t.tick, base, laser, cpuSpecial: order.cpuSpecial, arrivalTick: s.throwArrivalTick, relaySlot }
-  s.log.push(throwLogOf({ ...facts, bounce: special.bounce, thrown, chaserSlot: s.chaserSlot, chooser: order.chooser, fromSlot }))
+  pushPlayLog(s.log, () => throwLogOf({ ...facts, bounce: special.bounce, thrown, chaserSlot: s.chaserSlot, chooser: order.chooser, fromSlot }))
 }
 
 /** 공은 송구 계획 [3](중계면 중계맨, b2ea8)의 목표점(+0x2c)으로 쏜다 */

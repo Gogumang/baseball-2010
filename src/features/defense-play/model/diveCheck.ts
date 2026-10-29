@@ -3,6 +3,7 @@ import { AI_STATE, type FielderState } from '@/entities/fielding/model/fieldingS
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
 import { isFreeToStep, withCatchMotion } from '@/entities/fielding/model/fielderPose'
 import { DIVE_TICK_NONE } from '@/features/defense-play/model/catchForecast'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **비필살 다이빙 검사** — 플레이 vt4c `0xb45dc` 야수 고리의 분기 앞 b46c2~b475a (직접 뜬 것, r180).
@@ -72,9 +73,9 @@ export function diveCheckOf(input: DiveCheckInput): DiveCheck | null {
 
 /** 기록 줄 — 몸을 날린 틱 · AI 0xd 에 들고 나는 틱만 (키스톤 자리 잡기가 매 틱 AI 0xa 로 되돌리는 칸은 안 적는다) */
 export function logDiveCheck(log: string[], tick: number, slot: number, before: FielderState | undefined, dive: DiveCheck): void {
-  if (dive.dove) log.push(`${tick}틱 ${slot}번 야수가 몸을 날린다 (b4714 vt60 — 다이빙)`)
+  if (dive.dove) pushPlayLog(log, () => `${tick}틱 ${slot}번 야수가 몸을 날린다 (b4714 vt60 — 다이빙)`)
   const was = before?.aiState
   if (was === dive.fielder.aiState) return
-  if (dive.fielder.aiState === AI_STATE.DIVE) log.push(`${tick}틱 ${slot}번 야수가 공 길목으로 (b4728 다이빙 검사 — AI ${was} → 0xd)`)
-  else if (was === AI_STATE.DIVE) log.push(`${tick}틱 ${slot}번 야수 다이빙 끝 (b4752 — AI 0)`)
+  if (dive.fielder.aiState === AI_STATE.DIVE) pushPlayLog(log, () => `${tick}틱 ${slot}번 야수가 공 길목으로 (b4728 다이빙 검사 — AI ${was} → 0xd)`)
+  else if (was === AI_STATE.DIVE) pushPlayLog(log, () => `${tick}틱 ${slot}번 야수 다이빙 끝 (b4752 — AI 0)`)
 }

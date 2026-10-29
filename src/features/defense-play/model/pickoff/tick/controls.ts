@@ -6,6 +6,7 @@ import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/p
 import { runnerStates } from '@/features/defense-play/model/pickoff/runners/pickoffRunners'
 import { type DefenseKeyPress, framePressesOf } from '@/features/defense-play/model/runDefensePlay'
 import { slidingRunnerOf } from '@/features/defense-play/model/runnerPlayEngine'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **2b · 2c'. 사람 조작** — 상태 0x17 키 0x53420. 한 틀에 누름 · 되풀이가 함께 오면 0x498d4 가 누름 → 되풀이 차례로 둘 다 0x53420 에
@@ -27,7 +28,7 @@ export function applyPickoffKeys(g: PickoffFrame, tick: number, press: DefenseKe
 function applyDefenseKey(g: PickoffFrame, tick: number, command: InPlayCommand): void {
   if (command.kind !== '송구') return
   g.manualThrowBase = command.target
-  g.log.push(`${tick}틱 사람이 ${command.target}루로 송구 지시`)
+  pushPlayLog(g.log, () => `${tick}틱 사람이 ${command.target}루로 송구 지시`)
 }
 
 /** 2c' — 공격이면 0x53420 이 주루 0x5331c(0x582 진루 · 0x584 귀루) · OK 0x585(슬라이딩) */
@@ -55,7 +56,7 @@ function applySlideKey(g: PickoffFrame, tick: number): void {
     if (runner === undefined || runner.state.sliding) continue
     runner.state = { ...runner.state, sliding: true, speed: runner.state.speed + SLIDING_SPEED_BONUS }
   }
-  if (decision.slidRunnerIndexes.length > 0) g.log.push(`${tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
+  if (decision.slidRunnerIndexes.length > 0) pushPlayLog(g.log, () => `${tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
 }
 
 /** 0x5209e / 0x5222a → 0xa9b04 — 성공하면 플레이+0x128 = 1 */
@@ -76,5 +77,5 @@ function applyRunnerKey(g: PickoffFrame, tick: number, command: Extract<InPlayCo
   })
   if (!keyed.succeeded) return
   g.play = { ...g.play, wantsThrow: true }
-  g.log.push(`${tick}틱 ${command.kind} 키 — 주자 ${keyed.retargeted.map((index) => g.runners[index]?.state.index).join('·')}`)
+  pushPlayLog(g.log, () => `${tick}틱 ${command.kind} 키 — 주자 ${keyed.retargeted.map((index) => g.runners[index]?.state.index).join('·')}`)
 }

@@ -9,6 +9,7 @@ import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/t
 import { rollThrowBall } from '@/features/defense-play/model/defensePlay/throw/throwBall'
 import type { ThrowChooser } from '@/features/defense-play/model/defensePlay/throw/throwChooser'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **루로 보내기 0xb2c90**(플레이.vt58, 인자 루·특수) — 성공(1)이면 참. 직접 뜬 것:
@@ -93,7 +94,7 @@ function carryBallToBase(s: DefensePlayState, t: TickFrame, holder: FielderState
   s.fielders = s.fielders.map((fielder) =>
     fielder.slot === holder.slot ? { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY } : fielder,
   )
-  s.log.push(`${t.tick}틱 ${holder.slot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${holder.slot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
 }
 
 /**
@@ -104,7 +105,7 @@ function stepOnBaseYourself(s: DefensePlayState, t: TickFrame, fromSlot: number,
   const claimed = claimCoverOfBase(s.play, s.fielders, fromSlot, base)
   s.play = claimed.play
   s.fielders = claimed.fielders
-  if (runTicks > 0) s.log.push(`${t.tick}틱 ${fromSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
+  if (runTicks > 0) pushPlayLog(s.log, () => `${t.tick}틱 ${fromSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
 }
 
 /** b2df8~b2e14: 던진 야수가 커버(AI 2~5)도 AI 9 도 아니면 AI 0 — 시작 자리로 돌아간다 */

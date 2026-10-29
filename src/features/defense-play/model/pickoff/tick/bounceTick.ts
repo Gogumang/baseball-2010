@@ -4,6 +4,7 @@ import { bounceOffFielder, chaseLooseBall } from '@/features/defense-play/model/
 import { takeLooseBall } from '@/features/defense-play/model/pickoff/ball/takeLooseBall'
 import { MAXIMUM_TICKS } from '@/features/defense-play/model/pickoff/constants'
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **플레이 틱 꼬리 b45a0** (이 그림 그리기보다 먼저 — 깐 그림은 공+0x68 = 0 이라 공을 안 그린다) — 사건(펌블)이 있었으면
@@ -21,5 +22,8 @@ export function rollPickoffBounce(g: PickoffFrame, tick: number): void {
   takeLooseBall(g, chaseLooseBall(bounced.ball, tick, g.fielders, { initialChaserSlot: fumbledBall.slot }, MAXIMUM_TICKS))
   g.flight = null
   const picker = g.chase === null ? `${NONE}번 야수가 ${tick}틱에` : `${g.chase.slot}번 야수가 ${g.chase.catchTick}틱에`
-  g.log.push(`${tick}틱 공 튕김 (0xb3148) — 속도 ${bounced.speed} · v0 ${bounced.verticalSpeed} · 각 ${bounced.angle} · ${picker} 줍는다`)
+  pushPlayLog(
+    g.log,
+    () => `${tick}틱 공 튕김 (0xb3148) — 속도 ${bounced.speed} · v0 ${bounced.verticalSpeed} · 각 ${bounced.angle} · ${picker} 줍는다`,
+  )
 }

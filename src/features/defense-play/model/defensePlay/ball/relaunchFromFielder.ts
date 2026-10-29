@@ -5,6 +5,7 @@ import { runCoverOnce } from '@/features/defense-play/model/defensePlay/cover/co
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **플레이.vt70 = 0xb3148 — 공을 야수에게서 튕겨 다시 쏜다** (직접 뜬 것). 틱 끝 b45a0 이 사건(sp+0x24)이면 부른다.
@@ -32,7 +33,7 @@ const RELAUNCH_TURN_SPREAD = 20
 export function rollRelaunchFromFielder(s: DefensePlayState, t: TickFrame): void {
   if (s.trajectory.pointDetailAt === undefined) {
     // 손으로 만든 시험 궤적 — 원본 점 칸이 없어 다시 쏠 수 없다. 공은 그 자리에 둔다
-    s.log.push(`${t.tick}틱 공 튕김 — 궤적 칸이 없어 다시 쏘지 않는다`)
+    pushPlayLog(s.log, () => `${t.tick}틱 공 튕김 — 궤적 칸이 없어 다시 쏘지 않는다`)
     return
   }
   const point = s.trajectory.pointDetailAt(t.tick)
@@ -62,8 +63,10 @@ export function rollRelaunchFromFielder(s: DefensePlayState, t: TickFrame): void
   takeLooseBall(s, t, next, { initialChaserSlot: s.chaserSlot })
   // b32b0 vt30 = 0xb1c90 — 새 고르기 뒤 커버 한 번 (r171)
   runCoverOnce(s, t)
-  s.log.push(
-    `${t.tick}틱 공 튕김 (0xb3148) — 속도 ${speed} · v0 ${verticalSpeed} · 각 ${point.angle + turn} · ${s.chaserSlot}번 야수가 ${s.catchTick}틱에 줍는다`,
+  pushPlayLog(
+    s.log,
+    () =>
+      `${t.tick}틱 공 튕김 (0xb3148) — 속도 ${speed} · v0 ${verticalSpeed} · 각 ${point.angle + turn} · ${s.chaserSlot}번 야수가 ${s.catchTick}틱에 줍는다`,
   )
 }
 

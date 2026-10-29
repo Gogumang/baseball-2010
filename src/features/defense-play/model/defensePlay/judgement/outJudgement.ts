@@ -4,6 +4,7 @@ import { markOut } from '@/features/defense-play/model/defensePlay/runners/mutab
 import { contextAt } from '@/features/defense-play/model/defensePlay/step/defenseContext'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState, MutableRunner } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **아웃 판정 0xb36d0 (플레이 vt90) 한 번 돌리기.**
@@ -86,7 +87,7 @@ function applyOutTail(s: DefensePlayState, t: TickFrame, victim: MutableRunner, 
   s.tagOut = judged.kind === OUT_KIND.TAG
   const rundownTag = judged.kind === OUT_KIND.TAG && s.rundown.runnerIndex === judged.runnerIndex
   if (rundownTag) s.rundownOuts += 1
-  s.log.push(outLogOf(t, judged, rundownTag))
+  pushPlayLog(s.log, () => outLogOf(t, judged, rundownTag))
   // 결과 3(태그)이면 원본은 그 자리에서 협살을 끝낸다 (0xb3946 → 0xb26b8)
   if (judged.kind === OUT_KIND.TAG) {
     s.fielders = endRundown(s.fielders)

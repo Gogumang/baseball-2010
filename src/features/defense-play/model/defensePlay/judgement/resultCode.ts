@@ -6,6 +6,7 @@ import { type PlayEndState, isFoulEnded, playEndResultCode } from '@/entities/fi
 import { isAtTarget } from '@/features/defense-play/model/defensePlay/runners/mutableRunner'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState, MutableRunner } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **이 플레이 틱의 결과 코드** — 포구 틱의 9(b4292) → 6c 의 9(b4412) → 6d 의 판 끝 판정 0x9d5bc → 이번 틱 vt90 아웃이면 13(b4540).
@@ -51,7 +52,7 @@ function markHolderArrivedSafe(s: DefensePlayState, t: TickFrame): boolean {
   if (holderBase === NONE) return false
   const standing = runnerStandingOn(s, holderBase)
   if (standing === undefined || !isHolderJustArrivedWithBall(s, holder)) return false
-  s.log.push(`${t.tick}틱 결과 코드 9 — ${holder.slot}번 야수가 ${holderBase}루에 닿았지만 ${standing.state.index}번 주자가 서 있다`)
+  pushPlayLog(s.log, () => `${t.tick}틱 결과 코드 9 — ${holder.slot}번 야수가 ${holderBase}루에 닿았지만 ${standing.state.index}번 주자가 서 있다`)
   return true
 }
 
@@ -103,7 +104,7 @@ function firstContactResultCode(s: DefensePlayState, t: TickFrame): number | nul
   if (landedNow) t.landedUncaughtThisTick = true
   const endState = playEndStateOfContact(s, landedNow)
   const resultCode = playEndResultCode(endState)
-  s.log.push(`${t.tick}틱 ${contact} — 판 끝 결과 코드 ${resultCode} (0x9d5bc)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${contact} — 판 끝 결과 코드 ${resultCode} (0x9d5bc)`)
   // b4510~b453c: 파울이면 0xa9620(리터치), 아니면 0xa95e8(포스) · 0xa95c0
   const runners = s.runners.map((runner) => runner.state)
   setRequiredBases(s, isFoulEnded(endState) ? requiredBasesOnFlyCatch(runners) : requiredBasesOnBounce(runners))

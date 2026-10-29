@@ -4,6 +4,7 @@ import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/t
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
 import { fireLaser } from '@/features/defense-play/model/defenseScene'
 import { canFireLaserNow, laserWindowTick } from '@/features/defense-play/model/laserTick'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **0b. 레이저 송구 반짝임 창** (0x523bc · 0xb2648 · 0x4e858 — I-controls 2d).
@@ -76,5 +77,5 @@ export function fireLaserIfReady(s: DefensePlayState, t: TickFrame): void {
   t.pausedThisTick = true
   // 앞 틱 끝에서 센 G2(52502)는 524e6 뒤라 원본은 부르지 않았다
   s.endCounter = s.counterBeforeHead
-  s.log.push(`${t.tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
+  pushPlayLog(s.log, () => `${t.tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
 }

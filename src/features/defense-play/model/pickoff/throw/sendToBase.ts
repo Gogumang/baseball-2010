@@ -7,6 +7,7 @@ import { MINIMUM_THROW_DISTANCE } from '@/features/defense-play/model/pickoff/co
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
 import { wrapBase } from '@/features/defense-play/model/pickoff/runners/pickoffRunners'
 import { rollThrowBall } from '@/features/defense-play/model/pickoff/throw/throwBall'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * 받은 야수의 이어 던지기 — 루로 보내기 0xb2c90 · 송구 0xb2e38 (`runDefensePlay` 의 rollSendToBase · rollThrowBall 과 같은 갈래).
@@ -71,7 +72,7 @@ function carryBallToBase(g: PickoffFrame, tick: number, holderSlot: number, base
     if (!acceptsTargetVt14(fielder)) return { ...fielder, aiState: AI_STATE.CARRY }
     return { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY }
   })
-  g.log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
+  pushPlayLog(g.log, () => `${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
 }
 
 /**
@@ -82,7 +83,7 @@ function stepOnBaseYourself(g: PickoffFrame, tick: number, holderSlot: number, b
   const claimed = claimCoverOfBase(g.play, g.fielders, holderSlot, base)
   g.play = claimed.play
   g.fielders = claimed.fielders
-  if (runTicks > 0) g.log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
+  if (runTicks > 0) pushPlayLog(g.log, () => `${tick}틱 ${holderSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
 }
 
 /** b2df8~b2e14 — 던진 야수가 커버(0xa0ff4 — AI 2~5)도 AI 9 도 아니면 AI 0 (시작 자리로). 미룬 송구는 AI 9 라 그대로 */

@@ -6,6 +6,7 @@ import { contextAt } from '@/features/defense-play/model/defensePlay/step/defens
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
 import { isBugFixed } from '@/shared/config/bugfixes'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **b42ce~b42ec 갈래(직접 뜬 것, 2026-10 r87)** — F = 야수[P+0x130](0xb0c90) ;
@@ -51,8 +52,10 @@ export function startRundownIfAble(s: DefensePlayState, t: TickFrame, arrivalBra
       ? { ...withPoseCleared(fielder), aiState: AI_STATE.RUNDOWN }
       : fielder,
   )
-  s.log.push(
-    `${t.tick}틱 협살 시작 — ${s.rundown.runnerIndex}번 주자 ${s.rundown.backBase}↔${s.rundown.frontBase}루 ` +
+  pushPlayLog(
+    s.log,
+    () =>
+      `${t.tick}틱 협살 시작 — ${s.rundown.runnerIndex}번 주자 ${s.rundown.backBase}↔${s.rundown.frontBase}루 ` +
       `(야수 ${s.rundown.backFielder}·${s.rundown.frontFielder})`,
   )
 }

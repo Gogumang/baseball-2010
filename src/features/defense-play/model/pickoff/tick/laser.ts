@@ -4,6 +4,7 @@ import { canFireLaserNow, laserWindowTick } from '@/features/defense-play/model/
 import { DEFAULT_ABILITY } from '@/features/defense-play/model/pickoff/constants'
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
 import type { DefenseKeyPress } from '@/features/defense-play/model/runDefensePlay'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /** 4d 절 */
 export function rollPickoffLaser(g: PickoffFrame, tick: number, press: DefenseKeyPress | null): void {
@@ -43,7 +44,7 @@ export function rollPickoffLaser(g: PickoffFrame, tick: number, press: DefenseKe
       g.pausedThisTick = true
       // 앞 틱 끝에서 센 G2(52502)는 524e6 뒤라 원본은 부르지 않았다
       g.endCounter = g.counterBeforeHead
-      g.log.push(`${tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
+      pushPlayLog(g.log, () => `${tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
     }
   }
 }

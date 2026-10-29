@@ -8,6 +8,7 @@ import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/f
 import { wrapBase } from '@/features/defense-play/model/runnerPlay/runners/playRunners'
 import { rollThrowBall } from '@/features/defense-play/model/runnerPlay/throw/throwBall'
 import type { ThrowChooser } from '@/features/defense-play/model/runnerPlay/types/runnerPlayTypes'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * 루로 보내기 0xb2c90(P, 루, 특수) — 성공(1)이면 참 (`runDefensePlay` 의 `rollSendToBase` 와 같은 갈래).
@@ -75,7 +76,7 @@ function carryBallToBase(g: RunnerPlayFrame, tick: number, holderSlot: number, b
     if (!acceptsTargetVt14(fielder)) return { ...fielder, aiState: AI_STATE.CARRY }
     return { ...fielder, target: basePoint, targetBase: base, aiState: AI_STATE.CARRY }
   })
-  g.log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
+  pushPlayLog(g.log, () => `${tick}틱 ${holderSlot}번 야수가 ${base}루로 공을 들고 뛴다 (커버 없음)`)
 }
 
 /** b2d14~b2d64: t_run ≤ max(t_throw, t_recv) — 공 가진 야수가 송구 · 받기보다 먼저 루에 닿는다 */
@@ -93,7 +94,7 @@ function stepOnBaseYourself(g: RunnerPlayFrame, tick: number, holderSlot: number
   const claimed = claimCoverOfBase(g.play, g.fielders, holderSlot, base)
   g.play = claimed.play
   g.fielders = claimed.fielders
-  g.log.push(`${tick}틱 ${holderSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
+  pushPlayLog(g.log, () => `${tick}틱 ${holderSlot}번 야수가 ${base}루를 직접 밟으러 간다`)
 }
 
 /**

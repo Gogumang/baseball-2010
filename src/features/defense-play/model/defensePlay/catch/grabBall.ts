@@ -7,6 +7,7 @@ import { runOutJudgement } from '@/features/defense-play/model/defensePlay/judge
 import { isAtTarget } from '@/features/defense-play/model/defensePlay/runners/mutableRunner'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **포구 틱의 쥐기** — 결과 코드 9 보기(b4292) → 쥐기 0xb2710(+0x12c = 1 → vt90 아웃 판정 → +0x112 = 1) → 뜬공이면 리터치.
@@ -32,7 +33,7 @@ export function grabBall(s: DefensePlayState, t: TickFrame): void {
   s.play = { ...s.play, held: true, wantsThrow: true }
   // 쥐기 0xb2710 — +0x127 = 0
   s.landingChase = false
-  s.log.push(`${t.tick}틱 ${s.chaserSlot}번 야수가 잡았다 (종류 ${s.play.catchKind})`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${s.chaserSlot}번 야수가 잡았다 (종류 ${s.play.catchKind})`)
   t.judgedKindThisCall = OUT_KIND.NONE
   runOutJudgement(s, t)
   t.grabOutThisTick = t.outJudgedThisTick
@@ -57,7 +58,10 @@ function markRunnerStandingUnderCatch(s: DefensePlayState, t: TickFrame): void {
   const standing = s.runners.find((runner) => !runner.state.isOut && runner.state.startBase === footBase)
   if (standing === undefined || !isAtTarget(standing.state)) return
   t.catchResultCode = 9
-  s.log.push(`${t.tick}틱 결과 코드 9 — ${s.chaserSlot}번 야수가 ${footBase}루 위에서 잡았지만 ${standing.state.index}번 주자가 서 있다 (b4292)`)
+  pushPlayLog(
+    s.log,
+    () => `${t.tick}틱 결과 코드 9 — ${s.chaserSlot}번 야수가 ${footBase}루 위에서 잡았지만 ${standing.state.index}번 주자가 서 있다 (b4292)`,
+  )
 }
 
 /**

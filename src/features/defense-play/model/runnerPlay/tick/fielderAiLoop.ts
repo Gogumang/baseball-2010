@@ -9,6 +9,7 @@ import { type DiveCheck, diveCheckOf, logDiveCheck } from '@/features/defense-pl
 import { contextAt } from '@/features/defense-play/model/runnerPlay/context/playContext'
 import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/frame/runnerPlayFrame'
 import { rollSendToBase } from '@/features/defense-play/model/runnerPlay/throw/sendToBase'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **3c. 야수 AI 고리** (같은 vt4c, 분기표 0xd8808) — AI 9 미룬 송구 (b4838): 받을 야수.vtc0() ≤ 공 가진 야수.vtb8(루 좌표) 가 되면
@@ -100,7 +101,7 @@ function backupAi(g: RunnerPlayFrame, slot: number, self: FielderState): void {
 function coverAi(g: RunnerPlayFrame, tick: number, slot: number, self: FielderState, base: number): void {
   if (g.fielderArrivals[slot] === true && isFreeToRetarget(self)) {
     const claimed = claimCoverOfBase(g.play, g.fielders, slot, base)
-    if (claimed.play !== g.play) g.log.push(`${tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
+    if (claimed.play !== g.play) pushPlayLog(g.log, () => `${tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
     g.play = claimed.play
     g.fielders = claimed.fielders
   }

@@ -3,6 +3,7 @@ import { HOME_BASE } from '@/features/defense-play/model/pickoff/constants'
 import { contextAt } from '@/features/defense-play/model/pickoff/context/pickoffContext'
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
 import type { PickoffRunner } from '@/features/defense-play/model/pickoff/types/pickoffTypes'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **자동 추가 진루 0xaf918** — 경기 장면 슬롯 2 가 매 틱 부른다 (종류 4 는 거르개 2·3·8 밖이다).
@@ -28,7 +29,7 @@ function applyAutoAdvance(g: PickoffFrame, tick: number, runner: PickoffRunner, 
   if (!finished && toBase > HOME_BASE) return
   if (!finished) {
     startPickoffLeg(runner, toBase)
-    g.log.push(`${tick}틱 ${runner.state.index}번 주자 자동 진루 → ${toBase}루`)
+    pushPlayLog(g.log, () => `${tick}틱 ${runner.state.index}번 주자 자동 진루 → ${toBase}루`)
   }
   g.play = { ...g.play, wantsThrow: true }
 }

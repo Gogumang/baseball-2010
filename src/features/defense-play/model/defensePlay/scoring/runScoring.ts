@@ -4,6 +4,7 @@ import { RELEASED_RUN_SLOT } from '@/features/defense-play/model/defensePlay/con
 import { isAtTarget, wrapBase } from '@/features/defense-play/model/defensePlay/runners/mutableRunner'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState, MutableRunner } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **6f · 6g. 득점** — 주자 관리 vt18 `0xaa0a8`(슬롯 2 525fc — 플레이 틱 vt48 525e8 바로 뒤 · vt4c 52612 앞)과 그 꼬리 보류 풀기 0xaa34c.
@@ -54,7 +55,7 @@ function scoreRunner(s: DefensePlayState, t: TickFrame, runner: MutableRunner, b
   }
   // aa1de~aa1fe — 홈에 닿은 주자가 이번 타자(+0x98)이고 담장 · 폴 홈런 사건이 없으면 state[0x25] = 1 (그라운드 홈런)
   if (runner.state.isBatterRunner && !s.homeRunEvent) s.groundHomeRun = true
-  s.log.push(`${t.tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${s.held.heldRuns} / 득점 ${s.held.scoreboardRuns}`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${s.held.heldRuns} / 득점 ${s.held.scoreboardRuns}`)
 }
 
 /**
