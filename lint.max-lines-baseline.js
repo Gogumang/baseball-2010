@@ -17,7 +17,6 @@ export const maxLinesBaseline = [
   'src/entities/batting/model/battedBallOutcome.ts',
   'src/entities/batting/model/swingResult.ts',
   'src/entities/career/model/seasonFlow.ts',
-  'src/entities/career/model/titles.ts',
   'src/entities/career/model/training.ts',
   'src/entities/fielding/model/catchPrediction.ts',
   'src/entities/league/model/league.ts',
