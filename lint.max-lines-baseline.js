@@ -186,7 +186,6 @@ export const maxLinesBaseline = [
   'src/shared/lib/sprite/spritePreload.ts',
   'src/shared/ui/MessageBox/MessageBox.tsx',
   'src/widgets/ace-level-up/ui/AceLevelUpWindow.tsx',
-  'src/widgets/batting-stage/lib/batterLayers.ts',
   'src/widgets/batting-stage/lib/bigHitScreen.ts',
   'src/widgets/batting-stage/lib/homeRunBanner.ts',
   'src/widgets/batting-stage/lib/pitchInputOverlay.ts',

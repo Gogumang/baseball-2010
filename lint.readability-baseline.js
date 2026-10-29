@@ -360,7 +360,6 @@ export const readabilityBaseline = [
   'src/widgets/ace-level-up/ui/AceLevelUpWindow.tsx',
   'src/widgets/batting-stage/lib/acePitcherEffect.ts',
   'src/widgets/batting-stage/lib/baseRunners.ts',
-  'src/widgets/batting-stage/lib/batterLayers.ts',
   'src/widgets/batting-stage/lib/batterOverlayMarks.ts',
   'src/widgets/batting-stage/lib/hitCamera.ts',
   'src/widgets/batting-stage/lib/homeRunBanner.ts',
