@@ -15,7 +15,6 @@ export const readabilityBaseline = [
   'src/app/assetPacks/assetPackGate.ts',
   'src/app/model/afterGameEventPreload.ts',
   'src/app/model/commonWindowScene.ts',
-  'src/app/model/screenBgm.ts',
   'src/app/model/screenSpritePreload.ts',
   'src/app/model/seasonEvents.ts',
   'src/app/model/seasonHallOfFameRecords.ts',
