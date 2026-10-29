@@ -157,7 +157,6 @@ export const readabilityBaseline = [
   'src/features/defense-play/model/laserPresentation.ts',
   'src/features/defense-play/model/laserTick.ts',
   'src/features/defense-play/model/passedBallPlay.ts',
-  'src/features/defense-play/model/pickoffPlay.ts',
   'src/features/defense-play/model/playOutcome.ts',
   'src/features/defense-play/model/playerEffects.ts',
   'src/features/defense-play/model/redrawDefensePlay.ts',
