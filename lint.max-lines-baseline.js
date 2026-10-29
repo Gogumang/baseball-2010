@@ -95,7 +95,6 @@ export const maxLinesBaseline = [
   'src/pages/pitcher-league/ui/PitcherManagementScreen.tsx',
   'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx',
   'src/pages/pitching/model/usePitcherGame.ts',
-  'src/pages/pitching/ui/PitchGradeGauge.tsx',
   'src/pages/pitching/ui/PitchingScreen.tsx',
   'src/pages/record/lib/recordAnnalsLayout.ts',
   'src/pages/record/ui/RecordAnnals.tsx',

@@ -245,7 +245,6 @@ export const readabilityBaseline = [
   'src/pages/pitching/lib/pitcherMatchupCards.ts',
   'src/pages/pitching/model/usePitcherGame.ts',
   'src/pages/pitching/ui/AimCursor.tsx',
-  'src/pages/pitching/ui/PitchGradeGauge.tsx',
   'src/pages/pitching/ui/PitchingScreen.tsx',
   'src/pages/record/lib/annalsGrid.ts',
   'src/pages/record/lib/recordAnnalsLayout.ts',
