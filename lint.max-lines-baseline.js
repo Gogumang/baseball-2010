@@ -55,7 +55,6 @@ export const maxLinesBaseline = [
   'src/pages/story/lib/yearGoalWindow.ts',
   'src/pages/story/ui/EvaluationEventPlayer.tsx',
   'src/pages/story/ui/EventDialogueBox.tsx',
-  'src/shared/api/audio/webAudioSound.ts',
   'src/shared/config/bugfixes/bugfixes.ts',
   'src/shared/config/original/acePlayers.ts',
   'src/shared/config/original/battedBallPatterns.ts',
