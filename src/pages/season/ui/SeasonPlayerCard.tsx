@@ -101,13 +101,22 @@ function figureMemoryAt(memory: FigureMemory, tick: number, isBatter: boolean, f
   return { tick, state, key }
 }
 
-/** 0x45e8 를 갱신마다 한 번 — 상태 틱이 되돌아가면(다시 들어옴) 처음부터. 걸은 자세는 상태로 들고 렌더 중에 맞춘다(굴림 없는 순수 계산) */
+/**
+ * 0x45e8 를 갱신마다 한 번 — 상태 틱이 되돌아가면(다시 들어옴) 처음부터. 걸은 자세는 렌더가 읽고 고치는 칸에 든다(예전 ref 그대로 —
+ * 틱마다 한 번 그리고, 굴림 없는 순수 계산이라 다시 그려도 같다)
+ */
 function useSeasonCardFigurePose(isBatter: boolean, form: number, isAnimating: boolean): number {
   const tick = useUpdateCounter(isAnimating)
-  const [memory, setMemory] = useState<FigureMemory>(() => ({ tick: -1, state: initialSeasonCardFigure(isBatter, form), key: `${isBatter}:${form}` }))
-  const current = figureMemoryAt(memory, tick, isBatter, form, isAnimating)
-  if (current !== memory) setMemory(current)
-  return current.state.pose
+  const [figure] = useState(() => {
+    let memory: FigureMemory = { tick: -1, state: initialSeasonCardFigure(isBatter, form), key: `${isBatter}:${form}` }
+    return {
+      poseAt(nextTick: number, batter: boolean, nextForm: number, animating: boolean): number {
+        memory = figureMemoryAt(memory, nextTick, batter, nextForm, animating)
+        return memory.state.pose
+      },
+    }
+  })
+  return figure.poseAt(tick, isBatter, form, isAnimating)
 }
 
 /**
