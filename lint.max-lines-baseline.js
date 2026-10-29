@@ -55,7 +55,6 @@ export const maxLinesBaseline = [
   'src/pages/shop/ui/ShopScreen.tsx',
   'src/pages/shop/ui/ShopWindow.tsx',
   'src/pages/special/ui/SkinBackdrops.tsx',
-  'src/pages/story/ui/EvaluationEventPlayer.tsx',
   'src/shared/api/audio/webAudioSound.ts',
   'src/shared/config/bugfixes/bugfixes.ts',
   'src/shared/config/original/acePlayers.ts',

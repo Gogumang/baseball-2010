@@ -1,12 +1,9 @@
 import { useState } from 'react'
-import type { ReactNode } from 'react'
 import { MessageBox } from '@/shared/ui'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
 import { EvaluationChangeWindow } from '@/pages/story/ui/EvaluationChangeWindow'
 import { EvaluationGauge } from '@/pages/story/ui/EvaluationGauge'
-import type { EvaluationChangeValues } from '@/pages/story/lib/evaluationChangeWindow'
-import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
 import { evaluationManagerPortraitsOf } from '@/pages/story/lib/evaluationDialogue'
 import { PORTRAIT_HEIGHT } from '@/pages/story/ui/StoryScreen.css'
 import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
@@ -14,12 +11,9 @@ import { portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
 import { RewardSkillWindow } from '@/pages/story/ui/RewardSkillWindow'
 import { EVENT_WINDOW_DIM_OPACITY } from '@/pages/story/lib/eventDialogue'
 import type { RewardNotice } from '@/entities/story/model/rewardNotice'
-
-/**
- * 평가 내장 이벤트를 차례로 튼다 — 명령 1 say → 명령 2 system sub 2(변화 창) → (있으면) 명령 3 say(연속 기록)
- * → (있으면) 보상 명령(종류 7)들 → (있으면) 마지막 system sub 5 알림 창
- */
-type EvaluationStep = '대사' | '변화' | '연속기록' | '보상' | '알림'
+import { givenRewardCountOf, nextWindowRewardOf } from '@/pages/story/ui/evaluationEventPlayer/rewardSteps'
+import type { EvaluationStep } from '@/pages/story/ui/evaluationEventPlayer/rewardSteps'
+import type { EvaluationEventPlayerProps } from '@/pages/story/ui/evaluationEventPlayer/evaluationEventPlayerProps'
 
 /** 보상 창 버튼 — 0x74ef4 종류 1 (OK 하나) */
 const NOTICE_BUTTONS = ['OK'] as const
@@ -32,51 +26,6 @@ const NOTICE_BUTTONS = ['OK'] as const
  * 0x7f998 은 (0, 0, W, y + 1) 로 잘라 y 를 바닥으로 그린다.
  */
 const PORTRAIT_BOTTOM = SCREEN_HEIGHT - portraitBaseYOf(false, false)
-
-interface EvaluationEventPlayerProps {
-  /** 116 · 114 밑그림 — 공 무늬 · 상태판([이벤트+0xb] = 1) · 머리띠 */
-  readonly underlay: ReactNode
-  /** 명령 1 글 — 기록 줄 + 감독 글 (0x8bab8 — 말하는 이 0 이라 머리말 없음) */
-  readonly dialogue: string
-  /** 명령 1 표정 [명령+8] (`batterEvaluationExpressionOf` · `pitcherEvaluationExpressionOf`) */
-  readonly dialogueExpression: number
-  readonly changeValues: EvaluationChangeValues
-  readonly goals: YearGoalWindowSource
-  readonly year: number
-  readonly game: number
-  /** 명령 3 글 — 연속 기록 알림 줄(전역 버퍼 0x1552af4). 빈 글이면 명령이 없다 */
-  readonly streak: string
-  readonly streakExpression: number
-  /**
-   * 0x8587c 의 인기도 변화 막대 — S+0x4a 와 d(`evaluationGaugeDivisorOf`). 0x8b5ac 가 틀마다 대사 상자 뒤에
-   * 0x847e0 · 0x85944 · 0x858cc 로 그린다(`EvaluationGauge`)
-   */
-  readonly gauge: { readonly popularityChange: number; readonly divisor: number }
-  /**
-   * 마지막 명령 system sub 5 의 글 — 시즌 0xd3 에서 구내매점이 끝났으면 StrUSER_EVT[113] (0x8a6fc). 공용 창 0x74ef4(종류 1, OK)로
-   * 띄우고, 떠 있는 동안에도 0x8b5ac 가 틀마다 0x7fbc4 로 마지막 say 상자 · 초상화와 인기도 막대를 그린다. 없으면 null
-   */
-  readonly finalNotice?: string | null
-  /**
-   * 0x8a6fc 가 연속 기록 say 뒤에 쌓은 **보상 명령**(종류 7, 명령마다 항목 하나 — 8ac54 평판 합 · 8ad22~8af8a 스킬 ±n)의 창.
-   * 실행 0x8d4c4 가 명령마다 0x8beb8 글로 첫 종류 4 면 스킬 창(0x741a1 · 그리기 0x87108 · 키 0x8e054), 그 밖이면 공용 알림 0x74ef4
-   * 종류 1 을 띄우고 같은 갱신에 0x8c460 으로 보상을 준다 — 기다림 0x8daa0 · 0x8e054 가 키를 받은 그 갱신에 다음 명령
-   * (`rewardNoticeOf`, StoryScreen 과 같은 창). 없으면 빈 목록
-   */
-  readonly rewardNotices?: readonly RewardNotice[]
-  /**
-   * 밑그림을 보상 몫만큼 고쳐 그린다 — 0x8c460 이 창을 띄운 갱신에 보상을 주므로(평판 → 상태판 0x7d34c 칸) 그 창부터 새 값이다.
-   * 인자는 이미 준 보상 명령 수. 없으면 `underlay` 그대로
-   */
-  readonly underlayAfterRewards?: (givenRewardCount: number) => ReactNode
-  /**
-   * 보상 명령의 창이 선 갱신 — 0x8c460 이 그 명령의 보상을 주고 끝(0x8b0e4 · 0x8cd44)에서 **저장한다**(S+0x50 은 114 진입이 이미 3 ·
-   * 0xb). 인자는 이제까지 준 보상 명령 수. 세션이 그 몫을 주고 저장한다(Q-23)
-   */
-  readonly onRewardsGiven?: (givenRewardCount: number) => void
-  /** 마지막 명령이 끝나면 — 114 끝 */
-  readonly onDone: () => void
-}
 
 /**
  * **114 가 트는 116 평가 내장 이벤트 0x8a6fc** (그림 0x8b5ac → 0x7fbc4 — say 상자 `EventDialogueBox`, 직접 떴다).
@@ -116,27 +65,24 @@ export function EvaluationEventPlayer({
    */
   const [closingReward, setClosingReward] = useState<{ readonly key: number; readonly notice: RewardNotice } | null>(null)
   const finish = () => (finalNotice !== null ? setStep('알림') : onDone())
-  /** 창 없이 지나가는 보상 명령(첫 종류 7 인데 글을 못 짓는 id 등 — 평가 이벤트에는 없다)은 건너뛴다 */
-  const isWindowNotice = (notice: RewardNotice | undefined) => notice?.kind === '알림' || notice?.kind === '스킬'
-  const nextRewardFrom = (index: number) => {
-    let at = index
-    while (at < rewardNotices.length && !isWindowNotice(rewardNotices[at])) at += 1
-    return at
-  }
   /** 연속 기록 say 다음 — 보상 명령이 있으면 그 창, 없으면 끝(또는 system sub 5) */
   const afterStreak = () => {
-    const first = nextRewardFrom(0)
+    const first = nextWindowRewardOf(rewardNotices, 0)
     if (first >= rewardNotices.length) return finish()
     setRewardIndex(first)
     setStep('보상')
     onRewardsGiven?.(first + 1)
   }
-  const afterChange = () => (streak !== '' ? (setStreakShown(true), setStep('연속기록')) : afterStreak())
+  const afterChange = () => {
+    if (streak === '') return afterStreak()
+    setStreakShown(true)
+    setStep('연속기록')
+  }
   const answerReward = () => {
     const notice = rewardNotices[rewardIndex]
     if (step !== '보상' || notice === undefined) return
     setClosingReward({ key: rewardIndex, notice })
-    const next = nextRewardFrom(rewardIndex + 1)
+    const next = nextWindowRewardOf(rewardNotices, rewardIndex + 1)
     if (next >= rewardNotices.length) return finish()
     setRewardIndex(next)
     onRewardsGiven?.(next + 1)
@@ -144,8 +90,7 @@ export function EvaluationEventPlayer({
   const finishRewardWindow = (key: number) => setClosingReward((closing) => (closing?.key === key ? null : closing))
   const currentReward = step === '보상' ? rewardNotices[rewardIndex] : undefined
   const shownReward = currentReward !== undefined ? { key: rewardIndex, notice: currentReward } : closingReward
-  /** 이미 준 보상 명령 수 — 보상 창이 선 갱신에 그 명령의 보상이 들어간다(0x8c460) */
-  const givenRewardCount = step === '보상' ? rewardIndex + 1 : step === '알림' ? rewardNotices.length : 0
+  const givenRewardCount = givenRewardCountOf(step, rewardIndex, rewardNotices.length)
   const expression = hasStreakShown ? streakExpression : dialogueExpression
 
   return (
