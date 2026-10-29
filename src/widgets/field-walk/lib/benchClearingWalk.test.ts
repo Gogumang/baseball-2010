@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BASE_POSITIONS, FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
-import { FIELDER_ACTION } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
 import {
   BENCH_CLEARING_EXIT_TICK,
   benchClearingIrisOf,

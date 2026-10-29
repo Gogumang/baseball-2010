@@ -1,5 +1,6 @@
 import { globalFontFace, globalStyle } from '@vanilla-extract/css'
-import { PIXEL_FONT_FAMILY, theme } from '@/app/styles/theme.css'
+import { theme } from '@/app/styles/theme.css'
+import { PIXEL_FONT_FAMILY } from '@/shared/config/design/pixelFont'
 
 /**
  * 원본 비트맵 글꼴을 구운 웹폰트.

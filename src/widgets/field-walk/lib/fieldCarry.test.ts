@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
 import { cameraBoundsOf, centerOn, stepCamera } from '@/pages/defense/lib/defenseCamera'
-import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 import {
   NEW_FIELD_CARRY,
   fieldCarryAfterBenchClearing,
