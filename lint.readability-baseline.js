@@ -187,7 +187,6 @@ export const readabilityBaseline = [
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
   'src/pages/nari-record-room/ui/NariRecordRoom.tsx',
-  'src/pages/nari-record-room/ui/RankingBoard.tsx',
   'src/pages/national-cup/ui/NationalCupBracket.tsx',
   'src/pages/national-cup/ui/NationalCupScreen.tsx',
   'src/pages/outing-map/ui/OutingMapScreen.tsx',
