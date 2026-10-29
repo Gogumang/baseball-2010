@@ -118,6 +118,7 @@ export const TEST_AREAS = {
   pitcher: [
     'src/pages/pitcher-league/',
     'src/app/ui/PitcherLeagueRoute',
+    'src/app/ui/pitcherLeagueRoute/',
     'src/app/model/usePitcherLeagueSession',
     'src/app/model/modePitcher',
     'src/entities/pitcher-career/',

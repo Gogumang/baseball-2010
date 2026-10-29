@@ -9,7 +9,6 @@ export const maxLinesBaseline = [
   'src/app/ui/App.tsx',
   'src/app/ui/EntryRoutes.tsx',
   'src/app/ui/MissionRoutes.tsx',
-  'src/app/ui/PitcherLeagueRoute.tsx',
   'src/entities/batting/model/battedBallFlight.ts',
   'src/entities/batting/model/battedBallOutcome.ts',
   'src/entities/batting/model/settlementEffect.ts',
