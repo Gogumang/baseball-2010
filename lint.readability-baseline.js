@@ -401,7 +401,6 @@ export const readabilityBaseline = [
   'src/widgets/season/lib/seasonOuting.ts',
   'src/widgets/season/model/useSeasonCursor.ts',
   'src/widgets/season/ui/SeasonListWindow.tsx',
-  'src/widgets/skill-window/ui/SkillWindow.tsx',
   'src/widgets/special-swing/lib/specialTrainingWindow.ts',
   'src/widgets/special-swing/ui/SpecialSwingWindow.tsx',
   'src/widgets/special-swing/ui/SpecialTrainingFigure.tsx',
