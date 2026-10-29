@@ -251,7 +251,6 @@ export const readabilityBaseline = [
   'src/pages/record/lib/annalsGrid.ts',
   'src/pages/record/lib/recordAnnalsLayout.ts',
   'src/pages/record/lib/statCells.ts',
-  'src/pages/record/ui/RecordAnnals.tsx',
   'src/pages/season/lib/seasonMatchInfo.ts',
   'src/pages/season/lib/seasonPlayerCard.ts',
   'src/pages/season/lib/seasonPlayerDetail.ts',
