@@ -7,7 +7,6 @@ export const maxLinesBaseline = [
   'src/app/model/screenBgm.ts',
   'src/app/model/useCollection.ts',
   'src/app/ui/App.tsx',
-  'src/app/ui/EntryRoutes.tsx',
   'src/entities/batting/model/battedBallFlight.ts',
   'src/entities/batting/model/battedBallOutcome.ts',
   'src/entities/batting/model/settlementEffect.ts',

@@ -42,6 +42,7 @@ export const TEST_AREAS = {
     'src/pages/settings/',
     'src/entities/settings/',
     'src/app/ui/EntryRoutes',
+    'src/app/ui/entryRoutes/',
     'src/app/ui/BootShell',
   ],
   mission: [
