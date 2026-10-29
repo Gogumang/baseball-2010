@@ -95,26 +95,31 @@ export function useCollection(
 
   // 투수편 칭호 — 0xa40e0 이 투수편 기록연감 비트(+0xec)에 켠다
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeTitlesIntoCollection(previous, pitcherTitleIds))
   }, [pitcherTitleIds])
 
   // 시즌 엔딩 — 새 해 0x6e0c 가 엔딩으로 갈 때 전역기록 +0xa0+e = 1
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeSeasonEndingIntoCollection(previous, seasonEndingIndex))
   }, [seasonEndingIndex])
 
   useEffect(() => {
     if (career === null) return
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeCareerIntoCollection(previous, career))
   }, [career])
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeOpenedHiddenIds(previous, pitcherOpenedHiddenIds))
   }, [pitcherOpenedHiddenIds])
 
   const pitcherEndingIndex = pitcherEnding?.endingIndex ?? null
   const pitcherSeenEventIds = pitcherEnding?.seenEventIds ?? NO_EVENTS
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeEndingIntoCollection(previous, { endingIndex: pitcherEndingIndex, seenEventIds: pitcherSeenEventIds }))
   }, [pitcherEndingIndex, pitcherSeenEventIds])
 
