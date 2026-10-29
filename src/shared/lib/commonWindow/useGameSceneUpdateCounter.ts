@@ -31,8 +31,7 @@ export function useGameSceneUpdateCounter(isRunning = true, startTickRef?: Mutab
     }
     handle = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 적어 줄 칸은 부르는 쪽 ref 하나다
-  }, [isRunning])
+  }, [isRunning, startTickRef])
 
   return update
 }

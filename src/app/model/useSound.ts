@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createSilentSound, setActiveSound } from '@/shared/api/audio/soundPort'
 import type { SoundPort } from '@/shared/api/audio/soundPort'
 import { createWebAudioSound } from '@/shared/api/audio/webAudioSound'
@@ -19,15 +19,14 @@ const VOLUME_PER_LEVEL = 25
  * `AudioContext` 가 없는 환경(시험 DOM·오래된 브라우저)에서는 조용한 포트로 떨어진다.
  */
 export function useSound(soundLevel: number): SoundPort {
-  const sound = useMemo<SoundPort>(() => {
+  // 통로는 앱이 사는 동안 하나다(처음 소리 크기로 만든다) — 소리 크기는 아래 effect 가 따라간다
+  const [sound] = useState<SoundPort>(() =>
     // 통로를 못 만드는 환경에서는 게임이 멈추지 않게 조용한 포트로 간다
-    return tryOrElse(
+    tryOrElse(
       () => createWebAudioSound({ volume: soundLevel * VOLUME_PER_LEVEL }),
       () => createSilentSound(),
-    )
-    // 통로는 앱이 사는 동안 하나다 — 소리 크기는 아래 effect 가 따라간다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    ),
+  )
 
   // 원본 전역 사운드 포인터 `[0x1400058]` 자리에 꽂는다 — 경기 화면들이 소품을 안 받고도
   // 같은 통로로 소리를 낸다 (`shared/api/audio/soundPort` 의 `activeSound`).

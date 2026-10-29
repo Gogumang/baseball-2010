@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { FrameSprite, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { INTRO_TICKS, introBandAlphaOf, introCounterAt, introFadeAt } from '@/widgets/game-scene/lib/introSchedule'
@@ -26,6 +26,7 @@ import { introCanvasOverlayOf } from '@/widgets/game-scene/ui/introCanvas'
 import type { SceneryBackdropStage } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
 const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
@@ -74,12 +75,12 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   useMarksGameScene()
   const doneRef = useRef(false)
   const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
-  const finish = () => {
+  useMirrorRef(onDoneRef, onDone)
+  const finish = useCallback(() => {
     if (doneRef.current) return
     doneRef.current = true
     onDoneRef.current()
-  }
+  }, [])
   /** 받은 키 칸 — 인트로 키 0x39b54 는 받은 다음 틀의 52da2~ 상태 키 자리(갱신 표 52e14 앞)에서 돈다(`sceneKeyLatch`) */
   const keyLatch = useSceneKeyLatchOwner()
   const tick = useSceneTick(
@@ -101,8 +102,7 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [keyLatch, finish])
 
   const counter = introCounterAt(tick)
   const fade = introFadeAt(tick)

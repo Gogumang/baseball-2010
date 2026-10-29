@@ -1,3 +1,4 @@
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { loadSpriteImage } from '@/shared/lib/sprite/spriteCache'
@@ -30,8 +31,12 @@ export function ComposedOverlay({ rect, underOps, ops, backdrop = 0, fallback, t
   const [isComposed, setComposed] = useState(false)
   const [loadedVersion, setLoadedVersion] = useState(0)
   const key = useMemo(() => JSON.stringify([rect, underOps, ops, backdrop]), [rect, underOps, ops, backdrop])
+  // 아래 effect 는 내용(key)이 바뀔 때만 돈다 — 그때 이 그림의 재료를 읽는다
+  const inputsRef = useRef({ rect, underOps, ops, backdrop })
+  useMirrorRef(inputsRef, { rect, underOps, ops, backdrop })
 
   useLayoutEffect(() => {
+    const { rect, underOps, ops, backdrop } = inputsRef.current
     const drawn = composeOverlay565(rect, underOps, ops, sprite565At, backdrop)
     if (drawn.missing) {
       setComposed(false)
@@ -56,7 +61,6 @@ export function ComposedOverlay({ rect, underOps, ops, backdrop = 0, fallback, t
     setComposed(true)
     return undefined
     // 그리기는 내용(key)으로 본다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, loadedVersion])
 
   const style: CSSProperties = {

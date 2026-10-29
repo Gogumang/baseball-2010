@@ -15,6 +15,7 @@
  * 경기 결과로 달라지는 조건(인기도 · 평판)은 경기 전 값으로 본다 — 빗나가면 그 이벤트 그림이 예전처럼 늦게 뜰 뿐이다.
  */
 import { useEffect, useMemo, useState } from 'react'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { EVENT_TRIGGER, forgetRepeatableEvents, nextEventFor } from '@/entities/story/model/storyScene'
 import { evaluationManagerAnimations } from '@/pages/story/lib/evaluationDialogue'
@@ -97,6 +98,24 @@ export function afterGameEventPreloadsOf(career: PlayerCareer, events: readonly 
  * 나리 타자편 경기 장면이 서 있는 동안 경기 뒤 이벤트 판 그림을 유휴로 받는다. 이벤트 본문은 `useStorySchedule` 처럼
  * 따로 불러온다(같은 묶음이라 이미 받았으면 곧바로 풀린다).
  */
+interface PreloadBasis {
+  readonly career: PlayerCareer
+  readonly events: readonly OriginalEvent[] | null
+}
+
+/** 이벤트 표 · 날짜 · 본 이벤트 · 몸 · 피부가 그대로면 앞 바탕을 그대로 둔다 */
+function keepPreloadBasis(previous: PreloadBasis | null, next: PreloadBasis): PreloadBasis {
+  if (previous === null || previous.events !== next.events) return next
+  const [before, now] = [previous.career, next.career]
+  const isSameCareer =
+    before.season === now.season &&
+    before.gamesPlayed === now.gamesPlayed &&
+    before.seenEventIds === now.seenEventIds &&
+    before.battingTypeIndex === now.battingTypeIndex &&
+    before.skinIndex === now.skinIndex
+  return isSameCareer ? previous : next
+}
+
 export function useAfterGameEventPreload(career: PlayerCareer): void {
   const [events, setEvents] = useState<readonly OriginalEvent[] | null>(null)
   useEffect(() => {
@@ -108,12 +127,9 @@ export function useAfterGameEventPreload(career: PlayerCareer): void {
       isLive = false
     }
   }, [])
-  const requests = useMemo(
-    () => (events === null ? null : afterGameEventPreloadsOf(career, events)),
-    // 경기 중에는 날짜 · 본 이벤트 · 몸 · 피부가 바뀌지 않는다 — 그 밖의 커리어 변화로 다시 계산하지 않는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [events, career.season, career.gamesPlayed, career.seenEventIds, career.battingTypeIndex, career.skinIndex],
-  )
+  // 경기 중에는 날짜 · 본 이벤트 · 몸 · 피부가 바뀌지 않는다 — 그 밖의 커리어 변화로 다시 계산하지 않는다
+  const basis = useRenderMachine(keepPreloadBasis, { career, events })
+  const requests = useMemo(() => (basis.events === null ? null : afterGameEventPreloadsOf(basis.career, basis.events)), [basis])
   useEffect(() => {
     if (requests !== null) preloadSprites(requests, 'idle')
   }, [requests])

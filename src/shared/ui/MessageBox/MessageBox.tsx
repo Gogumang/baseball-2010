@@ -1,3 +1,4 @@
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { MarkupText } from '@/shared/ui'
@@ -217,7 +218,7 @@ export function MessageBox({
   onRawKey,
 }: MessageBoxProps) {
   const onRawKeyRef = useRef(onRawKey)
-  onRawKeyRef.current = onRawKey
+  useMirrorRef(onRawKeyRef, onRawKey)
   // 창을 띄울 때 [창+0x24f] 를 [창+0x24e] 로 옮긴다(0x7503c) — 띄운 자리가 정하지 않았으면 지금 장면의 값
   const sceneClosesWithoutShrink = useSceneClosesWithoutShrink()
   const closesWithoutShrink = closesWithoutShrinkProp ?? sceneClosesWithoutShrink
@@ -229,14 +230,14 @@ export function MessageBox({
   // 상자가 열려 있는 동안 키는 상자 것이다. 뒤쪽 메뉴가 같은 Enter 를 같이 받으면
   // 상자를 눌러 닫을 수 없고 (상점 구매 확인), Escape 가 화면을 빠져나가 버린다 (관리 알림).
   const selectedRef = useRef(selected)
-  selectedRef.current = selected
+  useMirrorRef(selectedRef, selected)
   const onAnswerRef = useRef(onAnswer)
-  onAnswerRef.current = onAnswer
+  useMirrorRef(onAnswerRef, onAnswer)
   const onAnswerKeyRef = useRef(onAnswerKey)
-  onAnswerKeyRef.current = onAnswerKey
+  useMirrorRef(onAnswerKeyRef, onAnswerKey)
   const isAnsweredRef = useRef(false)
   const closesWithoutShrinkRef = useRef(closesWithoutShrink)
-  closesWithoutShrinkRef.current = closesWithoutShrink
+  useMirrorRef(closesWithoutShrinkRef, closesWithoutShrink)
   const isFinishedRef = useRef(false)
   /**
    * 창이 치워졌다 — [창+9] = 0 (닫힘 0x7558a~ 이 폭 99 이하에서 0x742a8). 그 전까지(펼침 · 닫힘 포함) 공용 창이 떠 있다고 센다
@@ -252,13 +253,13 @@ export function MessageBox({
 
   // 열림: 첫 그리기 전에 높이를 재고 10 에서 시작한다 (0x75006). `opensOneStepIn` 이면 띄운 갱신이 한 번 두 배로 한 뒤라
   // 첫 그림이 20 — 목표 < 20 이면 그 갱신에 다 펼친다(0x7557c)
+  const opensOneStepInAtMount = useRef(opensOneStepIn)
   useLayoutEffect(() => {
     const full = boxRef.current?.offsetHeight ?? 0
     fullHeightRef.current = full
-    const start = opensOneStepIn ? OPEN_START_HEIGHT * OPEN_GROWTH : OPEN_START_HEIGHT
+    const start = opensOneStepInAtMount.current ? OPEN_START_HEIGHT * OPEN_GROWTH : OPEN_START_HEIGHT
     if (full > OPEN_START_HEIGHT && start <= full) setAnimation({ kind: '열림', height: start })
     // 처음 한 번만 — 펼침 시작은 띄운 그 갱신이 정한다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 같은 자리에서 글만 바뀌면 **새 상자**다 (보상 안내가 잇달아 뜨는 화면들). 답 잠금을 푼다 —
@@ -267,16 +268,18 @@ export function MessageBox({
   // 0x6bd38 이 +0xc/+0x10 을 0 으로, 칸 배치 0x6bfe1 이 `vtbl+0x14(0, 0)`(0x6c00d) 로 (0, 0) 에 둔다.
   // 그 자리가 띄운 뒤 `0x749d5(창, n)` 을 부르면 n 칸 — 곧 `initialSelected` 다. 앞 상자의 커서는 남지 않는다.
   const shownTextRef = useRef(text)
+  // 글이 바뀐 그림의 처음 칸 — 아래 effect 는 글이 바뀔 때만 돈다
+  const firstSelectedRef = useRef(firstSelected)
+  useMirrorRef(firstSelectedRef, firstSelected)
   useEffect(() => {
     if (shownTextRef.current === text) return
     shownTextRef.current = text
     isAnsweredRef.current = false
     isFinishedRef.current = false
     setIsGone(false)
-    setSelected(firstSelected)
+    setSelected(firstSelectedRef.current)
     setAnimation(fullHeightRef.current > OPEN_START_HEIGHT ? { kind: '열림', height: OPEN_START_HEIGHT } : null)
     // 새 상자는 글이 바뀔 때만 생긴다 — 같은 글에서 처음 칸 값만 바뀌어도 커서를 옮기지 않는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text])
 
   const answer = useCallback((index: number) => {
@@ -293,7 +296,7 @@ export function MessageBox({
 
   // 갱신 한 번 = 게임 루프 한 틱 (원본도 "매 갱신" 이다)
   const animationRef = useRef(animation)
-  animationRef.current = animation
+  useMirrorRef(animationRef, animation)
   const animationKind = animation?.kind ?? null
   useEffect(() => {
     if (animationKind === null) return

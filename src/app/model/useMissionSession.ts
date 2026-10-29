@@ -1047,7 +1047,6 @@ export function useMissionSession({
     }
     handledPitchSelectionRef.current = entry.serial
     askPitchSelection(entry.kind)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pitchSelectionEntry, pitchSelectionDueSerial, runner.bannerText])
 
   /**
@@ -1386,7 +1385,6 @@ export function useMissionSession({
       finishMissionArrivalAtBat(play, { hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase })
       return reply
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [aceLevels, audio, batterRunningMode, batterSkillIds, random, runner],
   )
 

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { PointerEvent } from 'react'
 import type { SceneKeyKind } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
@@ -64,10 +64,13 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
    * 받은 틱은 **키 사건이 난 시각에 화면에 있던 그림의 틱**이다(`keyLatch.tickAt` — 원본은 키를 받은 틀 = 마지막으로 그린 틀). 손잡이가
    * 돈 때의 시각 틱으로 세면 그리기 · 주 스레드가 밀린 만큼(한두 틱) 늦게 누른 것이 된다 (r211)
    */
-  const latch = (event: Event, apply: (tick: number) => void, kind: SceneKeyKind = 'press', inputTime = inputTimeOf(event)) => {
-    const tick = keyLatch.tickAt(inputTime)
-    keyLatch.push(() => apply(tick), kind, inputTime)
-  }
+  const latch = useCallback(
+    (event: Event, apply: (tick: number) => void, kind: SceneKeyKind = 'press', inputTime = inputTimeOf(event)) => {
+      const tick = keyLatch.tickAt(inputTime)
+      keyLatch.push(() => apply(tick), kind, inputTime)
+    },
+    [keyLatch],
+  )
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -113,8 +116,7 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 칸(`keyLatch`)은 부품마다 하나다
-  }, [actions])
+  }, [actions, latch, latestRef])
 
   return {
     /**

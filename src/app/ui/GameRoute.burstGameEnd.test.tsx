@@ -25,27 +25,33 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
  * 마지막 내 타석에 돌발이 판정되고 그 뒤 동료 · 상대 타석(중계)이 남은 채 경기가 끝난다(r315 시험과 같은 경기)
  */
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async (importOriginal) => {
-  const { useEffect } = await import('react')
+  const { useEffect, useRef } = await import('react')
   return {
     ...(await importOriginal<object>()),
     LoadingTip: ({ onDone }: { onDone: () => void }) => {
+      // 올릴 때 한 번만
+      const done = useRef(false)
       useEffect(() => {
+        if (done.current) return
+        done.current = true
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      }, [onDone])
       return null
     },
   }
 })
 vi.mock('@/widgets/game-scene/ui/GameIntro', async (importOriginal) => {
-  const { useEffect } = await import('react')
+  const { useEffect, useRef } = await import('react')
   return {
     ...(await importOriginal<object>()),
     GameIntro: ({ onDone }: { onDone: () => void }) => {
+      // 올릴 때 한 번만
+      const done = useRef(false)
       useEffect(() => {
+        if (done.current) return
+        done.current = true
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      }, [onDone])
       return null
     },
   }
