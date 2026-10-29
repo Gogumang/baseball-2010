@@ -54,8 +54,10 @@
     "src/pages/defense/lib/defenseView.ts": ["exports"], // LASER_SHINE_COLOR · LASER_SHINE_EFFECT_KIND
     "src/pages/defense/lib/fieldMap.ts": ["exports"], // MAP_COLORS (0x39680)
     "src/pages/record/lib/recordAnnalsLayout.ts": ["exports"], // SEASON_ENDING_CELL_COUNT
+    "src/pages/record/lib/recordAnnalsLayout/annalsProgress.ts": ["exports"], // SEASON_ENDING_CELL_COUNT (barrel 이 다시 내보낸다)
     "src/pages/record/lib/recordDescriptions.ts": ["exports"], // RECORD_DESCRIPTION_FIRST_ID (StrGAME[0x38])
     "src/pages/settings/lib/settingsLayout.ts": ["exports"], // ROW_SHAKE_TABLES (0xd1784 · 0xd1754)
+    "src/pages/settings/lib/settingsLayout/settingsSubPages.ts": ["exports"], // ROW_SHAKE_TABLES (barrel 이 다시 내보낸다)
     "src/pages/shop/lib/shopLayout.ts": ["exports"], // STADIUM_BOXES · STADIUM_COLORS (구장 아이템 화면 — 웹 미구현, 좌표만)
     "src/pages/story/lib/evaluationChangeWindow.ts": ["exports"], // SYSTEM_EVALUATION_CHANGE_WINDOW
     "src/widgets/entry-editor/lib/entryListWindow.ts": ["exports"], // ENTRY_VISIBLE_ROWS (0x55798)
