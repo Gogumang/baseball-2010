@@ -1,66 +1,22 @@
-import { useEffect, useEffectEvent, useState } from 'react'
-import { FrameSprite, MessageBox, RawScreen, SpriteNumber } from '@/shared/ui'
-import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useState } from 'react'
+import { MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
-import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
-import { FONT_SPACING, LINE_HEIGHT } from '@/shared/lib/font/layout'
-import { PixelText } from '@/shared/ui/PixelText/PixelText'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonPlayerRecordView } from '@/entities/season-mode/model/seasonPlayerRecord'
-import {
-  SEASON_EQUIPMENT_LEVEL_COUNT,
-  SEASON_EQUIPMENT_TEXT,
-  applySeasonEquipment,
-  checkSeasonEquipment,
-} from '@/entities/season-mode/model/seasonEquipment'
+import { SEASON_EQUIPMENT_TEXT, applySeasonEquipment, checkSeasonEquipment } from '@/entities/season-mode/model/seasonEquipment'
 import type { SeasonEquipmentApplied } from '@/entities/season-mode/model/seasonEquipment'
 import { seasonCardAbilitiesOf } from '@/pages/season/lib/seasonPlayerDetail'
 import { seasonCardLookOf } from '@/pages/season/lib/seasonPlayerCard'
-import {
-  EQUIPMENT_COLORS,
-  EQUIPMENT_WINDOW,
-  centeredOffsetOf,
-  descriptionBoxRectsOf,
-  effectOffsetsOf,
-  equipmentDescriptionOf,
-  equipmentEffectBonusOf,
-  equipmentItemNameOf,
-  equipmentPriceTenThousandsOf,
-  isBlinkOn,
-  moveEquipmentLevel,
-  moveEquipmentPart,
-  partMarkerBoxOf,
-  partSeparatorRectsOf,
-  scrollThumbRectsOf,
-  scrolledEquipmentTopOf,
-  tabPanelRectsOf,
-  windowRowOf,
-} from '@/pages/season/lib/seasonEquipmentWindow'
-import type { WindowBox, WindowRect } from '@/pages/season/lib/seasonEquipmentWindow'
+import { moveEquipmentLevel, moveEquipmentPart, scrolledEquipmentTopOf } from '@/pages/season/lib/seasonEquipmentWindow'
 import { SeasonPlayerCard } from '@/pages/season/ui/SeasonPlayerCard'
 import { fillModeText, seasonMoneyTextOf } from '@/widgets/season/lib/seasonText'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import * as styles from '@/widgets/season/ui/SeasonWindow.css'
-import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { SkinBackdrop } from './seasonEquipmentScreen/otherSlices'
+import { EquipmentWindow } from './seasonEquipmentScreen/EquipmentWindow'
+import { useEquipmentKeys } from './seasonEquipmentScreen/useEquipmentKeys'
 
-const MODE_UI = assetUrl('./sprites/mode_ui/frames')
-const IMG_TEXT = assetUrl('./sprites/img_text/frames')
-const NUM = assetUrl('./sprites/num')
-const imageOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
-const pixel = { position: 'absolute', pointerEvents: 'none' } as const
-/** num "+" 105 크기 */
-const PLUS_SIZE = 6
-/**
- * 설명 글 줄 간격 — 0xba411(박스 4, 글, 정렬 0x11, 5, 5) → 0xba2e4 가 글상자 0x6ecd0 으로 그려 **앱 전역 글꼴**(줄 11 + 줄간 3)이다.
- * 정렬 0x11 의 비트 0x1 · 0x10 은 0xba2e4 가 안 본다(0x2 · 0x4 · 0x20 · 0x40 만) — (x + 5, y + 5) 왼쪽 위 그대로.
- */
-const TEXT_LINE = LINE_HEIGHT + FONT_SPACING.app.lineGap
-
-const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
-const isConfirmKey = (key: string) => key === 'Enter' || key === '5'
 const modeText = (id: number) => ORIGINAL_MODE_TEXT[id] ?? ''
 
 export interface SeasonEquipmentScreenProps {
@@ -126,13 +82,14 @@ export function SeasonEquipmentScreen({
   const [notice, setNotice] = useState<string | null>(null)
   const [question, setQuestion] = useState<{ readonly text: string } | null>(null)
   const tick = useUpdateCounter()
+  const isPopup = notice !== null || question !== null
+  const player = { isBatter, equipment, ownedEquipment }
 
   const select = () => {
-    const checked = checkSeasonEquipment(record, { isBatter, equipment, ownedEquipment }, part, level, isHiddenOpen)
+    const checked = checkSeasonEquipment(record, player, part, level, isHiddenOpen)
     if (!checked.ok) {
       const text = modeText(SEASON_EQUIPMENT_TEXT[checked.reason])
-      setNotice(checked.reason === '인기도부족' ? fillModeText(text, checked.required ?? 0) : text)
-      return
+      return setNotice(checked.reason === '인기도부족' ? fillModeText(text, checked.required ?? 0) : text)
     }
     // B-23 고친 길 — 산 적 있는 칸은 확인 창 없이 곧장 끼운다(StrMODE[142] 장착 완료)
     if (checked.owned === true) return buy()
@@ -141,10 +98,11 @@ export function SeasonEquipmentScreen({
 
   const buy = () => {
     setQuestion(null)
-    onPurchase(applySeasonEquipment(record.money, { isBatter, equipment, ownedEquipment }, part, level))
+    onPurchase(applySeasonEquipment(record.money, player, part, level))
     setNotice(modeText(SEASON_EQUIPMENT_TEXT.장착완료))
   }
 
+  /** 칸 목록으로 — 칸 커서 · 맨 윗줄 0 이고 첫 칸을 끼워 본다(0x81c78 → 0x81938) */
   const enterItems = (target: number) => {
     setItemFocus(true)
     setLevel(0)
@@ -152,6 +110,7 @@ export function SeasonEquipmentScreen({
     setCardNibbles((held) => withNibble(held, target, 0))
   }
 
+  /** 부위 목록으로 — 그 부위를 **진짜 니블**로 되돌린다(0x81a9a) */
   const leaveItems = () => {
     setItemFocus(false)
     setLevel(0)
@@ -166,76 +125,46 @@ export function SeasonEquipmentScreen({
     setCardNibbles((held) => withNibble(held, part, next))
   }
 
-  const latest = useEffectEvent(() => ({
-    isItemFocus,
-    part,
+  const run = {
+    back: onBack,
+    enter: () => enterItems(part),
+    left: () => setPart((held) => moveEquipmentPart(held, -1)),
+    right: () => setPart((held) => moveEquipmentPart(held, 1)),
+    leave: leaveItems,
     select,
-    enterItems,
-    leaveItems,
-    moveLevel,
-    onBack,
-    isPopup: notice !== null || question !== null,
-  }))
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest()
-      if (current.isPopup) return
-      const key = event.key
-      if (!current.isItemFocus) {
-        if (isCancelKey(key)) current.onBack()
-        else if (isConfirmKey(key) || key === 'ArrowDown' || key === '8') current.enterItems(current.part)
-        else if (key === 'ArrowLeft' || key === '4') setPart((held) => moveEquipmentPart(held, -1))
-        else if (key === 'ArrowRight' || key === '6') setPart((held) => moveEquipmentPart(held, 1))
-        else return
-      } else if (isCancelKey(key)) current.leaveItems()
-      else if (isConfirmKey(key)) current.select()
-      else if (key === 'ArrowUp' || key === '2') current.moveLevel(-1)
-      else if (key === 'ArrowDown' || key === '8') current.moveLevel(1)
-      else return
-      event.preventDefault()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+    up: () => moveLevel(-1),
+    down: () => moveLevel(1),
+  }
+  useEquipmentKeys({ isItemFocus, isPopup, run })
 
   // 터치 기기 — 레벨 목록(11칸 중 5줄만 보인다)에 들어가 있으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 보이는 줄은 눌러서 고른다
-  useTouchScrollKeys(isItemFocus && notice === null && question === null)
+  useTouchScrollKeys(isItemFocus && !isPopup)
+
+  const pickPart = (slot: number) => {
+    if (isPopup) return
+    // ⚠️ 웹 전용 길(원본은 칸 목록에서 부위로 가려면 취소 0x81a9a 를 거친다) — 칸 목록에서 다른 부위를 누르면
+    // 먼저 지금 부위를 진짜 니블로 되돌린다. 안 그러면 앞 부위에 끼워 본 장비가 카드 사본에 남았다(r263)
+    if (isItemFocus) leaveItems()
+    setPart(slot)
+    enterItems(slot)
+  }
+  const pickLevel = (slot: number) => {
+    if (!isItemFocus) return
+    if (slot === level) return select()
+    setLevel(slot)
+    setCardNibbles((held) => withNibble(held, part, slot))
+  }
 
   const cardView = { ...view, equipment: cardNibbles }
   const abilities = seasonCardAbilitiesOf(cardView, { record, teamMorale })
+  const windowState = { record, isBatter, equipment, part, level, top, isItemFocus, tick, isHiddenOpen }
 
   return (
     <RawScreen>
       {/* 공통 앞그림 0xb810 — 0xdc 는 0xdd · 0xe0 · 0xe1 밖이라 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 먼저 깐다 */}
       <SkinBackdrop kind="공무늬" />
       <div role="group" aria-label={`장비 ${view.name}`} data-testid="장비-창" data-nibbles={cardNibbles.join(',')}>
-        <EquipmentWindow
-          record={record}
-          isBatter={isBatter}
-          equipment={equipment}
-          part={part}
-          level={level}
-          top={top}
-          isItemFocus={isItemFocus}
-          tick={tick}
-          isHiddenOpen={isHiddenOpen}
-          onPickPart={(slot) => {
-            if (notice !== null || question !== null) return
-            // ⚠️ 웹 전용 길(원본은 칸 목록에서 부위로 가려면 취소 0x81a9a 를 거친다) — 칸 목록에서 다른 부위를 누르면
-            // 먼저 지금 부위를 진짜 니블로 되돌린다. 안 그러면 앞 부위에 끼워 본 장비가 카드 사본에 남았다(r263)
-            if (isItemFocus) leaveItems()
-            setPart(slot)
-            enterItems(slot)
-          }}
-          onPickLevel={(slot) => {
-            if (!isItemFocus) return
-            if (slot === level) select()
-            else {
-              setLevel(slot)
-              setCardNibbles((held) => withNibble(held, part, slot))
-            }
-          }}
-        />
+        <EquipmentWindow {...windowState} onPickPart={pickPart} onPickLevel={pickLevel} />
       </div>
       <SeasonPlayerCard
         teamId={record.teamId}
@@ -251,235 +180,5 @@ export function SeasonEquipmentScreen({
       )}
       {question === null && notice !== null && <MessageBox text={notice} buttons={['OK']} onAnswer={() => setNotice(null)} />}
     </RawScreen>
-  )
-}
-
-function Rects({ rects, testId }: { readonly rects: readonly WindowRect[]; readonly testId?: string }) {
-  return (
-    <svg viewBox="0 0 240 320" shapeRendering="crispEdges" data-testid={testId} style={{ ...pixel, left: 0, top: 0, width: 240, height: 320 }}>
-      {rects.map((rect, index) => (
-        <rect key={index} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />
-      ))}
-    </svg>
-  )
-}
-
-/** 정렬 0x24 — 오른쪽(ox) · 세로 가운데 */
-function RightImage({
-  src,
-  box,
-  width,
-  height,
-  ox,
-  oy = 0,
-}: {
-  readonly src: string
-  readonly box: WindowBox
-  readonly width: number
-  readonly height: number
-  readonly ox: number
-  readonly oy?: number
-}) {
-  return <img alt="" src={src} style={{ ...pixel, left: box.x + box.width - width + ox, top: box.y + centeredOffsetOf(box.height, height) + oy }} />
-}
-
-function EquipmentWindow({
-  record,
-  isBatter,
-  equipment,
-  part,
-  level,
-  top,
-  isItemFocus,
-  tick,
-  isHiddenOpen,
-  onPickPart,
-  onPickLevel,
-}: {
-  readonly record: SeasonRecord
-  readonly isBatter: boolean
-  readonly equipment: readonly number[]
-  readonly part: number
-  readonly level: number
-  readonly top: number
-  readonly isItemFocus: boolean
-  readonly tick: number
-  readonly isHiddenOpen: (id: number) => boolean
-  readonly onPickPart: (part: number) => void
-  readonly onPickLevel: (level: number) => void
-}) {
-  const uiOrigins = useFrameOrigins(MODE_UI)
-  const textOrigins = useFrameOrigins(IMG_TEXT)
-  const sizeOf = (frame: number) => textOrigins?.[String(frame).padStart(3, '0')]
-  const { labels, values, items, description } = EQUIPMENT_WINDOW
-  const valueRight = values.x + values.width - EQUIPMENT_WINDOW.valueInset
-  const marker = partMarkerBoxOf(part)
-  const markerOrigin = uiOrigins?.[String(EQUIPMENT_WINDOW.partMarkerFrame).padStart(3, '0')]
-  const visible = Array.from({ length: EQUIPMENT_WINDOW.visibleRows }, (_unused, row) => top + row).filter(
-    (index) => index < SEASON_EQUIPMENT_LEVEL_COUNT,
-  )
-  const bonus = equipmentEffectBonusOf(level)
-  const effectOffsets = effectOffsetsOf(bonus)
-  const effectLabel = EQUIPMENT_WINDOW.effectLabelBase[isBatter ? '타자' : '투수'] + part
-  const effectLabelSize = sizeOf(effectLabel)
-  const effectRow = windowRowOf(values, 2)
-  const descriptionText = isItemFocus ? equipmentDescriptionOf(isBatter, part, level, isHiddenOpen) : null
-
-  return (
-    <>
-      <Rects rects={[...tabPanelRectsOf(EQUIPMENT_WINDOW.panel, true), ...partSeparatorRectsOf(), ...descriptionBoxRectsOf()]} testId="장비-판" />
-      <FrameSprite folder={MODE_UI} frame={EQUIPMENT_WINDOW.frame} origins={uiOrigins} x={0} y={0} />
-      {EQUIPMENT_WINDOW.labelFrames.map((frame, row) => {
-        const size = sizeOf(frame)
-        return size === undefined ? null : (
-          <RightImage
-            key={frame}
-            src={imageOf(IMG_TEXT, frame)}
-            box={windowRowOf(labels, row)}
-            width={size.width}
-            height={size.height}
-            ox={-EQUIPMENT_WINDOW.valueInset}
-          />
-        )
-      })}
-      <div data-testid="장비-소지금" aria-label={String(record.money * 100)}>
-        <SpriteNumber glyphs={moneyGlyphsOf(record.money * 100)} right={valueRight} boxTop={values.y} boxHeight={values.height} />
-      </div>
-      {/* 부위 표시 — 부위 목록에 있을 때는 틱 % 10 == 0 에 꺼진다 */}
-      {(isItemFocus || isBlinkOn(tick)) && markerOrigin !== undefined && (
-        <img
-          alt=""
-          data-testid="장비-부위표시"
-          data-part={part}
-          src={imageOf(MODE_UI, EQUIPMENT_WINDOW.partMarkerFrame)}
-          style={{
-            ...pixel,
-            left: marker.x + centeredOffsetOf(marker.width, markerOrigin.width),
-            top: marker.y + centeredOffsetOf(marker.height, markerOrigin.height),
-          }}
-        />
-      )}
-      {[0, 1, 2, 3].map((slot) => {
-        const box = partMarkerBoxOf(slot)
-        return (
-          <button
-            key={slot}
-            type="button"
-            aria-label={`부위 ${slot + 1}`}
-            aria-current={slot === part}
-            style={{
-              position: 'absolute',
-              left: box.x,
-              top: box.y,
-              width: box.width,
-              height: box.height,
-              background: 'transparent',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-            }}
-            onClick={() => onPickPart(slot)}
-          />
-        )
-      })}
-      {visible.map((index, row) => {
-        const box = windowRowOf(items, row)
-        const isEquipped = (equipment[part] ?? 0) - 1 === index
-        const isCursor = isItemFocus && index === level
-        const name = equipmentItemNameOf(isBatter, part, index, isHiddenOpen)
-        return (
-          <div key={index} data-testid={`장비-칸-${index}`}>
-            {isEquipped && <img alt="" src={imageOf(MODE_UI, EQUIPMENT_WINDOW.equippedBarFrame)} style={{ ...pixel, left: box.x, top: box.y }} />}
-            <button
-              type="button"
-              className={styles.title}
-              aria-label={name}
-              aria-current={isCursor}
-              style={{
-                left: box.x,
-                top: box.y,
-                width: box.width,
-                height: box.height,
-                lineHeight: `${box.height}px`,
-                color: isEquipped ? EQUIPMENT_COLORS.equippedText : EQUIPMENT_COLORS.itemText,
-                pointerEvents: 'auto',
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-              }}
-              onClick={() => onPickLevel(index)}
-            >
-              {name}
-            </button>
-            {/* 0xb9ed5 → 0x6a978 은 폭 · 높이에 1 을 더해 (w + 1) × (h + 1) 칸을 덮는다 (U-113, R12 6절) */}
-            {isCursor && isBlinkOn(tick) && (
-              <div
-                data-testid="장비-커서"
-                style={{
-                  ...pixel,
-                  left: box.x,
-                  top: box.y,
-                  width: box.width + 1,
-                  height: box.height + 1,
-                  boxSizing: 'border-box',
-                  border: `1px solid ${EQUIPMENT_COLORS.cursor}`,
-                }}
-              />
-            )}
-          </div>
-        )
-      })}
-      {isItemFocus && (
-        <>
-          <div data-testid="장비-가격" aria-label={String(equipmentPriceTenThousandsOf(isBatter, part, level))}>
-            <SpriteNumber
-              glyphs={moneyGlyphsOf(equipmentPriceTenThousandsOf(isBatter, part, level))}
-              right={valueRight}
-              boxTop={windowRowOf(values, 1).y}
-              boxHeight={values.height}
-            />
-          </div>
-          <div data-testid="장비-효과" aria-label={`+${bonus}`}>
-            {effectLabelSize !== undefined && (
-              <RightImage
-                src={imageOf(IMG_TEXT, effectLabel)}
-                box={effectRow}
-                width={effectLabelSize.width}
-                height={effectLabelSize.height}
-                ox={effectOffsets.label}
-              />
-            )}
-            <RightImage
-              src={imageOf(NUM, EQUIPMENT_WINDOW.plusFrame)}
-              box={effectRow}
-              width={PLUS_SIZE}
-              height={PLUS_SIZE}
-              ox={effectOffsets.plus}
-              oy={1}
-            />
-            <SpriteNumber glyphs={numberGlyphsOf(bonus)} right={valueRight} boxTop={effectRow.y} boxHeight={values.height} />
-          </div>
-          {descriptionText !== null && (
-            <div data-testid="장비-설명" aria-label={descriptionText.replaceAll('!N', '\n')}>
-              {descriptionText.split('!N').map((line, index) => (
-                <PixelText
-                  key={index}
-                  style={{
-                    ...pixel,
-                    left: description.x + EQUIPMENT_WINDOW.descriptionInset,
-                    top: description.y + EQUIPMENT_WINDOW.descriptionInset + index * TEXT_LINE,
-                    color: EQUIPMENT_COLORS.cursor,
-                  }}
-                >
-                  {line}
-                </PixelText>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-      <Rects rects={scrollThumbRectsOf(top)} testId="장비-굴림" />
-    </>
   )
 }
