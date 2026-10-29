@@ -172,7 +172,7 @@ export const crossSliceBaseline = [
   'src/entities/pitching/model/selectPitch.ts',
   'src/entities/pitching/model/simulateBatter.ts',
   'src/entities/player-name/model/editedNames.ts',
-  'src/entities/season-mode/model/seasonEntry.ts',
+  'src/entities/season-mode/model/seasonEntry/otherSlices.ts',
   'src/entities/season-mode/model/seasonPlayerRecord.ts',
   'src/entities/season-mode/model/seasonRecordRanking.ts',
   'src/entities/season-mode/model/seasonRewards.ts',
