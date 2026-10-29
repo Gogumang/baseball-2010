@@ -291,7 +291,6 @@ export const readabilityBaseline = [
   'src/pages/story/ui/EventDialogueBox.tsx',
   'src/pages/story/ui/StoryScreen.tsx',
   'src/pages/team-game/lib/teamAutoRelay.ts',
-  'src/pages/team-game/model/useTeamGame.ts',
   'src/pages/team-game/ui/TeamRelayFigures.tsx',
   'src/shared/api/save/localStorageSaveGame.ts',
   'src/shared/config/balance/balance.ts',

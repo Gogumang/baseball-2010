@@ -381,7 +381,7 @@ export const crossSliceBaseline = [
   'src/pages/special/ui/SpecialScreen.tsx',
   'src/pages/story/ui/EvaluationChangeWindow.tsx',
   'src/pages/team-game/lib/gameLoadingPreloads.ts',
-  'src/pages/team-game/model/useTeamGame.ts',
+  'src/pages/team-game/model/teamGame/otherSlices.ts',
   'src/pages/team-game/ui/TeamRelayFigures.tsx',
   'src/pages/team-game/ui/substitutionWindow/otherSlices.ts',
   'src/pages/team-game/ui/teamAutoRelay/otherSlices.ts',
