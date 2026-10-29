@@ -1,3 +1,10 @@
+// 판 종류 마스크 표는 맨 앞에 둔다 — 원본 대조 시험이 배열 위 13 줄의 표 주소를 그 배열의 출처로 읽는다(`originalSource.test`)
+/** 슬롯 2 의 52602 — 판 종류가 이 마스크(0x58c)면 플레이 vt4c 0xb45dc 를 안 부른다 (`runnerPlayEngine` 과 같은 표) */
+export const VT4C_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
+
+/** 슬롯 2 머리 52546 — [sp+0x14] = 0xae61c(판 종류 ∉ 마스크 0x58c = 2 · 3 · 7 · 8 · 10)가 거짓이면 필살 포구 연출을 안 켠다 */
+export const DEADLY_FLASH_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
+
 /** 능력치를 안 주면 쓰는 값 — 원본 평균대(등급 3) */
 export const DEFAULT_ABILITY = 500
 /** 야수.vte4 = 0xa1e60 — 필살타법 타구에 맞은 야수의 동작 잠금 +0xb4 (`movs r3, #0xf`, a1e70) */
@@ -19,14 +26,8 @@ export const DEEP_LANDING_DISTANCE = 10_274
 /** 홈을 가리키는 루 번호 — 원본 루 표의 [4] 가 홈의 사본이라 진루는 4 로 센다 */
 export const HOME_BASE = 4
 
-/** 슬롯 2 의 52602 — 판 종류가 이 마스크(0x58c)면 플레이 vt4c 0xb45dc 를 안 부른다 (`runnerPlayEngine` 과 같은 표) */
-export const VT4C_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
-
 /** 타구 판의 플레이 종류 (0x3e11a 이후 상태 0x13 → 0x17) */
 export const BATTED_BALL_PLAY_KIND = 1
-
-/** 슬롯 2 머리 52546 — [sp+0x14] = 0xae61c(판 종류 ∉ 마스크 0x58c = 2 · 3 · 7 · 8 · 10)가 거짓이면 필살 포구 연출을 안 켠다 */
-export const DEADLY_FLASH_BLOCKED_PLAY_KINDS: readonly number[] = [2, 3, 7, 8, 10]
 
 /**
  * 예보 0xb12d0 은 틱 구간을 자르지 않고 궤적 끝까지(t = 1 → 공+0x6c − 1) 한 표를 만들고, 0xb3b38 은 낙구 전 포구
