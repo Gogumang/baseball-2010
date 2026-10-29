@@ -100,7 +100,7 @@ export const crossSliceBaseline = [
   'src/entities/game/model/gameRecords.ts',
   'src/entities/game/model/gameState.ts',
   'src/entities/game/model/gameSummary.ts',
-  'src/entities/game/model/quickAtBat.ts',
+  'src/entities/game/model/quickAtBat/otherSlices.ts',
   'src/entities/game/model/quickLineup.ts',
   'src/entities/game/model/simulateHalfInning/otherSlices.ts',
   'src/entities/game/model/steal.ts',

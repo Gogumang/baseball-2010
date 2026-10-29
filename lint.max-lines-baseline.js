@@ -31,7 +31,6 @@ export const maxLinesBaseline = [
   'src/entities/fielding/model/throwTargetBase.ts',
   'src/entities/game/model/gameRecords.ts',
   'src/entities/game/model/gameState.ts',
-  'src/entities/game/model/quickAtBat.ts',
   'src/entities/league/model/league.ts',
   'src/entities/league/model/leaguePlayerStats.ts',
   'src/entities/mission/model/missionGoal.ts',
