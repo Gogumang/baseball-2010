@@ -47,7 +47,7 @@
 ## 6. 세션 상태는 atom 으로 (Jotai)
 
 세션 훅(`useXxxSession`)이 하위 훅에 값을 줄줄이 넘기지 않게, 상태를 의미 단위 atom 으로 두고 하위 훅이 필요한 atom 만 직접 읽고 쓴다.
-본보기는 시즌 세션(`app/model/seasonSession/atoms`, r370) · 커리어 세션(`app/model/careerSession/atoms`, r372). 남은 세션(투수 리그 · 미션)도 같은 순서로 옮긴다.
+본보기는 시즌 세션(`app/model/seasonSession/atoms`, r370) · 커리어 세션(`app/model/careerSession/atoms`, r372) · 투수 리그 세션(`app/model/pitcherLeagueSession/atoms`, r373). 남은 세션(미션)도 같은 순서로 옮긴다.
 
 1. **store 는 세션마다 하나** — `useState(() => createXxxAtoms(args))`. 옛 `useState` 처음 값(저장소 읽기 따위)을 **같은 차례로** 여기서 넣는다.
    앱 전체 `Provider` 를 쓰지 않는다: 세션 훅은 `App` 몸통에서 서고, 세션이 새로 서면 칸도 새것이어야 옛 동작과 같다.
