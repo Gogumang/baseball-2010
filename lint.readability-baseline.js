@@ -193,7 +193,6 @@ export const readabilityBaseline = [
   'src/pages/national-cup/ui/NationalCupScreen.tsx',
   'src/pages/outing-map/ui/OutingMapScreen.tsx',
   'src/pages/pitcher-league/lib/breakingPitchCursor.ts',
-  'src/pages/pitcher-league/lib/pitchTrainingWindow.ts',
   'src/pages/pitcher-league/lib/pitcherCardFigure.ts',
   'src/pages/pitcher-league/lib/pitcherMatchInfo.ts',
   'src/pages/pitcher-league/model/pitcherGameOptions.ts',

@@ -320,7 +320,7 @@ export const crossSliceBaseline = [
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
   'src/pages/nari-record-room/ui/NariRecordRoom.tsx',
   'src/pages/outing-map/ui/OutingMap.tsx',
-  'src/pages/pitcher-league/lib/pitchTrainingWindow.ts',
+  'src/pages/pitcher-league/lib/pitchTrainingWindow/otherSlices.ts',
   'src/pages/pitcher-league/lib/pitcherCardFigure.ts',
   'src/pages/pitcher-league/lib/pitcherCommandBar.ts',
   'src/pages/pitcher-league/lib/pitcherDetailPopup.ts',
