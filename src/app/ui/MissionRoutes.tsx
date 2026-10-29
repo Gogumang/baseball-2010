@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import {
@@ -81,6 +82,12 @@ const MISSION_STAGE_PRELOADS = mergeSpritePreloads(gameEntryCastPreloadsOf(), st
  * 같은 팀이면 같은 배열을 돌려준다(`LoadingTip` 이 다시 받지 않게)
  */
 const missionStagePreloadCache = new Map<number, readonly SpriteFolderPreload[]>()
+/** 미션 경기 장면 하나를 가리키는 진행 화면 칸 — 진행 화면(미션 · 투수 미션 · 대결)이 설 때마다 그 칸, 그 밖 화면에서는 앞 칸 그대로 */
+function advancePlayScreen(previous: Screen | null, screen: Screen): Screen | null {
+  const isPlayScreen = screen.kind === '미션진행' || screen.kind === '투수미션' || screen.kind === '마선수대결'
+  return isPlayScreen ? screen : previous
+}
+
 function missionStagePreloadsOf(cpuTeamId: number | undefined): readonly SpriteFolderPreload[] {
   if (cpuTeamId === undefined) return MISSION_STAGE_PRELOADS
   const cached = missionStagePreloadCache.get(cpuTeamId)
@@ -183,16 +190,15 @@ export function MissionRoutes({
    * 미션 경기 장면 0x104 하나 — 미션 · 마선수 대결을 세울 때마다(`begin` · `beginAceMatch` 가 새 화면 칸을 세운다) 새로 만든다.
    * 이 라우트는 목록 · 설명 · 결과도 그려 마운트 수명이 장면보다 길다 — 진행 화면 칸이 바뀔 때 아래 칸들을 0 으로 둔다
    */
-  const playScreenRef = useRef<Screen | null>(null)
-  if (screen.kind === '미션진행' || screen.kind === '투수미션' || screen.kind === '마선수대결') playScreenRef.current = screen
+  const playScreen = useRenderMachine<Screen | null, Screen>(advancePlayScreen, screen)
   /** 미션 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 (`defenseHomeRunEffects`) */
-  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, playScreenRef.current)
+  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, playScreen)
   /** 장면 +0xfdc — 타자 미션의 번트 · 스윙 키가 쓴다. 키 없는 공은 0(0x11 진입의 memset — `BattingStage.sceneBuntKind`) */
-  const sceneBuntKindRef = useSceneScopedRef(0, playScreenRef.current)
+  const sceneBuntKindRef = useSceneScopedRef(0, playScreen)
   /** 장면 +0xf24 의 루상 주자 애니 0~2 — 미션 장면이 사는 동안 0x35b94 가 부를 때마다 돈다 (`RunnerAnimationClock`) */
-  const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), playScreenRef.current)
+  const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), playScreen)
   /** 경기 스킬 표시 판의 함성 비트 칸 skin+0x44c(0x3301c 가 0x3ff) · 애니 7 · 8 — 미션 장면이 사는 동안 (`skillPanel`) */
-  const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), playScreenRef.current)
+  const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), playScreen)
 
   const playingRun =
     screen.kind === '투수미션' ? session.pitcherRun : screen.kind === '미션진행' || screen.kind === '마선수대결' ? session.missionRun : null
@@ -223,7 +229,7 @@ export function MissionRoutes({
   // 진입 0x3a5f0 — 0x12 대기 · 진입 앞 사구는 아직 아니다
   const benchRun = session.pendingBenchClearing?.phase === 'scene' ? session.pendingBenchClearing.run : null
   const walkerSeats = useWalkerLineSeats({
-    sceneKey: playScreenRef.current,
+    sceneKey: playScreen,
     playKey: session.pendingDefensePlay ?? session.pendingRunnerPlay ?? session.pickoffReplay,
     playDefenseRecords: playingRun === null ? null : (missionWalkTeamOf(playingRun, true)?.records ?? null),
     board:
@@ -347,6 +353,7 @@ export function MissionRoutes({
         }}
         // 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린다 (A-37)
         onContact={session.preRollContact}
+        // oxlint-disable-next-line react/refs -- 장면 +0xfdc 를 이 그림의 값으로 넘긴다 — 타석 화면은 넘겨받은 값이 바뀐 그림에서만 따라간다(키가 고친 값을 덮는 때가 옛 꼴 그대로)
         sceneBuntKind={sceneBuntKindRef.current}
         // 필살타법 — 나리 타자편 저장 선수의 번호(+0x18)와 이 미션 한 판의 남은 횟수 (0xaebe4 가 채운다)
         specialSwingNumber={stageBatter.specialSwingNumber}

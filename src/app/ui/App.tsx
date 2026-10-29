@@ -235,7 +235,7 @@ export function App({ bootScreen }: AppProps = {}) {
     noteSafePoint(isSafeToReload)
   }, [isSafeToReload])
   /** 게임시작 목록 커서 전역 [0x1552d24] — 장면 0x103 이 내려가도 남는다(관리 메뉴 취소로 하위 5 에 바로 서면 그 칸) */
-  const gameStartCursor = useRef(createGameStartCursor()).current
+  const [gameStartCursor] = useState(createGameStartCursor)
   /** 일반모드 진입 창 [13] 에서 빠른실행을 골랐는가 (원본 메인 메뉴 this+0x14c) */
   const [isGeneralQuickStart, setGeneralQuickStart] = useState(false)
   /** 일반모드 이어하기로 올린 진행 — 있으면 준비 화면 없이 경기 장면으로 (0x213c0(앱, 1, 0) → 0x104) */
@@ -439,6 +439,7 @@ export function App({ bootScreen }: AppProps = {}) {
     batterRunAbility: modeBatterOf(missionBatterCareer ?? null).ability.run,
     // 선수 고르기에서 명예 선수(+0xa5/+0xa6 ≥ 0)를 고르면 0x1fbd0 · 0x1fc20 이 이 기록을 준다.
     // 기록연감 훅은 미션 세션보다 늦게 서므로(올 클리어를 본다) 지난 그림의 값을 넘긴다 — 명전은 미션 중에 안 바뀐다
+    // oxlint-disable-next-line react/refs -- 지난 그림의 기록연감: 기록연감 훅이 미션 세션의 올 클리어를 보고 서서(아래) 이 그림 값은 아직 없다
     hallOfFame: hallOfFameForMissionRef.current,
     // 마선수 대결의 사람 칸 팀 (0xaa57c aa6dc~aa728) — g[0xf6] 모드 저장 레코드 +1 = 그 편 나리 저장의 팀
     nariTeamIds: {
@@ -486,16 +487,16 @@ export function App({ bootScreen }: AppProps = {}) {
     hiddenOpenNotice.announce,
   )
   const { recordStat: recordCollectionStat, openHidden: openCollectionHidden } = collection
-  hallOfFameForMissionRef.current = collection.collection
+  useMirrorRef(hallOfFameForMissionRef, collection.collection)
   const pitcherEditionFirsts = pitcherSession.career?.regularSeasonFirstCount ?? 0
   const batterEditionFirsts = (careerSession.career ?? careerSession.savedCareer)?.regularSeasonFirstCount ?? 0
   const seasonModeFirstCount = seasonSession.state?.record.regularSeasonFirsts ?? 0
-  autobotBatInputRef.current = {
+  useMirrorRef(autobotBatInputRef, {
     pitcherEditionFirsts,
     batterEditionFirsts,
     globalOpenedHiddenIds: collection.collection.openedHiddenIds,
-  }
-  otherModesRef.current = {
+  })
+  useMirrorRef(otherModesRef, {
     batter: {
       otherLeagueFirstCount: pitcherEditionFirsts,
       seasonModeFirstCount,
@@ -506,7 +507,7 @@ export function App({ bootScreen }: AppProps = {}) {
       seasonModeFirstCount,
       globalOpenedHiddenIds: collection.collection.openedHiddenIds,
     },
-  }
+  })
   useEffect(() => {
     recordStatRef.current = recordCollectionStat
     openHiddenRef.current = openCollectionHidden

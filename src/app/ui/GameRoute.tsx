@@ -2,6 +2,8 @@ import { gameBenchOffenseOf, gameFieldTeamsOf } from '@/pages/game/lib/gameField
 import { gameIntroBatterHandOf } from '@/pages/game/lib/gameMatchupCards'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
+import { useLastRenderValue } from '@/shared/lib/renderMachine/useLastRenderValue'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
@@ -79,6 +81,21 @@ interface GameRouteProps {
 /** 타자 스킬 22 압도 — 0xa5e14 가 `0xb62b4(현재 타자, 22)` 면 투구 소모 ×2 (`useCareerSession` 과 같은 칸) */
 const INTIMIDATE_SKILL_ID = 22
 
+/** 경기 장면 0x104 번호 — 로딩 팁이 새로 선 그림마다 하나 오른다(그 그림 안에서 바로 본다) */
+function advanceSceneSerial(previous: { readonly serial: number; readonly wasLoading: boolean } | null, isLoading: boolean) {
+  const serial = previous?.serial ?? 0
+  const isNewScene = isLoading && !(previous?.wasLoading ?? false)
+  return { serial: isNewScene ? serial + 1 : serial, wasLoading: isLoading }
+}
+
+/** 알림에 넘기는 진행 — 공 끝을 기다리는 동안은 지난 그림이 넘긴 것을 그대로 (`useBatterPitchEnd`) */
+function advanceReleasedProgress(
+  previous: GameProgress | null,
+  { isHolding, progress }: { readonly isHolding: boolean; readonly progress: GameProgress },
+) {
+  return isHolding ? (previous ?? progress) : progress
+}
+
 /**
  * 나만의리그 경기 — 원작 로딩 화면(StrTIP)이 끝나면 타석으로.
  *
@@ -123,19 +140,16 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
    * 경기 장면 0x104 하나 — 경기를 세울 때(`startGame` → 적재 상태 8, 웹은 로딩 팁) 새로 만든다. 로딩 팁이 새로 설 때마다 하나 오른다.
    * 그 장면이 사는 동안 아래 칸들이 판 · 타석 · 이닝을 건너 남는다(`useSceneScopedRef`)
    */
-  const sceneSerialRef = useRef(0)
-  const wasLoadingRef = useRef(false)
   const isLoading = session.loadingTip !== null
-  if (isLoading && !wasLoadingRef.current) sceneSerialRef.current += 1
-  wasLoadingRef.current = isLoading
+  const sceneSerial = useRenderMachine(advanceSceneSerial, isLoading).serial
   /** 경기 장면 동안 남는 HOMERUN 글자 칸 · 표시 비거리 +0x36 — 수비 판 홈런 연출이 판마다 이어 쓴다 (`defenseHomeRunEffects`) */
-  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, sceneSerialRef.current)
+  const defenseSceneRef = useSceneScopedRef<DefenseSceneMemory>(DEFENSE_SCENE_START, sceneSerial)
   /** 장면 +0xfdc — 사람 타석의 번트 · 스윙 키가 쓴다. 키 없는 공은 0(0x11 진입의 memset — `BattingStage.sceneBuntKind`) */
-  const sceneBuntKindRef = useSceneScopedRef(0, sceneSerialRef.current)
+  const sceneBuntKindRef = useSceneScopedRef(0, sceneSerial)
   /** 장면 +0xf24 의 루상 주자 애니 0~2 — 장면이 사는 동안 0x35b94 가 부를 때마다 돈다 (`RunnerAnimationClock`) */
-  const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), sceneSerialRef.current)
+  const runnerAnimationClockRef = useSceneScopedRef(createRunnerAnimationClock(), sceneSerial)
   /** 경기 스킬 표시 판의 함성 비트 칸 skin+0x44c — 경기 장면 초기화 0x3301c 가 0x3ff 로 채운다 · 애니 7 · 8 (`skillPanel`) */
-  const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), sceneSerialRef.current)
+  const skillPanelSceneRef = useSceneScopedRef(createSkillPanelScene(), sceneSerial)
   /** 수비 재생 · 중계 바탕 0x35218 의 팔레트 줄 — 수비 구장 +0xc(0x39fdc 모드 4 의 0x788f8, 0~9 는 타석 줄과 같다) */
   const grassPalette = sceneFieldPaletteOf(session.sceneStadium)
   // 타석 바닥 · 수비 바탕을 미리 칠한다 — 원본은 구장 객체 적재 때 팔레트를 갈아 끼운다
@@ -147,7 +161,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
    */
   const relay = progress.autoRelay ?? null
   const [shownRelay, setShownRelay] = useState<{ readonly scene: number; readonly serial: number } | null>(null)
-  const relayScene = sceneSerialRef.current
+  const relayScene = sceneSerial
   // 경기를 끝낸 중계면 세션이 정산을 그 끝으로 미룬다 — 이 화면이 붙어 있는 동안만 (`attachRelayHost`, A-38)
   useEffect(() => sessionActionsRef.current.attachRelayHost(), [])
   const finishRelay = useCallback(() => {
@@ -165,7 +179,9 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
    */
   const isAwaitingConfirm = useIsSceneConfirmAwaiting(progress.sceneConfirm)
   /** 팝업이 떠 있으면 0x12 상태 틱이 멈춘다(0x52cc6) — 아래 알림 장면 칸을 밀어내기 판 대기도 본다 */
-  const alertSceneFrozenRef = useRef(false)
+  const [alertScene, setAlertScene] = useState<RecordAlertScene>({ isFrozen: false, key: 'play' })
+  /** 지난 그림의 알림 멈춤 — 아래 두 고리는 알림 장면이 이 그림에 고친 값을 한 그림 뒤에 본다(옛 차례) */
+  const alertSceneFrozenBefore = useLastRenderValue(alertScene.isFrozen, false)
   const proposal = burst !== null && burst.current !== null && burst.current !== shownProposal && !isAwaitingConfirm ? burst.current : null
   const closeProposal = useCallback(() => setShownProposal(proposal), [proposal])
   const { closeBurstResult } = session.actions
@@ -189,7 +205,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const isReplayReady = useFreePassPlayStart(
     play !== null && play !== shownPlay ? play : null,
     progress.pendingBenchClearing !== null,
-    alertSceneFrozenRef.current,
+    alertSceneFrozenBefore,
     // 0x12 끝 돌발 판정의 결과 창(0x1d)을 닫은 뒤에야 판정 A 의 0x17
     resolution !== null,
   )
@@ -197,7 +213,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   useHitByPitchWait({
     hold: progress.pendingBenchClearing,
     waitTicks: RESULT_WAIT_TICKS_AT_BAT_END,
-    isFrozen: alertSceneFrozenRef.current,
+    isFrozen: alertSceneFrozenBefore,
     random,
     onJudge: session.actions.judgeHitByPitch,
     onEnter: session.actions.enterBenchClearing,
@@ -214,7 +230,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
   const boardNow = progress.halfInningBoard ?? null
   const boardOursOffense = boardNow !== null && (boardNow.half === '초' ? 0 : 1) === progress.game.playerSide
   const walkerSeats = useWalkerLineSeats({
-    sceneKey: sceneSerialRef.current,
+    sceneKey: sceneSerial,
     playKey: progress.pendingDefensePlay ?? runnerPlay ?? play,
     playDefenseRecords: fieldTeams.opponent.aces.records,
     board:
@@ -231,15 +247,13 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         ? null
         : { key: progress.pendingBenchClearing, offense: gameBenchOffenseOf(fieldTeams.ours, progress) },
   })
-  const [alertScene, setAlertScene] = useState<RecordAlertScene>({ isFrozen: false, key: 'play' })
-  alertSceneFrozenRef.current = alertScene.isFrozen
   const reportAlertScene = useCallback((scene: RecordAlertScene) => {
     setAlertScene((previous) => (previous.isFrozen === scene.isFrozen && previous.key === scene.key ? previous : scene))
   }, [])
   const pitchEnd = useBatterPitchEnd({ isPlayShown: isDefenseShown, isFrozen: alertScene.isFrozen })
   /** 알림이 지난번에 받은 진행 — 공 끝을 기다리는 동안은 이것을 그대로 넘긴다 */
   const releasedRef = useRef(progress)
-  const released = pitchEnd.isHolding ? releasedRef.current : progress
+  const released = useRenderMachine(advanceReleasedProgress, { isHolding: pitchEnd.isHolding, progress })
   /** 타석 위 돌발 결과 창(0x1d)이 서 있으면 그 그리기 0x4d1e0 이 상태 틱을 100 으로 박는다 — 아래 창 갈래에서 넣는다 */
   const burstResultTickRef = useRef<number | null>(null)
   const recordAlert = useRecordAlert(released.recordIds, {
@@ -262,16 +276,17 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     releasedRef.current = released
   }, [released])
   const { handlePitchResolved: resolvePitchInSession } = session
+  const { notePitchResolved } = pitchEnd
   const handlePitchResolved = useCallback(
     (detail: PitchOutcomeDetail, pitch: unknown, isUncatchable?: boolean, buntKind?: number) => {
       // 0x12 대기 틱은 이 공으로 끝난 타석 결과(st[0xb])로 정한다 — 굴림 없는 카운트 계산이다
       const outcomeAfter = applyPitchResolution(runner.atBat, detail.resolution).outcome
-      pitchEnd.notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
+      notePitchResolved({ isHit: detail.resultCode !== null, waitTicks: resultWaitTicksOf(outcomeAfter) })
       sceneBuntKindRef.current = buntKind ?? 0
       // 0x3dfac 의 답(낫아웃이면 판정 칸을 지웠다) — 타석 화면이 0x12 틱 0 그림에 쓴다
       return resolvePitchInSession(detail, pitch, isUncatchable, buntKind)
     },
-    [pitchEnd.notePitchResolved, resolvePitchInSession, runner.atBat],
+    [notePitchResolved, resolvePitchInSession, runner.atBat, sceneBuntKindRef],
   )
 
   if (session.loadingTip !== null) {
@@ -407,6 +422,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
     </>,
   )
   // 0x1c(판 위 창 0x46ee0)는 상태 틱을 안 박고, 타석 위 결과 창 0x1d(0x4d1e0)만 박는다
+  // oxlint-disable-next-line react/refs -- 0x1d 그리기 0x4d1e0 이 상태 틱을 박는 칸: 이 갈래까지 온 그림만 적는다(앞 갈래로 나간 그림은 지난 값 그대로 — 그동안 알림 틱은 서 있다)
   burstResultTickRef.current = heldDefense === null && burstWindow !== null && resolution !== null ? BURST_RESULT_STATE_TICK : null
   if (heldDefense !== null) return heldDefense
   // 자동진행 중계(0x21) — 앞 판의 수비 재생 뒤 · 내 공의 0x12 대기(15/31 틱)가 끝난 뒤(판정 A 가 0x21 로 보낸다), 0x18 · 0xe ·
@@ -463,6 +479,7 @@ export function GameRoute({ session, progress, runner, random, career, gameSetti
         onPitchResolved={handlePitchResolved}
         // 맞은 판정 틀 — 메시지 0x11 굴림 묶음을 미리 굴린다 (A-37)
         onContact={session.preRollContact}
+        // oxlint-disable-next-line react/refs -- 장면 +0xfdc 를 이 그림의 값으로 넘긴다 — 타석 화면은 넘겨받은 값이 바뀐 그림에서만 따라간다(키가 고친 값을 덮는 때가 옛 꼴 그대로)
         sceneBuntKind={sceneBuntKindRef.current}
         runnerAnimationClock={runnerAnimationClockRef}
         skillPanelScene={skillPanelSceneRef}
