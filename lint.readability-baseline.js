@@ -67,7 +67,6 @@ export const readabilityBaseline = [
   'src/entities/fielding/model/throwArrival.ts',
   'src/entities/game/model/baseRunners.ts',
   'src/entities/game/model/gamePitcherLines.ts',
-  'src/entities/game/model/gameState.ts',
   'src/entities/game/model/quickLineup.ts',
   'src/entities/game/model/quickPlateAppearance.ts',
   'src/entities/game/model/winLossSave.ts',
