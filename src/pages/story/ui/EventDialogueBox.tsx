@@ -1,9 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite, PressArea } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import {
   DIALOGUE_CURSOR,
@@ -12,81 +11,20 @@ import {
   SCREEN_HEIGHT,
   SCREEN_WIDTH,
   layoutDialogue,
-  lowerDialogueBox,
-  pressDialogue,
-  restartDialogueText,
-  startDialogue,
   substituteDialogue,
-  tickDialogue,
-  visibleDialogueLinesOf,
 } from '@/pages/story/lib/eventDialogue'
-import type { DialogueLayout, DialogueLine, DialogueState } from '@/pages/story/lib/eventDialogue'
+import type { DialogueLine } from '@/pages/story/lib/eventDialogue'
 import * as styles from '@/pages/story/ui/EventDialogueBox.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import type { EventDialogueBoxProps } from '@/pages/story/ui/eventDialogueBox/eventDialogueBoxProps'
+import { useDialogueTyping } from '@/pages/story/ui/eventDialogueBox/useDialogueTyping'
+import { useDialogueKeys } from '@/pages/story/ui/eventDialogueBox/useDialogueKeys'
+import { ChoiceFrame, DialogueBoxBody } from '@/pages/story/ui/eventDialogueBox/dialogueBoxShapes'
+import { cancelAreaOf, choiceLinesOf, sayLinesOf } from '@/pages/story/ui/eventDialogueBox/dialogueBoxPlacement'
+import type { PlacedDialogueLine } from '@/pages/story/ui/eventDialogueBox/dialogueBoxPlacement'
 
 const MODE_UI = assetUrl('./sprites/mode_ui/frames')
-
-/** 선택지 갈래(0x7fd22) — [창+0xe4] = 갈래 수 ≠ 1 */
-export interface DialogueChoiceList {
-  /** 상자 글 칸 k = 갈래 k 의 글 (0x8ba2c) */
-  readonly lines: readonly string[]
-  /** [mgr+0xb9] — 노랑 테두리를 두를 줄 */
-  readonly selected: number
-}
-
-interface EventDialogueBoxProps {
-  /**
-   * 상자 글 칸 0 — say 면 머리말(`speakerPrefixOf`)까지 붙인 원본 마크업, 선택지면 첫 갈래 글. `%s` 는 `replacements` 로 채운다.
-   * 빈 글이면 0x7fbc4 가 아무것도 안 그린다(0x7fbe0 — 상자 · 넘김 표시 모두).
-   */
-  readonly raw: string
-  readonly replacements?: readonly string[]
-  /** 선택지 갈래로 그린다(갈래 수 ≠ 1). 없으면 say 갈래 — 칸 0 을 찍는다 */
-  readonly choices?: DialogueChoiceList | null
-  /**
-   * 처음 세울 때 상자가 아래에서 올라오는가(높이 0 에서). 거짓이면 다 올라온 높이다.
-   * 세운 뒤의 높이는 상자 객체([mgr+0xb4])처럼 이어 간다 — say · 선택지가 바뀌어도 그대로다.
-   */
-  readonly slideIn: boolean
-  /** 바뀌면 글 찍기를 처음으로 — say · 선택지 명령이 돌 때(0x7f7d5). 안 주면 `raw` 가 바뀔 때 */
-  readonly textKey?: string
-  /**
-   * 바뀌면 상자를 내린다 — 높이 0 · 글 찍기 처음으로(이벤트의 첫 say 0x8d1f2 의 0x7f7cc, 화면효과 6 · 7 의 '끝' 0x7f7d4 · 0x7f7cc).
-   * 그 그리기에서 곧바로 한 칸(15) 오른다.
-   */
-  readonly lowerKey?: number
-  /** say 갈래의 글 끝(단계 4)에서 확인 — 다음 명령으로 */
-  readonly onAdvance: () => void
-  /** 키 · 누르기를 받는가 — 위에 다른 창이 떠 있거나 지금 명령이 say · 선택지가 아니면 끈다(0x8b804 는 say · 선택지 명령만 본다) */
-  readonly isActive?: boolean
-  /**
-   * say 중 취소(CLR −16 — 웹 Escape · Backspace). 지금 명령이 say 일 때만 준다 — 0x8b804 는 say(0) 갈래에서만 −16 을
-   * 0x8b7b0 으로 넘기고, 상자 단계는 안 본다(올라오는 중에도 먹는다). 선택지 갈래는 −16 을 안 받는다.
-   */
-  readonly onCancel?: () => void
-  /** 선택지 위 · 아래 — 고른 줄을 (고른 줄 ± 1) % 갈래 수 로 */
-  readonly onChoiceMove?: (selected: number) => void
-  /** 선택지 확인 — 고른 줄의 갈 이벤트로. 상자 단계와 상관없이 곧바로 받는다 */
-  readonly onChoiceConfirm?: (selected: number) => void
-  /**
-   * 0x7fad0 의 장식(mode_ui 프레임 21 "CLR:SKIP")을 그리는가 — 0x7fbc4 의 넷째 인자. 이벤트 재생기 0x8b5ac 는 1, 강판 감독 대사
-   * 0x50828 은 0 이다(r334 직접 뜸 — 7fbd6 r2 = 넷째 인자 → 0x7fad0 의 7fb5a 장식 문). 안 주면 참
-   */
-  readonly showsOrnament?: boolean
-  /**
-   * 그리기 틀 시계 — 틀마다 `callback` 을 한 번 부르고 끊는 함수를 돌려준다. 안 주면 앱 틀 시계(`setAppTickInterval`).
-   * 경기 장면 위 상자(0x23)는 경기 장면 시계를 넘긴다 — 공용 창이 서면 52efe 가 상태 그리기를 건너뛰어 상자도 선다
-   */
-  readonly tickInterval?: (callback: () => void) => () => void
-  /**
-   * 확인(say 갈래)을 곧바로 하지 않고 넘겨 미룬다 — 경기 장면의 상태 키는 받은 다음 틀의 키 자리(52da2)에서 그리기보다 먼저 돈다
-   * (`sceneKeyLatch`). 안 주면 곧바로
-   */
-  readonly deferPress?: (run: () => void) => void
-}
-
-/** 그리기 한 번(0x7fbc4)을 거친 상자 — 명령이 돌거나 상자를 내린 틀에도 그 틀의 그리기가 높이를 올리고 글을 찍는다 */
-const drawnState = (state: DialogueState, layout: DialogueLayout | null) => tickDialogue(state, layout)
+const TEXT_ALIGN_OF: Readonly<Record<DialogueLine['align'], 'left' | 'center' | 'right'>> = { 왼: 'left', 가운데: 'center', 오른: 'right' }
 
 /**
  * **이벤트 재생기 대사 상자** — 0x7fbc4 · 0x7fad0 · 키 0x8b804 (배치 · 찍기는 `pages/story/lib/eventDialogue`).
@@ -115,131 +53,24 @@ export function EventDialogueBox({
   const isList = choices !== null && choices.lines.length !== 1
   const layout = useMemo(() => layoutDialogue(text), [text])
   const typingLayout = isList ? null : layout
-  const [state, setState] = useState<DialogueState>(() => drawnState(startDialogue(slideIn), typingLayout))
   const origins = useFrameOrigins(MODE_UI)
   const animations = useAnimations(MODE_UI)
-  /** 넘김 표시 애니(0x93d90)를 그린 횟수 — 다 올라온 그리기마다 하나 (그린 뒤 한 칸 돌린다) */
-  const [cursorUpdates, setCursorUpdates] = useState(() => (state.height === EVENT_DIALOGUE.boxHeight ? 1 : 0))
-
-  // 명령이 돈 틀 — 글 찍기를 처음으로 돌리고 그 틀의 그리기를 거친다 (React 의 "props 가 바뀌면 상태를 맞춘다")
-  const shownTextKey = textKey ?? raw
-  const [textKeySeen, setTextKeySeen] = useState(shownTextKey)
-  const [lowerKeySeen, setLowerKeySeen] = useState(lowerKey)
-  if (lowerKey !== lowerKeySeen || shownTextKey !== textKeySeen) {
-    const lowered = lowerKey !== lowerKeySeen ? lowerDialogueBox(state) : state
-    const drawn = drawnState(restartDialogueText(lowered), typingLayout)
-    setLowerKeySeen(lowerKey)
-    setTextKeySeen(shownTextKey)
-    setState(drawn)
-    if (drawn.height === EVENT_DIALOGUE.boxHeight) setCursorUpdates((count) => count + 1)
-  }
-
-  const stateRef = useRef(state)
-  const layoutRef = useRef(typingLayout)
-  useLayoutEffect(() => {
-    stateRef.current = state
-    layoutRef.current = typingLayout
-  })
-  // 명령이 돌거나 상자를 내린 틀은 위에서 이미 그렸다 — 다음 그리기는 한 틀 뒤다(틀 시계를 그 틀에 맞춘다)
-  const tickIntervalRef = useRef(tickInterval)
-  useLayoutEffect(() => {
-    tickIntervalRef.current = tickInterval
-  })
-  useEffect(() => {
-    const tick = tickIntervalRef.current(() => {
-      const next = tickDialogue(stateRef.current, layoutRef.current)
-      stateRef.current = next
-      setState(next)
-      // 0x7fd9a — 다 올라온 그리기마다 넘김 표시를 그리고 한 칸 돌린다(0x93d90)
-      if (next.height === EVENT_DIALOGUE.boxHeight) setCursorUpdates((count) => count + 1)
-    })
-    return () => tick()
-  }, [textKeySeen, lowerKeySeen])
-  const isUp = state.height === EVENT_DIALOGUE.boxHeight
-  const onAdvanceRef = useRef(onAdvance)
-  const choicesRef = useRef(choices)
-  const onChoiceMoveRef = useRef(onChoiceMove)
-  const onChoiceConfirmRef = useRef(onChoiceConfirm)
-  const onCancelRef = useRef(onCancel)
-  const deferPressRef = useRef(deferPress)
-  useLayoutEffect(() => {
-    onAdvanceRef.current = onAdvance
-    choicesRef.current = choices
-    onChoiceMoveRef.current = onChoiceMove
-    onChoiceConfirmRef.current = onChoiceConfirm
-    onCancelRef.current = onCancel
-    deferPressRef.current = deferPress
-  })
-  const pressNow = () => {
-    const list = choicesRef.current
-    if (list !== null) return onChoiceConfirmRef.current?.(list.selected)
-    const pressed = pressDialogue(stateRef.current)
-    if (pressed.advance) return onAdvanceRef.current()
-    stateRef.current = pressed.state
-    setState(pressed.state)
-  }
-  const press = () => {
-    const defer = deferPressRef.current
-    if (defer === undefined) return pressNow()
-    defer(pressNow)
-  }
-
-  useEffect(() => {
-    if (!isActive) return undefined
-    const onKeyDown = (event: KeyboardEvent) => {
-      const list = choicesRef.current
-      if (list !== null && list.lines.length > 0) {
-        // 0x8b8de · 0x8b8f8 — 위 −1 · '2' / 아래 −2 · '8', 갈래 수로 돈다(0xca910)
-        const count = list.lines.length
-        if (event.key === 'ArrowUp' || event.key === '2') {
-          event.preventDefault()
-          return onChoiceMoveRef.current?.((list.selected + count - 1) % count)
-        }
-        if (event.key === 'ArrowDown' || event.key === '8') {
-          event.preventDefault()
-          return onChoiceMoveRef.current?.((list.selected + 1) % count)
-        }
-      }
-      // 0x8b8a6 — say 갈래의 −16 은 0x8b7b0 (단계와 상관없이)
-      if ((event.key === 'Escape' || event.key === 'Backspace') && list === null && onCancelRef.current !== undefined) {
-        event.preventDefault()
-        return onCancelRef.current()
-      }
-      if (event.key !== 'Enter' && event.key !== ' ' && event.key !== '5') return
-      event.preventDefault()
-      press()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  })
+  const [state, cursorUpdates, pressText] = useDialogueTyping(slideIn, typingLayout, textKey ?? raw, lowerKey, tickInterval)
+  const [press, onCancelRef] = useDialogueKeys(choices, isActive, pressText, onAdvance, onCancel, onChoiceMove, onChoiceConfirm, deferPress)
 
   // 0x7fbe0 — 상자 글 칸 0 이 비면 아무것도 안 그린다
   if (raw === '') return null
 
   const { height } = state
+  const isUp = height === EVENT_DIALOGUE.boxHeight
   const boxTop = SCREEN_HEIGHT - height
   const bandTop = boxTop - EVENT_DIALOGUE.bandHeight
-  const bandBottom = bandTop + EVENT_DIALOGUE.bandHeight - 1
-  const split = EVENT_DIALOGUE.bandSplit
-  const slope = EVENT_DIALOGUE.bandHeight - 1
   const textTop = boxTop + EVENT_DIALOGUE.text.top
-  /** 그릴 줄 — y 와 함께 */
-  const placed: { readonly key: string; readonly line: DialogueLine; readonly top: number; readonly choice: number | null }[] = []
-  if (isUp && choices !== null && isList) {
-    // 0x7fd22 — 갈래 k 는 y + k × (글꼴 높이 + 3) 에 제 글을 모두(줄 높이 14) 그린다
-    choices.lines.forEach((line, choice) => {
-      const top = textTop + choice * EVENT_DIALOGUE_CHOICE.lineStep
-      layoutDialogue(substituteDialogue(line, replacements)).lines.forEach((wrapped, index) => {
-        placed.push({ key: `${choice}:${index}`, line: wrapped, top: top + index * EVENT_DIALOGUE.text.lineHeight, choice })
-      })
-    })
-  } else if (isUp) {
-    visibleDialogueLinesOf(layout, state.firstLine, state.shown).forEach((line, index) => {
-      placed.push({ key: String(state.firstLine + index), line, top: textTop + index * EVENT_DIALOGUE.text.lineHeight, choice: null })
-    })
-  }
+  const listChoices = isList ? choices : null
+  let placed: readonly PlacedDialogueLine[] = []
+  if (isUp) placed = listChoices !== null ? choiceLinesOf(listChoices, replacements, textTop) : sayLinesOf(layout, state, textTop)
   const cursorStep = animations === null ? null : animationStepAt(animations[DIALOGUE_CURSOR.animation] ?? [], cursorUpdates - 1)
-  const selectedTop = isList && choices !== null ? textTop + choices.selected * EVENT_DIALOGUE_CHOICE.lineStep : null
+  const selectedTop = listChoices !== null ? textTop + listChoices.selected * EVENT_DIALOGUE_CHOICE.lineStep : null
 
   return (
     <div
@@ -247,29 +78,9 @@ export function EventDialogueBox({
       role="group"
       aria-label="대사"
       data-testid="대사-상자"
-      data-text={stripGameMarkup(isList && choices !== null ? choices.lines.join('\n') : text)}
+      data-text={stripGameMarkup(listChoices !== null ? listChoices.lines.join('\n') : text)}
     >
-      <svg
-        className={styles.layer}
-        style={{ left: 0, top: 0 }}
-        width={SCREEN_WIDTH}
-        height={SCREEN_HEIGHT}
-        viewBox={`0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}`}
-        shapeRendering="crispEdges"
-      >
-        {/* 0x7cfc8 윗 띠 — 바깥 #12307E · 안 #1D44A8 · 꺾임 계단(높이 − 1 칸) · 밝은 줄 #3563D7 */}
-        <rect data-part="띠" x={0} y={bandTop} width={SCREEN_WIDTH} height={EVENT_DIALOGUE.bandHeight} fill={ORIGINAL_COLORS.bandDark} />
-        <rect x={0} y={bandTop + 1} width={SCREEN_WIDTH} height={EVENT_DIALOGUE.bandHeight - 2} fill={ORIGINAL_COLORS.panelDeep} />
-        {Array.from({ length: slope }, (_unused, index) => (
-          <g key={index}>
-            <rect x={split + index} y={bandBottom - index} width={1} height={1} fill={ORIGINAL_COLORS.bandDark} />
-            <rect x={split + index + 1} y={bandBottom - index} width={1} height={1} fill={ORIGINAL_COLORS.bandLight} />
-          </g>
-        ))}
-        <rect x={split + slope} y={bandTop + 1} width={SCREEN_WIDTH - split - slope} height={1} fill={ORIGINAL_COLORS.bandLight} />
-        {/* 0xb9f74 본체 — 검정 알파 0xB4 */}
-        <rect data-part="본체" x={0} y={boxTop} width={SCREEN_WIDTH} height={height} fill="#000000" fillOpacity={EVENT_DIALOGUE.boxAlpha} />
-      </svg>
+      <DialogueBoxBody height={height} />
       {/* 0xba19d 장식 — mode_ui 프레임 21 을 (W, 본체 위) */}
       {showsOrnament && <FrameSprite folder={MODE_UI} frame={EVENT_DIALOGUE.ornamentFrame} origins={origins} x={SCREEN_WIDTH} y={boxTop} />}
       <button
@@ -284,16 +95,7 @@ export function EventDialogueBox({
         0x8b7b0 으로 넘기므로 `onCancel` 이 있을 때만 세운다. 칸은 장식이 앉는 윗 띠의 곧은 오른쪽(꺾임 끝 ~ W)
       */}
       {isActive && choices === null && onCancel !== undefined && (
-        <PressArea
-          label="CLR 건너뛰기"
-          onPress={() => onCancelRef.current?.()}
-          rect={{
-            x: split + slope,
-            y: bandTop,
-            width: SCREEN_WIDTH - split - slope,
-            height: EVENT_DIALOGUE.bandHeight,
-          }}
-        />
+        <PressArea label="CLR 건너뛰기" onPress={() => onCancelRef.current?.()} rect={cancelAreaOf(bandTop)} />
       )}
       {placed.map(({ key, line, top, choice }) => (
         <div
@@ -306,7 +108,7 @@ export function EventDialogueBox({
             left: EVENT_DIALOGUE.text.x,
             top,
             width: EVENT_DIALOGUE.text.width,
-            textAlign: line.align === '가운데' ? 'center' : line.align === '오른' ? 'right' : 'left',
+            textAlign: TEXT_ALIGN_OF[line.align],
             pointerEvents: choice === null || !isActive ? undefined : 'auto',
           }}
           onClick={choice === null || !isActive ? undefined : () => onChoiceConfirm?.(choice)}
@@ -318,28 +120,7 @@ export function EventDialogueBox({
           ))}
         </div>
       ))}
-      {isUp && selectedTop !== null && (
-        // 0x6a978 — 고른 줄 노랑 테두리 (글 뒤에 그린다)
-        <svg
-          className={styles.layer}
-          style={{ left: 0, top: 0 }}
-          width={SCREEN_WIDTH}
-          height={SCREEN_HEIGHT}
-          viewBox={`0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}`}
-          shapeRendering="crispEdges"
-          data-part="고른줄"
-        >
-          <rect
-            x={EVENT_DIALOGUE_CHOICE.cursor.x + 0.5}
-            y={selectedTop + EVENT_DIALOGUE_CHOICE.cursor.top + 0.5}
-            width={EVENT_DIALOGUE_CHOICE.cursor.width - 1}
-            height={EVENT_DIALOGUE_CHOICE.cursor.height - 1}
-            fill="none"
-            stroke={EVENT_DIALOGUE_CHOICE.cursor.color}
-            strokeWidth={1}
-          />
-        </svg>
-      )}
+      {isUp && selectedTop !== null && <ChoiceFrame top={selectedTop} />}
       {isUp && cursorStep !== null && (
         // 0x7fd9a — 넘김 표시 mode_ui 애니 0 (W − 3, H − 3)
         <FrameSprite
