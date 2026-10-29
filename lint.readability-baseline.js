@@ -205,7 +205,6 @@ export const readabilityBaseline = [
   'src/pages/pitcher-league/lib/pitcherCardFigure.ts',
   'src/pages/pitcher-league/lib/pitcherMatchInfo.ts',
   'src/pages/pitcher-league/model/pitcherGameOptions.ts',
-  'src/pages/pitcher-league/model/usePitcherManagementMenu.ts',
   'src/pages/pitcher-league/ui/PitchChoicePopup.tsx',
   'src/pages/pitcher-league/ui/PitchTrainingScreen.tsx',
   'src/pages/pitcher-league/ui/PitchWindowFigure.tsx',

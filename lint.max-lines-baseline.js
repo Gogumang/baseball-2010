@@ -54,7 +54,6 @@ export const maxLinesBaseline = [
   'src/pages/nari-record-room/ui/RankingBoard.tsx',
   'src/pages/national-cup/ui/NationalCupScreen.tsx',
   'src/pages/pitcher-league/lib/pitchTrainingWindow.ts',
-  'src/pages/pitcher-league/model/usePitcherManagementMenu.ts',
   'src/pages/pitcher-league/ui/PitchChoicePopup.tsx',
   'src/pages/pitcher-league/ui/PitchWindowFigure.tsx',
   'src/pages/pitcher-league/ui/PitcherManagementScreen.tsx',
