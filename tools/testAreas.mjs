@@ -49,6 +49,7 @@ export const TEST_AREAS = {
     'src/pages/mission-select/',
     'src/entities/mission/',
     'src/app/ui/MissionRoutes',
+    'src/app/ui/missionRoutes/',
     'src/app/model/useMissionSession',
     'src/app/model/missionSession/',
     'src/app/model/missionVibration',
