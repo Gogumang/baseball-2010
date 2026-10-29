@@ -27,7 +27,9 @@ interface HalfInningBoardProps {
    * 운동장 전경 0x4fb8c 의 재료 — 판 틱 0 의 굴림 36 개 · 공격 측 · 앞 자리 · 팀 · 이름 (`widgets/field-walk`). 틱은 판이 넣는다.
    * 안 주면 바탕을 안 그린다(검정).
    */
-  readonly field?: Omit<HalfInningFieldProps, 'tick'>
+  readonly field?: Omit<HalfInningFieldProps, 'tick' | 'walkStateRef'>
+  /** 그린 틱의 걸음 상태를 적어 둘 칸 — 판이 닫힐 때 부르는 쪽이 `fieldCarryAfterHalfInning` 으로 넘긴다 (`HalfInningField.walkStateRef`) */
+  readonly walkStateRef?: HalfInningFieldProps['walkStateRef']
   /** OK — 메시지 1(인자 0x18) → 0xae3a0 → 경기 중이라 다음 반 이닝 첫 타석(0xd) */
   readonly onConfirm: () => void
 }
@@ -48,7 +50,7 @@ interface HalfInningBoardProps {
  *   더그아웃으로 들어가며, 틱 100 뒤에는 카메라가 야수를 하나씩 비추며 이름표를 단다 (`widgets/field-walk/ui/HalfInningField`).
  * - 화면을 누르는 투명 칸(`OkTapArea`)은 웹 전용이다(원본은 OK 키). 예전 웹의 "N회초" 글자는 원본에 없어 뺐다.
  */
-export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, field, onConfirm }: HalfInningBoardProps) {
+export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, field, walkStateRef, onConfirm }: HalfInningBoardProps) {
   // 교대 판 0x18도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
   // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
   useMarksGameScene()
@@ -83,7 +85,7 @@ export function HalfInningBoard({ inning, half, onTick, scoreboardSides, cards, 
     <RawScreen>
       <div data-testid={`교대-판-${inning}회${half}`} data-tick={tick}>
         {/* 0x4fef8 0x4fb8c — 늘 바탕 */}
-        {field !== undefined && <HalfInningField {...field} tick={tick} />}
+        {field !== undefined && <HalfInningField {...field} walkStateRef={walkStateRef} tick={tick} />}
         {scoreboardSides !== undefined && tick >= HALF_INNING_SCOREBOARD_FROM_TICK && (
           <ScoreboardFrame {...SCOREBOARD_AT.halfInning} side0={scoreboardSides[0]} side1={scoreboardSides[1]} />
         )}

@@ -1,7 +1,6 @@
-import type { MutableRefObject } from 'react'
 import type { HalfInningFielderRoll } from '@/features/play-game/model/halfInningBoard'
 import type { FieldCarry } from '@/widgets/field-walk/lib/fieldCarry'
-import type { HalfInningWalkInput, HalfInningWalkState } from '@/widgets/field-walk/lib/halfInningWalk'
+import type { HalfInningWalkInput } from '@/widgets/field-walk/lib/halfInningWalk'
 import { type WalkTeamAces, type WalkerLineSeats, walkAceSpritesOf } from '@/widgets/field-walk/lib/walkerAces'
 
 /** 수비 칸 수 */
@@ -32,8 +31,6 @@ export interface HalfInningFieldSource {
    * 안 주면 경기 장면을 세운 뒤 아무도 안 적은 줄(모두 0)이다. 판 뒤 값은 `seatsAfterHalfInningBoard`
    */
   readonly seats?: WalkerLineSeats | null
-  /** 그린 틱의 걸음 상태를 적어 둘 칸 — 판이 닫힐 때 `fieldCarryAfterHalfInning` 으로 넘긴다 */
-  readonly walkStateRef?: MutableRefObject<HalfInningWalkState | null>
 }
 
 /** 판 하나의 운동장 전경 재료 — `HalfInningBoard.field` */
@@ -56,7 +53,6 @@ export function halfInningFieldOf(source: HalfInningFieldSource) {
     ...(source.fielderNames === undefined ? {} : { fielderNames: source.fielderNames }),
     ...(source.defenseAces == null ? {} : { defenseAces: walkAceSpritesOf(source.defenseAces, source.seats?.defense) }),
     ...(source.offenseAces == null ? {} : { offenseAces: walkAceSpritesOf(source.offenseAces, source.seats?.offense) }),
-    ...(source.walkStateRef === undefined ? {} : { walkStateRef: source.walkStateRef }),
   }
 }
 
