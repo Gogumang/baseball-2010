@@ -70,7 +70,6 @@ export const maxLinesBaseline = [
   'src/shared/lib/pixelEffect/pixelEffect.ts',
   'src/shared/lib/pixelEffect/screenCompose.ts',
   'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts',
-  'src/shared/lib/screen565/screen565.ts',
   'src/shared/lib/sprite/originalScale.fixture.ts',
   'src/shared/lib/sprite/paletteSwap.ts',
   'src/shared/lib/sprite/spritePreload.ts',

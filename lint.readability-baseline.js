@@ -252,7 +252,6 @@ export const readabilityBaseline = [
   'src/shared/lib/sceneKeyLatch/keyHold.ts',
   'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts',
   'src/shared/lib/sceneKeyLatch/shownSceneTicks.ts',
-  'src/shared/lib/screen565/screen565.ts',
   'src/shared/lib/screenShake/useWholeScreenOffset.ts',
   'src/shared/lib/skinFrameSlide/skinFrameSlide.ts',
   'src/shared/lib/sprite/frameLayers.ts',
