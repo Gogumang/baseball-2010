@@ -378,7 +378,6 @@ export const readabilityBaseline = [
   'src/widgets/burst-mission/ui/BurstMissionWindow.tsx',
   'src/widgets/entry-editor/lib/entryListWindow.ts',
   'src/widgets/entry-editor/ui/EntryEditorScreen.tsx',
-  'src/widgets/entry-editor/ui/EntryListWindow.tsx',
   'src/widgets/event-portraits/ui/EventPortraits.tsx',
   'src/widgets/field-walk/lib/halfInningFieldInput.ts',
   'src/widgets/field-walk/lib/halfInningWalk.ts',

@@ -191,7 +191,6 @@ export const maxLinesBaseline = [
   'src/widgets/burst-mission/ui/BurstMissionWindow.tsx',
   'src/widgets/entry-editor/lib/entryListWindow.ts',
   'src/widgets/entry-editor/ui/EntryEditorScreen.tsx',
-  'src/widgets/entry-editor/ui/EntryListWindow.tsx',
   'src/widgets/game-scene/ui/BenchClearingScene.tsx',
   'src/widgets/line-score/lib/lineScoreLayout.ts',
   'src/widgets/management/ui/TitleListWindow.tsx',
