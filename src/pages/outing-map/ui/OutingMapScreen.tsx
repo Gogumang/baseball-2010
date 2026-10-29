@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import type { ReactNode } from 'react'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import type { OutingPlace } from '@/shared/config/outingPlaces'
@@ -79,12 +79,11 @@ export function OutingMapScreen({
    * 말풍선(113) · 효과 팝업 · 126 연출이 떠 있으면 그쪽이 키를 받는다. 앞서 웹은 이 키를 안 받아 지도가 마우스로만 움직였다 (r82)
    */
   const isMapKeyOn = openPlace === null && resultText === null && presentation === null && noticeText === ''
-  const latest = useRef({ selectedPlaceId, onBack })
-  latest.current = { selectedPlaceId, onBack }
+  const latest = useEffectEvent(() => ({ selectedPlaceId, onBack }))
   useEffect(() => {
     if (!isMapKeyOn) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
+      const current = latest()
       const cursor = Math.max(
         OUTING_PLACES.findIndex((place) => place.id === current.selectedPlaceId),
         0,

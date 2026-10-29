@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { TITLE_KEY_FRAMES_TO_MENU, titleSceneAt } from '@/pages/title/model/titleIntro'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
@@ -25,8 +25,7 @@ export function useTitleIntro(onStart: () => void): { scene: TitleScene; press: 
   /** 키를 받은 그리기 차례 — 메뉴는 이 차례 + 2 틀에 선다 */
   const acceptedAtRef = useRef<number | null>(null)
   const hasStartedRef = useRef(false)
-  const onStartRef = useRef(onStart)
-  onStartRef.current = onStart
+  const onStartLatest = useEffectEvent(onStart)
 
   useEffect(() => {
     let handle = 0
@@ -36,7 +35,7 @@ export function useTitleIntro(onStart: () => void): { scene: TitleScene; press: 
       if (acceptedAt !== null && next.draw >= acceptedAt + TITLE_KEY_FRAMES_TO_MENU) {
         if (!hasStartedRef.current) {
           hasStartedRef.current = true
-          onStartRef.current()
+          onStartLatest()
         }
         return
       }
