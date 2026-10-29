@@ -134,6 +134,7 @@ export const TEST_AREAS = {
     'src/widgets/standings/',
     'src/entities/season-mode/',
     'src/app/ui/SeasonRoute',
+    'src/app/ui/seasonRoute/',
     'src/app/model/useSeasonSession',
     'src/app/model/seasonEvents',
     'src/app/model/seasonHallOfFameRecords',
