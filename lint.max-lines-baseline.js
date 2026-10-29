@@ -69,8 +69,6 @@ export const maxLinesBaseline = [
   'src/entities/story/model/storyScene.ts',
   'src/features/defense-play/model/catchForecast.ts',
   'src/features/defense-play/model/defensePlayView.ts',
-  'src/features/defense-play/model/defenseScene.ts',
-  'src/features/defense-play/model/laserPresentation.ts',
   'src/features/defense-play/model/passedBallPlay.ts',
   'src/features/defense-play/model/pitchArrivalPlay.ts',
   'src/features/defense-play/model/stealPlay.ts',
