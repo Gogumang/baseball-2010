@@ -20,6 +20,10 @@ pre-commit:
     - name: check-lines
       glob: '*.{ts,tsx,js,mjs}'
       run: node tools/check-lines-baseline.mjs
+    # FSD 층 경계 · 순환 import 예외 목록 — src 전체를 보지만 1초 안쪽 (r366)
+    - name: check-boundaries
+      glob: '*.{ts,tsx,js,mjs}'
+      run: node tools/check-boundaries-baseline.mjs
 
 pre-push:
   jobs:

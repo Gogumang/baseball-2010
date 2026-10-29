@@ -4,12 +4,13 @@
 import { defineConfig } from 'oxlint'
 import { maxLinesBaseline } from './lint.max-lines-baseline.js'
 import { readabilityBaseline, readabilityRules } from './lint.readability-baseline.js'
+import { boundaryRules, crossSliceBaseline, cycleBaseline, layerDirectionBaseline } from './lint.boundaries-baseline.js'
 
 /** 코드만(주석 · 빈 줄 빼고) 150줄. 넘는 옛 파일은 `lint.max-lines-baseline.js` 예외 목록 — 쪼개면 목록에서 뺀다 (`pnpm check:lines`). */
 const MAX_LINES = ['error', { max: 150, skipBlankLines: true, skipComments: true }] as const
 const TEST_FILES = ['**/*.test.ts', '**/*.test.tsx']
 const SRC = ['src/**/*.ts', 'src/**/*.tsx']
-const BASELINE_FILES = ['lint.max-lines-baseline.js', 'lint.readability-baseline.js']
+const BASELINE_FILES = ['lint.max-lines-baseline.js', 'lint.readability-baseline.js', 'lint.boundaries-baseline.js']
 
 /** eslint recommended 가운데 TS 가 대신 잡아 typescript-eslint 가 .ts 에서 끄는 것 — .js · .mjs 에서만 켠다 */
 const JS_ONLY_RULES = {
@@ -152,7 +153,12 @@ export default defineConfig({
     // if 줄이기 — 갈래 8 · 블록 겹 2 · else-return · 외톨이 if · 콜백 겹 3. 어기는 옛 파일은 `lint.readability-baseline.js` 예외 목록
     { files: SRC, rules: readabilityRules },
     { files: [...TEST_FILES, ...readabilityBaseline], rules: Object.fromEntries(Object.keys(readabilityRules).map((rule) => [rule, 'off'])) },
-    { files: TEST_FILES, rules: { 'max-lines': 'off' } },
+    // FSD 층 경계 · 순환 import (r366) — 어기는 옛 파일은 `lint.boundaries-baseline.js` 의 규칙별 예외 목록, 시험 파일은 밖
+    { files: SRC, plugins: ['eslint', 'typescript', 'import'], jsPlugins: ['./tools/lint/localPlugin.mjs'], rules: boundaryRules },
+    { files: layerDirectionBaseline, rules: { 'local/fsd-layer-direction': 'off' } },
+    { files: crossSliceBaseline, rules: { 'local/fsd-cross-slice': 'off' } },
+    { files: cycleBaseline, rules: { 'import/no-cycle': 'off' } },
+    { files: TEST_FILES, rules: { ...Object.fromEntries(Object.keys(boundaryRules).map((rule) => [rule, 'off'])), 'max-lines': 'off' } },
     { files: [...maxLinesBaseline, ...BASELINE_FILES], rules: { 'max-lines': 'off' } },
   ],
 })
