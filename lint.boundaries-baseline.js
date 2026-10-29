@@ -37,7 +37,6 @@ export const layerDirectionBaseline = [
   'src/widgets/entry-editor/ui/EntryListWindow.tsx',
   'src/widgets/field-walk/lib/benchClearingWalk.ts',
   'src/widgets/field-walk/lib/fieldCarry.ts',
-  'src/widgets/field-walk/lib/fieldWalker.ts',
   'src/widgets/field-walk/lib/halfInningWalk.ts',
   'src/widgets/field-walk/lib/walkerAces.ts',
   'src/widgets/field-walk/ui/FieldWalkView.tsx',

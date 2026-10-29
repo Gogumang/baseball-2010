@@ -312,9 +312,7 @@ export function ballFrameOf(height: number): number {
   return Math.min(Math.trunc(height / BALL_HEIGHT_PER_FRAME) + BALL_GROUND_FRAME, BALL_MAX_FRAME)
 }
 
-// 동작 번호 표 · 스냅샷 모양은 아래 층으로 내렸다(r379) — `widgets/field-walk` 가 아직 이 파일에서 읽어 다시 내보낸다
-export { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
-export type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
+// 공 그림자 조각은 `shared/lib/ballShadow` 에 있다 — 수비 화면 쪽이 이 자리로도 읽는다 (동작 번호 표 · 스냅샷 모양은 r379 · r381 에 걷었다)
 export type { BallShadowPiece } from '@/shared/lib/ballShadow/ballShadowPieces'
 export { BALL_SHADOW_RIM_COLOR } from '@/shared/lib/ballShadow/ballShadowPieces'
 /** 공중 공의 그림자 크기 (36fbc) · 땅 공(화면 높이 0)의 크기 (36fda) */

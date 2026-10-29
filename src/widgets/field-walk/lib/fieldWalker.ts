@@ -1,5 +1,5 @@
 import { FIELDER_SPEED, stepToward } from '@/entities/fielding/model/fieldGeometry'
-import { FIELDER_ACTION } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
 
 /**
  * **운동장을 걷는 선수 한 명** — 야수 클래스(vtable 0xd7934, 0xa0e08 이 만든다)의 걷기 몫만 옮긴 것.

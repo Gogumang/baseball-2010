@@ -1,6 +1,7 @@
 import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
 import { type CameraState, cameraBoundsOf, centerOn, stepCamera } from '@/pages/defense/lib/defenseCamera'
-import { type DefenseViewState, cameraTargetOf } from '@/pages/defense/lib/defenseView'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
+import { cameraTargetOf } from '@/pages/defense/lib/defenseView'
 import type { BenchClearingWalkState } from '@/widgets/field-walk/lib/benchClearingWalk'
 import type { HalfInningWalkState } from '@/widgets/field-walk/lib/halfInningWalk'
 

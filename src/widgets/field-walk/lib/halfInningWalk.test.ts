@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FIELDER_START_POSITIONS } from '@/entities/fielding/model/fieldGeometry'
 import { cameraBoundsOf, centerOn } from '@/pages/defense/lib/defenseCamera'
-import { FIELDER_ACTION } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
 import {
   DUGOUT_POSITIONS,
   HALF_INNING_TOUR_SLOTS,
