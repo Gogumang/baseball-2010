@@ -1,5 +1,7 @@
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-import { ACE_LAYOUT } from '@/pages/general-mode/lib/prepareLayout'
+import type { ReactNode } from 'react'
+import type { GridOpenDraw } from '@/shared/lib/gridOpen/gridOpen'
+import { ACE_LAYOUT, isAceGridCursorOn } from '@/pages/general-mode/lib/prepareLayout'
 import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
 import type { AnnalsDirection, AnnalsGridShape } from './otherSlices'
@@ -43,13 +45,13 @@ const ACE_GRID_SHAPES: Readonly<Record<'고르기' | '레벨업', AnnalsGridShap
 export const aceGridShapeOf = (mode: AceSelectMode) => ACE_GRID_SHAPES[mode === '레벨업' ? '레벨업' : '고르기']
 
 /** 칸의 마선수가 열렸는가 — 윗줄은 저장 +0x30..0x34(마투수), 아랫줄은 +0x35..0x39(마타자) */
-export function isAceCellOpen(cell: number, openedAcePitcherIds: readonly number[], openedAceBatterIds: readonly number[]): boolean {
+export function isAceCellOpen(cell: number, openedAcePitcherIds: readonly number[] = [], openedAceBatterIds: readonly number[] = []): boolean {
   const opened = aceRoleOfCell(cell) === ACE_PHASE.마투수 ? openedAcePitcherIds : openedAceBatterIds
   return opened.includes(aceIndexOfCell(cell))
 }
 
 /** 0x7b408~0x7b42e — for i in 0..9: 전역 +0x30 + i == 0 이면 그만, 다 켜졌으면 0x62368(ui, 12, 0) */
-export function isEveryAceOpen(openedAcePitcherIds: readonly number[], openedAceBatterIds: readonly number[]): boolean {
+export function isEveryAceOpen(openedAcePitcherIds: readonly number[] = [], openedAceBatterIds: readonly number[] = []): boolean {
   return Array.from({ length: ACE_PER_ROLE }, (_unused, index) => index).every(
     (index) => openedAcePitcherIds.includes(index) && openedAceBatterIds.includes(index),
   )
@@ -85,3 +87,25 @@ export const aceKeyDirectionOf = (key: string): AnnalsDirection | null => (Objec
 /** 상태 21 의 ↑ ↓ 는 격자에 안 넘긴다 */
 export const isAceDirectionPassed = (mode: AceSelectMode, direction: AnnalsDirection) =>
   mode !== '고르기' || (direction !== 'up' && direction !== 'down')
+
+/** 마투수 단계는 윗줄에서, 마타자 단계는 아랫줄에서 커서가 시작한다 (원본이 OK 뒤 커서를 내린다) */
+export const aceStartCursorOf = (phase: AcePhase) => (phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
+
+/**
+ * 격자 커서 칸이 그려지는가 — 깜빡임 [격자+0x18] 은 시작 0x7a005 가 0 으로 두고(0x7a01e) 그릴 때마다 끝에서 +1(0x7b490) → 본문 몇째
+ * 그림인가와 같다. 커서 칸 그리기 0x7b3a0 은 열림 애니가 끝났고([격자+9]) 깜빡임이 켜졌을 때만 돈다(0x7b3a2 · 0x7b3c6)
+ */
+export const isAceGridCursorShownOf = (gridOpen: GridOpenDraw | null) =>
+  gridOpen !== null && gridOpen.state.isDone && isAceGridCursorOn(gridOpen.blink)
+
+/** 팝업 · 창(오픈 힌트 · G 부족 · 최고 레벨 · 레벨업 · 부르는 쪽 팝업)이 떠 있으면 격자는 키를 받지 않는다 — MessageBox 가 답을 가져간다 */
+export const isAceGridBlockedOf = (
+  hintCell: number | null,
+  isShortageOpen: boolean,
+  isMaxLevelOpen: boolean,
+  levelUpCell: number | null,
+  overlay: ReactNode,
+) => hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null || (overlay !== undefined && overlay !== null && overlay !== false)
+
+/** 바닥 0x205 = 가운데 "0레벨업" + 되돌아가기 · 코치채용(this+0x11c == 2)은 0x54d95(skin, 4, 5) — 되돌아가기만 (0xad94~0xada0) */
+export const aceFooterOf = (mode: AceSelectMode) => (mode === '코치' ? 5 : 0x205)

@@ -5,10 +5,18 @@ import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
 import { aceLevelOf, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
-import { ACE_GRID_OPEN, isAceGridCursorOn } from '@/pages/general-mode/lib/prepareLayout'
-import { ACE_PER_ROLE, ACE_PHASE } from '@/pages/general-mode/lib/generalModeSetup'
+import { ACE_GRID_OPEN } from '@/pages/general-mode/lib/prepareLayout'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
-import { IMG_TEXT_FRAME, isAceCellOpen, isAceCellReachable, isEveryAceOpen as isEveryAceOpenOf } from './aceSelect/aceSelectRules'
+import {
+  IMG_TEXT_FRAME,
+  aceFooterOf,
+  aceStartCursorOf,
+  isAceCellOpen,
+  isAceCellReachable,
+  isAceGridBlockedOf,
+  isAceGridCursorShownOf,
+  isEveryAceOpen as isEveryAceOpenOf,
+} from './aceSelect/aceSelectRules'
 import type { AceSelectScreenProps } from './aceSelect/aceSelectProps'
 import { AceCursorInfo } from './aceSelect/AceCursorInfo'
 import { AceGrid } from './aceSelect/AceGrid'
@@ -44,8 +52,8 @@ export type { AceSelectScreenProps } from './aceSelect/aceSelectProps'
  */
 export function AceSelectScreen({
   phase,
-  openedAcePitcherIds = [],
-  openedAceBatterIds = [],
+  openedAcePitcherIds,
+  openedAceBatterIds,
   levels,
   mode = '고르기',
   gamePoint = 0,
@@ -61,7 +69,7 @@ export function AceSelectScreen({
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
   // 마투수 단계는 윗줄에서, 마타자 단계는 아랫줄에서 커서가 시작한다 (원본이 OK 뒤 커서를 내린다)
-  const [cursor, setCursor] = useState(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
+  const [cursor, setCursor] = useState(aceStartCursorOf(phase))
   /** 오픈 힌트 팝업이 뜬 칸 (0xa68e~0xa6dc). null 이면 안 뜬 것 */
   const [hintCell, setHintCell] = useState<number | null>(null)
   /** G가 모자라 뜬 부족 팝업 (0xa46e → 0xaa00, 팝업 id 0x20) */
@@ -81,9 +89,7 @@ export function AceSelectScreen({
   const { keyLock, grid: gridOpen } = useListPageEntry({ grid: { shape: ACE_GRID_OPEN, isAnimated: true } })
   // 커서 튕김 — 시작 0x7a005(격자, 1, 1, 1) 의 셋째 인자 [격자+6] = 1 (`useGridCursorBounce`)
   const bounce = useGridCursorBounce()
-  // 격자 커서 깜빡임 [격자+0x18] — 시작 0x7a005 가 0 으로 두고(0x7a01e) 그릴 때마다 끝에서 +1(0x7b490) → 본문 몇째 그림인가와 같다.
-  // 커서 칸 그리기 0x7b3a0 은 열림 애니가 끝났고([격자+9]) 깜빡임이 켜졌을 때만 돈다(0x7b3a2 · 0x7b3c6)
-  const isGridCursorOn = gridOpen !== null && gridOpen.state.isDone && isAceGridCursorOn(gridOpen.blink)
+  const isGridCursorOn = isAceGridCursorShownOf(gridOpen)
 
   // 0x7b408 은 커서 칸 그리기(종류 7) 안이라 커서가 그려지는 그림에서만 돈다
   useAllAcesOpenNotice(isEveryAceOpen && isGridCursorOn, onAllAcesOpen)
@@ -91,8 +97,7 @@ export function AceSelectScreen({
   const isCellOpen = (cell: number) => isAceCellOpen(cell, openedAcePitcherIds, openedAceBatterIds)
   const isCellReachable = (cell: number) => isAceCellReachable(cell, mode, phase)
   // 팝업 · 창이 떠 있으면 격자는 키를 받지 않는다 — MessageBox 가 답을 가져간다
-  const isGridBlocked =
-    hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null || (overlay !== undefined && overlay !== null && overlay !== false)
+  const isGridBlocked = isAceGridBlockedOf(hintCell, isShortageOpen, isMaxLevelOpen, levelUpCell, overlay)
 
   /**
    * **레벨업 요청** — 상태 21 의 `0` 키(0x29efc `cmp r5,#0x30`) · 상태 28 의 OK·`0` 키(0x2b00a·0x2affc).
@@ -172,7 +177,7 @@ export function AceSelectScreen({
         title="마선수선택"
         gamePoint={gamePoint}
         onBack={onCancel}
-        footer={isCoachMode ? 5 : 0x205}
+        footer={aceFooterOf(mode)}
         footerPresses={{
           [FOOTER_BITS.levelUp]: { label: '0 레벨업', onPress: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: '0' })) },
         }}
