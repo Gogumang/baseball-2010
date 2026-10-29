@@ -1,7 +1,7 @@
 import { isHeadingBack } from '@/entities/fielding/model/autoAdvance'
 import type { RunnerState } from '@/entities/fielding/model/fieldingState'
 import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
-import { FIELDER_ACTION } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
 
 /**
  * 수비 화면 선수 부착 효과(player_effect.pzx, 게임+0x1030)의 **상태** — 그리기 0x43278(야수) · 0x43a0c(주자)가 보는 칸.

@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
-import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import { registerContact } from '@/entities/batting/model/battedContact'

@@ -2,7 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
-import { FIELDER_ACTION, type DefenseViewState } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 
 /** game_ui 애니 1~3 (animations.json 그대로) */
 const 애니들 = [

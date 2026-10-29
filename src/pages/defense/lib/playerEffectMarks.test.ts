@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { FIELDER_ACTION, type DefenseFielder } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { DefenseFielder } from '@/entities/fielding/model/defenseView/defenseFigures'
 import { fielderEffectMarksOf, runnerEffectMarksOf } from '@/pages/defense/lib/playerEffectMarks'
 
 const 야수 = (over: Partial<DefenseFielder> = {}): DefenseFielder => ({

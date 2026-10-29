@@ -2,13 +2,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
-import {
-  DEFENSE_BACKGROUND_WIDTH,
-  defenderPaletteIndexOf,
-  FIELDER_ACTION,
-  RUNNER_ACTION,
-  type DefenseViewState,
-} from '@/pages/defense/lib/defenseView'
+import { DEFENSE_BACKGROUND_WIDTH, defenderPaletteIndexOf } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION, RUNNER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { resetSpriteCacheForTest } from '@/shared/lib/sprite/spriteCache'
 

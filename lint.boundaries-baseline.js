@@ -15,8 +15,6 @@ export const layerDirectionBaseline = [
   'src/entities/mission/model/missionRun.ts',
   'src/entities/mission/model/missionRunners.ts',
   'src/entities/mission/model/pitcherRun.ts',
-  'src/features/defense-play/model/defensePlayView.ts',
-  'src/features/defense-play/model/playerEffects.ts',
   'src/features/play-game/model/stagePressAreas.ts',
   'src/pages/help/ui/HelpScreen.css.ts',
   'src/pages/main-menu/ui/MainMenuScreen.css.ts',

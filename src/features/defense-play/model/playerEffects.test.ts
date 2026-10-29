@@ -8,7 +8,7 @@ import {
   tickMarkCounter,
   type DustTrailState,
 } from '@/features/defense-play/model/playerEffects'
-import { FIELDER_ACTION } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
 
 describe('달리기 먼지 자국 (0x43546 · vt6c~vt84)', () => {
   const 자리 = { x: 10_000, y: 0, z: 20_000 }

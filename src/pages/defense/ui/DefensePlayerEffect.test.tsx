@@ -2,7 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
-import { FIELDER_ACTION, type DefenseViewState } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 
 const 애니들 = Array.from({ length: 17 }, (_, index) => (index === 13 ? [{ frame: 50, delay: 0 }] : [{ frame: 0, delay: 2 }]))
 const 원점들 = Object.fromEntries(Array.from({ length: 60 }, (_, frame) => [String(frame).padStart(3, '0'), { x: -4, y: -4, width: 8, height: 8 }]))

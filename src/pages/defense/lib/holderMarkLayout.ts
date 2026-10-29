@@ -1,4 +1,4 @@
-import type { HolderPlate } from '@/pages/defense/lib/defenseView'
+import type { HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
 import {
   IMG_TEXT_FRAMES,
   batterPositionBadgeOf,

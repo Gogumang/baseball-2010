@@ -4,17 +4,10 @@ import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
 import { basePosition, isSamePoint, progressPercent, SLIDING_PROGRESS_RANGE, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import { NONE, type FielderState, type RunnerState } from '@/entities/fielding/model/fieldingState'
 import { DUST_TRAIL_OFF, slideDustDirectionOf, stepDustTrail, type DustTrailState } from '@/features/defense-play/model/playerEffects'
-import {
-  FIELDER_ACTION,
-  HOLDER_MARK_ANIM,
-  RUNNER_ACTION,
-  type BallParticleFacts,
-  type DefenseFielder,
-  type HolderMark,
-  type HolderPlate,
-  type DefenseRunner,
-  type DefenseViewState,
-} from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION, HOLDER_MARK_ANIM, RUNNER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { BallParticleFacts, DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
+import type { DefenseFielder, DefenseRunner } from '@/entities/fielding/model/defenseView/defenseFigures'
+import type { HolderMark, HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
 
 /**
  * 한 틱치 화면 스냅샷 만들기.

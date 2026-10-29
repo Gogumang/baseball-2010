@@ -16,12 +16,11 @@ import {
   DEADLY_EFFECT_FRAMES,
   DEFENDER_FRAMES,
   DEFENSE_BACKGROUND_URL,
-  FIELDER_ACTION,
   FIELDER_FRAME_OFFSET,
   fielderActionFrameOf,
-  RUNNER_ACTION,
   runnerFrameOf,
 } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION, RUNNER_ACTION } from '@/shared/config/original/defenseAnimations'
 
 /** 한 번짜리 동작의 가장 긴 것(점프 캐치 16틱)보다 넉넉히 — 표는 마지막 칸에서 멈춘다 */
 const ACTION_TICK_SPAN = 24

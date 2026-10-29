@@ -11,7 +11,7 @@ import {
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
 import { createKeyHold, HOLD_STAGE_MASK, type KeyHold } from '@/shared/lib/sceneKeyLatch/keyHold'
 import { useShownSceneTicks } from '@/shared/lib/sceneKeyLatch/useShownSceneTicks'
-import type { DefenseViewState } from '@/pages/defense/lib/defenseView'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 import { originalKeyOf, type ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import { offenseOffersFor, useInPlayTouchKeys } from '@/features/defense-play/model/inPlayTouchKeys'
 import type { InPlayRunnerSituation } from '@/features/defense-play/model/inPlayTouchKeys'
