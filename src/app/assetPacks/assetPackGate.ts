@@ -13,14 +13,5 @@
  * - **건너뜀**: 개발 서버 · 시험, 서비스 워커 · Cache Storage · `DecompressionStream` 이 없는 브라우저.
  * 결과는 `<html data-asset-packs="…">` 에 적는다.
  */
-export {
-  ASSET_PACK_CACHE_PREFIX,
-  ASSET_PACK_MANIFEST,
-  ASSET_PACK_SERVICE_WORKER,
-  ASSET_PACK_STORED,
-  missingPacks,
-  parseAssetPackManifest,
-  versionOfCacheName,
-} from '@/app/assetPacks/assetPackGate/manifest'
-export type { AssetPackEntry, AssetPackGateResult, AssetPackManifest } from '@/app/assetPacks/assetPackGate/manifest'
+export { missingPacks, parseAssetPackManifest, versionOfCacheName } from '@/app/assetPacks/assetPackGate/manifest'
 export { runAssetPackGate } from '@/app/assetPacks/assetPackGate/gate'

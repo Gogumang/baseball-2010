@@ -8,6 +8,7 @@ import { assetPacks } from './tools/viteAssetPacks.ts'
 import { reactCompiler } from './tools/viteReactCompiler.ts'
 import { appChunk } from './tools/viteAppChunk.ts'
 import { optInChunks } from './tools/viteOptInChunks.ts'
+import { configNotesStrip } from './tools/viteConfigNotesStrip.ts'
 import { unitTestGroups } from './tools/vitestProjects.ts'
 import { unitTestCoverage } from './tools/vitestCoverage.ts'
 
@@ -36,10 +37,12 @@ export default defineConfig({
   // 빌드 산출물 자산을 gzip 묶음 몇 개 + 서비스 워커로 — 첫 진입에 한꺼번에 받는다 (r322, `app/assetPacks`). 맨 끝에 둔다(산출물을 다 쓴 뒤 훑는다)
   // 화면 부품(`ui/`) 가운데 `'use memo'` 를 단 것만 React Compiler 로 자동 메모 — 게임 진행 훅은 뺀다 (r353, `tools/viteReactCompiler.ts`)
   // 앱이 정적으로 끌고 오는 모듈(첫 진입 몫 빼고)을 앱 덩이 하나로 — 같이 받던 작은 공용 덩이 28개를 합쳐 gzip 이 준다 (r376, `tools/viteAppChunk.ts`)
+  // 버그 고치기 · 해금 · 판정값 표의 설명 글(증상 · 근거 주소 …)은 화면에 안 쓰여 배포판에서 뺀다 (r392, `tools/viteConfigNotesStrip.ts`)
   // `?vitals` 일 때만 받는 성능 표시 덩이를 `assets/opt/` 로 — 크기 상한의 "전체 JS" 에서 빠진다 (r380, `tools/viteOptInChunks.ts`)
   plugins: [
     react(),
     reactCompiler(process.env['REACT_COMPILER_LOG'], process.env['REACT_COMPILER_MODE']),
+    configNotesStrip(),
     vanillaExtractPlugin(),
     spriteJsonBundle(),
     versionedAssets(),
@@ -47,6 +50,13 @@ export default defineConfig({
     optInChunks(),
     assetPacks(),
   ],
+  build: {
+    rolldownOptions: {
+      // 다른 모듈에서 가져온 상수(글자 · 숫자 따위 리터럴 `const`)를 쓰는 자리에 모두 넣는다 — 기본(`smart`)은 조건식 자리만 넣는다.
+      // 값이 바뀌지 않는 리터럴이라 동작은 같고, 덩이 사이 import 와 상수 이름이 빠진다(전체 JS gzip −3.4kB, r392)
+      optimization: { inlineConst: { mode: 'all', pass: 3 } },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
