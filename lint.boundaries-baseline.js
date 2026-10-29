@@ -49,7 +49,7 @@ export const crossSliceBaseline = [
   'src/entities/awards/model/seasonAwards/otherSlices.ts',
   'src/entities/batting/model/atBatResultRing.ts',
   'src/entities/batting/model/ballPhysics/otherSlices.ts',
-  'src/entities/batting/model/battedBallFlight.ts',
+  'src/entities/batting/model/battedBallFlight/otherSlices.ts',
   'src/entities/batting/model/battedContact.ts',
   'src/entities/batting/model/swingSkills.ts',
   'src/entities/burst-mission/model/burstMissionTrigger.ts',
