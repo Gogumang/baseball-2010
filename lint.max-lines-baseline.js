@@ -68,7 +68,6 @@ export const maxLinesBaseline = [
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
   'src/pages/defense/lib/defenseHomeRunEffects.ts',
   'src/pages/defense/lib/defenseView.ts',
-  'src/pages/defense/ui/DefensePlayback.tsx',
   'src/pages/defense/ui/DefenseScreen.tsx',
   'src/pages/ending/lib/endingLayout.ts',
   'src/pages/ending/ui/EndingScreen.tsx',
