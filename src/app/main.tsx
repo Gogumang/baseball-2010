@@ -5,6 +5,7 @@ import { ViewportShell } from '@/app/ui/ViewportShell'
 import { installAppKeyGate } from '@/shared/lib/sceneKeyLatch/appKeyGate'
 import { installStaleBuildReload } from '@/shared/lib/staleBuild/staleBuild'
 import { runAssetPackGate } from '@/app/assetPacks/assetPackGate'
+import { installPerfOverlay } from '@/app/devtools/perfOverlay'
 import './styles/global.css'
 
 const container = document.getElementById('root')
@@ -18,6 +19,9 @@ installStaleBuildReload(window, { checkDocument: !import.meta.env.DEV })
 
 // 앱 키 문 — 화면들보다 먼저 단다(잡기 단계 맨 앞). 받은 키는 다음 앱 틱에 화면 · 창에 간다(0xbca05 받은 칸)
 installAppKeyGate(window)
+
+// 성능 표시(web-vitals · stats.js) — 개발 서버는 늘, 배포판은 `?vitals` 일 때만. 따로 받는 덩이다 (r365, `app/devtools/perfOverlay`)
+installPerfOverlay(window.location.search)
 
 /**
  * 앱 덩이 — 세션 훅 · 경기 엔진을 끌고 오는 큰 덩이라 첫 덩이에서 뺐다(r224). 받는 동안 부팅 껍데기가 이용안내를 그린다.
