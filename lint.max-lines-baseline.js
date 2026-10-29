@@ -74,7 +74,6 @@ export const maxLinesBaseline = [
   'src/pages/pitching/ui/PitchingScreen.tsx',
   'src/pages/record/lib/recordAnnalsLayout.ts',
   'src/pages/record/ui/RecordAnnals.tsx',
-  'src/pages/season/lib/seasonEquipmentWindow.ts',
   'src/pages/season/ui/PlayerRecruitScreen.tsx',
   'src/pages/season/ui/SeasonMatchInfoScreen.tsx',
   'src/pages/season/ui/SeasonOutingPopup.tsx',
