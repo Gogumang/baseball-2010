@@ -1,7 +1,5 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
+import { useState } from 'react'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import { EventAnimationSprite as AnimationSprite } from '@/widgets/training-scene/ui/EventAnimationSprite'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import {
@@ -17,6 +15,7 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useGaugePopupTicks } from '@/pages/season/ui/gaugePopup/useGaugePopupTicks'
 
 const WINDOW_FOLDER = assetUrl('./sprites/mode_back/frames')
 const { x: RX, y: RY, width: RW, height: RH, d: D } = OUTING_PANEL
@@ -59,47 +58,12 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
   const windowOrigins = useFrameOrigins(WINDOW_FOLDER)
   /** 창 배경 0x7b9ac — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (장면에 들어설 때 0x7b934 가 세운 값) */
   const windowSprite = useModeBackSprite(useSceneHour())
-  const [update, setUpdate] = useState(0)
   const [isDone, setDone] = useState(false)
-  const skipRef = useRef<() => void>(() => undefined)
-  const onFinishedLatest = useEffectEvent(onFinished)
-
-  useEffect(() => {
-    const startTick = appTickNow()
-    let handle = 0
-    let hasFinished = false
-    const finish = () => {
-      if (hasFinished) return
-      hasFinished = true
-      cancelAnimationFrame(handle)
-      // 0x84e58 — 세 애니를 놓고 참을 돌려준다(이 뒤로 0x848d0 은 그리지 않는다)
-      setDone(true)
-      onFinishedLatest()
-    }
-    const tick = (now: number) => {
-      const current = Math.max(0, appTickOf(now) - startTick)
-      setUpdate(current)
-      if (current >= TRAINING_POPUP_UPDATES) return finish()
-      handle = requestAnimationFrame(tick)
-    }
-    handle = requestAnimationFrame(tick)
-    // [gfx+0x1d0] = [gfx+0x1d8] — 게이지 끝이라 0x84e58 이 끝을 본다(원본은 다음 갱신, 웹은 곧바로)
-    skipRef.current = () => {
-      setUpdate(TRAINING_POPUP_UPDATES)
-      finish()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!isSeasonOutingSkipKey(event.key)) return
-      event.preventDefault()
-      skipRef.current()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      hasFinished = true
-      cancelAnimationFrame(handle)
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [])
+  // 0x84e58 — 세 애니를 놓고 참을 돌려준다(이 뒤로 0x848d0 은 그리지 않는다)
+  const [update, skipRef] = useGaugePopupTicks(isSeasonOutingSkipKey, () => {
+    setDone(true)
+    onFinished()
+  })
 
   const windowKey = windowSprite.key
   const windowOrigin = windowOrigins?.[windowKey]
