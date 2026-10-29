@@ -375,7 +375,7 @@ export const crossSliceBaseline = [
   'src/pages/shop/ui/PitcherShopScreen.tsx',
   'src/pages/shop/ui/ShopScreen.tsx',
   'src/pages/special-edit/lib/specialEditFlow.ts',
-  'src/pages/special-edit/ui/SpecialEditScreen.tsx',
+  'src/pages/special-edit/ui/specialEdit/otherSlices.ts',
   'src/pages/special/lib/hallOfFameGrid.ts',
   'src/pages/special/lib/specialLayout.ts',
   'src/pages/special/ui/specialScreen/otherSlices.ts',
