@@ -4,7 +4,6 @@
 export const maxLinesBaseline = [
   'src/features/play-game/model/aceCutIn.ts',
   'src/features/play-game/model/useSceneConfirm.ts',
-  'src/features/play-pitcher-game/model/pitcherPitch.ts',
   'src/features/play-team-game/model/gameAbilities.ts',
   'src/features/play-team-game/model/teamGameRoster.ts',
   'src/features/play-team-game/ui/InGameMenu.tsx',
