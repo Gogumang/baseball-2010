@@ -15,7 +15,6 @@ export const maxLinesBaseline = [
   'src/app/ui/SeasonRoute.tsx',
   'src/entities/batting/model/battedBallFlight.ts',
   'src/entities/batting/model/battedBallOutcome.ts',
-  'src/entities/batting/model/swingResult.ts',
   'src/entities/career/model/training.ts',
   'src/entities/fielding/model/catchPrediction.ts',
   'src/entities/mission/model/missionGoal.ts',

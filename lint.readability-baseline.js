@@ -46,7 +46,6 @@ export const readabilityBaseline = [
   'src/entities/batting/model/homeRunFireworks.ts',
   'src/entities/batting/model/pinchHitAi.ts',
   'src/entities/batting/model/swingBoost.ts',
-  'src/entities/batting/model/swingResult.ts',
   'src/entities/burst-mission/model/burstMissionJudge.ts',
   'src/entities/burst-mission/model/burstResultBits.ts',
   'src/entities/career/model/nariCpuEquipment.ts',
