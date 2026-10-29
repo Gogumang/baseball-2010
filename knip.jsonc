@@ -70,6 +70,7 @@
     "src/entities/mission/model/missionGame/auto/humanTeamAutoHalf.ts": ["exports"], // simulateHumanTeamAutoHalf (위 모음이 다시 내보낸다)
     "src/entities/pitcher-career/model/pitcherTitles.ts": ["exports"], // isPitcherOnlyTitleNumber
     "src/entities/season-mode/model/entryEditor.ts": ["exports"], // fieldPositionLabelOf (레코드 +0x1c 위치 코드)
+    "src/entities/season-mode/model/entryEditor/labels.ts": ["exports"], // fieldPositionLabelOf (위 모음이 다시 내보낸다)
     "src/features/defense-play/model/walkPlay.ts": ["exports"], // walkPitchJudgementOf (0x3e1ae)
     "src/features/play-team-game/model/teamGameRoster.ts": ["exports"], // quickBatterFor · quickPitcherFor · stageBatterAbility · stagePitcherAbility (0xb62b4 경기 능력치 조립)
     "src/pages/create-player/lib/teamSelectLayout.ts": ["exports", "duplicates"], // abilityChartMaximumOf (0x76424 — 웹은 안 그림) · 나만의리그 칸 = 팀 칸
