@@ -50,6 +50,13 @@ export default defineConfig({
     optInChunks(),
     assetPacks(),
   ],
+  build: {
+    rolldownOptions: {
+      // 다른 모듈에서 가져온 상수(글자 · 숫자 따위 리터럴 `const`)를 쓰는 자리에 모두 넣는다 — 기본(`smart`)은 조건식 자리만 넣는다.
+      // 값이 바뀌지 않는 리터럴이라 동작은 같고, 덩이 사이 import 와 상수 이름이 빠진다(전체 JS gzip −3.4kB, r392)
+      optimization: { inlineConst: { mode: 'all', pass: 3 } },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
