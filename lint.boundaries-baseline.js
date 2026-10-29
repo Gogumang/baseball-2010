@@ -60,7 +60,7 @@ export const crossSliceBaseline = [
   'src/entities/career/model/burstReward.ts',
   'src/entities/career/model/condition.ts',
   'src/entities/career/model/equipment.ts',
-  'src/entities/career/model/gameEvaluation.ts',
+  'src/entities/career/model/gameEvaluation/otherSlices.ts',
   'src/entities/career/model/gpItems/otherSlices.ts',
   'src/entities/career/model/leagueGameSetup.ts',
   'src/entities/career/model/nariCpuEquipment.ts',

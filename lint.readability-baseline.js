@@ -50,7 +50,6 @@ export const readabilityBaseline = [
   'src/entities/batting/model/swingResult.ts',
   'src/entities/burst-mission/model/burstMissionJudge.ts',
   'src/entities/burst-mission/model/burstResultBits.ts',
-  'src/entities/career/model/gameEvaluation.ts',
   'src/entities/career/model/nariCpuEquipment.ts',
   'src/entities/career/model/nariCupTeams.ts',
   'src/entities/career/model/nariTeamRecord.ts',
