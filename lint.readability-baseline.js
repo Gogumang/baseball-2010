@@ -114,7 +114,6 @@ export const readabilityBaseline = [
   'src/entities/season-mode/model/playerTrade.ts',
   'src/entities/season-mode/model/seasonEquipment.ts',
   'src/entities/season-mode/model/seasonEvaluation.ts',
-  'src/entities/season-mode/model/seasonEventFlow.ts',
   'src/entities/season-mode/model/seasonGameEvaluation.ts',
   'src/entities/season-mode/model/seasonItemShop.ts',
   'src/entities/season-mode/model/seasonPlayerRecord.ts',

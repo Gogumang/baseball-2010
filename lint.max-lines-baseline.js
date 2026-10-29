@@ -48,7 +48,6 @@ export const maxLinesBaseline = [
   'src/entities/pitching/model/simulateBatter.ts',
   'src/entities/season-mode/model/entryEditor.ts',
   'src/entities/season-mode/model/playerRecruit.ts',
-  'src/entities/season-mode/model/seasonEventFlow.ts',
   'src/entities/season-mode/model/seasonItemShop.ts',
   'src/entities/season-mode/model/seasonRecord.ts',
   'src/entities/season-mode/model/seasonStateMachine.ts',

@@ -37,6 +37,8 @@
     "src/entities/pitcher-career/model/pitchTraining.ts": ["exports"], // PITCH_TRAINING_COLUMN_COUNT
     "src/entities/season-mode/model/seasonAttendance.ts": ["exports"], // STORE_GAMES_ON_PURCHASE
     "src/entities/season-mode/model/seasonEventFlow.ts": ["exports"], // SEASON_SCREEN_CODE · ILLNESS_ABILITY_PENALTY_PERCENT (b5824)
+    "src/entities/season-mode/model/seasonEventFlow/ids.ts": ["exports"], // SEASON_SCREEN_CODE (위 모음이 다시 내보낸다)
+    "src/entities/season-mode/model/seasonEventFlow/illness.ts": ["exports"], // ILLNESS_ABILITY_PENALTY_PERCENT (b5824, 위 모음이 다시 내보낸다)
     "src/entities/season-mode/model/seasonGoals.ts": ["exports"], // SEASON_GOAL_INTRO_EVENT_ID
     "src/entities/season-mode/model/seasonItemShop.ts": ["exports"], // SEASON_SHOP_SLOT_COUNT
     "src/entities/season-mode/model/seasonReputation.ts": ["exports"], // UNUSED_SLOT (S[15])
