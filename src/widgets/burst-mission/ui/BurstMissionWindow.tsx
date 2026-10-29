@@ -1,42 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
-import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
-import type { CSSProperties } from 'react'
 import { MarkupText, PressArea } from '@/shared/ui'
-import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { flippedFrameUrlOf, frameCopiesUrl, hasFrameCopies } from '@/shared/lib/sprite/frameCopies'
-import { useSpriteJson } from '@/shared/lib/sprite/useSpriteJson'
 import { useWholeScreenOffset } from '@/shared/lib/screenShake/useWholeScreenOffset'
-import { useCommonWindowPush } from '@/shared/lib/commonWindow/commonWindow'
 import type { BurstJudgement } from '@/entities/burst-mission/model/burstMissionJudge'
 import type { BurstMissionRow } from '@/entities/burst-mission/model/burstMissionRow'
 import type { OriginalBurstLine } from '@/shared/config/original/burstMissions'
 import {
-  BURST_BAND_HEIGHT,
-  BURST_BAND_SLASH_LENGTH,
-  BURST_BAND_SLASH_X,
-  BURST_COLORS,
   BURST_NEXT_MARK_IMAGE,
-  BURST_SCREEN,
-  BURST_WINDOW_START,
-  burstBandTopOf,
   burstLineIndexOf,
   burstNextMarkAt,
   burstPortraitAnchorOf,
-  burstPortraitOf,
-  burstResultPopupTextOf,
   burstShakeOffsetOf,
   burstSpeakerPrefixOf,
   burstTextBoxOf,
   isBurstWindowOpen,
-  tickBurstWindow,
-  burstObjectTicks,
 } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
-import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionWindowLayout'
 import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 import * as styles from '@/widgets/burst-mission/ui/BurstMissionWindow.css'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
+import { BurstPortrait } from '@/widgets/burst-mission/ui/burstMissionWindow/BurstPortrait'
+import { BurstWindowBand } from '@/widgets/burst-mission/ui/burstMissionWindow/BurstWindowBand'
+import { useBurstWindowClock } from '@/widgets/burst-mission/ui/burstMissionWindow/useBurstWindowClock'
+import { useBurstWindowClose } from '@/widgets/burst-mission/ui/burstMissionWindow/useBurstWindowClose'
 
 interface BurstMissionWindowProps {
   /**
@@ -83,51 +65,11 @@ export function BurstMissionWindow({
   onClose,
 }: BurstMissionWindowProps) {
   const line = lines[burstLineIndexOf(judgement)]
-  const [state, setState] = useState<BurstWindowState>(() => tickBurstWindow({ ...BURST_WINDOW_START, ticks: burstObjectTicks.value }))
-  /** 그린 수 — 초상 애니는 그린 뒤 한 칸 나아간다(0x93d91) */
-  const [draws, setDraws] = useState(0)
-  const stateRef = useRef(state)
-  useMirrorRef(stateRef, state)
-
-  useEffect(() => {
-    burstObjectTicks.value = stateRef.current.ticks
-    const timer = setAppTickInterval(() => {
-      const next = tickBurstWindow(stateRef.current)
-      burstObjectTicks.value = next.ticks
-      stateRef.current = next
-      setState(next)
-      setDraws((count) => count + 1)
-    })
-    return () => timer()
-  }, [])
-
+  const { state, draws, stateRef } = useBurstWindowClock()
   useWholeScreenOffset(burstShakeOffsetOf(state))
-
-  const pushCommonWindow = useCommonWindowPush()
-  const closeRef = useRef(() => {})
-  useMirrorRef(closeRef, () => {
-    if (!isBurstWindowOpen(stateRef.current)) return
-    const popup = burstResultPopupTextOf(judgement, row)
-    if (popup !== null) pushCommonWindow(popup)
-    onClose()
-  })
-
-  // 창이 떠 있는 동안 키는 창 것이다 — 뒤 타석 화면이 같은 Enter 를 같이 받으면 스윙이 나간다.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      // 잡는 단계에서 멈춰 뒤쪽 타석·커맨드 줄의 window 리스너까지 막는다
-      event.stopImmediatePropagation()
-      event.preventDefault()
-      // 0x8e60c — 다 열리기 전(c ≠ −1)의 키는 버려진다
-      closeRef.current()
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [])
+  const closeRef = useBurstWindowClose(stateRef, judgement, row, onClose)
 
   const isOpen = isBurstWindowOpen(state)
-  const bandTop = burstBandTopOf(state.height)
-  const bodyTop = BURST_SCREEN.height - state.height
   const textBox = burstTextBoxOf(state.height)
   const nextMark = burstNextMarkAt(state.ticks)
 
@@ -149,32 +91,7 @@ export function BurstMissionWindow({
           anchor={burstPortraitAnchorOf(state.height, isBatterLeftHanded)}
         />
       )}
-      <svg
-        className={styles.layer}
-        width={BURST_SCREEN.width}
-        height={BURST_SCREEN.height}
-        viewBox={`0 0 ${BURST_SCREEN.width} ${BURST_SCREEN.height}`}
-        shapeRendering="crispEdges"
-        aria-hidden
-      >
-        {/* 0x8f194 윗 띠 */}
-        <rect x={0} y={bandTop} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT} fill={BURST_COLORS.bandEdge} />
-        <rect x={0} y={bandTop + 1} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT - 2} fill={BURST_COLORS.bandLight} />
-        <rect x={0} y={bandTop + 2} width={BURST_SCREEN.width} height={BURST_BAND_HEIGHT - 2} fill={BURST_COLORS.bandFill} />
-        {Array.from({ length: BURST_BAND_SLASH_LENGTH }, (_, i) => {
-          const x = BURST_BAND_SLASH_X + i
-          const y = bandTop + BURST_BAND_HEIGHT - 1 - i
-          return (
-            <g key={i}>
-              <rect x={x} y={y} width={1} height={1} fill={BURST_COLORS.bandEdge} />
-              <rect x={x - 1} y={y} width={1} height={1} fill={BURST_COLORS.bandLight} />
-              <rect x={x + 1} y={y} width={1} height={1} fill={BURST_COLORS.bandLight} />
-            </g>
-          )
-        })}
-        {/* 0x8f392 본체 — 검정 알파 0xB4 */}
-        <rect x={0} y={bodyTop} width={BURST_SCREEN.width} height={state.height} fill={BURST_COLORS.body} />
-      </svg>
+      <BurstWindowBand height={state.height} />
       {isOpen && line !== undefined && (
         <>
           <div className={styles.dialogue} style={{ left: textBox.x, top: textBox.y, width: textBox.width }}>
@@ -187,38 +104,4 @@ export function BurstMissionWindow({
       <PressArea label="돌발미션 넘기기" onPress={() => closeRef.current()} isDisabled={!isOpen} testId="돌발미션-넘기기" />
     </div>
   )
-}
-
-/** 0x8f29c 초상 — 0x63a04 애니를 그린 뒤 한 칸 나아간다(되풀이) */
-function BurstPortrait({
-  speaker,
-  expression,
-  draws,
-  anchor,
-}: {
-  readonly speaker: number
-  readonly expression: number
-  readonly draws: number
-  readonly anchor: { readonly x: number; readonly y: number; readonly isFlipped: boolean }
-}) {
-  const portrait = burstPortraitOf(speaker, expression)
-  const folder = assetUrl(`./sprites/${portrait?.file ?? 'event_char_0'}/frames`)
-  const origins = useFrameOrigins(folder)
-  const animations = useAnimations(folder)
-  // 좌타는 깃발 0x11 로 그린다(0x8f310~) — 0xc9f98 ca07c 갈래라 0x66 반투명 파트(볼터치)도 섞지 않고 복사한 판(`frameCopies`)
-  const copies = useSpriteJson<unknown>(anchor.isFlipped && hasFrameCopies(folder) ? frameCopiesUrl(folder) : null)
-  if (portrait === null) return null
-  const entries = animations?.[portrait.animation]
-  const step = entries === undefined ? null : animationStepAt(entries, draws)
-  if (step === null) return null
-  const key = String(step.frame).padStart(3, '0')
-  const origin = origins?.[key]
-  if (origin === undefined) return null
-  const x = anchor.x + step.dx
-  const y = anchor.y + step.dy
-  const style: CSSProperties = anchor.isFlipped
-    ? { left: x - origin.x - origin.width, top: y + origin.y, transform: 'scaleX(-1)' }
-    : { left: x + origin.x, top: y + origin.y }
-  const src = anchor.isFlipped ? flippedFrameUrlOf(folder, step.frame, copies) : `${folder}/${key}.png`
-  return <img className={styles.sprite} style={style} src={src} alt="" data-frame={step.frame} />
 }
