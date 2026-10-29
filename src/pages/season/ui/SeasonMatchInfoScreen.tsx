@@ -131,7 +131,7 @@ export function SeasonMatchInfoScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isSettingsOpen, onStart, onOpenSettings, onCancel, onOpenEntry])
+  }, [isSettingsOpen, onStart, onOpenSettings, onCancel, onOpenEntry, isKeyReady])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT

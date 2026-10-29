@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { FrameSprite, MessageBox, RawScreen, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -166,11 +166,19 @@ export function SeasonEquipmentScreen({
     setCardNibbles((held) => withNibble(held, part, next))
   }
 
-  const latest = useRef({ isItemFocus, part, select, enterItems, leaveItems, moveLevel, onBack, isPopup: false })
-  latest.current = { isItemFocus, part, select, enterItems, leaveItems, moveLevel, onBack, isPopup: notice !== null || question !== null }
+  const latest = useEffectEvent(() => ({
+    isItemFocus,
+    part,
+    select,
+    enterItems,
+    leaveItems,
+    moveLevel,
+    onBack,
+    isPopup: notice !== null || question !== null,
+  }))
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
+      const current = latest()
       if (current.isPopup) return
       const key = event.key
       if (!current.isItemFocus) {

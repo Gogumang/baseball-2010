@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { ORIGINAL_ENDINGS } from '@/shared/config/original/endings'
@@ -99,8 +99,7 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
     if (isBonusReceived) setLeaveStage((stage) => (isBugFixed('B-34') && stage >= 1 ? stage : stage + 1))
     else setPhase('보너스')
   }
-  const pressRef = useRef(press)
-  pressRef.current = press
+  const pressLatest = useEffectEvent(press)
   /**
    * **키 길** — 시즌 장면 0xe9ac 의 키 갈래(ec6a~ec9a)는 공용 창 0x754f9 가 키를 안 먹고 이 틀에 누름([this+0x34])이 있으면
    * 상태 표 0xcbf6c[상태 − 0xc8] 로 간다. [0x2d](0xf5) = 0xed60 → `bl 0x6b3c` 이고, 0x6b3c 는 키 값([this+0x40])을 읽지 않는다 —
@@ -112,7 +111,7 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
       event.preventDefault()
-      pressRef.current()
+      pressLatest()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

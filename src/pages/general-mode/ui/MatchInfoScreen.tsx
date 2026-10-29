@@ -166,7 +166,7 @@ export function MatchInfoScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isQuickStart, isRespinning, isSettingsOpen, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry])
+  }, [isQuickStart, isRespinning, isSettingsOpen, onStart, onOpenSettings, onRespin, onCancel, onOpenEntry, isKeyReady])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = setup.playerSide === PLAYER_SIDE_FIRST_BAT

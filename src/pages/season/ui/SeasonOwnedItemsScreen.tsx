@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { seasonSubItemsOf } from '@/widgets/season/lib/seasonSubItems'
@@ -40,16 +40,15 @@ export interface SeasonOwnedItemsScreenProps {
  */
 export function SeasonOwnedItemsScreen({ record, teamMorale, gamePoint = 0, onBack }: SeasonOwnedItemsScreenProps) {
   const [cursor, setCursor] = useState(0)
-  const latest = useRef({ onBack })
-  latest.current = { onBack }
 
   // 0x5f10 — 취소(−16) → 0xcd. 그 밖 키는 창 0x819ac(격자 커서) — `ShopWindow` 가 받는다
+  const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== 'Escape' && event.key !== 'Backspace') return
+    event.preventDefault()
+    onBack()
+  })
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' && event.key !== 'Backspace') return
-      event.preventDefault()
-      latest.current.onBack()
-    }
+    const onKeyDown = (event: KeyboardEvent) => handleKey(event)
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])

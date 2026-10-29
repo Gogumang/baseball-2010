@@ -166,23 +166,30 @@ function centeredTextDyOf(boxHeight: number): number {
   return d > 0 ? (d >> 1) + (d % 2) : d >> 1
 }
 
+function segmentLeftsOf(segments: readonly { readonly text: string }[], start: number): readonly number[] {
+  const lefts: number[] = []
+  let x = start
+  for (const segment of segments) {
+    lefts.push(x)
+    x += measurePixelTextWidth(segment.text) + 1
+  }
+  return lefts
+}
+
 function CenteredMarkup({ raw, box, color, testId }: { readonly raw: string; readonly box: Box; readonly color: string; readonly testId?: string }) {
   const segments = parseGameMarkup(raw).flatMap((line) => line.segments)
   const text = segments.map((segment) => segment.text).join('')
   const width = measurePixelTextWidth(text)
-  let x = box.x + ((box.width - width) >> 1)
   const top = box.y + centeredTextDyOf(box.height)
+  // 조각마다 왼쪽 끝 — 가운데 맞춘 시작에서 (앞 조각 폭 + 1) 씩 민다
+  const lefts = segmentLeftsOf(segments, box.x + ((box.width - width) >> 1))
   return (
     <div data-testid={testId} aria-label={text}>
-      {segments.map((segment, index) => {
-        const left = x
-        x += measurePixelTextWidth(segment.text) + 1
-        return (
-          <PixelText key={index} style={{ ...pixel, left, top, color: segment.color ?? color }}>
-            {segment.text}
-          </PixelText>
-        )
-      })}
+      {segments.map((segment, index) => (
+        <PixelText key={index} style={{ ...pixel, left: lefts[index], top, color: segment.color ?? color }}>
+          {segment.text}
+        </PixelText>
+      ))}
     </div>
   )
 }

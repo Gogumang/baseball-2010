@@ -23,7 +23,7 @@ const 시즌 = (덮어쓰기: Partial<SeasonRecord> = {}, 사기 = 50): SeasonSt
   return { ...state, record: { ...state.record, ...덮어쓰기 }, teamMorale: 사기 }
 }
 
-function 지도({
+function OutingMap지도({
   state,
   onRun = vi.fn(),
   onBack = vi.fn(),
@@ -73,7 +73,7 @@ describe('외출 지도 방향 이동 0x7f3e4 (표 0xd491c)', () => {
 
 describe('시즌 외출 지도 (상태 0xd1)', () => {
   it('고른 칸 지도를 그리고 방향 키로 칸을 옮긴다', () => {
-    render(<지도 state={시즌({ popularity: 999, money: 50 })} />)
+    render(<OutingMap지도 state={시즌({ popularity: 999, money: 50 })} />)
     expect(고른칸()).toBe('0')
 
     키('ArrowUp')
@@ -86,7 +86,7 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
 
   it('확인 키는 가드를 거쳐 팝업 0x16 — 비용 줄 [162] 이 먼저, "예" 면 장소를 넘긴다', () => {
     const onRun = vi.fn()
-    render(<지도 state={시즌({ popularity: 999, money: 50 })} onRun={onRun} 처음={1} />)
+    render(<OutingMap지도 state={시즌({ popularity: 999, money: 50 })} onRun={onRun} 처음={1} />)
 
     키('5')
     expect(알림글()).toContain('[회식] 이벤트를')
@@ -98,7 +98,7 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
   })
 
   it('건물을 누르면 그 칸으로 옮겨 확인과 같게 가드를 탄다', () => {
-    render(<지도 state={시즌({ popularity: 999, money: 50 })} />)
+    render(<OutingMap지도 state={시즌({ popularity: 999, money: 50 })} />)
 
     fireEvent.click(건물('학교'))
     expect(고른칸()).toBe('3')
@@ -108,7 +108,7 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
 
   it('친선경기는 인기도 200, 구단CF 는 400 이 필요하다 (StrMODE[62])', () => {
     const onRun = vi.fn()
-    render(<지도 state={시즌({ popularity: 199, money: 50 })} onRun={onRun} />)
+    render(<OutingMap지도 state={시즌({ popularity: 199, money: 50 })} onRun={onRun} />)
 
     fireEvent.click(건물('경기장'))
     expect(알림글()).toContain('필요한 인기도 : 200')
@@ -120,20 +120,20 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
   })
 
   it('건강하면 입원이 StrMODE[196] 로 막힌다', () => {
-    render(<지도 state={시즌({ money: 50, illness: 0 })} />)
+    render(<OutingMap지도 state={시즌({ money: 50, illness: 0 })} />)
     fireEvent.click(건물('병원'))
     expect(알림글()).toContain('건강한 상태입니다')
   })
 
   it('사기가 100 이면 회식이 StrMODE[91] 로 막힌다', () => {
-    render(<지도 state={시즌({ money: 50 }, 100)} />)
+    render(<OutingMap지도 state={시즌({ money: 50 }, 100)} />)
     fireEvent.click(건물('번화가'))
     expect(알림글()).toContain('사기 최고 상태')
   })
 
   it('⚠️ 원본 버그 — 서브 아이템이 있어도 소지금 500만이 없으면 입원이 막힌다', () => {
     const onRun = vi.fn()
-    render(<지도 state={시즌({ money: 4, illness: 1, outingSubItems: [false, false, true, false, false] })} onRun={onRun} />)
+    render(<OutingMap지도 state={시즌({ money: 4, illness: 1, outingSubItems: [false, false, true, false, false] })} onRun={onRun} />)
 
     fireEvent.click(건물('병원'))
 
@@ -143,7 +143,7 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
 
   it('취소(−16) 는 관리 메뉴로 돌아간다', () => {
     const onBack = vi.fn()
-    render(<지도 state={시즌({ money: 50 })} onBack={onBack} />)
+    render(<OutingMap지도 state={시즌({ money: 50 })} onBack={onBack} />)
 
     키('Escape')
 
@@ -152,7 +152,7 @@ describe('시즌 외출 지도 (상태 0xd1)', () => {
 
   it("지도 그림 0xa04c 에 CLR 글자 자리가 없어 '뒤로' 상황 버튼(Escape)을 낸다 — 팝업이 뜨면 걷는다 (r194)", () => {
     const onBack = vi.fn()
-    render(<지도 state={시즌({ money: 50, illness: 0 })} onBack={onBack} />)
+    render(<OutingMap지도 state={시즌({ money: 50, illness: 0 })} onBack={onBack} />)
     expect(touchKeyOffersNow()).toContainEqual({ key: 'Escape', label: '뒤로' })
     // 투명 "취소" 칸은 그대로
     expect(screen.getByRole('button', { name: '취소' })).toBeTruthy()

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -43,13 +43,12 @@ export function SeasonCommandBar({ slots, cursor, parent, disabledIds = NO_IDS, 
   const labelOrigins = useFrameOrigins(assetUrl('./sprites/img_text/frames'))
   const [movedAt, setMovedAt] = useState<number | null>(null)
   const lastCursor = useRef(cursor)
-  const latestUpdate = useRef(update)
-  latestUpdate.current = update
+  const markMoved = useEffectEvent(() => setMovedAt(update))
   // 메뉴 +0x25(바뀜) 가 서면 [gfx+0x98] = 0 (0x9008 · 0x8f30 의 그 밖 키 갈래)
   useEffect(() => {
     if (lastCursor.current === cursor) return
     lastCursor.current = cursor
-    setMovedAt(latestUpdate.current)
+    markMoved()
   }, [cursor])
   const labelWidths = Object.fromEntries(slots.map((slot) => [slot.labelFrame, labelOrigins?.[String(slot.labelFrame).padStart(3, '0')]?.width ?? 0]))
   return (

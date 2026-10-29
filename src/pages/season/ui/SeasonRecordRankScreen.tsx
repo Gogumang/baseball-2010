@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { addSkinStepCounter } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -75,11 +75,10 @@ export interface SeasonRecordRankScreenProps {
  * `RankingBoard`(배치 `pages/nari-record-room/lib/rankingBoard.ts` 머리말 — 칸 폭은 game_ui 프레임 25 · 54 · 75 · 36)를 같이 쓴다.
  */
 export function SeasonRecordRankScreen({ side, page, entries, myTeamId, gamePoint = 0, onMovePage, onBack }: SeasonRecordRankScreenProps) {
-  const latest = useRef({ onMovePage, onBack })
-  latest.current = { onMovePage, onBack }
+  const latest = useEffectEvent(() => ({ onMovePage, onBack }))
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
+      const current = latest()
       // 0x74c4: 취소(−16) → 0xcd · 그 밖은 모두 0x5787d — 쪽이 바뀌든 말든 [skin+0x40c] += 1 (5793e~57948, 쪽 화살 x 가 본다)
       if (isCancelKey(event.key)) current.onBack()
       else if (event.key === 'ArrowRight' || event.key === '6') {

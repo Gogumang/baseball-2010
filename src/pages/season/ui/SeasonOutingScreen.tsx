@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { BACK_KEY_OFFER, tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { MAP_FRAMES, OUTING_PLACES } from '@/shared/config/outingPlaces'
@@ -57,14 +57,13 @@ export function SeasonOutingScreen({ state, cursor, onCursorChange, onRun, onBac
     setQuestion(index)
   }
 
-  const latest = useRef({ cursor, select, onBack, onCursorChange })
-  latest.current = { cursor, select, onBack, onCursorChange }
+  const latest = useEffectEvent(() => ({ cursor, select, onBack, onCursorChange }))
   const isEnabled = notice === null && question === null
 
   useEffect(() => {
     if (!isEnabled) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
+      const current = latest()
       if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
         event.preventDefault()
         return current.select(current.cursor)

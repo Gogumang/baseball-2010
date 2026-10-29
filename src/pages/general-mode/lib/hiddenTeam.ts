@@ -67,7 +67,7 @@ export function canSelectTeam(teamId: number, options: { readonly openedHiddenId
  *     잠겼으면 `sprintf(0xcc1fc "%s!N%s!N!N%s!N%s", [225], [226+k], [0], [1])` → 팝업 0x74ef5(…, 1, 0, 0, 0) (14236)
  *
  * 고를 수 있는 경우(일반모드 + 열린 팀, 또는 히든이 아닌 팀)에는 `null` 이다.
- * 시즌 0xca · 트레이드 0xe4 는 `pages/season` 의 `hiddenTeamHintOf` 가 따로 옮겼다.
+ * 시즌 0xca · 트레이드 0xe4 는 `pages/season/lib/hiddenTeamHint` 의 `hiddenTeamHintOf` 가 따로 옮겼다.
  */
 export function hiddenTeamHintMessage(
   teamId: number,

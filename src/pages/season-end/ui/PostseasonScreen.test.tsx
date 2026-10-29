@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { PostseasonScreen, postseasonPopupTextOf } from '@/pages/season-end/ui/PostseasonScreen'
+import { PostseasonScreen } from '@/pages/season-end/ui/PostseasonScreen'
+import { postseasonPopupTextOf } from '@/pages/season-end/lib/postseasonPopupText'
 import { startPostseason } from '@/entities/league/model/league'
 import { TEAMS } from '@/shared/config/original/teams'
 
