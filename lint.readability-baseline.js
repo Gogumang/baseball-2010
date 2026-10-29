@@ -93,7 +93,6 @@ export const readabilityBaseline = [
   'src/entities/pitcher-career/model/pitcherEventReward.ts',
   'src/entities/pitcher-career/model/pitcherGameRecord.ts',
   'src/entities/pitcher-career/model/pitcherSeasonFlow.ts',
-  'src/entities/pitcher-career/model/pitcherStoryScene.ts',
   'src/entities/pitcher-career/model/pitcherStreaks.ts',
   'src/entities/pitcher-career/model/pitcherYearEnd.ts',
   'src/entities/pitching/model/displaySpeed.ts',

@@ -157,7 +157,7 @@ export const crossSliceBaseline = [
   'src/entities/pitcher-career/model/pitcherItems.ts',
   'src/entities/pitcher-career/model/pitcherManagement/otherSlices.ts',
   'src/entities/pitcher-career/model/pitcherSeasonFlow.ts',
-  'src/entities/pitcher-career/model/pitcherStoryScene.ts',
+  'src/entities/pitcher-career/model/pitcherStoryScene/otherSlices.ts',
   'src/entities/pitcher-career/model/pitcherStreaks.ts',
   'src/entities/pitcher-career/model/pitcherTitles.ts',
   'src/entities/pitcher-career/model/pitcherYearEnd.ts',

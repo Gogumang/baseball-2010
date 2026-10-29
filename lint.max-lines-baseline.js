@@ -37,7 +37,6 @@ export const maxLinesBaseline = [
   'src/entities/mode-save/model/modeSave.ts',
   'src/entities/particle/model/particleEmitter.ts',
   'src/entities/pitcher-career/model/magicPitch.ts',
-  'src/entities/pitcher-career/model/pitcherStoryScene.ts',
   'src/entities/pitching/model/pitcherChange.ts',
   'src/entities/pitching/model/selectPitch.ts',
   'src/entities/season-mode/model/entryEditor.ts',
