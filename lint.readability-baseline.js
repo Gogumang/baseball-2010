@@ -103,7 +103,6 @@ export const readabilityBaseline = [
   'src/entities/season-mode/model/tradeRequest.ts',
   'src/entities/settings/model/gameSettings.ts',
   'src/entities/story/model/eventReward.ts',
-  'src/entities/story/model/rewardNotice.ts',
   'src/entities/story/model/screenEffect.ts',
   'src/entities/team/model/recordAbility.ts',
   'src/features/defense-play/model/ballParticleFacts.ts',

@@ -174,7 +174,7 @@ export const crossSliceBaseline = [
   'src/entities/season-mode/model/tradeRequest.ts',
   'src/entities/story/model/aceMatch.ts',
   'src/entities/story/model/eventReward.ts',
-  'src/entities/story/model/rewardNotice.ts',
+  'src/entities/story/model/rewardNotice/otherSlices.ts',
   'src/entities/story/model/skillCondition.ts',
   'src/entities/story/model/storyScene/otherSlices.ts',
   'src/entities/team/model/recordAbility.ts',
