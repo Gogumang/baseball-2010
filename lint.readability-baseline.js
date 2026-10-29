@@ -363,7 +363,6 @@ export const readabilityBaseline = [
   'src/widgets/batting-stage/ui/MatchInfoStadiumBackdrop.tsx',
   'src/widgets/burst-mission/lib/burstMissionWindowLayout.ts',
   'src/widgets/burst-mission/lib/burstPortraitPreload.ts',
-  'src/widgets/burst-mission/ui/BurstMissionWindow.tsx',
   'src/widgets/event-portraits/ui/EventPortraits.tsx',
   'src/widgets/field-walk/lib/halfInningFieldInput.ts',
   'src/widgets/field-walk/lib/halfInningWalk.ts',
