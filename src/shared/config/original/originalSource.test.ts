@@ -627,6 +627,8 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
      */
     const DERIVED = new Set([
       'src/entities/collection/model/hiddenOpenNotice.ts#NAME_RANGES', // 0x61e8c 갈래 상수 (0xd1720 은 줄바꿈 글)
+      'src/entities/fielding/model/throwPlan/flight/errantThrow.ts#HORIZONTAL_DAMPING', // a18a4 코드 비교 문턱 · 곱 · 나눔 (h·6/7 · h·8/9)
+      'src/entities/fielding/model/throwPlan/flight/errantThrow.ts#VERTICAL_DAMPING', // a18a4 코드 비교 문턱 · 곱 · 나눔 (w·3/4 · 4/5 · 5/6)
       'src/entities/league/model/leagueDay/ability/cpuGameAbility.ts#TEAM_ABILITY_SLOT_OF_PITCHER', // 0xb592c 코드
       'src/entities/season-mode/model/seasonReputation.ts#RECORD_CODE_TO_SLOT', // 점프표 0xd7d7c 의 갈래 차례 (B-16)
       'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts#MANAGER_TEXT_GRADES_STARTER', // 0xcc558 × 2 (0x1285a)

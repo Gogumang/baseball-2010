@@ -70,7 +70,6 @@ export const readabilityBaseline = [
   'src/entities/fielding/model/rundown.ts',
   'src/entities/fielding/model/runnerLead.ts',
   'src/entities/fielding/model/throwArrival.ts',
-  'src/entities/fielding/model/throwPlan.ts',
   'src/entities/game/model/baseRunners.ts',
   'src/entities/game/model/gamePitcherLines.ts',
   'src/entities/game/model/gameState.ts',

@@ -27,7 +27,6 @@ export const maxLinesBaseline = [
   'src/entities/fielding/model/catchPrediction.ts',
   'src/entities/fielding/model/coverAssignment.ts',
   'src/entities/fielding/model/fieldingState.ts',
-  'src/entities/fielding/model/throwPlan.ts',
   'src/entities/game/model/gameState.ts',
   'src/entities/league/model/league.ts',
   'src/entities/mission/model/missionGoal.ts',
