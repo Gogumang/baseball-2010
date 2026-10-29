@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea } from '@/shared/ui'
 import { CANCEL_KEY_OFFER, tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
@@ -7,37 +7,19 @@ import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
 import * as styles from '@/widgets/season/ui/SeasonWindow.css'
 import {
-  RECORD_PICK_CELL_SIZE,
-  RECORD_PICK_CELLS,
-  RECORD_PICK_DIM_LABEL_COLOR,
-  RECORD_PICK_LABEL_GAP,
   RECORD_PICK_POPUP_HEIGHT,
   RECORD_PICK_TITLE_ID,
   RECORD_PICK_TITLE_X,
   RECORD_PICK_TITLE_Y,
-  recordPickIconOffsetOf,
-  recordPickLabelXOf,
   recordPickPopupTopOf,
 } from '@/widgets/record-pick-popup/lib/recordPickPopup'
-import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
-import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
-
-const IMG_TEXT = assetUrl('./sprites/img_text/frames')
-const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
-const isCancelKey = (key: string) => key === 'Escape' || key === 'Backspace'
-
-/** `ui/mode_icon.pzx` 그림 · 33×33. mpl 첫 벌(주황)로 칠한 사본은 tools/generate_management_sprites.py 가 만든다 */
-const MODE_ICON_SIZE = 33
-const modeIconOf = (frame: number) => assetUrl(`./sprites/mode_icon/${String(frame).padStart(3, '0')}.png`)
-const selectedModeIconOf = (frame: number) => assetUrl(`./sprites/management/icon_selected_${frame}.png`)
-
-const pixel = { position: 'absolute', pointerEvents: 'none' } as const
+import { RecordPickCellButton } from '@/widgets/record-pick-popup/ui/recordPickPopup/RecordPickCellButton'
+import { RECORD_PICK_LABEL_FOLDER, pixel } from '@/widgets/record-pick-popup/ui/recordPickPopup/recordPickAssets'
+import { useRecordPickKeys } from '@/widgets/record-pick-popup/ui/recordPickPopup/useRecordPickKeys'
 
 const TITLE_RAW = ORIGINAL_MODE_TEXT[RECORD_PICK_TITLE_ID] ?? ''
 /** 제목 가운데 x — 0x1949c (W/2 − 0x54) + (0x9c52c 폭 >> 1) */
@@ -107,52 +89,15 @@ export function RecordPickPopup({
     if ((boxRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
   }, [])
   const motion = usePopupWindowMotion({ targetHeight: RECORD_PICK_POPUP_HEIGHT, skipsMotion: hasNoLayout })
-  const closeKindRef = useRef(closeKind)
-  useMirrorRef(closeKindRef, closeKind)
-  /** 확인 — `'바로'` 는 치운 자리에서, `'줄임'` 은 다음 갱신에 `onConfirm` · 다 닫히면 `onClosed` */
-  const closeMotion = motion.close
-  const confirm = useCallback(() => {
-    if (closeKindRef.current === '바로') return closeMotion('바로', () => latest.current.onConfirm())
-    return closeMotion(
-      '줄임',
-      () => latest.current.onClosed?.(),
-      () => latest.current.onConfirm(),
-    )
-  }, [closeMotion])
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
-      const isToggle = ['ArrowLeft', 'ArrowRight', '4', '6'].includes(event.key)
-      const isConfirm = event.key === 'Enter' || event.key === '5'
-      const isCancel = isCancelKey(event.key)
-      // 펼치는 동안 · 줄이는 동안은 창이 키를 잡기만 하고 키 콜백을 부르지 않는다 (0x754f8 → 0x75556 · 0x7558a 갈래)
-      if (!motion.acceptsKeys()) {
-        if (motion.isClosed) return
-        event.preventDefault()
-        event.stopPropagation()
-        return
-      }
-      if (isCancel) motion.close(closeKindRef.current, current.onCancel)
-      else if (isToggle) current.onToggle()
-      else if (isConfirm) confirm()
-      else return
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-    // `motion` 은 그림마다 새 꼴이라 이 effect 는 그림마다 다시 건다
-  }, [motion, confirm])
+  const confirm = useRecordPickKeys(motion, closeKind, latest)
 
-  const labelOrigins = useFrameOrigins(IMG_TEXT)
+  const labelOrigins = useFrameOrigins(RECORD_PICK_LABEL_FOLDER)
   // 창 그림 0x19448 은 제목 · 칸 둘만 그려 CLR 글자 자리가 없다(아래 바닥띠 표시는 뒤 어둡게에 덮인다) — 키를 받는 동안 '취소' 상황
   // 버튼을 낸다(r194). Escape 키 사건이라 위 듣는 곳과 같은 길이다
   useTouchKeyOffer(!motion.isClosed && motion.openingHeight === null && motion.closingWidth === null ? CANCEL_KEY_OFFER : null)
   if (motion.isClosed) return null
   /** 판 0x744c4 — 펼치는 동안 높이 [창+0x212], 줄이는 동안 폭 [창+0x210] 을 가로 가운데로 */
   const box = popupBoxStyleOf(motion, RECORD_PICK_POPUP_HEIGHT)
-  const icon = recordPickIconOffsetOf(MODE_ICON_SIZE, MODE_ICON_SIZE)
-  const labelTop = RECORD_PICK_CELL_SIZE + RECORD_PICK_LABEL_GAP
   return (
     <div role="dialog" aria-label={ariaLabel}>
       {/* 0x746cc — 뒤 어둡게(단계 5) 뒤 판 0x744c4 (0, (H − 높이) >> 1, 240, 높이) */}
@@ -170,67 +115,21 @@ export function RecordPickPopup({
           <div className={styles.title} style={{ left: TITLE_CENTER_X - 120, top: RECORD_PICK_TITLE_Y, width: 240, whiteSpace: 'nowrap' }}>
             <MarkupText raw={TITLE_RAW} />
           </div>
-          {cells.map((cell, index) => {
-            const geometry = RECORD_PICK_CELLS[index]
-            const isOn = index === selected
-            const labelSrc = frameSrc(cell.labelFrame)
-            const labelSize = labelOrigins?.[String(cell.labelFrame).padStart(3, '0')]
-            const labelX = labelSize === undefined ? 0 : recordPickLabelXOf(labelSize.width)
-            return (
-              <button
-                key={cell.label}
-                type="button"
-                aria-pressed={isOn}
-                aria-label={cell.label}
-                className={windowStyles.layer}
-                style={{
-                  left: geometry.x,
-                  top: geometry.y,
-                  width: RECORD_PICK_CELL_SIZE,
-                  height: labelTop + (labelSize?.height ?? 0),
-                  background: 'transparent',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  pointerEvents: 'auto',
-                  overflow: 'visible',
-                }}
-                onClick={() => {
-                  if (!motion.acceptsKeys()) return
-                  if (isOn) confirm()
-                  else onToggle()
-                }}
-              >
-                <img
-                  alt=""
-                  data-testid={`${testIdPrefix}-칸-${index}`}
-                  src={isOn ? selectedModeIconOf(geometry.iconFrame) : modeIconOf(geometry.iconFrame)}
-                  style={{ ...pixel, left: icon.x, top: icon.y }}
-                />
-                {isOn || labelSize === undefined ? (
-                  <img alt="" src={labelSrc} style={{ ...pixel, left: labelX, top: labelTop }} />
-                ) : (
-                  // 효과 0xb 단색 — 그림을 마스크로 쓰고 회색을 칠한다
-                  <span
-                    style={{
-                      ...pixel,
-                      left: labelX,
-                      top: labelTop,
-                      width: labelSize.width,
-                      height: labelSize.height,
-                      background: solidColorCss(RECORD_PICK_DIM_LABEL_COLOR),
-                      maskImage: spriteMaskImage(labelSrc),
-                      WebkitMaskImage: spriteMaskImage(labelSrc),
-                      maskSize: '100% 100%',
-                      WebkitMaskSize: '100% 100%',
-                      maskRepeat: 'no-repeat',
-                      WebkitMaskRepeat: 'no-repeat',
-                    }}
-                  />
-                )}
-              </button>
-            )
-          })}
+          {cells.map((cell, index) => (
+            <RecordPickCellButton
+              key={cell.label}
+              cell={cell}
+              index={index}
+              isOn={index === selected}
+              labelOrigins={labelOrigins}
+              testIdPrefix={testIdPrefix}
+              onPress={() => {
+                if (!motion.acceptsKeys()) return
+                if (index === selected) confirm()
+                else onToggle()
+              }}
+            />
+          ))}
           {/* CLR — 창 아래 106 화면이 그대로 그리는 바닥띠 되돌아가기 표시 자리(웹 전용 누름 칸, r186). 키와 같은 길(위 듣는 곳) */}
           <div style={{ pointerEvents: 'auto' }}>
             <PressArea label="취소" rect={FOOTER_BACK_PRESS_RECT} onPress={() => tapKey('Escape')} />
