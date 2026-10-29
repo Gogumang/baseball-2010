@@ -350,7 +350,6 @@ export const readabilityBaseline = [
   'src/widgets/batting-stage/lib/baseRunners.ts',
   'src/widgets/batting-stage/lib/batterOverlayMarks.ts',
   'src/widgets/batting-stage/lib/hitCamera.ts',
-  'src/widgets/batting-stage/lib/homeRunBanner.ts',
   'src/widgets/batting-stage/lib/homeRunEffects.ts',
   'src/widgets/batting-stage/lib/magicBallEffect.ts',
   'src/widgets/batting-stage/lib/specialSwingBadge.ts',
