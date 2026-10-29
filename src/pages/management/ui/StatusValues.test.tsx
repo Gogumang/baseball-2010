@@ -2,8 +2,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createCareer } from '@/entities/career/model/playerCareer'
-import { StatusValues, statusIconFramesOf } from '@/pages/management/ui/StatusValues'
-import { eagleEyeDigitsOf } from '@/pages/management/ui/StatusIconRow'
+import { StatusValues } from '@/pages/management/ui/StatusValues'
+import { statusIconFramesOf } from '@/pages/management/lib/statusIcons'
+import { eagleEyeDigitsOf } from '@/pages/management/lib/statusIcons'
 
 /** 상태판 0x7d34c 끝의 상태 아이콘 줄 (0x7dd46~0x7df92) */
 

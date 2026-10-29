@@ -30,6 +30,17 @@ const NUM_FOLDER = assetUrl('./sprites/num')
 /** num 20번대 숫자 높이 — 칸 높이와 같아 세로 어긋남이 없다 */
 const NUMBER_HEIGHT = 10
 
+/** 글자마다 왼쪽 끝 — `start` 에서 (폭 + 자간) 씩 민다 */
+function glyphLeftsOf(glyphs: readonly Glyph[], start: number): readonly number[] {
+  const lefts: number[] = []
+  let x = start
+  for (const glyph of glyphs) {
+    lefts.push(x)
+    x += glyph.width + (glyph.spacing ?? GLYPH_SPACING)
+  }
+  return lefts
+}
+
 /**
  * 색 있는 숫자 — 0x7ba44 가 기본값 0xb6415(기록,k,0) 과 실효값 0xb570c 를 견줘 색을 정하고
  * (실효가 낮으면 (0xff,0,0) · 높으면 (0,0xff,0x40), 같으면 0), 레이더 0x5a990 은 **숫자에만** 그 색을 쓴다:
@@ -47,12 +58,11 @@ export function TintedNumber({
   readonly top: number
   readonly color: string
 }) {
-  let x = right - glyphsWidthOf(glyphs)
+  const lefts = glyphLeftsOf(glyphs, right - glyphsWidthOf(glyphs))
   return (
     <>
       {glyphs.map((glyph, index) => {
-        const left = x
-        x += glyph.width + (glyph.spacing ?? GLYPH_SPACING)
+        const left = lefts[index]
         const src = `${NUM_FOLDER}/${String(glyph.frame).padStart(3, '0')}.png`
         return (
           <div

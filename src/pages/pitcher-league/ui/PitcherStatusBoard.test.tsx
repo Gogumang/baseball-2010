@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { createPitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PitcherStatusBoard, pitcherStatusIconStateOf, staminaBarLayoutOf } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
-import { statusIconFramesFrom } from '@/pages/management/ui/StatusIconRow'
+import { statusIconFramesFrom } from '@/pages/management/lib/statusIcons'
 
 /** 투수편도 상태판 0x7d34c 끝의 상태 아이콘 줄(0x7dd46~0x7df92)을 탄다 — 모드 3 은 갈림 없이 다섯을 본다 */
 

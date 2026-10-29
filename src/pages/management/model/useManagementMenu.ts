@@ -1,5 +1,5 @@
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useTrainingPlayback } from '@/widgets/training-scene/model/useTrainingPlayback'
@@ -12,7 +12,14 @@ import {
   batterAbilityDetailViewOf,
   scrollAbilityDetail,
 } from '@/pages/management/lib/abilityDetail'
-import { createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf } from '@/pages/management/model/nariMainMenuCursor'
+import {
+  clearNariReturnSubMenu,
+  createNariMainMenuCursor,
+  leaveNariSubMenu,
+  moveNariMainCursor,
+  nariMainCursorOnEntry,
+  nariReturnSubMenuOf,
+} from '@/pages/management/model/nariMainMenuCursor'
 import { isNariMenuOkKey, nariMenuCursorAfterStep, nariMenuStepOfKey } from '@/pages/management/lib/nariMenuKeys'
 import { nariMainMenuOffIdsOf } from '@/pages/management/lib/nariMenuEnable'
 
@@ -53,7 +60,7 @@ export type ManagementOverlay = '기록실' | '필살타법' | '필살타법훈�
 /** 관리 화면 커서·하위 메뉴·훈련 연출 상태 */
 export function useManagementMenu(props: ManagementScreenProps) {
   /** 관리 메뉴 [this+0x8c] 커서 — 루트가 들고 있으면 그것(다른 화면을 다녀와도 남는다), 아니면 이 화면 몫 */
-  const ownMainCursor = useRef(createNariMainMenuCursor()).current
+  const [ownMainCursor] = useState(createNariMainMenuCursor)
   const mainCursor = props.mainCursor ?? ownMainCursor
   /** 111 상점 · 121 장비착용에서 돌아왔으면 그 하위 메뉴(110 · 106) 그 칸, 다 펼쳐진 채 (`nariReturnSubMenuOf`) */
   const [returned] = useState(() => nariReturnSubMenuOf(mainCursor))
@@ -64,9 +71,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
   )
   const [movedAt, setMovedAt] = useState<number | null>(null)
   const [openedAt, setOpenedAt] = useState(returned === null ? 0 : -SETTLED_UPDATES)
-  useEffect(() => {
-    mainCursor.returnSubMenu = null
-  }, [mainCursor])
+  useEffect(() => clearNariReturnSubMenu(mainCursor), [mainCursor])
   /** 선수정보 하위 메뉴에서 연 카드 — 상태판 자리에 그린다 (0x15e20) */
   const [isShowingBasicInfo, setIsShowingBasicInfo] = useState(false)
   /**
@@ -79,6 +84,19 @@ export function useManagementMenu(props: ManagementScreenProps) {
   /** 예/아니오 질문 (StrMODE[85] 훈련 · [90] 휴식) */
   const [question, setQuestion] = useState<{ text: string; onYes: () => void } | null>(null)
   const update = useUpdateCounter()
+  const setMainCursor = (index: number) => {
+    moveNariMainCursor(mainCursor, index)
+    setCursor(index)
+  }
+  const open = (next: MenuKind, nextParent: MenuSlot | null) => {
+    setIsShowingBasicInfo(false)
+    setAbilityDetailOffset(null)
+    setOverlay(null)
+    setKind(next)
+    setParent(nextParent)
+    setCursor(0)
+    setOpenedAt(update)
+  }
   /*
    * 125 의 결과 창 — 연출이 끝난 틀(0x18dd8 의 0x84e58 → 0x17f5c)부터 그 창이 닫힐 때까지 원본은 아직 125 다. 칸 0~3 은 상세 결과 창
    * (닫으면 콜백 0x1b5b8 이 `0xbcb49(0x69)`), 칸 4(필살타법)는 알림 창(닫히면 틀 0x18dd8 이 105)이다. 그동안 그림 0x19da4 는 가운데
@@ -91,8 +109,11 @@ export function useManagementMenu(props: ManagementScreenProps) {
     setTrainingResult('pending')
     props.onTraining(menuId)
   })
-  useLayoutEffect(() => {
-    if (trainingResult === null) return
+  /**
+   * 결과 창이 떴는지 · 닫혔는지는 결과 상태와 세션 창(상세 · 알림)만 보고 정한다 — 렌더 중에 맞춘다(예전 레이아웃 효과와 같은 값이
+   * 그림 전에 선다. 굴림 · 세션 콜백은 없다)
+   */
+  const settleTrainingResult = () => {
     if (trainingResult === 'pending') {
       if (props.detail !== null) return setTrainingResult('detail')
       if (props.noticeText !== '') return setTrainingResult('notice')
@@ -102,7 +123,8 @@ export function useManagementMenu(props: ManagementScreenProps) {
     open('main', null)
     // 커서는 메뉴 객체 그대로(트레이닝 칸). 행동함이면 105 진입이 첫 칸으로 (아래 `awaitingEntry`)
     setMainCursor(COMMAND_SLOTS.findIndex((slot) => slot.id === '트레이닝'))
-  })
+  }
+  if (trainingResult !== null) settleTrainingResult()
   /** 상태 125 — 연출(`playback`)과 결과 창 */
   const isTrainingState = playback.playingMenuId !== null || trainingResult !== null
   /**
@@ -113,30 +135,17 @@ export function useManagementMenu(props: ManagementScreenProps) {
    * 세운다(창 게이트 0x754f9 는 1d070 에서 키만 막는다) — 알림이 떠 있는 동안 가운데 판이 보이는 것이 원본이다
    */
   const [restPhase, setRestPhase] = useState<'playing' | 'result' | null>(null)
-  useLayoutEffect(() => {
-    if (restPhase !== 'result' || props.detail !== null) return
+  // 결과 창이 닫힌 렌더에서 곧바로 걷는다(위 훈련 결과와 같은 까닭)
+  if (restPhase === 'result' && props.detail === null) {
     setRestPhase(null)
     // 결과 창이 닫혀 105 에 다시 든다(0x1b308 1b466 · 틀 0x19080 190cc `0xbcb49(0x69)`) — 진입 0x11910 은 늘 11c26 에서
     // 0x7ff21 로 여섯 칸을 처음 자리에 되돌리고 [gfx+0x99] = 1 이라 다시 펼친다(그동안 키를 버린다, A-50). 줄 표는 그대로고
     // 커서는 행동함 진입이 첫 칸으로 (`awaitingEntry`)
     setOpenedAt(update)
-  })
+  }
   const slots = kind === 'main' ? COMMAND_SLOTS : COMMAND_MENUS[kind]
   const disabledIds = NO_DISABLED_IDS
 
-  const setMainCursor = (index: number) => {
-    mainCursor.current = index
-    setCursor(index)
-  }
-  const open = (next: MenuKind, nextParent: MenuSlot | null) => {
-    setIsShowingBasicInfo(false)
-    setAbilityDetailOffset(null)
-    setOverlay(null)
-    setKind(next)
-    setParent(nextParent)
-    setCursor(0)
-    setOpenedAt(update)
-  }
   /** 105 켬 표가 0 인 칸 — 하위 메뉴(106 · 107 · 110)의 표는 늘 켜져 있다 */
   const mainOffIds = nariMainMenuOffIdsOf(props.career)
   const isOffSlot = (index: number) => kind === 'main' && mainOffIds.has(slots[index]?.id ?? '')
@@ -146,7 +155,7 @@ export function useManagementMenu(props: ManagementScreenProps) {
   const isSliding = () => isCommandBarIdle() && update - openedAt < SLIDE_KEY_LOCK_UPDATES
   const moveCursor = (index: number) => {
     if (index === cursor) return
-    if (kind === 'main') mainCursor.current = index
+    if (kind === 'main') moveNariMainCursor(mainCursor, index)
     setCursor(index)
     setMovedAt(update)
   }
@@ -175,15 +184,15 @@ export function useManagementMenu(props: ManagementScreenProps) {
   const [awaitingEntry, setAwaitingEntry] = useState(false)
   const isIdleMain =
     kind === 'main' && !isTrainingState && restPhase === null && props.detail === null && question === null && overlay === null && !isShowingBasicInfo
-  useLayoutEffect(() => {
+  const noteActed = useEffectEvent(() => {
     if (props.career.hasActedThisCycle && !wasActed.current) setAwaitingEntry(true)
     wasActed.current = props.career.hasActedThisCycle
   })
-  useLayoutEffect(() => {
-    if (!awaitingEntry || !isIdleMain) return
+  useLayoutEffect(() => noteActed(), [props.career.hasActedThisCycle])
+  if (awaitingEntry && isIdleMain) {
     setAwaitingEntry(false)
     setMainCursor(nariMainCursorOnEntry(mainCursor.current, props.career.hasActedThisCycle, false))
-  })
+  }
 
   const ask = (text: string, onYes: () => void) => setQuestion({ text, onYes })
   const answer = (isYes: boolean) => {

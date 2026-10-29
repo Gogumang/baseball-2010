@@ -36,6 +36,16 @@ export function createNariMainMenuCursor(): NariMainMenuCursor {
   return { current: 0, subCursor: 0, returnSubMenu: null }
 }
 
+/** 메뉴 객체 커서를 옮긴다 — 0x6c00c 가 +0xc 에 적는 것. 루트가 들고 있는 객체라 그 자리에서 바꾼다 */
+export function moveNariMainCursor(cursor: NariMainMenuCursor, index: number): void {
+  cursor.current = index
+}
+
+/** 관리 화면이 서면 돌아온 하위 메뉴 표시를 지운다 — 한 번 쓴 뒤로는 105 진입처럼 메인 메뉴부터 */
+export function clearNariReturnSubMenu(cursor: NariMainMenuCursor): void {
+  cursor.returnSubMenu = null
+}
+
 /** 하위 메뉴 칸 `subCursor` 에서 화면 밖 상태(111 · 121)로 간다 — 돌아오면 그 하위 메뉴 그 칸 */
 export function leaveNariSubMenu(cursor: NariMainMenuCursor, kind: NariReturnSubMenu, subCursor: number): void {
   cursor.returnSubMenu = kind

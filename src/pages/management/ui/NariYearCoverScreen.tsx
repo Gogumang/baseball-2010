@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { PressArea, RawScreen, ScreenOverlay } from '@/shared/ui'
 import { LeftFrame } from '@/shared/ui/LeftFrame/LeftFrame'
@@ -60,26 +60,21 @@ export function NariYearCoverScreen({ yearIndex, onDone, previousScreenAt, start
   /** 키를 받은 137 틀 — 키 0x106a4 가 [장면+0x28c] = 0x51 을 넣는 틀(키가 든 그리기의 다음 틀) */
   const [skipAt, setSkipAt] = useState<number | null>(null)
   const step = yearCoverStepAt(frame, skipAt)
-  const stepRef = useRef(step)
-  stepRef.current = step
   const press = () => {
-    const current = stepRef.current
-    if (current.kind !== '표지' || !current.acceptsKey) return
-    setSkipAt((previous) => previous ?? current.tick + 1)
+    if (step.kind !== '표지' || !step.acceptsKey) return
+    setSkipAt((previous) => previous ?? step.tick + 1)
   }
-  const pressRef = useRef(press)
-  pressRef.current = press
+  const pressFromKey = useEffectEvent(press)
   useEffect(() => {
-    const onKeyDown = () => pressRef.current()
+    const onKeyDown = () => pressFromKey()
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
+  const done = useEffectEvent(onDone)
   const isDone = step.kind === '관리'
   useEffect(() => {
-    if (isDone) onDoneRef.current()
+    if (isDone) done()
   }, [isDone])
 
   const opacity = coverOpacityOf(step)
@@ -114,10 +109,9 @@ export function YearCoverHoldLayer({ onDone }: { readonly onDone: () => void }) 
   const frame = useUpdateCounter()
   const step = yearCoverStepAt(frame, null)
   const isDone = step.kind !== '앞화면'
-  const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
+  const done = useEffectEvent(onDone)
   useEffect(() => {
-    if (isDone) onDoneRef.current()
+    if (isDone) done()
   }, [isDone])
   // 앞 화면의 키 처리기(useEffect)보다 먼저 걸리게 레이아웃 효과에서 window 잡는 단계에 건다 (`NariScreenPush` 와 같은 문)
   useLayoutEffect(() => {

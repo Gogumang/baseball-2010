@@ -1,7 +1,7 @@
 import { SpriteNumber } from '@/shared/ui'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { ORIGINAL_MONEY_UNIT } from '@/entities/career/model/playerCareer'
-import { GAMES_PER_SEASON, hasSkill, isSkillEquipped } from '@/entities/career/model/playerCareer'
+import { GAMES_PER_SEASON } from '@/entities/career/model/playerCareer'
 import { leagueDayCounterOf } from '@/entities/career/model/leagueGameSetup'
 import {
   MESSAGE_COLORS,
@@ -14,35 +14,19 @@ import {
 } from '@/pages/management/lib/managementLayout'
 import type { Box } from '@/pages/management/lib/managementLayout'
 import * as styles from '@/pages/management/ui/ManagementScreen.css'
-import { HELPLESSNESS_SKILL_ID, LUCK_SKILL_ID, StatusIconRow, statusIconFramesFrom } from '@/pages/management/ui/StatusIconRow'
-import type { StatusIconState } from '@/pages/management/ui/StatusIconRow'
+import { StatusIconRow } from '@/pages/management/ui/StatusIconRow'
+import { statusIconStateOf } from '@/pages/management/lib/statusIcons'
+import type { StatusIconState } from '@/pages/management/lib/statusIcons'
+import { valueRightOf } from '@/pages/management/lib/statusValueLayout'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const LABEL_HEIGHT = 10
-/** 값 숫자는 박스 오른쪽 끝에서 2px 안쪽 */
-const VALUE_INSET = 2
 /** 프레임 11 박스 2~5 의 이름표 — 표 0xd4880[1..4] (327 인기도 · 302 소지금 · 331 평판 · 332 연봉) */
 export const NARI_LAST_LABEL_FRAME = 332
 const SCREEN_WIDTH = 240
 
-/** 상태 아이콘 줄의 조건 — 타자 커리어에서 읽는다 (그리기는 `StatusIconRow`) */
-export function statusIconStateOf(career: PlayerCareer): StatusIconState {
-  return {
-    isLuckEquipped: isSkillEquipped(career, LUCK_SKILL_ID),
-    eagleEyeGamesRemaining: career.eagleEyeGamesRemaining,
-    isSick: career.isSick,
-    isInjured: career.isInjured,
-    hasHelplessness: hasSkill(career, HELPLESSNESS_SKILL_ID),
-  }
-}
-
-export function statusIconFramesOf(career: PlayerCareer): readonly number[] {
-  return statusIconFramesFrom(statusIconStateOf(career))
-}
-
 const imageOf = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
-export const valueRightOf = (box: Box, ox = -VALUE_INSET) => box.x + box.width + ox
 
 /**
  * 이름표 넷 — 0x7d9c6~0x7dac8: 박스 2+k 에 img_text 0xd4880[k+1] 을 정렬 0x24(오른쪽 · 세로 가운데 올림)로.
