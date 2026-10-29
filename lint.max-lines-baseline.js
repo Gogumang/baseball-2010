@@ -124,7 +124,6 @@ export const maxLinesBaseline = [
   'src/pages/special/lib/hallOfFameFigure.ts',
   'src/pages/special/lib/specialLayout.ts',
   'src/pages/special/ui/SkinBackdrops.tsx',
-  'src/pages/special/ui/SpecialScreen.tsx',
   'src/pages/story/lib/eventDialogue.ts',
   'src/pages/story/lib/yearGoalWindow.ts',
   'src/pages/story/model/useEventPlayback.ts',
