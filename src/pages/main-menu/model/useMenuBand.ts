@@ -51,8 +51,8 @@ export function useMenuBand(isOpen: boolean, startsGrown = false): MenuBandState
     }
     handle = requestAnimationFrame(step)
     return () => cancelAnimationFrame(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 열릴 때마다 한 번 센다
-  }, [opening, isOpen])
+    // 열릴 때마다(opening) 한 번 센다 — 닫히거나 다 자라면(isGrowing 거짓) 멈춘다
+  }, [opening, isGrowing])
 
   // 닫혀 있으면(처음 메뉴) 띠는 안 그리고 키도 안 막는다 — 처음 메뉴 갱신 0x29454 는 [0xe2] 를 안 본다
   return isOpen ? menuBandStateAt(tick) : CLOSED

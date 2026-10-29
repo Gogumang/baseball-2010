@@ -798,7 +798,8 @@ function TeamGameScene({
    * 앞에 붙인다. 판(타구 · 주자 판 · 견제 · 밀어내기 재생)은 그 판이 끝나는 그림이다
    */
   const { notePitchResolved } = pitchEnd
-  useEffect(() => {
+  // 진행 한 걸음에 한 번 — 판정이 든 그림의 값으로 싣는다(진행의 다른 칸은 읽기만 한다)
+  const noteThrowPitchEnd = useEffectEvent(() => {
     if (!isThrowPitchEndPendingRef.current) return
     const thrown = progress.lastResolution
     if (thrown === null) return
@@ -809,9 +810,8 @@ function TeamGameScene({
       waitTicks:
         pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order) - 1 + waitTicks,
     })
-    // 진행 한 걸음에 한 번 — 판정이 든 그림의 값으로 싣는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, notePitchResolved])
+  })
+  useEffect(() => noteThrowPitchEnd(), [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, notePitchResolved])
   const pitchEndSerial = pitchEnd.serial
   /** 타석 위 돌발 결과 창(0x1d)이 서 있으면 그 그리기 0x4d1e0 이 상태 틱을 100 으로 박는다 — 아래 창 갈래에서 넣는다 */
   const burstResultTickRef = useRef<number | null>(null)

@@ -24,13 +24,13 @@ import { createMemoryAutoRelayRecordPort, setAutoRelayRecordPort } from '@/entit
  * (`useTeamGame` 감싸기). 창을 닫으면(`closeBurst`) 판정을 내린다
  */
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     LoadingTip: ({ onDone }: { onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }

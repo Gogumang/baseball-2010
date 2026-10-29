@@ -22,13 +22,13 @@ import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
  * 밀어내기 판을 넣는다(`usePitcherGame` 감싸기).
  */
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     LoadingTip: ({ onDone }: { onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }
@@ -38,7 +38,7 @@ const 재생기록 = vi.hoisted(() => [] as string[])
 /** 끝난 진행에 판을 넣기 시작하는가 — 둘째 시험은 경기 끝 판이 선 뒤에 켜 "판과 경기 끝이 함께 온" 화면 쪽 꼴을 만든다 */
 const 주입 = vi.hoisted(() => ({ 켬: true }))
 vi.mock('@/pages/defense/ui/DefensePlayback', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   const { drawnReplayFieldingErrorsOf } = await import('@/features/defense-play/model/fieldingErrors')
   return {
     DefensePlayback: ({
@@ -50,14 +50,14 @@ vi.mock('@/pages/defense/ui/DefensePlayback', async () => {
       onDone: () => void
       onFieldingErrors?: (errors: readonly unknown[]) => void
     }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         if (ticks === undefined) return
         재생기록.push(document.querySelector('[alt="세이브"]') === null ? '재생' : '끝판 뒤 재생')
         const errors = drawnReplayFieldingErrorsOf(ticks)
         if (errors.length > 0) onFieldingErrors?.(errors)
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return <div data-testid="재생판" />
     },
   }
