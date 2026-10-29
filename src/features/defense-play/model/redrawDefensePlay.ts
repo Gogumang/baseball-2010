@@ -1,5 +1,5 @@
 import { drawDefenseScene } from '@/features/defense-play/model/defenseScene'
-import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import type { DefensePlayState } from '@/features/defense-play/model/runDefensePlay'
 
 /**

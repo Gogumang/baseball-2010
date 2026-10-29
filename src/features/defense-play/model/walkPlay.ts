@@ -1,6 +1,6 @@
 import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { runnerSpeedOf, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
-import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import type { HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
 import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { DEFENSE_SCENE_START, type DefenseScene } from '@/features/defense-play/model/defenseScene'
 import {

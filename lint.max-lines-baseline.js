@@ -56,7 +56,6 @@ export const maxLinesBaseline = [
   'src/entities/season-mode/model/seasonStateMachine.ts',
   'src/entities/story/model/rewardNotice.ts',
   'src/entities/story/model/storyScene.ts',
-  'src/features/defense-play/model/defensePlayView.ts',
   'src/features/play-at-bat/model/resolvePitch.ts',
   'src/features/play-game/model/aceCutIn.ts',
   'src/features/play-game/model/useSceneConfirm.ts',

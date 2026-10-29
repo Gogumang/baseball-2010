@@ -1,4 +1,4 @@
-import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import { drawDefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
 

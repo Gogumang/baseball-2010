@@ -1,4 +1,4 @@
-import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/frame/runnerPlayFrame'
 import { drawSceneEffects } from '@/features/defense-play/model/runnerPlay/view/sceneEffects'
 import { snapshotAt } from '@/features/defense-play/model/runnerPlay/view/snapshot'

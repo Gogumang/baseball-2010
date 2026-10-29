@@ -1,4 +1,4 @@
-import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import type { DefenseKeyPress } from '@/features/defense-play/model/runDefensePlay'
 import { openRunnerPlay } from '@/features/defense-play/model/runnerPlay/frame/openRunnerPlay'
 import { runPlayStartDecisions } from '@/features/defense-play/model/runnerPlay/frame/playStart'

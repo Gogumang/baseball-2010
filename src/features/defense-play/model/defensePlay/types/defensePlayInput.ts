@@ -4,7 +4,7 @@ import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { ManualAutoMode } from '@/entities/settings/model/gameSettings'
 import type { DefensePlayControls } from '@/features/defense-play/model/defensePlay/types/defenseKeyPress'
-import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import type { HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { RandomPort } from '@/shared/api/random/randomPort'

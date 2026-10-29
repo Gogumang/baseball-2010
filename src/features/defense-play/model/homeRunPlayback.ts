@@ -2,7 +2,7 @@ import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import { battedBallTrajectory } from '@/entities/batting/model/battedBallFlight'
 import type { BaseState } from '@/entities/game/model/baseState'
-import { aceIndexesWithOriginalBug } from '@/features/defense-play/model/defensePlayView'
+import { aceIndexesWithOriginalBug } from '@/features/defense-play/model/defensePlayView/aceIndexes'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { runDefensePlay, type DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'

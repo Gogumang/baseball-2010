@@ -1,5 +1,5 @@
 import type { BattedBallTrajectory } from '@/entities/fielding/model/catchPrediction'
-import type { BallParticleFacts } from '@/features/defense-play/model/defensePlayView'
+import type { BallParticleFacts } from '@/entities/fielding/model/defenseView/defenseViewState'
 
 /** 0x357e0 — 결과 코드 24~26(홈런성) */
 const HOME_RUN_HIT_CODES: readonly number[] = [24, 25, 26]
