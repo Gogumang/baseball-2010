@@ -38,6 +38,7 @@
 | 포맷 | oxfmt — `pnpm format:check` (설정 `.oxfmtrc.json`) |
 | try/catch | `src/shared/lib/safe` 도우미로만 — oxlint `local/no-try-statement` (`tools/lint/localPlugin.mjs`) |
 | 중첩 · 복잡도 | oxlint `max-depth` 2 · `complexity` 8 · `no-else-return` · `no-lonely-if` · `max-nested-callbacks` 3 — 옛 파일은 `lint.readability-baseline.js` |
+| 응집도 — 안 쓰는 코드 | knip — `pnpm knip` (설정 `knip.jsonc`). 안 쓰는 파일 · export · 의존성 0. 일부러 남긴 원본 기록 · 나중에 쓸 길은 `knip.jsonc` 의 `ignoreIssues` 에 이유와 함께 |
 
 새 파일은 예외 목록에 넣지 않는다. 옛 파일을 고칠 때는 이 기준으로 고치고 목록에서 뺀다.
 
