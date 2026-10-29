@@ -1,13 +1,6 @@
 import { createGlobalTheme } from '@vanilla-extract/css'
 import { UI_COLORS } from '@/shared/config/design'
-
-/**
- * 원본 비트맵 글꼴을 구운 웹폰트의 글꼴 이름.
- *
- * 만드는 법은 `tools/build_webfont.py` 머리 주석에 있다. `@font-face` 선언은
- * `app/styles/global.css.ts` 가 한다 — 여기는 이름만 들고 있다.
- */
-export const PIXEL_FONT_FAMILY = 'SynGak9'
+import { PIXEL_FONT_FAMILY } from '@/shared/config/design/pixelFont'
 
 /**
  * 피처폰 화면의 색·치수 토큰.

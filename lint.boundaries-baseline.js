@@ -30,7 +30,6 @@ export const layerDirectionBaseline = [
   'src/shared/ui/PixelScreen/PixelScreen.css.ts',
   'src/shared/ui/RawScreen/RawScreen.css.ts',
   'src/shared/ui/ScreenOverlay/ScreenOverlay.css.ts',
-  'src/widgets/batting-stage/lib/skillPanel.ts',
   'src/widgets/batting-stage/ui/BattingStage.css.ts',
   'src/widgets/batting-stage/ui/PitcherSideStage.css.ts',
   'src/widgets/entry-editor/lib/entryListWindow.ts',
