@@ -186,7 +186,6 @@ export const readabilityBaseline = [
   'src/pages/management/lib/nariMenuKeys.ts',
   'src/pages/management/lib/nariScreenPush.ts',
   'src/pages/management/lib/nariYearCover.ts',
-  'src/pages/management/model/useManagementMenu.ts',
   'src/pages/management/ui/BasicInfoCard.tsx',
   'src/pages/management/ui/CenterStage.tsx',
   'src/pages/management/ui/CommandBar.tsx',

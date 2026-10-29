@@ -42,7 +42,6 @@ export const maxLinesBaseline = [
   'src/pages/main-menu/lib/mainMenuLayout.ts',
   'src/pages/main-menu/model/mainMenu.ts',
   'src/pages/main-menu/ui/MainMenuScreen.tsx',
-  'src/pages/management/model/useManagementMenu.ts',
   'src/pages/management/ui/ManagementScreen.tsx',
   'src/pages/management/ui/NariYearCoverScreen.tsx',
   'src/pages/management/ui/RadarChart.tsx',
