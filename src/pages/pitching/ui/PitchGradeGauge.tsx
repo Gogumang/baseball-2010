@@ -1,15 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { gameSceneTickSeenAt, inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
-import { GAUGE_LAST_CELL } from '@/entities/pitcher-career/model/pitchGauge'
 import { gaugePressedCellOf, isPitchReleaseDue, originalKeyCodeOf, KEY_OK } from '@/features/play-pitcher-game/model/pitchAim'
 import { gaugeTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
-import { showsGaugeTargetFrameOf } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 import { PressArea } from '@/shared/ui'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
-import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
-import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
+import { gaugeOverlayOf, type GaugeOverlaySource } from './pitchGradeGauge/gaugeOverlay'
+import { isDecidedCell, rememberDrawnCursor, seenCursorOf, seenDrawIndexOf, type DrawnCursor } from './pitchGradeGauge/drawnCursors'
 import { createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 
 interface PitchGradeGaugeProps {
@@ -26,28 +24,9 @@ interface PitchGradeGaugeProps {
    * 아무것도 안 그리고 누름도 안 받은 채 틱 10 에 칸 0 으로 놓는다(등급은 놓기 0x4dbac 가 제구·체력 표로 뽑는다). 기본 참
    */
   readonly showsGauge?: boolean
-  /**
-   * 장면 위 게이지(0x4d2ac — 목표점의 slt_pitch 원)의 재료를 실을 칸 — 확정한 조준점 · 투영 칸 · 환경설정 게이지(+0x2d).
-   * 누름 칸도 그 목표점 둘레에 선다. 안 넘기면(장면 없음) 누름 칸이 판 전체다
-   */
-  readonly overlay?: {
-    readonly ref: PitchInputOverlayRef
-    readonly aim: WorldPoint
-    readonly aimSide: number
-    readonly gaugeSettingOn: boolean
-    /**
-     * 경기 모드 [+0x1104] — 목표 표시 프레임 0x23 판정 0x4d360(`showsGaugeTargetFrameOf`)이 본다. 이 부품은 사람이 던질 때만 서므로
-     * 공격 측은 늘 CPU 다(이글아이 줄 4d380 은 사람 공격 갈래라 안 탄다). 안 주면 예전처럼 게이지 설정만 본다
-     */
-    readonly gameMode?: number
-    /**
-     * 고른 구질이 마구(22)인가 — 장면이 0x11 놓기 전 그림(틱 0~9)에 마구 공 파티클을 쏜다(0x3b2f4 3b4dc · Q-09). 안 주면 거짓
-     */
-    readonly isMagicPitch?: boolean
-  }
+  /** 장면 위 게이지 재료를 실을 칸 (`GaugeOverlaySource`) — 안 넘기면(장면 없음) 누름 칸이 판 전체다 */
+  readonly overlay?: GaugeOverlaySource
 }
-
-const isDecidedCell = (cell: number) => cell >= 1 && cell <= GAUGE_LAST_CELL
 
 /**
  * 원본 투구 게이지 — 경기 상태 0x11 (그리기 0x4d2ac, 누름 0x50e08, 놓기 0x4e060 — P1 4-1 · S5 U-15).
@@ -82,33 +61,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   const releasedRef = useRef(false)
   usePublishedOverlay(
     overlay?.ref,
-    overlay === undefined
-      ? null
-      : {
-          kind: '게이지',
-          aim: overlay.aim,
-          aimSide: overlay.aimSide,
-          showsGauge,
-          gaugeSettingOn: overlay.gaugeSettingOn,
-          ...(overlay.gameMode === undefined
-            ? {}
-            : {
-                showsTargetFrame: showsGaugeTargetFrameOf({
-                  mode: overlay.gameMode,
-                  // 난이도(설정 +0x2c)는 원본도 늘 기본 2 다 — 바꾸는 화면이 없다(P7 K2). 게다가 이 화면은 미션(모드 5)이라
-                  // 4d366 의 난이도 0 갈래는 모드 5 · 6 에서 안 탄다
-                  difficulty: 2,
-                  isAttackSideHuman: false,
-                  eagleEyeGames: 0,
-                  gaugeSettingOn: overlay.gaugeSettingOn,
-                }),
-              }),
-          cursor,
-          pressed,
-          decidedTicks: resultTick,
-          ...(overlay.isMagicPitch === true ? { isMagicPitch: true } : {}),
-          stateTickRef: tickRef,
-        },
+    overlay === undefined ? null : { ...gaugeOverlayOf(overlay, showsGauge, { cursor, pressed, decidedTicks: resultTick }), stateTickRef: tickRef },
   )
   const onReleaseRef = useRef(onRelease)
   useLayoutEffect(() => {
@@ -124,7 +77,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
    * 그림의 커서**다(다음 틀 머리의 0x50e08 이 그 틀 그리기 0x4d708 보다 먼저 읽는다). 웹은 커서를 틱 시계로 올리고 장면이 rAF 로 그리므로
    * 그리기가 밀리면 시각 틱 · 지금 커서가 본 그림보다 한두 칸 앞이다 — 본 틱의 커서로 정한다 (r217)
    */
-  const drawnCursorsRef = useRef<{ readonly tick: number; readonly cursor: number }[]>([])
+  const drawnCursorsRef = useRef<DrawnCursor[]>([])
   useEffect(() => openSceneKeyLatch(keyLatch), [keyLatch])
 
   useEffect(() => {
@@ -156,9 +109,7 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
       } else {
         cursorRef.current += 1
         setCursor(cursorRef.current)
-        const drawn = drawnCursorsRef.current
-        drawn.push({ tick: gameSceneTickNow(), cursor: cursorRef.current })
-        if (drawn.length > 32) drawn.splice(0, drawn.length - 32)
+        rememberDrawnCursor(drawnCursorsRef.current, gameSceneTickNow(), cursorRef.current)
       }
     })
     return () => handle()
@@ -171,14 +122,8 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
   const press = (seenTick: number) => {
     if (releasedRef.current || isPaused || !showsGauge) return
     const drawn = drawnCursorsRef.current
-    let seenIndex = -1
-    for (let index = drawn.length - 1; index >= 0; index -= 1) {
-      if ((drawn[index]?.tick ?? Number.POSITIVE_INFINITY) <= seenTick) {
-        seenIndex = index
-        break
-      }
-    }
-    const seenCursor = seenIndex < 0 ? (drawn.length === 0 ? cursorRef.current : 0) : (drawn[seenIndex]?.cursor ?? cursorRef.current)
+    const seenIndex = seenDrawIndexOf(drawn, seenTick)
+    const seenCursor = seenCursorOf(drawn, seenIndex, cursorRef.current)
     const wasDecided = isDecidedCell(pressedRef.current)
     pressedRef.current = gaugePressedCellOf(pressedRef.current, seenCursor)
     setPressed(pressedRef.current)

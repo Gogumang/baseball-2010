@@ -1,84 +1,35 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
-import { ComposedOverlay, FrameSprite, MessageBox, PressArea } from '@/shared/ui'
-import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
-import { frameComposeOps, type ComposeImageOp, type ComposeOp } from '@/shared/lib/pixelEffect/screenCompose'
+import type { ReactNode } from 'react'
+import { useEffect } from 'react'
+import { MessageBox } from '@/shared/ui'
 import { useRecoloredSprite } from '@/shared/lib/sprite/paletteSwap'
-import { DEFENSE_BACKGROUND_URL } from '@/pages/defense/lib/defenseView'
-import { relayFieldBackgroundAt } from '@/pages/auto-play-relay/lib/relayFieldBackground'
-import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { AutoPlayRelayScreen } from '@/pages/auto-play-relay'
-import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
-import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
+import type { SoundPort } from '@/shared/api/audio/soundPort'
 import type { TeamAutoRelay as TeamAutoRelayState, TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow'
-import { teamAutoRelayEntryStepOf, teamAutoRelayStepOf, teamRelayEntryFiguresOf, teamRelayFiguresOf } from '@/pages/team-game/lib/teamAutoRelay'
-import type { TeamRelayFigures as TeamRelayFiguresValue } from '@/pages/team-game/lib/teamAutoRelay'
 import { TeamRelayFigures } from '@/pages/team-game/ui/TeamRelayFigures'
-import { effectOpacityOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
-import { AUTO_RELAY_SPEED_MAX, autoRelaySpeed, setAutoRelaySpeed } from '@/pages/team-game/model/autoRelaySpeed'
-import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { AUTO_RELAY_SPEED_MAX, autoRelaySpeed } from '@/pages/team-game/model/autoRelaySpeed'
+import { AutoPlayRelayScreen, DEFENSE_BACKGROUND_URL } from './teamAutoRelay/otherSlices'
+import {
+  AUTO_RELAY_BGM,
+  AUTO_RELAY_STOP_QUESTION,
+  CHANGE_IMAGE,
+  GAME_POPUP_DIM_OPACITY,
+  GAME_UI_FRAMES,
+  IMG_TEXT_FRAMES,
+  changeImagePosition,
+  gameUiImageSrc,
+  imageStyle,
+} from './teamAutoRelay/relayLayout'
+import { RelaySpeedPanel } from './teamAutoRelay/RelaySpeedPanel'
+import { useRelayKeys } from './teamAutoRelay/useRelayKeys'
+import { useRelayState } from './teamAutoRelay/useRelayState'
+import { useRelayTick } from './teamAutoRelay/useRelayTick'
 
-/** 화면 240×320 */
-const SCREEN_WIDTH = 240
-const SCREEN_HEIGHT = 320
-/** 상태 0x21 진입 0x3abf0 의 배경음 (모드 ∈ {1, 2, 8, 9} · 속도 ≠ 2) */
-export const AUTO_RELAY_BGM = 33
-/** 0xc2198 이 반 이닝을 넘기면 거는 연출 대기 sim+0x9d */
-export const AUTO_RELAY_CHANGE_WAIT = 10
-/** StrGAME[6] — CLR 중단 질문 (`base/extracted/StrGAME.json` [6] 원문 그대로) */
-export const AUTO_RELAY_STOP_QUESTION = '!C!cFFFFFF자동진행을 중단하시겠습니까?'
-
-const GAME_UI = assetUrl('./sprites/game_ui')
-const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
-const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
-/** game_ui 프레임 92 — 아래 안내 띠 (W/2 − w/2, H − h − 1) */
-const GUIDE_FRAME = 92
-/** game_ui 프레임 33 — 속도 칸 바탕 (W/2 − w/2, 216), 효과 (1, 0xc) */
-const SPEED_PLATE_FRAME = 33
-/** 0xba759 효과 1 · 인자 L = 반투명 겹치기, 그림 몫 L/16 (R6 3a) — 속도 칸 바탕 (1, 0xc) · 꺼진 세모 (1, 6) */
-const SPEED_PLATE_EFFECT_LEVEL = 0xc
-const SPEED_MARK_DIM_EFFECT_LEVEL = 6
-const SPEED_PLATE_Y = 216
-/** img_text 프레임 386 — 속도 글 (W/2 − w/2, 218) */
-const SPEED_LABEL_FRAME = 386
-const SPEED_LABEL_Y = 218
-/** game_ui 그림 97 (5×8) — 깜빡이는 좌우 화살표(y 219) · 속도 세모 세 개 */
-const ARROW_IMAGE = 97
-const ARROW_SIZE = { width: 5, height: 8 } as const
-const ARROW_Y = 219
-/** 세모 줄 y = 196 + 18 + 프레임 33 높이 + 4 */
-const SPEED_PLATE_HEIGHT = 15
-const SPEED_MARKS_Y = 196 + 18 + SPEED_PLATE_HEIGHT + 4
-/** game_ui 그림 93 (98×19) "CHANGE" — 화면 가운데 */
-const CHANGE_IMAGE = 93
-const CHANGE_SIZE = { width: 98, height: 19 } as const
-/**
- * "CHANGE" 자리 (42b44~42bba, U-57 — 직접 뜸): 0xba815(game_ui, 0x5d, 종류 0) 상자 뒤 `x = W/2 − (w / 2)` · `y = H/2 − (h / 2)` —
- * 반은 부호 있는 정수 나눗셈(`lsrs #0x1f ; adds ; asrs #1`)이라 19 → 9 · (71, 151). (앞서 웹은 `trunc(160 − 9.5)` = 150 이었다)
- */
-const changeImagePosition = {
-  x: (SCREEN_WIDTH >> 1) - Math.trunc(CHANGE_SIZE.width / 2),
-  y: (SCREEN_HEIGHT >> 1) - Math.trunc(CHANGE_SIZE.height / 2),
-} as const
-
-/**
- * 질문 창 뒤 어둡게 — 경기 장면은 [창+0x24f] = 1(0x3301c)이라 창을 연 그림에 한 번만 0x746cc 가 검정 단계 5 = (5 + 1)/16 로 덮는다
- * (+0x24d 를 지움). 그 뒤로는 장면을 안 그려(0x52efe — [+0x250] 도 그 그림에 지워진다) 멈춘 장면 + 어둡게 위에 창만 그린다.
- * 단계 5 의 칠하기([0x15605d0] = 0x9b3f4)는 색 몫 (단계 + 1)/16 = 6/16 이다 (`POPUP_DIM_OPACITY`).
- */
-const GAME_POPUP_DIM_OPACITY = POPUP_DIM_OPACITY
-
-/** 부호 있는 바이트로 줄인다 — sim+0x9d 는 `strb` · `lsls #0x18` 로 비교하는 바이트다 */
-function signedByte(value: number): number {
-  return ((((value + 128) % 256) + 256) % 256) - 128
-}
-
-/** 그림(종류 0) 한 장 — 원점 없이 왼쪽 위 */
-function imageStyle(x: number, y: number, extra?: CSSProperties): CSSProperties {
-  return { position: 'absolute', left: x, top: y, imageRendering: 'pixelated', ...extra }
+/** 진입 0x3abf0 — v ≠ 2 면 배경음 33 */
+function useRelayEntryBgm(audio: SoundPort): void {
+  useEffect(() => {
+    if (autoRelaySpeed() !== AUTO_RELAY_SPEED_MAX) audio.playBgm(AUTO_RELAY_BGM)
+  }, [audio])
 }
 
 interface TeamAutoRelayProps {
@@ -145,272 +96,32 @@ export function TeamAutoRelay({
   recordAlert = null,
   onAskingChange,
 }: TeamAutoRelayProps) {
-  const [shown, setShown] = useState<MissionAutoRelayStep>(() => teamAutoRelayEntryStepOf(progress))
-  // 0x18 길은 4faf8 0x47cc8 이 주자 그림판에 마선수 그림을 다시 싣는다(타자 → 가장 앞선 마선수 주자) · 메뉴 길은 타석 0xd 때 그림
-  const [figures, setFigures] = useState<TeamRelayFiguresValue>(() => teamRelayEntryFiguresOf(progress, entryLoadedRunnerAce))
-  const [speed, setSpeed] = useState(autoRelaySpeed)
-  const speedRef = useRef(speed)
-  useLayoutEffect(() => {
-    speedRef.current = speed
-  })
-  const [isChangeShown, setChangeShown] = useState(false)
-  const [isAsking, setAsking] = useState(false)
-  const isAskingRef = useRef(false)
-  const onAskingChangeRef = useRef(onAskingChange)
-  useLayoutEffect(() => {
-    isAskingRef.current = isAsking
-    onAskingChangeRef.current = onAskingChange
-  })
-  useEffect(() => {
-    onAskingChangeRef.current?.(isAsking)
-  }, [isAsking])
-  // 중계 화면이 내려가면 창도 함께 내려간다
-  useEffect(() => () => onAskingChangeRef.current?.(false), [])
-  /** CLR 을 받았다 — 다음 그림(그 키의 그림)이 갱신 · 그리기를 다 한 뒤 질문 창을 띄운다 */
-  const clrPendingRef = useRef(false)
-  const [sceneTick, setSceneTick] = useState(0)
-  /** sim+0x9c · sim+0x9d */
-  const waitRef = useRef({ armed: false, count: 0 })
-  const isDoneRef = useRef(false)
+  const state = useRelayState(progress, entryLoadedRunnerAce, onAskingChange)
   const audio = activeSound()
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   /** 배경 운동장 — `AutoPlayRelayScreen` 과 같은 칠한 그림(같은 캐시) */
   const fieldUrl = useRecoloredSprite(DEFENSE_BACKGROUND_URL, grassPalette)
+  useRelayEntryBgm(audio)
+  const keyLatch = useRelayKeys(state)
+  const onTick = useRelayTick(state, onStep, audio)
+  const { speed, isAsking, setAsking } = state
 
-  // 진입 0x3abf0 — v ≠ 2 면 배경음 33
-  useEffect(() => {
-    if (autoRelaySpeed() !== AUTO_RELAY_SPEED_MAX) audio.playBgm(AUTO_RELAY_BGM)
-  }, [audio])
-
-  /**
-   * 키 0x3e25c — 상태 0x21 의 상태 키 함수(52da2~)라 받은 다음 틀의 진입 뒤 · 갱신 0x48480 앞에서 돈다(`sceneKeyLatch`). 받은 키는 이
-   * 부품의 칸에 들고 장면 틱(`AutoPlayRelayScreen` 의 `useSceneTick`)이 틱 머리에서 꺼낸다 — 속도는 그 틀의 갱신부터 본다
-   */
-  const keyLatch = useSceneKeyLatchOwner()
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (isAskingRef.current || isDoneRef.current) return
-      const change = (delta: number) => {
-        event.preventDefault()
-        keyLatch.push(() => {
-          if (isAskingRef.current || isDoneRef.current) return
-          setAutoRelaySpeed(speedRef.current + delta)
-          speedRef.current = autoRelaySpeed()
-          setSpeed(speedRef.current)
-        })
-      }
-      if (event.key === 'ArrowLeft' || event.key === '4') return change(-1)
-      if (event.key === 'ArrowRight' || event.key === '6') return change(1)
-      if (event.key === 'Escape' || event.key === 'Backspace') {
-        event.preventDefault()
-        // 원본은 키 단계(0x3e25c → 0xbbef8)에서 창을 열고 **같은 그림의** 갱신 0x48480 · 그리기 0x4258c 를 그대로 마친다
-        keyLatch.push(() => {
-          if (!isAskingRef.current && !isDoneRef.current) clrPendingRef.current = true
-        })
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [keyLatch])
-
-  const onTick = (tick: number) => {
-    if (isDoneRef.current || isAskingRef.current) return
-    update(tick)
-    if (clrPendingRef.current) {
-      clrPendingRef.current = false
-      if (isDoneRef.current) return
-      // 창이 떠 있는 동안은 장면 틱(0xbc9c8) · 키 · 갱신이 안 돌고 장면도 다시 안 그린다 — 화면이 `isPaused` 로 멈춘다
-      isAskingRef.current = true
-      setAsking(true)
-    }
-  }
-
-  /** 한 그림 — 갱신 0x48480 뒤 그리기 0x4258c 의 sim+0x9d 셈 */
-  const update = (tick: number) => {
-    setSceneTick(tick)
-    const v = speedRef.current
-    const fast = v === AUTO_RELAY_SPEED_MAX
-    const wait = waitRef.current
-    // 갱신 0x48480
-    let runs = fast || tick % ((AUTO_RELAY_SPEED_MAX - v) * 4) === 0
-    if (runs && wait.armed) {
-      wait.count = signedByte(wait.count - 1)
-      if (wait.count > 0) runs = false
-    }
-    if (runs) {
-      // 0xc2198 머리 — sim+0x9c · +0x9d 를 지운다
-      wait.armed = false
-      wait.count = 0
-      // 걸음 하나 = 0xc262c 한 번(교체 틱 또는 타석 틱)
-      const relay = onStep()
-      if (relay === null) {
-        // 0xc2198 거짓 — +0x1784 = 0 · 상태 0x18 · 0x6e418 배경음 끔
-        isDoneRef.current = true
-        audio.stop()
-        return
-      }
-      const next = relay.ticks[0]
-      if (next !== undefined) {
-        if (next.halfFlipped && !fast) {
-          wait.armed = true
-          wait.count = AUTO_RELAY_CHANGE_WAIT
-        }
-        setShown(teamAutoRelayStepOf(next))
-        // 48572~485a6 — 실린 마선수 그림은 틱을 넘어 이어진다(속도와 상관없이 싣는다)
-        setFigures((previous) => teamRelayFiguresOf(next, previous.loadedRunnerAce))
-      }
-    }
-    // 그리기 0x4258c 42b30 — 모드 · 속도를 안 보고 sim+0x9d 를 그림마다 1 줄이고 > 0 이면 "CHANGE"
-    wait.count = signedByte(wait.count - 1)
-    setChangeShown(wait.count > 0)
-  }
-
-  const fast = speed === AUTO_RELAY_SPEED_MAX
-  const guide = gameUiOrigins?.[String(GUIDE_FRAME).padStart(3, '0')]
-  const plate = gameUiOrigins?.[String(SPEED_PLATE_FRAME).padStart(3, '0')]
-  const label = textOrigins?.[String(SPEED_LABEL_FRAME).padStart(3, '0')]
-  const labelWidth = label?.width ?? 0
-  const marksX = SCREEN_WIDTH / 2 - Math.trunc((3 * ARROW_SIZE.width + 3) / 2)
-  /**
-   * 속도 칸 바탕(효과 1, 0xc) · 꺼진 세모(효과 1, 6) 아래는 0x41230 이 깐 수비 운동장뿐이다 — 운동장 그림(투수 발 y 190 · 타자 머리
-   * y ≥ 238 이고 x 가 세모 줄 밖 · 주자 x 33 · 207 · 포수 y ≥ 250)도 중계 칸(y < 214)도 이 사각형에 안 닿는다. 그래서 운동장 두 장
-   * (`AutoPlayRelayScreen` 의 왼쪽 · 뒤집은 오른쪽)을 같은 좌표로 다시 그려 원본 식으로 섞는다(Q-03 r301, `ComposedOverlay`)
-   */
-  const fieldAt = relayFieldBackgroundAt()
-  const fieldUnderOps: readonly ComposeOp[] = [
-    { kind: 'image', src: fieldUrl, x: fieldAt.x, y: fieldAt.y },
-    { kind: 'image', src: fieldUrl, x: fieldAt.mirroredX, y: fieldAt.y, flipX: true },
-  ]
-  const plateX = SCREEN_WIDTH / 2 - Math.trunc((plate?.width ?? 0) / 2)
-  const plateOps = frameComposeOps(
-    GAME_UI_FRAMES,
-    SPEED_PLATE_FRAME,
-    gameUiOrigins,
-    plateX,
-    SPEED_PLATE_Y,
-    DRAW_EFFECT.TRANSLUCENT,
-    SPEED_PLATE_EFFECT_LEVEL,
-  )
-  const markSrc = `${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`
-  const dimMarkOps: readonly ComposeImageOp[] = [0, 1, 2].map((index) => ({
-    kind: 'image',
-    src: markSrc,
-    x: marksX + index * (ARROW_SIZE.width + 1),
-    y: SPEED_MARKS_Y,
-    effect: DRAW_EFFECT.TRANSLUCENT,
-    argument: SPEED_MARK_DIM_EFFECT_LEVEL,
-  }))
   const overlay = (
     <>
-      {/* 모드 ∈ {1,2,8,9} 면 속도와 상관없이 (42ab2 · 42bbe) */}
-      <div data-testid="중계-속도" data-speed={speed}>
-        {guide !== undefined && (
-          <FrameSprite
-            folder={GAME_UI_FRAMES}
-            frame={GUIDE_FRAME}
-            origins={gameUiOrigins}
-            x={SCREEN_WIDTH / 2 - Math.trunc(guide.width / 2)}
-            y={SCREEN_HEIGHT - guide.height - 1}
-          />
-        )}
-        {plate !== undefined && plateOps[0] !== undefined && (
-          <ComposedOverlay
-            testId="중계-속도칸"
-            rect={{ x: plateOps[0].x, y: plateOps[0].y, width: plate.width, height: plate.height }}
-            underOps={fieldUnderOps}
-            ops={plateOps}
-            fallback={
-              <FrameSprite
-                folder={GAME_UI_FRAMES}
-                frame={SPEED_PLATE_FRAME}
-                origins={gameUiOrigins}
-                x={plateX}
-                y={SPEED_PLATE_Y}
-                style={{ opacity: effectOpacityOf(SPEED_PLATE_EFFECT_LEVEL) }}
-              />
-            }
-          />
-        )}
-        {label !== undefined && (
-          <FrameSprite
-            folder={IMG_TEXT_FRAMES}
-            frame={SPEED_LABEL_FRAME}
-            origins={textOrigins}
-            x={SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2)}
-            y={SPEED_LABEL_Y}
-          />
-        )}
-        {sceneTick % 8 <= 4 && (
-          <>
-            <img
-              alt=""
-              src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
-              style={imageStyle(SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 8, ARROW_Y, { transform: 'scaleX(-1)' })}
-            />
-            <img
-              alt=""
-              src={`${GAME_UI}/${String(ARROW_IMAGE).padStart(3, '0')}.png`}
-              style={imageStyle(SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) + 3, ARROW_Y)}
-            />
-          </>
-        )}
-        {/* 웹 덧붙임 — 속도 화살(5×8, 깜박임) 위 투명 칸: 원본 ← · → 키 한 번(속도 −1 · +1). 같은 키를 상황 버튼으로 또 내지 않는다(필요한 버튼만) */}
-        {!isAsking && (
-          <>
-            <PressArea
-              label="속도 느리게"
-              onPress={() => tapKey('ArrowLeft')}
-              rect={{ x: SCREEN_WIDTH / 2 - Math.trunc(labelWidth / 2) - 13, y: ARROW_Y - 4, width: 14, height: 16 }}
-            />
-            <PressArea
-              label="속도 빠르게"
-              onPress={() => tapKey('ArrowRight')}
-              rect={{ x: SCREEN_WIDTH / 2 + Math.trunc(labelWidth / 2) - 1, y: ARROW_Y - 4, width: 14, height: 16 }}
-            />
-            {/* "CLR 중단" 글자(game_ui 92, 위 안내 그림) 자리 — 원본 CLR 키 한 번(중단 질문). r186 — 늘 있던 뒤로 버튼을 걷었다 */}
-            {guide !== undefined && (
-              <PressArea
-                label="CLR 중단"
-                onPress={() => tapKey('Escape')}
-                rect={{
-                  x: SCREEN_WIDTH / 2 - Math.trunc(guide.width / 2),
-                  y: SCREEN_HEIGHT - guide.height - 1,
-                  width: guide.width,
-                  height: guide.height,
-                }}
-              />
-            )}
-          </>
-        )}
-        {/* 42e7c~42efa — 세 개를 효과 (1, 6) 으로 깐 뒤 i ≤ v 만 효과 0 으로 한 번 더 */}
-        <ComposedOverlay
-          testId="중계-속도세모"
-          rect={{ x: marksX, y: SPEED_MARKS_Y, width: 3 * ARROW_SIZE.width + 2, height: ARROW_SIZE.height }}
-          underOps={fieldUnderOps}
-          ops={dimMarkOps}
-          fallback={[0, 1, 2]
-            .filter((index) => index > speed)
-            .map((index) => (
-              <img
-                key={index}
-                alt=""
-                src={markSrc}
-                style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y, { opacity: effectOpacityOf(SPEED_MARK_DIM_EFFECT_LEVEL) })}
-              />
-            ))}
-        />
-        {[0, 1, 2]
-          .filter((index) => index <= speed)
-          .map((index) => (
-            <img key={index} alt="" data-lit src={markSrc} style={imageStyle(marksX + index * (ARROW_SIZE.width + 1), SPEED_MARKS_Y)} />
-          ))}
-      </div>
-      {isChangeShown && (
+      <RelaySpeedPanel
+        speed={speed}
+        sceneTick={state.sceneTick}
+        isAsking={isAsking}
+        gameUiOrigins={gameUiOrigins}
+        textOrigins={textOrigins}
+        fieldUrl={fieldUrl}
+      />
+      {state.isChangeShown && (
         <img
           alt="CHANGE"
           data-testid="중계-CHANGE"
-          src={`${GAME_UI}/${String(CHANGE_IMAGE).padStart(3, '0')}.png`}
+          src={gameUiImageSrc(CHANGE_IMAGE)}
           style={imageStyle(changeImagePosition.x, changeImagePosition.y)}
         />
       )}
@@ -433,7 +144,7 @@ export function TeamAutoRelay({
 
   return (
     <AutoPlayRelayScreen
-      step={shown}
+      step={state.shown}
       onTick={onTick}
       isPaused={isAsking}
       keyLatch={keyLatch}
@@ -442,7 +153,7 @@ export function TeamAutoRelay({
       overlay={overlay}
       grassPalette={grassPalette}
       // 운동장 그림은 v ≠ 2 일 때만 (`[sp+0x5c]`)
-      field={fast ? null : <TeamRelayFigures figures={figures} />}
+      field={speed === AUTO_RELAY_SPEED_MAX ? null : <TeamRelayFigures figures={state.figures} />}
     />
   )
 }
