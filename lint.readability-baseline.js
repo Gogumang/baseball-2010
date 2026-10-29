@@ -180,7 +180,6 @@ export const readabilityBaseline = [
   'src/pages/management/ui/CommandBar.tsx',
   'src/pages/match-settings/lib/matchSettingsMenu.ts',
   'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
-  'src/pages/mission-play/lib/missionMatchupCards.ts',
   'src/pages/mission-play/lib/missionResultBoard.ts',
   'src/pages/mission-play/ui/MissionHud.tsx',
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
