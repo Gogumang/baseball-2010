@@ -385,7 +385,6 @@ export const readabilityBaseline = [
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
   'src/widgets/screen-frame/model/useListPageEntry.ts',
   'src/widgets/season/lib/postseasonBracketLayout.ts',
-  'src/widgets/season/lib/seasonOuting.ts',
   'src/widgets/season/model/useSeasonCursor.ts',
   'src/widgets/season/ui/SeasonListWindow.tsx',
   'src/widgets/special-swing/lib/specialTrainingWindow.ts',
