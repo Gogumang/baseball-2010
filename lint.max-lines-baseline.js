@@ -184,6 +184,5 @@ export const maxLinesBaseline = [
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
   'src/widgets/player-detail-window/ui/PlayerDetailWindow.tsx',
   'src/widgets/record-pick-popup/ui/RecordPickPopup.tsx',
-  'src/widgets/season/lib/postseasonBracketLayout.ts',
   'src/widgets/special-swing/ui/SpecialTrainingFigure.tsx',
 ]
