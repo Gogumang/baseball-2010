@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { tapKey } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonState } from '@/entities/season-mode/model/seasonRecord'
@@ -29,7 +29,8 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { MarkupText } from '@/shared/ui'
-import { hiddenTeamHintOf } from '@/pages/season/ui/SeasonTeamSelectScreen'
+import { hiddenTeamHintOf } from '@/pages/season/lib/hiddenTeamHint'
+import { tradeQuestionTextOf } from '@/pages/season/lib/tradeQuestion'
 
 /** StrMODE — 트레이드 문구 [163]~[175] · CPU 요청 [204]·[205]·[216] */
 const CHOOSE_ACQUIRED = ORIGINAL_MODE_TEXT[163] // "상대 팀에서 우리 팀으로 영입할 선수를 선택합니다"
@@ -37,22 +38,6 @@ const CHOOSE_GIVEN = ORIGINAL_MODE_TEXT[164] // "상대 팀에게 보상할 우�
 const REFUSE_CAREER = ORIGINAL_MODE_TEXT[165] // "나만의 리그 선수는 트레이드 할 수 없습니다"
 const REFUSE_HALL_OF_FAME = ORIGINAL_MODE_TEXT[166] // "명예의 전당 선수는 트레이드 할 수 없습니다"
 // [167] "트레이드 비용 :" · [168]~[170] 비용 칸 글은 확인 판(`TradeConfirmWindow` · `lib/tradeConfirmLayout`)이 그린다
-const TRADE_QUESTION = ORIGINAL_MODE_TEXT[171] // "!C트레이드를 하시겠습니까?"
-const GAME_POINT_SPENT = ORIGINAL_MODE_TEXT[172] // " !cFFFF00G포인트!cFFFFFF가 소모됩니다"(앞 빈칸 원문)
-
-/**
- * 0xe7 확인(−5 · '5') 이 띄우는 [171] 팝업 글 — 0xc6ae~0xc736 (직접 떴다). 버퍼는 "!C"(0xcc210) 로 시작한다:
- * ```
- * 칸 0      "!C" + [171]
- * 칸 1 · 2  "!C" + 비용표 0xcbbed[칸] × 100 (0xbc73c 정수 이어 붙이기) + [172] + "!N"(0xcbbe0) + [171]
- * ```
- * 칸 0 은 [171] 도 "!C" 로 시작해 "!C" 가 둘이다 — 원본 그대로.
- */
-export function tradeQuestionTextOf(boost: number): string {
-  if (boost === 0) return `!C${TRADE_QUESTION}`
-  // [172] 원문은 " !cFFFF00G포인트…" 로 앞에 빈칸이 있다 — 생성 표가 원문 빈칸을 그대로 둔다(r223)
-  return `!C${tradeBoostCostOf(boost)}${GAME_POINT_SPENT}!N${TRADE_QUESTION}`
-}
 const TRADE_PROGRESS = ORIGINAL_MODE_TEXT[173] // "트레이드 진행 중"
 const TRADE_SUCCESS = ORIGINAL_MODE_TEXT[174] // "트레이드 성공!!!"
 const TRADE_FAILURE = ORIGINAL_MODE_TEXT[175] // "트레이드 실패!!!"
@@ -633,13 +618,15 @@ export function TradeScreen({
 
 /** 목록 윗줄 — 0x6c2bd: 커서가 [윗줄, 윗줄 + 보이는 줄) 밖이면 아래로 나갔을 때 커서 − 보이는 줄 + 1, 위로 나갔을 때 커서 */
 function useListTop(cursor: number, count: number): number {
-  const topRef = useRef(0)
+  const [heldTop, setHeldTop] = useState(0)
   const visible = Math.min(10, count)
-  let top = Math.min(topRef.current, Math.max(0, count - visible))
+  let top = Math.min(heldTop, Math.max(0, count - visible))
   if (cursor < top) top = cursor
   else if (cursor >= top + visible) top = cursor - visible + 1
-  topRef.current = Math.max(0, top)
-  return topRef.current
+  const nextTop = Math.max(0, top)
+  // 윗줄은 지난 렌더의 것에서 이어진다 — 바뀌면 렌더 중에 맞춘다(그림은 이번 값 그대로)
+  if (nextTop !== heldTop) setHeldTop(nextTop)
+  return nextTop
 }
 
 /**
@@ -680,8 +667,7 @@ function TradeProgress({ stage, onComplete, onFinish }: TradeProgressProps) {
   const gauge = stage !== '진행' || isSkipped ? PROGRESS_BOX.width : Math.min((update + 1) * PROGRESS_STEP, PROGRESS_BOX.width)
 
   // 다 찬 틀에 한 번만 굴린다 — 건너뛰기면 그다음 틀
-  const latest = useRef(onComplete)
-  latest.current = onComplete
+  const complete = useEffectEvent(onComplete)
   const [skippedAt, setSkippedAt] = useState<number | null>(null)
   useEffect(() => {
     if (stage !== '진행' || isCompleted.current) return
@@ -689,7 +675,7 @@ function TradeProgress({ stage, onComplete, onFinish }: TradeProgressProps) {
     const isSkipDone = skippedAt !== null && update > skippedAt
     if (!isFull && !isSkipDone) return
     isCompleted.current = true
-    latest.current()
+    complete()
   }, [stage, update, skippedAt])
 
   /** 단계 1 의 확인·취소 — this+0x164 = 너비 (0xc76e~0xc7b6) */
@@ -698,13 +684,15 @@ function TradeProgress({ stage, onComplete, onFinish }: TradeProgressProps) {
     setSkippedAt((current) => current ?? update)
   }
 
+  const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    if (!['Enter', ' ', '5', 'Escape', 'Backspace'].includes(event.key)) return
+    event.preventDefault()
+    if (stage === '진행') return skip()
+    onFinish()
+  })
+  // 등록 차례는 옛 그대로 — 단계 · 틀 · onFinish 가 바뀔 때마다 다시 건다(다른 keydown 처리기와의 차례가 같게)
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!['Enter', ' ', '5', 'Escape', 'Backspace'].includes(event.key)) return
-      event.preventDefault()
-      if (stage === '진행') return skip()
-      onFinish()
-    }
+    const onKeyDown = (event: KeyboardEvent) => handleKey(event)
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [stage, update, onFinish])

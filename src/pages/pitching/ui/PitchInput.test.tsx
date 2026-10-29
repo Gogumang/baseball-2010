@@ -109,7 +109,7 @@ describe('조준 0x10 — 흐르는 조준점', () => {
 })
 
 describe("'*' 로 메뉴를 연 그림에도 0x39c5c 가 한 번 돈다 (52cc6 게이트는 키 앞)", () => {
-  function 메뉴와조준({ onTick }: { readonly onTick: (aim: WorldPoint, direction: AimDirection) => WorldPoint }) {
+  function MenuAndAim({ onTick }: { readonly onTick: (aim: WorldPoint, direction: AimDirection) => WorldPoint }) {
     const menu = useInGameMenuState()
     const { toggle } = menu
     useEffect(() => {
@@ -124,7 +124,7 @@ describe("'*' 로 메뉴를 연 그림에도 0x39c5c 가 한 번 돈다 (52cc6 �
 
   it('방향을 지운 뒤(메시지 8) 그 자리에서 한 틱 — 열린 뒤로는 멈춘다', () => {
     const onTick = vi.fn((aim: WorldPoint, direction: AimDirection) => aimTickOf(aim, direction, 1))
-    render(<메뉴와조준 onTick={onTick} />)
+    render(<MenuAndAim onTick={onTick} />)
     키('6')
     틱(2)
     expect(onTick).toHaveBeenCalledTimes(2)

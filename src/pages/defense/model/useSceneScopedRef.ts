@@ -1,4 +1,4 @@
-import { useRef, type MutableRefObject } from 'react'
+import { useState, type MutableRefObject } from 'react'
 
 /**
  * **경기 장면 0x104 의 수명으로 드는 칸** — 장면 +0x1961~(HOMERUN 글자 칸) · +0xfdc(번트 종류) · 경기 상태 +0x36(표시 비거리) 처럼
@@ -10,11 +10,24 @@ import { useRef, type MutableRefObject } from 'react'
  * 바뀔 때 `initial` 로 되돌린다.
  */
 export function useSceneScopedRef<T>(initial: T, sceneKey: unknown): MutableRefObject<T> {
-  const ref = useRef(initial)
-  const keyRef = useRef(sceneKey)
-  if (keyRef.current !== sceneKey) {
-    keyRef.current = sceneKey
-    ref.current = initial
+  const [scope] = useState(() => createSceneScope(initial, sceneKey))
+  return scope.refFor(initial, sceneKey)
+}
+
+/**
+ * 장면 칸 하나 — 칸 객체는 늘 같고, 장면 열쇠가 바뀐 렌더에서 그 자리를 `initial` 로 되돌린다(같은 칸을 쥔 곳도 되돌린 값을 본다).
+ * 렌더 중에 고치는 것은 예전 그대로다 — 장면을 새로 만든 그림부터 0 이다
+ */
+function createSceneScope<T>(initial: T, sceneKey: unknown) {
+  const ref: MutableRefObject<T> = { current: initial }
+  let key = sceneKey
+  return {
+    refFor(next: T, nextKey: unknown): MutableRefObject<T> {
+      if (key !== nextKey) {
+        key = nextKey
+        ref.current = next
+      }
+      return ref
+    },
   }
-  return ref
 }

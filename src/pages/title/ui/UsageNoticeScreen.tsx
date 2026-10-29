@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { layoutDialogue } from '@/pages/story/lib/eventDialogue'
@@ -44,18 +44,17 @@ interface UsageNoticeScreenProps {
  */
 export function UsageNoticeScreen({ onNext }: UsageNoticeScreenProps) {
   const tick = useUpdateCounter()
-  const onNextRef = useRef(onNext)
-  onNextRef.current = onNext
+  const onNextLatest = useEffectEvent(onNext)
 
   useEffect(() => {
     // 갱신 0x245dc 는 키 값이 0 이 아니기만 하면 넘어간다 — 아무 키나
-    const onKeyDown = () => onNextRef.current()
+    const onKeyDown = () => onNextLatest()
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
   return (
-    <RawScreen onPress={() => onNextRef.current()}>
+    <RawScreen onPress={onNext}>
       <div className={styles.whiteBackground} />
       <LaidOutText raw={USAGE_NOTICE_TEXT} top={BODY_Y} testId="이용안내-본문" />
       {tick % PROMPT_PERIOD !== 0 && <LaidOutText raw={USAGE_NOTICE_PROMPT} top={PROMPT_Y} testId="이용안내-안내" />}

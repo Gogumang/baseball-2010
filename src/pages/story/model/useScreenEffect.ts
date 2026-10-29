@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
@@ -63,12 +63,9 @@ export function useScreenEffect(
   const handledRef = useRef<string | null>(null)
   const handleRef = useRef(0)
   const serialRef = useRef(0)
-  const isVibrationOnRef = useRef(isVibrationOn)
-  isVibrationOnRef.current = isVibrationOn
-  const onEndRef = useRef(onEnd)
-  onEndRef.current = onEnd
-  const onReleaseRef = useRef(onRelease)
-  onReleaseRef.current = onRelease
+  const isVibrationOnNow = useEffectEvent(() => isVibrationOn)
+  const end = useEffectEvent((effectId: number, nextCommand: EventCommand | null) => onEnd?.(effectId, nextCommand))
+  const releaseStep = useEffectEvent((stepKey: string) => onRelease?.(stepKey))
 
   // 효과기는 전역 하나라 다음 명령으로 넘어가도 끝날 때까지 돈다 — 화면을 떠날 때만 멈춘다
   useLayoutEffect(() => () => cancelAnimationFrame(handleRef.current), [])
@@ -84,13 +81,13 @@ export function useScreenEffect(
     const vibrateUpTo = (frame: number) => {
       while (vibrated < entries.length && entries[vibrated].start <= frame) {
         const { vibrationMilliseconds } = entries[vibrated]
-        if (vibrationMilliseconds > 0) vibrate(vibrationMilliseconds, isVibrationOnRef.current)
+        if (vibrationMilliseconds > 0) vibrate(vibrationMilliseconds, isVibrationOnNow())
         vibrated += 1
       }
     }
     vibrateUpTo(0)
     if (releaseFrame === 0) {
-      onReleaseRef.current?.(key)
+      releaseStep(key)
       return undefined
     }
     if (entries.every((entry) => entry.kind === null)) {
@@ -101,7 +98,7 @@ export function useScreenEffect(
           setView((previous) => ({ ...previous, lastEffectId: entry.id }))
         }, entry.start),
       )
-      const release = setAppTickTimeout(() => onReleaseRef.current?.(key), releaseFrame)
+      const release = setAppTickTimeout(() => releaseStep(key), releaseFrame)
       return () => {
         timers.forEach((clear) => clear())
         release()
@@ -135,7 +132,7 @@ export function useScreenEffect(
         }
         if (frameIndex < endFrame) return
         ended[index] = true
-        onEndRef.current?.(entry.id, step.passed[entry.commandIndex + 1] ?? step.command)
+        end(entry.id, step.passed[entry.commandIndex + 1] ?? step.command)
       })
       const active = activeEntryAt(entries, frameIndex)
       const lastEffectId = lastIdAt(frameIndex)
@@ -160,7 +157,7 @@ export function useScreenEffect(
       }
       if (!isReleased && frameIndex >= releaseFrame) {
         isReleased = true
-        onReleaseRef.current?.(key)
+        releaseStep(key)
       }
       if (!isReleased) return true
       if (active === -1) return false

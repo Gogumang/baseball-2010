@@ -255,7 +255,6 @@ export const readabilityBaseline = [
   'src/pages/management/ui/DetailPopup.tsx',
   'src/pages/management/ui/ManagementScreen.tsx',
   'src/pages/management/ui/NariMatchInfoScreen.tsx',
-  'src/pages/management/ui/NariScreenPush.tsx',
   'src/pages/match-settings/lib/matchSettingsMenu.ts',
   'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
   'src/pages/mission-play/lib/missionHudLayout.ts',

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PressArea } from '@/shared/ui'
 import { MENU_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import * as stageScreen from '@/features/play-game/ui/stageScreen.css'
@@ -167,7 +167,9 @@ export function HomeRunDerbyScreen({
    */
   const { confirm, skipHomeRun } = session
   const sceneKeyStateRef = useRef({ acceptsConfirm, isPlayRunning })
-  sceneKeyStateRef.current = { acceptsConfirm, isPlayRunning }
+  useLayoutEffect(() => {
+    sceneKeyStateRef.current = { acceptsConfirm, isPlayRunning }
+  })
   const pressConfirm = useCallback(() => {
     pushSceneKey(() => {
       if (sceneKeyStateRef.current.acceptsConfirm) confirm()

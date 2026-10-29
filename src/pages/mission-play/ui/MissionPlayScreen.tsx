@@ -1,6 +1,6 @@
 import type { PitchResolvedReply } from '@/widgets/batting-stage/lib/stageText'
 import type { LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { MutableRefObject } from 'react'
@@ -337,23 +337,25 @@ export function MissionPlayScreen({
   const { pressStar } = menu
   // 단말 일시정지 0x463ac — 끝난 미션(결과 판) 밖이고 하위 창이 없으면 같은 메뉴를 연다
   useInGameMenuOpenOnHide(menu, !isOver && overlay === null)
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return
-      // '*'(소프트키1 −6 도 '*', 498e8)는 상태 0xd~0x15 에서 경기 중 메뉴 0x3c02c 를 연다(4991c~49922 — 모드를 안 본다).
-      // 미션 장면도 경기 장면 0x104 다. 결과 판(끝난 미션)은 범위 밖 · 조작방법 뷰어의 키는 뷰어 0x637d0 만 받는다(0x3ca36)
-      if (event.key === '*') {
-        if (isOver || overlay === '조작방법') return
-        event.preventDefault()
-        return pressStar()
-      }
-      if (isMenuOpen || overlay !== null) return
-      const base = stealBaseOfKey(event.key)
-      if (base !== null && stealableBases.includes(base)) {
-        event.preventDefault()
-        stealIfFlying(base)
-      }
+  const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.repeat) return
+    // '*'(소프트키1 −6 도 '*', 498e8)는 상태 0xd~0x15 에서 경기 중 메뉴 0x3c02c 를 연다(4991c~49922 — 모드를 안 본다).
+    // 미션 장면도 경기 장면 0x104 다. 결과 판(끝난 미션)은 범위 밖 · 조작방법 뷰어의 키는 뷰어 0x637d0 만 받는다(0x3ca36)
+    if (event.key === '*') {
+      if (isOver || overlay === '조작방법') return
+      event.preventDefault()
+      return pressStar()
     }
+    if (isMenuOpen || overlay !== null) return
+    const base = stealBaseOfKey(event.key)
+    if (base !== null && stealableBases.includes(base)) {
+      event.preventDefault()
+      stealIfFlying(base)
+    }
+  })
+  // 등록 차례는 옛 그대로 — 아래 값이 바뀔 때마다 다시 건다(다른 keydown 처리기와의 차례가 같게). 처리는 그때 값으로
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => handleKey(event)
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isMenuOpen, isOver, onSteal, overlay, stealableBases, pressStar])

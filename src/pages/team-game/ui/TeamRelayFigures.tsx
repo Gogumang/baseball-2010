@@ -14,10 +14,10 @@ const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
 
 /** 기준점 — 425d8 r6 = W >> 1 · 425f2 r7 = (H >> 1) + 0x1e */
-export const RELAY_FIGURES_CENTER = { x: SCREEN_WIDTH >> 1, y: (SCREEN_HEIGHT >> 1) + 0x1e } as const
+const RELAY_FIGURES_CENTER = { x: SCREEN_WIDTH >> 1, y: (SCREEN_HEIGHT >> 1) + 0x1e } as const
 
 /** 주자 자리 표 0xd0028 — 1루 (+87, −10) · 2루 (0, −80) · 3루 (−87, −10) */
-export const RELAY_BASE_OFFSETS = [
+const RELAY_BASE_OFFSETS = [
   { x: 87, y: -10 },
   { x: 0, y: -80 },
   { x: -87, y: -10 },

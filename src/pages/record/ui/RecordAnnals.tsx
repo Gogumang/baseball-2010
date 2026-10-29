@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { noteSkinShakeDirection } from '@/shared/lib/cursorShake/skinShakeDirection'
 import type { ReactNode } from 'react'
 import { CommonPanel, FrameSprite, InsetBox, PressArea, RawScreen, useImgTextPalette3 } from '@/shared/ui'
@@ -205,9 +205,8 @@ export function RecordAnnals({ collection, onBack, gamePoint = 0, secretCode: he
   const [listBuiltAt, setListBuiltAt] = useState(0)
   // 들어올 때 0x2407c — 버퍼 this+0x178 만 비운다. 이 화면이 떠 있는 동안은 여기만 고치므로 바뀔 때마다 위로 알린다
   const [secretCode, setSecretCode] = useState(() => enterAnnalsSecretCode(heldSecretCode ?? INITIAL_SECRET_CODE_STATE))
-  const reportSecretCode = useRef(onSecretCodeChange)
-  reportSecretCode.current = onSecretCodeChange
-  useEffect(() => reportSecretCode.current?.(secretCode), [secretCode])
+  const reportSecretCode = useEffectEvent((code: typeof secretCode) => onSecretCodeChange?.(code))
+  useEffect(() => reportSecretCode(secretCode), [secretCode])
   const frames = useFrameOrigins(SLT_FRAMES)
   const textFrames = useFrameOrigins(IMG_TEXT)
   /**
@@ -676,9 +675,6 @@ function CellGrid({
     </>
   )
 }
-
-/** 앱을 새로 띄운 것과 같다 (0x5390c) — 테스트용. 카운터는 `shared/lib/skinTicker` 에 앱 하나로 있다 */
-export { resetSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
 
 /**
  * 탭 0 설명 — 흐르는 글 0x5a8c8. [skin+0x284] 로 x 를 정해 그린 **뒤** 3 올린다(0x5a958~0x5a962) —

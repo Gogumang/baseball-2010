@@ -45,7 +45,7 @@ import {
   abilityAtLimitTextOf,
   popularityShortageTextOf,
   trainingQuestionOf,
-  useQuestionOf,
+  magicUseQuestionOf,
 } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import type { PitcherManagementCommand } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import { pitcherRestBlockReasonOf, recoverAfterPitcherRest, runPitcherRest } from '@/pages/pitcher-league/model/pitcherRest'
@@ -500,7 +500,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
        */
       return setSubWindow('기록실')
     },
-    [onOpenShop, openChoice, openPitchWindow],
+    [onOpenShop, openPitchWindow],
   )
 
   const selectTraining = useCallback(
@@ -676,7 +676,7 @@ export function usePitcherManagementMenu(input: UsePitcherManagementMenuInput): 
       if (reason !== null) return setNotice(PITCHER_MANAGEMENT_TEXT.magicNeedsTraining)
       const name = magicPitchNameOf(magicNumberOfCell(cellIndex), pitcherFormOfCareer(career)) ?? ''
       return setQuestion({
-        text: useQuestionOf(name),
+        text: magicUseQuestionOf(name),
         onYes: () => onSave(selectMagicPitch(career, cellIndex)),
       })
     },

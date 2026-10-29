@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { RawScreen, SpriteNumber, useImgTextPalettes } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -135,13 +135,12 @@ function NumberValue({
  * 구장 줄은 흐르는 글 0x5a8c8 (`StadiumTicker`).
  */
 export function SeasonTeamInfoScreen({ teamId, teamAbilities, rows, gamePoint = 0, hasCardBadge = false, onBack }: SeasonTeamInfoScreenProps) {
-  const latestBack = useRef(onBack)
-  latestBack.current = onBack
+  const latestBack = useEffectEvent(onBack)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' && event.key !== 'Backspace') return
       event.preventDefault()
-      latestBack.current()
+      latestBack()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

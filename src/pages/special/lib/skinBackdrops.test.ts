@@ -16,7 +16,7 @@ import {
   rgbTo565,
   whitenStep3Of565,
 } from '@/pages/special/lib/skinBackdrops'
-import { GPOINT_ANIMATION } from '@/pages/special/ui/SkinBackdrops'
+import { GPOINT_ANIMATION } from '@/pages/special/lib/skinBackdrops'
 import { grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
 import type { Sprite565 } from '@/shared/lib/pixelEffect/screenCompose'
 

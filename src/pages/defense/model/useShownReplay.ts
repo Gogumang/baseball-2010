@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 
 /**
@@ -22,7 +22,9 @@ export function useShownReplay(play: DefensePlayResult | null, onShown?: (play: 
   /** 이미 다 보여 준 플레이 — 같은 플레이를 두 번 재생하지 않는다 */
   const [shownPlay, setShownPlay] = useState<DefensePlayResult | null>(null)
   const onShownRef = useRef(onShown)
-  onShownRef.current = onShown
+  useLayoutEffect(() => {
+    onShownRef.current = onShown
+  })
   const finishPlayback = useCallback(() => {
     setShownPlay(play)
     onShownRef.current?.(play)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { addSkinStepCounter, useMirrorSkinStepCounter } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import type { CSSProperties } from 'react'
@@ -241,21 +241,22 @@ function RoundedBorder({
 function YearRecordScreen({ edition, rows, title, gamePoint, onBack }: YearRecordScreenProps) {
   const columns = yearColumnsOf(edition)
   const [view, setView] = useState<YearRecordView>(OPEN_YEAR_RECORD_VIEW)
-  const latest = useRef({ onBack, rowCount: rows.length })
-  latest.current = { onBack, rowCount: rows.length }
+  const latest = useEffectEvent(() => ({ onBack, rowCount: rows.length }))
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 줄 수는 키를 받은 때의 값 — 갱신 함수는 렌더 중에 돌 수 있어 미리 꺼내 둔다
+      const { onBack: back, rowCount } = latest()
       // 0x1463c: 취소(−16)는 106 을 걸고 **돌아가지 않고** 아래로 흐른다(14644~1464c 뒤 14650) — [+0x164] == 0 갈래에서 '0'(0x30) ·
       // '*'(0x2a) 만 버리고(1465e~14664) 취소를 포함한 나머지는 0x55865 로 간다. 0x55864 머리가 [+0x40c] += 1(55868~55874) 한 뒤
       // 취소는 보기 전용 갈래 558d6 → 55908([+0x418] == −1 → +0x338 = 1)뿐이라 판은 그대로다 — 곧 취소도 한 번 센다(r168).
       if (isCancelKey(event.key)) {
         addSkinStepCounter()
-        setView((held) => pressYearRecordKey(held, '기타', latest.current.rowCount))
-        latest.current.onBack()
+        setView((held) => pressYearRecordKey(held, '기타', rowCount))
+        back()
       } else {
         const key = YEAR_KEYS[event.key]
-        if (key !== undefined) setView((held) => pressYearRecordKey(held, key, latest.current.rowCount))
+        if (key !== undefined) setView((held) => pressYearRecordKey(held, key, rowCount))
         else if (!['0', '*'].includes(event.key)) return
       }
       event.preventDefault()
@@ -435,8 +436,7 @@ interface NariRankingScreenProps {
 function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRankingScreenProps) {
   const side = nariRankingSideOf(edition)
   const [page, setPage] = useState(0)
-  const latest = useRef({ onBack })
-  latest.current = { onBack }
+  const latest = useEffectEvent(() => ({ onBack }))
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // 0x1463c: 취소는 106 을 걸고도 아래로 흘러(14650) 순위 갈래(14670)에서 0x5787d(−16) 로 간다 — 쪽은 안 바뀌고
@@ -444,7 +444,7 @@ function NariRankingScreen({ edition, career, title, gamePoint, onBack }: NariRa
       // 그 밖의 키는 모두 0x5787d — 쪽이 바뀌든 말든 += 1.
       if (isCancelKey(event.key)) {
         addSkinStepCounter()
-        latest.current.onBack()
+        latest().onBack()
       } else if (event.key === 'ArrowRight' || event.key === '6') {
         addSkinStepCounter()
         setPage((held) => moveRankingPage(side, held, 1))

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { checkSeasonGpItem, checkSeasonSubItem } from '@/entities/season-mode/model/seasonItemShop'
@@ -92,14 +92,13 @@ export function SeasonItemShopScreen({
   }
 
   const isPopup = notice !== null || question !== null || lackNotice !== null
-  const latest = useRef({ isPopup, onBack })
-  latest.current = { isPopup, onBack }
+  const latest = useEffectEvent(() => ({ isPopup, onBack }))
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (latest.current.isPopup) return
+      if (latest().isPopup) return
       if (event.key !== 'Escape' && event.key !== 'Backspace') return
       event.preventDefault()
-      latest.current.onBack()
+      latest().onBack()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

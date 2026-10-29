@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
@@ -97,9 +97,7 @@ export function SpecialEditScreen({ gamePoint, onRename, onBack }: SpecialEditSc
   // 머리띠 미끄러짐 [skin+0x84] 는 상태 29 진입 0x24804(24846) 와 그림 0x2e1e0 의 공용 목록 0x63b14(상태 틱 0 인 첫 그림)만 세운다.
   // 하위 0 ↔ 1 ↔ 2 는 [skin+0xe6] 만 바뀌고 상태 틱은 이어지므로 다시 미끄러지지 않는다 — 처음 선 하위 0 에서만 미끄러진다
   const [hasLeftTeamSelect, setLeftTeamSelect] = useState(false)
-  useEffect(() => {
-    if (state.step !== SPECIAL_EDIT_STEP.팀고르기) setLeftTeamSelect(true)
-  }, [state.step])
+  if (state.step !== SPECIAL_EDIT_STEP.팀고르기 && !hasLeftTeamSelect) setLeftTeamSelect(true)
   // 하위 1(선수 고르기 — 엔트리 창, [skin+0xe6] == 1)은 갱신 0x2b2e0 의 2b444~2b44e 가 **날 키**를 0x5550d 에 넘긴 뒤 창 키 0x55865 에
   // 준다([skin+0xe4] 확인 없이) — 화살표면 까딱임 방향 [skin+0x8c] 에 남는다(Q-10). 하위 2(이름 창)는 안 넘긴다
   useEffect(() => {
@@ -221,27 +219,29 @@ function EditTeamSelect({ cursor, gamePoint, onMove, onPoint, onChoose, onBack, 
   // 격자 시작 0x7a005(격자, [skin+0xe8], 1, 1) — [격자+6] = 1 이라 칸이 바뀐 키에 커서 튕김 (0x6409c)
   const bounce = useGridCursorBounce()
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (keyLock.current) return
-      const direction = ARROW_DIRECTIONS[event.key]
-      // 하위 0: 격자 vt+0x18(숫자키 꼴 1)이 바꾼 키를 0x5550d 에 넘긴다(2b328~2b33e) — '2' '4' '6' '8' 도 방향으로 남는다(Q-10)
-      if (direction !== undefined) noteSkinShakeDirection(direction)
-      if (direction !== undefined) {
-        event.preventDefault()
-        if (moveGridCursor(EDIT_GRID_SHAPE, cursor, direction) !== cursor) bounce.start(direction)
-        return onMove(direction)
-      }
-      if (event.key === 'Enter' || event.key === '5') {
-        event.preventDefault()
-        return onChoose()
-      }
-      // CLR(−16) — 웹은 다른 화면과 같이 Escape · Backspace 둘 다 CLR 로 받는다 (갱신 0x2b2e0 하위 0)
-      if (event.key === 'Escape' || event.key === 'Backspace') {
-        event.preventDefault()
-        onBack()
-      }
+  const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    if (keyLock.current) return
+    const direction = ARROW_DIRECTIONS[event.key]
+    // 하위 0: 격자 vt+0x18(숫자키 꼴 1)이 바꾼 키를 0x5550d 에 넘긴다(2b328~2b33e) — '2' '4' '6' '8' 도 방향으로 남는다(Q-10)
+    if (direction !== undefined) noteSkinShakeDirection(direction)
+    if (direction !== undefined) {
+      event.preventDefault()
+      if (moveGridCursor(EDIT_GRID_SHAPE, cursor, direction) !== cursor) bounce.start(direction)
+      return onMove(direction)
     }
+    if (event.key === 'Enter' || event.key === '5') {
+      event.preventDefault()
+      return onChoose()
+    }
+    // CLR(−16) — 웹은 다른 화면과 같이 Escape · Backspace 둘 다 CLR 로 받는다 (갱신 0x2b2e0 하위 0)
+    if (event.key === 'Escape' || event.key === 'Backspace') {
+      event.preventDefault()
+      onBack()
+    }
+  })
+  // 등록 차례는 옛 그대로 — deps 가 바뀔 때만 다시 건다(다른 처리기와의 차례 유지). 처리는 그때 렌더 값으로
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => handleKey(event)
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onMove, onChoose, onBack, keyLock, cursor, bounce.start])
@@ -418,9 +418,11 @@ const EDIT_NAME_CLEAR_OFFER: TouchKeyOffer = { key: 'Escape', label: '지우기�
 function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
   const [name, setName] = useState('')
   const nameRef = useRef(name)
-  nameRef.current = name
   const handlersRef = useRef({ onConfirm, onCancel })
-  handlersRef.current = { onConfirm, onCancel }
+  useLayoutEffect(() => {
+    nameRef.current = name
+    handlersRef.current = { onConfirm, onCancel }
+  })
   // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침을 건너뛴다
   const bandRef = useRef<HTMLDivElement>(null)
   const [hasNoLayout, setHasNoLayout] = useState(false)
@@ -433,7 +435,9 @@ function EditNamePopup({ onConfirm, onCancel }: EditNamePopupProps) {
    */
   const motion = usePopupWindowMotion({ targetHeight: POPUP_HEIGHT, skipsMotion: hasNoLayout })
   const motionRef = useRef(motion)
-  motionRef.current = motion
+  useLayoutEffect(() => {
+    motionRef.current = motion
+  })
 
   useEffect(() => {
     // 창이 떠 있는 동안 키는 창 것이다 — 뒤의 엔트리 화면(window 리스너)이 숫자·* 키를 가로채지 않게 잡는 단계에서 멈춘다

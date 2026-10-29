@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { InputMethodText, MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { InputModeBox } from '@/shared/ui/InputMethodText/InputModeBox'
 import { DescriptionBand } from '@/shared/ui/DescriptionBand/DescriptionBand'
@@ -12,34 +12,10 @@ import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { SeasonTeamCard } from '@/pages/season/ui/SeasonTeamCard'
 import { SeasonTeamInfoPanel } from '@/pages/season/ui/SeasonTeamInfoScreen'
 import type { TeamInfoRow } from '@/pages/season/lib/seasonTeamInfo'
-import { hiddenTeamUnlockIdOf, isUnlocked } from '@/shared/config/unlocks'
+import { hiddenTeamHintOf } from '@/pages/season/lib/hiddenTeamHint'
 
 /** 0xca 에서 고를 수 있는 칸의 끝 — 칸 > 9(히든 팀 10~14)는 힌트만 띄운다 (0x8e06 `cmp r3, #9`) */
 const LAST_PICKABLE_TEAM = 9
-/** 히든 팀 첫 칸 — 힌트 글은 StrMODE[226 + (칸 − 10)] */
-const FIRST_HIDDEN_TEAM = 10
-
-/**
- * 히든 팀 힌트 팝업 글 — 0x8e18~0x8ec2 (직접 떴다). 칸은 메뉴 +0xc(열)로 고르고 해금은 전역 +0x70 + 칸:
- * ```
- * 열렸으면   sprintf("%s!N%s!N!N%s",      [225], [226 + 열], [1])
- * 아니면     sprintf("%s!N%s!N!N%s!N%s",  [225], [226 + 열], [0], [1])   → 팝업 (1, 1, 1)
- * ```
- * [225] "<히든 팀 오픈 힌트>" · [226~230] 팀별 힌트 · [0] "선택 할 수 없는 팀입니다" · [1] "일반모드에서 사용 할 수 있습니다".
- * 트레이드 팀 고르기 0xe4(0x82c2~0x8374)도 같은 글이다.
- */
-export function hiddenTeamHintOf(teamId: number, openedHiddenIds: readonly number[]): string {
-  const title = ORIGINAL_MODE_TEXT[225] ?? ''
-  const hint = ORIGINAL_MODE_TEXT[226 + teamId - FIRST_HIDDEN_TEAM] ?? ''
-  const cannotPick = ORIGINAL_MODE_TEXT[0] ?? ''
-  const generalModeOnly = ORIGINAL_MODE_TEXT[1] ?? ''
-  // 해금 표(`unlocks.json`)가 풀면 열린 팀의 글([0] 줄 없음)이다
-  const unlockId = hiddenTeamUnlockIdOf(teamId)
-  const original = () => openedHiddenIds.includes(teamId)
-  return (unlockId === null ? original() : isUnlocked(unlockId, original))
-    ? `${title}!N${hint}!N!N${generalModeOnly}`
-    : `${title}!N${hint}!N!N${cannotPick}!N${generalModeOnly}`
-}
 
 export interface SeasonTeamSelectScreenProps {
   /** 전역 저장 +0x70 + 칸 — 열린 히든 팀은 격자에 그림이 서지만 시즌에서는 고를 수 없다 */
@@ -183,17 +159,16 @@ const NAME_OK_PRESS_RECT = { x: 2, y: 320 - 18, width: 47, height: 12 } as const
 function SeasonTeamNameScreen({ teamId, onConfirm, onBack, gamePoint, infoRows }: SeasonTeamNameScreenProps) {
   const [name, setName] = useState('')
   const [isAsking, setAsking] = useState(false)
-  const latest = useRef({ name, onBack })
-  latest.current = { name, onBack }
+  const latest = useEffectEvent(() => ({ name, onBack }))
 
   useEffect(() => {
     if (isAsking) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current.name
+      const current = latest().name
       // 취소(−16) — 원본 CLR 은 지우기와 되돌아가기를 한 키가 한다
       if (event.key === 'Escape' || (event.key === 'Backspace' && current === '')) {
         event.preventDefault()
-        if (current === '') return latest.current.onBack()
+        if (current === '') return latest().onBack()
         return setName(nameWithoutLastChar(current))
       }
       if (event.key === 'Enter') {

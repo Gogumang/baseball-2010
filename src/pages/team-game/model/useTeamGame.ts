@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { startPlayClock } from '@/entities/collection/model/playClock'
 import { mountOnce } from '@/shared/lib/strictMount/strictMount'
 import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
@@ -253,7 +253,9 @@ export function useTeamGame(
   const progressRef = useRef(progress)
   const audio = activeSound()
   const isVibrationOnRef = useRef(isVibrationOn)
-  isVibrationOnRef.current = isVibrationOn
+  useLayoutEffect(() => {
+    isVibrationOnRef.current = isVibrationOn
+  })
 
   /**
    * 진행 한 걸음을 먹이고, 그 사이에 원본이 내는 소리를 울린다.

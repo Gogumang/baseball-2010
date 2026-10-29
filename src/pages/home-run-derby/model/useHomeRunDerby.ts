@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { LaunchedShot } from '@/widgets/batting-stage/lib/hitPause'
 import { startPlayClock } from '@/entities/collection/model/playClock'
 import { openScenePatternDeck } from '@/entities/batting/model/battedBallOutcome'
@@ -396,12 +396,14 @@ export function useHomeRunDerby({
   const [benchClearingEntryRolls, setBenchClearingEntryRolls] = useState<readonly BenchClearingEntryRoll[] | null>(null)
   const isBenchClearingRef = useRef(false)
   const myTeamIdRef = useRef(myTeamId)
-  myTeamIdRef.current = myTeamId
   const modeBatterSlotRef = useRef(modeBatterSlot)
-  modeBatterSlotRef.current = modeBatterSlot
+  useLayoutEffect(() => {
+    myTeamIdRef.current = myTeamId
+    modeBatterSlotRef.current = modeBatterSlot
+  })
   /** 공격 팀 타순 — 셈(예약 포함)은 ref, 화면 칸은 0xd 에서 타순이 넘어갈 때 맞춘다 */
-  const lineupRef = useRef<DerbyLineup>(createDerbyLineup(myTeamId, modeBatterSlot))
-  const [lineup, setLineup] = useState<DerbyLineup>(lineupRef.current)
+  const [lineup, setLineup] = useState<DerbyLineup>(() => createDerbyLineup(myTeamId, modeBatterSlot))
+  const lineupRef = useRef<DerbyLineup>(lineup)
   /** 경기 초기화 0x39fdc 모드 7 — 팀 0 을 새로 세워 타순을 모드 타자 칸 k 로 */
   const startLineup = () => {
     const fresh = createDerbyLineup(myTeamIdRef.current, modeBatterSlotRef.current)
@@ -437,13 +439,22 @@ export function useHomeRunDerby({
   // `runRef` 가 셈의 원본이다 — 화면 칸 `run` 은 판 끝에야 따라오므로 그림마다 되덮지 않는다
   const runRef = useRef(run)
   const bestRef = useRef(bestDistance)
-  bestRef.current = bestDistance
   const onFinishRef = useRef(onFinish)
-  onFinishRef.current = onFinish
   const onOpenHiddenRef = useRef(onOpenHidden)
-  onOpenHiddenRef.current = onOpenHidden
   const randomRef = useRef(random)
-  randomRef.current = random
+  useLayoutEffect(() => {
+    bestRef.current = bestDistance
+    onFinishRef.current = onFinish
+    onOpenHiddenRef.current = onOpenHidden
+    randomRef.current = random
+  })
+
+  const audio = activeSound()
+  const audioRef = useRef(audio)
+  useLayoutEffect(() => {
+    audioRef.current = audio
+  })
+  const isAwaitingConfirmRef = useRef(isAwaitingConfirm)
 
   // 장면에 들어선 첫 그림 뒤 한 번 — 첫 공(상태 0xd → 투구)보다 앞이다. StrictMode 의 효과 두 번 돌기에도 한 번만
   const isSceneStartRolledRef = useRef(false)
@@ -521,7 +532,6 @@ export function useHomeRunDerby({
     setIsAwaitingConfirm(true)
     armConfirmLock()
   }
-  const isAwaitingConfirmRef = useRef(isAwaitingConfirm)
 
   /**
    * 상태 0xd 진입 0x48d50 이 진행에 하는 일 — 모드 7 · 단계 > 0 이면 마투수 표 0xcfce8[단계 − 1] 레코드를 지금 투수에
@@ -599,10 +609,6 @@ export function useHomeRunDerby({
     [],
   )
 
-  const audio = activeSound()
-  const audioRef = useRef(audio)
-  audioRef.current = audio
-
   /** 0x45a0c~0x45a18 — 콤보 표시를 끄고 +0x84 = 0 */
   const endShownCombo = () => {
     clearComboTimer()
@@ -639,6 +645,151 @@ export function useHomeRunDerby({
     setIsAwaitingConfirm(false)
     enterNextPitch()
   }, [])
+
+  /** 이번 공이 사구(판정 v4)였나 — 0x12 대기 끝의 벤치 클리어링 굴림 조건 */
+  const isHitByPitchRef = useRef(false)
+
+  /** 판 안 소리를 공 틱에 맞춰 건다 — `fromTick` 앞의 틱은 이미 지났다 */
+  const schedulePlaySounds = (batted: DerbyBattedBall, startedAt: number, fromTick: number) => {
+    const soundTicks = [
+      ...batted.homeRunTicks.map((tick) => ({ tick, soundId: DERBY_HOME_RUN_SOUND })),
+      ...(batted.foulCallTick === null ? [] : [{ tick: batted.foulCallTick, soundId: FOUL_CALL_SOUND }]),
+    ].filter(({ tick }) => tick >= fromTick)
+    const elapsed = gameSceneNow() - startedAt
+    for (const { tick, soundId } of soundTicks) {
+      playSoundTimersRef.current.push(
+        setGameSceneTimeout(() => playSoundIds(audioRef.current, [soundId]), Math.max(0, tick * millisecondsPerFrame() - elapsed)),
+      )
+    }
+  }
+
+  /** HOMERUN 글자 창 · 비거리 판을 이 판으로 — 글자 칸은 판 앞에 남은 칸에서 셈한다 */
+  const showPlay = (batted: DerbyBattedBall, field: DerbyFieldPlay) => {
+    const play = playRef.current
+    if (play === null) return
+    const text = derbyHomeRunTextOf(batted, play.startedAt, play.textSceneBefore, millisecondsPerFrame())
+    homeRunTextSceneRef.current = text.after
+    setHomeRunText(text.window)
+    setDistanceBoard({ startedAt: play.startedAt, batted, previous: play.runBefore.lastDistance, field })
+  }
+
+  /**
+   * 0xae3e8/0xae24c 모드 7 갈래 — 이 판의 홈런 · 비거리로 진행을 셈한다. 셈은 판 시작에 미리 해 두고(난수를 안 쓴다)
+   * 화면 칸(`run`)은 판 끝 `armPlayEnd` 에서 맞춘다.
+   */
+  const nextSceneStateRef = useRef<number>(0xf)
+  const applyPlayResult = (before: DerbyRun, batted: DerbyBattedBall | null, zoneHit: boolean) => {
+    const isHomeRun = batted?.isHomeRun ?? false
+    const next = applyDerbyPitch(before, {
+      isHomeRun,
+      distance: batted?.distance ?? 0,
+      displayDistance: batted?.displayDistance ?? null,
+      isEventZoneHit: zoneHit,
+    })
+    // 0xae3e8/0xae24c 가 돌려주는 다음 상태 — 0xd(→ 0xe OK 대기) · 0xf · 0x1a
+    nextSceneStateRef.current = derbySceneStateAfter(before, next)
+    runRef.current = next
+  }
+
+  /** 0xae3e8 · 0xae24c 를 지난 뒤 — 화면 칸을 셈에 맞추고 다음 상태(0xf · 0xd · 0x1a)로 */
+  const finishPitch = () => {
+    // 0xae3e8 · 0xae24c — 기회 · 공 번호 · 누적 · 콤보 칸이 여기서 바뀐다
+    setRun(runRef.current)
+    if (runRef.current.isFinished) {
+      const finished = derbyResultOf(runRef.current, bestRef.current)
+      setResult(finished)
+      // 결과 창 진입 0x4f574 의 4f6b0 — 구장 준비 0x352e8 을 다시 불러 하늘 줄 rand(0, 6) 을 한 번 더 굴린다(결과 배경이 이 줄)
+      if (randomRef.current !== undefined) setSkyRow(randomRef.current.rand(0, SKY_ROW_COUNT))
+      // 결과 창(상태 0x1a) 진입 0x4f574 — 누적 > 저장 +0x5c 면 신기록 0x1f(31), 아니면 0x20(32)
+      // 을 예약한다 (R14 1-2 · L 1-F). 승패 징글과 **같은 번호를 나눠 쓰는 자리**다
+      playSoundIds(audioRef.current, [finished.isNewRecord ? WIN_SOUND : LOSE_SOUND])
+      // 결과에는 기록달성 목록이 없다: 0x4f710 `0x22e10` 은 나리 타자편 버퍼(0x328c8 0x213c0(mgr, 4, 0))의 이번 경기 칸을
+      // 더하는데, 더비 중엔 a780a(state[1] = 7)가 기록을 막고 game_br.sav 의 그 칸은 늘 0 이라 0 마흔이다 (annalsStats 머리말)
+      onFinishRef.current?.(finished)
+      return
+    }
+    setIsPaused(false)
+    // 단계가 오르거나 보너스 게임을 열 때(0xae3e8 → 상태 0xd)는 0xe 에서 **사람 OK 를 기다린 뒤** 0xf 를 지난다 (확정, U-89):
+    //   0xd 갱신 0x39e14 — 틱 > 0 이고 점수판 [+0xf10]+0x6c ≠ 1 이면 0xe (모드 갈림 없음)
+    //   0xe 진입 0x50674 — 강판 0x504cc 는 모드 3 이 아니면 늘 0(0x504de) → 0x23 으로 안 샌다
+    //   0xe 갱신 0x39bd4 — 모드 7 이면 아무것도 안 한다 (시간 제한·자동 진행 없음)
+    //   0xe 키 0x532b0 — OK(−5·'5') → 메시지 1 → 0x50c18: 인자 0xe 면 상태 0xf (돌발 객체 +0xf28 이 있고 0x8f158 참일 때만 0x1b → 0xf)
+    //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
+    // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
+    //   0xd 는 늘 두 그림(`SCENE_D_FRAMES`) 머문다 — 점수판 +0x6c 는 1 이 되는 일이 없다.
+    // 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(투수·타자 소개 판)를 더 그린다 — 화면이 `isAwaitingConfirm` 동안 띄운다.
+    if (nextSceneStateRef.current === 0xd) {
+      enterScenePrepare()
+      return
+    }
+    // 보통 공(0xf)은 곧바로 다음 공 준비다
+    enterNextPitch()
+  }
+
+  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 — 장면 틱 `dueTick` 의 틀 머리(지났으면 다음 틀 머리) */
+  const armPlayEnd = (dueTick: number) => {
+    clearTimer()
+    const ticks = dueTick - gameSceneTickNow()
+    timerRef.current = setGameSceneTickTimeout(() => {
+      timerRef.current = null
+      // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
+      // 맞지 않은 공(0xae24c)은 이 갈래가 없다
+      if (playRef.current?.batted.isHomeRun === true) audioRef.current.stop()
+      // 판(0x17) 그리기를 내리고 다음 상태로 — 0x17 끝 0xbcb48 은 다음 상태 칸 [장면+0x18+8] 만 적고, 다음 틀 머리 52cd8 0xbc9c8 이
+      // 지금 칸 [+0x1c] 로 옮긴다. 그래서 판이 끝난 그림의 그리기(52f3a 표 0xd05a0[0x17 − 9] = 0x46c88)까지는 0x17 이다
+      const leavePlay = () => {
+        setIsPlayHeld(false)
+        setIsEventZoneShown(false)
+        setEventZoneRewardX(null)
+        // 0x17 그리기(비거리 판 · 필드 화면)는 더는 안 돈다
+        setDistanceBoard(null)
+      }
+      // 52a00~52a16 — 판(0x17) 끝, 0x35108 · 0xae3e8 앞에서 누적 비거리 st+0x34 > 1999 면 히든 39. 누적은 판 안 0xa600c 가
+      // 이미 더했다(웹은 판 시작에 셈해 둔 `runRef`). 맞지 않은 공(0x12)은 이 갈래를 안 지난다
+      const isHiddenShown =
+        playRef.current !== null &&
+        runRef.current.totalDistance > DERBY_DISTANCE_HIDDEN_THRESHOLD &&
+        onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID, () => {
+          leavePlay()
+          finishPitch()
+        }) === true
+      // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
+      if (playRef.current !== null) setEffectsClearedAt(gameSceneTickStartTime(gameSceneTickNow()))
+      playRef.current = null
+      // 0x17 끝 0x35108 — HOMERUN 글자를 끈다(0x351d0 +0x1960 = 0 · 0x351d6 [0x1552d0c]+0x1d = 0)
+      setHomeRunText(null)
+      /*
+       * **창이 선 그림의 그리기 — 판(0x17)의 필드 화면이 창 뒤에 남는다** (2026-10-26 직접 떴다, r299):
+       *   52a16  0x62368 → 0x74ef4 가 창을 세우고 [창+0x250] = 1
+       *   52a54  0xae3e8 이 다음 상태를 돌려주고 52ab2 0xbcb48(장면+0x18, 다음) — +8 = 다음 · +0x18 = 1 만 적는다(지금 +4 그대로)
+       *   52efe  [+0x250] = 1 이라 그리기를 건너뛰지 않는다 → 52f3a [장면+0x1c] = 아직 0x17 → 0x46c88(+ 앞의 0x41230 구장 · 이벤트 존)
+       *   다음 그림부터 52cc6 이 0xbc9c8(상태 옮기기) · 갱신을, 52efe 가 그리기를 건너뛰어 그 그림이 남는다
+       * 0x46c88 은 모드 7 이라 비거리 판 0x36cd4(판 종류 8 이면 늘) · 야수 · 공 · 존을 그리고, HOMERUN 0x40b18(46e2e~46e5c)은 관문
+       * 0xb0d28 이 닫혀(판 끝은 관문이 닫힌 뒤 11 번째 갱신) 안 그린다. 파티클은 53048 이 창 동안 건너뛴다. 타석 화면 0x4c4bc(HUD)는 없다.
+       * 창을 닫으면 그 다음 틀 머리가 다음 상태(0xf · 0xd · 0x1a)로 옮겨 진입 · 그리기를 한다 — 웹은 닫힘에서 `finishPitch`
+       */
+      if (isHiddenShown) {
+        setIsPlayHeld(true)
+        return
+      }
+      leavePlay()
+      // 0x12 갱신 0x4e740~0x4e776 — 사구(st[0xb] == 4)면 플레이 종류 [+0x118] 은 v4 의 0xb0cb8(플레이, 2) 가 쓴 2 라
+      // 8(더비 판) 검사에 안 걸린다 → 더비도 rand(0, 99) ≤ 19 면 벤치 클리어링(0x1e). 돌발 객체는 더비에 없다
+      if (isHitByPitchRef.current) {
+        isHitByPitchRef.current = false
+        const scene = randomRef.current
+        if (scene !== undefined && rollsIntoBenchClearing({ isHitByPitch: true, isHomeRunDerby: false, burstInProgress: false }, scene)) {
+          // 진입 0x3a5f0 — 공격 9명 굴림 45 번 (`rollBenchClearingEntry`). 꼬리 0x3ab4a~ 의 수비 CPU 투구 수 +10 · 평판 0xa755c 는
+          // 더비에 보이는 곳이 없다(체력% 0xaebb0 은 모드 7 이면 늘 100 · 기록은 a780a 가 막는다)
+          setBenchClearingEntryRolls(rollBenchClearingEntry(scene))
+          isBenchClearingRef.current = true
+          setIsBenchClearing(true)
+          return
+        }
+      }
+      finishPitch()
+    }, ticks)
+  }
 
   /**
    * **맞은 판정 틀에 쏜 공** (A-37) — 원본은 맞은 틀의 0x51408 이 판 공(51188) · [경기+0xf2c] 공(5174c)을 쏘며 폴 굴림을 돌린 뒤
@@ -739,151 +890,6 @@ export function useHomeRunDerby({
       batted === null ? passedTick + BATTER_PITCH_RESULT_ENTRY_TICKS + derbyNoContactWaitFramesOf(call.judgment) : passedTick + batted.endTicks,
     )
   }, [])
-
-  /** 이번 공이 사구(판정 v4)였나 — 0x12 대기 끝의 벤치 클리어링 굴림 조건 */
-  const isHitByPitchRef = useRef(false)
-
-  /** 판 안 소리를 공 틱에 맞춰 건다 — `fromTick` 앞의 틱은 이미 지났다 */
-  const schedulePlaySounds = (batted: DerbyBattedBall, startedAt: number, fromTick: number) => {
-    const soundTicks = [
-      ...batted.homeRunTicks.map((tick) => ({ tick, soundId: DERBY_HOME_RUN_SOUND })),
-      ...(batted.foulCallTick === null ? [] : [{ tick: batted.foulCallTick, soundId: FOUL_CALL_SOUND }]),
-    ].filter(({ tick }) => tick >= fromTick)
-    const elapsed = gameSceneNow() - startedAt
-    for (const { tick, soundId } of soundTicks) {
-      playSoundTimersRef.current.push(
-        setGameSceneTimeout(() => playSoundIds(audioRef.current, [soundId]), Math.max(0, tick * millisecondsPerFrame() - elapsed)),
-      )
-    }
-  }
-
-  /** HOMERUN 글자 창 · 비거리 판을 이 판으로 — 글자 칸은 판 앞에 남은 칸에서 셈한다 */
-  const showPlay = (batted: DerbyBattedBall, field: DerbyFieldPlay) => {
-    const play = playRef.current
-    if (play === null) return
-    const text = derbyHomeRunTextOf(batted, play.startedAt, play.textSceneBefore, millisecondsPerFrame())
-    homeRunTextSceneRef.current = text.after
-    setHomeRunText(text.window)
-    setDistanceBoard({ startedAt: play.startedAt, batted, previous: play.runBefore.lastDistance, field })
-  }
-
-  /**
-   * 0xae3e8/0xae24c 모드 7 갈래 — 이 판의 홈런 · 비거리로 진행을 셈한다. 셈은 판 시작에 미리 해 두고(난수를 안 쓴다)
-   * 화면 칸(`run`)은 판 끝 `armPlayEnd` 에서 맞춘다.
-   */
-  const nextSceneStateRef = useRef<number>(0xf)
-  const applyPlayResult = (before: DerbyRun, batted: DerbyBattedBall | null, zoneHit: boolean) => {
-    const isHomeRun = batted?.isHomeRun ?? false
-    const next = applyDerbyPitch(before, {
-      isHomeRun,
-      distance: batted?.distance ?? 0,
-      displayDistance: batted?.displayDistance ?? null,
-      isEventZoneHit: zoneHit,
-    })
-    // 0xae3e8/0xae24c 가 돌려주는 다음 상태 — 0xd(→ 0xe OK 대기) · 0xf · 0x1a
-    nextSceneStateRef.current = derbySceneStateAfter(before, next)
-    runRef.current = next
-  }
-
-  /** 판 끝(관문이 닫힌 뒤 10틱 → 0xbb9 → 0xae3e8) · 0x12 대기 끝 시계 — 장면 틱 `dueTick` 의 틀 머리(지났으면 다음 틀 머리) */
-  const armPlayEnd = (dueTick: number) => {
-    clearTimer()
-    const ticks = dueTick - gameSceneTickNow()
-    timerRef.current = setGameSceneTickTimeout(() => {
-      timerRef.current = null
-      // 판정 B 0xae3e8 의 모드 7 갈래 머리 ae40e~ae41a — 이 판에 홈런(state[0x1d])이 났으면 소리를 끊는다(0x6e418).
-      // 맞지 않은 공(0xae24c)은 이 갈래가 없다
-      if (playRef.current?.batted.isHomeRun === true) audioRef.current.stop()
-      // 판(0x17) 그리기를 내리고 다음 상태로 — 0x17 끝 0xbcb48 은 다음 상태 칸 [장면+0x18+8] 만 적고, 다음 틀 머리 52cd8 0xbc9c8 이
-      // 지금 칸 [+0x1c] 로 옮긴다. 그래서 판이 끝난 그림의 그리기(52f3a 표 0xd05a0[0x17 − 9] = 0x46c88)까지는 0x17 이다
-      const leavePlay = () => {
-        setIsPlayHeld(false)
-        setIsEventZoneShown(false)
-        setEventZoneRewardX(null)
-        // 0x17 그리기(비거리 판 · 필드 화면)는 더는 안 돈다
-        setDistanceBoard(null)
-      }
-      // 52a00~52a16 — 판(0x17) 끝, 0x35108 · 0xae3e8 앞에서 누적 비거리 st+0x34 > 1999 면 히든 39. 누적은 판 안 0xa600c 가
-      // 이미 더했다(웹은 판 시작에 셈해 둔 `runRef`). 맞지 않은 공(0x12)은 이 갈래를 안 지난다
-      const isHiddenShown =
-        playRef.current !== null &&
-        runRef.current.totalDistance > DERBY_DISTANCE_HIDDEN_THRESHOLD &&
-        onOpenHiddenRef.current?.(DERBY_DISTANCE_HIDDEN_ID, () => {
-          leavePlay()
-          finishPitch()
-        }) === true
-      // 0x17 끝 0x35108 — 판(맞은 공)이었으면 파티클을 치운다(0x351e2 → 0x6dee4). 맞지 않은 공(0x12)은 0x17 을 안 지난다
-      if (playRef.current !== null) setEffectsClearedAt(gameSceneTickStartTime(gameSceneTickNow()))
-      playRef.current = null
-      // 0x17 끝 0x35108 — HOMERUN 글자를 끈다(0x351d0 +0x1960 = 0 · 0x351d6 [0x1552d0c]+0x1d = 0)
-      setHomeRunText(null)
-      /*
-       * **창이 선 그림의 그리기 — 판(0x17)의 필드 화면이 창 뒤에 남는다** (2026-10-26 직접 떴다, r299):
-       *   52a16  0x62368 → 0x74ef4 가 창을 세우고 [창+0x250] = 1
-       *   52a54  0xae3e8 이 다음 상태를 돌려주고 52ab2 0xbcb48(장면+0x18, 다음) — +8 = 다음 · +0x18 = 1 만 적는다(지금 +4 그대로)
-       *   52efe  [+0x250] = 1 이라 그리기를 건너뛰지 않는다 → 52f3a [장면+0x1c] = 아직 0x17 → 0x46c88(+ 앞의 0x41230 구장 · 이벤트 존)
-       *   다음 그림부터 52cc6 이 0xbc9c8(상태 옮기기) · 갱신을, 52efe 가 그리기를 건너뛰어 그 그림이 남는다
-       * 0x46c88 은 모드 7 이라 비거리 판 0x36cd4(판 종류 8 이면 늘) · 야수 · 공 · 존을 그리고, HOMERUN 0x40b18(46e2e~46e5c)은 관문
-       * 0xb0d28 이 닫혀(판 끝은 관문이 닫힌 뒤 11 번째 갱신) 안 그린다. 파티클은 53048 이 창 동안 건너뛴다. 타석 화면 0x4c4bc(HUD)는 없다.
-       * 창을 닫으면 그 다음 틀 머리가 다음 상태(0xf · 0xd · 0x1a)로 옮겨 진입 · 그리기를 한다 — 웹은 닫힘에서 `finishPitch`
-       */
-      if (isHiddenShown) {
-        setIsPlayHeld(true)
-        return
-      }
-      leavePlay()
-      // 0x12 갱신 0x4e740~0x4e776 — 사구(st[0xb] == 4)면 플레이 종류 [+0x118] 은 v4 의 0xb0cb8(플레이, 2) 가 쓴 2 라
-      // 8(더비 판) 검사에 안 걸린다 → 더비도 rand(0, 99) ≤ 19 면 벤치 클리어링(0x1e). 돌발 객체는 더비에 없다
-      if (isHitByPitchRef.current) {
-        isHitByPitchRef.current = false
-        const scene = randomRef.current
-        if (scene !== undefined && rollsIntoBenchClearing({ isHitByPitch: true, isHomeRunDerby: false, burstInProgress: false }, scene)) {
-          // 진입 0x3a5f0 — 공격 9명 굴림 45 번 (`rollBenchClearingEntry`). 꼬리 0x3ab4a~ 의 수비 CPU 투구 수 +10 · 평판 0xa755c 는
-          // 더비에 보이는 곳이 없다(체력% 0xaebb0 은 모드 7 이면 늘 100 · 기록은 a780a 가 막는다)
-          setBenchClearingEntryRolls(rollBenchClearingEntry(scene))
-          isBenchClearingRef.current = true
-          setIsBenchClearing(true)
-          return
-        }
-      }
-      finishPitch()
-    }, ticks)
-  }
-
-  /** 0xae3e8 · 0xae24c 를 지난 뒤 — 화면 칸을 셈에 맞추고 다음 상태(0xf · 0xd · 0x1a)로 */
-  const finishPitch = () => {
-    // 0xae3e8 · 0xae24c — 기회 · 공 번호 · 누적 · 콤보 칸이 여기서 바뀐다
-    setRun(runRef.current)
-    if (runRef.current.isFinished) {
-      const finished = derbyResultOf(runRef.current, bestRef.current)
-      setResult(finished)
-      // 결과 창 진입 0x4f574 의 4f6b0 — 구장 준비 0x352e8 을 다시 불러 하늘 줄 rand(0, 6) 을 한 번 더 굴린다(결과 배경이 이 줄)
-      if (randomRef.current !== undefined) setSkyRow(randomRef.current.rand(0, SKY_ROW_COUNT))
-      // 결과 창(상태 0x1a) 진입 0x4f574 — 누적 > 저장 +0x5c 면 신기록 0x1f(31), 아니면 0x20(32)
-      // 을 예약한다 (R14 1-2 · L 1-F). 승패 징글과 **같은 번호를 나눠 쓰는 자리**다
-      playSoundIds(audioRef.current, [finished.isNewRecord ? WIN_SOUND : LOSE_SOUND])
-      // 결과에는 기록달성 목록이 없다: 0x4f710 `0x22e10` 은 나리 타자편 버퍼(0x328c8 0x213c0(mgr, 4, 0))의 이번 경기 칸을
-      // 더하는데, 더비 중엔 a780a(state[1] = 7)가 기록을 막고 game_br.sav 의 그 칸은 늘 0 이라 0 마흔이다 (annalsStats 머리말)
-      onFinishRef.current?.(finished)
-      return
-    }
-    setIsPaused(false)
-    // 단계가 오르거나 보너스 게임을 열 때(0xae3e8 → 상태 0xd)는 0xe 에서 **사람 OK 를 기다린 뒤** 0xf 를 지난다 (확정, U-89):
-    //   0xd 갱신 0x39e14 — 틱 > 0 이고 점수판 [+0xf10]+0x6c ≠ 1 이면 0xe (모드 갈림 없음)
-    //   0xe 진입 0x50674 — 강판 0x504cc 는 모드 3 이 아니면 늘 0(0x504de) → 0x23 으로 안 샌다
-    //   0xe 갱신 0x39bd4 — 모드 7 이면 아무것도 안 한다 (시간 제한·자동 진행 없음)
-    //   0xe 키 0x532b0 — OK(−5·'5') → 메시지 1 → 0x50c18: 인자 0xe 면 상태 0xf (돌발 객체 +0xf28 이 있고 0x8f158 참일 때만 0x1b → 0xf)
-    //   0xf 진입 0x3d954 → 0x3db92~0x3dbf2(모드 7 애니 되돌리기) · 0x3dbf8(+0x84 > 0 → 표시 켜기)
-    // (예전 근거 "0x48d50 의 0x49846" 은 0x49846 이 교체 화면 키 0x495fc 안이라 틀린 주소였다.)
-    //   0xd 는 늘 두 그림(`SCENE_D_FRAMES`) 머문다 — 점수판 +0x6c 는 1 이 되는 일이 없다.
-    // 0xe 그리기 0x4d9ec 는 0xd 그리기에 0x44944(투수·타자 소개 판)를 더 그린다 — 화면이 `isAwaitingConfirm` 동안 띄운다.
-    if (nextSceneStateRef.current === 0xd) {
-      enterScenePrepare()
-      return
-    }
-    // 보통 공(0xf)은 곧바로 다음 공 준비다
-    enterNextPitch()
-  }
 
   const skipHomeRun = useCallback((keySceneTick: number = gameSceneTickNow() + 1) => {
     const play = playRef.current

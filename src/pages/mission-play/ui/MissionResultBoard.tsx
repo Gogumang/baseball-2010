@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
@@ -78,8 +78,6 @@ export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldG
   const resultOrigins = useFrameOrigins(RESULT_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   const popupOrigins = useFrameOrigins(POPUP_FRAMES)
-  const exitRef = useRef(onExit)
-  exitRef.current = onExit
   const doneRef = useRef(false)
   const flags = { flag11f: aceMatch?.flag11f ?? false, flag176: aceMatch?.flag176 ?? false }
   const isAce = flags.flag11f || flags.flag176
@@ -94,23 +92,22 @@ export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldG
     setAnswer(step.answer)
     if (step.exit !== null) {
       doneRef.current = true
-      exitRef.current(step.exit)
+      onExit(step.exit)
     }
   }
 
   // 키 0x407f0 은 상태 0x19 의 상태 키 함수(52da2~)라 받은 다음 틀에 돈다 — 장면 키 칸(`pushSceneKey`, 밑의 결과 배경 타석이 올려 둔
   // 칸)에 넣고 그 틀 머리에서 꺼낸다. 고른 답은 꺼낸 차례대로 고치고 읽는다
+  // 고른 답 — 꺼낸 키가 그 자리에서 고쳐 쓴다(다음 키가 바로 읽는다). 답은 `act` 만 바꾼다
   const answerRef = useRef(answer)
-  answerRef.current = answer
-  const actRef = useRef(act)
-  actRef.current = act
+  const actLatest = useEffectEvent(act)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
       const action = missionResultKeyActionOf(event.key)
       if (action === null) return
       event.preventDefault()
-      pushSceneKey(() => actRef.current(action, answerRef.current))
+      pushSceneKey(() => actLatest(action, answerRef.current))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { PitchInputOverlay } from '@/widgets/batting-stage/lib/pitchInputOverlay'
 
 /**
@@ -16,10 +16,12 @@ export function usePitchInputOverlayRef(): PitchInputOverlayRef {
 /** 지금 값을 칸에 싣고, 내려갈 때 제가 실은 값이면 비운다 */
 export function usePublishedOverlay(ref: PitchInputOverlayRef | undefined, overlay: PitchInputOverlay | null): void {
   const publishedRef = useRef<PitchInputOverlay | null>(null)
-  if (ref !== undefined && overlay !== null) {
+  // 커밋 때 싣는다 — 장면은 rAF 그리기(flushSync 로 커밋까지 마친 뒤)에서 읽는다
+  useLayoutEffect(() => {
+    if (ref === undefined || overlay === null) return
     ref.current = overlay
     publishedRef.current = overlay
-  }
+  })
   useEffect(
     () => () => {
       if (ref !== undefined && ref.current === publishedRef.current) ref.current = null

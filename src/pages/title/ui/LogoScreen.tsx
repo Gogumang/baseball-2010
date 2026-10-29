@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -29,21 +29,19 @@ export function LogoScreen({ onDone, onVoice }: LogoScreenProps) {
   const origins = useFrameOrigins(LOGO_FRAMES)
   const pose = logoPoseAt(updates)
 
-  const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
-  const onVoiceRef = useRef(onVoice)
-  onVoiceRef.current = onVoice
+  const onDoneLatest = useEffectEvent(onDone)
+  const voice = useEffectEvent(() => onVoice?.())
   const hasVoicedRef = useRef(false)
   const isDoneRef = useRef(false)
   useEffect(() => {
     const last = updates - 1
     if (!hasVoicedRef.current && last >= LOGO_VOICE_UPDATE) {
       hasVoicedRef.current = true
-      onVoiceRef.current?.()
+      voice()
     }
     if (!isDoneRef.current && last >= logoDoneUpdateOf(millisecondsPerFrame())) {
       isDoneRef.current = true
-      onDoneRef.current()
+      onDoneLatest()
     }
   }, [updates])
 

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { SeasonTeamSelectScreen, hiddenTeamHintOf } from '@/pages/season/ui/SeasonTeamSelectScreen'
+import { SeasonTeamSelectScreen } from '@/pages/season/ui/SeasonTeamSelectScreen'
+import { hiddenTeamHintOf } from '@/pages/season/lib/hiddenTeamHint'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import { TEAMS } from '@/shared/config/original/teams'
 import { FRESH_SEASON_INFO_RECORD, seasonNameInfoRowsOf } from '@/pages/season/lib/seasonTeamInfo'

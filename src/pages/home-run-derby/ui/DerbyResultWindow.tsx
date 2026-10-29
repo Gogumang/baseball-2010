@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { CommonPanel, FrameSprite, RoundBox, SpriteNumber, useImgTextPalette3 } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -79,7 +79,9 @@ export function DerbyResultWindow({ result, heldGamePoint, onRetry, onExit }: De
   // 타석이 올려 둔 칸)에 넣고 그 틀 머리에서 꺼낸다. 고른 답은 꺼낸 차례대로 고친다(앞 틀의 ←/→ 를 다음 틀의 OK 가 본다)
   const answerRef = useRef(answer)
   const exitRef = useRef({ onRetry, onExit })
-  exitRef.current = { onRetry, onExit }
+  useLayoutEffect(() => {
+    exitRef.current = { onRetry, onExit }
+  })
   const isDoneRef = useRef(false)
   useEffect(() => {
     const choose = (next: boolean) => {

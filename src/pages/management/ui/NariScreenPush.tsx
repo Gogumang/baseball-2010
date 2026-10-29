@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
 import { nariMatchPushDirectionOf, screenPushFrameAt } from '@/pages/management/lib/nariScreenPush'
@@ -45,11 +45,10 @@ export function NariScreenPush<V extends string = NariMatchPushView>({ view, dir
 
   // 0x10758 · 0x10774 — 효과기가 도는 동안 키 누름 · 뗌을 버린다. 자식 화면의 키 처리기(useEffect)보다 먼저 걸리도록
   // 처음 붙을 때 레이아웃 효과에서 window 잡는 단계에 한 번 건다
-  const isPushingRef = useRef(false)
-  isPushingRef.current = push !== null
+  const isPushing = useEffectEvent(() => push !== null)
   useLayoutEffect(() => {
     const swallow = (event: KeyboardEvent) => {
-      if (!isPushingRef.current) return
+      if (!isPushing()) return
       event.stopImmediatePropagation()
       event.preventDefault()
     }
@@ -92,7 +91,9 @@ export function NariScreenPush<V extends string = NariMatchPushView>({ view, dir
         handleRef.current = requestAnimationFrame(tick)
       }
     }
-    // 지금 화면을 떠 둔다 — 다음에 화면이 바뀌면 이것이 옛 화면이다
+  }, [view, directionOf])
+  // 지금 화면을 떠 둔다 — 다음에 화면이 바뀌면 이것이 옛 화면이다. 위 효과(옛 화면을 쓰는 쪽) 다음에, 그림마다 돈다
+  useLayoutEffect(() => {
     lastSnapshotRef.current = liveRef.current?.firstElementChild?.cloneNode(true) ?? null
   })
 

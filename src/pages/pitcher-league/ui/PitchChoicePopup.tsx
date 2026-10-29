@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea, ScreenOverlay } from '@/shared/ui'
 import { CANCEL_KEY_OFFER, tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
@@ -20,6 +20,7 @@ import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { PITCH_CHOICE_CELLS } from '@/pages/pitcher-league/lib/pitchChoicePopup'
 
 const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -41,15 +42,6 @@ const TITLE_RISE = 0x1e
 const TITLE_RAW = ORIGINAL_MODE_TEXT[PITCH_CHOICE_TITLE_ID] ?? ''
 /** 제목 가운데 x — (W/2 − 0x46) + (0x9c52c 폭 >> 1) */
 const TITLE_CENTER_X = measuredTitleCenterXOf(120 - TITLE_BACK, TITLE_RAW)
-/**
- * 칸 둘 — 0x19162~0x19170 칸 0 (W/2 − 0x38, H/2, 0x20, 0x20) 프레임 0x13 · 0x19272~0x19284 칸 1 (W/2 + 0x18, H/2, 0x20, 0x20)
- * 프레임 0x12 를 0x858fd([장면+0xe0], 칸, 프레임, 팔레트) 로 (0x1919c · 0x192a4). 칸 글은 img_text +0x4d0(308 "마구") ·
- * +0x4d4(309 "변화구") 를 (칸 x + (0x20 − 글 폭)/2, 칸 y + 0x20 + 4) 에.
- */
-export const PITCH_CHOICE_CELLS: readonly { readonly x: number; readonly y: number; readonly iconFrame: number; readonly labelFrame: number }[] = [
-  { x: 120 - 0x38, y: 160, iconFrame: 0x13, labelFrame: 308 },
-  { x: 120 + 0x18, y: 160, iconFrame: 0x12, labelFrame: 309 },
-]
 /** 아닌 칸 글 — 효과 0xb 단색 0x1400748(0x7f, 0x7f, 0x77) (0x19248~0x19264 · 0x19342~0x1935e) */
 export const PITCH_CHOICE_DIM_LABEL_COLOR = '#7f7f77'
 
@@ -85,8 +77,11 @@ interface PitchChoicePopupProps {
  * 창이 떠 있는 동안(펼침 · 줄임 포함) 장면 키는 0x754f9 가 막는다 — 웹은 창이 잡는 단계에서 키를 멈춘다.
  */
 export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: PitchChoicePopupProps) {
+  // 키 · 연출 끝 콜백이 볼 최신 값 — 커밋 때 적는다(키와 연출 끝은 늘 커밋 뒤에 온다)
   const latest = useRef({ selected, onMove, onChoose, onClosed })
-  latest.current = { selected, onMove, onChoose, onClosed }
+  useLayoutEffect(() => {
+    latest.current = { selected, onMove, onChoose, onClosed }
+  })
   // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침 · 줄임을 건너뛴다
   const boxRef = useRef<HTMLDivElement>(null)
   const [hasNoLayout, setHasNoLayout] = useState(false)
@@ -101,8 +96,7 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
     latest.current.onChoose(index)
     motion.close('줄임', () => latest.current.onClosed())
   }
-  const confirmRef = useRef(confirm)
-  confirmRef.current = confirm
+  const confirmFromKey = useEffectEvent(confirm)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -115,7 +109,7 @@ export function PitchChoicePopup({ selected, onMove, onChoose, onClosed }: Pitch
         return
       }
       if (['ArrowLeft', 'ArrowRight', '4', '6'].includes(event.key)) current.onMove(current.selected === 0 ? 1 : 0)
-      else if (event.key === 'Enter' || event.key === ' ' || event.key === '5') confirmRef.current(current.selected === 0 ? 0 : 1)
+      else if (event.key === 'Enter' || event.key === ' ' || event.key === '5') confirmFromKey(current.selected === 0 ? 0 : 1)
       else if (isCancelKey(event.key)) motion.close('줄임', () => latest.current.onClosed())
       else return
       event.preventDefault()

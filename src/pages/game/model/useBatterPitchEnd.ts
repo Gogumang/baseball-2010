@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 
 /** 판정된 공 하나가 원본의 어느 끝을 기다리는가 */
@@ -58,63 +58,87 @@ export function useBatterPitchEnd({
   readonly isFrozen: boolean
 }): BatterPitchEnd {
   const [, setVersion] = useState(0)
-  const pendingRef = useRef<Pending | null>(null)
-  const wasPlayShownRef = useRef(isPlayShown)
-  const serialRef = useRef(0)
-
+  const [counter] = useState(() => createPitchEndCounter(isPlayShown))
   // 그림 안에서 갈래를 정한다 — 공 끝 번호가 오르는 그림과 기록을 넘기는 그림이 같아야 한다(StrictMode 두 번 그림에도 한 번만)
-  let pending = pendingRef.current
-  const wasPlayShown = wasPlayShownRef.current
-  wasPlayShownRef.current = isPlayShown
-  if (wasPlayShown && !isPlayShown) {
-    // 0x17 끝 0x52a60
-    serialRef.current += 1
-    if (pending?.kind === 'play') pending = null
-  }
-  if (pending?.kind === 'resolved') {
-    if (isPlayShown) {
-      pending = { kind: 'play' }
-    } else if (pending.isHit) {
-      serialRef.current += 1
-      pending = null
-    } else {
-      pending = { kind: 'wait', waitTicks: pending.waitTicks, elapsed: 0 }
-    }
-  } else if (pending?.kind === 'due') {
-    // 0x12 끝 0x4e796
-    serialRef.current += 1
-    pending = null
-  }
-  pendingRef.current = pending
+  const pending = counter.drawFor(isPlayShown)
 
   useSceneTick(
     () => {
-      const current = pendingRef.current
-      if (current?.kind !== 'wait') return
-      const elapsed = current.elapsed + 1
-      if (elapsed >= current.waitTicks) {
-        pendingRef.current = { kind: 'due' }
-        setVersion((version) => version + 1)
-      } else {
-        pendingRef.current = { ...current, elapsed }
-      }
+      if (counter.tickWait()) setVersion((version) => version + 1)
     },
     pending?.kind === 'wait' && !isFrozen,
   )
 
-  const notePitchResolved = useCallback((pitch: { readonly isHit: boolean; readonly waitTicks: number }) => {
-    const previous = pendingRef.current
-    // 앞 공의 0x12 대기가 아직이면 그 끝을 이번 그림에서 함께 부른다 (안전판 — 장면 틱 셈에서는 안 일어난다, 머리말)
-    if (previous?.kind === 'wait' || previous?.kind === 'due') serialRef.current += 1
-    pendingRef.current = { kind: 'resolved', isHit: pitch.isHit, waitTicks: pitch.waitTicks }
-    setVersion((version) => version + 1)
-  }, [])
+  const notePitchResolved = useCallback(
+    (pitch: { readonly isHit: boolean; readonly waitTicks: number }) => {
+      counter.resolve(pitch)
+      setVersion((version) => version + 1)
+    },
+    [counter],
+  )
 
   const notePitchPlayOpened = useCallback(() => {
-    if (pendingRef.current?.kind !== 'wait') return
-    pendingRef.current = { kind: 'play' }
-    setVersion((version) => version + 1)
-  }, [])
+    if (counter.openPlay()) setVersion((version) => version + 1)
+  }, [counter])
 
-  return { serial: serialRef.current, isHolding: pending !== null || isPlayShown, notePitchResolved, notePitchPlayOpened }
+  return { serial: counter.serial(), isHolding: pending !== null || isPlayShown, notePitchResolved, notePitchPlayOpened }
+}
+
+/**
+ * 공 끝 셈 칸 — 렌더가 그림마다 갈래를 정하고(그 그림에서 번호가 오른다), 장면 틱이 0x12 대기를 센다(세는 동안은 다시 그리지 않는다).
+ * 예전 ref 셋(대기 · 판이 떠 있었나 · 번호) 그대로다 — 렌더 중에 고치는 것도 같아 StrictMode 두 번째 그림은 이미 정한 갈래를 본다
+ */
+function createPitchEndCounter(initialPlayShown: boolean) {
+  let pending: Pending | null = null
+  let wasPlayShown = initialPlayShown
+  let serial = 0
+  return {
+    serial: () => serial,
+    drawFor(isPlayShown: boolean): Pending | null {
+      const wasShown = wasPlayShown
+      wasPlayShown = isPlayShown
+      if (wasShown && !isPlayShown) {
+        // 0x17 끝 0x52a60
+        serial += 1
+        if (pending?.kind === 'play') pending = null
+      }
+      if (pending?.kind === 'resolved') {
+        if (isPlayShown) {
+          pending = { kind: 'play' }
+        } else if (pending.isHit) {
+          serial += 1
+          pending = null
+        } else {
+          pending = { kind: 'wait', waitTicks: pending.waitTicks, elapsed: 0 }
+        }
+      } else if (pending?.kind === 'due') {
+        // 0x12 끝 0x4e796
+        serial += 1
+        pending = null
+      }
+      return pending
+    },
+    /** 장면 틱 하나 — 대기가 다 찼으면 참(다음 그림에서 부른다) */
+    tickWait(): boolean {
+      if (pending?.kind !== 'wait') return false
+      const elapsed = pending.elapsed + 1
+      if (elapsed < pending.waitTicks) {
+        pending = { ...pending, elapsed }
+        return false
+      }
+      pending = { kind: 'due' }
+      return true
+    },
+    resolve(pitch: { readonly isHit: boolean; readonly waitTicks: number }): void {
+      // 앞 공의 0x12 대기가 아직이면 그 끝을 이번 그림에서 함께 부른다 (안전판 — 장면 틱 셈에서는 안 일어난다, 머리말)
+      if (pending?.kind === 'wait' || pending?.kind === 'due') serial += 1
+      pending = { kind: 'resolved', isHit: pitch.isHit, waitTicks: pitch.waitTicks }
+    },
+    /** 0x12 대기를 세던 공이 판을 열었다 — 바꿨으면 참 */
+    openPlay(): boolean {
+      if (pending?.kind !== 'wait') return false
+      pending = { kind: 'play' }
+      return true
+    },
+  }
 }

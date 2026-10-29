@@ -116,7 +116,7 @@ export function NariMatchInfoScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onStart, onCancel, onEntry])
+  }, [onStart, onCancel, onEntry, isKeyReady])
 
   const { anchorA, anchorB, firstBatTag } = MATCH_INFO_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT

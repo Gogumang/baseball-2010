@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { DefensePlayback } from '@/pages/defense/ui/DefensePlayback'
 import { useDefenseUnderBurstWindow } from '@/pages/defense/model/useDefenseUnderBurstWindow'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
@@ -72,21 +72,20 @@ describe('DefensePlayback.burstWindow — 0x1c', () => {
 describe('useDefenseUnderBurstWindow — 판 끝 판정만 판 위 창', () => {
   /** 판 요소 — 몇 번 새로 섰는지 센다 */
   const 섰다 = vi.fn()
-  function 판({ window }: { readonly window?: ReactNode }) {
-    const mounted = useRef(false)
-    if (!mounted.current) {
-      mounted.current = true
-      섰다()
-    }
+  function Board판({ window }: { readonly window?: ReactNode }) {
+    // 새로 설 때(마운트) 한 번
+    useEffect(() => 섰다(), [])
     return <div data-testid="판">{window}</div>
   }
   type 단계 = { readonly playing: boolean; readonly resolution: object | null }
   let 바꾸기: (next: 단계) => void = () => {}
-  function 화면() {
+  function Screen화면() {
     const [단계, set단계] = useState<단계>({ playing: true, resolution: null })
-    바꾸기 = set단계
+    useEffect(() => {
+      바꾸기 = set단계
+    }, [])
     const under = useDefenseUnderBurstWindow(단계.resolution)
-    if (단계.playing) return under.show((window) => <판 window={window} />)
+    if (단계.playing) return under.show((window) => <Board판 window={window} />)
     const held = under.held(<div data-testid="창" />)
     if (held !== null) return held
     return <div data-testid="타석">{단계.resolution !== null && <div data-testid="창" />}</div>
@@ -94,7 +93,7 @@ describe('useDefenseUnderBurstWindow — 판 끝 판정만 판 위 창', () => {
 
   it('판이 끝나며 판정이 서면 같은 판 위에 창 — 창을 닫으면 타석', () => {
     섰다.mockClear()
-    const { queryByTestId } = render(<화면 />)
+    const { queryByTestId } = render(<Screen화면 />)
     expect(queryByTestId('판')).not.toBeNull()
     act(() => 바꾸기({ playing: false, resolution: {} }))
     expect(queryByTestId('판')).not.toBeNull()
@@ -107,7 +106,7 @@ describe('useDefenseUnderBurstWindow — 판 끝 판정만 판 위 창', () => {
 
   it('판 밖에서 먼저 본 판정(0x12 끝 — 밀어내기 판 앞 대기)은 판이 끝나도 판 위 창이 아니다', () => {
     const 판정 = {}
-    const { queryByTestId } = render(<화면 />)
+    const { queryByTestId } = render(<Screen화면 />)
     act(() => 바꾸기({ playing: false, resolution: 판정 }))
     // 위 갈래 — 판이 막 끝나 판정이 섰다. 창을 닫지 않고 판 밖 그림(타석 대기)이 본 것으로 둔다
     act(() => 바꾸기({ playing: false, resolution: null }))

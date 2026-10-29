@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import {
@@ -143,16 +143,17 @@ export function StadiumShopScreen({
   const [hiddenNotices, setHiddenNotices] = useState<readonly string[]>([])
   const [question, setQuestion] = useState<{ readonly kind: StadiumKind; readonly slot: number; readonly text: string } | null>(null)
   const tick = useUpdateCounter()
-  const sceneOut = useRef({ entryScene, scoreboardX, onPreviewSceneChange })
-  sceneOut.current = { entryScene, scoreboardX, onPreviewSceneChange }
+  // 구장관리 진입이 잰 하늘은 곧장 장면 칸에 남는다
+  const enterScene = useEffectEvent(() => {
+    if (!isShop) onPreviewSceneChange?.(entryScene)
+  })
+  // 나갈 때 흘린 전광판 글자 자리를 장면 칸에 돌려준다
+  const leaveScene = useEffectEvent(() => {
+    if (isShop) onPreviewSceneChange?.({ ...entryScene, scoreboardX })
+  })
   useEffect(() => {
-    // 구장관리 진입이 잰 하늘은 곧장 장면 칸에 남는다
-    if (!isShop) sceneOut.current.onPreviewSceneChange?.(sceneOut.current.entryScene)
-    // 나갈 때 흘린 전광판 글자 자리를 장면 칸에 돌려준다
-    return () => {
-      const out = sceneOut.current
-      if (isShop) out.onPreviewSceneChange?.({ ...out.entryScene, scoreboardX: out.scoreboardX })
-    }
+    enterScene()
+    return () => leaveScene()
   }, [])
 
   const select = (nextKind: StadiumKind, nextSlot: number) => {
@@ -209,41 +210,36 @@ export function StadiumShopScreen({
     setTop(0)
     setShopPreviewSlot(null)
     // 상점 칸 목록 취소 — 미리보기를 저장값으로 되돌린 뒤 0x77edc(구장, 1) (0x9c0a~0x9c84)
-    const current = latest.current
-    if (current.isShop && current.isSlotFocus) {
-      setScoreboardX((held) => rewoundScoreboardX(held, stadiumPreviewOf(current.record).board))
-    }
+    if (isShop && isSlotFocus) setScoreboardX((held) => rewoundScoreboardX(held, stadiumPreviewOf(record).board))
   }
   const moveSlotTo = (next: number) => {
     setSlot(next)
     setTop((held) => scrolledEquipmentTopOf(held, next))
     setShopPreviewSlot(next)
     // 상점에서 전광판(종류 1) 칸을 갈아 끼우면 +0x8a = 그 칸 · 0x76ba5 · 0x77edc(구장, 1) (0x9d48~0x9d72)
-    const current = latest.current
-    if (current.isShop && current.kind === '전광판') setScoreboardX((held) => rewoundScoreboardX(held, next))
+    if (isShop && kind === '전광판') setScoreboardX((held) => rewoundScoreboardX(held, next))
   }
 
   const isPopup = notice !== null || question !== null || hiddenNotices.length > 0
-  const latest = useRef({ kind, slot, isSlotFocus, isPopup, select, onBack, isShop, record })
-  latest.current = { kind, slot, isSlotFocus, isPopup, select, onBack, isShop, record }
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
-      if (current.isPopup) return
-      const key = event.key
-      if (!current.isSlotFocus) {
-        if (isCancelKey(key)) current.onBack()
-        else if (isConfirmKey(key) || key === 'ArrowDown' || key === '8') enterSlots()
-        else if (key === 'ArrowLeft' || key === '4') setKind((held) => moveStadiumKind(held, -1))
-        else if (key === 'ArrowRight' || key === '6') setKind((held) => moveStadiumKind(held, 1))
-        else return
-      } else if (isCancelKey(key)) leaveSlots()
-      else if (isConfirmKey(key)) current.select(current.kind, current.slot)
-      else if (key === 'ArrowUp' || key === '2') moveSlotTo(moveStadiumSlot(current.kind, current.slot, -1))
-      else if (key === 'ArrowDown' || key === '8') moveSlotTo(moveStadiumSlot(current.kind, current.slot, 1))
+  /** 키는 그때 그 렌더의 값으로 본다 (`useEffectEvent` — 등록은 들어올 때 한 번) */
+  const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    if (isPopup) return
+    const key = event.key
+    if (!isSlotFocus) {
+      if (isCancelKey(key)) onBack()
+      else if (isConfirmKey(key) || key === 'ArrowDown' || key === '8') enterSlots()
+      else if (key === 'ArrowLeft' || key === '4') setKind((held) => moveStadiumKind(held, -1))
+      else if (key === 'ArrowRight' || key === '6') setKind((held) => moveStadiumKind(held, 1))
       else return
-      event.preventDefault()
-    }
+    } else if (isCancelKey(key)) leaveSlots()
+    else if (isConfirmKey(key)) select(kind, slot)
+    else if (key === 'ArrowUp' || key === '2') moveSlotTo(moveStadiumSlot(kind, slot, -1))
+    else if (key === 'ArrowDown' || key === '8') moveSlotTo(moveStadiumSlot(kind, slot, 1))
+    else return
+    event.preventDefault()
+  })
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => handleKey(event)
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
@@ -258,10 +254,13 @@ export function StadiumShopScreen({
   // 상점 그리기 0xb1f8 — 구장을 그린 **뒤** 0x77fb5(구장, 1) 로 +0x8c 를 한 칸 흘린다(b24e). 갱신 한 번에 그리기 한 번
   const steppedTick = useRef(tick)
   const previewBoard = previewStadium.board
+  const stepScoreboard = useEffectEvent((steps: number) => {
+    if (isShop && steps > 0) setScoreboardX((held) => stepSeasonScoreboardX(held, previewBoard, steps))
+  })
   useEffect(() => {
     const steps = tick - steppedTick.current
     steppedTick.current = tick
-    if (isShop && steps > 0) setScoreboardX((held) => stepSeasonScoreboardX(held, previewBoard, steps))
+    stepScoreboard(steps)
   }, [tick])
 
   return (

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea } from '@/shared/ui'
 import { CANCEL_KEY_OFFER, tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
@@ -49,8 +49,11 @@ export function EventMissionWindow({
   readonly onClosed: () => void
 }) {
   const motion = usePopupWindowMotion({ targetHeight: EVENT_MISSION_WINDOW.height })
+  // 창이 다 닫힌 뒤(연출 끝) 부를 최신 콜백 — 커밋 때 적는다
   const latest = useRef({ onKey, onClosed })
-  latest.current = { onKey, onClosed }
+  useLayoutEffect(() => {
+    latest.current = { onKey, onClosed }
+  })
 
   // 0x1dcb0 은 하위 상태를 쓰고 [창+0x215] = 1 — 다음 갱신부터 폭 240 → 120 → 닫힘(0x7558a~0x755d8)
   const close = (answer: EventMissionAnswer) => {

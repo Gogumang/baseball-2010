@@ -261,7 +261,7 @@ export function GameScreen({
   const sceneConfirm = useSceneConfirm(progress.sceneConfirm, isSceneUncovered && !substitution.isShown)
   // 단말 일시정지 0x463ac — '*' 가 열리는 때(벤치 클리어링 · 1회초 판 밖)이고 하위 창이 없으면 같은 메뉴를 연다
   useInGameMenuOpenOnHide(menu, !isBenchClearing && !isHalfInningBoardOpen && overlay === null)
-  /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1' */
+  /** 원본 공용 키 처리 0x498d4 — '*' 메뉴 · 도루 '3'/'2'/'1'. 도루 칸 목록이 그림마다 새 배열이라 예전에도 그림마다 다시 걸었다 — deps 없이 같다 */
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -283,7 +283,7 @@ export function GameScreen({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isBenchClearing, isHalfInningBoardOpen, isMenuOpen, menu.pressStar, onSteal, overlay, stealableBases])
+  })
 
   // 기록 달성 알림의 팝업 멈춤 · 장면 갈래를 알림을 든 쪽에 알린다 (`RecordAlertScene`)
   const isAlertFrozen = isMenuOpen || overlay !== null

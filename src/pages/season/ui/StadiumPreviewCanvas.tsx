@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { drawStadiumPreview } from '@/widgets/batting-stage/lib/renderScenery'
 import { createDrawMemo } from '@/shared/lib/canvas/drawMemo'
 import type { StadiumPreviewState } from '@/widgets/batting-stage/lib/renderScenery'
@@ -10,8 +10,7 @@ import { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayo
  */
 export function StadiumPreviewCanvas({ state }: { readonly state: StadiumPreviewState }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const stateRef = useRef(state)
-  stateRef.current = state
+  const stateLatest = useEffectEvent(() => state)
 
   useEffect(() => {
     let frame = 0
@@ -19,7 +18,7 @@ export function StadiumPreviewCanvas({ state }: { readonly state: StadiumPreview
     const drawMemo = createDrawMemo()
     const draw = () => {
       const context = canvasRef.current?.getContext('2d') ?? null
-      if (context !== null && drawMemo.needsDraw(canvasRef.current, stateRef.current)) drawStadiumPreview(context, stateRef.current)
+      if (context !== null && drawMemo.needsDraw(canvasRef.current, stateLatest())) drawStadiumPreview(context, stateLatest())
       frame = requestAnimationFrame(draw)
     }
     draw()

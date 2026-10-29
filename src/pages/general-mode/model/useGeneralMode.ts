@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { FULL_PLAY_SETTINGS } from '@/features/play-team-game/model/matchSettings'
@@ -219,8 +219,11 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
    * 22 진입의 +0x11e 검사 (0x3163c~0x31688) — 23 에서 돌아온 길(0x314ce)도 이 자리로 뛰지만 그때는 이미 1 이다.
    * 0 이면 창을 열고 1 · 저장. 빠른실행은 처음부터 22 라 첫 그림 뒤 한 번 돈다(아래 effect)
    */
+  // 고르기(이벤트) · 첫 그림 효과가 함께 보는 칸 — 커밋 때 적는다
   const seenSlotRef = useRef(matchSettingsSeen)
-  seenSlotRef.current = matchSettingsSeen
+  useLayoutEffect(() => {
+    seenSlotRef.current = matchSettingsSeen
+  })
   const checkMatchSettingsSeen = useCallback(() => {
     const slot = seenSlotRef.current
     if (slot === undefined || slot.read()) return
@@ -255,8 +258,7 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
    */
   const [respinTick, setRespinTick] = useState<number | null>(null)
   // 열린 것 목록은 부르는 쪽이 그릴 때마다 새 배열일 수 있다 — 틱 타이머가 그 때문에 다시 걸리지 않게 ref 로 읽는다
-  const openStateRef = useRef<QuickStartOpenState>({})
-  openStateRef.current = { openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }
+  const openStateNow = useEffectEvent((): QuickStartOpenState => ({ openedHiddenTeamIds, openedAcePitcherIds, openedAceBatterIds }))
   const [respinBuilt, setRespinBuilt] = useState<{ readonly userTeamId: number; readonly aiTeamId: number } | null>(null)
 
   const respin = useCallback(() => {
@@ -271,13 +273,13 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
     return setAppTickTimeout(() => {
       const tick = respinTick + 1
       if (tick < QUICK_RESPIN_TICKS) {
-        const teams = rollQuickRespinTeams(random, openStateRef.current)
+        const teams = rollQuickRespinTeams(random, openStateNow())
         setFlow((current) => withSetup(current, { ...current.setup, ...teams }))
         setRespinTick(tick)
         return
       }
       // 20틱째 — 팀 둘 · 선공 · 마투수 · 마타자 → [skin+0xf4] = 0 → 0x30f20. 고친 엔트리도 여기서 사라진다
-      const setup = finishQuickRespin(random, flow.setup, openStateRef.current)
+      const setup = finishQuickRespin(random, flow.setup, openStateNow())
       setUserEntryRoster(null)
       setRolls(rollsOf(setup, random))
       setFlow((current) => withSetup(current, setup))
@@ -473,15 +475,14 @@ export function useGeneralMode(options: UseGeneralModeOptions): GeneralModeSessi
   )
 
   // 블록 쓰기 — 0x30f20 / 0x2a370 이 세운 두 팀·st(경기정보 OK 가 쓸 첫 진행과 같은 것). 굴림은 이미 `rolls` 에 있어 난수를 안 먹는다
-  const blockWriteRef = useRef({ gameOptions, onMatchBlockWrite, random })
-  blockWriteRef.current = { gameOptions, onMatchBlockWrite, random }
+  const blockWriteNow = useEffectEvent(() => ({ gameOptions, onMatchBlockWrite, random }))
   useEffect(() => {
     if (blockWriteSerial === 0) return
     // B-30 — 원본은 경기정보 OK 앞에서도 모드 1 블록을 새 경기로 덮어(+0x4d 는 그대로) 이어하기가 있던 채 새로하기 → OK 없이 나가면
     // [최근게임]이 옛 경기 대신 새 1회초 0:0 을 연다. 고친 길(기본)은 OK(0x3136e — `onGameStart`) 전에는 블록을 안 쓴다.
     // 블록 쓰기는 굴림이 없어 난수 차례는 같다(플레이 시간 칸은 다음 쓰기 때 몰아 적힌다)
     if (isBugFixed('B-30')) return
-    const { gameOptions: options, onMatchBlockWrite: write, random: port } = blockWriteRef.current
+    const { gameOptions: options, onMatchBlockWrite: write, random: port } = blockWriteNow()
     if (write === undefined || options.opponentAces === undefined || options.startingPitcherSlots === undefined) return
     write(teamGameStartPointOf(options, port))
   }, [blockWriteSerial])

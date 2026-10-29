@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { RawScreen } from '@/shared/ui'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -76,16 +76,17 @@ export function SeasonPlayerCardScreen({
   hasCardBadge = false,
 }: SeasonPlayerCardScreenProps) {
   const [scrollOffset, setScrollOffset] = useState(0)
-  // 0x52f4 가 들어올 때마다 글을 새로 만들고 창+0x380 = 0 — 창을 다시 열면 맨 위부터
-  useEffect(() => {
+  // 0x52f4 가 들어올 때마다 글을 새로 만들고 창+0x380 = 0 — 창을 다시 열면 맨 위부터(열리는 렌더에서 맞춘다)
+  const [wasDetailOpen, setWasDetailOpen] = useState(isDetailOpen)
+  if (wasDetailOpen !== isDetailOpen) {
+    setWasDetailOpen(isDetailOpen)
     if (isDetailOpen) setScrollOffset(0)
-  }, [isDetailOpen])
+  }
 
-  const latest = useRef({ isDetailOpen, onOpenDetail, onCloseDetail, onBack, lineCount: detail.messages.length })
-  latest.current = { isDetailOpen, onOpenDetail, onCloseDetail, onBack, lineCount: detail.messages.length }
+  const latest = useEffectEvent(() => ({ isDetailOpen, onOpenDetail, onCloseDetail, onBack, lineCount: detail.messages.length }))
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
+      const current = latest()
       const isCancel = event.key === 'Escape' || event.key === 'Backspace'
       if (!current.isDetailOpen) {
         // 0x48a0 — 취소 → 0xdf · '0' → 0xda

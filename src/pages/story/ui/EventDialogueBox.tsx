@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { FrameSprite, PressArea } from '@/shared/ui'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -135,12 +135,16 @@ export function EventDialogueBox({
   }
 
   const stateRef = useRef(state)
-  stateRef.current = state
   const layoutRef = useRef(typingLayout)
-  layoutRef.current = typingLayout
+  useLayoutEffect(() => {
+    stateRef.current = state
+    layoutRef.current = typingLayout
+  })
   // 명령이 돌거나 상자를 내린 틀은 위에서 이미 그렸다 — 다음 그리기는 한 틀 뒤다(틀 시계를 그 틀에 맞춘다)
   const tickIntervalRef = useRef(tickInterval)
-  tickIntervalRef.current = tickInterval
+  useLayoutEffect(() => {
+    tickIntervalRef.current = tickInterval
+  })
   useEffect(() => {
     const tick = tickIntervalRef.current(() => {
       const next = tickDialogue(stateRef.current, layoutRef.current)
@@ -153,17 +157,19 @@ export function EventDialogueBox({
   }, [textKeySeen, lowerKeySeen])
   const isUp = state.height === EVENT_DIALOGUE.boxHeight
   const onAdvanceRef = useRef(onAdvance)
-  onAdvanceRef.current = onAdvance
   const choicesRef = useRef(choices)
-  choicesRef.current = choices
   const onChoiceMoveRef = useRef(onChoiceMove)
-  onChoiceMoveRef.current = onChoiceMove
   const onChoiceConfirmRef = useRef(onChoiceConfirm)
-  onChoiceConfirmRef.current = onChoiceConfirm
   const onCancelRef = useRef(onCancel)
-  onCancelRef.current = onCancel
   const deferPressRef = useRef(deferPress)
-  deferPressRef.current = deferPress
+  useLayoutEffect(() => {
+    onAdvanceRef.current = onAdvance
+    choicesRef.current = choices
+    onChoiceMoveRef.current = onChoiceMove
+    onChoiceConfirmRef.current = onChoiceConfirm
+    onCancelRef.current = onCancel
+    deferPressRef.current = deferPress
+  })
   const pressNow = () => {
     const list = choicesRef.current
     if (list !== null) return onChoiceConfirmRef.current?.(list.selected)

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -35,7 +35,15 @@ import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { PITCHER_COMMAND_BAR, pitcherLabelDxOf, pitcherParentSlotOf } from '@/pages/pitcher-league/lib/pitcherCommandBar'
 import type { PitcherCommandKind } from '@/pages/pitcher-league/lib/pitcherCommandBar'
 import type { PitcherManagementMenu } from '@/pages/pitcher-league/model/usePitcherManagementMenu'
-import { createNariMainMenuCursor, leaveNariSubMenu, nariMainCursorOnEntry, nariReturnSubMenuOf } from '@/pages/management/model/nariMainMenuCursor'
+import {
+  clearNariReturnSubMenu,
+  createNariMainMenuCursor,
+  leaveNariSubMenu,
+  moveNariMainCursor,
+  moveNariSubCursor,
+  nariMainCursorOnEntry,
+  nariReturnSubMenuOf,
+} from '@/pages/management/model/nariMainMenuCursor'
 import type { NariMainMenuCursor } from '@/pages/management/model/nariMainMenuCursor'
 import { isNariMenuOkKey, nariMenuCursorAfterStep, nariMenuStepOfKey } from '@/pages/management/lib/nariMenuKeys'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
@@ -152,30 +160,32 @@ function PitcherCommandBar({
         0,
         slots.findIndex((slot) => slot.id === state.kind),
       )
-      mainCursor.current = nariMainCursorOnEntry(returning, hasActed, state.kind === '아이템')
+      moveNariMainCursor(mainCursor, nariMainCursorOnEntry(returning, hasActed, state.kind === '아이템'))
     } else {
       // 105 에서 하위 메뉴로 — 106 은 진입이, 107 · 110 은 앞선 105 진입이 커서를 0 으로 되감아 둔다
-      mainCursor.subCursor = 0
+      moveNariSubCursor(mainCursor, 0)
     }
     setState({ kind, cursor: kind === '관리' ? mainCursor.current : 0, openedAt: update, movedAt: null, entryCount: menu.entryCount })
   }
   const cursor = Math.min(kind === '관리' ? mainCursor.current : state.cursor, slots.length - 1)
   const moveTo = (index: number) => {
     if (index === cursor) return
-    if (kind === '관리') mainCursor.current = index
-    else mainCursor.subCursor = index
+    if (kind === '관리') moveNariMainCursor(mainCursor, index)
+    else moveNariSubCursor(mainCursor, index)
     setState((held) => ({ ...held, cursor: index, movedAt: update }))
   }
   /** 105 켬 표 0 칸 — 메뉴 객체 이동 vt+8 0x6c445 가 건너뛰어 커서가 서지 못한다(하위 메뉴 표는 늘 켜져 있다) */
   const isOffSlot = (index: number) => kind === '관리' && mainOffIds.has(slots[index]?.id ?? '')
   const isSliding = update - state.openedAt < SLIDE_KEY_LOCK_UPDATES
-  slidingRef.current = isKeyEnabled && isSliding
-  const latest = useRef({ cursor, slots, moveTo, menu, isOffSlot, isSliding })
-  latest.current = { cursor, slots, moveTo, menu, isOffSlot, isSliding }
+  // 화면의 머리띠 되돌아가기가 볼 값 — 커밋 때 적는다(누름은 늘 커밋 뒤에 온다)
+  useLayoutEffect(() => {
+    slidingRef.current = isKeyEnabled && isSliding
+  })
+  const latest = useEffectEvent(() => ({ cursor, slots, moveTo, menu, isOffSlot, isSliding }))
   useEffect(() => {
     if (!isKeyEnabled) return undefined
     const onKey = (event: KeyboardEvent) => {
-      const held = latest.current
+      const held = latest()
       if (held.isSliding) return
       // vt+0x18 0x6c299 → 0x6c031(숫자키 꼴 1) → vt+8 0x6c445 — ←↑'4''2' / →↓'6''8', 꺼진 칸은 건너뛴다 (`nariMenuKeys`)
       const step = nariMenuStepOfKey(event.key)
@@ -239,13 +249,11 @@ function titleViewOf(career: PitcherCareer): PlayerCareer {
 
 export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const { career } = props
-  const ownMainCursor = useRef(createNariMainMenuCursor()).current
+  const [ownMainCursor] = useState(createNariMainMenuCursor)
   const mainCursor = props.mainCursor ?? ownMainCursor
   /** 111 상점 · 121 장비착용에서 돌아왔으면 그 하위 메뉴(110 · 106) (`nariReturnSubMenuOf`) */
   const [returned] = useState(() => nariReturnSubMenuOf(mainCursor))
-  useEffect(() => {
-    mainCursor.returnSubMenu = null
-  }, [mainCursor])
+  useEffect(() => clearNariReturnSubMenu(mainCursor), [mainCursor])
   const { onOpenShop } = props
   /** 커맨드 줄 칸이 펼쳐지는 중(`PitcherCommandBar` 가 그릴 때마다 적는다) — 그동안 취소도 버린다 */
   const slidingRef = useRef(false)
@@ -280,15 +288,16 @@ export function PitcherManagementScreen(props: PitcherManagementScreenProps) {
   const wasActed = useRef(career.hasActedThisCycle)
   const [awaitingEntry, setAwaitingEntry] = useState(false)
   const isIdleMain = menu.kind === '관리' && menu.subWindow === null && menu.detail === null && menu.question === null && menu.choice === null
-  useLayoutEffect(() => {
+  const noteActed = useEffectEvent(() => {
     if (career.hasActedThisCycle && !wasActed.current) setAwaitingEntry(true)
     wasActed.current = career.hasActedThisCycle
   })
-  useLayoutEffect(() => {
-    if (!awaitingEntry || !isIdleMain) return
-    mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false)
+  useLayoutEffect(() => noteActed(), [career.hasActedThisCycle])
+  // 관리 메뉴만 남은 렌더에서 곧바로 105 진입을 친다(예전 레이아웃 효과와 같은 값이 그림 전에 선다)
+  if (awaitingEntry && isIdleMain) {
+    moveNariMainCursor(mainCursor, nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, false))
     setAwaitingEntry(false)
-  })
+  }
 
   // 124 그림 0x16778 — 목록 판과 머리띠만(관리 화면은 없다). 취소 → 106
   /**

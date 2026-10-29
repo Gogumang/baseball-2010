@@ -123,8 +123,11 @@ export function DetailWindow({
     skipsMotion: !opensAsCommonPopup || hasNoLayout,
     isCommonWindow: opensAsCommonPopup,
   })
+  // 닫힘 연출이 끝난 뒤에 부를 최신 `onClose` — 커밋 때 적는다(연출 끝은 rAF 라 그 뒤다)
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose
+  })
   const close = () => {
     if (!opensAsCommonPopup) return onClose()
     motion.close('바로', () => onCloseRef.current())

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
 import { SPEAKER_NAMES } from '@/shared/config/original/eventMeta'
 import type { EventCommand, OriginalEvent } from '@/shared/config/original/eventTypes'
@@ -183,7 +183,7 @@ export function StoryScreen({
     windowTextOf,
     (current) => isStepHeld(current, releasedKey),
     rewardNoticeContext === undefined ? undefined : (items, eventId) => rewardNoticeOf(items, eventId, rewardNoticeContext()),
-    () => closeSystemWindow(),
+    onSystemWindowConfirm,
     onReward,
   )
   // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
@@ -194,11 +194,11 @@ export function StoryScreen({
    * 이벤트를 실은 횟수 — 재생 시작과 선택지 · 예아니오로 옮길 때마다 0x8be20 이 [mgr+0x2c0] = 0 으로 둔다.
    * 그 이벤트의 첫 say(0x8d1f2)만 상자를 내렸다 다시 올린다.
    */
-  const eventLoadsRef = useRef(0)
+  const [eventLoads, setEventLoads] = useState(0)
   /** 대사 상자 글 칸 — say · 선택지 명령이 돌 때 쓴다 (아래) */
-  const boxRef = useRef<DialogueBoxContent | null>(null)
+  const [heldBox, setBox] = useState<DialogueBoxContent | null>(null)
   const jump = (eventId: number) => {
-    eventLoadsRef.current += 1
+    setEventLoads((count) => count + 1)
     jumpToEvent(eventId)
   }
   // '끝'(+0x10 = 2) 그리기만 [mgr+0x2c8] 을 바꾸고, id 6 · 7 이면 글 · 초상화 · 상자를 처음으로 돌린다.
@@ -207,9 +207,7 @@ export function StoryScreen({
   const onEffectorEnd = (endedId: number, nextCommand: EventCommand | null) => {
     // 0x8d9c2 — 갱신이 먼저: id 6 바로 뒤가 경기 명령이면 초상화 · 높이 · 글 칸 셋을 비운다. 같은 틀의 '끝' 그리기는
     // 칸 0 이 비어 상자도 초상화도 안 그린다(0x7fbe0)
-    if (clearsDialogueBeforeMatch(endedId, nextCommand) && boxRef.current !== null) {
-      boxRef.current = { ...boxRef.current, slots: [] }
-    }
+    if (clearsDialogueBeforeMatch(endedId, nextCommand)) setBox((held) => (held === null ? held : { ...held, slots: [] }))
     const ended = drawEventBackdrop({ effectId: endedId, fill: null }, '끝')
     setBackdrop((previous) => drawEventBackdrop({ ...previous, effectId: endedId }, '끝').state)
     if (!ended.resetsDialogue) return
@@ -228,6 +226,7 @@ export function StoryScreen({
   const effectId = screenEffect.lastEffectId ?? backdrop.effectId
   const passedEffectId = screenEffect.lastEffectId
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- [mgr+0x2c4] 는 레이아웃 단계의 '끝' 그리기(useScreenEffect → onEffectorEnd)가 먼저 적고 이 효과가 뒤에 적어야 원본 차례와 같다 — 렌더 중으로 옮기면 차례가 뒤집힌다
     if (passedEffectId !== null) setBackdrop((previous) => ({ ...previous, effectId: passedEffectId }))
   }, [passedEffectId, step])
   // '끝' 의 바뀐 색은 위에서 이미 들였으니 이 그리기는 '없음' 처럼 남은 색만 본다
@@ -250,26 +249,28 @@ export function StoryScreen({
   // 0x7fbc4 로 앞 상자를 그린다 — 선택지 뒤라면 선택지 줄과 고른 줄 테두리가 그대로 남는다.
   /** [mgr+0xb9] — 선택지가 돌 때 0, 위 · 아래로 바뀐다. 다음 say · 선택지가 돌 때까지 남는다 */
   const [selectedChoice, setSelectedChoice] = useState(0)
-  /** 이 이벤트 실음에서 say 를 돌렸는가 ([mgr+0x2c0]) — 값은 그때의 `eventLoadsRef` */
-  const saidInLoadRef = useRef<number | null>(null)
+  /** 이 이벤트 실음에서 say 를 돌렸는가 ([mgr+0x2c0]) — 값은 그때의 `eventLoads` */
+  const [saidInLoad, setSaidInLoad] = useState<number | null>(null)
   const commandKey = `${step.cursor.eventId}:${step.cursor.commandIndex}`
-  if ((command?.op === 'say' || command?.op === 'choice') && boxRef.current?.key !== commandKey) {
+  // 명령이 도는 렌더에서 곧바로 상자 칸을 쓴다(그 렌더의 그림부터 새 칸)
+  let box = heldBox
+  if ((command?.op === 'say' || command?.op === 'choice') && heldBox?.key !== commandKey) {
     if (command.op === 'say') {
       // 0x8d1f2 — 이 이벤트의 첫 say 면 0x7f7cc(높이 0) · [mgr+0x2c0] = 1, 그다음 0x8bab8 · 0x7f7d5
-      if (saidInLoadRef.current !== eventLoadsRef.current) {
-        saidInLoadRef.current = eventLoadsRef.current
-        if (boxRef.current !== null) setLowerCount((count) => count + 1)
+      if (saidInLoad !== eventLoads) {
+        setSaidInLoad(eventLoads)
+        if (heldBox !== null) setLowerCount((count) => count + 1)
       }
-      boxRef.current = { key: commandKey, slots: [`${speakerPrefixOf(speakerName)}${command.text}`], isChoice: false, replacements }
+      box = { key: commandKey, slots: [`${speakerPrefixOf(speakerName)}${command.text}`], isChoice: false, replacements }
     } else {
       // 0x8d22c — 0x8ba2c(칸 k = 갈래 글, [mgr+0xb9] = 0) · 0x7f7d5 · [창+0xe4] = 갈래 수 · 0x7f54c(초상화)
-      boxRef.current = { key: commandKey, slots: command.choices.map((choice) => choice.text), isChoice: true, replacements: [] }
+      box = { key: commandKey, slots: command.choices.map((choice) => choice.text), isChoice: true, replacements: [] }
       setSelectedChoice(0)
     }
+    setBox(box)
   }
   // 경기 명령(0x8d8c4~0x8d8f0)과 재생 끝(0x8d1b6 → 0x8d4e2)은 초상화 · 상자 높이 · 글 칸 셋을 비운다 — 그 틀부터 상자를 안 그린다
   const isBoxCleared = isReleased && (step.command === null || step.command.op === 'match')
-  const box = boxRef.current
   const isYearGoalWindow = command?.op === 'system' && command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined
   /**
    * 0x8cf64 명령 2(system) 하위 0(0x8b924) · 3(0x8b3bc) · 4(0x8b23c) · 5(0x8b1b8) 는 글을 [mgr+0xba] 에 채워 공용 창

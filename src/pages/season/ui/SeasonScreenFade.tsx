@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { ScreenOverlay } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { screenEffectFrameAt } from '@/entities/story/model/screenEffect'
@@ -41,13 +41,12 @@ export function SeasonScreenFade({ kind, onEnd, startFrame = 0 }: SeasonScreenFa
     window.addEventListener('keydown', swallow, true)
     return () => window.removeEventListener('keydown', swallow, true)
   }, [isRunning])
-  const onEndRef = useRef(onEnd)
-  onEndRef.current = onEnd
+  const onEndLatest = useEffectEvent(() => onEnd?.())
   const hasEndedRef = useRef(false)
   useEffect(() => {
     if (effect !== null || hasEndedRef.current) return
     hasEndedRef.current = true
-    onEndRef.current?.()
+    onEndLatest()
   }, [effect])
   if (effect === null || effect.overlay === null) return null
   return (

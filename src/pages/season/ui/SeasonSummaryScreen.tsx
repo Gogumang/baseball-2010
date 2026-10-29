@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { MessageBox, PressArea, RawScreen } from '@/shared/ui'
 import { TEAMS } from '@/shared/config/original/teams'
 import type { PostseasonSeries } from '@/entities/league/model/league'
@@ -123,12 +123,15 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
 
   // 진입 몫은 그 진입에 한 번 — 세션이 진입 효과(0x6900)에서 `entry` 를 세우므로 화면이 선 뒤에 온다
   const handledEntry = useRef<number | null>(null)
+  const enterSummary = useEffectEvent((opensAutobotBat: boolean) => {
+    if (opensAutobotBat) setPhase('해금알림')
+    else checkLeagueFirst()
+  })
+  // 진입(serial)마다 한 번만 — 다른 값이 바뀌어도 다시 돌지 않는다
   useEffect(() => {
     if (entry === null || handledEntry.current === entry.serial) return
     handledEntry.current = entry.serial
-    if (entry.opensAutobotBat) setPhase('해금알림')
-    else checkLeagueFirst()
-    // 진입(serial)마다 한 번만 — 다른 값이 바뀌어도 다시 돌지 않는다
+    enterSummary(entry.opensAutobotBat)
   }, [entry])
 
   const isFinished = series !== null && series.round === '종료'

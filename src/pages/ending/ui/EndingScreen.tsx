@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MarkupText, MessageBox, RawScreen } from '@/shared/ui'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -172,9 +172,7 @@ export function EndingScreen(props: EndingScreenProps) {
   /** 띠 안 배경 — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (`BAND_BACKGROUND` 머리말) */
   const band = useModeBackSprite(props.hour ?? sceneHour)
   // 단계 3 의 첫 틀에 제작진으로 (0x1bf9c) — 그 뒤 키가 보너스 · 등록을 묻는다
-  useEffect(() => {
-    if (stage === 3 && phase === '엔딩') setPhase('제작진')
-  }, [stage, phase])
+  if (stage === 3 && phase === '엔딩') setPhase('제작진')
 
   const questions: Record<QuestionPhase, Question> = {
     이어하기질문: {
@@ -208,8 +206,22 @@ export function EndingScreen(props: EndingScreenProps) {
    * **어느 키든** 화면 탭(`onPress`)과 같다(직접 떴다). 팝업이 떠 있는 단계는 창이 키를 먹는다(`MessageBox` — 그동안 `onPress` 가 없다).
    * 되풀이(+0x38)는 누름이 아니라 거른다
    */
+  /** 엔딩 → (부상·방출이면 이어하기 / 그 밖이면 단계 1 의 키만 단계 2 로 — 어둡게 덮은 뒤 제작진) → 보너스 → 등록 */
+  const onPress =
+    phase === '엔딩'
+      ? () => {
+          if (isContinuable) return setPhase('이어하기질문')
+          if (stage === 1) setLeavingAt(tick)
+        }
+      : phase === '제작진'
+        ? () => setPhase(bonusGamePoint > 0 && props.isBonusReceived !== true ? '보너스' : '등록질문')
+        : undefined
   const pressRef = useRef<(() => void) | undefined>(undefined)
-  pressRef.current = undefined
+  // 키가 볼 누름 — 커밋 때 적는다. 판정 없음 · 등록 목록 화면은 누름이 없다
+  const isPressScreen = endingIndex >= 0 && phase !== '등록목록'
+  useLayoutEffect(() => {
+    pressRef.current = isPressScreen ? onPress : undefined
+  })
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const press = pressRef.current
@@ -249,18 +261,6 @@ export function EndingScreen(props: EndingScreenProps) {
       />
     )
   }
-
-  /** 엔딩 → (부상·방출이면 이어하기 / 그 밖이면 단계 1 의 키만 단계 2 로 — 어둡게 덮은 뒤 제작진) → 보너스 → 등록 */
-  const onPress =
-    phase === '엔딩'
-      ? () => {
-          if (isContinuable) return setPhase('이어하기질문')
-          if (stage === 1) setLeavingAt(tick)
-        }
-      : phase === '제작진'
-        ? () => setPhase(bonusGamePoint > 0 && props.isBonusReceived !== true ? '보너스' : '등록질문')
-        : undefined
-  pressRef.current = onPress
 
   const romanceEndingIndex = romanceEndingIndexOf(endingIndex, seenEventIds)
   // 제작진은 은퇴 엔딩(연애 엔딩이 붙는 e 2~9)에만 있고, 그 뒤 보너스·등록 팝업도 제작진 위에 뜬다 (단계 > 2 의 키)

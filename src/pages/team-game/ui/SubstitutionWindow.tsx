@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
@@ -62,9 +62,11 @@ export function SubstitutionWindow({ kind, ourTeamId, current, bench, detailOf, 
   /** 도형을 다시 만든 그림 (+0x1e3 = 0 — '0' · 위아래) */
   const [radarRestartAt, setRadarRestartAt] = useState(0)
   const stateRef = useRef({ list, detailOpenedAt, tick })
-  stateRef.current = { list, detailOpenedAt, tick }
   const latest = useRef({ bench, onConfirm })
-  latest.current = { bench, onConfirm }
+  useLayoutEffect(() => {
+    stateRef.current = { list, detailOpenedAt, tick }
+    latest.current = { bench, onConfirm }
+  })
 
   const move = (dy: number) => {
     setList((value) => movedListCursor(value.cursor, value.top, latest.current.bench.length, dy))

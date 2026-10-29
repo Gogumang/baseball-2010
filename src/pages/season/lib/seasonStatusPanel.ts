@@ -1,7 +1,7 @@
 import { SEASON_YEAR_GOALS } from '@/entities/season-mode/model/seasonGoals'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { NAME_BAND, STATUS_BOXES, messageGameNumberOf, nameBandSplitOf } from '@/pages/management/lib/managementLayout'
-import type { StatusIconState } from '@/pages/management/ui/StatusIconRow'
+import type { StatusIconState } from '@/pages/management/lib/statusIcons'
 
 /**
  * 시즌모드 상태판 — 공용 상태판 **0x7d34c 의 모드 2 갈래** (직접 떴다, 0x7d34c~0x7df92 · 메시지줄 0x7d120).

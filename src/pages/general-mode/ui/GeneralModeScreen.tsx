@@ -127,6 +127,17 @@ export interface GeneralModeScreenProps {
 /** 19 진입 0x23e70 의 처음 칸 — 격자 x 0 · y 1(23eb2 · 23eb4), 폭 5 라 팀 5 */
 const AI_TEAM_INITIAL_CURSOR = 5
 
+/** 지금 보이는 것과 바로 앞에 보였던 것 — 렌더 중에 맞춘다 */
+interface ViewTrail<V> {
+  readonly view: V
+  readonly previous: V | null
+}
+
+/** 보이는 것이 바뀌었으면 앞의 것을 남긴 새 자취, 아니면 그대로 */
+function trailAfter<V>(trail: ViewTrail<V>, view: V): ViewTrail<V> {
+  return trail.view === view ? trail : { view, previous: trail.view }
+}
+
 export function GeneralModeScreen(props: GeneralModeScreenProps) {
   const live = withLiveGameInning(props)
   if (live.resumeGame !== undefined) return <GeneralModeResume {...live} resumeGame={live.resumeGame} />
@@ -288,16 +299,18 @@ function GeneralModePrepare(props: GeneralModeScreenProps) {
    * 본문 숨김 · 배너 연출을 켠다 (모드 1 · 8 · 9 두 갈래 모두, 0x2e0ee~0x2e11a · 0x2e16a~). `pages/management/lib/matchInfoEntry`.
    */
   const matchView = session.isPlaying || flow.step !== GENERAL_MODE_STEP.경기정보 ? null : session.entryEdit !== null ? '23' : '22'
-  const matchViewTrail = useRef<{ readonly view: string | null; readonly previous: string | null }>({ view: matchView, previous: null })
-  if (matchViewTrail.current.view !== matchView) matchViewTrail.current = { view: matchView, previous: matchViewTrail.current.view }
-  const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '23'
+  const [heldMatchViewTrail, setMatchViewTrail] = useState<ViewTrail<string | null>>({ view: matchView, previous: null })
+  const matchViewTrail = trailAfter(heldMatchViewTrail, matchView)
+  if (matchViewTrail !== heldMatchViewTrail) setMatchViewTrail(matchViewTrail)
+  const isMatchInfoEntryAnimated = matchViewTrail.previous !== '23'
   /**
    * 18 · 19 그림(0x2de3c · 0x2ddb0)의 0x63b15 넷째 인자 = `[메뉴+0x28] ≠ 0x13` · `≠ 0x12` — 상대 팀 고르기에서 넘어왔으면 0 이라
    * 0x63bd8~0x63be0 이 머리띠 미끄러짐([skin+0x84]) · 격자 열림 애니([skin+0xe8])를 끈다 (2de7e · 2ddf2, r333)
    */
-  const stepTrail = useRef<{ readonly step: number; readonly previous: number | null }>({ step: flow.step, previous: null })
-  if (stepTrail.current.step !== flow.step) stepTrail.current = { step: flow.step, previous: stepTrail.current.step }
-  const isTeamSelectEntryAnimated = (otherTeamStep: number) => stepTrail.current.previous !== otherTeamStep
+  const [heldStepTrail, setStepTrail] = useState<ViewTrail<number>>({ view: flow.step, previous: null })
+  const stepTrail = trailAfter(heldStepTrail, flow.step)
+  if (stepTrail !== heldStepTrail) setStepTrail(stepTrail)
+  const isTeamSelectEntryAnimated = (otherTeamStep: number) => stepTrail.previous !== otherTeamStep
   /** 준비 단계 취소 — 18 · 빠른실행 22 의 CLR 은 게임시작 목록(하위 5)으로 (0x29d9a · 0x313c4) */
   const cancelPrepare = () => onExit(5)
   const back = () => {

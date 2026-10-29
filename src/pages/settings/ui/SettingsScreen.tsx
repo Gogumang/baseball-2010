@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { stopSkinFrameSlide } from '@/shared/lib/skinFrameSlide/skinFrameSlide'
 import type { ReactNode } from 'react'
@@ -211,8 +211,7 @@ export function SettingsScreen({
    */
   const [pageSlideStart, setPageSlideStart] = useState<number | null>(isInGame ? null : 0)
   const isPageShown = pageSlideStart === null || isFrameSlideClearedAt(updates - pageSlideStart)
-  const isPageShownRef = useRef(isPageShown)
-  isPageShownRef.current = isPageShown
+  const isPageShownNow = useEffectEvent(() => isPageShown)
   const panel = isInGame ? IN_GAME_PANEL : PANEL
   /** 판·제목·줄·OK 가 y0 를 따라 내려가는 만큼 */
   const panelDy = panel.y - PANEL.y
@@ -241,22 +240,24 @@ export function SettingsScreen({
    * 그대로 서 있어 다 편 상태를 들고 있다.
    */
   const [fold, setFold] = useState<PanelFold>(openingFold)
+  // 틱 · 나가기가 이어 읽는 판 — 틱이 그 자리에서 고쳐 쓰고, 렌더 값은 커밋 때 맞춘다
   const foldRef = useRef(fold)
-  foldRef.current = fold
-  const onBackRef = useRef(onBack)
-  onBackRef.current = onBack
+  useLayoutEffect(() => {
+    foldRef.current = fold
+  })
+  const back = useEffectEvent(onBack)
   const isFolding = !fold.isDone
   useEffect(() => {
     if (!isFolding) return undefined
     const timer = setAppTickInterval(() => {
       // 0x5a6fe 는 0x593c8 이 판을 그린 뒤에만 부른다 — 머리띠가 미끄러지는 동안은 펼침도 멈춘다
-      if (!isPageShownRef.current) return
+      if (!isPageShownNow()) return
       const next = nextPanelFold(foldRef.current, panel.height)
       // 접힘이 끝나면 갱신 끝 0x29688 이 상태 4 로 — 10 높이 판은 그려지지 않는다
       if (!next.isOpening && next.isDone) {
         timer()
         foldRef.current = next
-        return onBackRef.current()
+        return back()
       }
       foldRef.current = next
       setFold(next)

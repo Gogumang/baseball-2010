@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
@@ -62,8 +62,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
   const [update, setUpdate] = useState(0)
   const [isDone, setDone] = useState(false)
   const skipRef = useRef<() => void>(() => undefined)
-  const onFinishedRef = useRef(onFinished)
-  onFinishedRef.current = onFinished
+  const onFinishedLatest = useEffectEvent(onFinished)
 
   useEffect(() => {
     const startTick = appTickNow()
@@ -75,7 +74,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
       cancelAnimationFrame(handle)
       // 0x84e58 — 세 애니를 놓고 참을 돌려준다(이 뒤로 0x848d0 은 그리지 않는다)
       setDone(true)
-      onFinishedRef.current()
+      onFinishedLatest()
     }
     const tick = (now: number) => {
       const current = Math.max(0, appTickOf(now) - startTick)

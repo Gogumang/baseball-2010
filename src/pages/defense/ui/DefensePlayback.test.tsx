@@ -940,13 +940,13 @@ describe('수비 재생 — 공용 창이 서면 판이 멈춘다 (경기 장면
         })
       }
     }
-    function 타석(): null {
+    function AtBat타석(): null {
       useMarksGameScene()
       return null
     }
     const { rerender } = render(
       <GameSceneMarkContext.Provider value={mark}>
-        <타석 />
+        <AtBat타석 />
       </GameSceneMarkContext.Provider>,
     )
     expect(up).toBe(1)

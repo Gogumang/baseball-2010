@@ -1,12 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
 import {
   BALL_PATTERN_BACKDROP,
   BALL_PATTERN_GRID,
   MAIN_TITLE_BACKDROP,
+  GPOINT_ANIMATION,
   SKIN_SCREEN,
   ballPatternCounterAfter,
   ballPatternRect565,
@@ -163,27 +163,27 @@ function buildMainTitleBuffer(): Promise<string | null> {
 }
 
 /**
- * gpoint 애니 0 — 프레임 0~5 · 지연 3 (public/sprites/gpoint/frames/animations.json 그대로, 테스트가 맞춰 본다).
- * ⚠️ 이 애니 객체를 0x5fd61 말고 다른 곳도 진행시키는지는 다 훑지 않았다 — 웹은 이 바탕을 그린 수로만 센다.
- */
-export const GPOINT_ANIMATION: readonly AnimationEntry[] = [0, 1, 2, 3, 4, 5].map((frame) => ({ frame, delay: 3 }))
-
-/**
  * 공 무늬를 그린 수 — [skin+0x414] 와 gpoint 애니 진행이 둘 다 스킨(앱에 하나)에 있어 화면을 건너 이어진다.
  * 0 으로 놓는 곳은 스킨을 만들 때(0x5390c) 뿐이다.
  */
 const ballPatternDraws = { value: 0 }
 
+/** 그린 뒤 — 지난번 센 틱부터 이번 틱까지 그린 수를 올리고 센 틱을 적는다 */
+function countBallPatternDraws(lastDrawn: { tick: number }, tick: number): void {
+  ballPatternDraws.value += Math.max(0, tick - lastDrawn.tick)
+  lastDrawn.tick = tick
+}
+
 /** 0x5fd61 — 하늘색 위에 공 아이콘이 엇갈린 격자로 오른쪽 아래로 흐른다. 그린 **뒤** 카운터·애니를 한 번 진행한다 */
 function BallPatternBackdrop() {
   const tick = useUpdateCounter()
-  const lastDrawnTick = useRef(tick - 1)
+  // 이 바탕이 마지막으로 센 틱 — 렌더는 읽기만 하고 센 뒤(effect) 적는다. 적어도 다시 그리지 않는다(그린 수 칸과 같은 바깥 칸)
+  const [lastDrawn] = useState(() => ({ tick: tick - 1 }))
   useEffect(() => {
-    ballPatternDraws.value += Math.max(0, tick - lastDrawnTick.current)
-    lastDrawnTick.current = tick
-  }, [tick])
+    countBallPatternDraws(lastDrawn, tick)
+  }, [lastDrawn, tick])
   // 건너뛴 갱신도 원본에선 한 번씩 그렸다 — 그만큼 앞당겨 센다
-  const draws = ballPatternDraws.value + Math.max(0, tick - lastDrawnTick.current - 1)
+  const draws = ballPatternDraws.value + Math.max(0, tick - lastDrawn.tick - 1)
   const counter = ballPatternCounterAfter(draws)
   const frame = animationStepAt(GPOINT_ANIMATION, draws)?.frame ?? 0
   const { width, height } = SKIN_SCREEN
@@ -330,7 +330,7 @@ function setBallPattern(owner: symbol, now: BallPatternNow | null): void {
  * (알림을 받는 쪽은 React 를 거치지 않고 캔버스를 곧바로 칠한다)
  */
 function usePublishBallPattern(counter: number, frame: number): void {
-  const owner = useRef(Symbol('공무늬')).current
+  const [owner] = useState(() => Symbol('공무늬'))
   useLayoutEffect(() => {
     setBallPattern(owner, { counter, frame })
   }, [owner, counter, frame])
@@ -384,15 +384,14 @@ export function BallPatternTranslucentImage({
 }: BallPatternTranslucentImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isComposed, setComposed] = useState(false)
-  const latest = useRef({ src, x, y, width, height, level, rowOver, imagePlaceOf })
-  latest.current = { src, x, y, width, height, level, rowOver, imagePlaceOf }
+  const latest = useEffectEvent(() => ({ src, x, y, width, height, level, rowOver, imagePlaceOf }))
 
   useLayoutEffect(() => {
     let isActive = true
     let waiting: string | null = null
     /** 그렸으면 참 — 못 그리면(무늬 없음 · 그림 못 받음 · 다룰 수 없는 줄) 거짓 */
     const draw = (): boolean => {
-      const current = latest.current
+      const current = latest()
       const pattern = ballPatternNow
       if (pattern === null) return false
       const tileSrc = `${GPOINT_FRAMES}/${pad(pattern.frame)}.png`
@@ -446,7 +445,7 @@ export function BallPatternTranslucentImage({
     let hasDrawn = false
     const redraw = () => {
       const drawn = draw()
-      if (!drawn && hasDrawn) effectContextOf(canvasRef.current)?.clearRect(0, 0, latest.current.width, latest.current.height)
+      if (!drawn && hasDrawn) effectContextOf(canvasRef.current)?.clearRect(0, 0, latest().width, latest().height)
       hasDrawn = drawn
       return drawn
     }
@@ -455,7 +454,7 @@ export function BallPatternTranslucentImage({
     }
     ballPatternListeners.add(onChange)
     const unsubscribeGray = subscribeScreenGrayRects(onChange)
-    setComposed(redraw())
+    onChange()
     return () => {
       isActive = false
       ballPatternListeners.delete(onChange)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useRecoloredSprite, useWarmRecoloredSprites, outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
@@ -51,8 +51,7 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
   const windowSprite = useModeBackSprite(useSceneHour())
   const [update, setUpdate] = useState(0)
   const skipRef = useRef<() => void>(() => undefined)
-  const onFinishedRef = useRef(onFinished)
-  onFinishedRef.current = onFinished
+  const onFinishedLatest = useEffectEvent(onFinished)
 
   useEffect(() => {
     const startTick = appTickNow()
@@ -62,7 +61,7 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
       if (isDone) return
       isDone = true
       cancelAnimationFrame(handle)
-      onFinishedRef.current()
+      onFinishedLatest()
     }
     const tick = (now: number) => {
       const current = Math.max(0, appTickOf(now) - startTick)

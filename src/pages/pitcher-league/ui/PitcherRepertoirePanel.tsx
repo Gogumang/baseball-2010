@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { PITCH_WINDOW_TABS } from '@/pages/pitcher-league/lib/pitcherManagementMenu'
 import { PITCH_TRAINING_START, pitchTrainingKeyOf, pitchTrainingKeyOutcomeOf } from '@/pages/pitcher-league/lib/pitchTrainingWindow'
@@ -49,12 +49,11 @@ export function PitcherRepertoirePanel({ career, tab, isKeyEnabled, onSelectMagi
   /** 탭 2 — 탭 격자(행) · 칸 격자 · 초점 */
   const [pitchCursor, setPitchCursor] = useState<PitchTrainingCursor>(PITCH_TRAINING_START)
 
-  const latest = useRef({ isMagic, magicCursor, pitchCursor, onSelectMagic, onSelectPitch, onClose })
-  latest.current = { isMagic, magicCursor, pitchCursor, onSelectMagic, onSelectPitch, onClose }
+  const latest = useEffectEvent(() => ({ isMagic, magicCursor, pitchCursor, onSelectMagic, onSelectPitch, onClose }))
   useEffect(() => {
     if (!isKeyEnabled) return undefined
     const onKey = (event: KeyboardEvent) => {
-      const held = latest.current
+      const held = latest()
       if (held.isMagic) {
         const key = specialTrainingKeyOf(event.key)
         if (key === null) return

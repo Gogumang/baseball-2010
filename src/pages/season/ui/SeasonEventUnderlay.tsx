@@ -3,7 +3,7 @@ import { MANAGEMENT_MENU } from '@/entities/season-mode/model/seasonStateMachine
 import { OutingMapUnderlay } from '@/pages/management/ui/OutingMapUnderlay'
 import { SEASON_COMMAND_SLOTS } from '@/pages/season/lib/seasonCommandBar'
 import { SeasonCommonFrame } from '@/pages/season/ui/SeasonCommonFrame'
-import { disabledManagementIndexesOf } from '@/pages/season/ui/SeasonManagementScreen'
+import { disabledManagementIndexesOf } from '@/pages/season/lib/managementMenuDisabled'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { SeasonStatusPanel } from '@/pages/season/ui/SeasonStatusPanel'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'

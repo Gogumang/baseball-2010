@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { OK_KEY_OFFER, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { FrameSprite, InputMethodText, MessageBox, PaintedRects, PressArea, RawScreen, SolidStamp } from '@/shared/ui'
@@ -141,11 +141,9 @@ export function PitcherRegisterScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0,
    * 띠를 다시 펴지 않는다 — 0x67 이 편 만큼(보통 다 편 160) 이어서 0x66 글을 쓴다. 0x66 띠가 처음 그릴 때의 펼침 갱신 수다.
    */
   const [registerBandTicks, setRegisterBandTicks] = useState(0)
-  const pitchTickRef = useRef(pitchTick)
-  pitchTickRef.current = pitchTick
   /** 0x67 → 0x66 (CLR) — 0x67 이 그린 띠 갱신 수를 0x66 띠가 이어받는다 */
   const leavePitchPhase = () => {
-    setRegisterBandTicks(pitchTickRef.current + 1)
+    setRegisterBandTicks(pitchTick + 1)
     setPhase('등록')
   }
   // 0x66 의 상태 틱 [장면+0x2c] — 진입 틀에 0(0xbc9c8 bc9ec), 그 뒤 틀마다 +1. 그리기는 같은 틀 뒤쪽이라 진입 틀의 그림이 0 을 읽는다.
@@ -155,9 +153,14 @@ export function PitcherRegisterScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0,
   const uiOrigins = useFrameOrigins(MODE_UI)
   const pitchOrigins = useFrameOrigins(SLT_PITCH)
 
+  // '변화구'(0x67) 에 들 때마다 상태 틱을 0 부터 — 드는 렌더에서 맞춘다
+  const [tickPhase, setTickPhase] = useState(phase)
+  if (tickPhase !== phase) {
+    setTickPhase(phase)
+    if (phase === '변화구') setPitchTick(0)
+  }
   useEffect(() => {
     if (phase !== '변화구') return undefined
-    setPitchTick(0)
     const timer = setAppTickInterval(() => setPitchTick((previous) => previous + 1))
     return () => timer()
   }, [phase])

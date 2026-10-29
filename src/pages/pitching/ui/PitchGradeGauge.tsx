@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { gameSceneTickSeenAt, inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { GAUGE_LAST_CELL } from '@/entities/pitcher-career/model/pitchGauge'
@@ -111,7 +111,9 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
         },
   )
   const onReleaseRef = useRef(onRelease)
-  onReleaseRef.current = onRelease
+  useLayoutEffect(() => {
+    onReleaseRef.current = onRelease
+  })
   /**
    * 받은 키 칸 — 메시지 9(OK · '5' → 0x50e08)는 받은 다음 틀의 키 0x498d4(52d9e)가 0x11 갱신보다 먼저 처리한다(`sceneKeyLatch`).
    * 받은 틱은 키 사건이 난 때 장면 화면에 있던 그림의 틱이다(`gameSceneTickSeenAt` — 투수편 장면이 적는다, r217)
@@ -190,9 +192,11 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
     }
   }
   const pressRef = useRef(press)
-  pressRef.current = press
   const isPausedRef = useRef(isPaused)
-  isPausedRef.current = isPaused
+  useLayoutEffect(() => {
+    pressRef.current = press
+    isPausedRef.current = isPaused
+  })
 
   /** 키 · 누름 하나를 칸에 넣는다 — 받은 틱은 사건이 난 때 화면에 있던 그림의 틱(누름 칸은 닿은 시각 — `PressArea`) */
   const pushPress = (event: Event | undefined) => {
@@ -201,7 +205,9 @@ export function PitchGradeGauge({ onRelease, isPaused = false, showsGauge = true
     keyLatch.push(() => pressRef.current(seenTick), 'press', inputTime)
   }
   const pushPressRef = useRef(pushPress)
-  pushPressRef.current = pushPress
+  useLayoutEffect(() => {
+    pushPressRef.current = pushPress
+  })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -70,6 +70,7 @@ import { isBugFixed } from '@/shared/config/bugfixes'
 import { finishSkinBackdrop565, rgbTo565 } from '@/shared/lib/screen565/screen565'
 import { grayPixel565 } from '@/shared/lib/pixelEffect/pixelEffect'
 import type { Sprite565 } from '@/shared/lib/pixelEffect/screenCompose'
+import type { AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
 
 export const SKIN_SCREEN = { width: 240, height: 320 } as const
 
@@ -198,3 +199,9 @@ export function ballPatternRect565(
   }
   return out
 }
+
+/**
+ * gpoint 애니 0 — 프레임 0~5 · 지연 3 (public/sprites/gpoint/frames/animations.json 그대로, 테스트가 맞춰 본다).
+ * ⚠️ 이 애니 객체를 0x5fd61 말고 다른 곳도 진행시키는지는 다 훑지 않았다 — 웹은 이 바탕을 그린 수로만 센다.
+ */
+export const GPOINT_ANIMATION: readonly AnimationEntry[] = [0, 1, 2, 3, 4, 5].map((frame) => ({ frame, delay: 3 }))

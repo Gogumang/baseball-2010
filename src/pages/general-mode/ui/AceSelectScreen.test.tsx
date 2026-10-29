@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { ACE_PHASE, DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
-import { AceSelectScreen, acePlayerOfCell } from '@/pages/general-mode/ui/AceSelectScreen'
+import { AceSelectScreen } from '@/pages/general-mode/ui/AceSelectScreen'
+import { acePlayerOfCell } from '@/pages/general-mode/lib/aceSelectCells'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
 vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {

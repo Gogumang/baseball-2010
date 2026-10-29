@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
 import type { ReactNode } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -248,14 +248,13 @@ export function MainMenuScreen({
 
   const isWheel = state.tier === 4
 
-  const tenthTickRef = useRef(onTopMenuTenthTick)
-  tenthTickRef.current = onTopMenuTenthTick
+  const tenthTick = useEffectEvent(() => onTopMenuTenthTick?.())
   useEffect(() => {
     if (!isWheel) return undefined
     // 0x29454 의 `[this+0x2c] == 10` 판정(0x2951e~0x29536)도 맨 앞 `[+0xe1] == 0 → 0x29538` 건너뛰기 안이다 — 10번째 갱신에 바퀴가
     // 돌고 있으면 판정을 건너뛰고, 틱은 11 · 12 … 로 넘어가 처음 메뉴에 다시 들어올 때까지 미뤄진다 (r333)
     return setAppTickTimeout(() => {
-      if (!turningRef.current) tenthTickRef.current?.()
+      if (!turningRef.current) tenthTick()
     }, TOP_MENU_REWARD_TICK)
   }, [isWheel, turningRef])
   const entries = entriesOf(state.tier)
@@ -269,7 +268,10 @@ export function MainMenuScreen({
   // 윗단은 5틱(카운터 0~4), 아랫단은 스크롤 석 장을 그린 뒤 배열이 돈다
   const turn = useMenuTurn(cursor, entries.length, isWheel ? MENU_WHEEL_TURN_TICKS : MENU_REEL_SCROLL_STEPS.length)
   // 도는 동안은 키를 버린다 — `useMainMenu` 의 `turningRef` (0x29454 · 0x28cb0 · 0x28ad4 맨 앞 [+0xe1])
-  turningRef.current = turn.direction !== null
+  const isTurning = turn.direction !== null
+  useLayoutEffect(() => {
+    turningRef.current = isTurning
+  }, [turningRef, isTurning])
   /** 도는 동안은 **돌기 전 배열**을 그린다 (회전은 마지막 틱에 한 번 일어난다) */
   const shownCursor = turn.direction === null ? cursor : turn.fromCursor
 

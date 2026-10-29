@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { ReactNode } from 'react'
@@ -163,45 +163,47 @@ export function TeamSelectScreen({
   const gridOpen = entry.grid
   // 격자 시작 0x7a005(격자, [skin+0xe8], 1, 1) — 셋째 인자 [격자+6] = 1 이라 커서 튕김이 있다 (0x6409c)
   const bounce = useGridCursorBounce()
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (keyLock.current) return
-      // 장면 키(나만의리그 0x14114 · 시즌 0xca 0x8da4 · 트레이드 0xe4 0x8250 · 일반모드 18 0x29b38 · 19 0x29c98)는
-      // 모두 키 [this+0x40] 을 걸러 내지 않고 격자 vt+0x18(0x6c299 → 0x6c521 → 0x6c031)에 그대로 넘긴다 —
-      // 숫자키 꼴 1 이라 '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK(−5) 로 돌아온다 (표 0xd2e7c).
-      const direction =
-        event.key === 'ArrowRight' || event.key === '6'
-          ? 'right'
-          : event.key === 'ArrowLeft' || event.key === '4'
-            ? 'left'
-            : event.key === 'ArrowDown' || event.key === '8'
-              ? 'down'
-              : event.key === 'ArrowUp' || event.key === '2'
-                ? 'up'
-                : null
-      // 격자가 돌려준 키를 곧바로 0x5550d 에 넘긴다(0x8250 828c · 0x8da4 8de0 · 0x14114 1414a · 0x29b38 29b66 · 0x29c98 29cc6) —
-      // 숫자키도 방향으로 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
-      if (direction !== null) noteSkinShakeDirection(direction)
-      if (direction !== null) {
-        event.preventDefault()
-        const next = moveGridCursor(gridShape, cursor, direction)
-        // 칸이 바뀐 키(커서 +0x25)면 0x7a571 이 고른 칸을 그 방향으로 튕긴다 (`useGridCursorBounce`)
-        if (next !== cursor) bounce.start(direction)
-        return setCursor(next)
-      }
-      const isOk = event.key === 'Enter' || event.key === '5'
-      if (isOk && isSelectable(cursor)) {
-        event.preventDefault()
-        onSelect(cursor)
-      } else if (isOk && onSelectLocked !== undefined) {
-        event.preventDefault()
-        onSelectLocked(cursor)
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCancel()
-      }
+  const handleKey = useEffectEvent((event: KeyboardEvent) => {
+    if (keyLock.current) return
+    // 장면 키(나만의리그 0x14114 · 시즌 0xca 0x8da4 · 트레이드 0xe4 0x8250 · 일반모드 18 0x29b38 · 19 0x29c98)는
+    // 모두 키 [this+0x40] 을 걸러 내지 않고 격자 vt+0x18(0x6c299 → 0x6c521 → 0x6c031)에 그대로 넘긴다 —
+    // 숫자키 꼴 1 이라 '2' '4' '6' '8' 은 ↑ ← → ↓, '5' 는 OK(−5) 로 돌아온다 (표 0xd2e7c).
+    const direction =
+      event.key === 'ArrowRight' || event.key === '6'
+        ? 'right'
+        : event.key === 'ArrowLeft' || event.key === '4'
+          ? 'left'
+          : event.key === 'ArrowDown' || event.key === '8'
+            ? 'down'
+            : event.key === 'ArrowUp' || event.key === '2'
+              ? 'up'
+              : null
+    // 격자가 돌려준 키를 곧바로 0x5550d 에 넘긴다(0x8250 828c · 0x8da4 8de0 · 0x14114 1414a · 0x29b38 29b66 · 0x29c98 29cc6) —
+    // 숫자키도 방향으로 까딱임 방향 [skin+0x8c] 에 남는다(Q-10)
+    if (direction !== null) noteSkinShakeDirection(direction)
+    if (direction !== null) {
+      event.preventDefault()
+      const next = moveGridCursor(gridShape, cursor, direction)
+      // 칸이 바뀐 키(커서 +0x25)면 0x7a571 이 고른 칸을 그 방향으로 튕긴다 (`useGridCursorBounce`)
+      if (next !== cursor) bounce.start(direction)
+      return setCursor(next)
     }
+    const isOk = event.key === 'Enter' || event.key === '5'
+    if (isOk && isSelectable(cursor)) {
+      event.preventDefault()
+      onSelect(cursor)
+    } else if (isOk && onSelectLocked !== undefined) {
+      event.preventDefault()
+      onSelectLocked(cursor)
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onCancel()
+    }
+  })
+  // 등록 차례는 옛 그대로 — deps 가 바뀔 때만 다시 건다(다른 처리기와의 차례 유지). 처리는 그때 렌더 값으로
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => handleKey(event)
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [cursor, openedHiddenIds, hiddenTeamsSelectable, gridShape, onSelect, onSelectLocked, onCancel, bounce.start])

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, isRunningSceneKeys, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { gameSceneTickSeenAt, inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { WorldPoint } from '@/entities/pitching/model/pitchCurve'
@@ -75,7 +75,6 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
   const directionRef = useRef<AimDirection>(AIM_STILL)
   const isDoneRef = useRef(false)
   const propsRef = useRef({ side, onTick, onConfirm, onCancel, isPaused })
-  propsRef.current = { side, onTick, onConfirm, onCancel, isPaused }
 
   const tick = () => {
     const { side: currentSide, onTick: currentOnTick } = propsRef.current
@@ -84,7 +83,6 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     setAim(next)
   }
   const tickRef = useRef(tick)
-  tickRef.current = tick
 
   /**
    * 받은 키 칸 — 메시지 8 은 받은 다음 틀의 키 0x498d4(52d9e)가 0x10 갱신 0x39c5c(52e14~)보다 먼저 처리한다(`sceneKeyLatch`).
@@ -147,7 +145,6 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     else propsRef.current.onCancel?.()
   }
   const applyRef = useRef(apply)
-  applyRef.current = apply
 
   // '*'(소프트키1 · "*MENU" 누름 칸도) — 공용 키 0x498d4 가 메뉴를 세운 뒤 같은 키로 메시지 8 을 보내 dx · dy 를 지우고(499fa →
   // 0x534b0 → 0x50e3a), 그 그림의 갱신 0x39c5c 가 게이트(52cc6, 키 앞) 뒤라 한 번 더 돈다. 다음 그림부터는 창이 멈춘다.
@@ -168,8 +165,14 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     const seenTick = keyLatch.tickAt(inputTime)
     keyLatch.push(() => applyRef.current(action, seenTick), 'press', inputTime)
   }
-  const pushActionRef = useRef(pushAction)
-  pushActionRef.current = pushAction
+  const pushActionLatest = useEffectEvent(pushAction)
+
+  // 틱 · 받은 키 · 메뉴 알림이 볼 최신 값 — 커밋 때 적는다(그것들은 늘 커밋 뒤에 돈다)
+  useLayoutEffect(() => {
+    propsRef.current = { side, onTick, onConfirm, onCancel, isPaused }
+    tickRef.current = tick
+    applyRef.current = apply
+  })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -178,7 +181,7 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
       const action = aimKeyActionOf(event.key)
       if (action === null) return
       event.preventDefault()
-      pushActionRef.current(action, event)
+      pushActionLatest(action, event)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -189,7 +192,6 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     const action = aimKeyActionOf(key)
     if (action !== null) pushAction(action, event)
   }
-  const rects = aimTapRectsOf(side)
 
   return (
     <PressLayer testId="조준 영역">
@@ -198,7 +200,7 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
       {AIM_KEYPAD_KEYS.map((key, index) => (
         <PressArea
           key={key}
-          rect={rects[index]}
+          rect={aimTapRectsOf(side)[index]}
           label={key === '5' ? '조준 확정' : `조준 ${KEYPAD_LABELS[key] ?? key}`}
           onPress={(event) => pressKey(key, event)}
         />

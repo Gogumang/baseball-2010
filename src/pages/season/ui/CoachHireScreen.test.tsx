@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { CoachHireScreen } from '@/pages/season/ui/CoachHireScreen'
-import { acePlayerOfCell } from '@/pages/general-mode/ui/AceSelectScreen'
+import { acePlayerOfCell } from '@/pages/general-mode/lib/aceSelectCells'
 import { coachNameOf } from '@/entities/season-mode/model/seasonCoach'
 import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord, SeasonState } from '@/entities/season-mode/model/seasonRecord'

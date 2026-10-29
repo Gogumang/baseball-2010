@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { ABILITY_DETAIL_VISIBLE_LINES } from '@/pages/management/lib/abilityDetail'
@@ -142,11 +142,10 @@ function SeasonTrainingResultPopup({
   readonly onFirstLineChange: (line: number) => void
 }) {
   const lineCount = result.messages.length
-  const latest = useRef({ firstLine, onFirstLineChange })
-  latest.current = { firstLine, onFirstLineChange }
+  const latest = useEffectEvent(() => ({ firstLine, onFirstLineChange }))
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const current = latest.current
+      const current = latest()
       if (event.key === 'Enter' || event.key === '5' || event.key === ' ' || event.key === 'Escape' || event.key === 'Backspace') {
         event.preventDefault()
         onClose()
