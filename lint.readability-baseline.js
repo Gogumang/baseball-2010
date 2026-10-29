@@ -87,7 +87,6 @@ export const readabilityBaseline = [
   'src/entities/league/model/postseasonPlay.ts',
   'src/entities/mission/model/missionAutoRelay.ts',
   'src/entities/mission/model/missionGoal.ts',
-  'src/entities/mission/model/missionRunners.ts',
   'src/entities/mission/model/pitcherRun.ts',
   'src/entities/mode-save/model/modeSave.ts',
   'src/entities/national-cup/model/nationalCup.ts',
