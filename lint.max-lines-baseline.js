@@ -181,7 +181,6 @@ export const maxLinesBaseline = [
   'src/widgets/ace-level-up/ui/AceLevelUpWindow.tsx',
   'src/widgets/batting-stage/lib/bigHitScreen.ts',
   'src/widgets/batting-stage/lib/homeRunBanner.ts',
-  'src/widgets/batting-stage/lib/pitchInputOverlay.ts',
   'src/widgets/batting-stage/lib/pitcherSideStage.ts',
   'src/widgets/batting-stage/lib/renderHud.ts',
   'src/widgets/batting-stage/lib/skillPanel.ts',
