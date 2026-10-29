@@ -672,7 +672,12 @@ function drawRecordedUpdates(slots: RecordedPlaybackSlots, bundle: RecordedBundl
 }
 
 /** 0x519cc 키 건너뛰기 — 받은 틱보다 뒤 틱의 갱신이 왔는가(갱신 u 의 장면 틱은 갱신 0 의 장면 틱 + u) */
-function isSkippedByKey(slots: RecordedPlaybackSlots, skipTick: RecordedSkipTick | null, ticks: readonly DefenseViewState[], update: number): boolean {
+function isSkippedByKey(
+  slots: RecordedPlaybackSlots,
+  skipTick: RecordedSkipTick | null,
+  ticks: readonly DefenseViewState[],
+  update: number,
+): boolean {
   const recordedUpdateStart = slots.updateStartTickRef.current
   return skipTick !== null && skipTick.ticks === ticks && recordedUpdateStart !== null && recordedUpdateStart + update > skipTick.at
 }
@@ -716,7 +721,15 @@ function drawRecordedFrame(slots: RecordedPlaybackSlots, input: RecordedFrameInp
   if (isFinished && burstHold === null) clearBallParticles(bundle.run)
   if (burstHold !== null) {
     const lastIndex = Math.max(0, ticks.length - 1)
-    drawBurstWindowFrames(burstHold, bundle.run, ticks[lastIndex], slots.cameraOffsetRef.current, bundle.random, update, slots.updateStartTickRef.current)
+    drawBurstWindowFrames(
+      burstHold,
+      bundle.run,
+      ticks[lastIndex],
+      slots.cameraOffsetRef.current,
+      bundle.random,
+      update,
+      slots.updateStartTickRef.current,
+    )
   }
   return { bundle, isFinished, burstHold }
 }
@@ -774,7 +787,14 @@ function RecordedPlayback({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [freePassPlay, ticks])
-  const { bundle, isFinished, burstHold } = drawRecordedFrame(slots, { ticks, update, redraws, isHomeRun, skipTick, hasBurstWindow: burstWindow != null })
+  const { bundle, isFinished, burstHold } = drawRecordedFrame(slots, {
+    ticks,
+    update,
+    redraws,
+    isHomeRun,
+    skipTick,
+    hasBurstWindow: burstWindow != null,
+  })
   const { tally, errors: drawnErrors, run } = bundle
 
   /** `onDone` 을 부른 재생 묶음 — 판이 끝난 뒤에도 남는 그림(0x1c)이 다시 그려져도 한 번만 부른다 */
