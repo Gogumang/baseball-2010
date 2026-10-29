@@ -2,12 +2,11 @@
  * 경기 진행 흐름 — 공개 이름만 다시 내보내는 barrel.
  * 몸통은 `gameFlow/` 아래 하위 도메인 파일로 옮겼다(r347, 동작 그대로).
  */
-export type { GameLogEntry, GameProgress, GameAutoRelay, GameAutoRelayTick } from '@/features/play-game/model/gameFlow/types/progress'
+export type { GameProgress, GameAutoRelay, GameAutoRelayTick } from '@/features/play-game/model/gameFlow/types/progress'
 export { UNFILLED_SPECIAL_SWING_COUNT } from '@/features/play-game/model/gameFlow/types/constants'
 export { startGame } from '@/features/play-game/model/gameFlow/setup/startGame'
 export type { GamePitcherSetup } from '@/features/play-game/model/gameFlow/setup/startGame'
 export { applyPlayerOutcome, recordMyBuntAttempt, startPlayerOutcome } from '@/features/play-game/model/gameFlow/batting/applyPlayerOutcome'
-export type { PlayerOutcomeOptions, AtBatCount, GamePendingRunnerPlay } from '@/features/play-game/model/gameFlow/types/plays'
 export {
   throwOpponentPitch,
   stageOpponentPitcherAbilityOf,
@@ -35,7 +34,6 @@ export {
 } from '@/features/play-game/model/gameFlow/baseRunning/runners'
 export { teamBatterNameAt } from '@/features/play-game/model/gameFlow/roster/teamPlayers'
 export { withAutoStopLateInningSetup } from '@/features/play-game/model/gameFlow/autoPlay/lateInning'
-export { pitchersOfRecordOf } from '@/features/play-game/model/gameFlow/settlement/decisions'
 export { mySpecialSwingRemainingOf, spendMySpecialSwing } from '@/features/play-game/model/gameFlow/roster/specialSwing'
 export { startSteal, stealableBasesOf } from '@/features/play-game/model/gameFlow/baseRunning/steals'
 export type { PitchArrivalStep } from '@/features/play-game/model/gameFlow/types/pitchArrival'

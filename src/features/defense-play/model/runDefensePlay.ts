@@ -1192,11 +1192,6 @@ export function preRollContactMessage(input: DefensePlayInput): ContactMessageRo
   return roll
 }
 
-/** 이 쏜 공에 맞은 틀이 미리 굴린 묶음 — 없으면 undefined */
-export function contactMessageRollOf(contact: object): ContactMessageRoll | undefined {
-  return CONTACT_MESSAGE_ROLLS.get(contact)
-}
-
 /**
  * 타구 하나를 **시작 상태**로 세운다 — 포구 예보 · 필살수비 굴림 · 커버 배정까지.
  *
@@ -3688,11 +3683,6 @@ function slidingRunnerOf(runner: MutableRunner): SlidingRunner {
     targetBase: runner.state.targetBase,
     ticksToArrive: ticksToReach(runner.state.position, target, runner.state.speed),
   }
-}
-
-/** 패턴에서 궤적까지 한 번에 만들어 돌린다 — 부르는 쪽이 편하게 */
-export function runDefensePlayForPattern(input: Omit<DefensePlayInput, 'trajectory'> & { readonly pattern: BattedBallPattern }): DefensePlayResult {
-  return runDefensePlay({ ...input, trajectory: battedBallTrajectory(input.pattern) })
 }
 
 // ── 잡다한 도우미들 ──

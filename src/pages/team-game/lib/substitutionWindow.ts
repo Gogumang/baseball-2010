@@ -202,25 +202,8 @@ export function movedListCursor(cursor: number, top: number, count: number, dy: 
 
 /* ── 상세 창 0x5b798 ('0' INFO) — 엔트리 목록 창과 같이 쓴다 (`widgets/player-detail-window`) ─────────────── */
 
-export {
-  BATTER_DETAIL_ROWS,
-  DETAIL_COLORS,
-  DETAIL_LABEL_CELL,
-  DETAIL_LABEL_DX,
-  DETAIL_NONE_TEXT,
-  DETAIL_RADAR,
-  DETAIL_RADAR_AXES,
-  DETAIL_RADAR_LABELS,
-  DETAIL_VALUE_CELL,
-  DETAIL_VALUE_DX,
-  DETAIL_WINDOW,
-  PITCHER_DETAIL_ROWS,
-  SUBSTITUTION_DETAIL_ORIGIN,
-  detailWindowFrameAt,
-  salaryTextOf,
-  specialSwingTextOf,
-} from '@/widgets/player-detail-window/lib/playerDetailWindow'
-export type { DetailRow, DetailRowValue, DetailWindowFrame, PlayerDetail } from '@/widgets/player-detail-window/lib/playerDetailWindow'
+export { DETAIL_RADAR_AXES, detailWindowFrameAt, salaryTextOf, specialSwingTextOf } from '@/widgets/player-detail-window/lib/playerDetailWindow'
+export type { PlayerDetail } from '@/widgets/player-detail-window/lib/playerDetailWindow'
 
 /**
  * 레코드 +0x1b — 상세 창 0x5b798 은 모드 2 에서 이 칸을 표 선수 · 영입 선수 가리지 않고 연봉으로 찍는다(5c87c~5c884).

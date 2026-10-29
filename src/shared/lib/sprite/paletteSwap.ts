@@ -318,11 +318,6 @@ export function useWarmRecoloredFolder(folder: string, paletteIndices: readonly 
   useWarmRecoloredSprites([...new Set(paletteIndices)].flatMap((paletteIndex) => recolorRequestsOf(folder, frames, paletteIndex)))
 }
 
-/** 폴더의 `palette.json`. 아직 오지 않았거나 실패하면 null. */
-export function useSpritePalettes(folder: string): SpritePalettes | null {
-  return useSpriteJson<SpritePalettes>(`${folder}/palette.json`)
-}
-
 /** 팔레트를 갈아 끼운 그림. 칠하기 전에는 구운 그림을 그대로 내보내 화면이 비지 않는다. */
 export function useRecoloredSprite(spriteUrl: string, paletteIndex: number | null): string {
   // 벌을 안 고르면(null) palette.json 을 청하지 않는다 — 팔레트가 없는 폴더(batter_batter 따위)가 404 를 내던 일 (r124 측정)

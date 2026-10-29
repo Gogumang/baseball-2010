@@ -26,7 +26,6 @@ import {
   runRunnerPlay,
   type RunnerPlayEngineInput,
   type RunnerPlayEngineResult,
-  type RunnerPlayResultCode,
 } from '@/features/defense-play/model/runnerPlayEngine'
 
 /**
@@ -424,5 +423,3 @@ const FORCE_OUT_CALL = 20
 export function isStealPlayResult(result: DefensePlayResult | null): result is StealPlayResult {
   return result !== null && 'stealingFrom' in result && 'resultCode' in result
 }
-
-export type { RunnerPlayResultCode as StealResultCode }

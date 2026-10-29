@@ -31,7 +31,6 @@ import type { MissionAutoHalf, MissionGame } from '@/entities/mission/model/miss
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 import { drainMissionAutoTicks } from '@/entities/mission/model/missionAutoRelay'
 import { lineupSlotOf, recordLineupPlay } from '@/entities/game/model/quickLineup'
-import { EMPTY_BASE_RUNNERS } from '@/entities/game/model/baseRunners'
 import type { BaseRunners } from '@/entities/game/model/baseRunners'
 import { survivorsFromBaseOfFates } from '@/features/defense-play/model/runnerFates'
 import { missionBoardFielderZeroOf, missionRunnersAfterPlay, missionRunnersOf, missionStartRunnersOf } from '@/entities/mission/model/missionRunners'
@@ -596,27 +595,6 @@ export function applyPickoff<T extends MissionRun>(
     ? { ...run, bases: EMPTY_BASES, runners, outs: 0, cpu, game }
     : { ...run, bases: advance.bases, runners, outs, cpu, game }
   return judgedAtGameEnd(moved, outs)
-}
-
-/** 도루 실패 — 주자가 죽는다 */
-export function failSteal(run: MissionRun): MissionRun {
-  if (!canSteal(run)) return run
-  const bases = { ...run.bases, first: false }
-  const outs = run.outs + 1
-  if (outs >= OUTS_PER_INNING) {
-    return judgedAtGameEnd(
-      {
-        ...run,
-        bases: EMPTY_BASES,
-        runners: EMPTY_BASE_RUNNERS,
-        outs: 0,
-        cpu: missionCpuAfterRuns(run.cpu, 0, true),
-        game: afterHumanPlateAppearance(run.game, run.mission, null, 0, true),
-      },
-      outs,
-    )
-  }
-  return { ...run, bases, runners: { ...missionRunnersOf(run), first: null }, outs }
 }
 
 /** 반 이닝을 몇 번까지 자동으로 돌리나 — 경기 끝(연장도 결국 끝난다) 전에 멈출 일이 없게 넉넉히 */

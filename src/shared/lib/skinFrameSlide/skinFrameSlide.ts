@@ -31,9 +31,6 @@ const slide = { isSliding: false, position: 0 }
 /** 지금 깃발 [skin+0x84] — 이번 머리띠를 그리기 **앞** */
 export const isSkinFrameSliding = () => slide.isSliding
 
-/** 지금 자리 [skin+0x86] — 마지막 머리띠가 그린 값 */
-export const skinFrameSlidePosition = () => slide.position
-
 /** 들어옴이 미끄러짐을 세운다 — +0x84 = 1 · +0x86 = 1 */
 export function startSkinFrameSlide(): void {
   slide.isSliding = true

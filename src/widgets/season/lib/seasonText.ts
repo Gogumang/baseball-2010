@@ -18,27 +18,6 @@ export function seasonMoneyTextOf(millions: number): string {
 }
 
 /**
- * 경기 수입 글 — 표시(0xdea0)는 `"수입: X만"` 으로 `SR+0x66 × 100` 을 찍는다 (J 4-7).
- * 그래서 여기서는 억 서식을 쓰지 않고 만원 수를 그대로 쓴다.
- */
-export function incomeTextOf(millions: number): string {
-  return `${millions * MILLION_TO_TEN_THOUSAND}만`
-}
-
-/** 팀 타율 — 목표 표는 ×1000 정수다 (P4 2b). 표기는 **근사** */
-export function battingAverageTextOf(perMille: number): string {
-  return `0.${String(Math.max(0, Math.trunc(perMille)))
-    .padStart(3, '0')
-    .slice(-3)}`
-}
-
-/** 팀 방어율 — 목표 표는 ×100 정수다 (P4 2b, "방어율로 보임" 유력). 표기는 **근사** */
-export function earnedRunAverageTextOf(perHundred: number): string {
-  const value = Math.max(0, Math.trunc(perHundred))
-  return `${Math.trunc(value / 100)}.${String(value % 100).padStart(2, '0')}`
-}
-
-/**
  * StrMODE 문구의 `%s`·`%d` 를 순서대로 채운다.
  *
  * 메시지 상자(`MessageBox`)는 서식 인자를 받지 않아(마크업만 그린다) 여기서 미리 채운다.

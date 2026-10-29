@@ -1,21 +1,4 @@
-import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
-
-/** 공 하나의 판정을 화면 배너 문구로 바꾼다. */
-export function describePitchResolution(resolution: PitchResolution): string {
-  switch (resolution.kind) {
-    case '볼':
-      return '볼'
-    case '사구':
-      return '몸에 맞는 공'
-    case '파울':
-      return '파울'
-    case '스트라이크':
-      return resolution.isSwinging ? '헛스윙' : '스트라이크'
-    case '타구':
-      return describeBanner(resolution.outcome.kind)
-  }
-}
 
 /** 원본 기록달성 이름 StrGAME[9]~[12] — 누상 주자 수 순서 */
 const HOME_RUN_NAMES = ['솔로 홈런', '2점 홈런', '3점 홈런', '만루 홈런']

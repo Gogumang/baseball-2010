@@ -335,7 +335,6 @@ const FOLD_GROWTH = 4
 const FOLD_END_HEIGHT = 10
 
 export const openingFold = (): PanelFold => ({ isOpening: true, height: PANEL_UNFOLD_START_HEIGHT, step: 1, isDone: false })
-export const openedFold = (fullHeight: number): PanelFold => ({ isOpening: true, height: fullHeight, step: 1, isDone: true })
 /** 0x295e2 — 끝 0 · 걸음 1 · 접힘. 높이는 지금 그대로다 */
 export const closingFold = (from: PanelFold): PanelFold => ({ isOpening: false, height: from.height, step: 1, isDone: false })
 

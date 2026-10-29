@@ -15,45 +15,4 @@
  * `TeamGameOptions.settings` 로 넘긴다 — 한 번도 안 고쳤으면 생성자 0x9f26c 의 기본값(이닝 · 전체) `SEASON_DEFAULT_MATCH_SETTINGS`
  * (`src/app/model/useSeasonSession.ts`).
  */
-export { MatchSettingsWindow, MatchSettingsScreen } from '@/pages/match-settings/ui/MatchSettingsWindow'
-export type { MatchSettingsWindowProps } from '@/pages/match-settings/ui/MatchSettingsWindow'
-
-/** 창 상태·키 처리 (0x5ffcc) — 화면 없이 규칙만 쓰고 싶을 때 */
-export {
-  SETTINGS_STAGE,
-  DETAIL_ROW,
-  DETAIL_ROW_COUNT,
-  DETAIL_CELL_COUNTS,
-  KIND_COUNT,
-  CHANCE_VALUE_COUNT,
-  INNING_VALUE_COUNT,
-  openMatchSettings,
-  pressMatchSettingsKey,
-  answerMatchSettingsPopup,
-  detailCellCountOf,
-  detailBitsOf,
-  toggleDetailBit,
-  valueCountOf,
-} from '@/pages/match-settings/lib/matchSettingsMenu'
-export type {
-  MatchSettingsAction,
-  MatchSettingsKey,
-  MatchSettingsPopup,
-  MatchSettingsWindowState,
-} from '@/pages/match-settings/lib/matchSettingsMenu'
-
-/** 원본 문구·이름 그림 표 (R4 4절 · StrMAINMENU[121]~[126]) */
-export {
-  KIND_LABELS,
-  KIND_LABEL_FRAMES,
-  KIND_DESCRIPTIONS,
-  CHANCE_DESCRIPTIONS,
-  CHANCE_LABELS,
-  INNING_LABELS,
-  INNING_LABEL_FRAMES,
-  INNING_DESCRIPTIONS,
-  DETAIL_ROW_LABELS,
-  DETAIL_ROW_DESCRIPTIONS,
-  CONFIRM_TEXT,
-  NO_DETAIL_TEXT,
-} from '@/pages/match-settings/lib/matchSettingsText'
+export { MatchSettingsWindow } from '@/pages/match-settings/ui/MatchSettingsWindow'

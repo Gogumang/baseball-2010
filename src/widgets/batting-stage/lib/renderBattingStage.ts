@@ -122,7 +122,7 @@ import {
 import { stageCameraShiftOf, type StageCamera } from '@/widgets/batting-stage/lib/hitCamera'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
-export { STAGE_HEIGHT, STAGE_WIDTH, toPixel, toZoneCoordinate } from '@/widgets/batting-stage/lib/stageLayout'
+export { STAGE_HEIGHT, STAGE_WIDTH } from '@/widgets/batting-stage/lib/stageLayout'
 
 export interface StageScene {
   readonly pitch: Pitch | null

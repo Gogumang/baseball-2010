@@ -46,8 +46,6 @@ export const DRAW_EFFECT = {
   FLIP: 0x11,
 } as const
 
-export type DrawEffect = (typeof DRAW_EFFECT)[keyof typeof DRAW_EFFECT]
-
 /* ── 효과 1 반투명 ────────────────────────────────────────────────────────── */
 
 /**

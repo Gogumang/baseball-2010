@@ -174,19 +174,3 @@ export function useRecordAlert(
 
   return isDrawing ? frame : NO_FRAME
 }
-
-/**
- * 공 끝 번호 — `keys` 가운데 하나라도 지난 그림과 다르면(`Object.is`) 1 오른다. 진행기가 공 하나 · 플레이 하나가 끝날 때마다
- * 새로 세우는 칸(마지막 판정 · 마지막 수비 플레이 · 붙든 타구가 풀림 …)을 넘기면 0x4e600 의 부름 자리(`pitchEnd.serial`)가 된다.
- * 같은 그림을 두 번 그려도(StrictMode) 한 번만 오른다.
- */
-export function usePitchEndSerial(keys: readonly unknown[]): number {
-  const previousRef = useRef(keys)
-  const serialRef = useRef(0)
-  const previous = previousRef.current
-  if (previous.length !== keys.length || keys.some((key, index) => !Object.is(key, previous[index]))) {
-    previousRef.current = keys
-    serialRef.current += 1
-  }
-  return serialRef.current
-}

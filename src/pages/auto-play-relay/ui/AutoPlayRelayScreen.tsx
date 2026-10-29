@@ -29,9 +29,6 @@ const SCREEN_HEIGHT = 320
  */
 const BASE_BOX = { width: 212, height: 57 } as const
 
-/** 점수판 0x41c18(경기, W/2 − 폭/2, 10, 0) 자리 (42812~4283a) — `LINE_SCORE_AT.autoRelay` */
-export const SCOREBOARD_AT = { x: SCREEN_WIDTH / 2 - BASE_BOX.width / 2, y: 10 } as const
-
 /** 두 팀 판 — 0x420dc(경기, W/2 − 폭/2 − 6, H − 0x46) → 0x42364(경기, W/2 + 0x24, H − 0x46) 차례 (4283e~4289a) */
 export const RELAY_CARDS_AT: HalfInningCardsAt = {
   pitcherX: SCREEN_WIDTH / 2 - BASE_BOX.width / 2 - 6,

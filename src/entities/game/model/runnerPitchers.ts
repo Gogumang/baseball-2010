@@ -1,5 +1,5 @@
 import type { BaseNumber, BaseRunners } from '@/entities/game/model/baseRunners'
-import { EMPTY_BASE_RUNNERS, runnerOnBase } from '@/entities/game/model/baseRunners'
+import { runnerOnBase } from '@/entities/game/model/baseRunners'
 
 /**
  * **루에 선 주자마다 그 주자를 내보낸 투수(책임 투수)** — 원본 주자 객체의 `+0x30` (S1 5절 · 직접 떴다).
@@ -31,8 +31,6 @@ export interface RunnerPitcherTags {
   /** 그 주자를 내보낸 투수 열쇠 */
   readonly pitchers: BaseRunners
 }
-
-export const EMPTY_RUNNER_PITCHER_TAGS: RunnerPitcherTags = { runners: EMPTY_BASE_RUNNERS, pitchers: EMPTY_BASE_RUNNERS }
 
 /** 루 b 의 주자를 내보낸 투수 — 모르면(적은 신원과 지금 신원이 다르면) `fallback` */
 export function pitcherOnBase(tags: RunnerPitcherTags | undefined, runners: BaseRunners, base: BaseNumber, fallback: number): number {

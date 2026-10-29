@@ -77,7 +77,7 @@ export function frameAnimations(folder: string): readonly (readonly StageAnimati
 // <img> 쪽은 `shared/lib/sprite/paletteSwap` 의 훅이 맡지만 캔버스에는 훅을 쓸 수 없어
 // 원점·애니 표와 같은 공용 JSON 캐시(비동기로 받아 두고 도착하면 다음 프레임부터)를 쓴다.
 
-/** 폴더의 palette.json. 아직 안 불러왔으면 null (DOM 의 `useSpritePalettes` 와 같은 캐시) */
+/** 폴더의 palette.json. 아직 안 불러왔으면 null */
 function spritePalettes(folder: string): SpritePalettes | null {
   return spriteJsonNow<SpritePalettes>(paletteUrl(`${folder}/000.png`))
 }

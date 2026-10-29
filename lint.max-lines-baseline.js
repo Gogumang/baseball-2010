@@ -85,7 +85,6 @@ export const maxLinesBaseline = [
   'src/features/play-team-game/model/gameAbilities.ts',
   'src/features/play-team-game/model/teamGameRoster.ts',
   'src/features/play-team-game/ui/InGameMenu.tsx',
-  'src/pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx',
   'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
   'src/pages/defense/lib/defenseHomeRunEffects.ts',

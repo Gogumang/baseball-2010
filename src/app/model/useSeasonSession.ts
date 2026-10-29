@@ -26,25 +26,11 @@ import { useGameProgressActions } from '@/app/model/seasonSession/game/useGamePr
 import { seasonSessionOf } from '@/app/model/seasonSession/hook/seasonSessionOf'
 
 export { SEASON_DEFAULT_MATCH_SETTINGS, seasonEvaluationJingleIdOf } from '@/app/model/seasonSession/constants/seasonConstants'
-export type {
-  SeasonSession,
-  SeasonEventPlayback,
-  SeasonIncomeEvaluation,
-  SeasonEntryEdit,
-  PendingSeasonGame,
-  SeasonGameKind,
-  SeasonGameSettingOptions,
-} from '@/app/model/seasonSession/types/session'
-export type { SeasonEquipPurchase, SeasonActions } from '@/app/model/seasonSession/types/actions'
+export type { SeasonSession, SeasonGameSettingOptions } from '@/app/model/seasonSession/types/session'
 export { seasonRecordAcesAfterGame } from '@/app/model/seasonSession/records/humanGameRecords'
-export { seasonLeagueStarterSlotOf, seasonLeaguePitcherOrderOf, nationalCupOpponentPitcherOrderOf } from '@/app/model/seasonSession/game/pitcherOrder'
 export { seasonGameProgressOf, withRecordSalaryGrades } from '@/app/model/seasonSession/save/normalize'
-export { seasonRanksOf } from '@/app/model/seasonSession/game/sceneSetup'
-export { seasonBatterLineOf, seasonEntryCellSourceOf, seasonPitcherLineOf } from '@/app/model/seasonSession/records/entryCells'
-export type { SeasonLeagueRecordSource } from '@/app/model/seasonSession/records/entryCells'
-export { seasonLeagueRecordsOf, isPitcherLeaderKind } from '@/app/model/seasonSession/awards/leagueRecords'
+export { seasonLeagueRecordsOf } from '@/app/model/seasonSession/awards/leagueRecords'
 export { seasonTeamRankOf, seasonGoalInputOf, seasonGoalWindowNumbersFor, seasonPostseasonRankOf } from '@/app/model/seasonSession/goals/seasonGoals'
-export type { SeasonGoalSource } from '@/app/model/seasonSession/goals/seasonGoals'
 
 /**
  * @param wallet 전역 G 지갑(`useGamePointWallet`). 넘기면 **지갑이 G 의 주인**이고

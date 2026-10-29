@@ -51,8 +51,6 @@ import { preloadPtcParts } from '@/widgets/particles/lib/renderParticles'
 export {
   claimSceneParticleTick,
   claimSceneParticles,
-  clearSceneParticles,
-  holdSceneParticleTicks,
   isSceneParticleTickHeld,
   isSceneParticlesClaimed,
   sceneParticleScene,

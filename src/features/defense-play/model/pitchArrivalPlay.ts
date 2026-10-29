@@ -134,9 +134,6 @@ export function startHumanSteal(bases: BaseState, stealingFrom: readonly StealBa
   return [...stealingFrom, base]
 }
 
-/** 주자의 루 → 도루 키 (`stealBaseOfKey` 의 거꾸로) — 터치 상황 버튼이 이 키를 쏜다 */
-export const STEAL_KEY_OF_BASE: Readonly<Record<StealBase, string>> = { 1: '3', 2: '2', 3: '1' }
-
 /** 사람 공격의 도루 키 '3'·'2'·'1' → 대상 주자의 루 (`0x53610`). 다른 키는 null */
 export function stealBaseOfKey(key: string): StealBase | null {
   if (key === '3') return 1

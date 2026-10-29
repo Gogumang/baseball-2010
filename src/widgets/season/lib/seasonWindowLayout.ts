@@ -10,9 +10,6 @@
  * (구장 아이템 창은 0x83378 종류 4 를 직접 떠 `pages/season/lib/stadiumItemWindow` 로 옮겼다.)
  */
 
-/** 원본 화면 한 장 */
-export const SCREEN = { width: 240, height: 320 } as const
-
 export interface SeasonBox {
   readonly x: number
   readonly y: number
