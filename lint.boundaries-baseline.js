@@ -161,7 +161,7 @@ export const crossSliceBaseline = [
   'src/entities/pitching/model/displaySpeed.ts',
   'src/entities/pitching/model/magicPitchGame.ts',
   'src/entities/pitching/model/mistakePitch.ts',
-  'src/entities/pitching/model/pitcherChange.ts',
+  'src/entities/pitching/model/pitcherChange/otherSlices.ts',
   'src/entities/pitching/model/pitcherGameStats.ts',
   'src/entities/pitching/model/selectPitch/otherSlices.ts',
   'src/entities/pitching/model/simulateBatter/otherSlices.ts',

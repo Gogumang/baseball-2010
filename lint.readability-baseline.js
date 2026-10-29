@@ -87,7 +87,6 @@ export const readabilityBaseline = [
   'src/entities/pitching/model/mistakePitch.ts',
   'src/entities/pitching/model/pitchIntelligence.ts',
   'src/entities/pitching/model/pitchTarget.ts',
-  'src/entities/pitching/model/pitcherChange.ts',
   'src/entities/season-mode/model/cpuEquipment.ts',
   'src/entities/season-mode/model/playerRecruit.ts',
   'src/entities/season-mode/model/playerTrade.ts',
