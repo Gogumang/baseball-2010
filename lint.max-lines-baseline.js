@@ -34,7 +34,6 @@ export const maxLinesBaseline = [
   'src/pages/management/ui/RadarChart.tsx',
   'src/pages/match-settings/lib/matchSettingsLayout.ts',
   'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
-  'src/pages/mission-play/lib/missionHudLayout.ts',
   'src/pages/mission-play/lib/missionMatchupCards.ts',
   'src/pages/mission-play/ui/MissionHud.tsx',
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
