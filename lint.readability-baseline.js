@@ -359,7 +359,6 @@ export const readabilityBaseline = [
   'src/widgets/game-scene/ui/GameIntro.tsx',
   'src/widgets/game-scene/ui/introCanvas.ts',
   'src/widgets/loading-tip/ui/LoadingTip.tsx',
-  'src/widgets/management/ui/TitleListWindow.tsx',
   'src/widgets/matchup-cards/ui/MatchupCards.tsx',
   'src/widgets/particles/lib/renderParticles.ts',
   'src/widgets/particles/ui/SceneParticleLayer.tsx',
