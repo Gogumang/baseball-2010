@@ -256,7 +256,6 @@ export const readabilityBaseline = [
   'src/shared/lib/sprite/originalScale.ts',
   'src/shared/lib/sprite/readPngForTests.ts',
   'src/shared/lib/sprite/spriteCache.ts',
-  'src/shared/lib/sprite/spritePreload.ts',
   'src/shared/ui/IconMenu/IconMenu.tsx',
   'src/shared/ui/MenuList/MenuList.tsx',
   'src/shared/ui/MessageBox/MessageBox.tsx',
