@@ -138,7 +138,6 @@ export const maxLinesBaseline = [
   'src/pages/team-game/ui/SettlementBoard.tsx',
   'src/pages/team-game/ui/SubstitutionWindow.tsx',
   'src/pages/team-game/ui/TeamAutoRelay.tsx',
-  'src/pages/team-game/ui/TeamGameScreen.tsx',
   'src/shared/api/audio/webAudioSound.ts',
   'src/shared/config/bugfixes/bugfixes.ts',
   'src/shared/config/original/acePlayers.ts',

@@ -300,7 +300,6 @@ export const readabilityBaseline = [
   'src/pages/team-game/ui/SettlementBoard.tsx',
   'src/pages/team-game/ui/SubstitutionWindow.tsx',
   'src/pages/team-game/ui/TeamAutoRelay.tsx',
-  'src/pages/team-game/ui/TeamGameScreen.tsx',
   'src/pages/team-game/ui/TeamRelayFigures.tsx',
   'src/shared/api/save/localStorageSaveGame.ts',
   'src/shared/config/balance/balance.ts',
