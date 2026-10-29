@@ -1,0 +1,27 @@
+# Git hook (r365) — 커밋 전에 빠른 것만, push 전에 타입 검사.
+# 설치: 메인 트리에서 한 번 `pnpm hooks:install`(= `lefthook install`). `prepare` 에 두지 않는다 — 워크트리 · Vercel 의
+#   `pnpm install` 마다 hook 을 다시 쓰거나(.git 없는 곳에서는) 설치가 깨진다. 워크트리는 메인 `.git/hooks` 를 같이 쓰고,
+#   hook 이 돌 때는 그 워크트리의 이 파일을 읽는다(이 파일이 없는 옛 브랜치는 경고만 내고 지나간다).
+# 건너뛰기: `LEFTHOOK=0 git commit ...` (hook 전체) · `LEFTHOOK_EXCLUDE=check-lines git commit ...` (한 일만).
+#   에이전트가 같은 검사를 이미 돌렸거나 hook 이 막혀 일을 못 할 때만 쓴다 — 조정자 머지 전 `pnpm verify` 는 그대로.
+
+# 명령은 `pnpm` 을 거치지 않고 바로 부른다(pnpm 의 설치 확인 0.3s 를 아낀다) — package.json 의 같은 이름 스크립트와 같은 일
+pre-commit:
+  parallel: true
+  jobs:
+    # 올린(staged) 파일만 — 0.2s 안팎
+    - name: lint
+      glob: '*.{ts,tsx,js,mjs}'
+      run: node_modules/.bin/oxlint {staged_files}
+    - name: format
+      glob: '*.{ts,tsx,js,mjs,json,yml,yaml,css}'
+      run: node_modules/.bin/oxfmt --check --no-error-on-unmatched-pattern {staged_files}
+    # 150줄 · 읽기 규칙 예외 목록 — 저장소 전체를 보지만 3초 안쪽이라 커밋 전에 둔다
+    - name: check-lines
+      glob: '*.{ts,tsx,js,mjs}'
+      run: node tools/check-lines-baseline.mjs
+
+pre-push:
+  jobs:
+    - name: typecheck
+      run: node_modules/.bin/tsc --noEmit

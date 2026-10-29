@@ -7,6 +7,7 @@ import { versionedAssets } from './tools/viteVersionedAssets.ts'
 import { assetPacks } from './tools/viteAssetPacks.ts'
 import { reactCompiler } from './tools/viteReactCompiler.ts'
 import { unitTestGroups } from './tools/vitestProjects.ts'
+import { unitTestCoverage } from './tools/vitestCoverage.ts'
 
 const UNIT_TEST_INCLUDE = ['src/**/*.test.ts', 'src/**/*.test.tsx']
 const UNIT_TEST_EXCLUDE = configDefaults.exclude
@@ -51,6 +52,8 @@ export default defineConfig({
     // 고르는 파일(include · exclude)은 아래 `projects` 무리마다 적는다 — 뿌리에 두면 무리 설정과 배열이 합쳐진다
     // 변환 결과를 디스크에 남겨 다시 돌릴 때 빠르게 한다
     fsModuleCache: true,
+    // `pnpm test:coverage` 에서만 잰다 — `tools/vitestCoverage.ts`
+    coverage: unitTestCoverage,
     // 대부분은 워커 안에서 읽은 모듈을 나눠 쓰고(격리 끔), 모듈 바꿔치기 등으로 나누면 깨지는 것만 격리한다 — `tools/vitestProjects.ts`
     projects: [
       {
