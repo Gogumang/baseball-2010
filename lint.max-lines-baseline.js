@@ -23,7 +23,6 @@ export const maxLinesBaseline = [
   'src/entities/career/model/gameEvaluation.ts',
   'src/entities/career/model/gpItems.ts',
   'src/entities/career/model/nariTeamRecord.ts',
-  'src/entities/career/model/playerCareer.ts',
   'src/entities/career/model/seasonFlow.ts',
   'src/entities/career/model/titles.ts',
   'src/entities/career/model/training.ts',
