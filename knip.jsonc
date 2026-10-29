@@ -19,6 +19,7 @@
     "src/entities/batting/model/batter.ts": ["exports"], // ABILITY_SCALE (generate_game_data.py 가 같은 눈금을 쓴다)
     "src/entities/career/model/battingOrder.ts": ["exports"], // START_BATTING_ORDER
     "src/entities/career/model/gpItems.ts": ["exports"], // EAGLE_EYE_NOTICE · EAGLE_EYE_ITEM_ID (StrMODE[224], 0x13ab4)
+    "src/entities/career/model/gpItems/guard/guard.ts": ["exports"], // EAGLE_EYE_NOTICE · EAGLE_EYE_ITEM_ID (위 모음이 다시 내보낸다)
     "src/entities/career/model/seasonFlow.ts": ["exports"], // ENDING_EVENT_IDS
     "src/entities/defense-controls/model/laserThrow.ts": ["exports"], // LASER_SPEED_PERCENT · LASER_RANGE_PERCENT · LASER_WILD_THROW_BONUS
     "src/entities/defense-controls/model/pickoff.ts": ["exports"], // PICKOFF_AI_STATE (0xb47da)

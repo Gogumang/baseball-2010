@@ -19,7 +19,6 @@ export const maxLinesBaseline = [
   'src/entities/batting/model/settlementEffect.ts',
   'src/entities/batting/model/swingResult.ts',
   'src/entities/career/model/gameEvaluation.ts',
-  'src/entities/career/model/gpItems.ts',
   'src/entities/career/model/nariTeamRecord.ts',
   'src/entities/career/model/seasonFlow.ts',
   'src/entities/career/model/titles.ts',
