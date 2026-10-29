@@ -191,7 +191,6 @@ export const readabilityBaseline = [
   'src/pages/mission-play/lib/missionMatchupCards.ts',
   'src/pages/mission-play/lib/missionResultBoard.ts',
   'src/pages/mission-play/ui/MissionHud.tsx',
-  'src/pages/mission-play/ui/MissionPlayScreen.tsx',
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
   'src/pages/nari-record-room/lib/nariRecordRoom.ts',
