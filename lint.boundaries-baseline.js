@@ -104,7 +104,7 @@ export const crossSliceBaseline = [
   'src/entities/home-run-derby/model/derbyLineup.ts',
   'src/entities/home-run-derby/model/derbyPitcher.ts',
   'src/entities/home-run-derby/model/derbyRules.ts',
-  'src/entities/league/model/league.ts',
+  'src/entities/league/model/league/otherSlices.ts',
   'src/entities/league/model/leagueDay/ability/cpuGameAbility.ts',
   'src/entities/league/model/leagueDay/aces/acePlayers.ts',
   'src/entities/league/model/leagueDay/aces/cpuGamePrep.ts',
