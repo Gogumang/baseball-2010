@@ -2,7 +2,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resetTouchKeyOffersForTest, touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
-import { PITCH_CHOICE_CELLS, PITCH_CHOICE_POPUP_HEIGHT, PITCH_CHOICE_TITLE_ID, PitchChoicePopup } from '@/pages/pitcher-league/ui/PitchChoicePopup'
+import { PITCH_CHOICE_POPUP_HEIGHT, PITCH_CHOICE_TITLE_ID, PitchChoicePopup } from '@/pages/pitcher-league/ui/PitchChoicePopup'
+import { PITCH_CHOICE_CELLS } from '@/pages/pitcher-league/lib/pitchChoicePopup'
 
 afterEach(() => {
   cleanup()

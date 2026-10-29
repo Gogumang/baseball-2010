@@ -131,7 +131,7 @@ export function popularityShortageTextOf(required: number): string {
 }
 
 /** StrMODE[70] "[%s] 을 사용하시겠습니까?" — 123 창의 마구 고르기 확인 (0x17cec), %s = 마구 이름 */
-export function useQuestionOf(name: string): string {
+export function magicUseQuestionOf(name: string): string {
   return modeText(70).replace('%s', name)
 }
 

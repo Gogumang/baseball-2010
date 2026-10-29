@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { MessageBox } from '@/shared/ui'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
@@ -39,11 +39,10 @@ export function PitchTrainingScreen({ career, onTrain, onClose }: PitchTrainingS
     setPopup({ kind: '확인', row, column, cost: gate.cost })
   }
 
-  const latest = useRef({ cursor, popup, confirm, onClose })
-  latest.current = { cursor, popup, confirm, onClose }
+  const latest = useEffectEvent(() => ({ cursor, popup, confirm, onClose }))
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const held = latest.current
+      const held = latest()
       // 팝업이 떠 있으면 MessageBox 가 키를 가져간다
       if (held.popup !== null) return
       const key = pitchTrainingKeyOf(event.key)

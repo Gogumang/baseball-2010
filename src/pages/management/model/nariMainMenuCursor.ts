@@ -41,6 +41,11 @@ export function moveNariMainCursor(cursor: NariMainMenuCursor, index: number): v
   cursor.current = index
 }
 
+/** 열린 하위 메뉴 객체의 커서를 옮긴다(106 [this+0x90] · 107 [+0x94] · 110 [+0x98] 자리) */
+export function moveNariSubCursor(cursor: NariMainMenuCursor, index: number): void {
+  cursor.subCursor = index
+}
+
 /** 관리 화면이 서면 돌아온 하위 메뉴 표시를 지운다 — 한 번 쓴 뒤로는 105 진입처럼 메인 메뉴부터 */
 export function clearNariReturnSubMenu(cursor: NariMainMenuCursor): void {
   cursor.returnSubMenu = null
