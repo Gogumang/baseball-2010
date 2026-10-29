@@ -40,10 +40,6 @@ export function setGameSpeedLevel(level: number): void {
   for (const listener of speedChangeListeners) listener()
 }
 
-export function gameSpeedLevel(): number {
-  return currentSpeedLevel
-}
-
 export function millisecondsPerFrame(): number {
   return MILLISECONDS_PER_FRAME_BY_SPEED[currentSpeedLevel]
 }

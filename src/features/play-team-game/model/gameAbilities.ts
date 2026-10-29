@@ -290,7 +290,7 @@ function isFightingSpiritSlot(input: Pick<GameAbilityInput, 'isPitcher' | 'slot'
   return input.fightingSpirit === true && input.isPitcher && input.slot !== FIGHTING_SPIRIT_EXCLUDED_SLOT
 }
 
-export { FIGHTING_SPIRIT_SKILL_BIT, hasFightingSpiritBit } from '@/entities/pitching/model/pitcherGameStats'
+export { hasFightingSpiritBit } from '@/entities/pitching/model/pitcherGameStats'
 
 /**
  * 경기용 능력치 한 칸을 계산한다 — 피로가 없는 값(체력 인자 90: 타자·야수·능력 합 0xb5b50).

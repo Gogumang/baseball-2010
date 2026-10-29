@@ -1,5 +1,6 @@
 // oxlint JS 플러그인 — oxlint 에 없는 이 저장소만의 규칙 (`oxlint.config.ts` 의 jsPlugins).
-// ESLint 의 `no-restricted-syntax` 선택자(TryStatement)를 대신한다.
+// ESLint 의 `no-restricted-syntax` 선택자(TryStatement)를 대신한다. FSD 층 경계 규칙은 `fsdBoundaries.mjs`.
+import { fsdCrossSlice, fsdLayerDirection } from './fsdBoundaries.mjs'
 
 const TRY_MESSAGE = 'try/catch 는 shared/lib/safe 도우미로 (tryOr · tryOrElse · ignoreErrors · withFinally …)'
 
@@ -17,5 +18,5 @@ const noTryStatement = {
 
 export default {
   meta: { name: 'local' },
-  rules: { 'no-try-statement': noTryStatement },
+  rules: { 'no-try-statement': noTryStatement, 'fsd-layer-direction': fsdLayerDirection, 'fsd-cross-slice': fsdCrossSlice },
 }

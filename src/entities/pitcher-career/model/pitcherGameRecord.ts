@@ -184,19 +184,3 @@ export function saveSituationOf(input: SaveSituationInput): SaveSituation {
 export function recordEntryLead(record: PitcherGameRecord, situation: SaveSituation): PitcherGameRecord {
   return { ...record, leadingAtEntry: situation.leading }
 }
-
-/**
- * 웹에 아직 없어서 **채울 수 없는 것**:
- *   - 마운드 교체 기록(누가 언제 올라왔는지)이 없다. `saveSituationOf` 가 돌려주는
- *     후보 측·투수 번호(`state+0x5c`/`+0x60`/`+0x64`)를 실제로 적으려면 그 기록이 있어야 한다.
- *   - 주자 객체의 "아웃 표시"(주자+0x96) 목록이 필요하다 — `recordAllowedBaserunner` 의 인자다.
- *   - 사구 칸 `state[0x12]` 에 해당하는 판정이 웹 타석 결과에 없다.
- */
-export interface SaveCandidate {
-  /** `state+0x5c` = 세이브 측 (수비측 번호) */
-  readonly side: number
-  /** `state+0x60` = 세이브 후보 투수 번호 */
-  readonly pitcherNumber: number
-  /** `state+0x64` = 세이브 요건 1 / 3 / 9 */
-  readonly requirement: number
-}

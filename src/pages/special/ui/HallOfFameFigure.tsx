@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { resetSkinStepCounter, setSkinStepCounter, skinStepCounterValue } from '@/shared/lib/skinStepCounter/skinStepCounter'
+import { setSkinStepCounter, skinStepCounterValue } from '@/shared/lib/skinStepCounter/skinStepCounter'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { outfitPaletteIndex, useRecoloredSprite, useWarmRecoloredSprites } from '@/shared/lib/sprite/paletteSwap'
@@ -157,11 +157,6 @@ export type HallOfFameListOwner = '메뉴' | '나리' | '시즌'
 
 /** 머무름 · 자세 — 앱에 하나 (그린 수는 `skinStepCounterValue`) */
 let listMemory: FigureListMemory = INITIAL_FIGURE_LIST_MEMORY
-/** 앱을 새로 띄운 것과 같다 — 테스트용 */
-export const resetHallOfFameFigureMemory = () => {
-  listMemory = INITIAL_FIGURE_LIST_MEMORY
-  resetSkinStepCounter()
-}
 
 /**
  * 갱신 한 번에 그림 한 번 — 그린 **뒤** 목록 칸을 굳힌다(그림이 나간 뒤 effect). 건너뛴 갱신은 그만큼 앞당겨 그린다.

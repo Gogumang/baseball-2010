@@ -1,5 +1,3 @@
-import { nextPopupOpeningHeight } from '@/shared/lib/commonWindow/popupWindow'
-
 /**
  * **두 칸 고르기 팝업 0x80 — 시즌 기록순위(그리기 0xf334 · 키 0xf5d4)와 나리 기록실(그리기 0x19448 · 키 0x196ec)이 같은 꼴**
  * (2026-10-09 두 함수를 명령 단위로 견줬다 — 다른 것은 아래 셋뿐이다):
@@ -60,12 +58,6 @@ export function recordPickLabelXOf(labelWidth: number): number {
  * 펼치는 동안은 판만 긋고(0x7479c `bne` 끝) 키도 안 본다(0x754f8).
  */
 export const RECORD_PICK_POPUP_HEIGHT = 0x80
-export const RECORD_PICK_POPUP_START_HEIGHT = 6
-
-/** 펼침 한 틀 — 다 펼쳤으면 null */
-export function nextRecordPickPopupHeightOf(height: number): number | null {
-  return nextPopupOpeningHeight(height, RECORD_PICK_POPUP_HEIGHT)
-}
 
 /** 판 윗변 — (H − 그리는 높이) >> 1 (0x74502~0x74520) */
 export const recordPickPopupTopOf = (height: number) => (320 - height) >> 1

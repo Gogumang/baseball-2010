@@ -131,27 +131,6 @@ export interface PlayerDetailSource {
   readonly nurturedSalary?: number
 }
 
-export const EMPTY_ENTRY_BATTER_LINE: EntryBatterLine = {
-  atBats: 0,
-  hits: 0,
-  doubles: 0,
-  triples: 0,
-  homeRuns: 0,
-  runsBattedIn: 0,
-  steals: 0,
-  errors: 0,
-}
-export const EMPTY_ENTRY_PITCHER_LINE: EntryPitcherLine = {
-  outs: 0,
-  runsAllowed: 0,
-  saves: 0,
-  strikeouts: 0,
-  pitches: 0,
-  walks: 0,
-  wins: 0,
-  losses: 0,
-}
-
 /**
  * Xls 행 바이트 32~43(+0x20~+0x2a) 시즌 줄 여섯 칸 → 레코드 줄 — 타자 [타수, 안타, 2루타, 3루타, 홈런, 타점] ·
  * 투수 [잡은 아웃, 실점, 세이브, 탈삼진, 투구 수, +0x2a]. 행 바이트 44~47 은 타자 0 · 투수 스태미나 10000 · 승패 0 이다

@@ -81,8 +81,3 @@ export function emitSubstitutionEntryParticle(kind: SubstitutionEntryKind): void
   const particle = substitutionEntryParticleOf(kind, lastEntryPoints ?? defaultEntryPointsOf())
   emitSceneParticles(particle.id, particle.x, particle.y, particle.img)
 }
-
-/** 시험용 — 적어 둔 자리를 지운다 */
-export function resetStageEntryPointsForTest(): void {
-  lastEntryPoints = null
-}

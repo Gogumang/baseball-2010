@@ -105,16 +105,6 @@ function selectEquipment(career: PlayerCareer, part: number, level: number): Sho
   return { career: bought, notice: '', openedHiddenIds: opened }
 }
 
-const TEN_THOUSAND = 10_000
-
-/** 만원 값 → "1억5000만" */
-export function formatMoney(amount: number): string {
-  const hundredMillions = Math.trunc(amount / TEN_THOUSAND)
-  const rest = amount % TEN_THOUSAND
-  if (hundredMillions === 0) return `${rest}만`
-  return rest === 0 ? `${hundredMillions}억` : `${hundredMillions}억${rest}만`
-}
-
 const HUNDRED_MILLION = 10_000
 
 /** 원본 금액 서식 0x55cf4 — 9999 이하 "%d", 1억 이상 "%d억" 또는 "%d억%03d" (만원 단위, "만" 없음 — 점검 12차) */

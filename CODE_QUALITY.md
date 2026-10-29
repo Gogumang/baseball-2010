@@ -38,7 +38,9 @@
 | 포맷 | oxfmt — `pnpm format:check` (설정 `.oxfmtrc.json`) |
 | try/catch | `src/shared/lib/safe` 도우미로만 — oxlint `local/no-try-statement` (`tools/lint/localPlugin.mjs`) |
 | 중첩 · 복잡도 | oxlint `max-depth` 2 · `complexity` 8 · `no-else-return` · `no-lonely-if` · `max-nested-callbacks` 3 — 옛 파일은 `lint.readability-baseline.js` |
+| 결합도 — 층 경계 | FSD 층 방향(app > pages > widgets > features > entities > shared, 아래가 위를 import 금지) · 같은 층 다른 조각 import 금지 · 실행 순환 import 금지 — oxlint `local/fsd-layer-direction` · `local/fsd-cross-slice`(`tools/lint/fsdBoundaries.mjs`) · `import/no-cycle`. 옛 파일은 `lint.boundaries-baseline.js`(규칙별 목록), `pnpm check:boundaries` |
+| 응집도 — 안 쓰는 코드 | knip — `pnpm knip` (설정 `knip.jsonc`). 안 쓰는 파일 · export · 의존성 0. 일부러 남긴 원본 기록 · 나중에 쓸 길은 `knip.jsonc` 의 `ignoreIssues` 에 이유와 함께 |
 
 새 파일은 예외 목록에 넣지 않는다. 옛 파일을 고칠 때는 이 기준으로 고치고 목록에서 뺀다.
 
-예외 목록 두 개는 **파일 이름만, 경로 알파벳 순**으로 둔다(줄 수 · 위반 수 같은 숫자 주석을 달지 않는다 — 한 줄만 고쳐도 목록이 바뀌고 머지 충돌이 나서). `pnpm check:lines` 는 "목록에 있는데 이제 규칙을 지키는 파일"과 "없는 파일"만 잡고, `pnpm check:lines --update` 가 그런 파일을 빼고 이름 목록을 다시 쓴다.
+예외 목록(`lint.max-lines-baseline.js` · `lint.readability-baseline.js` · `lint.boundaries-baseline.js`)은 **파일 이름만, 경로 알파벳 순**으로 둔다(줄 수 · 위반 수 같은 숫자 주석을 달지 않는다 — 한 줄만 고쳐도 목록이 바뀌고 머지 충돌이 나서). `pnpm check:lines` 는 "목록에 있는데 이제 규칙을 지키는 파일"과 "없는 파일"만 잡고, `pnpm check:lines --update` 가 그런 파일을 빼고 이름 목록을 다시 쓴다. 층 경계 목록은 `pnpm check:boundaries`(`--update`)가 같은 일을 하고, 목록에 없는 새 위반도 잡는다.

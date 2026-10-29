@@ -35,7 +35,6 @@ export const SEASON_RECORD_CODE = {
   만루홈런: 0xd,
   사이클: 0xe,
 } as const
-export type SeasonRecordCode = (typeof SEASON_RECORD_CODE)[keyof typeof SEASON_RECORD_CODE]
 
 /**
  * 점프표 `0xd7d7c` 가 만드는 **코드 → 칸** 대응.

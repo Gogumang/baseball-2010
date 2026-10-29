@@ -63,7 +63,6 @@ export const EQUIPMENT_BOXES = {
 /** 탭 칸 수 · 한 화면 줄 수 ([목록+0x38] = 5, 0x815ea) · 줄 간격 (h + 2) */
 export const EQUIPMENT_PART_COUNT = 4
 export const EQUIPMENT_VISIBLE_ROWS = 5
-export const EQUIPMENT_ROW_STEP = EQUIPMENT_BOXES.row.height + 2
 export const EQUIPMENT_TAB_STEP = EQUIPMENT_BOXES.tab.width + 2
 
 /** 이름표 img_text — 표 0xd495c [302 소지금 · 303 가격 · 333 효과] */

@@ -1,32 +1,4 @@
-import * as styles from '@/shared/ui/PixelNumber/PixelNumber.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-/** 원본 ui/num.pzx 의 숫자 그림. 10개씩 색상별로 묶여 있다. */
-const DIGIT_SET_START: Readonly<Record<string, number>> = {
-  흰색: 0,
-  노랑: 10,
-  주황: 20,
-}
-
-interface PixelNumberProps {
-  readonly value: number
-  readonly color?: keyof typeof DIGIT_SET_START
-  /** 자릿수를 맞춰 앞을 0으로 채운다 */
-  readonly minimumDigits?: number
-}
-
-export function PixelNumber({ value, color = '흰색', minimumDigits = 1 }: PixelNumberProps) {
-  'use memo'
-  const start = DIGIT_SET_START[color] ?? 0
-  const digits = String(Math.max(0, Math.trunc(value))).padStart(minimumDigits, '0')
-
-  return (
-    <span className={styles.number}>
-      {[...digits].map((digit, index) => (
-        <img key={index} src={assetUrl(`./sprites/num/${String(start + Number(digit)).padStart(3, '0')}.png`)} alt={digit} />
-      ))}
-    </span>
-  )
-}
 
 /** 원본 ui/game_frame.pzx 의 메뉴 제목 그림. 시트를 눈으로 확인해 매긴 번호다. */
 export const HEADING_SPRITE = {
@@ -45,11 +17,6 @@ export const HEADING_SPRITE = {
   대전모드: '031',
 } as const
 
-export function HeadingSprite({ name }: { readonly name: keyof typeof HEADING_SPRITE }) {
-  'use memo'
-  return <img className={styles.headingSprite} src={assetUrl(`./sprites/game_frame/${HEADING_SPRITE[name]}.png`)} alt={name} />
-}
-
 /** 원본 ui/popup.pzx 의 버튼 라벨 그림. 시트를 눈으로 확인해 매긴 번호다. */
 export const POPUP_LABEL = {
   예: '006',
@@ -61,11 +28,6 @@ export const POPUP_LABEL = {
   타자편: '046',
   투수편: '047',
 } as const
-
-export function PopupLabel({ name }: { readonly name: keyof typeof POPUP_LABEL }) {
-  'use memo'
-  return <img className={styles.popupLabel} src={assetUrl(`./sprites/popup/${POPUP_LABEL[name]}.png`)} alt={name} />
-}
 
 /**
  * 원본 ui/mode_icon.pzx 의 메뉴 아이콘. 시트를 눈으로 보고 고른 번호다.

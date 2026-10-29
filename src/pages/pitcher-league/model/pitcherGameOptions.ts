@@ -1,10 +1,9 @@
-import { DEFAULT_TEAM_MORALE, teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
+import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import type { PlayerSide } from '@/entities/game/model/gameState'
 import { startsToday } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import type { PitcherGameOptions, PitcherGameSummary } from '@/features/play-pitcher-game/model/pitcherGameFlow'
 import { leagueDayCounterOf, leagueGamePlayerSideOf } from '@/entities/career/model/leagueGameSetup'
 import { magicPitchCountOf } from '@/entities/pitcher-career/model/magicPitch'
-import { isMyStartDay } from '@/entities/pitcher-career/model/pitcherRotation'
 import { PITCHER_ROLE } from '@/entities/pitcher-career/model/pitcherRole'
 import {
   equippedPitcherAbilityOf,
@@ -69,12 +68,6 @@ const TIMID_SKILL = 17
 const COOL_SKILL = 22
 /** 행운 스킬 6 — 경기 뒤 사기 +1 (pitcherGameEvaluation 의 `hasLuckSkill`) */
 const LUCK_SKILL = 6
-
-/**
- * 팀 사기 기본값 — 팀 레코드 s16 +2 (XlsTEAM_DATA 둘째 u16). 전 팀이 100 으로 시작한다 (`entities/team/model/teamMorale`).
- * 나리 경기는 두 팀 칸이 모두 지금 나리 사기(0xa3a24)로 덮여 `pitcherGameOptionsOf` 는 `nariMoraleOf` 를 쓴다
- */
-export { DEFAULT_TEAM_MORALE }
 
 export function teamMoraleOf(teamId: number): number {
   return teamRecordMoraleOf(teamId)
@@ -193,15 +186,6 @@ export function startsTodayFor(career: PitcherCareer, settings: PitcherGameSetti
 export function todayAssignmentOf(career: PitcherCareer, settings: PitcherGameSettings = {}): '선발' | '구원' | '대기' {
   if (career.role === PITCHER_ROLE.relief) return '구원'
   return startsTodayFor(career, settings) ? '선발' : '대기'
-}
-
-/**
- * 다음 등판까지 남은 경기 수 — 선발은 날짜 카운터 g 가 **짝수인 날**마다 등판한다 (`isMyStartDay`).
- * 구원은 매 경기 8회에 올라오므로 늘 0 이다.
- */
-export function gamesUntilNextStartOf(career: PitcherCareer): number {
-  if (career.role === PITCHER_ROLE.relief) return 0
-  return isMyStartDay(career.gamesPlayed) ? 0 : 1
 }
 
 export interface PitcherGameOutcomeExtras {

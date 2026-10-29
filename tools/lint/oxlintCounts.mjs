@@ -11,11 +11,15 @@ const OXLINT = join(ROOT, 'node_modules/.bin/oxlint')
 /** `eslint(max-lines)` → `max-lines` */
 const ruleOf = (code) => code?.match(/^[\w-]+\((.+)\)$/)?.[1] ?? code
 
-/** 고른 규칙(`rules`, eslint 규칙 이름)만으로 `files` 를 돌려 `Map<파일, 진단[]>` 를 낸다. 진단에는 `rule` 이 붙는다 */
-export function oxlintDiagnostics(rules, files) {
+/**
+ * 고른 규칙(`rules`)만으로 `files` 를 돌려 `Map<파일, 진단[]>` 를 낸다. 진단에는 `rule` 이 붙는다.
+ * eslint 밖의 규칙은 `plugins`(oxlint 내장 — `import` …) · `jsPlugins`(저장소 뿌리 기준 경로)로 싣는다.
+ */
+export function oxlintDiagnostics(rules, files, { plugins = ['eslint'], jsPlugins = [] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'oxlint-counts-'))
   const config = join(dir, 'oxlintrc.json')
-  writeFileSync(config, JSON.stringify({ categories: { correctness: 'off' }, plugins: ['eslint'], rules }))
+  const absoluteJsPlugins = jsPlugins.map((plugin) => join(ROOT, plugin))
+  writeFileSync(config, JSON.stringify({ categories: { correctness: 'off' }, plugins, jsPlugins: absoluteJsPlugins, rules }))
   const run = spawnSync(OXLINT, ['-c', config, '--disable-nested-config', '-f', 'json', ...files], {
     cwd: ROOT,
     encoding: 'utf8',

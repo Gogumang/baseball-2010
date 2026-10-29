@@ -1,7 +1,6 @@
 import type { PitcherCareer } from '@/entities/pitcher-career/model/pitcherCareer'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import {
-  FASTBALL_TYPE_NUMBER,
   HIDDEN_PITCH_COLUMN,
   PITCH_TRAINING_TABLE,
   isInPitchList,
@@ -66,7 +65,7 @@ export function selectMagicPitch(career: PitcherCareer, cellIndex: number): Pitc
 }
 
 /** 구질 목록 판정 `0xa436c` 은 구질 훈련 창과 같이 써서 `pitchTraining` 에 둔다 */
-export { FASTBALL_TYPE_NUMBER, isInPitchList }
+export { isInPitchList }
 
 /** 123 탭 2 의 칸 열 — 커서 열은 `min(열, 4)` 로 읽는다 (0x17e30) */
 const columnOf = (column: number) => Math.min(column, HIDDEN_PITCH_COLUMN)

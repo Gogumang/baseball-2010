@@ -7,21 +7,6 @@ import { TEXT } from '@/widgets/season/lib/seasonWindowLayout'
  * 공용 창 0x55e60 의 판은 원본 선 목록대로 `shared/ui` 의 `CommonPanel` 이 그린다.
  */
 
-/** 원작 좌표에 그대로 놓는 그림·글 한 장 */
-export const layer = style({
-  position: 'absolute',
-  imageRendering: 'pixelated',
-  pointerEvents: 'none',
-})
-
-/** 판 안의 작은 칸 (아이템 창 박스와 같은 #1D44A8 채우기) */
-export const innerBox = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  background: ORIGINAL_COLORS.panelDeep,
-  border: `1px solid ${ORIGINAL_COLORS.boxEdgeOuter}`,
-})
-
 const baseText = {
   position: 'absolute',
   color: ORIGINAL_COLORS.text,
@@ -79,9 +64,6 @@ export const rowLabel = style({ flex: '1 1 auto', overflow: 'hidden', textOverfl
 /** 줄 오른쪽 값 (가격·수치) */
 export const rowValue = style({ flex: '0 0 auto', color: 'inherit' })
 
-/** 이미 가진 칸·못 고르는 칸 */
-export const rowDisabled = style({ color: ORIGINAL_COLORS.tableDivider })
-
 /** 판 아래 되돌아가기 — 원본은 바닥띠(0x54d94)의 뒤로 표시가 맡는다 */
 export const backButton = style({
   position: 'absolute',
@@ -94,29 +76,3 @@ export const backButton = style({
   lineHeight: `${TEXT.smallLineHeight}px`,
   cursor: 'pointer',
 })
-
-/** 구장 아이템 창의 칸 막대 (파란 막대 7개) */
-export const stadiumBar = style({
-  position: 'absolute',
-  boxSizing: 'border-box',
-  padding: '0 1px',
-  border: '1px solid #29318C',
-  background: '#4A7BDE',
-  color: ORIGINAL_COLORS.text,
-  fontSize: `${TEXT.smallSize}px`,
-  lineHeight: `${TEXT.smallLineHeight}px`,
-  // 이름 + 값이 70px 을 넘으면 접히면서 윗줄을 덮었다 — 한 줄로 못박고 이름만 줄인다
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  cursor: 'pointer',
-})
-
-/** 칸 이름 — 자리가 모자라면 말줄임 */
-export const stadiumBarName = style({
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-})
-
-/** 칸 값 (가격·보유 여부) — 절대 줄이지 않는다 */
-export const stadiumBarValue = style({ flex: 'none' })

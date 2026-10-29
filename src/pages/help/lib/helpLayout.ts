@@ -1,4 +1,4 @@
-import { FOOTER, HEADBAND, SCREEN } from '@/pages/special/lib/specialLayout'
+import { SCREEN } from '@/pages/special/lib/specialLayout'
 import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
 
 /**
@@ -19,7 +19,7 @@ import { ORIGINAL_MAIN_MENU_TEXT } from '@/shared/config/original/mainMenuText'
  * (앞서 "다섯 칸뿐이라 이 화면에 없다" 고 적어 둔 주석은 틀렸다).
  */
 
-export { FOOTER, HEADBAND, SCREEN }
+export { SCREEN }
 
 /**
  * ⚠️ 아래 다섯 칸은 **도움말이 아니라 랭킹 하위 메뉴(상태 9)** 의 것이다 (표 `0xceb37` =

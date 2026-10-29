@@ -35,20 +35,14 @@
  * 포스트시즌·국가대항전도 같은 화면을 쓴다 — `mode` 는 그대로 2 이고 상대 팀만 바뀐다.
  */
 export type { TeamGameOptions } from '@/features/play-team-game/model/teamGameFlow/types/options'
-export type {
-  TeamGameLogEntry,
-  TeamPitchingLine,
-  TeamRecordTally,
-  PendingDefensePlay,
-} from '@/features/play-team-game/model/teamGameFlow/types/records'
+export type { PendingDefensePlay } from '@/features/play-team-game/model/teamGameFlow/types/records'
 export type { TeamGameProgress, TeamAutoRelay, TeamAutoRelayTick } from '@/features/play-team-game/model/teamGameFlow/types/progress'
-export { TEAM_GAME_RESUME_SAVE } from '@/features/play-team-game/model/teamGameFlow/setup/savePoint'
 export { resumeTeamGame, migrateTeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/setup/resume'
 export { rollOpponentAces, rollTeamSetup } from '@/features/play-team-game/model/teamGameFlow/setup/opponentAces'
 export type { TeamSetupRolls } from '@/features/play-team-game/model/teamGameFlow/setup/opponentAces'
 export { teamGameStartPointOf } from '@/features/play-team-game/model/teamGameFlow/setup/startPoint'
 export { startTeamGame } from '@/features/play-team-game/model/teamGameFlow/setup/startTeamGame'
-export { DEFAULT_PLAYER_SIDE, isOurOffense, isHumanTurn, isBatterTurn, isPitchTurn } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
+export { isOurOffense, isHumanTurn, isBatterTurn, isPitchTurn } from '@/features/play-team-game/model/teamGameFlow/turn/turns'
 export {
   currentBatterEntry,
   entryBatterSkillIdsOf,
@@ -69,12 +63,7 @@ export {
 } from '@/features/play-team-game/model/teamGameFlow/roster/currentPitcher'
 export { substitutionDetailAbilities, substitutionStaminaOf } from '@/features/play-team-game/model/teamGameFlow/substitution/substitutionDetail'
 export { runnerAcesFor } from '@/features/play-team-game/model/teamGameFlow/defense/fielders'
-export type {
-  BatterOutcomeOptions,
-  TeamPitchInput,
-  TeamPendingPitchArrival,
-  TeamPendingRunnerPlay,
-} from '@/features/play-team-game/model/teamGameFlow/types/plays'
+export type { TeamPitchInput } from '@/features/play-team-game/model/teamGameFlow/types/plays'
 export { applyBatterPitch, startBatterPitch, batterContactDefenseInputOf } from '@/features/play-team-game/model/teamGameFlow/batting/batterPitch'
 export { applyBatterOutcome, startBatterOutcome } from '@/features/play-team-game/model/teamGameFlow/batting/batterOutcome'
 export { resolveBenchClearing, judgeHitByPitch, enterBenchClearing } from '@/features/play-team-game/model/teamGameFlow/benchClearing/benchClearing'
@@ -90,7 +79,6 @@ export { withLeagueStolenBases } from '@/features/play-team-game/model/teamGameF
 export { confirmScene } from '@/features/play-team-game/model/teamGameFlow/scene/prepareAtBat'
 export { returnToPitchSelection } from '@/features/play-team-game/model/teamGameFlow/scene/enterPitchSelection'
 export { replacementPitcherIndexOf } from '@/features/play-team-game/model/teamGameFlow/substitution/replacementPick'
-export type { ReplacementPickInput } from '@/features/play-team-game/model/teamGameFlow/substitution/replacementPick'
 export {
   changePitcher,
   cancelSubstitution,
@@ -98,12 +86,7 @@ export {
   canOpenPitcherChange,
 } from '@/features/play-team-game/model/teamGameFlow/substitution/pitcherChange'
 export { availablePinchHitters, canOpenPinchHit, pinchHit } from '@/features/play-team-game/model/teamGameFlow/substitution/pinchHit'
-export {
-  AUTO_PROGRESS_COST_VERSUS,
-  AUTO_PROGRESS_COST,
-  autoProgressCostOf,
-  canAutoProgress,
-} from '@/features/play-team-game/model/teamGameFlow/autoProgress/autoProgressCost'
+export { autoProgressCostOf, canAutoProgress } from '@/features/play-team-game/model/teamGameFlow/autoProgress/autoProgressCost'
 export { runAutoProgress, stepAutoRelay } from '@/features/play-team-game/model/teamGameFlow/autoProgress/autoRelay'
 export { stopAutoRelay } from '@/features/play-team-game/model/teamGameFlow/autoProgress/relayTick'
 export { moundStaminaOf } from '@/features/play-team-game/model/teamGameFlow/stamina/moundStamina'

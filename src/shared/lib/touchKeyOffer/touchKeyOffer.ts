@@ -87,9 +87,6 @@ export function useTouchKeyOffer(offer: TouchKeyOffer | null): void {
 /** 목록 · 글 위아래 넘기기 상황 버튼 (↑ · ↓) — 화면 안에 그 칸이 없거나 손가락보다 작을 때 */
 export const SCROLL_UP_OFFER: TouchKeyOffer = { key: 'ArrowUp', label: '▲ 위' }
 export const SCROLL_DOWN_OFFER: TouchKeyOffer = { key: 'ArrowDown', label: '▼ 아래' }
-/** 쪽 · 탭 앞뒤 넘기기 상황 버튼 (← · →) */
-export const PAGE_PREVIOUS_OFFER: TouchKeyOffer = { key: 'ArrowLeft', label: '◀ 앞' }
-export const PAGE_NEXT_OFFER: TouchKeyOffer = { key: 'ArrowRight', label: '뒤 ▶' }
 
 /** OK(Enter) 상황 버튼 — 원본 그림에 OK 글자 자리가 없는 화면(선수 등록 · 변화구 고르기, 10-29 사용자 신고) */
 export const OK_KEY_OFFER: TouchKeyOffer = { key: 'Enter', label: 'OK' }
@@ -104,12 +101,6 @@ export const CANCEL_KEY_OFFER: TouchKeyOffer = { key: 'Escape', label: '취소' 
 export function useTouchScrollKeys(isActive: boolean): void {
   useTouchKeyOffer(isActive ? SCROLL_UP_OFFER : null)
   useTouchKeyOffer(isActive ? SCROLL_DOWN_OFFER : null)
-}
-
-/** `isActive` 동안 ← · → 상황 버튼을 알린다 */
-export function useTouchPageKeys(isActive: boolean): void {
-  useTouchKeyOffer(isActive ? PAGE_PREVIOUS_OFFER : null)
-  useTouchKeyOffer(isActive ? PAGE_NEXT_OFFER : null)
 }
 
 /** 상황 버튼 목록을 읽는다 (`widgets/touch-controls`) */

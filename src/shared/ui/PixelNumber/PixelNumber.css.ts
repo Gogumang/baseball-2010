@@ -11,11 +11,6 @@ globalStyle(`${number} img`, {
   imageRendering: 'pixelated',
 })
 
-export const headingSprite = style({
-  display: 'block',
-  imageRendering: 'pixelated',
-})
-
 export const popupLabel = style({
   display: 'inline-block',
   imageRendering: 'pixelated',

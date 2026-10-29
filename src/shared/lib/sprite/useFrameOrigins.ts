@@ -37,10 +37,6 @@ export type FrameBox = readonly [x: number, y: number, width: number, height: nu
 
 export type FrameBoxes = Readonly<Record<string, readonly FrameBox[]>>
 
-export function useFrameBoxes(folder: string): FrameBoxes | null {
-  return useSpriteJson<FrameBoxes>(`${folder}/boxes.json`)
-}
-
 /** 프레임 번호(정수)로 박스를 찾는다. 없으면 빈 목록이다. */
 export function frameBoxesOf(boxes: FrameBoxes | null, frame: number): readonly FrameBox[] {
   return boxes?.[String(frame).padStart(3, '0')] ?? []

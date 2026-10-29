@@ -20,8 +20,6 @@
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { FONT_SPACING, LINE_HEIGHT } from '@/shared/lib/font/layout'
 
-export const SCREEN = { width: 240, height: 320 } as const
-
 export interface ShopBox {
   readonly x: number
   readonly y: number

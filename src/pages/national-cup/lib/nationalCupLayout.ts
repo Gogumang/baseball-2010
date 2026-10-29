@@ -45,8 +45,6 @@ export {
 /** 대회 순위표는 **4줄** 이다 (`0x7f070` 의 `L+0xac` 가지) */
 export const NATIONAL_CUP_ROW_COUNT = NATIONAL_MATCH_ROW_COUNT
 
-export const SCREEN = { width: 240, height: 320 } as const
-
 /**
  * 대진판 `0x85af4(ui)` (직접 떴다, 끝 0x85e36 → 머리띠 0x7f4ec).
  *

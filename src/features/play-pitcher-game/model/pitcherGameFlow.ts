@@ -21,25 +21,10 @@
  * ```
  */
 // 상수 · 옵션 · 진행 상태 꼴
-export {
-  MY_PITCHER_NUMBER,
-  MY_PITCHER_SLOT,
-  OUR_ACE_PITCHER_SLOT,
-  DEFAULT_PLAYER_SIDE,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/constants'
+export { MY_PITCHER_SLOT, OUR_ACE_PITCHER_SLOT, DEFAULT_PLAYER_SIDE } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/constants'
 export type { PitcherGameOptions } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/optionsTypes'
-export type {
-  PitcherGameProgress,
-  PitcherAutoRelay,
-  PitcherAutoRelayTick,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/progressTypes'
-export type { PitcherGameLogEntry } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/logTypes'
-export type {
-  PitchInput,
-  PitcherPendingPitchArrival,
-  PitcherStealDisplay,
-  PitcherPendingRunnerPlay,
-} from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/pitchStateTypes'
+export type { PitcherGameProgress, PitcherAutoRelayTick } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/progressTypes'
+export type { PitchInput } from '@/features/play-pitcher-game/model/pitcherGameFlow/shared/pitchStateTypes'
 // 로스터 · 투수 차례
 export { startsToday, ourPitcherOrderOf, opponentPitcherOrderOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/pitcherOrder'
 export { opponentBatterOf } from '@/features/play-pitcher-game/model/pitcherGameFlow/roster/opponentBatters'

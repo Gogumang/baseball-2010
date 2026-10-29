@@ -1,10 +1,7 @@
-import { type PlayerSide, PLAYER_SIDE_LAST_BAT, ourHalfOf } from '@/entities/game/model/gameState'
+import { ourHalfOf } from '@/entities/game/model/gameState'
 import { type MatchProgressSettings, FULL_PLAY_SETTINGS, isHumanControlled } from '@/features/play-team-game/model/matchSettings'
 import { AUTO_PROGRESS_LAST_INNING_INDEX, isVersusMode } from '@/features/play-team-game/model/teamGameFlow/autoProgress/autoProgressCost'
 import type { TeamGameProgress } from '@/features/play-team-game/model/teamGameFlow/types/progress'
-
-/** 기본 측 — 일반모드는 빠른실행이 반반으로 뽑지만(0x3123c) 화면이 없으면 후공으로 둔다 */
-export const DEFAULT_PLAYER_SIDE: PlayerSide = PLAYER_SIDE_LAST_BAT
 
 /* ── 지금 누구 차례인가 ───────────────────────────────────────────────────────── */
 

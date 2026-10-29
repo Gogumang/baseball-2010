@@ -1,5 +1,5 @@
 import { isBugFixed } from '@/shared/config/bugfixes'
-import { CHANCE_VALUE, INNING_VALUE, MATCH_SETTING_KIND, hasAnyDetailSelection } from '@/features/play-team-game/model/matchSettings'
+import { CHANCE_VALUE, MATCH_SETTING_KIND, hasAnyDetailSelection } from '@/features/play-team-game/model/matchSettings'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 
 /**
@@ -115,13 +115,6 @@ export function toggleDetailBit(settings: MatchProgressSettings, row: number, ce
   return settings
 }
 
-/** 종류에 딸린 값의 개수 — 상세는 값(+0x2bd)을 쓰지 않는다 */
-export function valueCountOf(kind: number): number {
-  if (kind === MATCH_SETTING_KIND.찬스) return CHANCE_VALUE_COUNT
-  if (kind === MATCH_SETTING_KIND.이닝) return INNING_VALUE_COUNT
-  return 0
-}
-
 const 유지 = (state: MatchSettingsWindowState): MatchSettingsAction => ({ kind: '유지', state })
 
 /** 키 한 번 (0x5ffcc) */
@@ -227,8 +220,3 @@ export function answerMatchSettingsPopup(state: MatchSettingsWindowState, isYes:
   if (state.popup === '확인' && isYes) return { kind: '저장', settings: state.settings }
   return 유지({ ...state, popup: null })
 }
-
-/** 이 창이 채우는 값들이 `matchSettings.ts` 의 이름과 어긋나지 않는지 붙잡아 두는 상수 */
-export const KIND_VALUES = MATCH_SETTING_KIND
-export const CHANCE_VALUES = CHANCE_VALUE
-export const INNING_VALUES = INNING_VALUE

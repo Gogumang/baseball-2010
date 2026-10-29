@@ -173,10 +173,6 @@ export const GPOINT_ANIMATION: readonly AnimationEntry[] = [0, 1, 2, 3, 4, 5].ma
  * 0 으로 놓는 곳은 스킨을 만들 때(0x5390c) 뿐이다.
  */
 const ballPatternDraws = { value: 0 }
-/** 앱을 새로 띄운 것과 같다 — 테스트용 */
-export const resetBallPatternDraws = () => {
-  ballPatternDraws.value = 0
-}
 
 /** 0x5fd61 — 하늘색 위에 공 아이콘이 엇갈린 격자로 오른쪽 아래로 흐른다. 그린 **뒤** 카운터·애니를 한 번 진행한다 */
 function BallPatternBackdrop() {

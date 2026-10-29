@@ -194,8 +194,6 @@ export function moraleGaugeFrameOf(morale: number): number {
   return 14
 }
 
-/** 숫자 글자 배치는 공용 모듈을 쓴다 (shared/lib/pixelNumber) */
-export type { Glyph } from '@/shared/lib/pixelNumber/pixelNumber'
 export { GLYPH_SPACING, SLASH_FRAME, glyphsWidthOf, moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 
 /** 이름 띠가 꺾이는 x — 0x7d43c: 시즌(모드 2)이면 W/2 − 0x1c, 아니면 W/2 − 0x2d */

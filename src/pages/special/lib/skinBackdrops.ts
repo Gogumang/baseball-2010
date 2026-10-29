@@ -92,7 +92,7 @@ export const MAIN_TITLE_BACKDROP = {
 
 /* ── 16비트(RGB565) 화면 연산 — 0xbdc2c · 0x9a628 · 0x6a905 (`shared/lib/screen565`) ─────────── */
 
-export { blurScreen565, darkenLine565, rgbOf565, rgbTo565, whitenStep3Of565 } from '@/shared/lib/screen565/screen565'
+export { blurScreen565, rgbOf565, rgbTo565, whitenStep3Of565 } from '@/shared/lib/screen565/screen565'
 
 /** 프레임 13 · 이미지 7 을 그린 화면(565) 에 흐리기 → 3줄 선 → 흰 단계 3 을 차례로 — 0x583fc~0x58476 */
 export function finishMainTitleBackdrop565(pixels: Uint16Array, width: number, height: number): void {

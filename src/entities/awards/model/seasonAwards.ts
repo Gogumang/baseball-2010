@@ -314,12 +314,6 @@ export function salaryRankOf(awards: SeasonAwards): number {
 }
 
 /**
- * 기록표를 안 넘겼을 때의 빈 순위표. 자격자가 없어 1위도 수상도 없다 (등급 k = 0).
- * 리그 밖에서 부르는 곳(테스트·미션)이 쓰라고 남겨 둔다.
- */
-export const NO_LEAGUE_RECORDS: readonly LeagueRecord[] = []
-
-/**
  * `app/model/seasonEvents.ts` 가 쓰는 입구 — 커리어 하나로 등급 k 를 낸다.
  *
  * 둘째 인자를 안 주면 **커리어가 들고 있는 리그 선수 기록표**(`career.leaguePlayerStats`)로
