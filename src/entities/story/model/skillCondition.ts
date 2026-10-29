@@ -61,7 +61,7 @@ function seasonTrainingByteTotalOf(career: PlayerCareer): number {
 /**
  * 칸 하나의 `통산 − 사본`.
  * ⚠️ 원본 버그(B-70): 통산은 u8(ldrb) · 사본은 s8(ldrb → lsl/asr 24) 로 읽어 사본이 128 을 넘으면 음수가 되어 차이가 256 만큼 커진다.
- * **고침(`bugfixes.json` B-70, 기본 켬)**: 웹이 든 참 값끼리 뺀다(`seasonTrainingCountOf` 와 같은 이번 시즌 훈련 수). 굴림 없음
+ * **고침(`bugfixes.json` B-70, 기본 켬)**: 웹이 든 참 값끼리 뺀다(이번 시즌 훈련 수 = 통산 − 새 시즌 사본). 굴림 없음
  * (조건 판정만 바뀐다 — 사본이 128 이상인 해에 몹쓸몸 · 유리몸 · 18 · 19 · 20 이 원본과 달리 맞을 수 있다).
  */
 function trainingDifferenceOf(career: PlayerCareer, menuId: string): number {
