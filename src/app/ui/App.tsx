@@ -72,6 +72,8 @@ import { leaveGameSceneObject } from '@/widgets/game-scene/model/gameSceneObject
 import { RecordAchievedContext } from '@/widgets/game-scene/model/recordAchievedContext'
 import { lazyScreen, preloadLazyScreens } from '@/shared/lib/lazyScreen/lazyScreen'
 import { noteSafePoint } from '@/shared/lib/staleBuild/staleBuild'
+import { useScreenWakeLock } from '@/shared/lib/wakeLock/useScreenWakeLock'
+import { useDevPanel } from '@/app/devtools/useDevPanel'
 
 /*
  * 모드 화면은 따로 받는다(`lazyScreen` — 첫 화면 덩이를 줄인다, r224). 켤 때 길에서 `preloadLazyScreens` 가 미리 받아 두므로
@@ -215,7 +217,8 @@ export function App({ bootScreen }: AppProps = {}) {
   })
   useSoundPauseOnHide(sound)
   // 부팅 씨앗 — 원본 0x2ed8 은 밀리초 시계의 아래 32비트 (저장 · 읽기 때 다시 세우기는 옮기지 않았다 — seededRandom 머리 주석)
-  const random = useMemo(() => createSeededRandom(bootSeed()), [])
+  const seed = useMemo(() => bootSeed(), [])
+  const random = useMemo(() => createSeededRandom(seed), [seed])
   // 켤 때는 장면 0x103 생성자의 [0x140006c] = −1 갈래 — 하위 0x2a <이용안내> 부터 (→ 2 로고 → 3 타이틀)
   const [screen, setScreen] = useState<Screen>(() => bootScreen ?? { kind: '이용안내' })
   // 모드 화면 덩이(`lazyScreen`)는 로고가 끝난 뒤(타이틀부터) 받아 둔다 — 타이틀 · 메인 메뉴에 머무는 동안 다 온다.
@@ -608,6 +611,18 @@ export function App({ bootScreen }: AppProps = {}) {
    */
   // 다음 장면 그림 미리 받기 — 기다리지 않는다(덜 받았으면 예전처럼 늦게 뜰 뿐)
   useScreenSpritePreload(screen.kind, gameSceneCount > 0)
+  // 경기 장면(0x104)이 서 있는 동안 화면이 꺼지지 않게 — 탭이 숨으면 풀고 돌아오면 다시 잡는다 (웹 전용, r365)
+  useScreenWakeLock(gameSceneCount > 0)
+  // 개발 서버 전용 패널(Tweakpane) — 보기만 하고 속도만 환경설정과 같은 길로 바꾼다. 배포 빌드에는 없다 (r365)
+  useDevPanel({
+    screenKind: screen.kind,
+    gameSceneCount,
+    game: careerSession.progress?.game ?? null,
+    atBat: runner.atBat,
+    bootSeed: seed,
+    speedLevel: gameSettings.settings.speedLevel,
+    onSpeedLevelChange: (speedLevel) => gameSettings.setSettings({ ...gameSettings.settings, speedLevel }),
+  })
   const sceneClosesWithoutShrink = gameSceneCount > 0 || sceneClosesWithoutShrinkOf(screen.kind, mission.player !== null)
   const withHiddenOpenNotice = (routes: ReactNode) => (
     <RecordAchievedContext.Provider value={unlockByRecord}>
