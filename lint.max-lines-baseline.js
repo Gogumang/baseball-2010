@@ -30,7 +30,6 @@ export const maxLinesBaseline = [
   'src/pages/main-menu/lib/mainMenuLayout.ts',
   'src/pages/main-menu/model/mainMenu.ts',
   'src/pages/main-menu/ui/MainMenuScreen.tsx',
-  'src/pages/management/ui/NariYearCoverScreen.tsx',
   'src/pages/match-settings/lib/matchSettingsLayout.ts',
   'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
