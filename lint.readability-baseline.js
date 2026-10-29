@@ -224,7 +224,6 @@ export const readabilityBaseline = [
   'src/pages/season/ui/SeasonSummaryScreen.tsx',
   'src/pages/season/ui/SeasonTrainingPopup.tsx',
   'src/pages/season/ui/SeasonTrainingScreen.tsx',
-  'src/pages/shop/lib/equipmentWindowLayout.ts',
   'src/pages/shop/lib/equipmentWindowState.ts',
   'src/pages/shop/lib/shopLayout.ts',
   'src/pages/shop/ui/ShopScreen.tsx',
