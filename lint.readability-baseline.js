@@ -101,7 +101,6 @@ export const readabilityBaseline = [
   'src/features/defense-play/model/throwLaunch.ts',
   'src/features/defense-play/model/walkPlay.ts',
   'src/features/play-at-bat/model/atBatSounds.ts',
-  'src/features/play-at-bat/model/resolvePitch.ts',
   'src/features/play-game/model/aceCutIn.ts',
   'src/features/play-game/model/batterHitRateHarness.ts',
   'src/features/play-game/model/gameFlow/atBat/pitchSelection.ts',
