@@ -51,7 +51,7 @@
     "src/features/play-team-game/model/gameAbilities.ts": ["exports"], // ALL_POSITION_SKILL_ID · NO_COACH
     "src/features/play-team-game/model/teamGameFlow/setup/savePoint.ts": ["exports"], // TEAM_GAME_RESUME_SAVE
     "src/pages/defense/lib/defenseCamera.ts": ["exports"], // CAMERA_ENDING_FOLLOW_PERCENT (0xc0558)
-    "src/pages/defense/lib/defenseView.ts": ["exports"], // LASER_SHINE_COLOR · LASER_SHINE_EFFECT_KIND
+    "src/pages/defense/lib/defenseView/defenseSprites.ts": ["exports"], // LASER_SHINE_COLOR · LASER_SHINE_EFFECT_KIND
     "src/pages/defense/lib/fieldMap.ts": ["exports"], // MAP_COLORS (0x39680)
     "src/pages/record/lib/recordAnnalsLayout.ts": ["exports"], // SEASON_ENDING_CELL_COUNT
     "src/pages/record/lib/recordAnnalsLayout/annalsProgress.ts": ["exports"], // SEASON_ENDING_CELL_COUNT (barrel 이 다시 내보낸다)
