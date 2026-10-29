@@ -28,13 +28,13 @@ import { PitcherGameScreen } from '@/pages/pitching/ui/PitcherGameScreen'
  * 의 끝난 진행에 그 판정을 싣는다(`usePitcherGame` 감싸기). 창을 닫으면(`closeBurst`) 판정을 내린다
  */
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     LoadingTip: ({ onDone }: { onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }
@@ -44,15 +44,15 @@ vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
 const 차례 = vi.hoisted(() => [] as string[])
 vi.mock('@/pages/auto-play-relay', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/pages/auto-play-relay')>()
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     ...actual,
     AutoPlayRelayReplay: ({ onDone }: { onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         차례.push(document.querySelector('[aria-label="돌발미션"]') === null ? '중계' : '창 위 중계')
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }

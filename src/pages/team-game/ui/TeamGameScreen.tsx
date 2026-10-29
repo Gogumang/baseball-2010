@@ -1,5 +1,5 @@
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
@@ -60,14 +60,8 @@ import { introStadiumNameFrameOf } from '@/widgets/game-scene/lib/introLayout'
 import { fielderNamesByPosition, halfInningFieldOf } from '@/widgets/field-walk/lib/halfInningFieldInput'
 import { type BenchClearingOffenseAces, aceRunnerBasesOf, benchClearingFieldOf } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { useWalkerLineSeats } from '@/widgets/field-walk/lib/useWalkerLineSeats'
-import {
-  type FieldCarry,
-  NEW_FIELD_CARRY,
-  fieldCarryAfterBenchClearing,
-  fieldCarryAfterHalfInning,
-  fieldCarryAfterPlay,
-  fieldCarryAfterRelay,
-} from '@/widgets/field-walk/lib/fieldCarry'
+import { useFieldCarryTrack } from '@/pages/team-game/model/useFieldCarryTrack'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import type { HalfInningWalkState } from '@/widgets/field-walk/lib/halfInningWalk'
 import type { BenchClearingWalkState } from '@/widgets/field-walk/lib/benchClearingWalk'
 import type { WalkTeamAces } from '@/widgets/field-walk/lib/walkerAces'
@@ -141,7 +135,6 @@ import { createRunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunn
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
 import { stealBaseOfKey } from '@/features/defense-play/model/pitchArrivalPlay'
-import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import * as styles from '@/pages/team-game/ui/TeamGameScreen.css'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
@@ -297,10 +290,10 @@ function TeamGameScene({
   const summary = isBurstResultHeld ? null : summaryAfterReplay(progressSummary, isReplayPending)
   // 이어하기 저장 0x4f928 — 진행기가 새 저장 진행을 담을 때마다 한 번씩 넘긴다
   const halfInningSave = progress.halfInningSave ?? null
-  const onHalfInningSaveRef = useRef(onHalfInningSave)
-  onHalfInningSaveRef.current = onHalfInningSave
+  // 넘길 곳은 최신 것을 읽기만 한다 — 다시 넘기는 때는 저장 진행이 바뀔 때뿐
+  const saveHalfInning = useEffectEvent((save: NonNullable<typeof halfInningSave>) => onHalfInningSave?.(save))
   useEffect(() => {
-    if (halfInningSave !== null) onHalfInningSaveRef.current?.(halfInningSave)
+    if (halfInningSave !== null) saveHalfInning(halfInningSave)
   }, [halfInningSave])
   /** 지금 마운드에 선 상대 투수가 마투수면 그 선수 (0xb88c8 로 8번 칸에 앉은 그것) */
   const opposingAcePitcher = ACE_PITCHERS[currentPitcherAceIndex(progress)] ?? null
@@ -343,8 +336,6 @@ function TeamGameScene({
   const isThrowPitchEndPendingRef = useRef(false)
   const [pitchBusyTicks, setPitchBusyTicks] = useState(0)
   const [heldResultTicks, setHeldResultTicks] = useState(0)
-  const pitchBusyTicksRef = useRef(0)
-  pitchBusyTicksRef.current = pitchBusyTicks
   /** 던진 공의 판정이 든 렌더 — 공 끝 대기 · 0x11 길이를 그 렌더 값으로 정한다 (아래 deps 가 바뀔 때만) */
   const settleThrownPitch = useEffectEvent(() => {
     if (!isThrowPendingRef.current) return
@@ -361,6 +352,7 @@ function TeamGameScene({
     // 마투수가 던졌으면 공 틱이 오르는 단계가 0xcfbe4[순번]이라 0x11 이 그만큼 길다 (0x3f378)
     setPitchBusyTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks, teamPitcherSideStageOf(progress).acePitcher?.order))
   })
+  // oxlint-disable-next-line react/set-state-in-effect -- 던진 공의 판정이 든 그림이 한 번 커밋된 뒤(그 그림은 '게이지' 갈래 — 아래 sceneStateKey) 공 끝 대기 · 0x11 · 0x12 틱을 세운다 — 렌더 중으로 옮기면 그 그림이 사라져 상태 틱 0 점이 달라진다
   useEffect(() => settleThrownPitch(), [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, progress.pendingRunnerPlay])
   useSceneTick(() => setPitchBusyTicks((left) => Math.max(0, left - 1)), pitchBusyTicks > 0 && !isMenuOpen && overlay !== '조작방법')
   const isPitchSceneBusy = pitchBusyTicks > 0
@@ -375,57 +367,21 @@ function TeamGameScene({
   /** 인트로·교대 판·벤치 클리어링이 화면을 덮고 있는가 — 경기 키(0x498d4)가 안 먹는다 */
   // 붙든 사구가 0x12 대기 · 진입 앞이면 아직 타석 · 투구 장면이 0x12 를 그린다(A-22) — 연출 단계만 덮는다
   const isSceneCovering = !isIntroDone || isHalfInningBoardOpen || progress.pendingBenchClearing?.phase === 'scene'
-  /**
-   * 장면 +0x111c 수비 줄 자리 · 카메라 +0x1e8 — 경기 내내 같은 객체라 교대 판 0x3fac4 가 앞 장면이 남긴 그대로 읽는다(`lib/fieldCarry`).
-   * 수비 화면 0x17 이 끝난 판 · 교대 판이 닫힌 틱 · 벤치 클리어링 · 자동진행 중계(카메라만)가 차례로 덮는다.
-   */
-  const fieldCarryRef = useRef<FieldCarry>(NEW_FIELD_CARRY)
+  /** 장면 +0x111c 수비 줄 자리 · 카메라 +0x1e8 (`useFieldCarryTrack`) — 판 · 중계는 선 그림에서 이어 받는다 */
+  const fieldCarryTrack = useFieldCarryTrack()
+  const fieldCarry = fieldCarryTrack.followRender(play, progress.autoRelay?.serial ?? null)
   const boardWalkRef = useRef<HalfInningWalkState | null>(null)
   const benchWalkRef = useRef<BenchClearingWalkState | null>(null)
-  const carriedPlayRef = useRef<DefensePlayResult | null>(null)
-  const carriedRelayRef = useRef<number | null>(null)
-  // 재생 갈래 · 키 없이 돈 판(`lastDefensePlay`)은 판이 정해진 자리에서 이어 받는다 — 판마다 한 번
-  if (play !== null && play !== carriedPlayRef.current) {
-    carriedPlayRef.current = play
-    fieldCarryRef.current = fieldCarryAfterPlay(play.ticks, fieldCarryRef.current)
-  }
-  // 자동진행 중계 0x21 진입 3ac04 — 카메라만 투수판으로
-  const relaySerial = progress.autoRelay?.serial ?? null
-  if (relaySerial !== null && relaySerial !== carriedRelayRef.current) {
-    carriedRelayRef.current = relaySerial
-    fieldCarryRef.current = fieldCarryAfterRelay(fieldCarryRef.current)
-  }
   /**
    * 주자 그림판 [장면+0xf24] +0x1c 에 실린 마선수 그림 — 타석 0xd 진입 0x48d50 이 48ddc 예약 확정 뒤 48e90 0x47cc8 로 싣는다(직접 뜸, r215).
    * 0xd 는 새 타석 · 교체 연출 0x16 뒤(대타 · 투수 교체)에 서고, 타석 사이 도루 · 견제 · 폭투는 다시 싣지 않는다. 메뉴 자동진행(0x3c8da)은
    * 0x47cc8 을 안 거쳐 이 값이 중계 첫 그림에 남는다(`TeamAutoRelay.entryLoadedRunnerAce`). 웹은 타석이 선 그림(판 · 중계가 없는)마다
    * 타석 열쇠(이닝 · 초말 · 두 타순 · 그 칸 선수 · 두 투수)가 바뀌면 그때 주자로 떠 둔다.
    */
-  const atBatLoadRef = useRef<{ readonly key: readonly unknown[]; readonly loaded: number | null } | null>(null)
-  if (progress.autoRelay == null && progress.pendingDefensePlay === null && progress.pendingRunnerPlay == null && !progress.game.isFinished) {
-    const ourOffense = progress.game.half === (progress.game.playerSide === 0 ? '초' : '말')
-    const offenseEntry = ourOffense ? progress.ourEntry[progress.game.battingOrderIndex] : progress.opponentEntry[progress.opponentOrderIndex]
-    const key: readonly unknown[] = [
-      progress.game.inning,
-      progress.game.half,
-      progress.game.battingOrderIndex,
-      progress.opponentOrderIndex,
-      offenseEntry,
-      progress.ourPitcherIndex,
-      progress.opponentPitcherIndex,
-    ]
-    const before = atBatLoadRef.current
-    if (before === null || key.some((value, index) => value !== before.key[index])) {
-      atBatLoadRef.current = { key, loaded: teamLoadedRunnerAceOf(progress) }
-    }
-  }
-  /** 메뉴 자동진행으로 들어설 때 넘길 실린 그림 — 중계가 아닌 그림에서는 걷는다 */
-  const menuRelayLoadedRef = useRef<number | null | undefined>(undefined)
-  if (progress.autoRelay == null) menuRelayLoadedRef.current = undefined
-  /** 실시간으로 돈 판 — 결과를 먹이기 앞에 자리 · 카메라를 받는다 */
-  const carryLivePlay = (result: DefensePlayResult | undefined) => {
-    if (result !== undefined) fieldCarryRef.current = fieldCarryAfterPlay(result.ticks, fieldCarryRef.current)
-  }
+  const atBatLoad = useRenderMachine<AtBatLoad | null, TeamGameProgress>(advanceAtBatLoad, progress)
+  /** 메뉴 자동진행으로 들어설 때 넘길 실린 그림 — 중계가 아닌 그림에서는 걷는다(렌더 중 맞추기) */
+  const [menuRelayLoaded, setMenuRelayLoaded] = useState<number | null | undefined>(undefined)
+  if (progress.autoRelay == null && menuRelayLoaded !== undefined) setMenuRelayLoaded(undefined)
   /**
    * 장면 두 줄의 +0xec (`useWalkerLineSeats`) — 교대 판 0x3fac4 · 수비 판 시작 0xb0fb4 · 벤치 클리어링 0x3a5f0 이 차례로 적는다.
    * 수비 판은 실시간 갈래(`pendingDefensePlay` · `pendingRunnerPlay`)든 재생 갈래(`lastDefensePlay`)든 판 하나마다 그 판 앞 그림의 수비 팀으로 훑는다
@@ -462,15 +418,17 @@ function TeamGameScene({
     if (changeWindow === null) return
     setChangeWindow(null)
     actions.cancelSubstitution()
-  }, [actions, changeWindow])
+  }, [actions, changeWindow, setChangeWindow])
   /** 제안 대사를 이미 보여 준 돌발 행 번호 */
   const [shownProposal, setShownProposal] = useState<number | null>(null)
 
-  // 타석·차례가 바뀌면 투구 1단계로 되돌린다
-  useEffect(() => {
-    if (!canPitch) return
-    if (progress.atBat.balls === 0 && progress.atBat.strikes === 0) setPhase('구질')
-  }, [canPitch, progress.atBat.balls, progress.atBat.strikes])
+  // 타석·차례가 바뀌면 투구 1단계로 되돌린다 — 던질 수 있음 · 볼 · 스트라이크가 바뀐 렌더에서 맞춘다(투수편 `PitcherGameScene` 과 같다)
+  const countKey = `${canPitch}:${progress.atBat.balls}:${progress.atBat.strikes}`
+  const [seenCountKey, setSeenCountKey] = useState<string | null>(null)
+  if (seenCountKey !== countKey) {
+    setSeenCountKey(countKey)
+    if (canPitch && progress.atBat.balls === 0 && progress.atBat.strikes === 0) setPhase('구질')
+  }
 
   /**
    * 원본 공용 키 처리 `0x498d4` — '\*' 경기 중 메뉴 · '#' 교체 · 도루 '3'/'2'/'1'.
@@ -519,7 +477,7 @@ function TeamGameScene({
   const isPitchSceneBeforePlay = isHitSceneShowing || isArrivalHolding
   /** 원본 상태 0x17 — 공용 키 0x498d4 의 '*'(상태 0xd~0x15) · '#' · 도루가 안 열린다 */
   const isPlayKeyBlocked = isDefenseInPlay && !isPitchSceneBeforePlay
-  /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 이 매 그리기마다 채운다 */
+  /** 상태 0xe 에서 OK 를 기다리는 중인가 — 아래 `useSceneConfirm` 의 값을 커밋 때 적는다 */
   const isAwaitingConfirmRef = useRef(false)
   /** 대기 중 0xd 두 그림을 지나 0xe 에 들어섰는가 — '#' 는 0xe·0xf 에서만 열린다 */
   const isInConfirmStateRef = useRef(false)
@@ -527,8 +485,7 @@ function TeamGameScene({
    * '#' 키 — 받은 다음 틀에 처리한다(`pushSceneKey`). 0x498d4 의 '#' 가지(4994a~499f8)는 0x38984 참이고 상태 0xe · 0xf 면 0x49598 → 0xb
    * (교체 창), 0xb 의 키 함수 0x495fc 의 '#' 는 교체 창을 닫는다(취소). 그 틀의 상태를 보므로 지금 값으로 다시 가린다.
    */
-  const hashKeyRef = useRef<() => void>(() => undefined)
-  hashKeyRef.current = () => {
+  const pressHashKey = useEffectEvent(() => {
     if (isSceneCovering || isDefenseInPlay || overlay !== null || isMenuOpen) return
     // 0x495fc 의 '#' 는 교체 화면을 닫는다(취소). 그 밖에서는 0x49598 의 갈림길 그대로 —
     // 공격이 사람이면 대타(0xaf06c), 아니면 투수 교체(0xaf09c)다
@@ -538,15 +495,14 @@ function TeamGameScene({
     // 0xd(대기가 보인 뒤 두 그림)는 0x4994a 의 상태 범위 밖이라 안 열린다
     if (isAwaitingConfirmRef.current && !isInConfirmStateRef.current) return
     // 내 공이 날거나 0x12 인 동안(상태 0x11 · 0x12)도 범위 밖
-    if (pitchBusyTicksRef.current > 0) return
+    if (pitchBusyTicks > 0) return
     if (session.canChangePitcher) return setChangeWindow('투수')
     if (session.canPinchHit) setChangeWindow('대타')
-  }
+  })
   /** 교체 창(0xb)의 CLR — 0x495fc 가 받은 다음 틀에 닫는다 */
-  const changeWindowClearRef = useRef<() => void>(() => undefined)
-  changeWindowClearRef.current = () => {
+  const pressChangeWindowClear = useEffectEvent(() => {
     if (changeWindow !== null && !isMenuOpen && overlay === null) closeChangeWindow()
-  }
+  })
   // 단말 일시정지 0x463ac — '*' 가 메뉴를 여는 때(경기 끝 판 · 중계 0x21 · 교대 판 · 수비 진행 · 교체 창 0xb 밖)이고 하위 창이 없으면 같은 메뉴를 연다
   useInGameMenuOpenOnHide(
     menu,
@@ -560,7 +516,7 @@ function TeamGameScene({
       if (isSceneCovering) return
       // 수비 진행 중(상태 0x17)에는 이 키들이 원본에서도 안 먹는다 — '*' 는 경기 상태 0xd~0x15,
       // '#' 는 0xe·0xf 일 때만 열리고(0x498d4), 그 사이 키는 주루·송구가 가져간다. 판이 섰어도 0x11 끝 · 0x12 · 0x13 을 그리는
-      // 동안(`isPitchSceneBeforePlay`)은 아직 0x17 전이라 '*' 가 열린다 ('#' 는 `hashKeyRef` 가 그대로 막는다)
+      // 동안(`isPitchSceneBeforePlay`)은 아직 0x17 전이라 '*' 가 열린다 ('#' 는 `pressHashKey` 가 그대로 막는다)
       if (isPlayKeyBlocked) return
       // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
       if (overlay === '조작방법') return
@@ -582,14 +538,14 @@ function TeamGameScene({
       if (event.key === '#') {
         event.preventDefault()
         // 장면 키 칸으로 — 받은 다음 틀의 키 0x498d4 '#' 가지(4994a~499f8) · 0xb 키 함수 0x495fc 가 그 틀의 상태를 본다
-        pushSceneKey(() => hashKeyRef.current())
+        pushSceneKey(() => pressHashKey())
         return
       }
       if (event.key === 'Escape' || event.key === 'Backspace') {
         if (changeWindow !== null) {
           event.preventDefault()
           // 0x495fc 의 CLR — 장면 키 칸으로(다음 틀)
-          pushSceneKey(() => changeWindowClearRef.current())
+          pushSceneKey(() => pressChangeWindowClear())
           return
         }
         // 코스 고르기(상태 0x10)의 CLR(−16)은 조준 화면(`AimCursor` 의 onCancel)이 받는다 — 0x50ee0 → 0xf
@@ -671,6 +627,7 @@ function TeamGameScene({
   const { notePitchPlayOpened } = pitchEnd
   useEffect(() => {
     if (humanArrivalPlay === null) return
+    // oxlint-disable-next-line react/set-state-in-effect -- 판이 선 그림(0x12 틱 0)은 대기 틱이 남은 채 한 번 커밋된다 — 공 끝 알림(notePitchPlayOpened)과 같은 자리에서 지운다(투수편과 같다)
     setPitchBusyTicks(0)
     notePitchPlayOpened()
   }, [humanArrivalPlay, notePitchPlayOpened])
@@ -740,8 +697,10 @@ function TeamGameScene({
   }
   /** 정산 효과 층(비 · 파티클) — 타석 배경과 정산 판이 같이 쓴다 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
-  isAwaitingConfirmRef.current = isAwaitingConfirm
-  isInConfirmStateRef.current = sceneConfirm.isInConfirmState
+  useLayoutEffect(() => {
+    isAwaitingConfirmRef.current = isAwaitingConfirm
+    isInConfirmStateRef.current = sceneConfirm.isInConfirmState
+  })
   /** 0xd 두 그림을 지나 0xe 에 들어섰으면 소개 판을 그린다 (0x4d9ec → 0x44944) */
   const isMatchupShown = isAwaitingConfirm && sceneConfirm.isInConfirmState
   /**
@@ -798,7 +757,8 @@ function TeamGameScene({
    * 앞에 붙인다. 판(타구 · 주자 판 · 견제 · 밀어내기 재생)은 그 판이 끝나는 그림이다
    */
   const { notePitchResolved } = pitchEnd
-  useEffect(() => {
+  // 진행 한 걸음에 한 번 — 판정이 든 그림의 값으로 싣는다(진행의 다른 칸은 읽기만 한다)
+  const noteThrowPitchEnd = useEffectEvent(() => {
     if (!isThrowPitchEndPendingRef.current) return
     const thrown = progress.lastResolution
     if (thrown === null) return
@@ -809,9 +769,8 @@ function TeamGameScene({
       waitTicks:
         pitchResultEntryDelayTicksOf(progress.lastPitch?.frameCount ?? 0, teamPitcherSideStageOf(progress).acePitcher?.order) - 1 + waitTicks,
     })
-    // 진행 한 걸음에 한 번 — 판정이 든 그림의 값으로 싣는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, notePitchResolved])
+  })
+  useEffect(() => noteThrowPitchEnd(), [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, notePitchResolved])
   const pitchEndSerial = pitchEnd.serial
   /** 타석 위 돌발 결과 창(0x1d)이 서 있으면 그 그리기 0x4d1e0 이 상태 틱을 100 으로 박는다 — 아래 창 갈래에서 넣는다 */
   const burstResultTickRef = useRef<number | null>(null)
@@ -828,7 +787,8 @@ function TeamGameScene({
     // 사람 장면이 없는 갈래(자동진행)만 공 끝 번호로 가른다
     sceneStateKey: isHalfInningBoardOpen
       ? `board-${board?.serial ?? 0}`
-      : `${canBat ? 'bat' : canPitch ? (isPitchSceneBusy || isThrowPendingRef.current ? '게이지' : phase) : `auto-${pitchEndSerial}`}-${isAwaitingConfirm ? 'confirm' : 'play'}`,
+      : // oxlint-disable-next-line react/refs -- 던진 걸음의 첫 그림(위 효과가 ref 를 내리고 대기 틱을 세우기 전)도 '게이지' 갈래로 친다 — 효과가 다시 그리지 않고 끝나면 그 그림이 그대로 남는 것까지 예전과 같다
+        `${canBat ? 'bat' : canPitch ? (isPitchSceneBusy || isThrowPendingRef.current ? '게이지' : phase) : `auto-${pitchEndSerial}`}-${isAwaitingConfirm ? 'confirm' : 'play'}`,
     pitchEnd: {
       serial: pitchEndSerial,
       humanCountOf: (added) => leadingRecordCountOf(added, (id) => !isGameEndRecord(id)),
@@ -1002,7 +962,7 @@ function TeamGameScene({
         // 그림 0x43278 이 올린 실책 +0x2e — 판 끝 정산보다 먼저 얹는다
         onFieldingErrors={actions.recordFieldingErrors}
         onDone={(result) => {
-          carryLivePlay(result)
+          fieldCarryTrack.afterLivePlay(result)
           actions.finishDefensePlay(result)
         }}
         burstWindow={window}
@@ -1022,7 +982,7 @@ function TeamGameScene({
         runScoreBoard={runScoreBoardSourceOf(progress.game, scoreboardSides)}
         onFieldingErrors={actions.recordFieldingErrors}
         onDone={(result) => {
-          carryLivePlay(result)
+          fieldCarryTrack.afterLivePlay(result)
           actions.finishRunnerPlay(result)
         }}
         burstWindow={window}
@@ -1057,6 +1017,7 @@ function TeamGameScene({
     </>,
   )
   // 0x1c(판 위 창 0x46ee0)는 상태 틱을 안 박고, 타석 위 결과 창 0x1d(0x4d1e0)만 박는다
+  // oxlint-disable-next-line react/refs -- 상태 그리기 0x4d1e0 처럼 이 갈래를 그리는 렌더만 틱을 박는다 — 앞 갈래(판 · 벤치 클리어링 · 교대 판)로 나간 렌더는 옛 값을 둔다(훅으로 옮기면 그 갈래 구분이 사라진다, 투수편과 같다)
   burstResultTickRef.current = heldDefense === null && burstWindow !== null && resolution !== null ? BURST_RESULT_STATE_TICK : null
   if (heldDefense !== null) return heldDefense
 
@@ -1084,7 +1045,7 @@ function TeamGameScene({
         // 틱 10 의 수비 목표 굴림 8 번(0x401d4)을 화면이 그 틱에 낸다 — 끝에서 다시 굴리지 않는다(onDone 이 거짓)
         random={random}
         onDone={(reachedTargetTick) => {
-          if (benchWalkRef.current !== null) fieldCarryRef.current = fieldCarryAfterBenchClearing(benchWalkRef.current)
+          if (benchWalkRef.current !== null) fieldCarryTrack.afterBenchClearing(benchWalkRef.current)
           benchWalkRef.current = null
           actions.finishBenchClearing(reachedTargetTick)
         }}
@@ -1113,8 +1074,7 @@ function TeamGameScene({
           rolls: board.fielderRolls,
           half: board.half,
           // 앞 장면(0x17 · 앞 판 · 0x1e · 0x21)이 남긴 수비 줄 자리 · 카메라 — 자리 합 0 인 칸이 있으면 0x3fac4 가 경기 첫 판으로 본다
-          carry: fieldCarryRef.current,
-          walkStateRef: boardWalkRef,
+          carry: fieldCarry,
           // 마선수 그림 0x79b48 — 수비 줄 · 공격 줄 팀 각각 (못 찾은 칸은 판 앞 +0xec 가 남는다)
           defenseAces: teamWalkAcesOf(progress, !isOurOffense(progress)),
           offenseAces: teamWalkAcesOf(progress, isOurOffense(progress)),
@@ -1129,9 +1089,10 @@ function TeamGameScene({
             teamRecordBattersOf(progress, !isOurOffense(progress)),
           ),
         })}
+        walkStateRef={boardWalkRef}
         onConfirm={() => {
           // 판이 닫힌 틱의 자리 · 카메라 — 0x4f7ac 는 0x18 동안만 걸음 · 카메라를 굴린다
-          if (boardWalkRef.current !== null) fieldCarryRef.current = fieldCarryAfterHalfInning(boardWalkRef.current)
+          if (boardWalkRef.current !== null) fieldCarryTrack.afterHalfInning(boardWalkRef.current)
           boardWalkRef.current = null
           setClosedBoardSerial(board.serial)
         }}
@@ -1152,7 +1113,7 @@ function TeamGameScene({
         sideTeams={options.playerSide === 0 ? [options.ourTeamId, options.opponentTeamId] : [options.opponentTeamId, options.ourTeamId]}
         humanSide={options.playerSide}
         grassPalette={fieldPalette}
-        entryLoadedRunnerAce={menuRelayLoadedRef.current}
+        entryLoadedRunnerAce={menuRelayLoaded}
         // 0x21 에도 기록 달성 알림 0x4e35c 를 그린다(0x17 말고는 늘 — 53066). 질문 창 동안은 멈춘다
         recordAlert={<RecordAlertStageOverlay frame={recordAlert} />}
         onAskingChange={setRelayAsking}
@@ -1590,7 +1551,7 @@ function TeamGameScene({
                   ? undefined
                   : (cost) => {
                       onSpendGamePoint(cost)
-                      menuRelayLoadedRef.current = atBatLoadRef.current?.loaded ?? null
+                      setMenuRelayLoaded(atBatLoad?.loaded ?? null)
                       actions.autoProgress()
                       menu.close()
                     }
@@ -1616,6 +1577,35 @@ function TeamGameScene({
       )}
     </div>
   )
+}
+
+/** 타석이 선 그림에서 뜬 주자 그림판의 마선수 그림 — 타석 열쇠와 함께 든다 */
+interface AtBatLoad {
+  readonly key: readonly unknown[]
+  readonly loaded: number | null
+}
+
+/**
+ * 주자 그림판 [장면+0xf24] +0x1c 에 실린 마선수 그림 (`TeamGameScene` 의 `atBatLoad`) — 타석이 선 그림(판 · 중계가 없는)에서 타석 열쇠
+ * (이닝 · 초말 · 두 타순 · 그 칸 선수 · 두 투수)가 바뀌면 그때 주자로 떠 둔다. 그 밖의 그림은 앞 값을 그대로 둔다(`useRenderMachine`)
+ */
+function advanceAtBatLoad(before: AtBatLoad | null, progress: TeamGameProgress): AtBatLoad | null {
+  if (progress.autoRelay != null || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null || progress.game.isFinished) {
+    return before
+  }
+  const ourOffense = progress.game.half === (progress.game.playerSide === 0 ? '초' : '말')
+  const offenseEntry = ourOffense ? progress.ourEntry[progress.game.battingOrderIndex] : progress.opponentEntry[progress.opponentOrderIndex]
+  const key: readonly unknown[] = [
+    progress.game.inning,
+    progress.game.half,
+    progress.game.battingOrderIndex,
+    progress.opponentOrderIndex,
+    offenseEntry,
+    progress.ourPitcherIndex,
+    progress.opponentPitcherIndex,
+  ]
+  const isSameAtBat = before !== null && key.every((value, index) => value === before.key[index])
+  return isSameAtBat ? before : { key, loaded: teamLoadedRunnerAceOf(progress) }
 }
 
 /** 칸 5 는 '0' 키 자리다 (0x534d8 의 메시지 7). 빈 칸(구질 0)은 그리지 않는다 */

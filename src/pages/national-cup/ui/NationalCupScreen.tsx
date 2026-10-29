@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import type { ReactNode } from 'react'
 import { MessageBox, RawScreen } from '@/shared/ui'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
@@ -159,11 +159,11 @@ export function NationalCupScreen({
   const [entryPopupIndex, setEntryPopupIndex] = useState(0)
   const entryPopup = entry.popups[entryPopupIndex] ?? null
 
-  // 0x65de4 — 처음 열린 팀은 팝업을 띄우는 그 자리에서 전역 해금표에 쓰고 저장한다
+  // 0x65de4 — 처음 열린 팀은 팝업을 띄우는 그 자리에서 전역 해금표에 쓰고 저장한다.
+  // 진입 한 번에 한 번만(entry 는 굳힌 값) — 이 화면이 새로 설 때가 134 진입이다. 넘길 곳은 최신 것을 읽기만 한다
+  const saveOpenedTeams = useEffectEvent((teams: EntryState['openedTeams']) => onOpenHiddenTeams?.(teams))
   useEffect(() => {
-    if (entry.openedTeams.length > 0) onOpenHiddenTeams?.(entry.openedTeams)
-    // 진입 한 번에 한 번만 — 이 화면이 새로 설 때가 134 진입이다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (entry.openedTeams.length > 0) saveOpenedTeams(entry.openedTeams)
   }, [entry])
 
   /** 띄운 팝업이 닫혔다 — 대기 칸의 다음 팝업(0x75440) */
@@ -205,8 +205,7 @@ export function NationalCupScreen({
    * 팝업(히든 팀 · 칭호 · 결과 · 보상)이 떠 있는 동안은 창이 키를 먹는다(0x754f9) — 대진판 확인도 팝업이 다 닫힌 뒤다.
    * 화면 탭(대진판 · 순위표의 투명 누름 칸)은 OK 와 같다.
    */
-  const keyRef = useRef<(key: string) => boolean>(() => false)
-  keyRef.current = (key) => {
+  const handleKey = useEffectEvent((key: string): boolean => {
     const isOk = key === 'Enter' || key === '5'
     if (step === '대진' && entryPopup === null) {
       if (!isOk) return false
@@ -224,11 +223,11 @@ export function NationalCupScreen({
       }
     }
     return false
-  }
+  })
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      if (keyRef.current(event.key)) event.preventDefault()
+      if (handleKey(event.key)) event.preventDefault()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

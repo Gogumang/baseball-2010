@@ -15,13 +15,13 @@ vi.mock('@/widgets/batting-stage/ui/BattingStage', () => ({
   },
 }))
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     LoadingTip: ({ onDone }: { onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }

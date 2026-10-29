@@ -111,8 +111,8 @@ export default defineConfig({
     'typescript/triple-slash-reference': 'error',
     // 이 저장소 규칙
     'max-lines': MAX_LINES,
-    // 옛 코드에 있고 고치려면 코드를 바꿔야 하는 규칙 — 경고로 두고 조금씩 줄인다 (r343)
-    'no-useless-assignment': 'warn',
+    // r343 에 경고로 들였다가 r368 에 0 이 되어 에러로 올렸다 (r369)
+    'no-useless-assignment': 'error',
     'prefer-const': ['error', { destructuring: 'all' }],
   },
   overrides: [
@@ -126,21 +126,23 @@ export default defineConfig({
       plugins: ['eslint', 'typescript', 'react'],
       rules: {
         'react/error-boundaries': 'error',
-        'react/exhaustive-deps': 'warn',
-        'react/incompatible-library': 'warn',
+        // ⚠️ 이 규칙을 끄는 주석(철자가 무엇이든)은 그 컴포넌트 · 훅의 React Compiler 검사(refs · immutability · set-state-in-effect …)를
+        // 통째로 끈다 — 끄지 말고 고친다 (`CODE_QUALITY.md` "끄기 주석")
+        'react/exhaustive-deps': 'error',
+        'react/incompatible-library': 'error',
         'react/purity': 'error',
         'react/set-state-in-render': 'error',
         'react/static-components': 'error',
-        'react/unsupported-syntax': 'warn',
+        'react/unsupported-syntax': 'error',
         'react/use-memo': 'error',
-        // React Compiler 계열 새 규칙 · 내보내기 규칙 — 옛 코드에 많다. 경고로 둔다 (동작을 바꾸는 수정은 따로)
-        'react/rules-of-hooks': 'warn',
-        'react/refs': 'warn',
-        'react/set-state-in-effect': 'warn',
-        'react/immutability': 'warn',
-        'react/globals': 'warn',
-        'react/preserve-manual-memoization': 'warn',
-        'react/only-export-components': ['warn', { allowConstantExport: true, allowCompoundComponents: true }],
+        // React Compiler 계열 새 규칙 · 내보내기 규칙 — r367 · r368 · r369 에 경고 0 이 되어 에러로 올렸다
+        'react/rules-of-hooks': 'error',
+        'react/refs': 'error',
+        'react/set-state-in-effect': 'error',
+        'react/immutability': 'error',
+        'react/globals': 'error',
+        'react/preserve-manual-memoization': 'error',
+        'react/only-export-components': ['error', { allowConstantExport: true, allowCompoundComponents: true }],
       },
     },
     {

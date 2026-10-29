@@ -22,14 +22,14 @@ import { createMemoryAutoRelayRecordPort, setAutoRelayRecordPort } from '@/entit
  */
 const 로딩판 = vi.hoisted(() => [] as string[])
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     LoadingTip: ({ tip, onDone }: { tip: string; onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         로딩판.push(tip)
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }
@@ -38,7 +38,7 @@ vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
 /** 재생 화면 — 판 틱을 다 그린 실책을 판 끝(onDone 앞)에 넘긴다(`DefensePlayback` 재생 갈래와 같은 차례) */
 const 재생기록 = vi.hoisted(() => [] as string[])
 vi.mock('@/pages/defense/ui/DefensePlayback', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   const { drawnReplayFieldingErrorsOf } = await import('@/features/defense-play/model/fieldingErrors')
   return {
     DefensePlayback: ({
@@ -50,15 +50,15 @@ vi.mock('@/pages/defense/ui/DefensePlayback', async () => {
       onDone: () => void
       onFieldingErrors?: (errors: readonly unknown[]) => void
     }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         if (ticks === undefined) return
         // 경기 끝 판이 이미 섰던가 — 섰으면 재생이 잘린 것이다
         재생기록.push(document.querySelector('[alt="승리투수"]') === null ? '재생' : '끝판 뒤 재생')
         const errors = drawnReplayFieldingErrorsOf(ticks)
         if (errors.length > 0) onFieldingErrors?.(errors)
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return <div data-testid="재생판" />
     },
   }

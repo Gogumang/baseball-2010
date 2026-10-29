@@ -19,14 +19,14 @@ import { liveGameInningIndex, resetLiveGameState } from '@/shared/lib/liveGameSt
  */
 const 로딩판 = vi.hoisted(() => [] as { tip: string; steps: number | undefined }[])
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     LoadingTip: ({ tip, steps, onDone }: { tip: string; steps?: number; onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         로딩판.push({ tip, steps })
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }

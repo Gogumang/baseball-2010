@@ -116,8 +116,9 @@ describe('원본 미션 레코드 38개(목록 28 + 마선수 공략 10)는 모�
 
 describe('원본 레코드의 제한값', () => {
   it('목표 이름에 제어문자가 섞여 있지 않다', () => {
-    // eslint-disable-next-line no-control-regex
-    const broken = MISSIONS.flatMap((mission) => mission.goals).filter((goal) => /[\x00-\x1f]/.test(goal))
+    const CONTROL_CHAR_END = 0x20
+    const hasControlChar = (text: string) => Array.from(text, (char) => char.charCodeAt(0)).some((code) => code < CONTROL_CHAR_END)
+    const broken = MISSIONS.flatMap((mission) => mission.goals).filter(hasControlChar)
 
     expect(broken).toEqual([])
   })
