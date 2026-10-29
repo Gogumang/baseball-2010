@@ -3,7 +3,6 @@
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
   'src/app/assetPacks/assetPackGate.ts',
-  'src/app/model/modePitcher.ts',
   'src/app/model/screenBgm.ts',
   'src/app/model/useCollection.ts',
   'src/app/ui/App.tsx',

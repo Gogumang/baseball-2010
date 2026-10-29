@@ -123,6 +123,7 @@ export const TEST_AREAS = {
     'src/app/ui/pitcherLeagueRoute/',
     'src/app/model/usePitcherLeagueSession',
     'src/app/model/modePitcher',
+    'src/app/model/modePitcher/',
     'src/entities/pitcher-career/',
     'src/features/play-pitcher-game/',
     'src/pages/pitching/',
