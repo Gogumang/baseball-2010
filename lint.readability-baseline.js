@@ -89,7 +89,6 @@ export const readabilityBaseline = [
   'src/entities/mission/model/missionAutoRelay.ts',
   'src/entities/mission/model/missionGame.ts',
   'src/entities/mission/model/missionGoal.ts',
-  'src/entities/mission/model/missionRun.ts',
   'src/entities/mission/model/missionRunners.ts',
   'src/entities/mission/model/pitcherRun.ts',
   'src/entities/mode-save/model/modeSave.ts',

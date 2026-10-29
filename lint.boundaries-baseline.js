@@ -12,7 +12,7 @@ export const boundaryRules = {
 }
 
 export const layerDirectionBaseline = [
-  'src/entities/mission/model/missionRun.ts',
+  'src/entities/mission/model/missionRun/otherSlices.ts',
   'src/entities/mission/model/missionRunners.ts',
   'src/entities/mission/model/pitcherRun.ts',
   'src/features/play-game/model/stagePressAreas.ts',
@@ -130,7 +130,7 @@ export const crossSliceBaseline = [
   'src/entities/mission/model/missionCpuTeam/otherSlices.ts',
   'src/entities/mission/model/missionGame.ts',
   'src/entities/mission/model/missionGoal.ts',
-  'src/entities/mission/model/missionRun.ts',
+  'src/entities/mission/model/missionRun/otherSlices.ts',
   'src/entities/mission/model/missionRunners.ts',
   'src/entities/mission/model/pitcherRun.ts',
   'src/entities/national-cup/model/nationalCup.ts',
