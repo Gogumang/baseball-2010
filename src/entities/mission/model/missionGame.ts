@@ -13,13 +13,7 @@ export {
 } from '@/entities/mission/model/missionGame/types'
 export { humanRecordsOf, missionHumanRecordSlotOf } from '@/entities/mission/model/missionGame/start/humanRecords'
 export { MISSION_HUMAN_START_ORDER } from '@/entities/mission/model/missionGame/start/startOrder'
-export {
-  cpuSideOf,
-  humanSideOf,
-  missionHumanTeamIdOf,
-  missionTeamIdsOf,
-  type MissionAceMatchOrigin,
-} from '@/entities/mission/model/missionGame/start/sides'
+export { cpuSideOf, humanSideOf, missionHumanTeamIdOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame/start/sides'
 export { startMissionGame, type MissionGameSetup } from '@/entities/mission/model/missionGame/start/startGame'
 export {
   battingRecordAt,
