@@ -6,6 +6,7 @@ import { spriteJsonBundle } from './tools/viteSpriteJsonBundle.ts'
 import { versionedAssets } from './tools/viteVersionedAssets.ts'
 import { assetPacks } from './tools/viteAssetPacks.ts'
 import { reactCompiler } from './tools/viteReactCompiler.ts'
+import { appChunk } from './tools/viteAppChunk.ts'
 import { unitTestGroups } from './tools/vitestProjects.ts'
 import { unitTestCoverage } from './tools/vitestCoverage.ts'
 
@@ -33,12 +34,14 @@ export default defineConfig({
   // 빌드 산출물의 `public/` 을 `v/<내용 해시>/` 로 — 호스트가 오래 캐시해도 배포 뒤 옛 그림이 안 섞인다 (r318 A2, `shared/lib/assetUrl`)
   // 빌드 산출물 자산을 gzip 묶음 몇 개 + 서비스 워커로 — 첫 진입에 한꺼번에 받는다 (r322, `app/assetPacks`). 맨 끝에 둔다(산출물을 다 쓴 뒤 훑는다)
   // 화면 부품(`ui/`) 가운데 `'use memo'` 를 단 것만 React Compiler 로 자동 메모 — 게임 진행 훅은 뺀다 (r353, `tools/viteReactCompiler.ts`)
+  // 앱이 정적으로 끌고 오는 모듈(첫 진입 몫 빼고)을 앱 덩이 하나로 — 같이 받던 작은 공용 덩이 28개를 합쳐 gzip 이 준다 (r376, `tools/viteAppChunk.ts`)
   plugins: [
     react(),
     reactCompiler(process.env['REACT_COMPILER_LOG'], process.env['REACT_COMPILER_MODE']),
     vanillaExtractPlugin(),
     spriteJsonBundle(),
     versionedAssets(),
+    appChunk(),
     assetPacks(),
   ],
   resolve: {
