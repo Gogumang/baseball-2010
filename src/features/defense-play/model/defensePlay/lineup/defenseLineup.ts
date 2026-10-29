@@ -1,6 +1,6 @@
 import { FIELDER_COUNT } from '@/entities/fielding/model/fieldGeometry'
 import { DEFAULT_ABILITY } from '@/features/defense-play/model/defensePlay/constants'
-import type { HolderPlate } from '@/features/defense-play/model/defensePlayView'
+import type { HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
 
 /** `defenseAbilitiesOf` 가 받는 수비 한 명 */
 export interface DefenseLineupPlayer {

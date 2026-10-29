@@ -2,17 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
 import { BASE_POSITIONS, runnerSpeedOf, SLIDING_PROGRESS_RANGE } from '@/entities/fielding/model/fieldGeometry'
 import { createFielders, createRunner, NONE } from '@/entities/fielding/model/fieldingState'
-import { aceIndexesWithOriginalBug, holderMarkOf, viewStateOf, type ActionMemory } from '@/features/defense-play/model/defensePlayView'
+import { aceIndexesWithOriginalBug } from '@/features/defense-play/model/defensePlayView/aceIndexes'
+import { holderMarkOf } from '@/features/defense-play/model/defensePlayView/holderMark'
+import { viewStateOf } from '@/features/defense-play/model/defensePlayView/viewStateOf'
+import type { ActionMemory } from '@/features/defense-play/model/defensePlayView/actionMemory'
 import {
   ACE_PITCHER_DEFENDER_FRAMES,
   cameraTargetOf,
   DEFENDER_FRAMES,
   fielderFrameOf,
   fielderSpriteOf,
-  FIELDER_ACTION,
   flashOffsetOf,
-  RUNNER_ACTION,
 } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION, RUNNER_ACTION } from '@/shared/config/original/defenseAnimations'
 
 const 야수들 = createFielders(Array.from({ length: 9 }, () => 500))
 const 주력 = runnerSpeedOf(500)

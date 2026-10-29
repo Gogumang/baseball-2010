@@ -1,6 +1,6 @@
 import type { OriginalMission } from '@/shared/config/original/missions'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
-import type { RunScoreBoardSource } from '@/pages/defense/ui/DefensePlayback'
+import type { RunScoreBoardSource } from '@/pages/defense/ui/playback/runScoreBoardView'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 

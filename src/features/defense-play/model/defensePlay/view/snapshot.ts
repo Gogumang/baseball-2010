@@ -5,7 +5,9 @@ import { ballPointAt, isBallBeyondFence, isBallStoppedAt } from '@/features/defe
 import { bigHitWatchOf } from '@/features/defense-play/model/defensePlay/start/bigHitWatch'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
-import { type DefensePlayView, type ViewStateInput, holderMarkOf, viewStateOf } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView, ViewStateInput } from '@/features/defense-play/model/defensePlayView/viewStateInput'
+import { holderMarkOf } from '@/features/defense-play/model/defensePlayView/holderMark'
+import { viewStateOf } from '@/features/defense-play/model/defensePlayView/viewStateOf'
 import { loadedRunnerAceOf, runnerAceIndexesOf } from '@/features/defense-play/model/runnerAces'
 
 /**

@@ -1,7 +1,7 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import type { ControlSide } from '@/entities/defense-controls/model/defenseKeys'
 import type { DefenseKeyPress, DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
-import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import { runRunnerPlay, startRunnerPlay } from '@/features/defense-play/model/runnerPlayEngine'
 import { runPickoffPlay, startPickoffPlay, type PickoffPlayInput } from '@/features/defense-play/model/pickoffPlay'
 import type { OpenedPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'

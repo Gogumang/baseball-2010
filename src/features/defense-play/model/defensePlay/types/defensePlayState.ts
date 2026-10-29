@@ -4,7 +4,8 @@ import type { FielderState, PlayView, RunnerState } from '@/entities/fielding/mo
 import type { HeldRunState } from '@/entities/fielding/model/heldRuns'
 import type { RundownPlan } from '@/entities/fielding/model/rundown'
 import type { DefensePlayInput } from '@/features/defense-play/model/defensePlay/types/defensePlayInput'
-import type { ActionMemory, DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { ActionMemory } from '@/features/defense-play/model/defensePlayView/actionMemory'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 
 /**

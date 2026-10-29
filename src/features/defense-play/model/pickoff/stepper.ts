@@ -1,5 +1,5 @@
 import { autoAdvanceDecisions } from '@/entities/fielding/model/autoAdvance'
-import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import { MAXIMUM_TICKS } from '@/features/defense-play/model/pickoff/constants'
 import { contextAt } from '@/features/defense-play/model/pickoff/context/pickoffContext'
 import { openPickoffPlay } from '@/features/defense-play/model/pickoff/frame/openPickoffPlay'

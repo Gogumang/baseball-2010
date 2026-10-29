@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ORIGINAL_BUGFIX_CONFIG, bugfixConfigWith, setBugfixConfigForTests } from '@/shared/config/bugfixes'
-import { aceIndexesWithOriginalBug } from '@/features/defense-play/model/defensePlayView'
+import { aceIndexesWithOriginalBug } from '@/features/defense-play/model/defensePlayView/aceIndexes'
 
 afterEach(() => setBugfixConfigForTests(ORIGINAL_BUGFIX_CONFIG))
 

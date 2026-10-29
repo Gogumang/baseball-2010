@@ -21,9 +21,6 @@ import {
   DEFENSE_BACKGROUND_URL,
   DEFENSE_BACKGROUND_WIDTH,
   DEFENDER_FRAMES,
-  type DefenseFielder,
-  type DefenseRunner,
-  type DefenseViewState,
   ballFrameOf,
   ballShadowOf,
   cameraTargetOf,
@@ -34,6 +31,8 @@ import {
   runnerFrameOf,
   runnerSpriteFolderOf,
 } from '@/pages/defense/lib/defenseView'
+import type { DefenseFielder, DefenseRunner } from '@/entities/fielding/model/defenseView/defenseFigures'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { DefenseFieldMap } from '@/pages/defense/ui/DefenseFieldMap'
 import { DefenseHolderMark } from '@/pages/defense/ui/DefenseHolderMark'

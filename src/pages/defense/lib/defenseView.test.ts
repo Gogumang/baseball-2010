@@ -3,14 +3,10 @@ import {
   ACE_BATTER_DEFENDER_FRAMES,
   ACE_PITCHER_DEFENDER_FRAMES,
   DEFENDER_FRAMES,
-  FIELDER_ACTION,
   FIELDER_ACTION_TICKS,
   FIELDER_FRAME_OFFSET,
-  RUNNER_ACTION,
   RUNNER_SLIDE_TICKS,
   TICKS_PER_ACTION_FRAME,
-  type DefenseFielder,
-  type DefenseViewState,
   BALL_SHADOW_RIM_COLOR,
   ballFrameOf,
   ballShadowOf,
@@ -22,6 +18,9 @@ import {
   flashOffsetOf,
   runnerFrameOf,
 } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION, RUNNER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { DefenseFielder } from '@/entities/fielding/model/defenseView/defenseFigures'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 
 /**
  * 야수 동작 → 프레임 (R3 2-1 표 = I-controls 1c).

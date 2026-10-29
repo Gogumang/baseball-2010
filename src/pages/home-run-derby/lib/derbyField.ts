@@ -6,7 +6,9 @@ import { ballParticleFactsOf } from '@/features/defense-play/model/ballParticleF
 import { isBallBeyondFence } from '@/features/defense-play/model/runDefensePlay'
 import { ballParticleShotsOf } from '@/pages/defense/lib/ballParticles'
 import { type CameraState, cameraBoundsOf, centerOn, screenOffsetOf, stepCamera, toScreenX, toScreenY } from '@/pages/defense/lib/defenseCamera'
-import { FIELDER_ACTION, type DefenseFielder, type DefenseViewState } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { DefenseFielder } from '@/entities/fielding/model/defenseView/defenseFigures'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '@/pages/defense/ui/DefenseScreen.css'
 import { isBugFixed } from '@/shared/config/bugfixes'
 

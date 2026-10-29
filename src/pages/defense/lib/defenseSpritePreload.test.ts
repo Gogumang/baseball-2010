@@ -4,8 +4,9 @@ import { resolve } from 'node:path'
 import { preloadImageUrlsOf } from '@/shared/lib/sprite/spritePreload'
 import type { SpriteFolderPreload } from '@/shared/lib/sprite/spritePreload'
 import { defenseSpritePreloadsOf, fielderRawFramesOf, runnerRawFramesOf } from '@/pages/defense/lib/defenseSpritePreload'
-import { FIELDER_ACTION, fielderSpriteOf, runnerFrameOf, RUNNER_ACTION } from '@/pages/defense/lib/defenseView'
-import type { DefenseFielder } from '@/pages/defense/lib/defenseView'
+import { fielderSpriteOf, runnerFrameOf } from '@/pages/defense/lib/defenseView'
+import { FIELDER_ACTION, RUNNER_ACTION } from '@/shared/config/original/defenseAnimations'
+import type { DefenseFielder } from '@/entities/fielding/model/defenseView/defenseFigures'
 import { frameUrl } from '@/shared/lib/sprite/spritePreload'
 
 const PUBLIC = resolve(__dirname, '../../../../public')

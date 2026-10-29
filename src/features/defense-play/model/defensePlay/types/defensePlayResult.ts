@@ -1,6 +1,6 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { AdvanceResult } from '@/entities/game/model/baseState'
-import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView'
+import type { DefensePlayView } from '@/features/defense-play/model/defensePlayView/viewStateInput'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
 import type { RunnerFate } from '@/features/defense-play/model/runnerFates'
 

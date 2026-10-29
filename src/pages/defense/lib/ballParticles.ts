@@ -1,5 +1,6 @@
 import { toScreenX, toScreenY } from '@/pages/defense/lib/defenseCamera'
-import { isBallDrawn, type DefenseViewState } from '@/pages/defense/lib/defenseView'
+import { isBallDrawn } from '@/pages/defense/lib/defenseView'
+import type { DefenseViewState } from '@/entities/fielding/model/defenseView/defenseViewState'
 
 /**
  * **수비 화면 공 그리기 0x36dfc 가 쏘는 파티클** (2026-10-14 직접 뜸 — 진행기 쪽 조건은 `defenseView.BallParticleFacts`).

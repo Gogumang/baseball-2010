@@ -1,6 +1,6 @@
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useAnimations } from '@/shared/lib/sprite/useFrameOrigins'
-import type { HolderMark, HolderPlate } from '@/pages/defense/lib/defenseView'
+import type { HolderMark, HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
 import { HOLDER_PLATE_BOX, HOLDER_PLATE_FRAME, holderPlateLayoutOf, holderRingPointOf } from '@/pages/defense/lib/holderMarkLayout'
 import { IMG_TEXT_FRAMES } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
