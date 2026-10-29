@@ -242,8 +242,6 @@ export const readabilityBaseline = [
   'src/pages/season/ui/SeasonSummaryScreen.tsx',
   'src/pages/season/ui/SeasonTrainingPopup.tsx',
   'src/pages/season/ui/SeasonTrainingScreen.tsx',
-  'src/pages/season/ui/StadiumItemWindow.tsx',
-  'src/pages/season/ui/StadiumShopScreen.tsx',
   'src/pages/settings/ui/SettingsScreen.tsx',
   'src/pages/shop/lib/equipmentWindowLayout.ts',
   'src/pages/shop/lib/equipmentWindowState.ts',
