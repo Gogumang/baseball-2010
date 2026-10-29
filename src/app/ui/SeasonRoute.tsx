@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { usePreviousDistinct } from '@/shared/lib/renderMachine/usePreviousDistinct'
 import { ITEM_WINDOW_KIND } from '@/widgets/season/lib/seasonItemMenu'
 import {
   GameIncomeScreen,
@@ -174,6 +175,11 @@ const CENTER_SLIDE_FROM: readonly number[] = [
 
 /** 나리 칸 후보 — id 0xfe · +0xa 0x80/0xa0 · 기록 사본 (`nariRecruitPlayerOf`) */
 /** 엔트리 목록 창 칸 재료 — 저장이 없으면 넘기지 않는다(받는 쪽 기본값) */
+/** 카드 딱지 [창+0x168] 를 넣는 진입 — 팀 고르기 0xca 0x50a8 · 트레이드 0xe4 0x4774 */
+function isCardBadgeScene(scene: number): boolean {
+  return scene === SEASON_SCENE_STATE.팀고르기 || scene === SEASON_SCENE_STATE.트레이드
+}
+
 function withEntryCells(cells: SeasonEntryCellSource | undefined): { readonly cells?: SeasonEntryCellSource } {
   return cells === undefined ? {} : { cells }
 }
@@ -274,34 +280,36 @@ function SeasonScreens({
    * 다시 서며 0 이다.
    */
   const [trainingResultFirstLine, setTrainingResultFirstLine] = useState(0)
-  useEffect(() => {
-    if (scene === SEASON_SCENE_STATE.경기직전) setTrainingResultFirstLine(0)
-  }, [scene])
   /**
    * 외출 지도 고른 칸 this+0xf8 — 장면 0x105 객체 칸이라 지도를 오가도 남고(진입 0xbd24 는 그림만 싣는다), 경기로 장면이
    * 지워졌다 새로 서면(위 창 첫 줄과 같은 수명) 0 이다.
    */
   const [outingCursor, setOutingCursor] = useState(0)
-  useEffect(() => {
-    if (scene === SEASON_SCENE_STATE.경기직전) setOutingCursor(0)
-  }, [scene])
   /**
    * 장면 구장 [장면+0x10c] 의 하늘 줄 · 하늘 칸 · 전광판 글자 자리 — 0x3b14 가 장면마다 새로 만든다(`StadiumPreviewScene`).
    * 상점(0xdc 종류 4)은 앞서 구장관리(0xea)가 잰 하늘을 그대로 쓰고, 구장관리는 상점이 흘려 둔 글자 자리에 멈춰 있다.
    */
   const [stadiumPreviewScene, setStadiumPreviewScene] = useState(INITIAL_STADIUM_PREVIEW_SCENE)
-  useEffect(() => {
-    if (scene === SEASON_SCENE_STATE.경기직전) setStadiumPreviewScene(INITIAL_STADIUM_PREVIEW_SCENE)
-  }, [scene])
   /**
    * 카드 딱지 [창+0x168] — 같은 창 칸이라 수명이 장면 0x105 와 같다. 팀 고르기 0xca 진입 0x50a8 · 트레이드 0xe4 진입 0x4774 만
    * 슬롯 그림([장면+0xd4] = ui/slt_frame)을 넣는다 (`pages/season/lib/seasonPlayerCard.ts` 머리말). 경기로 장면이 지워지면 다시 0.
    */
-  const [hasCardBadge, setHasCardBadge] = useState(false)
-  useEffect(() => {
-    if (scene === SEASON_SCENE_STATE.팀고르기 || scene === SEASON_SCENE_STATE.트레이드) setHasCardBadge(true)
-    else if (scene === SEASON_SCENE_STATE.경기직전) setHasCardBadge(false)
-  }, [scene])
+  const [hasCardBadge, setHasCardBadge] = useState(() => isCardBadgeScene(scene))
+  /**
+   * 장면이 바뀐 그림에서 위 장면 칸들을 고친다 — 0xe1(경기직전)에 들어서면 창 · 장면 칸이 새로 선 값(0)으로, 팀 고르기 · 트레이드
+   * 진입은 카드 딱지를 넣는다. 원본은 진입이 그리기보다 먼저라 그 그림부터 새 값이다
+   */
+  const [sceneOfLife, setSceneOfLife] = useState(scene)
+  if (sceneOfLife !== scene) {
+    setSceneOfLife(scene)
+    if (isCardBadgeScene(scene)) setHasCardBadge(true)
+    if (scene === SEASON_SCENE_STATE.경기직전) {
+      setTrainingResultFirstLine(0)
+      setOutingCursor(0)
+      setStadiumPreviewScene(INITIAL_STADIUM_PREVIEW_SCENE)
+      setHasCardBadge(false)
+    }
+  }
   /** 0xdf 목적 1 에서 나리 선수를 고르면 뜨는 StrMODE[220] 알림 (0xbbef9(…, 1, 1, 1) — 상태는 0xdf 그대로) */
   const [pickNotice, setPickNotice] = useState<string | null>(null)
   /**
@@ -323,9 +331,7 @@ function SeasonScreens({
    * 이전 장면 — 관리 메뉴 0xc9 진입 0x4efc 가 이전 상태 1 · 0xd3 · 0xcb · 0xf5 · 0xf1 이면 가운데 판을 미끄러뜨린다(0x8a2d8).
    * 처음 서는 관리 메뉴(이전 없음)는 진입 분기 0xcb 를 지난 것이다.
    */
-  const sceneTrail = useRef<{ readonly scene: number; readonly previous: number | null }>({ scene, previous: null })
-  if (sceneTrail.current.scene !== scene) sceneTrail.current = { scene, previous: sceneTrail.current.scene }
-  const previousScene = sceneTrail.current.previous
+  const previousScene = usePreviousDistinct(scene)
   /** 0xd3 재생이 끝난 한 틀 — 대화창 없이 0xa09c 의 끝 그림을 그린 뒤 넘긴다 (`useEventEndFrame`) */
   const eventEnd = useEventEndFrame(actions.finishSeasonEvent)
   /** 엔딩을 넘긴 틀이 건 효과기 종류 2 — 관리 메뉴 0xc9 위에서 돈다 (`SeasonEndingScreen`) */
@@ -333,14 +339,18 @@ function SeasonScreens({
   const [isEnteringGame, setEnteringGame] = useState(() => session.isGameInProgress)
   /** 장면 0x105 를 세운 굴림은 들어올 때 한 번 (StrictMode 의 효과 다시 돌기에도) */
   const isSceneConstructed = useRef(false)
+  /** 들어온 그림의 값 — 아래 들어올 때 한 번 도는 고리가 읽는다 */
+  const enteredWith = useRef({ isEnteringGame, actions })
   useLayoutEffect(() => {
+    const entered = enteredWith.current
     // 3284e — 중간 저장 경기(+0x42 && +0x4e)가 없으면 장면 0x105 를 세운다: 상태 1 적재 0x75fc 의 팁 rand(0, 73) 이 그 장면 맨 앞
-    if (!isEnteringGame) {
-      if (!isSceneConstructed.current) actions.constructScene()
+    if (!entered.isEnteringGame) {
+      if (!isSceneConstructed.current) entered.actions.constructScene()
       isSceneConstructed.current = true
       return
     }
-    actions.resumeSavedGame()
+    entered.actions.resumeSavedGame()
+    // 0x327b8 모드 2 갈래 — 중간 저장 경기를 이어 세운 뒤에야 첫 그림을 낸다(첫 렌더는 비워 관리 화면이 한 번도 안 서게)
     setEnteringGame(false)
     // 들어올 때 한 번만 — 0x327b8 은 시즌모드에 들어오는 그 순간에만 돈다
   }, [])
