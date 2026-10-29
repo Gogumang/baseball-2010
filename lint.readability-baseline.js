@@ -147,7 +147,6 @@ export const readabilityBaseline = [
   'src/entities/story/model/storyScene.ts',
   'src/entities/team/model/recordAbility.ts',
   'src/features/defense-play/model/ballParticleFacts.ts',
-  'src/features/defense-play/model/catchForecast.ts',
   'src/features/defense-play/model/defensePlayView.ts',
   'src/features/defense-play/model/diveCheck.ts',
   'src/features/defense-play/model/fieldingErrors.ts',
