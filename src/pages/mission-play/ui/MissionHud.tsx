@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
 import type { OriginalMission } from '@/shared/config/original/missions'
 import type { MissionProgress } from '@/entities/mission/model/missionGoal'
 import { goalTickerFrameAt } from '@/entities/mission/model/goalTicker'
@@ -9,21 +8,18 @@ import {
   GOAL_TEXT_WIDTH,
   MISSION_HUD_BASE,
   TEXT_CLIP,
-  TIMER_ICON,
-  TIMER_STRIP,
   goalCountOf,
   goalLineDrawsOf,
   limitStripsOf,
   missionHudIconOf,
   pitcherGoalCountOf,
   slashCounterGlyphsOf,
-  timerGlyphsOf,
 } from '@/pages/mission-play/lib/missionHudLayout'
-import type { ClipRect, HudGlyph, HudSprite, MissionHudMode, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
+import type { MissionHudMode, MissionLimitState } from '@/pages/mission-play/lib/missionHudLayout'
 import * as styles from '@/pages/mission-play/ui/MissionHud.css'
-import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { createGameSceneDrawGate, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
-import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
+import { Clip, Glyphs, Sprite } from '@/pages/mission-play/ui/missionHud/hudSprites'
+import { HudTimer } from '@/pages/mission-play/ui/missionHud/HudTimer'
 
 interface MissionHudProps {
   readonly mission: OriginalMission
@@ -47,49 +43,6 @@ interface MissionHudProps {
    * (`missionStageStripsOf`, Q-03 r301). 거짓이면 띠도 CSS 불투명도 근사로 그린다
    */
   readonly stripsOnStage?: boolean
-}
-
-function Sprite({ sprite }: { readonly sprite: HudSprite }) {
-  return (
-    <img
-      className={styles.sprite}
-      style={{ left: sprite.left, top: sprite.top, ...(sprite.opacity === undefined ? {} : { opacity: sprite.opacity }) }}
-      src={sprite.src}
-      alt=""
-      {...(sprite.testId === undefined ? {} : { 'data-testid': sprite.testId })}
-    />
-  )
-}
-
-function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; readonly testId: string }) {
-  return (
-    <>
-      {glyphs.map((glyph, index) => (
-        <img
-          key={index}
-          className={styles.sprite}
-          style={{ left: glyph.left, top: glyph.top }}
-          src={glyph.src}
-          alt=""
-          data-testid={testId}
-          data-src={glyph.src}
-        />
-      ))}
-    </>
-  )
-}
-
-/** 자르기 창 — 안쪽은 다시 240×320 원본 좌표로 되돌려 놓는다 */
-function Clip({ rect, children }: { readonly rect: ClipRect | null; readonly children: ReactNode }) {
-  if (rect === null) return <>{children}</>
-  const style: CSSProperties = { left: rect.x, top: rect.y, width: rect.width, height: rect.height }
-  return (
-    <div className={styles.clip} style={style}>
-      <div className={styles.unclip} style={{ left: -rect.x, top: -rect.y }}>
-        {children}
-      </div>
-    </div>
-  )
 }
 
 /**
@@ -125,7 +78,6 @@ export function MissionHud({
   const frame = goalTickerFrameAt(tick, lineCount)
   const isSliding = frame.nextIndex !== null
   const draws = lineCount === 0 ? [] : goalLineDrawsOf(frame)
-  const timer = remainingSeconds === null || remainingSeconds <= 0 ? null : timerGlyphsOf(Math.ceil(remainingSeconds))
 
   return (
     <div className={styles.hud} data-testid="미션-HUD" {...(isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {})}>
@@ -167,29 +119,7 @@ export function MissionHud({
           <Glyphs glyphs={strip.glyphs} testId="미션-한도-수" />
         </div>
       ))}
-      {timer !== null && (
-        <div data-testid="미션-시계">
-          {!stripsOnStage && <Sprite sprite={TIMER_STRIP} />}
-          <Sprite sprite={TIMER_ICON} />
-          {timer.glyphs.map((glyph, index) => {
-            const mask = spriteMaskImage(glyph.src)
-            return (
-              <span
-                key={index}
-                className={styles.stamp}
-                style={{ left: glyph.left, top: glyph.top, background: solidColorCss(glyph.color), maskImage: mask, WebkitMaskImage: mask }}
-              />
-            )
-          })}
-          {timer.dots.map((dot, index) => (
-            <span
-              key={index}
-              className={styles.dot}
-              style={{ left: dot.left, top: dot.top, width: dot.size, height: dot.size, background: dot.color }}
-            />
-          ))}
-        </div>
-      )}
+      {remainingSeconds !== null && remainingSeconds > 0 && <HudTimer seconds={Math.ceil(remainingSeconds)} stripsOnStage={stripsOnStage} />}
     </div>
   )
 }
