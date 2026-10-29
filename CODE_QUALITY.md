@@ -47,7 +47,7 @@
 ## 6. 세션 상태는 atom 으로 (Jotai)
 
 세션 훅(`useXxxSession`)이 하위 훅에 값을 줄줄이 넘기지 않게, 상태를 의미 단위 atom 으로 두고 하위 훅이 필요한 atom 만 직접 읽고 쓴다.
-본보기는 시즌 세션(`app/model/seasonSession/atoms`, r370). 다른 세션(커리어 · 투수 리그 · 미션)도 같은 순서로 옮긴다.
+본보기는 시즌 세션(`app/model/seasonSession/atoms`, r370) · 커리어 세션(`app/model/careerSession/atoms`, r372). 남은 세션(투수 리그 · 미션)도 같은 순서로 옮긴다.
 
 1. **store 는 세션마다 하나** — `useState(() => createXxxAtoms(args))`. 옛 `useState` 처음 값(저장소 읽기 따위)을 **같은 차례로** 여기서 넣는다.
    앱 전체 `Provider` 를 쓰지 않는다: 세션 훅은 `App` 몸통에서 서고, 세션이 새로 서면 칸도 새것이어야 옛 동작과 같다.
@@ -68,7 +68,7 @@
 
 - 끄기는 **고칠 수 없는 한 줄**에만: 원본 차례(커밋 뒤에 적어야 하는 칸, 이 갈래를 그리는 렌더만 박는 틱 따위)가 그 모양을 요구할 때.
   `oxlint-disable-next-line <규칙> -- <까닭>` 꼴로, 까닭(원본 주소 · 바꾸면 무엇이 달라지는지)을 반드시 적는다. 파일 · 블록 전체 끄기는
-  쓰지 않는다(지금 하나 — `useCareerSession` 의 105 진입 표지 — 는 `oxlint-enable` 로 바로 닫는다).
+  쓰지 않는다(마지막 하나였던 `useCareerSession` 의 105 진입 표지는 r372 에서 이름 붙인 칸 객체 `managementEntryMarker` 로 옮겨 걷었다).
 - **`exhaustive-deps` 는 끄지 않는다** — 철자(`react/` · `react-hooks/` · `eslint-disable`)가 무엇이든 그 컴포넌트 · 훅 전체의
   React Compiler 검사(refs · immutability · set-state-in-effect …)가 함께 꺼진다. 의존성을 일부러 뺀 effect 는 `useEffectEvent` 로
   읽고 열쇠만 의존성에 둔다. `react/refs` · `react/set-state-in-effect` 같은 다른 규칙 끄기는 그 줄만 끈다.
