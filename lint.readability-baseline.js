@@ -56,7 +56,6 @@ export const readabilityBaseline = [
   'src/entities/career/model/outing.ts',
   'src/entities/career/model/seasonFlow.ts',
   'src/entities/career/model/seasonStats.ts',
-  'src/entities/collection/model/annalsStats.ts',
   'src/entities/collection/model/collectionRewards.ts',
   'src/entities/defense-controls/model/defenseKeys.ts',
   'src/entities/fielding/model/autoAdvance.ts',

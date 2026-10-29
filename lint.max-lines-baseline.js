@@ -21,7 +21,6 @@ export const maxLinesBaseline = [
   'src/entities/career/model/seasonFlow.ts',
   'src/entities/career/model/titles.ts',
   'src/entities/career/model/training.ts',
-  'src/entities/collection/model/annalsStats.ts',
   'src/entities/fielding/model/catchPrediction.ts',
   'src/entities/fielding/model/fieldingState.ts',
   'src/entities/game/model/gameState.ts',
