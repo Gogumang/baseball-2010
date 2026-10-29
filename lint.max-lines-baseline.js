@@ -2,7 +2,6 @@
 // 목록은 파일 이름만, 경로 알파벳 순(숫자 주석 없음). 파일을 쪼개 150 이하가 되면 목록에서 뺀다 — `pnpm check:lines` 가 빠질 파일을 알려 준다.
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
-  'src/app/assetPacks/assetPackGate.ts',
   'src/app/ui/App.tsx',
   'src/entities/batting/model/battedBallFlight.ts',
   'src/entities/batting/model/battedBallOutcome.ts',

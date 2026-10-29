@@ -12,7 +12,6 @@ export const readabilityRules = {
 }
 
 export const readabilityBaseline = [
-  'src/app/assetPacks/assetPackGate.ts',
   'src/app/model/afterGameEventPreload.ts',
   'src/app/model/commonWindowScene.ts',
   'src/app/model/screenSpritePreload.ts',
