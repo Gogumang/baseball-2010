@@ -2,14 +2,7 @@
 // 목록은 파일 이름만, 경로 알파벳 순(숫자 주석 없음). 파일을 쪼개 150 이하가 되면 목록에서 뺀다 — `pnpm check:lines` 가 빠질 파일을 알려 준다.
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
-  'e2e/all.mjs',
-  'e2e/derby-stage.mjs',
-  'e2e/perf.mjs',
-  'e2e/scene-pixels.mjs',
-  'e2e/snapshot.mjs',
   'src/app/assetPacks/assetPackGate.ts',
-  'src/app/dev/sceneRunner.ts',
-  'src/app/dev/sessionSnapshot.ts',
   'src/app/model/modePitcher.ts',
   'src/app/model/screenBgm.ts',
   'src/app/model/useCareerSession.ts',

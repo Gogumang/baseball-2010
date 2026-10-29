@@ -1,4 +1,3 @@
-import { trackCellForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
@@ -174,8 +173,6 @@ export const GPOINT_ANIMATION: readonly AnimationEntry[] = [0, 1, 2, 3, 4, 5].ma
  * 0 으로 놓는 곳은 스킨을 만들 때(0x5390c) 뿐이다.
  */
 const ballPatternDraws = { value: 0 }
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다)
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') trackCellForSnapshot('SkinBackdrops.ballPatternDraws', ballPatternDraws)
 /** 앱을 새로 띄운 것과 같다 — 테스트용 */
 export const resetBallPatternDraws = () => {
   ballPatternDraws.value = 0
@@ -373,7 +370,7 @@ interface BallPatternTranslucentImageProps {
  * **공 무늬 바탕 위 반투명 그림** — 효과 1(0x9a449)을 원본 식(`translucentPixel565`, 마스크 내림 · 565)으로 칠한다.
  * DOM 겹이라 아래 화면을 못 읽으므로 아래를 **같은 좌표로 다시 그린다**: 공 무늬(지금 카운터 · gpoint 그림 · 흑백 사각형) 위에
  * 그 사이에 먼저 그린 줄 색(`rowOver` — 카드 계단형 판)을 얹고, 그림의 불투명 칸만 섞어 캔버스에 찍는다(투명 칸은 비워 DOM 이 보인다).
- * 무늬가 없거나 그림을 아직 못 받았거나 캔버스가 없으면(jsdom) CSS 불투명도 L/16 근사(`translucentOpacityOf`)로 둔다.
+ * 무늬가 없거나 그림을 아직 못 받았거나 캔버스가 없으면(시험 DOM) CSS 불투명도 L/16 근사(`translucentOpacityOf`)로 둔다.
  */
 export function BallPatternTranslucentImage({
   src,
@@ -449,7 +446,7 @@ export function BallPatternTranslucentImage({
       context.putImageData(out, 0, 0)
       return true
     }
-    /** 한 번이라도 칠했는가 — 못 그리게 되면 지운다(캔버스를 안 연 jsdom 에서는 문맥을 열지 않는다) */
+    /** 한 번이라도 칠했는가 — 못 그리게 되면 지운다(캔버스를 안 연 시험 DOM 에서는 문맥을 열지 않는다) */
     let hasDrawn = false
     const redraw = () => {
       const drawn = draw()

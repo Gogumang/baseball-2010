@@ -9,7 +9,7 @@ import { ignoreErrors, tryOr, tryOrAsync } from '@/shared/lib/safe/tryOr'
  * 파일은 `tools/extract_sounds.py` 가 원본 `sound/%03d.mmf`(야마하 SMAF) 에서 구워 둔 것이다.
  * 브라우저는 SMAF 를 직접 못 읽어서 미리 굽는 길을 골랐다 (docs/re/L-sound-effects.md 1-D).
  *
- * `AudioContext` 가 없는 환경(jsdom·서버 렌더)에서는 **아무 소리도 내지 않고 조용히 넘어간다**.
+ * `AudioContext` 가 없는 환경(시험 DOM·서버 렌더)에서는 **아무 소리도 내지 않고 조용히 넘어간다**.
  * 소리가 안 나는 것 때문에 게임이 멈추면 안 되므로 모든 접근을 예외 삼키기(`shared/lib/safe`)로 감쌌다.
  *
  * 효과음은 배경음을 끊고 **끝나도 배경음으로 돌아오지 않는다** — 원본 그대로다 (`SoundPort` 머리 주석:
@@ -32,7 +32,7 @@ export interface WebAudioSoundOptions {
 
 type MaybeAudioContextCtor = { AudioContext?: new () => AudioContext; webkitAudioContext?: new () => AudioContext }
 
-// jsdom 에는 AudioContext 가 없다. 못 열면 소리 없이 계속 간다.
+// 시험 DOM 에는 AudioContext 가 없다. 못 열면 소리 없이 계속 간다.
 const defaultCreateContext: AudioContextFactory = () =>
   tryOr(() => {
     const global = globalThis as unknown as MaybeAudioContextCtor

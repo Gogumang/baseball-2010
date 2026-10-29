@@ -1,4 +1,3 @@
-import { trackCellForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect, useRef } from 'react'
 
 /**
@@ -23,8 +22,6 @@ export const SKIN_TICKER_STEP = 3
 export const SKIN_TICKER_CLIP_INSET = 2
 
 const skinTickerCounter = { value: 0 }
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다)
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') trackCellForSnapshot('skinTicker.skinTickerCounter', skinTickerCounter)
 
 /** 지금 [skin+0x284] — 읽기만 (테스트·디버그용) */
 export const skinTickerCounterValue = () => skinTickerCounter.value

@@ -4,7 +4,7 @@ import type { RunnerAces } from '@/features/defense-play/model/runnerAces'
 import type { RunnerAnimationClock } from '@/widgets/batting-stage/lib/baseRunners'
 import type { HomeRunTextWindow } from '@/widgets/batting-stage/lib/homeRunBanner'
 import type { SettlementEffectSource } from '@/widgets/batting-stage/model/stageRefs'
-import { plateErrorOf, resolvePitch, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
+import { resolvePitch, unjudgedSwingDetailOf } from '@/features/play-at-bat/model/resolvePitch'
 import { unjudgedWhiffSoundIdOf } from '@/features/play-at-bat/model/atBatSounds'
 import type { BattingSwing } from '@/features/play-at-bat/model/resolvePitch'
 import { nextBatterShift } from '@/features/play-at-bat/model/batterShift'
@@ -54,11 +54,8 @@ import { ballFrameOf, useStageRefs } from '@/widgets/batting-stage/model/stageRe
 import type { AcePitcherFrames, SkillPanelSource, StageHud, SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 import { useStageAnimation } from '@/widgets/batting-stage/model/useStageAnimation'
 import { useStageCastPreload } from '@/widgets/batting-stage/model/useStageCastPreload'
-import { gameSceneNow, gameSceneTickNow, gameSceneTickStartTime, useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
+import { useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
 import { activeSound } from '@/shared/api/audio/soundPort'
-import { publishScenePeek, pushBattingLog } from '@/shared/lib/scenePeek/scenePeek'
-import { millisecondsPerFrame } from '@/shared/config/frameRate'
-import { pitcherReleaseTicksOf } from '@/widgets/batting-stage/lib/stageScenery'
 import { SCENE_STATE, markSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { useStageControls } from '@/widgets/batting-stage/model/useStageControls'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
@@ -548,17 +545,6 @@ export function BattingStage({
         specialSwing: { number: specialSwingNumber, isAceBatter: aceBatterIndex >= 0 },
       }
       const resolved = resolvePitch(pitch, swing, context, deck, latest.random)
-      if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') && swing !== null) {
-        const { resolution } = resolved.detail
-        pushBattingLog({
-          kind: '판정',
-          tick,
-          keyTick: swing.frame,
-          frameCount: pitch.frameCount,
-          at: performance.now(),
-          result: resolution.kind === '스트라이크' ? (resolution.isSwinging ? '헛스윙' : '스트라이크') : resolution.kind,
-        })
-      }
       // 진동 — 맞은 공은 0xbc5 → 0x5228c 의 100/200/300ms, 사구는 0x51b0e 의 200ms, 삼진은 0x4d0d6 의 100ms.
       // 환경설정 진동(+0x3b)이 켜졌을 때만. HUD 는 이 공 전 볼카운트다. 맞은 공은 판정 순간, 나머지는 결과(0x12)를 세울 때 울린다
       const vibrateNow = () =>
@@ -721,9 +707,6 @@ export function BattingStage({
       if (pitch === null) return
       const swing = swingRef.current
       if (swing !== null && swing.isReleased) {
-        if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-          pushBattingLog({ kind: '판정', tick, keyTick: swing.frame, frameCount: pitch.frameCount, at: performance.now(), result: '판정없음' })
-        }
         // 판정 없는 헛스윙은 이 틀(공 끝 0x4e060 의 4e21c — 0x12 예약 4e24e 와 같은 갱신)에 8/27 을 낸다. 심판 콜은 다음 틀 0x12 진입이다
         playContactSoundNow(swing.isUnjudgedWhiff ? unjudgedWhiffSoundIdOf(aceBatterIndex >= 0) : null)
         const pitchTypeNumber = pitchTypeNumberRef.current
@@ -824,16 +807,6 @@ export function BattingStage({
         dropPendingBunt()
         // 0x51db6: 예약 +0xfe0 = 1 · +0xfd8 = 지금 틱 — 스윙은 다음 갱신(F + 1)에 나가고 F + 2 에 판정한다(`useStageAnimation`)
         swingRef.current = { frame: keyTickNow(tick), isSpecial: false, isReleased: false, isUnjudgedWhiff: false }
-        if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-          pushBattingLog({
-            kind: '스윙',
-            tick,
-            tickNow: gameSceneTickNow(),
-            keyTick: keyTickNow(tick),
-            frameCount: pitchRef.current?.frameCount ?? -1,
-            at: performance.now(),
-          })
-        }
       },
       /**
        * 번트 키 '7'/'8'/'9' 누름 (0x535a4 → 메시지 0x6a7 → 0x51e48). 상태 0x11 · S+4 가 아니면 무시하고, 지금 타자가
@@ -907,24 +880,6 @@ export function BattingStage({
       flightProbeRef.current = null
     }
   }, [flightProbeRef, phaseRef, pitchRef])
-
-  // 장면 들여다보기(웹 개발 도구 — r242 타이밍 측정): 공 그림 · 틱 격자를 e2e 가 읽는다. 상태는 안 바꾼다
-  useEffect(() => {
-    if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
-    publishScenePeek('battingStage', {
-      probe: () => ({
-        phase: phaseRef.current,
-        phaseStartTick: phaseStartTickRef.current,
-        frameCount: pitchRef.current?.frameCount ?? null,
-        releaseTicks: pitcherReleaseTicksOf(latestRef.current.acePitcher?.order),
-        tickNow: gameSceneTickNow(),
-        tickStartTimeOf: (tick: number) => gameSceneTickStartTime(tick) + (performance.now() - gameSceneNow()),
-        msPerTick: millisecondsPerFrame(),
-        plateError: pitchRef.current === null ? null : plateErrorOf(pitchRef.current, 0),
-      }),
-    })
-    return () => publishScenePeek('battingStage', null)
-  }, [phaseRef, phaseStartTickRef, pitchRef, latestRef])
 
   // 타석 장면은 원본 틱 차례(갱신 → 그리기 → 프레임 끝 0x6de84)로 앱 전역 파티클 관리자를 직접 굴리고 그린다
   useClaimSceneParticles()

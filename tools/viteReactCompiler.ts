@@ -43,7 +43,7 @@ export function reactCompiler(logFile: string | undefined, mode: string | undefi
   const compilationMode = mode === 'infer' ? 'infer' : 'annotation'
   const preset = reactCompilerPreset({ compilationMode, ...(logger === undefined ? {} : { logger }) })
   preset.rolldown.filter = { ...preset.rolldown.filter, id: { include: COMPILED, exclude: NOT_COMPILED } }
-  // 프리셋은 브라우저 쪽 환경에만 붙는다 — vitest(node · jsdom 환경)에서도 같은 컴파일 결과를 시험하게 늘 붙인다
+  // 프리셋은 브라우저 쪽 환경에만 붙는다 — vitest(node · happy-dom 환경)에서도 같은 컴파일 결과를 시험하게 늘 붙인다
   preset.rolldown.applyToEnvironmentHook = () => true
   return babel({ presets: [preset] })
 }

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -103,7 +103,7 @@ describe('정산 판 (0x4a384 의 4a948 갈래 — 팀경기 SettlementBoard)', 
     expect(board.children[1]).toBe(boardCanvases[0])
     expect(board.children[board.children.length - 1]).toBe(boardCanvases[1])
     expect(container.querySelectorAll('canvas').length).toBe(3)
-    // jsdom 은 캔버스 그리기가 없어 rAF 효과 틱이 안 돈다
+    // 시험 DOM 은 캔버스 그리기가 없어 rAF 효과 틱이 안 돈다
     expect(rand).not.toHaveBeenCalled()
     expect(rand9d).not.toHaveBeenCalled()
   })

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { screenRectFrom, screenRectOf } from '@/shared/lib/viewportFit/zoomedRect'
 
@@ -25,7 +25,7 @@ describe('zoom 판 안 요소의 화면 좌표 사각형 (r242)', () => {
     })
   })
 
-  it('배율 1 이거나 배치 폭을 모르면(jsdom 0) 그대로', () => {
+  it('배율 1 이거나 배치 폭을 모르면(시험 DOM 0) 그대로', () => {
     expect(screenRectFrom({ left: 5, top: 6, width: 240, height: 320 }, 240, 1)).toEqual({ left: 5, top: 6, width: 240, height: 320 })
     expect(screenRectFrom({ left: 5, top: 6, width: 240, height: 320 }, 0, 2)).toEqual({ left: 5, top: 6, width: 240, height: 320 })
   })

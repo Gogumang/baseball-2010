@@ -1,4 +1,3 @@
-import { trackWeakCollectionForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { gameSceneTickNow, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
@@ -87,7 +86,3 @@ export function useSubstitutionScene(
 
 /** 다 그린 연출 — 화면이 다시 서도(수비 화면을 갔다 와도) 같은 연출을 두 번 안 그린다 */
 const seenSerials = new WeakSet<SubstitutionScene>()
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 상태 객체를 열쇠로 든 약한 표
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  trackWeakCollectionForSnapshot('useSubstitutionScene.seenSerials', seenSerials)
-}

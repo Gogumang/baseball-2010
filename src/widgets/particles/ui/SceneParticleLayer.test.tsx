@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -48,7 +48,7 @@ describe('SceneParticleLayer — 경기 장면 0x52c50 의 공용 창 게이트(
       return frames.length
     })
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
-    // jsdom 에는 캔버스가 없다 — 그리기는 `drawParticles` 를 막아 두었으니 칠하기만 받는다
+    // 시험 DOM 에는 캔버스가 없다 — 그리기는 `drawParticles` 를 막아 두었으니 칠하기만 받는다
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   })
   afterEach(() => {

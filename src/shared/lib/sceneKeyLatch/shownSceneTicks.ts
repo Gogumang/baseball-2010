@@ -80,7 +80,7 @@ const MAX_INPUT_AGE_MS = 1000
 
 /**
  * 키 · 누름 사건이 난 실제 시각(`performance.now()` 기준). `event.timeStamp` 는 주 스레드가 손잡이를 돌린 때가 아니라 사건이 난 때다.
- * 터치 버튼이 대신 쏜 사건은 붙여 둔 손가락 시각(`stampInputTime`). 시각 바탕이 다르거나(옛 브라우저 · jsdom 의 Date 시각) 앞뒤가 안 맞으면 지금 시각
+ * 터치 버튼이 대신 쏜 사건은 붙여 둔 손가락 시각(`stampInputTime`). 시각 바탕이 다르거나(옛 브라우저 · 시험 DOM 의 Date 시각) 앞뒤가 안 맞으면 지금 시각
  */
 export function inputTimeOf(event: Event | null | undefined, now: number = performance.now()): number {
   if (event === null || event === undefined) return now

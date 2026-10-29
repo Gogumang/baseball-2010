@@ -112,7 +112,7 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   const { r, g, b } = INTRO_BAND_RGB
   /**
    * 띠 · 막대 · 글씨 · 점수판을 배경 캔버스에 이어 그린다(Q-03 r301 — 흐려지는 동안 효과 1 이 배경 화면을 읽어 원본 식으로 섞는다).
-   * 배경이 없거나 그림을 다 받기 전(·jsdom)이면 아래 DOM 근사로 둔다
+   * 배경이 없거나 그림을 다 받기 전(· 시험 DOM)이면 아래 DOM 근사로 둔다
    */
   const canvasOverlay =
     backdrop === undefined
@@ -122,7 +122,7 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
           gameUiOrigins,
           textOrigins,
         )
-  /** DOM 근사 — 캔버스로 못 그릴 때(배경 없음 · 그림 받는 중 · jsdom) */
+  /** DOM 근사 — 캔버스로 못 그릴 때(배경 없음 · 그림 받는 중 · 시험 DOM) */
   const domLayers = (
     <>
       <div

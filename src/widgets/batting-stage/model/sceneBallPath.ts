@@ -1,4 +1,3 @@
-import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 import type { Pitch } from '@/entities/pitching/model/pitch'
 
 /**
@@ -23,14 +22,4 @@ export function sceneBallPathPitch(): Pitch | null {
 /** 장면 0x104 를 내렸다 — 다음 장면 객체는 0 채움으로 선다 */
 export function resetSceneBallPath(): void {
   lastPathPitch = null
-}
-
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 마지막 공 경로
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  registerSnapshotSlot('sceneBallPath', {
-    capture: () => lastPathPitch,
-    restore: (value) => {
-      lastPathPitch = value as Pitch | null
-    },
-  })
 }

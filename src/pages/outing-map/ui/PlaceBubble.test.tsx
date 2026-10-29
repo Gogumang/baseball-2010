@@ -1,9 +1,10 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { PlaceBubble } from '@/pages/outing-map/ui/PlaceBubble'
 import { OUTING_PLACES } from '@/shared/config/outingPlaces'
 import { MAP_TOP } from '@/pages/outing-map/ui/OutingMapScreen.css'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 /**
  * 장소 기능 말풍선 (0x7ee1a, F-2 2-7).
@@ -52,9 +53,10 @@ describe('장소 기능 말풍선', () => {
     띄우기()
     const [first, second] = screen.getAllByRole('button')
 
-    expect(first.style.color).toBe('rgb(255, 255, 0)')
-    expect(first.style.outline).toBe('1px solid #FFFF00')
-    expect(second.style.color).toBe('rgb(255, 255, 255)')
+    expect(cssColor(first.style.color)).toBe('rgb(255, 255, 0)')
+    // 테두리 글의 낱말 차례는 DOM 마다 다르다(happy-dom 은 적은 그대로) — 낱말로 본다
+    expect(first.style.outline.split(' ').sort()).toEqual(['#FFFF00', '1px', 'solid'])
+    expect(cssColor(second.style.color)).toBe('rgb(255, 255, 255)')
     expect(second.style.outline).toBe('')
   })
 
@@ -81,7 +83,7 @@ describe('장소 기능 말풍선', () => {
     띄우기({ onClose })
 
     fireEvent.keyDown(window, { key: 'ArrowDown' })
-    expect(screen.getAllByRole('button')[1].style.color).toBe('rgb(255, 255, 0)')
+    expect(cssColor(screen.getAllByRole('button')[1].style.color)).toBe('rgb(255, 255, 0)')
 
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()

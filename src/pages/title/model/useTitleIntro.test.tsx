@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, renderHook } from '@testing-library/react'
 import { useTitleIntro } from '@/pages/title/model/useTitleIntro'

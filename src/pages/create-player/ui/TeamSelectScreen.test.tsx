@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TeamSelectScreen } from '@/pages/create-player/ui/TeamSelectScreen'
@@ -137,7 +137,7 @@ describe('팀 고르기', () => {
   it('칸마다 파란 바탕 그림(slt_frame 0)을 깐다', () => {
     const { container } = 띄우기()
 
-    // jsdom 에는 canvas 도 vanilla-extract 도 없어 CSS 로는 못 본다 — src 로 센다
+    // 시험 DOM 에는 canvas 도 vanilla-extract 도 없어 CSS 로는 못 본다 — src 로 센다
     expect(container.querySelectorAll('img[src$="slt_frame/000.png"]')).toHaveLength(TEAM_COUNT)
   })
 

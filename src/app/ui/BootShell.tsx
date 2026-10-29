@@ -10,8 +10,6 @@ type AppComponent = ComponentType<{ readonly bootScreen?: Screen }>
 interface BootShellProps {
   /** 앱 덩이(`App` — 세션 훅 · 경기 엔진을 끌고 온다)를 받는다 */
   readonly loadApp: () => Promise<AppComponent>
-  /** 이미 받아 둔 앱 — 있으면 첫 틀부터 앱을 그린다 (개발 · e2e 장면 바로가기) */
-  readonly readyApp?: AppComponent
 }
 
 /** 받기가 실패하면(망 끊김) 이만큼 뒤에 다시 받는다 */
@@ -25,8 +23,8 @@ const RETRY_MS = 2000
  * 앱이 오기 전에 아무 키를 받았으면(갱신 0x245dc — 다음은 로고) 로고의 흰 바탕(0x68c18)만 깔고 기다렸다가 앱을 로고부터 세운다.
  * 이용안내에는 틱 · 난수 · 소리가 없다 — 깜빡이는 안내 줄만 앱으로 넘어갈 때 틱을 새로 센다.
  */
-export function BootShell({ loadApp, readyApp }: BootShellProps) {
-  const [app, setApp] = useState<{ readonly App: AppComponent } | null>(() => (readyApp === undefined ? null : { App: readyApp }))
+export function BootShell({ loadApp }: BootShellProps) {
+  const [app, setApp] = useState<{ readonly App: AppComponent } | null>(null)
   const [isNoticeDone, setNoticeDone] = useState(false)
 
   const isAppReady = app !== null

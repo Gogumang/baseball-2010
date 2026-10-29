@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
@@ -10,7 +10,7 @@ import { PressArea } from '@/shared/ui/PressArea/PressArea'
  */
 afterEach(cleanup)
 
-/** 사건 시각(`timeStamp`)을 정한 사건 — jsdom 은 사건 시각을 마음대로 못 준다 */
+/** 사건 시각(`timeStamp`)을 정한 사건 — 시험 DOM 은 사건 시각을 마음대로 못 준다 */
 const 시각 = (time: number) => (event: Event) => Object.defineProperty(event, 'timeStamp', { value: time })
 
 describe('PressArea — 누름 사건 시각', () => {

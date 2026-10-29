@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -208,7 +208,7 @@ describe('팀 경기 화면 — 인플레이 타구는 수비 화면으로 (상�
    * 사람이 던진 공이 인플레이 타구가 되면 **투구 단계 대신 수비 화면**이 뜬다.
    * 원본도 그 순간 경기 장면이 0x17 로 넘어가 공이 멈출 때까지 같은 루프를 돌며 키를 읽는다.
    *
-   * ⚠️ jsdom 에는 캔버스도 프레임 원점 JSON 도 없어 야수·공 그림은 확인할 수 없다 —
+   * ⚠️ 시험 DOM 에는 캔버스도 프레임 원점 JSON 도 없어 야수·공 그림은 확인할 수 없다 —
    * 구장 배경이 섰는지로 화면이 바뀐 것만 본다 (`DefensePlayback.test.tsx` 와 같은 한계).
    * 붙든 상태를 다시 푸는 쪽은 `useTeamGame.test.tsx` 가 본다.
    */

@@ -1,10 +1,11 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { StoryScreen } from '@/pages/story/ui/StoryScreen'
 import type { OriginalEvent } from '@/shared/config/original/eventTypes'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { createFractionRandom } from '@/shared/api/random/fractionRandom'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -365,7 +366,7 @@ describe('system 0 알림 · 예아니오 — 공용 창 0x74ef4 (0x8d288 · 0x8
     const 창 = screen.getByRole('dialog')
     expect(창.textContent).toContain('아이템')
     // 이벤트 장면은 [창+0x24f] = 0 — 떠 있는 그리기마다 검정 (5 + 1)/16 로 덮는다 (0x746cc)
-    expect(창.style.background).toBe('rgba(0, 0, 0, 0.375)')
+    expect(cssColor(창.style.background)).toBe('rgba(0, 0, 0, 0.375)')
     expect(
       within(창)
         .getAllByRole('button')
@@ -443,7 +444,7 @@ describe('StoryScreen — 명령 5 화면효과', () => {
 
     const 덮개 = screen.getByTestId('screen-effect-cover')
     expect(덮개.style.opacity).toBe('1')
-    expect(덮개.style.background).toContain('0, 0, 0')
+    expect(cssColor(덮개.style.background)).toContain('0, 0, 0')
   })
 })
 
@@ -587,7 +588,7 @@ describe('say 대사 상자 — 0x7fbc4 · 0x7fad0 · 키 0x8b804', () => {
     띄우기([{ op: 'say', text: '좋아', speaker: 2, format: 0, portraits: [] }])
     틀(200)
     expect(대사글()).toContain('[감독] : 좋아')
-    const 이름 = [...글줄()[0].querySelectorAll('span')].filter((span) => span.style.color === 'rgb(0, 204, 0)')
+    const 이름 = [...글줄()[0].querySelectorAll('span')].filter((span) => cssColor(span.style.color) === 'rgb(0, 204, 0)')
     expect(이름.map((span) => span.textContent).join('')).toBe('감독')
   })
 
@@ -672,7 +673,7 @@ describe('초상화 바닥 y · 효과 칠 — 0x7fbc4 끝 0x7fdee · 대화창 
     expect(대사글()).toBe('앞')
     // 프레임 9 가 '끝'(+0x10 = 2) 그리기 — 칠 · 252 · 상자 높이 0(0x7f7cc)
     틀(6)
-    expect(칠()?.style.background).toContain('0, 0, 0')
+    expect(cssColor(칠()?.style.background)).toContain('0, 0, 0')
     expect(초상화판().style.bottom).toBe('68px')
     expect(Number(본체높이())).toBeLessThan(55)
     // 그다음 틀부터 뒤 say — 상자가 다시 올라 글을 처음부터 찍는다

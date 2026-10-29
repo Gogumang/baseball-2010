@@ -4,7 +4,7 @@ import { createWebAudioSound } from '@/shared/api/audio/webAudioSound'
 
 /**
  * 소리 포트. 원본 사운드 객체(0x6ea6c/0x6e438/0x6eaf0/0x6e4d0)의 규칙을 지키는지 본다.
- * jsdom·node 에는 AudioContext 가 없으므로 "없어도 안 터진다" 가 첫 번째 조건이다.
+ * 시험 DOM·node 에는 AudioContext 가 없으므로 "없어도 안 터진다" 가 첫 번째 조건이다.
  */
 
 interface StartedSound {

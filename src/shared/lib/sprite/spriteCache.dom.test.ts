@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isSpriteImageRequested, loadSpriteImage, resetSpriteCacheForTest, retainDisplayedSprites } from '@/shared/lib/sprite/spriteCache'
 import { spriteMaskImage, spriteMaskSrc } from '@/shared/lib/sprite/spriteMask'

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -129,7 +129,7 @@ const 그림 = (at: number) =>
     for (const callback of pending) callback(at)
   })
 
-/** 손가락 사건 — 사건 시각(`timeStamp`)을 `pressedAt` 으로. jsdom 에는 PointerEvent 가 없어 MouseEvent 로 흉내 낸다 */
+/** 손가락 사건 — 사건 시각(`timeStamp`)을 `pressedAt` 으로. 시험 DOM 에는 PointerEvent 가 없어 MouseEvent 로 흉내 낸다 */
 const 누름 = (target: Element, pressedAt: number) => {
   const event = new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 })
   Object.defineProperty(event, 'timeStamp', { value: pressedAt })

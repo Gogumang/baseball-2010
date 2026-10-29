@@ -45,7 +45,6 @@ import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/mod
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
 import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
-import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
 interface MissionPlayScreenProps {
@@ -360,24 +359,6 @@ export function MissionPlayScreen({
   }, [isMenuOpen, isOver, onSteal, overlay, stealableBases, pressStar])
 
   // 경기 중 메뉴의 "설정"(0x3c326). "조작방법"(0x3c212)은 아래에서 경기 장면 위에 얹는다
-  // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
-  const peekPitchSlotPicker = false
-  const peekResultShown = isOver
-  useEffect(() => {
-    if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
-    publishScenePeek('mission', {
-      side: '타자',
-      isAwaitingConfirm,
-      isPitchSlotPickerShown: peekPitchSlotPicker,
-      isResultShown: peekResultShown,
-    })
-  }, [isAwaitingConfirm, peekPitchSlotPicker, peekResultShown])
-  useEffect(
-    () => () => {
-      if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('mission', null)
-    },
-    [],
-  )
 
   if (overlay === '설정' && settings !== undefined && onSettingsChange !== undefined) {
     return (

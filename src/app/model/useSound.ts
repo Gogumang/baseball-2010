@@ -15,7 +15,7 @@ const VOLUME_PER_LEVEL = 25
  * (`createWebAudioSound` 는 만들 때 `AudioContext` 를 열지 않는다) 첫 입력 뒤부터 울린다.
  * 원본도 타이틀에서 아무 키나 누른 뒤에야 메인메뉴 배경음(1)이 나오므로 결과가 같다.
  *
- * `AudioContext` 가 없는 환경(jsdom·오래된 브라우저)에서는 조용한 포트로 떨어진다.
+ * `AudioContext` 가 없는 환경(시험 DOM·오래된 브라우저)에서는 조용한 포트로 떨어진다.
  */
 export function useSound(soundLevel: number): SoundPort {
   const sound = useMemo<SoundPort>(() => {

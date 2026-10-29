@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createLocalStorageSaveGame } from '@/shared/api/save/localStorageSaveGame'
 import { createCareer } from '@/entities/career/model/playerCareer'

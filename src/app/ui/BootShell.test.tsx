@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { Screen } from '@/app/model/screen'
@@ -41,10 +41,5 @@ describe('BootShell — 앱 덩이를 받는 동안 이용안내', () => {
       app.resolve()
     })
     expect(screen.getByTestId('앱').textContent).toBe('로고')
-  })
-
-  it('받아 둔 앱이 있으면 첫 그림부터 앱이다 (개발 · e2e 바로가기)', () => {
-    render(<BootShell loadApp={() => Promise.reject(new Error('부르면 안 된다'))} readyApp={FakeApp} />)
-    expect(screen.getByTestId('앱').textContent).toBe('이용안내')
   })
 })

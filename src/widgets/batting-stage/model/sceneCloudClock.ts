@@ -1,4 +1,3 @@
-import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 import { gameSceneBackdropFreezeSerialNow, gameSceneTickOf, gameSceneTimeOf } from '@/shared/lib/commonWindow/commonWindow'
 import { SCENE_STATE, sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { LOADING_CLOUD_CALLS } from '@/widgets/batting-stage/lib/stageScenery'
@@ -157,28 +156,4 @@ export function resetSceneCloudClock(): void {
   countedThrough = null
   countingSpans.clear()
   scoreboardOrigin = null
-}
-
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 구름 · 전광판 셈
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  registerSnapshotSlot('sceneCloudClock', {
-    capture: () => ({
-      calls,
-      lastFrame,
-      countedThrough,
-      countingSpans: [...countingSpans].map(([, frame]) => frame),
-      scoreboardOrigin,
-      scoreboardOriginFreezes,
-    }),
-    restore: (value) => {
-      const saved = value as { countingSpans: number[] } & Record<string, unknown>
-      ;({ calls, lastFrame, countedThrough, scoreboardOrigin, scoreboardOriginFreezes } = saved as never)
-      // 덮개 셈 번호는 그 덮개 effect 가 쥔다 — 되살린 덮개가 지금 쥔 번호(단 차례)에 뜬 시작 그림을 차례로 넣는다
-      const live = [...countingSpans.keys()]
-      live.forEach((id, index) => {
-        const frame = saved.countingSpans[index]
-        if (frame !== undefined) countingSpans.set(id, frame)
-      })
-    },
-  })
 }

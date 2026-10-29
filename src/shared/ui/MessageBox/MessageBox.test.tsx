@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
@@ -100,7 +100,7 @@ describe('메시지 상자 버튼 — popup.pzx 프레임', () => {
 
 /**
  * 열림·닫힘 애니메이션 (F-1 1-4 확정).
- * jsdom 은 레이아웃이 없어 `offsetHeight` 가 0 이다 — 그때는 애니메이션을 건너뛰고
+ * 시험 DOM 은 레이아웃이 없어 `offsetHeight` 가 0 이다 — 그때는 애니메이션을 건너뛰고
  * 답을 그 자리에서 넘긴다(기존 호출 계약). 아래 두 묶음은 높이를 흉내 내 애니메이션을 켠다.
  */
 const 상자 = () => document.querySelector('[role="dialog"] > div') as HTMLElement

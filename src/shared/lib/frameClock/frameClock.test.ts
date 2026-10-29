@@ -1,13 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SPEED_LEVEL, setGameSpeedLevel } from '@/shared/config/frameRate'
-import {
-  appTickNow,
-  appTickOf,
-  appTickStartTime,
-  createTickClock,
-  rebaseAppTickForDev,
-  resetAppTickClockForTest,
-} from '@/shared/lib/frameClock/frameClock'
+import { appTickNow, appTickOf, appTickStartTime, createTickClock, resetAppTickClockForTest } from '@/shared/lib/frameClock/frameClock'
 
 describe('틱 시계 — 시각을 틀 길이(millisecondsPerFrame) 격자의 정수 틱으로', () => {
   afterEach(() => {
@@ -54,19 +47,5 @@ describe('틱 시계 — 시각을 틀 길이(millisecondsPerFrame) 격자의 �
     expect(appTickNow()).toBe(2)
     expect(appTickOf(130)).toBe(2)
     expect(appTickStartTime(2)).toBe(124)
-  })
-})
-
-describe('rebaseAppTickForDev — 경기 중간 스냅샷이 뜬 틱을 되살린다 (개발 · e2e 전용, r329)', () => {
-  afterEach(() => {
-    resetAppTickClockForTest()
-  })
-
-  it('준 시각이 그 틱의 머리가 되고, 그 뒤로는 틀 길이 격자로 센다', () => {
-    rebaseAppTickForDev(876, 10_000)
-    expect(appTickOf(10_000)).toBe(876)
-    expect(appTickOf(10_061)).toBe(876)
-    expect(appTickOf(10_062)).toBe(877)
-    expect(appTickStartTime(880)).toBe(10_000 + 4 * 62)
   })
 })

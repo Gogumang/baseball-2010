@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'
@@ -6,7 +6,7 @@ import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 beforeEach(() => {
   vi.useFakeTimers()
-  // jsdom 은 캔버스 그리기가 없다 — 컷인은 그림 칸만 본다
+  // 시험 DOM 은 캔버스 그리기가 없다 — 컷인은 그림 칸만 본다
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 })
 afterEach(() => {

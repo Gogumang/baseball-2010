@@ -17,8 +17,6 @@ export interface TickClock {
   readonly startTimeOf: (tick: number) => number
   /** 기준점을 처음으로 되돌린다(시험용) */
   readonly reset: () => void
-  /** 시각 `time` 이 틱 `tick` 의 머리가 되게 기준점을 옮긴다 — 개발 · e2e 의 경기 중간 스냅샷이 틱을 되살린다(배포 빌드에는 없다) */
-  readonly rebaseAppTick?: (time: number, tick: number) => void
 }
 
 export function createTickClock(): TickClock {
@@ -42,13 +40,6 @@ export function createTickClock(): TickClock {
     reset: () => {
       anchor = { time: 0, tick: 0, length: millisecondsPerFrame() }
     },
-    ...(import.meta.env.DEV || import.meta.env.MODE === 'e2e'
-      ? {
-          rebaseAppTick: (time: number, tick: number) => {
-            anchor = { time, tick, length: millisecondsPerFrame() }
-          },
-        }
-      : {}),
   }
 }
 
@@ -77,14 +68,6 @@ export function appTickNow(): number {
 /** 앱 틱 `tick` 이 시작하는 실제 시각 */
 export function appTickStartTime(tick: number): number {
   return appClock.startTimeOf(tick)
-}
-
-/**
- * 개발 · e2e 전용 — 시각 `time` 이 앱 틱 `tick` 의 머리가 되게 한다. 경기 중간 스냅샷(`app/dev/sessionSnapshot`)이 뜬 순간의 틱을
- * 되살린다(되살리는 동안 틀마다 불러 틱을 세워 둔다). 배포 앱은 부르지 않는다
- */
-export function rebaseAppTickForDev(tick: number, time: number = performance.now()): void {
-  appClock.rebaseAppTick?.(time, tick)
 }
 
 /** 시험용 — 앱 틱 기준점을 되돌린다 */

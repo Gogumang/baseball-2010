@@ -39,7 +39,7 @@ describe('versionOfCacheName · missingPacks', () => {
 
 describe('runAssetPackGate', () => {
   it('시험에서는 건너뛴다', async () => {
-    await expect(runAssetPackGate({ isShortcut: false })).resolves.toBe('skipped')
+    await expect(runAssetPackGate()).resolves.toBe('skipped')
   })
 })
 

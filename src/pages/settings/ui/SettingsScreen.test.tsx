@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
@@ -24,6 +24,7 @@ import {
   rowTopOf,
 } from '@/pages/settings/lib/settingsLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 /**
  * 환경설정 창 (공용 페이지 0x593c8 종류 8 — P6 5절).
@@ -117,7 +118,7 @@ describe('소리 막대·속도 꺾쇠 (0x59a14 · 0x59b9c)', () => {
     expect(screen.getAllByText('OFF')).toHaveLength(2)
     expect(screen.getByTestId('설정아이콘-2').getAttribute('src')).toContain('/092.png')
     expect(screen.getByTestId('진동값테두리').style.left).toBe(`${PANEL.x + 99 + 39}px`)
-    expect(screen.getByText('ON').style.color).toBe('rgb(255, 255, 255)')
+    expect(cssColor(screen.getByText('ON').style.color)).toBe('rgb(255, 255, 255)')
   })
 })
 
@@ -438,8 +439,8 @@ describe('환경설정 → 상세 설정 (원본 페이지 32, 네 줄)', () => 
   it('지금 값만 흰색이고 아닌 칸은 #7B93D4 다 — 기본값 투구는 [74] 기본이다', () => {
     상세열기()
 
-    expect(screen.getByText('기본').style.color).toBe('rgb(255, 255, 255)')
-    expect(screen.getByText('게이지').style.color).toBe('rgb(123, 147, 212)')
+    expect(cssColor(screen.getByText('기본').style.color)).toBe('rgb(255, 255, 255)')
+    expect(cssColor(screen.getByText('게이지').style.color)).toBe('rgb(123, 147, 212)')
   })
 
   it('줄을 누르면 값이 뒤집힌다 (갱신 0x288ac 의 `eor #1`)', () => {

@@ -1,7 +1,8 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 afterEach(cleanup)
 
@@ -14,7 +15,7 @@ describe('ScoreboardFrame — 0x41440', () => {
     expect([logo.style.left, logo.style.top]).toEqual(['148px', '119px'])
     const plate = screen.getByTestId('점수판-이름칸-0').children
     expect(plate).toHaveLength(2)
-    expect((plate[0] as HTMLElement).style.background).toBe('rgb(36, 54, 119)')
+    expect(cssColor((plate[0] as HTMLElement).style.background)).toBe('rgb(36, 54, 119)')
   })
 
   it('효과 1 · 인자 0 이면 그림은 안 그리고 칠만 남는다 (인트로 끝)', () => {

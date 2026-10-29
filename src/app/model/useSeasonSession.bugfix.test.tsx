@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useSeasonSession } from '@/app/model/useSeasonSession'

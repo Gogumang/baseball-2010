@@ -24,7 +24,7 @@ export function screenRectFrom(rect: ScreenRect, layoutWidth: number, zoom: numb
   return { left: rect.left * zoom, top: rect.top * zoom, width: rect.width * zoom, height: rect.height * zoom }
 }
 
-/** 요소와 조상들의 CSS `zoom` 곱 — 지원 안 하는 환경(jsdom)은 1 */
+/** 요소와 조상들의 CSS `zoom` 곱 — 지원 안 하는 환경(시험 DOM)은 1 */
 export function zoomProductOf(element: Element): number {
   let product = 1
   for (let node: Element | null = element; node !== null; node = node.parentElement) {

@@ -1,4 +1,3 @@
-import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { ReactNode } from 'react'
@@ -883,92 +882,7 @@ export function PitcherSideStage(props: PitcherSideStageProps) {
       handle = requestAnimationFrame(frame)
     }
     handle = requestAnimationFrame(frame)
-    // 개발 · e2e 전용 — 경기 중간 스냅샷(`app/dev/sessionSnapshot`)이 이 루프의 변수를 읽고 되살린다(타자편 `useStageAnimation` 과 같은 꼴).
-    // 없으면 되살린 쪽 루프가 새로 선 값(스킬 판 돌림의 마지막 틱 따위)으로 이어 세 판이 한 틱 갈린다(r355). 배포 빌드에서는 빠진다.
-    // ⚠️ 이 루프에 상태 변수(let)를 더하면 여기에도 더한다 — 빠지면 `pnpm e2e:snapshot verify` 가 다름을 찾는다
-    let releaseSnapshotSlot = () => {}
-    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-      releaseSnapshotSlot = registerSnapshotSlot('pitcherSideStage', {
-        capture: () => ({
-          shownPitch,
-          releaseTick,
-          shownSwing,
-          shownMistake,
-          pausedSinceTick,
-          wasPaused,
-          markedStateEntries,
-          seenIdlePress,
-          idleStartTick,
-          idleEndTick,
-          frozenTicks,
-          frozenSinceTick,
-          lastStageScene,
-          redrawTicks,
-          hitFrozenDraws,
-          skillPanelStateFSerial,
-          wasSkillPanelStateF,
-          seenSceneDEntryMark,
-          shownHit,
-          hitSparkShot,
-          hitStopShot,
-          hitEndNotified,
-          hitGroundEmittedTick,
-          hitSkipOffered,
-          hitSpecialEffect,
-          magicEmittedTick,
-          strikeoutShot,
-          hitSkipTick,
-          keyHitTick,
-          cloudCursor,
-          // 스킬 판 재료는 함수(`situation`)와 장면 칸 ref 를 쥐어 새로 선 쪽 것을 쓰고 값 칸만 옮긴다
-          lastSkillPanelFrame: lastSkillPanelFrame === null ? null : { ...lastSkillPanelFrame, source: null, situation: null },
-          frozenDrawGate: frozenDrawGate.devSnapshot?.capture(),
-          skillPanel: stepSkillPanel.devSnapshot?.capture(),
-        }),
-        restore: (value, shiftMs) => {
-          const saved = value as Record<string, unknown>
-          ;({
-            shownPitch,
-            releaseTick,
-            shownSwing,
-            shownMistake,
-            pausedSinceTick,
-            wasPaused,
-            markedStateEntries,
-            seenIdlePress,
-            idleStartTick,
-            idleEndTick,
-            frozenTicks,
-            frozenSinceTick,
-            lastStageScene,
-            redrawTicks,
-            hitFrozenDraws,
-            skillPanelStateFSerial,
-            wasSkillPanelStateF,
-            seenSceneDEntryMark,
-            shownHit,
-            hitSparkShot,
-            hitStopShot,
-            hitEndNotified,
-            hitGroundEmittedTick,
-            hitSkipOffered,
-            hitSpecialEffect,
-            magicEmittedTick,
-            strikeoutShot,
-            hitSkipTick,
-            keyHitTick,
-          } = saved as never)
-          const live = lastSkillPanelFrame
-          const savedFrame = saved.lastSkillPanelFrame as SkillPanelFrame | null
-          lastSkillPanelFrame = savedFrame === null || live === null ? null : { ...savedFrame, source: live.source, situation: live.situation }
-          Object.assign(cloudCursor, saved.cloudCursor)
-          frozenDrawGate.devSnapshot?.restore(saved.frozenDrawGate, shiftMs)
-          stepSkillPanel.devSnapshot?.restore(saved.skillPanel, shiftMs)
-        },
-      })
-    }
     return () => {
-      releaseSnapshotSlot()
       isDisposed = true
       cancelAnimationFrame(handle)
       gameSceneShownTicks.clear()

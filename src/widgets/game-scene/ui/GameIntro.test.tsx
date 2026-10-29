@@ -1,8 +1,9 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { GameIntro } from '@/widgets/game-scene/ui/GameIntro'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 afterEach(() => {
   cleanup()
@@ -16,7 +17,7 @@ describe('경기 시작 인트로 그리기 (0x417ac)', () => {
     expect(band.style.top).toBe('55px')
     expect(band.style.height).toBe('30px')
     expect(band.style.width).toBe('240px')
-    expect(band.style.background).toBe('rgba(48, 78, 162, 0.667)')
+    expect(cssColor(band.style.background)).toBe('rgba(48, 78, 162, 0.667)')
     expect(band.style.opacity).toBe('')
     expect(screen.getByTestId('인트로-팀이름').dataset.frame).toBe(String(0x41 + 2))
   })

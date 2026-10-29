@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { safeJsonParse } from '@/shared/lib/safe/safeJson'
 import { safeLocalStorage } from '@/shared/lib/safe/safeStorage'

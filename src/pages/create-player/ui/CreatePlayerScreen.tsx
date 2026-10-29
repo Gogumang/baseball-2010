@@ -329,7 +329,7 @@ export function CreatePlayerScreen({ teamId = DEFAULT_TEAM_ID, gamePoint = 0, on
  *
  * `FrameSprite` 를 못 쓰고 `<img>` 를 직접 놓는 이유: 칠한 그림은 데이터 URL 이라 `src` 를 갈아야 하는데
  * `FrameSprite` 는 폴더·프레임으로 `src` 를 스스로 만든다. 자리 계산은 `FrameSprite` 와 같다.
- * ⚠️ 캔버스가 없으면(테스트의 jsdom) `useRecoloredSprite` 가 조용히 구운 그림을 그대로 내보낸다.
+ * ⚠️ 캔버스가 없으면(시험 DOM) `useRecoloredSprite` 가 조용히 구운 그림을 그대로 내보낸다.
  */
 function LayerSprite({ layer, skinIndex, teamIndex }: { readonly layer: BatterLayer; readonly skinIndex: number; readonly teamIndex: number }) {
   const origins = useFrameOrigins(layer.folder)

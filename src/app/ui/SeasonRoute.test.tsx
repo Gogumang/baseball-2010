@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { useEffect } from 'react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,7 @@ import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import type { Collection, HallOfFamePitcher, HallOfFamer } from '@/entities/collection/model/collection'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
 vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
@@ -508,7 +509,7 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
     expect(saved.state.record.money).toBe(10)
     expect(saved.roster.pitchers.some((player) => player.equipment?.[0] === 1)).toBe(true)
     // 낀 칸은 mode_ui 44 막대 위 (0xce, 0xc7, 0xbd) 글
-    expect(screen.getByRole('button', { name: '나이스 모자' }).style.color).toBe('rgb(206, 199, 189)')
+    expect(cssColor(screen.getByRole('button', { name: '나이스 모자' }).style.color)).toBe('rgb(206, 199, 189)')
 
     키('Enter') // 같은 칸을 다시 — 지금 낀 것
     expect(알림글()).toContain('이미 가지고 있는')

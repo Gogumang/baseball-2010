@@ -1,4 +1,3 @@
-import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 /**
  * **경기 장면 상태가 선 장면 틱** — 원본 상태 객체(장면+0x18)의 상태 [장면+0x1c] 와 그 상태 틱 [장면+0x2c] 의 0 점.
  *
@@ -84,14 +83,4 @@ export function lastSceneStateEntry(): SceneStateEntry | null {
 /** 경기 장면 객체가 사라진다(0x332b8) — 다음 장면은 새 상태 객체로 선다 */
 export function resetSceneStateEntries(): void {
   entries = []
-}
-
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 장면 상태 칸
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  registerSnapshotSlot('sceneStateEntries', {
-    capture: () => entries,
-    restore: (value) => {
-      entries = value as SceneStateEntry[]
-    },
-  })
 }

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { MatchInfoStadiumBackdrop, TARGET_CONTEXT_OPTIONS } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'

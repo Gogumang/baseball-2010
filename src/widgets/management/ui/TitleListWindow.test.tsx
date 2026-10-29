@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TitleListWindow } from '@/widgets/management/ui/TitleListWindow'
@@ -13,6 +13,7 @@ import {
   titleNumberLeftOf,
   titleScrollBarRectsOf,
 } from '@/widgets/management/lib/titleListLayout'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 /** 칭호 목록 창 0x198fc — mode_ui 프레임 63 박스 · 줄 막대 64/65 */
 
@@ -35,7 +36,7 @@ describe('칭호 목록 창 0x198fc', () => {
     expect(screen.getByTestId('칭호-막대-8-64').style.top).toBe(`${79 + TITLE_ROW_STEP * 8}px`)
     expect(screen.getByTestId('칭호-막대-1-65')).toBeTruthy()
     expect(screen.queryByTestId('칭호-막대-0-65')).toBeNull()
-    expect(screen.getByText(TITLE_NAMES[3]).style.color).toBe('rgb(0, 0, 0)')
+    expect(cssColor(screen.getByText(TITLE_NAMES[3]).style.color)).toBe('rgb(0, 0, 0)')
     expect(screen.getByText(TITLE_NAMES[0]).style.left).toBe(`${TITLE_LIST_BOXES.name.x}px`)
   })
 
