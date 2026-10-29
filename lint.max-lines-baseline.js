@@ -39,7 +39,6 @@ export const maxLinesBaseline = [
   'src/pages/mission-play/ui/MissionHud.tsx',
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
-  'src/pages/nari-record-room/lib/nariRecordRoom.ts',
   'src/pages/nari-record-room/ui/NariRecordRoom.tsx',
   'src/pages/nari-record-room/ui/RankingBoard.tsx',
   'src/pages/national-cup/ui/NationalCupScreen.tsx',
