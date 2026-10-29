@@ -112,7 +112,6 @@ export const readabilityBaseline = [
   'src/entities/story/model/eventReward.ts',
   'src/entities/story/model/rewardNotice.ts',
   'src/entities/story/model/screenEffect.ts',
-  'src/entities/story/model/storyScene.ts',
   'src/entities/team/model/recordAbility.ts',
   'src/features/defense-play/model/ballParticleFacts.ts',
   'src/features/defense-play/model/diveCheck.ts',

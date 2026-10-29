@@ -176,7 +176,7 @@ export const crossSliceBaseline = [
   'src/entities/story/model/eventReward.ts',
   'src/entities/story/model/rewardNotice.ts',
   'src/entities/story/model/skillCondition.ts',
-  'src/entities/story/model/storyScene.ts',
+  'src/entities/story/model/storyScene/otherSlices.ts',
   'src/entities/team/model/recordAbility.ts',
   'src/entities/team/model/teamRoster.ts',
   'src/features/play-game/model/batterHitRateHarness.ts',
