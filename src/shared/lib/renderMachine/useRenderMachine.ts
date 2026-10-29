@@ -9,6 +9,7 @@ import { useRef } from 'react'
  * 곁일 — 깜빡임 셈 따위 — 이 두 번 난다). 그래서 이 훅 하나만 그리는 중 ref 를 읽고 쓰고, 부르는 쪽은 `advance` 를 순수 함수로 둔다.
  *
  * `advance` 는 같은 (앞 상태, 입력)에 같은 값을 내야 한다(난수 · 저장 금지). 바뀔 것이 없으면 앞 상태를 그대로 돌려준다.
+ * 상태가 쥔 덩이(자식 화면과 같이 쓰는 커서 칸 따위)는 그 자리에서 고쳐도 된다 — 옛 꼴이 그리는 중에 고치던 그대로다.
  */
 export function useRenderMachine<S, I>(advance: (previous: S | null, input: I) => S, input: I): S {
   const state = useRef<S | null>(null)

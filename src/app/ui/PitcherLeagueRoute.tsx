@@ -2,7 +2,7 @@ import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
 import { PitcherCreateFlow } from '@/pages/pitcher-league/ui/PitcherCreateFlow'
 import { nariGameRecordOf } from '@/entities/career/model/nariCupTeams'
 import { nariRecordFieldersOf } from '@/entities/career/model/nariTeamRecord'
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { castOfTeamRecordEquipment, stageSpritePreloadsOf } from '@/app/model/gameSpritePreload'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { PitcherManagementScreen } from '@/pages/pitcher-league/ui/PitcherManagementScreen'
@@ -10,7 +10,9 @@ import { PitcherEventUnderlay } from '@/pages/pitcher-league/ui/PitcherEventUnde
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
 import { PitcherResumeManagementFrame } from '@/pages/pitcher-league/ui/PitcherResumeManagementFrame'
-import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
+import { nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
+import { useNariMainCursor } from '@/app/model/useNariMainCursor'
+import { usePreviousDistinct } from '@/shared/lib/renderMachine/usePreviousDistinct'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
@@ -130,9 +132,7 @@ export function PitcherLeagueRoute(props: PitcherLeagueRouteProps) {
 function PitcherLeagueScreens({ session, random, openedHiddenIds = [], gameSettings, onExit, renderAceMatch, hallOfFame }: PitcherLeagueRouteProps) {
   const { career, scene, gameOptions, shopTab, shopNotice, shopGpDetail, actions } = session
   /** 이전 장면 — 105 진입 0x11910 이 이전 상태 1 · 114 · 100 이면 가운데 판을 미끄러뜨린다 (0x8a2d8) */
-  const sceneTrail = useRef<{ readonly scene: string; readonly previous: string | null }>({ scene, previous: null })
-  if (sceneTrail.current.scene !== scene) sceneTrail.current = { scene, previous: sceneTrail.current.scene }
-  const previousScene = sceneTrail.current.previous
+  const previousScene = usePreviousDistinct<string>(scene)
   /**
    * 관리 메뉴 [this+0x8c] 의 커서 — 타자편 `CareerRoutes` 와 같다(`NariMainMenuCursor`). 105 에 들어올 때마다(관리 장면, 또는
    * 105 진입 곁가지로 바로 뜬 '관리' 이벤트) 0x11910 규칙: 행동함이고 이전이 109 · 110 이 아니면 첫 칸. 상점(111 · 121)에서
@@ -143,11 +143,7 @@ function PitcherLeagueScreens({ session, random, openedHiddenIds = [], gameSetti
    * 머리띠 미끄러짐 · 배너 연출을 켠다 (`pages/management/lib/matchInfoEntry`).
    */
   const matchView = scene === '경기준비' ? (session.entryView === null ? '142' : '143') : null
-  const matchViewTrail = useRef<{ readonly view: string | null; readonly previous: string | null }>({ view: matchView, previous: null })
-  if (matchViewTrail.current.view !== matchView) matchViewTrail.current = { view: matchView, previous: matchViewTrail.current.view }
-  const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '143'
-  const mainCursor = useRef(createNariMainMenuCursor()).current
-  const entryTrail = useRef<string | null>(null)
+  const isMatchInfoEntryAnimated = usePreviousDistinct(matchView) !== '143'
   const entryKey =
     career === null
       ? null
@@ -156,16 +152,14 @@ function PitcherLeagueScreens({ session, random, openedHiddenIds = [], gameSetti
         : scene === '이벤트' && session.story?.context === '관리'
           ? `이벤트:${session.story.eventId}`
           : null
-  if (entryKey !== entryTrail.current) {
-    const isFromManagementFrame = scene === '이벤트' && entryTrail.current === '관리'
-    if (career !== null && entryKey !== null && !isFromManagementFrame) {
-      // 이벤트 → 관리 · 이벤트 → 이벤트는 이전 114 다
-      const isFromStandings = entryTrail.current === null && previousScene === '다음경기순위'
-      const isSubMenuReturn = entryTrail.current === null && previousScene === '상점'
-      if (!isSubMenuReturn) mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, isFromStandings)
-    }
-    entryTrail.current = entryKey
-  }
+  // 열쇠가 있으면 커리어가 있다(커리어가 없으면 열쇠는 null)
+  const mainCursor = useNariMainCursor({
+    entryKey,
+    isEventScreen: scene === '이벤트',
+    previous: previousScene,
+    subMenuScreen: '상점',
+    hasActedThisCycle: career?.hasActedThisCycle ?? false,
+  })
   /** 114 재생이 끝난 한 틀 — 대화창 없이 0x19da4 를 그린 뒤 넘긴다 (`useEventEndFrame`) */
   const eventEnd = useEventEndFrame(actions.completeStory)
 
