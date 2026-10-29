@@ -116,7 +116,6 @@ export const maxLinesBaseline = [
   'src/pages/shop/ui/EquipmentWindow.tsx',
   'src/pages/shop/ui/ShopScreen.tsx',
   'src/pages/shop/ui/ShopWindow.tsx',
-  'src/pages/special/lib/hallOfFameFigure.ts',
   'src/pages/special/ui/SkinBackdrops.tsx',
   'src/pages/story/lib/eventDialogue.ts',
   'src/pages/story/lib/yearGoalWindow.ts',
