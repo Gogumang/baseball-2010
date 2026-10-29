@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
 import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
 import type { ReactNode } from 'react'
@@ -7,7 +7,6 @@ import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
-import { ACE_PLAYERS } from '@/shared/config/original/acePlayers'
 import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
 import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/lib/aceOpenState'
 import { ACE_LEVEL_UP_TEXT, aceLevelOf, aceRecordAbilityAtLevel, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
@@ -33,6 +32,7 @@ import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBou
 import { noteSkinShakeDirection, noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { acePlayerOfCell } from '@/pages/general-mode/lib/aceSelectCells'
 
 const SLT_IMAGE = assetUrl('./sprites/slt_frame')
 /** [skin+0xac] — 격자 칸 그림 (0~9 마선수 얼굴 · 10 "?") */
@@ -51,15 +51,6 @@ const imageSrc = (folder: string, index: number) => `${folder}/${String(index).p
 
 /** 잠긴 칸 글 — slt_frame 이미지 114 "LOCK" 을 대신하는 읽기용 이름 */
 const LOCK_LABEL = 'LOCK'
-
-/**
- * 웹판 `ACE_PLAYERS` 는 **마타자 0~4 · 마투수 5~9** 순서다. 화면 격자는 **윗줄 마투수 · 아랫줄 마타자**라
- * 칸 번호를 이렇게 갈아 준다.
- */
-export function acePlayerOfCell(cell: number) {
-  const index = aceIndexOfCell(cell)
-  return aceRoleOfCell(cell) === ACE_PHASE.마투수 ? ACE_PLAYERS[ACE_PER_ROLE + index] : ACE_PLAYERS[index]
-}
 
 export interface AceSelectScreenProps {
   /** 하위 단계 `[skin+0xd0]` — 마투수를 먼저 고른다 */
@@ -228,12 +219,11 @@ export function AceSelectScreen({
   // 커서 칸 그리기 0x7b3a0 은 열림 애니가 끝났고([격자+9]) 깜빡임이 켜졌을 때만 돈다(0x7b3a2 · 0x7b3c6)
   const isGridCursorOn = gridOpen !== null && gridOpen.state.isDone && isAceGridCursorOn(gridOpen.blink)
 
-  const onAllAcesOpenRef = useRef(onAllAcesOpen)
-  onAllAcesOpenRef.current = onAllAcesOpen
+  const allAcesOpen = useEffectEvent(() => onAllAcesOpen?.())
   // 0x7b408 은 커서 칸 그리기(종류 7) 안이라 커서가 그려지는 그림에서만 돈다
   const isEveryAceOpenSeen = isEveryAceOpen && isGridCursorOn
   useEffect(() => {
-    if (isEveryAceOpenSeen) onAllAcesOpenRef.current?.()
+    if (isEveryAceOpenSeen) allAcesOpen()
   }, [isEveryAceOpenSeen])
 
   const isCellOpen = (cell: number) =>

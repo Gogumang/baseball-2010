@@ -22,6 +22,7 @@ import type { FirstBatPhase } from '@/pages/general-mode/lib/generalModeSetup'
 import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { firstBatStadiumKeyActionOf } from '@/pages/general-mode/lib/firstBatStadiumKeys'
 
 const SLT_IMAGE = assetUrl('./sprites/slt_frame')
 const GAME_UI_FRAME = assetUrl('./sprites/game_ui/frames')
@@ -73,38 +74,6 @@ const GRID_NUMERIC_DIRECTIONS: Readonly<Record<string, 'left' | 'right' | 'up' |
   6: 'right',
   2: 'up',
   8: 'down',
-}
-
-/** 키 0x2896c 가 하는 일 — 'none' 은 아무것도 안 한다 */
-export type FirstBatStadiumKeyAction = 'flip' | 'previous' | 'next' | 'ok' | 'back' | 'none'
-
-/**
- * 키 0x2896c 의 두 갈래 (Q-14, 직접 떴다 — R4 3a 표와 같다):
- * ```
- * 단계 0 날 키 [장면+0x40] (289ca~289f6)
- *   ← −3 · → −4 · '4' · '6'      → 289f8  선공 커서 skin+0x74 뒤집기
- *   ↓ −2 · OK −5 · '5' · '8'      → 28a12  rec+8 = (skin+0x74 ≠ 0) · 단계 1 로
- *   CLR −16                       → 28a2e  상태 19 로
- *   ↑ −1 · 그 밖                  → 아무것도 안 한다
- * 단계 1 구장 격자 [this+0x74] vt+0x18(진입 0x23f18 `vt+0x1c(10, 1, 숫자키 꼴 1, 0x10)`)이 바꾼 키 (28a36~28a64)
- *   ← → '4' '6'                   격자가 커서를 옮긴다(0x6c0bc vt+8 — 꼴 0x10 은 끝에서 감는다). 키 함수는 그 값을 안 본다
- *   OK −5 · '5'                   → 28a66  rec+0xc = 커서 → 상태 21
- *   ↑ −1 · '2' · CLR −16          → 28a84 · 28a96  rec+0xc = 커서 · 단계 0 으로
- *   ↓ −2 · '8' · 그 밖            → 아무것도 안 한다 (28a60 의 '2'(0x32) 비교는 격자가 −1 로 바꾼 뒤라 닿지 않는다)
- * ```
- */
-export function firstBatStadiumKeyActionOf(isStadiumPhase: boolean, key: string): FirstBatStadiumKeyAction {
-  if (key === 'Escape') return 'back'
-  if (!isStadiumPhase) {
-    if (key === 'ArrowLeft' || key === 'ArrowRight' || key === '4' || key === '6') return 'flip'
-    if (key === 'Enter' || key === 'ArrowDown' || key === '5' || key === '8') return 'ok'
-    return 'none'
-  }
-  if (key === 'ArrowLeft' || key === '4') return 'previous'
-  if (key === 'ArrowRight' || key === '6') return 'next'
-  if (key === 'Enter' || key === '5') return 'ok'
-  if (key === 'ArrowUp' || key === '2') return 'back'
-  return 'none'
 }
 
 export function FirstBatStadiumScreen({
@@ -164,7 +133,7 @@ export function FirstBatStadiumScreen({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isStadiumPhase, playerSide, stadiumId, onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel])
+  }, [isStadiumPhase, playerSide, stadiumId, onMoveFirstBat, onChooseFirstBat, onChooseStadium, onMoveStadium, onCancel, keyLock])
 
   const { anchorA, anchorB, firstBatTag } = FIRST_BAT_LAYOUT
   const isUserFirstBat = playerSide === PLAYER_SIDE_FIRST_BAT

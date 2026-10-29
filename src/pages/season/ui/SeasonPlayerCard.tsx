@@ -22,7 +22,8 @@ import { abilityChartFrameOf } from '@/pages/create-player/lib/teamSelectLayout'
 import * as managementStyles from '@/pages/management/ui/ManagementScreen.css'
 import { HALL_OF_FAME_FIGURE, figureHandOf } from '@/pages/special/lib/hallOfFameFigure'
 import type { HallOfFameFigureLook } from '@/pages/special/lib/hallOfFameFigure'
-import { FigureLayers, PitcherFigure, figureBatterWarmLayersOf } from '@/pages/special/ui/HallOfFameFigure'
+import { FigureLayers, PitcherFigure } from '@/pages/special/ui/HallOfFameFigure'
+import { figureBatterWarmLayersOf } from '@/pages/special/lib/figureWarmLayers'
 import * as specialStyles from '@/pages/special/ui/SpecialScreen.css'
 import {
   SEASON_CARD_BADGE,

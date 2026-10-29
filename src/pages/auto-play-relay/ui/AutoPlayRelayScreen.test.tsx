@@ -2,14 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import {
-  AutoPlayRelayScreen,
-  OFFENSE_BAND,
-  OFFENSE_TEAM_RIGHT,
-  OFFENSE_TEXT_AT,
-  RELAY_BOX,
-  RELAY_CARDS_AT,
-} from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
+import { AutoPlayRelayScreen } from '@/pages/auto-play-relay/ui/AutoPlayRelayScreen'
+import { OFFENSE_BAND, OFFENSE_TEAM_RIGHT, OFFENSE_TEXT_AT, RELAY_BOX, RELAY_CARDS_AT } from '@/pages/auto-play-relay/lib/relayLayout'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import type { MissionAutoRelayStep } from '@/entities/mission/model/missionAutoRelay'
 
