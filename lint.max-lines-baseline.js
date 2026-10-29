@@ -22,7 +22,6 @@ export const maxLinesBaseline = [
   'src/entities/mission/model/missionGoal.ts',
   'src/entities/particle/model/particleEmitter.ts',
   'src/entities/pitcher-career/model/magicPitch.ts',
-  'src/entities/season-mode/model/playerRecruit.ts',
   'src/entities/season-mode/model/seasonItemShop.ts',
   'src/features/play-at-bat/model/resolvePitch.ts',
   'src/features/play-game/model/aceCutIn.ts',
