@@ -6,6 +6,8 @@ const gzipLimit = (name, path, measuredBytes) => ({ name, path, gzip: true, limi
 export default [
   // 첫 진입 덩이(index.html 이 부르는 것) — 앱 · 화면 덩이는 나눠 받는다
   gzipLimit('첫 진입 JS (index)', 'dist/assets/index-*.js', 74217),
+  // 전체 JS 는 `assets/` 바로 아래만 센다 — `?vitals` 일 때만 받는 성능 표시 덩이(web-vitals · stats.js, `vitalsOverlay` · `statsOverlay`,
+  // gzip 약 4.7kB)는 `assets/opt/` 로 내서 뺐다(r380, `tools/viteOptInChunks.ts`). 보통 손님은 받지 않는다
   gzipLimit('전체 JS', 'dist/assets/*.js', 940707),
   gzipLimit('전체 CSS', 'dist/assets/*.css', 12164),
   gzipLimit('자산 묶음 합계 (asset-packs)', 'dist/asset-packs/*.bin', 5680012),
