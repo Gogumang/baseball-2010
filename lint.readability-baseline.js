@@ -29,7 +29,6 @@ export const readabilityBaseline = [
   'src/app/model/seasonSession/seasonEnd/useSeasonEndActions.ts',
   'src/app/model/seasonSession/settlement/useSettleGame.ts',
   'src/app/model/seasonSession/shop/useSeasonShopActions.ts',
-  'src/app/model/useCollection.ts',
   'src/app/model/useSound.ts',
   'src/app/ui/App.tsx',
   'src/entities/at-bat/model/atBatState.ts',

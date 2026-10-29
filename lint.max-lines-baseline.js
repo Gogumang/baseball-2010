@@ -3,7 +3,6 @@
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
   'src/app/assetPacks/assetPackGate.ts',
-  'src/app/model/useCollection.ts',
   'src/app/ui/App.tsx',
   'src/entities/batting/model/battedBallFlight.ts',
   'src/entities/batting/model/battedBallOutcome.ts',

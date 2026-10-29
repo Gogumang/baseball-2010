@@ -107,6 +107,7 @@ export const TEST_AREAS = {
     'src/entities/wallet/',
     'src/entities/collection/',
     'src/app/model/useCollection',
+    'src/app/model/useCollection/',
   ],
   'pitcher-career': [
     'src/pages/ending/',
