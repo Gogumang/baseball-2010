@@ -631,8 +631,8 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
       'src/entities/fielding/model/throwPlan/flight/errantThrow.ts#VERTICAL_DAMPING', // a18a4 코드 비교 문턱 · 곱 · 나눔 (w·3/4 · 4/5 · 5/6)
       'src/entities/league/model/leagueDay/ability/cpuGameAbility.ts#TEAM_ABILITY_SLOT_OF_PITCHER', // 0xb592c 코드
       'src/entities/season-mode/model/seasonReputation.ts#RECORD_CODE_TO_SLOT', // 점프표 0xd7d7c 의 갈래 차례 (B-16)
-      'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts#MANAGER_TEXT_GRADES_STARTER', // 0xcc558 × 2 (0x1285a)
-      'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts#MANAGER_TEXT_SECTION_STARTS', // 0x128ac 스택 상수
+      'src/features/play-pitcher-game/model/pitcherGameEvaluation/managerComment.ts#MANAGER_TEXT_GRADES_STARTER', // 0xcc558 × 2 (0x1285a)
+      'src/features/play-pitcher-game/model/pitcherGameEvaluation/managerComment.ts#MANAGER_TEXT_SECTION_STARTS', // 0x128ac 스택 상수
       'src/pages/pitcher-league/lib/pitchTrainingWindow.ts#TAB_BOXES', // mode_ui 39 박스 (그림 자료)
       'src/pages/pitcher-league/lib/pitcherRegisterLayout.ts#REGISTER_ROW_HINTS', // 점프표 0xcc6d8 갈래 상수
       'src/pages/record/lib/annalsGrid.ts#NICKNAME_PAGE_FIRST_NAMES', // 쪽별 칸 수 누계
