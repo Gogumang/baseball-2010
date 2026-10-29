@@ -190,7 +190,6 @@ export const readabilityBaseline = [
   'src/pages/management/ui/BasicInfoCard.tsx',
   'src/pages/management/ui/CenterStage.tsx',
   'src/pages/management/ui/CommandBar.tsx',
-  'src/pages/management/ui/DetailPopup.tsx',
   'src/pages/management/ui/ManagementScreen.tsx',
   'src/pages/match-settings/lib/matchSettingsMenu.ts',
   'src/pages/match-settings/ui/MatchSettingsWindow.tsx',

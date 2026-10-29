@@ -1,52 +1,32 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { CommonPanel, FrameSprite, SpriteNumber } from '@/shared/ui'
+import { CommonPanel, FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
-import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
-import { glyphsWidthOf, numberGlyphsOf } from '@/pages/management/lib/managementLayout'
 import {
-  CHANGE_ARROW_FRAMES,
-  DETAIL_CHANGE_X,
-  DETAIL_CURRENT_DX,
   DETAIL_HEADER,
-  DETAIL_LABEL_BOX,
-  DETAIL_MAXIMUM_DX,
-  DETAIL_MESSAGE_LINE_HEIGHT,
-  DETAIL_SLASH_FRAME,
   DETAIL_TABLE_FRAME,
-  DETAIL_SCROLL_BAR_COLORS,
   DETAIL_TITLE_FRAME,
   DETAIL_VALUE_BOX,
   DETAIL_WINDOW,
   DETAIL_Y_OFFSET,
   detailRowsOf,
-  detailMessageBoxOf,
   detailRowTopOf,
-  detailScrollBarOf,
 } from '@/pages/management/lib/detailPopup'
-import type { DetailResult, DetailRow, ScrollBarRect } from '@/pages/management/lib/detailPopup'
+import type { DetailResult, DetailRow } from '@/pages/management/lib/detailPopup'
 import * as styles from '@/pages/management/ui/DetailPopup.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { ARROW_SWAY_UPDATES, IMG_TEXT, MODE_UI, frameNameOf, imageOf } from './detailPopup/detailAssets'
+import { DetailRowView } from './detailPopup/DetailRowView'
+import { DetailMessages } from './detailPopup/DetailMessages'
+import { useDetailWindowClose } from './detailPopup/useDetailWindowClose'
 
-const IMG_TEXT = assetUrl('./sprites/img_text/frames')
-const MODE_UI = assetUrl('./sprites/mode_ui/frames')
-const imageOf = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
-const ROW_HEIGHT = 15
-/** 화살표는 3갱신마다 1px 흔들린다 */
-const ARROW_SWAY_UPDATES = 3
-const NUM = assetUrl('./sprites/num')
-/** 넷째 칸(보너스) 부호 — num 105 "+" · 128 "−" (0x875fa~0x8760c: 글자판 +0x1a4 / +0x200) */
-const BONUS_SIGN_FRAMES = { plus: 105, minus: 128 }
-/** 부호 그림 높이 (num 105 = 6px · 128 = 2px) — 세로 자리는 미확인이라 줄 가운데에 둔다 (추정) */
-const BONUS_SIGN_HEIGHTS = { plus: 6, minus: 2 }
-/**
- * 보너스 칸 자리 — 원본은 변화량 숫자를 dx 4, 보너스 숫자를 dx 22(0x16), 부호를 dx 14(0xe) 에 그린다(같은 기준점).
- * 기준점 자체는 변화량처럼 미확인이라, 변화량 숫자 왼쪽(아래 `CHANGE_LEFT`)에서 그 차이(+18 · +10)만큼 민다.
- */
-const CHANGE_LEFT = DETAIL_CHANGE_X + 15
-const BONUS_NUMBER_DX = 22 - 4
-const BONUS_SIGN_DX = 14 - 4
+const VALUE_CENTER = DETAIL_VALUE_BOX.x + Math.trunc(DETAIL_VALUE_BOX.width / 2)
+
+/** 뒤 어둡게 — 몫을 안 주면 안 덮는다 */
+const dimStyleOf = (dimOpacity: number | undefined) => (dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` })
+/** 글이 비면 글 · 막대를 숨기는 창(0x87700 strlen == 0)인가 */
+const showsMessagesOf = (hidesEmptyMessages: boolean, messages: readonly string[]) => !hidesEmptyMessages || messages.length > 0
+/** 펼치는 동안은 그림을 숨긴다 — 띄운 그림은 펼침이라 그리기 콜백을 안 부른다(0x7479c) */
+const openingStyleOf = (openingHeight: number | null) => ({ visibility: openingHeight !== null ? ('hidden' as const) : undefined })
 
 interface DetailPopupProps {
   readonly result: DetailResult
@@ -112,67 +92,17 @@ export function DetailWindow({
   dimOpacity,
   opensAsCommonPopup = false,
 }: DetailWindowProps) {
-  // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침 틀을 건너뛴다
-  const overlayRef = useRef<HTMLDivElement>(null)
-  const [hasNoLayout, setHasNoLayout] = useState(false)
-  useLayoutEffect(() => {
-    if ((overlayRef.current?.offsetHeight ?? 0) <= 0) setHasNoLayout(true)
-  }, [])
-  const motion = usePopupWindowMotion({
-    targetHeight: 0,
-    skipsMotion: !opensAsCommonPopup || hasNoLayout,
-    isCommonWindow: opensAsCommonPopup,
-  })
-  // 닫힘 연출이 끝난 뒤에 부를 최신 `onClose` — 커밋 때 적는다(연출 끝은 rAF 라 그 뒤다)
-  const onCloseRef = useRef(onClose)
-  useLayoutEffect(() => {
-    onCloseRef.current = onClose
-  })
-  const close = () => {
-    if (!opensAsCommonPopup) return onClose()
-    motion.close('바로', () => onCloseRef.current())
-  }
-  useEffect(() => {
-    if (!opensAsCommonPopup) return undefined
-    const onKeyDown = (event: KeyboardEvent) => {
-      // 펼치는 갱신에는 키 콜백을 안 부른다 — 뒤 화면 리스너(시즌 결과의 글 넘김 따위)까지 막는다
-      if (!motion.acceptsKeys()) {
-        if (!motion.isClosed) event.stopImmediatePropagation()
-        return
-      }
-      // 닫는 키는 창이 가져간다 — 그 밖의 키(시즌 결과 0xf2c8 의 위 · 아래)는 부른 쪽 리스너가 본다
-      if (!['Enter', ' ', '5', 'Escape', 'Backspace'].includes(event.key)) return
-      event.stopImmediatePropagation()
-      event.preventDefault()
-      close()
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  })
-  const messageBox = detailMessageBoxOf(tableYOffset)
-  const showsMessages = !hidesEmptyMessages || messages.length > 0
+  const { overlayRef, motion, close } = useDetailWindowClose(opensAsCommonPopup, onClose)
+  const showsMessages = showsMessagesOf(hidesEmptyMessages, messages)
   const origins = useFrameOrigins(MODE_UI)
   const textOrigins = useFrameOrigins(IMG_TEXT)
   const sway = Math.floor(useUpdateCounter() / ARROW_SWAY_UPDATES) % 2
-  const widthOf = (frame: number) => textOrigins?.[String(frame).padStart(3, '0')]?.width ?? 0
-  const valueCenter = DETAIL_VALUE_BOX.x + Math.trunc(DETAIL_VALUE_BOX.width / 2)
-  const centered = (value: number, center: number, top: number) => {
-    const glyphs = numberGlyphsOf(value)
-    return <SpriteNumber glyphs={glyphs} right={center + Math.ceil(glyphsWidthOf(glyphs) / 2)} boxTop={top} boxHeight={ROW_HEIGHT} />
-  }
+  const widthOf = (frame: number) => textOrigins?.[frameNameOf(frame)]?.width ?? 0
 
   if (motion.isClosed) return null
   return (
-    <div
-      className={styles.overlay}
-      role="dialog"
-      aria-label="상세정보"
-      onClick={close}
-      ref={overlayRef}
-      style={dimOpacity === undefined ? undefined : { background: `rgba(0, 0, 0, ${dimOpacity})` }}
-    >
-      {/* 띄운 그림은 펼침이라 그리기 콜백을 안 부른다(0x7479c) — 뒤 어둡게만 */}
-      <div style={{ visibility: motion.openingHeight !== null ? 'hidden' : undefined }}>
+    <div className={styles.overlay} role="dialog" aria-label="상세정보" onClick={close} ref={overlayRef} style={dimStyleOf(dimOpacity)}>
+      <div style={openingStyleOf(motion.openingHeight)}>
         <CommonPanel x={DETAIL_WINDOW.x} y={DETAIL_WINDOW.y} width={DETAIL_WINDOW.width} height={DETAIL_WINDOW.height} titleTab />
         <img
           className={styles.layer}
@@ -185,105 +115,20 @@ export function DetailWindow({
           className={styles.layer}
           alt=""
           src={imageOf(IMG_TEXT, DETAIL_HEADER.frame)}
-          style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_HEADER.frame) / 2), top: DETAIL_HEADER.box.y + 3 }}
+          style={{ left: VALUE_CENTER - Math.trunc(widthOf(DETAIL_HEADER.frame) / 2), top: DETAIL_HEADER.box.y + 3 }}
         />
-        {rows.map((row, index) => {
-          const top = detailRowTopOf(index, tableYOffset)
-          return (
-            <div key={row.labelFrame}>
-              <img
-                className={styles.layer}
-                alt=""
-                src={imageOf(IMG_TEXT, row.labelFrame)}
-                style={{ left: DETAIL_LABEL_BOX.x + DETAIL_LABEL_BOX.width - widthOf(row.labelFrame), top: top + 3 }}
-              />
-              {centered(row.current, valueCenter + DETAIL_CURRENT_DX, top)}
-              <img
-                className={styles.layer}
-                alt=""
-                src={imageOf(IMG_TEXT, DETAIL_SLASH_FRAME)}
-                style={{ left: valueCenter - Math.trunc(widthOf(DETAIL_SLASH_FRAME) / 2), top: top + 3 }}
-              />
-              {centered(row.maximum, valueCenter + DETAIL_MAXIMUM_DX, top)}
-              {row.change !== 0 && (
-                <>
-                  <img
-                    className={styles.layer}
-                    alt=""
-                    src={imageOf(MODE_UI, row.change > 0 ? CHANGE_ARROW_FRAMES.up : CHANGE_ARROW_FRAMES.down)}
-                    style={{ left: DETAIL_CHANGE_X, top: top + 2 - (row.change > 0 ? sway : -sway) }}
-                  />
-                  {/* |값| 을 dx +4 — 기준(정렬)은 미확인이라 화살표 오른쪽에 둔다 (추정) */}
-                  <SpriteNumber
-                    glyphs={numberGlyphsOf(Math.abs(row.change))}
-                    right={CHANGE_LEFT + glyphsWidthOf(numberGlyphsOf(Math.abs(row.change)))}
-                    boxTop={top}
-                    boxHeight={ROW_HEIGHT}
-                  />
-                  {/* 넷째 칸 — 변화량이 0 이 아닐 때만 본다 (0x87548 이 변화량 0 이면 줄 끝으로 건너뛴다) */}
-                  {row.bonus !== 0 && (
-                    <>
-                      <img
-                        className={styles.layer}
-                        alt=""
-                        src={imageOf(NUM, row.bonus > 0 ? BONUS_SIGN_FRAMES.plus : BONUS_SIGN_FRAMES.minus)}
-                        style={{
-                          left: CHANGE_LEFT + BONUS_SIGN_DX,
-                          top: top + Math.trunc((ROW_HEIGHT - (row.bonus > 0 ? BONUS_SIGN_HEIGHTS.plus : BONUS_SIGN_HEIGHTS.minus)) / 2),
-                        }}
-                      />
-                      <SpriteNumber
-                        glyphs={numberGlyphsOf(Math.abs(row.bonus))}
-                        right={CHANGE_LEFT + BONUS_NUMBER_DX + glyphsWidthOf(numberGlyphsOf(Math.abs(row.bonus)))}
-                        boxTop={top}
-                        boxHeight={ROW_HEIGHT}
-                      />
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )
-        })}
-        {showsMessages && (
-          <>
-            <div className={styles.messages} style={{ left: messageBox.x, top: messageBox.y, width: messageBox.width, height: messageBox.height }}>
-              {/* 글은 0xba269 가 색 마크업(!c)을 읽으며 그린다 — 능력치 상세(120)의 "[!cFFFF00이름!cFFFFFF]" */}
-              {messages.slice(scrollOffset).map((message, index) => (
-                <div key={scrollOffset + index} style={{ height: DETAIL_MESSAGE_LINE_HEIGHT }}>
-                  {parseGameMarkup(message)
-                    .flatMap((line) => line.segments)
-                    .map((segment, segmentIndex) => (
-                      <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
-                        {segment.text}
-                      </span>
-                    ))}
-                </div>
-              ))}
-            </div>
-            {/* 오른쪽 스크롤 막대 (0x8a182~0x8a2a4) — 줄 수 ≤ 3 이면 가득, 아니면 4줄 몫 손잡이 */}
-            <svg
-              className={styles.layer}
-              style={{ left: 0, top: 0 }}
-              viewBox="0 0 240 320"
-              width={240}
-              height={320}
-              shapeRendering="crispEdges"
-              data-testid="상세스크롤막대"
-            >
-              {scrollBarRects(detailScrollBarOf(messages.length, scrollOffset, tableYOffset)).map(([name, rect, fill]) => (
-                <rect key={name} data-part={name} x={rect.x} y={rect.y} width={rect.width} height={Math.max(rect.height, 0)} fill={fill} />
-              ))}
-            </svg>
-          </>
-        )}
+        {rows.map((row, index) => (
+          <DetailRowView
+            key={row.labelFrame}
+            row={row}
+            top={detailRowTopOf(index, tableYOffset)}
+            valueCenter={VALUE_CENTER}
+            sway={sway}
+            widthOf={widthOf}
+          />
+        ))}
+        {showsMessages && <DetailMessages messages={messages} scrollOffset={scrollOffset} tableYOffset={tableYOffset} />}
       </div>
     </div>
   )
 }
-
-const scrollBarRects = (bar: ReturnType<typeof detailScrollBarOf>): readonly (readonly [string, ScrollBarRect, string])[] => [
-  ['track', bar.track, DETAIL_SCROLL_BAR_COLORS.track],
-  ['thumb', bar.thumb, DETAIL_SCROLL_BAR_COLORS.thumb],
-  ['thumbInner', bar.thumbInner, DETAIL_SCROLL_BAR_COLORS.thumbInner],
-]
