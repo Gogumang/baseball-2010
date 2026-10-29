@@ -162,6 +162,8 @@ import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import type { NariGameMatch, NariGameSavePort, NariMatchAces, NariOpenedAces } from '@/pages/management/lib/nariMatchPrepare'
 import { DEFAULT_OPENED_ACE_BATTER_IDS, DEFAULT_OPENED_ACE_PITCHER_IDS } from '@/pages/general-mode/lib/generalModeSetup'
 import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
+import { useOnRenderChange } from '@/shared/lib/renderMachine/useOnRenderChange'
+import { useHeldWhileSame } from '@/shared/lib/renderMachine/useHeldWhileSame'
 
 /** 처음부터 열린 마선수 — 저장 +0x30 · +0x35 (`normalizeAceOpenSave` 가 늘 켠다) */
 const DEFAULT_NARI_OPENED_ACES: NariOpenedAces = {
@@ -751,11 +753,9 @@ export function usePitcherLeagueSession(
   /** 두 편 대결 대기(전역기록) — 자동 훑기 가드 1cfe4~1d008 (`isAutoScanHeldByAceMatch`) */
   const aceMatchHoldRef = useRef(aceMatchHold)
   useMirrorRef(aceMatchHoldRef, aceMatchHold)
-  const loaded = useRef<PitcherCareer | null>(null)
-  if (loaded.current === null) loaded.current = normalizePitcherCareer(store.load())
+  const [loaded] = useState(() => normalizePitcherCareer(store.load()))
   /** 띄울 때 저장에 들어 있던 G — 다리가 갈아 끼우기 전의 값이라 첫 렌더에서 떠 둔다 */
-  const legacyGamePoint = useRef<number | null>(null)
-  if (legacyGamePoint.current === null) legacyGamePoint.current = loaded.current?.gamePoint ?? 0
+  const [legacyGamePoint] = useState(() => loaded?.gamePoint ?? 0)
 
   /**
    * **이어하기** — 장면 0x106 에 들어오면 상태 100 진입 0x1c154 가 S+0x50 으로 돌아갈 상태를 고른다 (`pitcherResumePointOf`).
@@ -764,11 +764,11 @@ export function usePitcherLeagueSession(
    * 경기 뒤(116, S+0x50 = 2)에 끊겼으면 116 의 끝처럼 대진이 있을 때 g == 0 → 시즌 끝(136 자리) · 아니면 128.
    * 타자편 794c8d9 `continueSaved` 와 같은 꼴이다.
    */
-  const resumed = useRef<PitcherResume | null>(null)
-  if (resumed.current === null) resumed.current = pitcherResumeOf(loaded.current)
+  const [initialResume] = useState(() => pitcherResumeOf(loaded))
+  const resumed = useRef<PitcherResume | null>(initialResume)
   /** 이어할 자리 — 엔딩을 등록 없이 떠나면(`finishEnding(false)`) 남은 저장으로 다시 고른다 */
-  const [resumePoint, setResumePoint] = useState<PitcherResumePoint>(resumed.current.point)
-  const [career, setCareer] = useState<PitcherCareer | null>(resumed.current.career)
+  const [resumePoint, setResumePoint] = useState<PitcherResumePoint>(initialResume.point)
+  const [career, setCareer] = useState<PitcherCareer | null>(initialResume.career)
 
   /**
    * **켠 스킬 통계** (`0xb663c` → `[mgr+0xc8]+0xf8`, 모드 3) — 장착 0xa4b04 가 새로 켤 때마다 비트를 OR 한다.
@@ -838,14 +838,14 @@ export function usePitcherLeagueSession(
    * mgr+0x304 = 1. 투수편 화면에 들어설 때(메인 메뉴에서 · 이어하기)와 경기 뒤 · 경기 나가기 뒤 · 마선수 대결 뒤에 선다.
    * (장면+0x288 은 `matchPreparedRef` 가 따로 든다.)
    */
+  /** 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 경기 뒤 커리어 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`) */
+  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
   const setUpPitcherScene = useCallback(() => {
     cursorRef.current = 0
     freshSceneRef.current = true
     setShouldForgetRepeatable(true)
     setSceneSetUpCount((count) => count + 1)
   }, [])
-  /** 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 경기 뒤 커리어 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`) */
-  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
   /** B-84 고친 길 — 앞 셋업 때(이 세션에서 마지막으로 본) 경기 수. 2 로 막 오른 셋업만 지운다 */
   const lastSeenGamesRef = useRef<number | null>(null)
   useEffect(() => {
@@ -857,15 +857,12 @@ export function usePitcherLeagueSession(
     lastSeenGamesRef.current = career?.gamesPlayed ?? null
   }, [career?.gamesPlayed])
   // 메인 메뉴 따위에서 투수편 화면으로 들어선다 — 장면 0x106 이 새로 선다(떠나면 헐린다)
-  const wasOnScreenRef = useRef(isOnScreen)
-  if (wasOnScreenRef.current !== isOnScreen) {
-    wasOnScreenRef.current = isOnScreen
-    if (isOnScreen) {
-      cursorRef.current = 0
-      freshSceneRef.current = true
-      if (!shouldForgetRepeatable) setShouldForgetRepeatable(true)
-    }
-  }
+  useOnRenderChange(isOnScreen, (isEntering) => {
+    if (!isEntering) return
+    cursorRef.current = 0
+    freshSceneRef.current = true
+    if (!shouldForgetRepeatable) setShouldForgetRepeatable(true)
+  })
   /**
    * 상태 100 진입 0x1c154 의 머리 1c15e `0x6e439([0x1400058])` = stopBgm — S+0x50 갈래(1c24e~)보다 먼저 늘 부른다(r163 직접 뜸).
    * 이어하기로 투수편에 들어서면 메인 메뉴 배경음 1 이 끊긴다: 134 대진판 · 116 경기 결과 · 이벤트 재생(40 가드가 막으면) 같은
@@ -900,6 +897,7 @@ export function usePitcherLeagueSession(
   }, [career, isOnScreen, random, resumePoint, store])
   useEffect(() => {
     if (!shouldForgetRepeatable || fileEvents === null) return
+    // oxlint-disable-next-line react/set-state-in-effect -- 셋업 0xf684 의 0xacf60: 이벤트 본문이 온 뒤 커밋에서 지운다 — 105 진입 훑기(굴림)가 이 고침 다음 커밋에 도는 옛 차례
     setShouldForgetRepeatable(false)
     setCareer((current) => (current === null ? current : forgetRepeatableEvents(current, fileEvents)))
   }, [fileEvents, shouldForgetRepeatable])
@@ -994,9 +992,9 @@ export function usePitcherLeagueSession(
     if (done) return
     // 표식을 먼저 적는다 — 중간에 다시 띄워도 두 번 더해지지 않는다
     mergeStore.save({ merged: true })
-    const carried = legacyGamePoint.current ?? 0
+    const carried = legacyGamePoint
     if (carried !== 0) wallet.gain(carried)
-  }, [mergeStore, wallet])
+  }, [mergeStore, wallet, legacyGamePoint])
 
   /**
    * 관리 장면 +0x270 — 117 진입 0x11e84(11ee6~11f4a)가 칭호 1 · 9 를 주지 않고 넣어 두는 칸. 서 있으면 105 둘째 틀에 판정 0x1a1c0
@@ -1058,8 +1056,6 @@ export function usePitcherLeagueSession(
   const seenReentryCountRef = useRef(0)
   /** 상점(111 · 121)에서 돌아왔다 — 하위 메뉴 110 · 106 으로 서므로 105 진입이 아니다 */
   const isFromShopRef = useRef(false)
-  if (scene === '상점') isFromShopRef.current = true
-  else if (scene !== '관리') isFromShopRef.current = false
   /** 화면이 '관리' 인 채 125 → 105 로 다시 들어와 배경음 4 를 다시 튼 수 (`PitcherLeagueSession.managementBgmRestart`) */
   const [managementBgmRestart, setManagementBgmRestart] = useState(0)
   const reenterManagement = useCallback((from?: number) => {
@@ -1078,6 +1074,9 @@ export function usePitcherLeagueSession(
   const enterOutingMapRef = useRef<() => void>(() => {})
   useEffect(() => {
     // 셋업의 반복 이벤트 지우기가 아직이면 그 뒤에 훑는다 — 원본은 셋업 0xf684 가 105 진입보다 먼저다
+    // 상점에서 돌아왔나 — 상점이면 서고, 관리 · 상점 밖으로 가면 내린다(이 고리는 장면이 바뀔 때마다 돈다)
+    if (scene === '상점') isFromShopRef.current = true
+    else if (scene !== '관리') isFromShopRef.current = false
     const isIdle = isOnScreen && career !== null && scene === '관리' && story === null && fileEvents !== null && !shouldForgetRepeatable
     if (!isIdle) {
       wasIdleAtManagementRef.current = false
@@ -1817,7 +1816,7 @@ export function usePitcherLeagueSession(
       setPostseasonPopup(postseasonPopupOfResume(next.career, next.point))
       setCupView(cupViewOfResume(next.point))
     },
-    [random, store],
+    [store],
   )
 
   const goto = useCallback((next: PitcherScene) => setScene(next), [])
@@ -1976,7 +1975,7 @@ export function usePitcherLeagueSession(
     // 0x8cdc0 은 머리 0x8cdd4 · 끝 0x8ce34 에서 reader+0x28 = 0 — 112 진입 뒤 자동 발동은 처음부터 훑는다
     cursorRef.current = 0
   }, [])
-  enterOutingMapRef.current = enterOutingMap
+  useMirrorRef(enterOutingMapRef, enterOutingMap)
   /** 105 → 112 로 들어설 때의 행동함(S+4) — B-26 고친 길에서 지도 취소가 되돌릴 값. 지도 밖이면 null */
   const outingEntryActedRef = useRef<boolean | null>(null)
   const openOuting = useCallback(() => {
@@ -2029,13 +2028,12 @@ export function usePitcherLeagueSession(
    * 모드 갈림이 없는 코드라 판정만 투수 갈래(`pitcherStoryScene`)로 본다. 무작위는 굴리지 않는다.
    * 이벤트 본문이 아직 안 왔으면 오는 때 찍는다.
    */
-  const careerForSlotsRef = useRef(career)
-  useMirrorRef(careerForSlotsRef, career)
+  // 찍는 그림의 커리어 — 진입 · 이벤트 본문이 바뀐 그림의 것을 든다(머무는 동안 커리어가 바뀌어도 다시 안 찍는다)
+  const slotsCareer = useHeldWhileSame(career, [outingEntryCount, fileEvents])
   const outingSlots = useMemo(() => {
-    const current = careerForSlotsRef.current
-    if (outingEntryCount === 0 || current === null || fileEvents === null) return EMPTY_OUTING_PLACE_SLOTS
-    return outingPlaceSlotsOf((placeFrame) => pitcherPlaceEventOf(current, fileEvents, placeFrame))
-  }, [outingEntryCount, fileEvents])
+    if (outingEntryCount === 0 || slotsCareer === null || fileEvents === null) return EMPTY_OUTING_PLACE_SLOTS
+    return outingPlaceSlotsOf((placeFrame) => pitcherPlaceEventOf(slotsCareer, fileEvents, placeFrame))
+  }, [outingEntryCount, fileEvents, slotsCareer])
   const eventPlaceIds = useMemo(() => outingSlotPlaceIdsOf(outingSlots), [outingSlots])
 
   /**
@@ -2052,6 +2050,7 @@ export function usePitcherLeagueSession(
     if (!isIdle || scannedOutingEntryRef.current === outingEntryCount) return
     scannedOutingEntryRef.current = outingEntryCount
     const event = scanAuto(career, fileEvents, EVENT_TRIGGER.외출, random)
+    // oxlint-disable-next-line react/set-state-in-effect -- 112 진입 자동 훑기 0x1cf9c: 굴림 · 이벤트 열기는 그린 뒤(커밋 뒤) — 진입 틀 차례 그대로
     if (event !== null) openStory({ eventId: event.id, context: '지도', viewed: [] })
   }, [career, fileEvents, openStory, outingEntryCount, outingPresentation, outingResult, random, scanAuto, scene, story])
 
