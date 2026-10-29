@@ -375,7 +375,6 @@ export const readabilityBaseline = [
   'src/widgets/game-scene/ui/BenchClearingScene.tsx',
   'src/widgets/game-scene/ui/GameIntro.tsx',
   'src/widgets/game-scene/ui/introCanvas.ts',
-  'src/widgets/line-score/lib/lineScoreLayout.ts',
   'src/widgets/loading-tip/ui/LoadingTip.tsx',
   'src/widgets/management/ui/TitleListWindow.tsx',
   'src/widgets/matchup-cards/ui/MatchupCards.tsx',
