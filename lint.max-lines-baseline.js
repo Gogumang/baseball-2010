@@ -132,7 +132,6 @@ export const maxLinesBaseline = [
   'src/pages/story/ui/StoryScreen.tsx',
   'src/pages/team-game/lib/settlementBoard.ts',
   'src/pages/team-game/lib/substitutionWindow.ts',
-  'src/pages/team-game/lib/teamMatchupCards.ts',
   'src/pages/team-game/model/useTeamGame.ts',
   'src/pages/team-game/ui/SettlementBoard.tsx',
   'src/pages/team-game/ui/SubstitutionWindow.tsx',
