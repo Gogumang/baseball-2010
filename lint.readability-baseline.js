@@ -238,7 +238,6 @@ export const readabilityBaseline = [
   'src/shared/config/bugfixes/bugfixes.ts',
   'src/shared/config/unlocks/unlocks.ts',
   'src/shared/lib/canvas/drawMemo.ts',
-  'src/shared/lib/commonPanel/commonPanel.ts',
   'src/shared/lib/commonWindow/commonWindow.ts',
   'src/shared/lib/commonWindow/popupWindow.ts',
   'src/shared/lib/font/compose.ts',
