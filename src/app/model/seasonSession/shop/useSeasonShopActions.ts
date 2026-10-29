@@ -14,11 +14,17 @@ import { SEASON_STAT_MODE } from '@/app/model/seasonSession/constants/seasonCons
 import { recordPitcherIndexOf } from '@/app/model/seasonSession/roster/roster'
 import { rosterTradeSwapOf, withTradeSwap } from '@/app/model/seasonSession/roster/tradeSwap'
 import type { SeasonEquipPurchase } from '@/app/model/seasonSession/types/actions'
-import type { SeasonRosterActionsContext } from '@/app/model/seasonSession/roster/useSeasonRosterActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
 
-/** `useSeasonSession` 몸통 문장 75~79 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useSeasonShopActions(ctx: SeasonRosterActionsContext) {
-  const { latestSaveRef, commit, spendGamePoint, random, recordStat, save } = ctx
+/** 장비 · 상점 아이템 · 스태미나 회복 · 트레이드 정산 */
+export function useSeasonShopActions(scope: SeasonScope) {
+  const { atoms, random, recordStat } = scope
+  const save = useSeasonValue(atoms, saveAtom)
+  const { commit } = useSeasonSaveWriters(scope)
+  const { spendGamePoint } = useGamePointPurse(scope)
   /**
    * 트레이드 진행 결과 (0xe7 — `docs/re/J-modes-rules.md` 4-4).
    *
@@ -27,7 +33,7 @@ export function useSeasonShopActions(ctx: SeasonRosterActionsContext) {
    */
   const equipSeasonPlayer = useCallback(
     (purchase: SeasonEquipPurchase) => {
-      const current = latestSaveRef.current
+      const current = atoms.get(saveAtom)
       if (current === null) return
       const myTeamId = current.state.record.teamId
       const rosterIndex = purchase.isPitcher ? recordPitcherIndexOf(current, myTeamId, current.roster, purchase.recordIndex) : purchase.recordIndex
@@ -48,21 +54,21 @@ export function useSeasonShopActions(ctx: SeasonRosterActionsContext) {
         roster: purchase.isPitcher ? { ...current.roster, pitchers: replaced } : { ...current.roster, batters: replaced },
       })
     },
-    [commit, latestSaveRef],
+    [atoms, commit],
   )
   const buySeasonSubItem = useCallback(
     (slot: number) => {
-      const current = latestSaveRef.current
+      const current = atoms.get(saveAtom)
       if (current === null) return ''
       const applied = applySeasonSubItem(current.state.record, slot)
       commit({ ...current, state: { ...current.state, record: applied.record } })
       return applied.notice
     },
-    [commit, latestSaveRef],
+    [atoms, commit],
   )
   const buySeasonGpItem = useCallback(
     (slot: number) => {
-      const current = latestSaveRef.current
+      const current = atoms.get(saveAtom)
       if (current === null || slot === SEASON_STAMINA_ITEM) return null
       // 0x8034~0x8058: G 를 빼고 0x22c29(3, 값) — spendGamePoint 가 같은 차례로 적는다
       spendGamePoint(seasonGpItemPriceOf(slot))
@@ -72,11 +78,11 @@ export function useSeasonShopActions(ctx: SeasonRosterActionsContext) {
       recordStat?.({ kind: 'GP아이템수', mode: SEASON_STAT_MODE, index: slot })
       return effect.notice
     },
-    [commit, random, recordStat, spendGamePoint, latestSaveRef],
+    [atoms, commit, random, recordStat, spendGamePoint],
   )
   const recoverSeasonPitcherStamina = useCallback(
     (recordIndex: number) => {
-      const current = latestSaveRef.current
+      const current = atoms.get(saveAtom)
       if (current === null) return { notice: '', recovered: false }
       // 0x5870 목록은 레코드 그대로라 남은 마투수가 8번 칸에 있고 옛 8번은 맨 끝이다(`SeasonRecordAces`) — 목록 칸을 레코드 줄로
       const myTeamId = current.state.record.teamId
@@ -113,7 +119,7 @@ export function useSeasonShopActions(ctx: SeasonRosterActionsContext) {
       commit({ ...current, roster: { ...current.roster, pitchers } })
       return { notice: seasonShopTextOf(SEASON_SHOP_TEXT.스태미나회복), recovered: true }
     },
-    [commit, recordStat, spendGamePoint, latestSaveRef],
+    [atoms, commit, recordStat, spendGamePoint],
   )
   const finishTrade = useCallback(
     (settlement: TradeSettlement) => {
@@ -131,6 +137,3 @@ export function useSeasonShopActions(ctx: SeasonRosterActionsContext) {
   )
   return { equipSeasonPlayer, buySeasonSubItem, buySeasonGpItem, recoverSeasonPitcherStamina, finishTrade }
 }
-
-/** `useSeasonShopActions` 까지 선 값 */
-export type SeasonShopActionsContext = SeasonRosterActionsContext & ReturnType<typeof useSeasonShopActions>

@@ -3,11 +3,19 @@ import { rollSeasonTraining, applySeasonTraining, seasonTrainingResultOf } from 
 import { HELL_TRAINING_INDEX, HELL_TRAINING_GAME_POINT } from '@/widgets/season/lib/seasonTraining'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { rollSeasonOuting } from '@/widgets/season/lib/seasonOuting'
-import type { PostseasonActionsContext } from '@/app/model/seasonSession/postseason/usePostseasonActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { sceneAtom } from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { outingPlaceAtom, outingResultTextAtom, trainingResultAtom } from '@/app/model/seasonSession/atoms/uiAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
 
-/** `useSeasonSession` 몸통 문장 116~120 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useTrainingOutingActions(ctx: PostseasonActionsContext) {
-  const { save, random, commit, spendGamePoint, setTrainingResult, setScene, setOutingResultText, setOutingPlace } = ctx
+/** 훈련 · 외출 (관리 메뉴) */
+export function useTrainingOutingActions(scope: SeasonScope) {
+  const { atoms, random } = scope
+  const save = useSeasonValue(atoms, saveAtom)
+  const { commit } = useSeasonSaveWriters(scope)
+  const { spendGamePoint } = useGamePointPurse(scope)
   /**
    * 팀 트레이닝 — 0xde 연출이 끝난 틀에 굴림 `0xc074` 한 번 (`rollSeasonTraining` — 난수 차례 원본 그대로:
    * 칸 0~3 은 상승 → 감소, **지옥훈련은 감소 → 상승 넷**) → 적용 `0xa2f24` → 결과 팝업(0x741a0, 상태는 0xde 그대로).
@@ -35,23 +43,23 @@ export function useTrainingOutingActions(ctx: PostseasonActionsContext) {
       // 예전에는 시즌 G 칸이 늘 0 이라 이 차감이 통째로 빠져 있었다
       if (slot === HELL_TRAINING_INDEX) spendGamePoint(HELL_TRAINING_GAME_POINT)
       // 결과 팝업 — 현재값은 적용 뒤 팀 레코드를 다시 읽는다(0xc290). 닫을 때 0xc9 로 간다(`closeTrainingResult`)
-      setTrainingResult(seasonTrainingResultOf(slot, record, roll, applied))
+      atoms.set(trainingResultAtom, seasonTrainingResultOf(slot, record, roll, applied))
     },
-    [commit, random, save, spendGamePoint, setTrainingResult],
+    [atoms, commit, random, save, spendGamePoint],
   )
   /** 결과 팝업 키 0xf2c8 — 확인 · 취소면 0x742a9(닫기) · 상태 0xc9 */
   const closeTrainingResult = useCallback(() => {
-    setTrainingResult(null)
-    setScene(SEASON_SCENE_STATE.관리메뉴)
-  }, [setScene, setTrainingResult])
+    atoms.set(trainingResultAtom, null)
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.관리메뉴)
+  }, [atoms])
   /** 0x4a94 — 확인 팝업 0x16 에 "예": [gfx+0x184] = 장소 · 0xe3 (진입 0x5184 → 0x85074 연출) */
   const enterOuting = useCallback(
     (place: number) => {
-      setOutingResultText(null)
-      setOutingPlace(place)
-      setScene(SEASON_SCENE_STATE.외출연출)
+      atoms.set(outingResultTextAtom, null)
+      atoms.set(outingPlaceAtom, place)
+      atoms.set(sceneAtom, SEASON_SCENE_STATE.외출연출)
     },
-    [setOutingPlace, setOutingResultText, setScene],
+    [atoms],
   )
   /**
    * 외출 결과 `0xc81c` (`rollSeasonOuting`) — 0xce0c 가 연출 끝(0x84e58)을 본 틀에 부른다.
@@ -69,19 +77,16 @@ export function useTrainingOutingActions(ctx: PostseasonActionsContext) {
         ...save,
         state: { ...save.state, teamMorale: outcome.teamMorale, record: { ...outcome.record, acted: true } },
       })
-      setOutingPlace(place)
-      setOutingResultText(outcome.text)
+      atoms.set(outingPlaceAtom, place)
+      atoms.set(outingResultTextAtom, outcome.text)
     },
-    [commit, random, save, setOutingPlace, setOutingResultText],
+    [atoms, commit, random, save],
   )
   /** 0xce0c — 팝업 0x17 이 닫히면(답 0 · 0x14) SR+4 = 1 · 0xc9. SR+4 는 0xc81c 가 이미 켜 두었다 */
   const closeOutingResult = useCallback(() => {
-    setOutingResultText(null)
-    setOutingPlace(null)
-    setScene(SEASON_SCENE_STATE.관리메뉴)
-  }, [setOutingPlace, setOutingResultText, setScene])
+    atoms.set(outingResultTextAtom, null)
+    atoms.set(outingPlaceAtom, null)
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.관리메뉴)
+  }, [atoms])
   return { runTraining, closeTrainingResult, enterOuting, runOuting, closeOutingResult }
 }
-
-/** `useTrainingOutingActions` 까지 선 값 */
-export type TrainingOutingActionsContext = PostseasonActionsContext & ReturnType<typeof useTrainingOutingActions>

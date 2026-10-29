@@ -12,11 +12,26 @@ import { NO_CHAMPION, SEASON_STAT_MODE } from '@/app/model/seasonSession/constan
 import { nationalCupOpponentPitcherOrderOf, seasonAbilityContextOf } from '@/app/model/seasonSession/game/pitcherOrder'
 import { cpuLeagueRecordOf } from '@/app/model/seasonSession/roster/roster'
 import { nextYearOf } from '@/app/model/seasonSession/year/nextYear'
-import type { AfterGameActionsContext } from '@/app/model/seasonSession/settlement/useAfterGameActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { sceneAtom } from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
+import { useStartEvent } from '@/app/model/seasonSession/state/useStartEvent'
+import { useGameOptionsFor } from '@/app/model/seasonSession/nextGame/useGameOptionsFor'
+import { useNextGameSteps } from '@/app/model/seasonSession/nextGame/useNextGameSteps'
+import { useEnterMatchInfo } from '@/app/model/seasonSession/nextGame/useEnterMatchInfo'
 
-/** `useSeasonSession` 몸통 문장 113~115 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function usePostseasonActions(ctx: AfterGameActionsContext) {
-  const { save, optionsFor, enterPreGameSquad, random, aceLevels, commit, enterMatchInfo, gainGamePoint, recordStat, startEvent, setScene } = ctx
+/** 포스트시즌 · 국가대항전 진행 — 결산 화면(0xef)과 대회 화면이 부른다 */
+export function usePostseasonActions(scope: SeasonScope) {
+  const { atoms, random, aceLevels, recordStat } = scope
+  const save = useSeasonValue(atoms, saveAtom)
+  const { commit } = useSeasonSaveWriters(scope)
+  const { gainGamePoint } = useGamePointPurse(scope)
+  const startEvent = useStartEvent(scope)
+  const optionsFor = useGameOptionsFor(scope)
+  const { enterPreGameSquad } = useNextGameSteps(scope)
+  const enterMatchInfo = useEnterMatchInfo(scope)
   /**
    * 결산 화면(0xef)이 포스트시즌을 한 걸음 진행시킨다.
    * 내 팀이 지금 시리즈에 있으면 **사람이 친다**(원본 0xd7 선수단 → 경기),
@@ -146,12 +161,9 @@ export function usePostseasonActions(ctx: AfterGameActionsContext) {
       // 히든 팀은 여기서 열지 않는다 — 0xf3 갱신 0xe684 가 대진판에 있는 동안 열었다(`openCupHiddenTeams`)
       // 대회 연차(짝수 idx)는 마지막 해(9)가 아니라 엔딩 갈래에 닿지 않지만, 같은 0x6e0c 라 같게 둔다
       if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
-      setScene(next.scene)
+      atoms.set(sceneAtom, next.scene)
     },
-    [commit, gainGamePoint, random, recordStat, save, startEvent, setScene],
+    [atoms, commit, gainGamePoint, random, recordStat, save, startEvent],
   )
   return { continuePostseason, playCupGame, finishCup }
 }
-
-/** `usePostseasonActions` 까지 선 값 */
-export type PostseasonActionsContext = AfterGameActionsContext & ReturnType<typeof usePostseasonActions>

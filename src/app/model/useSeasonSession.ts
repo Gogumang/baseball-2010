@@ -6,23 +6,24 @@ import type { SeasonAutobotBatInput } from '@/entities/season-mode/model/seasonR
 import type { SeasonHallOfFame } from '@/app/model/seasonHallOfFameRecords'
 import type { MatchProgressSettings } from '@/features/play-team-game/model/matchSettings'
 import type { SeasonGameSettingOptions, SeasonSession } from '@/app/model/seasonSession/types/session'
-import { useSeasonSaveState } from '@/app/model/seasonSession/state/useSeasonSaveState'
-import { useSeasonSceneState } from '@/app/model/seasonSession/state/useSeasonSceneState'
-import { useSeasonUiState } from '@/app/model/seasonSession/state/useSeasonUiState'
-import { useSeasonPersistence } from '@/app/model/seasonSession/state/useSeasonPersistence'
+import { useSeasonAtoms } from '@/app/model/seasonSession/atoms/seasonScope'
+import { useMatchSettingsMigration } from '@/app/model/seasonSession/state/useSeasonMatchSettings'
+import { useMenuCursors, useRewardRecordStore } from '@/app/model/seasonSession/state/useSeasonStateEffects'
+import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
+import { useSeasonGameSetup } from '@/app/model/seasonSession/state/useSeasonGameSetup'
 import { useSceneEntryEffect } from '@/app/model/seasonSession/scene/useSceneEntryEffect'
 import { useSeasonRosterActions } from '@/app/model/seasonSession/roster/useSeasonRosterActions'
 import { useSeasonShopActions } from '@/app/model/seasonSession/shop/useSeasonShopActions'
 import { useNextGameStart } from '@/app/model/seasonSession/nextGame/useNextGameStart'
 import { useMatchInfoActions } from '@/app/model/seasonSession/nextGame/useMatchInfoActions'
 import { useEntryEditActions } from '@/app/model/seasonSession/nextGame/useEntryEditActions'
-import { useSettleGame } from '@/app/model/seasonSession/settlement/useSettleGame'
 import { useAfterGameActions } from '@/app/model/seasonSession/settlement/useAfterGameActions'
 import { usePostseasonActions } from '@/app/model/seasonSession/postseason/usePostseasonActions'
 import { useTrainingOutingActions } from '@/app/model/seasonSession/management/useTrainingOutingActions'
 import { useSeasonEndActions } from '@/app/model/seasonSession/seasonEnd/useSeasonEndActions'
 import { useSeasonEventActions } from '@/app/model/seasonSession/seasonEnd/useSeasonEventActions'
 import { useGameProgressActions } from '@/app/model/seasonSession/game/useGameProgressActions'
+import { useSeasonView } from '@/app/model/seasonSession/hook/useSeasonView'
 import { seasonSessionOf } from '@/app/model/seasonSession/hook/seasonSessionOf'
 
 export { SEASON_DEFAULT_MATCH_SETTINGS, seasonEvaluationJingleIdOf } from '@/app/model/seasonSession/constants/seasonConstants'
@@ -103,22 +104,51 @@ export function useSeasonSession(
     onRegularSeasonWin,
     gameSettingsNow,
   }
-  const c1 = { ...args, ...useSeasonSaveState(args) }
-  const c2 = { ...c1, ...useSeasonSceneState(c1) }
-  const c3 = { ...c2, ...useSeasonUiState(c2) }
-  const c4 = { ...c3, ...useSeasonPersistence(c3) }
-  const c5 = { ...c4, ...useSceneEntryEffect(c4) }
-  const c6 = { ...c5, ...useSeasonRosterActions(c5) }
-  const c7 = { ...c6, ...useSeasonShopActions(c6) }
-  const c8 = { ...c7, ...useNextGameStart(c7) }
-  const c9 = { ...c8, ...useMatchInfoActions(c8) }
-  const c10 = { ...c9, ...useEntryEditActions(c9) }
-  const c11 = { ...c10, ...useSettleGame(c10) }
-  const c12 = { ...c11, ...useAfterGameActions(c11) }
-  const c13 = { ...c12, ...usePostseasonActions(c12) }
-  const c14 = { ...c13, ...useTrainingOutingActions(c13) }
-  const c15 = { ...c14, ...useSeasonEndActions(c14) }
-  const c16 = { ...c15, ...useSeasonEventActions(c15) }
-  const c17 = { ...c16, ...useGameProgressActions(c16) }
-  return seasonSessionOf(c17)
+  // 세션 상태는 이 세션의 atom store 에 있다 — 하위 훅은 store 와 매개변수만 받아 필요한 atom 을 직접 읽고 쓴다.
+  // effect 차례(설정 이사 → 보상 저장 → 메뉴 커서 → 장면 진입)는 옛 훅 차례 그대로다
+  const scope = { ...args, atoms: useSeasonAtoms(args) }
+  useMatchSettingsMigration(scope)
+  useRewardRecordStore(scope)
+  const { moveMenuCursor } = useMenuCursors(scope)
+  useSceneEntryEffect(scope)
+  const { spendGamePoint } = useGamePointPurse(scope)
+  const { recordSourceNow } = useSeasonGameSetup(scope)
+  const roster = useSeasonRosterActions(scope)
+  const shop = useSeasonShopActions(scope)
+  const nextGame = useNextGameStart(scope)
+  const matchInfo = useMatchInfoActions(scope)
+  const { matchInfoStarterName, matchInfoOpponentStarterName, ...entryEdit } = useEntryEditActions(scope)
+  const afterGame = useAfterGameActions(scope)
+  const postseason = usePostseasonActions(scope)
+  const trainingOuting = useTrainingOutingActions(scope)
+  const seasonEnd = useSeasonEndActions(scope)
+  const seasonEvent = useSeasonEventActions(scope)
+  const gameProgress = useGameProgressActions(scope)
+  const view = useSeasonView(scope)
+  const { choosePreGameAceAction, cancelPreGameAceAction, ...matchInfoRest } = matchInfo
+  const { pressEntryKeyAction, pointEntryCursorAction, ...entryEditRest } = entryEdit
+  return seasonSessionOf(
+    scope.atoms,
+    view,
+    { recordSourceNow, matchInfoStarterName, matchInfoOpponentStarterName },
+    {
+      ...roster,
+      ...shop,
+      ...nextGame,
+      ...matchInfoRest,
+      choosePreGameAce: choosePreGameAceAction,
+      cancelPreGameAce: cancelPreGameAceAction,
+      ...entryEditRest,
+      pressEntryKey: pressEntryKeyAction,
+      pointEntryCursor: pointEntryCursorAction,
+      ...afterGame,
+      ...postseason,
+      ...trainingOuting,
+      ...seasonEnd,
+      ...seasonEvent,
+      ...gameProgress,
+      spendGamePoint,
+      moveMenuCursor,
+    },
+  )
 }

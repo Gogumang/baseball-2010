@@ -15,11 +15,21 @@ import { seasonEntryCellSourceOf } from '@/app/model/seasonSession/records/entry
 import { cpuRosterOf } from '@/app/model/seasonSession/roster/roster'
 import type { SeasonSave } from '@/app/model/seasonSession/save/seasonSave'
 import type { PendingSeasonGame } from '@/app/model/seasonSession/types/session'
-import type { MatchInfoActionsContext } from '@/app/model/seasonSession/nextGame/useMatchInfoActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { sceneAtom } from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { entryEditAtom, nextGameFromMenuAtom, pendingGameAtom, preGameAcesAtom } from '@/app/model/seasonSession/atoms/nextGameAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
 
-/** `useSeasonSession` 몸통 문장 94~101 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useEntryEditActions(ctx: MatchInfoActionsContext) {
-  const { preGameAces, save, pendingGame, setEntryEdit, aceLevels, setScene, entryEdit, stageSave, nextGameFromMenu, commit } = ctx
+/** 엔트리 편집(0xe0) · 경기정보 선발 이름 · 다음경기 취소 */
+export function useEntryEditActions(scope: SeasonScope) {
+  const { atoms, aceLevels } = scope
+  const save = useSeasonValue(atoms, saveAtom)
+  const pendingGame = useSeasonValue(atoms, pendingGameAtom)
+  const preGameAces = useSeasonValue(atoms, preGameAcesAtom)
+  const entryEdit = useSeasonValue(atoms, entryEditAtom)
+  const nextGameFromMenu = useSeasonValue(atoms, nextGameFromMenuAtom)
+  const { commit, stageSave } = useSeasonSaveWriters(scope)
   /**
    * 0xe0 의 유저 팀 명단 — 정규·포스트시즌은 시즌 세이브 명단(+ 0xd7 에서 고른 마선수), 국가대항전은
    * 대한민국 명단(마선수 없음, 0x6548 66ae). 로테이션 날짜는 경기 옵션과 같은 값이다.
@@ -79,7 +89,7 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
             aceBatterId: options.opponentAces?.batter ?? -1,
             cells: seasonEntryCellSourceOf(save, options.opponentTeamId, false),
           }
-      setEntryEdit({
+      atoms.set(entryEditAtom, {
         isUserTeam,
         teamId: source.teamId,
         editor: openEntryEditor(isUserTeam),
@@ -87,9 +97,9 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
         lists: seasonEntryListsOf({ ...source, aceLevels }),
         isAceLocked: false,
       })
-      setScene(SEASON_SCENE_STATE.엔트리편집)
+      atoms.set(sceneAtom, SEASON_SCENE_STATE.엔트리편집)
     },
-    [aceLevels, pendingGame, save, userEntrySourceOf, setEntryEdit, setScene],
+    [aceLevels, atoms, pendingGame, save, userEntrySourceOf],
   )
   /**
    * 0xe0 키 `0x7044` — 편집기 `0x55864` 를 돌리고 끝 코드 `[ed+0x338]` 을 본다:
@@ -114,24 +124,24 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
         lists = seasonEntryListsOf({ ...source, roster, aceLevels })
       }
       if (leavesEntryEditor(outcome.state.result, entryEdit.isUserTeam)) {
-        setEntryEdit(null)
-        setScene(SEASON_SCENE_STATE.경기정보)
+        atoms.set(entryEditAtom, null)
+        atoms.set(sceneAtom, SEASON_SCENE_STATE.경기정보)
         return
       }
-      setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
+      atoms.set(entryEditAtom, { ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
     },
-    [aceLevels, entryEdit, pendingGame, save, stageSave, userEntrySourceOf, setEntryEdit, setScene],
+    [aceLevels, atoms, entryEdit, pendingGame, save, stageSave, userEntrySourceOf],
   )
   const pointEntryCursorAction = useCallback(
     (index: number) => {
       if (entryEdit === null || entryEdit.isAceLocked) return
-      setEntryEdit({ ...entryEdit, editor: pointEntryCursor(entryEdit.editor, entryEdit.lists, index) })
+      atoms.set(entryEditAtom, { ...entryEdit, editor: pointEntryCursor(entryEdit.editor, entryEdit.lists, index) })
     },
-    [entryEdit, setEntryEdit],
+    [atoms, entryEdit],
   )
   const closeEntryAceLocked = useCallback(() => {
-    setEntryEdit((current) => (current === null ? null : { ...current, isAceLocked: false }))
-  }, [setEntryEdit])
+    atoms.set(entryEditAtom, (current) => (current === null ? null : { ...current, isAceLocked: false }))
+  }, [atoms])
   /** 0xdd "선발" 줄 — 내 팀 명단(엔트리 편집 결과)의 투수 0번 */
   const matchInfoStarterName =
     save !== null && pendingGame !== null
@@ -163,8 +173,8 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
       ...save,
       state: { ...save.state, record: { ...save.state.record, phase: SEASON_PHASE.기본 } },
     })
-    setScene(SEASON_SCENE_STATE.관리메뉴)
-  }, [commit, nextGameFromMenu, save, setScene])
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.관리메뉴)
+  }, [atoms, commit, nextGameFromMenu, save])
   return {
     openEntryEdit,
     pressEntryKeyAction,
@@ -175,6 +185,3 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
     cancelNextGame,
   }
 }
-
-/** `useEntryEditActions` 까지 선 값 */
-export type EntryEditActionsContext = MatchInfoActionsContext & ReturnType<typeof useEntryEditActions>

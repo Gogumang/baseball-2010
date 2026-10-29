@@ -25,12 +25,25 @@ import { seasonGoalInputOf } from '@/app/model/seasonSession/goals/seasonGoals'
 import { withEvent100Awarded } from '@/app/model/seasonSession/save/globals'
 import type { SeasonSave } from '@/app/model/seasonSession/save/seasonSave'
 import { nextYearOf } from '@/app/model/seasonSession/year/nextYear'
-import type { TrainingOutingActionsContext } from '@/app/model/seasonSession/management/useTrainingOutingActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { rewardRecordAtom, saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { sceneAtom } from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { eventPlaybackAtom } from '@/app/model/seasonSession/atoms/uiAtoms'
+import { eventCursorAtom, seasonMvpKindAtom } from '@/app/model/seasonSession/atoms/eventAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
+import { useStartEvent } from '@/app/model/seasonSession/state/useStartEvent'
+import { useSeasonGameSetup } from '@/app/model/seasonSession/state/useSeasonGameSetup'
 
-/** `useSeasonSession` 몸통 문장 121~124 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
-  const { setRewardRecord, rewardStore, gainGamePoint, recordStat, save, commit, startEvent, random, setScene, eventPlayback, updateGlobals } = ctx
-  const { eventCursorRef, recordSourceNow, seasonMvpKindRef, setEventPlayback, latestSaveRef } = ctx
+/** 시즌 끝 — 리그 1위 G · 결산 닫기 · 이벤트 재생 끝과 보상 */
+export function useSeasonEndActions(scope: SeasonScope) {
+  const { atoms, rewardStore, recordStat, random } = scope
+  const save = useSeasonValue(atoms, saveAtom)
+  const eventPlayback = useSeasonValue(atoms, eventPlaybackAtom)
+  const { commit, updateGlobals } = useSeasonSaveWriters(scope)
+  const { gainGamePoint } = useGamePointPurse(scope)
+  const startEvent = useStartEvent(scope)
+  const { recordSourceNow } = useSeasonGameSetup(scope)
   /**
    * 리그 1위 G 지급 (`0x6900` → `0x87e8`). 받은 칸은 **전역 저장 +0x145 비트**라
    * 시즌을 새로 시작해도 남는다 — 그래서 시즌 저장이 아니라 따로 둔다.
@@ -39,12 +52,12 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
     (award: LeagueFirstAward) => {
       // 0x6a56~0x6a94: G += 금액(99999 상한) → 비트 k 켜기 0x9f709 → 저장 0x1f1b9 — 팝업을 띄우는 그 자리에서 다 한다.
       // 같은 바이트의 k 3~7 은 메인 메뉴 전부 수집 보상(0x292f8)이 켠다 — 저장된 비트를 합친 뒤 켜야 그 비트를 안 지운다
-      setRewardRecord((record) => withAwardedBit(withStoredAwardedBits(record, rewardStore?.load()), award.bit))
+      atoms.set(rewardRecordAtom, (record) => withAwardedBit(withStoredAwardedBits(record, rewardStore?.load()), award.bit))
       gainGamePoint(award.gamePoint)
       // 0x6a98~0x6abc: 이어서 0x22dd5(mgr, k = 0·1·2) — 통계 [mgr+0xc8] +0x106+k 달성 표시 → 통계 저장 0x1f1e1
       recordStat?.({ kind: '달성표시', index: award.bit })
     },
-    [gainGamePoint, recordStat, rewardStore, setRewardRecord],
+    [atoms, gainGamePoint, recordStat, rewardStore],
   )
   /**
    * 결산을 닫았다 (`0x87b4`) — 연차 idx 가 **짝수**면 국가대항전, 홀수면 곧장 새 해 `0x6e0c`(`nextYearOf`)다.
@@ -79,9 +92,9 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       commit(next.save)
       // 엔딩 갈래는 500 을 틀고 [다음 0xf5] (6e54~6e76)
       if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
-      setScene(next.scene)
+      atoms.set(sceneAtom, next.scene)
     },
-    [commit, random, save, startEvent, setScene],
+    [atoms, commit, random, save, startEvent],
   )
   /**
    * 이벤트 재생 0xd3 이 끝났다 (실행기 0x8cf64 의 끝 → 이전 상태 `this+0x24`).
@@ -117,7 +130,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       // 선택지가 번호로 부른 마지막 이벤트 다음부터 이어 훑는다 (0xae170)
       const lastCalled = viewedEventIds[viewedEventIds.length - 1]
       if (lastCalled !== undefined && lastCalled !== playback.eventId) {
-        eventCursorRef.current = cursorAfterCalling(eventCursorRef.current, lastCalled)
+        atoms.set(eventCursorAtom, cursorAfterCalling(atoms.get(eventCursorAtom), lastCalled))
       }
       const goalRecordOf = recordSourceNow()
       const followUp = seasonEventFollowUpOf(playback.eventId, () =>
@@ -138,27 +151,13 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
         ),
       )
       // 실행기 끝 0x8d134~0x8d19c: 370 · 371 은 0x8b04c, 376 은 0x8b370 이 결과 이벤트를 고른다(시즌 갈래)
-      const awardFollowUp = seasonAwardFollowUpOf(playback.eventId, next, goalRecordOf, seasonMvpKindRef.current)
+      const awardFollowUp = seasonAwardFollowUpOf(playback.eventId, next, goalRecordOf, atoms.get(seasonMvpKindAtom))
       if (awardFollowUp !== null) return startEvent(awardFollowUp, playback.returnScene)
       if (followUp !== null) return startEvent(followUp, playback.returnScene)
-      setEventPlayback(null)
-      setScene(playback.returnScene)
+      atoms.set(eventPlaybackAtom, null)
+      atoms.set(sceneAtom, playback.returnScene)
     },
-    [
-      commit,
-      eventPlayback,
-      gainGamePoint,
-      random,
-      recordSourceNow,
-      recordStat,
-      save,
-      startEvent,
-      updateGlobals,
-      eventCursorRef,
-      seasonMvpKindRef,
-      setEventPlayback,
-      setScene,
-    ],
+    [atoms, commit, eventPlayback, gainGamePoint, random, recordSourceNow, recordStat, save, startEvent, updateGlobals],
   )
   /**
    * 보상 명령 하나를 그 자리에서 준다 — 0x8c460 모드 2 갈래(`applySeasonEventRewards`). 이벤트 번호는 그 명령이 든 이벤트다
@@ -179,7 +178,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
    */
   const giveSeasonEventReward = useCallback(
     (rewards: readonly SeasonEventReward[], eventId: number, viewedEventIds: readonly number[] = [eventId]) => {
-      const current = latestSaveRef.current
+      const current = atoms.get(saveAtom)
       if (current === null) return
       const applied = applySeasonEventRewards(current.state, rewards, eventId, random)
       const seen = [eventId, ...viewedEventIds].filter((id) => id !== YEAR_GOAL_EVENT_ID).reduce(markEventSeen, applied.state.record)
@@ -192,10 +191,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       }
       if (applied.event100Awarded) updateGlobals(withEvent100Awarded)
     },
-    [commit, gainGamePoint, random, recordStat, updateGlobals, latestSaveRef],
+    [atoms, commit, gainGamePoint, random, recordStat, updateGlobals],
   )
   return { awardLeagueFirst, finishSeason, finishSeasonEvent, giveSeasonEventReward }
 }
-
-/** `useSeasonEndActions` 까지 선 값 */
-export type SeasonEndActionsContext = TrainingOutingActionsContext & ReturnType<typeof useSeasonEndActions>

@@ -11,6 +11,7 @@
     "test:quick": "vitest run --maxWorkers=2",
     "test:coverage": "vitest run --coverage --maxWorkers=2",
     "test:watch": "vitest",
+    "bench": "vitest bench --run --maxWorkers=1 --project \"node (bench)\" --reporter=default",
     "typecheck": "tsc --noEmit",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm check:lines && pnpm check:boundaries && pnpm knip && pnpm test:quick && pnpm build && pnpm size",
     "test:area": "node tools/test-area.mjs",
@@ -25,6 +26,7 @@
     "hooks:install": "lefthook install"
   },
   "dependencies": {
+    "jotai": "3.0.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "stats.js": "0.17.0",

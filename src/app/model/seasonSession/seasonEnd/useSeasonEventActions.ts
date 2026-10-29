@@ -3,30 +3,38 @@ import { YEAR_GOAL_EVENT_ID, markEventSeen } from '@/entities/season-mode/model/
 import { judgeSeasonEnding, ENDING_BONUS_GAME_POINTS } from '@/entities/season-mode/model/seasonRewards'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { ENDING_BONUS_UNIT, SEASON_STAT_MODE } from '@/app/model/seasonSession/constants/seasonConstants'
-import type { SeasonEndActionsContext } from '@/app/model/seasonSession/seasonEnd/useSeasonEndActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { sceneAtom } from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { openedHiddenIdsAtom } from '@/app/model/seasonSession/atoms/uiAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
 
-/** `useSeasonSession` 몸통 문장 125~130 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useSeasonEventActions(ctx: SeasonEndActionsContext) {
-  const { latestSaveRef, commit, updateGlobals, setOpenedHiddenIds, save, gainGamePoint, recordStat, setScene } = ctx
+/** 이벤트 고르기 · 시스템 창 · 구장 히든 · 대회 히든 팀 · 엔딩 보너스 */
+export function useSeasonEventActions(scope: SeasonScope) {
+  const { atoms, recordStat } = scope
+  const save = useSeasonValue(atoms, saveAtom)
+  const { commit, updateGlobals } = useSeasonSaveWriters(scope)
+  const { gainGamePoint } = useGamePointPurse(scope)
   const confirmSeasonEventChoice = useCallback(
     (_eventId: number, leftEventIds: readonly number[]) => {
-      const current = latestSaveRef.current
+      const current = atoms.get(saveAtom)
       if (current === null) return
       const record = leftEventIds.filter((id) => id !== YEAR_GOAL_EVENT_ID).reduce(markEventSeen, current.state.record)
       commit({ ...current, state: { ...current.state, record } })
     },
-    [commit, latestSaveRef],
+    [atoms, commit],
   )
   /**
    * 이벤트 system 창 답 0 — 0x7fe90(상자): 0x7b998(모드 2)이면 [[상자+0x150]+0x187] = 1, 그리고 0x22755([0x1400054], 1) 저장.
    * 이미 켜져 있어도 원본은 저장한다. 재생이 끝날 때 목표 창 이벤트를 보고 켜는 자리(`finishSeasonEvent`)는 같은 값이라 그대로 둔다.
    */
   const confirmEventSystemWindow = useCallback(() => {
-    const current = latestSaveRef.current
+    const current = atoms.get(saveAtom)
     if (current === null) return
     const { record } = current.state
     commit(record.yearGoalShown ? current : { ...current, state: { ...current.state, record: { ...record, yearGoalShown: true } } })
-  }, [commit, latestSaveRef])
+  }, [atoms, commit])
   /**
    * 구장 히든 아이템 해금 (`0x81d0` → `0x9f6cc(app, 종류, k, 1)`).
    * 원본 자리가 전역기록이라 시즌 레코드가 아니라 전역 칸(`SeasonGlobalSlots`)에 쌓고 곧바로 저장한다 (0x62368 → 0x1f1b9).
@@ -44,12 +52,12 @@ export function useSeasonEventActions(ctx: SeasonEndActionsContext) {
   /** 0xe684 → 0x65de4 — 전역 해금표(웹 `openedHiddenIds`, 팀은 10~14 그대로)에 쓴다. 앱이 전역 기록으로 모은다 */
   const openCupHiddenTeams = useCallback(
     (teams: readonly number[]) => {
-      setOpenedHiddenIds((opened) => {
+      atoms.set(openedHiddenIdsAtom, (opened) => {
         const added = teams.filter((id) => !opened.includes(id))
         return added.length === 0 ? opened : [...opened, ...added]
       })
     },
-    [setOpenedHiddenIds],
+    [atoms],
   )
   /**
    * 엔딩 보너스 팝업 0x2b 닫힘 — 0x8bd8(직접 떴다):
@@ -82,10 +90,7 @@ export function useSeasonEventActions(ctx: SeasonEndActionsContext) {
     if (!save.state.record.endingSeen) {
       commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingSeen: true } } })
     }
-    setScene(SEASON_SCENE_STATE.관리메뉴)
-  }, [commit, save, setScene])
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.관리메뉴)
+  }, [atoms, commit, save])
   return { confirmSeasonEventChoice, confirmEventSystemWindow, openStadiumItems, openCupHiddenTeams, receiveEndingBonus, finishEnding }
 }
-
-/** `useSeasonEventActions` 까지 선 값 */
-export type SeasonEventActionsContext = SeasonEndActionsContext & ReturnType<typeof useSeasonEventActions>

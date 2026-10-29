@@ -16,13 +16,22 @@ import { startPostseason } from '@/entities/league/model/league'
 import { rollTradeRequest } from '@/entities/season-mode/model/tradeRequest'
 import { NO_CHAMPION, SEASON_MANAGEMENT_BGM, SEASON_STAT_MODE } from '@/app/model/seasonSession/constants/seasonConstants'
 import { cpuRosterOf, tradeRecordRosterOf } from '@/app/model/seasonSession/roster/roster'
-import type { SettleGameContext } from '@/app/model/seasonSession/settlement/useSettleGame'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { gameOptionsAtom, resumeGameAtom, sceneAtom, settledGameAtom } from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { menuCursorsAtom, tradeRequestAlertOpenAtom, tradeRequestAtom } from '@/app/model/seasonSession/atoms/uiAtoms'
+import { freshSceneAtom } from '@/app/model/seasonSession/atoms/eventAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useNextGameSteps } from '@/app/model/seasonSession/nextGame/useNextGameSteps'
+import { useSettleGame } from '@/app/model/seasonSession/settlement/useSettleGame'
 
-/** `useSeasonSession` 몸통 문장 103~112 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useAfterGameActions(ctx: SettleGameContext) {
-  const { settledGameRef, settleGame, random, freshSceneRef, setResumeGame, setGameOptions, setScene, save, commit, recordStat, setTradeRequest } =
-    ctx
-  const { nextGameEntered, setTradeRequestAlertOpen, setMenuCursors } = ctx
+/** 경기 뒤 — 정산 진입 · 결과 확인 · 관중수입 · 경기 뒤 마무리(0xf1) · CPU 트레이드 요청 */
+export function useAfterGameActions(scope: SeasonScope) {
+  const { atoms, random, recordStat } = scope
+  const save = useSeasonValue(atoms, saveAtom)
+  const { commit } = useSeasonSaveWriters(scope)
+  const { nextGameEntered } = useNextGameSteps(scope)
+  const settleGame = useSettleGame(scope)
   /**
    * **정산 진입** (`TeamGameScreen.onSettlementEnter` — 경기 끝 결과 판 OK → 상태 0x19, 진입 0x4ea0c).
    * 원본 0x4ea0c 는 이 자리에서 정산을 **다** 한다 — 기록 달성 G(4ec5a) · 갈래별 리그·평가·CPU 경기·하루 끝(4f216~4f31e) ·
@@ -31,14 +40,11 @@ export function useAfterGameActions(ctx: SettleGameContext) {
    */
   const enterGameSettlement = useCallback(
     (summary: TeamGameSummary) => {
-      if (settledGameRef.current !== null) return
-      settledGameRef.current = settleGame(summary)
+      if (atoms.get(settledGameAtom) !== null) return
+      atoms.set(settledGameAtom, settleGame(summary))
     },
-    [settleGame, settledGameRef],
+    [atoms, settleGame],
   )
-  /**
-   * 결과 화면 확인 — 정산 진입에서 정해 둔 다음 장면으로 간다. 정산 진입을 거치지 않고 왔으면(테스트 · 옛 길) 여기서 정산한다.
-   */
   /**
    * **장면 0x105 의 상태 1 — 자원 적재 0x75fc**(직접 떴다, 그리기 나무 0xedb6 의 edd0 `cmp #1` → 0xee6a). 로딩 판 0x667f9 · 진행 막대
    * 0x54121(판, 7) 뒤 76cc `0x53dbd(판, [this+0xcc])` — StrTIP 첫 줄(73)로 rand(0, 73)(53dde, 경기 장면 상태 7 의 0x39f88 과 같은
@@ -50,26 +56,27 @@ export function useAfterGameActions(ctx: SettleGameContext) {
   }, [random])
   /** 들어와 장면 0x105 를 세운다 — 셋업 0x3b14 가 mgr+0x304 = 1, 이어서 상태 1 적재의 팁 굴림 */
   const constructScene = useCallback(() => {
-    freshSceneRef.current = true
+    atoms.set(freshSceneAtom, true)
     rollSceneLoadTip()
-  }, [rollSceneLoadTip, freshSceneRef])
+  }, [atoms, rollSceneLoadTip])
   /** 관리 메뉴 0xc9 확인 키(−5 · '5') — 0x8f82 가 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
   const pressManagementConfirm = useCallback(() => {
-    freshSceneRef.current = false
-  }, [freshSceneRef])
+    atoms.set(freshSceneAtom, false)
+  }, [atoms])
+  /** 결과 화면 확인 — 정산 진입에서 정해 둔 다음 장면으로 간다. 정산 진입을 거치지 않고 왔으면(테스트 · 옛 길) 여기서 정산한다 */
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
-      const settled = settledGameRef.current ?? settleGame(summary)
-      settledGameRef.current = null
-      setResumeGame(null)
+      const settled = atoms.get(settledGameAtom) ?? settleGame(summary)
+      atoms.set(settledGameAtom, null)
+      atoms.set(resumeGameAtom, null)
       // 경기 장면이 끝나면 장면 0x105 를 새로 세운다(0x3874 가 지운 뒤 0x3b14) — 상태 1 의 팁 굴림이 그 장면의 맨 앞이다
       if (settled !== null) rollSceneLoadTip()
       if (settled === null) return
-      setGameOptions(null)
+      atoms.set(gameOptionsAtom, null)
       if (settled.jingle !== null) activeSound().play(settled.jingle)
-      setScene(settled.next)
+      atoms.set(sceneAtom, settled.next)
     },
-    [rollSceneLoadTip, settleGame, setGameOptions, setResumeGame, setScene, settledGameRef],
+    [atoms, rollSceneLoadTip, settleGame],
   )
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */
   const confirmIncome = useCallback(
@@ -116,7 +123,7 @@ export function useAfterGameActions(ctx: SettleGameContext) {
           },
         })
         // 원본 시즌 끝 사슬의 첫 칸 (0xee → 시상 셋 → 정규시즌순위 → 결산)
-        return setScene(SEASON_END_CHAIN[0].state)
+        return atoms.set(sceneAtom, SEASON_END_CHAIN[0].state)
       }
       // 0xe9 → (0xd3 평가 이벤트) → **0xf1 경기 뒤 마무리**. 진입 0x953c: CPU 트레이드 요청 0x93c8 을 굴려
       // this+0x148 에 담고(요청 횟수 SR+0x17a 는 레코드) 배경음 4 를 반복으로 튼다 (0x6ea6d(소리, 4, −1, 1))
@@ -135,11 +142,11 @@ export function useAfterGameActions(ctx: SettleGameContext) {
         (team) => save.recordAces?.[team],
       )
       commit({ ...save, state: { ...save.state, record: rolled.record } })
-      setTradeRequest(rolled.request)
+      atoms.set(tradeRequestAtom, rolled.request)
       activeSound().playBgm(SEASON_MANAGEMENT_BGM)
-      setScene(SEASON_SCENE_STATE.경기뒤마무리)
+      atoms.set(sceneAtom, SEASON_SCENE_STATE.경기뒤마무리)
     },
-    [commit, random, recordStat, save, setScene, setTradeRequest],
+    [atoms, commit, random, recordStat, save],
   )
   /** 0xf1 키 0x49a4 — 확인이면 포스트시즌 0xef · 경기 수 짝수 0xc9 · 홀수 0xd8 */
   const confirmDayResults = useCallback(() => {
@@ -147,28 +154,28 @@ export function useAfterGameActions(ctx: SettleGameContext) {
     const next = afterGameNext(save.state.record)
     // 홀수 경기 뒤는 관리 메뉴를 건너뛰고 곧장 0xd8 — 들어옴 0x4cb8 이 phase 를 4 로 둔다
     if (next === SEASON_SCENE_STATE.다음경기) return nextGameEntered(save, false)
-    setScene(next)
-  }, [nextGameEntered, save, setScene])
+    atoms.set(sceneAtom, next)
+  }, [atoms, nextGameEntered, save])
   const answerTradeRequest = useCallback(
     (accept: boolean) => {
-      setTradeRequestAlertOpen(false)
+      atoms.set(tradeRequestAlertOpenAtom, false)
       if (accept) {
         // 7440~7484 — 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서를 칸 1 로 (구단관리 · 트레이드)
-        setMenuCursors((cursors) => ({ ...cursors, management: TRADE_REQUEST_MENU_CURSOR, teamMenu: TRADE_REQUEST_MENU_CURSOR }))
-        return setScene(SEASON_SCENE_STATE.트레이드영입선수)
+        atoms.set(menuCursorsAtom, (cursors) => ({ ...cursors, management: TRADE_REQUEST_MENU_CURSOR, teamMenu: TRADE_REQUEST_MENU_CURSOR }))
+        return atoms.set(sceneAtom, SEASON_SCENE_STATE.트레이드영입선수)
       }
-      setTradeRequest((request) => ({ ...request, isRequested: false }))
+      atoms.set(tradeRequestAtom, (request) => ({ ...request, isRequested: false }))
     },
-    [setMenuCursors, setScene, setTradeRequest, setTradeRequestAlertOpen],
+    [atoms],
   )
   const cancelTradeRequest = useCallback(() => {
-    setTradeRequest((request) => ({ ...request, isRequested: false }))
-    setScene(SEASON_SCENE_STATE.구단관리)
-  }, [setScene, setTradeRequest])
+    atoms.set(tradeRequestAtom, (request) => ({ ...request, isRequested: false }))
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.구단관리)
+  }, [atoms])
   const closeTradeResult = useCallback(() => {
-    setTradeRequest((request) => ({ ...request, isRequested: false }))
-    setScene(SEASON_SCENE_STATE.관리메뉴)
-  }, [setScene, setTradeRequest])
+    atoms.set(tradeRequestAtom, (request) => ({ ...request, isRequested: false }))
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.관리메뉴)
+  }, [atoms])
   return {
     enterGameSettlement,
     constructScene,
@@ -181,6 +188,3 @@ export function useAfterGameActions(ctx: SettleGameContext) {
     closeTradeResult,
   }
 }
-
-/** `useAfterGameActions` 까지 선 값 */
-export type AfterGameActionsContext = SettleGameContext & ReturnType<typeof useAfterGameActions>

@@ -22,32 +22,30 @@ import type { SeasonSave, SettledSeasonGame } from '@/app/model/seasonSession/sa
 import { withDayEndRecovery, withGameEndStamina } from '@/app/model/seasonSession/stamina/stamina'
 import { cupSettledSaveOf, regularSeasonSettledSaveOf } from '@/app/model/seasonSession/settlement/settledSaves'
 import { playedSeasonRecordOf, recordSeasonGameEndStats } from '@/app/model/seasonSession/settlement/gameEndRecord'
-import type { EntryEditActionsContext } from '@/app/model/seasonSession/nextGame/useEntryEditActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import { gameKindAtom, gameOptionsAtom, ownRotationShiftAtom } from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { eventCursorAtom, freshSceneAtom, newPlayerFlagAtom } from '@/app/model/seasonSession/atoms/eventAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
 
-/** `useSeasonSession` 몸통 문장 102~102 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useSettleGame(ctx: EntryEditActionsContext) {
-  const {
-    latestSaveRef,
-    gameOptions,
-    gameKind,
-    gainGamePoint,
-    recordStat,
-    eventCursorRef,
-    newPlayerFlagRef,
-    freshSceneRef,
-    ownRotationShift,
-    commit,
-  } = ctx
-  const { random, onRegularSeasonWin, aceLevels } = ctx
+/** 정산 진입 0x4ea0c 의 정산 — 결과 화면 확인(`useAfterGameActions`)이 부른다 */
+export function useSettleGame(scope: SeasonScope) {
+  const { atoms, recordStat, random, onRegularSeasonWin, aceLevels } = scope
+  const gameOptions = useSeasonValue(atoms, gameOptionsAtom)
+  const gameKind = useSeasonValue(atoms, gameKindAtom)
+  const ownRotationShift = useSeasonValue(atoms, ownRotationShiftAtom)
+  const { commit } = useSeasonSaveWriters(scope)
+  const { gainGamePoint } = useGamePointPurse(scope)
   /**
    * 경기가 끝났다 — 원본 차례 그대로 정산한다:
    * 내 경기를 전적에 넣고, 같은 날 나머지 네 경기를 돌리고(0xc2a48 — 칸·명단 엇갈림 포함, `cpuGameSidesOf`),
    * 선수 기록표에 **양 팀 타석**을 쌓고(0xa8024), 평가(0xa719c)를 얹은 뒤 관중수입(0xe9)으로 간다.
    * 평가는 **정규시즌 경기만** 받는다 — 포스트시즌·국가대항전은 원본 0x4ea0c 가 건너뛴다.
    */
-  const settleGame = useCallback(
+  return useCallback(
     (summary: TeamGameSummary): SettledSeasonGame | null => {
-      const latest = latestSaveRef.current
+      const latest = atoms.get(saveAtom)
       if (latest === null) return null
       // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다(0xb6b6c — 정규·포스트시즌·국가대항전 모두) (`liveGameState`)
       setLiveGameInningIndex(summary.inningsPlayed - 1)
@@ -79,9 +77,9 @@ export function useSettleGame(ctx: EntryEditActionsContext) {
       //
       // 4f15a~4f19a — 모드 2 경기마다 SR+0x1bd = 내 칸 점수 · SR+0x1be = 상대 칸 점수(바이트, 0xe9 기록 줄이 s8 로 읽는다)
       const played = playedSeasonRecordOf(record, summary)
-      eventCursorRef.current = START_SEASON_EVENT_CURSOR
-      newPlayerFlagRef.current = false
-      freshSceneRef.current = true
+      atoms.set(eventCursorAtom, START_SEASON_EVENT_CURSOR)
+      atoms.set(newPlayerFlagAtom, false)
+      atoms.set(freshSceneAtom, true)
 
       // 승패는 원본 셈 `0xb69c8`·`0x4f072` 로 다시 낸다 — 이긴 칸 = R(1) > R(0) ? 1 : 0 이라
       // **동점이면 선공(칸 0) 쪽이 이긴다**. 요약의 `won`(내 점수 > 상대 점수)은 동점을 패로 본다.
@@ -190,24 +188,6 @@ export function useSettleGame(ctx: EntryEditActionsContext) {
       // 관중수입 창(0xe9)이 뜨면서 나는 평가 징글 36·37·38 (0xdec4/0xdede) — 창은 결과 화면 확인 뒤에 선다
       return { next: SEASON_SCENE_STATE.관중수입, jingle: seasonEvaluationJingleIdOf(evaluation.popularityChange) }
     },
-    [
-      aceLevels,
-      commit,
-      gainGamePoint,
-      gameKind,
-      gameOptions,
-      onRegularSeasonWin,
-      ownRotationShift,
-      random,
-      recordStat,
-      eventCursorRef,
-      freshSceneRef,
-      latestSaveRef,
-      newPlayerFlagRef,
-    ],
+    [aceLevels, atoms, commit, gainGamePoint, gameKind, gameOptions, onRegularSeasonWin, ownRotationShift, random, recordStat],
   )
-  return { settleGame }
 }
-
-/** `useSettleGame` 까지 선 값 */
-export type SettleGameContext = EntryEditActionsContext & ReturnType<typeof useSettleGame>

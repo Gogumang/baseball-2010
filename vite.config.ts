@@ -54,6 +54,9 @@ export default defineConfig({
     fsModuleCache: true,
     // `pnpm test:coverage` 에서만 잰다 — `tools/vitestCoverage.ts`
     coverage: unitTestCoverage,
+    // `pnpm bench`(`src/**/*.bench.ts`, 기본 `vitest run` 에서 빠짐) — 기준 숫자만 본다(실패 기준 없음).
+    // 시험 모듈 실행기가 export 를 getter 로 감싸 안쪽 호출에 조금 얹힌다 — 배포 덩이엔 없는 몫이라 숫자는 보수적이다(경고만 끈다)
+    benchmark: { suppressExportGetterWarnings: true },
     // 대부분은 워커 안에서 읽은 모듈을 나눠 쓰고(격리 끔), 모듈 바꿔치기 등으로 나누면 깨지는 것만 격리한다 — `tools/vitestProjects.ts`
     projects: [
       {

@@ -8,14 +8,28 @@ import { SEASON_SCENE_STATE, type SeasonSceneState } from '@/entities/season-mod
 import { SQUAD_PURPOSE } from '@/entities/season-mode/model/preGameFlow'
 import { SEASON_STAT_MODE } from '@/app/model/seasonSession/constants/seasonConstants'
 import { withSceneSetupIncome } from '@/app/model/seasonSession/game/sceneSetup'
-import type { SeasonEventActionsContext } from '@/app/model/seasonSession/seasonEnd/useSeasonEventActions'
+import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
+import { saveAtom } from '@/app/model/seasonSession/atoms/saveAtoms'
+import {
+  gameKindAtom,
+  gameOptionsAtom,
+  noticeAtom,
+  ownRotationShiftAtom,
+  resumeGameAtom,
+  sceneAtom,
+  settledGameAtom,
+} from '@/app/model/seasonSession/atoms/sceneAtoms'
+import { entryEditAtom, isMatchSettingsOpenAtom, pendingGameAtom, squadPurposeAtom } from '@/app/model/seasonSession/atoms/nextGameAtoms'
+import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonSaveWriters'
+import { useSeasonGameSetup } from '@/app/model/seasonSession/state/useSeasonGameSetup'
 
-/** `useSeasonSession` 몸통 문장 131~137 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
-export function useGameProgressActions(ctx: SeasonEventActionsContext) {
-  const { latestSaveRef, settledGameRef, recordStat, commit, gameKind, ownRotationShift, withGameSettings, aceLevels, entryOrderOf, setGameKind } =
-    ctx
-  const { setOwnRotationShift, setPendingGame, setEntryEdit, setIsMatchSettingsOpen, setGameOptions, setResumeGame, setScene } = ctx
-  const { setSquadPurpose, setNotice } = ctx
+/** 경기 진행 저장 · 이어하기 · 나가기 · 장면 옮기기 */
+export function useGameProgressActions(scope: SeasonScope) {
+  const { atoms, recordStat, aceLevels } = scope
+  const gameKind = useSeasonValue(atoms, gameKindAtom)
+  const ownRotationShift = useSeasonValue(atoms, ownRotationShiftAtom)
+  const { commit } = useSeasonSaveWriters(scope)
+  const { withGameSettings, entryOrderOf } = useSeasonGameSetup(scope)
   /**
    * 경기 화면의 이어하기 저장 (`TeamGameScreen.onHalfInningSave`) — 진행 한 판마다 +0x4e = 1 과 블록을 시즌 저장에 쓴다.
    * 첫 진행이 0xdd OK 몫(0x847e — 원본도 OK 가 두 팀·st 를 칸 0xc · 0xd 에 걸고 파일을 쓴 뒤 경기 장면으로 간다),
@@ -23,9 +37,9 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
    */
   const saveGameProgress = useCallback(
     (progress: TeamGameProgress) => {
-      const current = latestSaveRef.current
+      const current = atoms.get(saveAtom)
       // 정산 진입(0x4ea0c) 뒤에는 반 이닝 저장이 없다 — 늦게 온 effect 가 +0x4e 를 되세우지 않게
-      if (current === null || settledGameRef.current !== null) return
+      if (current === null || atoms.get(settledGameAtom) !== null) return
       // 반 이닝 저장(0x4f928)은 이닝 넘김 0xb6b6c 뒤다 — 전역 경기 상태 +0x6b 가 지금 이닝이다. 경기 중 나가기(0x40140)는
       // 이 칸을 안 지우므로 나간 그 이닝이 남는다 (`liveGameState`). 이어하기 첫 진행은 블록에서 되복사한 st 의 이닝이다
       setLiveGameInningIndex(progress.game.inning - 1)
@@ -34,7 +48,7 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
       recordStat?.({ kind: '플레이시간', mode: SEASON_STAT_MODE, elapsed: lapPlayClock() })
       commit({ ...current, isGameInProgress: true, gameSave: { progress, kind: gameKind, ownRotationShift } })
     },
-    [commit, gameKind, ownRotationShift, recordStat, latestSaveRef, settledGameRef],
+    [atoms, commit, gameKind, ownRotationShift, recordStat],
   )
   /**
    * 0x327b8 모드 2 갈래 — `+0x42(시즌 저장 있음) && +0x4e` 면 곧장 경기. 원본은 장면 0x105 를 세우지 않고 0x104 로 가서
@@ -45,7 +59,7 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
    * 마선수 레벨은 원본이 경기 중 전역 칸에서 그때그때 읽으므로 지금 값으로 바꿔 끼운다.
    */
   const resumeSavedGame = useCallback((): boolean => {
-    const current = latestSaveRef.current
+    const current = atoms.get(saveAtom)
     if (current === null || current.isGameInProgress !== true) return false
     // +0x4e 와 블록은 함께 선다 — 쓰는 곳(경기 중간 저장)이 둘을 같이 적고, 읽을 때(`normalizeSeasonSave`)는 블록을 못 가려 내면
     // +0x4e 도 내린다. 그래서 여기서 다시 가리던 웹 전용 안전망(못 읽으면 표시를 내림)은 앱 길에서 안 닿아 걷었다(Q-13, r325 계측)
@@ -68,59 +82,42 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
     // (이어하기는 `isGameInProgress` 가 선 뒤라 그 판의 수입이 늘 들어 있다). 난수 없음
     const withIncome = isBugFixed('B-07') ? current : withSceneSetupIncome(current, saved.options.opponentTeamId)
     if (withIncome !== current) commit(withIncome)
-    setGameKind(block.kind)
-    setOwnRotationShift(block.ownRotationShift)
-    setPendingGame(null)
-    setEntryEdit(null)
-    setIsMatchSettingsOpen(false)
-    setGameOptions(options)
-    setResumeGame(restored)
-    setScene(SEASON_SCENE_STATE.경기직전)
+    atoms.set(gameKindAtom, block.kind)
+    atoms.set(ownRotationShiftAtom, block.ownRotationShift)
+    atoms.set(pendingGameAtom, null)
+    atoms.set(entryEditAtom, null)
+    atoms.set(isMatchSettingsOpenAtom, false)
+    atoms.set(gameOptionsAtom, options)
+    atoms.set(resumeGameAtom, restored)
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.경기직전)
     return true
-  }, [
-    aceLevels,
-    commit,
-    entryOrderOf,
-    withGameSettings,
-    latestSaveRef,
-    setEntryEdit,
-    setGameKind,
-    setGameOptions,
-    setIsMatchSettingsOpen,
-    setOwnRotationShift,
-    setPendingGame,
-    setResumeGame,
-    setScene,
-  ])
+  }, [atoms, aceLevels, commit, entryOrderOf, withGameSettings])
   /** 경기 중 "나가기" — 장면만 내린다(+0x4e · 블록은 그대로). 다음 진입이 `resumeSavedGame` 으로 다시 세운다 */
   const leaveGame = useCallback(() => {
-    setGameOptions(null)
-    setResumeGame(null)
-    setScene(SEASON_SCENE_STATE.관리메뉴)
-  }, [setGameOptions, setResumeGame, setScene])
+    atoms.set(gameOptionsAtom, null)
+    atoms.set(resumeGameAtom, null)
+    atoms.set(sceneAtom, SEASON_SCENE_STATE.관리메뉴)
+  }, [atoms])
   /**
    * `0xb512c` 를 열 팀에 — 0xdf 진입 0x5980(5988~599e) · 0xe5 진입 0x5cd0(5cd8~5cee)이 목록을 채우기 전에 부른다(U-105 r154).
    * 저장은 따로 안 쓴다(다음 저장이 레코드째 쓴다) — 웹은 세이브 칸을 바로 비운다
    */
   const clearRecordAces = useCallback(() => {
-    const current = latestSaveRef.current
+    const current = atoms.get(saveAtom)
     if (current === null || current.recordAces === undefined) return
     const { recordAces: _cleared, ...rest } = current
     commit(rest)
-  }, [commit, latestSaveRef])
+  }, [atoms, commit])
   const goto = useCallback(
     (next: SeasonSceneState) => {
       // 구단관리 칸 3 코치채용 → this+0x11c = 2, 0xd7 (키 0x4e40)
-      if (next === SEASON_SCENE_STATE.선수단) setSquadPurpose(SQUAD_PURPOSE.코치채용)
+      if (next === SEASON_SCENE_STATE.선수단) atoms.set(squadPurposeAtom, SQUAD_PURPOSE.코치채용)
       if (next === SEASON_SCENE_STATE.선수고르기) clearRecordAces()
-      setScene(next)
+      atoms.set(sceneAtom, next)
     },
-    [clearRecordAces, setScene, setSquadPurpose],
+    [atoms, clearRecordAces],
   )
-  const clearNotice = useCallback(() => setNotice(''), [setNotice])
-  const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [setScene])
+  const clearNotice = useCallback(() => atoms.set(noticeAtom, ''), [atoms])
+  const quit = useCallback(() => atoms.set(sceneAtom, SEASON_SCENE_STATE.팀고르기), [atoms])
   return { saveGameProgress, resumeSavedGame, leaveGame, clearRecordAces, goto, clearNotice, quit }
 }
-
-/** `useGameProgressActions` 까지 선 값 */
-export type GameProgressActionsContext = SeasonEventActionsContext & ReturnType<typeof useGameProgressActions>
