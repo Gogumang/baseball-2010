@@ -136,7 +136,6 @@ export const readabilityBaseline = [
   'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
   'src/pages/defense/lib/ballParticles.ts',
-  'src/pages/defense/lib/defenseHomeRunEffects.ts',
   'src/pages/defense/lib/defenseSpritePreload.ts',
   'src/pages/defense/lib/playerEffectMarks.ts',
   'src/pages/defense/model/useFreePassPlayStart.ts',
