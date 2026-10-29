@@ -13,8 +13,6 @@ export const readabilityRules = {
 
 export const readabilityBaseline = [
   'src/app/assetPacks/assetPackGate.ts',
-  'src/app/dev/sceneRunner.ts',
-  'src/app/dev/sessionSnapshot.ts',
   'src/app/model/afterGameEventPreload.ts',
   'src/app/model/commonWindowScene.ts',
   'src/app/model/screenBgm.ts',
@@ -355,7 +353,6 @@ export const readabilityBaseline = [
   'src/shared/lib/commonPanel/commonPanel.ts',
   'src/shared/lib/commonWindow/commonWindow.ts',
   'src/shared/lib/commonWindow/popupWindow.ts',
-  'src/shared/lib/dev/snapshotSlots.ts',
   'src/shared/lib/font/compose.ts',
   'src/shared/lib/font/layout.ts',
   'src/shared/lib/gameMarkup/gameMarkup.ts',

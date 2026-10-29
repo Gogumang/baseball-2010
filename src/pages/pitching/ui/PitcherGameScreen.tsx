@@ -114,7 +114,6 @@ import { usePitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverla
 import { createSkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
 import { useSkillCheerRestore } from '@/widgets/batting-stage/model/useSkillCheerRestore'
 import { usePickoffTouchKeys } from '@/features/defense-play/model/pickoffTouchKeys'
-import { publishScenePeek } from '@/shared/lib/scenePeek/scenePeek'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 import { SceneCloudCountingSpan } from '@/widgets/batting-stage/model/useSceneCloudCountingSpan'
 
@@ -586,35 +585,6 @@ function PitcherGameScene({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [acceptsGiveUpKey, pressGiveUp])
-  // 장면 바로가기 · e2e 가 기다릴 자리(웹 개발 도구 — `shared/lib/scenePeek`). 스위치는 그 자리에 둬야 배포 빌드에서 접힌다
-  const isPitchSlotPickerShown =
-    canPitch &&
-    !isSceneShowing &&
-    !isAwaitingConfirm &&
-    !isPitchSceneBusy &&
-    !isReplaying &&
-    !isRelaying &&
-    phase === '구질' &&
-    progress.pendingDefensePlay === null &&
-    progress.pendingRunnerPlay == null
-  const isDefensePlayShown = progress.pendingDefensePlay !== null && !isHitSceneShowing
-  useEffect(() => {
-    if (!(import.meta.env.DEV || import.meta.env.MODE === 'e2e')) return
-    publishScenePeek('pitcherGame', {
-      isIntroDone,
-      canPitch,
-      isAwaitingConfirm,
-      isPitchSlotPickerShown,
-      acceptsGiveUpKey,
-      isDefensePlayShown,
-    })
-  }, [isIntroDone, canPitch, isAwaitingConfirm, isPitchSlotPickerShown, acceptsGiveUpKey, isDefensePlayShown])
-  useEffect(
-    () => () => {
-      if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') publishScenePeek('pitcherGame', null)
-    },
-    [],
-  )
 
   const throwWith = (gaugeCell: number, throwAim: WorldPoint | null = aim) => {
     if (slot === null) return

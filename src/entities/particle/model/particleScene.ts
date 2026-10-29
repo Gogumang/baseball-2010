@@ -67,22 +67,6 @@ export function emitParticles(scene: ParticleScene, config: ParticleConfig | nul
   return block
 }
 
-/**
- * 개발 · e2e 전용 — 관리자 `target` 을 `source`(경기 중간 스냅샷이 푼 값) 그대로 만든다. 이미터는 `target` 의 풀을 쓰고, 블록 번호를 다시
- * 단다(`app/dev/sessionSnapshot`). 배포 앱은 부르지 않는다
- */
-export function restoreParticleSceneForDev(target: ParticleScene, source: ParticleScene): void {
-  target.pool.free = source.pool.free
-  for (const emitter of source.emitters) (emitter as { pool: ParticlePool }).pool = target.pool
-  for (const emitter of source.blocks) if (emitter !== null) (emitter as { pool: ParticlePool }).pool = target.pool
-  target.emitters.splice(0, target.emitters.length, ...source.emitters)
-  target.blocks.splice(0, target.blocks.length, ...source.blocks)
-  target.blockStates.splice(0, target.blockStates.length, ...source.blockStates)
-  source.blocks.forEach((emitter, block) => {
-    if (emitter !== null) blockOfEmitter.set(emitter, block)
-  })
-}
-
 /** 블록 자리의 +0x58 — 지운 이미터의 자리면 마지막 값, 새 이미터가 받았으면 그 이미터의 값 */
 export function blockStateOf(scene: ParticleScene, block: number): EmitterState {
   return scene.blockStates[block] ?? 0

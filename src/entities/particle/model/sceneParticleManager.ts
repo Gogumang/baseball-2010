@@ -1,5 +1,4 @@
-import { clearParticles, createParticleScene, restoreParticleSceneForDev } from '@/entities/particle/model/particleScene'
-import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
+import { clearParticles, createParticleScene } from '@/entities/particle/model/particleScene'
 import type { ParticleScene } from '@/entities/particle/model/particleScene'
 
 /**
@@ -130,20 +129,6 @@ export function claimSceneParticleTick(target: ParticleScene, appTick: number | 
   if (lastTickedAppTick !== null && appTick <= lastTickedAppTick) return false
   lastTickedAppTick = appTick
   return true
-}
-
-// 경기 중간 스냅샷(개발 · e2e 전용 — 배포 빌드에서 빠진다): 이미터 · 풀 · 블록과 마지막으로 굴린 앱 틱. 쥔 수 · 걸린 갱신은 부품이 다시 건다
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  registerSnapshotSlot('sceneParticles', {
-    capture: () => ({ scene, lastTickedAppTick }),
-    // 관리자 객체는 붙박이 — 스냅샷이 이 객체에 그대로 채우고, 여기서는 이미터 풀 · 블록 번호를 다시 단다
-    anchors: () => ({ scene }),
-    restore: (value) => {
-      const saved = value as { scene: ParticleScene; lastTickedAppTick: number | null }
-      restoreParticleSceneForDev(scene, saved.scene)
-      lastTickedAppTick = saved.lastTickedAppTick
-    },
-  })
 }
 
 /** 시험용 — 관리자를 비우고 쥔 수를 되돌린다 */

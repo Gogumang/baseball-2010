@@ -9,8 +9,7 @@ import { reactCompiler } from './tools/viteReactCompiler.ts'
 import { unitTestGroups } from './tools/vitestProjects.ts'
 
 const UNIT_TEST_INCLUDE = ['src/**/*.test.ts', 'src/**/*.test.tsx']
-// 실제 브라우저(CSS · z-index · zoom 이 실린다)에서 도는 시험은 따로 돈다 — `pnpm test:browser` (vitest.browser.config.ts)
-const UNIT_TEST_EXCLUDE = [...configDefaults.exclude, 'src/**/*.browser.test.tsx']
+const UNIT_TEST_EXCLUDE = configDefaults.exclude
 // 나눠 받는 화면(`lazyScreen`)을 시험 전에 받아 둔다 — 화면이 첫 그림부터 곧바로 선다
 // 해금 표(`unlocks.json`)는 시험에서 원본 잠금으로 돌린다 — `originalUnlocksForTests`
 // 숨은 판정값(`balance.json`)도 시험에서는 원본 값으로 돌린다 — `originalBalanceForTests`

@@ -64,16 +64,13 @@ export function createSeededRandom(seed: number): RandomPort {
   return createSeededRandomOn({ state: seed >>> 0 })
 }
 
-/**
- * 씨앗 칸 [0x15606d4] — 32비트 상태 하나. `createSeededRandomOn` 이 이 칸을 굴린다. 웹 개발 도구(원본에 없다)인 경기 중간
- * 스냅샷(`app/dev/sessionSnapshot`)이 이 칸을 읽고 되살린다 — 앱은 개발 · e2e 빌드에서만 칸을 따로 쥔다(`App.tsx`)
- */
-export interface SeededRandomCell {
+/** 씨앗 칸 [0x15606d4] — 32비트 상태 하나. `createSeededRandomOn` 이 이 칸을 굴린다 */
+interface SeededRandomCell {
   state: number
 }
 
 /** 칸 `cell` 을 굴리는 원본 난수 생성기 — `createSeededRandom` 과 같은 수열이다(씨앗을 칸에 넣었을 뿐) */
-export function createSeededRandomOn(cell: SeededRandomCell): RandomPort {
+function createSeededRandomOn(cell: SeededRandomCell): RandomPort {
   return {
     rand(lo: number, hi: number): number {
       // bfa60~bfa68: s = (s * 0x343fd + 0x269ec3) >>> 1 — 밀린 값을 그대로 씨앗에 넣는다

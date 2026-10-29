@@ -40,7 +40,7 @@ export default defineConfig({
   categories: { correctness: 'off' },
   plugins: ['eslint', 'typescript'],
   options: { reportUnusedDisableDirectives: 'error' },
-  ignorePatterns: ['dist', 'base', 'public', 'e2e/snapshots', 'e2e/fixtures', 'e2e/.run', 'tools/.venv'],
+  ignorePatterns: ['dist', 'base', 'public', 'tools/.venv'],
   rules: {
     // eslint recommended
     'for-direction': 'error',
@@ -110,7 +110,7 @@ export default defineConfig({
     'typescript/triple-slash-reference': 'error',
     // 이 저장소 규칙
     'max-lines': MAX_LINES,
-    // 옛 코드에 있고 고치려면 코드를 바꿔야 하는 규칙 — 경고로 두고 조금씩 줄인다 (r343 도입 때 개수는 e2e/README.md)
+    // 옛 코드에 있고 고치려면 코드를 바꿔야 하는 규칙 — 경고로 두고 조금씩 줄인다 (r343)
     'no-useless-assignment': 'warn',
     'prefer-const': ['error', { destructuring: 'all' }],
   },
@@ -118,7 +118,7 @@ export default defineConfig({
     { files: ['**/*.js', '**/*.mjs', '**/*.cjs'], rules: JS_ONLY_RULES },
     { files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'], rules: TS_ONLY_RULES },
     { files: SRC, env: { browser: true } },
-    { files: ['e2e/**', 'tools/**', '*.config.ts', '*.config.js', ...BASELINE_FILES], env: { node: true, browser: true } },
+    { files: ['tools/**', '*.config.ts', '*.config.js', ...BASELINE_FILES], env: { node: true, browser: true } },
     {
       // react-hooks recommended(React Compiler 규칙 포함) + react-refresh — oxlint 의 react 플러그인에 같은 이름으로 있다
       files: SRC,

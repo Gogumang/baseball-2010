@@ -9,7 +9,6 @@ import { derbyNoContactWaitFramesOf, derbyPitchCallOf } from '@/pages/home-run-d
 import { DERBY_HOME_RUN_SOUND, derbyBattedBallOf, skipDerbyBattedBall, type DerbyBattedBall } from '@/entities/home-run-derby/model/derbyBattedBall'
 import { derbyPitcherOf } from '@/entities/home-run-derby/model/derbyPitcher'
 import { DERBY_NO_BATTER_SAVE_TEAM_ID } from '@/entities/home-run-derby/model/derbyRules'
-import { devDerbyStartNow, setDevDerbyStart } from '@/shared/lib/devDerbyStart/devDerbyStart'
 import {
   confirmDerbyNextBatter,
   createDerbyLineup,
@@ -382,14 +381,7 @@ export function useHomeRunDerby({
   onOpenHidden,
 }: HomeRunDerbyOptions): HomeRunDerbySession {
   /** HUD 가 그리는 진행 — 셈(`runRef`)은 공이 맞은 순간 하고, 이 칸은 판 끝 · 0x12 대기 끝에 따라 맞춘다 */
-  // 장면 바로가기 `derby-stage<N>`(웹 개발 도구 — `shared/lib/devDerbyStart`)가 적어 둔 단계 시작 상태가 있으면 첫 판만 그것으로.
-  // 스위치는 그 자리에 둬야 배포 빌드에서 접힌다. 마운드 단계(`moundStage`)도 이 값에서 시작한다
-  const [run, setRun] = useState<DerbyRun>(() => {
-    const devStart = import.meta.env.DEV || import.meta.env.MODE === 'e2e' ? devDerbyStartNow() : null
-    if (devStart === null) return createDerbyRun()
-    const fresh = createDerbyRun()
-    return { ...fresh, ...devStart, pitchesThrown: fresh.remainingPitches - devStart.remainingPitches }
-  })
+  const [run, setRun] = useState<DerbyRun>(createDerbyRun)
   const [isPaused, setIsPaused] = useState(false)
   /** 상대 팀 v (장면 시작 굴림 3a454) — 난수가 없으면 undefined */
   const [opponentTeamId, setOpponentTeamId] = useState<number | undefined>(undefined)
@@ -479,8 +471,6 @@ export function useHomeRunDerby({
   useEffect(() => {
     if (isSceneStartRolledRef.current) return
     isSceneStartRolledRef.current = true
-    // 단계 바로가기는 첫 판에만 — 다시하기 · 재도전은 0 단계부터
-    if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') setDevDerbyStart(null)
     // 0x39fdc 모드 7 갈래 3a49c — 0xb6814(전역 상태): +0x6b = 0 (`liveGameState`). 더비는 한 공 끝 판정 A 가 0x18 로
     // 안 가(모드 7 → 0xd / 0x1a) 이닝 넘김 0xb6b6c 를 안 지나므로 그대로 0 이 남는다
     resetLiveGameState()

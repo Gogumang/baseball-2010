@@ -10,9 +10,8 @@
  * - **두 번째 방문**: 캐시에 묶음이 다 있으면 화면 없이 곧바로 지난다. 망이 끊겨도 마지막 판 캐시로 지난다(워커가 index.html 도 낸다).
  * - **배포가 바뀌면** 목록의 판이 바뀐다 — 새 판 캐시에 새로 받고, 다른 판 캐시는 지운다.
  * - **실패**: 묶음마다 세 번까지 다시 받는다. 끝내 못 받은 묶음은 빼고 지난다 — 그 자산은 예전처럼 낱개로 받는다.
- * - **건너뜀**: 개발 서버 · 시험, 서비스 워커 · Cache Storage · `DecompressionStream` 이 없는 브라우저, 장면 바로가기(`?scene=`,
- *   e2e) — 바로가기는 받기를 건너뛰되, 같은 맥락에서 이미 받아 둔 묶음과 워커가 있으면 그대로 쓴다.
- * 결과는 `<html data-asset-packs="…">` 에 적는다(e2e 가 기다린다).
+ * - **건너뜀**: 개발 서버 · 시험, 서비스 워커 · Cache Storage · `DecompressionStream` 이 없는 브라우저.
+ * 결과는 `<html data-asset-packs="…">` 에 적는다.
  */
 import { hideAssetLoadingScreen, showAssetLoadingScreen } from '@/app/assetPacks/loadingScreen'
 import { tryOrAsync, tryOrElseAsync } from '@/shared/lib/safe/tryOr'
@@ -171,26 +170,12 @@ async function storedVersion(): Promise<string | null> {
   return null
 }
 
-export interface AssetPackGateOptions {
-  /** 장면 바로가기(`?scene=`) — 받기를 건너뛴다 */
-  readonly isShortcut: boolean
-}
-
 /** 문을 지난다. 기다린 뒤에 앱을 그린다 */
-export async function runAssetPackGate({ isShortcut }: AssetPackGateOptions): Promise<AssetPackGateResult> {
+export async function runAssetPackGate(): Promise<AssetPackGateResult> {
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') return 'skipped'
   if (!isSupported()) return setResult('unsupported')
   return tryOrElseAsync(
     async () => {
-      if (isShortcut) {
-        // 바로가기 — 이 맥락에서 이미 받은 판이 있고 워커가 맡고 있을 때만 쓴다(받지 않는다)
-        const controller = navigator.serviceWorker.controller
-        const version = controller === null ? null : new URL(controller.scriptURL).searchParams.get('v')
-        if (version === null || (await storedPacks(await caches.open(`${ASSET_PACK_CACHE_PREFIX}${version}`))).length === 0) {
-          return setResult('skipped')
-        }
-        return setResult('cached')
-      }
       const manifest = await fetchManifest()
       if (manifest === null) {
         // 오프라인(또는 묶음 없는 빌드) — 넣어 둔 판이 있으면 그 판 워커로

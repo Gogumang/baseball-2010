@@ -1,4 +1,3 @@
-import { registerSnapshotSlot } from '@/shared/lib/dev/snapshotSlots'
 /**
  * **경기 장면의 플레이 시계** — 장면 `+0x19d8`(시작 시각) · `+0x19e0`(멈춘 시간) 자리.
  *
@@ -22,15 +21,4 @@ export function lapPlayClock(now: number = Date.now()): number {
   const elapsed = now - startedAt
   startedAt = now
   return elapsed
-}
-
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 플레이 시계
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  registerSnapshotSlot('playClock', {
-    // 벽시계(Date.now) 칸 — 지난 밀리초로 옮긴다
-    capture: () => (startedAt === null ? null : Date.now() - startedAt),
-    restore: (value) => {
-      startedAt = value === null ? null : Date.now() - (value as number)
-    },
-  })
 }

@@ -1,4 +1,3 @@
-import { trackWeakCollectionForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { CATCH_KIND } from '@/entities/fielding/model/catchPrediction'
@@ -111,10 +110,6 @@ export interface ViewStateInput {
  * 진행기마다 판 하나 동안 들고 있는 `previousActions` 에 붙여 둔다(따로 넘길 칸을 늘리지 않으려고).
  */
 const dustTrailsOf = new WeakMap<ActionMemory, DustTrailState[]>()
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 상태 객체를 열쇠로 든 약한 표
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  trackWeakCollectionForSnapshot('defensePlayView.dustTrailsOf', dustTrailsOf)
-}
 
 export function viewStateOf(input: ViewStateInput): DefensePlayView {
   const fielders: DefenseFielder[] = input.fielders.map((fielder) => {

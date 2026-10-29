@@ -1,4 +1,3 @@
-import { trackWeakCollectionForSnapshot } from '@/shared/lib/dev/snapshotSlots'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { clearSceneParticles } from '@/entities/particle/model/sceneParticleManager'
@@ -86,14 +85,6 @@ function sceneDEntryTickOf(wait: SceneConfirmWait, confirmed: number, now: numbe
 
 /** 대기 객체마다 받은 OK 수 — 화면이 다시 서도 남는다 (진행 상태가 같은 객체를 들고 있는 동안) */
 const confirmedCounts = new WeakMap<SceneConfirmWait, number>()
-// 경기 중간 스냅샷(개발 · e2e 전용 — `shared/lib/dev/snapshotSlots`, 배포 빌드에서 빠진다): 상태 객체를 열쇠로 든 약한 표
-if (import.meta.env.DEV || import.meta.env.MODE === 'e2e') {
-  trackWeakCollectionForSnapshot('useSceneConfirm.announcedWaits', announcedWaits)
-  trackWeakCollectionForSnapshot('useSceneConfirm.enteredSceneD', enteredSceneD)
-  trackWeakCollectionForSnapshot('useSceneConfirm.passedHookWaits', passedHookWaits)
-  trackWeakCollectionForSnapshot('useSceneConfirm.notedSceneDEntries', notedSceneDEntries)
-  trackWeakCollectionForSnapshot('useSceneConfirm.confirmedCounts', confirmedCounts)
-}
 
 /** OK 를 받을 때마다 부른다 — 대기를 화면 밖에서 보는 쪽(`useIsSceneConfirmAwaiting`)이 다시 그린다 */
 const confirmListeners = new Set<() => void>()

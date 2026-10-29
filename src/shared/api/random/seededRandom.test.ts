@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSeededRandom, createSeededRandomOn } from '@/shared/api/random/seededRandom'
+import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
 /*
  * 기대값은 원본 산술을 파이썬으로 따로 계산했다:
@@ -49,24 +49,5 @@ describe('createSeededRandom — 원본 0xbfa54 · 0x9d468', () => {
       expect(value).toBeGreaterThanOrEqual(-3)
       expect(value).toBeLessThan(4)
     }
-  })
-})
-
-describe('createSeededRandomOn — 씨앗 칸을 밖에서 쥔 생성기 (경기 중간 스냅샷, r329)', () => {
-  const draw = (random: ReturnType<typeof createSeededRandom>) =>
-    Array.from({ length: 40 }, (_, index) => (index % 3 === 0 ? random.rand9d(97) : random.rand(-50, 1000)))
-
-  it('같은 씨앗이면 createSeededRandom 과 같은 수열이다 — 배포 앱의 난수 차례는 그대로', () => {
-    expect(draw(createSeededRandomOn({ state: 20100901 }))).toEqual(draw(createSeededRandom(20100901)))
-    expect(draw(createSeededRandomOn({ state: 0xffffffff }))).toEqual(draw(createSeededRandom(0xffffffff)))
-  })
-
-  it('칸의 32비트 상태를 떠 두었다가 새 칸에 넣으면 그 뒤 수열이 같다', () => {
-    const cell = { state: 5 }
-    const random = createSeededRandomOn(cell)
-    draw(random)
-    const saved = cell.state
-    const rest = draw(random)
-    expect(draw(createSeededRandomOn({ state: saved }))).toEqual(rest)
   })
 })

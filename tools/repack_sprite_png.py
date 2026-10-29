@@ -15,7 +15,7 @@ public/sprites 의 PNG 를 **무손실 팔레트 PNG** 로 다시 쓴다 (r311, 
 - IHDR · PLTE · tRNS · IDAT · IEND 외의 덩이(gAMA · iCCP · sRGB · cHRM · tEXt …)가 생기면 그 파일도 그대로 둔다
   — 색 관리 덩이가 붙으면 브라우저가 색을 바꿀 수 있다.
 - 색이 256개를 넘거나, 다시 써도 작아지지 않으면 그대로 둔다. 그래서 **멱등**이다(두 번째부터는 바뀌는 것이 없다).
-- 브라우저 대조(chromium · webkit `drawImage` → `getImageData`)는 `e2e/png-rgba.mjs` 로 한다.
+- 브라우저 대조(chromium · webkit `drawImage` → `getImageData`)는 옛 `e2e/png-rgba.mjs` 로 했다(r364 에 e2e 와 함께 지움).
 
 자산을 다시 뽑는 도구(`prune_sprites.py` · `apply_mpl.py` · `generate_management_sprites.py`) 끝에서 이 단계를 부른다.
 `decode_pzx.py -o public/sprites` 로 직접 뽑았으면 `apply_mpl.py` 를 돌리거나 이 도구를 한 번 돌린다.
