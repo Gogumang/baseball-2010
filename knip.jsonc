@@ -20,7 +20,7 @@
     "src/entities/career/model/battingOrder.ts": ["exports"], // START_BATTING_ORDER
     "src/entities/career/model/gpItems.ts": ["exports"], // EAGLE_EYE_NOTICE · EAGLE_EYE_ITEM_ID (StrMODE[224], 0x13ab4)
     "src/entities/career/model/gpItems/guard/guard.ts": ["exports"], // EAGLE_EYE_NOTICE · EAGLE_EYE_ITEM_ID (위 모음이 다시 내보낸다)
-    "src/entities/career/model/seasonFlow.ts": ["exports"], // ENDING_EVENT_IDS
+    "src/entities/career/model/seasonFlow/endingAftermath.ts": ["exports"], // ENDING_EVENT_IDS
     "src/entities/defense-controls/model/laserThrow.ts": ["exports"], // LASER_SPEED_PERCENT · LASER_RANGE_PERCENT · LASER_WILD_THROW_BONUS
     "src/entities/defense-controls/model/pickoff.ts": ["exports"], // PICKOFF_AI_STATE (0xb47da)
     "src/entities/defense-controls/model/sliding.ts": ["exports"], // SLIDING_MOTION
@@ -29,7 +29,7 @@
     "src/entities/home-run-derby/model/derbyRules.ts": ["exports"], // NEW_RECORD_SOUND_ID · NORMAL_RECORD_SOUND_ID (0x4f644)
     "src/entities/league/model/leagueDay.ts": ["exports"], // REGULAR_INNINGS · LEAGUE_DAY_GAME_COUNT
     "src/entities/national-cup/model/nationalCup.ts": ["exports"], // NATIONAL_CUP_FULL_STAMINA
-    "src/entities/pitcher-career/model/magicPitch.ts": ["exports"], // MAGIC_PITCH_NAME_STRING_INDEX (StrCOMMON)
+    "src/entities/pitcher-career/model/magicPitch/names.ts": ["exports"], // MAGIC_PITCH_NAME_STRING_INDEX (StrCOMMON)
     "src/entities/pitcher-career/model/managerHook.ts": ["exports"], // SELF_HOOK_PROMPT_GAME_TEXT_INDEX · HOOK_SCENE_STATE
     "src/entities/pitcher-career/model/pitcherAbility.ts": ["exports", "duplicates"], // PITCHER_ABILITY_ITEM_TEXT_INDEX · 아이템 대상 = 능력치 차례 (같은 표의 두 이름)
     "src/entities/pitcher-career/model/pitcherRegistration.ts": ["exports"], // PITCHER_RECORD_BYTE_0X0A
@@ -41,7 +41,7 @@
     "src/entities/season-mode/model/seasonEventFlow/ids.ts": ["exports"], // SEASON_SCREEN_CODE (위 모음이 다시 내보낸다)
     "src/entities/season-mode/model/seasonEventFlow/illness.ts": ["exports"], // ILLNESS_ABILITY_PENALTY_PERCENT (b5824, 위 모음이 다시 내보낸다)
     "src/entities/season-mode/model/seasonGoals.ts": ["exports"], // SEASON_GOAL_INTRO_EVENT_ID
-    "src/entities/season-mode/model/seasonItemShop.ts": ["exports"], // SEASON_SHOP_SLOT_COUNT
+    "src/entities/season-mode/model/seasonItemShop/prices.ts": ["exports"], // SEASON_SHOP_SLOT_COUNT
     "src/entities/season-mode/model/seasonReputation.ts": ["exports"], // UNUSED_SLOT (S[15])
     "src/entities/season-mode/model/stadiumItems.ts": ["exports"], // GRASS_HAS_NO_EFFECT (없는 게 원본과 같다는 표시)
     "src/entities/settings/model/modeReset.ts": ["exports"], // MODE_RESET_SLOT (0x224ec)
