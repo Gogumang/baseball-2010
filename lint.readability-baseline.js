@@ -56,7 +56,6 @@ export const readabilityBaseline = [
   'src/entities/defense-controls/model/defenseKeys.ts',
   'src/entities/fielding/model/autoAdvance.ts',
   'src/entities/fielding/model/baserunningKey.ts',
-  'src/entities/fielding/model/catchPrediction.ts',
   'src/entities/fielding/model/fielderPose.ts',
   'src/entities/fielding/model/outJudgement.ts',
   'src/entities/fielding/model/playGate.ts',
