@@ -1,5 +1,5 @@
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
 import type { ReactNode } from 'react'
@@ -321,11 +321,13 @@ function PitcherGameScene({
     setLiveGameSides(liveGameSidesOf({ ourTeamId, opponentTeamId }, { ourScore, opponentScore, playerSide }))
   }, [ourTeamId, opponentTeamId, ourScore, opponentScore, playerSide])
 
-  // 타석·차례가 바뀌면 1단계로 되돌린다
-  useEffect(() => {
-    if (!canPitch) return
-    if (progress.atBat.balls === 0 && progress.atBat.strikes === 0) setPhase('구질')
-  }, [canPitch, progress.atBat.balls, progress.atBat.strikes])
+  // 타석·차례가 바뀌면 1단계로 되돌린다 — 던질 수 있음 · 볼 · 스트라이크가 바뀐 렌더에서 맞춘다
+  const countKey = `${canPitch}:${progress.atBat.balls}:${progress.atBat.strikes}`
+  const [seenCountKey, setSeenCountKey] = useState<string | null>(null)
+  if (seenCountKey !== countKey) {
+    setSeenCountKey(countKey)
+    if (canPitch && progress.atBat.balls === 0 && progress.atBat.strikes === 0) setPhase('구질')
+  }
 
   /**
    * 원본 공용 키 처리 `0x498d4` 의 '\*' — 경기 중 메뉴.
@@ -333,6 +335,7 @@ function PitcherGameScene({
    */
   // 단말 일시정지 0x463ac — '*' 가 받는 때이고 하위 창이 없으면 같은 메뉴를 연다
   useInGameMenuOpenOnHide(menu, !isSceneShowing && overlay === null)
+  const { pressStar } = menu
   useEffect(() => {
     if (isSceneShowing) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -340,11 +343,11 @@ function PitcherGameScene({
       // 조작방법 뷰어(경기 중 메뉴 하위 4)의 키는 0x3ca36 이 뷰어 0x637d0 에만 준다 — '*' 도 아무 일 안 한다
       if (overlay === '조작방법') return
       event.preventDefault()
-      menu.pressStar()
+      pressStar()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isSceneShowing, menu.pressStar, overlay])
+  }, [isSceneShowing, pressStar, overlay])
 
   const burst = progress.burst
   const resolution = progress.lastBurstResolution
@@ -440,6 +443,7 @@ function PitcherGameScene({
   // 0x12 진입 틀에 공 도착 판이 섰다 — 공 끝 · 키 막음은 이제 판이 맡는다(놓는 그림은 판이 설지 몰라 대기 틱을 세웠다)
   useEffect(() => {
     if (arrivalPlay === null) return
+    // oxlint-disable-next-line react/set-state-in-effect -- 판이 선 그림(0x12 틱 0)은 대기 틱이 남은 채 한 번 커밋된다 — 공 끝 알림(notePitchPlayOpened)과 같은 자리에서 지운다
     setPitchWaitTicks(0)
     notePitchPlayOpened()
   }, [arrivalPlay, notePitchPlayOpened])
@@ -462,6 +466,7 @@ function PitcherGameScene({
    * 던진 걸음의 첫 그림은 위 효과가 대기 틱을 세우기 전이라 새 판정(`lastResolution`)이 들어온 그림도 그동안으로 친다
    */
   /** 내 공이 날거나 0x12 인 동안(0x11 · 0x12) — 던진 걸음의 첫 그림은 위 효과가 대기 틱을 세우기 전이라 새 판정이 든 그림도 친다 */
+  // oxlint-disable-next-line react/refs -- 새 판정이 든 첫 그림(위 효과가 ref 를 고치고 대기 틱을 세우기 전)을 가린다 — 효과가 다시 그리지 않고 끝나면 그 그림이 그대로 남는 것까지 예전과 같다
   const isPitchFlightShown = isPitchSceneBusy || lastResolutionRef.current !== lastResolution || isHitSceneShowing || isArrivalHolding
   const hiddenRunnerBases = hiddenStealBasesOf(progress, isPitchFlightShown)
   // 0x12 끝 돌발 판정이 참이면 0x35108 이 0x21 로 덮은 +0x1b6c 는 결과 창(0x1d)을 닫은 뒤다 (K 돌발 · R10 0x12 끝) — 창이 먼저
@@ -568,13 +573,15 @@ function PitcherGameScene({
     visibleBurstLines === null &&
     (isAwaitingConfirm ? sceneConfirm.isInConfirmState : phase === '구질')
   const acceptsGiveUpKeyRef = useRef(acceptsGiveUpKey)
-  acceptsGiveUpKeyRef.current = acceptsGiveUpKey
+  useLayoutEffect(() => {
+    acceptsGiveUpKeyRef.current = acceptsGiveUpKey
+  })
   /** '#' 는 장면 키 칸에 든다 — 받은 다음 틀의 키 0x498d4(4994a)가 그 틀의 상태(0xe · 0xf)를 보고 물음을 띄운다 */
   const pressGiveUp = useCallback(() => {
     pushSceneKey(() => {
       if (acceptsGiveUpKeyRef.current) setAsksGiveUp(true)
     })
-  }, [])
+  }, [setAsksGiveUp])
   useEffect(() => {
     if (!acceptsGiveUpKey) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -784,6 +791,7 @@ function PitcherGameScene({
     </>,
   )
   // 0x1c(판 위 창 0x46ee0)는 상태 틱을 안 박고, 타석 위 결과 창 0x1d(0x4d1e0)만 박는다
+  // oxlint-disable-next-line react/refs -- 상태 그리기 0x4d1e0 처럼 이 갈래를 그리는 렌더만 틱을 박는다 — 앞 갈래(인트로 · 판)로 돌아간 렌더는 옛 값을 둔다(훅으로 옮기면 그 갈래 구분이 사라진다)
   burstResultTickRef.current = heldDefense === null && burstWindow !== null && resolution !== null ? BURST_RESULT_STATE_TICK : null
   if (heldDefense !== null) return heldDefense
   // 자동진행 중계(0x21) — 굴려 둔 틱을 매 틱 한 칸씩 (모드 3: 키 · 속도 · 배경음 없음)

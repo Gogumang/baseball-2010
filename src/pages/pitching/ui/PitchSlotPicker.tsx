@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createSceneKeyLatch, openSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { isPitchSelectionDue, pitchSlotOfKey } from '@/features/play-pitcher-game/model/pitchAim'
 import { okBadgeTapRectOf, slotTapRectOf } from '@/pages/pitching/lib/pitchInputTapZones'
@@ -83,7 +83,9 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
   const chosenRef = useRef<number | null>(null)
   const isDoneRef = useRef(false)
   const propsRef = useRef({ choices, onDecide, isPaused })
-  propsRef.current = { choices, onDecide, isPaused }
+  useLayoutEffect(() => {
+    propsRef.current = { choices, onDecide, isPaused }
+  })
   /**
    * 받은 키 칸 — 칸 키 0x534d8 · 견제 키 0x53548(부르는 쪽이 `pushSceneKey` 로 넣는다)는 받은 다음 틀의 키 0x498d4(52d9e)가
    * 0xf 갱신 0x39c1c(52e14~)보다 먼저 처리한다(`sceneKeyLatch`)
@@ -130,7 +132,9 @@ export function PitchSlotPicker({ choices, onDecide, isPaused = false, overlay, 
     chosenRef.current = slot
   }
   const pressRef = useRef(press)
-  pressRef.current = press
+  useLayoutEffect(() => {
+    pressRef.current = press
+  })
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
