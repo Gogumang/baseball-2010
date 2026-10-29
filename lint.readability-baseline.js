@@ -372,7 +372,6 @@ export const readabilityBaseline = [
   'src/widgets/batting-stage/model/skillPanelDriver.ts',
   'src/widgets/batting-stage/model/usePitcherHitScene.ts',
   'src/widgets/batting-stage/model/useStageControls.ts',
-  'src/widgets/batting-stage/ui/BattingStage.tsx',
   'src/widgets/batting-stage/ui/MatchInfoStadiumBackdrop.tsx',
   'src/widgets/burst-mission/lib/burstMissionWindowLayout.ts',
   'src/widgets/burst-mission/lib/burstPortraitPreload.ts',
