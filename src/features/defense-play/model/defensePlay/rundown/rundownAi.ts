@@ -8,6 +8,7 @@ import { contextAt } from '@/features/defense-play/model/defensePlay/step/defens
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import { rollThrowBall } from '@/features/defense-play/model/defensePlay/throw/throwBall'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **AI 8 = 0xb48b6 — 협살 야수 한 칸** (플레이 vt4c 야수 고리의 분기표 0xd8808[8], 직접 뜬 것, r313):
@@ -35,7 +36,7 @@ export function rollRundownAi(s: DefensePlayState, t: TickFrame, slot: number): 
     // 0xb26b8 — 기록칸을 지우고 상태 8 인 야수를 전부 상태 0 으로. 날아가던 짝 송구는 보통 송구 공이라 그대로 날아가 예보가 고른 야수가 받는다
     s.fielders = endRundown(s.fielders)
     s.rundown = NO_RUNDOWN
-    s.log.push(`${t.tick}틱 협살 종료 — ${slot}번 야수의 협살 AI 가 풀었다 (b4912)`)
+    pushPlayLog(s.log, () => `${t.tick}틱 협살 종료 — ${slot}번 야수의 협살 AI 가 풀었다 (b4912)`)
     return
   }
   const self = s.fielders[slot]
@@ -83,7 +84,7 @@ function rollPartnerThrow(s: DefensePlayState, t: TickFrame, slot: number, toSlo
   if (partner === undefined) return
   const thrown = rollThrowBall(s, t, slot, toSlot, partnerThrowBaseOf(s, partner), '협살', false)
   if (!thrown || s.play.held) return
-  s.log.push(`${t.tick}틱 협살 송구 ${slot}→${toSlot} — ${s.throwArrivalTick}틱 도착 (${s.chaserSlot}번 야수가 받는다)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 협살 송구 ${slot}→${toSlot} — ${s.throwArrivalTick}틱 도착 (${s.chaserSlot}번 야수가 받는다)`)
 }
 
 function partnerThrowBaseOf(s: DefensePlayState, partner: FielderState): number {

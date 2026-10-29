@@ -13,6 +13,7 @@ import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/f
 import { grab } from '@/features/defense-play/model/runnerPlay/judgement/outJudgement'
 import { isAtTarget, markSlot, wrapBase } from '@/features/defense-play/model/runnerPlay/runners/playRunners'
 import { RUNNER_PLAY_RESULT } from '@/features/defense-play/model/runnerPlay/types/runnerPlayTypes'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **1. 포구 틱 갈래 0xb401c** — 쫓는 공을 고른 야수가 포구 틱(+0x174)에
@@ -67,7 +68,7 @@ function rollChaseFumble(g: RunnerPlayFrame, tick: number, chase: ChasedBall): b
   g.fumbled = true
   g.ballEventThisTick = true
   g.fumbleMarks = markSlot(g.fumbleMarks, chase.slot, FUMBLE_MARK_TICKS)
-  g.log.push(`${tick}틱 ${chase.slot}번 야수 펌블 (0xbc2)`)
+  pushPlayLog(g.log, () => `${tick}틱 ${chase.slot}번 야수 펌블 (0xbc2)`)
   return true
 }
 
@@ -86,10 +87,10 @@ function grabChasedBall(g: RunnerPlayFrame, tick: number, chase: ChasedBall): vo
   const footBase = baseUnderFoot(g.fielders[chase.slot])
   const onBase = footBase === NONE ? undefined : g.runners.find((runner) => !runner.state.isOut && wrapBase(runner.state.startBase) === footBase)
   grab(g, tick, chase.slot, { actionRemainingTicks: readyTicksOf(chase.slot) })
-  g.log.push(`${tick}틱 ${chase.slot}번 야수가 공을 쥐었다`)
+  pushPlayLog(g.log, () => `${tick}틱 ${chase.slot}번 야수가 공을 쥐었다`)
   if (onBase === undefined || !isAtTarget(onBase.state)) return
   g.tickMessageCode = 9
   if (g.resultCode !== null) return
   g.resultCode = RUNNER_PLAY_RESULT.SAFE
-  g.log.push(`${tick}틱 ${footBase}루 세이프 (결과 9)`)
+  pushPlayLog(g.log, () => `${tick}틱 ${footBase}루 세이프 (결과 9)`)
 }

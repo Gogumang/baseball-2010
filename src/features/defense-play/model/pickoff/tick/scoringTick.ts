@@ -1,5 +1,6 @@
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
 import { wrapBase } from '@/features/defense-play/model/pickoff/runners/pickoffRunners'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /** 득점 절 */
 export function runPickoffScoring(g: PickoffFrame, tick: number): void {
@@ -15,6 +16,6 @@ export function runPickoffScoring(g: PickoffFrame, tick: number): void {
     runner.counted = true
     runner.state = { ...runner.state, scored: true }
     g.runsScored += 1
-    g.log.push(`${tick}틱 ${runner.state.index}번 주자 홈인`)
+    pushPlayLog(g.log, () => `${tick}틱 ${runner.state.index}번 주자 홈인`)
   }
 }

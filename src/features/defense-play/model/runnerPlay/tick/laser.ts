@@ -4,6 +4,7 @@ import { canFireLaserNow, laserWindowTick } from '@/features/defense-play/model/
 import type { DefenseKeyPress } from '@/features/defense-play/model/runDefensePlay'
 import { DEFAULT_ABILITY } from '@/features/defense-play/model/runnerPlay/constants'
 import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/frame/runnerPlayFrame'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **0d. 레이저 송구** — 슬롯 2 머리 524c4(+0x1992 == −1)의 0x523bc 굴림 · 0x4e858 반짝임 · 0x400bc 발사 (`laserTick`, r201).
@@ -44,5 +45,5 @@ function fireRunnerPlayLaser(g: RunnerPlayFrame, tick: number): void {
   g.laserTrailOn = true
   g.pausedThisTick = true
   g.endCounter = g.counterBeforeHead
-  g.log.push(`${tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
+  pushPlayLog(g.log, () => `${tick}틱 레이저 발사 (0x400bc) — 경기 멈춤 +0x1993`)
 }

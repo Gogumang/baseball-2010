@@ -4,6 +4,7 @@ import { NO_RUNDOWN, endRundown } from '@/entities/fielding/model/rundown'
 import { runOutJudgement } from '@/features/defense-play/model/defensePlay/judgement/outJudgement'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **6b. 아웃 판정 0xb36d0** — 플레이 틱 b43cc~b43ea: 이 플레이의 야수(0xb0c90)가 +0xe0(쥠) 이면 매 틱 vt90 (직접 뜬 것).
@@ -24,7 +25,7 @@ export function judgeOutsOnPlayTick(s: DefensePlayState, t: TickFrame, arrivalBr
   if (arrivalBranch && isRundownRunnerJustArrived(s)) {
     s.fielders = endRundown(s.fielders)
     s.rundown = NO_RUNDOWN
-    s.log.push(`${t.tick}틱 협살 종료 — 쫓던 주자가 루에 닿았다 (b4336)`)
+    pushPlayLog(s.log, () => `${t.tick}틱 협살 종료 — 쫓던 주자가 루에 닿았다 (b4336)`)
   }
 }
 

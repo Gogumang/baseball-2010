@@ -13,6 +13,7 @@ import { runOutJudgement } from '@/features/defense-play/model/pickoff/judgement
 import { isAtTarget, markSlot, wrapBase } from '@/features/defense-play/model/pickoff/runners/pickoffRunners'
 import { PICKOFF_RESULT } from '@/features/defense-play/model/pickoff/types/pickoffTypes'
 import { FUMBLE_MARK_TICKS } from '@/features/defense-play/model/playerEffects'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **5. 포구 틱 갈래 0xb401c** — 받는(줍는) 야수가 포구 틱(+0x174)에
@@ -66,7 +67,7 @@ function rollChaseFumble(g: PickoffFrame, tick: number, chase: LooseBallChase): 
   g.fumbled = true
   g.ballEventThisTick = true
   g.fumbleMarks = markSlot(g.fumbleMarks, chase.slot, FUMBLE_MARK_TICKS)
-  g.log.push(`${tick}틱 ${chase.slot}번 야수 펌블 (0xbc2)`)
+  pushPlayLog(g.log, () => `${tick}틱 ${chase.slot}번 야수 펌블 (0xbc2)`)
   return true
 }
 
@@ -87,13 +88,13 @@ function grabChasedBall(g: PickoffFrame, tick: number, receiver: number): void {
   const onBase = footBase === NONE ? undefined : g.runners.find((runner) => !runner.state.isOut && wrapBase(runner.state.startBase) === footBase)
   g.play = { ...g.play, ballHolderSlot: receiver, catchFielderSlot: receiver, held: true, wantsThrow: true }
   g.grabbed = true
-  g.log.push(`${tick}틱 ${receiver}번 야수가 공을 쥐었다`)
+  pushPlayLog(g.log, () => `${tick}틱 ${receiver}번 야수가 공을 쥐었다`)
   runOutJudgement(g, tick)
   if (onBase === undefined || !isAtTarget(onBase.state)) return
   g.tickMessageCode = 9
   if (g.resultCode !== null) return
   g.resultCode = PICKOFF_RESULT.SAFE
-  g.log.push(`${tick}틱 ${footBase}루 세이프 (결과 9)`)
+  pushPlayLog(g.log, () => `${tick}틱 ${footBase}루 세이프 (결과 9)`)
 }
 
 function fielderAfterGrab(fielder: FielderState, receiver: number): FielderState {

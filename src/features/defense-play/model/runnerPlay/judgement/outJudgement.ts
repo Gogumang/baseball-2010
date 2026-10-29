@@ -4,6 +4,7 @@ import { contextAt } from '@/features/defense-play/model/runnerPlay/context/play
 import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/frame/runnerPlayFrame'
 import { runnerStates } from '@/features/defense-play/model/runnerPlay/runners/playRunners'
 import { RUNNER_PLAY_RESULT } from '@/features/defense-play/model/runnerPlay/types/runnerPlayTypes'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 export function runOutJudgement(g: RunnerPlayFrame, tick: number): void {
   if (g.play.finished) return
@@ -19,7 +20,7 @@ export function runOutJudgement(g: RunnerPlayFrame, tick: number): void {
   // state[0x87] — 마지막 판정이 태그였나 (0xb36d0 꼬리)
   g.tagOut = judged.kind === OUT_KIND.TAG
   g.resultCode = RUNNER_PLAY_RESULT.OUT
-  g.log.push(`${tick}틱 ${victim.state.index}번 주자 아웃 (0xb36d0 결과 ${judged.kind})`)
+  pushPlayLog(g.log, () => `${tick}틱 ${victim.state.index}번 주자 아웃 (0xb36d0 결과 ${judged.kind})`)
   const relaxed = releaseForcesAfterOut(runnerStates(g))
   g.runners.forEach((runner, index) => {
     runner.state = relaxed[index] ?? runner.state

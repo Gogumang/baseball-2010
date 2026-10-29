@@ -2,6 +2,7 @@ import { type RunnerState, createRunner } from '@/entities/fielding/model/fieldi
 import { type StealBase, stealTargetBaseOf } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { DefenseScene } from '@/features/defense-play/model/defenseScene'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 import { runRunnerPlay } from '@/features/defense-play/model/runnerPlayEngine'
 import { DEFAULT_ABILITY, occupiedBasesOf, stealRunnerSpeedOf } from '@/features/defense-play/model/stealPlay/stealStartRunners'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -25,8 +26,7 @@ export interface StealStartThrowInput {
 export interface StealStartThrowResult {
   /** `playEnd` 를 0xafa60 뒤 상태로 바꾼 장면 (던졌으면 +0x128 = 0 · 던진 야수는 공을 놓았다) */
   readonly scene: DefenseScene | undefined
-  /** 0xafa60 이 루를 골라 0xb2c90 을 불렀나 */
-  readonly decided: boolean
+  /** 진행 기록(`pushPlayLog` — 개발 · 시험에서만, 배포판은 빈 배열). 게임은 읽지 않는다 */
   readonly log: readonly string[]
 }
 
@@ -46,7 +46,7 @@ export interface StealStartThrowResult {
  */
 export function stealStartThrowDecision(input: StealStartThrowInput): StealStartThrowResult {
   const carried = input.scene?.playEnd
-  if (carried === undefined || !carried.play.wantsThrow) return { scene: input.scene, decided: false, log: [] }
+  if (carried === undefined || !carried.play.wantsThrow) return { scene: input.scene, log: [] }
   const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
   const result = runRunnerPlay({
     kind: carried.play.kind,
@@ -63,10 +63,11 @@ export function stealStartThrowDecision(input: StealStartThrowInput): StealStart
     throwDecisionOnly: true,
   })
   const after = result.scene.playEnd
+  const log: string[] = []
+  for (const line of result.log) pushPlayLog(log, () => `도루 키 0x583 · ${line}`)
   return {
     scene: input.scene === undefined || after === undefined ? input.scene : { ...input.scene, playEnd: after },
-    decided: result.log.length > 0,
-    log: result.log.map((line) => `도루 키 0x583 · ${line}`),
+    log,
   }
 }
 

@@ -5,6 +5,7 @@ import { wrapBase } from '@/features/defense-play/model/defensePlay/runners/muta
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { ThrowChooser } from '@/features/defense-play/model/defensePlay/throw/throwChooser'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /** b2eb2~b2ee4: 받는 야수(중계면 중계맨)가 목표점에 없고 1구간 틱 안에 못 닿으면 미룬다 (AI 9) */
 export function isReceiverLate(s: DefensePlayState, plan: ThrowPlan): boolean {
@@ -26,6 +27,6 @@ export function deferThrow(s: DefensePlayState, t: TickFrame, holder: FielderSta
     fielder.slot === holder.slot ? { ...fielder, aiState: AI_STATE.RECEIVE, target: point, targetBase: wrapBase(plan.base) } : fielder,
   )
   const byCpu = chooser === 'CPU' ? ' (CPU 결정)' : ''
-  s.log.push(`${t.tick}틱 ${holder.slot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)${byCpu}`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${holder.slot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)${byCpu}`)
   return true
 }

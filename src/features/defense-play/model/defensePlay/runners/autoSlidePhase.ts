@@ -3,6 +3,7 @@ import { NONE } from '@/entities/fielding/model/fieldingState'
 import { slidingRunnerOf } from '@/features/defense-play/model/defensePlay/runners/mutableRunner'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **4b. 자동 슬라이딩** (0x52670 → 0xaf8fc → 제어기 vt10 = 0xb030c) — 원본은 경기 장면 슬롯 2 에서 자동 진루(0x52660) **바로 뒤**,
@@ -33,5 +34,5 @@ export function runAutoSlide(s: DefensePlayState, t: TickFrame): void {
   if (slid.length === 0) return
   t.slidingSoundThisTick = true
   t.tickSounds.push({ kind: 'sound', soundId: SLIDING_SOUND_EFFECT })
-  s.log.push(`${t.tick}틱 자동 슬라이딩 — 주자 ${slid.join('·')}`)
+  pushPlayLog(s.log, () => `${t.tick}틱 자동 슬라이딩 — 주자 ${slid.join('·')}`)
 }

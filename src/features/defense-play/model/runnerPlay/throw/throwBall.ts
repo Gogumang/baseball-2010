@@ -15,6 +15,7 @@ import { deferThrow, isReceiverLate } from '@/features/defense-play/model/runner
 import { throwLogOf } from '@/features/defense-play/model/runnerPlay/throw/throwLog'
 import type { ThrowChooser } from '@/features/defense-play/model/runnerPlay/types/runnerPlayTypes'
 import { type ThrownBall, forecastOptionsOf, launchThrow } from '@/features/defense-play/model/throwLaunch'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **송구 0xb2e38**(플레이.vt5c, 인자 받을 야수 C · 특수) — 공 가진 야수가 C 에게 던진다. 던졌거나 미뤘으면(AI 9) 참.
@@ -71,7 +72,7 @@ function rollThrowNow(g: RunnerPlayFrame, tick: number, order: ThrowOrder, plan:
   // 커버를 그 상태로 다시 고른다. 던진 야수가 커버 표에 남으면 b2564 가 vt14(그 루) · AI 루 + 2 — 공을 쥐고 AI 1 이던 도루 판
   // 포수도 여기서 홈 커버로 돌아간다(`stealPlay` 머리말)
   coverTick(g, tick)
-  g.log.push(throwLogOf(g, { tick, holderSlot, base, laser, cpuSpecial: order.cpuSpecial, plan, thrown, byHuman: order.byHuman }))
+  pushPlayLog(g.log, () => throwLogOf(g, { tick, holderSlot, base, laser, cpuSpecial: order.cpuSpecial, plan, thrown, byHuman: order.byHuman }))
 }
 
 /** 공은 계획 [3](중계면 중계맨)의 목표점으로 간다(b2f52) */

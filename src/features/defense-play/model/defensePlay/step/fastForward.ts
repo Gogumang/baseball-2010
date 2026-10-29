@@ -3,6 +3,7 @@ import { HOME_BASE } from '@/features/defense-play/model/defensePlay/constants'
 import { acceptsFastForwardKey } from '@/features/defense-play/model/defensePlay/step/playFinished'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState, MutableRunner } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **0x17 키 건너뛰기** — 키 처리 0x53420 이 키마다 끝에 메시지 0x587 → 0x509a0(0x50afe) → 0x519cc (갱신 0x524c0 보다 먼저).
@@ -13,7 +14,7 @@ import type { DefensePlayState, MutableRunner } from '@/features/defense-play/mo
 export function pressFastForwardKey(s: DefensePlayState, t: TickFrame): void {
   if (t.key !== null && !s.fastForward && acceptsFastForwardKey(s)) {
     s.fastForward = true
-    s.log.push(`${t.tick}틱 키 건너뛰기 (0x519cc +0xfe7)`)
+    pushPlayLog(s.log, () => `${t.tick}틱 키 건너뛰기 (0x519cc +0xfe7)`)
   }
   if (s.fastForward && !t.fastForwardAtHead && !t.pausedAtHead) cameraFastForwardRunIn(s, t)
 }
@@ -46,7 +47,7 @@ export function cameraFastForwardRunIn(s: DefensePlayState, t: TickFrame): void 
   s.held = { ...s.held, scoreboardRuns: s.held.scoreboardRuns + 1 }
   t.runInsThisTick.push(firstRunner.state.index)
   t.tickSounds.push({ kind: 'runIn', slot: firstRunner.state.index })
-  s.log.push(`${t.tick}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 카메라 0x3f060 — 타자주자 홈, 건너뛰기 풀림 (+0xfe7 = 0 · 메시지 0x13)`)
 }
 
 /** 3f0f0 — 건너뛰는 중(+0xfe7)이고 홈런(+0x111) · 폴 홈런(+0x129) 판에서 공.vt18(멈춤 — 쥔 공도 멈춘 것으로 본다) */

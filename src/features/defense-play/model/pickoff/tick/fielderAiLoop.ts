@@ -6,6 +6,7 @@ import { AI_STATE, type FielderState, NONE, fielderArrivalTicks } from '@/entiti
 import { throwTicksTo } from '@/entities/fielding/model/throwPlan'
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
 import { rollSendToBase } from '@/features/defense-play/model/pickoff/throw/sendToBase'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **AI 9 — 미룬 송구** (b4838): 받을 야수.vtc0() ≤ 공 가진 야수.vtb8(루 좌표) 가 되면 0xb2c90(루, 0), 참이면 AI 0.
@@ -70,7 +71,7 @@ function backupAi(g: PickoffFrame, slot: number, self: FielderState): void {
 function coverAi(g: PickoffFrame, tick: number, slot: number, self: FielderState, base: number): void {
   if (g.fielderArrivals[slot] === true && isFreeToRetarget(self)) {
     const claimed = claimCoverOfBase(g.play, g.fielders, slot, base)
-    if (claimed.play !== g.play) g.log.push(`${tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
+    if (claimed.play !== g.play) pushPlayLog(g.log, () => `${tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
     g.play = claimed.play
     g.fielders = claimed.fielders
   }

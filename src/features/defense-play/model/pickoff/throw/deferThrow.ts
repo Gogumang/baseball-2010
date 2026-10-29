@@ -4,6 +4,7 @@ import { AI_STATE, type FielderState, fielderArrivalTicks } from '@/entities/fie
 import type { ThrowPlan } from '@/entities/fielding/model/throwPlan'
 import type { PickoffFrame } from '@/features/defense-play/model/pickoff/frame/pickoffFrame'
 import { wrapBase } from '@/features/defense-play/model/pickoff/runners/pickoffRunners'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /** b2eb2: 받는 야수(중계면 중계맨)가 목표점에 없고 1구간 틱(계획 [5]) 안에 못 닿는다 */
 export function isReceiverLate(g: PickoffFrame, plan: ThrowPlan): boolean {
@@ -18,7 +19,7 @@ export function deferThrow(g: PickoffFrame, tick: number, holder: FielderState, 
   g.deferredThrowReceiver = plan.toSlot
   g.deferredThrowBase = plan.base
   g.fielders = g.fielders.map((fielder) => (fielder.slot === holder.slot ? deferredHolderOf(fielder, plan.base) : fielder))
-  g.log.push(`${tick}틱 ${holder.slot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)`)
+  pushPlayLog(g.log, () => `${tick}틱 ${holder.slot}번 야수가 ${plan.base}루 송구를 미룬다 — ${plan.toSlot}번 야수가 늦다 (AI 9)`)
   return true
 }
 

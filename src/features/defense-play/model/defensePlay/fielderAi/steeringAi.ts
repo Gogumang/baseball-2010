@@ -5,6 +5,7 @@ import { acceptsTargetVt14, isFreeToRetarget, isFreeToStep, withReturnToStartTic
 import type { FielderState } from '@/entities/fielding/model/fieldingState'
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /** 야수 AI 고리 한 칸의 갈래 (분기표 0xd8808[상태]) */
 export type FielderAiStep = (s: DefensePlayState, t: TickFrame, slot: number, self: FielderState) => void
@@ -72,7 +73,7 @@ export function pickUpAi(s: DefensePlayState, slot: number, self: FielderState):
 export function coverAi(s: DefensePlayState, t: TickFrame, slot: number, self: FielderState, base: number): void {
   if (s.fielderArrivals[slot] === true && isFreeToRetarget(self)) {
     const claimed = claimCoverOfBase(s.play, s.fielders, slot, base)
-    if (claimed.play !== s.play) s.log.push(`${t.tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
+    if (claimed.play !== s.play) pushPlayLog(s.log, () => `${t.tick}틱 ${slot}번 야수가 ${base}루 커버를 가져간다 (b4814 0xb2a48)`)
     s.play = claimed.play
     s.fielders = claimed.fielders
   }

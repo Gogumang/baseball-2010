@@ -9,6 +9,7 @@ import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/t
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
 import { judgeCallSoundIdOf } from '@/features/defense-play/model/judgeCall'
 import { postJudgeMessage } from '@/features/defense-play/model/laserPresentation'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **b4562 — 결과 코드가 선 틱**: vt44 = 0xb2bc4(사건 칸) · vt54 = 0xb2c58(야수 AI 0xf) · 메시지 0xbba(결과 판 · 콜) 차례로.
@@ -77,7 +78,7 @@ function markBuntFoulOut(s: DefensePlayState, t: TickFrame): void {
   markOut(batterRunner)
   s.outs += 1
   s.outsAdded += 1
-  s.log.push(`${t.tick}틱 타자주자 아웃 — 2스트라이크 번트 파울 (0xb36d0 b373a)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 타자주자 아웃 — 2스트라이크 번트 파울 (0xb36d0 b373a)`)
 }
 
 /**
@@ -87,7 +88,7 @@ function markBuntFoulOut(s: DefensePlayState, t: TickFrame): void {
 function returnFieldersOnFoulOrPole(s: DefensePlayState, t: TickFrame, resultCode: number): void {
   if (resultCode !== 7 && resultCode !== 12) return
   s.fielders = s.fielders.map((fielder) => ({ ...fielder, aiState: AI_STATE.RETURN }))
-  s.log.push(`${t.tick}틱 사건 ${resultCode} — 야수 9명 AI 0xf (0xb2c58)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 사건 ${resultCode} — 야수 9명 AI 0xf (0xb2c58)`)
 }
 
 /**

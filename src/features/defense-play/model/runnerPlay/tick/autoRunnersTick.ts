@@ -6,6 +6,7 @@ import { contextAt } from '@/features/defense-play/model/runnerPlay/context/play
 import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/frame/runnerPlayFrame'
 import { slidingRunnerOf, startLeg } from '@/features/defense-play/model/runnerPlay/runners/playRunners'
 import type { PlayRunner } from '@/features/defense-play/model/runnerPlay/types/runnerPlayTypes'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **4. 자동 추가 진루 0xaf918 · 자동 슬라이딩 0xb030c** — 결과 코드(9·13)가 선 뒤에도 돈다: 슬롯 2 의 52660 은 판 진행 관문 0xb0d28 이
@@ -35,7 +36,7 @@ function applyAutoAdvance(g: RunnerPlayFrame, tick: number, runner: PlayRunner, 
   if (!finished && toBase > HOME_BASE) return
   if (!finished) startLeg(runner, toBase)
   g.play = { ...g.play, wantsThrow: true }
-  if (!finished) g.log.push(`${tick}틱 ${runner.state.index}번 주자 자동 진루 → ${toBase}루`)
+  if (!finished) pushPlayLog(g.log, () => `${tick}틱 ${runner.state.index}번 주자 자동 진루 → ${toBase}루`)
 }
 
 /** 자동 슬라이딩 0xb030c — 0x52670: 슬라이딩시킨 수 > 0 이면 그 자리에서 효과음 10 (0x5268c, 잠금 없음) */
@@ -45,7 +46,7 @@ function runAutoSlide(g: RunnerPlayFrame, tick: number): void {
     const runner = g.runners[index]
     if (runner === undefined) continue
     runner.state = { ...runner.state, sliding: true, speed: runner.state.speed + SLIDING_SPEED_BONUS }
-    g.log.push(`${tick}틱 ${runner.state.index}번 주자 자동 슬라이딩`)
+    pushPlayLog(g.log, () => `${tick}틱 ${runner.state.index}번 주자 자동 슬라이딩`)
   }
   if (slid.length === 0) return
   g.sound.slidingThisTick = true

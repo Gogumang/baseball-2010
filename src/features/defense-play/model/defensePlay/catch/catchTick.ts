@@ -11,6 +11,7 @@ import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/t
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
 import { FUMBLE_MARK_TICKS } from '@/features/defense-play/model/playerEffects'
 import type { RandomPort } from '@/shared/api/random/randomPort'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **1. 포구** — 포구 틱 갈래 전체(b4074~b42ce: 동작 시작 · 펌블 굴림 · 필살타법 표시 · 결과 코드 9 · 쥐기)는 플레이 틱 0xb401c 머리
@@ -82,7 +83,7 @@ function rollUncatchableHit(s: DefensePlayState, t: TickFrame): void {
     fielder.slot === s.chaserSlot ? { ...withAction(fielder, FIELDER_ACTION.HIT_STAGGER), actionLockTicks: HIT_STAGGER_LOCK_TICKS } : fielder,
   )
   t.hitStaggerSoundThisTick = true
-  s.log.push(`${t.tick}틱 ${s.chaserSlot}번 야수에게 필살타법 타구가 맞았다 (0xbc3)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${s.chaserSlot}번 야수에게 필살타법 타구가 맞았다 (0xbc3)`)
 }
 
 /**
@@ -99,5 +100,5 @@ function rollFumbleAtCatch(s: DefensePlayState, t: TickFrame, random: RandomPort
   // b4280: 야수+0xb8 = 6(놓침 동작) · 메시지 0xbc2 · 사건(sp+0x24) = 1 — 쥐지 않는다. 틱 끝 b45a4 가 플레이.vt70 = 0xb3148 로
   // 공을 그 야수 자리에서 지금 점의 속도·각으로 다시 쏘고 새 예보로 줍는 야수를 다시 고른다(`rollRelaunchFromFielder`)
   t.ballEventThisTick = true
-  s.log.push(`${t.tick}틱 ${s.chaserSlot}번 야수 펌블 (0xbc2)`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${s.chaserSlot}번 야수 펌블 (0xbc2)`)
 }

@@ -5,6 +5,7 @@ import { slidingRunnerOf } from '@/features/defense-play/model/defensePlay/runne
 import type { TickFrame } from '@/features/defense-play/model/defensePlay/step/tickFrame'
 import { framePressesOf } from '@/features/defense-play/model/defensePlay/types/defenseKeyPress'
 import type { DefensePlayState } from '@/features/defense-play/model/defensePlay/types/defensePlayState'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **0. 사람 조작** (상태 0x17 갈래 0x53420 — I-controls 0·2b·3b절). 이번 틱에 눌린 키를 받는다(예전에는 `input.controls?.keyAt(tick)`
@@ -26,7 +27,7 @@ function applyInPlayCommand(s: DefensePlayState, t: TickFrame, command: InPlayCo
     case '송구':
       // 메시지 0x588 → 플레이 vt0x60 → 플레이+0x160. 자동 규칙(0xb1c90)보다 늘 앞선다
       s.play = { ...s.play, manualThrowBase: command.target }
-      s.log.push(`${t.tick}틱 사람이 ${command.target}루로 송구 지시`)
+      pushPlayLog(s.log, () => `${t.tick}틱 사람이 ${command.target}루로 송구 지시`)
       return
     case '슬라이딩':
       applySlideKey(s, t)
@@ -59,7 +60,7 @@ function applySlideKey(s: DefensePlayState, t: TickFrame): void {
     runner.state = { ...runner.state, sliding: true, speed: runner.state.speed + SLIDING_SPEED_BONUS }
   }
   if (decision.slidRunnerIndexes.length > 0) {
-    s.log.push(`${t.tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
+    pushPlayLog(s.log, () => `${t.tick}틱 슬라이딩 — 주자 ${decision.slidRunnerIndexes.join('·')}`)
   }
 }
 
@@ -88,5 +89,5 @@ function applyRunnerKey(s: DefensePlayState, t: TickFrame, command: Extract<InPl
   if (!keyed.succeeded) return
   s.autoBaserunning = true
   s.play = { ...s.play, wantsThrow: true }
-  s.log.push(`${t.tick}틱 ${command.kind} — 주자 ${keyed.retargeted.map((index) => s.runners[index]?.state.index).join('·')}`)
+  pushPlayLog(s.log, () => `${t.tick}틱 ${command.kind} — 주자 ${keyed.retargeted.map((index) => s.runners[index]?.state.index).join('·')}`)
 }

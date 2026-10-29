@@ -3,6 +3,7 @@ import { someRunnerStillActive } from '@/entities/fielding/model/playGate'
 import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/frame/runnerPlayFrame'
 import { batterRunnerOf, isAtTarget, runnerStates, wrapBase } from '@/features/defense-play/model/runnerPlay/runners/playRunners'
 import type { PlayRunner } from '@/features/defense-play/model/runnerPlay/types/runnerPlayTypes'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **2e. 득점 0xaa0a8** (슬롯 2 525fc — 플레이 틱 뒤 · vt4c 앞): 내림차순으로 +0x3b(목록 틱에 막 닿음) && +0x8c == 4 인 주자.
@@ -41,5 +42,5 @@ function scoreRunner(g: RunnerPlayFrame, tick: number, runner: PlayRunner): void
     batterRunner: batterRunnerOf(g),
     scoringRunnerIsBatterRunner: runner.state.isBatterRunner,
   })
-  g.log.push(`${tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${g.held.heldRuns} / 득점 ${g.held.scoreboardRuns}`)
+  pushPlayLog(g.log, () => `${tick}틱 ${runner.state.index}번 주자 홈 — 보류 ${g.held.heldRuns} / 득점 ${g.held.scoreboardRuns}`)
 }

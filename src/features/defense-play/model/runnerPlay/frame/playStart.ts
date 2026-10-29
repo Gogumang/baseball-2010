@@ -3,6 +3,7 @@ import { contextAt } from '@/features/defense-play/model/runnerPlay/context/play
 import type { RunnerPlayFrame } from '@/features/defense-play/model/runnerPlay/frame/runnerPlayFrame'
 import { startLeg } from '@/features/defense-play/model/runnerPlay/runners/playRunners'
 import { rollCpuThrowDecision } from '@/features/defense-play/model/runnerPlay/throw/cpuThrowDecision'
+import { pushPlayLog } from '@/features/defense-play/model/playLog'
 
 /**
  * **0x46766** — 0x17 진입 0x46418 끝: 판 진행 관문 0xb0d28 이 열려 있으면 `0xaf8c0(제어기, 1)` 을 **한 번**, 주루 설정
@@ -20,6 +21,6 @@ export function runPlayStartDecisions(g: RunnerPlayFrame): void {
     const runner = g.runners.find((candidate) => candidate.state.index === decision.runnerIndex)
     if (runner === undefined || decision.toBase === runner.state.targetBase) continue
     startLeg(runner, decision.toBase)
-    g.log.push(`판 시작 ${runner.state.index}번 주자 자동 진루 → ${decision.toBase}루`)
+    pushPlayLog(g.log, () => `판 시작 ${runner.state.index}번 주자 자동 진루 → ${decision.toBase}루`)
   }
 }
