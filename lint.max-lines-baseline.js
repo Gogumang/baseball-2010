@@ -68,6 +68,5 @@ export const maxLinesBaseline = [
   'src/shared/lib/commonPanel/commonPanel.ts',
   'src/shared/lib/commonWindow/commonWindow.ts',
   'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts',
-  'src/shared/lib/sprite/originalScale.fixture.ts',
   'src/shared/ui/MessageBox/MessageBox.tsx',
 ]
