@@ -30,7 +30,6 @@ export const readabilityBaseline = [
   'src/app/model/seasonSession/seasonEnd/useSeasonEndActions.ts',
   'src/app/model/seasonSession/settlement/useSettleGame.ts',
   'src/app/model/seasonSession/shop/useSeasonShopActions.ts',
-  'src/app/model/useCareerSession.ts',
   'src/app/model/useCollection.ts',
   'src/app/model/useMissionSession.ts',
   'src/app/model/usePitcherLeagueSession.ts',
