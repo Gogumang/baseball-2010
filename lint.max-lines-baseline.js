@@ -42,7 +42,6 @@ export const maxLinesBaseline = [
   'src/pages/nari-record-room/ui/NariRecordRoom.tsx',
   'src/pages/nari-record-room/ui/RankingBoard.tsx',
   'src/pages/national-cup/ui/NationalCupScreen.tsx',
-  'src/pages/pitcher-league/ui/PitcherRegisterScreen.tsx',
   'src/pages/season/ui/PlayerRecruitScreen.tsx',
   'src/pages/season/ui/SeasonOutingPopup.tsx',
   'src/pages/season/ui/SeasonTrainingPopup.tsx',
