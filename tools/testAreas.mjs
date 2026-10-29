@@ -50,6 +50,7 @@ export const TEST_AREAS = {
     'src/entities/mission/',
     'src/app/ui/MissionRoutes',
     'src/app/model/useMissionSession',
+    'src/app/model/missionSession/',
     'src/app/model/missionVibration',
     'src/app/model/aceMatchScanGuard',
   ],
