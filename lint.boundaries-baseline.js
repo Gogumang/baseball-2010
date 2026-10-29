@@ -125,7 +125,7 @@ export const crossSliceBaseline = [
   'src/entities/mission/model/missionAutoRelay.ts',
   'src/entities/mission/model/missionCpuTeam/otherSlices.ts',
   'src/entities/mission/model/missionGame/otherSlices.ts',
-  'src/entities/mission/model/missionGoal.ts',
+  'src/entities/mission/model/missionGoal/otherSlices.ts',
   'src/entities/mission/model/missionRun/otherSlices.ts',
   'src/entities/mission/model/missionRunners/otherSlices.ts',
   'src/entities/mission/model/pitcherRun/otherSlices.ts',
