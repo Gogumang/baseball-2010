@@ -183,7 +183,6 @@ export const readabilityBaseline = [
   'src/pages/main-menu/model/mainMenu.ts',
   'src/pages/main-menu/model/useMainMenu.ts',
   'src/pages/main-menu/ui/MainMenuScreen.tsx',
-  'src/pages/management/lib/nariMatchPrepare.ts',
   'src/pages/management/lib/nariMenuKeys.ts',
   'src/pages/management/lib/nariScreenPush.ts',
   'src/pages/management/lib/nariYearCover.ts',

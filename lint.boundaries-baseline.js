@@ -304,7 +304,7 @@ export const crossSliceBaseline = [
   'src/pages/home-run-derby/ui/DerbyFieldPlay.tsx',
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx',
   'src/pages/main-menu/ui/MainMenuScreen.tsx',
-  'src/pages/management/lib/nariMatchPrepare.ts',
+  'src/pages/management/lib/nariMatchPrepare/otherSlices.ts',
   'src/pages/management/ui/BasicInfoCard.tsx',
   'src/pages/management/ui/CardPlate.tsx',
   'src/pages/management/ui/ManagementScreen.tsx',
