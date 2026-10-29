@@ -52,7 +52,6 @@ export const maxLinesBaseline = [
   'src/pages/season/ui/SeasonOutingPopup.tsx',
   'src/pages/season/ui/SeasonTrainingPopup.tsx',
   'src/pages/season/ui/SeasonTrainingScreen.tsx',
-  'src/pages/shop/ui/ShopScreen.tsx',
   'src/pages/special/ui/SkinBackdrops.tsx',
   'src/pages/story/lib/eventDialogue.ts',
   'src/pages/story/lib/yearGoalWindow.ts',

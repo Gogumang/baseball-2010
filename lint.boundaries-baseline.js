@@ -373,7 +373,7 @@ export const crossSliceBaseline = [
   'src/pages/season/ui/tradeScreen/otherSlices.ts',
   'src/pages/shop/lib/gpDetailView.ts',
   'src/pages/shop/ui/PitcherShopScreen.tsx',
-  'src/pages/shop/ui/ShopScreen.tsx',
+  'src/pages/shop/ui/shopScreen/otherSlices.ts',
   'src/pages/special-edit/lib/specialEditFlow.ts',
   'src/pages/special-edit/ui/specialEdit/otherSlices.ts',
   'src/pages/special/lib/hallOfFameGrid.ts',
