@@ -29,7 +29,7 @@
     "src/entities/home-run-derby/model/derbyRules.ts": ["exports"], // NEW_RECORD_SOUND_ID · NORMAL_RECORD_SOUND_ID (0x4f644)
     "src/entities/league/model/leagueDay.ts": ["exports"], // REGULAR_INNINGS · LEAGUE_DAY_GAME_COUNT
     "src/entities/national-cup/model/nationalCup.ts": ["exports"], // NATIONAL_CUP_FULL_STAMINA
-    "src/entities/pitcher-career/model/magicPitch.ts": ["exports"], // MAGIC_PITCH_NAME_STRING_INDEX (StrCOMMON)
+    "src/entities/pitcher-career/model/magicPitch/names.ts": ["exports"], // MAGIC_PITCH_NAME_STRING_INDEX (StrCOMMON)
     "src/entities/pitcher-career/model/managerHook.ts": ["exports"], // SELF_HOOK_PROMPT_GAME_TEXT_INDEX · HOOK_SCENE_STATE
     "src/entities/pitcher-career/model/pitcherAbility.ts": ["exports", "duplicates"], // PITCHER_ABILITY_ITEM_TEXT_INDEX · 아이템 대상 = 능력치 차례 (같은 표의 두 이름)
     "src/entities/pitcher-career/model/pitcherRegistration.ts": ["exports"], // PITCHER_RECORD_BYTE_0X0A
