@@ -337,7 +337,7 @@ export const crossSliceBaseline = [
   'src/pages/pitcher-league/ui/PitcherResumeManagementFrame.tsx',
   'src/pages/pitcher-league/ui/PitcherStatusBoard.tsx',
   'src/pages/pitcher-league/ui/PitcherTrainingScene.tsx',
-  'src/pages/pitching/model/usePitcherGame.ts',
+  'src/pages/pitching/model/pitcherGame/otherSlices.ts',
   'src/pages/pitching/ui/ManagerHookWindow.tsx',
   'src/pages/pitching/ui/PitchingScreen.tsx',
   'src/pages/pitching/ui/pitcherGameScene/otherSlices.ts',
