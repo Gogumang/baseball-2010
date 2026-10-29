@@ -32,7 +32,6 @@ export const layerDirectionBaseline = [
   'src/shared/ui/ScreenOverlay/ScreenOverlay.css.ts',
   'src/widgets/batting-stage/ui/BattingStage.css.ts',
   'src/widgets/batting-stage/ui/PitcherSideStage.css.ts',
-  'src/widgets/entry-editor/lib/entryListWindow.ts',
   'src/widgets/entry-editor/ui/entryListWindow/otherSlices.ts',
   'src/widgets/field-walk/lib/benchClearingWalk.ts',
   'src/widgets/field-walk/lib/fieldCarry.ts',
