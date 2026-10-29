@@ -205,7 +205,6 @@ export const maxLinesBaseline = [
   'src/widgets/game-scene/ui/BenchClearingScene.tsx',
   'src/widgets/line-score/lib/lineScoreLayout.ts',
   'src/widgets/management/ui/TitleListWindow.tsx',
-  'src/widgets/matchup-cards/lib/matchupCardsLayout.ts',
   'src/widgets/matchup-cards/ui/MatchupCards.tsx',
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
   'src/widgets/player-detail-window/ui/PlayerDetailWindow.tsx',

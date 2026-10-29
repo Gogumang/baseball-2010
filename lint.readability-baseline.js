@@ -402,7 +402,6 @@ export const readabilityBaseline = [
   'src/widgets/line-score/lib/lineScoreLayout.ts',
   'src/widgets/loading-tip/ui/LoadingTip.tsx',
   'src/widgets/management/ui/TitleListWindow.tsx',
-  'src/widgets/matchup-cards/lib/matchupCardsLayout.ts',
   'src/widgets/matchup-cards/ui/MatchupCards.tsx',
   'src/widgets/particles/lib/renderParticles.ts',
   'src/widgets/particles/ui/SceneParticleLayer.tsx',
