@@ -33,7 +33,6 @@ export const readabilityBaseline = [
   'src/app/model/useCollection.ts',
   'src/app/model/useSound.ts',
   'src/app/ui/App.tsx',
-  'src/app/ui/CareerRoutes.tsx',
   'src/app/ui/EntryRoutes.tsx',
   'src/app/ui/MissionRoutes.tsx',
   'src/app/ui/PitcherLeagueRoute.tsx',

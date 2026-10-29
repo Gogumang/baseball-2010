@@ -69,6 +69,7 @@ export const TEST_AREAS = {
     'src/pages/management/',
     'src/widgets/management/',
     'src/app/ui/CareerRoutes',
+    'src/app/ui/careerRoutes/',
     'src/app/ui/GameRoute',
     'src/app/ui/gameRoute/',
     'src/app/model/useCareerSession',
