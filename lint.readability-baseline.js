@@ -103,7 +103,6 @@ export const readabilityBaseline = [
   'src/entities/national-cup/model/nationalCup.ts',
   'src/entities/particle/model/particleEmitter.ts',
   'src/entities/pitcher-career/model/managerHook.ts',
-  'src/entities/pitcher-career/model/pitcherCareer.ts',
   'src/entities/pitcher-career/model/pitcherEventReward.ts',
   'src/entities/pitcher-career/model/pitcherGameRecord.ts',
   'src/entities/pitcher-career/model/pitcherManagement.ts',
