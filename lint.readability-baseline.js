@@ -227,7 +227,6 @@ export const readabilityBaseline = [
   'src/pages/shop/lib/equipmentWindowState.ts',
   'src/pages/shop/lib/shopLayout.ts',
   'src/pages/shop/ui/ShopScreen.tsx',
-  'src/pages/shop/ui/ShopWindow.tsx',
   'src/pages/special/lib/skinBackdrops.ts',
   'src/pages/special/ui/SkinBackdrops.tsx',
   'src/pages/story/lib/eventBackdrop.ts',
