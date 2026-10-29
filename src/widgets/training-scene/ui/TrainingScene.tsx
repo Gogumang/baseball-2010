@@ -47,7 +47,7 @@ interface TrainingSceneProps {
 const BATTER_TRAINING_FIGURE_FLAG = 1
 
 /** 키 0x105a4 — 확인(−5) · '5' 면 [팝업+0x1d0] = [팝업+0x1d8](게이지 끝). 그 밖 키 없음(취소도 안 받는다) */
-export const isTrainingSkipKey = (key: string): boolean => key === 'Enter' || key === '5' || key === ' '
+const isTrainingSkipKey = (key: string): boolean => key === 'Enter' || key === '5' || key === ' '
 
 /**
  * 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다.

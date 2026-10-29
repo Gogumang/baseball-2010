@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { MarkupText } from '@/shared/ui'
 import { PressArea } from '@/shared/ui/PressArea/PressArea'
-import type { PressRect } from '@/shared/ui/PressArea/PressArea'
+import type { PressRect } from '@/shared/ui/PressArea/pressRect'
 import { useMarksCommonWindowShown, useSceneClosesWithoutShrink } from '@/shared/lib/commonWindow/commonWindow'
 import * as styles from '@/shared/ui/MessageBox/MessageBox.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'

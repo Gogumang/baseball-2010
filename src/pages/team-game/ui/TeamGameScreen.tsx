@@ -43,7 +43,8 @@ import {
   isOurOffense,
   runnerAcesFor,
 } from '@/features/play-team-game/model/teamGameFlow'
-import { endBoardLineScoreOf, GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
+import { GameEndBoard } from '@/widgets/game-scene/ui/GameEndBoard'
+import { endBoardLineScoreOf } from '@/widgets/game-scene/lib/endBoardLineScore'
 import { HalfInningBoard } from '@/widgets/game-scene/ui/HalfInningBoard'
 import { teamHalfInningCardsOf } from '@/pages/team-game/lib/teamHalfInningCards'
 import { runScoreBoardSourceOf } from '@/pages/defense/lib/runScoreBoard'
@@ -83,7 +84,7 @@ import { TeamAutoRelay } from '@/pages/team-game/ui/TeamAutoRelay'
 import { teamLoadedRunnerAceOf } from '@/pages/team-game/lib/teamAutoRelay'
 import { humanVsComputerSidesOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
-import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import { useSettlementEffectLayers } from '@/widgets/batting-stage/model/useSettlementEffectLayers'
 import { SceneMatchupCards } from '@/widgets/matchup-cards/ui/SceneMatchupCards'
 import { useSubstitutionScene } from '@/features/play-game/model/useSubstitutionScene'
 import { SubstitutionSceneOverlay } from '@/features/play-game/ui/SubstitutionSceneOverlay'

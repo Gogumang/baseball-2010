@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import { PixelText, pieceMaskStyle } from '@/shared/ui/PixelText/PixelText'
+import { PixelText } from '@/shared/ui/PixelText/PixelText'
+import { pieceMaskStyle } from '@/shared/ui/PixelText/pieceMask'
 import { ASCII_ATLAS, HANGUL_ATLAS } from '@/shared/lib/font/atlas'
 
 afterEach(cleanup)

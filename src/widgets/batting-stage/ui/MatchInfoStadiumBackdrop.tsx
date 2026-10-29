@@ -9,7 +9,7 @@ import { tryOr } from '@/shared/lib/safe/tryOr'
 /** 그림이 다 실렸는지 가늠하는 표본 간격 — 날 그림이 바뀌었을 때만 흐리기를 다시 한다 */
 const SAMPLE_STEP = 97
 /** 보이는 캔버스의 2D 문맥 옵션 — 흐리기(`finishSkinBackdropOnCanvas`)가 화소를 읽어 되놓는다 */
-export const TARGET_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true }
+const TARGET_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true }
 
 function checksumOf(context: CanvasRenderingContext2D): number {
   const { data } = context.getImageData(0, 0, STAGE_WIDTH, STAGE_HEIGHT)

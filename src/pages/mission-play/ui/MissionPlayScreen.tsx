@@ -43,7 +43,7 @@ import type { MissionResultBoardProps } from '@/pages/mission-play/ui/MissionRes
 import { liveGameSidesOf, setLiveGameInningIndex, setLiveGameSides } from '@/shared/lib/liveGameState/liveGameState'
 import { cpuSideOf, humanSideOf, missionTeamIdsOf } from '@/entities/mission/model/missionGame'
 import { settlementBackdropOffsetAt } from '@/pages/team-game/model/settlementBackdrop'
-import { useSettlementEffectLayers } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
+import { useSettlementEffectLayers } from '@/widgets/batting-stage/model/useSettlementEffectLayers'
 import { useMarksCommonWindowShown, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
