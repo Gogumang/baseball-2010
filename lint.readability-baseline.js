@@ -251,7 +251,6 @@ export const readabilityBaseline = [
   'src/pages/story/model/useScreenEffect.ts',
   'src/pages/story/ui/EvaluationEventPlayer.tsx',
   'src/pages/story/ui/EventDialogueBox.tsx',
-  'src/pages/story/ui/StoryScreen.tsx',
   'src/pages/team-game/lib/substitutionWindow.ts',
   'src/pages/team-game/lib/teamAutoRelay.ts',
   'src/pages/team-game/model/useTeamGame.ts',
