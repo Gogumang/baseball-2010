@@ -88,6 +88,7 @@ export function useSkinStepDrawCounter(tick: number): number {
   const last = drawnBy.get(id)
   if (last !== undefined && last.tick === tick) return last.value
   const draws = last === undefined ? 1 : Math.max(0, tick - last.tick)
+  // oxlint-disable-next-line react/immutability -- 원본 공용 셈 [skin+0x40c] 은 경기설정 창 그리기 0x6042c(60440~6044a)가 그 자리에서 올린다 — 그림 차례대로 올린 값을 본다(위 머리말)
   counter.value += draws
   drawnBy.set(id, { tick, value: counter.value })
   return counter.value

@@ -42,9 +42,12 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
   const columnsRef = useRef(columns)
   useMirrorRef(columnsRef, columns)
 
-  useEffect(() => {
+  // 항목이 바뀌면 첫 칸 — 바뀐 그림에서 바로 고친다
+  const [shownItems, setShownItems] = useState(items)
+  if (shownItems !== items) {
+    setShownItems(items)
     setSelectedIndex(0)
-  }, [items])
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

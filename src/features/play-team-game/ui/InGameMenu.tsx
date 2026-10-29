@@ -379,7 +379,7 @@ function PauseWindow({
   const cursorRef = useRef(cursor)
   useMirrorRef(cursorRef, cursor)
   const latest = useRef({ actions, onMoveCursor, onChoose, onRequestClose })
-  latest.current = { actions, onMoveCursor, onChoose, onRequestClose }
+  useMirrorRef(latest, { actions, onMoveCursor, onChoose, onRequestClose })
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return

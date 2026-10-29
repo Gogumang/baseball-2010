@@ -62,15 +62,19 @@ export function TrainingScene({ presentation, battingTypeIndex = 0, equipmentLev
   /** 창 배경 0x7b9ac — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (장면에 들어설 때 0x7b934 가 세운 값) */
   const windowSprite = useModeBackSprite(useSceneHour())
   const [update, setUpdate] = useState(-1)
+  // 판이 내려가면(null) 걸음을 −1 로 — 다음 판은 첫 틱 전까지 게이지를 안 그린다. 판이 바뀐 그림에서 바로 고친다(그 그림은 판이 없어
+  // 걸음을 안 그린다 — 예전 effect 의 고침과 보이는 것이 같다)
+  const [shownPresentation, setShownPresentation] = useState(presentation)
+  if (shownPresentation !== presentation) {
+    setShownPresentation(presentation)
+    if (presentation === null) setUpdate(-1)
+  }
 
   const onFinishedRef = useRef(onFinished)
   useMirrorRef(onFinishedRef, onFinished)
 
   useEffect(() => {
-    if (presentation === null) {
-      setUpdate(-1)
-      return
-    }
+    if (presentation === null) return
     const startTick = appTickNow()
     let handle = 0
     let isDone = false

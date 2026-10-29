@@ -53,6 +53,7 @@ export function useSkinBlinkCounter(tick: number, perDraw = 1): number {
   const last = drawnBy.get(id)
   if (last !== undefined && last.tick === tick) return last.value
   const draws = last === undefined ? 1 : Math.max(0, tick - last.tick)
+  // oxlint-disable-next-line react/immutability -- 원본 공용 셈 [skin+0x410] 은 그리기 머리(0x593ce~0x593dc)가 그 자리에서 올린다 — 한 틀 두 그림이 그림 차례대로 다른 값을 봐야 한다(위 머리말, r160)
   skinBlinkCounter.value += perDraw * draws
   drawnBy.set(id, { tick, value: skinBlinkCounter.value })
   return skinBlinkCounter.value

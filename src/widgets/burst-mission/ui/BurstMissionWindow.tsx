@@ -105,12 +105,12 @@ export function BurstMissionWindow({
 
   const pushCommonWindow = useCommonWindowPush()
   const closeRef = useRef(() => {})
-  closeRef.current = () => {
+  useMirrorRef(closeRef, () => {
     if (!isBurstWindowOpen(stateRef.current)) return
     const popup = burstResultPopupTextOf(judgement, row)
     if (popup !== null) pushCommonWindow(popup)
     onClose()
-  }
+  })
 
   // 창이 떠 있는 동안 키는 창 것이다 — 뒤 타석 화면이 같은 Enter 를 같이 받으면 스윙이 나간다.
   useEffect(() => {
