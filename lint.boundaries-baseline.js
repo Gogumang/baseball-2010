@@ -123,7 +123,7 @@ export const crossSliceBaseline = [
   'src/entities/league/model/leagueDay/game/simulateLeagueGame.ts',
   'src/entities/league/model/leagueDay/roster/slots.ts',
   'src/entities/league/model/leagueDay/roster/teamRecord.ts',
-  'src/entities/league/model/leaguePlayerStats.ts',
+  'src/entities/league/model/leaguePlayerStats/otherSlices.ts',
   'src/entities/league/model/postseasonPlay.ts',
   'src/entities/mission/model/aceLevel.ts',
   'src/entities/mission/model/missionAutoRelay.ts',
