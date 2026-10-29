@@ -3,7 +3,7 @@ import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { hasSkill, isSeasonFinished } from '@/entities/career/model/playerCareer'
 import { equippedAbilityOf } from '@/entities/career/model/condition'
 import { battingAverageOf } from '@/entities/career/model/seasonStats'
-import { careerMvpCount, hasBackToBackMvp, hasMvpInSeason } from '@/entities/awards/model/seasonAwards'
+import { careerMvpCount, hasBackToBackMvp, hasMvpInSeason } from '@/entities/awards/model/seasonAwards/mvpBits'
 import { stripGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { ORIGINAL_MODE_TEXT } from '@/shared/config/original/modeText'
 

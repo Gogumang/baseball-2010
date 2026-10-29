@@ -48,7 +48,7 @@ export const layerDirectionBaseline = [
 ]
 
 export const crossSliceBaseline = [
-  'src/entities/awards/model/seasonAwards.ts',
+  'src/entities/awards/model/seasonAwards/otherSlices.ts',
   'src/entities/batting/model/atBatResultRing.ts',
   'src/entities/batting/model/ballPhysics/otherSlices.ts',
   'src/entities/batting/model/battedBallFlight.ts',
@@ -418,10 +418,4 @@ export const crossSliceBaseline = [
   'src/widgets/training-scene/ui/TrainingScene.tsx',
 ]
 
-export const cycleBaseline = [
-  'src/entities/awards/model/seasonAwards.ts',
-  'src/entities/career/model/seasonFlow.ts',
-  'src/entities/career/model/titles.ts',
-  'src/shared/ui/MessageBox/MessageBox.tsx',
-  'src/shared/ui/index.ts',
-]
+export const cycleBaseline = ['src/shared/ui/MessageBox/MessageBox.tsx', 'src/shared/ui/index.ts']

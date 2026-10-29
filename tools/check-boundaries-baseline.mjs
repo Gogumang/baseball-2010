@@ -15,12 +15,13 @@ const TEST_FILE = /\.test\.tsx?$/
 const LISTS = { 'fsd-layer-direction': 'layerDirectionBaseline', 'fsd-cross-slice': 'crossSliceBaseline', 'no-cycle': 'cycleBaseline' }
 const update = process.argv.includes('--update')
 
-const listPattern = (name) => new RegExp(`(export const ${name} = \\[\\n)([^\\]]*)(\\])`)
+// 줄마다 하나씩 쓴 목록과 oxfmt 가 한 줄로 접은 짧은 목록(`['a', 'b']`)을 둘 다 읽는다
+const listPattern = (name) => new RegExp(`(export const ${name} = \\[\\n?)([^\\]]*)(\\])`)
 
 /** 예외 목록 하나의 파일 이름들 */
 function readList(source, name) {
   const body = source.match(listPattern(name))?.[2] ?? ''
-  return [...body.matchAll(/^\s*'([^']+)',/gm)].map(([, file]) => file)
+  return [...body.matchAll(/'([^']+)'/g)].map(([, file]) => file)
 }
 
 /** 예외 목록 하나를 이름만(알파벳 순)으로 다시 쓴 원문 */
@@ -29,7 +30,7 @@ function withList(source, name, files) {
     .sort()
     .map((file) => `  '${file}',\n`)
     .join('')
-  return source.replace(listPattern(name), (_, head, _body, tail) => `${head}${body}${tail}`)
+  return source.replace(listPattern(name), (_, _head, _body, tail) => `export const ${name} = [\n${body}${tail}`)
 }
 
 /** 규칙 이름 → 그 규칙을 어기는 파일(저장소 뿌리 기준 경로) */
