@@ -43,7 +43,6 @@ export const layerDirectionBaseline = [
   'src/widgets/game-scene/ui/RecordAlertPanel.css.ts',
   'src/widgets/particles/ui/SceneParticleLayer.css.ts',
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
-  'src/widgets/player-detail-window/ui/PlayerDetailWindow.tsx',
 ]
 
 export const crossSliceBaseline = [
@@ -411,7 +410,6 @@ export const crossSliceBaseline = [
   'src/widgets/game-scene/ui/introCanvas.ts',
   'src/widgets/particles/lib/renderParticles.ts',
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
-  'src/widgets/player-detail-window/ui/PlayerDetailWindow.tsx',
   'src/widgets/record-pick-popup/ui/RecordPickPopup.tsx',
   'src/widgets/training-scene/ui/TrainingFigure.tsx',
   'src/widgets/training-scene/ui/TrainingScene.tsx',

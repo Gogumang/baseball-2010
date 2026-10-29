@@ -2,8 +2,8 @@
  * **선수 정보 창 0x5b798(skin, 종류, rec)** — '0' INFO. 창 자리 · 열리기(`detailWindowFrame` 머리말) · 줄 · 도형 칸(`detailRows`) ·
  * 값 글(`detailTexts`) · 투수 갈래(`pitcherDetail`) · 타자 갈래(`batterDetail`).
  *
- * 다른 조각을 읽는 두 가지 — 능력치 도형 축(`pages/create-player` 의 `abilityRadarAxesOf`) · 타자 손(`widgets/matchup-cards` 의
- * `batterHandOf`) — 는 이 파일에서만 읽는다(경계 예외가 이 파일 하나).
+ * 다른 조각을 읽는 것 — 능력치 도형 축 · 꼭짓점 · 바탕 테(`pages/create-player`) · 타자 손 · 둥근 칠(`widgets/matchup-cards`) ·
+ * 칸 숫자 · 글 가운데(`pages/nari-record-room`) — 은 이 파일에서만 읽는다(이 조각의 경계 예외가 이 파일 하나, `ui/` 도 여기서 받는다).
  */
 import { abilityRadarAxesOf } from '@/pages/create-player/lib/abilityRadarPanel'
 import type { AbilityRadarAxis } from '@/pages/create-player/lib/abilityRadarPanel'
@@ -15,6 +15,10 @@ import { detailSalaryOf } from '@/widgets/player-detail-window/lib/playerDetailW
 import type { PlayerDetail } from '@/widgets/player-detail-window/lib/playerDetailWindow/detailTexts'
 import { pitcherDetailOf } from '@/widgets/player-detail-window/lib/playerDetailWindow/pitcherDetail'
 
+// 다른 조각의 그림 셈 — `ui/playerDetailWindow` 가 이 파일을 거쳐 받는다
+export { abilityChartFrameOf, abilityChartVerticesOf } from '@/pages/create-player/lib/teamSelectLayout'
+export { yearCellDrawingOf, yearLabelOffsetOf } from '@/pages/nari-record-room/lib/nariRecordRoom'
+export { roundFillRectsOf } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 export {
   SUBSTITUTION_DETAIL_ORIGIN,
   ENTRY_DETAIL_ORIGIN,
