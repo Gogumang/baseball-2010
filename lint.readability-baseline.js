@@ -82,7 +82,6 @@ export const readabilityBaseline = [
   'src/entities/game/model/quickAtBat.ts',
   'src/entities/game/model/quickLineup.ts',
   'src/entities/game/model/quickPlateAppearance.ts',
-  'src/entities/game/model/simulateHalfInning.ts',
   'src/entities/game/model/winLossSave.ts',
   'src/entities/home-run-derby/model/derbyBattedBall.ts',
   'src/entities/home-run-derby/model/derbyRun.ts',
