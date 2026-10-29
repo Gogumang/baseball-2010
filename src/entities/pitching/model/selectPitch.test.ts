@@ -269,7 +269,7 @@ describe('selectPitch CPU 견제 — 0x345fc 종류 4 = 0x34848 (I-controls 4a-2
       computerPitchTypeOf({ list: pitchListOf(0x1143, false), magicCount: 0, ...상황2 }, expected)
     }
     expect(targetKindOf('hard', 상황2, expected)).toBe(4)
-    let base = 0
+    let base: number
     do {
       base = expected.rand(1, 4)
     } while (!이삼루.hasRunnerOnBase(base))

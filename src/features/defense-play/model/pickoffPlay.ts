@@ -351,15 +351,15 @@ function* pickoffPlaySteps(
   /** 처음 공을 쥔 틱 */
   let catchTick = -1
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2). 서면 틱 끝 b45a4 가 0xb3148 */
-  let ballEventThisTick = false
+  let ballEventThisTick: boolean
   /** 플레이 +0x120 — 판 진행 관문 0xb0d28 의 판 끝 세기 */
   let endCounter = 0
   /** 판을 닫은 관문 다음 그림의 G1 이 열렸나 (`fielderSlackAtPlayEnd`) */
   let closingListTickOpen = false
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 결과 메시지 0xbba */
-  let outJudgedThisTick = false
+  let outJudgedThisTick: boolean
   /** 이번 틱 플레이 틱이 보낼 결과 메시지 0xbba 의 코드 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다(b4562 에서 한 번) */
-  let tickMessageCode = 0
+  let tickMessageCode: number
   /** 수비 장면 연출 칸 — 0x17 진입 0x46418 이 결과 판 타이머를 −1 로 (`defenseScene`) */
   let scene = enterDefenseScene(input.scene, false)
   /**
@@ -431,7 +431,7 @@ function* pickoffPlaySteps(
 
   /** 0xb36d0 한 번 — 타구 진행기의 `runOutJudgement` 와 같은 자리, 다만 타자주자 제외가 없다 */
   /** 바로 앞 0xb36d0 한 번의 결과 — 같은 플레이 틱의 두 번째 판정이 state[0x87] 을 다시 적는다(타구 진행기 `grabOutThisTick`) */
-  let lastJudgedKind: number = OUT_KIND.NONE
+  let lastJudgedKind: number
   const runOutJudgement = (tick: number): void => {
     if (play.finished) return
     const judged = judgeOut(contextAt(tick))

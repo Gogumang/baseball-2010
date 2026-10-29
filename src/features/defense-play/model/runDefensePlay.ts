@@ -1121,7 +1121,7 @@ function rollContactMessage(input: DefensePlayInput): ContactMessageRoll {
   const fielders = createFielders(abilities, input.defenseTeamBonus ?? 0)
   const window = FULL_FORECAST_WINDOW
   const chase = { chaseToLanding: trajectory.landingChase === true }
-  let forecast = forecastCatch(trajectory, fielders, window, chase)
+  const forecast = forecastCatch(trajectory, fielders, window, chase)
 
   // ── 필살수비 굴림 (메시지 0x11 = 타구가 떠난 순간, I-controls 2c) ──
   // A(점프, +0x1f5) 를 먼저 굴리고 실패했을 때만 B(슬라이딩, +0x1f6). 창을 여는 것뿐이라
@@ -1150,7 +1150,7 @@ function rollContactMessage(input: DefensePlayInput): ContactMessageRoll {
   ) {
     launchedPattern = displayPatternOf(sceneDeck.deck, specialDefense.jumpUnlocked ? 'jump' : 'slide', swungContact.pattern, input.random)
     trajectory = battedBallTrajectory(launchedPattern)
-    forecast = forecastCatch(trajectory, fielders, window, chase)
+    // 원본은 여기서 예보를 다시 만든다 — 굴림이 없고 이 함수에서 더 안 보므로 건너뛴다(판 시작이 마지막 예보를 만든다)
   }
   // ── 쏘기 + 세계 0xbfed0 (메시지 0x11 의 51172~511a4) — 필살수비 굴림(50fe6 · 51012) 뒤다 ──
   // 궤적 계산 안의 굴림은 폴 충돌 0xa2c64 의 rand(−25, 25) 하나뿐이다. 부르는 쪽은 난수 없이 궤적을 깔아 넘기므로
@@ -1531,8 +1531,8 @@ export function stepDefensePlay(state: DefensePlayState, key: DefenseKeyPress | 
   let deferredThrowReceiver = state.deferredThrowReceiver
   let deferredThrowBase = state.deferredThrowBase
   let endCounter = state.endCounter
-  let counterBeforeHead = state.counterBeforeHead
-  let drawGateOpen = state.drawGateOpen
+  let counterBeforeHead: number
+  let drawGateOpen: boolean | null
   // ── 0x17 키 건너뛰기 — 키 처리 0x53420 이 키마다 끝에 메시지 0x587 → 0x509a0(0x50afe) → 0x519cc (갱신 0x524c0 보다 먼저) ──
   // state[0x1d](홈런) || +0x129(폴 홈런) || state[0xb] ∈ {3, 4} 일 때만 +0xfe7 = 1 — 이 틱부터 한 그림 안에서 판을 끝까지 돈다
   let fastForward = state.fastForward
@@ -1703,11 +1703,11 @@ export function stepDefensePlay(state: DefensePlayState, key: DefenseKeyPress | 
   }
 
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba (6c 절) */
-  let outJudgedThisTick = false
+  let outJudgedThisTick: boolean
   /** 이번 틱 쥐기 0xb2710 안의 판정(0xb2758)이 아웃을 냈나 — 같은 플레이 틱의 두 번째 판정(6b 절)이 state[0x87] 을 다시 적는다 */
   let grabOutThisTick = false
   /** 바로 앞 `runOutJudgement` 한 번의 결과 종류 — 쥐기의 뜬공 아웃(결과 1)을 가른다 */
-  let judgedKindThisCall: number = OUT_KIND.NONE
+  let judgedKindThisCall: number
 
   /**
    * **플레이 vt30 = 0xb1c90 한 번** (`coverTick.runCoverTick`) — vt4c 끝 b4c72(1d 절, 매 틱) · 송구 0xb2e38 꼬리 b3094(예보 vt24(0) ·
