@@ -10,13 +10,14 @@ import { rollSceneLoadingTip } from '@/entities/game/model/sceneLoadingTip'
 /** 로딩 판이 받은 팁 글 — 그림 대신 그리자마자 끝낸다(상태 7 · 9 · 8 적재를 다 그린 꼴) */
 const 받은팁: string[] = []
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useEffectEvent } = await import('react')
   return {
     LoadingTip: ({ tip, onDone }: { tip: string; onDone: () => void }) => {
-      useEffect(() => {
+      const finish = useEffectEvent(() => {
         받은팁.push(tip)
         onDone()
-      }, [])
+      })
+      useEffect(() => finish(), [])
       return null
     },
   }

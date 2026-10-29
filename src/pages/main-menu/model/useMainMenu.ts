@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { initialMainMenu, listCursorOf, reduceMainMenu, topCursorOf } from '@/pages/main-menu/model/mainMenu'
 import type {
@@ -87,21 +87,23 @@ export function useMainMenu(
   )
 
   const stateRef = useRef(state)
-  stateRef.current = state
   const onEffectRef = useRef(onEffect)
-  onEffectRef.current = onEffect
   const hasSavedRef = useRef(hasSavedGame)
-  hasSavedRef.current = hasSavedGame
   const isSheetOpenRef = useRef(isSheetOpen)
-  isSheetOpenRef.current = isSheetOpen
   const globalRecordRef = useRef(globalRecord)
-  globalRecordRef.current = globalRecord
   const gameStartCursorRef = useRef(gameStartCursor)
-  gameStartCursorRef.current = gameStartCursor
   const topMenuCursorRef = useRef(topMenuCursor)
-  topMenuCursorRef.current = topMenuCursor
   const isInputBlockedRef = useRef(isInputBlocked)
-  isInputBlockedRef.current = isInputBlocked
+  useLayoutEffect(() => {
+    stateRef.current = state
+    onEffectRef.current = onEffect
+    hasSavedRef.current = hasSavedGame
+    isSheetOpenRef.current = isSheetOpen
+    globalRecordRef.current = globalRecord
+    gameStartCursorRef.current = gameStartCursor
+    topMenuCursorRef.current = topMenuCursor
+    isInputBlockedRef.current = isInputBlocked
+  })
   const turningRef = useRef(false)
   const isKeyBlocked = () => isInputBlockedRef.current || turningRef.current
 
