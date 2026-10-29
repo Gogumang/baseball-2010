@@ -1,14 +1,8 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { useRecoloredSprite, useWarmRecoloredSprites, outfitPaletteIndex } from '@/shared/lib/sprite/paletteSwap'
-import { animationFolderOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
+import { animationFolderOf } from '@/shared/config/original/trainingAnimation'
 import { animationStepAt, figurePoseAt } from '@/widgets/training-scene/lib/animationPlayback'
 import { TrainingFigure } from '@/widgets/training-scene/ui/TrainingFigure'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
-import { layerRecolorRequestsOf, pitcherLayersOf } from '@/widgets/batting-stage/lib/batterLayers'
-import type { BatterLayer } from '@/widgets/batting-stage/lib/batterLayers'
-import { PITCHER_FRAMES } from '@/widgets/batting-stage/lib/spriteLoader'
 import {
   SEASON_TRAINING_BATTER_FORM,
   SEASON_TRAINING_BATTER_MIRROR_FLAG,
@@ -20,6 +14,8 @@ import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useGaugePopupTicks } from '@/pages/season/ui/gaugePopup/useGaugePopupTicks'
+import { PitcherTrainingFigure } from '@/pages/season/ui/seasonTrainingPopup/PitcherTrainingFigure'
 
 /** 연출 기준점 = 창 사각형 ((x + w) / 2, y + h + d) = (120, 137), d = 0 (0x84954) */
 const ANCHOR = { x: 120, y: 137 }
@@ -49,44 +45,7 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
   const windowOrigins = useFrameOrigins(WINDOW_FOLDER)
   /** 창 배경 0x7b9ac — 프레임 · 팔레트 = 시간대 [gfx+0x1c] (장면에 들어설 때 0x7b934 가 세운 값) */
   const windowSprite = useModeBackSprite(useSceneHour())
-  const [update, setUpdate] = useState(0)
-  const skipRef = useRef<() => void>(() => undefined)
-  const onFinishedLatest = useEffectEvent(onFinished)
-
-  useEffect(() => {
-    const startTick = appTickNow()
-    let handle = 0
-    let isDone = false
-    const finish = () => {
-      if (isDone) return
-      isDone = true
-      cancelAnimationFrame(handle)
-      onFinishedLatest()
-    }
-    const tick = (now: number) => {
-      const current = Math.max(0, appTickOf(now) - startTick)
-      setUpdate(current)
-      if (current >= TRAINING_POPUP_UPDATES) return finish()
-      handle = requestAnimationFrame(tick)
-    }
-    handle = requestAnimationFrame(tick)
-    // [gfx+0x1d0] = [gfx+0x1d8] — 게이지 끝이라 0x84e58 이 끝을 본다(원본은 다음 갱신, 웹은 곧바로)
-    skipRef.current = () => {
-      setUpdate(TRAINING_POPUP_UPDATES)
-      finish()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!isSeasonTrainingSkipKey(event.key)) return
-      event.preventDefault()
-      skipRef.current()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      isDone = true
-      cancelAnimationFrame(handle)
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [])
+  const [update, skipRef] = useGaugePopupTicks(isSeasonTrainingSkipKey, onFinished)
 
   const entries = animations?.[presentation.animation]
   const step = entries === undefined ? null : animationStepAt(entries, update)
@@ -142,47 +101,4 @@ export function SeasonTrainingPopup({ slot, teamIndex, onFinished }: SeasonTrain
       <TrainingGauge filled={update} />
     </div>
   )
-}
-
-/**
- * 단일 PZX 투수 그림 0x79525 — 동작 번호 = pitcher.pzx 프레임 번호(0x795f6), +0x3d < 0(마투수 아님) 갈래의 겹 여섯 칸
- * (`pitcherLayersOf` — 새로 만든 객체라 장비 칸은 비어 있다). +0x3c = 0 이라 안 뒤집는다. 바탕 팔레트 = 피부 0 × 15 + 팀.
- */
-function PitcherTrainingFigure({
-  pose,
-  poses,
-  teamIndex,
-  x,
-  y,
-}: {
-  readonly pose: number
-  /** 이 애니가 낼 자세들 — 그 겹을 미리 칠해 둔다(자세가 넘어가는 그림에 구운 벌이 비치지 않게) */
-  readonly poses: readonly number[]
-  readonly teamIndex: number
-  readonly x: number
-  readonly y: number
-}) {
-  const paletteOf = (layer: BatterLayer) =>
-    layer.gradePaletteRow ?? (layer.folder === PITCHER_FRAMES ? outfitPaletteIndex(SEASON_TRAINING_SKIN, teamIndex) : null)
-  useWarmRecoloredSprites(
-    layerRecolorRequestsOf(
-      [...new Set(poses)].flatMap((shown) => pitcherLayersOf(shown)),
-      paletteOf,
-    ),
-  )
-  return (
-    <div data-testid="시즌-훈련-투수" style={{ position: 'absolute', left: x, top: 0 }}>
-      {pitcherLayersOf(pose).map((layer, index) => (
-        <PitcherLayer key={`${layer.folder}#${index}`} layer={layer} y={y} paletteIndex={paletteOf(layer)} />
-      ))}
-    </div>
-  )
-}
-
-function PitcherLayer({ layer, y, paletteIndex }: { readonly layer: BatterLayer; readonly y: number; readonly paletteIndex: number | null }) {
-  const key = String(layer.frame).padStart(3, '0')
-  const src = useRecoloredSprite(`${layer.folder}/${key}.png`, paletteIndex)
-  const origin = useFrameOrigins(layer.folder)?.[key]
-  if (origin === undefined) return null
-  return <img className={styles.sprite} style={{ left: origin.x, top: y + origin.y }} src={src} alt="" />
 }
