@@ -89,8 +89,7 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
       })
       setScene(SEASON_SCENE_STATE.엔트리편집)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [aceLevels, pendingGame, save, userEntrySourceOf],
+    [aceLevels, pendingGame, save, userEntrySourceOf, setEntryEdit, setScene],
   )
   /**
    * 0xe0 키 `0x7044` — 편집기 `0x55864` 를 돌리고 끝 코드 `[ed+0x338]` 을 본다:
@@ -121,21 +120,18 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
       }
       setEntryEdit({ ...entryEdit, editor: outcome.state, lists, isAceLocked: outcome.isAceLocked })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [aceLevels, entryEdit, pendingGame, save, stageSave, userEntrySourceOf],
+    [aceLevels, entryEdit, pendingGame, save, stageSave, userEntrySourceOf, setEntryEdit, setScene],
   )
   const pointEntryCursorAction = useCallback(
     (index: number) => {
       if (entryEdit === null || entryEdit.isAceLocked) return
       setEntryEdit({ ...entryEdit, editor: pointEntryCursor(entryEdit.editor, entryEdit.lists, index) })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [entryEdit],
+    [entryEdit, setEntryEdit],
   )
   const closeEntryAceLocked = useCallback(() => {
     setEntryEdit((current) => (current === null ? null : { ...current, isAceLocked: false }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  }, [setEntryEdit])
   /** 0xdd "선발" 줄 — 내 팀 명단(엔트리 편집 결과)의 투수 0번 */
   const matchInfoStarterName =
     save !== null && pendingGame !== null
@@ -168,8 +164,7 @@ export function useEntryEditActions(ctx: MatchInfoActionsContext) {
       state: { ...save.state, record: { ...save.state.record, phase: SEASON_PHASE.기본 } },
     })
     setScene(SEASON_SCENE_STATE.관리메뉴)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [commit, nextGameFromMenu, save])
+  }, [commit, nextGameFromMenu, save, setScene])
   return {
     openEntryEdit,
     pressEntryKeyAction,

@@ -13,7 +13,7 @@ export function seasonSessionOf(ctx: GameProgressActionsContext): SeasonSession 
   const { save, scene, recordSourceNow, gameOptions, squadPurpose, preGameAces, pendingGame, isMatchSettingsOpen, matchInfoStage } = ctx
   const { seasonMatchSettings, entryEdit, matchInfoStarterName, matchInfoOpponentStarterName, gameKind, resumeGame, leagueFirstAwardedBits } = ctx
   const { gamePoints, nextGameFromMenu, openedStadiumIds, openedHiddenIds, summaryEntry, eventPlayback, tradeRequest, trainingResult } = ctx
-  const { outingPlace, outingResultText, incomeEvaluation, seasonMvpKind, isTradeRequestAlertOpen, menuCursors, notice, chooseTeam, goto } = ctx
+  const { outingPlace, outingResultText, incomeEvaluation, seasonMvpKindRef, isTradeRequestAlertOpen, menuCursors, notice, chooseTeam, goto } = ctx
   const { clearRecordAces, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason, finishTrade, equipSeasonPlayer } = ctx
   const { buySeasonSubItem, buySeasonGpItem, recoverSeasonPitcherStamina, playNextGame, openNextGame, confirmNextGame, cancelNextGame } = ctx
   const { confirmIncome, confirmDayResults, answerTradeRequest, cancelTradeRequest, closeTradeResult, moveMenuCursor, choosePreGameAceAction } = ctx
@@ -69,7 +69,7 @@ export function seasonSessionOf(ctx: GameProgressActionsContext): SeasonSession 
     awardWindowTextOf: (sub: number) =>
       save === null || eventPlayback === null
         ? null
-        : seasonAwardWindowTextOf(eventPlayback.eventId, sub, save, recordSourceNow(), seasonMvpKind.current),
+        : seasonAwardWindowTextOf(eventPlayback.eventId, sub, save, recordSourceNow(), seasonMvpKindRef.current),
     isTradeRequestAlertOpen,
     menuCursors,
     notice,

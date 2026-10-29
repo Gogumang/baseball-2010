@@ -12,7 +12,20 @@ import type { SceneEntryEffectContext } from '@/app/model/seasonSession/scene/us
 
 /** `useSeasonSession` 몸통 문장 69~74 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSeasonRosterActions(ctx: SceneEntryEffectContext) {
-  const { save, carriedGlobals, commit, newPlayerFlag, setScene, latestSave, persistedSave, setSave, store, globalsRef, setGameOptions } = ctx
+  const {
+    save,
+    carriedGlobalsRef,
+    setCarriedGlobals,
+    commit,
+    newPlayerFlagRef,
+    setScene,
+    latestSaveRef,
+    persistedSaveRef,
+    setSave,
+    store,
+    globalsRef,
+    setGameOptions,
+  } = ctx
   const { setResumeGame, setPendingGame, setEntryEdit } = ctx
   const chooseTeam = useCallback(
     (teamId: number, name: string) => {
@@ -29,15 +42,14 @@ export function useSeasonRosterActions(ctx: SceneEntryEffectContext) {
         cpuPitcherStaminas: fullCpuPitcherStaminas(teamId),
         // 경기진행 설정(+0x12c+1)과 창을 본 표시(+0x11e)는 전역 저장 칸이라 새 시즌이 넘겨받는다 — 시즌 초기화 뒤면
         // 남겨 둔 덩어리에서
-        ...seasonGlobalCarryOf(save ?? carriedGlobals.current),
+        ...seasonGlobalCarryOf(save ?? carriedGlobalsRef.current),
       }
       commit(next)
       // 0xcc → 0xcb: 새 시즌 초기화에서 왔으니 새 선수 플래그가 선다 — 관리 메뉴 첫 폴링이 400 을 튼다
-      newPlayerFlag.current = true
+      newPlayerFlagRef.current = true
       setScene(SEASON_SCENE_STATE.관리메뉴)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, save],
+    [commit, save, carriedGlobalsRef, newPlayerFlagRef, setScene],
   )
   const updateRecord = useCallback(
     (record: SeasonRecord) => {
@@ -63,13 +75,12 @@ export function useSeasonRosterActions(ctx: SceneEntryEffectContext) {
   )
   const removeCareerPlayer = useCallback(
     (isPitcher: boolean) => {
-      const current = latestSave.current
+      const current = latestSaveRef.current
       if (current === null) return
       const roster = removeCareerPlayerFromRoster(current.roster, isPitcher, recordAceSlotOf(current, isPitcher))
       if (roster !== current.roster) commit({ ...current, roster })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit],
+    [commit, latestSaveRef],
   )
   /**
    * 0x224ec(mgr, 2) — 시즌 파일 지움(+0x42 = 0) · +0x4e = 0. 웹 시즌 저장 한 칸이 곧 그 파일이고 +0x4e 도 그 안에 있다.
@@ -79,11 +90,12 @@ export function useSeasonRosterActions(ctx: SceneEntryEffectContext) {
    * 그 두 칸만 쓴다(`SeasonGlobalCarry`).
    */
   const resetSeason = useCallback(() => {
-    const current = latestSave.current
-    const carry = seasonGlobalCarryOf(current ?? carriedGlobals.current)
-    carriedGlobals.current = carry
-    latestSave.current = null
-    persistedSave.current = null
+    const current = latestSaveRef.current
+    const carry = seasonGlobalCarryOf(current ?? carriedGlobalsRef.current)
+    carriedGlobalsRef.current = carry
+    setCarriedGlobals(carry)
+    latestSaveRef.current = null
+    persistedSaveRef.current = null
     setSave(null)
     store.save({ ...carry, ...globalsRef.current })
     setGameOptions(null)
@@ -91,8 +103,20 @@ export function useSeasonRosterActions(ctx: SceneEntryEffectContext) {
     setPendingGame(null)
     setEntryEdit(null)
     setScene(SEASON_SCENE_STATE.팀고르기)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [store])
+  }, [
+    store,
+    carriedGlobalsRef,
+    globalsRef,
+    latestSaveRef,
+    persistedSaveRef,
+    setCarriedGlobals,
+    setEntryEdit,
+    setGameOptions,
+    setPendingGame,
+    setResumeGame,
+    setSave,
+    setScene,
+  ])
   return { chooseTeam, updateRecord, updateRoster, removeHallOfFamer, removeCareerPlayer, resetSeason }
 }
 

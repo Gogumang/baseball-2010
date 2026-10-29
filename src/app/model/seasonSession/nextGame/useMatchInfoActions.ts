@@ -16,7 +16,7 @@ import type { NextGameStartContext } from '@/app/model/seasonSession/nextGame/us
 export function useMatchInfoActions(ctx: NextGameStartContext) {
   const { setPendingGame, random, setMatchInfoStage, matchSettingsSeenSlot, commit, setIsMatchSettingsOpen, setScene, save, optionsFor } = ctx
   const { enterPreGameSquad, pendingGame, preGameAces, setPreGameAces, nextGameEntered, clearGameRecord, setGameKind, setResumeGame } = ctx
-  const { seasonMatchSettingsRef, entryOrderOf, setOwnRotationShift, setGameOptions, withGameSettings, setGlobalMatchSettings, latestSave } = ctx
+  const { seasonMatchSettingsRef, entryOrderOf, setOwnRotationShift, setGameOptions, withGameSettings, setGlobalMatchSettings, latestSaveRef } = ctx
   const { writeGlobalField } = ctx
   /**
    * 0xdd 경기정보로 — 들어옴 0x6548 (이전 상태가 0xe0 이면 6556 에서 곧장 6850 으로 — 웹은 0xe0 에서 돌아올 때
@@ -64,8 +64,7 @@ export function useMatchInfoActions(ctx: NextGameStartContext) {
       setIsMatchSettingsOpen(firstTime)
       setScene(SEASON_SCENE_STATE.경기정보)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, random, matchSettingsSeenSlot],
+    [commit, random, matchSettingsSeenSlot, setIsMatchSettingsOpen, setMatchInfoStage, setPendingGame, setScene],
   )
   /** 확인 `0x48fc`: `SR+0xb4`(포스트시즌) ? 0xef : (this+0x11c = 1, 0xd7 선수단 → 0xdd → 경기) */
   const confirmNextGame = useCallback(() => {
@@ -75,8 +74,7 @@ export function useMatchInfoActions(ctx: NextGameStartContext) {
     const options = optionsFor(seasonOpponentOf(save.state.record), leagueSideOf(save.state.record.games, save.state.record.teamId))
     if (options === null) return
     enterPreGameSquad({ kind: '정규', options })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [enterPreGameSquad, optionsFor, save])
+  }, [enterPreGameSquad, optionsFor, save, setScene])
   /** 0xd7 OK (0xa734) — 잠긴 칸 팝업·레벨업 창은 화면(`AceSelectScreen`)이 한다 */
   const choosePreGameAceAction = useCallback(
     (cell: number) => {
@@ -85,8 +83,7 @@ export function useMatchInfoActions(ctx: NextGameStartContext) {
       setPreGameAces(step.aces)
       if (step.kind === '경기정보') enterMatchInfo(save, pendingGame, step.aces)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [enterMatchInfo, pendingGame, preGameAces, save],
+    [enterMatchInfo, pendingGame, preGameAces, save, setPreGameAces],
   )
   /**
    * 0xd7 CLR (0xa900). 마투수 단계에서 나가면 포스트시즌 0xef · 그 밖 0xd8 이다.
@@ -100,8 +97,7 @@ export function useMatchInfoActions(ctx: NextGameStartContext) {
     setPendingGame(null)
     if (step.scene === SEASON_SCENE_STATE.다음경기) return nextGameEntered(save, false, true)
     setScene(step.scene)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [nextGameEntered, preGameAces, save])
+  }, [nextGameEntered, preGameAces, save, setPendingGame, setPreGameAces, setScene])
   /**
    * 0xdd OK (0x847e~0x8532): 저장 · 평판 16칸 지움(0xa3424) · 0xe1 → 경기 장면.
    * 정규·포스트시즌이면 0xd7 에서 고른 마선수가 내 팀에 들어간다(0x6548 66ae~670a, 국가대항전은 안 넣는다).
@@ -131,8 +127,22 @@ export function useMatchInfoActions(ctx: NextGameStartContext) {
     setGameOptions(withGameSettings(prepared.options))
     setPendingGame(null)
     setScene(SEASON_SCENE_STATE.경기직전)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [clearGameRecord, pendingGame, preGameAces, save, withGameSettings])
+  }, [
+    clearGameRecord,
+    pendingGame,
+    preGameAces,
+    save,
+    withGameSettings,
+    entryOrderOf,
+    seasonMatchSettingsRef,
+    setGameKind,
+    setGameOptions,
+    setIsMatchSettingsOpen,
+    setOwnRotationShift,
+    setPendingGame,
+    setResumeGame,
+    setScene,
+  ])
   /** 0xdd CLR (0x844e) — 국가대항전이면 0xf4(웹은 대회 화면), 아니면 0xd7 을 다시 들어온다(0x5268) */
   const cancelMatchInfo = useCallback(() => {
     if (pendingGame === null) return
@@ -141,11 +151,9 @@ export function useMatchInfoActions(ctx: NextGameStartContext) {
     if (next === SEASON_SCENE_STATE.선수단) return enterPreGameSquad(pendingGame)
     setPendingGame(null)
     setScene(next)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [enterPreGameSquad, pendingGame])
+  }, [enterPreGameSquad, pendingGame, setIsMatchSettingsOpen, setPendingGame, setScene])
   /** 0xdd '0' (0x857a) — `0x5fef4(메뉴, 열림 뒤집기)` */
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  const toggleMatchSettings = useCallback(() => setIsMatchSettingsOpen((open) => !open), [])
+  const toggleMatchSettings = useCallback(() => setIsMatchSettingsOpen((open) => !open), [setIsMatchSettingsOpen])
   /**
    * 0xdd 설정 창 확인 — 전역 m = 1 칸을 되쓰고 0x1f1b9 로 **전역 저장만** 쓴다(시즌 파일은 안 쓴다 — 0xe0 에서 고친 명단은
    * 아직 메모리에만 있다, `pressEntryKeyAction`). 전역 칸 손잡이가 없으면(시험) 시즌 저장 칸에 적되 마지막으로 파일에 쓴 시즌
@@ -160,11 +168,10 @@ export function useMatchInfoActions(ctx: NextGameStartContext) {
         setGlobalMatchSettings(settings)
         return
       }
-      if (latestSave.current === null) return
+      if (latestSaveRef.current === null) return
       writeGlobalField({ matchSettings: settings })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [matchSettingsSeenSlot, writeGlobalField],
+    [matchSettingsSeenSlot, writeGlobalField, latestSaveRef, setGlobalMatchSettings, setIsMatchSettingsOpen],
   )
   return {
     enterMatchInfo,

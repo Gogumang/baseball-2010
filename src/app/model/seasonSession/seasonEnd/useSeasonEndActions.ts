@@ -30,7 +30,7 @@ import type { TrainingOutingActionsContext } from '@/app/model/seasonSession/man
 /** `useSeasonSession` 몸통 문장 121~124 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
   const { setRewardRecord, rewardStore, gainGamePoint, recordStat, save, commit, startEvent, random, setScene, eventPlayback, updateGlobals } = ctx
-  const { eventCursor, recordSourceNow, seasonMvpKind, setEventPlayback, latestSave } = ctx
+  const { eventCursorRef, recordSourceNow, seasonMvpKindRef, setEventPlayback, latestSaveRef } = ctx
   /**
    * 리그 1위 G 지급 (`0x6900` → `0x87e8`). 받은 칸은 **전역 저장 +0x145 비트**라
    * 시즌을 새로 시작해도 남는다 — 그래서 시즌 저장이 아니라 따로 둔다.
@@ -44,8 +44,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       // 0x6a98~0x6abc: 이어서 0x22dd5(mgr, k = 0·1·2) — 통계 [mgr+0xc8] +0x106+k 달성 표시 → 통계 저장 0x1f1e1
       recordStat?.({ kind: '달성표시', index: award.bit })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [gainGamePoint, recordStat, rewardStore],
+    [gainGamePoint, recordStat, rewardStore, setRewardRecord],
   )
   /**
    * 결산을 닫았다 (`0x87b4`) — 연차 idx 가 **짝수**면 국가대항전, 홀수면 곧장 새 해 `0x6e0c`(`nextYearOf`)다.
@@ -82,8 +81,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
       setScene(next.scene)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, random, save, startEvent],
+    [commit, random, save, startEvent, setScene],
   )
   /**
    * 이벤트 재생 0xd3 이 끝났다 (실행기 0x8cf64 의 끝 → 이전 상태 `this+0x24`).
@@ -119,7 +117,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       // 선택지가 번호로 부른 마지막 이벤트 다음부터 이어 훑는다 (0xae170)
       const lastCalled = viewedEventIds[viewedEventIds.length - 1]
       if (lastCalled !== undefined && lastCalled !== playback.eventId) {
-        eventCursor.current = cursorAfterCalling(eventCursor.current, lastCalled)
+        eventCursorRef.current = cursorAfterCalling(eventCursorRef.current, lastCalled)
       }
       const goalRecordOf = recordSourceNow()
       const followUp = seasonEventFollowUpOf(playback.eventId, () =>
@@ -140,14 +138,27 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
         ),
       )
       // 실행기 끝 0x8d134~0x8d19c: 370 · 371 은 0x8b04c, 376 은 0x8b370 이 결과 이벤트를 고른다(시즌 갈래)
-      const awardFollowUp = seasonAwardFollowUpOf(playback.eventId, next, goalRecordOf, seasonMvpKind.current)
+      const awardFollowUp = seasonAwardFollowUpOf(playback.eventId, next, goalRecordOf, seasonMvpKindRef.current)
       if (awardFollowUp !== null) return startEvent(awardFollowUp, playback.returnScene)
       if (followUp !== null) return startEvent(followUp, playback.returnScene)
       setEventPlayback(null)
       setScene(playback.returnScene)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, eventPlayback, gainGamePoint, random, recordSourceNow, recordStat, save, startEvent, updateGlobals],
+    [
+      commit,
+      eventPlayback,
+      gainGamePoint,
+      random,
+      recordSourceNow,
+      recordStat,
+      save,
+      startEvent,
+      updateGlobals,
+      eventCursorRef,
+      seasonMvpKindRef,
+      setEventPlayback,
+      setScene,
+    ],
   )
   /**
    * 보상 명령 하나를 그 자리에서 준다 — 0x8c460 모드 2 갈래(`applySeasonEventRewards`). 이벤트 번호는 그 명령이 든 이벤트다
@@ -168,7 +179,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
    */
   const giveSeasonEventReward = useCallback(
     (rewards: readonly SeasonEventReward[], eventId: number, viewedEventIds: readonly number[] = [eventId]) => {
-      const current = latestSave.current
+      const current = latestSaveRef.current
       if (current === null) return
       const applied = applySeasonEventRewards(current.state, rewards, eventId, random)
       const seen = [eventId, ...viewedEventIds].filter((id) => id !== YEAR_GOAL_EVENT_ID).reduce(markEventSeen, applied.state.record)
@@ -181,8 +192,7 @@ export function useSeasonEndActions(ctx: TrainingOutingActionsContext) {
       }
       if (applied.event100Awarded) updateGlobals(withEvent100Awarded)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, gainGamePoint, random, recordStat, updateGlobals],
+    [commit, gainGamePoint, random, recordStat, updateGlobals, latestSaveRef],
   )
   return { awardLeagueFirst, finishSeason, finishSeasonEvent, giveSeasonEventReward }
 }

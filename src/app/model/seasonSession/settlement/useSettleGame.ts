@@ -2,16 +2,14 @@ import { useCallback } from 'react'
 import type { TeamGameSummary } from '@/features/play-team-game/model/teamGameFlow'
 import { setLiveGameInningIndex, setLiveGameSides, liveGameSidesOf } from '@/shared/lib/liveGameState/liveGameState'
 import { applySeasonBurstRewards } from '@/entities/season-mode/model/seasonRewards'
-import { lapPlayClock } from '@/entities/collection/model/playClock'
-import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import { clearRepeatableSeen, tickAfterAnyGame, START_SEASON_EVENT_CURSOR } from '@/entities/season-mode/model/seasonEventFlow'
+import { START_SEASON_EVENT_CURSOR } from '@/entities/season-mode/model/seasonEventFlow'
 import { seasonHumanWonOf, seasonGameIsEvaluated, evaluateSeasonGame, applySeasonGameEvaluation } from '@/entities/season-mode/model/seasonEvaluation'
 import { advancePostseason, recordLeagueResult } from '@/entities/league/model/league'
 import { EMPTY_LEAGUE_PLAYER_STATS, recordLeagueStolenBases, recordLeaguePlateAppearances } from '@/entities/league/model/leaguePlayerStats'
 import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMachine'
 import { playLeagueDay } from '@/entities/league/model/leagueDay'
 import { postseasonDayOf } from '@/app/model/seasonSession/awards/seasonAwards'
-import { NO_CHAMPION, SEASON_STAT_MODE, seasonEvaluationJingleIdOf } from '@/app/model/seasonSession/constants/seasonConstants'
+import { NO_CHAMPION, seasonEvaluationJingleIdOf } from '@/app/model/seasonSession/constants/seasonConstants'
 import { seasonAbilityContextOf } from '@/app/model/seasonSession/game/pitcherOrder'
 import {
   humanGameRecordAcesOf,
@@ -23,11 +21,23 @@ import { cpuLeagueRecordOf } from '@/app/model/seasonSession/roster/roster'
 import type { SeasonSave, SettledSeasonGame } from '@/app/model/seasonSession/save/seasonSave'
 import { withDayEndRecovery, withGameEndStamina } from '@/app/model/seasonSession/stamina/stamina'
 import { cupSettledSaveOf, regularSeasonSettledSaveOf } from '@/app/model/seasonSession/settlement/settledSaves'
+import { playedSeasonRecordOf, recordSeasonGameEndStats } from '@/app/model/seasonSession/settlement/gameEndRecord'
 import type { EntryEditActionsContext } from '@/app/model/seasonSession/nextGame/useEntryEditActions'
 
 /** `useSeasonSession` 몸통 문장 102~102 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSettleGame(ctx: EntryEditActionsContext) {
-  const { latestSave, gameOptions, gameKind, gainGamePoint, recordStat, eventCursor, newPlayerFlag, freshScene, ownRotationShift, commit } = ctx
+  const {
+    latestSaveRef,
+    gameOptions,
+    gameKind,
+    gainGamePoint,
+    recordStat,
+    eventCursorRef,
+    newPlayerFlagRef,
+    freshSceneRef,
+    ownRotationShift,
+    commit,
+  } = ctx
   const { random, onRegularSeasonWin, aceLevels } = ctx
   /**
    * 경기가 끝났다 — 원본 차례 그대로 정산한다:
@@ -37,7 +47,7 @@ export function useSettleGame(ctx: EntryEditActionsContext) {
    */
   const settleGame = useCallback(
     (summary: TeamGameSummary): SettledSeasonGame | null => {
-      const latest = latestSave.current
+      const latest = latestSaveRef.current
       if (latest === null) return null
       // 전역 경기 상태 +0x6b 에 이 경기 끝 이닝이 남는다(0xb6b6c — 정규·포스트시즌·국가대항전 모두) (`liveGameState`)
       setLiveGameInningIndex(summary.inningsPlayed - 1)
@@ -58,13 +68,7 @@ export function useSettleGame(ctx: EntryEditActionsContext) {
       // 경기 끝 0x4ea0c 는 모드가 5·6(미션)이 아니면 **갈래(정규·포스트시즌·국가대항전)를 가르기 전에**
       // 기록 달성 G 합 [scene+0x17f4] 를 저장 G(+0x64)에 더하고(4ec5a, 99999 상한) 0x4ec82 `0x22c7d(합, 모드 2)` 로
       // 획득 GP 통계에 적는다. 합은 요약이 싣고 온다(fc7f196 — 30G 자동진행 뒤 타석도 기록을 쌓는다, R15 10-3)
-      const earned = summary.gamePoints ?? 0
-      if (earned !== 0) gainGamePoint(earned)
-      recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: earned })
-      // 이어서 0x4ec8a `0x22e10` — 이번 경기 기록달성 횟수(0x1fce0, 모드 2 저장+0x8f0)를 통계 +4+n 누계에 더한다
-      recordStat?.({ kind: '기록달성', recordIds: summary.recordIds ?? [] })
-      // 0x4ea0c 끝 0x4f54a `0x4e8b0` — 지난 시간을 칸 3(시즌) 플레이 시간에 (0x22efc)
-      recordStat?.({ kind: '플레이시간', mode: SEASON_STAT_MODE, elapsed: lapPlayClock() })
+      recordSeasonGameEndStats(summary, gainGamePoint, recordStat)
 
       // 경기 중 `0xa755c` 가 올린 평판 16칸 — 원본은 경기 장면이 SR+0x1a0 을 직접 올리므로
       // **갈래와 상관없이** 레코드에 남는다 (S4 2b·6절). 웹은 요약이 싣고 와서 여기서 꽂는다.
@@ -74,17 +78,10 @@ export function useSettleGame(ctx: EntryEditActionsContext) {
       // (커서)와 새 선수 플래그(this+0xf9)도 새로 선다.
       //
       // 4f15a~4f19a — 모드 2 경기마다 SR+0x1bd = 내 칸 점수 · SR+0x1be = 상대 칸 점수(바이트, 0xe9 기록 줄이 s8 로 읽는다)
-      const played: SeasonRecord = clearRepeatableSeen(
-        tickAfterAnyGame({
-          ...record,
-          gameRecord: summary.gameRecord,
-          lastGameScore: (summary.ourScore << 24) >> 24,
-          lastGameConceded: (summary.opponentScore << 24) >> 24,
-        }),
-      )
-      eventCursor.current = START_SEASON_EVENT_CURSOR
-      newPlayerFlag.current = false
-      freshScene.current = true
+      const played = playedSeasonRecordOf(record, summary)
+      eventCursorRef.current = START_SEASON_EVENT_CURSOR
+      newPlayerFlagRef.current = false
+      freshSceneRef.current = true
 
       // 승패는 원본 셈 `0xb69c8`·`0x4f072` 로 다시 낸다 — 이긴 칸 = R(1) > R(0) ? 1 : 0 이라
       // **동점이면 선공(칸 0) 쪽이 이긴다**. 요약의 `won`(내 점수 > 상대 점수)은 동점을 패로 본다.
@@ -193,8 +190,21 @@ export function useSettleGame(ctx: EntryEditActionsContext) {
       // 관중수입 창(0xe9)이 뜨면서 나는 평가 징글 36·37·38 (0xdec4/0xdede) — 창은 결과 화면 확인 뒤에 선다
       return { next: SEASON_SCENE_STATE.관중수입, jingle: seasonEvaluationJingleIdOf(evaluation.popularityChange) }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [aceLevels, commit, gainGamePoint, gameKind, gameOptions, onRegularSeasonWin, ownRotationShift, random, recordStat],
+    [
+      aceLevels,
+      commit,
+      gainGamePoint,
+      gameKind,
+      gameOptions,
+      onRegularSeasonWin,
+      ownRotationShift,
+      random,
+      recordStat,
+      eventCursorRef,
+      freshSceneRef,
+      latestSaveRef,
+      newPlayerFlagRef,
+    ],
   )
   return { settleGame }
 }

@@ -18,7 +18,7 @@ import type { SeasonShopActionsContext } from '@/app/model/seasonSession/shop/us
 /** `useSeasonSession` 몸통 문장 80~85 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useNextGameStart(ctx: SeasonShopActionsContext) {
   const { save, seasonMatchSettingsRef, aceLevels, entryOrderOf, commit, setGameKind, setResumeGame, setOwnRotationShift, setGameOptions } = ctx
-  const { withGameSettings, setScene, latestSave, setSave, setNextGameFromMenu, setPendingGame, setSquadPurpose, setPreGameAces } = ctx
+  const { withGameSettings, setScene, latestSaveRef, setSave, setNextGameFromMenu, setPendingGame, setSquadPurpose, setPreGameAces } = ctx
   const { setIsMatchSettingsOpen } = ctx
   /**
    * 커리어·팀 상태에서 팀 경기 옵션을 만든다 (세 종류가 같은 화면을 쓴다).
@@ -65,8 +65,7 @@ export function useNextGameStart(ctx: SeasonShopActionsContext) {
         ...(save.cpuRosters?.[opponent] === undefined ? {} : { opponentEntryOrder: seasonEntryOrderOf(save.cpuRosters[opponent]) }),
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [aceLevels, entryOrderOf, save],
+    [aceLevels, entryOrderOf, save, seasonMatchSettingsRef],
   )
   /**
    * 평판 기록 16칸(SR+0x1a0..0x1af)을 0 으로 — 원본 `0xa3424` = `memset(SR+0x1a0, 0, 16)`.
@@ -111,8 +110,7 @@ export function useNextGameStart(ctx: SeasonShopActionsContext) {
     setOwnRotationShift(prepared.shift)
     setGameOptions(withGameSettings(prepared.options))
     setScene(SEASON_SCENE_STATE.경기직전)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [clearGameRecord, optionsFor, save, withGameSettings])
+  }, [clearGameRecord, optionsFor, save, withGameSettings, setGameKind, setGameOptions, setOwnRotationShift, setResumeGame, setScene])
   /**
    * 다음경기 화면 0xd8 에 들어간다 — 들어옴 `0x4cb8`:
    * ```
@@ -131,7 +129,7 @@ export function useNextGameStart(ctx: SeasonShopActionsContext) {
       }
       // 4cc8 — 이전 상태가 0xd7(경기 전 마선수 고르기 CLR)이면 phase 4 는 메모리에만 쓰고 저장하지 않는다
       if (fromSquad) {
-        latestSave.current = entered
+        latestSaveRef.current = entered
         setSave(entered)
       } else {
         commit(entered)
@@ -139,8 +137,7 @@ export function useNextGameStart(ctx: SeasonShopActionsContext) {
       setNextGameFromMenu(fromMenu)
       setScene(SEASON_SCENE_STATE.다음경기)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit],
+    [commit, latestSaveRef, setNextGameFromMenu, setSave, setScene],
   )
   const openNextGame = useCallback(() => {
     if (save === null) return
@@ -149,14 +146,16 @@ export function useNextGameStart(ctx: SeasonShopActionsContext) {
   /**
    * 0xd7 경기 전 마선수 고르기로 (this+0x11c = 1). 들어옴 0x5268 이 메뉴+0xd0 = 1 이라 늘 마투수부터다.
    */
-  const enterPreGameSquad = useCallback((pending: PendingSeasonGame) => {
-    setPendingGame(pending)
-    setSquadPurpose(SQUAD_PURPOSE.경기전)
-    setPreGameAces(PRE_GAME_ACES_START)
-    setIsMatchSettingsOpen(false)
-    setScene(SEASON_SCENE_STATE.선수단)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  const enterPreGameSquad = useCallback(
+    (pending: PendingSeasonGame) => {
+      setPendingGame(pending)
+      setSquadPurpose(SQUAD_PURPOSE.경기전)
+      setPreGameAces(PRE_GAME_ACES_START)
+      setIsMatchSettingsOpen(false)
+      setScene(SEASON_SCENE_STATE.선수단)
+    },
+    [setIsMatchSettingsOpen, setPendingGame, setPreGameAces, setScene, setSquadPurpose],
+  )
   return { optionsFor, clearGameRecord, playNextGame, nextGameEntered, openNextGame, enterPreGameSquad }
 }
 

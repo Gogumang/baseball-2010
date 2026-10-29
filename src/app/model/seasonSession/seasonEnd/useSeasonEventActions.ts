@@ -7,28 +7,26 @@ import type { SeasonEndActionsContext } from '@/app/model/seasonSession/seasonEn
 
 /** `useSeasonSession` 몸통 문장 125~130 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSeasonEventActions(ctx: SeasonEndActionsContext) {
-  const { latestSave, commit, updateGlobals, setOpenedHiddenIds, save, gainGamePoint, recordStat, setScene } = ctx
+  const { latestSaveRef, commit, updateGlobals, setOpenedHiddenIds, save, gainGamePoint, recordStat, setScene } = ctx
   const confirmSeasonEventChoice = useCallback(
     (_eventId: number, leftEventIds: readonly number[]) => {
-      const current = latestSave.current
+      const current = latestSaveRef.current
       if (current === null) return
       const record = leftEventIds.filter((id) => id !== YEAR_GOAL_EVENT_ID).reduce(markEventSeen, current.state.record)
       commit({ ...current, state: { ...current.state, record } })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit],
+    [commit, latestSaveRef],
   )
   /**
    * 이벤트 system 창 답 0 — 0x7fe90(상자): 0x7b998(모드 2)이면 [[상자+0x150]+0x187] = 1, 그리고 0x22755([0x1400054], 1) 저장.
    * 이미 켜져 있어도 원본은 저장한다. 재생이 끝날 때 목표 창 이벤트를 보고 켜는 자리(`finishSeasonEvent`)는 같은 값이라 그대로 둔다.
    */
   const confirmEventSystemWindow = useCallback(() => {
-    const current = latestSave.current
+    const current = latestSaveRef.current
     if (current === null) return
     const { record } = current.state
     commit(record.yearGoalShown ? current : { ...current, state: { ...current.state, record: { ...record, yearGoalShown: true } } })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [commit])
+  }, [commit, latestSaveRef])
   /**
    * 구장 히든 아이템 해금 (`0x81d0` → `0x9f6cc(app, 종류, k, 1)`).
    * 원본 자리가 전역기록이라 시즌 레코드가 아니라 전역 칸(`SeasonGlobalSlots`)에 쌓고 곧바로 저장한다 (0x62368 → 0x1f1b9).
@@ -44,13 +42,15 @@ export function useSeasonEventActions(ctx: SeasonEndActionsContext) {
     [updateGlobals],
   )
   /** 0xe684 → 0x65de4 — 전역 해금표(웹 `openedHiddenIds`, 팀은 10~14 그대로)에 쓴다. 앱이 전역 기록으로 모은다 */
-  const openCupHiddenTeams = useCallback((teams: readonly number[]) => {
-    setOpenedHiddenIds((opened) => {
-      const added = teams.filter((id) => !opened.includes(id))
-      return added.length === 0 ? opened : [...opened, ...added]
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  const openCupHiddenTeams = useCallback(
+    (teams: readonly number[]) => {
+      setOpenedHiddenIds((opened) => {
+        const added = teams.filter((id) => !opened.includes(id))
+        return added.length === 0 ? opened : [...opened, ...added]
+      })
+    },
+    [setOpenedHiddenIds],
+  )
   /**
    * 엔딩 보너스 팝업 0x2b 닫힘 — 0x8bd8(직접 떴다):
    * ```
@@ -83,8 +83,7 @@ export function useSeasonEventActions(ctx: SeasonEndActionsContext) {
       commit({ ...save, state: { ...save.state, record: { ...save.state.record, endingSeen: true } } })
     }
     setScene(SEASON_SCENE_STATE.관리메뉴)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [commit, save])
+  }, [commit, save, setScene])
   return { confirmSeasonEventChoice, confirmEventSystemWindow, openStadiumItems, openCupHiddenTeams, receiveEndingBonus, finishEnding }
 }
 

@@ -22,9 +22,9 @@ import type { SeasonPersistenceContext } from '@/app/model/seasonSession/state/u
 
 /** `useSeasonSession` 몸통 문장 67~68 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
-  const { scene, setSummaryEntry, setIncomeEvaluation, save, commit, eventCursor, event100Awarded, newPlayerFlag, freshScene, random } = ctx
+  const { scene, setSummaryEntry, setIncomeEvaluation, save, commit, eventCursorRef, event100Awarded, newPlayerFlagRef, freshSceneRef, random } = ctx
   const { startEvent, tradeRequest, setTradeRequestAlertOpen, setTradeRequest, autobotBatInputRef, openedHiddenIds, setOpenedHiddenIds } = ctx
-  const { summaryEntrySerial, seasonMvpKind, recordSourceNow } = ctx
+  const { summaryEntrySerialRef, seasonMvpKindRef, recordSourceNow } = ctx
   /**
    * 상태에 **막 들어온 틀** (0xe9ac 의 e9c2: 상태가 바뀐 틀에만 ① 상태별 진입 함수 ② 이벤트 폴링이 돈다).
    * 같은 상태로 다시 가라고 해도(관리 메뉴 → 관리 메뉴) 바뀐 것이 아니라 돌지 않는다.
@@ -62,22 +62,22 @@ export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
           ? { ...record, phase: SEASON_PHASE.기본 }
           : record
       const polled = pollSeasonEvents(
-        eventCursor.current,
+        eventCursorRef.current,
         {
           scene,
           record: entered,
           teamMorale: save.state.teamMorale,
           event100Awarded,
-          newPlayerFlag: newPlayerFlag.current,
-          isFreshScene: freshScene.current,
+          newPlayerFlag: newPlayerFlagRef.current,
+          isFreshScene: freshSceneRef.current,
         },
         random,
       )
-      eventCursor.current = polled.cursor
+      eventCursorRef.current = polled.cursor
       if (polled.record !== record) commit({ ...save, state: { ...save.state, record: polled.record } })
       const { poll } = polled
       if (poll.kind === '오프닝') {
-        newPlayerFlag.current = false
+        newPlayerFlagRef.current = false
         return startEvent(OPENING_EVENT_ID, scene)
       }
       if (poll.kind === '연초목표') return startEvent(YEAR_GOAL_EVENT_ID, scene)
@@ -111,8 +111,8 @@ export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
           globalOpenedHiddenIds: [...input.globalOpenedHiddenIds, ...openedHiddenIds],
         })
       if (opens) setOpenedHiddenIds((opened) => [...opened, SEASON_AUTOBOT_BAT_HIDDEN_ID])
-      summaryEntrySerial.current += 1
-      setSummaryEntry({ serial: summaryEntrySerial.current, opensAutobotBat: opens })
+      summaryEntrySerialRef.current += 1
+      setSummaryEntry({ serial: summaryEntrySerialRef.current, opensAutobotBat: opens })
       // 0x690e~0x6922 — 머리에서 SR+0x50 = 0xf 를 쓰고 0x1fded · 0x22755 로 저장한다(조건 없이, 포스트시즌 경기 뒤 다시 들어와도)
       commit({ ...save, state: { ...save.state, record: { ...record, phase: SEASON_PHASE.결산 } } })
       return
@@ -146,11 +146,31 @@ export function useSceneEntryEffect(ctx: SeasonPersistenceContext) {
     if (scene === SEASON_SCENE_STATE.투수시상) return startEvent(SEASON_AWARD_INTRO_EVENT_ID.투수, step.next)
     // 0xed 0xe7ac — 0x8dd61(evmgr) 가 표 0xd4f34 에서 rand(0..6) 으로 MVP 순위 종류를 고른 뒤(빈 순위표면 다시) 376 을 튼다
     if (scene === SEASON_SCENE_STATE.최우수선수) {
-      seasonMvpKind.current = rollSeasonMvpKind(save, recordSourceNow(), random)
+      seasonMvpKindRef.current = rollSeasonMvpKind(save, recordSourceNow(), random)
       return startEvent(SEASON_AWARD_INTRO_EVENT_ID.MVP, step.next)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [commit, event100Awarded, openedHiddenIds, random, recordSourceNow, save, scene, startEvent, tradeRequest.isRequested])
+  }, [
+    commit,
+    event100Awarded,
+    openedHiddenIds,
+    random,
+    recordSourceNow,
+    save,
+    scene,
+    startEvent,
+    tradeRequest.isRequested,
+    autobotBatInputRef,
+    eventCursorRef,
+    freshSceneRef,
+    newPlayerFlagRef,
+    seasonMvpKindRef,
+    setIncomeEvaluation,
+    setOpenedHiddenIds,
+    setSummaryEntry,
+    setTradeRequest,
+    setTradeRequestAlertOpen,
+    summaryEntrySerialRef,
+  ])
   return {}
 }
 

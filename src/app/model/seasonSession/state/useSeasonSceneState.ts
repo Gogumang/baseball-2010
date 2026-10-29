@@ -12,7 +12,7 @@ import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** `useSeasonSession` 몸통 문장 14~37 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSeasonSceneState(ctx: SeasonSaveStateContext) {
-  const { save, rewardStore, store, loaded, autobotBatInput } = ctx
+  const { save, rewardStore, store, loadedSave, autobotBatInput } = ctx
   const [scene, setScene] = useState<SeasonSceneState>(() =>
     save === null
       ? SEASON_SCENE_STATE.팀고르기
@@ -56,14 +56,14 @@ export function useSeasonSceneState(ctx: SeasonSaveStateContext) {
    * 전역기록 칸 둘 — 구장 히든 app+0xe0(S3 7절) · 이벤트 100 수령 +0xbe(0x8c714). 시즌 저장에 실어 두고 시즌을 쓸 때마다 같이
    * 적는다(`SeasonGlobalSlots`) — 새로 고쳐도 · 새 시즌에도 남는다
    */
-  const [globals, setGlobals] = useState<SeasonGlobalSlots>(() => seasonGlobalSlotsOf(store.load(), loaded.current))
+  const [globals, setGlobals] = useState<SeasonGlobalSlots>(() => seasonGlobalSlotsOf(store.load(), loadedSave))
   const globalsRef = useRef(globals)
   const { openedStadiumIds, event100Awarded } = globals
   /** 전역 해금표 app+0xc0 중 시즌모드가 연 칸 (0x29) — 세션 상태, 앱이 기록연감 해금 목록에 합친다 */
   const [openedHiddenIds, setOpenedHiddenIds] = useState<readonly number[]>([])
   /** 지금 결산 진입(0x6900) — 0x29 가 새로 열려 진입의 리그 1위 G 검사를 건너뛰었는가 (0x69ce → 0x6ac8) */
   const [summaryEntry, setSummaryEntry] = useState<SeasonSummaryEntry | null>(null)
-  const summaryEntrySerial = useRef(0)
+  const summaryEntrySerialRef = useRef(0)
   const autobotBatInputRef = useRef(autobotBatInput)
   useMirrorRef(autobotBatInputRef, autobotBatInput)
   return {
@@ -103,7 +103,7 @@ export function useSeasonSceneState(ctx: SeasonSaveStateContext) {
     setOpenedHiddenIds,
     summaryEntry,
     setSummaryEntry,
-    summaryEntrySerial,
+    summaryEntrySerialRef,
     autobotBatInputRef,
   }
 }
