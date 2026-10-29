@@ -29,11 +29,37 @@
 - **억지 공통화보다 중복을 허용한다.** 원본도 모드마다 코드가 따로다. 비슷해 보여도 따로 바뀔 코드라면 합치지 않는다.
 - **props 를 여러 단계로 넘기지 않는다.** 세션 상태는 상태 atom 으로 꺼내 쓴다.
 
+## 5. 렌더 중 곁일은 정해진 도우미에서만
+
+원본은 장면 갱신마다 화면 칸을 그 자리에서 고친다. 웹도 같은 그림의 뒤 계산 · 자식이 고친 값을 봐야 할 때가 있어 그리는 중에 칸을
+고치는데, 이 일은 아래 도우미 **안에서만** 한다. 컴포넌트 몸통에서 `ref.current` 를 읽고 쓰거나 상태 값을 고치지 않는다.
+
+- **최신 값 ref** — `useMirrorRef(ref, value)` (`shared/lib/mirrorRef`): 틱 고리 · 키 처리기가 지난 그림의 값을 읽게 하는 ref.
+  커밋 뒤에 읽기만 하면 `useEffectEvent` 나 `useLayoutEffect` 안에서 적기가 먼저다.
+- **그림 차례 상태 기계** — `useRenderMachine(advance, input)` 와 그 위의 `usePreviousDistinct` · `useOnRenderChange` ·
+  `useLastRenderValue` · `useHeldWhileSame` (`shared/lib/renderMachine`): `advance` 는 순수 함수(난수 · 저장 금지)로 둔다.
+- **이름 붙인 칸 객체** — `useState(createXxx)` 로 한 번 만든 객체에 칸을 두고, 고치는 일은 그 객체의 메서드나 옆의 이름 붙인 함수만
+  한다(예: `useFieldCarryTrack`, 수비 재생의 `drawRecordedFrame`). 난수 · 소리처럼 원본이 그 그림에서 내는 곁일을 그리는 중에 내야 할 때 쓴다.
+  머리말에 "무엇을 그림에서, 무엇을 사건에서 고치는지" 를 적는다.
+
+린트(React Compiler 계열 `react/refs` · `react/immutability`)는 이 도우미 안을 보지 못한다 — 그래서 도우미 밖에서는 같은 일을 하지 않는다.
+
+## 끄기 주석
+
+- 끄기는 **고칠 수 없는 한 줄**에만: 원본 차례(커밋 뒤에 적어야 하는 칸, 이 갈래를 그리는 렌더만 박는 틱 따위)가 그 모양을 요구할 때.
+  `oxlint-disable-next-line <규칙> -- <까닭>` 꼴로, 까닭(원본 주소 · 바꾸면 무엇이 달라지는지)을 반드시 적는다. 파일 · 블록 전체 끄기는
+  쓰지 않는다(지금 하나 — `useCareerSession` 의 105 진입 표지 — 는 `oxlint-enable` 로 바로 닫는다).
+- **`exhaustive-deps` 는 끄지 않는다** — 철자(`react/` · `react-hooks/` · `eslint-disable`)가 무엇이든 그 컴포넌트 · 훅 전체의
+  React Compiler 검사(refs · immutability · set-state-in-effect …)가 함께 꺼진다. 의존성을 일부러 뺀 effect 는 `useEffectEvent` 로
+  읽고 열쇠만 의존성에 둔다. `react/refs` · `react/set-state-in-effect` 같은 다른 규칙 끄기는 그 줄만 끈다.
+- 시험 파일도 같다 — 하네스 모양을 바꿔(효과 이벤트 · `renderHook`) 끄지 않는다.
+- 이름은 `oxlint-disable` 로 쓴다(`eslint-disable` 은 쓰지 않는다). 안 쓰이는 끄기는 린트 에러다(`reportUnusedDisableDirectives`).
+
 ## 강제 장치
 
 | 기준 | 장치 |
 |---|---|
-| 린트 | oxlint — `pnpm lint` (설정 `oxlint.config.ts`, 에러 0) |
+| 린트 | oxlint — `pnpm lint` (설정 `oxlint.config.ts`, 에러 0 — 경고 규칙은 없다, 모두 에러. 커밋 hook 이 올린 파일을 본다) |
 | 파일 길이 | oxlint `max-lines` 150(코드만) — 옛 파일은 `lint.max-lines-baseline.js`, `pnpm check:lines` |
 | 포맷 | oxfmt — `pnpm format:check` (설정 `.oxfmtrc.json`) |
 | try/catch | `src/shared/lib/safe` 도우미로만 — oxlint `local/no-try-statement` (`tools/lint/localPlugin.mjs`) |
