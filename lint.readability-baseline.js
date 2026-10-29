@@ -356,7 +356,6 @@ export const readabilityBaseline = [
   'src/widgets/field-walk/ui/HalfInningField.tsx',
   'src/widgets/game-scene/lib/recordAlert.ts',
   'src/widgets/game-scene/model/useRecordAlert.ts',
-  'src/widgets/game-scene/ui/BenchClearingScene.tsx',
   'src/widgets/game-scene/ui/GameIntro.tsx',
   'src/widgets/game-scene/ui/introCanvas.ts',
   'src/widgets/loading-tip/ui/LoadingTip.tsx',

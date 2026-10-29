@@ -1,35 +1,24 @@
 import { type MutableRefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
-import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import { RawScreen } from '@/shared/ui'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { BENCH_CLEARING_SOUND, BENCH_CLEARING_TARGET_TICK, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
-import { screenOffsetOf } from '@/pages/defense/lib/defenseCamera'
+import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { clearSceneParticles, holdSceneParticleTicks } from '@/entities/particle/model/sceneParticleManager'
+import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
+import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
+import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import {
   BENCH_CLEARING_EXIT_TICK,
   type BenchClearingField,
-  type BenchClearingWalkInput,
   type BenchClearingWalkState,
-  benchClearingCamera,
   benchClearingIrisOf,
-  startBenchClearingWalk,
-  stepBenchClearingWalk,
-} from '@/widgets/field-walk/lib/benchClearingWalk'
-import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
-import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
-import { irisHoleSpansOf } from '@/widgets/game-scene/lib/irisClose'
-import * as styles from '@/widgets/game-scene/ui/GameScene.css'
-import {
-  claimSceneParticleTick,
-  clearSceneParticles,
-  holdSceneParticleTicks,
-  sceneParticleScene,
-} from '@/entities/particle/model/sceneParticleManager'
-import { tickParticles } from '@/entities/particle/model/particleScene'
-import { OkTapArea } from '@/widgets/game-scene/ui/OkTapArea'
-import { appTickOfGameSceneTick, gameSceneTickNow, useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
-import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+} from '@/widgets/game-scene/ui/benchClearingScene/otherSlices'
+import { BenchClearingFieldView } from '@/widgets/game-scene/ui/benchClearingScene/BenchClearingFieldView'
+import { IrisCloseCanvas } from '@/widgets/game-scene/ui/benchClearingScene/IrisCloseCanvas'
+import { rollHeldSceneParticleTick } from '@/widgets/game-scene/ui/benchClearingScene/heldParticleTick'
+import { useBenchClearingWalk } from '@/widgets/game-scene/ui/benchClearingScene/useBenchClearingWalk'
 
 interface BenchClearingSceneProps {
   /** 운동장 18명 — 안 주면 바탕을 안 그린다(검정) */
@@ -111,14 +100,7 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
         }
       }
       if (next >= BENCH_CLEARING_EXIT_TICK) finish()
-      // 같은 틀의 프레임 끝 관리자 틱 0x6de85(53048) — 갱신 표(52e14) 뒤다. 앞 상태가 쏜 이미터가 남았으면 이 틀에 굴린다
-      // (틱 10 이면 목표 굴림 8 번 뒤). 앱 층의 그림 시계(requestAnimationFrame)에 맡기면 같은 틀의 두 굴림 차례가 어느 시계가 먼저
-      // 울리느냐에 달려 장면 갱신 바로 뒤에서 돌린다(`holdSceneParticleTicks`, r284). 공용 창이 서 있는 틀은 갱신과 함께 건너뛴다(52cc6 · 53048)
-      const random = randomRef.current
-      const scene = sceneParticleScene()
-      if (random !== undefined && scene.emitters.length > 0 && claimSceneParticleTick(scene, appTickOfGameSceneTick(gameSceneTickNow()))) {
-        tickParticles(scene, random)
-      }
+      rollHeldSceneParticleTick(randomRef.current)
     },
     true,
     false,
@@ -150,94 +132,9 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
   const iris = benchClearingIrisOf(tick)
   return (
     <RawScreen>
-      {field !== undefined && walk !== null && (
-        <FieldWalkView
-          offset={screenOffsetOf(benchClearingCamera())}
-          grassPalette={field.grassPalette ?? null}
-          rows={[
-            // 43240 0x43010(장면, [+0xf20], +0x111c, 0) — 수비 줄
-            {
-              walkers: walk.fielders,
-              teamIndex: field.defenseTeam ?? null,
-              ...(field.defenseAces === undefined ? {} : { aceSprites: field.defenseAces }),
-            },
-            // 43252 0x43010(장면, [+0x177c], +0x1758, 1) — 공격 줄
-            {
-              walkers: walk.offense,
-              teamIndex: field.offenseTeam ?? null,
-              ...(field.offenseAces === undefined ? {} : { aceSprites: field.offenseAces }),
-            },
-          ]}
-        />
-      )}
+      {field !== undefined && walk !== null && <BenchClearingFieldView field={field} walk={walk} />}
       {iris !== null && <IrisCloseCanvas x={iris.x} y={iris.y} size={iris.size} />}
       <OkTapArea onTap={() => keyLatch.push(skip)} />
     </RawScreen>
   )
-}
-
-const SCREEN_WIDTH = 240
-const SCREEN_HEIGHT = 320
-
-/**
- * **원 닫기 한 그림** — 0xbd5bc: 화면 크기(W × H) 그림을 검정으로 칠하고(0x14006e8(0, 0, W, H)) (255, 0, 255) 채운 원
- * 0x1400708(x, y, w, h, 0, 360) 으로 구멍을 뚫어 (0, 0) 에 찍는다. 구멍 칸은 `irisHoleSpansOf`(⚠️ 단말 함수라 화소 규칙은 미확인).
- */
-function IrisCloseCanvas({ x, y, size }: { readonly x: number; readonly y: number; readonly size: number }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  useEffect(() => {
-    const context = canvasRef.current?.getContext('2d') ?? null
-    if (context === null) return
-    context.globalCompositeOperation = 'source-over'
-    context.fillStyle = '#000000'
-    context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
-    for (const span of irisHoleSpansOf(x, y, size)) context.clearRect(span.from, span.y, span.to - span.from + 1, 1)
-  }, [x, y, size])
-  return (
-    <canvas
-      ref={canvasRef}
-      className={styles.cover}
-      width={SCREEN_WIDTH}
-      height={SCREEN_HEIGHT}
-      data-testid="벤치-원닫기"
-      data-size={size}
-      style={{ imageRendering: 'pixelated' }}
-    />
-  )
-}
-
-/** 틱마다 한 걸음씩 — 진입부터 다시 굴리지 않게 지난 상태를 들고 있는다 */
-function useBenchClearingWalk(
-  field: BenchClearingWalkInput | undefined,
-  tick: number,
-  targetRolls: readonly number[] | null,
-): BenchClearingWalkState | null {
-  const memory = useRenderMachine<BenchWalkMemory | null, BenchWalkInput>(advanceBenchWalkMemory, { field, tick, targetRolls })
-  return field === undefined ? null : (memory?.state ?? null)
-}
-
-interface BenchWalkMemory {
-  readonly field: BenchClearingWalkInput
-  readonly tick: number
-  readonly state: BenchClearingWalkState
-}
-
-interface BenchWalkInput {
-  readonly field: BenchClearingWalkInput | undefined
-  readonly tick: number
-  readonly targetRolls: readonly number[] | null
-}
-
-/** 판 재료가 없으면 앞 걸음을 그대로 들고 있는다(다시 오면 이어 굴린다) */
-function advanceBenchWalkMemory(previous: BenchWalkMemory | null, { field, tick, targetRolls }: BenchWalkInput): BenchWalkMemory | null {
-  if (field === undefined) return previous
-  const isSame =
-    previous !== null &&
-    previous.field.entryRolls === field.entryRolls &&
-    previous.field.offenseSide === field.offenseSide &&
-    previous.field.isLeftBatter === field.isLeftBatter
-  const start = previous === null || !isSame || previous.tick > tick ? { field, tick: -1, state: startBenchClearingWalk(field) } : previous
-  let { state } = start
-  for (let t = start.tick + 1; t <= tick; t += 1) state = stepBenchClearingWalk(state, t, field, targetRolls)
-  return { field, tick: Math.max(tick, start.tick), state }
 }
