@@ -80,7 +80,7 @@ export const crossSliceBaseline = [
   'src/entities/career/model/seasonStats.ts',
   'src/entities/career/model/subItems.ts',
   'src/entities/career/model/titles/otherSlices.ts',
-  'src/entities/career/model/training.ts',
+  'src/entities/career/model/training/otherSlices.ts',
   'src/entities/career/model/trainingText.ts',
   'src/entities/collection/model/collection/otherSlices.ts',
   'src/entities/collection/model/collectionRewards.ts',
