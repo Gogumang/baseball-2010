@@ -377,7 +377,7 @@ export const crossSliceBaseline = [
   'src/pages/special-edit/lib/specialEditFlow.ts',
   'src/pages/special-edit/ui/specialEdit/otherSlices.ts',
   'src/pages/special/lib/hallOfFameGrid.ts',
-  'src/pages/special/lib/specialLayout.ts',
+  'src/pages/special/lib/specialLayout/otherSlices.ts',
   'src/pages/special/ui/specialScreen/otherSlices.ts',
   'src/pages/story/ui/EvaluationChangeWindow.tsx',
   'src/pages/team-game/lib/gameLoadingPreloads.ts',

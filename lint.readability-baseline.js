@@ -278,7 +278,6 @@ export const readabilityBaseline = [
   'src/pages/shop/ui/ShopWindow.tsx',
   'src/pages/special/lib/hallOfFameFigure.ts',
   'src/pages/special/lib/skinBackdrops.ts',
-  'src/pages/special/lib/specialLayout.ts',
   'src/pages/special/ui/SkinBackdrops.tsx',
   'src/pages/story/lib/eventBackdrop.ts',
   'src/pages/story/lib/eventDialogue.ts',
