@@ -39,7 +39,7 @@ export {
   pitcherYearRowsOf,
   yearColumnsOf,
 } from '@/pages/nari-record-room/lib/nariRecordRoom/yearColumns'
-export type { NariRecordEdition, RecordRoomPick, YearCellNumber } from '@/pages/nari-record-room/lib/nariRecordRoom/yearColumns'
+export type { NariRecordEdition, RecordRoomPick, YearCellNumber, YearRecordColumn } from '@/pages/nari-record-room/lib/nariRecordRoom/yearColumns'
 export {
   OPEN_YEAR_RECORD_VIEW,
   advanceYearSlide,
