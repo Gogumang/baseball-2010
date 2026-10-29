@@ -64,7 +64,7 @@ export const crossSliceBaseline = [
   'src/entities/career/model/nariCpuEquipment.ts',
   'src/entities/career/model/nariCupTeams.ts',
   'src/entities/career/model/nariMorale.ts',
-  'src/entities/career/model/nariTeamRecord.ts',
+  'src/entities/career/model/nariTeamRecord/otherSlices.ts',
   'src/entities/career/model/playerCareer/create/createCareer.ts',
   'src/entities/career/model/playerCareer/create/rookie.ts',
   'src/entities/career/model/playerCareer/evaluation/nariLastGame.ts',

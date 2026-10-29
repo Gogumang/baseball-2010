@@ -52,7 +52,6 @@ export const readabilityBaseline = [
   'src/entities/burst-mission/model/burstResultBits.ts',
   'src/entities/career/model/nariCpuEquipment.ts',
   'src/entities/career/model/nariCupTeams.ts',
-  'src/entities/career/model/nariTeamRecord.ts',
   'src/entities/career/model/outing.ts',
   'src/entities/career/model/seasonFlow.ts',
   'src/entities/career/model/seasonStats.ts',
