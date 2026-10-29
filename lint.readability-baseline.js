@@ -380,7 +380,6 @@ export const readabilityBaseline = [
   'src/widgets/batting-stage/model/sceneCloudClock.ts',
   'src/widgets/batting-stage/model/skillPanelDriver.ts',
   'src/widgets/batting-stage/model/usePitcherHitScene.ts',
-  'src/widgets/batting-stage/model/useStageAnimation.ts',
   'src/widgets/batting-stage/model/useStageControls.ts',
   'src/widgets/batting-stage/ui/BattingStage.tsx',
   'src/widgets/batting-stage/ui/MatchInfoStadiumBackdrop.tsx',

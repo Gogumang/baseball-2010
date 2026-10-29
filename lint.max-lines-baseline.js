@@ -197,7 +197,6 @@ export const maxLinesBaseline = [
   'src/widgets/batting-stage/lib/spriteLoader.ts',
   'src/widgets/batting-stage/lib/stageScenery.ts',
   'src/widgets/batting-stage/model/stageRefs.ts',
-  'src/widgets/batting-stage/model/useStageAnimation.ts',
   'src/widgets/batting-stage/ui/BattingStage.tsx',
   'src/widgets/batting-stage/ui/PitcherSideStage.tsx',
   'src/widgets/burst-mission/ui/BurstMissionWindow.tsx',
