@@ -232,7 +232,6 @@ export const readabilityBaseline = [
   'src/pages/special/lib/skinBackdrops.ts',
   'src/pages/special/ui/SkinBackdrops.tsx',
   'src/pages/story/lib/eventBackdrop.ts',
-  'src/pages/story/lib/eventDialogue.ts',
   'src/pages/story/lib/eventPortraitCast.ts',
   'src/pages/story/model/useScreenEffect.ts',
   'src/pages/story/ui/EvaluationEventPlayer.tsx',
