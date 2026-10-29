@@ -80,7 +80,6 @@ export const maxLinesBaseline = [
   'src/pages/special/ui/SkinBackdrops.tsx',
   'src/pages/story/lib/eventDialogue.ts',
   'src/pages/story/lib/yearGoalWindow.ts',
-  'src/pages/story/model/useEventPlayback.ts',
   'src/pages/story/ui/EvaluationEventPlayer.tsx',
   'src/pages/story/ui/EventDialogueBox.tsx',
   'src/pages/story/ui/StoryScreen.tsx',

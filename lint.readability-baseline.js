@@ -248,7 +248,6 @@ export const readabilityBaseline = [
   'src/pages/story/lib/eventBackdrop.ts',
   'src/pages/story/lib/eventDialogue.ts',
   'src/pages/story/lib/eventPortraitCast.ts',
-  'src/pages/story/model/useEventPlayback.ts',
   'src/pages/story/model/useScreenEffect.ts',
   'src/pages/story/ui/EvaluationEventPlayer.tsx',
   'src/pages/story/ui/EventDialogueBox.tsx',
