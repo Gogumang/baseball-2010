@@ -1,167 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MessageBox } from '@/shared/ui/MessageBox/MessageBox'
-import { SPEAKER_NAMES } from '@/shared/config/original/eventMeta'
-import type { EventCommand, OriginalEvent } from '@/shared/config/original/eventTypes'
+import type { EventCommand } from '@/shared/config/original/eventTypes'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { eventPortraitCastOf } from '@/pages/story/lib/eventPortraitCast'
 import { useEventPlayback } from '@/pages/story/model/useEventPlayback'
 import { isStepHeld, useScreenEffect } from '@/pages/story/model/useScreenEffect'
+import type { ScreenEffectFrame } from '@/entities/story/model/screenEffect'
 import { useEventSounds } from '@/pages/story/model/useEventSounds'
-import type {
-  EventChoiceConfirmHandler,
-  EventCompleteHandler,
-  EventRewardHandler,
-  MatchCommand,
-  SystemCommand,
-} from '@/pages/story/model/useEventPlayback'
-import type { StoryCarry } from '@/entities/story/model/aceMatch'
 import * as styles from '@/pages/story/ui/StoryScreen.css'
-import { YearGoalWindow } from '@/pages/story/ui/YearGoalWindow'
-import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
-import { RewardSkillWindow } from '@/pages/story/ui/RewardSkillWindow'
-import { rewardNoticeOf } from '@/entities/story/model/rewardNotice'
-import type { RewardNotice, RewardNoticeContext } from '@/entities/story/model/rewardNotice'
-import { speakerPrefixOf } from '@/pages/story/lib/eventDialogue'
-import { SYSTEM_YEAR_GOAL_WINDOW } from '@/pages/story/lib/yearGoalWindow'
-import type { YearGoalWindowSource } from '@/pages/story/lib/yearGoalWindow'
-import { EVENT_WINDOW_DIM_OPACITY, SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
+import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
 import { INITIAL_EVENT_BACKDROP, clearsDialogueBeforeMatch, drawEventBackdrop, portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
-import type { EventBackdropState } from '@/pages/story/lib/eventBackdrop'
+import type { EventBackdropFill, EventBackdropState } from '@/pages/story/lib/eventBackdrop'
 import { useWholeScreenOffset } from '@/shared/lib/screenShake/useWholeScreenOffset'
-
-/** 화자 번호 1 은 플레이어 이름으로 바꾼다. */
-const PLAYER_SPEAKER = 1
-/** 대사 fmt 9 는 %s 자리에 팀 이름을 넣는다 (그 밖에는 선수 이름). */
-const TEAM_NAME_FORMAT = 9
-
-/**
- * 공용 알림 · 질문 창 0x74ef4(창 [0x140005c], 글 [mgr+0xba], 종류, 0, 0, 0) 의 버튼 — 화면에는 `ui/popup.pzx` 그림이 나간다.
- * 종류 1(알림)은 프레임 0 "OK" 하나 · 종류 2(예아니오)는 1 "예" · 2 "아니오"(0x750f8~0x75140).
- */
-const NOTICE_BUTTONS = ['OK'] as const
-const YES_NO_BUTTONS = ['예', '아니오'] as const
-
-/**
- * 대사 상자 객체 [mgr+0xb4] 의 글 칸(+0xa8 + 0x14k) — 0x8b5ac 가 틀마다 0x7fbc4 로 그린다. say(0x8bab8)는 칸 0 에 글을 넣고
- * [창+0xe4] = 1, 선택지(0x8ba2c)는 칸 k 에 갈래 글을 넣고 [창+0xe4] = 갈래 수다. 다음 say · 선택지가 쓸 때까지 남는다 —
- * system 창 · 예아니오 · 화면효과 · 이벤트 옮기기(0x8be20)는 안 건드린다.
- */
-interface DialogueBoxContent {
-  /** 칸을 쓴 명령의 열쇠 — 바뀌면 글 찍기를 처음으로(0x7f7d5) */
-  readonly key: string
-  /** say 면 칸 0 하나, 선택지면 갈래 글 */
-  readonly slots: readonly string[]
-  readonly isChoice: boolean
-  readonly replacements: readonly string[]
-}
-
-interface StoryScreenProps {
-  readonly events: readonly OriginalEvent[]
-  readonly event: OriginalEvent
-  readonly playerName: string
-  readonly teamName: string
-  /** 주인공 초상화 팔레트 — 피부 0 황인 · 1 백인 · 2 흑인 (event_char_0.mpl, C-1) */
-  readonly skinIndex?: number
-  /** 0 타격형 · 1 장타형. 장타형이면 초상화 애니가 **+8** 이다 (V2 정정) */
-  readonly battingTypeIndex?: number
-  /** 재생 끝 — 셋째 값은 첫 종류 21 로 끝낸 이벤트(엔딩 요청 [0x1552adc], 그 이벤트는 본 표시 안 함) · 보통 끝이면 null */
-  readonly onComplete: EventCompleteHandler
-  /** 경기 명령 — 마선수 대결로 나간다 */
-  readonly onMatch: (command: MatchCommand, carry: StoryCarry) => void
-  /** 대결에서 돌아온 결과 이벤트라면 앞 이벤트가 모은 보상·기록 */
-  readonly carried?: StoryCarry
-  /**
-   * 이벤트 번호별 `%s` 자리 글 — 원본이 그 이벤트에만 따로 서식을 쓰는 곳 (380 연봉 제시액 0x8bc4c).
-   * undefined 를 돌려주면 기본(이름·팀). 안 넘기면 늘 기본이다.
-   */
-  readonly replacementsFor?: (eventId: number) => readonly string[] | undefined
-  /**
-   * system 3·4 — 타이틀(0x8b3bc)·MVP(0x8b23c) 발표 창의 글. null 이면 그 명령은 예전처럼 지나간다.
-   * 나만의리그 두 편이 시상 판정으로 채운다 (`pages/story/lib/awardWindows`).
-   */
-  readonly systemWindowTextOf?: (command: SystemCommand) => string | null
-  /**
-   * system 1 — **올해의 목표 창**(0x8d304 → 0x741a1 · 그리기 0x86fdc)의 값. 연초 115 · 392 가 연다.
-   * 창을 그릴 때 부른다(원본도 틀마다 커리어를 읽어 그린다). 안 넘기면 그 명령은 예전처럼 지나간다.
-   */
-  readonly yearGoalWindowOf?: () => YearGoalWindowSource
-  /**
-   * 환경설정 진동(저장 +0x3b) — 명령 5 화면효과 1·2 의 500ms 진동(0x3a44)이 이 칸을 본다.
-   * 안 넘기면 켠 것으로 본다(원본 기본값 켬).
-   */
-  readonly isVibrationOn?: boolean
-  /**
-   * 시즌모드(0x7b999) — 말하는 이 1(선수)의 이름 머리말을 안 붙인다(0x8bab8 의 0x8bafe: 시즌이면 빈 이름).
-   */
-  readonly isSeasonMode?: boolean
-  /**
-   * 장면 [gfx+0x174] 이 0x70 · 0x71 — 외출 지도(112) · 장소(113) · 대결결과(140, 진입 0x10df8 이 0x7e84c(gfx, 0x70)) 뒤에 뜬 이벤트.
-   * 대화창 0x8b5ac 가 밑그림으로 지도를 깔고, 초상화 바닥 y 가 H − 0x44 = 252 다(0x7fdee). 그 밖(관리 · 연초 · 시즌 …)은 135.
-   * 안 넘기면 거짓.
-   */
-  readonly isOverOutingMap?: boolean
-  /**
-   * 보상 명령 7 의 알림 맥락(모드 · 선수 · 난수 — `rewardNoticeContextOf`). 주면 보상마다 원본 알림 창(0x8beb8 글 → 0x74ef4
-   * 종류 1, 첫 종류 4 면 스킬 창 0x741a0)을 띄우고 확인까지 기다린다(0x8daa0). 종류 11 은 그 자리에서 굴린다.
-   * 안 주면 예전처럼 보상은 창 없이 지나간다.
-   */
-  readonly rewardNoticeContext?: () => RewardNoticeContext
-  /**
-   * **system 창을 답 0 으로 닫았다** — 기다림 0x8d91c(0x8d928~0x8d942)가 창 [창+0x21c] == 0 이면 0x7fe90(상자)을 부른다:
-   * 나리면 선수 +0x1b7(올해의 목표 창을 봤다) · 시즌모드면 기록 +0x187 = 1, 그리고 저장 0x22755([0x1400054], 1).
-   * system 창은 하위와 상관없이 모두다 — 알림(0 · 3 · 4 · 5, OK · CLR 모두 답 0)과 올해의 목표 창(1, OK · '5' 가 답 0).
-   * 예아니오(0x8d954) · 보상(0x8daa0)은 안 부른다. 안 넘기면 아무 일도 없다.
-   */
-  readonly onSystemWindowConfirm?: () => void
-  /**
-   * **보상 명령 7 을 그 자리에서 준다** — 0x8d4c4 가 글 · 창을 세운 그 갱신에 0x8c460(mgr, 명령)이 준다. 항목은 0x8beb8 이 고친
-   * 값(질병 번호)이고 이벤트 번호는 그 명령이 든 이벤트다(연차 보정 393~396 · 중간평가 452~454 가 본다). 주면 끝(`onComplete`)과
-   * 경기(`onMatch`)로 넘기는 보상은 비어 있다. 안 주면 예전처럼 끝에 모아 넘긴다.
-   */
-  readonly onReward?: EventRewardHandler
-  /**
-   * **선택지를 OK 로 골랐다** — 0x8b804 의 8b8d8 `0x8b0e4(mgr)`: 떠나온 이벤트 줄 본 표시 · 외출 행동함(S+4) · 저장.
-   * 고른 이벤트로 넘어가기(0x8be20) 앞이다. 안 넘기면 아무 일도 없다(끝 · 보상 자리에서 같은 값이 된다).
-   */
-  readonly onChoiceConfirm?: EventChoiceConfirmHandler
-  /**
-   * 키 · 누르기를 안 받는다 — 효과기가 도는 동안 나리 장면 키 문 0x10758 · 0x10774 가 키를 버리는 틀(이어하기 길 137 앞의 연초 114
-   * — `resumeCoverUnderlayAt` 의 '대화'). 재생기는 그대로 돈다
-   */
-  readonly isInputLocked?: boolean
-}
+import type { DialogueBoxContent, StoryScreenProps } from './storyScreen/storyScreenProps'
+import { currentRewardOf, rewardNoticeOfContext, storyWindowTextOf } from './storyScreen/storyLines'
+import type { ShownReward } from './storyScreen/storyLines'
+import { useDialogueBoxContent } from './storyScreen/useDialogueBoxContent'
+import { StoryDialogue } from './storyScreen/StoryDialogue'
+import { rewardWindowsOf, systemWindowsOf, yesNoWindowOf } from './storyScreen/storyWindows'
 
 /** 원작 이벤트. 대사마다 원본이 정한 인물·표정·자리로 초상화를 띄운다. */
-export function StoryScreen({
-  events,
-  event,
-  playerName,
-  teamName,
-  skinIndex,
-  battingTypeIndex,
-  onComplete,
-  onMatch,
-  carried,
-  replacementsFor,
-  systemWindowTextOf,
-  yearGoalWindowOf,
-  isVibrationOn = true,
-  isSeasonMode = false,
-  isOverOutingMap = false,
-  rewardNoticeContext,
-  onSystemWindowConfirm,
-  onReward,
-  onChoiceConfirm,
-  isInputLocked = false,
-}: StoryScreenProps) {
+export function StoryScreen(props: StoryScreenProps) {
+  const { events, event, onComplete, onMatch, carried, yearGoalWindowOf, onSystemWindowConfirm } = props
   // 대본이 적어 둔 표정 전부 — 주인공 초상화의 표정 애니를 미리 칠한다(`eventPortraitCastOf`)
   const upcomingPortraits = useMemo(() => eventPortraitCastOf(events, event), [events, event])
-  // 목표 창도 재생기가 멈추는 창이다 — 글 대신 빈 글로 세워 두고 아래에서 창을 그린다
-  const windowTextOf =
-    systemWindowTextOf === undefined && yearGoalWindowOf === undefined
-      ? undefined
-      : (command: SystemCommand) =>
-          command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined ? '' : (systemWindowTextOf?.(command) ?? null)
   /** 막는 효과(id 4~7)를 다 기다린 걸음 — 그 걸음의 멈출 명령이 돈다 (0x8b564) */
   const [releasedKey, setReleasedKey] = useState<string | null>(null)
   const {
@@ -180,11 +41,11 @@ export function StoryScreen({
     onComplete,
     onMatch,
     carried,
-    windowTextOf,
+    storyWindowTextOf(props.systemWindowTextOf, yearGoalWindowOf),
     (current) => isStepHeld(current, releasedKey),
-    rewardNoticeContext === undefined ? undefined : (items, eventId) => rewardNoticeOf(items, eventId, rewardNoticeContext()),
+    rewardNoticeOfContext(props.rewardNoticeContext),
     onSystemWindowConfirm,
-    onReward,
+    props.onReward,
   )
   // 0x8b5ac 의 효과 칠 — [mgr+0x2c4](마지막 명령 5 id) · [mgr+0x2c8](칠 색). 재생은 0x8a380 이 비운 값으로 시작한다
   const [backdrop, setBackdrop] = useState<EventBackdropState>(INITIAL_EVENT_BACKDROP)
@@ -215,11 +76,11 @@ export function StoryScreen({
     setLowerCount((count) => count + 1)
   }
   // 명령 5 화면효과 — 흔들기 오프셋·덮개 (효과기 0xbd844)
-  const screenEffect = useScreenEffect(step, isVibrationOn, onEffectorEnd, setReleasedKey)
+  const screenEffect = useScreenEffect(step, props.isVibrationOn ?? true, onEffectorEnd, setReleasedKey)
   // 명령 6 소리 — 지나온 명령이 도는 틀에 (0x8d470)
   useEventSounds(step)
   const effect = screenEffect.frame
-  useWholeScreenOffset(effect?.offset ?? null)
+  useWholeScreenOffset(screenOffsetOf(effect))
   // 막는 효과를 기다리는 동안은 멈출 명령이 아직 돌지 않았다 — 앞 say 상자 · 초상화가 그대로다
   const command = isReleased ? step.command : null
 
@@ -231,67 +92,16 @@ export function StoryScreen({
   }, [passedEffectId, step])
   // '끝' 의 바뀐 색은 위에서 이미 들였으니 이 그리기는 '없음' 처럼 남은 색만 본다
   const backdropDraw = drawEventBackdrop({ effectId, fill: backdrop.fill }, screenEffect.phase === '끝' ? '없음' : screenEffect.phase)
-  const portraitBaseY = portraitBaseYOf(isOverOutingMap, backdropDraw.isEffectFill)
-
-  // 0x8bab8 — 말하는 이 [명령+0x20]: 1 은 선수 이름(시즌모드면 빈 머리말) · 2~24 는 StrMODE[말하는 이 + 91] · 그 밖 없음
-  const speakerName =
-    command?.op !== 'say' || command.speaker === 0
-      ? null
-      : command.speaker === PLAYER_SPEAKER
-        ? isSeasonMode
-          ? null
-          : playerName
-        : (SPEAKER_NAMES[command.speaker] ?? null)
-  const replacements =
-    replacementsFor?.(step.cursor.eventId) ?? (command?.op === 'say' && command.format === TEAM_NAME_FORMAT ? [teamName] : [playerName, teamName])
-  // say · 선택지 명령이 도는 틀 — 상자 글 칸을 쓴다. system · 예아니오는 대사 상자의 글을 건드리지 않는다 — 0x8b924 는 관리자
-  // 버퍼 [mgr+0xba] 에 쓰고(say 글은 0x7b818 이 돌려주는 상자 쪽 글 0xbc965), 0x8b5ac 는 창이 떠 있는 동안에도 틀마다
-  // 0x7fbc4 로 앞 상자를 그린다 — 선택지 뒤라면 선택지 줄과 고른 줄 테두리가 그대로 남는다.
-  /** [mgr+0xb9] — 선택지가 돌 때 0, 위 · 아래로 바뀐다. 다음 say · 선택지가 돌 때까지 남는다 */
-  const [selectedChoice, setSelectedChoice] = useState(0)
-  /** 이 이벤트 실음에서 say 를 돌렸는가 ([mgr+0x2c0]) — 값은 그때의 `eventLoads` */
-  const [saidInLoad, setSaidInLoad] = useState<number | null>(null)
+  const portraitBaseY = portraitBaseYOf(props.isOverOutingMap ?? false, backdropDraw.isEffectFill)
   const commandKey = `${step.cursor.eventId}:${step.cursor.commandIndex}`
-  // 명령이 도는 렌더에서 곧바로 상자 칸을 쓴다(그 렌더의 그림부터 새 칸)
-  let box = heldBox
-  if ((command?.op === 'say' || command?.op === 'choice') && heldBox?.key !== commandKey) {
-    if (command.op === 'say') {
-      // 0x8d1f2 — 이 이벤트의 첫 say 면 0x7f7cc(높이 0) · [mgr+0x2c0] = 1, 그다음 0x8bab8 · 0x7f7d5
-      if (saidInLoad !== eventLoads) {
-        setSaidInLoad(eventLoads)
-        if (heldBox !== null) setLowerCount((count) => count + 1)
-      }
-      box = { key: commandKey, slots: [`${speakerPrefixOf(speakerName)}${command.text}`], isChoice: false, replacements }
-    } else {
-      // 0x8d22c — 0x8ba2c(칸 k = 갈래 글, [mgr+0xb9] = 0) · 0x7f7d5 · [창+0xe4] = 갈래 수 · 0x7f54c(초상화)
-      box = { key: commandKey, slots: command.choices.map((choice) => choice.text), isChoice: true, replacements: [] }
-      setSelectedChoice(0)
-    }
-    setBox(box)
-  }
-  // 경기 명령(0x8d8c4~0x8d8f0)과 재생 끝(0x8d1b6 → 0x8d4e2)은 초상화 · 상자 높이 · 글 칸 셋을 비운다 — 그 틀부터 상자를 안 그린다
-  const isBoxCleared = isReleased && (step.command === null || step.command.op === 'match')
-  const isYearGoalWindow = command?.op === 'system' && command.sub === SYSTEM_YEAR_GOAL_WINDOW && yearGoalWindowOf !== undefined
-  /**
-   * 0x8cf64 명령 2(system) 하위 0(0x8b924) · 3(0x8b3bc) · 4(0x8b23c) · 5(0x8b1b8) 는 글을 [mgr+0xba] 에 채워 공용 창
-   * 0x74ef4(…, 종류 1) 을 띄운다(0x8d404~0x8d414). 명령 3(예아니오, 0x8d426) 은 하위 0 일 때만 0x8b924 → 0x74ef4(…, 종류 2).
-   * 창은 대사 상자 밖 — 화면 가운데 공용 판이다(`MessageBox`). 창이 닫히면(0x8d91c · 0x8d954 → [창+9] == 0 → 0x8dac2) 다음 명령.
-   */
-  const noticeText = command?.op === 'system' && !isYearGoalWindow ? (command.text ?? null) : null
-  // 상자는 창 밑에도 남는다 — 키는 창 것이다(0x8b804 는 지금 명령이 say · 선택지일 때만 받는다)
-  const isBoxActive = command?.op === 'say' || command?.op === 'choice'
-  const choiceCommand = command?.op === 'choice' ? command : null
+  const [box, selectedChoice, setSelectedChoice] = useDialogueBoxContent(step, isReleased, props, heldBox, setBox, eventLoads, setLowerCount)
   /**
    * 보상 창(알림 · 스킬) — 기다림 0x8daa0 은 답 0 · 0x14 를 받은 **그 갱신에** [mgr+8] = 1 로 다음 명령으로 넘긴다(스킬 창 키
    * 0x8e054 도 0x742a9 로 닫기 시작하며 같은 갱신에). 창은 닫힘 애니(240 → 120 → 60)를 마저 돌고 그동안 다음 명령이 겹쳐 돈다 —
    * 넘긴 뒤에도 다 닫힐 때까지 이 칸에 남겨 그린다. 다음 명령이 또 보상 창이면 공용 창이 새로 서므로 그쪽이 덮는다.
    */
-  const [closingReward, setClosingReward] = useState<{ readonly key: string; readonly notice: RewardNotice } | null>(null)
-  const currentReward =
-    command?.op === 'reward' && rewardNotice !== null && (rewardNotice.kind === '알림' || rewardNotice.kind === '스킬')
-      ? { key: commandKey, notice: rewardNotice }
-      : null
-  const shownReward = currentReward ?? closingReward
+  const [closingReward, setClosingReward] = useState<ShownReward | null>(null)
+  const currentReward = currentRewardOf(command, rewardNotice, commandKey)
   /** 키를 받은 그 갱신 — 닫히는 창을 남겨 두고 다음 명령으로 (0x8daa0 · 0x8e054) */
   const answerReward = () => {
     if (currentReward === null) return
@@ -309,47 +119,33 @@ export function StoryScreen({
   return (
     // 흔들기(종류 9)는 그린 화면 버퍼를 통째로 옮긴다(0xba888) — 밑그림 · 이야기 판 · 창 모두 (`useWholeScreenOffset`)
     <div className={styles.overlay}>
-      {backdropDraw.fill !== null && (
-        // 0x6a734 — 밑그림 위 · 상자와 초상화 아래에 화면 전체를 칠한다 ([mgr+0x2c8])
-        <div
-          className={styles.backdropFill}
-          data-testid="event-backdrop-fill"
-          style={{ background: backdropDraw.fill === '흰색' ? '#FFFFFF' : '#000000' }}
-        />
-      )}
+      {backdropFillOf(backdropDraw.fill)}
 
       {/* 초상화 바닥 y — 0x7fbc4 끝 0x7fdee (외출 지도 · 효과 칠 252, 그 밖 135) */}
       <div className={styles.portraitLayer} data-testid="event-portrait-layer" style={{ bottom: SCREEN_HEIGHT - portraitBaseY }}>
         <EventPortraits
           portraits={portraits}
           height={styles.PORTRAIT_HEIGHT}
-          skinIndex={skinIndex}
-          battingTypeIndex={battingTypeIndex}
+          skinIndex={props.skinIndex}
+          battingTypeIndex={props.battingTypeIndex}
           upcomingPortraits={upcomingPortraits}
         />
       </div>
 
       {box !== null && (
-        // 상자 객체는 재생 내내 하나다 — 재생은 늘 높이 0 에서 시작한다(앞 재생 끝 0x8d4e2 의 0x7f7cc · 글 칸 비우기)
-        <EventDialogueBox
-          raw={isBoxCleared ? '' : (box.slots[0] ?? '')}
-          replacements={box.replacements}
-          choices={box.isChoice ? { lines: box.slots, selected: selectedChoice } : null}
-          textKey={box.key}
-          lowerKey={lowerCount}
-          slideIn
-          onAdvance={next}
-          isActive={isBoxActive && !isInputLocked}
-          // 0x8b7b0 — say 중 취소는 다음 보상 · system · 선택지 · 예아니오 · 4 · 경기 명령까지 say · 효과 · 소리를 건너뛴다
-          onCancel={command?.op === 'say' ? skip : undefined}
-          onChoiceMove={setSelectedChoice}
-          // 0x8b8b6 — [mgr+0x2bc] = [명령+0x24 + 2 × 고른 줄] · [mgr+8] = 1 → 다음 틀에 그 이벤트를 싣는다(0x8be20)
-          onChoiceConfirm={(selected) => {
-            const choice = choiceCommand?.choices[selected]
-            // 8b8d8 0x8b0e4 — 고른 이벤트를 싣기(다음 틀 0x8be20) 앞에 떠나온 줄 본 표시 · S+4 · 저장
-            onChoiceConfirm?.(step.cursor.eventId, leftEventIds())
-            if (choice !== undefined) jump(choice.gotoEvent)
-          }}
+        <StoryDialogue
+          box={box}
+          command={command}
+          step={step}
+          isReleased={isReleased}
+          selectedChoice={selectedChoice}
+          setSelectedChoice={setSelectedChoice}
+          lowerCount={lowerCount}
+          props={props}
+          next={next}
+          skip={skip}
+          leftEventIds={leftEventIds}
+          jump={jump}
         />
       )}
 
@@ -358,66 +154,33 @@ export function StoryScreen({
         공용 창 그리기가 덮는다. 상자 판(zIndex 30) 위로 한 겹 올려, 뒤 어둡게가 상자까지 덮고 상자 누름 칸이 창 누름을 가로채지 않게 한다
       */}
       <div className={styles.windowLayer}>
-        {isYearGoalWindow && <YearGoalWindow values={yearGoalWindowOf()} onClose={closeSystemWindow} />}
-
-        {noticeText !== null && (
-          // 0x74ef4 종류 1 — 알림. CLR 도 0(0x751c2~0x751ec: 키 −16 → 0)
-          <MessageBox
-            key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-            text={noticeText}
-            buttons={NOTICE_BUTTONS}
-            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-            onAnswer={closeSystemWindow}
-          />
-        )}
-
-        {shownReward?.notice.kind === '알림' && (
-          // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)을 받은 그 갱신에 다음 명령
-          <MessageBox
-            key={shownReward.key}
-            text={shownReward.notice.text}
-            buttons={NOTICE_BUTTONS}
-            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-            onAnswerKey={answerReward}
-            onAnswer={() => finishRewardWindow(shownReward.key)}
-          />
-        )}
-
-        {shownReward?.notice.kind === '스킬' && (
-          // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a0 (그리기 0x87108 · 키 0x8e054 — 받은 그 갱신에 다음 명령)
-          <RewardSkillWindow
-            key={shownReward.key}
-            text={shownReward.notice.text}
-            gained={shownReward.notice.gained}
-            onKey={answerReward}
-            onClose={() => finishRewardWindow(shownReward.key)}
-          />
-        )}
-
-        {command?.op === 'yesno' && (
-          // 0x74ef4 종류 2 — 0x749d5 를 안 불러 처음 커서는 [예]. CLR 은 1 [아니오](0x7514a~0x75174: 키 −16 → 1).
-          // 답 0 → [mgr+0x2bc] = 예 이벤트([명령+8]) · 1 → 아니오 이벤트([명령+0xa]) (0x8d954~0x8d9a2)
-          <MessageBox
-            key={`${step.cursor.eventId}:${step.cursor.commandIndex}`}
-            text={command.text}
-            buttons={YES_NO_BUTTONS}
-            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-            onAnswer={(answer) => jump(answer === 0 ? command.yesEvent : command.noEvent)}
-          />
-        )}
+        {systemWindowsOf(command, commandKey, yearGoalWindowOf, closeSystemWindow)}
+        {rewardWindowsOf(currentReward ?? closingReward, answerReward, finishRewardWindow)}
+        {yesNoWindowOf(command, commandKey, jump)}
       </div>
 
-      {effect?.overlay != null && (
-        // 화면 전체 덮개 — 검정 덮기 (16 − 단계)/16 · 색 덮기 (단계 + 1)/16 (`screenEffect` 머리말)
-        <div
-          className={styles.effectCover}
-          data-testid="screen-effect-cover"
-          style={{
-            background: effect.overlay.color === '흰색' ? '#FFFFFF' : '#000000',
-            opacity: effect.overlay.opacity,
-          }}
-        />
-      )}
+      {effectCoverOf(effect)}
     </div>
   )
 }
+
+/** 0x6a734 — 밑그림 위 · 상자와 초상화 아래에 화면 전체를 칠한다 ([mgr+0x2c8]) */
+function backdropFillOf(fill: EventBackdropFill | null) {
+  if (fill === null) return false
+  return <div className={styles.backdropFill} data-testid="event-backdrop-fill" style={{ background: fill === '흰색' ? '#FFFFFF' : '#000000' }} />
+}
+
+/** 화면 전체 덮개 — 검정 덮기 (16 − 단계)/16 · 색 덮기 (단계 + 1)/16 (`screenEffect` 머리말) */
+function effectCoverOf(effect: ScreenEffectFrame | null) {
+  const overlay = effect?.overlay
+  if (overlay == null) return false
+  return (
+    <div
+      className={styles.effectCover}
+      data-testid="screen-effect-cover"
+      style={{ background: overlay.color === '흰색' ? '#FFFFFF' : '#000000', opacity: overlay.opacity }}
+    />
+  )
+}
+
+const screenOffsetOf = (effect: ScreenEffectFrame | null) => effect?.offset ?? null

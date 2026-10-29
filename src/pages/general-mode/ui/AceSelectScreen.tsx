@@ -1,138 +1,29 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useListPageEntry } from '@/widgets/screen-frame/model/useListPageEntry'
-import { gridOpenCellDy } from '@/shared/lib/gridOpen/gridOpen'
-import type { ReactNode } from 'react'
-import { EffectImage, FrameSprite, MessageBox, RawScreen } from '@/shared/ui'
-import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
+import { RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { FOOTER_BITS } from '@/widgets/screen-frame/lib/screenFrameLayout'
-import { aceOpenPopupTextOf, aceOpensWithGamePoint } from '@/shared/config/original/aceOpen'
-import { ACE_OPEN_SHORTAGE_POPUP, aceOpenPriceOf } from '@/pages/general-mode/lib/aceOpenState'
-import { ACE_LEVEL_UP_TEXT, aceLevelOf, aceRecordAbilityAtLevel, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
-import { AbilityRadarPanel } from '@/pages/create-player/ui/AbilityRadarPanel'
-import { ABILITY_RADAR_LABELS } from '@/pages/create-player/lib/abilityRadarPanel'
-import { AceLevelUpWindow } from '@/widgets/ace-level-up/ui/AceLevelUpWindow'
-import { emitMenuSparkle } from '@/widgets/particles/model/sceneParticles'
-import {
-  ACE_GRID_OPEN,
-  ACE_LAYOUT,
-  LOCKED_CIRCLES,
-  NAME_BAR,
-  TAG,
-  aceCellPositionOf,
-  isAceCellDimmed,
-  isAceGridCursorOn,
-} from '@/pages/general-mode/lib/prepareLayout'
-import { ACE_PER_ROLE, ACE_PHASE, aceIndexOfCell, aceRoleOfCell } from '@/pages/general-mode/lib/generalModeSetup'
-import type { AcePhase } from '@/pages/general-mode/lib/generalModeSetup'
-import * as styles from '@/pages/general-mode/ui/prepareScreen.css'
-import { moveGridCursor } from '@/pages/record/lib/annalsGrid'
+import { aceLevelOf, isAceMaxLevel } from '@/entities/mission/model/aceLevel'
+import { ACE_GRID_OPEN } from '@/pages/general-mode/lib/prepareLayout'
 import { useGridCursorBounce } from '@/shared/lib/gridCursorBounce/gridCursorBounce'
-import { noteSkinShakeDirection, noteSkinShakeKey } from '@/shared/lib/cursorShake/skinShakeDirection'
-import type { AnnalsDirection, AnnalsGridShape } from '@/pages/record/lib/annalsGrid'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-import { acePlayerOfCell } from '@/pages/general-mode/lib/aceSelectCells'
+import {
+  IMG_TEXT_FRAME,
+  aceFooterOf,
+  aceStartCursorOf,
+  isAceCellOpen,
+  isAceCellReachable,
+  isAceGridBlockedOf,
+  isAceGridCursorShownOf,
+  isEveryAceOpen as isEveryAceOpenOf,
+} from './aceSelect/aceSelectRules'
+import type { AceSelectScreenProps } from './aceSelect/aceSelectProps'
+import { AceCursorInfo } from './aceSelect/AceCursorInfo'
+import { AceGrid } from './aceSelect/AceGrid'
+import { AceSelectPopups } from './aceSelect/AceSelectPopups'
+import { useAceGridKeys, useAllAcesOpenNotice, useCursorFollowsPhase } from './aceSelect/useAceSelectEffects'
 
-const SLT_IMAGE = assetUrl('./sprites/slt_frame')
-/** [skin+0xac] — 격자 칸 그림 (0~9 마선수 얼굴 · 10 "?") */
-const ACE_ICON = assetUrl('./sprites/ace_icon')
-const IMG_TEXT_FRAME = assetUrl('./sprites/img_text/frames')
-
-/** 0xb6415(기록, i, 1) 네 칸 — 기록 칸 차례(투수도 같은 네 칸에 제구 · 구속 · 변화 · 체력) */
-const abilityValuesOf = (ability: { readonly hit: number; readonly power: number; readonly defense: number; readonly run: number }) => [
-  ability.hit,
-  ability.power,
-  ability.defense,
-  ability.run,
-]
-
-const imageSrc = (folder: string, index: number) => `${folder}/${String(index).padStart(3, '0')}.png`
-
-/** 잠긴 칸 글 — slt_frame 이미지 114 "LOCK" 을 대신하는 읽기용 이름 */
-const LOCK_LABEL = 'LOCK'
-
-export interface AceSelectScreenProps {
-  /** 하위 단계 `[skin+0xd0]` — 마투수를 먼저 고른다 */
-  readonly phase: AcePhase
-  /** 저장 +0x30..0x34 — 열린 마투수 번호 0~4 */
-  readonly openedAcePitcherIds?: readonly number[]
-  /** 저장 +0x35..0x39 — 열린 마타자 번호 0~4 */
-  readonly openedAceBatterIds?: readonly number[]
-  /**
-   * 마선수 레벨 — 전역 저장 `mgr[0x13a + 칸]` (0~4, `entities/mission/model/useAceLevels`).
-   * 이름 막대 글은 `"!C!cFFFFFF%s !cFFFF00LV.%d"` (0xd2498) 이고 %d 는 **레벨 + 1** 이다
-   * (0x64b34 `ldrsb r4,[mgr+0x13a+칸]` → 0x64b40 `adds r4,#1`). 칸이 비면 새 저장 값 0 = LV.1.
-   */
-  readonly levels?: Readonly<Record<number, number>>
-  /**
-   * 하위 상태 — `'고르기'` = 상태 21(일반모드 마선수, 갱신 0x29df8) · `'레벨업'` = 상태 28(스페셜 마선수
-   * 선택, 갱신 0x2af20). 28 은 OK 도 레벨업 쪽으로 가고(고르기가 없다) 두 줄을 다 오간다.
-   * `'코치'` = 시즌 선수단 0xd7 을 `this+0x11c = 2`(코치채용)로 띄운 것 — 키 0xa734~ (직접 떴다):
-   * ```
-   * r4 = 전역 +0x30 + 칸 (오픈)
-   * r4 == 0 → 0xa880 오픈 힌트 (칸 4·9 [42] 알림 · 그 밖 [43] 팝업 0x1f — 예면 G 오픈) — 줄을 가리지 않는다
-   * r4 ≠ 0 → 채용 가드 [147] · [77] · [62] → [146] (0xa79c~0xa87a) — 부르는 쪽 `onSelect`
-   * ```
-   * 바닥은 5(되돌아가기만, 0xad94~0xada0)이고 레벨업 창은 열지 않는다.
-   */
-  readonly mode?: '고르기' | '레벨업' | '코치'
-  /**
-   * 레벨업 확정 (0x5fbee · 0x5fc0a) — 받는 쪽이 레벨을 올리고 G `cost` 를 뺀다.
-   * 안 넘기면 `0` 키 레벨업 창을 열지 않는다.
-   */
-  readonly onLevelUp?: (cell: number, cost: number) => void
-  /** 머리띠 G포인트 — 들고 있는 곳에서만 넘긴다 (팀 고르기 화면과 같은 규칙) */
-  readonly gamePoint?: number
-  /**
-   * **G포인트로 이 칸을 연다** — 확인 팝업에서 "예" 를 고르고 G가 모자라지 않을 때만 부른다
-   * (0xa3a2 → 0xa3dc → 0xa3f6). 받는 쪽이 G를 빼고 오픈 플래그를 세운다.
-   * 안 넘기면 팝업이 힌트만 보여 주고 닫힌다 (예전 그대로).
-   */
-  readonly onOpenAce?: (cell: number) => void
-  /**
-   * 이미 고른 마투수 칸(rec+0xe) — 마타자 단계에서 **이 칸만 빼고** 마투수 칸을 회색(효과 0xa)으로 그린다(0x7b1d8~0x7b1ea).
-   * 안 넘기면 마타자 단계의 마투수 칸을 모두 회색으로 그린다.
-   */
-  readonly chosenPitcherCell?: number | null
-  readonly onSelect: (cell: number) => void
-  readonly onCancel: () => void
-  /**
-   * **마선수 10명이 모두 열렸으면 히든 팀 외인구단** — 격자 그리기 0x7a570 의 종류 7(공용 목록 k 2 = 일반모드 상태 21 ·
-   * 시즌 0xd7 경기 전, 0x64802 `[sp+0xe0] == 2 ? 7 : 8`)만 0x7b408 로 가서 전역기록 +0x30..+0x39 가 다 켜졌으면
-   * `0x62368(ui, 12, 0)` 을 부른다(0x7b424). 그 칸 그리기는 매 틱이고 0x62368 이 이미 열린 것을 거르므로 웹은 화면이 서 있는
-   * 동안 열 칸이 다 열려 있으면(열리는 순간 포함) 한 번 부른다. 스페셜(k 11)·코치채용(k 10)은 종류 8 이라 넘기지 않는다.
-   * 그 갈래 앞의 그리기 조건 — 확정(r166, 0x7b3a0~0x7b3dc 직접 떴다): [격자+9](열림 애니 끝) ≠ 0 · [격자+6] ≠ 0(시작 0x7a005 의
-   * 둘째 인자 — 마선수 격자는 (격자, 1, 1, 1) 이라 늘 1, 0x7a010) · 깜빡임 [sp+0x58] = ([격자+0x18] % 8) ≤ 4(0x7a632~0x7a64a) 다.
-   * 곧 커서 칸이 그려지는 그림에서만 열리므로 화면이 선 뒤 열림 애니 · 깜빡임이 켜지는 첫 그림에 연다 — 웹도 같은 조건
-   * (`isGridCursorOn` — 아래 본문)에서 부른다
-   */
-  readonly onAllAcesOpen?: () => void
-  /**
-   * 화면 맨 밑에 먼저 깔 것 — 시즌 장면 0x105 는 상태별 그리기 앞에 늘 공통 앞그림 0xb810 을 부르고, 0xd7 마선수 고르기는 0xdd · 0xe0 · 0xe1 밖이라
-   * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
-   */
-  readonly underlay?: ReactNode
-  /** 화면 맨 위에 얹을 팝업 — 코치채용의 가드·확인 팝업 */
-  readonly overlay?: ReactNode
-  /**
-   * 목록 뒤 · 머리띠 앞에 그릴 것 (커서 칸을 받는다) — 코치채용 정보 상자. 0xaa24 가 공용 목록 0x63b15 뒤 · 머리띠 0x54d95 앞
-   * (0xaa6c~0xad78)에 그리고, 머리띠가 미끄러지는 동안(목록이 아무것도 안 그릴 때)에도 그린다
-   */
-  readonly panel?: (cursor: number) => ReactNode
-}
-
-/**
- * 격자 [메뉴+0x74] 의 꼴 — 진입이 `vt+0x1c(격자, 5열, 2줄, 숫자키 꼴 1, 꼴)` 로 짓는다(직접 떴다):
- * - 상태 21 진입 0x263f4(0x26408~0x26418): 꼴 **0x10** — 가로는 같은 줄 안에서 감고 세로는 끝에서 멈춘다.
- * - 상태 28 진입 0x262c8(0x262dc~0x262ea): 꼴 **0x20** — 세로는 감고 가로는 끝에서 멈춘다.
- * (진입 표 0xcf06c 는 상태 − 2 번째 칸: [19] 0x263f4 · [26] 0x262c8.)
- * - 시즌 0xd7(마선수 · 코치채용)의 격자 [장면+0x8c] 는 장면 생성자 0x3cc8~0x3ce6 이 꼴 **0x10** 으로 한 번 짓는다 — 고르기 꼴과 같다.
- */
-const ACE_GRID_SHAPES: Readonly<Record<'고르기' | '레벨업', AnnalsGridShape>> = {
-  고르기: { columns: ACE_LAYOUT.grid.columns, rows: ACE_LAYOUT.grid.rows, wrapsColumns: true, wrapsRows: false },
-  레벨업: { columns: ACE_LAYOUT.grid.columns, rows: ACE_LAYOUT.grid.rows, wrapsColumns: false, wrapsRows: true },
-}
+export type { AceSelectScreenProps } from './aceSelect/aceSelectProps'
 
 /**
  * **마선수 고르기** — 메인 메뉴 하위 상태 **21**, 공용 목록 `0x63b15` 의 **k = 2**
@@ -161,8 +52,8 @@ const ACE_GRID_SHAPES: Readonly<Record<'고르기' | '레벨업', AnnalsGridShap
  */
 export function AceSelectScreen({
   phase,
-  openedAcePitcherIds = [],
-  openedAceBatterIds = [],
+  openedAcePitcherIds,
+  openedAceBatterIds,
   levels,
   mode = '고르기',
   gamePoint = 0,
@@ -177,9 +68,8 @@ export function AceSelectScreen({
   panel,
 }: AceSelectScreenProps) {
   const imgTextOrigins = useFrameOrigins(IMG_TEXT_FRAME)
-  const cellCount = ACE_LAYOUT.grid.columns * ACE_LAYOUT.grid.rows
   // 마투수 단계는 윗줄에서, 마타자 단계는 아랫줄에서 커서가 시작한다 (원본이 OK 뒤 커서를 내린다)
-  const [cursor, setCursor] = useState(phase === ACE_PHASE.마투수 ? 0 : ACE_PER_ROLE)
+  const [cursor, setCursor] = useState(aceStartCursorOf(phase))
   /** 오픈 힌트 팝업이 뜬 칸 (0xa68e~0xa6dc). null 이면 안 뜬 것 */
   const [hintCell, setHintCell] = useState<number | null>(null)
   /** G가 모자라 뜬 부족 팝업 (0xa46e → 0xaa00, 팝업 id 0x20) */
@@ -191,49 +81,23 @@ export function AceSelectScreen({
   const isLevelUpMode = mode === '레벨업'
   const isCoachMode = mode === '코치'
 
-  /**
-   * 단계가 바뀌면 커서를 옮긴다. 마투수 OK 는 (0, 1) = 칸 5 로 내린다(시즌 0xa78e~0xa798).
-   * 마타자 단계의 CLR 은 커서를 **고른 마투수 칸**(rec+0xe)으로 되돌린다 — +0xc = 칸 % 열 · +0x10 = 칸 / 열
-   * (시즌 0xa91c~0xa94a · 일반모드 상태 21 0x2a0bc~0x2a0e2, 0xca911 나머지 · 0xca7b5 몫). 0 칸이 아니다.
-   */
-  const previousPhaseRef = useRef(phase)
-  useEffect(() => {
-    if (previousPhaseRef.current === phase) return
-    previousPhaseRef.current = phase
-    const isChosen = chosenPitcherCell !== null && chosenPitcherCell >= 0 && chosenPitcherCell < ACE_PER_ROLE
-    setCursor(phase === ACE_PHASE.마투수 ? (isChosen ? chosenPitcherCell : 0) : ACE_PER_ROLE)
-  }, [phase, chosenPitcherCell])
+  useCursorFollowsPhase(phase, chosenPitcherCell, setCursor)
 
-  // 0x7b408~0x7b42e — for i in 0..9: 전역 +0x30 + i == 0 이면 그만, 다 켜졌으면 0x62368(ui, 12, 0)
-  const isEveryAceOpen = Array.from({ length: ACE_PER_ROLE }, (_unused, index) => index).every(
-    (index) => openedAcePitcherIds.includes(index) && openedAceBatterIds.includes(index),
-  )
+  const isEveryAceOpen = isEveryAceOpenOf(openedAcePitcherIds, openedAceBatterIds)
   // 머리띠가 미끄러지는 동안은 본문이 없고, 본문 첫 그림에 지은 격자가 열림 애니(0x79fa8)를 다 돌 때까지 키 함수가
   // [skin+0xe4] == 0 을 보고 아무것도 안 한다 (`useListPageEntry`). 마선수 격자는 시작 0x7a005(격자, 1, 1, 1)이라 애니가 늘 돈다(0x64834)
-  const entry = useListPageEntry({ grid: { shape: ACE_GRID_OPEN, isAnimated: true } })
-  const { keyLock } = entry
-  const gridOpen = entry.grid
+  const { keyLock, grid: gridOpen } = useListPageEntry({ grid: { shape: ACE_GRID_OPEN, isAnimated: true } })
   // 커서 튕김 — 시작 0x7a005(격자, 1, 1, 1) 의 셋째 인자 [격자+6] = 1 (`useGridCursorBounce`)
   const bounce = useGridCursorBounce()
-  // 격자 커서 깜빡임 [격자+0x18] — 시작 0x7a005 가 0 으로 두고(0x7a01e) 그릴 때마다 끝에서 +1(0x7b490) → 본문 몇째 그림인가와 같다.
-  // 커서 칸 그리기 0x7b3a0 은 열림 애니가 끝났고([격자+9]) 깜빡임이 켜졌을 때만 돈다(0x7b3a2 · 0x7b3c6)
-  const isGridCursorOn = gridOpen !== null && gridOpen.state.isDone && isAceGridCursorOn(gridOpen.blink)
+  const isGridCursorOn = isAceGridCursorShownOf(gridOpen)
 
-  const allAcesOpen = useEffectEvent(() => onAllAcesOpen?.())
   // 0x7b408 은 커서 칸 그리기(종류 7) 안이라 커서가 그려지는 그림에서만 돈다
-  const isEveryAceOpenSeen = isEveryAceOpen && isGridCursorOn
-  useEffect(() => {
-    if (isEveryAceOpenSeen) allAcesOpen()
-  }, [isEveryAceOpenSeen])
+  useAllAcesOpenNotice(isEveryAceOpen && isGridCursorOn, onAllAcesOpen)
 
-  const isCellOpen = (cell: number) =>
-    aceRoleOfCell(cell) === ACE_PHASE.마투수 ? openedAcePitcherIds.includes(aceIndexOfCell(cell)) : openedAceBatterIds.includes(aceIndexOfCell(cell))
-
-  /**
-   * 지금 단계의 줄만 고를 수 있다 — 원본도 단계에 맞는 줄에서만 OK 를 받는다.
-   * 상태 28 은 고르기가 없고 OK 가 레벨업 쪽이라 어느 칸이든 누를 수 있다.
-   */
-  const isCellSelectable = (cell: number) => isLevelUpMode || (isCoachMode ? isCellOpen(cell) : aceRoleOfCell(cell) === phase && isCellOpen(cell))
+  const isCellOpen = (cell: number) => isAceCellOpen(cell, openedAcePitcherIds, openedAceBatterIds)
+  const isCellReachable = (cell: number) => isAceCellReachable(cell, mode, phase)
+  // 팝업 · 창이 떠 있으면 격자는 키를 받지 않는다 — MessageBox 가 답을 가져간다
+  const isGridBlocked = isAceGridBlockedOf(hintCell, isShortageOpen, isMaxLevelOpen, levelUpCell, overlay)
 
   /**
    * **레벨업 요청** — 상태 21 의 `0` 키(0x29efc `cmp r5,#0x30`) · 상태 28 의 OK·`0` 키(0x2b00a·0x2affc).
@@ -252,313 +116,51 @@ export function AceSelectScreen({
 
   /**
    * OK 한 번 — 열린 칸이면 고르고, **잠긴 칸이면 오픈 힌트 팝업**을 띄운다 (0xa248 → 0xa68e).
-   * 팝업은 단계에 맞는 줄에서만 띄운다 (OK 를 받는 줄이 거기뿐이다).
+   * 지금 단계의 줄만 고를 수 있고 팝업도 그 줄에서만 띄운다(OK 를 받는 줄이 거기뿐이다). 상태 28 은 고르기가 없고 OK 가 레벨업 쪽이다.
+   * 코치채용(0xa79c → 0xa880)은 두 줄 모두 열린 칸이면 고르고 잠긴 칸이면 힌트다.
    */
   const pressCell = (cell: number) => {
     if (isLevelUpMode) return requestLevelUp(cell)
-    if (isCellSelectable(cell)) return onSelect(cell)
-    // 코치채용(0xa79c → 0xa880)은 두 줄 모두 잠긴 칸이면 힌트다
-    if (isCoachMode || aceRoleOfCell(cell) === phase) setHintCell(cell)
+    if (isCellReachable(cell) && isCellOpen(cell)) return onSelect(cell)
+    if (isCellReachable(cell)) setHintCell(cell)
   }
-
-  /**
-   * **커서가 갈 수 있는 칸** — 격자 [메뉴+0x74] 는 진입(0x263f4 · 0x262c8)의 vt+0x1c 가 막힌 칸 표 [+0x28] 을 모두 1 로 채우고
-   * 지우는 곳이 없어(직접 떴다) **잠긴 칸에도 커서가 간다** — 그 칸의 OK(0x29fbe~)가 `mgr[0x30 + 칸] == 0` 을 보고 오픈 힌트를 띄운다.
-   * 상태 21 은 ↑ ↓ 를 격자에 안 넘겨(0x29e74~0x29e80) 단계의 줄 안에서만 다닌다. 상태 28 · 코치채용은 두 줄 모두.
-   */
-  const isCellReachable = (cell: number) => isLevelUpMode || isCoachMode || aceRoleOfCell(cell) === phase
 
   /**
    * **칸 탭** (웹 터치 길 — 원본은 키패드뿐): 커서가 아닌 칸이면 커서만 그 칸으로 옮기고(이름 막대 · ABILITY 판 · '0레벨업' 이
    * 그 칸을 본다), 커서 칸을 다시 누르면 OK 한 번이다 — 열린 칸은 고르고, 잠긴 칸은 오픈 힌트 · G 구매 팝업이 뜬다.
    */
   const tapCell = (cell: number) => {
-    if (keyLock.current || !isCellReachable(cell)) return
-    // 팝업 · 창이 떠 있으면 격자는 키를 받지 않는다 — 키 길(아래)과 같다
-    if (hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null) return
-    if (overlay !== undefined && overlay !== null && overlay !== false) return
+    if (keyLock.current || !isCellReachable(cell) || isGridBlocked) return
     if (cell !== cursor) return setCursor(cell)
     pressCell(cell)
   }
 
-  /**
-   * 오픈 힌트 팝업의 답 (0xa390~0xa46e). 첫 버튼(0)이 "예" 다.
-   *
-   * G가 모자라면(`G < 가격`, 0xa3dc `blt`) **사지 않고** 부족 팝업으로 넘어간다 — G도 안 깎인다.
-   * 가격과 딱 같으면 산다. 못 여는 칸(4·9)은 버튼이 OK 하나라 여기로 와도 아무 일이 없다.
-   */
-  const answerOpenPopup = (cell: number, answer: number) => {
-    setHintCell(null)
-    if (answer !== 0 || !aceOpensWithGamePoint(cell) || onOpenAce === undefined) return
-    if (gamePoint < aceOpenPriceOf(cell)) return setIsShortageOpen(true)
-    onOpenAce(cell)
-    // 0xa45c · 0x2a24c · 0x2b20c — 산 뒤 (60, 160) 에 ptc/003 반짝이. 장면 프레임이 관리자를 돌려 곧바로 보인다
-    emitMenuSparkle()
-  }
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (keyLock.current) return
-      // 팝업이 떠 있는 동안에는 격자 키를 받지 않는다 — MessageBox 가 답을 가져간다
-      if (hintCell !== null || isShortageOpen || isMaxLevelOpen || levelUpCell !== null) return
-      if (overlay !== undefined && overlay !== null && overlay !== false) return
-      // 상태 21 (0x29df8): ↑ ↓ '2' '8' 은 격자에 안 넘긴다(0x29e74~0x29e80) — 그 키를 받는 갈래도 없어 아무 일이 없다.
-      // 그 밖의 키는 격자 vt+0x18(0x6c031, 숫자키 꼴 1)이 '4' '6' 을 ← →, '5' 를 OK 로 바꾼다.
-      // 상태 28 (0x2af20): 모든 키를 격자에 넘긴다(0x2af68~0x2af72) — '2' '8' 도 ↑ ↓.
-      // 코치채용(시즌 0xd7, [this+0x11c] = 2): 키 0xa248 의 0xa578~0xa586 이 모든 키를 격자 [this+0x8c] vt+0x18 에 넘긴다.
-      //   그 격자는 장면 생성자 0x3cc8~0x3ce6 이 `vt+0x1c(5열, 2줄, 숫자키 꼴 1, 꼴 0x10)` 로 한 번 짓고 다시 안 짓는다.
-      const direction: AnnalsDirection | null =
-        event.key === 'ArrowRight' || event.key === '6'
-          ? 'right'
-          : event.key === 'ArrowLeft' || event.key === '4'
-            ? 'left'
-            : event.key === 'ArrowDown' || event.key === '8'
-              ? 'down'
-              : event.key === 'ArrowUp' || event.key === '2'
-                ? 'up'
-                : null
-      // 팝업(0x5fb25)이 키를 안 가져갔으면 0x5550d 에 넘긴다 — 까딱임 방향 [skin+0x8c] (Q-10).
-      // 상태 21 0x29df8(29e4a~29e54) · 시즌 0xd7 0xa248(a4fc~a50a)은 **날 키**(숫자키는 안 적힌다), 상태 28 0x2af20(2af68~2af7e)은
-      // 격자가 바꾼 키(숫자키도 방향)
-      if (isLevelUpMode) {
-        if (direction !== null) noteSkinShakeDirection(direction)
-      } else {
-        noteSkinShakeKey(event.key)
-      }
-      if (direction !== null) {
-        event.preventDefault()
-        if (!isLevelUpMode && !isCoachMode && (direction === 'up' || direction === 'down')) return
-        const next = moveGridCursor(ACE_GRID_SHAPES[mode === '레벨업' ? '레벨업' : '고르기'], cursor, direction)
-        // 칸이 바뀐 키(커서 +0x25)면 고른 칸을 튕긴다 — 0x7a005(격자, 1, 1, 1) 의 [격자+6] = 1 (0x64836)
-        if (next !== cursor) bounce.start(direction)
-        return setCursor(next)
-      }
-      if (event.key === 'Enter' || event.key === '5') {
-        event.preventDefault()
-        pressCell(cursor)
-        return
-      }
-      if (event.key === '0' && !isCoachMode) {
-        event.preventDefault()
-        requestLevelUp(cursor)
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onCancel()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-    // 커서·열린 목록·단계를 모두 보는 닫힘이라 **매 그림마다** 새로 건다 (의존 목록 없음)
-  })
-
-  const { anchorA, anchorB } = ACE_LAYOUT
-  const cursorPlayer = acePlayerOfCell(cursor)
-  const isCursorOpen = isCellOpen(cursor)
-  const cursorLevel = aceLevelOf(levels, cursor)
+  useAceGridKeys(keyLock, isGridBlocked, mode, cursor, bounce.start, setCursor, pressCell, requestLevelUp, onCancel)
 
   return (
     <RawScreen>
       {underlay}
       {gridOpen !== null && (
         <>
-          {/*
-        ⚠️ **A 딱지는 그리지 않는다 — 원본도 마선수 고르기(k 2·11)에서는 안 그린다.**
-        공용 목록 0x63b15 는 A 딱지 플래그 `[sp+0xb4]` 를 기본 1 로 두는데(0x63cea `movs r2,#1`
-        → 0x63cfa), 마선수 갈래가 0x63d62~0x63d68 에서 0 으로 끈다. 그리는 쪽 0x65764~0x65768 이
-        `ldr r2,[sp,#0xb4]; cmp r2,#0; beq 0x657e0` 로 통째로 건너뛴다.
-        (플래그를 0 으로 쓰는 곳은 셋 — 0x63d68 마선수 · 0x63da6 k 6~9 · 0x63dbc k 10.
-         즉 A 딱지가 그려지는 k 는 **0·1·3·4·5 뿐**이다. 직접 디스어셈해 전수 확인했다.)
-        어느 단계인지는 아래 안내 줄이 알려 준다. B 딱지(ABILITY)는 원본도 그린다.
-      */}
-          {/*
-        B 딱지 — 파란 막대(117) 에 ABILITY, k 2 는 기본값 43 위다. 코치채용(k 10)은 그리지 않는다: 0x63cdc 가 B 글 [sp+0xc0] 을 −1 로
-        두고 k 10 갈래 0x63daa~0x63dc0 는 그 칸을 안 고쳐(k 2 갈래 0x63d64 만 0x9f) 0x657e0~0x657e4 가 B 딱지를 통째로 건너뛴다(r263 직접 뜸)
-      */}
-          {!isCoachMode && (
-            <>
-              <img
-                className={styles.layer}
-                alt=""
-                src={imageSrc(SLT_IMAGE, TAG.blueBar)}
-                style={{ left: anchorB.x + TAG.dx, top: anchorB.y + TAG.bDyDefault }}
-              />
-              <FrameSprite
-                folder={IMG_TEXT_FRAME}
-                frame={ACE_LAYOUT.tagFrames.ability}
-                origins={imgTextOrigins}
-                centerX
-                x={anchorB.x}
-                y={anchorB.y + TAG.bDyDefault + TAG.textDdy}
-              />
-            </>
-          )}
-
-          {/*
-        ABILITY 판 — k 2(고르기) · k 11(레벨업)만 0x64b6e~0x64bac 에서 0x5aefc(skin, 레이더 [skin+0xd4], B.x, B.y + 8,
-        종류 **1**, 기록 0, 순번 = [skin+0xd0] == 0 ? 칸 − 5 : 칸, 반지름 30) 을 부른다(직접 떴다). 코치채용(k 10)은 안 부른다.
-        종류 1 은 0x5b090: [skin+0xd0] == 1 이면 마투수 기록 0x1f825(저장, 순번) · 이름 0~3, 아니면 마타자 0x1f84d · 이름 4~7,
-        값 = 0xb6415(기록, i, 1)(레벨 배율 뒤 장착 스킬까지 = `aceRecordAbilityAtLevel`). 축 최대치는 틀 표 0xd1b2c 그대로 999.
-        잠긴 칸도 거르지 않는다. 단계 [skin+0xd0] 은 커서 줄과 늘 같다(21 은 줄을 못 옮기고 28 은 위아래가 줄과 함께 뒤집는다).
-      */}
-          {!isCoachMode && cursorPlayer !== undefined && (
-            <AbilityRadarPanel
-              center={{ x: anchorB.x + ACE_LAYOUT.abilityChart.dx, y: anchorB.y + ACE_LAYOUT.abilityChart.dy }}
-              radius={ACE_LAYOUT.abilityChart.radius}
-              maximumLength={ACE_LAYOUT.abilityChart.radius}
-              labelFrames={aceRoleOfCell(cursor) === ACE_PHASE.마투수 ? ABILITY_RADAR_LABELS.pitcher : ABILITY_RADAR_LABELS.batter}
-              targets={abilityValuesOf(aceRecordAbilityAtLevel(cursorPlayer, cursorLevel))}
-              restartKey={`${cursor}:${cursorLevel}`}
-            />
-          )}
-
-          {/* A — 커서가 짚은 마선수. 잠겼으면 원 두 개 + LOCK */}
-          {isCursorOpen && cursorPlayer !== undefined ? (
-            <img className={styles.layer} alt={cursorPlayer.name} src={cursorPlayer.stillUrl} style={{ left: anchorA.x - 20, top: anchorA.y - 20 }} />
-          ) : (
-            LOCKED_CIRCLES.map((circle) => (
-              <span
-                key={circle.diameter}
-                className={styles.lockedCircle}
-                style={{
-                  left: anchorA.x - circle.diameter / 2,
-                  top: anchorA.y - circle.diameter / 2,
-                  width: circle.diameter,
-                  height: circle.diameter,
-                  background: circle.color,
-                }}
-              />
-            ))
-          )}
-
-          {/* 이름 막대 (slt_frame 이미지 9) + 이름 + 노란 LV */}
-          <img
-            className={styles.layer}
-            alt=""
-            src={imageSrc(SLT_IMAGE, NAME_BAR.image)}
-            style={{ left: anchorA.x + NAME_BAR.dx, top: anchorA.y + NAME_BAR.dy }}
+          <AceCursorInfo
+            cursor={cursor}
+            cursorLevel={aceLevelOf(levels, cursor)}
+            isCursorOpen={isCellOpen(cursor)}
+            isCoachMode={isCoachMode}
+            imgTextOrigins={imgTextOrigins}
           />
-          <span
-            className={styles.centeredText}
-            data-testid="마선수-이름"
-            style={{ left: anchorA.x + NAME_BAR.dx, top: anchorA.y + NAME_BAR.textDy, width: NAME_BAR.width }}
-          >
-            {isCursorOpen && cursorPlayer !== undefined ? `${cursorPlayer.name} LV.${cursorLevel + 1}` : LOCK_LABEL}
-          </span>
-
-          {/* 줄 딱지 — PITCHER / BATTER */}
-          {ACE_LAYOUT.rowTags.map((tag) => (
-            <span key={tag.label}>
-              <span
-                className={styles.fillPanel}
-                style={{
-                  left: tag.panel.x,
-                  top: tag.panel.y,
-                  width: tag.panel.width,
-                  height: tag.panel.height,
-                  background: ACE_LAYOUT.panelColor,
-                  borderRadius: 2,
-                }}
-              />
-              <img
-                className={styles.layer}
-                alt={tag.label}
-                src={imageSrc(SLT_IMAGE, tag.image)}
-                style={{ left: tag.imageAt.x, top: tag.imageAt.y }}
-              />
-            </span>
-          ))}
-
-          {/*
-        10칸 격자 0x7a571 종류 7 — 칸마다 남색 둥근 바탕(x − 3, y − 3, 43×43) · slt_frame 이미지 0 · 얼굴(x + 3, y + 2) 또는 "?"(x + 10, y + 5),
-        커서는 깜빡일 때 slt_frame 이미지 1 을 (x − 2, y − 2) (prepareLayout `ACE_LAYOUT.cellBack` 머리말)
-      */}
-          {Array.from({ length: cellCount }, (_unused, cell) => {
-            const shake = cell === cursor ? bounce.offset : null
-            const x = aceCellPositionOf(cell).x + (shake?.dx ?? 0)
-            const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell) + (shake?.dy ?? 0)
-            const back = ACE_LAYOUT.cellBack
-            return (
-              <span key={`back-${cell}`}>
-                {/* 0x6b7d5(…, 43, 43, 둥글기 1) — (w + 1)×(h + 1) 에서 네 모서리 점이 빠진 꼴 */}
-                <span
-                  className={styles.fillPanel}
-                  style={{
-                    left: x + back.dx + 1,
-                    top: y + back.dy,
-                    width: back.size - 1,
-                    height: back.size + 1,
-                    background: back.color,
-                  }}
-                />
-                <span
-                  className={styles.fillPanel}
-                  style={{
-                    left: x + back.dx,
-                    top: y + back.dy + 1,
-                    width: back.size + 1,
-                    height: back.size - 1,
-                    background: back.color,
-                  }}
-                />
-              </span>
-            )
-          })}
-          {Array.from({ length: cellCount }, (_unused, cell) => {
-            const shake = cell === cursor ? bounce.offset : null
-            const x = aceCellPositionOf(cell).x + (shake?.dx ?? 0)
-            const y = aceCellPositionOf(cell).y + gridOpenCellDy(ACE_GRID_OPEN, gridOpen.state, cell) + (shake?.dy ?? 0)
-            const player = acePlayerOfCell(cell)
-            const open = isCellOpen(cell)
-            // [skin+0x105] 가 서 있으면 흐리지 않는다(0x7b17a) — 레벨업 화면, 그리고 코치채용: 시즌 0xd7 진입 0x5268 이
-            // this+0x11c == 2(코치채용)면 [skin+0x105] = 1 로 둔다(0x52ac~0x52ba, [this+0xa8] = [0x1552cfc] 는 생성자 0x3b3c~0x3b4c) — 확정
-            const isDimmed = !isLevelUpMode && !isCoachMode && isAceCellDimmed(cell, phase === ACE_PHASE.마투수, chosenPitcherCell)
-            return (
-              <button
-                key={cell}
-                type="button"
-                aria-label={open && player !== undefined ? player.name : LOCK_LABEL}
-                aria-pressed={cell === cursor}
-                disabled={!isCellReachable(cell)}
-                className={styles.cell}
-                data-dimmed={isDimmed}
-                style={{ left: x, top: y, width: ACE_LAYOUT.grid.cell, height: ACE_LAYOUT.grid.cell }}
-                // 원본 격자(상태 21 진입 0x263f4 · 28 진입 0x262c8 의 vt+0x1c)는 키패드로만 커서를 옮긴다 — 올려 두기로 커서를 옮기던 onMouseEnter 는 걷었다(멈춘
-                // 포인터가 키 커서를 빼앗는다, 메인 메뉴 r27 과 같은 종류). 누름만 남긴다 — 첫 누름은 커서, 커서 칸 누름은 OK (`tapCell`)
-                onClick={() => tapCell(cell)}
-              >
-                <img className={styles.layer} alt="" src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cellImage)} style={{ left: 0, top: 0 }} />
-                {open && player !== undefined ? (
-                  <EffectImage
-                    className={styles.layer}
-                    src={player.iconUrl}
-                    effect={isDimmed ? DRAW_EFFECT.GRAY : null}
-                    style={{ left: ACE_LAYOUT.icon.dx, top: ACE_LAYOUT.icon.dy }}
-                  />
-                ) : (
-                  <img
-                    className={styles.layer}
-                    alt=""
-                    src={imageSrc(ACE_ICON, ACE_LAYOUT.lockedIcon.image)}
-                    style={{ left: ACE_LAYOUT.lockedIcon.dx, top: ACE_LAYOUT.lockedIcon.dy }}
-                  />
-                )}
-              </button>
-            )
-          })}
-          {isGridCursorOn && (
-            <img
-              className={styles.layer}
-              alt=""
-              data-testid="마선수-커서"
-              src={imageSrc(SLT_IMAGE, ACE_LAYOUT.cursor.image)}
-              style={{
-                left: aceCellPositionOf(cursor).x + ACE_LAYOUT.cursor.dx + bounce.offset.dx,
-                top: aceCellPositionOf(cursor).y + ACE_LAYOUT.cursor.dy + bounce.offset.dy,
-              }}
-            />
-          )}
+          <AceGrid
+            mode={mode}
+            phase={phase}
+            cursor={cursor}
+            chosenPitcherCell={chosenPitcherCell}
+            openState={gridOpen.state}
+            bounceOffset={bounce.offset}
+            isGridCursorOn={isGridCursorOn}
+            isCellOpen={isCellOpen}
+            isCellReachable={isCellReachable}
+            onTapCell={tapCell}
+          />
         </>
       )}
 
@@ -575,44 +177,26 @@ export function AceSelectScreen({
         title="마선수선택"
         gamePoint={gamePoint}
         onBack={onCancel}
-        footer={isCoachMode ? 5 : 0x205}
+        footer={aceFooterOf(mode)}
         footerPresses={{
           [FOOTER_BITS.levelUp]: { label: '0 레벨업', onPress: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: '0' })) },
         }}
       />
 
-      {/*
-        **오픈 힌트 팝업** (0xa68e~0xa6dc) — 칸 4·9(드래고나·킹타이거)는 StrCOMMON[42] 알림 하나,
-        나머지는 StrCOMMON[43] 예/아니오다. 버튼 짝은 원본대로 두었지만 **"예" 가 아무 일도 하지 않는다** —
-        G포인트를 빼고 오픈 플래그를 세울 저장 칸이 웹판에 없다 (근사).
-      */}
-      {hintCell !== null && (
-        <MessageBox
-          text={aceOpenPopupTextOf(hintCell)}
-          buttons={aceOpensWithGamePoint(hintCell) ? ['예', '아니오'] : ['OK']}
-          onAnswer={(answer) => answerOpenPopup(hintCell, answer)}
-        />
-      )}
-
-      {/*
-        **G포인트 부족 팝업** (0xa46e → 0xaa00, id 0x20) — 글은 문자열표가 아니라 코드에 박힌
-        0xcc214 다. ⚠️ 원본은 "예" 가 유료 구매 페이지로 나가지만 웹판에는 그 길이 없어 둘 다 닫는다.
-      */}
-      {isShortageOpen && <MessageBox text={ACE_OPEN_SHORTAGE_POPUP} buttons={['예', '아니오']} onAnswer={() => setIsShortageOpen(false)} />}
-
-      {/* StrCOMMON[40] — 최고 레벨 알림 (0x2b0e4 · 0x29f8a, 버튼 하나) */}
-      {isMaxLevelOpen && <MessageBox text={ACE_LEVEL_UP_TEXT.maxLevel} buttons={['OK']} onAnswer={() => setIsMaxLevelOpen(false)} />}
-
-      {/* 레벨업 창 0x5f394 · 0x5fb24 — 머리띠 위에 겹친다 (갱신 함수가 목록보다 먼저 키를 넘긴다) */}
-      {levelUpCell !== null && onLevelUp !== undefined && (
-        <AceLevelUpWindow
-          cell={levelUpCell}
-          level={aceLevelOf(levels, levelUpCell)}
-          gamePoint={gamePoint}
-          onLevelUp={onLevelUp}
-          onClose={() => setLevelUpCell(null)}
-        />
-      )}
+      <AceSelectPopups
+        hintCell={hintCell}
+        isShortageOpen={isShortageOpen}
+        isMaxLevelOpen={isMaxLevelOpen}
+        levelUpCell={levelUpCell}
+        levels={levels}
+        gamePoint={gamePoint}
+        onLevelUp={onLevelUp}
+        onOpenAce={onOpenAce}
+        setHintCell={setHintCell}
+        setIsShortageOpen={setIsShortageOpen}
+        setIsMaxLevelOpen={setIsMaxLevelOpen}
+        setLevelUpCell={setLevelUpCell}
+      />
       {overlay}
     </RawScreen>
   )
