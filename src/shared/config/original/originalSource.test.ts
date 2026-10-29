@@ -640,7 +640,7 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
       'src/shared/config/frameRate.ts#MILLISECONDS_PER_FRAME_BY_SPEED', // 1000 ÷ fps 표 0xd7624 (frameRate.test 가 본다)
       'src/shared/lib/stepCover/stepCover.ts#WEIGHT_TERMS', // 0xd5e58 마스크 · 0xd5de0 밀기를 한 줄로 묶음
       'src/widgets/ace-level-up/lib/aceLevelUpLayout.ts#ACE_BATTER_ROW_LABEL_FRAMES', // 0xd1c48 을 0x5f5c2 가 바꿔 넣은 값
-      'src/widgets/batting-stage/lib/batterLayers.ts#HAND_THIRD_GRADES', // 코드 비교 상수
+      'src/widgets/batting-stage/lib/batterLayers/batterEquipment.ts#HAND_THIRD_GRADES', // 코드 비교 상수
       'src/widgets/loading-tip/lib/loadingTipLayout.ts#LOADING_BACKGROUND_RGB', // .data 색 값을 RGB 로 푼 것
       'src/widgets/matchup-cards/lib/matchupRecord.ts#ACE_BATTER_PROFILES', // XlsACE_BAT_DATA +0xb (위 마선수 시험이 본다)
       'src/widgets/season/lib/seasonTrainingResult.ts#SEASON_TEAM_DETAIL_LABEL_FRAMES', // 0xd4ad8 앞 넷을 0x87360 이 바꿔 넣음
