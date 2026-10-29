@@ -1,65 +1,35 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { CommonPanel, FrameSprite, InsetBox } from '@/shared/ui'
+import { useState } from 'react'
+import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
 import { colorStepCoverOpacityOf } from '@/shared/lib/stepCover/stepCover'
-import { SKIN_TICKER_CLIP_INSET, skinTickerTextXOf, useSkinTickerCounter } from '@/shared/lib/skinTicker/skinTicker'
-import { measureRawTextWidth } from '@/shared/lib/font'
-import { RECORD_NAMES } from '@/entities/game/model/gameRecords'
-import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
-import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
-import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import {
-  NO_RECORD_TEXT,
   SETTLEMENT_BAND,
-  SETTLEMENT_INFO_BAR,
-  SETTLEMENT_INFO_POINT,
   SETTLEMENT_LOSE_DIM_STEP,
   SETTLEMENT_RESULT_SPRITE,
   SETTLEMENT_SCORE,
-  SETTLEMENT_SCROLL_TRACK,
   SETTLEMENT_TITLE_BAR,
   SETTLEMENT_VISIBLE_ROWS,
   isVersusMode,
-  recordCountTextOf,
   scrollSettlementRecords,
-  settlementKeyActionOf,
   settlementPanelHeightOf,
   settlementPanelLayoutOf,
   settlementRecordRowsOf,
   startSettlementScroll,
-  versusRewardTextOf,
-  versusWinPopupTextOf,
-  VERSUS_WIN_POPUP_TICK,
 } from '@/pages/team-game/lib/settlementBoard'
 import type { VersusWinReward } from '@/pages/team-game/lib/settlementBoard'
-import { useCommonWindowPush, useIsCommonWindowOpen } from '@/shared/lib/commonWindow/commonWindow'
-import { hiddenNameOf } from '@/entities/collection/model/hiddenOpenNotice'
+import type { SettlementKeyAction } from '@/pages/team-game/lib/settlementBoard/settlementKeys'
 import * as styles from '@/pages/team-game/ui/SettlementBoard.css'
-import { GamePointBadge } from '@/widgets/screen-frame/ui/GamePointBadge'
 import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
 import { SCOREBOARD_AT } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { SettlementEffectCanvas } from '@/widgets/batting-stage/ui/SettlementEffectCanvas'
 import type { SettlementEffectLayers } from '@/widgets/batting-stage/model/stageRefs'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-
-const GAME_UI = assetUrl('./sprites/game_ui')
-const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
-const RESULT_FRAMES = assetUrl('./sprites/result/frames')
-const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
-const POPUP_FRAMES = assetUrl('./sprites/popup/frames')
-const SLT_FRAME = assetUrl('./sprites/slt_frame')
-const NUM = assetUrl('./sprites/num')
-const imageSrc = (folder: string, image: number) => `${folder}/${String(image).padStart(3, '0')}.png`
-
-/** num 70 + 자리 숫자 — 그림 폭(70~79) */
-const SCORE_DIGIT_WIDTHS = [32, 22, 29, 29, 32, 30, 30, 31, 30, 30] as const
-const SCORE_DIGIT_HEIGHTS = [36, 35, 35, 36, 36, 36, 36, 34, 36, 36] as const
-/** img_text 252 "GP" */
-const GP_LABEL_FRAME = 252
-const SCROLL_TRACK_COLOR = '#20309e'
-const SCROLL_ARROW_IMAGE = 78
+import { BasicView } from './settlementBoard/BasicView'
+import { RecordPanel } from './settlementBoard/RecordPanel'
+import { ScoreNumber } from './settlementBoard/ScoreNumber'
+import { GAME_UI_FRAMES, IMG_TEXT_FRAMES, POPUP_FRAMES, RESULT_FRAMES } from './settlementBoard/settlementAssets'
+import { useSettlementKeys } from './settlementBoard/useSettlementKeys'
+import { useSettlementPanel } from './settlementBoard/useSettlementPanel'
 
 export interface SettlementBoardProps {
   readonly mode: number
@@ -114,29 +84,7 @@ export function SettlementBoard({
   effectLayers,
   versusReward,
 }: SettlementBoardProps) {
-  const [isPanelOpen, setPanelOpenState] = useState(false)
-  /** 판 열림 [장면+0x17e8] — 키 처리가 꺼낸 차례대로 고치고 읽는다 */
-  const isPanelOpenRef = useRef(false)
-  const setPanelOpen = (isOpen: boolean) => {
-    isPanelOpenRef.current = isOpen
-    setPanelOpenState(isOpen)
-  }
-  const pushCommonWindow = useCommonWindowPush()
-  // 0x4b100 은 [장면+0x17e8](기록 판) && 모드 8·9 일 때 틱 [장면+0x2c] == 0x14 에서 이겼으면 승리 팝업을 공용 창에 띄운다
-  // (4b17a~4b2d4). 틱은 들어선 그림이 0 이고, 공용 창이 떠 있는 동안 경기 장면 0x52c50 은 상태 바꿈(틱 +1)을 건너뛴다(52cc6)
-  // 키 0x407f0 은 상태 0x19 의 상태 키 함수(52da2~)라 받은 다음 틀의 진입 뒤 · 갱신 앞에서 돈다 — 받은 키는 이 판의 칸에 들고 이
-  // 판의 틱 머리에서 꺼낸다(`sceneKeyLatch`)
-  const keyLatch = useSceneKeyLatchOwner()
-  useSceneTick(
-    (tick) => {
-      if (tick !== VERSUS_WIN_POPUP_TICK || !isPanelOpenRef.current || !isVersusMode(mode) || !isWin || versusReward === undefined) return
-      const text = versusWinPopupTextOf(versusReward, hiddenNameOf)
-      if (text !== null) pushCommonWindow(text)
-    },
-    !useIsCommonWindowOpen(),
-    false,
-    keyLatch,
-  )
+  const { isPanelOpen, isPanelOpenRef, setPanelOpen, keyLatch } = useSettlementPanel(mode, isWin, versusReward)
   const rows = settlementRecordRowsOf(recordIds)
   const [scroll, setScroll] = useState(() => startSettlementScroll(rows.length))
   const gameUiOrigins = useFrameOrigins(GAME_UI_FRAMES)
@@ -144,34 +92,17 @@ export function SettlementBoard({
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   const popupOrigins = useFrameOrigins(POPUP_FRAMES)
 
-  const act = (action: ReturnType<typeof settlementKeyActionOf>) => {
-    if (action === '판열기') setPanelOpen(true)
-    else if (action === '판닫기') setPanelOpen(false)
-    else if (action === '나가기') onExit()
-    else if (action === '위로') setScroll((current) => scrollSettlementRecords(current, 'up'))
-    else if (action === '아래로') setScroll((current) => scrollSettlementRecords(current, 'down'))
+  const actions: Readonly<Record<NonNullable<SettlementKeyAction>, () => void>> = {
+    판열기: () => setPanelOpen(true),
+    판닫기: () => setPanelOpen(false),
+    나가기: onExit,
+    위로: () => setScroll((current) => scrollSettlementRecords(current, 'up')),
+    아래로: () => setScroll((current) => scrollSettlementRecords(current, 'down')),
   }
-
-  // 꺼낸 틀에 그때 렌더의 처리로 — 키는 받은 다음 틀에 돈다
-  const actLatest = useEffectEvent(act)
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return
-      const { key } = event
-      if (settlementKeyActionOf(key, isPanelOpenRef.current) === null && settlementKeyActionOf(key, !isPanelOpenRef.current) === null) return
-      event.preventDefault()
-      // 판 열림은 꺼낸 틀의 값으로 가른다
-      keyLatch.push(() => {
-        const action = settlementKeyActionOf(key, isPanelOpenRef.current)
-        if (action !== null) actLatest(action)
-      })
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  })
-
-  // 터치 기기 — 기록 판이 열려 있고 줄이 넘치면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건 → 0x61ce5 스크롤)
-  useTouchScrollKeys(isPanelOpen && rows.length > SETTLEMENT_VISIBLE_ROWS)
+  const act = (action: SettlementKeyAction) => {
+    if (action !== null) actions[action]()
+  }
+  useSettlementKeys(keyLatch, isPanelOpenRef, act, isPanelOpen && rows.length > SETTLEMENT_VISIBLE_ROWS)
 
   const hasRewardLine = isVersusMode(mode) && isWin
   const panel = settlementPanelLayoutOf(settlementPanelHeightOf(mode, isWin), rows.length, hasRewardLine)
@@ -216,244 +147,22 @@ export function SettlementBoard({
       <ScoreNumber value={side0Score} centerX={SETTLEMENT_SCORE.side0.centerX} y={SETTLEMENT_SCORE.side0.y} testId="정산-점수-0" />
       <ScoreNumber value={side1Score} centerX={SETTLEMENT_SCORE.side1.centerX} y={SETTLEMENT_SCORE.side1.y} testId="정산-점수-1" />
 
-      {!isPanelOpen ? (
-        <>
-          {/* 4af50 기본 화면 — game_ui 이미지 12 · "0:INFO" · 번 G */}
-          <img
-            className={styles.sprite}
-            alt=""
-            src={imageSrc(GAME_UI, SETTLEMENT_INFO_BAR.image)}
-            style={{ left: SETTLEMENT_INFO_BAR.x, top: SETTLEMENT_INFO_BAR.y }}
-          />
-          <FrameSprite
-            folder={IMG_TEXT_FRAMES}
-            frame={SETTLEMENT_INFO_BAR.labelFrame}
-            origins={textOrigins}
-            x={SETTLEMENT_INFO_BAR.labelX}
-            y={SETTLEMENT_INFO_BAR.labelY}
-          />
-          {/* 원본에 없는 웹 단추 — '0' 키와 같다 */}
-          <button
-            type="button"
-            className={styles.hitArea}
-            aria-label="0:INFO"
-            style={{
-              left: SETTLEMENT_INFO_BAR.x,
-              top: SETTLEMENT_INFO_BAR.y,
-              width: SETTLEMENT_INFO_BAR.imageWidth,
-              height: SETTLEMENT_INFO_BAR.imageHeight,
-            }}
-            onClick={() => act('판열기')}
-          />
-          {gamePoints > 0 && (
-            <GamePointBadge
-              testId="정산-번-G"
-              value={gamePoints}
-              x={SETTLEMENT_INFO_POINT.x}
-              y={SETTLEMENT_INFO_POINT.y}
-              width={SETTLEMENT_INFO_POINT.width}
-              align={SETTLEMENT_INFO_POINT.align}
-              plus={SETTLEMENT_INFO_POINT.plus}
-              plate={SETTLEMENT_INFO_POINT.plate}
-            />
-          )}
-        </>
+      {isPanelOpen ? (
+        <RecordPanel
+          panel={panel}
+          visibleRows={visibleRows}
+          scroll={scroll}
+          gamePoints={gamePoints}
+          heldGamePoints={heldGamePoints}
+          versusWinBonus={versusWinBonus}
+          textOrigins={textOrigins}
+          popupOrigins={popupOrigins}
+        />
       ) : (
-        <>
-          {/* 4aafe 공용 판 0x55e61(skin, W/2, H/2, 176, h, 0, 0x22, 위 띠 0x10, 0, 0, 0) */}
-          <CommonPanel
-            x={panel.window.x}
-            y={panel.window.y}
-            width={panel.window.width}
-            height={panel.window.height}
-            topBand={0x10}
-            testId="정산-판-창"
-          />
-          <img
-            className={styles.sprite}
-            alt="RESULT"
-            src={imageSrc(GAME_UI, panel.title.image)}
-            style={{ left: panel.title.x, top: panel.title.y }}
-          />
-          {/* 4ab6e 칸 0xbb28d(…, 정렬 2) */}
-          <InsetBox x={panel.recordBox.x} y={panel.recordBox.y} width={panel.recordBox.width} height={panel.recordBox.height} />
-          {panel.hasRecords ? (
-            <>
-              {visibleRows.map((row, offset) => {
-                const y = panel.records.firstRowY + panel.records.rowStep * offset
-                return (
-                  <div key={row.id} data-testid={`정산-기록-${row.id}`}>
-                    <span className={styles.text} style={{ left: panel.records.nameX, top: y }}>
-                      {RECORD_NAMES[row.id] ?? ''}
-                    </span>
-                    <span
-                      className={styles.text}
-                      style={{
-                        left: panel.records.countX,
-                        top: y,
-                        width: panel.records.countWidth,
-                        textAlign: 'right',
-                      }}
-                    >
-                      {recordCountTextOf(row.count)}
-                    </span>
-                  </div>
-                )
-              })}
-              {/* 스크롤 막대 0x58c11 — 길 · ▲▼(slt_frame 이미지 78) · 흰 손잡이 */}
-              <div
-                className={styles.block}
-                style={{
-                  left: panel.records.scrollBar.x,
-                  top: panel.records.scrollBar.y,
-                  width: 7,
-                  height: SETTLEMENT_SCROLL_TRACK + 2,
-                  background: SCROLL_TRACK_COLOR,
-                }}
-              />
-              <img
-                className={styles.sprite}
-                alt=""
-                src={imageSrc(SLT_FRAME, SCROLL_ARROW_IMAGE)}
-                style={{ left: panel.records.scrollBar.x, top: panel.records.scrollBar.y - 4 }}
-              />
-              <img
-                className={styles.sprite}
-                alt=""
-                src={imageSrc(SLT_FRAME, SCROLL_ARROW_IMAGE)}
-                style={{ left: panel.records.scrollBar.x, top: panel.records.scrollBar.y + SETTLEMENT_SCROLL_TRACK + 1, transform: 'scaleY(-1)' }}
-              />
-              <div
-                className={styles.scrollThumb}
-                style={{
-                  left: panel.records.scrollBar.x + 1,
-                  top: panel.records.scrollBar.y + scroll.thumb + 1,
-                  width: 4,
-                  height: scroll.thumbLength,
-                }}
-              />
-            </>
-          ) : (
-            <span
-              className={styles.text}
-              style={{
-                left: panel.emptyText.x,
-                top: panel.emptyText.y,
-                width: panel.emptyText.width,
-                textAlign: 'center',
-              }}
-            >
-              {NO_RECORD_TEXT}
-            </span>
-          )}
-
-          {/* 4ad34 칸 0xbb28d(…, 정렬 2) */}
-          <InsetBox x={panel.pointBox.x} y={panel.pointBox.y} width={panel.pointBox.width} height={panel.pointBox.height} />
-          {panel.pointRows.map((row, index) => {
-            const value = index === 0 ? gamePoints : heldGamePoints
-            return (
-              <div key={row.name}>
-                <FrameSprite folder={IMG_TEXT_FRAMES} frame={row.label} origins={textOrigins} x={panel.pointLabelX} y={row.labelY} />
-                <FrameSprite folder={IMG_TEXT_FRAMES} frame={GP_LABEL_FRAME} origins={textOrigins} x={panel.pointGpX} y={row.labelY} />
-                {value !== undefined && (
-                  <GamePointBadge
-                    testId={`정산-${row.name}-G`}
-                    value={value}
-                    x={panel.pointValue.x}
-                    y={row.valueY}
-                    width={panel.pointValue.width}
-                    align={panel.pointValue.align}
-                    plus={row.plus}
-                    plate={panel.pointValue.plate}
-                  />
-                )}
-              </div>
-            )
-          })}
-
-          {panel.rewardBox !== null && panel.ticker !== null && (
-            <>
-              {/* 4aeb4 칸 0xbb28d(…, 정렬 2) */}
-              <InsetBox x={panel.rewardBox.x} y={panel.rewardBox.y} width={panel.rewardBox.width} height={panel.rewardBox.height} />
-              {versusWinBonus !== undefined && <RewardTicker text={versusRewardTextOf(versusWinBonus)} box={panel.ticker} />}
-            </>
-          )}
-
-          <FrameSprite folder={POPUP_FRAMES} frame={panel.okButton.frame} origins={popupOrigins} x={panel.okButton.x} y={panel.okButton.y} />
-        </>
+        <BasicView gamePoints={gamePoints} textOrigins={textOrigins} onOpenPanel={() => act('판열기')} />
       )}
       {/* 프레임 끝 0x6dd69 — 파티클(밤 승리 불꽃)은 판까지 다 그린 뒤 맨 위 */}
       {effectLayers !== undefined && <SettlementEffectCanvas canvasRef={effectLayers.particles} />}
-    </div>
-  )
-}
-
-/** 0xba689(x, y, 0, 값, 0x46, num, 정렬 0x12) — 자간 0, x 가 가운데, 가장 큰 글자에 아래를 맞춘다(0xba628) */
-function ScoreNumber({
-  value,
-  centerX,
-  y,
-  testId,
-}: {
-  readonly value: number
-  readonly centerX: number
-  readonly y: number
-  readonly testId: string
-}) {
-  const digits = [...String(Math.max(0, Math.trunc(value)))].map(Number)
-  const totalWidth = digits.reduce((sum, digit) => sum + SCORE_DIGIT_WIDTHS[digit], 0)
-  const maxHeight = Math.max(...digits.map((digit) => SCORE_DIGIT_HEIGHTS[digit]))
-  let x = centerX + Math.floor(-totalWidth / 2)
-  return (
-    <div data-testid={testId} data-value={value}>
-      {digits.map((digit, index) => {
-        const left = x
-        x += SCORE_DIGIT_WIDTHS[digit]
-        return (
-          <img
-            key={index}
-            className={styles.sprite}
-            alt=""
-            src={imageSrc(NUM, SETTLEMENT_SCORE.digitBaseFrame + digit)}
-            style={{ left, top: y + maxHeight - SCORE_DIGIT_HEIGHTS[digit] }}
-          />
-        )
-      })}
-    </div>
-  )
-}
-
-/**
- * 0x4aef0 `0x5a8c8(skin, 글, W/2 − 0x51, r7 + 3, 162, 18, 1, 1, 1)` — 자르기 (x + 2, y, w − 4, h) ·
- * 글 왼쪽 = x + w − [skin+0x284] % (글폭 + w) · 그린 뒤 3 올린다 (`shared/lib/skinTicker`).
- */
-function RewardTicker({
-  text,
-  box,
-}: {
-  readonly text: string
-  readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
-}) {
-  const tick = useSceneTick()
-  const counter = useSkinTickerCounter(tick)
-  // 글폭은 0x5a91a 의 0x9c52c 가 **서식까지** 잰 날 글 폭 — 글 = "" + "승리 추가 보상[!cffff00"(0xd060c) + 수 + " G포인트!cffffff]"(0xd0624)
-  // (0x4ae56~0x4ae96)이라 서식 글자 열여섯도 폭에 든다
-  const textWidth = measureRawTextWidth(text)
-  const segments = parseGameMarkup(`!cffffff${text}`).flatMap((line) => line.segments)
-  const clipLeft = box.x + SKIN_TICKER_CLIP_INSET
-  return (
-    <div
-      className={styles.tickerClip}
-      data-testid="정산-흐르는-글"
-      style={{ left: clipLeft, top: box.y, width: box.width - SKIN_TICKER_CLIP_INSET * 2, height: box.height }}
-    >
-      <span className={styles.tickerText} style={{ left: skinTickerTextXOf(box.x, box.width, counter, textWidth) - clipLeft }}>
-        {segments.map((segment, index) => (
-          <span key={index} style={segment.color === null ? undefined : { color: segment.color }}>
-            {segment.text}
-          </span>
-        ))}
-      </span>
     </div>
   )
 }
