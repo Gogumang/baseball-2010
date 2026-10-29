@@ -3,6 +3,7 @@ import { normalizeSettings } from '@/entities/settings/model/gameSettings'
 import type { GameSettings } from '@/entities/settings/model/gameSettings'
 import { setGameSpeedLevel } from '@/shared/config/frameRate'
 import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 환경설정을 불러오고 게임 속도에 반영한다.
@@ -14,7 +15,7 @@ import type { JsonStorePort } from '@/shared/api/save/jsonStorePort'
 export function useGameSettings(settingsStore: JsonStorePort) {
   const [settings, setSettingsState] = useState<GameSettings>(() => normalizeSettings(settingsStore.load()))
   const settingsRef = useRef(settings)
-  settingsRef.current = settings
+  useMirrorRef(settingsRef, settings)
   /** 마지막 변경이 저장을 미룬 것인가 */
   const isDeferredRef = useRef(false)
 

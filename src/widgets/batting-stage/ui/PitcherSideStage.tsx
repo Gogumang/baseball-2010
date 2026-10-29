@@ -72,6 +72,7 @@ import { hasDueSceneFrameUpdate, runDueSceneFrameUpdates } from '@/entities/part
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
 import { preloadSprites } from '@/shared/lib/sprite/scenePreload'
 import { stageCastSpritePreloadsOf } from '@/widgets/batting-stage/lib/stageSpritePreload'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 interface PitcherSideStageProps {
   /** 이 화면에서 마지막으로 던진 공(진행기 `lastPitch`). 화면이 설 때 이미 있던 공은 다시 날리지 않는다 */
@@ -224,7 +225,7 @@ const HIT_SKIP_OFFER: TouchKeyOffer = { key: 'Enter', label: '넘기기' }
 export function PitcherSideStage(props: PitcherSideStageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const latestRef = useRef(props)
-  latestRef.current = props
+  useMirrorRef(latestRef, props)
   /**
    * 터치 기기 — 큰 타구 0x13 을 OK 로 건너뛸 수 있는 동안(아래 `onKeyDown` 과 같은 조건)만 '넘기기' 상황 버튼을 띄운다. 타자편은 캔버스
    * 탭이 OK 지만 투수편 캔버스는 탭을 안 받는다(r186 — 늘 있던 확인 버튼을 걷었다). 버튼은 Enter 키 사건이라 키보드와 같은 길이다

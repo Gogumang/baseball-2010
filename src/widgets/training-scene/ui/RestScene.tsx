@@ -10,6 +10,7 @@ import { EventAnimationSprite } from '@/widgets/training-scene/ui/EventAnimation
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
 import * as styles from '@/widgets/training-scene/ui/TrainingScene.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const EVENT_ANI = assetUrl('./sprites/event_ani/frames')
 const EVENT_CHAR_0 = assetUrl('./sprites/event_char_0/frames')
@@ -44,7 +45,7 @@ export function RestScene({ presentation, char0Palette, onFinished }: RestSceneP
   const [isDone, setDone] = useState(false)
   const skipRef = useRef<() => void>(() => undefined)
   const onFinishedRef = useRef(onFinished)
-  onFinishedRef.current = onFinished
+  useMirrorRef(onFinishedRef, onFinished)
 
   useEffect(() => {
     const startTick = appTickNow()

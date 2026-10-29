@@ -4,6 +4,7 @@ import { gameSceneTickNow, setGameSceneTickTimeout } from '@/shared/lib/commonWi
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import type { SubstitutionScene } from '@/features/play-game/model/substitutionScene'
 import { confirmedCountOf, noteSceneDEntryTick, SCENE_PREPARE_FRAMES } from '@/features/play-game/model/useSceneConfirm'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 export interface SubstitutionScenePlayback {
   /** 지금 0x16 — "CHANGE" 애니(`SubstitutionSceneOverlay`)를 그리고 0xe 대기를 세지 않는다 */
@@ -53,11 +54,11 @@ export function useSubstitutionScene(
   }, [isShown, scene])
 
   const sceneRef = useRef(scene)
-  sceneRef.current = scene
+  useMirrorRef(sceneRef, scene)
   const waitRef = useRef(wait)
-  waitRef.current = wait
+  useMirrorRef(waitRef, wait)
   const onEntryDrawRef = useRef(onEntryDraw)
-  onEntryDrawRef.current = onEntryDraw
+  useMirrorRef(onEntryDrawRef, onEntryDraw)
   const finish = useCallback(() => {
     const current = sceneRef.current
     if (current == null || seenSerials.has(current)) return

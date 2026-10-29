@@ -82,6 +82,7 @@ import { createSkillPanelDriver } from '@/widgets/batting-stage/model/skillPanel
 import type { SkillPanelSituation, SkillPanelView } from '@/widgets/batting-stage/lib/skillPanel'
 import type { PitcherAbility } from '@/entities/pitching/model/pitch'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 홈런더비 = 원본 전역 모드 7 */
 const HOME_RUN_DERBY_GAME_MODE = 7
@@ -145,13 +146,14 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
   } = refs
   // 고리는 남은 필살 횟수 같은 props 로 자주 바뀐다 — 루프를 다시 세우면 투구 시작 시각이 지워지므로 ref 로 읽는다
   const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
+  useMirrorRef(handlersRef, handlers)
   /**
    * 쉬기(`isPaused`)가 풀린 커밋의 장면 틱 — 쉬기를 푸는 쪽(견제 판 끝 `finishRunnerPlay` · 0xe 의 OK)은 원본에서 그 틀의 갱신이 다음
    * 상태를 예약하는 자리라(0xbcb48 → 다음 틀 0xbc9c8 이 틱 0) 다음 틀이 0xf 틱 0 이다. 루프가 쉬는 '대기' 를 본 뒤에만 쓴다
    */
   const resumeTickRef = useRef<number | null>(null)
-  const pausedAtCommitRef = useRef(latestRef.current.isPaused)
+  // 첫 커밋은 비교만 하고 넘어간다 — 첫 값이 무엇이든 `앞 && !지금` 이 거짓이다(첫 그림의 쉬기와 첫 커밋의 쉬기는 같은 값)
+  const pausedAtCommitRef = useRef(false)
   useLayoutEffect(() => {
     const isPaused = latestRef.current.isPaused
     if (pausedAtCommitRef.current && !isPaused) resumeTickRef.current = gameSceneTickNow()
@@ -1090,7 +1092,35 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
     }
     // ref 묶음은 값이 바뀌지 않는다. 고리는 handlersRef 로 읽는다 — 루프를 다시 세우는 때는 예전처럼 판정 · 0x13 고리가 바뀔 때뿐이다
     // (타자가 바뀌면 판정 고리가 바뀐다). 필살 횟수로 바뀌는 고리(releaseSwing · endPitch)는 투구 도중이라 다시 세우지 않는다
-  }, [handlers.judgePitch, handlers.commitHit])
+  }, [
+    handlers.judgePitch,
+    handlers.commitHit,
+    buntRef,
+    canvasRef,
+    heldResultRef,
+    hitSkipKeyTickRef,
+    homeRunStartTickRef,
+    inPlayEnteredTickRef,
+    isHitByPitchResultRef,
+    isInPlayResultRef,
+    keyLatch,
+    latestRef,
+    particlesRef,
+    pendingHitRef,
+    phaseEntryRef,
+    phaseRef,
+    phaseStartTickRef,
+    pitchJudgedRef,
+    pitchRef,
+    pitchTypeNumberRef,
+    pitcherStartTickRef,
+    resultTextRef,
+    resultTicksRef,
+    shiftRef,
+    shownTicks,
+    swingRef,
+    swingStartTickRef,
+  ])
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -1120,5 +1150,23 @@ export function useStageAnimation(refs: StageRefs, handlers: StageHandlers) {
 
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [])
+  }, [
+    buntRef,
+    heldResultRef,
+    hitSkipKeyTickRef,
+    homeRunStartTickRef,
+    keyLatch,
+    particlesRef,
+    pendingHitRef,
+    phaseEntryRef,
+    phaseRef,
+    phaseStartTickRef,
+    pitchJudgedRef,
+    pitchRef,
+    pitcherStartTickRef,
+    resultTextRef,
+    shownTicks,
+    swingRef,
+    swingStartTickRef,
+  ])
 }

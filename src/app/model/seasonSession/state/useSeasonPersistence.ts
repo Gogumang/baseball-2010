@@ -1,5 +1,6 @@
 import { isInfiniteGamePointOn } from '@/shared/lib/dev/devOptions'
 import { GAME_POINT_LIMIT } from '@/entities/season-mode/model/seasonRewards'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 import { useCallback, useRef } from 'react'
 import { GAME_POINT_USAGE } from '@/entities/collection/model/annalsStats'
 import { type SeasonSceneState, SEASON_SCENE_STATE, SEASON_PHASE } from '@/entities/season-mode/model/seasonStateMachine'
@@ -12,8 +13,8 @@ import type { SeasonUiStateContext } from '@/app/model/seasonSession/state/useSe
 
 /** `useSeasonSession` 몸통 문장 55~66 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useSeasonPersistence(ctx: SeasonUiStateContext) {
-  const { wallet, ownGamePoints, setOwnGamePoints, recordStat, save, setSave, store, globalsRef, carriedGlobals, setGlobals, eventCursor } = ctx
-  const { playbackSerial, setEventPlayback, setScene } = ctx
+  const { wallet, ownGamePoints, setOwnGamePoints, recordStat, save, setSave, store, globalsRef, carriedGlobalsRef, setGlobals, eventCursorRef } = ctx
+  const { playbackSerialRef, setEventPlayback, setScene } = ctx
   /**
    * 지금 들고 있는 G — **화면도 판정도 이 값 하나만 본다.**
    *
@@ -28,8 +29,7 @@ export function useSeasonPersistence(ctx: SeasonUiStateContext) {
       if (wallet !== null) return wallet.gain(amount)
       setOwnGamePoints((points) => Math.min(GAME_POINT_LIMIT, points + amount))
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [wallet],
+    [wallet, setOwnGamePoints],
   )
   /**
    * G 를 치른다 (`spendGamePoint` 액션이자 안에서도 쓴다).
@@ -44,50 +44,49 @@ export function useSeasonPersistence(ctx: SeasonUiStateContext) {
       if (wallet !== null) return wallet.spend(cost)
       setOwnGamePoints((points) => Math.max(0, points - cost))
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [recordStat, wallet],
+    [recordStat, wallet, setOwnGamePoints],
   )
   /** 정산 진입(0x4ea0c)에서 정산을 마친 경기 — 결과 화면 확인(`finishGame`)이 다음 장면으로 넘긴다 */
-  const settledGame = useRef<SettledSeasonGame | null>(null)
+  const settledGameRef = useRef<SettledSeasonGame | null>(null)
   /** 마지막으로 쓴 저장 — 경기 화면의 이어하기 저장(effect)이 렌더 사이에 잇달아 와도 앞 것을 덮지 않게 */
-  const latestSave = useRef(save)
-  latestSave.current = save
+  const latestSaveRef = useRef(save)
+  useMirrorRef(latestSaveRef, save)
   /**
    * **마지막으로 파일(저장소)에 쓴 시즌** — 원본은 저장 객체(메모리)를 고치는 것과 시즌 파일 쓰기(0x22754)가 따로다. 웹 시즌 저장소
    * 한 칸에 전역 칸 몇(`SeasonGlobalSlots` 등)이 같이 실려 있어, 전역 칸만 쓸 때는 메모리 시즌이 아니라 이 값 위에 얹어 쓴다 —
    * 메모리에만 고친 것(`stageSave`)이 전역 저장 때문에 파일에 새지 않게
    */
-  const persistedSave = useRef(save)
+  const persistedSaveRef = useRef(save)
   const commit = useCallback(
     (next: SeasonSave) => {
-      latestSave.current = next
-      persistedSave.current = next
+      latestSaveRef.current = next
+      persistedSaveRef.current = next
       setSave(next)
       store.save({ ...next, ...globalsRef.current })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [store],
+    [store, globalsRef, setSave],
   )
   /** 저장 객체(메모리)만 고친다 — 파일 쓰기는 다음 `commit` 이 한다 (원본의 저장 객체 고치기와 0x22754 사이) */
-  const stageSave = useCallback((next: SeasonSave) => {
-    latestSave.current = next
-    setSave(next)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  const stageSave = useCallback(
+    (next: SeasonSave) => {
+      latestSaveRef.current = next
+      setSave(next)
+    },
+    [setSave],
+  )
   /**
    * 시즌 저장소에 같이 실린 전역 칸 하나를 고치고 곧바로 쓴다 — 메모리 시즌에도 얹되 파일에는 마지막으로 쓴 시즌 위에만 얹는다
-   * (`persistedSave`)
+   * (`persistedSaveRef`)
    */
   const writeGlobalField = useCallback(
     (patch: Partial<SeasonSave>) => {
-      const current = latestSave.current
-      const persisted = persistedSave.current
+      const current = latestSaveRef.current
+      const persisted = persistedSaveRef.current
       if (current !== null) stageSave({ ...current, ...patch })
-      if (persisted !== null) persistedSave.current = { ...persisted, ...patch }
-      store.save({ ...(persisted ?? carriedGlobals.current), ...patch, ...globalsRef.current })
+      if (persisted !== null) persistedSaveRef.current = { ...persisted, ...patch }
+      store.save({ ...(persisted ?? carriedGlobalsRef.current), ...patch, ...globalsRef.current })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [stageSave, store],
+    [stageSave, store, carriedGlobalsRef, globalsRef],
   )
   /** 전역기록 칸(`SeasonGlobalSlots`)을 고치고 곧바로 저장한다 — 원본도 쓰는 그 자리에서 전역 저장 0x1f1b9 를 부른다 */
   const updateGlobals = useCallback(
@@ -97,33 +96,34 @@ export function useSeasonPersistence(ctx: SeasonUiStateContext) {
       globalsRef.current = next
       setGlobals(next)
       // 메모리에만 고친 시즌(`stageSave`)은 싣지 않는다 — 전역 저장 0x1f1b9 는 시즌 파일을 안 쓴다
-      store.save({ ...(persistedSave.current ?? carriedGlobals.current), ...next })
+      store.save({ ...(persistedSaveRef.current ?? carriedGlobalsRef.current), ...next })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [store],
+    [store, carriedGlobalsRef, globalsRef, setGlobals],
   )
   /**
    * 번호로 이벤트를 틀고 0xd3 으로 — `0x8bdc8` 은 커서 +0x2c 를 그 레코드 다음으로 옮긴다(0xae170).
    * 연초 목표 내장 이벤트(0x8a680)는 커서를 건드리지 않는다.
    */
-  const startEvent = useCallback((eventId: number, returnScene: SeasonSceneState) => {
-    if (eventId !== YEAR_GOAL_EVENT_ID) eventCursor.current = cursorAfterCalling(eventCursor.current, eventId)
-    playbackSerial.current += 1
-    setEventPlayback({ eventId, returnScene, serial: playbackSerial.current })
-    setScene(SEASON_SCENE_STATE.이벤트재생)
-    // 0xd3 진입 0x5110 — 0x8be21(이벤트 시작) 뒤 SR+0x50(phase) ≠ 2(정규시즌 경기 끝)이고 내장 이벤트([관리자+0x39f],
-    // 연초 목표 0xc038 → 0x8a680)가 아니면 배경음 40 (512c~5152, 나리 114 0x11d00 과 같은 두 가드)
-    const phase = latestSave.current?.state.record.phase
-    if (eventId !== YEAR_GOAL_EVENT_ID && phase !== SEASON_PHASE.경기끝) activeSound().playBgm(SEASON_EVENT_BGM)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  const startEvent = useCallback(
+    (eventId: number, returnScene: SeasonSceneState) => {
+      if (eventId !== YEAR_GOAL_EVENT_ID) eventCursorRef.current = cursorAfterCalling(eventCursorRef.current, eventId)
+      playbackSerialRef.current += 1
+      setEventPlayback({ eventId, returnScene, serial: playbackSerialRef.current })
+      setScene(SEASON_SCENE_STATE.이벤트재생)
+      // 0xd3 진입 0x5110 — 0x8be21(이벤트 시작) 뒤 SR+0x50(phase) ≠ 2(정규시즌 경기 끝)이고 내장 이벤트([관리자+0x39f],
+      // 연초 목표 0xc038 → 0x8a680)가 아니면 배경음 40 (512c~5152, 나리 114 0x11d00 과 같은 두 가드)
+      const phase = latestSaveRef.current?.state.record.phase
+      if (eventId !== YEAR_GOAL_EVENT_ID && phase !== SEASON_PHASE.경기끝) activeSound().playBgm(SEASON_EVENT_BGM)
+    },
+    [eventCursorRef, playbackSerialRef, setEventPlayback, setScene],
+  )
   return {
     gamePoints,
     gainGamePoint,
     spendGamePoint,
-    settledGame,
-    latestSave,
-    persistedSave,
+    settledGameRef,
+    latestSaveRef,
+    persistedSaveRef,
     commit,
     stageSave,
     writeGlobalField,

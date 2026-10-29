@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { preRollContactMessage, type DefensePlayInput } from '@/features/defense-play/model/runDefensePlay'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -6,6 +6,8 @@ import type { CpuSwingPose } from '@/entities/pitching/model/simulateBatter'
 import { pitchHitSceneTicksOf, pitcherHitSceneOf } from '@/widgets/batting-stage/lib/pitcherSideStage'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import type { PitcherHitScene } from '@/widgets/batting-stage/lib/pitcherSideStage'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 
 export interface PitcherHitSceneState {
   /** 지금 사람 투구 장면(`PitcherSideStage`)이 그릴 맞은 공 재료 — 그리는 동안만. 아니면 null */
@@ -19,6 +21,34 @@ export interface PitcherHitSceneState {
    * 필살타법)을 판 입력으로 미리 굴려(`preRollContactMessage`) 쏜 공에 묶고, 표시 패턴으로 다시 만든 0x13 재료를 돌려준다(A-37)
    */
   readonly judge: () => PitcherHitScene | null
+}
+
+interface HitSceneInput {
+  readonly play: DefensePlayInput | null
+  readonly pitch: Pitch | null
+  readonly mountedPlay: DefensePlayInput | null
+  readonly cpuSwing: CpuSwingPose | null
+  readonly batterHand: number
+}
+
+/** 판 · 공이 바뀐 그림에서만 0x13 재료를 다시 만든다 — 그 밖의 그림은 앞 재료 그대로 */
+function advanceHitScene(
+  previous: { readonly input: HitSceneInput; readonly scene: PitcherHitScene | null } | null,
+  input: HitSceneInput,
+): { readonly input: HitSceneInput; readonly scene: PitcherHitScene | null } {
+  const isSame =
+    previous !== null &&
+    previous.input.play === input.play &&
+    previous.input.pitch === input.pitch &&
+    previous.input.mountedPlay === input.mountedPlay
+  if (isSame) return previous
+  return { input, scene: hitSceneOf(input) }
+}
+
+function hitSceneOf({ play, pitch, mountedPlay, cpuSwing, batterHand }: HitSceneInput): PitcherHitScene | null {
+  if (play === null || play === mountedPlay || pitch === null) return null
+  const contact = contactOfOutcome(play.outcome)
+  return contact === undefined ? null : pitcherHitSceneOf(contact, cpuSwing, pitch.frameCount, batterHand)
 }
 
 /**
@@ -57,21 +87,16 @@ export function usePitcherHitScene({
   const [mountedPlay] = useState(play)
   const [endedPlay, setEndedPlay] = useState<object | null>(null)
   const playRef = useRef(play)
-  playRef.current = play
-  const hitScene = useMemo(() => {
-    if (play === null || play === mountedPlay || pitch === null) return null
-    const contact = contactOfOutcome(play.outcome)
-    return contact === undefined ? null : pitcherHitSceneOf(contact, cpuSwing, pitch.frameCount, batterHand)
-    // 판 하나 · 공 하나에 한 번 — 타자 손은 판이 서는 그림의 값
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [play, pitch, mountedPlay])
+  useMirrorRef(playRef, play)
+  // 판 하나 · 공 하나에 한 번 — 타석 자세 · 타자 손은 판이 서는 그림의 값
+  const hitScene = useRenderMachine(advanceHitScene, { play, pitch, mountedPlay, cpuSwing, batterHand }).scene
   /** 판정 틀에 굴려 다시 만든 0x13 재료 — 그 판의 것만 쓴다 */
   const [judged, setJudged] = useState<{ readonly play: object; readonly scene: PitcherHitScene } | null>(null)
   const shownScene = hitScene === null ? null : judged !== null && judged.play === play ? judged.scene : hitScene
   const isShowing = shownScene !== null && play !== null && endedPlay !== play
   const end = useCallback(() => setEndedPlay(playRef.current), [])
   const sceneInputsRef = useRef({ pitch, cpuSwing, batterHand })
-  sceneInputsRef.current = { pitch, cpuSwing, batterHand }
+  useMirrorRef(sceneInputsRef, { pitch, cpuSwing, batterHand })
   const judge = useCallback((): PitcherHitScene | null => {
     const current = playRef.current
     const inputs = sceneInputsRef.current
@@ -85,10 +110,11 @@ export function usePitcherHitScene({
   }, [])
   // 안전판 — 0x17 틱 + 1 에 놓는다 (판마다 처음부터 센다). 길이는 지금 재료(판정 틀에 다시 만든 것)로 센다
   const fallbackRef = useRef<{ readonly play: object | null; elapsed: number }>({ play: null, elapsed: 0 })
-  if (isShowing && fallbackRef.current.play !== play) fallbackRef.current = { play, elapsed: 0 }
   const shownSceneRef = useRef(shownScene)
-  shownSceneRef.current = shownScene
+  useMirrorRef(shownSceneRef, shownScene)
   useSceneTick(() => {
+    // 새 판이면 처음부터 센다 — 틱은 보이는 동안만 돌므로 그 판의 첫 틱 머리가 곧 판이 선 때다(팝업으로 멈춘 틱은 안 센다)
+    if (fallbackRef.current.play !== playRef.current) fallbackRef.current = { play: playRef.current, elapsed: 0 }
     const fallback = fallbackRef.current
     const scene = shownSceneRef.current
     fallback.elapsed += 1

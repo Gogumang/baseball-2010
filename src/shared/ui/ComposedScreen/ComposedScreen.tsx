@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { loadSpriteImage } from '@/shared/lib/sprite/spriteCache'
 import { composeScreen565, rgbaOfScreen565, type ComposeOp } from '@/shared/lib/pixelEffect/screenCompose'
 import { sprite565At } from '@/shared/lib/pixelEffect/sprite565Cache'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 interface ComposedScreenProps {
   /** 그리기 차례 — 바탕 색 위에 원본 식(`screenCompose`)으로 덮어 쓴다 */
@@ -25,8 +26,12 @@ export function ComposedScreen({ ops, backdrop = 0, width = 240, height = 320, l
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [loadedVersion, setLoadedVersion] = useState(0)
   const opsKey = useMemo(() => JSON.stringify(ops), [ops])
+  // effect 는 내용(opsKey)이 바뀔 때만 돈다 — 그때 이 그림의 ops 를 읽는다
+  const opsRef = useRef(ops)
+  useMirrorRef(opsRef, ops)
 
   useLayoutEffect(() => {
+    const ops = opsRef.current
     const context = canvasRef.current?.getContext('2d') ?? null
     if (context === null) return undefined
     const drawn = composeScreen565(width, height, backdrop, ops, sprite565At)

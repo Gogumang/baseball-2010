@@ -15,6 +15,7 @@ import {
 } from '@/widgets/particles/model/sceneParticles'
 import * as styles from '@/widgets/particles/ui/SceneParticleLayer.css'
 import { effectContextOf } from '@/shared/lib/pixelEffect/pixelEffect'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 탭이 쉬다 돌아왔을 때 한꺼번에 따라잡는 틱 수 상한 (타석 장면과 같은 값) */
 const CATCH_UP_LIMIT = 4
@@ -41,9 +42,9 @@ interface SceneParticleLayerProps {
 export function SceneParticleLayer({ random, isGameScene = false }: SceneParticleLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const randomRef = useRef(random)
-  randomRef.current = random
+  useMirrorRef(randomRef, random)
   const isGameSceneRef = useRef(isGameScene)
-  isGameSceneRef.current = isGameScene
+  useMirrorRef(isGameSceneRef, isGameScene)
   const [isShown, setIsShown] = useState(false)
 
   useEffect(() => {

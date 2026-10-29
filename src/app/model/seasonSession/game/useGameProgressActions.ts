@@ -12,7 +12,8 @@ import type { SeasonEventActionsContext } from '@/app/model/seasonSession/season
 
 /** `useSeasonSession` 몸통 문장 131~137 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useGameProgressActions(ctx: SeasonEventActionsContext) {
-  const { latestSave, settledGame, recordStat, commit, gameKind, ownRotationShift, withGameSettings, aceLevels, entryOrderOf, setGameKind } = ctx
+  const { latestSaveRef, settledGameRef, recordStat, commit, gameKind, ownRotationShift, withGameSettings, aceLevels, entryOrderOf, setGameKind } =
+    ctx
   const { setOwnRotationShift, setPendingGame, setEntryEdit, setIsMatchSettingsOpen, setGameOptions, setResumeGame, setScene } = ctx
   const { setSquadPurpose, setNotice } = ctx
   /**
@@ -22,9 +23,9 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
    */
   const saveGameProgress = useCallback(
     (progress: TeamGameProgress) => {
-      const current = latestSave.current
+      const current = latestSaveRef.current
       // 정산 진입(0x4ea0c) 뒤에는 반 이닝 저장이 없다 — 늦게 온 effect 가 +0x4e 를 되세우지 않게
-      if (current === null || settledGame.current !== null) return
+      if (current === null || settledGameRef.current !== null) return
       // 반 이닝 저장(0x4f928)은 이닝 넘김 0xb6b6c 뒤다 — 전역 경기 상태 +0x6b 가 지금 이닝이다. 경기 중 나가기(0x40140)는
       // 이 칸을 안 지우므로 나간 그 이닝이 남는다 (`liveGameState`). 이어하기 첫 진행은 블록에서 되복사한 st 의 이닝이다
       setLiveGameInningIndex(progress.game.inning - 1)
@@ -33,8 +34,7 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
       recordStat?.({ kind: '플레이시간', mode: SEASON_STAT_MODE, elapsed: lapPlayClock() })
       commit({ ...current, isGameInProgress: true, gameSave: { progress, kind: gameKind, ownRotationShift } })
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, gameKind, ownRotationShift, recordStat],
+    [commit, gameKind, ownRotationShift, recordStat, latestSaveRef, settledGameRef],
   )
   /**
    * 0x327b8 모드 2 갈래 — `+0x42(시즌 저장 있음) && +0x4e` 면 곧장 경기. 원본은 장면 0x105 를 세우지 않고 0x104 로 가서
@@ -45,7 +45,7 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
    * 마선수 레벨은 원본이 경기 중 전역 칸에서 그때그때 읽으므로 지금 값으로 바꿔 끼운다.
    */
   const resumeSavedGame = useCallback((): boolean => {
-    const current = latestSave.current
+    const current = latestSaveRef.current
     if (current === null || current.isGameInProgress !== true) return false
     // +0x4e 와 블록은 함께 선다 — 쓰는 곳(경기 중간 저장)이 둘을 같이 적고, 읽을 때(`normalizeSeasonSave`)는 블록을 못 가려 내면
     // +0x4e 도 내린다. 그래서 여기서 다시 가리던 웹 전용 안전망(못 읽으면 표시를 내림)은 앱 길에서 안 닿아 걷었다(Q-13, r325 계측)
@@ -77,26 +77,37 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
     setResumeGame(restored)
     setScene(SEASON_SCENE_STATE.경기직전)
     return true
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [aceLevels, commit, entryOrderOf, withGameSettings])
+  }, [
+    aceLevels,
+    commit,
+    entryOrderOf,
+    withGameSettings,
+    latestSaveRef,
+    setEntryEdit,
+    setGameKind,
+    setGameOptions,
+    setIsMatchSettingsOpen,
+    setOwnRotationShift,
+    setPendingGame,
+    setResumeGame,
+    setScene,
+  ])
   /** 경기 중 "나가기" — 장면만 내린다(+0x4e · 블록은 그대로). 다음 진입이 `resumeSavedGame` 으로 다시 세운다 */
   const leaveGame = useCallback(() => {
     setGameOptions(null)
     setResumeGame(null)
     setScene(SEASON_SCENE_STATE.관리메뉴)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  }, [setGameOptions, setResumeGame, setScene])
   /**
    * `0xb512c` 를 열 팀에 — 0xdf 진입 0x5980(5988~599e) · 0xe5 진입 0x5cd0(5cd8~5cee)이 목록을 채우기 전에 부른다(U-105 r154).
    * 저장은 따로 안 쓴다(다음 저장이 레코드째 쓴다) — 웹은 세이브 칸을 바로 비운다
    */
   const clearRecordAces = useCallback(() => {
-    const current = latestSave.current
+    const current = latestSaveRef.current
     if (current === null || current.recordAces === undefined) return
     const { recordAces: _cleared, ...rest } = current
     commit(rest)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [commit])
+  }, [commit, latestSaveRef])
   const goto = useCallback(
     (next: SeasonSceneState) => {
       // 구단관리 칸 3 코치채용 → this+0x11c = 2, 0xd7 (키 0x4e40)
@@ -104,13 +115,10 @@ export function useGameProgressActions(ctx: SeasonEventActionsContext) {
       if (next === SEASON_SCENE_STATE.선수고르기) clearRecordAces()
       setScene(next)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [clearRecordAces],
+    [clearRecordAces, setScene, setSquadPurpose],
   )
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  const clearNotice = useCallback(() => setNotice(''), [])
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [])
+  const clearNotice = useCallback(() => setNotice(''), [setNotice])
+  const quit = useCallback(() => setScene(SEASON_SCENE_STATE.팀고르기), [setScene])
   return { saveGameProgress, resumeSavedGame, leaveGame, clearRecordAces, goto, clearNotice, quit }
 }
 

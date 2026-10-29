@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { CSSProperties } from 'react'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -85,8 +85,8 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
   const update = useUpdateClock()
 
   // 같은 자리에서 표정만 바뀌면 원작도 다시 들어오지 않는다 — 슬라이드는 자리 열쇠 기준이다.
-  const slideStartRef = useRef(update)
-  const slideUpdate = update - slideStartRef.current
+  const [slideStart] = useState(update)
+  const slideUpdate = update - slideStart
 
   // 장타형 주인공은 애니 번호가 +8 이다 (0x63a70).
   const entries = animations?.[portraitAnimationOf(placed.portrait, battingTypeIndex)]

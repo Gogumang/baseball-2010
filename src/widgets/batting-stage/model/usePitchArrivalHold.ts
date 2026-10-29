@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 공 도착 판을 받은 그림(0x12 진입 틀 — 0x3dfac 이 판을 연 틀)에서 0x17 틱 0 까지 — 진입이 0xbcb49(…, 0x17) 로 예약하므로 0x17 은 그 다음
@@ -36,13 +37,12 @@ export function usePitchArrivalHold({
   const [mountedPlay] = useState(play)
   const [releasedPlay, setReleasedPlay] = useState<object | null>(null)
   const playRef = useRef(play)
-  playRef.current = play
+  useMirrorRef(playRef, play)
   const isHolding = play !== null && play !== mountedPlay && releasedPlay !== play
   const countRef = useRef<{ readonly play: object | null; left: number }>({ play: null, left: 0 })
-  if (isHolding && countRef.current.play !== play) {
-    countRef.current = { play, left: PITCH_ARRIVAL_PLAY_TICKS }
-  }
   useSceneTick(() => {
+    // 새로 붙든 판이면 셈을 처음부터 — 틱은 붙드는 동안만 돌므로 그 판의 첫 틱 머리가 곧 붙든 때다(팝업으로 멈춘 틱은 안 센다)
+    if (countRef.current.play !== playRef.current) countRef.current = { play: playRef.current, left: PITCH_ARRIVAL_PLAY_TICKS }
     const count = countRef.current
     count.left -= 1
     if (count.left <= 0 && count.play === playRef.current) setReleasedPlay(count.play)

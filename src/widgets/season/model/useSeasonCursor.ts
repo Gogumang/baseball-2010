@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 시즌 화면의 커서 — 원본 키 규칙 그대로 (P4 1a).
@@ -107,7 +108,7 @@ export function useSeasonCursor({
   }
 
   const latest = useRef({ count, onSelect, onCancel, cursor: safeCursor, stepCursor })
-  latest.current = { count, onSelect, onCancel, cursor: safeCursor, stepCursor }
+  useMirrorRef(latest, { count, onSelect, onCancel, cursor: safeCursor, stepCursor })
 
   useEffect(() => {
     if (!isEnabled) return undefined

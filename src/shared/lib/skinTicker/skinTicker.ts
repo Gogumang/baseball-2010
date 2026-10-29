@@ -53,5 +53,6 @@ export function useSkinTickerCounter(tick: number, perDraw = 1): number {
     skinTickerCounter.value += step * Math.max(0, tick - lastDrawnTick.current)
     lastDrawnTick.current = tick
   }, [tick, step])
+  // oxlint-disable-next-line react/refs -- 원본 0x5a8c8 은 그린 뒤 올리고 건너뛴 갱신도 한 번씩 그렸다 — 마지막으로 그린(effect 가 센) 틱에서 앞당겨 센 값을 이 그림이 보여야 한다
   return skinTickerCounter.value + step * Math.max(0, tick - lastDrawnTick.current - 1)
 }

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { InputMethodText, inputBufferTextOf, resetCursorBlinkCountForTest } from '@/shared/ui/InputMethodText/InputMethodText'
+import { InputMethodText } from '@/shared/ui/InputMethodText/InputMethodText'
+import { inputBufferTextOf, resetCursorBlinkCountForTest } from '@/shared/ui/InputMethodText/inputCursorBlink'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 
 afterEach(cleanup)

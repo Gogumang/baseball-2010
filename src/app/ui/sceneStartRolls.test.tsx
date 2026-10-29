@@ -53,13 +53,16 @@ const recordingRandom = (seed: number): { random: RandomPort; rolls: Roll[] } =>
 
 // 로딩 판은 그리자마자 끝낸다(상태 7 · 9 · 8 적재를 다 그린 꼴) — 굴림 차례와 무관하다
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useRef } = await import('react')
   return {
     LoadingTip: ({ onDone }: { onDone: () => void }) => {
+      // 올릴 때 한 번만
+      const done = useRef(false)
       useEffect(() => {
+        if (done.current) return
+        done.current = true
         onDone()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
+      }, [onDone])
       return null
     },
   }

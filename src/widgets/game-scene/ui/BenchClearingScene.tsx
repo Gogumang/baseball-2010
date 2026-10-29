@@ -1,4 +1,6 @@
-import { type MutableRefObject, useEffect, useRef } from 'react'
+import { type MutableRefObject, useCallback, useEffect, useRef, useState } from 'react'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import { RawScreen } from '@/shared/ui'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -68,28 +70,29 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
   // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
   useMarksGameScene()
   const reachedRef = useRef(false)
+  /** 틱 10 의 목표 굴림 — 고리 · 출구는 ref 를, 걸음 그림은 상태를 본다(같은 틱에 둘을 같이 적는다) */
   const targetRollsRef = useRef<readonly number[] | null>(null)
+  const [targetRolls, setTargetRolls] = useState<readonly number[] | null>(null)
   const doneRef = useRef(false)
   const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
+  useMirrorRef(onDoneRef, onDone)
   const randomRef = useRef(random)
-  randomRef.current = random
-  const audio = activeSound()
+  useMirrorRef(randomRef, random)
 
-  const finish = () => {
+  const finish = useCallback(() => {
     if (doneRef.current) return
     doneRef.current = true
     // 0x40500(전환 끝) · 0x4063a(키 건너뛰기) — 0x6e418
-    audio.stop()
+    activeSound().stop()
     onDoneRef.current(reachedRef.current && targetRollsRef.current === null)
-  }
+  }, [])
 
   /** 키 0x40628 — OK(−5) · '5': 소리 멈춤 0x6e418 · 파티클 +0x57 = 0 · 0x6dee4(4064c, 굴림 없음) 뒤 같은 출구 */
-  const skip = () => {
+  const skip = useCallback(() => {
     if (doneRef.current) return
     clearSceneParticles()
     finish()
-  }
+  }, [finish])
 
   /**
    * 받은 키 칸 — 키 0x40628 은 받은 다음 틀의 52da2~ 상태 키 자리(52de8)에서 갱신 표(52e14 — 틱 10 의 목표 굴림)보다 먼저 돈다
@@ -102,7 +105,10 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
       if (next === BENCH_CLEARING_TARGET_TICK) {
         reachedRef.current = true
         // 0x401d4 틱 10 — 수비 8명 목표 굴림 8 번
-        if (randomRef.current !== undefined) targetRollsRef.current = rollBenchClearingTargets(randomRef.current)
+        if (randomRef.current !== undefined) {
+          targetRollsRef.current = rollBenchClearingTargets(randomRef.current)
+          setTargetRolls(targetRollsRef.current)
+        }
       }
       if (next >= BENCH_CLEARING_EXIT_TICK) finish()
       // 같은 틀의 프레임 끝 관리자 틱 0x6de85(53048) — 갱신 표(52e14) 뒤다. 앞 상태가 쏜 이미터가 남았으면 이 틀에 굴린다
@@ -124,9 +130,8 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
 
   // 진입 꼬리 0x3aba4 — 0x6e498(음, 0x2c, 0)
   useEffect(() => {
-    audio.play(BENCH_CLEARING_SOUND)
+    activeSound().play(BENCH_CLEARING_SOUND)
     // 진입 한 번 — 다시 내지 않는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -137,11 +142,11 @@ export function BenchClearingScene({ field, random, onDone, walkStateRef }: Benc
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [keyLatch, skip])
 
-  const walk = useBenchClearingWalk(field, tick, targetRollsRef.current)
-  if (walkStateRef !== undefined && walk !== null) walkStateRef.current = walk
+  const walk = useBenchClearingWalk(field, tick, targetRolls)
+  // 걸음이 있는 그림만 적는다(판 재료가 없는 그림은 앞 걸음 그대로)
+  useMirrorRef(walk === null ? undefined : walkStateRef, walk)
   const iris = benchClearingIrisOf(tick)
   return (
     <RawScreen>
@@ -207,19 +212,32 @@ function useBenchClearingWalk(
   tick: number,
   targetRolls: readonly number[] | null,
 ): BenchClearingWalkState | null {
-  const memory = useRef<{ readonly field: BenchClearingWalkInput; readonly tick: number; readonly state: BenchClearingWalkState } | null>(null)
-  if (field === undefined) return null
-  let current = memory.current
+  const memory = useRenderMachine<BenchWalkMemory | null, BenchWalkInput>(advanceBenchWalkMemory, { field, tick, targetRolls })
+  return field === undefined ? null : (memory?.state ?? null)
+}
+
+interface BenchWalkMemory {
+  readonly field: BenchClearingWalkInput
+  readonly tick: number
+  readonly state: BenchClearingWalkState
+}
+
+interface BenchWalkInput {
+  readonly field: BenchClearingWalkInput | undefined
+  readonly tick: number
+  readonly targetRolls: readonly number[] | null
+}
+
+/** 판 재료가 없으면 앞 걸음을 그대로 들고 있는다(다시 오면 이어 굴린다) */
+function advanceBenchWalkMemory(previous: BenchWalkMemory | null, { field, tick, targetRolls }: BenchWalkInput): BenchWalkMemory | null {
+  if (field === undefined) return previous
   const isSame =
-    current !== null &&
-    current.field.entryRolls === field.entryRolls &&
-    current.field.offenseSide === field.offenseSide &&
-    current.field.isLeftBatter === field.isLeftBatter
-  if (current === null || !isSame || current.tick > tick) {
-    current = { field, tick: -1, state: startBenchClearingWalk(field) }
-  }
-  let { state } = current
-  for (let t = current.tick + 1; t <= tick; t += 1) state = stepBenchClearingWalk(state, t, field, targetRolls)
-  memory.current = { field, tick: Math.max(tick, current.tick), state }
-  return state
+    previous !== null &&
+    previous.field.entryRolls === field.entryRolls &&
+    previous.field.offenseSide === field.offenseSide &&
+    previous.field.isLeftBatter === field.isLeftBatter
+  const start = previous === null || !isSame || previous.tick > tick ? { field, tick: -1, state: startBenchClearingWalk(field) } : previous
+  let { state } = start
+  for (let t = start.tick + 1; t <= tick; t += 1) state = stepBenchClearingWalk(state, t, field, targetRolls)
+  return { field, tick: Math.max(tick, start.tick), state }
 }

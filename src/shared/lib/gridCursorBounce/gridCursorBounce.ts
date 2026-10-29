@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 export type GridBounceDirection = 'left' | 'right' | 'up' | 'down'
 
@@ -44,7 +45,7 @@ export function gridCursorBounceOf(direction: GridBounceDirection, step: number)
 export function useGridCursorBounce(): { readonly offset: GridBounceOffset; readonly start: (direction: GridBounceDirection) => void } {
   const draws = useUpdateCounter()
   const drawsRef = useRef(draws)
-  drawsRef.current = draws
+  useMirrorRef(drawsRef, draws)
   const [bounce, setBounce] = useState<{ readonly direction: GridBounceDirection; readonly startDraw: number } | null>(null)
   const start = useCallback((direction: GridBounceDirection) => {
     setBounce({ direction, startDraw: drawsRef.current })

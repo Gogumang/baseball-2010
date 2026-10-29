@@ -229,6 +229,10 @@ import type { NariEntryView } from '@/pages/management/lib/nariEntryView'
 import type { EntryKey } from '@/entities/season-mode/model/entryEditor'
 import { PLAYER_SIDE_LAST_BAT } from '@/entities/game/model/gameState'
 import type { PlayerSide } from '@/entities/game/model/gameState'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
+import { useOnRenderChange } from '@/shared/lib/renderMachine/useOnRenderChange'
+import { useHeldWhileSame } from '@/shared/lib/renderMachine/useHeldWhileSame'
 
 /**
  * **경기 뒤 평가 창의 좋음·보통·나쁨 징글** (36 · 37 · 38).
@@ -252,6 +256,13 @@ import type { PlayerSide } from '@/entities/game/model/gameState'
  * 두 화면이라(r287) 승패 징글 31 · 32 는 정산 0x19 진입, 평가 징글은 정산 판을 나가 116 이 선 그 틀에 낸다(`enterGameEvaluationScreen`).
  */
 const MY_LEAGUE_EVALUATION_THRESHOLD = 1
+/** 112 진입(0x118e4) 셈 — 화면이 바뀐 그림마다 그 길이 112 진입이면 하나 오른다(첫 그림도 본다, `isOutingMapEntry`) */
+function advanceOutingMapEntries(previous: { readonly screen: Screen; readonly count: number } | null, screen: Screen) {
+  if (previous === null) return { screen, count: isOutingMapEntry(null, screen) ? 1 : 0 }
+  if (previous.screen === screen) return previous
+  return { screen, count: previous.count + (isOutingMapEntry(previous.screen, screen) ? 1 : 0) }
+}
+
 function evaluationJingleIdOf(popularityChange: number): number {
   if (popularityChange < 0) return 38
   return popularityChange > MY_LEAGUE_EVALUATION_THRESHOLD ? 36 : 37
@@ -562,17 +573,17 @@ export function useCareerSession({
    * reader+0x28 = 0) · fb7a mgr+0x304 = 1 · 0xfb7c 장면+0x288 = 0. 장면은 이어하기(`continueSaved`)와 **경기 뒤마다**(`finishGame` ·
    * `finishCupGame` — 경기 장면 0x104 를 지나 0x106 이 다시 선다) · 마선수 대결 뒤 · 새 선수 등록에 선다.
    */
+  /**
+   * 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 셋업은 경기 뒤 커리어가 들어오기 전에 불리므로(경기 정산이 경기 수를
+   * 올린 뒤의 장면이다) 그 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`)
+   */
+  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
   const setUpNariScene = useCallback(() => {
     matchPreparedRef.current = false
     storySceneSetUpRef.current()
     setShouldForgetRepeatable(true)
     setSceneSetUpCount((count) => count + 1)
   }, [])
-  /**
-   * 셋업 0xf684 fb92~fba8 — 경기 수 == 2 면 외출 칸 +0x6a = 0. 셋업은 경기 뒤 커리어가 들어오기 전에 불리므로(경기 정산이 경기 수를
-   * 올린 뒤의 장면이다) 그 커밋 뒤 렌더에서 지운다 (`withNariSceneSetupOutings`)
-   */
-  const [sceneSetUpCount, setSceneSetUpCount] = useState(0)
   /** B-84 고친 길 — 앞 셋업 때(이 세션에서 마지막으로 본) 경기 수. 2 로 막 오른 셋업만 지운다 */
   const lastSeenGamesRef = useRef<number | null>(null)
   useEffect(() => {
@@ -585,22 +596,22 @@ export function useCareerSession({
   }, [career?.gamesPlayed])
   /** 전역기록 +0x50 손잡이 — 콜백 신원이 흔들리지 않게 ref 로 읽는다 */
   const nariGameSaveRef = useRef(nariGameSave)
-  nariGameSaveRef.current = nariGameSave
+  useMirrorRef(nariGameSaveRef, nariGameSave)
   /** 나간 마선수 대결 대기(전역기록) 손잡이 — 안 넘기면 세션 메모리 */
   const memoryAceMatchPending = useMemo(() => createMemoryAceMatchPendingPort(), [])
   const aceMatchPendingRef = useRef(aceMatchPending ?? memoryAceMatchPending)
-  aceMatchPendingRef.current = aceMatchPending ?? memoryAceMatchPending
+  useMirrorRef(aceMatchPendingRef, aceMatchPending ?? memoryAceMatchPending)
   /** 두 편 대결 대기(전역기록) — 자동 훑기 가드 1cfe4~1d008 (`isAutoScanHeldByAceMatch`) */
   const aceMatchHoldRef = useRef(aceMatchHold)
-  aceMatchHoldRef.current = aceMatchHold
+  useMirrorRef(aceMatchHoldRef, aceMatchHold)
 
   // 캔버스 루프에서 최신 값을 읽어야 한다 — useAtBatRunner의 atBatRef와 같은 이유다.
   const progressRef = useRef(progress)
-  progressRef.current = progress
+  useMirrorRef(progressRef, progress)
   const careerRef = useRef(career)
-  careerRef.current = career
+  useMirrorRef(careerRef, career)
   const rawCareerRef = useRef(rawCareer)
-  rawCareerRef.current = rawCareer
+  useMirrorRef(rawCareerRef, rawCareer)
   /**
    * **메모리에만 있는 커리어** — 원본이 그 자리에서 모드 저장(0x22755)을 안 부르는 변경이 만든 값. 저장 고리가 이 값이면 쓰지 않는다
    * (그 뒤 다른 변경이 새 값을 만들면 원본의 다음 저장처럼 통째로 쓴다). 메인 메뉴를 다녀오면 원본은 0x213c0(앱, 4, 0) 으로
@@ -625,7 +636,7 @@ export function useCareerSession({
   const arrivalContextRef = useRef<ArrivalContext | null>(null)
   // 경기를 세우는 `startMatch` 가 읽는다 — 설정이 바뀔 때마다 콜백 신원이 흔들리지 않게 ref 로 둔다
   const runningModeManualRef = useRef(runningModeManual)
-  runningModeManualRef.current = runningModeManual
+  useMirrorRef(runningModeManualRef, runningModeManual)
 
   /**
    * 경기 중에 환경설정 "주루" 를 바꾸면 **그 자리에서** 먹게 잇는다 — 원본은 이 칸(설정 +0xbd)을
@@ -702,6 +713,7 @@ export function useCareerSession({
     }
     if (careerPoint !== null && careerPoint !== walletBalance) {
       walletBridgeRef.current = { career: walletBalance, wallet: walletBalance }
+      // oxlint-disable-next-line react/set-state-in-effect -- 지갑 다리: 지갑 G 와 커리어 G 두 주인을 커밋 뒤에 맞춘다(어느 쪽이 바뀌었는지는 앞 커밋 값과 견줘야 안다)
       setCareer((current) => (current === null ? current : { ...current, gamePoint: walletBalance }))
       return
     }
@@ -1029,7 +1041,7 @@ export function useCareerSession({
         settlementSkyRow: stadiumSkyRowRef.current,
       })
     },
-    [aceLevels, audio, random, recordStat, setScreen, setUpNariScene],
+    [aceLevels, random, recordStat, setScreen, setUpNariScene],
   )
 
   /**
@@ -1112,7 +1124,7 @@ export function useCareerSession({
         settlementSkyRow: stadiumSkyRowRef.current,
       })
     },
-    [audio, random, recordStat, setCareer, setScreen, setUpNariScene],
+    [random, recordStat, setCareer, setScreen, setUpNariScene],
   )
 
   /**
@@ -1174,11 +1186,12 @@ export function useCareerSession({
     [finishCupGame, finishGame],
   )
   const endGameRef = useRef(endGame)
-  endGameRef.current = endGame
+  useMirrorRef(endGameRef, endGame)
   // 돌발 결과 창을 닫아 판정이 치워졌다 — 보상이 든 커리어 · 진행이 그려진 뒤 미룬 정산을 한다
   useEffect(() => {
     if (!isGameEndHeldByBurst) return
     if (progress === null || !progress.game.isFinished) {
+      // oxlint-disable-next-line react/set-state-in-effect -- 돌발 결과 창을 닫은 뒤 그려진 커밋에서 미룬 정산을 한다(보상이 든 커리어 · 진행을 그린 다음)
       setGameEndHeldByBurst(false)
       return
     }
@@ -1392,7 +1405,7 @@ export function useCareerSession({
   )
 
   const story = useStorySchedule(career)
-  storySceneSetUpRef.current = story.setUpScene
+  useMirrorRef(storySceneSetUpRef, story.setUpScene)
   /**
    * 외출 지도 [!] 칸 [gfx+0x9c] — 112 진입 0x118e4 → 0x8cdc0 이 **들어설 때 한 번** 찍은 값(`outingPlaceSlotsOf`). 지도 그림
    * 0x7ed6c 의 [!] 와 [들어가기] 0x8ce58 이 모두 이 값을 쓴다. 웹 화면이 112 진입이 되는 때(`isOutingMapEntry`):
@@ -1400,27 +1413,22 @@ export function useCareerSession({
    * · 이벤트 '대결결과'(105 진입 0x11910 의 0x11bb2 가 0x118e4 를 부르고 140). 장소 이벤트('장소')에서 돌아오는 길은 113 이라 안 찍는다.
    * 이벤트 본문이 아직 안 왔으면 오는 때 찍는다.
    */
-  const careerForSlotsRef = useRef(career)
-  careerForSlotsRef.current = career
-  const outingEntryRef = useRef<{ readonly screen: Screen; readonly count: number }>({
-    screen,
-    count: isOutingMapEntry(null, screen) ? 1 : 0,
+  const outingMapEntries = useRenderMachine(advanceOutingMapEntries, screen).count
+  // 0x8cdc0 은 찍고 나서 reader+0x28 = 0 (`rewindCursor`) — 다음 훑기는 처음부터다. 들어선 그 그림에서
+  const { rewindCursor } = story
+  useOnRenderChange(screen, (next, previous) => {
+    if (isOutingMapEntry(previous, next)) rewindCursor()
   })
-  if (outingEntryRef.current.screen !== screen) {
-    const entered = isOutingMapEntry(outingEntryRef.current.screen, screen)
-    outingEntryRef.current = { screen, count: outingEntryRef.current.count + (entered ? 1 : 0) }
-    // 0x8cdc0 은 찍고 나서 reader+0x28 = 0 (`rewindCursor`) — 다음 훑기는 처음부터다
-    if (entered) story.rewindCursor()
-  }
   /** 113 취소로 112 에 다시 들어선 횟수 — 화면은 '외출' 그대로라 위 셈에 안 잡힌다(`reenterOutingMap`, Q-22) */
   const [outingReentryCount, setOutingReentryCount] = useState(0)
-  const outingEntryCount = outingEntryRef.current.count + outingReentryCount
+  const outingEntryCount = outingMapEntries + outingReentryCount
+  // 찍는 그림의 커리어 — 진입 · 이벤트 본문이 바뀐 그림의 것을 든다(머무는 동안 커리어가 바뀌어도 다시 안 찍는다)
+  const slotsCareer = useHeldWhileSame(career, [outingEntryCount, story.events])
   const outingSlots = useMemo(() => {
-    const current = careerForSlotsRef.current
     const events = story.events
-    if (outingEntryCount === 0 || current === null || events === null) return EMPTY_OUTING_PLACE_SLOTS
-    return outingPlaceSlotsOf((placeFrame) => nextEventFor(current, events, placeTriggerOf(placeFrame)))
-  }, [outingEntryCount, story.events])
+    if (outingEntryCount === 0 || slotsCareer === null || events === null) return EMPTY_OUTING_PLACE_SLOTS
+    return outingPlaceSlotsOf((placeFrame) => nextEventFor(slotsCareer, events, placeTriggerOf(placeFrame)))
+  }, [outingEntryCount, story.events, slotsCareer])
   const eventPlaceIds = useMemo(() => outingSlotPlaceIdsOf(outingSlots), [outingSlots])
   /** 재생기에 넘기는 목록 — 파일 이벤트 뒤에 연초 115 내장 이벤트를 붙인다 (훑기는 파일 것만 본다, 투수편과 같다) */
   const storyEvents = useMemo(() => (story.events === null ? null : [...story.events, NARI_YEAR_START_EVENT]), [story.events])
@@ -1439,7 +1447,7 @@ export function useCareerSession({
    */
   const [managementReentryCount, setManagementReentryCount] = useState(0)
   const managementBgmRestartRef = useRef(onManagementBgmRestart)
-  managementBgmRestartRef.current = onManagementBgmRestart
+  useMirrorRef(managementBgmRestartRef, onManagementBgmRestart)
   /**
    * `from` 은 105 로 다시 들어오는 원본 앞 상태 — 0x1aec4 의 배경음 4 목록에 들면(125 훈련 결과) 배경음 4 를 처음부터 다시 튼다
    * (`restartsManagementBgmFrom`). 하위 메뉴 106 · 107 · 110 취소 · 127 휴식은 목록 밖이다
@@ -1453,6 +1461,7 @@ export function useCareerSession({
   /** 부상 첫 팝업 0x28 이 떠 있다 — 닫히면 105 틀 0x1aec4 가 둘째 팝업 0x29(`INJURY_FOLLOW_UP_NOTICE`)를 띄운다 */
   const injuryNoticeRef = useRef(false)
   const managementEntryRef = useRef({ kind: screen.kind, reentryCount: managementReentryCount, isPending: false })
+  /* oxlint-disable react/refs -- 105 진입 표지: 화면 · 다시 들어옴이 바뀐 그림에서 세우고(그 그림의 칭호 판정 · 진입 고리가 본다) 진입 고리가 다 본 뒤 내린다 — 세우는 쪽(그림)과 내리는 쪽(effect)이 한 칸을 같이 쓴다 */
   {
     const seen = managementEntryRef.current
     if (seen.kind !== screen.kind || seen.reentryCount !== managementReentryCount) {
@@ -1466,6 +1475,7 @@ export function useCareerSession({
     }
   }
   const isManagementEntry = screen.kind === '관리' && managementEntryRef.current.isPending
+  /* oxlint-enable react/refs */
   /**
    * **칭호 팝업 하나** — 관리 장면 this+0x270 (줄 칭호 번호, −1 = 없음). 판정 0x1a1c0 은 관리 장면 갱신 0x1aec4 끝
    * (0x1af90~0x1afc2)에서 `this+0x274 == 1`(관리 화면 105 에 들어와 두 번째 갱신 — 진입 0x11c64 가 0 으로 둔다)이고
@@ -1477,6 +1487,7 @@ export function useCareerSession({
    * 머무는 둘째 틀에 0x1a1c0 대신 그 팝업이 서고(+0x270 ≥ 0 이라 판정을 건너뛴다) 확인이 비트 · 장착 · 저장을 한다.
    */
   const [heldTitle, setHeldTitle] = useState<string | null>(null)
+  // oxlint-disable-next-line react/refs -- 위 105 진입 표지(그림이 세우고 진입 고리가 내리는 칸)를 본다 — 진입 검사가 끝난 그림부터 칭호를 판정한다
   const pendingTitle = screen.kind === '관리' && !isManagementEntry && career !== null ? (heldTitle ?? nextTitleOf(career)) : null
   // 장면이 새로 서면 반복 이벤트를 다시 볼 수 있게 한다 (0xacf60, `setUpNariScene`) — 이벤트 본문이 도착한 뒤에.
   // ⚠️ 내보인 `career` 가 아니라 **지금 칸**(`current`)에서 지운다 (r245): 경기 끝(`finishGame`)은 셋업과 같은 그림에 기록 달성 G
@@ -1485,6 +1496,7 @@ export function useCareerSession({
   const events = story.events
   useEffect(() => {
     if (!shouldForgetRepeatable || career === null || events === null) return
+    // oxlint-disable-next-line react/set-state-in-effect -- 셋업 0xf684 의 0xacf60: 이벤트 본문이 온 뒤 커밋에서 지운다 — 105 진입 훑기(굴림)가 이 고침 다음 커밋에 도는 옛 차례
     setShouldForgetRepeatable(false)
     setCareer((current) => (current === null ? current : forgetRepeatableEvents(current, events)))
   }, [shouldForgetRepeatable, career, events])
@@ -1526,6 +1538,7 @@ export function useCareerSession({
     if (!career.hasSeenYearGoalWindow) {
       // 지금 칸에서 지운다 — 같은 그림에 커리어 쪽 G 가 움직였으면 내보인 커리어는 아직 지갑 값이다(위 반복 이벤트 지움과 같다)
       if (career.removedMinusSkillIds.length > 0) {
+        // oxlint-disable-next-line react/set-state-in-effect -- 115 진입 0x16aac 의 0xa4ee9: 105 진입 고리(커밋 뒤 — 훑기 굴림과 같은 자리)에서 해제 기록을 지운다
         setCareer((current) => (current === null ? current : { ...current, removedMinusSkillIds: [] }))
       }
       return setScreen({ kind: '이벤트', eventId: NARI_YEAR_START_EVENT_ID, context: '연초' })
@@ -1557,6 +1570,7 @@ export function useCareerSession({
       return setScreen({ kind: '이벤트', eventId: midSeasonEventId(achieved), context: '관리' })
     }
     if (orderEventId !== null) setScreen({ kind: '이벤트', eventId: orderEventId, context: '관리' })
+    // oxlint-disable-next-line react/refs -- 위 105 진입 표지 — 표지가 선 그림에 이 고리가 돈다
   }, [isManagementEntry, managementReentryCount, career, story, random, setScreen, shouldForgetRepeatable])
 
   /*
@@ -1568,6 +1582,7 @@ export function useCareerSession({
     if (!isAceMatchResultScreen) return
     aceMatchPendingRef.current.clear()
     // 대결(미션 장면)을 마치면 나리 장면 0x106 이 새로 선다(0xf684) — 105 진입에서 140 으로 온 길은 이어하기가 이미 세웠다(다시 해도 같다)
+    // oxlint-disable-next-line react/set-state-in-effect -- 140 진입 0x10df8: 결과 이벤트가 열린 커밋 뒤에 대기 칸을 지우고 장면 0x106 을 새로 세운다(지우기와 같은 차례)
     setUpNariScene()
   }, [isAceMatchResultScreen, setUpNariScene])
 

@@ -270,7 +270,7 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   const 판 = () => screen.queryByTestId('경기-메뉴-판')
 
   /** 여는 곳 흉내 — `useInGameMenuState` 를 그대로 쓴다 */
-  function 여는곳({
+  function MenuHost({
     onQuit,
     onRestart,
     mode = 6,
@@ -318,7 +318,7 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   it("'*' 로 연 창은 [+0x290] = 0 — 연 그림은 펼침이라 판이 없고, 다음 갱신부터 그린다 (0x49936 · 0x7550a)", () => {
     vi.useFakeTimers()
     되돌리기 = 높이를_잴_수_있게(320)
-    render(<여는곳 />)
+    render(<MenuHost />)
     fireEvent.click(screen.getByText('별표'))
     expect(판()).toBeNull()
     틀()
@@ -328,7 +328,7 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   it("'*' 로 연 창의 계속 · CLR 은 한 갱신 뒤에 닫힌다 — 그동안 메뉴가 그대로 남는다 (0x3c1a8 · 7550a~75552)", () => {
     vi.useFakeTimers()
     되돌리기 = 높이를_잴_수_있게(320)
-    render(<여는곳 />)
+    render(<MenuHost />)
     fireEvent.click(screen.getByText('별표'))
     틀()
     fireEvent.keyDown(window, { key: 'Escape' })
@@ -344,7 +344,7 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   it('질문은 메뉴 창이 닫힌 갱신에 뜨고, [아니오] 뒤 다시 뜬 메뉴는 한 갱신 펼침 · 닫힘은 두 갱신 줄임이다 (0x7442d · 0x75440)', () => {
     vi.useFakeTimers()
     되돌리기 = 높이를_잴_수_있게(320)
-    render(<여는곳 onRestart={vi.fn()} />)
+    render(<MenuHost onRestart={vi.fn()} />)
     fireEvent.click(screen.getByText('별표'))
     틀()
     fireEvent.click(칸('재도전'))
@@ -376,7 +376,7 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   it("'*' 로 연 창 뒤의 질문은 첫 그림이 이미 높이 20 이다 — 7550a~75552 → 0x75440 → 75556 펼침이 같은 갱신", () => {
     vi.useFakeTimers()
     되돌리기 = 높이를_잴_수_있게(320)
-    render(<여는곳 onRestart={vi.fn()} />)
+    render(<MenuHost onRestart={vi.fn()} />)
     fireEvent.click(screen.getByText('별표'))
     틀()
     fireEvent.click(칸('재도전'))
@@ -389,7 +389,7 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   it('다시 띄운 창([+0x290] = 1) 뒤의 질문은 줄임 끝 0x75440 뒤 곧장 돌아가(755d8) 10 부터다', () => {
     vi.useFakeTimers()
     되돌리기 = 높이를_잴_수_있게(320)
-    render(<여는곳 onRestart={vi.fn()} />)
+    render(<MenuHost onRestart={vi.fn()} />)
     fireEvent.click(screen.getByText('별표'))
     틀()
     fireEvent.click(칸('재도전'))
@@ -409,7 +409,7 @@ describe('경기 중 메뉴 — 일시정지 창 0x741a0 의 여닫기 (2026-10-
   it('자동진행 [예] 뒤 G포인트 부족 알림(하위 2 0x3c7d8)은 닫힘 콜백이 없다 — 닫히면 메뉴 없이 경기로 돌아간다', () => {
     vi.useFakeTimers()
     되돌리기 = 높이를_잴_수_있게(320)
-    render(<여는곳 mode={1} gamePoint={0} />)
+    render(<MenuHost mode={1} gamePoint={0} />)
     fireEvent.click(screen.getByText('별표'))
     틀()
     fireEvent.click(칸('자동진행'))

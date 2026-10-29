@@ -29,6 +29,7 @@ import type { SceneKeyLatch } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { createShownSceneTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import type { ShownSceneTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 원본 경기 상태 — 대기·투구중 0xf/0x11 · **타격 0x13** · 결과 0x12/0x17 */
 export type StagePhase = '대기' | '투구중' | '타격' | '결과'
@@ -381,7 +382,7 @@ export interface StageRefs {
  */
 export function useStageRefs(latest: StageLatest): StageRefs {
   const latestRef = useRef(latest)
-  latestRef.current = latest
+  useMirrorRef(latestRef, latest)
 
   return {
     canvasRef: useRef<HTMLCanvasElement>(null),

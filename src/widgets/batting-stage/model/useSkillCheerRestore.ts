@@ -10,14 +10,14 @@ import type { SkillPanelScene } from '@/widgets/batting-stage/lib/skillPanel'
  */
 export function useSkillCheerRestore(
   scene: SubstitutionScene | null | undefined,
-  skillPanelScene: MutableRefObject<SkillPanelScene> | undefined,
+  skillPanelSceneRef: MutableRefObject<SkillPanelScene> | undefined,
 ): void {
   const appliedRef = useRef<SubstitutionScene | null>(null)
   useEffect(() => {
     if (scene === null || scene === undefined || scene === appliedRef.current) return
     appliedRef.current = scene
     const restore = scene.cheerRestore
-    if (restore === undefined || skillPanelScene === undefined) return
-    skillPanelScene.current.cheerBits = restoreCheerBit(skillPanelScene.current.cheerBits, restore.attackSide, restore.recordSlot)
-  }, [scene, skillPanelScene])
+    if (restore === undefined || skillPanelSceneRef === undefined) return
+    skillPanelSceneRef.current.cheerBits = restoreCheerBit(skillPanelSceneRef.current.cheerBits, restore.attackSide, restore.recordSlot)
+  }, [scene, skillPanelSceneRef])
 }

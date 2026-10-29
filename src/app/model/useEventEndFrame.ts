@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { setAppTickTimeout } from '@/shared/lib/frameClock/frameClock'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * **이벤트 재생의 끝 틀** — 나리 114 · 시즌 0xd3 (직접 떴다).
@@ -23,7 +24,7 @@ export function useEventEndFrame<A extends readonly unknown[]>(
 } {
   const [pending, setPending] = useState<A | null>(null)
   const completeRef = useRef(complete)
-  completeRef.current = complete
+  useMirrorRef(completeRef, complete)
   useEffect(() => {
     if (pending === null) return
     const clear = setAppTickTimeout(() => {

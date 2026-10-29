@@ -1,5 +1,4 @@
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
-import { useRef } from 'react'
 import type { Screen } from '@/app/model/screen'
 import type { AtBatRunner } from '@/app/model/useAtBatRunner'
 import type { useCareerSession } from '@/app/model/useCareerSession'
@@ -32,7 +31,9 @@ import { SeasonScreenFade } from '@/pages/season/ui/SeasonScreenFade'
 import { NariEventUnderlay } from '@/pages/management/ui/NariEventUnderlay'
 import { NariMainCommandBar } from '@/pages/management/ui/NariMainCommandBar'
 import { NariResumeManagementFrame } from '@/pages/management/ui/NariResumeManagementFrame'
-import { createNariMainMenuCursor, nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
+import { nariMainCursorOnEntry } from '@/pages/management/model/nariMainMenuCursor'
+import { useNariMainCursor } from '@/app/model/useNariMainCursor'
+import { usePreviousDistinct } from '@/shared/lib/renderMachine/usePreviousDistinct'
 import { isBattingOrderEventId } from '@/entities/career/model/battingOrder'
 import { useEventEndFrame } from '@/app/model/useEventEndFrame'
 import { OutingMapUnderlay } from '@/pages/management/ui/OutingMapUnderlay'
@@ -119,9 +120,7 @@ function CareerScreens({ screen, setScreen, session, runner, random, career, hal
   /** 114 재생이 끝난 한 틀 — 대화창 없이 0x19da4 를 그린 뒤 넘긴다 (`useEventEndFrame`) */
   const eventEnd = useEventEndFrame(actions.completeScene)
   /** 이전 화면 — 105 진입 0x11910 이 이전 상태 1 · 114 · 100 이면 가운데 판을 미끄러뜨린다 (0x8a2d8) */
-  const screenTrail = useRef<{ readonly kind: Screen['kind']; readonly previous: Screen['kind'] | null }>({ kind: screen.kind, previous: null })
-  if (screenTrail.current.kind !== screen.kind) screenTrail.current = { kind: screen.kind, previous: screenTrail.current.kind }
-  const previousKind = screenTrail.current.previous
+  const previousKind = usePreviousDistinct(screen.kind)
   /**
    * 관리 메뉴 [this+0x8c] 의 커서 — 장면 0x106 이 서 있는 동안 남는다(`NariMainMenuCursor`). 105 에 들어올 때마다(관리 화면,
    * 또는 105 진입 곁가지로 바로 뜬 '관리' 이벤트) 0x11910 의 규칙을 친다: 행동함이고 이전이 109(다음 경기 순위표) · 110(아이템 하위
@@ -133,22 +132,15 @@ function CareerScreens({ screen, setScreen, session, runner, random, career, hal
    * 머리띠 미끄러짐 · 배너 연출을 켠다 (`pages/management/lib/matchInfoEntry`).
    */
   const matchView = screen.kind === '경기준비' ? (session.entryView === null ? '142' : '143') : null
-  const matchViewTrail = useRef<{ readonly view: string | null; readonly previous: string | null }>({ view: matchView, previous: null })
-  if (matchViewTrail.current.view !== matchView) matchViewTrail.current = { view: matchView, previous: matchViewTrail.current.view }
-  const isMatchInfoEntryAnimated = matchViewTrail.current.previous !== '143'
-  const mainCursor = useRef(createNariMainMenuCursor()).current
-  const entryTrail = useRef<string | null>(null)
+  const isMatchInfoEntryAnimated = usePreviousDistinct(matchView) !== '143'
   const entryKey = screen.kind === '관리' ? '관리' : screen.kind === '이벤트' && screen.context === '관리' ? `이벤트:${screen.eventId}` : null
-  if (entryKey !== entryTrail.current) {
-    const isFromManagementFrame = screen.kind === '이벤트' && entryTrail.current === '관리'
-    if (entryKey !== null && !isFromManagementFrame) {
-      // 이벤트 → 관리 · 이벤트 → 이벤트는 이전 114 다
-      const isFromStandings = entryTrail.current === null && previousKind === '다음경기순위'
-      const isSubMenuReturn = entryTrail.current === null && previousKind === '아이템'
-      if (!isSubMenuReturn) mainCursor.current = nariMainCursorOnEntry(mainCursor.current, career.hasActedThisCycle, isFromStandings)
-    }
-    entryTrail.current = entryKey
-  }
+  const mainCursor = useNariMainCursor({
+    entryKey,
+    isEventScreen: screen.kind === '이벤트',
+    previous: previousKind,
+    subMenuScreen: '아이템',
+    hasActedThisCycle: career.hasActedThisCycle,
+  })
 
   const management = (
     <ManagementScreen

@@ -32,10 +32,9 @@ const 타자주자 = createRunner(0, 0, 주력500)
 function 사이주자(index: number, percent: number): RunnerState {
   const from = basePosition(1)
   const to = basePosition(2)
-  let position = from
   // 한 틱 이동 0xbf158 은 맨해튼 거리(1루→2루 10951)로 나누므로 한 걸음 = 속도 ÷ 10951 몫이다
   const speed = Math.max(1, Math.trunc((10_951 * percent) / 100))
-  position = stepToward(from, to, speed)
+  const position = stepToward(from, to, speed)
   return createRunner(index, 1, 주력500, { targetBase: 2, position, legStart: from })
 }
 

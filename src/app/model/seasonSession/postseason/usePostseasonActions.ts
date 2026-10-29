@@ -148,8 +148,7 @@ export function usePostseasonActions(ctx: AfterGameActionsContext) {
       if (next.scene === SEASON_SCENE_STATE.엔딩) return startEvent(SEASON_FINAL_EVENT_ID, next.scene)
       setScene(next.scene)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, gainGamePoint, random, recordStat, save, startEvent],
+    [commit, gainGamePoint, random, recordStat, save, startEvent, setScene],
   )
   return { continuePostseason, playCupGame, finishCup }
 }

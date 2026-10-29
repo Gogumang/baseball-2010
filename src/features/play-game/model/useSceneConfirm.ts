@@ -5,6 +5,7 @@ import { clearGameSceneTimeout, gameSceneTickNow, isGameSceneFrozen, setGameScen
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { SCENE_STATE, lastSceneStateEntry, markSceneStateEntries } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 상태 0xe 에 들어선 뒤 OK 를 안 받는 갱신 수 — 키 처리 0x498d4 끝(0x49a26~0x49a30)이
@@ -243,7 +244,7 @@ export function useSceneConfirm(
   }, [isCounting, wait, confirmed])
 
   const stateRef = useRef({ wait, confirmed, acceptsConfirm, onConfirm })
-  stateRef.current = { wait, confirmed, acceptsConfirm, onConfirm }
+  useMirrorRef(stateRef, { wait, confirmed, acceptsConfirm, onConfirm })
   const confirmNow = useCallback(() => {
     const current = stateRef.current
     if (!current.acceptsConfirm || current.wait == null || !isUnlockedRef.current) return

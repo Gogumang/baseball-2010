@@ -178,6 +178,9 @@ import type { MissionCpuTeam } from '@/entities/mission/model/missionCpuTeam'
 import { PITCHER_CHANGE_SOUND, pitcherEntrySoundIdOf } from '@/pages/team-game/model/teamGameSounds'
 import type { SceneConfirmWait } from '@/features/play-game/model/sceneConfirm'
 import { gameSceneTickNow, isGameSceneFrozen, setGameSceneTickTimeout } from '@/shared/lib/commonWindow/commonWindow'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
+import { useHeldWhileSame } from '@/shared/lib/renderMachine/useHeldWhileSame'
 
 interface MissionSessionInput {
   readonly runner: AtBatRunner
@@ -342,6 +345,17 @@ export function missionOpponentAbility(mission: OriginalMission, aceLevels?: Rea
 }
 
 /** 필살 남은 칸의 "아직 안 채움" — 타석 교대 0xaebe4 가 음수일 때만 채운다 (H2 1-2) */
+/** 판이 끝났나(성공 · 실패) — 진행 중이거나 판이 없으면 아니다 */
+function isRunEnded(run: { readonly status: string } | null): boolean {
+  return run !== null && run.status !== '진행중'
+}
+
+/** 끝난 판 번호 — 끝난 판에서 진행(또는 판 없음)으로 돌아간 그림에 하나 오른다 */
+function advanceSettlementEpisode(previous: { readonly episode: number; readonly wasEnded: boolean } | null, isEnded: boolean) {
+  const episode = previous === null ? 0 : previous.episode + (previous.wasEnded && !isEnded ? 1 : 0)
+  return { episode, wasEnded: isEnded }
+}
+
 const UNFILLED_SPECIAL_SWING = -1
 /** 마선수 레코드 +0x18 = 순번(0부터) + 5 (H2 4-1) */
 const ACE_SPECIAL_NUMBER_OFFSET = 5
@@ -576,17 +590,20 @@ export function useMissionSession({
    */
   const [player, setPlayer] = useState<HallOfFamePlayerPick | null>(null)
   const isInMissionMode = MISSION_MODE_SCREENS.includes(screen.kind)
-  useEffect(() => {
+  // 미션 모드를 나간 그림에서 고른 선수를 버린다(그 밖 화면은 선수를 안 본다)
+  const [wasInMissionMode, setWasInMissionMode] = useState(isInMissionMode)
+  if (wasInMissionMode !== isInMissionMode) {
+    setWasInMissionMode(isInMissionMode)
     if (!isInMissionMode) setPlayer(null)
-  }, [isInMissionMode])
+  }
   const silent = useMemo(() => createSilentSound(), [])
   const audio = sound ?? silent
   const [missionRun, setMissionRun] = useState<MissionRun | null>(null)
   const missionRunRef = useRef(missionRun)
-  missionRunRef.current = missionRun
+  useMirrorRef(missionRunRef, missionRun)
   const [pitcherRun, setPitcherRun] = useState<PitcherRun | null>(null)
   const pitcherRunRef = useRef(pitcherRun)
-  pitcherRunRef.current = pitcherRun
+  useMirrorRef(pitcherRunRef, pitcherRun)
   /**
    * **자동진행 0x21 의 틱 묶음** — 사람 반 이닝이 3아웃으로 끝나면(`game.halfEnded`) 0x18 → 0x21 로 가서 갱신 0x48480 이 **틱마다**
    * 0xc2198 → 0xc262c 를 한 번 부른다(타석 하나 또는 교체 부름 하나). 웹은 중계 화면(`AutoPlayRelayScreen`)의 틱마다 `stepAutoRelay`
@@ -609,7 +626,7 @@ export function useMissionSession({
   const opponentMoundStamina = missionAceMoundStaminaOf(missionRun)
   const [pendingDefensePlay, setPendingDefensePlay] = useState<PendingMissionDefense | null>(null)
   const pendingDefensePlayRef = useRef(pendingDefensePlay)
-  pendingDefensePlayRef.current = pendingDefensePlay
+  useMirrorRef(pendingDefensePlayRef, pendingDefensePlay)
   /**
    * 다 돌려 놓은 주자 판 하나 — CPU 견제(종류 4) · 공 도착 판(0x3dfac 종류 5 도루 · 9 폭투·포일).
    * 화면이 재생을 마치면 비운다 (`actions.finishPickoffReplay`)
@@ -727,7 +744,7 @@ export function useMissionSession({
    */
   const [pendingBenchClearing, setPendingBenchClearing] = useState<MissionHeldResult | null>(null)
   const pendingBenchClearingRef = useRef(pendingBenchClearing)
-  pendingBenchClearingRef.current = pendingBenchClearing
+  useMirrorRef(pendingBenchClearingRef, pendingBenchClearing)
   /**
    * **필살 남은 칸** s8 팀[+0x29 + 타순] — 미션 한 판에 한 번 채우고(0xaebe4) 스윙 틱 0x4e136 이 줄인다. −1 = 안 채움.
    * 이 칸은 타자 미션의 내 타자 칸이다 — 투수 미션 상대 타자 칸은 타순마다 CPU 타선(`MissionCpuBatting.specialSwing`)이 든다.
@@ -792,6 +809,7 @@ export function useMissionSession({
    * 난수는 다음 0xe · 0xf 앞이다(중계가 0xe 확인 대기보다 먼저 돈다).
    */
   const settleBatterRun = (run: MissionRun): MissionRun => run
+  const settlePitcherRun = (run: PitcherRun): PitcherRun => run
   /** 새 타석 0xd → 0xe — OK 를 기다린 뒤 0xf 로 간다 */
   const enterNewAtBatConfirm = () => {
     const wait = enterSceneConfirm()
@@ -864,16 +882,17 @@ export function useMissionSession({
    */
   const missionBatterRunAbility = hallOfFameBatter?.ability.run ?? nariBatterRunAbility
   const specialRunnersRef = useRef<(mission: OriginalMission) => MissionSpecialRunners>(() => ({}))
-  specialRunnersRef.current = (mission) => {
+  const specialRunnersOf = (mission: OriginalMission): MissionSpecialRunners => {
     const aceBatterRun = mission.side === '투수' ? missionOpponentAbility(mission, aceLevels)?.run : undefined
     return {
       ...(missionBatterRunAbility === undefined ? {} : { missionBatterRun: missionBatterRunAbility }),
       ...(aceBatterRun === undefined ? {} : { aceBatterRun }),
     }
   }
+  useMirrorRef(specialRunnersRef, specialRunnersOf)
   /** 투수 미션의 미션 투수 이름 판(0x43cb0 칸 0) — 판을 먹이는 콜백들이 늘 지금 값을 보게 ref 로 든다 */
   const missionPitcherPlateRef = useRef<ModePitcher['plate']>(undefined)
-  missionPitcherPlateRef.current = pitcher.plate
+  useMirrorRef(missionPitcherPlateRef, pitcher.plate)
   /**
    * 수비 판에 먹이는 수비 아홉 칸 · 루별 주루 — 미션 타구 · 공 도착 · 견제 판이 같은 값을 쓴다 (`missionPlayAbilitiesOf`).
    * 그림 전용 이름 판(0x43cb0) · 마선수 주자(0x79d10)도 함께 싣는다 (`missionFielderPlatesOf` · `missionRunnerAcesOf`)
@@ -1031,12 +1050,15 @@ export function useMissionSession({
     setSceneConfirm(enterSceneConfirm())
   }
 
+  /** 아래 0xf 진입 고리가 읽는 이 그림의 값 — 고리는 공 · 마감 · 결과 띠가 바뀔 때만 돈다 */
+  const pitchSelectionSceneRef = useRef({ isPitcherSide: false, askPitchSelection })
+  useMirrorRef(pitchSelectionSceneRef, { isPitcherSide: screen.kind === '투수미션' || pitcherAceMatchMission !== null, askPitchSelection })
   /** 같은 타석 다음 공의 0xf 진입 — 진행이 다 먹인 뒤의 판을 봐야 해서 그린 뒤에 돈다 */
   useEffect(() => {
     const entry = pitchSelectionEntry
     if (entry === null || entry.serial === handledPitchSelectionRef.current) return
     // 타자 미션은 결과 띠가 걷혀야(0x12 가 끝나야) 0xf 다
-    const isPitcherSide = screen.kind === '투수미션' || pitcherAceMatchMission !== null
+    const { isPitcherSide, askPitchSelection: ask } = pitchSelectionSceneRef.current
     if (!isPitcherSide && runner.bannerText !== '') return
     // 투수 미션 — 0x12 를 다 선 0xf 진입 틀까지 장면 틱으로 센다(공용 창이 서면 함께 선다, 52cc6)
     if (isPitcherSide && entry.delayTicks > 0 && pitchSelectionDueSerial !== entry.serial) {
@@ -1046,8 +1068,7 @@ export function useMissionSession({
       return
     }
     handledPitchSelectionRef.current = entry.serial
-    askPitchSelection(entry.kind)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ask(entry.kind)
   }, [pitchSelectionEntry, pitchSelectionDueSerial, runner.bannerText])
 
   /**
@@ -1203,6 +1224,15 @@ export function useMissionSession({
     [random],
   )
 
+  // 아래 콜백이 부르는 공 도착 걸음 — 콜백과 같은 열쇠로 붙잡는다(열쇠가 바뀐 그림의 함수를 부르던 옛 꼴 그대로)
+  const arrivalSteps = useHeldWhileSame({ continueMissionArrival, finishMissionArrivalAtBat }, [
+    aceLevels,
+    audio,
+    batterRunningMode,
+    batterSkillIds,
+    random,
+    runner,
+  ])
   const handleMissionPitch = useCallback(
     (
       detail: PitchOutcomeDetail,
@@ -1330,7 +1360,7 @@ export function useMissionSession({
       )
 
       const context: MissionArrivalContext | null = current === null ? null : { current, hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase }
-      if (context !== null ? continueMissionArrival(play, context) : outcome === null) {
+      if (context !== null ? arrivalSteps.continueMissionArrival(play, context) : outcome === null) {
         // 판이 없는 판(`current` 없음)의 같은 타석 다음 공 — 아래 `continueMissionArrival` 과 같은 길
         if (context === null) signalPitchSelection('same')
         return reply
@@ -1383,11 +1413,10 @@ export function useMissionSession({
         runner.setIsPaused(true)
         return reply
       }
-      finishMissionArrivalAtBat(play, { hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase })
+      arrivalSteps.finishMissionArrivalAtBat(play, { hasSwung, outcome, isBunt: detail.isBunt, runnersOnBase })
       return reply
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [aceLevels, audio, batterRunningMode, batterSkillIds, random, runner],
+    [aceLevels, audio, batterRunningMode, batterSkillIds, random, runner, arrivalSteps],
   )
 
   /**
@@ -1959,6 +1988,8 @@ export function useMissionSession({
    * 화면이 결과를 안 넘겨 주면 여기서 끝까지 돌려서라도 붙들어 둔 상태를 푼다 — 안 그러면
    * 다음 타석이 영영 시작되지 않는다 (`useCareerSession.finishDefensePlay` 와 같은 자리).
    */
+  // 아래 콜백이 부르는 새 타석 걸음 — 콜백과 같은 열쇠로 붙잡는다(열쇠가 바뀐 그림의 함수를 부르던 옛 꼴 그대로)
+  const settleSteps = useHeldWhileSame({ resetAtBatWithConfirm }, [aceLevels, audio, runner])
   const finishDefensePlay = useCallback(
     (result?: DefensePlayResult) => {
       const pending = pendingDefensePlayRef.current
@@ -2000,7 +2031,7 @@ export function useMissionSession({
       if (pending.side === '투수') {
         // `played.runnerFates`(주자별 +0x95·+0x96)로 실점 R+0x128 · 출루 허용 R+0x130 을 원본대로 센다
         setPitcherRun((previous) => (previous === null ? previous : settlePitcherRun(applyPitcherOutcome(previous, pending.outcome, { played }))))
-        resetAtBatWithConfirm()
+        settleSteps.resetAtBatWithConfirm()
         runner.setIsPaused(false)
         return
       }
@@ -2015,7 +2046,7 @@ export function useMissionSession({
       // 0x17 판 끝 → 판정 B 가 곧장 0xd
       runner.pauseWithBanner(describeOutcomeBanner(settled, pending.runnersOnBase), 0)
     },
-    [aceLevels, audio, runner],
+    [audio, runner, settleSteps],
   )
 
   /**
@@ -2084,13 +2115,18 @@ export function useMissionSession({
    * 웹은 판 상태가 진행중에서 끝으로 바뀐 그 그리기 전에 한 번 한다. 결과 판의 번 G 는 그때 적은 값(`settledEarned`)이다.
    * 판을 닫는 키(목록 · 다시하기 · 대결 결과 이벤트)는 더 적지 않는다 — 다시하기 0x1e908 의 `0xa5368(미션, 0)` 은 아무 일도 안 한다.
    */
-  const [settledEarned, setSettledEarned] = useState<number | null>(null)
+  const [settled, setSettled] = useState<{ readonly earned: number; readonly episode: number } | null>(null)
+  /** 판이 끝났다가 다시 진행(또는 판 없음)으로 돌아간 횟수 — 끝난 판 하나가 한 번호다. 적은 G 는 그 번호의 판에만 보인다 */
+  const settlementEpisode = useRenderMachine(advanceSettlementEpisode, isRunEnded(missionRun ?? pitcherRun)).episode
+  const settledEarned = settled !== null && settled.episode === settlementEpisode ? settled.earned : null
   const isSettledRef = useRef(false)
+  /** 정산 고리가 부르는 이 그림의 적기 함수 — 고리는 판 · 화면이 바뀔 때 돈다(판이 끝난 커밋이 늘 그중 하나다) */
+  const rememberRef = useRef({ rememberCleared, rememberAceMatchCleared })
+  useMirrorRef(rememberRef, { rememberCleared, rememberAceMatchCleared })
   useLayoutEffect(() => {
     const run = missionRun ?? pitcherRun
     if (run === null || run.status === '진행중') {
       isSettledRef.current = false
-      if (settledEarned !== null) setSettledEarned(null)
       return
     }
     if (isSettledRef.current) return
@@ -2098,15 +2134,17 @@ export function useMissionSession({
     const isWin = run.status === '성공'
     const aceMission = missionRun !== null ? (screen.kind === '마선수대결' ? screen.mission : null) : pitcherAceMatchMission
     let countsAfter = clearCounts
+    let earned = 0
     if (aceMission !== null) {
       // 대결은 0x4ef3e 가 G 를 건너뛰고, 0xa5368 은 +0xbd(team − 1) ≤ 15 일 때만 그 편 칸을 올린다
-      if (isWin) countsAfter = rememberAceMatchCleared(aceMission)
-      setSettledEarned(0)
+      if (isWin) countsAfter = rememberRef.current.rememberAceMatchCleared(aceMission)
     } else {
-      const cleared = rememberCleared(run.mission, run.status)
+      const cleared = rememberRef.current.rememberCleared(run.mission, run.status)
       countsAfter = cleared.counts
-      setSettledEarned(cleared.earned)
+      earned = cleared.earned
     }
+    // 0x4ea0c 정산 — 판이 끝난 커밋에 횟수 · G 를 적고(곁일 — 그리는 중엔 못 한다) 그때 번 G 를 결과 판에 싣는다
+    setSettled({ earned, episode: settlementEpisode })
     // 4ef84~4efae — 성공이면(대기로 G 를 건너뛴 판도) 그 편 올클리어 0xa5184 를 보고 0x62368(ui, 모드 6 ? 37 : 21, 0)
     const side: OriginalMission['side'] = missionRun !== null ? '타자' : '투수'
     if (isWin && isMissionSideAllCleared(countsAfter, side)) openHidden?.(MISSION_ALL_CLEAR_HIDDEN_ID[side])
@@ -2122,7 +2160,7 @@ export function useMissionSession({
     // 결과 징글 — 0x4ea0c 의 모드 표 0xd0428[5 · 6] = 0x4ef18 이 [sp+0x50] 을 [미션+0xbc](성공?)로 덮고(4ef36 · 4efb4),
     // 모든 모드가 모이는 4f41a 가 1 이면 31 · 0 이면 32 를 예약한다(4f544) — 마선수 대결도 같다
     audio.play(isWin ? WIN_SOUND : LOSE_SOUND)
-  })
+  }, [aceMatchHold, audio, clearCounts, missionRun, openHidden, pitcherAceMatchMission, pitcherRun, recordStat, screen, settlementEpisode])
 
   /**
    * **하늘 줄 — 구장 +0x10** (0x783b0, `stadiumSkyRowOf`). 미션(모드 5 · 6)은 그 밖 갈래라 rand(0, 6) — 경기 적재(상태 8 갱신
@@ -2137,7 +2175,6 @@ export function useMissionSession({
    * 투수 미션 판이 3아웃으로 끝나도 여기서는 자동진행을 굴리지 않는다 — 타자 미션(`settleBatterRun`)과 같이 중계 화면이 틱마다
    * `stepAutoRelay` 로 굴린다(사람 칸 팀이 치는 반 이닝, `pitcherMissionAutoTicks`).
    */
-  const settlePitcherRun = (run: PitcherRun): PitcherRun => run
 
   /**
    * **자동진행 0x21 의 틱 하나** — 중계 화면(`AutoPlayRelayScreen`)이 틱마다 부른다 (0x48480: 모드 5·6 은 속도 칸을 안 보고 매 틱 한 걸음).
@@ -2793,7 +2830,7 @@ export function useMissionSession({
      * 타자 미션 타석 화면 HUD 의 루별 주자 주력 — 0x35b94 상태 0xe 주루 칸(35f74 `0xb570d(ctx, 3, 주자, 1, 90, 1)`).
      * 루에 선 주자의 신원(사람 칸 팀 타순 칸)대로다 (`missionRunnerRunAbilitiesOf`)
      */
-    missionRunnerRunAbilities: missionRun === null ? {} : missionRunnerRunAbilitiesOf(missionRun, specialRunnersRef.current(missionRun.mission)),
+    missionRunnerRunAbilities: missionRun === null ? {} : missionRunnerRunAbilitiesOf(missionRun, specialRunnersOf(missionRun.mission)),
     /**
      * 타자 미션 타석 화면의 타자 · 루 주자 마선수 번호 — 루상 주자 0x35b94 가 주자 +0x9c ≠ −1 이면 타석 교대 0x483a0 이 +0x1c 에 실은
      * ace/defender 그림으로 그린다. 수비 판(`playAbilitiesOf` 의 `runnerAces`)과 같은 값이다 (`missionRunnerAcesOf`)

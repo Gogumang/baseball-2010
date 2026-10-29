@@ -18,6 +18,7 @@ import { ENTRY_TABLES_BASIC, entrySlideOffsetOf } from '@/widgets/entry-editor/l
 import type { EntryBatterLine, EntryColumnTables, EntryPitcherLine } from '@/widgets/entry-editor/lib/entryListWindow'
 import { EntryListWindow } from '@/widgets/entry-editor/ui/EntryListWindow'
 import { EntryDetailOverlay } from '@/widgets/entry-editor/ui/EntryDetailOverlay'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 편집기 한 줄이 화면에 보여 줄 것 */
 export interface EntryFace {
@@ -164,7 +165,7 @@ export function EntryEditorScreen<B extends EntryBatterRow & EntryFace, P extend
   // 그림 한 틀 — 열 밀기 한 단계(0x5c984) · 메인 메뉴의 틀마다 키 셈
   const isSliding = editor.slide !== null
   const frameRef = useRef(onFrame)
-  frameRef.current = onFrame
+  useMirrorRef(frameRef, onFrame)
   const hasFrame = onFrame !== undefined
   useEffect(() => {
     if (!hasFrame || (!isSliding && !ticksEveryFrame)) return undefined

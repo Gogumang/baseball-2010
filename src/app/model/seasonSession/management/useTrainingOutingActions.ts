@@ -37,22 +37,22 @@ export function useTrainingOutingActions(ctx: PostseasonActionsContext) {
       // 결과 팝업 — 현재값은 적용 뒤 팀 레코드를 다시 읽는다(0xc290). 닫을 때 0xc9 로 간다(`closeTrainingResult`)
       setTrainingResult(seasonTrainingResultOf(slot, record, roll, applied))
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, random, save, spendGamePoint],
+    [commit, random, save, spendGamePoint, setTrainingResult],
   )
   /** 결과 팝업 키 0xf2c8 — 확인 · 취소면 0x742a9(닫기) · 상태 0xc9 */
   const closeTrainingResult = useCallback(() => {
     setTrainingResult(null)
     setScene(SEASON_SCENE_STATE.관리메뉴)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  }, [setScene, setTrainingResult])
   /** 0x4a94 — 확인 팝업 0x16 에 "예": [gfx+0x184] = 장소 · 0xe3 (진입 0x5184 → 0x85074 연출) */
-  const enterOuting = useCallback((place: number) => {
-    setOutingResultText(null)
-    setOutingPlace(place)
-    setScene(SEASON_SCENE_STATE.외출연출)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  const enterOuting = useCallback(
+    (place: number) => {
+      setOutingResultText(null)
+      setOutingPlace(place)
+      setScene(SEASON_SCENE_STATE.외출연출)
+    },
+    [setOutingPlace, setOutingResultText, setScene],
+  )
   /**
    * 외출 결과 `0xc81c` (`rollSeasonOuting`) — 0xce0c 가 연출 끝(0x84e58)을 본 틀에 부른다.
    * 사기 난수는 [a, b) 이고 **친선경기(0)·야구교실(3)은 부호를 뒤집는다**(0xc8b0).
@@ -72,16 +72,14 @@ export function useTrainingOutingActions(ctx: PostseasonActionsContext) {
       setOutingPlace(place)
       setOutingResultText(outcome.text)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, random, save],
+    [commit, random, save, setOutingPlace, setOutingResultText],
   )
   /** 0xce0c — 팝업 0x17 이 닫히면(답 0 · 0x14) SR+4 = 1 · 0xc9. SR+4 는 0xc81c 가 이미 켜 두었다 */
   const closeOutingResult = useCallback(() => {
     setOutingResultText(null)
     setOutingPlace(null)
     setScene(SEASON_SCENE_STATE.관리메뉴)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  }, [setOutingPlace, setOutingResultText, setScene])
   return { runTraining, closeTrainingResult, enterOuting, runOuting, closeOutingResult }
 }
 

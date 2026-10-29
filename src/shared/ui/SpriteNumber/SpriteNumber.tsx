@@ -20,6 +20,16 @@ interface SpriteNumberProps {
   readonly glyphHeight?: number
 }
 
+/** 글자마다 왼쪽 x — 첫 글자 `start` 에서 한 글자 전진 = 폭 + 간격 */
+function glyphLeftsOf(glyphs: SpriteNumberProps['glyphs'], start: number): number[] {
+  let x = start
+  return glyphs.map((glyph) => {
+    const left = x
+    x += glyph.width + (glyph.spacing ?? GLYPH_SPACING)
+    return left
+  })
+}
+
 /** num.pzx 숫자 그림을 오른쪽 정렬로 늘어놓는다 — 한 글자 전진 = 폭 + 1, 세로 가운데(ceil) */
 export function SpriteNumber({
   glyphs,
@@ -30,12 +40,11 @@ export function SpriteNumber({
   glyphHeight = GLYPH_HEIGHT,
 }: SpriteNumberProps) {
   const top = boxTop + Math.trunc((boxHeight - glyphHeight + 1) / 2)
-  let x = right - glyphsWidthOf(glyphs)
+  const lefts = glyphLeftsOf(glyphs, right - glyphsWidthOf(glyphs))
   return (
     <>
       {glyphs.map((glyph, index) => {
-        const left = x
-        x += glyph.width + (glyph.spacing ?? GLYPH_SPACING)
+        const left = lefts[index]
         const height = SHORT_GLYPH_FRAMES.has(glyph.frame) ? SHORT_GLYPH_HEIGHT : glyphHeight
         return (
           <img

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { fakeAppTickClock, settledFireEvent as fireEvent } from '@/shared/lib/testing/slideSettledEvents'
@@ -61,7 +61,9 @@ function 띄우기(saved: PlayerCareer) {
     const runner = useAtBatRunner()
     const session = useCareerSession({ runner, random, saveGame: port, screen: screenState, setScreen })
     const gameSettings = useGameSettings(설정저장)
-    latest.career = session.career
+    useLayoutEffect(() => {
+      latest.career = session.career
+    })
     if (session.career === null) {
       return (
         <button

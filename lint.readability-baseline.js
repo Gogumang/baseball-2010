@@ -412,7 +412,6 @@ export const readabilityBaseline = [
   'src/widgets/event-portraits/ui/EventPortraits.tsx',
   'src/widgets/field-walk/lib/halfInningFieldInput.ts',
   'src/widgets/field-walk/lib/halfInningWalk.ts',
-  'src/widgets/field-walk/lib/useWalkerLineSeats.ts',
   'src/widgets/field-walk/lib/walkerAces.ts',
   'src/widgets/field-walk/ui/HalfInningField.tsx',
   'src/widgets/game-scene/lib/recordAlert.ts',

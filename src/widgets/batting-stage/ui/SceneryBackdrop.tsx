@@ -12,6 +12,7 @@ import {
   sceneScoreboardTickOf,
 } from '@/widgets/batting-stage/model/sceneCloudClock'
 import { tryOr } from '@/shared/lib/safe/tryOr'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 배경 고르기 `0x40ff0` 이 쓰는 구장 값 — 틱(구름 · 전광판 흐름)과 세로 밀기는 부르는 쪽이 따로 준다 */
 export type SceneryBackdropStage = Omit<SceneryState, 'tick' | 'offsetY' | 'cloudCalls'>
@@ -53,7 +54,7 @@ interface SceneryBackdropProps {
 export function SceneryBackdrop({ stage, offsetY, overlay }: SceneryBackdropProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const latestRef = useRef({ stage, offsetY, overlay })
-  latestRef.current = { stage, offsetY, overlay }
+  useMirrorRef(latestRef, { stage, offsetY, overlay })
   /** 지금 곧바로 한 번 칠한다 — 겹이 바뀐 커밋에서 DOM 과 한 틀도 어긋나지 않게(아래 레이아웃 효과) */
   const drawNowRef = useRef<(() => void) | null>(null)
 

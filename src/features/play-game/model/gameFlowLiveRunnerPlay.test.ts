@@ -96,11 +96,9 @@ describe('타자편 공 도착 판(도루 · 폭투)을 붙들어 사람 주루 
         expect(끝.play?.shownLive).toBe(true)
         expect(끝.progress.lastDefensePlay).toBe(출발.lastDefensePlay)
         // 타석이 끝난 공 — 타석 결과 쪽(`startPlayerOutcome` 의 `arrivalPlay`)도 같다
-        let 미리뒤 = 미리.progress
-        let 실시간뒤 = 끝.progress
         if (outcomeAfter !== null && !미리.interrupted) {
-          미리뒤 = startPlayerOutcome(미리.progress, outcomeAfter, 미리Random, { arrivalPlay: 미리.play })
-          실시간뒤 = startPlayerOutcome(끝.progress, outcomeAfter, 실시간Random, { arrivalPlay: 끝.play })
+          const 미리뒤 = startPlayerOutcome(미리.progress, outcomeAfter, 미리Random, { arrivalPlay: 미리.play })
+          const 실시간뒤 = startPlayerOutcome(끝.progress, outcomeAfter, 실시간Random, { arrivalPlay: 끝.play })
           expect(칸(실시간뒤)).toEqual(칸(미리뒤))
           expect(실시간뒤.lastDefensePlay).not.toBe(미리.play?.result)
         }

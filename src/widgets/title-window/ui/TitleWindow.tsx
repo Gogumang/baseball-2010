@@ -5,6 +5,7 @@ import * as boxStyles from '@/shared/ui/MessageBox/MessageBox.css'
 import { POPUP_DIM_OPACITY } from '@/shared/ui/MessageBox/popupDim'
 import { TITLE_WINDOW, titleWindowLinesOf } from '@/widgets/title-window/lib/titleWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const SCREEN_WIDTH = 240
 const SCREEN_HEIGHT = 320
@@ -34,9 +35,9 @@ export function TitleWindow({
 }) {
   const motion = usePopupWindowMotion({ targetHeight: TITLE_WINDOW.height })
   const onKeyRef = useRef(onKey)
-  onKeyRef.current = onKey
+  useMirrorRef(onKeyRef, onKey)
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useMirrorRef(onCloseRef, onClose)
 
   const close = () =>
     motion.close('바로', () => {

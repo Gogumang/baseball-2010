@@ -414,11 +414,11 @@ function* runnerPlaySteps(
   /** 플레이 +0x126 — 판 시작 vt20(b11fe)이 1. 0xb203a 가 중계 자리를 잡으면 0 */
   let relayFlag = input.relayFlag ?? true
   /** sp+0x24 — 이번 틱 포구 틱의 사건(펌블 0xbc2). 서면 틱 끝 b45a4 가 0xb3148 */
-  let ballEventThisTick = false
+  let ballEventThisTick: boolean
   /** 이번 틱에 0xb36d0 이 아웃을 냈나 — 결과 코드 13 → 메시지 0xbba */
-  let outJudgedThisTick = false
+  let outJudgedThisTick: boolean
   /** 이번 틱 플레이 틱이 보낼 결과 메시지 0xbba 의 코드 — 포구 b4292 의 9 를 b4540 의 13 이 덮는다(b4562 에서 한 번) */
-  let tickMessageCode = 0
+  let tickMessageCode: number
   /** 수비 장면 연출 칸 — 0x17 진입 0x46418 이 결과 판 타이머를 −1 로 (`defenseScene`) */
   let scene = enterDefenseScene(input.scene, true)
   /** state[0x8b] — 결과 판 큰 OUT 이 +0x1999 를 보고 세운다 */
@@ -489,7 +489,7 @@ function* runnerPlaySteps(
 
   /** 0xb36d0 한 번 — 원본처럼 모든 주자를 본다(타자주자 제외 없음) */
   /** 바로 앞 0xb36d0 한 번의 결과 — 같은 플레이 틱의 두 번째 판정이 state[0x87] 을 다시 적는다(타구 진행기 `grabOutThisTick`) */
-  let lastJudgedKind: number = OUT_KIND.NONE
+  let lastJudgedKind: number
   const runOutJudgement = (tick: number): void => {
     if (play.finished) return
     const judged = judgeOut(contextAt(tick))

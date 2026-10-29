@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 /**
  * **0xc37a8 흑백 사각형 알림판** — 0xc37a8(x, y, w, h) 은 이미 그린 화면 사각형을 제자리에서 회색으로 바꾼다(`grayRect565`).
@@ -51,7 +51,7 @@ export function useScreenGrayRects(): readonly ScreenGrayRect[] {
 
 /** 흑백 사각형을 건다 — 그리는 동안(마운트된 동안)만. 그림 전에(레이아웃 단계) 올려 한 틀 늦지 않게 한다 */
 export function usePublishScreenGrayRects(rects: readonly ScreenGrayRect[]): void {
-  const owner = useRef(Symbol('흑백')).current
+  const [owner] = useState(() => Symbol('흑백'))
   const last = useRef<readonly ScreenGrayRect[]>([])
   useLayoutEffect(() => {
     if (sameRects(last.current, rects)) return

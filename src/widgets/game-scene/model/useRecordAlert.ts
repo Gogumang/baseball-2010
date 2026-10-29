@@ -5,6 +5,7 @@ import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
 import { sceneStateEntryAt } from '@/shared/lib/commonWindow/sceneStateEntries'
 import { EMPTY_RECORD_ALERT, drawRecordAlert, enqueueRecordAlert, flushRecordAlertQueue } from '@/widgets/game-scene/lib/recordAlert'
 import type { RecordAlertFrame, RecordAlertState } from '@/widgets/game-scene/lib/recordAlert'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const NO_FRAME: RecordAlertFrame = { panel: null, rows: [] }
 
@@ -84,19 +85,19 @@ export function useRecordAlert(
   const seenRef = useRef(queuesInitialRecords ? 0 : recordIds.length)
   const serialRef = useRef(pitchEnd?.serial)
   const frozenRef = useRef(isFrozen)
-  frozenRef.current = isFrozen
+  useMirrorRef(frozenRef, isFrozen)
   const settledRef = useRef(isSettled)
-  settledRef.current = isSettled
+  useMirrorRef(settledRef, isSettled)
   /** 공 끝 자리의 0x19 여부는 **그 공 앞** 상태다 — 마지막 공의 0x17 끝(0x52a60)은 판정 B 가 0x18 을 걸어 둔 채 부른다 */
   const settledBeforeRef = useRef(isSettled)
   const removedRef = useRef(isPitcherRemoved)
-  removedRef.current = isPitcherRemoved
+  useMirrorRef(removedRef, isPitcherRemoved)
   const humanCountOfRef = useRef(pitchEnd?.humanCountOf)
-  humanCountOfRef.current = pitchEnd?.humanCountOf
+  useMirrorRef(humanCountOfRef, pitchEnd?.humanCountOf)
   const pinnedRef = useRef(pinnedStateTickRef)
-  pinnedRef.current = pinnedStateTickRef
+  useMirrorRef(pinnedRef, pinnedStateTickRef)
   const sceneKeyRef = useRef(sceneStateKey)
-  sceneKeyRef.current = sceneStateKey
+  useMirrorRef(sceneKeyRef, sceneStateKey)
   const tickedKeyRef = useRef(sceneStateKey)
   const stateTickRef = useRef(0)
   /** 지금 상태 틱의 0 점(장면 틱) — 갈래가 바뀐 틱이나 부품이 적은 상태 칸. 아직 없으면 null */
@@ -105,7 +106,7 @@ export function useRecordAlert(
   /** 0xa77f0 끝 a7922 `0x62234(ui, k)` — 기록이 새로 들어올 때마다 (`RecordAchievedContext`) */
   const onRecordAchieved = useContext(RecordAchievedContext)
   const onRecordAchievedRef = useRef(onRecordAchieved)
-  onRecordAchievedRef.current = onRecordAchieved
+  useMirrorRef(onRecordAchievedRef, onRecordAchieved)
   const hasPitchEnd = pitchEnd !== undefined
   const serial = pitchEnd?.serial
 

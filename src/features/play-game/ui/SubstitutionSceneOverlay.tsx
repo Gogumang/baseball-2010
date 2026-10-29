@@ -7,6 +7,7 @@ import { ACE_CUT_IN_DRAWS } from '@/features/play-game/model/aceCutIn'
 import { AceCutInCanvas } from '@/features/play-game/ui/AceCutInCanvas'
 import { isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const GAME_UI_FOLDER = assetUrl('./sprites/game_ui/frames')
 
@@ -33,7 +34,7 @@ export function SubstitutionSceneOverlay({ onDone, aceSlot = null }: Substitutio
   const [draw, setDraw] = useState(0)
   const drawRef = useRef(0)
   const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
+  useMirrorRef(onDoneRef, onDone)
 
   const totalDraws = aceSlot === null ? SUBSTITUTION_SCENE_DRAWS : ACE_CUT_IN_DRAWS
   useEffect(() => {

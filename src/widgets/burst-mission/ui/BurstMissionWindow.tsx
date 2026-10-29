@@ -36,6 +36,7 @@ import type { BurstWindowState } from '@/widgets/burst-mission/lib/burstMissionW
 import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 import * as styles from '@/widgets/burst-mission/ui/BurstMissionWindow.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 interface BurstMissionWindowProps {
   /**
@@ -86,7 +87,7 @@ export function BurstMissionWindow({
   /** 그린 수 — 초상 애니는 그린 뒤 한 칸 나아간다(0x93d91) */
   const [draws, setDraws] = useState(0)
   const stateRef = useRef(state)
-  stateRef.current = state
+  useMirrorRef(stateRef, state)
 
   useEffect(() => {
     burstObjectTicks.value = stateRef.current.ticks
@@ -104,12 +105,12 @@ export function BurstMissionWindow({
 
   const pushCommonWindow = useCommonWindowPush()
   const closeRef = useRef(() => {})
-  closeRef.current = () => {
+  useMirrorRef(closeRef, () => {
     if (!isBurstWindowOpen(stateRef.current)) return
     const popup = burstResultPopupTextOf(judgement, row)
     if (popup !== null) pushCommonWindow(popup)
     onClose()
-  }
+  })
 
   // 창이 떠 있는 동안 키는 창 것이다 — 뒤 타석 화면이 같은 Enter 를 같이 받으면 스윙이 나간다.
   useEffect(() => {

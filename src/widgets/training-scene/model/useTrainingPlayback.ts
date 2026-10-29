@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 훈련 연출 → 결과 순서를 지킨다.
@@ -9,7 +10,7 @@ export function useTrainingPlayback(onRunTraining: (menuId: string) => void) {
 
   const playingRef = useRef<string | null>(null)
   const onRunRef = useRef(onRunTraining)
-  onRunRef.current = onRunTraining
+  useMirrorRef(onRunRef, onRunTraining)
 
   const start = (menuId: string) => {
     if (playingRef.current !== null) return

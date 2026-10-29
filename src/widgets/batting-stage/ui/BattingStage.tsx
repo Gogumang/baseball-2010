@@ -460,6 +460,7 @@ export function BattingStage({
     isSceneFrozen: isCommonWindowOpen,
   })
   const {
+    canvasRef,
     pitchRef,
     pitchTypeNumberRef,
     phaseRef,
@@ -492,17 +493,57 @@ export function BattingStage({
   }, [sceneBuntKind])
   /** +0xfdc 를 마지막으로 지운 공 — 새 공이면 0x11 진입 0x3de10(3deb8 0x340dc)의 memset 처럼 0 으로 지운다(`sceneBuntKindOnPitch`) */
   const sceneBuntPitchRef = useRef<Pitch | null>(null)
-  const sceneBuntKindOfThisPitch = () => {
+  const sceneBuntKindOfThisPitch = useCallback(() => {
     const memory = sceneBuntKindOnPitch({ pitch: sceneBuntPitchRef.current, kind: sceneBuntKindRef.current }, pitchRef.current)
     sceneBuntPitchRef.current = memory.pitch
     sceneBuntKindRef.current = memory.kind
     return memory.kind
-  }
+  }, [pitchRef])
 
   /** 타구 순간 소리 — 판정 틀에 곧바로 낸다(소리 통로 `activeSound`, 투구 순간 소리 `useStageAnimation` 과 같은 통로) */
   const playContactSoundNow = (soundId: number | null | undefined) => {
     if (soundId !== null && soundId !== undefined) activeSound().play(soundId)
   }
+
+  /** 결과(0x12)를 세운다 — 문구 · 결과 길이 · 알림 */
+  const showResult = useCallback(
+    (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable: boolean, tick: number) => {
+      const latest = latestRef.current
+      buntRef.current = null
+      const isHomeRun = isHomeRunResolution(detail)
+      // 공 끝 0x4e24e 가 이 틀에 0x12 를 예약한다(4e26c → 0xbcb49) — 0x12 는 다음 틀이 틱 0 이다(`phaseEntryRef`)
+      homeRunStartTickRef.current = isHomeRun ? tick + 1 : null
+      resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
+      // 판정 v — 타석을 끝낸 스트라이크 · 볼은 삼진(애니 9) · 볼넷(애니 6) 글자다 (`judgeTextOf`)
+      resultTextRef.current = judgeTextOf(detail.resolution, resultTicksRef.current > RESULT_PHASE_TICKS)
+      isInPlayResultRef.current = false
+      // 사구(st[0x12]) — 0x12 틱 0~7 에 타자 머리 위 표시(4a0ce, `batterOverlayMarks`)
+      isHitByPitchResultRef.current = detail.resolution.kind === '사구'
+      phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
+      // 0x12 는 다음 틀이 틱 0, 문턱 갱신이 예약한 다음 상태는 그 `resultTicks` 틀 뒤에 선다(0x4e6d4 → 판정 A)
+      markSceneStateEntries(
+        { tick: tick + 1, state: SCENE_STATE.결과 },
+        // 타석을 끝낸 공(문턱 0x1f)이면 판정 A 가 0xd(밀어내기면 0x17 판) — 아니면 같은 타석 다음 공 0xf
+        { tick: tick + 1 + resultTicksRef.current, state: resultTicksRef.current > RESULT_PHASE_TICKS ? SCENE_STATE.준비 : SCENE_STATE.선택 },
+      )
+      const reply = latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch(), tick)
+      // 0x3dfac 낫아웃 갈래가 판정 칸을 지웠으면(3e0aa) 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다 — 진입이 그 그림보다 먼저다
+      if (reply != null && reply.judgementCleared === true) {
+        resultTextRef.current = judgeTextOf(detail.resolution, resultTicksRef.current > RESULT_PHASE_TICKS, true)
+      }
+    },
+    [
+      buntRef,
+      homeRunStartTickRef,
+      isHitByPitchResultRef,
+      isInPlayResultRef,
+      latestRef,
+      phaseEntryRef,
+      resultTextRef,
+      resultTicksRef,
+      sceneBuntKindOfThisPitch,
+    ],
+  )
 
   const finishPitch = useCallback(
     (swing: BattingSwing | null, tick: number) => {
@@ -661,35 +702,25 @@ export function BattingStage({
       if (swing !== null) heldResultRef.current = show
       else show(tick)
     },
-    [aceBatterIndex, specialSwingNumber, isBatterOwnPlayer, careerYearIndex],
+    [
+      aceBatterIndex,
+      specialSwingNumber,
+      isBatterOwnPlayer,
+      careerYearIndex,
+      buntRef,
+      deckRef,
+      heldResultRef,
+      hitSkipKeyTickRef,
+      latestRef,
+      particlesRef,
+      pendingHitRef,
+      phaseEntryRef,
+      pitchRef,
+      pitchTypeNumberRef,
+      sceneBuntKindOfThisPitch,
+      showResult,
+    ],
   )
-
-  /** 결과(0x12)를 세운다 — 문구 · 결과 길이 · 알림 */
-  const showResult = (detail: PitchOutcomeDetail, pitch: Pitch, isUncatchable: boolean, tick: number) => {
-    const latest = latestRef.current
-    buntRef.current = null
-    const isHomeRun = isHomeRunResolution(detail)
-    // 공 끝 0x4e24e 가 이 틀에 0x12 를 예약한다(4e26c → 0xbcb49) — 0x12 는 다음 틀이 틱 0 이다(`phaseEntryRef`)
-    homeRunStartTickRef.current = isHomeRun ? tick + 1 : null
-    resultTicksRef.current = resultPhaseTicksOf(detail.resolution, latest.hud)
-    // 판정 v — 타석을 끝낸 스트라이크 · 볼은 삼진(애니 9) · 볼넷(애니 6) 글자다 (`judgeTextOf`)
-    resultTextRef.current = judgeTextOf(detail.resolution, resultTicksRef.current > RESULT_PHASE_TICKS)
-    isInPlayResultRef.current = false
-    // 사구(st[0x12]) — 0x12 틱 0~7 에 타자 머리 위 표시(4a0ce, `batterOverlayMarks`)
-    isHitByPitchResultRef.current = detail.resolution.kind === '사구'
-    phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
-    // 0x12 는 다음 틀이 틱 0, 문턱 갱신이 예약한 다음 상태는 그 `resultTicks` 틀 뒤에 선다(0x4e6d4 → 판정 A)
-    markSceneStateEntries(
-      { tick: tick + 1, state: SCENE_STATE.결과 },
-      // 타석을 끝낸 공(문턱 0x1f)이면 판정 A 가 0xd(밀어내기면 0x17 판) — 아니면 같은 타석 다음 공 0xf
-      { tick: tick + 1 + resultTicksRef.current, state: resultTicksRef.current > RESULT_PHASE_TICKS ? SCENE_STATE.준비 : SCENE_STATE.선택 },
-    )
-    const reply = latest.onPitchResolved(detail, pitch, isUncatchable, sceneBuntKindOfThisPitch(), tick)
-    // 0x3dfac 낫아웃 갈래가 판정 칸을 지웠으면(3e0aa) 0x12 틱 0 의 판정 글자 · 삼진 파티클이 없다 — 진입이 그 그림보다 먼저다
-    if (reply != null && reply.judgementCleared === true) {
-      resultTextRef.current = judgeTextOf(detail.resolution, resultTicksRef.current > RESULT_PHASE_TICKS, true)
-    }
-  }
 
   /**
    * **공 끝** — 0x4e060 의 4e24e: 공 틱 > N 이고 맞지 않았으면 0x12. 판정을 들고 있으면 그 결과, 스윙은 나갔는데 판정이 없었으면
@@ -720,7 +751,7 @@ export function BattingStage({
       }
       finishPitch(null, tick)
     },
-    [aceBatterIndex, finishPitch],
+    [aceBatterIndex, finishPitch, heldResultRef, latestRef, pitchRef, pitchTypeNumberRef, showResult, swingRef],
   )
 
   /** 스윙이 나가는 틱(F + 1, 0x4e0ce) — 필살이면 남은 횟수 −1 (0x4e136: S+0x10 ≠ 0 && 남은 > 0, 결과와 무관) */
@@ -735,26 +766,40 @@ export function BattingStage({
   )
 
   /** 상태 0x13 을 끝내고 인플레이(0x17)로 넘긴다 — 시간이 다 됐거나 OK/'5' 로 건너뛸 때 */
-  const commitHit = useCallback((tick: number) => {
-    const pending = pendingHitRef.current
-    if (pending === null) return
-    pendingHitRef.current = null
-    // 016(id 15, 프레임 10)은 0x13 끝이 아니라 멈춤이 풀리는 0x13 그림(틱 7)이 쏜다 — 정정(2026-10-24, 0x4cb1c 4ccba~4cd14 직접
-    // 떴다): `useStageAnimation` 의 0x13 그리기 몫(`hitPause.HIT_STOP_TICKS`)
-    // 0x13 → 0x17 — 0x17 진입 0x46418(4673e)이 다음 틱에 파티클 관리자를 비운다 (`useStageAnimation`)
-    inPlayEnteredTickRef.current = tick
-    hitSkipKeyTickRef.current = null
-    resultTextRef.current = pending.resultText
-    // 0x13 갱신이 이 틀에 0x17 을 예약한다(40786~407b0 → 0xbcb49) — 다음 틀이 틱 0 이다(`phaseEntryRef`)
-    homeRunStartTickRef.current = pending.isHomeRun ? tick + 1 : null
-    // 맞은 공은 원본이 0x12 가 아니라 인플레이(0x17)로 간다 — 웹 결과 문구는 보통 결과 길이로 둔다
-    resultTicksRef.current = RESULT_PHASE_TICKS
-    isInPlayResultRef.current = true
-    isHitByPitchResultRef.current = false
-    phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
-    markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.인플레이 })
-    latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind, tick)
-  }, [])
+  const commitHit = useCallback(
+    (tick: number) => {
+      const pending = pendingHitRef.current
+      if (pending === null) return
+      pendingHitRef.current = null
+      // 016(id 15, 프레임 10)은 0x13 끝이 아니라 멈춤이 풀리는 0x13 그림(틱 7)이 쏜다 — 정정(2026-10-24, 0x4cb1c 4ccba~4cd14 직접
+      // 떴다): `useStageAnimation` 의 0x13 그리기 몫(`hitPause.HIT_STOP_TICKS`)
+      // 0x13 → 0x17 — 0x17 진입 0x46418(4673e)이 다음 틱에 파티클 관리자를 비운다 (`useStageAnimation`)
+      inPlayEnteredTickRef.current = tick
+      hitSkipKeyTickRef.current = null
+      resultTextRef.current = pending.resultText
+      // 0x13 갱신이 이 틀에 0x17 을 예약한다(40786~407b0 → 0xbcb49) — 다음 틀이 틱 0 이다(`phaseEntryRef`)
+      homeRunStartTickRef.current = pending.isHomeRun ? tick + 1 : null
+      // 맞은 공은 원본이 0x12 가 아니라 인플레이(0x17)로 간다 — 웹 결과 문구는 보통 결과 길이로 둔다
+      resultTicksRef.current = RESULT_PHASE_TICKS
+      isInPlayResultRef.current = true
+      isHitByPitchResultRef.current = false
+      phaseEntryRef.current = { phase: '결과', tick: tick + 1 }
+      markSceneStateEntries({ tick: tick + 1, state: SCENE_STATE.인플레이 })
+      latestRef.current.onPitchResolved(pending.detail, pending.pitch, pending.isUncatchable, pending.buntKind, tick)
+    },
+    [
+      hitSkipKeyTickRef,
+      homeRunStartTickRef,
+      inPlayEnteredTickRef,
+      isHitByPitchResultRef,
+      isInPlayResultRef,
+      latestRef,
+      pendingHitRef,
+      phaseEntryRef,
+      resultTextRef,
+      resultTicksRef,
+    ],
+  )
 
   const actions = useMemo(() => {
     /**
@@ -869,7 +914,22 @@ export function BattingStage({
         swingRef.current = { frame: keyTickNow(tick), isSpecial: true, isReleased: false, isUnjudgedWhiff: false }
       },
     }
-  }, [commitHit, specialSwingNumber, aceBatterIndex, specialSwingRemaining])
+  }, [
+    specialSwingNumber,
+    aceBatterIndex,
+    specialSwingRemaining,
+    buntRef,
+    hitSkipKeyTickRef,
+    latestRef,
+    pendingHitRef,
+    phaseEntryRef,
+    phaseRef,
+    phaseStartTickRef,
+    pitchRef,
+    sceneBuntKindOfThisPitch,
+    shiftRef,
+    swingRef,
+  ])
 
   // 상태 0x11 인가 — 도루 키(0x53610)를 받는 화면이 묻는다. 0x53670 은 0x11 **전체**(와인드업 포함, 공 틱이 0 인 동안도)에서
   // 0x53610 을 부르므로 릴리스 전도 참이다. 0x11 은 맞은 공의 판정(→ 0x13)이나 공 끝(틱 N + 1 → 0x12)까지 이어진다
@@ -902,7 +962,7 @@ export function BattingStage({
 
   return (
     <canvas
-      ref={refs.canvasRef}
+      ref={canvasRef}
       className={styles.stage}
       // 홈런더비 판(0x17) — 밑에 깔린 필드 화면이 비치도록 바탕을 뺀다(`isFieldPlay`)
       style={props.isFieldPlay === true ? { background: 'transparent' } : undefined}

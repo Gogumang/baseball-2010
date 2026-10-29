@@ -14,7 +14,7 @@ import { frameSlideOf } from '@/widgets/screen-frame/lib/frameSlide'
 
 afterEach(cleanup)
 
-function 머리띠({ tick, starts }: { readonly tick: number; readonly starts: boolean }) {
+function HeaderBand({ tick, starts }: { readonly tick: number; readonly starts: boolean }) {
   return <span data-slide={useSkinFrameSlide(tick, starts)} />
 }
 const slideOf = (container: HTMLElement) => Number(container.querySelector('span')?.dataset.slide)
@@ -31,35 +31,35 @@ describe('머리띠 미끄러짐 [skin+0x84] · [+0x86] — 앱에 하나 (r168)
 
   it('세우는 화면 → 미끄러지는 도중 세우지 않는 화면으로 가면 남은 걸음을 잇는다', () => {
     resetSkinFrameSlide()
-    const 앞 = render(<머리띠 tick={0} starts />)
+    const 앞 = render(<HeaderBand tick={0} starts />)
     expect(slideOf(앞.container)).toBe(2)
-    앞.rerender(<머리띠 tick={1} starts />)
+    앞.rerender(<HeaderBand tick={1} starts />)
     expect(slideOf(앞.container)).toBe(4)
     cleanup()
-    const 뒤 = render(<머리띠 tick={0} starts={false} />)
+    const 뒤 = render(<HeaderBand tick={0} starts={false} />)
     expect(slideOf(뒤.container)).toBe(8)
-    뒤.rerender(<머리띠 tick={2} starts={false} />)
+    뒤.rerender(<HeaderBand tick={2} starts={false} />)
     expect(slideOf(뒤.container)).toBe(30)
     expect(isSkinFrameSliding()).toBe(false)
   })
 
   it('깃발을 지우는 들어옴(기록연감 0x2407c · 경기 중 0x3c26a · 0x3c3b8) 뒤엔 첫 그림부터 30', () => {
     resetSkinFrameSlide()
-    render(<머리띠 tick={0} starts />)
+    render(<HeaderBand tick={0} starts />)
     cleanup()
     stopSkinFrameSlide()
-    const 뒤 = render(<머리띠 tick={0} starts={false} />)
+    const 뒤 = render(<HeaderBand tick={0} starts={false} />)
     expect(slideOf(뒤.container)).toBe(30)
   })
 
   it('같은 틱을 다시 그리면 안 옮긴다 · 다 내려온 뒤 세우지 않는 화면은 30', () => {
     resetSkinFrameSlide()
-    const 화면 = render(<머리띠 tick={0} starts />)
-    화면.rerender(<머리띠 tick={0} starts />)
+    const 화면 = render(<HeaderBand tick={0} starts />)
+    화면.rerender(<HeaderBand tick={0} starts />)
     expect(slideOf(화면.container)).toBe(2)
-    화면.rerender(<머리띠 tick={9} starts />)
+    화면.rerender(<HeaderBand tick={9} starts />)
     expect(slideOf(화면.container)).toBe(30)
     cleanup()
-    expect(slideOf(render(<머리띠 tick={0} starts={false} />).container)).toBe(30)
+    expect(slideOf(render(<HeaderBand tick={0} starts={false} />).container)).toBe(30)
   })
 })

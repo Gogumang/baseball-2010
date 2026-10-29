@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import { ORIGINAL_COLORS } from '@/shared/config/design'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
@@ -148,7 +149,8 @@ export function PlayerDetailWindow({ detail, origin, draw, radarDraw, radarKey }
   const tickerCount = frame.isOpen ? rows.filter((_, index) => detail.values[index]?.kind === 'ticker').length : 0
   const tickerCounter = useSkinTickerCounter(draw, tickerCount)
   const openDraw = openDrawOf(origin)
-  let tickerIndex = 0
+  // 0x5a8c8 — 한 그림의 k 번째 흐르는 글은 카운터 c + 3k 로 그려진다. 줄마다 그 앞 흐르는 글 수가 k 다
+  const tickerOrders = tickerOrdersOf(rows.map((_, index) => detail.values[index]?.kind === 'ticker'))
   return (
     <div data-testid="선수 정보 창">
       <RoundFill x={x} y={y} width={width} height={height} color={DETAIL_COLORS.outer} />
@@ -194,9 +196,7 @@ export function PlayerDetailWindow({ detail, origin, draw, radarDraw, radarKey }
                 </PixelText>
               )
             } else if (value?.kind === 'ticker' && frame.isOpen) {
-              // 0x5a8c8 — 한 그림의 k 번째 흐르는 글은 카운터 c + 3k 로 그려진다
-              content = <DetailTicker text={value.text} x={valueX} y={textY + 2} counter={tickerCounter + SKIN_TICKER_STEP * tickerIndex} />
-              tickerIndex += 1
+              content = <DetailTicker text={value.text} x={valueX} y={textY + 2} counter={tickerCounter + SKIN_TICKER_STEP * tickerOrders[index]} />
             }
             return (
               <div key={index} data-testid={`선수 정보 줄 ${index}`} aria-label={value?.text}>
@@ -214,6 +214,22 @@ export function PlayerDetailWindow({ detail, origin, draw, radarDraw, radarKey }
 }
 
 /** 창이 다 열리는(+0x425 = 1) 첫 그림 */
+/** 줄마다 그 앞에 선 흐르는 글 수 — 그림 안 차례 k */
+function tickerOrdersOf(isTickerRows: readonly boolean[]): number[] {
+  let seen = 0
+  return isTickerRows.map((isTicker) => {
+    const order = seen
+    if (isTicker) seen += 1
+    return order
+  })
+}
+
+/** 도형 자람의 시작 — 열쇠(다시 열기 · 능력)가 바뀐 그림에서 지난 목표값(detailRadarObject)으로 새로 만든다 */
+function radarStartOf(previous: { readonly key: string; readonly start: RadarGrowthState } | null, key: string) {
+  if (previous !== null && previous.key === key) return previous
+  return { key, start: radarGrowthStart(detailRadarObject.previous, detailRadarObject.hasPrevious, 4, false) }
+}
+
 function openDrawOf(origin: DetailWindowOrigin): number {
   let draw = 0
   while (!detailWindowFrameAt(draw, origin).isOpen) draw += 1
@@ -260,13 +276,10 @@ function DetailRadar({
   readonly restartKey: number
   readonly center: { readonly x: number; readonly y: number }
 }) {
-  const startRef = useRef<{ key: string; start: RadarGrowthState } | null>(null)
   // '0' · 위아래가 +0x1e3 = 0 — 다음 그림의 0x75ebc 가 지난 목표값(+0xad 면)에서 다시 만든다
   const key = `${restartKey}:${abilities.join(',')}`
-  if (startRef.current === null || startRef.current.key !== key) {
-    startRef.current = { key, start: radarGrowthStart(detailRadarObject.previous, detailRadarObject.hasPrevious, 4, false) }
-  }
-  const state = radarGrowthAt(startRef.current.start, abilities, Math.max(0, draw))
+  const { start } = useRenderMachine(radarStartOf, key)
+  const state = radarGrowthAt(start, abilities, Math.max(0, draw))
   useEffect(() => {
     detailRadarObject.previous = state.previous
     detailRadarObject.hasPrevious = state.hasPrevious

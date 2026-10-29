@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { Screen } from '@/app/model/screen'
 import { MessageBox } from '@/shared/ui'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
@@ -204,9 +204,12 @@ export function EntryRoutes({
    */
   const [annalsSecretCode, setAnnalsSecretCode] = useState(INITIAL_SECRET_CODE_STATE)
   const isOutsideMenuScene = screen.kind === '팀선택' || screen.kind === '선수등록' || screen.kind === '홈런더비'
-  useEffect(() => {
+  // 메뉴 장면 밖으로 나간 그림에서 비운다(그동안은 기록연감이 안 서 보이는 것이 같다)
+  const [wasOutsideMenuScene, setWasOutsideMenuScene] = useState(isOutsideMenuScene)
+  if (wasOutsideMenuScene !== isOutsideMenuScene) {
+    setWasOutsideMenuScene(isOutsideMenuScene)
     if (isOutsideMenuScene) setAnnalsSecretCode(INITIAL_SECRET_CODE_STATE)
-  }, [isOutsideMenuScene])
+  }
   /** 전부 수집 보상 팝업 글 (0x292f8 의 `0xbbef9(글, 1, −1, 1)`) — 메뉴 위에 뜬다 */
   const [collectionRewardText, setCollectionRewardText] = useState<string | null>(null)
   const claimReward = () => setCollectionRewardText(claimCollectionReward?.() ?? null)
@@ -222,7 +225,7 @@ export function EntryRoutes({
    * 다녀오면 그 칸에 선다(진입 0x24a40 은 안 건드린다). 다른 장면(0x104~0x107)으로는 늘 [게임시작](0 칸)에서 하위 5 를 거쳐 나가므로
    * 돌아와 장면을 새로 세울 때(memset 0)와 값이 같다 — 이 컴포넌트가 내려가 0 으로 돌아와도 원본과 같다.
    */
-  const topMenuCursor = useRef(createGameStartCursor()).current
+  const [topMenuCursor] = useState(createGameStartCursor)
   const [derbyBest, setDerbyBest] = useState(() => {
     const saved = derbyStore.load()
     const value = (saved as { bestDistance?: unknown } | null)?.bestDistance

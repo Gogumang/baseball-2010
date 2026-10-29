@@ -3,13 +3,7 @@ import { stampInputTime } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import * as styles from '@/shared/ui/PressArea/PressArea.css'
-
-export interface PressRect {
-  readonly x: number
-  readonly y: number
-  readonly width: number
-  readonly height: number
-}
+import type { PressRect } from '@/shared/ui/PressArea/pressRect'
 
 interface PressAreaProps {
   /** 읽어 주는 이름 — 화면에는 안 보인다 (예: "확인", "메뉴", "도루 1루") */
@@ -36,13 +30,6 @@ interface PressAreaProps {
    */
   readonly touchKey?: TouchKeyOffer
 }
-
-/**
- * 바닥띠 **되돌아가기 표시** 자리 — `ScreenFrame` 이 바닥비트 0x4 일 때 game_frame 21(19×13)을 (206, 바닥 − 16 = 304) 에 그린다
- * (0x55226). 그 표시를 그대로 둔 채 위에 창이 뜨는 곳(기록실 · 구질 두 칸 팝업 따위)이 CLR 을 이 자리 누름 칸으로 받는다 (r186 —
- * 늘 있던 뒤로 버튼을 걷었다). 손가락 칸이라 사방 2px 넓힌다
- */
-export const FOOTER_BACK_PRESS_RECT: PressRect = { x: 206 - 2, y: 304 - 2, width: 19 + 4, height: 13 + 4 }
 
 /** 화면 전체 240×320 */
 const WHOLE_SCREEN: PressRect = { x: 0, y: 0, width: 240, height: 320 }

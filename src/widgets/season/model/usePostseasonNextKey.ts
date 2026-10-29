@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 0x13da0 · 0x9dc8 의 확인 키 — `[+0x40]` 이 −5(OK) 또는 0x35('5') 일 때만 다음으로 */
 const POSTSEASON_NEXT_KEYS: ReadonlySet<string> = new Set(['Enter', '5'])
@@ -9,7 +10,7 @@ const POSTSEASON_NEXT_KEYS: ReadonlySet<string> = new Set(['Enter', '5'])
  */
 export function usePostseasonNextKey(onNext: (() => void) | undefined): void {
   const onNextRef = useRef(onNext)
-  onNextRef.current = onNext
+  useMirrorRef(onNextRef, onNext)
   const isListening = onNext !== undefined
   useEffect(() => {
     if (!isListening) return

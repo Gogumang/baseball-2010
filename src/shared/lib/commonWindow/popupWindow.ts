@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { setAppTickInterval } from '@/shared/lib/frameClock/frameClock'
 import { useMarksCommonWindowShown } from '@/shared/lib/commonWindow/commonWindow'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * **공용 창 [0x140005c] 의 0x741a0 계열 여닫기** — 그리기 · 키 콜백을 받는 창(칭호 · 스킬 보상 · 이벤트 미션 · 기록 고르기 …).
@@ -115,9 +116,9 @@ export function usePopupWindowMotion({
   const onClosedRef = useRef<(() => void) | undefined>(undefined)
   const onNextUpdateRef = useRef<(() => void) | undefined>(undefined)
   const skipsMotionRef = useRef(skipsMotion)
-  skipsMotionRef.current = skipsMotion
+  useMirrorRef(skipsMotionRef, skipsMotion)
   const expandsRef = useRef(expands)
-  expandsRef.current = expands
+  useMirrorRef(expandsRef, expands)
 
   const finish = useCallback(() => {
     isClosedRef.current = true

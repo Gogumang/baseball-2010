@@ -30,6 +30,7 @@ import {
   normalizeCollectionRewardRecord,
   withAwardedBit,
 } from '@/entities/collection/model/collectionRewards'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const NO_IDS: readonly number[] = []
 const NO_ANNOUNCE = () => {}
@@ -83,37 +84,42 @@ export function useCollection(
   const [collection, setCollection] = useState<Collection>(() => normalizeCollection(store.load()))
   /** 판정이 읽는 지금 값 — 팝업을 닫고 곧바로 다시 판정할 때 렌더를 기다리지 않는다 */
   const collectionRef = useRef(collection)
-  collectionRef.current = collection
+  useMirrorRef(collectionRef, collection)
   /** 통계의 지금 값 — 한 틀에 사건이 여럿 와도 문턱을 더한 뒤 값으로 본다 */
   const statsRef = useRef(collection.stats)
-  statsRef.current = collection.stats
+  useMirrorRef(statsRef, collection.stats)
   const announceRef = useRef(announceHiddenOpen)
-  announceRef.current = announceHiddenOpen
+  useMirrorRef(announceRef, announceHiddenOpen)
   /** 이번 렌더 전에 이미 연 k — 같은 틀에 두 번 불려도 창을 한 번만 띄운다 */
   const openingRef = useRef<Set<number>>(new Set())
 
   // 투수편 칭호 — 0xa40e0 이 투수편 기록연감 비트(+0xec)에 켠다
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeTitlesIntoCollection(previous, pitcherTitleIds))
   }, [pitcherTitleIds])
 
   // 시즌 엔딩 — 새 해 0x6e0c 가 엔딩으로 갈 때 전역기록 +0xa0+e = 1
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeSeasonEndingIntoCollection(previous, seasonEndingIndex))
   }, [seasonEndingIndex])
 
   useEffect(() => {
     if (career === null) return
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeCareerIntoCollection(previous, career))
   }, [career])
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeOpenedHiddenIds(previous, pitcherOpenedHiddenIds))
   }, [pitcherOpenedHiddenIds])
 
   const pitcherEndingIndex = pitcherEnding?.endingIndex ?? null
   const pitcherSeenEventIds = pitcherEnding?.seenEventIds ?? NO_EVENTS
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- 다른 세션 값을 전역기록에 합치는 것은 커밋 뒤(옛 때) — 지난 그림 기록연감을 읽는 곳(미션 명전 · 히든 판정)의 차례가 그대로다
     setCollection((previous) => mergeEndingIntoCollection(previous, { endingIndex: pitcherEndingIndex, seenEventIds: pitcherSeenEventIds }))
   }, [pitcherEndingIndex, pitcherSeenEventIds])
 

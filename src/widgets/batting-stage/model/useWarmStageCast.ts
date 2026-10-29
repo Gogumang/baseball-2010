@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { warmStageCast } from '@/widgets/batting-stage/lib/renderBattingStage'
 import { warmFieldBackground } from '@/widgets/batting-stage/lib/spriteLoader'
 import type { StageWarmCast } from '@/widgets/batting-stage/lib/renderBattingStage'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /** 원점 · 팔레트를 기다리는 동안 다시 걸어 보는 간격 (ms) — 그리기 · 경기 틱과는 상관없다 */
 const WARM_RETRY_MS = 100
@@ -14,7 +15,7 @@ const WARM_RETRY_MS = 100
  */
 export function useWarmStageCast(cast: StageWarmCast | null): void {
   const castRef = useRef(cast)
-  castRef.current = cast
+  useMirrorRef(castRef, cast)
   const key = cast === null ? '' : JSON.stringify(cast)
   useEffect(() => {
     if (key === '' || warmStageCast(castRef.current)) return undefined

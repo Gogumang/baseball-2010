@@ -20,7 +20,8 @@ import type { SettleGameContext } from '@/app/model/seasonSession/settlement/use
 
 /** `useSeasonSession` 몸통 문장 103~112 을 그대로 옮겼다 (r346) — 부르는 차례 · 훅 차례는 `useSeasonSession` 그대로 */
 export function useAfterGameActions(ctx: SettleGameContext) {
-  const { settledGame, settleGame, random, freshScene, setResumeGame, setGameOptions, setScene, save, commit, recordStat, setTradeRequest } = ctx
+  const { settledGameRef, settleGame, random, freshSceneRef, setResumeGame, setGameOptions, setScene, save, commit, recordStat, setTradeRequest } =
+    ctx
   const { nextGameEntered, setTradeRequestAlertOpen, setMenuCursors } = ctx
   /**
    * **정산 진입** (`TeamGameScreen.onSettlementEnter` — 경기 끝 결과 판 OK → 상태 0x19, 진입 0x4ea0c).
@@ -30,11 +31,10 @@ export function useAfterGameActions(ctx: SettleGameContext) {
    */
   const enterGameSettlement = useCallback(
     (summary: TeamGameSummary) => {
-      if (settledGame.current !== null) return
-      settledGame.current = settleGame(summary)
+      if (settledGameRef.current !== null) return
+      settledGameRef.current = settleGame(summary)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [settleGame],
+    [settleGame, settledGameRef],
   )
   /**
    * 결과 화면 확인 — 정산 진입에서 정해 둔 다음 장면으로 간다. 정산 진입을 거치지 않고 왔으면(테스트 · 옛 길) 여기서 정산한다.
@@ -50,19 +50,17 @@ export function useAfterGameActions(ctx: SettleGameContext) {
   }, [random])
   /** 들어와 장면 0x105 를 세운다 — 셋업 0x3b14 가 mgr+0x304 = 1, 이어서 상태 1 적재의 팁 굴림 */
   const constructScene = useCallback(() => {
-    freshScene.current = true
+    freshSceneRef.current = true
     rollSceneLoadTip()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [rollSceneLoadTip])
+  }, [rollSceneLoadTip, freshSceneRef])
   /** 관리 메뉴 0xc9 확인 키(−5 · '5') — 0x8f82 가 칸을 보기 전에 mgr+0x304 = 0 (490 쿨다운 검사가 다시 선다) */
   const pressManagementConfirm = useCallback(() => {
-    freshScene.current = false
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+    freshSceneRef.current = false
+  }, [freshSceneRef])
   const finishGame = useCallback(
     (summary: TeamGameSummary) => {
-      const settled = settledGame.current ?? settleGame(summary)
-      settledGame.current = null
+      const settled = settledGameRef.current ?? settleGame(summary)
+      settledGameRef.current = null
       setResumeGame(null)
       // 경기 장면이 끝나면 장면 0x105 를 새로 세운다(0x3874 가 지운 뒤 0x3b14) — 상태 1 의 팁 굴림이 그 장면의 맨 앞이다
       if (settled !== null) rollSceneLoadTip()
@@ -71,8 +69,7 @@ export function useAfterGameActions(ctx: SettleGameContext) {
       if (settled.jingle !== null) activeSound().play(settled.jingle)
       setScene(settled.next)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [rollSceneLoadTip, settleGame],
+    [rollSceneLoadTip, settleGame, setGameOptions, setResumeGame, setScene, settledGameRef],
   )
   /** 관중수입 창에서 확인 — 정산된 레코드를 받아 경기 뒤 마무리로 간다 (0xf1) */
   const confirmIncome = useCallback(
@@ -142,8 +139,7 @@ export function useAfterGameActions(ctx: SettleGameContext) {
       activeSound().playBgm(SEASON_MANAGEMENT_BGM)
       setScene(SEASON_SCENE_STATE.경기뒤마무리)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-    [commit, random, recordStat, save],
+    [commit, random, recordStat, save, setScene, setTradeRequest],
   )
   /** 0xf1 키 0x49a4 — 확인이면 포스트시즌 0xef · 경기 수 짝수 0xc9 · 홀수 0xd8 */
   const confirmDayResults = useCallback(() => {
@@ -152,28 +148,27 @@ export function useAfterGameActions(ctx: SettleGameContext) {
     // 홀수 경기 뒤는 관리 메뉴를 건너뛰고 곧장 0xd8 — 들어옴 0x4cb8 이 phase 를 4 로 둔다
     if (next === SEASON_SCENE_STATE.다음경기) return nextGameEntered(save, false)
     setScene(next)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [nextGameEntered, save])
-  const answerTradeRequest = useCallback((accept: boolean) => {
-    setTradeRequestAlertOpen(false)
-    if (accept) {
-      // 7440~7484 — 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서를 칸 1 로 (구단관리 · 트레이드)
-      setMenuCursors((cursors) => ({ ...cursors, management: TRADE_REQUEST_MENU_CURSOR, teamMenu: TRADE_REQUEST_MENU_CURSOR }))
-      return setScene(SEASON_SCENE_STATE.트레이드영입선수)
-    }
-    setTradeRequest((request) => ({ ...request, isRequested: false }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  }, [nextGameEntered, save, setScene])
+  const answerTradeRequest = useCallback(
+    (accept: boolean) => {
+      setTradeRequestAlertOpen(false)
+      if (accept) {
+        // 7440~7484 — 관리 메뉴(this+0x70)·구단관리(this+0x78) 커서를 칸 1 로 (구단관리 · 트레이드)
+        setMenuCursors((cursors) => ({ ...cursors, management: TRADE_REQUEST_MENU_CURSOR, teamMenu: TRADE_REQUEST_MENU_CURSOR }))
+        return setScene(SEASON_SCENE_STATE.트레이드영입선수)
+      }
+      setTradeRequest((request) => ({ ...request, isRequested: false }))
+    },
+    [setMenuCursors, setScene, setTradeRequest, setTradeRequestAlertOpen],
+  )
   const cancelTradeRequest = useCallback(() => {
     setTradeRequest((request) => ({ ...request, isRequested: false }))
     setScene(SEASON_SCENE_STATE.구단관리)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  }, [setScene, setTradeRequest])
   const closeTradeResult = useCallback(() => {
     setTradeRequest((request) => ({ ...request, isRequested: false }))
     setScene(SEASON_SCENE_STATE.관리메뉴)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 옮긴 하위 훅(r346): setter·ref 는 useSeasonSession 의 useState·useRef 값이고 의존성은 옮기기 전 그대로
-  }, [])
+  }, [setScene, setTradeRequest])
   return {
     enterGameSettlement,
     constructScene,

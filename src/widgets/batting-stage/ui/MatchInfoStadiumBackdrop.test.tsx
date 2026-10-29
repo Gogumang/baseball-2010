@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import { MatchInfoStadiumBackdrop, TARGET_CONTEXT_OPTIONS } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
+import { MatchInfoStadiumBackdrop } from '@/widgets/batting-stage/ui/MatchInfoStadiumBackdrop'
 
 afterEach(() => {
   cleanup()
@@ -17,7 +17,6 @@ describe('경기정보 화면 바탕', () => {
     const visible = getByTestId('경기정보-구장')
     const visibleCalls = getContext.mock.contexts.flatMap((canvas, index) => (canvas === visible ? [getContext.mock.calls[index]] : []))
     expect(visibleCalls.length).toBeGreaterThan(0)
-    for (const call of visibleCalls) expect(call).toEqual(['2d', TARGET_CONTEXT_OPTIONS])
-    expect(TARGET_CONTEXT_OPTIONS.willReadFrequently).toBe(true)
+    for (const call of visibleCalls) expect(call).toEqual(['2d', { willReadFrequently: true }])
   })
 })

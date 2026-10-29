@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import { isCommonWindowShown, isGameSceneFrozen, noteCommonWindowOpensInSceneUpdate } from '@/shared/lib/commonWindow/commonWindow'
 import { isRunningSceneKeys, pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 /**
  * 일시정지 창이 어떻게 떴는가 — 창 [+0x290] 과 펼침이 이것으로 갈린다 (2026-10-14 직접 뜸):
@@ -94,7 +95,7 @@ export function useInGameMenuState(): InGameMenuState {
   const [slidesIn, setSlidesIn] = useState(false)
   const [opening, setOpening] = useState<InGameMenuOpening>('별표')
   const isOpenRef = useRef(isOpen)
-  isOpenRef.current = isOpen
+  useMirrorRef(isOpenRef, isOpen)
   const closerRef = useRef<InGameMenuCloser | null>(null)
 
   const closeAtOnce = useCallback(() => {
@@ -162,7 +163,7 @@ export function useInGameMenuState(): InGameMenuState {
  */
 export function useInGameMenuOpenOnHide(menu: Pick<InGameMenuState, 'openFromPause'>, canOpen: boolean): void {
   const canOpenRef = useRef(canOpen)
-  canOpenRef.current = canOpen
+  useMirrorRef(canOpenRef, canOpen)
   const { openFromPause } = menu
   useEffect(() => {
     const onVisibilityChange = () => {

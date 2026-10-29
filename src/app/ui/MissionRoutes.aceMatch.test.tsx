@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
+import { useLayoutEffect } from 'react'
 import { useAtBatRunner } from '@/app/model/useAtBatRunner'
 import { useMissionSession } from '@/app/model/useMissionSession'
 import type { Screen } from '@/app/model/screen'
@@ -41,13 +42,17 @@ vi.mock('@/pages/defense/ui/DefensePlayback', () => ({
 /** 로딩 판이 받은 팁 글 — 그림 대신 그리자마자 끝낸다(상태 7 · 9 · 8 적재를 다 그린 꼴) */
 const 받은팁: string[] = []
 vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useRef } = await import('react')
   return {
     LoadingTip: ({ tip, onDone }: { tip: string; onDone: () => void }) => {
+      // 올릴 때 한 번만 — 다시 그려져도 다시 부르지 않는다
+      const done = useRef(false)
       useEffect(() => {
+        if (done.current) return
+        done.current = true
         받은팁.push(tip)
         onDone()
-      }, [])
+      }, [tip, onDone])
       return null
     },
   }
@@ -71,7 +76,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     if (mission === null) throw new Error('투수 미션 17 이 없다')
     const onFinish = vi.fn()
     const screen: Screen = { kind: '투수편' }
-    let 세션: ReturnType<typeof useMissionSession> | null = null
+    const 세션: { current: ReturnType<typeof useMissionSession> | null } = { current: null }
 
     function Harness() {
       const runner = useAtBatRunner()
@@ -82,7 +87,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
         screen,
         setScreen: vi.fn(),
       })
-      세션 = session
+      useLayoutEffect(() => {
+        세션.current = session
+      })
       return (
         <PitcherAceMatchRoute
           mission={mission!}
@@ -97,22 +104,22 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     }
     render(<Harness />)
     // 첫 0x18 판의 OK → 0xd → 0xe
-    act(() => 세션!.actions.confirmHalfInningBoard())
+    act(() => 세션.current!.actions.confirmHalfInningBoard())
 
     const shown = 받은것.at(-1)!
     expect(shown.settings).toBe(설정.settings)
     expect(shown.onSettingsChange).toBe(설정.setSettings)
     expect(shown.onRestart).toBeTypeOf('function')
-    act(() => 세션!.actions.giveUpPitcher())
+    act(() => 세션.current!.actions.giveUpPitcher())
     expect(받은것.at(-1)?.run.status).toBe('실패')
     // 다시하기 — 새 판(진행중)이고 여전히 대결이다: 끝나면 투수편으로 이겼나를 넘긴다
     act(() => 받은것.at(-1)!.onRestart!())
     // 다시 세운 장면도 첫 0x18 판부터
-    act(() => 세션!.actions.confirmHalfInningBoard())
+    act(() => 세션.current!.actions.confirmHalfInningBoard())
     const again = 받은것.at(-1)!
     expect(again.run.mission).toBe(mission)
     expect(again.run.status).toBe('진행중')
-    act(() => 세션!.actions.giveUpPitcher())
+    act(() => 세션.current!.actions.giveUpPitcher())
     act(() => 받은것.at(-1)!.onFinish())
     expect(onFinish).toHaveBeenCalledWith(false)
   })
@@ -124,7 +131,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     const onQuit = vi.fn()
     const setScreen = vi.fn()
     const screen: Screen = { kind: '투수편' }
-    let 세션: ReturnType<typeof useMissionSession> | null = null
+    const 세션: { current: ReturnType<typeof useMissionSession> | null } = { current: null }
 
     function Harness() {
       const runner = useAtBatRunner()
@@ -135,7 +142,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
         screen,
         setScreen,
       })
-      세션 = session
+      useLayoutEffect(() => {
+        세션.current = session
+      })
       return (
         <PitcherAceMatchRoute
           mission={mission!}
@@ -149,7 +158,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
       )
     }
     render(<Harness />)
-    act(() => 세션!.actions.confirmHalfInningBoard())
+    act(() => 세션.current!.actions.confirmHalfInningBoard())
     act(() => 받은것.at(-1)!.onGiveUp())
     expect(onQuit).toHaveBeenCalledTimes(1)
     expect(setScreen).toHaveBeenLastCalledWith({ kind: '메인메뉴' })
@@ -163,7 +172,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     const onFinish = vi.fn()
     const screen: Screen = { kind: '투수편' }
     const random = createSeededRandom(1)
-    let 세션: ReturnType<typeof useMissionSession> | null = null
+    const 세션: { current: ReturnType<typeof useMissionSession> | null } = { current: null }
 
     function Harness() {
       const runner = useAtBatRunner()
@@ -174,7 +183,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
         screen,
         setScreen: vi.fn(),
       })
-      세션 = session
+      useLayoutEffect(() => {
+        세션.current = session
+      })
       return (
         <PitcherAceMatchRoute
           mission={mission!}
@@ -200,7 +211,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
 
     const shown = 받은것.at(-1)
     expect(shown?.run.mission).toMatchObject({ side: '투수', id: 18, name: '로제' })
-    act(() => 세션!.actions.giveUpPitcher())
+    act(() => 세션.current!.actions.giveUpPitcher())
     const finished = 받은것.at(-1)
     expect(finished?.run.status).toBe('실패')
     act(() => finished?.onFinish())
@@ -211,7 +222,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
   it('들어서면 첫 0x18 판보다 먼저 로딩 판 — 팁은 상태 7 진입 0x53dbc 의 rand(0, 73) 칸 StrTIP[1 + n] (다시하기도 다시 선다)', () => {
     const mission = aceMatchMissionOf(18, '투수')
     if (mission === null) throw new Error('투수 미션 18 이 없다')
-    let 세션: ReturnType<typeof useMissionSession> | null = null
+    const 세션: { current: ReturnType<typeof useMissionSession> | null } = { current: null }
     function Harness() {
       const runner = useAtBatRunner()
       const session = useMissionSession({
@@ -221,7 +232,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
         screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
-      세션 = session
+      useLayoutEffect(() => {
+        세션.current = session
+      })
       return (
         <PitcherAceMatchRoute
           mission={mission!}
@@ -238,9 +251,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     // 팁 굴림은 장면 시작 굴림의 맨 앞이다 — 같은 씨앗의 첫 rand(0, 73)
     expect(받은팁).toEqual([LOADING_TIPS[rollSceneLoadingTip(createSeededRandom(1))]])
     // 로딩 판을 다 그리면 첫 0x18 판
-    expect(세션!.loadingTip).toBeNull()
+    expect(세션.current!.loadingTip).toBeNull()
     expect(view.getByTestId(/^교대-판-/)).toBeTruthy()
-    act(() => 세션!.actions.beginPitcherAceMatch(mission))
+    act(() => 세션.current!.actions.beginPitcherAceMatch(mission))
     expect(받은팁).toHaveLength(2)
   })
 
@@ -286,7 +299,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     if (mission === null) throw new Error('투수 미션 17 이 없다')
     const 밀어내기 = { kind: 2, pitchJudgement: '볼넷', ticks: [{}] } as never
 
-    let 세션: ReturnType<typeof useMissionSession> | null = null
+    const 세션: { current: ReturnType<typeof useMissionSession> | null } = { current: null }
 
     function Harness() {
       const runner = useAtBatRunner()
@@ -297,7 +310,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
         screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
-      세션 = session
+      useLayoutEffect(() => {
+        세션.current = session
+      })
       return (
         <PitcherAceMatchRoute
           mission={mission!}
@@ -311,7 +326,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
       )
     }
     render(<Harness />)
-    act(() => 세션!.actions.confirmHalfInningBoard())
+    act(() => 세션.current!.actions.confirmHalfInningBoard())
     act(() => {
       vi.advanceTimersByTime(30 * millisecondsPerFrame())
     })
@@ -328,7 +343,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
     if (mission === null) throw new Error('투수 미션 17 이 없다')
     const 밀어내기 = { kind: 2, pitchJudgement: '볼넷', ticks: [{}] } as never
 
-    let 세션: ReturnType<typeof useMissionSession> | null = null
+    const 세션: { current: ReturnType<typeof useMissionSession> | null } = { current: null }
 
     function Harness() {
       const runner = useAtBatRunner()
@@ -339,7 +354,9 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
         screen: { kind: '투수편' },
         setScreen: vi.fn(),
       })
-      세션 = session
+      useLayoutEffect(() => {
+        세션.current = session
+      })
       return (
         <PitcherAceMatchRoute
           mission={mission!}
@@ -353,7 +370,7 @@ describe('투수편 마선수 대결 화면 (`renderAceMatch` 가 그린다)', (
       )
     }
     render(<Harness />)
-    act(() => 세션!.actions.confirmHalfInningBoard())
+    act(() => 세션.current!.actions.confirmHalfInningBoard())
     act(() => {
       vi.advanceTimersByTime(10 * millisecondsPerFrame())
     })

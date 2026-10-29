@@ -1,4 +1,4 @@
-import { type MutableRefObject, useRef } from 'react'
+import type { MutableRefObject } from 'react'
 import { screenOffsetOf, toScreenX, toScreenY } from '@/pages/defense/lib/defenseCamera'
 import {
   type HalfInningWalkInput,
@@ -11,6 +11,8 @@ import { nameTagBoxOf, nameTagPiecesOf } from '@/widgets/field-walk/lib/nameTag'
 import type { WalkerAceSprite } from '@/widgets/field-walk/lib/walkerAces'
 import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
 import * as styles from '@/widgets/field-walk/ui/FieldWalkView.css'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 export interface HalfInningFieldProps {
   readonly input: HalfInningWalkInput
@@ -38,6 +40,29 @@ export interface HalfInningFieldProps {
   readonly walkStateRef?: MutableRefObject<HalfInningWalkState | null>
 }
 
+interface WalkMemory {
+  readonly input: HalfInningWalkInput
+  readonly tick: number
+  readonly state: HalfInningWalkState
+}
+
+/**
+ * 판 틱까지 걸음을 굴린다 — 판 재료가 같으면(굴림 · 측 · 앞 자리) 앞 그림의 걸음에서 이어 굴린다. 부르는 쪽이 그림마다 새 꼴을
+ * 만들어도 처음부터 다시 돌지 않는다
+ */
+function advanceWalkMemory(previous: WalkMemory | null, { input, tick }: { readonly input: HalfInningWalkInput; readonly tick: number }): WalkMemory {
+  const isSameInput =
+    previous !== null &&
+    previous.input.rolls === input.rolls &&
+    previous.input.offenseSide === input.offenseSide &&
+    previous.input.previousFielders === input.previousFielders &&
+    previous.input.previousCamera === input.previousCamera
+  const start = previous === null || !isSameInput || previous.tick > tick ? { input, tick: -1, state: startHalfInningWalk(input) } : previous
+  let { state } = start
+  for (let t = start.tick + 1; t <= tick; t += 1) state = stepHalfInningWalk(state, t)
+  return { input, tick: Math.max(tick, start.tick), state }
+}
+
 /**
  * **공수 교대 판의 운동장 전경 0x4fb8c** — `lib/halfInningWalk` 의 상태를 판 틱마다 한 걸음씩 굴려 그린다.
  * 수비 줄(새 수비)이 더그아웃에서 제자리로 걷고, 공격 줄(앞 반 이닝 수비)이 더그아웃으로 들어가며, 틱 100 뒤 카메라가 야수를 하나씩
@@ -54,22 +79,8 @@ export function HalfInningField({
   offenseAces,
   walkStateRef,
 }: HalfInningFieldProps) {
-  const memory = useRef<{ readonly input: HalfInningWalkInput; readonly tick: number; readonly state: HalfInningWalkState } | null>(null)
-  let current = memory.current
-  // 판 재료가 같으면(굴림 · 측 · 앞 자리) 이어서 굴린다 — 부르는 쪽이 그림마다 새 꼴을 만들어도 처음부터 다시 돌지 않는다
-  const isSameInput =
-    current !== null &&
-    current.input.rolls === input.rolls &&
-    current.input.offenseSide === input.offenseSide &&
-    current.input.previousFielders === input.previousFielders &&
-    current.input.previousCamera === input.previousCamera
-  if (current === null || !isSameInput || current.tick > tick) {
-    current = { input, tick: -1, state: startHalfInningWalk(input) }
-  }
-  let { state } = current
-  for (let t = current.tick + 1; t <= tick; t += 1) state = stepHalfInningWalk(state, t)
-  memory.current = { input, tick: Math.max(tick, current.tick), state }
-  if (walkStateRef !== undefined) walkStateRef.current = state
+  const { state } = useRenderMachine(advanceWalkMemory, { input, tick })
+  useMirrorRef(walkStateRef, state)
 
   const offset = screenOffsetOf(state.camera)
   const tagSlot = halfInningNameTagSlotOf(state, tick)

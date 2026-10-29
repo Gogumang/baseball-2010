@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FOOTER_BACK_PRESS_RECT, MarkupText, PressArea } from '@/shared/ui'
 import { CANCEL_KEY_OFFER, tapKey, useTouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { popupBoxStyleOf, usePopupWindowMotion } from '@/shared/lib/commonWindow/popupWindow'
@@ -26,6 +26,7 @@ import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
 import { measuredTitleCenterXOf } from '@/shared/lib/font'
 import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
 
 const IMG_TEXT = assetUrl('./sprites/img_text/frames')
 const frameSrc = (frame: number) => `${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`
@@ -98,7 +99,7 @@ export function RecordPickPopup({
   onClosed,
 }: RecordPickPopupProps) {
   const latest = useRef({ onToggle, onConfirm, onCancel, onClosed })
-  latest.current = { onToggle, onConfirm, onCancel, onClosed }
+  useMirrorRef(latest, { onToggle, onConfirm, onCancel, onClosed })
   // 레이아웃이 없는 환경(측정 높이 0 — 시험)에서는 `MessageBox` 처럼 펼침 · 줄임을 건너뛴다
   const boxRef = useRef<HTMLDivElement>(null)
   const [hasNoLayout, setHasNoLayout] = useState(false)
@@ -107,16 +108,17 @@ export function RecordPickPopup({
   }, [])
   const motion = usePopupWindowMotion({ targetHeight: RECORD_PICK_POPUP_HEIGHT, skipsMotion: hasNoLayout })
   const closeKindRef = useRef(closeKind)
-  closeKindRef.current = closeKind
+  useMirrorRef(closeKindRef, closeKind)
   /** 확인 — `'바로'` 는 치운 자리에서, `'줄임'` 은 다음 갱신에 `onConfirm` · 다 닫히면 `onClosed` */
-  const confirm = () => {
-    if (closeKindRef.current === '바로') return motion.close('바로', () => latest.current.onConfirm())
-    return motion.close(
+  const closeMotion = motion.close
+  const confirm = useCallback(() => {
+    if (closeKindRef.current === '바로') return closeMotion('바로', () => latest.current.onConfirm())
+    return closeMotion(
       '줄임',
       () => latest.current.onClosed?.(),
       () => latest.current.onConfirm(),
     )
-  }
+  }, [closeMotion])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest.current
@@ -139,7 +141,8 @@ export function RecordPickPopup({
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [motion])
+    // `motion` 은 그림마다 새 꼴이라 이 effect 는 그림마다 다시 건다
+  }, [motion, confirm])
 
   const labelOrigins = useFrameOrigins(IMG_TEXT)
   // 창 그림 0x19448 은 제목 · 칸 둘만 그려 CLR 글자 자리가 없다(아래 바닥띠 표시는 뒤 어둡게에 덮인다) — 키를 받는 동안 '취소' 상황
