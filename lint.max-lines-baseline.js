@@ -18,7 +18,6 @@ export const maxLinesBaseline = [
   'src/pages/ending/lib/endingLayout.ts',
   'src/pages/ending/ui/EndingScreen.tsx',
   'src/pages/game/ui/GameScreen.tsx',
-  'src/pages/general-mode/model/useGeneralMode.ts',
   'src/pages/general-mode/ui/FirstBatStadiumScreen.tsx',
   'src/pages/general-mode/ui/GeneralModeScreen.tsx',
   'src/pages/general-mode/ui/MatchInfoScreen.tsx',
