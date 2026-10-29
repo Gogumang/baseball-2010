@@ -7,7 +7,6 @@ export const maxLinesBaseline = [
   'src/app/model/screenBgm.ts',
   'src/app/model/useCollection.ts',
   'src/app/model/useMissionSession.ts',
-  'src/app/model/usePitcherLeagueSession.ts',
   'src/app/ui/App.tsx',
   'src/app/ui/CareerRoutes.tsx',
   'src/app/ui/EntryRoutes.tsx',
