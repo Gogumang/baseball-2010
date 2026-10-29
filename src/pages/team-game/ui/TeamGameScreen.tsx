@@ -1,5 +1,5 @@
 import { emitSubstitutionEntryParticle } from '@/widgets/batting-stage/lib/substitutionEntryParticle'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { pushSceneKey } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 import { inputTimeOf } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { isRivalryMatch } from '@/widgets/game-scene/lib/rivalryBand'
@@ -344,7 +344,8 @@ function TeamGameScene({
   const [heldResultTicks, setHeldResultTicks] = useState(0)
   const pitchBusyTicksRef = useRef(0)
   pitchBusyTicksRef.current = pitchBusyTicks
-  useEffect(() => {
+  /** 던진 공의 판정이 든 렌더 — 공 끝 대기 · 0x11 길이를 그 렌더 값으로 정한다 (아래 deps 가 바뀔 때만) */
+  const settleThrownPitch = useEffectEvent(() => {
     if (!isThrowPendingRef.current) return
     isThrowPendingRef.current = false
     const thrown = progress.lastResolution
@@ -358,7 +359,8 @@ function TeamGameScene({
     if (progress.pendingRunnerPlay != null) return
     // 마투수가 던졌으면 공 틱이 오르는 단계가 0xcfbe4[순번]이라 0x11 이 그만큼 길다 (0x3f378)
     setPitchBusyTicks(pitchSceneBusyTicksOf(progress.lastPitch?.frameCount ?? 0, waitTicks, teamPitcherSideStageOf(progress).acePitcher?.order))
-  }, [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, progress.pendingRunnerPlay])
+  })
+  useEffect(() => settleThrownPitch(), [progress.lastResolution, progress.lastPitch, session.pendingDefensePlay, progress.pendingRunnerPlay])
   useSceneTick(() => setPitchBusyTicks((left) => Math.max(0, left - 1)), pitchBusyTicks > 0 && !isMenuOpen && overlay !== '조작방법')
   const isPitchSceneBusy = pitchBusyTicks > 0
   /** 경기 끝 결과 판(0x18)에서 OK 를 눌러 정산(0x19)으로 넘어갔는가 */
@@ -549,6 +551,7 @@ function TeamGameScene({
     menu,
     summary === null && progress.autoRelay == null && !isSceneCovering && !isPlayKeyBlocked && overlay === null && changeWindow === null,
   )
+  const { pressStar, close: closeMenu } = menu
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -565,13 +568,13 @@ function TeamGameScene({
         // 교체 창(상태 0xb)에서는 '*' 가 안 먹는다 — 0x498d4 의 '*' 가지(4991c)는 상태 0xd~0x15 만 받고,
         // 0xb 의 키 함수 0x495fc 는 '2'·'8'·'#'·'0'·'5' 만 본다. 창을 닫지도 메뉴를 열지도 않는다
         if (changeWindow !== null && !isMenuOpen) return
-        return menu.pressStar()
+        return pressStar()
       }
       if (isMenuOpen || overlay !== null) {
         // 교체 화면과 메뉴에서 CLR 은 닫기다 (0x495fc 의 '#'·CLR 가지)
         if (event.key === 'Escape' || event.key === 'Backspace') {
           event.preventDefault()
-          menu.close()
+          closeMenu()
         }
         return
       }
@@ -613,8 +616,8 @@ function TeamGameScene({
     isSceneCovering,
     isMenuOpen,
     isStealable,
-    menu.close,
-    menu.pressStar,
+    closeMenu,
+    pressStar,
     overlay,
     phase,
     session.canChangePitcher,

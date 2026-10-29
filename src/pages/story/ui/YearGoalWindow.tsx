@@ -39,7 +39,9 @@ export function YearGoalWindow({ values, onClose }: { readonly values: YearGoalW
   // 0x8d304: 0x741a1(높이 0, 그리기 0x8a351, 키 없음) · 키 표 −5 · '5' → 0 — [창+0x290] 은 1 그대로
   const motion = usePopupWindowMotion({ targetHeight: 0, skipsMotion: hasNoLayout })
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose
+  })
   // 키 표 갈래(0x75670~0x756b6)는 [창+0x215] = 1 — 판이 없어 줄임은 안 보이고 글만 두 갱신 더 남는다
   const close = () => motion.close('줄임', () => onCloseRef.current())
 

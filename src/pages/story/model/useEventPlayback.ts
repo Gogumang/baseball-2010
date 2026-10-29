@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { advanceCursor, findEvent, jumpToEvent, skipSayCursor, stepFrom } from '@/entities/story/model/eventScript'
 import type { EventCursor, EventStep } from '@/entities/story/model/eventScript'
 import { EVENT_REWARD_KIND, rewardsIn } from '@/entities/story/model/eventReward'
@@ -36,6 +36,44 @@ const opensRewardWindow = (notice: RewardNotice) => notice.kind === '알림' || 
  * 엔딩으로 간다. 데이터의 종류 21(r_event 500 · 501 · 503 · 504, s_event 500)은 모두 그 이벤트의 마지막 명령이다.
  */
 const endsPlayback = (command: RewardCommand) => command.items[0]?.kind === EVENT_REWARD_KIND.엔딩진입
+
+/**
+ * 커서의 걸음을 짓는다 — 보상 알림(종류 11 은 굴린다)은 커서마다 칸에 담아 다시 지어도 다시 굴리지 않는다
+ * (예전 `useMemo` 본문 그대로)
+ */
+function buildStep(
+  events: readonly OriginalEvent[],
+  cursor: EventCursor,
+  stopsAtEveryReward: boolean,
+  windowTextOf: ((command: SystemCommand) => string | null) | undefined,
+  noticeOf: RewardNoticeOf | undefined,
+  noticeCache: WeakMap<EventCursor, Map<number, RewardNoticeResult>>,
+): EventStep {
+  const cached = noticeCache.get(cursor) ?? new Map<number, RewardNoticeResult>()
+  noticeCache.set(cursor, cached)
+  return stopAtWindow(
+    stepFrom(events, cursor),
+    windowTextOf,
+    noticeOf === undefined
+      ? undefined
+      : (command, commandIndex) => {
+          const known = cached.get(commandIndex)
+          if (known !== undefined) return known
+          const result = noticeOf(command.items, cursor.eventId)
+          cached.set(commandIndex, result)
+          return result
+        },
+    stopsAtEveryReward,
+  )
+}
+
+/** 지은 걸음과 그 열쇠 (`useEventPlayback`) */
+interface BuiltStep {
+  readonly events: readonly OriginalEvent[]
+  readonly cursor: EventCursor
+  readonly stopsAtEveryReward: boolean
+  readonly step: EventStep
+}
 
 /**
  * 창을 띄우는 명령에서 멈춘다 — 이벤트 스크립트(`stepFrom`)는 system 0 만 멈추는 명령으로 보므로, 지나온 명령 가운데 첫 창 명령에서 끊는다.
@@ -130,8 +168,8 @@ export function useEventPlayback(
   isHeld?: (step: EventStep) => boolean,
   /** 보상 명령 7 의 알림(0x8d4c4 · 0x8beb8) — 안 주면 예전처럼 보상은 창 없이 지나간다 */
   rewardNoticeOf?: RewardNoticeOf,
-  /** 올해의 목표 창을 키(OK · '5')로 닫을 때 — 안 주면 곧바로 다음 명령. 주면 그쪽이 다음 명령까지 맡는다 */
-  closeYearGoalWindow?: () => void,
+  /** 올해의 목표 창을 키(OK · '5')로 닫을 때 다음 명령 앞에 부른다 — 0x7fe90(목표 창 봤음 · 저장) */
+  onYearGoalWindowConfirm?: () => void,
   /** 보상 명령을 그 자리에서 준다(0x8c460) — 안 주면 예전처럼 끝에 모아 넘긴다 */
   onReward?: EventRewardHandler,
 ): {
@@ -154,48 +192,42 @@ export function useEventPlayback(
   leftEventIds: () => readonly number[]
 } {
   const [cursor, setCursor] = useState(() => jumpToEvent(startEvent.id))
-  // 창 글은 커리어에서 나온다 — 부르는 쪽이 렌더마다 새 함수를 넘겨도 걸음이 다시 계산되지 않게 ref 로 든다
-  const windowTextOfRef = useRef(windowTextOf)
-  windowTextOfRef.current = windowTextOf
-  const rewardNoticeOfRef = useRef(rewardNoticeOf)
-  rewardNoticeOfRef.current = rewardNoticeOf
   /**
    * 보상 알림은 커서 하나에 한 번만 짓는다 — 종류 11 이 굴리므로(0xbfa55) 다시 그려도 다시 굴리면 안 된다.
    * 커서 객체마다 담아 두니 선택지로 같은 이벤트에 다시 오면(새 커서) 원본처럼 새로 짓는다.
    */
-  const noticeCacheRef = useRef(new WeakMap<EventCursor, Map<number, RewardNoticeResult>>())
+  const [noticeCache] = useState(() => new WeakMap<EventCursor, Map<number, RewardNoticeResult>>())
   const onRewardRef = useRef(onReward)
-  onRewardRef.current = onReward
+  useLayoutEffect(() => {
+    onRewardRef.current = onReward
+  })
   const stopsAtEveryReward = onReward !== undefined
-  const step = useMemo(() => {
-    const noticeOf = rewardNoticeOfRef.current
-    const cached = noticeCacheRef.current.get(cursor) ?? new Map<number, RewardNoticeResult>()
-    noticeCacheRef.current.set(cursor, cached)
-    return stopAtWindow(
-      stepFrom(events, cursor),
-      windowTextOfRef.current,
-      noticeOf === undefined
-        ? undefined
-        : (command, commandIndex) => {
-            const known = cached.get(commandIndex)
-            if (known !== undefined) return known
-            const result = noticeOf(command.items, cursor.eventId)
-            cached.set(commandIndex, result)
-            return result
-          },
-      stopsAtEveryReward,
-    )
-  }, [events, cursor, stopsAtEveryReward])
-  const rewardNotice = step.command?.op === 'reward' ? (noticeCacheRef.current.get(cursor)?.get(step.cursor.commandIndex)?.notice ?? null) : null
+  /**
+   * 걸음은 (이벤트 표 · 커서 · 보상마다 멈춤) 이 바뀔 때만 다시 짓는다 — 창 글 · 보상 알림 함수는 부르는 쪽이 렌더마다 새로 넘겨도
+   * 다시 짓지 않고, 지을 때의 것을 쓴다. 지은 걸음은 상태로 들고 열쇠가 바뀐 렌더에서 맞춘다(useMemo 와 같은 때 한 번)
+   */
+  const [built, setBuilt] = useState<BuiltStep | null>(null)
+  const isBuiltFresh = built !== null && built.events === events && built.cursor === cursor && built.stopsAtEveryReward === stopsAtEveryReward
+  const current: BuiltStep = isBuiltFresh
+    ? built
+    : { events, cursor, stopsAtEveryReward, step: buildStep(events, cursor, stopsAtEveryReward, windowTextOf, rewardNoticeOf, noticeCache) }
+  if (!isBuiltFresh) setBuilt(current)
+  const { step } = current
+  const rewardNotice = step.command?.op === 'reward' ? (noticeCache.get(cursor)?.get(step.cursor.commandIndex)?.notice ?? null) : null
 
   const isReleased = isHeld === undefined || !isHeld(step)
 
   const [portraits, setPortraits] = useState<readonly EventPortrait[]>([])
-  useEffect(() => {
-    if (!isReleased) return
+  // 걸음 · 풀림이 바뀐 렌더에서 대사 · 선택지의 초상화로 맞춘다(바뀔 때마다 한 번 — 사이에 `clearPortraits` 가 비울 수 있다)
+  const [portraitsFor, setPortraitsFor] = useState<{ readonly step: EventStep | null; readonly isReleased: boolean }>({
+    step: null,
+    isReleased: false,
+  })
+  if (portraitsFor.step !== step || portraitsFor.isReleased !== isReleased) {
+    setPortraitsFor({ step, isReleased })
     const command = step.command
-    if (command !== null && (command.op === 'say' || command.op === 'choice')) setPortraits(command.portraits)
-  }, [step, isReleased])
+    if (isReleased && command !== null && (command.op === 'say' || command.op === 'choice')) setPortraits(command.portraits)
+  }
 
   /**
    * 보상을 그 자리에서 준다 (`onReward`) — 보상 명령마다 멈춘 걸음이 돌 때(막는 효과를 다 기다린 뒤) 한 번.
@@ -203,6 +235,10 @@ export function useEventPlayback(
    * 창을 안 띄우는 보상은 주고 곧바로 다음 명령으로 — 세션의 커리어가 바뀐 다음 렌더에 다음 걸음(과 그 글)을 짓는다.
    */
   const rewardedCursorsRef = useRef(new WeakSet<EventCursor>())
+  const rewardsByCursorRef = useRef(new Map<string, readonly EventReward[]>())
+  const collectedRewardsOf = (stepNow: EventStep) => (onRewardRef.current === undefined ? rewardsOfStep(stepNow) : [])
+  const carriedRef = useRef(carried)
+  const collect = (): StoryCarry => mergeStoryCarry(carriedRef.current, rewardsByCursorRef.current)
   /** 첫 종류 21 로 끝낸 이벤트 — [0x1552adc] 자리 (`EventCompleteHandler`) */
   const endingEventIdRef = useRef<number | null>(null)
   useEffect(() => {
@@ -210,6 +246,7 @@ export function useEventPlayback(
     // 0x8d4ce — [0x1552adc] = 1 · 주지 않고 재생 끝(이 이벤트의 끝 커서 — 뒤 명령은 지나온 명령에도 안 든다)
     endingEventIdRef.current = step.cursor.eventId
     const event = findEvent(events, step.cursor.eventId)
+    // oxlint-disable-next-line react/set-state-in-effect -- 끝 보상 칸이 한 번 커밋돼야 같은 커밋의 칸 기록 효과(rewardsByCursorRef)가 그 칸을 담는다 — 렌더 중으로 옮기면 모은 보상 · 본 이벤트가 달라진다
     setCursor({ eventId: step.cursor.eventId, commandIndex: event?.commands.length ?? step.cursor.commandIndex + 1 })
   }, [events, step, isReleased])
 
@@ -219,24 +256,18 @@ export function useEventPlayback(
     if (rewardedCursorsRef.current.has(cursor)) return
     rewardedCursorsRef.current.add(cursor)
     give(step.command.items, step.cursor.eventId, [...new Set([...collect().viewedEventIds, step.cursor.eventId])])
-    const notice = noticeCacheRef.current.get(cursor)?.get(step.cursor.commandIndex)?.notice
+    const notice = noticeCache.get(cursor)?.get(step.cursor.commandIndex)?.notice
+    // oxlint-disable-next-line react/set-state-in-effect -- 0x8c460 은 보상을 준 그 자리에서 다음 명령으로 간다 — 주기(세션 콜백)가 효과라 넘김도 그 뒤 같은 효과에서
     if (notice === undefined || !opensRewardWindow(notice)) setCursor(advanceCursor(step.cursor))
-  }, [cursor, step, isReleased])
+  }, [cursor, step, isReleased, noticeCache])
 
   // 같은 칸을 두 번 세지 않도록 커서별로 담는다 (개발 모드의 이펙트 재실행 포함). 그 자리에서 준 보상은 담지 않는다
-  const rewardsByCursorRef = useRef(new Map<string, readonly EventReward[]>())
-  const collectedRewardsOf = (current: EventStep) => (onRewardRef.current === undefined ? rewardsOfStep(current) : [])
   useEffect(() => {
     rewardsByCursorRef.current.set(`${step.cursor.eventId}:${step.cursor.commandIndex}`, collectedRewardsOf(step))
   }, [step])
 
-  const carriedRef = useRef(carried)
-  const collect = (): StoryCarry => mergeStoryCarry(carriedRef.current, rewardsByCursorRef.current)
-
-  const onCompleteRef = useRef(onComplete)
-  onCompleteRef.current = onComplete
-  const onMatchRef = useRef(onMatch)
-  onMatchRef.current = onMatch
+  const complete = useEffectEvent(onComplete)
+  const match = useEffectEvent(onMatch)
   const isCompletedRef = useRef(false)
   useEffect(() => {
     if (isCompletedRef.current || !isReleased) return
@@ -244,21 +275,24 @@ export function useEventPlayback(
       isCompletedRef.current = true
       // 경기 명령까지 지나온 보상도 담기도록 이 칸을 먼저 기록한다
       rewardsByCursorRef.current.set(`${step.cursor.eventId}:${step.cursor.commandIndex}`, collectedRewardsOf(step))
-      onMatchRef.current(step.command, collect())
+      match(step.command, collect())
       return
     }
     if (step.command !== null) return
     isCompletedRef.current = true
     const collected = collect()
-    onCompleteRef.current(collected.rewards, collected.viewedEventIds, endingEventIdRef.current)
+    complete(collected.rewards, collected.viewedEventIds, endingEventIdRef.current)
   }, [step, isReleased])
 
+  // 돌려주는 함수(다음 · 건너뛰기 · 떠나온 줄)와 키가 볼 값 — 커밋 때 적는다
   const stepRef = useRef(step)
-  stepRef.current = step
-  const closeYearGoalWindowRef = useRef(closeYearGoalWindow)
-  closeYearGoalWindowRef.current = closeYearGoalWindow
+  const yearGoalConfirmRef = useRef(onYearGoalWindowConfirm)
   const isReleasedRef = useRef(isReleased)
-  isReleasedRef.current = isReleased
+  useLayoutEffect(() => {
+    stepRef.current = step
+    yearGoalConfirmRef.current = onYearGoalWindowConfirm
+    isReleasedRef.current = isReleased
+  })
   const next = () => setCursor(advanceCursor(stepRef.current.cursor))
   const skip = () => setCursor(skipSayCursor(events, stepRef.current.cursor))
   const jump = (eventId: number) => setCursor(jumpToEvent(eventId))
@@ -290,7 +324,7 @@ export function useEventPlayback(
       if (event.key !== 'Enter' && event.key !== ' ') return
       if (event.target instanceof HTMLButtonElement) return
       event.preventDefault()
-      if (closeYearGoalWindowRef.current !== undefined) return closeYearGoalWindowRef.current()
+      yearGoalConfirmRef.current?.()
       setCursor(advanceCursor(stepRef.current.cursor))
     }
     window.addEventListener('keydown', onKeyDown)

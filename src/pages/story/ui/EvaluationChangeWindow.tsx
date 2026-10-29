@@ -61,7 +61,9 @@ export function EvaluationChangeWindow({ values, goals, year, game, onClose }: E
   // 0x8d386: 0x741a1(높이 0, 그리기 0x8a361, 키 없음) 뒤 [창+0x290] = 0(0x8d39e~0x8d3a8) · 키 표 −5 · '5' → 0
   const motion = usePopupWindowMotion({ targetHeight: 0, expands: false, skipsMotion: hasNoLayout })
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose
+  })
   const close = () => motion.close('줄임', () => onCloseRef.current())
 
   useEffect(() => {

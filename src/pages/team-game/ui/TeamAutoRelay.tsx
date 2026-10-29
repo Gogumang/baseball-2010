@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { ComposedOverlay, FrameSprite, MessageBox, PressArea } from '@/shared/ui'
 import { DRAW_EFFECT } from '@/shared/lib/pixelEffect/pixelEffect'
@@ -59,7 +59,7 @@ const CHANGE_SIZE = { width: 98, height: 19 } as const
  * "CHANGE" 자리 (42b44~42bba, U-57 — 직접 뜸): 0xba815(game_ui, 0x5d, 종류 0) 상자 뒤 `x = W/2 − (w / 2)` · `y = H/2 − (h / 2)` —
  * 반은 부호 있는 정수 나눗셈(`lsrs #0x1f ; adds ; asrs #1`)이라 19 → 9 · (71, 151). (앞서 웹은 `trunc(160 − 9.5)` = 150 이었다)
  */
-export const changeImagePosition = {
+const changeImagePosition = {
   x: (SCREEN_WIDTH >> 1) - Math.trunc(CHANGE_SIZE.width / 2),
   y: (SCREEN_HEIGHT >> 1) - Math.trunc(CHANGE_SIZE.height / 2),
 } as const
@@ -150,13 +150,17 @@ export function TeamAutoRelay({
   const [figures, setFigures] = useState<TeamRelayFiguresValue>(() => teamRelayEntryFiguresOf(progress, entryLoadedRunnerAce))
   const [speed, setSpeed] = useState(autoRelaySpeed)
   const speedRef = useRef(speed)
-  speedRef.current = speed
+  useLayoutEffect(() => {
+    speedRef.current = speed
+  })
   const [isChangeShown, setChangeShown] = useState(false)
   const [isAsking, setAsking] = useState(false)
   const isAskingRef = useRef(false)
-  isAskingRef.current = isAsking
   const onAskingChangeRef = useRef(onAskingChange)
-  onAskingChangeRef.current = onAskingChange
+  useLayoutEffect(() => {
+    isAskingRef.current = isAsking
+    onAskingChangeRef.current = onAskingChange
+  })
   useEffect(() => {
     onAskingChangeRef.current?.(isAsking)
   }, [isAsking])

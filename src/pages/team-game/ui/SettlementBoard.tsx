@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { CommonPanel, FrameSprite, InsetBox } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
@@ -143,19 +143,17 @@ export function SettlementBoard({
   const resultOrigins = useFrameOrigins(RESULT_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   const popupOrigins = useFrameOrigins(POPUP_FRAMES)
-  const exitRef = useRef(onExit)
-  exitRef.current = onExit
 
   const act = (action: ReturnType<typeof settlementKeyActionOf>) => {
     if (action === '판열기') setPanelOpen(true)
     else if (action === '판닫기') setPanelOpen(false)
-    else if (action === '나가기') exitRef.current()
+    else if (action === '나가기') onExit()
     else if (action === '위로') setScroll((current) => scrollSettlementRecords(current, 'up'))
     else if (action === '아래로') setScroll((current) => scrollSettlementRecords(current, 'down'))
   }
 
-  const actRef = useRef(act)
-  actRef.current = act
+  // 꺼낸 틀에 그때 렌더의 처리로 — 키는 받은 다음 틀에 돈다
+  const actLatest = useEffectEvent(act)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
@@ -165,7 +163,7 @@ export function SettlementBoard({
       // 판 열림은 꺼낸 틀의 값으로 가른다
       keyLatch.push(() => {
         const action = settlementKeyActionOf(key, isPanelOpenRef.current)
-        if (action !== null) actRef.current(action)
+        if (action !== null) actLatest(action)
       })
     }
     window.addEventListener('keydown', onKeyDown)
