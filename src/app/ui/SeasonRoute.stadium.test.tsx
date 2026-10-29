@@ -65,7 +65,7 @@ const 레코드 = (덮어쓰기: Partial<SeasonRecord> = {}): SeasonRecord => ({
   ...덮어쓰기,
 })
 
-function 시즌화면({ store }: { readonly store: JsonStorePort }) {
+function SeasonScreen({ store }: { readonly store: JsonStorePort }) {
   const session = useSeasonSession(store, createSeededRandom(20100901))
   const gameSettings = useGameSettings(설정저장)
   const { goto } = session.actions
@@ -79,7 +79,7 @@ function 시즌화면({ store }: { readonly store: JsonStorePort }) {
 function 경기를연다(record: SeasonRecord) {
   받은Prop.값 = undefined
   vi.useFakeTimers()
-  render(<시즌화면 store={메모리저장({ state: { record } })} />)
+  render(<SeasonScreen store={메모리저장({ state: { record } })} />)
   // 다음경기 0xd8 의 확인 (키 0x48d0 −5) → 0xd7 경기 전 마선수 고르기
   fireEvent.click(screen.getByRole('button', { name: '확인' }))
   // 새 저장은 싸이커(칸 0)·메디카(칸 5)만 열려 있다 — 단계마다 누를 수 있는 격자 칸이 하나뿐이다

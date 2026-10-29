@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
@@ -139,7 +139,9 @@ async function 치르기(seed: number): Promise<경기끝> {
     const [screenNow, setScreen] = useState<Screen>({ kind: '메인메뉴' })
     const runner = useAtBatRunner()
     const session = useCareerSession({ runner, random, saveGame, screen: screenNow, setScreen })
-    지금.current = { screen: screenNow, progress: session.progress, actions: session.actions }
+    useLayoutEffect(() => {
+      지금.current = { screen: screenNow, progress: session.progress, actions: session.actions }
+    })
     if (screenNow.kind !== '경기' || session.progress === null || session.career === null) return null
     return (
       <GameRoute

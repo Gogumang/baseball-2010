@@ -64,7 +64,7 @@ interface 화면Props {
   readonly nariRecords?: NonNullable<ComponentProps<typeof SeasonRoute>['nariRecords']>
 }
 
-function 시즌화면({ store, 장면, onExit, hallOfFame, nari, nariRecords }: 화면Props) {
+function SeasonScreen({ store, 장면, onExit, hallOfFame, nari, nariRecords }: 화면Props) {
   const session = useSeasonSession(store, createSeededRandom(20100901))
   const gameSettings = useGameSettings(설정저장)
   const { goto } = session.actions
@@ -87,7 +87,7 @@ function 시즌화면({ store, 장면, onExit, hallOfFame, nari, nariRecords }: 
 const 알림글 = () => screen.getByRole('dialog', { name: '알림' }).textContent ?? ''
 
 describe('장면 0x105 를 세운 상태 1 의 팁 굴림 (0x75fc 76cc · 3284e)', () => {
-  function 엿보는화면({ store, constructScene }: { readonly store: JsonStorePort; readonly constructScene: () => void }) {
+  function PeekingScreen({ store, constructScene }: { readonly store: JsonStorePort; readonly constructScene: () => void }) {
     const session = useSeasonSession(store, createSeededRandom(20100901))
     const gameSettings = useGameSettings(설정저장)
     return (
@@ -102,8 +102,10 @@ describe('장면 0x105 를 세운 상태 1 의 팁 굴림 (0x75fc 76cc · 3284e)
 
   it('시즌모드로 들어오면 한 번 — 다시 그려도 더 안 굴린다', () => {
     const constructScene = vi.fn()
-    const { rerender } = render(<엿보는화면 store={메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100] })))} constructScene={constructScene} />)
-    rerender(<엿보는화면 store={메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100] })))} constructScene={constructScene} />)
+    const { rerender } = render(
+      <PeekingScreen store={메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100] })))} constructScene={constructScene} />,
+    )
+    rerender(<PeekingScreen store={메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100] })))} constructScene={constructScene} />)
     expect(constructScene).toHaveBeenCalledTimes(1)
   })
 })
@@ -137,7 +139,7 @@ describe('엔딩 0xf5 배선', () => {
     )
 
     vi.useFakeTimers()
-    render(<시즌화면 store={store} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} onExit={vi.fn()} />)
     글까지()
 
     // 인기도 900 · 1위 0회 → 판정 1 = StrENDING[16] 지역 인기 구단 (0xa3084)
@@ -159,7 +161,7 @@ describe('엔딩 0xf5 배선', () => {
       ),
     )
     vi.useFakeTimers()
-    render(<시즌화면 store={store} onExit={onExit} />)
+    render(<SeasonScreen store={store} onExit={onExit} />)
     // 진입 0x6be8 의 효과기 종류 2 — 도는 동안은 키가 안 먹는다(0x4b18)
     효과기넘기기()
 
@@ -203,13 +205,13 @@ describe('엔딩 0xf5 배선', () => {
         }),
       ),
     )
-    render(<시즌화면 store={store} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} onExit={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     fireEvent.click(screen.getByRole('button', { name: 'OK' }))
     cleanup()
 
     vi.useFakeTimers()
-    render(<시즌화면 store={store} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} onExit={vi.fn()} />)
     글까지()
 
     expect(document.body.textContent).toContain('지역 인기 구단')
@@ -233,13 +235,13 @@ describe('엔딩 0xf5 배선', () => {
       ),
     )
     vi.useFakeTimers()
-    render(<시즌화면 store={store} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} onExit={vi.fn()} />)
     효과기넘기기()
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     효과기넘기기()
     cleanup()
 
-    render(<시즌화면 store={store} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} onExit={vi.fn()} />)
 
     expect(document.body.textContent).not.toContain('지역 인기 구단')
     expect(screen.getByRole('button', { name: '다음경기' })).toBeDefined()
@@ -257,7 +259,7 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
 
   it('기본 4칸을 모으면 히든 칸이 **열린 채로 남는다** — 예전에는 onUnlock 이 없어 사라졌다', () => {
     const store = 메모리저장(세이브(관중석([0, 1, 2])))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
     // 사기 전에는 보이는 다섯 줄의 히든 칸 4 가 "????"(0xd4c18) 다
     expect(screen.getByRole('option', { name: '관중석 ????' })).toBeDefined()
 
@@ -273,7 +275,7 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
 
   it('열린 히든 칸은 실제로 살 수 있다 (checkStadiumPurchase 의 미오픈 가드를 지난다)', () => {
     const store = 메모리저장(세이브(관중석([0, 1, 2])))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
     fireEvent.click(screen.getByRole('option', { name: '관중석 4단 관중석' }))
     fireEvent.click(screen.getByRole('option', { name: '관중석 4단 관중석' }))
     fireEvent.click(screen.getByRole('button', { name: '예' }))
@@ -289,7 +291,7 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
 
   it('상점(0xdc 종류 4)에서 취소하면 아이템 메뉴 0xd0 — 관리 메뉴가 아니다 (0x957c 0x9aa2 → 0x9bec)', () => {
     const store = 메모리저장(세이브(관중석([])))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템상점} onExit={vi.fn()} />)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.getByRole('button', { name: '구장아이템' })).toBeTruthy()
   })
@@ -298,7 +300,7 @@ describe('구장 상점 히든 해금 배선 (app+0xe0)', () => {
 describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => {
   it('트레이드를 고르면 "아직 없습니다" 가 아니라 **팀 고르기**가 뜬다', () => {
     const store = 메모리저장(세이브(레코드()))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: /트레이드/ }))
 
@@ -308,7 +310,7 @@ describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => 
 
   it('트레이드를 한 번 쓰면(SR+0x56) 위·아래가 트레이드 칸을 건너뛴다 (0x6c444) — 구장관리 ↓ 는 선수영입', () => {
     const store = 메모리저장(세이브(레코드({ tradeUsed: 1 })))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
 
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'Enter' })
@@ -319,7 +321,7 @@ describe('구단관리 트레이드·코치채용 배선 (0xe4 · 0xd7)', () => 
 
   it('코치채용을 고르면 코치 목록이 뜨고, 뽑은 코치가 **저장에 남는다** (SR+0x185)', () => {
     const store = 메모리저장(세이브(레코드({ money: 9999, popularity: 9999 })))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.구단관리} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: /코치채용/ }))
     expect(screen.getByRole('button', { name: /싸이커/ })).toBeDefined()
@@ -338,7 +340,7 @@ describe('이벤트 재생 0xd3 배선', () => {
   it('해마다 첫 관리 메뉴에서 연초 목표 — 감독 대사 다음 올해의 목표 창, 닫으면 끝 틀 하나 뒤 관리 메뉴', async () => {
     vi.useFakeTimers()
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1] })))
-    render(<시즌화면 store={store} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} onExit={vi.fn()} />)
 
     // 재생기 say 상자 — 다 오르고 글을 끝까지 찍은 뒤 확인 (0x7fbc4 · 0x8b804)
     act(() => {
@@ -369,7 +371,7 @@ describe('이벤트 재생 0xd3 배선', () => {
 describe('아이템 메뉴 0xd0 배선', () => {
   it('구장아이템은 아이템 상점(0xdc 창 4)으로 가고, GP아이템(창 2)에서 취소하면 다시 아이템 메뉴', () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'GP아이템' }))
     expect(screen.getByRole('group', { name: 'GP아이템 상점' })).toBeTruthy()
@@ -383,7 +385,7 @@ describe('아이템 메뉴 0xd0 배선', () => {
 describe('시즌정보 0xcd → 선수정보(0xdf 목적 2) → 카드 0xd9 ↔ 상세 0xda 배선', () => {
   const 띄우기 = (덮어쓰기: Partial<SeasonRecord> = {}) => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true, ...덮어쓰기 })))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.시즌정보} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.시즌정보} onExit={vi.fn()} />)
   }
   const 키 = (key: string) => fireEvent.keyDown(window, { key })
 
@@ -492,7 +494,7 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
 
   it('리그 선수를 고르면 장비 창 0xdc(종류 3) — 사면 소지금·니블을 함께 저장, 부위에서 취소하면 0xdf, 거기서 취소는 0xd0', () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true, money: 50 })))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
     expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('봉은중')
@@ -534,7 +536,7 @@ describe('아이템 → 장착아이템 = 선수 고르기 0xdf 목적 1 (키 0x
         batters: Array.from({ length: 12 }, (_, slot) => ({ ...표, id: slot, kindByte: slot })),
       },
     })
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: '장착아이템' }))
     expect(screen.getByTestId('엔트리-줄-0').getAttribute('aria-label')).toContain('나리투수')
@@ -560,7 +562,7 @@ describe('선수영입 후보 목록 = 명예의 전당 목록 종류 0 (진입 
     } satisfies HallOfFamePitcher
     const 타자 = { name: '이전당', ability: { hit: 1, power: 2, defense: 3, run: 4 }, endingIndex: 6, season: 13, titleIds: [] } satisfies HallOfFamer
     render(
-      <시즌화면
+      <SeasonScreen
         store={store}
         장면={SEASON_SCENE_STATE.선수영입}
         onExit={vi.fn()}
@@ -615,7 +617,7 @@ describe('선수영입 나리 칸 0·5 — 0x22168 · 0x220ec 의 내 선수 기
   const 띄우기 = () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1, 5, 100], yearGoalShown: true })))
     render(
-      <시즌화면
+      <SeasonScreen
         store={store}
         장면={SEASON_SCENE_STATE.선수영입}
         onExit={vi.fn()}
@@ -665,7 +667,7 @@ describe('아이템 → 서브아이템·GP아이템 = 상점 0xdc 종류 1·2 (
 
   it('서브아이템 — 사면 소지금이 줄고 SR+0x58 이 서며, 다시 사면 [78], 취소는 아이템 메뉴 0xd0', () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true, money: 300 })))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: '서브아이템' }))
     expect(screen.getByRole('group', { name: '서브아이템 상점' })).toBeTruthy()
@@ -687,7 +689,7 @@ describe('아이템 → 서브아이템·GP아이템 = 상점 0xdc 종류 1·2 (
 
   it('GP아이템 — G 가 모자라면 [65] 만 뜨고 아무것도 안 바뀐다', () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
-    render(<시즌화면 store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
+    render(<SeasonScreen store={store} 장면={SEASON_SCENE_STATE.아이템} onExit={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'GP아이템' }))
     expect(screen.getByRole('group', { name: 'GP아이템 상점' })).toBeTruthy()
@@ -704,7 +706,7 @@ describe('훈련 결과 팝업 첫 줄 [창+0x2d8] 의 수명 — 창은 장면 
     messages: ['가', '나', '다', '라', '마'],
   }
 
-  function 결과화면({ store }: { readonly store: JsonStorePort }) {
+  function ResultScreen({ store }: { readonly store: JsonStorePort }) {
     const session = useSeasonSession(store, createSeededRandom(20100901))
     const gameSettings = useGameSettings(설정저장)
     return (
@@ -731,7 +733,7 @@ describe('훈련 결과 팝업 첫 줄 [창+0x2d8] 의 수명 — 창은 장면 
 
   it('0x105 안에서는 남고, 경기 장면 0x104(0xe1)를 다녀오면 새 창이라 0 이다', () => {
     const store = 메모리저장(세이브(레코드({ seenEvents: [400, 1], yearGoalShown: true })))
-    render(<결과화면 store={store} />)
+    render(<ResultScreen store={store} />)
     fireEvent.click(screen.getByRole('button', { name: '훈련으로' }))
     expect(창글()).toContain('가')
     fireEvent.keyDown(window, { key: '8' })

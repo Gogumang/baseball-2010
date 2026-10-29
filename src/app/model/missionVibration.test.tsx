@@ -76,7 +76,7 @@ function 던지며모으기(isVibrationOn: boolean | undefined, seed: number, ac
     ...createPitcherCareer('진동투수'),
     ability: { control: 900, velocity: 900, breaking: 900, stamina: 900 },
   })
-  let 판정: { strikesBefore: number; kind: PitchResolution['kind'] } | null = null
+  let 판정: { strikesBefore: number; kind: PitchResolution['kind'] } | null
   const rendered = renderHook(() => {
     const base = useAtBatRunner()
     const runner = {
