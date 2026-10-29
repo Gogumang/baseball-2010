@@ -162,7 +162,6 @@ export const readabilityBaseline = [
   'src/features/defense-play/model/playerEffects.ts',
   'src/features/defense-play/model/redrawDefensePlay.ts',
   'src/features/defense-play/model/representativePattern.ts',
-  'src/features/defense-play/model/runDefensePlay.ts',
   'src/features/defense-play/model/runnerAces.ts',
   'src/features/defense-play/model/runnerFates.ts',
   'src/features/defense-play/model/runnerPlayEngine.ts',
