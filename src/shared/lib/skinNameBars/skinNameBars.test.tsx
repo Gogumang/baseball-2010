@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { resetSkinNameBars, skinNameBarsValue, useMarkSkinNameBars } from '@/shared/lib/skinNameBars/skinNameBars'

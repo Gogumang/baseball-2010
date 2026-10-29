@@ -167,7 +167,7 @@ const pendingFrameSets = new Map<string, string>()
 export function warmRecoloredFrames(key: string, framesOf: () => readonly RecolorFrame[]): boolean {
   if (warmedFrameSets.has(key)) return true
   // 못 다 건 묶음은 그 뒤로 재료(JSON)가 하나도 안 왔으면 다시 봐도 똑같이 못 건다 — 원점 · 팔레트 · 겹 목록은 도착할 때만
-  // 바뀌고(`noteAssetLoaded`), 이미 건 칠하기 · 시작한 받기는 다시 불러도 아무 일이 없다. 그림이 끝내 안 오는 자리(jsdom 시험)에서
+  // 바뀌고(`noteAssetLoaded`), 이미 건 칠하기 · 시작한 받기는 다시 불러도 아무 일이 없다. 그림이 끝내 안 오는 자리(시험 DOM 시험)에서
   // 틀마다 목록 · 주소를 다시 만들던 몫을 던다 (r330, OPTIMIZATION B1). 캐시를 비우면(시험) 받기를 다시 시작해야 하므로 그 횟수도 본다
   const stamp = `${assetLoadCount()}|${spriteJsonCacheEpoch()}`
   if (pendingFrameSets.get(key) === stamp) return false

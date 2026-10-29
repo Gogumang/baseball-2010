@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import {
@@ -11,7 +11,7 @@ import {
 } from '@/shared/lib/sprite/paletteSwap'
 import { resetSpriteCacheForTest } from '@/shared/lib/sprite/spriteCache'
 
-/** 그림 · 번호 지도가 늘 오는 가짜 Image (jsdom 캔버스는 없어 칠하기는 구운 주소로 끝나지만 "칠해 둠" 표는 남는다) */
+/** 그림 · 번호 지도가 늘 오는 가짜 Image (시험 DOM 캔버스는 없어 칠하기는 구운 주소로 끝나지만 "칠해 둠" 표는 남는다) */
 class FakeImage {
   static requested: string[] = []
   onload: (() => void) | null = null
@@ -46,7 +46,7 @@ beforeEach(() => {
   FakeImage.requested = []
   resetSpriteCacheForTest()
   vi.stubGlobal('Image', FakeImage)
-  // jsdom 은 캔버스가 없다 — 칠하기는 구운 주소로 끝난다(시끄러운 "Not implemented" 를 막는다)
+  // 시험 DOM 은 캔버스가 없다 — 칠하기는 구운 주소로 끝난다(시끄러운 "Not implemented" 를 막는다)
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   vi.stubGlobal(
     'fetch',

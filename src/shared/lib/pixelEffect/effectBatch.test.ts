@@ -13,7 +13,7 @@ import type { EffectCanvasContext, EffectDraw, RgbaSurface } from '@/shared/lib/
  * 성능 손질(r108) 전후 같은 픽셀 증명 — 화면 읽기 · 쓰기를 모은 `drawRgbasWithEffect` 가
  * 손질 전 `drawImageWithEffect`(그리기마다 제 칸을 읽고 섞고 놓기)를 차례대로 부른 것과 **바이트 단위로 같은지** 본다.
  *
- * jsdom 에는 캔버스가 없어 가짜 캔버스를 쓴다. 브라우저 캔버스는 픽셀을 **곱한 알파(premultiplied)** 로 담아
+ * 시험 DOM 에는 캔버스가 없어 가짜 캔버스를 쓴다. 브라우저 캔버스는 픽셀을 **곱한 알파(premultiplied)** 로 담아
  * 읽기 · 놓기 왕복이 반투명 칸 값을 반올림할 수 있다 — 가짜 캔버스도 그렇게 담는다(반올림 · 버림 두 모형).
  * 그러면 "왕복 횟수가 달라지면 결과가 달라지는" 경우까지 잡힌다.
  */

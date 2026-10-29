@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { StrictMode, useMemo, useRef, useState } from 'react'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, waitFor } from '@testing-library/react'
@@ -8,7 +8,7 @@ import type { EventPortrait } from '@/shared/config/original/eventTypes'
 /**
  * 이벤트 초상화 — 주인공은 피부 팔레트와 장타형 몸(+8)을 따라간다 (C-1 확정).
  *
- * 칠하기 자체는 캔버스(`recoloredSpriteUrl`) 몫인데 jsdom 에는 캔버스가 없다 — 그래서 여기서는
+ * 칠하기 자체는 캔버스(`recoloredSpriteUrl`) 몫인데 시험 DOM 에는 캔버스가 없다 — 그래서 여기서는
  * **`<img src>` 가 어느 프레임을 가리키는지**만 본다. 색이 실제로 바뀌는지는
  * `shared/lib/sprite/paletteSwap.test.ts` 의 순수 함수(`recolorPixels`) 쪽에서 검사한다.
  */

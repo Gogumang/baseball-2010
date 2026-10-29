@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { describe, expect, it, vi, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { koreanHourOf, modeBackPaletteOf, timeSlotOfHour, useSceneEntryHour } from '@/shared/lib/phoneClock/phoneClock'

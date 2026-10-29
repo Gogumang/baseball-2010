@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { SCENE_CONFIRM_READY_FRAMES, SCENE_PREPARE_FRAMES, noteSceneDEntryTick, useSceneConfirm } from '@/features/play-game/model/useSceneConfirm'

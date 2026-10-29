@@ -373,7 +373,7 @@ interface BallPatternTranslucentImageProps {
  * **공 무늬 바탕 위 반투명 그림** — 효과 1(0x9a449)을 원본 식(`translucentPixel565`, 마스크 내림 · 565)으로 칠한다.
  * DOM 겹이라 아래 화면을 못 읽으므로 아래를 **같은 좌표로 다시 그린다**: 공 무늬(지금 카운터 · gpoint 그림 · 흑백 사각형) 위에
  * 그 사이에 먼저 그린 줄 색(`rowOver` — 카드 계단형 판)을 얹고, 그림의 불투명 칸만 섞어 캔버스에 찍는다(투명 칸은 비워 DOM 이 보인다).
- * 무늬가 없거나 그림을 아직 못 받았거나 캔버스가 없으면(jsdom) CSS 불투명도 L/16 근사(`translucentOpacityOf`)로 둔다.
+ * 무늬가 없거나 그림을 아직 못 받았거나 캔버스가 없으면(시험 DOM) CSS 불투명도 L/16 근사(`translucentOpacityOf`)로 둔다.
  */
 export function BallPatternTranslucentImage({
   src,
@@ -449,7 +449,7 @@ export function BallPatternTranslucentImage({
       context.putImageData(out, 0, 0)
       return true
     }
-    /** 한 번이라도 칠했는가 — 못 그리게 되면 지운다(캔버스를 안 연 jsdom 에서는 문맥을 열지 않는다) */
+    /** 한 번이라도 칠했는가 — 못 그리게 되면 지운다(캔버스를 안 연 시험 DOM 에서는 문맥을 열지 않는다) */
     let hasDrawn = false
     const redraw = () => {
       const drawn = draw()

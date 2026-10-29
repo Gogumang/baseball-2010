@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { fireEvent as rawFireEvent } from '@testing-library/react'

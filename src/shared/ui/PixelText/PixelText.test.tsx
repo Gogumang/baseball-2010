@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { PixelText, pieceMaskStyle } from '@/shared/ui/PixelText/PixelText'
@@ -6,7 +6,7 @@ import { ASCII_ATLAS, HANGUL_ATLAS } from '@/shared/lib/font/atlas'
 
 afterEach(cleanup)
 
-/** jsdom 에는 canvas 가 없으므로 조각을 DOM 으로 찍고 그 DOM 을 본다 */
+/** 시험 DOM 에는 canvas 가 없으므로 조각을 DOM 으로 찍고 그 DOM 을 본다 */
 function 조각들(): HTMLElement[] {
   return Array.from(screen.getByRole('img').querySelectorAll('span'))
 }

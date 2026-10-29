@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import { LOADING_STEPS_BATTER_CAREER, LOADING_STEPS_DEFAULT, LoadingTip } from '@/widgets/loading-tip/ui/LoadingTip'

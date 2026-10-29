@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { HomeRunDerbyScreen } from '@/pages/home-run-derby/ui/HomeRunDerbyScreen'
@@ -22,7 +22,7 @@ vi.mock('@/widgets/loading-tip/ui/LoadingTip', async () => {
   }
 })
 
-// jsdom 에는 캔버스가 없다 — 타석 그리기는 컨텍스트가 없으면 스스로 멈춘다
+// 시험 DOM 에는 캔버스가 없다 — 타석 그리기는 컨텍스트가 없으면 스스로 멈춘다
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 })

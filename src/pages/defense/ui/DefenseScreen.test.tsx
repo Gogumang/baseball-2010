@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { DefenseScreen } from '@/pages/defense/ui/DefenseScreen'
@@ -10,6 +10,7 @@ import {
   type DefenseViewState,
 } from '@/pages/defense/lib/defenseView'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { resetSpriteCacheForTest } from '@/shared/lib/sprite/spriteCache'
 
 /**
  * 수비 화면 (R3-field-view 1~6절).
@@ -272,7 +273,7 @@ describe('좌·우 그림 (S12 8절 — 좌우 반전이 아니다)', () => {
 /**
  * 팀 15색 팔레트 (C-1).
  *
- * ⚠️ jsdom 에는 canvas 도 그림 적재도 없다 — 교체 엔진은 조용히 **구운 그림**을 그대로 내놓는다.
+ * ⚠️ 시험 DOM(happy-dom)에는 canvas 도 그림 적재도 없다 — 교체 엔진은 조용히 **구운 그림**을 그대로 내놓는다.
  * 그래서 여기서는 `<img src>` 가 이번 프레임의 구운 주소인지, 그리고 프레임이 바뀔 때
  * 그림이 **새로 마운트되는지**만 본다(색이 실제로 바뀌는 것은 브라우저 쪽 눈 확인).
  * 원점(`origins.json`)·팔레트 표는 fetch 를 가짜로 세워 준다.
@@ -286,6 +287,8 @@ describe('팀 팔레트로 다시 칠하기', () => {
   let 원래_fetch: typeof globalThis.fetch | undefined
 
   beforeEach(() => {
+    // 앞 시험들이 가짜 fetch 없이 걸어 둔 원점 요청(시험 DOM 에서 안 끝난다)을 버린다
+    resetSpriteCacheForTest()
     원래_fetch = globalThis.fetch
     globalThis.fetch = ((url: string) =>
       Promise.resolve({
@@ -303,33 +306,29 @@ describe('팀 팔레트로 다시 칠하기', () => {
     fielders: [{ slot: 0, x: 20000, z: 24500, action, actionTick: 0, teamIndex }],
   })
   const 그림 = () => screen.getByTestId('defense-fielder-0').querySelector('img')
+  /** 원점(가짜 fetch)이 와서 그림이 설 때까지 */
+  const 그림이_설_때까지 = (주소: string) => vi.waitFor(() => expect(그림()?.getAttribute('src')).toBe(주소))
 
-  it('팀 번호를 주면 defender 그림을 칠해서 내놓는다 (jsdom 에선 구운 그림 그대로)', async () => {
+  it('팀 번호를 주면 defender 그림을 칠해서 내놓는다 (시험 DOM 에선 구운 그림 그대로)', async () => {
     띄우기(야수(FIELDER_ACTION.stand, 7))
-    await act(async () => {})
-
     // 제자리 동작 = vt40 날값 0 + 17 = 프레임 017
-    expect(그림()?.getAttribute('src')).toBe('./sprites/defender/frames/017.png')
+    await 그림이_설_때까지('./sprites/defender/frames/017.png')
   })
 
   it('팀 번호를 안 주면 지금까지처럼 맨 그림을 쓴다', async () => {
     띄우기(야수(FIELDER_ACTION.stand, null))
-    await act(async () => {})
-
-    expect(그림()?.getAttribute('src')).toBe('./sprites/defender/frames/017.png')
+    await 그림이_설_때까지('./sprites/defender/frames/017.png')
   })
 
   it('⚠️ 프레임이 바뀌면 그림을 새로 마운트한다 — 칠한 주소가 한 박자 늦는 함정 때문이다', async () => {
     const { rerender } = render(<DefenseScreen state={야수(FIELDER_ACTION.stand, 7)} isRunning={false} />)
-    await act(async () => {})
+    await 그림이_설_때까지('./sprites/defender/frames/017.png')
     const 먼저 = 그림()
 
     rerender(<DefenseScreen state={야수(FIELDER_ACTION.throw, 7)} isRunning={false} />)
-    await act(async () => {})
-    const 나중 = 그림()
-
     // 송구 동작 = 날값 12 + 17 = 프레임 029
-    expect(나중?.getAttribute('src')).toBe('./sprites/defender/frames/029.png')
+    await 그림이_설_때까지('./sprites/defender/frames/029.png')
+    const 나중 = 그림()
     // 같은 자리인데 **다른 DOM 마디**여야 한다 (key = 프레임 → 새로 마운트)
     expect(나중).not.toBe(먼저)
   })

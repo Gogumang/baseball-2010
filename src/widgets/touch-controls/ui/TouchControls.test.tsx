@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TouchControls } from '@/widgets/touch-controls/ui/TouchControls'
@@ -6,7 +6,7 @@ import { offerTouchKey, resetTouchKeyOffersForTest, tapKey, useTouchKeyOffer, us
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { PressArea } from '@/shared/ui/PressArea/PressArea'
 
-/** jsdom 에는 PointerEvent 가 없다 — 단추(button) · pointerId 를 싣게 MouseEvent 로 흉내 낸다 */
+/** 시험 DOM 에는 PointerEvent 가 없다 — 단추(button) · pointerId 를 싣게 MouseEvent 로 흉내 낸다 */
 if (typeof window.PointerEvent === 'undefined') {
   class TestPointerEvent extends MouseEvent {
     readonly pointerId: number

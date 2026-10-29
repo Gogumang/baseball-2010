@@ -1,11 +1,11 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { PixelScreen } from '@/shared/ui/PixelScreen/PixelScreen'
 
 afterEach(cleanup)
 
-/** jsdom 은 실제 레이아웃을 하지 않아 스크롤 치수를 손으로 넣어 준다 */
+/** 시험 DOM 은 실제 레이아웃을 하지 않아 스크롤 치수를 손으로 넣어 준다 */
 function 본문치수(container: HTMLElement, clientHeight: number, scrollHeight: number) {
   // 감싸개(bodyWrapper)가 아니라 그 안의 스크롤되는 본문이다
   const wrapper = container.querySelector('[class*="bodyWrapper"]') as HTMLElement

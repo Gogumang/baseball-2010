@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -59,7 +59,7 @@ beforeEach(() => {
     return handle
   })
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((handle) => void frames.delete(handle))
-  // jsdom 에는 캔버스가 없다 — 그리기 함수는 막아 두었으니 아무 일도 안 하는 붓을 준다
+  // 시험 DOM 에는 캔버스가 없다 — 그리기 함수는 막아 두었으니 아무 일도 안 하는 붓을 준다
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
     return new Proxy({ canvas: this } as object, {
       get: (target, key) => (key in target ? (target as Record<string | symbol, unknown>)[key] : () => undefined),

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { ScreenOverlay } from '@/shared/ui/ScreenOverlay/ScreenOverlay'
@@ -31,7 +31,7 @@ describe('화면 덮개 층', () => {
   })
 
   /**
-   * ⚠️ jsdom 에는 vanilla-extract 의 실제 CSS 가 안 실려 `getComputedStyle` 로는
+   * ⚠️ 시험 DOM 에는 vanilla-extract 의 실제 CSS 가 안 실려 `getComputedStyle` 로는
    * `position: relative` 를 확인할 수 없다. **덮개가 기둥 안에 들어가는 것**까지만 본다 —
    * 기준점이 되는 건 그 중첩이고, 규칙 자체는 `ScreenOverlay.css.ts` 가 들고 있다.
    */

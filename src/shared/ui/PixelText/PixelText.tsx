@@ -65,7 +65,7 @@ const ATLAS_SIZE = {
 /**
  * 조각 한 칸을 아틀라스에서 떠 오는 마스크 스타일.
  *
- * jsdom 은 mask-* 를 아예 버려서 DOM 으로는 확인할 수 없다. 그래서 따로 빼 두고 값만 테스트한다.
+ * 시험 DOM 은 mask-* 를 아예 버려서 DOM 으로는 확인할 수 없다. 그래서 따로 빼 두고 값만 테스트한다.
  * webkit 접두사를 같이 다는 건 구형 사파리·웹뷰 때문이다.
  */
 export function pieceMaskStyle(piece: PlacedPiece, scale: number): CSSProperties {

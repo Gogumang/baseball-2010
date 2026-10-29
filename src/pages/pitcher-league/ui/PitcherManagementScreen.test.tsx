@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
@@ -161,7 +161,7 @@ describe('상태판 0x7d34c 모드 3 · 커맨드 줄 0x7e418 투수 표', () =>
       './sprites/management/icon_selected_19.png',
     ])
     const 이름표 = container.querySelector('img[src$="command_label_116.png"]') as HTMLElement
-    // 칸 4 (199, 236) 은 가운데 정렬 — 폭을 못 읽는 jsdom 에선 trunc(32/2) = 16 → 199 − 6 + 16 − 1
+    // 칸 4 (199, 236) 은 가운데 정렬 — 폭을 못 읽는 시험 DOM 에선 trunc(32/2) = 16 → 199 − 6 + 16 − 1
     expect(이름표.style.left).toBe('208px')
   })
 })

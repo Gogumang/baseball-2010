@@ -22,7 +22,7 @@ interface ComposedOverlayProps {
 /**
  * **겹 하나 합성 캔버스** (Q-03 r301) — DOM 겹이라 아래 화면을 못 읽는 반투명 자리에서, 아래 겹이 그린 그림을 **같은 좌표로 다시
  * 그려**(`underOps`) 원본 식(`screenCompose` — 효과 1 0x9a449 의 마스크 내림 · 565)으로 이 겹(`ops`)을 섞는다. 이 겹이 칠한 칸만
- * 찍고 나머지는 비워 DOM 아래 겹이 그대로 보인다. 그림이 다 오기 전 · 캔버스가 없을 때(jsdom)는 `fallback`(CSS 불투명도 근사)을 세운다.
+ * 찍고 나머지는 비워 DOM 아래 겹이 그대로 보인다. 그림이 다 오기 전 · 캔버스가 없을 때(시험 DOM)는 `fallback`(CSS 불투명도 근사)을 세운다.
  * 아래 겹이 이 사각형에서 바뀌지 않는(또는 같이 다시 그리는) 자리에만 쓴다.
  */
 export function ComposedOverlay({ rect, underOps, ops, backdrop = 0, fallback, testId }: ComposedOverlayProps) {

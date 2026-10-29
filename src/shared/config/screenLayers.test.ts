@@ -5,7 +5,7 @@ import { SCREEN_LAYERS } from '@/shared/config/screenLayers'
 /**
  * 겹 차례 — 키를 가져가는 창은 그 아래 화면의 누름 칸보다 위에 서야 클릭 · 탭이 창에 간다(r195 · r203).
  *
- * ⚠️ jsdom 에는 vanilla-extract 의 실제 CSS 가 안 실려 `getComputedStyle` 로 z-index 를 못 읽는다 — 규칙을 든 `.css.ts` 원문을 본다.
+ * ⚠️ 시험 DOM 에는 vanilla-extract 의 실제 CSS 가 안 실려 `getComputedStyle` 로 z-index 를 못 읽는다 — 규칙을 든 `.css.ts` 원문을 본다.
  */
 
 /** `.css.ts` 원문에서 `export const <이름> = style({ … })` 덩이를 꺼낸다 */

@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen as view } from '@testing-library/react'
 import type { ComponentProps } from 'react'
@@ -7,7 +7,7 @@ import { EMPTY_COLLECTION } from '@/entities/collection/model/collection'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 
-// jsdom 은 스프라이트 원점 json 을 못 읽어 칸 단추를 안 그린다 — 칸마다 같은 크기를 주어 바퀴·릴 단추를 세운다
+// 시험 DOM 은 스프라이트 원점 json 을 못 읽어 칸 단추를 안 그린다 — 칸마다 같은 크기를 주어 바퀴·릴 단추를 세운다
 vi.mock('@/shared/lib/sprite/useFrameOrigins', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/shared/lib/sprite/useFrameOrigins')>()
   const origins = new Proxy({}, { get: () => ({ x: 0, y: 0, width: 40, height: 10 }) })

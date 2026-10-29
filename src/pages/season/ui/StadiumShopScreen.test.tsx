@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { StadiumShopScreen } from '@/pages/season/ui/StadiumShopScreen'
@@ -7,6 +7,7 @@ import { startNewSeason } from '@/entities/season-mode/model/seasonRecord'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
 import { seasonScoreboardRewindXOf } from '@/widgets/batting-stage/lib/renderScenery'
 import { boardBonusOf, standCapacityOf, stadiumOwnedIndexOf } from '@/entities/season-mode/model/stadiumItems'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 /**
  * 구장 아이템 상점(0x957c · 0x7d90)과 구장관리 교체(0x7958) — S3 확정.
@@ -116,7 +117,7 @@ describe('구장 아이템 상점 — 구매 확정 (0x812c)', () => {
 
     expect(알림글()).toContain('[구단관리]-[구장관리]')
     const 노랑 = [...screen.getByRole('dialog', { name: '알림' }).querySelectorAll('span')]
-      .filter((node) => node.style.color === 'rgb(255, 255, 0)')
+      .filter((node) => cssColor(node.style.color) === 'rgb(255, 255, 0)')
       .map((node) => node.textContent)
     expect(노랑).toEqual(expect.arrayContaining(['구단관리', '구장관리']))
   })
@@ -239,7 +240,7 @@ describe('구장관리 교체 (0x7958)', () => {
     const 이름 = [...screen.getByRole('dialog', { name: '알림' }).querySelectorAll('span')].find((node) => node.textContent === '4단 관중석') as
       | HTMLElement
       | undefined
-    expect(이름?.style.color).toBe('rgb(255, 255, 0)')
+    expect(cssColor(이름?.style.color)).toBe('rgb(255, 255, 0)')
   })
 })
 

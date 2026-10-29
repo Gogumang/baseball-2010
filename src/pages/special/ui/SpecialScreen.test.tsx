@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { noteSkinShakeKey, resetSkinShakeDirectionForTest } from '@/shared/lib/cursorShake/skinShakeDirection'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -18,6 +18,7 @@ import {
   hallOfFameChartVerticesOf,
   HOME_RUN_DERBY_FIRST_ROW_Y,
 } from '@/pages/special/lib/specialLayout'
+import { resetSpriteCacheForTest } from '@/shared/lib/sprite/spriteCache'
 
 // 들어올 때 연출(머리띠 다섯 그림 · 격자 열림 애니 0x79fa8)과 그동안의 키 막음(`useListPageEntry`)은 따로 시험한다 — 여기서는 다 연 뒤로 본다
 vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) => {
@@ -25,7 +26,7 @@ vi.mock('@/widgets/screen-frame/model/useListPageEntry', async (importOriginal) 
   return { ...actual, useListPageEntry: actual.settledListPageEntry }
 })
 
-// 회색(효과 0xa) 칠하기는 캔버스가 없는 jsdom 에서 끝나지 않는다 — 칠한 주소 대신 원래 주소를 바로 돌려준다
+// 회색(효과 0xa) 칠하기는 캔버스가 없는 시험 DOM 에서 끝나지 않는다 — 칠한 주소 대신 원래 주소를 바로 돌려준다
 vi.mock('@/shared/lib/pixelEffect/pixelEffect', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/shared/lib/pixelEffect/pixelEffect')>()
   return { ...actual, paintedEffectSpriteUrlOf: (url: string) => url }
@@ -134,6 +135,8 @@ describe('스페셜 목록 = 세로 릴 0x2524c(this, 6) — 메인 메뉴 아�
 
 describe('반원 바퀴 칸 글자 (0x24f9e~ — 메인 메뉴 wheelLabels 와 같은 꼴)', () => {
   it('[스페셜] 을 고른 배열 그대로 — [스페셜] 은 0° 라 안 그리고 나머지 다섯 칸 글자가 선다', async () => {
+    // 앞 시험들이 가짜 fetch 없이 걸어 둔 원점 요청(시험 DOM 에서 안 끝난다)을 버린다
+    resetSpriteCacheForTest()
     const origins = Object.fromEntries([0, 2, 3, 4, 26].map((frame) => [String(frame).padStart(3, '0'), { x: 0, y: 0, width: 40, height: 10 }]))
     vi.stubGlobal(
       'fetch',

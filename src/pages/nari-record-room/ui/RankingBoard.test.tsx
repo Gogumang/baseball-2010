@@ -1,9 +1,10 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { resetTouchKeyOffersForTest, touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { RankingBoard } from '@/pages/nari-record-room/ui/RankingBoard'
 import { EMPTY_LEAGUE_RECORD } from '@/entities/awards/model/leaderboard'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 afterEach(() => {
   cleanup()
@@ -20,8 +21,8 @@ describe('순위 판 0x5796c 그리기', () => {
       <RankingBoard kind={12} kindLabelFrame={172} entries={entries} myTeamId={3} hasPreviousPage={false} hasNextPage testIdPrefix="기록순위" />,
     )
     expect(screen.getByTestId('기록순위-줄-9').querySelectorAll('img')).toHaveLength(4)
-    expect(screen.getByTestId('기록순위-이름-0').style.color).toBe('rgb(255, 212, 41)')
-    expect(screen.getByTestId('기록순위-이름-1').style.color).not.toBe('rgb(255, 212, 41)')
+    expect(cssColor(screen.getByTestId('기록순위-이름-0').style.color)).toBe('rgb(255, 212, 41)')
+    expect(cssColor(screen.getByTestId('기록순위-이름-1').style.color)).not.toBe('rgb(255, 212, 41)')
     expect(screen.getByTestId('기록순위-값-0').getAttribute('aria-label')).toBe('.315')
     expect(screen.getByTestId('기록순위-값-0').querySelectorAll('img')).toHaveLength(3)
     expect(container.querySelector('img[alt="다음 쪽"]')).not.toBeNull()

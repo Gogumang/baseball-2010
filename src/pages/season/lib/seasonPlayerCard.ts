@@ -100,7 +100,7 @@ export const steppedBoardLeftEnd = (offset: number) => SCREEN.width / 2 + offset
 /**
  * team_logo 77×76 — (W/2 − w/2 − 0x3e, H/2 − h/2 − 0x32), 효과 1 · 인자 12 = 무게 12/16 (R6 3절).
  * 로고가 판 위 가장자리(y 122)를 걸쳐 아래가 공 무늬 · 판 두 겹이다 — `CardPlate` 가 둘을 같은 좌표로 다시 그려 원본 식으로 섞는다
- * (Q-03 r301, `BallPatternTranslucentImage`). `opacity` 는 캔버스가 없을 때(jsdom)의 CSS 근사다.
+ * (Q-03 r301, `BallPatternTranslucentImage`). `opacity` 는 캔버스가 없을 때(시험 DOM)의 CSS 근사다.
  */
 export const SEASON_CARD_LOGO = {
   x: SCREEN.width / 2 - (77 >> 1) - 0x3e,

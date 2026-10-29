@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { useState } from 'react'
 import { INJURY_FOLLOW_UP_NOTICE } from '@/entities/career/model/condition'
 import { nariLineupSlotsOf } from '@/entities/career/model/nariTeamRecord'

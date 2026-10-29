@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
@@ -26,6 +26,7 @@ import {
 import { STAT_NAMES } from '@/pages/record/lib/statNames'
 import { RECORD_DESCRIPTIONS } from '@/pages/record/lib/recordDescriptions'
 import { applyAnnalsStat } from '@/entities/collection/model/annalsStats'
+import { cssColor } from '@/shared/lib/testing/cssColor'
 
 /** 켠 스킬 비트(+0xf4 타자 · +0xf8 투수)만 세운 기록연감 — 스킬 탭 '얻음' 은 0x58a3c 가 이 비트로 가른다 */
 const 켠스킬 = (batterBits: number[], pitcherBits: number[] = []) => ({
@@ -210,7 +211,7 @@ describe('기록연감 칸 격자', () => {
     expect(lines[0]).toBe('샛노란 병아리 신인')
     expect(lines[1]).toBe('어느 정도는 봐줘야겠지?')
     expect(lines[2]).toBe('효과 : 감독 평가 +1')
-    expect((screen.getByText('감독 평가 +1') as HTMLElement).style.color).toBe('rgb(255, 255, 0)')
+    expect(cssColor((screen.getByText('감독 평가 +1') as HTMLElement).style.color)).toBe('rgb(255, 255, 0)')
 
     fireEvent.keyDown(window, { key: 'ArrowDown' })
     fireEvent.keyDown(window, { key: 'ArrowRight' })
@@ -496,7 +497,7 @@ describe('탭 0 설명 막대 (0x2e9b0~0x2ea86)', () => {
   it('흐르는 글 카운터 [skin+0x284] 는 그린 뒤 3 오르고, 글이 사라졌다 다시 떠도 이어진다', () => {
     resetSkinTickerCounter()
     띄우기()
-    // jsdom 은 글 폭 0 — 한 바퀴 170, 글 왼쪽 = 자르기 칸 기준 170 − 카운터 − 2
+    // 시험 DOM 은 글 폭 0 — 한 바퀴 170, 글 왼쪽 = 자르기 칸 기준 170 − 카운터 − 2
     const 글왼쪽 = () => parseInt((screen.getByTestId('기록-설명').firstElementChild as HTMLElement).style.left, 10)
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(글왼쪽()).toBe(168)
