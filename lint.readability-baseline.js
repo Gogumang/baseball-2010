@@ -63,7 +63,6 @@ export const readabilityBaseline = [
   'src/entities/fielding/model/autoAdvance.ts',
   'src/entities/fielding/model/baserunningKey.ts',
   'src/entities/fielding/model/catchPrediction.ts',
-  'src/entities/fielding/model/coverAssignment.ts',
   'src/entities/fielding/model/fielderPose.ts',
   'src/entities/fielding/model/outJudgement.ts',
   'src/entities/fielding/model/playGate.ts',
