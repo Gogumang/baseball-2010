@@ -6,6 +6,7 @@
  * 읽어야 원본 틱 시계에 맞춘 차례가 그대로다. React 가 그림을 버리면(동시 렌더) 버린 그림의 값이 남을 수 있는데, 이 앱은 그런
  * 갱신(transition · Suspense 재시도)으로 이 ref 를 가진 화면을 그리지 않는다 — 옛 꼴과 같은 한계다.
  */
-export function useMirrorRef<T>(ref: { current: T }, value: T): void {
-  ref.current = value
+export function useMirrorRef<T>(ref: { current: T } | undefined, value: T): void {
+  // 부르는 쪽이 ref 를 안 줄 수 있다(선택 props) — 훅은 조건 없이 부른다
+  if (ref !== undefined) ref.current = value
 }

@@ -1,4 +1,5 @@
 import { type MutableRefObject, useEffect, useRef } from 'react'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import { RawScreen } from '@/shared/ui'
 import { activeSound } from '@/shared/api/audio/soundPort'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -207,19 +208,32 @@ function useBenchClearingWalk(
   tick: number,
   targetRolls: readonly number[] | null,
 ): BenchClearingWalkState | null {
-  const memory = useRef<{ readonly field: BenchClearingWalkInput; readonly tick: number; readonly state: BenchClearingWalkState } | null>(null)
-  if (field === undefined) return null
-  let current = memory.current
+  const memory = useRenderMachine<BenchWalkMemory | null, BenchWalkInput>(advanceBenchWalkMemory, { field, tick, targetRolls })
+  return field === undefined ? null : (memory?.state ?? null)
+}
+
+interface BenchWalkMemory {
+  readonly field: BenchClearingWalkInput
+  readonly tick: number
+  readonly state: BenchClearingWalkState
+}
+
+interface BenchWalkInput {
+  readonly field: BenchClearingWalkInput | undefined
+  readonly tick: number
+  readonly targetRolls: readonly number[] | null
+}
+
+/** 판 재료가 없으면 앞 걸음을 그대로 들고 있는다(다시 오면 이어 굴린다) */
+function advanceBenchWalkMemory(previous: BenchWalkMemory | null, { field, tick, targetRolls }: BenchWalkInput): BenchWalkMemory | null {
+  if (field === undefined) return previous
   const isSame =
-    current !== null &&
-    current.field.entryRolls === field.entryRolls &&
-    current.field.offenseSide === field.offenseSide &&
-    current.field.isLeftBatter === field.isLeftBatter
-  if (current === null || !isSame || current.tick > tick) {
-    current = { field, tick: -1, state: startBenchClearingWalk(field) }
-  }
-  let { state } = current
-  for (let t = current.tick + 1; t <= tick; t += 1) state = stepBenchClearingWalk(state, t, field, targetRolls)
-  memory.current = { field, tick: Math.max(tick, current.tick), state }
-  return state
+    previous !== null &&
+    previous.field.entryRolls === field.entryRolls &&
+    previous.field.offenseSide === field.offenseSide &&
+    previous.field.isLeftBatter === field.isLeftBatter
+  const start = previous === null || !isSame || previous.tick > tick ? { field, tick: -1, state: startBenchClearingWalk(field) } : previous
+  let { state } = start
+  for (let t = start.tick + 1; t <= tick; t += 1) state = stepBenchClearingWalk(state, t, field, targetRolls)
+  return { field, tick: Math.max(tick, start.tick), state }
 }

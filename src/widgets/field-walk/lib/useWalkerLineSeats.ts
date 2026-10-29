@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
 import { type BenchClearingOffenseAces, seatsAfterBenchClearing } from '@/widgets/field-walk/lib/benchClearingFieldInput'
 import { NEW_WALKER_LINE_SEATS, type WalkerLineSeats, seatsAfterDefensePlay, seatsAfterHalfInningBoard } from '@/widgets/field-walk/lib/walkerAces'
 
@@ -20,6 +20,59 @@ export interface WalkerLineSeatsEvents {
   readonly benchClearing: { readonly key: unknown; readonly offense: BenchClearingOffenseAces | null } | null
 }
 
+interface WalkerLineSeatsMemory {
+  readonly sceneKey: unknown
+  readonly seats: WalkerLineSeats
+  readonly playKey: unknown
+  readonly boardKey: unknown
+  readonly boardBefore: WalkerLineSeats
+  readonly benchKey: unknown
+  readonly benchDefense: WalkerLineSeats['defense']
+  readonly previousPlayDefense: SeatRecords | null
+}
+
+/** 장면을 세울 때 — 이미 들고 있던 판(옛 판)은 이 장면의 판이 아니다(그대로 둔다) */
+function freshMemoryOf(events: WalkerLineSeatsEvents): WalkerLineSeatsMemory {
+  return {
+    sceneKey: events.sceneKey,
+    seats: NEW_WALKER_LINE_SEATS,
+    playKey: events.playKey,
+    boardKey: null,
+    boardBefore: NEW_WALKER_LINE_SEATS,
+    benchKey: null,
+    benchDefense: NEW_WALKER_LINE_SEATS.defense,
+    previousPlayDefense: events.playDefenseRecords,
+  }
+}
+
+/** 수비 판 시작 0xb0fb4 — 판의 정체가 바뀌면 한 번. 판 시작 때 수비 줄은 판을 낸 걸음 앞 그림의 레코드다 */
+function afterDefensePlay(memory: WalkerLineSeatsMemory, events: WalkerLineSeatsEvents): WalkerLineSeatsMemory {
+  if (events.playKey === memory.playKey) return memory
+  const defense = memory.previousPlayDefense ?? events.playDefenseRecords
+  const isPlayStarted = events.playKey != null && defense !== null
+  return { ...memory, playKey: events.playKey, seats: isPlayStarted ? seatsAfterDefensePlay(memory.seats, defense) : memory.seats }
+}
+
+/** 교대 판 0x3fac4 — 판 그림이 못 찾은 칸에 남는 값(`boardBefore`)을 잡아 두고 두 줄을 고친다 */
+function afterHalfInningBoard(memory: WalkerLineSeatsMemory, board: WalkerLineSeatsEvents['board']): WalkerLineSeatsMemory {
+  if (board === null || board.key === memory.boardKey) return memory
+  return { ...memory, boardKey: board.key, boardBefore: memory.seats, seats: seatsAfterHalfInningBoard(memory.seats, board.defense, board.offense) }
+}
+
+/** 벤치 클리어링 진입 0x3a5f0 */
+function afterBenchClearing(memory: WalkerLineSeatsMemory, bench: WalkerLineSeatsEvents['benchClearing']): WalkerLineSeatsMemory {
+  if (bench === null || bench.key === memory.benchKey) return memory
+  return { ...memory, benchKey: bench.key, benchDefense: memory.seats.defense, seats: seatsAfterBenchClearing(memory.seats, bench.offense) }
+}
+
+/** 한 그림 — 수비 판 → 교대 판 → 벤치 클리어링 차례 */
+function advanceWalkerLineSeats(previous: WalkerLineSeatsMemory | null, events: WalkerLineSeatsEvents): WalkerLineSeatsMemory {
+  const start = previous === null || previous.sceneKey !== events.sceneKey ? freshMemoryOf(events) : previous
+  const played = afterDefensePlay(start, events)
+  const remembered = played.previousPlayDefense === events.playDefenseRecords ? played : { ...played, previousPlayDefense: events.playDefenseRecords }
+  return afterBenchClearing(afterHalfInningBoard(remembered, events.board), events.benchClearing)
+}
+
 /**
  * **경기 장면 두 줄의 +0xec 를 장면이 사는 동안 따라간다** (`WalkerLineSeats` — 적는 곳은 교대 판 0x3fac4 · 수비 판 시작 0xb0fb4 ·
  * 벤치 클리어링 0x3a5f0 셋뿐). 한 그림 안 차례는 수비 판 → 교대 판 → 벤치 클리어링으로 본다.
@@ -29,45 +82,6 @@ export function useWalkerLineSeats(events: WalkerLineSeatsEvents): {
   readonly boardBefore: WalkerLineSeats
   readonly benchDefense: WalkerLineSeats['defense']
 } {
-  const ref = useRef<{
-    sceneKey: unknown
-    seats: WalkerLineSeats
-    playKey: unknown
-    boardKey: unknown
-    boardBefore: WalkerLineSeats
-    benchKey: unknown
-    benchDefense: WalkerLineSeats['defense']
-    previousPlayDefense: SeatRecords | null
-  } | null>(null)
-  if (ref.current === null || ref.current.sceneKey !== events.sceneKey) {
-    ref.current = {
-      sceneKey: events.sceneKey,
-      seats: NEW_WALKER_LINE_SEATS,
-      playKey: events.playKey,
-      boardKey: null,
-      boardBefore: NEW_WALKER_LINE_SEATS,
-      benchKey: null,
-      benchDefense: NEW_WALKER_LINE_SEATS.defense,
-      previousPlayDefense: events.playDefenseRecords,
-    }
-    // 장면을 세울 때 이미 들고 있던 판(옛 판)은 이 장면의 판이 아니다 — 그대로 둔다
-  }
-  const state = ref.current
-  if (events.playKey !== state.playKey) {
-    state.playKey = events.playKey
-    const defense = state.previousPlayDefense ?? events.playDefenseRecords
-    if (events.playKey != null && defense !== null) state.seats = seatsAfterDefensePlay(state.seats, defense)
-  }
-  state.previousPlayDefense = events.playDefenseRecords
-  if (events.board !== null && events.board.key !== state.boardKey) {
-    state.boardKey = events.board.key
-    state.boardBefore = state.seats
-    state.seats = seatsAfterHalfInningBoard(state.seats, events.board.defense, events.board.offense)
-  }
-  if (events.benchClearing !== null && events.benchClearing.key !== state.benchKey) {
-    state.benchKey = events.benchClearing.key
-    state.benchDefense = state.seats.defense
-    state.seats = seatsAfterBenchClearing(state.seats, events.benchClearing.offense)
-  }
-  return { boardBefore: state.boardBefore, benchDefense: state.benchDefense }
+  const memory = useRenderMachine(advanceWalkerLineSeats, events)
+  return { boardBefore: memory.boardBefore, benchDefense: memory.benchDefense }
 }
