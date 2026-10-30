@@ -39,13 +39,16 @@ const LAST_ROW = REGISTER_ROW_COUNT - 1
 /** 목록 [0x74] 한 칸 옮기기 — 꼴 0 이라 끝에서 멈춘다 */
 const clampRow = (row: number) => Math.min(Math.max(row, 0), LAST_ROW)
 
+/** CLR — 이름 줄이면 빈 이름은 0x65(팀 고르기) · 아니면 한 글자 지움, 다른 줄은 ↑ 로 한 줄 위 */
+function clearKeyOutcomeOf(row: number, nameLength: number): RegisterKeyOutcome {
+  if (row !== NAME_ROW) return { kind: 'move', row: clampRow(row - 1) }
+  return nameLength === 0 ? { kind: 'cancel' } : { kind: 'deleteChar' }
+}
+
 export function registerKeyOutcomeOf(row: number, key: RegisterKey, nameLength: number): RegisterKeyOutcome {
-  const isEmptyName = row === NAME_ROW && nameLength === 0
-  if (key === 'clr') {
-    if (row !== NAME_ROW) return { kind: 'move', row: clampRow(row - 1) }
-    return isEmptyName ? { kind: 'cancel' } : { kind: 'deleteChar' }
-  }
+  if (key === 'clr') return clearKeyOutcomeOf(row, nameLength)
   if (key === 'up') return { kind: 'move', row: clampRow(row - 1) }
+  const isEmptyName = row === NAME_ROW && nameLength === 0
   if (isEmptyName) return { kind: 'none' }
   if (key === 'ok' && row === LAST_ROW) return { kind: 'finish' }
   return { kind: 'move', row: clampRow(row + 1) }
@@ -56,12 +59,25 @@ export function registerKeyOutcomeOf(row: number, key: RegisterKey, nameLength: 
  * '2' · '8' 은 이름 줄이 아닐 때만 목록 키(표 0xd2e7c — ↑ · ↓)다. 이름 줄에서는 글자다.
  */
 export function registerKeyOf(key: string, isNameRow: boolean): RegisterKey | null {
-  if (key === 'ArrowUp' || (key === '2' && !isNameRow)) return 'up'
-  if (key === 'ArrowDown' || (key === '8' && !isNameRow)) return 'down'
-  if (key === 'Enter') return 'ok'
-  if (key === 'Escape' || key === 'Backspace') return 'clr'
-  return null
+  const listKey = LIST_KEYS.get(key)
+  if (listKey !== undefined) return listKey
+  if (isNameRow) return null
+  return DIGIT_LIST_KEYS.get(key) ?? null
 }
+
+/** 어느 줄에서나 목록 키인 웹 키 */
+const LIST_KEYS: ReadonlyMap<string, RegisterKey> = new Map([
+  ['ArrowUp', 'up'],
+  ['ArrowDown', 'down'],
+  ['Enter', 'ok'],
+  ['Escape', 'clr'],
+  ['Backspace', 'clr'],
+])
+/** 이름 줄이 아닐 때만 목록 키인 숫자 (표 0xd2e7c) */
+const DIGIT_LIST_KEYS: ReadonlyMap<string, RegisterKey> = new Map([
+  ['2', 'up'],
+  ['8', 'down'],
+])
 
 /** 한 글자 지우기 (0x66fd5) — 웹은 코드 포인트 하나를 뗀다 */
 export const nameWithoutLastChar = (name: string) => Array.from(name).slice(0, -1).join('')

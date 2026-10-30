@@ -59,20 +59,32 @@ export function fielderEffectMarksOf(fielder: DefenseFielder): PlayerEffectMark[
     raise,
     zKey: fielder.z,
   })
-  if (fielder.action >= FIELDER_ACTION.diveDown && fielder.action <= FIELDER_ACTION.diveRight) {
-    const anim = DIVE_DUST_ANIM[fielderActionFrameOf(fielder.action, fielder.actionTick)]
-    if (anim !== undefined) marks.push(at('dive', 'anim', anim))
-  }
-  const trail = fielder.dustTrail ?? null
-  if (trail !== null) {
-    marks.push({ key: `f${fielder.slot}-trail`, kind: 'frame', index: trail.frame, x: trail.x, z: trail.z, raise: 0, zKey: trail.z })
-  }
+  const diveAnim = diveDustAnimOf(fielder)
+  if (diveAnim !== undefined) marks.push(at('dive', 'anim', diveAnim))
+  marks.push(...dustTrailMarksOf(fielder))
   const lockTicks = fielder.lockTicks ?? 0
   if (fielder.catchFlag === true || lockTicks > 0) marks.push(at('catch', 'anim', CATCH_DUST_ANIM))
   if (lockTicks > 0) marks.push(at('dizzy', 'anim', DIZZY_ANIM, DIZZY_RAISE))
-  else if ((fielder.fumbleTicks ?? 0) > 0) marks.push(at('alert', 'anim', ALERT_ANIM, ALERT_RAISE))
-  else if ((fielder.throwErrorTicks ?? 0) > 0) marks.push(at('alert', 'anim', ALERT_ANIM, ALERT_RAISE))
+  else if (isAlerting(fielder)) marks.push(at('alert', 'anim', ALERT_ANIM, ALERT_RAISE))
   return marks
+}
+
+/** 0x434a2 — 몸 날리기 동작(8..0xb)일 때 그림 칸에 맞는 먼지 애니 (없으면 undefined) */
+function diveDustAnimOf(fielder: DefenseFielder): number | undefined {
+  if (fielder.action < FIELDER_ACTION.diveDown || fielder.action > FIELDER_ACTION.diveRight) return undefined
+  return DIVE_DUST_ANIM[fielderActionFrameOf(fielder.action, fielder.actionTick)]
+}
+
+/** 0x43546 — 달리기 먼지 자국 (자국 점의 z 가 깊이 키) */
+function dustTrailMarksOf(fielder: DefenseFielder): PlayerEffectMark[] {
+  const trail = fielder.dustTrail ?? null
+  if (trail === null) return []
+  return [{ key: `f${fielder.slot}-trail`, kind: 'frame', index: trail.frame, x: trail.x, z: trail.z, raise: 0, zKey: trail.z }]
+}
+
+/** 0x43818 · 0x438c4 — 공 놓침(+0xb8) 이나 송구 실책(+0xc0) 틱이 남았으면 "!" */
+function isAlerting(fielder: DefenseFielder): boolean {
+  return (fielder.fumbleTicks ?? 0) > 0 || (fielder.throwErrorTicks ?? 0) > 0
 }
 
 /**

@@ -50,8 +50,12 @@ export function ballParticleShotsOf(
   const groundY = offset.y + toScreenY(state.ball.z)
   const height = toScreenY(state.ball.height)
   if (facts.bigHit) shots.push({ ...BIG_HIT_BALL_PARTICLE, x, y: groundY - height, bounce: false })
-  if (height < 0 || groundY < 1 || height !== 0) return shots
-  if (facts.bounceNextHeight === null || toScreenY(facts.bounceNextHeight) === 0) return shots
-  shots.push({ ...BOUNCE_BALL_PARTICLE, x, y: groundY, bounce: true })
+  if (isBounceShot(height, groundY, facts.bounceNextHeight)) shots.push({ ...BOUNCE_BALL_PARTICLE, x, y: groundY, bounce: true })
   return shots
+}
+
+/** 0x36fba~0x37042 — 땅점이 화면 안(y ≥ 1)이고 공이 땅에 붙어(h == 0) 있는데 다음 틱 높이가 0 이 아니면 튐 */
+function isBounceShot(height: number, groundY: number, bounceNextHeight: number | null): boolean {
+  if (height < 0 || groundY < 1 || height !== 0) return false
+  return bounceNextHeight !== null && toScreenY(bounceNextHeight) !== 0
 }

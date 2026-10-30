@@ -1,7 +1,13 @@
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import { useAnimations } from '@/shared/lib/sprite/useFrameOrigins'
 import type { HolderMark, HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
-import { HOLDER_PLATE_BOX, HOLDER_PLATE_FRAME, holderPlateLayoutOf, holderRingPointOf } from '@/pages/defense/lib/holderMarkLayout'
+import {
+  HOLDER_PLATE_BOX,
+  HOLDER_PLATE_FRAME,
+  holderPlateLayoutOf,
+  holderRingPointOf,
+  type HolderPlateLayout,
+} from '@/pages/defense/lib/holderMarkLayout'
 import { IMG_TEXT_FRAMES } from '@/widgets/matchup-cards/lib/matchupCardsLayout'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
@@ -36,7 +42,6 @@ export function DefenseHolderMark({
   const step = animationStepAt(animations?.[mark.anim] ?? [], update)
   const ring = fielderPoint === null ? null : holderRingPointOf(fielderPoint)
   const layout = plate === null ? null : holderPlateLayoutOf(mark.slot, plate, screen)
-  const labelSize = layout === null ? undefined : IMG_TEXT_FRAMES[layout.label]
   return (
     <>
       {ring !== null && step !== null && (
@@ -50,41 +55,47 @@ export function DefenseHolderMark({
           data-frame={step.frame}
         />
       )}
-      {layout !== null && (
-        <div data-testid="수비-이름판" data-slot={mark.slot}>
-          <img
-            className={styles.paintedSprite}
-            style={{ left: layout.plate.x, top: layout.plate.y }}
-            src={`${GAME_UI}/${pad(HOLDER_PLATE_FRAME)}.png`}
-            alt=""
-          />
-          <span
-            className={styles.holderName}
-            style={{ left: layout.plate.x, top: layout.plate.y, width: HOLDER_PLATE_BOX.width, height: HOLDER_PLATE_BOX.height }}
-            data-testid="수비-이름"
-          >
-            {layout.name}
-          </span>
-          <img
-            className={styles.paintedSprite}
-            style={{ left: layout.chip.x, top: layout.chip.y }}
-            src={`${GAME_UI}/${pad(layout.chipFrame)}.png`}
-            alt=""
-            data-testid="수비-칸아이콘"
-            data-frame={layout.chipFrame}
-          />
-          {layout.labelAt !== null && labelSize !== undefined && (
-            <img
-              className={styles.paintedSprite}
-              style={{ left: layout.labelAt.x + labelSize.x, top: layout.labelAt.y + labelSize.y }}
-              src={`${IMG_TEXT}/${pad(layout.label)}.png`}
-              alt=""
-              data-testid="수비-칸글자"
-              data-frame={layout.label}
-            />
-          )}
-        </div>
-      )}
+      {layout !== null && holderPlateOf(mark.slot, layout)}
     </>
+  )
+}
+
+/** 오른쪽 아래 이름 판 — 판 · 이름 · 칸 아이콘 · 칸 글자 */
+function holderPlateOf(slot: number, layout: HolderPlateLayout) {
+  const labelSize = IMG_TEXT_FRAMES[layout.label]
+  return (
+    <div data-testid="수비-이름판" data-slot={slot}>
+      <img
+        className={styles.paintedSprite}
+        style={{ left: layout.plate.x, top: layout.plate.y }}
+        src={`${GAME_UI}/${pad(HOLDER_PLATE_FRAME)}.png`}
+        alt=""
+      />
+      <span
+        className={styles.holderName}
+        style={{ left: layout.plate.x, top: layout.plate.y, width: HOLDER_PLATE_BOX.width, height: HOLDER_PLATE_BOX.height }}
+        data-testid="수비-이름"
+      >
+        {layout.name}
+      </span>
+      <img
+        className={styles.paintedSprite}
+        style={{ left: layout.chip.x, top: layout.chip.y }}
+        src={`${GAME_UI}/${pad(layout.chipFrame)}.png`}
+        alt=""
+        data-testid="수비-칸아이콘"
+        data-frame={layout.chipFrame}
+      />
+      {layout.labelAt !== null && labelSize !== undefined && (
+        <img
+          className={styles.paintedSprite}
+          style={{ left: layout.labelAt.x + labelSize.x, top: layout.labelAt.y + labelSize.y }}
+          src={`${IMG_TEXT}/${pad(layout.label)}.png`}
+          alt=""
+          data-testid="수비-칸글자"
+          data-frame={layout.label}
+        />
+      )}
+    </div>
   )
 }

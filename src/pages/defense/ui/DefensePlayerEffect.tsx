@@ -1,6 +1,6 @@
 import { FrameSprite } from '@/shared/ui'
-import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
-import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { animationStepAt, type AnimationStep } from '@/shared/lib/sprite/animationPlayback'
+import { useAnimations, useFrameOrigins, type AnimationEntry } from '@/shared/lib/sprite/useFrameOrigins'
 import { PLAYER_EFFECT_FRAMES, type PlayerEffectMark } from '@/pages/defense/lib/playerEffectMarks'
 import * as styles from '@/pages/defense/ui/DefenseScreen.css'
 
@@ -19,13 +19,13 @@ export function DefensePlayerEffect({
 }) {
   const origins = useFrameOrigins(PLAYER_EFFECT_FRAMES)
   const animations = useAnimations(PLAYER_EFFECT_FRAMES)
-  const step = mark.kind === 'anim' ? animationStepAt(animations?.[mark.index] ?? [], update) : null
-  const frame = mark.kind === 'frame' ? mark.index : step?.frame
-  if (frame === undefined) return null
+  const step = effectStepOf(mark, animations, update)
+  if (step === null) return null
+  const { frame } = step
   return (
     <div
       className={styles.actor}
-      style={{ left: point.x + (step?.dx ?? 0), top: point.y - mark.raise + (step?.dy ?? 0) }}
+      style={{ left: point.x + step.dx, top: point.y - mark.raise + step.dy }}
       data-testid={`수비-효과-${mark.key}`}
       data-kind={mark.kind}
       data-index={mark.index}
@@ -34,4 +34,14 @@ export function DefensePlayerEffect({
       <FrameSprite folder={PLAYER_EFFECT_FRAMES} frame={frame} origins={origins} x={0} y={0} />
     </div>
   )
+}
+
+/** 'frame'(0xbe8d5)은 그 칸 그대로(밀기 없음), 'anim'(0xbe8a5)은 이번 칸 — 애니가 아직 없으면 null */
+function effectStepOf(
+  mark: PlayerEffectMark,
+  animations: readonly (readonly AnimationEntry[])[] | null,
+  update: number,
+): Pick<AnimationStep, 'frame' | 'dx' | 'dy'> | null {
+  if (mark.kind === 'frame') return { frame: mark.index, dx: 0, dy: 0 }
+  return animationStepAt(animations?.[mark.index] ?? [], update)
 }
