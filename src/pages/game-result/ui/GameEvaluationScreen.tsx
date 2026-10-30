@@ -120,7 +120,7 @@ export function GameEvaluationScreen({
         <EvaluationEventPlayer
           underlay={underlay}
           // 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로
-          dialogue={`${recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)}${ORIGINAL_USER_EVENTS[evaluation.commentIndex] ?? ''}`}
+          dialogue={evaluationDialogueOf(recordLine, evaluation.commentIndex)}
           dialogueExpression={batterEvaluationExpressionOf(career.reputation, evaluation.popularityChange)}
           changeValues={changeValues}
           goals={yearGoalWindowValuesOf(career)}
@@ -134,10 +134,7 @@ export function GameEvaluationScreen({
           rewardNotices={streakRewards.map(
             (reward) => rewardNoticeOf([reward], EVALUATION_EVENT_ID, rewardNoticeContextOf(career, BATTER_REWARD_MODE, NO_ROLL_RANDOM)).notice,
           )}
-          {...(rewardUnderlay === undefined
-            ? {}
-            : { underlayAfterRewards: (given: number) => rewardUnderlay(applyEventRewards(career, streakRewards.slice(0, given))) })}
-          {...(onRewardsGiven === undefined ? {} : { onRewardsGiven })}
+          {...rewardCallbacksOf(career, streakRewards, rewardUnderlay, onRewardsGiven)}
           onDone={onContinue}
         />
       )}
@@ -158,4 +155,25 @@ export function GameEvaluationScreen({
       )}
     </RawScreen>
   )
+}
+
+/** 0x8bab8 — 이벤트 +0x2cc 의 기록 줄(…홈런!N) 뒤에 감독 글을 이어 한 대사로 */
+function evaluationDialogueOf(recordLine: NariRecordLine | undefined, commentIndex: number): string {
+  const recordText = recordLine === undefined ? '' : nariRecordLineTextOf(recordLine)
+  return `${recordText}${ORIGINAL_USER_EVENTS[commentIndex] ?? ''}`
+}
+
+/** 보상 명령 창이 선 갱신의 밑그림 · 몫 주기 — 넘긴 것만 */
+function rewardCallbacksOf(
+  career: PlayerCareer,
+  streakRewards: readonly EventReward[],
+  rewardUnderlay: GameEvaluationScreenProps['rewardUnderlay'],
+  onRewardsGiven: GameEvaluationScreenProps['onRewardsGiven'],
+) {
+  return {
+    ...(rewardUnderlay === undefined
+      ? {}
+      : { underlayAfterRewards: (given: number) => rewardUnderlay(applyEventRewards(career, streakRewards.slice(0, given))) }),
+    ...(onRewardsGiven === undefined ? {} : { onRewardsGiven }),
+  }
 }

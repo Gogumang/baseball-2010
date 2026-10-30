@@ -27,10 +27,7 @@ export function gameHalfInningCardsOf(progress: GameProgress, career: Pick<Playe
   const nameAt = (slot: number): string | null => {
     if (slot === lineupSlotOf(game.playerOrderIndex)) return career.name
     const rosterSlot = rosterSlotAt(progress.ourLineup, slot)
-    if (rosterSlot === ACE_BATTER_ROSTER_SLOT) {
-      const index = progress.aces?.ours.batter
-      return index === undefined ? null : (aceBatterPlayerOf(index)?.name ?? null)
-    }
+    if (rosterSlot === ACE_BATTER_ROSTER_SLOT) return aceBatterNameOf(progress.aces?.ours.batter)
     return roster[rosterSlot % roster.length]?.name ?? null
   }
   return {
@@ -40,4 +37,9 @@ export function gameHalfInningCardsOf(progress: GameProgress, career: Pick<Playe
     currentOrder,
     dueUpNames: Array.from({ length: DUE_UP_ROWS }, (_unused, row) => nameAt(dueUpLineupSlotOf(currentOrder, row))),
   }
+}
+
+/** 142 가 넣은 마타자 칸 — 실린 마선수 이름 */
+function aceBatterNameOf(index: number | undefined): string | null {
+  return index === undefined ? null : (aceBatterPlayerOf(index)?.name ?? null)
 }

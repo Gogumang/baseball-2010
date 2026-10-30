@@ -16,6 +16,7 @@ import {
   sumPitcherLines,
 } from '@/widgets/matchup-cards/lib/matchupRecord'
 import type { MatchupBatterCard, MatchupPitcherCard } from '@/widgets/matchup-cards/ui/MatchupCards'
+import type { MatchupPitcherLine } from '@/widgets/matchup-cards/lib/matchupRecord'
 
 /**
  * **나리 타자편 상태 0xe 의 소개 판 값** (0x44944) — 내 타석에만 0xe 를 지난다(동료·상대 타석은 자동진행 0x21).
@@ -39,34 +40,7 @@ export function gameMatchupCardsOf(
 } {
   const countsThisGame = career.postseason === null
   const mound = opponentMoundOf(progress)
-  // 마투수는 XlsACE_PIT 행의 줄 그대로 — 게이트 0xa571c 가 마선수를 걸러 이 경기 줄이 없다(칸이 null 이라 아래 이 경기 줄도 0)
-  const pitcherBase =
-    mound.aceRecordLine !== undefined
-      ? pitcherLineOfRecord(mound.aceRecordLine)
-      : mound.pitcherSlot === null
-        ? null
-        : leaguePitcherLineOf(career.leaguePlayerStats, leaguePitcherIdOf(progress.opponentTeamId, mound.pitcherSlot))
-  const pitcherGame =
-    mound.pitcherSlot === null
-      ? undefined
-      : progress.pitcherLines.find(
-          (line) => line.teamId === progress.opponentTeamId && line.pitcherSlot === mound.pitcherSlot && line.recordId === undefined,
-        )
-  const pitcherLine =
-    pitcherBase === null
-      ? null
-      : countsThisGame
-        ? sumPitcherLines(pitcherBase, {
-            outs: pitcherGame?.outs ?? 0,
-            runsAllowed: pitcherGame?.runsAllowed ?? 0,
-            strikeouts: pitcherGame?.strikeouts ?? 0,
-          })
-        : pitcherBase
-
-  const myLine = countsThisGame ? sumBatterLines(career.stats, progress.myStats) : career.stats
-  const myPosition = nariTeamRecordOf(nariTeamsOf(career), progress.ourTeamId).batters.find((batter) => batter.slot === MY_RECORD_SLOT)?.position
-  const mySlot = lineupSlotOf(progress.game.battingOrderIndex)
-
+  const pitcherLine = pitcherCardLineOf(progress, career, mound, countsThisGame)
   return {
     batterHand: career.battingSide,
     pitcher: {
@@ -77,14 +51,49 @@ export function gameMatchupCardsOf(
       stamina: staminaGaugeOf(mound),
       ...(pitcherLine === null ? {} : pitcherCardStatsOf(pitcherLine)),
     },
-    batter: {
-      isComputer: false,
-      name: career.name,
-      battingOrder: career.battingOrder - 1,
-      ...(myPosition === undefined ? {} : { position: myPosition }),
-      ...batterCardStatsOf(myLine),
-      recentResults: progress.ourLineup.records[mySlot]?.results ?? [],
-    },
+    batter: myBatterCardOf(progress, career, countsThisGame),
+  }
+}
+
+type OpponentMound = ReturnType<typeof opponentMoundOf>
+
+/** 투수 판의 시즌 줄 — 리그 기록표 줄 + (정규시즌이면) 이 경기 줄 */
+function pitcherCardLineOf(progress: GameProgress, career: PlayerCareer, mound: OpponentMound, countsThisGame: boolean): MatchupPitcherLine | null {
+  const base = pitcherSeasonLineOf(progress, career, mound)
+  if (base === null || !countsThisGame) return base
+  return sumPitcherLines(base, pitcherGameLineOf(progress, mound))
+}
+
+/** 마투수는 XlsACE_PIT 행의 줄 그대로 — 게이트 0xa571c 가 마선수를 걸러 이 경기 줄이 없다(칸이 null 이라 이 경기 줄도 0) */
+function pitcherSeasonLineOf(progress: GameProgress, career: PlayerCareer, mound: OpponentMound): MatchupPitcherLine | null {
+  if (mound.aceRecordLine !== undefined) return pitcherLineOfRecord(mound.aceRecordLine)
+  if (mound.pitcherSlot === null) return null
+  return leaguePitcherLineOf(career.leaguePlayerStats, leaguePitcherIdOf(progress.opponentTeamId, mound.pitcherSlot))
+}
+
+/** 이 경기 상대 투수 줄 (`pitcherLines` — 레코드 줄이 아닌 칸). 없으면 0 */
+function pitcherGameLineOf(progress: GameProgress, mound: OpponentMound): MatchupPitcherLine {
+  const game =
+    mound.pitcherSlot === null
+      ? undefined
+      : progress.pitcherLines.find(
+          (line) => line.teamId === progress.opponentTeamId && line.pitcherSlot === mound.pitcherSlot && line.recordId === undefined,
+        )
+  return { outs: game?.outs ?? 0, runsAllowed: game?.runsAllowed ?? 0, strikeouts: game?.strikeouts ?? 0 }
+}
+
+/** 내 선수 판 — 시즌 줄(정규시즌이면 이 경기 내 타석 더함) · 수비(내 팀 레코드의 내 줄) · 오늘 타석 기록(내 타순 칸 링) */
+function myBatterCardOf(progress: GameProgress, career: PlayerCareer, countsThisGame: boolean): MatchupBatterCard {
+  const myLine = countsThisGame ? sumBatterLines(career.stats, progress.myStats) : career.stats
+  const myPosition = nariTeamRecordOf(nariTeamsOf(career), progress.ourTeamId).batters.find((batter) => batter.slot === MY_RECORD_SLOT)?.position
+  const mySlot = lineupSlotOf(progress.game.battingOrderIndex)
+  return {
+    isComputer: false,
+    name: career.name,
+    battingOrder: career.battingOrder - 1,
+    ...(myPosition === undefined ? {} : { position: myPosition }),
+    ...batterCardStatsOf(myLine),
+    recentResults: progress.ourLineup.records[mySlot]?.results ?? [],
   }
 }
 
@@ -98,14 +107,15 @@ export function gameMatchupCardsOf(
  * - 측 0 이 상대 팀이면 웹 상대 명단(로스터 차례, 마타자는 9번)의 1번 = 로스터 0번.
  */
 export function gameIntroBatterHandOf(progress: GameProgress, career: Pick<PlayerCareer, 'battingSide'>): number {
-  if (progress.game.playerSide !== 0) {
-    const profile = teamBatters(progress.opponentTeamId)[0]?.profile
-    return profile === undefined ? 0 : batterHandOf(profile)
-  }
+  if (progress.game.playerSide !== 0) return profileHandOf(teamBatters(progress.opponentTeamId)[0]?.profile)
   if (progress.game.playerOrderIndex === 0) return career.battingSide
   const slot = rosterSlotAt(progress.ourLineup, 0)
   if (slot === ACE_BATTER_ROSTER_SLOT) return batterHandOf(0, progress.aces?.ours.batter ?? -1)
   const roster = teamBatters(progress.ourTeamId)
-  const profile = roster[slot % roster.length]?.profile
+  return profileHandOf(roster[slot % roster.length]?.profile)
+}
+
+/** 붙박이 표 행 +0xb 의 손 — 행이 없으면 0 */
+function profileHandOf(profile: number | undefined): number {
   return profile === undefined ? 0 : batterHandOf(profile)
 }

@@ -115,9 +115,7 @@ export function GameResultScreen({
   const [backdropRandom] = useState(() => createSeededRandom(0))
   /** 정산 효과 층 — 비는 진 판 덮개 위 · 띠 아래, 파티클은 판 맨 위 (원본 그리기 차례 0x4a384) */
   const settlementLayers = useSettlementEffectLayers()
-  // 진행기가 요약에 실어 보낸 이름이 기본이다 (`gameFlow.pitchersOfRecordOf` — 득점 0xa5c34·교체 0xa60c0 로 센 칸)
-  const names = pitcherNames ?? summary.pitchersOfRecord
-  const rowNames = names === undefined ? EMPTY_PITCHER_NAMES : [names.win, names.loss, names.save]
+  const rowNames = pitcherRowNamesOf(pitcherNames, summary)
   // 0x4a350 — 사람 팀이 앞섰나. 비기면 거짓(진 판 · 비)
   const isWin = summary.result === '승'
   // 0xb69b0(st, 0/1) — 측 0(선공)이 왼쪽. 사람 팀은 `playerSide` 측 (이어하기처럼 재료가 없으면 원래 웹 배치대로 측 1)
@@ -139,14 +137,7 @@ export function GameResultScreen({
           names={rowNames}
           scoreboardSides={scoreboardSides}
           // 503d8 — 이닝별 점수판 0x41c18 을 (14, 252) 에 (작은 로고는 측 0 · 측 1 팀)
-          lineScore={
-            summary.lineScore === undefined
-              ? undefined
-              : {
-                  ...summary.lineScore,
-                  sideTeams: playerSide === 0 ? [summary.ourTeamId, summary.opponentTeamId] : [summary.opponentTeamId, summary.ourTeamId],
-                }
-          }
+          lineScore={endBoardLineScoreOf(summary, playerSide)}
           onConfirm={() => setPhase('정산')}
         />
       </>
@@ -174,8 +165,7 @@ export function GameResultScreen({
             isPaused
             isResultBackdrop
             resultBackdropOffsetOf={(tick) => settlementBackdropOffsetAt(tick, isWin)}
-            {...(settlement.skyRow === undefined ? {} : { skyRow: settlement.skyRow })}
-            {...(settlement.stadium === null || settlement.stadium === undefined ? {} : { stadium: settlement.stadium.stadium })}
+            {...backdropStadiumPropsOf(settlement)}
             fieldPalette={sceneFieldPaletteOf(settlement.stadium)}
             random={backdropRandom}
             settlement={{
@@ -211,4 +201,25 @@ export function GameResultScreen({
       <SettlementPressArea />
     </RawScreen>
   )
+}
+
+/** 승 · 패 · 세 줄 이름 — 진행기가 요약에 실어 보낸 이름이 기본이다(`gameFlow.pitchersOfRecordOf` — 득점 0xa5c34 · 교체 0xa60c0 로 센 칸) */
+function pitcherRowNamesOf(pitcherNames: PitcherOfRecordNames | undefined, summary: GameSummary): readonly (string | null)[] {
+  const names = pitcherNames ?? summary.pitchersOfRecord
+  return names === undefined ? EMPTY_PITCHER_NAMES : [names.win, names.loss, names.save]
+}
+
+/** 503d8 — 이닝별 점수판 0x41c18 을 (14, 252) 에 (작은 로고는 측 0 · 측 1 팀) */
+function endBoardLineScoreOf(summary: GameSummary, playerSide: PlayerSide) {
+  if (summary.lineScore === undefined) return undefined
+  const sideTeams: [number, number] = playerSide === 0 ? [summary.ourTeamId, summary.opponentTeamId] : [summary.opponentTeamId, summary.ourTeamId]
+  return { ...summary.lineScore, sideTeams }
+}
+
+/** 결과 배경의 하늘 줄 · 구장 — 넘긴 것만 */
+function backdropStadiumPropsOf(settlement: NonNullable<GameResultScreenProps['settlement']>) {
+  return {
+    ...(settlement.skyRow === undefined ? {} : { skyRow: settlement.skyRow }),
+    ...(settlement.stadium === null || settlement.stadium === undefined ? {} : { stadium: settlement.stadium.stadium }),
+  }
 }

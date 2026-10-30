@@ -129,38 +129,14 @@ export function AutoPlayRelayScreen({
   const offenseTeam = sideTeams[step.offenseSide]
   const label = step.offenseSide === humanSide ? OFFENSE_LABEL.player : OFFENSE_LABEL.computer
   const teamFrame = TEAM_NAME_BASE_FRAME + offenseTeam
-  const teamFrameWidth = textOrigins?.[String(teamFrame).padStart(3, '0')]?.width ?? 0
-  const cards = step.cards
+  const teamFrameWidth = frameWidthOf(textOrigins, teamFrame)
   return (
     <RawScreen>
       <RelayFieldBackground grassPalette={grassPalette} />
       {field ?? null}
       {/* 점수판 0x41c18(경기, 14, 10) — 이닝별 점수 줄 */}
-      {step.inningRuns !== undefined && (
-        <LineScoreBoard
-          {...LINE_SCORE_AT.autoRelay}
-          inning={step.inning}
-          offenseSide={step.offenseSide}
-          inningRuns={step.inningRuns}
-          totals={step.scores}
-          isGameOver={cards?.gameOver ?? false}
-          tick={tick}
-          sideTeams={sideTeams}
-        />
-      )}
-      {cards !== undefined && (
-        <HalfInningCards
-          at={RELAY_CARDS_AT}
-          isGameOver={cards.gameOver}
-          data={{
-            battingSide: step.offenseSide,
-            count: { strikes: cards.strikes, balls: cards.balls, outs: cards.outs },
-            pitcherName: cards.pitcherName,
-            currentOrder: cards.currentOrder,
-            dueUpNames: cards.dueUpNames.map((name, row) => (cards.dueUpIsMissionBatter?.[row] === true ? (missionBatterName ?? null) : name)),
-          }}
-        />
-      )}
+      {relayLineScoreOf(step, tick, sideTeams)}
+      {relayHalfInningCardsOf(step, missionBatterName)}
       <div
         className={styles.offenseBand}
         style={{ left: OFFENSE_BAND.x, top: OFFENSE_BAND.y, width: OFFENSE_BAND.width, height: OFFENSE_BAND.height }}
@@ -174,17 +150,64 @@ export function AutoPlayRelayScreen({
         공격팀({label})
       </div>
       <FrameSprite folder={IMG_TEXT_FRAMES} frame={teamFrame} origins={textOrigins} x={OFFENSE_TEAM_RIGHT - teamFrameWidth} y={OFFENSE_TEXT_AT.y} />
-      {step.line !== null && (
-        <>
-          {roundPlateRectsOf(RELAY_BOX).map((rect, part) => (
-            <span key={part} className={styles.relayPlate} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} />
-          ))}
-          <div className={styles.relayLine} style={{ left: RELAY_BOX.x, top: RELAY_BOX.y + 4, width: RELAY_BOX.width }} data-testid="중계-글">
-            {step.line}
-          </div>
-        </>
-      )}
+      {step.line !== null && relayLinePlateOf(step.line)}
       {overlay}
     </RawScreen>
+  )
+}
+
+/** img_text 한 장의 폭 — 원점 표를 아직 못 받았으면 0 */
+function frameWidthOf(origins: ReturnType<typeof useFrameOrigins>, frame: number): number {
+  return origins?.[String(frame).padStart(3, '0')]?.width ?? 0
+}
+
+/** 점수판 0x41c18(경기, 14, 10) — 이닝별 점수 줄. 중계 칸이 이닝별 칸을 안 들면(목록 꼴) 안 그린다 */
+function relayLineScoreOf(step: MissionAutoRelayStep, tick: number, sideTeams: readonly [number, number]) {
+  if (step.inningRuns === undefined) return null
+  return (
+    <LineScoreBoard
+      {...LINE_SCORE_AT.autoRelay}
+      inning={step.inning}
+      offenseSide={step.offenseSide}
+      inningRuns={step.inningRuns}
+      totals={step.scores}
+      isGameOver={step.cards?.gameOver ?? false}
+      tick={tick}
+      sideTeams={sideTeams}
+    />
+  )
+}
+
+/** 두 팀 판 0x420dc · 0x42364 — DUE UP 줄이 미션 타자 칸이면 그 선수 이름(없으면 빈 이름) */
+function relayHalfInningCardsOf(step: MissionAutoRelayStep, missionBatterName: string | null | undefined) {
+  const cards = step.cards
+  if (cards === undefined) return null
+  const dueUpNameOf = (name: string | null, row: number) => (cards.dueUpIsMissionBatter?.[row] === true ? (missionBatterName ?? null) : name)
+  return (
+    <HalfInningCards
+      at={RELAY_CARDS_AT}
+      isGameOver={cards.gameOver}
+      data={{
+        battingSide: step.offenseSide,
+        count: { strikes: cards.strikes, balls: cards.balls, outs: cards.outs },
+        pitcherName: cards.pitcherName,
+        currentOrder: cards.currentOrder,
+        dueUpNames: cards.dueUpNames.map(dueUpNameOf),
+      }}
+    />
+  )
+}
+
+/** 중계 칸 (58, 196, 124×18) — 둥근 판 위에 중계 글 */
+function relayLinePlateOf(line: string) {
+  return (
+    <>
+      {roundPlateRectsOf(RELAY_BOX).map((rect, part) => (
+        <span key={part} className={styles.relayPlate} style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }} />
+      ))}
+      <div className={styles.relayLine} style={{ left: RELAY_BOX.x, top: RELAY_BOX.y + 4, width: RELAY_BOX.width }} data-testid="중계-글">
+        {line}
+      </div>
+    </>
   )
 }
