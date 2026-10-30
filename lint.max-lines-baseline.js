@@ -12,7 +12,6 @@ export const maxLinesBaseline = [
   'src/features/play-team-game/ui/InGameMenu.tsx',
   'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
-  'src/pages/defense/ui/DefenseScreen.tsx',
   'src/pages/game/ui/GameScreen.tsx',
   'src/pages/help/ui/HelpScreen.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',

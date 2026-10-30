@@ -141,7 +141,6 @@ export const readabilityBaseline = [
   'src/pages/defense/model/useFreePassPlayStart.ts',
   'src/pages/defense/ui/DefenseHolderMark.tsx',
   'src/pages/defense/ui/DefensePlayerEffect.tsx',
-  'src/pages/defense/ui/DefenseScreen.tsx',
   'src/pages/game-result/ui/GameEvaluationScreen.tsx',
   'src/pages/game-result/ui/GameResultScreen.tsx',
   'src/pages/game/lib/gameFieldTeams.ts',
