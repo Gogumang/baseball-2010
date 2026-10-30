@@ -633,7 +633,7 @@ describe.skipIf(JAR_DIR === undefined)('원본 대조 — 웹 데이터 = jar ·
       'src/entities/season-mode/model/seasonReputation.ts#RECORD_CODE_TO_SLOT', // 점프표 0xd7d7c 의 갈래 차례 (B-16)
       'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts#MANAGER_TEXT_GRADES_STARTER', // 0xcc558 × 2 (0x1285a)
       'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts#MANAGER_TEXT_SECTION_STARTS', // 0x128ac 스택 상수
-      'src/pages/pitcher-league/lib/pitchTrainingWindow.ts#TAB_BOXES', // mode_ui 39 박스 (그림 자료)
+      'src/pages/pitcher-league/lib/pitchTrainingWindow/windowLayout.ts#TAB_BOXES', // mode_ui 39 박스 (그림 자료)
       'src/pages/pitcher-league/lib/pitcherRegisterLayout.ts#REGISTER_ROW_HINTS', // 점프표 0xcc6d8 갈래 상수
       'src/pages/record/lib/annalsGrid.ts#NICKNAME_PAGE_FIRST_NAMES', // 쪽별 칸 수 누계
       'src/pages/season/lib/seasonOutingPopup.ts#NARI_OUTING_ANIMATIONS', // 점프표 0xd4a90 갈래 상수
