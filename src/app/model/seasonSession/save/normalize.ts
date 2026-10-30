@@ -19,17 +19,30 @@ const SEASON_GAME_KINDS: readonly SeasonGameKind[] = ['정규', '포스트시즌
  * 웹 판이 저장 꼴을 넓히기 전에 쓴 브라우저 저장을 위해 남긴다.
  */
 export function seasonGameProgressOf(raw: unknown): TeamGameProgress | null {
-  if (raw === null || typeof raw !== 'object') return null
+  if (!isObject(raw)) return null
   const progress = raw as Partial<TeamGameProgress>
-  const { options, game } = progress
-  if (options === undefined || options === null || typeof options !== 'object') return null
-  if (options.mode !== SEASON_GAME_MODE) return null
-  if (game === undefined || game === null || typeof game !== 'object') return null
-  if (typeof game.inning !== 'number' || (game.half !== '초' && game.half !== '말')) return null
-  if (!Array.isArray(progress.ourEntry) || !Array.isArray(progress.opponentEntry)) return null
-  if (!Array.isArray(progress.ourPitcherEntry) || !Array.isArray(progress.opponentPitcherEntry)) return null
+  if (!isSeasonGameOptions(progress.options) || !isGameInHalf(progress.game) || !hasEntries(progress)) return null
   // 꼴이 넓어진 칸은 옛 블록 이사(`migrateTeamGameProgress`)가 채운다
   return migrateTeamGameProgress(raw as TeamGameProgress)
+}
+
+const isObject = (value: unknown): value is object => value !== null && value !== undefined && typeof value === 'object'
+
+/** 시즌(모드 2) 경기 옵션인가 */
+function isSeasonGameOptions(options: Partial<TeamGameProgress>['options']): boolean {
+  return isObject(options) && options.mode === SEASON_GAME_MODE
+}
+
+/** 이닝 수 · 초/말이 선 경기 칸인가 */
+function isGameInHalf(game: Partial<TeamGameProgress>['game']): boolean {
+  if (!isObject(game)) return false
+  return typeof game.inning === 'number' && (game.half === '초' || game.half === '말')
+}
+
+/** 양 팀 타자 · 투수 명단이 모두 배열인가 */
+function hasEntries(progress: Partial<TeamGameProgress>): boolean {
+  const { ourEntry, opponentEntry, ourPitcherEntry, opponentPitcherEntry } = progress
+  return [ourEntry, opponentEntry, ourPitcherEntry, opponentPitcherEntry].every((entry) => Array.isArray(entry))
 }
 
 /** 저장의 경기 블록을 고른다 — 꼴이 안 맞으면 null */
@@ -53,34 +66,47 @@ function normalizeGameSave(raw: unknown): SeasonGameSaveBlock | null {
  * 와 같은 자세로 **빠진 칸만 기본값으로 채운다** — 있는 값은 손대지 않는다.
  */
 export function normalizeSeasonSave(saved: Partial<SeasonSave> | null): SeasonSave | null {
-  if (saved === null || saved === undefined || typeof saved !== 'object') return null
+  if (!isObject(saved)) return null
   // 시즌 초기화(`resetSeason` — game_s.sav 지움)가 남긴 덩어리 — 저장소에 clear 가 없어 전역 칸 둘만 남긴 덩어리
   // (`SeasonGlobalCarry`)를 덮어쓴다. 시즌은 없다
   if (saved.state === undefined) return null
   const state = normalizeSeasonState(saved.state)
-  const roster = saved.roster === undefined ? rosterOf(state.record.teamId) : withTablePositions(saved.roster, state.record.teamId)
-  // 스태미나 표가 생기기 전 저장은 명단 투수를 0(표에서 만든 값)으로 적었고 경기는 늘 10000 으로 쳤다 —
-  // 그 값 그대로 10000 으로 채운다
-  const staminaKnown = saved.cpuPitcherStaminas !== undefined
   // 옛 저장(칸 없음)은 경기 저장 없음 — 블록을 못 읽으면 +0x4e 도 내린다(웹 전용, 블록 없이 표시만 설 수는 없다)
   const gameSave = normalizeGameSave(saved.gameSave)
-  const cupActive = saved.cup !== undefined && saved.cup !== null
   return {
     ...saved,
     isGameInProgress: saved.isGameInProgress === true && gameSave !== null,
     gameSave,
     state,
     league: saved.league ?? EMPTY_LEAGUE,
-    roster: withRecordSalaryGrades(staminaKnown ? roster : withFullRosterStamina(roster)),
+    roster: savedRosterOf(saved, state.record.teamId),
     // 레코드 마선수 칸이 생기기 전 저장 — 마선수가 빠진 레코드(0xb512c 뒤)로 이사한다(그날 넣은 마선수는 남아 있지 않다)
     recordAces: saved.recordAces ?? {},
-    // 대회 중 저장인데 대표팀 쌓임 칸이 없으면 빈 표로 이사 — 그 전 경기들이 쌓은 +0x2a · +0x2e 는 남아 있지 않다
-    ...(cupActive ? { cupPlayerStats: saved.cupPlayerStats ?? EMPTY_LEAGUE_PLAYER_STATS } : {}),
+    ...cupPlayerStatsSlotOf(saved),
     playerStats: saved.playerStats ?? EMPTY_LEAGUE_PLAYER_STATS,
     cpuPitcherStaminas: saved.cpuPitcherStaminas ?? fullCpuPitcherStaminas(state.record.teamId),
-    // 준PO 승자 칸(L+0x3b)이 생기기 전 시리즈 이사 — `withSemiPlayoffWinner`
-    ...(saved.series === undefined || saved.series === null ? {} : { series: withSemiPlayoffWinner(saved.series) }),
+    ...seriesSlotOf(saved.series),
   }
+}
+
+/** 준PO 승자 칸(L+0x3b)이 생기기 전 시리즈 이사 — `withSemiPlayoffWinner`. 시리즈가 없으면 칸을 그대로 둔다 */
+function seriesSlotOf(series: SeasonSave['series']): Pick<SeasonSave, 'series'> {
+  return series === undefined || series === null ? {} : { series: withSemiPlayoffWinner(series) }
+}
+
+/** 명단 — 없으면 표 명단, 있으면 표 수비 위치를 얹는다. 스태미나 표가 생기기 전 저장은 명단 투수를 10000 으로 */
+function savedRosterOf(saved: Partial<SeasonSave>, teamId: number): SeasonTeamRoster {
+  const roster = saved.roster === undefined ? rosterOf(teamId) : withTablePositions(saved.roster, teamId)
+  // 스태미나 표가 생기기 전 저장은 명단 투수를 0(표에서 만든 값)으로 적었고 경기는 늘 10000 으로 쳤다 —
+  // 그 값 그대로 10000 으로 채운다
+  const staminaKnown = saved.cpuPitcherStaminas !== undefined
+  return withRecordSalaryGrades(staminaKnown ? roster : withFullRosterStamina(roster))
+}
+
+/** 대회 중 저장인데 대표팀 쌓임 칸이 없으면 빈 표로 이사 — 그 전 경기들이 쌓은 +0x2a · +0x2e 는 남아 있지 않다 */
+function cupPlayerStatsSlotOf(saved: Partial<SeasonSave>): Pick<SeasonSave, 'cupPlayerStats'> {
+  const cupActive = saved.cup !== undefined && saved.cup !== null
+  return cupActive ? { cupPlayerStats: saved.cupPlayerStats ?? EMPTY_LEAGUE_PLAYER_STATS } : {}
 }
 
 /**

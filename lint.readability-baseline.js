@@ -12,14 +12,8 @@ export const readabilityRules = {
 }
 
 export const readabilityBaseline = [
-  'src/app/model/seasonSession/awards/leagueRecords.ts',
-  'src/app/model/seasonSession/goals/seasonGoals.ts',
-  'src/app/model/seasonSession/hook/seasonSessionOf.ts',
   'src/app/model/seasonSession/nextGame/useEntryEditActions.ts',
   'src/app/model/seasonSession/postseason/usePostseasonActions.ts',
-  'src/app/model/seasonSession/records/humanGameRecords.ts',
-  'src/app/model/seasonSession/save/globals.ts',
-  'src/app/model/seasonSession/save/normalize.ts',
   'src/app/model/seasonSession/seasonEnd/useSeasonEndActions.ts',
   'src/app/model/seasonSession/settlement/useSettleGame.ts',
   'src/app/model/seasonSession/shop/useSeasonShopActions.ts',

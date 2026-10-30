@@ -24,28 +24,34 @@ import { SEASON_STAMINA_RECOVERY } from '@/app/model/seasonSession/stamina/stami
  * 를 올리고 그 레코드의 id(+0)가 옛 팀 Xls 행이라 기록이 선수를 따라간다. 표 팀이 없으면 그 함수 그대로다.
  */
 export function recordSeasonHumanGamePitchers(stats: LeaguePlayerStats, pitchers: GameLeaguePitchers | undefined): LeaguePlayerStats {
-  const tableTeams = pitchers?.decisionTableTeams
-  const recordIds = pitchers?.decisionRecordIds
-  if (pitchers === undefined || (tableTeams === undefined && recordIds === undefined)) {
+  if (pitchers === undefined || (pitchers.decisionTableTeams === undefined && pitchers.decisionRecordIds === undefined)) {
     return recordHumanGamePitchers(stats, pitchers, true)
-  }
-  const recordOf = (record: PitcherOfRecord | null, teamId: number | undefined, recordId: number | undefined) => {
-    if (record === null) return null
-    // 표 밖 투수(영입한 명전·나리)는 줄과 같이 칸 −1 · 원본 id 로 찾는다
-    if (recordId !== undefined) return { side: record.side, pitcherSlot: -1, recordId }
-    return { side: record.side, pitcherSlot: record.number, ...(teamId === undefined ? {} : { teamId }) }
   }
   const appearances = leaguePitcherAppearancesOf(
     pitchers.lines,
-    {
-      winner: recordOf(pitchers.decision.winner, tableTeams?.winner, recordIds?.winner),
-      loser: recordOf(pitchers.decision.loser, tableTeams?.loser, recordIds?.loser),
-      save: recordOf(pitchers.decision.save, tableTeams?.save, recordIds?.save),
-    },
+    seasonDecisionsOf(pitchers),
     (side) => pitchers.sideTeams[side] ?? pitchers.sideTeams[0],
     (_teamId, pitcherSlot, recordId) => recordId === undefined && (pitcherSlot < 0 || pitcherSlot >= PITCHERS_PER_TEAM),
   )
   return recordLeaguePitcherAppearances(stats, appearances)
+}
+
+/** 승 · 패 · 세이브 투수 — 표 팀(옮겨 온 투수) · 원본 id(표 밖 투수)를 얹는다 */
+function seasonDecisionsOf(pitchers: GameLeaguePitchers) {
+  const tableTeams = pitchers.decisionTableTeams
+  const recordIds = pitchers.decisionRecordIds
+  return {
+    winner: seasonDecisionOf(pitchers.decision.winner, tableTeams?.winner, recordIds?.winner),
+    loser: seasonDecisionOf(pitchers.decision.loser, tableTeams?.loser, recordIds?.loser),
+    save: seasonDecisionOf(pitchers.decision.save, tableTeams?.save, recordIds?.save),
+  }
+}
+
+function seasonDecisionOf(record: PitcherOfRecord | null, teamId: number | undefined, recordId: number | undefined) {
+  if (record === null) return null
+  // 표 밖 투수(영입한 명전·나리)는 줄과 같이 칸 −1 · 원본 id 로 찾는다
+  if (recordId !== undefined) return { side: record.side, pitcherSlot: -1, recordId }
+  return { side: record.side, pitcherSlot: record.number, ...(teamId === undefined ? {} : { teamId }) }
 }
 
 /**
@@ -102,16 +108,19 @@ export function humanGameRecordAcesOf(options: TeamGameOptions | null, summary: 
   const aces: Record<number, SeasonRecordAces> = {}
   const pitcher = options.acePitcherId ?? -1
   const batter = options.aceBatterId ?? -1
-  if (pitcher >= 0 || batter >= 0) {
-    const ended = summary.ourAcePitcherStamina ?? FULL_PITCHER_STAMINA
-    aces[myTeamId] = {
-      pitcher,
-      batter,
-      ...(pitcher >= 0 ? { pitcherStamina: recoverStaminaAfterGameDay(ended, SEASON_STAMINA_RECOVERY) } : {}),
-    }
-  }
+  if (pitcher >= 0 || batter >= 0) aces[myTeamId] = myRecordAcesOf(pitcher, batter, summary.ourAcePitcherStamina)
   if (options.opponentAces !== undefined) {
     aces[summary.opponentTeamId] = { pitcher: options.opponentAces.pitcher, batter: options.opponentAces.batter }
   }
   return aces
+}
+
+/** 내 팀 마선수 줄 — 마투수 +0x2c 는 경기 끝 값에 하루 끝 회복(4f2bc `0xb617c`)을 먹인 값 */
+function myRecordAcesOf(pitcher: number, batter: number, endedStamina: number | undefined): SeasonRecordAces {
+  const ended = endedStamina ?? FULL_PITCHER_STAMINA
+  return {
+    pitcher,
+    batter,
+    ...(pitcher >= 0 ? { pitcherStamina: recoverStaminaAfterGameDay(ended, SEASON_STAMINA_RECOVERY) } : {}),
+  }
 }
