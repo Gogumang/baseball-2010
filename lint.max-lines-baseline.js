@@ -22,7 +22,6 @@ export const maxLinesBaseline = [
   'src/pages/general-mode/ui/MatchInfoScreen.tsx',
   'src/pages/help/ui/HelpScreen.tsx',
   'src/pages/home-run-derby/model/useHomeRunDerby.ts',
-  'src/pages/home-run-derby/ui/DerbyResultWindow.tsx',
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx',
   'src/pages/management/ui/NariYearCoverScreen.tsx',
   'src/pages/management/ui/RadarChart.tsx',

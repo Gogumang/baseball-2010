@@ -165,7 +165,6 @@ export const readabilityBaseline = [
   'src/pages/home-run-derby/lib/derbyPitchCall.ts',
   'src/pages/home-run-derby/model/useHomeRunDerby.ts',
   'src/pages/home-run-derby/ui/DerbyHud.tsx',
-  'src/pages/home-run-derby/ui/DerbyResultWindow.tsx',
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx',
   'src/pages/main-menu/model/useMainMenu.ts',
   'src/pages/main-menu/ui/MainMenuScreen.tsx',
