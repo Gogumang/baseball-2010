@@ -1,5 +1,5 @@
 import { swingResultOf } from '@/entities/batting/model/swingResult'
-import { timingOf } from '@/entities/batting/model/swingTiming'
+import { humanSwingTimingOf } from '@/entities/batting/model/swingTiming'
 import type { Pitch, PitcherAbility } from '@/entities/pitching/model/pitch'
 import { cpuPitchStatsOf } from '@/entities/pitching/model/pitcherGameStats'
 import { skillIdsOfBits } from '@/entities/team/model/teamRoster'
@@ -28,7 +28,7 @@ export function rollSwingResult(pitch: Pitch, swing: BattingSwing, context: Batt
     {
       horizontalError: error.horizontal,
       verticalError: error.vertical,
-      timing: timingOf(swing.frame, pitch.frameCount, pitch.isMagicPitch === true),
+      timing: humanSwingTimingOf(swing.frame, pitch.frameCount, pitch.isMagicPitch === true),
       buntKind: swing.buntKind,
       controlTier: pitch.controlTier,
       batter: context.batter,

@@ -66,7 +66,7 @@ function runPitcherSideFrame(loop: PitcherSideLoop, rawNow: number): boolean {
   emitFlightMagicParticles(loop, frame)
   markPitchStateEntries(loop, frame)
   drawPitcherSideScene(loop, pitcherSideSceneNow(loop, frame), nowTick)
-  // 이 틱의 그림이 화면에 섰다 — 이 뒤에 난 게이지 · 조준 키는 이 틱 그림을 보고 누른 것이다(`gameSceneShownTicks`, r217 —
+  // 이 틱의 그림을 다 그렸다 — 다음 화면 갱신에 나온 뒤 난 게이지 · 조준 키는 이 틱 그림을 보고 누른 것이다(`gameSceneShownTicks`, r217 · r406 —
   // 원본은 키를 받은 틀 = 마지막으로 그린 틀. 타자편 `useStageAnimation` 의 `shownTicks` 와 같은 셈)
   gameSceneShownTicks.mark(sceneTick, performance.now())
   return true

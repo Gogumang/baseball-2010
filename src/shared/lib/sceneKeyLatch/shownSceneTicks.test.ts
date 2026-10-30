@@ -1,18 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_SEEN_LAG_TICKS, createShownSceneTicks, inputTimeOf, stampInputTime } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
+import { MAX_SEEN_LAG_TICKS, PRESENT_DELAY_MS, createShownSceneTicks, inputTimeOf, stampInputTime } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { createSceneKeyLatch, runSceneKeys } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
 
 describe('키를 누를 때 화면에 있던 그림의 틱 (r211)', () => {
-  it('사건 시각 앞에 마지막으로 그린 그림의 틱 — 그 뒤에 그린 그림은 못 봤다', () => {
+  it('사건 시각 앞에 마지막으로 화면에 나온 그림의 틱 — 그 뒤에 나온 그림은 못 봤다', () => {
     const shown = createShownSceneTicks()
     shown.mark(10, 620)
     shown.mark(11, 690)
     shown.mark(12, 760)
-    expect(shown.tickSeenAt(700, 12)).toBe(11)
-    expect(shown.tickSeenAt(690, 12)).toBe(11)
-    expect(shown.tickSeenAt(689, 12)).toBe(10)
+    expect(shown.tickSeenAt(720, 12)).toBe(11)
+    expect(shown.tickSeenAt(690 + PRESENT_DELAY_MS, 12)).toBe(11)
+    expect(shown.tickSeenAt(690 + PRESENT_DELAY_MS - 0.01, 12)).toBe(10)
     // 그림이 밀려 시각으로는 14 틱이어도 화면은 12 틱 그림이다
     expect(shown.tickSeenAt(900, 14)).toBe(12)
+  })
+
+  it('그린 직후 다음 화면 갱신 전에 누른 키는 앞 그림 틱으로 센다 — 새 그림은 아직 화면에 안 나왔다 (r406)', () => {
+    const shown = createShownSceneTicks()
+    shown.mark(10, 620)
+    shown.mark(11, 690)
+    expect(shown.tickSeenAt(691, 11)).toBe(10)
+    expect(shown.tickSeenAt(690 + PRESENT_DELAY_MS / 2, 11)).toBe(10)
+    expect(shown.tickSeenAt(690 + PRESENT_DELAY_MS, 11)).toBe(11)
   })
 
   it('기록이 없거나 · 사건이 모든 그림보다 앞이거나 · 너무 낡았으면 지금 틱', () => {

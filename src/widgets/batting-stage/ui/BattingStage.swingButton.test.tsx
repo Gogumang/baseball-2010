@@ -4,6 +4,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { PRESENT_DELAY_MS } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { markGameSceneUp, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 import { resetTouchKeyOffersForTest, touchKeyOffersNow } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
@@ -137,7 +138,7 @@ const 누름 = (target: Element, pressedAt: number) => {
 }
 
 /**
- * 공 끝 3 틱 앞 그림을 본 뒤 누르는데, 사건 손잡이가 다음 그림보다 늦게 돈다(주 스레드 막힘 — r211 의 어려운 경우).
+ * 공 끝 3 틱 앞 그림이 화면에 나온 뒤 누르는데, 사건 손잡이가 다음 그림보다 늦게 돈다(주 스레드 막힘 — r211 의 어려운 경우).
  * `어디` 가 고른 곳(화면 · 스윙 버튼)을 눌러 판정에 들어간 키 틱 F 를 낸다
  */
 const 판정틱 = (어디: (view: ReturnType<typeof render>) => Element) => {
@@ -152,7 +153,8 @@ const 판정틱 = (어디: (view: ReturnType<typeof render>) => Element) => {
     if (last?.pitch && last.frame >= 0 && last.frame === last.pitch.frameCount - 3) 본 = { at: index * 틀간격, frame: last.frame }
   }
   if (본 === null) throw new Error('공이 안 섰다')
-  const 누른때 = 본.at + 1
+  // 본 그림이 화면에 나온(다음 화면 갱신 — `PRESENT_DELAY_MS`, r406) 뒤에 누른다
+  const 누른때 = 본.at + PRESENT_DELAY_MS + 1
   그림(본.at + 틱 + 0.5)
   clock = 본.at + 틱 + 3
   누름(어디(view), 누른때)

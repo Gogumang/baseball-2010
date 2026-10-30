@@ -4,6 +4,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSeededRandom } from '@/shared/api/random/seededRandom'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
+import { PRESENT_DELAY_MS } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { markGameSceneUp, resetCommonWindowShownForTest } from '@/shared/lib/commonWindow/commonWindow'
 import { DEFAULT_PITCHER_ABILITY } from '@/entities/pitching/model/pitch'
 import type { Pitch } from '@/entities/pitching/model/pitch'
@@ -115,6 +116,8 @@ describe('타자편 스윙 키 틱 — F = 보이던 공 틱 + 1 (0x52c50 차례
       const last = drawn.at(-1)
       if (본틱 === null && last?.pitch && last.frame >= 0 && last.frame === last.pitch.frameCount - back) {
         본틱 = last.frame
+        // 그 그림이 화면에 나온(다음 화면 갱신, r406) 뒤에 누른다
+        clock += PRESENT_DELAY_MS
         act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })))
       }
     }
@@ -185,7 +188,7 @@ describe('타자편 스윙 키 틱 — 그리기가 밀려도 사람이 본 그�
     // 30Hz 쯤 — 한 틀이 틱 반
     const 틀간격 = 틱 / 2 + 0.37
     const 본 = 그때까지(3, 틀간격)
-    const 누른때 = 본.at + 1
+    const 누른때 = 본.at + PRESENT_DELAY_MS + 1
     // 키 사건이 줄에 선 사이 다음 그림(본 틱 + 1)이 먼저 섰다
     그림(본.at + 틱 + 0.5)
     expect(drawn.at(-1)?.frame).toBe(본.frame + 1)
@@ -194,6 +197,19 @@ describe('타자편 스윙 키 틱 — 그리기가 밀려도 사람이 본 그�
     for (let index = 1; index < 200 && judged.length === 0; index += 1) 그림(clock + index * 틀간격)
     expect(judged).toHaveLength(1)
     expect(judged[0].frame).toBe(본.frame + 1)
+    장면내림()
+  })
+
+  it('그린 직후 다음 화면 갱신 전에 누른 키는 앞 그림 틱으로 센다 — 새 그림은 아직 화면에 안 나왔다 (r406)', () => {
+    const 장면내림 = markGameSceneUp()
+    띄우기(20101025 + 2)
+    const 틀간격 = 틱 / 2 + 0.37
+    const 본 = 그때까지(3, 틀간격)
+    clock = 본.at + 1
+    키(clock)
+    for (let index = 1; index < 200 && judged.length === 0; index += 1) 그림(clock + index * 틀간격)
+    expect(judged).toHaveLength(1)
+    expect(judged[0].frame).toBe(본.frame)
     장면내림()
   })
 })

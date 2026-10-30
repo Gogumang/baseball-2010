@@ -1,4 +1,5 @@
 import { balanceNumber } from '@/shared/config/balance'
+import { isBugFixed } from '@/shared/config/bugfixes'
 import type { SwingReservation } from '@/widgets/batting-stage/model/stageRefs'
 
 /**
@@ -46,9 +47,20 @@ export function pitchEndTickOf(frameCount: number): number {
   return frameCount + 1
 }
 
-/** 판정 틱이 0x11 의 마지막 갱신(N + 1) 안에 드는가 — F ≤ N − 1. F == N 이면 스윙만 나가고 판정 없이 0x12 */
+/**
+ * **이 공에서 스윙을 판정하는 틱** — 원본은 F + 2(`swingJudgeTickOf`)라 F == N 이면 공 끝(N + 1) 뒤라 판정이 없다.
+ * B-130 고친 길: 공이 홈에 닿아 보이는 그림(F == N)에서 누른 스윙도 공 끝 갱신 N + 1 에서 판정한다 — 그 갱신은 판정(4e15c~4e24a)을 공 끝
+ * (4e24e)보다 먼저 돌리므로 차례가 맞고, 깊이 관문은 경로 [N − 1](F == N − 1 과 같은 자리)을 본다. 타이밍은 F 그대로(두 틱 늦음)로 센다.
+ * 판정 굴림(0xab214)이 그 공에 하나 는다 — 고친 길에서만.
+ */
+export function judgeTickOf(keyTick: number, frameCount: number): number {
+  const judgeTick = swingJudgeTickOf(keyTick)
+  return isBugFixed('B-130') ? Math.min(judgeTick, pitchEndTickOf(frameCount)) : judgeTick
+}
+
+/** 판정 틱이 0x11 의 마지막 갱신(N + 1) 안에 드는가 — F ≤ N − 1. F == N 이면 스윙만 나가고 판정 없이 0x12 (B-130 고친 길은 F ≤ N) */
 export function isSwingJudgeable(keyTick: number, frameCount: number): boolean {
-  return swingJudgeTickOf(keyTick) <= pitchEndTickOf(frameCount)
+  return judgeTickOf(keyTick, frameCount) <= pitchEndTickOf(frameCount)
 }
 
 /**
@@ -108,15 +120,15 @@ type FlightSwing = NonNullable<FlightState['swing']>
 const isSwingReleaseDue = (swing: FlightState['swing'], frame: number): swing is FlightSwing =>
   swing !== null && !swing.isReleased && frame >= swingReleaseTickOf(swing.frame)
 
-/** 4e15c — 풀린 스윙이 아직 판정 전이고 판정할 수 있는 스윙이며 F + 2 에 닿았나 */
+/** 4e15c — 풀린 스윙이 아직 판정 전이고 판정할 수 있는 스윙이며 판정 틱(F + 2, `judgeTickOf`)에 닿았나 */
 function isSwingJudgeDue(state: FlightState, swing: FlightSwing, frame: number): boolean {
   if (!swing.isReleased || swing.isUnjudgedWhiff || state.isJudged) return false
-  return isSwingJudgeable(swing.frame, state.frameCount) && frame >= swingJudgeTickOf(swing.frame)
+  return isSwingJudgeable(swing.frame, state.frameCount) && frame >= judgeTickOf(swing.frame, state.frameCount)
 }
 
 /** 맞힐 프레임에 공이 타자 근처면 0x6aa 판정, 아니면 0x4e21c 바람 소리만 */
 function swingJudgeEventOf(state: FlightState, swing: FlightSwing): FlightEvent {
-  return state.isInReach(swingJudgeTickOf(swing.frame))
+  return state.isInReach(judgeTickOf(swing.frame, state.frameCount))
     ? { kind: '판정', frame: swing.frame, buntKind: 0, isSpecial: swing.isSpecial }
     : { kind: '판정없는헛스윙' }
 }
