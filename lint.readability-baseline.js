@@ -118,7 +118,6 @@ export const readabilityBaseline = [
   'src/features/play-game/model/gameFlow/roster/opponentMound.ts',
   'src/features/play-game/model/gameFlow/roster/teamPlayers.ts',
   'src/features/play-game/model/gameFlow/setup/startGame.ts',
-  'src/features/play-game/model/useSceneConfirm.ts',
   'src/features/play-game/model/useSubstitutionScene.ts',
   'src/features/play-game/ui/AceCutInCanvas.tsx',
   'src/features/play-pitcher-game/model/pitchAim.ts',
