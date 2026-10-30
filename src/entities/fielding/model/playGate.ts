@@ -89,25 +89,33 @@ export interface PlayGateResult {
 /** 판 진행 관문 `0xb0d28` 그대로 */
 export function passPlayGate(input: PlayGateInput): PlayGateResult {
   const counter = input.endCounter
-  if (input.foulFlag) {
-    const ball = input.foulBall
-    if (ball === undefined) return { open: true, endCounter: counter }
-    // b0d70~b0d8c — 담장선을 먼저 넘고 떨어지는 바로 그 틱
-    const landedOutside = ball.fenceTick !== -1 && ball.landingTick > ball.fenceTick && ball.currentTick === ball.landingTick
-    // b0d8e~b0da4 — z > 0x7f57 && q + 0xe1 < 0 && q > −315 (0xfffffec5)
-    const behindPlate = ball.z > 0x7f57 && ball.angle + 0xe1 < 0 && ball.angle > -315
-    return { open: !(ball.stopped || landedOutside || behindPlate), endCounter: counter }
-  }
+  if (input.foulFlag) return { open: isFoulBallLive(input.foulBall), endCounter: counter }
   if (input.lastEventCode === 11) return { open: false, endCounter: counter }
   if (input.outs > 2) return { open: false, endCounter: counter }
   if (input.someRunnerActive) return { open: true, endCounter: 0 }
-  if (input.homeRunDerby) {
-    if (input.ballStopped === true) return { open: false, endCounter: counter }
-    return { open: true, endCounter: 0 }
-  }
-  if ((input.homeRunFlag || input.poleHomeRunFlag) && input.liveRunnerCount === 0) {
-    return { open: false, endCounter: counter }
-  }
+  if (input.homeRunDerby) return input.ballStopped === true ? { open: false, endCounter: counter } : { open: true, endCounter: 0 }
+  return passSettledPlayGate(input, counter)
+}
+
+/** 파울 갈래 — 공이 멈췄거나 · 담장선 밖에 떨어지는 틱이거나 · 홈 뒤로 갔으면 닫는다 (공이 없으면 연다) */
+function isFoulBallLive(ball: FoulBallView | undefined): boolean {
+  if (ball === undefined) return true
+  return !(ball.stopped || landsOutsideFenceNow(ball) || isBehindPlate(ball))
+}
+
+/** b0d70~b0d8c — 담장선을 먼저 넘고 떨어지는 바로 그 틱 */
+function landsOutsideFenceNow(ball: FoulBallView): boolean {
+  return ball.fenceTick !== -1 && ball.landingTick > ball.fenceTick && ball.currentTick === ball.landingTick
+}
+
+/** b0d8e~b0da4 — z > 0x7f57 && q + 0xe1 < 0 && q > −315 (0xfffffec5) */
+function isBehindPlate(ball: FoulBallView): boolean {
+  return ball.z > 0x7f57 && ball.angle + 0xe1 < 0 && ball.angle > -315
+}
+
+/** 주자가 다 선 뒤 — 홈런으로 다 들어왔으면 닫고, 쥔 공(또는 +0x124)이 있으면 세기를 올려 51 번째까지 연다 */
+function passSettledPlayGate(input: PlayGateInput, counter: number): PlayGateResult {
+  if ((input.homeRunFlag || input.poleHomeRunFlag) && input.liveRunnerCount === 0) return { open: false, endCounter: counter }
   if (!input.ballHeld && !input.groundRuleFlag) return { open: true, endCounter: 0 }
   return { open: counter <= PLAY_END_COUNT_LIMIT, endCounter: counter + 1 }
 }
@@ -289,10 +297,20 @@ export function isFoulEnded(state: PlayEndState): boolean {
 export function playEndResultCode(state: PlayEndState): number {
   if (state.flyOut) return 13
   if (state.specialEvent) return 0
-  if (isFoulEnded(state)) return state.strikes > 1 && state.buntKind !== 0 ? 11 : 7
-  if (state.poleTick > 0) return state.ballTouched && state.fenceTick !== -1 ? 10 : 12
+  if (isFoulEnded(state)) return foulEndResultCode(state)
+  if (state.poleTick > 0) return poleResultCode(state)
   if (state.fenceTick > 0) return state.ballTouched ? 10 : 8
   return 6
+}
+
+/** 파울로 끝난 판 — 2스트라이크 번트면 11(번트 파울 아웃), 아니면 7 */
+function foulEndResultCode(state: PlayEndState): number {
+  return state.strikes > 1 && state.buntKind !== 0 ? 11 : 7
+}
+
+/** 폴 맞은 판 — 땅에 닿았고 담장선도 넘었으면 10(2루타), 아니면 12(폴 홈런) */
+function poleResultCode(state: PlayEndState): number {
+  return state.ballTouched && state.fenceTick !== -1 ? 10 : 12
 }
 
 /**

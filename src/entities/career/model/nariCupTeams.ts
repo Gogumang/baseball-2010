@@ -115,20 +115,26 @@ export interface NariCupGameMarks {
  * +0x2a 사사구(a8b04~a8bee) · +0x2e 실책(0x43278 4381a~43904) · +2 사기(3a31e · b5762)만 남는다. 상대국 칸 몫은 그날 밤 지워져 안 담는다
  */
 export function recordNariCupGame(teams: NariCupTeams, marks: NariCupGameMarks): NariCupTeams {
-  const koreaErrors: Record<number, number> = { ...teams.koreaErrors }
-  let hasError = false
-  for (const error of marks.errors ?? []) {
-    if (error.teamId !== KOREA_TEAM) continue
-    koreaErrors[error.battingOrderIndex] = Math.min(CUP_RECORD_COUNTER_LIMIT, (koreaErrors[error.battingOrderIndex] ?? 0) + 1)
-    hasError = true
-  }
+  const koreaErrors = koreaErrorsAfter(teams, marks.errors ?? [])
   const myWalks = marks.myWalks ?? 0
   return {
     ...teams,
     ...(marks.morale === undefined ? {} : { koreaMorale: marks.morale }),
-    ...(hasError ? { koreaErrors } : {}),
+    ...(koreaErrors === null ? {} : { koreaErrors }),
     ...(myWalks > 0 ? { myCupWalks: (teams.myCupWalks ?? 0) + myWalks } : {}),
   }
+}
+
+/** 대표팀 실책 칸(+0x2e)에 그날 실책을 하나씩 얹는다(0~9999) — 대표팀 실책이 없었으면 null(칸을 안 고친다) */
+function koreaErrorsAfter(teams: NariCupTeams, errors: NonNullable<NariCupGameMarks['errors']>): Record<number, number> | null {
+  const koreaErrors: Record<number, number> = { ...teams.koreaErrors }
+  let hasError = false
+  for (const error of errors) {
+    if (error.teamId !== KOREA_TEAM) continue
+    koreaErrors[error.battingOrderIndex] = Math.min(CUP_RECORD_COUNTER_LIMIT, (koreaErrors[error.battingOrderIndex] ?? 0) + 1)
+    hasError = true
+  }
+  return hasError ? koreaErrors : null
 }
 
 /**

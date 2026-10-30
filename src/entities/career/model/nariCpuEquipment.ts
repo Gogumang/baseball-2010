@@ -4,6 +4,7 @@ import type { LeagueRecordPlayer, LeagueTeamRecord } from '@/entities/league/mod
 import { teamBatters, teamPitchers } from '@/entities/team/model/teamRoster'
 import type { TeamRecordEquipment } from '@/entities/team/model/teamRoster'
 import { NARI_CPU_EQUIPMENT_YEAR_LIMIT, rollCpuEquipment } from '@/entities/season-mode/model/cpuEquipment'
+import type { CpuEquipmentWrite } from '@/entities/season-mode/model/cpuEquipment'
 import { MY_RECORD_SLOT, nariTeamRecordOf, withNariTeamRecord } from '@/entities/career/model/nariTeamRecord'
 import type { NariTeamRecord, NariTeamRecords } from '@/entities/career/model/nariTeamRecord'
 
@@ -73,26 +74,36 @@ export function rollNariCpuEquipment(
 ): NariTeamRecords {
   const writes = rollCpuEquipment(random, newYearIndex, myTeamId, NARI_CPU_EQUIPMENT_YEAR_LIMIT)
   let next = records
-  for (const write of writes) {
-    if (write.teamId < 0 || write.teamId >= LEAGUE_TEAM_COUNT) continue
-    const record = nariTeamRecordOf(next, write.teamId)
-    if (write.isBatter) {
-      const row = record.batters[write.recordIndex]
-      // 0xb53d1 이 칸 밖이면 0 을 돌려 원본은 [0 + 0x19] 를 건드린다 — 웹은 버린다 (열 팀 타자는 늘 12 줄이라 오지 않는다)
-      if (row === undefined) continue
-      const equipment = withPart(nariBatterEquipmentOf(record, write.teamId, write.recordIndex), write.part, write.value)
-      const batters = record.batters.map((current, index) => (index === write.recordIndex ? { ...current, equipment } : current))
-      next = withNariTeamRecord(next, write.teamId, { ...record, batters })
-    } else {
-      const tableSlot = pitcherOrderOf(write.teamId)[write.recordIndex] ?? write.recordIndex
-      const equipment = withPart(nariPitcherEquipmentOf(record, write.teamId, tableSlot), write.part, write.value)
-      next = withNariTeamRecord(next, write.teamId, {
-        ...record,
-        pitcherEquipment: { ...record.pitcherEquipment, [tableSlot]: equipment },
-      })
-    }
-  }
+  for (const write of writes) next = withNariEquipmentWrite(next, write, pitcherOrderOf)
   return next
+}
+
+/** 굴린 니블 한 칸을 그 팀 레코드에 — 리그 밖 팀은 버린다 */
+function withNariEquipmentWrite(
+  records: NariTeamRecords,
+  write: CpuEquipmentWrite,
+  pitcherOrderOf: (teamId: number) => readonly number[],
+): NariTeamRecords {
+  if (write.teamId < 0 || write.teamId >= LEAGUE_TEAM_COUNT) return records
+  const record = nariTeamRecordOf(records, write.teamId)
+  if (write.isBatter) return withNariBatterWrite(records, record, write)
+  const tableSlot = pitcherOrderOf(write.teamId)[write.recordIndex] ?? write.recordIndex
+  const equipment = withPart(nariPitcherEquipmentOf(record, write.teamId, tableSlot), write.part, write.value)
+  return withNariTeamRecord(records, write.teamId, {
+    ...record,
+    pitcherEquipment: { ...record.pitcherEquipment, [tableSlot]: equipment },
+  })
+}
+
+/**
+ * 타자 줄 니블 — 0xb53d1 이 칸 밖이면 0 을 돌려 원본은 [0 + 0x19] 를 건드린다. 웹은 버린다
+ * (열 팀 타자는 늘 12 줄이라 오지 않는다)
+ */
+function withNariBatterWrite(records: NariTeamRecords, record: NariTeamRecord, write: CpuEquipmentWrite): NariTeamRecords {
+  if (record.batters[write.recordIndex] === undefined) return records
+  const equipment = withPart(nariBatterEquipmentOf(record, write.teamId, write.recordIndex), write.part, write.value)
+  const batters = record.batters.map((current, index) => (index === write.recordIndex ? { ...current, equipment } : current))
+  return withNariTeamRecord(records, write.teamId, { ...record, batters })
 }
 
 /**
@@ -101,21 +112,33 @@ export function rollNariCpuEquipment(
  * 0xb8680 → 0x1f989 로 같은 레코드를 읽는다.
  */
 export function nariTeamRecordEquipmentOf(records: NariTeamRecords | undefined, teamId: number): TeamRecordEquipment | undefined {
-  if (records === undefined || teamId < 0 || teamId >= LEAGUE_TEAM_COUNT) return undefined
-  const record = records[teamId]
+  const record = leagueNariRecordOf(records, teamId)
   if (record === undefined) return undefined
+  const batters = recordBatterEquipmentOf(record)
+  const pitchers = record.pitcherEquipment
+  const hasBatter = Object.keys(batters).length > 0
+  const hasPitcher = pitchers !== undefined && Object.keys(pitchers).length > 0
+  if (!hasBatter && !hasPitcher) return undefined
+  return {
+    ...(hasBatter ? { batters } : {}),
+    ...(hasPitcher && pitchers !== undefined ? { pitchers } : {}),
+  }
+}
+
+/** 리그 열 팀의 레코드 — 레코드가 없거나 리그 밖 팀이면 undefined */
+function leagueNariRecordOf(records: NariTeamRecords | undefined, teamId: number): NariTeamRecord | undefined {
+  if (records === undefined || teamId < 0 || teamId >= LEAGUE_TEAM_COUNT) return undefined
+  return records[teamId]
+}
+
+/** 레코드 타자 줄의 굴린 니블 — 붙박이 표 칸마다 첫 줄 것만(마타자 · 내 선수 줄 빼고) */
+function recordBatterEquipmentOf(record: NariTeamRecord): Record<number, readonly number[]> {
   const batters: Record<number, readonly number[]> = {}
   for (const row of record.batters) {
     if (row.equipment === undefined || row.ace !== undefined || row.slot === MY_RECORD_SLOT) continue
     if (batters[row.slot] === undefined) batters[row.slot] = row.equipment
   }
-  const hasBatter = Object.keys(batters).length > 0
-  const hasPitcher = record.pitcherEquipment !== undefined && Object.keys(record.pitcherEquipment).length > 0
-  if (!hasBatter && !hasPitcher) return undefined
-  return {
-    ...(hasBatter ? { batters } : {}),
-    ...(hasPitcher && record.pitcherEquipment !== undefined ? { pitchers: record.pitcherEquipment } : {}),
-  }
+  return batters
 }
 
 /**

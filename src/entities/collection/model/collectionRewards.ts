@@ -121,19 +121,29 @@ const ALL_ENDINGS = 20
 
 const bitOf = (bits: number, at: number) => ((bits >>> at) & 1) !== 0
 
+/** 공통 스킬 비트 0~7 가운데 어느 편이든 켠 것 */
+function commonSkillCountOf(stats: AnnalsStats): number {
+  let count = 0
+  for (let at = 0; at < COMMON_SKILL_BITS; at += 1) {
+    if (bitOf(stats.batterEquippedSkillBits, at) || bitOf(stats.pitcherEquippedSkillBits, at)) count += 1
+  }
+  return count
+}
+
+/** 한 편의 스킬 비트 8~0x17 가운데 켠 것 */
+function sideSkillCountOf(bits: number): number {
+  let count = 0
+  for (let at = COMMON_SKILL_BITS; at <= SIDE_SKILL_LAST_BIT; at += 1) if (bitOf(bits, at)) count += 1
+  return count
+}
+
 /** k 5 "스킬 모두 수집" — 공통 8(어느 편이든) + 타자 16 + 투수 16 = 40 */
 function isEverySkillEquipped(stats: AnnalsStats): boolean {
-  let common = 0
-  for (let at = 0; at < COMMON_SKILL_BITS; at += 1) {
-    if (bitOf(stats.batterEquippedSkillBits, at) || bitOf(stats.pitcherEquippedSkillBits, at)) common += 1
-  }
-  let batter = 0
-  let pitcher = 0
-  for (let at = COMMON_SKILL_BITS; at <= SIDE_SKILL_LAST_BIT; at += 1) {
-    if (bitOf(stats.batterEquippedSkillBits, at)) batter += 1
-    if (bitOf(stats.pitcherEquippedSkillBits, at)) pitcher += 1
-  }
-  return common === COMMON_SKILL_BITS && batter === SIDE_SKILL_COUNT && pitcher === SIDE_SKILL_COUNT
+  return (
+    commonSkillCountOf(stats) === COMMON_SKILL_BITS &&
+    sideSkillCountOf(stats.batterEquippedSkillBits) === SIDE_SKILL_COUNT &&
+    sideSkillCountOf(stats.pitcherEquippedSkillBits) === SIDE_SKILL_COUNT
+  )
 }
 
 /** k 6 "닉네임 모두 수집" — 공통 0~31 은 어느 편이든 한 칸 · 32~47 타자 16 · 48~63 투수 16 */
@@ -168,14 +178,21 @@ function isEveryEndingSeen(endings: readonly number[], seasonEndings: readonly n
  * ```
  */
 export function judgeCollectionReward(input: CollectionRewardJudgeInput): number {
-  const isAwarded = (kind: number) => isRewardAwarded(input.record, kind)
-  if (!isAwarded(3) && input.isEveryMissionCleared) return 3
-  if (!isAwarded(4)) {
-    const achieved = Array.from({ length: RECORD_COUNT_KINDS }, (_, n) => recordCountOf(input.stats, n)).filter((count) => count !== 0)
-    if (achieved.length === RECORD_COUNT_KINDS) return 4
-  }
-  if (!isAwarded(5) && isEverySkillEquipped(input.stats)) return 5
-  if (!isAwarded(6) && isEveryTitleCollected(input.titles)) return 6
-  if (!isAwarded(7) && isEveryEndingSeen(input.endings, input.seasonEndings)) return 7
-  return -1
+  const met = COLLECTION_REWARD_CHECKS.find(([kind, isMet]) => !isRewardAwarded(input.record, kind) && isMet(input))
+  return met === undefined ? -1 : met[0]
 }
+
+/** k 4 "기록 모두 달성" — 기록달성 누계 0x28 칸이 모두 ≠ 0 */
+function isEveryRecordAchieved(stats: AnnalsStats): boolean {
+  const achieved = Array.from({ length: RECORD_COUNT_KINDS }, (_, n) => recordCountOf(stats, n)).filter((count) => count !== 0)
+  return achieved.length === RECORD_COUNT_KINDS
+}
+
+/** k 3 → 7 차례의 판정 */
+const COLLECTION_REWARD_CHECKS: readonly (readonly [number, (input: CollectionRewardJudgeInput) => boolean])[] = [
+  [3, (input) => input.isEveryMissionCleared],
+  [4, (input) => isEveryRecordAchieved(input.stats)],
+  [5, (input) => isEverySkillEquipped(input.stats)],
+  [6, (input) => isEveryTitleCollected(input.titles)],
+  [7, (input) => isEveryEndingSeen(input.endings, input.seasonEndings)],
+]

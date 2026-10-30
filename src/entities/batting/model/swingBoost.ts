@@ -82,58 +82,66 @@ function aceIndexOf(side: SwingBoostSide): number {
   return clampIndex(side.aceLevel ?? 0, ACE_LEVEL_COUNT) * ACE_ORDER_COUNT + clampIndex(side.aceOrder ?? 0, ACE_ORDER_COUNT)
 }
 
+/** 한쪽 선수가 채우는 네 칸 — 타자면 히트·파워, 투수면 구속·제구, 그리고 % 두 칸 */
+interface BoostRow {
+  readonly first: number
+  readonly second: number
+  readonly solidPercent: number
+  readonly homeRunPercent: number
+}
+
+/** 이 쪽은 채우지 않는다 — 번호 0, 또는 마선수도 비트7 도 아닌 선수 */
+const NO_BOOST_ROW: BoostRow = { first: 0, second: 0, solidPercent: 0, homeRunPercent: 0 }
+
+type BoostColumn = readonly number[]
+
+/** 표 네 줄의 i 번째 칸 — 표 밖은 0 */
+function boostRowAt(index: number, first: BoostColumn, second: BoostColumn, solid: BoostColumn, homeRun: BoostColumn): BoostRow {
+  return { first: first[index] ?? 0, second: second[index] ?? 0, solidPercent: solid[index] ?? 0, homeRunPercent: homeRun[index] ?? 0 }
+}
+
+/** 0x34da6 — 타자 쪽: 마선수는 레벨·순번 칸(out+0·+2·+0xa·+0xb), 육성·명전은 필살 번호 칸 */
+function batterBoostRowOf(batter: SwingBoostSide): BoostRow {
+  const table = D_LEVEL.boost
+  if (batter.number === 0) return NO_BOOST_ROW
+  if (batter.isAce) {
+    const k = aceIndexOf(batter)
+    return boostRowAt(k, table.aceBatterHit, table.aceBatterPower, table.aceBatterSolidPercent, table.aceBatterHomeRunPercent)
+  }
+  if (!batter.isOwnPlayer) return NO_BOOST_ROW
+  const n = batter.number - 1
+  return boostRowAt(n, table.burstBatterHit, table.burstBatterPower, table.burstBatterSolidPercent, table.burstBatterHomeRunPercent)
+}
+
+/** 0x34ebc — 투수 쪽: 마선수는 레벨·순번 칸(out+4·+6·+0xa·+0xb), 육성·명전은 마구 번호 칸 */
+function pitcherBoostRowOf(pitcher: SwingBoostSide): BoostRow {
+  const table = D_LEVEL.boost
+  if (pitcher.number === 0) return NO_BOOST_ROW
+  if (pitcher.isAce) {
+    const k = aceIndexOf(pitcher)
+    return boostRowAt(k, table.acePitcherSpeed, table.acePitcherControl, table.acePitcherSolidPercent, table.acePitcherHomeRunPercent)
+  }
+  if (!pitcher.isOwnPlayer) return NO_BOOST_ROW
+  const n = pitcher.number - 1
+  return boostRowAt(n, table.magicPitchSpeed, table.magicPitchControl, table.magicPitchSolidPercent, table.magicPitchHomeRunPercent)
+}
+
 /** 0x34d6c — 이번 스윙과 공에 실린 번호로 12바이트 보정을 만든다. 난수는 쓰지 않는다 */
 export function swingBoostOf(batter: SwingBoostSide, pitcher: SwingBoostSide): SwingBoost {
-  const table = D_LEVEL.boost
-  let batterHit = 0
-  let batterPower = 0
-  let pitcherVelocity = 0
-  let pitcherControl = 0
-  let solidPercent = 0
-  let homeRunPercent = 0
-  /** 투수 쪽이 % 를 덮어썼나 (B-02 고친 길이 본다) */
-  let pitcherFilled = false
-
-  if (batter.number !== 0) {
-    if (batter.isAce) {
-      const k = aceIndexOf(batter)
-      batterHit = table.aceBatterHit[k] ?? 0
-      batterPower = table.aceBatterPower[k] ?? 0
-      solidPercent = table.aceBatterSolidPercent[k] ?? 0
-      homeRunPercent = table.aceBatterHomeRunPercent[k] ?? 0
-    } else if (batter.isOwnPlayer) {
-      const n = batter.number - 1
-      batterHit = table.burstBatterHit[n] ?? 0
-      batterPower = table.burstBatterPower[n] ?? 0
-      solidPercent = table.burstBatterSolidPercent[n] ?? 0
-      homeRunPercent = table.burstBatterHomeRunPercent[n] ?? 0
-    }
+  const batterRow = batterBoostRowOf(batter)
+  const pitcherRow = pitcherBoostRowOf(pitcher)
+  // out+0xa/+0xb 는 투수 쪽이 채웠으면 그 값으로 덮어쓴다 — B-02 고친 길은 그 % 의 부호를 뒤집는다
+  const pitcherFilled = pitcherRow !== NO_BOOST_ROW
+  const percentRow = pitcherFilled ? pitcherRow : batterRow
+  const percentSign = pitcherFilled && isBugFixed('B-02') ? -1 : 1
+  return {
+    batterHit: batterRow.first,
+    batterPower: batterRow.second,
+    pitcherVelocity: pitcherRow.first,
+    pitcherControl: pitcherRow.second,
+    solidPercent: percentSign * percentRow.solidPercent,
+    homeRunPercent: percentSign * percentRow.homeRunPercent,
   }
-
-  if (pitcher.number !== 0) {
-    if (pitcher.isAce) {
-      const k = aceIndexOf(pitcher)
-      pitcherVelocity = table.acePitcherSpeed[k] ?? 0
-      pitcherControl = table.acePitcherControl[k] ?? 0
-      solidPercent = table.acePitcherSolidPercent[k] ?? 0
-      homeRunPercent = table.acePitcherHomeRunPercent[k] ?? 0
-      pitcherFilled = true
-    } else if (pitcher.isOwnPlayer) {
-      const n = pitcher.number - 1
-      pitcherVelocity = table.magicPitchSpeed[n] ?? 0
-      pitcherControl = table.magicPitchControl[n] ?? 0
-      solidPercent = table.magicPitchSolidPercent[n] ?? 0
-      homeRunPercent = table.magicPitchHomeRunPercent[n] ?? 0
-      pitcherFilled = true
-    }
-  }
-
-  if (pitcherFilled && isBugFixed('B-02')) {
-    solidPercent = -solidPercent
-    homeRunPercent = -homeRunPercent
-  }
-
-  return { batterHit, batterPower, pitcherVelocity, pitcherControl, solidPercent, homeRunPercent }
 }
 
 /**

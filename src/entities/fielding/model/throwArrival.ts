@@ -13,40 +13,36 @@ import { RELAY_DISTANCE, readyTicksOf, relayTicksToBase, throwTicksTo, throwTick
 export function defenseArrivalTicks(context: DefenseContext, base: number): number {
   const { play, fielders } = context
   const holder = fielders[play.ballHolderSlot]
-  const catcher = fielders[play.catchFielderSlot] ?? holder
   const basePoint = basePosition(base)
-  const coverSlot = play.coverOfBase[((base % 4) + 4) % 4] ?? NONE
+  const coverSlot = play.coverOfBase[mod4(base)] ?? NONE
   const cover = coverSlot === NONE ? undefined : fielders[coverSlot]
+  if (cover === undefined) return uncoveredArrivalTicks(fielders, holder, base, basePoint)
+  return coveredArrivalTicks(context, holder, cover, base, basePoint)
+}
 
-  // ── (A) 커버가 없다: 직접 뛰는 것과 루 담당 기본 야수가 닿는 것 중 빠른 쪽 ──
-  if (cover === undefined) {
-    const carryTicks = ticksToReach(holder.position, basePoint, holder.speed)
-    const defaultFielder = fielders[BASE_DEFAULT_FIELDER[((base % 4) + 4) % 4]]
-    let defaultTicks = fielderArrivalTicks(defaultFielder)
-    if (defaultFielder.targetBase !== base) {
-      defaultTicks += ticksToReach(defaultFielder.position, basePoint, defaultFielder.speed)
-    }
-    return Math.min(carryTicks, defaultTicks)
-  }
+const mod4 = (base: number): number => ((base % 4) + 4) % 4
 
-  // ── (B) 커버가 있다 ──
+/** ── (A) 커버가 없다: 직접 뛰는 것과 루 담당 기본 야수가 닿는 것 중 빠른 쪽 ── */
+function uncoveredArrivalTicks(fielders: readonly FielderState[], holder: FielderState, base: number, basePoint: WorldPoint): number {
+  const carryTicks = ticksToReach(holder.position, basePoint, holder.speed)
+  const defaultFielder = fielders[BASE_DEFAULT_FIELDER[mod4(base)]]
+  const arrivalTicks = fielderArrivalTicks(defaultFielder)
+  const walkTicks = defaultFielder.targetBase === base ? 0 : ticksToReach(defaultFielder.position, basePoint, defaultFielder.speed)
+  return Math.min(carryTicks, arrivalTicks + walkTicks)
+}
+
+/** ── (B) 커버가 있다 ── */
+function coveredArrivalTicks(context: DefenseContext, holder: FielderState, cover: FielderState, base: number, basePoint: WorldPoint): number {
+  const { play, fielders } = context
+  const catcher = fielders[play.catchFielderSlot] ?? holder
   const relayed = holder.slot === catcher.slot && isOutfieldSlot(holder.slot) && horizontalDistance(holder.position, basePoint) >= RELAY_DISTANCE
-
   // 원본은 중계가 아니면 두 갈래가 완전히 같은 코드다(0xaf532 / 0xaf53e) — "언제나 잡을야수.vtb4(커버야수)"
-  let ticks = relayed ? relayTicksToBase(fielders, holder, cover, base) : throwTicksToFielder(catcher, cover)
-
-  let remaining = 0
-  if (!catcher.holdingBall) {
-    // 아직 공을 안 잡았다 → 잡기까지 남은 틱 + 잡고 던지기까지의 준비 틱(내야 3 / 외야 6)
-    remaining = play.catchTick - context.currentTick
-    ticks += readyTicksOf(catcher.slot)
-  } else {
-    ticks += catcher.actionRemainingTicks
-  }
-
+  const throwTicks = relayed ? relayTicksToBase(fielders, holder, cover, base) : throwTicksToFielder(catcher, cover)
+  // 아직 공을 안 잡았다 → 잡기까지 남은 틱 + 잡고 던지기까지의 준비 틱(내야 3 / 외야 6)
+  const remaining = catcher.holdingBall ? 0 : play.catchTick - context.currentTick
+  const ticks = throwTicks + (catcher.holdingBall ? catcher.actionRemainingTicks : readyTicksOf(catcher.slot))
   // 커버 야수가 루에 못 가 있으면 그만큼 늦어진다
-  ticks = Math.max(ticks, ticksToReach(cover.position, basePoint, cover.speed) - remaining)
-  return remaining + ticks
+  return remaining + Math.max(ticks, ticksToReach(cover.position, basePoint, cover.speed) - remaining)
 }
 
 /**
@@ -179,50 +175,86 @@ export function secondBaseHelperPlacement(input: SecondBaseHelperInput): SecondB
   const { play, fielders } = context
   const stay = { kind: '그대로' } as const
   if (fielders.some((fielder) => fielder.aiState === AI_STATE.RUNDOWN)) return stay
-  if (secondBaseCover !== 3 && secondBaseCover !== 5) return stay
+  if (!isKeystoneSlot(secondBaseCover)) return stay
   const slot = secondBaseCover === 3 ? 5 : 3
   const helper = fielders[slot]
-  if (helper === undefined || play.catchFielderSlot === slot) return stay
-  if (helper.aiState === AI_STATE.DIVE || helper.aiState === AI_STATE.RECEIVE) return stay
+  if (helper === undefined || play.catchFielderSlot === slot || isHelperBusy(helper)) return stay
   const holder = fielders[play.ballHolderSlot]
   if (holder === undefined) return stay
-  const base = autoThrowTargetBase(context)
+  return helperSpotOf(input, slot, helper, holder)
+}
+
+/** 키스톤 야수 — 2루수(3) · 유격수(5) */
+const isKeystoneSlot = (slot: number): boolean => slot === 3 || slot === 5
+
+/** b1f1c — AI 0xd(다이빙) · 9(받기) 중인 야수는 안 건드린다 */
+function isHelperBusy(helper: FielderState): boolean {
+  return helper.aiState === AI_STATE.DIVE || helper.aiState === AI_STATE.RECEIVE
+}
+
+/** b1f42~b232e — 기본 자리 · 멈춤 · 중계 가운데 자리 */
+function helperSpotOf(input: SecondBaseHelperInput, slot: number, helper: FielderState, holder: FielderState): SecondBaseHelperPlacement {
+  const base = autoThrowTargetBase(input.context)
   const defaultSpot = { kind: '자리', slot, target: KEYSTONE_DEFAULT_SPOTS[slot === 5 ? 1 : 0], relayPlaced: false } as const
-  if (base === NONE) return defaultSpot
+  if (base === NONE || !isLongOutfieldRelay(holder, base)) return defaultSpot
+  // b2318 — 쥐었으면 +0x126 == 0 일 때만 제 위치에 멈춘다
+  if (holder.holdingBall) return input.relayFlag ? defaultSpot : { kind: '자리', slot, target: helper.position, relayPlaced: false }
+  return { kind: '자리', slot, target: relayMiddleSpotOf(holder, base, input.ballToFirstSide), relayPlaced: true }
+}
+
+/** b20d6 — 외야수(칸 6~8) && 목표점 ~ 루 거리 ≥ cfg+0x42(17000) */
+function isLongOutfieldRelay(holder: FielderState, base: number): boolean {
+  return isOutfieldSlot(holder.slot) && horizontalDistance(holder.target, basePosition(base)) >= RELAY_DISTANCE
+}
+
+/** b210c — 가운데 M 이 가장 가까운 루 k 의 반지름 r 안이면 그 원 둘레로 x 를 민다 */
+function relayMiddleSpotOf(holder: FielderState, base: number, ballToFirstSide: boolean): WorldPoint {
   const a = holder.target
   const b = basePosition(base)
-  const outfield = isOutfieldSlot(holder.slot)
-  const far = horizontalDistance(a, b) >= RELAY_DISTANCE
-  if (!(outfield && far)) return defaultSpot
-  if (holder.holdingBall) {
-    return input.relayFlag ? defaultSpot : { kind: '자리', slot, target: helper.position, relayPlaced: false }
-  }
   const middle = { x: (a.x + b.x) >> 1, y: (a.y + b.y) >> 1, z: (a.z + b.z) >> 1 }
-  let nearest = NONE
-  let nearestDistance = NEAREST_BASE_START
-  for (let k = 0; k <= 3; k += 1) {
-    const distance = horizontalDistance(middle, basePosition(k))
-    if (distance < nearestDistance) {
-      nearestDistance = distance
-      nearest = k
-    }
-  }
+  const nearest = nearestBaseOf(middle)
   const radius = Math.trunc(horizontalDistance(basePosition(1), basePosition(2)) / 2)
-  if (nearestDistance >= radius) return { kind: '자리', slot, target: middle, relayPlaced: true }
-  const anchor = basePosition(nearest)
+  if (nearest.distance >= radius) return middle
+  const anchor = basePosition(nearest.base)
   const dz = middle.z - anchor.z
   const offset = integerSquareRoot(radius * radius - dz * dz)
-  let signed = offset
-  let keepMiddle = false
-  if (nearest === 1) signed = -offset
-  else if (nearest === 2) {
-    if (holder.slot === 6) {
-      signed = -offset
-      keepMiddle = base === 2
-    } else if (holder.slot === 8 && base === 3) signed = -offset
-    else if (holder.slot === 8 && base === 0) signed = input.ballToFirstSide ? offset : -offset
-    else keepMiddle = base === 2
+  const sign = relaySignOf(nearest.base, holder.slot, base, ballToFirstSide)
+  return sign === KEEP_MIDDLE ? middle : { ...middle, x: anchor.x + sign * offset }
+}
+
+/** M 에 가장 가까운 루 k(0~3) — 999999 에서 작아질 때만 바꾼다 (b21a4) */
+function nearestBaseOf(point: WorldPoint): { readonly base: number; readonly distance: number } {
+  let base = NONE
+  let distance = NEAREST_BASE_START
+  for (let k = 0; k <= 3; k += 1) {
+    const candidate = horizontalDistance(point, basePosition(k))
+    if (candidate < distance) {
+      base = k
+      distance = candidate
+    }
   }
-  const target = keepMiddle ? middle : { ...middle, x: anchor.x + signed }
-  return { kind: '자리', slot, target, relayPlaced: true }
+  return { base, distance }
+}
+
+/** 부호 대신 가운데 M 을 그대로 둔다 */
+const KEEP_MIDDLE = 0
+
+/** x 를 미는 부호 — 가장 가까운 루가 1 이면 −, 2 면 아래, 그 밖(0 · 3)은 + */
+function relaySignOf(nearestBase: number, holderSlot: number, base: number, ballToFirstSide: boolean): number {
+  if (nearestBase === 1) return -1
+  if (nearestBase === 2) return secondBaseRelaySignOf(holderSlot, base, ballToFirstSide)
+  return 1
+}
+
+/**
+ * 가장 가까운 루가 2루일 때의 부호 — 공가진야수 6 이면 −, 8 이면 루 3 → − · 루 0 → 공이 1루 쪽이면 + 아니면 − · 그 밖 +,
+ * 7 이면 +. 어느 갈래든 루가 2 면 M 그대로다
+ */
+function secondBaseRelaySignOf(holderSlot: number, base: number, ballToFirstSide: boolean): number {
+  if (base === 2) return KEEP_MIDDLE
+  if (holderSlot === 6) return -1
+  if (holderSlot !== 8) return 1
+  if (base === 3) return -1
+  if (base === 0) return ballToFirstSide ? 1 : -1
+  return 1
 }

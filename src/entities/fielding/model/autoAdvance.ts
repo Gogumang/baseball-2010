@@ -100,17 +100,21 @@ export interface AutoAdvanceInput extends DefenseContext {
  *   리드 고리(n 틱 걸음 뒤 vt48(둠))도 걸음이 +0x3a = 0 을 적은 뒤라 같다.
  */
 export function isHeadingBack(runner: RunnerState, previousTarget: number): boolean {
-  let target = runner.targetBase
-  let touched = runner.startBase
-  let previous = previousTarget
-  if (target === 0 && touched === 3) target = 4
-  if (previous === 0 && touched === 3) previous = 4
-  if (target === 3 && touched === 0) touched = 4
+  // 9fe92 — 홈 = 0 = 4: 3루와 짝지은 0 은 4 로 본다 (닿은 루는 고친 목표가 아니라 원래 목표 3 과 견준다 — 0 → 4 만 고치니 같다)
+  const target = homeAfterThird(runner.targetBase, runner.startBase)
+  const previous = homeAfterThird(previousTarget, runner.startBase)
+  const touched = homeAfterThird(runner.startBase, runner.targetBase)
   if (target < touched) return true
-  if (!isRunnerStopped(runner) && target === touched && previous > target) return true
-  if (touched === target && touched === previous) return true
   if (target !== touched) return false
+  // 여기부터 t == g
+  if (!isRunnerStopped(runner) && previous > target) return true
+  if (touched === previous) return true
   return !isSamePoint(runner.position, basePosition(runner.targetBase))
+}
+
+/** 루 0 이 3루와 짝이면 4(홈) — 9fe92 의 세 줄이 같은 꼴이다 */
+function homeAfterThird(base: number, other: number): number {
+  return base === 0 && other === 3 ? 4 : base
 }
 
 /**
@@ -132,21 +136,27 @@ export function isPathClear(
   previousTargetOf: (runnerIndex: number) => number = (index) => runners.find((candidate) => candidate.index === index)?.startBase ?? NONE,
 ): boolean {
   const mine = runner.startBase
-  // 0xa97d4 — 목록 번호 i+1 부터 오름차순으로 처음 만나는 산(+0x96 == 0) 주자. 득점도 +0x96 을 세운다(0xaa0a8 → aa1da 0xa9520)
+  const front = frontRunnerOf(runner, runners)
+  if (front === undefined) return true
+  const frontBase = front.startBase
+  const frontEnd = frontBase > 1 ? frontBase - 1 : frontBase
+  const forward = !isHeadingBack(front, previousTargetOf(front.index))
+  if (isRunnerStopped(front)) return mine + 1 < frontBase || mine + 1 < frontEnd || mine === 0
+  return clearsRunningFront(mine, frontBase, frontEnd, forward)
+}
+
+/** 0xa97d4 — 목록 번호 i+1 부터 오름차순으로 처음 만나는 산(+0x96 == 0) 주자. 득점도 +0x96 을 세운다(0xaa0a8 → aa1da 0xa9520) */
+function frontRunnerOf(runner: RunnerState, runners: readonly RunnerState[]): RunnerState | undefined {
   let front: RunnerState | undefined
   for (const other of runners) {
     if (other.index <= runner.index || other.isOut || other.scored) continue
     if (front === undefined || other.index < front.index) front = other
   }
-  if (front === undefined) return true
-  const frontBase = front.startBase
-  const frontEnd = frontBase > 1 ? frontBase - 1 : frontBase
-  const forward = !isHeadingBack(front, previousTargetOf(front.index))
-  if (isRunnerStopped(front)) {
-    if (mine + 1 < frontBase) return true
-    if (mine + 1 < frontEnd) return true
-    return mine === 0
-  }
+  return front
+}
+
+/** a9954 거짓 갈래 — 앞 주자가 달리는 중일 때 (r6 = mine · r7 = frontBase · 끝 = frontEnd · 앞으로 = forward) */
+function clearsRunningFront(mine: number, frontBase: number, frontEnd: number, forward: boolean): boolean {
   if (mine < frontBase && forward) return true
   if (mine < frontEnd && !forward) return true
   if (mine === 3) return frontBase === 3 && forward
@@ -160,58 +170,77 @@ export function isPathClear(
  * 그래서 원본에는 "희생플라이 보장" 이 없고, 태그업 뒤 이 판단을 한 번 더 거쳐야 홈에 들어온다.
  */
 export function autoAdvanceDecisions(input: AutoAdvanceInput): readonly AutoAdvanceDecision[] {
-  const { play, runners } = input
+  const { runners } = input
   const pathClear = input.isPathClear ?? ((runner: RunnerState, all: readonly RunnerState[]) => isPathClear(runner, all, input.previousTargetOf))
   const decisions: AutoAdvanceDecision[] = []
   for (let index = runners.length - 1; index >= 0; index -= 1) {
     const runner = runners[index]
-    if (runner === undefined) continue
-    // 죽은 주자(+0x96)도 **거르지 않는다** — 루프 af93c~afa36 에는 +0x96 을 읽는 곳이 없다(직접 뜬 것). 아웃(0xa9520)과
-    // 득점(0xaa0a8) 모두 +0x96 만 세우고 목록에서 빼지 않으므로, 멈춰 선 죽은 주자도 아래 갈래를 다 거쳐 afa0e 에 닿으면
-    // vt48 과 **플레이+0x128 = 1** 을 받는다. 죽은 주자는 주자 틱 0xa01cc 가 흔들기(+0xba, 0xa03ac)·끝(+0xbb)으로만 돌아
-    // 움직이지 않으니, 부르는 쪽은 그 결정에 +0x128 만 세우고 주자는 옮기지 않는다.
-    // 0xaf950~0xaf95a — `r0 = vt18(주자) ; r0 != 0 → 계속 ; 아니면 force == 0 이면 건너뜀`.
-    // 곧 **루에 붙어 멈춘 주자는 언제나 보고, 달리는 중인 주자는 force 일 때만 본다.**
-    // 정정: 예전 줄은 이 조건이 **거꾸로**(멈춘 주자를 force 없이는 안 봄) 박혀 있었다.
-    // 부르는 자리는 이제 원본 인자 그대로다 — 매 틱 force 0(52660), 판 시작 한 번 force 1(0x46766).
-    if (!isRunnerStopped(runner) && input.force !== true) continue
-
-    // ── 0xaf96e · 0xaf978 — **홈런(+0x111) 이나 폴 홈런(+0x129) 이 서 있으면 틱 비교 없이 한 루 진루** ──
-    // 두 검사 모두 `bne 0xafa0e` 로 **진루 자리로 곧장 뛴다**. 그러니 이 갈래에서는
-    // 종류 2·3·8 거르개도, vt94(잡힐 뜬공) 도, 0xaf284 틱 비교도, 앞길 검사(0xa9924)도 **안 본다**.
-    if (play.finished || play.suppressed) {
-      decisions.push({ runnerIndex: runner.index, toBase: nextBaseOf(runner) })
-      continue
-    }
-
-    // 종류 7 은 틱 비교 없이 바로 진루한다 (이미 **투구 때 루**+2 에 닿았으면 건너뜀)
-    // 0xaf97e: r3 = 주자+0x78 ; r2 = [r3,#0x14](= **+0x8c 마지막으로 닿은 루**)
-    //          r3 = [r3,#0x18](= **+0x90 투구 때 루**)
-    // 0xaf986: r3 += 2 ; cmp r2, r3 ; bge 0xafa30(건너뜀)
-    // 오른쪽 항은 +0x90 이라 안 바뀌고, 왼쪽 항은 +0x8c = 이 모델의 `startBase` 다.
-    if (play.kind === 7) {
-      if (runner.startBase >= runner.pitchBase + 2) continue
-      decisions.push({ runnerIndex: runner.index, toBase: nextBaseOf(runner) })
-      continue
-    }
-
-    // ── 0xaf98e — vt94 = "뜬공이 잡힐 예정"(+0x11c ≤ 낙구 틱) 이고 아직 안 잡혔으면 아무도 안 뜀 ──
-    // ── 0xaf9ac · 0xaf9b2 — 종류 2·3·8 은 아예 안 본다 ──
-    // 둘 다 원본에서 **루프 밖이 아니라 이 자리**의 `b 0xafa38`(함수 끝) 이다. 두 조건 모두
-    // 주자와 무관하니 결과는 같지만, 앞선 주자가 위 두 갈래로 이미 진루해 두었으면
-    // 그 진루는 **남는다** — 그래서 `[]` 가 아니라 여기까지 모은 것을 돌려준다.
-    if (play.earliestCatchTick <= input.landingTick && !play.everHeld) return decisions
-    if (SKIPPED_PLAY_KINDS.has(play.kind)) return decisions
-
-    // 0xaf9b6: b = ([주자+0x8c] + 1) % 4 — 틱을 재는 루도 **마지막으로 닿은 루**에서 한 칸이다
-    const nextBase = (((runner.startBase + 1) % 4) + 4) % 4
-    const runTicks = ticksToReach(runner.position, basePosition(nextBase), runner.speed) + 1
-    const defenseTicks = defenseArrivalTicks(input, nextBase)
-    if (beatsThrow(runTicks, defenseTicks) && pathClear(runner, runners)) {
-      decisions.push({ runnerIndex: runner.index, toBase: nextBaseOf(runner) })
-    }
+    if (runner === undefined || !isWatchedRunner(runner, input.force)) continue
+    const verdict = autoAdvanceVerdictOf(input, runner, pathClear)
+    // 0xaf98e · 0xaf9ac 의 `b 0xafa38`(함수 끝) — 여기까지 모은 진루는 남는다
+    if (verdict === '그만') return decisions
+    if (verdict === '진루') decisions.push({ runnerIndex: runner.index, toBase: nextBaseOf(runner) })
   }
   return decisions
+}
+
+/**
+ * 죽은 주자(+0x96)도 **거르지 않는다** — 루프 af93c~afa36 에는 +0x96 을 읽는 곳이 없다(직접 뜬 것). 아웃(0xa9520)과
+ * 득점(0xaa0a8) 모두 +0x96 만 세우고 목록에서 빼지 않으므로, 멈춰 선 죽은 주자도 아래 갈래를 다 거쳐 afa0e 에 닿으면
+ * vt48 과 **플레이+0x128 = 1** 을 받는다. 죽은 주자는 주자 틱 0xa01cc 가 흔들기(+0xba, 0xa03ac)·끝(+0xbb)으로만 돌아
+ * 움직이지 않으니, 부르는 쪽은 그 결정에 +0x128 만 세우고 주자는 옮기지 않는다.
+ * 0xaf950~0xaf95a — `r0 = vt18(주자) ; r0 != 0 → 계속 ; 아니면 force == 0 이면 건너뜀`.
+ * 곧 **루에 붙어 멈춘 주자는 언제나 보고, 달리는 중인 주자는 force 일 때만 본다.**
+ * 정정: 예전 줄은 이 조건이 **거꾸로**(멈춘 주자를 force 없이는 안 봄) 박혀 있었다.
+ * 부르는 자리는 이제 원본 인자 그대로다 — 매 틱 force 0(52660), 판 시작 한 번 force 1(0x46766).
+ */
+function isWatchedRunner(runner: RunnerState, force: boolean | undefined): boolean {
+  return isRunnerStopped(runner) || force === true
+}
+
+/** 주자 하나의 갈래 끝 — 0xafa0e 진루 · 0xafa30 건너뜀 · 0xafa38 함수 끝 */
+type AutoAdvanceVerdict = '진루' | '건너뜀' | '그만'
+
+function autoAdvanceVerdictOf(
+  input: AutoAdvanceInput,
+  runner: RunnerState,
+  pathClear: (runner: RunnerState, runners: readonly RunnerState[]) => boolean,
+): AutoAdvanceVerdict {
+  const { play } = input
+  // ── 0xaf96e · 0xaf978 — **홈런(+0x111) 이나 폴 홈런(+0x129) 이 서 있으면 틱 비교 없이 한 루 진루** ──
+  // 두 검사 모두 `bne 0xafa0e` 로 **진루 자리로 곧장 뛴다**. 그러니 이 갈래에서는
+  // 종류 2·3·8 거르개도, vt94(잡힐 뜬공) 도, 0xaf284 틱 비교도, 앞길 검사(0xa9924)도 **안 본다**.
+  if (play.finished || play.suppressed) return '진루'
+
+  // 종류 7 은 틱 비교 없이 바로 진루한다 (이미 **투구 때 루**+2 에 닿았으면 건너뜀)
+  // 0xaf97e: r3 = 주자+0x78 ; r2 = [r3,#0x14](= **+0x8c 마지막으로 닿은 루**)
+  //          r3 = [r3,#0x18](= **+0x90 투구 때 루**)
+  // 0xaf986: r3 += 2 ; cmp r2, r3 ; bge 0xafa30(건너뜀)
+  // 오른쪽 항은 +0x90 이라 안 바뀌고, 왼쪽 항은 +0x8c = 이 모델의 `startBase` 다.
+  if (play.kind === 7) return runner.startBase >= runner.pitchBase + 2 ? '건너뜀' : '진루'
+
+  if (holdsEveryRunner(input)) return '그만'
+  return outrunsThrow(input, runner) && pathClear(runner, input.runners) ? '진루' : '건너뜀'
+}
+
+/**
+ * ── 0xaf98e — vt94 = "뜬공이 잡힐 예정"(+0x11c ≤ 낙구 틱) 이고 아직 안 잡혔으면 아무도 안 뜀 ──
+ * ── 0xaf9ac · 0xaf9b2 — 종류 2·3·8 은 아예 안 본다 ──
+ * 둘 다 원본에서 **루프 밖이 아니라 이 자리**의 `b 0xafa38`(함수 끝) 이다. 두 조건 모두
+ * 주자와 무관하니 결과는 같지만, 앞선 주자가 위 두 갈래로 이미 진루해 두었으면
+ * 그 진루는 **남는다** — 그래서 `[]` 가 아니라 여기까지 모은 것을 돌려준다.
+ */
+function holdsEveryRunner(input: AutoAdvanceInput): boolean {
+  const { play } = input
+  return (play.earliestCatchTick <= input.landingTick && !play.everHeld) || SKIPPED_PLAY_KINDS.has(play.kind)
+}
+
+/** 0xaf9b6 — 다음 루에 수비 송구보다 먼저 닿는가. b = ([주자+0x8c] + 1) % 4 — 틱을 재는 루도 **마지막으로 닿은 루**에서 한 칸이다 */
+function outrunsThrow(input: AutoAdvanceInput, runner: RunnerState): boolean {
+  const nextBase = (((runner.startBase + 1) % 4) + 4) % 4
+  const runTicks = ticksToReach(runner.position, basePosition(nextBase), runner.speed) + 1
+  const defenseTicks = defenseArrivalTicks(input, nextBase)
+  return beatsThrow(runTicks, defenseTicks)
 }
 
 /**

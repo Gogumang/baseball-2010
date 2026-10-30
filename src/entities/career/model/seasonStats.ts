@@ -41,18 +41,24 @@ export function batterRecordLineOf(stats: SeasonStats): readonly number[] {
   return [stats.atBats, stats.hits, stats.doubles, stats.triples, stats.homeRuns, stats.runsBattedIn]
 }
 
+/** 참이면 1 — 타석 결과로 칸 하나를 올릴지 */
+const tally = (counts: boolean): number => (counts ? 1 : 0)
+
+/** 안타 가운데 진루 수가 bases 인 것 (2루타 · 3루타) */
+const isHitOfBases = (outcome: AtBatOutcome, bases: number): boolean => outcome.kind === '안타' && outcome.bases === bases
+
 export function recordAtBat(stats: SeasonStats, outcome: AtBatOutcome, runsBattedIn: number): SeasonStats {
   return {
     ...stats,
     plateAppearances: stats.plateAppearances + 1,
-    atBats: stats.atBats + (countsAsAtBat(outcome) ? 1 : 0),
-    hits: stats.hits + (isHit(outcome) ? 1 : 0),
-    doubles: stats.doubles + (outcome.kind === '안타' && outcome.bases === 2 ? 1 : 0),
-    triples: stats.triples + (outcome.kind === '안타' && outcome.bases === 3 ? 1 : 0),
-    homeRuns: stats.homeRuns + (outcome.kind === '홈런' ? 1 : 0),
+    atBats: stats.atBats + tally(countsAsAtBat(outcome)),
+    hits: stats.hits + tally(isHit(outcome)),
+    doubles: stats.doubles + tally(isHitOfBases(outcome, 2)),
+    triples: stats.triples + tally(isHitOfBases(outcome, 3)),
+    homeRuns: stats.homeRuns + tally(outcome.kind === '홈런'),
     runsBattedIn: stats.runsBattedIn + runsBattedIn,
-    walks: stats.walks + (outcome.kind === '볼넷' ? 1 : 0),
-    strikeouts: stats.strikeouts + (outcome.kind === '삼진' ? 1 : 0),
+    walks: stats.walks + tally(outcome.kind === '볼넷'),
+    strikeouts: stats.strikeouts + tally(outcome.kind === '삼진'),
   }
 }
 

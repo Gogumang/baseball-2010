@@ -89,66 +89,60 @@ function judgeDefensiveGoal(successBits: number, bits: number): BurstJudgement {
   return '무효'
 }
 
+/** 공격 계열 목표 (0~4 · 10) — 성공 비트면 성공, 무효 비트면 무효, 아무것도 아니면 실패 */
+function judgeOffensiveGoal(successBits: number, voidBits: number, bits: number): BurstJudgement {
+  if (hasBit(bits, successBits)) return '성공'
+  if (hasBit(bits, voidBits)) return '무효'
+  return '실패'
+}
+
+type GoalJudge = (bits: number) => BurstJudgement | null
+
+const offensiveGoal =
+  (successBits: number, voidBits: number): GoalJudge =>
+  (bits) =>
+    judgeOffensiveGoal(successBits, voidBits, bits)
+const defensiveGoal =
+  (successBits: number): GoalJudge =>
+  (bits) =>
+    judgeDefensiveGoal(successBits, bits)
+
+/**
+ * 안타 목표의 성공 비트 — ⚠️ B3(단타)이 **없다**. 그래도 단타면 B5(출루·이닝 안 끝남)가 함께 켜져
+ * 성공이다 (CORRECTIONS.md "K: 안타 목표에서 단타는 실패" 정정, P7 → K).
+ * ⚠️ 원본 버그 그대로: 단타로 3아웃째가 나면 B5 가 안 켜져 **B3 만 남아 실패**로 떨어진다.
+ * 고침(B-52): 성공 비트에 B3(단타)을 넣는다 — 안타면 이닝이 끝나도 성공
+ */
+function hitGoalSuccessBits(): number {
+  return B.홈런 | B['2루타'] | B['3루타'] | B.타점 | B.출루 | (isBugFixed('B-52') ? B.단타 : 0)
+}
+
+/** 점프표 0xd525c — b8 목표마다 판정 */
+const GOAL_JUDGES: Readonly<Record<number, GoalJudge>> = {
+  [BURST_GOAL.안타]: (bits) => judgeOffensiveGoal(hitGoalSuccessBits(), B.번트진루, bits),
+  [BURST_GOAL.장타]: offensiveGoal(B.홈런 | B['2루타'] | B['3루타'], B.단타 | B.타점 | B.출루),
+  [BURST_GOAL.홈런]: offensiveGoal(B.홈런, B['2루타'] | B['3루타'] | B.단타 | B.타점 | B.출루 | B.번트진루),
+  [BURST_GOAL.타점]: offensiveGoal(B.홈런 | B.타점, B['2루타'] | B['3루타'] | B.단타 | B.출루 | B.번트진루),
+  [BURST_GOAL.번트]: offensiveGoal(B.번트진루 | B.번트득점권, B.홈런 | B['2루타'] | B['3루타'] | B.단타 | B.타점 | B.출루),
+  // 5 — 점프표에 칸은 있으나 판정하지 않는다
+  [BURST_GOAL.없음]: () => null,
+  [BURST_GOAL.아웃]: defensiveGoal(B.아웃 | B.삼진 | B.병살),
+  [BURST_GOAL.삼진]: defensiveGoal(B.삼진),
+  [BURST_GOAL.병살]: defensiveGoal(B.병살),
+  // 고의사구 — ⚠️ 원본 그대로 **아무 볼넷이나** 성공이다 (B11 은 고의사구를 가리지 않는다).
+  // B-52 의 이 갈래는 고치지 않는다 — 원본에 고의사구 명령이 없어 "볼 넷을 던져 내보내라"(대사 "일단은 고의사구 작전이다")는
+  // 아무 볼넷으로만 따를 수 있다. 원본 버그가 아니라 목표의 뜻이 그렇다
+  [BURST_GOAL.고의사구]: defensiveGoal(B.볼넷),
+  [BURST_GOAL.미상10]: offensiveGoal(B.번트진루, B.홈런 | B['2루타'] | B['3루타'] | B.단타 | B.타점 | B.출루),
+}
+
 /**
  * 목표 b8 과 타석 결과비트로 성공·실패·무효를 가린다.
  * 판정할 것이 없으면(b8 = 5, 또는 결과비트가 0) `null` 을 돌려준다 — 돌발은 그대로 살아 있다.
+ * 점프표 밖의 b8 은 세 표에는 없다. 원본은 점프표를 벗어나므로 웹은 판정하지 않는다
  */
 export function judgeBurstGoal(goal: number, bits: number): BurstJudgement | null {
   if (bits === 0) return null
-
-  switch (goal) {
-    // 안타 — ⚠️ 성공 비트에 B3(단타)이 **없다**. 그래도 단타면 B5(출루·이닝 안 끝남)가 함께 켜져
-    // 성공이다 (CORRECTIONS.md "K: 안타 목표에서 단타는 실패" 정정, P7 → K).
-    // ⚠️ 원본 버그 그대로: 단타로 3아웃째가 나면 B5 가 안 켜져 **B3 만 남아 실패**로 떨어진다.
-    // 고침(B-52): 성공 비트에 B3(단타)을 넣는다 — 안타면 이닝이 끝나도 성공
-    case BURST_GOAL.안타:
-      if (hasBit(bits, B.홈런 | B['2루타'] | B['3루타'] | B.타점 | B.출루 | (isBugFixed('B-52') ? B.단타 : 0))) return '성공'
-      if (hasBit(bits, B.번트진루)) return '무효'
-      return '실패'
-
-    case BURST_GOAL.장타:
-      if (hasBit(bits, B.홈런 | B['2루타'] | B['3루타'])) return '성공'
-      if (hasBit(bits, B.단타 | B.타점 | B.출루)) return '무효'
-      return '실패'
-
-    case BURST_GOAL.홈런:
-      if (hasBit(bits, B.홈런)) return '성공'
-      if (hasBit(bits, B['2루타'] | B['3루타'] | B.단타 | B.타점 | B.출루 | B.번트진루)) return '무효'
-      return '실패'
-
-    case BURST_GOAL.타점:
-      if (hasBit(bits, B.홈런 | B.타점)) return '성공'
-      if (hasBit(bits, B['2루타'] | B['3루타'] | B.단타 | B.출루 | B.번트진루)) return '무효'
-      return '실패'
-
-    case BURST_GOAL.번트:
-      if (hasBit(bits, B.번트진루 | B.번트득점권)) return '성공'
-      if (hasBit(bits, B.홈런 | B['2루타'] | B['3루타'] | B.단타 | B.타점 | B.출루)) return '무효'
-      return '실패'
-
-    // 5 — 점프표에 칸은 있으나 판정하지 않는다
-    case BURST_GOAL.없음:
-      return null
-
-    case BURST_GOAL.아웃:
-      return judgeDefensiveGoal(B.아웃 | B.삼진 | B.병살, bits)
-    case BURST_GOAL.삼진:
-      return judgeDefensiveGoal(B.삼진, bits)
-    case BURST_GOAL.병살:
-      return judgeDefensiveGoal(B.병살, bits)
-    // 고의사구 — ⚠️ 원본 그대로 **아무 볼넷이나** 성공이다 (B11 은 고의사구를 가리지 않는다).
-    // B-52 의 이 갈래는 고치지 않는다 — 원본에 고의사구 명령이 없어 "볼 넷을 던져 내보내라"(대사 "일단은 고의사구 작전이다")는
-    // 아무 볼넷으로만 따를 수 있다. 원본 버그가 아니라 목표의 뜻이 그렇다
-    case BURST_GOAL.고의사구:
-      return judgeDefensiveGoal(B.볼넷, bits)
-
-    case BURST_GOAL.미상10:
-      if (hasBit(bits, B.번트진루)) return '성공'
-      if (hasBit(bits, B.홈런 | B['2루타'] | B['3루타'] | B.단타 | B.타점 | B.출루)) return '무효'
-      return '실패'
-
-    default:
-      // 점프표 밖의 b8 — 세 표에는 없다. 원본은 점프표를 벗어나므로 웹은 판정하지 않는다
-      return null
-  }
+  const judge = Object.hasOwn(GOAL_JUDGES, goal) ? GOAL_JUDGES[goal] : undefined
+  return judge === undefined ? null : judge(bits)
 }

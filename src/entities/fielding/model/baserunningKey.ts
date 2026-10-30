@@ -166,15 +166,15 @@ export function applyBaserunningKey(input: BaserunningKeyInput, kind: Baserunnin
     retargeted.push(index)
   }
 
-  let succeeded = false
-  if (target === '전원') {
+  const everyone = (): boolean => {
     // a9b1e — 인자 −1 갈래도 머리의 0xae794 를 먼저 지난다(거짓이면 갈래 없이 0)
-    if (isStealAllowedInPlayKind(input.playKind)) {
-      const order = kind === '귀루' ? [1, 2, 3] : [3, 2, 1]
-      for (const base of order) succeeded = one(base) || succeeded
-    }
-  } else {
-    succeeded = one(target)
+    if (!isStealAllowedInPlayKind(input.playKind)) return false
+    const order = kind === '귀루' ? [1, 2, 3] : [3, 2, 1]
+    let succeeded = false
+    for (const base of order) succeeded = one(base) || succeeded
+    return succeeded
   }
+
+  const succeeded = target === '전원' ? everyone() : one(target)
   return { handled: true, succeeded, retargeted, runners, previousTargets }
 }

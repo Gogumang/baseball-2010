@@ -30,24 +30,36 @@ export function isAtBatFinished(state: AtBatState): boolean {
   return state.outcome !== null
 }
 
+/** 스트라이크 하나 — 세 번째면 삼진 */
+function addStrike(state: AtBatState): AtBatState {
+  const strikes = state.strikes + 1
+  return strikes >= STRIKES_FOR_STRIKEOUT ? { ...state, strikes, outcome: { kind: '삼진' } } : { ...state, strikes }
+}
+
+/** 볼 하나 — 네 번째면 볼넷 */
+function addBall(state: AtBatState): AtBatState {
+  const balls = state.balls + 1
+  return balls >= BALLS_FOR_WALK ? { ...state, balls, outcome: { kind: '볼넷' } } : { ...state, balls }
+}
+
+/** 투 스트라이크 이후의 파울은 카운트를 올리지 않는다. */
+function addFoul(state: AtBatState): AtBatState {
+  return state.strikes >= STRIKES_FOR_STRIKEOUT - 1 ? state : { ...state, strikes: state.strikes + 1 }
+}
+
 /** 투구 하나의 결과를 반영한 새 카운트를 돌려준다. 기존 상태는 변경하지 않는다. */
 export function applyPitchResolution(state: AtBatState, resolution: PitchResolution): AtBatState {
   if (state.outcome !== null) return state
 
   switch (resolution.kind) {
-    case '스트라이크': {
-      const strikes = state.strikes + 1
-      return strikes >= STRIKES_FOR_STRIKEOUT ? { ...state, strikes, outcome: { kind: '삼진' } } : { ...state, strikes }
-    }
-    case '볼': {
-      const balls = state.balls + 1
-      return balls >= BALLS_FOR_WALK ? { ...state, balls, outcome: { kind: '볼넷' } } : { ...state, balls }
-    }
+    case '스트라이크':
+      return addStrike(state)
+    case '볼':
+      return addBall(state)
     case '사구':
       return { ...state, outcome: { kind: '사구' } }
     case '파울':
-      // 투 스트라이크 이후의 파울은 카운트를 올리지 않는다.
-      return state.strikes >= STRIKES_FOR_STRIKEOUT - 1 ? state : { ...state, strikes: state.strikes + 1 }
+      return addFoul(state)
     case '타구':
       return { ...state, outcome: resolution.outcome }
   }

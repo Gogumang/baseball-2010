@@ -139,28 +139,39 @@ export function tickHomeRunFireworks<E>(fireworks: HomeRunFireworks<E>, port: Fi
   return { slots }
 }
 
+type SlotTick<E> = { readonly alive: boolean; readonly next: FireworkSlot<E> }
+
+/** 상태 1 — 기다림을 세다가 0 이 되면 솟는 입자를 띄운다 */
+function tickWaitingSlot<E>(slot: FireworkSlot<E>, port: FireworksParticlePort<E>): SlotTick<E> {
+  const delay = signedByte(slot.delay - 1)
+  if (delay > 0) return { alive: true, next: { ...slot, delay } }
+  port.emit(FIREWORK_PARTICLES.rise, slot.x, slot.y, FIREWORK_PARTICLES.image)
+  return { alive: true, next: { ...slot, delay: 0, state: 2 } }
+}
+
+/** 상태 2 — 터지는 입자 둘 가운데 하나를 굴려 띄운다 */
+function rollBurstSlot<E>(slot: FireworkSlot<E>, port: FireworksParticlePort<E>, random: RandomPort): SlotTick<E> {
+  const roll = random.rand(0, 2)
+  const id = roll === 0 ? FIREWORK_PARTICLES.burstA : FIREWORK_PARTICLES.burstB
+  const burst = port.emit(id, slot.x, slot.y - BURST_RISE, FIREWORK_PARTICLES.image)
+  return { alive: true, next: { ...slot, state: 3, burst } }
+}
+
+/** 상태 3 — 터진 입자가 다 지면 남는 틱을 건다 */
+function tickBurstingSlot<E>(slot: FireworkSlot<E>, port: FireworksParticlePort<E>): SlotTick<E> {
+  if (slot.burst === null || !port.isFinished(slot.burst)) return { alive: true, next: slot }
+  return { alive: true, next: { ...slot, state: 4, linger: LINGER_TICKS } }
+}
+
 /** 0x8fa00 — 칸 하나. 0 을 돌려주면(alive 거짓) 부르는 쪽이 +0x11 을 센다 */
-function tickSlot<E>(
-  slot: FireworkSlot<E>,
-  port: FireworksParticlePort<E>,
-  random: RandomPort,
-): { readonly alive: boolean; readonly next: FireworkSlot<E> } {
+function tickSlot<E>(slot: FireworkSlot<E>, port: FireworksParticlePort<E>, random: RandomPort): SlotTick<E> {
   switch (slot.state) {
-    case 1: {
-      const delay = signedByte(slot.delay - 1)
-      if (delay > 0) return { alive: true, next: { ...slot, delay } }
-      port.emit(FIREWORK_PARTICLES.rise, slot.x, slot.y, FIREWORK_PARTICLES.image)
-      return { alive: true, next: { ...slot, delay: 0, state: 2 } }
-    }
-    case 2: {
-      const roll = random.rand(0, 2)
-      const id = roll === 0 ? FIREWORK_PARTICLES.burstA : FIREWORK_PARTICLES.burstB
-      const burst = port.emit(id, slot.x, slot.y - BURST_RISE, FIREWORK_PARTICLES.image)
-      return { alive: true, next: { ...slot, state: 3, burst } }
-    }
+    case 1:
+      return tickWaitingSlot(slot, port)
+    case 2:
+      return rollBurstSlot(slot, port, random)
     case 3:
-      if (slot.burst === null || !port.isFinished(slot.burst)) return { alive: true, next: slot }
-      return { alive: true, next: { ...slot, state: 4, linger: LINGER_TICKS } }
+      return tickBurstingSlot(slot, port)
     case 4:
       return { alive: false, next: slot }
   }
