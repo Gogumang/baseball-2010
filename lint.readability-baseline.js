@@ -142,7 +142,6 @@ export const readabilityBaseline = [
   'src/pages/defense/ui/DefenseHolderMark.tsx',
   'src/pages/defense/ui/DefensePlayerEffect.tsx',
   'src/pages/defense/ui/DefenseScreen.tsx',
-  'src/pages/ending/ui/EndingScreen.tsx',
   'src/pages/game-result/ui/GameEvaluationScreen.tsx',
   'src/pages/game-result/ui/GameResultScreen.tsx',
   'src/pages/game/lib/gameFieldTeams.ts',

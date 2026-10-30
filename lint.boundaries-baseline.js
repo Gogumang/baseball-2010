@@ -290,7 +290,7 @@ export const crossSliceBaseline = [
   'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/MyLeagueTeamSelectScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
-  'src/pages/ending/ui/EndingScreen.tsx',
+  'src/pages/ending/ui/endingScreen/otherSlices.ts',
   'src/pages/game-result/ui/GameEvaluationScreen.tsx',
   'src/pages/game-result/ui/GameResultScreen.tsx',
   'src/pages/game/ui/GameScreen.tsx',

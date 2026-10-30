@@ -13,7 +13,6 @@ export const maxLinesBaseline = [
   'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
   'src/pages/defense/ui/DefenseScreen.tsx',
-  'src/pages/ending/ui/EndingScreen.tsx',
   'src/pages/game/ui/GameScreen.tsx',
   'src/pages/help/ui/HelpScreen.tsx',
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx',
