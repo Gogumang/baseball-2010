@@ -36,39 +36,43 @@ export const HOLD_LONG_RELEASE_FLAG = 0x100
 /** 뗌 (bcaf6) */
 export const HOLD_RELEASE_FLAG = 0x200
 
+/** 4틀째(누른 채 [+0x4c] > 3)마다 되풀이 단계가 오른다 (bca6e) */
+const TICKS_PER_REPEAT = 3
+
 export function createKeyHold(): KeyHold {
   let isHeld = false
   let heldTicks = 0
   let stage = 0
   let lastPressed: string | null = null
+  /** bca6e · bcab0 — 뗌 없이 누르고 있는 틀: 4틀째마다 단계를 올리고 되풀이 */
+  const countHeldTick = (): KeyHoldFrame => {
+    heldTicks += 1
+    if (heldTicks <= TICKS_PER_REPEAT) return { repeat: null, flags: 0 }
+    stage += 1
+    heldTicks = 0
+    return { repeat: lastPressed, flags: Math.min(stage << 4, HOLD_STAGE_MASK) }
+  }
+  /** bca8a — 뗌이 있거나 안 누르고 있는 틀: 단계가 있었으면 길게 누른 뒤 뗌 되풀이, 없으면 셈을 비운다 */
+  const settleHold = (): KeyHoldFrame => {
+    if (stage === 0) {
+      heldTicks = 0
+      return { repeat: null, flags: 0 }
+    }
+    stage = 0
+    return { repeat: lastPressed, flags: HOLD_LONG_RELEASE_FLAG }
+  }
   return {
     frame: (press, hasRelease) => {
-      let flags = 0
-      let repeat: string | null = null
-      if (!hasRelease && isHeld) {
-        heldTicks += 1
-        if (heldTicks > 3) stage += 1
-      } else if (stage !== 0) {
-        flags = (flags & ~HOLD_STAGE_MASK) | HOLD_LONG_RELEASE_FLAG
-        repeat = lastPressed
-        stage = 0
-      } else {
-        heldTicks = 0
-      }
-      if (stage > 0 && heldTicks > 3) {
-        flags |= Math.min(stage << 4, HOLD_STAGE_MASK)
-        repeat = lastPressed
-        heldTicks = 0
-      }
+      const held = !hasRelease && isHeld ? countHeldTick() : settleHold()
+      // bcad8 — 이 틀의 누름
       if (press !== null) {
         isHeld = true
         lastPressed = press
       }
-      if (hasRelease) {
-        flags |= HOLD_RELEASE_FLAG
-        isHeld = false
-      }
-      return { repeat, flags }
+      if (!hasRelease) return held
+      // bcaec — 뗌
+      isHeld = false
+      return { repeat: held.repeat, flags: held.flags | HOLD_RELEASE_FLAG }
     },
     reset: () => {
       isHeld = false

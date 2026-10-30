@@ -75,6 +75,11 @@ export interface PopupWindowMotion {
   readonly close: (kind: PopupCloseKind, onClosed?: () => void, onNextUpdate?: () => void) => boolean
 }
 
+/** 처음 펼침 높이 — 펼침을 건너뛰거나 다 펼친 채로 처음 그리면 null(다 펼침) */
+function openingStartHeightOf(skipsMotion: boolean, opensAtOnce: boolean): number | null {
+  return skipsMotion || opensAtOnce ? null : POPUP_OPEN_START_HEIGHT
+}
+
 /**
  * 0x741a0 창 하나의 펼침 · 닫힘. 갱신 한 번 = 원본 틀 하나(`millisecondsPerFrame`).
  * `skipsMotion` 이 참이면(레이아웃이 없는 시험 환경 따위) 다 펼친 채로 시작하고 `'줄임'` 도 바로 닫는다 — `MessageBox` 와 같은 약속.
@@ -106,7 +111,7 @@ export function usePopupWindowMotion({
    */
   readonly isCommonWindow?: boolean
 }): PopupWindowMotion {
-  const [openingHeight, setOpeningHeight] = useState<number | null>(skipsMotion || opensAtOnce ? null : POPUP_OPEN_START_HEIGHT)
+  const [openingHeight, setOpeningHeight] = useState(() => openingStartHeightOf(skipsMotion, opensAtOnce))
   const [closingWidth, setClosingWidth] = useState<number | null>(null)
   const [isClosed, setIsClosed] = useState(false)
   // 틀 · 키는 그리기를 기다리지 않고 이 값을 본다 — 틀 여럿이 한 그리기에 묶여도 한 틀씩 나아간다

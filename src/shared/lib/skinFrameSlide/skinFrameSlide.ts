@@ -80,11 +80,18 @@ export function useSkinFrameSlide(tick: number, starts: boolean): number {
     [id],
   )
   const last = drawnBy.get(id)
-  if (last !== undefined && last.tick === tick) return last.position
-  if (last === undefined && starts) startSkinFrameSlide()
-  const draws = last === undefined ? 1 : Math.max(0, tick - last.tick)
-  let position = last?.position ?? slide.position
-  for (let draw = 0; draw < draws; draw += 1) position = drawSkinFrameSlide()
+  if (last === undefined) return drawFirstSkinFrame(id, tick, starts)
+  if (last.tick === tick) return last.position
+  let position = last.position
+  for (let draw = Math.max(0, tick - last.tick); draw > 0; draw -= 1) position = drawSkinFrameSlide()
+  drawnBy.set(id, { tick, position })
+  return position
+}
+
+/** 이 부품의 첫 그림 — 들어옴이면 미끄러짐을 먼저 세우고 한 걸음 옮긴다 */
+function drawFirstSkinFrame(id: string, tick: number, starts: boolean): number {
+  if (starts) startSkinFrameSlide()
+  const position = drawSkinFrameSlide()
   drawnBy.set(id, { tick, position })
   return position
 }
