@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { isMyTurn } from '@/entities/league/model/seasonEnd'
-import { postseasonSideOf, postseasonStarterSlotOf, postseasonPitcherOrderOf } from '@/entities/league/model/league'
+import { postseasonSideOf, postseasonStarterSlotOf, postseasonPitcherOrderOf, type PostseasonSeries } from '@/entities/league/model/league'
+import type { SeasonSave } from '@/app/model/seasonSession/save/seasonSave'
 import { runCpuPostseasonWithStamina } from '@/entities/league/model/postseasonPlay'
 import { nationalCupSideOf } from '@/entities/national-cup/model/nationalCup'
 import type { NationalCupFinish } from '@/entities/national-cup/model/nationalCupFlow'
@@ -22,6 +23,24 @@ import { useGameOptionsFor } from '@/app/model/seasonSession/nextGame/useGameOpt
 import { useNextGameSteps } from '@/app/model/seasonSession/nextGame/useNextGameSteps'
 import { useEnterMatchInfo } from '@/app/model/seasonSession/nextGame/useEnterMatchInfo'
 
+/** 포스트시즌 가지 — 윗 시드(대진 칸 0)가 홈이다 (0xb7844 의 리그+0x34 가지). 내 팀이 아닌 쪽이 상대 */
+function postseasonOpponentOf(series: PostseasonSeries, myTeam: number): number {
+  return series.teams[0] === myTeam ? series.teams[1] : series.teams[0]
+}
+
+/** CPU 끼리 돌린 뒤의 저장 — 투수 +0x2c · 대진 · 날짜(시리즈 g) · 우승팀 */
+function cpuPostseasonSaveOf(save: SeasonSave, advanced: PostseasonSeries, pitcherStaminas: SeasonSave['cpuPitcherStaminas']): SeasonSave {
+  return {
+    ...save,
+    cpuPitcherStaminas: pitcherStaminas,
+    series: advanced,
+    state: {
+      ...save.state,
+      record: { ...save.state.record, games: postseasonDayOf(advanced), postseasonChampion: advanced.champion ?? NO_CHAMPION },
+    },
+  }
+}
+
 /** 포스트시즌 · 국가대항전 진행 — 결산 화면(0xef)과 대회 화면이 부른다 */
 export function usePostseasonActions(scope: SeasonScope) {
   const { atoms, random, aceLevels, recordStat } = scope
@@ -42,8 +61,7 @@ export function usePostseasonActions(scope: SeasonScope) {
     if (save === null || series === null) return
     const myTeam = save.state.record.teamId
     if (isMyTurn(series, myTeam)) {
-      // 포스트시즌 가지 — 윗 시드(대진 칸 0)가 홈이다 (0xb7844 의 리그+0x34 가지)
-      const opponent = series.teams[0] === myTeam ? series.teams[1] : series.teams[0]
+      const opponent = postseasonOpponentOf(series, myTeam)
       const options = optionsFor(opponent, postseasonSideOf(series, myTeam))
       if (options === null) return
       // 날짜 카운터는 시즌 경기 수가 아니라 **이 시리즈의 g**(L+0x32 — 0xb80a8 b811c 0 · 0xb7724 b777a −1 ·
@@ -65,16 +83,7 @@ export function usePostseasonActions(scope: SeasonScope) {
     const cpu = runCpuPostseasonWithStamina(series, myTeam, random, save.cpuPitcherStaminas, aceLevels, seasonAbilityContextOf(save.state), (team) =>
       cpuLeagueRecordOf(save, team),
     )
-    const advanced = cpu.series
-    commit({
-      ...save,
-      cpuPitcherStaminas: cpu.pitcherStaminas,
-      series: advanced,
-      state: {
-        ...save.state,
-        record: { ...save.state.record, games: postseasonDayOf(advanced), postseasonChampion: advanced.champion ?? NO_CHAMPION },
-      },
-    })
+    commit(cpuPostseasonSaveOf(save, cpu.series, cpu.pitcherStaminas))
   }, [aceLevels, commit, enterPreGameSquad, optionsFor, random, save])
   /**
    * 국가대항전 한 경기 — 원본대로 **사람이 대표팀을 조작한다** (시즌 221).

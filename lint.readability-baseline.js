@@ -12,11 +12,6 @@ export const readabilityRules = {
 }
 
 export const readabilityBaseline = [
-  'src/app/model/seasonSession/nextGame/useEntryEditActions.ts',
-  'src/app/model/seasonSession/postseason/usePostseasonActions.ts',
-  'src/app/model/seasonSession/seasonEnd/useSeasonEndActions.ts',
-  'src/app/model/seasonSession/settlement/useSettleGame.ts',
-  'src/app/model/seasonSession/shop/useSeasonShopActions.ts',
   'src/entities/at-bat/model/atBatState.ts',
   'src/entities/awards/model/leaderboard.ts',
   'src/entities/batting/model/hitDirection.ts',

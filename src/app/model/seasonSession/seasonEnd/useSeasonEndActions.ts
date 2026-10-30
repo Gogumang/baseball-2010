@@ -11,7 +11,6 @@ import {
   type SeasonEventReward,
   YEAR_GOAL_EVENT_ID,
   markEventSeen,
-  opensSeasonGoalWindow,
   applySeasonEventRewards,
   cursorAfterCalling,
   seasonEventFollowUpOf,
@@ -20,9 +19,7 @@ import { SEASON_SCENE_STATE } from '@/entities/season-mode/model/seasonStateMach
 import { seasonGoalResultEventId, achievedSeasonGoalCount } from '@/entities/season-mode/model/seasonGoals'
 import { rewardResumePatchOf } from '@/entities/story/model/storyScene'
 import { seasonAwardFollowUpOf } from '@/app/model/seasonSession/awards/seasonAwards'
-import { SEASON_STAT_MODE } from '@/app/model/seasonSession/constants/seasonConstants'
 import { seasonGoalInputOf } from '@/app/model/seasonSession/goals/seasonGoals'
-import { withEvent100Awarded } from '@/app/model/seasonSession/save/globals'
 import type { SeasonSave } from '@/app/model/seasonSession/save/seasonSave'
 import { nextYearOf } from '@/app/model/seasonSession/year/nextYear'
 import { type SeasonScope, useSeasonValue } from '@/app/model/seasonSession/atoms/seasonScope'
@@ -34,6 +31,7 @@ import { useSeasonSaveWriters } from '@/app/model/seasonSession/state/useSeasonS
 import { useGamePointPurse } from '@/app/model/seasonSession/state/useGamePointPurse'
 import { useStartEvent } from '@/app/model/seasonSession/state/useStartEvent'
 import { useSeasonGameSetup } from '@/app/model/seasonSession/state/useSeasonGameSetup'
+import { lastCalledEventOf, payEventRewardExtras, recordAfterEventPlayback } from '@/app/model/seasonSession/seasonEnd/eventFinish'
 
 /** 시즌 끝 — 리그 1위 G · 결산 닫기 · 이벤트 재생 끝과 보상 */
 export function useSeasonEndActions(scope: SeasonScope) {
@@ -113,25 +111,14 @@ export function useSeasonEndActions(scope: SeasonScope) {
     (rewards: readonly SeasonEventReward[], viewedEventIds: readonly number[], endingEventId: number | null = null) => {
       const playback = eventPlayback
       if (save === null || playback === null) return
-      // 첫 종류 21(s_event 500)로 끝났으면 그 이벤트만 본 표시를 안 한다 — 0x8d4ce 는 0x8cf8c 를 안 지나고, 0xd3 끝 0x78f0 의
-      // 0x8b0e4 가 떠나온 이벤트 줄만 켠다. [0x1552adc] 는 0xe9ac(ec04)가 지우기만 한다 — 엔딩 0xf5 는 500 을 튼 쪽이 줄에 넣었다
-      const fileEvents = viewedEventIds.filter((id) => id !== YEAR_GOAL_EVENT_ID && id !== endingEventId)
-      let record = fileEvents.reduce(markEventSeen, save.state.record)
-      if ([playback.eventId, ...viewedEventIds].some(opensSeasonGoalWindow)) record = { ...record, yearGoalShown: true }
+      const record = recordAfterEventPlayback(save.state.record, playback.eventId, viewedEventIds, endingEventId)
       const applied = applySeasonEventRewards({ ...save.state, record }, rewards, playback.eventId, random)
       const next: SeasonSave = { ...save, state: applied.state }
       commit(next)
-      if (rewards.some((reward) => reward.kind === 10)) {
-        gainGamePoint(applied.gamePoint)
-        // 0x8c6e4 `0x22c7d(v, 모드)` — 획득 GP 통계
-        recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: applied.gamePoint })
-      }
-      if (applied.event100Awarded) updateGlobals(withEvent100Awarded)
+      payEventRewardExtras(rewards, applied, gainGamePoint, recordStat, updateGlobals)
       // 선택지가 번호로 부른 마지막 이벤트 다음부터 이어 훑는다 (0xae170)
-      const lastCalled = viewedEventIds[viewedEventIds.length - 1]
-      if (lastCalled !== undefined && lastCalled !== playback.eventId) {
-        atoms.set(eventCursorAtom, cursorAfterCalling(atoms.get(eventCursorAtom), lastCalled))
-      }
+      const lastCalled = lastCalledEventOf(viewedEventIds, playback.eventId)
+      if (lastCalled !== undefined) atoms.set(eventCursorAtom, cursorAfterCalling(atoms.get(eventCursorAtom), lastCalled))
       const goalRecordOf = recordSourceNow()
       const followUp = seasonEventFollowUpOf(playback.eventId, () =>
         seasonGoalResultEventId(
@@ -185,11 +172,7 @@ export function useSeasonEndActions(scope: SeasonScope) {
       const patch = rewardResumePatchOf(eventId, '시즌')
       const record = patch === null || seen.phase === patch.resumeCode ? seen : { ...seen, phase: patch.resumeCode }
       commit({ ...current, state: { ...applied.state, record } })
-      if (rewards.some((reward) => reward.kind === 10)) {
-        gainGamePoint(applied.gamePoint)
-        recordStat?.({ kind: 'G획득', mode: SEASON_STAT_MODE, amount: applied.gamePoint })
-      }
-      if (applied.event100Awarded) updateGlobals(withEvent100Awarded)
+      payEventRewardExtras(rewards, applied, gainGamePoint, recordStat, updateGlobals)
     },
     [atoms, commit, gainGamePoint, random, recordStat, updateGlobals],
   )
