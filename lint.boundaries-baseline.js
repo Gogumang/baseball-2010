@@ -187,7 +187,7 @@ export const crossSliceBaseline = [
   'src/features/play-game/model/gameFlow/baseRunning/runnerPlaySettlement.ts',
   'src/features/play-game/model/gameFlow/baseRunning/steals.ts',
   'src/features/play-game/model/gameFlow/batting/applyPlayerOutcome.ts',
-  'src/features/play-game/model/gameFlow/batting/finishPlayerOutcome.ts',
+  'src/features/play-game/model/gameFlow/batting/finishPlayerOutcome/otherSlices.ts',
   'src/features/play-game/model/gameFlow/batting/foulPlay.ts',
   'src/features/play-game/model/gameFlow/batting/strikeoutSteal.ts',
   'src/features/play-game/model/gameFlow/benchClearing/benchClearing.ts',

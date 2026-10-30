@@ -8,6 +8,13 @@ import { moundsOf } from '@/features/play-game/model/gameFlow/settlement/decisio
 import { MAXIMUM_PITCHER_COUNTER, RUNNER_PLAY_OUTCOME_PLACEHOLDER } from '@/features/play-game/model/gameFlow/types/constants'
 import type { GameProgress } from '@/features/play-game/model/gameFlow/types/progress'
 
+/** 판이 아웃 · 득점 · 루를 바꿨나 — 안 바꿨으면 재생 칸 · 장면 칸만 고친다 */
+function changesGame(before: GameState, advance: DefensePlayResult['advance']): boolean {
+  if (advance.outsAdded > 0 || advance.runsScored > 0) return true
+  const { bases } = advance
+  return bases.first !== before.bases.first || bases.second !== before.bases.second || bases.third !== before.bases.third
+}
+
 /**
  * 주자만 움직인 판(견제 종류 4 · 도루 종류 5 · 폭투 종류 9)의 advance 를 먹인다 — 타석이 끝난 것이 아니라
  * 타순 커서는 그대로다. 득점은 상대 투수 실점 A·B 에 붙는다(득점 처리 0xa5c34). 재생 칸에 판을 넣는다.
@@ -30,13 +37,7 @@ export function withRunnerOnlyPlay(
     defenseScene: result.scene,
   }
   const advance = result.advance
-  const changed =
-    advance.outsAdded > 0 ||
-    advance.runsScored > 0 ||
-    advance.bases.first !== before.bases.first ||
-    advance.bases.second !== before.bases.second ||
-    advance.bases.third !== before.bases.third
-  if (!changed) return next
+  if (!changesGame(before, advance)) return next
   // 결과 코드는 precomputed 가 있으면 안 읽는다
   const game: GameState = {
     ...applyAtBatOutcome(before, RUNNER_PLAY_OUTCOME_PLACEHOLDER, advance, {

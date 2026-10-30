@@ -83,14 +83,6 @@ export function withWildPitchSettlement(
   const events = settlementEventsOfPlay(result)
   const outs = events.outs
   const atBat = outs > 0 && events.runs === 0
-  const slot = before.game.battingOrderIndex
-  const records = [...next.ourLineup.records]
-  const index = lineupSlotOf(slot)
-  records[index] = recordPlateAppearance(records[index] ?? EMPTY_BATTER_GAME_RECORD, {
-    isHit: false,
-    isHomeRun: false,
-    ...(outs > 0 ? { resultCode: OUT_RESULT_CODE } : {}),
-  })
   const settled: GameProgress = {
     ...withRunnerPlaySettlement(next, before, result, events, isRecorded),
     myStats: {
@@ -98,20 +90,45 @@ export function withWildPitchSettlement(
       plateAppearances: next.myStats.plateAppearances + 1,
       atBats: next.myStats.atBats + (atBat ? 1 : 0),
     },
-    ourLineup: { ...next.ourLineup, records },
-    ...(outs > 0
-      ? {
-          recentAtBatCodes: [...next.recentAtBatCodes, OUT_RESULT_CODE].slice(-RECENT_AT_BAT_COUNT),
-          consecutiveHits: 0,
-          homeRunStreak: 0,
-          reputationCounts: { ...next.reputationCounts, homeRunStreak: 0 },
-        }
-      : {}),
+    ourLineup: { ...next.ourLineup, records: wildPitchLineupRecordsOf(next, before.game.battingOrderIndex, outs) },
+    ...(outs > 0 ? wildPitchOutStreaksOf(next) : {}),
   }
   if (settled.burst === null) return settled
+  return withWildPitchBurst(settled, settled.burst, { next, before, result, outs })
+}
+
+/** a8ac8 — 타순 칸 타석 +0x14 (아웃이면 결과 코드도) */
+function wildPitchLineupRecordsOf(next: GameProgress, slot: number, outs: number): GameProgress['ourLineup']['records'] {
+  const records = [...next.ourLineup.records]
+  const index = lineupSlotOf(slot)
+  records[index] = recordPlateAppearance(records[index] ?? EMPTY_BATTER_GAME_RECORD, {
+    isHit: false,
+    isHomeRun: false,
+    ...(outs > 0 ? { resultCode: OUT_RESULT_CODE } : {}),
+  })
+  return records
+}
+
+/** a8a72 — 아웃이면 결과 링 ← 5 · 연속 안타 · 연속 홈런을 끊는다 */
+function wildPitchOutStreaksOf(next: GameProgress): Partial<GameProgress> {
+  return {
+    recentAtBatCodes: [...next.recentAtBatCodes, OUT_RESULT_CODE].slice(-RECENT_AT_BAT_COUNT),
+    consecutiveHits: 0,
+    homeRunStreak: 0,
+    reputationCounts: { ...next.reputationCounts, homeRunStreak: 0 },
+  }
+}
+
+/** 0xa599c 결과비트(종류 9 는 거르지 않는다) → 0x17 끝(52a8e)의 0x8f414 가 그 비트로 돌발을 판정한다 */
+function withWildPitchBurst(
+  settled: GameProgress,
+  burst: NonNullable<GameProgress['burst']>,
+  play: { readonly next: GameProgress; readonly before: GameProgress; readonly result: DefensePlayResult; readonly outs: number },
+): GameProgress {
+  const { next, before, result, outs } = play
   const isWalkOff = next.game.isFinished && next.game.ourScore > next.game.opponentScore
   const resolution = resolveBurst(
-    settled.burst,
+    burst,
     burstResultBitsOf({
       // 안타 · 볼넷 갈래가 아니다 — B4(타점)는 a8946 갈래(희생플라이 · 볼넷 · 사구) 안이라 안 선다
       outcome: RUNNER_PLAY_OUTCOME_PLACEHOLDER,

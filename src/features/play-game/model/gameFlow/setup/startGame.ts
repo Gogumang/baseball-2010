@@ -1,12 +1,9 @@
-import { rotationSlotOf, ROTATION_SIZE } from '@/entities/pitcher-career/model/pitcherRotation'
-import { FULL_STAMINA } from '@/entities/pitcher-career/model/pitcherStamina'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { PLAYER_BATTING_ORDER_INDEX, type PlayerSide, PLAYER_SIDE_LAST_BAT, createGame, isPlayerTurn } from '@/entities/game/model/gameState'
 import { opponentOf } from '@/entities/league/model/league'
-import { type GameAceSetup, NO_GAME_ACES, withAcePitcherOrder, withAcePitcherStamina, withAceBatterLineup } from '@/features/play-game/model/gameAces'
+import { type GameAceSetup, NO_GAME_ACES, withAceBatterLineup } from '@/features/play-game/model/gameAces'
 import { type QuickLineup, rosterLineupOf } from '@/entities/game/model/quickLineup'
 import { type TeamRecordEquipment, BATTERS_PER_TEAM, teamBatters } from '@/entities/team/model/teamRoster'
-import { startingMoundOf } from '@/entities/game/model/simulateHalfInning'
 import { FRESH_HELD_CPU_MAGIC } from '@/entities/pitching/model/magicPitchGame'
 import { EMPTY_SEASON_STATS } from '@/entities/career/model/seasonStats'
 import { EMPTY_REPUTATION_COUNTS } from '@/entities/career/model/gameEvaluation'
@@ -19,7 +16,7 @@ import { rollHalfInningFielders } from '@/features/play-game/model/halfInningBoa
 import { fielderRecordsAfterBoard } from '@/entities/fielding/model/fielderRecords'
 import { advanceUntilPlayerTurn } from '@/features/play-game/model/gameFlow/autoPlay/advance'
 import { opponentFielderSeatOf } from '@/features/play-game/model/gameFlow/defense/opponentFielders'
-import { ALL_PITCHER_SLOTS, MY_LEAGUE_BATTER_MODE, UNFILLED_SPECIAL_SWING_COUNT } from '@/features/play-game/model/gameFlow/types/constants'
+import { MY_LEAGUE_BATTER_MODE, UNFILLED_SPECIAL_SWING_COUNT } from '@/features/play-game/model/gameFlow/types/constants'
 import type { GameProgress } from '@/features/play-game/model/gameFlow/types/progress'
 
 /**
@@ -27,26 +24,9 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow/types/pro
  * 리그 상대가 아니다. 상대는 자기 팀을 뺀 기본 팀에서 고른다.
  */
 
-/** 리그 경기의 양 팀 투수 차례·칸별 레코드 스태미나 (`startGame` 마지막 인자) */
-export interface GamePitcherSetup {
-  /** 내 팀 투수 레코드 차례 — 0번이 선발 */
-  readonly ourOrder?: readonly number[]
-  readonly opponentOrder?: readonly number[]
-  /** 붙박이 표 칸(0~7)별 레코드 `+0x2c`. 빠진 칸은 10000 */
-  readonly ourStaminas?: readonly number[]
-  readonly opponentStaminas?: readonly number[]
-}
+import { gamePitchingOf, type GamePitcherSetup } from '@/features/play-game/model/gameFlow/setup/startGame/gamePitching'
 
-/** 날짜만큼 돈 4인 로테이션 차례 (0xb5ca8 을 g 번 — 0~3 칸은 `(g + i) % 4`, 4번 뒤는 그대로). 첫 시즌 정규시즌에서만 원본과 같다 */
-function rotatedRosterOrderOf(dayCounter: number): readonly number[] {
-  const first = rotationSlotOf(dayCounter)
-  return ALL_PITCHER_SLOTS.map((slot) => (slot < ROTATION_SIZE ? (first + slot) % ROTATION_SIZE : slot))
-}
-
-/** 칸별 스태미나 표 — 빠진 칸은 10000 */
-function staminaTableOf(given: readonly number[] | undefined): readonly number[] {
-  return ALL_PITCHER_SLOTS.map((slot) => given?.[slot] ?? FULL_STAMINA)
-}
+export type { GamePitcherSetup }
 
 /**
  * 상대는 원본 일정표(0xd89cb)가 정한다 — 무작위로 고르지 않는다.
@@ -99,77 +79,17 @@ export function startGame(
   /** 상대 팀 레코드 장비 니블 (`GameProgress.opponentEquipment`) — 안 넘기면 Xls 행 그대로 */
   opponentEquipment?: TeamRecordEquipment,
 ): GameProgress {
-  const ourAces = aces?.ours ?? NO_GAME_ACES
-  const opponentAces = aces?.opponent ?? NO_GAME_ACES
-  const ourPitcherOrder = withAcePitcherOrder(pitchers?.ourOrder ?? rotatedRosterOrderOf(dayCounter), ourAces.pitcher)
-  const opponentPitcherOrder = withAcePitcherOrder(pitchers?.opponentOrder ?? rotatedRosterOrderOf(dayCounter), opponentAces.pitcher)
-  // 마투수는 저장 레코드째(+0x2c = 10000) 8번 칸에 복사된다 (0xb521c)
-  const ourPitcherStaminas = withAcePitcherStamina(staminaTableOf(pitchers?.ourStaminas), ourAces.pitcher)
-  const opponentPitcherStaminas = withAcePitcherStamina(staminaTableOf(pitchers?.opponentStaminas), opponentAces.pitcher)
-  const ourStarter = ourPitcherOrder[0] ?? 0
-  const opponentStarter = opponentPitcherOrder[0] ?? 0
-  const initial: GameProgress = {
-    game: createGame(battingOrder - 1, playerSide),
+  const initial = initialProgressOf({
     ourTeamId,
+    battingOrder,
     opponentTeamId,
-    // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 마선수 대결은 이벤트 match 명령으로만 (누락 탐색 8차)
-    aceOpponent: null,
-    ...(aces === undefined ? {} : { aces }),
-    // 모드 4 는 경기 준비 0x1c46c 에서 **두 팀 모두** 0xb8c80 로 4인 로테이션을 한 칸 돌린다
-    // (P1 1-1 의 `else (모드 4): if g != 0: 0xb8c80(내 팀)` + 그 앞줄의 상대 팀). 무작위가 아니다.
-    opponentStartingPitcherIndex: opponentStarter,
-    ourStartingPitcherIndex: ourStarter,
-    ourPitcherOrder,
-    opponentPitcherOrder,
-    ourPitcherStaminas,
-    opponentPitcherStaminas,
-    pitcherLines: [],
-    // 경기 시작 0x3a55a 가 0 으로 세운다 — 그 뒤로는 이닝을 넘어 이어진다
-    opponentOrderIndex: 0,
-    // 선발이 막 올라온 마운드 — 레코드 +0x2c 그대로 선다 (부르는 쪽이 리그 표를 안 넘기면 10000)
-    ourMound: startingMoundOf(ourStarter, ourPitcherStaminas[ourStarter] ?? FULL_STAMINA),
-    opponentMound: startingMoundOf(opponentStarter, opponentPitcherStaminas[opponentStarter] ?? FULL_STAMINA),
-    // 팀 new 0xb891c 의 +0x28 = −1 · 공 new 의 +0x10 = 0
-    opponentCpuMagic: FRESH_HELD_CPU_MAGIC,
-    opponentInningRunsAllowed: 0,
-    // 마타자는 첫 벤치 칸(9번)에 앉는다 — 타석에 서는 길은 CPU 대타(0xac228)뿐이다 (0xb8870)
-    ourLineup: ourRecordLineup ?? withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), ourAces.batter),
-    opponentLineup: withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), opponentAces.batter),
-    pinchHitUsed: false,
-    myStats: EMPTY_SEASON_STATS,
-    popularityPoints: 0,
-    doublePlays: 0,
-    scoringPositionOuts: 0,
-    reputationCounts: EMPTY_REPUTATION_COUNTS,
-    recentAtBatCodes: [],
-    recordIds: [],
-    consecutiveHits: 0,
-    homeRunStreak: 0,
-    teammateLogs: {},
-    leaguePlateAppearances: [],
-    leagueStolenBases: [],
-    pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0, strikeouts: 0, strikeoutCombo: 0 },
-    log: [],
-    nextLogId: 1,
-    lastDefensePlay: null,
-    sceneResultCode: SCENE_RESULT_CODE_START,
-    pendingDefensePlay: null,
-    burst: createBurstSession(MY_LEAGUE_BATTER_MODE),
-    lastBurstResolution: null,
+    playerSide,
     runningModeManual,
-    // 경기 상태 초기화 0xb6814 — 셋 다 측 2(없음)
-    decisions: EMPTY_DECISION_STATE,
-    pendingBenchClearing: null,
-    halfInningBoard: null,
-    specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
-    stealingFrom: [],
-    ...(myRunAbility === undefined ? {} : { myRunAbility }),
-    ...(teamMorale === undefined ? {} : { teamMorale }),
-    // 상대 첫 투수 첫 공은 이 경기에서 상대 레코드가 아직 안 덮였으면 앞 값을 본다(`opponentRecordMorale` 이 없을 때만).
-    // 상대가 후공이면 1회초 첫 공, 선공이면 1회초 공격(자동진행)에서 한 번도 안 덮였을 때의 1회말 첫 공이다 (r104)
-    ...(opponentStaleMorale === undefined ? {} : { opponentStaleMorale }),
-    ...(opponentEquipment === undefined ? {} : { opponentEquipment }),
-  }
+    pitching: gamePitchingOf(pitchers, aces, dayCounter),
+    aces,
+    ourRecordLineup,
+    optional: { myRunAbility, teamMorale, opponentStaleMorale, opponentEquipment },
+  })
   // 상태 9 갱신 0x3f584 의 공통 꼬리 0x3fa0e — 시뮬 초기화 0xc0dac 의 rand(0, 2) 한 번 (모든 모드, 1회초 판 0x18 보다 앞)
   // 상태 7 장면 초기화 0x3e340 의 3ed76 → 0xb08e8 — 이 경기 장면의 패턴 덱을 섞는다(상태 9 의 시뮬 초기화보다 앞)
   openScenePatternDeck(random)
@@ -202,5 +122,99 @@ function withFirstInningBoard(progress: GameProgress, random: RandomPort): GameP
     fielderRecords: fielderRecordsAfterBoard(progress.fielderRecords, teamBatters(progress.opponentTeamId), (index) =>
       opponentFielderSeatOf(progress, index),
     ),
+  }
+}
+
+interface InitialProgressArgs {
+  readonly ourTeamId: number
+  readonly battingOrder: number
+  readonly opponentTeamId: number
+  readonly playerSide: PlayerSide
+  readonly runningModeManual: boolean
+  readonly pitching: ReturnType<typeof gamePitchingOf>
+  readonly aces: GameAceSetup | undefined
+  readonly ourRecordLineup: QuickLineup | undefined
+  readonly optional: OptionalSessionFields
+}
+
+interface OptionalSessionFields {
+  readonly myRunAbility: number | undefined
+  readonly teamMorale: number | undefined
+  readonly opponentStaleMorale: number | undefined
+  readonly opponentEquipment: TeamRecordEquipment | undefined
+}
+
+/** 부르는 쪽이 넘긴 칸만 싣는다 */
+function optionalSessionFieldsOf(optional: OptionalSessionFields): Partial<GameProgress> {
+  const { myRunAbility, teamMorale, opponentStaleMorale, opponentEquipment } = optional
+  return {
+    ...(myRunAbility === undefined ? {} : { myRunAbility }),
+    ...(teamMorale === undefined ? {} : { teamMorale }),
+    // 상대 첫 투수 첫 공은 이 경기에서 상대 레코드가 아직 안 덮였으면 앞 값을 본다(`opponentRecordMorale` 이 없을 때만).
+    // 상대가 후공이면 1회초 첫 공, 선공이면 1회초 공격(자동진행)에서 한 번도 안 덮였을 때의 1회말 첫 공이다 (r104)
+    ...(opponentStaleMorale === undefined ? {} : { opponentStaleMorale }),
+    ...(opponentEquipment === undefined ? {} : { opponentEquipment }),
+  }
+}
+
+/** 경기 시작 진행 — 굴림 없음 */
+function initialProgressOf(args: InitialProgressArgs): GameProgress {
+  const { ours, opponent } = args.pitching
+  const { aces } = args
+  return {
+    game: createGame(args.battingOrder - 1, args.playerSide),
+    ourTeamId: args.ourTeamId,
+    opponentTeamId: args.opponentTeamId,
+    // 정규 경기에 마선수가 무작위로 나오는 코드는 원본에 없다 — 마선수 대결은 이벤트 match 명령으로만 (누락 탐색 8차)
+    aceOpponent: null,
+    ...(aces === undefined ? {} : { aces }),
+    // 모드 4 는 경기 준비 0x1c46c 에서 **두 팀 모두** 0xb8c80 로 4인 로테이션을 한 칸 돌린다
+    // (P1 1-1 의 `else (모드 4): if g != 0: 0xb8c80(내 팀)` + 그 앞줄의 상대 팀). 무작위가 아니다.
+    opponentStartingPitcherIndex: opponent.starter,
+    ourStartingPitcherIndex: ours.starter,
+    ourPitcherOrder: ours.order,
+    opponentPitcherOrder: opponent.order,
+    ourPitcherStaminas: ours.staminas,
+    opponentPitcherStaminas: opponent.staminas,
+    pitcherLines: [],
+    // 경기 시작 0x3a55a 가 0 으로 세운다 — 그 뒤로는 이닝을 넘어 이어진다
+    opponentOrderIndex: 0,
+    ourMound: ours.mound,
+    opponentMound: opponent.mound,
+    // 팀 new 0xb891c 의 +0x28 = −1 · 공 new 의 +0x10 = 0
+    opponentCpuMagic: FRESH_HELD_CPU_MAGIC,
+    opponentInningRunsAllowed: 0,
+    // 마타자는 첫 벤치 칸(9번)에 앉는다 — 타석에 서는 길은 CPU 대타(0xac228)뿐이다 (0xb8870)
+    ourLineup: args.ourRecordLineup ?? withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), (aces?.ours ?? NO_GAME_ACES).batter),
+    opponentLineup: withAceBatterLineup(rosterLineupOf(BATTERS_PER_TEAM), (aces?.opponent ?? NO_GAME_ACES).batter),
+    pinchHitUsed: false,
+    myStats: EMPTY_SEASON_STATS,
+    popularityPoints: 0,
+    doublePlays: 0,
+    scoringPositionOuts: 0,
+    reputationCounts: EMPTY_REPUTATION_COUNTS,
+    recentAtBatCodes: [],
+    recordIds: [],
+    consecutiveHits: 0,
+    homeRunStreak: 0,
+    teammateLogs: {},
+    leaguePlateAppearances: [],
+    leagueStolenBases: [],
+    pitching: { hitsAllowed: 0, walksAllowed: 0, outsRecorded: 0, strikeouts: 0, strikeoutCombo: 0 },
+    log: [],
+    nextLogId: 1,
+    lastDefensePlay: null,
+    sceneResultCode: SCENE_RESULT_CODE_START,
+    pendingDefensePlay: null,
+    burst: createBurstSession(MY_LEAGUE_BATTER_MODE),
+    lastBurstResolution: null,
+    runningModeManual: args.runningModeManual,
+    // 경기 상태 초기화 0xb6814 — 셋 다 측 2(없음)
+    decisions: EMPTY_DECISION_STATE,
+    pendingBenchClearing: null,
+    halfInningBoard: null,
+    specialSwingRemaining: UNFILLED_SPECIAL_SWING_COUNT,
+    stealingFrom: [],
+    ...optionalSessionFieldsOf(args.optional),
   }
 }
