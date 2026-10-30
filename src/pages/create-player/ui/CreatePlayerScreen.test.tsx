@@ -259,3 +259,19 @@ describe('선수 등록 — 피부·팀이 그림 팔레트를 고른다 (C-1)',
     expect([0, 1, 2].map((skin) => batterLayerPaletteIndex(몸통, skin, 팀))).toEqual([5, 20, 35])
   })
 })
+
+describe('터치 기기 OK 상황 버튼 (웹 — 원본 등록 화면에 OK 그림 자리가 없다)', () => {
+  it('줄을 고르는 동안 OK 버튼을 띄우고, 확인 상자가 뜨면 거둔다 · 아니오로 닫으면 다시 띄운다', async () => {
+    const { touchKeyOffersNow } = await import('@/shared/lib/touchKeyOffer/touchKeyOffer')
+    const okOffered = () => touchKeyOffersNow().some((offer) => offer.key === 'Enter' && offer.label === 'OK')
+    화면()
+    expect(okOffered()).toBe(true)
+    이름넣기('홍길동')
+    expect(okOffered()).toBe(true)
+    등록()
+    expect(screen.getByText(/이대로 결정/)).toBeTruthy()
+    expect(okOffered()).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: '아니오' }))
+    expect(okOffered()).toBe(true)
+  })
+})
