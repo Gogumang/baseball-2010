@@ -31,7 +31,6 @@ export const maxLinesBaseline = [
   'src/pages/mission-play/ui/MissionHud.tsx',
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
-  'src/pages/national-cup/ui/NationalCupScreen.tsx',
   'src/pages/pitcher-league/lib/pitchTrainingWindow.ts',
   'src/pages/pitcher-league/ui/PitchChoicePopup.tsx',
   'src/pages/pitcher-league/ui/PitchWindowFigure.tsx',
