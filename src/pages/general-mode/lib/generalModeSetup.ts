@@ -224,11 +224,13 @@ export function teamGameOptionsOf(
     aceBatterId: setup.aceBatterId,
     // 고른 마투수는 투수 명단 8번 칸으로 들어간다 (0xb88c8). AI 팀 마투수(0x66968)의 입력이기도 하다
     acePitcherId: setup.acePitcherId,
-    ...(extra.settings === undefined ? {} : { settings: extra.settings }),
-    ...(extra.gaugeSettingOn === undefined ? {} : { gaugeSettingOn: extra.gaugeSettingOn }),
-    ...(extra.runningModeManual === undefined ? {} : { runningModeManual: extra.runningModeManual }),
-    ...(extra.throwModeManual === undefined ? {} : { throwModeManual: extra.throwModeManual }),
-    ...(extra.aceLevels === undefined ? {} : { aceLevels: extra.aceLevels }),
+    ...definedFieldsOf({
+      settings: extra.settings,
+      gaugeSettingOn: extra.gaugeSettingOn,
+      runningModeManual: extra.runningModeManual,
+      throwModeManual: extra.throwModeManual,
+      aceLevels: extra.aceLevels,
+    }),
     ...(extra.teamSetupRolls === undefined
       ? {}
       : {
@@ -237,4 +239,11 @@ export function teamGameOptionsOf(
         }),
     ...(extra.ourEntryOrder === undefined ? {} : { ourEntryOrder: extra.ourEntryOrder }),
   }
+}
+
+type DefinedFields<T> = { [K in keyof T]?: Exclude<T[K], undefined> }
+
+/** 넘긴(undefined 가 아닌) 칸만 — 차례 그대로 */
+function definedFieldsOf<T extends object>(fields: T): DefinedFields<T> {
+  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as DefinedFields<T>
 }

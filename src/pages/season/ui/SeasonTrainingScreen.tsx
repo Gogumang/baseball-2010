@@ -97,15 +97,7 @@ export function SeasonTrainingScreen({
           // 0xde 는 공통 틀에서 가운데 판을 빼고 0x848d0 을 덧그린다
           showsCenterStage={playingIndex === null}
           // 결과 팝업이 떠 있는 동안도 상태는 0xde — 끝난 연출 위에 팝업이 뜬다
-          overlay={
-            playingIndex === null ? undefined : (
-              <SeasonTrainingPopup
-                slot={playingIndex}
-                teamIndex={record.teamId}
-                onFinished={() => onTrain(TRAINING_SLOTS[playingIndex], playingIndex)}
-              />
-            )
-          }
+          overlay={trainingOverlayOf(playingIndex, record.teamId, onTrain)}
           commandBar={{
             slots: SEASON_SUB_COMMAND_SLOTS.트레이닝,
             cursor,
@@ -116,22 +108,41 @@ export function SeasonTrainingScreen({
         />
       </div>
 
-      {result !== null && (
-        <SeasonTrainingResultPopup result={result} onClose={() => onCloseResult?.()} firstLine={firstLine} onFirstLineChange={setFirstLine} />
-      )}
+      {resultPopupOf(result, onCloseResult, firstLine, setFirstLine)}
 
-      {popup !== null && (
-        <MessageBox
-          text={popup.text}
-          buttons={popup.asks ? ['예', '아니오'] : ['확인']}
-          onAnswer={(answer) => {
-            const trainIndex = popup.trainIndex
-            setPopup(null)
-            // 팝업 0x11 · 0x12 에 예 → 상태 0xde(0x7570) — 굴림은 연출이 끝난 뒤(0xc384 → 0xc074)
-            if (popup.asks && answer === 0 && trainIndex !== null) setPlayingIndex(trainIndex)
-          }}
-        />
-      )}
+      {popup !== null && confirmPopupOf(popup, setPopup, setPlayingIndex)}
     </RawScreen>
+  )
+}
+
+/** 상태 0xde — 확인한 칸의 훈련 팝업. 결과 팝업이 떠 있는 동안도 끝난 연출 위에 뜬다 */
+function trainingOverlayOf(playingIndex: number | null, teamIndex: number, onTrain: SeasonTrainingScreenProps['onTrain']) {
+  if (playingIndex === null) return undefined
+  return <SeasonTrainingPopup slot={playingIndex} teamIndex={teamIndex} onFinished={() => onTrain(TRAINING_SLOTS[playingIndex], playingIndex)} />
+}
+
+/** 결과 팝업 — 줄 넘김 자리는 부르는 쪽이 들 수 있다 */
+function resultPopupOf(
+  result: SeasonTrainingScreenProps['result'] | null,
+  onCloseResult: (() => void) | undefined,
+  firstLine: number,
+  setFirstLine: (line: number) => void,
+) {
+  if (result === null || result === undefined) return null
+  return <SeasonTrainingResultPopup result={result} onClose={() => onCloseResult?.()} firstLine={firstLine} onFirstLineChange={setFirstLine} />
+}
+
+/** 칸 확인 팝업 — 묻는 팝업(0x11 · 0x12)에 예면 상태 0xde(0x7570). 굴림은 연출이 끝난 뒤(0xc384 → 0xc074) */
+function confirmPopupOf(popup: TrainingPopup, setPopup: (popup: TrainingPopup | null) => void, setPlayingIndex: (index: number) => void) {
+  return (
+    <MessageBox
+      text={popup.text}
+      buttons={popup.asks ? ['예', '아니오'] : ['확인']}
+      onAnswer={(answer) => {
+        const trainIndex = popup.trainIndex
+        setPopup(null)
+        if (popup.asks && answer === 0 && trainIndex !== null) setPlayingIndex(trainIndex)
+      }}
+    />
   )
 }

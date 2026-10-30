@@ -51,14 +51,22 @@ export type EquipmentKeyResult =
 
 /** 웹 키 → 원본 키. '2'·'4'·'5'·'6'·'8' 은 원본 숫자 키 */
 export function equipmentKeyOf(key: string): EquipmentKey | null {
-  if (key === 'ArrowLeft' || key === '4') return '왼'
-  if (key === 'ArrowRight' || key === '6') return '오른'
-  if (key === 'ArrowUp' || key === '2') return '위'
-  if (key === 'ArrowDown' || key === '8') return '아래'
-  if (key === 'Enter' || key === '5') return '확인'
-  if (key === 'Escape') return '취소'
-  return null
+  return EQUIPMENT_KEYS.get(key) ?? null
 }
+
+const EQUIPMENT_KEYS: ReadonlyMap<string, EquipmentKey> = new Map<string, EquipmentKey>([
+  ['ArrowLeft', '왼'],
+  ['4', '왼'],
+  ['ArrowRight', '오른'],
+  ['6', '오른'],
+  ['ArrowUp', '위'],
+  ['2', '위'],
+  ['ArrowDown', '아래'],
+  ['8', '아래'],
+  ['Enter', '확인'],
+  ['5', '확인'],
+  ['Escape', '취소'],
+])
 
 const wrap = (value: number, count: number) => (value + count) % count
 
@@ -66,22 +74,36 @@ const wrap = (value: number, count: number) => (value + count) % count
 function movedRow(state: EquipmentWindowState, step: number, rowCount: number): EquipmentWindowState {
   if (rowCount === 0) return state
   const cursor = wrap(state.cursor + step, rowCount)
-  const top = cursor < state.top ? cursor : cursor >= state.top + EQUIPMENT_VISIBLE_ROWS ? cursor - EQUIPMENT_VISIBLE_ROWS + 1 : state.top
-  return { ...state, cursor, top }
+  return { ...state, cursor, top: topShowing(cursor, state.top) }
+}
+
+/** 커서 줄이 보이게 맞춘 윗줄 */
+function topShowing(cursor: number, top: number): number {
+  if (cursor < top) return cursor
+  if (cursor >= top + EQUIPMENT_VISIBLE_ROWS) return cursor - EQUIPMENT_VISIBLE_ROWS + 1
+  return top
 }
 
 export function equipmentWindowKeyOf(state: EquipmentWindowState, key: EquipmentKey, rowCount: number): EquipmentKeyResult {
-  if (state.focus === '탭') {
-    if (key === '취소') return { kind: '나가기' }
-    if (key === '아래' || key === '확인') {
-      return rowCount > 0 ? { kind: '상태', state: { ...state, focus: '줄', cursor: 0, top: 0 } } : { kind: '상태', state }
-    }
-    if (key === '왼' || key === '오른') {
-      const part = wrap(state.part + (key === '왼' ? -1 : 1), EQUIPMENT_PART_COUNT)
-      return { kind: '상태', state: { ...state, part, cursor: 0, top: 0 } }
-    }
-    return { kind: '상태', state }
+  if (state.focus === '탭') return tabFocusKeyOf(state, key, rowCount)
+  return rowFocusKeyOf(state, key, rowCount)
+}
+
+/** 탭 초점 — 취소는 나가기, ↓ · 확인은 줄로(줄이 있으면), ← → 는 부위 탭 */
+function tabFocusKeyOf(state: EquipmentWindowState, key: EquipmentKey, rowCount: number): EquipmentKeyResult {
+  if (key === '취소') return { kind: '나가기' }
+  if (key === '아래' || key === '확인') {
+    return rowCount > 0 ? { kind: '상태', state: { ...state, focus: '줄', cursor: 0, top: 0 } } : { kind: '상태', state }
   }
+  if (key === '왼' || key === '오른') {
+    const part = wrap(state.part + (key === '왼' ? -1 : 1), EQUIPMENT_PART_COUNT)
+    return { kind: '상태', state: { ...state, part, cursor: 0, top: 0 } }
+  }
+  return { kind: '상태', state }
+}
+
+/** 줄 초점 — 취소는 탭으로, 확인은 고르기, ↑ ↓ 는 줄 옮기기 */
+function rowFocusKeyOf(state: EquipmentWindowState, key: EquipmentKey, rowCount: number): EquipmentKeyResult {
   if (key === '취소') return { kind: '상태', state: { ...state, focus: '탭', cursor: 0, top: 0 } }
   if (key === '확인') return { kind: '고르기', cursor: state.cursor }
   if (key === '위' || key === '아래') return { kind: '상태', state: movedRow(state, key === '위' ? -1 : 1, rowCount) }

@@ -130,18 +130,11 @@ export function PlayerRecruitScreen({
     isEnabled: step === null && notice === null && renderCandidates === undefined,
   })
 
-  const noticeBox =
-    notice === null ? null : (
-      <MessageBox
-        text={notice}
-        buttons={['확인']}
-        onAnswer={() => {
-          setNotice(null)
-          // 0x6fe0 — 팝업 0x19 가 닫히면 0xce
-          if (isRecruited) onDone()
-        }}
-      />
-    )
+  const noticeBox = recruitNoticeOf(notice, () => {
+    setNotice(null)
+    // 0x6fe0 — 팝업 0x19 가 닫히면 0xce
+    if (isRecruited) onDone()
+  })
 
   // 2단계 — 공용 선수 고르기 0xdf 목적 3: 탭은 후보 종류로 고정(0x5980), '*' 막힘 · 바닥 7 (0x6fe0 · 0xb010)
   if (chosen !== null) {
@@ -149,10 +142,10 @@ export function PlayerRecruitScreen({
       <SeasonPlayerPickScreen
         teamId={teamId}
         roster={recordRoster}
-        initialTab={chosen.isPitcher ? ENTRY_TAB.투수 : ENTRY_TAB.타자}
+        initialTab={slotTabOf(chosen.isPitcher)}
         gamePoint={gamePoint}
         isRecruitSlot
-        {...(cells === undefined ? {} : { cells })}
+        {...cellsPropsOf(cells)}
         overlay={noticeBox}
         onPick={(_tab, index) => selectSlot(index)}
         // 0xc3e8 취소 → 목적 3 은 0xe2
@@ -183,3 +176,13 @@ export function PlayerRecruitScreen({
     </RawScreen>
   )
 }
+
+/** 안내 팝업 — [179] 자리 고르기 · [181] 이미 영입 · [180] 영입 끝 */
+function recruitNoticeOf(notice: string | null, onClose: () => void) {
+  if (notice === null) return null
+  return <MessageBox text={notice} buttons={['확인']} onAnswer={onClose} />
+}
+
+/** 2단계 탭 — 후보 종류로 고정 (0x5980) */
+const slotTabOf = (isPitcher: boolean) => (isPitcher ? ENTRY_TAB.투수 : ENTRY_TAB.타자)
+const cellsPropsOf = (cells: PlayerRecruitScreenProps['cells']) => (cells === undefined ? {} : { cells })

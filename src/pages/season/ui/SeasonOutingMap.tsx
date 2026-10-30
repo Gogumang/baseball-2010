@@ -71,55 +71,69 @@ export function SeasonOutingMap({ selected, hidesNames = false, hour }: SeasonOu
               : [{ kind: 'image', src: mapLabelSrc(layout.labels[index].frame), x: layout.labels[index].left, y: layout.labels[index].top }],
         })}
       />
-      {selectedPlace !== undefined && (
-        <>
-          {FOUR_WAYS.map(([dx, dy]) => (
-            <SolidStamp
-              key={`${dx},${dy}`}
-              folder={MAP_FRAMES}
-              frame={selectedPlace.frame}
-              origins={origins}
-              x={layout.mapX + dx}
-              y={layout.mapY + dy}
-              color="#FFFFFF"
-            />
-          ))}
-          <FrameSprite folder={MAP_FRAMES} frame={selectedPlace.frame} origins={origins} x={layout.mapX} y={layout.mapY} />
-        </>
-      )}
-      {selectedPlace !== undefined && selectedLabel !== undefined && (
-        // 이름 그림(map_label_*)은 1px 테두리를 둘러 글자보다 1px 왼쪽 위에서 시작한다 — 글자 자리는 +1
-        <>
-          {EIGHT_WAYS.map(([dx, dy]) => (
-            <SolidStamp
-              key={`label${dx},${dy}`}
-              folder={PLACE_LABEL_FRAMES}
-              frame={selectedPlace.labelFrame}
-              origins={labelOrigins}
-              x={selectedLabel.left + 1 + dx}
-              y={selectedLabel.top + 1 + dy}
-              color="#FFFF00"
-            />
-          ))}
-          <SolidStamp
-            folder={PLACE_LABEL_FRAMES}
-            frame={selectedPlace.labelFrame}
-            origins={labelOrigins}
-            x={selectedLabel.left + 1}
-            y={selectedLabel.top + 1}
-            color="#000000"
-          />
-        </>
-      )}
-      {selectedPlace !== undefined && cursorStep !== null && (
-        <FrameSprite
-          folder={MAP_FRAMES}
-          frame={cursorStep.frame}
-          origins={origins}
-          x={layout.mapX + selectedPlace.cursorBox.x + Math.trunc(selectedPlace.cursorBox.width / 2) + cursorStep.dx}
-          y={layout.mapY + selectedPlace.cursorBox.y + cursorStep.dy}
-        />
-      )}
+      {placeHighlightOf(selectedPlace, origins, layout)}
+      {labelHighlightOf(selectedPlace, selectedLabel, labelOrigins)}
+      {placeCursorOf(selectedPlace, cursorStep, origins, layout)}
     </div>
+  )
+}
+
+type Place = (typeof OUTING_PLACES)[number]
+type Origins = ReturnType<typeof useFrameOrigins>
+type MapLayout = ReturnType<typeof outingMapUnderlayLayoutOf>
+
+/** 고른 건물 — 네 방향 흰 테두리 뒤 그 건물 */
+function placeHighlightOf(place: Place | undefined, origins: Origins, layout: MapLayout) {
+  if (place === undefined) return null
+  return (
+    <>
+      {FOUR_WAYS.map(([dx, dy]) => (
+        <SolidStamp
+          key={`${dx},${dy}`}
+          folder={MAP_FRAMES}
+          frame={place.frame}
+          origins={origins}
+          x={layout.mapX + dx}
+          y={layout.mapY + dy}
+          color="#FFFFFF"
+        />
+      ))}
+      <FrameSprite folder={MAP_FRAMES} frame={place.frame} origins={origins} x={layout.mapX} y={layout.mapY} />
+    </>
+  )
+}
+
+/** 고른 건물 이름 — 이름 그림(map_label_*)은 1px 테두리를 둘러 글자보다 1px 왼쪽 위에서 시작한다(글자 자리는 +1). 여덟 방향 노랑 뒤 검정 */
+function labelHighlightOf(place: Place | undefined, label: MapLayout['labels'][number] | undefined, labelOrigins: Origins) {
+  if (place === undefined || label === undefined) return null
+  return (
+    <>
+      {EIGHT_WAYS.map(([dx, dy]) => (
+        <SolidStamp
+          key={`label${dx},${dy}`}
+          folder={PLACE_LABEL_FRAMES}
+          frame={place.labelFrame}
+          origins={labelOrigins}
+          x={label.left + 1 + dx}
+          y={label.top + 1 + dy}
+          color="#FFFF00"
+        />
+      ))}
+      <SolidStamp folder={PLACE_LABEL_FRAMES} frame={place.labelFrame} origins={labelOrigins} x={label.left + 1} y={label.top + 1} color="#000000" />
+    </>
+  )
+}
+
+/** 고른 건물 위 커서 애니 */
+function placeCursorOf(place: Place | undefined, cursorStep: ReturnType<typeof animationStepAt>, origins: Origins, layout: MapLayout) {
+  if (place === undefined || cursorStep === null) return null
+  return (
+    <FrameSprite
+      folder={MAP_FRAMES}
+      frame={cursorStep.frame}
+      origins={origins}
+      x={layout.mapX + place.cursorBox.x + Math.trunc(place.cursorBox.width / 2) + cursorStep.dx}
+      y={layout.mapY + place.cursorBox.y + cursorStep.dy}
+    />
   )
 }

@@ -45,6 +45,22 @@ interface MissionHudProps {
   readonly stripsOnStage?: boolean
 }
 
+/** 목표 줄 그리기 — 줄이 없으면 아무것도 */
+function goalDrawsOf(frame: ReturnType<typeof goalTickerFrameAt>, lineCount: number) {
+  return lineCount === 0 ? [] : goalLineDrawsOf(frame)
+}
+
+/** 어둡게(15/32) 그릴 때의 style */
+function dimmedPropsOf(isDimmed: boolean) {
+  return isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {}
+}
+
+/** 시간 제한이 남았으면 왼쪽 시계 */
+function hudTimerOf(remainingSeconds: number | null, stripsOnStage: boolean) {
+  if (remainingSeconds === null || !(remainingSeconds > 0)) return null
+  return <HudTimer seconds={Math.ceil(remainingSeconds)} stripsOnStage={stripsOnStage} />
+}
+
 /**
  * **타자 미션 HUD (0x36714)** — 오른쪽 위 trainning.pzx 판에 목표 글 한 줄과 "지금/목표"(노랑), 그 아래 타석 · 스윙 한도 띠,
  * 시간 제한이면 왼쪽에 시계. 목표 글은 줄이 둘 이상이면 21 그림 머물고 17 그림 동안 왼쪽으로 넘긴다(`goalTicker`).
@@ -77,10 +93,10 @@ export function MissionHud({
 
   const frame = goalTickerFrameAt(tick, lineCount)
   const isSliding = frame.nextIndex !== null
-  const draws = lineCount === 0 ? [] : goalLineDrawsOf(frame)
+  const draws = goalDrawsOf(frame, lineCount)
 
   return (
-    <div className={styles.hud} data-testid="미션-HUD" {...(isDimmed ? { style: { filter: `brightness(${15 / 32})` } } : {})}>
+    <div className={styles.hud} data-testid="미션-HUD" {...dimmedPropsOf(isDimmed)}>
       {MISSION_HUD_BASE.slice(0, 2).map((sprite, index) => (
         <Sprite key={index} sprite={sprite} />
       ))}
@@ -119,7 +135,7 @@ export function MissionHud({
           <Glyphs glyphs={strip.glyphs} testId="미션-한도-수" />
         </div>
       ))}
-      {remainingSeconds !== null && remainingSeconds > 0 && <HudTimer seconds={Math.ceil(remainingSeconds)} stripsOnStage={stripsOnStage} />}
+      {hudTimerOf(remainingSeconds, stripsOnStage)}
     </div>
   )
 }

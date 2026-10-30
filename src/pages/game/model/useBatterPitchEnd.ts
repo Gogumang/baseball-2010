@@ -11,6 +11,7 @@ type Pending =
   | { readonly kind: 'play' }
   /** 대기가 다 찼다 — 다음 그림에서 부른다 */
   | { readonly kind: 'due' }
+type ResolvedPending = Extract<Pending, { readonly kind: 'resolved' }>
 
 export interface BatterPitchEnd {
   /** 칸 채우기 0x4e600 이 불린 횟수 — `useRecordAlert` 의 `pitchEnd.serial` */
@@ -92,30 +93,28 @@ function createPitchEndCounter(initialPlayShown: boolean) {
   let pending: Pending | null = null
   let wasPlayShown = initialPlayShown
   let serial = 0
+  /** 공 하나가 끝났다(칸 채우기 0x4e600) — 다음 기다림으로 */
+  const endPitch = (next: Pending | null) => {
+    serial += 1
+    pending = next
+  }
+  /** 0x17 끝 0x52a60 — 판을 기다리던 공이면 그 공도 끝 */
+  const endPlay = () => endPitch(pending?.kind === 'play' ? null : pending)
+  /** 판정된 공의 갈래 — 판이 떴으면 0x17 끝을, 맞은 공은 지금 끝, 맞히지 못한 공은 0x12 대기 */
+  const settleResolved = (resolved: ResolvedPending, isPlayShown: boolean) => {
+    if (isPlayShown) pending = { kind: 'play' }
+    else if (resolved.isHit) endPitch(null)
+    else pending = { kind: 'wait', waitTicks: resolved.waitTicks, elapsed: 0 }
+  }
   return {
     serial: () => serial,
     drawFor(isPlayShown: boolean): Pending | null {
       const wasShown = wasPlayShown
       wasPlayShown = isPlayShown
-      if (wasShown && !isPlayShown) {
-        // 0x17 끝 0x52a60
-        serial += 1
-        if (pending?.kind === 'play') pending = null
-      }
-      if (pending?.kind === 'resolved') {
-        if (isPlayShown) {
-          pending = { kind: 'play' }
-        } else if (pending.isHit) {
-          serial += 1
-          pending = null
-        } else {
-          pending = { kind: 'wait', waitTicks: pending.waitTicks, elapsed: 0 }
-        }
-      } else if (pending?.kind === 'due') {
-        // 0x12 끝 0x4e796
-        serial += 1
-        pending = null
-      }
+      if (wasShown && !isPlayShown) endPlay()
+      if (pending?.kind === 'resolved') settleResolved(pending, isPlayShown)
+      // 0x12 끝 0x4e796
+      else if (pending?.kind === 'due') endPitch(null)
       return pending
     },
     /** 장면 틱 하나 — 대기가 다 찼으면 참(다음 그림에서 부른다) */

@@ -199,17 +199,23 @@ export interface EventBackdropDraw {
 /** 0x8b5ac 의 0x8b62e~0x8b714 — 한 번 그릴 때의 효과 칠 */
 export function drawEventBackdrop(state: EventBackdropState, phase: EffectorPhase): EventBackdropDraw {
   const { effectId } = state
-  if (phase === '도는중') {
-    // 8b6f0 — 흔들기(2 · 3)만 앞서 칠한 색을 다시 칠한다. 어두워짐 · 밝아짐이 도는 동안은 칠하지 않는다
-    const isEffectFill = (effectId === 2 || effectId === 3) && state.fill !== null
-    return { state, fill: isEffectFill ? state.fill : null, isEffectFill, resetsDialogue: false }
-  }
-  let fill = state.fill
-  if (phase === '끝') {
-    if (effectId === 4 || effectId === 5) fill = null
-    else if (effectId === 6) fill = '검정'
-    else if (effectId === 7) fill = '흰색'
-  }
-  const resetsDialogue = phase === '끝' && (effectId === 6 || effectId === 7)
+  if (phase === '도는중') return runningBackdropDraw(state)
+  const isEnd = phase === '끝'
+  const fill = isEnd ? fillAfterEffectOf(effectId, state.fill) : state.fill
+  const resetsDialogue = isEnd && (effectId === 6 || effectId === 7)
   return { state: { effectId, fill }, fill, isEffectFill: fill !== null || resetsDialogue, resetsDialogue }
+}
+
+/** 8b6f0 — 흔들기(2 · 3)만 앞서 칠한 색을 다시 칠한다. 어두워짐 · 밝아짐이 도는 동안은 칠하지 않는다 */
+function runningBackdropDraw(state: EventBackdropState): EventBackdropDraw {
+  const isEffectFill = (state.effectId === 2 || state.effectId === 3) && state.fill !== null
+  return { state, fill: isEffectFill ? state.fill : null, isEffectFill, resetsDialogue: false }
+}
+
+/** 효과가 끝난 그리기의 칠 — 4 · 5 는 지우고, 6 은 검정 · 7 은 흰색으로 남긴다. 그 밖은 앞 칠 그대로 */
+function fillAfterEffectOf(effectId: EventBackdropState['effectId'], fill: EventBackdropFill): EventBackdropFill {
+  if (effectId === 4 || effectId === 5) return null
+  if (effectId === 6) return '검정'
+  if (effectId === 7) return '흰색'
+  return fill
 }

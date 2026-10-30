@@ -90,6 +90,16 @@ export interface PitcherGameSettings {
   readonly teamMorale?: number
 }
 
+/**
+ * 상대 리그 팀 레코드 칸 — 대회 상대국은 리그 레코드가 아니라 없다(상대국 칸은 나리 사기 그 자체).
+ * - 남은 사기: 이 경기에서 그 칸이 아직 안 덮였을 때 상대 첫 공만 본다 (`opponentStaleMorale`, r101 · r104)
+ * - 장비 니블: 상대 팀 객체 0xb8680 → 0x1f989(모드 3 → 0x1f940)가 읽는 저장 레코드 값 — 나리 새 시즌 CPU 장비 굴림 0x665e8 이 쓴 값
+ */
+function leagueOpponentRecordOf(career: PitcherCareer, opponentTeamId: number) {
+  if (career.nationalCup !== undefined) return {}
+  return { opponentStaleMorale: nariTeamRecordMoraleOf(career, opponentTeamId), ...opponentEquipmentOf(career, opponentTeamId) }
+}
+
 export function pitcherGameOptionsOf(career: PitcherCareer, settings: PitcherGameSettings = {}): PitcherGameOptions {
   // 0xb570c 의 사기 감소는 b5768 이 쓴 0xa3a24 값을 읽는다 — 대회 중이면 상대국 칸 +2 (원본 버그, `nariMorale`)
   const morale = nariMoraleOf(career)
@@ -150,12 +160,7 @@ export function pitcherGameOptionsOf(career: PitcherCareer, settings: PitcherGam
     // 두 팀 레코드 +2 — 셋업 0x39fdc(3a332) · 0xb570c(b5768)가 두 팀 모두 0xa3a24 로 덮는다. 0xa3a24 는 `0x1f988(저장, R[1])` + 2 라
     // 대회가 아니면 커리어 사기, 대회 중이면 상대국 칸 +2 다 (원본 버그 — `nariMoraleOf`)
     teamMorale: settings.teamMorale ?? morale,
-    // 상대 리그 팀 레코드에 남은 값 — 이 경기에서 그 칸이 아직 안 덮였을 때 상대 첫 공만 본다 (`opponentStaleMorale`, r101 · r104).
-    // 대회 상대국 칸은 나리 사기 그 자체라 없다
-    ...(career.nationalCup !== undefined ? {} : { opponentStaleMorale: nariTeamRecordMoraleOf(career, opponentTeamId) }),
-    // 상대 팀 객체 0xb8680 → 0x1f989(모드 3 → 0x1f940)가 읽는 저장 레코드의 장비 니블 — 나리 새 시즌 CPU 장비 굴림 0x665e8 이 쓴 값.
-    // 대회 상대국은 리그 레코드가 아니라 없다
-    ...(career.nationalCup !== undefined ? {} : opponentEquipmentOf(career, opponentTeamId)),
+    ...leagueOpponentRecordOf(career, opponentTeamId),
     reputation: career.reputation,
     // 원본 기본값은 꺼짐이다 — 환경설정에서 켠 값을 그대로 받아 넘긴다
     gaugeSettingOn: settings.gaugeSettingOn ?? false,

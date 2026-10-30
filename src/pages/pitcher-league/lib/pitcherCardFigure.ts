@@ -32,25 +32,34 @@ const animationOf = (form: number, state: number): FigureAnimation => ({ state, 
 /** 던지기를 시작하는 틱인가 — 30 이거나 0 이 아닌 140 의 배수 (0x14374~0x14386) */
 const startsPitch = (tick: number) => tick === 30 || (tick !== 0 && tick % 0x8c === 0)
 
+/** 늘린 뒤의 [장면+0x108] 이 이 값을 넘으면 서 있기로 (늘리기 전 > 4) */
+const HOLD_LIMIT = 5
+
+/** 던지기 시작마다 애니와 [장면+0x108] 이 새로 서므로 마지막 시작 틱부터만 굴려도 같다 */
+function lastPitchStartAt(tick: number): number {
+  if (tick < 30) return 0
+  if (tick < 0x8c) return 30
+  return Math.floor(tick / 0x8c) * 0x8c
+}
+
+/** 던지기 애니(상태 1)가 단계 0xb 를 넘었다 — [장면+0x108] 을 센다 */
+const isPastThrowFinish = (animation: FigureAnimation) => animation.state === 1 && animation.step > 0xb
+
 /** 상태 틱 `tick`(진입 첫 틀 0) 의 틀이 끝난 뒤 자세 [장면+0x104] */
 export function pitcherCardPoseAt(form: number, tick: number): number {
-  // 던지기 시작마다 애니와 [장면+0x108] 이 새로 서므로 마지막 시작 틱부터만 굴려도 같다
-  const lastStart = tick < 30 ? 0 : tick < 0x8c ? 30 : Math.floor(tick / 0x8c) * 0x8c
   let animation = animationOf(form, 0)
   let hold = 0
   let pose = 0
-  for (let t = lastStart; t <= tick; t += 1) {
+  for (let t = lastPitchStartAt(tick); t <= tick; t += 1) {
     if (startsPitch(t)) {
       animation = animationOf(form, 1)
       hold = 0
     }
-    if (animation.state === 1 && animation.step > 0xb) {
-      const before = hold
-      hold += 1
-      if (before > 4) {
-        animation = animationOf(form, 0)
-        hold = 0
-      }
+    if (isPastThrowFinish(animation)) hold += 1
+    // 늘리기 전 값이 4 를 넘었다 = 늘린 뒤 5 를 넘었다 — [장면+0x108] 은 이 갈래에서만 오르므로 위 갈래의 틀에서만 선다
+    if (hold > HOLD_LIMIT) {
+      animation = animationOf(form, 0)
+      hold = 0
     }
     animation = advancePitcherAnimation(animation)
     pose = pitcherPoseOf(animation)

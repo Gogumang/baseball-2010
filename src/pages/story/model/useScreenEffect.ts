@@ -6,8 +6,9 @@ import type { ScreenEffectFrame } from '@/entities/story/model/screenEffect'
 import type { EventStep } from '@/entities/story/model/eventScript'
 import type { EventCommand } from '@/shared/config/original/eventTypes'
 import { vibrate } from '@/entities/defense-controls/model/vibration'
-import { effectTimelineOf, effectorEndingFrameOf, effectorPhaseAt } from '@/pages/story/lib/eventBackdrop'
-import type { EffectorPhase, EffectTimelineEntry } from '@/pages/story/lib/eventBackdrop'
+import { effectTimelineOf, effectorPhaseAt } from '@/pages/story/lib/eventBackdrop'
+import type { EffectorPhase } from '@/pages/story/lib/eventBackdrop'
+import { activeEntryAt, effectEndAt, effectStillRuns, withLastEffectId } from '@/pages/story/model/screenEffectEntries'
 
 export interface ScreenEffectView {
   /** 효과기가 이 프레임에 칠하는 덮개 · 흔들기 오프셋. 없으면 null */
@@ -28,15 +29,6 @@ export function stepKeyOf(step: EventStep): string {
 /** 이 걸음이 효과(id 4~7)를 기다리느라 멈출 명령을 아직 돌리지 않는가 — 열쇠가 풀린 걸음과 다르면 기다린다 */
 export function isStepHeld(step: EventStep, releasedKey: string | null): boolean {
   return effectTimelineOf(step.passed).releaseFrame > 0 && releasedKey !== stepKeyOf(step)
-}
-
-/** `frame` 틀에 효과기를 쥔 마지막 명령(종류가 있는 것) */
-function activeEntryAt(entries: readonly EffectTimelineEntry[], frame: number): number {
-  let active = -1
-  entries.forEach((entry, index) => {
-    if (entry.kind !== null && entry.start <= frame) active = index
-  })
-  return active
 }
 
 /**
@@ -95,7 +87,7 @@ export function useScreenEffect(
       const timers = entries.map((entry) =>
         setAppTickTimeout(() => {
           vibrateUpTo(entry.start)
-          setView((previous) => ({ ...previous, lastEffectId: entry.id }))
+          setView(withLastEffectId(entry.id))
         }, entry.start),
       )
       const release = setAppTickTimeout(() => releaseStep(key), releaseFrame)
@@ -123,46 +115,39 @@ export function useScreenEffect(
       vibrateUpTo(frameIndex)
       // 지나간 효과의 '끝' — 뒤 효과에 덮이기 전에 끝 그리기에 닿은 것만 (막는 효과는 늘 닿는다)
       entries.forEach((entry, index) => {
-        if (entry.kind === null || ended[index]) return
-        const endFrame = entry.start + effectorEndingFrameOf(entry.kind) + 1
-        const overriddenAt = entries.slice(index + 1).find((later) => later.kind !== null)?.start ?? Infinity
-        if (overriddenAt <= endFrame) {
-          if (overriddenAt <= frameIndex) ended[index] = true
-          return
-        }
-        if (frameIndex < endFrame) return
+        if (ended[index]) return
+        const ending = effectEndAt(entries, index, frameIndex)
+        if (ending === null) return
         ended[index] = true
-        end(entry.id, step.passed[entry.commandIndex + 1] ?? step.command)
+        if (ending === '끝') end(entry.id, step.passed[entry.commandIndex + 1] ?? step.command)
       })
       const active = activeEntryAt(entries, frameIndex)
       const lastEffectId = lastIdAt(frameIndex)
-      if (active === -1) {
-        // 아직 효과기를 건드리지 않았다 — 지나온 명령 5(효과기 없음 · 진동만)의 id 만 [mgr+0x2c4] 에 남긴다
-        if (lastEffectId !== null) setView((previous) => ({ ...previous, lastEffectId }))
-      } else {
-        if (!hasTakenOver) {
-          // 새로 걸면 앞 효과를 덮는다 (0xbdae8)
-          hasTakenOver = true
-          cancelAnimationFrame(handleRef.current)
-        }
-        const entry = entries[active]
-        const local = frameIndex - entry.start
-        const phase = entry.kind === null ? '없음' : effectorPhaseAt(entry.kind, local)
-        setView({
-          frame: entry.kind === null ? null : screenEffectFrameAt(entry.kind, entry.color, local),
-          phase,
-          serial,
-          lastEffectId,
-        })
-      }
+      if (active !== -1) showActive(active, frameIndex, lastEffectId)
+      // 아직 효과기를 건드리지 않았다 — 지나온 명령 5(효과기 없음 · 진동만)의 id 만 [mgr+0x2c4] 에 남긴다
+      else if (lastEffectId !== null) setView(withLastEffectId(lastEffectId))
       if (!isReleased && frameIndex >= releaseFrame) {
         isReleased = true
         releaseStep(key)
       }
       if (!isReleased) return true
-      if (active === -1) return false
-      const phase = entries[active].kind === null ? '없음' : effectorPhaseAt(entries[active].kind, frameIndex - entries[active].start)
-      return phase !== '없음' || activeEntryAt(entries, Infinity) !== active
+      return effectStillRuns(entries, active, frameIndex)
+    }
+    /** 효과기를 쥔 명령의 이 틀 그림 — 처음 쥐면 앞 효과를 덮는다 (0xbdae8) */
+    const showActive = (active: number, frameIndex: number, lastEffectId: number | null) => {
+      if (!hasTakenOver) {
+        hasTakenOver = true
+        cancelAnimationFrame(handleRef.current)
+      }
+      const entry = entries[active]
+      const local = frameIndex - entry.start
+      const phase = entry.kind === null ? '없음' : effectorPhaseAt(entry.kind, local)
+      setView({
+        frame: entry.kind === null ? null : screenEffectFrameAt(entry.kind, entry.color, local),
+        phase,
+        serial,
+        lastEffectId,
+      })
     }
     const tick = (now: number) => {
       const frameIndex = Math.max(0, appTickOf(now) - startTick)

@@ -25,6 +25,22 @@ const imageSrc = (folder: string, image: number) => `${folder}/${String(image).p
 /** 마선수 대결 끝 — CLR(Escape) */
 const ACE_DUEL_END_OFFER: TouchKeyOffer = { key: 'Escape', label: '대결 끝' }
 
+type AceFlags = { readonly flag11f: boolean; readonly flag176: boolean }
+
+/** 마선수 대결 칸 g[0x11f] · g[0x176] — 대결이 아니면 둘 다 거짓 */
+function aceFlagsOf(aceMatch: MissionResultBoardProps['aceMatch']): AceFlags {
+  return { flag11f: aceMatch?.flag11f ?? false, flag176: aceMatch?.flag176 ?? false }
+}
+
+/**
+ * 마선수 대결에서 깃발이 하나만 서면 OK(판 전체 칸 — 다시)와 CLR(대결 끝)이 갈린다. 판에 CLR 글자 자리가 없어 '대결 끝' 상황 버튼으로
+ * 낸다(r186 — 늘 있던 뒤로 버튼을 걷었다). Escape 키 사건이라 판의 키 듣는 곳과 같은 길이다
+ */
+function aceDuelEndOfferOf(flags: AceFlags): TouchKeyOffer | null {
+  const isAce = flags.flag11f || flags.flag176
+  return isAce && !(flags.flag11f && flags.flag176) ? ACE_DUEL_END_OFFER : null
+}
+
 /**
  * **미션 결과 판** (경기 상태 0x19 그리기 0x4a384 의 모드 5·6 갈래 · 키 0x407f0) — 좌표·흐름은 `lib/missionResultBoard` 머리말.
  * 앞부분(실패 덮개 · 띠 · game_ui 프레임 8 · YOU WIN/LOSE)은 팀경기 정산 판과 같은 그림이라 그 자리 값을 쓴다.
@@ -36,12 +52,11 @@ export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldG
   const resultOrigins = useFrameOrigins(RESULT_FRAMES)
   const textOrigins = useFrameOrigins(IMG_TEXT_FRAMES)
   const popupOrigins = useFrameOrigins(POPUP_FRAMES)
-  const flags = { flag11f: aceMatch?.flag11f ?? false, flag176: aceMatch?.flag176 ?? false }
+  const flags = aceFlagsOf(aceMatch)
   const isAce = flags.flag11f || flags.flag176
-  // 마선수 대결에서 깃발이 하나만 서면 OK(판 전체 칸 — 다시)와 CLR(대결 끝)이 갈린다. 판에 CLR 글자 자리가 없어 '대결 끝' 상황 버튼으로
-  // 낸다(r186 — 늘 있던 뒤로 버튼을 걷었다). Escape 키 사건이라 아래 듣는 곳과 같은 길이다
-  useTouchKeyOffer(isAce && !(flags.flag11f && flags.flag176) ? ACE_DUEL_END_OFFER : null)
+  useTouchKeyOffer(aceDuelEndOfferOf(flags))
   const [answer, act] = useMissionResultAnswer(flags, onExit)
+  const resultFrame = isSuccess ? SETTLEMENT_RESULT_SPRITE.winFrame : SETTLEMENT_RESULT_SPRITE.loseFrame
 
   return (
     <div className={styles.layer} data-testid="미션-결과-판">
@@ -67,10 +82,10 @@ export function MissionResultBoard({ isSuccess, aceMatch, earnedGamePoint, heldG
         x={SETTLEMENT_TITLE_BAR.centerX - (SETTLEMENT_TITLE_BAR.width >> 1)}
         y={SETTLEMENT_TITLE_BAR.y}
       />
-      <span data-testid="미션-결과-그림" data-frame={isSuccess ? SETTLEMENT_RESULT_SPRITE.winFrame : SETTLEMENT_RESULT_SPRITE.loseFrame}>
+      <span data-testid="미션-결과-그림" data-frame={resultFrame}>
         <FrameSprite
           folder={RESULT_FRAMES}
-          frame={isSuccess ? SETTLEMENT_RESULT_SPRITE.winFrame : SETTLEMENT_RESULT_SPRITE.loseFrame}
+          frame={resultFrame}
           origins={resultOrigins}
           x={SETTLEMENT_RESULT_SPRITE.x}
           y={SETTLEMENT_RESULT_SPRITE.y}

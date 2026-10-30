@@ -169,16 +169,17 @@ export function typeSecretDigit(state: SecretCodeState, digit: string): SecretCo
  * 다른 쪽은 값 글이 없다.
  */
 export function statTotalTextOf(page: number, stats?: AnnalsStats): string | null {
-  if ((page === 6 || page === 7) && isBugFixed('B-66') && stats !== undefined) {
-    const total =
-      page === 6
-        ? range(0, 6).reduce((sum, slot) => sum + gamePointEarnedOf(stats, slot), 0)
-        : range(0, 7).reduce((sum, kind) => sum + gamePointUsageOf(stats, kind), 0)
-    return `${total}G`
-  }
-  if (page === 6 || page === 7) return '0G'
+  const isGamePointPage = page === 6 || page === 7
+  if (isGamePointPage && isBugFixed('B-66') && stats !== undefined) return `${gamePointPageTotalOf(page, stats)}G`
+  if (isGamePointPage) return '0G'
   if (page === 0 && stats !== undefined) return playTimeTotalTextOf(totalPlayTimeOf(stats))
   return null
+}
+
+/** 고친 길(B-66) — 쪽 6 은 획득 GP 0~6, 쪽 7 은 소모 GP 0~7 의 합 (`0x58801` 의 4 · 5 갈래) */
+function gamePointPageTotalOf(page: number, stats: AnnalsStats): number {
+  if (page === 6) return range(0, 6).reduce((sum, slot) => sum + gamePointEarnedOf(stats, slot), 0)
+  return range(0, 7).reduce((sum, kind) => sum + gamePointUsageOf(stats, kind), 0)
 }
 
 /**

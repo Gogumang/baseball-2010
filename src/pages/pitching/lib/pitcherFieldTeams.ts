@@ -20,9 +20,15 @@ export function pitcherFieldAcesOf(
   isOurs: boolean,
 ): WalkTeamAces | null {
   if (lineups === undefined) return null
-  const acePitcher = (isOurs ? options.aces?.ours : options.aces?.opponent)?.pitcher ?? -1
-  const onAceSlot = isOurs
-    ? !progress.onMound && progress.ourMound.pitcherSlot === OUR_ACE_PITCHER_SLOT
-    : progress.opponentMound.pitcherSlot === ACE_PITCHER_SLOT
-  return { pitcherAce: onAceSlot && acePitcher >= 0 ? acePitcher : null, records: isOurs ? lineups.ours : lineups.opponent }
+  if (isOurs) {
+    const onAceSlot = !progress.onMound && progress.ourMound.pitcherSlot === OUR_ACE_PITCHER_SLOT
+    return fieldAcesOf(options.aces?.ours.pitcher ?? -1, onAceSlot, lineups.ours)
+  }
+  const onAceSlot = progress.opponentMound.pitcherSlot === ACE_PITCHER_SLOT
+  return fieldAcesOf(options.aces?.opponent.pitcher ?? -1, onAceSlot, lineups.opponent)
+}
+
+/** 마운드가 마투수 칸이고 마투수가 실렸으면 그 번호 */
+function fieldAcesOf(acePitcher: number, onAceSlot: boolean, records: readonly NariRecordFielder[]): WalkTeamAces {
+  return { pitcherAce: onAceSlot && acePitcher >= 0 ? acePitcher : null, records }
 }

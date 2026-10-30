@@ -25,18 +25,30 @@ export function gameFieldTeamsOf(
   progress: Pick<GameProgress, 'ourTeamId' | 'opponentTeamId' | 'ourMound' | 'opponentMound' | 'aces'> &
     Partial<Pick<GameProgress, 'ourLineup' | 'opponentLineup'>>,
 ): { readonly ours: GameFieldTeam; readonly opponent: GameFieldTeam } {
-  const teamOf = (isOurs: boolean): GameFieldTeam => {
-    const teamId = isOurs ? progress.ourTeamId : progress.opponentTeamId
-    const lineup = nariFieldersAfterPinchHits(
-      nariRecordFieldersOf(nariGameRecordOf(career, teamId), teamId, isOurs ? career.name : null),
-      isOurs ? progress.ourLineup : progress.opponentLineup,
-    )
-    const mound = isOurs ? progress.ourMound : progress.opponentMound
-    const acePitcher = (isOurs ? progress.aces?.ours : progress.aces?.opponent)?.pitcher ?? -1
-    const pitcherAce = mound.pitcherSlot === ACE_PITCHER_SLOT && acePitcher >= 0 ? acePitcher : null
-    return { lineup, aces: { pitcherAce, records: lineup } }
-  }
-  return { ours: teamOf(true), opponent: teamOf(false) }
+  const ours = fieldTeamOf(career, progress.ourTeamId, career.name, progress.ourLineup, progress.ourMound, progress.aces?.ours.pitcher ?? -1)
+  const opponent = fieldTeamOf(
+    career,
+    progress.opponentTeamId,
+    null,
+    progress.opponentLineup,
+    progress.opponentMound,
+    progress.aces?.opponent.pitcher ?? -1,
+  )
+  return { ours, opponent }
+}
+
+/** 한 팀 — 레코드 차례(내 팀이면 내 줄에 내 이름)와, 마운드가 마투수 칸이면 그 마투수 번호 */
+function fieldTeamOf(
+  career: PlayerCareer,
+  teamId: number,
+  myName: string | null,
+  lineupNow: GameProgress['ourLineup'] | undefined,
+  mound: GameProgress['ourMound'],
+  acePitcher: number,
+): GameFieldTeam {
+  const lineup = nariFieldersAfterPinchHits(nariRecordFieldersOf(nariGameRecordOf(career, teamId), teamId, myName), lineupNow)
+  const pitcherAce = mound.pitcherSlot === ACE_PITCHER_SLOT && acePitcher >= 0 ? acePitcher : null
+  return { lineup, aces: { pitcherAce, records: lineup } }
 }
 
 /**

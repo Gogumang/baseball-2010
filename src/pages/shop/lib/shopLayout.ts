@@ -63,13 +63,21 @@ export type SlotGridKey = '왼' | '오른' | '위' | '아래' | '확인'
 
 /** 웹 키 → 격자 키 — 숫자키 꼴 1(0x6c031 · 표 0xd2e7c): '2' ↑ · '4' ← · '6' → · '8' ↓ · '5' 확인 */
 export function slotGridKeyOf(key: string): SlotGridKey | null {
-  if (key === 'ArrowLeft' || key === '4') return '왼'
-  if (key === 'ArrowRight' || key === '6') return '오른'
-  if (key === 'ArrowUp' || key === '2') return '위'
-  if (key === 'ArrowDown' || key === '8') return '아래'
-  if (key === 'Enter' || key === '5') return '확인'
-  return null
+  return SLOT_GRID_KEYS.get(key) ?? null
 }
+
+const SLOT_GRID_KEYS: ReadonlyMap<string, SlotGridKey> = new Map<string, SlotGridKey>([
+  ['ArrowLeft', '왼'],
+  ['4', '왼'],
+  ['ArrowRight', '오른'],
+  ['6', '오른'],
+  ['ArrowUp', '위'],
+  ['2', '위'],
+  ['ArrowDown', '아래'],
+  ['8', '아래'],
+  ['Enter', '확인'],
+  ['5', '확인'],
+])
 
 /**
  * 격자 커서 한 걸음 — 창 0x81618 이 종류 1 · 2 · 5 에 목록 [창+0x19c] 을 vt+0x1c(5 열, 2 줄, 숫자키 꼴 1, 꼴 0x30)

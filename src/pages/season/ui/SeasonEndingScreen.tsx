@@ -144,18 +144,7 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
         width={ENDING_SCREEN.width}
         height={ENDING_SCREEN.height}
       >
-        {circle !== null && (
-          <path
-            fillRule="evenodd"
-            fill={ENDING_IRIS.cover}
-            d={
-              `M0,0H${ENDING_SCREEN.width}V${ENDING_SCREEN.height}H0Z` +
-              `M${circle.x},${circle.y + circle.diameter / 2}` +
-              `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0` +
-              `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`
-            }
-          />
-        )}
+        {circle !== null && irisPathOf(circle)}
       </svg>
 
       {isSeasonEndingTextShown(tick) && (
@@ -174,12 +163,7 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
         />
       )}
 
-      {leaveStage > 0 ? (
-        // 단계 1 의 종류 1 끝만 넘긴다(0x8bd8 8cdc `cmp r1, #1`) — 단계 2 부터는 끝나도 아무 일이 없다
-        <SeasonScreenFade key={`종류1:${leaveStage}`} kind="검정에서밝아짐" {...(leaveStage === 1 ? { onEnd: onFinish } : {})} />
-      ) : (
-        <SeasonScreenFade key="종류2" kind="검게어두워짐" />
-      )}
+      {screenFadeOf(leaveStage, onFinish)}
 
       {phase === '보너스' && (
         <MessageBox
@@ -194,4 +178,26 @@ export function SeasonEndingScreen({ endingIndex, isBonusReceived = false, onBon
       )}
     </RawScreen>
   )
+}
+
+/** 원형 전환 판 — 검정 판에 원을 뚫는다(evenodd 라 원 안쪽이 구멍) */
+function irisPathOf(circle: NonNullable<ReturnType<typeof seasonEndingIrisOf>>) {
+  return (
+    <path
+      fillRule="evenodd"
+      fill={ENDING_IRIS.cover}
+      d={
+        `M0,0H${ENDING_SCREEN.width}V${ENDING_SCREEN.height}H0Z` +
+        `M${circle.x},${circle.y + circle.diameter / 2}` +
+        `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${circle.diameter},0` +
+        `a${circle.diameter / 2},${circle.diameter / 2} 0 1,0 ${-circle.diameter},0`
+      }
+    />
+  )
+}
+
+/** 효과기 — 진입은 종류 2, 키마다 단계 + 1 · 종류 1. 단계 1 의 종류 1 끝만 넘긴다(0x8bd8 8cdc `cmp r1, #1`) — 단계 2 부터는 끝나도 아무 일이 없다 */
+function screenFadeOf(leaveStage: number, onFinish: () => void) {
+  if (leaveStage <= 0) return <SeasonScreenFade key="종류2" kind="검게어두워짐" />
+  return <SeasonScreenFade key={`종류1:${leaveStage}`} kind="검정에서밝아짐" {...(leaveStage === 1 ? { onEnd: onFinish } : {})} />
 }

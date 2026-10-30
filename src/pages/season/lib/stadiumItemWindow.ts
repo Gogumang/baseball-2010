@@ -146,12 +146,18 @@ export function stadiumItemDescriptionOf(kind: StadiumKind, slot: number, isHidd
     return ORIGINAL_ITEMS[HIDDEN_HINT_BASE + slot + (kind === '전광판' ? BOARD_HINT_SHIFT : 0)] ?? ''
   }
   if (kind === '잔디') return ORIGINAL_ITEMS[GRASS_DESCRIPTION_BASE + slot] ?? ''
+  return `${popularityLineOf(kind, slot)}!N${effectLineOf(kind, slot)}`
+}
+
+/** 인기도 줄 — p = 0xd44c4[8 × 종류 + 칸] == 0 ? StrITEM[184] : sprintf(StrITEM[185], p) */
+function popularityLineOf(kind: StadiumKind, slot: number): string {
   const required = requiredPopularityOf(kind, slot) ?? 0
-  const popularity =
-    required === 0 ? (ORIGINAL_ITEMS[NO_POPULARITY_LIMIT] ?? '') : (ORIGINAL_ITEMS[POPULARITY_LIMIT_FORMAT] ?? '').replace('%d', String(required))
-  const effect =
-    kind === '관중석'
-      ? `${(STAND_CAPACITY_TABLE[slot] ?? 0) * 1000}명 수용!N가능`
-      : `${ORIGINAL_MODE_TEXT[CROWD_TEXT] ?? ''} +${(BOARD_BONUS_TABLE[slot] ?? 0) * 1000}`
-  return `${popularity}!N${effect}`
+  if (required === 0) return ORIGINAL_ITEMS[NO_POPULARITY_LIMIT] ?? ''
+  return (ORIGINAL_ITEMS[POPULARITY_LIMIT_FORMAT] ?? '').replace('%d', String(required))
+}
+
+/** 효과 줄 — 관중석 "%d명 수용!N가능"(v × 1000) · 전광판 "%s +%d"(StrMODE[218], v × 1000) */
+function effectLineOf(kind: StadiumKind, slot: number): string {
+  if (kind === '관중석') return `${(STAND_CAPACITY_TABLE[slot] ?? 0) * 1000}명 수용!N가능`
+  return `${ORIGINAL_MODE_TEXT[CROWD_TEXT] ?? ''} +${(BOARD_BONUS_TABLE[slot] ?? 0) * 1000}`
 }

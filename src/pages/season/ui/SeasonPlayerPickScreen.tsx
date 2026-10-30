@@ -87,8 +87,7 @@ export function SeasonPlayerPickScreen({
       if (overlay !== undefined && overlay !== null) return
       // 0xc3e8 이 확인·취소를 먼저 받는다 — 보기 전용 목록은 확인을 안 먹고, 취소는 끝 코드만 세운다(읽는 쪽 없음)
       if (key === '확인') {
-        const count = editor.tab === ENTRY_TAB.투수 ? lists.pitchers.length : lists.batters.length
-        if (editor.cursor < count) onPick(editor.tab, editor.cursor)
+        if (isOnListedRow(editor, lists)) onPick(editor.tab, editor.cursor)
         return
       }
       if (key === '취소') return onBack()
@@ -119,4 +118,10 @@ export function SeasonPlayerPickScreen({
       onCloseAceLocked={() => undefined}
     />
   )
+}
+
+/** 커서가 그 탭 목록 안의 줄에 있나 — 빈 줄에서는 확인이 아무 일도 안 한다 */
+function isOnListedRow(editor: EntryEditorState, lists: ReturnType<typeof seasonRecordEntryListsOf>): boolean {
+  const count = editor.tab === ENTRY_TAB.투수 ? lists.pitchers.length : lists.batters.length
+  return editor.cursor < count
 }

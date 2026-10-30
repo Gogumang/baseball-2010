@@ -67,11 +67,21 @@ export function moveGridCursor(shape: AnnalsGridShape, index: number, direction:
   if (blocked.length === 0) return stepGridCursor(shape, index, direction)
   // 0x6c445: 열린 칸 수(0x6c3f4)가 — 지금 칸이 열렸으면 2 이상, 막혔으면 1 이상일 때만 옮긴다.
   // 한 칸씩(0x6be71) 옮기다 열린 칸에 서면 멈춘다. 한 걸음이 제자리면(끝에서 잘림) 처음 칸으로 되돌린다.
-  const cellCount = shape.columns * shape.rows
   const isOpen = (cell: number) => !blocked.includes(cell)
+  if (!canLeaveCell(shape, index, isOpen)) return index
+  return walkToOpenCell(shape, index, direction, isOpen)
+}
+
+/** 0x6c3f4 열린 칸 수가 — 지금 칸이 열렸으면 2 이상, 막혔으면 1 이상인가 */
+function canLeaveCell(shape: AnnalsGridShape, index: number, isOpen: (cell: number) => boolean): boolean {
   let openCount = 0
-  for (let cell = 0; cell < cellCount; cell += 1) if (isOpen(cell)) openCount += 1
-  if (isOpen(index) ? openCount <= 1 : openCount <= 0) return index
+  for (let cell = 0; cell < shape.columns * shape.rows; cell += 1) if (isOpen(cell)) openCount += 1
+  return isOpen(index) ? !(openCount <= 1) : !(openCount <= 0)
+}
+
+/** 한 칸씩(0x6be71) 옮기다 열린 칸에 서면 멈춘다. 한 걸음이 제자리면(끝에서 잘림) 처음 칸으로 되돌린다 */
+function walkToOpenCell(shape: AnnalsGridShape, index: number, direction: AnnalsDirection, isOpen: (cell: number) => boolean): number {
+  const cellCount = shape.columns * shape.rows
   let current = index
   for (let guard = 0; guard <= cellCount; guard += 1) {
     const next = stepGridCursor(shape, current, direction)
@@ -94,22 +104,29 @@ function stepGridCursor(shape: AnnalsGridShape, index: number, direction: Annals
  * 0x6bead(격자, dx, dy, 깊이) — 가로를 먼저(0x6bebc~0x6bf36), 세로를 뒤에(0x6bf38~) 옮긴다.
  * 감기는 쪽(0x10 · 0x20)은 넘칠 때만(0x6bdc4 · 0x6bde0) `(값 + d + 개수) % 개수`, 아니면 0 ~ 개수−1 로 자른다.
  */
-function moveCell(shape: AnnalsGridShape, cell: { x: number; y: number }, dx: number, dy: number, depth: number) {
-  const nextDepth = depth + 1
-  if (dx !== 0) {
-    const overflows = cell.x + dx < 0 || cell.x + dx >= shape.columns
-    cell.x = stepOf(cell.x, dx, shape.columns, shape.wrapsColumns)
-    if (overflows && shape.wrapsColumns && shape.carriesRowOnColumnWrap === true && shape.rows > 1 && nextDepth <= 1) {
-      moveCell(shape, cell, 0, Math.sign(dx), nextDepth)
-    }
-  }
-  if (dy !== 0) {
-    const overflows = cell.y + dy < 0 || cell.y + dy >= shape.rows
-    cell.y = stepOf(cell.y, dy, shape.rows, shape.wrapsRows)
-    if (overflows && shape.wrapsRows && shape.carriesColumnOnRowWrap === true && shape.columns > 1 && nextDepth <= 1) {
-      moveCell(shape, cell, Math.sign(dy), 0, nextDepth)
-    }
-  }
+function moveCell(shape: AnnalsGridShape, cell: GridCell, dx: number, dy: number, depth: number) {
+  if (dx !== 0) moveColumn(shape, cell, dx, depth)
+  if (dy !== 0) moveRow(shape, cell, dy, depth)
+}
+
+type GridCell = { x: number; y: number }
+/** 0x6bead 의 되부름은 한 번까지 (깊이 0 → 1) */
+const MAX_CARRY_DEPTH = 1
+
+/** 가로 (0x6bebc~0x6bf36) — 감아 넘치면 꼴이 시키는 대로 줄도 한 칸 */
+function moveColumn(shape: AnnalsGridShape, cell: GridCell, dx: number, depth: number) {
+  const overflows = cell.x + dx < 0 || cell.x + dx >= shape.columns
+  cell.x = stepOf(cell.x, dx, shape.columns, shape.wrapsColumns)
+  const carriesRow = shape.wrapsColumns && shape.carriesRowOnColumnWrap === true && shape.rows > 1
+  if (overflows && carriesRow && depth + 1 <= MAX_CARRY_DEPTH) moveCell(shape, cell, 0, Math.sign(dx), depth + 1)
+}
+
+/** 세로 (0x6bf38~) — 감아 넘치면 꼴이 시키는 대로 열도 한 칸 */
+function moveRow(shape: AnnalsGridShape, cell: GridCell, dy: number, depth: number) {
+  const overflows = cell.y + dy < 0 || cell.y + dy >= shape.rows
+  cell.y = stepOf(cell.y, dy, shape.rows, shape.wrapsRows)
+  const carriesColumn = shape.wrapsRows && shape.carriesColumnOnRowWrap === true && shape.columns > 1
+  if (overflows && carriesColumn && depth + 1 <= MAX_CARRY_DEPTH) moveCell(shape, cell, Math.sign(dy), 0, depth + 1)
 }
 
 function stepOf(value: number, delta: number, count: number, wraps: boolean): number {

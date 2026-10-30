@@ -77,26 +77,44 @@ function scrollHelpText(state: HelpViewerState, key: HelpViewerKey, lineCount: n
  * 닫기 연출은 뷰어 그리기 쪽 일이다(`HelpScreen` — `+0x125` 가 서면 곧장 닫는다).
  */
 export function stepHelpViewer(state: HelpViewerState, key: HelpViewerKey, isLocked: boolean, pageCount: number, lineCount = 0): HelpViewerStep {
-  // 0x637f4 — 쪽 보기면 줄 넘기기를 먼저 (위·아래만 본다)
-  const scrolled = state.isChoosingChapter ? state : scrollHelpText(state, key, lineCount)
+  const scrolled = scrollWhenReading(state, key, lineCount)
   switch (key) {
     case 'OK':
     case '아래':
-      if (isLocked || !state.isChoosingChapter) return scrolled
-      return { ...state, isChoosingChapter: false }
+      return confirmHelpViewer(state, scrolled, isLocked)
     case 'CLR':
-      if (isLocked || state.isChoosingChapter) return '닫기'
-      return { ...state, isChoosingChapter: true }
+      return clearHelpViewer(state, isLocked)
     case '왼':
-    case '오른': {
-      const step = key === '오른' ? 1 : -1
-      if (state.isChoosingChapter) {
-        const chapter = (state.chapter + step + BROWSABLE_CHAPTER_COUNT) % BROWSABLE_CHAPTER_COUNT
-        return { ...state, chapter, page: 0, scrollTop: 0 }
-      }
-      return { ...state, page: (state.page + step + pageCount) % pageCount, scrollTop: 0 }
-    }
+      return turnHelpViewer(state, -1, pageCount)
+    case '오른':
+      return turnHelpViewer(state, 1, pageCount)
     case '위':
       return scrolled
   }
+}
+
+/** 0x637f4 — 쪽 보기면 줄 넘기기를 먼저 (위·아래만 본다) */
+function scrollWhenReading(state: HelpViewerState, key: HelpViewerKey, lineCount: number): HelpViewerState {
+  return state.isChoosingChapter ? state : scrollHelpText(state, key, lineCount)
+}
+
+/** 63828 — 잠김이거나 쪽 보기면 줄 넘기기 그대로, 장 고르기면 쪽 보기로 */
+function confirmHelpViewer(state: HelpViewerState, scrolled: HelpViewerState, isLocked: boolean): HelpViewerStep {
+  if (isLocked || !state.isChoosingChapter) return scrolled
+  return { ...state, isChoosingChapter: false }
+}
+
+/** 63840 — 잠김 · 장 고르기면 닫기, 쪽 보기면 장 고르기로 */
+function clearHelpViewer(state: HelpViewerState, isLocked: boolean): HelpViewerStep {
+  if (isLocked || state.isChoosingChapter) return '닫기'
+  return { ...state, isChoosingChapter: true }
+}
+
+/** 638a0 · 638fe — 장 고르기면 장을, 쪽 보기면 쪽을 한 칸 돌린다(끝에서 감는다). 잠금은 안 본다 */
+function turnHelpViewer(state: HelpViewerState, step: 1 | -1, pageCount: number): HelpViewerStep {
+  if (state.isChoosingChapter) {
+    const chapter = (state.chapter + step + BROWSABLE_CHAPTER_COUNT) % BROWSABLE_CHAPTER_COUNT
+    return { ...state, chapter, page: 0, scrollTop: 0 }
+  }
+  return { ...state, page: (state.page + step + pageCount) % pageCount, scrollTop: 0 }
 }

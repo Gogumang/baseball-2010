@@ -57,26 +57,7 @@ export function SeasonItemShopScreen({
   const [lackNotice, setLackNotice] = useState<string | null>(null)
   const [question, setQuestion] = useState<{ readonly text: string; readonly slot: number } | null>(null)
 
-  const entries: readonly ShopEntry[] =
-    kind === 1
-      ? seasonSubItemsOf(record).map((item) => ({
-          id: `시즌서브:${item.slot}`,
-          name: item.name,
-          description: item.description,
-          price: item.price,
-          iconFrame: item.iconFrame,
-          isOwned: item.isOwned,
-          blockNotice: null,
-        }))
-      : seasonGpItemsOf().map((item) => ({
-          id: `시즌GP:${item.slot}`,
-          name: item.name,
-          description: item.description,
-          price: item.price,
-          iconFrame: item.iconFrame,
-          isOwned: false,
-          blockNotice: null,
-        }))
+  const entries = shopEntriesOf(kind, record)
 
   const select = (slot: number) => {
     const checked = kind === 1 ? checkSeasonSubItem(record, slot) : checkSeasonGpItem({ record, teamMorale, gamePoint }, slot)
@@ -91,7 +72,7 @@ export function SeasonItemShopScreen({
     if (text !== null) setNotice(text)
   }
 
-  const isPopup = notice !== null || question !== null || lackNotice !== null
+  const isPopup = isShopPopupOpen(notice, question, lackNotice)
   const latest = useEffectEvent(() => ({ isPopup, onBack }))
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -127,7 +108,41 @@ export function SeasonItemShopScreen({
         <MessageBox text={question.text} buttons={['예', '아니오']} onAnswer={(index) => (index === 0 ? buy(question.slot) : setQuestion(null))} />
       )}
       {lackNotice !== null && <MessageBox text={lackNotice} buttons={['예', '아니오']} onAnswer={() => setLackNotice(null)} />}
-      {question === null && notice !== null && <MessageBox text={notice} buttons={['OK']} onAnswer={() => setNotice(null)} />}
+      {question === null && noticeBoxOf(notice, () => setNotice(null))}
     </RawScreen>
   )
+}
+
+/** 창 칸 — 1 서브아이템(가진 것은 표시), 그 밖 GP아이템 */
+function shopEntriesOf(kind: SeasonItemShopScreenProps['kind'], record: SeasonItemShopScreenProps['record']): readonly ShopEntry[] {
+  return kind === 1
+    ? seasonSubItemsOf(record).map((item) => ({
+        id: `시즌서브:${item.slot}`,
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        iconFrame: item.iconFrame,
+        isOwned: item.isOwned,
+        blockNotice: null,
+      }))
+    : seasonGpItemsOf().map((item) => ({
+        id: `시즌GP:${item.slot}`,
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        iconFrame: item.iconFrame,
+        isOwned: false,
+        blockNotice: null,
+      }))
+}
+
+/** 팝업(알림 · 확인 · G부족)이 떠 있으면 창이 키를 안 받는다 */
+function isShopPopupOpen(notice: string | null, question: object | null, lackNotice: string | null): boolean {
+  return notice !== null || question !== null || lackNotice !== null
+}
+
+/** 알림 — 확인 팝업이 없을 때만 */
+function noticeBoxOf(notice: string | null, onClose: () => void) {
+  if (notice === null) return null
+  return <MessageBox text={notice} buttons={['OK']} onAnswer={onClose} />
 }

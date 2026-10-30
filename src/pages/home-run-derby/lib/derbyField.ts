@@ -138,14 +138,25 @@ function eventZoneAt(input: DerbyFieldInput, tick: number, ballTick: number, cam
   const offset = screenOffsetOf(camera)
   const height = toScreenY(point.y)
   const groundY = offset.y + toScreenY(point.z)
-  // 36fba · 36fce — 높이 투영 < 0 이거나 땅점 화면 y < 1 이면 그림자 · 존이 없다
-  if (height < 0 || groundY < 1) return null
-  if (height > ZONE_HEIGHT_LIMIT) return null
-  if (groundY >= Math.trunc(SCREEN.height / 3)) return null
-  if (!HOME_RUN_HIT_CODES.includes(input.resultCode ?? -1) || !input.isBigFlyPattern) return null
+  if (!isZoneSpot(height, groundY)) return null
+  if (!isHomeRunBigFly(input)) return null
   // B-32 고침 — 존 좌표(372d4~372e4, 공 땅점 화면 자리)에서 필드 오프셋을 뺀 자리가 존 그림 두 칸 안일 때만 적중. 굴림 없음
   if (isBugFixed('B-32') && !isBallInEventZone({ x: toScreenX(point.x), y: groundY - offset.y })) return null
   return { tick, x: offset.x + toScreenX(point.x), y: groundY > ZONE_TOP_LIMIT ? groundY : ZONE_TOP }
+}
+
+/** 존을 놓을 수 있는 공 자리 — 높이 투영 · 땅점 화면 y (머리말 조건) */
+function isZoneSpot(height: number, groundY: number): boolean {
+  // 36fba · 36fce — 높이 투영 < 0 이거나 땅점 화면 y < 1 이면 그림자 · 존이 없다
+  if (height < 0 || groundY < 1) return false
+  if (height > ZONE_HEIGHT_LIMIT) return false
+  if (groundY >= Math.trunc(SCREEN.height / 3)) return false
+  return true
+}
+
+/** 홈런성 결과 코드이고 큰 타구 무늬인가 */
+function isHomeRunBigFly(input: DerbyFieldInput): boolean {
+  return HOME_RUN_HIT_CODES.includes(input.resultCode ?? -1) && input.isBigFlyPattern
 }
 
 /** 판 틱 t 의 그림 — 판 끝을 넘으면 마지막 그림 */

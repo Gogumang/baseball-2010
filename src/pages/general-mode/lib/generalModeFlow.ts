@@ -152,28 +152,34 @@ export function stepBack(state: GeneralModeFlowState): GeneralModeFlowState | nu
     case GENERAL_MODE_STEP.AI팀:
       return { ...state, step: GENERAL_MODE_STEP.유저팀 }
     case GENERAL_MODE_STEP.선공구장:
-      if (state.firstBatPhase === FIRST_BAT_PHASE.구장) {
-        return { ...state, firstBatPhase: FIRST_BAT_PHASE.선공 }
-      }
-      return { ...state, step: GENERAL_MODE_STEP.AI팀 }
+      return stepBackFromFirstBat(state)
     case GENERAL_MODE_STEP.마선수:
-      if (state.acePhase === ACE_PHASE.마타자) {
-        return { ...state, acePhase: ACE_PHASE.마투수 }
-      }
-      // 상태 20 진입 0x23ed0 이 단계를 0(선공)으로 · 선공 커서를 0 으로 되돌리고 구장 커서는 지난번 구장(rec+0xc)에서 시작한다
-      return {
-        ...state,
-        setup: { ...state.setup, stadiumId: stadiumCursorOnEntry(state.setup.stadiumId) },
-        step: GENERAL_MODE_STEP.선공구장,
-        firstBatPhase: FIRST_BAT_PHASE.선공,
-        firstBatCursor: PLAYER_SIDE_FIRST_BAT,
-      }
+      return stepBackFromAce(state)
     case GENERAL_MODE_STEP.경기정보:
       if (state.isQuickStart) return null
       // 0x313b2 의 [skin+0xd0] = 0 은 21 진입 0x263f4 가 곧바로 1(마투수)로 덮는다
       return { ...state, step: GENERAL_MODE_STEP.마선수, acePhase: ACE_PHASE.마투수 }
     default:
       return null
+  }
+}
+
+/** 20 — 구장 단계 → 선공 단계(고른 구장은 그대로) · 선공 단계 → 19 */
+function stepBackFromFirstBat(state: GeneralModeFlowState): GeneralModeFlowState {
+  if (state.firstBatPhase === FIRST_BAT_PHASE.구장) return { ...state, firstBatPhase: FIRST_BAT_PHASE.선공 }
+  return { ...state, step: GENERAL_MODE_STEP.AI팀 }
+}
+
+/** 21 — 마타자 단계 → 마투수 단계 · 마투수 단계 → 20 */
+function stepBackFromAce(state: GeneralModeFlowState): GeneralModeFlowState {
+  if (state.acePhase === ACE_PHASE.마타자) return { ...state, acePhase: ACE_PHASE.마투수 }
+  // 상태 20 진입 0x23ed0 이 단계를 0(선공)으로 · 선공 커서를 0 으로 되돌리고 구장 커서는 지난번 구장(rec+0xc)에서 시작한다
+  return {
+    ...state,
+    setup: { ...state.setup, stadiumId: stadiumCursorOnEntry(state.setup.stadiumId) },
+    step: GENERAL_MODE_STEP.선공구장,
+    firstBatPhase: FIRST_BAT_PHASE.선공,
+    firstBatCursor: PLAYER_SIDE_FIRST_BAT,
   }
 }
 

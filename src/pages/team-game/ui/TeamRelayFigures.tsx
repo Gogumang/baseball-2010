@@ -8,34 +8,18 @@ import {
   defenderPaletteIndexOf,
 } from '@/pages/defense/lib/defenseView'
 import type { TeamRelayFigures as TeamRelayFiguresValue } from '@/pages/team-game/lib/teamAutoRelay'
-
-/** 화면 240×320 */
-const SCREEN_WIDTH = 240
-const SCREEN_HEIGHT = 320
-
-/** 기준점 — 425d8 r6 = W >> 1 · 425f2 r7 = (H >> 1) + 0x1e */
-const RELAY_FIGURES_CENTER = { x: SCREEN_WIDTH >> 1, y: (SCREEN_HEIGHT >> 1) + 0x1e } as const
-
-/** 주자 자리 표 0xd0028 — 1루 (+87, −10) · 2루 (0, −80) · 3루 (−87, −10) */
-const RELAY_BASE_OFFSETS = [
-  { x: 87, y: -10 },
-  { x: 0, y: -80 },
-  { x: -87, y: -10 },
-] as const
-
-/** 주자 프레임 — 0x79d10(…, 프레임 0) = defender 000 (앞보고 서기) */
-const RUNNER_FRAME = 0
-/** 투수 프레임 — 0x79b48(…, 프레임 0): 보통 · 타자 마선수 그림은 +17, 투수 마선수 그림(a ≠ 0)은 날값 */
-const PITCHER_FRAME = 0
-/** 포수 프레임 — 0x79b48(…, b, 0x49) → +17 = 90 (마스크 쓴 포수) */
-const CATCHER_FRAME = 0x49
-/** 포수 자리 — (W/2, 기준 y + 0x55) */
-const CATCHER_DY = 0x55
-/** 타자 — 좌타면 (W/2 + 0x16, 기준 y + 0x47) 에 프레임 7, 우타면 (W/2 − 0x16, …) 에 프레임 10 (0x79d10, 날값) */
-const BATTER_DX = 0x16
-const BATTER_DY = 0x47
-const BATTER_LEFT_FRAME = 7
-const BATTER_RIGHT_FRAME = 0xa
+import {
+  BATTER_DX,
+  BATTER_DY,
+  BATTER_LEFT_FRAME,
+  BATTER_RIGHT_FRAME,
+  CATCHER_DY,
+  CATCHER_FRAME,
+  PITCHER_FRAME,
+  RELAY_BASE_OFFSETS,
+  RELAY_FIGURES_CENTER,
+  RUNNER_FRAME,
+} from '@/pages/team-game/lib/relayFiguresLayout'
 
 /**
  * 그림 한 장 — 기준점(크기 0 칸)에 원점(`origins.json`)만큼 비껴 놓는다. 팔레트 번호가 있으면 `defender.mpl` 그 벌로 칠한다.
@@ -144,47 +128,57 @@ export function TeamRelayFigures({ figures }: { readonly figures: TeamRelayFigur
           />
         )
       })}
-      {pitcherAce !== null && (
-        <>
-          {pitcherAce >= 0 ? (
-            <RelayFigure
-              testId="중계-투수"
-              folder={ACE_PITCHER_DEFENDER_FRAMES[pitcherAce] ?? DEFENDER_FRAMES}
-              frame={PITCHER_FRAME}
-              paletteIndex={null}
-              x={center.x}
-              y={center.y}
-            />
-          ) : (
-            <RelayFigure
-              testId="중계-투수"
-              folder={DEFENDER_FRAMES}
-              frame={PITCHER_FRAME + FIELDER_FRAME_OFFSET}
-              paletteIndex={defensePalette}
-              x={center.x}
-              y={center.y}
-            />
-          )}
-          <RelayFigure
-            testId="중계-포수"
-            folder={figures.catcherAce >= 0 ? (ACE_BATTER_DEFENDER_FRAMES[figures.catcherAce] ?? DEFENDER_FRAMES) : DEFENDER_FRAMES}
-            frame={CATCHER_FRAME + FIELDER_FRAME_OFFSET}
-            paletteIndex={figures.catcherAce >= 0 ? null : defensePalette}
-            x={center.x}
-            y={center.y + CATCHER_DY}
-          />
-        </>
-      )}
-      {batter !== null && (
+      {pitcherAce !== null && batteryFiguresOf(pitcherAce, figures.catcherAce, defensePalette)}
+      {batter !== null && batterFigureOf(batter, offensePalette)}
+    </>
+  )
+}
+
+/** 수비 팀 투수(마선수면 투수 마선수 그림 날값, 아니면 야수 +17) · 포수(마선수면 타자 마선수 그림) */
+function batteryFiguresOf(pitcherAce: number, catcherAce: number, defensePalette: number | null) {
+  return (
+    <>
+      {pitcherAce >= 0 ? (
         <RelayFigure
-          testId="중계-타자"
-          folder={batter.aceIndex >= 0 ? (ACE_BATTER_DEFENDER_FRAMES[batter.aceIndex] ?? DEFENDER_FRAMES) : DEFENDER_FRAMES}
-          frame={batter.isLeft ? BATTER_LEFT_FRAME : BATTER_RIGHT_FRAME}
-          paletteIndex={batter.aceIndex >= 0 ? null : offensePalette}
-          x={center.x + (batter.isLeft ? BATTER_DX : -BATTER_DX)}
-          y={center.y + BATTER_DY}
+          testId="중계-투수"
+          folder={ACE_PITCHER_DEFENDER_FRAMES[pitcherAce] ?? DEFENDER_FRAMES}
+          frame={PITCHER_FRAME}
+          paletteIndex={null}
+          x={RELAY_FIGURES_CENTER.x}
+          y={RELAY_FIGURES_CENTER.y}
+        />
+      ) : (
+        <RelayFigure
+          testId="중계-투수"
+          folder={DEFENDER_FRAMES}
+          frame={PITCHER_FRAME + FIELDER_FRAME_OFFSET}
+          paletteIndex={defensePalette}
+          x={RELAY_FIGURES_CENTER.x}
+          y={RELAY_FIGURES_CENTER.y}
         />
       )}
+      <RelayFigure
+        testId="중계-포수"
+        folder={catcherAce >= 0 ? (ACE_BATTER_DEFENDER_FRAMES[catcherAce] ?? DEFENDER_FRAMES) : DEFENDER_FRAMES}
+        frame={CATCHER_FRAME + FIELDER_FRAME_OFFSET}
+        paletteIndex={catcherAce >= 0 ? null : defensePalette}
+        x={RELAY_FIGURES_CENTER.x}
+        y={RELAY_FIGURES_CENTER.y + CATCHER_DY}
+      />
     </>
+  )
+}
+
+/** 공격 팀 지금 타자 — 좌타면 W/2 + 0x16 에 7, 우타면 W/2 − 0x16 에 10 */
+function batterFigureOf(batter: NonNullable<TeamRelayFiguresValue['batter']>, offensePalette: number | null) {
+  return (
+    <RelayFigure
+      testId="중계-타자"
+      folder={batter.aceIndex >= 0 ? (ACE_BATTER_DEFENDER_FRAMES[batter.aceIndex] ?? DEFENDER_FRAMES) : DEFENDER_FRAMES}
+      frame={batter.isLeft ? BATTER_LEFT_FRAME : BATTER_RIGHT_FRAME}
+      paletteIndex={batter.aceIndex >= 0 ? null : offensePalette}
+      x={RELAY_FIGURES_CENTER.x + (batter.isLeft ? BATTER_DX : -BATTER_DX)}
+      y={RELAY_FIGURES_CENTER.y + BATTER_DY}
+    />
   )
 }

@@ -1,37 +1,20 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { MessageBox, PressArea, RawScreen } from '@/shared/ui'
-import { TEAMS } from '@/shared/config/original/teams'
+import { PressArea, RawScreen } from '@/shared/ui'
 import type { PostseasonSeries } from '@/entities/league/model/league'
 import type { SeasonRecord } from '@/entities/season-mode/model/seasonRecord'
-import { SEASON_AUTOBOT_BAT_HIDDEN_ID, koreanSeriesRewardOf, nextLeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
-import { hiddenOpenNoticeTextOf } from '@/entities/collection/model/hiddenOpenNotice'
+import { koreanSeriesRewardOf, nextLeagueFirstAward } from '@/entities/season-mode/model/seasonRewards'
 import type { LeagueFirstAward, SeasonReward, SeasonSummaryEntry } from '@/entities/season-mode/model/seasonRewards'
-import { MILLION_TO_TEN_THOUSAND } from '@/widgets/season/lib/seasonWindowLayout'
 import { PostseasonBracketWindow } from '@/widgets/season/ui/PostseasonBracketWindow'
 import { usePostseasonNextKey } from '@/widgets/season/model/usePostseasonNextKey'
 import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { SkinBackdrop } from '@/pages/special/ui/SkinBackdrops'
-
-/**
- * 원본 문구 (`base/extracted/StrMODE.json` 그대로 — 번호는 P4 4b 확정).
- *   137 한국시리즈 우승 팀 알림(팝업 id 7)
- *   197 우승 보상(팝업 9) · 198 준우승 보상(팝업 10) — `%d` 셋은 인기도·평판·**만원** 소지금
- *   223 리그 1위 누적 G 지급 — `%d` 둘은 문턱 횟수·G
- */
-const TEXT = {
-  champion: '!C한국시리즈 우승!!N[!cFFFF00%s!cFFFFFF]', // StrMODE[137]
-  koreanSeries: {
-    197: '!C[!c00FF00한국시리즈 우승!!!cFFFFFF]!N!N인기도 +%d / 평판 +%d!N소지금 +%d만',
-    198: '!C[!c00FF00한국시리즈 준우승!!!cFFFFFF]!N!N인기도 +%d / 평판 +%d!N소지금 +%d만',
-  } as Readonly<Record<number, string>>,
-  leagueFirst: '!C시즌모드 리그 1위 %d회!N달성!N[!cFFFF00%d G포인트!cFFFFFF] 지급', // StrMODE[223]
-}
-
-/** `%d`·`%s` 를 앞에서부터 하나씩 바꾼다 (원본 sprintf 와 같은 차례) */
-function formatted(raw: string, values: readonly (string | number)[]): string {
-  let index = 0
-  return raw.replace(/%[ds]/g, () => String(values[index++] ?? ''))
-}
+import {
+  championNameOf,
+  championNoticeOf,
+  koreanSeriesNoticeOf,
+  leagueFirstNoticeOf,
+  unlockNoticeOf,
+} from '@/pages/season/ui/seasonSummaryScreen/summaryPopups'
 
 export interface SeasonSummaryScreenProps {
   readonly record: SeasonRecord
@@ -74,9 +57,6 @@ export interface SeasonSummaryScreenProps {
 }
 
 type Phase = '대진표' | '해금알림' | '리그1위' | '우승문구' | '한국시리즈보상'
-
-/** SR+0xb7 = 0xf 는 "우승팀 미정" 이다 (P4 1a) */
-const NO_CHAMPION = 0xf
 
 /**
  * 시즌 결산 (장면 0x105 상태 **0xef**, 진입 `0x6900` · 키 `0x9dc8` · 갱신 `0x85ec` · 그리기 `0xb7b8` — P4 1a·4b,
@@ -134,9 +114,8 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
     enterSummary(entry.opensAutobotBat)
   }, [entry])
 
-  const isFinished = series !== null && series.round === '종료'
-  const championId = series?.champion ?? (record.postseasonChampion === NO_CHAMPION ? null : record.postseasonChampion)
-  const championName = championId === null ? '' : (TEAMS[championId]?.name ?? '')
+  const isFinished = series?.round === '종료'
+  const championName = championNameOf(series, record)
   const reward = koreanSeriesRewardOf(postseasonRank)
 
   const onPressNext = () => {
@@ -164,57 +143,31 @@ export function SeasonSummaryScreen(props: SeasonSummaryScreenProps) {
         ⚠️ 웹 자리: "경기" · "결과" 키 — 원본 화면에 그림 자리가 없다. 웹 단추와 설명 줄을 걷고 화면 전체 투명 누름 칸으로 받는다.
         팝업이 떠 있으면 팝업이 키를 받는다(`onPressNext` 가 대진표 단계에서만 듣는다)
       */}
-      {phase === '대진표' && <PressArea label={isFinished ? '결과' : '경기'} onPress={onPressNext} />}
+      {nextPressOf(phase, isFinished, onPressNext)}
 
-      {phase === '해금알림' && (
-        <MessageBox
-          text={hiddenOpenNoticeTextOf(SEASON_AUTOBOT_BAT_HIDDEN_ID) ?? ''}
-          buttons={['OK']}
-          // 꼬리표 0 이 닫히면 0x87e8 — 리그 1위 G 검사를 한 번 (1·5·10 중 아직 안 받은 첫 칸 하나)
-          onAnswer={checkLeagueFirst}
-        />
-      )}
-
-      {phase === '리그1위' && pendingAward !== null && (
-        <MessageBox
-          text={formatted(TEXT.leagueFirst, [pendingAward.threshold, pendingAward.gamePoint])}
-          buttons={['OK']}
-          onAnswer={() => {
-            // G 팝업(0xbbef9(…, 1, 1, 1), 꼬리표 1)은 닫혀도 0x85ec 의 어느 가지에도 안 걸린다 — 대진표로 돌아간다
-            setPendingAward(null)
-            setPhase('대진표')
-          }}
-        />
-      )}
-
-      {phase === '우승문구' && (
-        <MessageBox
-          text={formatted(TEXT.champion, [championName])}
-          buttons={['OK']}
-          onAnswer={() => {
-            // 팝업 7 이 닫히면 0x85ec 가 순위로 [197]/[198] 을 띄운다(보상은 아직 — 그 팝업이 닫힐 때). 3위 아래는 곧장 0x87b4
-            if (reward.messageId === 0) {
-              onFinish(null)
-              return
-            }
-            setPhase('한국시리즈보상')
-          }}
-        />
-      )}
-
-      {phase === '한국시리즈보상' && (
-        <MessageBox
-          text={formatted(TEXT.koreanSeries[reward.messageId] ?? '', [
-            reward.popularity,
-            reward.reputation,
-            // 문구의 소지금은 **만원** 단위다 (표값 40 → 4000만)
-            reward.money * MILLION_TO_TEN_THOUSAND,
-          ])}
-          buttons={['OK']}
-          // 꼬리표 9·10 이 닫히면 보상을 더하고(0x86dc~ · 0x8752~) 곧장 0x87b4 — 리그 1위 G 검사 없이 결산을 닫는다
-          onAnswer={() => onFinish(reward)}
-        />
-      )}
+      {phase === '해금알림' && unlockNoticeOf(checkLeagueFirst)}
+      {phase === '리그1위' &&
+        leagueFirstNoticeOf(pendingAward, () => {
+          // G 팝업(0xbbef9(…, 1, 1, 1), 꼬리표 1)은 닫혀도 0x85ec 의 어느 가지에도 안 걸린다 — 대진표로 돌아간다
+          setPendingAward(null)
+          setPhase('대진표')
+        })}
+      {phase === '우승문구' &&
+        championNoticeOf(championName, () => {
+          // 팝업 7 이 닫히면 0x85ec 가 순위로 [197]/[198] 을 띄운다(보상은 아직 — 그 팝업이 닫힐 때). 3위 아래는 곧장 0x87b4
+          if (reward.messageId === 0) {
+            onFinish(null)
+            return
+          }
+          setPhase('한국시리즈보상')
+        })}
+      {phase === '한국시리즈보상' && koreanSeriesNoticeOf(reward, onFinish)}
     </RawScreen>
   )
+}
+
+/** 대진표 단계의 "경기" · "결과" 키 — 화면 전체 투명 누름 칸 (팝업이 떠 있으면 팝업이 키를 받는다) */
+function nextPressOf(phase: Phase, isFinished: boolean, onPressNext: () => void) {
+  if (phase !== '대진표') return null
+  return <PressArea label={isFinished ? '결과' : '경기'} onPress={onPressNext} />
 }

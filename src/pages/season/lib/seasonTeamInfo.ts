@@ -81,13 +81,14 @@ export interface SeasonTeamInfoInput {
 export function teamTypeFrameOf(abilities: readonly number[]): number {
   const values = [0, 1, 2, 3].map((index) => abilities[index] ?? 0)
   const frames: number[] = [...TEAM_TYPE_FRAMES]
+  /** 뒤 칸 값이 크면 두 칸을 맞바꾼다 */
+  const swapIfLower = (i: number, j: number) => {
+    if (!(values[i] < values[j])) return
+    ;[values[i], values[j]] = [values[j], values[i]]
+    ;[frames[i], frames[j]] = [frames[j], frames[i]]
+  }
   for (let i = 0; i <= 2; i += 1) {
-    for (let j = i + 1; j <= 3; j += 1) {
-      if (values[i] < values[j]) {
-        ;[values[i], values[j]] = [values[j], values[i]]
-        ;[frames[i], frames[j]] = [frames[j], frames[i]]
-      }
-    }
+    for (let j = i + 1; j <= 3; j += 1) swapIfLower(i, j)
   }
   return frames[0]
 }

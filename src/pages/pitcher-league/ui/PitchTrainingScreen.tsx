@@ -70,30 +70,43 @@ export function PitchTrainingScreen({ career, onTrain, onClose }: PitchTrainingS
         }}
       />
 
-      {popup?.kind === '알림' && <MessageBox text={popup.text} buttons={['확인']} onAnswer={() => setPopup(null)} />}
-      {popup?.kind === 'G부족' && (
+      {popup !== null && trainingPopupOf(popup, setPopup, () => setCursor(PITCH_TRAINING_START), onTrain)}
+    </div>
+  )
+}
+
+/**
+ * 팝업 — [67] · [68] 알림, [65] G 부족(예 → 139 G 충전), [66] 확인(예 → 훈련). 종류마다 따로 선다(`key`)
+ */
+function trainingPopupOf(popup: Popup, setPopup: (popup: Popup | null) => void, restart: () => void, onTrain: (row: number, column: number) => void) {
+  switch (popup.kind) {
+    case '알림':
+      return <MessageBox key="알림" text={popup.text} buttons={['확인']} onAnswer={() => setPopup(null)} />
+    case 'G부족':
+      return (
         <MessageBox
+          key="G부족"
           text={ORIGINAL_MODE_TEXT[PITCH_TRAINING_TEXT.notEnoughPoints] ?? ''}
           buttons={['예', '아니오']}
           onAnswer={(index) => {
             setPopup(null)
             // 예 → 139 G 충전(틀 0x106bc) — 웹에 결제가 없어 충전 없이 떠난 길만 옮긴다: 108 진입 0x17730 이 다시 돌아 커서가 처음으로.
             // ⚠️ 139 화면은 옮기지 않았다
-            if (index === 0) setCursor(PITCH_TRAINING_START)
+            if (index === 0) restart()
           }}
         />
-      )}
-      {popup?.kind === '확인' && (
+      )
+    case '확인':
+      return (
         <MessageBox
+          key="확인"
           text={(ORIGINAL_MODE_TEXT[PITCH_TRAINING_TEXT.confirm] ?? '').replace('%d', String(popup.cost))}
           buttons={['예', '아니오']}
           onAnswer={(index) => {
-            const chosen = popup
             setPopup(null)
-            if (index === 0) onTrain(chosen.row, chosen.column)
+            if (index === 0) onTrain(popup.row, popup.column)
           }}
         />
-      )}
-    </div>
-  )
+      )
+  }
 }

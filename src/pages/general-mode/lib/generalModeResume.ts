@@ -13,14 +13,28 @@ const GENERAL_MODE = 1
  * 시험 계측에서 null 갈래는 단위 시험(옛 꼴)만 지났고 앱 길(이어하기)은 늘 읽었다. 꼴이 넓어진 칸은 `migrateTeamGameProgress` 가 채운다.
  */
 export function generalGameOfSave(raw: unknown): TeamGameProgress | null {
-  if (raw === null || typeof raw !== 'object') return null
+  if (!isObject(raw)) return null
   const progress = raw as Partial<TeamGameProgress>
-  const { options, game } = progress
-  if (options === undefined || options === null || typeof options !== 'object') return null
-  if (options.mode !== GENERAL_MODE) return null
-  if (game === undefined || game === null || typeof game !== 'object') return null
-  if (typeof game.inning !== 'number' || (game.half !== '초' && game.half !== '말')) return null
-  if (!Array.isArray(progress.ourEntry) || !Array.isArray(progress.opponentEntry)) return null
-  if (!Array.isArray(progress.ourPitcherEntry) || !Array.isArray(progress.opponentPitcherEntry)) return null
+  if (!isGeneralModeOptions(progress.options)) return null
+  if (!isGameShape(progress.game)) return null
+  if (!hasEntryArrays(progress)) return null
   return migrateTeamGameProgress(raw as TeamGameProgress)
+}
+
+const isObject = (value: unknown): value is object => value !== null && typeof value === 'object'
+
+function isGeneralModeOptions(options: TeamGameProgress['options'] | undefined): boolean {
+  return isObject(options) && options.mode === GENERAL_MODE
+}
+
+/** 경기 상태 꼴 — 이닝 수 · 초/말 */
+function isGameShape(game: TeamGameProgress['game'] | undefined): boolean {
+  if (!isObject(game)) return false
+  return typeof game.inning === 'number' && (game.half === '초' || game.half === '말')
+}
+
+/** 두 팀 타자 · 투수 엔트리가 배열인가 */
+function hasEntryArrays(progress: Partial<TeamGameProgress>): boolean {
+  const entries = [progress.ourEntry, progress.opponentEntry, progress.ourPitcherEntry, progress.opponentPitcherEntry]
+  return entries.every((entry) => Array.isArray(entry))
 }

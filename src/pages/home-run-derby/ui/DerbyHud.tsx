@@ -45,6 +45,13 @@ function Glyphs({ glyphs, testId }: { readonly glyphs: readonly HudGlyph[]; read
   )
 }
 
+/** 콤보 표시가 켜져 있고(+0x1b60) 값이 있으면 그 자리 · 칸 — 아니면 그리지 않는다 */
+function shownComboPlacementOf(shownCombo: number | null, batterSide: number, ticksSinceShown: number) {
+  const isShown = shownCombo !== null && shownCombo > 0
+  if (!isShown) return null
+  return comboDisplayPlacementOf(shownCombo, batterSide, ticksSinceShown)
+}
+
 /**
  * 홈런더비 HUD (0x45a54) — 오른쪽 위에 trainning.pzx 판 "최고 ___M / 현재 ___M" 을 놓고
  * 판 머리에 "공 번호 / 공 수", 두 칸에 최고 기록과 누적 비거리를 쓴다. 좌표·글꼴·색은 전부 원본 값이다(`derbyHudLayout`).
@@ -54,7 +61,7 @@ export function DerbyHud({ run, bestDistance, tick, shownCombo = null, batterSid
   // 콤보 표시를 켠 갱신 — 상태 0xf 가 +0x19ec = 0 · 두 애니를 첫 칸으로 돌린다(0x3db92~0x3dc14)
   const [comboShownAt, setComboShownAt] = useState<{ value: number | null; tick: number }>({ value: shownCombo, tick })
   if (comboShownAt.value !== shownCombo) setComboShownAt({ value: shownCombo, tick })
-  const comboPlacement = shownCombo !== null && shownCombo > 0 ? comboDisplayPlacementOf(shownCombo, batterSide, tick - comboShownAt.tick) : null
+  const comboPlacement = shownComboPlacementOf(shownCombo, batterSide, tick - comboShownAt.tick)
 
   return (
     <div className={styles.hud}>

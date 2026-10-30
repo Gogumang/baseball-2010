@@ -31,6 +31,23 @@ function moundPitcherNameOf(progress: TeamGameProgress, ours: boolean): string |
   return pitcher?.name ?? null
 }
 
+type RelayTick = Pick<TeamAutoRelayTick, 'progress' | 'before' | 'atBat'>
+
+/** 공격 팀 지금 타자 칸 — 타석 틱이면 방금 친 타자, 교체 틱은 공격 팀 팀[+0x32] */
+function relayOrderIndexOf(tick: RelayTick, offenseOurs: boolean): number {
+  if (tick.atBat !== null) return tick.atBat.orderIndex
+  return offenseOurs ? tick.progress.game.battingOrderIndex : tick.progress.opponentOrderIndex
+}
+
+/** 중계 글 0xc25e4 — 친 타자 이름 + 결과 낱말. 교체 틱은 글이 없다 */
+function relayLineOfTick(progress: TeamGameProgress, atBat: RelayTick['atBat']): string | null {
+  if (atBat === null) return null
+  return relayLineOf(
+    batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '',
+    relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true),
+  )
+}
+
 /**
  * **팀경기(모드 1 · 2 · 8 · 9) 0x21 중계 칸** — 그리기 0x4258c 의 미션과 같은 몫(점수판 · 두 팀 판 · 공격팀 띠 · 중계 글).
  * - 중계 글 0xc25e4: 타석 틱이면 친 타자 이름 + 결과 낱말(`relayCodeOf`), 교체 틱은 글이 없다(c2630 sim+0xc4 = 0).
@@ -45,14 +62,8 @@ export function teamAutoRelayStepOf(tick: Pick<TeamAutoRelayTick, 'progress' | '
   const ourHalf = game.playerSide === PLAYER_SIDE_FIRST_BAT ? '초' : '말'
   const offenseOurs = game.half === ourHalf
   const atBat = tick.atBat
-  const currentOrder = lineupSlotOf(atBat !== null ? atBat.orderIndex : offenseOurs ? progress.game.battingOrderIndex : progress.opponentOrderIndex)
-  const line =
-    atBat === null
-      ? null
-      : relayLineOf(
-          batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '',
-          relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true),
-        )
+  const currentOrder = lineupSlotOf(relayOrderIndexOf(tick, offenseOurs))
+  const line = relayLineOfTick(progress, atBat)
   return {
     inning: slots.inning,
     offenseSide: slots.offenseSide,
@@ -147,36 +158,82 @@ export function teamRelayFiguresOf(
   loadedBefore: number | null = null,
 ): TeamRelayFigures {
   const progress = tick.progress
-  const after = progress.game
-  const flipped = !after.isFinished && (after.inning !== tick.before.inning || after.half !== tick.before.half)
-  const half = flipped ? tick.before.half : after.half
-  const ourHalf = after.playerSide === PLAYER_SIDE_FIRST_BAT ? '초' : '말'
-  const offenseOurs = half === ourHalf
+  const flipped = isHalfFlippedAt(tick)
+  const offenseOurs = isOurOffenseAt(tick, flipped)
   const { options } = progress
   const offenseTeam = offenseOurs ? options.ourTeamId : options.opponentTeamId
   const defenseTeam = offenseOurs ? options.opponentTeamId : options.ourTeamId
-  // 원본은 3아웃 타석 틱에도 주자 관리 [장면+0x20c](= sim+0x80)가 그 타석 끝 그대로다 — 지우기 0xa9250 은 다음 틱 0xc2198 의
-  // c21fc 3아웃 넘김 뒤 c2222. 웹 간이 타석은 3아웃이면 그 자리에서 루를 비우므로 타석 끝 루(도루로 민 루 포함)를 따로 받는다
-  const bases = flipped ? (tick.atBat?.basesAtEnd ?? tick.before.bases) : after.bases
-  const pitcher = offenseOurs ? progress.opponentPitcherEntry[progress.opponentPitcherIndex] : progress.ourPitcherEntry[progress.ourPitcherIndex]
-  const defenseEntries = offenseOurs ? progress.opponentEntry : progress.ourEntry
-  const catcher = defenseEntries.find((entry) => entry.position === CATCHER_POSITION)
-  const atBat = tick.atBat
-  const order = atBat !== null ? atBat.orderIndex : offenseOurs ? after.battingOrderIndex : progress.opponentOrderIndex
-  const batter = (offenseOurs ? progress.ourEntry : progress.opponentEntry)[lineupSlotOf(order)]
-  // 루 위 주자 신원 — 3아웃 틱은 웹이 지운 루 대신 타석 끝 루 · 신원(`basesAtEnd` · `runnersAtEnd`)
-  const runnerSource =
-    flipped && tick.atBat !== null ? { ...progress, game: { ...after, bases: tick.atBat.basesAtEnd, runners: tick.atBat.runnersAtEnd } } : progress
-  const aces = runnerAcesFor(runnerSource, offenseOurs)
-  const batterAce = batter !== undefined && batter.aceIndex >= 0 ? batter.aceIndex : null
+  const bases = drawnBasesOf(tick, flipped)
+  const batter = (offenseOurs ? progress.ourEntry : progress.opponentEntry)[lineupSlotOf(relayOrderIndexOf(tick, offenseOurs))]
+  const aces = runnerAcesFor(runnerSourceOf(tick, flipped), offenseOurs)
   return {
     offenseTeam,
     defenseTeam,
     bases: [bases.first, bases.second, bases.third],
-    pitcherAce: pitcher === undefined ? null : pitcher.aceIndex,
-    catcherAce: catcher?.aceIndex ?? -1,
-    batter: batter === undefined ? null : { aceIndex: batter.aceIndex, isLeft: teamBatterHandOf(offenseTeam, batter) === 1 },
-    aceRunners: [bases.first && aces.first != null, bases.second && aces.second != null, bases.third && aces.third != null],
-    loadedRunnerAce: batterAce ?? loadedBefore,
+    pitcherAce: relayPitcherAceOf(progress, offenseOurs),
+    catcherAce: relayCatcherAceOf(progress, offenseOurs),
+    batter: relayBatterFigureOf(batter, offenseTeam),
+    aceRunners: aceRunnersOf(bases, aces),
+    loadedRunnerAce: batterAceOf(batter) ?? loadedBefore,
   }
+}
+
+type RelayEntry = TeamGameProgress['ourEntry'][number]
+
+/** 그 틱이 반 이닝을 넘겼나(경기가 안 끝났을 때) — 3아웃 넘김 0xb6b6c 는 다음 틱이라 그림은 앞 반 이닝이다 */
+function isHalfFlippedAt(tick: RelayTick): boolean {
+  const after = tick.progress.game
+  return !after.isFinished && (after.inning !== tick.before.inning || after.half !== tick.before.half)
+}
+
+/** 그림의 반 이닝이 우리 공격인가 */
+function isOurOffenseAt(tick: RelayTick, flipped: boolean): boolean {
+  const after = tick.progress.game
+  const half = flipped ? tick.before.half : after.half
+  const ourHalf = after.playerSide === PLAYER_SIDE_FIRST_BAT ? '초' : '말'
+  return half === ourHalf
+}
+
+/**
+ * 원본은 3아웃 타석 틱에도 주자 관리 [장면+0x20c](= sim+0x80)가 그 타석 끝 그대로다 — 지우기 0xa9250 은 다음 틱 0xc2198 의
+ * c21fc 3아웃 넘김 뒤 c2222. 웹 간이 타석은 3아웃이면 그 자리에서 루를 비우므로 타석 끝 루(도루로 민 루 포함)를 따로 받는다
+ */
+function drawnBasesOf(tick: RelayTick, flipped: boolean): GameState['bases'] {
+  if (!flipped) return tick.progress.game.bases
+  return tick.atBat?.basesAtEnd ?? tick.before.bases
+}
+
+/** 루 위 주자 신원 — 3아웃 틱은 웹이 지운 루 대신 타석 끝 루 · 신원(`basesAtEnd` · `runnersAtEnd`) */
+function runnerSourceOf(tick: RelayTick, flipped: boolean): TeamGameProgress {
+  const { progress, atBat } = tick
+  if (!flipped || atBat === null) return progress
+  return { ...progress, game: { ...progress.game, bases: atBat.basesAtEnd, runners: atBat.runnersAtEnd } }
+}
+
+/** 수비 팀 지금 투수 — 없으면 null */
+function relayPitcherAceOf(progress: TeamGameProgress, offenseOurs: boolean): number | null {
+  const pitcher = offenseOurs ? progress.opponentPitcherEntry[progress.opponentPitcherIndex] : progress.ourPitcherEntry[progress.ourPitcherIndex]
+  return pitcher === undefined ? null : pitcher.aceIndex
+}
+
+/** 수비 9명 칸 1 의 포수 — 없으면 −1 */
+function relayCatcherAceOf(progress: TeamGameProgress, offenseOurs: boolean): number {
+  const defenseEntries = offenseOurs ? progress.opponentEntry : progress.ourEntry
+  return defenseEntries.find((entry) => entry.position === CATCHER_POSITION)?.aceIndex ?? -1
+}
+
+/** 공격 팀 지금 타자 그림 — 마선수 칸 · 손 0xb63c0 */
+function relayBatterFigureOf(batter: RelayEntry | undefined, offenseTeam: number): TeamRelayFigures['batter'] {
+  if (batter === undefined) return null
+  return { aceIndex: batter.aceIndex, isLeft: teamBatterHandOf(offenseTeam, batter) === 1 }
+}
+
+/** 1 · 2 · 3루 주자가 마선수인가 (주자 +0x9c ≠ −1) */
+function aceRunnersOf(bases: GameState['bases'], aces: ReturnType<typeof runnerAcesFor>): TeamRelayFigures['aceRunners'] {
+  return [bases.first && aces.first != null, bases.second && aces.second != null, bases.third && aces.third != null]
+}
+
+/** 이 틱 타자가 마선수면 그 그림 번호 */
+function batterAceOf(batter: RelayEntry | undefined): number | null {
+  return batter !== undefined && batter.aceIndex >= 0 ? batter.aceIndex : null
 }

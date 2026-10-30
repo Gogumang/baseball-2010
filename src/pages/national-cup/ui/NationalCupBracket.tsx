@@ -2,21 +2,10 @@ import { useId } from 'react'
 import { FrameSprite } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { TEAMS } from '@/shared/config/original/teams'
-import { FINAL_STAGE, matchTeamOf } from '@/entities/national-cup/model/nationalCup'
-import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
-import {
-  BRACKET_END_BOXES,
-  BRACKET_FINAL_BOXES,
-  BRACKET_FINAL_TITLE_FRAME,
-  BRACKET_FRAME,
-  BRACKET_LEAGUE_BOXES,
-  BRACKET_LEAGUE_TITLE_BASE,
-  TEAM_LABEL_BASE_FRAME,
-  TEAM_LOGO_SIZES,
-  frameCenterOf,
-  imageCenterOf,
-} from '@/pages/national-cup/lib/nationalCupLayout'
+import { TEAM_LABEL_BASE_FRAME, TEAM_LOGO_SIZES, frameCenterOf, imageCenterOf } from '@/pages/national-cup/lib/nationalCupLayout'
 import type { BracketBox } from '@/pages/national-cup/lib/nationalCupLayout'
+import { bracketStageOf } from '@/pages/national-cup/lib/bracketStage'
+import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
 import * as styles from '@/pages/national-cup/ui/NationalCupStandings.css'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 
@@ -30,13 +19,6 @@ interface NationalCupBracketProps {
   readonly onConfirm: () => void
   /** 확인 칸을 받는가 — 결과 팝업이 떠 있는 동안에는 키를 팝업이 가져간다 */
   readonly isConfirmable?: boolean
-}
-
-/** 한 칸: 로고 박스 · 이름표 박스 · 팀 */
-interface Slot {
-  readonly team: number
-  readonly logoBox: BracketBox
-  readonly labelBox: BracketBox
 }
 
 /**
@@ -54,24 +36,7 @@ export function NationalCupBracket({ cup, onConfirm, isConfirmable = true }: Nat
   const textSizeOf = (frame: number) => textOrigins?.[String(frame).padStart(3, '0')] ?? null
 
   const stage = cup.stage
-  const frame = stage > FINAL_STAGE ? BRACKET_FRAME.풀리그 : stage === FINAL_STAGE ? BRACKET_FRAME.결승 : BRACKET_FRAME.끝
-  const titleFrame = stage > FINAL_STAGE ? BRACKET_LEAGUE_TITLE_BASE - stage : stage === FINAL_STAGE ? BRACKET_FINAL_TITLE_FRAME : null
-  const slots: readonly Slot[] =
-    stage > FINAL_STAGE
-      ? [0, 1, 2, 3].map((i) => ({
-          team: matchTeamOf(cup, stage, i),
-          logoBox: BRACKET_LEAGUE_BOXES[i + 1],
-          labelBox: BRACKET_LEAGUE_BOXES[i + 5],
-        }))
-      : stage === FINAL_STAGE
-        ? [0, 1].map((i) => ({
-            team: matchTeamOf(cup, stage, i),
-            logoBox: BRACKET_FINAL_BOXES[i + 1],
-            labelBox: BRACKET_FINAL_BOXES[i + 3],
-          }))
-        : // n ≤ 0: S+0x12c(대회 중) 이면 S+0x144 우승국 — 이 화면은 대회 중에만 뜬다
-          [{ team: cup.champion, logoBox: BRACKET_END_BOXES[0], labelBox: BRACKET_END_BOXES[1] }]
-  const titleBox = stage > FINAL_STAGE ? BRACKET_LEAGUE_BOXES[0] : BRACKET_FINAL_BOXES[0]
+  const { frame, titleFrame, titleBox, slots } = bracketStageOf(cup)
 
   const textAt = (textFrame: number, box: BracketBox, filter?: string) => {
     const size = textSizeOf(textFrame)

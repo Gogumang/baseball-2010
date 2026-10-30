@@ -33,19 +33,25 @@ export type BreakingPitchKey = 'up' | 'down' | 'left' | 'right'
 
 /** ↑ ↓ ← → 로 옮긴 칸 (0x12410) */
 export function breakingPitchCursorAfter(cell: number, key: BreakingPitchKey): number {
-  if (key === 'down') {
-    const next = cell + 2
-    if (next === 9) return BREAKING_PITCH_OK_CELL
-    return next <= BREAKING_PITCH_OK_CELL ? next : cell - 7
-  }
-  if (key === 'up') {
-    if (cell === BREAKING_PITCH_OK_CELL) return 7
-    if (cell === 0) return BREAKING_PITCH_OK_CELL
-    const next = cell - 2
-    return next < 0 ? cell + 7 : next
-  }
+  if (key === 'down') return cursorBelow(cell)
+  if (key === 'up') return cursorAbove(cell)
   const step = key === 'right' ? 1 : -1
   return (cell + step + BREAKING_PITCH_CELL_COUNT) % BREAKING_PITCH_CELL_COUNT
+}
+
+/** ↓ — 두 칸 아래, 7 다음은 OK, 넘치면 위로 감는다 */
+function cursorBelow(cell: number): number {
+  const next = cell + 2
+  if (next === 9) return BREAKING_PITCH_OK_CELL
+  return next <= BREAKING_PITCH_OK_CELL ? next : cell - 7
+}
+
+/** ↑ — OK 위는 7, 0 위는 OK, 두 칸 위가 모자라면 아래로 감는다 */
+function cursorAbove(cell: number): number {
+  if (cell === BREAKING_PITCH_OK_CELL) return 7
+  if (cell === 0) return BREAKING_PITCH_OK_CELL
+  const next = cell - 2
+  return next < 0 ? cell + 7 : next
 }
 
 /**
@@ -64,11 +70,20 @@ export function breakingPitchCursorAfterToggle(cell: number, chosenCount: number
  * '2' '8' 은 0x12410 이 ↑ ↓ 와 함께 보고, '4' '6' 은 목록(숫자키 꼴 1, 표 0xd2e7c)이 ← → 로 바꾼다.
  */
 export function breakingPitchKeyOf(key: string): BreakingPitchKey | 'ok' | 'clr' | null {
-  if (key === 'ArrowUp' || key === '2') return 'up'
-  if (key === 'ArrowDown' || key === '8') return 'down'
-  if (key === 'ArrowLeft' || key === '4') return 'left'
-  if (key === 'ArrowRight' || key === '6') return 'right'
-  if (key === 'Enter' || key === '5') return 'ok'
-  if (key === 'Escape' || key === 'Backspace') return 'clr'
-  return null
+  return BREAKING_PITCH_KEYS.get(key) ?? null
 }
+
+const BREAKING_PITCH_KEYS: ReadonlyMap<string, BreakingPitchKey | 'ok' | 'clr'> = new Map<string, BreakingPitchKey | 'ok' | 'clr'>([
+  ['ArrowUp', 'up'],
+  ['2', 'up'],
+  ['ArrowDown', 'down'],
+  ['8', 'down'],
+  ['ArrowLeft', 'left'],
+  ['4', 'left'],
+  ['ArrowRight', 'right'],
+  ['6', 'right'],
+  ['Enter', 'ok'],
+  ['5', 'ok'],
+  ['Escape', 'clr'],
+  ['Backspace', 'clr'],
+])

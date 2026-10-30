@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { MessageBox } from '@/shared/ui'
 import { EventPortraits } from '@/widgets/event-portraits/ui/EventPortraits'
 import { EventDialogueBox } from '@/pages/story/ui/EventDialogueBox'
 import { EvaluationChangeWindow } from '@/pages/story/ui/EvaluationChangeWindow'
@@ -8,15 +7,11 @@ import { evaluationManagerPortraitsOf } from '@/pages/story/lib/evaluationDialog
 import { PORTRAIT_HEIGHT } from '@/pages/story/ui/StoryScreen.css'
 import { SCREEN_HEIGHT } from '@/pages/story/lib/eventDialogue'
 import { portraitBaseYOf } from '@/pages/story/lib/eventBackdrop'
-import { RewardSkillWindow } from '@/pages/story/ui/RewardSkillWindow'
-import { EVENT_WINDOW_DIM_OPACITY } from '@/pages/story/lib/eventDialogue'
 import type { RewardNotice } from '@/entities/story/model/rewardNotice'
+import { finalNoticeWindowOf, rewardNoticeWindowOf, rewardSkillWindowOf, shownRewardOf } from '@/pages/story/ui/evaluationEventPlayer/rewardWindows'
 import { givenRewardCountOf, nextWindowRewardOf } from '@/pages/story/ui/evaluationEventPlayer/rewardSteps'
 import type { EvaluationStep } from '@/pages/story/ui/evaluationEventPlayer/rewardSteps'
 import type { EvaluationEventPlayerProps } from '@/pages/story/ui/evaluationEventPlayer/evaluationEventPlayerProps'
-
-/** 보상 창 버튼 — 0x74ef4 종류 1 (OK 하나) */
-const NOTICE_BUTTONS = ['OK'] as const
 
 /**
  * 초상화 바닥 — 0x7fbc4 끝(0x7fdee~0x7fe4c)이 0x7f998(창, y) 에 넘기는 y:
@@ -88,8 +83,7 @@ export function EvaluationEventPlayer({
     onRewardsGiven?.(next + 1)
   }
   const finishRewardWindow = (key: number) => setClosingReward((closing) => (closing?.key === key ? null : closing))
-  const currentReward = step === '보상' ? rewardNotices[rewardIndex] : undefined
-  const shownReward = currentReward !== undefined ? { key: rewardIndex, notice: currentReward } : closingReward
+  const shownReward = shownRewardOf(step, rewardNotices, rewardIndex, closingReward)
   const givenRewardCount = givenRewardCountOf(step, rewardIndex, rewardNotices.length)
   const expression = hasStreakShown ? streakExpression : dialogueExpression
 
@@ -133,36 +127,9 @@ export function EvaluationEventPlayer({
           <EvaluationChangeWindow values={changeValues} goals={goals} year={year} game={game} onClose={afterChange} />
         </div>
       )}
-      {shownReward?.notice.kind === '알림' && (
-        // 0x8d71c — 0xbbef8(글, 1, 1, 1) → 0x74ef4 종류 1. 기다림 0x8daa0 은 답 0(OK · CLR)을 받은 그 갱신에 다음 명령
-        <div style={{ position: 'absolute', inset: 0, zIndex: 40 }}>
-          <MessageBox
-            key={`보상${shownReward.key}`}
-            text={shownReward.notice.text}
-            buttons={NOTICE_BUTTONS}
-            dimOpacity={EVENT_WINDOW_DIM_OPACITY}
-            onAnswerKey={answerReward}
-            onAnswer={() => finishRewardWindow(shownReward.key)}
-          />
-        </div>
-      )}
-      {shownReward?.notice.kind === '스킬' && (
-        // 0x8d6bc — 첫 종류 4 는 스킬 창 0x741a1(그리기 0x87108 · 키 0x8e054 — OK · '5' · CLR, 받은 그 갱신에 다음 명령)
-        <div style={{ position: 'absolute', inset: 0, zIndex: 40 }}>
-          <RewardSkillWindow
-            key={`보상${shownReward.key}`}
-            text={shownReward.notice.text}
-            gained={shownReward.notice.gained}
-            onKey={answerReward}
-            onClose={() => finishRewardWindow(shownReward.key)}
-          />
-        </div>
-      )}
-      {step === '알림' && finalNotice !== null && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 40 }}>
-          <MessageBox text={finalNotice} buttons={['확인']} onAnswer={onDone} />
-        </div>
-      )}
+      {rewardNoticeWindowOf(shownReward, answerReward, finishRewardWindow)}
+      {rewardSkillWindowOf(shownReward, answerReward, finishRewardWindow)}
+      {finalNoticeWindowOf(step, finalNotice, onDone)}
     </>
   )
 }

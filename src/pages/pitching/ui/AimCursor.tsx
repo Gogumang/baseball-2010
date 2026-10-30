@@ -9,6 +9,7 @@ import { CLEAR_PRESS_RECT } from '@/features/play-game/model/stagePressAreas'
 import { PressArea } from '@/shared/ui'
 import type { TouchKeyOffer } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { PressLayer } from '@/pages/pitching/ui/PressLayer'
+import { seenAimOf } from '@/pages/pitching/lib/aimHistory'
 import { usePublishedOverlay } from '@/pages/pitching/model/pitchInputOverlayRef'
 import type { PitchInputOverlayRef } from '@/pages/pitching/model/pitchInputOverlayRef'
 import { createGameSceneDrawGate, gameSceneTickNow, isGameSceneFrozen, setGameSceneTickInterval } from '@/shared/lib/commonWindow/commonWindow'
@@ -134,14 +135,14 @@ export function AimCursor({ side, onTick, onConfirm, onCancel, isPaused = false,
     if (action.kind === 'cancel' && propsRef.current.onCancel === undefined) return
     isDoneRef.current = true
     // 본 그림 뒤에 갱신이 조준점을 더 흘렸으면(늦게 꺼냄) 본 그림의 조준점으로 되돌린다 — ⚠️ 미션 흔들림 난수는 그 갱신들이 이미 썼다(근사)
-    const history = aimHistoryRef.current
-    if (history.length > 0 && (history.at(-1)?.tick ?? seenTick) > seenTick) {
-      let seenAim = startAimRef.current
-      for (const entry of history) if (entry.tick <= seenTick) seenAim = entry.aim
-      aimRef.current = seenAim
-    }
+    const seenAim = seenAimOf(aimHistoryRef.current, seenTick, startAimRef.current)
+    if (seenAim !== null) aimRef.current = seenAim
     tickRef.current()
-    if (action.kind === 'confirm') propsRef.current.onConfirm(aimRef.current)
+    settle(action.kind)
+  }
+  /** OK 는 조준점으로 확정, CLR 은 구질로 */
+  const settle = (kind: AimKeyAction['kind']) => {
+    if (kind === 'confirm') propsRef.current.onConfirm(aimRef.current)
     else propsRef.current.onCancel?.()
   }
   const applyRef = useRef(apply)

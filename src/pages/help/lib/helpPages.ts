@@ -1,5 +1,6 @@
 import { ORIGINAL_HOWTO } from '@/shared/config/original/howto'
-import { FONT_SPACING, LINE_HEIGHT, measurePixelTextWidth } from '@/shared/lib/font'
+import { FONT_SPACING, LINE_HEIGHT } from '@/shared/lib/font'
+import { createHelpLineWriter, helpCommandAt, type HelpTextLine } from '@/pages/help/lib/helpTextWrap'
 import { GAME_VERSION, HELP_CHAPTER_LENGTHS } from '@/shared/config/helpSections'
 
 /**
@@ -51,21 +52,7 @@ export const HELP_TEXT_BOX = {
   lineHeight: LINE_HEIGHT + FONT_SPACING.app.lineGap,
 } as const
 
-/** 자간 — 0x6ecd0 이 고른 앱 전역 글꼴의 +0x66 = 1 */
-const LETTER_GAP = FONT_SPACING.app.letterGap
-
-export type HelpTextAlign = '왼' | '가운데' | '오른'
-
-export interface HelpTextSegment {
-  readonly text: string
-  /** '#RRGGBB' 또는 기본(흰)색 null */
-  readonly color: string | null
-}
-
-export interface HelpTextLine {
-  readonly segments: readonly HelpTextSegment[]
-  readonly align: HelpTextAlign
-}
+export type { HelpTextAlign, HelpTextLine } from '@/pages/help/lib/helpTextWrap'
 
 /**
  * 글을 원본 줄로 편다 — 글 배치 `0x6ef4c` 의 줄 나누기 그대로 (0x6efe0~0x6f23c):
@@ -75,70 +62,28 @@ export interface HelpTextLine {
  * - 끝의 `!N` 은 빈 줄을 하나 더 만들지 않는다(마지막 토큰에서 줄을 한 번만 닫는다). 빈 글은 0줄이다.
  */
 export function wrapHelpText(raw: string, maxWidth: number = HELP_TEXT_BOX.width): readonly HelpTextLine[] {
-  const lines: HelpTextLine[] = []
-  let segments: HelpTextSegment[] = []
-  let buffer = ''
-  let color: string | null = null
-  let align: HelpTextAlign = '왼'
-  let x = 0
-  let hasContent = false
-
-  const flushSegment = () => {
-    if (buffer === '') return
-    segments.push({ text: buffer, color })
-    buffer = ''
-  }
-  const flushLine = () => {
-    flushSegment()
-    lines.push({ segments, align })
-    segments = []
-    x = 0
-    hasContent = false
-  }
-
+  const writer = createHelpLineWriter()
   let index = 0
   while (index < raw.length) {
-    const isLast = (unitLength: number) => index + unitLength >= raw.length
-    if (raw[index] === '!' && index + 1 < raw.length) {
-      const next = raw[index + 1]
-      if (next === 'N') {
-        flushLine()
-        index += 2
-        continue
-      }
-      if (next === 'L' || next === 'C' || next === 'R') {
-        flushSegment()
-        align = next === 'L' ? '왼' : next === 'C' ? '가운데' : '오른'
-        index += 2
-        if (isLast(0) && hasContent) flushLine()
-        continue
-      }
-      if (next === 'c' && /^[0-9A-Fa-f]{6}$/.test(raw.slice(index + 2, index + 8))) {
-        flushSegment()
-        const code = raw.slice(index + 2, index + 8).toUpperCase()
-        color = code === 'FFFFFF' ? null : `#${code}`
-        index += 8
-        if (isLast(0) && hasContent) flushLine()
-        continue
-      }
-    }
-    const character = raw[index]
-    // 한 글자 폭 0x6f2e4 → 0x9c52c — 한글 9 · 영문/공백 5 · 못 그리는 글자(2350자 밖 · 기호) 0
-    const advance = measurePixelTextWidth(character)
-    const width = advance + (x > 0 ? LETTER_GAP : 0)
-    if (maxWidth - x - width < 0 && x > 0) {
-      // 넘치면 이 글자 앞에서 줄을 닫고 다음 줄 첫 글자로 다시 잰다 (0x6f216 `+0x44 = 0`)
-      flushLine()
+    const command = helpCommandAt(raw, index)
+    if (command !== null) {
+      index += command.length
+      writer.apply(command, index >= raw.length)
       continue
     }
-    buffer += character
-    x += width
-    hasContent = true
+    const character = raw[index]
+    const width = writer.widthOf(character)
+    // 넘치면 이 글자 앞에서 줄을 닫고 다음 줄 첫 글자로 다시 잰다 (0x6f216 `+0x44 = 0`)
+    if (writer.overflows(width, maxWidth)) {
+      writer.flushLine()
+      continue
+    }
+    writer.put(character, width)
     index += 1
-    if (index >= raw.length) flushLine()
+    if (index >= raw.length) writer.flushLine()
   }
-  if (hasContent || buffer !== '') flushLine()
-  return lines
+  writer.finish()
+  return writer.lines
 }
 
 /**

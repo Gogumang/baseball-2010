@@ -43,6 +43,47 @@ interface OutingMapScreenProps {
   readonly onCloseBubble?: () => void
 }
 
+const OPEN_KEYS: ReadonlySet<string> = new Set(['Enter', ' ', '5'])
+const BACK_KEYS: ReadonlySet<string> = new Set(['Escape', 'Backspace'])
+
+const placeOfId = (id: string | null) => OUTING_PLACES.find((place) => place.id === id) ?? null
+const firstSelectedIdOf = (openPlace: OutingPlace | null) => openPlace?.id ?? OUTING_PLACES[0].id
+
+/** 지도 커서 [this+0xac] — 고른 장소의 칸(없으면 0) */
+function placeCursorOf(placeId: string): number {
+  return Math.max(
+    OUTING_PLACES.findIndex((place) => place.id === placeId),
+    0,
+  )
+}
+
+/** 방향 이동 표 0xd491c 로 옮긴 장소 — 칸이 없으면 그대로 */
+function placeIdAfterMove(cursor: number, direction: NonNullable<ReturnType<typeof outingMapDirectionOf>>, currentId: string): string {
+  return OUTING_PLACES[moveOutingMapCursor(cursor, direction)]?.id ?? currentId
+}
+
+/** 효과 팝업 · 126 연출 · 막힘 글이 떠 있지 않다 — 지도나 말풍선이 키를 받는다 */
+function isOutingInputFree(resultText: string | null, presentation: ReactNode, noticeText: string): boolean {
+  return resultText === null && presentation === null && noticeText === ''
+}
+
+/** 말풍선은 0x7ee1a 가 113 일 때만 그린다 — 126(연출 · 효과 팝업)이면 사라진다 */
+function isBubbleDrawn(presentation: ReactNode, resultText: string | null): boolean {
+  return presentation === null && resultText === null
+}
+
+/** 113 가드의 막힘 글 팝업 */
+function noticeBoxOf(noticeText: string, onCloseNotice: () => void) {
+  if (noticeText === '') return null
+  return <MessageBox text={noticeText} buttons={['확인']} onAnswer={onCloseNotice} />
+}
+
+/** 126 효과 팝업 */
+function resultBoxOf(resultText: string | null, onCloseResult: (() => void) | undefined) {
+  if (resultText === null) return null
+  return <MessageBox text={resultText} buttons={['확인']} onAnswer={() => onCloseResult?.()} />
+}
+
 /**
  * 원작 외출 — 도시 지도에서 장소를 고른다 (StrHOWTO[16]).
  * 지도는 원본 프레임 배치 그대로다. 장소를 고르면 **지도 위 말풍선**(박스 3, 70×42)에
@@ -58,11 +99,11 @@ export function OutingMapScreen({
   resultText = null,
   onCloseResult,
   presentation = null,
-  initialOpenPlaceId = null,
+  initialOpenPlaceId,
   onCloseBubble,
 }: OutingMapScreenProps) {
-  const [openPlace, setOpenPlace] = useState<OutingPlace | null>(() => OUTING_PLACES.find((place) => place.id === initialOpenPlaceId) ?? null)
-  const [selectedPlaceId, setSelectedPlaceId] = useState(openPlace?.id ?? OUTING_PLACES[0].id)
+  const [openPlace, setOpenPlace] = useState<OutingPlace | null>(() => placeOfId(initialOpenPlaceId ?? null))
+  const [selectedPlaceId, setSelectedPlaceId] = useState(firstSelectedIdOf(openPlace))
   /** 113 → 112 — 말풍선을 닫고 112 진입을 세션에 알린다 */
   const closeBubble = () => {
     setOpenPlace(null)
@@ -78,28 +119,26 @@ export function OutingMapScreen({
    * ```
    * 말풍선(113) · 효과 팝업 · 126 연출이 떠 있으면 그쪽이 키를 받는다. 앞서 웹은 이 키를 안 받아 지도가 마우스로만 움직였다 (r82)
    */
-  const isMapKeyOn = openPlace === null && resultText === null && presentation === null && noticeText === ''
+  const isInputFree = isOutingInputFree(resultText, presentation, noticeText)
+  const isMapKeyOn = openPlace === null && isInputFree
   const latest = useEffectEvent(() => ({ selectedPlaceId, onBack }))
   useEffect(() => {
     if (!isMapKeyOn) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       const current = latest()
-      const cursor = Math.max(
-        OUTING_PLACES.findIndex((place) => place.id === current.selectedPlaceId),
-        0,
-      )
-      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
+      const cursor = placeCursorOf(current.selectedPlaceId)
+      if (OPEN_KEYS.has(event.key)) {
         event.preventDefault()
         return setOpenPlace(OUTING_PLACES[cursor])
       }
-      if (event.key === 'Escape' || event.key === 'Backspace') {
+      if (BACK_KEYS.has(event.key)) {
         event.preventDefault()
         return current.onBack()
       }
       const direction = outingMapDirectionOf(event.key)
       if (direction === null) return
       event.preventDefault()
-      setSelectedPlaceId(OUTING_PLACES[moveOutingMapCursor(cursor, direction)]?.id ?? current.selectedPlaceId)
+      setSelectedPlaceId(placeIdAfterMove(cursor, direction, current.selectedPlaceId))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -108,8 +147,8 @@ export function OutingMapScreen({
   // 동안 '뒤로' 상황 버튼을 낸다(r194). Escape 키 사건이라 위 듣는 곳(CLR → 105, 행동함 내림 `leaveOutingMap`)과 같은 길이다
   // 말풍선(113)이 키를 받는 동안도 같다 — 말풍선 그림(0x7ee1a)에도 CLR 글자 자리가 없고, 그 CLR(Escape)은 말풍선을 닫아 지도(112)로
   // 돌린다(`PlaceBubble`). 앞서 버튼을 지도에서만 내 터치 기기에서 건물을 한 번 누르면 투명 "취소" 칸 말고는 나갈 길이 안 보였다(r206)
-  const isBubbleKeyOn = openPlace !== null && resultText === null && presentation === null && noticeText === ''
-  useTouchKeyOffer(isMapKeyOn || isBubbleKeyOn ? BACK_KEY_OFFER : null)
+  // 지도(112) · 말풍선(113) 어느 쪽이든 키를 받는 동안이다
+  useTouchKeyOffer(isInputFree ? BACK_KEY_OFFER : null)
 
   return (
     <OutingMap
@@ -125,12 +164,12 @@ export function OutingMapScreen({
         말풍선은 0x7ee1a 가 [gfx+0x174] == 0x71(113) 일 때만 그린다 — 기능이 막히면 113 에 남아 팝업 밑에 그대로 있고,
         통과하면 126(연출 · 효과 팝업)이라 사라진다(0x16dd4~0x16ddc)
       */}
-      {openPlace !== null && presentation === null && resultText === null && (
+      {openPlace !== null && isBubbleDrawn(presentation, resultText) && (
         <PlaceBubble place={openPlace} isKeyEnabled={noticeText === ''} onEnter={() => onEnter(openPlace)} onRun={onRun} onClose={closeBubble} />
       )}
       {presentation}
-      {noticeText !== '' && <MessageBox text={noticeText} buttons={['확인']} onAnswer={onCloseNotice} />}
-      {resultText !== null && <MessageBox text={resultText} buttons={['확인']} onAnswer={() => onCloseResult?.()} />}
+      {noticeBoxOf(noticeText, onCloseNotice)}
+      {resultBoxOf(resultText, onCloseResult)}
     </OutingMap>
   )
 }
