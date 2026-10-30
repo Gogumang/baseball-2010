@@ -86,6 +86,10 @@ export function inputTimeOf(event: Event | null | undefined, now: number = perfo
   if (event === null || event === undefined) return now
   const stamped = stampedTimes.get(event)
   const time = stamped ?? event.timeStamp
-  if (!Number.isFinite(time) || time <= 0 || time > now + 1 || now - time > MAX_INPUT_AGE_MS) return now
-  return time
+  return isImplausibleInputTime(time, now) ? now : time
+}
+
+/** 사건 시각을 못 믿는가 — 수가 아니거나 0 이하 · 지금(+1ms)보다 뒤 · 너무 오래 전(시각 바탕이 다른 환경) */
+function isImplausibleInputTime(time: number, now: number): boolean {
+  return !Number.isFinite(time) || time <= 0 || time > now + 1 || now - time > MAX_INPUT_AGE_MS
 }

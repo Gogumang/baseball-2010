@@ -12,6 +12,50 @@ function boxOf(rect: { readonly left: number; readonly top: number; readonly wid
   return { ...rect, right: rect.left + rect.width, bottom: rect.top + rect.height }
 }
 
+/** 옮기기 전에 잰 자리 — 뿌리 · 화면 판(없으면 null) · 판 바깥 틀(없으면 null) */
+function measureShakeBoxes(root: HTMLElement) {
+  const screen = root.querySelector<HTMLElement>(SCREEN_SELECTOR)
+  // 판 · 바깥 틀은 CSS zoom 안이라 웹킷(아이폰 Safari)은 사각형을 zoom 뺀 값으로 낸다 — 화면 좌표로 옮겨 잰다(`screenRectOf`).
+  // 안 옮기면 배율이 1 로 읽혀 자르는 사각형이 판의 1/배율 크기로 왼쪽 위에 잡혀, 흔드는 동안 판 오른쪽 · 아래가 잘려 검게 보였다 (r255)
+  const rootBox = boxOf(screenRectOf(root))
+  const screenBox = screen === null ? null : boxOf(screenRectOf(screen))
+  const frame = screen?.parentElement ?? null
+  const frameBox = frame === null ? null : boxOf(screenRectOf(frame))
+  return { rootBox, screenBox, frameBox }
+}
+
+type ShakeBox = ReturnType<typeof boxOf>
+
+/** 옮긴 뒤 좌표계로 옮기기 전 화면 판 자리만 남긴다(오프셋만큼 거꾸로 민다) */
+function clipToScreenBox(root: HTMLElement, rootBox: ShakeBox, screenBox: ShakeBox, x: number, y: number): void {
+  const scale = screenBox.width / SCREEN_WIDTH
+  const dx = x * scale
+  const dy = y * scale
+  const top = screenBox.top - rootBox.top - dy
+  const left = screenBox.left - rootBox.left - dx
+  const right = rootBox.right - screenBox.right + dx
+  const bottom = rootBox.bottom - screenBox.bottom + dy
+  root.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`
+}
+
+/** 잘려 나간 바깥 — 옮기기 전 화면 판 바깥 틀 자리에 까는 검정 받침 */
+function appendShakeBacking(frameBox: ShakeBox): HTMLDivElement {
+  const backing = document.createElement('div')
+  backing.dataset.screenShakeBacking = ''
+  Object.assign(backing.style, {
+    position: 'fixed',
+    left: `${frameBox.left}px`,
+    top: `${frameBox.top}px`,
+    width: `${frameBox.width}px`,
+    height: `${frameBox.height}px`,
+    background: '#000000',
+    zIndex: '-1',
+    pointerEvents: 'none',
+  })
+  document.body.appendChild(backing)
+  return backing
+}
+
 /**
  * **그린 화면 통째로 옮기기** 0xba888(화면, dx, dy) — 화면 버퍼의 픽셀을 (dx, dy) 만큼 옮기고(0xb95b0) 비운 줄 · 칸을 0(검정)으로
  * 채운다(0x1400428). 장면 그리기 끝(창 0x746cd · 효과기 0xbd844 순서)에서 부르므로 그 틀에 그린 것 **모두**가 옮겨진다.
@@ -28,43 +72,13 @@ export function useWholeScreenOffset(offset: { readonly x: number; readonly y: n
   useLayoutEffect(() => {
     const root = document.getElementById(ROOT_ID)
     if (root === null || (x === 0 && y === 0)) return undefined
-    const screen = root.querySelector<HTMLElement>(SCREEN_SELECTOR)
-    // 옮기기 전에 잰다 — 앞 효과의 정리가 이미 되돌려 두었다.
-    // 판 · 바깥 틀은 CSS zoom 안이라 웹킷(아이폰 Safari)은 사각형을 zoom 뺀 값으로 낸다 — 화면 좌표로 옮겨 잰다(`screenRectOf`).
-    // 안 옮기면 배율이 1 로 읽혀 자르는 사각형이 판의 1/배율 크기로 왼쪽 위에 잡혀, 흔드는 동안 판 오른쪽 · 아래가 잘려 검게 보였다 (r255)
-    const rootBox = boxOf(screenRectOf(root))
-    const screenBox = screen === null ? null : boxOf(screenRectOf(screen))
-    const frame = screen?.parentElement ?? null
-    const frameBox = frame === null ? null : boxOf(screenRectOf(frame))
+    // 옮기기 전에 잰다 — 앞 효과의 정리가 이미 되돌려 두었다
+    const { rootBox, screenBox, frameBox } = measureShakeBoxes(root)
     const previous = { transform: root.style.transform, clipPath: root.style.clipPath }
     root.style.transform = `translate(calc(${x}px * var(--zoom, 1)), calc(${y}px * var(--zoom, 1)))`
-
-    let backing: HTMLDivElement | null = null
-    if (screenBox !== null && screenBox.width > 0) {
-      const scale = screenBox.width / SCREEN_WIDTH
-      const dx = x * scale
-      const dy = y * scale
-      const top = screenBox.top - rootBox.top - dy
-      const left = screenBox.left - rootBox.left - dx
-      const right = rootBox.right - screenBox.right + dx
-      const bottom = rootBox.bottom - screenBox.bottom + dy
-      root.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`
-      if (frameBox !== null) {
-        backing = document.createElement('div')
-        backing.dataset.screenShakeBacking = ''
-        Object.assign(backing.style, {
-          position: 'fixed',
-          left: `${frameBox.left}px`,
-          top: `${frameBox.top}px`,
-          width: `${frameBox.width}px`,
-          height: `${frameBox.height}px`,
-          background: '#000000',
-          zIndex: '-1',
-          pointerEvents: 'none',
-        })
-        document.body.appendChild(backing)
-      }
-    }
+    const clipsToScreen = screenBox !== null && screenBox.width > 0
+    if (clipsToScreen) clipToScreenBox(root, rootBox, screenBox, x, y)
+    const backing = clipsToScreen && frameBox !== null ? appendShakeBacking(frameBox) : null
     return () => {
       root.style.transform = previous.transform
       root.style.clipPath = previous.clipPath

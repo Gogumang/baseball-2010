@@ -65,6 +65,38 @@ function sceneLatchOwnsKeys(): boolean {
   return hasOpenSceneKeyLatch() && !isCommonWindowShown()
 }
 
+/** 폰 키인가 — 폰에 없는 키 · 수식 키(Ctrl · Meta · Alt — 브라우저 단축키)는 지나 보낸다 */
+function isPhoneKey(event: KeyboardEvent): boolean {
+  return isSlotKey(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey
+}
+
+/** 칸에 둘 키 — 다음 틱 머리에 같은 키 사건으로 다시 쏜다 */
+function heldEventOf(event: KeyboardEvent, tick: number): HeldEvent {
+  return {
+    tick,
+    type: event.type === 'keyup' ? 'keyup' : 'keydown',
+    target: event.target,
+    init: {
+      key: event.key,
+      code: event.code,
+      location: event.location,
+      shiftKey: event.shiftKey,
+      repeat: false,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    },
+  }
+}
+
+/** 받은 칸 [+0x20] · [+0x24] 는 하나 — 그 틀의 마지막 누름 · 마지막 뗌만, 누름 먼저 */
+function lastKeysOfTick(due: readonly HeldEvent[], tick: number): HeldEvent[] {
+  const ofTick = due.filter((entry) => entry.tick === tick)
+  const lastPress = ofTick.filter((entry) => entry.type === 'keydown').at(-1)
+  const lastRelease = ofTick.filter((entry) => entry.type === 'keyup').at(-1)
+  return [lastPress, lastRelease].filter((entry) => entry !== undefined)
+}
+
 /** 지금 달린 문 — 다시 달면(개발 서버의 다시 읽기) 앞 문을 거둔다 */
 let installed: AppKeyGate | null = null
 
@@ -80,13 +112,7 @@ export function installAppKeyGate(view: Window = window): AppKeyGate {
     held = held.filter((entry) => entry.tick >= now)
     const ticks = [...new Set(due.map((entry) => entry.tick))].sort((a, b) => a - b)
     for (const at of ticks) {
-      const ofTick = due.filter((entry) => entry.tick === at)
-      // 받은 칸 [+0x20] · [+0x24] 는 하나 — 그 틀의 마지막 누름 · 마지막 뗌만, 누름 먼저
-      const lastPress = ofTick.filter((entry) => entry.type === 'keydown').at(-1)
-      const lastRelease = ofTick.filter((entry) => entry.type === 'keyup').at(-1)
-      for (const entry of [lastPress, lastRelease]) {
-        if (entry !== undefined) replay(entry)
-      }
+      for (const entry of lastKeysOfTick(due, at)) replay(entry)
     }
     if (held.length > 0) schedule()
   }
@@ -106,29 +132,14 @@ export function installAppKeyGate(view: Window = window): AppKeyGate {
 
   const onKey = (event: KeyboardEvent) => {
     if (replayed.has(event)) return
-    if (!isSlotKey(event.key) || event.ctrlKey || event.metaKey || event.altKey) return
-    if (isEditableTarget(event.target)) return
+    if (!isPhoneKey(event) || isEditableTarget(event.target)) return
     if (sceneLatchOwnsKeys()) return
     // 칸에 넣는다 — 뒤쪽 듣는 곳(화면 · 창)은 다음 틱 머리에 다시 쏜 사건으로 받는다
     event.stopImmediatePropagation()
     event.preventDefault()
     // 누른 채 되풀이는 원본 장면 밖 · 창에 없다(되풀이 [+0x38] 은 0x498d4 만 읽는다)
     if (event.type === 'keydown' && event.repeat) return
-    held.push({
-      tick: appTickNow(),
-      type: event.type === 'keyup' ? 'keyup' : 'keydown',
-      target: event.target,
-      init: {
-        key: event.key,
-        code: event.code,
-        location: event.location,
-        shiftKey: event.shiftKey,
-        repeat: false,
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-      },
-    })
+    held.push(heldEventOf(event, appTickNow()))
     schedule()
   }
 

@@ -53,15 +53,23 @@ export function reachablePortraitsOf(events: readonly OriginalEvent[], first: Or
     const event = pending.pop()
     if (event === undefined || visited.has(event.id)) continue
     visited.add(event.id)
-    for (const command of event.commands) {
-      if (command.op === 'say' || command.op === 'choice') portraits.push(...command.portraits)
-    }
-    for (const id of branchEventIdsOf(event)) {
-      const next = byId.get(id)
-      if (next !== undefined && !visited.has(id)) pending.push(next)
-    }
+    portraits.push(...shownPortraitsOf(event))
+    pending.push(...unvisitedBranchesOf(event, byId, visited))
   }
   return portraits
+}
+
+/** 이벤트의 say · choice 초상 (명령 차례) */
+function shownPortraitsOf(event: OriginalEvent): EventPortrait[] {
+  return event.commands.flatMap((command) => (command.op === 'say' || command.op === 'choice' ? command.portraits : []))
+}
+
+/** 갈래로 닿는 이벤트 가운데 아직 안 훑은 것 */
+function unvisitedBranchesOf(event: OriginalEvent, byId: ReadonlyMap<number, OriginalEvent>, visited: ReadonlySet<number>): OriginalEvent[] {
+  return branchEventIdsOf(event).flatMap((id) => {
+    const next = byId.get(id)
+    return next !== undefined && !visited.has(id) ? [next] : []
+  })
 }
 
 /** 초상 목록 → 받을 그림. 애니 번호는 화면과 같은 식(`portraitAnimationOf`), 피부 팔레트를 쓰면 번호 지도 · palette.json 도 */

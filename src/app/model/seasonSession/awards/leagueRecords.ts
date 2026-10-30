@@ -27,30 +27,41 @@ export function seasonLeagueRecordsOf(source: SeasonLeagueRecordSource, isPitche
   const records: LeagueRecord[] = []
   for (let team = 0; team < LEAGUE_TEAM_COUNT; team += 1) {
     const roster = team === source.myTeamId ? source.roster : source.cpuRosterOf(team)
-    if (!isPitcher) {
-      roster.batters.forEach((player, index) => {
-        const line = seasonBatterLineOf(source.playerStats, team, player)
-        records.push({
-          ...EMPTY_LEAGUE_RECORD,
-          teamId: team,
-          name: recordNameOf(source, team, player, false, index),
-          atBatsOrOuts: line.atBats,
-          hits: line.hits,
-          homeRuns: line.homeRuns,
-          runsBattedIn: line.runsBattedIn,
-          // +0x2c 도루 — 순위 종류 10 (0x9d789). 옛 저장은 칸이 없어 0
-          batterExtra: line.steals ?? 0,
-        })
-      })
-      continue
+    records.push(...(isPitcher ? teamPitcherRecordsOf(source, team, roster) : teamBatterRecordsOf(source, team, roster)))
+  }
+  return records
+}
+
+type SeasonRoster = ReturnType<SeasonLeagueRecordSource['cpuRosterOf']>
+
+/** 한 팀 타자 배열(0xb53d1) — 레코드 차례대로 */
+function teamBatterRecordsOf(source: SeasonLeagueRecordSource, team: number, roster: SeasonRoster): LeagueRecord[] {
+  return roster.batters.map((player, index) => {
+    const line = seasonBatterLineOf(source.playerStats, team, player)
+    return {
+      ...EMPTY_LEAGUE_RECORD,
+      teamId: team,
+      name: recordNameOf(source, team, player, false, index),
+      atBatsOrOuts: line.atBats,
+      hits: line.hits,
+      homeRuns: line.homeRuns,
+      runsBattedIn: line.runsBattedIn,
+      // +0x2c 도루 — 순위 종류 10 (0x9d789). 옛 저장은 칸이 없어 0
+      batterExtra: line.steals ?? 0,
     }
-    const order = pitcherOrderOf(source.league, team)
-    const indexes = roster.pitchers.length === order.length ? order : roster.pitchers.map((_player, index) => index)
-    for (const index of indexes) {
-      const player = roster.pitchers[index]
-      if (player === undefined) continue
-      const line = seasonPitcherLineOf(source.playerStats, team, player)
-      records.push({
+  })
+}
+
+/** 한 팀 투수 배열(0xb51fd) — 로테이션(0xb5ca8)으로 섞인 레코드 차례 */
+function teamPitcherRecordsOf(source: SeasonLeagueRecordSource, team: number, roster: SeasonRoster): LeagueRecord[] {
+  const order = pitcherOrderOf(source.league, team)
+  const indexes = roster.pitchers.length === order.length ? order : roster.pitchers.map((_player, index) => index)
+  return indexes.flatMap((index) => {
+    const player = roster.pitchers[index]
+    if (player === undefined) return []
+    const line = seasonPitcherLineOf(source.playerStats, team, player)
+    return [
+      {
         ...EMPTY_LEAGUE_RECORD,
         teamId: team,
         name: recordNameOf(source, team, player, true, index),
@@ -61,10 +72,9 @@ export function seasonLeagueRecordsOf(source: SeasonLeagueRecordSource, isPitche
         earnedRuns: line.runsAllowed,
         wins: line.wins,
         losses: line.losses,
-      })
-    }
-  }
-  return records
+      },
+    ]
+  })
 }
 
 /** 순위표 종류가 투수 배열을 훑는가 — 0x9d789 `cmp 종류, #7 ; ble` (9d83e · 9d85c) */

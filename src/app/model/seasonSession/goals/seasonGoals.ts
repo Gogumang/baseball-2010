@@ -146,16 +146,25 @@ export function seasonPostseasonRankOf(
 function goalBracketOf(series: PostseasonSeries | null): GoalPostseasonBracket {
   if (series === null) return { champion: null, pairs: [] }
   const [first, second, third, fourth] = series.qualifiers
-  const inKoreanSeries = series.round === '한국시리즈' || series.round === '종료'
-  // 플레이오프 칸 1(L+0x3b) = 준PO 승자 — 준PO 가 끝나면 0xb7724 가 넣고 포스트시즌 끝까지 남는다(`semiPlayoffWinner`).
-  // 옛 저장은 불러올 때 `withSemiPlayoffWinner` 가 채운다 — 그래도 모르면(로테이션 칸도 없는 저장) 빈 칸이다
-  const playoffLower = series.round === '준플레이오프' ? null : (withSemiPlayoffWinner(series).semiPlayoffWinner ?? null)
   return {
     champion: series.champion,
     pairs: [
-      [first ?? null, inKoreanSeries ? series.teams[1] : null],
-      [second ?? null, playoffLower],
+      [first ?? null, koreanSeriesLowerOf(series)],
+      [second ?? null, playoffLowerOf(series)],
       [third ?? null, fourth ?? null],
     ],
   }
+}
+
+/** 한국시리즈 칸 1 — 한국시리즈가 열렸으면(끝났어도) 맞붙은 팀 */
+function koreanSeriesLowerOf(series: PostseasonSeries): number | null {
+  return series.round === '한국시리즈' || series.round === '종료' ? series.teams[1] : null
+}
+
+/**
+ * 플레이오프 칸 1(L+0x3b) = 준PO 승자 — 준PO 가 끝나면 0xb7724 가 넣고 포스트시즌 끝까지 남는다(`semiPlayoffWinner`).
+ * 옛 저장은 불러올 때 `withSemiPlayoffWinner` 가 채운다 — 그래도 모르면(로테이션 칸도 없는 저장) 빈 칸이다
+ */
+function playoffLowerOf(series: PostseasonSeries): number | null {
+  return series.round === '준플레이오프' ? null : (withSemiPlayoffWinner(series).semiPlayoffWinner ?? null)
 }

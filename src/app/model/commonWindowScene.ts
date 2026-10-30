@@ -12,29 +12,23 @@ import type { Screen } from '@/app/model/screen'
  *   - 장면 0x105(시즌 0x3b14) — 시즌모드 안 경기 밖 화면
  */
 export function sceneClosesWithoutShrinkOf(kind: Screen['kind'], isMissionPlayerPicked: boolean): boolean {
-  switch (kind) {
-    case '이용안내':
-    case '로고':
-    case '타이틀':
-    case '메인메뉴':
-    case '도움말':
-    case '환경설정':
-    case '스페셜':
-    case '홈런더비':
-    case '일반모드':
-      return true
-    case '미션선택':
-      return !isMissionPlayerPicked
-    // 경기 장면 그 자체 — 경기 화면이 서기 전 · 내려간 뒤의 틈에도 장면은 0x104 다
-    case '경기':
-    case '미션진행':
-    case '투수미션':
-    case '마선수대결':
-      return true
-    default:
-      return false
-  }
+  if (kind === '미션선택') return !isMissionPlayerPicked
+  // 경기 장면 그 자체 — 경기 화면이 서기 전 · 내려간 뒤의 틈에도 장면은 0x104 다
+  return MAIN_MENU_SCENE_SCREENS.has(kind) || isGameSceneScreenKind(kind)
 }
+
+/** 장면 0x103(메인 메뉴)의 화면 — 미션선택은 선수를 고르기 전까지만(위 머리말) */
+const MAIN_MENU_SCENE_SCREENS: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>([
+  '이용안내',
+  '로고',
+  '타이틀',
+  '메인메뉴',
+  '도움말',
+  '환경설정',
+  '스페셜',
+  '홈런더비',
+  '일반모드',
+])
 
 /**
  * 이 화면 갈래가 경기 장면 0x104 자체인가(`sceneClosesWithoutShrinkOf` 의 경기 갈래와 같은 넷) — 경기 화면 부품이 내려간 틈

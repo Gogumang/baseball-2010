@@ -1,4 +1,9 @@
 import rawConfig from '@/shared/config/bugfixes/bugfixes.json'
+import { parseBugfixConfig } from '@/shared/config/bugfixes/bugfixConfig'
+import type { BugfixConfig } from '@/shared/config/bugfixes/bugfixConfig'
+
+export { BUG_IMPACTS, parseBugfixConfig } from '@/shared/config/bugfixes/bugfixConfig'
+export type { BugfixConfig } from '@/shared/config/bugfixes/bugfixConfig'
 
 /**
  * **원본 버그 고치기 표** — 원본(binary.mod)에 있던 버그를 웹에도 그대로 옮겨 두었는데(`DECISIONS.md` 2026-09-19),
@@ -12,31 +17,6 @@ import rawConfig from '@/shared/config/bugfixes/bugfixes.json'
  * 코드는 원본 갈래를 지우지 않고 `isBugFixed('B-xx') ? 고친 길 : 원본 길` 꼴로 감싼다.
  * 시험은 원본(모두 끔)으로 돈다 — `originalBugfixesForTests` (vitest `setupFiles`).
  */
-export interface BugfixEntry {
-  /** `ORIGINAL-BUGS.md` 의 id (B-01~B-100) */
-  readonly id: string
-  /** 모드/화면 */
-  readonly name: string
-  /** 원본 증상 */
-  readonly symptom: string
-  /** 원본 근거 주소 */
-  readonly source: string
-  /** 플레이 영향 — 큼 · 중 · 작음 · 거의 없음 */
-  readonly impact: BugImpact
-  /** 고친 길이 코드에 있는가 */
-  readonly implemented: boolean
-  /** true 고침 · false 원본 버그대로 · null `fixAll` 을 따른다 */
-  readonly fixed: boolean | null
-}
-
-export type BugImpact = '큼' | '중' | '작음' | '거의 없음'
-
-export const BUG_IMPACTS: readonly BugImpact[] = ['큼', '중', '작음', '거의 없음']
-
-export interface BugfixConfig {
-  readonly fixAll: boolean
-  readonly entries: readonly BugfixEntry[]
-}
 
 /**
  * `ORIGINAL-BUGS.md` 1절의 id 전부 — B-01 ~ B-100 과 그 뒤에 새로 찾은 것(B-106~).
@@ -146,34 +126,6 @@ export const IMPLEMENTED_BUGFIX_IDS: readonly string[] = [
   'B-128',
   'B-129',
 ]
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
-
-/** JSON 모양을 검사해 타입을 입힌다 — 틀리면 어디가 틀렸는지 적고 멈춘다 */
-export function parseBugfixConfig(raw: unknown): BugfixConfig {
-  if (!isRecord(raw)) throw new Error('bugfixes.json: 객체가 아니다')
-  if (typeof raw.fixAll !== 'boolean') throw new Error('bugfixes.json: fixAll 은 true/false 다')
-  if (!Array.isArray(raw.entries)) throw new Error('bugfixes.json: entries 는 배열이다')
-  const seen = new Set<string>()
-  const entries = raw.entries.map((entry: unknown, index): BugfixEntry => {
-    const where = `bugfixes.json entries[${index}]`
-    if (!isRecord(entry)) throw new Error(`${where}: 객체가 아니다`)
-    const { id, name, symptom, source, impact, implemented, fixed } = entry
-    if (typeof id !== 'string' || !/^B-\d{2,3}$/.test(id)) throw new Error(`${where}: id ${String(id)} 는 B-xx 꼴이다`)
-    if (seen.has(id)) throw new Error(`${where}: id ${id} 가 겹친다`)
-    seen.add(id)
-    if (typeof name !== 'string' || typeof symptom !== 'string' || typeof source !== 'string') {
-      throw new Error(`${where}: name · symptom · source 는 글이다`)
-    }
-    if (typeof impact !== 'string' || !BUG_IMPACTS.includes(impact as BugImpact)) {
-      throw new Error(`${where}: impact ${String(impact)} 를 모른다`)
-    }
-    if (typeof implemented !== 'boolean') throw new Error(`${where}: implemented 는 true/false 다`)
-    if (fixed !== null && typeof fixed !== 'boolean') throw new Error(`${where}: fixed 는 true · false · null 이다`)
-    return { id, name, symptom, source, impact: impact as BugImpact, implemented, fixed }
-  })
-  return { fixAll: raw.fixAll, entries }
-}
 
 /** `bugfixes.json` 그대로 */
 export const BUGFIX_CONFIG: BugfixConfig = parseBugfixConfig(rawConfig)

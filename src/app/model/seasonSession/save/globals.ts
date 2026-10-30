@@ -33,14 +33,21 @@ const SEASON_EVENT_100_ID = 100
 export function seasonGlobalSlotsOf(raw: unknown, legacy: SeasonSave | null): SeasonGlobalSlots {
   const value = raw !== null && typeof raw === 'object' ? (raw as Partial<SeasonSave>) : {}
   const record = legacy?.state.record
-  const openedStadiumIds = Array.isArray(value.openedStadiumIds)
-    ? value.openedStadiumIds.filter((id, index, ids) => STADIUM_HIDDEN_IDS.includes(id) && ids.indexOf(id) === index)
-    : record === undefined
-      ? []
-      : legacyOpenedStadiumIdsOf(record)
-  const event100Awarded =
-    typeof value.event100Awarded === 'boolean' ? value.event100Awarded : (record?.seenEvents.includes(SEASON_EVENT_100_ID) ?? false)
-  return { openedStadiumIds, event100Awarded }
+  return { openedStadiumIds: openedStadiumIdsOf(value, record), event100Awarded: event100AwardedOf(value, record) }
+}
+
+/** 구장 히든 칸 — 저장 칸이 있으면 히든 id 만 한 번씩, 없으면 옛 저장 이사 */
+function openedStadiumIdsOf(value: Partial<SeasonSave>, record: SeasonRecord | undefined): readonly number[] {
+  if (Array.isArray(value.openedStadiumIds)) {
+    return value.openedStadiumIds.filter((id, index, ids) => STADIUM_HIDDEN_IDS.includes(id) && ids.indexOf(id) === index)
+  }
+  return record === undefined ? [] : legacyOpenedStadiumIdsOf(record)
+}
+
+/** 이벤트 100 — 저장 칸이 있으면 그 값, 없으면 본 비트에 100 이 서 있는가 */
+function event100AwardedOf(value: Partial<SeasonSave>, record: SeasonRecord | undefined): boolean {
+  if (typeof value.event100Awarded === 'boolean') return value.event100Awarded
+  return record?.seenEvents.includes(SEASON_EVENT_100_ID) ?? false
 }
 
 /** 이벤트 100 보상 — 전역기록 +0xbe = 1 (0x8c714). 이미 서 있으면 같은 객체 */

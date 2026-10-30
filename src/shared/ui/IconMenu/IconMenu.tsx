@@ -30,6 +30,22 @@ interface IconMenuProps {
   readonly onSelect: (id: string) => void
 }
 
+/** 격자라서 좌우는 한 칸, 위아래는 한 줄(`columns` 칸)만큼 움직인다. 방향 키가 아니면 0 */
+function gridStepOf(key: string, columns: number): number {
+  switch (key) {
+    case 'ArrowRight':
+      return 1
+    case 'ArrowLeft':
+      return -1
+    case 'ArrowDown':
+      return columns
+    case 'ArrowUp':
+      return -columns
+    default:
+      return 0
+  }
+}
+
 export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
 
@@ -53,29 +69,16 @@ export function IconMenu({ items, columns = 3, onSelect }: IconMenuProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       const current = itemsRef.current
       if (current.length === 0) return
-
-      // 격자라서 좌우는 한 칸, 위아래는 한 줄만큼 움직인다.
-      const step =
-        event.key === 'ArrowRight'
-          ? 1
-          : event.key === 'ArrowLeft'
-            ? -1
-            : event.key === 'ArrowDown'
-              ? columnsRef.current
-              : event.key === 'ArrowUp'
-                ? -columnsRef.current
-                : 0
-
+      const step = gridStepOf(event.key, columnsRef.current)
       if (step !== 0) {
         event.preventDefault()
         setSelectedIndex((previous) => (previous + step + current.length) % current.length)
         return
       }
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        const item = current[selectedRef.current]
-        if (item !== undefined && item.isDisabled !== true) onSelectRef.current(item.id)
-      }
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      const item = current[selectedRef.current]
+      if (item !== undefined && item.isDisabled !== true) onSelectRef.current(item.id)
     }
 
     window.addEventListener('keydown', onKeyDown)

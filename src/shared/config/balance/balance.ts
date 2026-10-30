@@ -49,13 +49,17 @@ function shapeProblemOf(value: unknown, original: BalanceValue): string | null {
   if (typeof original === 'number') return isNumber(value) ? null : '수여야 한다'
   if (!Array.isArray(value) || value.length !== original.length) return `칸 ${original.length} 개 배열이어야 한다`
   for (let index = 0; index < original.length; index += 1) {
-    const expected = original[index]
-    const actual: unknown = value[index]
-    if (typeof expected === 'number') {
-      if (!isNumber(actual)) return `[${index}] 은 수여야 한다`
-    } else if (!Array.isArray(actual) || actual.length !== expected.length || !actual.every(isNumber)) {
-      return `[${index}] 는 수 ${expected.length} 개 배열이어야 한다`
-    }
+    const problem = cellProblemOf(original[index] as number | readonly number[], value[index] as unknown, index)
+    if (problem !== null) return problem
+  }
+  return null
+}
+
+/** 목록 · 격자의 칸 하나 — 원본 칸이 수면 수, 줄이면 같은 길이의 수 줄 */
+function cellProblemOf(expected: number | readonly number[], actual: unknown, index: number): string | null {
+  if (typeof expected === 'number') return isNumber(actual) ? null : `[${index}] 은 수여야 한다`
+  if (!Array.isArray(actual) || actual.length !== expected.length || !actual.every(isNumber)) {
+    return `[${index}] 는 수 ${expected.length} 개 배열이어야 한다`
   }
   return null
 }
@@ -63,43 +67,61 @@ function shapeProblemOf(value: unknown, original: BalanceValue): string | null {
 const leavesOf = (value: BalanceValue): readonly number[] =>
   typeof value === 'number' ? [value] : (value as readonly (number | readonly number[])[]).flatMap((cell) => cell)
 
+/** id 가 원본 표에 있고 앞 항목과 겹치지 않는가 — 본 id 로 적는다 */
+function claimBalanceId(where: string, id: unknown, seen: Set<string>): BalanceId {
+  if (typeof id !== 'string' || !(id in ORIGINAL_BALANCE_VALUES)) throw new Error(`${where}: id ${String(id)} 를 모른다`)
+  if (seen.has(id)) throw new Error(`${where}: id ${id} 가 겹친다`)
+  seen.add(id)
+  return id as BalanceId
+}
+
+/** range 는 { min, max } (min ≤ max) */
+function balanceRangeOf(where: string, range: unknown): BalanceRange {
+  const min = isRecord(range) ? range.min : undefined
+  const max = isRecord(range) ? range.max : undefined
+  if (!isNumber(min) || !isNumber(max) || min > max) throw new Error(`${where}: range 는 { min, max } (min ≤ max) 다`)
+  return { min, max }
+}
+
+/** 값 — 원본과 같은 모양이고 모든 칸이 범위 안 */
+function balanceValueOf(where: string, id: BalanceId, value: unknown, { min, max }: BalanceRange): BalanceValue {
+  const problem = shapeProblemOf(value, ORIGINAL_BALANCE_VALUES[id])
+  if (problem !== null) throw new Error(`${where} (${id}): value ${problem}`)
+  const typed = value as BalanceValue
+  const outside = leavesOf(typed).find((leaf) => leaf < min || leaf > max)
+  if (outside !== undefined) throw new Error(`${where} (${id}): value ${outside} 가 범위 ${min}~${max} 밖이다`)
+  return typed
+}
+
+function parseBalanceEntry(entry: unknown, index: number, seen: Set<string>): BalanceEntry {
+  const where = `balance.json entries[${index}]`
+  if (!isRecord(entry)) throw new Error(`${where}: 객체가 아니다`)
+  const { id, category, name, value, source, effect, range } = entry
+  const balanceId = claimBalanceId(where, id, seen)
+  if (typeof category !== 'string' || !BALANCE_CATEGORIES.includes(category as BalanceCategory)) {
+    throw new Error(`${where}: category ${String(category)} 를 모른다`)
+  }
+  if (typeof name !== 'string' || typeof source !== 'string' || typeof effect !== 'string') {
+    throw new Error(`${where}: name · source · effect 는 글이다`)
+  }
+  const checkedRange = balanceRangeOf(where, range)
+  return {
+    id: balanceId,
+    category: category as BalanceCategory,
+    name,
+    value: balanceValueOf(where, balanceId, value, checkedRange),
+    source,
+    effect,
+    range: checkedRange,
+  }
+}
+
 /** JSON 모양을 검사해 타입을 입힌다 — 틀리면 어디가 틀렸는지 적고 멈춘다 */
 export function parseBalanceConfig(raw: unknown): BalanceConfig {
   if (!isRecord(raw)) throw new Error('balance.json: 객체가 아니다')
   if (!Array.isArray(raw.entries)) throw new Error('balance.json: entries 는 배열이다')
   const seen = new Set<string>()
-  const entries = raw.entries.map((entry: unknown, index): BalanceEntry => {
-    const where = `balance.json entries[${index}]`
-    if (!isRecord(entry)) throw new Error(`${where}: 객체가 아니다`)
-    const { id, category, name, value, source, effect, range } = entry
-    if (typeof id !== 'string' || !(id in ORIGINAL_BALANCE_VALUES)) throw new Error(`${where}: id ${String(id)} 를 모른다`)
-    if (seen.has(id)) throw new Error(`${where}: id ${id} 가 겹친다`)
-    seen.add(id)
-    if (typeof category !== 'string' || !BALANCE_CATEGORIES.includes(category as BalanceCategory)) {
-      throw new Error(`${where}: category ${String(category)} 를 모른다`)
-    }
-    if (typeof name !== 'string' || typeof source !== 'string' || typeof effect !== 'string') {
-      throw new Error(`${where}: name · source · effect 는 글이다`)
-    }
-    const min = isRecord(range) ? range.min : undefined
-    const max = isRecord(range) ? range.max : undefined
-    if (!isNumber(min) || !isNumber(max) || min > max) throw new Error(`${where}: range 는 { min, max } (min ≤ max) 다`)
-    const original = ORIGINAL_BALANCE_VALUES[id as BalanceId]
-    const problem = shapeProblemOf(value, original)
-    if (problem !== null) throw new Error(`${where} (${id}): value ${problem}`)
-    const typed = value as BalanceValue
-    const outside = leavesOf(typed).find((leaf) => leaf < min || leaf > max)
-    if (outside !== undefined) throw new Error(`${where} (${id}): value ${outside} 가 범위 ${min}~${max} 밖이다`)
-    return {
-      id: id as BalanceId,
-      category: category as BalanceCategory,
-      name,
-      value: typed,
-      source,
-      effect,
-      range: { min, max },
-    }
-  })
+  const entries = raw.entries.map((entry: unknown, index): BalanceEntry => parseBalanceEntry(entry, index, seen))
   const missing = Object.keys(ORIGINAL_BALANCE_VALUES).filter((id) => !seen.has(id))
   if (missing.length > 0) throw new Error(`balance.json: 항목이 빠졌다 — ${missing.join(', ')}`)
   return { entries }

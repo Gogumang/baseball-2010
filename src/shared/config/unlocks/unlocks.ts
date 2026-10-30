@@ -1,4 +1,9 @@
 import rawConfig from '@/shared/config/unlocks/unlocks.json'
+import { parseUnlockConfig } from '@/shared/config/unlocks/unlockConfig'
+import type { UnlockConfig } from '@/shared/config/unlocks/unlockConfig'
+
+export { UNLOCK_KINDS, parseUnlockConfig } from '@/shared/config/unlocks/unlockConfig'
+export type { UnlockConfig, UnlockKind } from '@/shared/config/unlocks/unlockConfig'
 
 /**
  * **해금 관리 표** — 화면에 보이지만 잠겨 있는 것(마선수·히든 팀·히든 아이템·마구·미션 칸·명전 칸·기록연감 숨은 쪽)을
@@ -12,72 +17,6 @@ import rawConfig from '@/shared/config/unlocks/unlocks.json'
  *
  * 각 잠금 판정 코드는 원본 조건 판정을 지우지 않고 `isUnlocked(id, () => 원본판정)` 으로 감싼다.
  */
-export type UnlockKind =
-  | 'acePlayer'
-  | 'hiddenTeam'
-  | 'stadiumItem'
-  | 'pitcherEquipment'
-  | 'batterEquipment'
-  | 'hiddenPitch'
-  | 'mission'
-  | 'hallOfFameSlot'
-  | 'annalsPage'
-
-export const UNLOCK_KINDS: readonly UnlockKind[] = [
-  'acePlayer',
-  'hiddenTeam',
-  'stadiumItem',
-  'pitcherEquipment',
-  'batterEquipment',
-  'hiddenPitch',
-  'mission',
-  'hallOfFameSlot',
-  'annalsPage',
-]
-
-export interface UnlockEntry {
-  readonly id: string
-  readonly kind: UnlockKind
-  /** 원본 이름 */
-  readonly name: string
-  /** 원본 해금 조건 (사람이 읽는 글) */
-  readonly condition: string
-  /** 근거 주소 */
-  readonly source: string
-  /** true 늘 풀림 · false 원본 조건 · null `unlockAll` 을 따른다 */
-  readonly unlocked: boolean | null
-}
-
-export interface UnlockConfig {
-  readonly unlockAll: boolean
-  readonly entries: readonly UnlockEntry[]
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
-
-/** JSON 모양을 검사해 타입을 입힌다 — 틀리면 어디가 틀렸는지 적고 멈춘다 */
-export function parseUnlockConfig(raw: unknown): UnlockConfig {
-  if (!isRecord(raw)) throw new Error('unlocks.json: 객체가 아니다')
-  if (typeof raw.unlockAll !== 'boolean') throw new Error('unlocks.json: unlockAll 은 true/false 다')
-  if (!Array.isArray(raw.entries)) throw new Error('unlocks.json: entries 는 배열이다')
-  const seen = new Set<string>()
-  const entries = raw.entries.map((entry: unknown, index): UnlockEntry => {
-    const where = `unlocks.json entries[${index}]`
-    if (!isRecord(entry)) throw new Error(`${where}: 객체가 아니다`)
-    const { id, kind, name, condition, source, unlocked } = entry
-    if (typeof id !== 'string' || id === '') throw new Error(`${where}: id 가 비었다`)
-    if (seen.has(id)) throw new Error(`${where}: id ${id} 가 겹친다`)
-    seen.add(id)
-    if (typeof kind !== 'string' || !UNLOCK_KINDS.includes(kind as UnlockKind)) throw new Error(`${where}: kind ${String(kind)} 를 모른다`)
-    if (typeof name !== 'string' || typeof condition !== 'string' || typeof source !== 'string') {
-      throw new Error(`${where}: name · condition · source 는 글이다`)
-    }
-    if (unlocked !== null && typeof unlocked !== 'boolean') throw new Error(`${where}: unlocked 는 true · false · null 이다`)
-    return { id, kind: kind as UnlockKind, name, condition, source, unlocked }
-  })
-  return { unlockAll: raw.unlockAll, entries }
-}
-
 /** `unlocks.json` 그대로 */
 export const UNLOCK_CONFIG: UnlockConfig = parseUnlockConfig(rawConfig)
 
