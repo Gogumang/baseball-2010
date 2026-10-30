@@ -293,7 +293,7 @@ export const crossSliceBaseline = [
   'src/pages/ending/ui/endingScreen/otherSlices.ts',
   'src/pages/game-result/ui/GameEvaluationScreen.tsx',
   'src/pages/game-result/ui/GameResultScreen.tsx',
-  'src/pages/game/ui/GameScreen.tsx',
+  'src/pages/game/ui/gameScreen/otherSlices.ts',
   'src/pages/general-mode/lib/generalPrepPush.ts',
   'src/pages/general-mode/ui/aceSelect/otherSlices.ts',
   'src/pages/general-mode/ui/firstBatStadiumScreen/otherSlices.ts',

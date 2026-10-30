@@ -1,0 +1,6 @@
+/**
+ * 경기 화면이 쓰는 **다른 조각**의 값 — 조각 경계를 넘는 import 를 이 파일 한 곳에 모은다.
+ * 경기 중 메뉴의 "조작방법"(0x3c212) · "설정"(0x3c326)은 메인 메뉴의 두 화면을 그대로 띄운다.
+ */
+export { HelpScreen } from '@/pages/help/ui/HelpScreen'
+export { SettingsScreen } from '@/pages/settings/ui/SettingsScreen'
