@@ -14,12 +14,16 @@ import type { ScreenPushDirection } from '@/pages/management/lib/nariScreenPush'
  */
 export type GeneralPrepPushView = '18' | '19' | '22' | '23:유저' | '23:CPU' | '그밖'
 
+/** `바뀌기 전 → 바뀐 뒤` 화면 → 밀기 방향 (위 표 그대로) */
+const PUSH_DIRECTIONS: ReadonlyMap<string, ScreenPushDirection> = new Map([
+  ['18→19', 3],
+  ['19→18', 4],
+  ['22→23:유저', 4],
+  ['22→23:CPU', 3],
+  ['23:유저→22', 3],
+  ['23:CPU→22', 4],
+])
+
 export function generalPrepPushDirectionOf(from: GeneralPrepPushView, to: GeneralPrepPushView): ScreenPushDirection | null {
-  if (from === '18' && to === '19') return 3
-  if (from === '19' && to === '18') return 4
-  if (from === '22' && to === '23:유저') return 4
-  if (from === '22' && to === '23:CPU') return 3
-  if (from === '23:유저' && to === '22') return 3
-  if (from === '23:CPU' && to === '22') return 4
-  return null
+  return PUSH_DIRECTIONS.get(`${from}→${to}`) ?? null
 }
