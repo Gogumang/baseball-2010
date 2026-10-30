@@ -33,6 +33,25 @@ const NAME_PLACEHOLDER = '%s'
 /** 원본이 '기본색으로 되돌리기'에 쓰는 흰색 코드 */
 const DEFAULT_COLOR_CODE = 'FFFFFF'
 
+/** 글 사이의 제어 표시 — 줄바꿈 · 정렬 · 색. `length` 는 표시가 차지한 글자 수 */
+type MarkupToken =
+  | { readonly kind: 'break'; readonly length: number }
+  | { readonly kind: 'align'; readonly isCentered: boolean; readonly length: number }
+  | { readonly kind: 'color'; readonly color: string | null; readonly length: number }
+
+/** `index` 자리에서 시작하는 제어 표시 — 없으면(보통 글자) null. 꼴이 틀린 `!c` 는 보통 글자다 */
+function markupTokenAt(text: string, index: number): MarkupToken | null {
+  const rest = text.slice(index)
+  if (rest.startsWith(LINE_BREAK)) return { kind: 'break', length: LINE_BREAK.length }
+  if (rest.startsWith(CENTER)) return { kind: 'align', isCentered: true, length: CENTER.length }
+  if (rest.startsWith(LEFT)) return { kind: 'align', isCentered: false, length: LEFT.length }
+  if (!rest.startsWith(COLOR_PREFIX)) return null
+  const code = text.slice(index + COLOR_PREFIX.length, index + COLOR_PREFIX.length + COLOR_CODE_LENGTH)
+  if (!isColorCode(code)) return null
+  const color = code.toUpperCase() === DEFAULT_COLOR_CODE ? null : `#${code}`
+  return { kind: 'color', color, length: COLOR_PREFIX.length + COLOR_CODE_LENGTH }
+}
+
 export function parseGameMarkup(raw: string, replacements: readonly string[] = []): readonly MarkupLine[] {
   const substituted = substituteNames(raw, replacements)
   const lines: MarkupLine[] = []
@@ -56,34 +75,19 @@ export function parseGameMarkup(raw: string, replacements: readonly string[] = [
 
   let index = 0
   while (index < substituted.length) {
-    const rest = substituted.slice(index)
-
-    if (rest.startsWith(LINE_BREAK)) {
-      flushLine()
-      index += LINE_BREAK.length
+    const token = markupTokenAt(substituted, index)
+    if (token === null) {
+      buffer += substituted[index]
+      index += 1
       continue
     }
-    if (rest.startsWith(CENTER)) {
-      isCentered = true
-      index += CENTER.length
-      continue
+    index += token.length
+    if (token.kind === 'break') flushLine()
+    else if (token.kind === 'align') isCentered = token.isCentered
+    else {
+      flushSegment()
+      color = token.color
     }
-    if (rest.startsWith(LEFT)) {
-      isCentered = false
-      index += LEFT.length
-      continue
-    }
-    if (rest.startsWith(COLOR_PREFIX)) {
-      const code = substituted.slice(index + COLOR_PREFIX.length, index + COLOR_PREFIX.length + COLOR_CODE_LENGTH)
-      if (isColorCode(code)) {
-        flushSegment()
-        color = code.toUpperCase() === DEFAULT_COLOR_CODE ? null : `#${code}`
-        index += COLOR_PREFIX.length + COLOR_CODE_LENGTH
-        continue
-      }
-    }
-    buffer += substituted[index]
-    index += 1
   }
   flushLine()
 

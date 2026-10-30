@@ -68,14 +68,19 @@ export function frameLayerUrlsOf(framesFolder: string, listing: unknown, frames:
   if (listing === null || typeof listing !== 'object') return []
   const urls = new Set<string>()
   for (const frame of frames) {
-    const entries: unknown = (listing as Record<string, unknown>)[String(frame).padStart(3, '0')]
-    if (!Array.isArray(entries)) continue
-    for (const entry of entries) {
-      const png = typeof entry === 'object' && entry !== null ? (entry as { png?: unknown }).png : undefined
-      if (typeof png === 'string') urls.add(`${framesFolder}/layers/${png}`)
-    }
+    for (const png of layerPngsOf(listing, frame)) urls.add(`${framesFolder}/layers/${png}`)
   }
   return [...urls]
+}
+
+/** 프레임 하나의 겹 그림 이름들 — 모양이 틀린 칸은 뺀다 */
+function layerPngsOf(listing: object, frame: number): string[] {
+  const entries: unknown = (listing as Record<string, unknown>)[String(frame).padStart(3, '0')]
+  if (!Array.isArray(entries)) return []
+  return entries.flatMap((entry: unknown) => {
+    const png = typeof entry === 'object' && entry !== null ? (entry as { png?: unknown }).png : undefined
+    return typeof png === 'string' ? [png] : []
+  })
 }
 
 /** 받은 겹 하나 */

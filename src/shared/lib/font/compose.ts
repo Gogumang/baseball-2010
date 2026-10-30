@@ -20,6 +20,11 @@ const SET_ROWS: readonly (readonly [number, number, number])[] = [
   [5, 1, 0],
 ]
 
+/** 세로 모음 + 받침이 쓰는 표 0xd7290 의 마지막 행 */
+const VERTICAL_VOWEL_ROW = 4
+/** 모음이 홀로 있을 때의 중성 전용 벌 (0x9bcb8) */
+const LONE_VOWEL_JUNG_SET = 6
+
 /** 0xd731d SHAPE[21] — 받침이 없을 때 중성 모양이 정하는 초성 벌 */
 const SHAPE = [0, 1, 0, 1, 0, 1, 0, 1, 2, 4, 4, 4, 2, 3, 5, 5, 5, 3, 2, 4, 0]
 
@@ -107,31 +112,41 @@ export function chooseSets({ cho, jung, jong }: JamoIndices): JamoSets {
   const vowel = jung < 0 && jong < 0 ? 0 : jung
   const horizontal = vowel >= 0 ? HAS_HORIZONTAL_STROKE[vowel] === 1 : false
 
-  if (horizontal && jong >= 0) {
-    const choStroke = HANGUL_ATLAS.choStroke[Math.max(cho, 0)]
-    const jongStroke = HANGUL_ATLAS.jongStroke[jong]
-    const rowIndex = choStroke + jongStroke > 4 ? 0 : choStroke === 1 && jongStroke === 3 ? 1 : choStroke === 3 && jongStroke === 1 ? 2 : 3
-    const row = SET_ROWS[rowIndex]
-    return {
-      choSet: row[0] + (IS_COMPLEX_VOWEL[vowel] === 1 ? 1 : 0),
-      jungSet: row[1],
-      // 모음 홀로는 여기 오지 않는다 (jong >= 0)
-      jongSet: row[2],
-    }
-  }
+  if (horizontal && jong >= 0) return horizontalVowelSetsOf(cho, vowel, jong)
+  if (jong < 0) return openSyllableSetsOf(cho, vowel)
 
-  if (jong < 0) {
-    const shape = vowel >= 0 ? SHAPE[vowel] : 0
-    return {
-      choSet: shape > 0 ? shape - 1 : shape, // 머리글 없는 형식에서만 1 뺀다
-      // 모음이 홀로 있으면 중성 전용 벌 6 을 쓴다 (0x9bcb8)
-      jungSet: cho < 0 ? 6 : 0,
-      jongSet: 0,
-    }
-  }
-
-  const row = SET_ROWS[4]
+  const row = SET_ROWS[VERTICAL_VOWEL_ROW]
   return { choSet: row[0], jungSet: row[1], jongSet: 0 }
+}
+
+/** 가로 모음 + 받침 — 초성 · 종성 획 복잡도로 표 0xd7290 의 행(0~3)을 고른다 */
+function strokeRowIndexOf(choStroke: number, jongStroke: number): number {
+  if (choStroke + jongStroke > 4) return 0
+  if (choStroke === 1 && jongStroke === 3) return 1
+  if (choStroke === 3 && jongStroke === 1) return 2
+  return 3
+}
+
+function horizontalVowelSetsOf(cho: number, vowel: number, jong: number): JamoSets {
+  const choStroke = HANGUL_ATLAS.choStroke[Math.max(cho, 0)]
+  const jongStroke = HANGUL_ATLAS.jongStroke[jong]
+  const row = SET_ROWS[strokeRowIndexOf(choStroke, jongStroke)]
+  return {
+    choSet: row[0] + (IS_COMPLEX_VOWEL[vowel] === 1 ? 1 : 0),
+    jungSet: row[1],
+    // 모음 홀로는 여기 오지 않는다 (jong >= 0)
+    jongSet: row[2],
+  }
+}
+
+/** 받침 없음 — 중성 모양(SHAPE)이 초성 벌을 정한다 */
+function openSyllableSetsOf(cho: number, vowel: number): JamoSets {
+  const shape = vowel >= 0 ? SHAPE[vowel] : 0
+  return {
+    choSet: shape > 0 ? shape - 1 : shape, // 머리글 없는 형식에서만 1 뺀다
+    jungSet: cho < 0 ? LONE_VOWEL_JUNG_SET : 0,
+    jongSet: 0,
+  }
 }
 
 /**
