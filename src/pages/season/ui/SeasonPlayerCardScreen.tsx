@@ -126,55 +126,73 @@ export function SeasonPlayerCardScreen({
         isAnimating={!isDetailOpen}
         hasCardBadge={hasCardBadge}
       >
-        {info !== undefined && (
-          <>
-            <div
-              className={infoStyles.layer}
-              style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }}
-            />
-            {SEASON_CARD_INFO_LABELS[view.isPitcher ? '투수' : '타자'].map((frame, row) => {
-              const column = INFO_COLUMNS[row < 4 ? 0 : 1]
-              const top = INFO_TOP + (row % 4) * INFO_ROW_STEP
-              const isBattingOrder = row === 7
-              return (
-                <div key={frame} data-testid={`선수상세-정보-${row}`}>
-                  <img
-                    className={infoStyles.layer}
-                    alt=""
-                    src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
-                    style={{ left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)' }}
-                  />
-                  <div
-                    className={infoStyles.infoValue}
-                    data-testid={`선수상세-정보값-${row}`}
-                    style={{
-                      left: column.value.x,
-                      top,
-                      width: column.value.width,
-                      height: INFO_ROW_HEIGHT,
-                      color: isBattingOrder ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text,
-                    }}
-                  >
-                    {isBattingOrder ? info.battingOrder : info.values[row]}
-                  </div>
-                </div>
-              )
-            })}
-          </>
-        )}
+        {info !== undefined && cardInfoOf(info, view.isPitcher)}
       </SeasonPlayerCard>
 
-      <ScreenFrame
-        title="시즌모드"
-        gamePoint={gamePoint}
-        onBack={isDetailOpen ? onCloseDetail : onBack}
-        footer={7}
-        slides={false}
-        // 웹 덧붙임 — 바닥띠 "0상세정보" 글자 자리(가운데) 위 투명 칸 = 원본 '0' (0x48a0 → 0xda)
-        footerPresses={{ [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: isDetailOpen ? onCloseDetail : onOpenDetail } }}
-      />
+      {cardScreenFrameOf(gamePoint, isDetailOpen, onOpenDetail, onCloseDetail, onBack)}
 
-      {isDetailOpen && <DetailWindow rows={detail.rows} messages={detail.messages} scrollOffset={scrollOffset} onClose={onCloseDetail} />}
+      {detailWindowOf(isDetailOpen, detail, scrollOffset, onCloseDetail)}
     </RawScreen>
+  )
+}
+
+/** 정보 칸 0x7c450 시즌 · 0xd9 줄 — 팀명 · 이름 · 타입 · 필살 · 보직 · 손 · 피부 · 타순(노랑) */
+function cardInfoOf(info: NonNullable<SeasonPlayerCardScreenProps['info']>, isPitcher: boolean) {
+  return (
+    <>
+      <div
+        className={infoStyles.layer}
+        style={{ left: INFO_BOARD.x, top: INFO_BOARD.y, width: INFO_BOARD.width, height: INFO_BOARD.height, background: INFO_BOARD.color }}
+      />
+      {SEASON_CARD_INFO_LABELS[isPitcher ? '투수' : '타자'].map((frame, row) => {
+        const column = INFO_COLUMNS[row < 4 ? 0 : 1]
+        const top = INFO_TOP + (row % 4) * INFO_ROW_STEP
+        const isBattingOrder = row === 7
+        return (
+          <div key={frame} data-testid={`선수상세-정보-${row}`}>
+            <img
+              className={infoStyles.layer}
+              alt=""
+              src={`${IMG_TEXT}/${String(frame).padStart(3, '0')}.png`}
+              style={{ left: column.label.x + column.label.width, top: top + 3, transform: 'translateX(-100%)' }}
+            />
+            <div
+              className={infoStyles.infoValue}
+              data-testid={`선수상세-정보값-${row}`}
+              style={{
+                left: column.value.x,
+                top,
+                width: column.value.width,
+                height: INFO_ROW_HEIGHT,
+                color: isBattingOrder ? ORIGINAL_COLORS.highlightYellow : ORIGINAL_COLORS.text,
+              }}
+            >
+              {isBattingOrder ? info.battingOrder : info.values[row]}
+            </div>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+/** 상세정보 창 0x8a0a4 (0xda) */
+function detailWindowOf(isDetailOpen: boolean, detail: SeasonPlayerCardScreenProps['detail'], scrollOffset: number, onClose: () => void) {
+  if (!isDetailOpen) return null
+  return <DetailWindow rows={detail.rows} messages={detail.messages} scrollOffset={scrollOffset} onClose={onClose} />
+}
+
+/** 머리띠 · 바닥 7 — 상세정보가 열려 있으면 뒤로 · '0' 모두 창 닫기 */
+function cardScreenFrameOf(gamePoint: number, isDetailOpen: boolean, onOpenDetail: () => void, onCloseDetail: () => void, onBack: () => void) {
+  return (
+    <ScreenFrame
+      title="시즌모드"
+      gamePoint={gamePoint}
+      onBack={isDetailOpen ? onCloseDetail : onBack}
+      footer={7}
+      slides={false}
+      // 웹 덧붙임 — 바닥띠 "0상세정보" 글자 자리(가운데) 위 투명 칸 = 원본 '0' (0x48a0 → 0xda)
+      footerPresses={{ [FOOTER_BITS.detail]: { label: '0 상세정보', onPress: isDetailOpen ? onCloseDetail : onOpenDetail } }}
+    />
   )
 }

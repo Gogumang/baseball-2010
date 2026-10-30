@@ -65,8 +65,6 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
     onFinished()
   })
 
-  const windowKey = windowSprite.key
-  const windowOrigin = windowOrigins?.[windowKey]
   const { overlays } = presentation
   const panelTop = RY + D
 
@@ -95,11 +93,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
       />
       {!isDone && (
         <>
-          <div style={{ position: 'absolute', overflow: 'hidden', ...WINDOW_CLIP }}>
-            {windowOrigin !== undefined && (
-              <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
-            )}
-          </div>
+          <div style={{ position: 'absolute', overflow: 'hidden', ...WINDOW_CLIP }}>{windowImageOf(windowOrigins, windowSprite)}</div>
           <div style={{ position: 'absolute', left: 0, top: 0, width: 240, height: ANIMATION_CLIP_HEIGHT, overflow: 'hidden' }}>
             <AnimationSprite
               folder={presentation.folder}
@@ -108,25 +102,7 @@ export function SeasonOutingPopup({ place, presentation: given, char0Palette = n
               update={update}
               anchor={ANCHOR}
             />
-            {overlays !== null && (
-              <>
-                <AnimationSprite
-                  folder={EVENT_CHAR_1}
-                  origins={char1Origins}
-                  entries={char1Animations?.[overlays.char1]}
-                  update={update}
-                  anchor={ANCHOR}
-                />
-                <AnimationSprite
-                  folder={EVENT_CHAR_0}
-                  origins={char0Origins}
-                  entries={char0Animations?.[overlays.char0]}
-                  update={update}
-                  anchor={ANCHOR}
-                  palette={char0Palette}
-                />
-              </>
-            )}
+            {overlays !== null && overlaySpritesOf(overlays, update, char0Palette, char1Origins, char1Animations, char0Origins, char0Animations)}
           </div>
           {/* 0x847e0(1, R.y + R.h + d) — 게이지는 d = 0 의 (1, 137) 에서 d 만큼 내린다 */}
           <div style={{ position: 'absolute', left: 0, top: D }}>
@@ -146,5 +122,40 @@ function Band({ top, lines }: { readonly top: number; readonly lines: readonly (
         <div key={y} style={{ position: 'absolute', left: 0, top: y, width: 240, height: 1, background: color }} />
       ))}
     </div>
+  )
+}
+
+type Origins = ReturnType<typeof useFrameOrigins>
+type Animations = ReturnType<typeof useAnimations>
+
+/** 창 배경 0x7b9ac — 원점을 아직 못 받았으면 안 그린다 */
+function windowImageOf(windowOrigins: Origins, windowSprite: ReturnType<typeof useModeBackSprite>) {
+  const windowOrigin = windowOrigins?.[windowSprite.key]
+  if (windowOrigin === undefined) return null
+  return <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
+}
+
+/** 연출 위 인물 둘 — event_char_1 뒤 event_char_0(팔레트) */
+function overlaySpritesOf(
+  overlays: NonNullable<SeasonOutingPresentation['overlays']>,
+  update: number,
+  char0Palette: number | null,
+  char1Origins: Origins,
+  char1Animations: Animations,
+  char0Origins: Origins,
+  char0Animations: Animations,
+) {
+  return (
+    <>
+      <AnimationSprite folder={EVENT_CHAR_1} origins={char1Origins} entries={char1Animations?.[overlays.char1]} update={update} anchor={ANCHOR} />
+      <AnimationSprite
+        folder={EVENT_CHAR_0}
+        origins={char0Origins}
+        entries={char0Animations?.[overlays.char0]}
+        update={update}
+        anchor={ANCHOR}
+        palette={char0Palette}
+      />
+    </>
   )
 }
