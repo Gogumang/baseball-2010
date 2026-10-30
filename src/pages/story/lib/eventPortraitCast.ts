@@ -16,19 +16,30 @@ export function eventPortraitCastOf(events: readonly OriginalEvent[], start: Ori
     if (event === undefined || seen.has(event.id)) continue
     seen.add(event.id)
     for (const command of event.commands) {
-      const nextIds = nextEventIdsOf(command)
-      for (const id of nextIds) {
-        const next = byId.get(id)
-        if (next !== undefined && !seen.has(id)) queue.push(next)
-      }
-      if (command.op !== 'say' && command.op !== 'choice') continue
-      for (const portrait of command.portraits) portraits.set(`${portrait.file}#${portrait.animation}`, portrait)
+      queueNextEvents(command, byId, seen, queue)
+      addCommandPortraits(command, portraits)
     }
   }
   return [...portraits.values()]
 }
 
-function nextEventIdsOf(command: OriginalEvent['commands'][number]): readonly number[] {
+type EventCommand = OriginalEvent['commands'][number]
+
+/** 이 명령이 넘어갈 수 있는 이벤트 중 아직 안 본 것을 줄 끝에 */
+function queueNextEvents(command: EventCommand, byId: ReadonlyMap<number, OriginalEvent>, seen: ReadonlySet<number>, queue: OriginalEvent[]) {
+  for (const id of nextEventIdsOf(command)) {
+    const next = byId.get(id)
+    if (next !== undefined && !seen.has(id)) queue.push(next)
+  }
+}
+
+/** `say` · `choice` 가 적어 둔 인물 · 표정 */
+function addCommandPortraits(command: EventCommand, portraits: Map<string, EventPortrait>) {
+  if (command.op !== 'say' && command.op !== 'choice') return
+  for (const portrait of command.portraits) portraits.set(`${portrait.file}#${portrait.animation}`, portrait)
+}
+
+function nextEventIdsOf(command: EventCommand): readonly number[] {
   if (command.op === 'choice') return command.choices.map((choice) => choice.gotoEvent)
   if (command.op === 'yesno') return [command.yesEvent, command.noEvent]
   if (command.op === 'match') return command.resultEvents
