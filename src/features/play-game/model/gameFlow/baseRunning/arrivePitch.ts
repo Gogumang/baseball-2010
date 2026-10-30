@@ -3,7 +3,14 @@ import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
 import { isPlayerTurn } from '@/entities/game/model/gameState'
 import { sceneResultCodeAfterPitch, sceneResultCodeOfThrown } from '@/features/defense-play/model/sceneResultCode'
-import { arrivesUnhit, openPitchArrivalPlay, pitchJudgementOf, runOpenedPitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
+import {
+  arrivesUnhit,
+  openPitchArrivalPlay,
+  pitchJudgementOf,
+  runOpenedPitchArrivalPlay,
+  type OpenedPitchArrivalPlay,
+  type PitchArrivalPlayInput,
+} from '@/features/defense-play/model/pitchArrivalPlay'
 import { enterPitchSelection } from '@/features/play-game/model/gameFlow/atBat/pitchSelection'
 import { applyArrivalPlay } from '@/features/play-game/model/gameFlow/baseRunning/arrivalPlay'
 import { ourRunnerAcesOf, runAbilitiesOnBaseOf, withoutSteal } from '@/features/play-game/model/gameFlow/baseRunning/runners'
@@ -35,108 +42,128 @@ import type { GameProgress } from '@/features/play-game/model/gameFlow/types/pro
  *
  * 난수: `rollPassedBall` 1번(매 못 맞힌 공) → 판이 열리면 그 안의 굴림 (`runPitchArrivalPlay`).
  */
-export function arrivePitch(
-  progress: GameProgress,
-  pitch: {
-    readonly resolution: PitchResolution
-    readonly outcomeAfter: AtBatOutcome | null
-    /** 장면 +0xfdc — 이 공의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
-    readonly buntKind?: number
-    /** 맞은 공(타구)의 방향까지 붙인 결과 코드 (`PitchOutcomeDetail.resultCode`) — 경기 +0xfd4. 안 주면 쏜 공(`contactOfOutcome`)에서 */
-    readonly resultCode?: number | null
-    /** 지금 타자의 손 0xb63c0(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884, `PitchArrivalPlayInput.batterHand`) */
-    readonly batterHand: number
-  },
-  random: RandomPort,
-  options: {
-    /** 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓 (`resolveDefensePlay` 의 `isRecorded`). 안 넘기면 참 */
-    readonly isRecorded?: boolean
-    /** 이 공을 먹인 뒤의 볼카운트 — 타석이 이어져 0xf 에 다시 들 때 교체 틱 굴림(0x344dc)이 본다 (`AtBatCount`) */
-    readonly countAfter: AtBatCount
-    /**
-     * 화면이 판을 실시간으로 돌린다 — 도루 · 폭투 판(종류 5 · 9)을 붙들고(`pendingRunnerPlay`, 사람 공격) 끝나면 `resolveRunnerPlay`.
-     * 판 시작 굴림(0.1% · 폭투 쏘기 · 도루 리드)은 여기서, 판 안의 굴림은 화면의 틱에서 — 그 사이 다른 굴림이 없어 차례가 같다
-     */
-    readonly live?: boolean
-  },
-): PitchArrivalStep {
+/** 공 도착 0x3dfac 에 넘기는 이 공 */
+interface ArrivingPitch {
+  readonly resolution: PitchResolution
+  readonly outcomeAfter: AtBatOutcome | null
+  /** 장면 +0xfdc — 이 공의 번트 종류(못 맞힌 번트면 그 종류, 안 휘둘렀으면 0). 도루 판 리드 0x3d7b8 이 본다 */
+  readonly buntKind?: number
+  /** 맞은 공(타구)의 방향까지 붙인 결과 코드 (`PitchOutcomeDetail.resultCode`) — 경기 +0xfd4. 안 주면 쏜 공(`contactOfOutcome`)에서 */
+  readonly resultCode?: number | null
+  /** 지금 타자의 손 0xb63c0(1 = 좌타) — 밀어내기 · 낫아웃 판의 타자주자 타석 자리(vt94 0xa0884, `PitchArrivalPlayInput.batterHand`) */
+  readonly batterHand: number
+}
+
+interface ArrivalOptions {
+  /** 0xa56dc(ctx, 지금 타자, 1) — 포스트시즌 · 국가대항전이면 거짓 (`resolveDefensePlay` 의 `isRecorded`). 안 넘기면 참 */
+  readonly isRecorded?: boolean
+  /** 이 공을 먹인 뒤의 볼카운트 — 타석이 이어져 0xf 에 다시 들 때 교체 틱 굴림(0x344dc)이 본다 (`AtBatCount`) */
+  readonly countAfter: AtBatCount
+  /**
+   * 화면이 판을 실시간으로 돌린다 — 도루 · 폭투 판(종류 5 · 9)을 붙들고(`pendingRunnerPlay`, 사람 공격) 끝나면 `resolveRunnerPlay`.
+   * 판 시작 굴림(0.1% · 폭투 쏘기 · 도루 리드)은 여기서, 판 안의 굴림은 화면의 틱에서 — 그 사이 다른 굴림이 없어 차례가 같다
+   */
+  readonly live?: boolean
+}
+
+/** 공 도착을 볼 수 있는 진행인가 — 경기가 안 끝났고 내 차례이며 붙든 판이 없다 */
+function canArrivePitch(progress: GameProgress): boolean {
   const before = progress.game
-  if (before.isFinished || !isPlayerTurn(before) || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) {
-    return { progress, play: null, interrupted: false }
-  }
-  // 경기 +0xfd4 — 이 공의 0x11 진입이 지우고 휘두른 공이면 스윙 판정이 덮는다. 바뀔 때만 새 객체(부르는 쪽이 같은 객체로 판 없음을 본다)
+  if (before.isFinished || !isPlayerTurn(before)) return false
+  return progress.pendingDefensePlay === null && progress.pendingRunnerPlay == null
+}
+
+/** 경기 +0xfd4 — 이 공의 0x11 진입이 지우고 휘두른 공이면 스윙 판정이 덮는다. 바뀔 때만 새 객체(부르는 쪽이 같은 객체로 판 없음을 본다) */
+function withSceneResultCode(progress: GameProgress, pitch: ArrivingPitch): GameProgress {
   const sceneResultCode =
     pitch.resultCode !== undefined ? sceneResultCodeAfterPitch(pitch.resolution, pitch.resultCode) : sceneResultCodeOfThrown(pitch.resolution)
-  if (sceneResultCode !== progress.sceneResultCode) progress = { ...progress, sceneResultCode }
-  if (!arrivesUnhit(pitch.resolution)) {
-    const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
-    // 판 없이 온 파울(옛 길) — 판정 A 0xae24c 의 파울 → 같은 타석 다음 공 0xf 진입 0x3d954
-    const continued = pitch.resolution.kind === '파울' && pitch.outcomeAfter === null ? enterPitchSelection(next, random, options.countAfter) : next
-    return { progress: continued, play: null, interrupted: false }
+  return sceneResultCode === progress.sceneResultCode ? progress : { ...progress, sceneResultCode }
+}
+
+/** 맞은 공 · 판 없이 온 파울(옛 길) — 판정 A 0xae24c 의 파울 → 같은 타석 다음 공 0xf 진입 0x3d954 */
+function hitArrivalStep(progress: GameProgress, pitch: ArrivingPitch, random: RandomPort, countAfter: AtBatCount): PitchArrivalStep {
+  const next = pitch.resolution.kind === '타구' ? progress : withoutSteal(progress)
+  const continued = pitch.resolution.kind === '파울' && pitch.outcomeAfter === null ? enterPitchSelection(next, random, countAfter) : next
+  return { progress: continued, play: null, interrupted: false }
+}
+
+/** 공 도착 판 입력 — 우리 공격이니 수비는 상대 팀, 타구 진행기와 같은 아홉 칸 */
+function arrivalPlayInputOf(progress: GameProgress, pitch: ArrivingPitch): PitchArrivalPlayInput {
+  const before = progress.game
+  return {
+    gameMode: MY_LEAGUE_BATTER_MODE,
+    pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
+    stealingFrom: progress.stealingFrom,
+    bases: before.bases,
+    outs: before.outs,
+    batterHand: pitch.batterHand,
+    defenseAbilities: opponentDefenseAbilitiesOf(progress),
+    // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 타구 판과 같은 칸
+    fielderPlates: opponentFielderPlatesOf(progress),
+    // 초감각(21) — 같은 칸 고르기의 상대 야수 레코드 +0x14 (`defenseSkillIdsOf`)
+    fielderSkillIds: opponentFielderSkillIdsOf(progress),
+    // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
+    defenseTeamIndex: progress.opponentTeamId,
+    fielderRecords: opponentFielderRecordsOf(progress),
+    offenseTeamIndex: progress.ourTeamId,
+    runnerAces: ourRunnerAcesOf(progress),
+    runAbilities: runAbilitiesOnBaseOf(progress),
+    defenseIsCpu: true,
+    // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
+    offenseIsCpu: false,
+    runningMode: progress.runningModeManual ? '수동' : '자동',
+    // 장면 +0xfdc — 못 맞힌 번트면 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
+    // (키 없는 공은 0 — 0x11 진입 0x3de10 이 공마다 memset 한다, `BattingStage.sceneBuntKind`)
+    buntKind: pitch.buntKind ?? 0,
+    scene: progress.defenseScene,
+    sceneResultCode: progress.sceneResultCode,
   }
-  const cleared = withoutSteal(progress)
-  const opened = openPitchArrivalPlay(
-    {
-      gameMode: MY_LEAGUE_BATTER_MODE,
-      pitchJudgement: pitchJudgementOf(pitch.resolution, pitch.outcomeAfter),
-      stealingFrom: progress.stealingFrom,
-      bases: before.bases,
-      outs: before.outs,
-      batterHand: pitch.batterHand,
-      // 우리 공격이니 수비는 상대 팀 — 타구 진행기와 같은 아홉 칸
-      defenseAbilities: opponentDefenseAbilitiesOf(progress),
-      // 공 가진 야수 이름 판(0x43cb0) · 마선수 주자 그림(0x79d10) — 타구 판과 같은 칸
-      fielderPlates: opponentFielderPlatesOf(progress),
-      // 초감각(21) — 같은 칸 고르기의 상대 야수 레코드 +0x14 (`defenseSkillIdsOf`)
-      fielderSkillIds: opponentFielderSkillIdsOf(progress),
-      // 야수 · 주자 그림 팔레트 (defender.mpl 15벌 — 팀 번호, C-1)
-      defenseTeamIndex: progress.opponentTeamId,
-      fielderRecords: opponentFielderRecordsOf(progress),
-      offenseTeamIndex: progress.ourTeamId,
-      runnerAces: ourRunnerAcesOf(progress),
-      runAbilities: runAbilitiesOnBaseOf(progress),
-      defenseIsCpu: true,
-      // 타자편은 사람이 늘 공격이다 — 환경설정 "주루" 혼자가 자동 진루 제어기를 켠다 (0xae690)
-      offenseIsCpu: false,
-      runningMode: progress.runningModeManual ? '수동' : '자동',
-      // 장면 +0xfdc — 못 맞힌 번트면 도루 판 리드 0x3d7b8 이 도루 안 한 주자에게 +3 틱
-      // (키 없는 공은 0 — 0x11 진입 0x3de10 이 공마다 memset 한다, `BattingStage.sceneBuntKind`)
-      buntKind: pitch.buntKind ?? 0,
-      scene: progress.defenseScene,
-      sceneResultCode: progress.sceneResultCode,
-    },
-    random,
-  )
-  // 판이 안 열린 공 — 판정 A 0xae24c: 타석이 이어지면(볼 · 스트라이크) 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 본다
-  if (opened === null) {
-    return {
-      progress: pitch.outcomeAfter === null ? enterPitchSelection(cleared, random, options.countAfter) : cleared,
-      play: null,
-      interrupted: false,
-    }
-  }
-  const isRecorded = options.isRecorded !== false
-  // 사람 공격의 도루 · 폭투 판 — 상태 0x17 키 0x53420 이 사람 공격이면 주루 0x5331c(0x582 · 0x584 → 0xa9b04)와 OK 0x585 를
-  // 보내므로 화면이 실시간으로 돌린다. 밀어내기(종류 2)는 0xae794 · 0x518da 가 둘 다 막아 키가 할 일이 없으니 미리 돌린다
-  if (options.live === true && opened.kind !== 2) {
-    return {
-      progress: {
-        ...cleared,
-        pendingRunnerPlay: {
-          kind: 'arrival',
-          opened,
-          side: '공격',
-          arrival: {
-            outcomeAfter: pitch.outcomeAfter,
-            isRecorded,
-            countAfter: options.countAfter,
-          },
+}
+
+/**
+ * 사람 공격의 도루 · 폭투 판 — 상태 0x17 키 0x53420 이 사람 공격이면 주루 0x5331c(0x582 · 0x584 → 0xa9b04)와 OK 0x585 를
+ * 보내므로 화면이 실시간으로 돌린다. 판을 붙들고 끝나면 `resolveRunnerPlay`
+ */
+function deferredArrivalStep(
+  cleared: GameProgress,
+  opened: Exclude<OpenedPitchArrivalPlay, { readonly kind: 2 }>,
+  pitch: ArrivingPitch,
+  isRecorded: boolean,
+  countAfter: AtBatCount,
+): PitchArrivalStep {
+  return {
+    progress: {
+      ...cleared,
+      pendingRunnerPlay: {
+        kind: 'arrival',
+        opened,
+        side: '공격',
+        arrival: {
+          outcomeAfter: pitch.outcomeAfter,
+          isRecorded,
+          countAfter,
         },
       },
-      play: null,
-      interrupted: false,
-      deferred: true,
-    }
+    },
+    play: null,
+    interrupted: false,
+    deferred: true,
   }
-  return applyArrivalPlay(cleared, progress, runOpenedPitchArrivalPlay(opened), pitch.outcomeAfter, isRecorded, random, options.countAfter)
+}
+
+export function arrivePitch(progress: GameProgress, pitch: ArrivingPitch, random: RandomPort, options: ArrivalOptions): PitchArrivalStep {
+  if (!canArrivePitch(progress)) return { progress, play: null, interrupted: false }
+  const current = withSceneResultCode(progress, pitch)
+  if (!arrivesUnhit(pitch.resolution)) return hitArrivalStep(current, pitch, random, options.countAfter)
+  const cleared = withoutSteal(current)
+  const opened = openPitchArrivalPlay(arrivalPlayInputOf(current, pitch), random)
+  // 판이 안 열린 공 — 판정 A 0xae24c: 타석이 이어지면(볼 · 스트라이크) 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 본다
+  if (opened === null) {
+    const continued = pitch.outcomeAfter === null ? enterPitchSelection(cleared, random, options.countAfter) : cleared
+    return { progress: continued, play: null, interrupted: false }
+  }
+  const isRecorded = options.isRecorded !== false
+  // 밀어내기(종류 2)는 0xae794 · 0x518da 가 둘 다 막아 키가 할 일이 없으니 미리 돌린다
+  if (options.live === true && opened.kind !== 2) return deferredArrivalStep(cleared, opened, pitch, isRecorded, options.countAfter)
+  return applyArrivalPlay(cleared, current, runOpenedPitchArrivalPlay(opened), pitch.outcomeAfter, isRecorded, random, options.countAfter)
 }

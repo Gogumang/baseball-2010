@@ -66,17 +66,39 @@ export function cpuPickoff(
     readonly live?: boolean
   },
 ): GameProgress {
-  const before = progress.game
-  if (before.isFinished || !isPlayerTurn(before) || progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) {
-    return progress
+  if (!canPickoff(progress, base)) return progress
+  const input = pickoffInputOf(progress, base, random)
+  const isRecorded = options.isRecorded !== false
+  if (options.live === true) {
+    return {
+      ...progress,
+      pendingRunnerPlay: {
+        kind: 'pickoff',
+        input,
+        side: '공격',
+        pickoff: { isRecorded, count: options.count },
+      },
+    }
   }
-  if (!(base === 1 ? before.bases.first : base === 2 ? before.bases.second : before.bases.third)) return progress
+  return applyCpuPickoff(progress, base, runPickoffPlay(input), random, { isRecorded, shownLive: false, count: options.count })
+}
 
-  const input: PickoffPlayInput = {
+/** 내 타석 중(경기 끝 · 붙든 판 없음)이고 그 루에 주자가 있나 */
+function canPickoff(progress: GameProgress, base: PickoffBase): boolean {
+  const before = progress.game
+  if (before.isFinished || !isPlayerTurn(before)) return false
+  if (progress.pendingDefensePlay !== null || progress.pendingRunnerPlay != null) return false
+  const occupied = { 1: before.bases.first, 2: before.bases.second, 3: before.bases.third }
+  return occupied[base]
+}
+
+/** 견제 판 입력 — 우리 공격이니 수비는 상대 팀이다(타구 진행기와 같은 아홉 칸 · 같은 주루 근사) */
+function pickoffInputOf(progress: GameProgress, base: PickoffBase, random: RandomPort): PickoffPlayInput {
+  const before = progress.game
+  return {
     targetBase: base,
     bases: before.bases,
     outs: before.outs,
-    // 우리 공격이니 수비는 상대 팀이다 — 타구 진행기와 같은 아홉 칸·같은 주루 근사
     defenseAbilities: opponentDefenseAbilitiesOf(progress),
     fielderPlates: opponentFielderPlatesOf(progress),
     // 초감각(21) — 같은 칸 고르기의 상대 야수 레코드 +0x14 (`defenseSkillIdsOf`)
@@ -99,19 +121,6 @@ export function cpuPickoff(
     // 경기 +0xfd4 — 견제는 0x11 을 안 지나 앞 공의 값(앞 타석 마지막 공일 수도 있다)이 남는다
     sceneResultCode: progress.sceneResultCode,
   }
-  const isRecorded = options.isRecorded !== false
-  if (options.live === true) {
-    return {
-      ...progress,
-      pendingRunnerPlay: {
-        kind: 'pickoff',
-        input,
-        side: '공격',
-        pickoff: { isRecorded, count: options.count },
-      },
-    }
-  }
-  return applyCpuPickoff(progress, base, runPickoffPlay(input), random, { isRecorded, shownLive: false, count: options.count })
 }
 
 /** 다 돈 CPU 견제 판을 경기에 먹인다 — `cpuPickoff` 의 뒷부분. 실시간으로 보여 준 판(`shownLive`)은 재생 칸에 다시 안 넣는다 */
@@ -128,26 +137,33 @@ export function applyCpuPickoff(
   },
 ): GameProgress {
   const before = progress.game
-  // 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·홈런 가지도 안 선다 (pinchHitAi 게이트)
-  const slot = lineupSlotOf(before.battingOrderIndex)
+  // 득점 처리 0xa5c34 는 1점마다 수비 팀 실점 A·B 와 승·패·세 칸을 고친다 (내 타석 정산과 같은 칸)
+  let next = withRunnerOnlyPlay(withPickoffPlateAppearance(progress), result, true, options.shownLive)
+  // 정산 0xa8024(종류 4)의 거르지 않는 칸 — 사건 목록은 0x11 을 안 지나 같은 투구 틈 앞 판의 몫이 함께 든다
+  const events = withSettlementEvents(progress.pendingSettlementEvents, settlementEventsOfPlay(result))
+  next = withRunnerPlaySettlement(next, progress, result, events, options.isRecorded)
+  const ended = next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
+  next = { ...next, pendingSettlementEvents: ended ? undefined : events }
+  next = appendLog(next, pickoffLogOf(before, base, result, next.game.ourScore - before.ourScore), true)
+  // 같은 타석이 이어지면(판정 B ae592 → 상태 0xf) 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 본다.
+  // 반 이닝이 바뀌었거나 끝났으면 다음 내 차례까지 넘긴다
+  return isPlayerTurn(next.game) && !next.game.isFinished ? enterPitchSelection(next, random, options.count) : advanceUntilPlayerTurn(next, random)
+}
+
+/** 정산 0xa8024 — 종류 4 라 타석 칸(+0x14)이 안 오르고 안타·홈런 가지도 안 선다 (pinchHitAi 게이트) */
+function withPickoffPlateAppearance(progress: GameProgress): GameProgress {
+  const slot = lineupSlotOf(progress.game.battingOrderIndex)
   const records = [...progress.ourLineup.records]
   records[slot] = recordPlateAppearance(records[slot] ?? EMPTY_BATTER_GAME_RECORD, {
     isHit: false,
     isHomeRun: false,
     playKind: PICKOFF_PLAY_KIND,
   })
-  // 득점 처리 0xa5c34 는 1점마다 수비 팀 실점 A·B 와 승·패·세 칸을 고친다 (내 타석 정산과 같은 칸)
-  let next = withRunnerOnlyPlay({ ...progress, ourLineup: { ...progress.ourLineup, records } }, result, true, options.shownLive)
-  // 정산 0xa8024(종류 4)의 거르지 않는 칸 — 사건 목록은 0x11 을 안 지나 같은 투구 틈 앞 판의 몫이 함께 든다
-  const events = withSettlementEvents(progress.pendingSettlementEvents, settlementEventsOfPlay(result))
-  next = withRunnerPlaySettlement(next, progress, result, events, options.isRecorded)
-  const ended = next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
-  next = { ...next, pendingSettlementEvents: ended ? undefined : events }
-  const runs = next.game.ourScore - before.ourScore
+  return { ...progress, ourLineup: { ...progress.ourLineup, records } }
+}
 
+/** 기록 줄 — `n회초 상대 b루 견제 — 견제사 · 악송구 · 세이프 (k점)` */
+function pickoffLogOf(before: GameProgress['game'], base: PickoffBase, result: PickoffPlayResult, runs: number): string {
   const call = result.resultCode === PICKOFF_RESULT.OUT ? '견제사' : result.errantThrow ? '악송구' : '세이프'
-  next = appendLog(next, `${before.inning}회${before.half} 상대 ${base}루 견제 — ${call}${runs > 0 ? ` (${runs}점)` : ''}`, true)
-  // 같은 타석이 이어지면(판정 B ae592 → 상태 0xf) 0xf 진입 0x3d954 가 CPU 투수 교체를 다시 본다.
-  // 반 이닝이 바뀌었거나 끝났으면 다음 내 차례까지 넘긴다
-  return isPlayerTurn(next.game) && !next.game.isFinished ? enterPitchSelection(next, random, options.count) : advanceUntilPlayerTurn(next, random)
+  return `${before.inning}회${before.half} 상대 ${base}루 견제 — ${call}${runs > 0 ? ` (${runs}점)` : ''}`
 }

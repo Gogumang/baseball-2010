@@ -2,6 +2,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { runnerCountOf, type BaseState } from '@/entities/game/model/baseState'
 import { isBugFixed } from '@/shared/config/bugfixes'
 import { runnersBehindCursor } from '@/entities/game/model/baseRunners'
+import type { GameState } from '@/entities/game/model/gameState'
 import type { GameProgress } from '@/features/play-game/model/gameFlow/types/progress'
 
 /**
@@ -30,34 +31,38 @@ const LAST_REGULAR_INNING_INDEX = 8
 /** B-13 고친 길 — 내 타석이 오는 반 이닝의 아웃 상한(3아웃이면 이닝이 끝났다) */
 const MAXIMUM_OUTS_BEFORE_MY_AT_BAT = 2
 
-export function withAutoStopLateInningSetup(progress: GameProgress, random: RandomPort): GameProgress {
-  const game = progress.game
-  if (game.inning - 1 < LAST_REGULAR_INNING_INDEX) return progress
-  if (game.half !== '말') return progress
-  // 말 공격이 내 차례이므로 우리가 측 1(후공)이다 — 측 0 점수 = 상대, 측 1 = 우리
-  const deficit = game.opponentScore - game.ourScore
-  if (deficit < 0 || deficit > 3) return progress
-  const total = game.outs + runnerCountOf(game.bases)
-  if (total < deficit) return progress
-  let runners = random.rand(deficit, total + 1)
-  // c232e st[6] = max(0, t − n) — t 가 5(2아웃 만루)까지라 n 이 작으면 아웃이 3~5 로 선다(원본 버그 B-13).
-  // 고친 길은 내 타석 앞 아웃의 상한 2 로 자른다 — 굴림 · 주자 세우기는 원본 그대로다
-  const outs = isBugFixed('B-13') ? Math.min(MAXIMUM_OUTS_BEFORE_MY_AT_BAT, Math.max(0, total - runners)) : Math.max(0, total - runners)
+/** 9회 이후 말 공격인가 — 말 공격이 내 차례이므로 우리가 측 1(후공)이다 */
+function isLateBottomHalf(game: GameState): boolean {
+  return game.inning - 1 >= LAST_REGULAR_INNING_INDEX && game.half === '말'
+}
+
+/**
+ * c232e st[6] = max(0, t − n) — t 가 5(2아웃 만루)까지라 n 이 작으면 아웃이 3~5 로 선다(원본 버그 B-13).
+ * 고친 길은 내 타석 앞 아웃의 상한 2 로 자른다 — 굴림 · 주자 세우기는 원본 그대로다
+ */
+function lateInningOutsOf(total: number, runners: number): number {
+  const outs = Math.max(0, total - runners)
+  return isBugFixed('B-13') ? Math.min(MAXIMUM_OUTS_BEFORE_MY_AT_BAT, outs) : outs
+}
+
+/** c2342 — 루 i = 0(1루)·1·2: n == 3 − i 이면 세움(n−1) · 아니면 rand(0, n + 1) == 0 일 때 세움(n−1) */
+function rollLateInningBases(runners: number, random: RandomPort): BaseState {
+  let left = runners
   const placed: boolean[] = []
   for (let base = 0; base <= 2; base += 1) {
-    if (runners === 3 - base) {
-      placed.push(true)
-      runners -= 1
-    } else if (random.rand(0, runners + 1) === 0) {
-      placed.push(true)
-      runners -= 1
-    } else {
-      placed.push(false)
-    }
+    const seated = left === 3 - base || random.rand(0, left + 1) === 0
+    placed.push(seated)
+    if (seated) left -= 1
   }
-  const bases: BaseState = { first: placed[0] === true, second: placed[1] === true, third: placed[2] === true }
-  // c237a 0xa9a9c → 0xa9a10(주자관리, 공격 팀 sim+0x74, 수비 팀 sim+0x78, 루표) — 찬 루를 3 → 1 루로 세며 k 번째 루에
-  // 공격 팀 지금 타자 칸(team+0x32 = 내 칸)에서 거꾸로 k 번째 타순 칸을 세운다 (`runnersBehindCursor`). 굴림 없음
+  return { first: placed[0] === true, second: placed[1] === true, third: placed[2] === true }
+}
+
+/**
+ * c237a 0xa9a9c → 0xa9a10(주자관리, 공격 팀 sim+0x74, 수비 팀 sim+0x78, 루표) — 찬 루를 3 → 1 루로 세며 k 번째 루에
+ * 공격 팀 지금 타자 칸(team+0x32 = 내 칸)에서 거꾸로 k 번째 타순 칸을 세운다 (`runnersBehindCursor`). 굴림 없음
+ */
+function withSeatedLateRunners(progress: GameProgress, outs: number, bases: BaseState): GameProgress {
+  const game = progress.game
   const seated = runnersBehindCursor(bases, game.battingOrderIndex)
   // 0xa9a10 a9a44 — 새로 세운 주자의 책임 투수(주자+0x30)는 지금 마운드 투수 0xae83d(수비 팀)다
   const pitcher = progress.opponentMound.pitcherSlot
@@ -67,4 +72,17 @@ export function withAutoStopLateInningSetup(progress: GameProgress, random: Rand
     third: seated.third === null ? null : pitcher,
   }
   return { ...progress, game: { ...game, outs, bases, runners: seated }, runnerPitchers: { runners: seated, pitchers } }
+}
+
+export function withAutoStopLateInningSetup(progress: GameProgress, random: RandomPort): GameProgress {
+  const game = progress.game
+  if (!isLateBottomHalf(game)) return progress
+  // 측 0 점수 = 상대, 측 1 = 우리
+  const deficit = game.opponentScore - game.ourScore
+  if (deficit < 0 || deficit > 3) return progress
+  const total = game.outs + runnerCountOf(game.bases)
+  if (total < deficit) return progress
+  const runners = random.rand(deficit, total + 1)
+  const outs = lateInningOutsOf(total, runners)
+  return withSeatedLateRunners(progress, outs, rollLateInningBases(runners, random))
 }
