@@ -127,12 +127,11 @@ function applyRules(
   let { solid, homeRun } = weights
   rules.forEach((rule, index) => {
     if (!owned.includes(rule.id) || !rule.isActive(situation)) return
-    const [solidPercent, homeRunPercent] = percents[index]
+    // 37 열혈은 주자 수만큼 % 를 곱해 한 번에 깎는다 — B -= trunc(n·B/50) (0xabd54~0xabd90). 겹쳐 깎지 않는다.
     const times = rule.perRunner === true ? situation.runnerCount : 1
-    for (let repeat = 0; repeat < times; repeat += 1) {
-      if (solidPercent !== 0) solid = stepOf(solid, solidPercent)
-      if (homeRunPercent !== 0) homeRun = stepOf(homeRun, homeRunPercent)
-    }
+    const [solidPercent, homeRunPercent] = percents[index].map((percent) => percent * times)
+    if (solidPercent !== 0) solid = stepOf(solid, solidPercent)
+    if (homeRunPercent !== 0) homeRun = stepOf(homeRun, homeRunPercent)
   })
   return { solid, homeRun }
 }

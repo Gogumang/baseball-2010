@@ -155,7 +155,20 @@ export function playCareerGames(options: HitRateOptions): HitRateTally {
   const tally: HitRateTally = { swings: 0, whiffs: 0, fair: 0, hits: 0, homeRuns: 0, strikeouts: 0, atBats: 0 }
   for (let seed = 1; seed <= options.games; seed += 1) {
     const random = createSeededRandom(seed * 7919)
-    let progress: GameProgress = startGame(random)
+    // 실제 경기처럼 신인 주력을 넘긴다(leagueMatchSetup) — 안 넘기면 타자주자가 명단 칸 선수 주력으로 달린다
+    let progress: GameProgress = startGame(
+      random,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      batter.run,
+    )
     let deck = createPatternDeck(random)
     const swing: HarnessSwing = { batter, offsets, careerYearIndex: options.careerYearIndex ?? 0, random, tally }
     for (let guard = 0; !progress.game.isFinished && guard < 200; guard += 1) {

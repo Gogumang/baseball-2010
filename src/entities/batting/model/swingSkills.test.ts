@@ -22,8 +22,9 @@ describe('스윙 스킬 보정 — 0xab214 (점검 10차)', () => {
     expect(applySwingSkills({ solid: 5000, homeRun: 1000 }, [8, 9], [], 상황())).toEqual({ solid: 5151, homeRun: 1010 })
   })
 
-  it('37(주자 1명당 −2%)은 주자 수만큼 반복한다', () => {
-    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [], [37], 상황({ runnerCount: 2 }))).toEqual({ solid: 961, homeRun: 961 })
+  it('37(주자 1명당 −2%)은 주자 수를 곱해 한 번에 깎는다 — B -= trunc(n·B/50) (0xabd62~0xabd88)', () => {
+    expect(applySwingSkills({ solid: 1000, homeRun: 1000 }, [], [37], 상황({ runnerCount: 2 }))).toEqual({ solid: 960, homeRun: 960 })
+    expect(applySwingSkills({ solid: 3000, homeRun: 3000 }, [], [37], 상황({ runnerCount: 3 }))).toEqual({ solid: 2820, homeRun: 2820 })
   })
 
   it('31 은 0부터 센 타순 2·3·4(클린업)일 때만 C −10%', () => {
