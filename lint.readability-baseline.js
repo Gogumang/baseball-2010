@@ -86,7 +86,6 @@ export const readabilityBaseline = [
   'src/entities/story/model/eventReward.ts',
   'src/entities/story/model/screenEffect.ts',
   'src/entities/team/model/recordAbility.ts',
-  'src/features/play-at-bat/model/atBatSounds.ts',
   'src/features/play-game/model/batterHitRateHarness.ts',
   'src/features/play-game/model/gameFlow/atBat/pitchSelection.ts',
   'src/features/play-game/model/gameFlow/autoPlay/lateInning.ts',
