@@ -41,9 +41,8 @@ export function useSubstitutionScene(
   onEntryDraw?: (scene: SubstitutionScene) => void,
 ): SubstitutionScenePlayback {
   const [, setVersion] = useState(0)
-  const isDone = scene == null || seenSerials.has(scene)
   const confirmed = confirmedCountOf(wait)
-  const isShown = !isDone && canRun && confirmed >= (scene?.confirmsBefore ?? 0)
+  const isShown = isSceneDue(scene, confirmed) && canRun
 
   // 3da88 — 0x16 에 들어서기 전 "Time!" 22 (진행기가 안 냈을 때만 실려 온다)
   const timePlayedRef = useRef<SubstitutionScene | null>(null)
@@ -76,13 +75,19 @@ export function useSubstitutionScene(
     }, SCENE_PREPARE_FRAMES)
   }, [])
 
-  return {
-    isShown,
-    serial: scene?.serial ?? 0,
-    incomingIsAce: scene?.incomingIsAce ?? false,
-    aceSlot: scene?.aceSlot ?? null,
-    finish,
-  }
+  return { isShown, ...sceneFieldsOf(scene), finish }
+}
+
+/** 아직 다 안 본 연출이 앞 0xe 대기의 OK 를 `confirmsBefore` 번 받았나 */
+function isSceneDue(scene: SubstitutionScene | null | undefined, confirmed: number): boolean {
+  if (scene == null || seenSerials.has(scene)) return false
+  return confirmed >= (scene.confirmsBefore ?? 0)
+}
+
+/** 겹치는 판이 읽는 연출 칸 — 연출이 없으면 빈 값 */
+function sceneFieldsOf(scene: SubstitutionScene | null | undefined): Pick<SubstitutionScenePlayback, 'serial' | 'incomingIsAce' | 'aceSlot'> {
+  if (scene == null) return { serial: 0, incomingIsAce: false, aceSlot: null }
+  return { serial: scene.serial, incomingIsAce: scene.incomingIsAce, aceSlot: scene.aceSlot ?? null }
 }
 
 /** 다 그린 연출 — 화면이 다시 서도(수비 화면을 갔다 와도) 같은 연출을 두 번 안 그린다 */

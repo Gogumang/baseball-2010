@@ -3,13 +3,15 @@ import { opponentPitcherAbilityOf, resolveDefensePlay, startGame, startPlayerOut
 import type { GameProgress } from '@/features/play-game/model/gameFlow'
 import { recordedOutcomeOf, runDefensePlay } from '@/features/defense-play/model/runDefensePlay'
 import { resolvePitch } from '@/features/play-at-bat/model/resolvePitch'
-import { createPatternDeck } from '@/entities/batting/model/battedBallOutcome'
+import { createPatternDeck, type PatternDeck } from '@/entities/batting/model/battedBallOutcome'
 import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import { CPU_PITCH_TYPE_TICKS, cpuPitchAimOf, cpuPitchTypeTickOf, releaseCpuPitch } from '@/entities/pitching/model/selectPitch'
 import { createCareer } from '@/entities/career/model/playerCareer'
 import type { PlayerCareer } from '@/entities/career/model/playerCareer'
 import { effectiveAbilityOf } from '@/entities/career/model/condition'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { PitchResolution } from '@/entities/at-bat/model/atBatState'
+import type { RandomPort } from '@/shared/api/random/randomPort'
 
 /**
  * **나리 타자편 타율 하네스** (r209 · r242 시험에서 떼어 냈다 — r265 밸런스 측정이 같이 쓴다).
@@ -42,6 +44,111 @@ export interface HitRateOptions {
   readonly careerPatch?: Partial<PlayerCareer>
 }
 
+/** 한 타석 안에서 굴리는 칸 — 상대 투수 · 신인 타자 · 키 틱 · 연차 */
+interface HarnessSwing {
+  readonly batter: ReturnType<typeof effectiveAbilityOf>
+  readonly offsets: readonly number[]
+  readonly careerYearIndex: number
+  readonly random: RandomPort
+  readonly tally: HitRateTally
+}
+
+interface SwingResult {
+  readonly strikes: number
+  readonly outcome: AtBatOutcome | null
+  readonly pattern?: BattedBallPattern
+}
+
+/** CPU 투구 0x344dc · 0x345fc · 0x4dc78 — 목표가 아닌 공(빠진 공)이면 null */
+function throwHarnessPitch(progress: GameProgress, strikes: number, balls: number, random: RandomPort) {
+  const pitcher = opponentPitcherAbilityOf(progress)
+  const args = {
+    pitcher,
+    situation: { strikes, balls, outs: progress.game.outs, runnerCount: 0, hasSecondBaseRunner: false, batterSide: 0, side: 0 },
+    difficulty: 'hard' as const,
+    batterIntimidates: false,
+  }
+  let typeNumber = 0
+  for (let tick = 0; tick < CPU_PITCH_TYPE_TICKS; tick += 1) typeNumber = cpuPitchTypeTickOf(args, random)
+  const aim = cpuPitchAimOf(args, random)
+  if (aim.kind !== '목표') return null
+  return { pitcher, pitch: releaseCpuPitch(args, typeNumber, aim.target, random).pitch }
+}
+
+/** 판정 하나를 셈에 먹인다 — 파울은 2스트라이크 뒤에는 그대로, 헛스윙 셋이면 삼진 */
+function swingResultOf(resolution: PitchResolution, pattern: BattedBallPattern | undefined, strikes: number, tally: HitRateTally): SwingResult {
+  if (resolution.kind === '타구') return { strikes, outcome: resolution.outcome, pattern }
+  if (resolution.kind === '파울') return { strikes: strikes < 2 ? strikes + 1 : strikes, outcome: null }
+  tally.whiffs += 1
+  return { strikes: strikes + 1, outcome: strikes + 1 >= 3 ? { kind: '삼진' } : null }
+}
+
+/** 타석 하나 — 모든 공에 스윙한다(볼넷 · 사구 없음). 30 공 안에 안 끝나면 결과 없음 */
+function swingThroughAtBat(progress: GameProgress, deck: PatternDeck, swing: HarnessSwing): SwingResult & { readonly deck: PatternDeck } {
+  const balls = 0
+  let current: SwingResult = { strikes: 0, outcome: null }
+  let currentDeck = deck
+  for (let n = 0; n < 30 && current.outcome === null; n += 1) {
+    const thrown = throwHarnessPitch(progress, current.strikes, balls, swing.random)
+    if (thrown === null) continue
+    const frame = thrown.pitch.frameCount - 2 + swing.offsets[swing.random.rand(0, swing.offsets.length)]
+    swing.tally.swings += 1
+    const resolved = resolvePitch(
+      thrown.pitch,
+      { frame, shift: 0, buntKind: 0 },
+      harnessContextOf(swing, thrown.pitcher, current.strikes, balls),
+      currentDeck,
+      swing.random,
+    )
+    currentDeck = resolved.deck
+    current = swingResultOf(resolved.detail.resolution, resolved.detail.pattern, current.strikes, swing.tally)
+  }
+  return { ...current, deck: currentDeck }
+}
+
+/** 스윙 판정 0xab214 의 맥락 — 신인 타자 · 1회 · 주자 없음 */
+function harnessContextOf(swing: HarnessSwing, pitcher: ReturnType<typeof opponentPitcherAbilityOf>, strikes: number, balls: number) {
+  return {
+    batter: swing.batter,
+    pitcher,
+    mode: '나만의리그' as const,
+    batterSkillIds: [],
+    isBatterOwnPlayer: true,
+    careerYearIndex: swing.careerYearIndex,
+    situation: {
+      inning: 1,
+      isLosing: false,
+      runnerCount: 0,
+      hasSecondBaseRunner: false,
+      pitcherSide: 0,
+      batterSide: 0,
+      balls,
+      strikes,
+      batterOrderIndex: 0,
+      recentAtBatCodes: [],
+    },
+  }
+}
+
+/** 타석 결과를 경기에 먹인다 — 페어 타구는 수비 판을 돌려 판 끝 정산 0xa8024 로 */
+function settleHarnessAtBat(progress: GameProgress, swung: SwingResult, random: RandomPort, tally: HitRateTally): GameProgress {
+  tally.atBats += 1
+  if (swung.outcome === null || swung.outcome.kind === '삼진') tally.strikeouts += 1
+  const pattern = swung.pattern
+  const started = startPlayerOutcome(progress, swung.outcome ?? { kind: '삼진' }, random, pattern === undefined ? {} : { pattern })
+  const pending = started.pendingDefensePlay
+  if (pending === null) return started
+  const result = runDefensePlay(pending)
+  if (pattern !== undefined) tallyFairBall(tally, recordedOutcomeOf(pending, result))
+  return resolveDefensePlay(started, result, random, { countAfterFoul: { strikes: 1, balls: 0 } })
+}
+
+function tallyFairBall(tally: HitRateTally, recorded: AtBatOutcome): void {
+  tally.fair += 1
+  if (recorded.kind === '안타' || recorded.kind === '홈런') tally.hits += 1
+  if (recorded.kind === '홈런') tally.homeRuns += 1
+}
+
 export function playCareerGames(options: HitRateOptions): HitRateTally {
   const offsets = options.offsets ?? [0]
   const batter = effectiveAbilityOf({ ...createCareer('측정'), ...options.careerPatch })
@@ -50,81 +157,11 @@ export function playCareerGames(options: HitRateOptions): HitRateTally {
     const random = createSeededRandom(seed * 7919)
     let progress: GameProgress = startGame(random)
     let deck = createPatternDeck(random)
+    const swing: HarnessSwing = { batter, offsets, careerYearIndex: options.careerYearIndex ?? 0, random, tally }
     for (let guard = 0; !progress.game.isFinished && guard < 200; guard += 1) {
-      const balls = 0
-      let strikes = 0
-      let outcome: AtBatOutcome | null = null
-      let pattern: BattedBallPattern | undefined
-      for (let n = 0; n < 30 && outcome === null; n += 1) {
-        const pitcher = opponentPitcherAbilityOf(progress)
-        const args = {
-          pitcher,
-          situation: { strikes, balls, outs: progress.game.outs, runnerCount: 0, hasSecondBaseRunner: false, batterSide: 0, side: 0 },
-          difficulty: 'hard' as const,
-          batterIntimidates: false,
-        }
-        let typeNumber = 0
-        for (let tick = 0; tick < CPU_PITCH_TYPE_TICKS; tick += 1) typeNumber = cpuPitchTypeTickOf(args, random)
-        const aim = cpuPitchAimOf(args, random)
-        if (aim.kind !== '목표') continue
-        const pitch = releaseCpuPitch(args, typeNumber, aim.target, random).pitch
-        const frame = pitch.frameCount - 2 + offsets[random.rand(0, offsets.length)]
-        tally.swings += 1
-        const resolved = resolvePitch(
-          pitch,
-          { frame, shift: 0, buntKind: 0 },
-          {
-            batter,
-            pitcher,
-            mode: '나만의리그',
-            batterSkillIds: [],
-            isBatterOwnPlayer: true,
-            careerYearIndex: options.careerYearIndex ?? 0,
-            situation: {
-              inning: 1,
-              isLosing: false,
-              runnerCount: 0,
-              hasSecondBaseRunner: false,
-              pitcherSide: 0,
-              batterSide: 0,
-              balls,
-              strikes,
-              batterOrderIndex: 0,
-              recentAtBatCodes: [],
-            },
-          },
-          deck,
-          random,
-        )
-        deck = resolved.deck
-        const resolution = resolved.detail.resolution
-        if (resolution.kind === '타구') {
-          outcome = resolution.outcome
-          pattern = resolved.detail.pattern
-        } else if (resolution.kind === '파울') {
-          if (strikes < 2) strikes += 1
-        } else {
-          tally.whiffs += 1
-          strikes += 1
-          if (strikes >= 3) outcome = { kind: '삼진' }
-        }
-      }
-      tally.atBats += 1
-      if (outcome === null || outcome.kind === '삼진') tally.strikeouts += 1
-      const started = startPlayerOutcome(progress, outcome ?? { kind: '삼진' }, random, pattern === undefined ? {} : { pattern })
-      const pending = started.pendingDefensePlay
-      if (pending === null) {
-        progress = started
-        continue
-      }
-      const result = runDefensePlay(pending)
-      if (pattern !== undefined) {
-        tally.fair += 1
-        const recorded = recordedOutcomeOf(pending, result)
-        if (recorded.kind === '안타' || recorded.kind === '홈런') tally.hits += 1
-        if (recorded.kind === '홈런') tally.homeRuns += 1
-      }
-      progress = resolveDefensePlay(started, result, random, { countAfterFoul: { strikes: 1, balls: 0 } })
+      const swung = swingThroughAtBat(progress, deck, swing)
+      deck = swung.deck
+      progress = settleHarnessAtBat(progress, swung, random, tally)
     }
   }
   return tally
