@@ -137,7 +137,6 @@ export const readabilityBaseline = [
   'src/pages/game/lib/gameHalfInningCards.ts',
   'src/pages/game/lib/gameMatchupCards.ts',
   'src/pages/game/model/useBatterPitchEnd.ts',
-  'src/pages/game/ui/GameScreen.tsx',
   'src/pages/general-mode/lib/generalModeFlow.ts',
   'src/pages/general-mode/lib/generalModeResume.ts',
   'src/pages/general-mode/lib/generalModeSetup.ts',
