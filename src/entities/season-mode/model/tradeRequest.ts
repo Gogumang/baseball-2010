@@ -158,13 +158,39 @@ export function rollTradeRequest(
     return { request: NO_TRADE_REQUEST, record }
   }
   const counted: SeasonRecord = { ...record, tradeRequestCount: record.tradeRequestCount + 1 }
-
-  let opponentTeamId = random.rand(0, LEAGUE_TEAM_COUNT)
-  while (opponentTeamId === record.teamId) opponentTeamId = random.rand(0, LEAGUE_TEAM_COUNT)
+  const opponentTeamId = rollOpponentTeamId(random, record.teamId)
 
   // A — 상대 선수가 나리·명전이면 탭부터 다시 (리그 열 팀 레코드에는 없어 한 번에 끝난다)
   const opponentRoster = opponentRosterOf(opponentTeamId)
   const opponentAces = recordAcesOf(opponentTeamId)
+  const pick = rollOpponentPick(random, opponentTeamId, opponentRoster, opponentAces)
+
+  const mine = tradeRecordRowsOf(roster, pick.tab, recordAcesOf(record.teamId))
+  return { request: rollMyPick(random, record.teamId, mine, pick, opponentTeamId), record: counted }
+}
+
+/** 상대 팀 — 내 팀이 나오면 다시 굴린다 */
+function rollOpponentTeamId(random: RandomPort, myTeamId: number): number {
+  let opponentTeamId = random.rand(0, LEAGUE_TEAM_COUNT)
+  while (opponentTeamId === myTeamId) opponentTeamId = random.rand(0, LEAGUE_TEAM_COUNT)
+  return opponentTeamId
+}
+
+/** A 에서 고른 상대 줄 */
+interface OpponentPick {
+  readonly tab: number
+  readonly opponentIndex: number
+  /** 그 줄의 +0x1b — 웹 CPU 명단은 늘 8·12 명이라 비는 칸은 없다 (원본은 0xb5695 가 0 을 돌려 그 +0x1b 를 읽는다) */
+  readonly grade: number
+}
+
+/** 탭 → 칸을 굴리고, 그 줄이 나리·명전(거절)이면 탭부터 다시 */
+function rollOpponentPick(
+  random: RandomPort,
+  opponentTeamId: number,
+  opponentRoster: SeasonTeamRoster,
+  opponentAces: SeasonRecordAces | undefined,
+): OpponentPick {
   let tab: number
   let opponentIndex: number
   let opponent: ReturnType<typeof rowGradeOf>
@@ -174,23 +200,20 @@ export function rollTradeRequest(
     // 0xb5695 — 레코드에 남은 마선수가 앉은 배열 (타자 9번 = 마타자)
     opponent = rowGradeOf(opponentTeamId, tab, tradeRecordRowsOf(opponentRoster, tab, opponentAces)[opponentIndex])
   } while (opponent !== undefined && opponent.refused)
+  return { tab, opponentIndex, grade: opponent?.grade ?? 0 }
+}
 
-  // 웹 CPU 명단은 늘 8·12 명이라 비는 칸은 없다 (원본은 0xb5695 가 0 을 돌려 그 +0x1b 를 읽는다)
-  const opponentGrade = opponent?.grade ?? 0
-  const mine = tradeRecordRowsOf(roster, tab, recordAcesOf(record.teamId))
+/** B — 뽑고 나서 n 을 본다: 0..limit 로 limit + 1 번. 상대 등급 이상이고 거절이 아닌 내 줄이 나오면 요청이 선다 */
+function rollMyPick(random: RandomPort, myTeamId: number, mine: readonly TradeRecordRow[], pick: OpponentPick, opponentTeamId: number): TradeRequest {
+  const { tab, opponentIndex } = pick
   const limit = rangeOf(tab)
-  // B — 뽑고 나서 n 을 본다: 0..limit 로 limit + 1 번
   for (let tries = 0; ; tries += 1) {
     const myIndex = random.rand(0, limit)
-    const player = rowGradeOf(record.teamId, tab, mine[myIndex])
+    const player = rowGradeOf(myTeamId, tab, mine[myIndex])
     // 웹 명단은 늘 8·12 명 이상이라 비는 칸은 없다 (원본은 0xb5695 가 0 을 돌려 그 +0x1b 를 읽는다)
-    const fits = player !== undefined && player.grade >= opponentGrade && !player.refused
-    if (fits) {
-      return { request: { isRequested: true, myIndex, opponentIndex, tab, opponentTeamId }, record: counted }
-    }
-    if (tries === limit) {
-      // 요청은 사라지지만 나머지 칸(탭·팀·칸)은 마지막 값으로 남는다 — 플래그만 0 (9502)
-      return { request: { isRequested: false, myIndex, opponentIndex, tab, opponentTeamId }, record: counted }
-    }
+    const fits = player !== undefined && player.grade >= pick.grade && !player.refused
+    if (fits) return { isRequested: true, myIndex, opponentIndex, tab, opponentTeamId }
+    // 요청은 사라지지만 나머지 칸(탭·팀·칸)은 마지막 값으로 남는다 — 플래그만 0 (9502)
+    if (tries === limit) return { isRequested: false, myIndex, opponentIndex, tab, opponentTeamId }
   }
 }

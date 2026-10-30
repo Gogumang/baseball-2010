@@ -42,25 +42,32 @@ const KNUCKLE_TOP_STEP = 6
 export function displaySpeedKmhOf(typeNumber: number, rank: number, random: RandomPort): number {
   const offset = SPEED_BASE_OFFSETS[typeNumber - 1]
   if (offset === undefined) return 0
+  const [low, high] = typeNumber === KNUCKLE_TYPE_NUMBER ? knuckleSpeedRangeOf(offset, rank) : plainSpeedRangeOf(offset, rank)
+  return random.rand(low, high + 1)
+}
+
+/** 66e0c — i = 1 부터 rank 까지 올라가며 lo += (i 홀수 ? 3 : 2) ; hi = lo + (i 홀수 ? 5 : 4) */
+function plainSpeedRangeOf(offset: number, rank: number): readonly [number, number] {
   let low = offset + SPEED_LOW_BASE
   let high = offset + SPEED_HIGH_BASE
-  if (typeNumber === KNUCKLE_TYPE_NUMBER) {
-    high -= 1
-    if (rank <= KNUCKLE_TOP_STEP) {
-      for (let step = KNUCKLE_TOP_STEP; step >= rank; step -= 1) {
-        const isOdd = (step & 1) === 1
-        low += isOdd ? 3 : 2
-        high = low + (isOdd ? 4 : 5)
-      }
-    }
-  } else {
-    for (let step = 1; step <= rank; step += 1) {
-      const isOdd = (step & 1) === 1
-      low += isOdd ? 3 : 2
-      high = low + (isOdd ? 5 : 4)
-    }
+  for (let step = 1; step <= rank; step += 1) {
+    const isOdd = (step & 1) === 1
+    low += isOdd ? 3 : 2
+    high = low + (isOdd ? 5 : 4)
   }
-  return random.rand(low, high + 1)
+  return [low, high]
+}
+
+/** 66de4 — 구질 21: hi −= 1 ; i = 6 에서 rank 까지 내려가며 lo += (i 홀수 ? 3 : 2) ; hi = lo + (i 홀수 ? 4 : 5) (rank > 6 이면 고리가 돌지 않는다) */
+function knuckleSpeedRangeOf(offset: number, rank: number): readonly [number, number] {
+  let low = offset + SPEED_LOW_BASE
+  let high = offset + SPEED_HIGH_BASE - 1
+  for (let step = KNUCKLE_TOP_STEP; step >= rank; step -= 1) {
+    const isOdd = (step & 1) === 1
+    low += isOdd ? 3 : 2
+    high = low + (isOdd ? 4 : 5)
+  }
+  return [low, high]
 }
 
 export interface DisplaySpeedInput {

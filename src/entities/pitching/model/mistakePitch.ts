@@ -69,14 +69,26 @@ export interface MistakePitchInput {
   readonly pitcherIsCool: boolean
 }
 
-/** 실투 확률 % p (굴림과 견주기 전) — 0x33cfc~0x33de0 */
-export function mistakePercentOf(input: Omit<MistakePitchInput, 'isMagicPitch'>): number {
+type MistakePercentInput = Omit<MistakePitchInput, 'isMagicPitch'>
+
+/** 실투 확률 % p (굴림과 견주기 전) — 0x33cfc~0x33de0. 게이지를 안 누른 공(t = 0)은 등급 셈 대신 고정 % */
+export function mistakePercentOf(input: MistakePercentInput): number {
+  const p = input.grade === 0 ? balanceNumber('pitching.unpressedMistakePercent') : gradedMistakePercentOf(input)
+  return skillAdjustedMistakePercentOf(p, input)
+}
+
+/** 등급 t 0~5 의 구속 배율 · 덧셈 — 범위 밖이면 구속 그대로 · 덧셈 0 */
+function gradedMistakePercentOf(input: MistakePercentInput): number {
   const t = input.grade
-  const scaled =
-    t >= 0 && t <= 5 ? Math.trunc((input.effectiveVelocity * balanceList('pitching.mistakeAbilityPercent')[t]) / 100) : input.effectiveVelocity
-  const bonus = t >= 0 && t <= 5 ? balanceList('pitching.mistakeGradeBonus')[t] : 0
-  let p = Math.max(balanceNumber('pitching.mistakeBase') - abilityGradeOf(scaled) + bonus, MISTAKE_FLOOR)
-  if (t === 0) p = balanceNumber('pitching.unpressedMistakePercent')
+  const isGraded = t >= 0 && t <= 5
+  const scaled = isGraded ? Math.trunc((input.effectiveVelocity * balanceList('pitching.mistakeAbilityPercent')[t]) / 100) : input.effectiveVelocity
+  const bonus = isGraded ? balanceList('pitching.mistakeGradeBonus')[t] : 0
+  return Math.max(balanceNumber('pitching.mistakeBase') - abilityGradeOf(scaled) + bonus, MISTAKE_FLOOR)
+}
+
+/** 스킬 — 압도 +5 · 안정감(주자 2명 이상) −5 · 새가슴(2루 주자) +10 · 냉정 −10, 빼는 쪽은 0 밑으로 안 간다 */
+function skillAdjustedMistakePercentOf(percent: number, input: MistakePercentInput): number {
+  let p = percent
   if (input.batterIntimidates) p += INTIMIDATE_BONUS
   if (input.runnerCount > 1 && input.pitcherIsSteady) p = Math.max(p - STEADY_PENALTY, 0)
   if (input.hasSecondBaseRunner && input.pitcherIsTimid) p += TIMID_BONUS

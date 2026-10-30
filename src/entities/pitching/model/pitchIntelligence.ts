@@ -41,13 +41,17 @@ export interface PitchChoiceSituation {
  * 홈런더비(모드 7) 분기(0x344ea, 굴림 없이 22 또는 1)는 `selectPitch` 의 `derbyPitchType` 이 따른다
  */
 export function computerPitchTypeOf(situation: PitchChoiceSituation, random: RandomPort): number {
-  const { list, magicCount, runnerCount, strikes, balls } = situation
+  const { list, magicCount } = situation
   const hasMagic = list[MAGIC_SLOT] === MAGIC_PITCH
-  const isMagicMoment = runnerCount > 1 || strikes === 2 || (strikes === 0 && (balls === 0 || balls === 3))
-  if (hasMagic && magicCount > 0 && isMagicMoment) return MAGIC_PITCH
+  if (hasMagic && magicCount > 0 && isMagicMoment(situation)) return MAGIC_PITCH
   let type = list[random.rand(0, LIST_SIZE)] ?? 0
   if (type === MAGIC_PITCH && magicCount < 1) type = 0
   return type || FASTBALL
+}
+
+/** 마구를 꺼내는 때 — 주자 2명 이상 · 2스트라이크 · 0스트라이크에 0볼 또는 3볼 */
+function isMagicMoment({ runnerCount, strikes, balls }: PitchChoiceSituation): boolean {
+  return runnerCount > 1 || strikes === 2 || (strikes === 0 && (balls === 0 || balls === 3))
 }
 
 export interface CountSituation {

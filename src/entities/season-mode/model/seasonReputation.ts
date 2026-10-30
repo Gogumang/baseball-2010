@@ -147,16 +147,22 @@ export function hitTotalBonusOf(total: number): number {
 
 /** 점수 s → 등급 g (0xa70f4~0xa7146) */
 export function reputationGradeOf(score: number): number {
-  if (score <= -4) return -2
-  if (score <= -2) return -1
-  if (score <= 0) return 0
-  if (score <= 2) return 1
-  if (score <= 4) return 2
-  if (score <= 6) return 3
-  if (score <= 8) return 4
-  if (score <= 10) return 5
-  return 6
+  const band = REPUTATION_GRADE_BANDS.find(([upTo]) => score <= upTo)
+  return band === undefined ? TOP_REPUTATION_GRADE : band[1]
 }
+
+/** [점수 상한, 등급] — 위에서부터 처음으로 점수가 상한 이하인 줄 */
+const REPUTATION_GRADE_BANDS: readonly (readonly [number, number])[] = [
+  [-4, -2],
+  [-2, -1],
+  [0, 0],
+  [2, 1],
+  [4, 2],
+  [6, 3],
+  [8, 4],
+  [10, 5],
+]
+const TOP_REPUTATION_GRADE = 6
 
 /** 원본 나눗셈 `0xca739` 는 부호 없는 u8 / 3 이고 결과를 u8 로 자른다 → 버림 */
 const dividedByThree = (value: number) => Math.trunc(value / 3)

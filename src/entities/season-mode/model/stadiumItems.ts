@@ -98,6 +98,13 @@ export type StadiumPurchaseCheck =
   | { readonly ok: true; readonly price: number }
   | { readonly ok: false; readonly reason: StadiumPurchaseRefusal; readonly required?: number }
 
+/** 히든 칸인데 아직 안 열렸다 — 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다. 원본 판정 `isHiddenOpen` 은 그대로 감싼다 */
+function isLockedStadiumSlot(kind: StadiumKind, slot: number, isHiddenOpen: (unlockId: number) => boolean): boolean {
+  if (!isHiddenStadiumSlot(kind, slot)) return false
+  const unlockId = STADIUM_HIDDEN_UNLOCK_IDS[kindIndexOf(kind)][slot - STADIUM_HIDDEN_FIRST_SLOT]
+  return unlockId === undefined || !isHiddenUnlocked(unlockId, () => isHiddenOpen(unlockId))
+}
+
 /**
  * 구매 가드 — 원본 `0x9a84~0x9bd2` 의 **순서 그대로** (S3 4절).
  *   1. 미오픈 (StrMODE[76]) → 2. 이미 보유 (StrMODE[78] 계열)
@@ -117,11 +124,7 @@ export function checkStadiumPurchase(
   const required = requiredPopularityOf(kind, slot)
   if (price === null || required === null) return { ok: false, reason: '없는칸' }
 
-  if (isHiddenStadiumSlot(kind, slot)) {
-    const unlockId = STADIUM_HIDDEN_UNLOCK_IDS[kindIndexOf(kind)][slot - STADIUM_HIDDEN_FIRST_SLOT]
-    // 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다 — 원본 판정 `isHiddenOpen` 은 그대로 감싼다
-    if (unlockId === undefined || !isHiddenUnlocked(unlockId, () => isHiddenOpen(unlockId))) return { ok: false, reason: '미오픈' }
-  }
+  if (isLockedStadiumSlot(kind, slot, isHiddenOpen)) return { ok: false, reason: '미오픈' }
   if (ownsStadiumItem(record, kind, slot)) return { ok: false, reason: '이미보유' }
   if (popularity < required) return { ok: false, reason: '인기도부족', required }
   if (record.money < price) return { ok: false, reason: '소지금부족', required: price }

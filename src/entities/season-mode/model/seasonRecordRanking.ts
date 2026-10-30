@@ -79,36 +79,29 @@ export function seasonQualificationOf(games: number): { readonly atBats: number;
   return { atBats: Math.trunc((games * AT_BATS_PER_GAME_TENTHS + 9) / 10), innings: games }
 }
 
+type SeasonQualification = ReturnType<typeof seasonQualificationOf>
+
+/** 종류마다 레코드에서 읽는 값 — 방어율(4) · 타율(12)은 규정 이닝 · 타수를 못 채우면 null */
+const SEASON_RANKING_VALUE: Readonly<Record<number, (record: LeagueRecord, qualified: SeasonQualification) => number | null>> = {
+  1: (record) => record.wins,
+  2: (record) => record.losses,
+  3: (record) => record.saves,
+  4: (record, qualified) => (Math.trunc(record.atBatsOrOuts / OUTS_PER_INNING) >= qualified.innings ? earnedRunAverageOf(record) : null),
+  5: (record) => record.hits, // 투수 +0x22 실점
+  6: (record) => record.strikeouts,
+  8: (record) => record.hits,
+  9: (record) => record.homeRuns,
+  10: (record) => record.batterExtra,
+  11: (record) => record.runsBattedIn,
+  12: (record, qualified) => (record.atBatsOrOuts >= qualified.atBats ? battingAverageOf(record) : null),
+}
+
 /** 0x9d789 의 값 — null 이면 이 종류에 못 낀다 */
 export function seasonRankingValueOf(record: LeagueRecord, kind: number, games: number): number | null {
   if (record.isOutOfRanking || record.atBatsOrOuts <= 0) return null
   const qualified = seasonQualificationOf(games)
-  switch (kind) {
-    case 1:
-      return record.wins
-    case 2:
-      return record.losses
-    case 3:
-      return record.saves
-    case 4:
-      return Math.trunc(record.atBatsOrOuts / OUTS_PER_INNING) >= qualified.innings ? earnedRunAverageOf(record) : null
-    case 5:
-      return record.hits // 투수 +0x22 실점
-    case 6:
-      return record.strikeouts
-    case 8:
-      return record.hits
-    case 9:
-      return record.homeRuns
-    case 10:
-      return record.batterExtra
-    case 11:
-      return record.runsBattedIn
-    case 12:
-      return record.atBatsOrOuts >= qualified.atBats ? battingAverageOf(record) : null
-    default:
-      return null
-  }
+  const valueOf = Object.hasOwn(SEASON_RANKING_VALUE, kind) ? SEASON_RANKING_VALUE[kind] : undefined
+  return valueOf === undefined ? null : valueOf(record, qualified)
 }
 
 export interface SeasonRankingEntry {
@@ -126,16 +119,20 @@ export function rankSeasonRecords(records: readonly LeagueRecord[], kind: number
   const leaders: SeasonRankingEntry[] = []
   for (const record of records) {
     const value = seasonRankingValueOf(record, kind, games)
-    if (value === null) continue
-    const slot = leaders.findIndex((entry) => (ascending ? value < entry.value : value > entry.value))
-    if (slot < 0) {
-      if (leaders.length < SEASON_RANKING_SIZE) leaders.push({ record, value })
-      continue
-    }
-    leaders.splice(slot, 0, { record, value })
-    if (leaders.length > SEASON_RANKING_SIZE) leaders.pop()
+    if (value !== null) seatSeasonRanking(leaders, { record, value }, ascending)
   }
   return leaders
+}
+
+/** 칸 0 부터 처음으로 새 값이 엄격히 나은 칸에 끼우고 넘친 꼴찌를 뺀다 — 그런 칸이 없으면 빈자리에만 앉는다 */
+function seatSeasonRanking(leaders: SeasonRankingEntry[], entry: SeasonRankingEntry, ascending: boolean): void {
+  const slot = leaders.findIndex((seated) => (ascending ? entry.value < seated.value : entry.value > seated.value))
+  if (slot < 0) {
+    if (leaders.length < SEASON_RANKING_SIZE) leaders.push(entry)
+    return
+  }
+  leaders.splice(slot, 0, entry)
+  if (leaders.length > SEASON_RANKING_SIZE) leaders.pop()
 }
 
 /**

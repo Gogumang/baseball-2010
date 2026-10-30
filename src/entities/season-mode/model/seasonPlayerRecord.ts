@@ -73,40 +73,83 @@ export function seasonPlayerRecordOf(
   recordOf?: SeasonEntryRecordSource,
 ): SeasonPlayerRecordView {
   const fieldPosition = isPitcher ? 0 : player.fieldPosition & 0xf
-  if (player.id < HALL_OF_FAME_FIRST_ID) {
-    const team = tableTeamOf(player, ownerTeamId)
-    const row = (isPitcher ? teamPitchers(team) : teamBatters(team))[player.id]
-    if (row !== undefined) {
-      return {
-        name: row.name,
-        isPitcher,
-        base: row.ability,
-        profile: row.profile,
-        skillBits: row.skillBits,
-        equipment: player.equipment ?? row.equipment,
-        fieldPosition,
-        isComplete: true,
-      }
-    }
+  return tableRecordViewOf(ownerTeamId, player, isPitcher, fieldPosition) ?? copiedRecordViewOf(player, isPitcher, index, recordOf, fieldPosition)
+}
+
+/** 리그 선수 — 붙박이 표 팀 표의 id 번째 행. 영입 선수이거나 행이 없으면 null */
+function tableRecordViewOf(ownerTeamId: number, player: SeasonPlayer, isPitcher: boolean, fieldPosition: number): SeasonPlayerRecordView | null {
+  if (!(player.id < HALL_OF_FAME_FIRST_ID)) return null
+  const team = tableTeamOf(player, ownerTeamId)
+  const row = (isPitcher ? teamPitchers(team) : teamBatters(team))[player.id]
+  if (row === undefined) return null
+  return {
+    name: row.name,
+    isPitcher,
+    base: row.ability,
+    profile: row.profile,
+    skillBits: row.skillBits,
+    equipment: player.equipment ?? row.equipment,
+    fieldPosition,
+    isComplete: true,
   }
-  const record = player.record ?? (isPitcher ? recordOf?.pitcher(player) : recordOf?.batter(player))
-  const pitcherRecord = isPitcher ? (record as SeasonEntryPitcherRecord | undefined) : undefined
-  const batterRecord = isPitcher ? undefined : (record as SeasonEntryBatterRecord | undefined)
-  // +0xb — 기록 사본의 바이트, 옛 사본(칸이 생기기 전)은 투수 보직(+0xb & 3, 0xb6dec)만
-  const role: number = pitcherRecord?.role ?? 0
+}
+
+type CopiedRecord = SeasonEntryPitcherRecord | SeasonEntryBatterRecord | undefined
+
+/** 영입 선수 — 나리 선수는 옮긴 기록 사본, 명예 선수는 `recordOf` 가 주는 명전 칸 기록 */
+function copiedRecordViewOf(
+  player: SeasonPlayer,
+  isPitcher: boolean,
+  index: number,
+  recordOf: SeasonEntryRecordSource | undefined,
+  fieldPosition: number,
+): SeasonPlayerRecordView {
+  const record: CopiedRecord = player.record ?? (isPitcher ? recordOf?.pitcher(player) : recordOf?.batter(player))
   // 밑값 +0xc · +0x14 · 니블을 든 기록 사본 — 0x30 바이트 그대로 읽는다(니블은 시즌 명단 값, 없으면 옮긴 기록의 값)
   const hasParts = record?.baseAbility !== undefined
   return {
-    name: record?.name ?? `${isPitcher ? '투수' : '타자'} ${index + 1}번`,
+    name: copiedNameOf(record, isPitcher, index),
     isPitcher,
-    base: record?.baseAbility ?? record?.ability ?? [],
-    profile: record?.profile ?? role & 3,
-    specialNumber: (isPitcher ? pitcherRecord?.repertoire.magicId : batterRecord?.specialNumber) ?? 0,
-    skillBits: hasParts ? (record?.skillBits ?? 0) : 0,
-    equipment: player.equipment ?? (hasParts ? record?.equipment : undefined) ?? NO_EQUIPMENT,
+    base: copiedBaseOf(record),
+    profile: copiedProfileOf(record, isPitcher),
+    specialNumber: copiedSpecialNumberOf(record, isPitcher),
+    skillBits: hasParts ? copiedSkillBitsOf(record) : 0,
+    equipment: copiedEquipmentOf(player, record, hasParts),
     fieldPosition,
     isComplete: hasParts,
   }
+}
+
+/** 기록이 없으면 `투수 N번` · `타자 N번` (`playerFaceOf` 와 같다) */
+function copiedNameOf(record: CopiedRecord, isPitcher: boolean, index: number): string {
+  return record?.name ?? `${isPitcher ? '투수' : '타자'} ${index + 1}번`
+}
+
+/** 밑값 +0xc — 없으면 `0xb6414` 능력치를 기본값 자리에 둔다 */
+function copiedBaseOf(record: CopiedRecord): readonly number[] {
+  return record?.baseAbility ?? record?.ability ?? []
+}
+
+/** +0xb — 기록 사본의 바이트, 옛 사본(칸이 생기기 전)은 투수 보직(+0xb & 3, 0xb6dec)만 */
+function copiedProfileOf(record: CopiedRecord, isPitcher: boolean): number {
+  const role: number = isPitcher ? ((record as SeasonEntryPitcherRecord | undefined)?.role ?? 0) : 0
+  return record?.profile ?? role & 3
+}
+
+/** +0x18 — 투수는 마구 번호, 타자는 필살 번호 */
+function copiedSpecialNumberOf(record: CopiedRecord, isPitcher: boolean): number {
+  const number = isPitcher
+    ? (record as SeasonEntryPitcherRecord | undefined)?.repertoire.magicId
+    : (record as SeasonEntryBatterRecord | undefined)?.specialNumber
+  return number ?? 0
+}
+
+function copiedSkillBitsOf(record: CopiedRecord): number {
+  return record?.skillBits ?? 0
+}
+
+function copiedEquipmentOf(player: SeasonPlayer, record: CopiedRecord, hasParts: boolean): readonly number[] {
+  return player.equipment ?? (hasParts ? record?.equipment : undefined) ?? NO_EQUIPMENT
 }
 
 /** `0xb62b4(기록, n)` = (+0x14 >> n) & 1 — 장착 스킬 */
@@ -140,9 +183,13 @@ export function equippedSeasonAbilityOf(view: SeasonPlayerRecordView, slot: numb
   if (nibble >= 1) value = Math.min(value + equipmentBonusOf(nibble), ABILITY_LIMIT)
   if (hasSeasonSkill(view, SEASON_RECORD_SKILL.무력감)) value = Math.max(value - 100, 0)
   if (hasSeasonSkill(view, SEASON_RECORD_SKILL.전설)) value = Math.min(value + 50, ABILITY_LIMIT)
-  if (view.isPitcher && hasSeasonSkill(view, SEASON_RECORD_SKILL.냉정) && slot === 0) value += Math.trunc(value / 10)
-  if (!view.isPitcher && hasSeasonSkill(view, SEASON_RECORD_SKILL.수비불가) && slot === 2) value = Math.max(value - 100, 0)
-  return value
+  return withSideSkillAbility(view, slot, value)
+}
+
+/** b64e6 투수 ∧ 냉정 ∧ k == 0 → v += v / 10 (자르지 않는다) · b6512 타자 ∧ 수비불가 ∧ k == 2 → v = max(v − 100, 0) */
+function withSideSkillAbility(view: SeasonPlayerRecordView, slot: number, value: number): number {
+  if (view.isPitcher) return hasSeasonSkill(view, SEASON_RECORD_SKILL.냉정) && slot === 0 ? value + Math.trunc(value / 10) : value
+  return hasSeasonSkill(view, SEASON_RECORD_SKILL.수비불가) && slot === 2 ? Math.max(value - 100, 0) : value
 }
 
 /** 표 0xd1743 — 투수 한계 두 줄 (s8 × 10) · 0xd174b — 타자 타입 두 줄 */
