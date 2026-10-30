@@ -119,21 +119,22 @@ const RELAY_SEPARATOR = ' '
  */
 export function relayCodeOf(outcome: AtBatOutcome, fouled: boolean, swingingStrikeOutLost = false): number {
   if (swingingStrikeOutLost) return 5
-  switch (outcome.kind) {
-    case '삼진':
-      return 5
-    case '볼넷':
-      return 14
-    case '사구':
-      return 15
-    case '안타':
-      return 8 + outcome.bases
-    case '홈런':
-      return 12
-    case '아웃':
-      if (outcome.detail === '뜬공아웃') return fouled ? 13 : 0
-      return 1
-  }
+  if (outcome.kind === '안타') return 8 + outcome.bases
+  if (outcome.kind === '아웃') return outcome.detail === '뜬공아웃' ? flyOutRelayCodeOf(fouled) : 1
+  return RELAY_CODE_BY_KIND[outcome.kind]
+}
+
+/** 결과마다 고정인 sim+0xc4 */
+const RELAY_CODE_BY_KIND: Readonly<Record<Exclude<AtBatOutcome['kind'], '안타' | '아웃'>, number>> = {
+  삼진: 5,
+  볼넷: 14,
+  사구: 15,
+  홈런: 12,
+}
+
+/** 뜬공 — 코드 0 이면 안 적어 그 타석 앞 공의 값(파울 13, 아니면 0)이 남는다 */
+function flyOutRelayCodeOf(fouled: boolean): number {
+  return fouled ? 13 : 0
 }
 
 /** 0xc25e4 — 코드가 0 이면 글이 없다 */

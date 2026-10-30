@@ -74,6 +74,22 @@ export function runnersBehindCursor(bases: BaseState, cursor: number): BaseRunne
   return { first: seats[0] ?? null, second: seats[1] ?? null, third: seats[2] ?? null }
 }
 
+/** 루 b 가 찼나 */
+function isBaseOccupied(bases: BaseState, base: BaseNumber): boolean {
+  if (base === 3) return bases.third
+  return base === 2 ? bases.second : bases.first
+}
+
+/** 1·2·3루 칸 → 신원 (칸 밖은 빈 루) */
+function runnersOfSeats(seats: readonly (number | null)[]): BaseRunners {
+  return { first: seats[0] ?? null, second: seats[1] ?? null, third: seats[2] ?? null }
+}
+
+/** 찬 루 수 */
+function occupiedCountOf(bases: BaseState): number {
+  return Number(bases.first) + Number(bases.second) + Number(bases.third)
+}
+
 /** 앞선 주자부터 (3루 → 1루) */
 function leadFirstOf(runners: BaseRunners): number[] {
   return [runners.third, runners.second, runners.first].filter((runner): runner is number => runner !== null)
@@ -84,9 +100,9 @@ function seatLeadFirst(list: readonly number[], bases: BaseState): BaseRunners {
   const seats: (number | null)[] = [null, null, null]
   let index = 0
   for (const base of [3, 2, 1] as const) {
-    if (base === 3 ? bases.third : base === 2 ? bases.second : bases.first) seats[base - 1] = list[index++] ?? null
+    if (isBaseOccupied(bases, base)) seats[base - 1] = list[index++] ?? null
   }
-  return { first: seats[0] ?? null, second: seats[1] ?? null, third: seats[2] ?? null }
+  return runnersOfSeats(seats)
 }
 
 export interface ShiftedRunners {
@@ -100,11 +116,7 @@ export interface ShiftedRunners {
  * 간이 엔진의 안타(n 루) · 볼넷(c1918, n = 1) · 도루(n = 1) · 땅볼 진루(n = 1)가 모두 이 길이다.
  */
 export function shiftRunners(runners: BaseRunners, n: number, batter: number | null = null): ShiftedRunners {
-  const placed: (readonly [number, number])[] = []
-  if (batter !== null) placed.push([batter, 0])
-  if (runners.first !== null) placed.push([runners.first, 1])
-  if (runners.second !== null) placed.push([runners.second, 2])
-  if (runners.third !== null) placed.push([runners.third, 3])
+  const placed = listedRunnersOf(runners, batter)
   const seats: (number | null)[] = [null, null, null]
   const scored: number[] = []
   // 앞선 주자부터 득점이 난다
@@ -113,7 +125,17 @@ export function shiftRunners(runners: BaseRunners, n: number, batter: number | n
     if (to >= 4) scored.push(runner)
     else if (to >= 1) seats[to - 1] = runner
   }
-  return { runners: { first: seats[0] ?? null, second: seats[1] ?? null, third: seats[2] ?? null }, scored }
+  return { runners: runnersOfSeats(seats), scored }
+}
+
+/** 주자 목록 [신원, 루] — 0번 칸에 끼운 타자(루 0)부터 1 · 2 · 3루 차례 */
+function listedRunnersOf(runners: BaseRunners, batter: number | null): (readonly [number, number])[] {
+  const placed: (readonly [number, number])[] = []
+  if (batter !== null) placed.push([batter, 0])
+  if (runners.first !== null) placed.push([runners.first, 1])
+  if (runners.second !== null) placed.push([runners.second, 2])
+  if (runners.third !== null) placed.push([runners.third, 3])
+  return placed
 }
 
 /**
@@ -155,18 +177,24 @@ export interface RunnerChange {
  *   여기 온다 — 진행기를 도는 안타 · 아웃은 앱에서 늘 운명을 싣는다(타자편 · 팀 경기 · 투수편 · 미션).
  */
 export function runnersAfterPlay(before: BaseRunners, next: BaseState, change: RunnerChange): BaseRunners {
-  if (change.survivorsFromBase !== undefined) {
-    const list = [...change.survivorsFromBase]
-      .sort((a, b) => b - a)
-      .map((fromBase) => (fromBase === 0 ? change.batter : runnerOnBase(before, fromBase as BaseNumber)))
-    if (list.every((runner) => runner !== null)) {
-      const seated = seatLeadFirst(list as number[], next)
-      if (runnersFitBases(seated, next) && list.length === Number(next.first) + Number(next.second) + Number(next.third)) {
-        return seated
-      }
-    }
-  }
-  const occupied = Number(next.first) + Number(next.second) + Number(next.third)
+  const seated = change.survivorsFromBase === undefined ? null : seatSurvivors(before, next, change.batter, change.survivorsFromBase)
+  return seated ?? seatByRunsScored(before, next, change)
+}
+
+/** 살아남은 주자를 앞선 주자부터 앉힌다 — 신원을 모르는 주자가 있거나 찬 루와 수가 어긋나면 null */
+function seatSurvivors(before: BaseRunners, next: BaseState, batter: number, survivorsFromBase: readonly number[]): BaseRunners | null {
+  const list = [...survivorsFromBase]
+    .sort((a, b) => b - a)
+    .map((fromBase) => (fromBase === 0 ? batter : runnerOnBase(before, fromBase as BaseNumber)))
+  if (!list.every((runner) => runner !== null)) return null
+  const seated = seatLeadFirst(list as number[], next)
+  if (!runnersFitBases(seated, next) || list.length !== occupiedCountOf(next)) return null
+  return seated
+}
+
+/** ⚠️ 근사 — 득점 수만큼 앞선 주자를 빼고, 넘치면 가장 뒤의 주자부터 아웃으로 본다 (위 머리말) */
+function seatByRunsScored(before: BaseRunners, next: BaseState, change: RunnerChange): BaseRunners {
+  const occupied = occupiedCountOf(next)
   const runners = leadFirstOf(before).slice(Math.max(0, change.runsScored))
   let batterIn = change.batterReached && change.runsScored <= leadFirstOf(before).length
   while (runners.length + Number(batterIn) > occupied && runners.length > 0) runners.pop()

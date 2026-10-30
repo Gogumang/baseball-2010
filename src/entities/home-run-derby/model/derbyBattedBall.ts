@@ -186,56 +186,73 @@ export function derbyDisplayDistanceAt(batted: DerbyBattedBall, tick: number, pr
   return value
 }
 
+/** 판을 도는 동안 틱마다 쌓는 칸 */
+interface DerbyTickTally {
+  isHomeRun: boolean
+  distance: number
+  readonly homeRunTicks: number[]
+  foulCallTick: number | null
+  displayDistance: number | null
+  readonly displayDistanceTicks: { tick: number; value: number }[]
+}
+
 /** 판 하나를 공 틱 1 … closeTick − 1 로 돈다. `skipTick` 이면 그 틱을 끝으로 공 틱을 넘기고 다음 틱에 관문이 닫힌다 */
 function derbyPlayOf(pattern: BattedBallPattern, trajectory: BattedBallTrajectory, skipTick: number | null): DerbyBattedBall {
-  const landingTick = trajectory.landingTick
   const stopTick = derbyBallStopTickOf(trajectory)
   // 5284e → 다음 틱 52502 의 관문이 마지막 점(멈춤)을 보고 닫는다
   const closeTick = skipTick === null ? stopTick : Math.min(stopTick, skipTick + 1)
   // 0xb68dc — 더비는 state[0x19] = 0(0x35034 가 모드 7 이면 굴리지 않음) · state[0x1f] = 0(쥐는 이가 없음)이라 쏜 각 state[0x1c] 그대로
   const isFoul = !isFairAngle(pattern[0])
 
-  let isHomeRun = false
-  let distance = 0
-  const homeRunTicks: number[] = []
-  let foulCallTick: number | null = null
-  let displayDistance: number | null = null
-  const displayDistanceTicks: { tick: number; value: number }[] = []
-  for (let tick = 1; tick < closeTick; tick += 1) {
-    // 526d0 — 아직 낙구 전(aa0 ≥ t)이면 state[0x36] = 지금 점 비거리 (홈런 · 파울 가리지 않음)
-    if (landingTick >= tick) {
-      displayDistance = derbyDistanceOf(trajectory.pointAt(tick))
-      displayDistanceTicks.push({ tick, value: displayDistance })
-    }
-    // 52720 — 담장선 틱(aa4)이 낙구 이전이거나, 폴 틱(ab0)이 낙구 이전
-    const reachesHomeRun =
-      (trajectory.fenceTick === tick && landingTick >= tick) || (trajectory.poleTick === tick && landingTick >= trajectory.poleTick)
-    if (reachesHomeRun && !isFoul) {
-      isHomeRun = true
-      // 52780 — 낙구 틱의 점으로 0xa600c
-      distance += derbyDistanceOf(trajectory.pointAt(landingTick))
-      homeRunTicks.push(tick)
-    }
-    // 527f0 — 낙구 틱, 아직 홈런이 아니고(state[0x1d] == 0) 건너뛰기(+0xfe7)도 아니면 지금 점으로 0xa600c · 파울이면 25.
-    // 건너뛰기는 홈런 뒤에만 서므로 이 갈래는 state[0x1d] 로 이미 막혀 있다
-    if (landingTick === tick && !isHomeRun) {
-      if (isFoul) foulCallTick = tick
-      else distance += derbyDistanceOf(trajectory.pointAt(tick))
-    }
+  const tally: DerbyTickTally = {
+    isHomeRun: false,
+    distance: 0,
+    homeRunTicks: [],
+    foulCallTick: null,
+    displayDistance: null,
+    displayDistanceTicks: [],
   }
+  for (let tick = 1; tick < closeTick; tick += 1) tallyDerbyTick(tally, trajectory, isFoul, tick)
 
   return {
     pattern,
     trajectory,
     landing: landingPointOf(trajectory),
-    isHomeRun,
-    distance,
-    displayDistance,
-    homeRunTicks,
-    foulCallTick,
+    isHomeRun: tally.isHomeRun,
+    distance: tally.distance,
+    displayDistance: tally.displayDistance,
+    homeRunTicks: tally.homeRunTicks,
+    foulCallTick: tally.foulCallTick,
     endTicks: closeTick + DERBY_PLAY_CLOSE_TICKS,
     closeTick,
-    displayDistanceTicks,
+    displayDistanceTicks: tally.displayDistanceTicks,
     skippedAtTick: closeTick < stopTick ? skipTick : null,
   }
+}
+
+/** 공 틱 하나 — 표시 비거리 · 홈런 · 낙구를 이 차례로 본다 */
+function tallyDerbyTick(tally: DerbyTickTally, trajectory: BattedBallTrajectory, isFoul: boolean, tick: number): void {
+  const landingTick = trajectory.landingTick
+  // 526d0 — 아직 낙구 전(aa0 ≥ t)이면 state[0x36] = 지금 점 비거리 (홈런 · 파울 가리지 않음)
+  if (landingTick >= tick) {
+    tally.displayDistance = derbyDistanceOf(trajectory.pointAt(tick))
+    tally.displayDistanceTicks.push({ tick, value: tally.displayDistance })
+  }
+  if (reachesHomeRunAt(trajectory, tick) && !isFoul) {
+    tally.isHomeRun = true
+    // 52780 — 낙구 틱의 점으로 0xa600c
+    tally.distance += derbyDistanceOf(trajectory.pointAt(landingTick))
+    tally.homeRunTicks.push(tick)
+  }
+  // 527f0 — 낙구 틱, 아직 홈런이 아니고(state[0x1d] == 0) 건너뛰기(+0xfe7)도 아니면 지금 점으로 0xa600c · 파울이면 25.
+  // 건너뛰기는 홈런 뒤에만 서므로 이 갈래는 state[0x1d] 로 이미 막혀 있다
+  if (landingTick !== tick || tally.isHomeRun) return
+  if (isFoul) tally.foulCallTick = tick
+  else tally.distance += derbyDistanceOf(trajectory.pointAt(tick))
+}
+
+/** 52720 — 담장선 틱(aa4)이 낙구 이전이거나, 폴 틱(ab0)이 낙구 이전 */
+function reachesHomeRunAt(trajectory: BattedBallTrajectory, tick: number): boolean {
+  const landingTick = trajectory.landingTick
+  return (trajectory.fenceTick === tick && landingTick >= tick) || (trajectory.poleTick === tick && landingTick >= trajectory.poleTick)
 }

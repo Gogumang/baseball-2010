@@ -81,41 +81,49 @@ export interface RunScoredInput {
  * 끝 판 그리기 0x4fe9c 도 0x5026e `cmp r4,#2` 로 측 2 면 이름을 안 그린다.
  */
 export function applyRunScored(state: DecisionState, input: RunScoredInput): DecisionState {
-  const { offenseSide, defenseSide, scoreOf, moundPitcherOf } = input
-
-  let winner = state.winner
-  // 고침(B-35): 이닝 · 경기 종류 문을 걷어 패전 투수와 같은 셈으로 — 앞선 팀이 리드를 잡은 순간의 마운드 투수가 승리 투수다
-  const canDecideWinner =
-    isBugFixed('B-35') || (input.inningIndex >= WIN_PITCHER_FROM_INNING_INDEX && input.lastInningIndex === REGULATION_LAST_INNING_INDEX)
-  if (canDecideWinner) {
-    // 이미 정해져 있는데 그 팀이 더 이상 앞서지 않으면 지운다 (0xa5d2e)
-    if (winner.side !== NO_SIDE && scoreOf(winner.side) <= scoreOf(1 - winner.side)) {
-      winner = NO_PITCHER_OF_RECORD
-    }
-    if (winner.side === NO_SIDE) {
-      const defense = scoreOf(defenseSide)
-      const offense = scoreOf(offenseSide)
-      const side = defense > offense ? defenseSide : offense > defense ? offenseSide : NO_SIDE
-      winner = side === NO_SIDE ? NO_PITCHER_OF_RECORD : { side, number: moundPitcherOf(side) }
-    }
-  }
-
-  // 패전 투수 — 이닝·경기 종류 조건이 **없다** (0xa5d6c)
-  let loser = state.loser
-  if (loser.side !== NO_SIDE && scoreOf(loser.side) >= scoreOf(1 - loser.side)) {
-    loser = NO_PITCHER_OF_RECORD
-  }
-  if (loser.side === NO_SIDE) {
-    const defense = scoreOf(defenseSide)
-    const offense = scoreOf(offenseSide)
-    const side = defense < offense ? defenseSide : offense < defense ? offenseSide : NO_SIDE
-    loser = side === NO_SIDE ? NO_PITCHER_OF_RECORD : { side, number: moundPitcherOf(side) }
-  }
-
+  const winner = canDecideWinner(input) ? nextWinnerOf(state.winner, input) : state.winner
+  const loser = nextLoserOf(state.loser, input)
   // 세이브 후보는 **무효화만** 한다 — 재지정은 다음 교체 때뿐이다 (0xa5dea)
+  const { scoreOf } = input
   const save = state.save.side !== NO_SIDE && scoreOf(state.save.side) <= scoreOf(1 - state.save.side) ? NO_PITCHER_OF_RECORD : state.save
-
   return { ...state, winner, loser, save }
+}
+
+/** 고침(B-35): 이닝 · 경기 종류 문을 걷어 패전 투수와 같은 셈으로 — 앞선 팀이 리드를 잡은 순간의 마운드 투수가 승리 투수다 */
+function canDecideWinner(input: RunScoredInput): boolean {
+  return isBugFixed('B-35') || (input.inningIndex >= WIN_PITCHER_FROM_INNING_INDEX && input.lastInningIndex === REGULATION_LAST_INNING_INDEX)
+}
+
+/** 승리 투수 — 정해진 팀이 더 이상 앞서지 않으면 지우고(0xa5d2e) 앞선 팀의 마운드 투수로 다시 잡는다 */
+function nextWinnerOf(winner: PitcherOfRecord, input: RunScoredInput): PitcherOfRecord {
+  // 원본은 "더 이상 앞서지 않으면(≤) 지운다" — 그 부정 그대로 본다
+  if (winner.side !== NO_SIDE && !(input.scoreOf(winner.side) <= input.scoreOf(1 - winner.side))) return winner
+  return moundPitcherOfSide(
+    input,
+    sideWhere(input, (mine, other) => mine > other),
+  )
+}
+
+/** 패전 투수 — 이닝·경기 종류 조건이 **없다** (0xa5d6c). 정해진 팀이 더 이상 뒤지지 않으면 지우고 뒤진 팀으로 다시 잡는다 */
+function nextLoserOf(loser: PitcherOfRecord, input: RunScoredInput): PitcherOfRecord {
+  // 원본은 "더 이상 뒤지지 않으면(≥) 지운다" — 그 부정 그대로 본다
+  if (loser.side !== NO_SIDE && !(input.scoreOf(loser.side) >= input.scoreOf(1 - loser.side))) return loser
+  return moundPitcherOfSide(
+    input,
+    sideWhere(input, (mine, other) => mine < other),
+  )
+}
+
+/** 수비측 → 공격측 차례로 점수를 견주어 `beats` 가 참인 측 — 동점이면 없음 */
+function sideWhere(input: RunScoredInput, beats: (mine: number, other: number) => boolean): number {
+  const defense = input.scoreOf(input.defenseSide)
+  const offense = input.scoreOf(input.offenseSide)
+  if (beats(defense, offense)) return input.defenseSide
+  return beats(offense, defense) ? input.offenseSide : NO_SIDE
+}
+
+function moundPitcherOfSide(input: RunScoredInput, side: number): PitcherOfRecord {
+  return side === NO_SIDE ? NO_PITCHER_OF_RECORD : { side, number: input.moundPitcherOf(side) }
 }
 
 export interface SaveChanceInput {
@@ -150,28 +158,21 @@ export function applyPitcherChange(state: DecisionState, input: SaveChanceInput)
   const noSaveChance = (): DecisionState =>
     isBugFixed('B-10') && state.save.side === input.defenseSide ? { ...state, save: NO_PITCHER_OF_RECORD } : state
   if (defense <= offense) return noSaveChance()
-
-  const remaining = outsRemainingOf(input)
-  const gap = defense - offense
-  let code = 0
-  let qualifies = false
-  if (gap > 3) {
-    if (remaining > 8) {
-      code = 9
-      qualifies = true
-    }
-  } else if (remaining > 2) {
-    code = 3
-    qualifies = true
-  }
-  if (defense <= offense + input.runnerCount + 2 && remaining > 0) code = 1
-  if (!qualifies && code === 0) return noSaveChance()
+  const code = saveCodeOf(defense, offense, outsRemainingOf(input), input.runnerCount)
+  if (code === 0) return noSaveChance()
 
   return {
     ...state,
     save: { side: input.defenseSide, number: input.moundPitcherOf(input.defenseSide) },
     saveCode: code,
   }
+}
+
+/** 세이브 후보 코드 — 3점 넘게 앞서면 9(남은 아웃 > 8), 아니면 3(남은 아웃 > 2), 동점 주자 대기면 1 이 덮어쓴다. 0 이면 세이브 상황이 아니다 */
+function saveCodeOf(defense: number, offense: number, remaining: number, runnerCount: number): number {
+  if (defense <= offense + runnerCount + 2 && remaining > 0) return 1
+  if (defense - offense > 3) return remaining > 8 ? 9 : 0
+  return remaining > 2 ? 3 : 0
 }
 
 export interface GameEndDecision {
