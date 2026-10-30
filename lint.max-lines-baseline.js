@@ -13,7 +13,6 @@ export const maxLinesBaseline = [
   'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
   'src/pages/game/ui/GameScreen.tsx',
-  'src/pages/help/ui/HelpScreen.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
   'src/shared/api/audio/webAudioSound.ts',
   'src/shared/config/bugfixes/bugfixes.ts',

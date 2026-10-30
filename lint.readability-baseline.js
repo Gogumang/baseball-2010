@@ -154,7 +154,6 @@ export const readabilityBaseline = [
   'src/pages/general-mode/lib/generalPrepPush.ts',
   'src/pages/help/lib/helpPages.ts',
   'src/pages/help/lib/helpViewer.ts',
-  'src/pages/help/ui/HelpScreen.tsx',
   'src/pages/home-run-derby/lib/derbyField.ts',
   'src/pages/home-run-derby/lib/derbyPitchCall.ts',
   'src/pages/home-run-derby/ui/DerbyHud.tsx',
