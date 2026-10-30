@@ -157,7 +157,6 @@ export const readabilityBaseline = [
   'src/pages/general-mode/lib/generalModeSetup.ts',
   'src/pages/general-mode/lib/generalPrepPush.ts',
   'src/pages/general-mode/ui/FirstBatStadiumScreen.tsx',
-  'src/pages/general-mode/ui/MatchInfoScreen.tsx',
   'src/pages/help/lib/helpPages.ts',
   'src/pages/help/lib/helpViewer.ts',
   'src/pages/help/ui/HelpScreen.tsx',
