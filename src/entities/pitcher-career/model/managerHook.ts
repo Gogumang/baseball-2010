@@ -98,30 +98,48 @@ export interface ManagerHookResult {
  *   4) 만루 → 행 3 (마찬가지)
  */
 export function judgeManagerHook(input: ManagerHookInput, flags: ManagerHookFlags, random: RandomPort): ManagerHookResult {
-  const miss: ManagerHookResult = { hooked: false, userEventIndex: null, flags }
-  if (input.mode !== PITCHER_EDITION_MODE) return miss
-  if (input.role === PITCHER_ROLE.relief) return miss
+  if (input.mode !== PITCHER_EDITION_MODE || input.role === PITCHER_ROLE.relief) return { hooked: false, userEventIndex: null, flags }
 
   const column = Math.min(Math.max(Math.trunc(input.reputation / 100), 0), HOOK_PERCENT_TABLE[0].length - 1)
   const tone = managerToneOf(input.reputation)
   const rolls = (row: number) => random.rand(0, 10_000) < HOOK_PERCENT_TABLE[row][column] * 100
 
-  let next = flags
-  if (input.staminaPercent === 0 && !flags.rolledAtZeroStamina) {
-    next = { ...next, rolledAtZeroStamina: true }
-    if (rolls(1)) return { hooked: true, userEventIndex: HOOK_USER_EVENT_BASE.zeroStamina + tone, flags: next }
-  } else if (input.staminaPercent <= 20 && !flags.rolledAtLowStamina) {
-    next = { ...next, rolledAtLowStamina: true }
-    if (rolls(0)) return { hooked: true, userEventIndex: HOOK_USER_EVENT_BASE.lowStamina + tone, flags: next }
-  }
+  const stage = staminaHookStageOf(input, flags)
+  const next = stage === null ? flags : { ...flags, [stage.flag]: true }
+  // 조건이 선 행만 차례로 굴리고, 처음 걸린 행이 강판이다
+  const hook = hookChancesOf(input, stage).find((chance) => rolls(chance.row))
+  if (hook === undefined) return { hooked: false, userEventIndex: null, flags: next }
+  return { hooked: true, userEventIndex: hook.eventBase + tone, flags: next }
+}
 
-  if (input.runsAllowedThisInning > BIG_INNING_RUNS && rolls(2)) {
-    return { hooked: true, userEventIndex: HOOK_USER_EVENT_BASE.bigInning + tone, flags: next }
-  }
-  if (input.basesLoaded && rolls(3)) {
-    return { hooked: true, userEventIndex: HOOK_USER_EVENT_BASE.basesLoaded + tone, flags: next }
-  }
-  return { hooked: false, userEventIndex: null, flags: next }
+/** 강판 표의 행 하나와 그 강판 글 */
+interface HookChance {
+  readonly row: number
+  readonly eventBase: number
+}
+
+/** 체력 갈래 — 경기에 한 번씩만 굴려 플래그를 세운다 */
+interface StaminaHookStage extends HookChance {
+  readonly flag: keyof ManagerHookFlags
+}
+
+const ZERO_STAMINA_STAGE: StaminaHookStage = { row: 1, eventBase: HOOK_USER_EVENT_BASE.zeroStamina, flag: 'rolledAtZeroStamina' }
+const LOW_STAMINA_STAGE: StaminaHookStage = { row: 0, eventBase: HOOK_USER_EVENT_BASE.lowStamina, flag: 'rolledAtLowStamina' }
+
+/** 1) 체력 0% 이고 `S+0x69` 가 아직 0 → 행 1 · 그렇지 않으면 2) 체력 ≤20% 이고 `S+0x68` 이 아직 0 → 행 0 */
+function staminaHookStageOf(input: ManagerHookInput, flags: ManagerHookFlags): StaminaHookStage | null {
+  if (input.staminaPercent === 0 && !flags.rolledAtZeroStamina) return ZERO_STAMINA_STAGE
+  if (input.staminaPercent <= 20 && !flags.rolledAtLowStamina) return LOW_STAMINA_STAGE
+  return null
+}
+
+/** 굴릴 행 차례 — 체력 갈래 → 3) 이번 이닝 4실점 이상 행 2 → 4) 만루 행 3 */
+function hookChancesOf(input: ManagerHookInput, stage: StaminaHookStage | null): HookChance[] {
+  const chances: HookChance[] = []
+  if (stage !== null) chances.push(stage)
+  if (input.runsAllowedThisInning > BIG_INNING_RUNS) chances.push({ row: 2, eventBase: HOOK_USER_EVENT_BASE.bigInning })
+  if (input.basesLoaded) chances.push({ row: 3, eventBase: HOOK_USER_EVENT_BASE.basesLoaded })
+  return chances
 }
 
 /**

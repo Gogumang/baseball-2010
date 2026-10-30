@@ -54,57 +54,53 @@ function raisePitcherAbility(career: PitcherCareer, key: keyof PitcherAbility, v
   return { ...career, ability: { ...career.ability, [key]: raised > limit ? Math.min(limit, MAXIMUM_PITCHER_ABILITY) : raised } }
 }
 
+type RewardHandler = (career: PitcherCareer, value: number, random: RandomPort | undefined) => PitcherCareer
+
+/** 종류마다 커리어 칸 — 모드를 가르지 않는다 (능력치 13~16 은 `applyReward` 가 먼저 본다) */
+const REWARD_HANDLERS: Readonly<Record<number, RewardHandler>> = {
+  [EVENT_REWARD_KIND.인기도]: (career, value) => gainPitcherPopularity(career, value),
+  [EVENT_REWARD_KIND.평판]: (career, value) => gainPitcherReputation(career, value),
+  [EVENT_REWARD_KIND.사기]: (career, value) => gainPitcherMorale(career, value),
+  [EVENT_REWARD_KIND.소지금]: (career, value) => ({ ...career, money: clamp(career.money + value * ORIGINAL_MONEY_UNIT, 0, MAXIMUM_MONEY) }),
+  [EVENT_REWARD_KIND.스킬]: (career, value) => (value === 0 ? career : applySkillReward(career, value)),
+  [HIDDEN_PITCH_KIND]: (career, value) => openHiddenPitchRow(career, value),
+  [HIDDEN_OPEN_KIND]: (career, value) => openHiddenId(career, Math.abs(value)),
+  [EVENT_REWARD_KIND.GP아이템]: (career, value, random) => (random === undefined ? career : applyPitcherGpItem(career, value - 1, random).career),
+  [EVENT_REWARD_KIND.G포인트]: (career, value) => ({ ...career, gamePoint: clamp(career.gamePoint + value, 0, MAXIMUM_GAME_POINT) }),
+  [EVENT_REWARD_KIND.질병]: (career, value, random) => applyIllnessReward(career, value, random),
+  [EVENT_REWARD_KIND.모든능력치]: (career, value) => PITCHER_ABILITY_ORDER.reduce((current, key) => raisePitcherAbility(current, key, value), career),
+  [EVENT_REWARD_KIND.연봉]: (career, value) => applySalaryChange(career, value),
+}
+
 function applyReward(career: PitcherCareer, reward: EventReward, random: RandomPort | undefined): PitcherCareer {
   if (reward.kind >= FIRST_ABILITY_KIND && reward.kind <= LAST_ABILITY_KIND) {
     return raisePitcherAbility(career, PITCHER_ABILITY_ORDER[reward.kind - FIRST_ABILITY_KIND], reward.value)
   }
-  switch (reward.kind) {
-    case EVENT_REWARD_KIND.인기도:
-      return gainPitcherPopularity(career, reward.value)
-    case EVENT_REWARD_KIND.평판:
-      return gainPitcherReputation(career, reward.value)
-    case EVENT_REWARD_KIND.사기:
-      return gainPitcherMorale(career, reward.value)
-    case EVENT_REWARD_KIND.소지금:
-      return { ...career, money: clamp(career.money + reward.value * ORIGINAL_MONEY_UNIT, 0, MAXIMUM_MONEY) }
-    case EVENT_REWARD_KIND.스킬:
-      return reward.value === 0 ? career : applySkillReward(career, reward.value)
-    case HIDDEN_PITCH_KIND:
-      return openHiddenPitchRow(career, reward.value)
-    case HIDDEN_OPEN_KIND: {
-      const id = Math.abs(reward.value)
-      return career.openedHiddenIds.includes(id) ? career : { ...career, openedHiddenIds: [...career.openedHiddenIds, id] }
-    }
-    case EVENT_REWARD_KIND.GP아이템:
-      return random === undefined ? career : applyPitcherGpItem(career, reward.value - 1, random).career
-    case EVENT_REWARD_KIND.G포인트:
-      return { ...career, gamePoint: clamp(career.gamePoint + reward.value, 0, MAXIMUM_GAME_POINT) }
-    case EVENT_REWARD_KIND.질병:
-      // 값 < 0 치료 갈래 0x8c73e~0x8c752 (모드 갈림 없음): +5 = 0 · +6 = 표 0xd4d98[0](0) · +0x7c = 20 — 남은 기간도 0 (r257)
-      if (reward.value < 0) {
-        return { ...career, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: ILLNESS_COOLDOWN }
-      }
-      // 값 ≥ 0 은 알림 글 만들기(0x8c14e)가 bfa55(0,4)+1 로 다시 써 질병 종류가 된다 — 타자편과 같은 굴림
-      return {
-        ...career,
-        illnessCooldown: ILLNESS_COOLDOWN,
-        isSick: true,
-        illnessRemaining: ILLNESS_DURATION,
-        // 값 > 0 은 알림 글 0x8beb8 이 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 다시 안 굴린다
-        illnessName:
-          reward.value > 0
-            ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
-            : random === undefined
-              ? ILLNESS_NAMES[0]
-              : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)],
-      }
-    case EVENT_REWARD_KIND.모든능력치:
-      return PITCHER_ABILITY_ORDER.reduce((current, key) => raisePitcherAbility(current, key, reward.value), career)
-    case EVENT_REWARD_KIND.연봉:
-      return applySalaryChange(career, reward.value)
-    default:
-      return career
+  const handler = REWARD_HANDLERS[reward.kind]
+  return handler === undefined ? career : handler(career, reward.value, random)
+}
+
+function openHiddenId(career: PitcherCareer, id: number): PitcherCareer {
+  return career.openedHiddenIds.includes(id) ? career : { ...career, openedHiddenIds: [...career.openedHiddenIds, id] }
+}
+
+function applyIllnessReward(career: PitcherCareer, value: number, random: RandomPort | undefined): PitcherCareer {
+  // 값 < 0 치료 갈래 0x8c73e~0x8c752 (모드 갈림 없음): +5 = 0 · +6 = 표 0xd4d98[0](0) · +0x7c = 20 — 남은 기간도 0 (r257)
+  if (value < 0) return { ...career, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: ILLNESS_COOLDOWN }
+  // 값 ≥ 0 은 알림 글 만들기(0x8c14e)가 bfa55(0,4)+1 로 다시 써 질병 종류가 된다 — 타자편과 같은 굴림
+  return {
+    ...career,
+    illnessCooldown: ILLNESS_COOLDOWN,
+    isSick: true,
+    illnessRemaining: ILLNESS_DURATION,
+    illnessName: rollIllnessName(value, random),
   }
+}
+
+/** 값 > 0 은 알림 글 0x8beb8 이 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 다시 안 굴린다 */
+function rollIllnessName(value: number, random: RandomPort | undefined): string {
+  if (value > 0) return ILLNESS_NAMES[value - 1] ?? ILLNESS_NAMES[0]
+  return random === undefined ? ILLNESS_NAMES[0] : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)]
 }
 
 /**

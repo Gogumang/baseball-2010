@@ -63,16 +63,36 @@ export function judgePitcherEnding(career: PitcherCareer): number | null {
   if (career.injuredGamesPlayed >= INJURED_GAMES_FOR_ENDING) return PITCHER_INJURY_ENDING
   if (year < FIRST_ENDING_YEAR) return null
   if (year === FIRST_ENDING_YEAR && popularity <= 499) return PITCHER_RELEASE_ENDING
-  if (year >= FINAL_YEAR) {
-    // 전설은 **보유** 비트로 본다 (0xa3ade → 0xa3a74, +0x1b8) — 장착 칸(+0x14)이 아니다
-    if (popularity > 3500 && career.skillIds.includes(LEGEND_SKILL)) return 9
-    if (popularity > 3000 && reputation > 699 && money > 399) return 8
-    if (popularity > 2500 && reputation > 499) return 7
-    if (popularity > 2000 && reputation > 299) return 6
-  }
+  const finalYearEnding = year >= FINAL_YEAR ? finalYearEndingOf(career, popularity, reputation, money) : null
+  if (finalYearEnding !== null) return finalYearEnding
+  return popularityEndingOf(popularity, money)
+}
+
+/** 13년차만 보는 줄 — 인기도 · 평판 · 소지금(100만 단위)이 모두 넘어야 한다. 위에서부터 처음 맞는 것 */
+const FINAL_YEAR_ENDING_ROWS: readonly {
+  readonly ending: number
+  readonly popularity: number
+  readonly reputation: number
+  readonly money?: number
+}[] = [
+  { ending: 8, popularity: 3000, reputation: 699, money: 399 },
+  { ending: 7, popularity: 2500, reputation: 499 },
+  { ending: 6, popularity: 2000, reputation: 299 },
+]
+
+function finalYearEndingOf(career: PitcherCareer, popularity: number, reputation: number, money: number): number | null {
+  // 전설은 **보유** 비트로 본다 (0xa3ade → 0xa3a74, +0x1b8) — 장착 칸(+0x14)이 아니다
+  if (popularity > 3500 && career.skillIds.includes(LEGEND_SKILL)) return 9
+  const row = FINAL_YEAR_ENDING_ROWS.find(
+    (line) => popularity > line.popularity && reputation > line.reputation && (line.money === undefined || money > line.money),
+  )
+  return row === undefined ? null : row.ending
+}
+
+/** 인기도만 보는 줄 — 5 · 4(소지금도) · 3 · 은퇴식 */
+function popularityEndingOf(popularity: number, money: number): number | null {
   if (popularity > 1500) return 5
-  if (popularity > 1000 && money > 199) return 4
-  if (popularity > 1000) return 3
+  if (popularity > 1000) return money > 199 ? 4 : 3
   // ⚠️ 원본 버그(B-76): "999 이하" 만 은퇴식(0xa3b66)이고 3 은 `> 1000` 이라 인기도가 정확히 1000 이면 판정이 없다 (−1) —
   // 141 이 키를 안 먹는 화면에 갇힌다. 고침(bugfixes.json B-76, 기본 켬): 1000 도 은퇴식. 굴림 없음 (타자편 `judgeEnding` 과 같다)
   return popularity <= (isBugFixed('B-76') ? 1000 : 999) ? PITCHER_RETIREMENT_ENDING : null
