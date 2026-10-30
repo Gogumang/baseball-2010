@@ -317,7 +317,7 @@ export const crossSliceBaseline = [
   'src/pages/mission-play/lib/missionRunScoreBoard.ts',
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
   'src/pages/mission-play/ui/missionPlay/otherSlices.ts',
-  'src/pages/mission-select/ui/MissionSelectScreen.tsx',
+  'src/pages/mission-select/ui/missionSelectScreen/otherSlices.ts',
   'src/pages/nari-record-room/ui/nariRecordRoom/otherSlices.ts',
   'src/pages/outing-map/ui/OutingMap.tsx',
   'src/pages/pitcher-league/lib/pitchTrainingWindow/otherSlices.ts',
