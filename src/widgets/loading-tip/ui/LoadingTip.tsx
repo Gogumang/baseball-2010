@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MarkupText } from '@/shared/ui'
-import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useAnimations, useFrameOrigins, type FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import {
   gameSceneTickNow,
@@ -76,6 +76,21 @@ interface LoadingTipProps {
   readonly preloadRequests?: readonly SpriteFolderPreload[]
 }
 
+/** 달리는 선수의 이 그림 칸 — 애니 · 원점을 받기 전이면 null */
+function runnerFrameOf(animations: ReturnType<typeof useAnimations>, origins: FrameOrigins | null, update: number) {
+  const step = animationStepAt(animations?.[RUNNER_ANIMATION] ?? [], update)
+  if (step === null) return null
+  const frameKey = String(step.frame).padStart(3, '0')
+  const origin = origins?.[frameKey]
+  return origin === undefined ? null : { frameKey, origin }
+}
+
+/** 팁 번호 = +0x315 + 1 — 팁 글은 StrTIP[1 + n] 이고 73 줄이 모두 달라 글로 n 을 되찾는다 */
+function tipNumberGlyphsFor(tip: string) {
+  const tipIndex = LOADING_TIPS.indexOf(tip)
+  return tipIndex < 0 ? [] : tipNumberGlyphsOf(tipIndex + 1)
+}
+
 export function LoadingTip({ tip, onDone, steps = LOADING_STEPS_DEFAULT, preloadScenes = GAME_SCENE_PRELOADS, preloadRequests }: LoadingTipProps) {
   const origins = useFrameOrigins(FOLDER)
   const animations = useAnimations(FOLDER)
@@ -110,15 +125,11 @@ export function LoadingTip({ tip, onDone, steps = LOADING_STEPS_DEFAULT, preload
     return () => cancelAnimationFrame(handle)
   }, [steps])
 
-  const step = animationStepAt(animations?.[RUNNER_ANIMATION] ?? [], update)
-  const frameKey = step === null ? null : String(step.frame).padStart(3, '0')
-  const origin = frameKey === null ? undefined : origins?.[frameKey]
+  const runnerFrame = runnerFrameOf(animations, origins, update)
   // 0x54128 이 먼저 칸을 올린 뒤 0x53e04 가 그린다 — 첫 그림이 1/끝
   const fillWidth = loadingFillWidthOf(Math.min(steps, update + 1), steps)
   const runner = loadingRunnerAnchorOf(fillWidth)
-  // 팁 번호 = +0x315 + 1 — 팁 글은 StrTIP[1 + n] 이고 73 줄이 모두 달라 글로 n 을 되찾는다
-  const tipIndex = LOADING_TIPS.indexOf(tip)
-  const numberGlyphs = tipIndex < 0 ? [] : tipNumberGlyphsOf(tipIndex + 1)
+  const numberGlyphs = tipNumberGlyphsFor(tip)
 
   return (
     <div className={styles.overlay} role="status" aria-label="로딩 중">
@@ -164,12 +175,12 @@ export function LoadingTip({ tip, onDone, steps = LOADING_STEPS_DEFAULT, preload
               }}
             />
           ))}
-        {origin !== undefined && frameKey !== null && (
+        {runnerFrame !== null && (
           <img
             className={styles.sprite}
             data-testid="로딩-선수"
-            style={{ left: runner.x + origin.x, top: runner.y + origin.y }}
-            src={`${FOLDER}/${frameKey}.png`}
+            style={{ left: runner.x + runnerFrame.origin.x, top: runner.y + runnerFrame.origin.y }}
+            src={`${FOLDER}/${runnerFrame.frameKey}.png`}
             alt=""
           />
         )}

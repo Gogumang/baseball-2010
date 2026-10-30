@@ -1,35 +1,20 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { FrameSprite, RawScreen } from '@/shared/ui'
+import { RawScreen } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { INTRO_TICKS, introBandAlphaOf, introCounterAt, introFadeAt } from '@/widgets/game-scene/lib/introSchedule'
-import {
-  INTRO_BAND,
-  INTRO_BAND_RGB,
-  INTRO_BAR_FRAME,
-  INTRO_BAR_X,
-  INTRO_BAR_Y,
-  INTRO_STADIUM_LABEL_FRAME,
-  INTRO_STADIUM_LABEL_X,
-  INTRO_TEAM_NAME_X,
-  INTRO_TEXT_Y,
-} from '@/widgets/game-scene/lib/introLayout'
+import { INTRO_TICKS, introCounterAt, introFadeAt } from '@/widgets/game-scene/lib/introSchedule'
 import { isOkKey, useSceneTick } from '@/widgets/game-scene/model/useSceneTick'
 import { useSceneKeyLatchOwner } from '@/shared/lib/sceneKeyLatch/sceneKeyLatch'
-import * as styles from '@/widgets/game-scene/ui/GameScene.css'
-import { ScoreboardFrame } from '@/widgets/scoreboard-frame/ui/ScoreboardFrame'
-import { SCOREBOARD_AT, effectOpacityOf, introScoreboardEffectOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
+import { introScoreboardEffectOf } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import type { ScoreboardSide } from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
 import { SceneryBackdrop } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { rivalryStepAt } from '@/widgets/game-scene/lib/rivalryBand'
 import { RivalryBandCanvas } from '@/widgets/game-scene/ui/RivalryBandCanvas'
 import { introCanvasOverlayOf } from '@/widgets/game-scene/ui/introCanvas'
+import { introDomLayersOf } from '@/widgets/game-scene/ui/gameIntro/introDomLayers'
 import type { SceneryBackdropStage } from '@/widgets/batting-stage/ui/SceneryBackdrop'
 import { useMarksGameScene } from '@/shared/lib/commonWindow/commonWindow'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
+import { GAME_UI_FRAMES, IMG_TEXT_FRAMES } from '@/widgets/game-scene/ui/introCanvas/placed'
 import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
-
-const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
-const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
 
 interface GameIntroProps {
   /**
@@ -69,6 +54,19 @@ interface GameIntroProps {
  * 알파는 max(1, +0x17e4 − 0x55) = 1~170 이라 늘 섞는다. ⚠️ 미확인: 웹은 "윗바이트/255" 로 섞는다(남김 — 섞기 식은 단말 몫이라
  * 바이너리에 없다).
  */
+/** 41a00 — 라이벌전이고 흐려지기 전([+0x17e6] > 14)이며 띠 단계가 1 이상 */
+const showsRivalryBand = (isRivalry: boolean, fadeLevel: number, tick: number): boolean => isRivalry && fadeLevel > 14 && rivalryStepAt(tick) > 0
+
+/** 캔버스로 이어 그릴 인트로 재료 — 점수판 측은 준 것만 */
+function introCanvasInputOf(
+  stadiumNameFrame: number,
+  scoreboardSides: GameIntroProps['scoreboardSides'],
+  fade: ReturnType<typeof introFadeAt>,
+  effectLevel: number | null,
+) {
+  return { stadiumNameFrame, ...(scoreboardSides === undefined ? {} : { scoreboardSides }), fade, effectLevel }
+}
+
 export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRivalry = false, onDone }: GameIntroProps) {
   // 인트로 0xc도 경기 장면 0x104 의 한 상태다 — 이 판만 그리는 동안에도 장면 객체(+0xfd4 · 파티클 관리자)는 그대로다(새로 서는 것은
   // 장면 전환 0x3874 의 new 뿐). 공용 창이 줄임 없이 닫히고([창+0x24f]) 창이 떠 있으면 장면이 선다(52cc6)
@@ -107,9 +105,6 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   const counter = introCounterAt(tick)
   const fade = introFadeAt(tick)
   const effectLevel = introScoreboardEffectOf(fade.level)
-  const imageOpacity = effectOpacityOf(effectLevel)
-  const imageStyle = imageOpacity === 1 ? undefined : { opacity: imageOpacity }
-  const { r, g, b } = INTRO_BAND_RGB
   /**
    * 띠 · 막대 · 글씨 · 점수판을 배경 캔버스에 이어 그린다(Q-03 r301 — 흐려지는 동안 효과 1 이 배경 화면을 읽어 원본 식으로 섞는다).
    * 배경이 없거나 그림을 다 받기 전(· 시험 DOM)이면 아래 DOM 근사로 둔다
@@ -117,68 +112,15 @@ export function GameIntro({ stadiumNameFrame, scoreboardSides, backdrop, isRival
   const canvasOverlay =
     backdrop === undefined
       ? null
-      : introCanvasOverlayOf(
-          { stadiumNameFrame, ...(scoreboardSides === undefined ? {} : { scoreboardSides }), fade, effectLevel },
-          gameUiOrigins,
-          textOrigins,
-        )
-  /** DOM 근사 — 캔버스로 못 그릴 때(배경 없음 · 그림 받는 중 · 시험 DOM) */
-  const domLayers = (
-    <>
-      <div
-        className={styles.introBand}
-        data-testid="인트로-띠"
-        style={{
-          left: INTRO_BAND.x,
-          top: INTRO_BAND.y,
-          width: INTRO_BAND.width,
-          height: INTRO_BAND.height,
-          background: `rgba(${r}, ${g}, ${b}, ${introBandAlphaOf(fade) / 255})`,
-        }}
-      />
-      {imageOpacity > 0 && (
-        <>
-          <FrameSprite folder={GAME_UI_FRAMES} frame={INTRO_BAR_FRAME} origins={gameUiOrigins} x={INTRO_BAR_X} y={INTRO_BAR_Y} style={imageStyle} />
-          <span data-testid="인트로-팀이름" data-frame={stadiumNameFrame}>
-            <FrameSprite
-              folder={IMG_TEXT_FRAMES}
-              frame={stadiumNameFrame}
-              origins={textOrigins}
-              x={INTRO_TEAM_NAME_X}
-              y={INTRO_TEXT_Y}
-              style={imageStyle}
-            />
-          </span>
-          <FrameSprite
-            folder={IMG_TEXT_FRAMES}
-            frame={INTRO_STADIUM_LABEL_FRAME}
-            origins={textOrigins}
-            x={INTRO_STADIUM_LABEL_X}
-            y={INTRO_TEXT_Y}
-            style={imageStyle}
-          />
-        </>
-      )}
-      {/* 띠·막대·팀 글씨 뒤에 그린다 (0x419f4) */}
-      {scoreboardSides !== undefined && (
-        <ScoreboardFrame
-          {...SCOREBOARD_AT.intro}
-          side0={scoreboardSides[0]}
-          side1={scoreboardSides[1]}
-          effectLevel={effectLevel}
-          introAlpha={fade.alpha}
-        />
-      )}
-    </>
-  )
+      : introCanvasOverlayOf(introCanvasInputOf(stadiumNameFrame, scoreboardSides, fade, effectLevel), gameUiOrigins, textOrigins)
   return (
     <RawScreen onPress={() => keyLatch.push(finish)}>
       {backdrop !== undefined && (
         <SceneryBackdrop stage={backdrop} offsetY={counter} {...(canvasOverlay === null ? {} : { overlay: canvasOverlay })} />
       )}
-      {canvasOverlay === null && domLayers}
+      {canvasOverlay === null && introDomLayersOf({ stadiumNameFrame, scoreboardSides, fade, effectLevel, gameUiOrigins, textOrigins })}
       {/* 41a00 — +0x194a && [+0x17e6] > 14 → 0x3b80c (그림 0 은 단계 0 이라 안 그린다) */}
-      {isRivalry && fade.level > 14 && rivalryStepAt(tick) > 0 && <RivalryBandCanvas step={rivalryStepAt(tick)} />}
+      {showsRivalryBand(isRivalry, fade.level, tick) && <RivalryBandCanvas step={rivalryStepAt(tick)} />}
     </RawScreen>
   )
 }

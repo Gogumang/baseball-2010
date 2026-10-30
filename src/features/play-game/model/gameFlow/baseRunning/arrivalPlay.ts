@@ -40,31 +40,51 @@ export function applyArrivalPlay(
   if (arrivalApplicationOf(play) !== 'runnerOnly') return { progress: opened, play, interrupted: false }
 
   const settledApply = withRunnerOnlyPlay(opened, play.result, true, shownLive)
-  const ended = settledApply.game.isFinished || settledApply.game.inning !== before.inning || settledApply.game.half !== before.half
+  const ended = isHalfOrGameEnded(settledApply.game, before)
   // 판정 B 가 정산을 건너뛰는 판(삼진 없이 이어지는 폭투·포일 — ae596 → ae5a2)은 정산 칸을 안 센다
   let next = arrivalPlaySettles(play, { halfOrGameEnded: ended }) ? settledApply : withRunnerOnlyPlay(opened, play.result, false, shownLive)
   const recordIds = gatedOffenseRecords(play.recordIds)
   if (recordIds.length > 0) next = { ...next, recordIds: [...next.recordIds, ...recordIds] }
-  // 삼진 없는 도루 판(종류 5)의 정산 — 거르지 않는 칸 (`withRunnerPlaySettlement`). 삼진 + 도루 판은 정산이 하나라 타석 결과 쪽
-  // (`startPlayerOutcome` → `finishStrikeoutStealSettlement`)이 삼진 사건과 판의 사건을 함께 센다
-  if (play.kind === 5 && outcomeAfter === null) {
-    next = withRunnerPlaySettlement(next, progress, play.result, settlementEventsOfPlay(play.result), isRecorded)
-  }
-  // 삼진 없이 3아웃 · 경기 끝으로 정산되는 폭투·포일 판(종류 9) — 거르기가 없는 정산이라 타석 칸 · 결과 링까지 오른다
-  if (play.kind === 9 && ended && outcomeAfter === null) {
-    next = withWildPitchSettlement(next, progress, play.result, isRecorded)
-  }
+  next = withArrivalSettlement(next, progress, play, { outcomeAfter, ended, isRecorded })
   // 같은 타석이 이어지면 이 판의 사건이 목록에 남아 다음 견제 정산이 함께 센다 — 다음 공의 0xa5e14 가 비운다
   next = {
     ...next,
     pendingSettlementEvents: pendingSettlementEventsAfter(undefined, settlementEventsOfPlay(play.result), outcomeAfter === null && !ended),
   }
   next = appendLog(next, `${before.inning}회${before.half} ${describeArrivalPlay(play)}`, true)
-  const interrupted = ended
-  if (interrupted && !next.game.isFinished) next = advanceUntilPlayerTurn(next, random)
-  // 판정 B 0xae3e8 — 같은 타석이 이어지면 0xf(다음 공) 진입 0x3d954
-  else if (!interrupted && outcomeAfter === null) next = enterPitchSelection(next, random, countAfter)
-  return { progress: next, play, interrupted }
+  return { progress: continueAfterArrival(next, { ended, outcomeAfter }, random, countAfter), play, interrupted: ended }
+}
+
+/** 판이 반 이닝 · 경기를 끝냈나 */
+function isHalfOrGameEnded(game: GameProgress['game'], before: GameProgress['game']): boolean {
+  return game.isFinished || game.inning !== before.inning || game.half !== before.half
+}
+
+/** 삼진 없는 판의 정산 — 도루 판(종류 5)은 늘, 폭투·포일 판(종류 9)은 3아웃 · 경기 끝으로 정산될 때만 */
+function withArrivalSettlement(
+  next: GameProgress,
+  progress: GameProgress,
+  play: PitchArrivalPlay,
+  context: { readonly outcomeAfter: AtBatOutcome | null; readonly ended: boolean; readonly isRecorded: boolean },
+): GameProgress {
+  // 삼진 + 도루 판은 정산이 하나라 타석 결과 쪽(`startPlayerOutcome` → `finishStrikeoutStealSettlement`)이 삼진 사건과 판의 사건을 함께 센다
+  if (context.outcomeAfter !== null) return next
+  // 거르지 않는 칸 (`withRunnerPlaySettlement`)
+  if (play.kind === 5) return withRunnerPlaySettlement(next, progress, play.result, settlementEventsOfPlay(play.result), context.isRecorded)
+  // 거르기가 없는 정산이라 타석 칸 · 결과 링까지 오른다
+  if (play.kind === 9 && context.ended) return withWildPitchSettlement(next, progress, play.result, context.isRecorded)
+  return next
+}
+
+/** 판이 끝낸 반 이닝은 자동진행으로, 같은 타석이 이어지면 판정 B 0xae3e8 → 0xf(다음 공) 진입 0x3d954 */
+function continueAfterArrival(
+  next: GameProgress,
+  context: { readonly ended: boolean; readonly outcomeAfter: AtBatOutcome | null },
+  random: RandomPort,
+  countAfter: AtBatCount,
+): GameProgress {
+  if (context.ended) return next.game.isFinished ? next : advanceUntilPlayerTurn(next, random)
+  return context.outcomeAfter === null ? enterPitchSelection(next, random, countAfter) : next
 }
 
 /**
@@ -84,9 +104,7 @@ export function resolveRunnerPlay(progress: GameProgress, result: DefensePlayRes
       shownLive: true,
       count: pending.pickoff.count,
     })
-    const before = cleared.game
-    const interrupted = next.game.isFinished || next.game.inning !== before.inning || next.game.half !== before.half
-    return { progress: next, play: null, interrupted }
+    return { progress: next, play: null, interrupted: isHalfOrGameEnded(next.game, cleared.game) }
   }
   const play = finishPitchArrivalPlay(pending.opened, result as RunnerPlayEngineResult, true)
   const arrival = pending.arrival

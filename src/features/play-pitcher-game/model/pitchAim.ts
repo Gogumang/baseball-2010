@@ -27,28 +27,25 @@ const DIGIT_ZERO = 0x30
  * 웹 키 이름 → 원본 키 코드. 웹에서 OK 는 Enter·Space, CLR 은 Escape·Backspace 로 받는다(다른 화면과 같은 약속).
  * 원본 키가 아닌 것은 null.
  */
+const NAMED_KEY_CODES: ReadonlyMap<string, number> = new Map([
+  ['ArrowUp', KEY_UP],
+  ['ArrowDown', KEY_DOWN],
+  ['ArrowLeft', KEY_LEFT],
+  ['ArrowRight', KEY_RIGHT],
+  ['Enter', KEY_OK],
+  [' ', KEY_OK],
+  ['Escape', KEY_CLEAR],
+  ['Backspace', KEY_CLEAR],
+  ['*', '*'.charCodeAt(0)],
+  ['#', '#'.charCodeAt(0)],
+])
+
+const isDigitKey = (key: string): boolean => key.length === 1 && key >= '0' && key <= '9'
+
 export function originalKeyCodeOf(key: string): number | null {
-  switch (key) {
-    case 'ArrowUp':
-      return KEY_UP
-    case 'ArrowDown':
-      return KEY_DOWN
-    case 'ArrowLeft':
-      return KEY_LEFT
-    case 'ArrowRight':
-      return KEY_RIGHT
-    case 'Enter':
-    case ' ':
-      return KEY_OK
-    case 'Escape':
-    case 'Backspace':
-      return KEY_CLEAR
-    case '*':
-    case '#':
-      return key.charCodeAt(0)
-    default:
-      return key.length === 1 && key >= '0' && key <= '9' ? key.charCodeAt(0) : null
-  }
+  const named = NAMED_KEY_CODES.get(key)
+  if (named !== undefined) return named
+  return isDigitKey(key) ? key.charCodeAt(0) : null
 }
 
 /* ── 0xf 구질 고르기 ──────────────────────────────────────────────────────────── */
@@ -62,28 +59,24 @@ export function originalKeyCodeOf(key: string): number | null {
  *
  * 그 밖의 키는 메시지가 없다(견제 '3'·'1'·'7' 은 이어 부르는 0x53548 몫).
  */
+const PITCH_SLOT_OF_CODE: ReadonlyMap<number, number> = new Map([
+  [KEY_OK, 0],
+  [0x35, 0],
+  [KEY_UP, 1],
+  [0x32, 1],
+  [KEY_LEFT, 2],
+  [0x34, 2],
+  [KEY_RIGHT, 3],
+  [0x36, 3],
+  [KEY_DOWN, 4],
+  [0x38, 4],
+  [DIGIT_ZERO, 5],
+])
+
 export function pitchSlotOfKey(key: string): number | null {
-  switch (originalKeyCodeOf(key)) {
-    case KEY_OK:
-    case 0x35:
-      return 0
-    case KEY_UP:
-    case 0x32:
-      return 1
-    case KEY_LEFT:
-    case 0x34:
-      return 2
-    case KEY_RIGHT:
-    case 0x36:
-      return 3
-    case KEY_DOWN:
-    case 0x38:
-      return 4
-    case DIGIT_ZERO:
-      return 5
-    default:
-      return null
-  }
+  const code = originalKeyCodeOf(key)
+  if (code === null) return null
+  return PITCH_SLOT_OF_CODE.get(code) ?? null
 }
 
 /**
@@ -131,39 +124,29 @@ export type AimKeyAction =
  * +0x14 = 키 · +0x18 = 상태로 적고, vt+0xc 0x536bc → 상태 0x10 칸(표 0xd0a24[2]) 0x534b0 이 수비([+0xc] ≠ 0)면 그 키 그대로
  * 메시지 8 을 보낸다 → 0x50e3a 머리가 dx · dy 를 지우고 어느 갈래에도 안 걸려 멈춘다.
  */
+/** 방향 키 → (dx, dy) — 표에 없는 키는 멈춤(0, 0) */
+const AIM_DIRECTION_OF_CODE: ReadonlyMap<number, AimDirection> = new Map([
+  [KEY_UP, { dx: 0, dy: 1 }],
+  [0x32, { dx: 0, dy: 1 }],
+  [KEY_DOWN, { dx: 0, dy: -1 }],
+  [0x38, { dx: 0, dy: -1 }],
+  [KEY_LEFT, { dx: -1, dy: 0 }],
+  [0x34, { dx: -1, dy: 0 }],
+  [KEY_RIGHT, { dx: 1, dy: 0 }],
+  [0x36, { dx: 1, dy: 0 }],
+  [0x31, { dx: -1, dy: 1 }],
+  [0x33, { dx: 1, dy: 1 }],
+  [0x37, { dx: -1, dy: -1 }],
+  [0x39, { dx: 1, dy: -1 }],
+])
+
 export function aimKeyActionOf(key: string): AimKeyAction | null {
   const code = originalKeyCodeOf(key)
   if (code === null) return null
-  const move = (dx: number, dy: number): AimKeyAction => ({ kind: 'move', direction: { dx, dy } })
-  switch (code) {
-    case KEY_OK:
-    case 0x35:
-      return { kind: 'confirm' }
-    case KEY_CLEAR:
-      return { kind: 'cancel' }
-    case KEY_UP:
-    case 0x32:
-      return move(0, 1)
-    case KEY_DOWN:
-    case 0x38:
-      return move(0, -1)
-    case KEY_LEFT:
-    case 0x34:
-      return move(-1, 0)
-    case KEY_RIGHT:
-    case 0x36:
-      return move(1, 0)
-    case 0x31:
-      return move(-1, 1)
-    case 0x33:
-      return move(1, 1)
-    case 0x37:
-      return move(-1, -1)
-    case 0x39:
-      return move(1, -1)
-    default:
-      return move(0, 0)
-  }
+  if (code === KEY_OK || code === 0x35) return { kind: 'confirm' }
+  if (code === KEY_CLEAR) return { kind: 'cancel' }
+  const { dx, dy } = AIM_DIRECTION_OF_CODE.get(code) ?? AIM_STILL
+  return { kind: 'move', direction: { dx, dy } }
 }
 
 /** 한 틱 걸음 (0x39c5c) — x · y 는 방향 × 20, z 는 dy × 10 을 **뺀다** */

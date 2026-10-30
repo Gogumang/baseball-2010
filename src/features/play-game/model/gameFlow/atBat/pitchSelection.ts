@@ -76,47 +76,61 @@ export function enterPitchSelection(
   return { ...entered, stealDisplayUntilConfirm: entered.sceneConfirm ?? null }
 }
 
+/** 교체를 묻는 0xf 진입인가 — 경기 중 내 차례이고 돌발이 서 있지 않다 */
+function asksPitcherChange(current: GameProgress): boolean {
+  if (current.game.isFinished || !isPlayerTurn(current.game)) return false
+  return current.burst === null || current.burst.current === null
+}
+
+/**
+ * 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 내려가는 투수로
+ * (`rollCpuPitchTypeOnPitcherChangeTick`). 맞바꿈은 다음 확정 0xaebe4 라 0x344dc 의 0xae83c(마운드 투수) · 구질 목록 scene+0xfac ·
+ * 0xaea10(팀 +0x28 남은 마구)이 모두 내려가는 투수 쪽이다 (직접 떴다):
+ *   34516 0xae83c → [+0x18] 마구 > 0 · 34524 0xaea10 > 0 이고 (34536 0xa9599 주자 > 1 · 34540 st[4] 스트라이크 == 2 ·
+ *   st[4] == 0 && st[5] 볼 ∈ {0, 3}) 이면 22 를 적고 **굴리지 않는다**(3455c [+0xfc8] ≠ 0) · 아니면 34566 rand(0,6) 한 번
+ * 남은 마구는 진행기(`opponentCpuMagic`, 안 채웠으면 지금 마운드 투수로 — 0xd 진입 48ddc 의 0xaebe4 aeea8 이 채운 값),
+ * 볼카운트는 이 0xf 진입 때 값(`count`)이다. 마구 칸이 없으면 셋을 안 보고 rand(0,6) 한 번이다.
+ */
+function rollOutgoingPitchTypeTick(current: GameProgress, count: AtBatCount, random: RandomPort): void {
+  const outgoingPitcher = opponentPitcherAbilityOf(current)
+  rollCpuPitchTypeOnPitcherChangeTick(
+    {
+      repertoire: outgoingPitcher.repertoire,
+      magicRemaining: opponentCpuMagicStateOf(current, outgoingPitcher, current.aces?.levels).remaining,
+      runnerCount: runnerCountOf(current.game.bases),
+      strikes: count.strikes,
+      balls: count.balls,
+    },
+    random,
+  )
+}
+
+/** 22(3da88) → 0x16(3da94) — 앞 0xe 의 OK 를 다 받은 뒤 선다. 0x16 진입 0x3d458 이 투수 예약을 보고 +0x195c 비트1(마선수면 6) */
+function pitcherChangeSceneOf(current: GameProgress, changed: GameProgress, pendingWait: GameProgress['sceneConfirm'] | null): SubstitutionScene {
+  const incomingIsAce = moundAcePitcherOf(changed, false) !== undefined
+  return {
+    serial: (current.substitutionScene?.serial ?? 0) + 1,
+    // 투수 예약 갈래 — 0xe 첫 그림의 0x38b64 투수 가지(ptc/004)
+    entryKind: '투수',
+    incomingIsAce,
+    // 0x473f0 컷인 번호 — 0xb63a1(마투수) (투수라 +5 없음)
+    ...(incomingIsAce && changed.aces !== undefined ? { aceSlot: aceCutInSlotOf('투수', changed.aces.opponent.pitcher) } : {}),
+    entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: changed.game.bases }),
+    timeSoundId: SUBSTITUTION_TIME_SOUND,
+    confirmsBefore: pendingWait?.entries ?? 0,
+  }
+}
+
 /** `enterPitchSelection` 의 3d9e4 부터 — CPU 투수 교체 묻기 */
 function selectPitchAfterClear(progress: GameProgress, random: RandomPort, count: AtBatCount, afterConfirm: boolean): GameProgress {
   let current = progress
   let pendingWait = afterConfirm ? progress.sceneConfirm : null
   for (let entry = 0; entry < MAXIMUM_SUBSTITUTION_CALLS; entry += 1) {
-    if (current.game.isFinished || !isPlayerTurn(current.game)) return current
-    if (current.burst !== null && current.burst.current !== null) return current
+    if (!asksPitcherChange(current)) return current
     const changed = changeOpponentPitcher(current, random, true)
     if (changed === current) return current
-    // 교체를 예약한 그 틱(0xf 틱 0)에도 CPU 조작 0x53850 이 0x644 → 0x344dc 를 한 번 부른다 — 내려가는 투수로
-    // (`rollCpuPitchTypeOnPitcherChangeTick`). 맞바꿈은 다음 확정 0xaebe4 라 0x344dc 의 0xae83c(마운드 투수) · 구질 목록 scene+0xfac ·
-    // 0xaea10(팀 +0x28 남은 마구)이 모두 내려가는 투수 쪽이다 (직접 떴다):
-    //   34516 0xae83c → [+0x18] 마구 > 0 · 34524 0xaea10 > 0 이고 (34536 0xa9599 주자 > 1 · 34540 st[4] 스트라이크 == 2 ·
-    //   st[4] == 0 && st[5] 볼 ∈ {0, 3}) 이면 22 를 적고 **굴리지 않는다**(3455c [+0xfc8] ≠ 0) · 아니면 34566 rand(0,6) 한 번
-    // 남은 마구는 진행기(`opponentCpuMagic`, 안 채웠으면 지금 마운드 투수로 — 0xd 진입 48ddc 의 0xaebe4 aeea8 이 채운 값),
-    // 볼카운트는 이 0xf 진입 때 값(`count`)이다. 마구 칸이 없으면 셋을 안 보고 rand(0,6) 한 번이다.
-    const outgoingPitcher = opponentPitcherAbilityOf(current)
-    const outgoing = outgoingPitcher.repertoire
-    rollCpuPitchTypeOnPitcherChangeTick(
-      {
-        repertoire: outgoing,
-        magicRemaining: opponentCpuMagicStateOf(current, outgoingPitcher, current.aces?.levels).remaining,
-        runnerCount: runnerCountOf(current.game.bases),
-        strikes: count.strikes,
-        balls: count.balls,
-      },
-      random,
-    )
-    // 22(3da88) → 0x16(3da94) — 앞 0xe 의 OK 를 다 받은 뒤 선다. 0x16 진입 0x3d458 이 투수 예약을 보고 +0x195c 비트1(마선수면 6)
-    const incomingIsAce = moundAcePitcherOf(changed, false) !== undefined
-    const scene: SubstitutionScene = {
-      serial: (current.substitutionScene?.serial ?? 0) + 1,
-      // 투수 예약 갈래 — 0xe 첫 그림의 0x38b64 투수 가지(ptc/004)
-      entryKind: '투수',
-      incomingIsAce,
-      // 0x473f0 컷인 번호 — 0xb63a1(마투수) (투수라 +5 없음)
-      ...(incomingIsAce && changed.aces !== undefined ? { aceSlot: aceCutInSlotOf('투수', changed.aces.opponent.pitcher) } : {}),
-      entrySoundId: substitutionEntrySoundIdOf({ isAce: incomingIsAce, bases: changed.game.bases }),
-      timeSoundId: SUBSTITUTION_TIME_SOUND,
-      confirmsBefore: pendingWait?.entries ?? 0,
-    }
+    rollOutgoingPitchTypeTick(current, count, random)
+    const scene = pitcherChangeSceneOf(current, changed, pendingWait)
     // → 0xd → 0xe — OK 를 한 번 더 기다린다
     const sceneConfirm = chainSceneConfirm(pendingWait)
     pendingWait = sceneConfirm

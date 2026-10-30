@@ -67,14 +67,20 @@ export function createCloudFrameCursor(): CloudFrameCursor {
 /** 0x3f060 이 구름을 세는 경기 장면 상태 — 0xd~0x10 ('대기') */
 const CLOUD_STATES: ReadonlySet<number> = new Set([SCENE_STATE.준비, SCENE_STATE.확인, SCENE_STATE.선택, SCENE_STATE.조준])
 
+/** 지금 단계로 들어선 상태 칸의 틱 — (from, to] 안에 지금 단계(`counts`)로 든 칸이 없으면 from + 1 */
+function stateBoundaryTickOf(from: number, to: number, counts: boolean): number {
+  const entry = sceneStateEntryAt(to)
+  if (entry === null || entry.tick <= from || entry.tick > to) return from + 1
+  return CLOUD_STATES.has(entry.state) === counts ? entry.tick : from + 1
+}
+
 /**
  * 앞 그림(`from`, 세는 상태 `fromCounts`) 뒤부터 이 그림(`to`, `counts`)까지 센 틱의 구간 [첫 틱, 끝 틱]. 단계가 바뀌었으면 지금 틱에
  * 선 상태 칸의 틱을 경계로 가른다(머리말). 센 틱이 없으면 null
  */
 function countedTickRangeBetween(from: number, fromCounts: boolean, to: number, counts: boolean): readonly [number, number] | null {
   if (fromCounts === counts) return counts && to > from ? [from + 1, to] : null
-  const entry = sceneStateEntryAt(to)
-  const boundary = entry !== null && entry.tick > from && entry.tick <= to && CLOUD_STATES.has(entry.state) === counts ? entry.tick : from + 1
+  const boundary = stateBoundaryTickOf(from, to, counts)
   // 경계 앞(from + 1 ~ boundary − 1)은 앞 단계, 경계부터 지금(boundary ~ to)은 지금 단계
   const range: readonly [number, number] = counts ? [boundary, to] : [from + 1, boundary - 1]
   return range[1] >= range[0] ? range : null

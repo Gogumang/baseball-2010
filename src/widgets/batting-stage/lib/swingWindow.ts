@@ -102,24 +102,33 @@ export type FlightEvent =
  * 4e15c~4e24a → 공 끝 4e24e)대로 하나씩 돌려준다. 부르는 쪽이 적용하고 다시 부르면 다음 일이 나온다(없으면 null).
  * rAF 가 틱을 건너뛰어도 차례는 그대로다.
  */
+type FlightSwing = NonNullable<FlightState['swing']>
+
+/** 4e0ce — 예약이 아직 안 풀린 스윙이 F + 1 에 닿았나 */
+const isSwingReleaseDue = (swing: FlightState['swing'], frame: number): swing is FlightSwing =>
+  swing !== null && !swing.isReleased && frame >= swingReleaseTickOf(swing.frame)
+
+/** 4e15c — 풀린 스윙이 아직 판정 전이고 판정할 수 있는 스윙이며 F + 2 에 닿았나 */
+function isSwingJudgeDue(state: FlightState, swing: FlightSwing, frame: number): boolean {
+  if (!swing.isReleased || swing.isUnjudgedWhiff || state.isJudged) return false
+  return isSwingJudgeable(swing.frame, state.frameCount) && frame >= swingJudgeTickOf(swing.frame)
+}
+
+/** 맞힐 프레임에 공이 타자 근처면 0x6aa 판정, 아니면 0x4e21c 바람 소리만 */
+function swingJudgeEventOf(state: FlightState, swing: FlightSwing): FlightEvent {
+  return state.isInReach(swingJudgeTickOf(swing.frame))
+    ? { kind: '판정', frame: swing.frame, buntKind: 0, isSpecial: swing.isSpecial }
+    : { kind: '판정없는헛스윙' }
+}
+
+/** 번트 r7 — 번트 자세가 이 틱에 판정되나 */
+const isBuntJudgeDue = (state: FlightState, frame: number): boolean => state.bunt !== null && !state.isJudged && state.isBuntJudgeTick(frame)
+
 export function nextFlightEvent(state: FlightState, frame: number): FlightEvent | null {
   const { swing, bunt, frameCount } = state
-  if (swing !== null && !swing.isReleased && frame >= swingReleaseTickOf(swing.frame)) return { kind: '스윙나감' }
-  if (
-    swing !== null &&
-    swing.isReleased &&
-    !swing.isUnjudgedWhiff &&
-    !state.isJudged &&
-    isSwingJudgeable(swing.frame, frameCount) &&
-    frame >= swingJudgeTickOf(swing.frame)
-  ) {
-    return state.isInReach(swingJudgeTickOf(swing.frame))
-      ? { kind: '판정', frame: swing.frame, buntKind: 0, isSpecial: swing.isSpecial }
-      : { kind: '판정없는헛스윙' }
-  }
-  if (bunt !== null && !state.isJudged && state.isBuntJudgeTick(frame)) {
-    return { kind: '판정', frame: bunt.frame, buntKind: bunt.kind, isSpecial: false }
-  }
+  if (isSwingReleaseDue(swing, frame)) return { kind: '스윙나감' }
+  if (swing !== null && isSwingJudgeDue(state, swing, frame)) return swingJudgeEventOf(state, swing)
+  if (bunt !== null && isBuntJudgeDue(state, frame)) return { kind: '판정', frame: bunt.frame, buntKind: bunt.kind, isSpecial: false }
   if (frame >= pitchEndTickOf(frameCount)) return { kind: '공끝' }
   return null
 }

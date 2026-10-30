@@ -2,6 +2,7 @@ import type { RandomPort } from '@/shared/api/random/randomPort'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { rollBenchClearingEntry, rollBenchClearingTargets } from '@/features/play-game/model/benchClearingScene'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
+import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { rollsIntoBenchClearing, benchClearingEffectOf } from '@/entities/game/model/benchClearing'
 import { withoutSteal } from '@/features/play-game/model/gameFlow/baseRunning/runners'
 import { finishPlayerOutcome } from '@/features/play-game/model/gameFlow/batting/finishPlayerOutcome'
@@ -55,10 +56,12 @@ export function resolveBenchClearing(progress: GameProgress, scene: { readonly r
   if (pending === null) return progress
   if (scene.reachedTargetTick) rollBenchClearingTargets(random)
   const cleared = { ...progress, pendingBenchClearing: null }
-  // 출구 0xae24c → 0x17 밀어내기 판 — 연출 뒤에 재생한다
-  const playback =
-    homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs }) ?? pending.arrivalPlay?.result ?? null
-  return finishPlayerOutcome(cleared, pending.outcome, random, null, playback)
+  return finishPlayerOutcome(cleared, pending.outcome, random, null, benchClearingPlaybackOf(pending, cleared))
+}
+
+/** 출구 0xae24c → 0x17 밀어내기 판 — 연출 뒤에 재생한다 */
+function benchClearingPlaybackOf(pending: NonNullable<GameProgress['pendingBenchClearing']>, cleared: GameProgress): DefensePlayResult | null {
+  return homeRunPlaybackOf({ outcome: pending.outcome, bases: cleared.game.bases, outs: cleared.game.outs }) ?? pending.arrivalPlay?.result ?? null
 }
 
 /**

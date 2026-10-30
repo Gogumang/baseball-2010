@@ -33,26 +33,41 @@ export interface HalfInningFieldSource {
   readonly seats?: WalkerLineSeats | null
 }
 
+/** 판 걸음 입력 — 앞 판이 남긴 야수 자리 · 카메라를 잇는다 */
+function walkInputOf(
+  rolls: NonNullable<HalfInningFieldSource['rolls']>,
+  offenseSide: 0 | 1,
+  carry: HalfInningFieldSource['carry'],
+): HalfInningWalkInput {
+  const carried = carry ?? null
+  return {
+    rolls,
+    offenseSide,
+    previousFielders: carried === null ? null : carried.fielders,
+    ...(carried === null || carried.camera === null ? {} : { previousCamera: carried.camera }),
+  }
+}
+
+/** 이름표 · 마선수 그림 칸 — 준 것만 싣는다 */
+function walkExtrasOf(source: HalfInningFieldSource) {
+  return {
+    ...(source.fielderNames === undefined ? {} : { fielderNames: source.fielderNames }),
+    ...(source.defenseAces == null ? {} : { defenseAces: walkAceSpritesOf(source.defenseAces, source.seats?.defense) }),
+    ...(source.offenseAces == null ? {} : { offenseAces: walkAceSpritesOf(source.offenseAces, source.seats?.offense) }),
+  }
+}
+
 /** 판 하나의 운동장 전경 재료 — `HalfInningBoard.field` */
 export function halfInningFieldOf(source: HalfInningFieldSource) {
   if (source.rolls === undefined) return undefined
   const offenseSide: 0 | 1 = source.half === '초' ? 0 : 1
   const teamOf = (side: number) => (side === source.playerSide ? source.ourTeamId : source.opponentTeamId)
-  const carry = source.carry ?? null
-  const input: HalfInningWalkInput = {
-    rolls: source.rolls,
-    offenseSide,
-    previousFielders: carry === null ? null : carry.fielders,
-    ...(carry === null || carry.camera === null ? {} : { previousCamera: carry.camera }),
-  }
   return {
-    input,
+    input: walkInputOf(source.rolls, offenseSide, source.carry),
     defenseTeam: teamOf(offenseSide === 0 ? 1 : 0),
     offenseTeam: teamOf(offenseSide),
     grassPalette: source.grassPalette ?? null,
-    ...(source.fielderNames === undefined ? {} : { fielderNames: source.fielderNames }),
-    ...(source.defenseAces == null ? {} : { defenseAces: walkAceSpritesOf(source.defenseAces, source.seats?.defense) }),
-    ...(source.offenseAces == null ? {} : { offenseAces: walkAceSpritesOf(source.offenseAces, source.seats?.offense) }),
+    ...walkExtrasOf(source),
   }
 }
 

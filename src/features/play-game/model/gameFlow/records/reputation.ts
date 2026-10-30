@@ -26,24 +26,55 @@ export function addReputationCounts(
   },
 ): ReputationCounts {
   const { outcome, runsBattedIn, isWalkOff, ourScoreBefore, opponentScore } = play
-  const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
-  const after = ourScoreBefore + runsBattedIn
-  // G+0xe4 이어진 타석 홈런 — 코드 6(홈런 0xa8600) +1 · 코드 5(홈런 아닌 안타 0xa86c4 · 아웃 0xa8ac2) 0, 볼넷 · 사구는 그대로.
-  // 코드 6 은 +0xe4 ≤ 3 이면 +0xd4 + 4·(+0xe4) 를 올린다 — +0xdc 2 에 닿음 · +0xe0 3 에 닿음 (경기 카운터 0xa690c 의 재료)
-  const streakBefore = counts.homeRunStreak ?? 0
-  const homeRunStreak =
-    outcome.kind === '홈런' ? streakBefore + 1 : outcome.kind === '안타' || outcome.kind === '아웃' || outcome.kind === '삼진' ? 0 : streakBefore
-  const reached = outcome.kind === '홈런' ? homeRunStreak : 0
+  const homeRunStreak = homeRunStreakAfter(outcome, counts.homeRunStreak ?? 0)
   return {
     homeRunStreak,
-    homeRunStreaksOfTwo: (counts.homeRunStreaksOfTwo ?? 0) + (reached === 2 ? 1 : 0),
-    homeRunStreaksOfThree: (counts.homeRunStreaksOfThree ?? 0) + (reached === 3 ? 1 : 0),
-    grandSlams: counts.grandSlams + (outcome.kind === '홈런' && runsBattedIn === GRAND_SLAM_RUNS ? 1 : 0),
-    walkOffs: counts.walkOffs + (isWalkOff && isHit ? 1 : 0),
+    ...homeRunStreakMilestonesAfter(counts, outcome, homeRunStreak),
+    grandSlams: counts.grandSlams + (isGrandSlam(outcome, runsBattedIn) ? 1 : 0),
+    walkOffs: counts.walkOffs + (isWalkOff && isHitOutcome(outcome) ? 1 : 0),
     buntHits: counts.buntHits + (play.isBuntHit === true ? 1 : 0),
     ...(counts.bunts === undefined ? {} : { bunts: counts.bunts }),
     // G+0xfc 는 볼넷만이다 — 사구 갈래(0xa8b90)는 코드 13 으로 G+0x100 을 올리고, 평판식은 0xfc 만 읽는다
     walks: counts.walks + (outcome.kind === '볼넷' ? 1 : 0),
+    ...scoreSwingRunsAfter(counts, ourScoreBefore, opponentScore, ourScoreBefore + runsBattedIn),
+  }
+}
+
+/** 만루 홈런 — 그 플레이 득점이 4 점 (0xa8696) */
+const isGrandSlam = (outcome: AtBatOutcome, runsBattedIn: number): boolean => outcome.kind === '홈런' && runsBattedIn === GRAND_SLAM_RUNS
+
+const isHitOutcome = (outcome: AtBatOutcome): boolean => outcome.kind === '안타' || outcome.kind === '홈런'
+
+/**
+ * G+0xe4 이어진 타석 홈런 — 코드 6(홈런 0xa8600) +1 · 코드 5(홈런 아닌 안타 0xa86c4 · 아웃 0xa8ac2) 0, 볼넷 · 사구는 그대로
+ */
+function homeRunStreakAfter(outcome: AtBatOutcome, streakBefore: number): number {
+  if (outcome.kind === '홈런') return streakBefore + 1
+  const breaksStreak = outcome.kind === '안타' || outcome.kind === '아웃' || outcome.kind === '삼진'
+  return breaksStreak ? 0 : streakBefore
+}
+
+/** 코드 6 은 +0xe4 ≤ 3 이면 +0xd4 + 4·(+0xe4) 를 올린다 — +0xdc 2 에 닿음 · +0xe0 3 에 닿음 (경기 카운터 0xa690c 의 재료) */
+function homeRunStreakMilestonesAfter(
+  counts: ReputationCounts,
+  outcome: AtBatOutcome,
+  homeRunStreak: number,
+): Pick<ReputationCounts, 'homeRunStreaksOfTwo' | 'homeRunStreaksOfThree'> {
+  const reached = outcome.kind === '홈런' ? homeRunStreak : 0
+  return {
+    homeRunStreaksOfTwo: (counts.homeRunStreaksOfTwo ?? 0) + (reached === 2 ? 1 : 0),
+    homeRunStreaksOfThree: (counts.homeRunStreaksOfThree ?? 0) + (reached === 3 ? 1 : 0),
+  }
+}
+
+/** 역전(G+0x114) · 동점(G+0x110) 득점 — 내 점수가 `before+1 … after` 로 오르는 구간에 상대 점수가 걸리는가 (머리말) */
+function scoreSwingRunsAfter(
+  counts: ReputationCounts,
+  ourScoreBefore: number,
+  opponentScore: number,
+  after: number,
+): Pick<ReputationCounts, 'goAheadRuns' | 'tyingRuns'> {
+  return {
     goAheadRuns: counts.goAheadRuns + (opponentScore >= ourScoreBefore && opponentScore <= after - 1 ? 1 : 0),
     tyingRuns: counts.tyingRuns + (opponentScore > ourScoreBefore && opponentScore <= after ? 1 : 0),
   }

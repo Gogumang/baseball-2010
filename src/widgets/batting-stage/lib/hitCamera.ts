@@ -82,12 +82,30 @@ export function hitCameraAngleOf(patternAngle: number): number {
   return -patternAngle
 }
 
+/** 왼쪽 파울선 안쪽 각(−180 < θ < 0)이면 카메라가 공을 따라간다 */
+const followsBallAngle = (angle: number): boolean => angle < 0 && angle + 0xb4 > 0
+
+type BallPoint = NonNullable<ReturnType<typeof hitBallPointAt>>
+
+/** 공을 따라가는 카메라 — 두 틀의 투영 차이 반(상한 `FOLLOW_PERCENT_MAX`)만큼 다가간다 */
+function followedCameraOf(camera: StageCamera, now: BallPoint, before: BallPoint, side: number): StageCamera {
+  const p = projectToPlate(now, side)
+  const q = projectToPlate(before, side)
+  // 0x35854 — 화면 자리 = 투영 − 지금 카메라(앞 틀의 0x41230 이 적은 +0xff4 · +0xff8)
+  const px = p.x - camera.x
+  const py = p.y - camera.y
+  return {
+    x: approachCameraAxis(camera.x, px, Math.min(Math.abs(p.x - q.x) >> 1, FOLLOW_PERCENT_MAX)),
+    y: approachCameraAxis(camera.y, py, Math.min(Math.abs(p.y - q.y) >> 1, FOLLOW_PERCENT_MAX)),
+  }
+}
+
 /** 0x13 틱 `stateTick` 그림의 카메라 — 0x13 틱 0 부터 틀 머리를 차례로 돌린다 */
 export function hitCameraAt(input: HitCameraInput, stateTick: number): StageCamera {
   let x = STAGE_CAMERA_HOME.x
   let y = STAGE_CAMERA_HOME.y
   if (input.path.points.length === 0) return STAGE_CAMERA_HOME
-  const follows = input.angle < 0 && input.angle + 0xb4 > 0
+  const follows = followsBallAngle(input.angle)
   for (let tick = 0; tick <= stateTick; tick += 1) {
     // 3f1ea — 막음이 선 틀 머리는 카메라를 건드리지 않는다(풀린 그림 다음 틀부터)
     if (input.releaseTick !== null && tick <= input.releaseTick) continue
@@ -95,21 +113,11 @@ export function hitCameraAt(input: HitCameraInput, stateTick: number): StageCame
     const now = hitBallPointAt(input.path, ballTick)
     const before = hitBallPointAt(input.path, Math.max(ballTick - 1, 0))
     if (now === null || before === null) break
-    let cx = x
-    let cy = y
-    if (follows) {
-      const p = projectToPlate(now, input.side)
-      const q = projectToPlate(before, input.side)
-      // 0x35854 — 화면 자리 = 투영 − 지금 카메라(앞 틀의 0x41230 이 적은 +0xff4 · +0xff8)
-      const px = p.x - x
-      const py = p.y - y
-      cx = approachCameraAxis(cx, px, Math.min(Math.abs(p.x - q.x) >> 1, FOLLOW_PERCENT_MAX))
-      cy = approachCameraAxis(cy, py, Math.min(Math.abs(p.y - q.y) >> 1, FOLLOW_PERCENT_MAX))
-    }
-    cx = clampFollowX(cx, input.side, input.angle)
+    const followed = follows ? followedCameraOf({ x, y }, now, before, input.side) : { x, y }
+    const cx = clampFollowX(followed.x, input.side, input.angle)
     // vt+0x2c → vt+0x30 — 세계 안으로 자르고 곧바로 놓는다
     x = clamp(cx, CAMERA_MAX.x)
-    y = clamp(cy, CAMERA_MAX.y)
+    y = clamp(followed.y, CAMERA_MAX.y)
   }
   return { x, y }
 }

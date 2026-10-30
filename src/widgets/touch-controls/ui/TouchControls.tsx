@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { useTouchKeyOffers } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
 import { startTouchKeyPress, touchKeyOf } from '@/widgets/touch-controls/model/keyDispatch'
 import type { KeyPressHandle, TouchKey } from '@/widgets/touch-controls/model/keyDispatch'
@@ -99,19 +99,25 @@ export function TouchControls({ layout }: { readonly layout: TouchControlsLayout
   const isDense = offers.length >= BELOW_DENSE_FROM
   const optionClass = isDense ? `${styles.optionButton} ${styles.denseOption}` : styles.optionButton
   const optionButtons = offers.map((offer) => keyButton(touchKeyOf(offer.key), offer.label, offer.label, optionClass))
-  const sidesOptionClass = optionButtons.length > SIDES_COLUMN_MAX ? styles.optionGrid : `${styles.optionRow} ${styles.optionColumn}`
+  return layout === 'sides' ? sidesPanelOf(optionButtons) : belowPanelOf(optionButtons, isDense)
+}
 
-  if (layout === 'sides') {
-    return (
-      <div className={styles.panel} role="group" aria-label="상황 버튼">
-        {optionButtons.length > 0 && (
-          <div className={sidesOptionClass} data-option-layout={optionButtons.length > SIDES_COLUMN_MAX ? 'grid' : 'column'}>
-            {optionButtons}
-          </div>
-        )}
-      </div>
-    )
-  }
+/** 가로 배치 — 넷 이상이면 두 칸 격자 */
+function sidesPanelOf(optionButtons: readonly ReactElement[]) {
+  const isGrid = optionButtons.length > SIDES_COLUMN_MAX
+  return (
+    <div className={styles.panel} role="group" aria-label="상황 버튼">
+      {optionButtons.length > 0 && (
+        <div className={isGrid ? styles.optionGrid : `${styles.optionRow} ${styles.optionColumn}`} data-option-layout={isGrid ? 'grid' : 'column'}>
+          {optionButtons}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** 세로 배치 — 다섯 이상이면 네 칸 격자 */
+function belowPanelOf(optionButtons: readonly ReactElement[], isDense: boolean) {
   return (
     <div className={styles.panel} role="group" aria-label="터치 조작">
       {optionButtons.length > 0 && (

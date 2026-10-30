@@ -145,20 +145,23 @@ export interface AceMagicScaledDraw {
   readonly scale: number
 }
 
+/** 472ce `subs r3, r0, #7 / cmp #1 / bls` · 47386 `subs r3, #8 / cmp #1 / bls` — 키운 그림을 그리는 두 자세의 첫 자세 */
+const SCALED_FIRST_POSE: ReadonlyMap<number, number> = new Map([
+  [PSYKER_NUMBER, 7],
+  [DRAGONA_NUMBER, 8],
+])
+
+/** 472d8 s = p − 6 · 4738e s = p − 7 — 첫 자세면 1, 다음 자세면 2. 그 밖 자세는 null */
+function aceMagicScaleOf(aceNumber: number, pose: number): number | null {
+  const first = SCALED_FIRST_POSE.get(aceNumber)
+  if (first === undefined || (pose !== first && pose !== first + 1)) return null
+  return pose - first + 1
+}
+
 export function aceMagicScaledDrawOf(input: AcePitcherEffectInput, pose: number): AceMagicScaledDraw | null {
   const branch = aceMagicBranchOf(input)
   if (branch === null) return null
-  // 472ce `subs r3, r0, #7 / cmp #1 / bls` · 472d8 s = p − 6 — 47386 `subs r3, #8 / cmp #1 / bls` · 4738e s = p − 7
-  const scale =
-    branch.number === PSYKER_NUMBER
-      ? pose === 7 || pose === 8
-        ? pose - 6
-        : null
-      : branch.number === DRAGONA_NUMBER
-        ? pose === 8 || pose === 9
-          ? pose - 7
-          : null
-        : null
+  const scale = aceMagicScaleOf(branch.number, pose)
   if (scale === null) return null
   return { imageUrl: `${branch.folder}/000.png`, scale }
 }
@@ -210,25 +213,40 @@ export function leonyEffectDrawsOf(
   if (!isBugFixed('B-82')) return []
   const branch = aceMagicBranchOf(input)
   if (branch === null || branch.number !== LEONY_NUMBER) return []
-  const behind = LEONY_BASE_DEPTH - 1
-  const front = LEONY_BASE_DEPTH + 1
-  const at = (frame: number, dx = 0, dy = 0, depth = behind): LeonyEffectDraw => ({ frame, dx, dy, depth })
-  const above = (frame: number): LeonyEffectDraw | null => {
-    const box = boxOf(frame)
-    return box === null ? null : at(frame, 0, -box.height)
-  }
-  const drawn = (draws: readonly (LeonyEffectDraw | null)[]) => draws.filter((draw): draw is LeonyEffectDraw => draw !== null)
-  if (pose === 4 || pose === 5) return [at(pose + 1)]
-  if (pose === 6 || pose === 7) return drawn([at(pose + 1), above(pose - 4)])
-  if (pose === 8) return drawn([above(4)])
-  if (pose === 9) {
-    const box = boxOf(0)
-    return box === null ? [] : [at(0, -halfTowardZero(box.width), -halfTowardZero(box.height), front)]
-  }
-  if (pose === 10) {
-    const box = boxOf(1)
-    return box === null ? [] : [at(1, -halfTowardZero(box.width), -halfTowardZero(box.width), front)]
-  }
-  if (pose >= 11 && pose <= 14) return [at(pose - 2)]
-  return []
+  return leonyPoseDrawsOf(pose, boxOf)
+}
+
+type LeonyBoxOf = Parameters<typeof leonyEffectDrawsOf>[2]
+
+const LEONY_BEHIND_DEPTH = LEONY_BASE_DEPTH - 1
+const LEONY_FRONT_DEPTH = LEONY_BASE_DEPTH + 1
+
+const leonyAt = (frame: number, dx = 0, dy = 0, depth = LEONY_BEHIND_DEPTH): LeonyEffectDraw => ({ frame, dx, dy, depth })
+
+/** 프레임을 (0, −h) 에 — 상자를 모르면 없음 */
+function leonyAbove(frame: number, boxOf: LeonyBoxOf): LeonyEffectDraw | null {
+  const box = boxOf(frame)
+  return box === null ? null : leonyAt(frame, 0, -box.height)
+}
+
+const presentDraws = (draws: readonly (LeonyEffectDraw | null)[]) => draws.filter((draw): draw is LeonyEffectDraw => draw !== null)
+
+const isPoseIn = (pose: number, first: number, last: number): boolean => pose >= first && pose <= last
+
+/** p 9 · 10 — 프레임 0 · 1 을 (−w/2, −h/2) · (−w/2, −w/2)(y 도 폭으로 — 원본 그대로), 투수 앞 */
+function leonyFrontDraws(pose: number, boxOf: LeonyBoxOf): readonly LeonyEffectDraw[] {
+  const frame = pose - 9
+  const box = boxOf(frame)
+  if (box === null) return []
+  const dy = pose === 9 ? box.height : box.width
+  return [leonyAt(frame, -halfTowardZero(box.width), -halfTowardZero(dy), LEONY_FRONT_DEPTH)]
+}
+
+/** 자세 p 의 레오니 그림 (위 표) */
+function leonyPoseDrawsOf(pose: number, boxOf: LeonyBoxOf): readonly LeonyEffectDraw[] {
+  if (isPoseIn(pose, 4, 5)) return [leonyAt(pose + 1)]
+  if (isPoseIn(pose, 6, 7)) return presentDraws([leonyAt(pose + 1), leonyAbove(pose - 4, boxOf)])
+  if (pose === 8) return presentDraws([leonyAbove(4, boxOf)])
+  if (isPoseIn(pose, 9, 10)) return leonyFrontDraws(pose, boxOf)
+  return isPoseIn(pose, 11, 14) ? [leonyAt(pose - 2)] : []
 }

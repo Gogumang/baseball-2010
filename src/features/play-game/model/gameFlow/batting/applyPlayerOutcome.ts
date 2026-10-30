@@ -1,10 +1,16 @@
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { runDefensePlay, recordedOutcomeOf, withPredictedOutcome, isBattedBallInPlay } from '@/features/defense-play/model/runDefensePlay'
+import {
+  runDefensePlay,
+  recordedOutcomeOf,
+  withPredictedOutcome,
+  isBattedBallInPlay,
+  type DefensePlayResult,
+} from '@/features/defense-play/model/runDefensePlay'
 import { holdsUntilResultWaitEnd } from '@/features/play-game/model/benchClearingScene'
 import { contactOfOutcome } from '@/entities/batting/model/battedContact'
 import { isBattedBallKind } from '@/features/defense-play/model/playOutcome'
-import { arrivalApplicationOf } from '@/features/defense-play/model/pitchArrivalPlay'
+import { arrivalApplicationOf, type PitchArrivalPlay } from '@/features/defense-play/model/pitchArrivalPlay'
 import { homeRunPlaybackOf } from '@/features/defense-play/model/homeRunPlayback'
 import { fixturePatternFor } from '@/features/defense-play/model/representativePattern'
 import { withoutSteal, withoutStealDisplay } from '@/features/play-game/model/gameFlow/baseRunning/runners'
@@ -13,6 +19,7 @@ import { finishStrikeoutStealSettlement } from '@/features/play-game/model/gameF
 import { resolveBenchClearing } from '@/features/play-game/model/gameFlow/benchClearing/benchClearing'
 import { defensePlayInputOf } from '@/features/play-game/model/gameFlow/defense/defenseInputs'
 import { withFoulRecords } from '@/features/play-game/model/gameFlow/records/gameRecords'
+import type { BattedBallPattern } from '@/shared/config/original/battedBallPatterns'
 import type { PlayerOutcomeOptions } from '@/features/play-game/model/gameFlow/types/plays'
 import type { GameProgress } from '@/features/play-game/model/gameFlow/types/progress'
 
@@ -108,38 +115,16 @@ export function startPlayerOutcome(
   // 볼넷 · 사구 · 판 없는 삼진 — 공 도착 0x3dfac 은 0x12 를 예약할 뿐이다. 벤치 클리어링 굴림(4e74c, 사구만)·판정 A 의 밀어내기
   // 주루 · 정산(삼진은 0xd · 0x18 과 0xa8024)은 0x12 의 32 그림 뒤라 그동안 붙든다(그 그림들의 입자 굴림이 먼저 난다 —
   // `holdsUntilResultWaitEnd`, r295 · r298)
-  if (holdsUntilResultWaitEnd(outcome, options.arrivalPlay)) {
-    const arrivalPlay = options.arrivalPlay ?? null
-    return {
-      ...progress,
-      pendingBenchClearing: arrivalPlay === null ? { phase: 'wait', outcome } : { phase: 'wait', outcome, arrivalPlay },
-    }
-  }
-  // 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`)
-  const pattern = options.pattern ?? contactOfOutcome(outcome)?.pattern
-  if (isBattedBallKind(outcome) && pattern !== undefined) {
+  if (holdsUntilResultWaitEnd(outcome, options.arrivalPlay)) return withResultWait(progress, outcome, options.arrivalPlay ?? null)
+  const pattern = firedPatternOf(outcome, options)
+  if (pattern !== undefined) {
     return {
       // 타구 판(종류 1) 시작 리드 0x3d7b8 이 도루 주자의 출발 표시를 지운다(3d8c6~3d8d2)
       ...withoutStealDisplay(progress),
       pendingDefensePlay: withPredictedOutcome(defensePlayInputOf(progress, outcome, pattern, random, options)),
     }
   }
-  if (!isBattedBallInPlay(outcome)) {
-    const arrival = options.arrivalPlay ?? null
-    // 삼진 + 도루 — 판정 B 0xae3e8 이 정산 0xa8024 를 종류 5 로 한 번만 부른다(ae586 · ae5a8). 판의 진루는 `arrivePitch` 가 먹였다
-    if (arrival !== null && arrival.kind === 5 && outcome.kind === '삼진') {
-      return finishStrikeoutStealSettlement(withoutSteal(progress), outcome, arrival, random, options.isRecorded !== false)
-    }
-    // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a])
-    // 실시간으로 이미 보여 준 판(`shownLive` — 사람 주루 키를 받은 판)은 재생 칸에 다시 안 넣는다
-    const arrivalPlayback = arrival === null || arrival.shownLive === true ? null : arrival.result
-    if (arrival !== null && arrivalApplicationOf(arrival) === 'batterRuns') {
-      return finishPlayerOutcome(withoutSteal(progress), outcome, random, arrival.result, arrivalPlayback)
-    }
-    // 웹 전용 길: 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다
-    const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs, pattern: options.pattern }) ?? arrivalPlayback
-    return finishPlayerOutcome(withoutSteal(progress), outcome, random, null, playback)
-  }
+  if (!isBattedBallInPlay(outcome)) return finishOutcomeWithoutPlay(progress, outcome, random, options)
   // 웹 전용 길: 패턴 없이 들어온 안타·아웃(시험·옛 호출) — 원본에 없는 길이다. 결과에 맞는 패턴을 원본 표에서 골라 판을 돌린다
   //    (`fixturePatternFor`). 실제 타석(`resolvePitch`)은 늘 패턴을 싣는다
   return {
@@ -149,4 +134,44 @@ export function startPlayerOutcome(
       outcomeIsGiven: true,
     },
   }
+}
+
+/** 페어 타구면 쏜 패턴이 따라온다 — 넘겨받았거나(`options.pattern`) 타석 결과 객체에 묶여 있다(`contactOfOutcome`) */
+function firedPatternOf(outcome: AtBatOutcome, options: PlayerOutcomeOptions): BattedBallPattern | undefined {
+  if (!isBattedBallKind(outcome)) return undefined
+  return options.pattern ?? contactOfOutcome(outcome)?.pattern
+}
+
+/** 0x12 대기 — 끝(`judgeHitByPitch`)까지 타석 결과를 붙든다 */
+function withResultWait(progress: GameProgress, outcome: AtBatOutcome, arrivalPlay: PitchArrivalPlay | null): GameProgress {
+  return {
+    ...progress,
+    pendingBenchClearing: arrivalPlay === null ? { phase: 'wait', outcome } : { phase: 'wait', outcome, arrivalPlay },
+  }
+}
+
+/** 삼진 + 도루 — 판정 B 0xae3e8 이 정산 0xa8024 를 종류 5 로 한 번만 부른다(ae586 · ae5a8). 판의 진루는 `arrivePitch` 가 먹였다 */
+function isStrikeoutSteal(arrival: PitchArrivalPlay | null, outcome: AtBatOutcome): arrival is PitchArrivalPlay & { readonly kind: 5 } {
+  return arrival !== null && arrival.kind === 5 && outcome.kind === '삼진'
+}
+
+/** 실시간으로 이미 보여 준 판(`shownLive` — 사람 주루 키를 받은 판)은 재생 칸에 다시 안 넣는다 */
+function arrivalPlaybackOf(arrival: PitchArrivalPlay | null): DefensePlayResult | null {
+  return arrival === null || arrival.shownLive === true ? null : arrival.result
+}
+
+/** 판 없이 끝나는 타석 — 삼진 · 볼넷 · 사구 · 홈런(웹 전용 길) */
+function finishOutcomeWithoutPlay(progress: GameProgress, outcome: AtBatOutcome, random: RandomPort, options: PlayerOutcomeOptions): GameProgress {
+  const arrival = options.arrivalPlay ?? null
+  if (isStrikeoutSteal(arrival, outcome)) {
+    return finishStrikeoutStealSettlement(withoutSteal(progress), outcome, arrival, random, options.isRecorded !== false)
+  }
+  const arrivalPlayback = arrivalPlaybackOf(arrival)
+  // 낫아웃 — 폭투·포일 판의 진루(타자주자 포함)를 이 삼진 타석의 진루로 먹인다 (0x3e0d0 state[0x1a])
+  if (arrival !== null && arrivalApplicationOf(arrival) === 'batterRuns') {
+    return finishPlayerOutcome(withoutSteal(progress), outcome, random, arrival.result, arrivalPlayback)
+  }
+  // 웹 전용 길: 패턴 없이 들어온 홈런(시험·옛 호출)은 날아가는 그림만 따로 만든다 — 점수는 타석 쪽 규칙(전원 득점)이다
+  const playback = homeRunPlaybackOf({ outcome, bases: progress.game.bases, outs: progress.game.outs, pattern: options.pattern }) ?? arrivalPlayback
+  return finishPlayerOutcome(withoutSteal(progress), outcome, random, null, playback)
 }

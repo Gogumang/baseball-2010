@@ -39,6 +39,42 @@ interface SceneParticleLayerProps {
  * 경기 장면 부품(타석 · 수비 판)이 관리자를 쥔 동안(`isSceneParticlesClaimed`)은 그 부품이 제 틱 차례로 굴리고 제 캔버스에 그리므로
  * 이 층은 굴리지도 그리지도 않는다 — 쥔 부품이 없는 경기 화면(교대 판 · 벤치 클리어링 · 사람 투구 장면 따위)은 이 층이 돌린다.
  */
+type SceneParticles = ReturnType<typeof sceneParticleScene>
+
+/** 이 그림의 틱을 굴리지 않는가 — 입자가 없거나, 다른 화면 루프가 맡았거나, 공용 창에 막혔거나, 틱을 맡은 장면 부품이 있다 */
+function isTickPaused(scene: SceneParticles, isClaimed: boolean, isGated: boolean): boolean {
+  return scene.emitters.length === 0 || isClaimed || isGated || isSceneParticleTickHeld()
+}
+
+/** 보이는가 — 입자가 있고 다른 루프 · 공용 창에 안 막혔다 */
+const showsParticles = (scene: SceneParticles, isClaimed: boolean, isGated: boolean): boolean => scene.emitters.length > 0 && !isClaimed && !isGated
+
+/**
+ * 지난 틱 뒤부터 이 틱까지 굴린다(따라잡기는 `CATCH_UP_LIMIT` 까지). 앱 틀당 한 번 — 화면이 바뀌는 틀에 타석 · 수비 판 루프가
+ * 이 틀을 이미 굴렸으면 건너뛴다(`claimSceneParticleTick`). 굴린 마지막 틱을 낸다
+ */
+function rollSceneParticleTicks(
+  scene: SceneParticles,
+  startTick: number,
+  steppedTick: number,
+  tick: number,
+  randomRef: { readonly current: RandomPort },
+): number {
+  let stepped = Math.max(steppedTick, tick - CATCH_UP_LIMIT)
+  while (stepped < tick) {
+    stepped += 1
+    if (claimSceneParticleTick(scene, startTick + stepped)) tickSceneParticles(randomRef.current)
+  }
+  return stepped
+}
+
+/** 검게 지우고 입자를 그린다 */
+function paintParticleFrame(context: CanvasRenderingContext2D, scene: SceneParticles): void {
+  context.fillStyle = '#000'
+  context.fillRect(0, 0, WIDTH, HEIGHT)
+  drawParticles(context, scene)
+}
+
 export function SceneParticleLayer({ random, isGameScene = false }: SceneParticleLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const randomRef = useRef(random)
@@ -63,27 +99,14 @@ export function SceneParticleLayer({ random, isGameScene = false }: SceneParticl
       // 장면은 창이 선 첫 그림([창+0x250])에만 다시 그려지고(52efe~52f24) 그 그림에 파티클이 없으므로 멈춘 화면에도 파티클이 안 남는다
       const isGated = isGameSceneRef.current && isCommonWindowShown()
       // 틱만 맡은 장면 부품(`holdSceneParticleTicks` — 벤치 클리어링)이 있으면 그 부품이 제 갱신 뒤에 굴린다 — 여기는 그리기만
-      if (scene.emitters.length === 0 || isClaimed || isGated || isSceneParticleTickHeld()) {
-        steppedTick = tick
-      } else {
-        if (tick - steppedTick > CATCH_UP_LIMIT) steppedTick = tick - CATCH_UP_LIMIT
-        while (steppedTick < tick) {
-          steppedTick += 1
-          // 앱 틀당 한 번 — 화면이 바뀌는 틀에 타석 · 수비 판 루프가 이 틀을 이미 굴렸으면 건너뛴다(`claimSceneParticleTick`)
-          if (claimSceneParticleTick(scene, startTick + steppedTick)) tickSceneParticles(randomRef.current)
-        }
-      }
-      const shows = scene.emitters.length > 0 && !isClaimed && !isGated
+      steppedTick = isTickPaused(scene, isClaimed, isGated) ? tick : rollSceneParticleTicks(scene, startTick, steppedTick, tick, randomRef)
+      const shows = showsParticles(scene, isClaimed, isGated)
       if (shows !== wasShown) {
         wasShown = shows
         setIsShown(shows)
       }
       const context = effectContextOf(canvasRef.current)
-      if (context !== null && shows && drawMemo.needsDraw(canvasRef.current, particleSignatureOf(scene))) {
-        context.fillStyle = '#000'
-        context.fillRect(0, 0, WIDTH, HEIGHT)
-        drawParticles(context, scene)
-      }
+      if (context !== null && shows && drawMemo.needsDraw(canvasRef.current, particleSignatureOf(scene))) paintParticleFrame(context, scene)
       handle = requestAnimationFrame(frame)
     }
     handle = requestAnimationFrame(frame)

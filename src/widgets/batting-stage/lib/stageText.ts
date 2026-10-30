@@ -103,31 +103,56 @@ export function situationOf(
   /** 타자 손 0xb63c0 — 마타자는 표 0xd88b0 이라 폼과 다를 수 있다. 없으면 폼 & 1 */
   batterHand?: number,
 ): SwingSituation {
-  const bases = hud?.bases ?? { first: false, second: false, third: false }
+  const view = hudViewOf(hud)
   return {
-    inning: hud?.inning ?? 1,
-    isLosing: hud === null ? false : hud.ourScore < hud.opponentScore,
-    runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
-    hasSecondBaseRunner: bases.second,
+    inning: view.inning,
+    isLosing: view.isLosing,
+    runnerCount: runnerCountOfBases(view.bases),
+    hasSecondBaseRunner: view.bases.second,
     pitcherSide: pitch === undefined ? 0 : pitcherHandOfPitch(pitch),
     batterSide: batterHand ?? batterSideOfForm(batterForm),
-    balls: hud?.balls ?? 0,
-    strikes: hud?.strikes ?? 0,
+    balls: view.balls,
+    strikes: view.strikes,
     batterOrderIndex: batterRecordSlot,
     recentAtBatCodes,
   }
 }
 
+/** HUD 가 없으면(타석 밖 화면) 1회 · 빈 루 · 0 카운트 */
+const NO_HUD_VIEW = {
+  inning: 1,
+  isLosing: false,
+  bases: { first: false, second: false, third: false },
+  balls: 0,
+  strikes: 0,
+  outs: 0,
+} as const
+
+/** 상황이 읽는 HUD 칸 */
+function hudViewOf(hud: HudState | null): {
+  inning: number
+  isLosing: boolean
+  bases: HudState['bases']
+  balls: number
+  strikes: number
+  outs: number
+} {
+  if (hud === null) return NO_HUD_VIEW
+  return { inning: hud.inning, isLosing: hud.ourScore < hud.opponentScore, bases: hud.bases, balls: hud.balls, strikes: hud.strikes, outs: hud.outs }
+}
+
+const runnerCountOfBases = (bases: HudState['bases']): number => Number(bases.first) + Number(bases.second) + Number(bases.third)
+
 /** CPU 투구 AI 에 넘길 볼카운트·주자 상황. side 는 타자 손이라 투구 원점·판정 기준점이 따라 갈린다 */
 export function pitchSituationOf(hud: HudState | null, batterForm = 0, batterHand?: number): PitchSituation {
-  const bases = hud?.bases ?? { first: false, second: false, third: false }
+  const view = hudViewOf(hud)
   const side = batterHand ?? batterSideOfForm(batterForm)
   return {
-    strikes: hud?.strikes ?? 0,
-    balls: hud?.balls ?? 0,
-    outs: hud?.outs ?? 0,
-    runnerCount: Number(bases.first) + Number(bases.second) + Number(bases.third),
-    hasSecondBaseRunner: bases.second,
+    strikes: view.strikes,
+    balls: view.balls,
+    outs: view.outs,
+    runnerCount: runnerCountOfBases(view.bases),
+    hasSecondBaseRunner: view.bases.second,
     batterSide: side,
     side,
   }

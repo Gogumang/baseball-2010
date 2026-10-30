@@ -85,21 +85,63 @@ export function pitcherItemBlockNoticeOf(career: PitcherCareer, tab: '서브' | 
   return pitcherGpItemBlockReasonOf(career, index)
 }
 
+/** 서브 · GP 칸 — 막힘 알림이 없을 때만 묻는다 */
+function subOrGpQuestionOf(career: PitcherCareer, tab: '서브' | 'GP', part: number): string | null {
+  if (pitcherItemBlockNoticeOf(career, tab, part) !== null) return null
+  if (tab === '서브') return moneyQuestion(PITCHER_SUB_ITEMS[part].price)
+  // StrMODE[82] — 엄마의도시락은 최대인 칸 줄이 앞에 선다(0x138ca). 칸 9(십전대보탕)에는 이글아이 안내줄 224 가 안 붙는다
+  return pitcherGpItemQuestionOf(career, part)
+}
+
+/** 착용 칸 — 가졌고 지금 끼고 있지 않을 때만 StrMODE[81] */
+function wearQuestionOf(career: PitcherCareer, part: number, level: number): string | null {
+  if (!ownsPitcherEquipment(career, part, level) || isPitcherEquipmentEquipped(career, part, level)) return null
+  return `!C[!cFFFF00${pitcherEquipmentItemOf(part, level).name}!cFFFFFF] 아이템을!N장착하시겠습니까?` // StrMODE[81]
+}
+
 /** 살 수 있는(끼울 수 있는) 칸이면 확인 문구(원문 마크업), 아니면 null */
 export function pitcherPurchaseQuestionOf(career: PitcherCareer, itemId: string): string | null {
   const { tab, part, level } = parse(itemId)
-  if (tab === '서브' || tab === 'GP') {
-    if (pitcherItemBlockNoticeOf(career, tab, part) !== null) return null
-    if (tab === '서브') return moneyQuestion(PITCHER_SUB_ITEMS[part].price)
-    // StrMODE[82] — 엄마의도시락은 최대인 칸 줄이 앞에 선다(0x138ca). 칸 9(십전대보탕)에는 이글아이 안내줄 224 가 안 붙는다
-    return pitcherGpItemQuestionOf(career, part)
-  }
-  if (tab === '착용') {
-    if (!ownsPitcherEquipment(career, part, level) || isPitcherEquipmentEquipped(career, part, level)) return null
-    return `!C[!cFFFF00${pitcherEquipmentItemOf(part, level).name}!cFFFFFF] 아이템을!N장착하시겠습니까?` // StrMODE[81]
-  }
+  if (tab === '서브' || tab === 'GP') return subOrGpQuestionOf(career, tab, part)
+  if (tab === '착용') return wearQuestionOf(career, part, level)
   if (pitcherEquipmentBlockReasonOf(career, part, level) !== null) return null
   return moneyQuestion(pitcherEquipmentItemOf(part, level).price)
+}
+
+/** 0x14c8c — 소지금 −가격×10(0~9999) · 기록[0x58+k] = 1 · StrMODE[92] */
+function selectPitcherSubItem(career: PitcherCareer, part: number): PitcherShopSelection {
+  const blockNotice = pitcherItemBlockNoticeOf(career, '서브', part)
+  if (blockNotice !== null) return { career, notice: blockNotice }
+  return { career: purchaseSubItem(career, part), notice: purchasedText(PITCHER_SUB_ITEMS[part].name) }
+}
+
+/** GP 아이템 — 5 또또상품권만 굴린다 */
+function selectPitcherGpItem(career: PitcherCareer, part: number, random: RandomPort): PitcherShopSelection {
+  const blockNotice = pitcherItemBlockNoticeOf(career, 'GP', part)
+  if (blockNotice !== null) return { career, notice: blockNotice }
+  const purchase = purchasePitcherGpItem(career, part, random)
+  if (purchase.kind === '거절') return { career, notice: NOT_ENOUGH_GAME_POINT_TEXT }
+  const { result } = purchase
+  if (opensGpDetailWindow(part)) {
+    return { career: result.career, notice: '', detail: { itemIndex: part, before: career, after: result.career } }
+  }
+  return { career: result.career, notice: pitcherGpItemNoticeOf(part, result.lotteryPrize, result.prizeItemId) }
+}
+
+/** 0x17ad0 의 가드는 "지금 장착 중"(StrMODE[80]) 하나뿐이다. 장착 뒤 따로 알림은 없다 */
+function wearPitcherEquipment(career: PitcherCareer, part: number, level: number): PitcherShopSelection {
+  if (!ownsPitcherEquipment(career, part, level)) return { career, notice: '' }
+  if (isPitcherEquipmentEquipped(career, part, level)) return { career, notice: ORIGINAL_MODE_TEXT[80] ?? '' } // StrMODE[80] 원문
+  return { career: equipOwnedPitcherEquipment(career, part, level), notice: '' }
+}
+
+/** 0x14a74 kind 3 — 구매 완료 창 없이 새로 연 컬렉터 k 만 (0x62368 셋째 인자 0 이라 이미 열린 k 는 창이 없다) */
+function buyPitcherEquipment(career: PitcherCareer, part: number, level: number): PitcherShopSelection {
+  const blockNotice = pitcherEquipmentBlockNoticeOf(career, part, level)
+  if (blockNotice !== null) return { career, notice: blockNotice }
+  const bought = purchasePitcherEquipment(career, part, level)
+  const opened = bought.openedHiddenIds.filter((id) => !career.openedHiddenIds.includes(id))
+  return { career: bought, notice: '', openedHiddenIds: opened }
 }
 
 /**
@@ -108,33 +150,8 @@ export function pitcherPurchaseQuestionOf(career: PitcherCareer, itemId: string)
  */
 export function selectPitcherShopItem(career: PitcherCareer, itemId: string, random: RandomPort): PitcherShopSelection {
   const { tab, part, level } = parse(itemId)
-  if (tab === '서브') {
-    const blockNotice = pitcherItemBlockNoticeOf(career, '서브', part)
-    if (blockNotice !== null) return { career, notice: blockNotice }
-    // 0x14c8c — 소지금 −가격×10(0~9999) · 기록[0x58+k] = 1 · StrMODE[92]
-    return { career: purchaseSubItem(career, part), notice: purchasedText(PITCHER_SUB_ITEMS[part].name) }
-  }
-  if (tab === 'GP') {
-    const blockNotice = pitcherItemBlockNoticeOf(career, 'GP', part)
-    if (blockNotice !== null) return { career, notice: blockNotice }
-    const purchase = purchasePitcherGpItem(career, part, random)
-    if (purchase.kind === '거절') return { career, notice: NOT_ENOUGH_GAME_POINT_TEXT }
-    const { result } = purchase
-    if (opensGpDetailWindow(part)) {
-      return { career: result.career, notice: '', detail: { itemIndex: part, before: career, after: result.career } }
-    }
-    return { career: result.career, notice: pitcherGpItemNoticeOf(part, result.lotteryPrize, result.prizeItemId) }
-  }
-  if (tab === '착용') {
-    if (!ownsPitcherEquipment(career, part, level)) return { career, notice: '' }
-    // 0x17ad0 의 가드는 "지금 장착 중"(StrMODE[80]) 하나뿐이다. 장착 뒤 따로 알림은 없다
-    if (isPitcherEquipmentEquipped(career, part, level)) return { career, notice: ORIGINAL_MODE_TEXT[80] ?? '' } // StrMODE[80] 원문
-    return { career: equipOwnedPitcherEquipment(career, part, level), notice: '' }
-  }
-  const blockNotice = pitcherEquipmentBlockNoticeOf(career, part, level)
-  if (blockNotice !== null) return { career, notice: blockNotice }
-  const bought = purchasePitcherEquipment(career, part, level)
-  // 0x14a74 kind 3 — 구매 완료 창 없이 새로 연 컬렉터 k 만 (0x62368 셋째 인자 0 이라 이미 열린 k 는 창이 없다)
-  const opened = bought.openedHiddenIds.filter((id) => !career.openedHiddenIds.includes(id))
-  return { career: bought, notice: '', openedHiddenIds: opened }
+  if (tab === '서브') return selectPitcherSubItem(career, part)
+  if (tab === 'GP') return selectPitcherGpItem(career, part, random)
+  if (tab === '착용') return wearPitcherEquipment(career, part, level)
+  return buyPitcherEquipment(career, part, level)
 }

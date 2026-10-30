@@ -1,20 +1,26 @@
 import type { RandomPort } from '@/shared/api/random/randomPort'
-import { simulateHalfInningTicks } from '@/entities/game/model/simulateHalfInning'
+import { simulateHalfInningTicks, type HalfInningResult } from '@/entities/game/model/simulateHalfInning'
 import { startingPitcherOf } from '@/entities/team/model/teamRoster'
-import { isGameOverAt, endSituationOf, withInningRuns, applyOpponentInning } from '@/entities/game/model/gameState'
+import { isGameOverAt, endSituationOf, applyOpponentInning, type GameState } from '@/entities/game/model/gameState'
 import { ACE_BATTER_ROSTER_SLOT } from '@/features/play-game/model/gameAces'
-import { rosterSlotAt } from '@/entities/game/model/quickLineup'
 import { backToBackRecordOf } from '@/entities/game/model/gameRecords'
 import { ownPositionRecordIdsOf } from '@/entities/game/model/ownPositionRecords'
 import { teamRecordMoraleOf } from '@/entities/team/model/teamMorale'
 import { chargeHalfInningLines } from '@/entities/game/model/gamePitcherLines'
 import { gameFightingSpiritOf } from '@/features/play-game/model/gameFlow/context/fightingSpirit'
 import { appendLog } from '@/features/play-game/model/gameFlow/log/appendLog'
+import { markFinishedRelayTail, opponentRelayTickOf } from '@/features/play-game/model/gameFlow/autoPlay/opponentInning/opponentRelay'
+import {
+  opponentHalfLogOf,
+  opponentLeaguePlateAppearancesOf,
+  opponentLeagueStolenBasesOf,
+} from '@/features/play-game/model/gameFlow/autoPlay/opponentInning/opponentHalfRecords'
 import { quickDefenseOf } from '@/features/play-game/model/gameFlow/quick/quickDefense'
 import { withOutgoingStaminas } from '@/features/play-game/model/gameFlow/quick/stamina'
 import { teamAcePitcherOf, teamBatterAt } from '@/features/play-game/model/gameFlow/roster/teamPlayers'
 import { opponentHalfDecisionsOf } from '@/features/play-game/model/gameFlow/settlement/decisions'
 import { BATTING_ORDER_SIZE } from '@/features/play-game/model/gameFlow/types/constants'
+import type { DecisionState } from '@/entities/game/model/winLossSave'
 import type { GameAutoRelayTick, GameProgress } from '@/features/play-game/model/gameFlow/types/progress'
 
 /**
@@ -65,103 +71,63 @@ export function playOpponentInning(progress: GameProgress, random: RandomPort, r
     // 0xab214 의 전역 모드 4 · 수비(우리 팀)가 사람 팀 — 모드 3·4 라 수비 사람 −10 은 안 걸린다(0xab5c0)
     { mode: '나만의리그', isDefenseHuman: true },
   )
-  const opponentSide = 1 - progress.game.playerSide
   let runsSoFar = 0
-  let half
-  for (;;) {
-    const next = halfTicks.next()
-    if (next.done === true) {
-      half = next.value
-      break
-    }
+  let next = halfTicks.next()
+  while (next.done !== true) {
     const tick = next.value
     if (tick.kind === 'plateAppearance') runsSoFar += tick.appearance.runsBattedIn
-    relay?.push({
-      progress,
-      // 반 이닝 도중의 판 — 점수 · 이닝별 칸은 그 틱까지 든 득점, 아웃은 그 틱의 st[6]
-      game: withInningRuns({ ...progress.game, opponentScore: progress.game.opponentScore + runsSoFar, outs: tick.outs }, opponentSide, runsSoFar),
-      offenseOurs: false,
-      orderIndex: tick.battingOrderIndex,
-      lineup: tick.lineup ?? progress.opponentLineup,
-      pitcherSlot: tick.pitcherSlot ?? progress.ourMound.pitcherSlot,
-      atBat:
-        tick.kind === 'plateAppearance'
-          ? {
-              rosterSlot: tick.appearance.rosterSlot ?? rosterSlotAt(tick.lineup ?? progress.opponentLineup, tick.battingOrderIndex),
-              outcome: tick.appearance.outcome,
-              fouled: tick.appearance.fouled === true,
-              swingingStrikeOutLost: tick.appearance.swingingStrikeOutLost === true,
-              strikes: tick.strikes,
-              balls: tick.balls,
-            }
-          : null,
-    })
+    // 반 이닝 도중의 판 — 점수 · 이닝별 칸은 그 틱까지 든 득점, 아웃은 그 틱의 st[6]
+    relay?.push(opponentRelayTickOf(progress, tick, runsSoFar))
+    next = halfTicks.next()
   }
-  const runs = half.runs
-  const game = applyOpponentInning(progress.game, runs)
-  // 경기를 끝낸 마지막 틱은 끝난 판으로 그린다(끝내기 · 콜드 — 0xc2198 의 0xb68fc 가 그 다음 틱을 거짓으로)
-  const lastTick = relay?.[relay.length - 1]
-  if (relay !== undefined && lastTick !== undefined && lastTick.progress === progress && game.isFinished) {
-    relay[relay.length - 1] = { ...lastTick, game: { ...lastTick.game, isFinished: true } }
-  }
+  const half = next.value
+  const game = applyOpponentInning(progress.game, half.runs)
+  if (relay !== undefined) markFinishedRelayTail(relay, progress, game)
   const decisions = opponentHalfDecisionsOf(progress, half.runs, half.pitcherChanges ?? [])
   // 상대 타석도 정산 0xa8024 를 지난다 — 공격 팀이 사람이 아니라 백투백 카운터는 결과와 무관하게 0 이 된다
   const homeRunStreak = half.plateAppearances.reduce(
     (streak, appearance) => backToBackRecordOf({ streak, humanOffense: false, isHomeRun: appearance.outcome.kind === '홈런' }).streak,
     progress.homeRunStreak,
   )
+  return appendLog(opponentHalfProgressOf(progress, half, game, decisions, homeRunStreak), opponentHalfLogOf(progress, half), false)
+}
 
-  return appendLog(
-    {
-      ...progress,
-      game,
-      // 자동진행 반 이닝이 상대(공격) 레코드 +2 를 덮었으면(스윙 경로 0xab214 · 주자 있는 판정 경로 c19ec) 그때 사기다 — 이 반 이닝에는
-      // 돌발이 없어(상태 0xf 를 안 지난다) 사기가 그대로다 (`HalfInningResult.offenseRecordTouched`, r104)
-      ...(half.offenseRecordTouched ? { opponentRecordMorale: progress.teamMorale ?? teamRecordMoraleOf(progress.opponentTeamId) } : {}),
-      opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
-      ourMound: half.mound ?? progress.ourMound,
-      // 우리 투수 줄 — 반 이닝 엔진이 던진 투수마다 낸 줄 (투구 수 포함)
-      pitcherLines: chargeHalfInningLines(progress.pitcherLines, progress.ourTeamId, half.pitcherLines),
-      // 내려간 투수는 그 순간 값을 레코드에 남긴다
-      ourPitcherStaminas: withOutgoingStaminas(progress.ourPitcherStaminas, half.pitcherChanges ?? []),
-      decisions,
-      // 상대 공격이 끝나면 우리 공격 반 이닝이 시작된다 — 교대 0xa5b00 이 A 를 0 으로 되돌린다
-      opponentInningRunsAllowed: 0,
-      opponentLineup: half.lineup ?? progress.opponentLineup,
-      pinchHitUsed: half.pinchHitUsed ?? progress.pinchHitUsed,
-      homeRunStreak,
-      pitching: {
-        hitsAllowed: progress.pitching.hitsAllowed + half.hits,
-        walksAllowed: progress.pitching.walksAllowed + half.walks,
-        outsRecorded: progress.pitching.outsRecorded + half.outs,
-        strikeouts: progress.pitching.strikeouts + half.strikeouts,
-        strikeoutCombo: half.strikeoutCombo,
-      },
-      // 삼진 계열 기록도 우리 팀 것이다 (0xa77f0 은 수비 팀이 사람 팀인지 본다) — B-129 고친 길은 타자에게 수비 쪽 기록을 안 준다
-      recordIds: [...progress.recordIds, ...ownPositionRecordIdsOf(half.recordIds, 'batter')],
-      // 상대 팀 타석도 원본은 같은 0xa8024 로 상대 선수 레코드에 쌓는다 (B-2)
-      leaguePlateAppearances: [
-        ...progress.leaguePlateAppearances,
-        ...half.plateAppearances.map((appearance) => ({
-          teamId: progress.opponentTeamId,
-          // 실제로 선 선수의 로스터 칸 — 대타가 들어오면 타순 칸과 갈린다
-          battingOrderIndex: appearance.rosterSlot ?? appearance.battingOrderIndex % BATTING_ORDER_SIZE,
-          outcome: appearance.outcome,
-          runsBattedIn: appearance.runsBattedIn,
-        })),
-      ],
-      // 0xc1a42 — 성공한 도루의 주자마다 0xa56dc(ctx, 주자, 0) 참이면 +0x2c (마타자 칸은 summary 가 뺀다)
-      leagueStolenBases: [
-        ...(progress.leagueStolenBases ?? []),
-        ...half.stolenBases.map((steal) => ({
-          teamId: progress.opponentTeamId,
-          battingOrderIndex: steal.rosterSlot ?? steal.battingOrderIndex % BATTING_ORDER_SIZE,
-        })),
-      ],
+/** 상대 반 이닝이 끝난 진행 — 점수 · 마운드 · 투수 줄 · 기록 칸을 반 이닝 결과로 */
+function opponentHalfProgressOf(
+  progress: GameProgress,
+  half: HalfInningResult,
+  game: GameState,
+  decisions: DecisionState,
+  homeRunStreak: number,
+): GameProgress {
+  return {
+    ...progress,
+    game,
+    // 자동진행 반 이닝이 상대(공격) 레코드 +2 를 덮었으면(스윙 경로 0xab214 · 주자 있는 판정 경로 c19ec) 그때 사기다 — 이 반 이닝에는
+    // 돌발이 없어(상태 0xf 를 안 지난다) 사기가 그대로다 (`HalfInningResult.offenseRecordTouched`, r104)
+    ...(half.offenseRecordTouched ? { opponentRecordMorale: progress.teamMorale ?? teamRecordMoraleOf(progress.opponentTeamId) } : {}),
+    opponentOrderIndex: half.nextBattingOrderIndex % BATTING_ORDER_SIZE,
+    ourMound: half.mound ?? progress.ourMound,
+    // 우리 투수 줄 — 반 이닝 엔진이 던진 투수마다 낸 줄 (투구 수 포함)
+    pitcherLines: chargeHalfInningLines(progress.pitcherLines, progress.ourTeamId, half.pitcherLines),
+    // 내려간 투수는 그 순간 값을 레코드에 남긴다
+    ourPitcherStaminas: withOutgoingStaminas(progress.ourPitcherStaminas, half.pitcherChanges ?? []),
+    decisions,
+    // 상대 공격이 끝나면 우리 공격 반 이닝이 시작된다 — 교대 0xa5b00 이 A 를 0 으로 되돌린다
+    opponentInningRunsAllowed: 0,
+    opponentLineup: half.lineup ?? progress.opponentLineup,
+    pinchHitUsed: half.pinchHitUsed ?? progress.pinchHitUsed,
+    homeRunStreak,
+    pitching: {
+      hitsAllowed: progress.pitching.hitsAllowed + half.hits,
+      walksAllowed: progress.pitching.walksAllowed + half.walks,
+      outsRecorded: progress.pitching.outsRecorded + half.outs,
+      strikeouts: progress.pitching.strikeouts + half.strikeouts,
+      strikeoutCombo: half.strikeoutCombo,
     },
-    `${progress.game.inning}회${progress.game.half} 상대 공격 — ${runs}점${half.pinchHits
-      .map((pinch) => ` (${(pinch.battingOrderIndex % BATTING_ORDER_SIZE) + 1}번 CPU 대타)`)
-      .join('')}`,
-    false,
-  )
+    // 삼진 계열 기록도 우리 팀 것이다 (0xa77f0 은 수비 팀이 사람 팀인지 본다) — B-129 고친 길은 타자에게 수비 쪽 기록을 안 준다
+    recordIds: [...progress.recordIds, ...ownPositionRecordIdsOf(half.recordIds, 'batter')],
+    leaguePlateAppearances: opponentLeaguePlateAppearancesOf(progress, half),
+    leagueStolenBases: opponentLeagueStolenBasesOf(progress, half),
+  }
 }

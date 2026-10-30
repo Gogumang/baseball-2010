@@ -118,45 +118,42 @@ export function formatOriginalMoney(amount: number): string {
 
 const moneyQuestion = (amount: number) => `!C!cFFFF00소지금 ${formatOriginalMoney(amount)}!cFFFFFF이 소모됩니다!N구매하겠습니까?` // StrMODE[79]
 
-/** 살 수 있는 칸이면 구매 확인 문구(원문 마크업), 아니면 null (막힘 알림·다시 끼기는 묻지 않는다) */
-export function purchaseQuestionOf(career: PlayerCareer, itemId: string): string | null {
-  const [tab, first, second] = itemId.split(':')
-  const index = Number(first)
-  if (tab === '착용') {
-    const level = Number(second)
-    const isEquipped = career.equipmentLevels[EQUIPMENT_PARTS[index].ability] === level + 1
-    if (!ownsEquipment(career, index, level) || isEquipped) return null
-    return `!C[!cFFFF00${equipmentItemOf(index, level).name}!cFFFFFF] 아이템을!N장착하시겠습니까?` // StrMODE[81]
-  }
-  if (tab === '장착') {
-    const level = Number(second)
-    if (equipmentBlockReasonOf(career, index, level) !== null) return null
-    return moneyQuestion(equipmentItemOf(index, level).price)
-  }
-  if (tab === '서브') {
-    if (subItemBlockReasonOf(career, index) !== null) return null
-    return moneyQuestion(SUB_ITEMS[index].price)
-  }
-  const price = BATTER_GP_ITEMS[index].price
-  // G 부족(StrMODE[65])이 가장 먼저, 그 다음 아이템별 가드 여섯 (0x13460)
-  if (career.gamePoint < price) return null
+/** 착용 칸 — 가졌고 지금 끼고 있지 않을 때만 StrMODE[81] */
+function wearQuestionOf(career: PlayerCareer, index: number, level: number): string | null {
+  const isEquipped = career.equipmentLevels[EQUIPMENT_PARTS[index].ability] === level + 1
+  if (!ownsEquipment(career, index, level) || isEquipped) return null
+  return `!C[!cFFFF00${equipmentItemOf(index, level).name}!cFFFFFF] 아이템을!N장착하시겠습니까?` // StrMODE[81]
+}
+
+/** GP 칸 — G 부족(StrMODE[65])이 가장 먼저, 그 다음 아이템별 가드 여섯 (0x13460) */
+function gpQuestionOf(career: PlayerCareer, index: number): string | null {
+  if (career.gamePoint < BATTER_GP_ITEMS[index].price) return null
   if (gpItemBlockReasonOf(career, index) !== null) return null
   // StrMODE[82] — 엄마의도시락은 최대인 칸 줄 + "!N" 이, 이글아이는 StrMODE[224] 안내줄 + "!N!N" 이 앞에 선다 (0x138ca · 0x13ab4)
   return gpItemQuestionOf(career, index)
 }
 
-/** 상점에서 한 칸을 고르고 (구매라면 확인을 마친 뒤) 결과를 낸다 */
-export function selectShopItem(career: PlayerCareer, itemId: string, random: RandomPort): ShopSelection {
+/** 살 수 있는 칸이면 구매 확인 문구(원문 마크업), 아니면 null (막힘 알림·다시 끼기는 묻지 않는다) */
+export function purchaseQuestionOf(career: PlayerCareer, itemId: string): string | null {
   const [tab, first, second] = itemId.split(':')
   const index = Number(first)
-  if (tab === '장착') return selectEquipment(career, index, Number(second))
-  if (tab === '착용') return wearEquipment(career, index, Number(second))
-  if (tab === '서브') {
-    const blockReason = subItemBlockReasonOf(career, index)
-    if (blockReason !== null) return { career, notice: SUB_ITEM_BLOCK_TEXT[blockReason] }
-    return { career: purchaseSubItem(career, index), notice: purchasedText(SUB_ITEMS[index].name) }
+  if (tab === '착용') return wearQuestionOf(career, index, Number(second))
+  if (tab === '장착') {
+    const level = Number(second)
+    return equipmentBlockReasonOf(career, index, level) === null ? moneyQuestion(equipmentItemOf(index, level).price) : null
   }
-  // G 부족을 먼저 보고(StrMODE[65]), 그 다음 아이템별 가드 (R12 1b)
+  if (tab === '서브') return subItemBlockReasonOf(career, index) === null ? moneyQuestion(SUB_ITEMS[index].price) : null
+  return gpQuestionOf(career, index)
+}
+
+function selectSubItem(career: PlayerCareer, index: number): ShopSelection {
+  const blockReason = subItemBlockReasonOf(career, index)
+  if (blockReason !== null) return { career, notice: SUB_ITEM_BLOCK_TEXT[blockReason] }
+  return { career: purchaseSubItem(career, index), notice: purchasedText(SUB_ITEMS[index].name) }
+}
+
+/** GP 아이템 — G 부족을 먼저 보고(StrMODE[65]), 그 다음 아이템별 가드 (R12 1b). 굴림은 구매 안에서만 */
+function selectGpItem(career: PlayerCareer, index: number, random: RandomPort): ShopSelection {
   const gpBlock = career.gamePoint < BATTER_GP_ITEMS[index].price ? null : gpItemBlockReasonOf(career, index)
   if (gpBlock !== null) return { career, notice: gpBlock }
   const purchase = purchaseGpItem(career, index, random)
@@ -169,4 +166,14 @@ export function selectShopItem(career: PlayerCareer, itemId: string, random: Ran
     career: result.career,
     notice: gpItemNoticeOf(index, result.lotteryPrize, result.prizeItemId, result.career.eagleEyeGamesRemaining),
   }
+}
+
+/** 상점에서 한 칸을 고르고 (구매라면 확인을 마친 뒤) 결과를 낸다 */
+export function selectShopItem(career: PlayerCareer, itemId: string, random: RandomPort): ShopSelection {
+  const [tab, first, second] = itemId.split(':')
+  const index = Number(first)
+  if (tab === '장착') return selectEquipment(career, index, Number(second))
+  if (tab === '착용') return wearEquipment(career, index, Number(second))
+  if (tab === '서브') return selectSubItem(career, index)
+  return selectGpItem(career, index, random)
 }
