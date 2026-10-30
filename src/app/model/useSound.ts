@@ -96,6 +96,17 @@ export function bgmToRestoreOnUnmute(lastPlayed: number | null): number | null {
   return lastPlayed !== null && lastPlayed >= 1 && lastPlayed <= 4 ? lastPlayed : null
 }
 
+/** 글 입력 칸(편집 가능 요소 · input · textarea)인가 */
+function isTextInputTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+}
+
+/** 0 → 1 로 켤 때 기억한 배경음(1~4)을 다시 튼다 (0x2e22) */
+function replayBgmOnUnmute(sound: SoundPort): void {
+  const bgm = bgmToRestoreOnUnmute(sound.lastPlayed?.() ?? null)
+  if (bgm !== null) sound.playBgm(bgm)
+}
+
 /**
  * 앱 전역 소리 단축키 (`soundLevelAfterKey`). 키는 막지 않는다 — 원본도 장면에 그대로 넘긴다.
  * 단계는 그 자리에서 소리에 적용한다(0x9f524 → 0x6e4d0) — 0 → 1 로 켤 때 다시 트는 배경음이 볼륨 0 에 막히지 않게.
@@ -110,17 +121,13 @@ export function useSoundLevelKeys(sound: SoundPort, soundLevel: number, onSoundL
       const code = SOUND_KEY_CODES[event.key]
       if (code === undefined) return
       // ⚠️ 웹 전용: 글 입력 칸에 친 '-' · '+' 는 글자다
-      const target = event.target
-      if (target instanceof HTMLElement && (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+      if (isTextInputTarget(event.target)) return
       const next = soundLevelAfterKey(levelRef.current, code)
       if (next === null) return
       levelRef.current = next
       shortcutLevels.set(sound, next)
       sound.setVolume(next * VOLUME_PER_LEVEL)
-      if (next === 1) {
-        const bgm = bgmToRestoreOnUnmute(sound.lastPlayed?.() ?? null)
-        if (bgm !== null) sound.playBgm(bgm)
-      }
+      if (next === 1) replayBgmOnUnmute(sound)
       changeRef.current(next)
     }
     window.addEventListener('keydown', onKeyDown)

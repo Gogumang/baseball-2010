@@ -63,6 +63,11 @@ const NARI_MENU_SCREENS: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>([
   '연차표지',
 ])
 
+/** 메인메뉴와 그 앞 화면 */
+function isMainMenuSide(kind: Screen['kind']): boolean {
+  return kind === '메인메뉴' || BEFORE_MAIN_MENU_SCREENS.has(kind)
+}
+
 /**
  * 화면마다 **다음에 올 장면** 그림을 미리 받는다 — 화면 흐름·시간은 그대로이고, 받기는 뒤에서 돈다.
  *  - 메인메뉴(와 그 앞 화면): 나리 관리·팀선택·미션 고르기·홈런더비 선택 그림을 유휴로
@@ -73,7 +78,7 @@ const NARI_MENU_SCREENS: ReadonlySet<Screen['kind']> = new Set<Screen['kind']>([
  */
 export function screenSpritePreloadsOf(kind: Screen['kind'], isInGameScene: boolean): readonly ScreenSpritePreload[] {
   const list: ScreenSpritePreload[] = []
-  if (kind === '메인메뉴' || BEFORE_MAIN_MENU_SCREENS.has(kind)) {
+  if (isMainMenuSide(kind)) {
     for (const scene of MAIN_MENU_NEXT_SCENES) list.push({ scene, priority: 'idle' })
   }
   if (NARI_MENU_SCREENS.has(kind)) list.push({ scene: 'nariMenu', priority: 'scene' })

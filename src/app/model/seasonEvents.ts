@@ -169,6 +169,27 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
   if (career.endingIndex !== null) return { kind: '엔딩', endingIndex: career.endingIndex }
   // 1c25e — 0x11 은 6|7 바로 다음에 본다 (464 거절 보상 뒤 끊겼으면 새 시즌 처리부터)
   if (career.seasonEndState === 137) return { kind: '새시즌' }
+  const seasonEndPoint = seasonEndResumePointOf(career)
+  if (seasonEndPoint !== null) return seasonEndPoint
+  // 그 밖 갈래 1c346~1c35a — S+0x12c(국가대항전 중)면 134. S+0xb4(1c35c) 보다 먼저다. 463 끝 0x8cca2 가 S+0x50 = 3(웹 null)으로
+  // 두므로 대회 중엔 늘 이 갈래다
+  if (career.nationalCup !== undefined) return { kind: '국가대항전', cup: career.nationalCup }
+  if (career.postseason === null) return regularSeasonResumePointOf(career)
+  return postseasonResumePointOf(career, career.postseason)
+}
+
+/** S+0xb4(포스트시즌 중) — 128 대진, 경기 뒤 g == 0 이면 목표 사슬 */
+function postseasonResumePointOf(career: PlayerCareer, postseason: NonNullable<PlayerCareer['postseason']>): ResumePoint {
+  if (career.seasonEndState === 128) return { kind: '포스트시즌' }
+  // 경기 뒤(S+0x50 == 2 → 116) — 116 의 끝(12b74~12b94)처럼 g == 0 이면 [114 → 136](392 를 트는 136 진입으로 곧장), 아니면 128
+  // B-05 고침이면 대진이 막 열린 때만 사슬로 (`entersYearEndChainInPostseason`)
+  return leagueDayCounterOf(career) === 0 && entersYearEndChainInPostseason(postseason)
+    ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
+    : { kind: '포스트시즌' }
+}
+
+/** S+0x50 == 0xb · 0xc · 0xe · 9 · 0xa → 136 · 130 · 131 · 132 · 133 — 그 상태가 진입에서 트는 이벤트로. 그 밖은 null */
+function seasonEndResumePointOf(career: PlayerCareer): ResumePoint | null {
   switch (career.seasonEndState) {
     case 136:
       return { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
@@ -181,22 +202,14 @@ export function resumePointOf(career: PlayerCareer): ResumePoint {
     case 133:
       return salaryResumePointOf(career)
     default:
-      break
+      return null
   }
-  // 그 밖 갈래 1c346~1c35a — S+0x12c(국가대항전 중)면 134. S+0xb4(1c35c) 보다 먼저다. 463 끝 0x8cca2 가 S+0x50 = 3(웹 null)으로
-  // 두므로 대회 중엔 늘 이 갈래다
-  if (career.nationalCup !== undefined) return { kind: '국가대항전', cup: career.nationalCup }
-  if (career.postseason === null) {
-    // 맨 끝 갈래 1c38e~1c3b6 — S+0x50 == 4(109) 는 {1,3} 이 아니라 늘 109
-    if (career.seasonEndState === 109) return { kind: '다음경기순위' }
-    return leagueDayCounterOf(career) % 2 === 0 ? { kind: '관리' } : { kind: '다음경기순위' }
-  }
-  if (career.seasonEndState === 128) return { kind: '포스트시즌' }
-  // 경기 뒤(S+0x50 == 2 → 116) — 116 의 끝(12b74~12b94)처럼 g == 0 이면 [114 → 136](392 를 트는 136 진입으로 곧장), 아니면 128
-  // B-05 고침이면 대진이 막 열린 때만 사슬로 (`entersYearEndChainInPostseason`)
-  return leagueDayCounterOf(career) === 0 && entersYearEndChainInPostseason(career.postseason)
-    ? { kind: '이벤트', eventId: GOAL_INTRO_EVENT_ID }
-    : { kind: '포스트시즌' }
+}
+
+/** 맨 끝 갈래 1c38e~1c3b6 — S+0x50 == 4(109) 는 {1,3} 이 아니라 늘 109, 그 밖은 g 짝수면 105 · 홀수면 109 */
+function regularSeasonResumePointOf(career: PlayerCareer): ResumePoint {
+  if (career.seasonEndState === 109) return { kind: '다음경기순위' }
+  return leagueDayCounterOf(career) % 2 === 0 ? { kind: '관리' } : { kind: '다음경기순위' }
 }
 
 /** 0x1c154 의 S+0x50 == 0xa 갈래(1c2a2~1c344) — 연차idx(S+0xb3)는 끝난 해의 것(`season − 1`)이다 */
@@ -223,33 +236,40 @@ const FINAL_YEAR_INDEX = 12
  * 판정 없음(−1, 인기도가 정확히 1000)은 그대로 넘긴다 — 0x12300 이 고치지 않는다(`NO_ENDING_JUDGEMENT`, 화면은 `EndingScreen`).
  */
 export function nextSeasonStep(career: PlayerCareer, viewed: readonly number[], endingRequested = false): SeasonStep {
-  const saw = (id: number) => viewed.includes(id)
-
   if (endingRequested) return { kind: '엔딩', endingIndex: judgeEnding(career) ?? NO_ENDING_JUDGEMENT }
-  if (viewed.some((id) => SALARY_RESULT_EVENT_IDS.includes(id)) || saw(SALARY_ACCEPT_EVENT_ID)) {
-    return { kind: '새시즌' }
-  }
-  if (saw(SALARY_FIRM_EVENT_ID) || saw(SALARY_POLITE_EVENT_ID)) {
-    const choice = saw(SALARY_FIRM_EVENT_ID) ? SALARY_FIRM_EVENT_ID : SALARY_POLITE_EVENT_ID
-    return { kind: '이벤트', eventId: salaryResultEventId(choice, batterSalaryNegotiationRankOf(career)) }
-  }
+  // 사슬의 뒤쪽부터 본다 — 연봉 → MVP → 타이틀 → 목표
+  return salaryStepOf(career, viewed) ?? awardStepOf(career, viewed) ?? goalStepOf(career, viewed) ?? { kind: '관리' }
+}
+
+const sawAny = (viewed: readonly number[], ids: readonly number[]) => viewed.some((id) => ids.includes(id))
+
+/** 연봉 결과 · 수락을 봤으면 새 시즌, 강경 · 정중 선택을 봤으면 그 결과 이벤트 */
+function salaryStepOf(career: PlayerCareer, viewed: readonly number[]): SeasonStep | null {
+  if (sawAny(viewed, SALARY_RESULT_EVENT_IDS) || viewed.includes(SALARY_ACCEPT_EVENT_ID)) return { kind: '새시즌' }
+  if (!viewed.includes(SALARY_FIRM_EVENT_ID) && !viewed.includes(SALARY_POLITE_EVENT_ID)) return null
+  const choice = viewed.includes(SALARY_FIRM_EVENT_ID) ? SALARY_FIRM_EVENT_ID : SALARY_POLITE_EVENT_ID
+  return { kind: '이벤트', eventId: salaryResultEventId(choice, batterSalaryNegotiationRankOf(career)) }
+}
+
+/** MVP(131 · 375) · 타이틀(130 · 370) 사슬 */
+function awardStepOf(career: PlayerCareer, viewed: readonly number[]): SeasonStep | null {
   // 131 의 뒤 = 128 (0x197ec `0xbcb49(0x80)` · 0x197f4 `0xbcb49(0x72)`)
-  if (viewed.some((id) => MVP_RESULT_EVENT_IDS.includes(id))) return { kind: '포스트시즌' }
-  if (saw(MVP_INTRO_EVENT_ID)) {
+  if (sawAny(viewed, MVP_RESULT_EVENT_IDS)) return { kind: '포스트시즌' }
+  if (viewed.includes(MVP_INTRO_EVENT_ID)) {
     // 0x8b370 — 상태 131 이 남긴 evt+0x388 을 읽는다. 웹은 375 진입 때 세운 그 해 MVP 비트가 같은 값이다
     return { kind: '이벤트', eventId: mvpResultEventId(hasMvpInSeason(career.mvpSeasonBits, career.season)) }
   }
   // 130 의 뒤 = 131 (0x198c8 `0xbcb49(0x83)`) — 131 진입이 375 를 튼다
-  if (viewed.some((id) => TITLE_RESULT_EVENT_IDS.includes(id))) return { kind: '이벤트', eventId: MVP_INTRO_EVENT_ID }
-  if (saw(TITLE_INTRO_EVENT_ID)) {
-    // 0x8b04c — 371 + (evt+0x36c..0x36e 중 0 이 아닌 수). 칸은 130 이 0x8dad4(evt, 0xc 타자)로 채운다
-    const { wonCount } = judgeSeasonAwards(career, careerLeagueRecordsOf(career), '타자')
-    return { kind: '이벤트', eventId: titleResultEventId(wonCount) }
-  }
-  // 136 의 뒤 = 130 (0x10bec `0xbcb49(0x82)`) — 130 진입이 370 을 튼다
-  if (viewed.some((id) => GOAL_RESULT_EVENT_IDS.includes(id))) return { kind: '이벤트', eventId: TITLE_INTRO_EVENT_ID }
-  if (saw(GOAL_INTRO_EVENT_ID)) {
-    return { kind: '이벤트', eventId: goalResultEventId(achievedGoalCount(career, '연말')) }
-  }
-  return { kind: '관리' }
+  if (sawAny(viewed, TITLE_RESULT_EVENT_IDS)) return { kind: '이벤트', eventId: MVP_INTRO_EVENT_ID }
+  if (!viewed.includes(TITLE_INTRO_EVENT_ID)) return null
+  // 0x8b04c — 371 + (evt+0x36c..0x36e 중 0 이 아닌 수). 칸은 130 이 0x8dad4(evt, 0xc 타자)로 채운다
+  const { wonCount } = judgeSeasonAwards(career, careerLeagueRecordsOf(career), '타자')
+  return { kind: '이벤트', eventId: titleResultEventId(wonCount) }
+}
+
+/** 목표(136 · 392) 사슬 — 136 의 뒤 = 130 (0x10bec `0xbcb49(0x82)`) — 130 진입이 370 을 튼다 */
+function goalStepOf(career: PlayerCareer, viewed: readonly number[]): SeasonStep | null {
+  if (sawAny(viewed, GOAL_RESULT_EVENT_IDS)) return { kind: '이벤트', eventId: TITLE_INTRO_EVENT_ID }
+  if (!viewed.includes(GOAL_INTRO_EVENT_ID)) return null
+  return { kind: '이벤트', eventId: goalResultEventId(achievedGoalCount(career, '연말')) }
 }
