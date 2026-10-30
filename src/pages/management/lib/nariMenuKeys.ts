@@ -17,10 +17,20 @@
 
 /** 원본 키 → 한 칸 이동 (−1 = 앞 칸 · +1 = 다음 칸 · 0 = 이동 키가 아님) */
 export function nariMenuStepOfKey(key: string): -1 | 0 | 1 {
-  if (key === 'ArrowLeft' || key === 'ArrowUp' || key === '4' || key === '2') return -1
-  if (key === 'ArrowRight' || key === 'ArrowDown' || key === '6' || key === '8') return 1
-  return 0
+  return MENU_STEP_OF_KEY.get(key) ?? 0
 }
+
+/** 표 0xd2e7c — '2' ↑ · '4' ← 는 앞 칸, '6' → · '8' ↓ 는 다음 칸 (한 줄 메뉴라 ↑ 는 ←, ↓ 는 →) */
+const MENU_STEP_OF_KEY: ReadonlyMap<string, -1 | 1> = new Map<string, -1 | 1>([
+  ['ArrowLeft', -1],
+  ['ArrowUp', -1],
+  ['4', -1],
+  ['2', -1],
+  ['ArrowRight', 1],
+  ['ArrowDown', 1],
+  ['6', 1],
+  ['8', 1],
+])
 
 /** 확인 — OK(−5) · '5'(0x35) */
 export function isNariMenuOkKey(key: string): boolean {

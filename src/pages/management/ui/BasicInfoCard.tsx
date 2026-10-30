@@ -56,16 +56,7 @@ export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }
   // 0 이면 0xb570c 가 질병 · 부상 · 사기 감소(0xb5734 → 0xb58e6)를 건너뛴다. 이 카드(105 · 111 · 121)는 늘 1 → effectiveAbilityOf.
   // 피로 인자 0x5a 는 54 를 넘어 값을 안 바꾼다.
   const shown = effectiveAbilityOf(figureEquipment === undefined ? career : { ...career, equipmentLevels: figureEquipment })
-  const values = [
-    (TEAMS[career.teamId] ?? TEAMS[0]).name,
-    career.name,
-    BATTING_TYPE_NAMES[career.battingTypeIndex] ?? '',
-    // 필살 = 선수 +0x18 고른 번호의 이름 (0x7cb5c~0x7cbc0) — 0 이면 빈 줄
-    basicInfoSpecialNameOf(career.specialSwingNumber, career.battingTypeIndex),
-    POSITION_NAMES[career.positionIndex] ?? '',
-    SIDE_NAMES[career.battingSide] ?? '',
-    SKIN_NAMES[career.skinIndex] ?? '',
-  ]
+  const values = basicInfoValuesOf(career)
   const infoBoard = useMemo(() => boardRectsOf(INFO_BOARD, false), [])
   const uiOrigins = useFrameOrigins(MODE_UI)
   return (
@@ -97,6 +88,20 @@ export function BasicInfoCard({ career, showsInfoTable = true, figureEquipment }
       )}
     </div>
   )
+}
+
+/** 정보 칸 일곱 줄 — 팀 · 이름 · 타입 · 필살 · 포지션 · 타석 · 피부 */
+function basicInfoValuesOf(career: PlayerCareer): string[] {
+  return [
+    (TEAMS[career.teamId] ?? TEAMS[0]).name,
+    career.name,
+    BATTING_TYPE_NAMES[career.battingTypeIndex] ?? '',
+    // 필살 = 선수 +0x18 고른 번호의 이름 (0x7cb5c~0x7cbc0) — 0 이면 빈 줄
+    basicInfoSpecialNameOf(career.specialSwingNumber, career.battingTypeIndex),
+    POSITION_NAMES[career.positionIndex] ?? '',
+    SIDE_NAMES[career.battingSide] ?? '',
+    SKIN_NAMES[career.skinIndex] ?? '',
+  ]
 }
 
 /**

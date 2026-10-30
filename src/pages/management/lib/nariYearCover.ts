@@ -218,7 +218,18 @@ export function yearCoverStepAt(frame: number, skipAt: number | null): YearCover
   const tick = frame - YEAR_COVER_ENTRY_FRAMES
   const trigger = skipAt === null ? WAIT_TRIGGER_TICK : Math.min(skipAt, WAIT_TRIGGER_TICK)
   if (tick >= trigger + EFFECTOR_FRAMES + 1) return { kind: '관리' }
-  const counter = skipAt !== null && skipAt <= tick && skipAt < WAIT_TRIGGER_TICK ? YEAR_COVER_SKIP + (tick - skipAt) : tick
+  return coverStepAt(tick, trigger, skipAt)
+}
+
+/** 표지 카운터 — 기다림 문턱 전에 키로 넘겼으면 그 틀부터 넘김 값에서 센다 */
+function coverCounterOf(tick: number, skipAt: number | null): number {
+  const isSkipped = skipAt !== null && skipAt <= tick && skipAt < WAIT_TRIGGER_TICK
+  return isSkipped ? YEAR_COVER_SKIP + (tick - skipAt) : tick
+}
+
+/** 표지가 선 틀 `tick` — `trigger` 는 나갈 효과기를 거는 틀 */
+function coverStepAt(tick: number, trigger: number, skipAt: number | null): YearCoverStep {
+  const counter = coverCounterOf(tick, skipAt)
   const isLeaving = tick === trigger + EFFECTOR_FRAMES
   const entryFade = tick + 1 < EFFECTOR_FRAMES ? tick + 1 : null
   return {

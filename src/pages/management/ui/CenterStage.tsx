@@ -48,9 +48,10 @@ function StageSprite({ character, x, update }: { readonly character: StageCharac
     ),
   )
   const step = entries === undefined ? null : animationStepAt(entries, update)
-  const key = step === null ? '' : String(step.frame).padStart(3, '0')
-  const origin = step === null ? undefined : origins?.[key]
-  if (step === null || origin === undefined) return null
+  if (step === null) return null
+  const key = String(step.frame).padStart(3, '0')
+  const origin = origins?.[key]
+  if (origin === undefined) return null
   return (
     <PaintedFrame
       key={key}

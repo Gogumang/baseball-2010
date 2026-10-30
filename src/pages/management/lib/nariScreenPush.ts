@@ -64,6 +64,11 @@ export function screenPushFrameAt(
   if (step <= 0) return null
   const d = frame * step
   if (d >= size) return null
+  return pushedFrameOf(direction, d, width, height)
+}
+
+/** 거리 `d` 만큼 민 두 화면의 자리 — 방향 1 · 2 는 세로, 3 · 4 는 가로 */
+function pushedFrameOf(direction: ScreenPushDirection, d: number, width: number, height: number): ScreenPushFrame {
   switch (direction) {
     case 1:
       return { newX: 0, newY: height - d - 1, oldX: 0, oldY: -d }
@@ -81,9 +86,12 @@ export type NariMatchPushView = '142' | '143:내팀' | '143:상대'
 
 /** 화면이 바뀔 때의 밀기 방향 — 142 → 143 은 내 팀 4 · 상대 3, 143 → 142 는 내 팀 3 · 상대 4. 그 밖은 없음 */
 export function nariMatchPushDirectionOf(from: NariMatchPushView, to: NariMatchPushView): ScreenPushDirection | null {
-  if (from === '142' && to === '143:내팀') return 4
-  if (from === '142' && to === '143:상대') return 3
-  if (from === '143:내팀' && to === '142') return 3
-  if (from === '143:상대' && to === '142') return 4
-  return null
+  return MATCH_PUSH_DIRECTIONS.get(`${from}→${to}`) ?? null
 }
+
+const MATCH_PUSH_DIRECTIONS: ReadonlyMap<string, ScreenPushDirection> = new Map<string, ScreenPushDirection>([
+  ['142→143:내팀', 4],
+  ['142→143:상대', 3],
+  ['143:내팀→142', 3],
+  ['143:상대→142', 4],
+])

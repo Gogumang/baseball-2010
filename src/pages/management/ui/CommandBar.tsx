@@ -56,7 +56,7 @@ const BRACKET = { left: -5, top: -9 + 11 }
  * 그 밖 0xd4868) 시즌모드도 칸 표만 바꿔 이 줄을 그대로 쓴다.
  */
 export function CommandBar(props: CommandBarProps) {
-  const { slots, cursor, bounce, slideUpdates, disabledIds, labelWidths, parent, onHover, onSelect } = props
+  const { slots, cursor, bounce, slideUpdates, disabledIds, parent, onHover, onSelect } = props
   const isSubMenu = props.isSubMenu ?? parent !== null
   const isGray = (slot: MenuSlot) => disabledIds.has(slot.id) || props.grayedIds?.has(slot.id) === true
   // 0x7e6f8~0x7e710 — 꺼진 칸은 아이콘(· 고른 칸이면 이름표)까지 그린 뒤 0xc37a8(칸.x, 칸.y + 미끄럼, 칸.w, 칸.h) 로 화면을 흑백으로.
@@ -71,32 +71,9 @@ export function CommandBar(props: CommandBarProps) {
   )
   // 칸이 하나도 없으면(0x7e84c 가 표를 비운 상태 — 시즌 0xd6 · 0xdc) 부모 칸만 그린다
   const selected = slots[cursor] as MenuSlot | undefined
-  const selectedY = selected === undefined ? 0 : commandSlotYAt(selected.y, slideUpdates)
-  const labelWidth = selected === undefined ? 0 : (labelWidths[selected.labelFrame] ?? 0)
   return (
     <div data-testid="command-bar">
-      {parent !== null && (
-        <>
-          <img
-            className={styles.layer}
-            alt=""
-            src={iconOf(parent.icon, true)}
-            style={{
-              left: slidePositionAt(parent.x, PARENT_SLOT_TARGET.x, slideUpdates) - 1,
-              top: slidePositionAt(parent.y, PARENT_SLOT_TARGET.y, slideUpdates) - 1,
-            }}
-          />
-          {/* 도착하면 괄호를 그린다 */}
-          {slidePositionAt(parent.x, PARENT_SLOT_TARGET.x, slideUpdates) === PARENT_SLOT_TARGET.x && (
-            <img
-              className={styles.layer}
-              style={{ left: PARENT_SLOT_TARGET.x + BRACKET.left, top: PARENT_SLOT_TARGET.y + BRACKET.top }}
-              src={assetUrl('./sprites/mode_ui/frames/060.png')}
-              alt=""
-            />
-          )}
-        </>
-      )}
+      {parent !== null && parentSlotOf(parent, slideUpdates)}
       {slots.map((slot, index) => (
         <button
           key={slot.id}
@@ -128,17 +105,51 @@ export function CommandBar(props: CommandBarProps) {
           )}
         </button>
       ))}
-      {selected !== undefined && (
+      {selected !== undefined && selectedLabelOf(props, selected, isSubMenu)}
+    </div>
+  )
+}
+
+/** 하위 메뉴의 부모 칸 — 주황 아이콘이 (6, 245) 로 미끄러지고, 도착하면 파란 괄호를 덧그린다 */
+function parentSlotOf(parent: MenuSlot, slideUpdates: number) {
+  const left = slidePositionAt(parent.x, PARENT_SLOT_TARGET.x, slideUpdates)
+  return (
+    <>
+      <img
+        className={styles.layer}
+        alt=""
+        src={iconOf(parent.icon, true)}
+        style={{
+          left: left - 1,
+          top: slidePositionAt(parent.y, PARENT_SLOT_TARGET.y, slideUpdates) - 1,
+        }}
+      />
+      {/* 도착하면 괄호를 그린다 */}
+      {left === PARENT_SLOT_TARGET.x && (
         <img
           className={styles.layer}
-          src={assetUrl(`./sprites/management/command_label_${selected.labelFrame}.png`)}
+          style={{ left: PARENT_SLOT_TARGET.x + BRACKET.left, top: PARENT_SLOT_TARGET.y + BRACKET.top }}
+          src={assetUrl('./sprites/mode_ui/frames/060.png')}
           alt=""
-          style={{
-            left: commandLabelLeftOf(selected.x + (props.labelDxOf?.(selected) ?? 0), labelWidth, commandLabelAlignOf(isSubMenu, cursor)),
-            top: selectedY + COMMAND_LABEL_OFFSET_Y + Math.trunc((COMMAND_LABEL_HEIGHT - LABEL_GLYPH_HEIGHT + 1) / 2) - 1,
-          }}
         />
       )}
-    </div>
+    </>
+  )
+}
+
+/** 고른 칸의 이름표 — 칸 아래 y + 34, 정렬은 `commandLabelAlignOf`(하위 메뉴 칸 2·3 은 왼쪽) */
+function selectedLabelOf(props: CommandBarProps, selected: MenuSlot, isSubMenu: boolean) {
+  const selectedY = commandSlotYAt(selected.y, props.slideUpdates)
+  const labelWidth = props.labelWidths[selected.labelFrame] ?? 0
+  return (
+    <img
+      className={styles.layer}
+      src={assetUrl(`./sprites/management/command_label_${selected.labelFrame}.png`)}
+      alt=""
+      style={{
+        left: commandLabelLeftOf(selected.x + (props.labelDxOf?.(selected) ?? 0), labelWidth, commandLabelAlignOf(isSubMenu, props.cursor)),
+        top: selectedY + COMMAND_LABEL_OFFSET_Y + Math.trunc((COMMAND_LABEL_HEIGHT - LABEL_GLYPH_HEIGHT + 1) / 2) - 1,
+      }}
+    />
   )
 }
