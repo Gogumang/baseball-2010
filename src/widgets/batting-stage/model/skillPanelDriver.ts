@@ -48,6 +48,66 @@ export interface SkillPanelFrame {
 /** 0xf 밖이라는 표지 */
 const OUTSIDE_STATE_F = Symbol('0xf 밖')
 
+type SkillPanelScene = ReturnType<typeof createSkillPanelScene>
+
+/** 한 돌림이 그림 사이에 드는 칸 */
+interface DriverState {
+  stateFMark: unknown
+  lastTick: number
+  lastView: SkillPanelView | null
+}
+
+/** 0xd 진입 열쇠가 바뀌었으면 다음 0xf 진입에서 두 비트를 다시 정한다 */
+function noteEntryKey(scene: SkillPanelScene, entryKey: SkillPanelSource['entryKey']): void {
+  if (entryKey === null || entryKey === undefined || entryKey === scene.entryKey) return
+  scene.entryKey = entryKey
+  scene.isAtBatPending = true
+}
+
+/** 0xd 진입 0x48d50 — 48f9a 0x445cc · 48f9e 0x3d160 · 48fa4 */
+function enterAtBatPanel(scene: SkillPanelScene, frame: SkillPanelFrame): void {
+  scene.isAtBatPending = false
+  const situation = frame.situation()
+  scene.panel = enterAtBatSkillPanel(
+    scene.panel,
+    batterSkillPanelBitsOf(frame.batterSkillBits, situation),
+    pitcherSkillPanelBitsOf(frame.pitcherSkillBits, situation),
+  )
+}
+
+/** 새 0xf 진입이면 판 비트를 고친다 — 0xf 진입 0x3d954 3dd4e: st[4] == 2 && 수비 투수 비트 11 */
+function enterStateF(state: DriverState, scene: SkillPanelScene, frame: SkillPanelFrame): void {
+  if (!frame.isStateF) {
+    state.stateFMark = OUTSIDE_STATE_F
+    return
+  }
+  if (state.stateFMark === frame.stateFMark) return
+  state.stateFMark = frame.stateFMark
+  if (scene.isAtBatPending) enterAtBatPanel(scene, frame)
+  scene.panel = enterPitchSkillPanel(scene.panel, frame.strikes, frame.pitcherSkillBits)
+}
+
+/** 이 그림에 돌릴 판 그림 수 — 창 첫 그림은 한 번 더 돌리되 센 틱은 안 바꾼다 */
+function drawStepCountOf(state: DriverState, frame: SkillPanelFrame): number {
+  const isFirstOrExtra = frame.extraDraw === true || state.lastTick < 0
+  const steps = isFirstOrExtra ? 1 : Math.min(SKILL_PANEL_CATCH_UP_LIMIT, frame.nowTick - state.lastTick)
+  if (frame.extraDraw !== true || state.lastTick < 0) state.lastTick = frame.nowTick
+  return steps
+}
+
+/** 4c26a~4c3a2 — 판을 세운 뒤 첫 그림에서 한 번 함성 29 */
+function playSkillCheerOnce(scene: SkillPanelScene, frame: SkillPanelFrame): void {
+  if (!scene.panel.cheerPending) return
+  const cheered = skillCheerOf(scene.cheerBits, {
+    attackSide: frame.source.attackSide,
+    batterRecordSlot: frame.batterRecordSlot,
+    batterSkillBits: frame.batterSkillBits,
+  })
+  if (cheered === null) return
+  scene.cheerBits = cheered
+  activeSound().play(SKILL_CHEER_SOUND_ID)
+}
+
 /**
  * **경기 스킬 표시 판 한 화면의 돌림** (`lib/skillPanel`) — 장면 +0x19b0 ~ +0x19c0.
  * 0xd 진입 열쇠(`source.entryKey`)가 바뀐 뒤 첫 0xf 진입에서 0x445cc · 0x3d160 으로 두 비트를 정하고(웹은 0xd · 0xe 를 따로 안 세어
@@ -56,61 +116,28 @@ const OUTSIDE_STATE_F = Symbol('0xf 밖')
  * 장면 칸(`source.scene`)이 없으면 이 돌림이 사는 동안만 드는 칸을 쓴다.
  */
 export function createSkillPanelDriver(): (frame: SkillPanelFrame) => SkillPanelView | null {
-  let stateFMark: unknown = OUTSIDE_STATE_F
-  let lastTick = -1
-  let lastView: SkillPanelView | null = null
+  const state: DriverState = { stateFMark: OUTSIDE_STATE_F, lastTick: -1, lastView: null }
   const localScene = createSkillPanelScene()
-  const drive = (frame: SkillPanelFrame): SkillPanelView | null => {
+  return (frame: SkillPanelFrame): SkillPanelView | null => {
     const { source } = frame
     const scene = source.scene?.current ?? localScene
-    if (source.entryKey !== null && source.entryKey !== undefined && source.entryKey !== scene.entryKey) {
-      scene.entryKey = source.entryKey
-      scene.isAtBatPending = true
-    }
-    if (!frame.isStateF) stateFMark = OUTSIDE_STATE_F
-    else if (stateFMark !== frame.stateFMark) {
-      stateFMark = frame.stateFMark
-      if (scene.isAtBatPending) {
-        // 0xd 진입 0x48d50 — 48f9a 0x445cc · 48f9e 0x3d160 · 48fa4
-        scene.isAtBatPending = false
-        const situation = frame.situation()
-        scene.panel = enterAtBatSkillPanel(
-          scene.panel,
-          batterSkillPanelBitsOf(frame.batterSkillBits, situation),
-          pitcherSkillPanelBitsOf(frame.pitcherSkillBits, situation),
-        )
-      }
-      // 0xf 진입 0x3d954 3dd4e — st[4] == 2 && 수비 투수 비트 11
-      scene.panel = enterPitchSkillPanel(scene.panel, frame.strikes, frame.pitcherSkillBits)
-    }
+    noteEntryKey(scene, source.entryKey)
+    enterStateF(state, scene, frame)
     if (!frame.isDrawnState) {
-      lastTick = -1
+      state.lastTick = -1
       return null
     }
-    const steps = frame.extraDraw === true ? 1 : lastTick < 0 ? 1 : Math.min(SKILL_PANEL_CATCH_UP_LIMIT, frame.nowTick - lastTick)
-    if (frame.extraDraw !== true || lastTick < 0) lastTick = frame.nowTick
+    const steps = drawStepCountOf(state, frame)
     const drawSource = { batterHand: frame.batterHand, isDefenseCpu: source.isDefenseCpu ?? true }
     for (let step = 0; step < steps; step += 1) {
       const { view, next } = stepSkillPanel(scene.panel, drawSource, scene.arrowDraws)
       if (view !== null) {
-        // 4c26a~4c3a2 — 판을 세운 뒤 첫 그림에서 한 번
-        if (scene.panel.cheerPending) {
-          const cheered = skillCheerOf(scene.cheerBits, {
-            attackSide: source.attackSide,
-            batterRecordSlot: frame.batterRecordSlot,
-            batterSkillBits: frame.batterSkillBits,
-          })
-          if (cheered !== null) {
-            scene.cheerBits = cheered
-            activeSound().play(SKILL_CHEER_SOUND_ID)
-          }
-        }
+        playSkillCheerOnce(scene, frame)
         scene.arrowDraws += 1
       }
       scene.panel = next
-      lastView = view
+      state.lastView = view
     }
-    return lastView
+    return state.lastView
   }
-  return drive
 }

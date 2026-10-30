@@ -92,7 +92,7 @@ export function usePitcherHitScene({
   const hitScene = useRenderMachine(advanceHitScene, { play, pitch, mountedPlay, cpuSwing, batterHand }).scene
   /** 판정 틀에 굴려 다시 만든 0x13 재료 — 그 판의 것만 쓴다 */
   const [judged, setJudged] = useState<{ readonly play: object; readonly scene: PitcherHitScene } | null>(null)
-  const shownScene = hitScene === null ? null : judged !== null && judged.play === play ? judged.scene : hitScene
+  const shownScene = shownHitSceneOf(hitScene, judged, play)
   const isShowing = shownScene !== null && play !== null && endedPlay !== play
   const end = useCallback(() => setEndedPlay(playRef.current), [])
   const sceneInputsRef = useRef({ pitch, cpuSwing, batterHand })
@@ -127,6 +127,16 @@ export function usePitcherHitScene({
     }
   }, isShowing && !isFrozen)
   return { hitScene: isShowing ? shownScene : null, isShowing, end, judge }
+}
+
+/** 보이는 0x13 재료 — 판정 틀에 다시 만든 그 판의 것이 있으면 그것, 아니면 판이 선 그림의 것 */
+function shownHitSceneOf(
+  hitScene: PitcherHitScene | null,
+  judged: { readonly play: object; readonly scene: PitcherHitScene } | null,
+  play: DefensePlayInput | null,
+): PitcherHitScene | null {
+  if (hitScene === null) return null
+  return judged !== null && judged.play === play ? judged.scene : hitScene
 }
 
 /** 화면 쪽 안전판이 장면의 0x17 알림보다 늦게 서는 틱 수 */

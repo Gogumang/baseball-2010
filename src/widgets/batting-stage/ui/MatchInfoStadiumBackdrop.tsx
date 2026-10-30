@@ -27,6 +27,34 @@ function checksumOf(context: CanvasRenderingContext2D): number {
  * 웹은 스프라이트가 늦게 실리므로 날 그림(흐리기 앞)이 바뀔 때마다 다시 뜬다 — 다 실린 뒤로는 같은 그림이다.
  * `stage` 가 없으면(그 진입을 안 지났으면) 아무것도 안 그린다.
  */
+/** 마지막으로 옮긴 날 그림의 화소 합 — 같으면 다시 옮기지 않는다 */
+interface ShownChecksum {
+  lastChecksum: number | null
+}
+
+/**
+ * 흐리기가 이 캔버스를 그림이 실릴 때마다 다시 읽는다 — CPU 버퍼로 열어야 Chrome 의
+ * "Multiple readback operations using getImageData" 경고가 안 난다(픽셀 값은 같다)
+ */
+function targetContextOf(canvas: HTMLCanvasElement | null): CanvasRenderingContext2D | null {
+  return canvas?.getContext('2d', TARGET_CONTEXT_OPTIONS) ?? null
+}
+
+/** 날 그림을 다시 뜨고, 화소가 바뀌었으면 보이는 캔버스에 옮겨 흐린다 */
+function paintChangedBackdrop(
+  raw: CanvasRenderingContext2D,
+  target: CanvasRenderingContext2D,
+  stage: MatchInfoStadiumState,
+  shown: ShownChecksum,
+): void {
+  drawMatchInfoStadium(raw, stage)
+  const checksum = checksumOf(raw)
+  if (checksum === shown.lastChecksum) return
+  shown.lastChecksum = checksum
+  target.drawImage(raw.canvas, 0, 0)
+  finishSkinBackdropOnCanvas(target, STAGE_WIDTH, STAGE_HEIGHT)
+}
+
 export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoStadiumState | null | undefined }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef(stage)
@@ -37,7 +65,7 @@ export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoS
   useEffect(() => {
     if (stageKey === null) return undefined
     let frame = 0
-    let lastChecksum: number | null = null
+    const shown: ShownChecksum = { lastChecksum: null }
     /** 날 그림은 값 · 실린 그림이 바뀐 틀에서만 다시 뜬다(`createDrawMemo`) — 화소 읽기(`checksumOf`)도 그때만 */
     const drawMemo = createDrawMemo()
     const raw = tryOr(() => {
@@ -47,18 +75,10 @@ export function MatchInfoStadiumBackdrop({ stage }: { readonly stage: MatchInfoS
       return offscreen.getContext('2d', { willReadFrequently: true })
     }, null)
     const draw = () => {
-      // 흐리기가 이 캔버스를 그림이 실릴 때마다 다시 읽는다 — CPU 버퍼로 열어야 Chrome 의
-      // "Multiple readback operations using getImageData" 경고가 안 난다(픽셀 값은 같다)
-      const target = canvasRef.current?.getContext('2d', TARGET_CONTEXT_OPTIONS) ?? null
+      const target = targetContextOf(canvasRef.current)
       const current = stageRef.current
-      if (raw !== null && target !== null && current !== null && current !== undefined && drawMemo.needsDraw(canvasRef.current, current)) {
-        drawMatchInfoStadium(raw, current)
-        const checksum = checksumOf(raw)
-        if (checksum !== lastChecksum) {
-          lastChecksum = checksum
-          target.drawImage(raw.canvas, 0, 0)
-          finishSkinBackdropOnCanvas(target, STAGE_WIDTH, STAGE_HEIGHT)
-        }
+      if (raw !== null && target !== null && current != null && drawMemo.needsDraw(canvasRef.current, current)) {
+        paintChangedBackdrop(raw, target, current, shown)
       }
       frame = requestAnimationFrame(draw)
     }

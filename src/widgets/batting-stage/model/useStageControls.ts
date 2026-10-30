@@ -54,6 +54,32 @@ const RIGHT_KEYS: ReadonlySet<string> = new Set(['ArrowRight', '6'])
 /** 필살타법 (0x535a4 의 '0' → 0x6a6) */
 const SPECIAL_SWING_KEY = '0'
 
+/** 누른 키가 하는 일 — 받지 않는 키면 null. 번트 키만 브라우저 기본 동작을 안 막는다 */
+interface StageKeyPress {
+  readonly apply: (tick: number) => void
+  readonly preventsDefault: boolean
+}
+
+/** 필살타법 — 화면이 손잡이를 안 넘겼으면 원본 키만 받아 두고 아무 일도 하지 않는다 */
+function specialSwingPressOf(actions: StageActions): StageKeyPress | null {
+  if (actions.specialSwing === undefined) return null
+  const { specialSwing } = actions
+  return { apply: (tick) => specialSwing(tick), preventsDefault: true }
+}
+
+/**
+ * 키 → 동작. 좌우 이동 0x53470 → 0x6a4 → 0x50f86 은 키 처리 안에서 +0xfe4 를 바로 고친다 — 다음 틀의 키 자리에서 바뀌고 그 틀부터 그린다
+ */
+function stageKeyPressOf(key: string, actions: StageActions, canBunt: boolean): StageKeyPress | null {
+  if (SWING_KEYS.has(key)) return { apply: (tick) => actions.swing(tick), preventsDefault: true }
+  if (key === SPECIAL_SWING_KEY) return specialSwingPressOf(actions)
+  if (LEFT_KEYS.has(key)) return { apply: () => actions.moveBatter(-1), preventsDefault: true }
+  if (RIGHT_KEYS.has(key)) return { apply: () => actions.moveBatter(1), preventsDefault: true }
+  const buntKind = BUNT_KEYS[key]
+  if (buntKind === undefined || !canBunt) return null
+  return { apply: (tick) => actions.pressBunt(buntKind, tick), preventsDefault: false }
+}
+
 export function useStageControls(refs: StageRefs, actions: StageActions) {
   const { pointerDownAtRef, latestRef, keyLatch } = refs
 
@@ -74,30 +100,13 @@ export function useStageControls(refs: StageRefs, actions: StageActions) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return
       // 공용 창이 서 있으면 경기 장면 0x52c50 이 52cc6 에서 키 처리 0x498d4 를 건너뛴다 — 키는 창(0x754f9)이 가져간다.
       // 때는 경기 장면 틱(`gameSceneTickNow`)으로 잰다 — 단계 시작 틱과 같은 격자라야 키 틱이 맞는다
-      if (isGameSceneFrozen()) return
-      if (SWING_KEYS.has(event.key)) {
-        event.preventDefault()
-        latch(event, (tick) => actions.swing(tick))
-      } else if (event.key === SPECIAL_SWING_KEY) {
-        // 필살타법 — 화면이 손잡이를 안 넘겼으면 원본 키만 받아 두고 아무 일도 하지 않는다
-        if (actions.specialSwing === undefined) return
-        event.preventDefault()
-        const { specialSwing } = actions
-        latch(event, (tick) => specialSwing(tick))
-      } else if (LEFT_KEYS.has(event.key)) {
-        event.preventDefault()
-        // 좌우 이동 0x53470 → 0x6a4 → 0x50f86 은 키 처리 안에서 +0xfe4 를 바로 고친다 — 다음 틀의 키 자리에서 바뀌고 그 틀부터 그린다
-        latch(event, () => actions.moveBatter(-1))
-      } else if (RIGHT_KEYS.has(event.key)) {
-        event.preventDefault()
-        latch(event, () => actions.moveBatter(1))
-      } else if (BUNT_KEYS[event.key] !== undefined && latestRef.current.canBunt) {
-        const kind = BUNT_KEYS[event.key]
-        latch(event, (tick) => actions.pressBunt(kind, tick))
-      }
+      if (event.repeat || isGameSceneFrozen()) return
+      const press = stageKeyPressOf(event.key, actions, latestRef.current.canBunt)
+      if (press === null) return
+      if (press.preventsDefault) event.preventDefault()
+      latch(event, press.apply)
     }
     // 0x5364c — 뗀 키가 '7'~'9' 면 0x6a8 (종류를 가리지 않는다).
     // 창이 서 있는 동안 뗀 키는 버려진다 (2026-10-16 직접 떴다): 키 사건은 프레임마다 0x52c50 52cbc 의 0xbca05 가 만든다 —
