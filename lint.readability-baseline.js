@@ -133,7 +133,6 @@ export const readabilityBaseline = [
   'src/features/shop/model/shopSelection.ts',
   'src/pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx',
   'src/pages/create-player/lib/registerKeys.ts',
-  'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
   'src/pages/defense/lib/ballParticles.ts',
   'src/pages/defense/lib/defenseSpritePreload.ts',
