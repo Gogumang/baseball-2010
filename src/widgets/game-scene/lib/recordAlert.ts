@@ -170,6 +170,28 @@ export interface RecordAlertFrame {
 }
 
 /**
+ * 0x4e35c 의 갱신 몫 — 찬 칸마다 폭 두 배 · 시간 +1, 수명이 지나면 칸을 비우고 G 누계를 0 으로(얼었으면 세기만).
+ * `count` 는 갱신 앞에 찬 칸 수다
+ */
+function tickRecordAlertSlots(state: RecordAlertState, isFrozen: boolean) {
+  const slots = [...state.slots]
+  const widths = [...state.widths]
+  const timers = [...state.timers]
+  let pendingGamePoint = state.pendingGamePoint
+  let removed = false
+  const filled = slots.flatMap((slot, i) => (i < RECORD_ALERT_SLOTS && slot !== null ? [i] : []))
+  for (const i of isFrozen ? [] : filled) {
+    widths[i] = Math.min(widths[i]! * 2, RECORD_ALERT_WIDTH)
+    timers[i] = timers[i]! + 1
+    if (timers[i]! <= RECORD_ALERT_LIFETIME) continue
+    slots[i] = null
+    pendingGamePoint = 0
+    removed = true
+  }
+  return { slots, widths, timers, pendingGamePoint, removed, count: filled.length }
+}
+
+/**
  * 0x4e35c 한 번 — 갱신(폭·시간·내림)과 그림 자리를 함께 낸다. `isFrozen` 은 [0x140005c]+9 ≠ 0 (갱신 없이 그리기만).
  * `sceneTick` 은 장면 틱 [+0x2c] — 노랑 줄을 고른다.
  */
@@ -178,25 +200,7 @@ export function drawRecordAlert(
   sceneTick: number,
   isFrozen: boolean,
 ): { readonly next: RecordAlertState; readonly frame: RecordAlertFrame } {
-  const slots = [...state.slots]
-  const widths = [...state.widths]
-  const timers = [...state.timers]
-  let pendingGamePoint = state.pendingGamePoint
-  let removed = false
-  let count = 0
-  for (let i = 0; i < RECORD_ALERT_SLOTS; i += 1) {
-    if (slots[i] === null) continue
-    if (!isFrozen) {
-      widths[i] = Math.min(widths[i]! * 2, RECORD_ALERT_WIDTH)
-      timers[i] = timers[i]! + 1
-      if (timers[i]! > RECORD_ALERT_LIFETIME) {
-        slots[i] = null
-        pendingGamePoint = 0
-        removed = true
-      }
-    }
-    count += 1
-  }
+  const { slots, widths, timers, pendingGamePoint, removed, count } = tickRecordAlertSlots(state, isFrozen)
   if (count <= 0) {
     return { next: { ...state, slots, widths, timers, pendingGamePoint }, frame: { panel: null, rows: [] } }
   }

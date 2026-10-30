@@ -1,7 +1,6 @@
 import { spriteImage } from '@/shared/lib/sprite/spriteCache'
 import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { DRAW_EFFECT, drawImagesWithEffect, type ImageEffectDraw } from '@/shared/lib/pixelEffect/pixelEffect'
-import { bakedImgTextPaletteOf } from '@/shared/ui/ImgTextPalette/ImgTextPalette'
 import {
   INTRO_BAND,
   INTRO_BAND_RGB,
@@ -16,22 +15,13 @@ import {
 import { introBandAlphaOf, type IntroFade } from '@/widgets/game-scene/lib/introSchedule'
 import {
   NAME_PLATE_COLOR,
-  SCOREBOARD_AT,
-  SCOREBOARD_FRAME,
   namePlateOpacityOf,
   roundPlateRectsOf,
-  scoreboardPlacementOf,
   type ScoreboardSide,
-} from '@/widgets/scoreboard-frame/lib/scoreboardFrameLayout'
-import type { SceneryOverlay } from '@/widgets/batting-stage/ui/SceneryBackdrop'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-
-const GAME_UI_FRAMES = assetUrl('./sprites/game_ui/frames')
-const IMG_TEXT_FRAMES = assetUrl('./sprites/img_text/frames')
-const TEAM_LOGO = assetUrl('./sprites/team_logo')
-const pad = (index: number) => String(index).padStart(3, '0')
-/** PLAYER · COM 글자 팔레트 (0x913e5(img_text, 4)) — 구운 팔레트가 이것이어야 캔버스로 그린다 */
-const SIDE_LABEL_PALETTE = 4
+  type SceneryOverlay,
+} from '@/widgets/game-scene/ui/introCanvas/otherSlices'
+import { framePlaced, GAME_UI_FRAMES, IMG_TEXT_FRAMES, type Placed } from '@/widgets/game-scene/ui/introCanvas/placed'
+import { introScoreboardPlacedOf, NO_INTRO_SCOREBOARD, type IntroScoreboardPlaced } from '@/widgets/game-scene/ui/introCanvas/introScoreboard'
 
 export interface IntroCanvasInput {
   readonly stadiumNameFrame: number
@@ -39,18 +29,6 @@ export interface IntroCanvasInput {
   readonly fade: IntroFade
   /** 효과 1 의 인자 — null 이면 효과 0 (`introScoreboardEffectOf`) */
   readonly effectLevel: number | null
-}
-
-/** 그림 한 장 — 주소 · 왼쪽 위 */
-interface Placed {
-  readonly src: string
-  readonly x: number
-  readonly y: number
-}
-
-function framePlaced(folder: string, frame: number, origins: FrameOrigins, x: number, y: number): Placed | null {
-  const origin = origins[pad(frame)]
-  return origin === undefined ? null : { src: `${folder}/${pad(frame)}.png`, x: x + origin.x, y: y + origin.y }
 }
 
 /**
@@ -62,6 +40,47 @@ function framePlaced(folder: string, frame: number, origins: FrameOrigins, x: nu
  * 띠 · 이름 칸 칠은 플랫폼 그리기 속성(0x1400698 — 알파 윗바이트)이라 섞기 식이 바이너리에 없다 — 캔버스 알파 칠(DOM 과 같은 8비트 섞기)로
  * 그린다. 이름 칸 두 직사각형은 한 경로로 칠해 겹친 자리가 두 번 섞이지 않는다(`ScoreboardFrame` 과 같다).
  */
+/** 막대 · 팀 이름 · "스타디움" — 원점이 없으면 null */
+function introHeadOf(input: IntroCanvasInput, gameUiOrigins: FrameOrigins, textOrigins: FrameOrigins): readonly Placed[] | null {
+  const bar = framePlaced(GAME_UI_FRAMES, INTRO_BAR_FRAME, gameUiOrigins, INTRO_BAR_X, INTRO_BAR_Y)
+  const name = framePlaced(IMG_TEXT_FRAMES, input.stadiumNameFrame, textOrigins, INTRO_TEAM_NAME_X, INTRO_TEXT_Y)
+  const label = framePlaced(IMG_TEXT_FRAMES, INTRO_STADIUM_LABEL_FRAME, textOrigins, INTRO_STADIUM_LABEL_X, INTRO_TEXT_Y)
+  if (bar === null || name === null || label === null) return null
+  return [bar, name, label]
+}
+
+/** 다 받은 그림 — 하나라도 아직이면 null */
+function loadedImagesOf(placedList: readonly Placed[]): Map<string, HTMLImageElement> | null {
+  const images = new Map<string, HTMLImageElement>()
+  for (const placed of placedList) {
+    const image = spriteImage(placed.src)
+    if (image === null || image.naturalWidth === 0) return null
+    images.set(placed.src, image)
+  }
+  return images
+}
+
+/** 이름 칸 칠 — 두 직사각형을 한 경로로 칠해 겹친 자리가 두 번 섞이지 않는다 */
+function fillNamePlates(context: CanvasRenderingContext2D, plates: IntroScoreboardPlaced['plates'], opacity: number): void {
+  context.fillStyle = NAME_PLATE_COLOR
+  context.globalAlpha = opacity
+  for (const plate of plates) {
+    context.beginPath()
+    for (const rect of roundPlateRectsOf(plate)) context.rect(rect.x, rect.y, rect.width, rect.height)
+    context.fill()
+  }
+  context.globalAlpha = 1
+}
+
+/** 점수판을 안 그리는 인트로면 빈 판 */
+function introBoardOf(
+  sides: IntroCanvasInput['scoreboardSides'],
+  gameUiOrigins: FrameOrigins,
+  textOrigins: FrameOrigins,
+): IntroScoreboardPlaced | null {
+  return sides === undefined ? NO_INTRO_SCOREBOARD : introScoreboardPlacedOf(sides, gameUiOrigins, textOrigins)
+}
+
 export function introCanvasOverlayOf(
   input: IntroCanvasInput,
   gameUiOrigins: FrameOrigins | null,
@@ -70,48 +89,20 @@ export function introCanvasOverlayOf(
   if (gameUiOrigins === null || textOrigins === null) return null
   const effect = input.effectLevel === null ? DRAW_EFFECT.COPY : DRAW_EFFECT.TRANSLUCENT
   const argument = input.effectLevel ?? 0
-  const bar = framePlaced(GAME_UI_FRAMES, INTRO_BAR_FRAME, gameUiOrigins, INTRO_BAR_X, INTRO_BAR_Y)
-  const name = framePlaced(IMG_TEXT_FRAMES, input.stadiumNameFrame, textOrigins, INTRO_TEAM_NAME_X, INTRO_TEXT_Y)
-  const label = framePlaced(IMG_TEXT_FRAMES, INTRO_STADIUM_LABEL_FRAME, textOrigins, INTRO_STADIUM_LABEL_X, INTRO_TEXT_Y)
-  if (bar === null || name === null || label === null) return null
   /** 띠 다음 — 막대 · 글씨 둘 */
-  const head: Placed[] = [bar, name, label]
-  /** 점수판 — 틀 · 측 글자 · 로고 (칠 앞) / 팀 이름 (칠 뒤) */
-  const boardBefore: Placed[] = []
-  const boardAfter: Placed[] = []
-  let plates: readonly { x: number; y: number; width: number; height: number }[] = []
+  const head = introHeadOf(input, gameUiOrigins, textOrigins)
+  if (head === null) return null
   const sides = input.scoreboardSides
-  if (sides !== undefined) {
-    const placement = scoreboardPlacementOf(SCOREBOARD_AT.intro.x, SCOREBOARD_AT.intro.y, sides)
-    const frame = framePlaced(GAME_UI_FRAMES, SCOREBOARD_FRAME, gameUiOrigins, placement.frame.x, placement.frame.y)
-    if (frame === null) return null
-    boardBefore.push(frame)
-    for (const side of placement.labels) {
-      if (bakedImgTextPaletteOf(side.frame) !== SIDE_LABEL_PALETTE) return null
-      const placed = framePlaced(IMG_TEXT_FRAMES, side.frame, textOrigins, side.x, side.y)
-      if (placed === null) return null
-      boardBefore.push(placed)
-    }
-    for (const logo of placement.logos) boardBefore.push({ src: `${TEAM_LOGO}/${pad(logo.team)}.png`, x: logo.x, y: logo.y })
-    plates = placement.plates
-    for (const team of placement.names) {
-      const placed = framePlaced(IMG_TEXT_FRAMES, team.frame, textOrigins, team.x, team.y)
-      if (placed === null) return null
-      boardAfter.push(placed)
-    }
-  }
-  const images = new Map<string, HTMLImageElement>()
-  for (const placed of [...head, ...boardBefore, ...boardAfter]) {
-    const image = spriteImage(placed.src)
-    if (image === null || image.naturalWidth === 0) return null
-    images.set(placed.src, image)
-  }
+  const board = introBoardOf(sides, gameUiOrigins, textOrigins)
+  if (board === null) return null
+  const images = loadedImagesOf([...head, ...board.before, ...board.after])
+  if (images === null) return null
   const drawsOf = (list: readonly Placed[]): ImageEffectDraw[] =>
     list.map((placed) => ({ image: images.get(placed.src) as HTMLImageElement, x: placed.x, y: placed.y, effect, argument }))
   const { r, g, b } = INTRO_BAND_RGB
   const bandAlpha = introBandAlphaOf(input.fade) / 255
   const plateOpacity = namePlateOpacityOf(input.fade.alpha)
-  const key = JSON.stringify([input, head, boardBefore, boardAfter, plates])
+  const key = JSON.stringify([input, head, board.before, board.after, board.plates])
   return {
     key,
     draw: (context) => {
@@ -122,16 +113,9 @@ export function introCanvasOverlayOf(
       drawImagesWithEffect(context, drawsOf(head))
       if (sides === undefined) return
       // 419f4 → 0x41440 — 틀 · 측 글자 · 로고, 이름 칸 칠(인트로는 알파 +0x17e4), 팀 이름
-      drawImagesWithEffect(context, drawsOf(boardBefore))
-      context.fillStyle = NAME_PLATE_COLOR
-      context.globalAlpha = plateOpacity
-      for (const plate of plates) {
-        context.beginPath()
-        for (const rect of roundPlateRectsOf(plate)) context.rect(rect.x, rect.y, rect.width, rect.height)
-        context.fill()
-      }
-      context.globalAlpha = 1
-      drawImagesWithEffect(context, drawsOf(boardAfter))
+      drawImagesWithEffect(context, drawsOf(board.before))
+      fillNamePlates(context, board.plates, plateOpacity)
+      drawImagesWithEffect(context, drawsOf(board.after))
     },
   }
 }

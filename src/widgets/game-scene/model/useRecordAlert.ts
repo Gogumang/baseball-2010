@@ -56,6 +56,44 @@ export interface RecordAlertOptions {
 /** 0x4d1e0 4d1e2~4d1e4 `movs r3, #0x64 ; str r3, [r0, #0x2c]` — 돌발 결과 창(0x1d)이 그림마다 박는 상태 틱 */
 export const BURST_RESULT_STATE_TICK = 100
 
+/** 공 끝 자리가 없는 화면 */
+const NO_PITCH_END: Partial<NonNullable<RecordAlertOptions['pitchEnd']>> = {}
+
+type FlushOptions = Parameters<typeof flushRecordAlertQueue>[1]
+
+/**
+ * 새로 든 기록을 상태에 먹인다 — 공 끝 자리가 없는 화면은 늘 곧바로 줄을 비운다. 공 끝 자리가 있으면 공이 끝난 갱신에서만,
+ * 그 공에 붙은 몫(`humanCountOf`)을 먼저 비우고 나머지(자동 타석 · 경기 끝 몫)는 줄에 남긴다
+ */
+function recordAlertAfterAdded(
+  state: RecordAlertState,
+  added: readonly number[],
+  context: { readonly hasPitchEnd: boolean; readonly isPitchEnd: boolean; readonly flushOptions: FlushOptions },
+  humanCountOf: ((added: readonly number[]) => number) | undefined,
+): RecordAlertState {
+  if (!context.hasPitchEnd) return added.length === 0 ? state : flushRecordAlertQueue(enqueueRecordAlert(state, added), context.flushOptions)
+  if (!context.isPitchEnd) return enqueueRecordAlert(state, added)
+  const human = Math.max(0, Math.min(added.length, humanCountOf?.(added) ?? added.length))
+  const ended = flushRecordAlertQueue(enqueueRecordAlert(state, added.slice(0, human)), context.flushOptions)
+  return enqueueRecordAlert(ended, added.slice(human))
+}
+
+/**
+ * 상태 틱 한 걸음 — 갈래가 바뀌면 그 틱이 0, 부품이 적은 상태가 섰으면 그 틱이 0(이 갱신이 늦게 돌았어도 장면 틱으로 센다),
+ * 아니면 +1
+ */
+function nextStateClock(
+  now: number,
+  entry: { readonly tick: number } | null,
+  keyChanged: boolean,
+  origin: number | null,
+  tick: number,
+): { readonly origin: number | null; readonly tick: number } {
+  if (keyChanged) return { origin: now, tick: 0 }
+  if (entry !== null && (origin === null || entry.tick > origin)) return { origin: entry.tick, tick: now - entry.tick }
+  return { origin, tick: tick + 1 }
+}
+
 /**
  * **경기 중 기록 달성 알림 0x4e35c 의 상태** — 진행기가 쌓는 이번 경기 기록 번호(`recordIds`, 달성 차례)가 늘면
  * 0xa77f0 처럼 G 누계에 더하고 줄에 넣는다. 0x4e600 이 불리는 자리(`pitchEnd`)에서 줄을 빈 칸으로 옮긴다.
@@ -83,7 +121,8 @@ export function useRecordAlert(
 ): RecordAlertFrame {
   const stateRef = useRef<RecordAlertState>(EMPTY_RECORD_ALERT)
   const seenRef = useRef(queuesInitialRecords ? 0 : recordIds.length)
-  const serialRef = useRef(pitchEnd?.serial)
+  const { serial, humanCountOf } = pitchEnd ?? NO_PITCH_END
+  const serialRef = useRef(serial)
   const frozenRef = useRef(isFrozen)
   useMirrorRef(frozenRef, isFrozen)
   const settledRef = useRef(isSettled)
@@ -92,8 +131,8 @@ export function useRecordAlert(
   const settledBeforeRef = useRef(isSettled)
   const removedRef = useRef(isPitcherRemoved)
   useMirrorRef(removedRef, isPitcherRemoved)
-  const humanCountOfRef = useRef(pitchEnd?.humanCountOf)
-  useMirrorRef(humanCountOfRef, pitchEnd?.humanCountOf)
+  const humanCountOfRef = useRef(humanCountOf)
+  useMirrorRef(humanCountOfRef, humanCountOf)
   const pinnedRef = useRef(pinnedStateTickRef)
   useMirrorRef(pinnedRef, pinnedStateTickRef)
   const sceneKeyRef = useRef(sceneStateKey)
@@ -108,7 +147,6 @@ export function useRecordAlert(
   const onRecordAchievedRef = useRef(onRecordAchieved)
   useMirrorRef(onRecordAchievedRef, onRecordAchieved)
   const hasPitchEnd = pitchEnd !== undefined
-  const serial = pitchEnd?.serial
 
   useEffect(() => {
     if (recordIds.length < seenRef.current) {
@@ -125,20 +163,9 @@ export function useRecordAlert(
       isSettled: hasPitchEnd ? settledBeforeRef.current : settledRef.current,
     }
     settledBeforeRef.current = settledRef.current
-    if (!hasPitchEnd) {
-      if (added.length === 0) return
-      stateRef.current = flushRecordAlertQueue(enqueueRecordAlert(stateRef.current, added), flushOptions)
-      return
-    }
-    const isPitchEnd = serialRef.current !== serial
-    serialRef.current = serial
-    if (!isPitchEnd) {
-      stateRef.current = enqueueRecordAlert(stateRef.current, added)
-      return
-    }
-    const human = Math.max(0, Math.min(added.length, humanCountOfRef.current?.(added) ?? added.length))
-    const ended = flushRecordAlertQueue(enqueueRecordAlert(stateRef.current, added.slice(0, human)), flushOptions)
-    stateRef.current = enqueueRecordAlert(ended, added.slice(human))
+    const isPitchEnd = hasPitchEnd && serialRef.current !== serial
+    if (hasPitchEnd) serialRef.current = serial
+    stateRef.current = recordAlertAfterAdded(stateRef.current, added, { hasPitchEnd, isPitchEnd, flushOptions }, humanCountOfRef.current)
   }, [recordIds, hasPitchEnd, serial])
 
   useSceneTick(
@@ -147,21 +174,12 @@ export function useRecordAlert(
       if (!frozenRef.current) {
         const now = gameSceneTickNow()
         const entry = sceneStateEntryAt(now)
-        const origin = stateOriginRef.current
-        if (!Object.is(tickedKeyRef.current, sceneKeyRef.current)) {
-          tickedKeyRef.current = sceneKeyRef.current
-          stateOriginRef.current = now
-          stateTickRef.current = 0
-        } else if (entry !== null && (origin === null || entry.tick > origin)) {
-          // 부품이 적은 상태가 섰다 — 그 틱이 0 (이 갱신이 늦게 돌았어도 장면 틱으로 센다)
-          stateOriginRef.current = entry.tick
-          stateTickRef.current = now - entry.tick
-        } else {
-          stateTickRef.current += 1
-        }
+        const keyChanged = !Object.is(tickedKeyRef.current, sceneKeyRef.current)
+        if (keyChanged) tickedKeyRef.current = sceneKeyRef.current
+        const clock = nextStateClock(now, entry, keyChanged, stateOriginRef.current, stateTickRef.current)
+        stateOriginRef.current = clock.origin
         // 상태 그리기가 틱을 박는 창(0x1d 0x4d1e0) — 0x4e35c 는 그 상태 그리기 뒤라 박힌 값을 본다. 팝업 중에는 상태 그리기도 서서 그대로다
-        const pinned = pinnedRef.current?.current ?? null
-        if (pinned !== null) stateTickRef.current = pinned
+        stateTickRef.current = pinnedRef.current?.current ?? clock.tick
       }
       const drawn = drawRecordAlert(stateRef.current, stateTickRef.current, frozenRef.current)
       stateRef.current = drawn.next

@@ -406,7 +406,7 @@ export const crossSliceBaseline = [
   'src/widgets/game-scene/ui/HalfInningCards.tsx',
   'src/widgets/game-scene/ui/RecordAlertPanel.tsx',
   'src/widgets/game-scene/ui/benchClearingScene/otherSlices.ts',
-  'src/widgets/game-scene/ui/introCanvas.ts',
+  'src/widgets/game-scene/ui/introCanvas/otherSlices.ts',
   'src/widgets/particles/lib/renderParticles.ts',
   'src/widgets/player-detail-window/lib/playerDetailWindow.ts',
   'src/widgets/record-pick-popup/ui/RecordPickPopup.tsx',
