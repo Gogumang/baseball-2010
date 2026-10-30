@@ -68,6 +68,89 @@ export function splatExtentOf(value: number): number {
   return newtonRootOf(value >>> 0) - 1
 }
 
+/** 옮긴 버퍼에 찍는 칸 — 4.12 행렬(옮김 소수부 버림) · 네 귀의 최소 좌표 · 버퍼 크기 · 덩어리 크기(fx + 1) × (fy + 1) */
+interface SplatGeometry {
+  readonly a: number
+  readonly b: number
+  readonly c: number
+  readonly d: number
+  readonly tx: number
+  readonly ty: number
+  readonly minX: number
+  readonly minY: number
+  readonly width: number
+  readonly height: number
+  readonly fx: number
+  readonly fy: number
+}
+
+/** 66062~66128 — 네 귀 (0,0) (W,0) (0,H) (W,H) 를 (· + t) >> 12 로 옮겨 최소(처음 0x140) · 최대(처음 0) → 버퍼 크기 */
+function splatGeometryOf(matrix: FixedAffine, regionWidth: number, regionHeight: number): SplatGeometry {
+  const [a, b, rawTx, c, d, rawTy] = matrix
+  // 66014~66026 — 옮김의 소수부를 버린다
+  const tx = (rawTx >> FIXED_SHIFT) << FIXED_SHIFT
+  const ty = (rawTy >> FIXED_SHIFT) << FIXED_SHIFT
+  const wa = Math.imul(regionWidth, a)
+  const wc = Math.imul(regionWidth, c)
+  const hb = Math.imul(regionHeight, b)
+  const hd = Math.imul(regionHeight, d)
+  const xs = [tx, wa + tx, hb + tx, wa + hb + tx].map((x) => x >> FIXED_SHIFT)
+  const ys = [ty, wc + ty, hd + ty, hd + wc + ty].map((y) => y >> FIXED_SHIFT)
+  const minX = Math.min(MINIMUM_START, ...xs)
+  const minY = Math.min(MINIMUM_START, ...ys)
+  return {
+    a,
+    b,
+    c,
+    d,
+    tx,
+    ty,
+    minX,
+    minY,
+    width: Math.max(0, ...xs) - minX + 1,
+    height: Math.max(0, ...ys) - minY + 1,
+    fx: splatExtentOf(Math.imul(a >> FIXED_SHIFT, a >> FIXED_SHIFT) + Math.imul(b >> FIXED_SHIFT, b >> FIXED_SHIFT)),
+    fy: splatExtentOf(Math.imul(c >> FIXED_SHIFT, c >> FIXED_SHIFT) + Math.imul(d >> FIXED_SHIFT, d >> FIXED_SHIFT)),
+  }
+}
+
+/** 6616e~66234 — 원본 한 행의 픽셀마다 (fx + 1) × (fy + 1) 덩어리를 찍는다(0 번 색도) */
+function splatSourceRow(pixels: Uint32Array, source: Uint32Array, sourceStart: number, columns: number, row: number, geometry: SplatGeometry): void {
+  const { a, b, c, d, tx, ty, minX, minY, width, height, fx, fy } = geometry
+  const rowB = Math.imul(row, b)
+  const rowD = Math.imul(row, d)
+  const lastColumn = width - fx - 1
+  for (let column = 0; column < columns; column += 1) {
+    const pixel = source[sourceStart + column] ?? 0
+    const x = ((((Math.imul(column, a) + rowB) | 0) + tx) >> FIXED_SHIFT) - minX
+    const y = ((((Math.imul(column, c) + rowD) | 0) + ty) >> FIXED_SHIFT) - minY
+    const left = Math.min(lastColumn, x)
+    for (let k = 0; k <= fy; k += 1) {
+      const at = width * Math.min(height - 1, y + k) + left
+      pixels.fill(pixel, Math.max(0, at), Math.max(0, at + fx + 1))
+    }
+  }
+}
+
+/**
+ * 66244~662b4 — 구멍 메우기. 안쪽 칸을 행 차례로, 그 자리에서 고친 값을 다음 칸이 읽는다.
+ * 폭 < 3 이면 원본은 열 끝(폭 − 1)을 지나쳐 버리므로 웹은 돌지 않는다
+ */
+function fillSplatHoles(pixels: Uint32Array, width: number, height: number): void {
+  if (height - 1 <= 1 || width < 3) return
+  for (let row = 1; row <= height - 2; row += 1) {
+    for (let column = 1; column <= width - 2; column += 1) fillSplatHole(pixels, row * width + column, width)
+  }
+}
+
+/** 빈 칸 하나 — 왼 · 오른이 차면 왼 값, 이어서 아래 · **위 오른쪽**이 차면 **아래 왼쪽** 값(원본 그대로) */
+function fillSplatHole(pixels: Uint32Array, at: number, width: number): void {
+  if (pixels[at] !== 0) return
+  const left = pixels[at - 1] ?? 0
+  if (left !== 0 && pixels[at + 1] !== 0) pixels[at] = left
+  if (pixels[at + width] !== 0 && pixels[at - width + 1] !== 0) pixels[at] = pixels[at + width - 1] ?? 0
+}
+
 /**
  * **0x65f64** — 원본 픽셀(`source`, 폭 `sourceWidth`)의 (srcX, srcY) 부터 regionWidth × regionHeight 를 행렬로 옮긴 새 버퍼.
  * 픽셀 0 은 원본 0 번 색(투명)이다.
@@ -81,69 +164,14 @@ export function affineBlitPixels(
 ): ScaledPixels | null {
   // 65f84~65f9c — 영역이 그림을 넘으면 아무것도 안 한다
   if (region.x + region.width > sourceWidth || region.y + region.height > sourceHeight) return null
-  const [a, b, rawTx, c, d, rawTy] = matrix
-  // 66014~66026 — 옮김의 소수부를 버린다
-  const tx = (rawTx >> FIXED_SHIFT) << FIXED_SHIFT
-  const ty = (rawTy >> FIXED_SHIFT) << FIXED_SHIFT
-  const fx = splatExtentOf(Math.imul(a >> FIXED_SHIFT, a >> FIXED_SHIFT) + Math.imul(b >> FIXED_SHIFT, b >> FIXED_SHIFT))
-  const fy = splatExtentOf(Math.imul(c >> FIXED_SHIFT, c >> FIXED_SHIFT) + Math.imul(d >> FIXED_SHIFT, d >> FIXED_SHIFT))
-
-  // 66062~66126 — 네 귀
-  let maxX = 0
-  let maxY = 0
-  let minX = MINIMUM_START
-  let minY = MINIMUM_START
-  const visit = (x: number, y: number) => {
-    if (x > maxX) maxX = x
-    if (x < minX) minX = x
-    if (y > maxY) maxY = y
-    if (y < minY) minY = y
-  }
-  const W = region.width
-  const H = region.height
-  const wa = Math.imul(W, a)
-  const wc = Math.imul(W, c)
-  const hb = Math.imul(H, b)
-  const hd = Math.imul(H, d)
-  visit(tx >> FIXED_SHIFT, ty >> FIXED_SHIFT)
-  visit((wa + tx) >> FIXED_SHIFT, (wc + ty) >> FIXED_SHIFT)
-  visit((hb + tx) >> FIXED_SHIFT, (hd + ty) >> FIXED_SHIFT)
-  visit((wa + hb + tx) >> FIXED_SHIFT, (hd + wc + ty) >> FIXED_SHIFT)
-  const width = maxX - minX + 1
-  const height = maxY - minY + 1
+  const geometry = splatGeometryOf(matrix, region.width, region.height)
+  const { width, height } = geometry
   // ⚠️ 미확인(남김 — 단말 몫 · 바이너리 밖): 0x1400498 할당의 처음 값 — 0 으로 둔다(위 머리말)
   const pixels = new Uint32Array(Math.max(0, width * height))
-
-  // 6616e~66234 — 원본 픽셀마다 (fx + 1) × (fy + 1) 덩어리를 찍는다
-  const lastColumn = width - fx - 1
-  for (let row = 0; row < H; row += 1) {
-    const rowB = Math.imul(row, b)
-    const rowD = Math.imul(row, d)
-    const sourceRow = (region.y + row) * sourceWidth + region.x
-    for (let column = 0; column < W; column += 1) {
-      const pixel = source[sourceRow + column] ?? 0
-      const x = ((((Math.imul(column, a) + rowB) | 0) + tx) >> FIXED_SHIFT) - minX
-      const y = ((((Math.imul(column, c) + rowD) | 0) + ty) >> FIXED_SHIFT) - minY
-      const left = Math.min(lastColumn, x)
-      for (let k = 0; k <= fy; k += 1) {
-        const at = width * Math.min(height - 1, y + k) + left
-        pixels.fill(pixel, Math.max(0, at), Math.max(0, at + fx + 1))
-      }
-    }
+  for (let row = 0; row < region.height; row += 1) {
+    splatSourceRow(pixels, source, (region.y + row) * sourceWidth + region.x, region.width, row, geometry)
   }
-
-  // 66244~662b4 — 구멍 메우기. 폭 < 3 이면 원본은 열 끝(폭 − 1)을 지나쳐 버리므로 웹은 돌지 않는다
-  if (height - 1 > 1 && width >= 3) {
-    for (let row = 1; row <= height - 2; row += 1) {
-      for (let column = 1; column <= width - 2; column += 1) {
-        const at = row * width + column
-        if (pixels[at] !== 0) continue
-        const left = pixels[at - 1] ?? 0
-        if (left !== 0 && pixels[at + 1] !== 0) pixels[at] = left
-        if (pixels[at + width] !== 0 && pixels[at - width + 1] !== 0) pixels[at] = pixels[at + width - 1] ?? 0
-      }
-    }
-  }
+  fillSplatHoles(pixels, width, height)
   return { width, height, pixels }
 }
 

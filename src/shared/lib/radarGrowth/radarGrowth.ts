@@ -49,6 +49,11 @@ export function radarGrowthStart(previous: readonly number[], hasPrevious: boole
   }
 }
 
+/** 축 하나가 목표에 닿았나 — 내려가는 축(목표가 지난 목표보다 낮다)은 목표 이하, 오르는 축은 목표 이상 */
+function reachesTarget(value: number, target: number, isFalling: boolean): boolean {
+  return isFalling ? value <= target : value >= target
+}
+
 /** 한 걸음 0x760e8 */
 export function radarGrowthStep(state: RadarGrowthState, targets: readonly number[]): RadarGrowthState {
   if (state.isDone) return state
@@ -62,13 +67,12 @@ export function radarGrowthStep(state: RadarGrowthState, targets: readonly numbe
     const target = targets[axis] ?? 0
     const isFalling = hasPrevious && target < previous[axis]
     current[axis] += isFalling ? -RADAR_GROWTH_STEP : RADAR_GROWTH_STEP
-    const hit = isFalling ? current[axis] <= target : current[axis] >= target
-    if (!hit) continue
+    if (!reachesTarget(current[axis], target, isFalling)) continue
     reached += 1
     hasPrevious = true
     previous[axis] = target
     current[axis] = target
-    if (reached >= current.length) isDone = true
+    isDone = reached >= current.length
   }
   return { current, previous, hasPrevious, isDone }
 }

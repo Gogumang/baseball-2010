@@ -27,6 +27,10 @@ export function setDrawMemoBypassForTest(isBypassed: boolean): void {
 
 const EMPTY = Symbol('비었음')
 
+/** 캔버스 크기 — 캔버스가 없으면 −1 */
+const canvasWidthOf = (canvas: HTMLCanvasElement | null | undefined) => canvas?.width ?? -1
+const canvasHeightOf = (canvas: HTMLCanvasElement | null | undefined) => canvas?.height ?? -1
+
 export function createDrawMemo(): DrawMemo {
   let lastCanvas: HTMLCanvasElement | null | undefined = undefined
   let lastWidth = -1
@@ -36,8 +40,8 @@ export function createDrawMemo(): DrawMemo {
   return {
     needsDraw: (canvas, input) => {
       const version = assetLoadVersion()
-      const width = canvas?.width ?? -1
-      const height = canvas?.height ?? -1
+      const width = canvasWidthOf(canvas)
+      const height = canvasHeightOf(canvas)
       if (
         !bypassForTest &&
         lastInput !== EMPTY &&
@@ -70,29 +74,35 @@ function isPlainObject(value: object): boolean {
   return prototype === Object.prototype || prototype === null
 }
 
+const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null
+
 /**
  * 그림 입력 두 개가 값으로 같은가 — 원시값은 `Object.is`, 배열 · 보통 객체는 칸마다, 그 밖(그림 · 캔버스 · 함수 · 클래스 객체)은 같은
  * 것일 때만 같다. 같은 객체를 가리키면 안을 보지 않고 같다.
  */
 export function sameDrawInput(left: unknown, right: unknown, depth = 0): boolean {
   if (Object.is(left, right)) return true
-  if (typeof left !== 'object' || typeof right !== 'object' || left === null || right === null) return false
-  if (depth >= MAX_DEPTH) return false
-  if (Array.isArray(left)) {
-    if (!Array.isArray(right) || left.length !== right.length) return false
-    for (let index = 0; index < left.length; index += 1) {
-      if (!sameDrawInput(left[index], right[index], depth + 1)) return false
-    }
-    return true
+  if (!isObject(left) || !isObject(right) || depth >= MAX_DEPTH) return false
+  if (Array.isArray(left)) return sameArrays(left, right, depth)
+  return samePlainObjects(left, right, depth)
+}
+
+function sameArrays(left: readonly unknown[], right: object, depth: number): boolean {
+  if (!Array.isArray(right) || left.length !== right.length) return false
+  for (let index = 0; index < left.length; index += 1) {
+    if (!sameDrawInput(left[index], right[index], depth + 1)) return false
   }
+  return true
+}
+
+function samePlainObjects(left: object, right: object, depth: number): boolean {
   if (Array.isArray(right) || !isPlainObject(left) || !isPlainObject(right)) return false
   const leftRecord = left as Record<string, unknown>
   const rightRecord = right as Record<string, unknown>
   const keys = Object.keys(leftRecord)
   if (keys.length !== Object.keys(rightRecord).length) return false
   for (const key of keys) {
-    if (!Object.prototype.hasOwnProperty.call(rightRecord, key)) return false
-    if (!sameDrawInput(leftRecord[key], rightRecord[key], depth + 1)) return false
+    if (!Object.prototype.hasOwnProperty.call(rightRecord, key) || !sameDrawInput(leftRecord[key], rightRecord[key], depth + 1)) return false
   }
   return true
 }

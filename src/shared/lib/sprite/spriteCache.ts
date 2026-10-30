@@ -123,17 +123,16 @@ export function retainDisplayedSprites(target: Document): () => void {
     if (node instanceof HTMLImageElement) retain(node.getAttribute('src'))
     else if (node.firstElementChild !== null) for (const image of node.getElementsByTagName('img')) retain(image.getAttribute('src'))
   }
+  const retainRecord = (record: MutationRecord) => {
+    if (record.type !== 'attributes') {
+      for (const node of record.addedNodes) retainTree(node)
+    } else if (record.target instanceof HTMLImageElement) retain(record.target.getAttribute('src'))
+  }
   const observer =
     typeof MutationObserver === 'undefined'
       ? null
       : new MutationObserver((records) => {
-          for (const record of records) {
-            if (record.type === 'attributes') {
-              if (record.target instanceof HTMLImageElement) retain(record.target.getAttribute('src'))
-            } else {
-              for (const node of record.addedNodes) retainTree(node)
-            }
-          }
+          for (const record of records) retainRecord(record)
         })
   observer?.observe(target, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] })
   return () => {

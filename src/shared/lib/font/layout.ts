@@ -1,5 +1,5 @@
 import { ASCII_ATLAS, HANGUL_ATLAS } from '@/shared/lib/font/atlas'
-import { glyphOf } from '@/shared/lib/font/compose'
+import { type GlyphPiece, glyphOf } from '@/shared/lib/font/compose'
 import { isBugFixed } from '@/shared/config/bugfixes'
 
 /**
@@ -78,6 +78,84 @@ function isWordCharacter(character: string | undefined): boolean {
   return code >= ASCII_FIRST && code <= ASCII_LAST
 }
 
+/** 펴는 동안의 칸 — 설정(자간 · 줄간 · 접는 폭 · 첫머리 공백)과 지금 자리 · 지금까지 가장 긴 줄 */
+interface TextCursor {
+  readonly letterGap: number
+  readonly lineGap: number
+  readonly maxWidth: number
+  readonly skipLeadingSpace: boolean
+  readonly pieces: PlacedPiece[]
+  x: number
+  y: number
+  widest: number
+  lineCount: number
+}
+
+function startTextCursor(options: PixelTextOptions): TextCursor {
+  return {
+    letterGap: options.letterGap ?? FONT_SPACING.app.letterGap,
+    lineGap: options.lineGap ?? FONT_SPACING.app.lineGap,
+    maxWidth: options.maxWidth ?? 0,
+    skipLeadingSpace: options.skipLeadingSpace ?? false,
+    pieces: [],
+    x: 0,
+    y: 0,
+    widest: 0,
+    lineCount: 1,
+  }
+}
+
+function breakLine(cursor: TextCursor): void {
+  cursor.widest = Math.max(cursor.widest, cursor.x - cursor.letterGap)
+  cursor.x = 0
+  cursor.y += LINE_HEIGHT + cursor.lineGap
+  cursor.lineCount += 1
+}
+
+/** 낱말(0x21~0x7E 연속 n자)을 통째로 잰 폭 — `n*(5+자간) − 자간` */
+function wordWidthAt(characters: readonly string[], index: number, letterGap: number): number {
+  let length = 0
+  while (isWordCharacter(characters[index + length])) length += 1
+  return length * (ASCII_WIDTH + letterGap) - letterGap
+}
+
+/** 이 글자 앞에서 줄을 바꾸는가 — 영문은 낱말의 첫 글자에서만 낱말 전체를 재 보고, 한글은 글자마다 */
+function wrapsBefore(characters: readonly string[], index: number, cursor: TextCursor): boolean {
+  const { x, maxWidth } = cursor
+  if (maxWidth <= 0) return false
+  if (!isWordCharacter(characters[index])) return x + HANGUL_WIDTH > maxWidth && x > 0
+  if (isWordCharacter(characters[index - 1])) return false
+  return x > 0 && x + wordWidthAt(characters, index, cursor.letterGap) > maxWidth
+}
+
+function placeGlyphPieces(cursor: TextCursor, glyphPieces: readonly GlyphPiece[]): void {
+  for (const piece of glyphPieces) {
+    const atlas = piece.atlas === 'hangul' ? HANGUL_ATLAS : ASCII_ATLAS
+    cursor.pieces.push({
+      atlas: piece.atlas,
+      column: piece.column,
+      row: piece.row,
+      x: cursor.x + piece.shiftX,
+      y: cursor.y,
+      width: atlas.glyphWidth,
+      height: atlas.glyphHeight,
+    })
+  }
+}
+
+/** 글자 하나를 편다 — 줄바꿈 · 건너뜀 · 공백(줄 첫머리는 플래그가 켜져 있으면 없던 것처럼 버린다) · 조각 */
+function placeCharacter(cursor: TextCursor, characters: readonly string[], index: number): void {
+  const glyph = glyphOf(characters[index])
+  if (glyph.kind === 'newline') return breakLine(cursor)
+  if (glyph.kind === 'skip') return
+  if (glyph.kind === 'blank' && cursor.x === 0 && cursor.skipLeadingSpace) return
+  if (glyph.kind === 'draw') {
+    if (wrapsBefore(characters, index, cursor)) breakLine(cursor)
+    placeGlyphPieces(cursor, glyph.pieces)
+  }
+  cursor.x += glyph.advance + cursor.letterGap
+}
+
 /**
  * 글을 조각 목록으로 편다.
  *
@@ -87,76 +165,15 @@ function isWordCharacter(character: string | undefined): boolean {
  *   줄 첫머리가 아니면 낱말 앞에서 줄을 바꾼다. 한 낱말이 한 줄보다 길면 원본대로 넘친다.
  */
 export function layoutPixelText(text: string, options: PixelTextOptions = {}): PixelTextLayout {
-  const letterGap = options.letterGap ?? FONT_SPACING.app.letterGap
-  const lineGap = options.lineGap ?? FONT_SPACING.app.lineGap
-  const maxWidth = options.maxWidth ?? 0
-  const skipLeadingSpace = options.skipLeadingSpace ?? false
-
   const characters = [...text]
-  const pieces: PlacedPiece[] = []
-  let x = 0
-  let y = 0
-  let widest = 0
-  let lineCount = 1
-
-  const breakLine = () => {
-    widest = Math.max(widest, x - letterGap)
-    x = 0
-    y += LINE_HEIGHT + lineGap
-    lineCount += 1
-  }
-
-  for (let index = 0; index < characters.length; index += 1) {
-    const character = characters[index]
-    const glyph = glyphOf(character)
-
-    if (glyph.kind === 'newline') {
-      breakLine()
-      continue
-    }
-    if (glyph.kind === 'skip') continue
-
-    if (glyph.kind === 'blank') {
-      // 줄 첫머리 공백은 플래그가 켜져 있으면 없던 것처럼 버린다
-      if (x === 0 && skipLeadingSpace) continue
-      x += glyph.advance + letterGap
-      continue
-    }
-
-    if (maxWidth > 0) {
-      if (isWordCharacter(character)) {
-        // 낱말의 첫 글자에서만 낱말 전체를 재 본다
-        if (!isWordCharacter(characters[index - 1])) {
-          let length = 0
-          while (isWordCharacter(characters[index + length])) length += 1
-          const wordWidth = length * (ASCII_WIDTH + letterGap) - letterGap
-          if (x > 0 && x + wordWidth > maxWidth) breakLine()
-        }
-      } else if (x + HANGUL_WIDTH > maxWidth && x > 0) {
-        breakLine()
-      }
-    }
-
-    for (const piece of glyph.pieces) {
-      pieces.push({
-        atlas: piece.atlas,
-        column: piece.column,
-        row: piece.row,
-        x: x + piece.shiftX,
-        y,
-        width: piece.atlas === 'hangul' ? HANGUL_ATLAS.glyphWidth : ASCII_ATLAS.glyphWidth,
-        height: piece.atlas === 'hangul' ? HANGUL_ATLAS.glyphHeight : ASCII_ATLAS.glyphHeight,
-      })
-    }
-    x += glyph.advance + letterGap
-  }
-
-  widest = Math.max(widest, x - letterGap)
+  const cursor = startTextCursor(options)
+  for (let index = 0; index < characters.length; index += 1) placeCharacter(cursor, characters, index)
+  const widest = Math.max(cursor.widest, cursor.x - cursor.letterGap)
   return {
-    pieces,
+    pieces: cursor.pieces,
     width: Math.max(widest, 0),
-    height: y + LINE_HEIGHT,
-    lineCount,
+    height: cursor.y + LINE_HEIGHT,
+    lineCount: cursor.lineCount,
   }
 }
 

@@ -14,24 +14,21 @@ export const OUTING_MAP_MOVES: readonly (readonly [number, number, number, numbe
   [0, 1, 2, 3],
 ]
 
-/** 웹 키 → 0x7f3e4 의 방향 칸 (위 0 · 아래 1 · 왼쪽 2 · 오른쪽 3). 방향 키가 아니면 null */
+/** 웹 키 → 0x7f3e4 의 방향 칸 (위 0 · 아래 1 · 왼쪽 2 · 오른쪽 3) — 화살표와 숫자 키 '2' · '8' · '4' · '6' */
+const OUTING_MAP_DIRECTION_OF_KEY: ReadonlyMap<string, number> = new Map([
+  ['ArrowUp', 0],
+  ['2', 0],
+  ['ArrowDown', 1],
+  ['8', 1],
+  ['ArrowLeft', 2],
+  ['4', 2],
+  ['ArrowRight', 3],
+  ['6', 3],
+])
+
+/** 웹 키 → 방향 칸. 방향 키가 아니면 null */
 export function outingMapDirectionOf(key: string): number | null {
-  switch (key) {
-    case 'ArrowUp':
-    case '2':
-      return 0
-    case 'ArrowDown':
-    case '8':
-      return 1
-    case 'ArrowLeft':
-    case '4':
-      return 2
-    case 'ArrowRight':
-    case '6':
-      return 3
-    default:
-      return null
-  }
+  return OUTING_MAP_DIRECTION_OF_KEY.get(key) ?? null
 }
 
 /** 0x7f3e4 — 지금 칸에서 방향으로 옮긴 칸 */
