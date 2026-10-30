@@ -50,12 +50,13 @@ export function nationalCupMatchInfoRankOf(cup: NationalCup, team: number): numb
     ;[wins[i], wins[j]] = [wins[j], wins[i]]
     ;[losses[i], losses[j]] = [losses[j], losses[i]]
   }
-  for (let i = 0; i < teams.length; i += 1) {
-    for (let j = i; j <= 2; j += 1) {
-      if (wins[i] < wins[j]) swap(i, j)
-      else if (wins[i] === wins[j] && losses[i] > losses[j]) swap(i, j)
-    }
+  /** 칸 j 가 칸 i 보다 앞서야 하나 — 승이 많거나, 승이 같고 패가 적다 */
+  const isAhead = (i: number, j: number) => wins[i] < wins[j] || (wins[i] === wins[j] && losses[i] > losses[j])
+  /** 칸 i 를 j = i..2 와 견주며 바꾼다 (j 는 2 까지 — 넷째 칸은 견주지 않는다) */
+  const settleSlot = (i: number) => {
+    for (let j = i; j <= 2; j += 1) if (isAhead(i, j)) swap(i, j)
   }
+  for (let i = 0; i < teams.length; i += 1) settleSlot(i)
   return Math.max(0, teams.indexOf(team))
 }
 
@@ -120,14 +121,25 @@ function winLossTextOf(input: SeasonMatchInfoInput, team: number): string {
     const index = input.cup.teams.indexOf(team)
     return format(input.cup.wins[index] ?? 0, input.cup.losses[index] ?? 0)
   }
-  if (input.inPostseason && input.series !== null) {
-    const side = input.series.teams.indexOf(team)
-    // 0xb7968 = L+0x32(이번 라운드 경기 수) − 이번 시리즈 승 — 웹 시리즈는 경기 수 대신 두 팀 승을 들고 있어
-    // 상대 승으로 같은 값을 낸다 (라운드마다 L+0x32 가 0 부터인 것은 유력)
-    if (side < 0) return format(-1, -1)
-    return format(input.series.wins[side], input.series.wins[1 - side])
-  }
+  if (input.inPostseason && input.series !== null) return seriesWinLossTextOf(input.series, team)
   return format(input.league.wins[team] ?? 0, input.league.losses[team] ?? 0)
+}
+
+/**
+ * 포스트시즌 이번 시리즈 승패 — 0xb7968 = L+0x32(이번 라운드 경기 수) − 이번 시리즈 승. 웹 시리즈는 경기 수 대신 두 팀 승을 들고 있어
+ * 상대 승으로 같은 값을 낸다 (라운드마다 L+0x32 가 0 부터인 것은 유력)
+ */
+function seriesWinLossTextOf(series: PostseasonSeries, team: number): string {
+  const side = series.teams.indexOf(team)
+  if (side < 0) return `${-1}승${-1}패`
+  return `${series.wins[side]}승${series.wins[1 - side]}패`
+}
+
+/** 상대 "선발" 줄 — 레코드 0번 이름이 오면 그것, 아니면 돌린 차례의 0번 표 칸(그것도 없으면 날짜 칸) */
+function opponentStarterTextOf(input: SeasonMatchInfoInput): string {
+  if (input.opponentStarterName !== undefined && input.opponentStarterName !== null) return input.opponentStarterName
+  if (input.opponentPitcherOrder === undefined) return starterNameOf(input.opponentTeamId, input.opponentDayCounter ?? input.dayCounter)
+  return teamPitchers(input.opponentTeamId)[input.opponentPitcherOrder[0] ?? 0]?.name ?? EMPTY_VALUE
 }
 
 /** 그 팀 붙박이 표에서 `rotationSlotOf(값)` 칸 투수 — 값은 위 `dayCounter` 주석대로 리그 차례의 선발 칸이다 */
@@ -148,13 +160,7 @@ export function seasonMatchInfoLines(input: SeasonMatchInfoInput): readonly Matc
   const values: readonly (readonly [string, string])[] = [
     [rankTextOf(input, myTeamId), rankTextOf(input, opponentTeamId)],
     [winLossTextOf(input, myTeamId), winLossTextOf(input, opponentTeamId)],
-    [
-      input.myStarterName ?? starterNameOf(myTeamId, input.dayCounter),
-      input.opponentStarterName ??
-        (input.opponentPitcherOrder === undefined
-          ? starterNameOf(opponentTeamId, input.opponentDayCounter ?? input.dayCounter)
-          : (teamPitchers(opponentTeamId)[input.opponentPitcherOrder[0] ?? 0]?.name ?? EMPTY_VALUE)),
-    ],
+    [input.myStarterName ?? starterNameOf(myTeamId, input.dayCounter), opponentStarterTextOf(input)],
     [acePitcherNameOf(input.acePitcherId), acePitcherNameOf(input.opponentAces?.pitcher ?? -1)],
     [aceBatterNameOf(input.aceBatterId), aceBatterNameOf(input.opponentAces?.batter ?? -1)],
   ]

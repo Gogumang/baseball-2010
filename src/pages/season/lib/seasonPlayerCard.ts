@@ -207,31 +207,40 @@ export function initialSeasonCardFigure(isBatter: boolean, form: number): Season
  * ```
  */
 export function stepSeasonCardFigure(state: SeasonCardFigureState, tick: number, isBatter: boolean): SeasonCardFigureState {
+  return isBatter ? stepBatterCardFigure(state, tick) : stepPitcherCardFigure(state, tick)
+}
+
+/** 스윙(상태 3)이 머무는 단계 — 폼 2 · 3 은 4, 그 밖은 6 */
+const swingStepsOf = (form: number) => (form - 2 >= 0 && form - 2 <= 1 ? 4 : 6)
+
+/** 타자 갈래 — 걸면 준비(2), 준비가 4 를 넘게 머물면 스윙(3), 스윙이 13 을 넘게 머물면 대기(5) */
+function stepBatterCardFigure(state: SeasonCardFigureState, tick: number): SeasonCardFigureState {
   let { animation, hold } = state
   const { form } = animation
-  if (isBatter) {
-    if (isTriggerTick(tick)) {
-      animation = startAnimation(form, 2)
+  if (isTriggerTick(tick)) {
+    animation = startAnimation(form, 2)
+    hold = 0
+  }
+  if (animation.state === 3 && animation.step >= swingStepsOf(form)) {
+    const held = hold
+    hold += 1
+    if (held > 0xd) animation = startAnimation(form, 5)
+  } else if (animation.state === 2 && animation.step >= 1) {
+    const held = hold
+    hold += 1
+    if (held > 4) {
+      animation = startAnimation(form, 3)
       hold = 0
     }
-    if (animation.state === 3) {
-      const swingSteps = form - 2 >= 0 && form - 2 <= 1 ? 4 : 6
-      if (animation.step >= swingSteps) {
-        const held = hold
-        hold += 1
-        if (held > 0xd) animation = startAnimation(form, 5)
-      }
-    } else if (animation.state === 2 && animation.step >= 1) {
-      const held = hold
-      hold += 1
-      if (held > 4) {
-        animation = startAnimation(form, 3)
-        hold = 0
-      }
-    }
-    animation = advanceBatterAnimation(animation)
-    return { animation, hold, pose: batterPoseOf(animation) }
   }
+  animation = advanceBatterAnimation(animation)
+  return { animation, hold, pose: batterPoseOf(animation) }
+}
+
+/** 투수 갈래 — 걸면 투구(1), 단계 11 을 넘어 4 를 넘게 머물면 서기(0) */
+function stepPitcherCardFigure(state: SeasonCardFigureState, tick: number): SeasonCardFigureState {
+  let { animation, hold } = state
+  const { form } = animation
   if (isTriggerTick(tick)) {
     animation = startAnimation(form, 1)
     hold = 0

@@ -142,7 +142,17 @@ export function seasonPlayerDetailViewOf(view: SeasonPlayerRecordView, context: 
     { ability: effective.map((value, slot) => value - (base[slot] ?? 0)), morale: 0 },
   )
 
+  return { rows, messages: detailMessagesOf(view, context) }
+}
+
+/** 글 줄 — 장비 · 스킬(무력감 · 전설) · 질병 · 사기 · 포지션 불일치 · 코치 차례 */
+function detailMessagesOf(view: SeasonPlayerRecordView, context: SeasonPlayerDetailContext): string[] {
   const allAbilities = ORIGINAL_MODE_TEXT[ALL_ABILITIES_NAME] ?? ''
+  return [...equipmentMessagesOf(view), ...skillMessagesOf(view, allAbilities), ...conditionMessagesOf(view, context, allAbilities)]
+}
+
+/** 낀 장비마다 — 아이템 이름 · 능력 이름 +보너스 */
+function equipmentMessagesOf(view: SeasonPlayerRecordView): string[] {
   const messages: string[] = []
   view.equipment.forEach((nibble, part) => {
     if (nibble < 1) return
@@ -150,12 +160,24 @@ export function seasonPlayerDetailViewOf(view: SeasonPlayerRecordView, context: 
     const abilityName = ORIGINAL_MODE_TEXT[(view.isPitcher ? PITCHER_ABILITY_NAME_BASE : BATTER_ABILITY_NAME_BASE) + part] ?? ''
     messages.push(`${highlighted(ORIGINAL_ITEMS[itemIndex] ?? '')}${abilityName} +${equipmentBonusOf(nibble)}`)
   })
+  return messages
+}
+
+/** 무력감 −100 · 전설 +50 */
+function skillMessagesOf(view: SeasonPlayerRecordView, allAbilities: string): string[] {
+  const messages: string[] = []
   if (hasSeasonSkill(view, SEASON_RECORD_SKILL.무력감)) {
     messages.push(`${highlighted(ORIGINAL_SKILLS[SEASON_RECORD_SKILL.무력감]?.name ?? '')}${allAbilities} -100`)
   }
   if (hasSeasonSkill(view, SEASON_RECORD_SKILL.전설)) {
     messages.push(`${highlighted(ORIGINAL_SKILLS[SEASON_RECORD_SKILL.전설]?.name ?? '')}${allAbilities} +50`)
   }
+  return messages
+}
+
+/** 질병 · 사기 · 포지션 불일치 · 코치 (코치는 투수 코치면 투수에게만, 타자 코치면 타자에게만) */
+function conditionMessagesOf(view: SeasonPlayerRecordView, context: SeasonPlayerDetailContext, allAbilities: string): string[] {
+  const messages: string[] = []
   if (context.record.illness !== 0) messages.push(`${highlighted('질병')}${allAbilities} 30% 감소`)
   if (context.teamMorale <= MORALE_LINE_CEILING) {
     messages.push(`${highlighted('사기')}${allAbilities} ${moraleCutOf(context.teamMorale)} 감소`)
@@ -167,7 +189,7 @@ export function seasonPlayerDetailViewOf(view: SeasonPlayerRecordView, context: 
   if (coach >= 0 && coach <= LAST_PITCHER_COACH === view.isPitcher) {
     messages.push(`${highlighted('코치')}${ORIGINAL_MODE_TEXT[COACH_TEXT_BASE + coach] ?? ''}`)
   }
-  return { rows, messages }
+  return messages
 }
 
 /** 카드 레이더 한 칸 — 0x7ba44 시즌 갈래(0x7bede~0x7bf9a): 값 = 실효값, 색 = 기본값과 견줘 빨강(낮음)·초록(높음) */
