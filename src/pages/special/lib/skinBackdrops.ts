@@ -177,27 +177,38 @@ export function ballPatternRect565(
   grayRects: readonly { readonly x: number; readonly y: number; readonly width: number; readonly height: number }[] = [],
 ): Uint16Array {
   const out = new Uint16Array(rect.width * rect.height).fill(BALL_PATTERN_BACKDROP_565)
-  for (const at of ballPatternTilesOf(counter)) {
-    for (let row = 0; row < tile.height; row += 1) {
-      const y = at.y + row - rect.y
-      if (y < 0 || y >= rect.height) continue
-      for (let column = 0; column < tile.width; column += 1) {
-        const x = at.x + column - rect.x
-        if (x < 0 || x >= rect.width) continue
-        const from = row * tile.width + column
-        if (tile.opaque[from] !== 0) out[y * rect.width + x] = tile.pixels[from]
-      }
-    }
-  }
-  for (const gray of grayRects) {
-    for (let y = Math.max(gray.y, rect.y); y < Math.min(gray.y + gray.height, rect.y + rect.height); y += 1) {
-      for (let x = Math.max(gray.x, rect.x); x < Math.min(gray.x + gray.width, rect.x + rect.width); x += 1) {
-        const at = (y - rect.y) * rect.width + (x - rect.x)
-        out[at] = grayPixel565(out[at])
-      }
-    }
-  }
+  for (const at of ballPatternTilesOf(counter)) copyTile565(out, rect, tile, at)
+  for (const gray of grayRects) grayOut565(out, rect, gray)
   return out
+}
+
+type Rect = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+
+/** 칸 하나 — 사각형 안에 드는 줄만 */
+function copyTile565(out: Uint16Array, rect: Rect, tile: Sprite565, at: { readonly x: number; readonly y: number }) {
+  for (let row = 0; row < tile.height; row += 1) {
+    const y = at.y + row - rect.y
+    if (y >= 0 && y < rect.height) copyTileRow565(out, rect, tile, at.x, row, y)
+  }
+}
+
+/** 칸의 한 줄 — 사각형 안이고 불투명한 점만 옮긴다(투명 칸은 바탕) */
+function copyTileRow565(out: Uint16Array, rect: Rect, tile: Sprite565, atX: number, row: number, y: number) {
+  for (let column = 0; column < tile.width; column += 1) {
+    const x = atX + column - rect.x
+    const from = row * tile.width + column
+    if (x >= 0 && x < rect.width && tile.opaque[from] !== 0) out[y * rect.width + x] = tile.pixels[from]
+  }
+}
+
+/** 흑백 사각형(0xc37a8)과 겹친 몫을 회색 식으로 */
+function grayOut565(out: Uint16Array, rect: Rect, gray: Rect) {
+  for (let y = Math.max(gray.y, rect.y); y < Math.min(gray.y + gray.height, rect.y + rect.height); y += 1) {
+    for (let x = Math.max(gray.x, rect.x); x < Math.min(gray.x + gray.width, rect.x + rect.width); x += 1) {
+      const at = (y - rect.y) * rect.width + (x - rect.x)
+      out[at] = grayPixel565(out[at])
+    }
+  }
 }
 
 /**
