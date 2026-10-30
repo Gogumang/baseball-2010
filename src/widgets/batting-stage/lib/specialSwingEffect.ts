@@ -83,18 +83,7 @@ export function specialSwingStageEffectOf(
   batterHand: number,
 ): SpecialSwingStageEffect | null {
   const isRightHanded = batterHand === RIGHT_HANDED
-  if (aceBatterIndex >= 0) {
-    const folder = ACE_BATTER_EFFECT_FOLDERS[aceBatterIndex]
-    if (folder === undefined) return null
-    const isFlipped = aceBatterIndex === ACE_FLIPPED_ORDER
-    return {
-      folder,
-      isMirrored: isFlipped && isRightHanded,
-      isBehindBatter: isFlipped,
-      offsetY: aceBatterIndex === ACE_RAISED_ORDER ? RAISED_OFFSET_Y : 0,
-      showsMirage: false,
-    }
-  }
+  if (aceBatterIndex >= 0) return aceBatterStageEffectOf(aceBatterIndex, isRightHanded)
   const folder = SPECIAL_SWING_EFFECT_FOLDERS[swingNumber]
   if (folder === undefined) return null
   const isFlipped = swingNumber === FLIPPED_SPECIAL_NUMBER
@@ -105,6 +94,20 @@ export function specialSwingStageEffectOf(
     offsetY: swingNumber === RAISED_SPECIAL_NUMBER ? RAISED_OFFSET_Y : 0,
     // 0xb8e6d — 폼 니블 2 · 3(장타형)이면 참 → 미라지 그림 없음
     showsMirage: swingNumber === MIRAGE_SPECIAL_NUMBER && batterForm >> 1 !== 1,
+  }
+}
+
+/** 마타자(0xb63a1 ≥ 0)의 그림 갈래 — 미라지는 없다 */
+function aceBatterStageEffectOf(aceBatterIndex: number, isRightHanded: boolean): SpecialSwingStageEffect | null {
+  const folder = ACE_BATTER_EFFECT_FOLDERS[aceBatterIndex]
+  if (folder === undefined) return null
+  const isFlipped = aceBatterIndex === ACE_FLIPPED_ORDER
+  return {
+    folder,
+    isMirrored: isFlipped && isRightHanded,
+    isBehindBatter: isFlipped,
+    offsetY: aceBatterIndex === ACE_RAISED_ORDER ? RAISED_OFFSET_Y : 0,
+    showsMirage: false,
   }
 }
 

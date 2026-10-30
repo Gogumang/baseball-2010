@@ -102,11 +102,20 @@ export function specialSwingCountImagesOf(remaining: number): readonly number[] 
 export function drawSpecialSwingBadge(context: CanvasRenderingContext2D, phase: StagePhaseSnapshot, remaining: number | null, side: number): void {
   if (remaining === null || !showsSpecialSwingBadge(phase, remaining)) return
   const { plate, count } = specialSwingBadgeLayoutOf(side)
+  drawBadgePlate(context, phase, plate)
+  drawBadgeCount(context, remaining, count)
+}
+
+/** 판 그림 — 애니 칸이 아직이면 안 그린다 */
+function drawBadgePlate(context: CanvasRenderingContext2D, phase: StagePhaseSnapshot, plate: { readonly x: number; readonly y: number }): void {
   const entries = frameAnimations(GAME_UI_FRAMES)?.[SPECIAL_SWING_BADGE_ANIMATION]
   const frameIndex = entries === undefined ? null : specialSwingBadgeFrameOf(entries, phase)
   const frame = frameIndex === null ? null : placedFrame(GAME_UI_FRAMES, frameIndex)
   if (frame !== null) context.drawImage(frame.image, plate.x + frame.offsetX, plate.y + frame.offsetY)
+}
 
+/** 남은 횟수 숫자 — 그림이 다 실렸을 때만 */
+function drawBadgeCount(context: CanvasRenderingContext2D, remaining: number, count: { readonly x: number; readonly y: number }): void {
   const images = specialSwingCountImagesOf(remaining).map((index) => sprite(assetUrl(`./sprites/num/${String(index).padStart(3, '0')}.png`)))
   const base = sprite(assetUrl(`./sprites/num/${String(SPECIAL_SWING_COUNT_DIGIT_BASE).padStart(3, '0')}.png`))
   if (base === null || images.some((image) => image === null)) return

@@ -76,45 +76,62 @@ export function fireworksPortOf(particles: ParticleScene, configOf: (id: number)
   }
 }
 
+/** 1. 키 건너뛰기 0x519cc(0x8fc70 · 0x6dee4) · 0x17 끝 0x35108(0x6dee4) — 새로 온 치우기 시각에 닿았으면 효과 객체 · 파티클을 비운다 */
+function applyEffectsClear(effects: StageEffects, input: StageFrameInput): StageEffects {
+  const clearAt = input.effectsClearedAt
+  if (clearAt === null || clearAt === effects.clearedAt || input.time < clearAt) return effects
+  clearParticles(input.particles)
+  return { ...effects, clearedAt: clearAt, fireworks: null }
+}
+
+type Fireworks = StageEffects['fireworks']
+
+/** 2. 이 그림 앞의 갱신이 홈런 갈래를 지났다(첫 그림 · 둘째 홈런 갈래) — 0x90191(…, 2, 1) */
+function fireworksAfterPassedDraws(fireworks: Fireworks, lastDraw: number, draw: number, restarts: readonly number[]): Fireworks {
+  let current = fireworks
+  for (let passed = lastDraw + 1; passed <= draw; passed += 1) {
+    if (passed === 1 || restarts.includes(passed)) current = initHomeRunFireworks<number>()
+  }
+  return current
+}
+
+/** 새 그림 `draw` 까지의 효과 객체 — 깔기(2) 뒤 이 그림이 유지 단계면 0x40faa 의 효과 틱(3) */
+function stepHomeRunFireworks(window: HomeRunTextWindow, lastDraw: number, draw: number, fireworks: Fireworks, input: StageFrameInput): Fireworks {
+  const restarts = window.restartDraws ?? []
+  const current = fireworksAfterPassedDraws(fireworks, lastDraw, draw, restarts)
+  const before = homeRunTextAfterDraws(window.on, draw - 1, restarts).state
+  const isHold = !restarts.includes(draw) && before.stage >= 4
+  if (!isHold || current === null) return current
+  return tickHomeRunFireworks(current, fireworksPortOf(input.particles, input.configOf), input.random)
+}
+
+/** 그리기 목록 차례의 파티클(0x36dfc) — 치우기 뒤 · 글자 앞 */
+function emitDrawShots(input: StageFrameInput): void {
+  for (const shot of input.drawShots ?? []) emitParticles(input.particles, input.configOf(shot.id), shot.x, shot.y, shot.img)
+}
+
+/**
+ * 첫 그림 시각이 다른 창이면 새 홈런 — 효과 객체는 그 창의 첫 그림에서 다시 깐다.
+ * 같은 홈런의 창을 끝만 바꿔 다시 넘긴 것(키 건너뛰기)은 센 그림을 잇는다
+ */
+function continuedLastDraw(effects: StageEffects, window: HomeRunTextWindow | null): number {
+  return window?.startedAt !== effects.window?.startedAt ? 0 : effects.lastDraw
+}
+
 /** 원본 한 틱 프레임 (머리말 1~4) */
 export function stepStageFrame(effects: StageEffects, input: StageFrameInput): StageEffects {
-  let { window, lastDraw, fireworks, clearedAt } = effects
+  const cleared = applyEffectsClear(effects, input)
 
-  // 1. 키 건너뛰기 0x519cc(0x8fc70 · 0x6dee4) · 0x17 끝 0x35108(0x6dee4)
-  if (input.effectsClearedAt !== null && input.effectsClearedAt !== clearedAt && input.time >= input.effectsClearedAt) {
-    clearedAt = input.effectsClearedAt
-    fireworks = null
-    clearParticles(input.particles)
-  }
-
-  // 그리기 목록 차례의 파티클(0x36dfc) — 치우기 뒤 · 글자 앞
-  for (const shot of input.drawShots ?? []) emitParticles(input.particles, input.configOf(shot.id), shot.x, shot.y, shot.img)
-
-  // 첫 그림 시각이 다른 창이면 새 홈런 — 효과 객체는 그 창의 첫 그림에서 다시 깐다.
-  // 같은 홈런의 창을 끝만 바꿔 다시 넘긴 것(키 건너뛰기)은 센 그림을 잇는다
-  if (input.window?.startedAt !== window?.startedAt) lastDraw = 0
-  window = input.window
-
+  emitDrawShots(input)
+  const window = input.window
+  const lastDraw = continuedLastDraw(cleared, window)
   const draw = drawIndexAt(window, input.time, input.millisecondsPerTick)
-  if (window !== null && draw > lastDraw) {
-    const restarts = window.restartDraws ?? []
-    // 2. 이 그림 앞의 갱신이 홈런 갈래를 지났다(첫 그림 · 둘째 홈런 갈래) — 0x90191(…, 2, 1)
-    for (let passed = lastDraw + 1; passed <= draw; passed += 1) {
-      if (passed === 1 || restarts.includes(passed)) fireworks = initHomeRunFireworks<number>()
-    }
-    // 3. 이 그림이 유지 단계면 0x40faa 의 효과 틱
-    const before = homeRunTextAfterDraws(window.on, draw - 1, restarts).state
-    const restartsNow = restarts.includes(draw)
-    const isHold = !restartsNow && before.stage >= 4
-    if (isHold && fireworks !== null) {
-      fireworks = tickHomeRunFireworks(fireworks, fireworksPortOf(input.particles, input.configOf), input.random)
-    }
-    lastDraw = draw
-  }
+  const advances = window !== null && draw > lastDraw
+  const fireworks = advances ? stepHomeRunFireworks(window, lastDraw, draw, cleared.fireworks, input) : cleared.fireworks
 
   // 4. 프레임 끝 0x6de84 — 다른 화면 루프가 이 앱 틀에 이미 굴렸으면 건너뛴다
   if (claimSceneParticleTick(input.particles, input.appTick)) tickParticles(input.particles, input.random)
-  return { window, lastDraw, fireworks, clearedAt }
+  return { window, lastDraw: advances ? draw : lastDraw, fireworks, clearedAt: cleared.clearedAt }
 }
 
 /** 시각 `time` 의 그림 차례(1 부터) — 창 밖이면 0 */

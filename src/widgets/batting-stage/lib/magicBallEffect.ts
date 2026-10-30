@@ -102,27 +102,26 @@ export function magicBallParticlesOf(
   frameCount: number,
 ): readonly MagicBallParticle[] {
   if (pitch.isMagicPitch !== true) return []
-  switch (pitch.pitcherMagicNumber ?? 0) {
-    case 2:
-      return [{ id: 0x15, img: 15 }]
-    case 3:
-      return [{ id: 0x15, img: 16 }]
-    case 9:
-      return [{ id: 0x15, img: 14 }]
-    case SHINNING_MAGIC_NUMBER: {
-      const formGroup = (pitch.pitcherForm ?? 0) >> 1
-      if (formGroup === 1) return ballTick === 0 ? [{ id: 0x18, img: 15 }] : []
-      if (formGroup === 2) {
-        return ballTick <= Math.trunc(frameCount / 2)
-          ? [
-              { id: 0x16, img: 14 },
-              { id: 0x17, img: 14 },
-            ]
-          : []
-      }
-      return []
-    }
-    default:
-      return []
-  }
+  const magicNumber = pitch.pitcherMagicNumber ?? 0
+  if (magicNumber === SHINNING_MAGIC_NUMBER) return shinningParticlesOf(pitch.pitcherForm ?? 0, ballTick, frameCount)
+  const particle = FLAT_MAGIC_PARTICLES.get(magicNumber)
+  return particle === undefined ? [] : [{ ...particle }]
+}
+
+/** 3b4fa · 3b510 · 3b610 — 번호 2 · 3 · 9 는 공 틱과 상관없이 한 개 */
+const FLAT_MAGIC_PARTICLES: ReadonlyMap<number, MagicBallParticle> = new Map([
+  [2, { id: 0x15, img: 15 }],
+  [3, { id: 0x15, img: 16 }],
+  [9, { id: 0x15, img: 14 }],
+])
+
+/** 3b528 — 번호 4: 폼 >> 1 이 1 이면 공 틱 0 에만 · 2 면 공 틱 ≤ trunc(N / 2) 동안 둘 */
+function shinningParticlesOf(form: number, ballTick: number, frameCount: number): readonly MagicBallParticle[] {
+  const formGroup = form >> 1
+  if (formGroup === 1) return ballTick === 0 ? [{ id: 0x18, img: 15 }] : []
+  if (formGroup !== 2 || ballTick > Math.trunc(frameCount / 2)) return []
+  return [
+    { id: 0x16, img: 14 },
+    { id: 0x17, img: 14 },
+  ]
 }

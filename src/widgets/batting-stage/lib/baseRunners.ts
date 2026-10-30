@@ -96,6 +96,9 @@ export interface RunnerAnimationClock {
   readonly calls: [number, number, number]
 }
 
+/** 1 · 2 · 3루 칸 */
+const BASE_INDEXES = [0, 1, 2] as const
+
 export function createRunnerAnimationClock(): RunnerAnimationClock {
   return { calls: [0, 0, 0] }
 }
@@ -110,13 +113,12 @@ export function stepRunnerAnimationClock(
   hiddenBases: readonly number[],
   frames: number,
 ): readonly [number | null, number | null, number | null] {
-  const steps: (number | null)[] = [null, null, null]
   const occupied = [bases.first, bases.second, bases.third]
-  for (let index = 0; index < 3; index += 1) {
-    if (occupied[index] !== true || hiddenBases.includes(index + 1)) continue
-    clock.calls[index] = (clock.calls[index] ?? 0) + Math.max(0, frames)
-    steps[index] = Math.max(0, (clock.calls[index] ?? 0) - 1)
-  }
+  const steps = BASE_INDEXES.map((index) => {
+    if (occupied[index] !== true || hiddenBases.includes(index + 1)) return null
+    clock.calls[index] += Math.max(0, frames)
+    return Math.max(0, clock.calls[index] - 1)
+  })
   return [steps[0] ?? null, steps[1] ?? null, steps[2] ?? null]
 }
 

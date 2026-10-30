@@ -63,9 +63,14 @@ export function onceAnimationStepAt(
   let remaining = drawCall
   for (const entry of entries) {
     const length = Math.max(1, entry.delay)
-    if (remaining < length) return { frame: entry.frame, dx: entry.dx ?? 0, dy: entry.dy ?? 0 }
+    if (remaining < length) return animationStepOf(entry)
     remaining -= length
   }
-  const last = entries[entries.length - 1]
-  return { frame: last.frame, dx: last.dx ?? 0, dy: last.dy ?? 0 }
+  return animationStepOf(entries[entries.length - 1])
 }
+
+const animationStepOf = (entry: StageAnimationEntry): { readonly frame: number; readonly dx: number; readonly dy: number } => ({
+  frame: entry.frame,
+  dx: entry.dx ?? 0,
+  dy: entry.dy ?? 0,
+})
