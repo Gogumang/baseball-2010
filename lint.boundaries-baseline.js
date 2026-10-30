@@ -414,4 +414,4 @@ export const crossSliceBaseline = [
   'src/widgets/training-scene/ui/TrainingScene.tsx',
 ]
 
-export const cycleBaseline = ['src/shared/ui/MessageBox/MessageBox.tsx', 'src/shared/ui/index.ts']
+export const cycleBaseline = []

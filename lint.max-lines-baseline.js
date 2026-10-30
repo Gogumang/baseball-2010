@@ -2,14 +2,6 @@
 // 목록은 파일 이름만, 경로 알파벳 순(숫자 주석 없음). 파일을 쪼개 150 이하가 되면 목록에서 뺀다 — `pnpm check:lines` 가 빠질 파일을 알려 준다.
 // 새 파일은 넣지 않는다(처음부터 150 이하로).
 export const maxLinesBaseline = [
-  'src/features/play-at-bat/model/resolvePitch.ts',
-  'src/features/play-game/model/aceCutIn.ts',
-  'src/features/play-game/model/useSceneConfirm.ts',
-  'src/features/play-pitcher-game/model/pitcherGameEvaluation.ts',
-  'src/features/play-pitcher-game/model/pitcherPitch.ts',
-  'src/features/play-team-game/model/gameAbilities.ts',
-  'src/features/play-team-game/model/teamGameRoster.ts',
-  'src/features/play-team-game/ui/InGameMenu.tsx',
   'src/pages/create-player/ui/CreatePlayerScreen.tsx',
   'src/pages/create-player/ui/TeamSelectScreen.tsx',
   'src/pages/defense/ui/DefenseScreen.tsx',
@@ -20,7 +12,6 @@ export const maxLinesBaseline = [
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx',
   'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
-  'src/shared/api/audio/webAudioSound.ts',
   'src/shared/config/bugfixes/bugfixes.ts',
   'src/shared/config/original/acePlayers.ts',
   'src/shared/config/original/battedBallPatterns.ts',
@@ -30,14 +21,4 @@ export const maxLinesBaseline = [
   'src/shared/config/original/sounds.ts',
   'src/shared/config/outingPlaces.ts',
   'src/shared/config/spritePreloadScenes.ts',
-  'src/shared/lib/commonPanel/commonPanel.ts',
-  'src/shared/lib/commonWindow/commonWindow.ts',
-  'src/shared/lib/pixelEffect/pixelEffect.ts',
-  'src/shared/lib/pixelEffect/screenCompose.ts',
-  'src/shared/lib/sceneKeyLatch/sceneKeyLatch.ts',
-  'src/shared/lib/screen565/screen565.ts',
-  'src/shared/lib/sprite/originalScale.fixture.ts',
-  'src/shared/lib/sprite/paletteSwap.ts',
-  'src/shared/lib/sprite/spritePreload.ts',
-  'src/shared/ui/MessageBox/MessageBox.tsx',
 ]

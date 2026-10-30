@@ -47,8 +47,9 @@
     "src/entities/settings/model/modeReset.ts": ["exports"], // MODE_RESET_SLOT (0x224ec)
     "src/features/play-game/model/benchClearingScene.ts": ["exports"], // BENCH_CLEARING_TRANSITION_TICK
     "src/features/play-game/model/halfInningBoard.ts": ["exports"], // HALF_INNING_SCOREBOARD_TICK (0x4ff00)
-    "src/features/play-pitcher-game/model/pitcherPitch.ts": ["exports"], // STRIKE_ZONE_RECTS (0xcfb7c) · ZONE_CENTER_POINTS (0xcfb54)
-    "src/features/play-team-game/model/gameAbilities.ts": ["exports"], // ALL_POSITION_SKILL_ID · NO_COACH
+    "src/features/play-pitcher-game/model/pitcherPitch/zone.ts": ["exports"], // STRIKE_ZONE_RECTS (0xcfb7c) · ZONE_CENTER_POINTS (0xcfb54)
+    "src/features/play-team-game/model/gameAbilities/coach.ts": ["exports"], // NO_COACH
+    "src/features/play-team-game/model/gameAbilities/seasonPenalties.ts": ["exports"], // ALL_POSITION_SKILL_ID (0xb62b4(p, 0x15))
     "src/features/play-team-game/model/teamGameFlow/setup/savePoint.ts": ["exports"], // TEAM_GAME_RESUME_SAVE
     "src/pages/defense/lib/defenseCamera.ts": ["exports"], // CAMERA_ENDING_FOLLOW_PERCENT (0xc0558)
     "src/pages/defense/lib/defenseView/defenseSprites.ts": ["exports"], // LASER_SHINE_COLOR · LASER_SHINE_EFFECT_KIND
@@ -76,10 +77,11 @@
     "src/entities/season-mode/model/entryEditor/labels.ts": ["exports"], // fieldPositionLabelOf (위 모음이 다시 내보낸다)
     "src/features/defense-play/model/walkPlay.ts": ["exports"], // walkPitchJudgementOf (0x3e1ae)
     "src/features/play-team-game/model/teamGameRoster.ts": ["exports"], // quickBatterFor · quickPitcherFor · stageBatterAbility · stagePitcherAbility (0xb62b4 경기 능력치 조립)
+    "src/features/play-team-game/model/teamGameRoster/rosterAbilities.ts": ["exports"], // quickBatterFor · stageBatterAbility · stagePitcherAbility (위 모음이 다시 내보낸다)
     "src/pages/create-player/lib/teamSelectLayout.ts": ["exports", "duplicates"], // abilityChartMaximumOf (0x76424 — 웹은 안 그림) · 나만의리그 칸 = 팀 칸
     "src/pages/help/lib/helpLayout.ts": ["exports"], // RANKING_TITLE_FRAMES (0xcedf4) · rowLeftOf (0x253d4)
     "src/pages/management/lib/nariMatchPrepare/matchAces.ts": ["exports"], // nariGameAcesOf (0xb8870)
-    "src/shared/lib/commonWindow/commonWindow.ts": ["exports"], // gameSceneFreezeSerialNow (52efe)
+    "src/shared/lib/commonWindow/sceneMarks.ts": ["exports"], // gameSceneFreezeSerialNow (52efe)
     "src/shared/lib/liveGameState/liveGameState.ts": ["exports"], // isLiveGameLosingTeam (0xb6a4c · 0xb6be8)
     "src/shared/lib/skinTicker/skinTicker.ts": ["exports", "duplicates"], // clearSkinTickerCounter — 대전(0x31c60)이 부를 자리, 웹에 대전이 없다
     "src/widgets/season/lib/seasonAwardEvents.ts": ["exports"], // seasonAwardRewardOf (보상 표) · SEASON_PITCHER_TITLE_KINDS
