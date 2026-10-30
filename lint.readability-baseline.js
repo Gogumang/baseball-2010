@@ -121,7 +121,6 @@ export const readabilityBaseline = [
   'src/features/play-game/model/useSubstitutionScene.ts',
   'src/features/play-game/ui/AceCutInCanvas.tsx',
   'src/features/play-pitcher-game/model/pitchAim.ts',
-  'src/features/play-team-game/ui/InGameMenu.tsx',
   'src/features/shop/model/pitcherShopSelection.ts',
   'src/features/shop/model/shopSelection.ts',
   'src/pages/auto-play-relay/ui/AutoPlayRelayScreen.tsx',
