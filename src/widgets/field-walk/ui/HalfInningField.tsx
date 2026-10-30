@@ -9,6 +9,7 @@ import {
 } from '@/widgets/field-walk/lib/halfInningWalk'
 import { nameTagBoxOf, nameTagPiecesOf } from '@/widgets/field-walk/lib/nameTag'
 import type { WalkerAceSprite } from '@/widgets/field-walk/lib/walkerAces'
+import type { FieldWalker } from '@/widgets/field-walk/lib/fieldWalker'
 import { FieldWalkView } from '@/widgets/field-walk/ui/FieldWalkView'
 import * as styles from '@/widgets/field-walk/ui/FieldWalkView.css'
 import { useRenderMachine } from '@/shared/lib/renderMachine/useRenderMachine'
@@ -46,18 +47,39 @@ interface WalkMemory {
   readonly state: HalfInningWalkState
 }
 
+/** 판 재료가 같은가(굴림 · 측 · 앞 자리 · 앞 카메라) */
+function isSameWalkInput(previous: HalfInningWalkInput, input: HalfInningWalkInput): boolean {
+  if (previous.rolls !== input.rolls || previous.offenseSide !== input.offenseSide) return false
+  return previous.previousFielders === input.previousFielders && previous.previousCamera === input.previousCamera
+}
+
+/** 틱 100 뒤 비추는 야수의 이름표 — 칸 · 이름 · 상자. 이름을 모르거나 아직이면 null */
+function nameTagOf(
+  state: HalfInningWalkState,
+  tick: number,
+  fielderNames: readonly (string | null)[] | undefined,
+  offset: { readonly x: number; readonly y: number },
+) {
+  const slot = halfInningNameTagSlotOf(state, tick)
+  if (slot === null) return null
+  const name = fielderNames?.[slot] ?? null
+  const fielder = state.fielders[slot]
+  if (name === null || fielder === undefined) return null
+  return { slot, name, box: nameTagBoxOf({ x: toScreenX(fielder.x) + offset.x, y: toScreenY(fielder.z) + offset.y }) }
+}
+
+/** 걸음 줄 하나 — 마선수 그림은 준 것만 */
+function walkRowOf(walkers: readonly FieldWalker[], teamIndex: number | null, aces: readonly (WalkerAceSprite | null)[] | undefined) {
+  return { walkers, teamIndex, ...(aces === undefined ? {} : { aceSprites: aces }) }
+}
+
 /**
  * 판 틱까지 걸음을 굴린다 — 판 재료가 같으면(굴림 · 측 · 앞 자리) 앞 그림의 걸음에서 이어 굴린다. 부르는 쪽이 그림마다 새 꼴을
  * 만들어도 처음부터 다시 돌지 않는다
  */
 function advanceWalkMemory(previous: WalkMemory | null, { input, tick }: { readonly input: HalfInningWalkInput; readonly tick: number }): WalkMemory {
-  const isSameInput =
-    previous !== null &&
-    previous.input.rolls === input.rolls &&
-    previous.input.offenseSide === input.offenseSide &&
-    previous.input.previousFielders === input.previousFielders &&
-    previous.input.previousCamera === input.previousCamera
-  const start = previous === null || !isSameInput || previous.tick > tick ? { input, tick: -1, state: startHalfInningWalk(input) } : previous
+  const continues = previous !== null && isSameWalkInput(previous.input, input) && previous.tick <= tick
+  const start = continues ? previous : { input, tick: -1, state: startHalfInningWalk(input) }
   let { state } = start
   for (let t = start.tick + 1; t <= tick; t += 1) state = stepHalfInningWalk(state, t)
   return { input, tick: Math.max(tick, start.tick), state }
@@ -83,13 +105,7 @@ export function HalfInningField({
   useMirrorRef(walkStateRef, state)
 
   const offset = screenOffsetOf(state.camera)
-  const tagSlot = halfInningNameTagSlotOf(state, tick)
-  const tagName = tagSlot === null ? null : (fielderNames?.[tagSlot] ?? null)
-  const tagFielder = tagSlot === null ? undefined : state.fielders[tagSlot]
-  const tagBox =
-    tagName === null || tagFielder === undefined
-      ? null
-      : nameTagBoxOf({ x: toScreenX(tagFielder.x) + offset.x, y: toScreenY(tagFielder.z) + offset.y })
+  const tag = nameTagOf(state, tick, fielderNames, offset)
 
   return (
     <FieldWalkView
@@ -97,22 +113,22 @@ export function HalfInningField({
       grassPalette={grassPalette}
       rows={[
         // 4fbd2 0x43010(장면, [+0x177c], +0x111c, 0) — 수비 줄
-        { walkers: state.fielders, teamIndex: defenseTeam, ...(defenseAces === undefined ? {} : { aceSprites: defenseAces }) },
+        walkRowOf(state.fielders, defenseTeam, defenseAces),
         // 4fbea 0x43010(장면, [+0xf20], +0x1758, 1) — 공격 줄
-        { walkers: state.offense, teamIndex: offenseTeam, ...(offenseAces === undefined ? {} : { aceSprites: offenseAces }) },
+        walkRowOf(state.offense, offenseTeam, offenseAces),
       ]}
     >
-      {tagBox !== null && (
-        <div data-testid="운동장-이름표" data-slot={tagSlot}>
-          {nameTagPiecesOf(tagBox).map((piece, index) => (
+      {tag !== null && (
+        <div data-testid="운동장-이름표" data-slot={tag.slot}>
+          {nameTagPiecesOf(tag.box).map((piece, index) => (
             <span
               key={index}
               className={styles.block}
               style={{ left: piece.x, top: piece.y, width: piece.width, height: piece.height, background: piece.color }}
             />
           ))}
-          <div className={styles.tagText} style={{ left: tagBox.x, top: tagBox.y, width: tagBox.width, height: tagBox.height }}>
-            {tagName}
+          <div className={styles.tagText} style={{ left: tag.box.x, top: tag.box.y, width: tag.box.width, height: tag.box.height }}>
+            {tag.name}
           </div>
         </div>
       )}

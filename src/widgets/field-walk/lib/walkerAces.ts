@@ -128,15 +128,22 @@ export function walkAceSpritesOfRecords(
   roster: readonly { readonly ace: number | null }[],
 ): readonly (WalkerAceSprite | null)[] {
   const firstAce = roster.find((record) => isAceIndex(record.ace))?.ace ?? null
-  return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => {
-    if (slot === 0 && isAceIndex(pitcherAce)) return { kind: 'pitcher', index: pitcherAce }
-    const record = seated[slot] ?? null
-    // 고침(`bugfixes.json` B-83, 기본 켬): 팀 첫 마타자 그림 하나로 뭉개지 않고 칸마다 제 마타자 그림 — 굴림 없음(그림만)
-    if (record !== null && isAceIndex(record.ace) && isBugFixed('B-83')) return { kind: 'batter', index: record.ace }
-    // b — 그림 +0x1c 가 없으면(첫 마타자를 못 찾음) 0x79b48 이 아무것도 안 그린다 — 웹은 보통 그림으로 둔다
-    if (record !== null && isAceIndex(record.ace) && isAceIndex(firstAce)) return { kind: 'batter', index: firstAce }
-    return null
-  })
+  return Array.from({ length: FIELDER_COUNT }, (_unused, slot) => slotAceSpriteOf(slot, pitcherAce, seated[slot] ?? null, firstAce))
+}
+
+/** 칸 하나 — 칸 0 은 마투수(a), 그 밖은 +0xec 레코드가 마타자면 마타자 그림(b) */
+function slotAceSpriteOf(
+  slot: number,
+  pitcherAce: number | null,
+  record: { readonly ace: number | null } | null,
+  firstAce: number | null,
+): WalkerAceSprite | null {
+  if (slot === 0 && isAceIndex(pitcherAce)) return { kind: 'pitcher', index: pitcherAce }
+  if (record === null || !isAceIndex(record.ace)) return null
+  // 고침(`bugfixes.json` B-83, 기본 켬): 팀 첫 마타자 그림 하나로 뭉개지 않고 칸마다 제 마타자 그림 — 굴림 없음(그림만)
+  if (isBugFixed('B-83')) return { kind: 'batter', index: record.ace }
+  // b — 그림 +0x1c 가 없으면(첫 마타자를 못 찾음) 0x79b48 이 아무것도 안 그린다 — 웹은 보통 그림으로 둔다
+  return isAceIndex(firstAce) ? { kind: 'batter', index: firstAce } : null
 }
 
 /** 0x79b48 의 그림판과 프레임 — 투수 마선수는 날값, 타자 마선수 · 보통은 + 0x11 */

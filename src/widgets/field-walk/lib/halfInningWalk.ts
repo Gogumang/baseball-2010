@@ -103,6 +103,38 @@ export interface HalfInningWalkInput {
 /** 3fb7c~3fba4 — O(= F 의 지금 자리) 의 x + y + z == 0 */
 const isZeroPoint = (point: { readonly x: number; readonly y?: number; readonly z: number }) => point.x + (point.y ?? 0) + point.z === 0
 
+const NO_ROLL = { offenseSpeed: 0, scatterX: 0, scatterZ: 0, fielderSpeed: 0 }
+const ORIGIN_POINT = { x: 0, y: 0, z: 0 }
+
+/** 앞 판이 남긴 칸 자리 — 없으면 (0, 0, 0) */
+const previousFielderAt = (input: HalfInningWalkInput, index: number) => input.previousFielders?.[index] ?? ORIGIN_POINT
+
+/** 공격 칸 — 앞 자리에서 서고, 자리 합이 0 이 아니면 공격 더그아웃을 향한다 */
+function offenseWalkerOf(
+  previous: { readonly x: number; readonly y?: number; readonly z: number },
+  dugout: { readonly x: number; readonly z: number },
+): FieldWalker {
+  const walker = placeWalker(standWalker(NEW_FIELD_WALKER), { x: previous.x, z: previous.z })
+  return isZeroPoint(previous) ? walker : aimWalker(walker, dugout)
+}
+
+/** 수비 칸 — 수비 더그아웃에서 흩어 뒤로 물린 자리에서 제 자리를 향한다 */
+function fielderWalkerOf(
+  index: number,
+  previous: { readonly x: number; readonly z: number },
+  roll: typeof NO_ROLL,
+  dugout: { readonly x: number; readonly z: number },
+): FieldWalker {
+  const back = 8 - index
+  const start = {
+    x: dugout.x - (roll.scatterX + 100) * back,
+    z: dugout.z - (roll.scatterZ + 100) * back,
+  }
+  const home = FIELDER_START_POSITIONS[index]
+  const fielder = aimWalker(placeWalker(standWalker({ ...NEW_FIELD_WALKER, x: previous.x, z: previous.z }), start), home)
+  return setWalkerSpeed(fielder, roll.fielderSpeed)
+}
+
 /** 0x3fac4 — 판 틱 0 의 세우기 (그 틱의 0x4f7ac 앞) */
 export function startHalfInningWalk(input: HalfInningWalkInput): HalfInningWalkState {
   const defenseSide = input.offenseSide === 0 ? 1 : 0
@@ -113,24 +145,12 @@ export function startHalfInningWalk(input: HalfInningWalkInput): HalfInningWalkS
   const offense: FieldWalker[] = []
   let camera: CameraState | null = input.previousCamera ?? null
   for (let index = FIELDER_COUNT - 1; index >= 0; index -= 1) {
-    const roll = input.rolls[index] ?? { offenseSpeed: 0, scatterX: 0, scatterZ: 0, fielderSpeed: 0 }
-    const previous = input.previousFielders?.[index] ?? { x: 0, y: 0, z: 0 }
-    let walker = placeWalker(standWalker(NEW_FIELD_WALKER), { x: previous.x, z: previous.z })
-    if (!isZeroPoint(previous)) {
-      walker = aimWalker(walker, offenseDugout)
-    } else {
-      // 카메라 vtc — 가운데 맞춘 목표로 곧바로
-      camera = centerOn(BOUNDS, defenseDugout)
-    }
-    offense[index] = setWalkerSpeed(walker, roll.offenseSpeed)
-    const back = 8 - index
-    const start = {
-      x: defenseDugout.x - (roll.scatterX + 100) * back,
-      z: defenseDugout.z - (roll.scatterZ + 100) * back,
-    }
-    const home = FIELDER_START_POSITIONS[index]
-    const fielder = aimWalker(placeWalker(standWalker({ ...NEW_FIELD_WALKER, x: previous.x, z: previous.z }), start), home)
-    fielders[index] = setWalkerSpeed(fielder, roll.fielderSpeed)
+    const roll = input.rolls[index] ?? NO_ROLL
+    const previous = previousFielderAt(input, index)
+    // 카메라 vtc — 자리 합이 0 인 칸이 있으면 가운데 맞춘 목표로 곧바로
+    if (isZeroPoint(previous)) camera = centerOn(BOUNDS, defenseDugout)
+    offense[index] = setWalkerSpeed(offenseWalkerOf(previous, offenseDugout), roll.offenseSpeed)
+    fielders[index] = fielderWalkerOf(index, previous, roll, defenseDugout)
   }
   const cameraTarget = centerOn(BOUNDS, { x: plate.x, z: plate.z - CAMERA_Z_LIFT })
   return {
@@ -149,31 +169,43 @@ function walkOrStand(walker: FieldWalker): FieldWalker {
   return isWalkerArrived(walker) ? standWalker(walker) : stepWalker(walker)
 }
 
+type WalkCamera = Pick<HalfInningWalkState, 'camera' | 'cameraTarget' | 'followPercent' | 'cameraMoved' | 'tour'>
+
+/** 둘러보기 — 다음 칸(끝 칸에서 멈춤) 자리를 목표로 */
+function touredCameraOf(tour: number): Pick<HalfInningWalkState, 'cameraTarget' | 'followPercent' | 'tour'> {
+  const next = tour < TOUR_LAST ? tour + 1 : tour
+  const home = FIELDER_START_POSITIONS[HALF_INNING_TOUR_SLOTS[next]]
+  return { cameraTarget: centerOn(BOUNDS, { x: home.x, z: home.z - CAMERA_Z_LIFT }), followPercent: TOUR_FOLLOW_PERCENT, tour: next }
+}
+
+/** 카메라 한 틱 — 붙든 동안은 따라가기 % 만 오르고, 그 뒤는 (카메라가 멈췄으면 둘러보기로) 목표를 따라간다 */
+function stepWalkCamera(state: HalfInningWalkState, tick: number): WalkCamera {
+  const { camera } = state
+  if (tick <= CAMERA_HOLD_LAST_TICK)
+    return { camera, cameraTarget: state.cameraTarget, followPercent: tick, cameraMoved: state.cameraMoved, tour: state.tour }
+  const toursNow = tick > TOUR_FROM_TICK && !state.cameraMoved
+  const aim = toursNow ? touredCameraOf(state.tour) : { cameraTarget: state.cameraTarget, followPercent: state.followPercent, tour: state.tour }
+  const next = followCamera(camera, aim.cameraTarget, aim.followPercent)
+  return {
+    camera: next,
+    cameraTarget: aim.cameraTarget,
+    followPercent: aim.followPercent,
+    cameraMoved: next.x !== camera.x || next.y !== camera.y,
+    tour: aim.tour,
+  }
+}
+
 /** 갱신 0x4f7ac 한 번 (틱 = 경기+0x2c) */
 export function stepHalfInningWalk(state: HalfInningWalkState, tick: number): HalfInningWalkState {
-  let { camera, cameraTarget, followPercent, cameraMoved, tour } = state
-  if (tick <= CAMERA_HOLD_LAST_TICK) {
-    followPercent = tick
-  } else {
-    if (tick > TOUR_FROM_TICK && !cameraMoved) {
-      if (tour < TOUR_LAST) tour += 1
-      const slot = HALF_INNING_TOUR_SLOTS[tour]
-      const home = FIELDER_START_POSITIONS[slot]
-      cameraTarget = centerOn(BOUNDS, { x: home.x, z: home.z - CAMERA_Z_LIFT })
-      followPercent = TOUR_FOLLOW_PERCENT
-    }
-    const next = followCamera(camera, cameraTarget, followPercent)
-    cameraMoved = next.x !== camera.x || next.y !== camera.y
-    camera = next
-  }
+  const camera = stepWalkCamera(state, tick)
   return {
     fielders: state.fielders.map(walkOrStand),
     offense: state.offense.map(walkOrStand),
-    camera,
-    cameraTarget,
-    followPercent,
-    cameraMoved,
-    tour,
+    camera: camera.camera,
+    cameraTarget: camera.cameraTarget,
+    followPercent: camera.followPercent,
+    cameraMoved: camera.cameraMoved,
+    tour: camera.tour,
   }
 }
 

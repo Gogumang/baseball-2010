@@ -116,17 +116,25 @@ export function burstPortraitAnchorOf(height: number, isBatterLeftHanded: boolea
 /** 표 0xd0ae6 — 인물 → 애니 바탕 (`pages/management/lib/centerStage` · `features/play-game/model/aceCutIn` 과 같은 표) */
 const PORTRAIT_ANIMATION_BASE: readonly number[] = [-1, -1, 16, 23, 30, 37, 44, 51, 58, 65, 0, 7, 15, 23, 72, 79, 86, 40, 16, 8, 0, 24, 32]
 
+/** 돌발 대사에 없는 화자 — 1(육성 선수) · 8 · 9(팔레트 2) */
+const UNSPOKEN_SPEAKERS: ReadonlySet<number> = new Set([1, 8, 9])
+
+/** 0x63a04 의 그림 파일 — 10~13 `event_char_1` · 17~22 `event_char_2` · 그 밖 `event_char_0` */
+function portraitFileOf(speaker: number): string {
+  if (speaker >= 10 && speaker <= 13) return 'event_char_1'
+  return speaker >= 17 && speaker <= 22 ? 'event_char_2' : 'event_char_0'
+}
+
 /**
  * 초상 0x8e2dc → **0x63a04([0x1552cfc], 화자, 표정)** — 10~13 `event_char_1` · 17~22 `event_char_2` · 그 밖 `event_char_0`,
  * 애니 = 0xd0ae6[화자] + 표정. 화자 1(육성 선수 — 장타형 8 · 피부 팔레트)과 8 · 9(팔레트 2)는 돌발 대사에 없다(세 표 `_TEXT`
  * 전수: 2 · 3 · 4 · 5 · 6 · 10~13 · 17~22) — 그 화자면 null(안 그림).
  */
 export function burstPortraitOf(speaker: number, expression: number): { readonly file: string; readonly animation: number } | null {
-  if (speaker === 1 || speaker === 8 || speaker === 9) return null
+  if (UNSPOKEN_SPEAKERS.has(speaker)) return null
   const base = PORTRAIT_ANIMATION_BASE[speaker]
   if (base === undefined || base < 0) return null
-  const file = speaker >= 10 && speaker <= 13 ? 'event_char_1' : speaker >= 17 && speaker <= 22 ? 'event_char_2' : 'event_char_0'
-  return { file, animation: base + expression }
+  return { file: portraitFileOf(speaker), animation: base + expression }
 }
 
 /** 글 자리 — 0x8ea2c · 0x8ead0~0x8ead6 */
@@ -209,21 +217,31 @@ const asSignedByte = (value: number): number => (value > 127 ? value - 256 : val
  */
 export function burstResultPopupTextOf(judgement: BurstJudgement | null, row: BurstMissionRow | null): string | null {
   if (row === null) return null
-  if (judgement === '성공') {
-    let text = '!C!cffffff[!cffff00돌발미션 성공!!!cffffff]!N'
-    const [first, second] = row.successRewards
-    const valueOf = (reward: { readonly kind: number; readonly amount: number }) =>
-      reward.kind === MONEY_KIND ? asSignedByte(reward.amount) * MONEY_DISPLAY_SCALE : asSignedByte(reward.amount)
-    if (first.kind !== 0) text += `${BURST_REWARD_NAMES[first.kind] ?? ''} +${valueOf(first)}`
-    if (second.kind !== 0) text += `!N${BURST_REWARD_NAMES[second.kind] ?? ''} +${valueOf(second)}`
-    return text
-  }
-  if (judgement === '실패') {
-    const penalty = row.failurePenalty
-    if (penalty.amount === 0) return null
-    let text = '!C!cffffff[!cff5500돌발미션 실패!!!cffffff]!N'
-    if (penalty.kind !== 0) text += `${BURST_REWARD_NAMES[penalty.kind] ?? ''} -${asSignedByte(penalty.amount)}`
-    return text
-  }
+  if (judgement === '성공') return burstSuccessTextOf(row)
+  if (judgement === '실패') return burstFailureTextOf(row)
   return null
+}
+
+type BurstReward = BurstMissionRow['failurePenalty']
+
+/** 보상 표시 값 — 부호 있는 바이트, 소지금(4)은 ×100 */
+const rewardDisplayValueOf = (reward: BurstReward): number =>
+  reward.kind === MONEY_KIND ? asSignedByte(reward.amount) * MONEY_DISPLAY_SCALE : asSignedByte(reward.amount)
+
+/** 성공 — b10 · b12 가 0 이 아닌 보상 줄 */
+function burstSuccessTextOf(row: BurstMissionRow): string {
+  let text = '!C!cffffff[!cffff00돌발미션 성공!!!cffffff]!N'
+  const [first, second] = row.successRewards
+  if (first.kind !== 0) text += `${BURST_REWARD_NAMES[first.kind] ?? ''} +${rewardDisplayValueOf(first)}`
+  if (second.kind !== 0) text += `!N${BURST_REWARD_NAMES[second.kind] ?? ''} +${rewardDisplayValueOf(second)}`
+  return text
+}
+
+/** 실패 — b15 = 0 이면 창 없음. 소지금도 ×100 이 없다(원본 그대로) */
+function burstFailureTextOf(row: BurstMissionRow): string | null {
+  const penalty = row.failurePenalty
+  if (penalty.amount === 0) return null
+  const head = '!C!cffffff[!cff5500돌발미션 실패!!!cffffff]!N'
+  if (penalty.kind === 0) return head
+  return `${head}${BURST_REWARD_NAMES[penalty.kind] ?? ''} -${asSignedByte(penalty.amount)}`
 }

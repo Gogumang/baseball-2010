@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import type { CSSProperties } from 'react'
-import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
+import { useAnimations, useFrameOrigins, type FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { animationStepAt } from '@/shared/lib/sprite/animationPlayback'
 import type { EventPortrait } from '@/shared/config/original/eventTypes'
 import { placePortraits, portraitAnimationOf, portraitPaletteOf, slideX } from '@/widgets/event-portraits/lib/portraitSlots'
@@ -78,6 +78,15 @@ interface PortraitSpriteProps {
   readonly battingTypeIndex: number
 }
 
+/** 이 그림의 칸 — 애니가 없거나 빈 자리 프레임(그림도 원점도 없다 — 원작도 아무것도 그리지 않는다)이면 null */
+function shownPortraitFrameOf(entries: Parameters<typeof animationStepAt>[0] | undefined, update: number, origins: FrameOrigins | null) {
+  const step = entries === undefined ? null : animationStepAt(entries, update)
+  if (step === null) return null
+  const key = String(step.frame).padStart(3, '0')
+  const origin = origins?.[key]
+  return origin === undefined ? null : { step, key, origin }
+}
+
 function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: PortraitSpriteProps) {
   const folder = assetUrl(`./sprites/${placed.portrait.file}/frames`)
   const origins = useFrameOrigins(folder)
@@ -99,11 +108,9 @@ function PortraitSprite({ placed, baseline, skinIndex, battingTypeIndex }: Portr
       palette,
     ),
   )
-  const step = entries === undefined ? null : animationStepAt(entries, update)
-  const key = step === null ? '' : String(step.frame).padStart(3, '0')
-  // 빈 자리 프레임은 그림도 원점도 없다 — 원작도 아무것도 그리지 않는다.
-  const origin = step === null ? undefined : origins?.[key]
-  if (step === null || origin === undefined) return null
+  const shown = shownPortraitFrameOf(entries, update, origins)
+  if (shown === null) return null
+  const { step, key, origin } = shown
 
   const x = slideX(placed, slideUpdate, SCREEN_WIDTH) + origin.x + step.dx
   const y = baseline + origin.y + step.dy

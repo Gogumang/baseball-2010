@@ -17,16 +17,13 @@ const PORTRAIT_JSON = ['animations.json', 'origins.json'] as const
 /** 돌발미션 대사 초상 — 폴더(event_char_0 · _1 · _2)마다 쓰는 애니 전부 */
 export function burstPortraitPreloads(): SpriteFolderPreload[] {
   const animationsByFile = new Map<string, Set<number>>()
-  for (const table of Object.values(ORIGINAL_BURST_TABLES)) {
-    for (const row of table.lines) {
-      for (const line of row) {
-        const portrait = burstPortraitOf(line.speaker, line.expression)
-        if (portrait === null) continue
-        const animations = animationsByFile.get(portrait.file) ?? new Set<number>()
-        animations.add(portrait.animation)
-        animationsByFile.set(portrait.file, animations)
-      }
-    }
+  const lines = Object.values(ORIGINAL_BURST_TABLES).flatMap((table) => table.lines.flat())
+  for (const line of lines) {
+    const portrait = burstPortraitOf(line.speaker, line.expression)
+    if (portrait === null) continue
+    const animations = animationsByFile.get(portrait.file) ?? new Set<number>()
+    animations.add(portrait.animation)
+    animationsByFile.set(portrait.file, animations)
   }
   return [...animationsByFile]
     .sort(([a], [b]) => a.localeCompare(b))
