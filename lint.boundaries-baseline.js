@@ -313,7 +313,7 @@ export const crossSliceBaseline = [
   'src/pages/management/ui/managementScreen/otherSlices.ts',
   'src/pages/management/ui/matchInfoBoard/otherSlices.ts',
   'src/pages/management/ui/radarChart/otherSlices.ts',
-  'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
+  'src/pages/match-settings/ui/matchSettingsWindow/otherSlices.ts',
   'src/pages/mission-play/lib/missionRunScoreBoard.ts',
   'src/pages/mission-play/ui/MissionResultBoard.tsx',
   'src/pages/mission-play/ui/missionPlay/otherSlices.ts',

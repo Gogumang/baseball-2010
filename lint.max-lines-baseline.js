@@ -16,7 +16,6 @@ export const maxLinesBaseline = [
   'src/pages/game/ui/GameScreen.tsx',
   'src/pages/help/ui/HelpScreen.tsx',
   'src/pages/home-run-derby/ui/HomeRunDerbyScreen.tsx',
-  'src/pages/match-settings/ui/MatchSettingsWindow.tsx',
   'src/pages/mission-select/ui/MissionSelectScreen.tsx',
   'src/shared/api/audio/webAudioSound.ts',
   'src/shared/config/bugfixes/bugfixes.ts',
