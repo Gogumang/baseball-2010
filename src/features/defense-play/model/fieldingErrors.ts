@@ -57,23 +57,31 @@ export interface DrawnFielderCounters {
 const FUMBLE_RECORD_TICKS = 6
 const THROW_ERROR_RECORD_TICKS = 4
 
+/** 4381a · 438c4 — 이 그림에서 실책 값에 닿았나 (잠금 중이면 안 보고, 펌블이 있으면 펌블 값만 본다) */
+function reachesErrorMark(fielder: DrawnFielderCounters): boolean {
+  if ((fielder.lockTicks ?? 0) > 0) return false
+  const fumble = fielder.fumbleTicks ?? 0
+  if (fumble > 0) return fumble === FUMBLE_RECORD_TICKS
+  return (fielder.throwErrorTicks ?? 0) === THROW_ERROR_RECORD_TICKS
+}
+
+function drawnFieldingErrorOf(fielder: DrawnFielderCounters, record: FielderRecordSeat | undefined): DrawnFieldingError {
+  const error: DrawnFieldingError = {
+    slot: fielder.slot,
+    teamIndex: fielder.teamIndex ?? null,
+    ...(record === undefined ? {} : { record }),
+  }
+  return (fielder.fumbleTicks ?? 0) > 0 ? { ...error, isFumble: true } : error
+}
+
 /** 그림 하나에서 +0x2e 를 올리는 야수 칸 — 0x43278 의 고리 차례(칸 8 → 0) 그대로 */
 export function drawnFieldingErrorsOf(fielders: readonly DrawnFielderCounters[]): DrawnFieldingError[] {
   const errors: DrawnFieldingError[] = []
   const ordered = [...fielders].sort((left, right) => right.slot - left.slot)
   for (const fielder of ordered) {
-    if ((fielder.lockTicks ?? 0) > 0) continue
-    const fumble = fielder.fumbleTicks ?? 0
-    const hit = fumble > 0 ? fumble === FUMBLE_RECORD_TICKS : (fielder.throwErrorTicks ?? 0) === THROW_ERROR_RECORD_TICKS
-    if (!hit) continue
     // 4383a · 438ea — [+0xec] == 0 이면 +0x2e 도 0xa755d 도 건너뛴다 (펌블 함성 29 는 `drawnFumbleCheerOf` — 늘 지난다)
-    if (fielder.record === null) continue
-    const error: DrawnFieldingError = {
-      slot: fielder.slot,
-      teamIndex: fielder.teamIndex ?? null,
-      ...(fielder.record === undefined ? {} : { record: fielder.record }),
-    }
-    errors.push(fumble > 0 ? { ...error, isFumble: true } : error)
+    if (!reachesErrorMark(fielder) || fielder.record === null) continue
+    errors.push(drawnFieldingErrorOf(fielder, fielder.record))
   }
   return errors
 }

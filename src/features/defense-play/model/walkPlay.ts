@@ -1,22 +1,15 @@
 import type { FielderRecordSeat } from '@/entities/fielding/model/fielderRecords'
-import { runnerSpeedOf, type WorldPoint } from '@/entities/fielding/model/fieldGeometry'
+import type { WorldPoint } from '@/entities/fielding/model/fieldGeometry'
 import type { HolderPlate } from '@/entities/fielding/model/defenseView/holderMark'
 import { loadedRunnerAceOf, runnerAceIndexesOf, type RunnerAces } from '@/features/defense-play/model/runnerAces'
 import { DEFENSE_SCENE_START, type DefenseScene } from '@/features/defense-play/model/defenseScene'
-import {
-  batterBoxPosition,
-  createFielders,
-  createRunner,
-  initialPlayView,
-  type PlayView,
-  type RunnerState,
-} from '@/entities/fielding/model/fieldingState'
+import { createFielders, initialPlayView, type PlayView } from '@/entities/fielding/model/fieldingState'
 import { withCarriedSlack } from '@/entities/fielding/model/fielderPose'
-import { applyRunnerLead, runnerLeadOf } from '@/entities/fielding/model/runnerLead'
 import type { StealBase } from '@/entities/fielding/model/stealStart'
 import type { BaseState } from '@/entities/game/model/baseState'
 import type { DefensePlayResult } from '@/features/defense-play/model/runDefensePlay'
 import { runRunnerPlay, type RunnerPlayEngineResult } from '@/features/defense-play/model/runnerPlayEngine'
+import { WALK_PLAY_KIND, walkPlayRunnersOf } from '@/features/defense-play/model/walkPlay/walkRunners'
 
 /**
  * **볼넷 · 사구 밀어내기 주루 판** — 플레이 종류 2 (2026-10-08 직접 뜸).
@@ -123,8 +116,7 @@ export interface WalkPlayResult extends RunnerPlayEngineResult {
   readonly opensAtArrival?: boolean
 }
 
-/** 플레이 종류 2 — 0x3e1b4 0xb0cb8(플레이, 2) */
-export const WALK_PLAY_KIND = 2
+export { WALK_PLAY_KIND }
 
 /**
  * 0x12 갱신 0x4e6d4 의 대기 — 판정 st[0xb] 3 · 4 · 5 면 0x1f(0x4e6de~0x4e6f0). 이 틱에 판정 A 0xae24c 가 밀어내기 판(0x17)으로 보낸다.
@@ -137,73 +129,25 @@ const CATCHER_SLOT = 1
 /** 0xd7c24 — 종류 ≠ 5 의 공 첫 점 (투수판, 땅 위) */
 const WALK_BALL_POINT: WorldPoint = { x: 20000, y: 0, z: 24500 }
 
-export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
-  const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
-  const stealing = input.stealingFrom ?? []
-  const speedOf = (base: 0 | 1 | 2 | 3) =>
-    runnerSpeedOf(input.runAbilities?.[base] ?? input.runAbility ?? DEFAULT_ABILITY, input.runnerTeamGrade ?? 0)
-
-  // ── 0xa93ac 타자주자 — 목표 1 · 요구 루 1 · +0x94 · +0x98. 위치는 a9446 vt94 0xa0884 의 타석 자리(구간 출발점 legStart 는
-  // 진행률 vt90 의 분모 자리라 홈 그대로 — 타구 판 `createPlayRunners` 와 같다) ──
-  const runners: RunnerState[] = [
-    createRunner(0, 0, speedOf(0), {
-      targetBase: 1,
-      requiredBase: 1,
-      isBatterRunner: true,
-      position: batterBoxPosition(input.batterHand),
-    }),
-  ]
-  ;([1, 2, 3] as const).forEach((base) => {
-    const occupied = base === 1 ? input.bases.first : base === 2 ? input.bases.second : input.bases.third
-    if (occupied) runners.push(createRunner(runners.length, base, speedOf(base), { isBatterRunner: false }))
-  })
-
-  // ── 0xa9e44 — 목록 1 부터: 포스(0xa9f60) || 도루 표시면 앞 주자 +0x7c ≥ 내 루일 때 다음 루 ──
-  let previousTarget = runners[0].targetBase
-  for (let index = 1; index < runners.length; index += 1) {
-    const runner = runners[index]
-    const base = runner.startBase
-    const isStealing = stealing.includes(base as StealBase)
-    // 0xa9bd4 → vt48(0xb6228) — 도루 주자의 +0x7c 는 이미 다음 루, 아니면 vt88 이 제 루에 앉혔다
-    let target = isStealing ? base + 1 : base
-    const forced = index + 1 > base
-    if ((forced || isStealing) && previousTarget >= base) target = base + 1
-    runners[index] = { ...runner, targetBase: target }
-    previousTarget = target
-  }
-
-  // ── 0x4657e — 주자마다 0x3d7b8 리드 (종류 2: 도루 주자 틱 0 · 그 밖 0xcffb0 틱 뒤 목표 되돌리기) ──
-  for (let index = 0; index < runners.length; index += 1) {
-    const runner = runners[index]
-    const lead = runnerLeadOf(runner, {
-      playKind: WALK_PLAY_KIND,
-      stealing: stealing.includes(runner.startBase as StealBase),
-    })
-    runners[index] = applyRunnerLead(runner, lead)
-  }
-
-  // ── 0x465b8 — 밀리는 사슬(+0x8c 가 앞 주자 + 1)이 끊긴 자리부터, 도루 표시 주자는 +0x94 = 1 · 제 루로 ──
-  let chainEnd = 1
-  while (chainEnd < runners.length && runners[chainEnd].startBase === runners[chainEnd - 1].startBase + 1) chainEnd += 1
-  if (runners.length > 1) {
-    for (let index = chainEnd; index < runners.length; index += 1) {
-      const runner = runners[index]
-      if (!stealing.includes(runner.startBase as StealBase)) continue
-      // +0x88 = +0x8c (0xa9e44) · +0x94 = 1 — 웹은 +0x94 를 요구 루(≠ −1)로 읽는다
-      runners[index] = { ...runner, targetBase: runner.startBase, requiredBase: runner.startBase }
-    }
-  }
-
-  const play: PlayView = {
+/** 0xb288c — 판 칸 */
+function walkPlayViewOf(scene: DefenseScene | undefined): PlayView {
+  return {
     ...initialPlayView(WALK_PLAY_KIND),
     // vt30(커버)를 안 부르고 vt1c 0xb0edc 도 +0xf0 을 안 적는다(b0eea~b0f7a 직접 뜸 — 정정 r171) — 앞 판이 남긴 +0xf0 그대로
     // (`DefenseScene.playCovers`). 종류 2 · 3 은 vt4c 도 안 돌아 이 판은 이 칸을 바꾸지 않는다
-    coverOfBase: [...(input.scene?.playCovers ?? DEFENSE_SCENE_START.playCovers)],
+    coverOfBase: [...(scene?.playCovers ?? DEFENSE_SCENE_START.playCovers)],
     // P+0x130 = 1 · P+0x12c = 1. +0x112 · +0x128 은 안 선다
     ballHolderSlot: CATCHER_SLOT,
     catchFielderSlot: CATCHER_SLOT,
     held: true,
   }
+}
+
+export function runWalkPlay(input: WalkPlayInput): WalkPlayResult {
+  const abilities = input.defenseAbilities ?? Array.from({ length: 9 }, () => DEFAULT_ABILITY)
+  const stealing = input.stealingFrom ?? []
+  const runners = walkPlayRunnersOf(input, stealing)
+  const play = walkPlayViewOf(input.scene)
 
   const result = runRunnerPlay({
     kind: WALK_PLAY_KIND,

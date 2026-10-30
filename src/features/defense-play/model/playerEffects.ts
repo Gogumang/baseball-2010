@@ -87,21 +87,16 @@ export function stepDustTrail(
  * **원본 그대로**: 앞으로 가는 1 → 2루 · 홈 → 1루 슬라이딩은 0 이라 먼지가 없다(갈래 짝이 0x9fe80 의 참 · 거짓과
  * 어긋나 있다). 고치지 않는다.
  */
+/** 9ff60 참(되돌아가는 중) 갈래 — `닿은 루>달려가는 루` → 방향, 없으면 0 */
+const BACK_SLIDE_DUST: Readonly<Record<string, number>> = { '0>1': 1, '3>2': 1, '1>2': 2, '4>3': 2 }
+/** 9ff60 거짓(앞으로) 갈래 */
+const FORWARD_SLIDE_DUST: Readonly<Record<string, number>> = { '3>4': 3, '2>1': 3, '2>3': 4, '1>0': 4 }
+
 export function slideDustDirectionOf(runner: RunnerState, previousTarget: number): number {
-  let target = runner.targetBase
-  let touched = runner.startBase
-  if (target === 0 && touched === 3) target = 4
-  else if (target === 3 && touched === 0) touched = 4
-  if (isHeadingBack(runner, previousTarget)) {
-    if (touched === 0 && target === 1) return 1
-    if (touched === 3) return target === 2 ? 1 : 0
-    if (touched === 1) return target === 2 ? 2 : 0
-    if (touched === 4) return target === 3 ? 2 : 0
-    return 0
-  }
-  if (touched === 3 && target === 4) return 3
-  if (touched === 2 && target === 1) return 3
-  if (touched === 2) return target === 3 ? 4 : 0
-  if (touched === 1) return target === 0 ? 4 : 0
-  return 0
+  const { targetBase, startBase } = runner
+  // 9ff44 — 3루 ↔ 홈 사이는 홈을 4 로 본다
+  const target = targetBase === 0 && startBase === 3 ? 4 : targetBase
+  const touched = targetBase === 3 && startBase === 0 ? 4 : startBase
+  const table = isHeadingBack(runner, previousTarget) ? BACK_SLIDE_DUST : FORWARD_SLIDE_DUST
+  return table[`${touched}>${target}`] ?? 0
 }

@@ -73,29 +73,44 @@ export interface ThrowLaunchInput {
   readonly body?: BallBody
 }
 
+interface LaunchFlight {
+  readonly launch: ThrowLaunch
+  readonly error: ThrowErrorResult
+  readonly wobbled: boolean
+}
+
+/** a1802 — 원바운드: 0xbfaa0 = rand(0, 2) — 난수가 없으면 굴리지 않고 0(φ − 1) */
+function rollBounceLaunch(thrower: FielderState, target: WorldPoint, random: RandomPort | undefined): ThrowLaunch {
+  const turnsLeft = random !== undefined && random.rand(0, 2) !== 0
+  return bounceThrowLaunchOf(thrower, target, turnsLeft)
+}
+
+/** 보통 송구 — 악송구 굴림, 악송구가 아니면 긴 송구 흔들림 굴림 */
+function rollThrowFlight(input: ThrowLaunchInput, random: RandomPort): LaunchFlight {
+  const { thrower, target } = input
+  const special = input.special === true
+  const error = rollThrowError(input.ability, special, random)
+  if (error.errant) return { launch: errantThrowFlight(thrower, target, error, random), error, wobbled: false }
+  const wobbled = rollLongThrowWobble(thrower, target, special, random) === true
+  const launch = wobbled ? wobbledThrowFlight(thrower, target) : throwLaunchOf(thrower, target)
+  return { launch, error, wobbled }
+}
+
+/** 쏘기 값을 고른다 — 원바운드 · 굴림 없는 송구(레이저 · 난수 없음) · 보통 송구 */
+function rollLaunchFlight(input: ThrowLaunchInput, bounce: boolean): LaunchFlight {
+  const { thrower, target, random } = input
+  if (bounce) return { launch: rollBounceLaunch(thrower, target, random), error: NO_THROW_ERROR, wobbled: false }
+  if (input.laser === true || random === undefined) return { launch: throwLaunchOf(thrower, target), error: NO_THROW_ERROR, wobbled: false }
+  return rollThrowFlight(input, random)
+}
+
 /** 송구 공을 쏜다 — 위 순서 그대로. 굴림은 악송구(1 또는 5) · 흔들림(0 또는 1) · 세계 안 폴 충돌(드묾) */
 export function launchThrow(input: ThrowLaunchInput): ThrownBall {
   const { thrower, target } = input
-  const special = input.special === true
-  let error: ThrowErrorResult = NO_THROW_ERROR
-  let launch: ThrowLaunch = throwLaunchOf(thrower, target)
-  let wobbled = false
   const bounce = input.laser !== true && input.bounce === true
-  if (bounce) {
-    // a1802 0xbfaa0 = rand(0, 2) — 난수가 없으면 굴리지 않고 0(φ − 1)
-    const turnsLeft = input.random !== undefined && input.random.rand(0, 2) !== 0
-    launch = bounceThrowLaunchOf(thrower, target, turnsLeft)
-  } else if (input.laser !== true && input.random !== undefined) {
-    error = rollThrowError(input.ability, special, input.random)
-    if (error.errant) {
-      launch = errantThrowFlight(thrower, target, error, input.random)
-    } else if (rollLongThrowWobble(thrower, target, special, input.random) === true) {
-      launch = wobbledThrowFlight(thrower, target)
-      wobbled = true
-    }
-  }
+  const { launch, error, wobbled } = rollLaunchFlight(input, bounce)
   const loose = error.errant || bounce
-  let ball = thrownBallTrajectory({
+  const ball = thrownBallTrajectory({
     from: thrower.position,
     target,
     speed: launch.horizontalSpeed,
@@ -105,10 +120,8 @@ export function launchThrow(input: ThrowLaunchInput): ThrownBall {
     random: input.random,
     body: input.body,
   })
-  if (!loose && !wobbled) {
-    ball = withReceivePoint(ball, throwTicksTo(thrower, target) - 1, target)
-  }
-  return { ball, errant: error.errant, wobbled, bounce, loose, error }
+  const received = loose || wobbled ? ball : withReceivePoint(ball, throwTicksTo(thrower, target) - 1, target)
+  return { ball: received, errant: error.errant, wobbled, bounce, loose, error }
 }
 
 /** 송구 공 예보 vt24(0) 의 칸 — 던진 야수(+0x130 · +0xb1) · 움직임허용 공+0xaac · +0x1e8 (b303c~b307c) */

@@ -79,18 +79,21 @@ export function runnerFatesWithoutPlay(bases: BaseState, outcome: AtBatOutcome):
         retired: true,
       }))
     case '볼넷':
-    case '사구': {
-      // 1루부터 빈 루 없이 이어 찬 주자만 밀린다 — 만루일 때만 3루 주자가 홈을 밟는다
-      const forcedHome = bases.first && bases.second && bases.third
-      return [
-        { fromBase: 0, scored: false, retired: false },
-        ...onBase.map((fate) => (forcedHome && fate.fromBase === 3 ? { ...fate, scored: true, retired: true } : fate)),
-      ]
-    }
+    case '사구':
+      return walkRunnerFates(bases, onBase)
     case '안타':
     case '아웃':
       throw new Error('인플레이 타구의 주자 운명은 수비 진행기 결과(runnerFates)에서 온다')
   }
+}
+
+/** 볼넷 · 사구 — 1루부터 빈 루 없이 이어 찬 주자만 밀린다. 만루일 때만 3루 주자가 홈을 밟는다 */
+function walkRunnerFates(bases: BaseState, onBase: readonly RunnerFate[]): RunnerFate[] {
+  const forcedHome = bases.first && bases.second && bases.third
+  return [
+    { fromBase: 0, scored: false, retired: false },
+    ...onBase.map((fate) => (forcedHome && fate.fromBase === 3 ? { ...fate, scored: true, retired: true } : fate)),
+  ]
 }
 
 /**
@@ -218,15 +221,16 @@ export function baserunnerAllowedOfPlay(
   if (mine && outcome.kind !== '안타' && outcome.kind !== '아웃') {
     return baserunnerAllowedOfFates(runnerFatesWithoutPlay(bases, outcome))
   }
-  if (quickAdvance !== undefined) {
-    // 고침(B-37): 목록 전체를 보면 타자주자가 늘 살아 있다 — 홈런(전원 +0x96 = 1)만 안 선다
-    if (isHit(outcome) || isFreePass(outcome)) {
-      return isBugFixed('B-37') ? outcome.kind !== '홈런' : quickAdvance.runsScored === 0
-    }
-    return runnerCountOf(bases) > 0
-  }
+  if (quickAdvance !== undefined) return quickBaserunnerAllowed(bases, outcome, quickAdvance)
   // 판도 간이 엔진도 아닌 타석은 원본에 없다(정산 0xa8024 를 부르는 곳은 수비 판 · 사람 장면 · 간이 엔진 넷뿐 — 위 머리말).
   // 남는 것은 수비 화면 없이 정산으로 가는 결과뿐이라 사람 장면과 같은 목록으로 본다. 인플레이 타구가 판 없이 오면
   // `runnerFatesWithoutPlay` 가 오류를 낸다 — 예전 근사(안타 · 볼넷 · 사구면 선다)는 걷었다(전체 시험 · soak 에서 한 번도 안 지났다, r276)
   return baserunnerAllowedOfFates(runnerFatesWithoutPlay(bases, outcome))
+}
+
+/** 간이 엔진 타석 — 타자가 나간 결과는 득점이 없을 때만, 아웃 · 삼진은 루에 주자가 있으면 선다 (위 머리말) */
+function quickBaserunnerAllowed(bases: BaseState, outcome: AtBatOutcome, quickAdvance: AdvanceResult): boolean {
+  if (!isHit(outcome) && !isFreePass(outcome)) return runnerCountOf(bases) > 0
+  // 고침(B-37): 목록 전체를 보면 타자주자가 늘 살아 있다 — 홈런(전원 +0x96 = 1)만 안 선다
+  return isBugFixed('B-37') ? outcome.kind !== '홈런' : quickAdvance.runsScored === 0
 }

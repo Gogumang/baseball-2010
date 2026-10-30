@@ -41,10 +41,7 @@ export function runnerAceIndexesOf(aces: RunnerAces | undefined, bases: BaseStat
 export function loadedRunnerAceOf(aces: RunnerAces | undefined, bases: BaseState): number | null {
   const batter = aceOf(aces?.batter)
   if (batter !== null) return batter
-  let loaded: number | null = null
-  // 목록 차례 = 뒤 주자 → 앞선 주자 (1 → 2 → 3루), 덮어쓴다
-  if (bases.first && aceOf(aces?.first) !== null) loaded = aceOf(aces?.first)
-  if (bases.second && aceOf(aces?.second) !== null) loaded = aceOf(aces?.second)
-  if (bases.third && aceOf(aces?.third) !== null) loaded = aceOf(aces?.third)
-  return loaded
+  // 목록 차례 = 뒤 주자 → 앞선 주자 (1 → 2 → 3루), 덮어쓴다 — 곧 마선수가 있는 가장 앞선 주자
+  const loaded = runnerAceIndexesOf(aces, bases).filter((ace): ace is number => ace !== null)
+  return loaded.at(-1) ?? null
 }

@@ -54,23 +54,24 @@ export const FOUL_CALL_SOUND = 25
 /** 8 · 12 — 0x51c8a `movs r1,#0xb` */
 export const HOME_RUN_CALL_SOUND = 11
 
+/** 결과 메시지 0xbba 의 코드별 콜 — 13 은 아웃 꼴에 따라 갈려 `outCallSoundOf` 가 고른다 */
+const CALL_SOUND_OF_MESSAGE: ReadonlyMap<number, number> = new Map([
+  [7, FOUL_CALL_SOUND],
+  [8, HOME_RUN_CALL_SOUND],
+  [9, SAFE_CALL_SOUND],
+  [11, CAUGHT_OUT_CALL_SOUND],
+  [12, HOME_RUN_CALL_SOUND],
+])
+const OUT_MESSAGE_CODE = 13
+
+/** 13 — 태그 · 뜬공 아웃은 0x51b4c, 포스 아웃은 0x51bd8 갈래 */
+const outCallSoundOf = (context: JudgeCallContext): number =>
+  context.caughtOnTheFly || context.tagOut ? CAUGHT_OUT_CALL_SOUND : FORCE_OUT_CALL_SOUND
+
 /** 결과 메시지 0xbba(코드)가 그 자리에서 내는 콜 번호 — 소리가 없는 코드면 null */
 export function judgeCallSoundIdOf(messageCode: number, context: JudgeCallContext): number | null {
-  switch (messageCode) {
-    case 7:
-      return FOUL_CALL_SOUND
-    case 8:
-    case 12:
-      return HOME_RUN_CALL_SOUND
-    case 9:
-      return SAFE_CALL_SOUND
-    case 11:
-      return CAUGHT_OUT_CALL_SOUND
-    case 13:
-      return context.caughtOnTheFly || context.tagOut ? CAUGHT_OUT_CALL_SOUND : FORCE_OUT_CALL_SOUND
-    default:
-      return null
-  }
+  if (messageCode === OUT_MESSAGE_CODE) return outCallSoundOf(context)
+  return CALL_SOUND_OF_MESSAGE.get(messageCode) ?? null
 }
 
 /**
