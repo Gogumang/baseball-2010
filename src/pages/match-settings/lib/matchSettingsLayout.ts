@@ -43,262 +43,44 @@
  * 명전 몸 그림 0x5e8bc 가 올린 값)에서 잇는다 — `shared/lib/skinStepCounter`.
  * 판 0x55e60 은 공용 `CommonPanel` 이 그린다 — 네 자리 모두 (…, 0, 0x22, 0, 0, 제목 탭 1, 어둡게 1).
  */
-
-export interface SettingsBox {
-  readonly x: number
-  readonly y: number
-  readonly width: number
-  readonly height: number
-}
-
-export interface SettingsPoint {
-  readonly x: number
-  readonly y: number
-}
-
-const W = 240
-const H = 320
-const HALF_W = W / 2
-const HALF_H = H / 2
-
-/** 0x55e60(skin, W/2, H/2, 192, h, 0, 0x22) — 가운데 정렬 0x22 */
-const windowOf = (height: number): SettingsBox => ({
-  x: HALF_W - 0x60,
-  y: HALF_H - (height >> 1),
-  width: 0xc0,
-  height,
-})
-
-/** 종류 고르기 · 찬스 · 이닝 판 — (24, 80, 192, 160) */
-export const SMALL_WINDOW: SettingsBox = windowOf(0xa0)
-/** 상세 판 — (24, 54, 192, 212) */
-export const DETAIL_WINDOW: SettingsBox = windowOf(0xd4)
-
-/** 마우스 되돌아가기 단추 — 원본은 CLR 키가 맡는다 (**웹판 추가**). 판 바로 아래 왼쪽에 둔다 */
-export const BACK_BUTTON = { width: 60, height: 14, gap: 4 } as const
-export const backButtonOf = (board: SettingsBox): SettingsBox => ({
-  x: board.x,
-  y: board.y + board.height + BACK_BUTTON.gap,
-  width: BACK_BUTTON.width,
-  height: BACK_BUTTON.height,
-})
-
-/** img_text 팔레트 (0x913e5(애니, n)) — 0 흰 · 1 노랑 · 3 짙은 파랑 · 4 회색 */
-export const IMG_TEXT_PALETTE = { 흰: 0, 노랑: 1, 파랑: 3, 회색: 4 } as const
-
-/** 제목 "경기설정" — img_text 357 팔레트 3. x = W/2 − 0x60 − w/2 + 0x2d */
-export const TITLE = {
-  frame: 357,
-  centerX: HALF_W - 0x60 + 0x2d,
-  /** 종류·찬스·이닝 H/2 − 0x4b · 상세 H/2 − 0x65 */
-  smallY: HALF_H - 0x4b,
-  detailY: HALF_H - 0x65,
-} as const
-
-/** 꼬리 탭 — slt_frame **이미지** 40(91×15)을 효과 0x11 · 인자 0(좌우 뒤집기)로, 그 위에 종류 이름(팔레트 1) */
-export const TAB = {
-  image: 40,
-  imageWidth: 91,
-  /** W/2 − w + 0x5b */
-  x: HALF_W - 91 + 0x5b,
-  /** W/2 − w + 0x82 */
-  labelX: HALF_W - 91 + 0x82,
-  /** 찬스·이닝 (H/2 − 0x4a, H/2 − 0x48) · 상세 (y0 + 6, y0 + 8) */
-  smallY: HALF_H - 0x4a,
-  smallLabelY: HALF_H - 0x48,
-  detailY: DETAIL_WINDOW.y + 6,
-  detailLabelY: DETAIL_WINDOW.y + 8,
-} as const
-
-/** 꼬리 탭 위 이름 — 찬스 402 · 이닝 403 · 상세 353 */
-export const TAB_LABEL_FRAMES = [402, 403, 353] as const
-
-/** 종류 줄·이닝 값 줄 — slt_frame 프레임 15(101×18) */
-export const LIST_ROW = {
-  frame: 15,
-  width: 101,
-  height: 18,
-  /** W/2 − 101/2 */
-  x: HALF_W - (101 >> 1),
-  /** H/2 − 0x32 */
-  y: HALF_H - 0x32,
-  step: 0x1a,
-  /** 이름 그림은 줄 위에서 4 아래 */
-  labelDy: 4,
-} as const
-
-export const listRowTopOf = (index: number): number => LIST_ROW.y + LIST_ROW.step * index
-
-/** 가운데 놓기 — 원본 `W/2 − (w >> 1)` */
-export const centeredLeftOf = (centerX: number, width: number): number => centerX - (width >> 1)
-
-/** 둥근 테 0x6aa64(x, y, w, h, 둥글기 1, 색) — 선은 x..x+w · y..y+h, 네 모서리 점은 빈다 */
-export interface RoundOutline extends SettingsBox {
-  readonly color: string
-}
-
-/** 노랑 커서 RGB(255,255,85) · 켜진 칸 하늘 RGB(128,255,255) */
-export const OUTLINE_COLOR = { 커서: '#FFFF55', 켜짐: '#80FFFF' } as const
-
-/** 종류·이닝 줄 커서 — (70, 110 + 26k, 100, 17) */
-export const listCursorOf = (index: number): RoundOutline => ({
-  x: LIST_ROW.x,
-  y: listRowTopOf(index),
-  width: LIST_ROW.width - 1,
-  height: LIST_ROW.height - 1,
-  color: OUTLINE_COLOR.커서,
-})
-
-/** 찬스 두 칸 — popup 프레임 19 · 20, 고른 칸은 깜빡일 때 21 · 22, 이름 img_text 352 · 338 */
-export const CHANCE_SLOTS = [
-  { frame: 19, selectedFrame: 21, x: HALF_W - 0x42, y: HALF_H - 0x28, label: 352, labelX: HALF_W - 0x3c, labelY: HALF_H + 2 },
-  { frame: 20, selectedFrame: 22, x: HALF_W + 0x1f, y: HALF_H - 0x28, label: 338, labelX: HALF_W + 0x25, labelY: HALF_H + 2 },
-] as const
-/** 찬스 칸 그림 크기 (popup 프레임 19 · 20 = 35×35) — 마우스 칸으로만 쓴다 */
-export const CHANCE_SLOT_SIZE = 35
-
-/** 설명 칸 0xbb28c(W/2, y, 182, 40, 2) 와 글 0xba268(x, y, 폭) */
-export interface DescriptionLayout {
-  readonly box: SettingsBox
-  readonly text: SettingsBox
-}
-
-const DESCRIPTION_BOX_WIDTH = 0xb6
-const DESCRIPTION_BOX_HEIGHT = 0x28
-
-/** 종류·찬스·이닝 — 칸 (29, 195) · 글 (24, 202, 폭 192) */
-export const SMALL_DESCRIPTION: DescriptionLayout = {
-  box: { x: HALF_W - DESCRIPTION_BOX_WIDTH / 2, y: HALF_H + 0x23, width: DESCRIPTION_BOX_WIDTH, height: DESCRIPTION_BOX_HEIGHT },
-  text: { x: HALF_W - 0x60, y: HALF_H + 0x2a, width: 0xc0, height: DESCRIPTION_BOX_HEIGHT },
-}
-
-/** 상세 — 칸 (29, 199) · 글 (34, 206, 폭 172) */
-export const DETAIL_DESCRIPTION: DescriptionLayout = {
-  box: { x: HALF_W - DESCRIPTION_BOX_WIDTH / 2, y: HALF_H + 0x27, width: DESCRIPTION_BOX_WIDTH, height: DESCRIPTION_BOX_HEIGHT },
-  text: { x: HALF_W - 0x56, y: HALF_H + 0x2e, width: 0xac, height: DESCRIPTION_BOX_HEIGHT },
-}
-
-/** 설명 칸 색 — 0xbb28c 를 떠서 본 칠·선 (안 RGB(29,68,168) · 위·왼 (8,36,107) · 아래·오른 (90,134,255)) */
-export const DESCRIPTION_BOX_COLORS = { fill: '#1D44A8', dark: '#08246B', light: '#5A86FF' } as const
-
-/** 상세 화살 — slt_frame 이미지 32 ▲ · 33 ▼ (13×8) */
-export const DETAIL_ARROWS = {
-  up: 32,
-  down: 33,
-  x: HALF_W - 6,
-  /** 깜빡이면 2 */
-  bob: 2,
-} as const
-/** ▲ y = y0 − 깜빡2 − 10 */
-export const detailUpArrowYOf = (bob: number): number => DETAIL_WINDOW.y - bob - 10
-/** ▼ y = y0 + 깜빡2 + 0xd6 */
-export const detailDownArrowYOf = (bob: number): number => DETAIL_WINDOW.y + bob + 0xd6
-
-/** 상세 줄 Y (y0 + 0x22 → +0x27 → +20 → +40) */
-export const DETAIL_ROW_Y = [88, 127, 147, 187] as const
-
-/** 줄 머리 네모 — 지금 줄 38(노랑) · 아니면 39 — (35, Y − 2) */
-export const DETAIL_MARK = { current: 38, other: 39, x: 35, dy: -2 } as const
-
-/** 줄 이름 두 장 (45, Y − 3) · (67, Y − 3) — 팔레트 0 */
-export const DETAIL_LABEL = { x: [45, 67], dy: -3 } as const
-export const DETAIL_LABEL_FRAMES = [
-  [149, 354],
-  [352, 355],
-  [150, 354],
-  [338, 355],
-] as const
-
-/** 상세 칸 꼴 — 9칸 줄(0 · 2) 과 3칸 줄(1 · 3) */
-export interface DetailCellShape {
-  readonly offFrame: number
-  readonly onFrame: number
-  readonly width: number
-  readonly height: number
-  readonly x: number
-  /** 줄 Y 에서 */
-  readonly dy: number
-  /** 숫자 가운데 x 를 칸 가운데에서 옮기는 값 */
-  readonly numberDx: number
-  /** "루" 그림 — 9칸 줄은 없다 */
-  readonly hasBaseLabel: boolean
-}
-
-const INNING_CELL: DetailCellShape = {
-  offFrame: 48,
-  onFrame: 49,
-  width: 19,
-  height: 15,
-  x: 29,
-  dy: 11,
-  numberDx: 0,
-  hasBaseLabel: false,
-}
-const BASE_CELL: DetailCellShape = {
-  offFrame: 50,
-  onFrame: 51,
-  width: 33,
-  height: 15,
-  x: 107,
-  dy: -6,
-  numberDx: -3,
-  hasBaseLabel: true,
-}
-
-/** 줄별 칸 꼴 — 0 타자조작 · 1 공격주자 · 2 투수조작 · 3 수비주자 */
-export const DETAIL_CELL_SHAPES: readonly DetailCellShape[] = [INNING_CELL, BASE_CELL, INNING_CELL, BASE_CELL]
-
-/** 칸 i 의 상자 — 칸 사이는 w + 1 */
-export function detailCellBoxOf(row: number, cell: number): SettingsBox {
-  const shape = DETAIL_CELL_SHAPES[row] ?? INNING_CELL
-  return {
-    x: shape.x + (shape.width + 1) * cell,
-    y: (DETAIL_ROW_Y[row] ?? 0) + shape.dy,
-    width: shape.width,
-    height: shape.height,
-  }
-}
-
-/** 칸 숫자의 가운데 — (칸x + w/2 + 보정, 칸y + h/2 + 1). 0x585ac 정렬 0x22 가 숫자 폭·높이의 반을 뺀다 */
-export function detailNumberCenterOf(row: number, cell: number): SettingsPoint {
-  const shape = DETAIL_CELL_SHAPES[row] ?? INNING_CELL
-  const box = detailCellBoxOf(row, cell)
-  return { x: box.x + (shape.width >> 1) + shape.numberDx, y: box.y + (shape.height >> 1) + 1 }
-}
-
-/** "루" img_text 390 — (칸x + w/2 + 2, 칸y + 3) */
-export const BASE_LABEL_FRAME = 390
-export function baseLabelPointOf(row: number, cell: number): SettingsPoint {
-  const shape = DETAIL_CELL_SHAPES[row] ?? BASE_CELL
-  const box = detailCellBoxOf(row, cell)
-  return { x: box.x + (shape.width >> 1) + 2, y: box.y + 3 }
-}
-
-/** 칸 테두리 0x6aa64 — (칸x, 칸y, w − 1, h − 1) */
-export function detailCellOutlineOf(row: number, cell: number, color: string): RoundOutline {
-  const box = detailCellBoxOf(row, cell)
-  return { x: box.x, y: box.y, width: box.width - 1, height: box.height - 1, color }
-}
-
-/** 숫자 단색 — 켜짐 흰색 · 꺼짐 RGB(142,148,193) (0x1400748 → 0x585ac 효과 0xb) */
-export const DETAIL_NUMBER_COLOR = { on: '#FFFFFF', off: '#8E94C1' } as const
-
-/** num.pzx 이미지 90 + 숫자 — 크기 8×8, "1"(91) 만 4×8 */
-export const DETAIL_NUMBER = { base: 90, height: 8 } as const
-export const detailDigitWidthOf = (digit: number): number => (digit === 1 ? 4 : 8)
-
-/** 확인 단추 — popup 프레임 0(41×15) · 고르면 18. x = W/2 − 41/2 · y = y0 + 190 */
-export const DETAIL_OK = {
-  frame: 0,
-  selectedFrame: 18,
-  width: 41,
-  height: 15,
-  x: HALF_W - (41 >> 1),
-  y: DETAIL_WINDOW.y + 190,
-} as const
-
-/** 깜빡임 — 그릴 때마다 [skin+0x40c] 를 1 올린 뒤 `% 8 ≤ 4` (6045a~6046c) */
-export const isSettingsBlinkOn = (drawCount: number): boolean => ((drawCount % 8) + 8) % 8 <= 4
-
-/** 설명 글 줄 높이 — 0xba268 → 0x6ecd0(상자, 1) 앱 전역 글꼴(높이 11 + 줄간 3) */
-export const DESCRIPTION_LINE_HEIGHT = 14
+export {
+  backButtonOf,
+  centeredLeftOf,
+  CHANCE_SLOT_SIZE,
+  CHANCE_SLOTS,
+  DESCRIPTION_BOX_COLORS,
+  DETAIL_DESCRIPTION,
+  DETAIL_WINDOW,
+  IMG_TEXT_PALETTE,
+  LIST_ROW,
+  listCursorOf,
+  listRowTopOf,
+  OUTLINE_COLOR,
+  SMALL_DESCRIPTION,
+  SMALL_WINDOW,
+  TAB,
+  TAB_LABEL_FRAMES,
+  TITLE,
+} from '@/pages/match-settings/lib/matchSettingsLayout/settingsWindow'
+export type { DescriptionLayout, RoundOutline, SettingsBox } from '@/pages/match-settings/lib/matchSettingsLayout/settingsWindow'
+export {
+  BASE_LABEL_FRAME,
+  baseLabelPointOf,
+  DESCRIPTION_LINE_HEIGHT,
+  DETAIL_ARROWS,
+  DETAIL_CELL_SHAPES,
+  DETAIL_LABEL,
+  DETAIL_LABEL_FRAMES,
+  DETAIL_MARK,
+  DETAIL_NUMBER,
+  DETAIL_NUMBER_COLOR,
+  DETAIL_OK,
+  DETAIL_ROW_Y,
+  detailCellBoxOf,
+  detailCellOutlineOf,
+  detailDigitWidthOf,
+  detailDownArrowYOf,
+  detailNumberCenterOf,
+  detailUpArrowYOf,
+  isSettingsBlinkOn,
+} from '@/pages/match-settings/lib/matchSettingsLayout/settingsDetail'

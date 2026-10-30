@@ -1,47 +1,34 @@
-import { useEffect, useId } from 'react'
-import type { CSSProperties } from 'react'
+import { useId } from 'react'
 import { SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import type { FrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
 import { useTouchScrollKeys } from '@/shared/lib/touchKeyOffer/touchKeyOffer'
-import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
-import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
-import type { ShopBox } from '@/pages/shop/lib/shopLayout'
+import { moneyGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import {
-  ABILITY_LABEL_BASE,
-  ABILITY_LABEL_PALETTE,
-  DESCRIPTION_INSET,
   EQUIPMENT_BOXES,
-  EQUIPMENT_COLORS,
   EQUIPMENT_FRAME,
   EQUIPMENT_LABEL_FRAMES,
   EQUIPMENT_MODE_UI_FRAME,
   EQUIPMENT_PART_COUNT,
   EQUIPMENT_TAB_STEP,
   EQUIPMENT_VISIBLE_ROWS,
-  PLUS_FRAME,
   VALUE_RIGHT_INSET,
-  alignedPositionOf,
   boardRectsOf,
   descriptionPanelRectsOf,
-  effectOffsetsOf,
   rowBoxOf,
   scrollBarRectsOf,
   tabCursorBoxOf,
   tabSeparatorRectsOf,
 } from '@/pages/shop/lib/equipmentWindowLayout'
-import type { EquipmentEdition, PixelRect } from '@/pages/shop/lib/equipmentWindowLayout'
+import type { EquipmentEdition } from '@/pages/shop/lib/equipmentWindowLayout'
 import type { EquipmentRow } from '@/pages/shop/lib/equipmentRows'
-import { equipmentKeyOf, equipmentWindowKeyOf } from '@/pages/shop/lib/equipmentWindowState'
 import type { EquipmentWindowState } from '@/pages/shop/lib/equipmentWindowState'
+import { AlignedFrame, FramePicture, PixelRects } from '@/pages/shop/ui/equipmentWindow/equipmentPictures'
+import { IMG_TEXT, MODE_UI } from '@/pages/shop/ui/equipmentWindow/spriteFolders'
+import { EquipmentRows } from '@/pages/shop/ui/equipmentWindow/EquipmentRows'
+import { SelectedDetails } from '@/pages/shop/ui/equipmentWindow/SelectedDetails'
+import { useEquipmentWindowKeys } from '@/pages/shop/ui/equipmentWindow/useEquipmentWindowKeys'
 import * as styles from '@/pages/shop/ui/EquipmentWindow.css'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-
-const MODE_UI = assetUrl('./sprites/mode_ui/frames')
-const IMG_TEXT = assetUrl('./sprites/img_text/frames')
-const NUM = assetUrl('./sprites/num')
-const pad = (frame: number) => String(frame).padStart(3, '0')
 
 /** 0xca911(틱, 10) ≠ 0 — 열 번에 아홉 번 켜진다 (탭 커서 · 줄 테두리) */
 const BLINK_PERIOD = 10
@@ -74,29 +61,11 @@ export function EquipmentWindow({ edition, rows, state, onStateChange, onSelect,
   const paletteFilterId = `equipment-palette1-${useId().replace(/:/g, '')}`
   const isListFocused = state.focus === '줄'
 
-  useEffect(() => {
-    if (!isKeyEnabled) return undefined
-    const onKey = (event: KeyboardEvent) => {
-      const key = equipmentKeyOf(event.key)
-      if (key === null) return
-      event.preventDefault()
-      const result = equipmentWindowKeyOf(state, key, rows.length)
-      if (result.kind === '나가기') return onExit()
-      if (result.kind === '고르기') {
-        const row = rows[result.cursor]
-        if (row !== undefined) onSelect(row)
-        return
-      }
-      if (result.state !== state) onStateChange(result.state)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
+  useEquipmentWindowKeys(isKeyEnabled, state, rows, onStateChange, onSelect, onExit)
 
   // 터치 기기 — 줄 목록이 5줄을 넘으면 ▲ · ▼ 상황 버튼(↑ · ↓ 키 사건). 보이는 줄은 눌러서 고른다
   useTouchScrollKeys(isKeyEnabled && isListFocused && rows.length > EQUIPMENT_VISIBLE_ROWS)
 
-  const visibleRows = rows.slice(state.top, state.top + EQUIPMENT_VISIBLE_ROWS)
   const selected = isListFocused ? rows[state.cursor] : undefined
   const { label: labelBox, value: valueBox, row: rowBox, description: descriptionBox } = EQUIPMENT_BOXES
 
@@ -163,26 +132,7 @@ export function EquipmentWindow({ edition, rows, state, onStateChange, onSelect,
       ))}
 
       {/* 목록 다섯 줄 */}
-      {visibleRows.map((row, offset) => {
-        const index = state.top + offset
-        const target = rowBoxOf(rowBox, offset)
-        const bar = row.isEquipped ? EQUIPMENT_MODE_UI_FRAME.equippedBar : isShop && row.isOwned ? EQUIPMENT_MODE_UI_FRAME.ownedBar : null
-        const color = row.isEquipped ? EQUIPMENT_COLORS.equippedText : isShop && row.isOwned ? EQUIPMENT_COLORS.ownedText : EQUIPMENT_COLORS.rowText
-        return (
-          <span key={row.id}>
-            {bar !== null && <AlignedFrame folder={MODE_UI} frame={bar} origins={modeUiOrigins} target={target} align={0x22} />}
-            <button
-              type="button"
-              className={styles.rowButton}
-              data-testid={`장비줄-${row.level}`}
-              style={{ left: target.x, top: target.y, width: target.width, height: target.height, color }}
-              onClick={() => (isListFocused && state.cursor === index ? onSelect(row) : onStateChange({ ...state, focus: '줄', cursor: index }))}
-            >
-              {row.name}
-            </button>
-          </span>
-        )
-      })}
+      <EquipmentRows rows={rows} state={state} isShop={isShop} modeUiOrigins={modeUiOrigins} onStateChange={onStateChange} onSelect={onSelect} />
 
       {selected !== undefined && (
         <SelectedDetails
@@ -204,169 +154,5 @@ export function EquipmentWindow({ edition, rows, state, onStateChange, onSelect,
         </filter>
       </svg>
     </>
-  )
-}
-
-/** 고른 줄의 노랑 테두리 · 가격 · 효과 · 설명 (0x83c02~0x84334) */
-function SelectedDetails({
-  row,
-  edition,
-  part,
-  cursorBox,
-  isBlinkOn,
-  textOrigins,
-  paletteFilterId,
-}: {
-  readonly row: EquipmentRow
-  readonly edition: EquipmentEdition
-  readonly part: number
-  readonly cursorBox: ShopBox
-  readonly isBlinkOn: boolean
-  readonly textOrigins: FrameOrigins | null
-  readonly paletteFilterId: string
-}) {
-  const { value: valueBox, description: descriptionBox } = EQUIPMENT_BOXES
-  const priceBox = rowBoxOf(valueBox, 1)
-  const effectBox = rowBoxOf(valueBox, 2)
-  const offsets = effectOffsetsOf(row.bonus)
-  const lines = parseGameMarkup(row.description)
-  return (
-    <>
-      {/* 0xb9ed5 노랑 사각 테두리 — 0x6a978 이 폭·높이에 1 을 더해 플랫폼 0x14006d8 에 넘겨 (w + 1) × (h + 1) 칸을 덮는다(U-113 확정 — 플랫폼은 받은 폭 · 높이를 칸 수로 본다) */}
-      {isBlinkOn && (
-        <svg className={styles.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges" data-testid="장비-줄테두리">
-          <rect
-            x={cursorBox.x + 0.5}
-            y={cursorBox.y + 0.5}
-            width={cursorBox.width}
-            height={cursorBox.height}
-            fill="none"
-            stroke={EQUIPMENT_COLORS.cursor}
-            strokeWidth={1}
-          />
-        </svg>
-      )}
-
-      {/* 가격 — 박스 2 줄 1 */}
-      <SpriteNumber
-        glyphs={moneyGlyphsOf(row.price)}
-        right={priceBox.x + priceBox.width - VALUE_RIGHT_INSET}
-        boxTop={priceBox.y}
-        boxHeight={priceBox.height}
-      />
-
-      {/* 효과 — 능력치 이름(팔레트 1) · "+" · 보너스 (박스 2 줄 2) */}
-      <span data-testid="장비-효과" data-bonus={row.bonus}>
-        <AlignedFrame
-          folder={IMG_TEXT}
-          frame={ABILITY_LABEL_BASE[edition] + part}
-          origins={textOrigins}
-          target={effectBox}
-          align={0x24}
-          ox={offsets.labelOx}
-          style={{ filter: `url(#${paletteFilterId})` }}
-          paletteIndex={ABILITY_LABEL_PALETTE}
-        />
-        <PlusSign target={effectBox} ox={offsets.plusOx} />
-        <SpriteNumber
-          glyphs={numberGlyphsOf(row.bonus)}
-          right={effectBox.x + effectBox.width - VALUE_RIGHT_INSET}
-          boxTop={effectBox.y}
-          boxHeight={effectBox.height}
-        />
-      </span>
-
-      {/* 설명 — 박스 4, 정렬 0x11, (5, 5) */}
-      <div
-        className={styles.description}
-        data-testid="장비-설명"
-        style={{ left: descriptionBox.x + DESCRIPTION_INSET, top: descriptionBox.y + DESCRIPTION_INSET }}
-      >
-        {lines.map((line, lineIndex) => (
-          <p key={lineIndex} className={styles.descriptionLine} style={line.isCentered ? { textAlign: 'center' } : undefined}>
-            {line.segments.map((segment, segmentIndex) => (
-              <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
-                {segment.text}
-              </span>
-            ))}
-          </p>
-        ))}
-      </div>
-    </>
-  )
-}
-
-/** num "+" (6×6) — 0xb9d35 정렬 0x24 · 세로 가운데 내림 · oy 1 */
-const PLUS_SIZE = { width: 6, height: 6 } as const
-function PlusSign({ target, ox }: { readonly target: ShopBox; readonly ox: number }) {
-  const { x, y } = alignedPositionOf(target, PLUS_SIZE.width, PLUS_SIZE.height, 0x24, ox, 1, true)
-  return <img className={styles.layer} alt="" src={`${NUM}/${pad(PLUS_FRAME)}.png`} style={{ left: x, top: y }} />
-}
-
-function FramePicture({
-  folder,
-  frame,
-  origins,
-  x,
-  y,
-}: {
-  readonly folder: string
-  readonly frame: number
-  readonly origins: FrameOrigins | null
-  readonly x: number
-  readonly y: number
-}) {
-  const origin = origins?.[pad(frame)]
-  if (origin === undefined) return null
-  return <img className={styles.layer} alt="" src={`${folder}/${pad(frame)}.png`} style={{ left: x + origin.x, top: y + origin.y }} />
-}
-
-/** 0xb9e05 — 프레임을 박스에 정렬해 놓는다 (원점이 0 이 아닌 프레임은 원점만큼 더 민다) */
-function AlignedFrame({
-  folder,
-  frame,
-  origins,
-  target,
-  align,
-  ox = 0,
-  oy = 0,
-  style,
-  testId,
-  paletteIndex,
-}: {
-  readonly folder: string
-  readonly frame: number
-  readonly origins: FrameOrigins | null
-  readonly target: ShopBox
-  readonly align: number
-  readonly ox?: number
-  readonly oy?: number
-  readonly style?: CSSProperties
-  readonly testId?: string
-  readonly paletteIndex?: number
-}) {
-  const origin = origins?.[pad(frame)]
-  if (origin === undefined) return null
-  const { x, y } = alignedPositionOf(target, origin.width, origin.height, align, ox, oy)
-  return (
-    <img
-      className={styles.layer}
-      alt=""
-      data-testid={testId}
-      data-frame={frame}
-      data-palette={paletteIndex}
-      src={`${folder}/${pad(frame)}.png`}
-      style={{ left: x + origin.x, top: y + origin.y, ...style }}
-    />
-  )
-}
-
-function PixelRects({ rects }: { readonly rects: readonly PixelRect[] }) {
-  return (
-    <svg className={styles.pixels} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
-      {rects.map((rect, index) => (
-        <rect key={index} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />
-      ))}
-    </svg>
   )
 }

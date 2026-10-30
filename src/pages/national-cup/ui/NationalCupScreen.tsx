@@ -1,107 +1,16 @@
 import { useEffect, useEffectEvent, useState } from 'react'
-import type { ReactNode } from 'react'
-import { MessageBox, RawScreen } from '@/shared/ui'
-import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
-import { TEAMS } from '@/shared/config/original/teams'
-import type { RandomPort } from '@/shared/api/random/randomPort'
+import { RawScreen } from '@/shared/ui'
 import { nationalCupMatchupOf } from '@/entities/national-cup/model/nationalCup'
-import type { NationalCup, NationalCupMatchup as Matchup } from '@/entities/national-cup/model/nationalCup'
-import {
-  confirmNationalCupStandings,
-  finishNationalCup,
-  hiddenTeamOpenText,
-  nationalCupEditionOf,
-  nationalCupResultText,
-  nationalCupRewardText,
-  newlyOpenedHiddenTeamsOf,
-  queuedPopupsOf,
-} from '@/entities/national-cup/model/nationalCupFlow'
-import type { NationalCupFinish, NationalCupMode } from '@/entities/national-cup/model/nationalCupFlow'
+import type { NationalCup } from '@/entities/national-cup/model/nationalCup'
+import { confirmNationalCupStandings, finishNationalCup, nationalCupEditionOf } from '@/entities/national-cup/model/nationalCupFlow'
 import { NationalCupBracket } from '@/pages/national-cup/ui/NationalCupBracket'
 import { NationalCupStandings } from '@/pages/national-cup/ui/NationalCupStandings'
-import { TitleWindow } from '@/widgets/title-window/ui/TitleWindow'
-
-export interface NationalCupScreenProps {
-  readonly mode: NationalCupMode
-  /** 지금 대회 상태 (`createNationalCup()` 으로 시작한다) */
-  readonly cup: NationalCup
-  /** 연차 idx — 제 n 회 계산에 쓴다 (`SeasonRecord.yearIndex` = `S+0xb3`) */
-  readonly yearIndex: number
-  /** 머리띠 G포인트 */
-  readonly gamePoint?: number
-  readonly random: RandomPort
-  /**
-   * 경기 시작 — 나리 상태 142 / 시즌 221 로 넘어가는 자리다.
-   * 경기가 끝나면 `advanceNationalCupDay` 로 대회를 진행시키고 이 화면을 다시 띄우면 된다.
-   */
-  readonly onStartGame: (matchup: Matchup, cup: NationalCup) => void
-  /**
-   * 대회 끝 — 결과 팝업과 보상 팝업을 모두 닫았을 때. `finish.reward` 를 `applySeasonReward` 로 넣고,
-   * `finish.openedTeams` 로 히든 팀을 열면 된다.
-   *
-   * 국가대항전 플래그(`SeasonRecord.nationalCup`)는 이 화면이 내리지 않는다 — 시즌모드는 대회 끝이 곧장 새 해
-   * `0x6e0c` 로 가서 리그 초기화 memset 이 함께 지우고(588b201), 나만의리그는 제 세션이 내린다
-   * (`finishNationalCup` 주석 참고).
-   */
-  readonly onFinish: (finish: NationalCupFinish, cup: NationalCup) => void
-  /** 처음 그릴 단계 — 나리 142 취소(0x13c72 의 S+0x12c 갈래)는 135(순위)로 돌아온다. 안 주면 134(대진) */
-  readonly initialStep?: '대진' | '순위'
-  /**
-   * 화면 맨 밑에 먼저 깔 것 — 시즌 장면 0x105 는 상태별 그리기 앞에 늘 공통 앞그림 0xb810 을 부르고, 0xf3 국가대항전은 0xdd · 0xe0 · 0xe1 밖이라
-   * 공 무늬 0x5fd61(skin, 0, 0, W, H) 를 깐다(0xe9ac 0xefaa). 이 화면을 쓰는 다른 모드는 넘기지 않는다.
-   */
-  readonly underlay?: ReactNode
-  /**
-   * 나만의리그 편 — 나리 틀 0x16928 의 머리띠 제목(0x169ea~0x16a00)이 `장면+0xcc == 4 ? 8 : 9` 다.
-   * 모드 4(타자편)면 제목 8 "나만의리그타자편", 모드 3(투수편)이면 제목 9 "나만의리그투수편". 시즌모드는 안 본다
-   */
-  readonly edition?: '타자편' | '투수편'
-  /**
-   * 나리 134 진입 `0x19f30` 의 히든 팀 열기 — 지금 열려 있는 히든 id(전역 해금표 `+0x7a+k`, 웹 `openedHiddenIds`).
-   * 주면 대진(134)으로 들어설 때마다 대한민국 · (우승이면) 결승 상대 중 **처음 열리는 팀**마다 StrCOMMON[138]
-   * "히든 팀 오픈!!" 팝업(0x22)을 띄우고 `onOpenHiddenTeams` 로 연다. 안 주면(시즌모드) 열지 않는다.
-   * 142 취소로 135 부터 들어오면(`initialStep` 순위) 134 진입이 아니라 열지 않는다.
-   */
-  readonly openedHiddenIds?: readonly number[]
-  /** 134 진입이 처음 연 히든 팀 — 원본은 그 자리에서 전역 `+0x7a+k = 1` · 전역 저장 `0x1f1b9` */
-  readonly onOpenHiddenTeams?: (teams: readonly number[]) => void
-  /**
-   * 나리 134 첫 틀 `0x1b92c` 머리(1b92e~1b958)의 칭호 8 "국가 대표" — 비트 8 이 없을 때의 칭호 이름(`nationalCupStandingsTitleOf`).
-   * 주면 들어설 때 칭호 팝업(0x1274c — 0x741a1 높이 0x78)을 띄우고, 확인(0x1b1e4)에서 `onConfirmEntryTitle` 이 주고 곧바로 장착한다.
-   */
-  readonly entryTitle?: string | null
-  readonly onConfirmEntryTitle?: () => void
-}
-
-/** 134 에 들어설 때 걸리는 팝업 — 히든 팀 오픈(0x22) · 칭호(0x1274c 창, 높이 0x78) */
-type EntryPopup = { readonly kind: '히든팀'; readonly text: string } | { readonly kind: '칭호'; readonly title: string }
-
-interface EntryState {
-  /** 이번 진입이 처음 연 히든 팀 (팝업이 대기 칸에서 밀려도 열기는 다 일어난다) */
-  readonly openedTeams: readonly number[]
-  readonly popups: readonly EntryPopup[]
-}
-
-/**
- * 134 진입 한 번의 팝업 — 진입 `0x19f30` 이 먼저 `0x65de4` 로 히든 팀 팝업을 걸고(대한민국 → 결승 상대), 같은 진입의 첫 틀
- * `0x1b92c`(장면+0x2c == 1)가 칭호 8 팝업을 건다. 팝업 관리자는 띄운 것 하나 + 대기 한 칸이라 `queuedPopupsOf` 로 거른다.
- */
-function entryStateOf(
-  cup: NationalCup,
-  isEntering: boolean,
-  openedHiddenIds: readonly number[] | undefined,
-  entryTitle: string | null | undefined,
-): EntryState {
-  if (!isEntering) return { openedTeams: [], popups: [] }
-  const openedTeams = openedHiddenIds === undefined ? [] : newlyOpenedHiddenTeamsOf(cup, openedHiddenIds)
-  const hiddenPopups: EntryPopup[] = openedTeams.map((team) => ({ kind: '히든팀', text: hiddenTeamOpenText(TEAMS[team]?.name ?? '') }))
-  const titlePopups: EntryPopup[] =
-    entryTitle === null || entryTitle === undefined
-      ? []
-      : // 칭호 팝업 0x1274c — 그리기 0x1afe8 · 키 0x1b1e4 (`TitleWindow`)
-        [{ kind: '칭호', title: entryTitle }]
-  return { openedTeams, popups: queuedPopupsOf([...hiddenPopups, ...titlePopups]) }
-}
+import { entryStateOf } from '@/pages/national-cup/ui/nationalCupScreen/nationalCupEntry'
+import type { EntryState } from '@/pages/national-cup/ui/nationalCupScreen/nationalCupEntry'
+import { nationalCupKeyActionOf, shownCupOf } from '@/pages/national-cup/ui/nationalCupScreen/nationalCupKeys'
+import { NationalCupFrame } from '@/pages/national-cup/ui/nationalCupScreen/NationalCupFrame'
+import { NationalCupPopups } from '@/pages/national-cup/ui/nationalCupScreen/NationalCupPopups'
+import type { NationalCupScreenProps } from '@/pages/national-cup/ui/nationalCupScreen/nationalCupScreenProps'
 
 type Step = '대진' | '순위' | '결과' | '보상' | '끝'
 
@@ -172,10 +81,8 @@ export function NationalCupScreen({
   const [resolved, setResolved] = useState<NationalCup>(cup)
 
   const edition = nationalCupEditionOf(yearIndex)
-  const current = step === '대진' || step === '순위' ? cup : resolved
   const matchup = nationalCupMatchupOf(cup)
   const finish = finishNationalCup(mode, resolved)
-  const championName = TEAMS[resolved.champion]?.name ?? ''
 
   const confirmBracket = () => {
     const next = confirmNationalCupStandings(cup, random)
@@ -199,30 +106,13 @@ export function NationalCupScreen({
     setStep('보상')
   }
 
-  /**
-   * **키 길** (직접 떴다) — 대진 키 0xf3 `0xe6f8` · 134 `0x19fdc` 와 순위 키 135 `0x10680` 은 [this+0x40] 이 OK(−5) 또는 '5'(0x35)
-   * 일 때만 움직이고, 시즌 순위 0xf4 `0x4a18` 만 그 밖에 CLR(−16) → 0xf3(대진)이 있다. 그 밖의 키는 아무 일이 없다.
-   * 팝업(히든 팀 · 칭호 · 결과 · 보상)이 떠 있는 동안은 창이 키를 먹는다(0x754f9) — 대진판 확인도 팝업이 다 닫힌 뒤다.
-   * 화면 탭(대진판 · 순위표의 투명 누름 칸)은 OK 와 같다.
-   */
+  // 화면 탭(대진판 · 순위표의 투명 누름 칸)은 OK 와 같다 — 키 길은 `nationalCupKeyActionOf` 머리말
   const handleKey = useEffectEvent((key: string): boolean => {
-    const isOk = key === 'Enter' || key === '5'
-    if (step === '대진' && entryPopup === null) {
-      if (!isOk) return false
-      confirmBracket()
-      return true
-    }
-    if (step === '순위' && matchup !== null) {
-      if (isOk) {
-        onStartGame(matchup, cup)
-        return true
-      }
-      if (key === 'Escape' && mode === '시즌모드') {
-        setStep('대진')
-        return true
-      }
-    }
-    return false
+    const action = nationalCupKeyActionOf(key, step, entryPopup !== null, matchup !== null, mode)
+    if (action === '대진확인') confirmBracket()
+    else if (action === '경기시작' && matchup !== null) onStartGame(matchup, cup)
+    else if (action === '대진으로') setStep('대진')
+    return action !== null
   })
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -241,43 +131,29 @@ export function NationalCupScreen({
         <NationalCupStandings cup={cup} onConfirm={() => onStartGame(matchup, cup)} />
       ) : (
         // 팝업이 떠 있는 동안은 팝업 관리자가 키를 먹는다 — 대진판 확인은 팝업이 다 닫힌 뒤
-        <NationalCupBracket cup={current} onConfirm={confirmBracket} isConfirmable={step === '대진' && entryPopup === null} />
+        <NationalCupBracket cup={shownCupOf(step, cup, resolved)} onConfirm={confirmBracket} isConfirmable={step === '대진' && entryPopup === null} />
       )}
 
-      {/* 시즌 0xf3 은 제목 10 · 바닥 1, 0xf4 는 10 · 5. 나리 134·135 는 제목 장면+0xcc == 4 ? 8(타자편) : 9(투수편) · 5 — 되돌아가기는 표시만 */}
-      {mode === '시즌모드' ? (
-        <ScreenFrame
-          title="시즌모드"
-          gamePoint={gamePoint}
-          // 0xf4 키 0x4a18 만 −16 → 0xf3. 나리 0x10680 은 확인만 본다
-          onBack={step === '순위' ? () => setStep('대진') : null}
-          slides={false}
-        />
-      ) : (
-        <ScreenFrame
-          title={nariEdition === '투수편' ? '나만의리그투수편' : '나만의리그타자편'}
-          gamePoint={gamePoint}
-          onBack={null}
-          footer={5}
-          slides={false}
-        />
-      )}
+      <NationalCupFrame
+        mode={mode}
+        gamePoint={gamePoint}
+        nariEdition={nariEdition}
+        isStandings={step === '순위'}
+        onBackToBracket={() => setStep('대진')}
+      />
 
-      {entryPopup?.kind === '히든팀' && <MessageBox text={entryPopup.text} buttons={['확인']} onAnswer={closeEntryPopup} />}
-      {entryPopup?.kind === '칭호' && (
-        // 칭호 팝업 확인 0x1b1e4 — 키를 받은 그 자리에서 비트 · 곧바로 장착(+0x1c4) · 저장 · 창을 바로 치운다(0x742a8, 닫힘 애니 없음)
-        <TitleWindow key={entryPopupIndex} title={entryPopup.title} onKey={onConfirmEntryTitle} onClose={closeEntryPopup} />
-      )}
-
-      {step === '결과' && (
-        <MessageBox
-          text={nationalCupResultText(edition, finish.isKoreaChampion, championName, finish.koreaInFinal)}
-          buttons={['확인']}
-          onAnswer={closeResult}
-        />
-      )}
-
-      {step === '보상' && <MessageBox text={nationalCupRewardText(finish.reward)} buttons={['확인']} onAnswer={finishCup} />}
+      <NationalCupPopups
+        entryPopup={entryPopup}
+        entryPopupIndex={entryPopupIndex}
+        onConfirmEntryTitle={onConfirmEntryTitle}
+        onCloseEntryPopup={closeEntryPopup}
+        step={step}
+        edition={edition}
+        finish={finish}
+        champion={resolved.champion}
+        onCloseResult={closeResult}
+        onCloseReward={finishCup}
+      />
     </RawScreen>
   )
 }

@@ -3,7 +3,7 @@ import { pitcherPurchaseQuestionOf } from '@/features/shop/model/pitcherShopSele
 import type { PitcherShopTab } from '@/features/shop/model/pitcherShopSelection'
 import { pitcherShopEntriesOf } from '@/pages/shop/lib/pitcherShopEntries'
 import { pitcherEquipmentRowsOf } from '@/pages/shop/lib/equipmentRows'
-import { ShopScreenView } from '@/pages/shop/ui/ShopScreen'
+import { ShopScreenView } from '@/pages/shop/ui/shopScreen/ShopScreenView'
 import { PitcherStatusBoard } from '@/pages/pitcher-league/ui/PitcherStatusBoard'
 import { PitcherBasicInfoCard } from '@/pages/pitcher-league/ui/PitcherBasicInfoCard'
 import { PITCHER_EQUIPMENT_PARTS } from '@/entities/pitcher-career/model/pitcherEquipment'

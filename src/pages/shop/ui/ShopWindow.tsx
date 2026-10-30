@@ -1,50 +1,29 @@
 import { useEffect } from 'react'
-import { solidColorCss } from '@/shared/lib/pixelEffect/pixelEffect'
-import { CommonPanel, PressArea, SpriteNumber } from '@/shared/ui'
+import { CommonPanel, SpriteNumber } from '@/shared/ui'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { useUpdateCounter } from '@/shared/lib/sprite/useUpdateCounter'
-import { moneyGlyphsOf, numberGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
-import { parseGameMarkup } from '@/shared/lib/gameMarkup/gameMarkup'
+import { moneyGlyphsOf } from '@/shared/lib/pixelNumber/pixelNumber'
 import {
   CURSOR_BLINK_PERIOD,
   CURSOR_VISIBLE_UPDATES,
-  DESCRIPTION_BOX,
   HEAD_LABEL_FRAME,
-  INNER,
-  LABEL_HEIGHT,
   LEFT_TAB_BOX,
-  MODE_UI_FRAME,
   MONEY_BAR_OFFSET,
   MONEY_DIGIT_OFFSET,
   MONEY_LABEL_OFFSET,
-  NAME_BOX,
   RIGHT_TAB_BOX,
   SHOP_COLORS,
-  SLOT_COUNT,
-  SLOT_SIZE,
   VALUE_BOX,
-  VALUE_DIGIT_RIGHT_INSET,
   WINDOW_BOX,
-  centeredLeftOf,
-  centeredTopOf,
   movedSlotOf,
-  slotCellRectsOf,
   slotGridKeyOf,
-  slotPositionOf,
-  valueBarPositionOf,
 } from '@/pages/shop/lib/shopLayout'
-import type { ItemGridWindowKind, ShopBox } from '@/pages/shop/lib/shopLayout'
+import type { ItemGridWindowKind } from '@/pages/shop/lib/shopLayout'
 import type { ShopEntry } from '@/pages/shop/lib/shopEntries'
-import * as windowStyles from '@/shared/ui/GameWindow/GameWindow.css'
-import * as styles from '@/pages/shop/ui/ShopWindow.css'
-import { spriteMaskImage } from '@/shared/lib/sprite/spriteMask'
-import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
-
-const IMG_TEXT = assetUrl('./sprites/img_text/frames')
-const MODE_UI = assetUrl('./sprites/mode_ui/frames')
-const ITEM_ICON = assetUrl('./sprites/item_icon')
-
-const spriteSrc = (folder: string, frame: number) => `${folder}/${String(frame).padStart(3, '0')}.png`
+import { CenteredLabel, LeftLabel, ValueBar } from '@/pages/shop/ui/shopWindow/shopLabels'
+import { ShopSelectedText } from '@/pages/shop/ui/shopWindow/ShopSelectedText'
+import { ShopSlotGrid } from '@/pages/shop/ui/shopWindow/ShopSlotGrid'
+import { IMG_TEXT, MODE_UI } from '@/pages/shop/ui/shopWindow/spriteFolders'
 
 interface ShopWindowProps {
   readonly kind: ItemGridWindowKind
@@ -100,49 +79,6 @@ export function ShopWindow({ kind, entries, cursor, onMoveCursor, onSelect, mone
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const labelSizeOf = (frame: number) => textOrigins?.[String(frame).padStart(3, '0')] ?? null
-  /** img_text 글 그림을 단색으로 찍는다 (효과 11) */
-  const tintedLabel = (frame: number, left: number, top: number, color: string) => {
-    const size = labelSizeOf(frame)
-    if (size === null) return null
-    return (
-      <div
-        key={`${frame}-${left}`}
-        className={styles.tintedLabel}
-        style={{
-          // 효과 0xb 는 인자 색의 아래 16비트(565)를 찍는다 — `solidColorCss`
-          left,
-          top,
-          width: size.width,
-          height: size.height,
-          background: solidColorCss(color),
-          maskImage: spriteMaskImage(spriteSrc(IMG_TEXT, frame)),
-          WebkitMaskImage: spriteMaskImage(spriteSrc(IMG_TEXT, frame)),
-        }}
-      />
-    )
-  }
-  const centeredLabel = (frame: number, box: ShopBox, color: string) => {
-    const size = labelSizeOf(frame)
-    if (size === null) return null
-    return tintedLabel(frame, centeredLeftOf(box, size.width), centeredTopOf(box, size.height), color)
-  }
-  /** 값 막대 프레임 52 — 정렬 0x11 · (ox, oy) 또는 0x14(오른쪽 위) */
-  const valueBar = (box: ShopBox, align: 0x11 | 0x14, ox = 0, oy = 0) => {
-    const size = modeUiOrigins?.[String(MODE_UI_FRAME.valueBar).padStart(3, '0')] ?? null
-    if (size === null) return null
-    const { x, y } = valueBarPositionOf(box, align, size.width, ox, oy)
-    return <img className={styles.layer} alt="" src={spriteSrc(MODE_UI, MODE_UI_FRAME.valueBar)} style={{ left: x, top: y }} />
-  }
-  /** 칸 왼쪽 · 세로 가운데에 붙는 글 (정렬 0x21) */
-  const leftLabel = (frame: number, box: ShopBox, color: string, ox = 0, oy = 0) => {
-    const size = labelSizeOf(frame)
-    if (size === null) return null
-    return tintedLabel(frame, box.x + ox, centeredTopOf(box, size.height) + oy, color)
-  }
-
-  const descriptionLines = parseGameMarkup(selected?.description ?? '')
-
   return (
     <>
       {/* 박스 0 — 81e66 공용 판 0x55e61(skin, 24, 48, 192, 212, 0, 정렬 0x11, 위 띠 0x10, 0, 제목 탭 1, 0)
@@ -150,13 +86,24 @@ export function ShopWindow({ kind, entries, cursor, onMoveCursor, onSelect, mone
       <CommonPanel x={WINDOW_BOX.x} y={WINDOW_BOX.y} width={WINDOW_BOX.width} height={WINDOW_BOX.height} topBand={0x10} titleTab testId="상점-판" />
 
       {/* 머리 — 창 종류별 (0x81ea2~0x82254) */}
-      {kind !== 'GP' && centeredLabel(HEAD_LABEL_FRAME.서브아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
-      {kind === 'GP' && centeredLabel(HEAD_LABEL_FRAME.GP아이템, LEFT_TAB_BOX, SHOP_COLORS.tabOn)}
+      <CenteredLabel
+        frame={kind === 'GP' ? HEAD_LABEL_FRAME.GP아이템 : HEAD_LABEL_FRAME.서브아이템}
+        box={LEFT_TAB_BOX}
+        color={SHOP_COLORS.tabOn}
+        origins={textOrigins}
+      />
       {/* 서브 · 보유는 박스 2 에 소지금 (종류 1·5 — 막대 52 · img_text 302 · 주황 숫자, 모두 oy 4) */}
       {kind !== 'GP' && (
         <>
-          {valueBar(RIGHT_TAB_BOX, 0x11, MONEY_BAR_OFFSET.x, MONEY_BAR_OFFSET.y)}
-          {leftLabel(HEAD_LABEL_FRAME.소지금, RIGHT_TAB_BOX, SHOP_COLORS.text, MONEY_LABEL_OFFSET.x, MONEY_LABEL_OFFSET.y)}
+          <ValueBar box={RIGHT_TAB_BOX} align={0x11} origins={modeUiOrigins} ox={MONEY_BAR_OFFSET.x} oy={MONEY_BAR_OFFSET.y} />
+          <LeftLabel
+            frame={HEAD_LABEL_FRAME.소지금}
+            box={RIGHT_TAB_BOX}
+            color={SHOP_COLORS.text}
+            origins={textOrigins}
+            ox={MONEY_LABEL_OFFSET.x}
+            oy={MONEY_LABEL_OFFSET.y}
+          />
           <SpriteNumber
             glyphs={moneyGlyphsOf(money)}
             right={RIGHT_TAB_BOX.x + RIGHT_TAB_BOX.width + MONEY_DIGIT_OFFSET.x}
@@ -166,120 +113,19 @@ export function ShopWindow({ kind, entries, cursor, onMoveCursor, onSelect, mone
         </>
       )}
       {/* 값 칸 — 서브·GP 둘 다 막대 52(정렬 0x14) + img_text 303 "가격"(정렬 0x21) */}
-      {valueBar(VALUE_BOX, 0x14)}
-      {leftLabel(HEAD_LABEL_FRAME.가격, VALUE_BOX, SHOP_COLORS.text)}
+      <ValueBar box={VALUE_BOX} align={0x14} origins={modeUiOrigins} />
+      <LeftLabel frame={HEAD_LABEL_FRAME.가격} box={VALUE_BOX} color={SHOP_COLORS.text} origins={textOrigins} />
 
-      {/* 칸 바탕 0x7e764 — 10칸 모두 (0x82420, 깃발 0) */}
-      <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges" data-testid="shop-slot-cells">
-        {Array.from({ length: SLOT_COUNT }, (_unused, slot) =>
-          slotCellRectsOf(slotPositionOf(slot)).map((rect, part) => (
-            <rect key={`${slot}-${part}`} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={rect.color} />
-          )),
-        )}
-      </svg>
-
-      {/* 격자 커서 — 칸을 1px 둘러싼다 */}
-      <svg className={windowStyles.layer} viewBox="0 0 240 320" width={240} height={320} shapeRendering="crispEdges">
-        {isCursorVisible && cursor >= 0 && cursor < SLOT_COUNT && (
-          <rect
-            x={slotPositionOf(cursor).x - 0.5}
-            y={slotPositionOf(cursor).y - 0.5}
-            width={SLOT_SIZE + 1}
-            height={SLOT_SIZE + 1}
-            fill="none"
-            stroke={SHOP_COLORS.text}
-            strokeWidth={1}
-          />
-        )}
-      </svg>
-
-      {/* 아이콘 — 33×33 칸 가운데 (그림만, 눌림은 아래 투명 누름 칸 몫) */}
-      {Array.from({ length: SLOT_COUNT }, (_unused, index) => {
-        const entry = entries[index] ?? null
-        if (entry === null || entry.iconFrame === null) return null
-        const { x, y } = slotPositionOf(index)
-        return (
-          <div key={entry.id} className={styles.slotIcon} style={{ left: x, top: y, width: SLOT_SIZE, height: SLOT_SIZE }}>
-            <img className={kind === '서브' && entry.isOwned ? styles.ownedIcon : undefined} alt="" src={spriteSrc(ITEM_ICON, entry.iconFrame)} />
-          </div>
-        )
-      })}
-
-      {/* 칸 누름 — 격자 칸 k 자리 = mode_ui 34 박스 k(0x82408 0x94a65(…, 0, k) → 0x82420 칸 바탕 0x7e764 에 그대로 넘긴다).
-          목록은 창 0x81618 이 vt+0x1c(5, 2, 1, 0x30) 으로 지은 [창+0x19c] 다. 다른 칸을 누르면 그 칸 고르기,
-          고른 칸을 누르면 OK(확인)와 같다 — 투수 등록 · 변화구 칸과 같은 방식. ⚠️ 원본은 터치가 없어 웹 전용 입력이다 */}
-      {Array.from({ length: SLOT_COUNT }, (_unused, index) => {
-        const entry = entries[index] ?? null
-        const { x, y } = slotPositionOf(index)
-        return (
-          <PressArea
-            key={`누름:${index}`}
-            label={entry?.name ?? `빈 칸 ${index}`}
-            rect={{ x, y, width: SLOT_SIZE, height: SLOT_SIZE }}
-            option={{ isSelected: cursor === index }}
-            isDisabled={!isKeyEnabled}
-            onPress={() => (cursor === index ? onSelect(index) : onMoveCursor(index))}
-          />
-        )
-      })}
-
-      {/* 박스 3 이름 딱지 — 검정 그림자 뒤 흰 글 가운데 (0x8225e) */}
-      <div className={styles.nameTag} style={{ left: NAME_BOX.x, top: NAME_BOX.y, width: NAME_BOX.width, height: NAME_BOX.height }} />
-      <div
-        className={styles.nameShadow}
-        style={{
-          left: NAME_BOX.x + INNER.nameTextLeft + INNER.nameShadow,
-          top: centeredTopOf(NAME_BOX, LABEL_HEIGHT) + INNER.nameShadow,
-          width: NAME_BOX.width - INNER.nameTextLeft * 2,
-        }}
-      >
-        {selected?.name ?? ''}
-      </div>
-      <div
-        className={styles.nameText}
-        data-testid="shop-name"
-        style={{
-          left: NAME_BOX.x + INNER.nameTextLeft,
-          top: centeredTopOf(NAME_BOX, LABEL_HEIGHT),
-          width: NAME_BOX.width - INNER.nameTextLeft * 2,
-        }}
-      >
-        {selected?.name ?? ''}
-      </div>
-
-      {/* 박스 5 값 칸 — 서브는 만원(억 표기), GP 는 그냥 숫자. 글색 노랑 */}
-      {selected !== undefined && (
-        <SpriteNumber
-          glyphs={kind === 'GP' ? numberGlyphsOf(selected.price) : moneyGlyphsOf(selected.price)}
-          right={VALUE_BOX.x + VALUE_BOX.width - VALUE_DIGIT_RIGHT_INSET}
-          boxTop={VALUE_BOX.y}
-          boxHeight={VALUE_BOX.height}
-        />
-      )}
-
-      {/* 박스 4 설명 — 왼쪽 위 정렬 (0x802dd + 조건 문구) */}
-      <div
-        className={styles.description}
-        data-testid="shop-description"
-        style={{
-          left: DESCRIPTION_BOX.x + INNER.descriptionPadding,
-          top: DESCRIPTION_BOX.y + INNER.descriptionPadding,
-          width: DESCRIPTION_BOX.width - INNER.descriptionPadding * 2,
-          height: DESCRIPTION_BOX.height - INNER.descriptionPadding * 2,
-          lineHeight: `${INNER.descriptionLineHeight}px`,
-        }}
-      >
-        {descriptionLines.map((line, lineIndex) => (
-          <p key={lineIndex} className={styles.descriptionLine} style={line.isCentered ? { textAlign: 'center' } : undefined}>
-            {line.segments.map((segment, segmentIndex) => (
-              <span key={segmentIndex} style={segment.color === null ? undefined : { color: segment.color }}>
-                {segment.text}
-              </span>
-            ))}
-            {line.segments.length === 0 && ' '}
-          </p>
-        ))}
-      </div>
+      <ShopSlotGrid
+        kind={kind}
+        entries={entries}
+        cursor={cursor}
+        isCursorVisible={isCursorVisible}
+        isKeyEnabled={isKeyEnabled}
+        onMoveCursor={onMoveCursor}
+        onSelect={onSelect}
+      />
+      <ShopSelectedText kind={kind} selected={selected} />
     </>
   )
 }
