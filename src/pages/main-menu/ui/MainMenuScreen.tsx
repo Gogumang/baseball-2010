@@ -1,16 +1,12 @@
 import { useLayoutEffect, useState } from 'react'
 import { useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
 import { RawScreen } from '@/shared/ui/RawScreen/RawScreen'
-import { PressArea } from '@/shared/ui/PressArea/PressArea'
-import { entriesOf, selectedIdOf, TOP_ENTRIES } from '@/pages/main-menu/model/mainMenu'
+import { entriesOf, selectedIdOf } from '@/pages/main-menu/model/mainMenu'
 import { useMainMenu } from '@/pages/main-menu/model/useMainMenu'
 import { useMenuTurn } from '@/pages/main-menu/model/useMenuTurn'
-import { MENU_DESCRIPTION_PANEL, MENU_REEL_SCROLL_STEPS, MENU_WHEEL_TURN_TICKS } from '@/pages/main-menu/lib/mainMenuLayout'
 import { useMenuBand } from '@/pages/main-menu/model/useMenuBand'
 import { MenuBand } from '@/pages/main-menu/ui/MenuBand'
 import { MenuWheel } from '@/pages/main-menu/ui/MenuWheel'
-import * as styles from '@/pages/main-menu/ui/MainMenuScreen.css'
-import { ScreenFrame } from '@/widgets/screen-frame/ui/ScreenFrame'
 import { IMG_TEXT, MAIN_UI } from '@/pages/main-menu/ui/mainMenuScreen/menuAssets'
 import { MainMenuPopups } from '@/pages/main-menu/ui/mainMenuScreen/MainMenuPopups'
 import { MenuDescriptionPanel } from '@/pages/main-menu/ui/mainMenuScreen/MenuDescriptionPanel'
@@ -21,6 +17,14 @@ import type { MainMenuScreenProps } from '@/pages/main-menu/ui/mainMenuScreen/ma
 import { useTopMenuTenthTick } from '@/pages/main-menu/ui/mainMenuScreen/useTopMenuTenthTick'
 import { useStepToward } from '@/pages/main-menu/ui/mainMenuScreen/useStepToward'
 import { SkinBackdrop } from '@/pages/main-menu/ui/mainMenuScreen/otherSlices'
+import {
+  menuBackButtonOf,
+  menuGlobalRecordOf,
+  menuScreenFrameOf,
+  menuTurnTicksOf,
+  selectedPressAreaOf,
+  wheelCursorOf,
+} from '@/pages/main-menu/ui/mainMenuScreen/menuScreenParts'
 
 /**
  * 메인 메뉴 — 원작대로 **두 단**이다. 윗단(하위 상태 4, 처음 메뉴)에서 [게임시작] 을 고르면
@@ -46,29 +50,16 @@ import { SkinBackdrop } from '@/pages/main-menu/ui/mainMenuScreen/otherSlices'
  *    보이는 것은 위 세 줄 + 판 윗동강뿐이다. 값을 비틀지 않았다 — `mainMenuLayout.ts` 주석 참고.
  */
 export function MainMenuScreen(props: MainMenuScreenProps) {
-  const {
-    hasSavedGame,
-    isGeneralGameInProgress = false,
-    lastPlayedMode = 1,
-    nariGameReady,
-    onTopMenuTenthTick,
-    overlay,
-    gamePoint,
-    openTier = 4,
-    gameStartCursor,
-    topMenuCursor,
-    isBandGrown = false,
-    headerSlides = false,
-  } = props
+  const { hasSavedGame, onTopMenuTenthTick, overlay, gamePoint, openTier = 4, gameStartCursor, topMenuCursor } = props
   // 아랫단 바탕 띠 — 처음 메뉴 OK 로 내려올 때마다(0x294b8) · 장면이 하위 5 로 바로 설 때(생성자 0x2381c) 1 부터 자란다.
   // 자라는 동안은 릴 줄을 안 그리고(0x254d8) 하위 5·9 갱신이 키를 버린다([0xe2] ≠ 0 — 0x28cc2 · 0x28ae0)
   const [tier, setTier] = useState(openTier)
-  const band = useMenuBand(tier !== 4, isBandGrown)
+  const band = useMenuBand(tier !== 4, props.isBandGrown === true)
   const { state, dispatch, turningRef } = useMainMenu(
     hasSavedGame,
     false,
     (effect) => routeMainMenuEffect(effect, props),
-    { isGeneralGameInProgress, lastPlayedMode, ...(nariGameReady === undefined ? {} : { nariGameReady }) },
+    menuGlobalRecordOf(props),
     openTier,
     gameStartCursor,
     topMenuCursor,
@@ -89,8 +80,7 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
     0,
   )
 
-  // 윗단은 5틱(카운터 0~4), 아랫단은 스크롤 석 장을 그린 뒤 배열이 돈다
-  const turn = useMenuTurn(cursor, entries.length, isWheel ? MENU_WHEEL_TURN_TICKS : MENU_REEL_SCROLL_STEPS.length)
+  const turn = useMenuTurn(cursor, entries.length, menuTurnTicksOf(isWheel))
   // 도는 동안은 키를 버린다 — `useMainMenu` 의 `turningRef` (0x29454 · 0x28cb0 · 0x28ad4 맨 앞 [+0xe1])
   const isTurning = turn.direction !== null
   useLayoutEffect(() => {
@@ -100,13 +90,7 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
   const shownCursor = turn.direction === null ? cursor : turn.fromCursor
   const stepToward = useStepToward(isTurning, band.isGrowing, state.tier, dispatch)
 
-  // 아랫단에서도 바퀴는 처음 메뉴에서 고른 칸으로 깔린다
-  const wheelCursor = isWheel
-    ? shownCursor
-    : Math.max(
-        TOP_ENTRIES.findIndex((entry) => entry.id === state.selectedTopId),
-        0,
-      )
+  const wheelCursor = wheelCursorOf(isWheel, shownCursor, state.selectedTopId)
 
   return (
     <RawScreen>
@@ -159,36 +143,19 @@ export function MainMenuScreen(props: MainMenuScreenProps) {
           다른 하위 상태의 들어옴(3 0x258fc · 0x23f5c · 0x24804 …)과 타이틀 갱신 0x245f8 뿐이고 하위 4 들어옴 0x24a40 · 5 들어옴 0x25b88 은
           안 건드린다. 곧 타이틀에서 왔을 때만 미끄러지고(`headerSlides`), 두 단을 오가도 다시 내려오지 않는다 —
           같은 ScreenFrame 을 그대로 두어 미끄러짐을 이어 간다 */}
-      {gamePoint !== undefined && (
-        <ScreenFrame title="2010프로야구" gamePoint={gamePoint} onBack={isWheel ? null : () => dispatch({ type: '뒤로' })} slides={headerSlides} />
-      )}
+      {menuScreenFrameOf(gamePoint, isWheel, props.headerSlides, dispatch)}
 
       {/*
         설명 판 = 지금 고른 칸(판 안 큰 글자) — 투명 누름 칸으로 OK. 고른 칸 글자는 바퀴·릴 어디서도 화면 안에 안 그려져
         (바퀴 아래 자리 · 릴 자리 4 는 판이 대신 보인다) 마우스로 고른 칸을 시작할 길이 없었다. 바닥띠 되돌아가기(x 206~)는 비워 둔다
       */}
-      {state.lockedNotice === null && state.generalModeWindow === null && !state.isPickingNariEdition && (
-        <PressArea
-          label="고른 칸 시작"
-          onPress={() => dispatch({ type: '시작' })}
-          rect={{
-            x: MENU_DESCRIPTION_PANEL.x,
-            y: MENU_DESCRIPTION_PANEL.y,
-            width: 200 - MENU_DESCRIPTION_PANEL.x,
-            height: 320 - MENU_DESCRIPTION_PANEL.y,
-          }}
-        />
-      )}
+      {selectedPressAreaOf(state, dispatch)}
 
       <MainMenuPopups state={state} onCloseNotice={() => dispatch({ type: '시작' })} onAnswer={(answer) => dispatch({ type: '창답', answer })} />
 
       {/* 취소 — 아랫단이면 윗단으로 (원본은 CLR 키다, 버튼은 웹 임시). 머리띠를 그리면 바닥띠 뒤로 표시(바닥 5)가 같은 일을 한다.
           처음 메뉴(하위 4)는 CLR 을 안 보므로(0x29454) 타이틀로 가는 단추는 없다 */}
-      {gamePoint === undefined && !isWheel && (
-        <button type="button" className={styles.backButton} onClick={() => dispatch({ type: '뒤로' })}>
-          ‹ 처음 메뉴
-        </button>
-      )}
+      {menuBackButtonOf(gamePoint, isWheel, dispatch)}
 
       {overlay}
     </RawScreen>

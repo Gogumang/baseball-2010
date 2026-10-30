@@ -16,27 +16,28 @@ import type {
  *   CLR(−16) → 하위 5·9 만 처음 메뉴로 (하위 4 는 CLR 을 안 본다 — `reduceMainMenu` '뒤로').
  */
 function actionOfKey(key: string): MainMenuAction | null {
-  switch (key) {
-    case 'Enter':
-    case '5':
-      return { type: '시작' }
-    case 'Escape':
-    case 'Backspace':
-      return { type: '뒤로' }
-    case 'ArrowUp':
-    case 'ArrowLeft':
-    case '2':
-    case '4':
-      return { type: '커서', step: -1 }
-    case 'ArrowDown':
-    case 'ArrowRight':
-    case '6':
-    case '8':
-      return { type: '커서', step: 1 }
-    default:
-      return null
-  }
+  const action = KEY_ACTIONS.get(key)
+  return action === undefined ? null : { ...action }
 }
+
+const START: MainMenuAction = { type: '시작' }
+const BACK: MainMenuAction = { type: '뒤로' }
+const PREVIOUS: MainMenuAction = { type: '커서', step: -1 }
+const NEXT: MainMenuAction = { type: '커서', step: 1 }
+const KEY_ACTIONS: ReadonlyMap<string, MainMenuAction> = new Map<string, MainMenuAction>([
+  ['Enter', START],
+  ['5', START],
+  ['Escape', BACK],
+  ['Backspace', BACK],
+  ['ArrowUp', PREVIOUS],
+  ['ArrowLeft', PREVIOUS],
+  ['2', PREVIOUS],
+  ['4', PREVIOUS],
+  ['ArrowDown', NEXT],
+  ['ArrowRight', NEXT],
+  ['6', NEXT],
+  ['8', NEXT],
+])
 
 /**
  * 메뉴 상태와 화면 단위 키 입력 (`actionOfKey`).

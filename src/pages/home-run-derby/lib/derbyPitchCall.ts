@@ -44,22 +44,26 @@ export function derbyPitchCallOf(resolution: PitchResolution, balls: number): De
     case '스트라이크':
       // 0x3e14a — 모드 7 은 st[4]++ 를 건너뛰어 스트라이크 수가 늘 0 이다
       return { balls, judgment: 1, soundId: pitchCallSoundIdOf(resolution, { balls, strikes: 1, outcome: null }) }
-    case '볼': {
-      // 고침(B-54): 더비는 볼 수를 세지 않는다 — 늘 v2
-      if (isBugFixed('B-54')) {
-        return { balls, judgment: 2, soundId: pitchCallSoundIdOf(resolution, { balls: 0, strikes: 0, outcome: null }) }
-      }
-      const isWalk = balls > WALK_BALLS_ABOVE
-      const after = balls + 1
-      return {
-        balls: after,
-        judgment: isWalk ? 3 : 2,
-        soundId: pitchCallSoundIdOf(resolution, { balls: after, strikes: 0, outcome: isWalk ? { kind: '볼넷' } : null }),
-      }
-    }
+    case '볼':
+      return ballCallOf(resolution, balls)
     case '파울':
     case '타구':
       return { balls, judgment: null, soundId: null }
+  }
+}
+
+/** 볼 — 원본은 st[5]++ 뒤 넷째 볼이면 볼넷(v3) */
+function ballCallOf(resolution: PitchResolution, balls: number): DerbyPitchCall {
+  // 고침(B-54): 더비는 볼 수를 세지 않는다 — 늘 v2
+  if (isBugFixed('B-54')) {
+    return { balls, judgment: 2, soundId: pitchCallSoundIdOf(resolution, { balls: 0, strikes: 0, outcome: null }) }
+  }
+  const isWalk = balls > WALK_BALLS_ABOVE
+  const after = balls + 1
+  return {
+    balls: after,
+    judgment: isWalk ? 3 : 2,
+    soundId: pitchCallSoundIdOf(resolution, { balls: after, strikes: 0, outcome: isWalk ? { kind: '볼넷' } : null }),
   }
 }
 
