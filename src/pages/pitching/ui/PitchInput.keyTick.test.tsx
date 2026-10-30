@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { millisecondsPerFrame } from '@/shared/config/frameRate'
 import { gameSceneTickNow } from '@/shared/lib/commonWindow/commonWindow'
-import { gameSceneShownTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
+import { PRESENT_DELAY_MS, gameSceneShownTicks } from '@/shared/lib/sceneKeyLatch/shownSceneTicks'
 import { PitchGradeGauge } from '@/pages/pitching/ui/PitchGradeGauge'
 import { AimCursor } from '@/pages/pitching/ui/AimCursor'
 import { ZONE_CENTERS } from '@/entities/pitching/model/pitchCurve'
@@ -30,8 +30,8 @@ afterEach(() => {
 
 const 한틱 = millisecondsPerFrame()
 const 흘림 = (ms: number) => act(() => void vi.advanceTimersByTime(ms))
-/** 장면이 지금 틱 그림을 그렸다 */
-const 그림 = () => gameSceneShownTicks.mark(gameSceneTickNow(), performance.now())
+/** 장면이 지금 틱 그림을 한 화면 틀 앞에 그려 지금 화면에 나와 있다(r406 `PRESENT_DELAY_MS`) */
+const 그림 = () => gameSceneShownTicks.mark(gameSceneTickNow(), performance.now() - PRESENT_DELAY_MS)
 /** 틱마다 그림이 서는 틀 `n` 개 */
 const 틀 = (n: number) => {
   for (let index = 0; index < n; index += 1) {

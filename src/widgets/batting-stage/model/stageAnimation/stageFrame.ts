@@ -57,8 +57,8 @@ function runStageFrame(loop: StageLoop, rawNow: number): void {
   const settlementRain = loop.settlementEffect?.kind === 'rain' ? loop.settlementEffect.rain : null
   const stageScene = stageSceneNow(loop, reads, particles, { rawNow, settlementRain })
   drawStageFrame(loop, stageScene, { sceneTick, particles, settlementRain })
-  // 이 틱의 그림이 화면에 섰다(입력이 같아 건너뛴 그림도 캔버스에 남은 그림이 이 틱 그림이다) — 이 뒤에 난 키는 이 틱을 보고 누른 것이다
-  // (`shownSceneTicks` — 원본은 키를 받은 틀 = 마지막으로 그린 틀)
+  // 이 틱의 그림을 다 그렸다(입력이 같아 건너뛴 그림도 캔버스에 남은 그림이 이 틱 그림이다) — 화면에 나오는 다음 화면 갱신 뒤에 난 키는 이 틱을
+  // 보고 누른 것이다(`shownSceneTicks` 가 그린 시각에 한 화면 틀을 더해 센다, r406 — 원본은 키를 받은 틀 = 마지막으로 그린 틀)
   refs.shownTicks.mark(sceneTick, performance.now())
 }
 
