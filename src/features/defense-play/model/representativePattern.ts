@@ -57,25 +57,25 @@ const FIRST_CODES: Readonly<Record<string, readonly number[]>> = {
   홈런: [24, 25, 26],
 }
 
+/** 빈 루 · 무사에서 이 패턴을 수비 판에 돌린 결과가 맞는가 */
+function playsInto(pattern: BattedBallPattern, matches: (settled: AtBatOutcome) => boolean): boolean {
+  const played = runDefensePlay({
+    outcome: { kind: '아웃', detail: '땅볼아웃' },
+    trajectory: battedBallTrajectory(pattern),
+    bases: EMPTY_BASES,
+    outs: 0,
+    // 결과만 들고 오는 호출은 대부분 사람 타석(수비 CPU)이다 — CPU 송구 결정 0xafa60 이 돈다
+    defenseIsCpu: true,
+  })
+  return played.outcome !== undefined && matches(played.outcome)
+}
+
 function findPattern(key: string, matches: (settled: AtBatOutcome) => boolean): BattedBallPattern | null {
   const first = FIRST_CODES[key] ?? []
   const rest = Object.keys(BATTED_BALL_PATTERNS)
     .map(Number)
     .filter((code) => !first.includes(code))
     .sort((left, right) => left - right)
-  for (const code of [...first, ...rest]) {
-    for (const pattern of BATTED_BALL_PATTERNS[code]) {
-      if (!isFairAngle(pattern[0])) continue
-      const played = runDefensePlay({
-        outcome: { kind: '아웃', detail: '땅볼아웃' },
-        trajectory: battedBallTrajectory(pattern),
-        bases: EMPTY_BASES,
-        outs: 0,
-        // 결과만 들고 오는 호출은 대부분 사람 타석(수비 CPU)이다 — CPU 송구 결정 0xafa60 이 돈다
-        defenseIsCpu: true,
-      })
-      if (played.outcome !== undefined && matches(played.outcome)) return pattern
-    }
-  }
-  return null
+  const fairPatterns = [...first, ...rest].flatMap((code) => BATTED_BALL_PATTERNS[code]).filter((pattern) => isFairAngle(pattern[0]))
+  return fairPatterns.find((pattern) => playsInto(pattern, matches)) ?? null
 }

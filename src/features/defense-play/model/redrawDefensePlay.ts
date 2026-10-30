@@ -17,16 +17,10 @@ import type { DefensePlayState } from '@/features/defense-play/model/runDefenseP
  *
  * ⚠️ 판이 닫힌 뒤(진행기가 끝난 뒤 +0x1094 를 세는 갱신)의 그림은 웹이 연출을 안 돌린다(진행기 밖) — 그 그림의 창 첫 그림도 안 돌린다.
  */
-export function redrawDefensePlayScene(state: DefensePlayState): DefensePlayView | null {
-  const view = state.ticks[state.ticks.length - 1]
-  if (view === undefined) return null
-  const holderSlot = state.play.ballHolderSlot
-  const holderView = view.fielders.find((fielder) => fielder.slot === holderSlot)
-  const drawn = drawDefenseScene(state.scene, {
-    holderSlot,
-    holder: holderView === undefined ? undefined : { x: holderView.x, y: holderView.y ?? 0, z: holderView.z },
-    holderAction: holderView?.action,
-  })
+type SceneDraw = ReturnType<typeof drawDefenseScene>
+
+/** 그림이 고친 판 칸을 진행기 상태에 그대로 옮긴다 (진행기 `drawSceneEffects` 와 같은 칸) */
+function applyDrawnSceneFlags(state: DefensePlayState, drawn: SceneDraw): void {
   state.scene = drawn.scene
   // 46932 — 큰 OUT 첫 그림이 +0x1999 를 보고 state[0x8b] = 1
   if (drawn.recordsLaserOut) state.laserOutFlag = true
@@ -42,7 +36,10 @@ export function redrawDefensePlayScene(state: DefensePlayState): DefensePlayView
     state.deadlyJumpArmed = false
     state.deadlySlideArmed = false
   }
-  // 이 그림의 연출 칸 — 갱신이 있는 그림처럼 빈 칸에서 새로 얹는다
+}
+
+/** 이 그림의 연출 칸 — 갱신이 있는 그림처럼 빈 칸에서 새로 얹는다 */
+function viewWithDrawnEffects(view: DefensePlayView, drawn: SceneDraw): DefensePlayView {
   const { zoom: _zoom, bigOut: _bigOut, judgeText: _judgeText, flash: _flash, ...bare } = view
   return {
     ...bare,
@@ -51,4 +48,18 @@ export function redrawDefensePlayScene(state: DefensePlayState): DefensePlayView
     ...(drawn.judgeText === null ? {} : { judgeText: drawn.judgeText }),
     ...(drawn.flash === null ? {} : { flash: drawn.flash }),
   }
+}
+
+export function redrawDefensePlayScene(state: DefensePlayState): DefensePlayView | null {
+  const view = state.ticks[state.ticks.length - 1]
+  if (view === undefined) return null
+  const holderSlot = state.play.ballHolderSlot
+  const holderView = view.fielders.find((fielder) => fielder.slot === holderSlot)
+  const drawn = drawDefenseScene(state.scene, {
+    holderSlot,
+    holder: holderView === undefined ? undefined : { x: holderView.x, y: holderView.y ?? 0, z: holderView.z },
+    holderAction: holderView?.action,
+  })
+  applyDrawnSceneFlags(state, drawn)
+  return viewWithDrawnEffects(view, drawn)
 }

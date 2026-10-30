@@ -83,16 +83,18 @@ export function inPlayTouchOffersOf(side: ControlSide | undefined, situation?: I
   return []
 }
 
+const offerAt = (offers: readonly TouchKeyOffer[], index: number): TouchKeyOffer | null => offers[index] ?? null
+
 /** 판이 서 있는 동안 사람이 잡은 쪽의 송구 · 주루 버튼을 알린다 (훅 수는 늘 아홉 — 빈 자리는 null) */
 export function useInPlayTouchKeys(side: ControlSide | undefined, situation?: InPlayRunnerSituation | null): void {
   const offers = inPlayTouchOffersOf(side, situation)
-  useTouchKeyOffer(offers[0] ?? null)
-  useTouchKeyOffer(offers[1] ?? null)
-  useTouchKeyOffer(offers[2] ?? null)
-  useTouchKeyOffer(offers[3] ?? null)
-  useTouchKeyOffer(offers[4] ?? null)
-  useTouchKeyOffer(offers[5] ?? null)
-  useTouchKeyOffer(offers[6] ?? null)
-  useTouchKeyOffer(offers[7] ?? null)
-  useTouchKeyOffer(offers[8] ?? null)
+  useTouchKeyOffer(offerAt(offers, 0))
+  useTouchKeyOffer(offerAt(offers, 1))
+  useTouchKeyOffer(offerAt(offers, 2))
+  useTouchKeyOffer(offerAt(offers, 3))
+  useTouchKeyOffer(offerAt(offers, 4))
+  useTouchKeyOffer(offerAt(offers, 5))
+  useTouchKeyOffer(offerAt(offers, 6))
+  useTouchKeyOffer(offerAt(offers, 7))
+  useTouchKeyOffer(offerAt(offers, 8))
 }

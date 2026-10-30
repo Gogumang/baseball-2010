@@ -105,57 +105,82 @@ export function settledBatterOutcomeOf(input: PlayOutcomeInput): AtBatOutcome {
 /** a882e ~ a884c — 안타가 아닌 판에서 타수를 세나 (머리말 "타수를 안 세는 아웃") */
 function countsAsSettledAtBat(input: PlayOutcomeInput): boolean {
   const runs = input.runsScored ?? 0
-  const hitEvents = input.hitEvent || input.homeRunEvent
   if (runs > 0 && input.outEvents > 0) return false
-  if (!hitEvents && input.outEvents === 0) return false
+  if (!hasHitEvent(input) && input.outEvents === 0) return false
   return !isSacrificeOf(input)
 }
 
+/** 판에서 안타 사건(6 · 8)이 났나 — 정산 [sp+0x2c] > 0 */
+const hasHitEvent = (input: PlayOutcomeInput): boolean => input.hitEvent || input.homeRunEvent
+
+/** +0x96 — 끝난(아웃 · 득점) 주자 */
+const isEndedRunner = (runner: RunnerState): boolean => runner.isOut || runner.scored
+
 /** 1~3루 칸 수 — 정산 객체 +0x15c ~ +0x15e */
 const SACRIFICE_BASE_SLOTS = 3
+const isSacrificeSlot = (base: number): boolean => base >= 1 && base <= SACRIFICE_BASE_SLOTS
+
+/** a83e8 · a840c — 희생을 보는 판: 득점 · 야수 선택 없이 안타 사건이 났고, 타자주자가 끝났는데 이닝은 안 끝났다 */
+function isSacrificeCandidate(input: PlayOutcomeInput): boolean {
+  if ((input.runsScored ?? 0) !== 0 || isFieldersChoice(input.runners)) return false
+  if (!hasHitEvent(input)) return false
+  const batter = input.runners[0]
+  if (batter === undefined || (input.outsAfter ?? 0) > 2) return false
+  return isEndedRunner(batter)
+}
 
 /** **희생 [sp+8]** (a83e2 ~ a848e) — 칸은 투구 0xa5e14 가 투구 때 루(`pitchBase`)로 세운 것이다 (머리말) */
 export function isSacrificeOf(input: PlayOutcomeInput): boolean {
+  if (!isSacrificeCandidate(input)) return false
   const runners = input.runners
-  const batter = runners[0]
-  if ((input.runsScored ?? 0) !== 0) return false
-  if (isFieldersChoice(runners)) return false
-  if (!(input.hitEvent || input.homeRunEvent)) return false
-  if (batter === undefined) return false
-  if ((input.outsAfter ?? 0) > 2) return false
-  if (!(batter.isOut || batter.scored)) return false
+  const others = runners.slice(1)
+  // a8432 — 끝난 주자가 있으면 칸 셋을 지우고 멈춘다
+  if (others.some(isEndedRunner)) return false
   // a5e90 — 투구 때 루에 선 산 주자의 칸 (투구 때는 끝난 주자가 없다)
   const slots = Array.from({ length: SACRIFICE_BASE_SLOTS + 1 }, () => false)
   for (const runner of runners) {
-    if (runner.pitchBase >= 1 && runner.pitchBase <= SACRIFICE_BASE_SLOTS) slots[runner.pitchBase] = true
+    if (isSacrificeSlot(runner.pitchBase)) slots[runner.pitchBase] = true
   }
-  for (let index = 1; index < runners.length; index += 1) {
-    const runner = runners[index]
-    // a8432 — 끝난 주자가 있으면 칸 셋을 지우고 멈춘다
-    if (runner.isOut || runner.scored) return false
-    if (runner.startBase >= 1 && runner.startBase <= SACRIFICE_BASE_SLOTS) slots[runner.startBase] = false
+  for (const runner of others) {
+    if (isSacrificeSlot(runner.startBase)) slots[runner.startBase] = false
   }
   return slots.some((slot) => slot)
+}
+
+/** a81a6 — 안타 사건이 났고 야수 선택이 아닌 판의 타자주자. 아니면 null */
+function hitBatterOf(input: PlayOutcomeInput): RunnerState | null {
+  const batter = input.runners[0]
+  if (batter === undefined || !batter.isBatterRunner) return null
+  if (!input.hitEvent || isFieldersChoice(input.runners)) return null
+  return batter
+}
+
+/** a81d2 · a81f8 — 1루를 넘보며 땅에 닿은 공이 아니면, 끝난 타자주자에 아웃 사건이 있을 때 안타가 아니다 */
+function isPutOutOnHit(input: PlayOutcomeInput, ended: boolean, beyondFirst: boolean): boolean {
+  if (beyondFirst && !input.flyOut) return false
+  return ended && input.outEvents !== 0
+}
+
+/** a8210 — 루타 = +0x8c, 끝났는데 득점이 아니고 1루를 넘보지 않았으면 하나 뺀다. 안타가 아니면 0 */
+function hitBasesOf(input: PlayOutcomeInput, batter: RunnerState): number {
+  const previousTarget = input.previousTargets?.[0] ?? batter.startBase
+  const ended = isEndedRunner(batter)
+  const beyondFirst = batter.targetBase > 1 || previousTarget > 1
+  if (isPutOutOnHit(input, ended, beyondFirst)) return 0
+  const shortOfFirst = ended && !batter.scored && !beyondFirst
+  return shortOfFirst ? batter.startBase - 1 : batter.startBase
 }
 
 /** 정산이 적는 루타 — 0 이면 안타가 아니다 */
 export function creditedBasesOf(input: PlayOutcomeInput): number {
   // a8192 — 홈런 사건이 하나라도 있으면 루타 4
   if (input.homeRunEvent) return HOME_BASE
-  const batter = input.runners[0]
-  if (batter === undefined || !batter.isBatterRunner) return 0
-  if (!input.hitEvent) return 0
-  if (isFieldersChoice(input.runners)) return 0
-  const previousTarget = input.previousTargets?.[0] ?? batter.startBase
-  const ended = batter.isOut || batter.scored
-  const beyondFirst = batter.targetBase > 1 || previousTarget > 1
-  // a81d2 · a81f8
-  if (!(beyondFirst && !input.flyOut) && ended && input.outEvents !== 0) return 0
-  // a8210 — 루타 = +0x8c, 끝났는데 득점이 아니고 1루를 넘보지 않았으면 하나 뺀다
-  let bases = batter.startBase
-  if (ended && !batter.scored && !beyondFirst) bases -= 1
-  return bases
+  const batter = hitBatterOf(input)
+  return batter === null ? 0 : hitBasesOf(input, batter)
 }
+
+/** +0x96(끝) && +0x95 == 0(득점 아님) — 곧 아웃된 주자가 목록 번호 i + 1 루로 달려가던 것 */
+const isOutRunningToListBase = (runner: RunnerState, index: number): boolean => runner.isOut && !runner.scored && runner.targetBase === index + 1
 
 /**
  * **야수 선택 [sp+0x18]** (a8118 ~ a8190) — 타자주자가 살아 있고, 목록 i 번째(1부터) 주자가 득점 없이 끝났는데
@@ -164,14 +189,8 @@ export function creditedBasesOf(input: PlayOutcomeInput): number {
  */
 function isFieldersChoice(runners: readonly RunnerState[]): boolean {
   const batter = runners[0]
-  if (batter === undefined || !batter.isBatterRunner) return false
-  if (batter.isOut || batter.scored) return false
-  for (let index = 1; index < runners.length; index += 1) {
-    const runner = runners[index]
-    // +0x96(끝) && +0x95 == 0(득점 아님) — 곧 아웃된 주자
-    if (runner.isOut && !runner.scored && runner.targetBase === index + 1) return true
-  }
-  return false
+  if (batter === undefined || !batter.isBatterRunner || isEndedRunner(batter)) return false
+  return runners.some((runner, index) => index >= 1 && isOutRunningToListBase(runner, index))
 }
 
 /**

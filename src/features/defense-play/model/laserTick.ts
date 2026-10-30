@@ -75,44 +75,58 @@ export interface LaserWindowTickResult {
   readonly passed: boolean
 }
 
-/** 0x523bc(굴림) → 0x4e858(반짝임 · 확정) 한 틱 */
-export function laserWindowTick(input: LaserWindowTickInput): LaserWindowTickResult {
-  let { shining, confirmed, rolled } = input.flags
-  let rolledThisTick = false
-  let passed = false
-  if (input.random === undefined || input.effectStep !== -1) {
-    return { flags: input.flags, rolledThisTick, passed }
-  }
-  const windowOpen = isLaserWindowOpen({
+/** b2648 — 레이저 창이 열려 있나 */
+function laserWindowOpenOf(input: LaserWindowTickInput): boolean {
+  return isLaserWindowOpen({
     ticksSinceCatch: input.ticksSinceCatch,
     hasChosenThrowTarget: input.hasChosenThrowTarget,
     isBallHeld: input.isBallHeld,
     // b2666~b2670 — 공 가진 야수(0xb0c90 = +0x130).vtC4 (`fielderPose.isReadyToThrow`)
     isThrowerReady: input.holder !== undefined && isReadyToThrow(input.holder),
   })
-  // 523e6 — 공 가진 야수가 있으면 외야수(0xb8da8)일 때만 굴린다. 밀어내기 판(종류 2 · 3)은 시작 0xb288c(b28a2~b28a8)가
-  // P+0x130 = 1(포수)을 적어 여기서 끝난다 — `walkPlay` 가 `ballHolderSlot: CATCHER_SLOT` 으로 넘겨 같다(r309 직접 뜸).
-  // holder 가 없는(undefined) 길은 진행기가 늘 공 가진 야수를 세워 오지 않는다
+}
+
+/**
+ * 0x523bc — 이번 틱에 0x66a8c 를 굴리는가. 523e6 — 공 가진 야수가 있으면 외야수(0xb8da8)일 때만 굴린다. 밀어내기 판(종류 2 · 3)은
+ * 시작 0xb288c(b28a2~b28a8)가 P+0x130 = 1(포수)을 적어 여기서 끝난다 — `walkPlay` 가 `ballHolderSlot: CATCHER_SLOT` 으로 넘겨 같다
+ * (r309 직접 뜸). holder 가 없는(undefined) 길은 진행기가 늘 공 가진 야수를 세워 오지 않는다
+ */
+function isLaserRollTick(input: LaserWindowTickInput, windowOpen: boolean): boolean {
+  if (input.flags.rolled || !windowOpen) return false
   const holderGate = input.holder !== undefined && isOutfieldSlot(input.holder.slot)
-  if (!rolled && holderGate && windowOpen && input.ticksSinceCatch >= LASER_WINDOW_FIRST_TICK) {
-    rolled = true
-    rolledThisTick = true
-    passed = rollLaserThrow({ defenseAbility: input.holderAbility, skillIds: input.holderSkillIds }, input.random)
-    if (passed) {
-      if (input.defenseIsCpu) confirmed = true
-      else shining = true
-    }
-  }
-  // 0x4e858 — 조건 없이 매 틱: 창이 닫히면 +0x19ad 를 내리고, 반짝이는 중에 새로 누른 키가 오면 +0x19ae
+  return holderGate && input.ticksSinceCatch >= LASER_WINDOW_FIRST_TICK
+}
+
+/** 52456~52488 — 굴린 틱은 +0x19af, 통과면 사람 수비 +0x19ad(반짝임) / CPU +0x19ae(확정) */
+function laserFlagsAfterRoll(flags: LaserFlags, rolledThisTick: boolean, passed: boolean, defenseIsCpu: boolean): LaserFlags {
+  const rolled = flags.rolled || rolledThisTick
+  if (!passed) return { ...flags, rolled }
+  if (defenseIsCpu) return { ...flags, confirmed: true, rolled }
+  return { ...flags, shining: true, rolled }
+}
+
+/** 0x4e858 — 조건 없이 매 틱: 창이 닫히면 +0x19ad 를 내리고, 반짝이는 중에 새로 누른 키가 오면 +0x19ae */
+function laserFlagsAfterInput(flags: LaserFlags, windowOpen: boolean, press: DefenseKeyPress | null | undefined): LaserFlags {
   const judged = judgeLaserInput({
-    isShining: shining,
+    isShining: flags.shining,
     isWindowOpen: windowOpen,
-    key: input.press?.key ?? null,
-    isRepeat: input.press?.isRepeat === true,
+    key: press?.key ?? null,
+    isRepeat: press?.isRepeat === true,
   })
-  shining = judged.isShining
-  if (judged.isLaserConfirmed) confirmed = true
-  return { flags: { shining, confirmed, rolled }, rolledThisTick, passed }
+  return { shining: judged.isShining, confirmed: flags.confirmed || judged.isLaserConfirmed, rolled: flags.rolled }
+}
+
+/** 0x523bc(굴림) → 0x4e858(반짝임 · 확정) 한 틱 */
+export function laserWindowTick(input: LaserWindowTickInput): LaserWindowTickResult {
+  if (input.random === undefined || input.effectStep !== -1) {
+    return { flags: input.flags, rolledThisTick: false, passed: false }
+  }
+  const windowOpen = laserWindowOpenOf(input)
+  const rolledThisTick = isLaserRollTick(input, windowOpen)
+  let passed = false
+  if (rolledThisTick) passed = rollLaserThrow({ defenseAbility: input.holderAbility, skillIds: input.holderSkillIds }, input.random)
+  const afterRoll = laserFlagsAfterRoll(input.flags, rolledThisTick, passed, input.defenseIsCpu)
+  return { flags: laserFlagsAfterInput(afterRoll, windowOpen, input.press), rolledThisTick, passed }
 }
 
 /**

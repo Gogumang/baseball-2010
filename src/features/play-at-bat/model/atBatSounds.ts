@@ -118,18 +118,25 @@ export function unjudgedWhiffSoundIdOf(isAceBatter: boolean): number {
   return isAceBatter ? 27 : 8
 }
 
+/** 0x51328 · 0x5132e — 맞지 않은 스윙: 번트는 소리 없음, 필살 스윙이면 27 · 아니면 8 */
+function missedSwingSoundIdOf(input: ContactSoundInput): number | null {
+  if (input.buntKind !== 0) return null
+  return input.isSpecialSwing === true ? 27 : 8
+}
+
+/** 맞은 공의 타구음 — 큰 타구 7 · 번트 9 · 강한 타구 5 · 약한 타구 59 · 그 밖 6 (위 표 차례) */
+function hitSoundIdOf(input: ContactSoundInput): number {
+  const { resultCode, pattern } = input
+  if (resultCode !== null && pattern !== null && isBigHit(resultCode, pattern)) return 7
+  if (input.buntKind !== 0) return 9
+  if (pattern === null) return 6
+  if (isStrongHit(pattern)) return 5
+  return isWeakHit(pattern) ? 59 : 6
+}
+
 export function contactSoundIdOf(input: ContactSoundInput): number | null {
   if (!input.hasSwung) return null
-  if (!input.hasHit) {
-    if (input.buntKind !== 0) return null
-    return input.isSpecialSwing === true ? 27 : 8
-  }
-  if (input.resultCode !== null && input.pattern !== null && isBigHit(input.resultCode, input.pattern)) return 7
-  if (input.buntKind !== 0) return 9
-  if (input.pattern === null) return 6
-  if (isStrongHit(input.pattern)) return 5
-  if (isWeakHit(input.pattern)) return 59
-  return 6
+  return input.hasHit ? hitSoundIdOf(input) : missedSwingSoundIdOf(input)
 }
 
 /**
@@ -168,14 +175,19 @@ export function pitchCallSoundIdOf(resolution: PitchResolution, atBat: AtBatStat
     case '사구':
       return HIT_BY_PITCH_CALL_SOUND
     case '스트라이크':
-      if (atBat.outcome?.kind === '삼진') return 21
-      return atBat.strikes === 2 ? 39 : 18
+      return strikeCallSoundIdOf(atBat)
     case '파울':
       // 파울 콜 25 는 판의 결과 코드 7(51c5c)에서 난다 — `inPlayCallSoundIdOf` 의 `foulEnded`
       return null
     case '타구':
       return null
   }
+}
+
+/** 스트라이크(v1) — 삼진이면 21(0x51bf6), 올린 뒤 스트라이크 수가 2 면 39, 아니면 18 */
+function strikeCallSoundIdOf(atBat: AtBatState): number {
+  if (atBat.outcome?.kind === '삼진') return 21
+  return atBat.strikes === 2 ? 39 : 18
 }
 
 /** "Hit by pitch" — 판정 v4 (0x51b14 `movs r1,#0x17`). 볼넷과 달리 뒤에 함성 29 를 잇지 않는다 */
@@ -333,22 +345,37 @@ const SAFE_CALL = 17
 export function inPlayCallSoundIdOf(atBatOutcome: AtBatOutcome, play?: DefenseCallContext | null): number | null {
   // 파울로 닫힌 판 — 정산이 없고(0xae3e8 ae568) 콜은 결과 코드 7 의 25 뿐이다(위 칸 주석)
   if (play?.foulEnded === true) return FOUL_CALL_SOUND
-  // 판을 돈 타구는 정산 결과로 고른다 — 타석 결과는 타석을 끝낸 임시 값이다
-  const outcome = play?.outcome ?? atBatOutcome
+  const outcome = settledOutcomeOf(atBatOutcome, play)
   if (outcome.kind === '홈런') return 11
-  if (outcome.kind === '아웃') {
-    // 판정 v11(2스트라이크 번트 파울 아웃)은 **조건 없이** 62 다 (0x51b20 → 0x51b2e).
-    // 원본은 이 아웃을 수비 시뮬레이션 없이 그 자리에서 내므로 state[0x1f]·state[0x87] 을 아예 안 본다
-    if (play?.buntFoulOut === true) return CAUGHT_OUT_CALL
-    // 수비 결과를 받았으면 원본과 같은 칸(state[0x1f]·state[0x87])을 본다.
-    // 없으면(판 없이 들어온 아웃 — 웹 전용 길, 위 머리말) 타석 결과로 고른다: 뜬공/직선타만 62 다
-    const caught = play?.caughtOnTheFly ?? (outcome.detail === '뜬공아웃' || outcome.detail === '직선타아웃')
-    // 0x51b3a·0x51b44 — 두 칸 중 하나라도 서면 62 다 (`bne`/`beq` 두 갈래)
-    return caught || play?.tagOut === true ? CAUGHT_OUT_CALL : FORCE_OUT_CALL
-  }
+  if (outcome.kind === '아웃') return outCallSoundIdOf(outcome, play)
   // 판정 v9 — 판 안에서 결과 코드 9 의 메시지(b4562 → 0x51c14)가 간 틱이 있었다 (위 "17 은 판 틱 조건" 주석)
-  if (outcome.kind === '안타' && (play?.safeCallTick ?? -1) >= 0) return SAFE_CALL
+  if (outcome.kind === '안타' && hasSafeCallTick(play)) return SAFE_CALL
   return null
+}
+
+/** 판을 돈 타구는 정산 결과로 고른다 — 타석 결과는 타석을 끝낸 임시 값이다 */
+function settledOutcomeOf(atBatOutcome: AtBatOutcome, play: DefenseCallContext | null | undefined): AtBatOutcome {
+  return play?.outcome ?? atBatOutcome
+}
+
+const hasSafeCallTick = (play: DefenseCallContext | null | undefined): boolean => (play?.safeCallTick ?? -1) >= 0
+
+type OutOutcome = Extract<AtBatOutcome, { readonly kind: '아웃' }>
+
+/**
+ * 수비 결과를 받았으면 원본과 같은 칸(state[0x1f])을 본다. 없으면(판 없이 들어온 아웃 — 웹 전용 길, 위 머리말)
+ * 타석 결과로 고른다: 뜬공/직선타만 잡은 아웃이다
+ */
+function isCaughtOut(outcome: OutOutcome, play: DefenseCallContext | null | undefined): boolean {
+  return play?.caughtOnTheFly ?? (outcome.detail === '뜬공아웃' || outcome.detail === '직선타아웃')
+}
+
+function outCallSoundIdOf(outcome: OutOutcome, play: DefenseCallContext | null | undefined): number {
+  // 판정 v11(2스트라이크 번트 파울 아웃)은 **조건 없이** 62 다 (0x51b20 → 0x51b2e).
+  // 원본은 이 아웃을 수비 시뮬레이션 없이 그 자리에서 내므로 state[0x1f]·state[0x87] 을 아예 안 본다
+  if (play?.buntFoulOut === true) return CAUGHT_OUT_CALL
+  // 0x51b3a·0x51b44 — 두 칸(state[0x1f]·state[0x87]) 중 하나라도 서면 62 다 (`bne`/`beq` 두 갈래)
+  return isCaughtOut(outcome, play) || play?.tagOut === true ? CAUGHT_OUT_CALL : FORCE_OUT_CALL
 }
 
 /** 관중 함성 — 깊은 페어 타구가 아무도 못 잡고 떨어지는 틱 (0x52bb2) */

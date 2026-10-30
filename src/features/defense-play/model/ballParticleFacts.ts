@@ -8,6 +8,12 @@ const NO_BOUNCE_PARTICLE_CODES: readonly number[] = [9, 10, 11]
 /** 0x36f84~0x36f92 — 큰 타구 파티클을 쏘는 판 종류(state[0x26]): 1 타구 판 · 8 더비 판 */
 const BIG_HIT_PARTICLE_PLAY_KINDS: readonly number[] = [1, 8]
 
+/** 37010 · 37022 — 홈런성도 튐 없는 결과도 아닌가 (모르면 null = 둘 다 지난다) */
+function isBounceResultCode(resultCode: number | null): boolean {
+  const code = resultCode ?? -1
+  return !HOME_RUN_HIT_CODES.includes(code) && !NO_BOUNCE_PARTICLE_CODES.includes(code)
+}
+
 /**
  * 공 그리기 0x36dfc 의 파티클 조건 중 진행기 몫 (`defenseView.BallParticleFacts` 머리말 — 화면 쪽은 `pages/defense/lib/ballParticles`).
  *
@@ -31,10 +37,6 @@ export function ballParticleFactsOf(input: {
 }): BallParticleFacts | null {
   if (input.ballTick <= 0) return null
   const bigHit = input.bigHitWatch && BIG_HIT_PARTICLE_PLAY_KINDS.includes(input.playKind)
-  const bounces =
-    input.onTrajectory &&
-    input.at < input.trajectory.length - 1 &&
-    !HOME_RUN_HIT_CODES.includes(input.resultCode ?? -1) &&
-    !NO_BOUNCE_PARTICLE_CODES.includes(input.resultCode ?? -1)
+  const bounces = input.onTrajectory && input.at < input.trajectory.length - 1 && isBounceResultCode(input.resultCode)
   return { bigHit, bounceNextHeight: bounces ? input.trajectory.pointAt(input.at + 1).y : null }
 }

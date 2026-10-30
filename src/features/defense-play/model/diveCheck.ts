@@ -49,25 +49,32 @@ export interface DiveCheck {
 /** ldrsh — 16비트 부호 있는 읽기 */
 const int16 = (value: number): number => (value << 16) >> 16
 
+/** b46c2~b46e2 — 분기 앞 다이빙 검사를 보는 AI: 0 · 0xa · 0xd, 또는 커버할 루가 이제 필요 없는 커버(2~5) */
+function isDiveCheckState(state: number, coverNeeded: (base: number) => boolean): boolean {
+  if (state === AI_STATE.IDLE || state === AI_STATE.BUSY || state === AI_STATE.DIVE) return true
+  const isCover = state >= AI_STATE.COVER_HOME && state <= AI_STATE.COVER_THIRD
+  return isCover && !coverNeeded(state - AI_STATE.COVER_HOME)
+}
+
+/** b4728 — 공 길목 P(n) 으로 몸을 날린다: 0xa100c 는 +0xb4 ≤ 0 · vtc8 일 때만 목표를 받고, AI 0xd 로 분기 없이 다음 야수 */
+function divingCheckOf(fielder: FielderState, point: WorldPoint, dove: boolean): DiveCheck {
+  const canStep = fielder.actionLockTicks <= 0 && isFreeToStep(fielder)
+  const next = canStep ? { ...fielder, target: { x: point.x, y: 0, z: point.z } } : fielder
+  return { fielder: { ...next, aiState: AI_STATE.DIVE }, skipDispatch: true, dispatchState: AI_STATE.DIVE, dove }
+}
+
 export function diveCheckOf(input: DiveCheckInput): DiveCheck | null {
   const { fielder } = input
   if (fielder === undefined) return null
   const state = fielder.aiState
-  const unneededCover = state >= AI_STATE.COVER_HOME && state <= AI_STATE.COVER_THIRD && !input.coverNeeded(state - AI_STATE.COVER_HOME)
-  if (state !== AI_STATE.IDLE && state !== AI_STATE.BUSY && state !== AI_STATE.DIVE && !unneededCover) return null
+  if (!isDiveCheckState(state, input.coverNeeded)) return null
   const n = input.diveTick
-  if (n === DIVE_TICK_NONE) return null
-  if (int16(input.catchTick) <= n + 5) return null
-  let next = fielder
+  if (n === DIVE_TICK_NONE || int16(input.catchTick) <= n + 5) return null
   const dove = n === input.ballTick
   // b4714 vt60 0xa1ed8 — 바운드 전 낮은 공 동작과 같은 칸(+0xb3 · 동작 8)
-  if (dove) next = withCatchMotion(next, CATCH_KIND.GROUNDER)
-  if (n > input.ballTick - 5) {
-    const point = input.ballPointAt(n)
-    // 0xa100c → vt14 0xa14c8: +0xb4 ≤ 0 · vtc8 일 때만 목표를 받는다
-    if (next.actionLockTicks <= 0 && isFreeToStep(next)) next = { ...next, target: { x: point.x, y: 0, z: point.z } }
-    return { fielder: { ...next, aiState: AI_STATE.DIVE }, skipDispatch: true, dispatchState: AI_STATE.DIVE, dove }
-  }
+  const next = dove ? withCatchMotion(fielder, CATCH_KIND.GROUNDER) : fielder
+  if (n > input.ballTick - 5) return divingCheckOf(next, input.ballPointAt(n), dove)
+  // b4752 — AI 0, 분기는 옛 s 로
   return { fielder: { ...next, aiState: AI_STATE.IDLE }, skipDispatch: false, dispatchState: state, dove }
 }
 
