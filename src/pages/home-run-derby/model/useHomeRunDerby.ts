@@ -18,6 +18,7 @@ import { useDerbySceneStart } from './useHomeRunDerby/useDerbySceneStart'
 export { CONFIRM_LOCK_FRAMES, resultHoldMillisecondsOf, SCENE_D_FRAMES } from './useHomeRunDerby/derbySceneFrames'
 export type { DerbyFieldPlay } from './useHomeRunDerby/derbyPlayView'
 export { rollDerbySceneStart } from './useHomeRunDerby/rollDerbySceneStart'
+export type { HomeRunDerbySession } from './useHomeRunDerby/homeRunDerbyTypes'
 
 /**
  * 홈런더비 한 판의 진행 (H-2).
