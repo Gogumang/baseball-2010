@@ -107,36 +107,50 @@ export function derbyPitchTargetOf(side: number): WorldPoint {
 
 export function pitchTargetOf(kind: number, situation: TargetSituation, random: RandomPort): WorldPoint {
   const center = ZONE_CENTERS[situation.side] ?? ZONE_CENTERS[0]
-  // 종류 4 는 주자가 없거나 만루면 1 이다 (0x34684). 그 밖은 원본이 **투구를 안 하고 견제로 빠진다**
-  // (0x34848, 위 주석) — 견제가 켜진 `selectPitch` 는 여기 오기 전에 갈라진다. 견제가 꺼진 채로 여기 오면
-  // 모서리 투구로 던진다 — **알려진 어긋남**이다
-  const effective = kind === PICKOFF_KIND && (situation.runnerCount === 0 || situation.runnerCount === FULL_BASES) ? 1 : kind
-  switch (effective) {
-    case 0: {
-      const x = center.x + random.rand(-INNER, INNER)
-      const y = center.y + random.rand(-INNER, INNER)
-      return { x, y, z: PLATE_DEPTH }
-    }
-    case 2:
-    case 1:
-    case PICKOFF_KIND: {
-      const [minimumX, maximumX] = effective === 2 ? CORNER_X : EDGE_X
-      const [minimumY, maximumY] = effective === 2 ? CORNER_Y : EDGE_Y
-      const dx = random.rand(minimumX, maximumX)
-      const dy = random.rand(minimumY, maximumY)
-      const x = center.x + signed(random, dx)
-      const y = center.y + signed(random, dy)
-      return { x, y, z: PLATE_DEPTH }
-    }
-    default: {
-      const dx = random.rand(OUTSIDE_X[0], OUTSIDE_X[1])
-      const dy = random.rand(OUTSIDE_Y[0], OUTSIDE_Y[1])
-      let direction = situation.batterSide === 0 ? 1 : -1
-      if (random.rand(0, FLIP_CHANCE) === 0) direction = -direction
-      const y = center.y + signed(random, dy)
-      return { x: center.x + dx * direction, y, z: PLATE_DEPTH }
-    }
-  }
+  const effective = effectiveTargetKindOf(kind, situation)
+  if (effective === 0) return rollInnerTarget(center, random)
+  if (EDGE_TARGET_KINDS.has(effective)) return rollEdgeTarget(center, effective === 2, random)
+  return rollOutsideTarget(center, situation.batterSide, random)
+}
+
+/** 모서리(2) · 가장자리(1 · 견제 4) — 부호까지 굴린다 */
+const EDGE_TARGET_KINDS: ReadonlySet<number> = new Set([1, 2, PICKOFF_KIND])
+
+/**
+ * 종류 4 는 주자가 없거나 만루면 1 이다 (0x34684). 그 밖은 원본이 **투구를 안 하고 견제로 빠진다**
+ * (0x34848, 위 주석) — 견제가 켜진 `selectPitch` 는 여기 오기 전에 갈라진다. 견제가 꺼진 채로 여기 오면
+ * 모서리 투구로 던진다 — **알려진 어긋남**이다
+ */
+function effectiveTargetKindOf(kind: number, situation: TargetSituation): number {
+  return kind === PICKOFF_KIND && (situation.runnerCount === 0 || situation.runnerCount === FULL_BASES) ? 1 : kind
+}
+
+/** 종류 0 — 존 안쪽 x · y 를 차례로 굴린다 */
+function rollInnerTarget(center: { readonly x: number; readonly y: number }, random: RandomPort): WorldPoint {
+  const x = center.x + random.rand(-INNER, INNER)
+  const y = center.y + random.rand(-INNER, INNER)
+  return { x, y, z: PLATE_DEPTH }
+}
+
+/** 종류 1 · 2 · 4 — 거리 dx · dy 를 굴린 뒤 부호 x · y 를 굴린다 */
+function rollEdgeTarget(center: { readonly x: number; readonly y: number }, isCorner: boolean, random: RandomPort): WorldPoint {
+  const [minimumX, maximumX] = isCorner ? CORNER_X : EDGE_X
+  const [minimumY, maximumY] = isCorner ? CORNER_Y : EDGE_Y
+  const dx = random.rand(minimumX, maximumX)
+  const dy = random.rand(minimumY, maximumY)
+  const x = center.x + signed(random, dx)
+  const y = center.y + signed(random, dy)
+  return { x, y, z: PLATE_DEPTH }
+}
+
+/** 그 밖(3) — 바깥쪽 dx · dy, 뒤집기 굴림, y 부호 굴림 차례 */
+function rollOutsideTarget(center: { readonly x: number; readonly y: number }, batterSide: number, random: RandomPort): WorldPoint {
+  const dx = random.rand(OUTSIDE_X[0], OUTSIDE_X[1])
+  const dy = random.rand(OUTSIDE_Y[0], OUTSIDE_Y[1])
+  let direction = batterSide === 0 ? 1 : -1
+  if (random.rand(0, FLIP_CHANCE) === 0) direction = -direction
+  const y = center.y + signed(random, dy)
+  return { x: center.x + dx * direction, y, z: PLATE_DEPTH }
 }
 
 // 등급별 누적 % (표 0xcfd60) → 계수 칸 [12, 20, 25, 30] · slt_pitch 프레임 59~67 의 반폭(조준 칸 크기) —

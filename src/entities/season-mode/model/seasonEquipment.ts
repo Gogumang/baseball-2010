@@ -101,6 +101,12 @@ export type SeasonEquipmentCheck =
   | { readonly ok: true; readonly price: number; readonly owned?: true }
   | { readonly ok: false; readonly reason: SeasonEquipmentRefusal; readonly required?: number }
 
+/** 히든 칸(레벨 ≥ 첫 히든)인데 아직 안 열렸다 — 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다. 원본 판정 `isHiddenOpen` 은 그대로 감싼다 */
+function isLockedHiddenLevel(target: SeasonEquipmentTarget, part: number, level: number, isHiddenOpen: (id: number) => boolean): boolean {
+  const hiddenId = seasonEquipmentHiddenIdOf(target.isBatter, part, level)
+  return level >= SEASON_FIRST_HIDDEN_LEVEL && !isHiddenUnlocked(hiddenId, () => isHiddenOpen(hiddenId))
+}
+
 /** 0x957c 가드 — 차례 그대로 */
 export function checkSeasonEquipment(
   record: Pick<SeasonRecord, 'popularity' | 'money'>,
@@ -109,11 +115,7 @@ export function checkSeasonEquipment(
   level: number,
   isHiddenOpen: (id: number) => boolean,
 ): SeasonEquipmentCheck {
-  // 해금 표(`unlocks.json`)가 풀면 열린 것으로 본다 — 원본 판정 `isHiddenOpen` 은 그대로 감싼다
-  const hiddenId = seasonEquipmentHiddenIdOf(target.isBatter, part, level)
-  if (level >= SEASON_FIRST_HIDDEN_LEVEL && !isHiddenUnlocked(hiddenId, () => isHiddenOpen(hiddenId))) {
-    return { ok: false, reason: '미오픈' }
-  }
+  if (isLockedHiddenLevel(target, part, level, isHiddenOpen)) return { ok: false, reason: '미오픈' }
   if ((target.equipment[part] ?? 0) - 1 === level) return { ok: false, reason: '이미보유' }
   if (isBugFixed('B-23') && ownsSeasonEquipment(target, part, level)) return { ok: true, price: 0, owned: true }
   const required = seasonEquipmentRequiredPopularityOf(level)

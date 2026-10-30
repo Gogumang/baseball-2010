@@ -92,22 +92,31 @@ export function runnerLeadOf(runner: Pick<RunnerState, 'startBase' | 'targetBase
   const index = ((base % 4) + 4) % 4
   const walkLike = input.playKind === 2 || input.playKind === 3
   if (input.playKind === 4) {
-    const roll = input.random === undefined ? 0 : input.random.rand(0, 100)
-    const extra = roll <= 0 ? PICKOFF_EXTRA_TICKS : 0
-    return { ticks: PICKOFF_LEAD_TICKS[index] + extra, leadTargetBase, restoredTargetBase: base }
+    return { ticks: PICKOFF_LEAD_TICKS[index] + rollPickoffExtraTicks(input.random), leadTargetBase, restoredTargetBase: base }
   }
-  if (input.stealing) {
-    if (walkLike) return { ticks: 0, leadTargetBase, restoredTargetBase: null }
-    const roll = input.random === undefined ? 0 : input.random.rand(0, 9)
-    const extra = roll <= STEAL_EXTRA_FLOOR_BELOW ? STEAL_EXTRA_FLOOR : roll
-    return { ticks: STEAL_LEAD_TICKS[index] + extra, leadTargetBase, restoredTargetBase: runner.targetBase }
+  if (!input.stealing) {
+    const extra = isBuntLead(base, walkLike, input.buntKind) ? BUNT_EXTRA_TICKS : 0
+    return { ticks: PLAIN_LEAD_TICKS[index] + extra, leadTargetBase, restoredTargetBase: runner.targetBase }
   }
-  const bunt = base !== 0 && !walkLike && (input.buntKind ?? 0) !== 0
-  return {
-    ticks: PLAIN_LEAD_TICKS[index] + (bunt ? BUNT_EXTRA_TICKS : 0),
-    leadTargetBase,
-    restoredTargetBase: runner.targetBase,
-  }
+  if (walkLike) return { ticks: 0, leadTargetBase, restoredTargetBase: null }
+  return { ticks: STEAL_LEAD_TICKS[index] + rollStealExtraTicks(input.random), leadTargetBase, restoredTargetBase: runner.targetBase }
+}
+
+/** 견제 — rand(0,100) == 0 이면 덧틱 (난수가 없으면 0 으로 본다) */
+function rollPickoffExtraTicks(random: RandomPort | undefined): number {
+  const roll = random === undefined ? 0 : random.rand(0, 100)
+  return roll <= 0 ? PICKOFF_EXTRA_TICKS : 0
+}
+
+/** 도루 — rand(0,9), 바닥 아래면 바닥값 (난수가 없으면 0 으로 본다) */
+function rollStealExtraTicks(random: RandomPort | undefined): number {
+  const roll = random === undefined ? 0 : random.rand(0, 9)
+  return roll <= STEAL_EXTRA_FLOOR_BELOW ? STEAL_EXTRA_FLOOR : roll
+}
+
+/** 번트 판의 도루 아닌 루 주자 (타자주자 · 밀어내기 판 빼고) */
+function isBuntLead(base: number, walkLike: boolean, buntKind: number | undefined): boolean {
+  return base !== 0 && !walkLike && (buntKind ?? 0) !== 0
 }
 
 /**

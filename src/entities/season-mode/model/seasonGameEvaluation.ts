@@ -28,14 +28,23 @@ export function seasonGameEvaluationLineOf(record: SeasonRecord): string {
   const s = record.gameRecord
   const result = record.lastGameScore > record.lastGameConceded ? '경기승리!' : '경기패배!'
   const fixed = isBugFixed('B-67')
-  const hits = fixed ? (s[7] ?? 0) : (s[7] ?? 0) + (s[8] ?? 0) + (s[9] ?? 0)
-  const store = record.storeGames > 0 ? '(+200)' : ''
-  const income = originalMoneyText(record.lastIncome * 100)
   return (
     `득점: ${record.lastGameScore} / 실점: ${record.lastGameConceded} / ${result}!N` +
-    `안타: ${hits} / 피안타: ${s[2] ?? 0} / 에러: ${s[3] ?? 0}!N` +
-    `관중: ${record.lastAttendance}명 / 수입: ${fixed ? `${income}만${store}` : `${income}${store}만`}`
+    `안타: ${evaluationHitsOf(s, fixed)} / 피안타: ${s[2] ?? 0} / 에러: ${s[3] ?? 0}!N` +
+    `관중: ${record.lastAttendance}명 / 수입: ${incomeTextOf(record, fixed)}`
   )
+}
+
+/** 안타 — 원본은 S[7] + S[8] + S[9](2루타 · 3루타를 두 번 센다), 고친 길은 S[7] 하나 */
+function evaluationHitsOf(s: SeasonRecord['gameRecord'], fixed: boolean): number {
+  return fixed ? (s[7] ?? 0) : (s[7] ?? 0) + (s[8] ?? 0) + (s[9] ?? 0)
+}
+
+/** 수입 — 구내매점 "(+200)" 이 원본은 "만" 앞, 고친 길은 "만" 뒤 */
+function incomeTextOf(record: SeasonRecord, fixed: boolean): string {
+  const store = record.storeGames > 0 ? '(+200)' : ''
+  const income = originalMoneyText(record.lastIncome * 100)
+  return fixed ? `${income}만${store}` : `${income}${store}만`
 }
 
 /**

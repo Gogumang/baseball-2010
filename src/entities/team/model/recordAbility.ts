@@ -40,9 +40,13 @@ export function recordAbilityAt(record: AbilityRecord, slot: number, isPitcher: 
   if (nibble >= 1) value = Math.min(value + equipmentBonusOf(nibble), ABILITY_LIMIT)
   if (hasSkill(record.skillBits, SKILL.무력감)) value = Math.max(value - 100, 0)
   if (hasSkill(record.skillBits, SKILL.전설)) value = Math.min(value + 50, ABILITY_LIMIT)
-  if (isPitcher && hasSkill(record.skillBits, SKILL.냉정) && slot === PITCHER_CONTROL_SLOT) value += Math.trunc(value / 10)
-  if (!isPitcher && hasSkill(record.skillBits, SKILL.수비불가) && slot === BATTER_DEFENSE_SLOT) value = Math.max(value - 100, 0)
-  return value
+  return withSideSkill(record.skillBits, slot, isPitcher, value)
+}
+
+/** b64e6 투수 ∧ 냉정 ∧ k == 0 → v += v / 10 (자르지 않는다) · b6512 타자 ∧ 수비불가 ∧ k == 2 → v = max(v − 100, 0) */
+function withSideSkill(skillBits: number, slot: number, isPitcher: boolean, value: number): number {
+  if (isPitcher) return hasSkill(skillBits, SKILL.냉정) && slot === PITCHER_CONTROL_SLOT ? value + Math.trunc(value / 10) : value
+  return hasSkill(skillBits, SKILL.수비불가) && slot === BATTER_DEFENSE_SLOT ? Math.max(value - 100, 0) : value
 }
 
 /** `0xb6414(rec, k, 1)` 네 칸 */

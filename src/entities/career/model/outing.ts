@@ -47,10 +47,15 @@ export function outingBlockReasonOf(career: OutingCareer, outingFunction: Outing
   const moneyCost = outingMoneyCostOf(career, outingFunction)
   if (moneyCost > 0 && career.money < moneyCost) return '소지금부족'
   // StrMODE[196] "건강한 상태입니다 입원할 필요가 없습니다"
-  if (outingFunction.effect.healsInjury && !career.isInjured && !career.isSick) return '건강함'
+  if (outingFunction.effect.healsInjury && isHealthy(career)) return '건강함'
   // 외식은 사기가 최고면 막힌다 (StrMODE[91])
   if (outingFunction.id === '외식' && career.morale >= MAXIMUM_MORALE) return '사기최고'
   return null
+}
+
+/** 질병도 부상도 없다 — 입원할 까닭이 없다 */
+function isHealthy(career: OutingCareer): boolean {
+  return !career.isInjured && !career.isSick
 }
 
 /**
@@ -71,18 +76,19 @@ function outingMoneyCostOf(career: OutingCareer, outingFunction: OutingFunction)
   return applied.moneyCost
 }
 
+/** 막힘 알림 원문 줄 — StrMODE 첨자 */
+const BLOCK_TEXT_ID: Readonly<Record<OutingBlockReason, number>> = {
+  인기도부족: 62,
+  소지금부족: 77,
+  건강함: 196,
+  사기최고: 91,
+}
+
 /** 막힘 알림 원문 — StrMODE[62] · [77] · [196] · [91] 을 원문 표에서 마크업째 읽는다(r216), 이미 행동함은 r_event_txt[176] */
 export function outingBlockTextOf(reason: OutingBlockReason, outingFunction: OutingFunction): string {
-  switch (reason) {
-    case '인기도부족':
-      return (ORIGINAL_MODE_TEXT[62] ?? '').replace('%d', String(outingFunction.requiredPopularity))
-    case '소지금부족':
-      return ORIGINAL_MODE_TEXT[77] ?? ''
-    case '건강함':
-      return ORIGINAL_MODE_TEXT[196] ?? ''
-    case '사기최고':
-      return ORIGINAL_MODE_TEXT[91] ?? ''
-  }
+  const text = ORIGINAL_MODE_TEXT[BLOCK_TEXT_ID[reason]] ?? ''
+  // [62] "인기도가 부족합니다. 필요한 인기도 : %d"
+  return reason === '인기도부족' ? text.replace('%d', String(outingFunction.requiredPopularity)) : text
 }
 
 const clamp = (value: number, maximum: number) => Math.min(maximum, Math.max(0, value))

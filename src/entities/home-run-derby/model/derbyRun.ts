@@ -122,25 +122,13 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
   // 0. 비거리는 타구가 날아가는 동안 이미 더해진다 (0xa600c) — 홈런 순간 · 홈런 아닌 페어 공의 낙구 틱
   const totalDistance = run.totalDistance + outcome.distance
   const hasMoreChances = run.remainingPitches > 1
-
-  // 1. 콤보 — 직전·이번 모두 홈런이면 올리고(ae444), 마지막 공이거나 이번이 홈런이 아니면 지운다(ae470)
-  const isComboLinked = run.wasPreviousHomeRun && outcome.isHomeRun
-  const raisedCombo = isComboLinked ? run.combo + 1 : run.combo
-  const maxCombo = isComboLinked ? Math.max(run.maxCombo, raisedCombo) : run.maxCombo
-  let bonusGamePoint = run.bonusGamePoint + (isComboLinked ? raisedCombo * COMBO_BONUS_UNIT : 0)
-  const combo = run.wasPreviousHomeRun && !(hasMoreChances && outcome.isHomeRun) ? 0 : raisedCombo
-  // 콤보 표시값 +0x84 는 올린 콤보로만 쓴다(ae46c) — 바로 뒤 ae470 이 콤보를 지워도 남는다
-  const comboDisplay = isComboLinked ? raisedCombo : run.comboDisplay
-
-  // 5. 이벤트 존은 같은 처리 끝에서 더한다 (0xae548)
-  if (outcome.isEventZoneHit) bonusGamePoint += EVENT_ZONE_BONUS
-
-  const common = {
+  const tally = comboTallyOf(run, outcome, hasMoreChances)
+  const common: DerbyPitchCommon = {
     totalDistance,
     lastDistance: outcome.displayDistance ?? run.lastDistance,
-    maxCombo,
-    bonusGamePoint,
-    comboDisplay,
+    maxCombo: tally.maxCombo,
+    bonusGamePoint: tally.bonusGamePoint,
+    comboDisplay: tally.comboDisplay,
   }
 
   // 2. 아직 기회가 남았다 — 다음 공
@@ -148,26 +136,52 @@ export function applyDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome): Derb
     return {
       ...run,
       ...common,
-      combo,
+      combo: tally.combo,
       wasPreviousHomeRun: outcome.isHomeRun,
       remainingPitches: run.remainingPitches - 1,
       pitchesThrown: run.pitchesThrown + 1,
       stage: nextAceStageOf(run.stage, totalDistance),
     }
   }
+  return applyLastDerbyPitch(run, outcome, common, tally.combo)
+}
 
+/** 공마다 어느 갈래로 가든 같이 쓰는 칸 */
+type DerbyPitchCommon = Pick<DerbyRun, 'totalDistance' | 'lastDistance' | 'maxCombo' | 'bonusGamePoint' | 'comboDisplay'>
+
+/** 1. 콤보 — 직전·이번 모두 홈런이면 올리고(ae444) 최대 콤보 · 보너스 G 도 함께 올린다 */
+function comboTallyOf(run: DerbyRun, outcome: DerbyPitchOutcome, hasMoreChances: boolean) {
+  const isComboLinked = run.wasPreviousHomeRun && outcome.isHomeRun
+  const raisedCombo = isComboLinked ? run.combo + 1 : run.combo
+  return {
+    combo: comboAfterPitch(run, outcome, hasMoreChances, raisedCombo),
+    maxCombo: isComboLinked ? Math.max(run.maxCombo, raisedCombo) : run.maxCombo,
+    // 5. 이벤트 존은 같은 처리 끝에서 더한다 (0xae548)
+    bonusGamePoint: run.bonusGamePoint + (isComboLinked ? raisedCombo * COMBO_BONUS_UNIT : 0) + (outcome.isEventZoneHit ? EVENT_ZONE_BONUS : 0),
+    // 콤보 표시값 +0x84 는 올린 콤보로만 쓴다(ae46c) — 바로 뒤 ae470 이 콤보를 지워도 남는다
+    comboDisplay: isComboLinked ? raisedCombo : run.comboDisplay,
+  }
+}
+
+/** 직전 공이 홈런이었는데 마지막 공이거나 이번이 홈런이 아니면 콤보를 지운다 (ae470) */
+function comboAfterPitch(run: DerbyRun, outcome: DerbyPitchOutcome, hasMoreChances: boolean, raisedCombo: number): number {
+  return run.wasPreviousHomeRun && !(hasMoreChances && outcome.isHomeRun) ? 0 : raisedCombo
+}
+
+/** 마지막 공 — 보너스 게임을 열거나 끝낸다 */
+function applyLastDerbyPitch(run: DerbyRun, outcome: DerbyPitchOutcome, common: DerbyPitchCommon, combo: number): DerbyRun {
   // 고침(B-53): 마지막 공도 단계 문턱을 본다
-  const lastPitchStage = isBugFixed('B-53') ? nextAceStageOf(run.stage, totalDistance) : run.stage
+  const lastPitchStage = isBugFixed('B-53') ? nextAceStageOf(run.stage, common.totalDistance) : run.stage
 
   // 3. 보너스 게임 — 최대 콤보 수만큼, 한 번만. "직전 공 홈런" 은 지운다(ae502), 던진 공은 센다(ae51c)
-  if (maxCombo > 0 && !run.isBonusGame) {
+  if (common.maxCombo > 0 && !run.isBonusGame) {
     return {
       ...run,
       ...common,
       combo: 0,
       wasPreviousHomeRun: false,
       isBonusGame: true,
-      remainingPitches: maxCombo,
+      remainingPitches: common.maxCombo,
       pitchesThrown: run.pitchesThrown + 1,
       stage: lastPitchStage,
     }

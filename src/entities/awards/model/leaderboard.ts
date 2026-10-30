@@ -131,6 +131,20 @@ export function isAscending(kind: LeaderKind): boolean {
   return kind === LEADER_KIND.방어율
 }
 
+/** 종류마다 레코드에서 읽는 값 — 방어율 · 타율은 규정 이닝 · 타수를 못 채우면 null */
+const LEADER_VALUE: Record<LeaderKind, (record: LeagueRecord) => number | null> = {
+  [LEADER_KIND.승]: (record) => record.wins,
+  [LEADER_KIND.패]: (record) => record.losses,
+  [LEADER_KIND.세이브]: (record) => record.saves,
+  // 규정 이닝 — 원본은 `아웃 / 3 ≥ 45` 로 본다 (버림)
+  [LEADER_KIND.방어율]: (record) => (Math.trunc(record.atBatsOrOuts / OUTS_PER_INNING) >= QUALIFIED_INNINGS ? earnedRunAverageOf(record) : null),
+  [LEADER_KIND.탈삼진]: (record) => record.strikeouts,
+  [LEADER_KIND.홈런]: (record) => record.homeRuns,
+  [LEADER_KIND.타점]: (record) => record.runsBattedIn,
+  // 규정 타수 104
+  [LEADER_KIND.타율]: (record) => (record.atBatsOrOuts >= QUALIFIED_AT_BATS ? battingAverageOf(record) : null),
+}
+
 /**
  * 순위표에 넣을 값. `null` 이면 그 선수는 이 종류에 끼지 못한다.
  * 제외 조건 두 가지(`+0x20 ≤ 0` · `+0xa 비트6`)는 종류와 무관하게 먼저 본다.
@@ -138,29 +152,8 @@ export function isAscending(kind: LeaderKind): boolean {
 export function leaderValueOf(record: LeagueRecord, kind: LeaderKind): number | null {
   if (record.isOutOfRanking) return null
   if (record.atBatsOrOuts <= 0) return null
-
-  switch (kind) {
-    case LEADER_KIND.승:
-      return record.wins
-    case LEADER_KIND.패:
-      return record.losses
-    case LEADER_KIND.세이브:
-      return record.saves
-    case LEADER_KIND.방어율:
-      // 규정 이닝 — 원본은 `아웃 / 3 ≥ 45` 로 본다 (버림)
-      return Math.trunc(record.atBatsOrOuts / OUTS_PER_INNING) >= QUALIFIED_INNINGS ? earnedRunAverageOf(record) : null
-    case LEADER_KIND.탈삼진:
-      return record.strikeouts
-    case LEADER_KIND.홈런:
-      return record.homeRuns
-    case LEADER_KIND.타점:
-      return record.runsBattedIn
-    case LEADER_KIND.타율:
-      // 규정 타수 104
-      return record.atBatsOrOuts >= QUALIFIED_AT_BATS ? battingAverageOf(record) : null
-    default:
-      return null
-  }
+  const valueOf = LEADER_VALUE[kind] as ((record: LeagueRecord) => number | null) | undefined
+  return valueOf === undefined ? null : valueOf(record)
 }
 
 export interface LeaderEntry {
@@ -182,17 +175,20 @@ export function rankLeaders(records: readonly LeagueRecord[], kind: LeaderKind):
   const leaders: LeaderEntry[] = []
   for (const record of records) {
     const value = leaderValueOf(record, kind)
-    if (value === null) continue
-
-    const slot = leaders.findIndex((entry) => better(value, entry.value))
-    if (slot < 0) {
-      if (leaders.length < LEADERBOARD_SIZE) leaders.push({ record, value })
-      continue
-    }
-    leaders.splice(slot, 0, { record, value })
-    if (leaders.length > LEADERBOARD_SIZE) leaders.pop()
+    if (value !== null) seatLeader(leaders, { record, value }, better)
   }
   return leaders
+}
+
+/** 0x9d789 한 사람 — 처음으로 더 못한 칸 앞에 끼우고 넘친 꼴찌를 뺀다. 끼울 칸이 없으면 빈자리에만 앉는다 */
+function seatLeader(leaders: LeaderEntry[], entry: LeaderEntry, better: (candidate: number, seated: number) => boolean): void {
+  const slot = leaders.findIndex((seated) => better(entry.value, seated.value))
+  if (slot < 0) {
+    if (leaders.length < LEADERBOARD_SIZE) leaders.push(entry)
+    return
+  }
+  leaders.splice(slot, 0, entry)
+  if (leaders.length > LEADERBOARD_SIZE) leaders.pop()
 }
 
 /** 1위 한 명. 자격을 갖춘 선수가 하나도 없으면 null */

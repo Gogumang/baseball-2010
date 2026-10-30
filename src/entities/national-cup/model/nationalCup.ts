@@ -129,17 +129,23 @@ export function nationalCupRankingOf(cup: NationalCup): number[] {
   const wins = [...cup.wins]
   const losses = [...cup.losses]
 
-  for (let i = 0; i < order.length - 1; i += 1) {
-    for (let j = i + 1; j < order.length; j += 1) {
-      const isBetter = wins[i] < wins[j] || (wins[i] === wins[j] && losses[i] > losses[j])
-      if (!isBetter) continue
-      ;[wins[i], wins[j]] = [wins[j], wins[i]]
-      ;[losses[i], losses[j]] = [losses[j], losses[i]]
-      ;[order[i], order[j]] = [order[j], order[i]]
-    }
-  }
-
+  for (let i = 0; i < order.length - 1; i += 1) settleRankingSlot(i, order, wins, losses)
   return order
+}
+
+/** 칸 i 를 두고 j = i+1..끝을 차례로 보며, j 가 더 나으면 그 자리에서 바로 맞바꾼다 (b7f9c~b8014) */
+function settleRankingSlot(i: number, order: number[], wins: number[], losses: number[]): void {
+  for (let j = i + 1; j < order.length; j += 1) {
+    if (!isBetterRecordAt(wins, losses, j, i)) continue
+    ;[wins[i], wins[j]] = [wins[j], wins[i]]
+    ;[losses[i], losses[j]] = [losses[j], losses[i]]
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+}
+
+/** 칸 j 가 칸 i 보다 낫다 — 승이 많거나, 승이 같고 패가 적다 */
+function isBetterRecordAt(wins: readonly number[], losses: readonly number[], j: number, i: number): boolean {
+  return wins[i] < wins[j] || (wins[i] === wins[j] && losses[i] > losses[j])
 }
 
 const replaced = (values: readonly number[], index: number, value: number) =>

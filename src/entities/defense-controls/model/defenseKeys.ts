@@ -160,13 +160,17 @@ export interface InPlayKeyOptions {
 export function inPlayCommandOf(webKey: string, side: ControlSide, options: InPlayKeyOptions = {}): InPlayCommand | null {
   const key = originalKeyOf(webKey)
   if (key === null) return null
+  return side === '수비' ? throwCommandOf(key) : baserunningCommandOf(key, options)
+}
 
-  if (side === '수비') {
-    const target = THROW_BY_KEY[key]
-    return target === undefined ? null : { kind: '송구', target }
-  }
+/** 수비 — 송구 키만 */
+function throwCommandOf(key: OriginalKey): InPlayCommand | null {
+  const target = THROW_BY_KEY[key]
+  return target === undefined ? null : { kind: '송구', target }
+}
 
-  // 공격: 슬라이딩(OK) → 진루 → 귀루 순으로 본다. 원본 0x53420 도 OK 를 따로 먼저 본다.
+/** 공격 — 슬라이딩(OK) → 진루 → 귀루 순으로 본다. 원본 0x53420 도 OK 를 따로 먼저 본다. */
+function baserunningCommandOf(key: OriginalKey, options: InPlayKeyOptions): InPlayCommand | null {
   if (key === 'OK') return { kind: '슬라이딩' }
 
   const advance = ADVANCE_BY_KEY[key]

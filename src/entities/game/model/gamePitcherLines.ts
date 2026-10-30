@@ -57,48 +57,48 @@ export interface GameLeaguePitchers {
   }
 }
 
+type PitcherLineDelta = Partial<Pick<GamePitcherLine, 'outs' | 'runsAllowed' | 'strikeouts' | 'pitches' | 'walks'>>
+
 /** 줄 하나에 더한다 — 없으면 새로 만든다 (나온 차례대로) */
 export function chargePitcherLine(
   lines: readonly GamePitcherLine[],
   teamId: number,
   pitcherSlot: number,
-  delta: Partial<Pick<GamePitcherLine, 'outs' | 'runsAllowed' | 'strikeouts' | 'pitches' | 'walks'>>,
+  delta: PitcherLineDelta,
   /** 붙박이 표 밖 투수의 원본 id (`GamePitcherLine.recordId`) */
   recordId?: number,
 ): readonly GamePitcherLine[] {
-  const outs = delta.outs ?? 0
-  const runsAllowed = delta.runsAllowed ?? 0
-  const strikeouts = delta.strikeouts ?? 0
-  const pitches = delta.pitches ?? 0
-  const walks = delta.walks ?? 0
   const index = lines.findIndex((line) => line.teamId === teamId && line.pitcherSlot === pitcherSlot && line.recordId === recordId)
-  if (index < 0) {
-    return [
-      ...lines,
-      {
-        teamId,
-        pitcherSlot,
-        outs,
-        runsAllowed,
-        strikeouts,
-        pitches,
-        ...(walks > 0 ? { walks } : {}),
-        ...(recordId === undefined ? {} : { recordId }),
-      },
-    ]
+  if (index < 0) return [...lines, newPitcherLine(teamId, pitcherSlot, delta, recordId)]
+  return lines.map((line, at) => (at === index ? withPitcherLineDelta(line, delta) : line))
+}
+
+/** 처음 나온 투수의 줄 — 사사구 · 원본 id 칸은 있을 때만 */
+function newPitcherLine(teamId: number, pitcherSlot: number, delta: PitcherLineDelta, recordId: number | undefined): GamePitcherLine {
+  const walks = delta.walks ?? 0
+  return {
+    teamId,
+    pitcherSlot,
+    outs: delta.outs ?? 0,
+    runsAllowed: delta.runsAllowed ?? 0,
+    strikeouts: delta.strikeouts ?? 0,
+    pitches: delta.pitches ?? 0,
+    ...(walks > 0 ? { walks } : {}),
+    ...(recordId === undefined ? {} : { recordId }),
   }
-  return lines.map((line, at) =>
-    at === index
-      ? {
-          ...line,
-          outs: line.outs + outs,
-          runsAllowed: line.runsAllowed + runsAllowed,
-          strikeouts: line.strikeouts + strikeouts,
-          pitches: line.pitches + pitches,
-          ...(walks > 0 ? { walks: (line.walks ?? 0) + walks } : {}),
-        }
-      : line,
-  )
+}
+
+/** 있던 줄에 더한다 — 사사구 칸은 더할 것이 있을 때만 */
+function withPitcherLineDelta(line: GamePitcherLine, delta: PitcherLineDelta): GamePitcherLine {
+  const walks = delta.walks ?? 0
+  return {
+    ...line,
+    outs: line.outs + (delta.outs ?? 0),
+    runsAllowed: line.runsAllowed + (delta.runsAllowed ?? 0),
+    strikeouts: line.strikeouts + (delta.strikeouts ?? 0),
+    pitches: line.pitches + (delta.pitches ?? 0),
+    ...(walks > 0 ? { walks: (line.walks ?? 0) + walks } : {}),
+  }
 }
 
 /** 반 이닝 엔진 줄(`HalfInningPitcherLine`)들을 한 팀 몫으로 얹는다 */

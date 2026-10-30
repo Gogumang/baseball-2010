@@ -180,57 +180,81 @@ export interface OutJudgementInput extends DefenseContext {
   readonly skipRunnerIndexes?: readonly number[]
 }
 
+type PlayView = DefenseContext['play']
+
+/** b36e8~b36f4: 플레이 종류(+0x118) ≤ 10 이고 비트표 0x58d = {0, 2, 3, 7, 8, 10} 에 들면 곧바로 0 — 밀어내기 판(종류 2)은 아웃이 없다 */
+function isNoOutPlayKind(kind: number): boolean {
+  return kind >= 0 && kind <= 10 && ((1 << kind) & NO_OUT_PLAY_KINDS_MASK) !== 0
+}
+
 /** 아웃 판정 한 번 (0xb36d0). 아웃이 하나 나면 거기서 멈추고 돌려준다 */
 export function judgeOut(input: OutJudgementInput): OutJudgement {
   const { play, fielders, runners } = input
-  // b36e8~b36f4: 플레이 종류(+0x118) ≤ 10 이고 비트표 0x58d = {0, 2, 3, 7, 8, 10} 에 들면 곧바로 0 — 밀어내기 판(종류 2)은 아웃이 없다
-  if (play.kind >= 0 && play.kind <= 10 && ((1 << play.kind) & NO_OUT_PLAY_KINDS_MASK) !== 0) return NO_OUT
+  if (isNoOutPlayKind(play.kind)) return NO_OUT
   const skip = input.skipRunnerIndexes ?? []
   // 0xb0c90 = 야수[P+0x130] — "이 플레이의 야수"
   const fielder = fielders[play.ballHolderSlot]
 
   for (let index = runners.length - 1; index >= 0; index -= 1) {
     const runner = runners[index]
-    if (runner === undefined) continue
-    if (runner.isOut) continue
-    if (skip.includes(index)) continue
-
-    const requiredBase = mod4(runner.requiredBase)
-    const targetBase = mod4(runner.targetBase)
-    // P+0x153(송구 계획[7] = 목표 루) 거르개는 늘 −1 로 본다 → 모든 주자가 통과한다.
-    // CPU 송구는 0xafa60 이 송구 직후 −1 로 되돌려 정확하고, 사람·중계·AI 상태 송구는 근사다 (머리말)
-    const filter = NONE
-    if (filter !== NONE && filter !== targetBase) continue
-
-    const runnerStopped = isRunnerStopped(runner)
-    const footBase = fielder === undefined ? NONE : baseUnderFoot(fielder)
-    const holderReady = fielder !== undefined && play.held && fielderStopped(fielder)
-    let kind: OutKind = OUT_KIND.NONE
-
-    // ── 3a 0xb380e — 태그. 공 쥔 야수와의 거리 ≤ 499 이고 주자가 루에 안 붙었다
-    if (fielder !== undefined && play.held && horizontalDistance(fielder.position, runner.position) <= TAG_DISTANCE && !runnerStopped) {
-      kind = OUT_KIND.TAG
-    }
-
-    // ── 1 0xb3834 — 뜬공 노바운드 포구
-    if (runner.isBatterRunner && !play.everHeld && play.held) kind = OUT_KIND.FLY
-
-    // ── 2a 0xb3890 — 공 쥔 야수가 **주자가 달려가는 루**를 밟고 있고, 그 주자가 아직 밀려 있다.
-    // 평범한 포스(루) 아웃이 여기서 난다.
-    if (holderReady && footBase === targetBase && runner.targetBase !== 0 && isStillForced(runners, index) && !runnerStopped) {
-      kind = OUT_KIND.BASE
-    }
-
-    // ── 2b 0xb38e4 — 공 쥔 야수가 주자의 **요구 루**(포스)를 밟고 있다
-    if (requiredBase !== NONE && !runnerStopped && holderReady && footBase === requiredBase) {
-      kind = OUT_KIND.BASE
-    }
-
-    // ── 3b 0xb3938 — **옮기지 않았다** (머리말 "이 옮김의 근사" 둘째 항목 — 한 틱 안 차례가 0xb401c 에 있다)
-
+    if (runner === undefined || runner.isOut || skip.includes(index)) continue
+    const kind = outKindOf(play, fielder, runners, index, runner)
     if (kind !== OUT_KIND.NONE) return { kind, runnerIndex: index }
   }
   return NO_OUT
+}
+
+/**
+ * P+0x153(송구 계획[7] = 목표 루) 거르개는 늘 −1 로 본다 → 모든 주자가 통과한다.
+ * CPU 송구는 0xafa60 이 송구 직후 −1 로 되돌려 정확하고, 사람·중계·AI 상태 송구는 근사다 (머리말)
+ */
+const THROW_PLAN_TARGET_FILTER: number = NONE
+
+function passesThrowPlanFilter(runner: RunnerState): boolean {
+  return THROW_PLAN_TARGET_FILTER === NONE || THROW_PLAN_TARGET_FILTER === mod4(runner.targetBase)
+}
+
+/** 타자주자의 공을 한 번도 놓지 않고(+0x112 == 0) 쥐었다 */
+function isCaughtOnTheFly(play: PlayView, runner: RunnerState): boolean {
+  return runner.isBatterRunner && !play.everHeld && play.held
+}
+
+/**
+ * 주자 하나의 판정 — 원본은 3a 태그 → 1 뜬공 → 2a · 2b 루 차례로 **덮어쓰므로** 뒤의 것이 이긴다.
+ * 곧 루(2) > 뜬공(1) > 태그(3) 차례로 본다.
+ */
+function outKindOf(play: PlayView, fielder: FielderState | undefined, runners: readonly RunnerState[], index: number, runner: RunnerState): OutKind {
+  if (!passesThrowPlanFilter(runner)) return OUT_KIND.NONE
+  const runnerStopped = isRunnerStopped(runner)
+  const footBase = holderFootBaseOf(play, fielder)
+  if (!runnerStopped && footBase !== null && isForcedAt(runners, index, runner, footBase)) return OUT_KIND.BASE
+  // ── 1 0xb3834 — 뜬공 노바운드 포구
+  if (isCaughtOnTheFly(play, runner)) return OUT_KIND.FLY
+  if (isTagged(play, fielder, runner, runnerStopped)) return OUT_KIND.TAG
+  // ── 3b 0xb3938 — **옮기지 않았다** (머리말 "이 옮김의 근사" 둘째 항목 — 한 틱 안 차례가 0xb401c 에 있다)
+  return OUT_KIND.NONE
+}
+
+/** 공을 쥐고 멈춰 선 야수의 발밑 루(없으면 −1) — 쥐지 않았거나 걷는 중이면 null */
+function holderFootBaseOf(play: PlayView, fielder: FielderState | undefined): number | null {
+  if (fielder === undefined || !play.held || !fielderStopped(fielder)) return null
+  return baseUnderFoot(fielder)
+}
+
+/** 야수가 밟은 루가 주자를 잡는 루인가 */
+function isForcedAt(runners: readonly RunnerState[], index: number, runner: RunnerState, footBase: number): boolean {
+  // ── 2a 0xb3890 — 공 쥔 야수가 **주자가 달려가는 루**를 밟고 있고, 그 주자가 아직 밀려 있다.
+  // 평범한 포스(루) 아웃이 여기서 난다.
+  if (footBase === mod4(runner.targetBase) && runner.targetBase !== 0 && isStillForced(runners, index)) return true
+  // ── 2b 0xb38e4 — 공 쥔 야수가 주자의 **요구 루**(포스)를 밟고 있다
+  const requiredBase = mod4(runner.requiredBase)
+  return requiredBase !== NONE && footBase === requiredBase
+}
+
+/** ── 3a 0xb380e — 태그. 공 쥔 야수와의 거리 ≤ 499 이고 주자가 루에 안 붙었다 */
+function isTagged(play: PlayView, fielder: FielderState | undefined, runner: RunnerState, runnerStopped: boolean): boolean {
+  if (fielder === undefined || !play.held || runnerStopped) return false
+  return horizontalDistance(fielder.position, runner.position) <= TAG_DISTANCE
 }
 
 /**

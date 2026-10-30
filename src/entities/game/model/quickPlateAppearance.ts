@@ -69,65 +69,105 @@ export interface QuickPlateAppearance {
   readonly touchesOffenseRecord: boolean
 }
 
-export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, random: RandomPort): QuickPlateAppearance {
-  let bases = input.bases
-  let runners = input.runners
+/** 타석 동안 투구 판정 사건이 고쳐 가는 칸 — 공마다 판정 자리(c1918) · 도루(c1982~c1ade)가 이 차례로 고친다 */
+interface QuickPlateState {
+  bases: BaseState
+  runners: BaseRunners
   /** 볼넷(판정 3)이 판정 자리에서 민 주자의 득점 — 볼넷이 아니면 null */
-  let walkRuns: number | null = null
-  const stolenRunners: number[] = []
-  let steals = 0
-  let touchesOffenseRecord = false
+  walkRuns: number | null
+  readonly stolenRunners: number[]
+  steals: number
+  touchesOffenseRecord: boolean
+}
+
+export function playQuickPlateAppearance(input: QuickPlateAppearanceInput, random: RandomPort): QuickPlateAppearance {
+  const state: QuickPlateState = {
+    bases: input.bases,
+    runners: input.runners,
+    walkRuns: null,
+    stolenRunners: [],
+    steals: 0,
+    touchesOffenseRecord: false,
+  }
   const play = playQuickAtBat(input.batter, input.pitcher, input.situation, random, {
-    basesAtPitch: () => bases,
+    basesAtPitch: () => state.bases,
     onSwingPath: () => {
-      touchesOffenseRecord = true
+      state.touchesOffenseRecord = true
     },
     ...(input.beforePitch === undefined ? {} : { beforePitch: input.beforePitch }),
     onPitchJudged: (judged) => {
-      if (judged === '포볼') {
-        // c1918 — 타자를 0번 칸에 끼우고(0xa93ac) 전원 +1(0xc0fb4)
-        const walked = advanceOnQuickWalk(bases)
-        bases = walked.bases
-        walkRuns = walked.runsScored
-        // 고침(B-14)이면 밀려난 주자만 — `advanceOnQuickWalk` 와 같은 갈래
-        runners = (isBugFixed('B-14') ? forceRunners(runners, input.batterId) : shiftRunners(runners, 1, input.batterId)).runners
-      }
-      // c1982~c19ec — 주자 목록이 비지 않았으면 앞선 주자 주력을 0xb570c(공격 팀 레코드, 3, …)로 읽는다 (도루 굴림 앞, 3루가 차도)
-      if (bases.first || bases.second || bases.third) touchesOffenseRecord = true
-      const base = quickStealBaseOf(bases)
-      if (base === null) return
-      // 가장 앞선 주자 = 앞선 루의 주자 (목록 n−1)
-      const lead = base === 2 ? runners.second : runners.first
-      const stolen = quickEngineSteal(bases, { hit: 0, power: 0, defense: 0, run: lead === null ? 0 : input.runnerRunOf(lead) }, random)
-      // 0xc1a42 — 루를 옮긴 주자마다 (목록 0번 = 가장 뒤 주자부터)
-      if (stolen.stolen > 0) {
-        for (const runner of [runners.first, runners.second]) {
-          if (runner !== null) stolenRunners.push(runner)
-        }
-        runners = shiftRunners(runners, 1).runners
-      }
-      bases = stolen.bases
-      steals += stolen.stolen
+      if (judged === '포볼') applyQuickWalk(state, input.batterId)
+      rollQuickSteal(state, input, random)
     },
   })
-  const outcome = play.outcome
-  // 볼넷은 판정 자리(c1918)에서 이미 주자를 밀었다 — 여기서는 그 득점만 싣는다
-  let advance: AdvanceResult =
-    walkRuns !== null ? { bases, runsScored: walkRuns, outsAdded: 0 } : advanceRunners(bases, outcome, input.outs, { quickEngine: true })
-  if (walkRuns === null) {
-    // 안타 0xc0fb4(n) · 홈런 0xc1054(전원 득점) — 타자는 0xa93ac 로 0번 칸에 든다. 아웃 · 삼진은 주자를 안 움직인다
-    if (outcome.kind === '안타') runners = shiftRunners(runners, outcome.bases, input.batterId).runners
-    else if (outcome.kind === '홈런') runners = shiftRunners(runners, 4, input.batterId).runners
-  }
-  // 땅볼 아웃에 60% 로 주자가 한 루 나간다 (0xc15b8).
-  // **원본은 아웃 ≤1 이면 주자가 없어도 난수를 먼저 뽑고**, 그 뒤에 주자·3루 조건을 본다 (E 3g).
-  const isGroundOut = outcome.kind === '아웃' && outcome.detail === '땅볼아웃'
-  if (isGroundOut && input.outs < OUTS_PER_INNING - 1) {
-    const rolled = random.rand(0, RANDOM_LIMIT) <= GROUND_OUT_ADVANCE_LIMIT
-    if (rolled && canAdvanceOnGroundOut(advance.bases, input.outs)) {
-      advance = { ...advance, bases: advanceOnGroundOut(advance.bases) }
-      runners = shiftRunners(runners, 1).runners
-    }
-  }
+  const advance = rollQuickOutcomeAdvance(state, input, play.outcome, random)
+  const { runners, stolenRunners, steals, touchesOffenseRecord } = state
   return { play, advance, runners, stolenRunners, steals, touchesOffenseRecord }
+}
+
+/** c1918 — 타자를 0번 칸에 끼우고(0xa93ac) 전원 +1(0xc0fb4). 고침(B-14)이면 밀려난 주자만 — `advanceOnQuickWalk` 와 같은 갈래 */
+function applyQuickWalk(state: QuickPlateState, batterId: number): void {
+  const walked = advanceOnQuickWalk(state.bases)
+  state.bases = walked.bases
+  state.walkRuns = walked.runsScored
+  state.runners = (isBugFixed('B-14') ? forceRunners(state.runners, batterId) : shiftRunners(state.runners, 1, batterId)).runners
+}
+
+/** 투구 판정 뒤마다 도루 — 실패가 없다 */
+function rollQuickSteal(state: QuickPlateState, input: QuickPlateAppearanceInput, random: RandomPort): void {
+  const { bases, runners } = state
+  // c1982~c19ec — 주자 목록이 비지 않았으면 앞선 주자 주력을 0xb570c(공격 팀 레코드, 3, …)로 읽는다 (도루 굴림 앞, 3루가 차도)
+  if (bases.first || bases.second || bases.third) state.touchesOffenseRecord = true
+  const base = quickStealBaseOf(bases)
+  if (base === null) return
+  // 가장 앞선 주자 = 앞선 루의 주자 (목록 n−1)
+  const lead = base === 2 ? runners.second : runners.first
+  const stolen = quickEngineSteal(bases, { hit: 0, power: 0, defense: 0, run: lead === null ? 0 : input.runnerRunOf(lead) }, random)
+  // 0xc1a42 — 루를 옮긴 주자마다 (목록 0번 = 가장 뒤 주자부터)
+  if (stolen.stolen > 0) {
+    state.stolenRunners.push(...[runners.first, runners.second].filter((runner): runner is number => runner !== null))
+    state.runners = shiftRunners(runners, 1).runners
+  }
+  state.bases = stolen.bases
+  state.steals += stolen.stolen
+}
+
+/** 타석 결과를 주자에 먹인다 — 볼넷은 판정 자리(c1918)에서 이미 주자를 밀었다, 여기서는 그 득점만 싣는다 */
+function rollQuickOutcomeAdvance(
+  state: QuickPlateState,
+  input: QuickPlateAppearanceInput,
+  outcome: QuickAtBatPlay['outcome'],
+  random: RandomPort,
+): AdvanceResult {
+  const { bases, walkRuns } = state
+  if (walkRuns !== null) return rollGroundOutAdvance(state, { bases, runsScored: walkRuns, outsAdded: 0 }, outcome, input.outs, random)
+  const advance = advanceRunners(bases, outcome, input.outs, { quickEngine: true })
+  state.runners = runnersAfterQuickHit(state.runners, outcome, input.batterId)
+  return rollGroundOutAdvance(state, advance, outcome, input.outs, random)
+}
+
+/** 안타 0xc0fb4(n) · 홈런 0xc1054(전원 득점) — 타자는 0xa93ac 로 0번 칸에 든다. 아웃 · 삼진은 주자를 안 움직인다 */
+function runnersAfterQuickHit(runners: BaseRunners, outcome: QuickAtBatPlay['outcome'], batterId: number): BaseRunners {
+  if (outcome.kind === '안타') return shiftRunners(runners, outcome.bases, batterId).runners
+  if (outcome.kind === '홈런') return shiftRunners(runners, 4, batterId).runners
+  return runners
+}
+
+/**
+ * 땅볼 아웃에 60% 로 주자가 한 루 나간다 (0xc15b8).
+ * **원본은 아웃 ≤1 이면 주자가 없어도 난수를 먼저 뽑고**, 그 뒤에 주자·3루 조건을 본다 (E 3g).
+ */
+function rollGroundOutAdvance(
+  state: QuickPlateState,
+  advance: AdvanceResult,
+  outcome: QuickAtBatPlay['outcome'],
+  outs: number,
+  random: RandomPort,
+): AdvanceResult {
+  const isGroundOut = outcome.kind === '아웃' && outcome.detail === '땅볼아웃'
+  if (!isGroundOut || outs >= OUTS_PER_INNING - 1) return advance
+  const rolled = random.rand(0, RANDOM_LIMIT) <= GROUND_OUT_ADVANCE_LIMIT
+  if (!rolled || !canAdvanceOnGroundOut(advance.bases, outs)) return advance
+  state.runners = shiftRunners(state.runners, 1).runners
+  return { ...advance, bases: advanceOnGroundOut(advance.bases) }
 }

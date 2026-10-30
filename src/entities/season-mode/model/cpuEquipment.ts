@@ -98,14 +98,17 @@ export function rollCpuEquipment(
   yearLimit: number = SEASON_CPU_EQUIPMENT_YEAR_LIMIT,
 ): readonly CpuEquipmentWrite[] {
   const writes: CpuEquipmentWrite[] = []
-  for (const call of cpuEquipmentCallsOf(newYearIndex, yearLimit)) {
-    for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
-      if (teamId === myTeamId) continue
-      const value = call.base + random.rand(0, 2) + 1
-      writes.push({ teamId, isBatter: call.isBatter, recordIndex: call.recordIndex, part: call.part, value })
-    }
-  }
+  for (const call of cpuEquipmentCallsOf(newYearIndex, yearLimit)) rollCallForTeams(writes, call, myTeamId, random)
   return writes
+}
+
+/** 줄 하나 — 팀 0..9(내 팀 빼고) 차례로 `rand(0, 2)` 한 번씩 */
+function rollCallForTeams(writes: CpuEquipmentWrite[], call: CpuEquipmentCall, myTeamId: number, random: RandomPort): void {
+  for (let teamId = 0; teamId < LEAGUE_TEAM_COUNT; teamId += 1) {
+    if (teamId === myTeamId) continue
+    const value = call.base + random.rand(0, 2) + 1
+    writes.push({ teamId, isBatter: call.isBatter, recordIndex: call.recordIndex, part: call.part, value })
+  }
 }
 
 function withPart(player: SeasonPlayer, teamId: number, isPitcher: boolean, part: number, value: number): SeasonPlayer {
@@ -126,22 +129,33 @@ export function applyCpuEquipment(
   const rosters: Record<number, SeasonTeamRoster> = {}
   for (const write of writes) {
     const roster = rosters[write.teamId] ?? rosterOf(write.teamId)
-    if (write.isBatter) {
-      const player = roster.batters[write.recordIndex]
-      if (player === undefined) continue
-      rosters[write.teamId] = {
-        ...roster,
-        batters: roster.batters.map((p, i) => (i === write.recordIndex ? withPart(player, write.teamId, false, write.part, write.value) : p)),
-      }
-    } else {
-      const index = pitcherRosterIndexOf(write.teamId, roster, write.recordIndex)
-      const player = roster.pitchers[index]
-      if (player === undefined) continue
-      rosters[write.teamId] = {
-        ...roster,
-        pitchers: roster.pitchers.map((p, i) => (i === index ? withPart(player, write.teamId, true, write.part, write.value) : p)),
-      }
-    }
+    const next = write.isBatter ? rosterWithBatterWrite(roster, write) : rosterWithPitcherWrite(roster, write, pitcherRosterIndexOf)
+    if (next !== null) rosters[write.teamId] = next
   }
   return rosters
+}
+
+/** 타자 칸 쓰기 — 칸이 명단 밖이면 null(건너뜀) */
+function rosterWithBatterWrite(roster: SeasonTeamRoster, write: CpuEquipmentWrite): SeasonTeamRoster | null {
+  const player = roster.batters[write.recordIndex]
+  if (player === undefined) return null
+  return {
+    ...roster,
+    batters: roster.batters.map((p, i) => (i === write.recordIndex ? withPart(player, write.teamId, false, write.part, write.value) : p)),
+  }
+}
+
+/** 투수 칸 쓰기 — 레코드 칸을 명단 첨자(로테이션 차례)로 바꿔 쓴다. 명단 밖이면 null(건너뜀) */
+function rosterWithPitcherWrite(
+  roster: SeasonTeamRoster,
+  write: CpuEquipmentWrite,
+  pitcherRosterIndexOf: (teamId: number, roster: SeasonTeamRoster, recordIndex: number) => number,
+): SeasonTeamRoster | null {
+  const index = pitcherRosterIndexOf(write.teamId, roster, write.recordIndex)
+  const player = roster.pitchers[index]
+  if (player === undefined) return null
+  return {
+    ...roster,
+    pitchers: roster.pitchers.map((p, i) => (i === index ? withPart(player, write.teamId, true, write.part, write.value) : p)),
+  }
 }

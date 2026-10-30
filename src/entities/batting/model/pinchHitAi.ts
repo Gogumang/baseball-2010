@@ -112,12 +112,15 @@ export function recordPlateAppearance(
     hits: record.hits + (play.isHit ? 1 : 0),
     homeRuns: record.homeRuns + (play.isHit && play.isHomeRun ? 1 : 0),
     plateAppearances: record.plateAppearances + (countsAsPlateAppearance ? 1 : 0),
-    ...(pushesResult
-      ? { results: withAtBatResult(record.results, play.resultCode!) }
-      : record.results === undefined
-        ? {}
-        : { results: record.results }),
+    ...resultsFieldOf(record, pushesResult ? play.resultCode : undefined),
   }
+}
+
+/** 결과 링 칸 — 넣을 코드가 있으면 넣은 링, 없으면 옛 링을 그대로(옛 링도 없으면 칸을 안 만든다) */
+function resultsFieldOf(record: BatterGameRecord, pushedCode: number | undefined): Pick<BatterGameRecord, 'results'> {
+  if (pushedCode !== undefined) return { results: withAtBatResult(record.results, pushedCode) }
+  if (record.results === undefined) return {}
+  return { results: record.results }
 }
 
 export interface CpuPinchHitInput {
@@ -163,23 +166,30 @@ const PERMILLE = 1000
  * `rand(0, 벤치수)` 한 번. 그래서 대부분의 타석은 굴림을 하나도 쓰지 않는다.
  */
 export function judgeCpuPinchHit(input: CpuPinchHitInput, random: RandomPort): number {
-  if (input.blockedUntilNextPitch) return -1
-  if (input.batterIsAce) return -1
-  const bench = input.benchBatters
-  if (bench <= 0) return -1
+  if (isPinchHitClosed(input)) return -1
   // ac260~ac26e 가 같은 마선수 검사를 한 번 더 한다 — 결과는 같아 여기서는 위 한 줄로 갈음한다
-  const record = input.record
-  if (record.homeRuns !== 0) return -1
-  if (record.hits > 1) return -1
-  if (record.plateAppearances < 2) return -1
-  if (input.batterHasEquipment === true) return -1
+  if (keepsBatter(input)) return -1
+  if (random.rand(0, PERMILLE) >= pinchHitPermilleOf(input)) return -1
+  return random.rand(0, input.benchBatters)
+}
 
+/** 대타를 묻지 않는 때 — 다음 공 전까지 막힘 · 타석의 마선수 · 벤치 타자 없음 */
+function isPinchHitClosed(input: CpuPinchHitInput): boolean {
+  return input.blockedUntilNextPitch || input.batterIsAce || input.benchBatters <= 0
+}
+
+/** 바꾸지 않는 타자 — 홈런을 쳤거나 · 2안타 이상 · 아직 2타석 전 · 장비를 단 선수 */
+function keepsBatter(input: CpuPinchHitInput): boolean {
+  const record = input.record
+  return record.homeRuns !== 0 || record.hits > 1 || record.plateAppearances < 2 || input.batterHasEquipment === true
+}
+
+/** 대타 확률(천분율) — 주자 수로 정하고 만루는 끌어올린 뒤, 1안타면 반, 카운트가 쌓일수록 더 줄인다 */
+function pinchHitPermilleOf(input: CpuPinchHitInput): number {
   let permille = 100 * input.runnerCount + 100
   if (permille === LOADED_BASES_RAW) permille = LOADED_BASES_PERMILLE
-  if (record.hits === 1) permille >>= 1
+  if (input.record.hits === 1) permille >>= 1
   const count = input.strikes + input.balls
   if (count > 0) permille >>= count + 1
-
-  if (random.rand(0, PERMILLE) >= permille) return -1
-  return random.rand(0, bench)
+  return permille
 }

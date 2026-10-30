@@ -101,48 +101,71 @@ const MAXIMUM_OUTS_PER_INNING = 3
  * B3 는 원본이 "루타가 2·3 이 아닌 나머지"(a87b2) 라 단타와 루타 4 홈런에 켠다 (근사 아님).
  */
 export function burstResultBitsOf(input: BurstResultBitsInput): number {
-  const { outcome } = input
-  let bits = 0
-
-  if (outcome.kind === '홈런' && input.homeRunCounted !== false) bits |= BURST_RESULT_BIT.홈런
-  // a8790~a87b6 — 안타 갈래 끝이 루타 [sp+0x10] 로 고른다: 3 → B2 · 2 → B1 · **그 밖 → B3**. 홈런은 루타 4 라
-  // (a819e · a8210) 홈런 갈래(B0) 뒤 같은 자리에서 B3 도 켠다
-  if (outcome.kind === '홈런') bits |= BURST_RESULT_BIT.단타
-  if (outcome.kind === '안타') {
-    if (outcome.bases === 2) bits |= BURST_RESULT_BIT['2루타']
-    else if (outcome.bases === 3) bits |= BURST_RESULT_BIT['3루타']
-    else bits |= BURST_RESULT_BIT.단타
-  }
+  const isWalkOrHitByPitch = input.outcome.kind === '볼넷' || input.outcome.kind === '사구'
+  let bits = hitBitsOf(input)
   if (input.runsBattedIn > 0) bits |= BURST_RESULT_BIT.타점
-
-  // B5 — 타자가 출루했고 **이 플레이로 이닝이 끝나지 않았다** (0xa882a: 플레이 전 아웃 + 이번 아웃 ≤ 2).
-  // 이 비트가 "안타 목표에서 단타도 성공" 을 만든다 (CORRECTIONS.md 1절, P7 → K 정정).
-  const isHit = outcome.kind === '안타' || outcome.kind === '홈런'
-  // 0xa882a 는 "볼 4개 || 사구" 를 본다 — 사구도 출루다
-  const isWalkOrHitByPitch = outcome.kind === '볼넷' || outcome.kind === '사구'
-  const reachedBase = isHit || isWalkOrHitByPitch || (input.batterRunnerSafe ?? false)
-  if (reachedBase && input.outsBefore + input.outsAdded <= MAXIMUM_OUTS_PER_INNING - 1) {
-    bits |= BURST_RESULT_BIT.출루
-  }
-
-  const isBunt = input.isBunt ?? false
-  // B6 — 번트 타구로 주자가 나가거나 점수가 났다
-  if (isBunt && ((input.runnersAdvanced ?? false) || input.runsBattedIn > 0)) {
-    bits |= BURST_RESULT_BIT.번트진루
-  }
-  // B7 — 번트 뒤 2·3루에 주자가 남았다 (a88fc~a8944: 파울이 아니고 · 그 루의 첫 산 주자가 타자주자가 아니고 · 번트)
-  if (isBunt && !(input.foulBall ?? false) && (input.runnerInScoringPositionAfter ?? false)) {
-    bits |= BURST_RESULT_BIT.번트득점권
-  }
-
-  if (input.outsAdded >= 1) bits |= BURST_RESULT_BIT.아웃
-  if (input.outsAdded >= 2) bits |= BURST_RESULT_BIT.병살
-  if (outcome.kind === '삼진' && input.strikeoutWhileRunning !== true) bits |= BURST_RESULT_BIT.삼진
+  if (staysOnBaseInning(input, isWalkOrHitByPitch)) bits |= BURST_RESULT_BIT.출루
+  bits |= buntBitsOf(input)
+  bits |= outBitsOf(input)
   // B11 은 볼넷 갈래 0xa8b7a 와 사구 갈래 0xa8bf4 두 곳이 켠다
   if (isWalkOrHitByPitch) bits |= BURST_RESULT_BIT.볼넷
-
   // 고침(B-52): 끝내기 덧비트를 안 켠다
   if ((input.humanTeamWalkOff ?? false) && !isBugFixed('B-52')) bits |= HUMAN_WIN_END_BITS
+  return bits
+}
 
+/** 안타 진루 수 → 비트 — a87b2 는 2 → B1 · 3 → B2 · **그 밖 → B3** */
+function basesBitOf(bases: number): number {
+  if (bases === 2) return BURST_RESULT_BIT['2루타']
+  if (bases === 3) return BURST_RESULT_BIT['3루타']
+  return BURST_RESULT_BIT.단타
+}
+
+/**
+ * B0 ~ B3 — a8790~a87b6 의 안타 갈래 끝이 루타 [sp+0x10] 로 고른다. 홈런은 루타 4 라
+ * (a819e · a8210) 홈런 갈래(B0) 뒤 같은 자리에서 B3 도 켠다
+ */
+function hitBitsOf(input: BurstResultBitsInput): number {
+  const { outcome } = input
+  if (outcome.kind === '안타') return basesBitOf(outcome.bases)
+  if (outcome.kind !== '홈런') return 0
+  const homeRunBit = input.homeRunCounted !== false ? BURST_RESULT_BIT.홈런 : 0
+  return homeRunBit | BURST_RESULT_BIT.단타
+}
+
+/**
+ * B5 — 타자가 출루했고 **이 플레이로 이닝이 끝나지 않았다** (0xa882a: 플레이 전 아웃 + 이번 아웃 ≤ 2).
+ * 이 비트가 "안타 목표에서 단타도 성공" 을 만든다 (CORRECTIONS.md 1절, P7 → K 정정).
+ * 0xa882a 는 "볼 4개 || 사구" 를 본다 — 사구도 출루다
+ */
+function staysOnBaseInning(input: BurstResultBitsInput, isWalkOrHitByPitch: boolean): boolean {
+  const isHit = input.outcome.kind === '안타' || input.outcome.kind === '홈런'
+  const reachedBase = isHit || isWalkOrHitByPitch || (input.batterRunnerSafe ?? false)
+  return reachedBase && input.outsBefore + input.outsAdded <= MAXIMUM_OUTS_PER_INNING - 1
+}
+
+/**
+ * B6 — 번트 타구로 주자가 나가거나 점수가 났다.
+ * B7 — 번트 뒤 2·3루에 주자가 남았다 (a88fc~a8944: 파울이 아니고 · 그 루의 첫 산 주자가 타자주자가 아니고 · 번트)
+ */
+function buntBitsOf(input: BurstResultBitsInput): number {
+  if (!(input.isBunt ?? false)) return 0
+  return buntAdvanceBitOf(input) | buntScoringPositionBitOf(input)
+}
+
+function buntAdvanceBitOf(input: BurstResultBitsInput): number {
+  return (input.runnersAdvanced ?? false) || input.runsBattedIn > 0 ? BURST_RESULT_BIT.번트진루 : 0
+}
+
+function buntScoringPositionBitOf(input: BurstResultBitsInput): number {
+  return !(input.foulBall ?? false) && (input.runnerInScoringPositionAfter ?? false) ? BURST_RESULT_BIT.번트득점권 : 0
+}
+
+/** B8 아웃 · B10 병살 · B9 보통 삼진(낫아웃 판은 a8fc6~a8fdc 가 안 켠다) */
+function outBitsOf(input: BurstResultBitsInput): number {
+  let bits = 0
+  if (input.outsAdded >= 1) bits |= BURST_RESULT_BIT.아웃
+  if (input.outsAdded >= 2) bits |= BURST_RESULT_BIT.병살
+  if (input.outcome.kind === '삼진' && input.strikeoutWhileRunning !== true) bits |= BURST_RESULT_BIT.삼진
   return bits
 }

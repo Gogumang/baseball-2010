@@ -163,21 +163,16 @@ export interface SaveSituation {
 export function saveSituationOf(input: SaveSituationInput): SaveSituation {
   const outsRemaining = (input.lastInningIndex - input.currentInningIndex) * 3 - input.outs + 3
   const leading = input.defenseScore > input.offenseScore
-  let requirement = 0
-  let hit = false
-  if (leading) {
-    if (input.defenseScore - input.offenseScore > 3) {
-      if (outsRemaining > 8) {
-        requirement = 9
-        hit = true
-      }
-    } else if (outsRemaining > 2) {
-      requirement = 3
-      hit = true
-    }
-    if (input.defenseScore <= input.offenseScore + input.runnerCount + 2 && outsRemaining > 0) requirement = 1
-  }
-  return { outsRemaining, requirement, isCandidate: leading && (requirement !== 0 || hit), leading }
+  const requirement = leading ? saveRequirementOf(input, outsRemaining) : 0
+  // 원본은 요건을 세울 때 `hit` 도 함께 세우지만, 그때 요건은 늘 0 이 아니라(9 · 3 → 덮어써도 1) 요건만 보면 같다
+  return { outsRemaining, requirement, isCandidate: leading && requirement !== 0, leading }
+}
+
+/** 앞서고 있을 때의 요건 — 동점주자 대기(1)가 3점 넘는 리드(9) · 그 밖(3)을 덮어쓴다. 서지 않으면 0 */
+function saveRequirementOf(input: SaveSituationInput, outsRemaining: number): number {
+  if (input.defenseScore <= input.offenseScore + input.runnerCount + 2 && outsRemaining > 0) return 1
+  if (input.defenseScore - input.offenseScore > 3) return outsRemaining > 8 ? 9 : 0
+  return outsRemaining > 2 ? 3 : 0
 }
 
 /** 투수 교체 순간에 R+0x150 을 갱신한다 (0xa6194) */

@@ -1,6 +1,6 @@
 import { atBatResultCodeOf, quickAtBatResultCodeOf } from '@/entities/batting/model/atBatResultRing'
 import { EMPTY_BATTER_GAME_RECORD, judgeCpuPinchHit, recordPlateAppearance } from '@/entities/batting/model/pinchHitAi'
-import type { BatterGameRecord } from '@/entities/batting/model/pinchHitAi'
+import type { BatterGameRecord, CpuPinchHitInput } from '@/entities/batting/model/pinchHitAi'
 import { isHit } from '@/entities/at-bat/model/atBatOutcome'
 import type { AtBatOutcome } from '@/entities/at-bat/model/atBatOutcome'
 import type { RandomPort } from '@/shared/api/random/randomPort'
@@ -125,39 +125,9 @@ export interface QuickPinchHit {
  * 들어오는 곳은 CPU 끼리 경기 준비 0xc239c 의 마타자(`simulateLeagueGame` → `HalfInningOffense.isAceRosterSlot`)뿐이다.
  * ⚠️ **장비 레벨 니블**(`+0x19`·`+0x1a`)은 웹 로스터 표에 없다 — 리그 로스터 선수는 늘 0 이라 결과가 같다.
  */
-export function tryQuickCpuPinchHit(
-  lineup: QuickLineup,
-  order: number,
-  situation: {
-    /** `state[0xe]` — 다음 공이 나가기 전까지 막는 칸 (양 팀 공용 한 칸, 공마다 `0xa5e14` a5e7c 가 내린다) */
-    readonly alreadyUsedThisGame: boolean
-    /** 주자 수 (`0xa9599` = 주자관리 `+0xc`) */
-    readonly runnerCount: number
-    /**
-     * state[4]·state[5] 볼카운트 — 간이 엔진은 타석 시작이라 0. 사람 장면 0xf 진입(`0x3d954` 3da70)은 공마다 다시 물어
-     * 그때의 카운트다 (투수편). 안 넘기면 0.
-     */
-    readonly strikes?: number
-    readonly balls?: number
-    /** 지금 그 타순에 선 타자가 마선수인가 (`0xb633c`) — 참이면 굴림 없이 대타를 안 낸다. 안 넘기면 거짓 */
-    readonly batterIsAce?: boolean
-  },
-  random: RandomPort,
-): QuickPinchHit | null {
+export function tryQuickCpuPinchHit(lineup: QuickLineup, order: number, situation: QuickPinchHitSituation, random: RandomPort): QuickPinchHit | null {
   const slot = lineupSlotOf(order)
-  const benchIndex = judgeCpuPinchHit(
-    {
-      blockedUntilNextPitch: situation.alreadyUsedThisGame,
-      batterIsAce: situation.batterIsAce ?? false,
-      // 원본은 team+0x28c 만 보고 rand(0, n) 을 돌린다 — 명단 칸이 모자랄 일은 없지만 실제 칸 수로 자른다
-      benchBatters: Math.min(lineup.benchBatters, Math.max(0, lineup.rosterSlots.length - QUICK_LINEUP_SIZE)),
-      record: lineup.records[slot] ?? EMPTY_BATTER_GAME_RECORD,
-      runnerCount: situation.runnerCount,
-      strikes: situation.strikes ?? 0,
-      balls: situation.balls ?? 0,
-    },
-    random,
-  )
+  const benchIndex = judgeCpuPinchHit(pinchHitInputOf(lineup, slot, situation), random)
   if (benchIndex < 0) return null
 
   // 0xaf06c(team, k, 0) 이 team+0x293 = 9 + k 로 예약 → 0xaebe4 가 확정한다
@@ -165,35 +135,64 @@ export function tryQuickCpuPinchHit(
   const outgoingRosterSlot = lineup.rosterSlots[slot]
   const incomingRosterSlot = lineup.rosterSlots[entryIndex]
   if (outgoingRosterSlot === undefined || incomingRosterSlot === undefined) return null
+  const next = lineupAfterPinchHit(lineup, slot, entryIndex, outgoingRosterSlot, incomingRosterSlot)
+  return { lineup: next, outgoingRosterSlot, incomingRosterSlot }
+}
 
+interface QuickPinchHitSituation {
+  /** `state[0xe]` — 다음 공이 나가기 전까지 막는 칸 (양 팀 공용 한 칸, 공마다 `0xa5e14` a5e7c 가 내린다) */
+  readonly alreadyUsedThisGame: boolean
+  /** 주자 수 (`0xa9599` = 주자관리 `+0xc`) */
+  readonly runnerCount: number
+  /**
+   * state[4]·state[5] 볼카운트 — 간이 엔진은 타석 시작이라 0. 사람 장면 0xf 진입(`0x3d954` 3da70)은 공마다 다시 물어
+   * 그때의 카운트다 (투수편). 안 넘기면 0.
+   */
+  readonly strikes?: number
+  readonly balls?: number
+  /** 지금 그 타순에 선 타자가 마선수인가 (`0xb633c`) — 참이면 굴림 없이 대타를 안 낸다. 안 넘기면 거짓 */
+  readonly batterIsAce?: boolean
+}
+
+function pinchHitInputOf(lineup: QuickLineup, slot: number, situation: QuickPinchHitSituation): CpuPinchHitInput {
+  return {
+    blockedUntilNextPitch: situation.alreadyUsedThisGame,
+    batterIsAce: situation.batterIsAce ?? false,
+    // 원본은 team+0x28c 만 보고 rand(0, n) 을 돌린다 — 명단 칸이 모자랄 일은 없지만 실제 칸 수로 자른다
+    benchBatters: Math.min(lineup.benchBatters, Math.max(0, lineup.rosterSlots.length - QUICK_LINEUP_SIZE)),
+    record: lineup.records[slot] ?? EMPTY_BATTER_GAME_RECORD,
+    runnerCount: situation.runnerCount,
+    strikes: situation.strikes ?? 0,
+    balls: situation.balls ?? 0,
+  }
+}
+
+/** 명단 두 칸과 그 기록 24바이트를 맞바꾼 뒤(aed02~aed14) 빠진 선수를 명단에서 지운다 — 재출장은 없다 (aed16 `0xb95b1`) */
+function lineupAfterPinchHit(lineup: QuickLineup, slot: number, entryIndex: number, outgoing: number, incoming: number): QuickLineup {
   const rosterSlots = [...lineup.rosterSlots]
   const records = [...lineup.records]
-  // 명단 두 칸과 그 기록 24바이트를 맞바꾼다 (aed02~aed14)
-  rosterSlots[slot] = incomingRosterSlot
-  rosterSlots[entryIndex] = outgoingRosterSlot
+  rosterSlots[slot] = incoming
+  rosterSlots[entryIndex] = outgoing
   records[slot] = lineup.records[entryIndex] ?? EMPTY_BATTER_GAME_RECORD
   records[entryIndex] = lineup.records[slot] ?? EMPTY_BATTER_GAME_RECORD
-  // 빠진 선수를 명단에서 지운다 — 재출장은 없다 (aed16 `0xb95b1`)
   rosterSlots.splice(entryIndex, 1)
   records.splice(entryIndex, 1)
-  // 레코드 칸은 선수 레코드에 붙어 있어 명단 칸과 같이 옮겨진다 (`recordSlots` 주석)
-  let recordSlots: number[] | undefined
-  if (lineup.recordSlots !== undefined) {
-    recordSlots = [...lineup.recordSlots]
-    recordSlots[slot] = lineup.recordSlots[entryIndex] ?? entryIndex
-    recordSlots[entryIndex] = lineup.recordSlots[slot] ?? slot
-    recordSlots.splice(entryIndex, 1)
-  }
-
+  const recordSlots = recordSlotsAfterPinchHit(lineup.recordSlots, slot, entryIndex)
   return {
-    lineup: {
-      rosterSlots,
-      records,
-      // 벤치 타자 수 −1, 0 밑으로는 안 간다 (aed9c~aedae)
-      benchBatters: Math.max(0, lineup.benchBatters - 1),
-      ...(recordSlots === undefined ? {} : { recordSlots }),
-    },
-    outgoingRosterSlot,
-    incomingRosterSlot,
+    rosterSlots,
+    records,
+    // 벤치 타자 수 −1, 0 밑으로는 안 간다 (aed9c~aedae)
+    benchBatters: Math.max(0, lineup.benchBatters - 1),
+    ...(recordSlots === undefined ? {} : { recordSlots }),
   }
+}
+
+/** 레코드 칸은 선수 레코드에 붙어 있어 명단 칸과 같이 옮겨진다 (`recordSlots` 주석) */
+function recordSlotsAfterPinchHit(recordSlots: readonly number[] | undefined, slot: number, entryIndex: number): number[] | undefined {
+  if (recordSlots === undefined) return undefined
+  const next = [...recordSlots]
+  next[slot] = recordSlots[entryIndex] ?? entryIndex
+  next[entryIndex] = recordSlots[slot] ?? slot
+  next.splice(entryIndex, 1)
+  return next
 }

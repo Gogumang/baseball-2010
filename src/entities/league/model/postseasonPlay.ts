@@ -111,7 +111,7 @@ export function playCpuSeriesGameWithStamina(
   // **점수를 덜 낸 명단의 팀이 이긴다** — 원본 버그(B-04) (R1 항목 4 는 명단 엇갈림을 못 보고 "정상" 으로 읽었다).
   // 고침(`bugfixes.json` B-04, 기본 켬): 칸이 아니라 **명단**으로 견준다 — 칸 0(away)은 Y 의 명단, 칸 1(home)은 X 의 명단이라
   // X 의 득점(homeRuns)이 더 많으면 X 승, 그 밖(동점 포함)은 원본처럼 Y(윗 시드) 승. 굴림 수는 같다(승자만 바뀐다)
-  const winner = isBugFixed('B-04') ? (score.homeRuns > score.awayRuns ? x : y) : score.awayRuns > score.homeRuns ? x : y
+  const winner = seriesGameWinnerOf(score, x, y)
   const away = sides.away
   const home = sides.home
   return {
@@ -122,10 +122,21 @@ export function playCpuSeriesGameWithStamina(
       [home]: score.pitcherStaminas.home,
     },
     // 명단 쪽 마선수 — 그 명단 팀의 레코드에 들어간다(0xb8680 은 팀 객체 +0x25 = 명단 팀으로 레코드를 고른다, `playLeagueDay` 와 같다)
-    recordAces: {
-      ...(aces.away === undefined ? {} : { [away]: aces.away }),
-      ...(aces.home === undefined ? {} : { [home]: aces.home }),
-    },
+    recordAces: recordAcesOfGame(aces, away, home),
+  }
+}
+
+/** 이긴 팀 — 원본은 칸으로(B-04), 고친 길은 명단으로 견준다. 동점이면 Y(윗 시드) */
+function seriesGameWinnerOf(score: { readonly awayRuns: number; readonly homeRuns: number }, x: number, y: number): number {
+  if (isBugFixed('B-04')) return score.homeRuns > score.awayRuns ? x : y
+  return score.awayRuns > score.homeRuns ? x : y
+}
+
+/** 명단 팀마다 이 경기의 마선수 — 없는 쪽은 칸을 안 만든다 */
+function recordAcesOfGame(aces: ReturnType<typeof cpuGameAcesOf>, away: number, home: number): Readonly<Record<number, LeagueGameAces>> {
+  return {
+    ...(aces.away === undefined ? {} : { [away]: aces.away }),
+    ...(aces.home === undefined ? {} : { [home]: aces.home }),
   }
 }
 
@@ -159,13 +170,16 @@ export function runCpuPostseasonWithStamina(
     const teams = current.series.teams
     const played = playCpuSeriesGameWithStamina(current.series, random, current.pitcherStaminas, aceLevels, context, recordOf)
     current = { ...played, recordAces: { ...current.recordAces, ...played.recordAces } }
-    // 한 경기를 치른 두 팀 레코드 +2 는 0xb570c(b5768)가 나리 사기로 덮었다 — 다음 경기 첫 공의 앞 값이 그 값이다
-    const morale = context?.nariMorale
-    if (context?.staleRecordMorales !== undefined && morale !== undefined) {
-      context = { ...context, staleRecordMorales: { ...context.staleRecordMorales, [teams[0]]: morale, [teams[1]]: morale } }
-    }
+    context = withPlayedTeamsMorale(context, teams)
   }
   return withMorales(current)
+}
+
+/** 한 경기를 치른 두 팀 레코드 +2 는 0xb570c(b5768)가 나리 사기로 덮었다 — 다음 경기 첫 공의 앞 값이 그 값이다 */
+function withPlayedTeamsMorale(context: LeagueAbilityContext | undefined, teams: PostseasonSeries['teams']): LeagueAbilityContext | undefined {
+  const morale = context?.nariMorale
+  if (context?.staleRecordMorales === undefined || morale === undefined) return context
+  return { ...context, staleRecordMorales: { ...context.staleRecordMorales, [teams[0]]: morale, [teams[1]]: morale } }
 }
 
 /**

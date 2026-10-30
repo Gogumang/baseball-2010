@@ -109,17 +109,14 @@ const MASTER_SCAN_LAST = 7
  * 아니라 위 마스터 칸 번호다. 내 선수(this+0x14c)와 상대 선수(this+0x150)에 같은 식을 건다.
  */
 export function tradeSlotPenaltyOf(tab: number, masterSlot: number): number {
-  if (tab === TRADE_TAB.투수) {
-    if (masterSlot === 0) return 10
-    if (masterSlot === 7) return 8
-    if (masterSlot === 1 || masterSlot === 4) return 6
-    return 0
-  }
-  if (masterSlot === 3) return 10
-  if (masterSlot === 2 || masterSlot === 4) return 8
-  if (masterSlot === 0) return 6
-  return 0
+  const penalties = tab === TRADE_TAB.투수 ? PITCHER_TAB_SLOT_PENALTY : BATTER_TAB_SLOT_PENALTY
+  return penalties[masterSlot] ?? 0
 }
+
+/** 탭 0 (투수): 마스터 칸 → 벌점 */
+const PITCHER_TAB_SLOT_PENALTY: Readonly<Record<number, number>> = { 0: 10, 7: 8, 1: 6, 4: 6 }
+/** 탭 그 밖 (타자): 마스터 칸 → 벌점 */
+const BATTER_TAB_SLOT_PENALTY: Readonly<Record<number, number>> = { 3: 10, 2: 8, 4: 8, 0: 6 }
 
 /** 한 선수의 자리 벌점 — `tradeSlotPenaltyOf(탭, 0xb6561(p))` */
 export function tradePenaltyOf(player: SeasonPlayer, ownerTeamId: number, tab: number): number {
@@ -289,36 +286,44 @@ export interface TradedRosters {
  * - 임시 레코드 생성자·소멸자(0xb6c81/0xb6cb5 · 0xb8de5/0xb8e19)는 버퍼 준비뿐이라 옮길 것이 없다.
  */
 export function swapTradedPlayers(myTeamId: number, rosters: TradedRosters, swap: TradeSwap): TradedRosters {
-  const { mine, theirs } = rosters
-  const { opponentTeamId, tab, myIndex, opponentIndex } = swap
-  if (tab === TRADE_TAB.투수) {
-    const givenRecord = mine.pitchers[myIndex]
-    const takenRecord = theirs.pitchers[opponentIndex]
-    const given = givenRecord === undefined ? undefined : withClearedEquipment(givenRecord)
-    const taken = takenRecord === undefined ? undefined : withClearedEquipment(takenRecord)
-    // 0xb51fc 가 0(칸 밖)을 돌려주는 판은 원본도 널 포인터를 건드린다 — 웹 명단은 늘 8명 이상이라 닿지 않는다
-    if (given === undefined || taken === undefined) return rosters
-    const mineNext = [...mine.pitchers]
-    const theirsNext = [...theirs.pitchers]
-    mineNext[myIndex] = withTableTeam(taken, opponentTeamId, myTeamId)
-    theirsNext[opponentIndex] = withTableTeam(given, myTeamId, opponentTeamId)
-    return { mine: { ...mine, pitchers: mineNext }, theirs: { ...theirs, pitchers: theirsNext } }
-  }
-  if (tab === TRADE_TAB.타자) {
-    const givenRecord = mine.batters[myIndex]
-    const takenRecord = theirs.batters[opponentIndex]
-    const given = givenRecord === undefined ? undefined : withClearedEquipment(givenRecord)
-    const taken = takenRecord === undefined ? undefined : withClearedEquipment(takenRecord)
-    if (given === undefined || taken === undefined) return rosters
-    const mineNext = [...mine.batters]
-    const theirsNext = [...theirs.batters]
-    // 0xb5649 — 들어온 선수는 그 자리의 수비 위치(+0x1c & 0xf)와 칸 번호 j 를 받는다
-    mineNext[myIndex] = withSlot({ ...withTableTeam(taken, opponentTeamId, myTeamId), fieldPosition: given.fieldPosition & 0xf }, myIndex)
-    theirsNext[opponentIndex] = withSlot(
-      { ...withTableTeam(given, myTeamId, opponentTeamId), fieldPosition: taken.fieldPosition & 0xf },
-      opponentIndex,
-    )
-    return { mine: { ...mine, batters: mineNext }, theirs: { ...theirs, batters: theirsNext } }
-  }
+  if (swap.tab === TRADE_TAB.투수) return swapTradedPitchers(myTeamId, rosters, swap)
+  if (swap.tab === TRADE_TAB.타자) return swapTradedBatters(myTeamId, rosters, swap)
   return rosters
+}
+
+/** 두 선수의 장비 니블을 지운 사본 — 어느 쪽이든 칸 밖이면 null */
+function clearedPair(given: SeasonPlayer | undefined, taken: SeasonPlayer | undefined): readonly [SeasonPlayer, SeasonPlayer] | null {
+  const clearedGiven = given === undefined ? undefined : withClearedEquipment(given)
+  const clearedTaken = taken === undefined ? undefined : withClearedEquipment(taken)
+  // 0xb51fc 가 0(칸 밖)을 돌려주는 판은 원본도 널 포인터를 건드린다 — 웹 명단은 늘 8명 이상이라 닿지 않는다
+  if (clearedGiven === undefined || clearedTaken === undefined) return null
+  return [clearedGiven, clearedTaken]
+}
+
+/** d1fc 탭 0 — 0x30 바이트를 그대로 덮는다(0xb5625 는 고치는 칸이 없다) */
+function swapTradedPitchers(myTeamId: number, rosters: TradedRosters, swap: TradeSwap): TradedRosters {
+  const { mine, theirs } = rosters
+  const { opponentTeamId, myIndex, opponentIndex } = swap
+  const pair = clearedPair(mine.pitchers[myIndex], theirs.pitchers[opponentIndex])
+  if (pair === null) return rosters
+  const [given, taken] = pair
+  const mineNext = [...mine.pitchers]
+  const theirsNext = [...theirs.pitchers]
+  mineNext[myIndex] = withTableTeam(taken, opponentTeamId, myTeamId)
+  theirsNext[opponentIndex] = withTableTeam(given, myTeamId, opponentTeamId)
+  return { mine: { ...mine, pitchers: mineNext }, theirs: { ...theirs, pitchers: theirsNext } }
+}
+
+/** d2e0 탭 1 — 0xb5649: 들어온 선수는 그 자리의 수비 위치(+0x1c & 0xf)와 칸 번호 j 를 받는다 */
+function swapTradedBatters(myTeamId: number, rosters: TradedRosters, swap: TradeSwap): TradedRosters {
+  const { mine, theirs } = rosters
+  const { opponentTeamId, myIndex, opponentIndex } = swap
+  const pair = clearedPair(mine.batters[myIndex], theirs.batters[opponentIndex])
+  if (pair === null) return rosters
+  const [given, taken] = pair
+  const mineNext = [...mine.batters]
+  const theirsNext = [...theirs.batters]
+  mineNext[myIndex] = withSlot({ ...withTableTeam(taken, opponentTeamId, myTeamId), fieldPosition: given.fieldPosition & 0xf }, myIndex)
+  theirsNext[opponentIndex] = withSlot({ ...withTableTeam(given, myTeamId, opponentTeamId), fieldPosition: taken.fieldPosition & 0xf }, opponentIndex)
+  return { mine: { ...mine, batters: mineNext }, theirs: { ...theirs, batters: theirsNext } }
 }

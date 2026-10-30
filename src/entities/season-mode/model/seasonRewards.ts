@@ -207,9 +207,14 @@ export function judgeSeasonEnding(record: SeasonRecord): number | null {
   if (record.yearIndex !== 9) return null
   const k = record.regularSeasonFirsts
   const popularity = record.popularity
-  if (popularity > 2000 && k === 10) return 4 // 역사상 최고의 구단
-  if (popularity > 1500 && k > 6) return 3 // 세계 일류 구단
-  if (popularity > 1000 && k > 3) return 2 // 한국 최고 구단
-  if (popularity > 800) return 1 // 지역 인기 구단
-  return 0 // 비 인기 구단
+  const ending = SEASON_ENDING_ROWS.find((row) => popularity > row.popularity && row.firsts(k))
+  return ending === undefined ? 0 : ending.ending // 0 비 인기 구단
 }
+
+/** 위에서부터 처음 맞는 줄 — 인기도를 넘고 정규시즌 1위 횟수 조건도 맞아야 한다 */
+const SEASON_ENDING_ROWS: readonly { readonly ending: number; readonly popularity: number; readonly firsts: (k: number) => boolean }[] = [
+  { ending: 4, popularity: 2000, firsts: (k) => k === 10 }, // 역사상 최고의 구단
+  { ending: 3, popularity: 1500, firsts: (k) => k > 6 }, // 세계 일류 구단
+  { ending: 2, popularity: 1000, firsts: (k) => k > 3 }, // 한국 최고 구단
+  { ending: 1, popularity: 800, firsts: () => true }, // 지역 인기 구단
+]

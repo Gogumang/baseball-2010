@@ -268,15 +268,21 @@ export function isFreezeOpen(pose: number, frame: number): boolean {
   return (pose & POSE.FREEZE) === 0 || frame === 1 || frame === 2
 }
 
+/** 동작 0xe~0x12 (점프 · 슬라이딩 계열) — 0xe 는 프레임 0xf, 나머지는 0xc 에서 끝난다 */
+const isDiveAction = (action: number): boolean => action >= 0xe && action <= 0x12
+
+/** 가슴 높이 포구 · 송구 · 낮은 공 포구가 끝나는 프레임 */
+const ACTION_END_FRAME: Readonly<Record<number, number>> = {
+  [FIELDER_ACTION.CHEST_CATCH]: 5,
+  [FIELDER_ACTION.THROW]: 2,
+  [FIELDER_ACTION.LOW_CATCH]: 2,
+}
+
 /** a137a~a143e 의 지우기 판정 — 프레임은 야수 틱 머리에서 이미 올린 값 (`listTickFielder` 머리말) */
 export function shouldClearPose(fielder: PoseFields & Pick<FielderState, 'arrivalSlackTicks'>): boolean {
   const { action, actionFrame: frame } = fielder
-  if (action >= 0xe && action <= 0x12) {
-    return action === 0xe ? frame === 0xf : frame === 0xc
-  }
-  const chestEnd = action === FIELDER_ACTION.CHEST_CATCH && frame === 5
-  const throwEnd = action === FIELDER_ACTION.THROW && frame === 2
-  const lowEnd = action === FIELDER_ACTION.LOW_CATCH && frame === 2
+  if (isDiveAction(action)) return frame === (action === 0xe ? 0xf : 0xc)
+  const actionEnd = ACTION_END_FRAME[action] === frame
   const sweepEnd = (fielder.pose & POSE.LOW_SWEEP) !== 0 && frame === 5
-  return chestEnd || throwEnd || lowEnd || sweepEnd || !isFreeToStep(fielder)
+  return actionEnd || sweepEnd || !isFreeToStep(fielder)
 }

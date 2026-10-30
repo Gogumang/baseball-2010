@@ -126,32 +126,27 @@ export const DEFAULT_SETTINGS: GameSettings = {
 export function normalizeSettings(raw: unknown): GameSettings {
   if (typeof raw !== 'object' || raw === null) return DEFAULT_SETTINGS
   const candidate = raw as Partial<Record<keyof GameSettings, unknown>>
-
-  const speedLevel =
-    typeof candidate.speedLevel === 'number' &&
-    Number.isInteger(candidate.speedLevel) &&
-    candidate.speedLevel >= 0 &&
-    candidate.speedLevel < SPEED_LEVEL_COUNT
-      ? candidate.speedLevel
-      : DEFAULT_SETTINGS.speedLevel
-  const pitchControl = PITCH_CONTROLS.find((control) => control === candidate.pitchControl)
-  const soundLevel =
-    typeof candidate.soundLevel === 'number' &&
-    Number.isInteger(candidate.soundLevel) &&
-    candidate.soundLevel >= 0 &&
-    candidate.soundLevel < SOUND_LEVEL_COUNT
-      ? candidate.soundLevel
-      : DEFAULT_SETTINGS.soundLevel
-  const runningMode = MANUAL_AUTO_MODES.find((mode) => mode === candidate.runningMode)
-  const throwMode = MANUAL_AUTO_MODES.find((mode) => mode === candidate.throwMode)
-
   return {
-    speedLevel,
-    pitchControl: pitchControl ?? DEFAULT_SETTINGS.pitchControl,
-    soundLevel,
-    isVibrationOn: typeof candidate.isVibrationOn === 'boolean' ? candidate.isVibrationOn : DEFAULT_SETTINGS.isVibrationOn,
-    runningMode: runningMode ?? DEFAULT_SETTINGS.runningMode,
-    throwMode: throwMode ?? DEFAULT_SETTINGS.throwMode,
-    isScoreboardOn: typeof candidate.isScoreboardOn === 'boolean' ? candidate.isScoreboardOn : DEFAULT_SETTINGS.isScoreboardOn,
+    speedLevel: levelOr(candidate.speedLevel, SPEED_LEVEL_COUNT, DEFAULT_SETTINGS.speedLevel),
+    pitchControl: oneOf(PITCH_CONTROLS, candidate.pitchControl, DEFAULT_SETTINGS.pitchControl),
+    soundLevel: levelOr(candidate.soundLevel, SOUND_LEVEL_COUNT, DEFAULT_SETTINGS.soundLevel),
+    isVibrationOn: booleanOr(candidate.isVibrationOn, DEFAULT_SETTINGS.isVibrationOn),
+    runningMode: oneOf(MANUAL_AUTO_MODES, candidate.runningMode, DEFAULT_SETTINGS.runningMode),
+    throwMode: oneOf(MANUAL_AUTO_MODES, candidate.throwMode, DEFAULT_SETTINGS.throwMode),
+    isScoreboardOn: booleanOr(candidate.isScoreboardOn, DEFAULT_SETTINGS.isScoreboardOn),
   }
+}
+
+/** 0 이상 count 미만의 정수면 그 값, 아니면 기본값 */
+function levelOr(value: unknown, count: number, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < count ? value : fallback
+}
+
+/** 목록에 있는 값이면 그 값, 아니면 기본값 */
+function oneOf<T>(choices: readonly T[], value: unknown, fallback: T): T {
+  return choices.find((choice) => choice === value) ?? fallback
+}
+
+function booleanOr(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
 }

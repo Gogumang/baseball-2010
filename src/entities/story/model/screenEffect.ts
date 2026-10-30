@@ -112,27 +112,36 @@ function coverOf(kind: ScreenEffectKind, color: '검정' | '흰색', level: numb
 export function screenEffectFrameAt(kind: ScreenEffectKind, color: '검정' | '흰색', frame: number): ScreenEffectFrame | null {
   if (frame < 0) return null
   switch (kind) {
-    case '흔들기': {
-      // 단계 0~5 에 오프셋을 걸고, 단계 6 프레임은 끝만 세운다 → 그다음 비운다
-      const offset = SHAKE_OFFSETS[frame]
-      if (offset === undefined) return null
-      return { overlay: null, offset: { x: offset[0], y: offset[1] } }
-    }
+    case '흔들기':
+      return shakeFrameAt(frame)
     case '검정에서밝아짐':
-    case '색에서밝아짐': {
-      // 16,14,…,0 을 칠하고 0 을 칠한 프레임에 끝 → 9 프레임
-      const level = BRIGHTEN_START - LEVEL_STEP * frame
-      if (level < 0) return null
-      return { overlay: coverOf(kind, color, level), offset: NO_OFFSET }
-    }
+    case '색에서밝아짐':
+      return brightenFrameAt(kind, color, frame)
     case '검게어두워짐':
-    case '색으로덮임': {
-      // 0,2,…,16 을 칠하고 15 를 넘긴 단계를 칠한 프레임에 끝 → 9 프레임
-      const level = LEVEL_STEP * frame
-      if (level > DARKEN_LIMIT + 1) return null
-      return { overlay: coverOf(kind, color, level), offset: NO_OFFSET }
-    }
+    case '색으로덮임':
+      return darkenFrameAt(kind, color, frame)
   }
+}
+
+/** 단계 0~5 에 오프셋을 걸고, 단계 6 프레임은 끝만 세운다 → 그다음 비운다 */
+function shakeFrameAt(frame: number): ScreenEffectFrame | null {
+  const offset = SHAKE_OFFSETS[frame]
+  if (offset === undefined) return null
+  return { overlay: null, offset: { x: offset[0], y: offset[1] } }
+}
+
+/** 16,14,…,0 을 칠하고 0 을 칠한 프레임에 끝 → 9 프레임 */
+function brightenFrameAt(kind: ScreenEffectKind, color: '검정' | '흰색', frame: number): ScreenEffectFrame | null {
+  const level = BRIGHTEN_START - LEVEL_STEP * frame
+  if (level < 0) return null
+  return { overlay: coverOf(kind, color, level), offset: NO_OFFSET }
+}
+
+/** 0,2,…,16 을 칠하고 15 를 넘긴 단계를 칠한 프레임에 끝 → 9 프레임 */
+function darkenFrameAt(kind: ScreenEffectKind, color: '검정' | '흰색', frame: number): ScreenEffectFrame | null {
+  const level = LEVEL_STEP * frame
+  if (level > DARKEN_LIMIT + 1) return null
+  return { overlay: coverOf(kind, color, level), offset: NO_OFFSET }
 }
 
 /**

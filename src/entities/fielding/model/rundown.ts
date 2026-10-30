@@ -172,14 +172,8 @@ export interface RundownTickInput extends DefenseContext {
  * (예전 웹은 이 칸을 지나온 루 +0x8c 로 보아 "뒤에서 쫓기만 해 절대 못 잡는다" 고 적었다 — 칸 이름이 거꾸로였던 때의 해석)
  */
 export function rundownAction(input: RundownTickInput): RundownAction {
-  const { plan, slot, play, fielders, runners } = input
-  if (plan.runnerIndex === NONE) return { kind: '협살해제' }
-  // b48f0~b490e — 0xb3a04 로 계획을 **지금 상태로 다시 셈**(지역 칸 — 기록칸 P+0x1ec 는 그대로)한 뒤, 0xb398c 가 −1 이거나 다시 센
-  // [0] · [1] 어느 쪽도 이 칸이 아니면 푼다. 짝 · 루 · 주자는 기록칸에서 읽는다(b48b6~b48ee · b4940) (r313 — 예전 웹은 기록칸의
-  // 두 야수로 이 칸을 보았다. 다시 센 계획은 지금 주자 고르기와 커버 칸 +0xf0 으로 정해져 둘이 바뀌면 갈린다)
-  const recounted = buildRundownPlan(input, chooseRundownRunner(runners))
-  if (recounted.runnerIndex === NONE) return { kind: '협살해제' }
-  if (recounted.backFielder !== slot && recounted.frontFielder !== slot) return { kind: '협살해제' }
+  const { plan, slot, fielders, runners } = input
+  if (plan.runnerIndex === NONE || leavesRecountedRundown(input)) return { kind: '협살해제' }
 
   const runner = runners[plan.runnerIndex]
   const partnerSlot = slot === plan.backFielder ? plan.frontFielder : plan.backFielder
@@ -187,18 +181,42 @@ export function rundownAction(input: RundownTickInput): RundownAction {
   const self = fielders[slot]
   if (runner === undefined || partner === undefined || self === undefined) return { kind: '협살해제' }
 
-  if (slot === play.ballHolderSlot) {
-    // ── 내가 공을 쥐었다 ──
-    if (!self.holdingBall) return { kind: '공쫓기', target: input.ballTarget }
-    // b4976 — 내가 주자가 **달려가는 루(+0x7c)** 의 커버인가
-    const coversBack = slot === (play.coverOfBase[((runner.targetBase % 4) + 4) % 4] ?? NONE)
-    const safe = ticksToReach(runner.position, partner.position, runner.speed) > throwTicksToFielder(partner, self) + HOLDER_MARGIN_TICKS
-    if (coversBack || safe) return { kind: '주자추적', runnerIndex: plan.runnerIndex }
-    if (play.held) return { kind: '짝에게송구', toSlot: partnerSlot }
-    return { kind: '대기' }
-  }
+  if (slot === input.play.ballHolderSlot) return holderRundownAction(input, runner, self, partnerSlot, partner)
+  return freeRundownAction(input, runner, self, partner)
+}
 
-  // ── 내가 공이 없다 ──
+/**
+ * b48f0~b490e — 0xb3a04 로 계획을 **지금 상태로 다시 셈**(지역 칸 — 기록칸 P+0x1ec 는 그대로)한 뒤, 0xb398c 가 −1 이거나 다시 센
+ * [0] · [1] 어느 쪽도 이 칸이 아니면 푼다. 짝 · 루 · 주자는 기록칸에서 읽는다(b48b6~b48ee · b4940) (r313 — 예전 웹은 기록칸의
+ * 두 야수로 이 칸을 보았다. 다시 센 계획은 지금 주자 고르기와 커버 칸 +0xf0 으로 정해져 둘이 바뀌면 갈린다)
+ */
+function leavesRecountedRundown(input: RundownTickInput): boolean {
+  const recounted = buildRundownPlan(input, chooseRundownRunner(input.runners))
+  if (recounted.runnerIndex === NONE) return true
+  return recounted.backFielder !== input.slot && recounted.frontFielder !== input.slot
+}
+
+/** ── 내가 공을 쥐었다 ── */
+function holderRundownAction(
+  input: RundownTickInput,
+  runner: RunnerState,
+  self: FielderState,
+  partnerSlot: number,
+  partner: FielderState,
+): RundownAction {
+  const { play, slot, plan } = input
+  if (!self.holdingBall) return { kind: '공쫓기', target: input.ballTarget }
+  // b4976 — 내가 주자가 **달려가는 루(+0x7c)** 의 커버인가
+  const coversBack = slot === (play.coverOfBase[((runner.targetBase % 4) + 4) % 4] ?? NONE)
+  const safe = ticksToReach(runner.position, partner.position, runner.speed) > throwTicksToFielder(partner, self) + HOLDER_MARGIN_TICKS
+  if (coversBack || safe) return { kind: '주자추적', runnerIndex: plan.runnerIndex }
+  if (play.held) return { kind: '짝에게송구', toSlot: partnerSlot }
+  return { kind: '대기' }
+}
+
+/** ── 내가 공이 없다 ── */
+function freeRundownAction(input: RundownTickInput, runner: RunnerState, self: FielderState, partner: FielderState): RundownAction {
+  const { plan, slot } = input
   const runnerTicks = ticksToReach(runner.position, self.position, runner.speed)
   const throwTicks = throwTicksTo(partner, self.position)
   if (runnerTicks > throwTicks + FREE_MARGIN_TICKS) return { kind: '주자추적', runnerIndex: plan.runnerIndex }

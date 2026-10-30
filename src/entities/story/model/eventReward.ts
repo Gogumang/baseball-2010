@@ -88,58 +88,54 @@ function raiseAbility(career: PlayerCareer, ability: 'hit' | 'power' | 'defense'
 
 const ALL_ABILITIES = ['hit', 'power', 'defense', 'run'] as const
 
+type RewardHandler = (career: PlayerCareer, value: number, random: RandomPort | undefined) => PlayerCareer
+
+/** 종류마다 커리어 칸 (히든 오픈 7 · 능력치 13~16 은 `applyReward` 가 먼저 본다) */
+const REWARD_HANDLERS: Readonly<Record<number, RewardHandler>> = {
+  [EVENT_REWARD_KIND.인기도]: (career, value) => gainPopularity(career, value),
+  [EVENT_REWARD_KIND.평판]: (career, value) => gainReputation(career, value),
+  [EVENT_REWARD_KIND.사기]: (career, value) => gainMorale(career, value),
+  [EVENT_REWARD_KIND.소지금]: (career, value) => ({ ...career, money: clamp(career.money + value * MONEY_REWARD_UNIT, 0, MAXIMUM_MONEY) }),
+  [EVENT_REWARD_KIND.스킬]: (career, value) => applySkillReward(career, value),
+  [EVENT_REWARD_KIND.타순]: (career, value) => ({ ...career, battingOrder: value }),
+  [EVENT_REWARD_KIND.목표타순]: (career, value) => ({ ...career, battingOrderPath: battingOrderPathOf(value) }),
+  [EVENT_REWARD_KIND.연봉]: (career, value) => applySalaryChange(career, value),
+  [EVENT_REWARD_KIND.G포인트]: (career, value) => ({ ...career, gamePoint: clamp(career.gamePoint + value, 0, MAXIMUM_GAME_POINT) }),
+  // 네 칸 각각 13~16 과 같은 처리 (0x8c8e8). 이벤트 231 v=10
+  [EVENT_REWARD_KIND.모든능력치]: (career, value) => ALL_ABILITIES.reduce((current, key) => raiseAbility(current, key, value), career),
+  // GP 아이템 v−1 의 효과만 준다 (0xa4488) — 값을 치르지 않는다. 이벤트 36 v=10 → 아이템 9
+  [EVENT_REWARD_KIND.GP아이템]: (career, value, random) => (random === undefined ? career : applyGpItem(career, value - 1, random).career),
+  [EVENT_REWARD_KIND.질병]: (career, value, random) => applyIllnessReward(career, value, random),
+}
+
 function applyReward(career: PlayerCareer, reward: EventReward, random: RandomPort | undefined): PlayerCareer {
   if (reward.kind === HIDDEN_OPEN_KIND) return openHidden(career, Math.abs(reward.value))
   const ability = ABILITY_REWARD_KINDS[reward.kind]
   if (ability !== undefined) return raiseAbility(career, ability, reward.value)
-  switch (reward.kind) {
-    case EVENT_REWARD_KIND.인기도:
-      return gainPopularity(career, reward.value)
-    case EVENT_REWARD_KIND.평판:
-      return gainReputation(career, reward.value)
-    case EVENT_REWARD_KIND.사기:
-      return gainMorale(career, reward.value)
-    case EVENT_REWARD_KIND.소지금:
-      return { ...career, money: clamp(career.money + reward.value * MONEY_REWARD_UNIT, 0, MAXIMUM_MONEY) }
-    case EVENT_REWARD_KIND.스킬:
-      return applySkillReward(career, reward.value)
-    case EVENT_REWARD_KIND.타순:
-      return { ...career, battingOrder: reward.value }
-    case EVENT_REWARD_KIND.목표타순:
-      return { ...career, battingOrderPath: battingOrderPathOf(reward.value) }
-    case EVENT_REWARD_KIND.연봉:
-      return applySalaryChange(career, reward.value)
-    case EVENT_REWARD_KIND.G포인트:
-      return { ...career, gamePoint: clamp(career.gamePoint + reward.value, 0, MAXIMUM_GAME_POINT) }
-    case EVENT_REWARD_KIND.모든능력치:
-      // 네 칸 각각 13~16 과 같은 처리 (0x8c8e8). 이벤트 231 v=10
-      return ALL_ABILITIES.reduce((current, key) => raiseAbility(current, key, reward.value), career)
-    case EVENT_REWARD_KIND.GP아이템:
-      // GP 아이템 v−1 의 효과만 준다 (0xa4488) — 값을 치르지 않는다. 이벤트 36 v=10 → 아이템 9
-      return random === undefined ? career : applyGpItem(career, reward.value - 1, random).career
-    case EVENT_REWARD_KIND.질병:
-      // 값 ≤ 0 갈래 0x8c73e~0x8c752: +5 = 0 · +6 = 표 0xd4d98[0](0) · +0x7c = 20
-      if (reward.value < 0) {
-        return { ...career, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: ILLNESS_COOLDOWN }
-      }
-      return {
-        ...career,
-        illnessCooldown: ILLNESS_COOLDOWN,
-        isSick: true,
-        // 질병 남은 기간 — 표 0xd4d98 = 0,3,3,3,3 (누락 탐색 7차)
-        illnessRemaining: ILLNESS_DURATION,
-        // 값 > 0 은 알림 글 0x8beb8 이 이미 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 0x8c718 은 그 번호를 건다.
-        // 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
-        illnessName:
-          reward.value > 0
-            ? (ILLNESS_NAMES[reward.value - 1] ?? ILLNESS_NAMES[0])
-            : random === undefined
-              ? ILLNESS_NAMES[0]
-              : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)],
-      }
-    default:
-      return career
+  const handler = REWARD_HANDLERS[reward.kind]
+  return handler === undefined ? career : handler(career, reward.value, random)
+}
+
+function applyIllnessReward(career: PlayerCareer, value: number, random: RandomPort | undefined): PlayerCareer {
+  // 값 ≤ 0 갈래 0x8c73e~0x8c752: +5 = 0 · +6 = 표 0xd4d98[0](0) · +0x7c = 20
+  if (value < 0) return { ...career, isSick: false, illnessName: null, illnessRemaining: 0, illnessCooldown: ILLNESS_COOLDOWN }
+  return {
+    ...career,
+    illnessCooldown: ILLNESS_COOLDOWN,
+    isSick: true,
+    // 질병 남은 기간 — 표 0xd4d98 = 0,3,3,3,3 (누락 탐색 7차)
+    illnessRemaining: ILLNESS_DURATION,
+    illnessName: rollIllnessName(value, random),
   }
+}
+
+/**
+ * 값 > 0 은 알림 글 0x8beb8 이 이미 굴려 적은 질병 번호(r + 1, `rewardNoticeOf`) — 0x8c718 은 그 번호를 건다.
+ * 값 0 은 알림을 안 거친 재생(굴림 0xbfa55(0, 4) 한 번을 여기서)
+ */
+function rollIllnessName(value: number, random: RandomPort | undefined): string {
+  if (value > 0) return ILLNESS_NAMES[value - 1] ?? ILLNESS_NAMES[0]
+  return random === undefined ? ILLNESS_NAMES[0] : ILLNESS_NAMES[random.rand(0, ILLNESS_NAMES.length)]
 }
 
 /**

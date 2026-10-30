@@ -113,25 +113,32 @@ export function reputationCompleteGameOf(outs: number, lastRegularInningIndex: n
  * 다음 경기의 관중 수 계산이 읽는다.
  */
 export function popularityChangeOf(won: boolean, myRuns: number, opponentRuns: number, completeGame: CompleteGameKind): number {
-  let d: number
-  if (!won) d = -2
-  else if (completeGame === '퍼펙트') d = 8
-  else if (completeGame === '노히트') d = 7
-  else if (completeGame === '완봉') d = 6
-  else if (completeGame === '완투') d = 5
-  else d = 4
+  return resultPopularityOf(won, completeGame) + myRunsPopularityOf(myRuns) - opponentRunsPenaltyOf(opponentRuns)
+}
 
-  if (myRuns > 15) d += 4
-  else if (myRuns >= 10) d += 3
-  else if (myRuns >= 6) d += 2
-  else if (myRuns >= 3) d += 1
-  else if (myRuns === 0) d -= 1
+/** 승리 완투 종류별 점수 — 완투가 아니면 4 */
+const COMPLETE_GAME_POPULARITY: Readonly<Record<string, number>> = { 퍼펙트: 8, 노히트: 7, 완봉: 6, 완투: 5 }
 
-  if (opponentRuns > 9) d -= 5
-  else if (opponentRuns >= 6) d -= 4
-  else if (opponentRuns >= 3) d -= 3
+/** 패배 −2 · 승리는 완투 종류별 */
+function resultPopularityOf(won: boolean, completeGame: CompleteGameKind): number {
+  if (!won) return -2
+  return completeGame === null ? 4 : (COMPLETE_GAME_POPULARITY[completeGame] ?? 4)
+}
 
-  return d
+/** 내 득점: >15 +4 | 10~15 +3 | 6~9 +2 | 3~5 +1 | 0 −1 */
+function myRunsPopularityOf(myRuns: number): number {
+  if (myRuns > 15) return 4
+  if (myRuns >= 10) return 3
+  if (myRuns >= 6) return 2
+  if (myRuns >= 3) return 1
+  return myRuns === 0 ? -1 : 0
+}
+
+/** 상대 득점: >9 −5 | 6~9 −4 | 3~5 −3 */
+function opponentRunsPenaltyOf(opponentRuns: number): number {
+  if (opponentRuns > 9) return 5
+  if (opponentRuns >= 6) return 4
+  return opponentRuns >= 3 ? 3 : 0
 }
 
 /** 라이벌 표 `0xd8a90` (s8 쌍, 순서 무관) */
