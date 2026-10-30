@@ -81,7 +81,7 @@
     "src/pages/create-player/lib/teamSelectLayout.ts": ["exports", "duplicates"], // abilityChartMaximumOf (0x76424 — 웹은 안 그림) · 나만의리그 칸 = 팀 칸
     "src/pages/help/lib/helpLayout.ts": ["exports"], // RANKING_TITLE_FRAMES (0xcedf4) · rowLeftOf (0x253d4)
     "src/pages/management/lib/nariMatchPrepare/matchAces.ts": ["exports"], // nariGameAcesOf (0xb8870)
-    "src/shared/lib/commonWindow/commonWindow.ts": ["exports"], // gameSceneFreezeSerialNow (52efe)
+    "src/shared/lib/commonWindow/sceneMarks.ts": ["exports"], // gameSceneFreezeSerialNow (52efe)
     "src/shared/lib/liveGameState/liveGameState.ts": ["exports"], // isLiveGameLosingTeam (0xb6a4c · 0xb6be8)
     "src/shared/lib/skinTicker/skinTicker.ts": ["exports", "duplicates"], // clearSkinTickerCounter — 대전(0x31c60)이 부를 자리, 웹에 대전이 없다
     "src/widgets/season/lib/seasonAwardEvents.ts": ["exports"], // seasonAwardRewardOf (보상 표) · SEASON_PITCHER_TITLE_KINDS

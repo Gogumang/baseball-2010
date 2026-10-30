@@ -1,0 +1,87 @@
+import { createContext, useContext, useLayoutEffect } from 'react'
+import { markCommonWindowShown, markGameSceneLoading, markGameSceneUp } from '@/shared/lib/commonWindow/sceneMarks'
+
+/**
+ * **공용 창 [0x140005c] 이 떠 있는가** — 히든 오픈 알림(0x62368 → 0x74ef5)처럼 앱이 모든 화면 위에 얹는 창.
+ *
+ * 장면 틀마다 0x754f9(창, 키)가 [창+9](떠 있음)이면 참을 돌려주고, 장면이 그때 건너뛰는 것은 장면마다 다르다 (직접 떴다):
+ * ```
+ * 경기 장면 0x52c50  52cc6 참이면 52ef2 로 — 상태 바꿈 0xbc9c9(틱 [장면+0x2c] +1 · 진입) · 키 0x498d4 · 상태 갱신표 0xd0530 을
+ *                    모두 건너뛰고 그리기(0x457cc · 0x41230 · 그리기표 0xd05a0)만 한다
+ * 나리 0x1cdec       1d070 참이면 상태 키 표 0xcc7e0 만 건너뛴다 — 상태 바꿈 · 진입(ce0e~) · 갱신(1d1b2~) · 그리기는 돈다
+ * 시즌 0xe9ac        ec70 참이면 상태 키 표 0xcbf6c 만 건너뛴다
+ * 메인 메뉴 0x32634  3263e 참이면 하위 상태 키 표 0xcefa4 만 건너뛴다 ([메뉴+0xe0] = 그 값)
+ * 미션 고르기 0x1ea98 1eaac 참이면 0x1e99c(장면, 상태, 2) 를 건너뛴다 ([장면+0xa2] = 그 값)
+ * ```
+ * 키는 창(`MessageBox`)이 잡는 단계에서 다 가져가므로 웹은 따로 막을 것이 없고, 경기 장면만 이 값으로 갱신을 멈춘다
+ * (`BattingStage` — 정산 0x19 갱신 0x4b100 의 결과 배경 +0x17e2 가라앉음).
+ */
+export const CommonWindowOpenContext = createContext(false)
+
+export function useIsCommonWindowOpen(): boolean {
+  return useContext(CommonWindowOpenContext)
+}
+
+/**
+ * **공용 창에 글을 띄운다 — 0x74ef5([0x140005c], 글, 종류 1, 0, 0)**. 히든 오픈 알림과 같은 창 · 같은 줄(떠 있는 것 하나 + 대기 하나)이다.
+ * 앱이 창을 들고 있지 않은 자리(시험 등)에서는 아무것도 안 한다.
+ */
+export const CommonWindowPushContext = createContext<(text: string) => void>(() => undefined)
+
+export function useCommonWindowPush(): (text: string) => void {
+  return useContext(CommonWindowPushContext)
+}
+
+/**
+ * **지금 장면이 [창+0x24f] = 1 을 세웠는가** — 장면 생성자만 이 칸을 쓴다(리터럴 0x24f 를 읽는 곳 전수, 2026-10-14 직접 뜸):
+ * ```
+ * 1 을 쓰는 곳  메인 메뉴 0x234d4(234dc~234e2) · 경기 0x3301c(33062~)
+ * 0 을 쓰는 곳  시즌 0x3b14(3b1c~) · 나리 0xf684(f688~) · 미션 목록 0x1d784(1d788~)
+ * 읽는 곳       0x74228(0x741a0) · 0x7503c(0x74ef4) — 창을 띄울 때 [창+0x24e] 로 옮긴다 · 0x32dd8 · 0x74458 · 0x52efe(경기 그리기)
+ * ```
+ * [+0x24e] 가 선 창은 키를 받은 갱신의 격자 · 키 표 갈래가 [+0x215] 와 함께 폭 0 을 적어(75656~7566c · 756a4~756b4)
+ * 다음 갱신에 줄임 없이 닫힌다 — `MessageBox` 의 `closesWithoutShrink` 기본값이 이것이다.
+ * 앱이 지금 화면으로 값을 정하고, 경기 장면(0x104)을 그리는 화면은 `useMarksGameScene` 으로 서 있는 동안 1 로 둔다.
+ */
+export const CommonWindowSceneContext = createContext(false)
+
+export function useSceneClosesWithoutShrink(): boolean {
+  return useContext(CommonWindowSceneContext)
+}
+
+/** 경기 장면이 섰다(true) · 내려갔다(false) — 앱이 센다. 앱이 없는 자리(시험)에서는 아무것도 안 한다 */
+export const GameSceneMarkContext = createContext<(isUp: boolean) => void>(() => undefined)
+
+/**
+ * 경기 장면 0x104(생성자 0x3301c 가 [창+0x24f] = 1)를 그리는 화면이 부른다 — 서 있는 동안 앱의 공용 창(히든 오픈 알림 따위)과
+ * 그 아래 `MessageBox` 가 줄임 없이 닫힌다.
+ */
+export function useMarksGameScene(): void {
+  const mark = useContext(GameSceneMarkContext)
+  useLayoutEffect(() => {
+    mark(true)
+    const release = markGameSceneUp()
+    return () => {
+      release()
+      mark(false)
+    }
+  }, [mark])
+}
+
+/** `useMarksGameScene` 을 갈래 안에서 쓰는 자리(경기 끝 판 0x18 · 정산 0x19 를 한 화면이 같이 그리는 결과 화면 따위) */
+export function GameSceneMark(): null {
+  useMarksGameScene()
+  return null
+}
+
+/** `isShown` 인 동안 공용 창이 떠 있다고 센다 */
+export function useMarksCommonWindowShown(isShown: boolean): void {
+  useLayoutEffect(() => (isShown ? markCommonWindowShown() : undefined), [isShown])
+}
+/**
+ * 경기 장면 로딩 판(상태 7 · 9 · 8)이 서 있는 동안 센다 — 그때 선 창의 첫 그림은 배경 0x41230 을 안 그린다(52f28~52f32).
+ * 같은 판의 `useMarksGameScene` 보다 **먼저** 불러야 판이 서는 커밋에 이미 떠 있던 창도 로딩 판 몫으로 센다
+ */
+export function useMarksGameSceneLoading(): void {
+  useLayoutEffect(() => markGameSceneLoading(), [])
+}
