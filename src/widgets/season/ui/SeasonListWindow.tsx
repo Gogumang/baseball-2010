@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { ReactNode } from 'react'
 import { CommonPanel } from '@/shared/ui'
 import { FOOTER_BOX, SEASON_WINDOW, TITLE_BOX, VISIBLE_ROWS, rowBoxOf } from '@/widgets/season/lib/seasonWindowLayout'
@@ -40,6 +41,25 @@ export interface SeasonListPanel {
   readonly titleTab?: boolean
 }
 
+/** 판에 들어가는 줄 수를 넘으면 커서를 따라 굴린 첫 줄 (원본 목록 객체도 ▲▼ 로 굴린다 — 근사) */
+function firstVisibleRowOf(rowTotal: number, cursor: number, rowCount: number): number {
+  if (rowTotal <= rowCount) return 0
+  return Math.min(Math.max(0, cursor - rowCount + 1), rowTotal - rowCount)
+}
+
+/** 제목 자리 — 판을 넘긴 화면은 남색 글, 제목 탭이면 탭 폭(80)에 왼쪽 맞춤 */
+function titleStyleOf(panel: SeasonListWindowProps['panel']): CSSProperties {
+  const hasTitleTab = panel?.titleTab === true
+  return {
+    left: TITLE_BOX.x,
+    top: TITLE_BOX.y,
+    width: hasTitleTab ? 80 : TITLE_BOX.width,
+    height: TITLE_BOX.height,
+    ...(panel === undefined ? {} : { color: '#10246B' }),
+    ...(hasTitleTab ? { textAlign: 'left' as const } : {}),
+  }
+}
+
 /**
  * 시즌 화면들이 함께 쓰는 **공용 판 목록 창**.
  *
@@ -59,9 +79,8 @@ export function SeasonListWindow({
   backLabel = '되돌아가기',
   panel,
 }: SeasonListWindowProps) {
-  // 판에 들어가는 줄 수를 넘으면 커서를 따라 굴린다 (원본 목록 객체도 ▲▼ 로 굴린다 — 근사)
   const rowCount = VISIBLE_ROWS
-  const first = rows.length <= rowCount ? 0 : Math.min(Math.max(0, cursor - rowCount + 1), rows.length - rowCount)
+  const first = firstVisibleRowOf(rows.length, cursor, rowCount)
   const visible = rows.slice(first, first + rowCount)
 
   return (
@@ -86,17 +105,7 @@ export function SeasonListWindow({
           testId="시즌-목록-판"
         />
       )}
-      <div
-        className={styles.title}
-        style={{
-          left: TITLE_BOX.x,
-          top: TITLE_BOX.y,
-          width: panel?.titleTab === true ? 80 : TITLE_BOX.width,
-          height: TITLE_BOX.height,
-          ...(panel === undefined ? {} : { color: '#10246B' }),
-          ...(panel?.titleTab === true ? { textAlign: 'left' as const } : {}),
-        }}
-      >
+      <div className={styles.title} style={titleStyleOf(panel)}>
         {title}
       </div>
 

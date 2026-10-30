@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { appTickNow, appTickOf } from '@/shared/lib/frameClock/frameClock'
 import { useAnimations, useFrameOrigins } from '@/shared/lib/sprite/useFrameOrigins'
-import { animationFolderOf, figurePosesOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
+import { figurePosesOf, TRAINING_POPUP_UPDATES } from '@/shared/config/original/trainingAnimation'
 import type { TrainingPresentation } from '@/shared/config/original/trainingAnimation'
-import { animationStepAt, figurePoseAt } from '@/widgets/training-scene/lib/animationPlayback'
+import { figurePoseAt } from '@/widgets/training-scene/lib/animationPlayback'
 import { batterEquipmentOf, NO_EQUIPMENT } from '@/widgets/batting-stage/lib/batterLayers'
 import { TrainingFigure } from '@/widgets/training-scene/ui/TrainingFigure'
 import { TrainingGauge } from '@/widgets/training-scene/ui/TrainingGauge'
@@ -12,6 +12,7 @@ import { useSceneHour } from '@/shared/lib/phoneClock/phoneClock'
 import { useModeBackSprite } from '@/shared/lib/phoneClock/useModeBackSprite'
 import { assetUrl } from '@/shared/lib/assetUrl/assetUrl'
 import { useMirrorRef } from '@/shared/lib/mirrorRef/useMirrorRef'
+import { trainingFolderOf, trainingFrameOf, trainingStepOf, type TrainingStep } from '@/widgets/training-scene/ui/trainingScene/trainingFrame'
 
 /** 연출 기준점 = 창 사각형 ((x + w) / 2, y + h) = (120, 137) (0x84954) */
 const ANCHOR = { x: 120, y: 137 }
@@ -54,8 +55,36 @@ const isTrainingSkipKey = (key: string): boolean => key === 'Enter' || key === '
  * 원작 훈련 팝업. presentation 이 바뀔 때마다 처음부터 튼다.
  * 훈련 이름 글은 없다 — 0x848d0 은 창 · 연출 · 캐릭터 · 게이지만 그리고 글자 그리기(0x9c068)를 안 부른다(투수편 · 시즌 팝업과 같다, r204).
  */
+/** 판이 섰고 첫 틱을 지났으면 게이지를 그린다 */
+const showsTrainingGauge = (presentation: TrainingPresentation | null, update: number): boolean => presentation !== null && update >= 0
+
+/** 캐릭터 겹 — 판에 캐릭터가 있고 이 그림 칸이 있을 때만 */
+function trainingFigureOf(
+  presentation: TrainingPresentation | null,
+  step: TrainingStep | null,
+  props: Pick<TrainingSceneProps, 'equipmentLevels' | 'skinIndex' | 'teamIndex'> & { readonly battingTypeIndex: number },
+) {
+  const figure = presentation?.figure ?? null
+  if (figure === null || step === null) return null
+  const { battingTypeIndex, equipmentLevels } = props
+  return (
+    <TrainingFigure
+      pose={figurePoseAt(figurePosesOf(figure, battingTypeIndex), step.entryIndex)}
+      warmPoses={figurePosesOf(figure, battingTypeIndex)}
+      equipment={equipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(equipmentLevels)}
+      skinIndex={props.skinIndex}
+      teamIndex={props.teamIndex}
+      // 폼 rec[0xb] >> 4 = 2 × 타입 + 손 (0x1081a) — 몸통 종류(폼 >> 1)만 가른다. 손은 아래 +0x3c 덮어쓰기에 묻힌다
+      form={battingTypeIndex * 2}
+      mirrorFlag={BATTER_TRAINING_FIGURE_FLAG}
+      x={ANCHOR.x + figure.offsetX}
+      y={ANCHOR.y - figure.liftY}
+    />
+  )
+}
+
 export function TrainingScene({ presentation, battingTypeIndex = 0, equipmentLevels, skinIndex, teamIndex, onFinished }: TrainingSceneProps) {
-  const folder = animationFolderOf(presentation?.file ?? 'raise_traning_ani')
+  const folder = trainingFolderOf(presentation)
   const origins = useFrameOrigins(folder)
   const animations = useAnimations(folder)
   const windowOrigins = useFrameOrigins(WINDOW_FOLDER)
@@ -106,11 +135,8 @@ export function TrainingScene({ presentation, battingTypeIndex = 0, equipmentLev
     }
   }, [presentation])
 
-  const entries = presentation === null ? null : animations?.[presentation.animation]
-  const step = entries === undefined || entries === null || update < 0 ? null : animationStepAt(entries, update)
-  const frameKey = step === null ? '' : String(step.frame).padStart(3, '0')
-  const origin = step === null ? undefined : origins?.[frameKey]
-  const figure = presentation?.figure ?? null
+  const step = trainingStepOf(presentation, animations, update)
+  const frame = trainingFrameOf(step, origins)
   const windowKey = windowSprite.key
   const windowOrigin = windowOrigins?.[windowKey]
 
@@ -122,30 +148,17 @@ export function TrainingScene({ presentation, battingTypeIndex = 0, equipmentLev
         )}
       </div>
       <div className={styles.animationClip}>
-        {origin !== undefined && step !== null && (
+        {frame !== null && (
           <img
             className={styles.sprite}
-            style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
-            src={`${folder}/${frameKey}.png`}
+            style={{ left: ANCHOR.x + frame.origin.x + frame.step.dx, top: ANCHOR.y + frame.origin.y + frame.step.dy }}
+            src={`${folder}/${frame.frameKey}.png`}
             alt=""
           />
         )}
-        {figure !== null && step !== null && (
-          <TrainingFigure
-            pose={figurePoseAt(figurePosesOf(figure, battingTypeIndex), step.entryIndex)}
-            warmPoses={figurePosesOf(figure, battingTypeIndex)}
-            equipment={equipmentLevels === undefined ? NO_EQUIPMENT : batterEquipmentOf(equipmentLevels)}
-            skinIndex={skinIndex}
-            teamIndex={teamIndex}
-            // 폼 rec[0xb] >> 4 = 2 × 타입 + 손 (0x1081a) — 몸통 종류(폼 >> 1)만 가른다. 손은 아래 +0x3c 덮어쓰기에 묻힌다
-            form={battingTypeIndex * 2}
-            mirrorFlag={BATTER_TRAINING_FIGURE_FLAG}
-            x={ANCHOR.x + figure.offsetX}
-            y={ANCHOR.y - figure.liftY}
-          />
-        )}
+        {trainingFigureOf(presentation, step, { battingTypeIndex, equipmentLevels, skinIndex, teamIndex })}
       </div>
-      {presentation !== null && update >= 0 && <TrainingGauge filled={update} />}
+      {showsTrainingGauge(presentation, update) && <TrainingGauge filled={update} />}
     </div>
   )
 }

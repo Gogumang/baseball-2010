@@ -65,6 +65,20 @@ interface SpecialSwingWindowProps {
  * 아래 글 "사용중" · [69] 는 0xa43c4(4 + 타입) 로 서로 다르다(0x805f4 · 0x80be8).
  * 확인 키(Enter)는 모드에 따라 `0x17cec`(고르기) 또는 `0x17828`(배우기) 규칙을 탄다.
  */
+/**
+ * 처음 커서 — '훈련'(108 진입 0x17730 177b6~17806)은 min(s8 [저장+0x201], 3) = min(L, 3) 칸.
+ * '사용'(123 진입 0x17690)은 0x80235 가 탭 격자를 vt+0x14(0, 0) 으로 되감고 더 건드리지 않는다 — 칸 0
+ */
+function initialCursorOf(mode: SpecialSwingWindowProps['mode'], level: number): number {
+  return mode === '훈련' ? Math.min(level, SPECIAL_TRAINING_SLOT_COUNT - 1) : 0
+}
+
+/** 알림 · 질문 상자가 떠 있으면 덮개를 어둡게 */
+function overlayClassOf(notice: string | null, question: object | null): string {
+  const hasPopup = notice !== null || question !== null
+  return hasPopup ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay
+}
+
 export function SpecialSwingWindow({
   level,
   sessions,
@@ -78,9 +92,7 @@ export function SpecialSwingWindow({
   onBuyGamePoint,
   onClose,
 }: SpecialSwingWindowProps) {
-  // 처음 커서 — '훈련'(108 진입 0x17730 177b6~17806)은 min(s8 [저장+0x201], 3) = min(L, 3) 칸.
-  // '사용'(123 진입 0x17690)은 0x80235 가 탭 격자를 vt+0x14(0, 0) 으로 되감고 더 건드리지 않는다 — 칸 0
-  const [cursor, setCursor] = useState(mode === '훈련' ? Math.min(level, SPECIAL_TRAINING_SLOT_COUNT - 1) : 0)
+  const [cursor, setCursor] = useState(initialCursorOf(mode, level))
   /** 바깥이 번호를 들고 있지 않을 때의 자리 — 원본 레코드 +0x18 에 이어야 한다 */
   const [ownNumber, setOwnNumber] = useState(NO_SPECIAL_SWING_NUMBER)
   const inUseNumber = selectedNumber ?? ownNumber
@@ -141,12 +153,7 @@ export function SpecialSwingWindow({
   })
 
   return (
-    <div
-      className={notice !== null || question !== null ? `${styles.overlay} ${styles.overlayWithPopup}` : styles.overlay}
-      role="dialog"
-      aria-label="필살타법"
-      onClick={onClose}
-    >
+    <div className={overlayClassOf(notice, question)} role="dialog" aria-label="필살타법" onClick={onClose}>
       <SpecialTrainingFigure
         side="타자"
         state={mode}

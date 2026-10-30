@@ -42,27 +42,37 @@ export function drawParticles(context: CanvasRenderingContext2D, scene: Particle
   // 효과 입자는 모아 두었다가 한꺼번에 그린다 — 화면 읽기 · 쓰기를 모을 뿐 차례 · 픽셀은 하나씩 그린 것과 같다(`drawImagesWithEffect`).
   // 그냥 복사(효과 0) 입자가 끼면 그 앞까지 먼저 그려 겹침 차례를 지킨다
   const effectDraws: ImageEffectDraw[] = []
-  for (const emitter of scene.emitters) {
-    const { mode } = emitter.config
-    for (const particle of emitter.particles) {
-      const part = ptcPartOf(emitter.img, particle.life)
-      if (part === null) continue
-      const image = sprite(PTC_PART_IMAGE(part.image))
-      if (image === null) continue
-
-      const { x, y } = particlePixelOf(particle)
-      const { effect, argument } = particleEffectOf(mode, drawStrengthOf(particle))
-      // 파트 효과 3 = 좌우 뒤집기 — 파트 원점을 축으로 거울을 놓은 그림을 같은 자리에
-      const drawn = part.flip === true ? mirroredOf(image) : image
-      if (effect === DRAW_EFFECT.COPY) {
-        drawImagesWithEffect(context, effectDraws.splice(0))
-        context.drawImage(drawn, x + part.dx, y + part.dy)
-      }
-      // 화면 칸을 읽어 원본 식으로 섞는다(`drawImageWithEffect` — 565 · 내림 · 끝에서 자름)
-      else effectDraws.push({ image: drawn, x: x + part.dx, y: y + part.dy, effect, argument })
+  const particles = scene.emitters.flatMap((emitter) => emitter.particles.map((particle) => ({ emitter, particle })))
+  for (const { emitter, particle } of particles) {
+    const draw = particleDrawOf(emitter.img, emitter.config.mode, particle)
+    if (draw === null) continue
+    if (draw.effect === DRAW_EFFECT.COPY) {
+      drawImagesWithEffect(context, effectDraws.splice(0))
+      context.drawImage(draw.image, draw.x, draw.y)
     }
+    // 화면 칸을 읽어 원본 식으로 섞는다(`drawImageWithEffect` — 565 · 내림 · 끝에서 자름)
+    else effectDraws.push(draw)
   }
   drawImagesWithEffect(context, effectDraws)
+}
+
+type SceneEmitter = ParticleScene['emitters'][number]
+
+/** 입자 하나의 그림 — 파트 · 그림이 아직 없으면 null */
+function particleDrawOf(
+  img: SceneEmitter['img'],
+  mode: SceneEmitter['config']['mode'],
+  particle: SceneEmitter['particles'][number],
+): ImageEffectDraw | null {
+  const part = ptcPartOf(img, particle.life)
+  if (part === null) return null
+  const image = sprite(PTC_PART_IMAGE(part.image))
+  if (image === null) return null
+  const { x, y } = particlePixelOf(particle)
+  const { effect, argument } = particleEffectOf(mode, drawStrengthOf(particle))
+  // 파트 효과 3 = 좌우 뒤집기 — 파트 원점을 축으로 거울을 놓은 그림을 같은 자리에
+  const drawn = part.flip === true ? mirroredOf(image) : image
+  return { image: drawn, x: x + part.dx, y: y + part.dy, effect, argument }
 }
 
 const mirrored = new WeakMap<CanvasImageSource, HTMLCanvasElement>()

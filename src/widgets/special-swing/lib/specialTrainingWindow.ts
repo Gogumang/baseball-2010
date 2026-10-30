@@ -213,14 +213,23 @@ export const isSpecialTrainingBlinkOn = (tick: number) => tick % 10 !== 0
 export type SpecialTrainingKey = 'left' | 'right' | 'up' | 'down' | 'ok' | 'clr'
 
 /** 웹 키 → 원본 키. 숫자 '2' '4' '6' '8' 은 격자(숫자키 꼴 1)가 ↑ ← → ↓ 로 읽고, '5' 는 OK 다 */
+const SPECIAL_TRAINING_KEYS: ReadonlyMap<string, SpecialTrainingKey> = new Map([
+  ['ArrowUp', 'up'],
+  ['2', 'up'],
+  ['ArrowDown', 'down'],
+  ['8', 'down'],
+  ['ArrowLeft', 'left'],
+  ['4', 'left'],
+  ['ArrowRight', 'right'],
+  ['6', 'right'],
+  ['Enter', 'ok'],
+  ['5', 'ok'],
+  ['Escape', 'clr'],
+  ['Backspace', 'clr'],
+])
+
 export function specialTrainingKeyOf(key: string): SpecialTrainingKey | null {
-  if (key === 'ArrowUp' || key === '2') return 'up'
-  if (key === 'ArrowDown' || key === '8') return 'down'
-  if (key === 'ArrowLeft' || key === '4') return 'left'
-  if (key === 'ArrowRight' || key === '6') return 'right'
-  if (key === 'Enter' || key === '5') return 'ok'
-  if (key === 'Escape' || key === 'Backspace') return 'clr'
-  return null
+  return SPECIAL_TRAINING_KEYS.get(key) ?? null
 }
 
 /**

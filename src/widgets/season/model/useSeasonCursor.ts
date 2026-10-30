@@ -69,6 +69,16 @@ export interface SeasonCursor {
   readonly moveTo: (index: number) => void
 }
 
+/** 시즌 목록 키 — 칸 옮김 · 확인(원본 −5 · '5') · 취소(원본 −16). 다른 키는 null */
+type SeasonKeyAction = { readonly kind: 'step'; readonly step: number } | { readonly kind: 'ok' } | { readonly kind: 'cancel' }
+
+function seasonKeyActionOf(key: string, isCommandBar: boolean): SeasonKeyAction | null {
+  const step = isCommandBar ? COMMAND_BAR_STEPS[key] : PLAIN_STEPS[key]
+  if (step !== undefined) return { kind: 'step', step }
+  if (key === 'Enter' || key === ' ' || key === '5') return { kind: 'ok' }
+  return key === 'Escape' || key === 'Backspace' ? { kind: 'cancel' } : null
+}
+
 export function useSeasonCursor({
   count,
   onSelect,
@@ -114,26 +124,18 @@ export function useSeasonCursor({
     if (!isEnabled) return undefined
     const onKeyDown = (event: KeyboardEvent) => {
       const { count: total, cursor: current, onSelect: select, onCancel: cancel, stepCursor: move } = latest.current
-      const step = isCommandBar ? COMMAND_BAR_STEPS[event.key] : PLAIN_STEPS[event.key]
-      if (step !== undefined) {
-        if (total === 0) return
-        event.preventDefault()
-        move(step, total, current)
-        return
-      }
-      // 확인 — 원본 −5 · '5'
-      if (event.key === 'Enter' || event.key === ' ' || event.key === '5') {
-        if (total === 0) return
-        event.preventDefault()
-        select(current)
-        return
-      }
-      // 취소 — 원본 −16
-      if (event.key === 'Escape' || event.key === 'Backspace') {
+      const action = seasonKeyActionOf(event.key, isCommandBar)
+      if (action === null) return
+      if (action.kind === 'cancel') {
         if (cancel === undefined) return
         event.preventDefault()
         cancel()
+        return
       }
+      if (total === 0) return
+      event.preventDefault()
+      if (action.kind === 'step') move(action.step, total, current)
+      else select(current)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

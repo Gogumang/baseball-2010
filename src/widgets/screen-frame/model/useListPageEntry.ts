@@ -35,6 +35,14 @@ export interface ListPageEntry {
  * (0x64022~0x640a2 · 0x647c0~0x6483c · 0x65130~0x651ea). 시작 둘째 인자(애니)는 k 0·1·9 · 6~8 이 [skin+0xe8](틱 0 에
  * 넷째 인자 ≠ 0 이면 1, 0x63bd4 · 0x63be0), k 2·10·11 은 늘 1 이다(0x64834).
  */
+/** 본문 그림 `bodyDraw` 의 격자 열림 — 격자 없는 화면이면 null */
+function gridDrawOf(grid: ListPageGrid | null, bodyDraw: number) {
+  return grid === null ? null : gridOpenDrawAt(grid.shape, bodyDraw, grid.isAnimated)
+}
+
+/** 격자 열림 애니의 끝 깃발 [격자+9] 이 아직 안 섰나 */
+const isGridOpening = (gridDraw: ReturnType<typeof gridDrawOf>): boolean => gridDraw !== null && !gridDraw.isDoneAfter
+
 export function useListPageEntry({
   slides = true,
   grid = null,
@@ -45,8 +53,8 @@ export function useListPageEntry({
   const draws = useUpdateCounter()
   const bodyDraw = slides ? draws - FRAME_SLIDE_BODY_FIRST_DRAW : draws
   const isBodyShown = bodyDraw >= 0
-  const gridDraw = isBodyShown && grid !== null ? gridOpenDrawAt(grid.shape, bodyDraw, grid.isAnimated) : null
-  const locked = !isBodyShown || (gridDraw !== null && !gridDraw.isDoneAfter)
+  const gridDraw = isBodyShown ? gridDrawOf(grid, bodyDraw) : null
+  const locked = !isBodyShown || isGridOpening(gridDraw)
   const keyLock = useRef(locked)
   useEffect(() => {
     keyLock.current = locked
