@@ -84,10 +84,6 @@ export function PitcherTrainingScene({ presentation, look, onFinished }: Pitcher
 
   const entries = animations?.[presentation.animation]
   const step = entries === undefined ? null : animationStepAt(entries, update)
-  const frameKey = step === null ? '' : String(step.frame).padStart(3, '0')
-  const origin = step === null ? undefined : origins?.[frameKey]
-  const windowKey = windowSprite.key
-  const windowOrigin = windowOrigins?.[windowKey]
   const { figure } = presentation
 
   return (
@@ -99,20 +95,9 @@ export function PitcherTrainingScene({ presentation, look, onFinished }: Pitcher
       style={{ position: 'absolute', left: 0, top: 0, width: 240, height: 320 }}
       onClick={() => skipRef.current()}
     >
-      <div className={styles.windowClip}>
-        {windowOrigin !== undefined && (
-          <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
-        )}
-      </div>
+      <div className={styles.windowClip}>{windowImageOf(windowOrigins, windowSprite)}</div>
       <div className={styles.animationClip}>
-        {origin !== undefined && step !== null && (
-          <img
-            className={styles.sprite}
-            style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
-            src={`${folder}/${frameKey}.png`}
-            alt=""
-          />
-        )}
+        {step !== null && animationImageOf(folder, origins, step)}
         {figure !== null && step !== null && (
           <PitcherTrainingFigure
             look={look}
@@ -125,6 +110,30 @@ export function PitcherTrainingScene({ presentation, look, onFinished }: Pitcher
       </div>
       <TrainingGauge filled={update} />
     </div>
+  )
+}
+
+type FrameOrigins = ReturnType<typeof useFrameOrigins>
+
+/** 창 배경 0x7b9ac — 원점을 아직 못 받았으면 안 그린다 */
+function windowImageOf(windowOrigins: FrameOrigins, windowSprite: ReturnType<typeof useModeBackSprite>) {
+  const windowOrigin = windowOrigins?.[windowSprite.key]
+  if (windowOrigin === undefined) return null
+  return <img className={styles.sprite} style={{ left: windowOrigin.x, top: WINDOW_OFFSET_Y + windowOrigin.y }} src={windowSprite.src} alt="" />
+}
+
+/** 연출 애니의 이번 칸 — 원점을 아직 못 받았으면 안 그린다 */
+function animationImageOf(folder: string, origins: FrameOrigins, step: NonNullable<ReturnType<typeof animationStepAt>>) {
+  const frameKey = String(step.frame).padStart(3, '0')
+  const origin = origins?.[frameKey]
+  if (origin === undefined) return null
+  return (
+    <img
+      className={styles.sprite}
+      style={{ left: ANCHOR.x + origin.x + step.dx, top: ANCHOR.y + origin.y + step.dy }}
+      src={`${folder}/${frameKey}.png`}
+      alt=""
+    />
   )
 }
 
