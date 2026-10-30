@@ -1,5 +1,5 @@
 import type { PitchOutcomeDetail } from '@/features/play-at-bat/model/resolvePitch'
-import { timingOf } from '@/entities/batting/model/swingTiming'
+import { humanSwingTimingOf } from '@/entities/batting/model/swingTiming'
 import {
   HIT_BY_PITCH_VIBRATION_MILLISECONDS,
   STRIKEOUT_VIBRATION_MILLISECONDS,
@@ -35,5 +35,5 @@ export function pitchVibrationMillisecondsOf(
     return strikesBefore !== null && strikesBefore >= STRIKEOUT_STRIKES_BEFORE ? STRIKEOUT_VIBRATION_MILLISECONDS : 0
   }
   if (detail.resultCode === null || swingFrame === null) return 0
-  return vibrationMillisecondsOf(timingOf(swingFrame, pitch.frameCount, pitch.isMagicPitch === true))
+  return vibrationMillisecondsOf(humanSwingTimingOf(swingFrame, pitch.frameCount, pitch.isMagicPitch === true))
 }
