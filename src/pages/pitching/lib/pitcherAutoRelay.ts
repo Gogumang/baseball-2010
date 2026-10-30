@@ -17,6 +17,23 @@ function drawnGameOf(after: GameState, before: GameState): GameState {
   return { ...after, inning: before.inning, half: before.half, outs: 3 }
 }
 
+type RelayAtBat = PitcherAutoRelayTick['atBat']
+
+/** DUE UP 첫 칸 — 타석 틱이면 방금 친 타자, 교체 틱은 공격 팀 팀[+0x32] */
+function currentOrderIndexOf(tick: PitcherAutoRelayTick, offenseOurs: boolean): number {
+  if (tick.atBat !== null) return tick.atBat.orderIndex
+  return offenseOurs ? tick.progress.game.battingOrderIndex : tick.progress.opponentOrderIndex
+}
+
+/** 중계 글 0xc25e4 — 친 타자 이름 + 결과 낱말. 교체 틱은 글이 없다 */
+function relayLineOfTick(progress: PitcherGameProgress, atBat: RelayAtBat): string | null {
+  if (atBat === null) return null
+  return relayLineOf(
+    batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '',
+    relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true),
+  )
+}
+
 /**
  * **나리 투수편 0x21 중계 칸** (그리기 0x4258c 의 모드 3 갈래 — 미션과 같은 몫: 점수판 · 두 팀 판 · 공격팀 띠 · 중계 글).
  * - 중계 글 0xc25e4: 타석 틱이면 친 타자 이름 0xb62c0 + 결과 낱말(`relayCodeOf`), 교체 틱은 글이 없다(c2630 sim+0xc4 = 0).
@@ -32,14 +49,8 @@ export function pitcherAutoRelayStepsOf(ticks: readonly PitcherAutoRelayTick[], 
     const ourHalf = game.playerSide === PLAYER_SIDE_FIRST_BAT ? '초' : '말'
     const offenseOurs = game.half === ourHalf
     const atBat = tick.atBat
-    const currentOrder = lineupSlotOf(atBat !== null ? atBat.orderIndex : offenseOurs ? progress.game.battingOrderIndex : progress.opponentOrderIndex)
-    const line =
-      atBat === null
-        ? null
-        : relayLineOf(
-            batterNameAt(progress, atBat.ours, atBat.orderIndex) ?? '',
-            relayCodeOf(atBat.outcome, atBat.fouled, atBat.swingingStrikeOutLost === true),
-          )
+    const currentOrder = lineupSlotOf(currentOrderIndexOf(tick, offenseOurs))
+    const line = relayLineOfTick(progress, atBat)
     return {
       inning: slots.inning,
       offenseSide: slots.offenseSide,

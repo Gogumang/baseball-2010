@@ -59,30 +59,11 @@ export function pitcherMatchupCardsOf(
   // 기록 게이트 0xa56dc 모드 3 갈래 0xa571c — 국가대항전(+0x12c) · 포스트시즌(+0xb4)이면 거짓 (진행기 `countsMyPitcherRecord` 와 같은 조건)
   const countsThisGame = !options.isPostseason && options.isNationalCup !== true
   const batter = opponentBatterOf(progress)
-  const batterHand = batter.aceIndex !== undefined ? batterHandOf(0, batter.aceIndex) : batterHandOf(batter.profile ?? 0)
+  const batterHand = opponentBatterHandOf(batter)
   const slot = lineupSlotOf(progress.opponentOrderIndex)
   const results = progress.opponentLineup.records[slot]?.results ?? []
-
-  const myLine =
-    records === undefined
-      ? null
-      : countsThisGame
-        ? sumPitcherLines(records.mySeason, {
-            outs: progress.record.outsRecorded,
-            runsAllowed: progress.runsAllowedByMe,
-            strikeouts: progress.record.strikeouts,
-          })
-        : records.mySeason
-  // 마타자는 저장 레코드(XlsACE_BAT 행)를 통째 베낀 칸 — 게이트 0xa571c 가 마선수(0xb633d)를 늘 걸러 표의 줄 그대로다
-  const aceBatter = batter.aceIndex === undefined ? undefined : ACE_BATTERS[batter.aceIndex]
-  const batterBase =
-    aceBatter !== undefined
-      ? batterLineOfRecord(aceBatter.recordLine)
-      : records === undefined || batter.rosterSlot === null
-        ? null
-        : leagueBatterLineOf(records.stats, leagueBatterIdOf(options.opponentTeamId, batter.rosterSlot))
-  const batterLine =
-    batterBase === null ? null : countsThisGame && aceBatter === undefined ? sumBatterLines(batterBase, gameLineFromResults(results)) : batterBase
+  const myLine = myCardLineOf(progress, records, countsThisGame)
+  const batterLine = batterCardLineOf(batter, records, options.opponentTeamId, countsThisGame, results)
 
   return {
     batterHand,
@@ -94,15 +75,59 @@ export function pitcherMatchupCardsOf(
       stamina: staminaGaugeOf(myMoundStaminaOf(progress)),
       ...(myLine === null ? {} : pitcherCardStatsOf(myLine)),
     },
-    batter: {
-      isComputer: true,
-      battingOrder: slot,
-      recentResults: results,
-      ...(batter.name === undefined ? {} : { name: batter.name }),
-      ...(batter.position === undefined ? {} : { position: batter.position }),
-      ...(batterLine === null ? {} : batterCardStatsOf(batterLine)),
-    },
+    batter: opponentBatterCardOf(batter, slot, results, batterLine),
   }
+}
+
+/** 상대(COM) 타자 판 — 타순 · 오늘 타석 기록 · 이름 · 수비 · 시즌 줄 */
+function opponentBatterCardOf(
+  batter: OpponentBatter,
+  slot: number,
+  results: readonly number[],
+  batterLine: MatchupBatterLine | null,
+): MatchupBatterCard {
+  return {
+    isComputer: true,
+    battingOrder: slot,
+    recentResults: results,
+    ...(batter.name === undefined ? {} : { name: batter.name }),
+    ...(batter.position === undefined ? {} : { position: batter.position }),
+    ...(batterLine === null ? {} : batterCardStatsOf(batterLine)),
+  }
+}
+
+type OpponentBatter = ReturnType<typeof opponentBatterOf>
+
+/** 상대 타자 손 0xb63c0 — 마타자는 표 0xd88b0, 아니면 붙박이 표 행 */
+function opponentBatterHandOf(batter: OpponentBatter): number {
+  return batter.aceIndex !== undefined ? batterHandOf(0, batter.aceIndex) : batterHandOf(batter.profile ?? 0)
+}
+
+/** 내 투수 시즌 줄 — 기록 게이트를 지나면 이 경기 내 줄을 더한다. 기록이 없으면 비운다 */
+function myCardLineOf(progress: PitcherGameProgress, records: PitcherMatchupRecords | undefined, countsThisGame: boolean): MatchupPitcherLine | null {
+  if (records === undefined) return null
+  if (!countsThisGame) return records.mySeason
+  return sumPitcherLines(records.mySeason, {
+    outs: progress.record.outsRecorded,
+    runsAllowed: progress.runsAllowedByMe,
+    strikeouts: progress.record.strikeouts,
+  })
+}
+
+/** 상대 타자 시즌 줄 — 리그 기록표 줄 + (게이트를 지나면) 이 경기 줄. 마타자는 표의 줄 그대로 */
+function batterCardLineOf(
+  batter: OpponentBatter,
+  records: PitcherMatchupRecords | undefined,
+  opponentTeamId: number,
+  countsThisGame: boolean,
+  results: readonly number[],
+): MatchupBatterLine | null {
+  // 마타자는 저장 레코드(XlsACE_BAT 행)를 통째 베낀 칸 — 게이트 0xa571c 가 마선수(0xb633d)를 늘 걸러 표의 줄 그대로다
+  const aceBatter = batter.aceIndex === undefined ? undefined : ACE_BATTERS[batter.aceIndex]
+  if (aceBatter !== undefined) return batterLineOfRecord(aceBatter.recordLine)
+  if (records === undefined || batter.rosterSlot === null) return null
+  const base = leagueBatterLineOf(records.stats, leagueBatterIdOf(opponentTeamId, batter.rosterSlot))
+  return countsThisGame ? sumBatterLines(base, gameLineFromResults(results)) : base
 }
 
 /**
