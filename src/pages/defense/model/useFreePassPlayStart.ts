@@ -27,24 +27,39 @@ export function useFreePassPlayStart(
   isFrozen = false,
   isResultWindowShown = false,
 ): boolean {
-  // 도루 출발 중 볼넷 · 사구의 판(3e0e4 → 3e114 곧장 0x17, A-24)은 0x12 대기를 안 탄다 — 곧장 세운다
-  const isWalk = isWalkPlayResult(play) && !opensWalkPlayAtArrival(play)
+  const isWalk = isWaitingWalkPlay(play)
   /** 대기를 다 채운(또는 안 기다리는) 판 */
   const [readyPlay, setReadyPlay] = useState<DefensePlayResult | null>(null)
   const [walkWait] = useState(createWalkPlayWait)
-  const waiting = walkWait.noteDraw(play, isWalk && play !== readyPlay, benchClearingPending)
-  const due = isWalk && waiting !== null && waiting.play === play && waiting.elapsed >= WALK_PLAY_WAIT_TICKS
+  const isCounting = isWalk && play !== readyPlay
+  const waiting = walkWait.noteDraw(play, isCounting, benchClearingPending)
+  const due = isWalk && isWaitFilled(waiting, play)
 
   useSceneTick(
     () => {
       if (walkWait.tick(play)) setReadyPlay(play)
     },
-    isWalk && play !== readyPlay && !due && !isFrozen,
+    isCounting && !due && !isFrozen,
   )
 
+  return canStartPlay(isWalk, isResultWindowShown, play === readyPlay || due)
+}
+
+/** 밀어내기 판이 아니면 늘 세운다. 결과 창(0x1d)이 떠 있는 동안은 대기를 다 채웠어도 세우지 않는다 */
+function canStartPlay(isWalk: boolean, isResultWindowShown: boolean, isWaitDone: boolean): boolean {
   if (!isWalk) return true
   if (isResultWindowShown) return false
-  return play === readyPlay || due
+  return isWaitDone
+}
+
+/** 0x12 대기를 타는 밀어내기 판 — 도루 출발 중 볼넷 · 사구의 판(3e0e4 → 3e114 곧장 0x17, A-24)은 안 탄다(곧장 세운다) */
+function isWaitingWalkPlay(play: DefensePlayResult | null): boolean {
+  return isWalkPlayResult(play) && !opensWalkPlayAtArrival(play)
+}
+
+/** 이 판의 대기를 다 셌나 */
+function isWaitFilled(waiting: WalkWaiting | null, play: DefensePlayResult | null): boolean {
+  return waiting !== null && waiting.play === play && waiting.elapsed >= WALK_PLAY_WAIT_TICKS
 }
 
 interface WalkWaiting {

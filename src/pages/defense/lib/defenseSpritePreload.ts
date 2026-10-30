@@ -41,11 +41,14 @@ export function fielderRawFramesOf(): number[] {
 export function runnerRawFramesOf(): number[] {
   const frames = new Set<number>()
   for (const action of Object.values(RUNNER_ACTION)) {
-    for (let tick = 0; tick < ACTION_TICK_SPAN; tick += 1) {
-      for (const base of BASES) for (const isAdvancing of [true, false]) frames.add(runnerFrameOf(action, tick, base, isAdvancing))
-    }
+    for (let tick = 0; tick < ACTION_TICK_SPAN; tick += 1) addRunnerFramesOfTick(frames, action, tick)
   }
   return [...frames].sort((a, b) => a - b)
+}
+
+/** 한 동작 · 한 틱에서 베이스 넷 · 나아가기/돌아가기가 낼 수 있는 칸 */
+function addRunnerFramesOfTick(frames: Set<number>, action: number, tick: number) {
+  for (const base of BASES) for (const isAdvancing of [true, false]) frames.add(runnerFrameOf(action, tick, base, isAdvancing))
 }
 
 /** 공 그림 — 땅(004)부터 가장 큰 칸까지 (수비 화면의 공은 늘 보통 공이다) */
