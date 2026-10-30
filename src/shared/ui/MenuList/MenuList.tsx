@@ -33,6 +33,18 @@ interface MenuListProps {
   readonly selectsByDigit?: boolean
 }
 
+/** ↓ 한 칸 아래 · ↑ 한 칸 위, 그 밖은 0 */
+function cursorStepOf(key: string): number {
+  if (key === 'ArrowDown') return 1
+  return key === 'ArrowUp' ? -1 : 0
+}
+
+/** 숫자키 → 칸 — '1'~'9' 는 칸 0~8, '0' 은 칸 9 (0x6c100~0x6c14e). 숫자키가 아니면 null */
+function digitIndexOf(key: string): number | null {
+  if (!/^[0-9]$/.test(key)) return null
+  return key === '0' ? 9 : Number(key) - 1
+}
+
 /**
  * 원작의 커서 메뉴.
  * 키보드(↑↓ + Enter)와 터치(탭)를 같은 동작으로 다룬다 — 데스크탑과 모바일에서
@@ -74,35 +86,32 @@ export function MenuList({ items, onSelect, initialIndex = 0, onCursorChange, se
   }, [selectedIndex])
 
   useEffect(() => {
+    const selectItem = (item: MenuItem | undefined) => {
+      if (item !== undefined && item.isDisabled !== true) onSelectRef.current(item.id)
+    }
+    /** 숫자키 꼴 2 — 칸이 있으면 커서를 그 칸으로 옮기고 곧바로 OK */
+    const selectByDigit = (event: KeyboardEvent, currentItems: readonly MenuItem[], index: number) => {
+      if (index >= currentItems.length) return
+      event.preventDefault()
+      selectedIndexRef.current = index
+      setSelectedIndex(index)
+      selectItem(currentItems[index])
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       const currentItems = itemsRef.current
       if (currentItems.length === 0) return
 
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const step = cursorStepOf(event.key)
+      if (step !== 0) {
         event.preventDefault()
-        const step = event.key === 'ArrowDown' ? 1 : -1
         setSelectedIndex((previous) => (previous + step + currentItems.length) % currentItems.length)
         return
       }
-
-      if (selectsByDigitRef.current && /^[0-9]$/.test(event.key)) {
-        const index = event.key === '0' ? 9 : Number(event.key) - 1
-        if (index >= currentItems.length) return
-        event.preventDefault()
-        selectedIndexRef.current = index
-        setSelectedIndex(index)
-        const selected = currentItems[index]
-        if (selected !== undefined && selected.isDisabled !== true) onSelectRef.current(selected.id)
-        return
-      }
-
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        const selected = currentItems[selectedIndexRef.current]
-        if (selected !== undefined && selected.isDisabled !== true) {
-          onSelectRef.current(selected.id)
-        }
-      }
+      const digitIndex = selectsByDigitRef.current ? digitIndexOf(event.key) : null
+      if (digitIndex !== null) return selectByDigit(event, currentItems, digitIndex)
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      selectItem(currentItems[selectedIndexRef.current])
     }
 
     window.addEventListener('keydown', onKeyDown)

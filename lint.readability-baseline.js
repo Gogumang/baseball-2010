@@ -197,8 +197,6 @@ export const readabilityBaseline = [
   'src/pages/story/ui/EventDialogueBox.tsx',
   'src/pages/team-game/lib/teamAutoRelay.ts',
   'src/pages/team-game/ui/TeamRelayFigures.tsx',
-  'src/shared/ui/IconMenu/IconMenu.tsx',
-  'src/shared/ui/MenuList/MenuList.tsx',
   'src/widgets/batting-stage/lib/acePitcherEffect.ts',
   'src/widgets/batting-stage/lib/baseRunners.ts',
   'src/widgets/batting-stage/lib/batterOverlayMarks.ts',
