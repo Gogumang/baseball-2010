@@ -62,5 +62,4 @@ export const maxLinesBaseline = [
   'src/shared/config/original/sounds.ts',
   'src/shared/config/outingPlaces.ts',
   'src/shared/config/spritePreloadScenes.ts',
-  'src/shared/ui/MessageBox/MessageBox.tsx',
 ]

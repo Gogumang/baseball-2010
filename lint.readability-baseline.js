@@ -253,7 +253,6 @@ export const readabilityBaseline = [
   'src/shared/lib/sprite/spriteCache.ts',
   'src/shared/ui/IconMenu/IconMenu.tsx',
   'src/shared/ui/MenuList/MenuList.tsx',
-  'src/shared/ui/MessageBox/MessageBox.tsx',
   'src/widgets/batting-stage/lib/acePitcherEffect.ts',
   'src/widgets/batting-stage/lib/baseRunners.ts',
   'src/widgets/batting-stage/lib/batterOverlayMarks.ts',
