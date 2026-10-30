@@ -109,11 +109,20 @@ export function missionResultHeldOf(heldBefore: number, earned: number): number 
 export type MissionResultKeyAction = '뒤집기' | '확인' | '취소' | null
 
 export function missionResultKeyActionOf(key: string): MissionResultKeyAction {
-  if (key === 'ArrowLeft' || key === 'ArrowRight' || key === '4' || key === '6') return '뒤집기'
-  if (key === 'Enter' || key === ' ' || key === '5') return '확인'
-  if (key === 'Escape' || key === 'Backspace') return '취소'
-  return null
+  return RESULT_KEY_ACTIONS.get(key) ?? null
 }
+
+const RESULT_KEY_ACTIONS: ReadonlyMap<string, Exclude<MissionResultKeyAction, null>> = new Map<string, Exclude<MissionResultKeyAction, null>>([
+  ['ArrowLeft', '뒤집기'],
+  ['ArrowRight', '뒤집기'],
+  ['4', '뒤집기'],
+  ['6', '뒤집기'],
+  ['Enter', '확인'],
+  [' ', '확인'],
+  ['5', '확인'],
+  ['Escape', '취소'],
+  ['Backspace', '취소'],
+])
 
 /** 판에서 나가는 곳 — 0x140006c = 3(같은 미션 다시) · 1(미션 목록) · 대결 끝 길 0x4090e */
 export type MissionResultExit = '다시' | '목록' | '대결끝'
@@ -130,13 +139,16 @@ export function missionResultStepOf(
 ): { readonly answer: boolean; readonly exit: MissionResultExit | null } {
   const isAce = aceFlags.flag11f || aceFlags.flag176
   if (action === '뒤집기') return { answer: isAce ? answer : !answer, exit: null }
-  if (action === '확인') {
-    const isAceExit = isBugFixed('B-106') ? isAce : aceFlags.flag11f && aceFlags.flag176
-    if (isAceExit) return { answer, exit: '대결끝' }
-    return { answer, exit: answer ? '다시' : '목록' }
-  }
+  if (action === '확인') return { answer, exit: confirmExitOf(answer, isAce, aceFlags) }
   if (action === '취소') return { answer, exit: isAce ? '대결끝' : '목록' }
   return { answer, exit: null }
+}
+
+/** OK 로 나가는 곳 — 원본은 대결 칸이 둘 다 서야 대결 끝 길(B-106), 고친 길은 하나만 서도 */
+function confirmExitOf(answer: boolean, isAce: boolean, aceFlags: { readonly flag11f: boolean; readonly flag176: boolean }): MissionResultExit {
+  const isAceExit = isBugFixed('B-106') ? isAce : aceFlags.flag11f && aceFlags.flag176
+  if (isAceExit) return '대결끝'
+  return answer ? '다시' : '목록'
 }
 
 /**

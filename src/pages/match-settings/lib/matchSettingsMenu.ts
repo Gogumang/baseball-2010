@@ -162,49 +162,66 @@ function valueOnKindChosen(state: MatchSettingsWindowState): number {
 
 /** 단계 1 — 찬스·이닝 값 고르기 */
 function pressValueKey(state: MatchSettingsWindowState, key: MatchSettingsKey): MatchSettingsAction {
-  const { kind } = state.settings
-  if (kind === MATCH_SETTING_KIND.찬스 && (key === '왼쪽' || key === '오른쪽')) {
-    // **원본 그대로**: 찬스는 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다 (R4 4절).
-    //    칸이 둘이라 감아 도는 좌·우 이동과 결과가 같다 — 버그가 아니다(B-65 정정 r279).
-    const flipped = state.settings.value === CHANCE_VALUE.공격득점권 ? CHANCE_VALUE.수비삼루 : CHANCE_VALUE.공격득점권
-    return 유지({ ...state, settings: { ...state.settings, value: flipped } })
-  }
-  if (kind === MATCH_SETTING_KIND.이닝 && (key === '위' || key === '아래')) {
-    const step = key === '아래' ? 1 : -1
-    const next = (state.settings.value + step + INNING_VALUE_COUNT) % INNING_VALUE_COUNT
-    return 유지({ ...state, settings: { ...state.settings, value: next } })
-  }
+  const value = adjustedValueOf(state.settings, key)
+  if (value !== null) return 유지({ ...state, settings: { ...state.settings, value } })
   if (key === '확인') return 유지({ ...state, popup: '확인' })
   if (key === '취소') return 유지({ ...state, stage: SETTINGS_STAGE.종류 })
   return 유지(state)
 }
 
+const isVerticalKey = (key: MatchSettingsKey) => key === '위' || key === '아래'
+const isHorizontalKey = (key: MatchSettingsKey) => key === '왼쪽' || key === '오른쪽'
+
+/** 값 칸을 바꾸는 키면 새 값 — 찬스는 좌·우, 이닝은 위·아래. 아니면 null */
+function adjustedValueOf(settings: MatchSettingsWindowState['settings'], key: MatchSettingsKey): number | null {
+  if (settings.kind === MATCH_SETTING_KIND.찬스 && isHorizontalKey(key)) return flippedChanceValueOf(settings.value)
+  if (settings.kind === MATCH_SETTING_KIND.이닝 && isVerticalKey(key)) return steppedInningValueOf(settings.value, key)
+  return null
+}
+
+/**
+ * **원본 그대로**: 찬스는 좌·우 어느 쪽을 눌러도 값이 0 ↔ 1 로 뒤집힌다 (R4 4절).
+ * 칸이 둘이라 감아 도는 좌·우 이동과 결과가 같다 — 버그가 아니다(B-65 정정 r279).
+ */
+function flippedChanceValueOf(value: number): number {
+  return value === CHANCE_VALUE.공격득점권 ? CHANCE_VALUE.수비삼루 : CHANCE_VALUE.공격득점권
+}
+
+/** 이닝 값 — 위 · 아래로 감아 돈다 */
+function steppedInningValueOf(value: number, key: MatchSettingsKey): number {
+  const step = key === '아래' ? 1 : -1
+  return (value + step + INNING_VALUE_COUNT) % INNING_VALUE_COUNT
+}
+
 /** 단계 1 — 상세 (줄 0~3 항목 + 줄 4 확인) */
 function pressDetailKey(state: MatchSettingsWindowState, key: MatchSettingsKey): MatchSettingsAction {
-  if (key === '위' || key === '아래') {
-    const step = key === '아래' ? 1 : -1
-    // 줄을 바꾸면 칸은 0 으로 돌아간다 (R4 4절)
-    return 유지({
-      ...state,
-      detailRow: (state.detailRow + step + DETAIL_ROW_COUNT) % DETAIL_ROW_COUNT,
-      detailCell: 0,
-    })
-  }
-  if (key === '왼쪽' || key === '오른쪽') {
-    const count = detailCellCountOf(state.detailRow)
-    if (count === 0) return 유지(state)
-    const step = key === '오른쪽' ? 1 : -1
-    return 유지({ ...state, detailCell: (state.detailCell + step + count) % count })
-  }
-  if (key === '확인') {
-    if (state.detailRow !== DETAIL_ROW.확인) {
-      return 유지({ ...state, settings: toggleDetailBit(state.settings, state.detailRow, state.detailCell) })
-    }
-    // 줄 4(확인): 네 비트 묶음이 모두 0 이면 StrMAINMENU[126], 아니면 [125] 확인창
-    return 유지({ ...state, popup: hasAnyDetailSelection(state.settings) ? '확인' : '상세없음' })
-  }
+  if (isVerticalKey(key)) return 유지(detailRowMovedOf(state, key))
+  if (isHorizontalKey(key)) return 유지(detailCellMovedOf(state, key))
+  if (key === '확인') return 유지(detailConfirmedOf(state))
   if (key === '취소') return 유지({ ...state, stage: SETTINGS_STAGE.종류 })
   return 유지(state)
+}
+
+/** 줄을 바꾸면 칸은 0 으로 돌아간다 (R4 4절) */
+function detailRowMovedOf(state: MatchSettingsWindowState, key: MatchSettingsKey): MatchSettingsWindowState {
+  const step = key === '아래' ? 1 : -1
+  return { ...state, detailRow: (state.detailRow + step + DETAIL_ROW_COUNT) % DETAIL_ROW_COUNT, detailCell: 0 }
+}
+
+/** 줄 안에서 칸 옮기기 — 칸이 없는 줄(확인)은 그대로 */
+function detailCellMovedOf(state: MatchSettingsWindowState, key: MatchSettingsKey): MatchSettingsWindowState {
+  const count = detailCellCountOf(state.detailRow)
+  if (count === 0) return state
+  const step = key === '오른쪽' ? 1 : -1
+  return { ...state, detailCell: (state.detailCell + step + count) % count }
+}
+
+/** 항목 줄이면 그 칸 비트를 뒤집고, 줄 4(확인)면 네 비트 묶음이 모두 0 일 때 StrMAINMENU[126], 아니면 [125] 확인창 */
+function detailConfirmedOf(state: MatchSettingsWindowState): MatchSettingsWindowState {
+  if (state.detailRow !== DETAIL_ROW.확인) {
+    return { ...state, settings: toggleDetailBit(state.settings, state.detailRow, state.detailCell) }
+  }
+  return { ...state, popup: hasAnyDetailSelection(state.settings) ? '확인' : '상세없음' }
 }
 
 /**
